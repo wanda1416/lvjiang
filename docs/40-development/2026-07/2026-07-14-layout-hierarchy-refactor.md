@@ -226,6 +226,24 @@ config/
 - **阈值**：`SNAP_PIXELS = 6` 像素，x/y 分别用 `_display_rect` 宽高换算为归一化值，保证缩放后阈值恒为屏幕 6 像素。
 - **视觉反馈**：吸附命中时画品红色虚线参考线，横跨整个图片显示区域，松开鼠标后清除。
 
+### 15. 区域编辑器模块拆分
+
+**现象**：`region_editor_dialog.py` 单文件超过 1200 行，难以维护。
+
+**方案**：拆分为 `lvjiang/ui/region_editor/` 子包：
+
+```
+region_editor/
+├── __init__.py        # 导出 RegionEditorDialog, RegionCanvas, SceneTab
+├── canvas.py          # RegionCanvas 画布组件（~745 行）
+├── scene_tab.py       # SceneTab 场景 Tab（~100 行）
+└── dialog.py          # RegionEditorDialog 主对话框（~408 行）
+```
+
+- 共享常量（`REGION_COLORS`, `HANDLE_SIZE`, `SNAP_PIXELS`）和枚举（`DragMode`, `HandlePos`）移入 `canvas.py`
+- `main_window.py` 导入路径从 `.region_editor_dialog` 改为 `.region_editor`
+- 删除旧文件 `region_editor_dialog.py`
+
 ---
 
 ## 教训

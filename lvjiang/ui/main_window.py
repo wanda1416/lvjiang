@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
 
     def _open_region_editor(self):
         """打开区域编辑器（使用当前截屏图片）"""
-        from .region_editor_dialog import RegionEditorDialog
+        from .region_editor import RegionEditorDialog
         image = self._get_last_capture()
         if image is None:
             logger.warning("请先定位窗口并截屏")

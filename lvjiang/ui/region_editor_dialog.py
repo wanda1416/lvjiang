@@ -80,6 +80,7 @@ class RegionCanvas(QWidget):
         # 区域列表（归一化坐标 0.0~1.0）
         self._regions: list[Region] = []
         self._selected_idx: int = -1  # 当前选中区域索引
+        self._field_selected: bool = False  # 是否由右侧字段列表选中（单区域编辑模式）
 
         # 交互状态
         self._drag_mode = DragMode.NONE
@@ -252,13 +253,11 @@ class RegionCanvas(QWidget):
             return
         pos = event.position()
 
-        # 左键：只能创建新区域，或操作从右侧面板选中的区域
-        if self._selected_idx >= 0:
-            # 有选中区域时，检查是否点击了该区域的手柄或内部
+        if self._field_selected and self._selected_idx >= 0:
+            # 右侧字段列表选中：单区域编辑模式
             r = self._regions[self._selected_idx]
             handle = self._hit_handle(r, pos)
             if handle is not None:
-                # 开始缩放选中区域
                 self._drag_mode = DragMode.RESIZING
                 self._drag_handle = handle
                 self._drag_start = pos
@@ -268,13 +267,34 @@ class RegionCanvas(QWidget):
                 return
             rect = self._region_rect_widget(r)
             if rect.contains(pos):
-                # 开始移动选中区域
                 self._drag_mode = DragMode.MOVING
                 self._drag_start = pos
                 self._drag_orig = Region(**r.to_dict())
                 self._notify_changed()
                 self.update()
                 return
+            # 点击空白：退出单区域模式，回到全局模式
+            self._field_selected = False
+            self._selected_idx = -1
+            self.update()
+            # 继续往下走，进入全局模式逻辑
+
+        # 全局调整模式：可以选中/移动/缩放已有区域，或创建新区域
+        idx, handle = self._hit_test(pos)
+        if idx >= 0:
+            # 点击了已有区域
+            self._selected_idx = idx
+            r = self._regions[idx]
+            if handle is not None:
+                self._drag_mode = DragMode.RESIZING
+                self._drag_handle = handle
+            else:
+                self._drag_mode = DragMode.MOVING
+            self._drag_start = pos
+            self._drag_orig = Region(**r.to_dict())
+            self._notify_changed()
+            self.update()
+            return
 
         # 空白处：创建新区域
         nx, ny = self._widget_to_norm(pos)
@@ -348,6 +368,7 @@ class RegionCanvas(QWidget):
                 self._prompt_field_selection(len(self._regions) - 1)
         elif self._drag_mode in (DragMode.MOVING, DragMode.RESIZING):
             self._notify_changed()
+            # 全局模式下移动/缩放后保留选中，以便用户再次点击获取手柄进行拉伸
 
         self._drag_mode = DragMode.NONE
         self._drag_handle = None
@@ -379,8 +400,9 @@ class RegionCanvas(QWidget):
         r.h_ratio = min(1.0, y2) - r.y_ratio
 
     def _update_cursor(self, pos: QPointF):
-        """根据鼠标位置更新光标（仅对选中区域响应）"""
-        if self._selected_idx >= 0:
+        """根据鼠标位置更新光标"""
+        if self._field_selected and self._selected_idx >= 0:
+            # 单区域编辑模式：只对选中区域响应
             r = self._regions[self._selected_idx]
             handle = self._hit_handle(r, pos)
             if handle is not None:
@@ -400,7 +422,28 @@ class RegionCanvas(QWidget):
             if rect.contains(pos):
                 self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
                 return
-        # 默认十字光标（创建模式）
+            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            return
+
+        # 全局调整模式：检测所有区域
+        idx, handle = self._hit_test(pos)
+        if idx >= 0:
+            if handle is not None:
+                cursors = {
+                    HandlePos.TOP_LEFT:     Qt.CursorShape.SizeFDiagCursor,
+                    HandlePos.BOTTOM_RIGHT: Qt.CursorShape.SizeFDiagCursor,
+                    HandlePos.TOP_RIGHT:    Qt.CursorShape.SizeBDiagCursor,
+                    HandlePos.BOTTOM_LEFT:  Qt.CursorShape.SizeBDiagCursor,
+                    HandlePos.TOP:          Qt.CursorShape.SizeVerCursor,
+                    HandlePos.BOTTOM:       Qt.CursorShape.SizeVerCursor,
+                    HandlePos.LEFT:         Qt.CursorShape.SizeHorCursor,
+                    HandlePos.RIGHT:        Qt.CursorShape.SizeHorCursor,
+                }
+                self.setCursor(QCursor(cursors[handle]))
+                return
+            self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
+            return
+        # 空白处：十字光标（创建模式）
         self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
 
     def _prompt_field_selection(self, region_idx: int):
@@ -414,6 +457,7 @@ class RegionCanvas(QWidget):
             logger.warning("所有字段已分配，请先删除已有区域")
             self._regions.pop(region_idx)
             self._selected_idx = -1
+            self._field_selected = False
             self.update()
             return
 
@@ -435,11 +479,13 @@ class RegionCanvas(QWidget):
             key, name = available[idx]
             self._regions[region_idx].key = key
             self._regions[region_idx].name = name
-            self._selected_idx = -1  # 创建完成后取消选中，恢复全部显示
+            self._selected_idx = -1
+            self._field_selected = False  # 创建完成后回到全局模式
         else:
             # 取消则删除该区域
             self._regions.pop(region_idx)
             self._selected_idx = -1
+            self._field_selected = False
 
         self._notify_changed()
         self.update()
@@ -450,6 +496,7 @@ class RegionCanvas(QWidget):
         """设置区域列表（从预设加载）"""
         self._regions = [Region(**r.to_dict()) for r in regions]
         self._selected_idx = -1
+        self._field_selected = False
         self.update()
 
     def get_regions(self) -> list[Region]:
@@ -457,9 +504,10 @@ class RegionCanvas(QWidget):
         return [Region(**r.to_dict()) for r in self._regions if r.key]
 
     def select_region(self, idx: int):
-        """从外部选中某区域"""
+        """从外部（右侧字段列表）选中某区域，进入单区域编辑模式"""
         if 0 <= idx < len(self._regions):
             self._selected_idx = idx
+            self._field_selected = True
             self.update()
 
     def delete_selected(self):
@@ -467,6 +515,7 @@ class RegionCanvas(QWidget):
         if self._selected_idx >= 0:
             self._regions.pop(self._selected_idx)
             self._selected_idx = -1
+            self._field_selected = False
             self._notify_changed()
             self.update()
 
@@ -475,6 +524,12 @@ class RegionCanvas(QWidget):
             self.delete_selected()
         else:
             super().keyPressEvent(event)
+
+    def clear_field_selection(self):
+        """清除字段选择，回到全局调整模式"""
+        self._selected_idx = -1
+        self._field_selected = False
+        self.update()
 
     # ─── 绘制 ────────────────────────────────────────────
 
@@ -492,15 +547,18 @@ class RegionCanvas(QWidget):
                 self._pixmap,
             )
 
-        # 绘制区域：选中时只显示选中区域，否则显示全部
-        if self._selected_idx >= 0 and self._selected_idx < len(self._regions):
+        # 绘制区域
+        if self._field_selected and self._selected_idx >= 0 and self._selected_idx < len(self._regions):
+            # 单区域编辑模式：只显示选中区域
             r = self._regions[self._selected_idx]
             color = REGION_COLORS[self._selected_idx % len(REGION_COLORS)]
             self._draw_region(painter, r, color, True)
         else:
+            # 全局调整模式：显示所有区域，选中的高亮
             for i, r in enumerate(self._regions):
                 color = REGION_COLORS[i % len(REGION_COLORS)]
-                self._draw_region(painter, r, color, False)
+                is_sel = (i == self._selected_idx and not self._field_selected)
+                self._draw_region(painter, r, color, is_sel)
 
         painter.end()
 
@@ -641,6 +699,8 @@ class SceneTab(QWidget):
     def _on_list_selection(self, row: int):
         """列表选中项变化时同步到画布"""
         if row < 0:
+            # 取消选中：回到全局调整模式
+            self._canvas.clear_field_selection()
             return
         fields = get_scene_fields(self._scene_key)
         if row >= len(fields):
@@ -695,13 +755,13 @@ class RegionEditorDialog(QDialog):
         self._btn_activate.clicked.connect(self._on_activate_layout)
         top_bar.addWidget(self._btn_activate)
 
-        self._btn_new = QPushButton("新建")
-        self._btn_new.clicked.connect(self._on_new_layout)
-        top_bar.addWidget(self._btn_new)
-
         self._btn_save = QPushButton("保存")
         self._btn_save.clicked.connect(self._on_save_layout)
         top_bar.addWidget(self._btn_save)
+
+        self._btn_new = QPushButton("新建")
+        self._btn_new.clicked.connect(self._on_new_layout)
+        top_bar.addWidget(self._btn_new)
 
         self._btn_save_as = QPushButton("另存为")
         self._btn_save_as.clicked.connect(self._on_save_as_layout)
@@ -825,18 +885,26 @@ class RegionEditorDialog(QDialog):
         self._status_bar.showMessage(f"已激活布局「{name}」")
 
     def _on_new_layout(self):
-        """新建空布局（不自动激活）"""
+        """新建空布局并切换到画布（不自动激活）"""
         name, ok = QInputDialog.getText(self, "新建布局", "请输入布局名称：")
         if not ok or not name:
             return
         name = name.strip()
         if not name:
             return
+        # 保存当前激活布局，新建后恢复
+        prev_active = self._manager.get_active_layout_name()
         layout = self._manager.new_layout(name)
-        # new_layout 会自动设为 active，我们保持原来的 active 不变
-        # 重新读取 active 并恢复
+        # new_layout 会自动设为 active，恢复原来的
+        if prev_active and prev_active != name:
+            self._manager.set_active_layout(prev_active)
         self._current_layout = layout
         self._apply_layout_to_tabs()
+        # 下拉框定位到新布局
+        self._refresh_combo()
+        idx = self._layout_combo.findText(name)
+        if idx >= 0:
+            self._layout_combo.setCurrentIndex(idx)
         self._update_ui_state()
         self._status_bar.showMessage(f"已新建布局「{name}」")
 
@@ -855,7 +923,7 @@ class RegionEditorDialog(QDialog):
         logger.info(f"布局已保存: {name}, {total} 个区域")
 
     def _on_save_as_layout(self):
-        """另存为：输入新名称，若已存在则提示确认覆盖（不自动激活）"""
+        """另存为：输入新名称，若已存在则提示确认覆盖（保存后加载新布局）"""
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
@@ -885,23 +953,24 @@ class RegionEditorDialog(QDialog):
         temp.name = name
         self._manager.save_layout(temp)
         self._current_layout = temp
+        # 下拉框定位到新布局
+        self._refresh_combo()
+        idx = self._layout_combo.findText(name)
+        if idx >= 0:
+            self._layout_combo.setCurrentIndex(idx)
         self._update_ui_state()
         total = sum(len(r) for r in temp.scenes.values())
         self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
         logger.info(f"布局已另存为: {name}, {total} 个区域")
 
     def _on_delete_layout(self):
-        """删除布局（激活的不可删除）"""
-        active = self._manager.get_active_layout_name()
-        layouts = self._manager.list_layouts()
-        deletable = [n for n in layouts if n != active]
-        if not deletable:
-            self._status_bar.showMessage("没有可删除的布局（激活布局不可删除）")
+        """删除当前下拉框选中的布局（激活的不可删除），删除后加载默认激活布局"""
+        if self._current_layout is None:
             return
-        name, ok = QInputDialog.getItem(
-            self, "删除布局", "选择要删除的布局：", deletable, 0, False,
-        )
-        if not ok or not name:
+        active = self._manager.get_active_layout_name()
+        name = self._current_layout.name
+        if name == active:
+            self._status_bar.showMessage("激活布局不可删除")
             return
         reply = QMessageBox.question(
             self, "确认删除",
@@ -911,11 +980,16 @@ class RegionEditorDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
         if self._manager.delete_layout(name):
-            if self._current_layout and self._current_layout.name == name:
-                self._current_layout = None
-                self._clear_all_tabs()
+            self._current_layout = None
+            self._clear_all_tabs()
+            # 加载默认激活布局
+            if active:
+                layout = self._manager.load_layout(active)
+                if layout:
+                    self._current_layout = layout
+                    self._apply_layout_to_tabs()
             self._update_ui_state()
-            self._status_bar.showMessage(f"已删除布局「{name}」")
+            self._status_bar.showMessage(f"已删除布局「{name}」，已切换到默认布局")
         else:
             self._status_bar.showMessage(f"删除失败：布局「{name}」不存在")
 

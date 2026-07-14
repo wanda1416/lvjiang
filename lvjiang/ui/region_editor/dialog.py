@@ -9,10 +9,11 @@ from PyQt6.QtWidgets import (
 from loguru import logger
 
 from ...core.region_config import (
-    FIELD_GROUPS, Region, Layout, LayoutConfigManager,
+    FIELD_GROUPS, Region, CanvasConfig, Layout, LayoutConfigManager,
     get_scene_name, get_scene_fields,
 )
 from .scene_tab import SceneTab
+from .canvas import EditMode
 
 
 class RegionEditorDialog(QDialog):
@@ -74,6 +75,15 @@ class RegionEditorDialog(QDialog):
         self._btn_refresh = QPushButton("刷新截图")
         self._btn_refresh.clicked.connect(self._on_refresh_image)
         top_bar.addWidget(self._btn_refresh)
+
+        top_bar.addSpacing(20)
+
+        # 画布模式切换按钮
+        self._btn_canvas_mode = QPushButton("编辑画布")
+        self._btn_canvas_mode.setCheckable(True)
+        self._btn_canvas_mode.clicked.connect(self._on_toggle_canvas_mode)
+        self._btn_canvas_mode.setToolTip("切换画布编辑模式，调整画布范围以排除窗口边框")
+        top_bar.addWidget(self._btn_canvas_mode)
 
         top_bar.addStretch()
 
@@ -209,11 +219,15 @@ class RegionEditorDialog(QDialog):
         self._status_bar.showMessage(f"已新建布局「{name}」")
 
     def _on_save_layout(self):
-        """从所有 Tab 收集 regions，全量写入当前布局文件（不改变激活状态）"""
+        """从所有 Tab 收集 regions + canvas，全量写入当前布局文件"""
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
         name = self._current_layout.name
+        # 收集画布配置（从当前 Tab 获取，所有 Tab 共享同一画布）
+        current_tab = next(iter(self._tabs.values()))
+        self._current_layout.set_canvas(current_tab.get_canvas_config())
+        # 收集各场景区域
         for scene_key, tab in self._tabs.items():
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
         self._manager.save_layout(self._current_layout)
@@ -228,6 +242,9 @@ class RegionEditorDialog(QDialog):
             self._status_bar.showMessage("没有已加载的布局")
             return
         temp = Layout(name="")
+        # 收集画布配置
+        current_tab = next(iter(self._tabs.values()))
+        temp.set_canvas(current_tab.get_canvas_config())
         for scene_key, tab in self._tabs.items():
             temp.set_scene_regions(scene_key, tab.get_regions())
 
@@ -303,12 +320,16 @@ class RegionEditorDialog(QDialog):
     # ─── Tab 操作 ────────────────────────────────────────
 
     def _apply_layout_to_tabs(self):
-        """将当前布局的区域数据分发到各 Tab"""
+        """将当前布局的区域数据和画布配置分发到各 Tab"""
         if self._current_layout is None:
             return
+        canvas = self._current_layout.get_canvas()
         for scene_key, tab in self._tabs.items():
             regions = self._current_layout.get_scene_regions(scene_key)
             tab.set_regions(regions)
+            tab.set_canvas_config(canvas)
+            # 连接画布修改回调，同步到其他 Tab
+            tab.canvas.on_canvas_changed = self._on_any_canvas_changed
 
     def _clear_all_tabs(self):
         """清空所有 Tab 的区域"""
@@ -331,10 +352,40 @@ class RegionEditorDialog(QDialog):
         else:
             self._status_bar.showMessage("刷新截图失败")
 
+    # ─── 画布模式切换 ───────────────────────────────
+
+    def _on_toggle_canvas_mode(self, checked: bool):
+        """切换画布编辑模式，同步到所有 Tab"""
+        for tab in self._tabs.values():
+            if checked:
+                tab.set_canvas_mode()
+            else:
+                tab.set_region_mode()
+        self._btn_canvas_mode.setText("退出画布编辑" if checked else "编辑画布")
+        if checked:
+            self._status_bar.showMessage("画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框")
+        else:
+            self._status_bar.showMessage("已退出画布编辑模式")
+
+    def _on_any_canvas_changed(self):
+        """任一 Tab 的画布被修改时，同步到其他所有 Tab"""
+        # 从当前活跃的 Tab 获取画布配置，同步到其他 Tab
+        source_tab = None
+        for tab in self._tabs.values():
+            if tab.edit_mode == EditMode.CANVAS:
+                source_tab = tab
+                break
+        if source_tab is None:
+            source_tab = next(iter(self._tabs.values()))
+        canvas = source_tab.get_canvas_config()
+        for key, tab in self._tabs.items():
+            if tab is not source_tab:
+                tab.set_canvas_config(canvas)
+
     # ─── OCR 识别 ────────────────────────────────────────
 
     def _on_recognize(self):
-        """对当前 Tab 场景的所有已定义区域逐个裁剪识别"""
+        """对当前 Tab 场景的所有已定义区域逐个裁剪识别（叠加画布变换）"""
         current_tab = self._tabs.get(self._current_scene_key)
         if current_tab is None:
             return
@@ -353,13 +404,21 @@ class RegionEditorDialog(QDialog):
         engine = OCREngine()
         h, w = self._image.shape[:2]
 
+        # 画布配置（叠加两层变换）
+        canvas = current_tab.get_canvas_config()
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+
         self._result_text.clear()
         results = {}
         for region in regions:
-            x1 = int(region.x_ratio * w)
-            y1 = int(region.y_ratio * h)
-            x2 = int((region.x_ratio + region.w_ratio) * w)
-            y2 = int((region.y_ratio + region.h_ratio) * h)
+            # 区域坐标（画布相对） -> 截图像素
+            x1 = int(canvas_x + region.x_ratio * canvas_w)
+            y1 = int(canvas_y + region.y_ratio * canvas_h)
+            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
+            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
             crop = self._image[y1:y2, x1:x2]
             ocr_results = engine.recognize(crop)
             text = " | ".join(r.text for r in ocr_results) if ocr_results else "(未识别到)"

@@ -60,6 +60,27 @@ CONFIG_FILE = USER_CONFIG_DIR / "config.json"
 # ─── 数据类 ──────────────────────────────────────────────
 
 @dataclass
+class CanvasConfig:
+    """画布配置（布局级别）—— 定义截图中的纯内容区域（排除窗口边框）"""
+    x_ratio: float = 0.0
+    y_ratio: float = 0.0
+    w_ratio: float = 1.0
+    h_ratio: float = 1.0
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(d: dict) -> "CanvasConfig":
+        return CanvasConfig(
+            x_ratio=d.get("x_ratio", 0.0),
+            y_ratio=d.get("y_ratio", 0.0),
+            w_ratio=d.get("w_ratio", 1.0),
+            h_ratio=d.get("h_ratio", 1.0),
+        )
+
+
+@dataclass
 class Region:
     """单个区域定义（相对比例坐标）"""
     key: str
@@ -79,8 +100,9 @@ class Region:
 
 @dataclass
 class Layout:
-    """一个布局：包含所有场景的区域定义"""
+    """一个布局：包含画布配置 + 所有场景的区域定义"""
     name: str = ""
+    canvas: CanvasConfig = field(default_factory=CanvasConfig)
     scenes: dict[str, list[Region]] = field(default_factory=dict)
     # scenes = {"equip_detail": [Region, ...], "equip_tune": [Region, ...]}
 
@@ -90,21 +112,34 @@ class Layout:
     def set_scene_regions(self, scene_key: str, regions: list[Region]):
         self.scenes[scene_key] = regions
 
+    def get_canvas(self) -> CanvasConfig:
+        return self.canvas
+
+    def set_canvas(self, canvas: CanvasConfig):
+        self.canvas = canvas
+
     def to_dict(self) -> dict:
-        return {
-            scene: {"regions": [r.to_dict() for r in regions]}
-            for scene, regions in self.scenes.items()
-        }
+        result = {"canvas": self.canvas.to_dict()}
+        for scene, regions in self.scenes.items():
+            result[scene] = {"regions": [r.to_dict() for r in regions]}
+        return result
 
     @staticmethod
     def from_dict(name: str, d: dict) -> "Layout":
+        # 解析 canvas（可选，向后兼容）
+        canvas = CanvasConfig()
+        if "canvas" in d and isinstance(d["canvas"], dict):
+            canvas = CanvasConfig.from_dict(d["canvas"])
+        # 解析各场景 regions
         scenes = {}
         for scene_key, scene_data in d.items():
+            if scene_key == "canvas":
+                continue
             if isinstance(scene_data, dict) and "regions" in scene_data:
                 scenes[scene_key] = [
                     Region.from_dict(r) for r in scene_data["regions"]
                 ]
-        return Layout(name=name, scenes=scenes)
+        return Layout(name=name, canvas=canvas, scenes=scenes)
 
 
 # ─── 管理器 ──────────────────────────────────────────────

@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from ...core.region_config import Region, get_scene_fields
-from .canvas import RegionCanvas
+from ...core.region_config import Region, CanvasConfig, get_scene_fields
+from .canvas import RegionCanvas, EditMode
 
 
 class SceneTab(QWidget):
@@ -59,6 +59,22 @@ class SceneTab(QWidget):
     def set_regions(self, regions: list[Region]):
         self._canvas.set_regions(regions)
         self._refresh_field_list()
+
+    def set_canvas_config(self, config: CanvasConfig):
+        self._canvas.set_canvas_config(config)
+
+    def get_canvas_config(self) -> CanvasConfig:
+        return self._canvas.get_canvas_config()
+
+    def set_canvas_mode(self):
+        self._canvas.set_canvas_mode()
+
+    def set_region_mode(self):
+        self._canvas.set_region_mode()
+
+    @property
+    def edit_mode(self) -> EditMode:
+        return self._canvas.edit_mode
 
     def _refresh_field_list(self):
         """刷新字段列表，显示已绑定/未绑定状态"""

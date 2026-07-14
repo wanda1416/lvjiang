@@ -10,7 +10,7 @@ from PyQt6.QtGui import (
 )
 from loguru import logger
 
-from ...core.region_config import Region, EQUIP_FIELDS
+from ...core.region_config import Region, CanvasConfig, EQUIP_FIELDS
 
 
 # ─── 颜色方案与常量 ──────────────────────────────────────
@@ -35,6 +35,11 @@ class DragMode(Enum):
     DRAWING = auto()       # 正在绘制新矩形
     MOVING = auto()        # 正在移动矩形
     RESIZING = auto()      # 正在缩放矩形
+
+
+class EditMode(Enum):
+    REGION = auto()        # 区域编辑模式（默认）
+    CANVAS = auto()        # 画布编辑模式（移动/缩放画布框）
 
 
 class HandlePos(Enum):
@@ -91,9 +96,20 @@ class RegionCanvas(QWidget):
 
         # 信号回调
         self.on_region_changed = None  # callable() -> None
+        self.on_canvas_changed = None  # callable() -> None
 
         # 当前场景的字段列表（由外部设置）
         self._current_fields = EQUIP_FIELDS
+
+        # 画布配置（布局级别，由外部设置）
+        self._canvas_config = CanvasConfig()
+        self._edit_mode = EditMode.REGION  # 当前编辑模式
+
+        # 画布编辑模式的交互状态
+        self._canvas_drag_mode = DragMode.NONE
+        self._canvas_drag_handle: HandlePos | None = None
+        self._canvas_drag_start = QPointF()
+        self._canvas_drag_orig: CanvasConfig | None = None
 
     def set_current_fields(self, fields: list[tuple[str, str]]):
         """设置当前场景的字段列表（由对话框调用）"""
@@ -164,9 +180,38 @@ class RegionCanvas(QWidget):
         return QRectF(r.x_ratio, r.y_ratio, r.w_ratio, r.h_ratio)
 
     def _region_rect_widget(self, r: Region) -> QRectF:
-        """区域的 widget 坐标矩形"""
-        tl = self._norm_to_widget(r.x_ratio, r.y_ratio)
-        br = self._norm_to_widget(r.x_ratio + r.w_ratio, r.y_ratio + r.h_ratio)
+        """区域的 widget 坐标矩形（叠加画布变换）"""
+        sx, sy = self._canvas_to_screenshot_norm(r.x_ratio, r.y_ratio)
+        sw, sh = self._canvas_to_screenshot_norm(
+            r.x_ratio + r.w_ratio, r.y_ratio + r.h_ratio
+        )
+        tl = self._norm_to_widget(sx, sy)
+        br = self._norm_to_widget(sw, sh)
+        return QRectF(tl, br)
+
+    # ─── 画布坐标转换 ───────────────────────────────
+
+    def _canvas_to_screenshot_norm(self, cx: float, cy: float) -> tuple[float, float]:
+        """画布内归一化坐标 -> 截图归一化坐标"""
+        c = self._canvas_config
+        sx = c.x_ratio + cx * c.w_ratio
+        sy = c.y_ratio + cy * c.h_ratio
+        return sx, sy
+
+    def _screenshot_to_canvas_norm(self, sx: float, sy: float) -> tuple[float, float]:
+        """截图归一化坐标 -> 画布内归一化坐标"""
+        c = self._canvas_config
+        if c.w_ratio == 0 or c.h_ratio == 0:
+            return sx, sy
+        cx = (sx - c.x_ratio) / c.w_ratio
+        cy = (sy - c.y_ratio) / c.h_ratio
+        return max(0.0, min(1.0, cx)), max(0.0, min(1.0, cy))
+
+    def _canvas_rect_widget(self) -> QRectF:
+        """画布框的 widget 坐标矩形"""
+        c = self._canvas_config
+        tl = self._norm_to_widget(c.x_ratio, c.y_ratio)
+        br = self._norm_to_widget(c.x_ratio + c.w_ratio, c.y_ratio + c.h_ratio)
         return QRectF(tl, br)
 
     # ─── 滚轮缩放 ────────────────────────────────────────
@@ -250,6 +295,33 @@ class RegionCanvas(QWidget):
             return
         pos = event.position()
 
+        # ── 画布编辑模式：操作画布框 ──
+        if self._edit_mode == EditMode.CANVAS:
+            handle = self._hit_canvas_handle(pos)
+            if handle is not None:
+                self._canvas_drag_mode = DragMode.RESIZING
+                self._canvas_drag_handle = handle
+                self._canvas_drag_start = pos
+                self._canvas_drag_orig = CanvasConfig(
+                    self._canvas_config.x_ratio, self._canvas_config.y_ratio,
+                    self._canvas_config.w_ratio, self._canvas_config.h_ratio,
+                )
+                self.update()
+                return
+            canvas_rect = self._canvas_rect_widget()
+            if canvas_rect.contains(pos):
+                self._canvas_drag_mode = DragMode.MOVING
+                self._canvas_drag_start = pos
+                self._canvas_drag_orig = CanvasConfig(
+                    self._canvas_config.x_ratio, self._canvas_config.y_ratio,
+                    self._canvas_config.w_ratio, self._canvas_config.h_ratio,
+                )
+                self.update()
+                return
+            return
+
+        # ── 区域编辑模式（原有逻辑） ──
+
         if self._field_selected and self._selected_idx >= 0:
             # 右侧字段列表选中：单区域编辑模式
             r = self._regions[self._selected_idx]
@@ -293,14 +365,15 @@ class RegionCanvas(QWidget):
             self.update()
             return
 
-        # 空白处：创建新区域
-        nx, ny = self._widget_to_norm(pos)
+        # 空白处：创建新区域（坐标转换为画布相对）
+        sx, sy = self._widget_to_norm(pos)
+        cx, cy = self._screenshot_to_canvas_norm(sx, sy)
         self._drag_mode = DragMode.DRAWING
-        self._drag_start = QPointF(nx, ny)
+        self._drag_start = QPointF(cx, cy)
         self._selected_idx = len(self._regions)
         self._regions.append(Region(
             key="", name="新区域",
-            x_ratio=nx, y_ratio=ny, w_ratio=0, h_ratio=0,
+            x_ratio=cx, y_ratio=cy, w_ratio=0, h_ratio=0,
         ))
         self._notify_changed()
         self.update()
@@ -316,15 +389,35 @@ class RegionCanvas(QWidget):
             self.update()
             return
 
+        # ── 画布编辑模式 ──
+        if self._edit_mode == EditMode.CANVAS:
+            if self._canvas_drag_mode == DragMode.MOVING:
+                dx_s, dy_s = self._widget_to_norm(pos)
+                dx_s -= self._widget_to_norm(self._canvas_drag_start)[0]
+                dy_s -= self._widget_to_norm(self._canvas_drag_start)[1]
+                o = self._canvas_drag_orig
+                self._canvas_config.x_ratio = max(0.0, min(1.0 - o.w_ratio, o.x_ratio + dx_s))
+                self._canvas_config.y_ratio = max(0.0, min(1.0 - o.h_ratio, o.y_ratio + dy_s))
+                self.update()
+            elif self._canvas_drag_mode == DragMode.RESIZING:
+                self._apply_canvas_resize(pos)
+                self.update()
+            else:
+                self._update_canvas_cursor(pos)
+            return
+
+        # ── 区域编辑模式 ──
+
         if self._drag_mode == DragMode.DRAWING:
-            nx, ny = self._widget_to_norm(pos)
+            sx, sy = self._widget_to_norm(pos)
+            cx, cy = self._screenshot_to_canvas_norm(sx, sy)
             r = self._regions[-1]
             x0 = self._drag_start.x()
             y0 = self._drag_start.y()
-            r.x_ratio = min(x0, nx)
-            r.y_ratio = min(y0, ny)
-            r.w_ratio = abs(nx - x0)
-            r.h_ratio = abs(ny - y0)
+            r.x_ratio = min(x0, cx)
+            r.y_ratio = min(y0, cy)
+            r.w_ratio = abs(cx - x0)
+            r.h_ratio = abs(cy - y0)
             self.update()
 
         elif self._drag_mode == DragMode.MOVING:
@@ -354,6 +447,18 @@ class RegionCanvas(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             super().mouseReleaseEvent(event)
             return
+
+        # ── 画布编辑模式 ──
+        if self._edit_mode == EditMode.CANVAS:
+            if self._canvas_drag_mode in (DragMode.MOVING, DragMode.RESIZING):
+                self._notify_canvas_changed()
+            self._canvas_drag_mode = DragMode.NONE
+            self._canvas_drag_handle = None
+            self._canvas_drag_orig = None
+            self.update()
+            return
+
+        # ── 区域编辑模式 ──
 
         if self._drag_mode == DragMode.DRAWING:
             r = self._regions[-1]
@@ -633,6 +738,118 @@ class RegionCanvas(QWidget):
         self._field_selected = False
         self.update()
 
+    # ─── 画布编辑模式辅助方法 ───────────────────────
+
+    def _hit_canvas_handle(self, pos: QPointF) -> HandlePos | None:
+        """检测是否命中画布框的缩放手柄"""
+        rect = self._canvas_rect_widget()
+        cx = rect.center().x()
+        cy = rect.center().y()
+        handles = {
+            HandlePos.TOP_LEFT:     rect.topLeft(),
+            HandlePos.TOP:          QPointF(cx, rect.top()),
+            HandlePos.TOP_RIGHT:    rect.topRight(),
+            HandlePos.RIGHT:        QPointF(rect.right(), cy),
+            HandlePos.BOTTOM_RIGHT: rect.bottomRight(),
+            HandlePos.BOTTOM:       QPointF(cx, rect.bottom()),
+            HandlePos.BOTTOM_LEFT:  rect.bottomLeft(),
+            HandlePos.LEFT:         QPointF(rect.left(), cy),
+        }
+        for hpos, center in handles.items():
+            hr = QRectF(
+                center.x() - HANDLE_SIZE, center.y() - HANDLE_SIZE,
+                HANDLE_SIZE * 2, HANDLE_SIZE * 2,
+            )
+            if hr.contains(pos):
+                return hpos
+        return None
+
+    def _apply_canvas_resize(self, pos: QPointF):
+        """根据手柄位置调整画布框大小"""
+        nx, ny = self._widget_to_norm(pos)
+        o = self._canvas_drag_orig
+        h = self._canvas_drag_handle
+
+        x1, y1 = o.x_ratio, o.y_ratio
+        x2, y2 = o.x_ratio + o.w_ratio, o.y_ratio + o.h_ratio
+
+        moving_left = h in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT)
+        moving_right = h in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT)
+        moving_top = h in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT)
+        moving_bottom = h in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT)
+
+        if moving_left:
+            x1 = min(nx, x2 - 0.01)
+        if moving_right:
+            x2 = max(nx, x1 + 0.01)
+        if moving_top:
+            y1 = min(ny, y2 - 0.01)
+        if moving_bottom:
+            y2 = max(ny, y1 + 0.01)
+
+        self._canvas_config.x_ratio = max(0.0, x1)
+        self._canvas_config.y_ratio = max(0.0, y1)
+        self._canvas_config.w_ratio = min(1.0, x2) - self._canvas_config.x_ratio
+        self._canvas_config.h_ratio = min(1.0, y2) - self._canvas_config.y_ratio
+
+    def _update_canvas_cursor(self, pos: QPointF):
+        """画布模式下更新鼠标光标"""
+        handle = self._hit_canvas_handle(pos)
+        if handle is not None:
+            cursors = {
+                HandlePos.TOP_LEFT:     Qt.CursorShape.SizeFDiagCursor,
+                HandlePos.BOTTOM_RIGHT: Qt.CursorShape.SizeFDiagCursor,
+                HandlePos.TOP_RIGHT:    Qt.CursorShape.SizeBDiagCursor,
+                HandlePos.BOTTOM_LEFT:  Qt.CursorShape.SizeBDiagCursor,
+                HandlePos.TOP:          Qt.CursorShape.SizeVerCursor,
+                HandlePos.BOTTOM:       Qt.CursorShape.SizeVerCursor,
+                HandlePos.LEFT:         Qt.CursorShape.SizeHorCursor,
+                HandlePos.RIGHT:        Qt.CursorShape.SizeHorCursor,
+            }
+            self.setCursor(QCursor(cursors[handle]))
+            return
+        canvas_rect = self._canvas_rect_widget()
+        if canvas_rect.contains(pos):
+            self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
+            return
+        self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+
+    # ─── 模式切换 ───────────────────────────────────
+
+    def set_canvas_mode(self):
+        """切换到画布编辑模式"""
+        self._edit_mode = EditMode.CANVAS
+        self._selected_idx = -1
+        self._field_selected = False
+        self.update()
+
+    def set_region_mode(self):
+        """切换到区域编辑模式"""
+        self._edit_mode = EditMode.REGION
+        self.update()
+
+    @property
+    def edit_mode(self) -> EditMode:
+        return self._edit_mode
+
+    # ─── 画布配置访问 ───────────────────────────────
+
+    def set_canvas_config(self, config: CanvasConfig):
+        """设置画布配置（由外部调用）"""
+        self._canvas_config = config
+        self.update()
+
+    def get_canvas_config(self) -> CanvasConfig:
+        """获取当前画布配置"""
+        return CanvasConfig(
+            self._canvas_config.x_ratio, self._canvas_config.y_ratio,
+            self._canvas_config.w_ratio, self._canvas_config.h_ratio,
+        )
+
+    def _notify_canvas_changed(self):
+        if self.on_canvas_changed:
+            self.on_canvas_changed()
+
     # ─── 绘制 ────────────────────────────────────────────
 
     def paintEvent(self, event: QPaintEvent):
@@ -648,6 +865,9 @@ class RegionCanvas(QWidget):
                 int(self._display_rect.height()),
                 self._pixmap,
             )
+
+        # 绘制画布框（遮罩 + 边框）
+        self._draw_canvas_frame(painter)
 
         # 绘制区域
         if self._field_selected and self._selected_idx >= 0 and self._selected_idx < len(self._regions):
@@ -681,6 +901,69 @@ class RegionCanvas(QWidget):
             painter.restore()
 
         painter.end()
+
+    def _draw_canvas_frame(self, painter: QPainter):
+        """绘制画布框：遮罩 + 边框 + 手柄"""
+        c = self._canvas_config
+        # 如果画布覆盖全图，只绘制边框提示
+        is_full = (c.x_ratio <= 0.001 and c.y_ratio <= 0.001
+                   and c.w_ratio >= 0.998 and c.h_ratio >= 0.998)
+
+        canvas_rect = self._canvas_rect_widget()
+
+        if not is_full:
+            # 画布外半透明遮罩
+            painter.save()
+            dr = self._display_rect
+            # 上
+            painter.fillRect(QRectF(dr.left(), dr.top(), dr.width(), canvas_rect.top() - dr.top()),
+                             QColor(0, 0, 0, 120))
+            # 下
+            painter.fillRect(QRectF(dr.left(), canvas_rect.bottom(), dr.width(), dr.bottom() - canvas_rect.bottom()),
+                             QColor(0, 0, 0, 120))
+            # 左
+            painter.fillRect(QRectF(dr.left(), canvas_rect.top(), canvas_rect.left() - dr.left(), canvas_rect.height()),
+                             QColor(0, 0, 0, 120))
+            # 右
+            painter.fillRect(QRectF(canvas_rect.right(), canvas_rect.top(), dr.right() - canvas_rect.right(), canvas_rect.height()),
+                             QColor(0, 0, 0, 120))
+            painter.restore()
+
+        # 画布边框（始终清晰可见）
+        painter.save()
+        is_canvas_mode = self._edit_mode == EditMode.CANVAS
+        pen_color = QColor(255, 200, 0) if is_canvas_mode else QColor(255, 200, 0, 200)
+        pen_width = 3 if is_canvas_mode else 2
+        painter.setPen(QPen(pen_color, pen_width, Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(canvas_rect)
+        painter.restore()
+
+        # 画布编辑模式下绘制手柄
+        if self._edit_mode == EditMode.CANVAS:
+            painter.save()
+            cx = canvas_rect.center().x()
+            cy = canvas_rect.center().y()
+            handles = {
+                HandlePos.TOP_LEFT:     canvas_rect.topLeft(),
+                HandlePos.TOP:          QPointF(cx, canvas_rect.top()),
+                HandlePos.TOP_RIGHT:    canvas_rect.topRight(),
+                HandlePos.RIGHT:        QPointF(canvas_rect.right(), cy),
+                HandlePos.BOTTOM_RIGHT: canvas_rect.bottomRight(),
+                HandlePos.BOTTOM:       QPointF(cx, canvas_rect.bottom()),
+                HandlePos.BOTTOM_LEFT:  canvas_rect.bottomLeft(),
+                HandlePos.LEFT:         QPointF(canvas_rect.left(), cy),
+            }
+            painter.setPen(QPen(QColor(255, 200, 0), 1))
+            painter.setBrush(QBrush(QColor(255, 200, 0)))
+            for center in handles.values():
+                painter.drawRect(
+                    QRectF(
+                        center.x() - HANDLE_SIZE, center.y() - HANDLE_SIZE,
+                        HANDLE_SIZE * 2, HANDLE_SIZE * 2,
+                    )
+                )
+            painter.restore()
 
     def _draw_region(self, painter: QPainter, r: Region, color: QColor, selected: bool):
         """绘制单个区域"""

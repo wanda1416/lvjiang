@@ -35,6 +35,7 @@ REGION_COLORS = [
 ]
 
 HANDLE_SIZE = 6  # 缩放手柄半尺寸
+SNAP_PIXELS = 6  # 吸附像素阈值（widget 像素）
 
 
 class DragMode(Enum):
@@ -91,6 +92,10 @@ class RegionCanvas(QWidget):
         # 右键拖拽平移
         self._panning = False
         self._pan_start = QPointF()
+
+        # 吸附对齐参考线（归一化坐标，拖拽/拉伸时临时显示）
+        self._snap_lines_x: list[float] = []
+        self._snap_lines_y: list[float] = []
 
         # 信号回调
         self.on_region_changed = None  # callable() -> None
@@ -337,6 +342,7 @@ class RegionCanvas(QWidget):
             r = self._regions[self._selected_idx]
             r.x_ratio = max(0, min(1 - r.w_ratio, self._drag_orig.x_ratio + dx_n))
             r.y_ratio = max(0, min(1 - r.h_ratio, self._drag_orig.y_ratio + dy_n))
+            self._apply_move_snap(r)
             self.update()
 
         elif self._drag_mode == DragMode.RESIZING:
@@ -370,6 +376,9 @@ class RegionCanvas(QWidget):
             self._notify_changed()
             # 全局模式下移动/缩放后保留选中，以便用户再次点击获取手柄进行拉伸
 
+        # 清除吸附参考线
+        self._snap_lines_x = []
+        self._snap_lines_y = []
         self._drag_mode = DragMode.NONE
         self._drag_handle = None
         self._drag_orig = None
@@ -385,19 +394,120 @@ class RegionCanvas(QWidget):
         x1, y1 = o.x_ratio, o.y_ratio
         x2, y2 = o.x_ratio + o.w_ratio, o.y_ratio + o.h_ratio
 
-        if h in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT):
+        moving_left = h in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT)
+        moving_right = h in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT)
+        moving_top = h in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT)
+        moving_bottom = h in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT)
+
+        if moving_left:
             x1 = min(nx, x2 - 0.01)
-        if h in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT):
+        if moving_right:
             x2 = max(nx, x1 + 0.01)
-        if h in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT):
+        if moving_top:
             y1 = min(ny, y2 - 0.01)
-        if h in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT):
+        if moving_bottom:
             y2 = max(ny, y1 + 0.01)
+
+        # 对正在拖动的边做吸附
+        xs, ys = self._collect_snap_targets(self._selected_idx)
+        thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
+        self._snap_lines_x = []
+        self._snap_lines_y = []
+        if moving_left:
+            t = self._nearest(x1, xs, thx)
+            if t is not None and t < x2 - 0.01:
+                x1 = t
+                self._snap_lines_x.append(t)
+        if moving_right:
+            t = self._nearest(x2, xs, thx)
+            if t is not None and t > x1 + 0.01:
+                x2 = t
+                self._snap_lines_x.append(t)
+        if moving_top:
+            t = self._nearest(y1, ys, thy)
+            if t is not None and t < y2 - 0.01:
+                y1 = t
+                self._snap_lines_y.append(t)
+        if moving_bottom:
+            t = self._nearest(y2, ys, thy)
+            if t is not None and t > y1 + 0.01:
+                y2 = t
+                self._snap_lines_y.append(t)
 
         r.x_ratio = max(0.0, x1)
         r.y_ratio = max(0.0, y1)
         r.w_ratio = min(1.0, x2) - r.x_ratio
         r.h_ratio = min(1.0, y2) - r.y_ratio
+
+    # ─── 吸附对齐 ───────────────────────────────
+
+    def _snap_threshold_x(self) -> float:
+        """x 方向吸附阈值（归一化），基于像素阈值换算"""
+        w = self._display_rect.width()
+        return SNAP_PIXELS / w if w > 0 else 0.0
+
+    def _snap_threshold_y(self) -> float:
+        """y 方向吸附阈值（归一化）"""
+        hgt = self._display_rect.height()
+        return SNAP_PIXELS / hgt if hgt > 0 else 0.0
+
+    def _collect_snap_targets(self, exclude_idx: int) -> tuple[list[float], list[float]]:
+        """收集其他区域的吸附参考线（归一化）
+        返回 (xs, ys)：xs 为竖线 x 值（左边/右边/中心），ys 为横线 y 值（上边/下边/中心）
+        """
+        xs: list[float] = []
+        ys: list[float] = []
+        for i, r in enumerate(self._regions):
+            if i == exclude_idx:
+                continue
+            xs.extend([r.x_ratio, r.x_ratio + r.w_ratio, r.x_ratio + r.w_ratio / 2])
+            ys.extend([r.y_ratio, r.y_ratio + r.h_ratio, r.y_ratio + r.h_ratio / 2])
+        return xs, ys
+
+    @staticmethod
+    def _nearest(value: float, targets: list[float], threshold: float) -> float | None:
+        """在 targets 中找与 value 最接近且在阈值内的值，无则返回 None"""
+        best = None
+        best_d = threshold
+        for t in targets:
+            d = abs(value - t)
+            if d <= best_d:
+                best_d = d
+                best = t
+        return best
+
+    def _apply_move_snap(self, r: Region):
+        """移动时将区域的左/右/中心、上/下/中心向其他区域吸附对齐"""
+        xs, ys = self._collect_snap_targets(self._selected_idx)
+        thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
+        self._snap_lines_x = []
+        self._snap_lines_y = []
+
+        # x 方向：左边、右边、中心三条边取最优吸附
+        edges_x = [r.x_ratio, r.x_ratio + r.w_ratio, r.x_ratio + r.w_ratio / 2]
+        best = None  # (dist, shift, line)
+        for e in edges_x:
+            t = self._nearest(e, xs, thx)
+            if t is not None:
+                d = abs(e - t)
+                if best is None or d < best[0]:
+                    best = (d, t - e, t)
+        if best is not None:
+            r.x_ratio = max(0.0, min(1 - r.w_ratio, r.x_ratio + best[1]))
+            self._snap_lines_x.append(best[2])
+
+        # y 方向
+        edges_y = [r.y_ratio, r.y_ratio + r.h_ratio, r.y_ratio + r.h_ratio / 2]
+        best = None
+        for e in edges_y:
+            t = self._nearest(e, ys, thy)
+            if t is not None:
+                d = abs(e - t)
+                if best is None or d < best[0]:
+                    best = (d, t - e, t)
+        if best is not None:
+            r.y_ratio = max(0.0, min(1 - r.h_ratio, r.y_ratio + best[1]))
+            self._snap_lines_y.append(best[2])
 
     def _update_cursor(self, pos: QPointF):
         """根据鼠标位置更新光标"""
@@ -559,6 +669,24 @@ class RegionCanvas(QWidget):
                 color = REGION_COLORS[i % len(REGION_COLORS)]
                 is_sel = (i == self._selected_idx and not self._field_selected)
                 self._draw_region(painter, r, color, is_sel)
+
+        # 吸附对齐参考线（拖拽/拉伸时临时显示）
+        if self._snap_lines_x or self._snap_lines_y:
+            painter.save()
+            painter.setPen(QPen(QColor(255, 0, 255), 1, Qt.PenStyle.DashLine))
+            for nx in self._snap_lines_x:
+                x = self._display_rect.x() + nx * self._display_rect.width()
+                painter.drawLine(
+                    QPointF(x, self._display_rect.top()),
+                    QPointF(x, self._display_rect.bottom()),
+                )
+            for ny in self._snap_lines_y:
+                y = self._display_rect.y() + ny * self._display_rect.height()
+                painter.drawLine(
+                    QPointF(self._display_rect.left(), y),
+                    QPointF(self._display_rect.right(), y),
+                )
+            painter.restore()
 
         painter.end()
 

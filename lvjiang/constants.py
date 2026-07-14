@@ -5,6 +5,7 @@ from pathlib import Path
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
+USER_CONFIG_DIR = CONFIG_DIR / "user"
 FLOWS_DIR = CONFIG_DIR / "flows"
 
 # 默认配置文件路径

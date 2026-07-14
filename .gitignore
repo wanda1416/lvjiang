@@ -22,6 +22,9 @@ logs/
 # Generated
 config/coordinate.yaml
 
+# User-level config (layouts, active layout, etc.)
+config/user/
+
 # OS
 Thumbs.db
 Desktop.ini

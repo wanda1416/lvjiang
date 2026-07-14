@@ -6,7 +6,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from ..constants import CONFIG_DIR
+from ..constants import CONFIG_DIR, USER_CONFIG_DIR
 
 # ─── 场景 & 字段组定义 ───────────────────────────────────
 
@@ -53,8 +53,8 @@ def get_scene_fields(scene_key: str) -> list[tuple[str, str]]:
 
 # ─── 路径常量 ────────────────────────────────────────────
 
-LAYOUTS_DIR = CONFIG_DIR / "layouts"
-CONFIG_FILE = CONFIG_DIR / "config.json"
+LAYOUTS_DIR = USER_CONFIG_DIR / "layouts"
+CONFIG_FILE = USER_CONFIG_DIR / "config.json"
 
 
 # ─── 数据类 ──────────────────────────────────────────────
@@ -125,7 +125,7 @@ class LayoutConfigManager:
         return {"active_layout": ""}
 
     def _save_config(self):
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         CONFIG_FILE.write_text(
             json.dumps(self._config, ensure_ascii=False, indent=2),
             encoding="utf-8",

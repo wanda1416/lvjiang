@@ -6,10 +6,10 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
-    QTabWidget, QSplitter,
+    QTabWidget, QSplitter, QMenuBar,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent, QImage, QPixmap
+from PyQt6.QtGui import QKeyEvent, QImage, QPixmap, QAction
 from loguru import logger
 
 from .overlay import BorderOverlay
@@ -35,9 +35,49 @@ class MainWindow(QMainWindow):
 
         # 截屏器（定位后初始化，后续自动化复用）
         self._capture = None
+        self._last_capture = None  # 最近一次截屏（numpy BGR）
 
+        # 区域预设（定位后由区域编辑器设置）
+        self._region_preset = None
+
+        self._setup_menu()
         self._setup_ui()
         logger.info("主窗口已初始化")
+
+    def _setup_menu(self):
+        """构建顶部菜单栏"""
+        menubar = self.menuBar()
+
+        # 工具菜单
+        tools_menu = menubar.addMenu("工具")
+
+        ocr_test_action = QAction("OCR 测试", self)
+        ocr_test_action.triggered.connect(self._open_ocr_test)
+        tools_menu.addAction(ocr_test_action)
+
+        region_editor_action = QAction("区域编辑器", self)
+        region_editor_action.triggered.connect(self._open_region_editor)
+        tools_menu.addAction(region_editor_action)
+
+    def _open_ocr_test(self):
+        """打开 OCR 测试对话框"""
+        from .ocr_test_dialog import OCRTestDialog
+        dialog = OCRTestDialog(self)
+        dialog.exec()
+
+    def _open_region_editor(self):
+        """打开区域编辑器（使用当前截屏图片）"""
+        from .region_editor_dialog import RegionEditorDialog
+        image = self._get_last_capture()
+        if image is None:
+            logger.warning("请先定位窗口并截屏")
+            return
+        dialog = RegionEditorDialog(image, self._region_preset, self)
+        dialog.exec()
+        preset = dialog.get_preset()
+        if preset:
+            self._region_preset = preset
+            logger.info(f"区域预设已更新: {preset.name}, {len(preset.regions)} 个区域")
 
     def _setup_ui(self):
         """构建界面"""
@@ -304,6 +344,7 @@ class MainWindow(QMainWindow):
             if img is None:
                 self.preview_label.setText("截屏失败")
                 return
+            self._last_capture = img  # 保存截屏供区域编辑器使用
             h, w_img = img.shape[:2]
             rgb = np.ascontiguousarray(img[:, :, ::-1])
             fmt = QImage.Format.Format_RGB888
@@ -319,6 +360,10 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"截屏预览失败: {e}")
             self.preview_label.setText(f"截屏失败: {e}")
+
+    def _get_last_capture(self) -> np.ndarray | None:
+        """获取最近一次截屏图片（numpy BGR）"""
+        return self._last_capture
 
     def _refresh_window_rect(self, w: dict):
         """通过 Win32 GetWindowRect 实时刷新窗口位置。"""

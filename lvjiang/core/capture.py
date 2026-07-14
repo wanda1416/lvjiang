@@ -136,33 +136,52 @@ def list_visible_windows() -> list[dict]:
     user32 = ctypes.windll.user32
     results = []
 
-    def _callback(hwnd, _):
-        if user32.IsWindowVisible(hwnd):
-            length = user32.GetWindowTextW(hwnd)
-            if length > 0:
-                buf = ctypes.create_unicode_buffer(length + 1)
-                user32.GetWindowTextW(hwnd, buf, length + 1)
-                title = buf.value
-                # 过滤掉无标题窗口和系统窗口
-                if title.strip():
-                    rect = wintypes.RECT()
-                    user32.GetWindowRect(hwnd, ctypes.byref(rect))
-                    w = rect.right - rect.left
-                    h = rect.bottom - rect.top
-                    # 过滤掉太小的窗口（工具栏、托盘等）
-                    if w > 100 and h > 100:
-                        results.append({
-                            "title": title,
-                            "hwnd": hwnd,
-                            "left": rect.left,
-                            "top": rect.top,
-                            "width": w,
-                            "height": h,
-                        })
+    # Win32 常量
+    GWL_EXSTYLE = -20
+    WS_EX_TOOLWINDOW = 0x00000080   # 工具窗口（不显示在任务栏）
+    WS_EX_NOACTIVATE = 0x08000000   # 不可激活的窗口
+    GW_OWNER = 4
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def _callback(hwnd, lParam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+
+        # 过滤工具窗口（NVIDIA控制面板、托盘图标等）
+        ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        if ex_style & WS_EX_TOOLWINDOW:
+            return True
+        if ex_style & WS_EX_NOACTIVATE:
+            return True
+
+        # 过滤有所有者的窗口（弹窗、对话框，不是主窗口）
+        owner = user32.GetWindow(hwnd, GW_OWNER)
+        if owner:
+            return True
+
+        # 用固定大小缓冲区获取窗口标题
+        buf = ctypes.create_unicode_buffer(256)
+        user32.GetWindowTextW(hwnd, buf, 256)
+        title = buf.value
+        if not title.strip():
+            return True
+
+        rect = wintypes.RECT()
+        if user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            w = rect.right - rect.left
+            h = rect.bottom - rect.top
+            if w > 200 and h > 200:
+                results.append({
+                    "title": title,
+                    "hwnd": hwnd,
+                    "left": rect.left,
+                    "top": rect.top,
+                    "width": w,
+                    "height": h,
+                })
         return True
 
-    CALLBACK = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
-    user32.EnumWindows(CALLBACK(_callback), None)
+    user32.EnumWindows(_callback, None)
 
     logger.debug(f"枚举到 {len(results)} 个可见窗口")
     return results

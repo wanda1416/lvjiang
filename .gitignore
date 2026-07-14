@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+
+# Generated
+config/coordinate.yaml
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Qoder
+.qoder/

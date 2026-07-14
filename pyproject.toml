@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "lvjiang"
+version = "0.1.0"
+description = "燕云十六声手游装备调律自动化工具"
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt6>=6.6",
+    "mss>=9.0",
+    "pyautogui>=0.9",
+    "paddleocr>=2.7",
+    "paddlepaddle>=2.5",
+    "PyYAML>=6.0",
+    "pydantic>=2.0",
+    "loguru>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-qt>=4.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["lvjiang*"]

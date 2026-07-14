@@ -116,14 +116,15 @@ class RegionCanvas(QWidget):
         self.update()
 
     def _recalc_display(self):
-        """计算图片在 widget 中的显示区域（保持比例居中，支持缩放）"""
+        """计算图片在 widget 中的显示区域（左上角对齐，基准缩放）"""
         if not self._pixmap:
             self._display_rect = QRectF()
             return
         pw, ph = self._pixmap.width(), self._pixmap.height()
         ww, wh = self.width(), self.height()
         self._base_scale = min(ww / pw, wh / ph)
-        self._apply_zoom_anchor(QPointF(ww / 2, wh / 2))
+        scale = self._base_scale * self._zoom
+        self._display_rect = QRectF(0, 0, pw * scale, ph * scale)
 
     def _apply_zoom_anchor(self, anchor_widget_pos: QPointF):
         """以 anchor_widget_pos 为锚点重新计算 display_rect，保持该点归一化坐标不变"""

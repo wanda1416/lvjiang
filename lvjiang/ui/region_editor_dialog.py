@@ -5,7 +5,7 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QWidget, QListWidget, QListWidgetItem,
-    QComboBox, QInputDialog, QSplitter, QStatusBar,
+    QInputDialog, QSplitter, QStatusBar,
     QTextEdit, QApplication, QTabWidget, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QRectF, QPointF, QSize
@@ -674,8 +674,7 @@ class RegionEditorDialog(QDialog):
         self._current_layout: Layout | None = None
 
         self._setup_ui()
-        self._refresh_layout_combo()
-        self._on_load_layout()  # 自动加载 active 布局
+        self._auto_load_active()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -683,11 +682,18 @@ class RegionEditorDialog(QDialog):
         # ─── 顶部布局栏 ───
         top_bar = QHBoxLayout()
 
-        top_bar.addWidget(QLabel("布局:"))
+        # 左侧：当前布局标签
+        top_bar.addWidget(QLabel("当前布局"))
+        self._layout_name_label = QLabel("无布局")
+        self._layout_name_label.setStyleSheet("color: red; font-weight: bold;")
+        top_bar.addWidget(self._layout_name_label)
 
-        self._layout_combo = QComboBox()
-        self._layout_combo.setMinimumWidth(150)
-        top_bar.addWidget(self._layout_combo)
+        top_bar.addSpacing(20)
+
+        # 右侧：功能按钮
+        self._btn_activate = QPushButton("激活")
+        self._btn_activate.clicked.connect(self._on_activate_layout)
+        top_bar.addWidget(self._btn_activate)
 
         self._btn_new = QPushButton("新建")
         self._btn_new.clicked.connect(self._on_new_layout)
@@ -701,6 +707,10 @@ class RegionEditorDialog(QDialog):
         self._btn_save.clicked.connect(self._on_save_layout)
         top_bar.addWidget(self._btn_save)
 
+        self._btn_save_as = QPushButton("另存为")
+        self._btn_save_as.clicked.connect(self._on_save_as_layout)
+        top_bar.addWidget(self._btn_save_as)
+
         self._btn_delete = QPushButton("删除")
         self._btn_delete.clicked.connect(self._on_delete_layout)
         top_bar.addWidget(self._btn_delete)
@@ -708,10 +718,6 @@ class RegionEditorDialog(QDialog):
         self._btn_refresh = QPushButton("刷新截图")
         self._btn_refresh.clicked.connect(self._on_refresh_image)
         top_bar.addWidget(self._btn_refresh)
-
-        self._layout_label = QLabel("当前布局：--")
-        self._layout_label.setStyleSheet("color: #555; font-weight: bold;")
-        top_bar.addWidget(self._layout_label)
 
         top_bar.addStretch()
         layout.addLayout(top_bar)
@@ -747,22 +753,43 @@ class RegionEditorDialog(QDialog):
 
     # ─── 布局栏操作 ──────────────────────────────────────
 
-    def _refresh_layout_combo(self):
-        """刷新布局下拉框"""
-        self._layout_combo.clear()
-        self._layout_combo.addItems(self._manager.list_layouts())
-        active = self._manager.get_active_layout_name()
-        if active:
-            idx = self._layout_combo.findText(active)
-            if idx >= 0:
-                self._layout_combo.setCurrentIndex(idx)
-
     def _update_layout_label(self):
+        """更新当前布局标签：有激活布局显示名称，否则红色「无布局」"""
         name = self._manager.get_active_layout_name()
         if name:
-            self._layout_label.setText(f"当前布局：{name}")
+            self._layout_name_label.setText(name)
+            self._layout_name_label.setStyleSheet("color: #333; font-weight: bold;")
         else:
-            self._layout_label.setText("当前布局：--")
+            self._layout_name_label.setText("无布局")
+            self._layout_name_label.setStyleSheet("color: red; font-weight: bold;")
+        # 刷新按钮可用性
+        has_layout = self._current_layout is not None
+        self._btn_save.setEnabled(has_layout)
+        self._btn_save_as.setEnabled(has_layout)
+        self._btn_activate.setEnabled(has_layout)
+        # 激活布局不可删除
+        active = self._manager.get_active_layout_name()
+        self._btn_delete.setEnabled(has_layout and name and active != (self._current_layout.name if has_layout else ""))
+
+    def _auto_load_active(self):
+        """启动时自动加载激活布局"""
+        name = self._manager.get_active_layout_name()
+        if name:
+            layout = self._manager.load_layout(name)
+            if layout:
+                self._current_layout = layout
+                self._apply_layout_to_tabs()
+        self._update_layout_label()
+
+    def _on_activate_layout(self):
+        """将当前加载的布局设为激活"""
+        if self._current_layout is None:
+            self._status_bar.showMessage("没有已加载的布局")
+            return
+        name = self._current_layout.name
+        self._manager.set_active_layout(name)
+        self._update_layout_label()
+        self._status_bar.showMessage(f"已激活布局「{name}」")
 
     def _on_new_layout(self):
         """新建空布局"""
@@ -774,40 +801,35 @@ class RegionEditorDialog(QDialog):
             return
         self._current_layout = self._manager.new_layout(name)
         self._apply_layout_to_tabs()
-        self._refresh_layout_combo()
         self._update_layout_label()
-        self._status_bar.showMessage(f"已新建布局「{name}」")
+        self._status_bar.showMessage(f"已新建布局「{name}」并设为激活")
 
     def _on_load_layout(self):
-        """加载选中的布局到所有 Tab"""
-        name = self._layout_combo.currentText().strip()
-        if not name:
-            self._status_bar.showMessage("请选择要加载的布局")
+        """弹出对话框选择布局并加载"""
+        layouts = self._manager.list_layouts()
+        if not layouts:
+            self._status_bar.showMessage("没有可加载的布局，请先新建")
+            return
+        name, ok = QInputDialog.getItem(
+            self, "加载布局", "选择要加载的布局：", layouts, 0, False,
+        )
+        if not ok or not name:
             return
         layout = self._manager.load_layout(name)
         if layout is None:
-            self._status_bar.showMessage(f"布局「{name}」不存在")
+            self._status_bar.showMessage(f"布局「{name}」加载失败")
             return
         self._current_layout = layout
-        self._manager.set_active_layout(name)
         self._apply_layout_to_tabs()
         self._update_layout_label()
         self._status_bar.showMessage(f"已加载布局「{name}」")
 
     def _on_save_layout(self):
-        """从所有 Tab 收集 regions，全量写入布局文件"""
-        name = self._layout_combo.currentText().strip()
-        if not name:
-            self._status_bar.showMessage("请先新建或选择布局")
+        """从所有 Tab 收集 regions，全量写入当前布局文件"""
+        if self._current_layout is None:
+            self._status_bar.showMessage("没有已加载的布局")
             return
-        # 如果当前内存中没有布局，尝试加载
-        if self._current_layout is None or self._current_layout.name != name:
-            loaded = self._manager.load_layout(name)
-            if loaded is None:
-                self._status_bar.showMessage(f"布局「{name}」不存在，请先新建")
-                return
-            self._current_layout = loaded
-        # 从所有 tab 收集 regions
+        name = self._current_layout.name
         for scene_key, tab in self._tabs.items():
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
         self._manager.save_layout(self._current_layout)
@@ -817,11 +839,58 @@ class RegionEditorDialog(QDialog):
         self._status_bar.showMessage(f"已保存布局「{name}」，共 {total} 个区域")
         logger.info(f"布局已保存: {name}, {total} 个区域")
 
-    def _on_delete_layout(self):
-        """删除选中的布局"""
-        name = self._layout_combo.currentText().strip()
+    def _on_save_as_layout(self):
+        """另存为：输入新名称，若已存在则提示确认覆盖"""
+        if self._current_layout is None:
+            self._status_bar.showMessage("没有已加载的布局")
+            return
+        # 收集当前 regions 到临时布局
+        temp = Layout(name="")
+        for scene_key, tab in self._tabs.items():
+            temp.set_scene_regions(scene_key, tab.get_regions())
+
+        existing = self._manager.list_layouts()
+        name, ok = QInputDialog.getText(
+            self, "另存为", "请输入布局名称：",
+        )
+        if not ok or not name:
+            return
+        name = name.strip()
         if not name:
-            self._status_bar.showMessage("请选择要删除的布局")
+            return
+
+        # 检查是否覆盖
+        if name in existing:
+            reply = QMessageBox.question(
+                self, "确认覆盖",
+                f"布局「{name}」已存在，是否覆盖？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        temp.name = name
+        self._manager.save_layout(temp)
+        self._manager.set_active_layout(name)
+        self._current_layout = temp
+        self._update_layout_label()
+        total = sum(len(r) for r in temp.scenes.values())
+        self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
+        logger.info(f"布局已另存为: {name}, {total} 个区域")
+
+    def _on_delete_layout(self):
+        """删除布局（激活的不可删除）"""
+        active = self._manager.get_active_layout_name()
+        layouts = self._manager.list_layouts()
+        # 过滤掉激活布局
+        deletable = [n for n in layouts if n != active]
+        if not deletable:
+            self._status_bar.showMessage("没有可删除的布局（激活布局不可删除）")
+            return
+        name, ok = QInputDialog.getItem(
+            self, "删除布局", "选择要删除的布局：", deletable, 0, False,
+        )
+        if not ok or not name:
             return
         reply = QMessageBox.question(
             self, "确认删除",
@@ -831,9 +900,10 @@ class RegionEditorDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
         if self._manager.delete_layout(name):
-            self._current_layout = None
-            self._clear_all_tabs()
-            self._refresh_layout_combo()
+            # 如果删除的是当前加载的布局，清空内存
+            if self._current_layout and self._current_layout.name == name:
+                self._current_layout = None
+                self._clear_all_tabs()
             self._update_layout_label()
             self._status_bar.showMessage(f"已删除布局「{name}」")
         else:

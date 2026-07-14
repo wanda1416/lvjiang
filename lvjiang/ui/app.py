@@ -1,98 +1,295 @@
 """PyQt6 主窗口"""
 
+import ctypes
 import sys
+from ctypes import wintypes
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QStatusBar, QTabWidget, QSplitter, QListWidget, QListWidgetItem,
     QAbstractItemView,
 )
-from PyQt6.QtCore import Qt, QTimer, QRect
-from PyQt6.QtGui import QKeyEvent, QPainter, QPen, QColor
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QKeyEvent
 from loguru import logger
 
 
-class BorderOverlay(QWidget):
-    """全屏透明覆盖层，在目标窗口位置绘制彩色边框
-    
-    采用全屏覆盖策略：避免 Qt 多 DPI 下对非主屏窗口的坐标缩放问题。
-    窗口覆盖整个虚拟屏幕，只在目标窗口位置画边框，其余区域透明。
-    使用 WS_EX_TRANSPARENT 让鼠标点击穿透。
+HINSTANCE = getattr(wintypes, "HINSTANCE", wintypes.HANDLE)
+HICON = getattr(wintypes, "HICON", wintypes.HANDLE)
+HCURSOR = getattr(wintypes, "HCURSOR", wintypes.HANDLE)
+HBRUSH = getattr(wintypes, "HBRUSH", wintypes.HANDLE)
+HMENU = getattr(wintypes, "HMENU", wintypes.HANDLE)
+LPVOID = getattr(wintypes, "LPVOID", ctypes.c_void_p)
+ATOM = getattr(wintypes, "ATOM", ctypes.c_ushort)
+BYTE = getattr(wintypes, "BYTE", ctypes.c_ubyte)
+WPARAM = ctypes.c_size_t
+LPARAM = ctypes.c_ssize_t
+LRESULT = ctypes.c_ssize_t
+
+
+class BorderOverlay:
+    """Win32 点击穿透边框层。
+
+    这里刻意不用 Qt 顶层透明窗跨屏绘制，因为 Qt 的 screen.geometry()
+    是高 DPI 逻辑坐标，而 Win32 GetWindowRect/SetWindowPos 使用的是
+    当前进程视角下的窗口坐标。绘制和定位都走 Win32，能避免多屏/混合
+    DPI 时从屏幕 0 标记屏幕 1 出现偏移。
     """
 
+    _class_name = "LvjiangBorderOverlayWindow"
+    _class_registered = False
+    _wndproc = None
+    _instances: dict[int, "BorderOverlay"] = {}
+
     def __init__(self):
-        super().__init__()
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool  # 不显示在任务栏
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self._color = QColor(255, 0, 0)  # 默认红色
+        self._hwnd = None
+        self._color = (255, 0, 0)
         self._pen_width = 5
-        self._overlay_rect = None  # 边框绘制区域 (x, y, w, h)
 
-        # 设置为全屏点击穿透
-        import ctypes
-        self._setup_click_through()
+    @classmethod
+    def _register_class(cls):
+        if cls._class_registered:
+            return
 
-    def _setup_click_through(self):
-        """设置 WS_EX_TRANSPARENT 让鼠标事件穿透"""
-        import ctypes
-        hwnd = int(self.winId())
-        GWL_EXSTYLE = -20
-        WS_EX_TRANSPARENT = 0x00000020
-        WS_EX_LAYERED = 0x00080000
-        ex = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT | WS_EX_LAYERED)
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetModuleHandleW.restype = HINSTANCE
+        kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+        user32.DefWindowProcW.restype = LRESULT
+        user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, WPARAM, LPARAM]
+
+        wndproc_type = ctypes.WINFUNCTYPE(
+            LRESULT,
+            wintypes.HWND,
+            wintypes.UINT,
+            WPARAM,
+            LPARAM,
+        )
+
+        @wndproc_type
+        def wndproc(hwnd, msg, wparam, lparam):
+            if msg == 0x000F:  # WM_PAINT
+                overlay = cls._instances.get(int(hwnd))
+                if overlay is not None:
+                    overlay._paint(hwnd)
+                    return 0
+            if msg == 0x0002:  # WM_DESTROY
+                cls._instances.pop(int(hwnd), None)
+            return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+        cls._wndproc = wndproc
+
+        class WNDCLASSW(ctypes.Structure):
+            _fields_ = [
+                ("style", wintypes.UINT),
+                ("lpfnWndProc", wndproc_type),
+                ("cbClsExtra", ctypes.c_int),
+                ("cbWndExtra", ctypes.c_int),
+                ("hInstance", HINSTANCE),
+                ("hIcon", HICON),
+                ("hCursor", HCURSOR),
+                ("hbrBackground", HBRUSH),
+                ("lpszMenuName", wintypes.LPCWSTR),
+                ("lpszClassName", wintypes.LPCWSTR),
+            ]
+
+        user32.RegisterClassW.restype = ATOM
+        user32.RegisterClassW.argtypes = [ctypes.POINTER(WNDCLASSW)]
+
+        hinstance = kernel32.GetModuleHandleW(None)
+        wc = WNDCLASSW()
+        wc.lpfnWndProc = cls._wndproc
+        wc.hInstance = hinstance
+        wc.lpszClassName = cls._class_name
+
+        if not user32.RegisterClassW(ctypes.byref(wc)):
+            raise ctypes.WinError()
+        cls._class_registered = True
+
+    def _ensure_window(self):
+        if self._hwnd:
+            return
+
+        self._register_class()
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetModuleHandleW.restype = HINSTANCE
+        kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+
+        user32.CreateWindowExW.restype = wintypes.HWND
+        user32.CreateWindowExW.argtypes = [
+            wintypes.DWORD,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.HWND,
+            HMENU,
+            HINSTANCE,
+            LPVOID,
+        ]
+        user32.SetLayeredWindowAttributes.restype = wintypes.BOOL
+        user32.SetLayeredWindowAttributes.argtypes = [wintypes.HWND, wintypes.DWORD, BYTE, wintypes.DWORD]
+
+        ex_style = (
+            0x00000008  # WS_EX_TOPMOST
+            | 0x00080000  # WS_EX_LAYERED
+            | 0x00000020  # WS_EX_TRANSPARENT
+            | 0x00000080  # WS_EX_TOOLWINDOW
+            | 0x08000000  # WS_EX_NOACTIVATE
+        )
+        style = 0x80000000  # WS_POPUP
+        hwnd = user32.CreateWindowExW(
+            ex_style,
+            self._class_name,
+            "Lvjiang Border Overlay",
+            style,
+            0,
+            0,
+            1,
+            1,
+            None,
+            None,
+            kernel32.GetModuleHandleW(None),
+            None,
+        )
+        if not hwnd:
+            raise ctypes.WinError()
+
+        # 颜色键透明：窗口里的黑色透明，红/绿边框可见。
+        user32.SetLayeredWindowAttributes(hwnd, 0x000000, 255, 0x00000001)
+        self._hwnd = hwnd
+        self._instances[int(hwnd)] = self
+
+    def _paint(self, hwnd):
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+
+        class PAINTSTRUCT(ctypes.Structure):
+            _fields_ = [
+                ("hdc", wintypes.HDC),
+                ("fErase", wintypes.BOOL),
+                ("rcPaint", wintypes.RECT),
+                ("fRestore", wintypes.BOOL),
+                ("fIncUpdate", wintypes.BOOL),
+                ("rgbReserved", ctypes.c_byte * 32),
+            ]
+
+        user32.BeginPaint.restype = wintypes.HDC
+        user32.BeginPaint.argtypes = [wintypes.HWND, ctypes.POINTER(PAINTSTRUCT)]
+        user32.EndPaint.restype = wintypes.BOOL
+        user32.EndPaint.argtypes = [wintypes.HWND, ctypes.POINTER(PAINTSTRUCT)]
+        user32.GetClientRect.restype = wintypes.BOOL
+        user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        user32.FillRect.restype = ctypes.c_int
+        user32.FillRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), HBRUSH]
+        gdi32.CreateSolidBrush.restype = HBRUSH
+        gdi32.CreateSolidBrush.argtypes = [wintypes.DWORD]
+        gdi32.CreatePen.restype = wintypes.HANDLE
+        gdi32.CreatePen.argtypes = [ctypes.c_int, ctypes.c_int, wintypes.DWORD]
+        gdi32.SelectObject.restype = wintypes.HANDLE
+        gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HANDLE]
+        gdi32.GetStockObject.restype = wintypes.HANDLE
+        gdi32.GetStockObject.argtypes = [ctypes.c_int]
+        gdi32.DeleteObject.restype = wintypes.BOOL
+        gdi32.DeleteObject.argtypes = [wintypes.HANDLE]
+        gdi32.Rectangle.restype = wintypes.BOOL
+        gdi32.Rectangle.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+
+        ps = PAINTSTRUCT()
+        hdc = user32.BeginPaint(hwnd, ctypes.byref(ps))
+        try:
+            rect = wintypes.RECT()
+            user32.GetClientRect(hwnd, ctypes.byref(rect))
+
+            black_brush = gdi32.CreateSolidBrush(0x000000)
+            user32.FillRect(hdc, ctypes.byref(rect), black_brush)
+            gdi32.DeleteObject(black_brush)
+
+            r, g, b = self._color
+            colorref = r | (g << 8) | (b << 16)
+            pen = gdi32.CreatePen(0, self._pen_width, colorref)  # PS_SOLID
+            old_pen = gdi32.SelectObject(hdc, pen)
+            old_brush = gdi32.SelectObject(hdc, gdi32.GetStockObject(5))  # NULL_BRUSH
+
+            inset = max(1, self._pen_width // 2)
+            gdi32.Rectangle(
+                hdc,
+                inset,
+                inset,
+                max(inset + 1, rect.right - inset),
+                max(inset + 1, rect.bottom - inset),
+            )
+
+            gdi32.SelectObject(hdc, old_brush)
+            gdi32.SelectObject(hdc, old_pen)
+            gdi32.DeleteObject(pen)
+        finally:
+            user32.EndPaint(hwnd, ctypes.byref(ps))
 
     def show_border(self, left: int, top: int, width: int, height: int):
-        """显示全屏覆盖层，在指定位置绘制边框
-        坐标直接使用 Win32 虚拟屏幕坐标，无需 DPI 转换"""
-        # 计算整个虚拟屏幕范围
-        app = QApplication.instance()
-        min_x = min(s.geometry().x() for s in app.screens())
-        min_y = min(s.geometry().y() for s in app.screens())
-        max_x = max(s.geometry().x() + s.geometry().width() for s in app.screens())
-        max_y = max(s.geometry().y() + s.geometry().height() for s in app.screens())
-        # 设置全屏几何
-        self.setGeometry(min_x, min_y, max_x - min_x, max_y - min_y)
-        # 计算边框绘制区域（相对于窗口左上角）
-        offset = self._pen_width
-        self._overlay_rect = (
-            left - offset - min_x,
-            top - offset - min_y,
-            width + offset * 2,
-            height + offset * 2,
+        """在 Win32 窗口坐标上显示边框。"""
+        self._ensure_window()
+        user32 = ctypes.windll.user32
+        user32.SetWindowPos.restype = wintypes.BOOL
+        user32.SetWindowPos.argtypes = [
+            wintypes.HWND,
+            wintypes.HWND,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.UINT,
+        ]
+        user32.InvalidateRect.restype = wintypes.BOOL
+        user32.InvalidateRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT), wintypes.BOOL]
+        user32.UpdateWindow.restype = wintypes.BOOL
+        user32.UpdateWindow.argtypes = [wintypes.HWND]
+        user32.SetWindowPos(
+            self._hwnd,
+            wintypes.HWND(-1),  # HWND_TOPMOST
+            int(left),
+            int(top),
+            max(1, int(width)),
+            max(1, int(height)),
+            0x0010 | 0x0040 | 0x0200,  # NOACTIVATE | SHOWWINDOW | NOOWNERZORDER
         )
-        self.show()
-        self._setup_click_through()  # show 后重新设置
-        logger.debug(f"Overlay 全屏模式: 窗口=({min_x},{min_y},{max_x-min_x}x{max_y-min_y}) 边框={self._overlay_rect}")
+        user32.InvalidateRect(self._hwnd, None, True)
+        user32.UpdateWindow(self._hwnd)
+        logger.debug(f"Overlay Win32: ({left},{top},{width}x{height})")
 
     def hide_border(self):
-        """隐藏边框"""
-        self._overlay_rect = None
-        self.hide()
+        """隐藏边框。"""
+        if self._hwnd:
+            ctypes.windll.user32.ShowWindow.restype = wintypes.BOOL
+            ctypes.windll.user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+            ctypes.windll.user32.ShowWindow(self._hwnd, 0)  # SW_HIDE
 
     def set_color(self, color: str):
-        """设置边框颜色 ('red' / 'green')"""
+        """设置边框颜色 ('red' / 'green')。"""
         if color == "red":
-            self._color = QColor(255, 0, 0, 220)
+            self._color = (255, 0, 0)
         elif color == "green":
-            self._color = QColor(0, 200, 0, 220)
-        self.update()
+            self._color = (0, 200, 0)
+        if self._hwnd:
+            ctypes.windll.user32.InvalidateRect.restype = wintypes.BOOL
+            ctypes.windll.user32.InvalidateRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT), wintypes.BOOL]
+            ctypes.windll.user32.UpdateWindow.restype = wintypes.BOOL
+            ctypes.windll.user32.UpdateWindow.argtypes = [wintypes.HWND]
+            ctypes.windll.user32.InvalidateRect(self._hwnd, None, True)
+            ctypes.windll.user32.UpdateWindow(self._hwnd)
 
-    def paintEvent(self, event):
-        if not self._overlay_rect:
-            return
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(self._color, self._pen_width)
-        painter.setPen(pen)
-        rx, ry, rw, rh = self._overlay_rect
-        painter.drawRect(rx, ry, rw, rh)
-        painter.end()
+    def destroy(self):
+        """销毁原生窗口。"""
+        if self._hwnd:
+            ctypes.windll.user32.DestroyWindow.restype = wintypes.BOOL
+            ctypes.windll.user32.DestroyWindow.argtypes = [wintypes.HWND]
+            ctypes.windll.user32.DestroyWindow(self._hwnd)
+            self._instances.pop(int(self._hwnd), None)
+            self._hwnd = None
 
 
 class MainWindow(QMainWindow):
@@ -197,16 +394,10 @@ class MainWindow(QMainWindow):
         self.btn_scan.clicked.connect(self._on_scan)
         action_layout.addWidget(self.btn_scan)
 
-        self.btn_start = QPushButton("开始执行 (F9)")
-        self.btn_start.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;")
-        self.btn_start.clicked.connect(self._on_start)
-        action_layout.addWidget(self.btn_start)
-
-        self.btn_stop = QPushButton("停止 (F10)")
-        self.btn_stop.setStyleSheet("background-color: #f44336; color: white; padding: 8px;")
-        self.btn_stop.setEnabled(False)
-        self.btn_stop.clicked.connect(self._on_stop)
-        action_layout.addWidget(self.btn_stop)
+        self.btn_run_toggle = QPushButton()
+        self.btn_run_toggle.clicked.connect(self._on_toggle_running)
+        self._refresh_run_button()
+        action_layout.addWidget(self.btn_run_toggle)
 
         left_layout.addWidget(action_group)
         left_layout.addStretch()
@@ -257,6 +448,19 @@ class MainWindow(QMainWindow):
         sink = QtSink(self.log_text)
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
 
+    def _refresh_run_button(self):
+        """根据运行状态刷新单一运行按钮。"""
+        if self._running:
+            self.btn_run_toggle.setText("停止 (F10)")
+            self.btn_run_toggle.setStyleSheet(
+                "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+            )
+        else:
+            self.btn_run_toggle.setText("开始执行 (F9)")
+            self.btn_run_toggle.setStyleSheet(
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
+            )
+
     # === 快捷键 ===
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -277,14 +481,24 @@ class MainWindow(QMainWindow):
         if self._running:
             self.log_text.append("[提示] 请先停止当前任务，再重新扫描窗口")
             return
-        # 隐藏边框覆盖层
+
+        had_target = self._target_window is not None
+        self._target_window = None
         self._overlay.hide_border()
+        self.btn_locate.setEnabled(False)
+        self.lbl_window_info.setText("未定位窗口")
+        self.lbl_window_info.setStyleSheet("color: gray;")
+        self.statusBar().showMessage("正在扫描窗口...")
+        if had_target:
+            self.log_text.append("[状态] 重新扫描窗口，旧定位已失效")
+
         from ..core.capture import list_visible_windows
         self._scanned_windows = list_visible_windows()
         self.window_list.clear()
 
         if not self._scanned_windows:
             self.log_text.append("[错误] 未找到可见窗口")
+            self.statusBar().showMessage("未定位窗口 | 未找到可见窗口")
             return
 
         for w in self._scanned_windows:
@@ -296,6 +510,7 @@ class MainWindow(QMainWindow):
         self.btn_locate.setEnabled(False)
         self.lbl_window_info.setText("请在列表中选择目标窗口...")
         self.lbl_window_info.setStyleSheet("color: orange;")
+        self.statusBar().showMessage("已扫描窗口 | 请选择目标窗口并点击定位")
 
     def _on_window_selected(self):
         """窗口列表中选择了某项时，启用定位按钮"""
@@ -310,8 +525,8 @@ class MainWindow(QMainWindow):
         w = selected[0].data(Qt.ItemDataRole.UserRole)
         self._target_window = w
 
-        # Win32 与 Qt 同坐标系（Per Monitor DPI Aware v2），直接使用
-        ratio = self._get_dpi_ratio(w['left'], w['top'])
+        # 边框绘制和窗口枚举都走 Win32 坐标，DPI 这里只做诊断展示。
+        ratio = self._get_window_dpi_ratio(w["hwnd"])
         logger.info(
             f"目标窗口 Win32原始: ({w['left']},{w['top']},{w['width']}x{w['height']})"
             f" DPI={ratio}"
@@ -332,29 +547,20 @@ class MainWindow(QMainWindow):
         self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
         self._overlay.set_color("red")
 
-    def _get_dpi_ratio(self, physical_x: int, physical_y: int) -> float:
-        """根据坐标所在屏幕返回 DPI 缩放比
-
-        注意：Qt 的 screen.geometry() 逻辑坐标与 Win32 GetWindowRect
-        在同一坐标系下（Per Monitor DPI Aware v2），无需乘以 DPI。
-        """
-        app = QApplication.instance()
-        if not app:
-            return 1.0
-        for i, screen in enumerate(app.screens()):
-            geo = screen.geometry()
-            ratio = screen.devicePixelRatio()
-            logger.debug(
-                f"屏幕{i}: 逻辑=({geo.x()},{geo.y()},{geo.width()}x{geo.height()}) "
-                f"DPI={ratio}"
-            )
-            # 直接用逻辑坐标范围匹配（与 GetWindowRect 同坐标系）
-            if (geo.x() <= physical_x < geo.x() + geo.width()
-                    and geo.y() <= physical_y < geo.y() + geo.height()):
-                logger.info(f"目标在屏幕{i}, DPI={ratio}")
-                return ratio
-        logger.warning(f"未找到包含 ({physical_x},{physical_y}) 的屏幕")
+    def _get_window_dpi_ratio(self, hwnd: int) -> float:
+        """返回目标窗口所在屏幕的 DPI 缩放比，仅用于日志展示。"""
+        try:
+            dpi = ctypes.windll.user32.GetDpiForWindow(wintypes.HWND(hwnd))
+            if dpi:
+                return dpi / 96
+        except Exception as e:
+            logger.debug(f"获取窗口 DPI 失败: {e}")
         return 1.0
+
+    def closeEvent(self, event):
+        """关闭主窗口时清理原生覆盖层。"""
+        self._overlay.destroy()
+        super().closeEvent(event)
 
     def _on_scan(self):
         """扫描穿戴装备"""
@@ -367,12 +573,16 @@ class MainWindow(QMainWindow):
         """开始执行"""
         if self._running:
             return
+        if self._target_window is None:
+            message = "请先扫描窗口并点击“定位”，再开始执行。"
+            self.log_text.append(f"[提示] {message}")
+            self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
+            return
         flow = self.flow_selector.currentText()
         mode = self.mode_selector.currentText()
         self._running = True
         self.log_text.append(f"[操作] 开始执行: 流派={flow}, 模式={mode}")
-        self.btn_start.setEnabled(False)
-        self.btn_stop.setEnabled(True)
+        self._refresh_run_button()
         self.statusBar().showMessage(f"执行中: {flow} - {mode} | F10 停止")
         # 边框变绿色
         self._overlay.set_color("green")
@@ -383,11 +593,17 @@ class MainWindow(QMainWindow):
             return
         self._running = False
         self.log_text.append("[操作] 停止执行")
-        self.btn_start.setEnabled(True)
-        self.btn_stop.setEnabled(False)
+        self._refresh_run_button()
         self.statusBar().showMessage("已停止 | F9 开始")
         # 边框变回红色
         self._overlay.set_color("red")
+
+    def _on_toggle_running(self):
+        """单按钮切换运行状态。"""
+        if self._running:
+            self._on_stop()
+        else:
+            self._on_start()
 
 
 def run_app():

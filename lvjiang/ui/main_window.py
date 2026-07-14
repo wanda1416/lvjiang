@@ -2,13 +2,14 @@
 
 import ctypes
 from ctypes import wintypes
+import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QTabWidget, QSplitter,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtGui import QKeyEvent, QImage, QPixmap
 from loguru import logger
 
 from .overlay import BorderOverlay
@@ -31,6 +32,9 @@ class MainWindow(QMainWindow):
 
         # 边框覆盖层（定位/运行状态指示）
         self._overlay = BorderOverlay()
+
+        # 截屏器（定位后初始化，后续自动化复用）
+        self._capture = None
 
         self._setup_ui()
         logger.info("主窗口已初始化")
@@ -77,6 +81,15 @@ class MainWindow(QMainWindow):
 
         window_main_layout.addLayout(row2)
         main_layout.addWidget(window_group)
+
+        # === 截屏预览区 ===
+        self.preview_label = QLabel("定位窗口后自动截屏")
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setFixedHeight(320)
+        self.preview_label.setStyleSheet(
+            "background-color: #2b2b2b; color: #888; font-size: 14px;"
+        )
+        main_layout.addWidget(self.preview_label)
 
         # === 中部：左右分栏 ===
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -241,10 +254,12 @@ class MainWindow(QMainWindow):
         self.btn_locate.setEnabled(index >= 0)
 
     def _on_locate_window(self):
-        """定位选中的窗口，获取其坐标"""
+        """定位选中的窗口，实时获取其当前坐标"""
         w = self.window_combo.currentData()
         if not w:
             return
+        # 实时查询窗口当前位置（扫描时的坐标可能已过期）
+        self._refresh_window_rect(w)
         self._target_window = w
 
         # 边框绘制和窗口枚举都走 Win32 坐标，DPI 这里只做诊断展示。
@@ -270,6 +285,49 @@ class MainWindow(QMainWindow):
         self._overlay.set_color("red")
         # 定位成功，按钮从黄色"未定位"变为绿色"开始执行"
         self._refresh_run_button()
+        # 截屏展示
+        self._capture_preview()
+
+    def _capture_preview(self):
+        """截取已定位窗口的截图并展示在预览区。"""
+        if not self._target_window:
+            return
+        w = self._target_window
+        try:
+            from ..core.capture import ScreenCapture
+            if self._capture is None:
+                self._capture = ScreenCapture()
+            self._capture.set_capture_region(
+                w['left'], w['top'], w['width'], w['height']
+            )
+            img = self._capture.capture()  # numpy BGR
+            if img is None:
+                self.preview_label.setText("截屏失败")
+                return
+            h, w_img = img.shape[:2]
+            rgb = np.ascontiguousarray(img[:, :, ::-1])
+            fmt = QImage.Format.Format_RGB888
+            qimg = QImage(rgb.data, w_img, h, w_img * 3, fmt).copy()
+            pixmap = QPixmap.fromImage(qimg)
+            scaled = pixmap.scaled(
+                self.preview_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.preview_label.setPixmap(scaled)
+            logger.info(f"截屏预览成功 ({w_img}x{h})")
+        except Exception as e:
+            logger.error(f"截屏预览失败: {e}")
+            self.preview_label.setText(f"截屏失败: {e}")
+
+    def _refresh_window_rect(self, w: dict):
+        """通过 Win32 GetWindowRect 实时刷新窗口位置。"""
+        rect = wintypes.RECT()
+        if ctypes.windll.user32.GetWindowRect(wintypes.HWND(w['hwnd']), ctypes.byref(rect)):
+            w['left'] = rect.left
+            w['top'] = rect.top
+            w['width'] = rect.right - rect.left
+            w['height'] = rect.bottom - rect.top
 
     def _get_window_dpi_ratio(self, hwnd: int) -> float:
         """返回目标窗口所在屏幕的 DPI 缩放比，仅用于日志展示。"""

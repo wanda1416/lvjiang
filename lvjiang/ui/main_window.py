@@ -6,13 +6,14 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
-    QTabWidget, QSplitter, QMenuBar,
+    QTabWidget, QSplitter, QMenuBar, QMessageBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent, QImage, QPixmap, QAction
 from loguru import logger
 
 from .overlay import BorderOverlay
+from ..core.user_config import UserManager
 
 
 class MainWindow(QMainWindow):
@@ -40,24 +41,50 @@ class MainWindow(QMainWindow):
         # 区域布局（定位后由区域编辑器设置）
         self._region_layout = None
 
+        # 用户管理
+        self._user_manager = UserManager()
+
         self._setup_menu()
         self._setup_ui()
+        self._refresh_user_combo()  # 初始化用户选择器
         logger.info("主窗口已初始化")
 
     def _setup_menu(self):
         """构建顶部菜单栏"""
         menubar = self.menuBar()
 
-        # 工具菜单
+        # ── 设置 ──
+        settings_menu = menubar.addMenu("设置")
+
+        user_mgmt_action = QAction("用户管理", self)
+        user_mgmt_action.triggered.connect(self._open_user_manager)
+        settings_menu.addAction(user_mgmt_action)
+
+        settings_menu.addSeparator()
+
+        region_editor_action = QAction("区域编辑", self)
+        region_editor_action.triggered.connect(self._open_region_editor)
+        settings_menu.addAction(region_editor_action)
+
+        # ── 工具 ──
         tools_menu = menubar.addMenu("工具")
 
-        ocr_test_action = QAction("OCR 测试", self)
+        grad_calc_action = QAction("毕业率计算器", self)
+        grad_calc_action.setEnabled(False)
+        tools_menu.addAction(grad_calc_action)
+
+        tools_menu.addSeparator()
+
+        ocr_test_action = QAction("图像识别测试", self)
         ocr_test_action.triggered.connect(self._open_ocr_test)
         tools_menu.addAction(ocr_test_action)
 
-        region_editor_action = QAction("区域编辑器", self)
-        region_editor_action.triggered.connect(self._open_region_editor)
-        tools_menu.addAction(region_editor_action)
+        # ── 帮助 ──
+        help_menu = menubar.addMenu("帮助")
+
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
 
     def _open_ocr_test(self):
         """打开 OCR 测试对话框"""
@@ -79,13 +106,64 @@ class MainWindow(QMainWindow):
         )
         dialog.exec()
 
+    def _show_about(self):
+        """显示关于对话框"""
+        QMessageBox.about(
+            self,
+            "关于律匠",
+            "<h3>律匠 v0.1.0</h3>"
+            "<p>燕云十六声装备调律辅助工具</p>"
+            "<p>功能：窗口定位截屏 → 区域标注 → OCR识别 → 装备评估</p>"
+            "<hr>"
+            "<p style='color: gray;'>基于 PyQt6 + RapidOCR</p>",
+        )
+
+    def _open_user_manager(self):
+        """打开用户管理对话框"""
+        from .user_manager_dialog import UserManagerDialog
+        dialog = UserManagerDialog(self._user_manager, self)
+        dialog.exec()
+        # 关闭后刷新用户选择器
+        self._refresh_user_combo()
+
+    def _refresh_user_combo(self):
+        """刷新用户选择器下拉列表"""
+        self.user_combo.blockSignals(True)
+        self.user_combo.clear()
+        users = self._user_manager.list_users()
+        active = self._user_manager.get_active_user_name()
+        self.user_combo.addItems(users)
+        idx = self.user_combo.findText(active)
+        if idx >= 0:
+            self.user_combo.setCurrentIndex(idx)
+        self.user_combo.blockSignals(False)
+
+    def _on_user_changed(self, index: int):
+        """用户选择器切换"""
+        if index < 0:
+            return
+        name = self.user_combo.currentText()
+        if name and name != self._user_manager.get_active_user_name():
+            self._user_manager.set_active_user(name)
+            logger.info(f"已切换到用户: {name}")
+
     def _setup_ui(self):
         """构建界面"""
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
 
-        # === 顶部：目标窗口选择 ===
+        # === 顶部：当前用户 ===
+        user_row = QHBoxLayout()
+        user_row.addWidget(QLabel("当前用户"))
+        self.user_combo = QComboBox()
+        self.user_combo.setMinimumWidth(150)
+        self.user_combo.currentIndexChanged.connect(self._on_user_changed)
+        user_row.addWidget(self.user_combo)
+        user_row.addStretch()
+        main_layout.addLayout(user_row)
+
+        # === 目标窗口选择 ===
         window_group = QGroupBox("目标窗口")
         window_main_layout = QVBoxLayout(window_group)
 

@@ -37,8 +37,8 @@ class MainWindow(QMainWindow):
         self._capture = None
         self._last_capture = None  # 最近一次截屏（numpy BGR）
 
-        # 区域预设（定位后由区域编辑器设置）
-        self._region_preset = None
+        # 区域布局（定位后由区域编辑器设置）
+        self._region_layout = None
 
         self._setup_menu()
         self._setup_ui()
@@ -72,12 +72,12 @@ class MainWindow(QMainWindow):
         if image is None:
             logger.warning("请先定位窗口并截屏")
             return
-        dialog = RegionEditorDialog(image, self._region_preset, self)
+        dialog = RegionEditorDialog(
+            image,
+            refresh_callback=self._refresh_capture,
+            parent=self,
+        )
         dialog.exec()
-        preset = dialog.get_preset()
-        if preset:
-            self._region_preset = preset
-            logger.info(f"区域预设已更新: {preset.name}, {len(preset.regions)} 个区域")
 
     def _setup_ui(self):
         """构建界面"""
@@ -364,6 +364,26 @@ class MainWindow(QMainWindow):
     def _get_last_capture(self) -> np.ndarray | None:
         """获取最近一次截屏图片（numpy BGR）"""
         return self._last_capture
+
+    def _refresh_capture(self) -> np.ndarray | None:
+        """重新截取当前窗口截图（用于区域编辑器刷新）"""
+        if not self._target_window:
+            return None
+        try:
+            from ..core.capture import ScreenCapture
+            if self._capture is None:
+                self._capture = ScreenCapture()
+            w = self._target_window
+            self._capture.set_capture_region(
+                w['left'], w['top'], w['width'], w['height']
+            )
+            img = self._capture.capture()
+            if img is not None:
+                self._last_capture = img
+            return img
+        except Exception as e:
+            logger.error(f"刷新截图失败: {e}")
+            return None
 
     def _refresh_window_rect(self, w: dict):
         """通过 Win32 GetWindowRect 实时刷新窗口位置。"""

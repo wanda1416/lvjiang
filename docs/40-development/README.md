@@ -15,6 +15,7 @@
 | 日期 | 文件 | 主题 |
 |------|------|------|
 | 2026-07-14 | [2026-07/2026-07-14-overlay-dpi.md](2026-07/2026-07-14-overlay-dpi.md) | BorderOverlay 多 DPI 跨屏定位问题 |
+| 2026-07-14 | [2026-07/2026-07-14-layout-hierarchy-refactor.md](2026-07/2026-07-14-layout-hierarchy-refactor.md) | 区域配置布局层级重构（Layout → Scene → Region） |
 
 ## 日志格式
 

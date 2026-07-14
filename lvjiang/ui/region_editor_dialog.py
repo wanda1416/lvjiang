@@ -593,6 +593,7 @@ class RegionCanvas(QWidget):
 
         # 缩放手柄
         if selected:
+            painter.save()
             handles = self._get_handle_positions(r)
             painter.setPen(QPen(QColor(255, 255, 0), 1))
             painter.setBrush(QBrush(QColor(255, 255, 0)))
@@ -603,6 +604,7 @@ class RegionCanvas(QWidget):
                         HANDLE_SIZE * 2, HANDLE_SIZE * 2,
                     )
                 )
+            painter.restore()
 
     # ─── 尺寸变化 ────────────────────────────────────────
 
@@ -988,6 +990,13 @@ class RegionEditorDialog(QDialog):
                 if layout:
                     self._current_layout = layout
                     self._apply_layout_to_tabs()
+            # 先同步下拉框到激活布局，再刷新 UI 状态
+            self._layout_combo.blockSignals(True)
+            self._refresh_combo()
+            idx = self._layout_combo.findText(active) if active else -1
+            if idx >= 0:
+                self._layout_combo.setCurrentIndex(idx)
+            self._layout_combo.blockSignals(False)
             self._update_ui_state()
             self._status_bar.showMessage(f"已删除布局「{name}」，已切换到默认布局")
         else:

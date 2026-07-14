@@ -345,7 +345,7 @@ class MainWindow(QMainWindow):
 
         window_main_layout.addLayout(row1)
 
-        # 第二行：已定位信息 + 快捷键提示
+        # 第二行：已定位信息
         row2 = QHBoxLayout()
 
         self.lbl_window_info = QLabel("未选择窗口")
@@ -353,10 +353,6 @@ class MainWindow(QMainWindow):
         row2.addWidget(self.lbl_window_info)
 
         row2.addStretch()
-
-        shortcut_hint = QLabel("F9 开始 | F10 停止")
-        shortcut_hint.setStyleSheet("color: #666; font-size: 12px;")
-        row2.addWidget(shortcut_hint)
 
         window_main_layout.addLayout(row2)
         main_layout.addWidget(window_group)
@@ -449,11 +445,16 @@ class MainWindow(QMainWindow):
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
 
     def _refresh_run_button(self):
-        """根据运行状态刷新单一运行按钮。"""
+        """根据运行状态和定位状态刷新运行按钮。"""
         if self._running:
             self.btn_run_toggle.setText("停止 (F10)")
             self.btn_run_toggle.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+            )
+        elif self._target_window is None:
+            self.btn_run_toggle.setText("未定位")
+            self.btn_run_toggle.setStyleSheet(
+                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
             )
         else:
             self.btn_run_toggle.setText("开始执行 (F9)")
@@ -489,6 +490,7 @@ class MainWindow(QMainWindow):
         self.lbl_window_info.setText("未定位窗口")
         self.lbl_window_info.setStyleSheet("color: gray;")
         self.statusBar().showMessage("正在扫描窗口...")
+        self._refresh_run_button()  # 按钮变回黄色“未定位”
         if had_target:
             self.log_text.append("[状态] 重新扫描窗口，旧定位已失效")
 
@@ -546,6 +548,8 @@ class MainWindow(QMainWindow):
         # 显示红色边框（全屏覆盖层模式）
         self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
         self._overlay.set_color("red")
+        # 定位成功，按钮从黄色“未定位”变为绿色“开始执行”
+        self._refresh_run_button()
 
     def _get_window_dpi_ratio(self, hwnd: int) -> float:
         """返回目标窗口所在屏幕的 DPI 缩放比，仅用于日志展示。"""

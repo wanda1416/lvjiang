@@ -334,7 +334,7 @@ class RegionEditorDialog(QDialog):
     # ─── OCR 识别 ────────────────────────────────────────
 
     def _on_recognize(self):
-        """对当前 Tab 场景的所有已定义区域执行 OCR 识别（覆盖裁剪 + 一次推理）"""
+        """对当前 Tab 场景的所有已定义区域逐个裁剪识别"""
         current_tab = self._tabs.get(self._current_scene_key)
         if current_tab is None:
             return
@@ -353,42 +353,16 @@ class RegionEditorDialog(QDialog):
         engine = OCREngine()
         h, w = self._image.shape[:2]
 
-        # 计算覆盖所有区域的最小外接矩形（像素坐标）
-        min_x = min(r.x_ratio for r in regions) * w
-        min_y = min(r.y_ratio for r in regions) * h
-        max_x = max(r.x_ratio + r.w_ratio for r in regions) * w
-        max_y = max(r.y_ratio + r.h_ratio for r in regions) * h
-        # 转整数并留一点边距
-        crop_x = max(0, int(min_x) - 4)
-        crop_y = max(0, int(min_y) - 4)
-        crop_w = min(w, int(max_x) + 4) - crop_x
-        crop_h = min(h, int(max_y) + 4) - crop_y
-        crop_img = self._image[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w]
-
-        # 对裁剪区域一次 OCR
-        all_ocr = engine.recognize(crop_img)
-
-        # 将 OCR 结果的 bbox 坐标还原到全图坐标系
-        for ocr in all_ocr:
-            ocr.bbox = [(px + crop_x, py + crop_y) for px, py in ocr.bbox]
-
-        # 将 OCR 结果按 bbox 中心点分配到各区域
         self._result_text.clear()
         results = {}
         for region in regions:
-            rx1 = region.x_ratio * w
-            ry1 = region.y_ratio * h
-            rx2 = (region.x_ratio + region.w_ratio) * w
-            ry2 = (region.y_ratio + region.h_ratio) * h
-            texts = []
-            for ocr in all_ocr:
-                if not ocr.bbox:
-                    continue
-                cx = sum(p[0] for p in ocr.bbox) / 4
-                cy = sum(p[1] for p in ocr.bbox) / 4
-                if rx1 <= cx <= rx2 and ry1 <= cy <= ry2:
-                    texts.append(ocr.text)
-            text = " | ".join(texts) if texts else "(未识别到)"
+            x1 = int(region.x_ratio * w)
+            y1 = int(region.y_ratio * h)
+            x2 = int((region.x_ratio + region.w_ratio) * w)
+            y2 = int((region.y_ratio + region.h_ratio) * h)
+            crop = self._image[y1:y2, x1:x2]
+            ocr_results = engine.recognize(crop)
+            text = " | ".join(r.text for r in ocr_results) if ocr_results else "(未识别到)"
             results[region.name] = text
             self._result_text.append(f"{region.name}: {text}")
 

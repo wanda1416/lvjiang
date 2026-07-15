@@ -201,7 +201,7 @@ OCR 识别输出为原始文本，需经过清洗才能转换为上述结构化�
 | `XX阶` | 提取数字为 `level` |
 | `攻击100~232` | 解析为二元组 `[100, 232]` |
 
-**数据清洗模块**：`lvjiang.workflows.equip_analysis.EquipAnalysisWorkflow._parse_affix()`（待实现）
+**数据清洗模块**：词条清洗逻辑待实现，将作为 OCR 后处理步骤集成到工作流引擎（`WorkflowEngine` + `.wf` DSL）中。
 
 ---
 

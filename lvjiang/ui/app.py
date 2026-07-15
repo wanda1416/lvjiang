@@ -9,7 +9,8 @@ from .main_window import MainWindow
 
 def run_app():
     """启动应用"""
-    # Qt6 默认已设置 Per Monitor DPI Aware v2，无需额外调用
+    # 进程 DPI 感知已在入口 __main__._lock_dpi_awareness() 中锁定为 Per-Monitor v2，
+    # 必须早于 pyautogui import，此处不再重复设置。
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")

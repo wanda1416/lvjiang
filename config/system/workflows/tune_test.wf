@@ -9,7 +9,7 @@ wait step_interval
 click [equip_bag_detail].[slot_main_weapon]
 wait step_interval
 
-click [equip_bag_detail].[bag_1_2]
+click [equip_bag_detail].[bag_1_1]
 wait step_interval
 
 click [equip_weapon_detail].[more_func]

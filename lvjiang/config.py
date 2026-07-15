@@ -21,8 +21,8 @@ class DelayConfig(BaseModel):
     # ── 工作流级等待 ──
     step_interval: tuple[float, float] = (1.5, 2.5)       # 步骤间等待
     click_interval: tuple[float, float] = (1.5, 2.5)      # 连续点击间隔（未来扩展）
-    page_refresh_wait: float = 2.0                         # 点击后页面刷新等待
-    after_tune_wait: float = 3.0                           # 调律结果等待
+    page_refresh_wait: float | tuple[float, float] = 2.0   # 点击后页面刷新等待（单值固定等待，二元组则范围内随机）
+    after_tune_wait: float | tuple[float, float] = 3.0     # 调律结果等待（单值固定等待，二元组则范围内随机）
 
 
 class BudgetConfig(BaseModel):

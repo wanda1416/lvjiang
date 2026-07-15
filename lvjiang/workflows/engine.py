@@ -74,23 +74,28 @@ class WorkflowEngine:
 
             logger.debug(f"  步骤 {i+1}/{len(steps)}: {step.instruction} {step.args}")
 
-            match step.instruction:
-                case "click":
-                    self._exec_click(step)
-                case "wait":
-                    self._exec_wait(step)
-                case "scan":
-                    self._exec_scan(step)
-                case "click_match":
-                    result = self._exec_click_match(step)
-                    if result is not None:
-                        return result
-                case "collect":
-                    direct_output = dict(self._last_scan)
-                case "collect_as":
-                    self._exec_collect_as(step)
-                case "log":
-                    self._exec_log(step)
+            try:
+                match step.instruction:
+                    case "click":
+                        self._exec_click(step)
+                    case "wait":
+                        self._exec_wait(step)
+                    case "scan":
+                        self._exec_scan(step)
+                    case "click_match":
+                        result = self._exec_click_match(step)
+                        if result is not None:
+                            return result
+                    case "collect":
+                        direct_output = dict(self._last_scan)
+                    case "collect_as":
+                        self._exec_collect_as(step)
+                    case "log":
+                        self._exec_log(step)
+            except BaseException as e:
+                logger.error(f"工作流步骤异常 ({step.instruction} {step.args}): {e}")
+                logger.error(f"步骤 {i+1}/{len(steps)} 异常详情:\n{__import__('traceback').format_exc()}")
+                raise
 
         # 返回结果
         if direct_output is not None:

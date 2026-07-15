@@ -13,6 +13,58 @@
 | `equip_armor_detail` | 装备防具详情 | 识别防具的基础信息和词条分布（含双基础属性） |
 | `equip_tune_detail` | 装备调律详情 | 识别调律后的词条变化 |
 | `equip_tune_result` | 调律结果 | 识别调律结果页面的词条和关闭按钮 |
+| `game_main_page` | 游戏主页 | 主界面功能按钮（菜单、地图、移动等） |
+| `game_menu_page` | 游戏菜单 | 菜单页功能按钮（包裹、培养、商店等） |
+
+---
+
+## 字段属性语义
+
+每个场景字段由 YAML 定义，包含以下属性：
+
+```yaml
+fields:
+  - key: affix_gong       # 字段唯一标识（代码引用名）
+    name: 词条宫           # 显示名称（UI / 日志用）
+    type: attr             # 字段类型：attr / slot / func
+    is_text: true          # 是否需要 OCR 文字识别（仅 func 可设为 false）
+    is_clickable: true     # 是否可作为点击目标
+```
+
+### type — 字段类型
+
+决定字段在自动化流程中的**角色**，合法值三种：
+
+| type | 语义 | 典型场景 | OCR 行为 | 可点击 |
+|------|------|----------|----------|--------|
+| `attr` | **数据属性** — 需要被 OCR 读取的文字内容 | 装备词条（宫/商/角/徵/羽）、装备类型、等级 | 始终 OCR | 不可点击（默认） |
+| `slot` | **槽位** — 背包/装备栏中的可点击格子 | 装备槽位、背包格、材料格 | 不 OCR（默认 `is_text: false`） | 可点击 |
+| `func` | **功能按钮** — 界面上的可操作控件 | 返回、调律按钮、一键添加、菜单入口 | 视 `is_text` 而定 | 可点击 |
+
+### is_text — 是否进行 OCR 识别
+
+| 值 | 含义 | 常见搭配 |
+|----|------|----------|
+| `true`（默认） | 工作流对该区域执行 OCR，提取文字内容 | `attr` 字段默认；部分需要文字匹配的 `func` 按钮 |
+| `false` | 不执行 OCR，仅作为点击目标或占位区域 | `slot` 字段默认；图标类按钮（如返回、更多功能） |
+
+**典型用例**：`click_match "调律"` 指令依赖 `is_text: true` 的字段才能通过 OCR 文字匹配定位按钮。
+
+### is_clickable — 是否可点击
+
+| 值 | 含义 | 常见搭配 |
+|----|------|----------|
+| `false`（默认） | 该区域不会被点击，仅用于读取数据 | `attr` 字段 |
+| `true` | 工作流可通过 `click [scene].[field]` 点击该区域中心 | `slot`、`func` 字段 |
+
+### 属性组合速查
+
+| 组合 | 含义 | 实例 |
+|------|------|------|
+| `type: attr` | OCR 读文字，不点击 | 词条宫/商/角/徵/羽、装备类型 |
+| `type: slot, is_text: false, is_clickable: true` | 纯点击目标，不 OCR | 装备槽位、背包格 |
+| `type: func, is_text: false, is_clickable: true` | 图标按钮，点击但无需 OCR | 返回键、更多功能（`...`） |
+| `type: func, is_text: true, is_clickable: true` | 文字按钮，既可 OCR 匹配也可点击 | 「调律」「一键添加」「包裹」 |
 
 ---
 
@@ -128,7 +180,7 @@ config/local/screenshots/
 │   ├── equip_weapon_detail.png   # 武器详情页截图
 │   ├── equip_armor_detail.png    # 防具详情页截图
 │   └── equip_tune_detail.png     # 调律结果页截图
-└── VIVO投屏方案/
+└── 投屏布局/
     ├── equip_bag_detail.png
     ├── equip_weapon_detail.png
     ├── equip_armor_detail.png
@@ -146,7 +198,12 @@ name: 转律界面
 fields:
   - key: cost
     name: 消耗材料
-    type: info
+    type: attr
+  - key: confirm_btn
+    name: 确认
+    type: func
+    is_text: true
+    is_clickable: true
   # ...
 ```
 

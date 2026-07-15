@@ -6,7 +6,8 @@
 
 | 文件 | 内容 |
 |------|------|
-| [overview.md](overview.md) | 主流程与状态定义 |
+| [main-window-state-flow.md](main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
+| [scene-region-editing.md](scene-region-editing.md) | 场景区域编辑：装备武器/防具/调律详情 |
 
 ## 待补充
 

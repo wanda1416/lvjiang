@@ -13,7 +13,7 @@ from .canvas import RegionCanvas, EditMode
 class SceneTab(QWidget):
     """单个场景的编辑 Tab：左侧画布 + 右侧字段列表"""
 
-    def __init__(self, scene_key: str, image: np.ndarray, parent=None):
+    def __init__(self, scene_key: str, image: np.ndarray | None = None, parent=None):
         super().__init__(parent)
         self._scene_key = scene_key
 
@@ -21,7 +21,8 @@ class SceneTab(QWidget):
 
         # 左侧画布
         self._canvas = RegionCanvas()
-        self._canvas.set_image(image)
+        if image is not None:
+            self._canvas.set_image(image)
         self._canvas.set_current_fields(get_scene_fields(scene_key))
         splitter.addWidget(self._canvas)
 

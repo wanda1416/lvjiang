@@ -1,6 +1,5 @@
 """编辑器对话框 - 区域编辑器对话框 - 布局→场景 层级结构"""
 
-import numpy as np
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
     QPushButton, QComboBox, QInputDialog, QStatusBar,
@@ -12,6 +11,8 @@ from loguru import logger
 from ...core.region_config import (
     FIELD_GROUPS, Region, CanvasConfig, Layout, LayoutConfigManager,
     get_scene_name, get_scene_fields,
+    load_scene_screenshot, save_scene_screenshot,
+    copy_screenshots, delete_screenshots,
 )
 from .scene_tab import SceneTab
 from .canvas import EditMode
@@ -22,7 +23,6 @@ class RegionEditorDialog(QDialog):
 
     def __init__(
         self,
-        image: np.ndarray,
         refresh_callback=None,
         parent=None,
     ):
@@ -38,7 +38,6 @@ class RegionEditorDialog(QDialog):
         )
         self.setSizeGripEnabled(True)
 
-        self._image = image
         self._manager = LayoutConfigManager()
         self._refresh_callback = refresh_callback
         self._tabs: dict[str, SceneTab] = {}  # scene_key -> SceneTab
@@ -115,7 +114,7 @@ class RegionEditorDialog(QDialog):
         # 场景 Tab
         self._tab_widget = QTabWidget()
         for scene_key, (scene_name, _) in FIELD_GROUPS.items():
-            tab = SceneTab(scene_key, self._image)
+            tab = SceneTab(scene_key)  # 不传图片，后续按场景加载
             self._tabs[scene_key] = tab
             self._tab_widget.addTab(tab, scene_name)
         self._splitter.addWidget(self._tab_widget)
@@ -151,6 +150,28 @@ class RegionEditorDialog(QDialog):
         self._status_bar = QStatusBar()
         self._status_bar.showMessage("请先新建或加载布局")
         layout.addWidget(self._status_bar)
+
+    # ─── 名称校验 ─────────────────────────────────────────
+
+    def _validate_layout_name(self, name: str) -> bool:
+        """校验布局名称是否合法（不含文件系统禁用字符）"""
+        invalid_chars = r'\/:*?"<>|'
+        for ch in invalid_chars:
+            if ch in name:
+                QMessageBox.warning(
+                    self, "名称不合法",
+                    f"布局名称不能包含字符: {ch}\n"
+                    f"禁用字符: \\ / : * ? \" < > |",
+                )
+                return False
+        # 也不能以空格或点开头
+        if name.startswith(' ') or name.startswith('.'):
+            QMessageBox.warning(
+                self, "名称不合法",
+                "布局名称不能以空格或点开头",
+            )
+            return False
+        return True
 
     # ─── 布局栏操作 ──────────────────────────────────────
 
@@ -231,6 +252,8 @@ class RegionEditorDialog(QDialog):
         name = name.strip()
         if not name:
             return
+        if not self._validate_layout_name(name):
+            return
         # 保存当前激活布局，新建后恢复
         prev_active = self._manager.get_active_layout_name()
         layout = self._manager.new_layout(name)
@@ -287,6 +310,8 @@ class RegionEditorDialog(QDialog):
         name = name.strip()
         if not name:
             return
+        if not self._validate_layout_name(name):
+            return
 
         if name in existing:
             reply = QMessageBox.question(
@@ -299,6 +324,8 @@ class RegionEditorDialog(QDialog):
 
         temp.name = name
         self._manager.save_layout(temp)
+        # 复制截图目录
+        copy_screenshots(self._current_layout.name, name)
         self._current_layout = temp
         # 下拉框定位到新布局
         self._refresh_combo()
@@ -328,6 +355,7 @@ class RegionEditorDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
         if self._manager.delete_layout(name):
+            delete_screenshots(name)  # 删除截图目录
             self._current_layout = None
             self._clear_all_tabs()
             # 加载默认激活布局
@@ -351,14 +379,21 @@ class RegionEditorDialog(QDialog):
     # ─── Tab 操作 ────────────────────────────────────────
 
     def _apply_layout_to_tabs(self):
-        """将当前布局的区域数据和画布配置分发到各 Tab"""
+        """将当前布局的区域数据、画布配置、截图分发到各 Tab"""
         if self._current_layout is None:
             return
         canvas = self._current_layout.get_canvas()
+        layout_name = self._current_layout.name
         for scene_key, tab in self._tabs.items():
             regions = self._current_layout.get_scene_regions(scene_key)
             tab.set_regions(regions)
             tab.set_canvas_config(canvas)
+            # 加载该场景的截图，没有则清除旧截图
+            screenshot = load_scene_screenshot(layout_name, scene_key)
+            if screenshot is not None:
+                tab.canvas.set_image(screenshot)
+            else:
+                tab.canvas.clear_image()
             # 连接回调：区域变化 -> 标记 dirty
             tab.canvas.on_region_changed = self._on_any_region_changed
             # 连接回调：画布变化 -> 同步到其他 Tab + 标记 dirty
@@ -373,18 +408,29 @@ class RegionEditorDialog(QDialog):
     # ─── 刷新截图 ────────────────────────────────────────
 
     def _on_refresh_image(self):
-        """刷新截图（调用外部回调获取新截图）"""
+        """刷新当前场景的截图（调用外部回调获取新截图，保存到磁盘）"""
         if self._refresh_callback is None:
             self._status_bar.showMessage("无截图源，请先在主窗口定位窗口")
             return
-        new_image = self._refresh_callback()
+        if self._current_layout is None:
+            self._status_bar.showMessage("没有已加载的布局")
+            return
+        # 回调返回 (image, error_message)，成功时 error_message 为 None
+        result = self._refresh_callback()
+        new_image, error_msg = result if isinstance(result, tuple) else (result, None)
         if new_image is not None:
-            self._image = new_image
-            for tab in self._tabs.values():
-                tab.canvas.set_image(new_image)
-            self._status_bar.showMessage("截图已刷新")
+            scene_key = self._current_scene_key
+            layout_name = self._current_layout.name
+            # 保存到磁盘
+            save_scene_screenshot(layout_name, scene_key, new_image)
+            # 更新当前 Tab 画布
+            current_tab = self._tabs.get(scene_key)
+            if current_tab:
+                current_tab.canvas.set_image(new_image)
+            scene_name = get_scene_name(scene_key)
+            self._status_bar.showMessage(f"已保存「{scene_name}」场景截图")
         else:
-            self._status_bar.showMessage("刷新截图失败")
+            self._status_bar.showMessage(error_msg or "刷新截图失败")
 
     # ─── 画布模式切换 ───────────────────────────────
 
@@ -437,8 +483,14 @@ class RegionEditorDialog(QDialog):
         if not regions:
             self._status_bar.showMessage("没有已定义的区域")
             return
-        if self._image is None:
-            self._status_bar.showMessage("没有截图图片")
+        # 从当前 Tab 画布获取截图
+        if current_tab.canvas.pixmap is None:
+            self._status_bar.showMessage("当前场景无截图，请先刷新截图")
+            return
+        # 获取截图 numpy 数组
+        image = current_tab.canvas.get_image()
+        if image is None:
+            self._status_bar.showMessage("当前场景无截图")
             return
 
         self._status_bar.showMessage("正在识别...")
@@ -446,7 +498,7 @@ class RegionEditorDialog(QDialog):
 
         from ...core.ocr import OCREngine
         engine = OCREngine()
-        h, w = self._image.shape[:2]
+        h, w = image.shape[:2]
 
         # 画布配置（叠加两层变换）
         canvas = current_tab.get_canvas_config()
@@ -463,7 +515,7 @@ class RegionEditorDialog(QDialog):
             y1 = int(canvas_y + region.y_ratio * canvas_h)
             x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
             y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
-            crop = self._image[y1:y2, x1:x2]
+            crop = image[y1:y2, x1:x2]
             ocr_results = engine.recognize(crop)
             text = " | ".join(r.text for r in ocr_results) if ocr_results else "(未识别到)"
             results[region.name] = text

@@ -93,14 +93,9 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _open_region_editor(self):
-        """打开区域编辑器（使用当前截屏图片）"""
+        """打开区域编辑器（无需截图，按场景加载）"""
         from .region_editor import RegionEditorDialog
-        image = self._get_last_capture()
-        if image is None:
-            logger.warning("请先定位窗口并截屏")
-            return
         dialog = RegionEditorDialog(
-            image,
             refresh_callback=self._refresh_capture,
             parent=self,
         )
@@ -443,10 +438,12 @@ class MainWindow(QMainWindow):
         """获取最近一次截屏图片（numpy BGR）"""
         return self._last_capture
 
-    def _refresh_capture(self) -> np.ndarray | None:
-        """重新截取当前窗口截图（用于区域编辑器刷新）"""
+    def _refresh_capture(self) -> tuple[np.ndarray | None, str | None]:
+        """重新截取当前窗口截图（用于区域编辑器刷新）
+        返回 (image, error_message)，成功时 error_message 为 None
+        """
         if not self._target_window:
-            return None
+            return None, "请先在主窗口定位窗口"
         try:
             from ..core.capture import ScreenCapture
             if self._capture is None:
@@ -458,10 +455,11 @@ class MainWindow(QMainWindow):
             img = self._capture.capture()
             if img is not None:
                 self._last_capture = img
-            return img
+                return img, None
+            return None, "截图失败"
         except Exception as e:
             logger.error(f"刷新截图失败: {e}")
-            return None
+            return None, f"截图失败: {e}"
 
     def _refresh_window_rect(self, w: dict):
         """通过 Win32 GetWindowRect 实时刷新窗口位置。"""

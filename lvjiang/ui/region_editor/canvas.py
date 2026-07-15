@@ -67,6 +67,7 @@ class RegionCanvas(QWidget):
 
         # 图片
         self._pixmap: QPixmap | None = None
+        self._original_image: np.ndarray | None = None  # 原始 numpy 数组，供 OCR
         self._img_w = 0  # 原始图片尺寸
         self._img_h = 0
 
@@ -125,9 +126,28 @@ class RegionCanvas(QWidget):
         self._img_h = h
         qimg = QImage(rgb.data, w, h, w * 3, QImage.Format.Format_RGB888).copy()
         self._pixmap = QPixmap.fromImage(qimg)
+        self._original_image = image  # 保存原始 numpy 数组，供 OCR 使用
         self._zoom = 1.0  # 新图片时重置缩放
         self._recalc_display()
         self.update()
+
+    def get_image(self) -> np.ndarray | None:
+        """获取原始截图 numpy 数组（供 OCR 裁剪）"""
+        return self._original_image
+
+    def clear_image(self):
+        """清除背景图片（切换布局时调用）"""
+        self._pixmap = None
+        self._original_image = None
+        self._img_w = 0
+        self._img_h = 0
+        self._display_rect = QRectF()
+        self.update()
+
+    @property
+    def pixmap(self) -> QPixmap | None:
+        """是否有背景图片"""
+        return self._pixmap
 
     def _recalc_display(self):
         """计算图片在 widget 中的显示区域（左上角对齐，基准缩放）"""
@@ -865,6 +885,9 @@ class RegionCanvas(QWidget):
                 int(self._display_rect.height()),
                 self._pixmap,
             )
+        else:
+            # 无图片时绘制占位提示
+            self._draw_placeholder(painter)
 
         # 绘制画布框（遮罩 + 边框）
         self._draw_canvas_frame(painter)
@@ -905,6 +928,19 @@ class RegionCanvas(QWidget):
             painter.restore()
 
         painter.end()
+
+    def _draw_placeholder(self, painter: QPainter):
+        """无图片时绘制占位提示"""
+        painter.save()
+        # 深灰背景
+        painter.fillRect(self.rect(), QColor(40, 40, 40))
+        # 居中提示文字
+        font = QFont("Microsoft YaHei", 12)
+        painter.setFont(font)
+        painter.setPen(QColor(150, 150, 150))
+        text = "无截图\n请连接投屏后点击「刷新截图」"
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, text)
+        painter.restore()
 
     def _draw_canvas_frame(self, painter: QPainter):
         """绘制画布框：遮罩 + 边框 + 手柄"""

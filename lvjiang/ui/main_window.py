@@ -14,6 +14,7 @@ from loguru import logger
 
 from .overlay import BorderOverlay
 from ..core.user_config import UserConfigManager
+from ..core.region_config import LayoutConfigManager
 
 
 class MainWindow(QMainWindow):
@@ -44,9 +45,13 @@ class MainWindow(QMainWindow):
         # 用户管理
         self._user_manager = UserConfigManager()
 
+        # 布局管理
+        self._layout_manager = LayoutConfigManager()
+
         self._setup_menu()
         self._setup_ui()
         self._refresh_user_combo()  # 初始化用户选择器
+        self._refresh_layout_combo()  # 初始化布局选择器
         logger.info("主窗口已初始化")
 
     def _setup_menu(self):
@@ -96,6 +101,7 @@ class MainWindow(QMainWindow):
         """打开区域编辑器（无需截图，按场景加载）"""
         from .region_editor import RegionEditorDialog
         dialog = RegionEditorDialog(
+            layout_manager=self._layout_manager,
             refresh_callback=self._refresh_capture,
             parent=self,
         )
@@ -142,21 +148,54 @@ class MainWindow(QMainWindow):
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
 
+    def _refresh_layout_combo(self):
+        """刷新布局选择器下拉列表"""
+        self.layout_combo.blockSignals(True)
+        self.layout_combo.clear()
+        layouts = self._layout_manager.list_layouts()
+        active = self._layout_manager.get_active_layout_name()
+        self.layout_combo.addItems(layouts)
+        idx = self.layout_combo.findText(active)
+        if idx >= 0:
+            self.layout_combo.setCurrentIndex(idx)
+        self.layout_combo.blockSignals(False)
+
+    def _on_layout_changed(self, index: int):
+        """布局选择器切换"""
+        if index < 0:
+            return
+        name = self.layout_combo.currentText()
+        if name and name != self._layout_manager.get_active_layout_name():
+            self._layout_manager.set_active_layout(name)
+            logger.info(f"已切换到布局: {name}")
+
     def _setup_ui(self):
         """构建界面"""
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
 
-        # === 顶部：当前用户 ===
-        user_row = QHBoxLayout()
-        user_row.addWidget(QLabel("当前用户"))
+        # === 顶部：当前用户 + 当前布局 ===
+        top_row = QHBoxLayout()
+
+        # 当前用户
+        top_row.addWidget(QLabel("当前用户"))
         self.user_combo = QComboBox()
         self.user_combo.setMinimumWidth(150)
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
-        user_row.addWidget(self.user_combo)
-        user_row.addStretch()
-        main_layout.addLayout(user_row)
+        top_row.addWidget(self.user_combo)
+
+        top_row.addSpacing(20)
+
+        # 当前布局
+        top_row.addWidget(QLabel("当前布局"))
+        self.layout_combo = QComboBox()
+        self.layout_combo.setMinimumWidth(150)
+        self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
+        top_row.addWidget(self.layout_combo)
+
+        top_row.addStretch()
+        main_layout.addLayout(top_row)
 
         # === 目标窗口选择 ===
         window_group = QGroupBox("目标窗口")

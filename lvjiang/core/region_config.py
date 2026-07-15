@@ -283,6 +283,12 @@ class LayoutConfigManager:
             encoding="utf-8",
         )
 
+    def _reload_config(self):
+        """从文件重新加载配置（多实例同步）"""
+        self._config = self._load_config()
+        if "layouts" not in self._config:
+            self._config["layouts"] = []
+
     def _layout_path(self, name: str) -> Path:
         safe = "".join(c if c.isalnum() or c in "-_ " else "_" for c in name)
         return LAYOUTS_DIR / f"{safe}.json"
@@ -290,7 +296,8 @@ class LayoutConfigManager:
     # ─── 布局 CRUD ──────────────────────────────────────
 
     def list_layouts(self) -> list[str]:
-        """返回布局列表（按 config.json 中的顺序）"""
+        """返回布局列表（按 config.json 中的顺序，每次从文件读取）"""
+        self._reload_config()
         return list(self._config.get("layouts", []))
 
     def new_layout(self, name: str) -> Layout:

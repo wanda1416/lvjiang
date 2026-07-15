@@ -351,6 +351,20 @@ class LayoutConfigManager:
         logger.info(f"布局已删除: {name}")
         return True
 
+    def is_layout_valid(self, name: str) -> bool:
+        """检查布局是否有效（所有场景的所有字段都已绑定区域）"""
+        layout = self.load_layout(name)
+        if not layout:
+            return False
+        for scene_key in FIELD_GROUPS:
+            fields = get_scene_fields(scene_key)
+            regions = layout.scenes.get(scene_key, [])
+            bound_keys = {r.key for r in regions if r.key}
+            for field_key, _ in fields:
+                if field_key not in bound_keys:
+                    return False
+        return True
+
     # ─── 激活布局 ────────────────────────────────────────
 
     def get_active_layout_name(self) -> str:

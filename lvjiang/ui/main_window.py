@@ -48,10 +48,19 @@ class MainWindow(QMainWindow):
         # 布局管理
         self._layout_manager = LayoutConfigManager()
 
+        # OCR 引擎（懒加载）
+        from ..core.ocr import OCREngine
+        self._ocr = OCREngine()
+
+        # 输入控制器
+        from ..core.input import InputController
+        self._input = InputController()
+
         self._setup_menu()
         self._setup_ui()
         self._refresh_user_combo()  # 初始化用户选择器
         self._refresh_layout_combo()  # 初始化布局选择器
+        self._refresh_graduation_button()  # 初始化毕业率按钮
         logger.info("主窗口已初始化")
 
     def _setup_menu(self):
@@ -106,6 +115,9 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         dialog.exec()
+        # 区域编辑器关闭后，刷新布局和毕业率按钮状态
+        self._refresh_layout_combo()
+        self._refresh_graduation_button()
 
     def _show_about(self):
         """显示关于对话框"""
@@ -147,6 +159,7 @@ class MainWindow(QMainWindow):
         if name and name != self._user_manager.get_active_user_name():
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
+        self._refresh_graduation_button()
 
     def _refresh_layout_combo(self):
         """刷新布局选择器下拉列表"""
@@ -168,6 +181,50 @@ class MainWindow(QMainWindow):
         if name and name != self._layout_manager.get_active_layout_name():
             self._layout_manager.set_active_layout(name)
             logger.info(f"已切换到布局: {name}")
+        self._refresh_graduation_button()
+
+    def _refresh_graduation_button(self):
+        """刷新毕业率按钮可用性"""
+        user = self._user_manager.get_active_user_name()
+        layout = self._layout_manager.get_active_layout_name()
+        valid = bool(user and layout and self._layout_manager.is_layout_valid(layout))
+        self.btn_graduation.setEnabled(valid)
+
+    def _on_graduation(self):
+        """执行装备分析流程"""
+        if not self._target_window:
+            self.log_text.append("[错误] 请先定位窗口")
+            return
+
+        user_name = self._user_manager.get_active_user_name()
+        layout_name = self._layout_manager.get_active_layout_name()
+        layout = self._layout_manager.load_layout(layout_name)
+
+        if not layout:
+            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            return
+
+        from ..workflows.equip_analysis import EquipAnalysisWorkflow
+        workflow = EquipAnalysisWorkflow(
+            capture=self._capture,
+            ocr=self._ocr,
+            input_ctrl=self._input,
+            layout=layout,
+            user_name=user_name,
+            window_left=self._target_window["left"],
+            window_top=self._target_window["top"],
+        )
+
+        self.log_text.append("[开始] 装备分析流程...")
+        self.btn_graduation.setEnabled(False)
+        try:
+            result = workflow.run()
+            self.log_text.append(f"[完成] 识别到 {len(result)} 件装备")
+        except Exception as e:
+            self.log_text.append(f"[错误] 流程执行失败: {e}")
+            logger.exception("装备分析流程异常")
+        finally:
+            self._refresh_graduation_button()
 
     def _setup_ui(self):
         """构建界面"""
@@ -249,6 +306,12 @@ class MainWindow(QMainWindow):
         # 左侧：配置区
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
+
+        # 毕业率计算按钮
+        self.btn_graduation = QPushButton("计算毕业率")
+        self.btn_graduation.setEnabled(False)
+        self.btn_graduation.clicked.connect(self._on_graduation)
+        left_layout.addWidget(self.btn_graduation)
 
         # 流派选择
         flow_group = QGroupBox("目标流派")

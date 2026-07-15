@@ -8,6 +8,6 @@ fields:
 
   - key: close_btn
     name: 关闭
-    type: action
+    type: func
     is_text: false
     is_clickable: true

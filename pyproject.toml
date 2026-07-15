@@ -11,6 +11,7 @@ dependencies = [
     "PyQt6>=6.6",
     "mss>=9.0",
     "pyautogui>=0.9",
+    "pynput>=1.7",
     "rapidocr-onnxruntime>=1.2",
     "onnxruntime>=1.20,<1.21",
     "PyYAML>=6.0",

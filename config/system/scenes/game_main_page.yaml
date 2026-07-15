@@ -93,7 +93,7 @@ fields:
     is_clickable: true
 
   - key: greet
-    name: 打招呼
+    name: 动作
     type: func
     is_text: false
     is_clickable: true

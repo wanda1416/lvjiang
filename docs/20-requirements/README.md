@@ -92,8 +92,9 @@ user_config:
   
   # 延迟参数（模拟人类）
   delay:
-    click_interval: [0.1, 0.3]  # 随机范围
-    after_tune_wait: 1.5       # 调律动画等待
+    before_click_wait: [0.1, 0.3]  # 点击前延迟
+    after_click_wait: [0.1, 0.2]   # 点击后延迟
+    after_tune_wait: 3.0           # 调律动画等待
 ```
 
 ---

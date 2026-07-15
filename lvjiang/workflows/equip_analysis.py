@@ -168,15 +168,15 @@ class EquipAnalysisWorkflow:
 
         fields = get_scene_fields(scene_key)
         field_map = {k: name for k, name in fields}
-        # 获取功能字段集合（type == "func"），装备属性分析不需要
-        func_keys = {f.key for f in get_field_defs(scene_key) if f.type == "func"}
+        # 只 OCR type == "attr" 的字段
+        attr_keys = {f.key for f in get_field_defs(scene_key) if f.type == "attr"}
         result = {}
 
         for region in regions:
             if region.key not in field_map:
                 continue
-            if region.key in func_keys:
-                logger.debug(f"跳过功能字段: {region.key}")
+            if region.key not in attr_keys:
+                logger.debug(f"跳过非属性字段: {region.key}")
                 continue
 
             # 区域坐标 -> 截图像素

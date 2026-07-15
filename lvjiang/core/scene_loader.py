@@ -8,7 +8,7 @@ from loguru import logger
 
 
 # 合法的字段 type 枚举
-VALID_FIELD_TYPES = {"info", "attr", "func", "slot", "material", "action"}
+VALID_FIELD_TYPES = {"attr", "slot", "func"}
 
 
 @dataclass
@@ -16,7 +16,7 @@ class FieldDef:
     """单个字段的完整定义"""
     key: str
     name: str
-    type: str = "info"                # info/attr/func/slot/material/action
+    type: str = "attr"                # attr/slot/func
     is_text: bool = True              # 是否需要文字识别（OCR）
     is_clickable: bool = False        # 是否可点击
 

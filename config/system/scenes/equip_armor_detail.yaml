@@ -4,11 +4,11 @@ name: 防具详情
 fields:
   - key: equip_type
     name: 装备类型
-    type: info
+    type: attr
 
   - key: equip_level
     name: 装备等级
-    type: info
+    type: attr
 
   - key: base_attr_1
     name: 基础属性1

@@ -24,40 +24,40 @@ fields:
 
   - key: one_click_add
     name: 一键添加
-    type: action
+    type: func
     is_text: false
     is_clickable: true
 
   - key: material_1
     name: 材料格1
-    type: material
+    type: slot
 
   - key: material_2
     name: 材料格2
-    type: material
+    type: slot
 
   - key: material_3
     name: 材料格3
-    type: material
+    type: slot
 
   - key: material_4
     name: 材料格4
-    type: material
+    type: slot
 
   - key: material_5
     name: 材料格5
-    type: material
+    type: slot
 
   - key: material_6
     name: 材料格6
-    type: material
+    type: slot
 
   - key: material_7
     name: 材料格7
-    type: material
+    type: slot
 
   - key: tune_btn
     name: 调律
-    type: action
+    type: func
     is_text: false
     is_clickable: true

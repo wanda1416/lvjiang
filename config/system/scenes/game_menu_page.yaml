@@ -1,0 +1,137 @@
+key: game_menu_page
+name: 游戏菜单
+
+fields:
+  # ─── 无文字按钮 ───────────────────────────────────────
+  - key: yanji
+    name: 燕叽
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: mail
+    name: 邮件
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: notice
+    name: 公告
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: time
+    name: 时间
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: camera
+    name: 拍照
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: action
+    name: 动作
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: settings
+    name: 设置
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: feedback
+    name: 反馈
+    type: func
+    is_text: false
+    is_clickable: true
+
+  - key: exit
+    name: 退出
+    type: func
+    is_text: false
+    is_clickable: true
+
+  # ─── 有文字按钮 ───────────────────────────────────────
+  - key: bag
+    name: 包裹
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: train
+    name: 培养
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: wulinlu
+    name: 武林录
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: shop
+    name: 商店
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: activity
+    name: 活动
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: appearance
+    name: 外观
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: bu_gan
+    name: 不肝
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: harmony
+    name: 和鸣
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: travel
+    name: 同游
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: business
+    name: 百业
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: character
+    name: 角色
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: quest
+    name: 任务
+    type: func
+    is_text: true
+    is_clickable: true
+
+  - key: battle_pass
+    name: 战令
+    type: func
+    is_text: true
+    is_clickable: true

@@ -335,19 +335,17 @@ class LayoutConfigManager:
         logger.info(f"布局已删除: {name}")
         return True
 
-    def is_layout_valid(self, name: str) -> bool:
-        """检查布局是否有效（所有场景的所有字段都已绑定区域）"""
+    def check_scenes_valid(self, name: str, scene_keys: list[str]) -> list[str]:
+        """检查指定场景是否已绑定区域，返回缺失场景的名称列表"""
         layout = self.load_layout(name)
         if not layout:
-            return False
-        for scene_key in FIELD_GROUPS:
-            fields = get_scene_fields(scene_key)
+            return [get_scene_name(k) for k in scene_keys]
+        missing = []
+        for scene_key in scene_keys:
             regions = layout.scenes.get(scene_key, [])
-            bound_keys = {r.key for r in regions if r.key}
-            for field_key, _ in fields:
-                if field_key not in bound_keys:
-                    return False
-        return True
+            if not regions:
+                missing.append(get_scene_name(scene_key))
+        return missing
 
     # ─── 激活布局 ────────────────────────────────────────
 

@@ -35,7 +35,6 @@ class RunControlMixin:
         if name and name != self._user_manager.get_active_user_name():
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
-        self._refresh_graduation_button()
 
     # ─── 布局选择器 ────────────────────────────────────────
 
@@ -59,21 +58,14 @@ class RunControlMixin:
         if name and name != self._layout_manager.get_active_layout_name():
             self._layout_manager.set_active_layout(name)
             logger.info(f"已切换到布局: {name}")
-        self._refresh_graduation_button()
 
     # ─── 毕业率按钮 ────────────────────────────────────────
-
-    def _refresh_graduation_button(self):
-        """刷新毕业率按钮可用性"""
-        user = self._user_manager.get_active_user_name()
-        layout = self._layout_manager.get_active_layout_name()
-        valid = bool(user and layout and self._layout_manager.is_layout_valid(layout))
-        self.btn_graduation.setEnabled(valid)
 
     def _on_graduation(self):
         """执行装备分析流程"""
         if not self._target_window:
             self.log_text.append("[错误] 请先定位窗口")
+            self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
             return
 
         user_name = self._user_manager.get_active_user_name()
@@ -82,6 +74,15 @@ class RunControlMixin:
 
         if not layout:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            return
+
+        # 延迟校验：检查所需场景是否已绑定区域
+        from ..workflows.equip_analysis import REQUIRED_SCENES
+        missing = self._layout_manager.check_scenes_valid(layout_name, REQUIRED_SCENES)
+        if missing:
+            names = "、".join(missing)
+            self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
+            self.statusBar().showMessage(f"场景缺失: {names}")
             return
 
         from ..workflows.equip_analysis import EquipAnalysisWorkflow
@@ -104,7 +105,7 @@ class RunControlMixin:
             self.log_text.append(f"[错误] 流程执行失败: {e}")
             logger.exception("装备分析流程异常")
         finally:
-            self._refresh_graduation_button()
+            self.btn_graduation.setEnabled(True)
 
     # ─── 运行按钮 ──────────────────────────────────────────
 

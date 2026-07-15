@@ -32,6 +32,9 @@ TARGET_SLOTS = [
 WEAPON_SLOTS = {s[0] for s in TARGET_SLOTS[:4]}
 ARMOR_SLOTS = {s[0] for s in TARGET_SLOTS[4:]}
 
+# 装备分析所需场景
+REQUIRED_SCENES = ["equip_bag_detail", "equip_weapon_detail", "equip_armor_detail"]
+
 # 点击后等待页面刷新时间（秒）
 CLICK_WAIT = 2.0
 

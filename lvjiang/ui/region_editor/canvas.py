@@ -784,10 +784,10 @@ class RegionCanvas(QWidget):
         )
         self._regions.append(new_region)
         new_idx = len(self._regions) - 1
-        # 提示绑定字段
+        # 提示绑定字段（如果所有字段已分配，区域会被移除）
         self._prompt_field_selection(new_idx)
-        # 选中新区域（方便用户拖走）
-        if self._regions[new_idx].key:  # 如果绑定成功
+        # 选中新区域（需检查区域是否仍存在）
+        if new_idx < len(self._regions) and self._regions[new_idx].key:
             self._selected_idx = new_idx
             self._field_selected = True
             self.update()

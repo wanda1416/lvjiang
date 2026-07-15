@@ -1,0 +1,99 @@
+name: 鸣金虹
+description: 鸣金·虹流派装备评估规则
+
+# ── 有效词条（首词条之外） ──
+valid_affixes:
+  - 劲
+  - 势
+  - 最大外功攻击
+  - 最大无相攻击
+  - 最大鸣金攻击
+  - 会意率
+  - 会心率
+  - 精准率
+
+# ── 转律词库（转律后可能出现的所有词条） ──
+# 不在词库中的词条（如精准率）不可能通过转律获得
+tuning_pool:
+  weapon:     [最大外功攻击, 最大无相攻击, 劲, 势, 会意率, 会心率]
+  non_weapon: [最大外功攻击, 最大鸣金攻击, 劲, 势, 会意率, 会心率]
+
+# ── 转律约束 ──
+tuning_constraints:
+  no_duplicate: true          # 不会与已有非首词条重复
+  max_attribute_attack: 2     # 非首词条中最多 2 个属性攻击（无相/鸣金）
+
+# ── 优先级（从最差到最好，不含不合格词条） ──
+# 不合格词条自动视为比所有列出的更差且相同
+priority:
+  - 精准率                    # 不在词库，只可能是原有的
+  - 会心率                    # 扣1分
+  - 最大无相攻击              # 扣1分
+  - 最大鸣金攻击              # 扣1分
+  - 劲                        # 无扣分
+  - 势                        # 无扣分
+  - 会意率                    # 无扣分
+  - 最大外功攻击              # 无扣分（最佳）
+
+# ── 首词条（按部位） ──
+first_affix:
+  main_weapon: [最大外功攻击, 势]
+  sub_weapon:  [最大外功攻击, 势]
+  ring:        [最大外功攻击]
+  pendant:     [最大外功攻击]
+  head:        [会意率]
+  chest:       [会意率]
+  leg:         [劲]
+  wrist:       [劲]
+
+# ── 品阶要求 ──
+quality:
+  weapon_jewelry: gold
+  armor: [gold, purple]
+
+# ── 神力/特殊要求 ──
+divine_affixes:
+  - match: { type: 剑 }
+    affixes: [剑武学增伤]
+    required: true
+  - match: { type: 枪 }
+    affixes: [枪武学增伤]
+    required: false
+  - match: { slot: [ring, pendant] }
+    affixes: [全武学增效]
+    required: true
+  - match: { slot: [head, chest] }
+    affixes: [单体奇术增伤]
+    required: false
+  - match: { slot: [leg, wrist] }
+    affixes: [对首领单位增伤]
+    required: true
+    alt: [对玩家单位增效]
+
+# ── 扣分规则 ──
+deduction_rules:
+  - type: combo_count
+    affixes: [势, 会意率]
+    count_affix: 势
+    description: 势+会意率同时出现，扣分=势的条数
+
+  - type: invalid_count
+    affixes: [会心率, 精准率]
+    deduction: 1
+    disqualify_at: 2
+    description: 会心率/精准率每条扣1分，>=2条不合格
+
+  - type: existence
+    affixes: [最大无相攻击, 最大鸣金攻击]
+    deduction: 1
+    description: 无相/鸣金攻击每条扣1分
+
+# ── 评级阈值 ──
+rating:
+  heirloom: 0
+  qualified: 1
+  marginal: 2
+
+# ── 调律熔断阈值 ──
+tuning:
+  max_deductions: 2

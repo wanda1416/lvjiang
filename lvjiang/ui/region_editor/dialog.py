@@ -2,9 +2,9 @@
 
 import numpy as np
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
     QPushButton, QComboBox, QInputDialog, QStatusBar,
-    QTextEdit, QApplication, QTabWidget, QMessageBox,
+    QTextEdit, QApplication, QTabWidget, QMessageBox, QSplitter,
 )
 from PyQt6.QtCore import Qt
 from loguru import logger
@@ -43,6 +43,7 @@ class RegionEditorDialog(QDialog):
         self._refresh_callback = refresh_callback
         self._tabs: dict[str, SceneTab] = {}  # scene_key -> SceneTab
         self._current_layout: Layout | None = None
+        self._dirty = False  # 是否有未保存的改动
 
         self._setup_ui()
         self._auto_load_active()
@@ -96,38 +97,57 @@ class RegionEditorDialog(QDialog):
 
         top_bar.addStretch()
 
-        # 右侧：激活布局标签
+        # 右侧：激活布局标签 + 修改状态指示
         self._active_label = QLabel("默认布局：无")
         self._active_label.setStyleSheet("color: #555; font-weight: bold;")
         top_bar.addWidget(self._active_label)
 
+        self._dirty_label = QLabel("● 有改动")
+        self._dirty_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
+        self._dirty_label.setVisible(False)
+        top_bar.addWidget(self._dirty_label)
+
         layout.addLayout(top_bar)
 
-        # ─── 场景 Tab ───
+        # ─── 主分割器：画布 + OCR 结果 ───
+        self._splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # 场景 Tab
         self._tab_widget = QTabWidget()
         for scene_key, (scene_name, _) in FIELD_GROUPS.items():
             tab = SceneTab(scene_key, self._image)
             self._tabs[scene_key] = tab
             self._tab_widget.addTab(tab, scene_name)
-        layout.addWidget(self._tab_widget, stretch=1)
+        self._splitter.addWidget(self._tab_widget)
 
-        # ─── 底部：识别 + OCR 结果 + 状态栏 ───
-        bottom_row = QHBoxLayout()
+        # OCR 结果区
+        ocr_panel = QWidget()
+        ocr_layout = QVBoxLayout(ocr_panel)
+        ocr_layout.setContentsMargins(0, 0, 0, 0)
+
+        btn_row = QHBoxLayout()
         self._btn_recognize = QPushButton("识别全部字段")
         self._btn_recognize.clicked.connect(self._on_recognize)
-        bottom_row.addWidget(self._btn_recognize)
-        bottom_row.addStretch()
-        layout.addLayout(bottom_row)
+        btn_row.addWidget(self._btn_recognize)
+        btn_row.addStretch()
+        ocr_layout.addLayout(btn_row)
 
         self._result_text = QTextEdit()
         self._result_text.setReadOnly(True)
-        self._result_text.setMinimumHeight(180)
+        self._result_text.setMinimumHeight(60)
         self._result_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
         )
         self._result_text.setPlaceholderText("点击「识别全部字段」查看 OCR 结果")
-        layout.addWidget(self._result_text, stretch=1)
+        ocr_layout.addWidget(self._result_text)
 
+        self._splitter.addWidget(ocr_panel)
+        self._splitter.setStretchFactor(0, 2)  # 画布占 2/3
+        self._splitter.setStretchFactor(1, 1)  # OCR 占 1/3
+
+        layout.addWidget(self._splitter, stretch=1)
+
+        # ─── 状态栏 ───
         self._status_bar = QStatusBar()
         self._status_bar.showMessage("请先新建或加载布局")
         layout.addWidget(self._status_bar)
@@ -243,6 +263,7 @@ class RegionEditorDialog(QDialog):
         self._update_ui_state()
         total = sum(len(tab.get_regions()) for tab in self._tabs.values())
         self._status_bar.showMessage(f"已保存布局「{name}」，共 {total} 个区域")
+        self._set_dirty(False)
         logger.info(f"布局已保存: {name}, {total} 个区域")
 
     def _on_save_as_layout(self):
@@ -287,6 +308,7 @@ class RegionEditorDialog(QDialog):
         self._update_ui_state()
         total = sum(len(r) for r in temp.scenes.values())
         self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
+        self._set_dirty(False)
         logger.info(f"布局已另存为: {name}, {total} 个区域")
 
     def _on_delete_layout(self):
@@ -337,8 +359,11 @@ class RegionEditorDialog(QDialog):
             regions = self._current_layout.get_scene_regions(scene_key)
             tab.set_regions(regions)
             tab.set_canvas_config(canvas)
-            # 连接画布修改回调，同步到其他 Tab
+            # 连接回调：区域变化 -> 标记 dirty
+            tab.canvas.on_region_changed = self._on_any_region_changed
+            # 连接回调：画布变化 -> 同步到其他 Tab + 标记 dirty
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
+        self._set_dirty(False)
 
     def _clear_all_tabs(self):
         """清空所有 Tab 的区域"""
@@ -390,6 +415,16 @@ class RegionEditorDialog(QDialog):
         for key, tab in self._tabs.items():
             if tab is not source_tab:
                 tab.set_canvas_config(canvas)
+        self._set_dirty(True)
+
+    def _on_any_region_changed(self):
+        """任一 Tab 的区域被修改时，标记 dirty"""
+        self._set_dirty(True)
+
+    def _set_dirty(self, dirty: bool):
+        """设置/清除修改状态指示"""
+        self._dirty = dirty
+        self._dirty_label.setVisible(dirty)
 
     # ─── OCR 识别 ────────────────────────────────────────
 

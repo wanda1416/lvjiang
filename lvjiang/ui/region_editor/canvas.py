@@ -886,14 +886,18 @@ class RegionCanvas(QWidget):
         if self._snap_lines_x or self._snap_lines_y:
             painter.save()
             painter.setPen(QPen(QColor(255, 0, 255), 1, Qt.PenStyle.DashLine))
-            for nx in self._snap_lines_x:
-                x = self._display_rect.x() + nx * self._display_rect.width()
+            for cx in self._snap_lines_x:
+                # 画布相对归一化 -> 截图归一化 -> widget 坐标
+                sx, _ = self._canvas_to_screenshot_norm(cx, 0)
+                x = self._display_rect.x() + sx * self._display_rect.width()
                 painter.drawLine(
                     QPointF(x, self._display_rect.top()),
                     QPointF(x, self._display_rect.bottom()),
                 )
-            for ny in self._snap_lines_y:
-                y = self._display_rect.y() + ny * self._display_rect.height()
+            for cy in self._snap_lines_y:
+                # 画布相对归一化 -> 截图归一化 -> widget 坐标
+                _, sy = self._canvas_to_screenshot_norm(0, cy)
+                y = self._display_rect.y() + sy * self._display_rect.height()
                 painter.drawLine(
                     QPointF(self._display_rect.left(), y),
                     QPointF(self._display_rect.right(), y),

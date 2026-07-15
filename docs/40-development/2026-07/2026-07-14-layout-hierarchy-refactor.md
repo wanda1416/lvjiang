@@ -155,8 +155,8 @@ config/
 **现象**：用户频繁修改布局导致 `config/` 目录不断产生新提交，污染 git 历史。
 
 **修复**：
-- 新增 `USER_CONFIG_DIR = config/user/`，`LAYOUTS_DIR` 和 `CONFIG_FILE` 迁移至该目录。
-- `.gitignore` 排除 `config/user/`，自带配置（`default.yaml` 等）保留在 `config/` 下继续跟踪。
+- 新增 `LOCAL_CONFIG_DIR = config/local/`，`LAYOUTS_DIR` 和 `SESSION_PATH` 迁移至该目录。
+- `.gitignore` 排除 `config/local/`，系统配置（`app.yaml` 等）保留在 `config/system/` 下继续跟踪。
 
 ### 8. 画布全局调整模式
 
@@ -256,7 +256,7 @@ region_editor/
 - 设置菜单“用户管理”启用，打开用户管理对话框
 - 用户管理对话框支持新建用户、删除用户、查看用户信息
 - 激活用户不可删除，至少保留一个用户
-- 用户数据存储在 `config/user/users.json`（单文件）
+- 用户数据存储在 `config/local/session.json`（运行时状态）
 - 首次运行自动创建“默认用户”
 - 布局为全局共享配置，不与用户绑定
 
@@ -290,6 +290,6 @@ region_editor/
 | 语义清晰度 | "布局"一词在场景级别，容易混淆 | "布局"对应设备，直觉清晰 |
 | 保存方式 | 按场景单独保存 | 全量保存所有场景 |
 | UI 结构 | 场景下拉框 + 单画布 | 场景 Tab + 每 Tab 独立画布 |
-| 配置存储 | 单文件 `regions.json` | `config/default.yaml`（自带）+ `config/user/`（用户级，git 忽略） |
+| 配置存储 | 单文件 `regions.json` | `config/system/app.yaml`（系统配置）+ `config/local/`（本地数据，git 忽略） |
 
 **核心启示**：当发现组织层级反了的时候，越早改越好。继续在上层打补丁只会让后续逻辑越来越扭曲。用户频繁变动的配置必须与自带配置分离，避免污染 git 历史。

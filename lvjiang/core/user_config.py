@@ -7,12 +7,12 @@ from pathlib import Path
 
 from loguru import logger
 
-from ..constants import USER_CONFIG_DIR
+from ..constants import LOCAL_CONFIG_DIR
 
 
 # ─── 路径常量 ────────────────────────────────────────────
 
-CONFIG_FILE = USER_CONFIG_DIR / "config.json"
+SESSION_FILE = LOCAL_CONFIG_DIR / "session.json"
 
 
 # ─── 数据类 ──────────────────────────────────────────────
@@ -43,16 +43,16 @@ class UserConfigManager:
     """用户管理：增删查改 + 当前用户切换"""
 
     def __init__(self):
-        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         self._users: dict[str, User] = {}
         self._active_user: str = ""
         self._load()
 
     def _load(self):
-        """从 config.json 加载用户相关字段"""
-        if CONFIG_FILE.exists():
+        """从 session.json 加载用户相关字段"""
+        if SESSION_FILE.exists():
             try:
-                data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+                data = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
                 for u_data in data.get("users", []):
                     user = User.from_dict(u_data)
                     self._users[user.name] = user
@@ -60,7 +60,7 @@ class UserConfigManager:
                 if self._active_user and self._active_user not in self._users:
                     self._active_user = ""
             except Exception as e:
-                logger.error(f"加载 config.json 用户数据失败: {e}")
+                logger.error(f"加载 session.json 用户数据失败: {e}")
                 self._users = {}
                 self._active_user = ""
 
@@ -69,17 +69,17 @@ class UserConfigManager:
             self._create_default_user()
 
     def _save(self):
-        """保存用户字段到 config.json（保留其他字段）"""
+        """保存用户字段到 session.json（保留其他字段）"""
         data = {}
-        if CONFIG_FILE.exists():
+        if SESSION_FILE.exists():
             try:
-                data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+                data = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
             except Exception:
                 pass
         data["users"] = [u.to_dict() for u in self._users.values()]
         data["active_user"] = self._active_user
-        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG_FILE.write_text(
+        LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        SESSION_FILE.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )

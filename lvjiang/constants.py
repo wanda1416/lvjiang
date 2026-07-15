@@ -5,13 +5,16 @@ from pathlib import Path
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
-USER_CONFIG_DIR = CONFIG_DIR / "user"
-FLOWS_DIR = CONFIG_DIR / "flows"
-SYSTEM_SCENES_DIR = CONFIG_DIR / "system" / "scenes"
 
-# 默认配置文件路径
-DEFAULT_CONFIG_PATH = CONFIG_DIR / "default.yaml"
-COORDINATE_CONFIG_PATH = CONFIG_DIR / "coordinate.yaml"
+# 系统配置（随版本发布）
+SYSTEM_CONFIG_DIR = CONFIG_DIR / "system"
+SYSTEM_SCENES_DIR = SYSTEM_CONFIG_DIR / "scenes"
+APP_CONFIG_PATH = SYSTEM_CONFIG_DIR / "app.yaml"
+
+# 本地数据（运行时生成，.gitignore）
+LOCAL_CONFIG_DIR = CONFIG_DIR / "local"
+PREFERENCES_PATH = LOCAL_CONFIG_DIR / "preferences.yaml"
+SESSION_PATH = LOCAL_CONFIG_DIR / "session.json"
 
 # 基准分辨率（坐标配置基于此分辨率）
 BASE_RESOLUTION = (1920, 1080)

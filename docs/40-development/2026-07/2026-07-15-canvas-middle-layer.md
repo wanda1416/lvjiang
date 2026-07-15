@@ -25,7 +25,7 @@
 
 ## 数据模型变更
 
-### 存储格式（`config/user/layouts/xxx.json`）
+### 存储格式（`config/local/layouts/xxx.json`）
 
 ```json
 {

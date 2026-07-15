@@ -13,7 +13,7 @@ from ..core.input import InputController
 from ..core.region_config import (
     Layout, Region, get_scene_fields, get_field_defs, FIELD_GROUPS,
 )
-from ..constants import USER_CONFIG_DIR
+from ..constants import LOCAL_CONFIG_DIR
 
 
 # 8 个目标槽位（按优先级排序）
@@ -191,7 +191,7 @@ class EquipAnalysisWorkflow:
 
     def _save_result(self, result: dict):
         """保存结果到 config/user/users/{username}/equipments.json"""
-        user_dir = USER_CONFIG_DIR / "users" / self._user_name
+        user_dir = LOCAL_CONFIG_DIR / "users" / self._user_name
         user_dir.mkdir(parents=True, exist_ok=True)
         output_path = user_dir / "equipments.json"
 

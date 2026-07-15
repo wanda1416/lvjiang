@@ -8,17 +8,17 @@ from pathlib import Path
 import numpy as np
 from loguru import logger
 
-from ..constants import CONFIG_DIR, USER_CONFIG_DIR, SYSTEM_SCENES_DIR, DEFAULT_CONFIG_PATH
+from ..constants import CONFIG_DIR, LOCAL_CONFIG_DIR, SYSTEM_SCENES_DIR, APP_CONFIG_PATH, PREFERENCES_PATH, SESSION_PATH
 from .scene_loader import SceneRegistry, FieldDef, SceneDef
 
 
 def _load_scene_order() -> list[str] | None:
-    """从 default.yaml 读取场景加载顺序"""
-    if not DEFAULT_CONFIG_PATH.exists():
+    """从 app.yaml 读取场景加载顺序"""
+    if not APP_CONFIG_PATH.exists():
         return None
     try:
         import yaml
-        data = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+        data = yaml.safe_load(APP_CONFIG_PATH.read_text(encoding="utf-8"))
         order = data.get("layout_scenes") if isinstance(data, dict) else None
         return order if isinstance(order, list) else None
     except Exception as e:
@@ -69,9 +69,8 @@ def get_field_defs(scene_key: str) -> list[FieldDef]:
 
 # ─── 路径常量 ────────────────────────────────────────────
 
-LAYOUTS_DIR = USER_CONFIG_DIR / "layouts"
-CONFIG_FILE = USER_CONFIG_DIR / "config.json"
-SCREENSHOTS_DIR = USER_CONFIG_DIR / "screenshots"
+LAYOUTS_DIR = LOCAL_CONFIG_DIR / "layouts"
+SCREENSHOTS_DIR = LOCAL_CONFIG_DIR / "screenshots"
 
 
 def _safe_name(name: str) -> str:
@@ -254,16 +253,16 @@ class LayoutConfigManager:
             self._save_config()
 
     def _load_config(self) -> dict:
-        if CONFIG_FILE.exists():
+        if SESSION_PATH.exists():
             try:
-                return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+                return json.loads(SESSION_PATH.read_text(encoding="utf-8"))
             except Exception as e:
-                logger.error(f"加载 config.json 失败: {e}")
+                logger.error(f"加载 session.json 失败: {e}")
         return {"active_layout": "", "layouts": []}
 
     def _save_config(self):
-        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG_FILE.write_text(
+        LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        SESSION_PATH.write_text(
             json.dumps(self._config, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
@@ -364,4 +363,33 @@ class LayoutConfigManager:
         if not name:
             return None
         return self.load_layout(name)
+
+    # ─── 窗口标题（从 preferences.yaml 读取） ────────────
+
+    def get_window_title(self) -> str:
+        """获取投屏窗口标题匹配关键字（空串表示不自动定位）"""
+        try:
+            import yaml
+            if PREFERENCES_PATH.exists():
+                data = yaml.safe_load(PREFERENCES_PATH.read_text(encoding="utf-8"))
+                return data.get("window_title", "") if isinstance(data, dict) else ""
+        except Exception as e:
+            logger.warning(f"读取 window_title 失败: {e}")
+        return ""
+
+    def set_window_title(self, title: str):
+        """保存窗口标题到 preferences.yaml"""
+        try:
+            import yaml
+            data = {}
+            if PREFERENCES_PATH.exists():
+                data = yaml.safe_load(PREFERENCES_PATH.read_text(encoding="utf-8")) or {}
+            data["window_title"] = title
+            PREFERENCES_PATH.parent.mkdir(parents=True, exist_ok=True)
+            PREFERENCES_PATH.write_text(
+                yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.error(f"保存 window_title 失败: {e}")
 

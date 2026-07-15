@@ -12,12 +12,12 @@ collect_as sub_weapon
 
 click [equip_bag_detail].[slot_ring]
 wait page_refresh_wait
-scan [equip_armor_detail]
+scan [equip_weapon_detail]
 collect_as ring
 
 click [equip_bag_detail].[slot_pendant]
 wait page_refresh_wait
-scan [equip_armor_detail]
+scan [equip_weapon_detail]
 collect_as pendant
 
 click [equip_bag_detail].[slot_head]

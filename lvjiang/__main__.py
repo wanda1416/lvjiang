@@ -47,6 +47,7 @@ def main():
         retention="7 days",
         encoding="utf-8",
         level="DEBUG",
+        enqueue=True,  # 异步写入，防止进程崩溃时缓冲丢失
     )
 
     logger.info("律匠启动中...")

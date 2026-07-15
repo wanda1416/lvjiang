@@ -1,5 +1,7 @@
 """屏幕捕获模块 - 基于 mss，支持投屏窗口定位"""
 
+import threading
+
 import numpy as np
 import mss
 import mss.tools
@@ -7,11 +9,26 @@ from loguru import logger
 
 
 class ScreenCapture:
-    """屏幕捕获器"""
+    """屏幕捕获器
+
+    注意：mss 实例不是线程安全的——它在 Windows 上缓存了带线程亲和性的
+    GDI 设备上下文（srcdc/memdc）。跨线程调用 grab() 是未定义行为，会导致
+    偶发的原生访问违例（进程硬崩溃，Python 无法捕获）。
+    因此这里用线程本地存储，每个线程惰性创建自己的 mss 实例。
+    """
 
     def __init__(self):
-        self._sct = mss.mss()
+        self._local = threading.local()
         self._monitor = None  # 目标投屏窗口的捕获区域
+
+    @property
+    def _sct(self):
+        """返回当前线程专属的 mss 实例（惰性创建）"""
+        sct = getattr(self._local, "sct", None)
+        if sct is None:
+            sct = mss.mss()
+            self._local.sct = sct
+        return sct
 
     def list_monitors(self) -> list[dict]:
         """列出所有可用显示器/捕获区域"""

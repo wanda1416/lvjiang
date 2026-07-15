@@ -23,7 +23,10 @@ class InputController:
         self.click_random_offset = cfg.click_random_offset
         self.region_jitter_ratio = cfg.region_jitter_ratio
         # pyautogui 安全设置
-        pyautogui.FAILSAFE = True  # 鼠标移到左上角可中断
+        # FAILSAFE 禁用：自动化期间鼠标移动由程序控制，
+        # 启用 FAILSAFE 会在鼠标偶然经过屏幕角落时抛 FailSafeException，
+        # 导致 QThread 硬崩溃（进程闪退）。停止操作由工作流 stop_check 控制。
+        pyautogui.FAILSAFE = False
         pyautogui.PAUSE = 0.05
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
@@ -37,7 +40,11 @@ class InputController:
     def _move_to(self, x: int, y: int):
         """移动鼠标到指定位置（时长随机化）"""
         duration = random.uniform(*self.mouse_move_duration)
-        pyautogui.moveTo(x, y, duration=duration)
+        try:
+            pyautogui.moveTo(x, y, duration=duration)
+        except Exception as e:
+            logger.error(f"鼠标移动失败 ({x},{y}): {e}")
+            raise
 
     def _click(self, x: int, y: int, poi_name: str = ""):
         """
@@ -57,7 +64,11 @@ class InputController:
         # 执行点击
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"点击 {label}: ({actual_x}, {actual_y}) [偏移: {offset_x:+d}, {offset_y:+d}]")
-        pyautogui.click(actual_x, actual_y)
+        try:
+            pyautogui.click(actual_x, actual_y)
+        except Exception as e:
+            logger.error(f"点击失败 ({actual_x},{actual_y}): {e}")
+            raise
 
         # 点击后等待
         post_delay = random.uniform(*self.after_click_wait)

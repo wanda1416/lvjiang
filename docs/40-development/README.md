@@ -14,6 +14,7 @@
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
+| 2026-07-15 | [2026-07/2026-07-15-scene-yaml-externalization.md](2026-07/2026-07-15-scene-yaml-externalization.md) | 场景定义 YAML 外部化、SceneRegistry、加载顺序控制 |
 | 2026-07-15 | [2026-07/2026-07-15-scene-class-refactor.md](2026-07/2026-07-15-scene-class-refactor.md) | 装备场景类化重构、功能按钮标记、区域复制修复 |
 | 2026-07-15 | [2026-07/2026-07-15-architecture-refactor.md](2026-07/2026-07-15-architecture-refactor.md) | 架构文档重构、场景标识符规范化、布局顺序管理、右键菜单 |
 | 2026-07-15 | [2026-07/2026-07-15-canvas-middle-layer.md](2026-07/2026-07-15-canvas-middle-layer.md) | 画布中间层坐标解耦（Canvas Middle Layer） |

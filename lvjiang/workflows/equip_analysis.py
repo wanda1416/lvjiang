@@ -11,7 +11,7 @@ from ..core.capture import ScreenCapture
 from ..core.ocr import OCREngine
 from ..core.input import InputController
 from ..core.region_config import (
-    Layout, Region, get_scene_fields, FIELD_GROUPS,
+    Layout, Region, get_scene_fields, get_field_defs, FIELD_GROUPS,
 )
 from ..constants import USER_CONFIG_DIR
 
@@ -34,12 +34,6 @@ ARMOR_SLOTS = {s[0] for s in TARGET_SLOTS[4:]}
 
 # 点击后等待页面刷新时间（秒）
 CLICK_WAIT = 2.0
-
-# 装备属性分析时跳过的功能字段（与装备属性无关）
-SKIP_FIELDS = {
-    "main_func", "more_func",
-    "sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4",
-}
 
 
 class EquipAnalysisWorkflow:
@@ -170,12 +164,14 @@ class EquipAnalysisWorkflow:
 
         fields = get_scene_fields(scene_key)
         field_map = {k: name for k, name in fields}
+        # 获取功能字段集合（type == "func"），装备属性分析不需要
+        func_keys = {f.key for f in get_field_defs(scene_key) if f.type == "func"}
         result = {}
 
         for region in regions:
             if region.key not in field_map:
                 continue
-            if region.key in SKIP_FIELDS:
+            if region.key in func_keys:
                 logger.debug(f"跳过功能字段: {region.key}")
                 continue
 

@@ -279,6 +279,13 @@ class LayoutConfigManager:
 
     # ─── 布局 CRUD ──────────────────────────────────────
 
+    def _ensure_registered(self, name: str):
+        """确保布局名称在 config.json 的 layouts 数组中"""
+        layouts = self._config.setdefault("layouts", [])
+        if name not in layouts:
+            layouts.append(name)
+            self._save_config()
+
     def list_layouts(self) -> list[str]:
         """返回布局列表（按 config.json 中的顺序，每次从文件读取）"""
         self._reload_config()
@@ -290,10 +297,6 @@ class LayoutConfigManager:
         for scene_key in FIELD_GROUPS:
             layout.scenes[scene_key] = []
         self.save_layout(layout)
-        # 添加到 layouts 数组
-        if name not in self._config["layouts"]:
-            self._config["layouts"].append(name)
-            self._save_config()
         self.set_active_layout(name)
         logger.info(f"布局已新建: {name}")
         return layout
@@ -318,6 +321,7 @@ class LayoutConfigManager:
             json.dumps(layout.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        self._ensure_registered(layout.name)
         logger.info(f"布局已保存: {layout.name}")
 
     def delete_layout(self, name: str) -> bool:

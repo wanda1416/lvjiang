@@ -379,11 +379,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             r = self._regions[self._selected_idx]
             r.x_ratio = max(0, min(1 - r.w_ratio, self._drag_orig.x_ratio + dx_n))
             r.y_ratio = max(0, min(1 - r.h_ratio, self._drag_orig.y_ratio + dy_n))
-            self._apply_move_snap(r)
+            # Shift 按下时禁用吸附
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                self._snap_lines_x = []
+                self._snap_lines_y = []
+            else:
+                self._apply_move_snap(r)
             self.update()
 
         elif self._drag_mode == DragMode.RESIZING:
-            self._apply_resize(pos)
+            self._apply_resize(pos, event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
             self.update()
 
         else:
@@ -454,7 +459,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     # ─── 拖拽缩放 ────────────────────────────────────────
 
-    def _apply_resize(self, pos: QPointF):
+    def _apply_resize(self, pos: QPointF, shift_held: bool = False):
         """根据手柄位置调整矩形大小"""
         nx, ny = self._widget_to_norm(pos)
         r = self._regions[self._selected_idx]
@@ -478,31 +483,33 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if moving_bottom:
             y2 = max(ny, y1 + 0.01)
 
-        # 对正在拖动的边做吸附
-        xs, ys = self._collect_snap_targets(self._selected_idx)
-        thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
+        # Shift 按下时禁用吸附
         self._snap_lines_x = []
         self._snap_lines_y = []
-        if moving_left:
-            t = self._nearest(x1, xs, thx)
-            if t is not None and t < x2 - 0.01:
-                x1 = t
-                self._snap_lines_x.append(t)
-        if moving_right:
-            t = self._nearest(x2, xs, thx)
-            if t is not None and t > x1 + 0.01:
-                x2 = t
-                self._snap_lines_x.append(t)
-        if moving_top:
-            t = self._nearest(y1, ys, thy)
-            if t is not None and t < y2 - 0.01:
-                y1 = t
-                self._snap_lines_y.append(t)
-        if moving_bottom:
-            t = self._nearest(y2, ys, thy)
-            if t is not None and t > y1 + 0.01:
-                y2 = t
-                self._snap_lines_y.append(t)
+        if not shift_held:
+            # 对正在拖动的边做吸附
+            xs, ys = self._collect_snap_targets(self._selected_idx)
+            thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
+            if moving_left:
+                t = self._nearest(x1, xs, thx)
+                if t is not None and t < x2 - 0.01:
+                    x1 = t
+                    self._snap_lines_x.append(t)
+            if moving_right:
+                t = self._nearest(x2, xs, thx)
+                if t is not None and t > x1 + 0.01:
+                    x2 = t
+                    self._snap_lines_x.append(t)
+            if moving_top:
+                t = self._nearest(y1, ys, thy)
+                if t is not None and t < y2 - 0.01:
+                    y1 = t
+                    self._snap_lines_y.append(t)
+            if moving_bottom:
+                t = self._nearest(y2, ys, thy)
+                if t is not None and t > y1 + 0.01:
+                    y2 = t
+                    self._snap_lines_y.append(t)
 
         r.x_ratio = max(0.0, x1)
         r.y_ratio = max(0.0, y1)

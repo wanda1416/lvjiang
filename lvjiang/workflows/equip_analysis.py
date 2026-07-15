@@ -13,19 +13,19 @@ from ..core.input import InputController
 from ..core.region_config import (
     Layout, Region, get_scene_fields, get_field_defs, FIELD_GROUPS,
 )
-from ..constants import LOCAL_CONFIG_DIR
+from ..constants import LOCAL_CONFIG_DIR, EQUIP_SLOT_NAMES
 
 
-# 8 个目标槽位（按优先级排序）
+# 8 个目标槽位（按优先级排序）：(场景字段 key, 输出 key)
 TARGET_SLOTS = [
-    ("slot_main_weapon", "main_weapon", "主武器"),
-    ("slot_sub_weapon",  "sub_weapon",  "副武器"),
-    ("slot_ring",        "ring",        "环"),
-    ("slot_pendant",     "pendant",     "佩"),
-    ("slot_head",        "head",        "冠胄"),
-    ("slot_chest",       "chest",       "胸甲"),
-    ("slot_leg",         "leg",         "胫甲"),
-    ("slot_wrist",       "wrist",       "腕甲"),
+    ("slot_main_weapon", "main_weapon"),
+    ("slot_sub_weapon",  "sub_weapon"),
+    ("slot_ring",        "ring"),
+    ("slot_pendant",     "pendant"),
+    ("slot_head",        "head"),
+    ("slot_chest",       "chest"),
+    ("slot_leg",         "leg"),
+    ("slot_wrist",       "wrist"),
 ]
 
 # 前 4 个是武器类，后 4 个是防具类
@@ -74,7 +74,8 @@ class EquipAnalysisWorkflow:
         # 构建 key -> Region 映射
         bag_map = {r.key: r for r in bag_regions}
 
-        for slot_key, output_key, slot_name in TARGET_SLOTS:
+        for slot_key, output_key in TARGET_SLOTS:
+            slot_name = EQUIP_SLOT_NAMES.get(output_key, output_key)
             if slot_key not in bag_map:
                 logger.warning(f"槽位 {slot_name} 没有定义区域，跳过")
                 continue

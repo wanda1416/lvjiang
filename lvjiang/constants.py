@@ -16,17 +16,14 @@ LOCAL_CONFIG_DIR = CONFIG_DIR / "local"
 PREFERENCES_PATH = LOCAL_CONFIG_DIR / "preferences.yaml"
 SESSION_PATH = LOCAL_CONFIG_DIR / "session.json"
 
-# 基准分辨率（坐标配置基于此分辨率）
-BASE_RESOLUTION = (1920, 1080)
-
 # 装备部位枚举值
-EQUIP_SLOTS = ["weapon", "head", "chest", "leg", "wrist", "ring", "pendant"]
 EQUIP_SLOT_NAMES = {
-    "weapon": "武器",
-    "head": "头部",
-    "chest": "胸部",
-    "leg": "腿部",
-    "wrist": "腕部",
+    "main_weapon": "主武器",
+    "sub_weapon": "副武器",
+    "head": "冠胄",
+    "chest": "胸甲",
+    "leg": "胫甲",
+    "wrist": "腕甲",
     "ring": "环",
     "pendant": "佩",
 }
@@ -34,7 +31,6 @@ EQUIP_SLOT_NAMES = {
 # 默认延迟参数（秒）
 DEFAULT_CLICK_INTERVAL = (0.1, 0.3)
 DEFAULT_AFTER_CLICK_WAIT = (0.1, 0.2)
-DEFAULT_AFTER_TUNE_WAIT = 1.5
 
 # 鼠标随机偏移范围（像素）
 CLICK_RANDOM_OFFSET = 3

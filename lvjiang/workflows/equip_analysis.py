@@ -35,6 +35,12 @@ ARMOR_SLOTS = {s[0] for s in TARGET_SLOTS[4:]}
 # 点击后等待页面刷新时间（秒）
 CLICK_WAIT = 2.0
 
+# 装备属性分析时跳过的功能字段（与装备属性无关）
+SKIP_FIELDS = {
+    "main_func", "more_func",
+    "sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4",
+}
+
 
 class EquipAnalysisWorkflow:
     """装备分析工作流"""
@@ -168,6 +174,9 @@ class EquipAnalysisWorkflow:
 
         for region in regions:
             if region.key not in field_map:
+                continue
+            if region.key in SKIP_FIELDS:
+                logger.debug(f"跳过功能字段: {region.key}")
                 continue
 
             # 区域坐标 -> 截图像素

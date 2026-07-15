@@ -9,6 +9,7 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 # 系统配置（随版本发布）
 SYSTEM_CONFIG_DIR = CONFIG_DIR / "system"
 SYSTEM_SCENES_DIR = SYSTEM_CONFIG_DIR / "scenes"
+SYSTEM_WORKFLOWS_DIR = SYSTEM_CONFIG_DIR / "workflows"
 APP_CONFIG_PATH = SYSTEM_CONFIG_DIR / "app.yaml"
 
 # 本地数据（运行时生成，.gitignore）

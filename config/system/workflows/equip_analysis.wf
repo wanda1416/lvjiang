@@ -1,0 +1,41 @@
+# 装备分析工作流
+
+click [equip_bag_detail].[slot_main_weapon]
+wait page_refresh_wait
+scan [equip_weapon_detail]
+collect_as main_weapon
+
+click [equip_bag_detail].[slot_sub_weapon]
+wait page_refresh_wait
+scan [equip_weapon_detail]
+collect_as sub_weapon
+
+click [equip_bag_detail].[slot_ring]
+wait page_refresh_wait
+scan [equip_armor_detail]
+collect_as ring
+
+click [equip_bag_detail].[slot_pendant]
+wait page_refresh_wait
+scan [equip_armor_detail]
+collect_as pendant
+
+click [equip_bag_detail].[slot_head]
+wait page_refresh_wait
+scan [equip_armor_detail]
+collect_as head
+
+click [equip_bag_detail].[slot_chest]
+wait page_refresh_wait
+scan [equip_armor_detail]
+collect_as chest
+
+click [equip_bag_detail].[slot_leg]
+wait page_refresh_wait
+scan [equip_armor_detail]
+collect_as leg
+
+click [equip_bag_detail].[slot_wrist]
+wait page_refresh_wait
+scan [equip_armor_detail]
+collect_as wrist

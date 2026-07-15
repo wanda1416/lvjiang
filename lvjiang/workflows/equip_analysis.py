@@ -65,18 +65,24 @@ class EquipAnalysisWorkflow(WorkflowBase):
 
             logger.info(f"--- 处理槽位: {slot_name} ---")
 
-            # 1. 点击槽位（背包页和详情页同图层，直接切换）
-            self._click_region("equip_bag_detail", slot_key)
-            time.sleep(self._delay.page_refresh_wait)
+            try:
+                # 1. 点击槽位（背包页和详情页同图层，直接切换）
+                self._click_region("equip_bag_detail", slot_key)
+                time.sleep(self._delay.page_refresh_wait)
 
-            # 2. 截图 + OCR
-            if slot_key in WEAPON_SLOTS:
-                equip_data = self._ocr_scene("equip_weapon_detail")
-            else:
-                equip_data = self._ocr_scene("equip_armor_detail")
+                # 2. 截图 + OCR
+                if slot_key in WEAPON_SLOTS:
+                    equip_data = self._ocr_scene("equip_weapon_detail")
+                else:
+                    equip_data = self._ocr_scene("equip_armor_detail")
 
-            result[output_key] = equip_data
-            logger.info(f"  识别结果: {equip_data}")
+                result[output_key] = equip_data
+                logger.info(f"  识别结果: {equip_data}")
+            except Exception as e:
+                logger.error(f"  槽位 {slot_name} 处理失败: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                continue
 
         # 4. 保存结果
         self._save_result(result)

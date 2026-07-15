@@ -1,23 +1,38 @@
 """运行控制混入类 - 用户/布局选择器、启停控制、毕业率执行"""
 
+import traceback
+
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
+
+from ..constants import SYSTEM_WORKFLOWS_DIR
+from ..workflows.engine import WorkflowEngine
+
+
+# 各工作流所需场景（用于启动前校验）
+_GRADUATION_REQUIRED_SCENES = ["equip_bag_detail", "equip_weapon_detail", "equip_armor_detail"]
+_TUNE_TEST_REQUIRED_SCENES = [
+    "game_main_page", "game_menu_page", "equip_bag_detail",
+    "equip_weapon_detail", "equip_tune_detail", "equip_tune_result",
+]
 
 
 class WorkflowWorker(QThread):
     """工作流异步执行线程"""
     finished = pyqtSignal(str, object)  # (name, result_or_exception)
 
-    def __init__(self, name: str, workflow, parent=None):
+    def __init__(self, name: str, fn, parent=None):
         super().__init__(parent)
         self.name = name
-        self.workflow = workflow
+        self._fn = fn
 
     def run(self):
         try:
-            result = self.workflow.run()
+            result = self._fn()
             self.finished.emit(self.name, result)
-        except Exception as e:
+        except BaseException as e:
+            tb = traceback.format_exc()
+            logger.error(f"工作流 {self.name} 异常退出:\n{tb}")
             self.finished.emit(self.name, e)
 
 
@@ -143,7 +158,6 @@ class RunControlMixin:
         if not self._begin_automation("毕业率计算"):
             return
 
-        user_name = self._user_manager.get_active_user_name()
         layout_name = self._layout_manager.get_active_layout_name()
         layout = self._layout_manager.load_layout(layout_name)
 
@@ -153,8 +167,7 @@ class RunControlMixin:
             return
 
         # 延迟校验：检查所需场景是否已绑定区域
-        from ..workflows.equip_analysis import REQUIRED_SCENES
-        missing = self._layout_manager.check_scenes_valid(layout_name, REQUIRED_SCENES)
+        missing = self._layout_manager.check_scenes_valid(layout_name, _GRADUATION_REQUIRED_SCENES)
         if missing:
             names = "、".join(missing)
             self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
@@ -162,21 +175,20 @@ class RunControlMixin:
             self._end_automation("毕业率计算")
             return
 
-        from ..workflows.equip_analysis import EquipAnalysisWorkflow
-        workflow = EquipAnalysisWorkflow(
+        engine = WorkflowEngine(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
-            user_name=user_name,
+            delay_config=self._user_config.delay,
             window_left=self._target_window["left"],
             window_top=self._target_window["top"],
             stop_check=self._is_stopped,
-            delay_config=self._user_config.delay,
         )
+        wf_path = SYSTEM_WORKFLOWS_DIR / "equip_analysis.wf"
 
         self.log_text.append("[开始] 装备分析流程...")
-        self._start_workflow("毕业率计算", workflow)
+        self._start_workflow("毕业率计算", lambda: engine.run(wf_path))
 
     # ─── 单次调律测试按钮 ────────────────────────────────
 
@@ -199,8 +211,7 @@ class RunControlMixin:
             return
 
         # 延迟校验：检查所需场景是否已绑定区域
-        from ..workflows.tune_test import REQUIRED_SCENES
-        missing = self._layout_manager.check_scenes_valid(layout_name, REQUIRED_SCENES)
+        missing = self._layout_manager.check_scenes_valid(layout_name, _TUNE_TEST_REQUIRED_SCENES)
         if missing:
             names = "、".join(missing)
             self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
@@ -208,20 +219,20 @@ class RunControlMixin:
             self._end_automation("单次调律测试")
             return
 
-        from ..workflows.tune_test import TuneTestWorkflow
-        workflow = TuneTestWorkflow(
+        engine = WorkflowEngine(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
+            delay_config=self._user_config.delay,
             window_left=self._target_window["left"],
             window_top=self._target_window["top"],
             stop_check=self._is_stopped,
-            delay_config=self._user_config.delay,
         )
+        wf_path = SYSTEM_WORKFLOWS_DIR / "tune_test.wf"
 
         self.log_text.append("[开始] 单次调律测试流程...")
-        self._start_workflow("单次调律测试", workflow)
+        self._start_workflow("单次调律测试", lambda: engine.run(wf_path))
 
     # ─── 异步工作流执行 ────────────────────────────────
 
@@ -234,9 +245,9 @@ class RunControlMixin:
 
     def _on_workflow_finished(self, name: str, result_or_exception):
         """工作流完成回调（在主线程执行）"""
-        if isinstance(result_or_exception, Exception):
-            self.log_text.append(f"[错误] {name}流程执行失败: {result_or_exception}")
-            logger.exception(f"{name}流程异常")
+        if isinstance(result_or_exception, BaseException):
+            self.log_text.append(f"[错误] {name}流程异常退出: {result_or_exception}")
+            logger.error(f"{name}流程异常退出: {result_or_exception}")
         elif self._stop_requested:
             self.log_text.append(f"[已停止] {name}流程被用户中断")
         else:

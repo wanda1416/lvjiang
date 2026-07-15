@@ -1,0 +1,48 @@
+# 单次调律测试工作流
+
+click [game_main_page].[menu]
+wait step_interval
+
+click [game_menu_page].[bag]
+wait step_interval
+
+click [equip_bag_detail].[slot_main_weapon]
+wait step_interval
+
+click [equip_bag_detail].[bag_1_2]
+wait step_interval
+
+click [equip_weapon_detail].[more_func]
+wait step_interval
+
+scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4]
+click_match "调律" error "未找到调律按钮"
+wait step_interval
+
+click [equip_tune_detail].[one_click_add]
+wait step_interval
+
+click [equip_tune_detail].[tune_btn]
+wait step_interval
+
+wait after_tune_wait
+scan [equip_tune_result]
+log "调律结果已识别"
+collect
+
+click [equip_tune_result].[close_btn]
+wait step_interval
+
+click [equip_tune_detail].[back]
+wait step_interval
+
+click [equip_bag_detail].[back]
+wait step_interval
+
+click [equip_bag_detail].[back]
+wait step_interval
+
+click [equip_bag_detail].[back]
+wait step_interval
+
+click [game_menu_page].[back]

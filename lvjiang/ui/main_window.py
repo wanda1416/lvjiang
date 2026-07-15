@@ -59,7 +59,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._setup_ui()
         self._refresh_user_combo()
         self._refresh_layout_combo()
-        self._refresh_graduation_button()
         logger.info("主窗口已初始化")
 
     # ─── 菜单栏 ────────────────────────────────────────────
@@ -119,7 +118,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         )
         dialog.exec()
         self._refresh_layout_combo()
-        self._refresh_graduation_button()
 
     def _show_about(self):
         """显示关于对话框"""
@@ -217,7 +215,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         left_layout = QVBoxLayout(left_panel)
 
         self.btn_graduation = QPushButton("计算毕业率")
-        self.btn_graduation.setEnabled(False)
         self.btn_graduation.clicked.connect(self._on_graduation)
         left_layout.addWidget(self.btn_graduation)
 

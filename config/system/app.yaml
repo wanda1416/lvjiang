@@ -2,6 +2,8 @@
 
 # 场景加载顺序
 layout_scenes:
+  - game_main_page
+  - game_menu_page
   - equip_bag_detail
   - equip_weapon_detail
   - equip_armor_detail

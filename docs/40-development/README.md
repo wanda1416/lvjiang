@@ -14,6 +14,8 @@
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
+| 2026-07-15 | [2026-07/2026-07-15-architecture-refactor.md](2026-07/2026-07-15-architecture-refactor.md) | 架构文档重构、场景标识符规范化、布局顺序管理、右键菜单 |
+| 2026-07-15 | [2026-07/2026-07-15-canvas-middle-layer.md](2026-07/2026-07-15-canvas-middle-layer.md) | 画布中间层坐标解耦（Canvas Middle Layer） |
 | 2026-07-14 | [2026-07/2026-07-14-overlay-dpi.md](2026-07/2026-07-14-overlay-dpi.md) | BorderOverlay 多 DPI 跨屏定位问题 |
 | 2026-07-14 | [2026-07/2026-07-14-layout-hierarchy-refactor.md](2026-07/2026-07-14-layout-hierarchy-refactor.md) | 区域配置布局层级重构（Layout → Scene → Region） |
 

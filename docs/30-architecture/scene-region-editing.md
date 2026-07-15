@@ -4,17 +4,41 @@
 
 ## 场景列表
 
-当前定义了三个场景：
+当前定义了四个场景：
 
 | 场景 Key | 场景名称 | 用途 |
 |----------|----------|------|
+| `equip_bag_detail` | 装备背包详情 | 识别背包中各装备槽位的状态 |
 | `equip_weapon_detail` | 装备武器详情 | 识别武器的基础信息和词条分布 |
 | `equip_armor_detail` | 装备防具详情 | 识别防具的基础信息和词条分布（含双基础属性） |
 | `equip_tune_detail` | 装备调律详情 | 识别调律后的词条变化 |
 
 ---
 
-## 场景一：装备武器详情 (equip_weapon_detail)
+## 场景一：装备背包详情 (equip_bag_detail)
+
+**游戏内位置**：打开背包 → 装备总览页
+
+**需要识别的字段**：
+
+| 字段 Key | 字段名称 | 说明 |
+|----------|----------|------|
+| `slot_main_weapon` | 主武器 | 主武器槽位 |
+| `slot_sub_weapon` | 副武器 | 副武器槽位 |
+| `slot_ring` | 环 | 环槽位 |
+| `slot_pendant` | 佩 | 佩槽位 |
+| `slot_head` | 冠胄 | 头部装备槽位 |
+| `slot_chest` | 胸甲 | 胸部装备槽位 |
+| `slot_leg` | 胫甲 | 腿部装备槽位 |
+| `slot_wrist` | 腕甲 | 腕部装备槽位 |
+| `slot_bow` | 弓箭 | 弓箭槽位 |
+| `slot_arrow` | 射玦 | 射玦槽位 |
+
+**截图时机**：背包装备总览页完整显示时截图，用于快速扫描所有装备槽位状态。
+
+---
+
+## 场景二：装备武器详情 (equip_weapon_detail)
 
 **游戏内位置**：打开背包 → 选中武器 → 查看详情页
 
@@ -35,7 +59,7 @@
 
 ---
 
-## 场景二：装备防具详情 (equip_armor_detail)
+## 场景三：装备防具详情 (equip_armor_detail)
 
 **游戏内位置**：打开背包 → 选中防具（头/胸/腿/腕）→ 查看详情页
 
@@ -57,7 +81,7 @@
 
 ---
 
-## 场景三：装备调律详情 (equip_tune_detail)
+## 场景四：装备调律详情 (equip_tune_detail)
 
 **游戏内位置**：调律界面 → 放入装备后 → 显示调律结果
 
@@ -84,10 +108,12 @@
 ```
 config/user/screenshots/
 ├── 默认布局/
+│   ├── equip_bag_detail.png        # 背包总览页截图
 │   ├── equip_weapon_detail.png   # 武器详情页截图
 │   ├── equip_armor_detail.png    # 防具详情页截图
 │   └── equip_tune_detail.png     # 调律结果页截图
 └── VIVO投屏方案/
+    ├── equip_bag_detail.png
     ├── equip_weapon_detail.png
     ├── equip_armor_detail.png
     └── equip_tune_detail.png
@@ -99,6 +125,7 @@ config/user/screenshots/
 
 ```python
 FIELD_GROUPS = {
+    "equip_bag_detail": ("装备背包详情", [...]),
     "equip_weapon_detail": ("装备武器详情", [...]),
     "equip_armor_detail": ("装备防具详情", [...]),
     "equip_tune_detail": ("装备调律详情", [...]),

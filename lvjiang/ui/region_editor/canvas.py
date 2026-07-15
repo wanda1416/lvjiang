@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QInputDialog
+from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu
 from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import (
     QImage, QPixmap, QPainter, QPen, QBrush, QColor,
@@ -305,7 +305,16 @@ class RegionCanvas(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.RightButton:
-            # 右键开始拖拽平移
+            # 检查是否点击了已选中的区域
+            pos = event.position()
+            if self._selected_idx >= 0 and self._selected_idx < len(self._regions):
+                r = self._regions[self._selected_idx]
+                rect = self._region_rect_widget(r)
+                if rect.contains(pos):
+                    # 在已选中区域内右键，弹出菜单
+                    self._show_context_menu(pos)
+                    return
+            # 否则开始拖拽平移
             self._panning = True
             self._pan_start = event.position()
             self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
@@ -744,6 +753,43 @@ class RegionCanvas(QWidget):
             self._selected_idx = -1
             self._field_selected = False
             self._notify_changed()
+            self.update()
+
+    def _show_context_menu(self, pos: QPointF):
+        """在指定位置显示右键菜单"""
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu { background-color: #f0f0f0; padding: 4px; }"
+            "QMenu::item { padding: 4px 16px; }"
+            "QMenu::item:selected { background-color: #ddd; }"
+        )
+        copy_action = menu.addAction("复制区域")
+        delete_action = menu.addAction("删除区域")
+        action = menu.exec(self.mapToGlobal(pos.toPoint()))
+        if action == copy_action:
+            self._copy_selected_region()
+        elif action == delete_action:
+            self.delete_selected()
+
+    def _copy_selected_region(self):
+        """复制选中区域：创建相同大小的新区域，提示绑定新字段，并选中新区域"""
+        if self._selected_idx < 0 or self._selected_idx >= len(self._regions):
+            return
+        src = self._regions[self._selected_idx]
+        # 创建新区域，位置相同
+        new_region = Region(
+            key="", name="新区域",
+            x_ratio=src.x_ratio, y_ratio=src.y_ratio,
+            w_ratio=src.w_ratio, h_ratio=src.h_ratio,
+        )
+        self._regions.append(new_region)
+        new_idx = len(self._regions) - 1
+        # 提示绑定字段
+        self._prompt_field_selection(new_idx)
+        # 选中新区域（方便用户拖走）
+        if self._regions[new_idx].key:  # 如果绑定成功
+            self._selected_idx = new_idx
+            self._field_selected = True
             self.update()
 
     def keyPressEvent(self, event):

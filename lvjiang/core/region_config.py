@@ -13,6 +13,21 @@ from ..constants import CONFIG_DIR, USER_CONFIG_DIR
 # ─── 场景 & 字段组定义 ───────────────────────────────────
 
 FIELD_GROUPS: dict[str, tuple[str, list[tuple[str, str]]]] = {
+    "equip_bag_detail": (
+        "装备背包详情",
+        [
+            ("slot_main_weapon", "主武器"),
+            ("slot_sub_weapon",  "副武器"),
+            ("slot_ring",        "环"),
+            ("slot_pendant",     "佩"),
+            ("slot_head",        "冠胄"),
+            ("slot_chest",       "胸甲"),
+            ("slot_leg",         "胫甲"),
+            ("slot_wrist",       "腕甲"),
+            ("slot_bow",         "弓箭"),
+            ("slot_arrow",       "射玦"),
+        ],
+    ),
     "equip_weapon_detail": (
         "装备武器详情",
         [

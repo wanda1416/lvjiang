@@ -8,189 +8,35 @@ from pathlib import Path
 import numpy as np
 from loguru import logger
 
-from ..constants import CONFIG_DIR, USER_CONFIG_DIR
-
-# ─── 场景定义类 ─────────────────────────────────────────
-
-@dataclass
-class SceneDef:
-    """场景定义基类"""
-    key: str
-    name: str
-
-    @classmethod
-    def fields(cls) -> list[tuple[str, str]]:
-        raise NotImplementedError
-
-    @classmethod
-    def button_fields(cls) -> set[str]:
-        """返回纯功能按钮字段集合（OCR 时可跳过）"""
-        return set()
+from ..constants import CONFIG_DIR, USER_CONFIG_DIR, SYSTEM_SCENES_DIR, DEFAULT_CONFIG_PATH
+from .scene_loader import SceneRegistry, FieldDef, SceneDef
 
 
-# ── 装备背包详情 ──────────────────────────────────────────
-
-class EquipBagDetail(SceneDef):
-    key = "equip_bag_detail"
-    name = "装备背包详情"
-
-    @classmethod
-    def fields(cls) -> list[tuple[str, str]]:
-        return [
-            ("slot_main_weapon", "主武器"),
-            ("slot_sub_weapon",  "副武器"),
-            ("slot_ring",        "环"),
-            ("slot_pendant",     "佩"),
-            ("slot_head",        "冠胄"),
-            ("slot_chest",       "胸甲"),
-            ("slot_leg",         "胫甲"),
-            ("slot_wrist",       "腕甲"),
-            ("slot_bow",         "弓箭"),
-            ("slot_arrow",       "射玦"),
-        ]
-
-    @classmethod
-    def button_fields(cls) -> set[str]:
-        """背包槽位全部为功能按钮"""
-        return {f[0] for f in cls.fields()}
+def _load_scene_order() -> list[str] | None:
+    """从 default.yaml 读取场景加载顺序"""
+    if not DEFAULT_CONFIG_PATH.exists():
+        return None
+    try:
+        import yaml
+        data = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+        order = data.get("layout_scenes") if isinstance(data, dict) else None
+        return order if isinstance(order, list) else None
+    except Exception as e:
+        logger.warning(f"读取 layout_scenes 失败: {e}")
+        return None
 
 
-# ── 装备详情（基类） ─────────────────────────────────────
+# ─── 场景注册表（从 YAML 加载） ─────────────────────────
 
-class EquipDetail(SceneDef):
-    """装备详情基类：武器和防具共享的字段"""
-    key = ""  # 不直接实例化
-    name = ""
-
-    @classmethod
-    def _common_fields(cls) -> list[tuple[str, str]]:
-        return [
-            ("equip_type",  "装备类型"),
-            ("equip_level", "装备等级"),
-        ]
-
-    @classmethod
-    def _affix_fields(cls) -> list[tuple[str, str]]:
-        return [
-            ("affix_gong",  "词条宫"),
-            ("affix_shang", "词条商"),
-            ("affix_jue",   "词条角"),
-            ("affix_zhi",   "词条徵"),
-            ("affix_yu",    "词条羽"),
-        ]
-
-    @classmethod
-    def _func_fields(cls) -> list[tuple[str, str]]:
-        return [
-            ("main_func",   "主功能"),
-            ("more_func",   "更多功能"),
-            ("sub_func_1",  "次功能1"),
-            ("sub_func_2",  "次功能2"),
-            ("sub_func_3",  "次功能3"),
-            ("sub_func_4",  "次功能4"),
-        ]
-
-    @classmethod
-    def button_fields(cls) -> set[str]:
-        """更多功能为纯功能按钮"""
-        return {"more_func"}
-
-
-class EquipWeaponDetail(EquipDetail):
-    """装备武器详情：基础属性为单一范围值"""
-    key = "equip_weapon_detail"
-    name = "装备武器详情"
-
-    @classmethod
-    def fields(cls) -> list[tuple[str, str]]:
-        return (
-            cls._common_fields()
-            + [("base_attr", "基础属性")]
-            + cls._affix_fields()
-            + cls._func_fields()
-        )
-
-
-class EquipArmorDetail(EquipDetail):
-    """装备防具详情：基础属性分为气血和防御两项"""
-    key = "equip_armor_detail"
-    name = "装备防具详情"
-
-    @classmethod
-    def fields(cls) -> list[tuple[str, str]]:
-        return (
-            cls._common_fields()
-            + [("base_attr_1", "基础属性1"), ("base_attr_2", "基础属性2")]
-            + cls._affix_fields()
-            + cls._func_fields()
-        )
-
-
-# ── 装备调律详情 ──────────────────────────────────────────
-
-class EquipTuneDetail(SceneDef):
-    key = "equip_tune_detail"
-    name = "装备调律详情"
-
-    @classmethod
-    def fields(cls) -> list[tuple[str, str]]:
-        return [
-            ("affix_gong",    "词条宫"),
-            ("affix_shang",   "词条商"),
-            ("affix_jue",     "词条角"),
-            ("affix_zhi",     "词条徵"),
-            ("affix_yu",      "词条羽"),
-            ("one_click_add", "一键添加"),
-            ("material_1",    "材料格1"),
-            ("material_2",    "材料格2"),
-            ("material_3",    "材料格3"),
-            ("material_4",    "材料格4"),
-            ("material_5",    "材料格5"),
-            ("material_6",    "材料格6"),
-            ("material_7",    "材料格7"),
-            ("tune_btn",      "调律"),
-        ]
-
-
-# ── 装备调律结果 ──────────────────────────────────────────
-
-class EquipTuneResult(SceneDef):
-    key = "equip_tune_result"
-    name = "装备调律结果"
-
-    @classmethod
-    def fields(cls) -> list[tuple[str, str]]:
-        return [
-            ("tune_affix", "调律词条"),
-            ("close_btn",  "关闭"),
-        ]
-
-    @classmethod
-    def button_fields(cls) -> set[str]:
-        """关闭为纯功能按钮"""
-        return {"close_btn"}
-
-
-# ─── 场景注册表（兼容原有接口） ─────────────────────────
-
-_SCENE_CLASSES = {
-    cls.key: cls
-    for cls in [
-        EquipBagDetail,
-        EquipWeaponDetail,
-        EquipArmorDetail,
-        EquipTuneDetail,
-        EquipTuneResult,
-    ]
-    if cls.key
-}
+_registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
 
 FIELD_GROUPS: dict[str, tuple[str, list[tuple[str, str]]]] = {
-    key: (cls.name, cls.fields())
-    for key, cls in _SCENE_CLASSES.items()
+    key: (scene.name, [(f.key, f.name) for f in scene.fields])
+    for key, scene in _registry.all_scenes().items()
 }
 
-EQUIP_FIELDS = EquipWeaponDetail.fields()
+_wpn = _registry.get_scene("equip_weapon_detail")
+EQUIP_FIELDS = [(f.key, f.name) for f in _wpn.fields] if _wpn else []
 
 
 def get_scene_name(scene_key: str) -> str:
@@ -206,10 +52,19 @@ def get_scene_fields(scene_key: str) -> list[tuple[str, str]]:
 
 
 def get_button_fields(scene_key: str) -> set[str]:
-    """获取场景的纯功能按钮字段集合（OCR 时可跳过）"""
-    if scene_key in _SCENE_CLASSES:
-        return _SCENE_CLASSES[scene_key].button_fields()
-    return set()
+    """获取场景的纯功能按钮字段集合（is_clickable 且非 is_text）"""
+    scene = _registry.get_scene(scene_key)
+    if not scene:
+        return set()
+    return {f.key for f in scene.fields if f.is_clickable and not f.is_text}
+
+
+def get_field_defs(scene_key: str) -> list[FieldDef]:
+    """获取场景的完整字段定义列表"""
+    scene = _registry.get_scene(scene_key)
+    if not scene:
+        return []
+    return list(scene.fields)
 
 
 # ─── 路径常量 ────────────────────────────────────────────

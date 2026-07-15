@@ -1,0 +1,63 @@
+key: equip_tune_detail
+name: 调律详情
+
+fields:
+  - key: affix_gong
+    name: 词条宫
+    type: attr
+
+  - key: affix_shang
+    name: 词条商
+    type: attr
+
+  - key: affix_jue
+    name: 词条角
+    type: attr
+
+  - key: affix_zhi
+    name: 词条徵
+    type: attr
+
+  - key: affix_yu
+    name: 词条羽
+    type: attr
+
+  - key: one_click_add
+    name: 一键添加
+    type: action
+    is_text: false
+    is_clickable: true
+
+  - key: material_1
+    name: 材料格1
+    type: material
+
+  - key: material_2
+    name: 材料格2
+    type: material
+
+  - key: material_3
+    name: 材料格3
+    type: material
+
+  - key: material_4
+    name: 材料格4
+    type: material
+
+  - key: material_5
+    name: 材料格5
+    type: material
+
+  - key: material_6
+    name: 材料格6
+    type: material
+
+  - key: material_7
+    name: 材料格7
+    type: material
+
+  - key: tune_btn
+    name: 调律
+    type: action
+    is_text: false
+    is_clickable: true

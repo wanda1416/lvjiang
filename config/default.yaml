@@ -1,5 +1,13 @@
 # 律匠默认配置
 
+# 场景加载顺序（决定 FIELD_GROUPS 遍历顺序、区域编辑器 Tab 顺序）
+layout_scenes:
+  - equip_bag_detail
+  - equip_weapon_detail
+  - equip_armor_detail
+  - equip_tune_detail
+  - equip_tune_result
+
 # 当前目标流派
 target_flow: "会心双刀"
 

@@ -7,6 +7,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
 USER_CONFIG_DIR = CONFIG_DIR / "user"
 FLOWS_DIR = CONFIG_DIR / "flows"
+SYSTEM_SCENES_DIR = CONFIG_DIR / "system" / "scenes"
 
 # 默认配置文件路径
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "default.yaml"

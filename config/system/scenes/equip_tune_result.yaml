@@ -1,0 +1,13 @@
+key: equip_tune_result
+name: 调律结果
+
+fields:
+  - key: tune_affix
+    name: 调律词条
+    type: attr
+
+  - key: close_btn
+    name: 关闭
+    type: action
+    is_text: false
+    is_clickable: true

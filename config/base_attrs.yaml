@@ -19,20 +19,28 @@ weapon:
 ring:
   110:
     gold: 133
+    purple: 120
+    blue: 106
 
 # ── 佩饰：最大外功攻击（单值） ──
 pendant:
   110:
     gold: 199
+    purple: 179
+    blue: 159
 
 # ── 防具（非胸甲）：气血最大值（单值） ──
 # 适用于 head / leg / wrist，同等级同品阶值相同
 armor_other:
   110:
     gold: 9723
+    purple: 8750
+    blue: 7778
 
 # ── 胸甲：气血最大值（单值） ──
 chest:
   110:
     gold: 19445
     purple: 17500
+    blue: 15556
+    

@@ -1,7 +1,7 @@
 """材料分类器 - 识别材料槽中的材料类型、等级和数量
 
 识别策略：
-- 类型识别：模板匹配（cv2.matchTemplate）对比参考图标库
+- 类型识别：ORB 特征匹配对比参考图标库（抗局部遮挡）
 - 等级识别：OCR 裁剪左上角区域
 - 数量识别：OCR 裁剪右下角区域
 - 空槽检测：图像方差 + 饱和度判断
@@ -50,8 +50,8 @@ class MaterialRecognizer:
     COUNT_REGION = (0.45, 0.70, 0.55, 0.30)
     # 空槽判定：像素方差阈值
     EMPTY_VARIANCE_THRESHOLD = 50.0
-    # 模板匹配最低置信度
-    MATCH_THRESHOLD = 0.5
+    # ORB 特征匹配最低置信度
+    MATCH_THRESHOLD = 0.05
 
     def __init__(
         self,
@@ -197,10 +197,13 @@ class MaterialRecognizer:
             return True
         return False
 
-    # ─── 类型识别（模板匹配）─────────────────────────────────
+    # ─── 类型识别（ORB 特征匹配）───────────────────────────────
 
     def _match_type(self, slot_img: np.ndarray) -> tuple[str, float]:
-        """模板匹配识别材料类型
+        """ORB 特征匹配识别材料类型
+
+        对局部遮挡（如减号按钮）有容忍度，
+        只要图标未遮挡区域有足够特征点匹配即可识别。
 
         Returns:
             (type_name, confidence)
@@ -215,29 +218,72 @@ class MaterialRecognizer:
         best_score = -1.0
 
         for mat_type, variants in self._templates.items():
-            # 对同类型的每个等级变体取最高分
             for ref_img, _level in variants:
-                score = self._template_match(resized, ref_img)
+                score = self._match_score(resized, ref_img)
                 if score > best_score:
                     best_score = score
                     best_type = mat_type
 
         if best_score < self.MATCH_THRESHOLD:
-            logger.warning(f"模板匹配置信度过低: {best_score:.3f}，无法识别类型")
+            logger.warning(f"匹配置信度过低: {best_score:.3f}，无法识别类型")
             return "", best_score
 
         logger.debug(f"类型匹配: {best_type} (confidence={best_score:.3f})")
         return best_type, best_score
 
     @staticmethod
-    def _template_match(img: np.ndarray, template: np.ndarray) -> float:
-        """归一化模板匹配，返回最高匹配分数"""
-        if img.shape[:2] != template.shape[:2]:
-            # 尺寸不同，resize 到模板尺寸
-            img = cv2.resize(img, (template.shape[1], template.shape[0]))
+    def _match_score(img: np.ndarray, template: np.ndarray) -> float:
+        """综合匹配分数 = 0.5 × ORB特征分 + 0.5 × HSV颜色相似度
 
-        result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-        return float(result.max())
+        ORB 负责形状/结构匹配，颜色直方图负责区分形状相似但颜色不同的材料。
+        """
+        orb_score = MaterialRecognizer._orb_match(img, template)
+        color_sim = MaterialRecognizer._color_similarity(img, template)
+        return 0.5 * orb_score + 0.5 * color_sim
+
+    @staticmethod
+    def _orb_match(img: np.ndarray, template: np.ndarray) -> float:
+        """ORB 特征匹配分（0~1）"""
+        orb = cv2.ORB.create(nfeatures=300)
+
+        kp1, des1 = orb.detectAndCompute(img, None)
+        kp2, des2 = orb.detectAndCompute(template, None)
+
+        if des1 is None or des2 is None or len(des1) < 5 or len(des2) < 5:
+            return 0.0
+
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+        matches = bf.knnMatch(des1, des2, k=2)
+
+        good = []
+        for pair in matches:
+            if len(pair) == 2:
+                m, n = pair
+                if m.distance < 0.75 * n.distance:
+                    good.append(m)
+
+        if not good:
+            return 0.0
+
+        return min(len(good) / len(kp2), 1.0)
+
+    @staticmethod
+    def _color_similarity(img: np.ndarray, template: np.ndarray) -> float:
+        """CIE Lab 色彩空间平均颜色距离相似度（0~1）
+
+        Lab 空间与人眼感知一致，deltaE 直接对应视觉色差。
+        取两张图的平均 Lab 值，计算欧氏距离，归一化到 0~1。
+        """
+        lab1 = cv2.cvtColor(img, cv2.COLOR_BGR2Lab).astype(np.float32)
+        lab2 = cv2.cvtColor(template, cv2.COLOR_BGR2Lab).astype(np.float32)
+
+        avg1 = lab1.mean(axis=(0, 1))
+        avg2 = lab2.mean(axis=(0, 1))
+
+        # deltaE（欧氏距离）
+        dist = np.sqrt(np.sum((avg1 - avg2) ** 2))
+        # 归一化到 0~1（deltaE > 100 为完全不同）
+        return max(1.0 - dist / 100.0, 0.0)
 
     # ─── 等级 OCR ──────────────────────────────────────────
 

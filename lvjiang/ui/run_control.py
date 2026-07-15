@@ -252,11 +252,60 @@ class RunControlMixin:
             self.log_text.append(f"[已停止] {name}流程被用户中断")
         else:
             result = result_or_exception
+            # 通用保存：所有工作流结果 → users/{用户名}/{工作流名}.json
+            self._save_workflow_result(name, result)
+
             if name == "毕业率计算":
-                self.log_text.append(f"[完成] 识别到 {len(result)} 件装备")
+                self._show_graduation_result(result)
             elif name == "单次调律测试":
                 self.log_text.append(f"[调律词条] {result}")
         self._end_automation(name)
+
+    def _save_workflow_result(self, name: str, result):
+        """通用保存工作流结果到 users/{用户名}/{工作流名}.json"""
+        import json
+        from ..constants import LOCAL_CONFIG_DIR
+
+        username = self._user_manager.get_active_user_name()
+        if not username or not isinstance(result, (dict, list)):
+            return
+
+        user_dir = LOCAL_CONFIG_DIR / "users" / username
+        user_dir.mkdir(parents=True, exist_ok=True)
+        save_path = user_dir / f"{name}.json"
+        save_path.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        logger.info(f"工作流结果已保存: {save_path}")
+        self.log_text.append(f"[保存] {name} → users/{username}/{name}.json")
+
+    def _show_graduation_result(self, raw_data: dict):
+        """解析并展示毕业率结果"""
+        from ..equip_parser import EquipmentParser
+
+        parser = EquipmentParser()
+        self.log_text.append(f"[完成] 识别到 {len(raw_data)} 件装备")
+        self.log_text.append("─" * 40)
+
+        for slot, raw in raw_data.items():
+            try:
+                equip = parser.parse_slot(slot, raw)
+                warnings_str = f" ⚠{equip.warnings}" if equip.warnings else ""
+                affix_summary = ", ".join(
+                    f"{a.name}{'[转]' if a.is_transferred else ''}"
+                    for a in equip.affixes
+                )
+                self.log_text.append(
+                    f"  {slot:12s} | {equip.name or '?':8s} | "
+                    f"{equip.type or '-':4s} | {equip.level or '?'}阶 "
+                    f"| {affix_summary}{warnings_str}"
+                )
+            except Exception as e:
+                self.log_text.append(f"  {slot:12s} | [解析失败] {e}")
+                logger.warning(f"装备解析失败 {slot}: {e}")
+
+        self.log_text.append("─" * 40)
 
     # ─── 运行按钮 ──────────────────────────────────────────
 

@@ -42,8 +42,12 @@ class WorkflowEngine:
     # ─── 节点遍历 ──────────────────────────────────────────
 
     def _execute_nodes(self, nodes: list) -> dict | str | None:
-        """执行一组 AST 节点，返回 collect 的直接输出（如果有）"""
+        """执行一组 AST 节点，返回 collect 的直接输出（如果有）
+
+        容错策略：单步异常时跳过当前槽位剩余步骤，继续下一个 click 槽位。
+        """
         direct_output = None
+        skip_until_click = False  # 当前槽位已失败，跳过到下一个 click
 
         for i, node in enumerate(nodes):
             if self._wf.is_stopped:
@@ -56,7 +60,17 @@ class WorkflowEngine:
                 elif isinstance(node, EvalNode):
                     self._exec_eval(node)
                 elif isinstance(node, Step):
-                    logger.debug(f"  步骤 {i+1}/{len(nodes)}: {node.instruction} {node.args}")
+                    # 容错：跳过失败槽位的剩余步骤
+                    if skip_until_click:
+                        if node.instruction == "click":
+                            skip_until_click = False
+                            logger.debug(f"  步骤 {i+1}/{len(nodes)}: [新槽位] {node.instruction} {node.args}")
+                        else:
+                            logger.debug(f"  步骤 {i+1}/{len(nodes)}: [跳过] {node.instruction}")
+                            continue
+                    else:
+                        logger.debug(f"  步骤 {i+1}/{len(nodes)}: {node.instruction} {node.args}")
+
                     result = self._exec_step(node)
                     if result is not None:
                         direct_output = result
@@ -66,7 +80,12 @@ class WorkflowEngine:
                 line_info = f" (行 {node.line_no})" if hasattr(node, "line_no") else ""
                 logger.error(f"DSL 执行异常{line_info}: {e}")
                 logger.error(f"异常详情:\n{traceback.format_exc()}")
-                raise
+                # 容错：标记当前槽位失败，跳到下一个 click
+                if isinstance(node, Step):
+                    skip_until_click = True
+                    logger.warning(f"  当前槽位异常终止，跳过剩余步骤")
+                else:
+                    raise
 
         return direct_output
 

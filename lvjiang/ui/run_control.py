@@ -6,7 +6,7 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ..constants import SYSTEM_WORKFLOWS_DIR
-from ..workflows.engine import WorkflowEngine
+from ..workflows.base import BaseWorkflow
 
 
 # 各工作流所需场景（用于启动前校验）
@@ -175,7 +175,7 @@ class RunControlMixin:
             self._end_automation("毕业率计算")
             return
 
-        engine = WorkflowEngine(
+        wf = BaseWorkflow(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
@@ -188,7 +188,7 @@ class RunControlMixin:
         wf_path = SYSTEM_WORKFLOWS_DIR / "equip_analysis.wf"
 
         self.log_text.append("[开始] 装备分析流程...")
-        self._start_workflow("毕业率计算", lambda: engine.run(wf_path))
+        self._start_workflow("毕业率计算", lambda: wf.run_file(wf_path))
 
     # ─── 单次调律测试按钮 ────────────────────────────────
 
@@ -219,7 +219,7 @@ class RunControlMixin:
             self._end_automation("单次调律测试")
             return
 
-        engine = WorkflowEngine(
+        wf = BaseWorkflow(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
@@ -232,7 +232,7 @@ class RunControlMixin:
         wf_path = SYSTEM_WORKFLOWS_DIR / "tune_test.wf"
 
         self.log_text.append("[开始] 单次调律测试流程...")
-        self._start_workflow("单次调律测试", lambda: engine.run(wf_path))
+        self._start_workflow("单次调律测试", lambda: wf.run_file(wf_path))
 
     # ─── 异步工作流执行 ────────────────────────────────
 

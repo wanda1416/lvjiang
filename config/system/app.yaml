@@ -1,0 +1,9 @@
+# 律匠系统配置
+
+# 场景加载顺序
+layout_scenes:
+  - equip_bag_detail
+  - equip_weapon_detail
+  - equip_armor_detail
+  - equip_tune_detail
+  - equip_tune_result

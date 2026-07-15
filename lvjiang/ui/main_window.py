@@ -458,7 +458,18 @@ class MainWindow(QMainWindow):
                 w,
             )
 
-        self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
+        # 自动匹配 window_title
+        keyword = self._layout_manager.get_window_title()
+        if keyword:
+            for i, w in enumerate(self._scanned_windows):
+                if keyword in w["title"]:
+                    self.window_combo.setCurrentIndex(i)
+                    self._on_locate_window()
+                    self.log_text.append(f"[扫描] 已自动匹配窗口: {w['title']}（关键字: {keyword}）")
+                    return
+            self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，未匹配到关键字「{keyword}」")
+        else:
+            self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
         self.btn_locate.setEnabled(True)
         self.lbl_window_info.setText("请下拉选择目标窗口...")
         self.lbl_window_info.setStyleSheet("color: orange;")

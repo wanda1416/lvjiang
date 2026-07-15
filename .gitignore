@@ -19,11 +19,8 @@ venv/
 # Logs
 logs/
 
-# Generated
-config/coordinate.yaml
-
-# User-level config (layouts, active layout, etc.)
-config/user/
+# Local data (layouts, session, screenshots, etc.)
+config/local/
 
 # OS
 Thumbs.db

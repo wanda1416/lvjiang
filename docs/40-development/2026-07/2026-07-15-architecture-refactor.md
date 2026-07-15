@@ -17,7 +17,7 @@
 | 新增场景 | `equip_armor_detail`（装备防具详情，9 字段） |
 | 新增场景 | `equip_bag_detail`（装备背包详情，10 字段，Tab 第一列） |
 | 布局顺序 | `config.json` 新增 `layouts` 数组管理顺序 |
-| 截图存储 | 按布局+场景维度持久化到 `config/user/screenshots/` |
+| 截图存储 | 按布局+场景维度持久化到 `config/local/screenshots/` |
 | Bug 修复 | 字段绑定状态刷新、OpenCV 中文路径 |
 
 ---
@@ -93,7 +93,7 @@
 ### 存储路径
 
 ```
-config/user/screenshots/
+config/local/screenshots/
 ├── 默认布局/
 │   ├── equip_bag_detail.png
 │   ├── equip_weapon_detail.png

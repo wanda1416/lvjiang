@@ -4,7 +4,7 @@
 
 ## 场景列表
 
-当前定义了四个场景：
+当前定义了五个场景：
 
 | 场景 Key | 场景名称 | 用途 |
 |----------|----------|------|
@@ -12,6 +12,7 @@
 | `equip_weapon_detail` | 装备武器详情 | 识别武器的基础信息和词条分布 |
 | `equip_armor_detail` | 装备防具详情 | 识别防具的基础信息和词条分布（含双基础属性） |
 | `equip_tune_detail` | 装备调律详情 | 识别调律后的词条变化 |
+| `equip_tune_result` | 调律结果 | 识别调律结果页面的词条和关闭按钮 |
 
 ---
 
@@ -99,14 +100,29 @@
 
 ---
 
+## 场景五：调律结果 (equip_tune_result)
+
+**游戏内位置**：调律完成后 → 结果展示弹窗
+
+**需要识别的字段**：
+
+| 字段 Key | 字段名称 | 说明 |
+|----------|----------|------|
+| `tune_affix` | 调律词条 | 调律后获得的词条 |
+| `close_btn` | 关闭 | 关闭按钮（功能按钮，不 OCR） |
+
+**截图时机**：调律结果弹窗显示时截图，用于识别新获得的词条。
+
+---
+
 ## 场景与布局的关系
 
 - **布局** = 一套投屏方案（对应特定设备/分辨率）
 - 每个布局独立保存各场景的截图和区域坐标
-- 存储路径：`config/user/screenshots/{布局名}/{场景key}.png`
+- 存储路径：`config/local/screenshots/{布局名}/{场景key}.png`
 
 ```
-config/user/screenshots/
+config/local/screenshots/
 ├── 默认布局/
 │   ├── equip_bag_detail.png        # 背包总览页截图
 │   ├── equip_weapon_detail.png   # 武器详情页截图
@@ -121,15 +137,26 @@ config/user/screenshots/
 
 ## 扩展新场景
 
-如需支持更多游戏界面（如「转律界面」「传律界面」），在 `region_config.py` 的 `FIELD_GROUPS` 中添加新条目：
+在 `config/system/scenes/` 下新建 YAML 文件，并在 `config/system/app.yaml` 的 `layout_scenes` 中添加场景 key：
 
-```python
-FIELD_GROUPS = {
-    "equip_bag_detail": ("装备背包详情", [...]),
-    "equip_weapon_detail": ("装备武器详情", [...]),
-    "equip_armor_detail": ("装备防具详情", [...]),
-    "equip_tune_detail": ("装备调律详情", [...]),
-    # 新增场景示例：
-    # "transfer": ("转律界面", [("cost", "消耗材料"), ...]),
-}
+```yaml
+# config/system/scenes/transfer.yaml
+key: transfer
+name: 转律界面
+fields:
+  - key: cost
+    name: 消耗材料
+    type: info
+  # ...
+```
+
+```yaml
+# config/system/app.yaml
+layout_scenes:
+  - equip_bag_detail
+  - equip_weapon_detail
+  - equip_armor_detail
+  - equip_tune_detail
+  - equip_tune_result
+  - transfer  # 新增
 ```

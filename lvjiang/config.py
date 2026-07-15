@@ -6,7 +6,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
-from .constants import DEFAULT_CONFIG_PATH, BASE_RESOLUTION
+from .constants import APP_CONFIG_PATH, PREFERENCES_PATH
 
 
 class DelayConfig(BaseModel):
@@ -23,40 +23,13 @@ class BudgetConfig(BaseModel):
 
 
 class UserConfig(BaseModel):
-    """用户配置"""
+    """用户配置（从 preferences.yaml 加载）"""
+    window_title: str = ""
     target_flow: str = "会心双刀"
     auto_protect_top_tier: bool = True
     keep_strategy: str = "top2"
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     delay: DelayConfig = Field(default_factory=DelayConfig)
-    window_title: str = ""
-
-
-class RegionConfig(BaseModel):
-    """单个区域配置"""
-    type: str  # box / point / grid
-    # box 类型字段
-    left: int = 0
-    top: int = 0
-    width: int = 0
-    height: int = 0
-    # point 类型字段
-    x: int = 0
-    y: int = 0
-    # grid 类型字段
-    first_cell: list[int] = Field(default_factory=lambda: [0, 0])
-    cell_size: list[int] = Field(default_factory=lambda: [80, 80])
-    gap: list[int] = Field(default_factory=lambda: [10, 10])
-    cols: int = 6
-    rows: int = 5
-    # 可选颜色校验
-    color_check: list[int] | None = None
-
-
-class CoordinateConfig(BaseModel):
-    """坐标配置文件"""
-    base_resolution: list[int] = Field(default_factory=lambda: list(BASE_RESOLUTION))
-    regions: dict[str, RegionConfig] = Field(default_factory=dict)
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -76,15 +49,12 @@ def save_yaml(path: Path, data: dict[str, Any]) -> None:
 
 
 def load_user_config(path: Path | None = None) -> UserConfig:
-    """加载用户配置"""
-    config_path = path or DEFAULT_CONFIG_PATH
-    data = load_yaml(config_path)
+    """加载用户配置（app.yaml 默认值 + preferences.yaml 覆盖）"""
+    if path:
+        data = load_yaml(path)
+    else:
+        # 先加载系统默认，再用用户偏好覆盖
+        data = load_yaml(APP_CONFIG_PATH)
+        prefs = load_yaml(PREFERENCES_PATH)
+        data.update(prefs)
     return UserConfig(**data)
-
-
-def load_coordinate_config(path: Path | None = None) -> CoordinateConfig:
-    """加载坐标配置"""
-    from .constants import COORDINATE_CONFIG_PATH
-    config_path = path or COORDINATE_CONFIG_PATH
-    data = load_yaml(config_path)
-    return CoordinateConfig(**data)

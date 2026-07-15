@@ -28,9 +28,4 @@ EQUIP_SLOT_NAMES = {
     "pendant": "佩",
 }
 
-# 默认延迟参数（秒）
-DEFAULT_CLICK_INTERVAL = (0.1, 0.3)
-DEFAULT_AFTER_CLICK_WAIT = (0.1, 0.2)
-
-# 鼠标随机偏移范围（像素）
-CLICK_RANDOM_OFFSET = 3
+# 延迟参数已统一到 config.py 的 DelayConfig，不再在此处定义默认值

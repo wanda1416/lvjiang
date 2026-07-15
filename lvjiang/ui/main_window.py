@@ -5,19 +5,25 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QTabWidget, QSplitter, QMessageBox,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QKeyEvent, QAction
 from loguru import logger
+
+from pynput import keyboard as pynput_keyboard
 
 from .overlay import BorderOverlay
 from .window_ops import WindowOpsMixin
 from .run_control import RunControlMixin
+from ..config import load_user_config
 from ..core.user_config import UserConfigManager
 from ..core.region_config import LayoutConfigManager
 
 
 class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     """律匠主窗口"""
+
+    # 全局热键 F10 信号（跨线程，pynput 监听线程 emit，主线程处理）
+    f10_pressed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -30,6 +36,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # 运行状态
         self._running = False
+        self._stop_requested = False
+        self._current_worker = None  # 当前工作流线程，为 None 表示无自动化在运行
 
         # 边框覆盖层（定位/运行状态指示）
         self._overlay = BorderOverlay()
@@ -47,19 +55,34 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         # 布局管理
         self._layout_manager = LayoutConfigManager()
 
+        # 用户配置（延迟参数等）
+        self._user_config = load_user_config()
+
         # OCR 引擎（懒加载）
         from ..core.ocr import OCREngine
         self._ocr = OCREngine()
 
-        # 输入控制器
+        # 输入控制器（传入延迟配置）
         from ..core.input import InputController
-        self._input = InputController()
+        self._input = InputController(delay_config=self._user_config.delay)
 
         self._setup_menu()
         self._setup_ui()
         self._refresh_user_combo()
         self._refresh_layout_combo()
+
+        # 全局热键监听 F10（跨窗口焦点，自动化时游戏窗口占焦点也能响应）
+        self.f10_pressed.connect(self._request_stop)
+        self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
+            "<f10>": self._on_global_f10,
+        })
+        self._hotkey_listener.start()
+
         logger.info("主窗口已初始化")
+
+    def _on_global_f10(self):
+        """pynput 监听线程回调，转发到主线程处理"""
+        self.f10_pressed.emit()
 
     # ─── 菜单栏 ────────────────────────────────────────────
 
@@ -218,6 +241,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.btn_graduation.clicked.connect(self._on_graduation)
         left_layout.addWidget(self.btn_graduation)
 
+        self.btn_tune_test = QPushButton("单次调律测试")
+        self.btn_tune_test.clicked.connect(self._on_tune_test)
+        left_layout.addWidget(self.btn_tune_test)
+
         flow_group = QGroupBox("目标流派")
         flow_layout = QVBoxLayout(flow_group)
         self.flow_selector = QComboBox()
@@ -295,17 +322,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     # ─── 快捷键 + 关闭 ─────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):
-        """全局快捷键处理"""
+        """全局快捷键处理（仅在主窗口有焦点时生效，F10 主要靠全局热键）"""
         if event.key() == Qt.Key.Key_F9:
             if not self._running:
                 self._on_start()
         elif event.key() == Qt.Key.Key_F10:
-            if self._running:
-                self._on_stop()
+            self._request_stop()
         else:
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        """关闭主窗口时清理原生覆盖层。"""
+        """关闭主窗口时清理热键监听与原生覆盖层。"""
+        try:
+            self._hotkey_listener.stop()
+        except Exception:
+            pass
         self._overlay.destroy()
         super().closeEvent(event)

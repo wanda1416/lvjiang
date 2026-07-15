@@ -23,6 +23,7 @@ class RegionEditorDialog(QDialog):
 
     def __init__(
         self,
+        layout_manager=None,
         refresh_callback=None,
         parent=None,
     ):
@@ -38,7 +39,8 @@ class RegionEditorDialog(QDialog):
         )
         self.setSizeGripEnabled(True)
 
-        self._manager = LayoutConfigManager()
+        # 使用传入的布局管理器，或创建新的（向后兼容）
+        self._manager = layout_manager if layout_manager is not None else LayoutConfigManager()
         self._refresh_callback = refresh_callback
         self._tabs: dict[str, SceneTab] = {}  # scene_key -> SceneTab
         self._current_layout: Layout | None = None
@@ -61,10 +63,6 @@ class RegionEditorDialog(QDialog):
         top_bar.addWidget(self._layout_combo)
 
         # 中间：功能按钮
-        self._btn_activate = QPushButton("激活")
-        self._btn_activate.clicked.connect(self._on_activate_layout)
-        top_bar.addWidget(self._btn_activate)
-
         self._btn_save = QPushButton("保存")
         self._btn_save.clicked.connect(self._on_save_layout)
         top_bar.addWidget(self._btn_save)
@@ -96,11 +94,7 @@ class RegionEditorDialog(QDialog):
 
         top_bar.addStretch()
 
-        # 右侧：激活布局标签 + 修改状态指示
-        self._active_label = QLabel("默认布局：无")
-        self._active_label.setStyleSheet("color: #555; font-weight: bold;")
-        top_bar.addWidget(self._active_label)
-
+        # 右侧：修改状态指示
         self._dirty_label = QLabel("● 有改动")
         self._dirty_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
         self._dirty_label.setVisible(False)
@@ -187,24 +181,15 @@ class RegionEditorDialog(QDialog):
         self._layout_combo.blockSignals(False)
 
     def _update_ui_state(self):
-        """统一刷新所有 UI 状态：下拉框、按钮可用性、激活标签"""
+        """统一刷新所有 UI 状态：下拉框、按钮可用性"""
         self._refresh_combo()
         active = self._manager.get_active_layout_name()
-        # 激活标签
-        if active:
-            self._active_label.setText(f"默认布局：{active}")
-            self._active_label.setStyleSheet("color: #333; font-weight: bold;")
-        else:
-            self._active_label.setText("默认布局：无")
-            self._active_label.setStyleSheet("color: red; font-weight: bold;")
         # 按钮可用性
         has_layout = self._current_layout is not None
         self._btn_save.setEnabled(has_layout)
         self._btn_save_as.setEnabled(has_layout)
-        # 已激活的布局禁用激活按钮
-        is_active = has_layout and self._current_layout.name == active
-        self._btn_activate.setEnabled(has_layout and not is_active)
         # 激活布局不可删除
+        is_active = has_layout and self._current_layout.name == active
         self._btn_delete.setEnabled(has_layout and not is_active)
 
     def _on_combo_changed(self, index: int):
@@ -233,16 +218,6 @@ class RegionEditorDialog(QDialog):
                 self._current_layout = layout
                 self._apply_layout_to_tabs()
         self._update_ui_state()
-
-    def _on_activate_layout(self):
-        """将当前加载的布局设为激活"""
-        if self._current_layout is None:
-            self._status_bar.showMessage("没有已加载的布局")
-            return
-        name = self._current_layout.name
-        self._manager.set_active_layout(name)
-        self._update_ui_state()
-        self._status_bar.showMessage(f"已激活布局「{name}」")
 
     def _on_new_layout(self):
         """新建空布局并切换到画布（不自动激活）"""

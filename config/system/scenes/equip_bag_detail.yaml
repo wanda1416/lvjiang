@@ -61,3 +61,112 @@ fields:
     type: slot
     is_text: false
     is_clickable: true
+
+  # ─── 背包格子（3 行 × 6 列）───────────────────────
+  - key: bag_1_1
+    name: 背包格1_1
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_1_2
+    name: 背包格1_2
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_1_3
+    name: 背包格1_3
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_1_4
+    name: 背包格1_4
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_1_5
+    name: 背包格1_5
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_1_6
+    name: 背包格1_6
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_2_1
+    name: 背包格2_1
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_2_2
+    name: 背包格2_2
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_2_3
+    name: 背包格2_3
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_2_4
+    name: 背包格2_4
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_2_5
+    name: 背包格2_5
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_2_6
+    name: 背包格2_6
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_3_1
+    name: 背包格3_1
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_3_2
+    name: 背包格3_2
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_3_3
+    name: 背包格3_3
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_3_4
+    name: 背包格3_4
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_3_5
+    name: 背包格3_5
+    type: slot
+    is_text: false
+    is_clickable: true
+
+  - key: bag_3_6
+    name: 背包格3_6
+    type: slot
+    is_text: false
+    is_clickable: true

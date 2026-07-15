@@ -256,26 +256,20 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
 
         from ...core.ocr import OCREngine
         engine = OCREngine()
-        h, w = image.shape[:2]
-
         canvas = current_tab.get_canvas_config()
-        canvas_x = canvas.x_ratio * w
-        canvas_y = canvas.y_ratio * h
-        canvas_w = canvas.w_ratio * w
-        canvas_h = canvas.h_ratio * h
 
+        results = engine.ocr_scene_regions(image, canvas, regions, current_tab.scene_key)
+
+        # 展示结果
         self._result_text.clear()
-        results = {}
-        for region in regions:
-            x1 = int(canvas_x + region.x_ratio * canvas_w)
-            y1 = int(canvas_y + region.y_ratio * canvas_h)
-            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
-            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
-            crop = image[y1:y2, x1:x2]
-            ocr_results = engine.recognize(crop)
-            text = " | ".join(r.text for r in ocr_results) if ocr_results else "(未识别到)"
-            results[region.name] = text
-            self._result_text.append(f"{region.name}: {text}")
+        for key, text in results.items():
+            # 查找字段中文名
+            name = key
+            for r in regions:
+                if r.key == key:
+                    name = r.name
+                    break
+            self._result_text.append(f"{name}: {text or '(未识别到)'}")
 
         self._status_bar.showMessage(f"识别完成，共 {len(results)} 个字段")
         logger.info(

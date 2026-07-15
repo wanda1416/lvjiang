@@ -10,9 +10,7 @@ from loguru import logger
 from ..core.capture import ScreenCapture
 from ..core.ocr import OCREngine
 from ..core.input import InputController
-from ..core.region_config import (
-    Layout, Region, get_scene_fields, get_field_defs, FIELD_GROUPS,
-)
+from ..core.region_config import Layout, Region
 from ..constants import LOCAL_CONFIG_DIR, EQUIP_SLOT_NAMES
 
 
@@ -152,46 +150,13 @@ class EquipAnalysisWorkflow:
             logger.error("截图失败")
             return {}
 
-        h, w = img.shape[:2]
         canvas = self._layout.get_canvas()
-
-        # 画布变换
-        canvas_x = canvas.x_ratio * w
-        canvas_y = canvas.y_ratio * h
-        canvas_w = canvas.w_ratio * w
-        canvas_h = canvas.h_ratio * h
-
         regions = self._layout.get_scene_regions(scene_key)
         if not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return {}
 
-        fields = get_scene_fields(scene_key)
-        field_map = {k: name for k, name in fields}
-        # 只 OCR type == "attr" 的字段
-        attr_keys = {f.key for f in get_field_defs(scene_key) if f.type == "attr"}
-        result = {}
-
-        for region in regions:
-            if region.key not in field_map:
-                continue
-            if region.key not in attr_keys:
-                logger.debug(f"跳过非属性字段: {region.key}")
-                continue
-
-            # 区域坐标 -> 截图像素
-            x1 = int(canvas_x + region.x_ratio * canvas_w)
-            y1 = int(canvas_y + region.y_ratio * canvas_h)
-            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
-            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
-
-            # 裁剪 + OCR
-            crop = img[y1:y2, x1:x2]
-            ocr_results = self._ocr.recognize(crop)
-            text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
-            result[region.key] = text
-
-        return result
+        return self._ocr.ocr_scene_regions(img, canvas, regions, scene_key)
 
     def _save_result(self, result: dict):
         """保存结果到 config/user/users/{username}/equipments.json"""

@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QInputDialog, QStatusBar,
     QTextEdit, QApplication, QTabWidget, QMessageBox,
 )
+from PyQt6.QtCore import Qt
 from loguru import logger
 
 from ...core.region_config import (
@@ -28,6 +29,14 @@ class RegionEditorDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("区域编辑器")
         self.setMinimumSize(900, 700)
+        self.resize(1200, 800)
+        # 允许最大化/最小化和自由缩放
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+        )
+        self.setSizeGripEnabled(True)
 
         self._image = image
         self._manager = LayoutConfigManager()

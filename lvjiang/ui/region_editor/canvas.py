@@ -934,8 +934,12 @@ class RegionCanvas(QWidget):
         is_canvas_mode = self._edit_mode == EditMode.CANVAS
         pen_color = QColor(255, 200, 0) if is_canvas_mode else QColor(255, 200, 0, 200)
         pen_width = 3 if is_canvas_mode else 2
-        painter.setPen(QPen(pen_color, pen_width, Qt.PenStyle.DashLine))
+        # 先画黑色底衬，确保在任何背景下都可辨
+        painter.setPen(QPen(QColor(0, 0, 0, 180), pen_width + 2, Qt.PenStyle.DashLine))
         painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(canvas_rect)
+        # 再画黄色虚线
+        painter.setPen(QPen(pen_color, pen_width, Qt.PenStyle.DashLine))
         painter.drawRect(canvas_rect)
         painter.restore()
 
@@ -1013,12 +1017,10 @@ class RegionCanvas(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # 窗口大小变化时，重新计算基准缩放并应用当前 zoom
+        # 窗口大小变化时，重置缩放并重新计算显示区域
         if self._pixmap:
-            pw, ph = self._pixmap.width(), self._pixmap.height()
-            ww, wh = self.width(), self.height()
-            self._base_scale = min(ww / pw, wh / ph)
-            self._apply_zoom_anchor(QPointF(ww / 2, wh / 2))
+            self._zoom = 1.0
+            self._recalc_display()
 
     # ─── 通知 ────────────────────────────────────────────
 

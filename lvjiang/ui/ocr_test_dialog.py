@@ -1,4 +1,4 @@
-"""OCR 测试对话框 - 粘贴截图并识别"""
+"""图像识别测试对话框 - 粘贴截图，支持 OCR 文字识别和材料识别"""
 
 import numpy as np
 from PyQt6.QtWidgets import (
@@ -11,11 +11,11 @@ from loguru import logger
 
 
 class OCRTestDialog(QDialog):
-    """OCR 测试对话框：粘贴图片 -> 识别 -> 展示结果"""
+    """图像识别测试对话框：粘贴图片 -> OCR 文字识别 / 材料识别"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("OCR 测试")
+        self.setWindowTitle("图像识别测试")
         self.setMinimumSize(700, 600)
         self._image_label = None   # QLabel 显示图片
         self._result_text = None   # QTextEdit 显示结果
@@ -41,10 +41,15 @@ class OCRTestDialog(QDialog):
         self._btn_upload.clicked.connect(self._on_upload)
         btn_row.addWidget(self._btn_upload)
 
-        self._btn_recognize = QPushButton("识别 (F5)")
-        self._btn_recognize.setEnabled(False)
-        self._btn_recognize.clicked.connect(self._on_recognize)
-        btn_row.addWidget(self._btn_recognize)
+        self._btn_ocr = QPushButton("识别文字 (F5)")
+        self._btn_ocr.setEnabled(False)
+        self._btn_ocr.clicked.connect(self._on_recognize)
+        btn_row.addWidget(self._btn_ocr)
+
+        self._btn_material = QPushButton("识别材料 (F6)")
+        self._btn_material.setEnabled(False)
+        self._btn_material.clicked.connect(self._on_recognize_material)
+        btn_row.addWidget(self._btn_material)
 
         self._btn_clear = QPushButton("清空")
         self._btn_clear.clicked.connect(self._on_clear)
@@ -74,6 +79,8 @@ class OCRTestDialog(QDialog):
             self._paste_image()
         elif key == Qt.Key.Key_F5:
             self._on_recognize()
+        elif key == Qt.Key.Key_F6:
+            self._on_recognize_material()
         else:
             super().keyPressEvent(event)
 
@@ -130,27 +137,18 @@ class OCRTestDialog(QDialog):
             Qt.TransformationMode.SmoothTransformation,
         )
         self._image_label.setPixmap(scaled)
-        self._btn_recognize.setEnabled(True)
+        self._btn_ocr.setEnabled(True)
+        self._btn_material.setEnabled(True)
 
     def _on_recognize(self):
-        """执行 OCR 识别"""
+        """执行 OCR 文字识别"""
         if self._current_pixmap is None:
             return
 
-        self._status_label.setText("正在识别...")
+        self._status_label.setText("正在识别文字...")
         QApplication.processEvents()
 
-        # QPixmap -> numpy BGR
-        qimg = self._current_pixmap.toImage()
-        # 统一转为 RGB888，避免格式分支
-        qimg = qimg.convertToFormat(QImage.Format.Format_RGB888)
-        w, h = qimg.width(), qimg.height()
-        bpl = qimg.bytesPerLine()  # 行字节数（含 4 字节对齐填充）
-        buf = qimg.constBits()
-        buf.setsize(qimg.sizeInBytes())
-        # 按实际 stride reshape，再裁掉填充字节
-        arr = np.frombuffer(buf, dtype=np.uint8).reshape(h, bpl)
-        bgr = arr[:, :w * 3].reshape(h, w, 3)[:, :, ::-1].copy()
+        bgr = self._pixmap_to_bgr(self._current_pixmap)
 
         try:
             from ..core.ocr import OCREngine
@@ -169,17 +167,73 @@ class OCRTestDialog(QDialog):
                     self._result_text.append(f"    位置: {pts}")
                     self._result_text.append("")
 
-            self._status_label.setText(f"识别完成，共 {len(results)} 条结果")
+            self._status_label.setText(f"文字识别完成，共 {len(results)} 条结果")
             logger.info(f"OCR 测试：识别到 {len(results)} 条文字")
         except Exception as e:
             logger.error(f"OCR 识别失败: {e}")
             self._result_text.setText(f"识别失败: {e}")
             self._status_label.setText("识别失败")
 
+    def _on_recognize_material(self):
+        """执行材料识别（类型 + 等级 + 数量）"""
+        if self._current_pixmap is None:
+            return
+
+        self._status_label.setText("正在识别材料...")
+        QApplication.processEvents()
+
+        bgr = self._pixmap_to_bgr(self._current_pixmap)
+
+        try:
+            from ..core.ocr import OCREngine
+            from ..core.material_recognizer import MaterialRecognizer
+
+            ocr = OCREngine()
+            recognizer = MaterialRecognizer(ocr)
+            result = recognizer.recognize(bgr)
+
+            self._result_text.clear()
+            if not result.type:
+                self._result_text.append("未识别到材料（空槽或无匹配）")
+                self._result_text.append(f"  置信度: {result.confidence:.3f}")
+            else:
+                self._result_text.append(f"类型: {result.type}")
+                self._result_text.append(f"等级: {result.level if result.level is not None else '无'}")
+                count_str = str(result.count) if result.count is not None else '?'
+                owned_str = str(result.owned) if result.owned is not None else '?'
+                self._result_text.append(f"数量: {count_str}/{owned_str} (投入/持有)")
+                self._result_text.append(f"匹配置信度: {result.confidence:.3f}")
+
+            self._status_label.setText(
+                f"材料识别完成: {result.type or '(空)'}"
+            )
+            logger.info(
+                f"材料识别: type={result.type} level={result.level} "
+                f"count={result.count} conf={result.confidence:.3f}"
+            )
+        except Exception as e:
+            logger.error(f"材料识别失败: {e}")
+            self._result_text.setText(f"识别失败: {e}")
+            self._status_label.setText("识别失败")
+
+    @staticmethod
+    def _pixmap_to_bgr(pixmap: QPixmap) -> np.ndarray:
+        """QPixmap -> BGR numpy 数组"""
+        qimg = pixmap.toImage()
+        qimg = qimg.convertToFormat(QImage.Format.Format_RGB888)
+        w, h = qimg.width(), qimg.height()
+        bpl = qimg.bytesPerLine()
+        buf = qimg.constBits()
+        buf.setsize(qimg.sizeInBytes())
+        arr = np.frombuffer(buf, dtype=np.uint8).reshape(h, bpl)
+        bgr = arr[:, :w * 3].reshape(h, w, 3)[:, :, ::-1].copy()
+        return bgr
+
     def _on_clear(self):
         """清空图片和结果"""
         self._current_pixmap = None
         self._image_label.setText("Ctrl+V 粘贴截图（支持剪贴板中的图片）")
         self._result_text.clear()
-        self._btn_recognize.setEnabled(False)
+        self._btn_ocr.setEnabled(False)
+        self._btn_material.setEnabled(False)
         self._status_label.setText("就绪")

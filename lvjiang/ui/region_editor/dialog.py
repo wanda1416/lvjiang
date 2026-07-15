@@ -1,24 +1,24 @@
-"""编辑器对话框 - 区域编辑器对话框 - 布局→场景 层级结构"""
+"""编辑器对话框 - 区域编辑器主框架、Tab/画布管理、OCR 识别"""
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
-    QPushButton, QComboBox, QInputDialog, QStatusBar,
-    QTextEdit, QApplication, QTabWidget, QMessageBox, QSplitter,
+    QPushButton, QComboBox, QStatusBar, QTextEdit,
+    QApplication, QTabWidget, QSplitter,
 )
 from PyQt6.QtCore import Qt
 from loguru import logger
 
 from ...core.region_config import (
-    FIELD_GROUPS, Region, CanvasConfig, Layout, LayoutConfigManager,
-    get_scene_name, get_scene_fields,
+    FIELD_GROUPS, Layout, LayoutConfigManager,
+    get_scene_name,
     load_scene_screenshot, save_scene_screenshot,
-    copy_screenshots, delete_screenshots,
 )
+from .layout_ops import LayoutOpsMixin
 from .scene_tab import SceneTab
 from .canvas import EditMode
 
 
-class RegionEditorDialog(QDialog):
+class RegionEditorDialog(LayoutOpsMixin, QDialog):
     """区域编辑器对话框 - 布局→场景 层级结构"""
 
     def __init__(
@@ -31,7 +31,6 @@ class RegionEditorDialog(QDialog):
         self.setWindowTitle("区域编辑器")
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
-        # 允许最大化/最小化和自由缩放
         self.setWindowFlags(
             self.windowFlags()
             | Qt.WindowType.WindowMinimizeButtonHint
@@ -39,15 +38,16 @@ class RegionEditorDialog(QDialog):
         )
         self.setSizeGripEnabled(True)
 
-        # 使用传入的布局管理器，或创建新的（向后兼容）
         self._manager = layout_manager if layout_manager is not None else LayoutConfigManager()
         self._refresh_callback = refresh_callback
-        self._tabs: dict[str, SceneTab] = {}  # scene_key -> SceneTab
+        self._tabs: dict[str, SceneTab] = {}
         self._current_layout: Layout | None = None
-        self._dirty = False  # 是否有未保存的改动
+        self._dirty = False
 
         self._setup_ui()
         self._auto_load_active()
+
+    # ─── UI 构建 ───────────────────────────────────────────
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -55,14 +55,12 @@ class RegionEditorDialog(QDialog):
         # ─── 顶部布局栏 ───
         top_bar = QHBoxLayout()
 
-        # 左侧：当前布局 + 下拉框
         top_bar.addWidget(QLabel("当前布局"))
         self._layout_combo = QComboBox()
         self._layout_combo.setMinimumWidth(140)
         self._layout_combo.currentIndexChanged.connect(self._on_combo_changed)
         top_bar.addWidget(self._layout_combo)
 
-        # 中间：功能按钮
         self._btn_save = QPushButton("保存")
         self._btn_save.clicked.connect(self._on_save_layout)
         top_bar.addWidget(self._btn_save)
@@ -85,7 +83,6 @@ class RegionEditorDialog(QDialog):
 
         top_bar.addSpacing(20)
 
-        # 画布模式切换按钮
         self._btn_canvas_mode = QPushButton("编辑画布")
         self._btn_canvas_mode.setCheckable(True)
         self._btn_canvas_mode.clicked.connect(self._on_toggle_canvas_mode)
@@ -94,7 +91,6 @@ class RegionEditorDialog(QDialog):
 
         top_bar.addStretch()
 
-        # 右侧：修改状态指示
         self._dirty_label = QLabel("● 有改动")
         self._dirty_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
         self._dirty_label.setVisible(False)
@@ -105,10 +101,9 @@ class RegionEditorDialog(QDialog):
         # ─── 主分割器：画布 + OCR 结果 ───
         self._splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # 场景 Tab
         self._tab_widget = QTabWidget()
         for scene_key, (scene_name, _) in FIELD_GROUPS.items():
-            tab = SceneTab(scene_key)  # 不传图片，后续按场景加载
+            tab = SceneTab(scene_key)
             self._tabs[scene_key] = tab
             self._tab_widget.addTab(tab, scene_name)
         self._splitter.addWidget(self._tab_widget)
@@ -135,8 +130,8 @@ class RegionEditorDialog(QDialog):
         ocr_layout.addWidget(self._result_text)
 
         self._splitter.addWidget(ocr_panel)
-        self._splitter.setStretchFactor(0, 2)  # 画布占 2/3
-        self._splitter.setStretchFactor(1, 1)  # OCR 占 1/3
+        self._splitter.setStretchFactor(0, 2)
+        self._splitter.setStretchFactor(1, 1)
 
         layout.addWidget(self._splitter, stretch=1)
 
@@ -144,212 +139,6 @@ class RegionEditorDialog(QDialog):
         self._status_bar = QStatusBar()
         self._status_bar.showMessage("请先新建或加载布局")
         layout.addWidget(self._status_bar)
-
-    # ─── 名称校验 ─────────────────────────────────────────
-
-    def _validate_layout_name(self, name: str) -> bool:
-        """校验布局名称是否合法（不含文件系统禁用字符）"""
-        invalid_chars = r'\/:*?"<>|'
-        for ch in invalid_chars:
-            if ch in name:
-                QMessageBox.warning(
-                    self, "名称不合法",
-                    f"布局名称不能包含字符: {ch}\n"
-                    f"禁用字符: \\ / : * ? \" < > |",
-                )
-                return False
-        # 也不能以空格或点开头
-        if name.startswith(' ') or name.startswith('.'):
-            QMessageBox.warning(
-                self, "名称不合法",
-                "布局名称不能以空格或点开头",
-            )
-            return False
-        return True
-
-    # ─── 布局栏操作 ──────────────────────────────────────
-
-    def _refresh_combo(self):
-        """刷新下拉框，保持当前选中"""
-        current = self._layout_combo.currentText()
-        self._layout_combo.blockSignals(True)
-        self._layout_combo.clear()
-        self._layout_combo.addItems(self._manager.list_layouts())
-        idx = self._layout_combo.findText(current)
-        if idx >= 0:
-            self._layout_combo.setCurrentIndex(idx)
-        self._layout_combo.blockSignals(False)
-
-    def _update_ui_state(self):
-        """统一刷新所有 UI 状态：下拉框、按钮可用性"""
-        self._refresh_combo()
-        active = self._manager.get_active_layout_name()
-        # 按钮可用性
-        has_layout = self._current_layout is not None
-        self._btn_save.setEnabled(has_layout)
-        self._btn_save_as.setEnabled(has_layout)
-        # 激活布局不可删除
-        is_active = has_layout and self._current_layout.name == active
-        self._btn_delete.setEnabled(has_layout and not is_active)
-
-    def _on_combo_changed(self, index: int):
-        """下拉框切换时加载对应布局到画布（不激活）"""
-        name = self._layout_combo.currentText()
-        if not name:
-            return
-        layout = self._manager.load_layout(name)
-        if layout is None:
-            return
-        self._current_layout = layout
-        self._apply_layout_to_tabs()
-        self._update_ui_state()
-        self._status_bar.showMessage(f"已加载布局「{name}」到画布")
-
-    def _auto_load_active(self):
-        """启动时自动加载激活布局"""
-        self._refresh_combo()
-        name = self._manager.get_active_layout_name()
-        if name:
-            idx = self._layout_combo.findText(name)
-            if idx >= 0:
-                self._layout_combo.setCurrentIndex(idx)
-            layout = self._manager.load_layout(name)
-            if layout:
-                self._current_layout = layout
-                self._apply_layout_to_tabs()
-        self._update_ui_state()
-
-    def _on_new_layout(self):
-        """新建空布局并切换到画布（不自动激活）"""
-        name, ok = QInputDialog.getText(self, "新建布局", "请输入布局名称：")
-        if not ok or not name:
-            return
-        name = name.strip()
-        if not name:
-            return
-        if not self._validate_layout_name(name):
-            return
-        # 保存当前激活布局，新建后恢复
-        prev_active = self._manager.get_active_layout_name()
-        layout = self._manager.new_layout(name)
-        # new_layout 会自动设为 active，恢复原来的
-        if prev_active and prev_active != name:
-            self._manager.set_active_layout(prev_active)
-        self._current_layout = layout
-        self._apply_layout_to_tabs()
-        # 下拉框定位到新布局
-        self._refresh_combo()
-        idx = self._layout_combo.findText(name)
-        if idx >= 0:
-            self._layout_combo.setCurrentIndex(idx)
-        self._update_ui_state()
-        self._status_bar.showMessage(f"已新建布局「{name}」")
-
-    def _on_save_layout(self):
-        """从所有 Tab 收集 regions + canvas，全量写入当前布局文件"""
-        if self._current_layout is None:
-            self._status_bar.showMessage("没有已加载的布局")
-            return
-        name = self._current_layout.name
-        # 收集画布配置（从当前 Tab 获取，所有 Tab 共享同一画布）
-        current_tab = next(iter(self._tabs.values()))
-        self._current_layout.set_canvas(current_tab.get_canvas_config())
-        # 收集各场景区域
-        for scene_key, tab in self._tabs.items():
-            self._current_layout.set_scene_regions(scene_key, tab.get_regions())
-        self._manager.save_layout(self._current_layout)
-        self._update_ui_state()
-        total = sum(len(tab.get_regions()) for tab in self._tabs.values())
-        self._status_bar.showMessage(f"已保存布局「{name}」，共 {total} 个区域")
-        self._set_dirty(False)
-        logger.info(f"布局已保存: {name}, {total} 个区域")
-
-    def _on_save_as_layout(self):
-        """另存为：输入新名称，若已存在则提示确认覆盖（保存后加载新布局）"""
-        if self._current_layout is None:
-            self._status_bar.showMessage("没有已加载的布局")
-            return
-        temp = Layout(name="")
-        # 收集画布配置
-        current_tab = next(iter(self._tabs.values()))
-        temp.set_canvas(current_tab.get_canvas_config())
-        for scene_key, tab in self._tabs.items():
-            temp.set_scene_regions(scene_key, tab.get_regions())
-
-        existing = self._manager.list_layouts()
-        name, ok = QInputDialog.getText(
-            self, "另存为", "请输入布局名称：",
-        )
-        if not ok or not name:
-            return
-        name = name.strip()
-        if not name:
-            return
-        if not self._validate_layout_name(name):
-            return
-
-        if name in existing:
-            reply = QMessageBox.question(
-                self, "确认覆盖",
-                f"布局「{name}」已存在，是否覆盖？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-        temp.name = name
-        self._manager.save_layout(temp)
-        # 复制截图目录
-        copy_screenshots(self._current_layout.name, name)
-        self._current_layout = temp
-        # 下拉框定位到新布局
-        self._refresh_combo()
-        idx = self._layout_combo.findText(name)
-        if idx >= 0:
-            self._layout_combo.setCurrentIndex(idx)
-        self._update_ui_state()
-        total = sum(len(r) for r in temp.scenes.values())
-        self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
-        self._set_dirty(False)
-        logger.info(f"布局已另存为: {name}, {total} 个区域")
-
-    def _on_delete_layout(self):
-        """删除当前下拉框选中的布局（激活的不可删除），删除后加载默认激活布局"""
-        if self._current_layout is None:
-            return
-        active = self._manager.get_active_layout_name()
-        name = self._current_layout.name
-        if name == active:
-            self._status_bar.showMessage("激活布局不可删除")
-            return
-        reply = QMessageBox.question(
-            self, "确认删除",
-            f"确定要删除布局「{name}」吗？此操作不可恢复。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        if self._manager.delete_layout(name):
-            delete_screenshots(name)  # 删除截图目录
-            self._current_layout = None
-            self._clear_all_tabs()
-            # 加载默认激活布局
-            if active:
-                layout = self._manager.load_layout(active)
-                if layout:
-                    self._current_layout = layout
-                    self._apply_layout_to_tabs()
-            # 先同步下拉框到激活布局，再刷新 UI 状态
-            self._layout_combo.blockSignals(True)
-            self._refresh_combo()
-            idx = self._layout_combo.findText(active) if active else -1
-            if idx >= 0:
-                self._layout_combo.setCurrentIndex(idx)
-            self._layout_combo.blockSignals(False)
-            self._update_ui_state()
-            self._status_bar.showMessage(f"已删除布局「{name}」，已切换到默认布局")
-        else:
-            self._status_bar.showMessage(f"删除失败：布局「{name}」不存在")
 
     # ─── Tab 操作 ────────────────────────────────────────
 
@@ -363,15 +152,12 @@ class RegionEditorDialog(QDialog):
             regions = self._current_layout.get_scene_regions(scene_key)
             tab.set_regions(regions)
             tab.set_canvas_config(canvas)
-            # 加载该场景的截图，没有则清除旧截图
             screenshot = load_scene_screenshot(layout_name, scene_key)
             if screenshot is not None:
                 tab.canvas.set_image(screenshot)
             else:
                 tab.canvas.clear_image()
-            # 连接回调：区域变化 -> 标记 dirty
             tab.canvas.on_region_changed = self._on_any_region_changed
-            # 连接回调：画布变化 -> 同步到其他 Tab + 标记 dirty
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
         self._set_dirty(False)
 
@@ -390,15 +176,12 @@ class RegionEditorDialog(QDialog):
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
-        # 回调返回 (image, error_message)，成功时 error_message 为 None
         result = self._refresh_callback()
         new_image, error_msg = result if isinstance(result, tuple) else (result, None)
         if new_image is not None:
             scene_key = self._current_scene_key
             layout_name = self._current_layout.name
-            # 保存到磁盘
             save_scene_screenshot(layout_name, scene_key, new_image)
-            # 更新当前 Tab 画布
             current_tab = self._tabs.get(scene_key)
             if current_tab:
                 current_tab.canvas.set_image(new_image)
@@ -407,7 +190,7 @@ class RegionEditorDialog(QDialog):
         else:
             self._status_bar.showMessage(error_msg or "刷新截图失败")
 
-    # ─── 画布模式切换 ───────────────────────────────
+    # ─── 画布模式切换 ───────────────────────────────────
 
     def _on_toggle_canvas_mode(self, checked: bool):
         """切换画布编辑模式，同步到所有 Tab"""
@@ -424,7 +207,6 @@ class RegionEditorDialog(QDialog):
 
     def _on_any_canvas_changed(self):
         """任一 Tab 的画布被修改时，同步到其他所有 Tab"""
-        # 从当前活跃的 Tab 获取画布配置，同步到其他 Tab
         source_tab = None
         for tab in self._tabs.values():
             if tab.edit_mode == EditMode.CANVAS:
@@ -441,7 +223,6 @@ class RegionEditorDialog(QDialog):
     def _on_any_region_changed(self):
         """任一 Tab 的区域被修改时，标记 dirty + 刷新当前 Tab 的字段列表"""
         self._set_dirty(True)
-        # 刷新当前激活 Tab 的字段列表显示
         current = self._tab_widget.currentWidget()
         if hasattr(current, '_refresh_field_list'):
             current._refresh_field_list()
@@ -462,11 +243,9 @@ class RegionEditorDialog(QDialog):
         if not regions:
             self._status_bar.showMessage("没有已定义的区域")
             return
-        # 从当前 Tab 画布获取截图
         if current_tab.canvas.pixmap is None:
             self._status_bar.showMessage("当前场景无截图，请先刷新截图")
             return
-        # 获取截图 numpy 数组
         image = current_tab.canvas.get_image()
         if image is None:
             self._status_bar.showMessage("当前场景无截图")
@@ -479,7 +258,6 @@ class RegionEditorDialog(QDialog):
         engine = OCREngine()
         h, w = image.shape[:2]
 
-        # 画布配置（叠加两层变换）
         canvas = current_tab.get_canvas_config()
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
@@ -489,7 +267,6 @@ class RegionEditorDialog(QDialog):
         self._result_text.clear()
         results = {}
         for region in regions:
-            # 区域坐标（画布相对） -> 截图像素
             x1 = int(canvas_x + region.x_ratio * canvas_w)
             y1 = int(canvas_y + region.y_ratio * canvas_h)
             x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
@@ -500,9 +277,7 @@ class RegionEditorDialog(QDialog):
             results[region.name] = text
             self._result_text.append(f"{region.name}: {text}")
 
-        self._status_bar.showMessage(
-            f"识别完成，共 {len(results)} 个字段"
-        )
+        self._status_bar.showMessage(f"识别完成，共 {len(results)} 个字段")
         logger.info(
             f"OCR 识别完成 (场景={get_scene_name(current_tab.scene_key)}): {results}"
         )

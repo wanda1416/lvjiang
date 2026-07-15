@@ -1,23 +1,22 @@
-"""PyQt6 主窗口"""
+"""PyQt6 主窗口 - 框架、菜单、UI 构建"""
 
-import ctypes
-from ctypes import wintypes
-import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
-    QTabWidget, QSplitter, QMenuBar, QMessageBox,
+    QTabWidget, QSplitter, QMessageBox,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent, QImage, QPixmap, QAction
+from PyQt6.QtGui import QKeyEvent, QAction
 from loguru import logger
 
 from .overlay import BorderOverlay
+from .window_ops import WindowOpsMixin
+from .run_control import RunControlMixin
 from ..core.user_config import UserConfigManager
 from ..core.region_config import LayoutConfigManager
 
 
-class MainWindow(QMainWindow):
+class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     """律匠主窗口"""
 
     def __init__(self):
@@ -58,10 +57,12 @@ class MainWindow(QMainWindow):
 
         self._setup_menu()
         self._setup_ui()
-        self._refresh_user_combo()  # 初始化用户选择器
-        self._refresh_layout_combo()  # 初始化布局选择器
-        self._refresh_graduation_button()  # 初始化毕业率按钮
+        self._refresh_user_combo()
+        self._refresh_layout_combo()
+        self._refresh_graduation_button()
         logger.info("主窗口已初始化")
+
+    # ─── 菜单栏 ────────────────────────────────────────────
 
     def _setup_menu(self):
         """构建顶部菜单栏"""
@@ -100,6 +101,8 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
+    # ─── 对话框打开 ────────────────────────────────────────
+
     def _open_ocr_test(self):
         """打开 OCR 测试对话框"""
         from .ocr_test_dialog import OCRTestDialog
@@ -115,7 +118,6 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         dialog.exec()
-        # 区域编辑器关闭后，刷新布局和毕业率按钮状态
         self._refresh_layout_combo()
         self._refresh_graduation_button()
 
@@ -136,95 +138,9 @@ class MainWindow(QMainWindow):
         from .user_manager_dialog import UserManagerDialog
         dialog = UserManagerDialog(self._user_manager, self)
         dialog.exec()
-        # 关闭后刷新用户选择器
         self._refresh_user_combo()
 
-    def _refresh_user_combo(self):
-        """刷新用户选择器下拉列表"""
-        self.user_combo.blockSignals(True)
-        self.user_combo.clear()
-        users = self._user_manager.list_users()
-        active = self._user_manager.get_active_user_name()
-        self.user_combo.addItems(users)
-        idx = self.user_combo.findText(active)
-        if idx >= 0:
-            self.user_combo.setCurrentIndex(idx)
-        self.user_combo.blockSignals(False)
-
-    def _on_user_changed(self, index: int):
-        """用户选择器切换"""
-        if index < 0:
-            return
-        name = self.user_combo.currentText()
-        if name and name != self._user_manager.get_active_user_name():
-            self._user_manager.set_active_user(name)
-            logger.info(f"已切换到用户: {name}")
-        self._refresh_graduation_button()
-
-    def _refresh_layout_combo(self):
-        """刷新布局选择器下拉列表"""
-        self.layout_combo.blockSignals(True)
-        self.layout_combo.clear()
-        layouts = self._layout_manager.list_layouts()
-        active = self._layout_manager.get_active_layout_name()
-        self.layout_combo.addItems(layouts)
-        idx = self.layout_combo.findText(active)
-        if idx >= 0:
-            self.layout_combo.setCurrentIndex(idx)
-        self.layout_combo.blockSignals(False)
-
-    def _on_layout_changed(self, index: int):
-        """布局选择器切换"""
-        if index < 0:
-            return
-        name = self.layout_combo.currentText()
-        if name and name != self._layout_manager.get_active_layout_name():
-            self._layout_manager.set_active_layout(name)
-            logger.info(f"已切换到布局: {name}")
-        self._refresh_graduation_button()
-
-    def _refresh_graduation_button(self):
-        """刷新毕业率按钮可用性"""
-        user = self._user_manager.get_active_user_name()
-        layout = self._layout_manager.get_active_layout_name()
-        valid = bool(user and layout and self._layout_manager.is_layout_valid(layout))
-        self.btn_graduation.setEnabled(valid)
-
-    def _on_graduation(self):
-        """执行装备分析流程"""
-        if not self._target_window:
-            self.log_text.append("[错误] 请先定位窗口")
-            return
-
-        user_name = self._user_manager.get_active_user_name()
-        layout_name = self._layout_manager.get_active_layout_name()
-        layout = self._layout_manager.load_layout(layout_name)
-
-        if not layout:
-            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
-            return
-
-        from ..workflows.equip_analysis import EquipAnalysisWorkflow
-        workflow = EquipAnalysisWorkflow(
-            capture=self._capture,
-            ocr=self._ocr,
-            input_ctrl=self._input,
-            layout=layout,
-            user_name=user_name,
-            window_left=self._target_window["left"],
-            window_top=self._target_window["top"],
-        )
-
-        self.log_text.append("[开始] 装备分析流程...")
-        self.btn_graduation.setEnabled(False)
-        try:
-            result = workflow.run()
-            self.log_text.append(f"[完成] 识别到 {len(result)} 件装备")
-        except Exception as e:
-            self.log_text.append(f"[错误] 流程执行失败: {e}")
-            logger.exception("装备分析流程异常")
-        finally:
-            self._refresh_graduation_button()
+    # ─── UI 构建 ───────────────────────────────────────────
 
     def _setup_ui(self):
         """构建界面"""
@@ -235,7 +151,6 @@ class MainWindow(QMainWindow):
         # === 顶部：当前用户 + 当前布局 ===
         top_row = QHBoxLayout()
 
-        # 当前用户
         top_row.addWidget(QLabel("当前用户"))
         self.user_combo = QComboBox()
         self.user_combo.setMinimumWidth(150)
@@ -244,7 +159,6 @@ class MainWindow(QMainWindow):
 
         top_row.addSpacing(20)
 
-        # 当前布局
         top_row.addWidget(QLabel("当前布局"))
         self.layout_combo = QComboBox()
         self.layout_combo.setMinimumWidth(150)
@@ -258,7 +172,6 @@ class MainWindow(QMainWindow):
         window_group = QGroupBox("目标窗口")
         window_main_layout = QVBoxLayout(window_group)
 
-        # 第一行：扫描按钮 + 窗口列表 + 定位按钮
         row1 = QHBoxLayout()
 
         self.btn_scan_window = QPushButton("扫描窗口")
@@ -279,15 +192,11 @@ class MainWindow(QMainWindow):
 
         window_main_layout.addLayout(row1)
 
-        # 第二行：已定位信息
         row2 = QHBoxLayout()
-
         self.lbl_window_info = QLabel("未选择窗口")
         self.lbl_window_info.setStyleSheet("color: gray;")
         row2.addWidget(self.lbl_window_info)
-
         row2.addStretch()
-
         window_main_layout.addLayout(row2)
         main_layout.addWidget(window_group)
 
@@ -307,13 +216,11 @@ class MainWindow(QMainWindow):
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
 
-        # 毕业率计算按钮
         self.btn_graduation = QPushButton("计算毕业率")
         self.btn_graduation.setEnabled(False)
         self.btn_graduation.clicked.connect(self._on_graduation)
         left_layout.addWidget(self.btn_graduation)
 
-        # 流派选择
         flow_group = QGroupBox("目标流派")
         flow_layout = QVBoxLayout(flow_group)
         self.flow_selector = QComboBox()
@@ -323,7 +230,6 @@ class MainWindow(QMainWindow):
         flow_layout.addWidget(self.flow_selector)
         left_layout.addWidget(flow_group)
 
-        # 模式选择
         mode_group = QGroupBox("处理模式")
         mode_layout = QVBoxLayout(mode_group)
         self.mode_selector = QComboBox()
@@ -331,7 +237,6 @@ class MainWindow(QMainWindow):
         mode_layout.addWidget(self.mode_selector)
         left_layout.addWidget(mode_group)
 
-        # 操作按钮
         action_group = QGroupBox("操作")
         action_layout = QVBoxLayout(action_group)
 
@@ -353,13 +258,11 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
 
-        # 日志标签页
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         self.tabs.addTab(self.log_text, "运行日志")
 
-        # 状态标签页（预留）
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
         self.tabs.addTab(self.status_text, "装备状态")
@@ -375,7 +278,6 @@ class MainWindow(QMainWindow):
         # === 底部状态栏 ===
         self.statusBar().showMessage("就绪 | F9 开始 | F10 停止")
 
-        # 初始化日志重定向
         self._setup_log_redirect()
 
     def _setup_log_redirect(self):
@@ -393,25 +295,7 @@ class MainWindow(QMainWindow):
         sink = QtSink(self.log_text)
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
 
-    def _refresh_run_button(self):
-        """根据运行状态和定位状态刷新运行按钮。"""
-        if self._running:
-            self.btn_run_toggle.setText("停止 (F10)")
-            self.btn_run_toggle.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
-            )
-        elif self._target_window is None:
-            self.btn_run_toggle.setText("未定位")
-            self.btn_run_toggle.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
-            )
-        else:
-            self.btn_run_toggle.setText("开始执行 (F9)")
-            self.btn_run_toggle.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
-            )
-
-    # === 快捷键 ===
+    # ─── 快捷键 + 关闭 ─────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):
         """全局快捷键处理"""
@@ -424,219 +308,7 @@ class MainWindow(QMainWindow):
         else:
             super().keyPressEvent(event)
 
-    # === 事件处理 ===
-
-    def _on_scan_window(self):
-        """扫描所有可见窗口，填充列表"""
-        if self._running:
-            self.log_text.append("[提示] 请先停止当前任务，再重新扫描窗口")
-            return
-
-        had_target = self._target_window is not None
-        self._target_window = None
-        self._overlay.hide_border()
-        self.btn_locate.setEnabled(False)
-        self.lbl_window_info.setText("未定位窗口")
-        self.lbl_window_info.setStyleSheet("color: gray;")
-        self.statusBar().showMessage("正在扫描窗口...")
-        self._refresh_run_button()  # 按钮变回黄色"未定位"
-        if had_target:
-            self.log_text.append("[状态] 重新扫描窗口，旧定位已失效")
-
-        from ..core.capture import list_visible_windows
-        self._scanned_windows = list_visible_windows()
-        self.window_combo.clear()
-
-        if not self._scanned_windows:
-            self.log_text.append("[错误] 未找到可见窗口")
-            self.statusBar().showMessage("未定位窗口 | 未找到可见窗口")
-            return
-
-        for w in self._scanned_windows:
-            self.window_combo.addItem(
-                f"{w['title']}  ({w['width']}x{w['height']})",
-                w,
-            )
-
-        # 自动匹配 window_title
-        keyword = self._layout_manager.get_window_title()
-        if keyword:
-            for i, w in enumerate(self._scanned_windows):
-                if keyword in w["title"]:
-                    self.window_combo.setCurrentIndex(i)
-                    self._on_locate_window()
-                    self.log_text.append(f"[扫描] 已自动匹配窗口: {w['title']}（关键字: {keyword}）")
-                    return
-            self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，未匹配到关键字「{keyword}」")
-        else:
-            self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
-        self.btn_locate.setEnabled(True)
-        self.lbl_window_info.setText("请下拉选择目标窗口...")
-        self.lbl_window_info.setStyleSheet("color: orange;")
-        self.statusBar().showMessage("已扫描窗口 | 请下拉选择目标窗口并点击定位")
-
-    def _on_window_selected(self, index):
-        """下拉框选择了某项时，启用定位按钮"""
-        self.btn_locate.setEnabled(index >= 0)
-
-    def _on_locate_window(self):
-        """定位选中的窗口，实时获取其当前坐标"""
-        w = self.window_combo.currentData()
-        if not w:
-            return
-        # 实时查询窗口当前位置（扫描时的坐标可能已过期）
-        self._refresh_window_rect(w)
-        self._target_window = w
-
-        # 边框绘制和窗口枚举都走 Win32 坐标，DPI 这里只做诊断展示。
-        ratio = self._get_window_dpi_ratio(w["hwnd"])
-        logger.info(
-            f"目标窗口 Win32原始: ({w['left']},{w['top']},{w['width']}x{w['height']})"
-            f" DPI={ratio}"
-        )
-
-        self.lbl_window_info.setText(
-            f"已定位: {w['title']}  |  "
-            f"位置: ({w['left']}, {w['top']})  大小: {w['width']}x{w['height']}"
-            + (f"  DPI缩放: {ratio:.1f}x" if ratio != 1.0 else "")
-        )
-        self.lbl_window_info.setStyleSheet("color: green;")
-        self.log_text.append(
-            f"[定位成功] {w['title']}  "
-            f"({w['width']}x{w['height']} @ {w['left']},{w['top']})"
-            + (f" DPI={ratio:.1f}x" if ratio != 1.0 else "")
-        )
-        # 显示红色边框（全屏覆盖层模式）
-        self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
-        self._overlay.set_color("red")
-        # 定位成功，按钮从黄色"未定位"变为绿色"开始执行"
-        self._refresh_run_button()
-        # 截屏展示
-        self._capture_preview()
-
-    def _capture_preview(self):
-        """截取已定位窗口的截图并展示在预览区。"""
-        if not self._target_window:
-            return
-        w = self._target_window
-        try:
-            from ..core.capture import ScreenCapture
-            if self._capture is None:
-                self._capture = ScreenCapture()
-            self._capture.set_capture_region(
-                w['left'], w['top'], w['width'], w['height']
-            )
-            img = self._capture.capture()  # numpy BGR
-            if img is None:
-                self.preview_label.setText("截屏失败")
-                return
-            self._last_capture = img  # 保存截屏供区域编辑器使用
-            h, w_img = img.shape[:2]
-            rgb = np.ascontiguousarray(img[:, :, ::-1])
-            fmt = QImage.Format.Format_RGB888
-            qimg = QImage(rgb.data, w_img, h, w_img * 3, fmt).copy()
-            pixmap = QPixmap.fromImage(qimg)
-            scaled = pixmap.scaled(
-                self.preview_label.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self.preview_label.setPixmap(scaled)
-            logger.info(f"截屏预览成功 ({w_img}x{h})")
-        except Exception as e:
-            logger.error(f"截屏预览失败: {e}")
-            self.preview_label.setText(f"截屏失败: {e}")
-
-    def _get_last_capture(self) -> np.ndarray | None:
-        """获取最近一次截屏图片（numpy BGR）"""
-        return self._last_capture
-
-    def _refresh_capture(self) -> tuple[np.ndarray | None, str | None]:
-        """重新截取当前窗口截图（用于区域编辑器刷新）
-        返回 (image, error_message)，成功时 error_message 为 None
-        """
-        if not self._target_window:
-            return None, "请先在主窗口定位窗口"
-        try:
-            from ..core.capture import ScreenCapture
-            if self._capture is None:
-                self._capture = ScreenCapture()
-            w = self._target_window
-            self._capture.set_capture_region(
-                w['left'], w['top'], w['width'], w['height']
-            )
-            img = self._capture.capture()
-            if img is not None:
-                self._last_capture = img
-                return img, None
-            return None, "截图失败"
-        except Exception as e:
-            logger.error(f"刷新截图失败: {e}")
-            return None, f"截图失败: {e}"
-
-    def _refresh_window_rect(self, w: dict):
-        """通过 Win32 GetWindowRect 实时刷新窗口位置。"""
-        rect = wintypes.RECT()
-        if ctypes.windll.user32.GetWindowRect(wintypes.HWND(w['hwnd']), ctypes.byref(rect)):
-            w['left'] = rect.left
-            w['top'] = rect.top
-            w['width'] = rect.right - rect.left
-            w['height'] = rect.bottom - rect.top
-
-    def _get_window_dpi_ratio(self, hwnd: int) -> float:
-        """返回目标窗口所在屏幕的 DPI 缩放比，仅用于日志展示。"""
-        try:
-            dpi = ctypes.windll.user32.GetDpiForWindow(wintypes.HWND(hwnd))
-            if dpi:
-                return dpi / 96
-        except Exception as e:
-            logger.debug(f"获取窗口 DPI 失败: {e}")
-        return 1.0
-
     def closeEvent(self, event):
         """关闭主窗口时清理原生覆盖层。"""
         self._overlay.destroy()
         super().closeEvent(event)
-
-    def _on_scan(self):
-        """扫描穿戴装备"""
-        flow = self.flow_selector.currentText()
-        self.log_text.append(f"[操作] 扫描穿戴装备 (流派: {flow})")
-        # TODO: Phase 6 实现
-        self.log_text.append("[提示] 扫描功能待实现")
-
-    def _on_start(self):
-        """开始执行"""
-        if self._running:
-            return
-        if self._target_window is None:
-            message = '请先扫描窗口并点击“定位”，再开始执行。'
-            self.log_text.append(f"[提示] {message}")
-            self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
-            return
-        flow = self.flow_selector.currentText()
-        mode = self.mode_selector.currentText()
-        self._running = True
-        self.log_text.append(f"[操作] 开始执行: 流派={flow}, 模式={mode}")
-        self._refresh_run_button()
-        self.statusBar().showMessage(f"执行中: {flow} - {mode} | F10 停止")
-        # 边框变绿色
-        self._overlay.set_color("green")
-
-    def _on_stop(self):
-        """停止执行"""
-        if not self._running:
-            return
-        self._running = False
-        self.log_text.append("[操作] 停止执行")
-        self._refresh_run_button()
-        self.statusBar().showMessage("已停止 | F9 开始")
-        # 边框变回红色
-        self._overlay.set_color("red")
-
-    def _on_toggle_running(self):
-        """单按钮切换运行状态。"""
-        if self._running:
-            self._on_stop()
-        else:
-            self._on_start()

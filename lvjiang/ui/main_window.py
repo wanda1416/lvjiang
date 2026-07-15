@@ -13,7 +13,7 @@ from PyQt6.QtGui import QKeyEvent, QImage, QPixmap, QAction
 from loguru import logger
 
 from .overlay import BorderOverlay
-from ..core.user_config import UserManager
+from ..core.user_config import UserConfigManager
 
 
 class MainWindow(QMainWindow):
@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
         self._region_layout = None
 
         # 用户管理
-        self._user_manager = UserManager()
+        self._user_manager = UserConfigManager()
 
         self._setup_menu()
         self._setup_ui()

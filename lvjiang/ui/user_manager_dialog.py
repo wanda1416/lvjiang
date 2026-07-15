@@ -8,13 +8,13 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from loguru import logger
 
-from ..core.user_config import UserManager
+from ..core.user_config import UserConfigManager
 
 
 class UserManagerDialog(QDialog):
     """用户管理对话框"""
 
-    def __init__(self, user_manager: UserManager, parent=None):
+    def __init__(self, user_manager: UserConfigManager, parent=None):
         super().__init__(parent)
         self.setWindowTitle("用户管理")
         self.setMinimumSize(500, 400)

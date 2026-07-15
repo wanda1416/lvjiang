@@ -119,10 +119,13 @@ class Layout:
         self.canvas = canvas
 
     def to_dict(self) -> dict:
-        result = {"canvas": self.canvas.to_dict()}
-        for scene, regions in self.scenes.items():
-            result[scene] = {"regions": [r.to_dict() for r in regions]}
-        return result
+        return {
+            "canvas": self.canvas.to_dict(),
+            "scenes": {
+                scene: {"regions": [r.to_dict() for r in regions]}
+                for scene, regions in self.scenes.items()
+            },
+        }
 
     @staticmethod
     def from_dict(name: str, d: dict) -> "Layout":
@@ -132,13 +135,22 @@ class Layout:
             canvas = CanvasConfig.from_dict(d["canvas"])
         # 解析各场景 regions
         scenes = {}
-        for scene_key, scene_data in d.items():
-            if scene_key == "canvas":
-                continue
-            if isinstance(scene_data, dict) and "regions" in scene_data:
-                scenes[scene_key] = [
-                    Region.from_dict(r) for r in scene_data["regions"]
-                ]
+        if "scenes" in d and isinstance(d["scenes"], dict):
+            # 新格式：scenes 包裹
+            for scene_key, scene_data in d["scenes"].items():
+                if isinstance(scene_data, dict) and "regions" in scene_data:
+                    scenes[scene_key] = [
+                        Region.from_dict(r) for r in scene_data["regions"]
+                    ]
+        else:
+            # 旧格式：场景直接在顶层（向后兼容）
+            for scene_key, scene_data in d.items():
+                if scene_key == "canvas":
+                    continue
+                if isinstance(scene_data, dict) and "regions" in scene_data:
+                    scenes[scene_key] = [
+                        Region.from_dict(r) for r in scene_data["regions"]
+                    ]
         return Layout(name=name, canvas=canvas, scenes=scenes)
 
 

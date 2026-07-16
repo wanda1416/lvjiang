@@ -62,6 +62,7 @@ class SceneRegistry:
     """
 
     def __init__(self, scenes_dir: Path, scene_order: list[str] | None = None):
+        self._scenes_dir = scenes_dir
         self._scenes: dict[str, SceneDef] = {}
         self._order: list[str] = []
         self._load_all(scenes_dir, scene_order)
@@ -143,3 +144,168 @@ class SceneRegistry:
     def all_scenes(self) -> dict[str, SceneDef]:
         """返回所有场景的 {key: SceneDef} 字典（按配置顺序）"""
         return {k: self._scenes[k] for k in self._order}
+
+    # ─── 场景 CRUD ──────────────────────────────────────────
+
+    def create_scene(self, key: str, name: str) -> SceneDef:
+        """创建新场景 YAML 文件并注册"""
+        if key in self._scenes:
+            raise ValueError(f"场景 key 已存在: {key}")
+        scene = SceneDef(key=key, name=name)
+        yaml_path = self._scenes_dir / f"{key}.yaml"
+        self._save_scene_yaml(yaml_path, scene)
+        self._scenes[key] = scene
+        self._order.append(key)
+        logger.info(f"已创建场景: {key}")
+        return scene
+
+    def delete_scene(self, key: str):
+        """删除场景 YAML 文件并从注册表移除"""
+        if key not in self._scenes:
+            raise ValueError(f"场景不存在: {key}")
+        yaml_path = self._scenes_dir / f"{key}.yaml"
+        if yaml_path.exists():
+            yaml_path.unlink()
+        del self._scenes[key]
+        self._order.remove(key)
+        logger.info(f"已删除场景: {key}")
+
+    def rename_scene(self, key: str, new_key: str, new_name: str):
+        """重命名场景（修改 YAML 的 key/name，必要时重命名文件）"""
+        if key not in self._scenes:
+            raise ValueError(f"场景不存在: {key}")
+        if new_key != key and new_key in self._scenes:
+            raise ValueError(f"场景 key 已存在: {new_key}")
+        scene = self._scenes[key]
+        scene.key = new_key
+        scene.name = new_name
+        # 如果 key 变了，需要重命名文件
+        if new_key != key:
+            old_path = self._scenes_dir / f"{key}.yaml"
+            new_path = self._scenes_dir / f"{new_key}.yaml"
+            if old_path.exists():
+                old_path.rename(new_path)
+            del self._scenes[key]
+            self._scenes[new_key] = scene
+            idx = self._order.index(key)
+            self._order[idx] = new_key
+        self._save_scene_yaml(self._scenes_dir / f"{new_key}.yaml", scene)
+        logger.info(f"已重命名场景: {key} -> {new_key}")
+
+    def reorder_scenes(self, new_order: list[str]):
+        """更新场景顺序（仅内存，不写文件）"""
+        # 过滤掉不存在的 key，补充遗漏的 key
+        self._order = [k for k in new_order if k in self._scenes]
+        for k in self._scenes:
+            if k not in self._order:
+                self._order.append(k)
+
+    def save_scene_order(self, order: list[str], app_config_path: Path):
+        """将场景顺序写入 app.yaml 的 layout_scenes"""
+        self.reorder_scenes(order)
+        data = {}
+        if app_config_path.exists():
+            try:
+                data = yaml.safe_load(app_config_path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                pass
+        data["layout_scenes"] = list(self._order)
+        app_config_path.write_text(
+            yaml.dump(data, allow_unicode=True, default_flow_style=False),
+            encoding="utf-8",
+        )
+        logger.info(f"已保存场景顺序: {self._order}")
+
+    # ─── 区域/坐标 编辑 ───────────────────────────────────────
+
+    def add_region_to_scene(self, scene_key: str, region_def: RegionDef):
+        """向场景 YAML 追加 region 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        self._check_key_unique(scene, region_def.key)
+        scene.regions.append(region_def)
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def remove_region_from_scene(self, scene_key: str, region_key: str):
+        """从场景 YAML 移除 region 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        scene.regions = [r for r in scene.regions if r.key != region_key]
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def update_region_in_scene(self, scene_key: str, old_key: str, region_def: RegionDef):
+        """更新场景中的 region 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        for i, r in enumerate(scene.regions):
+            if r.key == old_key:
+                scene.regions[i] = region_def
+                break
+        else:
+            raise ValueError(f"区域不存在: {old_key}")
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def add_point_to_scene(self, scene_key: str, point_def: PointDef):
+        """向场景 YAML 追加 point 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        self._check_key_unique(scene, point_def.key)
+        scene.points.append(point_def)
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def remove_point_from_scene(self, scene_key: str, point_key: str):
+        """从场景 YAML 移除 point 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        scene.points = [p for p in scene.points if p.key != point_key]
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def update_point_in_scene(self, scene_key: str, old_key: str, point_def: PointDef):
+        """更新场景中的 point 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        for i, p in enumerate(scene.points):
+            if p.key == old_key:
+                scene.points[i] = point_def
+                break
+        else:
+            raise ValueError(f"坐标点不存在: {old_key}")
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    # ─── 内部方法 ─────────────────────────────────────────────
+
+    def _check_key_unique(self, scene: SceneDef, new_key: str):
+        """检查 key 在场景内是否重复"""
+        all_keys = [r.key for r in scene.regions] + [p.key for p in scene.points]
+        if new_key in all_keys:
+            raise ValueError(f"key 已存在: {new_key}")
+
+    def _save_scene_yaml(self, path: Path, scene: SceneDef):
+        """将场景定义写入 YAML 文件"""
+        data = {"key": scene.key, "name": scene.name}
+        if scene.regions:
+            data["regions"] = [
+                {
+                    "key": r.key,
+                    "name": r.name,
+                    "type": r.type,
+                    "is_text": r.is_text,
+                    "is_clickable": r.is_clickable,
+                }
+                for r in scene.regions
+            ]
+        if scene.points:
+            data["points"] = [
+                {"key": p.key, "name": p.name}
+                for p in scene.points
+            ]
+        path.write_text(
+            yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+            encoding="utf-8",
+        )

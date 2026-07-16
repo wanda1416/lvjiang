@@ -6,13 +6,16 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QSplitter, QTabWidget, QPushButton, QInputDialog, QMessageBox,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QCheckBox, QDialogButtonBox,
 )
 from PyQt6.QtCore import Qt
 
 from ...core.region_config import (
     Region, Point, Arrow, CanvasConfig,
     get_scene_regions, get_scene_point_pairs, get_point_def,
+    get_registry, reload_scene_registry,
 )
+from ...core.scene_loader import RegionDef, PointDef, VALID_REGION_TYPES
 from .canvas import RegionCanvas, EditMode
 
 
@@ -93,23 +96,39 @@ class SceneTab(QWidget):
     def _build_region_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel("区域列表："))
+        layout.addWidget(QLabel("区域列表（双击编辑属性）："))
         self._region_list = QListWidget()
         self._region_list.currentRowChanged.connect(self._on_region_selection)
+        self._region_list.itemDoubleClicked.connect(self._on_edit_region)
         layout.addWidget(self._region_list)
+
+        btn_row = QHBoxLayout()
+        self._btn_new_region = QPushButton("+ 创建区域")
+        self._btn_new_region.clicked.connect(self._on_new_region)
+        btn_row.addWidget(self._btn_new_region)
+        self._btn_del_region = QPushButton("删除区域")
+        self._btn_del_region.clicked.connect(self._on_delete_region)
+        self._btn_del_region.setEnabled(False)
+        btn_row.addWidget(self._btn_del_region)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
         return panel
 
     def _build_point_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel("坐标列表（来自 YAML 定义，✓ 已放置 / ○ 未放置）："))
+        layout.addWidget(QLabel("坐标列表（双击编辑属性）："))
         self._point_list = QListWidget()
         self._point_list.currentRowChanged.connect(self._on_point_selection)
+        self._point_list.itemDoubleClicked.connect(self._on_edit_point)
         layout.addWidget(self._point_list)
 
         btn_row = QHBoxLayout()
+        self._btn_new_point_def = QPushButton("+ 创建坐标")
+        self._btn_new_point_def.clicked.connect(self._on_new_point_def)
+        btn_row.addWidget(self._btn_new_point_def)
         self._btn_del_point = QPushButton("删除坐标")
-        self._btn_del_point.clicked.connect(self._on_delete_point)
+        self._btn_del_point.clicked.connect(self._on_delete_point_def)
         btn_row.addWidget(self._btn_del_point)
         btn_row.addStretch()
         layout.addLayout(btn_row)
@@ -118,15 +137,13 @@ class SceneTab(QWidget):
     def _build_arrow_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel("方向列表（选中坐标点后点击其 + 号创建）："))
+        layout.addWidget(QLabel("方向列表（双击重命名，选中坐标点后点击其 + 号创建）："))
         self._arrow_list = QListWidget()
         self._arrow_list.currentRowChanged.connect(self._on_arrow_selection)
+        self._arrow_list.itemDoubleClicked.connect(self._on_edit_arrow)
         layout.addWidget(self._arrow_list)
 
         btn_row = QHBoxLayout()
-        self._btn_rename_arrow = QPushButton("重命名")
-        self._btn_rename_arrow.clicked.connect(self._on_rename_arrow)
-        btn_row.addWidget(self._btn_rename_arrow)
         self._btn_del_arrow = QPushButton("删除方向")
         self._btn_del_arrow.clicked.connect(self._on_delete_arrow)
         btn_row.addWidget(self._btn_del_arrow)
@@ -200,13 +217,13 @@ class SceneTab(QWidget):
         for key, name in regions:
             if key in assigned_keys:
                 region = next(r for r in assigned if r.key == key)
-                item = QListWidgetItem(f"\u2713 {name}")
+                item = QListWidgetItem(f"\u2713 {name} ({key})")
                 item.setToolTip(
                     f"区域: ({region.x_ratio:.1%}, {region.y_ratio:.1%}) "
                     f"大小: ({region.w_ratio:.1%} x {region.h_ratio:.1%})"
                 )
             else:
-                item = QListWidgetItem(f"\u25cb {name}")
+                item = QListWidgetItem(f"\u25cb {name} ({key})")
                 item.setForeground(Qt.GlobalColor.gray)
             self._region_list.addItem(item)
         self._region_list.blockSignals(False)
@@ -252,6 +269,7 @@ class SceneTab(QWidget):
 
     def _on_region_selection(self, row: int):
         """列表选中项变化时同步到画布"""
+        self._btn_del_region.setEnabled(row >= 0)
         if row < 0:
             self._canvas.clear_field_selection()
             return
@@ -317,6 +335,7 @@ class SceneTab(QWidget):
         self._canvas.begin_draw_arrow(key)
 
     def _on_delete_point(self):
+        """从画布删除已放置的坐标点（保留 YAML 定义）"""
         row = self._point_list.currentRow()
         if row < 0:
             return
@@ -328,6 +347,245 @@ class SceneTab(QWidget):
         if key not in placed:
             return
         self._canvas.delete_point_by_key(key)
+
+    def _on_delete_point_def(self):
+        """从 YAML 删除坐标点定义"""
+        row = self._point_list.currentRow()
+        if row < 0:
+            return
+        item = self._point_list.item(row)
+        if item is None:
+            return
+        key = item.data(Qt.ItemDataRole.UserRole)
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要从场景定义中删除坐标点「{key}」吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        registry = get_registry()
+        try:
+            registry.remove_point_from_scene(self._scene_key, key)
+        except ValueError as e:
+            QMessageBox.warning(self, "删除失败", str(e))
+            return
+        reload_scene_registry()
+        self._refresh_lists()
+
+    def _on_new_point_def(self):
+        """创建新坐标点定义"""
+        point_def = self._show_point_edit_dialog(None)
+        if point_def is None:
+            return
+        registry = get_registry()
+        try:
+            registry.add_point_to_scene(self._scene_key, point_def)
+        except ValueError as e:
+            QMessageBox.warning(self, "创建失败", str(e))
+            return
+        reload_scene_registry()
+        self._refresh_lists()
+
+    def _on_edit_point(self, item: QListWidgetItem):
+        """双击编辑坐标点定义"""
+        key = item.data(Qt.ItemDataRole.UserRole)
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene:
+            return
+        old_def = next((p for p in scene.points if p.key == key), None)
+        if not old_def:
+            return
+        new_def = self._show_point_edit_dialog(old_def)
+        if new_def is None:
+            return
+        try:
+            registry.update_point_in_scene(self._scene_key, key, new_def)
+        except ValueError as e:
+            QMessageBox.warning(self, "更新失败", str(e))
+            return
+        reload_scene_registry()
+        self._refresh_lists()
+
+    # ─── region CRUD ─────────────────────────────────────
+
+    def _on_new_region(self):
+        """创建新区域定义"""
+        region_def = self._show_region_edit_dialog(None)
+        if region_def is None:
+            return
+        registry = get_registry()
+        try:
+            registry.add_region_to_scene(self._scene_key, region_def)
+        except ValueError as e:
+            QMessageBox.warning(self, "创建失败", str(e))
+            return
+        reload_scene_registry()
+        self._refresh_lists()
+
+    def _on_delete_region(self):
+        """删除区域定义"""
+        row = self._region_list.currentRow()
+        if row < 0:
+            return
+        regions = get_scene_regions(self._scene_key)
+        if row >= len(regions):
+            return
+        key, name = regions[row]
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要从场景定义中删除区域「{name}」({key}) 吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        registry = get_registry()
+        try:
+            registry.remove_region_from_scene(self._scene_key, key)
+        except ValueError as e:
+            QMessageBox.warning(self, "删除失败", str(e))
+            return
+        reload_scene_registry()
+        self._refresh_lists()
+
+    def _on_edit_region(self, item: QListWidgetItem):
+        """双击编辑区域定义"""
+        row = self._region_list.row(item)
+        regions = get_scene_regions(self._scene_key)
+        if row >= len(regions):
+            return
+        key, _ = regions[row]
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene:
+            return
+        old_def = next((r for r in scene.regions if r.key == key), None)
+        if not old_def:
+            return
+        new_def = self._show_region_edit_dialog(old_def)
+        if new_def is None:
+            return
+        try:
+            registry.update_region_in_scene(self._scene_key, key, new_def)
+        except ValueError as e:
+            QMessageBox.warning(self, "更新失败", str(e))
+            return
+        reload_scene_registry()
+        self._refresh_lists()
+
+    # ─── 编辑弹窗 ────────────────────────────────────────
+
+    def _show_region_edit_dialog(self, region_def: RegionDef | None) -> RegionDef | None:
+        """弹窗编辑区域属性，返回新的 RegionDef 或 None（取消）"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("新建区域" if region_def is None else "编辑区域")
+        form = QFormLayout(dialog)
+
+        key_edit = QLineEdit()
+        key_edit.setPlaceholderText("英文，如 my_region")
+        if region_def:
+            key_edit.setText(region_def.key)
+            key_edit.setReadOnly(True)
+        form.addRow("Key:", key_edit)
+
+        name_edit = QLineEdit()
+        name_edit.setPlaceholderText("中文名称")
+        if region_def:
+            name_edit.setText(region_def.name)
+        form.addRow("名称:", name_edit)
+
+        type_combo = QComboBox()
+        type_combo.addItems(sorted(VALID_REGION_TYPES))
+        if region_def:
+            type_combo.setCurrentText(region_def.type)
+        form.addRow("类型:", type_combo)
+
+        is_text_check = QCheckBox("含文本")
+        if region_def:
+            is_text_check.setChecked(region_def.is_text)
+        else:
+            is_text_check.setChecked(True)
+        form.addRow(is_text_check)
+
+        is_clickable_check = QCheckBox("可点击")
+        if region_def:
+            is_clickable_check.setChecked(region_def.is_clickable)
+        form.addRow(is_clickable_check)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        form.addRow(buttons)
+
+        # 实时校验：key 和 name 非空才启用 OK
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        def _validate():
+            ok_btn.setEnabled(bool(key_edit.text().strip() and name_edit.text().strip()))
+        key_edit.textChanged.connect(_validate)
+        name_edit.textChanged.connect(_validate)
+        _validate()
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+
+        return RegionDef(
+            key=key_edit.text().strip(),
+            name=name_edit.text().strip(),
+            type=type_combo.currentText(),
+            is_text=is_text_check.isChecked(),
+            is_clickable=is_clickable_check.isChecked(),
+        )
+
+    def _show_point_edit_dialog(self, point_def: PointDef | None) -> PointDef | None:
+        """弹窗编辑坐标点属性，返回新的 PointDef 或 None（取消）"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("新建坐标" if point_def is None else "编辑坐标")
+        form = QFormLayout(dialog)
+
+        key_edit = QLineEdit()
+        key_edit.setPlaceholderText("英文，如 my_point")
+        if point_def:
+            key_edit.setText(point_def.key)
+            key_edit.setReadOnly(True)
+        form.addRow("Key:", key_edit)
+
+        name_edit = QLineEdit()
+        name_edit.setPlaceholderText("中文名称")
+        if point_def:
+            name_edit.setText(point_def.name)
+        form.addRow("名称:", name_edit)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        form.addRow(buttons)
+
+        # 实时校验
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        def _validate():
+            ok_btn.setEnabled(bool(key_edit.text().strip() and name_edit.text().strip()))
+        key_edit.textChanged.connect(_validate)
+        name_edit.textChanged.connect(_validate)
+        _validate()
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+
+        return PointDef(key=key_edit.text().strip(), name=name_edit.text().strip())
+
+    def _refresh_lists(self):
+        """刷新区域和坐标列表（场景定义变化后调用）"""
+        self._canvas.set_current_regions(get_scene_regions(self._scene_key))
+        self._canvas.set_current_points(get_scene_point_pairs(self._scene_key))
+        self._refresh_region_list()
+        self._refresh_point_list()
 
     # ─── arrow 列表选择 / 重命名 / 删除 ──────────────────
 
@@ -354,7 +612,8 @@ class SceneTab(QWidget):
             return
         self._canvas.delete_arrow_by_key(key)
 
-    def _on_rename_arrow(self):
+    def _on_edit_arrow(self, item):
+        """双击重命名方向"""
         old = self._selected_arrow_key()
         if old is None:
             return

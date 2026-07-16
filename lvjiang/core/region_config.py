@@ -31,24 +31,52 @@ def _load_scene_order() -> list[str] | None:
 _registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
 
 # 场景 → (场景中文名, [(region_key, region_name), ...])
-SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {
-    key: (scene.name, [(r.key, r.name) for r in scene.regions])
-    for key, scene in _registry.all_scenes().items()
-}
+SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {}
 
 # 向后兼容别名
 FIELD_GROUPS = SCENE_REGIONS
 
-_wpn = _registry.get_scene("equip_weapon_detail")
-EQUIP_REGIONS = [(r.key, r.name) for r in _wpn.regions] if _wpn else []
+EQUIP_REGIONS: list[tuple[str, str]] = []
 # 向后兼容别名
 EQUIP_FIELDS = EQUIP_REGIONS
 
 # 场景 → [(point_key, point_name), ...]（来自 YAML 类型定义）
-SCENE_POINTS: dict[str, list[tuple[str, str]]] = {
-    key: [(p.key, p.name) for p in scene.points]
-    for key, scene in _registry.all_scenes().items()
-}
+SCENE_POINTS: dict[str, list[tuple[str, str]]] = {}
+
+
+def _rebuild_scene_globals():
+    """从 _registry 重建 SCENE_REGIONS / SCENE_POINTS 等全局字典"""
+    global SCENE_REGIONS, FIELD_GROUPS, EQUIP_REGIONS, EQUIP_FIELDS, SCENE_POINTS
+    SCENE_REGIONS.clear()
+    SCENE_REGIONS.update({
+        key: (scene.name, [(r.key, r.name) for r in scene.regions])
+        for key, scene in _registry.all_scenes().items()
+    })
+    FIELD_GROUPS = SCENE_REGIONS
+    _wpn = _registry.get_scene("equip_weapon_detail")
+    EQUIP_REGIONS.clear()
+    EQUIP_REGIONS.extend([(r.key, r.name) for r in _wpn.regions] if _wpn else [])
+    SCENE_POINTS.clear()
+    SCENE_POINTS.update({
+        key: [(p.key, p.name) for p in scene.points]
+        for key, scene in _registry.all_scenes().items()
+    })
+
+
+# 初始化
+_rebuild_scene_globals()
+
+
+def get_registry() -> SceneRegistry:
+    """获取场景注册表实例（供 UI 层调用 CRUD 方法）"""
+    return _registry
+
+
+def reload_scene_registry():
+    """重新加载场景注册表（场景增删改后调用）"""
+    global _registry
+    _registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
+    _rebuild_scene_globals()
 
 
 def get_scene_name(scene_key: str) -> str:

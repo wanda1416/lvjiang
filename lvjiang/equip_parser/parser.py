@@ -6,7 +6,7 @@
 import re
 from loguru import logger
 
-from .models import BaseAttr, Affix, EquipmentData
+from .models import EquipAttr, Affix, EquipmentData
 from .constants import (
     WEAPON_SLOTS,
     JEWELRY_SLOTS,
@@ -172,12 +172,12 @@ class EquipmentParser:
 
     # ─── base_attr 解析 ────────────────────────────────────
 
-    def _parse_weapon_base(self, raw: str) -> BaseAttr | None:
+    def _parse_weapon_base(self, raw: str) -> EquipAttr | None:
         """解析武器基础属性
 
-        "外功攻击100~232"  → BaseAttr("外功攻击", [100, 232])
-        "外功攻击 60~140"  → BaseAttr("外功攻击", [60, 140])
-        "外功攻击 老著 52~121" → BaseAttr("外功攻击", [52, 121])  [脏]
+        "外功攻击100~232"  → EquipAttr("外功攻击", [100, 232])
+        "外功攻击 60~140"  → EquipAttr("外功攻击", [60, 140])
+        "外功攻击 老著 52~121" → EquipAttr("外功攻击", [52, 121])  [脏]
         """
         raw = raw.strip()
         if not raw:
@@ -186,40 +186,40 @@ class EquipmentParser:
         # 提取范围数字（允许中间有 OCR 噪声）
         nums = re.findall(r"\d+", raw)
         if len(nums) >= 2:
-            return BaseAttr(name="外功攻击", value=[int(nums[0]), int(nums[1])])
+            return EquipAttr(name="外功攻击", value=[int(nums[0]), int(nums[1])])
 
         logger.warning(f"武器 base_attr 无法解析: {raw!r}")
         return None
 
-    def _parse_jewelry_base(self, raw: str) -> BaseAttr | None:
+    def _parse_jewelry_base(self, raw: str) -> EquipAttr | None:
         """解析首饰基础属性
 
-        "最小外功攻击 133" → BaseAttr("最小外功攻击", 133)
-        "最大外功攻击 199" → BaseAttr("最大外功攻击", 199)
+        "最小外功攻击 133" → EquipAttr("最小外功攻击", 133)
+        "最大外功攻击 199" → EquipAttr("最大外功攻击", 199)
         """
         return self._parse_single_value_attr(raw)
 
-    def _parse_armor_base1(self, raw: str) -> BaseAttr | None:
+    def _parse_armor_base1(self, raw: str) -> EquipAttr | None:
         """解析防具基础属性1
 
-        "气血最大值8750"    → BaseAttr("气血最大值", 8750)
-        "气血最大值 7778"   → BaseAttr("气血最大值", 7778)
+        "气血最大值8750"    → EquipAttr("气血最大值", 8750)
+        "气血最大值 7778"   → EquipAttr("气血最大值", 7778)
         "外功攻击 花著 52~121" → 脏数据，尝试提取
         """
         return self._parse_single_value_attr(raw)
 
-    def _parse_armor_base2(self, raw: str) -> BaseAttr | None:
+    def _parse_armor_base2(self, raw: str) -> EquipAttr | None:
         """解析防具基础属性2
 
-        "外功防御34"     → BaseAttr("外功防御", 34)
-        "外功防御 20"    → BaseAttr("外功防御", 20)
-        "外功防御 生无在病27" → BaseAttr("外功防御", 27)  [脏]
+        "外功防御34"     → EquipAttr("外功防御", 34)
+        "外功防御 20"    → EquipAttr("外功防御", 20)
+        "外功防御 生无在病27" → EquipAttr("外功防御", 27)  [脏]
         """
         return self._parse_single_value_attr(raw, expected_name="外功防御")
 
     def _parse_single_value_attr(
         self, raw: str, expected_name: str | None = None
-    ) -> BaseAttr | None:
+    ) -> EquipAttr | None:
         """通用：解析 "名称 + 单个数字" 格式的基础属性"""
         raw = raw.strip()
         if not raw:
@@ -231,14 +231,14 @@ class EquipmentParser:
                 remainder = raw[len(attr_name):]
                 nums = re.findall(r"\d+", remainder)
                 if nums:
-                    return BaseAttr(name=attr_name, value=int(nums[-1]))
+                    return EquipAttr(name=attr_name, value=int(nums[-1]))
                 return None
 
         # 无法匹配已知名称，尝试提取末尾数字
         if expected_name:
             nums = re.findall(r"\d+", raw)
             if nums:
-                return BaseAttr(name=expected_name, value=int(nums[-1]))
+                return EquipAttr(name=expected_name, value=int(nums[-1]))
 
         logger.warning(f"base_attr 无法解析: {raw!r}")
         return None

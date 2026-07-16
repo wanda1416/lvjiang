@@ -10,9 +10,10 @@ sys.path.insert(0, str(ROOT))
 from lvjiang.evaluator.rule_config import load_rule_config
 from lvjiang.evaluator.generic_evaluator import GenericEvaluator
 from lvjiang.evaluator.base import Rating
-from lvjiang.evaluator.base_attrs import BaseAttrConfig
+from lvjiang.evaluator.equip_attrs import EquipAttrConfig
 from lvjiang.equip_parser import EquipmentParser
 from lvjiang.equip_parser.constants import WEAPON_SLOTS
+from lvjiang.constants import SYSTEM_RULES_DIR
 
 
 def _extract_base_attr_value(equip, slot_key: str):
@@ -33,13 +34,13 @@ def _extract_base_attr_value(equip, slot_key: str):
 
 
 def main():
-    rule_path = ROOT / "config" / "rules" / "鸣金虹.yaml"
+    rule_path = SYSTEM_RULES_DIR / "鸣金虹.yaml"
     raw_path = ROOT / "config" / "local" / "users" / "刁刁蓝" / "equipments.json"
 
     # 加载规则
     config = load_rule_config(rule_path)
     evaluator = GenericEvaluator(config)
-    base_attrs = BaseAttrConfig()
+    equip_attrs = EquipAttrConfig()
 
     # 解析原始装备数据
     with open(raw_path, "r", encoding="utf-8") as f:
@@ -59,7 +60,7 @@ def main():
         if value is None:
             print(f"\n  [{slot}] {equip.name} | 无法提取基础属性")
             continue
-        quality = base_attrs.infer_quality(slot, equip.level, value)
+        quality = equip_attrs.infer_quality(slot, equip.level, value)
         q_label = {"gold": "金装", "purple": "紫装", "blue": "蓝装"}.get(quality, "未知")
         print(f"\n  [{slot}] {equip.name} | Lv.{equip.level}")
         print(f"    基础属性值: {value}")
@@ -74,7 +75,7 @@ def main():
         # 先设置推断出的品阶
         value = _extract_base_attr_value(equip, slot)
         if value is not None:
-            q = base_attrs.infer_quality(slot, equip.level, value)
+            q = equip_attrs.infer_quality(slot, equip.level, value)
             if q:
                 equip.quality = q
 

@@ -16,11 +16,11 @@
                   base_attr_1, base_attr_2, affixes, warnings)
 """
 
-from .models import BaseAttr, Affix, EquipmentData
+from .models import EquipAttr, Affix, EquipmentData
 from .parser import EquipmentParser
 
 __all__ = [
-    "BaseAttr",
+    "EquipAttr",
     "Affix",
     "EquipmentData",
     "EquipmentParser",

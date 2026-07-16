@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from lvjiang.equip_parser import EquipmentParser, EquipmentData, Affix
 from lvjiang.evaluator import GenericEvaluator, load_rule_config
+from lvjiang.constants import SYSTEM_RULES_DIR
 
 
 # ── 常量 ──
@@ -53,7 +54,7 @@ def test_wanyuanzhi():
     print("=" * 60)
 
     # 加载规则配置
-    rules_path = ROOT / "config" / "rules" / "鸣金虹.yaml"
+    rules_path = SYSTEM_RULES_DIR / "鸣金虹.yaml"
     config = load_rule_config(rules_path)
     evaluator = GenericEvaluator(config)
     print(f"  规则: {config.name}")
@@ -132,7 +133,7 @@ def test_circuit_breaker():
     print("  Mock 熔断测试")
     print(f"{'=' * 60}")
 
-    rules_path = ROOT / "config" / "rules" / "鸣金虹.yaml"
+    rules_path = SYSTEM_RULES_DIR / "鸣金虹.yaml"
     config = load_rule_config(rules_path)
     evaluator = GenericEvaluator(config)
 

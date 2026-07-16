@@ -10,6 +10,7 @@ from loguru import logger
 
 from ...core.region_config import (
     SCENE_REGIONS, Layout, LayoutConfigManager,
+    Point, Arrow,
     get_scene_name,
     load_scene_screenshot, save_scene_screenshot,
 )
@@ -143,14 +144,18 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
     # ─── Tab 操作 ────────────────────────────────────────
 
     def _apply_layout_to_tabs(self):
-        """将当前布局的区域数据、画布配置、截图分发到各 Tab"""
+        """将当前布局的区域/坐标/方向数据、画布配置、截图分发到各 Tab"""
         if self._current_layout is None:
             return
         canvas = self._current_layout.get_canvas()
         layout_name = self._current_layout.name
         for scene_key, tab in self._tabs.items():
             regions = self._current_layout.get_scene_regions(scene_key)
+            points = self._current_layout.get_scene_points(scene_key)
+            arrows = self._current_layout.get_scene_arrows(scene_key)
             tab.set_regions(regions)
+            tab.set_points(points)
+            tab.set_arrows(arrows)
             tab.set_canvas_config(canvas)
             screenshot = load_scene_screenshot(layout_name, scene_key)
             if screenshot is not None:
@@ -159,12 +164,15 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
                 tab.canvas.clear_image()
             tab.canvas.on_region_changed = self._on_any_region_changed
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
+            tab.canvas.on_poi_changed = self._on_any_poi_changed
         self._set_dirty(False)
 
     def _clear_all_tabs(self):
-        """清空所有 Tab 的区域"""
+        """清空所有 Tab 的区域/坐标/方向"""
         for tab in self._tabs.values():
             tab.set_regions([])
+            tab.set_points([])
+            tab.set_arrows([])
 
     # ─── 刷新截图 ────────────────────────────────────────
 
@@ -226,6 +234,13 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         current = self._tab_widget.currentWidget()
         if hasattr(current, '_refresh_region_list'):
             current._refresh_region_list()
+
+    def _on_any_poi_changed(self):
+        """任一 Tab 的 point/arrow 被修改时，标记 dirty + 刷新当前 Tab 的坐标/方向列表"""
+        self._set_dirty(True)
+        current = self._tab_widget.currentWidget()
+        if hasattr(current, '_on_poi_changed'):
+            current._on_poi_changed()
 
     def _set_dirty(self, dirty: bool):
         """设置/清除修改状态指示"""

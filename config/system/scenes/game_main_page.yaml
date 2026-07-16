@@ -44,30 +44,6 @@ regions:
     is_text: false
     is_clickable: true
 
-  - key: forward
-    name: 前进
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: backward
-    name: 后退
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: turn_left
-    name: 向左
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: turn_right
-    name: 向右
-    type: func
-    is_text: false
-    is_clickable: true
-
   - key: team
     name: 组队
     type: func
@@ -103,3 +79,19 @@ regions:
     type: func
     is_text: false
     is_clickable: true
+
+points:
+  - key: origin
+    name: 起点
+
+  - key: forward
+    name: 前进
+
+  - key: backward
+    name: 后退
+
+  - key: turn_left
+    name: 向左
+
+  - key: turn_right
+    name: 向右

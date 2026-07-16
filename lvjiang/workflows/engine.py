@@ -33,6 +33,13 @@ class _GotoSignal(Exception):
         self.target = target
 
 
+class _HaltSignal(Exception):
+    """工作流提前终止信号（如 click_match 失败）"""
+
+    def __init__(self, message: str):
+        self.message = message
+
+
 # ─── 引擎 ─────────────────────────────────────────────────
 
 class WorkflowEngine:
@@ -40,17 +47,23 @@ class WorkflowEngine:
 
     def __init__(self, workflow: BaseWorkflow):
         self._wf = workflow
+        self._collect_output = None  # collect 的直接输出
 
     def run(self, workflow_path: Path | str) -> dict | str:
         """加载并执行 .wf 文件"""
         program = parse_file(workflow_path)
+        self._collect_output = None
         logger.info(f"=== DSL 工作流开始: {Path(workflow_path).stem} ({len(program.body)} 条顶层指令) ===")
 
-        direct_output = self._exec_body(program.body)
+        try:
+            self._exec_body(program.body)
+        except _HaltSignal as sig:
+            logger.info(f"=== DSL 工作流提前终止: {sig.message} ===")
+            return sig.message
 
-        if direct_output is not None:
+        if self._collect_output is not None:
             logger.info(f"=== DSL 工作流完成 ===")
-            return direct_output
+            return self._collect_output
         if self._wf.output:
             logger.info(f"=== DSL 工作流完成，收集到 {len(self._wf.output)} 项数据 ===")
             return self._wf.output
@@ -59,12 +72,11 @@ class WorkflowEngine:
 
     # ─── 语句执行 ──────────────────────────────────────────
 
-    def _exec_body(self, stmts: list) -> str | None:
+    def _exec_body(self, stmts: list) -> None:
         """执行一组语句（含 goto 跳转支持）
 
-        Returns:
-            str: collect 的直接输出（如果有）
-            None: 无直接输出
+        collect 的输出记录到 self._collect_output，不中断执行流。
+        仅 break/goto/停止请求 才会提前终止。
         """
         # 预扫描标签位置
         label_index = self._build_label_index(stmts)
@@ -73,28 +85,24 @@ class WorkflowEngine:
         while pc < len(stmts):
             if self._wf.is_stopped:
                 logger.info("工作流被用户停止")
-                return "(已停止)"
+                return
 
             node = stmts[pc]
 
             try:
-                result = self._exec_stmt(node)
-                if result is not None:
-                    return result
+                self._exec_stmt(node)
             except _GotoSignal as sig:
                 target = sig.target
                 if target not in label_index:
                     logger.error(f"goto 目标标签不存在: {target}")
-                    return f"(错误: 标签 {target} 不存在)"
+                    return
                 pc = label_index[target]
                 continue  # 从标签位置继续，不 pc+1
 
             pc += 1
 
-        return None
-
-    def _exec_stmt(self, node) -> str | None:
-        """执行单条语句，返回 collect 的直接输出或 None"""
+    def _exec_stmt(self, node):
+        """执行单条语句"""
         match node:
             case Click():
                 self._exec_click(node)
@@ -103,9 +111,9 @@ class WorkflowEngine:
             case Scan() | ScanAs():
                 self._exec_scan(node)
             case ClickMatch():
-                return self._exec_click_match(node)
+                self._exec_click_match(node)
             case Collect():
-                return self._wf.collect_current()
+                self._collect_output = self._wf.collect_current()
             case CollectAs():
                 self._exec_collect_as(node)
             case Log():
@@ -126,7 +134,6 @@ class WorkflowEngine:
                 self._exec_eval(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
-        return None
 
     # ─── 基础指令 ─────────────────────────────────────────
 
@@ -159,10 +166,12 @@ class WorkflowEngine:
             var_name = self._resolve_var_name(node.target)
             self._wf.set_variable(var_name, result)
 
-    def _exec_click_match(self, node: ClickMatch) -> str | None:
+    def _exec_click_match(self, node: ClickMatch):
         text = self._resolve(node.text)
         error_msg = self._resolve(node.error_msg) if node.error_msg else None
-        return self._wf.click_match_text(str(text), str(error_msg) if error_msg else None)
+        result = self._wf.click_match_text(str(text), str(error_msg) if error_msg else None)
+        if result is not None:
+            raise _HaltSignal(result)
 
     def _exec_collect_as(self, node: CollectAs):
         key = self._resolve(node.key)

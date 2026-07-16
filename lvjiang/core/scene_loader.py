@@ -22,11 +22,24 @@ class RegionDef:
 
 
 @dataclass
+class PointDef:
+    """单个坐标点的类型定义（圆形交互锚点，不参与 OCR）
+
+    仅描述「场景里存在这样一个可交互坐标点」的类型信息（key/name）。
+    具体的坐标位置与半径属于实例数据，保存在布局 JSON 的 Point 中，
+    半径可在画布上随意调整，不在此处限死。
+    """
+    key: str
+    name: str
+
+
+@dataclass
 class SceneDef:
     """单个场景的完整定义"""
     key: str
     name: str
     regions: list[RegionDef] = field(default_factory=list)
+    points: list[PointDef] = field(default_factory=list)
 
 
 # 向后兼容别名（外部代码若仍用 FieldDef 可继续 import）
@@ -104,7 +117,20 @@ class SceneRegistry:
                 is_clickable=rd.get("is_clickable", False),
             ))
 
-        return SceneDef(key=key, name=name, regions=regions)
+        points = []
+        for pd in data.get("points", []):
+            points.append(PointDef(
+                key=pd["key"],
+                name=pd["name"],
+            ))
+
+        # region 与 point 同场景内 key 不得重复（共享命名空间）
+        all_keys = [r.key for r in regions] + [p.key for p in points]
+        dup = {k for k in all_keys if all_keys.count(k) > 1}
+        if dup:
+            raise ValueError(f"场景 {key} 的 region/point key 重复: {dup}")
+
+        return SceneDef(key=key, name=name, regions=regions, points=points)
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""

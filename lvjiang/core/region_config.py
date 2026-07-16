@@ -9,7 +9,7 @@ import numpy as np
 from loguru import logger
 
 from ..constants import CONFIG_DIR, LOCAL_CONFIG_DIR, SYSTEM_SCENES_DIR, APP_CONFIG_PATH, PREFERENCES_PATH, SESSION_PATH
-from .scene_loader import SceneRegistry, RegionDef, SceneDef, FieldDef
+from .scene_loader import SceneRegistry, RegionDef, PointDef, SceneDef, FieldDef
 
 
 def _load_scene_order() -> list[str] | None:
@@ -43,6 +43,12 @@ _wpn = _registry.get_scene("equip_weapon_detail")
 EQUIP_REGIONS = [(r.key, r.name) for r in _wpn.regions] if _wpn else []
 # 向后兼容别名
 EQUIP_FIELDS = EQUIP_REGIONS
+
+# 场景 → [(point_key, point_name), ...]（来自 YAML 类型定义）
+SCENE_POINTS: dict[str, list[tuple[str, str]]] = {
+    key: [(p.key, p.name) for p in scene.points]
+    for key, scene in _registry.all_scenes().items()
+}
 
 
 def get_scene_name(scene_key: str) -> str:
@@ -84,6 +90,27 @@ def get_region_defs(scene_key: str) -> list[RegionDef]:
 
 # 向后兼容别名
 get_field_defs = get_region_defs
+
+
+def get_scene_point_pairs(scene_key: str) -> list[tuple[str, str]]:
+    """获取场景的 (key, name) 坐标点列表（来自 YAML 定义）"""
+    return SCENE_POINTS.get(scene_key, [])
+
+
+def get_point_defs(scene_key: str) -> list[PointDef]:
+    """获取场景的完整坐标点定义列表"""
+    scene = _registry.get_scene(scene_key)
+    if not scene:
+        return []
+    return list(scene.points)
+
+
+def get_point_def(scene_key: str, point_key: str) -> PointDef | None:
+    """获取场景内指定 point 的类型定义"""
+    scene = _registry.get_scene(scene_key)
+    if not scene:
+        return None
+    return next((p for p in scene.points if p.key == point_key), None)
 
 
 # ─── 路径常量 ────────────────────────────────────────────
@@ -203,11 +230,68 @@ class Region:
 
 
 @dataclass
+class Point:
+    """单个坐标点实例（归一化中心 + 半径）"""
+    key: str
+    cx_ratio: float
+    cy_ratio: float
+    r_ratio: float = 0.015
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(d: dict) -> "Point":
+        return Point(
+            key=d["key"],
+            cx_ratio=d["cx_ratio"],
+            cy_ratio=d["cy_ratio"],
+            r_ratio=d.get("r_ratio", 0.015),
+        )
+
+
+@dataclass
+class Arrow:
+    """单个方向实例（从 from point 指向终点）
+
+    终点互斥二态：
+    - 吸附态：to_key 非空，终点绑定到另一个 point，随其移动
+    - 绝对态：to_cx_ratio/to_cy_ratio 非空，终点为固定归一化坐标
+    """
+    key: str
+    from_key: str
+    to_key: str | None = None
+    to_cx_ratio: float | None = None
+    to_cy_ratio: float | None = None
+
+    def to_dict(self) -> dict:
+        d: dict = {"key": self.key, "from_key": self.from_key}
+        if self.to_key is not None:
+            d["to_key"] = self.to_key
+        else:
+            d["to_cx_ratio"] = self.to_cx_ratio
+            d["to_cy_ratio"] = self.to_cy_ratio
+        return d
+
+    @staticmethod
+    def from_dict(d: dict) -> "Arrow":
+        return Arrow(
+            key=d["key"],
+            from_key=d["from_key"],
+            to_key=d.get("to_key"),
+            to_cx_ratio=d.get("to_cx_ratio"),
+            to_cy_ratio=d.get("to_cy_ratio"),
+        )
+
+
+@dataclass
 class Layout:
     """一个布局：包含画布配置 + 所有场景的区域定义"""
     name: str = ""
     canvas: CanvasConfig = field(default_factory=CanvasConfig)
     scenes: dict[str, list[Region]] = field(default_factory=dict)
+    points: dict[str, list[Point]] = field(default_factory=dict)
+    arrows: dict[str, list[Arrow]] = field(default_factory=dict)
     # scenes = {"equip_detail": [Region, ...], "equip_tune": [Region, ...]}
 
     def get_scene_regions(self, scene_key: str) -> list[Region]:
@@ -216,6 +300,18 @@ class Layout:
     def set_scene_regions(self, scene_key: str, regions: list[Region]):
         self.scenes[scene_key] = regions
 
+    def get_scene_points(self, scene_key: str) -> list[Point]:
+        return self.points.get(scene_key, [])
+
+    def set_scene_points(self, scene_key: str, points: list[Point]):
+        self.points[scene_key] = points
+
+    def get_scene_arrows(self, scene_key: str) -> list[Arrow]:
+        return self.arrows.get(scene_key, [])
+
+    def set_scene_arrows(self, scene_key: str, arrows: list[Arrow]):
+        self.arrows[scene_key] = arrows
+
     def get_canvas(self) -> CanvasConfig:
         return self.canvas
 
@@ -223,12 +319,23 @@ class Layout:
         self.canvas = canvas
 
     def to_dict(self) -> dict:
+        # 汇总所有出现过的场景 key
+        scene_keys = set(self.scenes) | set(self.points) | set(self.arrows)
+        scenes_out: dict[str, dict] = {}
+        for sk in scene_keys:
+            entry: dict = {}
+            regions = self.scenes.get(sk) or []
+            entry["regions"] = [r.to_dict() for r in regions]
+            pts = self.points.get(sk) or []
+            if pts:
+                entry["points"] = [p.to_dict() for p in pts]
+            arrs = self.arrows.get(sk) or []
+            if arrs:
+                entry["arrows"] = [a.to_dict() for a in arrs]
+            scenes_out[sk] = entry
         return {
             "canvas": self.canvas.to_dict(),
-            "scenes": {
-                scene: {"regions": [r.to_dict() for r in regions]}
-                for scene, regions in self.scenes.items()
-            },
+            "scenes": scenes_out,
         }
 
     @staticmethod
@@ -237,25 +344,32 @@ class Layout:
         canvas = CanvasConfig()
         if "canvas" in d and isinstance(d["canvas"], dict):
             canvas = CanvasConfig.from_dict(d["canvas"])
-        # 解析各场景 regions
-        scenes = {}
+        # 解析各场景 regions / points / arrows
+        scenes: dict[str, list[Region]] = {}
+        points: dict[str, list[Point]] = {}
+        arrows: dict[str, list[Arrow]] = {}
+
+        def _parse_scene_entry(scene_key: str, scene_data: dict):
+            if "regions" in scene_data:
+                scenes[scene_key] = [Region.from_dict(r) for r in scene_data["regions"]]
+            if "points" in scene_data:
+                points[scene_key] = [Point.from_dict(p) for p in scene_data["points"]]
+            if "arrows" in scene_data:
+                arrows[scene_key] = [Arrow.from_dict(a) for a in scene_data["arrows"]]
+
         if "scenes" in d and isinstance(d["scenes"], dict):
             # 新格式：scenes 包裹
             for scene_key, scene_data in d["scenes"].items():
-                if isinstance(scene_data, dict) and "regions" in scene_data:
-                    scenes[scene_key] = [
-                        Region.from_dict(r) for r in scene_data["regions"]
-                    ]
+                if isinstance(scene_data, dict):
+                    _parse_scene_entry(scene_key, scene_data)
         else:
             # 旧格式：场景直接在顶层（向后兼容）
             for scene_key, scene_data in d.items():
                 if scene_key == "canvas":
                     continue
-                if isinstance(scene_data, dict) and "regions" in scene_data:
-                    scenes[scene_key] = [
-                        Region.from_dict(r) for r in scene_data["regions"]
-                    ]
-        return Layout(name=name, canvas=canvas, scenes=scenes)
+                if isinstance(scene_data, dict):
+                    _parse_scene_entry(scene_key, scene_data)
+        return Layout(name=name, canvas=canvas, scenes=scenes, points=points, arrows=arrows)
 
 
 # ─── 管理器 ──────────────────────────────────────────────

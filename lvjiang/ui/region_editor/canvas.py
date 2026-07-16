@@ -2,7 +2,7 @@
 
 import numpy as np
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtCore import Qt, QRectF, QPointF
+from PyQt6.QtCore import Qt, QRectF, QPointF, QTimer
 from PyQt6.QtGui import (
     QImage, QPixmap, QPainter, QPen, QBrush, QColor,
     QPaintEvent, QFont,
@@ -10,6 +10,7 @@ from PyQt6.QtGui import (
 
 from ...core.region_config import Region, CanvasConfig, EQUIP_REGIONS
 from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
+from .canvas_poi import CanvasPoiMixin
 
 
 # ─── 颜色方案 ────────────────────────────────────────────
@@ -28,7 +29,7 @@ REGION_COLORS = [
 
 # ─── 画布组件 ────────────────────────────────────────────
 
-class RegionCanvas(QWidget, CanvasInteractionMixin):
+class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
     """可交互的图片画布，支持框选/拖拽/缩放矩形"""
 
     def __init__(self, parent=None):
@@ -83,6 +84,14 @@ class RegionCanvas(QWidget, CanvasInteractionMixin):
         self._canvas_drag_handle: HandlePos | None = None
         self._canvas_drag_start = QPointF()
         self._canvas_drag_orig: CanvasConfig | None = None
+
+        # point / arrow 状态（CanvasPoiMixin）
+        self._init_poi_state()
+        # 停手吸附检测定时器：画箭头时周期性检查鼠标是否静止
+        self._arrow_snap_timer = QTimer(self)
+        self._arrow_snap_timer.setInterval(50)
+        self._arrow_snap_timer.timeout.connect(self.on_arrow_snap_tick)
+        self._arrow_snap_timer.start()
 
     # ─── 公开接口 ────────────────────────────────────────
 
@@ -244,6 +253,10 @@ class RegionCanvas(QWidget, CanvasInteractionMixin):
                     QPointF(self._display_rect.right(), y),
                 )
             painter.restore()
+
+        # 绘制 point / arrow（在 region 之上）
+        self._draw_arrows(painter)
+        self._draw_points(painter)
 
         painter.end()
 

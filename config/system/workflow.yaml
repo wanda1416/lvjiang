@@ -22,3 +22,9 @@ flows:
       - equip_weapon_detail
       - equip_tune_detail
       - equip_tune_result
+
+  - id: move_forward_test
+    name: 向前移动测试
+    wf_file: move_forward_test.wf
+    required_scenes:
+      - game_main_page

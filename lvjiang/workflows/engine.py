@@ -143,7 +143,8 @@ class WorkflowEngine:
         scene = self._resolve_param(node.scene)
         arrow = self._resolve_param(node.arrow)
         duration = self._resolve_duration(node.duration) if node.duration else None
-        self._wf.drag_arrow(scene, arrow, duration=duration)
+        hold = node.hold  # float | None
+        self._wf.drag_arrow(scene, arrow, duration=duration, hold=hold)
 
     def _exec_wait(self, node: Wait):
         delay = node.delay

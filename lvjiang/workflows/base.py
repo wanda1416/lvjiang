@@ -276,11 +276,12 @@ class BaseWorkflow:
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}")
 
-    def drag_arrow(self, scene_key: str, arrow_key: str, duration: float | tuple[float, float] | None = None):
+    def drag_arrow(self, scene_key: str, arrow_key: str, duration: float | tuple[float, float] | None = None, hold: float | None = None):
         """执行 arrow 定义的拖拽
 
         Args:
             duration: 拖拽移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认值。
+            hold: 到达目标后按住不放的时长（秒）。None 表示不按住。
         """
         arrows = self._layout.get_scene_arrows(scene_key)
         arrow = next((a for a in arrows if a.key == arrow_key), None)
@@ -305,8 +306,8 @@ class BaseWorkflow:
         tx, ty = self._ratio_to_screen(to_cx, to_cy)
         if fx is None or tx is None:
             return
-        logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})")
-        self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration)
+        logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})" + (f" hold {hold}s" if hold else ""))
+        self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration, hold=hold)
 
     def _point_to_screen(self, point: Point) -> tuple[int | None, int | None]:
         """point 中心 → 屏幕坐标（带半径内随机偏移）"""

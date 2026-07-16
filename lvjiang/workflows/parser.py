@@ -56,8 +56,16 @@ class _DSLTransformer(Transformer):
 
     def drag_stmt(self, items):
         scene, arrow = items[0], items[1]
-        duration = items[2] if len(items) > 2 else None
-        return Drag(scene=scene, arrow=arrow, duration=duration, line_no=self._line(items))
+        duration = None
+        hold = None
+        for item in items[2:]:
+            if isinstance(item, Literal):
+                duration = item  # drag_duration 返回 Literal
+            elif isinstance(item, list):
+                duration = item  # drag_duration 返回 list[Literal]（二元组范围）
+            elif isinstance(item, float):
+                hold = item  # drag_hold 返回 float
+        return Drag(scene=scene, arrow=arrow, duration=duration, hold=hold, line_no=self._line(items))
 
     def drag_duration(self, items):
         item = items[0]
@@ -67,10 +75,14 @@ class _DSLTransformer(Transformer):
         # FLOAT token → Literal
         return Literal(value=float(item))
 
+    def drag_hold(self, items):
+        """hold <seconds> → float"""
+        return float(items[0])
+
     def wait_stmt(self, items):
         arg = items[0]
         if isinstance(arg, Token):
-            if arg.type == "FLOAT":
+            if arg.type in ("FLOAT", "INT"):
                 return Wait(delay=Literal(value=float(arg)), line_no=self._line(items))
             else:  # NAME
                 return Wait(delay=Literal(value=str(arg)), line_no=self._line(items))

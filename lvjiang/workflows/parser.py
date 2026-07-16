@@ -57,10 +57,15 @@ class _DSLTransformer(Transformer):
         return Click(target=target, line_no=self._line(items))
 
     def click_target(self, items):
-        """click 目标：[scene].[region] → SceneRef，$var → VarRef"""
+        """click 目标：[scene].[region] → SceneRef，[scene].[$var] → SceneRef(region=VarRef)，$var → VarRef"""
         if len(items) == 2:
-            # [scene].[region]
-            return SceneRef(scene=str(items[0]), region=str(items[1]))
+            scene_name = str(items[0])
+            region = items[1]
+            # region 可能是 bracket_expr (Token) 或 var_ref (VarRef)
+            if isinstance(region, VarRef):
+                return SceneRef(scene=scene_name, region=region)
+            else:
+                return SceneRef(scene=scene_name, region=str(region))
         else:
             # $var（var_ref 已返回 VarRef）
             return items[0]
@@ -436,6 +441,10 @@ class _DSLTransformer(Transformer):
     def bracket_expr(self, items):
         """[name] → str（场景名或区域名，由父节点组装为 SceneRef）"""
         return str(items[0])
+
+    def bracket_var(self, items):
+        """[$var] → VarRef（动态引用，由父节点组装为 SceneRef(region=VarRef)）"""
+        return items[0]  # var_ref 已返回 VarRef
 
     def bracket_list(self, items):
         """[a, b, "c"] → list[Literal]"""

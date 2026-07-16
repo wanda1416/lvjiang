@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
-    QTabWidget, QSplitter, QMessageBox,
+    QTabWidget, QSplitter, QMessageBox, QFormLayout, QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QKeyEvent, QAction
@@ -177,6 +177,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         dialog.exec()
         self._refresh_user_combo()
 
+    def _on_toggle_preview(self, checked: bool):
+        """切换截图预览区域的显示/隐藏"""
+        self.preview_label.setVisible(not checked)
+        self.btn_hide_window.setText("显示截图" if checked else "隐藏截图")
+
     # ─── UI 构建 ───────────────────────────────────────────
 
     def _setup_ui(self):
@@ -227,6 +232,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.btn_locate.clicked.connect(self._on_locate_window)
         row1.addWidget(self.btn_locate)
 
+        self.btn_hide_window = QPushButton("显示截图")
+        self.btn_hide_window.setFixedWidth(80)
+        self.btn_hide_window.setCheckable(True)
+        self.btn_hide_window.setChecked(True)  # 默认隐藏截图
+        self.btn_hide_window.setToolTip("隐藏/显示截图预览区域")
+        self.btn_hide_window.clicked.connect(self._on_toggle_preview)
+        row1.addWidget(self.btn_hide_window)
+
         window_main_layout.addLayout(row1)
 
         row2 = QHBoxLayout()
@@ -237,27 +250,33 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         window_main_layout.addLayout(row2)
         main_layout.addWidget(window_group)
 
-        # === 截屏预览区 ===
+        # === 截屏预览区（默认隐藏） ===
         self.preview_label = QLabel("定位窗口后自动截屏")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setFixedHeight(320)
         self.preview_label.setStyleSheet(
             "background-color: #2b2b2b; color: #888; font-size: 14px;"
         )
+        self.preview_label.setVisible(False)
         main_layout.addWidget(self.preview_label)
 
         # === 中部：左右分栏 ===
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # 左侧：配置区
+        # 左侧：配置区（可滚动）
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(4, 4, 4, 4)
 
         # 工作流选择
         wf_group = QGroupBox("工作流")
         wf_layout = QVBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.setMinimumWidth(200)
+        self.workflow_combo.currentIndexChanged.connect(self._rebuild_param_panel)
         wf_layout.addWidget(self.workflow_combo)
         left_layout.addWidget(wf_group)
 
@@ -269,23 +288,15 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         )
         left_layout.addWidget(self.btn_run_workflow)
 
-        flow_group = QGroupBox("目标流派")
-        flow_layout = QVBoxLayout(flow_group)
-        self.flow_selector = QComboBox()
-        self.flow_selector.addItems([
-            "会心双刀", "裂石威", "明川药典", "九剑", "无名",
-        ])
-        flow_layout.addWidget(self.flow_selector)
-        left_layout.addWidget(flow_group)
-
-        mode_group = QGroupBox("处理模式")
-        mode_layout = QVBoxLayout(mode_group)
-        self.mode_selector = QComboBox()
-        self.mode_selector.addItems(["批量筛选", "精调模式"])
-        mode_layout.addWidget(self.mode_selector)
-        left_layout.addWidget(mode_group)
+        # 工作流参数面板（动态生成）
+        self._param_panel = QGroupBox("参数设置")
+        self._param_layout = QFormLayout(self._param_panel)
+        self._param_panel.setVisible(False)
+        left_layout.addWidget(self._param_panel)
 
         left_layout.addStretch()
+
+        left_scroll.setWidget(left_panel)
 
         # 右侧：日志/预览区
         right_panel = QWidget()
@@ -304,11 +315,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         right_layout.addWidget(self.tabs)
 
-        splitter.addWidget(left_panel)
+        splitter.addWidget(left_scroll)
         splitter.addWidget(right_panel)
-        splitter.setSizes([300, 700])
+        splitter.setSizes([250, 750])
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
         self.statusBar().showMessage("就绪 | F9 开始 | F10 停止")
@@ -329,6 +340,48 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         sink = QtSink(self._log_bridge)
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
+
+    def _rebuild_param_panel(self):
+        """根据当前选中工作流的 parameters 声明重建参数面板"""
+        # 清空现有控件
+        while self._param_layout.rowCount() > 0:
+            self._param_layout.removeRow(0)
+
+        flow_cfg = self._get_selected_flow_config()
+        params = flow_cfg.get("parameters", []) if flow_cfg else []
+
+        if not params:
+            self._param_panel.setVisible(False)
+            return
+
+        for param_def in params:
+            name = param_def["name"]
+            label = param_def.get("label", name)
+            param_type = param_def.get("type", "select")
+            default = param_def.get("default")
+            options = param_def.get("options", [])
+
+            combo = QComboBox()
+            combo.setObjectName(name)
+
+            if param_type == "select" and options:
+                for opt in options:
+                    if isinstance(opt, dict):
+                        # { value: "bag_1_1", label: "位置 1" }
+                        combo.addItem(opt["label"], opt["value"])
+                    else:
+                        # 简单字符串
+                        combo.addItem(str(opt), str(opt))
+
+                # 设置默认值
+                if default is not None:
+                    idx = combo.findData(str(default))
+                    if idx >= 0:
+                        combo.setCurrentIndex(idx)
+
+            self._param_layout.addRow(label + ":", combo)
+
+        self._param_panel.setVisible(True)
 
     # ─── 快捷键 + 关闭 ─────────────────────────────────────
 

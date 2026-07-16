@@ -43,6 +43,8 @@
 
 变量**无需预先声明**，首次赋值即创建，后续引用即可。
 
+**外部参数注入**：工作流可以通过 `workflow.yaml` 声明参数，由 UI 参数面板注入初始值。详见「九、工作流参数声明」。
+
 ### 2.2 变量类型
 
 变量的实际类型由赋值来源决定：
@@ -108,7 +110,7 @@ call "sub.wf" read "k" as $v  ──→  variables[$v] = sub_output["k"]
 
 | 指令 | 语法 | 说明 |
 |---|---|---|
-| click | `click [scene].[region]` 或 `click $var` | 点击静态区域，或点击 find 产出的动态坐标 |
+| click | `click [scene].[region]` 或 `click [scene].[$var]` 或 `click $var` | 点击静态区域、动态 region 区域，或点击 find 产出的动态坐标 |
 | drag | `drag [scene].[arrow] [时长] [hold 秒数]` | 执行 arrow 定义的拖拽。时长可选：固定秒数或 `[min, max]` 范围；hold 可选，到达后按住不放的时长 |
 | wait | `wait <delay_name>` 或 `wait <秒数>` | 命名延迟或固定秒数 |
 | scan | `scan [scene] as $var` 或 `scan [scene].[f1, f2, ...] as $var` | OCR 扫描场景，结果存入 `$var`（dict，key 为区域名）。后者仅扫描指定字段 |
@@ -601,3 +603,82 @@ if not $bag_scan.sub_equip contains "装备"
     wait step_interval
 end
 ```
+
+## 九、工作流参数声明
+
+工作流可以通过 `workflow.yaml` 声明外部参数，由 UI 参数面板提供配置界面，运行时注入到工作流变量系统中。
+
+### 9.1 参数声明语法
+
+在 `config/system/workflow.yaml` 的 flow 条目下新增 `parameters` 字段：
+
+```yaml
+flows:
+  - id: single_tuning
+    name: 单件装备调律
+    wf_file: single_tuning.wf
+    required_scenes: [...]
+    parameters:
+      - name: target_material
+        label: 目标材料
+        type: select
+        default: "金色狗粮"
+        options: ["金色狗粮", "紫色狗粮", "彩色狗粮"]
+      - name: bag_slot
+        label: 背包槽位
+        type: select
+        default: "bag_1_1"
+        options:
+          - { value: "bag_1_1", label: "位置 1" }
+          - { value: "bag_1_2", label: "位置 2" }
+```
+
+### 9.2 参数类型
+
+当前支持 `select` 类型（下拉枚举）：
+
+| 字段 | 说明 |
+|---|---|
+| `name` | 参数名，即工作流中的变量名（`$name`） |
+| `label` | UI 显示标签 |
+| `type` | 参数类型，当前仅支持 `select` |
+| `default` | 默认值 |
+| `options` | 可选项列表，支持简单字符串或 `{value, label}` 对象 |
+
+### 9.3 工作流中使用
+
+声明参数后，工作流内直接通过 `$name` 引用，无需 `eval` 赋值：
+
+```diff
+- eval $target_material = "金色狗粮"   # 硬编码
++ # $target_material 由外部参数注入，直接使用
+```
+
+动态 region 引用：
+
+```diff
+- click [bag_equip_detail].[bag_1_1]   # 静态 region
++ click [bag_equip_detail].[$bag_slot]  # 动态 region，由参数注入
+```
+
+### 9.4 数据流
+
+```
+workflow.yaml (声明 parameters)
+       |
+       v
+UI 动态面板 (workflow_combo 切换时生成对应控件)
+       |
+       v
+_on_run_workflow() (收集面板值 → params dict)
+       |
+       v
+BaseWorkflow.run_file(wf_path, initial_variables=params)
+       |
+       v
+WorkflowEngine.variables = params (注入)
+       |
+       v
+.wf 文件中 $target_material / $bag_slot 引用
+```
+

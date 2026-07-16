@@ -165,8 +165,14 @@ class WorkflowEngine:
 
     def _exec_click(self, node: Click):
         if isinstance(node.target, SceneRef):
-            # 静态点击：[scene].[region]
-            self._wf.click_any(node.target.scene, node.target.region)
+            scene = node.target.scene
+            region = node.target.region
+            # region 可能是 VarRef（动态 region）或 str（静态 region）
+            if isinstance(region, VarRef):
+                region = self.variables.get(region.name)
+                if region is None:
+                    raise _HaltSignal(f"变量 ${node.target.region.name} 未定义，无法点击")
+            self._wf.click_any(scene, region)
         elif isinstance(node.target, VarRef):
             # 动态点击：$var（find 产出的坐标）
             coords = self.variables.get(node.target.name)

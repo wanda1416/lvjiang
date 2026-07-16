@@ -25,19 +25,9 @@ class DelayConfig(BaseModel):
     after_tune_wait: float | tuple[float, float] = 3.0     # 调律结果等待（单值固定等待，二元组则范围内随机）
 
 
-class BudgetConfig(BaseModel):
-    """调律预算"""
-    max_tunes_per_equip: int = 20
-    material_threshold: int = 10
-
-
 class UserConfig(BaseModel):
     """用户配置（从 preferences.yaml 加载）"""
     window_title: str = ""
-    target_flow: str = "会心双刀"
-    auto_protect_top_tier: bool = True
-    keep_strategy: str = "top2"
-    budget: BudgetConfig = Field(default_factory=BudgetConfig)
     delay: DelayConfig = Field(default_factory=DelayConfig)
 
 

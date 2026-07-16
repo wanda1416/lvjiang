@@ -79,10 +79,17 @@ class BaseWorkflow:
 
     # ─── DSL 便捷入口 ──────────────────────────────────────
 
-    def run_file(self, workflow_path: Path | str) -> dict:
-        """加载并执行 .wf 文件（DSL 驱动的工作流使用）"""
+    def run_file(self, workflow_path: Path | str, initial_variables: dict | None = None) -> dict:
+        """加载并执行 .wf 文件（DSL 驱动的工作流使用）
+
+        Args:
+            workflow_path: .wf 文件路径
+            initial_variables: 外部注入的初始变量（如 UI 参数面板传入的参数）
+        """
         from .engine import WorkflowEngine
         engine = WorkflowEngine(self)
+        if initial_variables:
+            engine.variables.update(initial_variables)
         output = engine.run(workflow_path)
         # 同步 engine 最终状态回 wf，供外部调用者读取
         self.variables = dict(engine.variables)

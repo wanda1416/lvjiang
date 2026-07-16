@@ -75,11 +75,13 @@ class InputController:
         time.sleep(post_delay)
 
     def drag_screen(self, from_x: int, from_y: int, to_x: int, to_y: int, poi_name: str = "",
-                    duration: float | tuple[float, float] | None = None):
+                    duration: float | tuple[float, float] | None = None,
+                    hold: float | None = None):
         """从起点拖拽到终点（模拟人类操作）
 
         Args:
             duration: 移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认 mouse_move_duration。
+            hold: 到达目标后按住不放的时长（秒）。None 表示不按。
         """
         self._move_to(from_x, from_y)
         pre_delay = random.uniform(*self.before_click_wait)
@@ -91,10 +93,15 @@ class InputController:
             move_dur = random.uniform(*duration)
         else:
             move_dur = float(duration)
-        logger.debug(f"拖拽 {poi_name}: ({from_x},{from_y}) -> ({to_x},{to_y}) [{move_dur:.2f}s]")
+        hold_info = f" + hold {hold}s" if hold else ""
+        logger.debug(f"拖拽 {poi_name}: ({from_x},{from_y}) -> ({to_x},{to_y}) [{move_dur:.2f}s]{hold_info}")
         pyautogui.moveTo(from_x, from_y, duration=move_dur)
         pyautogui.mouseDown()
         pyautogui.moveTo(to_x, to_y, duration=move_dur)
+        # 到达目标后按住不放
+        if hold is not None and hold > 0:
+            logger.debug(f"按住 {hold}s")
+            time.sleep(float(hold))
         pyautogui.mouseUp()
         post_delay = random.uniform(*self.after_click_wait)
         time.sleep(post_delay)

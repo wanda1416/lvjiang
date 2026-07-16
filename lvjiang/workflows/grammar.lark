@@ -30,11 +30,13 @@ start: (_NL | statement)*
 
 click_stmt: "click"i bracket_expr "." bracket_expr _NL
 
-drag_stmt: "drag"i bracket_expr "." bracket_expr drag_duration? _NL
+drag_stmt: "drag"i bracket_expr "." bracket_expr drag_duration? drag_hold? _NL
 
 drag_duration: FLOAT | bracket_list
 
-wait_stmt: "wait"i (NAME | FLOAT | bracket_expr) _NL
+drag_hold: "hold"i (FLOAT | INT)
+
+wait_stmt: "wait"i (NAME | FLOAT | INT | bracket_expr) _NL
 
 scan_stmt: "scan"i bracket_expr field_list? as_clause? _NL
 

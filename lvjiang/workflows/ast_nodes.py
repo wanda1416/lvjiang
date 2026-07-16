@@ -36,6 +36,7 @@ class Drag:
     scene: Any      # Literal | VarRef
     arrow: Any      # Literal | VarRef
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
+    hold: float | None = None  # 到达目标后按住不放的时长（秒）
     line_no: int = 0
 
 

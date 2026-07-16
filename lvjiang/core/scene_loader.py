@@ -59,15 +59,35 @@ class SceneRegistry:
             type: attr|slot|func
             is_text: true|false
             is_clickable: true|false
+
+    分组结构：
+        group_config: {group_key: [scene_key, ...]}
+        group_names:  {group_key: group_name}
     """
 
-    def __init__(self, scenes_dir: Path, scene_order: list[str] | None = None):
+    def __init__(
+        self,
+        scenes_dir: Path,
+        scene_order: list[str] | None = None,
+        group_config: dict[str, list[str]] | None = None,
+        group_names: dict[str, str] | None = None,
+    ):
         self._scenes_dir = scenes_dir
         self._scenes: dict[str, SceneDef] = {}
         self._order: list[str] = []
-        self._load_all(scenes_dir, scene_order)
+        # 分组数据
+        self._groups: dict[str, str] = {}            # group_key -> group_name
+        self._group_order: list[str] = []            # 分组顺序
+        self._group_scenes: dict[str, list[str]] = {}  # group_key -> [scene_key, ...]
+        self._load_all(scenes_dir, scene_order, group_config, group_names)
 
-    def _load_all(self, scenes_dir: Path, scene_order: list[str] | None):
+    def _load_all(
+        self,
+        scenes_dir: Path,
+        scene_order: list[str] | None,
+        group_config: dict[str, list[str]] | None = None,
+        group_names: dict[str, str] | None = None,
+    ):
         """加载场景：按 scene_order 指定的顺序，未指定的按文件名追加"""
         if not scenes_dir.exists():
             logger.warning(f"场景配置目录不存在: {scenes_dir}")
@@ -93,6 +113,9 @@ class SceneRegistry:
                     self._order.append(k)
         else:
             self._order = list(self._scenes.keys())
+
+        # 初始化分组
+        self._init_groups(group_config, group_names)
 
     def _load_scene(self, yaml_file: Path) -> SceneDef:
         """从单个 YAML 文件加载场景定义"""
@@ -145,10 +168,127 @@ class SceneRegistry:
         """返回所有场景的 {key: SceneDef} 字典（按配置顺序）"""
         return {k: self._scenes[k] for k in self._order}
 
+    # ─── 分组管理 ──────────────────────────────────────────
+
+    def _init_groups(
+        self,
+        group_config: dict[str, list[str]] | None,
+        group_names: dict[str, str] | None,
+    ):
+        """初始化分组结构，向后兼容旧格式（flat list → default 分组）"""
+        if group_config:
+            # 新格式：按分组配置初始化
+            self._group_order = list(group_config.keys())
+            for gk in self._group_order:
+                self._groups[gk] = (group_names or {}).get(gk, gk)
+                self._group_scenes[gk] = [k for k in group_config[gk] if k in self._scenes]
+        else:
+            # 旧格式兼容：所有场景放入 default 分组
+            self._group_order = ["default"]
+            self._groups["default"] = "默认分组"
+            self._group_scenes["default"] = list(self._order)
+        # 确保所有场景都在某个分组中
+        assigned = set()
+        for scenes in self._group_scenes.values():
+            assigned.update(scenes)
+        unassigned = [k for k in self._order if k not in assigned]
+        if unassigned:
+            first_group = self._group_order[0]
+            self._group_scenes[first_group].extend(unassigned)
+
+    def get_groups(self) -> list[tuple[str, str]]:
+        """返回分组列表 [(key, name), ...]，按配置顺序"""
+        return [(gk, self._groups[gk]) for gk in self._group_order]
+
+    def get_group_name(self, group_key: str) -> str:
+        """获取分组名称"""
+        return self._groups.get(group_key, group_key)
+
+    def get_group_scenes(self, group_key: str) -> list[str]:
+        """获取分组下的场景 key 列表"""
+        return list(self._group_scenes.get(group_key, []))
+
+    def get_scene_group(self, scene_key: str) -> str | None:
+        """获取场景所在的分组 key"""
+        for gk, scenes in self._group_scenes.items():
+            if scene_key in scenes:
+                return gk
+        return None
+
+    def create_group(self, key: str, name: str):
+        """创建新分组"""
+        if key in self._groups:
+            raise ValueError(f"分组 key 已存在: {key}")
+        self._groups[key] = name
+        self._group_order.append(key)
+        self._group_scenes[key] = []
+        logger.info(f"已创建分组: {key} ({name})")
+
+    def rename_group(self, key: str, new_name: str):
+        """重命名分组（key 不可变）"""
+        if key not in self._groups:
+            raise ValueError(f"分组不存在: {key}")
+        self._groups[key] = new_name
+        logger.info(f"已重命名分组: {key} -> {new_name}")
+
+    def delete_group(self, key: str):
+        """删除空分组（非空抛异常）"""
+        if key not in self._groups:
+            raise ValueError(f"分组不存在: {key}")
+        scenes = self._group_scenes.get(key, [])
+        if scenes:
+            raise ValueError(f"分组非空，无法删除: {key}（包含 {len(scenes)} 个场景）")
+        del self._groups[key]
+        self._group_order.remove(key)
+        del self._group_scenes[key]
+        logger.info(f"已删除分组: {key}")
+
+    def move_scene_to_group(self, scene_key: str, new_group_key: str):
+        """移动场景到其他分组"""
+        if scene_key not in self._scenes:
+            raise ValueError(f"场景不存在: {scene_key}")
+        if new_group_key not in self._groups:
+            raise ValueError(f"目标分组不存在: {new_group_key}")
+        # 从原分组移除
+        old_group = self.get_scene_group(scene_key)
+        if old_group:
+            self._group_scenes[old_group].remove(scene_key)
+        # 添加到新分组
+        if scene_key not in self._group_scenes[new_group_key]:
+            self._group_scenes[new_group_key].append(scene_key)
+        logger.info(f"已移动场景 {scene_key} 到分组 {new_group_key}")
+
+    def reorder_groups(self, new_order: list[str]):
+        """更新分组顺序（仅内存）"""
+        self._group_order = [k for k in new_order if k in self._groups]
+        for k in self._groups:
+            if k not in self._group_order:
+                self._group_order.append(k)
+
+    def save_group_config(self, app_config_path: Path):
+        """将分组配置写入 app.yaml"""
+        data = {}
+        if app_config_path.exists():
+            try:
+                data = yaml.safe_load(app_config_path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                pass
+        # 构建分组结构
+        layout_scenes = {}
+        for gk in self._group_order:
+            layout_scenes[gk] = self._group_scenes.get(gk, [])
+        data["layout_scenes"] = layout_scenes
+        data["group_names"] = dict(self._groups)
+        app_config_path.write_text(
+            yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+            encoding="utf-8",
+        )
+        logger.info(f"已保存分组配置: {self._group_order}")
+
     # ─── 场景 CRUD ──────────────────────────────────────────
 
-    def create_scene(self, key: str, name: str) -> SceneDef:
-        """创建新场景 YAML 文件并注册"""
+    def create_scene(self, key: str, name: str, group_key: str | None = None) -> SceneDef:
+        """创建新场景 YAML 文件并注册，可选指定分组"""
         if key in self._scenes:
             raise ValueError(f"场景 key 已存在: {key}")
         scene = SceneDef(key=key, name=name)
@@ -156,7 +296,11 @@ class SceneRegistry:
         self._save_scene_yaml(yaml_path, scene)
         self._scenes[key] = scene
         self._order.append(key)
-        logger.info(f"已创建场景: {key}")
+        # 添加到指定分组（或第一个分组）
+        target_group = group_key if group_key and group_key in self._groups else (self._group_order[0] if self._group_order else None)
+        if target_group:
+            self._group_scenes.setdefault(target_group, []).append(key)
+        logger.info(f"已创建场景: {key} (分组={target_group})")
         return scene
 
     def delete_scene(self, key: str):
@@ -168,6 +312,10 @@ class SceneRegistry:
             yaml_path.unlink()
         del self._scenes[key]
         self._order.remove(key)
+        # 从分组中移除
+        group = self.get_scene_group(key)
+        if group:
+            self._group_scenes[group].remove(key)
         logger.info(f"已删除场景: {key}")
 
     def rename_scene(self, key: str, new_key: str, new_name: str):
@@ -201,20 +349,15 @@ class SceneRegistry:
                 self._order.append(k)
 
     def save_scene_order(self, order: list[str], app_config_path: Path):
-        """将场景顺序写入 app.yaml 的 layout_scenes"""
+        """将场景顺序写入 app.yaml（保持分组结构）"""
         self.reorder_scenes(order)
-        data = {}
-        if app_config_path.exists():
-            try:
-                data = yaml.safe_load(app_config_path.read_text(encoding="utf-8")) or {}
-            except Exception:
-                pass
-        data["layout_scenes"] = list(self._order)
-        app_config_path.write_text(
-            yaml.dump(data, allow_unicode=True, default_flow_style=False),
-            encoding="utf-8",
-        )
-        logger.info(f"已保存场景顺序: {self._order}")
+        # 同步更新各分组内的场景顺序
+        for gk in self._group_order:
+            group_scene_list = self._group_scenes.get(gk, [])
+            # 按 order 中的顺序重新排列该分组的场景
+            new_list = [k for k in order if k in group_scene_list]
+            self._group_scenes[gk] = new_list
+        self.save_group_config(app_config_path)
 
     # ─── 区域/坐标 编辑 ───────────────────────────────────────
 

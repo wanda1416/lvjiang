@@ -8,7 +8,7 @@
 
 | 场景 Key | 场景名称 | 用途 |
 |----------|----------|------|
-| `equip_bag_detail` | 装备背包详情 | 识别背包中各装备槽位的状态 |
+| `bag_equip_detail` | 装备背包详情 | 识别背包中各装备槽位的状态 |
 | `equip_weapon_detail` | 装备武器详情 | 识别武器的基础信息和词条分布 |
 | `equip_armor_detail` | 装备防具详情 | 识别防具的基础信息和词条分布（含双基础属性） |
 | `equip_tune_detail` | 装备调律详情 | 识别调律后的词条变化 |
@@ -68,7 +68,7 @@ fields:
 
 ---
 
-## 场景一：装备背包详情 (equip_bag_detail)
+## 场景一：装备背包详情 (bag_equip_detail)
 
 **游戏内位置**：打开背包 → 装备总览页
 
@@ -176,12 +176,12 @@ fields:
 ```
 config/local/screenshots/
 ├── 默认布局/
-│   ├── equip_bag_detail.png        # 背包总览页截图
+│   ├── bag_equip_detail.png        # 背包总览页截图
 │   ├── equip_weapon_detail.png   # 武器详情页截图
 │   ├── equip_armor_detail.png    # 防具详情页截图
 │   └── equip_tune_detail.png     # 调律结果页截图
 └── 投屏布局/
-    ├── equip_bag_detail.png
+    ├── bag_equip_detail.png
     ├── equip_weapon_detail.png
     ├── equip_armor_detail.png
     └── equip_tune_detail.png
@@ -210,7 +210,7 @@ fields:
 ```yaml
 # config/system/app.yaml
 layout_scenes:
-  - equip_bag_detail
+  - bag_equip_detail
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail

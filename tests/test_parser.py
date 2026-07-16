@@ -122,7 +122,7 @@ def test_backward_compat():
     """验证所有旧指令仍正常解析"""
     print("\n=== 验证旧指令兼容 ===")
     text = """\
-click [equip_bag_detail].[slot_main_weapon]
+click [bag_equip_detail].[slot_main_weapon]
 wait page_refresh_wait
 wait 1.5
 scan [equip_weapon_detail]

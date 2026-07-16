@@ -15,7 +15,7 @@
 | 场景标识符 | `equip_detail` → `equip_weapon_detail` |
 | 场景标识符 | `equip_tune` → `equip_tune_detail` |
 | 新增场景 | `equip_armor_detail`（装备防具详情，9 字段） |
-| 新增场景 | `equip_bag_detail`（装备背包详情，10 字段，Tab 第一列） |
+| 新增场景 | `bag_equip_detail`（装备背包详情，10 字段，Tab 第一列） |
 | 布局顺序 | `config.json` 新增 `layouts` 数组管理顺序 |
 | 截图存储 | 按布局+场景维度持久化到 `config/local/screenshots/` |
 | Bug 修复 | 字段绑定状态刷新、OpenCV 中文路径 |
@@ -28,7 +28,7 @@
 
 | 场景 Key | 场景名称 | 字段数 | 优先级 |
 |----------|----------|--------|--------|
-| `equip_bag_detail` | 装备背包详情 | 10 | 1（Tab 第一列） |
+| `bag_equip_detail` | 装备背包详情 | 10 | 1（Tab 第一列） |
 | `equip_weapon_detail` | 装备武器详情 | 8 | 2 |
 | `equip_armor_detail` | 装备防具详情 | 9 | 3 |
 | `equip_tune_detail` | 装备调律详情 | 5 | 4 |
@@ -36,7 +36,7 @@
 ### 装备背包详情字段
 
 ```python
-"equip_bag_detail": (
+"bag_equip_detail": (
     "装备背包详情",
     [
         ("slot_main_weapon", "主武器"),
@@ -95,7 +95,7 @@
 ```
 config/local/screenshots/
 ├── 默认布局/
-│   ├── equip_bag_detail.png
+│   ├── bag_equip_detail.png
 │   ├── equip_weapon_detail.png
 │   ├── equip_armor_detail.png
 │   └── equip_tune_detail.png

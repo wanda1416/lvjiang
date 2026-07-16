@@ -13,22 +13,56 @@ from .scene_loader import SceneRegistry, RegionDef, PointDef, SceneDef, FieldDef
 
 
 def _load_scene_order() -> list[str] | None:
-    """从 app.yaml 读取场景加载顺序"""
+    """从 app.yaml 读取场景加载顺序（兼容旧格式 flat list）"""
     if not APP_CONFIG_PATH.exists():
         return None
     try:
         import yaml
         data = yaml.safe_load(APP_CONFIG_PATH.read_text(encoding="utf-8"))
-        order = data.get("layout_scenes") if isinstance(data, dict) else None
-        return order if isinstance(order, list) else None
+        if not isinstance(data, dict):
+            return None
+        layout_scenes = data.get("layout_scenes")
+        # 旧格式：flat list
+        if isinstance(layout_scenes, list):
+            return layout_scenes
+        return None
     except Exception as e:
         logger.warning(f"读取 layout_scenes 失败: {e}")
         return None
 
 
+def _load_group_config() -> tuple[dict[str, list[str]] | None, dict[str, str] | None]:
+    """从 app.yaml 读取分组配置，返回 (group_config, group_names)"""
+    if not APP_CONFIG_PATH.exists():
+        return None, None
+    try:
+        import yaml
+        data = yaml.safe_load(APP_CONFIG_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None, None
+        layout_scenes = data.get("layout_scenes")
+        # 新格式：dict of groups
+        if isinstance(layout_scenes, dict):
+            group_names = data.get("group_names")
+            if not isinstance(group_names, dict):
+                group_names = None
+            return layout_scenes, group_names
+        return None, None
+    except Exception as e:
+        logger.warning(f"读取分组配置失败: {e}")
+        return None, None
+
+
 # ─── 场景注册表（从 YAML 加载） ─────────────────────────
 
-_registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
+_scene_order = _load_scene_order()
+_group_config, _group_names = _load_group_config()
+_registry = SceneRegistry(
+    SYSTEM_SCENES_DIR,
+    scene_order=_scene_order,
+    group_config=_group_config,
+    group_names=_group_names,
+)
 
 # 场景 → (场景中文名, [(region_key, region_name), ...])
 SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {}
@@ -43,10 +77,16 @@ EQUIP_FIELDS = EQUIP_REGIONS
 # 场景 → [(point_key, point_name), ...]（来自 YAML 类型定义）
 SCENE_POINTS: dict[str, list[tuple[str, str]]] = {}
 
+# 分组缓存
+SCENE_GROUPS_META: dict[str, str] = {}   # group_key -> group_name
+GROUP_SCENES: dict[str, list[str]] = {}  # group_key -> [scene_key, ...]
+GROUP_ORDER: list[str] = []              # 分组顺序
+
 
 def _rebuild_scene_globals():
-    """从 _registry 重建 SCENE_REGIONS / SCENE_POINTS 等全局字典"""
+    """从 _registry 重建 SCENE_REGIONS / SCENE_POINTS / 分组缓存等全局字典"""
     global SCENE_REGIONS, FIELD_GROUPS, EQUIP_REGIONS, EQUIP_FIELDS, SCENE_POINTS
+    global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
     SCENE_REGIONS.clear()
     SCENE_REGIONS.update({
         key: (scene.name, [(r.key, r.name) for r in scene.regions])
@@ -61,10 +101,22 @@ def _rebuild_scene_globals():
         key: [(p.key, p.name) for p in scene.points]
         for key, scene in _registry.all_scenes().items()
     })
+    # 重建分组缓存
+    SCENE_GROUPS_META.clear()
+    GROUP_SCENES.clear()
+    GROUP_ORDER.clear()
+    for gk, gname in _registry.get_groups():
+        SCENE_GROUPS_META[gk] = gname
+        GROUP_SCENES[gk] = _registry.get_group_scenes(gk)
+        GROUP_ORDER.append(gk)
 
 
 # 初始化
 _rebuild_scene_globals()
+
+# 启动校验：至少存在一个分组
+if not _registry.get_groups():
+    raise RuntimeError("app.yaml 必须至少包含一个场景分组，请检查配置")
 
 
 def get_registry() -> SceneRegistry:
@@ -73,10 +125,42 @@ def get_registry() -> SceneRegistry:
 
 
 def reload_scene_registry():
-    """重新加载场景注册表（场景增删后调用）"""
+    """重新加载场景注册表（场景/分组增删后调用）"""
     global _registry
-    _registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
+    scene_order = _load_scene_order()
+    group_config, group_names = _load_group_config()
+    _registry = SceneRegistry(
+        SYSTEM_SCENES_DIR,
+        scene_order=scene_order,
+        group_config=group_config,
+        group_names=group_names,
+    )
     _rebuild_scene_globals()
+
+
+def sync_group_cache():
+    """仅刷新分组缓存（分组变更后调用）"""
+    global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
+    SCENE_GROUPS_META.clear()
+    GROUP_SCENES.clear()
+    GROUP_ORDER.clear()
+    for gk, gname in _registry.get_groups():
+        SCENE_GROUPS_META[gk] = gname
+        GROUP_SCENES[gk] = _registry.get_group_scenes(gk)
+        GROUP_ORDER.append(gk)
+
+
+def get_group_name(group_key: str) -> str:
+    """获取分组名称"""
+    return SCENE_GROUPS_META.get(group_key, group_key)
+
+
+def get_scene_group(scene_key: str) -> str | None:
+    """获取场景所在分组 key"""
+    for gk, scenes in GROUP_SCENES.items():
+        if scene_key in scenes:
+            return gk
+    return None
 
 
 def sync_scene_cache(scene_key: str):

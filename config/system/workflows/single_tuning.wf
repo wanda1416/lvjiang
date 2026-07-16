@@ -1,15 +1,20 @@
 # 单次调律工作流
 
+# 点开菜单
 click [game_main_page].[menu]
 wait step_interval
 
+# 点击包裹
 click [game_menu_page].[bag]
 wait step_interval
 
-click [equip_bag_detail].[slot_main_weapon]
+# 点击培养（可能点开包裹后在道具页）
+
+# 点击主武器
+click [bag_equip_detail].[slot_main_weapon]
 wait step_interval
 
-click [equip_bag_detail].[bag_1_1]
+click [bag_equip_detail].[bag_1_1]
 wait step_interval
 
 click [equip_weapon_detail].[more_func]
@@ -36,13 +41,13 @@ wait step_interval
 click [equip_tune_detail].[back]
 wait step_interval
 
-click [equip_bag_detail].[back]
+click [bag_equip_detail].[back]
 wait step_interval
 
-click [equip_bag_detail].[back]
+click [bag_equip_detail].[back]
 wait step_interval
 
-click [equip_bag_detail].[back]
+click [bag_equip_detail].[back]
 wait step_interval
 
 click [game_menu_page].[back]

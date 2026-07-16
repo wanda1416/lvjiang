@@ -1,0 +1,13 @@
+key: bag_item_detail
+name: 道具背包
+regions:
+- key: bag_1_1
+  name: 背包格1_1
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_1_2
+  name: 背包格1_2
+  type: slot
+  is_text: false
+  is_clickable: true

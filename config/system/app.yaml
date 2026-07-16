@@ -1,10 +1,17 @@
 layout_scenes:
-- game_main_page
-- game_menu_page
-- equip_bag_detail
-- equip_weapon_detail
-- equip_armor_detail
-- equip_tune_detail
-- equip_tune_result
-- prop_bag_detail
-- general_control
+  group_1:
+  - game_main_page
+  - game_menu_page
+  - general_control
+  group_2:
+  - equip_weapon_detail
+  - equip_armor_detail
+  - equip_tune_detail
+  - equip_tune_result
+  group_3:
+  - bag_equip_detail
+  - bag_item_detail
+group_names:
+  group_1: 通用
+  group_2: 调律
+  group_3: 背包

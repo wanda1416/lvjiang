@@ -1,5 +1,5 @@
 key: game_main_page
-name: 主页
+name: 游戏主页
 regions:
 - key: menu
   name: 菜单

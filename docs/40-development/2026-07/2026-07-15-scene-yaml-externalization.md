@@ -61,7 +61,7 @@ fields:
 
 ```yaml
 layout_scenes:
-  - equip_bag_detail
+  - bag_equip_detail
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail

@@ -73,10 +73,25 @@ def get_registry() -> SceneRegistry:
 
 
 def reload_scene_registry():
-    """重新加载场景注册表（场景增删改后调用）"""
+    """重新加载场景注册表（场景增删后调用）"""
     global _registry
     _registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
     _rebuild_scene_globals()
+
+
+def sync_scene_cache(scene_key: str):
+    """仅刷新单个场景的全局缓存（区域/坐标编辑后调用，避免全量重载）"""
+    global SCENE_REGIONS, SCENE_POINTS
+    scene = _registry.get_scene(scene_key)
+    if scene:
+        SCENE_REGIONS[scene_key] = (
+            scene.name,
+            [(r.key, r.name) for r in scene.regions],
+        )
+        SCENE_POINTS[scene_key] = [(p.key, p.name) for p in scene.points]
+    else:
+        SCENE_REGIONS.pop(scene_key, None)
+        SCENE_POINTS.pop(scene_key, None)
 
 
 def get_scene_name(scene_key: str) -> str:

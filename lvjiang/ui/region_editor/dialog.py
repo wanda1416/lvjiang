@@ -30,7 +30,7 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("区域编辑器")
+        self.setWindowTitle("页面管理")
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(
@@ -175,6 +175,7 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
             tab.canvas.on_poi_changed = self._on_any_poi_changed
         self._set_dirty(False)
+        self._status_bar.showMessage(f"当前布局: {layout_name}")
 
     def _clear_all_tabs(self):
         """清空所有 Tab 的区域/坐标/方向"""
@@ -365,6 +366,7 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
             return
         reload_scene_registry()
         self._rebuild_tabs()
+        self._apply_layout_to_tabs()
         self._status_bar.showMessage(f"已创建场景: {name}")
 
     def _on_tab_context_menu(self, pos):
@@ -385,34 +387,45 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
             self._do_delete_scene(scene_key)
 
     def _do_rename_scene(self, scene_key: str):
-        """重命名场景"""
+        """重命名场景（只允许修改名称，key 不可变）"""
+        from PyQt6.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox
         old_name = get_scene_name(scene_key)
-        new_key, ok = QInputDialog.getText(
-            self, "重命名场景",
-            f"场景 key（当前: {scene_key}）：",
-            text=scene_key,
+        dialog = QDialog(self)
+        dialog.setWindowTitle("重命名场景")
+        form = QFormLayout(dialog)
+        # 显示 key（只读）
+        key_label = QLineEdit(scene_key)
+        key_label.setReadOnly(True)
+        form.addRow("场景 Key:", key_label)
+        # 名称（可编辑）
+        name_edit = QLineEdit(old_name)
+        form.addRow("场景名称:", name_edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        if not ok or not new_key:
+        form.addRow(buttons)
+        # 实时校验
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        def _validate():
+            ok_btn.setEnabled(bool(name_edit.text().strip()))
+        name_edit.textChanged.connect(_validate)
+        _validate()
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        new_key = new_key.strip()
-        new_name, ok = QInputDialog.getText(
-            self, "重命名场景",
-            f"场景名称（当前: {old_name}）：",
-            text=old_name,
-        )
-        if not ok or not new_name:
-            return
-        new_name = new_name.strip()
+        new_name = name_edit.text().strip()
         registry = get_registry()
         try:
-            registry.rename_scene(scene_key, new_key, new_name)
+            registry.rename_scene(scene_key, scene_key, new_name)
         except ValueError as e:
             QMessageBox.warning(self, "重命名失败", str(e))
             return
         registry.save_scene_order(registry.all_scene_keys(), APP_CONFIG_PATH)
         reload_scene_registry()
         self._rebuild_tabs()
-        self._status_bar.showMessage(f"已重命名: {scene_key} -> {new_key}")
+        self._apply_layout_to_tabs()
+        self._status_bar.showMessage(f"已重命名场景: {new_name}")
 
     def _do_delete_scene(self, scene_key: str):
         """删除场景（二次确认）"""
@@ -434,6 +447,7 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         registry.save_scene_order(registry.all_scene_keys(), APP_CONFIG_PATH)
         reload_scene_registry()
         self._rebuild_tabs()
+        self._apply_layout_to_tabs()
         self._status_bar.showMessage(f"已删除场景: {scene_name}")
 
     def _on_tab_moved(self, from_index: int, to_index: int):

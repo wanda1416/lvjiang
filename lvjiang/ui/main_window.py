@@ -91,16 +91,26 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         """构建顶部菜单栏"""
         menubar = self.menuBar()
 
+        # 加宽菜单项和子项间距
+        menubar.setStyleSheet("""
+            QMenuBar::item { padding: 6px 16px; }
+            QMenuBar::item:selected { background: #d4d4d4; }
+            QMenu::item { padding: 8px 32px; }
+            QMenu::item:selected { background: #0078d4; color: white; }
+        """)
+
         # ── 设置 ──
         settings_menu = menubar.addMenu("设置")
 
         user_mgmt_action = QAction("用户管理", self)
+        user_mgmt_action.setShortcut("F2")
         user_mgmt_action.triggered.connect(self._open_user_manager)
         settings_menu.addAction(user_mgmt_action)
 
         settings_menu.addSeparator()
 
-        region_editor_action = QAction("区域编辑", self)
+        region_editor_action = QAction("页面管理", self)
+        region_editor_action.setShortcut("F3")
         region_editor_action.triggered.connect(self._open_region_editor)
         settings_menu.addAction(region_editor_action)
 
@@ -270,19 +280,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         mode_layout.addWidget(self.mode_selector)
         left_layout.addWidget(mode_group)
 
-        action_group = QGroupBox("操作")
-        action_layout = QVBoxLayout(action_group)
-
-        self.btn_scan = QPushButton("扫描穿戴装备")
-        self.btn_scan.clicked.connect(self._on_scan)
-        action_layout.addWidget(self.btn_scan)
-
-        self.btn_run_toggle = QPushButton()
-        self.btn_run_toggle.clicked.connect(self._on_toggle_running)
-        self._refresh_run_button()
-        action_layout.addWidget(self.btn_run_toggle)
-
-        left_layout.addWidget(action_group)
         left_layout.addStretch()
 
         # 右侧：日志/预览区

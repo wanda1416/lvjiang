@@ -13,7 +13,7 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, Find, Collect, Log,
+    Click, Drag, Wait, Scan, Find, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval,
     SceneRef, VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
@@ -169,6 +169,38 @@ class _DSLTransformer(Transformer):
     def arg_var(self, items):
         """var_ref 作为函数参数 → VarRef"""
         return items[0]  # var_ref 已返回 VarRef
+
+    # ─── 子工作流调用 ─────────────────────────────────────
+
+    def call_stmt(self, items):
+        wf_path = self._ensure_literal(items[0])
+        args = []
+        reads = []
+        for item in items[1:]:
+            if isinstance(item, list):
+                for sub in item:
+                    if isinstance(sub, tuple) and len(sub) == 2:
+                        if isinstance(sub[0], VarRef):
+                            args.append(sub)
+                        else:
+                            reads.append(sub)
+        return Call(workflow=wf_path, args=args, reads=reads, line_no=self._line(items))
+
+    def call_with_clause(self, items):
+        """with $x as arg1, $y as arg2 → [(VarRef, 'arg1'), (VarRef, 'arg2')]"""
+        return items  # 每个 item 是 call_arg 返回的 tuple
+
+    def call_arg(self, items):
+        """$x as arg1 → (VarRef, 'arg1')"""
+        return (items[0], str(items[1]))
+
+    def call_read_clause(self, items):
+        """read "key" as $var → [('key', VarRef)]"""
+        return items  # 每个 item 是 call_read_item 返回的 tuple
+
+    def call_read_item(self, items):
+        """"key" as $var → (Literal, VarRef)"""
+        return (self._ensure_literal(items[0]), items[1])
 
     # ─── 控制流 ───────────────────────────────────────────
 

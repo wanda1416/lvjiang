@@ -81,7 +81,10 @@ class BaseWorkflow:
         """加载并执行 .wf 文件（DSL 驱动的工作流使用）"""
         from .engine import WorkflowEngine
         engine = WorkflowEngine(self)
-        return engine.run(workflow_path)
+        output = engine.run(workflow_path)
+        # 同步 engine 最终状态回 wf，供外部调用者读取
+        self.variables = dict(engine.variables)
+        return output
 
     # ─── 点击操作 ──────────────────────────────────────────
 

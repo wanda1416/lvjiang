@@ -1,11 +1,8 @@
 # 装备分析工作流
 
-click [game_main_page].[menu]
-wait step_interval
+call "subcall/navigate_to_equip.wf"
 
-click [game_menu_page].[bag]
-wait step_interval
-
+# 点击主武器
 click [bag_equip_detail].[slot_main_weapon]
 wait step_interval
 scan [equip_weapon_detail] as $main_weapon_scan
@@ -53,3 +50,12 @@ wait step_interval
 scan [equip_armor_detail] as $wrist_scan
 eval wrist = equipment_parser($wrist_scan)
 collect $wrist
+
+# 返回主界面
+click [bag_equip_detail].[back]
+wait step_interval
+
+click [bag_equip_detail].[back]
+wait step_interval
+
+click [game_menu_page].[back]

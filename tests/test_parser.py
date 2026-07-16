@@ -3,7 +3,7 @@
 from pathlib import Path
 from lvjiang.workflows.parser import parse_file, parse_text
 from lvjiang.workflows.ast_nodes import (
-    Program, Click, Wait, Scan, Find, Collect, Log, Eval,
+    Program, Click, Wait, Scan, Find, Collect, Log, Eval, Call,
     If, Contains, FieldAccess, VarRef, Literal, SceneRef,
     Not,
 )
@@ -178,6 +178,77 @@ collect $scan1 as "output"
     print("  完整工作流: OK")
 
 
+def test_call_simple():
+    """测试 call 基本语法"""
+    print("\n=== 测试 call ===")
+
+    # call "sub.wf"
+    program = parse_text('call "sub_workflow.wf"')
+    assert len(program.body) == 1
+    n = program.body[0]
+    assert isinstance(n, Call)
+    assert isinstance(n.workflow, Literal)
+    assert n.workflow.value == "sub_workflow.wf"
+    assert n.args == []
+    assert n.reads == []
+    print('  call "sub.wf": OK')
+
+
+def test_call_with_args():
+    """测试 call with 参数传递"""
+    print("\n=== 测试 call with ===")
+
+    program = parse_text('call "sub.wf" with $slot as target_slot, $data as input_data')
+    n = program.body[0]
+    assert isinstance(n, Call)
+    assert len(n.args) == 2
+    # 第一个参数
+    assert isinstance(n.args[0][0], VarRef)
+    assert n.args[0][0].name == "slot"
+    assert n.args[0][1] == "target_slot"
+    # 第二个参数
+    assert isinstance(n.args[1][0], VarRef)
+    assert n.args[1][0].name == "data"
+    assert n.args[1][1] == "input_data"
+    print('  call with $x as arg: OK')
+
+
+def test_call_with_read():
+    """测试 call read 返回值"""
+    print("\n=== 测试 call read ===")
+
+    program = parse_text('call "sub.wf" read "main_weapon" as $weapon, "sub_weapon" as $sub')
+    n = program.body[0]
+    assert isinstance(n, Call)
+    assert len(n.reads) == 2
+    # 第一个 read
+    assert isinstance(n.reads[0][0], Literal)
+    assert n.reads[0][0].value == "main_weapon"
+    assert isinstance(n.reads[0][1], VarRef)
+    assert n.reads[0][1].name == "weapon"
+    # 第二个 read
+    assert isinstance(n.reads[1][0], Literal)
+    assert n.reads[1][0].value == "sub_weapon"
+    assert n.reads[1][1].name == "sub"
+    print('  call read "key" as $var: OK')
+
+
+def test_call_full():
+    """测试 call 完整形式"""
+    print("\n=== 测试 call 完整形式 ===")
+
+    program = parse_text('call "sub.wf" with $x as arg1 read "result" as $out')
+    n = program.body[0]
+    assert isinstance(n, Call)
+    assert len(n.args) == 1
+    assert len(n.reads) == 1
+    assert n.args[0][0].name == "x"
+    assert n.args[0][1] == "arg1"
+    assert n.reads[0][0].value == "result"
+    assert n.reads[0][1].name == "out"
+    print('  call with + read: OK')
+
+
 if __name__ == "__main__":
     test_existing_wf_files()
     test_scan_as_required()
@@ -188,4 +259,8 @@ if __name__ == "__main__":
     test_if_with_scan_as()
     test_eval_with_var()
     test_full_workflow()
+    test_call_simple()
+    test_call_with_args()
+    test_call_with_read()
+    test_call_full()
     print("\nALL PASSED")

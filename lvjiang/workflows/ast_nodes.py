@@ -134,6 +134,15 @@ class Eval:
     line_no: int = 0
 
 
+@dataclass(frozen=True)
+class Call:
+    """call "sub.wf" with $x as arg1 read "key" as $var"""
+    workflow: Any               # Literal（wf 文件路径）
+    args: list = field(default_factory=list)       # [(VarRef, str), ...] 传入参数
+    reads: list = field(default_factory=list)      # [(str, VarRef), ...] 读取返回值
+    line_no: int = 0
+
+
 # ─── 表达式 ───────────────────────────────────────────────
 
 @dataclass(frozen=True)

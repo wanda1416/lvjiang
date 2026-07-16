@@ -13,7 +13,7 @@ flows:
       - equip_armor_detail
 
   - id: single_tuning
-    name: 单装备调律
+    name: 单件装备调律
     wf_file: single_tuning.wf
     required_scenes:
       - game_main_page

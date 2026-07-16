@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QRectF, QPointF
 
-from ...core.region_config import Region, CanvasConfig
+from ...core.region_config import Region, CanvasConfig, Point
 
 
 class CanvasCoordMixin:
@@ -99,3 +99,24 @@ class CanvasCoordMixin:
         tl = self._norm_to_widget(c.x_ratio, c.y_ratio)
         br = self._norm_to_widget(c.x_ratio + c.w_ratio, c.y_ratio + c.h_ratio)
         return QRectF(tl, br)
+
+    # ─── point 坐标转换 ───────────────────────────────
+
+    def _point_center_widget(self, p: Point) -> QPointF:
+        """point 中心（画布内归一化）-> widget 坐标"""
+        sx, sy = self._canvas_to_screenshot_norm(p.cx_ratio, p.cy_ratio)
+        return self._norm_to_widget(sx, sy)
+
+    def _canvas_norm_center_widget(self, cx: float, cy: float) -> QPointF:
+        """画布内归一化中心 -> widget 坐标"""
+        sx, sy = self._canvas_to_screenshot_norm(cx, cy)
+        return self._norm_to_widget(sx, sy)
+
+    def _point_radius_pixels(self, p: Point) -> float:
+        """point 半径（归一化）-> widget 像素半径
+
+        以画布框在 widget 中的短边为基准换算，保证圆形视觉不随宽高比拉伸。
+        """
+        rect = self._canvas_rect_widget()
+        base = min(rect.width(), rect.height())
+        return p.r_ratio * base

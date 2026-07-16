@@ -230,6 +230,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if event.button() == Qt.MouseButton.RightButton:
             # 检查是否点击了已选中的区域
             pos = event.position()
+            # POI（point）右键菜单优先：命中坐标点则弹出复制/删除
+            if self._edit_mode == EditMode.REGION and self._poi_handle_context_menu(pos):
+                return
             if self._selected_idx >= 0 and self._selected_idx < len(self._regions):
                 r = self._regions[self._selected_idx]
                 rect = self._region_rect_widget(r)
@@ -246,6 +249,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             super().mousePressEvent(event)
             return
         pos = event.position()
+
+        # ── POI（point/arrow）优先介入 ──
+        if self._edit_mode == EditMode.REGION and self._poi_handle_press(event):
+            return
 
         # ── 画布编辑模式：操作画布框 ──
         if self._edit_mode == EditMode.CANVAS:
@@ -313,7 +320,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._drag_mode = DragMode.MOVING
             self._drag_start = pos
             self._drag_orig = Region(**r.to_dict())
-            self._notify_changed()
             self.update()
             return
 
@@ -339,6 +345,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self._display_rect.translate(delta)
             self._pan_start = pos
             self.update()
+            return
+
+        # ── POI（point/arrow）优先介入 ──
+        if self._edit_mode == EditMode.REGION and self._poi_handle_move(event):
             return
 
         # ── 画布编辑模式 ──
@@ -405,6 +415,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             super().mouseReleaseEvent(event)
             return
 
+        # ── POI（point/arrow）优先介入 ──
+        if self._edit_mode == EditMode.REGION and self._poi_handle_release(event):
+            return
+
         # ── 画布编辑模式 ──
         if self._edit_mode == EditMode.CANVAS:
             if self._canvas_drag_mode in (DragMode.MOVING, DragMode.RESIZING):
@@ -452,6 +466,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self.update()
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            if self._poi_handle_escape():
+                return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             self.delete_selected()
         else:

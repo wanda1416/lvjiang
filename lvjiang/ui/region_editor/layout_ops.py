@@ -114,7 +114,7 @@ class LayoutOpsMixin:
         self._status_bar.showMessage(f"已新建布局「{name}」")
 
     def _on_save_layout(self):
-        """从所有 Tab 收集 regions + canvas，全量写入当前布局文件"""
+        """从所有 Tab 收集 regions + points + arrows + canvas，全量写入当前布局文件"""
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
@@ -123,12 +123,20 @@ class LayoutOpsMixin:
         self._current_layout.set_canvas(current_tab.get_canvas_config())
         for scene_key, tab in self._tabs.items():
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
+            self._current_layout.set_scene_points(scene_key, tab.get_points())
+            self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
         self._manager.save_layout(self._current_layout)
         self._update_ui_state()
-        total = sum(len(tab.get_regions()) for tab in self._tabs.values())
-        self._status_bar.showMessage(f"已保存布局「{name}」，共 {total} 个区域")
+        total_r = sum(len(tab.get_regions()) for tab in self._tabs.values())
+        total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
+        total_a = sum(len(tab.get_arrows()) for tab in self._tabs.values())
+        self._status_bar.showMessage(
+            f"已保存布局「{name}」，共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向"
+        )
         self._set_dirty(False)
-        logger.info(f"布局已保存: {name}, {total} 个区域")
+        logger.info(
+            f"布局已保存: {name}, {total_r} 区域 / {total_p} 坐标 / {total_a} 方向"
+        )
 
     def _on_save_as_layout(self):
         """另存为：输入新名称，若已存在则提示确认覆盖"""
@@ -140,6 +148,8 @@ class LayoutOpsMixin:
         temp.set_canvas(current_tab.get_canvas_config())
         for scene_key, tab in self._tabs.items():
             temp.set_scene_regions(scene_key, tab.get_regions())
+            temp.set_scene_points(scene_key, tab.get_points())
+            temp.set_scene_arrows(scene_key, tab.get_arrows())
 
         existing = self._manager.list_layouts()
         name, ok = QInputDialog.getText(self, "另存为", "请输入布局名称：")

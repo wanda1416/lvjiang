@@ -32,6 +32,7 @@ start: (_NL | statement)*
 click_stmt: "click"i click_target _NL
 
 click_target: bracket_expr "." bracket_expr   // 静态 [scene].[region]
+            | bracket_expr "." bracket_var     // 动态 region [scene].[$var]
             | var_ref                          // 动态 $var（find 产出的坐标）
 
 drag_stmt: "drag"i bracket_expr "." bracket_expr drag_duration? drag_hold? _NL
@@ -147,6 +148,8 @@ field_access: field_access "." NAME -> field_chain
 var_ref: "$" NAME
 
 bracket_expr: "[" NAME "]"
+
+bracket_var: "[" var_ref "]"   // [$var] 动态引用
 
 // 逗号分隔列表：用于 for 迭代源和 in 条件
 // 元素可以是裸 NAME 或 "字符串"，统一视为字面量

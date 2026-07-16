@@ -50,7 +50,7 @@ class RunControlMixin:
         _user_manager, _layout_manager, _target_window, _running, _stop_requested,
         _capture, _ocr, _input, _overlay,
         user_combo, layout_combo, workflow_combo, btn_run_workflow,
-        flow_selector, mode_selector, log_text, statusBar()
+        _param_panel, log_text, statusBar()
     """
 
     # ─── 工作流配置加载 ──────────────────────────────────
@@ -73,6 +73,7 @@ class RunControlMixin:
                     "name": flow["name"],
                     "wf_file": flow["wf_file"],
                     "required_scenes": flow.get("required_scenes", []),
+                    "parameters": flow.get("parameters", []),
                 })
         except Exception as e:
             logger.error(f"加载工作流配置失败: {e}")
@@ -91,6 +92,28 @@ class RunControlMixin:
         if idx < 0 or idx >= len(self._workflow_configs):
             return None
         return self._workflow_configs[idx]
+
+    def _collect_flow_params(self) -> dict:
+        """从参数面板收集当前工作流的参数值"""
+        flow_cfg = self._get_selected_flow_config()
+        if not flow_cfg:
+            return {}
+        params = {}
+        panel = getattr(self, '_param_panel', None)
+        if panel is None:
+            return params
+        for param_def in flow_cfg.get("parameters", []):
+            name = param_def["name"]
+            widget = panel.findChild(type(panel), name) if hasattr(panel, 'findChild') else None
+            if widget is None:
+                # 尝试用 objectName 查找 QComboBox
+                from PyQt6.QtWidgets import QComboBox
+                widget = panel.findChild(QComboBox, name)
+            if widget is not None:
+                # 获取当前选中项的 value（userData）
+                data = widget.currentData()
+                params[name] = data if data is not None else widget.currentText()
+        return params
 
     # ─── 用户选择器 ────────────────────────────────────────
 
@@ -236,9 +259,12 @@ class RunControlMixin:
             stop_check=self._is_stopped,
         )
         wf_path = SYSTEM_WORKFLOWS_DIR / flow_cfg["wf_file"]
+        flow_params = self._collect_flow_params()
 
         self.log_text.append(f"[开始] {flow_name} 流程...")
-        self._start_workflow(flow_id, flow_name, lambda: wf.run_file(wf_path))
+        if flow_params:
+            self.log_text.append(f"[参数] {flow_params}")
+        self._start_workflow(flow_id, flow_name, lambda: wf.run_file(wf_path, initial_variables=flow_params))
 
     # ─── 异步工作流执行 ────────────────────────────────────
 
@@ -331,12 +357,3 @@ class RunControlMixin:
             self._request_stop()
         else:
             self._on_run_workflow()
-
-    # ─── 扫描装备 ──────────────────────────────────────────
-
-    def _on_scan(self):
-        """扫描穿戴装备"""
-        flow = self.flow_selector.currentText()
-        self.log_text.append(f"[操作] 扫描穿戴装备 (流派: {flow})")
-        # TODO: Phase 6 实现
-        self.log_text.append("[提示] 扫描功能待实现")

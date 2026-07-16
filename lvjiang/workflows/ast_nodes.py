@@ -172,9 +172,9 @@ class Call:
 
 @dataclass(frozen=True)
 class SceneRef:
-    """静态配置引用：[scene] 或 [scene].[region]"""
+    """静态配置引用：[scene] 或 [scene].[region]（region 支持 $var 动态引用）"""
     scene: str
-    region: str | None = None
+    region: str | None = None  # str | VarRef | None
 
 
 @dataclass(frozen=True)

@@ -70,28 +70,29 @@ def _count(scan_result: dict, *args) -> int:
 # ─── 装备解析函数 ─────────────────────────────────────
 
 
-@builtin_func("equipment_parser")
-def _equipment_parser(raw_data: dict) -> dict:
-    """解析装备 OCR 原始数据为 EquipmentData
+@builtin_func("to_equipment")
+def _to_equipment(raw_data: dict) -> dict:
+    """解析装备 OCR 原始数据为标准装备字典
 
-    返回 EquipmentData 对象，由工作流变量名提供 key。
+    返回 EquipmentData.to_dict() 结果，支持 DSL 链式字段访问：
+    $weapon.affix_1.value / $weapon.base_attr_1.name 等。
 
     .wf 用法:
         scan [equip_weapon_detail] as $result
-        eval main_weapon = equipment_parser($result)
+        eval main_weapon = to_equipment($result)
         collect $main_weapon
     """
     if not isinstance(raw_data, dict) or not raw_data:
-        logger.warning("equipment_parser: 输入为空或非字典")
+        logger.warning("to_equipment: 输入为空或非字典")
         return {}
 
     from ..equip_parser import EquipmentParser
     parser = EquipmentParser()
 
     try:
-        return parser.parse(raw_data)
+        return parser.parse(raw_data).to_dict()
     except Exception as e:
-        logger.warning(f"equipment_parser: 解析失败: {e}")
+        logger.warning(f"to_equipment: 解析失败: {e}")
         return {}
 
 

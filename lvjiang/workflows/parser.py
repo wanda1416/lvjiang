@@ -15,7 +15,9 @@ from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Find, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval,
-    SceneRef, VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
+    SceneRef, VarRef, Literal, FieldAccess,
+    Contains, Equals, InList, IsEmpty,
+    GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
 
@@ -146,19 +148,33 @@ class _DSLTransformer(Transformer):
     def log_stmt(self, items):
         return Log(message=self._ensure_literal(items[0]), line_no=self._line(items))
 
-    def eval_stmt(self, items):
-        """eval $var = func($arg...) 或 eval func($arg...)"""
+    def eval_assign_func(self, items):
+        """eval $var = func($arg...)"""
         tokens = [i for i in items if isinstance(i, Token)]
         names = [str(t) for t in tokens]
-        var_refs = [i for i in items if isinstance(i, VarRef)]
         lists = [i for i in items if isinstance(i, list)]
         func_args = lists[0] if lists else []
+        # names[0] = 赋值目标变量名, names[1] = 函数名
+        return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
-        # 判断是否有赋值目标：如果有两个 NAME token，第一个是目标变量
-        if len(names) == 2:
-            return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
-        else:
-            return Eval(func_name=names[0], func_args=func_args, target=None, line_no=self._line(items))
+    def eval_assign_lit(self, items):
+        """eval $var = "string" | 123 | -1.5"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        target_name = str(tokens[0])  # $ 后面的 NAME
+        # literal 值：STRING Token 或 float（number 规则产出）
+        lit_value = items[1]
+        if isinstance(lit_value, Token):
+            lit_value = self._unquote(str(lit_value))
+        # 用 Eval 节点承载字面量赋值：func_name="__literal__"，func_args=[Literal(value)]
+        return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
+
+    def eval_discard(self, items):
+        """eval func($arg...) — 丢弃返回值"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        names = [str(t) for t in tokens]
+        lists = [i for i in items if isinstance(i, list)]
+        func_args = lists[0] if lists else []
+        return Eval(func_name=names[0], func_args=func_args, target=None, line_no=self._line(items))
 
     def arg_list(self, items):
         return list(items)
@@ -232,11 +248,13 @@ class _DSLTransformer(Transformer):
         return For(var=var_name, iterable=iterable, body=body, line_no=self._line(items))
 
     def loop_stmt(self, items):
-        count_token = items[0]
-        if isinstance(count_token, Token):
-            count = int(str(count_token))
+        count_val = items[0]
+        if isinstance(count_val, (int, float)):
+            count = int(count_val)  # number 规则产出 float，loop 需要 int
+        elif isinstance(count_val, Token):
+            count = int(str(count_val))
         else:
-            count = str(count_token)
+            count = str(count_val)
         body = [i for i in items[1:] if i is not None and not isinstance(i, Token)]
         return Loop(count=count, body=body, line_no=self._line(items))
 
@@ -285,9 +303,51 @@ class _DSLTransformer(Transformer):
         """条件中的 $var → VarRef（truthy 检查）"""
         return items[0]
 
-    def field_access(self, items):
+    def field_base(self, items):
+        """$var.field → FieldAccess(root=VarRef, field_name)"""
         var_ref, field_name = items
-        return FieldAccess(var=var_ref, field_name=str(field_name))
+        return FieldAccess(root=var_ref, field_name=str(field_name))
+
+    def field_chain(self, items):
+        """field_access.field → FieldAccess(root=FieldAccess, field_name)"""
+        prev_access, field_name = items
+        return FieldAccess(root=prev_access, field_name=str(field_name))
+
+    def gt_op(self, items):
+        field_access, number = items
+        return GreaterThan(left=field_access, right=number, line_no=self._line(items))
+
+    def lt_op(self, items):
+        field_access, number = items
+        return LessThan(left=field_access, right=number, line_no=self._line(items))
+
+    def ge_op(self, items):
+        field_access, number = items
+        return GreaterEqual(left=field_access, right=number, line_no=self._line(items))
+
+    def le_op(self, items):
+        field_access, number = items
+        return LessEqual(left=field_access, right=number, line_no=self._line(items))
+
+    def ne_op(self, items):
+        field_access, number = items
+        return NotEqual(left=field_access, right=number, line_no=self._line(items))
+
+    def eq_num_op(self, items):
+        field_access, number = items
+        return NumericEqual(left=field_access, right=number, line_no=self._line(items))
+
+    def number_float(self, items):
+        return float(items[0])
+
+    def number_int(self, items):
+        return float(int(items[0]))  # 统一为 float
+
+    def number_neg_float(self, items):
+        return -float(items[0])
+
+    def number_neg_int(self, items):
+        return -float(int(items[0]))
 
     # ─── 通用原子 ─────────────────────────────────────────
 

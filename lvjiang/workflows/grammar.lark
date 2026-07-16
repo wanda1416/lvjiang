@@ -35,11 +35,11 @@ click_target: bracket_expr "." bracket_expr   // 静态 [scene].[region]
 
 drag_stmt: "drag"i bracket_expr "." bracket_expr drag_duration? drag_hold? _NL
 
-drag_duration: FLOAT | bracket_list
+drag_duration: number | bracket_list
 
-drag_hold: "hold"i (FLOAT | INT)
+drag_hold: "hold"i number
 
-wait_stmt: "wait"i (NAME | FLOAT | INT | bracket_expr) _NL
+wait_stmt: "wait"i (NAME | number | bracket_expr) _NL
 
 scan_stmt: "scan"i bracket_expr field_list? "as"i var_ref _NL
 
@@ -53,7 +53,9 @@ collect_as_clause: "as"i STRING
 
 log_stmt: "log"i STRING _NL
 
-eval_stmt: "eval"i (NAME "=")? NAME "(" arg_list? ")" _NL
+eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_func
+         | "eval"i "$" NAME "=" literal _NL                    -> eval_assign_lit
+         | "eval"i NAME "(" arg_list? ")" _NL                  -> eval_discard
 
 arg_list: arg ("," arg)*
 
@@ -80,7 +82,7 @@ else_clause: "else"i _NL statement*
 
 for_stmt: "for"i NAME "in"i bracket_list _NL statement* "end"i _NL
 
-loop_stmt: "loop"i (INT | NAME) _NL statement* "end"i _NL
+loop_stmt: "loop"i (number | NAME) _NL statement* "end"i _NL
 
 break_stmt: "break"i _NL
 
@@ -107,10 +109,27 @@ goto_stmt: "goto"i NAME _NL
           | field_access "equals"i STRING -> equals_op
           | field_access "in"i bracket_list -> in_op
           | field_access "is_empty"i -> is_empty_op
+          | field_access ">" number -> gt_op
+          | field_access "<" number -> lt_op
+          | field_access ">=" number -> ge_op
+          | field_access "<=" number -> le_op
+          | field_access "!=" number -> ne_op
+          | field_access "==" number -> eq_num_op
           | var_ref -> var_cond
 
-// $var.field
-field_access: var_ref "." NAME
+// $var.field 支持链式访问：$var.f1.f2.f3
+field_access: field_access "." NAME -> field_chain
+            | var_ref "." NAME -> field_base
+
+// 数值字面量：支持负数，统一为 number（float）
+?number: FLOAT -> number_float
+       | INT -> number_int
+       | "-" FLOAT -> number_neg_float
+       | "-" INT -> number_neg_int
+
+// 任意字面量（用于 eval 赋值右侧）
+?literal: STRING
+        | number
 
 // ─── 通用原子 ─────────────────────────────────────────────
 
@@ -122,7 +141,7 @@ bracket_expr: "[" NAME "]"
 // 元素可以是裸 NAME 或 "字符串"，统一视为字面量
 bracket_list: "[" [bracket_item ("," bracket_item)*] "]"
 
-?bracket_item: NAME | STRING | FLOAT
+?bracket_item: NAME | STRING | number
 
 field_list: "." "[" NAME ("," NAME)* "]"
 

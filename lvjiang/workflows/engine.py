@@ -14,7 +14,9 @@ from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Find, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval,
-    SceneRef, VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
+    SceneRef, VarRef, Literal, FieldAccess,
+    Contains, Equals, InList, IsEmpty,
+    GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
 from .parser import parse_file
@@ -232,7 +234,15 @@ class WorkflowEngine:
         logger.debug(f"collect: {key} = {value}")
 
     def _exec_eval(self, node: Eval):
-        # 解析参数
+        # 字面量赋值快捷路径：eval $var = "str" | 123 | -1.5
+        if node.func_name == "__literal__":
+            lit_val = node.func_args[0].value
+            if node.target is not None:
+                self.variables[node.target] = lit_val
+                logger.debug(f"eval: {node.target} = {lit_val!r}")
+            return
+
+        # 函数调用路径
         resolved_args = []
         for arg in node.func_args:
             resolved_args.append(self._resolve(arg))
@@ -347,6 +357,24 @@ class WorkflowEngine:
             case IsEmpty():
                 left = self._eval_field_access(node.expr)
                 return not left or str(left).strip() == ""
+            case GreaterThan():
+                left = self._eval_field_access(node.left)
+                return self._to_number(left) > node.right
+            case LessThan():
+                left = self._eval_field_access(node.left)
+                return self._to_number(left) < node.right
+            case GreaterEqual():
+                left = self._eval_field_access(node.left)
+                return self._to_number(left) >= node.right
+            case LessEqual():
+                left = self._eval_field_access(node.left)
+                return self._to_number(left) <= node.right
+            case NotEqual():
+                left = self._eval_field_access(node.left)
+                return self._to_number(left) != node.right
+            case NumericEqual():
+                left = self._eval_field_access(node.left)
+                return self._to_number(left) == node.right
             case Not():
                 return not self._eval_condition(node.operand)
             case And():
@@ -361,11 +389,45 @@ class WorkflowEngine:
                 logger.error(f"未知条件节点: {type(node).__name__}")
                 return False
 
+    @staticmethod
+    def _to_number(val: str) -> float:
+        """将字符串转为数值，失败时返回 0.0"""
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return 0.0
+
+    @staticmethod
+    def _field_path(node: FieldAccess) -> str:
+        """生成字段访问路径的调试描述：$ring.affix_1.value → 'ring.affix_1.value'"""
+        parts = []
+        current = node
+        while isinstance(current, FieldAccess):
+            parts.append(current.field_name)
+            current = current.root
+        if isinstance(current, VarRef):
+            parts.append(current.name)
+        return ".".join(reversed(parts))
+
     def _eval_field_access(self, node: FieldAccess) -> str:
-        """求值 $var.field → 从变量中取字段"""
-        var_val = self.variables.get(node.var.name)
-        if isinstance(var_val, dict):
-            return str(var_val.get(node.field_name, ""))
+        """求值字段访问链：$var.f1.f2.f3 → 逐层遍历，返回字符串"""
+        return str(self._eval_field_raw(node))
+
+    def _eval_field_raw(self, node: FieldAccess):
+        """求值字段访问链，返回原始值（dict/int/float/str 等）
+
+        中间层返回 dict 以便继续链式访问，叶子层返回具体值。
+        """
+        # 先解析 root
+        if isinstance(node.root, VarRef):
+            current = self.variables.get(node.root.name)
+        elif isinstance(node.root, FieldAccess):
+            current = self._eval_field_raw(node.root)
+        else:
+            return ""
+        # 再取当前层字段
+        if isinstance(current, dict):
+            return current.get(node.field_name, "")
         return ""
 
     # ─── 变量解析 ─────────────────────────────────────────
@@ -426,13 +488,25 @@ class WorkflowEngine:
         """条件的调试描述"""
         match node:
             case Contains():
-                return f"{node.left.var.name}.{node.left.field_name} contains {node.right}"
+                return f"{WorkflowEngine._field_path(node.left)} contains {node.right}"
             case Equals():
-                return f"{node.left.var.name}.{node.left.field_name} equals {node.right}"
+                return f"{WorkflowEngine._field_path(node.left)} equals {node.right}"
             case InList():
-                return f"{node.left.var.name}.{node.left.field_name} in [...]"
+                return f"{WorkflowEngine._field_path(node.left)} in [...]"
             case IsEmpty():
-                return f"{node.expr.var.name}.{node.expr.field_name} is_empty"
+                return f"{WorkflowEngine._field_path(node.expr)} is_empty"
+            case GreaterThan():
+                return f"{WorkflowEngine._field_path(node.left)} > {node.right}"
+            case LessThan():
+                return f"{WorkflowEngine._field_path(node.left)} < {node.right}"
+            case GreaterEqual():
+                return f"{WorkflowEngine._field_path(node.left)} >= {node.right}"
+            case LessEqual():
+                return f"{WorkflowEngine._field_path(node.left)} <= {node.right}"
+            case NotEqual():
+                return f"{WorkflowEngine._field_path(node.left)} != {node.right}"
+            case NumericEqual():
+                return f"{WorkflowEngine._field_path(node.left)} == {node.right}"
             case Not():
                 return f"not ({WorkflowEngine._cond_desc(node.operand)})"
             case And():

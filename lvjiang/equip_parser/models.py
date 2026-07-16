@@ -73,6 +73,7 @@ class EquipmentData:
     base_attr_1: EquipAttr | None = None
     base_attr_2: EquipAttr | None = None
     affixes: list[Affix] = field(default_factory=list)
+    extra_data: dict = field(default_factory=dict)  # 辅助信息，如 {"affix_count": 5}
     warnings: list[str] = field(default_factory=list)
 
     @property
@@ -99,6 +100,8 @@ class EquipmentData:
             d[f"affix_{i}"] = affix.to_dict()
         if self.warnings:
             d["_warnings"] = self.warnings
+        if self.extra_data:
+            d["_extra"] = self.extra_data
         return d
 
     @classmethod
@@ -120,4 +123,5 @@ class EquipmentData:
             base_attr_2=EquipAttr.from_dict(d["base_attr_2"]) if d.get("base_attr_2") else None,
             affixes=affixes,
             warnings=d.get("_warnings", []),
+            extra_data=d.get("_extra", {}),
         )

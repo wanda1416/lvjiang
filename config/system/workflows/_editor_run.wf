@@ -1,0 +1,10 @@
+scan [equip_weapon_detail] as $weapon_scan
+eval $weapon = to_equipment($weapon_scan)
+if $weapon._extra.affix_count == 1
+  log "词条数量符合"
+end
+call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
+if not $tune_status
+    log "未进入调律页面"
+    return
+end

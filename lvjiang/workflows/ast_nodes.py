@@ -166,8 +166,13 @@ class Literal:
 
 @dataclass(frozen=True)
 class FieldAccess:
-    """$var.field"""
-    var: VarRef
+    """$var.field 或 $var.field1.field2（链式访问）
+
+    root 为 VarRef（最外层变量）或另一个 FieldAccess（链式嵌套）。
+    例如 $ring.affix_1.value 表示为：
+        FieldAccess(root=FieldAccess(root=VarRef('ring'), field_name='affix_1'), field_name='value')
+    """
+    root: Any          # VarRef | FieldAccess
     field_name: str
 
 
@@ -195,6 +200,54 @@ class InList:
 @dataclass(frozen=True)
 class IsEmpty:
     expr: FieldAccess
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class GreaterThan:
+    """$var.field > number"""
+    left: FieldAccess
+    right: float
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class LessThan:
+    """$var.field < number"""
+    left: FieldAccess
+    right: float
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class GreaterEqual:
+    """$var.field >= number"""
+    left: FieldAccess
+    right: float
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class LessEqual:
+    """$var.field <= number"""
+    left: FieldAccess
+    right: float
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class NotEqual:
+    """$var.field != number"""
+    left: FieldAccess
+    right: float
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class NumericEqual:
+    """$var.field == number"""
+    left: FieldAccess
+    right: float
     line_no: int = 0
 
 

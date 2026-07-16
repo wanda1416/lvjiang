@@ -75,6 +75,9 @@ class EquipmentParser:
         equip.affixes, affix_warnings = self._parse_affixes(raw)
         equip.warnings.extend(affix_warnings)
 
+        # 辅助信息
+        equip.extra_data["affix_count"] = len(equip.affixes)
+
         return equip
 
     def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:

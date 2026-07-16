@@ -656,8 +656,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction("复制区域")
-        delete_action = menu.addAction("删除区域")
+        copy_action = menu.addAction("复制")
+        delete_action = menu.addAction("删除")
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
         if action == copy_action:
             self._copy_selected_region()

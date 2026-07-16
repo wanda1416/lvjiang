@@ -248,8 +248,8 @@ class CanvasPoiMixin:
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction("复制坐标")
-        del_action = menu.addAction("删除坐标")
+        copy_action = menu.addAction("复制")
+        del_action = menu.addAction("删除")
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
         if action == copy_action:
             self._copy_selected_point()

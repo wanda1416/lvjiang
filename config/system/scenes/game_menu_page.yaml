@@ -1,7 +1,7 @@
 key: game_menu_page
 name: 游戏菜单
 
-fields:
+regions:
   # ─── 无文字按钮 ───────────────────────────────────────
   - key: back
     name: 返回

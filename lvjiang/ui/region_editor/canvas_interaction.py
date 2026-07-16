@@ -69,7 +69,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _pan_start: QPointF
     _snap_lines_x: list[float]
     _snap_lines_y: list[float]
-    _current_fields: list[tuple[str, str]]
+    _current_regions: list[tuple[str, str]]
     _edit_mode: EditMode
     _canvas_drag_mode: DragMode
     _canvas_drag_handle: HandlePos | None
@@ -585,17 +585,17 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
         self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
-    # ─── 字段选择与右键菜单 ──────────────────────────────
+    # ─── 区域选择与右键菜单 ──────────────────────────────
 
     def _prompt_field_selection(self, region_idx: int):
-        """弹出字段选择对话框"""
-        # 获取未绑定的字段（使用当前场景的字段列表）
+        """弹出区域选择对话框"""
+        # 获取未绑定的区域（使用当前场景的区域列表）
         assigned = {r.key for i, r in enumerate(self._regions) if i != region_idx and r.key}
-        available = [(k, n) for k, n in self._current_fields if k not in assigned]
-        logger.debug(f"字段选择: current_fields={self._current_fields}, available={available}")
+        available = [(k, n) for k, n in self._current_regions if k not in assigned]
+        logger.debug(f"区域选择: current_regions={self._current_regions}, available={available}")
 
         if not available:
-            logger.warning("所有字段已分配，请先删除已有区域")
+            logger.warning("所有区域已分配，请先删除已有区域")
             self._regions.pop(region_idx)
             self._selected_idx = -1
             self._field_selected = False

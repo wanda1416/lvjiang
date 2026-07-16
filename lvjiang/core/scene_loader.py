@@ -7,13 +7,13 @@ import yaml
 from loguru import logger
 
 
-# 合法的字段 type 枚举
-VALID_FIELD_TYPES = {"attr", "slot", "func"}
+# 合法的 region type 枚举
+VALID_REGION_TYPES = {"attr", "slot", "func"}
 
 
 @dataclass
-class FieldDef:
-    """单个字段的完整定义"""
+class RegionDef:
+    """单个区域的完整定义（场景内的一个可交互/可识别元素）"""
     key: str
     name: str
     type: str = "attr"                # attr/slot/func
@@ -26,7 +26,11 @@ class SceneDef:
     """单个场景的完整定义"""
     key: str
     name: str
-    fields: list[FieldDef] = field(default_factory=list)
+    regions: list[RegionDef] = field(default_factory=list)
+
+
+# 向后兼容别名（外部代码若仍用 FieldDef 可继续 import）
+FieldDef = RegionDef
 
 
 class SceneRegistry:
@@ -36,10 +40,10 @@ class SceneRegistry:
     每个 .yaml 文件定义一个场景，格式：
         key: scene_key
         name: 场景名称
-        fields:
-          - key: field_key
-            name: 字段名称
-            type: info|attr|func|slot|material|action
+        regions:
+          - key: region_key
+            name: 区域名称
+            type: attr|slot|func
             is_text: true|false
             is_clickable: true|false
     """
@@ -62,7 +66,7 @@ class SceneRegistry:
                 scene = self._load_scene(yaml_file)
                 file_map[scene.key] = yaml_file
                 self._scenes[scene.key] = scene
-                logger.debug(f"已加载场景: {scene.key}（{len(scene.fields)} 个字段）")
+                logger.debug(f"已加载场景: {scene.key}（{len(scene.regions)} 个区域）")
             except Exception as e:
                 logger.error(f"加载场景配置失败 {yaml_file.name}: {e}")
 
@@ -87,20 +91,20 @@ class SceneRegistry:
         if not key or not name:
             raise ValueError("场景必须包含 key 和 name")
 
-        fields = []
-        for fd in data.get("fields", []):
-            ftype = fd.get("type", "info")
-            if ftype not in VALID_FIELD_TYPES:
-                raise ValueError(f"字段 {fd.get('key')} 的 type '{ftype}' 不合法，合法值: {VALID_FIELD_TYPES}")
-            fields.append(FieldDef(
-                key=fd["key"],
-                name=fd["name"],
-                type=ftype,
-                is_text=fd.get("is_text", True),
-                is_clickable=fd.get("is_clickable", False),
+        regions = []
+        for rd in data.get("regions", []):
+            rtype = rd.get("type", "info")
+            if rtype not in VALID_REGION_TYPES:
+                raise ValueError(f"区域 {rd.get('key')} 的 type '{rtype}' 不合法，合法值: {VALID_REGION_TYPES}")
+            regions.append(RegionDef(
+                key=rd["key"],
+                name=rd["name"],
+                type=rtype,
+                is_text=rd.get("is_text", True),
+                is_clickable=rd.get("is_clickable", False),
             ))
 
-        return SceneDef(key=key, name=name, fields=fields)
+        return SceneDef(key=key, name=name, regions=regions)
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 from loguru import logger
 
-from .region_config import CanvasConfig, Region, get_field_defs
+from .region_config import CanvasConfig, Region, get_region_defs
 
 
 @dataclass
@@ -100,13 +100,13 @@ class OCREngine:
         canvas_w = canvas.w_ratio * w
         canvas_h = canvas.h_ratio * h
 
-        # 获取 is_text 为 True 的字段集合
-        text_keys = {f.key for f in get_field_defs(scene_key) if f.is_text}
+        # 获取 is_text 为 True 的区域集合
+        text_keys = {r.key for r in get_region_defs(scene_key) if r.is_text}
 
         results: dict[str, str] = {}
         for region in regions:
             if region.key not in text_keys:
-                logger.debug(f"跳过非文字字段: {region.key}")
+                logger.debug(f"跳过非文字区域: {region.key}")
                 continue
 
             # 区域归一化坐标 -> 截图像素

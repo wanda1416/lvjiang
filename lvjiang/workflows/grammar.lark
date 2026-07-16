@@ -14,7 +14,6 @@ start: (_NL | statement)*
           | wait_stmt
           | scan_stmt
           | recognize_stmt
-          | find_stmt
           | collect_stmt
           | log_stmt
           | eval_stmt
@@ -29,41 +28,55 @@ start: (_NL | statement)*
 
 // ─── 基础指令 ─────────────────────────────────────────────
 
-click_stmt: "click"i click_target _NL
+click_stmt: "click"i const_or_var "." const_or_var _NL
+drag_stmt: "drag"i const_or_var "." const_or_var drag_duration? drag_hold? _NL
 
-click_target: bracket_expr "." bracket_expr   // 静态 [scene].[region]
-            | bracket_expr "." bracket_var     // 动态 region [scene].[$var]
-            | var_ref                          // 动态 $var（find 产出的坐标）
-
-drag_stmt: "drag"i bracket_expr "." bracket_expr drag_duration? drag_hold? _NL
+// 常量或变量：scene/region/arrow 都支持三种形式
+?const_or_var: bracket_expr    // [name] — 括号常量
+            | STRING            // "name" — 字符串常量
+            | var_ref           // $var — 变量引用
 
 drag_duration: number | bracket_list
 
 drag_hold: "hold"i number
 
-wait_stmt: "wait"i (NAME | number | bracket_expr) _NL
+wait_stmt: "wait"i (NAME | number | bracket_expr | var_ref | wait_range) _NL
 
-scan_stmt: "scan"i bracket_expr field_list? "as"i var_ref _NL
+wait_range: "(" number "," number ")"
 
-recognize_stmt: "recognize"i bracket_expr field_list? "as"i var_ref _NL
+scan_stmt: "scan"i scene_target "as"i var_ref _NL
 
-find_stmt: "find"i var_ref (STRING | var_ref) "as"i var_ref error_clause? _NL
+recognize_stmt: "recognize"i scene_target "as"i var_ref _NL
 
-error_clause: "error"i STRING
+// 场景目标：支持静态/动态场景名 + 静态/动态字段
+// 场景名：[scene] / "scene" / $var
+// 字段：.[field] / .$var / .[f1,f2] / 无字段
+scene_target: scene_name "." var_ref         -> scene_target_dyn
+            | scene_name field_list?         -> scene_target_static
+
+?scene_name: bracket_expr | STRING | var_ref
 
 collect_stmt: "collect"i var_ref collect_as_clause? _NL
 
-collect_as_clause: "as"i STRING
+// collect as 支持字符串常量或变量
+collect_as_clause: "as"i (STRING | var_ref)
 
-log_stmt: "log"i (STRING | func_call) _NL
+log_stmt: "log"i log_arg _NL
+
+// log 参数：任何能求值为字符串的表达式
+?log_arg: STRING | func_call | var_ref | field_access
 
 eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_func
          | "eval"i "$" NAME "=" literal _NL                    -> eval_assign_lit
-         | "eval"i "$" NAME "." NAME "=" eval_rhs _NL          -> eval_field_assign
+         | "eval"i "$" NAME "=" field_access _NL               -> eval_assign_expr
+         | "eval"i "$" NAME "=" var_ref _NL                    -> eval_assign_expr
+         | "eval"i field_access "=" eval_rhs _NL               -> eval_field_assign
          | "eval"i NAME "(" arg_list? ")" _NL                  -> eval_discard
 
 eval_rhs: NAME "(" arg_list? ")"  -> eval_rhs_func
         | literal                   -> eval_rhs_lit
+        | field_access              -> eval_rhs_field
+        | var_ref                   -> eval_rhs_var
 
 func_call: NAME "(" arg_list? ")"
 
@@ -77,13 +90,14 @@ arg_list: arg ("," arg)*
 
 call_stmt: "call"i STRING call_with_clause? call_read_clause? _NL
 
-call_with_clause: "with"i call_arg ("," call_arg)*
+call_with_clause: "with"i as_var ("," as_var)*
 
-call_arg: var_ref "as"i NAME
+call_read_clause: "read"i as_var ("," as_var)*
 
-call_read_clause: "read"i call_read_item ("," call_read_item)*
+// 对称结构：两侧均支持 $var 或 "string"
+as_var: as_side "as"i as_side
 
-call_read_item: STRING "as"i var_ref
+?as_side: var_ref | STRING
 
 // ─── 控制流 ───────────────────────────────────────────────
 
@@ -91,7 +105,10 @@ if_stmt: "if"i condition _NL statement* else_clause? "end"i _NL
 
 else_clause: "else"i _NL statement*
 
-for_stmt: "for"i NAME "in"i bracket_list _NL statement* "end"i _NL
+for_stmt: "for"i NAME "in"i for_iter _NL statement* "end"i _NL
+
+for_iter: list_literal -> for_iter_static
+        | var_ref      -> for_iter_var
 
 loop_stmt: "loop"i (number | NAME) _NL statement* "end"i _NL
 
@@ -116,9 +133,10 @@ goto_stmt: "goto"i NAME _NL
 ?not_cond: cond_atom -> cond_passthrough
          | "not"i cond_atom -> not_op
 
-?cond_atom: field_access "contains"i STRING -> contains_op
-          | field_access "equals"i STRING -> equals_op
-          | field_access "in"i bracket_list -> in_op
+?cond_atom: field_access "contains"i cond_text -> contains_op
+          | field_access "equals"i cond_text -> equals_op
+          | field_access "in"i list_literal -> in_op
+          | var_ref "in"i list_literal -> in_op
           | field_access "is_empty"i -> is_empty_op
           | field_access ">" number -> gt_op
           | field_access "<" number -> lt_op
@@ -128,9 +146,23 @@ goto_stmt: "goto"i NAME _NL
           | field_access "==" number -> eq_num_op
           | var_ref -> var_cond
 
+// 条件中的文本操作数：支持 "string" 或 $var
+?cond_text: STRING | var_ref
+
 // $var.field 支持链式访问：$var.f1.f2.f3
+// $var.$key 支持动态字典访问（用 . 代替 Python 的 dict[] 语法）
+// $var[$i] 支持列表索引访问（直接 [] 表示 index）
+// $var."key" / $var.[key] 支持静态字面量访问（"" 与 [] 在非赋值语境等价）
 field_access: field_access "." NAME -> field_chain
+            | field_access "." var_ref -> field_var_chain
+            | field_access "[" var_ref "]" -> field_index_chain
+            | field_access "." STRING -> field_str_chain
+            | field_access "." "[" NAME "]" -> field_bracket_chain
             | var_ref "." NAME -> field_base
+            | var_ref "." var_ref -> field_var_base
+            | var_ref "[" var_ref "]" -> field_index_base
+            | var_ref "." STRING -> field_str_base
+            | var_ref "." "[" NAME "]" -> field_bracket_base
 
 // 数值字面量：支持负数，统一为 number（float）
 ?number: FLOAT -> number_float
@@ -142,14 +174,20 @@ field_access: field_access "." NAME -> field_chain
 ?literal: STRING
         | number
         | "{" "}" -> empty_dict
+        | list_literal
+
+// 列表字面量：["a", "b", 1, 2]，支持字符串、数字和变量引用
+list_literal: "[" [list_item ("," list_item)*] "]"
+
+?list_item: STRING -> list_item_str
+          | number -> list_item_num
+          | var_ref -> list_item_var
 
 // ─── 通用原子 ─────────────────────────────────────────────
 
 var_ref: "$" NAME
 
 bracket_expr: "[" NAME "]"
-
-bracket_var: "[" var_ref "]"   // [$var] 动态引用
 
 // 逗号分隔列表：用于 for 迭代源和 in 条件
 // 元素可以是裸 NAME 或 "字符串"，统一视为字面量

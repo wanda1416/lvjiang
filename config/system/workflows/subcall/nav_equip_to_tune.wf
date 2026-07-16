@@ -8,12 +8,12 @@ click [equip_weapon_detail].[more_func]
 wait step_interval
 
 scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_scan
-find $tune_scan "调律" as $tune_pos
-if not $tune_pos
+eval $tune_key = find_key($tune_scan, "调律")
+if not $tune_key
     log "未找到调律按钮"
     return
 end
-click $tune_pos
+click [equip_weapon_detail].$tune_key
 wait step_interval
 
 eval $result = "ok"

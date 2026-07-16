@@ -6,12 +6,12 @@
 call "subcall/nav_main_to_equip.wf"
 
 # 点击指定装备部位
-click [bag_equip_detail].[$equip_slot]
+click [bag_equip_detail].$equip_slot
 wait step_interval
 
 # 拼接背包槽位名：bag_{row}_{col}
 eval $bag_slot = concat("bag_", $bag_row, "_", $bag_col)
-click [bag_equip_detail].[$bag_slot]
+click [bag_equip_detail].$bag_slot
 wait step_interval
 
 call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
@@ -26,14 +26,14 @@ if not $add_scan.one_click_add contains "添加"
     return
 end
 
-# 识别材料格，找到狗粮则点击（若未选择材料则跳过）
+# 识别材料格，找到目标材料则点击（若未选择材料则跳过）
 if $target_material
-    call "subcall/find_tune_material.wf" with $target_material as target_material read "position" as $material_pos
-    if not $material_pos
+    call "subcall/find_tune_material.wf" with $target_material as "material_name" read "slot_name" as $slot
+    if not $slot
         log concat($target_material, "材料不足，提前结束")
         return
     end
-    click $material_pos
+    click [equip_tune_detail].$slot
     wait step_interval
 end
 

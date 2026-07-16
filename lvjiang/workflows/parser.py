@@ -13,8 +13,8 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, Recognize, Find, Collect, Log, Call,
-    If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldAssign, FuncCall,
+    Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
+    If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
     SceneRef, VarRef, Literal, FieldAccess,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
@@ -52,31 +52,27 @@ class _DSLTransformer(Transformer):
 
     # ─── 基础指令 ─────────────────────────────────────────
 
-    def click_stmt(self, items):
-        target = items[0]  # click_target → SceneRef | VarRef
-        return Click(target=target, line_no=self._line(items))
-
-    def click_target(self, items):
-        """click 目标：[scene].[region] → SceneRef，[scene].[$var] → SceneRef(region=VarRef)，$var → VarRef"""
-        if len(items) == 2:
-            scene_name = str(items[0])
-            region = items[1]
-            # region 可能是 bracket_expr (Token) 或 var_ref (VarRef)
-            if isinstance(region, VarRef):
-                return SceneRef(scene=scene_name, region=region)
-            else:
-                return SceneRef(scene=scene_name, region=str(region))
+    def _resolve_const_or_var(self, item):
+        """解析 const_or_var：bracket_expr | STRING | var_ref"""
+        if isinstance(item, VarRef):
+            return item
+        elif isinstance(item, Token) and item.type == 'STRING':
+            return self._unquote(str(item))
         else:
-            # $var（var_ref 已返回 VarRef）
-            return items[0]
+            return str(item)
+
+    def click_stmt(self, items):
+        """click scene.coord — scene 和 coord 都可以是常量或变量"""
+        scene, coord = items  # 两个 const_or_var
+        scene_val = self._resolve_const_or_var(scene)
+        coord_val = self._resolve_const_or_var(coord)
+        return Click(target=SceneRef(scene=scene_val, region=coord_val), line_no=self._line(items))
 
     def drag_stmt(self, items):
-        scene_ref = SceneRef(scene=str(items[0]), region=str(items[1]))
-        arrow_ref = SceneRef(scene=str(items[0]), region=str(items[1]))  # 同场景
-        # 重新解析：items[0]=scene bracket, items[1]=region bracket
-        scene_name = str(items[0])
-        arrow_name = str(items[1])
-        scene_ref = SceneRef(scene=scene_name, region=arrow_name)
+        """drag scene.arrow — scene 和 arrow 都可以是常量或变量"""
+        scene_val = self._resolve_const_or_var(items[0])
+        arrow_val = self._resolve_const_or_var(items[1])
+        scene_ref = SceneRef(scene=scene_val, region=arrow_val)
         duration = None
         hold = None
         for item in items[2:]:
@@ -100,6 +96,12 @@ class _DSLTransformer(Transformer):
 
     def wait_stmt(self, items):
         arg = items[0]
+        if isinstance(arg, tuple) and len(arg) == 2:
+            # wait_range → (min, max) 随机范围
+            return Wait(delay=arg, line_no=self._line(items))
+        if isinstance(arg, VarRef):
+            # $var → 动态等待时间
+            return Wait(delay=arg, line_no=self._line(items))
         if isinstance(arg, Token):
             if arg.type in ("FLOAT", "INT"):
                 return Wait(delay=Literal(value=float(arg)), line_no=self._line(items))
@@ -110,76 +112,97 @@ class _DSLTransformer(Transformer):
             return Wait(delay=Literal(value=arg), line_no=self._line(items))
         return Wait(delay=arg, line_no=self._line(items))
 
+    def wait_range(self, items):
+        """(min, max) → (float, float) 随机范围元组"""
+        return (float(items[0]), float(items[1]))
+
     def scan_stmt(self, items):
-        scene_name = str(items[0])  # bracket_expr → str
+        scene_target = items[0]  # tuple: (scene_name, fields_or_var)
+        scene_name = scene_target[0]
         scene = SceneRef(scene=scene_name)
         fields = None
-        target = None
-        for item in items[1:]:
-            if isinstance(item, list) and item and isinstance(item[0], Literal):
-                fields = item  # field_list → list[Literal]
-                scene = SceneRef(scene=scene_name)  # 保持 scene
-            elif isinstance(item, VarRef):
-                target = item  # var_ref → VarRef
-        return Scan(scene=scene, fields=fields, target=target, line_no=self._line(items))
+        region_var = None
+        target = items[1]  # var_ref → VarRef (as 子句)
+        if len(scene_target) > 1 and scene_target[1] is not None:
+            second = scene_target[1]
+            if isinstance(second, list):
+                fields = second  # field_list → list[Literal]
+            elif isinstance(second, VarRef):
+                region_var = second  # 动态 region
+        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, line_no=self._line(items))
 
     def recognize_stmt(self, items):
-        """recognize [scene].[f1, f2, ...] as $var"""
-        scene_name = str(items[0])  # bracket_expr → str
+        """recognize [scene].[f1, f2, ...] as $var 或 recognize [scene].$var as $var"""
+        scene_target = items[0]  # tuple: (scene_name, fields_or_var)
+        scene_name = scene_target[0]
         scene = SceneRef(scene=scene_name)
         fields = None
-        target = None
-        for item in items[1:]:
-            if isinstance(item, list) and item and isinstance(item[0], Literal):
-                fields = item  # field_list → list[Literal]
-            elif isinstance(item, VarRef):
-                target = item  # var_ref → VarRef
-        return Recognize(scene=scene, fields=fields, target=target, line_no=self._line(items))
+        region_var = None
+        target = items[1]  # var_ref → VarRef (as 子句)
+        if len(scene_target) > 1 and scene_target[1] is not None:
+            second = scene_target[1]
+            if isinstance(second, list):
+                fields = second  # field_list → list[Literal]
+            elif isinstance(second, VarRef):
+                region_var = second  # 动态 region
+        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, line_no=self._line(items))
 
-    def find_stmt(self, items):
-        """find $source ("text" | $var) as $target [error "msg"]"""
-        source = items[0]   # var_ref → VarRef
-        # text 可以是字面量（STRING Token 或 Literal）或变量引用
-        raw_text = items[1]
-        if isinstance(raw_text, VarRef):
-            text = raw_text
-        else:
-            text = self._ensure_literal(raw_text)  # STRING Token → Literal
-        target = None
-        error_msg = None
-        for item in items[2:]:
-            if isinstance(item, VarRef) and target is None:
-                target = item
-            elif isinstance(item, Literal):
-                error_msg = item
-        if target is None:
-            raise ValueError(f"find 语句缺少目标变量: {items}")
-        return Find(source=source, text=text, target=target, error_msg=error_msg, line_no=self._line(items))
+    def scene_target_static(self, items):
+        """[scene] 或 [scene].[f1, f2] 或 $var.[f1] 等"""
+        scene_name = self._resolve_scene_name(items[0])
+        field_list = items[1] if len(items) > 1 else None
+        return (scene_name, field_list)
 
-    def error_clause(self, items):
-        return self._ensure_literal(items[0])
+    def scene_target_dyn(self, items):
+        """[scene].$var 或 $var.$field 等"""
+        scene_name = self._resolve_scene_name(items[0])
+        var_ref = items[1]  # VarRef
+        return (scene_name, var_ref)
+
+    def _resolve_scene_name(self, item):
+        """解析场景名：bracket_expr→str, STRING→去引号str, var_ref→VarRef"""
+        if isinstance(item, VarRef):
+            return item  # 动态场景名
+        if isinstance(item, Token) and item.type == 'STRING':
+            return self._unquote(str(item))  # 字符串常量
+        return str(item)  # bracket_expr
 
     def collect_stmt(self, items):
         source = items[0]  # var_ref → VarRef
         alias = None
+        alias_var = None
         if len(items) > 1:
-            # collect_as_clause 返回字符串（alias 标签）
+            # collect_as_clause 返回 str 或 VarRef
             alias_item = items[1]
-            if isinstance(alias_item, str):
+            if isinstance(alias_item, VarRef):
+                alias_var = alias_item  # 动态 alias
+            elif isinstance(alias_item, str):
                 alias = alias_item
             elif isinstance(alias_item, Token):
                 alias = self._unquote(str(alias_item))
-        return Collect(source=source, alias=alias, line_no=self._line(items))
+        return Collect(source=source, alias=alias, alias_var=alias_var, line_no=self._line(items))
 
     def collect_as_clause(self, items):
-        """as "label" → 字符串"""
-        return self._unquote(str(items[0]))
+        """as "label" 或 as $var → 字符串或 VarRef"""
+        item = items[0]
+        if isinstance(item, VarRef):
+            return item  # 动态 alias
+        return self._unquote(str(item))  # 静态 alias
 
     def log_stmt(self, items):
         arg = items[0]
+        # log 参数可以是：字符串常量、函数调用、变量引用、字段访问
         if isinstance(arg, FuncCall):
             return Log(message=arg, line_no=self._line(items))
+        if isinstance(arg, VarRef):
+            return Log(message=arg, line_no=self._line(items))
+        if isinstance(arg, FieldAccess):
+            return Log(message=arg, line_no=self._line(items))
         return Log(message=self._ensure_literal(arg), line_no=self._line(items))
+
+    def log_arg(self, items):
+        """log_arg: 透传任何表达式"""
+        return items[0]
 
     def eval_assign_func(self, items):
         """eval $var = func($arg...)"""
@@ -191,13 +214,16 @@ class _DSLTransformer(Transformer):
         return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
     def eval_assign_lit(self, items):
-        """eval $var = "string" | 123 | -1.5 | {}"""
+        """eval $var = "string" | 123 | -1.5 | {} | [list]"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])  # $ 后面的 NAME
         lit_value = items[1]
         # 空字典快捷路径
         if isinstance(lit_value, dict):
             return Eval(func_name="__empty_dict__", func_args=[], target=target_name, line_no=self._line(items))
+        # 列表快捷路径
+        if isinstance(lit_value, list):
+            return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
         if isinstance(lit_value, Token):
             lit_value = self._unquote(str(lit_value))
         # 用 Eval 节点承载字面量赋值：func_name="__literal__"，func_args=[Literal(value)]
@@ -211,20 +237,19 @@ class _DSLTransformer(Transformer):
         func_args = lists[0] if lists else []
         return Eval(func_name=names[0], func_args=func_args, target=None, line_no=self._line(items))
 
-    def eval_field_assign(self, items):
-        """eval $dict.key = value"""
+    def eval_assign_expr(self, items):
+        """eval $var = field_access | var_ref — 表达式赋值"""
         tokens = [i for i in items if isinstance(i, Token)]
-        names = [str(t) for t in tokens]
-        # names[0] = 变量名, names[1] = 字段名
-        var_name = names[0]
-        field_name = names[1]
-        # items 中最后一个非 Token 元素是 eval_rhs 的结果
-        value = None
-        for item in reversed(items):
-            if not isinstance(item, Token):
-                value = item
-                break
-        return EvalFieldAssign(var_name=var_name, field_name=field_name, value=value, line_no=self._line(items))
+        target_name = str(tokens[0])
+        expr = items[1]  # FieldAccess or VarRef
+        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
+
+    def eval_field_assign(self, items):
+        """eval $dict.key = value 或 eval $dict.key1.key2 = value — 字段赋值"""
+        # items: field_access, eval_rhs
+        target = items[0]  # FieldAccess
+        value = items[1]   # eval_rhs result
+        return EvalFieldChainAssign(target=target, value=value, line_no=self._line(items))
 
     def eval_rhs_func(self, items):
         """eval_rhs: NAME ( arg_list? ) → FuncCall"""
@@ -242,6 +267,14 @@ class _DSLTransformer(Transformer):
         if isinstance(val, Token):
             return Literal(value=self._unquote(str(val)))
         return val  # number (float)
+
+    def eval_rhs_field(self, items):
+        """eval_rhs: field_access → FieldAccess"""
+        return items[0]
+
+    def eval_rhs_var(self, items):
+        """eval_rhs: var_ref → VarRef"""
+        return items[0]
 
     def func_call(self, items):
         """func_name(arg_list?) → FuncCall"""
@@ -276,30 +309,30 @@ class _DSLTransformer(Transformer):
         args = []
         reads = []
         for item in items[1:]:
-            if isinstance(item, list):
-                for sub in item:
-                    if isinstance(sub, tuple) and len(sub) == 2:
-                        if isinstance(sub[0], VarRef):
-                            args.append(sub)
-                        else:
-                            reads.append(sub)
+            if isinstance(item, tuple) and len(item) == 2:
+                tag, pairs = item
+                if tag == "with":
+                    args = pairs
+                elif tag == "read":
+                    reads = pairs
         return Call(workflow=wf_path, args=args, reads=reads, line_no=self._line(items))
 
     def call_with_clause(self, items):
-        """with $x as arg1, $y as arg2 → [(VarRef, 'arg1'), (VarRef, 'arg2')]"""
-        return items  # 每个 item 是 call_arg 返回的 tuple
-
-    def call_arg(self, items):
-        """$x as arg1 → (VarRef, 'arg1')"""
-        return (items[0], str(items[1]))
+        """with $x as "name" → ("with", [(left, right), ...])"""
+        return ("with", list(items))
 
     def call_read_clause(self, items):
-        """read "key" as $var → [('key', VarRef)]"""
-        return items  # 每个 item 是 call_read_item 返回的 tuple
+        """read "key" as $var → ("read", [(left, right), ...])"""
+        return ("read", list(items))
 
-    def call_read_item(self, items):
-        """"key" as $var → (Literal, VarRef)"""
-        return (self._ensure_literal(items[0]), items[1])
+    def as_var(self, items):
+        """$x as "name" 或 "key" as $var → (left_node, right_node)
+        
+        VarRef 原样保留，STRING Token 转为 Literal
+        """
+        left = items[0] if isinstance(items[0], VarRef) else self._ensure_literal(items[0])
+        right = items[1] if isinstance(items[1], VarRef) else self._ensure_literal(items[1])
+        return (left, right)
 
     # ─── 控制流 ───────────────────────────────────────────
 
@@ -326,9 +359,17 @@ class _DSLTransformer(Transformer):
 
     def for_stmt(self, items):
         var_name = str(items[0])
-        iterable = items[1]  # bracket_list → list[Literal]
+        iterable = items[1]  # for_iter → list[Literal] | VarRef
         body = [i for i in items[2:] if i is not None and not isinstance(i, Token)]
         return For(var=var_name, iterable=iterable, body=body, line_no=self._line(items))
+
+    def for_iter_static(self, items):
+        """for_iter: list_literal → list[Literal | VarRef]"""
+        return items[0]  # list_literal 已返回 list
+
+    def for_iter_var(self, items):
+        """for_iter: var_ref → VarRef"""
+        return items[0]  # var_ref 已返回 VarRef
 
     def loop_stmt(self, items):
         count_val = items[0]
@@ -368,16 +409,18 @@ class _DSLTransformer(Transformer):
         return Not(operand=items[0], line_no=self._line(items))
 
     def contains_op(self, items):
-        field_access, string_token = items
-        return Contains(left=field_access, right=Literal(value=self._unquote(str(string_token))), line_no=self._line(items))
+        field_access, text_node = items
+        right = text_node if isinstance(text_node, VarRef) else Literal(value=self._unquote(str(text_node)))
+        return Contains(left=field_access, right=right, line_no=self._line(items))
 
     def equals_op(self, items):
-        field_access, string_token = items
-        return Equals(left=field_access, right=Literal(value=self._unquote(str(string_token))), line_no=self._line(items))
+        field_access, text_node = items
+        right = text_node if isinstance(text_node, VarRef) else Literal(value=self._unquote(str(text_node)))
+        return Equals(left=field_access, right=right, line_no=self._line(items))
 
     def in_op(self, items):
-        field_access, bracket_list = items
-        return InList(left=field_access, right=bracket_list, line_no=self._line(items))
+        field_access, list_literal = items
+        return InList(left=field_access, right=list_literal, line_no=self._line(items))
 
     def is_empty_op(self, items):
         return IsEmpty(expr=items[0], line_no=self._line(items))
@@ -395,6 +438,46 @@ class _DSLTransformer(Transformer):
         """field_access.field → FieldAccess(root=FieldAccess, field_name)"""
         prev_access, field_name = items
         return FieldAccess(root=prev_access, field_name=str(field_name))
+
+    def field_index_base(self, items):
+        """$list[$i] → FieldAccess(root=VarRef, field_name=VarRef) — 列表索引访问"""
+        var_ref, index_ref = items
+        return FieldAccess(root=var_ref, field_name=index_ref)
+
+    def field_index_chain(self, items):
+        """field_access[$i] → FieldAccess(root=FieldAccess, field_name=VarRef) — 列表索引链"""
+        prev_access, index_ref = items
+        return FieldAccess(root=prev_access, field_name=index_ref)
+
+    def field_var_base(self, items):
+        """$dict.$key → FieldAccess(root=VarRef, field_name=VarRef)"""
+        var_ref, key_ref = items
+        return FieldAccess(root=var_ref, field_name=key_ref)
+
+    def field_var_chain(self, items):
+        """field_access.$key → FieldAccess(root=FieldAccess, field_name=VarRef)"""
+        prev_access, key_ref = items
+        return FieldAccess(root=prev_access, field_name=key_ref)
+
+    def field_str_base(self, items):
+        """$var."key" → FieldAccess(root=VarRef, field_name=Literal)"""
+        var_ref, string_token = items
+        return FieldAccess(root=var_ref, field_name=Literal(value=self._unquote(str(string_token))))
+
+    def field_str_chain(self, items):
+        """field_access."key" → FieldAccess(root=FieldAccess, field_name=Literal)"""
+        prev_access, string_token = items
+        return FieldAccess(root=prev_access, field_name=Literal(value=self._unquote(str(string_token))))
+
+    def field_bracket_base(self, items):
+        """$var.[key] → FieldAccess(root=VarRef, field_name=Literal)"""
+        var_ref, name_token = items
+        return FieldAccess(root=var_ref, field_name=Literal(value=str(name_token)))
+
+    def field_bracket_chain(self, items):
+        """field_access.[key] → FieldAccess(root=FieldAccess, field_name=Literal)"""
+        prev_access, name_token = items
+        return FieldAccess(root=prev_access, field_name=Literal(value=str(name_token)))
 
     def gt_op(self, items):
         field_access, number = items
@@ -442,10 +525,6 @@ class _DSLTransformer(Transformer):
         """[name] → str（场景名或区域名，由父节点组装为 SceneRef）"""
         return str(items[0])
 
-    def bracket_var(self, items):
-        """[$var] → VarRef（动态引用，由父节点组装为 SceneRef(region=VarRef)）"""
-        return items[0]  # var_ref 已返回 VarRef
-
     def bracket_list(self, items):
         """[a, b, "c"] → list[Literal]"""
         result = []
@@ -455,6 +534,22 @@ class _DSLTransformer(Transformer):
                 s = self._unquote(s)
             result.append(Literal(value=s))
         return result
+
+    def list_literal(self, items):
+        """[item1, item2, ...] → list[Literal | VarRef]"""
+        return [item for item in items if item is not None]
+
+    def list_item_str(self, items):
+        """字符串列表项 → Literal"""
+        return Literal(value=self._unquote(str(items[0])))
+
+    def list_item_num(self, items):
+        """数字列表项 → Literal"""
+        return Literal(value=items[0])
+
+    def list_item_var(self, items):
+        """变量列表项 → VarRef"""
+        return items[0]  # var_ref 已返回 VarRef
 
     def field_list(self, items):
         """.[f1, f2, ...] → list[Literal]"""

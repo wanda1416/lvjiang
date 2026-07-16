@@ -168,7 +168,7 @@ regions:
   is_clickable: true
 - key: wallet
   name: 钱袋
-  type: attr
+  type: func
   is_text: false
   is_clickable: true
 - key: sub_equip

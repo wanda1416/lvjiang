@@ -4,22 +4,47 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
     QPushButton, QComboBox, QStatusBar, QTextEdit,
     QApplication, QTabWidget, QSplitter, QMenu, QInputDialog, QMessageBox,
+    QFileDialog,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from loguru import logger
 
 from ...core.region_config import (
     SCENE_REGIONS, Layout, LayoutConfigManager,
-    Point, Arrow,
     get_scene_name, get_registry, reload_scene_registry,
     load_scene_screenshot, save_scene_screenshot,
-    get_group_name, get_scene_group, sync_group_cache,
-    GROUP_SCENES, SCENE_GROUPS_META,
+    get_group_name, get_scene_group,
 )
-from ...constants import APP_CONFIG_PATH
+from ...constants import APP_CONFIG_PATH, SYSTEM_WORKFLOWS_DIR
 from .layout_ops import LayoutOpsMixin
 from .scene_tab import SceneTab
 from .canvas import EditMode
+
+
+class _ScriptOutputBridge(QObject):
+    """信号桥：将脚本测试输出安全转发到主线程 UI"""
+    append_output = pyqtSignal(str)
+
+
+class _SceneKeyButton(QPushButton):
+    """场景 key 按钮：点击后在脚本编辑器光标处插入当前场景 key"""
+
+    def __init__(self, get_scene_key, parent=None):
+        super().__init__("输入当前场景", parent)
+        self._get_scene_key = get_scene_key
+        self._target: QTextEdit | None = None
+        self.setToolTip("点击在脚本编辑器光标处插入当前场景 key")
+
+    def set_target(self, target: QTextEdit):
+        self._target = target
+
+    def _on_clicked(self):
+        key = self._get_scene_key()
+        if key and self._target is not None:
+            cursor = self._target.textCursor()
+            cursor.insertText(key)
+            self._target.setTextCursor(cursor)
+            self._target.setFocus()
 
 
 class RegionEditorDialog(LayoutOpsMixin, QDialog):
@@ -130,7 +155,10 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         self._splitter.addWidget(self._group_tab_widget)
         self._rebuild_group_tabs()
 
-        # OCR 结果区
+        # 底部面板：左侧 OCR 结果区 + 右侧脚本测试器
+        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # ── 左侧：OCR 结果区 ──
         ocr_panel = QWidget()
         ocr_layout = QVBoxLayout(ocr_panel)
         ocr_layout.setContentsMargins(0, 0, 0, 0)
@@ -139,6 +167,9 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         self._btn_recognize = QPushButton("识别全部字段")
         self._btn_recognize.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_recognize)
+        self._btn_recognize_mat = QPushButton("识别全部材料")
+        self._btn_recognize_mat.clicked.connect(self._on_recognize_materials)
+        btn_row.addWidget(self._btn_recognize_mat)
         btn_row.addStretch()
         ocr_layout.addLayout(btn_row)
 
@@ -148,10 +179,53 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         self._result_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
         )
-        self._result_text.setPlaceholderText("点击「识别全部字段」查看 OCR 结果")
+        self._result_text.setPlaceholderText("点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果")
         ocr_layout.addWidget(self._result_text)
 
-        self._splitter.addWidget(ocr_panel)
+        bottom_splitter.addWidget(ocr_panel)
+
+        # ── 右侧：脚本测试器 ──
+        script_panel = QWidget()
+        script_layout = QVBoxLayout(script_panel)
+        script_layout.setContentsMargins(0, 0, 0, 0)
+
+        script_btn_row = QHBoxLayout()
+        self._btn_run_script = QPushButton("运行脚本")
+        self._btn_run_script.clicked.connect(self._on_script_test)
+        script_btn_row.addWidget(self._btn_run_script)
+        self._btn_load_script = QPushButton("加载文件")
+        self._btn_load_script.clicked.connect(self._on_load_script_file)
+        script_btn_row.addWidget(self._btn_load_script)
+        # 当前场景 key 按钮
+        self._scene_key_btn = _SceneKeyButton(self._get_current_scene_key)
+        self._scene_key_btn.clicked.connect(self._scene_key_btn._on_clicked)
+        script_btn_row.addWidget(self._scene_key_btn)
+        script_btn_row.addStretch()
+        script_layout.addLayout(script_btn_row)
+
+        self._script_text = QTextEdit()
+        self._script_text.setPlaceholderText("输入 DSL 脚本内容...")
+        self._script_text.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 13px;"
+        )
+        script_layout.addWidget(self._script_text)
+
+        # 设置按钮目标为脚本编辑器
+        self._scene_key_btn.set_target(self._script_text)
+
+        self._script_output = QTextEdit()
+        self._script_output.setReadOnly(True)
+        self._script_output.setMinimumHeight(60)
+        self._script_output.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 12px; background-color: #1e1e1e; color: #d4d4d4;"
+        )
+        self._script_output.setPlaceholderText("脚本运行输出...")
+        script_layout.addWidget(self._script_output)
+
+        bottom_splitter.addWidget(script_panel)
+        bottom_splitter.setSizes([500, 500])
+
+        self._splitter.addWidget(bottom_splitter)
         self._splitter.setStretchFactor(0, 2)
         self._splitter.setStretchFactor(1, 1)
 
@@ -313,6 +387,168 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
             f"OCR 识别完成 (场景={get_scene_name(current_tab.scene_key)}): {results}"
         )
 
+    def _on_recognize_materials(self):
+        """对当前 Tab 场景中所有 type==slot 的区域做材料识别"""
+        current_tab = self._tabs.get(self._current_scene_key)
+        if current_tab is None:
+            return
+        regions = current_tab.get_regions()
+        if not regions:
+            self._status_bar.showMessage("没有已定义的区域")
+            return
+        if current_tab.canvas.pixmap is None:
+            self._status_bar.showMessage("当前场景无截图，请先刷新截图")
+            return
+        image = current_tab.canvas.get_image()
+        if image is None:
+            self._status_bar.showMessage("当前场景无截图")
+            return
+
+        # 筛选 slot 类型区域
+        from ...core.region_config import get_region_defs
+        slot_keys = {r.key for r in get_region_defs(current_tab.scene_key) if r.type == "slot"}
+        slot_regions = [r for r in regions if r.key in slot_keys]
+        if not slot_regions:
+            self._status_bar.showMessage("当前场景没有 slot 类型的区域")
+            return
+
+        self._status_bar.showMessage("正在识别材料...")
+        QApplication.processEvents()
+
+        from ...core.material_recognizer import MaterialRecognizer
+        from ...core.ocr import OCREngine
+        ocr_engine = OCREngine()
+        recognizer = MaterialRecognizer(ocr_engine)
+        canvas = current_tab.get_canvas_config()
+        h, w = image.shape[:2]
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+
+        # 展示结果
+        self._result_text.clear()
+        for region in slot_regions:
+            x1 = int(canvas_x + region.x_ratio * canvas_w)
+            y1 = int(canvas_y + region.y_ratio * canvas_h)
+            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
+            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
+            crop = image[y1:y2, x1:x2]
+            info = recognizer.recognize(crop)
+
+            if not info.type:
+                line = f"{region.name}: (空槽)"
+            else:
+                parts = [info.type]
+                if info.level is not None:
+                    parts.append(f"{info.level}级")
+                if info.count is not None:
+                    count_str = f"×{info.count}"
+                    if info.owned is not None:
+                        count_str += f"/{info.owned}"
+                    parts.append(count_str)
+                parts.append(f"[{info.confidence:.0%}]")
+                line = f"{region.name}: {' '.join(parts)}"
+            self._result_text.append(line)
+
+        self._status_bar.showMessage(f"材料识别完成，共 {len(slot_regions)} 个槽位")
+        logger.info(
+            f"材料识别完成 (场景={get_scene_name(current_tab.scene_key)}, "
+            f"槽位数={len(slot_regions)})"
+        )
+
+    # ─── 脚本测试 ─────────────────────────────────────────
+
+    def _on_load_script_file(self):
+        """加载 .wf 文件到脚本编辑器"""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择脚本文件",
+            str(SYSTEM_WORKFLOWS_DIR),
+            "工作流文件 (*.wf);;所有文件 (*)",
+        )
+        if not path:
+            return
+        from pathlib import Path
+        content = Path(path).read_text(encoding="utf-8")
+        self._script_text.setPlainText(content)
+        logger.info(f"已加载脚本: {path}")
+
+    def _on_script_test(self):
+        """执行脚本测试器中的 DSL 脚本（同步执行，结果输出到 script_output）"""
+        script = self._script_text.toPlainText().strip()
+        if not script:
+            self._script_output_append("[错误] 脚本内容为空")
+            return
+
+        # 检查是否有父窗口（主窗口）提供运行环境
+        main_win = self.parent()
+        if main_win is None or not hasattr(main_win, '_target_window') or main_win._target_window is None:
+            self._script_output_append("[错误] 请先在主窗口定位游戏窗口")
+            return
+
+        self._script_output_clear()
+        self._script_output_append("[运行] 执行脚本测试...")
+        self._status_bar.showMessage("脚本测试运行中...")
+        QApplication.processEvents()
+
+        try:
+            # 构建 BaseWorkflow
+            from ...workflows.base import BaseWorkflow
+            layout_name = self._current_layout.name if self._current_layout else ""
+            if not layout_name:
+                self._script_output_append("[错误] 没有已加载的布局")
+                return
+
+            layout = main_win._layout_manager.load_layout(layout_name)
+            if not layout:
+                self._script_output_append(f"[错误] 无法加载布局: {layout_name}")
+                return
+
+            wf = BaseWorkflow(
+                capture=main_win._capture,
+                ocr=main_win._ocr,
+                input_ctrl=main_win._input,
+                layout=layout,
+                delay_config=main_win._user_config.delay,
+                window_left=main_win._target_window["left"],
+                window_top=main_win._target_window["top"],
+                stop_check=lambda: False,  # 暂不支持主动停止
+            )
+
+            # 写入临时 .wf 文件
+            temp_wf = SYSTEM_WORKFLOWS_DIR / "_temp_test.wf"
+            temp_wf.write_text(script, encoding="utf-8")
+
+            # 同步执行
+            result = wf.run_file(temp_wf)
+
+            # 输出结果
+            import json
+            from ..run_control import _to_serializable
+            serializable = _to_serializable(result)
+            self._script_output_append(
+                f"[完成] 输出:\n{json.dumps(serializable, ensure_ascii=False, indent=2)}"
+            )
+            self._status_bar.showMessage("脚本测试完成")
+
+        except Exception as e:
+            import traceback
+            self._script_output_append(f"[错误] {e}")
+            self._script_output_append(traceback.format_exc())
+            self._status_bar.showMessage("脚本测试失败")
+            logger.error(f"脚本测试异常: {e}")
+
+    def _script_output_append(self, text: str):
+        """线程安全地追加脚本输出"""
+        if not hasattr(self, '_script_bridge'):
+            self._script_bridge = _ScriptOutputBridge()
+            self._script_bridge.append_output.connect(self._script_output.append)
+        self._script_bridge.append_output.emit(text)
+
+    def _script_output_clear(self):
+        """清空脚本输出（主线程调用）"""
+        self._script_output.clear()
+
     @property
     def _current_scene_key(self) -> str:
         """当前 Tab 对应的 scene_key"""
@@ -363,6 +599,20 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
             # 构建该分组下的场景 Tab
             self._rebuild_scene_tabs(group_key)
         self._group_tab_widget.blockSignals(False)
+
+    def _get_current_scene_key(self) -> str:
+        """获取当前激活的场景 key"""
+        idx = self._group_tab_widget.currentIndex()
+        groups = get_registry().get_groups()
+        if not (0 <= idx < len(groups)):
+            return ""
+        group_key = groups[idx][0]
+        scene_tab_widget = self._group_tabs.get(group_key)
+        if scene_tab_widget is None:
+            return ""
+        scene_idx = scene_tab_widget.currentIndex()
+        widget = scene_tab_widget.widget(scene_idx) if scene_idx >= 0 else None
+        return widget.scene_key if isinstance(widget, SceneTab) else ""
 
     def _rebuild_scene_tabs(self, group_key: str):
         """重建指定分组下的场景 Tab（二级 Tab）"""

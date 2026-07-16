@@ -1,6 +1,7 @@
 key: bag_item_detail
 name: 道具背包
 regions:
+# ── 第1行 ──
 - key: bag_1_1
   name: 背包格1_1
   type: slot
@@ -8,6 +9,150 @@ regions:
   is_clickable: true
 - key: bag_1_2
   name: 背包格1_2
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_1_3
+  name: 背包格1_3
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_1_4
+  name: 背包格1_4
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_1_5
+  name: 背包格1_5
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_1_6
+  name: 背包格1_6
+  type: slot
+  is_text: false
+  is_clickable: true
+# ── 第2行 ──
+- key: bag_2_1
+  name: 背包格2_1
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_2_2
+  name: 背包格2_2
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_2_3
+  name: 背包格2_3
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_2_4
+  name: 背包格2_4
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_2_5
+  name: 背包格2_5
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_2_6
+  name: 背包格2_6
+  type: slot
+  is_text: false
+  is_clickable: true
+# ── 第3行 ──
+- key: bag_3_1
+  name: 背包格3_1
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_3_2
+  name: 背包格3_2
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_3_3
+  name: 背包格3_3
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_3_4
+  name: 背包格3_4
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_3_5
+  name: 背包格3_5
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_3_6
+  name: 背包格3_6
+  type: slot
+  is_text: false
+  is_clickable: true
+# ── 第4行 ──
+- key: bag_4_1
+  name: 背包格4_1
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_4_2
+  name: 背包格4_2
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_4_3
+  name: 背包格4_3
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_4_4
+  name: 背包格4_4
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_4_5
+  name: 背包格4_5
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_4_6
+  name: 背包格4_6
+  type: slot
+  is_text: false
+  is_clickable: true
+# ── 第5行 ──
+- key: bag_5_1
+  name: 背包格5_1
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_5_2
+  name: 背包格5_2
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_5_3
+  name: 背包格5_3
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_5_4
+  name: 背包格5_4
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_5_5
+  name: 背包格5_5
+  type: slot
+  is_text: false
+  is_clickable: true
+- key: bag_5_6
+  name: 背包格5_6
   type: slot
   is_text: false
   is_clickable: true

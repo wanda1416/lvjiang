@@ -32,7 +32,6 @@ class EvaluationResult:
 
     def to_dict(self) -> dict:
         d: dict = {
-            "slot": self.equipment.slot,
             "name": self.equipment.name,
             "type": self.equipment.type,
             "level": self.equipment.level,
@@ -65,7 +64,6 @@ class TuningAdvice:
 
     def to_dict(self) -> dict:
         d: dict = {
-            "slot": self.equipment.slot,
             "name": self.equipment.name,
             "type": self.equipment.type,
             "should_continue": self.should_continue,

@@ -50,9 +50,8 @@ class Affix:
 class EquipmentData:
     """标准装备领域模型
 
-    JSON 输出格式（与 equipment.md 定义一致）：
+    JSON 输出格式：
     {
-        "slot": "main_weapon",
         "type": "剑",
         "name": "踏雪含光",
         "level": 110,
@@ -66,8 +65,7 @@ class EquipmentData:
         "_warnings": []
     }
     """
-    slot: str
-    type: str | None = None        # 武器类型（剑/枪/...）或防具类别（冠胄/...）
+    type: str | None = None        # 武器类型（剑/枪/...）或防具类别（冠胄/...）或首饰（环/佩）
     name: str | None = None        # 装备名称
     level: int | None = None
     quality: str | None = None     # gold/purple/blue/green，OCR 暂无法识别
@@ -77,13 +75,18 @@ class EquipmentData:
     affixes: list[Affix] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
+    @property
+    def category(self) -> str:
+        """从 type 推断装备类别：weapon / jewelry / armor / unknown"""
+        from .constants import infer_category
+        return infer_category(self.type)
+
     def to_dict(self) -> dict:
         """转换为标准装备领域模型 JSON dict
 
         affixes 列表展开为 affix_1 ~ affix_5 键。
         """
         d: dict = {
-            "slot": self.slot,
             "type": self.type,
             "name": self.name,
             "level": self.level,
@@ -108,7 +111,6 @@ class EquipmentData:
                 affixes.append(Affix.from_dict(d[key]))
 
         return cls(
-            slot=d["slot"],
             type=d.get("type"),
             name=d.get("name"),
             level=d.get("level"),

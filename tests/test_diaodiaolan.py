@@ -12,17 +12,17 @@ from lvjiang.evaluator.generic_evaluator import GenericEvaluator
 from lvjiang.evaluator.base import Rating
 from lvjiang.evaluator.equip_attrs import EquipAttrConfig
 from lvjiang.equip_parser import EquipmentParser
-from lvjiang.equip_parser.constants import WEAPON_SLOTS
+from lvjiang.equip_parser.constants import WEAPON_TYPES_SET
 from lvjiang.constants import SYSTEM_RULES_DIR
 
 
-def _extract_base_attr_value(equip, slot_key: str):
+def _extract_base_attr_value(equip):
     """从 EquipmentData 提取用于品阶推断的属性值。
 
     Returns:
         value (int) 或 None
     """
-    if slot_key in WEAPON_SLOTS:
+    if equip.type in WEAPON_TYPES_SET:
         ba = equip.base_attr_1
         if ba and ba.name == "外功攻击" and isinstance(ba.value, list):
             return ba.value[1]  # 取 max 值
@@ -55,14 +55,14 @@ def main():
     print("  品阶推断（基础属性 → 品阶）")
     print("=" * 70)
 
-    for slot, equip in equip_dict.items():
-        value = _extract_base_attr_value(equip, slot)
+    for key, equip in equip_dict.items():
+        value = _extract_base_attr_value(equip)
         if value is None:
-            print(f"\n  [{slot}] {equip.name} | 无法提取基础属性")
+            print(f"\n  [{key}] {equip.name} | 无法提取基础属性")
             continue
-        quality = equip_attrs.infer_quality(slot, equip.level, value)
+        quality = equip_attrs.infer_quality(equip.type, equip.level, value)
         q_label = {"gold": "金装", "purple": "紫装", "blue": "蓝装"}.get(quality, "未知")
-        print(f"\n  [{slot}] {equip.name} | Lv.{equip.level}")
+        print(f"\n  [{key}] {equip.name} | Lv.{equip.level}")
         print(f"    基础属性值: {value}")
         print(f"    推断品阶: {q_label} ({quality})")
 
@@ -71,11 +71,11 @@ def main():
     print("  装备评级结果")
     print("=" * 70)
 
-    for slot, equip in equip_dict.items():
+    for key, equip in equip_dict.items():
         # 先设置推断出的品阶
-        value = _extract_base_attr_value(equip, slot)
+        value = _extract_base_attr_value(equip)
         if value is not None:
-            q = equip_attrs.infer_quality(slot, equip.level, value)
+            q = equip_attrs.infer_quality(equip.type, equip.level, value)
             if q:
                 equip.quality = q
 
@@ -83,7 +83,7 @@ def main():
         affix_str = ", ".join(a.name for a in equip.affixes)
         dq_str = " [不合格]" if result.disqualified else ""
         q_str = f"({equip.quality})" if equip.quality else "(品阶未知)"
-        print(f"\n  [{slot}] {equip.name} | {equip.type or '?'} | Lv.{equip.level} {q_str}")
+        print(f"\n  [{key}] {equip.name} | {equip.type or '?'} | Lv.{equip.level} {q_str}")
         print(f"    词条({len(equip.affixes)}): {affix_str}")
         print(f"    评级: {result.rating.value}{dq_str} (扣分={result.deductions})")
         for d in result.details:
@@ -96,10 +96,10 @@ def main():
     print("  调律熔断检测")
     print("=" * 70)
 
-    for slot, equip in equip_dict.items():
+    for key, equip in equip_dict.items():
         advice = evaluator.check_tuning_worthiness(equip)
         status = "继续" if advice.should_continue else "熔断"
-        print(f"\n  [{slot}] {equip.name} | {equip.type or '?'}")
+        print(f"\n  [{key}] {equip.name} | {equip.type or '?'}")
         print(f"    词条: {', '.join(a.name for a in equip.affixes)}")
         print(f"    扣分={advice.current_deductions}  不合格={advice.invalid_count}  → {status}")
         for r in advice.reasons:

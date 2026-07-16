@@ -12,7 +12,6 @@ from dataclasses import replace
 from .base import BaseEvaluator, EvaluationResult, Rating, TuningAdvice
 from .rule_config import RuleConfig, DeductionRule, DivineAffixRule
 from lvjiang.equip_parser import EquipmentData, Affix
-from lvjiang.equip_parser.constants import WEAPON_SLOTS, JEWELRY_SLOTS, ARMOR_SLOTS
 
 
 # 属性攻击词条集合（用于 max_attribute_attack 约束）
@@ -75,11 +74,11 @@ class GenericEvaluator(BaseEvaluator):
             return advice
 
         first = equip.affixes[0]
-        possible = self.config.get_first_affix(equip.slot)
+        possible = self.config.get_first_affix(equip.type)
         if first.name not in possible:
             advice.should_continue = False
             advice.reasons.append(
-                f"首词条异常: {equip.slot} 不可能出现 "
+                f"首词条异常: {equip.type} 不可能出现 "
                 f"{first.name}（可能为 {'/'.join(possible)}）"
             )
             return advice
@@ -159,7 +158,7 @@ class GenericEvaluator(BaseEvaluator):
             return True
 
         q_cfg = self.config.quality
-        if equip.slot in WEAPON_SLOTS | JEWELRY_SLOTS:
+        if equip.category in ("weapon", "jewelry"):
             required = q_cfg.get("weapon_jewelry", "gold")
             if isinstance(required, str):
                 required = [required]
@@ -169,7 +168,7 @@ class GenericEvaluator(BaseEvaluator):
                     f"武器/首饰需{'/'.join(required)}，当前为{quality}"
                 )
                 return False
-        elif equip.slot in ARMOR_SLOTS:
+        elif equip.category == "armor":
             required = q_cfg.get("armor", ["gold", "purple"])
             if isinstance(required, str):
                 required = [required]
@@ -192,12 +191,12 @@ class GenericEvaluator(BaseEvaluator):
             return False
 
         first = equip.affixes[0]
-        possible = self.config.get_first_affix(equip.slot)
+        possible = self.config.get_first_affix(equip.type)
 
         if first.name not in possible:
             result.disqualified = True
             result.disqualify_reasons.append(
-                f"首词条异常: {equip.slot} 不可能出现 "
+                f"首词条异常: {equip.type} 不可能出现 "
                 f"{first.name}（可能为 {'/'.join(possible)}）"
             )
             return False
@@ -257,7 +256,7 @@ class GenericEvaluator(BaseEvaluator):
         """检查装备是否匹配神力规则"""
         if rule.match_type and equip.type == rule.match_type:
             return True
-        if rule.match_slot and equip.slot in rule.match_slot:
+        if rule.match_slot and equip.type in rule.match_slot:
             return True
         return False
 
@@ -350,7 +349,7 @@ class GenericEvaluator(BaseEvaluator):
         remaining_non_first_names: list[str],
     ) -> str:
         """从当前可用转律词库中选最优替换词条"""
-        is_weapon = equip.slot in WEAPON_SLOTS
+        is_weapon = equip.category == "weapon"
         pool = self.config.get_tuning_pool(is_weapon)
         constraints = self.config.tuning_constraints
 
@@ -378,7 +377,6 @@ class GenericEvaluator(BaseEvaluator):
     ) -> EquipmentData:
         """构造 mock 装备（替换词条列表，其余不变）"""
         return EquipmentData(
-            slot=equip.slot,
             type=equip.type,
             name=equip.name,
             level=equip.level,

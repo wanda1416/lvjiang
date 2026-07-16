@@ -130,9 +130,12 @@ class RuleConfig:
 def _parse_divine_affix(d: dict) -> DivineAffixRule:
     """解析单条神力规则"""
     match = d.get("match", {})
+    match_type = match.get("type")
+    # 向后兼容：slot 列表转为单独的 type 规则（由上层拆分）
+    match_slot = _ensure_list(match.get("slot", []))
     return DivineAffixRule(
-        match_type=match.get("type"),
-        match_slot=_ensure_list(match.get("slot", [])),
+        match_type=match_type,
+        match_slot=match_slot,
         affixes=d.get("affixes", []),
         required=d.get("required", True),
         alt=d.get("alt", []),

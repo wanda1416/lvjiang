@@ -39,7 +39,6 @@
 
 from .base import BaseEvaluator, EvaluationResult, Rating, TuningAdvice
 from lvjiang.equip_parser import EquipmentData, Affix
-from lvjiang.equip_parser.constants import WEAPON_SLOTS, JEWELRY_SLOTS, ARMOR_SLOTS
 
 
 # 鸣金虹有效词条
@@ -58,29 +57,45 @@ _VALID_AFFIXES = {
     "会意率", "会心率", "精准率",
 } | _DIVINE_AFFIXES
 
-# 鸣金虹首词条可能性（完整枚举）
-# 首词条由装备部位决定，不在列表中的词条视为 OCR 异常
+# 鸣金虹首词条可能性（按装备类型）
+# 首词条由装备类型决定，不在列表中的词条视为 OCR 异常
 _FIRST_AFFIX_POSSIBLE = {
-    "main_weapon": ["最大外功攻击", "势"],
-    "sub_weapon":  ["最大外功攻击", "势"],
-    "ring":        ["最大外功攻击"],
-    "pendant":     ["最大外功攻击"],
-    "head":        ["会意率"],
-    "chest":       ["会意率"],
-    "leg":         ["劲"],
-    "wrist":       ["劲"],
+    "剑": ["最大外功攻击", "势"],
+    "枪": ["最大外功攻击", "势"],
+    "扇": ["最大外功攻击", "势"],
+    "伞": ["最大外功攻击", "势"],
+    "陌刀": ["最大外功攻击", "势"],
+    "舞绫鼓": ["最大外功攻击", "势"],
+    "双刀": ["最大外功攻击", "势"],
+    "绳镖": ["最大外功攻击", "势"],
+    "横刀": ["最大外功攻击", "势"],
+    "拳甲": ["最大外功攻击", "势"],
+    "环":        ["最大外功攻击"],
+    "佩":        ["最大外功攻击"],
+    "冠胄":      ["会意率"],
+    "胸甲":      ["会意率"],
+    "胫甲":      ["劲"],
+    "腕甲":      ["劲"],
 }
 
 # 首词条偏好（用于调律选择，是 possible 的子集）
 _FIRST_AFFIX_PREFERRED = {
-    "main_weapon": ["最大外功攻击", "势"],
-    "sub_weapon":  ["最大外功攻击", "势"],
-    "ring":        ["最大外功攻击"],
-    "pendant":     ["最大外功攻击"],
-    "head":        ["会意率"],
-    "chest":       ["会意率"],
-    "leg":         ["劲"],
-    "wrist":       ["劲"],
+    "剑": ["最大外功攻击", "势"],
+    "枪": ["最大外功攻击", "势"],
+    "扇": ["最大外功攻击", "势"],
+    "伞": ["最大外功攻击", "势"],
+    "陌刀": ["最大外功攻击", "势"],
+    "舞绫鼓": ["最大外功攻击", "势"],
+    "双刀": ["最大外功攻击", "势"],
+    "绳镖": ["最大外功攻击", "势"],
+    "横刀": ["最大外功攻击", "势"],
+    "拳甲": ["最大外功攻击", "势"],
+    "环":        ["最大外功攻击"],
+    "佩":        ["最大外功攻击"],
+    "冠胄":      ["会意率"],
+    "胸甲":      ["会意率"],
+    "胫甲":      ["劲"],
+    "腕甲":      ["劲"],
 }
 
 
@@ -137,11 +152,11 @@ class MingHongEvaluator(BaseEvaluator):
         # ── 首词条检查（初始词条，不可更改） ──
         if equip.affixes:
             first = equip.affixes[0]
-            possible = _FIRST_AFFIX_POSSIBLE.get(equip.slot, [])
+            possible = _FIRST_AFFIX_POSSIBLE.get(equip.type, [])
             if first.name not in possible:
                 advice.should_continue = False
                 advice.reasons.append(
-                    f"首词条异常: {equip.slot} 不可能出现 "
+                    f"首词条异常: {equip.type} 不可能出现 "
                     f"{first.name}（可能为 {'/'.join(possible)}）"
                 )
                 return advice
@@ -223,14 +238,14 @@ class MingHongEvaluator(BaseEvaluator):
             result.details.append("品阶未知，暂按通过处理")
             return True
 
-        if equip.slot in WEAPON_SLOTS | JEWELRY_SLOTS:
+        if equip.category in ("weapon", "jewelry"):
             if quality != "gold":
                 result.disqualified = True
                 result.disqualify_reasons.append(
                     f"武器/首饰需金色，当前为{quality}"
                 )
                 return False
-        elif equip.slot in ARMOR_SLOTS:
+        elif equip.category == "armor":
             if quality not in ("gold", "purple"):
                 result.disqualified = True
                 result.disqualify_reasons.append(
@@ -255,12 +270,12 @@ class MingHongEvaluator(BaseEvaluator):
             return False
 
         first = equip.affixes[0]
-        possible = _FIRST_AFFIX_POSSIBLE.get(equip.slot, [])
+        possible = _FIRST_AFFIX_POSSIBLE.get(equip.type, [])
 
         if first.name not in possible:
             result.disqualified = True
             result.disqualify_reasons.append(
-                f"首词条异常: {equip.slot} 不可能出现 "
+                f"首词条异常: {equip.type} 不可能出现 "
                 f"{first.name}（可能为 {'/'.join(possible)}）"
             )
             return False
@@ -293,7 +308,7 @@ class MingHongEvaluator(BaseEvaluator):
             result.details.append("神力 ✓ 无枪武学增伤")
 
         # 首饰：必须有 全武学增效
-        if equip.slot in JEWELRY_SLOTS:
+        if equip.category == "jewelry":
             if "全武学增效" not in affix_names:
                 result.disqualified = True
                 result.disqualify_reasons.append("首饰必须有全武学增效")
@@ -301,12 +316,12 @@ class MingHongEvaluator(BaseEvaluator):
             result.details.append("神力 ✓ 全武学增效")
 
         # 冠胄/胸甲：不需要神力，有单体奇术增伤视为有效（PVP）
-        if equip.slot in ("head", "chest"):
+        if equip.type in ("冠胄", "胸甲"):
             if "单体奇术增伤" in affix_names:
                 result.details.append("神力 △ 单体奇术增伤（PVP 可用）")
 
         # 胫甲/腕甲：必须有 对首领单位增伤，对玩家单位增效视为有效
-        if equip.slot in ("leg", "wrist"):
+        if equip.type in ("胫甲", "腕甲"):
             has_boss = "对首领单位增伤" in affix_names
             has_pvp = "对玩家单位增效" in affix_names
             if not has_boss and not has_pvp:

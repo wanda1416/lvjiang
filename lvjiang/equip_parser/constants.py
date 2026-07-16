@@ -6,11 +6,34 @@
 import re
 
 
-# ─── 部位分类 ──────────────────────────────────────────────
+# ─── 部位分类（旧，仅 parser 内部用于 base_attr 分派） ────
 
 WEAPON_SLOTS = {"main_weapon", "sub_weapon"}
 JEWELRY_SLOTS = {"ring", "pendant"}
 ARMOR_SLOTS = {"head", "chest", "leg", "wrist"}
+
+# ─── 装备类型分类（type-based，替代 slot-based） ────────────
+
+WEAPON_TYPES_SET: set[str] = {
+    "陌刀", "舞绫鼓", "双刀", "绳镖", "横刀", "拳甲",
+    "剑", "枪", "扇", "伞",
+}
+JEWELRY_TYPES_SET: set[str] = {"环", "佩"}
+ARMOR_TYPES_SET: set[str] = {"冠胄", "胸甲", "胫甲", "腕甲"}
+
+
+def infer_category(equip_type: str | None) -> str:
+    """从装备 type 推断类别
+
+    Returns: "weapon" / "jewelry" / "armor" / "unknown"
+    """
+    if equip_type in WEAPON_TYPES_SET:
+        return "weapon"
+    if equip_type in JEWELRY_TYPES_SET:
+        return "jewelry"
+    if equip_type in ARMOR_TYPES_SET:
+        return "armor"
+    return "unknown"
 
 # ─── 武器类型枚举 ──────────────────────────────────────────
 

@@ -8,35 +8,38 @@ from loguru import logger
 
 from .models import EquipAttr, Affix, EquipmentData
 from .constants import (
-    WEAPON_SLOTS,
-    JEWELRY_SLOTS,
-    ARMOR_SLOTS,
+    WEAPON_TYPES_SET,
+    JEWELRY_TYPES_SET,
+    ARMOR_TYPES_SET,
     WEAPON_TYPES,
     AFFIX_NAMES,
     WUXUE_PATTERN,
     PERCENT_AFFIXES,
+    infer_category,
 )
 
 
 class EquipmentParser:
     """装备 OCR 数据转换器"""
 
-    def parse_slot(self, slot_key: str, raw: dict) -> EquipmentData:
-        """解析单个部位的 OCR 原始数据
+    def parse(self, raw: dict) -> EquipmentData:
+        """解析单件装备的 OCR 原始数据
+
+        从 equip_type 文本推断装备类别，决定解析路径。
 
         Args:
-            slot_key: 部位 key（如 "main_weapon"）
             raw: OCR 原始 dict
 
         Returns:
             EquipmentData
         """
-        equip = EquipmentData(slot=slot_key)
-
         # equip_type → name + type
-        equip.name, equip.type = self._parse_equip_type(
-            raw.get("equip_type", ""), slot_key
-        )
+        name, equip_type = self._parse_equip_type(raw.get("equip_type", ""))
+
+        # 从 type 推断类别，决定 base_attr 解析路径
+        category = infer_category(equip_type)
+
+        equip = EquipmentData(type=equip_type, name=name)
 
         # equip_level → level + is_chengyin
         equip.level, equip.is_chengyin = self._parse_equip_level(
@@ -44,15 +47,15 @@ class EquipmentParser:
         )
 
         # base_attr
-        if slot_key in WEAPON_SLOTS:
+        if category == "weapon":
             equip.base_attr_1 = self._parse_weapon_base(
                 raw.get("base_attr", "")
             )
-        elif slot_key in JEWELRY_SLOTS:
+        elif category == "jewelry":
             equip.base_attr_1 = self._parse_jewelry_base(
                 raw.get("base_attr", "")
             )
-        else:  # ARMOR_SLOTS
+        else:  # armor / unknown
             equip.base_attr_1 = self._parse_armor_base1(
                 raw.get("base_attr_1", "")
             )
@@ -66,29 +69,33 @@ class EquipmentParser:
 
         return equip
 
+    def parse_slot(self, slot_key: str, raw: dict) -> EquipmentData:
+        """向后兼容别名，新代码请用 parse()"""
+        return self.parse(raw)
+
     def parse_all(self, raw_data: dict) -> dict[str, EquipmentData]:
         """解析所有部位
 
         Args:
-            raw_data: 完整 OCR 数据 {slot_key: {field: text, ...}, ...}
+            raw_data: 完整 OCR 数据 {key: {field: text, ...}, ...}
 
         Returns:
-            {slot_key: EquipmentData, ...}
+            {key: EquipmentData, ...}
         """
         return {
-            slot: self.parse_slot(slot, raw)
-            for slot, raw in raw_data.items()
+            key: self.parse(raw)
+            for key, raw in raw_data.items()
         }
 
     # ─── equip_type 解析 ──────────────────────────────────
 
-    def _parse_equip_type(self, raw: str, slot_key: str) -> tuple[str | None, str | None]:
+    def _parse_equip_type(self, raw: str) -> tuple[str | None, str | None]:
         """解析装备类型字段
 
         格式：
             "踏雪含光 | 武器·剑"     → ("踏雪含光", "剑")
             "雁南飞冠 | 冠胄"        → ("雁南飞冠", "冠胄")
-            "流星云珑" (ring)        → ("流星云珑", "环")  [从 slot 推断]
+            "流星云珑"              → ("流星云珑", "环")  [从名称推断]
             "江无浪· | 一杆 | 武器·枪" → ("江无浪", "枪")  [脏]
 
         Returns:
@@ -103,8 +110,7 @@ class EquipmentParser:
         if len(parts) == 1:
             # 无分隔符，只有名称
             name = parts[0].strip("· ")
-            # 优先从名称推断，回退到 slot 推断
-            inferred_type = self._infer_type_from_name(name) or self._infer_type_from_slot(slot_key)
+            inferred_type = self._infer_type_from_name(name)
             return name, inferred_type
 
         # 名称取第一段，清理尾部残留符号
@@ -114,19 +120,11 @@ class EquipmentParser:
         last = parts[-1]
         weapon_type = self._extract_weapon_type(last)
 
-        # 如果提取失败，优先从名称推断，回退到 slot 推断
+        # 如果提取失败，尝试从名称推断
         if weapon_type is None:
-            weapon_type = self._infer_type_from_name(name) or self._infer_type_from_slot(slot_key)
+            weapon_type = self._infer_type_from_name(name)
 
         return name, weapon_type
-
-    def _infer_type_from_slot(self, slot_key: str) -> str | None:
-        """从部位推断类型（适用于 ring/pendant 等部位与类型一一对应的情况）"""
-        slot_type_map = {
-            "ring": "环",
-            "pendant": "佩",
-        }
-        return slot_type_map.get(slot_key)
 
     def _infer_type_from_name(self, name: str) -> str | None:
         """从装备名称推断类型（固定规则）

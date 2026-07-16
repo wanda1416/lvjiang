@@ -130,39 +130,46 @@ class BaseWorkflow:
         logger.info(f"OCR [{scene_key}]: {result}")
         return result
 
-    def click_match_text(self, scene_key: str, scan_result: dict | None, target_text: str, error_msg: str | None = None) -> str | None:
-        """在 OCR 结果中找包含目标文字的区域并点击
-
-        Args:
-            scene_key: 要点击的场景 key
-            scan_result: OCR 结果字典（来自 variables）
-            target_text: 要匹配的文字
-            error_msg: 匹配失败时的错误消息
+    def get_scene_region_map(self, scene_key: str, field_keys: list[str] | None = None) -> dict:
+        """获取场景的区域映射（供 find 定位坐标用）
 
         Returns:
-            None: 成功
-            str: 错误信息
+            {field_key: Region, ...}
+        """
+        regions = self._layout.get_scene_regions(scene_key)
+        if field_keys:
+            regions = [r for r in regions if r.key in field_keys]
+        return {r.key: r for r in regions}
+
+    def find_in_scan(self, scan_result: dict | None, target_text: str, region_map: dict | None = None) -> tuple[int, int] | None:
+        """在 OCR 结果中查找包含目标文字的区域，返回屏幕坐标
+
+        Args:
+            scan_result: OCR 结果 {field_key: text}
+            target_text: 要匹配的文字
+            region_map: 可选，{field_key: Region}，用于计算坐标
+
+        Returns:
+            (x, y) 屏幕绝对坐标，或 None（未找到）
         """
         if not scan_result:
-            msg = f"click_match: 变量为空，无法匹配 {target_text!r}"
-            logger.error(msg)
-            return f"(错误: {msg})"
+            return None
 
-        matched_key = None
         for key, text in scan_result.items():
-            if target_text in text:
-                matched_key = key
-                logger.debug(f"  匹配: {key} = {text!r} 包含 {target_text!r}")
-                break
+            if target_text in str(text):
+                logger.debug(f"  find: {key} = {text!r} 包含 {target_text!r}")
+                if region_map and key in region_map:
+                    coords = self._region_to_screen(region_map[key], jitter=False)
+                    return coords
+                logger.warning(f"find: 匹配到 {key} 但无 region 信息，无法定位坐标")
+                return None
 
-        if matched_key is None:
-            msg = error_msg or f"未找到包含 {target_text!r} 的区域"
-            logger.error(f"{msg}，OCR 结果: {scan_result}")
-            return f"(错误: {msg})"
-
-        logger.info(f"click_match: 找到 {matched_key}，点击")
-        self.click_region(scene_key, matched_key)
         return None
+
+    def click_at(self, x: int, y: int):
+        """点击屏幕绝对坐标"""
+        logger.debug(f"点击坐标: ({x}, {y})")
+        self._input.click_screen(x, y, "dynamic")
 
     # ─── 等待 ──────────────────────────────────────────────
 

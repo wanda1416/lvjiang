@@ -4,10 +4,14 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Drag / Wait / Scan / ClickMatch / Collect / Log
+- 语句：Click / Drag / Wait / Scan / Find / Collect / Log
          If / For / Loop / Break / Return / Label / Goto / Eval
-- 表达式：VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
+- 表达式：SceneRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
+
+引用语义：
+- SceneRef → 静态配置引用（场景名/区域名），来自 yaml，语法 [scene].[region]
+- VarRef   → 运行时变量引用，来自 variables dict，语法 $var
 """
 
 from dataclasses import dataclass, field
@@ -26,15 +30,14 @@ class Program:
 
 @dataclass(frozen=True)
 class Click:
-    scene: Any      # Literal | VarRef
-    field: Any      # Literal | VarRef
+    target: Any     # SceneRef（静态 [scene].[region]）| VarRef（动态 $var，find 产出坐标）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class Drag:
-    scene: Any      # Literal | VarRef
-    arrow: Any      # Literal | VarRef
+    scene: Any      # SceneRef（静态 [scene].[region]）
+    arrow: Any      # SceneRef
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
     hold: float | None = None  # 到达目标后按住不放的时长（秒）
     line_no: int = 0
@@ -48,17 +51,18 @@ class Wait:
 
 @dataclass(frozen=True)
 class Scan:
-    scene: Any      # Literal | VarRef
-    target: Any     # VarRef（必须为变量，as 子句）
+    scene: Any      # SceneRef（静态场景引用）
+    target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     line_no: int = 0
 
 
 @dataclass(frozen=True)
-class ClickMatch:
-    scene: Any      # VarRef（场景名）
-    var: Any        # VarRef（变量名，读取 OCR 结果）
-    text: Any       # Literal
+class Find:
+    """在 scan 结果中查找文本，将坐标存入变量"""
+    source: Any     # VarRef（scan 结果变量）
+    text: Any       # Literal（要查找的文本）
+    target: Any     # VarRef（坐标输出变量）
     error_msg: Any | None = None  # Literal | None
     line_no: int = 0
 
@@ -66,7 +70,7 @@ class ClickMatch:
 @dataclass(frozen=True)
 class Collect:
     source: Any     # VarRef（要收集的变量）
-    alias: str | None = None  # 可选别名
+    alias: str | None = None  # 可选别名（字面量字符串）
     line_no: int = 0
 
 
@@ -123,7 +127,7 @@ class Goto:
 
 @dataclass(frozen=True)
 class Eval:
-    """eval [var =] func(args...)"""
+    """eval $var = func($arg...)"""
     func_name: str
     func_args: list             # list[Literal | VarRef]
     target: str | None = None   # 赋值目标变量名，None 表示丢弃返回值
@@ -133,8 +137,15 @@ class Eval:
 # ─── 表达式 ───────────────────────────────────────────────
 
 @dataclass(frozen=True)
+class SceneRef:
+    """静态配置引用：[scene] 或 [scene].[region]"""
+    scene: str
+    region: str | None = None
+
+
+@dataclass(frozen=True)
 class VarRef:
-    """变量引用：[name]"""
+    """运行时变量引用：$name"""
     name: str
 
 
@@ -146,7 +157,7 @@ class Literal:
 
 @dataclass(frozen=True)
 class FieldAccess:
-    """[var].field"""
+    """$var.field"""
     var: VarRef
     field_name: str
 

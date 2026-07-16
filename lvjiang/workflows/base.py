@@ -29,10 +29,8 @@ class BaseWorkflow:
     """工作流基类
 
     运行时状态：
-    - last_scan: 上次 scan 的 OCR 结果 (dict)
-    - last_scan_scene: 上次 scan 的场景 key
-    - output: 收集的输出数据列表（由 collect 语句追加）
-    - variables: 用户变量表（scan/convert/eval 赋值）
+    - variables: 用户变量表（scan/eval 赋值，所有数据显式存储）
+    - output: 收集的输出数据字典（由 collect 语句写入，key 为 alias 或变量名）
     """
 
     def __init__(
@@ -56,24 +54,20 @@ class BaseWorkflow:
         self._stop_check = stop_check or (lambda: False)
 
         # 运行时状态
-        self.last_scan: dict[str, str] = {}
-        self.last_scan_scene: str = ""
-        self.output: list = []  # collect 语句追加的输出列表
+        self.output: dict = {}  # collect 语句写入的输出字典
         self.variables: dict = {}
 
-    def run(self) -> list:
+    def run(self) -> dict:
         """执行工作流（子类重写）
 
         Returns:
-            list: collect 累积结果
+            dict: collect 累积结果
         """
         raise NotImplementedError
 
     def reset_state(self):
         """重置运行时状态（在 run 开始前调用）"""
-        self.last_scan = {}
-        self.last_scan_scene = ""
-        self.output = []
+        self.output = {}
         self.variables = {}
 
     @property
@@ -83,7 +77,7 @@ class BaseWorkflow:
 
     # ─── DSL 便捷入口 ──────────────────────────────────────
 
-    def run_file(self, workflow_path: Path | str) -> list:
+    def run_file(self, workflow_path: Path | str) -> dict:
         """加载并执行 .wf 文件（DSL 驱动的工作流使用）"""
         from .engine import WorkflowEngine
         engine = WorkflowEngine(self)
@@ -121,42 +115,41 @@ class BaseWorkflow:
         img = self._capture.capture()
         if img is None:
             logger.error("截图失败")
-            self.last_scan = {}
-            self.last_scan_scene = ""
             return {}
 
         canvas = self._layout.get_canvas()
         regions = self._layout.get_scene_regions(scene_key)
         if not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
-            self.last_scan = {}
-            self.last_scan_scene = ""
             return {}
 
         if field_keys:
             regions = [r for r in regions if r.key in field_keys]
 
         result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key)
-        self.last_scan = result
-        self.last_scan_scene = scene_key
-        self.variables["last_scan"] = result
         logger.info(f"OCR [{scene_key}]: {result}")
         return result
 
-    def click_match_text(self, target_text: str, error_msg: str | None = None) -> str | None:
-        """在上次 OCR 结果中找包含目标文字的区域并点击
+    def click_match_text(self, scene_key: str, scan_result: dict | None, target_text: str, error_msg: str | None = None) -> str | None:
+        """在 OCR 结果中找包含目标文字的区域并点击
+
+        Args:
+            scene_key: 要点击的场景 key
+            scan_result: OCR 结果字典（来自 variables）
+            target_text: 要匹配的文字
+            error_msg: 匹配失败时的错误消息
 
         Returns:
             None: 成功
             str: 错误信息
         """
-        if not self.last_scan:
-            msg = "click_match 前没有 scan 结果"
+        if not scan_result:
+            msg = f"click_match: 变量为空，无法匹配 {target_text!r}"
             logger.error(msg)
             return f"(错误: {msg})"
 
         matched_key = None
-        for key, text in self.last_scan.items():
+        for key, text in scan_result.items():
             if target_text in text:
                 matched_key = key
                 logger.debug(f"  匹配: {key} = {text!r} 包含 {target_text!r}")
@@ -164,11 +157,11 @@ class BaseWorkflow:
 
         if matched_key is None:
             msg = error_msg or f"未找到包含 {target_text!r} 的区域"
-            logger.error(f"{msg}，OCR 结果: {self.last_scan}")
+            logger.error(f"{msg}，OCR 结果: {scan_result}")
             return f"(错误: {msg})"
 
         logger.info(f"click_match: 找到 {matched_key}，点击")
-        self.click_region(self.last_scan_scene, matched_key)
+        self.click_region(scene_key, matched_key)
         return None
 
     # ─── 等待 ──────────────────────────────────────────────

@@ -9,8 +9,8 @@ click [game_menu_page].[bag]
 wait step_interval
 
 # 点击培养（可能点开包裹后在道具页等其他页面，需要判断当前）
-scan [bag_equip_detail].[sub_equip]
-if not [last_scan].sub_equip contains "装备"
+scan [bag_equip_detail].[sub_equip] as [bag_scan]
+if not [bag_scan].sub_equip contains "装备"
     click [bag_equip_detail].[training]
     wait step_interval
 end
@@ -25,9 +25,15 @@ wait step_interval
 click [equip_weapon_detail].[more_func]
 wait step_interval
 
-scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4]
-click_match "调律" error "未找到调律按钮"
+scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as [tune_scan]
+click_match [equip_weapon_detail].[tune_scan] "调律" error "未找到调律按钮"
 wait step_interval
+
+scan [equip_tune_detail].[one_click_add] as [add_scan]
+if not [add_scan].one_click_add contains "添加"
+    log "装备已调律完毕，无需调律"
+    return
+end
 
 click [equip_tune_detail].[one_click_add]
 wait step_interval
@@ -36,9 +42,9 @@ click [equip_tune_detail].[tune_btn]
 wait step_interval
 
 wait after_tune_wait
-scan [equip_tune_result]
+scan [equip_tune_result] as [result]
 log "调律结果已识别"
-collect [last_scan]
+collect [result]
 
 click [equip_tune_result].[close_btn]
 wait step_interval

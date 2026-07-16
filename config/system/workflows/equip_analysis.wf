@@ -7,49 +7,49 @@ click [game_menu_page].[bag]
 wait step_interval
 
 click [bag_equip_detail].[slot_main_weapon]
-wait page_refresh_wait
-scan [equip_weapon_detail]
-eval main_weapon = equipment_parser([last_scan])
+wait step_interval
+scan [equip_weapon_detail] as [main_weapon_scan]
+eval main_weapon = equipment_parser([main_weapon_scan])
 collect [main_weapon]
 
 click [bag_equip_detail].[slot_sub_weapon]
-wait page_refresh_wait
-scan [equip_weapon_detail]
-eval sub_weapon = equipment_parser([last_scan])
+wait step_interval
+scan [equip_weapon_detail] as [sub_weapon_scan]
+eval sub_weapon = equipment_parser([sub_weapon_scan])
 collect [sub_weapon]
 
 click [bag_equip_detail].[slot_ring]
-wait page_refresh_wait
-scan [equip_weapon_detail]
-eval ring = equipment_parser([last_scan])
+wait step_interval
+scan [equip_weapon_detail] as [ring_scan]
+eval ring = equipment_parser([ring_scan])
 collect [ring]
 
 click [bag_equip_detail].[slot_pendant]
-wait page_refresh_wait
-scan [equip_weapon_detail]
-eval pendant = equipment_parser([last_scan])
+wait step_interval
+scan [equip_weapon_detail] as [pendant_scan]
+eval pendant = equipment_parser([pendant_scan])
 collect [pendant]
 
 click [bag_equip_detail].[slot_head]
-wait page_refresh_wait
-scan [equip_armor_detail]
-eval head = equipment_parser([last_scan])
+wait step_interval
+scan [equip_armor_detail] as [head_scan]
+eval head = equipment_parser([head_scan])
 collect [head]
 
 click [bag_equip_detail].[slot_chest]
-wait page_refresh_wait
-scan [equip_armor_detail]
-eval chest = equipment_parser([last_scan])
+wait step_interval
+scan [equip_armor_detail] as [chest_scan]
+eval chest = equipment_parser([chest_scan])
 collect [chest]
 
 click [bag_equip_detail].[slot_leg]
-wait page_refresh_wait
-scan [equip_armor_detail]
-eval leg = equipment_parser([last_scan])
+wait step_interval
+scan [equip_armor_detail] as [leg_scan]
+eval leg = equipment_parser([leg_scan])
 collect [leg]
 
 click [bag_equip_detail].[slot_wrist]
-wait page_refresh_wait
-scan [equip_armor_detail]
-eval wrist = equipment_parser([last_scan])
+wait step_interval
+scan [equip_armor_detail] as [wrist_scan]
+eval wrist = equipment_parser([wrist_scan])
 collect [wrist]

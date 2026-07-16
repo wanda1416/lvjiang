@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QTabWidget, QSplitter, QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QKeyEvent, QAction
 from loguru import logger
 
@@ -17,6 +17,11 @@ from .run_control import RunControlMixin
 from ..config import load_user_config
 from ..core.user_config import UserConfigManager
 from ..core.region_config import LayoutConfigManager
+
+
+class _LogBridge(QObject):
+    """信号桥：将后台线程的日志安全转发到主线程（pyqtSignal 必须定义在模块级类上）"""
+    append_log = pyqtSignal(str)
 
 
 class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
@@ -311,18 +316,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._setup_log_redirect()
 
     def _setup_log_redirect(self):
-        """将 loguru 日志输出到 GUI 日志面板"""
+        """将 loguru 日志输出到 GUI 日志面板（线程安全）"""
+        self._log_bridge = _LogBridge(self)
+        self._log_bridge.append_log.connect(self.log_text.append)  # 跨线程自动排队到主线程
+
         class QtSink:
-            def __init__(self, text_edit):
-                self.text_edit = text_edit
+            def __init__(self, bridge):
+                self._bridge = bridge
 
             def write(self, message):
-                try:
-                    self.text_edit.append(message.strip())
-                except RuntimeError:
-                    pass
+                self._bridge.append_log.emit(message.strip())
 
-        sink = QtSink(self.log_text)
+        sink = QtSink(self._log_bridge)
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
 
     # ─── 快捷键 + 关闭 ─────────────────────────────────────

@@ -30,6 +30,7 @@ _lock_dpi_awareness()
 
 from loguru import logger
 
+from .core.crash_handler import install as _install_crash_handler
 from .ui.app import run_app
 
 
@@ -49,6 +50,9 @@ def main():
         level="DEBUG",
         enqueue=True,  # 异步写入，防止进程崩溃时缓冲丢失
     )
+
+    # 崩溃防护：必须在所有 C 扩展（mss 等）加载之前安装
+    _install_crash_handler()
 
     logger.info("律匠启动中...")
     run_app()

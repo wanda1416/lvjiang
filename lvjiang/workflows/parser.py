@@ -13,8 +13,8 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, ScanAs, ClickMatch, Collect, Log,
-    If, For, Loop, Break, Label, Goto, Eval,
+    Click, Drag, Wait, Scan, ClickMatch, Collect, Log,
+    If, For, Loop, Break, Return, Label, Goto, Eval,
     VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
 )
@@ -97,18 +97,19 @@ class _DSLTransformer(Transformer):
                 fields = item  # field_list 返回的是 list[Literal]
             elif isinstance(item, VarRef):
                 target = item  # as_clause 返回 VarRef
-        if target is not None:
-            return ScanAs(scene=scene, fields=fields, target=target, line_no=self._line(items))
-        return Scan(scene=scene, fields=fields, line_no=self._line(items))
+        # as_clause 现在是必须的
+        return Scan(scene=scene, fields=fields, target=target, line_no=self._line(items))
 
     def as_clause(self, items):
         """as [var] → VarRef"""
         return items[0]  # bracket_expr 已转为 VarRef（在条件上下文中）或 Literal
 
     def click_match_stmt(self, items):
-        text = self._ensure_literal(items[0])
-        error_msg = self._ensure_literal(items[1]) if len(items) > 1 else None
-        return ClickMatch(text=text, error_msg=error_msg, line_no=self._line(items))
+        scene = items[0]   # bracket_expr → VarRef
+        var = items[1]     # bracket_expr → VarRef
+        text = self._ensure_literal(items[2])
+        error_msg = self._ensure_literal(items[3]) if len(items) > 3 else None
+        return ClickMatch(scene=scene, var=var, text=text, error_msg=error_msg, line_no=self._line(items))
 
     def error_clause(self, items):
         return self._ensure_literal(items[0])
@@ -197,6 +198,9 @@ class _DSLTransformer(Transformer):
 
     def break_stmt(self, items):
         return Break(line_no=self._line(items))
+
+    def return_stmt(self, items):
+        return Return(line_no=self._line(items))
 
     def label_stmt(self, items):
         return Label(name=str(items[0]), line_no=self._line(items))

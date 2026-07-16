@@ -4,8 +4,8 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Drag / Wait / Scan / ScanAs / ClickMatch / Collect / Log
-         If / For / Loop / Break / Label / Goto / Eval
+- 语句：Click / Drag / Wait / Scan / ClickMatch / Collect / Log
+         If / For / Loop / Break / Return / Label / Goto / Eval
 - 表达式：VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
 """
@@ -49,20 +49,15 @@ class Wait:
 @dataclass(frozen=True)
 class Scan:
     scene: Any      # Literal | VarRef
+    target: Any     # VarRef（必须为变量，as 子句）
     fields: list | None = None  # list[Literal] | None
     line_no: int = 0
 
 
 @dataclass(frozen=True)
-class ScanAs:
-    scene: Any
-    fields: list | None
-    target: Any     # VarRef（必须为变量）
-    line_no: int = 0
-
-
-@dataclass(frozen=True)
 class ClickMatch:
+    scene: Any      # VarRef（场景名）
+    var: Any        # VarRef（变量名，读取 OCR 结果）
     text: Any       # Literal
     error_msg: Any | None = None  # Literal | None
     line_no: int = 0
@@ -106,6 +101,11 @@ class Loop:
 
 @dataclass(frozen=True)
 class Break:
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Return:
     line_no: int = 0
 
 

@@ -3,9 +3,10 @@
 提供 DSL 中可调用的内置函数，用于数据判定和条件分支。
 
 使用方式（.wf 文件）：
-    eval result = is_good_equip(last_scan)
-    if is_good_equip(last_scan)
-        collect_as good_equip
+    scan [scene] as [result]
+    eval good = is_good_equip(result)
+    if [result].field contains "关键词"
+        collect [result] as [label]
     end
 """
 
@@ -47,7 +48,7 @@ def list_functions() -> list[str]:
 def _contains(scan_result: dict, *args) -> bool:
     """检查 scan 结果中是否有任意字段包含指定文本
 
-    .wf 用法: contains(last_scan, "调律")
+    .wf 用法: contains(result, "调律")
     """
     if not isinstance(scan_result, dict) or not args:
         return False
@@ -59,7 +60,7 @@ def _contains(scan_result: dict, *args) -> bool:
 def _count(scan_result: dict, *args) -> int:
     """统计 scan 结果中非空字段数量
 
-    .wf 用法: eval n = count(last_scan)
+    .wf 用法: eval n = count(result)
     """
     if not isinstance(scan_result, dict):
         return 0
@@ -76,8 +77,8 @@ def _equipment_parser(raw_data: dict) -> dict:
     返回 EquipmentData 对象，由工作流变量名提供 key。
 
     .wf 用法:
-        scan [equip_weapon_detail]
-        eval main_weapon = equipment_parser([last_scan])
+        scan [equip_weapon_detail] as [result]
+        eval main_weapon = equipment_parser([result])
         collect [main_weapon]
     """
     if not isinstance(raw_data, dict) or not raw_data:
@@ -112,9 +113,9 @@ def _is_good_equip(scan_result: dict, *args) -> bool:
     基于 OCR 扫描结果中的词条文本，检查是否包含足够多的高价值词条。
 
     .wf 用法:
-        scan [equip_weapon_detail]
-        if is_good_equip(last_scan)
-            collect_as good_equip
+        scan [equip_weapon_detail] as [result]
+        if is_good_equip(result)
+            collect [result] as [good_equip]
         end
     """
     if not isinstance(scan_result, dict) or not scan_result:

@@ -23,6 +23,7 @@ start: (_NL | statement)*
           | for_stmt
           | loop_stmt
           | break_stmt
+          | return_stmt
           | label_stmt
           | goto_stmt
 
@@ -38,11 +39,11 @@ drag_hold: "hold"i (FLOAT | INT)
 
 wait_stmt: "wait"i (NAME | FLOAT | INT | bracket_expr) _NL
 
-scan_stmt: "scan"i bracket_expr field_list? as_clause? _NL
+scan_stmt: "scan"i bracket_expr field_list? as_clause _NL
 
 as_clause: "as"i bracket_expr
 
-click_match_stmt: "click_match"i STRING error_clause? _NL
+click_match_stmt: "click_match"i bracket_expr "." bracket_expr STRING error_clause? _NL
 
 error_clause: "error"i STRING
 
@@ -69,6 +70,8 @@ for_stmt: "for"i NAME "in"i bracket_list _NL statement* "end"i _NL
 loop_stmt: "loop"i (INT | NAME) _NL statement* "end"i _NL
 
 break_stmt: "break"i _NL
+
+return_stmt: "return"i _NL
 
 label_stmt: "@" NAME _NL
 

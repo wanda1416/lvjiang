@@ -224,8 +224,8 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         """任一 Tab 的区域被修改时，标记 dirty + 刷新当前 Tab 的字段列表"""
         self._set_dirty(True)
         current = self._tab_widget.currentWidget()
-        if hasattr(current, '_refresh_field_list'):
-            current._refresh_field_list()
+        if hasattr(current, '_refresh_region_list'):
+            current._refresh_region_list()
 
     def _set_dirty(self, dirty: bool):
         """设置/清除修改状态指示"""

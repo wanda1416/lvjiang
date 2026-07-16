@@ -14,42 +14,56 @@ eval $bag_slot = concat("bag_", $bag_row, "_", $bag_col)
 click [bag_equip_detail].$bag_slot
 wait step_interval
 
-call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
-if not $tune_status
-    log "未进入调律页面，提前结束"
-    return
-end
+scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $main_weapon_scan
+eval $main_weapon = to_equipment($main_weapon_scan)
 
-scan [equip_tune_detail].[one_click_add] as $add_scan
-if not $add_scan.one_click_add contains "添加"
-    log "装备已调律完毕，无需调律"
-    return
-end
-
-# 识别材料格，找到目标材料则点击（若未选择材料则跳过）
-if $target_material
-    call "subcall/find_tune_material.wf" with $target_material as "material_name" read "slot_name" as $slot
-    if not $slot
-        log concat($target_material, "材料不足，提前结束")
-        return
+if $main_weapon.[_extra].[affix_count] < 5
+else 
+    log "词条满了，不用调律了"
+    loop 2
+        click [bag_equip_detail].[back]
+        wait step_interval
     end
-    click [equip_tune_detail].$slot
-    wait step_interval
+    click [game_menu_page].[back]
+    eval $exit_code = -1
+    collect $exit_code
+    return
 end
 
-click [equip_tune_detail].[one_click_add]
-wait step_interval
+eval $result = {}
+call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
 
-click [equip_tune_detail].[tune_btn]
-wait step_interval
-
-wait after_tune_wait
-scan [equip_tune_result] as $result
-log "调律结果已识别"
-collect $result
-
-click [equip_tune_result].[close_btn]
-wait step_interval
+if $tune_status
+    scan [equip_tune_detail].[one_click_add] as $add_scan
+    if $add_scan.one_click_add contains "添加"
+        eval $should_tune = "yes"
+        if $target_material
+            call "subcall/find_tune_material.wf" with $target_material as "material_name" read "slot_name" as $slot
+            if $slot
+                click [equip_tune_detail].$slot
+                wait step_interval
+            else
+                log concat($target_material, "材料不足，提前结束")
+                eval $should_tune = ""
+            end
+        end
+        if $should_tune
+            click [equip_tune_detail].[one_click_add]
+            wait step_interval
+            click [equip_tune_detail].[tune_btn]
+            wait step_interval
+            wait after_tune_wait
+            scan [equip_tune_result] as $result
+            log "调律结果已识别"
+            click [equip_tune_result].[close_btn]
+            wait step_interval
+        end
+    else
+        log "装备已调律完毕，无需调律"
+    end
+else
+    log "未进入调律页面，提前结束"
+end
 
 click [equip_tune_detail].[back]
 wait step_interval
@@ -60,3 +74,7 @@ loop 3
 end
 
 click [game_menu_page].[back]
+collect $result
+
+eval $exit_code = 0
+collect $exit_code

@@ -1,62 +1,6 @@
-# 单次调律工作流
-# 参数：$target_material — 目标材料（由 UI 参数面板注入）
-# 参数：$equip_slot — 装备部位（由 UI 参数面板注入）
-# 参数：$bag_row, $bag_col — 背包行列（由 UI 参数面板注入）
-
-call "subcall/nav_main_to_equip.wf"
-
-# 点击指定装备部位
-click [bag_equip_detail].$equip_slot
-wait step_interval
-
-# 拼接背包槽位名：bag_{row}_{col}
-eval $bag_slot = concat("bag_", $bag_row, "_", $bag_col)
-click [bag_equip_detail].$bag_slot
-wait step_interval
-
-call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
-if not $tune_status
-    log "未进入调律页面，提前结束"
-    return
+scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $main_weapon_scan
+eval $main_weapon = to_equipment($main_weapon_scan)
+if $main_weapon.[_extra].[affix_count] >= 5
+  log "词条满了，不用调律了"
 end
-
-scan [equip_tune_detail].[one_click_add] as $add_scan
-if not $add_scan.one_click_add contains "添加"
-    log "装备已调律完毕，无需调律"
-    return
-end
-
-# 识别材料格，找到目标材料则点击（若未选择材料则跳过）
-if $target_material
-    call "subcall/find_tune_material.wf" with $target_material as "material_name" read "slot_name" as $slot
-    if not $slot
-        log concat($target_material, "材料不足，提前结束")
-        return
-    end
-    click [equip_tune_detail].$slot
-    wait step_interval
-end
-
-click [equip_tune_detail].[one_click_add]
-wait step_interval
-
-click [equip_tune_detail].[tune_btn]
-wait step_interval
-
-wait after_tune_wait
-scan [equip_tune_result] as $result
-log "调律结果已识别"
-collect $result
-
-click [equip_tune_result].[close_btn]
-wait step_interval
-
-click [equip_tune_detail].[back]
-wait step_interval
-
-loop 3
-    click [bag_equip_detail].[back]
-    wait step_interval
-end
-
-click [game_menu_page].[back]
+collect $main_weapon

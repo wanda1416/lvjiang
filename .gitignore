@@ -30,3 +30,4 @@ Desktop.ini
 
 # Qoder
 .qoder/
+config/system/workflows/_editor_run.wf

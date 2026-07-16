@@ -44,25 +44,62 @@ class ScreenCapture:
         }
         logger.info(f"设置捕获区域: left={left}, top={top}, width={width}, height={height}")
 
-    def capture(self) -> np.ndarray | None:
+    def get_capture_size(self) -> tuple[int, int]:
+        """返回当前捕获区域的宽高（像素），不截屏
+
+        Returns:
+            (width, height)
+        """
+        if self._monitor:
+            return self._monitor["width"], self._monitor["height"]
+        # 未设置捕获区域时，取主显示器分辨率
+        mon = self._sct.monitors[1]
+        return mon["width"], mon["height"]
+
+    def capture(self, timeout: float = 5.0) -> np.ndarray | None:
         """
         截取屏幕，返回 numpy 数组（BGR 格式，OpenCV 兼容）
         如果设置了 _monitor 则截取指定区域，否则截取全屏
-        """
-        try:
-            if self._monitor:
-                screenshot = self._sct.grab(self._monitor)
-            else:
-                # 默认截取主显示器
-                screenshot = self._sct.grab(self._sct.monitors[1])
 
-            # 转换为 numpy 数组 (BGRA)
-            img = np.array(screenshot)
-            # BGRA -> BGR
-            return img[:, :, :3]
-        except Exception as e:
-            logger.error(f"截屏失败: {e}")
+        Args:
+            timeout: 超时秒数（默认 5s）。mss.grab 底层调用 Win32 GDI，
+                     可能因显示状态变化而永久阻塞，需要超时保护。
+        """
+        result: list[np.ndarray | None] = [None]
+        error: list[Exception | None] = [None]
+
+        def _grab():
+            try:
+                if self._monitor:
+                    screenshot = self._sct.grab(self._monitor)
+                else:
+                    screenshot = self._sct.grab(self._sct.monitors[1])
+                img = np.array(screenshot)
+                result[0] = img[:, :, :3]
+            except Exception as e:
+                error[0] = e
+
+        t = threading.Thread(target=_grab, daemon=True)
+        t.start()
+        t.join(timeout)
+
+        if t.is_alive():
+            logger.error(f"截屏超时（{timeout}s），mss.grab 可能已死锁，跳过本次捕获")
+            # 重建当前线程的 mss 实例，丢弃可能损坏的 GDI 上下文
+            old_sct = getattr(self._local, "sct", None)
+            if old_sct is not None:
+                try:
+                    old_sct.close()
+                except Exception:
+                    pass
+            self._local.sct = None
             return None
+
+        if error[0] is not None:
+            logger.error(f"截屏失败: {error[0]}")
+            return None
+
+        return result[0]
 
     def capture_to_file(self, path: str) -> bool:
         """截屏并保存为 PNG 文件"""
@@ -80,11 +117,10 @@ class ScreenCapture:
     def find_window_by_title(self, title_keyword: str) -> dict | None:
         """
         通过窗口标题关键词查找投屏窗口
-        注意：mss 本身不支持按窗口标题查找，这里用 pyautogui 辅助
+        使用 ctypes + Win32 API (EnumWindows / GetWindowTextW)
         返回窗口的位置信息 dict 或 None
         """
         try:
-            import pyautogui
             import ctypes
             from ctypes import wintypes
 

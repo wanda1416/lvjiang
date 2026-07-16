@@ -222,12 +222,7 @@ class BaseWorkflow:
 
     def _region_to_screen(self, region: Region, jitter: bool = True) -> tuple[int | None, int | None]:
         """区域坐标 → 屏幕坐标"""
-        img = self._capture.capture()
-        if img is None:
-            logger.error("截图失败")
-            return None, None
-
-        h, w = img.shape[:2]
+        w, h = self._capture.get_capture_size()
         canvas = self._layout.get_canvas()
 
         canvas_x = canvas.x_ratio * w

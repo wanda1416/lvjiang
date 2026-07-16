@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt
 from ...core.region_config import (
     Region, Point, Arrow, CanvasConfig,
     get_scene_regions, get_scene_point_pairs, get_point_def,
-    get_registry, reload_scene_registry,
+    get_registry, sync_scene_cache,
 )
 from ...core.scene_loader import RegionDef, PointDef, VALID_REGION_TYPES
 from .canvas import RegionCanvas, EditMode
@@ -370,7 +370,7 @@ class SceneTab(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))
             return
-        reload_scene_registry()
+        sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
     def _on_new_point_def(self):
@@ -384,7 +384,7 @@ class SceneTab(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "创建失败", str(e))
             return
-        reload_scene_registry()
+        sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
     def _on_edit_point(self, item: QListWidgetItem):
@@ -405,7 +405,7 @@ class SceneTab(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "更新失败", str(e))
             return
-        reload_scene_registry()
+        sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
     # ─── region CRUD ─────────────────────────────────────
@@ -421,7 +421,7 @@ class SceneTab(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "创建失败", str(e))
             return
-        reload_scene_registry()
+        sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
     def _on_delete_region(self):
@@ -446,7 +446,7 @@ class SceneTab(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))
             return
-        reload_scene_registry()
+        sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
     def _on_edit_region(self, item: QListWidgetItem):
@@ -471,7 +471,7 @@ class SceneTab(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "更新失败", str(e))
             return
-        reload_scene_registry()
+        sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
     # ─── 编辑弹窗 ────────────────────────────────────────

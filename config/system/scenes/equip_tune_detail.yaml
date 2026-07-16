@@ -1,69 +1,78 @@
 key: equip_tune_detail
 name: 调律详情
-
 regions:
-  - key: back
-    name: 返回
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: affix_gong
-    name: 词条宫
-    type: attr
-
-  - key: affix_shang
-    name: 词条商
-    type: attr
-
-  - key: affix_jue
-    name: 词条角
-    type: attr
-
-  - key: affix_zhi
-    name: 词条徵
-    type: attr
-
-  - key: affix_yu
-    name: 词条羽
-    type: attr
-
-  - key: one_click_add
-    name: 一键添加
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: material_1
-    name: 材料格1
-    type: slot
-
-  - key: material_2
-    name: 材料格2
-    type: slot
-
-  - key: material_3
-    name: 材料格3
-    type: slot
-
-  - key: material_4
-    name: 材料格4
-    type: slot
-
-  - key: material_5
-    name: 材料格5
-    type: slot
-
-  - key: material_6
-    name: 材料格6
-    type: slot
-
-  - key: material_7
-    name: 材料格7
-    type: slot
-
-  - key: tune_btn
-    name: 调律
-    type: func
-    is_text: false
-    is_clickable: true
+- key: back
+  name: 返回
+  type: func
+  is_text: false
+  is_clickable: true
+- key: affix_gong
+  name: 词条宫
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: affix_shang
+  name: 词条商
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: affix_jue
+  name: 词条角
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: affix_zhi
+  name: 词条徵
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: affix_yu
+  name: 词条羽
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: one_click_add
+  name: 一键添加
+  type: func
+  is_text: false
+  is_clickable: true
+- key: material_1
+  name: 材料格1
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: material_2
+  name: 材料格2
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: material_3
+  name: 材料格3
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: material_4
+  name: 材料格4
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: material_5
+  name: 材料格5
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: material_6
+  name: 材料格6
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: material_7
+  name: 材料格7
+  type: slot
+  is_text: true
+  is_clickable: false
+- key: tune_btn
+  name: 调律
+  type: func
+  is_text: false
+  is_clickable: true

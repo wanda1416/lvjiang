@@ -4,7 +4,7 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Wait / Scan / ScanAs / ClickMatch / Collect / CollectAs / Log
+- 语句：Click / Drag / Wait / Scan / ScanAs / ClickMatch / Collect / Log
          If / For / Loop / Break / Label / Goto / Eval
 - 表达式：VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
@@ -28,6 +28,14 @@ class Program:
 class Click:
     scene: Any      # Literal | VarRef
     field: Any      # Literal | VarRef
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Drag:
+    scene: Any      # Literal | VarRef
+    arrow: Any      # Literal | VarRef
+    duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
     line_no: int = 0
 
 
@@ -61,12 +69,8 @@ class ClickMatch:
 
 @dataclass(frozen=True)
 class Collect:
-    line_no: int = 0
-
-
-@dataclass(frozen=True)
-class CollectAs:
-    key: Any        # Literal | VarRef
+    source: Any     # VarRef（要收集的变量）
+    alias: str | None = None  # 可选别名
     line_no: int = 0
 
 

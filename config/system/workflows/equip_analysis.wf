@@ -1,41 +1,55 @@
 # 装备分析工作流
 
+click [game_main_page].[menu]
+wait step_interval
+
+click [game_menu_page].[bag]
+wait step_interval
+
 click [equip_bag_detail].[slot_main_weapon]
 wait page_refresh_wait
 scan [equip_weapon_detail]
-collect_as main_weapon
+eval main_weapon = equipment_parser([last_scan])
+collect [main_weapon]
 
 click [equip_bag_detail].[slot_sub_weapon]
 wait page_refresh_wait
 scan [equip_weapon_detail]
-collect_as sub_weapon
+eval sub_weapon = equipment_parser([last_scan])
+collect [sub_weapon]
 
 click [equip_bag_detail].[slot_ring]
 wait page_refresh_wait
 scan [equip_weapon_detail]
-collect_as ring
+eval ring = equipment_parser([last_scan])
+collect [ring]
 
 click [equip_bag_detail].[slot_pendant]
 wait page_refresh_wait
 scan [equip_weapon_detail]
-collect_as pendant
+eval pendant = equipment_parser([last_scan])
+collect [pendant]
 
 click [equip_bag_detail].[slot_head]
 wait page_refresh_wait
 scan [equip_armor_detail]
-collect_as head
+eval head = equipment_parser([last_scan])
+collect [head]
 
 click [equip_bag_detail].[slot_chest]
 wait page_refresh_wait
 scan [equip_armor_detail]
-collect_as chest
+eval chest = equipment_parser([last_scan])
+collect [chest]
 
 click [equip_bag_detail].[slot_leg]
 wait page_refresh_wait
 scan [equip_armor_detail]
-collect_as leg
+eval leg = equipment_parser([last_scan])
+collect [leg]
 
 click [equip_bag_detail].[slot_wrist]
 wait page_refresh_wait
 scan [equip_armor_detail]
-collect_as wrist
+eval wrist = equipment_parser([last_scan])
+collect [wrist]

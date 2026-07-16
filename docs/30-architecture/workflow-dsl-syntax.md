@@ -12,7 +12,7 @@
 - **标识符**：`[a-zA-Z_][a-zA-Z0-9_]*`
 - **变量引用**：**仅 `[]` 包裹的标识符被识别为变量引用**，未包裹的标识符一律视为字面量。例如 `[slot]` 是变量，`slot` 是字面量字符串
 - **内置变量**：
-  - `[last_result]`：最近一次 `scan` 的结果（dict），字段 key 为 `field_key`
+  - `[last_scan]`：最近一次 `scan` 的结果（dict），字段 key 为 `field_key`
   - `for` 循环变量：在循环体内通过 `[var]` 引用当前迭代值
 
 ## 二、指令集
@@ -21,13 +21,15 @@
 
 | 指令 | 语法 | 说明 |
 |---|---|---|
-| click | `click [scene].[field]` | 点击区域（含抖动） |
+| click | `click [scene].[key]` | 点击区域或坐标点（自动识别 region/point） |
+| drag | `drag [scene].[arrow_key] [时长]` | 执行 arrow 定义的拖拽操作。时长可选：固定秒数或 `[min, max]` 范围 |
 | wait | `wait <delay_name>` 或 `wait <秒数>` | 命名延迟或固定秒数 |
-| scan | `scan [scene]` 或 `scan [scene].[f1, f2, ...]` | OCR 整个场景或指定字段，结果写入 `[last_result]` |
+| scan | `scan [scene]` 或 `scan [scene].[f1, f2, ...]` | OCR 整个场景或指定字段，结果写入 `[last_scan]` |
 | scan as | `scan [scene] as [var_name]` | 同上，同时将结果存入自定义变量 `[var_name]` |
-| click_match | `click_match "文本" [error "错误信息"]` | 在 `[last_result]` 中匹配文本并点击 |
-| collect | `collect` | `[last_result]` 作为工作流输出 |
-| collect_as | `collect_as [key]` | `[last_result]` 存入输出字典的 `[key]` 字段 |
+| click_match | `click_match "文本" [error "错误信息"]` | 在 `[last_scan]` 中匹配文本并点击 |
+| collect | `collect [var]` | 将变量值追加到工作流输出列表 |
+| collect as | `collect [var] as [alias]` | 同上，但以 `{alias: value}` 形式追加 |
+| eval | `eval var = func(args...)` | 调用内置函数，可选地将返回值存入变量 |
 | log | `log "消息"` | 输出日志 |
 
 ### 2.2 控制流指令（v2 新增）
@@ -47,16 +49,16 @@
 
 | 形式 | 说明 |
 |---|---|
-| `[last_result].field_key contains "文本"` | 字段值包含子串 |
-| `[last_result].field_key equals "文本"` | 字段值完全相等 |
-| `[last_result].field_key in ["文本1", "文本2", ...]` | 字段值等于列表中任一项（等价于多个 equals 的 or 组合） |
-| `[last_result].field_key is_empty` | 字段不存在或为空字符串 |
+| `[last_scan].field_key contains "文本"` | 字段值包含子串 |
+| `[last_scan].field_key equals "文本"` | 字段值完全相等 |
+| `[last_scan].field_key in ["文本1", "文本2", ...]` | 字段值等于列表中任一项（等价于多个 equals 的 or 组合） |
+| `[last_scan].field_key is_empty` | 字段不存在或为空字符串 |
 | `not <基础条件>` | 取反任意一种 |
 
 示例：
 
 ```
-if [last_result].equip_type in ["万仞山披膊", "天罡战袍"]
+if [last_scan].equip_type in ["万仞山披膊", "天罡战袍"]
     log "命中目标装备类型"
 end
 ```
@@ -71,11 +73,11 @@ end
 示例：
 
 ```
-if [last_result].affix_gong contains "会心" and not [last_result].affix_shang is_empty
+if [last_scan].affix_gong contains "会心" and not [last_scan].affix_shang is_empty
     log "命中目标词条"
 end
 
-if [last_result].x is_empty or ([last_result].y equals "A" and [last_result].z contains "B")
+if [last_scan].x is_empty or ([last_scan].y equals "A" and [last_scan].z contains "B")
     click [scene].[field]
 end
 ```
@@ -102,9 +104,42 @@ if [weapon_data].affix_gong contains "会心"
 end
 ```
 
-## 四、完整示例
+## 四、内置函数与 eval
 
-### 4.1 装备分析（for + if/else）
+DSL 通过 `eval` 调用引擎内置函数，支持数据清洗、条件判定等能力。
+
+### 4.1 eval 语法
+
+```
+eval var = func_name(arg1, arg2, ...)
+```
+
+- 赋值目标 `var =` 可选，省略则丢弃返回值
+- 参数可以是 `[var]`（变量引用，运行时解析为实际值）或 `"literal"`（字面量字符串）
+
+### 4.2 内置函数列表
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `equipment_parser` | `(raw_data: dict) -> dict` | 解析装备 OCR 原始数据为 EquipmentData 字典 |
+| `contains` | `(scan_result: dict, text: str) -> bool` | 检查 scan 结果中是否有任意字段包含指定文本 |
+| `count` | `(scan_result: dict) -> int` | 统计 scan 结果中非空字段数量 |
+| `is_good_equip` | `(scan_result: dict) -> bool` | 判定装备是否值得保留（基于高价值词条） |
+
+### 4.3 装备解析示例
+
+```
+# scan → eval 解析 → collect 标准三步模式
+scan [equip_weapon_detail]
+eval main_weapon = equipment_parser([last_scan])
+collect [main_weapon]
+```
+
+`equipment_parser` 纯基于 OCR 文字分析装备类型，不依赖场景信息。
+
+## 五、完整示例
+
+### 5.1 装备分析（for + if/else）
 
 ```
 # 装备分析工作流
@@ -121,11 +156,11 @@ for slot in [slot_main_weapon, slot_sub_weapon,
         scan [equip_armor_detail]
     end
 
-    collect_as [slot]
+    collect [last_scan] as [slot]
 end
 ```
 
-### 4.2 调律决策树骨架（loop + if + goto + break）
+### 5.2 调律决策树骨架（loop + if + goto + break）
 
 ```
 @tune_start
@@ -135,12 +170,12 @@ click [equip_tune_detail].[tune_btn]
 wait after_tune_wait
 scan [equip_tune_result]
 
-if [last_result].result equals "成功"
+if [last_scan].result equals "成功"
     log "调律成功"
     goto tune_done
 end
 
-if [last_result].result contains "失败"
+if [last_scan].result contains "失败"
     loop 3
         click [equip_tune_detail].[retry]
         wait step_interval
@@ -155,7 +190,7 @@ break
 click [equip_tune_result].[close_btn]
 ```
 
-## 五、保留与兼容性
+## 六、保留与兼容性
 
 - v1 的 `.wf` 文件（无控制流）在 v2 解析器下 100% 可执行
 - 旧 `click_match "..." error "..."` 语法保持原样

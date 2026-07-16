@@ -13,7 +13,7 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Wait, Scan, ScanAs, ClickMatch, Collect, CollectAs, Log,
+    Click, Drag, Wait, Scan, ScanAs, ClickMatch, Collect, Log,
     If, For, Loop, Break, Label, Goto, Eval,
     VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
@@ -54,6 +54,19 @@ class _DSLTransformer(Transformer):
         scene, field = items
         return Click(scene=scene, field=field, line_no=self._line(items))
 
+    def drag_stmt(self, items):
+        scene, arrow = items[0], items[1]
+        duration = items[2] if len(items) > 2 else None
+        return Drag(scene=scene, arrow=arrow, duration=duration, line_no=self._line(items))
+
+    def drag_duration(self, items):
+        item = items[0]
+        if isinstance(item, list):
+            # bracket_list → list[Literal]，取前两个作为范围
+            return item[:2]
+        # FLOAT token → Literal
+        return Literal(value=float(item))
+
     def wait_stmt(self, items):
         arg = items[0]
         if isinstance(arg, Token):
@@ -89,10 +102,18 @@ class _DSLTransformer(Transformer):
         return self._ensure_literal(items[0])
 
     def collect_stmt(self, items):
-        return Collect(line_no=self._line(items))
+        source = items[0]  # bracket_expr → VarRef
+        alias = None
+        if len(items) > 1:
+            # collect_as_clause 返回元组 ("alias", VarRef)
+            alias_item = items[1]
+            if isinstance(alias_item, tuple) and alias_item[0] == "alias":
+                alias = alias_item[1].name if isinstance(alias_item[1], VarRef) else str(alias_item[1])
+        return Collect(source=source, alias=alias, line_no=self._line(items))
 
-    def collect_as_stmt(self, items):
-        return CollectAs(key=items[0], line_no=self._line(items))
+    def collect_as_clause(self, items):
+        """as [alias] → 返回标记元组"""
+        return ("alias", items[0])
 
     def log_stmt(self, items):
         return Log(message=self._ensure_literal(items[0]), line_no=self._line(items))
@@ -118,6 +139,10 @@ class _DSLTransformer(Transformer):
 
     def arg_var(self, items):
         return VarRef(name=str(items[0]))
+
+    def arg_var_ref(self, items):
+        """[var] 作为函数参数 → VarRef"""
+        return items[0]  # bracket_expr 已返回 VarRef
 
     # ─── 控制流 ───────────────────────────────────────────
 
@@ -301,17 +326,12 @@ class _ContextPostProcessor:
                 body=[_ContextPostProcessor._process_stmt(s) for s in node.body],
                 line_no=node.line_no,
             )
-        # bare NAME Token → Literal（wait/collect_as 等位置的裸标识符）
+        # bare NAME Token → Literal（wait 等位置的裸标识符）
         if isinstance(node, Wait):
             delay = node.delay
             if isinstance(delay, Token):
                 delay = Literal(value=str(delay))
             return Wait(delay=delay, line_no=node.line_no)
-        if isinstance(node, CollectAs):
-            key = node.key
-            if isinstance(key, Token):
-                key = Literal(value=str(key))
-            return CollectAs(key=key, line_no=node.line_no)
         return node
 
     @staticmethod

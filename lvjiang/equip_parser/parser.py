@@ -103,8 +103,8 @@ class EquipmentParser:
         if len(parts) == 1:
             # 无分隔符，只有名称
             name = parts[0].strip("· ")
-            # 从 slot 推断类型（ring/pendant 部位与类型一一对应）
-            inferred_type = self._infer_type_from_slot(slot_key)
+            # 优先从名称推断，回退到 slot 推断
+            inferred_type = self._infer_type_from_name(name) or self._infer_type_from_slot(slot_key)
             return name, inferred_type
 
         # 名称取第一段，清理尾部残留符号
@@ -114,9 +114,9 @@ class EquipmentParser:
         last = parts[-1]
         weapon_type = self._extract_weapon_type(last)
 
-        # 如果提取失败，尝试从 slot 推断
+        # 如果提取失败，优先从名称推断，回退到 slot 推断
         if weapon_type is None:
-            weapon_type = self._infer_type_from_slot(slot_key)
+            weapon_type = self._infer_type_from_name(name) or self._infer_type_from_slot(slot_key)
 
         return name, weapon_type
 
@@ -127,6 +127,18 @@ class EquipmentParser:
             "pendant": "佩",
         }
         return slot_type_map.get(slot_key)
+
+    def _infer_type_from_name(self, name: str) -> str | None:
+        """从装备名称推断类型（固定规则）
+
+        - 名称含“云珑” → 环
+        - 名称含“辟邪” → 佩
+        """
+        if "云珑" in name:
+            return "环"
+        if "辟邪" in name:
+            return "佩"
+        return None
 
     def _extract_weapon_type(self, text: str) -> str | None:
         """从文本中提取武器类型或防具类别

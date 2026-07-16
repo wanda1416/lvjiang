@@ -1,4 +1,4 @@
-# 单次调律测试工作流
+# 单次调律工作流
 
 click [game_main_page].[menu]
 wait step_interval
@@ -28,7 +28,7 @@ wait step_interval
 wait after_tune_wait
 scan [equip_tune_result]
 log "调律结果已识别"
-collect
+collect [last_scan]
 
 click [equip_tune_result].[close_btn]
 wait step_interval

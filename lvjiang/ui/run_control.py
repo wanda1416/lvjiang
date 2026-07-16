@@ -1,39 +1,46 @@
-"""运行控制混入类 - 用户/布局选择器、启停控制、毕业率执行"""
+"""运行控制混入类 - 用户/布局选择器、启停控制、工作流通用执行"""
 
+import json
 import traceback
+from datetime import datetime
 
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..constants import SYSTEM_WORKFLOWS_DIR
+import yaml
+
+from ..constants import SYSTEM_WORKFLOWS_DIR, SYSTEM_CONFIG_DIR
 from ..workflows.base import BaseWorkflow
 
 
-# 各工作流所需场景（用于启动前校验）
-_GRADUATION_REQUIRED_SCENES = ["equip_bag_detail", "equip_weapon_detail", "equip_armor_detail"]
-_TUNE_TEST_REQUIRED_SCENES = [
-    "game_main_page", "game_menu_page", "equip_bag_detail",
-    "equip_weapon_detail", "equip_tune_detail", "equip_tune_result",
-]
+def _to_serializable(obj):
+    """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
+    if isinstance(obj, list):
+        return [_to_serializable(item) for item in obj]
+    if isinstance(obj, dict):
+        return {k: _to_serializable(v) for k, v in obj.items()}
+    if hasattr(obj, 'to_dict'):
+        return obj.to_dict()
+    return obj
 
 
 class WorkflowWorker(QThread):
     """工作流异步执行线程"""
-    finished = pyqtSignal(str, object)  # (name, result_or_exception)
+    finished = pyqtSignal(str, object)  # (flow_id, result_or_exception)
 
-    def __init__(self, name: str, fn, parent=None):
+    def __init__(self, flow_id: str, fn, parent=None):
         super().__init__(parent)
-        self.name = name
+        self.flow_id = flow_id
         self._fn = fn
 
     def run(self):
         try:
             result = self._fn()
-            self.finished.emit(self.name, result)
+            self.finished.emit(self.flow_id, result)
         except BaseException as e:
             tb = traceback.format_exc()
-            logger.error(f"工作流 {self.name} 异常退出:\n{tb}")
-            self.finished.emit(self.name, e)
+            logger.error(f"工作流 {self.flow_id} 异常退出:\n{tb}")
+            self.finished.emit(self.flow_id, e)
 
 
 class RunControlMixin:
@@ -42,12 +49,48 @@ class RunControlMixin:
     依赖主类提供:
         _user_manager, _layout_manager, _target_window, _running, _stop_requested,
         _capture, _ocr, _input, _overlay,
-        user_combo, layout_combo, btn_graduation, btn_tune_test, btn_run_toggle,
+        user_combo, layout_combo, workflow_combo, btn_run_workflow,
         flow_selector, mode_selector, log_text, statusBar()
     """
 
-    # 工作流完成信号（由 MainWindow 定义）
-    # workflow_finished = pyqtSignal(str, object)  # (name, result_or_error)
+    # ─── 工作流配置加载 ──────────────────────────────────
+
+    def _load_workflow_configs(self):
+        """读取 workflow.yaml，填充 workflow_combo"""
+        self._workflow_configs: list[dict] = []
+        yaml_path = SYSTEM_CONFIG_DIR / "workflow.yaml"
+
+        if not yaml_path.exists():
+            logger.warning(f"工作流配置文件不存在: {yaml_path}")
+            return
+
+        try:
+            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            flows = data.get("flows", [])
+            for flow in flows:
+                self._workflow_configs.append({
+                    "id": flow["id"],
+                    "name": flow["name"],
+                    "wf_file": flow["wf_file"],
+                    "required_scenes": flow.get("required_scenes", []),
+                })
+        except Exception as e:
+            logger.error(f"加载工作流配置失败: {e}")
+            return
+
+        # 填充下拉列表
+        self.workflow_combo.clear()
+        for cfg in self._workflow_configs:
+            self.workflow_combo.addItem(cfg["name"], cfg["id"])
+
+        logger.info(f"已加载 {len(self._workflow_configs)} 个工作流配置")
+
+    def _get_selected_flow_config(self) -> dict | None:
+        """获取当前选中的工作流配置"""
+        idx = self.workflow_combo.currentIndex()
+        if idx < 0 or idx >= len(self._workflow_configs):
+            return None
+        return self._workflow_configs[idx]
 
     # ─── 用户选择器 ────────────────────────────────────────
 
@@ -99,7 +142,6 @@ class RunControlMixin:
 
     def _begin_automation(self, name: str) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
-        # 以 _current_worker 作为唯一真相：只要线程存在且在运行就拒绝
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
             self.log_text.append(f"[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止")
             self.statusBar().showMessage("自动化运行中 | F10 停止")
@@ -108,8 +150,7 @@ class RunControlMixin:
         self._running = True
         self._stop_requested = False
         self._refresh_run_button()
-        self.btn_graduation.setEnabled(False)
-        self.btn_tune_test.setEnabled(False)
+        self.btn_run_workflow.setEnabled(False)
         self.statusBar().showMessage(f"{name} 运行中 | F10 停止")
         logger.info(f"开始自动化: {name}")
         return True
@@ -120,8 +161,7 @@ class RunControlMixin:
         self._stop_requested = False
         self._current_worker = None
         self._refresh_run_button()
-        self.btn_graduation.setEnabled(True)
-        self.btn_tune_test.setEnabled(True)
+        self.btn_run_workflow.setEnabled(True)
         self.statusBar().showMessage(f"{name} 已结束")
         logger.info(f"自动化结束: {name}")
 
@@ -146,16 +186,24 @@ class RunControlMixin:
             self._overlay.set_color("red")
             self.log_text.append("[操作] 已停止")
 
-    # ─── 毕业率按钮 ────────────────────────────────────────
+    # ─── 通用工作流执行 ────────────────────────────────────
 
-    def _on_graduation(self):
-        """执行装备分析流程（异步）"""
+    def _on_run_workflow(self):
+        """执行选中的工作流（异步）"""
         if not self._target_window:
             self.log_text.append("[错误] 请先定位窗口")
             self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
             return
 
-        if not self._begin_automation("毕业率计算"):
+        flow_cfg = self._get_selected_flow_config()
+        if flow_cfg is None:
+            self.log_text.append("[错误] 请选择一个工作流")
+            return
+
+        flow_name = flow_cfg["name"]
+        flow_id = flow_cfg["id"]
+
+        if not self._begin_automation(flow_name):
             return
 
         layout_name = self._layout_manager.get_active_layout_name()
@@ -163,17 +211,19 @@ class RunControlMixin:
 
         if not layout:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
-            self._end_automation("毕业率计算")
+            self._end_automation(flow_name)
             return
 
         # 延迟校验：检查所需场景是否已绑定区域
-        missing = self._layout_manager.check_scenes_valid(layout_name, _GRADUATION_REQUIRED_SCENES)
-        if missing:
-            names = "、".join(missing)
-            self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
-            self.statusBar().showMessage(f"场景缺失: {names}")
-            self._end_automation("毕业率计算")
-            return
+        required_scenes = flow_cfg.get("required_scenes", [])
+        if required_scenes:
+            missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
+            if missing:
+                names = "、".join(missing)
+                self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
+                self.statusBar().showMessage(f"场景缺失: {names}")
+                self._end_automation(flow_name)
+                return
 
         wf = BaseWorkflow(
             capture=self._capture,
@@ -185,167 +235,91 @@ class RunControlMixin:
             window_top=self._target_window["top"],
             stop_check=self._is_stopped,
         )
-        wf_path = SYSTEM_WORKFLOWS_DIR / "equip_analysis.wf"
+        wf_path = SYSTEM_WORKFLOWS_DIR / flow_cfg["wf_file"]
 
-        self.log_text.append("[开始] 装备分析流程...")
-        self._start_workflow("毕业率计算", lambda: wf.run_file(wf_path))
+        self.log_text.append(f"[开始] {flow_name} 流程...")
+        self._start_workflow(flow_id, flow_name, lambda: wf.run_file(wf_path))
 
-    # ─── 单次调律测试按钮 ────────────────────────────────
+    # ─── 异步工作流执行 ────────────────────────────────────
 
-    def _on_tune_test(self):
-        """执行单次调律测试流程（异步）"""
-        if not self._target_window:
-            self.log_text.append("[错误] 请先定位窗口")
-            self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
-            return
-
-        if not self._begin_automation("单次调律测试"):
-            return
-
-        layout_name = self._layout_manager.get_active_layout_name()
-        layout = self._layout_manager.load_layout(layout_name)
-
-        if not layout:
-            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
-            self._end_automation("单次调律测试")
-            return
-
-        # 延迟校验：检查所需场景是否已绑定区域
-        missing = self._layout_manager.check_scenes_valid(layout_name, _TUNE_TEST_REQUIRED_SCENES)
-        if missing:
-            names = "、".join(missing)
-            self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
-            self.statusBar().showMessage(f"场景缺失: {names}")
-            self._end_automation("单次调律测试")
-            return
-
-        wf = BaseWorkflow(
-            capture=self._capture,
-            ocr=self._ocr,
-            input_ctrl=self._input,
-            layout=layout,
-            delay_config=self._user_config.delay,
-            window_left=self._target_window["left"],
-            window_top=self._target_window["top"],
-            stop_check=self._is_stopped,
-        )
-        wf_path = SYSTEM_WORKFLOWS_DIR / "tune_test.wf"
-
-        self.log_text.append("[开始] 单次调律测试流程...")
-        self._start_workflow("单次调律测试", lambda: wf.run_file(wf_path))
-
-    # ─── 异步工作流执行 ────────────────────────────────
-
-    def _start_workflow(self, name: str, workflow):
+    def _start_workflow(self, flow_id: str, flow_name: str, workflow_fn):
         """启动工作流线程"""
-        worker = WorkflowWorker(name, workflow)
+        worker = WorkflowWorker(flow_id, workflow_fn)
         worker.finished.connect(self._on_workflow_finished)
         self._current_worker = worker  # 保持引用防止被垃圾回收
+        # 在 worker 上附加 flow_name 以便日志显示
+        worker._flow_name = flow_name
         worker.start()
 
-    def _on_workflow_finished(self, name: str, result_or_exception):
+    def _on_workflow_finished(self, flow_id: str, result_or_exception):
         """工作流完成回调（在主线程执行）"""
+        # 从 worker 获取 flow_name
+        worker = self.sender()
+        flow_name = getattr(worker, '_flow_name', flow_id) if worker else flow_id
+
         if isinstance(result_or_exception, BaseException):
-            self.log_text.append(f"[错误] {name}流程异常退出: {result_or_exception}")
-            logger.error(f"{name}流程异常退出: {result_or_exception}")
+            self.log_text.append(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
+            logger.error(f"{flow_name}流程异常退出: {result_or_exception}")
         elif self._stop_requested:
-            self.log_text.append(f"[已停止] {name}流程被用户中断")
+            self.log_text.append(f"[已停止] {flow_name}流程被用户中断")
         else:
             result = result_or_exception
-            # 通用保存：所有工作流结果 → users/{用户名}/{工作流名}.json
-            self._save_workflow_result(name, result)
+            self._save_workflow_result(flow_id, result)
+            # 通用控制台输出
+            serializable = _to_serializable(result)
+            logger.info(f"工作流 {flow_id} 结果: {json.dumps(serializable, ensure_ascii=False, indent=2)}")
+            self.log_text.append(f"[完成] {flow_name} 结果已保存")
 
-            if name == "毕业率计算":
-                self._show_graduation_result(result)
-            elif name == "单次调律测试":
-                self.log_text.append(f"[调律词条] {result}")
-        self._end_automation(name)
+        self._end_automation(flow_name)
 
-    def _save_workflow_result(self, name: str, result):
-        """通用保存工作流结果到 users/{用户名}/{工作流名}.json"""
-        import json
-        from ..constants import LOCAL_CONFIG_DIR
-
+    def _save_workflow_result(self, flow_id: str, result):
+        """通用保存工作流结果到 users/{用户名}/{flow_id}_{timestamp}.json"""
         username = self._user_manager.get_active_user_name()
         if not username or not isinstance(result, (dict, list)):
             return
 
+        serializable = _to_serializable(result)
+
+        from ..constants import LOCAL_CONFIG_DIR
         user_dir = LOCAL_CONFIG_DIR / "users" / username
         user_dir.mkdir(parents=True, exist_ok=True)
-        save_path = user_dir / f"{name}.json"
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = user_dir / f"{flow_id}_{timestamp}.json"
         save_path.write_text(
-            json.dumps(result, ensure_ascii=False, indent=2),
+            json.dumps(serializable, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {name} → users/{username}/{name}.json")
-
-    def _show_graduation_result(self, raw_data: dict):
-        """解析并展示毕业率结果"""
-        from ..equip_parser import EquipmentParser
-
-        parser = EquipmentParser()
-        self.log_text.append(f"[完成] 识别到 {len(raw_data)} 件装备")
-        self.log_text.append("─" * 40)
-
-        for slot, raw in raw_data.items():
-            try:
-                equip = parser.parse_slot(slot, raw)
-                warnings_str = f" ⚠{equip.warnings}" if equip.warnings else ""
-                affix_summary = ", ".join(
-                    f"{a.name}{'[转]' if a.is_transferred else ''}"
-                    for a in equip.affixes
-                )
-                self.log_text.append(
-                    f"  {slot:12s} | {equip.name or '?':8s} | "
-                    f"{equip.type or '-':4s} | {equip.level or '?'}阶 "
-                    f"| {affix_summary}{warnings_str}"
-                )
-            except Exception as e:
-                self.log_text.append(f"  {slot:12s} | [解析失败] {e}")
-                logger.warning(f"装备解析失败 {slot}: {e}")
-
-        self.log_text.append("─" * 40)
+        self.log_text.append(f"[保存] {flow_id} → users/{username}/{flow_id}_{timestamp}.json")
 
     # ─── 运行按钮 ──────────────────────────────────────────
 
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮。"""
         if self._running:
-            self.btn_run_toggle.setText("停止 (F10)")
-            self.btn_run_toggle.setStyleSheet(
+            self.btn_run_workflow.setText("停止 (F10)")
+            self.btn_run_workflow.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
             )
         elif self._target_window is None:
-            self.btn_run_toggle.setText("未定位")
-            self.btn_run_toggle.setStyleSheet(
+            self.btn_run_workflow.setText("未定位")
+            self.btn_run_workflow.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
             )
         else:
-            self.btn_run_toggle.setText("开始执行 (F9)")
-            self.btn_run_toggle.setStyleSheet(
+            self.btn_run_workflow.setText("开始执行 (F9)")
+            self.btn_run_workflow.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
             )
 
     # ─── 启停控制 ──────────────────────────────────────────
 
     def _on_start(self):
-        """开始执行"""
+        """开始执行（F9 快捷键转发）"""
         if self._running:
             return
-        if self._target_window is None:
-            message = '请先扫描窗口并点击"定位"，再开始执行。'
-            self.log_text.append(f"[提示] {message}")
-            self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
-            return
-        flow = self.flow_selector.currentText()
-        mode = self.mode_selector.currentText()
-        self._running = True
-        self._stop_requested = False
-        self.log_text.append(f"[操作] 开始执行: 流派={flow}, 模式={mode}")
-        self._refresh_run_button()
-        self.statusBar().showMessage(f"执行中: {flow} - {mode} | F10 停止")
-        self._overlay.set_color("green")
+        self._on_run_workflow()
 
     def _on_stop(self):
         """停止执行（转发到统一停止入口）"""
@@ -356,7 +330,7 @@ class RunControlMixin:
         if self._running:
             self._request_stop()
         else:
-            self._on_start()
+            self._on_run_workflow()
 
     # ─── 扫描装备 ──────────────────────────────────────────
 

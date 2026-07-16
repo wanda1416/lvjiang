@@ -12,11 +12,11 @@ start: (_NL | statement)*
 // ─── 语句分派 ─────────────────────────────────────────────
 
 ?statement: click_stmt
+          | drag_stmt
           | wait_stmt
           | scan_stmt
           | click_match_stmt
           | collect_stmt
-          | collect_as_stmt
           | log_stmt
           | eval_stmt
           | if_stmt
@@ -30,6 +30,10 @@ start: (_NL | statement)*
 
 click_stmt: "click"i bracket_expr "." bracket_expr _NL
 
+drag_stmt: "drag"i bracket_expr "." bracket_expr drag_duration? _NL
+
+drag_duration: FLOAT | bracket_list
+
 wait_stmt: "wait"i (NAME | FLOAT | bracket_expr) _NL
 
 scan_stmt: "scan"i bracket_expr field_list? as_clause? _NL
@@ -40,9 +44,9 @@ click_match_stmt: "click_match"i STRING error_clause? _NL
 
 error_clause: "error"i STRING
 
-collect_stmt: "collect"i _NL
+collect_stmt: "collect"i bracket_expr collect_as_clause? _NL
 
-collect_as_stmt: "collect_as"i (NAME | bracket_expr) _NL
+collect_as_clause: "as"i bracket_expr
 
 log_stmt: "log"i STRING _NL
 
@@ -50,7 +54,7 @@ eval_stmt: "eval"i (NAME "=")? NAME "(" arg_list? ")" _NL
 
 arg_list: arg ("," arg)*
 
-?arg: STRING -> arg_lit | NAME -> arg_var
+?arg: STRING -> arg_lit | NAME -> arg_var | bracket_expr -> arg_var_ref
 
 // ─── 控制流 ───────────────────────────────────────────────
 
@@ -98,7 +102,7 @@ bracket_expr: "[" NAME "]"
 // 元素可以是裸 NAME 或 "字符串"，统一视为字面量
 bracket_list: "[" [bracket_item ("," bracket_item)*] "]"
 
-?bracket_item: NAME | STRING
+?bracket_item: NAME | STRING | FLOAT
 
 field_list: "." "[" NAME ("," NAME)* "]"
 

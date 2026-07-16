@@ -44,6 +44,17 @@ def list_functions() -> list[str]:
 
 # ─── 通用工具函数 ─────────────────────────────────────────
 
+@builtin_func("concat")
+def _concat(*args) -> str:
+    """拼接多个参数为字符串
+
+    .wf 用法:
+        log concat("当前数据: ", $dict.key)
+        eval $msg = concat("结果: ", $var, " 完成")
+    """
+    return "".join(str(arg) for arg in args)
+
+
 @builtin_func("contains")
 def _contains(scan_result: dict, *args) -> bool:
     """检查 scan 结果中是否有任意字段包含指定文本

@@ -13,8 +13,8 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, Find, Collect, Log, Call,
-    If, For, Loop, Break, Return, Label, Goto, Eval,
+    Click, Drag, Wait, Scan, Recognize, Find, Collect, Log, Call,
+    If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldAssign, FuncCall,
     SceneRef, VarRef, Literal, FieldAccess,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
@@ -118,12 +118,37 @@ class _DSLTransformer(Transformer):
                 target = item  # var_ref → VarRef
         return Scan(scene=scene, fields=fields, target=target, line_no=self._line(items))
 
+    def recognize_stmt(self, items):
+        """recognize [scene].[f1, f2, ...] as $var"""
+        scene_name = str(items[0])  # bracket_expr → str
+        scene = SceneRef(scene=scene_name)
+        fields = None
+        target = None
+        for item in items[1:]:
+            if isinstance(item, list) and item and isinstance(item[0], Literal):
+                fields = item  # field_list → list[Literal]
+            elif isinstance(item, VarRef):
+                target = item  # var_ref → VarRef
+        return Recognize(scene=scene, fields=fields, target=target, line_no=self._line(items))
+
     def find_stmt(self, items):
-        """find $source "text" as $target [error "msg"]"""
+        """find $source ("text" | $var) as $target [error "msg"]"""
         source = items[0]   # var_ref → VarRef
-        text = self._ensure_literal(items[1])  # STRING → Literal
-        target = items[2]   # var_ref → VarRef
-        error_msg = self._ensure_literal(items[3]) if len(items) > 3 else None
+        # text 可以是字面量（STRING Token 或 Literal）或变量引用
+        raw_text = items[1]
+        if isinstance(raw_text, VarRef):
+            text = raw_text
+        else:
+            text = self._ensure_literal(raw_text)  # STRING Token → Literal
+        target = None
+        error_msg = None
+        for item in items[2:]:
+            if isinstance(item, VarRef) and target is None:
+                target = item
+            elif isinstance(item, Literal):
+                error_msg = item
+        if target is None:
+            raise ValueError(f"find 语句缺少目标变量: {items}")
         return Find(source=source, text=text, target=target, error_msg=error_msg, line_no=self._line(items))
 
     def error_clause(self, items):
@@ -146,7 +171,10 @@ class _DSLTransformer(Transformer):
         return self._unquote(str(items[0]))
 
     def log_stmt(self, items):
-        return Log(message=self._ensure_literal(items[0]), line_no=self._line(items))
+        arg = items[0]
+        if isinstance(arg, FuncCall):
+            return Log(message=arg, line_no=self._line(items))
+        return Log(message=self._ensure_literal(arg), line_no=self._line(items))
 
     def eval_assign_func(self, items):
         """eval $var = func($arg...)"""
@@ -158,11 +186,13 @@ class _DSLTransformer(Transformer):
         return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
     def eval_assign_lit(self, items):
-        """eval $var = "string" | 123 | -1.5"""
+        """eval $var = "string" | 123 | -1.5 | {}"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])  # $ 后面的 NAME
-        # literal 值：STRING Token 或 float（number 规则产出）
         lit_value = items[1]
+        # 空字典快捷路径
+        if isinstance(lit_value, dict):
+            return Eval(func_name="__empty_dict__", func_args=[], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, Token):
             lit_value = self._unquote(str(lit_value))
         # 用 Eval 节点承载字面量赋值：func_name="__literal__"，func_args=[Literal(value)]
@@ -176,6 +206,50 @@ class _DSLTransformer(Transformer):
         func_args = lists[0] if lists else []
         return Eval(func_name=names[0], func_args=func_args, target=None, line_no=self._line(items))
 
+    def eval_field_assign(self, items):
+        """eval $dict.key = value"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        names = [str(t) for t in tokens]
+        # names[0] = 变量名, names[1] = 字段名
+        var_name = names[0]
+        field_name = names[1]
+        # items 中最后一个非 Token 元素是 eval_rhs 的结果
+        value = None
+        for item in reversed(items):
+            if not isinstance(item, Token):
+                value = item
+                break
+        return EvalFieldAssign(var_name=var_name, field_name=field_name, value=value, line_no=self._line(items))
+
+    def eval_rhs_func(self, items):
+        """eval_rhs: NAME ( arg_list? ) → FuncCall"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        func_name = str(tokens[0])
+        lists = [i for i in items if isinstance(i, list)]
+        func_args = lists[0] if lists else []
+        return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
+
+    def eval_rhs_lit(self, items):
+        """eval_rhs: literal → Literal | dict"""
+        val = items[0]
+        if isinstance(val, dict):
+            return val  # 空字典
+        if isinstance(val, Token):
+            return Literal(value=self._unquote(str(val)))
+        return val  # number (float)
+
+    def func_call(self, items):
+        """func_name(arg_list?) → FuncCall"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        func_name = str(tokens[0])
+        lists = [i for i in items if isinstance(i, list)]
+        func_args = lists[0] if lists else []
+        return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
+
+    def empty_dict(self, items):
+        """{} → 空字典标记"""
+        return {}
+
     def arg_list(self, items):
         return list(items)
 
@@ -185,6 +259,10 @@ class _DSLTransformer(Transformer):
     def arg_var(self, items):
         """var_ref 作为函数参数 → VarRef"""
         return items[0]  # var_ref 已返回 VarRef
+
+    def arg_field(self, items):
+        """field_access 作为函数参数 → FieldAccess"""
+        return items[0]  # field_access 已返回 FieldAccess
 
     # ─── 子工作流调用 ─────────────────────────────────────
 

@@ -22,6 +22,7 @@
 |---|---|---|---|
 | 字符串 | `"..."` | `"武器"`, `"slot_head"` | log、find 文本、collect alias、eval 参数、call 路径、contains/equals 比较、eval 字面量赋值 |
 | 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、数值比较、eval 字面量赋值 |
+| 空字典 | `{}` | `{}` | eval 字面量赋值（初始化空字典变量） |
 
 **不支持**：布尔值、null；eval 函数参数不能直接传数字常量（只能传 `$var` 或 `"string"`）。
 
@@ -36,6 +37,7 @@
 | scan 声明 | `scan [scene] as $var` | OCR 扫描结果存入 `$var`（dict，key 为区域名） |
 | eval 函数赋值 | `eval $var = func(args...)` | 内置函数返回值存入 `$var` |
 | eval 字面量赋值 | `eval $var = "str"` 或 `eval $var = 42` | 字面量直接存入 `$var` |
+| eval 空字典 | `eval $var = {}` | 初始化空字典，后续可通过 `eval $var.key = value` 逐字段赋值 |
 | for 循环变量 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
 | call 提取 | `call "sub.wf" read "key" as $var` | 从子工作流输出中提取值 |
 
@@ -51,6 +53,7 @@
 | `eval $var = to_equipment(...)` | `dict` | 嵌套字典，支持链式字段访问 |
 | `eval $var = "hello"` | `str` | 字符串 |
 | `eval $var = 42` | `float` | 数字（内部统一为 float） |
+| `eval $var = {}` | `dict` | 空字典，后续通过 `eval $var.key = value` 填充 |
 | `for x in [...]` | `str` | 迭代元素为字符串 |
 
 ### 2.3 字段访问
@@ -78,22 +81,26 @@ $var.affix_1.value       # 链式访问，逐层深入嵌套 dict
 |---|---|---|
 | `variables` | `dict` | 运行时变量空间，所有 `$var` 的存储 |
 | `output` | `dict` | `collect` 指令的输出缓冲区，工作流结束后返回给调用方 |
-| `scan_meta` | `dict` | scan 产出的区域坐标元数据，供 `find` 和 `click $var` 使用 |
+| `coord_meta` | `dict` | scan/recognize 产出的区域坐标元数据，供 `find` 和 `click $var` 使用。随 `call read` 透传给父工作流 |
 
 **数据流全景**：
 
 ```
-scan [scene] as $var  ──→  variables[$var] = dict
-                         scan_meta[$var] = {field: Region}
+scan [scene] as $var      ──→  variables[$var] = {field: ocr_text}
+                               coord_meta[$var] = {field: Region}
 
-eval $var = func(...)  ──→  variables[$var] = result
+recognize [scene] as $var ──→  variables[$var] = {slot: material_type}
+                               coord_meta[$var] = {slot: Region}
 
-collect $var           ──→  output[key] = variables[$var]
+eval $var = func(...)     ──→  variables[$var] = result
+
+collect $var              ──→  output[key] = variables[$var]
 
 call "sub.wf" read "k" as $v  ──→  variables[$v] = sub_output["k"]
+                                    coord_meta[$v] = sub_coord_meta[$v]  （若存在）
 ```
 
-`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。
+`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`coord_meta` 随 `read` 自动透传，使父工作流可以对透传回来的变量继续执行 `find` / `click`。
 
 ## 三、指令集
 
@@ -105,13 +112,92 @@ call "sub.wf" read "k" as $v  ──→  variables[$v] = sub_output["k"]
 | drag | `drag [scene].[arrow] [时长] [hold 秒数]` | 执行 arrow 定义的拖拽。时长可选：固定秒数或 `[min, max]` 范围；hold 可选，到达后按住不放的时长 |
 | wait | `wait <delay_name>` 或 `wait <秒数>` | 命名延迟或固定秒数 |
 | scan | `scan [scene] as $var` 或 `scan [scene].[f1, f2, ...] as $var` | OCR 扫描场景，结果存入 `$var`（dict，key 为区域名）。后者仅扫描指定字段 |
-| find | `find $source "文本" as $coord [error "错误信息"]` | 在 scan 结果中查找文本，将坐标存入 `$coord` |
+| recognize | `recognize [scene] as $var` 或 `recognize [scene].[f1, f2] as $var` | 图像识别场景中每个 slot 的材料类型，结果存入 `$var`（dict，key 为 slot 名）。后者仅识别指定字段。同时写入 coord_meta |
+| find | `find $source "文本" as $coord` 或 `find $source $var as $coord` | 在 scan/recognize 结果中查找文本，将坐标存入 `$coord`。搜索文本可以是字面量或变量引用 |
 | collect | `collect $var` 或 `collect $var as "label"` | 将变量值追加到工作流输出。后者以 `{label: value}` 形式追加 |
-| eval | `eval $var = func(args...)` 或 `eval $var = 字面量` | 调用内置函数或将字面量存入变量 |
+| eval | `eval $var = func(args...)` 或 `eval $var = 字面量` 或 `eval $var = {}` 或 `eval $var.field = value` | 调用内置函数、字面量赋值、初始化空字典、字典字段赋值 |
 | call | `call "sub.wf" with $x as arg1 read "key" as $var` | 调用子工作流，传入参数并提取返回值 |
-| log | `log "消息"` | 输出日志 |
+| log | `log "消息"` 或 `log func(args...)` | 输出日志。支持字符串字面量或函数调用（如 `concat`） |
 
-### 3.2 控制流指令
+### 3.2 scan/recognize 与 find 的协作机制
+
+`scan`（OCR 文字识别）和 `recognize`（图像识别）都与 `find` 配合使用。两者共享同一套 `coord_meta` 机制，`find` 无需区分数据来源。
+
+**内部执行流程**：
+
+```
+scan [scene] as $var          recognize [scene] as $var
+  │                              │
+  ├─ 截图当前屏幕                ├─ 截图当前屏幕
+  ├─ 取场景 Region 列表          ├─ 取场景 slot Region 列表
+  ├─ 逐 Region 裁切 + OCR       ├─ 逐 slot 裁切 + ORB 特征匹配
+  ├─ variables[$var] =           ├─ variables[$var] =
+  │   {field: ocr_text}          │   {slot: material_type}
+  └─ coord_meta[$var] =          └─ coord_meta[$var] =
+      {field: Region}                {slot: Region}
+
+两者的 coord_meta 结构完全相同，find 统一处理：
+
+find $var "目标文本" as $coord
+  │
+  ├─ 从 variables[$var] 中逐 key 查找包含"目标文本"的 value
+  ├─ 命中后，从 coord_meta[$var] 取出对应的 Region
+  ├─ 将 Region 转换为屏幕绝对坐标 (x, y)
+  └─ variables[$coord] = (x, y)
+```
+
+**关键点**：
+
+- `coord_meta` 是引擎内部状态，DSL 无法直接访问，它是 scan/recognize 与 find 之间的桥梁
+- scan 和 recognize 不可能对同一变量重复写入，因此共享一个 `coord_meta` 无冲突
+- `find` 的匹配逻辑完全通用：只要 value 是字符串且包含目标子串即命中，不区分 OCR 文字还是材料类型名
+- `find` 未找到目标时：若有 `error` 子句则终止工作流；否则 `$coord = None`，由后续 `if not $coord` 显式处理
+
+**coord_meta 随 call read 透传**：
+
+子工作流中 `find` 得到的坐标可以通过 `collect` + `call read` 透传给父工作流。同时 `coord_meta` 也会自动传递，使父工作流可以对该变量继续执行 `find` / `click`：
+
+```
+# 子工作流：识别材料并找到目标
+recognize [material_grid] as $mats
+find $mats "金狗粮" as $mat_pos
+collect $mat_pos as "pos"          # output["pos"] = (x, y)
+
+# 父工作流
+call "subcall/find_material.wf" read "pos" as $gold_pos
+# $gold_pos = (x, y)，同时 coord_meta 已自动透传
+click $gold_pos
+```
+
+**典型用法（OCR 路径）**：
+
+```
+scan [equip_weapon_detail] as $scan_result
+find $scan_result "调律" as $tune_pos error "未找到调律按钮"
+click $tune_pos
+```
+
+**典型用法（图像识别路径）**：
+
+```
+recognize [material_grid] as $mats
+find $mats "定音石" as $stone_pos error "未找到定音石"
+click $stone_pos
+```
+
+**未找到时的容错写法**：
+
+```
+recognize [material_grid] as $mats
+find $mats "金狗粮" as $gold_pos
+if not $gold_pos
+    log "未找到金狗粮"
+    return
+end
+click $gold_pos
+```
+
+### 3.3 控制流指令
 
 | 指令 | 语法 | 说明 |
 |---|---|---|
@@ -134,9 +220,20 @@ call "sub.wf" read "k" as $v  ──→  variables[$v] = sub_output["k"]
 | `$var.field in ["文本1", "文本2", ...]` | 字段值等于列表中任一项（等价于多个 equals 的 or 组合） |
 | `$var.field is_empty` | 字段不存在或为空字符串 |
 | `$var.field > N` / `< N` / `>= N` / `<= N` / `== N` / `!= N` | 字段数值与 N 比较（N 为整数或浮点数） |
+| `$var` | truthy 检查：变量存在且非空时为 true，不存在或为空时为 false |
 | `not <基础条件>` | 取反任意一种 |
 
 **字段访问支持链式嵌套**：`$var.f1.f2.f3`，每层从上一层结果中取字段。
+
+`$var` 的 truthy 检查常用于判断子工作流是否成功返回值：
+
+```
+call "sub.wf" read "status" as $result
+if not $result
+    log "子工作流未返回 status，执行失败"
+    return
+end
+```
 
 示例：
 
@@ -173,7 +270,7 @@ for slot in [slot_head, slot_chest]
     if $slot equals "slot_head"        # 条件表达式里用 $slot
         log "当前是头部槽位"
     end
-    log "当前迭代: $slot"          # log 只接受字符串字面量
+    log "当前迭代: $slot"          # log 支持字符串字面量和函数调用
 end
 ```
 
@@ -196,18 +293,25 @@ DSL 通过 `eval` 调用引擎内置函数，支持数据清洗、条件判定�
 eval $var = func_name(arg1, arg2, ...)   # 调用函数，结果存入变量
 eval $var = "字符串"                        # 字面量赋值
 eval $var = 42                              # 数字字面量赋值（支持负数）
+eval $var = {}                              # 初始化空字典
+eval $var.field = "value"                  # 字典字段赋值（字符串）
+eval $var.field = 123                      # 字典字段赋值（数字）
+eval $var.field = func(...)                # 字典字段赋值（函数返回值）
 eval func_name(arg1, arg2, ...)            # 调用函数，丢弃返回值
 ```
 
 - 赋值目标 `$var =` 可选，省略则丢弃返回值
-- 右侧可以是函数调用、字符串字面量或数字字面量
-- 函数参数可以是 `$var`（变量引用，运行时解析为实际值）或 `"literal"`（字面量字符串）
+- 右侧可以是函数调用、字符串字面量、数字字面量或空字典 `{}`
+- 函数参数可以是 `$var`（变量引用）、`$var.field`（字段访问）或 `"literal"`（字面量字符串）
+- 字典字段赋值要求目标变量已是 `dict` 类型，否则报错
+- 字典字段赋值的右侧支持字面量、数字和函数调用，不支持直接引用 `$var`（可通过 `concat($var)` 间接实现）
 
 ### 5.2 内置函数列表
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `to_equipment` | `(raw_data: dict) -> dict` | 解析装备 OCR 原始数据为标准装备字典，支持链式字段访问 |
+| `concat` | `(*args) -> str` | 拼接所有参数为字符串，用于 `log concat("文本", $var.field)` |
 | `contains` | `(scan_result: dict, text: str) -> bool` | 检查 scan 结果中是否有任意字段包含指定文本 |
 | `count` | `(scan_result: dict) -> int` | 统计 scan 结果中非空字段数量 |
 | `is_good_equip` | `(scan_result: dict) -> bool` | 判定装备是否值得保留（基于高价值词条） |
@@ -228,6 +332,28 @@ collect $main_weapon
 if $main_weapon.affix_1.value > 100
     log "首词条数值超过 100"
 end
+```
+
+### 5.4 字典变量用法
+
+通过 `eval $var = {}` 初始化空字典，再用 `eval $var.field = value` 逐字段填充：
+
+```
+eval $data = {}
+eval $data.name = "紫狗粮"
+eval $data.count = 3
+eval $data.rarity = concat("稀有度: ", $data.name)
+
+log concat($data.name, " x", $data.count)
+```
+
+字典变量常用于聚合多步操作结果后统一输出：
+
+```
+eval $summary = {}
+eval $summary.total_affixes = count($scan_result)
+eval $summary.status = "done"
+collect $summary
 ```
 
 ## 六、完整示例

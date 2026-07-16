@@ -11,7 +11,6 @@
 import math
 import random
 import time
-import traceback
 
 from loguru import logger
 from pathlib import Path
@@ -56,6 +55,9 @@ class BaseWorkflow:
         # 运行时状态
         self.output: dict = {}  # collect 语句写入的输出字典
         self.variables: dict = {}
+
+        # 延迟初始化
+        self._material_recognizer = None
 
     def run(self) -> dict:
         """执行工作流（子类重写）
@@ -173,6 +175,79 @@ class BaseWorkflow:
         """点击屏幕绝对坐标"""
         logger.debug(f"点击坐标: ({x}, {y})")
         self._input.click_screen(x, y, "dynamic")
+
+    # ─── 材料识别 ──────────────────────────────────────────
+
+    @property
+    def material_recognizer(self):
+        """延迟构造 MaterialRecognizer（首次访问时创建）"""
+        if self._material_recognizer is None:
+            from ..core.material_recognizer import MaterialRecognizer
+            self._material_recognizer = MaterialRecognizer(self._ocr)
+        return self._material_recognizer
+
+    def recognize_materials(
+        self,
+        scene_key: str,
+        slot_keys: list[str] | None = None,
+    ) -> tuple[dict[str, str], dict]:
+        """对指定场景的每个 slot 执行材料识别
+
+        Args:
+            scene_key: 场景 key
+            slot_keys: 可选，只识别指定 slot
+
+        Returns:
+            (result, region_map)
+            result: {slot_key: material_type, ...}  空槽为 ""
+            region_map: {slot_key: Region, ...}  供 coord_meta 存储
+        """
+        img = self._capture.capture()
+        if img is None:
+            logger.error("截图失败")
+            return {}, {}
+
+        canvas = self._layout.get_canvas()
+        regions = self._layout.get_scene_regions(scene_key)
+        if not regions:
+            logger.warning(f"场景 {scene_key} 没有定义区域")
+            return {}, {}
+
+        if slot_keys:
+            regions = [r for r in regions if r.key in slot_keys]
+
+        # 建立 region_map（供 coord_meta 存储）
+        region_map = {r.key: r for r in regions}
+
+        # 逐 slot 裁切 + 识别
+        result: dict[str, str] = {}
+        h, w = img.shape[:2]
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+
+        for region in regions:
+            x1 = int(canvas_x + region.x_ratio * canvas_w)
+            y1 = int(canvas_y + region.y_ratio * canvas_h)
+            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
+            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
+            slot_img = img[y1:y2, x1:x2]
+
+            if slot_img.size == 0:
+                logger.warning(f"slot {region.key} 裁切为空，跳过")
+                result[region.key] = ""
+                continue
+
+            info = self.material_recognizer.recognize(slot_img)
+            result[region.key] = info.type  # 空槽 info.type == ""
+            logger.debug(
+                f"材料识别 [{scene_key}].[{region.key}]: "
+                f"type={info.type!r} level={info.level} count={info.count}"
+            )
+
+        logger.info(f"材料识别 [{scene_key}]: {result}")
+        return result, region_map
 
     # ─── 等待 ──────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 from pathlib import Path
 from lvjiang.workflows.parser import parse_file, parse_text
 from lvjiang.workflows.ast_nodes import (
-    Program, Click, Wait, Scan, Find, Collect, Log, Eval, Call,
+    Program, Click, Wait, Scan, Recognize, Find, Collect, Log, Eval, Call,
     If, Contains, FieldAccess, VarRef, Literal, SceneRef,
     Not,
 )
@@ -38,6 +38,28 @@ def test_scan_as_required():
         assert False, "应该解析失败"
     except Exception:
         print("  scan 无 as 正确报错: OK")
+
+
+def test_recognize():
+    """测试 recognize 语法"""
+    print("\n=== 测试 recognize ===")
+
+    program = parse_text("recognize [material_grid] as $mats")
+    assert len(program.body) == 1
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert isinstance(n.scene, SceneRef)
+    assert n.scene.scene == "material_grid"
+    assert isinstance(n.target, VarRef)
+    assert n.target.name == "mats"
+    print('  recognize [material_grid] as $mats: OK')
+
+    # 不带 as 的 recognize 应该解析失败
+    try:
+        parse_text("recognize [material_grid]")
+        assert False, "应该解析失败"
+    except Exception:
+        print("  recognize 无 as 正确报错: OK")
 
 
 def test_find_stmt():

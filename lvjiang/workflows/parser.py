@@ -13,9 +13,9 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, ClickMatch, Collect, Log,
+    Click, Drag, Wait, Scan, Find, Collect, Log,
     If, For, Loop, Break, Return, Label, Goto, Eval,
-    VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
+    SceneRef, VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
 )
 
@@ -51,28 +51,40 @@ class _DSLTransformer(Transformer):
     # ─── 基础指令 ─────────────────────────────────────────
 
     def click_stmt(self, items):
-        scene, field = items
-        return Click(scene=scene, field=field, line_no=self._line(items))
+        target = items[0]  # click_target → SceneRef | VarRef
+        return Click(target=target, line_no=self._line(items))
+
+    def click_target(self, items):
+        """click 目标：[scene].[region] → SceneRef，$var → VarRef"""
+        if len(items) == 2:
+            # [scene].[region]
+            return SceneRef(scene=str(items[0]), region=str(items[1]))
+        else:
+            # $var（var_ref 已返回 VarRef）
+            return items[0]
 
     def drag_stmt(self, items):
-        scene, arrow = items[0], items[1]
+        scene_ref = SceneRef(scene=str(items[0]), region=str(items[1]))
+        arrow_ref = SceneRef(scene=str(items[0]), region=str(items[1]))  # 同场景
+        # 重新解析：items[0]=scene bracket, items[1]=region bracket
+        scene_name = str(items[0])
+        arrow_name = str(items[1])
+        scene_ref = SceneRef(scene=scene_name, region=arrow_name)
         duration = None
         hold = None
         for item in items[2:]:
             if isinstance(item, Literal):
-                duration = item  # drag_duration 返回 Literal
+                duration = item
             elif isinstance(item, list):
-                duration = item  # drag_duration 返回 list[Literal]（二元组范围）
+                duration = item
             elif isinstance(item, float):
-                hold = item  # drag_hold 返回 float
-        return Drag(scene=scene, arrow=arrow, duration=duration, hold=hold, line_no=self._line(items))
+                hold = item
+        return Drag(scene=scene_ref, arrow=scene_ref, duration=duration, hold=hold, line_no=self._line(items))
 
     def drag_duration(self, items):
         item = items[0]
         if isinstance(item, list):
-            # bracket_list → list[Literal]，取前两个作为范围
             return item[:2]
-        # FLOAT token → Literal
         return Literal(value=float(item))
 
     def drag_hold(self, items):
@@ -86,57 +98,61 @@ class _DSLTransformer(Transformer):
                 return Wait(delay=Literal(value=float(arg)), line_no=self._line(items))
             else:  # NAME
                 return Wait(delay=Literal(value=str(arg)), line_no=self._line(items))
+        # bracket_expr 返回 str → 视为命名延迟
+        if isinstance(arg, str):
+            return Wait(delay=Literal(value=arg), line_no=self._line(items))
         return Wait(delay=arg, line_no=self._line(items))
 
     def scan_stmt(self, items):
-        scene = items[0]
+        scene_name = str(items[0])  # bracket_expr → str
+        scene = SceneRef(scene=scene_name)
         fields = None
         target = None
         for item in items[1:]:
             if isinstance(item, list) and item and isinstance(item[0], Literal):
-                fields = item  # field_list 返回的是 list[Literal]
+                fields = item  # field_list → list[Literal]
+                scene = SceneRef(scene=scene_name)  # 保持 scene
             elif isinstance(item, VarRef):
-                target = item  # as_clause 返回 VarRef
-        # as_clause 现在是必须的
+                target = item  # var_ref → VarRef
         return Scan(scene=scene, fields=fields, target=target, line_no=self._line(items))
 
-    def as_clause(self, items):
-        """as [var] → VarRef"""
-        return items[0]  # bracket_expr 已转为 VarRef（在条件上下文中）或 Literal
-
-    def click_match_stmt(self, items):
-        scene = items[0]   # bracket_expr → VarRef
-        var = items[1]     # bracket_expr → VarRef
-        text = self._ensure_literal(items[2])
+    def find_stmt(self, items):
+        """find $source "text" as $target [error "msg"]"""
+        source = items[0]   # var_ref → VarRef
+        text = self._ensure_literal(items[1])  # STRING → Literal
+        target = items[2]   # var_ref → VarRef
         error_msg = self._ensure_literal(items[3]) if len(items) > 3 else None
-        return ClickMatch(scene=scene, var=var, text=text, error_msg=error_msg, line_no=self._line(items))
+        return Find(source=source, text=text, target=target, error_msg=error_msg, line_no=self._line(items))
 
     def error_clause(self, items):
         return self._ensure_literal(items[0])
 
     def collect_stmt(self, items):
-        source = items[0]  # bracket_expr → VarRef
+        source = items[0]  # var_ref → VarRef
         alias = None
         if len(items) > 1:
-            # collect_as_clause 返回元组 ("alias", VarRef)
+            # collect_as_clause 返回字符串（alias 标签）
             alias_item = items[1]
-            if isinstance(alias_item, tuple) and alias_item[0] == "alias":
-                alias = alias_item[1].name if isinstance(alias_item[1], VarRef) else str(alias_item[1])
+            if isinstance(alias_item, str):
+                alias = alias_item
+            elif isinstance(alias_item, Token):
+                alias = self._unquote(str(alias_item))
         return Collect(source=source, alias=alias, line_no=self._line(items))
 
     def collect_as_clause(self, items):
-        """as [alias] → 返回标记元组"""
-        return ("alias", items[0])
+        """as "label" → 字符串"""
+        return self._unquote(str(items[0]))
 
     def log_stmt(self, items):
         return Log(message=self._ensure_literal(items[0]), line_no=self._line(items))
 
     def eval_stmt(self, items):
-        """eval [var =] func(args...)"""
+        """eval $var = func($arg...) 或 eval func($arg...)"""
         tokens = [i for i in items if isinstance(i, Token)]
         names = [str(t) for t in tokens]
-        args = [i for i in items if isinstance(i, list)]
-        func_args = args[0] if args else []
+        var_refs = [i for i in items if isinstance(i, VarRef)]
+        lists = [i for i in items if isinstance(i, list)]
+        func_args = lists[0] if lists else []
 
         # 判断是否有赋值目标：如果有两个 NAME token，第一个是目标变量
         if len(names) == 2:
@@ -151,11 +167,8 @@ class _DSLTransformer(Transformer):
         return Literal(value=self._unquote(str(items[0])))
 
     def arg_var(self, items):
-        return VarRef(name=str(items[0]))
-
-    def arg_var_ref(self, items):
-        """[var] 作为函数参数 → VarRef"""
-        return items[0]  # bracket_expr 已返回 VarRef
+        """var_ref 作为函数参数 → VarRef"""
+        return items[0]  # var_ref 已返回 VarRef
 
     # ─── 控制流 ───────────────────────────────────────────
 
@@ -191,7 +204,6 @@ class _DSLTransformer(Transformer):
         if isinstance(count_token, Token):
             count = int(str(count_token))
         else:
-            # NAME → 运行时从变量解析，暂存为字符串
             count = str(count_token)
         body = [i for i in items[1:] if i is not None and not isinstance(i, Token)]
         return Loop(count=count, body=body, line_no=self._line(items))
@@ -238,7 +250,7 @@ class _DSLTransformer(Transformer):
         return IsEmpty(expr=items[0], line_no=self._line(items))
 
     def var_cond(self, items):
-        """条件中的 [var] → VarRef（truthy 检查）"""
+        """条件中的 $var → VarRef（truthy 检查）"""
         return items[0]
 
     def field_access(self, items):
@@ -247,10 +259,13 @@ class _DSLTransformer(Transformer):
 
     # ─── 通用原子 ─────────────────────────────────────────
 
+    def var_ref(self, items):
+        """$name → VarRef"""
+        return VarRef(name=str(items[0]))
+
     def bracket_expr(self, items):
-        """[name] — 在条件中为 VarRef，在 click/scan 中由父节点转为 Literal"""
-        name = str(items[0])
-        return VarRef(name=name)
+        """[name] → str（场景名或区域名，由父节点组装为 SceneRef）"""
+        return str(items[0])
 
     def bracket_list(self, items):
         """[a, b, "c"] → list[Literal]"""
@@ -300,72 +315,6 @@ class _DSLTransformer(Transformer):
         return node
 
 
-# ─── 上下文后处理 ─────────────────────────────────────────
-
-class _ContextPostProcessor:
-    """将 VarRef 根据上下文转为 Literal
-
-    bracket_expr 在语法层面统一返回 VarRef，
-    但在 click/scan/wait 等指令的参数位置应为 Literal（字面量 scene/field 名）。
-    此处理器遍历 AST，根据父节点类型决定子节点的语义。
-    """
-
-    @staticmethod
-    def process(program: Program) -> Program:
-        new_body = [_ContextPostProcessor._process_stmt(s) for s in program.body]
-        return Program(body=new_body, source=program.source)
-
-    @staticmethod
-    def _process_stmt(node):
-        """后处理：仅处理需要字面量的位置
-
-        click/scan 中的 [name] 保持 VarRef，由引擎运行时解析（变量优先，回退字面量）。
-        仅 bare NAME（Token）在 wait/collect_as 等位置需转为 Literal。
-        """
-        if isinstance(node, If):
-            return If(
-                condition=node.condition,
-                then_body=[_ContextPostProcessor._process_stmt(s) for s in node.then_body],
-                else_body=[_ContextPostProcessor._process_stmt(s) for s in node.else_body],
-                line_no=node.line_no,
-            )
-        if isinstance(node, For):
-            return For(
-                var=node.var,
-                iterable=node.iterable,
-                body=[_ContextPostProcessor._process_stmt(s) for s in node.body],
-                line_no=node.line_no,
-            )
-        if isinstance(node, Loop):
-            return Loop(
-                count=node.count,
-                body=[_ContextPostProcessor._process_stmt(s) for s in node.body],
-                line_no=node.line_no,
-            )
-        # bare NAME Token → Literal（wait 等位置的裸标识符）
-        if isinstance(node, Wait):
-            delay = node.delay
-            if isinstance(delay, Token):
-                delay = Literal(value=str(delay))
-            return Wait(delay=delay, line_no=node.line_no)
-        return node
-
-    @staticmethod
-    def _to_literal(node) -> Literal:
-        """VarRef/Token → Literal（参数位置的 [name] 或裸 name 视为字面量）"""
-        if isinstance(node, VarRef):
-            return Literal(value=node.name)
-        if isinstance(node, Token):
-            return Literal(value=str(node))
-        return node
-
-    @staticmethod
-    def _list_to_literal(items) -> list | None:
-        if items is None:
-            return None
-        return [_ContextPostProcessor._to_literal(i) for i in items]
-
-
 # ─── 公共接口 ─────────────────────────────────────────────
 
 def parse_file(path: Path | str) -> Program:
@@ -383,6 +332,4 @@ def parse_text(text: str, source: str = "<text>") -> Program:
         text += "\n"
     tree = parser.parse(text)
     program = _DSLTransformer().transform(tree)
-    # 上下文后处理：参数位置的 VarRef → Literal
-    program = _ContextPostProcessor.process(Program(body=program.body, source=source))
-    return program
+    return Program(body=program.body, source=source)

@@ -11,9 +11,9 @@ from pathlib import Path
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, ClickMatch, Collect, Log,
+    Click, Drag, Wait, Scan, Find, Collect, Log,
     If, For, Loop, Break, Return, Label, Goto, Eval,
-    VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
+    SceneRef, VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
 )
 from .parser import parse_file
@@ -38,7 +38,7 @@ class _GotoSignal(Exception):
 
 
 class _HaltSignal(Exception):
-    """工作流提前终止信号（如 click_match 失败）"""
+    """工作流提前终止信号（如 find 未找到目标）"""
 
     def __init__(self, message: str):
         self.message = message
@@ -51,6 +51,7 @@ class WorkflowEngine:
 
     def __init__(self, workflow: BaseWorkflow):
         self._wf = workflow
+        self._scan_meta: dict[str, dict] = {}  # var_name → {field_key: Region}
 
     def run(self, workflow_path: Path | str) -> dict:
         """加载并执行 .wf 文件"""
@@ -118,8 +119,8 @@ class WorkflowEngine:
                 self._exec_wait(node)
             case Scan():
                 self._exec_scan(node)
-            case ClickMatch():
-                self._exec_click_match(node)
+            case Find():
+                self._exec_find(node)
             case Collect():
                 self._exec_collect(node)
             case Log():
@@ -146,13 +147,22 @@ class WorkflowEngine:
     # ─── 基础指令 ─────────────────────────────────────────
 
     def _exec_click(self, node: Click):
-        scene = self._resolve_param(node.scene)
-        field = self._resolve_param(node.field)
-        self._wf.click_any(scene, field)
+        if isinstance(node.target, SceneRef):
+            # 静态点击：[scene].[region]
+            self._wf.click_any(node.target.scene, node.target.region)
+        elif isinstance(node.target, VarRef):
+            # 动态点击：$var（find 产出的坐标）
+            coords = self._wf.get_variable(node.target.name)
+            if coords is None:
+                raise _HaltSignal(f"变量 ${node.target.name} 未定义，无法点击")
+            x, y = coords
+            self._wf.click_at(x, y)
+        else:
+            logger.error(f"click: 未知目标类型 {type(node.target).__name__}")
 
     def _exec_drag(self, node: Drag):
-        scene = self._resolve_param(node.scene)
-        arrow = self._resolve_param(node.arrow)
+        scene = node.scene.scene if isinstance(node.scene, SceneRef) else str(node.scene)
+        arrow = node.scene.region if isinstance(node.scene, SceneRef) else str(node.arrow)
         duration = self._resolve_duration(node.duration) if node.duration else None
         hold = node.hold  # float | None
         self._wf.drag_arrow(scene, arrow, duration=duration, hold=hold)
@@ -170,31 +180,44 @@ class WorkflowEngine:
             self._wf.wait_delay(str(delay))
 
     def _exec_scan(self, node: Scan):
-        scene = self._resolve_param(node.scene)
+        scene = node.scene.scene if isinstance(node.scene, SceneRef) else str(node.scene)
         field_keys = None
         if node.fields:
-            field_keys = [self._resolve_param(f) for f in node.fields]
+            field_keys = [self._resolve(f) for f in node.fields]
 
         result = self._wf.ocr_scene(scene, field_keys)
-        var_name = self._resolve_var_name(node.target)
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         self._wf.set_variable(var_name, result)
+        # 存 region 元数据，供 find 定位坐标
+        self._scan_meta[var_name] = self._wf.get_scene_region_map(scene, field_keys)
 
-    def _exec_click_match(self, node: ClickMatch):
-        scene = self._resolve_param(node.scene)
-        var_name = self._resolve_var_name(node.var)
-        scan_result = self._wf.get_variable(var_name)
+    def _exec_find(self, node: Find):
+        """find $source "text" as $target [error "msg"]"""
+        source_name = node.source.name if isinstance(node.source, VarRef) else str(node.source)
+        scan_result = self._wf.get_variable(source_name)
         text = self._resolve(node.text)
+        target_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         error_msg = self._resolve(node.error_msg) if node.error_msg else None
-        result = self._wf.click_match_text(str(scene), scan_result, str(text), str(error_msg) if error_msg else None)
-        if result is not None:
-            raise _HaltSignal(result)
+
+        region_map = self._scan_meta.get(source_name)
+        coords = self._wf.find_in_scan(scan_result, str(text), region_map=region_map)
+        if coords is None:
+            if error_msg:
+                raise _HaltSignal(str(error_msg))
+            # 无 error 子句：存 None，由后续 if 显式处理
+            self._wf.set_variable(target_name, None)
+            logger.debug(f"find: {target_name} = None (未找到 '{text}')")
+            return
+
+        self._wf.set_variable(target_name, coords)
+        logger.debug(f"find: {target_name} = {coords}")
 
     def _exec_collect(self, node: Collect):
-        """collect [var] [as [alias]] — 将变量值存入输出 dict"""
+        """collect $var [as "label"] — 将变量值存入输出 dict"""
         var_name = node.source.name if isinstance(node.source, VarRef) else str(node.source)
         value = self._wf.get_variable(var_name)
         if value is None:
-            logger.warning(f"collect: 变量 [{var_name}] 未定义，跳过")
+            logger.warning(f"collect: 变量 ${var_name} 未定义，跳过")
             return
         key = node.alias if node.alias else var_name
         self._wf.output[key] = value
@@ -295,7 +318,7 @@ class WorkflowEngine:
                 return False
 
     def _eval_field_access(self, node: FieldAccess) -> str:
-        """求值 [var].field → 从变量中取字段"""
+        """求值 $var.field → 从变量中取字段"""
         var_val = self._wf.get_variable(node.var.name)
         if isinstance(var_val, dict):
             return str(var_val.get(node.field_name, ""))

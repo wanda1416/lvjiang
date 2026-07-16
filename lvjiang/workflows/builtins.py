@@ -77,9 +77,9 @@ def _equipment_parser(raw_data: dict) -> dict:
     返回 EquipmentData 对象，由工作流变量名提供 key。
 
     .wf 用法:
-        scan [equip_weapon_detail] as [result]
-        eval main_weapon = equipment_parser([result])
-        collect [main_weapon]
+        scan [equip_weapon_detail] as $result
+        eval main_weapon = equipment_parser($result)
+        collect $main_weapon
     """
     if not isinstance(raw_data, dict) or not raw_data:
         logger.warning("equipment_parser: 输入为空或非字典")

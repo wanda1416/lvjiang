@@ -12,7 +12,7 @@ from ..config import DelayConfig
 class InputController:
     """输入控制器（所有点击延迟参数统一从 DelayConfig 读取）
     
-    公开接口：仅 click_screen
+    公开接口：click_screen / drag_screen
     """
 
     def __init__(self, delay_config: DelayConfig | None = None):
@@ -71,5 +71,30 @@ class InputController:
             raise
 
         # 点击后等待
+        post_delay = random.uniform(*self.after_click_wait)
+        time.sleep(post_delay)
+
+    def drag_screen(self, from_x: int, from_y: int, to_x: int, to_y: int, poi_name: str = "",
+                    duration: float | tuple[float, float] | None = None):
+        """从起点拖拽到终点（模拟人类操作）
+
+        Args:
+            duration: 移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认 mouse_move_duration。
+        """
+        self._move_to(from_x, from_y)
+        pre_delay = random.uniform(*self.before_click_wait)
+        time.sleep(pre_delay)
+        # 解析时长
+        if duration is None:
+            move_dur = random.uniform(*self.mouse_move_duration)
+        elif isinstance(duration, tuple):
+            move_dur = random.uniform(*duration)
+        else:
+            move_dur = float(duration)
+        logger.debug(f"拖拽 {poi_name}: ({from_x},{from_y}) -> ({to_x},{to_y}) [{move_dur:.2f}s]")
+        pyautogui.moveTo(from_x, from_y, duration=move_dur)
+        pyautogui.mouseDown()
+        pyautogui.moveTo(to_x, to_y, duration=move_dur)
+        pyautogui.mouseUp()
         post_delay = random.uniform(*self.after_click_wait)
         time.sleep(post_delay)

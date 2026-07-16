@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .ast_nodes import (
     Program,
-    Click, Wait, Scan, ScanAs, ClickMatch, Collect, CollectAs, Log,
+    Click, Drag, Wait, Scan, ScanAs, ClickMatch, Collect, Log,
     If, For, Loop, Break, Label, Goto, Eval,
     VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
@@ -47,28 +47,20 @@ class WorkflowEngine:
 
     def __init__(self, workflow: BaseWorkflow):
         self._wf = workflow
-        self._collect_output = None  # collect 的直接输出
 
-    def run(self, workflow_path: Path | str) -> dict | str:
+    def run(self, workflow_path: Path | str) -> list[dict]:
         """加载并执行 .wf 文件"""
         program = parse_file(workflow_path)
-        self._collect_output = None
         logger.info(f"=== DSL 工作流开始: {Path(workflow_path).stem} ({len(program.body)} 条顶层指令) ===")
 
         try:
             self._exec_body(program.body)
         except _HaltSignal as sig:
             logger.info(f"=== DSL 工作流提前终止: {sig.message} ===")
-            return sig.message
+            return []
 
-        if self._collect_output is not None:
-            logger.info(f"=== DSL 工作流完成 ===")
-            return self._collect_output
-        if self._wf.output:
-            logger.info(f"=== DSL 工作流完成，收集到 {len(self._wf.output)} 项数据 ===")
-            return self._wf.output
-        logger.info(f"=== DSL 工作流完成 ===")
-        return {}
+        logger.info(f"=== DSL 工作流完成，收集到 {len(self._wf.output)} 项数据 ===")
+        return self._wf.output
 
     # ─── 语句执行 ──────────────────────────────────────────
 
@@ -98,6 +90,11 @@ class WorkflowEngine:
                     return
                 pc = label_index[target]
                 continue  # 从标签位置继续，不 pc+1
+            except BaseException as e:
+                line_info = f"(行 {node.line_no})" if hasattr(node, 'line_no') and node.line_no else ""
+                logger.error(f"DSL 执行异常 {line_info}: {e}")
+                logger.error(f"异常详情:\n{traceback.format_exc()}")
+                raise  # 异常即终止，不跳过继续
 
             pc += 1
 
@@ -106,6 +103,8 @@ class WorkflowEngine:
         match node:
             case Click():
                 self._exec_click(node)
+            case Drag():
+                self._exec_drag(node)
             case Wait():
                 self._exec_wait(node)
             case Scan() | ScanAs():
@@ -113,9 +112,7 @@ class WorkflowEngine:
             case ClickMatch():
                 self._exec_click_match(node)
             case Collect():
-                self._collect_output = self._wf.collect_current()
-            case CollectAs():
-                self._exec_collect_as(node)
+                self._exec_collect(node)
             case Log():
                 logger.info(self._resolve(node.message))
             case If():
@@ -140,7 +137,13 @@ class WorkflowEngine:
     def _exec_click(self, node: Click):
         scene = self._resolve_param(node.scene)
         field = self._resolve_param(node.field)
-        self._wf.click_region(scene, field)
+        self._wf.click_any(scene, field)
+
+    def _exec_drag(self, node: Drag):
+        scene = self._resolve_param(node.scene)
+        arrow = self._resolve_param(node.arrow)
+        duration = self._resolve_duration(node.duration) if node.duration else None
+        self._wf.drag_arrow(scene, arrow, duration=duration)
 
     def _exec_wait(self, node: Wait):
         delay = node.delay
@@ -173,9 +176,19 @@ class WorkflowEngine:
         if result is not None:
             raise _HaltSignal(result)
 
-    def _exec_collect_as(self, node: CollectAs):
-        key = self._resolve(node.key)
-        self._wf.collect_as(str(key))
+    def _exec_collect(self, node: Collect):
+        """collect [var] [as [alias]] — 将变量值追加到输出"""
+        var_name = node.source.name if isinstance(node.source, VarRef) else str(node.source)
+        value = self._wf.get_variable(var_name)
+        if value is None:
+            logger.warning(f"collect: 变量 [{var_name}] 未定义，跳过")
+            return
+        if node.alias:
+            self._wf.output.append({node.alias: value})
+            logger.debug(f"collect: {node.alias} = {value}")
+        else:
+            self._wf.output.append(value)
+            logger.debug(f"collect: {value}")
 
     def _exec_eval(self, node: Eval):
         # 解析参数
@@ -311,6 +324,14 @@ class WorkflowEngine:
         if isinstance(node, VarRef):
             return node.name
         return str(node)
+
+    def _resolve_duration(self, node) -> float | tuple[float, float]:
+        """解析拖拽时长：Literal → float，list[Literal] → tuple"""
+        if isinstance(node, list):
+            return (float(node[0].value), float(node[1].value))
+        if isinstance(node, Literal):
+            return float(node.value)
+        return float(node)
 
     # ─── 工具 ─────────────────────────────────────────────
 

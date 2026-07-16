@@ -8,6 +8,7 @@
 子类可直接使用，无需重复编写。
 """
 
+import math
 import random
 import time
 import traceback
@@ -20,7 +21,7 @@ from ..config import DelayConfig
 from ..core.capture import ScreenCapture
 from ..core.ocr import OCREngine
 from ..core.input import InputController
-from ..core.region_config import Layout, Region
+from ..core.region_config import Layout, Point, Region
 from . import builtins  # noqa: F401  触发内置函数注册
 
 
@@ -30,8 +31,8 @@ class BaseWorkflow:
     运行时状态：
     - last_scan: 上次 scan 的 OCR 结果 (dict)
     - last_scan_scene: 上次 scan 的场景 key
-    - output: 收集的输出数据
-    - variables: 用户变量表（eval 赋值、scan 结果自动存入 last_scan）
+    - output: 收集的输出数据列表（由 collect 语句追加）
+    - variables: 用户变量表（scan/convert/eval 赋值）
     """
 
     def __init__(
@@ -57,15 +58,14 @@ class BaseWorkflow:
         # 运行时状态
         self.last_scan: dict[str, str] = {}
         self.last_scan_scene: str = ""
-        self.output: dict = {}
+        self.output: list = []  # collect 语句追加的输出列表
         self.variables: dict = {}
 
-    def run(self) -> dict | str:
+    def run(self) -> list:
         """执行工作流（子类重写）
 
         Returns:
-            dict: collect_as 累积结果
-            str: collect 直接输出 或 错误信息
+            list: collect 累积结果
         """
         raise NotImplementedError
 
@@ -73,7 +73,7 @@ class BaseWorkflow:
         """重置运行时状态（在 run 开始前调用）"""
         self.last_scan = {}
         self.last_scan_scene = ""
-        self.output = {}
+        self.output = []
         self.variables = {}
 
     @property
@@ -83,7 +83,7 @@ class BaseWorkflow:
 
     # ─── DSL 便捷入口 ──────────────────────────────────────
 
-    def run_file(self, workflow_path: Path | str) -> dict | str:
+    def run_file(self, workflow_path: Path | str) -> list:
         """加载并执行 .wf 文件（DSL 驱动的工作流使用）"""
         from .engine import WorkflowEngine
         engine = WorkflowEngine(self)
@@ -191,17 +191,6 @@ class BaseWorkflow:
         logger.debug(f"等待 {seconds}s")
         time.sleep(seconds)
 
-    # ─── 数据收集 ──────────────────────────────────────────
-
-    def collect_current(self) -> dict:
-        """返回当前 last_scan 的副本"""
-        return dict(self.last_scan)
-
-    def collect_as(self, key: str):
-        """将当前 last_scan 存入 output"""
-        self.output[key] = dict(self.last_scan)
-        logger.debug(f"collect_as: {key} = {self.last_scan}")
-
     # ─── 变量与函数调用 ────────────────────────────────────
 
     def get_variable(self, name: str):
@@ -213,11 +202,20 @@ class BaseWorkflow:
         self.variables[name] = value
 
     def call_function(self, func_name: str, args: list) -> any:
-        """调用内置函数"""
+        """调用内置函数
+
+        若函数第一参数名为 _wf，自动注入 workflow 实例作为上下文。
+        """
         fn = builtins.get_function(func_name)
         if fn is None:
             available = ", ".join(builtins.list_functions())
             raise ValueError(f"未知内置函数: {func_name}，可用函数: {available}")
+        # 检查函数是否需要 workflow context（第一参数名为 _wf）
+        import inspect
+        sig = inspect.signature(fn)
+        params = list(sig.parameters.keys())
+        if params and params[0] == '_wf':
+            return fn(self, *args)
         return fn(*args)
 
     # ─── 坐标计算 ──────────────────────────────────────────
@@ -248,3 +246,98 @@ class BaseWorkflow:
             cy += region_h * random.uniform(-jitter_ratio, jitter_ratio)
 
         return int(self._window_left + cx), int(self._window_top + cy)
+
+    # ─── Point / Arrow 操作 ────────────────────────────────
+
+    def click_any(self, scene_key: str, key: str):
+        """点击 region 或 point（自动识别，region 优先）"""
+        regions = self._layout.get_scene_regions(scene_key)
+        region = next((r for r in regions if r.key == key), None)
+        if region is not None:
+            self.click_region(scene_key, key)
+            return
+        points = self._layout.get_scene_points(scene_key)
+        point = next((p for p in points if p.key == key), None)
+        if point is not None:
+            self.click_point(scene_key, key)
+            return
+        logger.error(f"场景 {scene_key} 没有定义 region 或 point: {key}")
+
+    def click_point(self, scene_key: str, point_key: str):
+        """点击 point 中心（带半径内随机偏移）"""
+        points = self._layout.get_scene_points(scene_key)
+        point = next((p for p in points if p.key == point_key), None)
+        if point is None:
+            logger.error(f"场景 {scene_key} 没有定义 point: {point_key}")
+            return
+        screen_x, screen_y = self._point_to_screen(point)
+        if screen_x is None:
+            return
+        logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
+        self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}")
+
+    def drag_arrow(self, scene_key: str, arrow_key: str, duration: float | tuple[float, float] | None = None):
+        """执行 arrow 定义的拖拽
+
+        Args:
+            duration: 拖拽移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认值。
+        """
+        arrows = self._layout.get_scene_arrows(scene_key)
+        arrow = next((a for a in arrows if a.key == arrow_key), None)
+        if arrow is None:
+            logger.error(f"场景 {scene_key} 没有定义 arrow: {arrow_key}")
+            return
+        points = self._layout.get_scene_points(scene_key)
+        from_point = next((p for p in points if p.key == arrow.from_key), None)
+        if from_point is None:
+            logger.error(f"arrow {arrow_key} 的起点 point {arrow.from_key} 未定义")
+            return
+        # 终点：吸附态动态查 point，绝对态直接用坐标
+        if arrow.to_key is not None:
+            to_point = next((p for p in points if p.key == arrow.to_key), None)
+            if to_point is None:
+                logger.error(f"arrow {arrow_key} 的终点 point {arrow.to_key} 未定义")
+                return
+            to_cx, to_cy = to_point.cx_ratio, to_point.cy_ratio
+        else:
+            to_cx, to_cy = arrow.to_cx_ratio, arrow.to_cy_ratio
+        fx, fy = self._point_to_screen(from_point)
+        tx, ty = self._ratio_to_screen(to_cx, to_cy)
+        if fx is None or tx is None:
+            return
+        logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})")
+        self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration)
+
+    def _point_to_screen(self, point: Point) -> tuple[int | None, int | None]:
+        """point 中心 → 屏幕坐标（带半径内随机偏移）"""
+        img = self._capture.capture()
+        if img is None:
+            logger.error("截图失败")
+            return None, None
+        h, w = img.shape[:2]
+        canvas = self._layout.get_canvas()
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+        cx = canvas_x + point.cx_ratio * canvas_w
+        cy = canvas_y + point.cy_ratio * canvas_h
+        # 半径内随机偏移
+        r = point.r_ratio * min(canvas_w, canvas_h)
+        angle = random.uniform(0, 2 * math.pi)
+        dist = random.uniform(0, r)
+        cx += dist * math.cos(angle)
+        cy += dist * math.sin(angle)
+        return int(self._window_left + cx), int(self._window_top + cy)
+
+    def _ratio_to_screen(self, cx_ratio: float, cy_ratio: float) -> tuple[int | None, int | None]:
+        """画布内归一化坐标 → 屏幕坐标"""
+        img = self._capture.capture()
+        if img is None:
+            logger.error("截图失败")
+            return None, None
+        h, w = img.shape[:2]
+        canvas = self._layout.get_canvas()
+        sx = canvas.x_ratio + cx_ratio * canvas.w_ratio
+        sy = canvas.y_ratio + cy_ratio * canvas.h_ratio
+        return int(self._window_left + sx * w), int(self._window_top + sy * h)

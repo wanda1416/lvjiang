@@ -70,6 +70,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._setup_ui()
         self._refresh_user_combo()
         self._refresh_layout_combo()
+        self._load_workflow_configs()
 
         # 全局热键监听 F10（跨窗口焦点，自动化时游戏窗口占焦点也能响应）
         self.f10_pressed.connect(self._request_stop)
@@ -237,13 +238,21 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
 
-        self.btn_graduation = QPushButton("计算毕业率")
-        self.btn_graduation.clicked.connect(self._on_graduation)
-        left_layout.addWidget(self.btn_graduation)
+        # 工作流选择
+        wf_group = QGroupBox("工作流")
+        wf_layout = QVBoxLayout(wf_group)
+        self.workflow_combo = QComboBox()
+        self.workflow_combo.setMinimumWidth(200)
+        wf_layout.addWidget(self.workflow_combo)
+        left_layout.addWidget(wf_group)
 
-        self.btn_tune_test = QPushButton("单次调律测试")
-        self.btn_tune_test.clicked.connect(self._on_tune_test)
-        left_layout.addWidget(self.btn_tune_test)
+        # 开始执行按钮
+        self.btn_run_workflow = QPushButton("开始执行 (F9)")
+        self.btn_run_workflow.clicked.connect(self._on_run_workflow)
+        self.btn_run_workflow.setStyleSheet(
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
+        )
+        left_layout.addWidget(self.btn_run_workflow)
 
         flow_group = QGroupBox("目标流派")
         flow_layout = QVBoxLayout(flow_group)

@@ -4,7 +4,7 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Drag / Wait / Scan / Find / Collect / Log
+- 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log
          If / For / Loop / Break / Return / Label / Goto / Eval
 - 表达式：SceneRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
@@ -54,6 +54,7 @@ class Scan:
     scene: Any      # SceneRef（静态场景引用）
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
+    region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     line_no: int = 0
 
 
@@ -62,23 +63,15 @@ class Recognize:
     scene: Any      # SceneRef（静态场景引用）
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
-    line_no: int = 0
-
-
-@dataclass(frozen=True)
-class Find:
-    """在 scan 结果中查找文本，将坐标存入变量"""
-    source: Any     # VarRef（scan 结果变量）
-    text: Any       # Literal（要查找的文本）
-    target: Any     # VarRef（坐标输出变量）
-    error_msg: Any | None = None  # Literal | None
+    region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class Collect:
-    source: Any     # VarRef（要收集的变量）
-    alias: str | None = None  # 可选别名（字面量字符串）
+    source: Any         # VarRef（要收集的变量）
+    alias: str | None = None      # 静态别名（字面量字符串）
+    alias_var: Any | None = None  # 动态别名（VarRef）
     line_no: int = 0
 
 
@@ -99,7 +92,7 @@ class If:
 @dataclass(frozen=True)
 class For:
     var: str                    # 循环变量名（裸字符串）
-    iterable: list              # list[Literal]（字面量字符串列表）
+    iterable: Any               # list[Literal]（静态列表）| VarRef（动态列表变量）
     body: list = field(default_factory=list)
     line_no: int = 0
 
@@ -143,11 +136,10 @@ class Eval:
 
 
 @dataclass(frozen=True)
-class EvalFieldAssign:
-    """eval $dict.key = value"""
-    var_name: str       # 字典变量名
-    field_name: str     # 字段名
-    value: Any          # Literal | FuncCall
+class EvalFieldChainAssign:
+    """eval $dict.key = value 或 eval $dict.key1.key2 = value — 字段赋值"""
+    target: Any         # FieldAccess — 字段访问链
+    value: Any          # Literal | FuncCall | VarRef
     line_no: int = 0
 
 
@@ -161,10 +153,10 @@ class FuncCall:
 
 @dataclass(frozen=True)
 class Call:
-    """call "sub.wf" with $x as arg1 read "key" as $var"""
+    """call "sub.wf" with $x as "arg1" read "key" as $var"""
     workflow: Any               # Literal（wf 文件路径）
-    args: list = field(default_factory=list)       # [(VarRef, str), ...] 传入参数
-    reads: list = field(default_factory=list)      # [(str, VarRef), ...] 读取返回值
+    args: list = field(default_factory=list)       # [(as_side, as_side), ...] with 传入参数
+    reads: list = field(default_factory=list)      # [(as_side, as_side), ...] read 读取返回值
     line_no: int = 0
 
 

@@ -142,42 +142,6 @@ class BaseWorkflow:
         logger.info(f"OCR [{scene_key}]: {result}")
         return result
 
-    def get_scene_region_map(self, scene_key: str, field_keys: list[str] | None = None) -> dict:
-        """获取场景的区域映射（供 find 定位坐标用）
-
-        Returns:
-            {field_key: Region, ...}
-        """
-        regions = self._layout.get_scene_regions(scene_key)
-        if field_keys:
-            regions = [r for r in regions if r.key in field_keys]
-        return {r.key: r for r in regions}
-
-    def find_in_scan(self, scan_result: dict | None, target_text: str, region_map: dict | None = None) -> tuple[int, int] | None:
-        """在 OCR 结果中查找包含目标文字的区域，返回屏幕坐标
-
-        Args:
-            scan_result: OCR 结果 {field_key: text}
-            target_text: 要匹配的文字
-            region_map: 可选，{field_key: Region}，用于计算坐标
-
-        Returns:
-            (x, y) 屏幕绝对坐标，或 None（未找到）
-        """
-        if not scan_result:
-            return None
-
-        for key, text in scan_result.items():
-            if target_text in str(text):
-                logger.debug(f"  find: {key} = {text!r} 包含 {target_text!r}")
-                if region_map and key in region_map:
-                    coords = self._region_to_screen(region_map[key], jitter=False)
-                    return coords
-                logger.warning(f"find: 匹配到 {key} 但无 region 信息，无法定位坐标")
-                return None
-
-        return None
-
     def click_at(self, x: int, y: int):
         """点击屏幕绝对坐标"""
         logger.debug(f"点击坐标: ({x}, {y})")

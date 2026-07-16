@@ -1,8 +1,13 @@
 # 从主界面导航到装备培养页面
 # 路径：主界面 → 菜单 → 包裹 → 培养（如不在装备页则自动切换）
 
-click [game_main_page].[menu]
-wait step_interval
+scan [game_menu_page].[wulinlu] as $result
+if not $result.[wulinlu] equals "武林录"
+   click [game_main_page].[menu]
+   wait step_interval
+else 
+   log "当前在菜单页" 
+end
 
 click [game_menu_page].[bag]
 wait step_interval

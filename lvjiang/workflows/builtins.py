@@ -78,6 +78,30 @@ def _count(scan_result: dict, *args) -> int:
     return sum(1 for v in scan_result.values() if v and str(v).strip())
 
 
+@builtin_func("find_key")
+def _find_key(scan_result: dict, *args) -> str:
+    """在字典 values 中查找包含目标文本的项，返回其 key 名
+
+    找不到时返回空字符串 ""，配合 if 判断。
+
+    .wf 用法:
+        scan [scene].[f1, f2, f3] as $scan
+        eval $key = find_key($scan, "调律")
+        if $key
+            click [scene].$key
+        end
+    """
+    if not isinstance(scan_result, dict) or not args:
+        return ""
+    target = str(args[0])
+    for key, value in scan_result.items():
+        if isinstance(value, str) and target in value:
+            logger.debug(f"find_key: '{target}' 命中 {key}='{value}'")
+            return key
+    logger.debug(f"find_key: '{target}' 未找到")
+    return ""
+
+
 # ─── 装备解析函数 ─────────────────────────────────────
 
 

@@ -8,7 +8,8 @@
 |------|------|
 | [main-window-state-flow.md](main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
 | [scene-region-editing.md](scene-region-editing.md) | 场景区域编辑：装备武器/防具/调律详情 |
-| [workflow-dsl-syntax.md](workflow-dsl-syntax.md) | 工作流 DSL 语法规范：变量、指令、条件、循环、子工作流 |
+
+DSL 语法文档已拆分至 [`../32-grammar/`](../32-grammar/README.md)。
 
 ## 待补充
 

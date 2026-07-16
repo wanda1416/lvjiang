@@ -1,0 +1,169 @@
+# DSL 基础约定与变量系统
+
+`.wf` 文件为纯文本工作流描述，存放于 `config/system/workflows/`。支持顺序执行、条件分支、循环、跳转等控制流。
+
+## 一、基础约定
+
+- **注释**：`#` 开头整行为注释
+- **空行**：忽略
+- **缩进**：自由（解析器不依赖缩进），但建议 4 空格以提升可读性
+- **块闭合**：靠 `end` 关键字，不靠缩进
+- **字符串**：双引号 `"..."`，内部不支持转义
+- **标识符**：`[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*`
+- **两种引用，语义不同**：
+  - `[name]` → **静态配置引用**：引用场景名 / 区域名，来自 YAML 场景定义
+  - `$name` → **运行时变量引用**：引用工作流执行过程中的动态变量
+  - 在非赋值语境中，`[]` 和 `""` 等价，都表示静态常量
+- **内置变量**：
+  - 无全局内置变量；通过 `scan [scene] as $var` 声明，后续用 `$var` 引用
+
+### 核心指令语义模型
+
+`click`、`scan`、`recognize`、`drag` 是引擎封装的四个语法糖函数，**参数都是常量**：
+
+```
+click     → click_func(scene_const, coord_const)
+scan      → scan_func(scene_const, fields_const)
+recognize → recognize_func(scene_const, fields_const)
+drag      → drag_func(scene_const, arrow_const, ...)
+```
+
+常量的来源有两种：
+- `[]` 或 `""` → 编译期常量（直接写在代码里）
+- `$var` → 运行时计算的常量（先解析变量值，再当作常量传入）
+
+因此语法上，四大指令的场景名和字段名都支持三种形式：
+
+```
+# 场景名（scene_name）
+[scene]          # 括号常量
+"scene"          # 字符串常量（等价于 [scene]）
+$var             # 变量引用（运行时解析）
+
+# 字段名（field）
+[field]          # 括号常量
+"field"          # 字符串常量
+$var             # 变量引用
+[f1, f2, ...]    # 多字段列表（仅 scan/recognize）
+
+# 示例
+scan [scene] as $var                    # 常量场景
+scan $scene.[field] as $var             # 变量场景 + 常量字段
+scan "scene".$region as $var            # 字符串场景 + 变量字段
+recognize $config.scene.[slot] as $var  # 字段访问作为场景名
+```
+
+变量只是**延迟求值的常量**，最终传给函数的都是字符串。
+
+### 常量类型
+
+| 类型 | 语法 | 示例 | 可用位置 |
+|---|---|---|---|
+| 字符串 | `"..."` | `"武器"`, `"slot_head"` | log、contains/equals 比较、eval 参数、collect alias、call 路径、eval 字面量赋值 |
+| 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、数值比较、eval 字面量赋值 |
+| 空字典 | `{}` | `{}` | eval 字面量赋值（初始化空字典变量） |
+| 列表 | `[item, ...]` | `["a", "b"]`, `[1, 2, 3]` | eval 字面量赋值（列表元素支持字符串、数字、变量引用） |
+
+**不支持**：布尔值、null；eval 函数参数不能直接传数字常量（只能传 `$var` 或 `"string"`）。
+
+## 二、变量系统
+
+变量是工作流运行时的动态数据载体，存储在引擎的 `variables` 字典中，通过 `$name` 引用。
+
+### 2.1 声明方式
+
+| 方式 | 语法 | 说明 |
+|---|---|---|
+| scan 声明 | `scan scene_name as $var` | OCR 扫描结果存入 `$var`（dict，key 为区域名）。场景名支持 `[]`/`""`/`$var` |
+| eval 函数赋值 | `eval $var = func(args...)` | 内置函数返回值存入 `$var` |
+| eval 字面量赋值 | `eval $var = "str"` 或 `eval $var = 42` | 字面量直接存入 `$var` |
+| eval 列表赋值 | `eval $var = ["a", "b", $c]` | 列表存入 `$var`，元素支持字符串、数字、变量引用 |
+| eval 空字典 | `eval $var = {}` | 初始化空字典，后续可通过 `eval $var.key = value` 逐字段赋值 |
+| for 循环变量 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
+| call 提取 | `call "sub.wf" read "key" as $var` | 从子工作流输出中提取值 |
+
+变量**无需预先声明**，首次赋值即创建，后续引用即可。
+
+**外部参数注入**：工作流可以通过 `workflow.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [05-subworkflows.md](05-subworkflows.md#工作流参数声明)。
+
+### 2.2 变量类型
+
+变量的实际类型由赋值来源决定：
+
+| 来源 | 类型 | 示例 |
+|---|---|---|
+| `scan ... as $var` | `dict` | `$var` = `{"equip_type": "武器", "affix_gong": "会心+10%"}` |
+| `eval $var = to_equipment(...)` | `dict` | 嵌套字典，支持链式字段访问 |
+| `eval $var = "hello"` | `str` | 字符串 |
+| `eval $var = 42` | `float` | 数字（内部统一为 float） |
+| `eval $var = {}` | `dict` | 空字典，后续通过 `eval $var.key = value` 填充 |
+| `eval $var = ["a", "b"]` | `list` | 列表，元素为字符串或数字 |
+| `eval $var = $other` | 同 `$other` | 变量引用赋值，类型跟随源变量 |
+| `eval $var = $dict.field` | 同字段值 | 字段访问赋值，类型跟随字段值 |
+| `for x in [...]` | `str` | 迭代元素为字符串 |
+
+### 2.3 字段访问
+
+当变量为 `dict` 或 `list` 类型时，可通过特定语法访问元素。字段访问既可用于**读取**（右侧），也可用于**赋值**（左侧）。
+
+**字典访问**（用 `.` 表示成员/键访问）：
+
+```
+# 读取
+$dict.$key               # 动态 key（变量）
+$dict."key"              # 静态 key（字符串常量）
+$dict.[key]              # 静态 key（括号常量，等价于 "key"）
+$dict.field.subfield     # 链式访问，逐层深入嵌套 dict
+
+# 赋值
+eval $dict.key = value          # 单层赋值
+eval $dict.a.b.c = value        # 链式赋值（自动创建中间层空字典）
+eval $dict.$key = value         # 动态 key 赋值
+eval $dict."key" = value        # 字符串 key 赋值
+eval $dict.[key] = value        # 括号 key 赋值（等价于 "key"）
+```
+
+**列表索引**（直接 `[]` 表示索引访问）：
+
+```
+$list[$i]                # 动态索引（变量）
+$list[0]                 # 静态索引（数字）
+```
+
+**语义区分**：`.` 表示成员/键访问（dict），`[]` 直接表示索引访问（list）。字段访问返回的是原始值（可能是 dict、str、int、float），在条件比较时自动转换为对应类型。
+
+### 2.4 引用规则
+
+- `$name` 在运行时从 `variables` 字典中查找，找不到则报错
+- 变量名遵循标识符规则：`[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*`
+- 变量作用域为当前工作流文件内，子工作流通过 `with/read` 显式传参，不共享变量
+
+### 2.5 运行时状态
+
+引擎持有三个核心状态：
+
+| 状态 | 类型 | 作用 |
+|---|---|---|
+| `variables` | `dict` | 运行时变量空间，所有 `$var` 的存储 |
+| `output` | `dict` | `collect` 指令的输出缓冲区，工作流结束后返回给调用方 |
+| `coord_meta` | `dict` | scan/recognize 产出的区域坐标元数据，供 `click [scene].$key` 解析坐标。引擎内部状态，DSL 不可直接访问 |
+
+**数据流全景**：
+
+```
+scan scene_name as $var      ──→  variables[$var] = {field: ocr_text}
+                                 coord_meta[$var] = {field: Region}
+
+recognize scene_name as $var ──→  variables[$var] = {slot: material_type}
+                                 coord_meta[$var] = {slot: Region}
+
+eval $var = func(...)        ──→  variables[$var] = result
+
+collect $var                 ──→  output[var_name] = variables[$var]      # name reification
+collect $var as "label"      ──→  output["label"] = variables[$var]       # 静态 alias
+collect $var as $alias       ──→  output[resolve($alias)] = variables[$var]  # 动态 alias
+
+call "sub.wf" read "k" as $v ──→  variables[$v] = sub_output["k"]
+```
+
+`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`coord_meta` 是引擎内部状态，随 scan/recognize 自动存入，使 `click [scene].$key` 可以解析动态 region 的坐标。

@@ -27,7 +27,7 @@ flows:
       - name: target_material
         label: 目标材料
         type: select
-        default: "金色狗粮"
+        default: "紫色狗粮"
         options:
           - { value: "", label: "不添加" }
           - { value: "紫色狗粮", label: "紫色狗粮" }

@@ -1,6 +1,6 @@
 """装备领域模型数据结构
 
-定义 BaseAttr、Affix、EquipmentData 三个核心数据类，
+定义 EquipAttr、Affix、EquipmentData 三个核心数据类，
 支持 JSON 序列化/反序列化。
 """
 
@@ -8,16 +8,16 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class BaseAttr:
-    """基础属性"""
+class EquipAttr:
+    """装备基础属性（武器为 [min, max]，防具/首饰为 int）"""
     name: str
-    value: int | list[int]  # 武器为 [min, max]，防具/首饰为 int
+    value: int | list[int]
 
     def to_dict(self) -> dict:
         return {"name": self.name, "value": self.value}
 
     @classmethod
-    def from_dict(cls, d: dict) -> "BaseAttr":
+    def from_dict(cls, d: dict) -> "EquipAttr":
         return cls(name=d["name"], value=d["value"])
 
 
@@ -72,8 +72,8 @@ class EquipmentData:
     level: int | None = None
     quality: str | None = None     # gold/purple/blue/green，OCR 暂无法识别
     is_chengyin: bool = False
-    base_attr_1: BaseAttr | None = None
-    base_attr_2: BaseAttr | None = None
+    base_attr_1: EquipAttr | None = None
+    base_attr_2: EquipAttr | None = None
     affixes: list[Affix] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -114,8 +114,8 @@ class EquipmentData:
             level=d.get("level"),
             quality=d.get("quality"),
             is_chengyin=d.get("is_chengyin", False),
-            base_attr_1=BaseAttr.from_dict(d["base_attr_1"]) if d.get("base_attr_1") else None,
-            base_attr_2=BaseAttr.from_dict(d["base_attr_2"]) if d.get("base_attr_2") else None,
+            base_attr_1=EquipAttr.from_dict(d["base_attr_1"]) if d.get("base_attr_1") else None,
+            base_attr_2=EquipAttr.from_dict(d["base_attr_2"]) if d.get("base_attr_2") else None,
             affixes=affixes,
             warnings=d.get("_warnings", []),
         )

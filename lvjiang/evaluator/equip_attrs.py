@@ -3,7 +3,7 @@
 根据基础属性数值反推装备品阶（gold/purple/blue/green），
 同时校验 OCR 解析结果是否合理。
 
-数据来源：config/base_attrs.yaml
+数据来源：config/system/equip_attrs.yaml
 """
 
 from __future__ import annotations
@@ -61,17 +61,17 @@ _SLOT_TO_KEY = {
 
 # ─── 配置加载 ──────────────────────────────────────────────
 
-class BaseAttrConfig:
-    """基础属性规则配置
+class EquipAttrConfig:
+    """装备基础属性规则配置
 
-    从 base_attrs.yaml 加载，提供品阶推断接口。
+    从 equip_attrs.yaml 加载，提供品阶推断接口。
     配置结构为 5 种平铺分类 + defense：
         weapon / ring / pendant / armor_other / chest / defense
     """
 
     def __init__(self, path: str | Path | None = None):
         if path is None:
-            path = Path(__file__).resolve().parent.parent.parent / "config" / "base_attrs.yaml"
+            path = Path(__file__).resolve().parent.parent.parent / "config" / "system" / "equip_attrs.yaml"
         self._path = Path(path)
         # key → level → LevelRule
         self._rules: dict[str, dict[int, LevelRule]] = {}

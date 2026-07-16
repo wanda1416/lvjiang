@@ -22,10 +22,15 @@ from .constants import (
 class EquipmentParser:
     """装备 OCR 数据转换器"""
 
+    def __init__(self):
+        from ..evaluator.equip_attrs import EquipAttrConfig
+        self._attr_config = EquipAttrConfig()
+
     def parse(self, raw: dict) -> EquipmentData:
         """解析单件装备的 OCR 原始数据
 
         从 equip_type 文本推断装备类别，决定解析路径。
+        解析完成后自动推断品阶（quality）。
 
         Args:
             raw: OCR 原始 dict
@@ -63,11 +68,24 @@ class EquipmentParser:
                 raw.get("base_attr_2", "")
             )
 
+        # 品阶推断：type + level + base_attr value → quality
+        equip.quality = self._infer_quality(equip, category)
+
         # affixes（带级联脏数据丢弃）
         equip.affixes, affix_warnings = self._parse_affixes(raw)
         equip.warnings.extend(affix_warnings)
 
         return equip
+
+    def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:
+        """根据 type + level + base_attr 推断品阶"""
+        if not equip.type or not equip.level or not equip.base_attr_1:
+            return None
+        value = equip.base_attr_1.value
+        # 武器 value 为 [min, max]，取 max
+        if isinstance(value, list):
+            value = value[1] if len(value) >= 2 else value[0]
+        return self._attr_config.infer_quality(equip.type, equip.level, value)
 
     def parse_slot(self, slot_key: str, raw: dict) -> EquipmentData:
         """向后兼容别名，新代码请用 parse()"""

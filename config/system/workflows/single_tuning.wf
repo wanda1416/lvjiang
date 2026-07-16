@@ -1,19 +1,6 @@
 # 单次调律工作流
 
-# 点开菜单
-click [game_main_page].[menu]
-wait step_interval
-
-# 点击包裹
-click [game_menu_page].[bag]
-wait step_interval
-
-# 点击培养（可能点开包裹后在道具页等其他页面，需要判断当前）
-scan [bag_equip_detail].[sub_equip] as $bag_scan
-if not $bag_scan.sub_equip contains "装备"
-    click [bag_equip_detail].[training]
-    wait step_interval
-end
+call "subcall/navigate_to_equip.wf"
 
 # 点击主武器
 click [bag_equip_detail].[slot_main_weapon]

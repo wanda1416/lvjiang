@@ -1,7 +1,8 @@
 """工作流 DSL v2 引擎
 
 递归执行 AST 节点，支持完整控制流（if/for/loop/break/goto）。
-引擎本身不持有运行时状态，所有操作委托给 BaseWorkflow 实例。
+引擎自身持有运行时状态（variables / output / scan_meta），
+子工作流通过创建独立 engine 实例实现天然隔离，无需 save/restore。
 """
 
 import traceback
@@ -11,7 +12,7 @@ from pathlib import Path
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, Find, Collect, Log,
+    Click, Drag, Wait, Scan, Find, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval,
     SceneRef, VarRef, Literal, FieldAccess, Contains, Equals, InList, IsEmpty,
     Not, And, Or,
@@ -51,24 +52,29 @@ class WorkflowEngine:
 
     def __init__(self, workflow: BaseWorkflow):
         self._wf = workflow
-        self._scan_meta: dict[str, dict] = {}  # var_name → {field_key: Region}
+        self.variables: dict = {}               # 运行时变量
+        self.output: dict = {}                  # collect 输出
+        self._scan_meta: dict[str, dict] = {}   # var_name → {field_key: Region}
+        self._base_dir: Path | None = None      # 当前 wf 所在目录，用于解析相对路径
 
     def run(self, workflow_path: Path | str) -> dict:
         """加载并执行 .wf 文件"""
-        program = parse_file(workflow_path)
-        logger.info(f"=== DSL 工作流开始: {Path(workflow_path).stem} ({len(program.body)} 条顶层指令) ===")
+        resolved = Path(workflow_path).resolve()
+        self._base_dir = resolved.parent
+        program = parse_file(resolved)
+        logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令) ===")
 
         try:
             self._exec_body(program.body)
         except _ReturnSignal:
-            logger.info(f"=== DSL 工作流正常返回，收集到 {len(self._wf.output)} 项数据 ===")
-            return self._wf.output
+            logger.info(f"=== DSL 工作流正常返回，收集到 {len(self.output)} 项数据 ===")
+            return self.output
         except _HaltSignal as sig:
             logger.info(f"=== DSL 工作流提前终止: {sig.message} ===")
-            return []
+            return {}
 
-        logger.info(f"=== DSL 工作流完成，收集到 {len(self._wf.output)} 项数据 ===")
-        return self._wf.output
+        logger.info(f"=== DSL 工作流完成，收集到 {len(self.output)} 项数据 ===")
+        return self.output
 
     # ─── 语句执行 ──────────────────────────────────────────
 
@@ -141,6 +147,8 @@ class WorkflowEngine:
                 raise _GotoSignal(node.target)
             case Eval():
                 self._exec_eval(node)
+            case Call():
+                self._exec_call(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
 
@@ -152,7 +160,7 @@ class WorkflowEngine:
             self._wf.click_any(node.target.scene, node.target.region)
         elif isinstance(node.target, VarRef):
             # 动态点击：$var（find 产出的坐标）
-            coords = self._wf.get_variable(node.target.name)
+            coords = self.variables.get(node.target.name)
             if coords is None:
                 raise _HaltSignal(f"变量 ${node.target.name} 未定义，无法点击")
             x, y = coords
@@ -187,14 +195,14 @@ class WorkflowEngine:
 
         result = self._wf.ocr_scene(scene, field_keys)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
-        self._wf.set_variable(var_name, result)
+        self.variables[var_name] = result
         # 存 region 元数据，供 find 定位坐标
         self._scan_meta[var_name] = self._wf.get_scene_region_map(scene, field_keys)
 
     def _exec_find(self, node: Find):
         """find $source "text" as $target [error "msg"]"""
         source_name = node.source.name if isinstance(node.source, VarRef) else str(node.source)
-        scan_result = self._wf.get_variable(source_name)
+        scan_result = self.variables.get(source_name)
         text = self._resolve(node.text)
         target_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         error_msg = self._resolve(node.error_msg) if node.error_msg else None
@@ -205,22 +213,22 @@ class WorkflowEngine:
             if error_msg:
                 raise _HaltSignal(str(error_msg))
             # 无 error 子句：存 None，由后续 if 显式处理
-            self._wf.set_variable(target_name, None)
+            self.variables[target_name] = None
             logger.debug(f"find: {target_name} = None (未找到 '{text}')")
             return
 
-        self._wf.set_variable(target_name, coords)
+        self.variables[target_name] = coords
         logger.debug(f"find: {target_name} = {coords}")
 
     def _exec_collect(self, node: Collect):
         """collect $var [as "label"] — 将变量值存入输出 dict"""
         var_name = node.source.name if isinstance(node.source, VarRef) else str(node.source)
-        value = self._wf.get_variable(var_name)
+        value = self.variables.get(var_name)
         if value is None:
             logger.warning(f"collect: 变量 ${var_name} 未定义，跳过")
             return
         key = node.alias if node.alias else var_name
-        self._wf.output[key] = value
+        self.output[key] = value
         logger.debug(f"collect: {key} = {value}")
 
     def _exec_eval(self, node: Eval):
@@ -232,10 +240,46 @@ class WorkflowEngine:
         result = self._wf.call_function(node.func_name, resolved_args)
 
         if node.target is not None:
-            self._wf.set_variable(node.target, result)
+            self.variables[node.target] = result
             logger.debug(f"eval: {node.target} = {result}")
         else:
             logger.debug(f"eval: {node.func_name}(...) = {result} (丢弃)")
+
+    def _exec_call(self, node: Call):
+        """call "sub.wf" with $x as arg1 read "key" as $var
+
+        创建独立子 engine，天然隔离变量空间，支持任意深度嵌套。
+        相对路径基于当前 wf 所在目录解析。
+        """
+        wf_path_str = self._resolve(node.workflow)
+        wf_path = Path(wf_path_str)
+        if not wf_path.is_absolute() and self._base_dir:
+            wf_path = self._base_dir / wf_path
+        logger.info(f"--- call 子工作流: {wf_path} ---")
+
+        # 1. 从父 context 取参数值
+        arg_values = {}
+        for var_ref, param_name in node.args:
+            arg_values[param_name] = self.variables.get(var_ref.name)
+
+        # 2. 创建独立子 engine + 注入参数
+        sub_engine = WorkflowEngine(self._wf)
+        sub_engine.variables = dict(arg_values)
+
+        # 3. 运行子 wf
+        sub_output = sub_engine.run(wf_path)
+
+        # 4. 从子 engine output 提取 read 结果，写入父 context
+        count = 0
+        for key_literal, var_ref in node.reads:
+            key = self._resolve(key_literal)
+            if isinstance(sub_output, dict) and key in sub_output:
+                self.variables[var_ref.name] = sub_output[key]
+                count += 1
+            else:
+                logger.warning(f"call: 子工作流 output 中无 key '{key}'")
+
+        logger.info(f"--- call 返回，取回 {count} 个值 ---")
 
     # ─── 控制流 ───────────────────────────────────────────
 
@@ -258,7 +302,7 @@ class WorkflowEngine:
                 logger.info("工作流被用户停止")
                 return
             # 设置循环变量
-            self._wf.set_variable(node.var, str(value))
+            self.variables[node.var] = str(value)
             try:
                 self._exec_body(node.body)
             except _BreakSignal:
@@ -270,7 +314,7 @@ class WorkflowEngine:
             count = node.count
         else:
             # 变量引用
-            val = self._wf.get_variable(str(node.count))
+            val = self.variables.get(str(node.count))
             count = int(val) if val is not None else 0
 
         logger.debug(f"loop {count}")
@@ -310,8 +354,8 @@ class WorkflowEngine:
             case Or():
                 return self._eval_condition(node.left) or self._eval_condition(node.right)
             case VarRef():
-                # 条件中的 [var] → truthy 检查
-                val = self._wf.get_variable(node.name)
+                # 条件中的 $var → truthy 检查
+                val = self.variables.get(node.name)
                 return bool(val)
             case _:
                 logger.error(f"未知条件节点: {type(node).__name__}")
@@ -319,7 +363,7 @@ class WorkflowEngine:
 
     def _eval_field_access(self, node: FieldAccess) -> str:
         """求值 $var.field → 从变量中取字段"""
-        var_val = self._wf.get_variable(node.var.name)
+        var_val = self.variables.get(node.var.name)
         if isinstance(var_val, dict):
             return str(var_val.get(node.field_name, ""))
         return ""
@@ -334,7 +378,7 @@ class WorkflowEngine:
         """
         match node:
             case VarRef():
-                val = self._wf.get_variable(node.name)
+                val = self.variables.get(node.name)
                 if val is not None:
                     return val
                 # 回退：未定义的变量视为字面量

@@ -17,6 +17,7 @@ start: (_NL | statement)*
           | collect_stmt
           | log_stmt
           | eval_stmt
+          | call_stmt
           | if_stmt
           | for_stmt
           | loop_stmt
@@ -58,6 +59,18 @@ arg_list: arg ("," arg)*
 
 ?arg: STRING -> arg_lit
     | var_ref -> arg_var
+
+// ─── 子工作流调用 ──────────────────────────────────────────
+
+call_stmt: "call"i STRING call_with_clause? call_read_clause? _NL
+
+call_with_clause: "with"i call_arg ("," call_arg)*
+
+call_arg: var_ref "as"i NAME
+
+call_read_clause: "read"i call_read_item ("," call_read_item)*
+
+call_read_item: STRING "as"i var_ref
 
 // ─── 控制流 ───────────────────────────────────────────────
 

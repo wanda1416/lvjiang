@@ -1,0 +1,15 @@
+# 从主界面导航到装备培养页面
+# 路径：主界面 → 菜单 → 包裹 → 培养（如不在装备页则自动切换）
+
+click [game_main_page].[menu]
+wait step_interval
+
+click [game_menu_page].[bag]
+wait step_interval
+
+# 点击培养（可能点开包裹后在道具页等其他页面，需要判断当前）
+scan [bag_equip_detail].[sub_equip] as $bag_scan
+if not $bag_scan.sub_equip contains "装备"
+    click [bag_equip_detail].[training]
+    wait step_interval
+end

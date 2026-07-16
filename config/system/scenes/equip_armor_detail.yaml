@@ -1,7 +1,7 @@
 key: equip_armor_detail
 name: 防具详情
 
-fields:
+regions:
   - key: equip_type
     name: 装备类型
     type: attr

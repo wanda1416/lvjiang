@@ -8,7 +8,7 @@ from PyQt6.QtGui import (
     QPaintEvent, QFont,
 )
 
-from ...core.region_config import Region, CanvasConfig, EQUIP_FIELDS
+from ...core.region_config import Region, CanvasConfig, EQUIP_REGIONS
 from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
 
 
@@ -71,8 +71,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin):
         self.on_region_changed = None  # callable() -> None
         self.on_canvas_changed = None  # callable() -> None
 
-        # 当前场景的字段列表（由外部设置）
-        self._current_fields = EQUIP_FIELDS
+        # 当前场景的区域列表（由外部设置）
+        self._current_regions = EQUIP_REGIONS
 
         # 画布配置（布局级别，由外部设置）
         self._canvas_config = CanvasConfig()
@@ -86,9 +86,9 @@ class RegionCanvas(QWidget, CanvasInteractionMixin):
 
     # ─── 公开接口 ────────────────────────────────────────
 
-    def set_current_fields(self, fields: list[tuple[str, str]]):
-        """设置当前场景的字段列表（由对话框调用）"""
-        self._current_fields = fields
+    def set_current_regions(self, regions: list[tuple[str, str]]):
+        """设置当前场景的区域列表（由对话框调用）"""
+        self._current_regions = regions
 
     def set_regions(self, regions: list[Region]):
         """设置区域列表（从预设加载）"""

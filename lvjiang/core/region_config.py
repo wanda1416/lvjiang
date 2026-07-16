@@ -9,7 +9,7 @@ import numpy as np
 from loguru import logger
 
 from ..constants import CONFIG_DIR, LOCAL_CONFIG_DIR, SYSTEM_SCENES_DIR, APP_CONFIG_PATH, PREFERENCES_PATH, SESSION_PATH
-from .scene_loader import SceneRegistry, FieldDef, SceneDef
+from .scene_loader import SceneRegistry, RegionDef, SceneDef, FieldDef
 
 
 def _load_scene_order() -> list[str] | None:
@@ -30,41 +30,60 @@ def _load_scene_order() -> list[str] | None:
 
 _registry = SceneRegistry(SYSTEM_SCENES_DIR, scene_order=_load_scene_order())
 
-FIELD_GROUPS: dict[str, tuple[str, list[tuple[str, str]]]] = {
-    key: (scene.name, [(f.key, f.name) for f in scene.fields])
+# 场景 → (场景中文名, [(region_key, region_name), ...])
+SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {
+    key: (scene.name, [(r.key, r.name) for r in scene.regions])
     for key, scene in _registry.all_scenes().items()
 }
 
+# 向后兼容别名
+FIELD_GROUPS = SCENE_REGIONS
+
 _wpn = _registry.get_scene("equip_weapon_detail")
-EQUIP_FIELDS = [(f.key, f.name) for f in _wpn.fields] if _wpn else []
+EQUIP_REGIONS = [(r.key, r.name) for r in _wpn.regions] if _wpn else []
+# 向后兼容别名
+EQUIP_FIELDS = EQUIP_REGIONS
 
 
 def get_scene_name(scene_key: str) -> str:
-    if scene_key in FIELD_GROUPS:
-        return FIELD_GROUPS[scene_key][0]
+    if scene_key in SCENE_REGIONS:
+        return SCENE_REGIONS[scene_key][0]
     return scene_key
 
 
-def get_scene_fields(scene_key: str) -> list[tuple[str, str]]:
-    if scene_key in FIELD_GROUPS:
-        return FIELD_GROUPS[scene_key][1]
+def get_scene_regions(scene_key: str) -> list[tuple[str, str]]:
+    """获取场景的 (key, name) 区域列表"""
+    if scene_key in SCENE_REGIONS:
+        return SCENE_REGIONS[scene_key][1]
     return []
 
 
-def get_button_fields(scene_key: str) -> set[str]:
-    """获取场景的纯功能按钮字段集合（is_clickable 且非 is_text）"""
+# 向后兼容别名
+get_scene_fields = get_scene_regions
+
+
+def get_button_regions(scene_key: str) -> set[str]:
+    """获取场景的纯功能按钮区域集合（is_clickable 且非 is_text）"""
     scene = _registry.get_scene(scene_key)
     if not scene:
         return set()
-    return {f.key for f in scene.fields if f.is_clickable and not f.is_text}
+    return {r.key for r in scene.regions if r.is_clickable and not r.is_text}
 
 
-def get_field_defs(scene_key: str) -> list[FieldDef]:
-    """获取场景的完整字段定义列表"""
+# 向后兼容别名
+get_button_fields = get_button_regions
+
+
+def get_region_defs(scene_key: str) -> list[RegionDef]:
+    """获取场景的完整区域定义列表"""
     scene = _registry.get_scene(scene_key)
     if not scene:
         return []
-    return list(scene.fields)
+    return list(scene.regions)
+
+
+# 向后兼容别名
+get_field_defs = get_region_defs
 
 
 # ─── 路径常量 ────────────────────────────────────────────
@@ -294,7 +313,7 @@ class LayoutConfigManager:
     def new_layout(self, name: str) -> Layout:
         """创建空布局（所有场景初始为空 regions）"""
         layout = Layout(name=name)
-        for scene_key in FIELD_GROUPS:
+        for scene_key in SCENE_REGIONS:
             layout.scenes[scene_key] = []
         self.save_layout(layout)
         self.set_active_layout(name)

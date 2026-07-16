@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 from loguru import logger
 
 from ...core.region_config import (
-    FIELD_GROUPS, Layout, LayoutConfigManager,
+    SCENE_REGIONS, Layout, LayoutConfigManager,
     get_scene_name,
     load_scene_screenshot, save_scene_screenshot,
 )
@@ -102,7 +102,7 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         self._splitter = QSplitter(Qt.Orientation.Vertical)
 
         self._tab_widget = QTabWidget()
-        for scene_key, (scene_name, _) in FIELD_GROUPS.items():
+        for scene_key, (scene_name, _) in SCENE_REGIONS.items():
             tab = SceneTab(scene_key)
             self._tabs[scene_key] = tab
             self._tab_widget.addTab(tab, scene_name)
@@ -280,5 +280,5 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
     def _current_scene_key(self) -> str:
         """当前 Tab 对应的 scene_key"""
         idx = self._tab_widget.currentIndex()
-        keys = list(FIELD_GROUPS.keys())
+        keys = list(SCENE_REGIONS.keys())
         return keys[idx] if 0 <= idx < len(keys) else keys[0]

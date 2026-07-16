@@ -1,7 +1,7 @@
 key: game_main_page
 name: 游戏主页
 
-fields:
+regions:
   - key: menu
     name: 菜单
     type: func

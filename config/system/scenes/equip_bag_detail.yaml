@@ -1,7 +1,7 @@
 key: equip_bag_detail
 name: 背包详情
 
-fields:
+regions:
   - key: back
     name: 返回
     type: func

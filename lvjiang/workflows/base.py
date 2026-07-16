@@ -220,40 +220,6 @@ class BaseWorkflow:
             raise ValueError(f"未知内置函数: {func_name}，可用函数: {available}")
         return fn(*args)
 
-    def eval_condition(self, condition: dict) -> bool:
-        """求值 DSL 条件表达式
-
-        condition 格式（由 parser 生成）：
-            {"func": name, "args": [...], "negated": bool}
-            {"var": name, "negated": bool}
-        """
-        negated = condition.get("negated", False)
-
-        if "func" in condition:
-            resolved = self._resolve_args(condition["args"])
-            result = self.call_function(condition["func"], resolved)
-            value = bool(result)
-        elif "var" in condition:
-            value = bool(self.variables.get(condition["var"]))
-        else:
-            logger.error(f"无法识别的条件: {condition}")
-            value = False
-
-        return (not value) if negated else value
-
-    def resolve_args(self, func_args: list[tuple[str, str]]) -> list:
-        """解析函数参数：变量引用 → 运行时值，字面量 → 原值"""
-        return self._resolve_args(func_args)
-
-    def _resolve_args(self, func_args: list[tuple[str, str]]) -> list:
-        resolved = []
-        for kind, value in func_args:
-            if kind == "var":
-                resolved.append(self.variables.get(value))
-            else:
-                resolved.append(value)
-        return resolved
-
     # ─── 坐标计算 ──────────────────────────────────────────
 
     def _region_to_screen(self, region: Region, jitter: bool = True) -> tuple[int | None, int | None]:

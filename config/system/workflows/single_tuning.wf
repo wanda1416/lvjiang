@@ -11,7 +11,7 @@ wait step_interval
 
 call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
 if not $tune_status
-    log "未进入调律页面"
+    log "未进入调律页面，提前结束"
     return
 end
 
@@ -20,6 +20,16 @@ if not $add_scan.one_click_add contains "添加"
     log "装备已调律完毕，无需调律"
     return
 end
+
+# 识别材料格，找到紫狗粮则点击，否则提前结束
+eval $target_material = "紫色狗粮"
+call "subcall/find_material.wf" with $target_material as target_material read "position" as $purple_pos
+if not $purple_pos
+    log "紫色狗粮不足，提前结束"
+    return
+end
+click $purple_pos
+wait step_interval
 
 click [equip_tune_detail].[one_click_add]
 wait step_interval

@@ -13,6 +13,7 @@ start: (_NL | statement)*
           | drag_stmt
           | wait_stmt
           | scan_stmt
+          | recognize_stmt
           | find_stmt
           | collect_stmt
           | log_stmt
@@ -43,7 +44,9 @@ wait_stmt: "wait"i (NAME | number | bracket_expr) _NL
 
 scan_stmt: "scan"i bracket_expr field_list? "as"i var_ref _NL
 
-find_stmt: "find"i var_ref STRING "as"i var_ref error_clause? _NL
+recognize_stmt: "recognize"i bracket_expr field_list? "as"i var_ref _NL
+
+find_stmt: "find"i var_ref (STRING | var_ref) "as"i var_ref error_clause? _NL
 
 error_clause: "error"i STRING
 
@@ -51,15 +54,22 @@ collect_stmt: "collect"i var_ref collect_as_clause? _NL
 
 collect_as_clause: "as"i STRING
 
-log_stmt: "log"i STRING _NL
+log_stmt: "log"i (STRING | func_call) _NL
 
 eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_func
          | "eval"i "$" NAME "=" literal _NL                    -> eval_assign_lit
+         | "eval"i "$" NAME "." NAME "=" eval_rhs _NL          -> eval_field_assign
          | "eval"i NAME "(" arg_list? ")" _NL                  -> eval_discard
+
+eval_rhs: NAME "(" arg_list? ")"  -> eval_rhs_func
+        | literal                   -> eval_rhs_lit
+
+func_call: NAME "(" arg_list? ")"
 
 arg_list: arg ("," arg)*
 
 ?arg: STRING -> arg_lit
+    | field_access -> arg_field
     | var_ref -> arg_var
 
 // ─── 子工作流调用 ──────────────────────────────────────────
@@ -130,6 +140,7 @@ field_access: field_access "." NAME -> field_chain
 // 任意字面量（用于 eval 赋值右侧）
 ?literal: STRING
         | number
+        | "{" "}" -> empty_dict
 
 // ─── 通用原子 ─────────────────────────────────────────────
 

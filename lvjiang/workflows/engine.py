@@ -1,7 +1,7 @@
 """工作流 DSL v2 引擎
 
 递归执行 AST 节点，支持完整控制流（if/for/loop/break/goto）。
-引擎自身持有运行时状态（variables / output / scan_meta），
+引擎自身持有运行时状态（variables / output / coord_meta），
 子工作流通过创建独立 engine 实例实现天然隔离，无需 save/restore。
 """
 
@@ -12,8 +12,8 @@ from pathlib import Path
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, Find, Collect, Log, Call,
-    If, For, Loop, Break, Return, Label, Goto, Eval,
+    Click, Drag, Wait, Scan, Recognize, Find, Collect, Log, Call,
+    If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldAssign, FuncCall,
     SceneRef, VarRef, Literal, FieldAccess,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
@@ -56,7 +56,7 @@ class WorkflowEngine:
         self._wf = workflow
         self.variables: dict = {}               # 运行时变量
         self.output: dict = {}                  # collect 输出
-        self._scan_meta: dict[str, dict] = {}   # var_name → {field_key: Region}
+        self._coord_meta: dict[str, dict] = {}   # var_name → {slot_key: Region}，scan/recognize 共享
         self._base_dir: Path | None = None      # 当前 wf 所在目录，用于解析相对路径
 
     def run(self, workflow_path: Path | str) -> dict:
@@ -127,12 +127,17 @@ class WorkflowEngine:
                 self._exec_wait(node)
             case Scan():
                 self._exec_scan(node)
+            case Recognize():
+                self._exec_recognize(node)
             case Find():
                 self._exec_find(node)
             case Collect():
                 self._exec_collect(node)
             case Log():
-                logger.info(self._resolve(node.message))
+                if isinstance(node.message, FuncCall):
+                    logger.info(str(self._call_func(node.message)))
+                else:
+                    logger.info(self._resolve(node.message))
             case If():
                 self._exec_if(node)
             case For():
@@ -149,6 +154,8 @@ class WorkflowEngine:
                 raise _GotoSignal(node.target)
             case Eval():
                 self._exec_eval(node)
+            case EvalFieldAssign():
+                self._exec_eval_field_assign(node)
             case Call():
                 self._exec_call(node)
             case _:
@@ -198,8 +205,19 @@ class WorkflowEngine:
         result = self._wf.ocr_scene(scene, field_keys)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         self.variables[var_name] = result
-        # 存 region 元数据，供 find 定位坐标
-        self._scan_meta[var_name] = self._wf.get_scene_region_map(scene, field_keys)
+        # 存 region 元数据，供 find 定位坐标（scan/recognize 共享 coord_meta）
+        self._coord_meta[var_name] = self._wf.get_scene_region_map(scene, field_keys)
+
+    def _exec_recognize(self, node: Recognize):
+        """recognize [scene].[f1, f2, ...] as $var — 图像识别场景中的材料，结果存入变量"""
+        scene = node.scene.scene if isinstance(node.scene, SceneRef) else str(node.scene)
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        field_keys = None
+        if node.fields:
+            field_keys = [self._resolve(f) for f in node.fields]
+        result, region_map = self._wf.recognize_materials(scene, field_keys)
+        self.variables[var_name] = result           # {slot_key: "材料类型"}
+        self._coord_meta[var_name] = region_map     # {slot_key: Region} — 共享 coord_meta
 
     def _exec_find(self, node: Find):
         """find $source "text" as $target [error "msg"]"""
@@ -209,7 +227,7 @@ class WorkflowEngine:
         target_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         error_msg = self._resolve(node.error_msg) if node.error_msg else None
 
-        region_map = self._scan_meta.get(source_name)
+        region_map = self._coord_meta.get(source_name)
         coords = self._wf.find_in_scan(scan_result, str(text), region_map=region_map)
         if coords is None:
             if error_msg:
@@ -242,18 +260,49 @@ class WorkflowEngine:
                 logger.debug(f"eval: {node.target} = {lit_val!r}")
             return
 
-        # 函数调用路径
-        resolved_args = []
-        for arg in node.func_args:
-            resolved_args.append(self._resolve(arg))
+        # 空字典初始化：eval $var = {}
+        if node.func_name == "__empty_dict__":
+            if node.target is not None:
+                self.variables[node.target] = {}
+                logger.debug(f"eval: {node.target} = {{}}")
+            return
 
-        result = self._wf.call_function(node.func_name, resolved_args)
+        # 函数调用路径
+        result = self._call_func_from_eval(node)
 
         if node.target is not None:
             self.variables[node.target] = result
             logger.debug(f"eval: {node.target} = {result}")
         else:
             logger.debug(f"eval: {node.func_name}(...) = {result} (丢弃)")
+
+    def _exec_eval_field_assign(self, node: EvalFieldAssign):
+        """eval $dict.key = value — 字典字段赋值"""
+        dict_var = self.variables.get(node.var_name)
+        if not isinstance(dict_var, dict):
+            logger.error(f"eval_field_assign: ${node.var_name} 不是字典类型")
+            return
+        # 解析右侧值
+        if isinstance(node.value, FuncCall):
+            value = self._call_func(node.value)
+        elif isinstance(node.value, dict):
+            value = {}  # 空字典
+        elif isinstance(node.value, Literal):
+            value = node.value.value
+        else:
+            value = node.value  # number (float)
+        dict_var[node.field_name] = value
+        logger.debug(f"eval: ${node.var_name}.{node.field_name} = {value!r}")
+
+    def _call_func(self, node: FuncCall):
+        """执行函数调用并返回结果"""
+        resolved_args = [self._resolve(arg) for arg in node.func_args]
+        return self._wf.call_function(node.func_name, resolved_args)
+
+    def _call_func_from_eval(self, node: Eval):
+        """从 Eval 节点执行函数调用"""
+        resolved_args = [self._resolve(arg) for arg in node.func_args]
+        return self._wf.call_function(node.func_name, resolved_args)
 
     def _exec_call(self, node: Call):
         """call "sub.wf" with $x as arg1 read "key" as $var
@@ -285,6 +334,9 @@ class WorkflowEngine:
             key = self._resolve(key_literal)
             if isinstance(sub_output, dict) and key in sub_output:
                 self.variables[var_ref.name] = sub_output[key]
+                # 透传 coord_meta：若子 engine 中该变量有坐标元数据，一并传回父级
+                if var_ref.name in sub_engine._coord_meta:
+                    self._coord_meta[var_ref.name] = sub_engine._coord_meta[var_ref.name]
                 count += 1
             else:
                 logger.warning(f"call: 子工作流 output 中无 key '{key}'")

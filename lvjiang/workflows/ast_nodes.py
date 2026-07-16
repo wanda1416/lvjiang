@@ -58,6 +58,14 @@ class Scan:
 
 
 @dataclass(frozen=True)
+class Recognize:
+    scene: Any      # SceneRef（静态场景引用）
+    target: Any     # VarRef（$var，as 子句）
+    fields: list | None = None  # list[Literal] | None
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Find:
     """在 scan 结果中查找文本，将坐标存入变量"""
     source: Any     # VarRef（scan 结果变量）
@@ -131,6 +139,23 @@ class Eval:
     func_name: str
     func_args: list             # list[Literal | VarRef]
     target: str | None = None   # 赋值目标变量名，None 表示丢弃返回值
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class EvalFieldAssign:
+    """eval $dict.key = value"""
+    var_name: str       # 字典变量名
+    field_name: str     # 字段名
+    value: Any          # Literal | FuncCall
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class FuncCall:
+    """函数调用：func_name($arg1, "arg2", ...)"""
+    func_name: str
+    func_args: list     # list[Literal | VarRef]
     line_no: int = 0
 
 

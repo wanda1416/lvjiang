@@ -4,7 +4,7 @@ import re
 
 import numpy as np
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QSplitter, QTabWidget, QPushButton, QInputDialog, QMessageBox,
     QDialog, QFormLayout, QLineEdit, QComboBox, QCheckBox, QDialogButtonBox,
     QTableWidget, QTableWidgetItem, QHeaderView,
@@ -97,6 +97,9 @@ class SceneTab(QWidget):
         self._region_table.verticalHeader().setVisible(False)
         self._region_table.currentCellChanged.connect(self._on_region_table_selection)
         self._region_table.cellDoubleClicked.connect(self._on_edit_region_from_table)
+        # Key 列右击复制
+        self._region_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._region_table.customContextMenuRequested.connect(self._on_region_table_context_menu)
         layout.addWidget(self._region_table)
 
         btn_row = QHBoxLayout()
@@ -114,9 +117,20 @@ class SceneTab(QWidget):
     def _build_point_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        self._point_list = QListWidget()
-        self._point_list.currentRowChanged.connect(self._on_point_selection)
-        self._point_list.itemDoubleClicked.connect(self._on_edit_point)
+        self._point_list = QTableWidget()
+        self._point_list.setColumnCount(2)
+        self._point_list.setHorizontalHeaderLabels(["名称", "Key"])
+        self._point_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._point_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._point_list.verticalHeader().setVisible(False)
+        self._point_list.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_point_selection(row))
+        self._point_list.cellDoubleClicked.connect(self._on_edit_point_from_table)
+        # Key 列右击复制
+        self._point_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._point_list.customContextMenuRequested.connect(self._on_point_table_context_menu)
         layout.addWidget(self._point_list)
 
         btn_row = QHBoxLayout()
@@ -139,9 +153,20 @@ class SceneTab(QWidget):
     def _build_arrow_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        self._arrow_list = QListWidget()
-        self._arrow_list.currentRowChanged.connect(self._on_arrow_selection)
-        self._arrow_list.itemDoubleClicked.connect(self._on_edit_arrow)
+        self._arrow_list = QTableWidget()
+        self._arrow_list.setColumnCount(2)
+        self._arrow_list.setHorizontalHeaderLabels(["Key", "方向"])
+        self._arrow_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self._arrow_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self._arrow_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._arrow_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._arrow_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._arrow_list.verticalHeader().setVisible(False)
+        self._arrow_list.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_arrow_selection(row))
+        self._arrow_list.cellDoubleClicked.connect(self._on_edit_arrow_from_table)
+        # Key 列右击复制
+        self._arrow_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._arrow_list.customContextMenuRequested.connect(self._on_arrow_table_context_menu)
         layout.addWidget(self._arrow_list)
 
         btn_row = QHBoxLayout()
@@ -284,60 +309,66 @@ class SceneTab(QWidget):
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
+    def _on_region_table_context_menu(self, pos):
+        """区域表格右击菜单：Key 列右击自动复制"""
+        item = self._region_table.itemAt(pos)
+        if item is None:
+            return
+        row = item.row()
+        col = item.column()
+        # 只在 Key 列（列 1）触发复制
+        if col != 1:
+            return
+        key_item = self._region_table.item(row, 1)
+        if key_item and key_item.text():
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(key_item.text())
+
     def _refresh_point_list(self):
         """刷新坐标列表，显示已放置/未放置状态"""
         self._point_list.blockSignals(True)
-        self._point_list.clear()
+        self._point_list.setRowCount(0)
         pairs = get_scene_point_pairs(self._scene_key)
         placed = {p.key for p in self._canvas.get_points()}
         for key, name in pairs:
-            if key in placed:
-                item = QListWidgetItem(f"\u2713 {name} ({key})")
-            else:
-                item = QListWidgetItem(f"\u25cb {name} ({key})")
-                item.setForeground(Qt.GlobalColor.gray)
-            item.setData(Qt.ItemDataRole.UserRole, key)
-            self._point_list.addItem(item)
+            row = self._point_list.rowCount()
+            self._point_list.insertRow(row)
+            # 名称
+            status = "\u2713" if key in placed else "\u25cb"
+            name_item = QTableWidgetItem(f"{status} {name}")
+            if key not in placed:
+                name_item.setForeground(Qt.GlobalColor.gray)
+            self._point_list.setItem(row, 0, name_item)
+            # Key
+            key_item = QTableWidgetItem(key)
+            if key not in placed:
+                key_item.setForeground(Qt.GlobalColor.gray)
+            self._point_list.setItem(row, 1, key_item)
         self._point_list.blockSignals(False)
 
     def _refresh_arrow_list(self):
         """刷新方向列表"""
         self._arrow_list.blockSignals(True)
-        self._arrow_list.clear()
+        self._arrow_list.setRowCount(0)
         for a in self._canvas.get_arrows():
+            row = self._arrow_list.rowCount()
+            self._arrow_list.insertRow(row)
+            # Key
+            self._arrow_list.setItem(row, 0, QTableWidgetItem(a.key))
+            # 方向
             if a.to_key is not None:
-                desc = f"\u2192 {a.key}  ({a.from_key} \u2192 {a.to_key})"
+                desc = f"{a.from_key} \u2192 {a.to_key}"
             else:
                 cx = a.to_cx_ratio if a.to_cx_ratio is not None else 0.0
                 cy = a.to_cy_ratio if a.to_cy_ratio is not None else 0.0
-                desc = f"\u2192 {a.key}  ({a.from_key} \u2192 {cx:.2f}, {cy:.2f})"
-            item = QListWidgetItem(desc)
-            item.setData(Qt.ItemDataRole.UserRole, a.key)
-            self._arrow_list.addItem(item)
+                desc = f"{a.from_key} \u2192 ({cx:.2f}, {cy:.2f})"
+            self._arrow_list.setItem(row, 1, QTableWidgetItem(desc))
         self._arrow_list.blockSignals(False)
 
     def _on_poi_changed(self):
         """画布 point/arrow 数据变化时刷新两个列表"""
         self._refresh_point_list()
         self._refresh_arrow_list()
-
-    # ─── region 列表选择 ─────────────────────────────────
-
-    def _on_region_selection(self, row: int):
-        """列表选中项变化时同步到画布"""
-        self._btn_del_region.setEnabled(row >= 0)
-        if row < 0:
-            self._canvas.clear_field_selection()
-            return
-        regions = get_scene_regions(self._scene_key)
-        if row >= len(regions):
-            return
-        key = regions[row][0]
-        assigned = self._canvas.get_regions()
-        for i, r in enumerate(assigned):
-            if r.key == key:
-                self._canvas.select_region(i)
-                return
 
     # ─── point 列表选择 / 删除 ───────────────────────────
 
@@ -346,10 +377,10 @@ class SceneTab(QWidget):
         if row < 0:
             self._canvas.clear_poi_selection()
             return
-        item = self._point_list.item(row)
-        if item is None:
+        key_item = self._point_list.item(row, 1)
+        if key_item is None:
             return
-        key = item.data(Qt.ItemDataRole.UserRole)
+        key = key_item.text()
         placed = {p.key for p in self._canvas.get_points()}
         if key in placed:
             self._canvas.select_point_by_key(key)
@@ -390,29 +421,15 @@ class SceneTab(QWidget):
             return
         self._canvas.begin_draw_arrow(key)
 
-    def _on_delete_point(self):
-        """从画布删除已放置的坐标点（保留 YAML 定义）"""
-        row = self._point_list.currentRow()
-        if row < 0:
-            return
-        item = self._point_list.item(row)
-        if item is None:
-            return
-        key = item.data(Qt.ItemDataRole.UserRole)
-        placed = {p.key for p in self._canvas.get_points()}
-        if key not in placed:
-            return
-        self._canvas.delete_point_by_key(key)
-
     def _on_delete_point_def(self):
         """从 YAML 删除坐标点定义"""
         row = self._point_list.currentRow()
         if row < 0:
             return
-        item = self._point_list.item(row)
-        if item is None:
+        key_item = self._point_list.item(row, 1)
+        if key_item is None:
             return
-        key = item.data(Qt.ItemDataRole.UserRole)
+        key = key_item.text()
         reply = QMessageBox.question(
             self, "确认删除",
             f"确定要从场景定义中删除坐标点「{key}」吗？",
@@ -443,9 +460,12 @@ class SceneTab(QWidget):
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
-    def _on_edit_point(self, item: QListWidgetItem):
-        """双击编辑坐标点定义"""
-        key = item.data(Qt.ItemDataRole.UserRole)
+    def _on_edit_point_from_table(self, row, col):
+        """双击表格行编辑坐标点定义"""
+        key_item = self._point_list.item(row, 1)
+        if key_item is None:
+            return
+        key = key_item.text()
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
         if not scene:
@@ -463,6 +483,21 @@ class SceneTab(QWidget):
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
+
+    def _on_point_table_context_menu(self, pos):
+        """坐标表格右击菜单：Key 列右击自动复制"""
+        item = self._point_list.itemAt(pos)
+        if item is None:
+            return
+        row = item.row()
+        col = item.column()
+        # 只在 Key 列（列 1）触发复制
+        if col != 1:
+            return
+        key_item = self._point_list.item(row, 1)
+        if key_item and key_item.text():
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(key_item.text())
 
     # ─── region CRUD ─────────────────────────────────────
 
@@ -624,18 +659,18 @@ class SceneTab(QWidget):
         if row < 0:
             self._canvas.clear_poi_selection()
             return
-        item = self._arrow_list.item(row)
-        if item is None:
+        key_item = self._arrow_list.item(row, 0)
+        if key_item is None:
             return
-        key = item.data(Qt.ItemDataRole.UserRole)
+        key = key_item.text()
         self._canvas.select_arrow_by_key(key)
 
     def _selected_arrow_key(self) -> str | None:
         row = self._arrow_list.currentRow()
         if row < 0:
             return None
-        item = self._arrow_list.item(row)
-        return item.data(Qt.ItemDataRole.UserRole) if item else None
+        key_item = self._arrow_list.item(row, 0)
+        return key_item.text() if key_item else None
 
     def _on_delete_arrow(self):
         key = self._selected_arrow_key()
@@ -643,7 +678,7 @@ class SceneTab(QWidget):
             return
         self._canvas.delete_arrow_by_key(key)
 
-    def _on_edit_arrow(self, item):
+    def _on_edit_arrow_from_table(self, row, col):
         """双击重命名方向"""
         old = self._selected_arrow_key()
         if old is None:
@@ -667,3 +702,18 @@ class SceneTab(QWidget):
                 continue
             self._canvas.rename_arrow_by_key(old, new)
             return
+
+    def _on_arrow_table_context_menu(self, pos):
+        """方向表格右击菜单：Key 列右击自动复制"""
+        item = self._arrow_list.itemAt(pos)
+        if item is None:
+            return
+        row = item.row()
+        col = item.column()
+        # 只在 Key 列（列 0）触发复制
+        if col != 0:
+            return
+        key_item = self._arrow_list.item(row, 0)
+        if key_item and key_item.text():
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(key_item.text())

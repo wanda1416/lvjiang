@@ -69,6 +69,11 @@ class MaterialRecognizer:
         self._template_size: tuple[int, int] | None = None
         self._loaded = False
 
+        # 预计算缓存（加载时填充，识别时只读）
+        self._cached_orb: list[tuple[str, np.ndarray | None, int, np.ndarray]] = []
+        # [(mat_type, descriptors, kp_count, lab_avg), ...]
+        self._orb: cv2.ORB | None = None
+
     # ─── 参考库加载 ──────────────────────────────────────────
 
     def _ensure_loaded(self):
@@ -120,10 +125,41 @@ class MaterialRecognizer:
             f"{total} 张参考图, 尺寸 {self._template_size}"
         )
 
+        # 预计算所有参考图的 ORB 描述子 + Lab 均值
+        self._precompute_features()
+
+    def _precompute_features(self):
+        """预计算所有参考图的 ORB 特征和 Lab 颜色均值
+
+        识别时只需对 slot 图算一次 ORB，然后与缓存做 knnMatch，
+        避免每次识别都重复计算参考图特征。
+        """
+        if self._template_size is None:
+            return
+
+        self._orb = cv2.ORB.create(nfeatures=300)
+        self._cached_orb.clear()
+
+        for mat_type, variants in self._templates.items():
+            for ref_img, _level in variants:
+                # 缩放到统一尺寸
+                resized = cv2.resize(ref_img, self._template_size, interpolation=cv2.INTER_AREA)
+                # ORB 特征
+                kp, des = self._orb.detectAndCompute(resized, None)
+                kp_count = len(kp) if kp else 0
+                # Lab 均值
+                lab = cv2.cvtColor(resized, cv2.COLOR_BGR2Lab).astype(np.float32)
+                lab_avg = lab.mean(axis=(0, 1))
+                self._cached_orb.append((mat_type, des, kp_count, lab_avg))
+
+        logger.debug(f"预计算完成: {len(self._cached_orb)} 条特征缓存")
+
     def reload(self):
         """强制重新加载参考库"""
         self._templates.clear()
         self._template_size = None
+        self._cached_orb.clear()
+        self._orb = None
         self._loaded = False
         self._ensure_loaded()
 
@@ -205,24 +241,49 @@ class MaterialRecognizer:
         对局部遮挡（如减号按钮）有容忍度，
         只要图标未遮挡区域有足够特征点匹配即可识别。
 
+        slot 图只计算一次 ORB，与预计算缓存做匹配。
+
         Returns:
             (type_name, confidence)
         """
-        if self._template_size is None:
+        if self._template_size is None or not self._cached_orb:
             return "", 0.0
 
         # 将槽图缩放到参考图尺寸
         resized = cv2.resize(slot_img, self._template_size, interpolation=cv2.INTER_AREA)
 
+        # slot 图 ORB（只算一次）
+        kp1, des1 = self._orb.detectAndCompute(resized, None)
+        # slot 图 Lab 均值
+        lab1 = cv2.cvtColor(resized, cv2.COLOR_BGR2Lab).astype(np.float32).mean(axis=(0, 1))
+
+        if des1 is None or len(kp1) < 5:
+            return "", 0.0
+
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+
         best_type = ""
         best_score = -1.0
 
-        for mat_type, variants in self._templates.items():
-            for ref_img, _level in variants:
-                score = self._match_score(resized, ref_img)
-                if score > best_score:
-                    best_score = score
-                    best_type = mat_type
+        for mat_type, des2, kp2_count, lab2 in self._cached_orb:
+            if des2 is None or kp2_count < 5:
+                continue
+            # ORB 匹配（复用缓存描述子）
+            matches = bf.knnMatch(des1, des2, k=2)
+            good = sum(
+                1 for pair in matches
+                if len(pair) == 2 and pair[0].distance < 0.75 * pair[1].distance
+            )
+            orb_score = min(good / kp2_count, 1.0) if good else 0.0
+
+            # 颜色相似度（复用缓存 Lab 均值）
+            dist = np.sqrt(np.sum((lab1 - lab2) ** 2))
+            color_sim = max(1.0 - dist / 100.0, 0.0)
+
+            score = 0.5 * orb_score + 0.5 * color_sim
+            if score > best_score:
+                best_score = score
+                best_type = mat_type
 
         if best_score < self.MATCH_THRESHOLD:
             logger.warning(f"匹配置信度过低: {best_score:.3f}，无法识别类型")
@@ -230,60 +291,6 @@ class MaterialRecognizer:
 
         logger.debug(f"类型匹配: {best_type} (confidence={best_score:.3f})")
         return best_type, best_score
-
-    @staticmethod
-    def _match_score(img: np.ndarray, template: np.ndarray) -> float:
-        """综合匹配分数 = 0.5 × ORB特征分 + 0.5 × HSV颜色相似度
-
-        ORB 负责形状/结构匹配，颜色直方图负责区分形状相似但颜色不同的材料。
-        """
-        orb_score = MaterialRecognizer._orb_match(img, template)
-        color_sim = MaterialRecognizer._color_similarity(img, template)
-        return 0.5 * orb_score + 0.5 * color_sim
-
-    @staticmethod
-    def _orb_match(img: np.ndarray, template: np.ndarray) -> float:
-        """ORB 特征匹配分（0~1）"""
-        orb = cv2.ORB.create(nfeatures=300)
-
-        kp1, des1 = orb.detectAndCompute(img, None)
-        kp2, des2 = orb.detectAndCompute(template, None)
-
-        if des1 is None or des2 is None or len(des1) < 5 or len(des2) < 5:
-            return 0.0
-
-        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
-        matches = bf.knnMatch(des1, des2, k=2)
-
-        good = []
-        for pair in matches:
-            if len(pair) == 2:
-                m, n = pair
-                if m.distance < 0.75 * n.distance:
-                    good.append(m)
-
-        if not good:
-            return 0.0
-
-        return min(len(good) / len(kp2), 1.0)
-
-    @staticmethod
-    def _color_similarity(img: np.ndarray, template: np.ndarray) -> float:
-        """CIE Lab 色彩空间平均颜色距离相似度（0~1）
-
-        Lab 空间与人眼感知一致，deltaE 直接对应视觉色差。
-        取两张图的平均 Lab 值，计算欧氏距离，归一化到 0~1。
-        """
-        lab1 = cv2.cvtColor(img, cv2.COLOR_BGR2Lab).astype(np.float32)
-        lab2 = cv2.cvtColor(template, cv2.COLOR_BGR2Lab).astype(np.float32)
-
-        avg1 = lab1.mean(axis=(0, 1))
-        avg2 = lab2.mean(axis=(0, 1))
-
-        # deltaE（欧氏距离）
-        dist = np.sqrt(np.sum((avg1 - avg2) ** 2))
-        # 归一化到 0~1（deltaE > 100 为完全不同）
-        return max(1.0 - dist / 100.0, 0.0)
 
     # ─── 等级 OCR ──────────────────────────────────────────
 

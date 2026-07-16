@@ -6,4 +6,5 @@ layout_scenes:
 - equip_armor_detail
 - equip_tune_detail
 - equip_tune_result
+- prop_bag_detail
 - general_control

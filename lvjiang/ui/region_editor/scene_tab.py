@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QSplitter, QTabWidget, QPushButton, QInputDialog, QMessageBox,
     QDialog, QFormLayout, QLineEdit, QComboBox, QCheckBox, QDialogButtonBox,
+    QTableWidget, QTableWidgetItem, QHeaderView,
 )
 from PyQt6.QtCore import Qt
 
@@ -74,33 +75,29 @@ class SceneTab(QWidget):
     # ─── 面板构建 ────────────────────────────────────────
 
     def _build_canvas_toolbar(self) -> QHBoxLayout:
-        """画布顶部工具栏：创建坐标 / 创建方向"""
+        """画布顶部工具栏（功能已移至各 Tab）"""
         bar = QHBoxLayout()
-        self._btn_new_point = QPushButton("\u2795 创建坐标")
-        self._btn_new_point.setToolTip(
-            "从 YAML 定义中选择一个未放置的坐标点，然后在画布上单击放置"
-        )
-        self._btn_new_point.clicked.connect(self._on_new_point)
-        bar.addWidget(self._btn_new_point)
-
-        self._btn_new_arrow = QPushButton("\u2192 创建方向")
-        self._btn_new_arrow.setToolTip(
-            "先选中一个已放置的坐标点，再从它拉出一条方向箭头"
-        )
-        self._btn_new_arrow.clicked.connect(self._on_new_arrow)
-        bar.addWidget(self._btn_new_arrow)
-
         bar.addStretch()
         return bar
 
     def _build_region_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel("区域列表（双击编辑属性）："))
-        self._region_list = QListWidget()
-        self._region_list.currentRowChanged.connect(self._on_region_selection)
-        self._region_list.itemDoubleClicked.connect(self._on_edit_region)
-        layout.addWidget(self._region_list)
+        self._region_table = QTableWidget()
+        self._region_table.setColumnCount(5)
+        self._region_table.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
+        self._region_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._region_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self._region_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self._region_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self._region_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self._region_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._region_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._region_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._region_table.verticalHeader().setVisible(False)
+        self._region_table.currentCellChanged.connect(self._on_region_table_selection)
+        self._region_table.cellDoubleClicked.connect(self._on_edit_region_from_table)
+        layout.addWidget(self._region_table)
 
         btn_row = QHBoxLayout()
         self._btn_new_region = QPushButton("+ 创建区域")
@@ -117,7 +114,6 @@ class SceneTab(QWidget):
     def _build_point_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel("坐标列表（双击编辑属性）："))
         self._point_list = QListWidget()
         self._point_list.currentRowChanged.connect(self._on_point_selection)
         self._point_list.itemDoubleClicked.connect(self._on_edit_point)
@@ -125,11 +121,17 @@ class SceneTab(QWidget):
 
         btn_row = QHBoxLayout()
         self._btn_new_point_def = QPushButton("+ 创建坐标")
+        self._btn_new_point_def.setToolTip("在场景 YAML 中新增坐标点定义（meta 数据）")
         self._btn_new_point_def.clicked.connect(self._on_new_point_def)
         btn_row.addWidget(self._btn_new_point_def)
         self._btn_del_point = QPushButton("删除坐标")
+        self._btn_del_point.setToolTip("从场景 YAML 中删除坐标点定义（meta 数据）")
         self._btn_del_point.clicked.connect(self._on_delete_point_def)
         btn_row.addWidget(self._btn_del_point)
+        self._btn_bind_point = QPushButton("绑定坐标")
+        self._btn_bind_point.setToolTip("在画布上放置一个坐标点（绑定到 YAML 定义）")
+        self._btn_bind_point.clicked.connect(self._on_new_point)
+        btn_row.addWidget(self._btn_bind_point)
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -137,13 +139,16 @@ class SceneTab(QWidget):
     def _build_arrow_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.addWidget(QLabel("方向列表（双击重命名，选中坐标点后点击其 + 号创建）："))
         self._arrow_list = QListWidget()
         self._arrow_list.currentRowChanged.connect(self._on_arrow_selection)
         self._arrow_list.itemDoubleClicked.connect(self._on_edit_arrow)
         layout.addWidget(self._arrow_list)
 
         btn_row = QHBoxLayout()
+        self._btn_new_arrow = QPushButton("创建方向")
+        self._btn_new_arrow.setToolTip("先选中一个已放置的坐标点，再从它拉出一条方向箭头")
+        self._btn_new_arrow.clicked.connect(self._on_new_arrow)
+        btn_row.addWidget(self._btn_new_arrow)
         self._btn_del_arrow = QPushButton("删除方向")
         self._btn_del_arrow.clicked.connect(self._on_delete_arrow)
         btn_row.addWidget(self._btn_del_arrow)
@@ -207,26 +212,77 @@ class SceneTab(QWidget):
     # ─── 列表刷新 ────────────────────────────────────────
 
     def _refresh_region_list(self):
-        """刷新区域列表，显示已绑定/未绑定状态"""
-        self._region_list.blockSignals(True)
-        self._region_list.clear()
-        regions = get_scene_regions(self._scene_key)
+        """刷新区域表格，显示 name(key)、类型、含文本、可点击"""
+        self._region_table.blockSignals(True)
+        self._region_table.setRowCount(0)
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene:
+            self._region_table.blockSignals(False)
+            return
         assigned = self._canvas.get_regions()
         assigned_keys = {r.key for r in assigned}
+        for region_def in scene.regions:
+            row = self._region_table.rowCount()
+            self._region_table.insertRow(row)
+            # 名称
+            status = "\u2713" if region_def.key in assigned_keys else "\u25cb"
+            name_item = QTableWidgetItem(f"{status} {region_def.name}")
+            if region_def.key not in assigned_keys:
+                name_item.setForeground(Qt.GlobalColor.gray)
+            self._region_table.setItem(row, 0, name_item)
+            # Key
+            key_item = QTableWidgetItem(region_def.key)
+            if region_def.key not in assigned_keys:
+                key_item.setForeground(Qt.GlobalColor.gray)
+            self._region_table.setItem(row, 1, key_item)
+            # 类型
+            self._region_table.setItem(row, 2, QTableWidgetItem(region_def.type))
+            # 含文本
+            text_item = QTableWidgetItem("\u2713" if region_def.is_text else "")
+            text_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._region_table.setItem(row, 3, text_item)
+            # 可点击
+            click_item = QTableWidgetItem("\u2713" if region_def.is_clickable else "")
+            click_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._region_table.setItem(row, 4, click_item)
+        self._region_table.blockSignals(False)
 
-        for key, name in regions:
-            if key in assigned_keys:
-                region = next(r for r in assigned if r.key == key)
-                item = QListWidgetItem(f"\u2713 {name} ({key})")
-                item.setToolTip(
-                    f"区域: ({region.x_ratio:.1%}, {region.y_ratio:.1%}) "
-                    f"大小: ({region.w_ratio:.1%} x {region.h_ratio:.1%})"
-                )
-            else:
-                item = QListWidgetItem(f"\u25cb {name} ({key})")
-                item.setForeground(Qt.GlobalColor.gray)
-            self._region_list.addItem(item)
-        self._region_list.blockSignals(False)
+    def _on_region_table_selection(self, row, col, prev_row, prev_col):
+        """表格行选中时更新删除按钮状态"""
+        self._btn_del_region.setEnabled(row >= 0)
+        # 同步画布选中
+        if row < 0:
+            return
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene or row >= len(scene.regions):
+            return
+        key = scene.regions[row].key
+        # 在画布的已绑定区域中查找索引
+        canvas_regions = self._canvas.get_regions()
+        for i, r in enumerate(canvas_regions):
+            if r.key == key:
+                self._canvas.select_region(i)
+                return
+
+    def _on_edit_region_from_table(self, row, col):
+        """双击表格行编辑区域"""
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene or row >= len(scene.regions):
+            return
+        old_def = scene.regions[row]
+        new_def = self._show_region_edit_dialog(old_def)
+        if new_def is None:
+            return
+        try:
+            registry.update_region_in_scene(self._scene_key, old_def.key, new_def)
+        except ValueError as e:
+            QMessageBox.warning(self, "更新失败", str(e))
+            return
+        sync_scene_cache(self._scene_key)
+        self._refresh_lists()
 
     def _refresh_point_list(self):
         """刷新坐标列表，显示已放置/未放置状态"""
@@ -426,50 +482,25 @@ class SceneTab(QWidget):
 
     def _on_delete_region(self):
         """删除区域定义"""
-        row = self._region_list.currentRow()
+        row = self._region_table.currentRow()
         if row < 0:
             return
-        regions = get_scene_regions(self._scene_key)
-        if row >= len(regions):
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene or row >= len(scene.regions):
             return
-        key, name = regions[row]
+        region_def = scene.regions[row]
         reply = QMessageBox.question(
             self, "确认删除",
-            f"确定要从场景定义中删除区域「{name}」({key}) 吗？",
+            f"确定要从场景定义中删除区域「{region_def.name}」({region_def.key}) 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        registry = get_registry()
         try:
-            registry.remove_region_from_scene(self._scene_key, key)
+            registry.remove_region_from_scene(self._scene_key, region_def.key)
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))
-            return
-        sync_scene_cache(self._scene_key)
-        self._refresh_lists()
-
-    def _on_edit_region(self, item: QListWidgetItem):
-        """双击编辑区域定义"""
-        row = self._region_list.row(item)
-        regions = get_scene_regions(self._scene_key)
-        if row >= len(regions):
-            return
-        key, _ = regions[row]
-        registry = get_registry()
-        scene = registry.get_scene(self._scene_key)
-        if not scene:
-            return
-        old_def = next((r for r in scene.regions if r.key == key), None)
-        if not old_def:
-            return
-        new_def = self._show_region_edit_dialog(old_def)
-        if new_def is None:
-            return
-        try:
-            registry.update_region_in_scene(self._scene_key, key, new_def)
-        except ValueError as e:
-            QMessageBox.warning(self, "更新失败", str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()

@@ -35,16 +35,24 @@ priority:
   - 会意率                    # 无扣分
   - 最大外功攻击              # 无扣分（最佳）
 
-# ── 首词条（按部位） ──
+# ── 首词条（按装备类型） ──
 first_affix:
-  main_weapon: [最大外功攻击, 势]
-  sub_weapon:  [最大外功攻击, 势]
-  ring:        [最大外功攻击]
-  pendant:     [最大外功攻击]
-  head:        [会意率]
-  chest:       [会意率]
-  leg:         [劲]
-  wrist:       [劲]
+  剑: [最大外功攻击, 势]
+  枪: [最大外功攻击, 势]
+  扇: [最大外功攻击, 势]
+  伞: [最大外功攻击, 势]
+  陌刀: [最大外功攻击, 势]
+  舞绫鼓: [最大外功攻击, 势]
+  双刀: [最大外功攻击, 势]
+  绳镖: [最大外功攻击, 势]
+  横刀: [最大外功攻击, 势]
+  拳甲: [最大外功攻击, 势]
+  环:        [最大外功攻击]
+  佩:        [最大外功攻击]
+  冠胄:      [会意率]
+  胸甲:      [会意率]
+  胫甲:      [劲]
+  腕甲:      [劲]
 
 # ── 品阶要求 ──
 quality:
@@ -59,13 +67,23 @@ divine_affixes:
   - match: { type: 枪 }
     affixes: [枪武学增伤]
     required: false
-  - match: { slot: [ring, pendant] }
+  - match: { type: 环 }
     affixes: [全武学增效]
     required: true
-  - match: { slot: [head, chest] }
+  - match: { type: 佩 }
+    affixes: [全武学增效]
+    required: true
+  - match: { type: 冠胄 }
     affixes: [单体奇术增伤]
     required: false
-  - match: { slot: [leg, wrist] }
+  - match: { type: 胸甲 }
+    affixes: [单体奇术增伤]
+    required: false
+  - match: { type: 胫甲 }
+    affixes: [对首领单位增伤]
+    required: true
+    alt: [对玩家单位增效]
+  - match: { type: 腕甲 }
     affixes: [对首领单位增伤]
     required: true
     alt: [对玩家单位增效]

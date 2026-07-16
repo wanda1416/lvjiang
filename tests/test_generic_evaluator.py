@@ -33,7 +33,7 @@ RATING_ICON = {
 }
 
 
-def make_equip(slot, type_, affixes):
+def make_equip(type_, affixes):
     """快速构造测试装备"""
     affix_list = []
     for item in affixes:
@@ -41,7 +41,7 @@ def make_equip(slot, type_, affixes):
         unit = item[2] if len(item) > 2 else None
         transferred = item[3] if len(item) > 3 else False
         affix_list.append(Affix(name=name, value=value, unit=unit, is_transferred=transferred))
-    return EquipmentData(slot=slot, type=type_, level=110, affixes=affix_list)
+    return EquipmentData(type=type_, level=110, affixes=affix_list)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -143,29 +143,29 @@ def test_circuit_breaker():
     cases = [
         # (name, equip, expect_continue)
         ("仅首词条（正确）",
-         make_equip("main_weapon", "剑", [("最大外功攻击", 114.1)]),
+         make_equip("剑", [("最大外功攻击", 114.1)]),
          True),
 
         ("首词条异常（武器首词条为会意率）",
-         make_equip("main_weapon", "剑", [("会意率", 6.6, "%")]),
+         make_equip("剑", [("会意率", 6.6, "%")]),
          False),
 
         ("首词条 + 1 有效",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("最大外功攻击", 114.1),
          ]),
          True),
 
         ("首词条 + 1 无效（气血最大值）",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("气血最大值", 8750),
          ]),
          True),  # mock: 移除无效 → 补最佳 → 传家宝
 
         ("首词条 + 2 无效 → 熔断",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("气血最大值", 8750),
              ("最小牵丝攻击", 45.9),
@@ -173,14 +173,14 @@ def test_circuit_breaker():
          False),  # mock: 移除1个无效 → 还有1个无效 → 仍垃圾
 
         ("首词条 + 扣分=1（最大鸣金攻击）",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("最大鸣金攻击", 67.2),
          ]),
          True),
 
         ("首词条 + 扣分=2 → 继续",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("最大鸣金攻击", 67.2),
              ("最大无相攻击", 64.7),
@@ -188,7 +188,7 @@ def test_circuit_breaker():
          True),  # mock: 移除鸣金 → 补最佳 → 扣1分 → 合格
 
         ("首词条 + 1无效 + 扣1分 → 继续（mock可修）",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("气血最大值", 8750),
              ("最大鸣金攻击", 67.2),
@@ -196,7 +196,7 @@ def test_circuit_breaker():
          True),  # mock: 移除无效 → 补最佳 → 扣1分 → 合格
 
         ("完整 5 词条无扣分",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("最大外功攻击", 114.1),
              ("劲", 72.2),
@@ -206,7 +206,7 @@ def test_circuit_breaker():
          True),
 
         ("完整 5 词条扣分=3 → 继续（mock可修）",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("会心率", 11.1, "%"),
              ("精准率", 8.4, "%"),
@@ -216,7 +216,7 @@ def test_circuit_breaker():
          True),  # mock: 移除会心率 → 补最佳 → 扣2分 → 凑合
 
         ("完整 5 词条 2无效+1扣分 → 熔断",
-         make_equip("main_weapon", "剑", [
+         make_equip("剑", [
              ("最大外功攻击", 114.1),
              ("气血最大值", 8750),     # 无效
              ("最小牵丝攻击", 45.9),   # 无效
@@ -226,11 +226,11 @@ def test_circuit_breaker():
          False),  # mock: 移除1个无效 → 还有1个无效 → 仍垃圾
 
         ("防具首词条正确（劲）",
-         make_equip("leg", "胫甲", [("劲", 72.2)]),
+         make_equip("胫甲", [("劲", 72.2)]),
          True),
 
         ("首饰首词条异常（势）",
-         make_equip("ring", None, [("势", 74.1)]),
+         make_equip(None, [("势", 74.1)]),
          False),
     ]
 
@@ -268,7 +268,7 @@ def test_circuit_breaker():
 
     for i, affixes in enumerate(stages, 1):
         total += 1
-        equip = make_equip("main_weapon", "剑", affixes)
+        equip = make_equip("剑", affixes)
         advice = evaluator.check_tuning_worthiness(equip)
 
         cont = "继续" if advice.should_continue else "停止"

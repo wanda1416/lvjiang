@@ -8,7 +8,12 @@ wait step_interval
 click [game_menu_page].[bag]
 wait step_interval
 
-# 点击培养（可能点开包裹后在道具页）
+# 点击培养（可能点开包裹后在道具页等其他页面，需要判断当前）
+scan [bag_equip_detail].[sub_equip]
+if not [last_scan].sub_equip contains "装备"
+    click [bag_equip_detail].[training]
+    wait step_interval
+end
 
 # 点击主武器
 click [bag_equip_detail].[slot_main_weapon]

@@ -68,44 +68,16 @@ def _count(scan_result: dict, *args) -> int:
 
 # ─── 装备解析函数 ─────────────────────────────────────
 
-# 部位分类 → 代表槽位（用于 parse_slot 的分派逻辑）
-_CATEGORY_REPR_SLOT = {
-    "weapon": "main_weapon",
-    "jewelry": "ring",
-    "armor": "head",
-}
-
-
-def _infer_equip_category(raw_data: dict) -> str:
-    """从 OCR 原始文字推断装备类别
-
-    纯基于 equip_type 字段内容判断，不依赖场景信息。
-    """
-    equip_type = raw_data.get("equip_type", "")
-    if "武器" in equip_type:
-        return "weapon"
-    # 防具特征：含防具类别名
-    for cat in ["冠胄", "胸甲", "胫甲", "腕甲"]:
-        if cat in equip_type:
-            return "armor"
-    # 首饰特征：含“环”“佩”或无武器/防具特征
-    for kw in ["环", "佩"]:
-        if kw in equip_type:
-            return "jewelry"
-    # 默认尝试防具解析（最宽松）
-    return "armor"
-
 
 @builtin_func("equipment_parser")
 def _equipment_parser(raw_data: dict) -> dict:
-    """解析装备 OCR 原始数据为 EquipmentData 字典
+    """解析装备 OCR 原始数据为 EquipmentData
 
-    纯基于 OCR 文字分析装备类型，不依赖场景信息。
-    解析不出来说是解析方法的 bug，修复解析器即可。
+    返回 EquipmentData 对象，由工作流变量名提供 key。
 
     .wf 用法:
         scan [equip_weapon_detail]
-        eval [main_weapon = equipment_parser([last_scan])]
+        eval main_weapon = equipment_parser([last_scan])
         collect [main_weapon]
     """
     if not isinstance(raw_data, dict) or not raw_data:
@@ -115,12 +87,8 @@ def _equipment_parser(raw_data: dict) -> dict:
     from ..equip_parser import EquipmentParser
     parser = EquipmentParser()
 
-    category = _infer_equip_category(raw_data)
-    slot_key = _CATEGORY_REPR_SLOT.get(category, "head")
-
     try:
-        equip = parser.parse_slot(slot_key, raw_data)
-        return {slot_key: equip}
+        return parser.parse(raw_data)
     except Exception as e:
         logger.warning(f"equipment_parser: 解析失败: {e}")
         return {}

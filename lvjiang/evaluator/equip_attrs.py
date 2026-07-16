@@ -13,7 +13,6 @@ from pathlib import Path
 
 import yaml
 
-from lvjiang.equip_parser.constants import WEAPON_SLOTS
 
 
 # ─── 数据结构 ──────────────────────────────────────────────
@@ -45,17 +44,19 @@ class LevelRule:
         return None
 
 
-# ─── slot → 配置 key 映射 ─────────────────────────────────
+# ─── equip_type → 配置 key 映射 ─────────────────────────────
 
-_SLOT_TO_KEY = {
-    "main_weapon": "weapon",
-    "sub_weapon": "weapon",
-    "ring": "ring",
-    "pendant": "pendant",
-    "head": "armor_other",
-    "leg": "armor_other",
-    "wrist": "armor_other",
-    "chest": "chest",
+_TYPE_TO_KEY = {
+    # 武器类型 → weapon
+    "陌刀": "weapon", "舞绫鼓": "weapon", "双刀": "weapon",
+    "绳镖": "weapon", "横刀": "weapon", "拳甲": "weapon",
+    "剑": "weapon", "枪": "weapon", "扇": "weapon", "伞": "weapon",
+    # 首饰
+    "环": "ring",
+    "佩": "pendant",
+    # 防具
+    "冠胄": "armor_other", "胫甲": "armor_other", "腕甲": "armor_other",
+    "胸甲": "chest",
 }
 
 
@@ -107,18 +108,18 @@ class EquipAttrConfig:
 
     # ── 品阶推断接口 ──
 
-    def infer_quality(self, slot: str, level: int, value: int) -> str | None:
+    def infer_quality(self, equip_type: str, level: int, value: int) -> str | None:
         """根据基础属性推断品阶
 
         Args:
-            slot: 部位 key（main_weapon / ring / head 等）
+            equip_type: 装备类型（剑/枪/环/佩/冠胄/胸甲/...）
             level: 装备等级
             value: 属性值（武器范围取 max）
 
         Returns:
             'gold' / 'purple' / 'blue' / None（无匹配）
         """
-        key = _SLOT_TO_KEY.get(slot)
+        key = _TYPE_TO_KEY.get(equip_type)
         if key is None:
             return None
         rule = self._rules.get(key, {}).get(level)

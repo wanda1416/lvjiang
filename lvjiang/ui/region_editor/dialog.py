@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
     QPushButton, QComboBox, QStatusBar, QTextEdit,
-    QApplication, QTabWidget, QSplitter,
+    QApplication, QTabWidget, QSplitter, QMenu, QInputDialog, QMessageBox,
 )
 from PyQt6.QtCore import Qt
 from loguru import logger
@@ -11,9 +11,10 @@ from loguru import logger
 from ...core.region_config import (
     SCENE_REGIONS, Layout, LayoutConfigManager,
     Point, Arrow,
-    get_scene_name,
+    get_scene_name, get_registry, reload_scene_registry,
     load_scene_screenshot, save_scene_screenshot,
 )
+from ...constants import APP_CONFIG_PATH
 from .layout_ops import LayoutOpsMixin
 from .scene_tab import SceneTab
 from .canvas import EditMode
@@ -90,6 +91,13 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         self._btn_canvas_mode.setToolTip("切换画布编辑模式，调整画布范围以排除窗口边框")
         top_bar.addWidget(self._btn_canvas_mode)
 
+        top_bar.addSpacing(20)
+
+        self._btn_new_scene = QPushButton("创建场景")
+        self._btn_new_scene.setToolTip("新建场景")
+        self._btn_new_scene.clicked.connect(self._on_new_scene)
+        top_bar.addWidget(self._btn_new_scene)
+
         top_bar.addStretch()
 
         self._dirty_label = QLabel("● 有改动")
@@ -103,11 +111,12 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
         self._splitter = QSplitter(Qt.Orientation.Vertical)
 
         self._tab_widget = QTabWidget()
-        for scene_key, (scene_name, _) in SCENE_REGIONS.items():
-            tab = SceneTab(scene_key)
-            self._tabs[scene_key] = tab
-            self._tab_widget.addTab(tab, scene_name)
+        self._tab_widget.setMovable(True)
+        self._tab_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._tab_widget.customContextMenuRequested.connect(self._on_tab_context_menu)
+        self._tab_widget.tabBar().tabMoved.connect(self._on_tab_moved)
         self._splitter.addWidget(self._tab_widget)
+        self._rebuild_tabs()
 
         # OCR 结果区
         ocr_panel = QWidget()
@@ -294,6 +303,149 @@ class RegionEditorDialog(LayoutOpsMixin, QDialog):
     @property
     def _current_scene_key(self) -> str:
         """当前 Tab 对应的 scene_key"""
-        idx = self._tab_widget.currentIndex()
-        keys = list(SCENE_REGIONS.keys())
-        return keys[idx] if 0 <= idx < len(keys) else keys[0]
+        current = self._tab_widget.currentWidget()
+        if isinstance(current, SceneTab):
+            return current.scene_key
+        keys = list(self._tabs.keys())
+        return keys[0] if keys else ""
+
+    # ─── Tab 重建 ────────────────────────────────────────
+
+    def _rebuild_tabs(self):
+        """从 SCENE_REGIONS 重建所有 Tab"""
+        self._tab_widget.blockSignals(True)
+        self._tab_widget.clear()
+        self._tabs.clear()
+        for scene_key, (scene_name, _) in SCENE_REGIONS.items():
+            tab = SceneTab(scene_key)
+            self._tabs[scene_key] = tab
+            self._tab_widget.addTab(tab, scene_name)
+        self._tab_widget.blockSignals(False)
+
+    # ─── 场景 CRUD ────────────────────────────────────────
+
+    def _on_new_scene(self):
+        """新建场景：弹窗输入 key 和 name"""
+        from PyQt6.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox
+        dialog = QDialog(self)
+        dialog.setWindowTitle("新建场景")
+        form = QFormLayout(dialog)
+        key_edit = QLineEdit()
+        key_edit.setPlaceholderText("英文，如 my_scene")
+        form.addRow("场景 Key:", key_edit)
+        name_edit = QLineEdit()
+        name_edit.setPlaceholderText("中文名称")
+        form.addRow("场景名称:", name_edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        form.addRow(buttons)
+
+        # 实时校验：非空 + key 格式
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        def _validate():
+            k = key_edit.text().strip()
+            n = name_edit.text().strip()
+            ok_btn.setEnabled(bool(k and n and k.replace("_", "").isalnum()))
+        key_edit.textChanged.connect(_validate)
+        name_edit.textChanged.connect(_validate)
+        _validate()
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        key = key_edit.text().strip()
+        name = name_edit.text().strip()
+        registry = get_registry()
+        try:
+            registry.create_scene(key, name)
+        except ValueError as e:
+            QMessageBox.warning(self, "创建失败", str(e))
+            return
+        reload_scene_registry()
+        self._rebuild_tabs()
+        self._status_bar.showMessage(f"已创建场景: {name}")
+
+    def _on_tab_context_menu(self, pos):
+        """Tab 右键菜单：重命名 / 删除"""
+        tab_index = self._tab_widget.tabBar().tabAt(pos)
+        if tab_index < 0:
+            return
+        scene_key = list(self._tabs.keys())[tab_index] if tab_index < len(self._tabs) else None
+        if not scene_key:
+            return
+        menu = QMenu(self)
+        rename_action = menu.addAction("重命名")
+        delete_action = menu.addAction("删除")
+        action = menu.exec(self._tab_widget.mapToGlobal(pos))
+        if action == rename_action:
+            self._do_rename_scene(scene_key)
+        elif action == delete_action:
+            self._do_delete_scene(scene_key)
+
+    def _do_rename_scene(self, scene_key: str):
+        """重命名场景"""
+        old_name = get_scene_name(scene_key)
+        new_key, ok = QInputDialog.getText(
+            self, "重命名场景",
+            f"场景 key（当前: {scene_key}）：",
+            text=scene_key,
+        )
+        if not ok or not new_key:
+            return
+        new_key = new_key.strip()
+        new_name, ok = QInputDialog.getText(
+            self, "重命名场景",
+            f"场景名称（当前: {old_name}）：",
+            text=old_name,
+        )
+        if not ok or not new_name:
+            return
+        new_name = new_name.strip()
+        registry = get_registry()
+        try:
+            registry.rename_scene(scene_key, new_key, new_name)
+        except ValueError as e:
+            QMessageBox.warning(self, "重命名失败", str(e))
+            return
+        registry.save_scene_order(registry.all_scene_keys(), APP_CONFIG_PATH)
+        reload_scene_registry()
+        self._rebuild_tabs()
+        self._status_bar.showMessage(f"已重命名: {scene_key} -> {new_key}")
+
+    def _do_delete_scene(self, scene_key: str):
+        """删除场景（二次确认）"""
+        scene_name = get_scene_name(scene_key)
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要删除场景「{scene_name}」({scene_key}) 吗？\n"
+            f"这将删除场景定义文件，但不会影响布局数据。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        registry = get_registry()
+        try:
+            registry.delete_scene(scene_key)
+        except ValueError as e:
+            QMessageBox.warning(self, "删除失败", str(e))
+            return
+        registry.save_scene_order(registry.all_scene_keys(), APP_CONFIG_PATH)
+        reload_scene_registry()
+        self._rebuild_tabs()
+        self._status_bar.showMessage(f"已删除场景: {scene_name}")
+
+    def _on_tab_moved(self, from_index: int, to_index: int):
+        """Tab 拖拽排序后保存新顺序到 app.yaml"""
+        # 收集当前 Tab 顺序对应的 scene_key
+        new_order = []
+        for i in range(self._tab_widget.count()):
+            widget = self._tab_widget.widget(i)
+            if isinstance(widget, SceneTab):
+                new_order.append(widget.scene_key)
+        registry = get_registry()
+        registry.save_scene_order(new_order, APP_CONFIG_PATH)
+        reload_scene_registry()
+        # 重建 _tabs 字典的顺序（虽然 dict 保持插入顺序，但这里不需要重建）
+        logger.info(f"场景顺序已更新: {new_order}")

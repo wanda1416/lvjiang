@@ -1,97 +1,79 @@
 key: game_main_page
 name: 游戏主页
-
 regions:
-  - key: menu
-    name: 菜单
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: activity
-    name: 活动
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: wulinlu
-    name: 武林录
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: shop
-    name: 商店
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: battle_pass
-    name: 战令
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: harmony
-    name: 和鸣
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: map
-    name: 地图
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: team
-    name: 组队
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: summon_horse
-    name: 唤马
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: listen_wind
-    name: 听风辩位
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: more_func
-    name: 更多功能
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: greet
-    name: 动作
-    type: func
-    is_text: false
-    is_clickable: true
-
-  - key: chat
-    name: 聊天
-    type: func
-    is_text: false
-    is_clickable: true
-
+- key: menu
+  name: 菜单
+  type: func
+  is_text: false
+  is_clickable: true
+- key: activity
+  name: 活动
+  type: func
+  is_text: false
+  is_clickable: true
+- key: wulinlu
+  name: 武林录
+  type: func
+  is_text: false
+  is_clickable: true
+- key: shop
+  name: 商店
+  type: func
+  is_text: false
+  is_clickable: true
+- key: battle_pass
+  name: 战令
+  type: func
+  is_text: false
+  is_clickable: true
+- key: harmony
+  name: 和鸣
+  type: func
+  is_text: false
+  is_clickable: true
+- key: map
+  name: 地图
+  type: func
+  is_text: false
+  is_clickable: true
+- key: team
+  name: 组队
+  type: func
+  is_text: false
+  is_clickable: true
+- key: summon_horse
+  name: 唤马
+  type: func
+  is_text: false
+  is_clickable: true
+- key: listen_wind
+  name: 听风辩位
+  type: func
+  is_text: false
+  is_clickable: true
+- key: more_func
+  name: 更多功能
+  type: func
+  is_text: false
+  is_clickable: true
+- key: greet
+  name: 动作
+  type: func
+  is_text: false
+  is_clickable: true
+- key: chat
+  name: 聊天
+  type: func
+  is_text: false
+  is_clickable: true
 points:
-  - key: origin
-    name: 起点
-
-  - key: forward
-    name: 前进
-
-  - key: backward
-    name: 后退
-
-  - key: turn_left
-    name: 向左
-
-  - key: turn_right
-    name: 向右
+- key: origin
+  name: 起点
+- key: forward
+  name: 前进
+- key: backward
+  name: 后退
+- key: turn_left
+  name: 向左
+- key: turn_right
+  name: 向右

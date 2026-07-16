@@ -1,15 +1,15 @@
 key: general_control
 name: 通用控制
-
 points:
-  - key: material_slot_1
-    name: 材料格1
-
-  - key: material_slot_2
-    name: 材料格2
-
-  - key: left_screen_1
-    name: 左屏点1
-
-  - key: left_screen_2
-    name: 左屏点2
+- key: material_slot_1
+  name: 材料格1
+- key: material_slot_2
+  name: 材料格2
+- key: left_screen_1
+  name: 左屏点1
+- key: left_screen_2
+  name: 左屏点2
+- key: equip_slot_1
+  name: 背包格1
+- key: equip_slot_2
+  name: 背包格2

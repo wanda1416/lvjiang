@@ -1,4 +1,4 @@
-key: equip_bag_detail
+key: bag_equip_detail
 name: 装备背包
 regions:
 - key: back
@@ -156,7 +156,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: prop
+- key: item
   name: 道具
   type: func
   is_text: false
@@ -170,4 +170,14 @@ regions:
   name: 钱袋
   type: attr
   is_text: false
+  is_clickable: true
+- key: sub_equip
+  name: 装备
+  type: func
+  is_text: true
+  is_clickable: true
+- key: sub_quick
+  name: 快捷道具
+  type: func
+  is_text: true
   is_clickable: true

@@ -88,7 +88,7 @@ end
 
 ```
 for slot in [slot_head, slot_chest]
-    click [equip_bag_detail].[slot]   # [slot] 引用循环变量
+    click [bag_equip_detail].[slot]   # [slot] 引用循环变量
     if [slot] equals "slot_head"      # 条件表达式里同样用 [slot]
         log "当前是头部槽位"
     end
@@ -147,7 +147,7 @@ collect [main_weapon]
 for slot in [slot_main_weapon, slot_sub_weapon,
              slot_ring, slot_pendant,
              slot_head, slot_chest, slot_leg, slot_wrist]
-    click [equip_bag_detail].[slot]
+    click [bag_equip_detail].[slot]
     wait page_refresh_wait
 
     if [slot] equals "slot_main_weapon" or [slot] equals "slot_sub_weapon"

@@ -93,7 +93,7 @@ SceneDef (基类)
 
 | 场景 | 标记为按钮的字段 |
 |------|-----------------|
-| `equip_bag_detail` | 全部 10 个槽位（slot_*） |
+| `bag_equip_detail` | 全部 10 个槽位（slot_*） |
 | `equip_weapon_detail` | `more_func`（更多功能） |
 | `equip_armor_detail` | `more_func`（更多功能） |
 | `equip_tune_detail` | 无 |
@@ -139,7 +139,7 @@ if new_idx < len(self._regions) and self._regions[new_idx].key:
 
 | 场景 | 字段数 | 按钮字段 |
 |------|--------|----------|
-| `equip_bag_detail` | 10 | 全部 10 个 |
+| `bag_equip_detail` | 10 | 全部 10 个 |
 | `equip_weapon_detail` | 14 | `more_func` |
 | `equip_armor_detail` | 15 | `more_func` |
 | `equip_tune_detail` | 14 | 无 |

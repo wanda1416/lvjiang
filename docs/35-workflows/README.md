@@ -11,7 +11,7 @@
 
 | 编号 | 文件 | 主题 | 依赖场景 |
 |------|------|------|----------|
-| 01 | [01-current-equip-analysis.md](01-current-equip-analysis.md) | 用户当前装备分析 | equip_bag_detail, equip_weapon_detail, equip_armor_detail |
+| 01 | [01-current-equip-analysis.md](01-current-equip-analysis.md) | 用户当前装备分析 | bag_equip_detail, equip_weapon_detail, equip_armor_detail |
 
 ## 流程文档模板
 

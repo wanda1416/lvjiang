@@ -1,7 +1,7 @@
 # 流程：用户当前装备分析
 
 > 编号：01
-> 依赖场景：`equip_bag_detail`、`equip_weapon_detail`、`equip_armor_detail`
+> 依赖场景：`bag_equip_detail`、`equip_weapon_detail`、`equip_armor_detail`
 
 ---
 
@@ -17,7 +17,7 @@
 
 | 场景 | 用途 |
 |------|------|
-| `equip_bag_detail` | 背包总览页，定位 10 个装备槽位 |
+| `bag_equip_detail` | 背包总览页，定位 10 个装备槽位 |
 | `equip_weapon_detail` | 武器详情页，识别 8 个字段 |
 | `equip_armor_detail` | 防具详情页，识别 9 个字段（含双基础属性） |
 
@@ -28,7 +28,7 @@
 ### 阶段一：扫描背包槽位
 
 1. **截图背包页**
-   - 使用 `equip_bag_detail` 场景的区域定义
+   - 使用 `bag_equip_detail` 场景的区域定义
    - 截图并识别 10 个槽位的状态（是否已装备）
 
 2. **确定目标槽位**
@@ -43,7 +43,7 @@
 
 ```
 对于槽位 i（i = 0 到 7）：
-    获取槽位 i 在 equip_bag_detail 场景中的区域 (x, y, w, h)
+    获取槽位 i 在 bag_equip_detail 场景中的区域 (x, y, w, h)
     
     在区域中心附近随机取点击坐标：
         click_x = x + w * random(0.25, 0.75)
@@ -120,7 +120,7 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  截图背包页 (equip_bag_detail)                               │
+│  截图背包页 (bag_equip_detail)                               │
 │  识别 10 个槽位状态                                          │
 └─────────────────────────────────────────────────────────────┘
                               │

@@ -13,6 +13,7 @@ if not $tune_key
     log "未找到调律按钮"
     return
 end
+
 click [equip_weapon_detail].$tune_key
 wait step_interval
 

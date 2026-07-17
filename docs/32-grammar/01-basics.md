@@ -97,7 +97,7 @@ $var = "hello"               # 隐式 eval，效果完全相同
 
 变量**无需预先声明**，首次赋值即创建，后续引用即可。
 
-**外部参数注入**：工作流可以通过 `workflow.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [05-subworkflows.md](05-subworkflows.md#工作流参数声明)。
+**外部参数注入**：工作流可以通过 `workflow.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [05-subworkflows.md](05-subworkflows.md#工作流参数声明)。也可直接在 `.wf` 文件内用 front-matter 声明（见下一节），便于外部加载。
 
 ### 2.2 变量类型
 
@@ -181,3 +181,45 @@ call "sub.wf" read "k" as $v ──→  variables[$v] = sub_output["k"]
 ```
 
 `output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`_coord_meta` 是引擎内部状态，随 scan/recognize 自动存入，使 `click [scene].$key` 可以解析动态 Area 的坐标。
+
+## 三、文件元数据（front-matter）
+
+`.wf` 文件可在**任意位置（约定放文件顶部）**用 `#%` 前缀声明 YAML 元数据，用于向 GUI 暴露工作流的 **名字 / 所需场景 / 参数（含可选项）**。这样通过「加载工作流」打开的外部 `.wf` 文件，也能像 `workflow.yaml` 中注册的内置工作流一样拥有名字与参数面板。
+
+### 3.1 语法
+
+- 每行以 `#%` 开头（前缀后可紧跟一个空格），其余部分为 YAML 正文
+- 由于每行都是 `#` 注释，DSL 引擎将其忽略，文件**仍可直接执行**
+- 剥掉 `#%` 前缀后，所有行拼成一段 YAML；**缩进在前缀之后保留**
+- schema 与 `workflow.yaml` 中单条 flow 完全一致（`name` / `required_scenes` / `parameters`），无需新概念
+- 普通 `#` 注释不会被采集；YAML 非法时仅记录警告并忽略，不影响执行
+
+### 3.2 示例
+
+```
+#% name: 单件装备调律
+#% required_scenes: [game_main_page, equip_tune_detail]
+#% parameters:
+#%   - name: target_material
+#%     label: 目标材料
+#%     type: select
+#%     default: 紫色狗粮
+#%     options:
+#%       - { value: "", label: 不添加 }
+#%       - { value: 紫色狗粮, label: 紫色狗粮 }
+#%   - name: bag_row
+#%     label: 背包行号
+#%     type: select
+#%     default: "1"
+#%     options: ["1", "2", "3"]
+
+# 下面是正常的可执行 DSL
+call "subcall/nav_main_to_equip.wf"
+click [bag_equip_detail].$equip_slot
+```
+
+### 3.3 与 workflow.yaml 的关系
+
+- **内置工作流**：仍以 `workflow.yaml` 为准（相对 `wf_file` 路径），无需迁移
+- **外部加载**：GUI「加载工作流」打开任意 `.wf` 时，从其 front-matter 提取名字与参数；缺失字段回退默认值（名字回退为 `[外部] 文件名`，场景/参数回退为空）
+- 解析入口：`lvjiang/workflows/metadata.py` 的 `parse_metadata` / `build_flow_config`

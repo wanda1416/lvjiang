@@ -3,6 +3,7 @@
 import json
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -58,6 +59,7 @@ class RunControlMixin:
     def _load_workflow_configs(self):
         """读取 workflow.yaml，填充 workflow_combo"""
         self._workflow_configs: list[dict] = []
+        self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
         yaml_path = SYSTEM_CONFIG_DIR / "workflow.yaml"
 
         if not yaml_path.exists():
@@ -85,6 +87,34 @@ class RunControlMixin:
             self.workflow_combo.addItem(cfg["name"], cfg["id"])
 
         logger.info(f"已加载 {len(self._workflow_configs)} 个工作流配置")
+
+    def _on_load_workflow(self):
+        """加载任意 .wf 文件为临时工作流项（非常驻，打开新文件会覆盖）
+
+        名字/参数/可选项从 .wf 文件顶部的 `#%` front-matter 元数据提取。
+        """
+        from PyQt6.QtWidgets import QFileDialog
+        from ..workflows.metadata import build_flow_config
+        path, _ = QFileDialog.getOpenFileName(
+            self, "加载工作流文件", str(SYSTEM_WORKFLOWS_DIR),
+            "工作流文件 (*.wf);;所有文件 (*)",
+        )
+        if not path:
+            return
+        p = Path(path)
+        cfg = build_flow_config(p)
+        # 覆盖上一次加载的临时项，否则追加
+        if self._loaded_flow_index is not None and self._loaded_flow_index < len(self._workflow_configs):
+            idx = self._loaded_flow_index
+            self._workflow_configs[idx] = cfg
+            self.workflow_combo.setItemText(idx, cfg["name"])
+            self.workflow_combo.setItemData(idx, cfg["id"])
+        else:
+            self._workflow_configs.append(cfg)
+            self.workflow_combo.addItem(cfg["name"], cfg["id"])
+            self._loaded_flow_index = len(self._workflow_configs) - 1
+        self.workflow_combo.setCurrentIndex(self._loaded_flow_index)
+        self.log_text.append(f"[加载] 已加载工作流: {cfg['name']}")
 
     def _get_selected_flow_config(self) -> dict | None:
         """获取当前选中的工作流配置"""
@@ -175,7 +205,7 @@ class RunControlMixin:
         self._running = True
         self._stop_requested = False
         self._refresh_run_button()
-        self.btn_run_workflow.setEnabled(False)
+        # 运行期间保持按钮可点击，以便用户点击切换为停止（_on_run_workflow 内部判断 _running 后转发 _request_stop）
         self.statusBar().showMessage(f"{name} 运行中 | F10 停止")
         logger.info(f"开始自动化: {name}")
         return True
@@ -186,7 +216,6 @@ class RunControlMixin:
         self._stop_requested = False
         self._current_worker = None
         self._refresh_run_button()
-        self.btn_run_workflow.setEnabled(True)
         self.statusBar().showMessage(f"{name} 已结束")
         logger.info(f"自动化结束: {name}")
 
@@ -269,7 +298,11 @@ class RunControlMixin:
             window_top=self._target_window["top"],
             stop_check=self._is_stopped,
         )
-        wf_path = SYSTEM_WORKFLOWS_DIR / flow_cfg["wf_file"]
+        # 外部加载的工作流为绝对路径，否则相对于系统工作流目录
+        wf_file = flow_cfg["wf_file"]
+        wf_path = Path(wf_file)
+        if not wf_path.is_absolute():
+            wf_path = SYSTEM_WORKFLOWS_DIR / wf_file
         flow_params = self._collect_flow_params()
 
         self.log_text.append(f"[开始] {flow_name} 流程...")

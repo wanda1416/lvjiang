@@ -32,6 +32,9 @@ class BaseWorkflow:
     - output: 收集的输出数据字典（由 collect 语句写入，key 为 alias 或变量名）
     """
 
+    # 类级别共享：MaterialRecognizer 跨所有实例复用，避免重复加载参考图
+    _shared_material_recognizer = None
+
     def __init__(
         self,
         capture: ScreenCapture,
@@ -55,9 +58,6 @@ class BaseWorkflow:
         # 运行时状态
         self.output: dict = {}  # collect 语句写入的输出字典
         self.variables: dict = {}
-
-        # 延迟初始化
-        self._material_recognizer = None
 
     def run(self) -> dict:
         """执行工作流（子类重写）
@@ -151,11 +151,11 @@ class BaseWorkflow:
 
     @property
     def material_recognizer(self):
-        """延迟构造 MaterialRecognizer（首次访问时创建）"""
-        if self._material_recognizer is None:
+        """延迟构造 MaterialRecognizer（类级别共享，跨工作流运行复用）"""
+        if BaseWorkflow._shared_material_recognizer is None:
             from ..core.material_recognizer import MaterialRecognizer
-            self._material_recognizer = MaterialRecognizer(self._ocr)
-        return self._material_recognizer
+            BaseWorkflow._shared_material_recognizer = MaterialRecognizer(self._ocr)
+        return BaseWorkflow._shared_material_recognizer
 
     def recognize_materials(
         self,

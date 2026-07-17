@@ -16,7 +16,7 @@ from .grammar import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, Literal, FieldAccess,
+    SceneRef, VarRef, Literal, FieldAccess, CoordPoint,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -159,7 +159,13 @@ class WorkflowEngine:
     # ─── 基础指令 ─────────────────────────────────────────
 
     def _exec_click(self, node: Click):
-        """click scene.coord — scene 和 coord 都可以是常量或变量"""
+        """click scene.coord — scene 和 coord 都可以是常量或变量。
+        若 target 为 CoordPoint，则按画布归一化坐标反算后点击。
+        """
+        if isinstance(node.target, CoordPoint):
+            x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
+            self._wf._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
+            return
         if isinstance(node.target, SceneRef):
             # 解析 scene（可能是 str 或 VarRef）
             if isinstance(node.target.scene, VarRef):
@@ -192,7 +198,19 @@ class WorkflowEngine:
             logger.error(f"click: 未知目标类型 {type(node.target).__name__}")
 
     def _exec_drag(self, node: Drag):
-        """drag scene.arrow — scene 和 arrow 都可以是常量或变量"""
+        """drag scene.arrow — scene 和 arrow 都可以是常量或变量。
+        若为坐标模式（from_point/to_point），则两端点按画布归一化坐标反算。
+        """
+        if isinstance(node.from_point, CoordPoint) and isinstance(node.to_point, CoordPoint):
+            x1, y1 = self._coord_ratio_to_screen(node.from_point.rx, node.from_point.ry)
+            x2, y2 = self._coord_ratio_to_screen(node.to_point.rx, node.to_point.ry)
+            duration = self._resolve_duration(node.duration) if node.duration else None
+            self._wf._input.drag_screen(
+                x1, y1, x2, y2,
+                f"coord({node.from_point.rx},{node.from_point.ry})->({node.to_point.rx},{node.to_point.ry})",
+                duration=duration, hold=node.hold,
+            )
+            return
         if isinstance(node.scene, SceneRef):
             # 解析 scene（可能是 str 或 VarRef）
             if isinstance(node.scene.scene, VarRef):
@@ -742,6 +760,23 @@ class WorkflowEngine:
         if isinstance(node, Literal):
             return float(node.value)
         return float(node)
+
+    def _coord_ratio_to_screen(self, rx: float, ry: float) -> tuple[int, int]:
+        """画布归一化坐标 (rx, ry) → 屏幕绝对坐标
+
+        与 _region_to_screen / _point_to_screen 同源的坐标转换链：
+        屏幕 = 窗口偏移 + 画布原点 + 归一化比例 × 画布尺寸。
+        窗口缩放/移动后回放仍准确。
+        """
+        w, h = self._wf._capture.get_capture_size()
+        canvas = self._wf._layout.get_canvas()
+        canvas_px_x = canvas.x_ratio * w
+        canvas_px_y = canvas.y_ratio * h
+        canvas_px_w = canvas.w_ratio * w
+        canvas_px_h = canvas.h_ratio * h
+        cx = canvas_px_x + rx * canvas_px_w
+        cy = canvas_px_y + ry * canvas_px_h
+        return int(self._wf._window_left + cx), int(self._wf._window_top + cy)
 
     # ─── coord_meta 查找 ─────────────────────────────────────
 

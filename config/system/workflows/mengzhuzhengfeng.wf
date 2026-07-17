@@ -70,7 +70,7 @@ end
 
 # 拖拽一件商品购买，由于开始战斗会弹框阻断一会，所以多等 5s
 wait (4, 5)
-drag [activity_mengzhu].[add_item]
+drag [activity_mengzhu].[add_item] hold 1
 wait $step_interval
 
 # 点击"开始战斗"进行对局

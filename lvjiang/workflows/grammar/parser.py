@@ -15,7 +15,7 @@ from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, Literal, FieldAccess,
+    SceneRef, VarRef, Literal, FieldAccess, CoordPoint,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -62,27 +62,55 @@ class _DSLTransformer(Transformer):
             return str(item)
 
     def click_stmt(self, items):
+        """click 目标（scene.area 引用 或 坐标点），目标已由子规则构造为 Click 节点"""
+        return items[0]
+
+    def click_scene_target(self, items):
         """click scene.coord — scene 和 coord 都可以是常量或变量"""
         scene, coord = items  # 两个 const_or_var
         scene_val = self._resolve_const_or_var(scene)
         coord_val = self._resolve_const_or_var(coord)
         return Click(target=SceneRef(scene=scene_val, region=coord_val), line_no=self._line(items))
 
+    def click_coord_target(self, items):
+        """click (rx, ry) — 画布归一化坐标点"""
+        cp = items[0]  # CoordPoint
+        return Click(target=cp, line_no=0)
+
+    def coord_point(self, items):
+        """(rx, ry) → CoordPoint，number 规则已转为 float"""
+        return CoordPoint(rx=float(items[0]), ry=float(items[1]))
+
     def drag_stmt(self, items):
-        """drag scene.arrow — scene 和 arrow 都可以是常量或变量"""
-        scene_val = self._resolve_const_or_var(items[0])
-        arrow_val = self._resolve_const_or_var(items[1])
-        scene_ref = SceneRef(scene=scene_val, region=arrow_val)
+        """drag 目标（scene.arrow 引用 或 两坐标点）+ 可选 duration/hold"""
+        drag_node = items[0]  # 已由 drag_*_target 构造为 Drag
         duration = None
         hold = None
-        for item in items[2:]:
+        for item in items[1:]:
             if isinstance(item, Literal):
                 duration = item
             elif isinstance(item, list):
                 duration = item
             elif isinstance(item, float):
                 hold = item
-        return Drag(scene=scene_ref, arrow=scene_ref, duration=duration, hold=hold, line_no=self._line(items))
+        return Drag(
+            scene=drag_node.scene, arrow=drag_node.arrow,
+            duration=duration, hold=hold,
+            from_point=drag_node.from_point, to_point=drag_node.to_point,
+            line_no=drag_node.line_no,
+        )
+
+    def drag_scene_target(self, items):
+        """drag scene.arrow — scene 和 arrow 都可以是常量或变量"""
+        scene_val = self._resolve_const_or_var(items[0])
+        arrow_val = self._resolve_const_or_var(items[1])
+        scene_ref = SceneRef(scene=scene_val, region=arrow_val)
+        return Drag(scene=scene_ref, arrow=scene_ref, line_no=self._line(items))
+
+    def drag_coord_target(self, items):
+        """drag (rx1, ry1) (rx2, ry2) — 两个画布归一化坐标点"""
+        from_point, to_point = items  # 两个 CoordPoint
+        return Drag(scene=None, arrow=None, from_point=from_point, to_point=to_point, line_no=0)
 
     def drag_duration(self, items):
         item = items[0]

@@ -13,7 +13,7 @@ from .ast_nodes import (
     If, For, Loop, Break, Return, Label, Goto,
     Eval, EvalFieldChainAssign, FuncCall,
     # 表达式节点
-    SceneRef, VarRef, Literal, FieldAccess,
+    SceneRef, VarRef, Literal, FieldAccess, CoordPoint,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -25,7 +25,7 @@ __all__ = [
     "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log", "Call",
     "If", "For", "Loop", "Break", "Return", "Label", "Goto",
     "Eval", "EvalFieldChainAssign", "FuncCall",
-    "SceneRef", "VarRef", "Literal", "FieldAccess",
+    "SceneRef", "VarRef", "Literal", "FieldAccess", "CoordPoint",
     "Contains", "Equals", "InList", "IsEmpty",
     "GreaterThan", "LessThan", "GreaterEqual", "LessEqual", "NotEqual", "NumericEqual",
     "Not", "And", "Or",

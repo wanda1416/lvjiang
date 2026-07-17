@@ -1,6 +1,4 @@
-scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $main_weapon_scan
-eval $main_weapon = to_equipment($main_weapon_scan)
-if $main_weapon.[_extra].[affix_count] >= 5
-  log "词条满了，不用调律了"
+loop 5
+    drag [general_control].[equip_up] 1
+    wait 2
 end
-collect $main_weapon

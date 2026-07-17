@@ -48,7 +48,7 @@ def make_equip(type_, affixes):
 #  Part 1: 宛元芷装备评估
 # ═══════════════════════════════════════════════════════════
 
-def test_wanyuanzhi():
+def _eval_wanyuanzhi():
     print("=" * 60)
     print("  通用评估引擎测试 — 宛元芷装备")
     print("=" * 60)
@@ -128,7 +128,7 @@ def test_wanyuanzhi():
 #  Part 2: Mock 熔断测试
 # ═══════════════════════════════════════════════════════════
 
-def test_circuit_breaker():
+def _eval_circuit_breaker():
     print(f"\n{'=' * 60}")
     print("  Mock 熔断测试")
     print(f"{'=' * 60}")
@@ -295,9 +295,21 @@ def test_circuit_breaker():
 #  Main
 # ═══════════════════════════════════════════════════════════
 
+def test_wanyuanzhi():
+    """pytest 入口：宛元芷装备评估结果应全部命中期望"""
+    passed, total = _eval_wanyuanzhi()
+    assert passed == total, f"宛元芷评估: {passed}/{total} 通过"
+
+
+def test_circuit_breaker():
+    """pytest 入口：Mock 熔断判断应全部命中期望"""
+    passed, total = _eval_circuit_breaker()
+    assert passed == total, f"熔断测试: {passed}/{total} 通过"
+
+
 def main():
-    p1, t1 = test_wanyuanzhi()
-    p2, t2 = test_circuit_breaker()
+    p1, t1 = _eval_wanyuanzhi()
+    p2, t2 = _eval_circuit_breaker()
 
     total_p = p1 + p2
     total_t = t1 + t2

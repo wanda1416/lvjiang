@@ -175,7 +175,8 @@ def test_wait():
     program = parse_text("wait 1.5")
     n = program.body[0]
     assert isinstance(n, Wait)
-    assert n.delay == 1.5
+    assert isinstance(n.delay, Literal)
+    assert n.delay.value == 1.5
     print("  wait 1.5: OK")
     
     # wait 命名延迟

@@ -11,7 +11,7 @@
 - **字符串**：双引号 `"..."`，内部不支持转义
 - **标识符**：`[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*`
 - **两种引用，语义不同**：
-  - `[name]` → **静态配置引用**：引用场景名 / 区域名，来自 YAML 场景定义
+  - `[name]` → **静态配置引用**：引用场景名 / Area 名（Region 或 Point）/ Action 名，来自 Scene YAML 和 Layout JSON 定义
   - `$name` → **运行时变量引用**：引用工作流执行过程中的动态变量
   - 在非赋值语境中，`[]` 和 `""` 等价，都表示静态常量
 - **内置变量**：
@@ -19,38 +19,39 @@
 
 ### 核心指令语义模型
 
-`click`、`scan`、`recognize`、`drag` 是引擎封装的四个语法糖函数，**参数都是常量**：
+`click`、`scan`、`recognize`、`drag` 是引擎封装的四个语法糖函数。前三者操作 **Area**（空间实体），后者操作 **Action**（行为实体）：
 
 ```
-click     → click_func(scene_const, coord_const)
-scan      → scan_func(scene_const, fields_const)
-recognize → recognize_func(scene_const, fields_const)
-drag      → drag_func(scene_const, arrow_const, ...)
+click     → click_func(scene, area)          # 操作 Area（Region 或 Point）
+scan      → scan_func(scene, area)           # 操作 Area（当前仅 Region）
+recognize → recognize_func(scene, area)      # 操作 Area（当前仅 Region）
+drag      → drag_func(scene, action, ...)    # 操作 Action（Arrow）
 ```
 
-常量的来源有两种：
+参数的来源有两种：
 - `[]` 或 `""` → 编译期常量（直接写在代码里）
 - `$var` → 运行时计算的常量（先解析变量值，再当作常量传入）
 
-因此语法上，四大指令的场景名和字段名都支持三种形式：
+因此语法上，四大指令的场景名和 Area/Action 名都支持三种形式：
 
 ```
-# 场景名（scene_name）
+# 场景名（scene）
 [scene]          # 括号常量
 "scene"          # 字符串常量（等价于 [scene]）
 $var             # 变量引用（运行时解析）
 
-# 字段名（field）
-[field]          # 括号常量
-"field"          # 字符串常量
+# Area / Action 名
+[area]           # 括号常量
+"area"           # 字符串常量
 $var             # 变量引用
-[f1, f2, ...]    # 多字段列表（仅 scan/recognize）
+[f1, f2, ...]    # 多 Area 列表（仅 scan/recognize）
 
 # 示例
 scan [scene] as $var                    # 常量场景
-scan $scene.[field] as $var             # 变量场景 + 常量字段
-scan "scene".$region as $var            # 字符串场景 + 变量字段
+scan $scene.[area] as $var              # 变量场景 + 常量 Area
+scan "scene".$area as $var              # 字符串场景 + 变量 Area
 recognize $config.scene.[slot] as $var  # 字段访问作为场景名
+drag [scene].[arrow]                    # Action 名（Arrow）
 ```
 
 变量只是**延迟求值的常量**，最终传给函数的都是字符串。
@@ -74,7 +75,7 @@ recognize $config.scene.[slot] as $var  # 字段访问作为场景名
 
 | 方式 | 语法 | 说明 |
 |---|---|---|
-| scan 声明 | `scan scene_name as $var` | OCR 扫描结果存入 `$var`（dict，key 为区域名）。场景名支持 `[]`/`""`/`$var` |
+| scan 声明 | `scan scene_name as $var` | OCR 扫描结果存入 `$var`（dict，key 为 Area 名）。场景名支持 `[]`/`""`/`$var` |
 | eval 函数赋值 | `eval $var = func(args...)` | 内置函数返回值存入 `$var` |
 | eval 字面量赋值 | `eval $var = "str"` 或 `eval $var = 42` | 字面量直接存入 `$var` |
 | eval 列表赋值 | `eval $var = ["a", "b", $c]` | 列表存入 `$var`，元素支持字符串、数字、变量引用 |
@@ -92,7 +93,7 @@ recognize $config.scene.[slot] as $var  # 字段访问作为场景名
 
 | 来源 | 类型 | 示例 |
 |---|---|---|
-| `scan ... as $var` | `dict` | `$var` = `{"equip_type": "武器", "affix_gong": "会心+10%"}` |
+| `scan ... as $var` | `dict` | `$var` = `{"equip_type": "武器", "affix_gong": "会心+10%"}`（key 为 Area 名） |
 | `eval $var = to_equipment(...)` | `dict` | 嵌套字典，支持链式字段访问 |
 | `eval $var = "hello"` | `str` | 字符串 |
 | `eval $var = 42` | `float` | 数字（内部统一为 float） |
@@ -146,16 +147,16 @@ $list[0]                 # 静态索引（数字）
 |---|---|---|
 | `variables` | `dict` | 运行时变量空间，所有 `$var` 的存储 |
 | `output` | `dict` | `collect` 指令的输出缓冲区，工作流结束后返回给调用方 |
-| `coord_meta` | `dict` | scan/recognize 产出的区域坐标元数据，供 `click [scene].$key` 解析坐标。引擎内部状态，DSL 不可直接访问 |
+| `coord_meta` | `dict` | scan/recognize 产出的 Area 坐标元数据，供 `click [scene].$key` 解析坐标。引擎内部状态，DSL 不可直接访问 |
 
 **数据流全景**：
 
 ```
-scan scene_name as $var      ──→  variables[$var] = {field: ocr_text}
-                                 coord_meta[$var] = {field: Region}
+scan scene_name as $var      ──→  variables[$var] = {area_key: ocr_text}
+                                 coord_meta[$var] = {area_key: Region}
 
-recognize scene_name as $var ──→  variables[$var] = {slot: material_type}
-                                 coord_meta[$var] = {slot: Region}
+recognize scene_name as $var ──→  variables[$var] = {area_key: material_type}
+                                 coord_meta[$var] = {area_key: Region}
 
 eval $var = func(...)        ──→  variables[$var] = result
 
@@ -166,4 +167,4 @@ collect $var as $alias       ──→  output[resolve($alias)] = variables[$var
 call "sub.wf" read "k" as $v ──→  variables[$v] = sub_output["k"]
 ```
 
-`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`coord_meta` 是引擎内部状态，随 scan/recognize 自动存入，使 `click [scene].$key` 可以解析动态 region 的坐标。
+`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`coord_meta` 是引擎内部状态，随 scan/recognize 自动存入，使 `click [scene].$key` 可以解析动态 Area 的坐标。

@@ -89,7 +89,7 @@ call "sub.wf" read "equip_data" as $data, "status" as $status
 
 ### 1.4 隔离机制
 
-每次 `call` 创建一个**独立的子 engine 实例**，拥有自己的 `variables`、`output`、`scan_meta`。父子之间完全隔离，不会互相污染。
+每次 `call` 创建一个**独立的子 engine 实例**，拥有自己的 `variables`、`output`、`coord_meta`。父子之间完全隔离，不会互相污染。
 
 **调用流程**：
 
@@ -253,11 +253,11 @@ flows:
 + # $target_material 由外部参数注入，直接使用
 ```
 
-动态 region 引用：
+动态 Area 引用：
 
 ```diff
-- click [bag_equip_detail].[bag_1_1]   # 静态 region
-+ click [bag_equip_detail].$bag_slot  # 动态 region，由参数注入
+- click [bag_equip_detail].[bag_1_1]   # 静态 Area
++ click [bag_equip_detail].$bag_slot  # 动态 Area，由参数注入
 ```
 
 ### 2.4 数据流

@@ -17,6 +17,7 @@ start: (_NL | statement)*
           | collect_stmt
           | log_stmt
           | eval_stmt
+          | implicit_eval_stmt
           | call_stmt
           | if_stmt
           | for_stmt
@@ -72,6 +73,13 @@ eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_fun
          | "eval"i "$" NAME "=" var_ref _NL                    -> eval_assign_expr
          | "eval"i field_access "=" eval_rhs _NL               -> eval_field_assign
          | "eval"i NAME "(" arg_list? ")" _NL                  -> eval_discard
+
+// 隐式 eval：省略 eval 关键字，直接 $var = ...
+implicit_eval_stmt: "$" NAME "=" NAME "(" arg_list? ")" _NL    -> implicit_eval_assign_func
+                  | "$" NAME "=" literal _NL                    -> implicit_eval_assign_lit
+                  | "$" NAME "=" field_access _NL               -> implicit_eval_assign_expr
+                  | "$" NAME "=" var_ref _NL                    -> implicit_eval_assign_expr
+                  | field_access "=" eval_rhs _NL               -> implicit_eval_field_assign
 
 eval_rhs: NAME "(" arg_list? ")"  -> eval_rhs_func
         | literal                   -> eval_rhs_lit

@@ -250,9 +250,13 @@ class WorkflowEngine:
         if node.fields:
             field_keys = [self._resolve(f) for f in node.fields]
         elif node.region_var:
-            # 动态 region：[scene].$var → 解析变量为 region key
+            # 动态 region：[scene].$var → 解析变量值
             region_key = self._resolve(node.region_var)
-            field_keys = [str(region_key)]
+            if isinstance(region_key, list):
+                # 列表变量：展开为多字段 key
+                field_keys = [str(k) for k in region_key]
+            else:
+                field_keys = [str(region_key)]
 
         result = self._wf.ocr_scene(scene, field_keys)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
@@ -276,9 +280,13 @@ class WorkflowEngine:
         if node.fields:
             field_keys = [self._resolve(f) for f in node.fields]
         elif node.region_var:
-            # 动态 region：[scene].$var → 解析变量为 region key
+            # 动态 region：[scene].$var → 解析变量值
             region_key = self._resolve(node.region_var)
-            field_keys = [str(region_key)]
+            if isinstance(region_key, list):
+                # 列表变量：展开为多字段 key
+                field_keys = [str(k) for k in region_key]
+            else:
+                field_keys = [str(region_key)]
         result, region_map = self._wf.recognize_materials(scene, field_keys)
         self.variables[var_name] = result           # {slot_key: "材料类型"}
         self._coord_meta[var_name] = region_map     # {slot_key: Region}

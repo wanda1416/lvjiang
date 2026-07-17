@@ -3,13 +3,31 @@ name: 通用控制
 points:
 - key: material_slot_1
   name: 材料格1
+  type: slot
+  is_text: false
+  is_clickable: true
 - key: material_slot_2
   name: 材料格2
+  type: slot
+  is_text: false
+  is_clickable: true
 - key: left_screen_1
   name: 左屏点1
+  type: func
+  is_text: false
+  is_clickable: true
 - key: left_screen_2
   name: 左屏点2
+  type: func
+  is_text: false
+  is_clickable: true
 - key: equip_slot_1
   name: 背包格1
+  type: slot
+  is_text: false
+  is_clickable: true
 - key: equip_slot_2
   name: 背包格2
+  type: slot
+  is_text: false
+  is_clickable: true

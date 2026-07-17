@@ -630,6 +630,108 @@ collect $scan1 as "output"
     print("  完整工作流: OK")
 
 
+# ─── 隐式 eval 测试 ─────────────────────────────────────────
+
+def test_implicit_eval():
+    """测试隐式 eval：$var = value 不需要 eval 前缀"""
+    print("\n=== 测试隐式 eval ===")
+
+    # $var = "string"
+    program = parse_text('$result = "hello"')
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.target == "result"
+    assert n.func_name == "__literal__"
+    print('  $var = "string": OK')
+
+    # $var = 123
+    program = parse_text("$count = 123")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.target == "count"
+    print("  $var = 123: OK")
+
+    # $var = {}
+    program = parse_text("$data = {}")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__empty_dict__"
+    print("  $var = {}: OK")
+
+    # $var = ["a", "b", "c"]
+    program = parse_text('$list = ["a", "b", "c"]')
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__list__"
+    assert len(n.func_args) == 3
+    print('  $var = ["a", "b", "c"]: OK')
+
+    # $var = func($arg)
+    program = parse_text("$result = to_equipment($scan)")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "to_equipment"
+    assert n.target == "result"
+    assert len(n.func_args) == 1
+    assert isinstance(n.func_args[0], VarRef)
+    print("  $var = func($arg): OK")
+
+    # $var = $other
+    program = parse_text("$copy = $original")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__expr__"
+    assert n.target == "copy"
+    print("  $var = $other: OK")
+
+    # $var = $dict.field
+    program = parse_text("$val = $dict.field")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__expr__"
+    print("  $var = $dict.field: OK")
+
+    # $dict.key = value（隐式字段赋值）
+    program = parse_text('$dict.key = "value"')
+    n = program.body[0]
+    assert isinstance(n, EvalFieldChainAssign)
+    assert isinstance(n.target, FieldAccess)
+    print("  $dict.key = value: OK")
+
+    # $dict.$key = value（隐式动态 key 赋值）
+    program = parse_text('$equipment.$slot = to_equipment($scan)')
+    n = program.body[0]
+    assert isinstance(n, EvalFieldChainAssign)
+    print("  $dict.$key = func($arg): OK")
+
+
+# ─── scan/recognize list 变量测试 ───────────────────────────
+
+def test_scan_list_var():
+    """测试 scan [scene].$list 支持列表变量"""
+    print("\n=== 测试 scan list 变量 ===")
+
+    # scan [scene].$list as $var
+    program = parse_text("scan [equip_weapon_detail].$fields as $result")
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    assert isinstance(n.scene, SceneRef)
+    assert n.scene.scene == "equip_weapon_detail"
+    assert n.region_var is not None
+    assert isinstance(n.region_var, VarRef)
+    assert n.region_var.name == "fields"
+    print("  scan [scene].$list as $var: OK")
+
+    # recognize [scene].$list as $var
+    program = parse_text("recognize [equip_tune_detail].$slots as $mats")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.region_var is not None
+    assert isinstance(n.region_var, VarRef)
+    assert n.region_var.name == "slots"
+    print("  recognize [scene].$list as $var: OK")
+
+
 # ─── 主入口 ─────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -663,6 +765,10 @@ if __name__ == "__main__":
     # eval
     test_eval_with_var()
     test_eval_field_assign()
+    test_implicit_eval()
+    
+    # scan/recognize list var
+    test_scan_list_var()
     
     # for
     test_for()

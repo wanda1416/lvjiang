@@ -251,6 +251,42 @@ class _DSLTransformer(Transformer):
         value = items[1]   # eval_rhs result
         return EvalFieldChainAssign(target=target, value=value, line_no=self._line(items))
 
+    # ─── 隐式 eval（省略 eval 关键字）─────────────────────
+
+    def implicit_eval_assign_func(self, items):
+        """$var = func($arg...) — 隐式函数调用赋值"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        names = [str(t) for t in tokens]
+        lists = [i for i in items if isinstance(i, list)]
+        func_args = lists[0] if lists else []
+        return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
+
+    def implicit_eval_assign_lit(self, items):
+        """$var = "string" | 123 | {} | [list] — 隐式字面量赋值"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        target_name = str(tokens[0])
+        lit_value = items[1]
+        if isinstance(lit_value, dict):
+            return Eval(func_name="__empty_dict__", func_args=[], target=target_name, line_no=self._line(items))
+        if isinstance(lit_value, list):
+            return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
+        if isinstance(lit_value, Token):
+            lit_value = self._unquote(str(lit_value))
+        return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
+
+    def implicit_eval_assign_expr(self, items):
+        """$var = field_access | $other — 隐式表达式赋值"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        target_name = str(tokens[0])
+        expr = items[1]
+        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
+
+    def implicit_eval_field_assign(self, items):
+        """$dict.key = value — 隐式字段赋值"""
+        target = items[0]
+        value = items[1]
+        return EvalFieldChainAssign(target=target, value=value, line_no=self._line(items))
+
     def eval_rhs_func(self, items):
         """eval_rhs: NAME ( arg_list? ) → FuncCall"""
         tokens = [i for i in items if isinstance(i, Token)]

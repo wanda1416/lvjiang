@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QMessageBox, QInputDialog,
+    QMessageBox, QInputDialog, QComboBox, QCheckBox,
 )
 from PyQt6.QtCore import Qt
 
@@ -14,7 +14,7 @@ from ...core.region_config import (
     get_scene_point_pairs, get_point_def,
     get_registry, sync_scene_cache,
 )
-from ...core.scene_loader import PointDef
+from ...core.scene_loader import PointDef, VALID_REGION_TYPES
 
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -43,10 +43,13 @@ class PoiPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._point_list = QTableWidget()
-        self._point_list.setColumnCount(2)
-        self._point_list.setHorizontalHeaderLabels(["名称", "Key"])
+        self._point_list.setColumnCount(5)
+        self._point_list.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
         self._point_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self._point_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self._point_list.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self._point_list.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self._point_list.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -110,22 +113,36 @@ class PoiPanelMixin:
         """刷新坐标列表，显示已放置/未放置状态"""
         self._point_list.blockSignals(True)
         self._point_list.setRowCount(0)
-        pairs = get_scene_point_pairs(self._scene_key)
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if not scene:
+            self._point_list.blockSignals(False)
+            return
         placed = {p.key for p in self._canvas.get_points()}
-        for key, name in pairs:
+        for point_def in scene.points:
             row = self._point_list.rowCount()
             self._point_list.insertRow(row)
             # 名称
-            status = "\u2713" if key in placed else "\u25cb"
-            name_item = QTableWidgetItem(f"{status} {name}")
-            if key not in placed:
+            status = "\u2713" if point_def.key in placed else "\u25cb"
+            name_item = QTableWidgetItem(f"{status} {point_def.name}")
+            if point_def.key not in placed:
                 name_item.setForeground(Qt.GlobalColor.gray)
             self._point_list.setItem(row, 0, name_item)
             # Key
-            key_item = QTableWidgetItem(key)
-            if key not in placed:
+            key_item = QTableWidgetItem(point_def.key)
+            if point_def.key not in placed:
                 key_item.setForeground(Qt.GlobalColor.gray)
             self._point_list.setItem(row, 1, key_item)
+            # 类型
+            self._point_list.setItem(row, 2, QTableWidgetItem(point_def.type))
+            # 含文本
+            text_item = QTableWidgetItem("\u2713" if point_def.is_text else "")
+            text_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._point_list.setItem(row, 3, text_item)
+            # 可点击
+            click_item = QTableWidgetItem("\u2713" if point_def.is_clickable else "")
+            click_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._point_list.setItem(row, 4, click_item)
         self._point_list.blockSignals(False)
 
     def _refresh_arrow_list(self):
@@ -367,6 +384,24 @@ class PoiPanelMixin:
             name_edit.setText(point_def.name)
         form.addRow("名称:", name_edit)
 
+        type_combo = QComboBox()
+        type_combo.addItems(sorted(VALID_REGION_TYPES))
+        if point_def:
+            type_combo.setCurrentText(point_def.type)
+        form.addRow("类型:", type_combo)
+
+        is_text_check = QCheckBox("含文本")
+        if point_def:
+            is_text_check.setChecked(point_def.is_text)
+        form.addRow(is_text_check)
+
+        is_clickable_check = QCheckBox("可点击")
+        if point_def:
+            is_clickable_check.setChecked(point_def.is_clickable)
+        else:
+            is_clickable_check.setChecked(True)
+        form.addRow(is_clickable_check)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -386,4 +421,10 @@ class PoiPanelMixin:
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
-        return PointDef(key=key_edit.text().strip(), name=name_edit.text().strip())
+        return PointDef(
+            key=key_edit.text().strip(),
+            name=name_edit.text().strip(),
+            type=type_combo.currentText(),
+            is_text=is_text_check.isChecked(),
+            is_clickable=is_clickable_check.isChecked(),
+        )

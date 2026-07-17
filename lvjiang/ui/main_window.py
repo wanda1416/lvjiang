@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QTabWidget, QSplitter, QMessageBox, QFormLayout, QScrollArea,
-    QSpinBox,
+    QSpinBox, QCheckBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QKeyEvent, QAction
@@ -248,6 +248,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.lbl_window_info.setStyleSheet("color: gray;")
         row2.addWidget(self.lbl_window_info)
         row2.addStretch()
+
+        self.chk_bg_mode = QCheckBox("后台模式")
+        self.chk_bg_mode.setToolTip("启用后鼠标操作不会移动光标，通过 PostMessage 直接向目标窗口发送鼠标事件")
+        self.chk_bg_mode.setEnabled(False)  # 定位窗口前不可用
+        self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
+        row2.addWidget(self.chk_bg_mode)
+
         window_main_layout.addLayout(row2)
         main_layout.addWidget(window_group)
 

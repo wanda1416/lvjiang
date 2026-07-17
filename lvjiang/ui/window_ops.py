@@ -105,6 +105,20 @@ class WindowOpsMixin:
         self._refresh_run_button()
         self._capture_preview()
 
+        # 定位成功后启用后台模式开关
+        if hasattr(self, 'chk_bg_mode'):
+            self.chk_bg_mode.setEnabled(True)
+
+    def _on_bg_mode_changed(self, state):
+        """后台模式开关切换"""
+        enabled = bool(state)
+        if enabled and self._target_window:
+            self._input.set_background_mode(True, hwnd=self._target_window["hwnd"])
+            self.log_text.append("[模式] 已切换到后台模式（PostMessage，不移动光标）")
+        else:
+            self._input.set_background_mode(False)
+            self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
+
     # ─── 截屏 ─────────────────────────────────────────────
 
     def _capture_preview(self):

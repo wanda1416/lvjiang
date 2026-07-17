@@ -250,6 +250,10 @@ class RunControlMixin:
                 self._end_automation(flow_name)
                 return
 
+        # 后台模式下，刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
+        if self._input.background_mode and self._target_window:
+            self._input.target_hwnd = self._target_window["hwnd"]
+
         wf = BaseWorkflow(
             capture=self._capture,
             ocr=self._ocr,

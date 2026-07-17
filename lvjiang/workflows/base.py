@@ -225,7 +225,7 @@ class BaseWorkflow:
     # ─── 等待 ──────────────────────────────────────────────
 
     def wait_delay(self, delay_name: str):
-        """按命名延迟参数等待"""
+        """按命名延迟参数等待（可被停止请求打断）"""
         delay_val = getattr(self._delay, delay_name, None)
         if delay_val is None:
             logger.error(f"未知的延迟参数: {delay_name}")
@@ -235,12 +235,22 @@ class BaseWorkflow:
         else:
             actual = float(delay_val)
         logger.debug(f"等待 {delay_name} = {actual:.2f}s")
-        time.sleep(actual)
+        self.wait_seconds(actual)
 
     def wait_seconds(self, seconds: float):
-        """固定等待"""
+        """固定等待（可被停止请求打断）
+
+        用 50ms 轮询代替 time.sleep 阻塞，期间持续检查停止标志，
+        使 F10 / 停止按钮能在等待期间立即生效，而不是等整段 sleep 结束。
+        """
         logger.debug(f"等待 {seconds}s")
-        time.sleep(seconds)
+        deadline = time.monotonic() + max(0.0, seconds)
+        while time.monotonic() < deadline:
+            if self._stop_check():
+                logger.info("等待期间收到停止请求，提前结束")
+                return
+            remaining = deadline - time.monotonic()
+            time.sleep(min(0.05, max(0.0, remaining)))
 
     # ─── 变量与函数调用 ────────────────────────────────────
 

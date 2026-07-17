@@ -142,7 +142,7 @@ class InputController:
         self.region_jitter_ratio = cfg.region_jitter_ratio
 
         # 后台模式相关
-        self.background_mode = False   # 是否启用 PostMessage 后台模式
+        self.background_mode = True    # 默认启用 PostMessage 后台模式（不移动光标）
         self.target_hwnd = None        # 目标窗口句柄
 
     def set_background_mode(self, enabled: bool, hwnd: int | None = None):

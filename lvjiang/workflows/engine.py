@@ -115,6 +115,9 @@ class WorkflowEngine:
 
     def _exec_stmt(self, node):
         """执行单条语句"""
+        # 语句边界也检查停止标志，让 F10 在两条语句之间立即生效
+        if self._wf.is_stopped:
+            raise _BreakSignal()
         match node:
             case Click():
                 self._exec_click(node)

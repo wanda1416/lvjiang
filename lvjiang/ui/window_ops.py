@@ -105,9 +105,14 @@ class WindowOpsMixin:
         self._refresh_run_button()
         self._capture_preview()
 
-        # 定位成功后启用后台模式开关
+        # 定位成功后启用后台模式开关，并默认勾选（后台模式为默认）
         if hasattr(self, 'chk_bg_mode'):
             self.chk_bg_mode.setEnabled(True)
+            self.chk_bg_mode.blockSignals(True)
+            self.chk_bg_mode.setChecked(True)
+            self.chk_bg_mode.blockSignals(False)
+            # 显式设置 hwnd，完成后台模式初始化
+            self._input.set_background_mode(True, hwnd=w["hwnd"])
 
     def _on_bg_mode_changed(self, state):
         """后台模式开关切换"""

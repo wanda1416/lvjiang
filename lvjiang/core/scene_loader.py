@@ -23,14 +23,17 @@ class RegionDef:
 
 @dataclass
 class PointDef:
-    """单个坐标点的类型定义（圆形交互锚点，不参与 OCR）
+    """单个坐标点的类型定义（圆形交互锚点）
 
-    仅描述「场景里存在这样一个可交互坐标点」的类型信息（key/name）。
+    描述「场景里存在这样一个可交互坐标点」的类型信息（key/name/type/is_text/is_clickable）。
     具体的坐标位置与半径属于实例数据，保存在布局 JSON 的 Point 中，
     半径可在画布上随意调整，不在此处限死。
     """
     key: str
     name: str
+    type: str = "func"              # attr/slot/func
+    is_text: bool = False           # 是否需要文字识别（OCR）
+    is_clickable: bool = True       # 是否可点击
 
 
 @dataclass
@@ -143,9 +146,15 @@ class SceneRegistry:
 
         points = []
         for pd in data.get("points", []):
+            ptype = pd.get("type", "func")
+            if ptype not in VALID_REGION_TYPES:
+                raise ValueError(f"坐标点 {pd.get('key')} 的 type '{ptype}' 不合法，合法值: {VALID_REGION_TYPES}")
             points.append(PointDef(
                 key=pd["key"],
                 name=pd["name"],
+                type=ptype,
+                is_text=pd.get("is_text", False),
+                is_clickable=pd.get("is_clickable", True),
             ))
 
         # region 与 point 同场景内 key 不得重复（共享命名空间）
@@ -445,7 +454,13 @@ class SceneRegistry:
             ]
         if scene.points:
             data["points"] = [
-                {"key": p.key, "name": p.name}
+                {
+                    "key": p.key,
+                    "name": p.name,
+                    "type": p.type,
+                    "is_text": p.is_text,
+                    "is_clickable": p.is_clickable,
+                }
                 for p in scene.points
             ]
         path.write_text(

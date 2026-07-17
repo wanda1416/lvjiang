@@ -1,10 +1,34 @@
 # DSL 指令集
 
+## 操作对象语义
+
+DSL 指令操作两类本质不同的对象：**Area**（空间实体）和 **Action**（行为实体）。
+
+| | Area | Action |
+|---|------|--------|
+| 本质 | **空间实体**（有位置、形状） | **行为实体**（定义一次交互） |
+| 定义层 | Scene 层定义，Layout 层绑定坐标 | 纯 Layout 层定义 |
+| 可执行操作 | click / scan / recognize（对空间做的事） | execute（执行该行为） |
+| 不可执行操作 | 不能 drag 一个 Area | 不能 scan / click 一个 Action |
+
+两类对象的操作集**完全正交**，不存在跨类操作。
+
+| 指令 | 操作对象 | 对象类型 | 说明 |
+|------|----------|----------|------|
+| `click [scene].[area]` | **Area** | 空间实体 | 点击区域中心（Region 或 Point） |
+| `scan [scene].[area]` | **Area** | 空间实体 | 对区域执行 OCR（当前仅支持 Region，未来可扩展 Point） |
+| `recognize [scene].[area]` | **Area** | 空间实体 | 对区域执行图像识别（当前仅支持 Region，未来可扩展 Point） |
+| `drag [scene].[action]` | **Action** | 行为实体 | 执行拖拽动作（Arrow） |
+
+> **注**：`scan` / `recognize` 当前实现仅支持 Region 类型的 Area，但语义上允许未来扩展到 Point 类型（对坐标点周围区域做 OCR）。
+
+---
+
 ## 一、click — 点击
 
-点击屏幕上的目标位置。
+点击屏幕上的 Area（Region 或 Point）。
 
-**语义**：`click` 是 `click_func(scene_const, coord_const)` 的语法糖，接收两个常量参数查坐标表。
+**语义**：`click` 是 `click_func(scene, area)` 的语法糖，接收两个常量参数查坐标表。
 
 **语法**：
 
@@ -24,16 +48,16 @@ click "scene"."region"         # 字符串常量（等价于 [scene].[region]）
 
 **说明**：
 
-- `[scene].[region]`：从场景配置中取出 region 的中心坐标并点击
-- `[scene].$var`：region 名在运行时由变量值决定。引擎会先从 `coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 region
-- `click` **不能**直接传坐标元组，必须通过 `scene.coord` 格式查表
+- `[scene].[area]`：从场景配置中取出 Area 的中心坐标并点击（Region 优先，未命中回退 Point）
+- `[scene].$var`：Area 名在运行时由变量值决定。引擎会先从 `coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 Area
+- `click` **不能**直接传坐标元组，必须通过 `scene.area` 格式查表
 - `[]` 和 `""` 在非赋值语境等价，都表示静态常量
 
 ## 二、drag — 拖拽
 
-执行基于 arrow 定义的拖拽操作。arrow 描述了起点和终点的方向与距离。
+执行基于 Arrow 定义的拖拽动作。Arrow 是 Layout Action 层定义的一次拖拽交互（起点 → 终点）。
 
-**语义**：`drag` 是 `drag_func(scene_const, arrow_const, ...)` 的语法糖。场景名和箭头名都支持 `[]`/`""`/`$var` 三种形式。
+**语义**：`drag` 是 `drag_func(scene, action, ...)` 的语法糖。场景名和 Arrow 名都支持 `[]`/`""`/`$var` 三种形式。
 
 **语法**：
 
@@ -88,16 +112,16 @@ wait (0.5, 1.5)             # 随机等待 0.5~1.5 秒
 
 ## 四、scan — OCR 扫描
 
-对指定场景进行截图，逐 Region 裁切后执行 OCR 文字识别，结果存入变量。
+对指定场景中的 Area 截图，逐 Region 裁切后执行 OCR 文字识别，结果存入变量。
 
-**语义**：`scan` 是 `scan_func(scene_const, fields_const)` 的语法糖。场景名和字段都可以是常量或变量。
+**语义**：`scan` 是 `scan_func(scene, area)` 的语法糖。场景名和 Area 名都可以是常量或变量。
 
 **语法**：
 
 ```
 scan scene_name as $var                    # 扫描场景所有 Region
-scan scene_name.[f1, f2, ...] as $var      # 仅扫描指定字段
-scan scene_name.$var as $result            # 动态 region（变量指定单个字段）
+scan scene_name.[a1, a2, ...] as $var      # 仅扫描指定 Area
+scan scene_name.$var as $result            # 动态 Area（变量指定单个 Area 名）
 
 # scene_name 可以是：
 #   [scene]    — 括号常量
@@ -123,22 +147,22 @@ scan "equip_weapon_detail".[affix_1] as $scan_result
 
 **说明**：
 
-- 扫描结果 `$var` 为字典，key 为区域名，value 为 OCR 识别文本
+- 扫描结果 `$var` 为字典，key 为 Area 名，value 为 OCR 识别文本
 - 引擎自动将 Region 坐标元数据存入内部 `coord_meta`，供后续 `click [scene].$key` 解析坐标
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
 
 ## 五、recognize — 图像识别
 
-对指定场景进行截图，逐 slot 裁切后通过 ORB 特征匹配识别材料类型，结果存入变量。
+对指定场景中的 Area 截图，逐 slot 裁切后通过 ORB 特征匹配识别材料类型，结果存入变量。
 
-**语义**：`recognize` 是 `recognize_func(scene_const, fields_const)` 的语法糖。场景名和字段都可以是常量或变量。
+**语义**：`recognize` 是 `recognize_func(scene, area)` 的语法糖。场景名和 Area 名都可以是常量或变量。
 
 **语法**：
 
 ```
 recognize scene_name as $var                   # 识别场景所有 slot
-recognize scene_name.[f1, f2] as $var          # 仅识别指定字段
-recognize scene_name.$var as $result           # 动态 region（变量指定单个字段）
+recognize scene_name.[a1, a2] as $var          # 仅识别指定 Area
+recognize scene_name.$var as $result           # 动态 Area（变量指定单个 Area 名）
 
 # scene_name 可以是：
 #   [scene]    — 括号常量
@@ -161,7 +185,7 @@ recognize $scene.$slot_var as $result
 
 **说明**：
 
-- 识别结果 `$var` 为字典，key 为 slot 名，value 为材料类型名
+- 识别结果 `$var` 为字典，key 为 Area 名，value 为材料类型名
 - 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `coord_meta`
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
 

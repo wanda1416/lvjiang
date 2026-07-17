@@ -1,4 +1,3 @@
-loop 5
-    drag [general_control].[equip_up] 1
-    wait 2
-end
+$list = ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"]
+scan [equip_weapon_detail].$list as $tune_scan
+log $tune_scan

@@ -139,7 +139,8 @@ class BaseWorkflow:
             regions = [r for r in regions if r.key in field_keys]
 
         result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key)
-        logger.info(f"OCR [{scene_key}]: {result}")
+        fields_display = field_keys if field_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
+        logger.info(f"OCR [{scene_key}]:{fields_display} => {result}")
         return result
 
     def click_at(self, x: int, y: int):
@@ -217,7 +218,8 @@ class BaseWorkflow:
                 f"type={info.type!r} level={info.level} count={info.count}"
             )
 
-        logger.info(f"材料识别 [{scene_key}]: {result}")
+        fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
+        logger.info(f"材料识别 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
     # ─── 等待 ──────────────────────────────────────────────

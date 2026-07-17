@@ -73,6 +73,7 @@ class MaterialRecognizer:
         self._cached_orb: list[tuple[str, np.ndarray | None, int, np.ndarray]] = []
         # [(mat_type, descriptors, kp_count, lab_avg), ...]
         self._orb: cv2.ORB | None = None
+        self._bf: cv2.BFMatcher | None = None  # 缓存 BFMatcher，避免每次识别都新建
 
     # ─── 参考库加载 ──────────────────────────────────────────
 
@@ -260,7 +261,9 @@ class MaterialRecognizer:
         if des1 is None or len(kp1) < 5:
             return "", 0.0
 
-        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+        if self._bf is None:
+            self._bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+        bf = self._bf
 
         best_type = ""
         best_score = -1.0

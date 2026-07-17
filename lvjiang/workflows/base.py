@@ -357,11 +357,11 @@ class BaseWorkflow:
 
     def _point_to_screen(self, point: Point) -> tuple[int | None, int | None]:
         """point 中心 → 屏幕坐标（带半径内随机偏移）"""
-        img = self._capture.capture()
-        if img is None:
-            logger.error("截图失败")
+        size = self._capture.get_capture_size()
+        if size == (0, 0):
+            logger.error("无法获取截屏尺寸")
             return None, None
-        h, w = img.shape[:2]
+        w, h = size
         canvas = self._layout.get_canvas()
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
@@ -379,11 +379,11 @@ class BaseWorkflow:
 
     def _ratio_to_screen(self, cx_ratio: float, cy_ratio: float) -> tuple[int | None, int | None]:
         """画布内归一化坐标 → 屏幕坐标"""
-        img = self._capture.capture()
-        if img is None:
-            logger.error("截图失败")
+        size = self._capture.get_capture_size()
+        if size == (0, 0):
+            logger.error("无法获取截屏尺寸")
             return None, None
-        h, w = img.shape[:2]
+        w, h = size
         canvas = self._layout.get_canvas()
         sx = canvas.x_ratio + cx_ratio * canvas.w_ratio
         sy = canvas.y_ratio + cy_ratio * canvas.h_ratio

@@ -83,6 +83,15 @@ drag [scene].[arrow]                    # Action 名（Arrow）
 | for 循环变量 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
 | call 提取 | `call "sub.wf" read "key" as $var` | 从子工作流输出中提取值 |
 
+**隐式 eval**：任何没有指令关键字开头的语句，解析器自动视为 `eval`。以下两行完全等价：
+
+```
+eval $var = "hello"
+$var = "hello"               # 隐式 eval，效果完全相同
+```
+
+隐式 eval 支持所有 eval 语法：字面量赋值、函数调用、字段赋值、链式赋值等。
+
 变量**无需预先声明**，首次赋值即创建，后续引用即可。
 
 **外部参数注入**：工作流可以通过 `workflow.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [05-subworkflows.md](05-subworkflows.md#工作流参数声明)。
@@ -147,16 +156,16 @@ $list[0]                 # 静态索引（数字）
 |---|---|---|
 | `variables` | `dict` | 运行时变量空间，所有 `$var` 的存储 |
 | `output` | `dict` | `collect` 指令的输出缓冲区，工作流结束后返回给调用方 |
-| `coord_meta` | `dict` | scan/recognize 产出的 Area 坐标元数据，供 `click [scene].$key` 解析坐标。引擎内部状态，DSL 不可直接访问 |
+| `_coord_meta` | `dict` | scan/recognize 产出的 Area 坐标元数据，供 `click [scene].$key` 解析坐标。引擎内部状态，DSL 不可直接访问 |
 
 **数据流全景**：
 
 ```
 scan scene_name as $var      ──→  variables[$var] = {area_key: ocr_text}
-                                 coord_meta[$var] = {area_key: Region}
+                                 _coord_meta[$var] = {area_key: Region}
 
 recognize scene_name as $var ──→  variables[$var] = {area_key: material_type}
-                                 coord_meta[$var] = {area_key: Region}
+                                 _coord_meta[$var] = {area_key: Region}
 
 eval $var = func(...)        ──→  variables[$var] = result
 
@@ -167,4 +176,4 @@ collect $var as $alias       ──→  output[resolve($alias)] = variables[$var
 call "sub.wf" read "k" as $v ──→  variables[$v] = sub_output["k"]
 ```
 
-`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`coord_meta` 是引擎内部状态，随 scan/recognize 自动存入，使 `click [scene].$key` 可以解析动态 Area 的坐标。
+`output` 是工作流的**唯一对外出口**：`collect` 写入，工作流结束时整体返回。调用方通过 `read` 从中提取值。`_coord_meta` 是引擎内部状态，随 scan/recognize 自动存入，使 `click [scene].$key` 可以解析动态 Area 的坐标。

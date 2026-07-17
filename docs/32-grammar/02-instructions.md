@@ -49,7 +49,7 @@ click "scene"."region"         # 字符串常量（等价于 [scene].[region]）
 **说明**：
 
 - `[scene].[area]`：从场景配置中取出 Area 的中心坐标并点击（Region 优先，未命中回退 Point）
-- `[scene].$var`：Area 名在运行时由变量值决定。引擎会先从 `coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 Area
+- `[scene].$var`：Area 名在运行时由变量值决定。引擎会先从 `_coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 Area
 - `click` **不能**直接传坐标元组，必须通过 `scene.area` 格式查表
 - `[]` 和 `""` 在非赋值语境等价，都表示静态常量
 
@@ -148,7 +148,7 @@ scan "equip_weapon_detail".[affix_1] as $scan_result
 **说明**：
 
 - 扫描结果 `$var` 为字典，key 为 Area 名，value 为 OCR 识别文本
-- 引擎自动将 Region 坐标元数据存入内部 `coord_meta`，供后续 `click [scene].$key` 解析坐标
+- 引擎自动将 Region 坐标元数据存入内部 `_coord_meta`，供后续 `click [scene].$key` 解析坐标
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
 
 ## 五、recognize — 图像识别
@@ -186,7 +186,7 @@ recognize $scene.$slot_var as $result
 **说明**：
 
 - 识别结果 `$var` 为字典，key 为 Area 名，value 为材料类型名
-- 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `coord_meta`
+- 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `_coord_meta`
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
 
 ## 六、collect — 收集输出

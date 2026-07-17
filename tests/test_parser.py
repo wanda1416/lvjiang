@@ -1,8 +1,8 @@
 """DSL 解析器验证测试"""
 
 from pathlib import Path
-from lvjiang.workflows.parser import parse_file, parse_text
-from lvjiang.workflows.ast_nodes import (
+from lvjiang.workflows.grammar import parse_file, parse_text
+from lvjiang.workflows.grammar import (
     Program, Click, Drag, Wait, Scan, Recognize, Collect, Log, Eval, Call,
     If, For, Loop, Break, Return, Label, Goto,
     Contains, Equals, InList, IsEmpty, FieldAccess, VarRef, Literal, SceneRef,

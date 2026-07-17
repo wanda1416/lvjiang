@@ -18,8 +18,8 @@ def test_field_assign_string():
     p = parse_text('eval $mydata.name = "hello"')
     n = p.body[0]
     assert isinstance(n, EvalFieldChainAssign)
-    assert n.var_name == 'mydata'
-    assert n.field_name == 'name'
+    assert n.target.root.name == 'mydata'
+    assert n.target.field_name == 'name'
     assert isinstance(n.value, Literal)
     assert n.value.value == 'hello'
     print('  eval $dict.key = "string": OK')
@@ -30,8 +30,8 @@ def test_field_assign_number():
     p = parse_text('eval $mydata.count = 123')
     n = p.body[0]
     assert isinstance(n, EvalFieldChainAssign)
-    assert n.var_name == 'mydata'
-    assert n.field_name == 'count'
+    assert n.target.root.name == 'mydata'
+    assert n.target.field_name == 'count'
     assert n.value == 123.0  # number -> float
     print("  eval $dict.key = 123: OK")
 

@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QTabWidget, QSplitter, QMessageBox, QFormLayout, QScrollArea,
+    QSpinBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QKeyEvent, QAction
@@ -361,25 +362,32 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             default = param_def.get("default")
             options = param_def.get("options", [])
 
-            combo = QComboBox()
-            combo.setObjectName(name)
+            if param_type == "number":
+                spin = QSpinBox()
+                spin.setObjectName(name)
+                spin.setRange(param_def.get("min", 1), param_def.get("max", 9999))
+                spin.setValue(int(default) if default is not None else 1)
+                self._param_layout.addRow(label + ":", spin)
+            else:
+                combo = QComboBox()
+                combo.setObjectName(name)
 
-            if param_type == "select" and options:
-                for opt in options:
-                    if isinstance(opt, dict):
-                        # { value: "bag_1_1", label: "位置 1" }
-                        combo.addItem(opt["label"], opt["value"])
-                    else:
-                        # 简单字符串
-                        combo.addItem(str(opt), str(opt))
+                if param_type == "select" and options:
+                    for opt in options:
+                        if isinstance(opt, dict):
+                            # { value: "bag_1_1", label: "位置 1" }
+                            combo.addItem(opt["label"], opt["value"])
+                        else:
+                            # 简单字符串
+                            combo.addItem(str(opt), str(opt))
 
-                # 设置默认值
-                if default is not None:
-                    idx = combo.findData(str(default))
-                    if idx >= 0:
-                        combo.setCurrentIndex(idx)
+                    # 设置默认值
+                    if default is not None:
+                        idx = combo.findData(str(default))
+                        if idx >= 0:
+                            combo.setCurrentIndex(idx)
 
-            self._param_layout.addRow(label + ":", combo)
+                self._param_layout.addRow(label + ":", combo)
 
         self._param_panel.setVisible(True)
 

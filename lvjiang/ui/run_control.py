@@ -102,15 +102,17 @@ class RunControlMixin:
         panel = getattr(self, '_param_panel', None)
         if panel is None:
             return params
+        from PyQt6.QtWidgets import QComboBox, QSpinBox
         for param_def in flow_cfg.get("parameters", []):
             name = param_def["name"]
-            widget = panel.findChild(type(panel), name) if hasattr(panel, 'findChild') else None
-            if widget is None:
-                # 尝试用 objectName 查找 QComboBox
-                from PyQt6.QtWidgets import QComboBox
-                widget = panel.findChild(QComboBox, name)
+            # 先找 QSpinBox
+            widget = panel.findChild(QSpinBox, name)
             if widget is not None:
-                # 获取当前选中项的 value（userData）
+                params[name] = str(widget.value())
+                continue
+            # 再找 QComboBox
+            widget = panel.findChild(QComboBox, name)
+            if widget is not None:
                 data = widget.currentData()
                 params[name] = data if data is not None else widget.currentText()
         return params

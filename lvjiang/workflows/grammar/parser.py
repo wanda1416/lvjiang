@@ -102,6 +102,9 @@ class _DSLTransformer(Transformer):
         if isinstance(arg, VarRef):
             # $var → 动态等待时间
             return Wait(delay=arg, line_no=self._line(items))
+        # number 规则已将 INT/FLOAT 转为 Python float，直接包装为 Literal
+        if isinstance(arg, (int, float)):
+            return Wait(delay=Literal(value=arg), line_no=self._line(items))
         if isinstance(arg, Token):
             if arg.type in ("FLOAT", "INT"):
                 return Wait(delay=Literal(value=float(arg)), line_no=self._line(items))
@@ -114,6 +117,10 @@ class _DSLTransformer(Transformer):
 
     def wait_range(self, items):
         """(min, max) → (float, float) 随机范围元组"""
+        return (float(items[0]), float(items[1]))
+
+    def range_literal(self, items):
+        """(min, max) → (float, float) 范围元组，用于 eval 赋值"""
         return (float(items[0]), float(items[1]))
 
     def scan_stmt(self, items):
@@ -214,7 +221,7 @@ class _DSLTransformer(Transformer):
         return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
     def eval_assign_lit(self, items):
-        """eval $var = "string" | 123 | -1.5 | {} | [list]"""
+        """eval $var = "string" | 123 | -1.5 | {} | [list] | (min, max)"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])  # $ 后面的 NAME
         lit_value = items[1]
@@ -224,6 +231,9 @@ class _DSLTransformer(Transformer):
         # 列表快捷路径
         if isinstance(lit_value, list):
             return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
+        # 范围元组路径：(min, max)
+        if isinstance(lit_value, tuple):
+            return Eval(func_name="__range__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, Token):
             lit_value = self._unquote(str(lit_value))
         # 用 Eval 节点承载字面量赋值：func_name="__literal__"，func_args=[Literal(value)]
@@ -262,7 +272,7 @@ class _DSLTransformer(Transformer):
         return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
     def implicit_eval_assign_lit(self, items):
-        """$var = "string" | 123 | {} | [list] — 隐式字面量赋值"""
+        """$var = "string" | 123 | {} | [list] | (min, max) — 隐式字面量赋值"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])
         lit_value = items[1]
@@ -270,6 +280,8 @@ class _DSLTransformer(Transformer):
             return Eval(func_name="__empty_dict__", func_args=[], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, list):
             return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
+        if isinstance(lit_value, tuple):
+            return Eval(func_name="__range__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, Token):
             lit_value = self._unquote(str(lit_value))
         return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
@@ -286,6 +298,16 @@ class _DSLTransformer(Transformer):
         target = items[0]
         value = items[1]
         return EvalFieldChainAssign(target=target, value=value, line_no=self._line(items))
+
+    def default_stmt(self, items):
+        """default $var = literal — 仅当变量未设置时赋默认值"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        target_name = str(tokens[0])
+        lit_value = items[1]
+        if isinstance(lit_value, Token):
+            lit_value = self._unquote(str(lit_value))
+        # 统一用 __default__，引擎根据值的类型处理
+        return Eval(func_name="__default__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
 
     def eval_rhs_func(self, items):
         """eval_rhs: NAME ( arg_list? ) → FuncCall"""
@@ -411,6 +433,8 @@ class _DSLTransformer(Transformer):
         count_val = items[0]
         if isinstance(count_val, (int, float)):
             count = int(count_val)  # number 规则产出 float，loop 需要 int
+        elif isinstance(count_val, VarRef):
+            count = count_val  # 变量引用，运行时解析
         elif isinstance(count_val, Token):
             count = int(str(count_val))
         else:

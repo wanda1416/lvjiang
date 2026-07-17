@@ -236,15 +236,34 @@ flows:
 
 ### 2.2 参数类型
 
-当前支持 `select` 类型（下拉枚举）：
+支持 `select`（下拉枚举）和 `number`（数字输入）两种类型：
 
 | 字段 | 说明 |
 |---|---|
 | `name` | 参数名，即工作流中的变量名（`$name`） |
 | `label` | UI 显示标签 |
-| `type` | 参数类型，当前仅支持 `select` |
+| `type` | 参数类型：`select`（下拉框）或 `number`（数字输入框） |
 | `default` | 默认值 |
-| `options` | 可选项列表，支持简单字符串或 `{value, label}` 对象 |
+| `options` | （仅 `select`）可选项列表，支持简单字符串或 `{value, label}` 对象 |
+| `min` | （仅 `number`）最小值，默认 1 |
+| `max` | （仅 `number`）最大值，默认 9999 |
+
+**示例**：
+
+```yaml
+parameters:
+  - name: execute_times
+    label: 执行次数
+    type: number
+    default: 10
+    min: 1
+    max: 999
+  - name: target_material
+    label: 目标材料
+    type: select
+    default: "金色狗粮"
+    options: ["金色狗粮", "紫色狗粮"]
+```
 
 ### 2.3 工作流中使用
 
@@ -253,6 +272,15 @@ flows:
 ```diff
 - eval $target_material = "金色狗粮"   # 硬编码
 + # $target_material 由外部参数注入，直接使用
+```
+
+配合 `default` 语句可提供未注入时的默认值：
+
+```
+default $execute_times = 10          # 未从 UI 传入时使用默认值 10
+loop $execute_times
+    # ... 每轮逻辑
+end
 ```
 
 动态 Area 引用：

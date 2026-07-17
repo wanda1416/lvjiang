@@ -62,3 +62,16 @@ flows:
     wf_file: move_forward_test.wf
     required_scenes:
       - game_main_page
+
+  - id: mengzhuzhengfeng
+    name: 盟主争锋
+    wf_file: mengzhuzhengfeng.wf
+    required_scenes:
+      - activity_mengzhu
+    parameters:
+      - name: execute_times
+        label: 执行次数
+        type: number
+        default: 10
+        min: 1
+        max: 999

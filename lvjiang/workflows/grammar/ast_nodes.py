@@ -99,7 +99,7 @@ class For:
 
 @dataclass(frozen=True)
 class Loop:
-    count: int
+    count: Any      # int | str(NAME) | VarRef
     body: list = field(default_factory=list)
     line_no: int = 0
 

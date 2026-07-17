@@ -1,0 +1,110 @@
+# 盟主争锋自动化流程
+#
+# 流程结构：
+#   loop $execute_times → 每轮执行一局游戏
+#      @start → 开始匹配 → 等待"确认选择" → 点击进入
+#         ↓
+#      @round_loop → 等待"开始战斗" → 拖拽商品 → 开始战斗 → 处理确认弹窗 → 等待结果
+#         ↓                                              ↓
+#         ↑ ← "下个回合"（胜利，下一回合）          "继续"（失败）
+#                                                   ↓
+#                                              连续点击"继续"结算
+#                                                   ↓
+#                                              回到 @start 开始下一局
+#
+# 状态判定：
+#   - "下个回合" = 胜利，进入下一回合
+#   - "继续" = 失败，需要重开一局
+#
+# 参数：
+#   execute_times — 循环执行次数，默认 10
+
+default $execute_times = 10
+
+$step_interval = (2, 3)
+
+loop $execute_times
+
+scan [activity_mengzhu].[start_new] as $scan_result
+if not $scan_result.[start_new] contains "开始匹配"
+   eval messagebox("请在初始界面开始执行")
+   return
+end
+
+# 点击开始匹配
+click [activity_mengzhu].[start_new]
+wait $step_interval
+
+# 等待加载动画，直到出现"确认选择"
+loop 100
+   scan [activity_mengzhu].[start_new] as $scan_result
+   if $scan_result.[start_new] contains "确认选择"
+       wait $step_interval
+       click [activity_mengzhu].[start_new]
+       wait $step_interval
+       break
+   end
+   wait $step_interval
+end
+
+# 单回合循环
+@round_loop
+
+# 等待"开始战斗"出现
+loop 100
+   scan [activity_mengzhu].[start_new] as $scan_result
+   if $scan_result.[start_new] contains "开始战斗"
+       break
+   end
+   wait $step_interval
+end
+
+# 拖拽一件商品购买，由于开始战斗会弹框阻断一会，所以多等 5s
+wait (4, 5)
+drag [activity_mengzhu].[add_item]
+wait $step_interval
+
+# 点击"开始战斗"进行对局
+click [activity_mengzhu].[start_new]
+wait $step_interval
+
+# 检查是否弹出购买确认对话框
+scan [activity_mengzhu].[confirm] as $scan_result
+if $scan_result.[confirm] contains "确认"
+   wait $step_interval
+   click [activity_mengzhu].[confirm]
+   wait $step_interval
+end
+
+# 等待对局结果："下个回合" 或 "继续"
+loop 100
+   scan [activity_mengzhu].[start_new] as $scan_result
+   if $scan_result.[start_new] equals "下个回合"
+       # 进入下一回合
+       wait $step_interval
+       click [activity_mengzhu].[next]
+       goto round_loop
+   end
+   if $scan_result.[start_new] contains "继续"
+       # 失败，需要重开
+       break
+   end
+   # 这里可以等久一些，每次 5s
+   wait (4, 6)
+end
+
+# 出现"继续"，连续点击"继续"结算，直到"开始匹配"重新出现
+loop 100
+   scan [activity_mengzhu].[start_new] as $scan_result
+   if $scan_result.[start_new] contains "开始匹配"
+       break
+   end
+   if $scan_result.[start_new] contains "继续"
+       wait $step_interval
+       click [activity_mengzhu].[next]
+   end
+   wait $step_interval
+end
+
+# 失败结算完成，回到 loop 开头开始下一局（loop 计数器自动 +1）
+end

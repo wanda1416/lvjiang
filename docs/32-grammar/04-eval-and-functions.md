@@ -11,6 +11,7 @@ eval $var = "字符串"                      # 字面量赋值
 eval $var = 42                            # 数字字面量赋值（支持负数）
 eval $var = {}                            # 初始化空字典
 eval $var = ["a", "b", $c]               # 列表赋值（支持字符串、数字、变量引用）
+eval $var = (min, max)                    # 范围字面量赋值（存储为元组，用于随机等待等场景）
 
 # 字段赋值（统一使用 field_access 语法）
 eval $var.field = "value"                # 单层字段赋值
@@ -24,7 +25,7 @@ eval func_name(arg1, arg2, ...)          # 调用函数，丢弃返回值
 ```
 
 - 赋值目标 `$var =` 可选，省略则丢弃返回值
-- 右侧可以是函数调用、字符串字面量、数字字面量、空字典 `{}`、列表 `[...]`、变量引用 `$var` 或字段访问 `$var.field`
+- 右侧可以是函数调用、字符串字面量、数字字面量、空字典 `{}`、列表 `[...]`、范围元组 `(...)`、变量引用 `$var` 或字段访问 `$var.field`
 - 函数参数可以是 `$var`（变量引用）、`$var.field`（字段访问）或 `"literal"`（字面量字符串）
 - 列表元素支持字符串字面量、数字字面量和 `$var` 变量引用，运行时求值
 
@@ -70,6 +71,12 @@ eval $d.a.b.c = "deep"
 |---|---|---|
 | `to_equipment` | `(dict) -> dict` | 解析装备 OCR 原始数据为标准装备字典，支持链式字段访问 |
 | `is_good_equip` | `(dict) -> bool` | 判定装备是否值得保留（基于高价值词条数量） |
+
+### UI 交互
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `messagebox` | `(str) -> str` | 弹出 Windows 消息框，阻塞直到用户点击确定，返回消息文本。可在工作流子线程中安全调用 |
 
 ## 三、装备解析示例
 
@@ -178,4 +185,39 @@ else
     eval $scene = "equip_armor_detail"
 end
 scan $scene as $result
+```
+
+## 七、范围字面量与随机等待
+
+通过 `(min, max)` 元组字面量存储随机范围，配合 `wait $var` 实现随机等待：
+
+```
+# 直接赋值
+eval $step_interval = (1, 2)
+wait $step_interval              # 在 1~2 秒之间随机等待
+
+# 配合 default 使用（支持外部覆盖）
+default $step_interval = (1.5, 2.5)
+wait $step_interval
+
+# 直接内联
+wait (0.5, 1.5)
+```
+
+## 八、messagebox 用法
+
+`messagebox` 弹出 Windows 消息框，阻塞直到用户点击确定。常用于流程异常时提示用户：
+
+```
+scan [scene].[area] as $result
+if not $result.area contains "目标文本"
+    eval messagebox("请在初始界面开始执行")
+    return
+end
+
+# 配合 concat 拼接变量
+if not $found
+    eval messagebox(concat("未找到: ", $target_name))
+    return
+end
 ```

@@ -103,6 +103,8 @@ class WorkflowEngine:
                     raise
             except _ReturnSignal:
                 raise  # return 直接穿透，不记错误日志
+            except _BreakSignal:
+                raise  # break 直接穿透，由 loop/for 处理
             except BaseException as e:
                 line_info = f"(行 {node.line_no})" if hasattr(node, 'line_no') and node.line_no else ""
                 logger.error(f"DSL 执行异常 {line_info}: {e}")
@@ -228,11 +230,18 @@ class WorkflowEngine:
         elif isinstance(delay, VarRef):
             # 动态等待：wait $var → 解析变量值
             val = self.variables.get(delay.name)
-            if isinstance(val, (int, float)):
+            if isinstance(val, tuple) and len(val) == 2:
+                # 随机范围等待：wait $var 其中 $var = (min, max)
+                import random
+                lo, hi = float(val[0]), float(val[1])
+                seconds = random.uniform(lo, hi)
+                logger.debug(f"动态随机等待 ${delay.name} = ({lo}, {hi}) → {seconds:.2f}s")
+                self._wf.wait_seconds(seconds)
+            elif isinstance(val, (int, float)):
                 self._wf.wait_seconds(float(val))
                 logger.debug(f"动态等待 ${delay.name} = {val}s")
             else:
-                logger.error(f"wait ${delay.name} 不是数值类型: {val}")
+                logger.error(f"wait ${delay.name} 不是数值或范围类型: {val}")
         elif isinstance(delay, Literal):
             val = delay.value
             if isinstance(val, (int, float)):
@@ -334,6 +343,22 @@ class WorkflowEngine:
                 list_val = [self._resolve(item) for item in node.func_args]
                 self.variables[node.target] = list_val
                 logger.debug(f"eval: {node.target} = {list_val!r}")
+            return
+
+        # 范围元组赋值：eval $var = (1, 2) 或 $var = (1, 2)
+        if node.func_name == "__range__":
+            if node.target is not None:
+                range_val = node.func_args[0].value  # (float, float)
+                self.variables[node.target] = range_val
+                logger.debug(f"eval: {node.target} = {range_val!r}")
+            return
+
+        # 默认值赋值：default $var = value — 仅当变量未从外部传入时才赋值
+        if node.func_name == "__default__":
+            if node.target is not None and node.target not in self.variables:
+                default_val = node.func_args[0].value
+                self.variables[node.target] = default_val
+                logger.debug(f"default: {node.target} = {default_val!r}")
             return
 
         # 表达式赋值：eval $var = $dict.$key | $other_var
@@ -515,8 +540,12 @@ class WorkflowEngine:
         # 解析循环次数
         if isinstance(node.count, int):
             count = node.count
+        elif isinstance(node.count, VarRef):
+            # 变量引用：loop $execute_times
+            val = self.variables.get(node.count.name)
+            count = int(val) if val is not None else 0
         else:
-            # 变量引用
+            # 字符串（NAME）
             val = self.variables.get(str(node.count))
             count = int(val) if val is not None else 0
 

@@ -42,6 +42,26 @@ def list_functions() -> list[str]:
     return list(_FUNCTION_REGISTRY.keys())
 
 
+# ─── UI 交互函数 ─────────────────────────────────────────
+
+@builtin_func("messagebox")
+def _messagebox(message: str, *args) -> str:
+    """弹出 Windows 消息框，阻塞直到用户点击确定
+
+    使用 Win32 MessageBoxW API，可在工作流子线程中安全调用。
+
+    .wf 用法:
+        eval messagebox("请在初始界面开始执行")
+        eval messagebox(concat("错误: ", $reason))
+    """
+    import ctypes
+    text = str(message)
+    if args:
+        text += " ".join(str(a) for a in args)
+    ctypes.windll.user32.MessageBoxW(0, text, "工作流提示", 0x40)  # MB_ICONINFORMATION
+    return text
+
+
 # ─── 通用工具函数 ─────────────────────────────────────────
 
 @builtin_func("concat")

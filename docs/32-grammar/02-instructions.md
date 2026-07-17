@@ -105,10 +105,16 @@ wait (min, max)         # 随机范围等待（在 min~max 秒之间随机取值
 ```
 wait page_refresh_wait      # 命名延迟（从配置读取）
 wait 1.5                    # 固定等待 1.5 秒
+wait 10                     # 固定等待 10 秒
 wait $interval              # 动态等待，$interval 的值是秒数
 wait (1, 2)                 # 随机等待 1~2 秒
 wait (0.5, 1.5)             # 随机等待 0.5~1.5 秒
 ```
+
+**说明**：
+
+- `$var` 的值可以是数字（固定等待）或元组 `(min, max)`（随机范围等待）
+- 配合 `eval $var = (min, max)` 或 `default $var = (min, max)` 赋值后使用
 
 ## 四、scan — OCR 扫描
 

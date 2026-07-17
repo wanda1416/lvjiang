@@ -22,7 +22,7 @@ logs/
 # Local data (layouts, session, screenshots, etc.)
 config/local/
 data/
-config/system/workflows/_editor_run.wf
+config/system/workflows/_*.wf
 
 # OS
 Thumbs.db

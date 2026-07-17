@@ -6,7 +6,7 @@
 |---|---|---|
 | if | `if <cond> ... [else ...] end` | 条件分支，可嵌套 |
 | for | `for $var in [a, b, c] ... end` 或 `for $var in $list ... end` | 枚举循环，迭代静态列表或列表变量 |
-| loop | `loop <N> ... end` | 计数循环，N 为正整数或变量名 |
+| loop | `loop <N> ... end` | 计数循环，N 为正整数或变量引用 |
 | break | `break` | 跳出最内层 for/loop |
 | return | `return` | 提前结束当前工作流 |
 | label | `@label_name` | 标签，goto 的目标 |
@@ -64,16 +64,50 @@ end
 
 ## 四、loop — 计数循环
 
-重复执行固定次数。N 可以是数字字面量或变量名：
+重复执行指定次数。N 可以是数字字面量或变量引用：
 
 ```
+# 固定次数
 loop 3
     click [equip_tune_detail].[retry]
     wait step_interval
 end
+
+# 变量引用（运行时从变量取值）
+loop $execute_times
+    # ... 执行逻辑
+end
 ```
 
-## 五、break — 跳出循环
+## 五、default — 默认值赋值
+
+仅当变量**未从外部传入**时才赋默认值。如果变量已通过 `call ... with` 或工作流参数传入，则跳过赋值。
+
+**语法**：
+
+```
+default $var = <literal>     # literal 可以是字符串、数字、范围元组等
+```
+
+**示例**：
+
+```
+default $execute_times = 10          # 未传入时使用默认值 10
+default $step_interval = (1, 2)      # 未传入时使用默认范围 1~2 秒
+```
+
+配合 `loop $var` 实现参数化循环：
+
+```
+default $execute_times = 10
+loop $execute_times
+    # ... 每轮逻辑
+end
+```
+
+> **与 `eval` 的区别**：`eval $var = 10` 每次都会覆盖变量值；`default $var = 10` 仅在变量不存在时赋值，保留外部传入的值。
+
+## 六、break — 跳出循环
 
 跳出最内层的 `for` 或 `loop`：
 
@@ -86,7 +120,7 @@ loop 10
 end
 ```
 
-## 六、return — 结束工作流
+## 七、return — 结束工作流
 
 提前结束当前工作流的执行。若当前是子工作流，则返回到调用方：
 
@@ -97,7 +131,7 @@ if not $gold_pos
 end
 ```
 
-## 七、label / goto — 标签跳转
+## 八、label / goto — 标签跳转
 
 `@label` 定义跳转目标，`goto` 无条件跳转到该标签。仅限同一工作流文件内：
 
@@ -112,7 +146,7 @@ if $result.result contains "失败"
 end
 ```
 
-## 八、条件表达式
+## 九、条件表达式
 
 ### 8.1 基础条件
 

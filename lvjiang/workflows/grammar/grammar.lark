@@ -18,6 +18,7 @@ start: (_NL | statement)*
           | log_stmt
           | eval_stmt
           | implicit_eval_stmt
+          | default_stmt
           | call_stmt
           | if_stmt
           | for_stmt
@@ -86,6 +87,9 @@ eval_rhs: NAME "(" arg_list? ")"  -> eval_rhs_func
         | field_access              -> eval_rhs_field
         | var_ref                   -> eval_rhs_var
 
+// 默认值赋值：仅当变量未从外部传入时才赋值
+default_stmt: "default"i "$" NAME "=" literal _NL
+
 func_call: NAME "(" arg_list? ")"
 
 arg_list: arg ("," arg)*
@@ -118,7 +122,7 @@ for_stmt: "for"i NAME "in"i for_iter _NL statement* "end"i _NL
 for_iter: list_literal -> for_iter_static
         | var_ref      -> for_iter_var
 
-loop_stmt: "loop"i (number | NAME) _NL statement* "end"i _NL
+loop_stmt: "loop"i (number | NAME | var_ref) _NL statement* "end"i _NL
 
 break_stmt: "break"i _NL
 
@@ -189,6 +193,10 @@ field_access: field_access "." NAME -> field_chain
         | number
         | "{" "}" -> empty_dict
         | list_literal
+        | range_literal
+
+// 范围字面量：(min, max) 用于 wait 随机等待
+range_literal: "(" number "," number ")"
 
 // 列表字面量：["a", "b", 1, 2]，支持字符串、数字和变量引用
 list_literal: "[" [list_item ("," list_item)*] "]"
@@ -218,7 +226,7 @@ NAME: /[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*/
 FLOAT: /[0-9]+\.[0-9]+/
 INT: /[0-9]+/
 
-COMMENT: /#[^\n]*/
+COMMENT: /#[^\n]*\n?/
 _NL: /(\s*\n)+/
 
 %ignore COMMENT

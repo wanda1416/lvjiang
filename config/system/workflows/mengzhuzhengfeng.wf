@@ -25,10 +25,16 @@ $step_interval = (2, 3)
 
 loop $execute_times
 
+$skip_confirm = 0
 scan [activity_mengzhu].[start_new] as $scan_result
 if not $scan_result.[start_new] contains "开始匹配"
-   eval messagebox("请在初始界面开始执行")
-   return
+   if not $scan_result.[start_new] contains "继续对局"
+      eval messagebox("请在初始界面开始执行")
+      return
+   else
+      # 可以跳过确认选择
+      $skip_confirm = 1
+   end
 end
 
 # 点击开始匹配
@@ -37,6 +43,9 @@ wait $step_interval
 
 # 等待加载动画，直到出现"确认选择"
 loop 100
+   if $skip_confirm == 1
+      break
+   end
    scan [activity_mengzhu].[start_new] as $scan_result
    if $scan_result.[start_new] contains "确认选择"
        wait $step_interval

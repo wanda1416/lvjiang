@@ -32,6 +32,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
     # 全局热键 F10 信号（跨线程，pynput 监听线程 emit，主线程处理）
     f10_pressed = pyqtSignal()
+    # 全局热键 F8 信号（录制开始/停止切换）
+    f8_pressed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -49,6 +51,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # 边框覆盖层（定位/运行状态指示）
         self._overlay = BorderOverlay()
+
+        # 宏录制器（录制中为 MacroRecorder 实例，否则为 None）
+        self._recorder = None
 
         # 截屏器（定位后初始化，后续自动化复用）
         self._capture = None
@@ -80,10 +85,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._refresh_layout_combo()
         self._load_workflow_configs()
 
-        # 全局热键监听 F10（跨窗口焦点，自动化时游戏窗口占焦点也能响应）
+        # 全局热键监听（跨窗口焦点，自动化/录制时游戏窗口占焦点也能响应）
+        # F10 停止工作流；F8 录制开始/停止切换
         self.f10_pressed.connect(self._request_stop)
+        self.f8_pressed.connect(self._toggle_recording)
         self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
             "<f10>": self._on_global_f10,
+            "<f8>": self._on_global_f8,
         })
         self._hotkey_listener.start()
 
@@ -92,6 +100,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     def _on_global_f10(self):
         """pynput 监听线程回调，转发到主线程处理"""
         self.f10_pressed.emit()
+
+    def _on_global_f8(self):
+        """pynput 监听线程回调（录制切换），转发到主线程处理"""
+        self.f8_pressed.emit()
 
     # ─── 菜单栏 ────────────────────────────────────────────
 
@@ -298,6 +310,27 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         )
         left_layout.addWidget(self.btn_run_workflow)
 
+        # 录制 + 加载工作流（各占一半）
+        tools_row = QHBoxLayout()
+
+        self.btn_record = QPushButton("录制 (F8)")
+        self.btn_record.setToolTip("在游戏窗口内点击/拖拽录制操作，生成可复用的 DSL 语句")
+        self.btn_record.clicked.connect(self._toggle_recording)
+        self.btn_record.setStyleSheet(
+            "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
+        )
+        tools_row.addWidget(self.btn_record)
+
+        self.btn_load_workflow = QPushButton("加载工作流")
+        self.btn_load_workflow.setToolTip("打开任意 .wf 文件并加入下拉列表（临时项，打开新文件会覆盖）")
+        self.btn_load_workflow.clicked.connect(self._on_load_workflow)
+        self.btn_load_workflow.setStyleSheet(
+            "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
+        )
+        tools_row.addWidget(self.btn_load_workflow)
+
+        left_layout.addLayout(tools_row)
+
         # 工作流参数面板（动态生成）
         self._param_panel = QGroupBox("参数设置")
         self._param_layout = QFormLayout(self._param_panel)
@@ -331,7 +364,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
-        self.statusBar().showMessage("就绪 | F9 开始 | F10 停止")
+        self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 录制")
 
         self._setup_log_redirect()
 
@@ -399,6 +432,81 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         self._param_panel.setVisible(True)
 
+    # ─── 宏录制 ────────────────────────────────────────────
+
+    def _toggle_recording(self):
+        """录制开关（按钮 / F8 全局热键统一入口）"""
+        if self._recorder is not None:
+            self._stop_recording()
+        else:
+            self._start_recording()
+
+    def _start_recording(self):
+        """开始录制鼠标操作"""
+        if self._running:
+            self.log_text.append("[录制] 工作流运行中，无法录制")
+            return
+        if not self._target_window:
+            self.log_text.append("[录制] 请先定位窗口")
+            self.statusBar().showMessage("未定位窗口 | 请先扫描并定位窗口")
+            return
+
+        layout_name = self._layout_manager.get_active_layout_name()
+        layout = self._layout_manager.load_layout(layout_name)
+        if not layout:
+            self.log_text.append(f"[录制] 无法加载布局: {layout_name}")
+            return
+
+        # 确保截屏器已就绪并附着到目标窗口
+        w = self._target_window
+        if self._capture is None:
+            from ..core.capture import ScreenCapture
+            self._capture = ScreenCapture()
+        self._capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
+
+        from ..macros import MacroRecorder
+        try:
+            self._recorder = MacroRecorder(
+                target_window=w,
+                capture=self._capture,
+                layout=layout,
+                win_left=w["left"],
+                win_top=w["top"],
+            )
+            self._recorder.start()
+        except Exception as e:
+            self._recorder = None
+            self.log_text.append(f"[录制] 启动失败: {e}")
+            logger.error(f"录制启动失败: {e}")
+            return
+
+        self.btn_record.setText("停止录制 (F8)")
+        self.btn_record.setStyleSheet(
+            "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+        )
+        self.statusBar().showMessage("录制中... | 在游戏窗口内点击/拖拽 | F8 停止")
+        self.log_text.append("[录制] 开始录制，在游戏窗口内点击/拖拽，按 F8 结束")
+
+    def _stop_recording(self):
+        """停止录制并展示生成的 DSL 结果"""
+        recorder = self._recorder
+        self._recorder = None
+        self.btn_record.setText("录制 (F8)")
+        self.btn_record.setStyleSheet(
+            "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
+        )
+        self.statusBar().showMessage("录制结束")
+        if recorder is None:
+            return
+        dsl = recorder.stop()
+        if not dsl.strip():
+            self.log_text.append("[录制] 未捕获到有效操作")
+            return
+        self.log_text.append("[录制] 录制完成，已生成 DSL 语句")
+        from .macro_result_dialog import MacroResultDialog
+        dialog = MacroResultDialog(dsl, self)
+        dialog.exec()
+
     # ─── 快捷键 + 关闭 ─────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -429,6 +537,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
                 return
             # 用户确认退出：请求停止工作流
             self._request_stop()
+
+        # 停止未结束的录制
+        if self._recorder is not None:
+            try:
+                self._recorder.stop()
+            except Exception:
+                pass
+            self._recorder = None
 
         try:
             self._hotkey_listener.stop()

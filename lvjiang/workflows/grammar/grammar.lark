@@ -30,8 +30,18 @@ start: (_NL | statement)*
 
 // ─── 基础指令 ─────────────────────────────────────────────
 
-click_stmt: "click"i const_or_var "." const_or_var _NL
-drag_stmt: "drag"i const_or_var "." const_or_var drag_duration? drag_hold? _NL
+// click 支持两种目标：scene.area 引用 或 画布归一化坐标点
+click_stmt: "click"i click_target _NL
+click_target: const_or_var "." const_or_var  -> click_scene_target
+            | coord_point                     -> click_coord_target
+
+// drag 支持两种目标：scene.arrow 引用 或 两个坐标点
+drag_stmt: "drag"i drag_target drag_duration? drag_hold? _NL
+drag_target: const_or_var "." const_or_var    -> drag_scene_target
+           | coord_point coord_point           -> drag_coord_target
+
+// 画布归一化坐标点：(rx, ry)，rx/ry ∈ [0,1]
+coord_point: "(" number "," number ")"
 
 // 常量或变量：scene/region/arrow 都支持三种形式
 ?const_or_var: bracket_expr    // [name] — 括号常量

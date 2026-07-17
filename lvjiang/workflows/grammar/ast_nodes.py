@@ -30,16 +30,18 @@ class Program:
 
 @dataclass(frozen=True)
 class Click:
-    target: Any     # SceneRef（静态 [scene].[region]）| VarRef（动态 $var，find 产出坐标）
+    target: Any     # SceneRef（静态 [scene].[region]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class Drag:
-    scene: Any      # SceneRef（静态 [scene].[region]）
-    arrow: Any      # SceneRef
+    scene: Any      # SceneRef（静态 [scene].[region]）| None（坐标模式）
+    arrow: Any      # SceneRef | None（坐标模式）
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
     hold: float | None = None  # 到达目标后按住不放的时长（秒）
+    from_point: Any = None  # CoordPoint | None（坐标模式起点）
+    to_point: Any = None    # CoordPoint | None（坐标模式终点）
     line_no: int = 0
 
 
@@ -167,6 +169,17 @@ class SceneRef:
     """静态配置引用：[scene] 或 [scene].[region]（region 支持 $var 动态引用）"""
     scene: str
     region: str | None = None  # str | VarRef | None
+
+
+@dataclass(frozen=True)
+class CoordPoint:
+    """画布归一化坐标点 (rx, ry ∈ [0,1])
+
+    录制产生的坐标字面量，不依赖 scene/region 定义。
+    回放时经画布配置 + 当前窗口位置反算为屏幕绝对坐标。
+    """
+    rx: float
+    ry: float
 
 
 @dataclass(frozen=True)

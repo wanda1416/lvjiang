@@ -1,6 +1,8 @@
 """屏幕捕获模块 - 基于 mss，支持投屏窗口定位"""
 
+import queue
 import threading
+import time
 
 import numpy as np
 import mss
@@ -11,24 +13,58 @@ from loguru import logger
 class ScreenCapture:
     """屏幕捕获器
 
-    注意：mss 实例不是线程安全的——它在 Windows 上缓存了带线程亲和性的
-    GDI 设备上下文（srcdc/memdc）。跨线程调用 grab() 是未定义行为，会导致
-    偶发的原生访问违例（进程硬崩溃，Python 无法捕获）。
-    因此这里用线程本地存储，每个线程惰性创建自己的 mss 实例。
+    使用一个持久化的专用工作线程执行截屏，避免每次 capture() 都创建新线程。
+    旧实现每次截屏创建 daemon 线程 + 线程本地 mss 实例，导致：
+    - 线程栈内存（~1MB/次）不断累积
+    - mss 缓存的 GDI 设备上下文（srcdc/memdc）随线程泄漏
+    - 超时线程被遗弃，GDI 句柄永远无法回收
+    新实现：单个工作线程拥有唯一 mss 实例，通过任务队列接收截屏请求。
     """
 
+    # 连续超时多少次后认为工作线程死锁，触发重建
+    _WORKER_DEADLOCK_THRESHOLD = 3
+
     def __init__(self):
-        self._local = threading.local()
         self._monitor = None  # 目标投屏窗口的捕获区域
+        self._main_sct = None  # 主线程 mss 实例（仅用于 list_monitors / get_capture_size）
+        self._task_queue: queue.Queue = queue.Queue(maxsize=2)
+        self._consecutive_timeouts = 0  # 连续超时计数
+        self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="ScreenCapture")
+        self._worker.start()
+
+    def _worker_loop(self):
+        """专用工作线程：拥有唯一 mss 实例，从任务队列取请求执行截屏"""
+        try:
+            sct = mss.mss()
+        except Exception as e:
+            logger.error(f"mss 初始化失败: {e}")
+            return
+
+        try:
+            while True:
+                task = self._task_queue.get()
+                if task is None:  # 关闭信号
+                    break
+                monitor, result_holder = task
+                try:
+                    target = monitor if monitor is not None else sct.monitors[1]
+                    screenshot = sct.grab(target)
+                    img = np.array(screenshot)
+                    result_holder[0] = img[:, :, :3]
+                except Exception as e:
+                    result_holder[0] = e
+        finally:
+            try:
+                sct.close()
+            except Exception:
+                pass
 
     @property
     def _sct(self):
-        """返回当前线程专属的 mss 实例（惰性创建）"""
-        sct = getattr(self._local, "sct", None)
-        if sct is None:
-            sct = mss.mss()
-            self._local.sct = sct
-        return sct
+        """主线程 mss 实例（惰性创建，仅用于 list_monitors / get_capture_size）"""
+        if self._main_sct is None:
+            self._main_sct = mss.mss()
+        return self._main_sct
 
     def list_monitors(self) -> list[dict]:
         """列出所有可用显示器/捕获区域"""
@@ -56,6 +92,22 @@ class ScreenCapture:
         mon = self._sct.monitors[1]
         return mon["width"], mon["height"]
 
+    def _restart_worker(self):
+        """重建工作线程和任务队列（旧线程死锁时调用）
+
+        旧的死锁线程作为 daemon 线程会被遗弃，进程退出时自动回收。
+        新建队列确保新线程不会收到旧任务。
+        """
+        logger.warning("截屏工作线程疑似死锁，正在重建...")
+        self._task_queue = queue.Queue(maxsize=2)
+        self._consecutive_timeouts = 0
+        self._worker = threading.Thread(
+            target=self._worker_loop, daemon=True,
+            name=f"ScreenCapture-{time.monotonic():.0f}",
+        )
+        self._worker.start()
+        logger.info("截屏工作线程已重建")
+
     def capture(self, timeout: float = 5.0) -> np.ndarray | None:
         """
         截取屏幕，返回 numpy 数组（BGR 格式，OpenCV 兼容）
@@ -65,41 +117,45 @@ class ScreenCapture:
             timeout: 超时秒数（默认 5s）。mss.grab 底层调用 Win32 GDI，
                      可能因显示状态变化而永久阻塞，需要超时保护。
         """
-        result: list[np.ndarray | None] = [None]
-        error: list[Exception | None] = [None]
+        if not self._worker.is_alive():
+            logger.warning("截屏工作线程已退出，尝试重建")
+            self._restart_worker()
 
-        def _grab():
-            try:
-                if self._monitor:
-                    screenshot = self._sct.grab(self._monitor)
-                else:
-                    screenshot = self._sct.grab(self._sct.monitors[1])
-                img = np.array(screenshot)
-                result[0] = img[:, :, :3]
-            except Exception as e:
-                error[0] = e
+        result_holder: list = [None]
 
-        t = threading.Thread(target=_grab, daemon=True)
-        t.start()
-        t.join(timeout)
-
-        if t.is_alive():
-            logger.error(f"截屏超时（{timeout}s），mss.grab 可能已死锁，跳过本次捕获")
-            # 重建当前线程的 mss 实例，丢弃可能损坏的 GDI 上下文
-            old_sct = getattr(self._local, "sct", None)
-            if old_sct is not None:
-                try:
-                    old_sct.close()
-                except Exception:
-                    pass
-            self._local.sct = None
+        try:
+            self._task_queue.put((self._monitor, result_holder), timeout=1.0)
+        except queue.Full:
+            logger.error("截屏队列已满（工作线程可能阻塞），跳过本次捕获")
+            self._consecutive_timeouts += 1
+            if self._consecutive_timeouts >= self._WORKER_DEADLOCK_THRESHOLD:
+                self._restart_worker()
             return None
 
-        if error[0] is not None:
-            logger.error(f"截屏失败: {error[0]}")
+        # 等待工作线程填充结果
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if result_holder[0] is not None:
+                break
+            time.sleep(0.005)
+
+        if result_holder[0] is None:
+            logger.error(f"截屏超时（{timeout}s），跳过本次捕获")
+            self._consecutive_timeouts += 1
+            if self._consecutive_timeouts >= self._WORKER_DEADLOCK_THRESHOLD:
+                self._restart_worker()
             return None
 
-        return result[0]
+        if isinstance(result_holder[0], Exception):
+            logger.error(f"截屏失败: {result_holder[0]}")
+            self._consecutive_timeouts += 1
+            if self._consecutive_timeouts >= self._WORKER_DEADLOCK_THRESHOLD:
+                self._restart_worker()
+            return None
+
+        # 成功：重置连续超时计数
+        self._consecutive_timeouts = 0
+        return result_holder[0]
 
     def capture_to_file(self, path: str) -> bool:
         """截屏并保存为 PNG 文件"""

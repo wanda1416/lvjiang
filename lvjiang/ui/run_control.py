@@ -196,8 +196,8 @@ class RunControlMixin:
 
     def _request_stop(self):
         """统一停止入口（F10 / 停止按钮）。只设标志，不立即改 running。"""
-        self.log_text.append("[操作] 收到 F10 停止请求")
-        logger.info("收到 F10 停止请求")
+        self.log_text.append("[操作] 收到停止请求")
+        logger.info("收到停止请求")
         if not self._running:
             self.log_text.append("[提示] 当前没有正在运行的自动化")
             return
@@ -214,7 +214,12 @@ class RunControlMixin:
     # ─── 通用工作流执行 ────────────────────────────────────
 
     def _on_run_workflow(self):
-        """执行选中的工作流（异步）"""
+        """执行选中的工作流（异步）；运行中点击则作为停止按钮。"""
+        # 运行中时该按钮文字为“停止 (F10)”，点击应触发停止而非重复启动
+        if self._running:
+            self._request_stop()
+            return
+
         if not self._target_window:
             self.log_text.append("[错误] 请先定位窗口")
             self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")

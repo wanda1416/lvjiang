@@ -10,6 +10,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QKeyEvent, QAction
 from loguru import logger
 
+from .widgets import TrimmedLogEdit
+
 from pynput import keyboard as pynput_keyboard
 
 from .overlay import BorderOverlay
@@ -312,8 +314,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         self.tabs = QTabWidget()
 
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
+        self.log_text = TrimmedLogEdit()
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         self.tabs.addTab(self.log_text, "运行日志")
 
@@ -411,7 +412,24 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        """关闭主窗口时清理热键监听与原生覆盖层。"""
+        """关闭主窗口时清理热键监听与原生覆盖层。
+
+        若工作流正在运行，先弹确认框，避免误关终止自动化。
+        """
+        if self._running:
+            reply = QMessageBox.question(
+                self,
+                "工作流运行中",
+                "当前有工作流正在运行，关闭程序将终止工作流。\n确定要退出吗？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
+            # 用户确认退出：请求停止工作流
+            self._request_stop()
+
         try:
             self._hotkey_listener.stop()
         except Exception:

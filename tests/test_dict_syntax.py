@@ -1,6 +1,6 @@
 """测试 DSL 字典变量语法增强"""
-from lvjiang.workflows.parser import parse_text
-from lvjiang.workflows.ast_nodes import Eval, EvalFieldAssign, FuncCall, Literal, Log
+from lvjiang.workflows.grammar import parse_text
+from lvjiang.workflows.grammar import Eval, EvalFieldChainAssign, FuncCall, Literal, Log
 
 
 def test_empty_dict():
@@ -17,7 +17,7 @@ def test_field_assign_string():
     """eval $dict.key = "string" """
     p = parse_text('eval $mydata.name = "hello"')
     n = p.body[0]
-    assert isinstance(n, EvalFieldAssign)
+    assert isinstance(n, EvalFieldChainAssign)
     assert n.var_name == 'mydata'
     assert n.field_name == 'name'
     assert isinstance(n.value, Literal)
@@ -29,7 +29,7 @@ def test_field_assign_number():
     """eval $dict.key = 123"""
     p = parse_text('eval $mydata.count = 123')
     n = p.body[0]
-    assert isinstance(n, EvalFieldAssign)
+    assert isinstance(n, EvalFieldChainAssign)
     assert n.var_name == 'mydata'
     assert n.field_name == 'count'
     assert n.value == 123.0  # number -> float

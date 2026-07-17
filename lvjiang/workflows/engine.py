@@ -11,7 +11,8 @@ from typing import Any
 from loguru import logger
 from pathlib import Path
 
-from .ast_nodes import (
+from .grammar import (
+    parse_file,
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
@@ -20,7 +21,6 @@ from .ast_nodes import (
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
-from .parser import parse_file
 from .base import BaseWorkflow
 
 
@@ -449,6 +449,8 @@ class WorkflowEngine:
         # 2. 创建独立子 engine + 注入参数
         sub_engine = WorkflowEngine(self._wf)
         sub_engine.variables = dict(arg_values)
+        # coord_meta 全局共享：子工作流可访问父工作流 scan/recognize 的坐标元数据
+        sub_engine._coord_meta = self._coord_meta
 
         # 3. 运行子 wf
         sub_output = sub_engine.run(wf_path)

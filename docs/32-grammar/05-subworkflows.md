@@ -89,7 +89,9 @@ call "sub.wf" read "equip_data" as $data, "status" as $status
 
 ### 1.4 隔离机制
 
-每次 `call` 创建一个**独立的子 engine 实例**，拥有自己的 `variables`、`output`、`coord_meta`。父子之间完全隔离，不会互相污染。
+每次 `call` 创建一个**独立的子 engine 实例**，拥有自己的 `variables`、`output`。父子之间变量空间完全隔离，不会互相污染。
+
+**`_coord_meta` 全局共享**：`_coord_meta`（scan/recognize 产出的坐标元数据）在父子 engine 间共享引用，子工作流可直接访问父工作流扫描得到的 Area 坐标。
 
 **调用流程**：
 

@@ -50,14 +50,26 @@ eval $d.a.b.c = "deep"
 
 ## 二、内置函数列表
 
+### 字符串处理
+
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `to_equipment` | `(raw_data: dict) -> dict` | 解析装备 OCR 原始数据为标准装备字典，支持链式字段访问 |
 | `concat` | `(*args) -> str` | 拼接所有参数为字符串，用于 `log concat("文本", $var.field)` |
-| `contains` | `(scan_result: dict, text: str) -> bool` | 检查 scan 结果中是否有任意字段包含指定文本 |
-| `count` | `(scan_result: dict) -> int` | 统计 scan 结果中非空字段数量 |
-| `is_good_equip` | `(scan_result: dict) -> bool` | 判定装备是否值得保留（基于高价值词条） |
-| `find_key` | `(dict, text: str) -> str` | 在字典中查找 value 包含指定文本的 key，找不到返回 `""` |
+
+### 字典处理
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `find_key` | `(dict, str) -> str` | 在字典中查找 value 包含指定文本的 key，找不到返回 `""` |
+| `contains` | `(dict, str) -> bool` | 检查字典中是否有任意 value 包含指定文本 |
+| `count` | `(dict) -> int` | 统计字典中非空字段数量 |
+
+### 装备处理
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `to_equipment` | `(dict) -> dict` | 解析装备 OCR 原始数据为标准装备字典，支持链式字段访问 |
+| `is_good_equip` | `(dict) -> bool` | 判定装备是否值得保留（基于高价值词条数量） |
 
 ## 三、装备解析示例
 

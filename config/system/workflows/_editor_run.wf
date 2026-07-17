@@ -1,3 +1,5 @@
-$list = ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"]
-scan [equip_weapon_detail].$list as $tune_scan
-log $tune_scan
+@label1
+log "1"
+$var = "2"
+goto label1
+collect $var

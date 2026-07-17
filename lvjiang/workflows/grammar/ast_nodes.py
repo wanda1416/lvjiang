@@ -222,48 +222,48 @@ class IsEmpty:
 
 @dataclass(frozen=True)
 class GreaterThan:
-    """$var.field > number"""
-    left: FieldAccess
+    """$var > number 或 $var.field > number"""
+    left: Any  # VarRef | FieldAccess
     right: float
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class LessThan:
-    """$var.field < number"""
-    left: FieldAccess
+    """$var < number 或 $var.field < number"""
+    left: Any  # VarRef | FieldAccess
     right: float
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class GreaterEqual:
-    """$var.field >= number"""
-    left: FieldAccess
+    """$var >= number 或 $var.field >= number"""
+    left: Any  # VarRef | FieldAccess
     right: float
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class LessEqual:
-    """$var.field <= number"""
-    left: FieldAccess
+    """$var <= number 或 $var.field <= number"""
+    left: Any  # VarRef | FieldAccess
     right: float
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class NotEqual:
-    """$var.field != number"""
-    left: FieldAccess
+    """$var != number 或 $var.field != number"""
+    left: Any  # VarRef | FieldAccess
     right: float
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class NumericEqual:
-    """$var.field == number"""
-    left: FieldAccess
+    """$var == number 或 $var.field == number"""
+    left: Any  # VarRef | FieldAccess
     right: float
     line_no: int = 0
 

@@ -1,5 +1,0 @@
-@label1
-log "1"
-$var = "2"
-goto label1
-collect $var

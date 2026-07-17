@@ -62,6 +62,9 @@ class WorkflowEngine:
 
         try:
             self._exec_body(program.body)
+        except _GotoSignal as sig:
+            logger.error(f"goto 目标标签不存在: {sig.target}")
+            return self.output
         except _ReturnSignal:
             logger.info(f"=== DSL 工作流正常返回，收集到 {len(self.output)} 项数据 ===")
             return self.output
@@ -76,10 +79,8 @@ class WorkflowEngine:
 
         collect 的输出记录到 self._collect_output，不中断执行流。
         仅 break/goto/停止请求 才会提前终止。
+        goto 信号会向上传播，直到找到包含目标标签的层级。
         """
-        # 预扫描标签位置
-        label_index = self._build_label_index(stmts)
-
         pc = 0
         while pc < len(stmts):
             if self._wf.is_stopped:
@@ -92,11 +93,14 @@ class WorkflowEngine:
                 self._exec_stmt(node)
             except _GotoSignal as sig:
                 target = sig.target
-                if target not in label_index:
-                    logger.error(f"goto 目标标签不存在: {target}")
-                    return
-                pc = label_index[target]
-                continue  # 从标签位置继续，不 pc+1
+                # 检查当前层级的标签索引
+                local_index = self._build_label_index(stmts)
+                if target in local_index:
+                    pc = local_index[target]
+                    continue  # 从标签位置继续，不 pc+1
+                else:
+                    # 当前层级没有该标签，向上传播
+                    raise
             except _ReturnSignal:
                 raise  # return 直接穿透，不记错误日志
             except BaseException as e:
@@ -547,23 +551,29 @@ class WorkflowEngine:
                 left = self._eval_field_access(node.expr)
                 return not left or str(left).strip() == ""
             case GreaterThan():
-                left = self._eval_field_access(node.left)
-                return self._to_number(left) > node.right
+                left = self._eval_var_or_field(node.left)
+                num = self._to_number(left)
+                return num > node.right if num is not None else False
             case LessThan():
-                left = self._eval_field_access(node.left)
-                return self._to_number(left) < node.right
+                left = self._eval_var_or_field(node.left)
+                num = self._to_number(left)
+                return num < node.right if num is not None else False
             case GreaterEqual():
-                left = self._eval_field_access(node.left)
-                return self._to_number(left) >= node.right
+                left = self._eval_var_or_field(node.left)
+                num = self._to_number(left)
+                return num >= node.right if num is not None else False
             case LessEqual():
-                left = self._eval_field_access(node.left)
-                return self._to_number(left) <= node.right
+                left = self._eval_var_or_field(node.left)
+                num = self._to_number(left)
+                return num <= node.right if num is not None else False
             case NotEqual():
-                left = self._eval_field_access(node.left)
-                return self._to_number(left) != node.right
+                left = self._eval_var_or_field(node.left)
+                num = self._to_number(left)
+                return num != node.right if num is not None else True
             case NumericEqual():
-                left = self._eval_field_access(node.left)
-                return self._to_number(left) == node.right
+                left = self._eval_var_or_field(node.left)
+                num = self._to_number(left)
+                return num == node.right if num is not None else False
             case Not():
                 return not self._eval_condition(node.operand)
             case And():
@@ -579,16 +589,19 @@ class WorkflowEngine:
                 return False
 
     @staticmethod
-    def _to_number(val: str) -> float:
-        """将字符串转为数值，失败时返回 0.0"""
+    def _to_number(val: str):
+        """将字符串转为数值，失败时返回 None"""
         try:
             return float(val)
         except (ValueError, TypeError):
-            return 0.0
+            return None
 
     @staticmethod
-    def _field_path(node: FieldAccess) -> str:
+    def _field_path(node) -> str:
         """生成字段访问路径的调试描述：$ring.affix_1.value → 'ring.affix_1.value'"""
+        # 裸变量直接返回名称
+        if isinstance(node, VarRef):
+            return node.name
         parts = []
         current = node
         while isinstance(current, FieldAccess):
@@ -607,6 +620,14 @@ class WorkflowEngine:
     def _eval_field_access(self, node: FieldAccess) -> str:
         """求值字段访问链：$var.f1.f2.f3 → 逐层遍历，返回字符串"""
         return str(self._eval_field_raw(node))
+
+    def _eval_var_or_field(self, node) -> str:
+        """求值变量或字段访问：支持 VarRef 和 FieldAccess"""
+        if isinstance(node, VarRef):
+            return str(self.variables.get(node.name, ""))
+        elif isinstance(node, FieldAccess):
+            return self._eval_field_access(node)
+        return ""
 
     def _eval_field_raw(self, node: FieldAccess):
         """求值字段访问链，返回原始值（dict/int/float/str 等）

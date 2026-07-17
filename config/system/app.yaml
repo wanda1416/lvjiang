@@ -11,7 +11,10 @@ layout_scenes:
   group_3:
   - bag_equip_detail
   - bag_item_detail
+  group_4:
+  - activity_mengzhu
 group_names:
   group_1: 通用
   group_2: 调律
   group_3: 背包
+  group_4: 活动

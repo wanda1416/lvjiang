@@ -1,0 +1,39 @@
+key: activity_mengzhu
+name: 萌主争锋
+regions:
+- key: start_new
+  name: 开始匹配
+  type: func
+  is_text: true
+  is_clickable: true
+- key: confirm
+  name: 确认
+  type: func
+  is_text: true
+  is_clickable: true
+- key: point_1
+  name: 确认点
+  type: func
+  is_text: false
+  is_clickable: true
+points:
+- key: item_1
+  name: 技能1
+  type: func
+  is_text: false
+  is_clickable: true
+- key: item_2
+  name: 技能2
+  type: func
+  is_text: false
+  is_clickable: true
+- key: item_3
+  name: 技能3
+  type: attr
+  is_text: false
+  is_clickable: true
+- key: cangku
+  name: 仓库
+  type: attr
+  is_text: false
+  is_clickable: true

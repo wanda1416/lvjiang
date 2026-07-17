@@ -152,6 +152,12 @@ goto_stmt: "goto"i NAME _NL
           | field_access "<=" number -> le_op
           | field_access "!=" number -> ne_op
           | field_access "==" number -> eq_num_op
+          | var_ref ">" number -> gt_op
+          | var_ref "<" number -> lt_op
+          | var_ref ">=" number -> ge_op
+          | var_ref "<=" number -> le_op
+          | var_ref "!=" number -> ne_op
+          | var_ref "==" number -> eq_num_op
           | var_ref -> var_cond
 
 // 条件中的文本操作数：支持 "string" 或 $var

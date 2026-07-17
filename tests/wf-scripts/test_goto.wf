@@ -1,0 +1,11 @@
+$var = 1
+@label1
+log concat("var = ", $var)
+if $var == 1
+   $var = 2
+   goto label1
+else
+   goto label2
+end
+@label2
+collect $var

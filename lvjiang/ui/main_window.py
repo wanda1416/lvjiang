@@ -40,9 +40,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.setWindowTitle("律匠 - 燕云十六声装备调律工具 v0.1.0")
         self.setMinimumSize(1000, 700)
 
-        # 投屏窗口信息
+        # 投屏窗口信息（windows 后端使用）
         self._target_window = None  # dict: {title, hwnd, left, top, width, height}
-        self._scanned_windows = []  # 扫描到的窗口列表
+        self._scanned_windows = []  # 扫描到的窗口/设备列表
+
+        # ADB 设备后端信息（adb 后端使用）
+        self._device = None          # AdbDevice（连接设备后创建）
+        self._device_ready = False   # ADB 设备是否就绪
 
         # 运行状态
         self._running = False
@@ -70,14 +74,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # 用户配置（延迟参数等）
         self._user_config = load_user_config()
+        # 设备后端运行态：windows（投屏窗口）| adb（adb screencap + adb shell input 直连手机）
+        # 由用户在界面上「扫描窗口」/「扫描设备」动态切换，config.backend 仅作初始默认
+        self._backend = (self._user_config.backend or "windows").lower()
 
         # OCR 引擎（懒加载）
         from ..core.ocr import OCREngine
         self._ocr = OCREngine()
 
-        # 输入控制器（传入延迟配置）
-        from ..core.input import InputController
-        self._input = InputController(delay_config=self._user_config.delay)
+        # 输入控制器：Windows 投屏常驻 PostMessageInput；ADB 连接设备后切换为 AdbInput
+        from ..core.desktop import create_input_backend as _create_desktop_input
+        self._win_input = _create_desktop_input(mode="post", delay_config=self._user_config.delay)
+        self._input = self._win_input
 
         self._setup_menu()
         self._setup_ui()
@@ -225,16 +233,24 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         top_row.addStretch()
         main_layout.addLayout(top_row)
 
-        # === 目标窗口选择 ===
+        # === 目标窗口/设备选择 ===
         window_group = QGroupBox("目标窗口")
+        self.window_group = window_group
         window_main_layout = QVBoxLayout(window_group)
 
         row1 = QHBoxLayout()
 
         self.btn_scan_window = QPushButton("扫描窗口")
         self.btn_scan_window.setFixedWidth(90)
+        self.btn_scan_window.setToolTip("Windows 投屏窗口模式：扫描并定位桌面窗口")
         self.btn_scan_window.clicked.connect(self._on_scan_window)
         row1.addWidget(self.btn_scan_window)
+
+        self.btn_scan_device = QPushButton("扫描设备")
+        self.btn_scan_device.setFixedWidth(90)
+        self.btn_scan_device.setToolTip("ADB 设备模式：扫描并连接 Android 手机")
+        self.btn_scan_device.clicked.connect(self._on_scan_devices)
+        row1.addWidget(self.btn_scan_device)
 
         self.window_combo = QComboBox()
         self.window_combo.setMinimumWidth(300)
@@ -270,6 +286,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         row2.addWidget(self.chk_bg_mode)
 
         window_main_layout.addLayout(row2)
+
+        # 按初始默认后端设置定位按钮文案与后台开关可见性（两种扫描均保留）
+        self._apply_backend_ui(self._backend)
+
         main_layout.addWidget(window_group)
 
         # === 截屏预览区（默认隐藏） ===
@@ -446,6 +466,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         if self._running:
             self.log_text.append("[录制] 工作流运行中，无法录制")
             return
+        if self._backend == "adb":
+            self.log_text.append("[录制] ADB 模式暂不支持录制（无投屏窗口）")
+            self.statusBar().showMessage("ADB 模式不支持录制")
+            return
         if not self._target_window:
             self.log_text.append("[录制] 请先定位窗口")
             self.statusBar().showMessage("未定位窗口 | 请先扫描并定位窗口")
@@ -460,8 +484,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         # 确保截屏器已就绪并附着到目标窗口
         w = self._target_window
         if self._capture is None:
-            from ..core.capture import ScreenCapture
-            self._capture = ScreenCapture()
+            from ..core.desktop import DesktopCapture
+            self._capture = DesktopCapture()
         self._capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
 
         from ..macros import MacroRecorder
@@ -545,6 +569,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             except Exception:
                 pass
             self._recorder = None
+
+        # 清理 ADB 后端资源
+        if self._backend == "adb":
+            self._teardown_adb_backend()
 
         try:
             self._hotkey_listener.stop()

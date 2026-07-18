@@ -65,7 +65,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._capture = None
         self._last_capture = None  # 最近一次截屏（numpy BGR）
 
-        # 区域布局（定位后由区域编辑器设置）
+        # 区域布局（定位后由场景编辑器设置）
         self._region_layout = None
 
         # 用户管理
@@ -141,10 +141,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         settings_menu.addSeparator()
 
-        region_editor_action = QAction("页面管理", self)
-        region_editor_action.setShortcut("F3")
-        region_editor_action.triggered.connect(self._open_region_editor)
-        settings_menu.addAction(region_editor_action)
+        scene_editor_action = QAction("场景管理", self)
+        scene_editor_action.setShortcut("F3")
+        scene_editor_action.triggered.connect(self._open_scene_editor)
+        settings_menu.addAction(scene_editor_action)
 
         # ── 工具 ──
         tools_menu = menubar.addMenu("工具")
@@ -174,10 +174,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         dialog = OCRTestDialog(self)
         dialog.exec()
 
-    def _open_region_editor(self):
-        """打开区域编辑器（无需截图，按场景加载）"""
-        from .region_editor import RegionEditorDialog
-        dialog = RegionEditorDialog(
+    def _open_scene_editor(self):
+        """打开场景编辑器（无需截图，按场景加载）"""
+        from .scene_editor import SceneEditorDialog
+        dialog = SceneEditorDialog(
             layout_manager=self._layout_manager,
             refresh_callback=self._refresh_capture,
             parent=self,

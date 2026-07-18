@@ -116,7 +116,7 @@
 设置
   ├─ 用户管理 (F2)        → UserManagerDialog
   ├─ ──────────
-  └─ 页面管理 (F3)        → RegionEditorDialog（原区域编辑器）
+  └─ 场景管理 (F3)        → SceneEditorDialog（场景/区域/POI 配置）
 
 工具
   ├─ 毕业率计算器          （占位，暂未启用）

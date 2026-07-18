@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from lvjiang.core.ocr import OCREngine
+from lvjiang.core.material_db import MaterialDatabase
 from lvjiang.core.material_recognizer import MaterialRecognizer
 
 
@@ -30,13 +31,15 @@ def load_img(path: Path) -> np.ndarray:
 
 
 def main():
-    templates_dir = ROOT / "data" / "materials"
-    if not templates_dir.exists():
-        print(f"参考图目录不存在: {templates_dir}")
+    materials_dir = ROOT / "data" / "materials"
+    if not materials_dir.exists():
+        print(f"参考图目录不存在: {materials_dir}")
         sys.exit(1)
 
     ocr = OCREngine()
-    recognizer = MaterialRecognizer(ocr, templates_dir)
+    db = MaterialDatabase(materials_dir)
+    db.load()
+    recognizer = MaterialRecognizer(ocr, db)
 
     # 打印参考库
     types = recognizer.list_types()
@@ -45,7 +48,7 @@ def main():
         print(f"  - {t} ({recognizer.get_reference_count(t)} 张)")
     print()
 
-    images = sorted(templates_dir.glob("*.png"))
+    images = sorted(materials_dir.rglob("*.png"))
 
     # ── 第一轮：OCR 文字识别 ──────────────────────────────
     print("=" * 60)
@@ -68,11 +71,12 @@ def main():
     failed = 0
 
     for path in images:
-        m = re.match(r"^(.+?)(?:_(\d+)级)?\.png$", path.name)
-        if not m:
+        # 从数据库查询期望值
+        entry = db.get_entry(path.name)
+        if not entry:
             continue
-        expected_type = m.group(1)
-        expected_level = int(m.group(2)) if m.group(2) else None
+        expected_type = entry.type
+        expected_level = entry.level
 
         img = load_img(path)
         result = recognizer.recognize(img)

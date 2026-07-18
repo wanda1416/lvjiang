@@ -1,14 +1,14 @@
 # 场景与布局 — 编辑器操作手册
 
-本文档描述页面管理 UI 的交互方式和扩展新场景的步骤。
+本文档描述场景管理 UI 的交互方式和扩展新场景的步骤。
 
 语义模型定义见 [scene-layout-definition.md](scene-layout-definition.md)，各场景字段实现见 [31-models/scene-implementations.md](../31-models/scene-implementations.md)。
 
 ---
 
-## 页面管理 UI
+## 场景管理 UI
 
-打开方式：菜单「设置 → 页面管理」或 `F3`。
+打开方式：菜单「设置 → 场景管理」或 `F3`。
 
 ### 界面结构
 
@@ -75,4 +75,4 @@ layout_scenes:
 
 ### 3. 在编辑器中配置坐标
 
-打开页面管理 → 切换到新场景 Tab → 导入截图 → 在画布上放置 Region 和 Point 并调整坐标。
+打开场景管理 → 切换到新场景 Tab → 导入截图 → 在画布上放置 Region 和 Point 并调整坐标。

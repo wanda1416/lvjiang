@@ -146,6 +146,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         scene_editor_action.triggered.connect(self._open_scene_editor)
         settings_menu.addAction(scene_editor_action)
 
+        material_manager_action = QAction("材料管理", self)
+        material_manager_action.setShortcut("F4")
+        material_manager_action.triggered.connect(self._open_material_manager)
+        settings_menu.addAction(material_manager_action)
+
         # ── 工具 ──
         tools_menu = menubar.addMenu("工具")
 
@@ -184,6 +189,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         )
         dialog.exec()
         self._refresh_layout_combo()
+
+    def _open_material_manager(self):
+        """打开材料管理对话框"""
+        from .material_manager import MaterialManagerDialog
+        dialog = MaterialManagerDialog(parent=self)
+        dialog.exec()
+        # 如果有数据变动，刷新共享的材料识别器
+        if dialog.data_changed:
+            from ..workflows.base import BaseWorkflow
+            if BaseWorkflow._shared_material_recognizer is not None:
+                BaseWorkflow._shared_material_recognizer.reload()
+                self.statusBar().showMessage("材料库已刷新", 3000)
 
     def _show_about(self):
         """显示关于对话框"""

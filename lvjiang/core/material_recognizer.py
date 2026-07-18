@@ -6,7 +6,7 @@
 - 数量识别：OCR 裁剪右下角区域
 - 空槽检测：图像方差 + 饱和度判断
 
-参考图片命名格式：{类型}_{等级}级.png 或 {类型}.png
+参考库数据源：MaterialDatabase（material.yaml），不再依赖文件名解析。
 """
 
 import re
@@ -19,6 +19,7 @@ from loguru import logger
 from PIL import Image
 
 from .ocr import OCREngine
+from .material_db import MaterialDatabase
 
 
 @dataclass
@@ -56,12 +57,10 @@ class MaterialRecognizer:
     def __init__(
         self,
         ocr_engine: OCREngine,
-        templates_dir: Path | str | None = None,
+        material_db: MaterialDatabase | None = None,
     ):
         self._ocr = ocr_engine
-        self._templates_dir = Path(templates_dir) if templates_dir else (
-            Path(__file__).resolve().parent.parent.parent / "data" / "materials"
-        )
+        self._db = material_db or MaterialDatabase()
 
         # 延迟加载
         self._templates: dict[str, list[tuple[np.ndarray, int | None]]] = {}
@@ -70,10 +69,14 @@ class MaterialRecognizer:
         self._loaded = False
 
         # 预计算缓存（加载时填充，识别时只读）
-        self._cached_orb: list[tuple[str, np.ndarray | None, int, np.ndarray]] = []
-        # [(mat_type, descriptors, kp_count, lab_avg), ...]
+        self._cached_orb: list[tuple[str, np.ndarray | None, int, np.ndarray, str]] = []
+        # [(mat_type, descriptors, kp_count, lab_avg, group), ...]
         self._orb: cv2.ORB | None = None
         self._bf: cv2.BFMatcher | None = None  # 缓存 BFMatcher，避免每次识别都新建
+
+    @property
+    def material_db(self) -> MaterialDatabase:
+        return self._db
 
     # ─── 参考库加载 ──────────────────────────────────────────
 
@@ -84,34 +87,36 @@ class MaterialRecognizer:
         self._loaded = True
 
     def _load_templates(self):
-        """从 data/materials 加载所有参考图片，按类型分组"""
-        if not self._templates_dir.exists():
-            logger.error(f"参考图片目录不存在: {self._templates_dir}")
+        """从 MaterialDatabase 加载所有参考图片，按类型分组"""
+        entries = self._db.list_materials()
+        if not entries:
+            logger.warning("材料数据库为空，无参考图可加载")
             return
 
-        # 文件名解析：{类型}_{等级}级.png 或 {类型}.png
-        pattern = re.compile(r"^(.+?)(?:_(\d+)级)?\.png$")
+        materials_dir = self._db.dir
+        loaded_count = 0
 
-        for path in sorted(self._templates_dir.glob("*.png")):
-            m = pattern.match(path.name)
-            if not m:
-                logger.warning(f"跳过无法解析的文件名: {path.name}")
+        for entry in entries:
+            path = materials_dir / entry.file
+            if not path.exists():
+                logger.warning(f"参考图片不存在，跳过: {entry.file}")
                 continue
-
-            mat_type = m.group(1)
-            level = int(m.group(2)) if m.group(2) else None
 
             # PIL 读中文路径 → numpy → cv2 BGR
             try:
                 img_rgb = np.array(Image.open(path))
                 img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
             except Exception as e:
-                logger.warning(f"加载参考图片失败 {path.name}: {e}")
+                logger.warning(f"加载参考图片失败 {entry.file}: {e}")
                 continue
+
+            mat_type = entry.type
+            level = entry.level
 
             if mat_type not in self._templates:
                 self._templates[mat_type] = []
             self._templates[mat_type].append((img_bgr, level))
+            loaded_count += 1
 
         # 记录参考图尺寸（取第一张）
         for type_list in self._templates.values():
@@ -120,10 +125,9 @@ class MaterialRecognizer:
                 self._template_size = (w, h)
                 break
 
-        total = sum(len(v) for v in self._templates.values())
         logger.info(
             f"材料参考库加载完成: {len(self._templates)} 种类型, "
-            f"{total} 张参考图, 尺寸 {self._template_size}"
+            f"{loaded_count} 张参考图, 尺寸 {self._template_size}"
         )
 
         # 预计算所有参考图的 ORB 描述子 + Lab 均值
@@ -141,17 +145,23 @@ class MaterialRecognizer:
         self._orb = cv2.ORB.create(nfeatures=300)
         self._cached_orb.clear()
 
-        for mat_type, variants in self._templates.items():
-            for ref_img, _level in variants:
-                # 缩放到统一尺寸
-                resized = cv2.resize(ref_img, self._template_size, interpolation=cv2.INTER_AREA)
-                # ORB 特征
-                kp, des = self._orb.detectAndCompute(resized, None)
-                kp_count = len(kp) if kp else 0
-                # Lab 均值
-                lab = cv2.cvtColor(resized, cv2.COLOR_BGR2Lab).astype(np.float32)
-                lab_avg = lab.mean(axis=(0, 1))
-                self._cached_orb.append((mat_type, des, kp_count, lab_avg))
+        # 遍历数据库条目，直接读取图片并计算特征
+        for entry in self._db.list_materials():
+            path = self._db.dir / entry.file
+            if not path.exists():
+                continue
+            try:
+                img_rgb = np.array(Image.open(path))
+                img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+            except Exception:
+                continue
+
+            resized = cv2.resize(img_bgr, self._template_size, interpolation=cv2.INTER_AREA)
+            kp, des = self._orb.detectAndCompute(resized, None)
+            kp_count = len(kp) if kp else 0
+            lab = cv2.cvtColor(resized, cv2.COLOR_BGR2Lab).astype(np.float32)
+            lab_avg = lab.mean(axis=(0, 1))
+            self._cached_orb.append((entry.type, des, kp_count, lab_avg, entry.group))
 
         logger.debug(f"预计算完成: {len(self._cached_orb)} 条特征缓存")
 
@@ -166,11 +176,16 @@ class MaterialRecognizer:
 
     # ─── 核心识别 ──────────────────────────────────────────
 
-    def recognize(self, slot_img: np.ndarray) -> MaterialInfo:
+    def recognize(
+        self,
+        slot_img: np.ndarray,
+        group: str | None = None,
+    ) -> MaterialInfo:
         """识别单个材料槽
 
         Args:
             slot_img: 材料槽裁剪图（BGR numpy 数组）
+            group: 限定匹配范围到指定分组，None 表示匹配所有分组
 
         Returns:
             MaterialInfo
@@ -185,8 +200,8 @@ class MaterialRecognizer:
         if self._is_empty(slot_img):
             return MaterialInfo(type="", level=None, count=None, owned=None, confidence=1.0)
 
-        # 2. 类型识别（模板匹配）
-        mat_type, confidence = self._match_type(slot_img)
+        # 2. 类型识别（模板匹配，支持分组过滤）
+        mat_type, confidence = self._match_type(slot_img, group=group)
 
         # 3. 等级识别（OCR 左上角）
         level = self._ocr_level(slot_img)
@@ -236,13 +251,21 @@ class MaterialRecognizer:
 
     # ─── 类型识别（ORB 特征匹配）───────────────────────────────
 
-    def _match_type(self, slot_img: np.ndarray) -> tuple[str, float]:
+    def _match_type(
+        self,
+        slot_img: np.ndarray,
+        group: str | None = None,
+    ) -> tuple[str, float]:
         """ORB 特征匹配识别材料类型
 
         对局部遮挡（如减号按钮）有容忍度，
         只要图标未遮挡区域有足够特征点匹配即可识别。
 
         slot 图只计算一次 ORB，与预计算缓存做匹配。
+
+        Args:
+            slot_img: 材料槽图像
+            group: 限定匹配范围到指定分组，None 表示匹配所有
 
         Returns:
             (type_name, confidence)
@@ -268,7 +291,15 @@ class MaterialRecognizer:
         best_type = ""
         best_score = -1.0
 
-        for mat_type, des2, kp2_count, lab2 in self._cached_orb:
+        # 根据分组过滤候选模板
+        candidates = self._cached_orb
+        if group:
+            candidates = [c for c in self._cached_orb if c[4] == group]
+            if not candidates:
+                logger.warning(f"分组 '{group}' 中无参考图")
+                return "", 0.0
+
+        for mat_type, des2, kp2_count, lab2, _grp in candidates:
             if des2 is None or kp2_count < 5:
                 continue
             # ORB 匹配（复用缓存描述子）
@@ -292,7 +323,7 @@ class MaterialRecognizer:
             logger.warning(f"匹配置信度过低: {best_score:.3f}，无法识别类型")
             return "", best_score
 
-        logger.debug(f"类型匹配: {best_type} (confidence={best_score:.3f})")
+        logger.debug(f"类型匹配: {best_type} (group={group}, confidence={best_score:.3f})")
         return best_type, best_score
 
     # ─── 等级 OCR ──────────────────────────────────────────

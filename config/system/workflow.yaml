@@ -27,12 +27,12 @@ flows:
       - name: target_material
         label: 目标材料
         type: select
-        default: "紫色狗粮"
+        default: "紫狗粮"
         options:
           - { value: "", label: "不添加" }
-          - { value: "紫色狗粮", label: "紫色狗粮" }
-          - { value: "金色狗粮", label: "金色狗粮" }
-          - { value: "彩色狗粮", label: "彩色狗粮" }
+          - { value: "紫狗粮", label: "紫狗粮" }
+          - { value: "金狗粮", label: "金狗粮" }
+          - { value: "彩狗粮", label: "彩狗粮" }
       - name: equip_slot
         label: 装备部位
         type: select

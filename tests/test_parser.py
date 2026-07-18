@@ -7,7 +7,7 @@ from lvjiang.workflows.grammar import (
     If, For, Loop, Break, Return, Label, Goto,
     Contains, Equals, InList, IsEmpty, FieldAccess, VarRef, Literal, SceneRef,
     Not, And, Or, GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    EvalFieldChainAssign, FuncCall,
+    EvalFieldChainAssign, FuncCall, ByClause,
 )
 
 
@@ -809,6 +809,86 @@ def test_scan_list_var():
     print("  recognize [scene].$list as $var: OK")
 
 
+# ─── scan/recognize by 子句测试 ───────────────────────────
+
+def test_scan_by_equals():
+    """测试 scan ... by equals"""
+    print("\n=== 测试 scan by equals ===")
+    program = parse_text('scan [scene].[f1, f2] as $found by equals "target"')
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    assert n.by is not None
+    assert isinstance(n.by, ByClause)
+    assert n.by.match_mode == "equals"
+    assert isinstance(n.by.target, Literal)
+    assert n.by.target.value == "target"
+    print("  scan by equals: OK")
+
+
+def test_scan_by_contains():
+    """测试 scan ... by contains"""
+    print("\n=== 测试 scan by contains ===")
+    program = parse_text("scan [scene].[f1, f2] as $found by contains $keyword")
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    assert n.by is not None
+    assert n.by.match_mode == "contains"
+    assert isinstance(n.by.target, VarRef)
+    assert n.by.target.name == "keyword"
+    print("  scan by contains $var: OK")
+
+
+def test_recognize_by_equals_any():
+    """测试 recognize ... by equals_any"""
+    print("\n=== 测试 recognize by equals_any ===")
+    program = parse_text("recognize [scene].[s1, s2, s3] as $found by equals_any $materials")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.by is not None
+    assert n.by.match_mode == "equals_any"
+    assert isinstance(n.by.target, VarRef)
+    assert n.by.target.name == "materials"
+    print("  recognize by equals_any $var: OK")
+
+
+def test_recognize_by_contains_any():
+    """测试 recognize ... by contains_any"""
+    print("\n=== 测试 recognize by contains_any ===")
+    program = parse_text("recognize [scene].[s1, s2] as $found by contains_any $keywords")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.by is not None
+    assert n.by.match_mode == "contains_any"
+    assert isinstance(n.by.target, VarRef)
+    assert n.by.target.name == "keywords"
+    print("  recognize by contains_any $var: OK")
+
+
+def test_scan_without_by():
+    """测试无 by 子句时 by 为 None"""
+    print("\n=== 测试 scan 无 by 子句 ===")
+    program = parse_text("scan [scene].[f1] as $result")
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    assert n.by is None
+    print("  scan 无 by → by=None: OK")
+
+
+def test_find_tune_material_wf():
+    """验证改写后的 find_tune_material.wf 能正常解析"""
+    print("\n=== 测试 find_tune_material.wf ===")
+    path = Path("config/system/workflows/subcall/find_tune_material.wf")
+    program = parse_file(path)
+    assert len(program.body) == 2  # recognize + collect
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.by is not None
+    assert n.by.match_mode == "equals"
+    assert isinstance(n.by.target, VarRef)
+    assert n.by.target.name == "material_name"
+    print("  find_tune_material.wf 解析 OK")
+
+
 # ─── 主入口 ─────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -843,6 +923,14 @@ if __name__ == "__main__":
     test_eval_with_var()
     test_eval_field_assign()
     test_implicit_eval()
+    
+    # scan/recognize by 子句
+    test_scan_by_equals()
+    test_scan_by_contains()
+    test_recognize_by_equals_any()
+    test_recognize_by_contains_any()
+    test_scan_without_by()
+    test_find_tune_material_wf()
     
     # scan/recognize list var
     test_scan_list_var()

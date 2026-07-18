@@ -15,7 +15,7 @@ from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, Literal, FieldAccess, CoordPoint,
+    SceneRef, VarRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -164,10 +164,11 @@ class _DSLTransformer(Transformer):
                 fields = second  # field_list → list[Literal]
             elif isinstance(second, VarRef):
                 region_var = second  # 动态 region
-        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, line_no=self._line(items))
+        by_clause = items[2] if len(items) > 2 else None  # ByClause | None
+        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, line_no=self._line(items))
 
     def recognize_stmt(self, items):
-        """recognize [scene].[f1, f2, ...] as $var 或 recognize [scene].$var as $var"""
+        """recognize [scene].[f1, f2, ...] as $var [by ...]"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
         scene = SceneRef(scene=scene_name)
@@ -180,7 +181,33 @@ class _DSLTransformer(Transformer):
                 fields = second  # field_list → list[Literal]
             elif isinstance(second, VarRef):
                 region_var = second  # 动态 region
-        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, line_no=self._line(items))
+        by_clause = items[2] if len(items) > 2 else None  # ByClause | None
+        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, line_no=self._line(items))
+
+    # ─── by 子句（短路识别）───────────────────────────────
+
+    def by_clause(self, items):
+        """by <match_mode> <target> → ByClause"""
+        match_mode = items[0]   # str: equals / contains / equals_any / contains_any
+        target_node = items[1]  # VarRef | Token(STRING)
+        # STRING token 须显式去引号包装为 Literal；VarRef 直接透传
+        if isinstance(target_node, VarRef):
+            target = target_node
+        else:
+            target = Literal(value=self._unquote(str(target_node)))
+        return ByClause(match_mode=match_mode, target=target)
+
+    def match_equals(self, _):
+        return "equals"
+
+    def match_contains(self, _):
+        return "contains"
+
+    def match_equals_any(self, _):
+        return "equals_any"
+
+    def match_contains_any(self, _):
+        return "contains_any"
 
     def scene_target_static(self, items):
         """[scene] 或 [scene].[f1, f2] 或 $var.[f1] 等"""

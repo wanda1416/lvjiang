@@ -240,6 +240,14 @@ class RunControlMixin:
             self._overlay.set_color("red")
             self.log_text.append("[操作] 已停止")
 
+    # ─── 后端就绪判定 ──────────────────────────────────
+
+    def _backend_ready(self) -> bool:
+        """当前后端是否就绪（adb：设备已连接；windows：已定位窗口）"""
+        if getattr(self, "_backend", "windows") == "adb":
+            return bool(getattr(self, "_device_ready", False))
+        return self._target_window is not None
+
     # ─── 通用工作流执行 ────────────────────────────────────
 
     def _on_run_workflow(self):
@@ -249,9 +257,13 @@ class RunControlMixin:
             self._request_stop()
             return
 
-        if not self._target_window:
-            self.log_text.append("[错误] 请先定位窗口")
-            self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
+        if not self._backend_ready():
+            if getattr(self, "_backend", "windows") == "adb":
+                self.log_text.append("[错误] 请先连接设备")
+                self.statusBar().showMessage("未连接设备 | 请先扫描并连接设备")
+            else:
+                self.log_text.append("[错误] 请先定位窗口")
+                self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
             return
 
         flow_cfg = self._get_selected_flow_config()
@@ -284,9 +296,15 @@ class RunControlMixin:
                 self._end_automation(flow_name)
                 return
 
-        # 后台模式下，刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
-        if self._input.background_mode and self._target_window:
-            self._input.target_hwnd = self._target_window["hwnd"]
+        # 后台模式下（windows），刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
+        # ADB 模式无窗口句柄，且坐标为设备物理像素（原点左上），window_left/top 恒为 0
+        if getattr(self, "_backend", "windows") == "adb":
+            window_left, window_top = 0, 0
+        else:
+            if self._input.background_mode and self._target_window:
+                self._input.target_hwnd = self._target_window["hwnd"]
+            window_left = self._target_window["left"]
+            window_top = self._target_window["top"]
 
         wf = BaseWorkflow(
             capture=self._capture,
@@ -294,8 +312,8 @@ class RunControlMixin:
             input_ctrl=self._input,
             layout=layout,
             delay_config=self._user_config.delay,
-            window_left=self._target_window["left"],
-            window_top=self._target_window["top"],
+            window_left=window_left,
+            window_top=window_top,
             stop_check=self._is_stopped,
         )
         # 外部加载的工作流为绝对路径，否则相对于系统工作流目录
@@ -372,8 +390,8 @@ class RunControlMixin:
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
             )
-        elif self._target_window is None:
-            self.btn_run_workflow.setText("未定位")
+        elif not self._backend_ready():
+            self.btn_run_workflow.setText("未连接" if getattr(self, "_backend", "windows") == "adb" else "未定位")
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
             )

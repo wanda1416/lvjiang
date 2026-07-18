@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from ..config import DelayConfig
-from ..core.capture import ScreenCapture
+from ..core.capture_base import CaptureBackend
 from ..core.ocr import OCREngine
-from ..core.input import InputController
+from ..core.input_base import InputBackend
 from ..core.region_config import Layout, Point, Region
 from . import builtins  # noqa: F401  触发内置函数注册
 
@@ -37,9 +37,9 @@ class BaseWorkflow:
 
     def __init__(
         self,
-        capture: ScreenCapture,
+        capture: CaptureBackend,
         ocr: OCREngine,
-        input_ctrl: InputController,
+        input_ctrl: InputBackend,
         layout: Layout,
         delay_config: DelayConfig | None = None,
         window_left: int = 0,

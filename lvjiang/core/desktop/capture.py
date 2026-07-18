@@ -1,4 +1,12 @@
-"""屏幕捕获模块 - 基于 mss，支持投屏窗口定位"""
+"""桌面端截图后端 - 基于 mss，支持投屏窗口定位
+
+使用一个持久化的专用工作线程执行截屏，避免每次 capture() 都创建新线程。
+旧实现每次截屏创建 daemon 线程 + 线程本地 mss 实例，导致：
+- 线程栈内存（~1MB/次）不断累积
+- mss 缓存的 GDI 设备上下文（srcdc/memdc）随线程泄漏
+- 超时线程被遗弃，GDI 句柄永远无法回收
+新实现：单个工作线程拥有唯一 mss 实例，通过任务队列接收截屏请求。
+"""
 
 import queue
 import threading
@@ -9,16 +17,13 @@ import mss
 import mss.tools
 from loguru import logger
 
+from ..capture_base import CaptureBackend
 
-class ScreenCapture:
-    """屏幕捕获器
 
-    使用一个持久化的专用工作线程执行截屏，避免每次 capture() 都创建新线程。
-    旧实现每次截屏创建 daemon 线程 + 线程本地 mss 实例，导致：
-    - 线程栈内存（~1MB/次）不断累积
-    - mss 缓存的 GDI 设备上下文（srcdc/memdc）随线程泄漏
-    - 超时线程被遗弃，GDI 句柄永远无法回收
-    新实现：单个工作线程拥有唯一 mss 实例，通过任务队列接收截屏请求。
+class DesktopCapture(CaptureBackend):
+    """桌面端截图后端（mss + 工作线程）
+
+    继承 CaptureBackend，提供桌面窗口截图能力。
     """
 
     # 连续超时多少次后认为工作线程死锁，触发重建
@@ -29,7 +34,7 @@ class ScreenCapture:
         self._main_sct = None  # 主线程 mss 实例（仅用于 list_monitors / get_capture_size）
         self._task_queue: queue.Queue = queue.Queue(maxsize=2)
         self._consecutive_timeouts = 0  # 连续超时计数
-        self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="ScreenCapture")
+        self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="DesktopCapture")
         self._worker.start()
 
     def _worker_loop(self):
@@ -103,15 +108,15 @@ class ScreenCapture:
         self._consecutive_timeouts = 0
         self._worker = threading.Thread(
             target=self._worker_loop, daemon=True,
-            name=f"ScreenCapture-{time.monotonic():.0f}",
+            name=f"DesktopCapture-{time.monotonic():.0f}",
         )
         self._worker.start()
         logger.info("截屏工作线程已重建")
 
     def capture(self, timeout: float = 5.0) -> np.ndarray | None:
-        """
-        截取屏幕，返回 numpy 数组（BGR 格式，OpenCV 兼容）
-        如果设置了 _monitor 则截取指定区域，否则截取全屏
+        """截取屏幕，返回 numpy 数组（BGR 格式，OpenCV 兼容）
+
+        如果设置了 _monitor 则截取指定区域，否则截取全屏。
 
         Args:
             timeout: 超时秒数（默认 5s）。mss.grab 底层调用 Win32 GDI，
@@ -158,7 +163,7 @@ class ScreenCapture:
         return result_holder[0]
 
     def capture_to_file(self, path: str) -> bool:
-        """截屏并保存为 PNG 文件"""
+        """截屏并保存为 PNG 文件（使用 mss.tools.to_png）"""
         img = self.capture()
         if img is None:
             return False
@@ -171,8 +176,8 @@ class ScreenCapture:
             return False
 
     def find_window_by_title(self, title_keyword: str) -> dict | None:
-        """
-        通过窗口标题关键词查找投屏窗口
+        """通过窗口标题关键词查找投屏窗口
+
         使用 ctypes + Win32 API (EnumWindows / GetWindowTextW)
         返回窗口的位置信息 dict 或 None
         """
@@ -221,9 +226,7 @@ class ScreenCapture:
             return None
 
     def attach_to_window(self, title_keyword: str) -> bool:
-        """
-        附着到指定投屏窗口（通过标题查找并设置捕获区域）
-        """
+        """附着到指定投屏窗口（通过标题查找并设置捕获区域）"""
         window = self.find_window_by_title(title_keyword)
         if window:
             self.set_capture_region(
@@ -232,65 +235,3 @@ class ScreenCapture:
             )
             return True
         return False
-
-
-def list_visible_windows() -> list[dict]:
-    """
-    列出所有可见窗口（Win32 API）
-    返回 list[dict]，每个 dict 包含 title, hwnd, left, top, width, height
-    """
-    import ctypes
-    from ctypes import wintypes
-
-    user32 = ctypes.windll.user32
-    results = []
-
-    # Win32 常量
-    GWL_EXSTYLE = -20
-    WS_EX_TOOLWINDOW = 0x00000080   # 工具窗口（不显示在任务栏）
-    WS_EX_NOACTIVATE = 0x08000000   # 不可激活的窗口
-    GW_OWNER = 4
-
-    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-    def _callback(hwnd, lParam):
-        if not user32.IsWindowVisible(hwnd):
-            return True
-
-        # 过滤工具窗口（NVIDIA控制面板、托盘图标等）
-        ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        if ex_style & WS_EX_TOOLWINDOW:
-            return True
-        if ex_style & WS_EX_NOACTIVATE:
-            return True
-
-        # 过滤有所有者的窗口（弹窗、对话框，不是主窗口）
-        owner = user32.GetWindow(hwnd, GW_OWNER)
-        if owner:
-            return True
-
-        # 用固定大小缓冲区获取窗口标题
-        buf = ctypes.create_unicode_buffer(256)
-        user32.GetWindowTextW(hwnd, buf, 256)
-        title = buf.value
-        if not title.strip():
-            return True
-
-        rect = wintypes.RECT()
-        if user32.GetWindowRect(hwnd, ctypes.byref(rect)):
-            w = rect.right - rect.left
-            h = rect.bottom - rect.top
-            if w > 200 and h > 200:
-                results.append({
-                    "title": title,
-                    "hwnd": hwnd,
-                    "left": rect.left,
-                    "top": rect.top,
-                    "width": w,
-                    "height": h,
-                })
-        return True
-
-    user32.EnumWindows(_callback, None)
-
-    logger.debug(f"枚举到 {len(results)} 个可见窗口")
-    return results

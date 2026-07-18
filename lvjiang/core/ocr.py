@@ -53,11 +53,37 @@ class OCREngine:
         if not self._ensure_loaded():
             return []
         try:
-            result, _ = self._ocr(image)
+            # 图像预处理：提升 OCR 准确率
+            processed = self._preprocess_for_ocr(image)
+            result, _ = self._ocr(processed)
             return self._parse_result(result)
         except Exception as e:
             logger.error(f"OCR 识别失败: {e}")
             return []
+
+    @staticmethod
+    def _preprocess_for_ocr(image: np.ndarray) -> np.ndarray:
+        """图像预处理：提升文字识别准确率
+
+        对裁剪区域做锐化 + 对比度增强，帮助 OCR 引擎识别文字。
+        保留颜色信息，避免灰度化导致颜色区分丢失。
+        """
+        import cv2
+
+        # 1. 锐化（Unsharp Mask）— 增强文字边缘
+        blurred = cv2.GaussianBlur(image, (0, 0), 3)
+        sharpened = cv2.addWeighted(image, 1.5, blurred, -0.5, 0)
+
+        # 2. 对比度增强（CLAHE）— 提升文字/背景区分度
+        # CLAHE 需要在 LAB 空间的 L 通道操作，保留颜色信息
+        lab = cv2.cvtColor(sharpened, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l)
+        enhanced_lab = cv2.merge([l_enhanced, a, b])
+        result = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+
+        return result
 
     @staticmethod
     def _parse_result(result) -> list[OCRResult]:

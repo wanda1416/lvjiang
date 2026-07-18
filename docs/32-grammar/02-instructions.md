@@ -134,6 +134,12 @@ scan scene_name as $var                    # 扫描场景所有 Region
 scan scene_name.[a1, a2, ...] as $var      # 仅扫描指定 Area
 scan scene_name.$var as $result            # 动态 Area（变量指定单个 Area 名）
 
+# 带 by 子句（短路识别，返回字段名）
+scan scene_name.[a1, a2, ...] as $var by equals "文本"
+scan scene_name.[a1, a2, ...] as $var by contains "文本"
+scan scene_name.[a1, a2, ...] as $var by equals_any $list
+scan scene_name.[a1, a2, ...] as $var by contains_any $list
+
 # scene_name 可以是：
 #   [scene]    — 括号常量
 #   "scene"    — 字符串常量（等价于 [scene]）
@@ -154,6 +160,12 @@ scan $scene_name.$region as $result
 
 # 字符串常量场景名
 scan "equip_weapon_detail".[affix_1] as $scan_result
+
+# by 子句短路识别
+scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3] as $key by contains "调律"
+if $key
+    click [equip_weapon_detail].$key
+end
 ```
 
 **说明**：
@@ -161,6 +173,55 @@ scan "equip_weapon_detail".[affix_1] as $scan_result
 - 扫描结果 `$var` 为字典，key 为 Area 名，value 为 OCR 识别文本
 - 引擎自动将 Region 坐标元数据存入内部 `_coord_meta`，供后续 `click [scene].$key` 解析坐标
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
+
+### by 子句（短路识别）
+
+`by` 子句附加在 `scan` / `recognize` 末尾，将扫描结果从 **dict** 变为 **str**（首个命中的字段名）。
+
+**语义**：一次截图 → 逐字段识别 → 首个命中即返回字段名，不再存入字典。
+
+**四种匹配模式**：
+
+| 模式 | 说明 | target 类型 |
+|---|---|---|
+| `equals "文本"` | 字段 OCR 文本完全等于目标 | 字符串 |
+| `contains "文本"` | 字段 OCR 文本包含目标子串 | 字符串 |
+| `equals_any $list` | 字段 OCR 文本等于列表中任一项 | 列表变量 |
+| `contains_any $list` | 字段 OCR 文本包含列表中任一项 | 列表变量 |
+
+**返回值类型契约**：
+
+| 形式 | `$var` 类型 | 含义 |
+|---|---|---|
+| `scan ... as $var` | `dict` | `{area_key: ocr_text}` |
+| `scan ... as $var by ...` | `str` | 首个命中的 area_key，未命中为空字符串 `""` |
+
+**示例**：
+
+```
+# 在多个按钮中找到"调律"按钮
+scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+if $tune_key
+    click [equip_weapon_detail].$tune_key
+end
+
+# 在材料格中找到指定材料
+recognize [equip_tune_detail].[material_1, material_2, material_3] as $slot by equals $material_name
+if $slot
+    click [equip_tune_detail].$slot
+end
+
+# 匹配多个目标之一
+eval $keywords = ["攻击", "防御"]
+scan [scene].[field_1, field_2, field_3] as $found by contains_any $keywords
+```
+
+> **与 find_key 的关系**：`by` 子句是 `scan` + `find_key` 的语法糖。以下两行等价：
+> ```
+> scan [scene].[a, b, c] as $key by contains "文本"
+> scan [scene].[a, b, c] as $tmp / eval $key = find_key($tmp, "文本")
+> ```
+> 推荐使用 `by` 子句，更简洁且只需一次截图。
 
 ## 五、recognize — 图像识别
 
@@ -174,6 +235,10 @@ scan "equip_weapon_detail".[affix_1] as $scan_result
 recognize scene_name as $var                   # 识别场景所有 slot
 recognize scene_name.[a1, a2] as $var          # 仅识别指定 Area
 recognize scene_name.$var as $result           # 动态 Area（变量指定单个 Area 名）
+
+# 带 by 子句（短路识别，返回字段名）
+recognize scene_name.[a1, a2] as $var by equals "文本"
+recognize scene_name.[a1, a2] as $var by contains "文本"
 
 # scene_name 可以是：
 #   [scene]    — 括号常量
@@ -192,6 +257,9 @@ recognize [material_grid].[slot_1, slot_2] as $mats
 eval $scene = "material_grid"
 recognize $scene.[slot_1] as $mats
 recognize $scene.$slot_var as $result
+
+# by 子句短路识别（一次截图，找到首个匹配的材料格）
+recognize [equip_tune_detail].[material_1, material_2, material_3] as $slot by equals $material_name
 ```
 
 **说明**：
@@ -199,6 +267,7 @@ recognize $scene.$slot_var as $result
 - 识别结果 `$var` 为字典，key 为 Area 名，value 为材料类型名
 - 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `_coord_meta`
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
+- **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str），详见上方 [by 子句说明](#by-子句短路识别)
 
 ## 六、collect — 收集输出
 
@@ -266,6 +335,15 @@ if $tune_key
     click [equip_weapon_detail].$tune_key
 end
 ```
+
+> **推荐**：上述模式可用 `by` 子句一步完成，无需中间字典变量：
+> ```
+> scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+> if $tune_key
+>     click [equip_weapon_detail].$tune_key
+> end
+> ```
+> `find_key` 仍适用于需要对扫描结果做多次查找或复杂处理的场景。
 
 ## 八、call — 调用子工作流
 

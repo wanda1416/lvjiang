@@ -123,7 +123,7 @@ def test_desktop_factory_with_hwnd():
 # ─── AdbInput 抽象一致性 ──────────────────────────────────────
 
 def test_adb_input_is_input_backend():
-    from lvjiang.core.adb.input import AdbInput
+    from lvjiang.core.android.input import AdbInput
 
     class _FakeDevice:
         def shell(self, *a, **kw): return ""
@@ -135,7 +135,7 @@ def test_adb_input_is_input_backend():
 
 
 def test_adb_input_delay_injection():
-    from lvjiang.core.adb.input import AdbInput
+    from lvjiang.core.android.input import AdbInput
 
     class _FakeDevice:
         def shell(self, *a, **kw): return ""
@@ -146,7 +146,7 @@ def test_adb_input_delay_injection():
 
 
 def test_adb_factory_returns_input_backend():
-    from lvjiang.core.adb import create_input_backend
+    from lvjiang.core.android import create_input_backend
 
     class _FakeDevice:
         def shell(self, *a, **kw): return ""

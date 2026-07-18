@@ -74,7 +74,7 @@ class AdbCapture(CaptureBackend):
                 return None
             # screencap 输出的坐标系与 input tap 使用的坐标系一致（游戏横屏时
             # 二者都是 2800x1260）。因此不做任何旋转，直接返回原图。
-            # get_capture_size 以“实际截图尺寸”为准，而非 wm size 物理竖屏分辨率，
+            # get_capture_size 以"实际截图尺寸"为准，而非 wm size 物理竖屏分辨率，
             # 否则归一化坐标会用错基准导致点击偏移。
             h, w = img.shape[:2]
             self._size = (w, h)

@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from lvjiang.core.adb import AdbDevice, list_adb_devices
-from lvjiang.core.adb.bootstrap import bootstrap_minitouch, BootstrapError
-from lvjiang.core.adb.minitouch import MinitouchClient
+from lvjiang.core.android import AdbDevice, list_adb_devices
+from lvjiang.core.android.bootstrap import bootstrap_minitouch, BootstrapError
+# 注意: MinitouchClient 已废弃，此脚本仅供历史参考
 
 
 def main():

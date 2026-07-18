@@ -28,7 +28,10 @@ class DelayConfig(BaseModel):
 class UserConfig(BaseModel):
     """用户配置（从 preferences.yaml 加载）"""
     backend: str = "adb"            # 设备后端：adb（adb screencap + adb shell input）| windows（投屏窗口）
+    adb_capture_method: str = "screencap"  # ADB 截图方式：screencap（adb exec-out screencap -p）| scrcpy（H.264 视频流）
     window_title: str = ""
+    background_mode: bool = True    # Windows 模式是否启用后台模式（PostMessage）
+    scrcpy_streaming: bool = False  # ADB 模式是否启用 scrcpy 流式截图
     delay: DelayConfig = Field(default_factory=DelayConfig)
 
 

@@ -34,6 +34,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     f10_pressed = pyqtSignal()
     # 全局热键 F8 信号（录制开始/停止切换）
     f8_pressed = pyqtSignal()
+    # scrcpy 帧信号（解码线程 emit，主线程处理，传递 BGR numpy 数组）
+    _scrcpy_frame_ready = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()
@@ -98,6 +100,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         # F10 停止工作流；F8 录制开始/停止切换
         self.f10_pressed.connect(self._request_stop)
         self.f8_pressed.connect(self._toggle_recording)
+        self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
             "<f10>": self._on_global_f10,
             "<f8>": self._on_global_f8,
@@ -202,9 +205,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._refresh_user_combo()
 
     def _on_toggle_preview(self, checked: bool):
-        """切换截图预览区域的显示/隐藏"""
+        """切换预览区域的显示/隐藏"""
         self.preview_label.setVisible(not checked)
-        self.btn_hide_window.setText("显示截图" if checked else "隐藏截图")
+        self.btn_hide_window.setText("显示预览" if checked else "隐藏预览")
 
     # ─── UI 构建 ───────────────────────────────────────────
 
@@ -234,8 +237,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         top_row.addStretch()
         main_layout.addLayout(top_row)
 
-        # === 目标窗口/设备选择 ===
-        window_group = QGroupBox("目标窗口")
+        # === 窗口/设备选择 ===
+        window_group = QGroupBox()
         self.window_group = window_group
         window_main_layout = QVBoxLayout(window_group)
 
@@ -264,11 +267,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.btn_locate.clicked.connect(self._on_locate_window)
         row1.addWidget(self.btn_locate)
 
-        self.btn_hide_window = QPushButton("显示截图")
+        self.btn_hide_window = QPushButton("显示预览")
         self.btn_hide_window.setFixedWidth(80)
         self.btn_hide_window.setCheckable(True)
-        self.btn_hide_window.setChecked(True)  # 默认隐藏截图
-        self.btn_hide_window.setToolTip("隐藏/显示截图预览区域")
+        self.btn_hide_window.setChecked(True)  # 默认隐藏预览
+        self.btn_hide_window.setToolTip("隐藏/显示实时预览区域")
         self.btn_hide_window.clicked.connect(self._on_toggle_preview)
         row1.addWidget(self.btn_hide_window)
 
@@ -282,9 +285,15 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         self.chk_bg_mode = QCheckBox("后台模式")
         self.chk_bg_mode.setToolTip("启用后鼠标操作不会移动光标，通过 PostMessage 直接向目标窗口发送鼠标事件")
-        self.chk_bg_mode.setEnabled(False)  # 定位窗口前不可用
+        self.chk_bg_mode.setVisible(False)  # 点击扫描窗口后才显示
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
         row2.addWidget(self.chk_bg_mode)
+
+        self.chk_scrcpy = QCheckBox("流式截图")
+        self.chk_scrcpy.setToolTip("启用后使用 scrcpy H.264 视频流截图（低延迟），关闭则使用 adb screencap")
+        self.chk_scrcpy.setVisible(False)  # 点击扫描设备后才显示
+        self.chk_scrcpy.stateChanged.connect(self._on_capture_method_changed)
+        row2.addWidget(self.chk_scrcpy)
 
         window_main_layout.addLayout(row2)
 
@@ -386,6 +395,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # === 底部状态栏 ===
         self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 录制")
+
+        # 锁定窗口最小尺寸，防止 checkbox 显隐时布局重算导致窗口大小变化
+        self.adjustSize()
+        self.setMinimumHeight(self.height())
 
         self._setup_log_redirect()
 

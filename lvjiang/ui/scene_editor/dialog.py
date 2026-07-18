@@ -1,4 +1,4 @@
-"""编辑器对话框 - 区域编辑器主框架、Tab/画布管理"""
+"""编辑器对话框 - 场景编辑器主框架、Tab/画布管理"""
 
 from math import gcd
 
@@ -22,8 +22,8 @@ from .script_ops import ScriptOpsMixin, _SceneKeyButton
 from .scene_tab import SceneTab
 
 
-class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, ScriptOpsMixin, QDialog):
-    """区域编辑器对话框 - 布局→场景 层级结构"""
+class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, ScriptOpsMixin, QDialog):
+    """场景编辑器对话框 - 布局→场景 层级结构"""
 
     def __init__(
         self,
@@ -32,7 +32,7 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("页面管理")
+        self.setWindowTitle("场景管理")
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(

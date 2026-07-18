@@ -3,7 +3,7 @@
 直接调用设备原生 screencap 命令获取 PNG 帧，绕过 minicap 对高版本 Android 的兼容性问题。
 每次 capture() 走一次 adb 子进程，延迟约 300–800ms/帧，适合工作流场景（非实时流）。
 
-上层（工作流引擎、OCR、材料识别、区域编辑器）无需改动：
+上层（工作流引擎、OCR、材料识别、场景编辑器）无需改动：
 - capture() 返回最新帧（BGR numpy）
 - get_capture_size() 返回设备物理分辨率
 - set_capture_region()/attach_to_window() 沿用 CaptureBackend 默认 no-op

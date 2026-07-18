@@ -441,7 +441,7 @@ class WindowOpsMixin:
         return self._last_capture
 
     def _refresh_capture(self) -> tuple[np.ndarray | None, str | None]:
-        """重新截取当前窗口/设备截图（用于区域编辑器刷新）
+        """重新截取当前窗口/设备截图（用于场景编辑器刷新）
         返回 (image, error_message)，成功时 error_message 为 None
         """
         if getattr(self, "_backend", "windows") == "adb":

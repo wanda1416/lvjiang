@@ -1,3 +1,6 @@
+#% name: 导航至调律页
+#% required_scenes: [equip_weapon_detail, equip_tune_detail]
+
 # 从装备详情页进入调律页面
 # 前置：在装备详情页（equip_weapon_detail）
 # 后置（成功）：在调律详情页（equip_tune_detail）
@@ -7,8 +10,7 @@
 click [equip_weapon_detail].[more_func]
 wait step_interval
 
-scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_scan
-eval $tune_key = find_key($tune_scan, "调律")
+scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
 if not $tune_key
     log "未找到调律按钮"
     return

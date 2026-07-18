@@ -89,6 +89,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         self._setup_menu()
         self._setup_ui()
+        self._refresh_run_button()  # 根据后端就绪状态设置按钮初始样式
         self._refresh_user_combo()
         self._refresh_layout_combo()
         self._load_workflow_configs()

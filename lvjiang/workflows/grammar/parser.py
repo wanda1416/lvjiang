@@ -704,6 +704,45 @@ class _DSLTransformer(Transformer):
         return node
 
 
+# ─── 预处理：换行续行 ────────────────────────────────────
+
+def _preprocess_line_continuation(text: str) -> str:
+    """处理两种换行续行：
+
+    1. 显式续行：行尾反斜杠 \\ → 与下一行拼接
+    2. 隐式续行：{} [] () 内部的换行视为空格（不终结语句）
+    """
+    # 第一步：显式续行 — 行尾 \\ 后紧跟换行，拼接两行
+    text = text.replace("\\\n", " ")
+
+    # 第二步：隐式续行 — 跟踪括号深度，深度 > 0 时换行替换为空格
+    result = []
+    depth = 0
+    in_string = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_string = not in_string
+            result.append(ch)
+        elif not in_string:
+            if ch in ('(', '[', '{'):
+                depth += 1
+                result.append(ch)
+            elif ch in (')', ']', '}'):
+                depth = max(0, depth - 1)
+                result.append(ch)
+            elif ch == '\n' and depth > 0:
+                # 括号内换行 → 空格
+                result.append(' ')
+            else:
+                result.append(ch)
+        else:
+            result.append(ch)
+        i += 1
+    return ''.join(result)
+
+
 # ─── 公共接口 ─────────────────────────────────────────────
 
 def parse_file(path: Path | str) -> Program:
@@ -716,6 +755,8 @@ def parse_file(path: Path | str) -> Program:
 def parse_text(text: str, source: str = "<text>") -> Program:
     """从字符串解析 DSL 文本，返回 Program AST 节点（主要用于测试）"""
     parser = _get_parser()
+    # 预处理：换行续行
+    text = _preprocess_line_continuation(text)
     # 确保文本以换行结尾（grammar 要求 _NL 终止）
     if not text.endswith("\n"):
         text += "\n"

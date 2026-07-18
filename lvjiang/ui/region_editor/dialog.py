@@ -342,19 +342,13 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
 
         ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
         cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
-
-        # 横纵比是否一致（画布 vs 截图）
-        same = abs(img_w / img_h - canvas_w / canvas_h) < 0.01
-        tip = ('<span style="color:#2ecc71;">比例一致</span>' if same
-               else '<span style="color:#e67e22;">比例不一致</span>')
-
+        
         self._info_label.setText(
             f'<span style="color:#ccc;">截图</span> '
             f'<b style="color:#4da6ff;">{ss_txt}</b>'
-            f'<span style="color:#666;">　│　</span>'
+            f'<span style="color:#666;"> │ </span>'
             f'<span style="color:#ccc;">画布</span> '
             f'<b style="color:#ffc850;">{cv_txt}</b>'
-            f'<span style="color:#666;">　—　</span>{tip}'
         )
 
     @staticmethod

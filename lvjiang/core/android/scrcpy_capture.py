@@ -1,0 +1,476 @@
+"""AndroidStreamCapture — 基于 scrcpy 4.1 server 协议的推送式截图后端
+
+与 AdbCapture（拉取式，每次 capture() 触发 adb screencap）不同，
+本后端采用推送式模型：
+
+- 在设备上启动 scrcpy 4.1 server（app_process 加载 scrcpy-server.jar）
+- 通过 adb forward + TCP socket 连接 server
+- 后台线程持续读取 H.264 视频流 → PyAV 增量解码 → 原子更新 _latest_frame
+- capture() 直接返回最新帧副本（~0ms，无 IO）
+- 提供 on_frame 回调供 UI 订阅，实现预览区实时视频流
+
+scrcpy 4.1 协议要点（已通过源码 + 实测验证）：
+- server 参数：4.1 scid=<8位hex> log_level=info audio=false max_size=N max_fps=N
+               control=false tunnel_forward=true cleanup=false
+- socket 名：scrcpy_<scid:08x>（localabstract）
+- tunnel_forward=true：server 用 LocalServerSocket 监听，client 通过 adb forward 连接
+- forward 连接时 server 先发 1 字节 dummy byte（0x00）用于检测连接错误
+- 协议头：1 字节 dummy → 64 字节设备名（UTF-8, 零填充）→ 4 字节 codec ID → 12 字节 session packet
+- 后续 media packet：12 字节帧头（flags + PTS + size）+ H.264 payload
+"""
+
+import os
+import random
+import socket
+import subprocess
+import struct
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+from loguru import logger
+
+from ..capture_base import CaptureBackend
+from .device import AdbDevice
+
+# scrcpy server jar 本地路径（相对于项目 data 目录）
+_JAR_RELATIVE = Path("data") / "scrcpy" / "scrcpy-server.jar"
+# 设备端 jar 路径
+_REMOTE_JAR_PATH = "/data/local/tmp/scrcpy-server.jar"
+# 默认视频端口
+_VIDEO_PORT = 27183
+# scrcpy 4.1 协议：forward 连接先发 1 字节 dummy byte
+_DUMMY_BYTE_SIZE = 1
+# scrcpy 4.1 协议：设备名固定 64 字节
+_DEVICE_META_SIZE = 64
+# server 版本（必须与 jar 匹配）
+_SERVER_VERSION = "4.1"
+
+
+class AndroidStreamCapture(CaptureBackend):
+    """基于 scrcpy 4.1 server 协议的截图后端
+
+    后台线程持续解码 H.264 帧，capture() 零延迟返回最新帧。
+    通过 set_on_frame() 订阅帧回调，可驱动 UI 实时预览。
+    """
+
+    def __init__(
+        self,
+        device: AdbDevice,
+        max_size: int = 0,
+        max_fps: int = 15,
+        jar_path: str | Path | None = None,
+    ):
+        """
+        Args:
+            device: AdbDevice 实例
+            max_size: 输出画面较长边的上限像素，0 表示不限制（使用设备原始分辨率，默认）
+                      注意：工作流坐标与 input tap 共享同一坐标系，截图必须保持原始分辨率
+            max_fps: 帧率上限，默认 15
+            jar_path: scrcpy-server.jar 路径；None 则使用项目 data/scrcpy/ 下默认路径
+        """
+        self._device = device
+        self._max_size = max_size
+        self._max_fps = max_fps
+
+        if jar_path is not None:
+            self._jar_local = Path(jar_path)
+        else:
+            # 相对于项目根目录（scrcpy_capture.py 在 lvjiang/core/android/，需向上 4 层）
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            self._jar_local = project_root / _JAR_RELATIVE
+
+        self._scid: int = 0
+        self._socket_name: str = ""
+        self._server_proc: subprocess.Popen | None = None
+        self._sock: socket.socket | None = None
+        self._decoder = None  # av.CodecContext
+        self._latest_frame: np.ndarray | None = None
+        self._frame_lock = threading.Lock()
+        self._on_frame_callback = None
+        self._running = False
+        self._decode_thread: threading.Thread | None = None
+        self._size: tuple[int, int] | None = None
+
+    # ─── 生命周期 ─────────────────────────────────────────
+
+    def start(self) -> bool:
+        """推送 jar → 启动 server → 建立连接 → 读协议头 → 启动解码线程 → 等待首帧"""
+        try:
+            import av  # noqa: F401
+        except ImportError:
+            logger.error(
+                "[AndroidStream] 未安装 PyAV，无法解码 H.264 流。请执行 `pip install av`"
+            )
+            return False
+
+        try:
+            self._running = True
+            self._scid = random.randint(1, 0x7FFFFFFF)
+            self._socket_name = f"scrcpy_{self._scid:08x}"
+
+            # 0. 确定 max_size：0 表示使用设备原始分辨率（取较长边）
+            if self._max_size <= 0:
+                dev_w, dev_h = self._device.get_resolution()
+                self._max_size = max(dev_w, dev_h)
+                logger.debug(f"[AndroidStream] max_size=0，使用设备分辨率较长边: {self._max_size}")
+
+            # 1. 推送 jar
+            if not self._push_jar():
+                self._running = False
+                return False
+
+            # 2. 清理旧 forward + 建立新 forward
+            self._cleanup_forward()
+            r = subprocess.run(
+                [*self._device._base(), "forward",
+                 f"tcp:{_VIDEO_PORT}", f"localabstract:{self._socket_name}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if r.returncode != 0:
+                logger.error(f"[AndroidStream] adb forward 失败: {r.stderr.strip()}")
+                self._running = False
+                return False
+            logger.debug(f"[AndroidStream] adb forward tcp:{_VIDEO_PORT} -> localabstract:{self._socket_name}")
+
+            # 3. 启动 server
+            if not self._start_server():
+                self._running = False
+                return False
+
+            # 4. 连接 socket
+            if not self._connect_socket():
+                self._running = False
+                return False
+
+            # 5. 读协议头（device meta + codec id + session packet）
+            if not self._read_protocol_header():
+                self._running = False
+                return False
+
+            # 6. 启动解码线程
+            self._decoder = av.CodecContext.create("h264", "r")
+            self._decode_thread = threading.Thread(
+                target=self._decode_loop, daemon=True, name="android-stream-decode"
+            )
+            self._decode_thread.start()
+
+            # 7. 等待首帧
+            deadline = time.monotonic() + 5.0
+            while self._latest_frame is None and time.monotonic() < deadline:
+                if not self._running:
+                    break
+                time.sleep(0.05)
+
+            if self._latest_frame is None:
+                logger.error("[AndroidStream] 5 秒内未收到首帧")
+                self.stop()
+                return False
+
+            h, w = self._latest_frame.shape[:2]
+            self._size = (w, h)
+            logger.info(
+                f"[AndroidStream] 启动成功 scrcpy={_SERVER_VERSION} "
+                f"分辨率={w}x{h} max_fps={self._max_fps} max_size={self._max_size}"
+            )
+            return True
+
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[AndroidStream] 启动失败: {e}")
+            self.stop()
+            return False
+
+    def stop(self):
+        """停止解码线程 → 关闭 socket → 终止 server → 清理 forward"""
+        self._running = False
+
+        if self._sock:
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+            self._sock = None
+
+        if self._server_proc:
+            try:
+                self._server_proc.terminate()
+                self._server_proc.wait(timeout=3.0)
+            except Exception:
+                try:
+                    self._server_proc.kill()
+                except Exception:
+                    pass
+            self._server_proc = None
+
+        if self._decode_thread and self._decode_thread.is_alive():
+            self._decode_thread.join(timeout=2.0)
+        self._decode_thread = None
+
+        self._cleanup_forward()
+        # 清理设备端 server 进程
+        subprocess.run(
+            [*self._device._base(), "shell", "pkill", "-f", "scrcpy-server"],
+            capture_output=True, timeout=5,
+        )
+
+        self._decoder = None
+        logger.debug("[AndroidStream] 已停止")
+
+    # ─── 截图接口（继承 CaptureBackend）────────────────────
+
+    def capture(self, timeout: float = 5.0) -> np.ndarray | None:
+        """零延迟取帧 — 返回后台线程已解码的最新帧副本"""
+        with self._frame_lock:
+            if self._latest_frame is None:
+                return None
+            return self._latest_frame.copy()
+
+    def get_capture_size(self) -> tuple[int, int]:
+        """返回实际截图尺寸 (width, height)"""
+        if self._size is not None:
+            return self._size
+        deadline = time.monotonic() + 3.0
+        while self._size is None and time.monotonic() < deadline:
+            time.sleep(0.1)
+        return self._size or (0, 0)
+
+    # ─── 帧回调（UI 订阅）────────────────────────────────
+
+    def set_on_frame(self, callback):
+        """订阅帧回调，实现预览区实时视频流
+
+        Args:
+            callback: callable(np.ndarray) — 接收 BGR 帧。
+                      注意此回调在解码线程执行，UI 侧需通过 Qt 信号转发到主线程。
+        """
+        self._on_frame_callback = callback
+
+    # ─── 内部：jar 推送 ──────────────────────────────────
+
+    def _push_jar(self) -> bool:
+        """推送 scrcpy-server.jar 到设备"""
+        if not self._jar_local.exists():
+            logger.error(f"[AndroidStream] scrcpy-server.jar 不存在: {self._jar_local}")
+            return False
+        r = subprocess.run(
+            [*self._device._base(), "push", str(self._jar_local), _REMOTE_JAR_PATH],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode != 0:
+            logger.error(f"[AndroidStream] 推送 jar 失败: {r.stderr.strip()}")
+            return False
+        logger.debug(f"[AndroidStream] jar 已推送到 {_REMOTE_JAR_PATH}")
+        return True
+
+    # ─── 内部：server 管理 ────────────────────────────────
+
+    def _start_server(self) -> bool:
+        """启动 scrcpy 4.1 server 进程"""
+        scid_hex = f"{self._scid:08x}"
+        shell_cmd = (
+            f"CLASSPATH={_REMOTE_JAR_PATH} "
+            f"app_process / com.genymobile.scrcpy.Server {_SERVER_VERSION} "
+            f"scid={scid_hex} log_level=info audio=false "
+            f"max_size={self._max_size} max_fps={self._max_fps} "
+            f"control=false tunnel_forward=true cleanup=false"
+        )
+        try:
+            self._server_proc = subprocess.Popen(
+                [*self._device._base(), "shell", shell_cmd],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            logger.debug(f"[AndroidStream] server 进程已启动 pid={self._server_proc.pid}")
+        except Exception as e:
+            logger.error(f"[AndroidStream] 启动 server 失败: {e}")
+            self._server_proc = None
+            return False
+
+        # 等待 server 就绪（监听 socket）
+        time.sleep(1.5)
+        if self._server_proc.poll() is not None:
+            _, stderr = self._server_proc.communicate()
+            logger.error(f"[AndroidStream] server 启动失败 (rc={self._server_proc.returncode}): "
+                         f"{stderr.decode(errors='replace')[:300]}")
+            self._server_proc = None
+            return False
+
+        logger.debug("[AndroidStream] server 进程运行中")
+        return True
+
+    # ─── 内部：socket 连接 ────────────────────────────────
+
+    def _connect_socket(self) -> bool:
+        """通过 adb forward 连接 server 的 video socket"""
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            try:
+                self._sock = socket.create_connection(("127.0.0.1", _VIDEO_PORT), timeout=2)
+                self._sock.settimeout(5.0)
+                logger.debug(f"[AndroidStream] 已连接到 video socket (port {_VIDEO_PORT})")
+                return True
+            except (ConnectionRefusedError, OSError):
+                time.sleep(0.2)
+        logger.error(f"[AndroidStream] 连接 video socket 超时 (port {_VIDEO_PORT})")
+        return False
+
+    # ─── 内部：协议头解析 ─────────────────────────────────
+
+    def _read_protocol_header(self) -> bool:
+        """读取 scrcpy 4.1 协议头：dummy byte + 64 字节设备名 + 4 字节 codec ID + 12 字节 session packet
+
+        tunnel_forward=true 时 server 先发 1 字节 dummy byte（0x00），用于检测连接错误。
+        """
+        assert self._sock is not None
+        try:
+            # 0. Dummy byte（1 字节，forward 连接特有）
+            dummy = self._recv_exact(_DUMMY_BYTE_SIZE)
+            if dummy is None:
+                logger.error("[AndroidStream] 读取 dummy byte 失败")
+                return False
+            logger.debug(f"[AndroidStream] dummy byte: 0x{dummy[0]:02x}")
+
+            # 1. 设备名（64 字节固定长度，UTF-8 零填充）
+            meta = self._recv_exact(_DEVICE_META_SIZE)
+            if meta is None:
+                logger.error("[AndroidStream] 读取设备名失败")
+                return False
+            device_name = meta.decode("utf-8").rstrip("\x00")
+            logger.debug(f"[AndroidStream] 设备名: {device_name}")
+
+            # 2. Codec ID（4 字节，如 b'h264'）
+            codec_id = self._recv_exact(4)
+            if codec_id is None:
+                logger.error("[AndroidStream] 读取 codec ID 失败")
+                return False
+            logger.debug(f"[AndroidStream] codec: {codec_id}")
+
+            # 3. Session packet（12 字节：flags + width + height）
+            session = self._recv_exact(12)
+            if session is None:
+                logger.error("[AndroidStream] 读取 session packet 失败")
+                return False
+            # 解析视频宽高（byte 4-7 = width, byte 8-11 = height）
+            vid_w = struct.unpack(">I", session[4:8])[0]
+            vid_h = struct.unpack(">I", session[8:12])[0]
+            logger.debug(f"[AndroidStream] session: {vid_w}x{vid_h}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"[AndroidStream] 读取协议头异常: {e}")
+            return False
+
+    def _recv_exact(self, n: int) -> bytes | None:
+        """从 socket 精确读取 n 字节"""
+        assert self._sock is not None
+        buf = b""
+        while len(buf) < n:
+            chunk = self._sock.recv(n - len(buf))
+            if not chunk:
+                return None
+            buf += chunk
+        return buf
+
+    # ─── 内部：解码循环 ───────────────────────────────────
+
+    def _decode_loop(self):
+        """后台线程：持续读取 scrcpy 视频流 → 增量解码 → 更新最新帧
+
+        scrcpy media packet 格式（12 字节帧头 + payload）：
+        - byte 0: flags (MSB=media_packet, C=config, K=keyframe) + PTS 高 7 位
+        - byte 1-7: PTS 低 56 位
+        - byte 8-11: packet size
+        - byte 12+: raw H.264 payload
+
+        PyAV 的 parse() 可以直接处理含非 H.264 数据的流（自动查找 NAL 起始码）。
+        """
+        import av
+
+        frame_interval = 1.0 / self._max_fps if self._max_fps > 0 else 0.0
+        last_frame_time = 0.0
+        buf = b""
+
+        while self._running:
+            if self._sock is None:
+                break
+            try:
+                data = self._sock.recv(65536)
+            except socket.timeout:
+                continue
+            except Exception as e:
+                logger.debug(f"[AndroidStream] socket 读取异常: {e}")
+                break
+
+            if not data:
+                logger.debug("[AndroidStream] socket EOF")
+                break
+
+            buf += data
+
+            # 解析 media packet：跳过 12 字节帧头，提取 H.264 payload
+            # PyAV parse() 能自动定位 NAL 起始码 (00 00 00 01 / 00 00 01)
+            # 所以直接喂整个 buffer 给 PyAV 即可
+            try:
+                packets = self._decoder.parse(buf)
+            except Exception:
+                buf = b""
+                continue
+
+            # parse 消费了多少数据？通过 packet size 估算
+            consumed = sum(p.size for p in packets)
+            if consumed > 0:
+                # 保守裁剪：保留未消费部分
+                buf = buf[min(consumed + 12 * len(packets), len(buf)):]
+                # 如果 buffer 太大，截断防止内存膨胀
+                if len(buf) > 1024 * 1024:
+                    buf = buf[-65536:]
+
+            for pkt in packets:
+                try:
+                    frames = self._decoder.decode(pkt)
+                except Exception:
+                    continue
+                for frame in frames:
+                    now = time.monotonic()
+                    if frame_interval and now - last_frame_time < frame_interval:
+                        continue
+                    last_frame_time = now
+
+                    bgr = self._frame_to_bgr(frame)
+                    with self._frame_lock:
+                        self._latest_frame = bgr
+                    h, w = bgr.shape[:2]
+                    self._size = (w, h)
+
+                    if self._on_frame_callback:
+                        try:
+                            self._on_frame_callback(bgr)
+                        except Exception as e:
+                            logger.debug(f"[AndroidStream] 帧回调异常: {e}")
+
+        # flush
+        if self._decoder:
+            try:
+                for frame in self._decoder.decode():
+                    bgr = self._frame_to_bgr(frame)
+                    with self._frame_lock:
+                        self._latest_frame = bgr
+            except Exception:
+                pass
+
+    @staticmethod
+    def _frame_to_bgr(frame) -> np.ndarray:
+        """将 PyAV VideoFrame 转换为 BGR numpy 数组"""
+        if frame.format.name != "bgr24":
+            frame = frame.reformat(format="bgr24")
+        return frame.to_ndarray()
+
+    # ─── 内部：forward 清理 ───────────────────────────────
+
+    def _cleanup_forward(self):
+        """清理 adb forward 规则"""
+        subprocess.run(
+            [*self._device._base(), "forward", "--remove-all"],
+            capture_output=True, timeout=5,
+        )

@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from lvjiang.core.adb import AdbDevice, list_adb_devices
-from lvjiang.core.adb.bootstrap import bootstrap_minicap, BootstrapError
-from lvjiang.core.adb.capture import AdbCapture
+from lvjiang.core.android import AdbDevice, list_adb_devices
+from lvjiang.core.android.bootstrap import bootstrap_minicap, BootstrapError
+from lvjiang.core.android.adb_capture import AdbCapture
 
 
 def main():

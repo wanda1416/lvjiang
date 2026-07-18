@@ -97,12 +97,12 @@ def test_desktop_capture_is_capture_backend():
 # ─── AdbCapture 抽象一致性 ────────────────────────────────────
 
 def test_adb_capture_is_capture_backend_class():
-    from lvjiang.core.adb.capture import AdbCapture
+    from lvjiang.core.android.adb_capture import AdbCapture
     assert issubclass(AdbCapture, CaptureBackend)
 
 
 def test_adb_factory_returns_capture_backend():
-    from lvjiang.core.adb import create_capture_backend, AdbCapture
+    from lvjiang.core.android import create_capture_backend, AdbCapture
 
     class _FakeDevice:
         def get_resolution(self): return (1080, 1920)

@@ -42,10 +42,8 @@ click [activity_mengzhu].[start_new]
 wait $step_interval
 
 # 等待加载动画，直到出现"确认选择"
+if $skip_confirm == 0
 loop 100
-   if $skip_confirm == 1
-      break
-   end
    scan [activity_mengzhu].[start_new] as $scan_result
    if $scan_result.[start_new] contains "确认选择"
        wait $step_interval
@@ -54,6 +52,7 @@ loop 100
        break
    end
    wait $step_interval
+end
 end
 
 # 单回合循环
@@ -104,11 +103,11 @@ end
 
 # 出现"继续"，连续点击"继续"结算，直到"开始匹配"重新出现
 loop 100
-   scan [activity_mengzhu].[start_new] as $scan_result
+   scan [activity_mengzhu].[start_new, next] as $scan_result
    if $scan_result.[start_new] contains "开始匹配"
        break
    end
-   if $scan_result.[start_new] contains "继续"
+   if $scan_result.[next] contains "继续"
        wait $step_interval
        click [activity_mengzhu].[next]
    end

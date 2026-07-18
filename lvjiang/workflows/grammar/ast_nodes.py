@@ -57,6 +57,7 @@ class Scan:
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
+    by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
     line_no: int = 0
 
 
@@ -66,7 +67,26 @@ class Recognize:
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
+    by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
     line_no: int = 0
+
+
+@dataclass(frozen=True)
+class ByClause:
+    """scan/recognize 的 by 子句 —— 短路识别策略
+
+    match_mode:
+        - "equals"        精确匹配单值（target 为 str）
+        - "contains"      子串匹配单值（target 为 str）
+        - "equals_any"    精确匹配列表任一元素（target 必须为 list）
+        - "contains_any"  子串匹配列表任一元素（target 必须为 list）
+    target:
+        Literal（字符串常量）或 VarRef（运行时变量，求值后须匹配 match_mode 要求类型）
+
+    语义：一次截图后逐字段识别，首个命中即返回该字段名（str）；全部未命中返回 ""。
+    """
+    match_mode: str
+    target: Any     # Literal | VarRef
 
 
 @dataclass(frozen=True)

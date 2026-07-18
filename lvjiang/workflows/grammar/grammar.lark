@@ -56,9 +56,19 @@ wait_stmt: "wait"i (NAME | number | bracket_expr | var_ref | wait_range) _NL
 
 wait_range: "(" number "," number ")"
 
-scan_stmt: "scan"i scene_target "as"i var_ref _NL
+scan_stmt: "scan"i scene_target "as"i var_ref by_clause? _NL
 
-recognize_stmt: "recognize"i scene_target "as"i var_ref _NL
+recognize_stmt: "recognize"i scene_target "as"i var_ref by_clause? _NL
+
+// by 子句：短路识别模式
+// 有 by 时返回首个命中的字段名（str），无 by 时返回完整 dict
+// match_mode 顺序：长关键字在前，确保词法 max-munch 正确分词
+by_clause: "by"i match_mode by_target
+match_mode: "equals_any"i -> match_equals_any
+          | "contains_any"i -> match_contains_any
+          | "equals"i -> match_equals
+          | "contains"i -> match_contains
+?by_target: STRING | var_ref
 
 // 场景目标：支持静态/动态场景名 + 静态/动态字段
 // 场景名：[scene] / "scene" / $var

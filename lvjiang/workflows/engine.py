@@ -16,12 +16,18 @@ from .grammar import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, Literal, FieldAccess, CoordPoint,
+    SceneRef, VarRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
 from .base import BaseWorkflow
+
+
+# ─── 用户可见的 DSL 错误 ──────────────────────────────────
+
+class WorkflowUserError(Exception):
+    """DSL 脚本中用户操作引发的可预期错误（类型不匹配、字段不存在等）"""
 
 
 # ─── 控制流信号 ───────────────────────────────────────────
@@ -291,18 +297,25 @@ class WorkflowEngine:
                 field_keys = [str(k) for k in region_key]
             else:
                 field_keys = [str(region_key)]
-
-        result = self._wf.ocr_scene(scene, field_keys)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
-        self.variables[var_name] = result
-        # 存 region 元数据，供 click [scene].$key 解析坐标
-        regions = self._wf._layout.get_scene_regions(scene)
-        if field_keys:
-            regions = [r for r in regions if r.key in field_keys]
-        self._coord_meta[var_name] = {r.key: r for r in regions}
+
+        if node.by is not None:
+            # ── by 子句：短路 OCR，返回字段名 str ──
+            by_clause: ByClause = node.by
+            target_value = self._resolve(by_clause.target)
+            result = self._wf.ocr_scene_by(scene, field_keys or [], target_value, by_clause.match_mode)
+            self.variables[var_name] = result  # str（命中字段名或 ""）
+        else:
+            result = self._wf.ocr_scene(scene, field_keys)
+            self.variables[var_name] = result  # dict
+            # 存 region 元数据，供 click [scene].$key 解析坐标
+            regions = self._wf._layout.get_scene_regions(scene)
+            if field_keys:
+                regions = [r for r in regions if r.key in field_keys]
+            self._coord_meta[var_name] = {r.key: r for r in regions}
 
     def _exec_recognize(self, node: Recognize):
-        """recognize [scene].[f1, f2, ...] as $var — 图像识别场景中的材料，结果存入变量"""
+        """recognize [scene].[f1, f2, ...] as $var [by ...] — 图像识别场景中的材料"""
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, SceneRef) else node.scene
         if isinstance(scene_ref, VarRef):
@@ -321,9 +334,17 @@ class WorkflowEngine:
                 field_keys = [str(k) for k in region_key]
             else:
                 field_keys = [str(region_key)]
-        result, region_map = self._wf.recognize_materials(scene, field_keys)
-        self.variables[var_name] = result           # {slot_key: "材料类型"}
-        self._coord_meta[var_name] = region_map     # {slot_key: Region}
+
+        if node.by is not None:
+            # ── by 子句：短路材料识别，返回 slot 名 str ──
+            by_clause: ByClause = node.by
+            target_value = self._resolve(by_clause.target)
+            result = self._wf.recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode)
+            self.variables[var_name] = result  # str（命中 slot 名或 ""）
+        else:
+            result, region_map = self._wf.recognize_materials(scene, field_keys)
+            self.variables[var_name] = result           # {slot_key: "材料类型"}
+            self._coord_meta[var_name] = region_map     # {slot_key: Region}
 
     def _exec_collect(self, node: Collect):
         """collect $var [as "label" | as $alias_var] — 将变量值存入输出 dict"""
@@ -713,6 +734,14 @@ class WorkflowEngine:
                 return current[idx] if 0 <= idx < len(current) else ""
             except (ValueError, TypeError):
                 return ""
+        # str 类型不支持字段访问（by 子句返回 str，用户误用 .field 时应报错）
+        if isinstance(current, str):
+            var_desc = self._field_path(node)
+            raise WorkflowUserError(
+                f"${var_desc} 的值是字符串类型（{current!r}），"
+                f"不能使用 .{key} 访问字段。"
+                f"by 子句返回的是字段名（str），不是 dict。"
+            )
         return ""
 
     # ─── 变量解析 ─────────────────────────────────────────

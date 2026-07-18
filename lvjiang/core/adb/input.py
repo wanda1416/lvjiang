@@ -78,7 +78,8 @@ class AdbInput(InputBackend):
 
         Args:
             duration: 移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认 mouse_move_duration。
-            hold: 到达终点后按住不放的时长（秒）。adb input swipe 不支持 hold，仅日志提示。
+            hold: 到达终点后按住不放的时长（秒）。通过延长 swipe 总时长实现
+                  （adb input swipe 的手指在 duration 结束前保持按下）。
         """
         if duration is None:
             move_dur = random.uniform(*self.mouse_move_duration)
@@ -87,26 +88,27 @@ class AdbInput(InputBackend):
         else:
             move_dur = float(duration)
 
+        # hold 合并到 swipe 时长：手指在 duration_ms 结束前不会抬起，
+        # 因此 move_dur + hold 等效于「滑到终点后按住 hold 秒再松开」
+        hold_dur = float(hold) if hold and hold > 0 else 0.0
+        total_dur = move_dur + hold_dur
+
         pre_delay = random.uniform(*self.before_click_wait)
         time.sleep(pre_delay)
 
-        duration_ms = int(move_dur * 1000)
-        hold_info = f" + hold {hold}s（adb 不支持）" if hold and hold > 0 else ""
+        duration_ms = int(total_dur * 1000)
+        hold_info = f" + hold {hold}s（合并到 swipe 时长）" if hold_dur > 0 else ""
 
         # 截图坐标 → 设备坐标（处理横竖屏旋转）
         fx, fy = self._transform(from_x, from_y)
         tx, ty = self._transform(to_x, to_y)
 
         logger.debug(f"[ADB] 拖拽 {poi_name}: 截图({from_x},{from_y})->({to_x},{to_y}) "
-                     f"→ 设备({fx},{fy})->({tx},{ty}) [{move_dur:.2f}s]{hold_info}")
+                     f"→ 设备({fx},{fy})->({tx},{ty}) [移动{move_dur:.2f}s]{hold_info}")
         self._device.shell(
             "input", "swipe",
             str(fx), str(fy), str(tx), str(ty), str(duration_ms),
         )
-
-        # adb input swipe 不支持 hold，若需要则额外 sleep 模拟
-        if hold is not None and hold > 0:
-            time.sleep(float(hold))
 
         post_delay = random.uniform(*self.after_click_wait)
         time.sleep(post_delay)

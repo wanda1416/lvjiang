@@ -10,6 +10,31 @@
 - **块闭合**：靠 `end` 关键字，不靠缩进
 - **字符串**：双引号 `"..."`，内部不支持转义
 - **标识符**：`[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*`
+
+### 换行与续行
+
+DSL 默认每行一条语句，但支持两种换行续行方式：
+
+**1. 显式续行** — 行尾 `\` 后紧跟换行，两行拼接为一条：
+
+```
+scan [scene].[field_1, field_2, \
+    field_3, field_4] as $result
+```
+
+**2. 隐式续行** — 在 `{}`、`[]`、`()` 括号内部，换行自动替换为空格，无需 `\`：
+
+```
+scan [scene].[field_1, field_2,
+    field_3, field_4] as $result
+
+eval $dict = {
+    "key1": "value1",
+    "key2": "value2"
+}
+```
+
+> 两种机制可以混用。隐式续行在字符串内的换行不生效（字符串内不支持换行）。
 - **两种引用，语义不同**：
   - `[name]` → **静态配置引用**：引用场景名 / Area 名（Region 或 Point）/ Action 名，来自 Scene YAML 和 Layout JSON 定义
   - `$name` → **运行时变量引用**：引用工作流执行过程中的动态变量
@@ -106,6 +131,8 @@ $var = "hello"               # 隐式 eval，效果完全相同
 | 来源 | 类型 | 示例 |
 |---|---|---|
 | `scan ... as $var` | `dict` | `$var` = `{"equip_type": "武器", "affix_gong": "会心+10%"}`（key 为 Area 名） |
+| `scan ... as $var by ...` | `str` | 首个命中的 Area 名，未命中为 `""` |
+| `recognize ... as $var by ...` | `str` | 首个命中的 Area 名，未命中为 `""` |
 | `eval $var = to_equipment(...)` | `dict` | 嵌套字典，支持链式字段访问 |
 | `eval $var = "hello"` | `str` | 字符串 |
 | `eval $var = 42` | `float` | 数字（内部统一为 float） |

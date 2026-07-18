@@ -345,8 +345,9 @@ class EquipmentParser:
             return None
 
         # ── 1. 转律标记 ──
-        is_transferred = bool(re.search(r"[［【\[]转[\]】\]]", text))
-        text = re.sub(r"[［【\[]转[\]】\]]", "", text)
+        # OCR 常将 ］/] 误识别为 1，兼容 ［转1 / [转1 等变体
+        is_transferred = bool(re.search(r"[［【\[]转[\]】\]1]", text))
+        text = re.sub(r"[［【\[]转[\]】\]1]", "", text)
 
         # ── 2. 过滤套装信息 ──
         if "套装" in text:

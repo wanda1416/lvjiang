@@ -889,6 +889,101 @@ def test_find_tune_material_wf():
     print("  find_tune_material.wf 解析 OK")
 
 
+# ─── 换行续行测试 ─────────────────────────────────────────
+
+def test_explicit_line_continuation():
+    """测试显式续行：行尾反斜杠"""
+    print("\n=== 测试显式续行 ===")
+    # 行尾 \\ 续行
+    program = parse_text('scan [scene].\\\n[f1, f2] as $result')
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    print("  scan [scene].\\\\\\n[f1, f2]: OK")
+
+    # 多行续行
+    program = parse_text('eval $list = [\\\n"a",\\\n"b",\\\n"c"\\\n]')
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    print("  eval $list = [\\\\\\n...\\\\\\n]: OK")
+
+
+def test_implicit_line_continuation_brackets():
+    """测试隐式续行：[] 内换行"""
+    print("\n=== 测试隐式续行 [] ===")
+    text = """\
+scan [scene].[
+f1,
+f2,
+f3
+] as $result
+"""
+    program = parse_text(text)
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    assert n.fields is not None
+    assert len(n.fields) == 3
+    print("  scan [scene].[\\nf1,\\nf2\\n] as $result: OK")
+
+
+def test_implicit_line_continuation_parens():
+    """测试隐式续行：() 内换行"""
+    print("\n=== 测试隐式续行 () ===")
+    text = """\
+eval $result = func(
+"arg1",
+"arg2"
+)
+"""
+    program = parse_text(text)
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "func"
+    assert len(n.func_args) == 2
+    print("  eval $result = func(\\n...\\n): OK")
+
+
+def test_implicit_line_continuation_braces():
+    """测试隐式续行：{} 内换行"""
+    print("\n=== 测试隐式续行 {} ===")
+    text = """\
+eval $dict = {
+}
+"""
+    program = parse_text(text)
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__empty_dict__"
+    print("  eval $dict = {\\n}: OK")
+
+
+def test_mixed_line_continuation():
+    """测试混合续行：显式 + 隐式"""
+    print("\n=== 测试混合续行 ===")
+    text = """\
+scan [scene].[
+f1, \\
+f2
+] as $result
+"""
+    program = parse_text(text)
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    assert len(n.fields) == 2
+    print("  显式 + 隐式混合: OK")
+
+
+def test_no_continuation_outside_brackets():
+    """测试括号外换行仍为语句终结"""
+    print("\n=== 测试括号外换行 ===")
+    text = """\
+scan [scene].[f1] as $r1
+scan [scene].[f2] as $r2
+"""
+    program = parse_text(text)
+    assert len(program.body) == 2
+    print("  括号外换行 = 语句终结: OK")
+
+
 # ─── 主入口 ─────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -931,6 +1026,14 @@ if __name__ == "__main__":
     test_recognize_by_contains_any()
     test_scan_without_by()
     test_find_tune_material_wf()
+    
+    # 换行续行
+    test_explicit_line_continuation()
+    test_implicit_line_continuation_brackets()
+    test_implicit_line_continuation_parens()
+    test_implicit_line_continuation_braces()
+    test_mixed_line_continuation()
+    test_no_continuation_outside_brackets()
     
     # scan/recognize list var
     test_scan_list_var()

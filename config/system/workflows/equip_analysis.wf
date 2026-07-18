@@ -1,3 +1,6 @@
+#% name: 装备分析
+#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail]
+
 # 装备分析工作流
 
 call "subcall/nav_main_to_equip.wf"

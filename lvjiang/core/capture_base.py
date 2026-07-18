@@ -35,6 +35,20 @@ class CaptureBackend(ABC):
             BGR numpy 数组，失败返回 None
         """
 
+    def capture_lossless(self, timeout: float = 10.0) -> np.ndarray | None:
+        """无损截图（用于 OCR 等需要高清晰度的场景）
+
+        默认实现：与 capture() 相同。子类可覆盖以提供更高质量截图。
+        例如：scrcpy 视频流后端可回退到 screencap 获取无损 PNG。
+
+        Args:
+            timeout: 超时秒数（默认 10s）
+
+        Returns:
+            BGR numpy 数组，失败返回 None
+        """
+        return self.capture(timeout=timeout)
+
     def capture_to_file(self, path: str) -> bool:
         """截屏并保存为 PNG 文件
 

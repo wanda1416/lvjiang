@@ -226,6 +226,44 @@ class AndroidStreamCapture(CaptureBackend):
                 return None
             return self._latest_frame.copy()
 
+    def capture_lossless(self, timeout: float = 10.0) -> np.ndarray | None:
+        """无损截图 — 回退到 adb screencap 获取高质量图像（用于 OCR）
+
+        scrcpy 视频流使用 H.264 有损压缩，文字边缘可能出现压缩伪影影响 OCR。
+        此方法通过 screencap 获取无损 PNG 截图，确保文字清晰。
+
+        Args:
+            timeout: 超时秒数（默认 10s，screencap 比视频流慢）
+
+        Returns:
+            BGR numpy 数组，失败返回 None
+        """
+        try:
+            png_bytes = self._device.shell_bytes("exec-out", "screencap", "-p", timeout=timeout)
+        except Exception as e:
+            from loguru import logger
+            logger.error(f"[AndroidStream] screencap 执行异常: {e}")
+            return None
+
+        if not png_bytes:
+            from loguru import logger
+            logger.error("[AndroidStream] screencap 返回空数据")
+            return None
+
+        try:
+            import cv2
+            arr = np.frombuffer(png_bytes, dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if img is None:
+                from loguru import logger
+                logger.error("[AndroidStream] PNG 解码失败")
+                return None
+            return img
+        except Exception as e:
+            from loguru import logger
+            logger.error(f"[AndroidStream] screencap 解码失败: {e}")
+            return None
+
     def get_capture_size(self) -> tuple[int, int]:
         """返回实际截图尺寸 (width, height)"""
         if self._size is not None:
@@ -380,10 +418,8 @@ class AndroidStreamCapture(CaptureBackend):
         scrcpy media packet 格式（12 字节帧头 + payload）：
         - byte 0: flags (MSB=media_packet, C=config, K=keyframe) + PTS 高 7 位
         - byte 1-7: PTS 低 56 位
-        - byte 8-11: packet size
+        - byte 8-11: packet size (H.264 payload 大小，big-endian)
         - byte 12+: raw H.264 payload
-
-        PyAV 的 parse() 可以直接处理含非 H.264 数据的流（自动查找 NAL 起始码）。
         """
         import av
 
@@ -398,8 +434,12 @@ class AndroidStreamCapture(CaptureBackend):
                 data = self._sock.recv(65536)
             except socket.timeout:
                 continue
+            except OSError:
+                # socket 已关闭（stop() 调用），正常退出
+                break
             except Exception as e:
-                logger.debug(f"[AndroidStream] socket 读取异常: {e}")
+                if self._running:
+                    logger.debug(f"[AndroidStream] socket 读取异常: {e}")
                 break
 
             if not data:
@@ -408,46 +448,52 @@ class AndroidStreamCapture(CaptureBackend):
 
             buf += data
 
-            # 解析 media packet：跳过 12 字节帧头，提取 H.264 payload
-            # PyAV parse() 能自动定位 NAL 起始码 (00 00 00 01 / 00 00 01)
-            # 所以直接喂整个 buffer 给 PyAV 即可
-            try:
-                packets = self._decoder.parse(buf)
-            except Exception:
-                buf = b""
-                continue
-
-            # parse 消费了多少数据？通过 packet size 估算
-            consumed = sum(p.size for p in packets)
-            if consumed > 0:
-                # 保守裁剪：保留未消费部分
-                buf = buf[min(consumed + 12 * len(packets), len(buf)):]
-                # 如果 buffer 太大，截断防止内存膨胀
-                if len(buf) > 1024 * 1024:
-                    buf = buf[-65536:]
-
-            for pkt in packets:
+            # 按 scrcpy 协议解析 media packet
+            while len(buf) >= 12:
+                # 解析 12 字节帧头
+                # byte 8-11: payload size (big-endian)
+                payload_size = struct.unpack(">I", buf[8:12])[0]
+                
+                # 检查 buffer 是否包含完整 packet
+                if len(buf) < 12 + payload_size:
+                    break  # 等待更多数据
+                
+                # 提取 H.264 payload
+                h264_data = buf[12:12 + payload_size]
+                buf = buf[12 + payload_size:]  # 移除已处理的 packet
+                
+                # 解码 H.264 帧
                 try:
-                    frames = self._decoder.decode(pkt)
+                    packets = self._decoder.parse(h264_data)
                 except Exception:
                     continue
-                for frame in frames:
-                    now = time.monotonic()
-                    if frame_interval and now - last_frame_time < frame_interval:
+                
+                for pkt in packets:
+                    try:
+                        frames = self._decoder.decode(pkt)
+                    except Exception:
                         continue
-                    last_frame_time = now
+                    for frame in frames:
+                        now = time.monotonic()
+                        if frame_interval and now - last_frame_time < frame_interval:
+                            continue
+                        last_frame_time = now
 
-                    bgr = self._frame_to_bgr(frame)
-                    with self._frame_lock:
-                        self._latest_frame = bgr
-                    h, w = bgr.shape[:2]
-                    self._size = (w, h)
+                        bgr = self._frame_to_bgr(frame)
+                        with self._frame_lock:
+                            self._latest_frame = bgr
+                        h, w = bgr.shape[:2]
+                        self._size = (w, h)
 
-                    if self._on_frame_callback:
-                        try:
-                            self._on_frame_callback(bgr)
-                        except Exception as e:
-                            logger.debug(f"[AndroidStream] 帧回调异常: {e}")
+                        if self._on_frame_callback:
+                            try:
+                                self._on_frame_callback(bgr)
+                            except Exception as e:
+                                logger.debug(f"[AndroidStream] 帧回调异常: {e}")
+
+            # buffer 过大时截断防止内存膨胀
+            if len(buf) > 1024 * 1024:
+                buf = buf[-65536:]
 
         # flush
         if self._decoder:

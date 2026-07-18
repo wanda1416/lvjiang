@@ -631,6 +631,82 @@ collect $scan1 as "output"
     print("  完整工作流: OK")
 
 
+def test_comment_in_if_body():
+    """测试 if 块体内的 # 注释被忽略（wf-scripts/test_comment.py 合并）"""
+    text = """\
+loop 100
+   scan [scene].[field] as $result
+   if $result.[field] contains "test"
+       # 这是注释
+       goto label1
+   end
+end
+@label1
+collect $result
+"""
+    program = parse_text(text)
+    # 顶层：loop + @label1 + collect
+    assert len(program.body) == 3
+    loop_node = program.body[0]
+    assert isinstance(loop_node, Loop)
+    assert loop_node.count == 100
+    # loop 体：scan + if
+    assert len(loop_node.body) == 2
+    assert isinstance(loop_node.body[0], Scan)
+    if_node = loop_node.body[1]
+    assert isinstance(if_node, If)
+    assert isinstance(if_node.condition, Contains)
+    # if 体：只有 goto，注释已被忽略
+    assert len(if_node.then_body) == 1
+    assert isinstance(if_node.then_body[0], Goto)
+    assert if_node.then_body[0].target == "label1"
+    # @label1
+    label_node = program.body[1]
+    assert isinstance(label_node, Label)
+    assert label_node.name == "label1"
+
+
+def test_goto_with_if_else():
+    """测试 goto 与 if/else 配合跳转（wf-scripts/test_goto.py 合并）"""
+    text = """\
+$var = 1
+@label1
+log concat("var = ", $var)
+if $var == 1
+   $var = 2
+   goto label1
+else
+   goto label2
+end
+@label2
+collect $var
+"""
+    program = parse_text(text)
+    # 顶层：$var=1 + @label1 + log + if + @label2 + collect
+    assert len(program.body) == 6
+    assert isinstance(program.body[0], Eval)
+    assert program.body[0].target == "var"
+    assert isinstance(program.body[1], Label)
+    assert program.body[1].name == "label1"
+    assert isinstance(program.body[2], Log)
+    if_node = program.body[3]
+    assert isinstance(if_node, If)
+    assert isinstance(if_node.condition, NumericEqual)
+    # then 分支：$var=2 + goto label1
+    assert len(if_node.then_body) == 2
+    assert isinstance(if_node.then_body[0], EvalFieldChainAssign) or isinstance(if_node.then_body[0], Eval)
+    assert isinstance(if_node.then_body[1], Goto)
+    assert if_node.then_body[1].target == "label1"
+    # else 分支：goto label2
+    assert len(if_node.else_body) == 1
+    assert isinstance(if_node.else_body[0], Goto)
+    assert if_node.else_body[0].target == "label2"
+    # @label2
+    assert isinstance(program.body[4], Label)
+    assert program.body[4].name == "label2"
+    assert isinstance(program.body[5], Collect)
+
+
 # ─── 隐式 eval 测试 ─────────────────────────────────────────
 
 def test_implicit_eval():
@@ -786,6 +862,8 @@ if __name__ == "__main__":
     # full workflow
     test_if_with_scan_as()
     test_full_workflow()
+    test_comment_in_if_body()
+    test_goto_with_if_else()
     
     print("\n" + "=" * 50)
     print("ALL TESTS PASSED")

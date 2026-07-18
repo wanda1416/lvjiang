@@ -26,16 +26,18 @@ class AdbCapture(CaptureBackend):
     # ─── 生命周期 ─────────────────────────────────────────────
 
     def start(self) -> bool:
-        """预热：刷新设备分辨率缓存，确认设备可响应
+        """预热：抓一帧确认设备可响应，并确定实际截图尺寸
 
-        screencap 无需常驻进程，start() 仅做可用性检查。
+        screencap 无需常驻进程。注意：设备物理分辨率（wm size）可能与实际
+        截图尺寸不一致（如游戏强制横屏时，wm size 为竖屏 1260x2800，而
+        screencap 输出横屏 2800x1260）。get_capture_size 必须以实际截图为准，
+        因此这里直接抓一帧来确定尺寸。
         """
         try:
-            w, h = self._device.get_resolution()
-            if w <= 0 or h <= 0:
-                logger.error("无法获取设备分辨率")
+            img = self.capture()
+            if img is None:
+                logger.error("adb screencap 预热失败：无法获取截图")
                 return False
-            self._size = (w, h)
             return True
         except Exception as e:
             logger.error(f"adb screencap 预热失败: {e}")
@@ -70,19 +72,24 @@ class AdbCapture(CaptureBackend):
             if img is None:
                 logger.error("PNG 解码失败")
                 return None
-            # 缓存分辨率
-            if self._size is None:
-                h, w = img.shape[:2]
-                self._size = (w, h)
+            # screencap 输出的坐标系与 input tap 使用的坐标系一致（游戏横屏时
+            # 二者都是 2800x1260）。因此不做任何旋转，直接返回原图。
+            # get_capture_size 以“实际截图尺寸”为准，而非 wm size 物理竖屏分辨率，
+            # 否则归一化坐标会用错基准导致点击偏移。
+            h, w = img.shape[:2]
+            self._size = (w, h)
             return img
         except Exception as e:
             logger.error(f"screencap 解码失败: {e}")
             return None
 
     def get_capture_size(self) -> tuple[int, int]:
-        """返回设备物理分辨率（width, height）"""
+        """返回实际截图尺寸（width, height）"""
         if self._size is None:
-            self._size = self._device.get_resolution()
+            img = self.capture()
+            if img is None:
+                # 退化兜底：无法截图时用物理分辨率（可能方向不符）
+                return self._device.get_resolution()
         return self._size
 
     # set_capture_region / attach_to_window 沿用 CaptureBackend 默认 no-op

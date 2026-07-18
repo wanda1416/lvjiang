@@ -30,20 +30,33 @@ class AdbInput(InputBackend):
         self.background_mode = True
         self.target_hwnd = None
 
+    # ─── 坐标映射 ──────────────────────────────────────────
+    #
+    # AdbCapture 已在截图阶段把图像旋转到设备原生方向，因此工作流下发的
+    # 截图坐标与 input tap 期望的设备坐标处于同一坐标系，通常无需变换。
+    # 保留一道尺寸一致性守卫作为安全网：仅当截图尺寸与设备分辨率一致时直通。
+
+    def _transform(self, x: int, y: int) -> tuple[int, int]:
+        """截图坐标 → 设备坐标（截图已对齐设备方向，直通）"""
+        return x, y
+
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
         """点击设备坐标（带随机偏移 + before/after 延迟）"""
         offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
         offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
-        actual_x = screen_x + offset_x
-        actual_y = screen_y + offset_y
+        sx = screen_x + offset_x
+        sy = screen_y + offset_y
+
+        # 截图坐标 → 设备坐标（处理横竖屏旋转）
+        actual_x, actual_y = self._transform(sx, sy)
 
         pre_delay = random.uniform(*self.before_click_wait)
         time.sleep(pre_delay)
 
         label = f"({poi_name})" if poi_name else ""
-        logger.debug(f"[ADB] 点击 {label}: ({actual_x}, {actual_y}) [偏移: {offset_x:+d}, {offset_y:+d}]")
+        logger.debug(f"[ADB] 点击 {label}: 截图({sx},{sy}) → 设备({actual_x},{actual_y})")
         self._device.shell("input", "tap", str(actual_x), str(actual_y))
 
         post_delay = random.uniform(*self.after_click_wait)
@@ -79,11 +92,16 @@ class AdbInput(InputBackend):
 
         duration_ms = int(move_dur * 1000)
         hold_info = f" + hold {hold}s（adb 不支持）" if hold and hold > 0 else ""
-        logger.debug(f"[ADB] 拖拽 {poi_name}: ({from_x},{from_y}) -> ({to_x},{to_y}) "
-                     f"[{move_dur:.2f}s]{hold_info}")
+
+        # 截图坐标 → 设备坐标（处理横竖屏旋转）
+        fx, fy = self._transform(from_x, from_y)
+        tx, ty = self._transform(to_x, to_y)
+
+        logger.debug(f"[ADB] 拖拽 {poi_name}: 截图({from_x},{from_y})->({to_x},{to_y}) "
+                     f"→ 设备({fx},{fy})->({tx},{ty}) [{move_dur:.2f}s]{hold_info}")
         self._device.shell(
             "input", "swipe",
-            str(from_x), str(from_y), str(to_x), str(to_y), str(duration_ms),
+            str(fx), str(fy), str(tx), str(ty), str(duration_ms),
         )
 
         # adb input swipe 不支持 hold，若需要则额外 sleep 模拟

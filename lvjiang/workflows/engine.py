@@ -433,17 +433,14 @@ class WorkflowEngine:
 
         # 最后一个字段是赋值目标
         final_field = field_chain[-1]
-        # 解析右侧值
+        # 解析右侧值：FuncCall 调用函数，空 dict 初始化，其余统一走 _resolve
+        # （_resolve 覆盖 VarRef / Literal / FieldAccess，后者用于 $a.b = $c.d.e）
         if isinstance(node.value, FuncCall):
             value = self._call_func(node.value)
         elif isinstance(node.value, dict):
             value = {}
-        elif isinstance(node.value, Literal):
-            value = node.value.value
-        elif isinstance(node.value, VarRef):
-            value = self.variables.get(node.value.name)
         else:
-            value = node.value
+            value = self._resolve(node.value)
         current[final_field] = value
         logger.debug(f"eval: ${'.'.join(field_chain)} = {value!r}")
 

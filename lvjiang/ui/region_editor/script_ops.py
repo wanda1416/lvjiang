@@ -80,9 +80,25 @@ class ScriptOpsMixin:
 
         # 检查是否有父窗口（主窗口）提供运行环境
         main_win = self.parent()
-        if main_win is None or not hasattr(main_win, '_target_window') or main_win._target_window is None:
-            self._result_text.setPlainText("[错误] 请先在主窗口定位游戏窗口")
+        if main_win is None:
+            self._result_text.setPlainText("[错误] 无主窗口，无法获取运行环境")
             return
+
+        backend = getattr(main_win, "_backend", "windows")
+        if backend == "adb":
+            # ADB 模式：检查设备是否已连接
+            if not getattr(main_win, "_device_ready", False):
+                self._result_text.setPlainText("[错误] 请先在主窗口连接 ADB 设备")
+                return
+            window_left = 0
+            window_top = 0
+        else:
+            # Windows 投屏模式：检查窗口是否已定位
+            if not hasattr(main_win, '_target_window') or main_win._target_window is None:
+                self._result_text.setPlainText("[错误] 请先在主窗口定位游戏窗口")
+                return
+            window_left = main_win._target_window["left"]
+            window_top = main_win._target_window["top"]
 
         self._result_text.clear()
         self._status_bar.showMessage("脚本测试运行中...")
@@ -106,8 +122,8 @@ class ScriptOpsMixin:
                 input_ctrl=main_win._input,
                 layout=layout,
                 delay_config=main_win._user_config.delay,
-                window_left=main_win._target_window["left"],
-                window_top=main_win._target_window["top"],
+                window_left=window_left,
+                window_top=window_top,
                 stop_check=lambda: False,
             )
 

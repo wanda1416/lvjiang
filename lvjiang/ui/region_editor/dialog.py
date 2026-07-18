@@ -1,5 +1,7 @@
 """编辑器对话框 - 区域编辑器主框架、Tab/画布管理"""
 
+from math import gcd
+
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
     QPushButton, QComboBox, QStatusBar, QTextEdit,
@@ -115,6 +117,13 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
 
         layout.addLayout(top_bar)
 
+        # ─── 尺寸信息栏（当前 TAB 截图 / 画布尺寸与横纵比）───
+        self._info_label = QLabel()
+        self._info_label.setTextFormat(Qt.TextFormat.RichText)
+        self._info_label.setStyleSheet("font-size: 12px; padding: 2px 2px 4px 2px;")
+        self._info_label.setText('<span style="color:#888;">截图：—　　画布：—</span>')
+        layout.addWidget(self._info_label)
+
         # ─── 主分割器：分组 Tab + OCR 结果区 ───
         self._splitter = QSplitter(Qt.Orientation.Vertical)
 
@@ -229,6 +238,7 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
             tab.canvas.on_poi_changed = self._on_any_poi_changed
         self._set_dirty(False)
         self._status_bar.showMessage(f"当前布局: {layout_name}")
+        self._update_info_label()
 
     def _clear_all_tabs(self):
         """清空所有 Tab 的区域/坐标/方向"""
@@ -258,6 +268,7 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
                 current_tab.canvas.set_image(new_image)
             scene_name = get_scene_name(scene_key)
             self._status_bar.showMessage(f"已保存「{scene_name}」场景截图")
+            self._update_info_label()
         else:
             self._status_bar.showMessage(error_msg or "刷新截图失败")
 
@@ -291,6 +302,7 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
             if tab is not source_tab:
                 tab.set_canvas_config(canvas)
         self._set_dirty(True)
+        self._update_info_label()
 
     def _on_any_region_changed(self):
         """任一 Tab 的区域被修改时，标记 dirty + 刷新当前 Tab 的字段列表"""
@@ -310,6 +322,48 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
         """设置/清除修改状态指示"""
         self._dirty = dirty
         self._dirty_label.setVisible(dirty)
+
+    # ─── 尺寸信息栏 ─────────────────────────────
+
+    def _update_info_label(self, *args):
+        """刷新尺寸信息栏：当前 TAB 截图尺寸/比例 + 画布相对截图的坐标尺寸/比例"""
+        if not hasattr(self, "_info_label"):
+            return
+        tab = self._current_scene_tab()
+        if tab is None or tab.canvas.image_size[0] <= 0:
+            self._info_label.setText(
+                '<span style="color:#888;">截图：—　　画布：—</span>'
+            )
+            return
+        img_w, img_h = tab.canvas.image_size
+        cfg = tab.get_canvas_config()
+        canvas_w = max(1, round(cfg.w_ratio * img_w))
+        canvas_h = max(1, round(cfg.h_ratio * img_h))
+
+        ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
+        cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
+
+        # 横纵比是否一致（画布 vs 截图）
+        same = abs(img_w / img_h - canvas_w / canvas_h) < 0.01
+        tip = ('<span style="color:#2ecc71;">比例一致</span>' if same
+               else '<span style="color:#e67e22;">比例不一致</span>')
+
+        self._info_label.setText(
+            f'<span style="color:#ccc;">截图</span> '
+            f'<b style="color:#4da6ff;">{ss_txt}</b>'
+            f'<span style="color:#666;">　│　</span>'
+            f'<span style="color:#ccc;">画布</span> '
+            f'<b style="color:#ffc850;">{cv_txt}</b>'
+            f'<span style="color:#666;">　—　</span>{tip}'
+        )
+
+    @staticmethod
+    def _fmt_ratio(w: int, h: int) -> str:
+        """格式化横纵比：最简整数比 + 小数"""
+        if w <= 0 or h <= 0:
+            return "-"
+        g = gcd(w, h)
+        return f"{w // g}:{h // g}, {w / h:.2f}"
 
     # ─── 当前场景辅助 ────────────────────────────────────
 

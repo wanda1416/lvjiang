@@ -203,6 +203,11 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         """是否有背景图片"""
         return self._pixmap
 
+    @property
+    def image_size(self) -> tuple[int, int]:
+        """当前背景图尺寸 (w, h)，无图时为 (0, 0)"""
+        return (self._img_w, self._img_h)
+
     # ─── 绘制 ────────────────────────────────────────────
 
     def paintEvent(self, event: QPaintEvent):

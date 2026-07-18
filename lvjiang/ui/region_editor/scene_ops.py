@@ -43,6 +43,7 @@ class SceneOpsMixin:
             scene_tab_widget.tabBar().tabMoved.connect(
                 lambda from_idx, to_idx, gk=group_key: self._on_scene_tab_moved(from_idx, to_idx, gk)
             )
+            scene_tab_widget.currentChanged.connect(self._update_info_label)
             self._group_tabs[group_key] = scene_tab_widget
             self._group_tab_widget.addTab(scene_tab_widget, group_name)
             # 构建该分组下的场景 Tab

@@ -153,8 +153,14 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
     # ─── 画布配置访问 ───────────────────────────────
 
     def set_canvas_config(self, config: CanvasConfig):
-        """设置画布配置（由外部调用）"""
-        self._canvas_config = config
+        """设置画布配置（由外部调用）
+
+        存副本而非直接引用，避免多个 Tab 共享同一 CanvasConfig 实例，
+        否则在一个 Tab 中原地修改会联动影响其他 Tab。
+        """
+        self._canvas_config = CanvasConfig(
+            config.x_ratio, config.y_ratio, config.w_ratio, config.h_ratio,
+        )
         self.update()
 
     def get_canvas_config(self) -> CanvasConfig:

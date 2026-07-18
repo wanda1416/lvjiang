@@ -18,7 +18,6 @@ from .scene_ops import SceneOpsMixin
 from .recognition_ops import RecognitionOpsMixin
 from .script_ops import ScriptOpsMixin, _SceneKeyButton
 from .scene_tab import SceneTab
-from .canvas import EditMode
 
 
 class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, ScriptOpsMixin, QDialog):
@@ -278,16 +277,17 @@ class RegionEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scr
             self._status_bar.showMessage("已退出画布编辑模式")
 
     def _on_any_canvas_changed(self):
-        """任一 Tab 的画布被修改时，同步到其他所有 Tab"""
-        source_tab = None
-        for tab in self._tabs.values():
-            if tab.edit_mode == EditMode.CANVAS:
-                source_tab = tab
-                break
+        """任一 Tab 的画布被修改时，以当前正在编辑的 Tab 为源，同步到其他所有 Tab
+
+        切换画布编辑模式时所有 Tab 都处于 CANVAS 模式，不能用 edit_mode 判断源 Tab（
+        否则永远选中第一个 Tab，将其旧值推回用户实际编辑的 Tab 造成“跳回原位”）。
+        鼠标只能作用于当前可见的画布，故当前激活 Tab 即为被编辑的 Tab。
+        """
+        source_tab = self._current_scene_tab()
         if source_tab is None:
             source_tab = next(iter(self._tabs.values()))
         canvas = source_tab.get_canvas_config()
-        for key, tab in self._tabs.items():
+        for tab in self._tabs.values():
             if tab is not source_tab:
                 tab.set_canvas_config(canvas)
         self._set_dirty(True)

@@ -5,13 +5,13 @@
 ```
 # 装备分析工作流（逐个点击扫描）
 
-click [bag_equip_detail].[slot_main_weapon]
+click [bag_equip_detail].[main_weapon]
 wait page_refresh_wait
 scan [equip_weapon_detail] as $main_weapon_scan
 eval $main_weapon = to_equipment($main_weapon_scan)
 collect $main_weapon
 
-click [bag_equip_detail].[slot_sub_weapon]
+click [bag_equip_detail].[sub_weapon]
 wait page_refresh_wait
 scan [equip_weapon_detail] as $sub_weapon_scan
 eval $sub_weapon = to_equipment($sub_weapon_scan)

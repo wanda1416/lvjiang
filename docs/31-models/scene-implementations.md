@@ -28,16 +28,16 @@
 
 | 字段 Key | 字段名称 | 说明 |
 |----------|----------|------|
-| `slot_main_weapon` | 主武器 | 主武器槽位 |
-| `slot_sub_weapon` | 副武器 | 副武器槽位 |
-| `slot_ring` | 环 | 环槽位 |
-| `slot_pendant` | 佩 | 佩槽位 |
-| `slot_head` | 冠胄 | 头部装备槽位 |
-| `slot_chest` | 胸甲 | 胸部装备槽位 |
-| `slot_leg` | 胫甲 | 腿部装备槽位 |
-| `slot_wrist` | 腕甲 | 腕部装备槽位 |
-| `slot_bow` | 弓箭 | 弓箭槽位 |
-| `slot_arrow` | 射玦 | 射玦槽位 |
+| `main_weapon` | 主武器 | 主武器槽位 |
+| `sub_weapon` | 副武器 | 副武器槽位 |
+| `ring` | 环 | 环槽位 |
+| `pendant` | 佩 | 佩槽位 |
+| `head` | 冠胄 | 头部装备槽位 |
+| `chest` | 胸甲 | 胸部装备槽位 |
+| `leg` | 胫甲 | 腿部装备槽位 |
+| `wrist` | 腕甲 | 腕部装备槽位 |
+| `bow` | 弓箭 | 弓箭槽位 |
+| `arrow` | 射玦 | 射玦槽位 |
 
 ---
 

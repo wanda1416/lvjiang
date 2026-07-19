@@ -6,52 +6,52 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: slot_main_weapon
+- key: main_weapon
   name: 主武器
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_sub_weapon
+- key: sub_weapon
   name: 副武器
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_ring
+- key: ring
   name: 环
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_pendant
+- key: pendant
   name: 佩
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_head
+- key: head
   name: 冠胄
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_chest
+- key: chest
   name: 胸甲
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_leg
+- key: leg
   name: 胫甲
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_wrist
+- key: wrist
   name: 腕甲
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_bow
+- key: bow
   name: 弓箭
   type: slot
   is_text: false
   is_clickable: true
-- key: slot_arrow
+- key: arrow
   name: 射玦
   type: slot
   is_text: false

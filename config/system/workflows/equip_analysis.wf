@@ -2,28 +2,31 @@
 #% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail]
 
 # 装备分析工作流
+# 读取角色已装备数据，写入 session.equipped 持久化
 
 call "subcall/nav_main_to_equip.wf"
 
-eval $equipment = {}
+# 初始化 session.equipped
+eval session.equipped = {}
 
 # 武器类（equip_weapon_detail）
-for slot in ["slot_main_weapon", "slot_sub_weapon", "slot_ring", "slot_pendant"]
+for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
     click [bag_equip_detail].$slot
     wait step_interval
     scan [equip_weapon_detail] as $scan_result
-    eval $equipment.$slot = to_equipment($scan_result)
+    eval session.equipped.$slot = to_equipment($scan_result)
 end
 
 # 防具类（equip_armor_detail）
-for slot in ["slot_head", "slot_chest", "slot_leg", "slot_wrist"]
+for slot in ["head", "chest", "leg", "wrist"]
     click [bag_equip_detail].$slot
     wait step_interval
     scan [equip_armor_detail] as $scan_result
-    eval $equipment.$slot = to_equipment($scan_result)
+    eval session.equipped.$slot = to_equipment($scan_result)
 end
 
-collect $equipment
+# 输出装备数据（供调用方 read 取用）
+collect session.equipped
 
 # 返回主界面
 click [bag_equip_detail].[back]

@@ -189,3 +189,22 @@ def _is_good_equip(scan_result: dict, *args) -> bool:
 
     logger.info(f"is_good_equip: 命中 {hit_count} 条高价值词条 (阈值 2)")
     return hit_count >= 2
+
+
+# ─── Session 持久化函数 ───────────────────────────────────
+
+@builtin_func("save")
+def _save(_engine=None, *args) -> str:
+    """强制保存 session 到磁盘
+
+    通过 engine._save_callback 触发 SessionManager.save()。
+
+    .wf 用法:
+        eval save()
+    """
+    if _engine is not None and _engine._save_callback is not None:
+        _engine._save_callback()
+        logger.info("session 已手动保存")
+    else:
+        logger.warning("save(): 无保存回调，跳过")
+    return ""

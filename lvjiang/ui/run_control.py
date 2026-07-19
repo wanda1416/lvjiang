@@ -11,7 +11,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 import yaml
 
 from ..constants import SYSTEM_WORKFLOWS_DIR, SYSTEM_CONFIG_DIR
-from ..workflows.base import BaseWorkflow
+from ..workflows.engine import WorkflowEngine
 
 
 def _to_serializable(obj):
@@ -48,8 +48,8 @@ class RunControlMixin:
     """运行控制混入类
 
     依赖主类提供:
-        _user_manager, _layout_manager, _target_window, _running, _stop_requested,
-        _capture, _ocr, _input, _overlay,
+        _user_manager, _session_manager, _layout_manager, _target_window,
+        _running, _stop_requested, _capture, _ocr, _input, _overlay,
         user_combo, layout_combo, workflow_combo, btn_run_workflow,
         _param_panel, log_text, statusBar()
     """
@@ -166,7 +166,12 @@ class RunControlMixin:
         if index < 0:
             return
         name = self.user_combo.currentText()
-        if name and name != self._user_manager.get_active_user_name():
+        old_name = self._user_manager.get_active_user_name()
+        if name and name != old_name:
+            # 切换前：如果有正在运行的工作流，先保存旧用户的 session
+            if getattr(self, '_current_engine', None) is not None and self._running:
+                self._session_manager.save(old_name, self._current_engine.session)
+                logger.info(f"用户切换前已保存 session: {old_name}")
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
 
@@ -306,7 +311,7 @@ class RunControlMixin:
             window_left = self._target_window["left"]
             window_top = self._target_window["top"]
 
-        wf = BaseWorkflow(
+        engine = WorkflowEngine(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
@@ -316,6 +321,13 @@ class RunControlMixin:
             window_top=window_top,
             stop_check=self._is_stopped,
         )
+        # session/context 初始化
+        username = self._user_manager.get_active_user_name()
+        engine.session = self._session_manager.load(username)
+        # context 由 execute() 自动初始化为空 dict
+        engine._save_callback = self._session_manager.save_fn(username, engine.session)
+        # 保存 engine 引用供完成回调使用
+        self._current_engine = engine
         # 外部加载的工作流为绝对路径，否则相对于系统工作流目录
         wf_file = flow_cfg["wf_file"]
         wf_path = Path(wf_file)
@@ -326,7 +338,7 @@ class RunControlMixin:
         self.log_text.append(f"[开始] {flow_name} 流程...")
         if flow_params:
             self.log_text.append(f"[参数] {flow_params}")
-        self._start_workflow(flow_id, flow_name, lambda: wf.run_file(wf_path, initial_variables=flow_params))
+        self._start_workflow(flow_id, flow_name, lambda: engine.execute(wf_path, initial_variables=flow_params))
 
     # ─── 异步工作流执行 ────────────────────────────────────
 
@@ -348,11 +360,15 @@ class RunControlMixin:
         if isinstance(result_or_exception, BaseException):
             self.log_text.append(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
             logger.error(f"{flow_name}流程异常退出: {result_or_exception}")
+            # 异常不保存 session
         elif self._stop_requested:
             self.log_text.append(f"[已停止] {flow_name}流程被用户中断")
+            # 用户中断不保存 session
         else:
             result = result_or_exception
             self._save_workflow_result(flow_id, result)
+            # 正常结束 → 自动保存 session
+            self._auto_save_session()
             # 通用控制台输出
             serializable = _to_serializable(result)
             logger.info(f"工作流 {flow_id} 结果: {json.dumps(serializable, ensure_ascii=False, indent=2)}")
@@ -360,26 +376,32 @@ class RunControlMixin:
 
         self._end_automation(flow_name)
 
+    def _auto_save_session(self):
+        """正常结束时自动保存 session"""
+        engine = getattr(self, '_current_engine', None)
+        if engine is not None:
+            username = self._user_manager.get_active_user_name()
+            if username:
+                self._session_manager.save(username, engine.session)
+
     def _save_workflow_result(self, flow_id: str, result):
-        """通用保存工作流结果到 users/{用户名}/{flow_id}_{timestamp}.json"""
-        username = self._user_manager.get_active_user_name()
-        if not username or not isinstance(result, (dict, list)):
+        """保存工作流结果到 local/output/{flow_id}_{timestamp}.json"""
+        if not isinstance(result, (dict, list)):
             return
 
         serializable = _to_serializable(result)
 
-        from ..constants import LOCAL_CONFIG_DIR
-        user_dir = LOCAL_CONFIG_DIR / "users" / username
-        user_dir.mkdir(parents=True, exist_ok=True)
+        from ..constants import OUTPUT_DIR
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = user_dir / f"{flow_id}_{timestamp}.json"
+        save_path = OUTPUT_DIR / f"{flow_id}_{timestamp}.json"
         save_path.write_text(
             json.dumps(serializable, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {flow_id} → users/{username}/{flow_id}_{timestamp}.json")
+        self.log_text.append(f"[保存] {flow_id} → output/{flow_id}_{timestamp}.json")
 
     # ─── 运行按钮 ──────────────────────────────────────────
 

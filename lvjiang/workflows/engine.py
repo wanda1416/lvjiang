@@ -1,22 +1,28 @@
 """工作流 DSL v2 引擎
 
+运行时主体：直接持有硬件后端，管理 session/context 生命周期，
 递归执行 AST 节点，支持完整控制流（if/for/loop/break/goto）。
-引擎自身持有运行时状态（variables / output / coord_meta），
 子工作流通过创建独立 engine 实例实现天然隔离，无需 save/restore。
 """
 
 import traceback
-from typing import Any
+from typing import Any, Callable
 
 from loguru import logger
 from pathlib import Path
+
+from ..config import DelayConfig
+from ..core.capture_base import CaptureBackend
+from ..core.ocr import OCREngine
+from ..core.input_base import InputBackend
+from ..core.scene_registry import Layout
 
 from .grammar import (
     parse_file,
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, Literal, FieldAccess, CoordPoint, ByClause,
+    SceneRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -50,18 +56,103 @@ class _GotoSignal(Exception):
 # ─── 引擎 ─────────────────────────────────────────────────
 
 class WorkflowEngine:
-    """DSL v2 工作流解释器"""
+    """DSL v2 工作流运行时
 
-    def __init__(self, workflow: BaseWorkflow):
-        self._wf = workflow
-        self.variables: dict = {}               # 运行时变量
-        self.output: dict = {}                  # collect 输出
-        self._coord_meta: dict[str, dict] = {}   # var_name → {slot_key: Region}，scan/recognize 共享
-        self._base_dir: Path | None = None      # 当前 wf 所在目录，用于解析相对路径
+    直接持有硬件后端，管理 session/context 生命周期。
+    通过 _ensure_workflow() 懒创建 BaseWorkflow 作为游戏操作委托。
+    """
 
-    def run(self, workflow_path: Path | str) -> dict:
+    def __init__(
+        self,
+        *,
+        capture: CaptureBackend,
+        ocr: OCREngine,
+        input_ctrl: InputBackend,
+        layout: Layout,
+        delay_config: DelayConfig | None = None,
+        window_left: int = 0,
+        window_top: int = 0,
+        stop_check: Callable[[], bool] | None = None,
+    ):
+        # 硬件后端（直接持有）
+        self._capture = capture
+        self._ocr = ocr
+        self._input = input_ctrl
+        self._layout = layout
+        self._delay = delay_config or DelayConfig()
+        self._window_left = window_left
+        self._window_top = window_top
+        self._stop_check = stop_check or (lambda: False)
+        # 执行状态
+        self.variables: dict = {}
+        self.output: dict = {}
+        self._coord_meta: dict[str, dict] = {}
+        self._base_dir: Path | None = None
+        # session / context（公开属性，UI 层注入）
+        self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
+        self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
+        self._save_callback: Callable | None = None
+        # 游戏操作委托（execute 时懒创建）
+        self._workflow: BaseWorkflow | None = None
+
+    @property
+    def _session(self) -> dict:
+        """兼容旧访问方式，DSL 内部使用"""
+        return self.session
+
+    @_session.setter
+    def _session(self, value: dict | None):
+        self.session = value if value is not None else {}
+
+    @property
+    def _context(self) -> dict:
+        """兼容旧访问方式，DSL 内部使用"""
+        return self.context
+
+    @_context.setter
+    def _context(self, value: dict | None):
+        self.context = value if value is not None else {}
+
+    def _ensure_workflow(self) -> BaseWorkflow:
+        """懒创建 BaseWorkflow 作为游戏操作委托"""
+        if self._workflow is None:
+            self._workflow = BaseWorkflow(
+                capture=self._capture,
+                ocr=self._ocr,
+                input_ctrl=self._input,
+                layout=self._layout,
+                delay_config=self._delay,
+                window_left=self._window_left,
+                window_top=self._window_top,
+                stop_check=self._stop_check,
+            )
+        return self._workflow
+
+    def execute(self, source: str | Path, *, initial_variables: dict | None = None) -> dict:
+        """统一执行入口
+
+        Args:
+            source: .wf 文件路径（后续扩展 Python 类）
+            initial_variables: 外部注入的初始变量
+
+        Returns:
+            dict: collect 累积结果
+        """
+        if initial_variables:
+            self.variables.update(initial_variables)
+
+        # context 每次执行重置为空 dict（临时状态）
+        self.context = {}
+
+        source_path = Path(source)
+        if source_path.suffix == ".wf":
+            return self._execute_dsl(source_path)
+        raise ValueError(f"不支持的执行源: {source}")
+
+    def _execute_dsl(self, wf_path: Path) -> dict:
         """加载并执行 .wf 文件"""
-        resolved = Path(workflow_path).resolve()
+        self._ensure_workflow()
+        resolved = Path(wf_path).resolve()
         self._base_dir = resolved.parent
         program = parse_file(resolved)
         logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令) ===")
@@ -89,7 +180,7 @@ class WorkflowEngine:
         """
         pc = 0
         while pc < len(stmts):
-            if self._wf.is_stopped:
+            if self._stop_check():
                 logger.info("工作流被用户停止")
                 return
 
@@ -122,7 +213,7 @@ class WorkflowEngine:
     def _exec_stmt(self, node):
         """执行单条语句"""
         # 语句边界也检查停止标志，让 F10 在两条语句之间立即生效
-        if self._wf.is_stopped:
+        if self._stop_check():
             raise _BreakSignal()
         match node:
             case Click():
@@ -173,7 +264,7 @@ class WorkflowEngine:
         """
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
-            self._wf._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
+            self._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
             return
         if isinstance(node.target, SceneRef):
             # 解析 scene（可能是 str 或 VarRef）
@@ -195,14 +286,14 @@ class WorkflowEngine:
                 # 尝试从 coord_meta 查找该 key 对应的 Region
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
-                    x, y = self._wf._region_to_screen(region_obj, jitter=True)
+                    x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
                     if x is not None and y is not None:
-                        self._wf._input.click_screen(x, y, f"{scene}/{region_val}")
+                        self._input.click_screen(x, y, f"{scene}/{region_val}")
                         return
                 # 回退：作为 region key 名查场景配置
-                self._wf.click_any(str(scene), str(region_val))
+                self._ensure_workflow().click_any(str(scene), str(region_val))
             else:
-                self._wf.click_any(str(scene), region)
+                self._ensure_workflow().click_any(str(scene), region)
         else:
             logger.error(f"click: 未知目标类型 {type(node.target).__name__}")
 
@@ -214,7 +305,7 @@ class WorkflowEngine:
             x1, y1 = self._coord_ratio_to_screen(node.from_point.rx, node.from_point.ry)
             x2, y2 = self._coord_ratio_to_screen(node.to_point.rx, node.to_point.ry)
             duration = self._resolve_duration(node.duration) if node.duration else None
-            self._wf._input.drag_screen(
+            self._input.drag_screen(
                 x1, y1, x2, y2,
                 f"coord({node.from_point.rx},{node.from_point.ry})->({node.to_point.rx},{node.to_point.ry})",
                 duration=duration, hold=node.hold,
@@ -241,7 +332,7 @@ class WorkflowEngine:
             
             duration = self._resolve_duration(node.duration) if node.duration else None
             hold = node.hold
-            self._wf.drag_arrow(str(scene), str(arrow), duration=duration, hold=hold)
+            self._ensure_workflow().drag_arrow(str(scene), str(arrow), duration=duration, hold=hold)
         else:
             logger.error(f"drag: 未知目标类型 {type(node.scene).__name__}")
 
@@ -253,7 +344,7 @@ class WorkflowEngine:
             lo, hi = float(delay[0]), float(delay[1])
             seconds = random.uniform(lo, hi)
             logger.debug(f"随机等待 {lo}~{hi}s → {seconds:.2f}s")
-            self._wf.wait_seconds(seconds)
+            self._ensure_workflow().wait_seconds(seconds)
         elif isinstance(delay, VarRef):
             # 动态等待：wait $var → 解析变量值
             val = self.variables.get(delay.name)
@@ -263,21 +354,21 @@ class WorkflowEngine:
                 lo, hi = float(val[0]), float(val[1])
                 seconds = random.uniform(lo, hi)
                 logger.debug(f"动态随机等待 ${delay.name} = ({lo}, {hi}) → {seconds:.2f}s")
-                self._wf.wait_seconds(seconds)
+                self._ensure_workflow().wait_seconds(seconds)
             elif isinstance(val, (int, float)):
-                self._wf.wait_seconds(float(val))
+                self._ensure_workflow().wait_seconds(float(val))
                 logger.debug(f"动态等待 ${delay.name} = {val}s")
             else:
                 logger.error(f"wait ${delay.name} 不是数值或范围类型: {val}")
         elif isinstance(delay, Literal):
             val = delay.value
             if isinstance(val, (int, float)):
-                self._wf.wait_seconds(float(val))
+                self._ensure_workflow().wait_seconds(float(val))
             else:
                 # 命名延迟
-                self._wf.wait_delay(str(val))
+                self._ensure_workflow().wait_delay(str(val))
         else:
-            self._wf.wait_delay(str(delay))
+            self._ensure_workflow().wait_delay(str(delay))
 
     def _exec_scan(self, node: Scan):
         # 解析场景名（可能是 str 或 VarRef）
@@ -303,13 +394,13 @@ class WorkflowEngine:
             # ── by 子句：短路 OCR，返回字段名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            result = self._wf.ocr_scene_by(scene, field_keys or [], target_value, by_clause.match_mode)
+            result = self._ensure_workflow().ocr_scene_by(scene, field_keys or [], target_value, by_clause.match_mode)
             self.variables[var_name] = result  # str（命中字段名或 ""）
         else:
-            result = self._wf.ocr_scene(scene, field_keys)
+            result = self._ensure_workflow().ocr_scene(scene, field_keys)
             self.variables[var_name] = result  # dict
             # 存 region 元数据，供 click [scene].$key 解析坐标
-            regions = self._wf._layout.get_scene_regions(scene)
+            regions = self._layout.get_scene_regions(scene)
             if field_keys:
                 regions = [r for r in regions if r.key in field_keys]
             self._coord_meta[var_name] = {r.key: r for r in regions}
@@ -344,27 +435,42 @@ class WorkflowEngine:
             # ── by 子句：短路材料识别，返回 slot 名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            result = self._wf.recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode, group=group)
+            result = self._ensure_workflow().recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode, group=group)
             self.variables[var_name] = result  # str（命中 slot 名或 ""）
         else:
-            result, region_map = self._wf.recognize_materials(scene, field_keys, group=group)
+            result, region_map = self._ensure_workflow().recognize_materials(scene, field_keys, group=group)
             self.variables[var_name] = result           # {slot_key: "材料类型"}
             self._coord_meta[var_name] = region_map     # {slot_key: Region}
 
     def _exec_collect(self, node: Collect):
-        """collect $var [as "label" | as $alias_var] — 将变量值存入输出 dict"""
-        var_name = node.source.name if isinstance(node.source, VarRef) else str(node.source)
-        value = self.variables.get(var_name)
-        if value is None:
-            logger.warning(f"collect: 变量 ${var_name} 未定义，跳过")
+        """collect $var | field_access [as "label" | as $alias_var] — 将值存入输出 dict"""
+        if isinstance(node.source, VarRef):
+            var_name = node.source.name
+            value = self.variables.get(var_name)
+            if value is None:
+                logger.warning(f"collect: 变量 ${var_name} 未定义，跳过")
+                return
+            default_key = var_name
+        elif isinstance(node.source, FieldAccess):
+            value = self._resolve(node.source)
+            # 默认 key 取最后一级字段名（如 session.equipped → "equipped"）
+            fn = node.source.field_name
+            if isinstance(fn, str):
+                default_key = fn
+            elif isinstance(fn, Literal):
+                default_key = str(fn.value)
+            else:
+                default_key = self._field_path(node.source)
+        else:
+            logger.warning(f"collect: 不支持的源类型 {type(node.source).__name__}")
             return
-        # 解析 key：优先 alias_var（动态），其次 alias（静态），最后 var_name
+        # 解析 key：优先 alias_var（动态），其次 alias（静态），最后 default_key
         if node.alias_var:
-            key = self.variables.get(node.alias_var.name, var_name)
+            key = self.variables.get(node.alias_var.name, default_key)
         elif node.alias:
             key = node.alias
         else:
-            key = var_name
+            key = default_key
         self.output[key] = value
         logger.debug(f"collect: {key} = {value}")
 
@@ -430,18 +536,27 @@ class WorkflowEngine:
             logger.debug(f"eval: {node.func_name}(...) = {result} (丢弃)")
 
     def _exec_eval_field_assign(self, node: EvalFieldChainAssign):
-        """eval $dict.key = value 或 eval $dict.key1.key2 = value — 字段赋值"""
+        """eval $dict.key = value 或 eval session.key = value — 字段赋值
+
+        支持 VarRef 根（$dict.key）和 KeywordRef 根（session.key / context.key）。
+        """
         # 解析字段访问链，获取所有字段名
         field_chain = self._extract_field_chain(node.target)
         if not field_chain:
             logger.error("eval_field_assign: 无法解析字段链")
             return
 
-        # 第一个字段是变量名
-        var_name = field_chain[0]
-        dict_var = self.variables.get(var_name)
+        # 第一个字段是变量名或关键字名
+        root_name = field_chain[0]
+        # 判断根是关键字还是普通变量
+        if root_name == "session":
+            dict_var = self.session
+        elif root_name == "context":
+            dict_var = self.context
+        else:
+            dict_var = self.variables.get(root_name)
         if not isinstance(dict_var, dict):
-            logger.error(f"eval_field_assign: ${var_name} 不是字典类型")
+            logger.error(f"eval_field_assign: {root_name} 不是字典类型")
             return
 
         # 遍历到倒数第二个字段，获取父字典
@@ -468,10 +583,13 @@ class WorkflowEngine:
         else:
             value = self._resolve(node.value)
         current[final_field] = value
-        logger.debug(f"eval: ${'.'.join(field_chain)} = {value!r}")
+        logger.debug(f"eval: {'.'.join(field_chain)} = {value!r}")
 
     def _extract_field_chain(self, node: FieldAccess) -> list:
-        """从 FieldAccess 节点提取字段名链"""
+        """从 FieldAccess 节点提取字段名链
+
+        支持 VarRef / KeywordRef 作为根。返回的链第一个元素是变量名或关键字名。
+        """
         chain = []
         current = node
         while isinstance(current, FieldAccess):
@@ -483,9 +601,13 @@ class WorkflowEngine:
                 chain.append(self.variables.get(fn.name, ""))
             elif isinstance(fn, Literal):
                 chain.append(fn.value)
+            elif isinstance(fn, KeywordRef):
+                chain.append(fn.name)
             current = current.root
-        # 最底层是 VarRef（变量名）
+        # 最底层是 VarRef（变量名）或 KeywordRef（关键字名）
         if isinstance(current, VarRef):
+            chain.append(current.name)
+        elif isinstance(current, KeywordRef):
             chain.append(current.name)
         chain.reverse()
         return chain
@@ -493,12 +615,12 @@ class WorkflowEngine:
     def _call_func(self, node: FuncCall):
         """执行函数调用并返回结果"""
         resolved_args = [self._resolve(arg) for arg in node.func_args]
-        return self._wf.call_function(node.func_name, resolved_args)
+        return self._ensure_workflow().call_function(node.func_name, resolved_args, engine=self)
 
     def _call_func_from_eval(self, node: Eval):
         """从 Eval 节点执行函数调用"""
         resolved_args = [self._resolve(arg) for arg in node.func_args]
-        return self._wf.call_function(node.func_name, resolved_args)
+        return self._ensure_workflow().call_function(node.func_name, resolved_args, engine=self)
 
     def _exec_call(self, node: Call):
         """call "sub.wf" with $x as "arg1" read "key" as $var
@@ -520,13 +642,21 @@ class WorkflowEngine:
             arg_values[str(key)] = val
 
         # 2. 创建独立子 engine + 注入参数
-        sub_engine = WorkflowEngine(self._wf)
+        sub_engine = WorkflowEngine(
+            capture=self._capture, ocr=self._ocr, input_ctrl=self._input,
+            layout=self._layout, delay_config=self._delay,
+            window_left=self._window_left, window_top=self._window_top,
+            stop_check=self._stop_check,
+        )
         sub_engine.variables = dict(arg_values)
         # coord_meta 全局共享：子工作流可访问父工作流 scan/recognize 的坐标元数据
         sub_engine._coord_meta = self._coord_meta
+        # session/context 透传：子工作流可读写同一份持久/临时状态
+        sub_engine.session = self.session
+        sub_engine.context = self.context
 
         # 3. 运行子 wf
-        sub_output = sub_engine.run(wf_path)
+        sub_output = sub_engine.execute(wf_path)
 
         # 4. 从子 engine output 提取 read 结果，写入父 context
         count = 0
@@ -570,7 +700,7 @@ class WorkflowEngine:
         logger.debug(f"for {node.var} in {items}")
 
         for value in items:
-            if self._wf.is_stopped:
+            if self._stop_check():
                 logger.info("工作流被用户停止")
                 return
             # 设置循环变量
@@ -595,7 +725,7 @@ class WorkflowEngine:
 
         logger.debug(f"loop {count}")
         for _ in range(count):
-            if self._wf.is_stopped:
+            if self._stop_check():
                 logger.info("工作流被用户停止")
                 return
             try:
@@ -671,9 +801,13 @@ class WorkflowEngine:
 
     @staticmethod
     def _field_path(node) -> str:
-        """生成字段访问路径的调试描述：$ring.affix_1.value → 'ring.affix_1.value'"""
-        # 裸变量直接返回名称
+        """生成字段访问路径的调试描述：$ring.affix_1.value → 'ring.affix_1.value'
+        支持 VarRef / KeywordRef 作为根。
+        """
+        # 裸变量/关键字直接返回名称
         if isinstance(node, VarRef):
+            return node.name
+        if isinstance(node, KeywordRef):
             return node.name
         parts = []
         current = node
@@ -681,12 +815,16 @@ class WorkflowEngine:
             fn = current.field_name
             if isinstance(fn, VarRef):
                 parts.append(f"${fn.name}")
+            elif isinstance(fn, KeywordRef):
+                parts.append(fn.name)
             elif isinstance(fn, Literal):
                 parts.append(f'"{fn.value}"')
             else:
                 parts.append(str(fn))
             current = current.root
         if isinstance(current, VarRef):
+            parts.append(current.name)
+        elif isinstance(current, KeywordRef):
             parts.append(current.name)
         return ".".join(reversed(parts))
 
@@ -706,14 +844,18 @@ class WorkflowEngine:
         """求值字段访问链，返回原始值（dict/int/float/str 等）
 
         中间层返回 dict/list 以便继续链式访问，叶子层返回具体值。
-        field_name 支持三种类型：
-          str    → 静态 dict key
-          VarRef → 动态 key（变量解析后查 dict / 按 index 取 list）
-          Literal→ 静态字面量 key（来自 $var."key" 或 $var.[key]）
+        root 支持 VarRef / KeywordRef / FieldAccess。
+        field_name 支持四种类型：
+          str      → 静态 dict key（裸 NAME）
+          VarRef   → 动态 key（变量解析后查 dict / 按 index 取 list）
+          Literal  → 静态字面量 key（来自 $var."key" 或 $var.[key]）
+          KeywordRef → 关键字引用（嵌套 session/context 访问）
         """
         # 先解析 root
         if isinstance(node.root, VarRef):
             current = self.variables.get(node.root.name)
+        elif isinstance(node.root, KeywordRef):
+            current = self._resolve(node.root)
         elif isinstance(node.root, FieldAccess):
             current = self._eval_field_raw(node.root)
         else:
@@ -726,6 +868,9 @@ class WorkflowEngine:
             key = self.variables.get(node.field_name.name, "")
         elif isinstance(node.field_name, Literal):
             key = node.field_name.value
+        elif isinstance(node.field_name, KeywordRef):
+            # field_access.session / field_access.context（罕见但合法）
+            return self._resolve(node.field_name)
         else:
             return ""
 
@@ -755,6 +900,7 @@ class WorkflowEngine:
         """解析表达式节点为运行时值
 
         VarRef → 查变量表（找不到则返回 name 本身作为字面量回退）
+        KeywordRef → 返回 session/context 字典引用
         Literal → 直接返回值
         FieldAccess → 逐层遍历字典/列表
         list 类型变量原样返回（支持 for 迭代）
@@ -766,6 +912,12 @@ class WorkflowEngine:
                     return val  # 保留原始类型（包括 list）
                 # 回退：未定义的变量视为字面量
                 return node.name
+            case KeywordRef():
+                if node.name == "session":
+                    return self.session
+                if node.name == "context":
+                    return self.context
+                return {}
             case Literal():
                 return node.value
             case FieldAccess():
@@ -802,15 +954,15 @@ class WorkflowEngine:
         屏幕 = 窗口偏移 + 画布原点 + 归一化比例 × 画布尺寸。
         窗口缩放/移动后回放仍准确。
         """
-        w, h = self._wf._capture.get_capture_size()
-        canvas = self._wf._layout.get_canvas()
+        w, h = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
         canvas_px_x = canvas.x_ratio * w
         canvas_px_y = canvas.y_ratio * h
         canvas_px_w = canvas.w_ratio * w
         canvas_px_h = canvas.h_ratio * h
         cx = canvas_px_x + rx * canvas_px_w
         cy = canvas_px_y + ry * canvas_px_h
-        return int(self._wf._window_left + cx), int(self._wf._window_top + cy)
+        return int(self._window_left + cx), int(self._window_top + cy)
 
     # ─── coord_meta 查找 ─────────────────────────────────────
 

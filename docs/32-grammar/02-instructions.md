@@ -328,7 +328,7 @@ eval $var.$key = value            # 动态字段名赋值
 eval func(args...)                # 调用函数，丢弃返回值
 ```
 
-详细说明见 [04-eval-and-functions.md](04-eval-and-functions.md)。
+详细说明见 [04-functions.md](04-functions.md)。
 
 ### find_key — 查找字典中匹配项的 key
 

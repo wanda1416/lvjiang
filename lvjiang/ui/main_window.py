@@ -19,6 +19,7 @@ from .window_ops import WindowOpsMixin
 from .run_control import RunControlMixin
 from ..config import load_user_config
 from ..core.user_config import UserConfigManager
+from ..core.session_manager import SessionManager
 from ..core.layout_manager import LayoutConfigManager
 
 
@@ -70,6 +71,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # 用户管理
         self._user_manager = UserConfigManager()
+
+        # Session 持久化管理
+        self._session_manager = SessionManager()
 
         # 布局管理
         self._layout_manager = LayoutConfigManager()

@@ -41,7 +41,7 @@ end
 **静态列表**（元素为裸标识符、字符串或变量引用）：
 
 ```
-for slot in [slot_head, slot_chest]
+for slot in [head, chest]
     click [scene].$slot
 end
 

@@ -46,7 +46,7 @@ fields:
 | info | 信息字段 | equip_type, equip_level |
 | attr | 属性字段 | base_attr, affix_* |
 | func | 功能字段 | main_func, sub_func_* |
-| slot | 槽位字段 | slot_main_weapon |
+| slot | 槽位字段 | main_weapon |
 | material | 材料格 | material_1~7 |
 | action | 动作按钮 | tune_btn, close_btn |
 

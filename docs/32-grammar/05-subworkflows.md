@@ -32,7 +32,7 @@ call "sub.wf" with $x as "param1", $y as "param2" read "key1" as $out1, "key2" a
 
 ```
 # 父工作流
-eval $slot = "slot_head"
+eval $slot = "head"
 eval $mode = "quick"
 call "check.wf" with $slot as "target_slot", $mode as "run_mode"
 ```
@@ -41,7 +41,7 @@ call "check.wf" with $slot as "target_slot", $mode as "run_mode"
 
 ```
 # check.wf
-if $target_slot equals "slot_head"
+if $target_slot equals "head"
     log "检查头部装备"
 end
 ```
@@ -174,7 +174,7 @@ end
 call "subcall/nav_main_to_equip.wf"
 
 # 2. 点击具体装备并扫描
-click [bag_equip_detail].[slot_main_weapon]
+click [bag_equip_detail].[main_weapon]
 wait page_refresh_wait
 scan [equip_weapon_detail] as $scan_result
 

@@ -163,12 +163,14 @@ class BaseWorkflow:
         self,
         scene_key: str,
         slot_keys: list[str] | None = None,
+        group: str | None = None,
     ) -> tuple[dict[str, str], dict]:
         """对指定场景的每个 slot 执行材料识别
 
         Args:
             scene_key: 场景 key
             slot_keys: 可选，只识别指定 slot
+            group: 可选，限定材料分组范围
 
         Returns:
             (result, region_map)
@@ -212,7 +214,7 @@ class BaseWorkflow:
                 result[region.key] = ""
                 continue
 
-            info = self.material_recognizer.recognize(slot_img)
+            info = self.material_recognizer.recognize(slot_img, group=group)
             result[region.key] = info.type  # 空槽 info.type == ""
             logger.debug(
                 f"材料识别 [{scene_key}].[{region.key}]: "
@@ -322,6 +324,7 @@ class BaseWorkflow:
         field_keys: list[str],
         target_value,
         mode: str,
+        group: str | None = None,
     ) -> str:
         """短路材料识别：一次截图，逐 slot 识别，首个命中即返回 slot 名
 
@@ -330,6 +333,7 @@ class BaseWorkflow:
             field_keys: 要识别的 slot 列表
             target_value: 匹配目标值（str 或 list，由 mode 决定）
             mode: equals | contains | equals_any | contains_any
+            group: 可选，限定材料分组范围
 
         Returns:
             首个命中的 slot_key（str），全部未命中返回 ""
@@ -355,12 +359,12 @@ class BaseWorkflow:
             if crop is None:
                 logger.debug(f"by 材料识别: region {region.key} 裁剪为空，跳过")
                 continue
-            info = self.material_recognizer.recognize(crop)
+            info = self.material_recognizer.recognize(crop, group=group)
             if self._match_text(info.type, target_value, mode):
-                logger.info(f"by 材料识别命中: [{scene_key}].[{region.key}] type={info.type!r} mode={mode}")
+                logger.info(f"by 材料识别命中: [{scene_key}].[{region.key}] type={info.type!r} mode={mode} group={group}")
                 return region.key
 
-        logger.info(f"by 材料识别未命中: [{scene_key}]:{field_keys} mode={mode}")
+        logger.info(f"by 材料识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
         return ""
 
     # ─── 等待 ──────────────────────────────────────────────

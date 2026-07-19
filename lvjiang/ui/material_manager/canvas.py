@@ -67,10 +67,12 @@ class MaterialCanvas(QWidget):
 
         # 网格区域（归一化坐标 0.0~1.0，相对于图片）
         self._grid_rect: QRectF | None = None  # x, y, w, h
+        self._drawing_rect: QRectF | None = None  # 绘制中的临时矩形
         self._drag_mode = DragMode.NONE
         self._drag_handle = HandlePos.NONE
         self._drag_start = QPointF()
         self._drag_orig: QRectF | None = None
+        self._pending_cell_toggle: tuple[int, int] | None = None  # 待处理的单元格切换
 
         # 右键拖拽平移
         self._panning = False
@@ -205,6 +207,52 @@ class MaterialCanvas(QWidget):
         r = self._grid_rect
         return (r.x(), r.y(), r.x() + r.width(), r.y() + r.height())
 
+    def get_region_pixels(self) -> tuple[int, int, int, int] | None:
+        """获取当前框选区域像素坐标 (x1, y1, x2, y2)"""
+        if self._grid_rect is None or self._original_image is None:
+            return None
+        h, w = self._original_image.shape[:2]
+        x1 = int(self._grid_rect.x() * w)
+        y1 = int(self._grid_rect.y() * h)
+        x2 = int((self._grid_rect.x() + self._grid_rect.width()) * w)
+        y2 = int((self._grid_rect.y() + self._grid_rect.height()) * h)
+        return (x1, y1, x2, y2)
+
+    def set_region_from_pixels(self, x: int, y: int, w: int, h: int):
+        """从像素坐标设置网格区域（用于“生成网格”功能）
+
+        Args:
+            x, y: 左上角像素坐标
+            w, h: 宽高像素
+        """
+        if self._original_image is None:
+            return
+        img_h, img_w = self._original_image.shape[:2]
+        # 转换为归一化坐标
+        nx = x / img_w
+        ny = y / img_h
+        nw = w / img_w
+        nh = h / img_h
+        # 限制在 [0, 1] 范围内
+        nx = max(0.0, min(1.0, nx))
+        ny = max(0.0, min(1.0, ny))
+        nw = max(0.0, min(1.0 - nx, nw))
+        nh = max(0.0, min(1.0 - ny, nh))
+        self._grid_rect = QRectF(nx, ny, nw, nh)
+        self._show_grid = True
+        self._selected_cells.clear()
+        self.update()
+        # 发射信号通知区域变化
+        self.region_changed.emit(nx, ny, nx + nw, ny + nh)
+
+    @property
+    def image_size(self) -> tuple[int, int] | None:
+        """获取图片尺寸 (width, height)，None 表示无图片"""
+        if self._original_image is None:
+            return None
+        h, w = self._original_image.shape[:2]
+        return (w, h)
+
     def get_grid_cells(self, gap: int = 0) -> list[tuple[int, int, int, int]] | None:
         """获取网格切割的单元格像素坐标列表
 
@@ -320,12 +368,32 @@ class MaterialCanvas(QWidget):
         wr = self._rect_to_widget(self._grid_rect)
         if not wr.contains(widget_pos):
             return None
-        rx = (widget_pos.x() - wr.x()) / wr.width()
-        ry = (widget_pos.y() - wr.y()) / wr.height()
-        col = int(rx * self._grid_cols)
-        row = int(ry * self._grid_rows)
+
+        # 计算 cell 尺寸（与 _draw_grid 一致）
+        h, w = self._original_image.shape[:2] if self._original_image is not None else (1, 1)
+        total_gap_w = self._grid_gap * (self._grid_cols - 1)
+        total_gap_h = self._grid_gap * (self._grid_rows - 1)
+        cell_w = (wr.width() - total_gap_w * wr.width() / w) / self._grid_cols
+        cell_h = (wr.height() - total_gap_h * wr.height() / h) / self._grid_rows
+        gap_w = self._grid_gap * wr.width() / w
+        gap_h = self._grid_gap * wr.height() / h
+
+        # 计算相对于区域左上角的偏移
+        dx = widget_pos.x() - wr.x()
+        dy = widget_pos.y() - wr.y()
+
+        # 计算列和行（考虑间隔）
+        col = int(dx / (cell_w + gap_w))
+        row = int(dy / (cell_h + gap_h))
         col = max(0, min(self._grid_cols - 1, col))
         row = max(0, min(self._grid_rows - 1, row))
+
+        # 检查是否点击在间隔区域（如果是则返回 None）
+        cell_x = col * (cell_w + gap_w)
+        cell_y = row * (cell_h + gap_h)
+        if dx > cell_x + cell_w or dy > cell_y + cell_h:
+            return None
+
         return (row, col)
 
     # ─── 绘制 ─────────────────────────────────────────────
@@ -368,6 +436,17 @@ class MaterialCanvas(QWidget):
             if self._hover_cell and self._show_grid:
                 self._draw_hover_cell(painter, wr)
 
+        # 绘制正在拖拽的预览矩形
+        if self._drawing_rect and self._drawing_rect.width() > 0.001:
+            dr = self._rect_to_widget(self._drawing_rect)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(100, 200, 255, 30)))
+            painter.drawRect(dr)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            pen = QPen(QColor(100, 200, 255, 150), 1, Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            painter.drawRect(dr)
+
         painter.end()
 
     def _draw_handles(self, painter: QPainter, wr: QRectF):
@@ -400,18 +479,21 @@ class MaterialCanvas(QWidget):
         gap_h = self._grid_gap * wr.height() / h
 
         if self._grid_gap > 0:
-            # 绘制间隔区域（半透明红色填充）
+            # 绘制间隔区域（半透明红色填充，精确绘制每个间隙块）
             painter.setPen(QPen(QColor(255, 80, 80, 150), 1))
             painter.setBrush(QBrush(QColor(255, 80, 80, 80)))
 
-            # 绘制水平间隔条
+            # 绘制水平间隙（每行之间的间隙块，仅覆盖 cell 宽度）
             for row in range(self._grid_rows - 1):
-                y = wr.y() + (row + 1) * cell_h + row * gap_h
-                painter.drawRect(QRectF(wr.x(), y, wr.width(), gap_h))
-            # 绘制垂直间隔条
+                gy = wr.y() + (row + 1) * cell_h + row * gap_h
+                for col in range(self._grid_cols):
+                    cx = wr.x() + col * (cell_w + gap_w)
+                    painter.drawRect(QRectF(cx, gy, cell_w, gap_h))
+
+            # 绘制垂直间隙（每列之间的间隙块，覆盖全高）
             for col in range(self._grid_cols - 1):
-                x = wr.x() + (col + 1) * cell_w + col * gap_w
-                painter.drawRect(QRectF(x, wr.y(), gap_w, wr.height()))
+                gx = wr.x() + (col + 1) * cell_w + col * gap_w
+                painter.drawRect(QRectF(gx, wr.y(), gap_w, wr.height()))
         else:
             # 无间隔时绘制黄色虚线网格
             pen = QPen(QColor(255, 200, 50, 180), 1, Qt.PenStyle.DashLine)
@@ -502,29 +584,42 @@ class MaterialCanvas(QWidget):
                 self._drag_mode = DragMode.RESIZING
                 self._drag_handle = handle
             elif self._show_grid and self._hit_rect(pos):
-                # 网格显示时，点击单元格切换选择
-                cell = self._get_hover_cell(pos)
-                if cell is not None:
-                    self.toggle_cell(cell[0], cell[1])
-                else:
-                    # 点击在矩形内但不在单元格上，移动矩形
-                    self._drag_mode = DragMode.MOVING
+                # 网格显示时，记录点击位置，松开时判断是单击还是拖拽
+                self._pending_cell_toggle = self._get_hover_cell(pos)
+                self._drag_start = pos  # 保存 widget 坐标
             elif self._hit_rect(pos):
                 self._drag_mode = DragMode.MOVING
             else:
-                # 开始绘制新矩形
+                # 开始绘制新矩形（不影响已有 _grid_rect）
                 self._drag_mode = DragMode.DRAWING
                 self._drag_start = self._widget_to_normalized(pos.x(), pos.y())
-                self._grid_rect = QRectF(self._drag_start.x(), self._drag_start.y(), 0, 0)
-            self._drag_orig = QRectF(self._grid_rect) if self._grid_rect else None
+                self._drawing_rect = QRectF(self._drag_start.x(), self._drag_start.y(), 0, 0)
+            if self._drag_mode != DragMode.DRAWING and self._pending_cell_toggle is None:
+                self._drag_orig = QRectF(self._grid_rect) if self._grid_rect else None
             self.update()
 
         elif event.button() == Qt.MouseButton.RightButton:
-            self._panning = True
-            self._pan_start = event.position()
+            pos = event.position()
+            if self._hit_rect(pos):
+                # 右键在区域内：移动区域
+                self._drag_mode = DragMode.MOVING
+                self._drag_start = self._widget_to_normalized(pos.x(), pos.y())
+                self._drag_orig = QRectF(self._grid_rect) if self._grid_rect else None
+            else:
+                # 右键在区域外：平移截图
+                self._panning = True
+                self._pan_start = pos
 
     def mouseMoveEvent(self, event: QMouseEvent):
         pos = event.position()
+
+        # 如果有待处理的单元格切换，但鼠标移动了，则取消（说明是拖拽而非单击）
+        if self._pending_cell_toggle is not None:
+            delta = pos - self._drag_start
+            if delta.manhattanLength() > 5:
+                self._pending_cell_toggle = None
+                self._drag_mode = DragMode.MOVING
+                self._drag_orig = QRectF(self._grid_rect) if self._grid_rect else None
 
         # 更新悬停单元格
         new_hover = self._get_hover_cell(pos)
@@ -555,7 +650,7 @@ class MaterialCanvas(QWidget):
         if self._drag_mode == DragMode.DRAWING:
             x1, y1 = self._drag_start.x(), self._drag_start.y()
             x2, y2 = norm.x(), norm.y()
-            self._grid_rect = QRectF(
+            self._drawing_rect = QRectF(
                 min(x1, x2), min(y1, y2),
                 abs(x2 - x1), abs(y2 - y1),
             ).normalized()
@@ -586,10 +681,20 @@ class MaterialCanvas(QWidget):
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
-            if self._drag_mode == DragMode.DRAWING and self._grid_rect:
-                # 太小则清除
-                if self._grid_rect.width() < 0.01 or self._grid_rect.height() < 0.01:
-                    self._grid_rect = None
+            # 处理待处理的单元格切换（单击切换，拖拽则不切换）
+            if self._pending_cell_toggle is not None:
+                pending = self._pending_cell_toggle
+                self._pending_cell_toggle = None
+                if self._drag_mode == DragMode.NONE:
+                    # 真正的单击（没有拖拽）
+                    self.toggle_cell(pending[0], pending[1])
+                    self.update()
+                    return
+            if self._drag_mode == DragMode.DRAWING and self._drawing_rect:
+                # 拖拽足够大则提交新矩形，否则保留原有矩形
+                if self._drawing_rect.width() >= 0.01 and self._drawing_rect.height() >= 0.01:
+                    self._grid_rect = self._drawing_rect
+                self._drawing_rect = None
             self._drag_mode = DragMode.NONE
             self._drag_handle = HandlePos.NONE
             if self.on_grid_rect_changed:
@@ -603,6 +708,17 @@ class MaterialCanvas(QWidget):
             self.update()
 
         elif event.button() == Qt.MouseButton.RightButton:
+            if self._drag_mode == DragMode.MOVING:
+                self._drag_mode = DragMode.NONE
+                self._drag_handle = HandlePos.NONE
+                if self.on_grid_rect_changed:
+                    self.on_grid_rect_changed()
+                if self._grid_rect:
+                    self.region_changed.emit(
+                        self._grid_rect.x(), self._grid_rect.y(),
+                        self._grid_rect.x() + self._grid_rect.width(),
+                        self._grid_rect.y() + self._grid_rect.height(),
+                    )
             self._panning = False
 
     def _move_rect(self, orig: QRectF, current_norm: QPointF, drag_start: QPointF) -> QRectF:
@@ -643,15 +759,24 @@ class MaterialCanvas(QWidget):
         }
         self.setCursor(cursors.get(handle, Qt.CursorShape.ArrowCursor))
 
-    # ─── 滚轮缩放 ─────────────────────────────────────────
+    # ─── 滚轮缩放（以鼠标位置为中心）──────────────────────
 
     def wheelEvent(self, event: QWheelEvent):
         if self._pixmap is None:
             return
+        pos = event.position()
+        # 缩放前：鼠标对应的归一化坐标
+        norm_before = self._widget_to_normalized(pos.x(), pos.y())
+
         delta = event.angleDelta().y()
         factor = 1.15 if delta > 0 else 1 / 1.15
         self._zoom = max(0.1, min(10.0, self._zoom * factor))
         self._update_display_rect()
+
+        # 缩放后：同一归一化坐标对应的 widget 坐标
+        new_widget = self._normalized_to_widget(norm_before.x(), norm_before.y())
+        # 平移使鼠标下的图片位置不变
+        self._display_rect.translate(pos.x() - new_widget.x(), pos.y() - new_widget.y())
         self.update()
 
     # ─── 窗口大小变化 ─────────────────────────────────────

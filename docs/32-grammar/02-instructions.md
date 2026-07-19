@@ -259,7 +259,9 @@ recognize $scene.[slot_1] as $mats
 recognize $scene.$slot_var as $result
 
 # by 子句短路识别（一次截图，找到首个匹配的材料格）
-recognize [equip_tune_detail].[material_1, material_2, material_3] as $slot by equals $material_name
+recognize [equip_tune_detail].[
+        material_1, material_2, material_3
+    ] as $slot by equals $material_name
 ```
 
 **说明**：

@@ -315,7 +315,7 @@ class WorkflowEngine:
             self._coord_meta[var_name] = {r.key: r for r in regions}
 
     def _exec_recognize(self, node: Recognize):
-        """recognize [scene].[f1, f2, ...] as $var [by ...] — 图像识别场景中的材料"""
+        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] — 图像识别场景中的材料"""
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, SceneRef) else node.scene
         if isinstance(scene_ref, VarRef):
@@ -335,14 +335,19 @@ class WorkflowEngine:
             else:
                 field_keys = [str(region_key)]
 
+        # 解析可选的 group 子句
+        group = None
+        if node.group is not None:
+            group = self._resolve(node.group)
+
         if node.by is not None:
             # ── by 子句：短路材料识别，返回 slot 名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            result = self._wf.recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode)
+            result = self._wf.recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode, group=group)
             self.variables[var_name] = result  # str（命中 slot 名或 ""）
         else:
-            result, region_map = self._wf.recognize_materials(scene, field_keys)
+            result, region_map = self._wf.recognize_materials(scene, field_keys, group=group)
             self.variables[var_name] = result           # {slot_key: "材料类型"}
             self._coord_meta[var_name] = region_map     # {slot_key: Region}
 

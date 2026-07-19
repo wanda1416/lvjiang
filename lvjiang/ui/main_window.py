@@ -76,9 +76,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # 用户配置（延迟参数等）
         self._user_config = load_user_config()
-        # 设备后端运行态：windows（投屏窗口）| adb（adb screencap + adb shell input 直连手机）
-        # 由用户在界面上「扫描窗口」/「扫描设备」动态切换，config.backend 仅作初始默认
-        self._backend = (self._user_config.backend or "windows").lower()
+        # 设备后端运行态：None（未选择）| windows（投屏窗口）| adb（adb 直连手机）
+        # 由用户在界面上「扫描窗口」/「扫描设备」动态切换
+        self._backend = None
 
         # OCR 引擎（懒加载）
         from ..core.ocr import OCREngine
@@ -86,7 +86,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         # 输入控制器：Windows 投屏常驻 PostMessageInput；ADB 连接设备后切换为 AdbInput
         from ..core.desktop import create_input_backend as _create_desktop_input
-        self._win_input = _create_desktop_input(mode="post", delay_config=self._user_config.delay)
+        self._win_input = _create_desktop_input(mode="post", delay_config=self._user_config.input_delay)
         self._input = self._win_input
 
         self._setup_menu()

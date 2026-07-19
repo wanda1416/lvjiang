@@ -168,7 +168,7 @@ class _DSLTransformer(Transformer):
         return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, line_no=self._line(items))
 
     def recognize_stmt(self, items):
-        """recognize [scene].[f1, f2, ...] as $var [by ...]"""
+        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...]"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
         scene = SceneRef(scene=scene_name)
@@ -181,8 +181,15 @@ class _DSLTransformer(Transformer):
                 fields = second  # field_list → list[Literal]
             elif isinstance(second, VarRef):
                 region_var = second  # 动态 region
-        by_clause = items[2] if len(items) > 2 else None  # ByClause | None
-        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, line_no=self._line(items))
+        by_clause = None
+        group_clause = None
+        # 解析可选的 by_clause 和 group_clause
+        for item in items[2:]:
+            if isinstance(item, ByClause):
+                by_clause = item
+            elif isinstance(item, (Literal, VarRef)):
+                group_clause = item  # group 子句返回的是 Literal 或 VarRef
+        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, line_no=self._line(items))
 
     # ─── by 子句（短路识别）───────────────────────────────
 
@@ -208,6 +215,14 @@ class _DSLTransformer(Transformer):
 
     def match_contains_any(self, _):
         return "contains_any"
+
+    def group_clause(self, items):
+        """group "分组名" 或 group $var → Literal 或 VarRef"""
+        target_node = items[0]  # Token(STRING) 或 VarRef
+        if isinstance(target_node, VarRef):
+            return target_node
+        else:
+            return Literal(value=self._unquote(str(target_node)))
 
     def scene_target_static(self, items):
         """[scene] 或 [scene].[f1, f2] 或 $var.[f1] 等"""

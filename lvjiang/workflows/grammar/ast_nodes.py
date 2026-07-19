@@ -68,6 +68,7 @@ class Recognize:
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
+    group: Any = None  # Literal | VarRef | None（group 子句：限定材料分组）
     line_no: int = 0
 
 

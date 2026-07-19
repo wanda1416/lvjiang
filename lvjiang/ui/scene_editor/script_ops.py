@@ -121,7 +121,7 @@ class ScriptOpsMixin:
                 ocr=main_win._ocr,
                 input_ctrl=main_win._input,
                 layout=layout,
-                delay_config=main_win._user_config.delay,
+                delay_config=main_win._user_config.input_delay,
                 window_left=window_left,
                 window_top=window_top,
                 stop_check=lambda: False,

@@ -311,7 +311,7 @@ class RunControlMixin:
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
-            delay_config=self._user_config.delay,
+            delay_config=self._user_config.input_delay,
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,

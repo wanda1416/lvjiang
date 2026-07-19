@@ -25,14 +25,22 @@ class DelayConfig(BaseModel):
     after_tune_wait: float | tuple[float, float] = 3.0     # 调律结果等待（单值固定等待，二元组则范围内随机）
 
 
+class MaterialGridConfig(BaseModel):
+    """材料网格切割默认参数"""
+    rows: int = Field(default=3, ge=1)     # 默认行数
+    cols: int = Field(default=6, ge=1)     # 默认列数
+    gap: int = Field(default=0, ge=0)      # 默认间隔(px)
+    height: int = Field(default=100, ge=1) # 默认单cell高度(px)
+    width: int = Field(default=100, ge=1)  # 默认单cell宽度(px)
+
+
 class UserConfig(BaseModel):
     """用户配置（从 preferences.yaml 加载）"""
-    backend: str = "adb"            # 设备后端：adb（adb screencap + adb shell input）| windows（投屏窗口）
-    adb_capture_method: str = "screencap"  # ADB 截图方式：screencap（adb exec-out screencap -p）| scrcpy（H.264 视频流）
-    window_title: str = ""
-    background_mode: bool = True    # Windows 模式是否启用后台模式（PostMessage）
-    scrcpy_streaming: bool = False  # ADB 模式是否启用 scrcpy 流式截图
-    delay: DelayConfig = Field(default_factory=DelayConfig)
+    adb_capture_streaming: bool = False    # ADB 模式是否启用 scrcpy 视频流截图（false 则用 screencap）
+    desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
+    desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
+    material_grid: MaterialGridConfig = Field(default_factory=MaterialGridConfig)
+    input_delay: DelayConfig = Field(default_factory=DelayConfig)
 
 
 def load_yaml(path: Path) -> dict[str, Any]:

@@ -51,7 +51,7 @@ class WindowOpsMixin:
             if not self.chk_bg_mode.isVisible():
                 # 首次进入 Windows 模式，从配置读取初始状态
                 self.chk_bg_mode.blockSignals(True)
-                self.chk_bg_mode.setChecked(self._user_config.background_mode)
+                self.chk_bg_mode.setChecked(self._user_config.desktop_background_input)
                 self.chk_bg_mode.blockSignals(False)
             self.chk_bg_mode.setVisible(True)
             self.chk_bg_mode.setEnabled(True)
@@ -123,7 +123,7 @@ class WindowOpsMixin:
         if hasattr(self, "chk_scrcpy"):
             if not self.chk_scrcpy.isVisible():
                 # 首次进入 ADB 模式，从配置读取初始状态
-                is_scrcpy = self._user_config.adb_capture_method == "scrcpy"
+                is_scrcpy = self._user_config.adb_capture_streaming
                 self.chk_scrcpy.blockSignals(True)
                 self.chk_scrcpy.setChecked(is_scrcpy)
                 self.chk_scrcpy.blockSignals(False)
@@ -186,7 +186,7 @@ class WindowOpsMixin:
             return
 
         # 创建截图后端（根据配置选择 screencap 或 scrcpy）
-        capture_method = self._user_config.adb_capture_method
+        capture_method = "scrcpy" if self._user_config.adb_capture_streaming else "screencap"
         self._capture = create_capture_backend(device=device, method=capture_method)
         if not self._capture.start():
             self.log_text.append(f"[错误] {capture_method} 截图后端不可用")
@@ -194,7 +194,7 @@ class WindowOpsMixin:
             return
 
         # 创建输入控制器（adb shell input）
-        self._input = create_input_backend(device=device, delay_config=self._user_config.delay)
+        self._input = create_input_backend(device=device, delay_config=self._user_config.input_delay)
 
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
         self._scrcpy_streaming = False
@@ -325,12 +325,12 @@ class WindowOpsMixin:
             if self.chk_bg_mode.isChecked():
                 from ..core.desktop import PostMessageInput
                 self._input = PostMessageInput(
-                    delay_config=self._user_config.delay,
+                    delay_config=self._user_config.input_delay,
                     hwnd=w["hwnd"],
                 )
             else:
                 from ..core.desktop import SendInputInput
-                self._input = SendInputInput(delay_config=self._user_config.delay)
+                self._input = SendInputInput(delay_config=self._user_config.input_delay)
                 self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
 
     def _on_bg_mode_changed(self, state):
@@ -341,13 +341,13 @@ class WindowOpsMixin:
         if bool(state):
             from ..core.desktop import PostMessageInput
             self._input = PostMessageInput(
-                delay_config=self._user_config.delay,
+                delay_config=self._user_config.input_delay,
                 hwnd=hwnd,
             )
             self.log_text.append("[模式] 已切换到后台模式（PostMessage，不移动光标）")
         else:
             from ..core.desktop import SendInputInput
-            self._input = SendInputInput(delay_config=self._user_config.delay)
+            self._input = SendInputInput(delay_config=self._user_config.input_delay)
             self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
 
     def _on_capture_method_changed(self, state):
@@ -356,11 +356,11 @@ class WindowOpsMixin:
 
         if not self._device:
             # 未连接设备时仅更新内存配置
-            self._user_config.adb_capture_method = method
+            self._user_config.adb_capture_streaming = state
             return
 
         # 已连接设备时重建截图后端
-        self._user_config.adb_capture_method = method
+        self._user_config.adb_capture_streaming = state
         from ..core.android import create_capture_backend
         old_capture = self._capture
         self._capture = create_capture_backend(device=self._device, method=method)
@@ -384,7 +384,7 @@ class WindowOpsMixin:
                 self._capture_preview()
         else:
             self.log_text.append(f"[错误] {method} 截图后端不可用，回退到 screencap")
-            self._user_config.adb_capture_method = "screencap"
+            self._user_config.adb_capture_streaming = False
             if hasattr(self, "chk_scrcpy"):
                 self.chk_scrcpy.blockSignals(True)
                 self.chk_scrcpy.setChecked(False)

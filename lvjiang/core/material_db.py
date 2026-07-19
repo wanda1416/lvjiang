@@ -247,6 +247,23 @@ class MaterialDatabase:
         types = sorted({e.type for e in self._entries if e.type})
         return types
 
+    def get_types_by_group(self, group: str) -> list[str]:
+        """返回指定分组下的去重类型列表（排序）"""
+        self._ensure_loaded()
+        types = sorted({e.type for e in self._entries if e.type and e.group == group})
+        return types
+
+    def get_all_types_by_group(self) -> dict[str, list[str]]:
+        """返回所有分组 -> 类型列表的映射"""
+        self._ensure_loaded()
+        result: dict[str, set[str]] = {}
+        for e in self._entries:
+            if e.group and e.type:
+                if e.group not in result:
+                    result[e.group] = set()
+                result[e.group].add(e.type)
+        return {g: sorted(types) for g, types in result.items()}
+
     def get_groups(self) -> list[str]:
         """返回所有去重分组列表（排序）"""
         self._ensure_loaded()

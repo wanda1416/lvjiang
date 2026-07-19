@@ -1,218 +1,644 @@
 version: 1
 materials:
-- file: 其他培养/E3E6D481.png
+- file: 装备材料/475BF859.png
   type: 装备碎片
   level: 110
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备材料
+  source: clipboard
   notes: ''
-- file: 调律材料/6E238EAF.png
+- file: 调律材料/D90CF5A6.png
   type: 彩狗粮
   level: 110
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 调律材料/9A49738F.png
+- file: 调律材料/EC3D0E06.png
   type: 金狗粮
   level: 110
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 其他培养/2A2F1E2D.png
+- file: 装备材料/DBFA2793.png
   type: 装备碎片
   level: 105
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备材料
+  source: clipboard
   notes: ''
-- file: 调律材料/3603D822.png
+- file: 调律材料/F2130E50.png
   type: 彩狗粮
   level: 105
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 调律材料/F729C87E.png
+- file: 调律材料/946CC90C.png
   type: 金狗粮
   level: 105
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 其他培养/7D4FE324.png
+- file: 装备材料/24CCB99E.png
   type: 装备碎片
   level: 100
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备材料
+  source: clipboard
   notes: ''
-- file: 调律材料/06A8FCE3.png
+- file: 调律材料/7D3E1342.png
   type: 金狗粮
   level: 100
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 其他培养/B5FD6779.png
+- file: 装备材料/28ED555E.png
   type: 装备碎片
   level: 96
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备材料
+  source: clipboard
   notes: ''
-- file: 调律材料/17EDEA11.png
+- file: 调律材料/895530AE.png
   type: 彩狗粮
   level: 96
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 调律材料/B714FB92.png
+- file: 调律材料/B72C379B.png
   type: 金狗粮
   level: 96
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 其他培养/EE48D579.png
+- file: 装备材料/5EE6F5A4.png
   type: 装备碎片
   level: 91
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备材料
+  source: clipboard
   notes: ''
-- file: 调律材料/50540CAF.png
+- file: 调律材料/DA54B4BF.png
   type: 彩狗粮
   level: 91
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 调律材料/359DAAB4.png
+- file: 调律材料/025FE7FC.png
   type: 金狗粮
   level: 91
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 其他培养/8FE34538.png
-  type: ''
+- file: 装备材料/CD8CEA8A.png
+  type: 装备碎片
+  level: 86
+  group: 装备材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/0B20A87D.png
+  type: 金狗粮
+  level: 86
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/E90F8B8F.png
+  type: 彩狗粮
+  level: 81
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/B12F39AF.png
+  type: 金狗粮
+  level: 81
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/5BB3DEEB.png
+  type: 金狗粮
+  level: 71
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/39B2C751.png
+  type: 金狗粮
+  level: 51
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 其他培养/C784A025.png
+  type: 奇术丹
   level: null
   group: 其他培养
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 培养定音/AC265AF8.png
+- file: 定音转律/7CB8171A.png
   type: 止戈定音石
   level: 110
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 其他培养/11108830.png
-  type: ''
+- file: 装备培养/AA3BBF3B.png
+  type: 啸玉
   level: 110
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备培养
+  source: clipboard
   notes: ''
-- file: 培养定音/B3C4B1B1.png
+- file: 定音转律/27B17F0B.png
   type: 定音石
   level: 110
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 其他培养/C52609C8.png
+- file: 装备培养/EAD816D7.png
+  type: 传律石
+  level: 110
+  group: 装备培养
+  source: clipboard
+  notes: ''
+- file: 装备培养/CF813DEE.png
   type: 承音石
   level: 110
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备培养
+  source: clipboard
   notes: ''
-- file: 培养定音/3C3D6572.png
+- file: 定音转律/F476BC36.png
+  type: 止戈变音石
+  level: 110
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/5A8FEDD2.png
   type: 变音石
   level: 110
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 培养定音/D793DA59.png
-  type: 变音石
-  level: 110
-  group: 培养定音
-  source: image_2.bmp
-  notes: ''
-- file: 培养定音/888F5D01.png
+- file: 定音转律/4B117BB7.png
   type: 转律石
   level: 110
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 调律材料/01F4ECE6.png
+- file: 调律材料/9625FF60.png
   type: 紫狗粮
   level: 110
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 培养定音/C1192E1B.png
+- file: 定音转律/DEC6244A.png
   type: 止戈定音石
   level: 105
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 培养定音/BC4E5B74.png
+- file: 定音转律/F3C84593.png
   type: 定音石
   level: 105
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 其他培养/9C2ABA08.png
-  type: ''
+- file: 装备培养/2ED12621.png
+  type: 承音石
   level: 105
-  group: 其他培养
-  source: image_2.bmp
+  group: 装备培养
+  source: clipboard
   notes: ''
-- file: 培养定音/7AD55F9D.png
-  type: 变音石
+- file: 定音转律/7D7FF1CB.png
+  type: 止戈变音石
   level: 105
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 培养定音/2EC8F816.png
+- file: 定音转律/D753EFED.png
   type: 转律石
   level: 105
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 调律材料/514EE359.png
+- file: 调律材料/AE8666A5.png
   type: 紫狗粮
   level: 105
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 培养定音/FF288346.png
+- file: 定音转律/E07396A6.png
   type: 止戈定音石
   level: 100
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 培养定音/2784DFC4.png
+- file: 定音转律/886B3F20.png
   type: 定音石
   level: 100
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 培养定音/12ED66D8.png
+- file: 装备培养/A775BBF0.png
   type: 传律石
   level: 100
-  group: 培养定音
-  source: image_2.bmp
+  group: 装备培养
+  source: clipboard
   notes: ''
-- file: 培养定音/C0B86A43.png
-  type: 变音石
+- file: 定音转律/A5EE90AA.png
+  type: 止戈变音石
   level: 100
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 调律材料/C2AD77D2.png
+- file: 调律材料/FFCBEA1D.png
   type: 紫狗粮
   level: 100
   group: 调律材料
-  source: image_2.bmp
+  source: clipboard
   notes: ''
-- file: 培养定音/34D56A7E.png
-  type: ''
+- file: 定音转律/9547A900.png
+  type: 止戈定音石
   level: 96
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
   notes: ''
-- file: 培养定音/9DC5DC65.png
+- file: 定音转律/6C977B21.png
   type: 定音石
   level: 96
-  group: 培养定音
-  source: image_2.bmp
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 装备培养/598D48C4.png
+  type: 传律石
+  level: 96
+  group: 装备培养
+  source: clipboard
+  notes: ''
+- file: 定音转律/B6F67472.png
+  type: 止戈变音石
+  level: 96
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/5CEA3A88.png
+  type: 变音石
+  level: 96
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/4EA174CA.png
+  type: 转律石
+  level: 96
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 调律材料/4D4D9EDB.png
+  type: 紫狗粮
+  level: 96
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 定音转律/C6F203B0.png
+  type: 止戈定音石
+  level: 91
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 装备培养/1373075E.png
+  type: 啸玉
+  level: 91
+  group: 装备培养
+  source: clipboard
+  notes: ''
+- file: 定音转律/FAF61FB3.png
+  type: 定音石
+  level: 91
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/33DA4809.png
+  type: 止戈变音石
+  level: 91
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/F3FEFBF2.png
+  type: 变音石
+  level: 91
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/794E7310.png
+  type: 转律石
+  level: 91
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 调律材料/B560FFAE.png
+  type: 紫狗粮
+  level: 91
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 定音转律/2B787250.png
+  type: 定音石
+  level: 86
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 装备培养/94AB92E9.png
+  type: 啸玉
+  level: 86
+  group: 装备培养
+  source: clipboard
+  notes: ''
+- file: 定音转律/54290841.png
+  type: 变音石
+  level: 86
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/064943B5.png
+  type: 转律石
+  level: 86
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 调律材料/9BE9F463.png
+  type: 紫狗粮
+  level: 86
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 定音转律/1FE6527B.png
+  type: 变音石
+  level: 81
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/7D77B9D2.png
+  type: 转律石
+  level: 81
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 定音转律/FD42CCB6.png
+  type: 定音石
+  level: 61
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 调律材料/45D8E60A.png
+  type: 紫狗粮
+  level: 61
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 定音转律/688A96C4.png
+  type: 定音石
+  level: 51
+  group: 定音转律
+  source: clipboard
+  notes: ''
+- file: 调律材料/26A86377.png
+  type: 大律准石
+  level: 110
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/188A0FD2.png
+  type: 大律准石
+  level: 105
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/AF43ACCC.png
+  type: 大律准石
+  level: 100
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/C4EB10EA.png
+  type: 大律准石
+  level: 96
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/E525FABE.png
+  type: 大律准石
+  level: 91
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/E2CB0994.png
+  type: 大律准石
+  level: 86
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/1D6B1C00.png
+  type: 大律准石
+  level: 81
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/3C7C4C01.png
+  type: 大律准石
+  level: 71
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/5AFABDB7.png
+  type: 大律准石
+  level: 61
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/C8FFCA19.png
+  type: 大律准石
+  level: 56
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/F3768512.png
+  type: 大律准石
+  level: 51
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 装备培养/8BF65636.png
+  type: 溯玉
+  level: null
+  group: 装备培养
+  source: clipboard
+  notes: ''
+- file: 调律材料/19C15875.png
+  type: 律准石
+  level: null
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 装备培养/A20C7B45.png
+  type: 振玉
+  level: null
+  group: 装备培养
+  source: clipboard
+  notes: ''
+- file: 调律材料/80CFEC02.png
+  type: 小律准石
+  level: 110
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/587E0292.png
+  type: 小律准石
+  level: 105
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/4476C8DE.png
+  type: 小律准石
+  level: 100
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/010EE2DC.png
+  type: 小律准石
+  level: 96
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/E5C29904.png
+  type: 小律准石
+  level: 91
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/8D149098.png
+  type: 小律准石
+  level: 86
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/161CF0A6.png
+  type: 小律准石
+  level: 56
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 调律材料/685989EA.png
+  type: 小律准石
+  level: 51
+  group: 调律材料
+  source: clipboard
+  notes: ''
+- file: 普通道具/6DAD5F1F.png
+  type: 装备匣子
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/63BED34F.png
+  type: 金装自选箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/BDE43720.png
+  type: 自选词条优
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/5DC3A2EC.png
+  type: 自选词条普
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/B8DE1C37.png
+  type: 战令经验
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/9AB22E8A.png
+  type: 金狗粮追赶箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/C9789D43.png
+  type: 定音石追赶箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/A5736562.png
+  type: 律准石追赶箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/5AB120F5.png
+  type: 金装追赶箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/5E61405F.png
+  type: 短陌钱箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/A7BEE0D2.png
+  type: 礼物盒
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/B21F3A19.png
+  type: 材料箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/93885CB0.png
+  type: 武学心得
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/22A110BD.png
+  type: 武学突破箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/C3E428E6.png
+  type: 武学升级箱
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/55F6B172.png
+  type: 袅袅之音
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/204ECF64.png
+  type: 八音窍
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/0269BEFC.png
+  type: 绕梁之音
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/99588D75.png
+  type: 袅袅非绑
+  level: null
+  group: 普通道具
+  source: clipboard
+  notes: ''
+- file: 普通道具/5C04CF08.png
+  type: 折音券
+  level: null
+  group: 普通道具
+  source: clipboard
   notes: ''

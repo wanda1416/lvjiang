@@ -57,7 +57,6 @@ class BrowserPanel(QWidget):
 
         filter_layout.addWidget(QLabel("等级:"))
         self._level_filter = QComboBox()
-        self._level_filter.addItem("全部", None)
         self._level_filter.setMinimumWidth(80)
         filter_layout.addWidget(self._level_filter)
 
@@ -279,6 +278,7 @@ class BrowserPanel(QWidget):
             entries = [e for e in entries if e.level is None]
         elif level is not None:
             entries = [e for e in entries if e.level == level]
+        # 如果没有选择等级（currentIndex < 0），则不过滤
 
         for entry in entries:
             self._add_item(entry)
@@ -315,9 +315,8 @@ class BrowserPanel(QWidget):
 
         self._level_filter.blockSignals(True)
         self._level_filter.clear()
-        self._level_filter.addItem("全部", None)
-        self._level_filter.addItem("- 未分级 -", "ungraded")
-        for lv in self._db.get_levels():
+        # 等级按倒序排列（高等级在前）
+        for lv in reversed(self._db.get_levels()):
             self._level_filter.addItem(f"{lv}级", lv)
         idx = self._level_filter.findData(cur_level)
         if idx >= 0:
@@ -483,13 +482,22 @@ class BrowserPanel(QWidget):
 
         self.data_changed.emit()  # 通知数据变动
 
+        # 保存当前分组过滤器（应用后保持不变）
+        current_group_filter = self._group_filter.currentData()
+
         # 清空批量输入
         self._batch_type_edit.clear()
         self._batch_level_edit.clear()
+        self._batch_group_edit.blockSignals(True)
         self._batch_group_edit.setEditText("")
+        self._batch_group_edit.blockSignals(False)
 
-        # 刷新列表和分组
+        # 刷新列表和分组（保持分组过滤器）
         self.set_known_groups(self._db.get_groups())
+        # 确保分组过滤器保持不变
+        idx = self._group_filter.findData(current_group_filter)
+        if idx >= 0:
+            self._group_filter.setCurrentIndex(idx)
         self.refresh()
 
     def _on_batch_delete(self):
@@ -515,5 +523,11 @@ class BrowserPanel(QWidget):
                 self._db.remove_entry(filename)
 
         self.data_changed.emit()
+        # 保存当前分组过滤器（删除后保持不变）
+        current_group_filter = self._group_filter.currentData()
         self.set_known_groups(self._db.get_groups())
+        # 确保分组过滤器保持不变
+        idx = self._group_filter.findData(current_group_filter)
+        if idx >= 0:
+            self._group_filter.setCurrentIndex(idx)
         self.refresh()

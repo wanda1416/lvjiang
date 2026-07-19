@@ -71,7 +71,7 @@ match_mode: "equals_any"i -> match_equals_any
 ?by_target: STRING | var_ref
 
 // group 子句：限定材料识别的分组范围
-group_clause: "group"i (STRING | var_ref)
+group_clause: "on"i "group"i (STRING | var_ref)
 
 // 场景目标：支持静态/动态场景名 + 静态/动态字段
 // 场景名：[scene] / "scene" / $var

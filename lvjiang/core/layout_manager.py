@@ -218,32 +218,3 @@ class LayoutConfigManager:
             return None
         return self.load_layout(name)
 
-    # ─── 窗口标题（从 preferences.yaml 读取） ────────────
-
-    def get_window_title(self) -> str:
-        """获取投屏窗口标题匹配关键字（空串表示不自动定位）"""
-        try:
-            import yaml
-            if PREFERENCES_PATH.exists():
-                data = yaml.safe_load(PREFERENCES_PATH.read_text(encoding="utf-8"))
-                return data.get("window_title", "") if isinstance(data, dict) else ""
-        except Exception as e:
-            logger.warning(f"读取 window_title 失败: {e}")
-        return ""
-
-    def set_window_title(self, title: str):
-        """保存窗口标题到 preferences.yaml"""
-        try:
-            import yaml
-            data = {}
-            if PREFERENCES_PATH.exists():
-                data = yaml.safe_load(PREFERENCES_PATH.read_text(encoding="utf-8")) or {}
-            data["window_title"] = title
-            PREFERENCES_PATH.parent.mkdir(parents=True, exist_ok=True)
-            PREFERENCES_PATH.write_text(
-                yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
-                encoding="utf-8",
-            )
-        except Exception as e:
-            logger.error(f"保存 window_title 失败: {e}")
-

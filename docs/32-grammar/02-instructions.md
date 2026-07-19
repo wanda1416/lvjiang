@@ -240,6 +240,10 @@ recognize scene_name.$var as $result           # 动态 Area（变量指定单�
 recognize scene_name.[a1, a2] as $var by equals "文本"
 recognize scene_name.[a1, a2] as $var by contains "文本"
 
+# 带 on group 子句（限定材料分组范围）
+recognize scene_name.[a1, a2] as $var on group "分组名"
+recognize scene_name.[a1, a2] as $var by equals $name on group "分组名"
+
 # scene_name 可以是：
 #   [scene]    — 括号常量
 #   "scene"    — 字符串常量（等价于 [scene]）
@@ -262,6 +266,11 @@ recognize $scene.$slot_var as $result
 recognize [equip_tune_detail].[
         material_1, material_2, material_3
     ] as $slot by equals $material_name
+
+# on group 子句限定分组范围（仅在指定分组的材料中匹配）
+recognize [equip_tune_detail].[
+        material_1, material_2, material_3
+    ] as $slot by equals $material_name on group "调律材料"
 ```
 
 **说明**：
@@ -270,6 +279,7 @@ recognize [equip_tune_detail].[
 - 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `_coord_meta`
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
 - **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str），详见上方 [by 子句说明](#by-子句短路识别)
+- **on group 子句**：限定材料识别的分组范围，仅在指定分组的参考材料中匹配。支持字符串常量和变量引用
 
 ## 六、collect — 收集输出
 

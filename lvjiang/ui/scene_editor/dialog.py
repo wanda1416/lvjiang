@@ -11,10 +11,10 @@ from PyQt6.QtCore import Qt
 from loguru import logger
 
 from ...core.scene_registry import (
-    Layout, LayoutConfigManager,
+    Layout,
     get_scene_name,
-    load_scene_screenshot, save_scene_screenshot,
 )
+from ...core.layout_manager import LayoutConfigManager, load_scene_screenshot, save_scene_screenshot
 from .layout_ops import LayoutOpsMixin
 from .scene_ops import SceneOpsMixin
 from .recognition_ops import RecognitionOpsMixin

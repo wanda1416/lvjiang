@@ -76,3 +76,8 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: dingyin
+  name: 定音
+  type: attr
+  is_text: true
+  is_clickable: false

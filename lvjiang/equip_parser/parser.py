@@ -327,10 +327,16 @@ class EquipmentParser:
 
         return affixes, warnings
 
+    # OCR 常见误识别 → 正确文本（在词条匹配前修正）
+    _OCR_CORRECTIONS = {
+        "猜准率": "精准率",
+    }
+
     def _parse_single_affix(self, raw: str) -> Affix | None:
         """解析单条词条
 
         处理流程：
+        0. 修正已知 OCR 误识别
         1. 检测 [转] 转律标记
         2. 过滤套装信息
         3. 匹配已知词条名称（最长前缀优先）
@@ -343,6 +349,10 @@ class EquipmentParser:
         text = raw.strip()
         if not text:
             return None
+
+        # ── 0. 修正已知 OCR 误识别 ──
+        for wrong, correct in self._OCR_CORRECTIONS.items():
+            text = text.replace(wrong, correct)
 
         # ── 1. 转律标记 ──
         # OCR 常将 ］/] 误识别为 1，兼容 ［转1 / [转1 等变体

@@ -52,24 +52,24 @@ base_attrs:
 #   chengyin: 承音数值（cap × 94%，只读展示）
 affix_caps:
   外功攻击:
-    110: { cap: 0, unit: "" }
+    110: { cap: 121.4, unit: "" }
   属性攻击:
-    110: { cap: 0, unit: "" }
+    110: { cap: 68.8, unit: "" }
   五维属性:
-    110: { cap: 0, unit: "" }
+    110: { cap: 76.8, unit: "" }
   会意率:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 7.0, unit: "%" }
   会心率:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 14.0, unit: "%" }
   精准率:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 12.4, unit: "%" }
   单武学增伤:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 9.8, unit: "%" }
   扇武学增效:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 9.8, unit: "%" }
   全武学增效:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 4.9, unit: "%" }
   对单位增效:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 5.1, unit: "%" }
   奇术类增伤:
-    110: { cap: 0, unit: "%" }
+    110: { cap: 15.0, unit: "%" }

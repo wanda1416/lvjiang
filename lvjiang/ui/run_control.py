@@ -385,23 +385,25 @@ class RunControlMixin:
                 self._session_manager.save(username, engine.session)
 
     def _save_workflow_result(self, flow_id: str, result):
-        """保存工作流结果到 local/output/{flow_id}_{timestamp}.json"""
+        """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json"""
         if not isinstance(result, (dict, list)):
             return
 
         serializable = _to_serializable(result)
 
         from ..constants import OUTPUT_DIR
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        username = self._user_manager.get_active_user_name() or "default"
+        user_output_dir = OUTPUT_DIR / username
+        user_output_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = OUTPUT_DIR / f"{flow_id}_{timestamp}.json"
+        save_path = user_output_dir / f"{flow_id}_{timestamp}.json"
         save_path.write_text(
             json.dumps(serializable, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {flow_id} → output/{flow_id}_{timestamp}.json")
+        self.log_text.append(f"[保存] {flow_id} → output/{username}/{flow_id}_{timestamp}.json")
 
     # ─── 运行按钮 ──────────────────────────────────────────
 

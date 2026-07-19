@@ -28,12 +28,16 @@ class Affix:
     value: float
     unit: str | None = None  # "%" 或 None
     is_transferred: bool = False
+    cap_pct: float | None = None  # 数值百分比（0-100），表示当前值占该等级上限的比例
 
     def to_dict(self) -> dict:
         d: dict = {"name": self.name, "value": self.value}
         if self.unit:
             d["unit"] = self.unit
-        d["is_transferred"] = self.is_transferred
+        if self.is_transferred:
+            d["is_transferred"] = self.is_transferred
+        if self.cap_pct is not None:
+            d["cap_pct"] = self.cap_pct
         return d
 
     @classmethod
@@ -43,6 +47,7 @@ class Affix:
             value=d["value"],
             unit=d.get("unit"),
             is_transferred=d.get("is_transferred", False),
+            cap_pct=d.get("cap_pct"),
         )
 
 
@@ -98,6 +103,9 @@ class EquipmentData:
         }
         for i, affix in enumerate(self.affixes, 1):
             d[f"affix_{i}"] = affix.to_dict()
+            # 记录转律词条位置供 DSL 快速定位
+            if affix.is_transferred:
+                self.extra_data["transferred_affix"] = f"affix_{i}"
         if self.warnings:
             d["_warnings"] = self.warnings
         if self.extra_data:

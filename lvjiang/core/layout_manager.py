@@ -8,7 +8,7 @@ import numpy as np
 from loguru import logger
 
 from ..constants import LOCAL_CONFIG_DIR, PREFERENCES_PATH
-from .region_config import Layout, get_scene_name
+from .scene_registry import Layout, get_scene_name
 
 
 # ─── 路径常量 ────────────────────────────────────────────
@@ -144,7 +144,7 @@ class LayoutConfigManager:
 
     def new_layout(self, name: str) -> Layout:
         """创建空布局（所有场景初始为空 regions）"""
-        from .region_config import SCENE_REGIONS
+        from .scene_registry import SCENE_REGIONS
         layout = Layout(name=name)
         for scene_key in SCENE_REGIONS:
             layout.scenes[scene_key] = []

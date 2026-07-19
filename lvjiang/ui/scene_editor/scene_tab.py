@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from ...core.region_config import (
+from ...core.scene_registry import (
     Region, Point, Arrow, CanvasConfig,
     get_scene_regions, get_scene_point_pairs,
 )

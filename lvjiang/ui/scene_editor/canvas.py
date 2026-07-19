@@ -8,7 +8,7 @@ from PyQt6.QtGui import (
     QPaintEvent, QFont,
 )
 
-from ...core.region_config import Region, CanvasConfig, EQUIP_REGIONS
+from ...core.scene_registry import Region, CanvasConfig, EQUIP_REGIONS
 from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
 from .canvas_poi import CanvasPoiMixin
 

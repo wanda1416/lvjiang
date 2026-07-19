@@ -5,23 +5,26 @@ from pathlib import Path
 
 from loguru import logger
 
-from ..constants import SYSTEM_SCENES_DIR, APP_CONFIG_PATH
-from .scene_loader import SceneRegistry, RegionDef, PointDef, SceneDef, FieldDef
+from ..constants import SYSTEM_SCENES_DIR, SCENES_CONFIG_PATH
+from .scene_loader import SceneRegistry, RegionDef, PointDef, SceneDef
 
 
 def _load_scene_order() -> list[str] | None:
-    """从 app.yaml 读取场景加载顺序（兼容旧格式 flat list）"""
-    if not APP_CONFIG_PATH.exists():
+    """从 scenes.yaml 读取场景加载顺序"""
+    if not SCENES_CONFIG_PATH.exists():
         return None
     try:
         import yaml
-        data = yaml.safe_load(APP_CONFIG_PATH.read_text(encoding="utf-8"))
+        data = yaml.safe_load(SCENES_CONFIG_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return None
         layout_scenes = data.get("layout_scenes")
-        # 旧格式：flat list
-        if isinstance(layout_scenes, list):
-            return layout_scenes
+        if isinstance(layout_scenes, dict):
+            # 从分组结构中提取场景顺序
+            order = []
+            for scenes in layout_scenes.values():
+                order.extend(scenes)
+            return order
         return None
     except Exception as e:
         logger.warning(f"读取 layout_scenes 失败: {e}")
@@ -29,12 +32,12 @@ def _load_scene_order() -> list[str] | None:
 
 
 def _load_group_config() -> tuple[dict[str, list[str]] | None, dict[str, str] | None]:
-    """从 app.yaml 读取分组配置，返回 (group_config, group_names)"""
-    if not APP_CONFIG_PATH.exists():
+    """从 scenes.yaml 读取分组配置，返回 (group_config, group_names)"""
+    if not SCENES_CONFIG_PATH.exists():
         return None, None
     try:
         import yaml
-        data = yaml.safe_load(APP_CONFIG_PATH.read_text(encoding="utf-8"))
+        data = yaml.safe_load(SCENES_CONFIG_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return None, None
         layout_scenes = data.get("layout_scenes")
@@ -64,12 +67,7 @@ _registry = SceneRegistry(
 # 场景 → (场景中文名, [(region_key, region_name), ...])
 SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {}
 
-# 向后兼容别名
-FIELD_GROUPS = SCENE_REGIONS
-
 EQUIP_REGIONS: list[tuple[str, str]] = []
-# 向后兼容别名
-EQUIP_FIELDS = EQUIP_REGIONS
 
 # 场景 → [(point_key, point_name), ...]（来自 YAML 类型定义）
 SCENE_POINTS: dict[str, list[tuple[str, str]]] = {}
@@ -82,14 +80,13 @@ GROUP_ORDER: list[str] = []              # 分组顺序
 
 def _rebuild_scene_globals():
     """从 _registry 重建 SCENE_REGIONS / SCENE_POINTS / 分组缓存等全局字典"""
-    global SCENE_REGIONS, FIELD_GROUPS, EQUIP_REGIONS, EQUIP_FIELDS, SCENE_POINTS
+    global SCENE_REGIONS, EQUIP_REGIONS, SCENE_POINTS
     global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
     SCENE_REGIONS.clear()
     SCENE_REGIONS.update({
         key: (scene.name, [(r.key, r.name) for r in scene.regions])
         for key, scene in _registry.all_scenes().items()
     })
-    FIELD_GROUPS = SCENE_REGIONS
     _wpn = _registry.get_scene("equip_weapon_detail")
     EQUIP_REGIONS.clear()
     EQUIP_REGIONS.extend([(r.key, r.name) for r in _wpn.regions] if _wpn else [])
@@ -113,7 +110,7 @@ _rebuild_scene_globals()
 
 # 启动校验：至少存在一个分组
 if not _registry.get_groups():
-    raise RuntimeError("app.yaml 必须至少包含一个场景分组，请检查配置")
+    raise RuntimeError("scenes.yaml 必须至少包含一个场景分组，请检查配置")
 
 
 def get_registry() -> SceneRegistry:
@@ -188,10 +185,6 @@ def get_scene_regions(scene_key: str) -> list[tuple[str, str]]:
     return []
 
 
-# 向后兼容别名
-get_scene_fields = get_scene_regions
-
-
 def get_button_regions(scene_key: str) -> set[str]:
     """获取场景的纯功能按钮区域集合（is_clickable 且非 is_text）"""
     scene = _registry.get_scene(scene_key)
@@ -200,20 +193,12 @@ def get_button_regions(scene_key: str) -> set[str]:
     return {r.key for r in scene.regions if r.is_clickable and not r.is_text}
 
 
-# 向后兼容别名
-get_button_fields = get_button_regions
-
-
 def get_region_defs(scene_key: str) -> list[RegionDef]:
     """获取场景的完整区域定义列表"""
     scene = _registry.get_scene(scene_key)
     if not scene:
         return []
     return list(scene.regions)
-
-
-# 向后兼容别名
-get_field_defs = get_region_defs
 
 
 def get_scene_point_pairs(scene_key: str) -> list[tuple[str, str]]:
@@ -389,7 +374,7 @@ class Layout:
 
     @staticmethod
     def from_dict(name: str, d: dict) -> "Layout":
-        # 解析 canvas（可选，向后兼容）
+        # 解析 canvas
         canvas = CanvasConfig()
         if "canvas" in d and isinstance(d["canvas"], dict):
             canvas = CanvasConfig.from_dict(d["canvas"])
@@ -406,31 +391,9 @@ class Layout:
             if "arrows" in scene_data:
                 arrows[scene_key] = [Arrow.from_dict(a) for a in scene_data["arrows"]]
 
-        if "scenes" in d and isinstance(d["scenes"], dict):
-            # 新格式：scenes 包裹
-            for scene_key, scene_data in d["scenes"].items():
-                if isinstance(scene_data, dict):
-                    _parse_scene_entry(scene_key, scene_data)
-        else:
-            # 旧格式：场景直接在顶层（向后兼容）
-            for scene_key, scene_data in d.items():
-                if scene_key == "canvas":
-                    continue
+        scenes_data = d.get("scenes", {})
+        if isinstance(scenes_data, dict):
+            for scene_key, scene_data in scenes_data.items():
                 if isinstance(scene_data, dict):
                     _parse_scene_entry(scene_key, scene_data)
         return Layout(name=name, canvas=canvas, scenes=scenes, points=points, arrows=arrows)
-
-
-# ─── 向后兼容重导出 ──────────────────────────────────────
-# 这些函数已移至 layout_manager.py，但为保持兼容性在此重导出
-
-from .layout_manager import (
-    LAYOUTS_DIR,
-    SCREENSHOTS_DIR,
-    layout_screenshots_dir,
-    load_scene_screenshot,
-    save_scene_screenshot,
-    copy_screenshots,
-    delete_screenshots,
-    LayoutConfigManager,
-)

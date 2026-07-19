@@ -159,7 +159,7 @@ def test_adb_factory_returns_input_backend():
 
 def test_base_workflow_accepts_fake_input_backend():
     """验证 BaseWorkflow 只依赖抽象接口，fake 子类可无缝注入"""
-    from lvjiang.core.region_config import Layout, CanvasConfig
+    from lvjiang.core.scene_registry import Layout, CanvasConfig
     from lvjiang.workflows.base import BaseWorkflow
 
     class _FakeCapture:

@@ -6,7 +6,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
-from .constants import APP_CONFIG_PATH, PREFERENCES_PATH
+from .constants import SCENES_CONFIG_PATH, PREFERENCES_PATH
 
 
 class DelayConfig(BaseModel):
@@ -60,12 +60,12 @@ def save_yaml(path: Path, data: dict[str, Any]) -> None:
 
 
 def load_user_config(path: Path | None = None) -> UserConfig:
-    """加载用户配置（app.yaml 默认值 + preferences.yaml 覆盖）"""
+    """加载用户配置（scenes.yaml 默认值 + preferences.yaml 覆盖）"""
     if path:
         data = load_yaml(path)
     else:
         # 先加载系统默认，再用用户偏好覆盖
-        data = load_yaml(APP_CONFIG_PATH)
+        data = load_yaml(SCENES_CONFIG_PATH)
         prefs = load_yaml(PREFERENCES_PATH)
         data.update(prefs)
     return UserConfig(**data)

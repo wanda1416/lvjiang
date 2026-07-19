@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 from loguru import logger
 
-from .region_config import CanvasConfig, Region, get_region_defs
+from .scene_registry import CanvasConfig, Region, get_region_defs
 
 
 @dataclass

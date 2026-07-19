@@ -21,7 +21,7 @@ from ..config import DelayConfig
 from ..core.capture_base import CaptureBackend
 from ..core.ocr import OCREngine
 from ..core.input_base import InputBackend
-from ..core.region_config import Layout, Point, Region, CanvasConfig
+from ..core.scene_registry import Layout, Point, Region, CanvasConfig
 from . import builtins  # noqa: F401  触发内置函数注册
 
 

@@ -1,7 +1,7 @@
 # Dev Log: 2026-07-16 工作流稳定性与评估体系闭环
 
 > 日期：2026-07-16
-> 涉及模块：`lvjiang/core/capture.py`、`lvjiang/core/input.py`、`lvjiang/core/material_recognizer.py`、`lvjiang/equip_parser/parser.py`、`lvjiang/workflows/engine.py`、`lvjiang/ui/run_control.py`、`lvjiang/__main__.py`、`config/system/equip_attrs.yaml`、`config/system/workflows/equip_analysis.wf`
+> 涉及模块：`lvjiang/core/capture.py`、`lvjiang/core/input.py`、`lvjiang/core/material_recognizer.py`、`lvjiang/equip_parser/parser.py`、`lvjiang/workflows/engine.py`、`lvjiang/ui/run_control.py`、`lvjiang/__main__.py`、`config/system/equipments.yaml`、`config/system/workflows/equip_analysis.wf`
 > 关键词：海森堡 Bug、FAILSAFE、mss 跨线程 GDI、thread-local、ORB + Lab、装备评估、鸣金虹
 
 ---
@@ -15,7 +15,7 @@
 - **鸣金虹流派通用评估引擎**：转律熔断、优先级替换、重评级完整实现
 - **统一扣分体系**：势 + 会意率扣分规则最终定型
 - **装备解析器扩展**：支持从 `slot` 部位自动推断 `type`（ring→环、pendant→佩），不再依赖 OCR 文本中的类型字段
-- **基础属性品阶推断**：`equip_attrs.yaml` 补充 ring/pendant/armor_other/chest 的 purple/blue 品阶数据
+- **基础属性品阶推断**：`equipments.yaml` 补充 ring/pendant/armor_other/chest 的 purple/blue 品阶数据
 
 ### 1.2 工作流稳定性修复（`f4ff72f`）
 
@@ -51,7 +51,7 @@
 #### 1.2.4 工作流与配置修正
 
 - `equip_analysis.wf`：ring/pendant 改用 `equip_weapon_detail` 场景（原错误使用 `equip_armor_detail`）
-- `equip_attrs.yaml`：补充 ring/pendant/armor_other/chest 的 purple/blue 品阶数据
+- `equipments.yaml`：补充 ring/pendant/armor_other/chest 的 purple/blue 品阶数据
 
 ---
 
@@ -175,7 +175,7 @@ def _save_workflow_result(self, name: str, result):
 | `lvjiang/workflows/engine.py` | 修改 | 逐槽容错扩展到所有 Step |
 | `lvjiang/ui/run_control.py` | 修改 | 通用保存 + 结果展示 |
 | `lvjiang/__main__.py` | 修改 | loguru enqueue=True |
-| `config/system/equip_attrs.yaml` | 修改 | 补充 purple/blue 品阶数据 |
+| `config/system/equipments.yaml` | 修改 | 补充 purple/blue 品阶数据 |
 | `config/system/workflows/equip_analysis.wf` | 修改 | ring/pendant 改用 equip_weapon_detail |
 
 ---

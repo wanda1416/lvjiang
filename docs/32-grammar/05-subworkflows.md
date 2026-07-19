@@ -207,11 +207,11 @@ end
 
 ## 二、工作流参数声明
 
-工作流可以通过 `workflow.yaml` 声明外部参数，由 UI 参数面板提供配置界面，运行时注入到工作流变量系统中。
+工作流可以通过 `workflows.yaml` 声明外部参数，由 UI 参数面板提供配置界面，运行时注入到工作流变量系统中。
 
 ### 2.1 参数声明语法
 
-在 `config/system/workflow.yaml` 的 flow 条目下新增 `parameters` 字段：
+在 `config/system/workflows.yaml` 的 flow 条目下新增 `parameters` 字段：
 
 ```yaml
 flows:
@@ -293,7 +293,7 @@ end
 ### 2.4 数据流
 
 ```
-workflow.yaml (声明 parameters)
+workflows.yaml (声明 parameters)
        |
        v
 UI 动态面板 (workflow_combo 切换时生成对应控件)

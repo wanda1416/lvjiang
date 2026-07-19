@@ -1,7 +1,7 @@
 # Dev Log: 架构文档重构与场景标识符规范化
 
 > 日期：2026-07-15
-> 涉及模块：`lvjiang/core/region_config.py`、`lvjiang/ui/region_editor/canvas.py`、`lvjiang/ui/region_editor/dialog.py`、`docs/`
+> 涉及模块：`lvjiang/core/scene_registry.py`、`lvjiang/ui/region_editor/canvas.py`、`lvjiang/ui/region_editor/dialog.py`、`docs/`
 > 关键词：文档重构、场景标识符、布局顺序、截图持久化、右键菜单
 
 ---

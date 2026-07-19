@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import QInputDialog, QMessageBox
 from loguru import logger
 
-from ...core.region_config import (
+from ...core.scene_registry import (
     Layout, copy_screenshots, delete_screenshots,
 )
 

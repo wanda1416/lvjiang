@@ -45,10 +45,6 @@ class SceneDef:
     points: list[PointDef] = field(default_factory=list)
 
 
-# 向后兼容别名（外部代码若仍用 FieldDef 可继续 import）
-FieldDef = RegionDef
-
-
 class SceneRegistry:
     """
     场景注册表：从 YAML 目录加载全部场景定义。
@@ -184,18 +180,13 @@ class SceneRegistry:
         group_config: dict[str, list[str]] | None,
         group_names: dict[str, str] | None,
     ):
-        """初始化分组结构，向后兼容旧格式（flat list → default 分组）"""
-        if group_config:
-            # 新格式：按分组配置初始化
-            self._group_order = list(group_config.keys())
-            for gk in self._group_order:
-                self._groups[gk] = (group_names or {}).get(gk, gk)
-                self._group_scenes[gk] = [k for k in group_config[gk] if k in self._scenes]
-        else:
-            # 旧格式兼容：所有场景放入 default 分组
-            self._group_order = ["default"]
-            self._groups["default"] = "默认分组"
-            self._group_scenes["default"] = list(self._order)
+        """初始化分组结构"""
+        if not group_config:
+            return
+        self._group_order = list(group_config.keys())
+        for gk in self._group_order:
+            self._groups[gk] = (group_names or {}).get(gk, gk)
+            self._group_scenes[gk] = [k for k in group_config[gk] if k in self._scenes]
         # 确保所有场景都在某个分组中
         assigned = set()
         for scenes in self._group_scenes.values():
@@ -274,12 +265,12 @@ class SceneRegistry:
             if k not in self._group_order:
                 self._group_order.append(k)
 
-    def save_group_config(self, app_config_path: Path):
-        """将分组配置写入 app.yaml"""
+    def save_group_config(self, scenes_config_path: Path):
+        """将分组配置写入 scenes.yaml"""
         data = {}
-        if app_config_path.exists():
+        if scenes_config_path.exists():
             try:
-                data = yaml.safe_load(app_config_path.read_text(encoding="utf-8")) or {}
+                data = yaml.safe_load(scenes_config_path.read_text(encoding="utf-8")) or {}
             except Exception:
                 pass
         # 构建分组结构
@@ -288,7 +279,7 @@ class SceneRegistry:
             layout_scenes[gk] = self._group_scenes.get(gk, [])
         data["layout_scenes"] = layout_scenes
         data["group_names"] = dict(self._groups)
-        app_config_path.write_text(
+        scenes_config_path.write_text(
             yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
             encoding="utf-8",
         )
@@ -357,8 +348,8 @@ class SceneRegistry:
             if k not in self._order:
                 self._order.append(k)
 
-    def save_scene_order(self, order: list[str], app_config_path: Path):
-        """将场景顺序写入 app.yaml（保持分组结构）"""
+    def save_scene_order(self, order: list[str], scenes_config_path: Path):
+        """将场景顺序写入 scenes.yaml（保持分组结构）"""
         self.reorder_scenes(order)
         # 同步更新各分组内的场景顺序
         for gk in self._group_order:
@@ -366,7 +357,7 @@ class SceneRegistry:
             # 按 order 中的顺序重新排列该分组的场景
             new_list = [k for k in order if k in group_scene_list]
             self._group_scenes[gk] = new_list
-        self.save_group_config(app_config_path)
+        self.save_group_config(scenes_config_path)
 
     # ─── 区域/坐标 编辑 ───────────────────────────────────────
 

@@ -75,6 +75,9 @@ class EquipmentParser:
         equip.affixes, affix_warnings = self._parse_affixes(raw)
         equip.warnings.extend(affix_warnings)
 
+        # 计算词条数值百分比（cap_pct）
+        self._calc_affix_cap_pct(equip)
+
         # 辅助信息
         equip.extra_data["affix_count"] = len(equip.affixes)
 
@@ -273,6 +276,20 @@ class EquipmentParser:
 
         logger.warning(f"base_attr 无法解析: {raw!r}")
         return None
+
+    def _calc_affix_cap_pct(self, equip: EquipmentData):
+        """计算每条词条的数值百分比（cap_pct）
+
+        cap_pct = (value / cap) * 100，保留 1 位小数
+        无对应上限数据时 cap_pct 保持 None
+        """
+        if not equip.level:
+            return
+        for affix in equip.affixes:
+            caps = self._attr_config.get_affix_caps(equip.level, affix.name)
+            if caps and caps.get("cap"):
+                cap = caps["cap"]
+                affix.cap_pct = round(affix.value / cap * 100, 1)
 
     # ─── affix 解析 ────────────────────────────────────────
 

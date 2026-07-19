@@ -39,11 +39,10 @@ def load_scene_screenshot(layout_name: str, scene_key: str) -> np.ndarray | None
         # cv2.imread 不支持中文路径，用 np.fromfile + imdecode
         data = path.read_bytes()
         buf = np.frombuffer(data, dtype=np.uint8)
-        img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
-        if img is not None:
-            # BGR -> RGB
-            if len(img.shape) == 3 and img.shape[2] >= 3:
-                img = img[:, :, :3][:, :, ::-1]
+        img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+        if img is None:
+            return None
+        # cv2.imdecode 返回 BGR，项目内部统一使用 BGR，无需翻转
         return img
     except Exception as e:
         logger.error(f"读取截图失败 {path}: {e}")
@@ -51,15 +50,15 @@ def load_scene_screenshot(layout_name: str, scene_key: str) -> np.ndarray | None
 
 
 def save_scene_screenshot(layout_name: str, scene_key: str, image: np.ndarray):
-    """保存场景截图（支持中文路径）"""
+    """保存场景截图（支持中文路径）
+
+    image: BGR numpy 数组（项目内部统一使用 BGR）
+    """
     import cv2
     d = layout_screenshots_dir(layout_name)
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{scene_key}.png"
-    # RGB -> BGR
-    if len(image.shape) == 3 and image.shape[2] >= 3:
-        image = image[:, :, :3][:, :, ::-1]
-    # cv2.imwrite 不支持中文路径，用 imencode + 文件写入
+    # image 已是 BGR，cv2.imencode 期望 BGR，无需翻转
     success, buf = cv2.imencode('.png', image)
     if success:
         path.write_bytes(buf.tobytes())

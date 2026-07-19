@@ -315,6 +315,10 @@ class BrowserPanel(QWidget):
 
         self._level_filter.blockSignals(True)
         self._level_filter.clear()
+        # 全部（不过滤）
+        self._level_filter.addItem("全部", None)
+        # 未分级（level 为 null）
+        self._level_filter.addItem("未分级", "ungraded")
         # 等级按倒序排列（高等级在前）
         for lv in reversed(self._db.get_levels()):
             self._level_filter.addItem(f"{lv}级", lv)

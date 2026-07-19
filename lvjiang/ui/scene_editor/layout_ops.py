@@ -3,9 +3,8 @@
 from PyQt6.QtWidgets import QInputDialog, QMessageBox
 from loguru import logger
 
-from ...core.scene_registry import (
-    Layout, copy_screenshots, delete_screenshots,
-)
+from ...core.scene_registry import Layout
+from ...core.layout_manager import copy_screenshots, delete_screenshots
 
 
 class LayoutOpsMixin:

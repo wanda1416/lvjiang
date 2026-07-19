@@ -84,8 +84,8 @@ class WindowOpsMixin:
                 w,
             )
 
-        # 自动匹配 window_title
-        keyword = self._layout_manager.get_window_title()
+        # 自动匹配 window_title（从 preferences.yaml 的 desktop_window_title）
+        keyword = self._user_config.desktop_window_title
         if keyword:
             for i, w in enumerate(self._scanned_windows):
                 if keyword in w["title"]:

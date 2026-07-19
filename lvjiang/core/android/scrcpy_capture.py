@@ -145,7 +145,25 @@ class AndroidStreamCapture(CaptureBackend):
                 return False
 
             # 5. 读协议头（device meta + codec id + session packet）
-            if not self._read_protocol_header():
+            # server 可能还没完全就绪，给 3 次重试机会
+            for attempt in range(3):
+                if self._read_protocol_header():
+                    break
+                if attempt < 2:
+                    logger.debug(f"[AndroidStream] 协议头读取失败，重试 ({attempt + 1}/3)")
+                    # 关闭当前 socket，等待后重连
+                    if self._sock:
+                        try:
+                            self._sock.close()
+                        except Exception:
+                            pass
+                        self._sock = None
+                    time.sleep(0.5)
+                    if not self._connect_socket():
+                        self._running = False
+                        return False
+            else:
+                logger.error("[AndroidStream] 3 次尝试均无法读取协议头")
                 self._running = False
                 return False
 

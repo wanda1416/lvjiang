@@ -23,8 +23,8 @@ class EquipmentParser:
     """装备 OCR 数据转换器"""
 
     def __init__(self):
-        from ..evaluator.equip_attrs import EquipAttrConfig
-        self._attr_config = EquipAttrConfig()
+        from ..evaluator.attr_rules import get_attr_rule_manager
+        self._attr_config = get_attr_rule_manager()
 
     def parse(self, raw: dict) -> EquipmentData:
         """解析单件装备的 OCR 原始数据
@@ -408,3 +408,16 @@ class EquipmentParser:
             unit=unit,
             is_transferred=is_transferred,
         )
+
+
+# ─── 全局单例 ─────────────────────────────────────────────
+
+_parser_instance: EquipmentParser | None = None
+
+
+def get_equipment_parser() -> EquipmentParser:
+    """获取全局 EquipmentParser 单例"""
+    global _parser_instance
+    if _parser_instance is None:
+        _parser_instance = EquipmentParser()
+    return _parser_instance

@@ -141,8 +141,8 @@ def _to_equipment(raw_data: dict) -> dict:
         logger.warning("to_equipment: 输入为空或非字典")
         return {}
 
-    from ..equip_parser import EquipmentParser
-    parser = EquipmentParser()
+    from ..equip_parser import get_equipment_parser
+    parser = get_equipment_parser()
 
     try:
         return parser.parse(raw_data).to_dict()
@@ -152,6 +152,58 @@ def _to_equipment(raw_data: dict) -> dict:
 
 
 # ─── 装备判定函数 ─────────────────────────────────────────
+
+
+@builtin_func("affix_cap")
+def _affix_cap(affix_name: str, level, *args) -> float:
+    """查询词条数值上限（不含单位）
+
+    根据词条名和装备等级，返回该词条在该等级下的上限值。
+    自动将真实词条名映射到配置类别（如 "最大外功攻击" → "外功攻击"）。
+    找不到配置时返回 0。
+
+    .wf 用法:
+        eval $equip = to_equipment($result)
+        eval cap = affix_cap($equip.affix_1.name, $equip.level)
+        if $equip.affix_1.value > cap
+            log concat($equip.affix_1.name, " 超标: ", $equip.affix_1.value, " > ", cap)
+        end
+    """
+    if not affix_name or level is None:
+        return 0
+    try:
+        level = int(level)
+    except (ValueError, TypeError):
+        return 0
+    from ..evaluator.attr_rules import get_attr_rule_manager
+    result = get_attr_rule_manager().get_affix_caps(level, str(affix_name))
+    if result is None:
+        logger.debug(f"affix_cap: 未找到配置 affix={affix_name} level={level}")
+        return 0
+    return result["cap"]
+
+
+@builtin_func("chengyin_cap")
+def _chengyin_cap(affix_name: str, level, *args) -> float:
+    """查询承音装备词条数值上限（不含单位）
+
+    与 affix_cap 相同，但返回承音数值（上限的 94%）。
+
+    .wf 用法:
+        eval cap = chengyin_cap($equip.affix_1.name, $equip.level)
+    """
+    if not affix_name or level is None:
+        return 0
+    try:
+        level = int(level)
+    except (ValueError, TypeError):
+        return 0
+    from ..evaluator.attr_rules import get_attr_rule_manager
+    result = get_attr_rule_manager().get_affix_caps(level, str(affix_name))
+    if result is None:
+        return 0
+    return result["chengyin"]
+
 
 # 高价值词条关键词（用于 is_good_equip 判定）
 # TODO: 从流派规则配置中读取，当前为硬编码

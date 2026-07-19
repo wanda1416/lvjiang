@@ -36,8 +36,12 @@ class MaterialManagerDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("材料管理")
         self.resize(1200, 800)
-        # 启用最大化按钮
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint)
+        # 启用最小化/最大化按钮
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+        )
 
         # 加载用户配置
         from ...config import load_user_config

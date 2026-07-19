@@ -65,8 +65,8 @@ AFFIX_NAMES = sorted([
     "气血最大值", "外功防御",
 ], key=len, reverse=True)
 
-# 武学增伤需要动态匹配（如 "剑武学增伤"），单独处理
-WUXUE_PATTERN = re.compile(r"^(.+?)武学增伤")
+# 武学增伤/增效需要动态匹配（如 "剑武学增伤"、"扇武学增效"），单独处理
+WUXUE_PATTERN = re.compile(r"^(.+?)武学增[伤效]")
 
 # 带 % 的词条（三率 + 神力类）
 PERCENT_AFFIXES = {

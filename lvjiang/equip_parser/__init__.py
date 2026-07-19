@@ -17,11 +17,12 @@
 """
 
 from .models import EquipAttr, Affix, EquipmentData
-from .parser import EquipmentParser
+from .parser import EquipmentParser, get_equipment_parser
 
 __all__ = [
     "EquipAttr",
     "Affix",
     "EquipmentData",
     "EquipmentParser",
+    "get_equipment_parser",
 ]

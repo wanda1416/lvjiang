@@ -155,6 +155,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         material_manager_action.triggered.connect(self._open_material_manager)
         settings_menu.addAction(material_manager_action)
 
+        attr_manager_action = QAction("属性管理", self)
+        attr_manager_action.setShortcut("F5")
+        attr_manager_action.triggered.connect(self._open_attr_manager)
+        settings_menu.addAction(attr_manager_action)
+
         # ── 工具 ──
         tools_menu = menubar.addMenu("工具")
 
@@ -205,6 +210,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             if BaseWorkflow._shared_material_recognizer is not None:
                 BaseWorkflow._shared_material_recognizer.reload()
                 self.statusBar().showMessage("材料库已刷新", 3000)
+
+    def _open_attr_manager(self):
+        """打开属性管理窗口"""
+        from .attr_manager import AttrManagerDialog
+        dialog = AttrManagerDialog(parent=self)
+        dialog.exec()
 
     def _show_about(self):
         """显示关于对话框"""

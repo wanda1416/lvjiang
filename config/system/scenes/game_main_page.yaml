@@ -4,7 +4,7 @@ regions:
 - key: menu
   name: 菜单
   type: func
-  is_text: false
+  is_text: true
   is_clickable: true
 - key: activity
   name: 活动
@@ -19,17 +19,17 @@ regions:
 - key: shop
   name: 商店
   type: func
-  is_text: false
+  is_text: true
   is_clickable: true
 - key: battle_pass
   name: 战令
   type: func
-  is_text: false
+  is_text: true
   is_clickable: true
 - key: harmony
   name: 和鸣
   type: func
-  is_text: false
+  is_text: true
   is_clickable: true
 - key: map
   name: 地图

@@ -46,13 +46,14 @@ class OCREngine:
 
     def recognize(self, image: np.ndarray) -> list[OCRResult]:
         """
-        对整张图做 OCR。多通道预处理确保不同颜色文字均可识别。
+        对整张图做 OCR
         image: BGR 格式的 numpy 数组
         返回: list[OCRResult]
         """
         if not self._ensure_loaded():
             return []
         try:
+            # 图像预处理：提升 OCR 准确率
             processed = self._preprocess_for_ocr(image)
             result, _ = self._ocr(processed)
             return self._parse_result(result)
@@ -62,70 +63,12 @@ class OCREngine:
 
     @staticmethod
     def _preprocess_for_ocr(image: np.ndarray) -> np.ndarray:
-        """图像预处理：提升多色文字识别准确率
+        """图像预处理：直接返回原图
 
-        根据图像尺寸自动选择预处理策略：
-        - 小区域（纯文字裁剪）：max-channel + 二值化，简洁高效
-        - 大图像（全屏截图）：分通道 CLAHE，保留多色文字对比度
+        RapidOCR 内部已有预处理和 resize 逻辑，
+        游戏截图是像素级精准的数子画面，无需额外锐化/对比度增强。
         """
-        import cv2
-
-        h, w = image.shape[:2]
-
-        # 小区域走简单二值化路径
-        # 当图像足够小时（如属性文字裁剪），max-channel + 二值化
-        # 比 CLAHE 更可靠：任何颜色的文字都变白，背景变黑
-        if h < 150 or w < 150:
-            return OCREngine._preprocess_small_region(image)
-
-        # 大图像：分通道 CLAHE
-        # 1. 锐化（Unsharp Mask）— 增强文字边缘
-        blurred = cv2.GaussianBlur(image, (0, 0), 3)
-        sharpened = cv2.addWeighted(image, 1.5, blurred, -0.5, 0)
-
-        # 2. 分通道 CLAHE — 每通道独立增强对比度
-        b, g, r = cv2.split(sharpened)
-
-        # 动态 tile 尺寸：保证每个 tile ≥ 40px，最多 8x8 个 tile
-        tile_size = max(40, min(h, w) // 8)
-        tile_size = max(2, (tile_size // 2) * 2)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(tile_size, tile_size))
-
-        b_enhanced = clahe.apply(b)
-        g_enhanced = clahe.apply(g)
-        r_enhanced = clahe.apply(r)
-        return cv2.merge([b_enhanced, g_enhanced, r_enhanced])
-
-    @staticmethod
-    def _preprocess_small_region(image: np.ndarray) -> np.ndarray:
-        """小区域纯文字预处理：max-channel + 二值化
-
-        游戏 UI 文字通常是彩色字在暗色背景上：
-        - max(B,G,R) 让任何颜色的文字都变亮（白）
-        - 二值化得到干净的黑底白字 / 白底黑字
-
-        这比 CLAHE 更简单直接，对小图识别率显著提升。
-        """
-        import cv2
-
-        # 1. 取三通道最大值 — 任何颜色的文字都变亮
-        if len(image.shape) == 3 and image.shape[2] >= 3:
-            gray = cv2.max(cv2.max(image[:, :, 0], image[:, :, 1]), image[:, :, 2])
-        else:
-            gray = image if len(image.shape) == 2 else image[:, :, 0]
-
-        # 2. 判断文字/背景明暗：如果文字比背景亮，反转
-        # 游戏 UI 通常是暗背景 + 亮文字 → 灰度图背景暗、文字亮
-        mean_val = gray.mean()
-        # 如果平均亮度较低（暗背景），说明文字是亮的 → 需要反转为黑字白底
-        if mean_val < 128:
-            gray = 255 - gray
-
-        # 3. 二值化（Otsu 自动阈值）
-        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-        # 4. 转回 BGR 三通道（OCR 引擎期望 BGR）
-        return cv2.merge([binary, binary, binary])
+        return image
 
     @staticmethod
     def _parse_result(result) -> list[OCRResult]:

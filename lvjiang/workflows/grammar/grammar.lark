@@ -81,7 +81,10 @@ scene_target: scene_name "." var_ref         -> scene_target_dyn
 
 ?scene_name: bracket_expr | STRING | var_ref
 
-collect_stmt: "collect"i var_ref collect_as_clause? _NL
+collect_stmt: "collect"i collect_source collect_as_clause? _NL
+
+// collect 源：变量引用或字段访问（如 session.equipped）
+?collect_source: var_ref | field_access
 
 // collect as 支持字符串常量或变量
 collect_as_clause: "as"i (STRING | var_ref)
@@ -194,6 +197,7 @@ goto_stmt: "goto"i NAME _NL
 // $var.$key 支持动态字典访问（用 . 代替 Python 的 dict[] 语法）
 // $var[$i] 支持列表索引访问（直接 [] 表示 index）
 // $var."key" / $var.[key] 支持静态字面量访问（"" 与 [] 在非赋值语境等价）
+// session.field / context.field 支持关键字作为字段访问根（KeywordRef）
 field_access: field_access "." NAME -> field_chain
             | field_access "." var_ref -> field_var_chain
             | field_access "[" var_ref "]" -> field_index_chain
@@ -204,6 +208,15 @@ field_access: field_access "." NAME -> field_chain
             | var_ref "[" var_ref "]" -> field_index_base
             | var_ref "." STRING -> field_str_base
             | var_ref "." "[" NAME "]" -> field_bracket_base
+            | keyword_ref "." NAME -> kw_field_base
+            | keyword_ref "." var_ref -> kw_field_var_base
+            | keyword_ref "." STRING -> kw_field_str_base
+            | keyword_ref "." "[" NAME "]" -> kw_field_bracket_base
+            | field_access "." keyword_ref -> field_kw_chain
+
+// DSL 关键字引用：session / context（持久/临时状态入口）
+keyword_ref: "session" -> session_ref
+           | "context" -> context_ref
 
 // 数值字面量：支持负数，统一为 number（float）
 ?number: FLOAT -> number_float

@@ -15,7 +15,7 @@ from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, Literal, FieldAccess, CoordPoint, ByClause,
+    SceneRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -608,6 +608,41 @@ class _DSLTransformer(Transformer):
         """field_access.[key] → FieldAccess(root=FieldAccess, field_name=Literal)"""
         prev_access, name_token = items
         return FieldAccess(root=prev_access, field_name=Literal(value=str(name_token)))
+
+    # ─── keyword_ref 字段访问（session / context） ──────────────
+
+    def session_ref(self, items):
+        """session → KeywordRef('session')"""
+        return KeywordRef(name="session")
+
+    def context_ref(self, items):
+        """context → KeywordRef('context')"""
+        return KeywordRef(name="context")
+
+    def kw_field_base(self, items):
+        """session.field → FieldAccess(root=KeywordRef, field_name=str)"""
+        kw_ref, field_name = items
+        return FieldAccess(root=kw_ref, field_name=str(field_name))
+
+    def kw_field_var_base(self, items):
+        """session.$key → FieldAccess(root=KeywordRef, field_name=VarRef)"""
+        kw_ref, key_ref = items
+        return FieldAccess(root=kw_ref, field_name=key_ref)
+
+    def kw_field_str_base(self, items):
+        """session."key" → FieldAccess(root=KeywordRef, field_name=Literal)"""
+        kw_ref, string_token = items
+        return FieldAccess(root=kw_ref, field_name=Literal(value=self._unquote(str(string_token))))
+
+    def kw_field_bracket_base(self, items):
+        """session.[key] → FieldAccess(root=KeywordRef, field_name=Literal)"""
+        kw_ref, name_token = items
+        return FieldAccess(root=kw_ref, field_name=Literal(value=str(name_token)))
+
+    def field_kw_chain(self, items):
+        """field_access.session → FieldAccess(root=FieldAccess, field_name=KeywordRef)"""
+        prev_access, kw_ref = items
+        return FieldAccess(root=prev_access, field_name=kw_ref)
 
     def gt_op(self, items):
         field_access, number = items

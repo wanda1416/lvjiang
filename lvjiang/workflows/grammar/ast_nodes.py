@@ -92,7 +92,7 @@ class ByClause:
 
 @dataclass(frozen=True)
 class Collect:
-    source: Any         # VarRef（要收集的变量）
+    source: Any         # VarRef | FieldAccess（要收集的值）
     alias: str | None = None      # 静态别名（字面量字符串）
     alias_var: Any | None = None  # 动态别名（VarRef）
     line_no: int = 0
@@ -210,6 +210,16 @@ class VarRef:
 
 
 @dataclass(frozen=True)
+class KeywordRef:
+    """DSL 关键字引用：session / context
+
+    与 VarRef 不同，KeywordRef 不查 variables 字典，
+    而是由引擎直接返回对应的持久/临时状态对象。
+    """
+    name: str          # "session" | "context"
+
+
+@dataclass(frozen=True)
 class Literal:
     """字面量字符串"""
     value: str
@@ -217,14 +227,16 @@ class Literal:
 
 @dataclass(frozen=True)
 class FieldAccess:
-    """$var.field 或 $var.field1.field2（链式访问）
+    """$var.field 或 session.field（链式访问）
 
-    root 为 VarRef（最外层变量）或另一个 FieldAccess（链式嵌套）。
+    root 为 VarRef / KeywordRef（最外层变量/关键字）或另一个 FieldAccess（链式嵌套）。
     例如 $ring.affix_1.value 表示为：
         FieldAccess(root=FieldAccess(root=VarRef('ring'), field_name='affix_1'), field_name='value')
+    例如 session.current_user 表示为：
+        FieldAccess(root=KeywordRef('session'), field_name='current_user')
     """
-    root: Any          # VarRef | FieldAccess
-    field_name: str
+    root: Any          # VarRef | KeywordRef | FieldAccess
+    field_name: Any    # str | VarRef | Literal
 
 
 @dataclass(frozen=True)

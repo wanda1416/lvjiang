@@ -1,11 +1,11 @@
-"""工作流基类 - 提供运行时状态和所有操作能力
+"""工作流基类 - 提供游戏操作能力
 
 子类可以：
 1. 纯 Python 实现：直接重写 run() 方法
-2. DSL 驱动：在 run() 中调用 self.run_file(wf_path)
+2. DSL 驱动：由 WorkflowEngine 加载 .wf 文件执行，操作委托给本实例
 
-所有操作（点击、截图、OCR、等待、变量管理）均在此类中实现，
-子类可直接使用，无需重复编写。
+所有游戏操作（点击、截图、OCR、等待、变量管理）均在此类中实现，
+由 WorkflowEngine 通过 _ensure_workflow() 懒创建并调用。
 """
 
 import math
@@ -77,24 +77,6 @@ class BaseWorkflow:
     def is_stopped(self) -> bool:
         """是否请求了停止"""
         return self._stop_check()
-
-    # ─── DSL 便捷入口 ──────────────────────────────────────
-
-    def run_file(self, workflow_path: Path | str, initial_variables: dict | None = None) -> dict:
-        """加载并执行 .wf 文件（DSL 驱动的工作流使用）
-
-        Args:
-            workflow_path: .wf 文件路径
-            initial_variables: 外部注入的初始变量（如 UI 参数面板传入的参数）
-        """
-        from .engine import WorkflowEngine
-        engine = WorkflowEngine(self)
-        if initial_variables:
-            engine.variables.update(initial_variables)
-        output = engine.run(workflow_path)
-        # 同步 engine 最终状态回 wf，供外部调用者读取
-        self.variables = dict(engine.variables)
-        return output
 
     # ─── 点击操作 ──────────────────────────────────────────
 
@@ -407,19 +389,22 @@ class BaseWorkflow:
         """设置变量"""
         self.variables[name] = value
 
-    def call_function(self, func_name: str, args: list) -> any:
+    def call_function(self, func_name: str, args: list, engine=None) -> any:
         """调用内置函数
 
-        若函数第一参数名为 _wf，自动注入 workflow 实例作为上下文。
+        若函数第一参数名为 _engine，自动注入当前 Engine 实例。
+        若函数第一参数名为 _wf，自动注入 workflow 实例（兼容旧代码）。
         """
         fn = builtins.get_function(func_name)
         if fn is None:
             available = ", ".join(builtins.list_functions())
             raise ValueError(f"未知内置函数: {func_name}，可用函数: {available}")
-        # 检查函数是否需要 workflow context（第一参数名为 _wf）
+        # 检查函数是否需要 engine 注入（第一参数名为 _engine）
         import inspect
         sig = inspect.signature(fn)
         params = list(sig.parameters.keys())
+        if params and params[0] == '_engine' and engine is not None:
+            return fn(engine, *args)
         if params and params[0] == '_wf':
             return fn(self, *args)
         return fn(*args)

@@ -104,4 +104,6 @@ user_config:
 | 文档 | 内容 |
 |------|------|
 | [game-rules.md](game-rules.md) | 游戏机制细节：顶级装备判定、流派规则、批量筛选、精调模式、决策流程 |
+| [character-management.md](character-management.md) | 角色管理需求：体力/心力追踪、调律材料库存、玩法进度 |
+| [auto-tuning.md](auto-tuning.md) | 自动调律：背包遍历、调律决策编排（规划中） |
 | [../10-game/README.md](../10-game/README.md) | 游戏机制介绍：装备系统、调律机制 |

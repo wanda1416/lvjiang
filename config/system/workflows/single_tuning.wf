@@ -13,16 +13,16 @@
 #%   - name: equip_slot
 #%     label: 装备部位
 #%     type: select
-#%     default: slot_main_weapon
+#%     default: main_weapon
 #%     options:
-#%       - { value: slot_main_weapon, label: 主武器 }
-#%       - { value: slot_sub_weapon, label: 副武器 }
-#%       - { value: slot_ring, label: 戒指 }
-#%       - { value: slot_pendant, label: 吊坠 }
-#%       - { value: slot_head, label: 头部 }
-#%       - { value: slot_chest, label: 衣服 }
-#%       - { value: slot_leg, label: 鞋子 }
-#%       - { value: slot_wrist, label: 护腕 }
+#%       - { value: main_weapon, label: 主武器 }
+#%       - { value: sub_weapon, label: 副武器 }
+#%       - { value: ring, label: 环 }
+#%       - { value: pendant, label: 佩 }
+#%       - { value: head, label: 头部 }
+#%       - { value: chest, label: 衣服 }
+#%       - { value: leg, label: 鞋子 }
+#%       - { value: wrist, label: 护腕 }
 #%   - name: bag_row
 #%     label: 背包行号
 #%     type: select

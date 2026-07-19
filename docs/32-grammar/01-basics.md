@@ -85,7 +85,7 @@ drag [scene].[arrow]                    # Action 名（Arrow）
 
 | 类型 | 语法 | 示例 | 可用位置 |
 |---|---|---|---|
-| 字符串 | `"..."` | `"武器"`, `"slot_head"` | log、contains/equals 比较、eval 参数、collect alias、call 路径、eval 字面量赋值 |
+| 字符串 | `"..."` | `"武器"`, `"head"` | log、contains/equals 比较、eval 参数、collect alias、call 路径、eval 字面量赋值 |
 | 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、数值比较、eval 字面量赋值 |
 | 空字典 | `{}` | `{}` | eval 字面量赋值（初始化空字典变量） |
 | 列表 | `[item, ...]` | `["a", "b"]`, `[1, 2, 3]` | eval 字面量赋值（列表元素支持字符串、数字、变量引用） |

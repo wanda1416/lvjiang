@@ -1,55 +1,8 @@
-# DSL 内置函数与 eval
+# DSL 内置函数
 
-DSL 通过 `eval` 调用引擎内置函数，支持数据清洗、条件判定等能力。
+DSL 通过 `eval` 调用引擎内置函数，支持数据清洗、条件判定等能力。eval 语法详见 [01-basics.md](01-basics.md#二变量系统)。
 
-## 一、eval 语法
-
-```
-# 变量赋值
-eval $var = func_name(arg1, arg2, ...)   # 调用函数，结果存入变量
-eval $var = "字符串"                      # 字面量赋值
-eval $var = 42                            # 数字字面量赋值（支持负数）
-eval $var = {}                            # 初始化空字典
-eval $var = ["a", "b", $c]               # 列表赋值（支持字符串、数字、变量引用）
-eval $var = (min, max)                    # 范围字面量赋值（存储为元组，用于随机等待等场景）
-
-# 字段赋值（统一使用 field_access 语法）
-eval $var.field = "value"                # 单层字段赋值
-eval $var.f1.f2.f3 = value               # 链式字段赋值（自动创建中间层）
-eval $var."key" = value                  # 字符串 key 赋值
-eval $var.[key] = value                  # 括号 key 赋值（等价于 "key"）
-eval $var.$key = value                   # 动态 key 赋值
-
-# 丢弃返回值
-eval func_name(arg1, arg2, ...)          # 调用函数，丢弃返回值
-```
-
-- 赋值目标 `$var =` 可选，省略则丢弃返回值
-- 右侧可以是函数调用、字符串字面量、数字字面量、空字典 `{}`、列表 `[...]`、范围元组 `(...)`、变量引用 `$var` 或字段访问 `$var.field`
-- 函数参数可以是 `$var`（变量引用）、`$var.field`（字段访问）或 `"literal"`（字面量字符串）
-- 列表元素支持字符串字面量、数字字面量和 `$var` 变量引用，运行时求值
-
-### 字段赋值语义
-
-字段赋值统一使用 `field_access` 语法，支持任意深度的链式访问：
-
-```
-eval $dict.key = value              # 单层：$dict["key"] = value
-eval $dict.a.b.c = value            # 链式：自动创建中间层空字典
-eval $dict."key" = value            # 字符串 key（等价于 .key）
-eval $dict.[key] = value            # 括号 key（等价于 .key）
-eval $dict.$key = value             # 动态 key：key 名由变量值决定
-```
-
-**链式赋值自动创建中间层**：
-
-```
-eval $d = {}
-eval $d.a.b.c = "deep"
-# $d = {"a": {"b": {"c": "deep"}}}
-```
-
-## 二、内置函数列表
+## 一、内置函数列表
 
 ### 字符串处理
 
@@ -78,7 +31,7 @@ eval $d.a.b.c = "deep"
 |---|---|---|
 | `messagebox` | `(str) -> str` | 弹出 Windows 消息框，阻塞直到用户点击确定，返回消息文本。可在工作流子线程中安全调用 |
 
-## 三、装备解析示例
+## 二、装备解析示例
 
 ```
 # scan → eval 解析 → collect 标准三步模式
@@ -96,7 +49,7 @@ if $main_weapon.affix_1.value > 100
 end
 ```
 
-## 四、字典变量用法
+## 三、字典变量用法
 
 通过 `eval $var = {}` 初始化空字典，再用字段赋值逐字段填充：
 
@@ -130,7 +83,7 @@ eval $summary.status = "done"
 collect $summary
 ```
 
-## 五、列表变量与 for 遍历
+## 四、列表变量与 for 遍历
 
 通过 `eval $var = [...]` 创建列表，再用 `for $x in $var` 遍历。列表元素支持字符串、数字和变量引用：
 
@@ -161,7 +114,7 @@ for $slot in $all_slots
 end
 ```
 
-## 六、动态场景名用法
+## 五、动态场景名用法
 
 `scan` 和 `recognize` 支持动态场景名，可以先将场景名存入变量再使用：
 
@@ -187,7 +140,7 @@ end
 scan $scene as $result
 ```
 
-## 七、范围字面量与随机等待
+## 六、范围字面量与随机等待
 
 通过 `(min, max)` 元组字面量存储随机范围，配合 `wait $var` 实现随机等待：
 
@@ -204,7 +157,7 @@ wait $step_interval
 wait (0.5, 1.5)
 ```
 
-## 八、messagebox 用法
+## 七、messagebox 用法
 
 `messagebox` 弹出 Windows 消息框，阻塞直到用户点击确定。常用于流程异常时提示用户：
 

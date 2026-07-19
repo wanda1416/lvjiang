@@ -104,8 +104,8 @@ class ScriptOpsMixin:
         self._status_bar.showMessage("脚本测试运行中...")
 
         try:
-            # 构建 BaseWorkflow
-            from ...workflows.base import BaseWorkflow
+            # 构建 WorkflowEngine
+            from ...workflows.engine import WorkflowEngine
             layout_name = self._current_layout.name if self._current_layout else ""
             if not layout_name:
                 self._result_text.setPlainText("[错误] 没有已加载的布局")
@@ -116,7 +116,7 @@ class ScriptOpsMixin:
                 self._result_text.setPlainText(f"[错误] 无法加载布局: {layout_name}")
                 return
 
-            wf = BaseWorkflow(
+            engine = WorkflowEngine(
                 capture=main_win._capture,
                 ocr=main_win._ocr,
                 input_ctrl=main_win._input,
@@ -126,13 +126,17 @@ class ScriptOpsMixin:
                 window_top=window_top,
                 stop_check=lambda: False,
             )
+            # session/context 装配（与主入口一致）
+            username = main_win._user_manager.get_active_user_name()
+            engine.session = main_win._session_manager.load(username)
+            # context 由 execute() 自动初始化为空 dict
 
             # 写入临时 .wf 文件
             temp_wf = SYSTEM_WORKFLOWS_DIR / "_editor_run.wf"
             temp_wf.write_text(script, encoding="utf-8")
 
             # 同步执行
-            result = wf.run_file(temp_wf)
+            result = engine.execute(temp_wf)
 
             # 输出结果到左侧结果区
             import json

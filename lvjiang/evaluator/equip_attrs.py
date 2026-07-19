@@ -3,7 +3,7 @@
 根据基础属性数值反推装备品阶（gold/purple/blue/green），
 同时校验 OCR 解析结果是否合理。
 
-数据来源：config/system/equip_attrs.yaml
+数据来源：config/system/equipments.yaml
 """
 
 from __future__ import annotations
@@ -65,14 +65,14 @@ _TYPE_TO_KEY = {
 class EquipAttrConfig:
     """装备基础属性规则配置
 
-    从 equip_attrs.yaml 加载，提供品阶推断接口。
+    从 equipments.yaml 加载，提供品阶推断接口。
     配置结构为 5 种平铺分类 + defense：
         weapon / ring / pendant / armor_other / chest / defense
     """
 
     def __init__(self, path: str | Path | None = None):
         if path is None:
-            path = Path(__file__).resolve().parent.parent.parent / "config" / "system" / "equip_attrs.yaml"
+            path = Path(__file__).resolve().parent.parent.parent / "config" / "system" / "equipments.yaml"
         self._path = Path(path)
         # key → level → LevelRule
         self._rules: dict[str, dict[int, LevelRule]] = {}

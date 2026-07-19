@@ -57,10 +57,10 @@ class RunControlMixin:
     # ─── 工作流配置加载 ──────────────────────────────────
 
     def _load_workflow_configs(self):
-        """读取 workflow.yaml，填充 workflow_combo"""
+        """读取 workflows.yaml，填充 workflow_combo"""
         self._workflow_configs: list[dict] = []
         self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
-        yaml_path = SYSTEM_CONFIG_DIR / "workflow.yaml"
+        yaml_path = SYSTEM_CONFIG_DIR / "workflows.yaml"
 
         if not yaml_path.exists():
             logger.warning(f"工作流配置文件不存在: {yaml_path}")

@@ -1,7 +1,7 @@
 # Dev Log: 装备场景类化重构与功能按钮标记
 
 > 日期：2026-07-15
-> 涉及模块：`lvjiang/core/region_config.py`、`lvjiang/ui/region_editor/canvas.py`、`lvjiang/workflows/equip_analysis.py`
+> 涉及模块：`lvjiang/core/scene_registry.py`、`lvjiang/ui/region_editor/canvas.py`、`lvjiang/workflows/equip_analysis.py`
 > 关键词：场景类化、字段继承、功能按钮标记、OCR跳过、区域复制修复
 
 ---

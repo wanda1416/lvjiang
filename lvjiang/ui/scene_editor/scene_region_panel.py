@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from ...core.region_config import get_registry, sync_scene_cache
+from ...core.scene_registry import get_registry, sync_scene_cache
 from ...core.scene_loader import RegionDef, VALID_REGION_TYPES
 
 

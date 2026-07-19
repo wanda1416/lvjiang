@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from loguru import logger
 
-from ...core.region_config import (
+from ...core.scene_registry import (
     Layout, LayoutConfigManager,
     get_scene_name,
     load_scene_screenshot, save_scene_screenshot,

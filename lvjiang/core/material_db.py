@@ -1,6 +1,6 @@
-"""材料数据库 - 基于 material.yaml 的材料元数据管理
+"""材料数据库 - 基于 materials.yaml 的材料元数据管理
 
-material.yaml 是材料参考库的唯一数据源，存放于 config/system/ 目录下。
+materials.yaml 是材料参考库的唯一数据源，存放于 config/system/ 目录下。
 图片文件按分组存放于 data/materials/{group}/ 子目录中。
 每个条目记录相对文件路径、材料类型、等级等元数据，与图片文件一一对应。
 """
@@ -16,7 +16,7 @@ from loguru import logger
 
 # 默认路径
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-_DEFAULT_YAML_PATH = _PROJECT_ROOT / "config" / "system" / "material.yaml"
+_DEFAULT_YAML_PATH = _PROJECT_ROOT / "config" / "system" / "materials.yaml"
 _DEFAULT_MATERIALS_DIR = _PROJECT_ROOT / "data" / "materials"
 
 
@@ -32,7 +32,7 @@ class MaterialEntry:
 
 
 class MaterialDatabase:
-    """材料数据库 - 管理 material.yaml 的读写与条目操作
+    """材料数据库 - 管理 materials.yaml 的读写与条目操作
 
     用法：
         db = MaterialDatabase()
@@ -73,9 +73,9 @@ class MaterialDatabase:
             self.load()
 
     def load(self):
-        """从 material.yaml 加载条目列表"""
+        """从 materials.yaml 加载条目列表"""
         if not self._yaml_path.exists():
-            logger.info(f"material.yaml 不存在，使用空数据库: {self._yaml_path}")
+            logger.info(f"materials.yaml 不存在，使用空数据库: {self._yaml_path}")
             self._entries = []
             self._loaded = True
             return
@@ -104,7 +104,7 @@ class MaterialDatabase:
         logger.info(f"材料数据库加载完成: {len(self._entries)} 条记录 <- {self._yaml_path}")
 
     def save(self):
-        """保存条目列表到 material.yaml"""
+        """保存条目列表到 materials.yaml"""
         self._yaml_path.parent.mkdir(parents=True, exist_ok=True)
 
         data = {

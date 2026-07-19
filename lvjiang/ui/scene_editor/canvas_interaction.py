@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QMouseEvent, QCursor, QWheelEvent
 from loguru import logger
 
-from ...core.region_config import Region, CanvasConfig
+from ...core.scene_registry import Region, CanvasConfig
 from .canvas_coords import CanvasCoordMixin
 
 

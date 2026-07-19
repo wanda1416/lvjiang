@@ -19,7 +19,7 @@ from .window_ops import WindowOpsMixin
 from .run_control import RunControlMixin
 from ..config import load_user_config
 from ..core.user_config import UserConfigManager
-from ..core.region_config import LayoutConfigManager
+from ..core.layout_manager import LayoutConfigManager
 
 
 class _LogBridge(QObject):

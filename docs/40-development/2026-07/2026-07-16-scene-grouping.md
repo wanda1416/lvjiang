@@ -1,8 +1,8 @@
 # Dev Log: 2026-07-16 场景分组管理功能
 
 > 日期：2026-07-16
-> 涉及模块：`lvjiang/core/scene_loader.py`、`lvjiang/core/region_config.py`、`lvjiang/ui/region_editor/dialog.py`、`config/system/app.yaml`、`config/system/scenes/`
-> 关键词：场景分组、二级 Tab、SceneRegistry、app.yaml 层级结构、PyQt6 bool 陷阱
+> 涉及模块：`lvjiang/core/scene_loader.py`、`lvjiang/core/scene_registry.py`、`lvjiang/ui/region_editor/dialog.py`、`config/system/scenes.yaml`、`config/system/scenes/`
+> 关键词：场景分组、二级 Tab、SceneRegistry、scenes.yaml 层级结构、PyQt6 bool 陷阱
 
 ---
 
@@ -16,7 +16,7 @@
 
 #### 1.1.1 数据结构与配置
 
-**app.yaml 新格式**：`layout_scenes` 从 flat list 改为 `group: [scenes]` 二级结构
+**scenes.yaml 新格式**：`layout_scenes` 从 flat list 改为 `group: [scenes]` 二级结构
 
 ```yaml
 layout_scenes:
@@ -53,11 +53,11 @@ group_names:
 - `_group_scenes`: dict[str, list[str]] — group_key → [scene_keys]
 - CRUD 方法：`create_group`、`rename_group`、`delete_group`（非空抛异常）、`move_scene_to_group`
 - 查询方法：`get_groups()`、`get_group_scenes()`、`get_scene_group()`
-- `save_group_config()` 写入新格式到 app.yaml
+- `save_group_config()` 写入新格式到 scenes.yaml
 
-#### 1.1.3 region_config 加载与缓存
+#### 1.1.3 scene_registry 加载与缓存
 
-`region_config.py` 新增：
+`scene_registry.py` 新增：
 - `_load_group_config()` 解析新格式
 - 全局缓存：`SCENE_GROUPS_META`、`GROUP_SCENES`、`GROUP_ORDER`
 - `sync_group_cache()`、`get_group_name()`、`get_scene_group()`
@@ -136,9 +136,9 @@ def save_group_config(self, path: Path):
 | 文件 | 操作 | 说明 |
 |------|------|------|
 | `lvjiang/core/scene_loader.py` | 修改 | 分组数据结构、CRUD、save_group_config |
-| `lvjiang/core/region_config.py` | 修改 | 分组加载、缓存、启动校验 |
+| `lvjiang/core/scene_registry.py` | 修改 | 分组加载、缓存、启动校验 |
 | `lvjiang/ui/region_editor/dialog.py` | 修改 | 二级 Tab UI、分组/场景 CRUD、右键菜单、PyQt6 bug 修复 |
-| `config/system/app.yaml` | 修改 | 从 flat list 迁移为分组格式 |
+| `config/system/scenes.yaml` | 修改 | 从 flat list 迁移为分组格式 |
 | `config/system/scenes/bag_equip_detail.yaml` | 新增 | 原 equip_bag_detail 重命名 |
 | `config/system/scenes/bag_item_detail.yaml` | 新增 | 原 prop_bag_detail 重命名 |
 | `config/system/scenes/equip_bag_detail.yaml` | 删除 | 重命名为 bag_equip_detail |

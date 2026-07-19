@@ -6,7 +6,7 @@
 - 数量识别：OCR 裁剪右下角区域
 - 空槽检测：图像方差 + 饱和度判断
 
-参考库数据源：MaterialDatabase（material.yaml），不再依赖文件名解析。
+参考库数据源：MaterialDatabase（materials.yaml），不再依赖文件名解析。
 """
 
 import re

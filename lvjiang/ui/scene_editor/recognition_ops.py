@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import QApplication
 from loguru import logger
 
-from ...core.region_config import get_scene_name, get_region_defs
+from ...core.scene_registry import get_scene_name, get_region_defs
 
 
 class RecognitionOpsMixin:

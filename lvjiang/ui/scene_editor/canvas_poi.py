@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QPen, QBrush, QColor, QFont, QPainter, QPolygonF, QCursor
 from loguru import logger
 
-from ...core.region_config import Point, Arrow
+from ...core.scene_registry import Point, Arrow
 
 
 # ─── 常量 ────────────────────────────────────────────────

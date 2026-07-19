@@ -1,7 +1,7 @@
 # Dev Log: 画布中间层坐标解耦（Canvas Middle Layer）
 
 > 日期：2026-07-15
-> 涉及模块：`lvjiang/core/region_config.py`、`lvjiang/ui/region_editor/canvas.py`、`lvjiang/ui/region_editor/scene_tab.py`、`lvjiang/ui/region_editor/dialog.py`
+> 涉及模块：`lvjiang/core/scene_registry.py`、`lvjiang/ui/region_editor/canvas.py`、`lvjiang/ui/region_editor/scene_tab.py`、`lvjiang/ui/region_editor/dialog.py`
 > 关键词：画布中间层、CanvasConfig、坐标解耦、两层变换、布局级别
 
 ---
@@ -49,7 +49,7 @@
 - `regions` 的归一化坐标相对于**画布**（0~1）
 - canvas 缺省时默认 `(0, 0, 1, 1)` 即全截图（向后兼容旧布局文件）
 
-### `region_config.py` 变更
+### `scene_registry.py` 变更
 
 | 变更 | 说明 |
 |------|------|

@@ -1,7 +1,7 @@
 # Dev Log: 场景定义 YAML 外部化
 
 > 日期：2026-07-15
-> 涉及模块：`lvjiang/core/scene_loader.py`、`lvjiang/core/region_config.py`、`lvjiang/constants.py`、`lvjiang/workflows/equip_analysis.py`、`config/system/app.yaml`、`config/system/scenes/`
+> 涉及模块：`lvjiang/core/scene_loader.py`、`lvjiang/core/scene_registry.py`、`lvjiang/constants.py`、`lvjiang/workflows/equip_analysis.py`、`config/system/scenes.yaml`、`config/system/scenes/`
 > 关键词：YAML 外部化、SceneRegistry、FieldDef、场景加载顺序、type 过滤
 
 ---
@@ -13,9 +13,9 @@
 | 架构重构 | 硬编码场景类 → YAML 配置文件驱动 |
 | 新建模块 | `scene_loader.py`（FieldDef / SceneDef / SceneRegistry） |
 | 新建配置 | `config/system/scenes/*.yaml`（5 个场景文件） |
-| 新增机制 | `app.yaml` 中 `layout_scenes` 控制场景加载顺序 |
+| 新增机制 | `scenes.yaml` 中 `layout_scenes` 控制场景加载顺序 |
 | 工作流优化 | `equip_analysis` 的 SKIP_FIELDS 硬编码 → `type == "func"` 过滤 |
-| 删除代码 | `region_config.py` 中 160+ 行硬编码场景类全部移除 |
+| 删除代码 | `scene_registry.py` 中 160+ 行硬编码场景类全部移除 |
 
 ---
 
@@ -57,7 +57,7 @@ fields:
 
 ### 场景加载顺序
 
-由 `config/system/app.yaml` 的 `layout_scenes` 数组控制：
+由 `config/system/scenes.yaml` 的 `layout_scenes` 数组控制：
 
 ```yaml
 layout_scenes:
@@ -87,7 +87,7 @@ class SceneRegistry:
     def all_scenes() -> dict[str, SceneDef]  # 按配置顺序
 ```
 
-### region_config.py 兼容接口
+### scene_registry.py 兼容接口
 
 对外接口不变：
 - `FIELD_GROUPS` — 从 SceneRegistry 自动构建
@@ -104,6 +104,6 @@ class SceneRegistry:
 | `lvjiang/constants.py` | 新增 `SYSTEM_SCENES_DIR` |
 | `config/system/scenes/*.yaml` | 新建 5 个场景文件 |
 | `lvjiang/core/scene_loader.py` | 新建（FieldDef + SceneDef + SceneRegistry） |
-| `lvjiang/core/region_config.py` | 删除 160+ 行硬编码类，改为 SceneRegistry 驱动 |
+| `lvjiang/core/scene_registry.py` | 删除 160+ 行硬编码类，改为 SceneRegistry 驱动 |
 | `lvjiang/workflows/equip_analysis.py` | SKIP_FIELDS → type 过滤 |
-| `config/system/app.yaml` | 新增 `layout_scenes` 数组 |
+| `config/system/scenes.yaml` | 新增 `layout_scenes` 数组 |

@@ -3,7 +3,7 @@
 > 本文档描述在「scene 扩展 points 与 arrows」UI 侧落地后，DSL 消费侧需要做的改造。
 > 当前 session 未触碰 DSL，所有 DSL 改造留给本 session 完成后由另一 session 执行。
 >
-> 依赖：`lvjiang/core/region_config.py` 中的 `Point` / `Arrow` 数据类与 `Layout.get_scene_points / get_scene_arrows` API 已就位。
+> 依赖：`lvjiang/core/scene_registry.py` 中的 `Point` / `Arrow` 数据类与 `Layout.get_scene_points / get_scene_arrows` API 已就位。
 
 ## 一、改造总览
 

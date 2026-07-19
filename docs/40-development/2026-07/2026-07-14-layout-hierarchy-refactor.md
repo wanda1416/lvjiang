@@ -1,7 +1,7 @@
 # Dev Log: 区域配置布局层级重构（Layout → Scene → Region）
 
 > 日期：2026-07-14
-> 涉及模块：`lvjiang/core/region_config.py`、`lvjiang/ui/region_editor_dialog.py`、`lvjiang/ui/main_window.py`
+> 涉及模块：`lvjiang/core/scene_registry.py`、`lvjiang/ui/region_editor_dialog.py`、`lvjiang/ui/main_window.py`
 > 关键词：布局层级、Layout、LayoutConfigManager、QTabWidget、数据迁移
 
 ---
@@ -47,7 +47,7 @@ config/
 
 ## 代码变更
 
-### 1. `region_config.py` — 完全重写
+### 1. `scene_registry.py` — 完全重写
 
 | 变更 | 说明 |
 |------|------|
@@ -156,7 +156,7 @@ config/
 
 **修复**：
 - 新增 `LOCAL_CONFIG_DIR = config/local/`，`LAYOUTS_DIR` 和 `SESSION_PATH` 迁移至该目录。
-- `.gitignore` 排除 `config/local/`，系统配置（`app.yaml` 等）保留在 `config/system/` 下继续跟踪。
+- `.gitignore` 排除 `config/local/`，系统配置（`scenes.yaml` 等）保留在 `config/system/` 下继续跟踪。
 
 ### 8. 画布全局调整模式
 
@@ -290,6 +290,6 @@ region_editor/
 | 语义清晰度 | "布局"一词在场景级别，容易混淆 | "布局"对应设备，直觉清晰 |
 | 保存方式 | 按场景单独保存 | 全量保存所有场景 |
 | UI 结构 | 场景下拉框 + 单画布 | 场景 Tab + 每 Tab 独立画布 |
-| 配置存储 | 单文件 `regions.json` | `config/system/app.yaml`（系统配置）+ `config/local/`（本地数据，git 忽略） |
+| 配置存储 | 单文件 `regions.json` | `config/system/scenes.yaml`（系统配置）+ `config/local/`（本地数据，git 忽略） |
 
 **核心启示**：当发现组织层级反了的时候，越早改越好。继续在上层打补丁只会让后续逻辑越来越扭曲。用户频繁变动的配置必须与自带配置分离，避免污染 git 历史。

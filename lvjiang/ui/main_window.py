@@ -11,6 +11,7 @@ from PyQt6.QtGui import QKeyEvent, QAction
 from loguru import logger
 
 from .widgets import TrimmedLogEdit
+from .equip_status_panel import EquipStatusPanel
 
 from pynput import keyboard as pynput_keyboard
 
@@ -97,6 +98,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._setup_ui()
         self._refresh_run_button()  # 根据后端就绪状态设置按钮初始样式
         self._refresh_user_combo()
+        self._refresh_equip_status()  # 初始化装备面板
         self._refresh_layout_combo()
         self._load_workflow_configs()
 
@@ -413,9 +415,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         self.tabs.addTab(self.log_text, "运行日志")
 
-        self.status_text = QTextEdit()
-        self.status_text.setReadOnly(True)
-        self.tabs.addTab(self.status_text, "装备状态")
+        self.equip_status_panel = EquipStatusPanel()
+        self.equip_status_panel.refresh_requested.connect(self._refresh_equip_status)
+        self.tabs.addTab(self.equip_status_panel, "装备状态")
 
         right_layout.addWidget(self.tabs)
 
@@ -448,6 +450,29 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         sink = QtSink(self._log_bridge)
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
+
+    def _refresh_equip_status(self):
+        """刷新装备状态面板"""
+        import json
+        from ..constants import LOCAL_CONFIG_DIR
+
+        user_name = self._user_manager.get_active_user_name()
+        if not user_name:
+            self.equip_status_panel.refresh({})
+            return
+
+        user_file = LOCAL_CONFIG_DIR / "users" / f"{user_name}.json"
+        if not user_file.exists():
+            self.equip_status_panel.refresh({})
+            return
+
+        try:
+            data = json.loads(user_file.read_text(encoding="utf-8"))
+            equipped = data.get("equipped", {})
+            self.equip_status_panel.refresh(equipped)
+        except Exception as e:
+            logger.error(f"加载用户装备数据失败: {e}")
+            self.equip_status_panel.refresh({})
 
     def _rebuild_param_panel(self):
         """根据当前选中工作流的 parameters 声明重建参数面板"""

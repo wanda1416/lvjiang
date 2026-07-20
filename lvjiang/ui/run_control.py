@@ -174,6 +174,8 @@ class RunControlMixin:
                 logger.info(f"用户切换前已保存 session: {old_name}")
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
+        # 刷新装备状态面板
+        self._refresh_equip_status()
 
     # ─── 布局选择器 ────────────────────────────────────────
 

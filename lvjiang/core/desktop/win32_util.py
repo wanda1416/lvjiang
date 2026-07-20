@@ -47,6 +47,8 @@ _WM_MOUSEMOVE = 0x0200
 _WM_LBUTTONDOWN = 0x0201
 _WM_LBUTTONUP = 0x0202
 _MK_LBUTTON = 0x0001
+_WM_NCHITTEST = 0x0084
+_HTCLIENT = 1
 
 
 def send_mouse_event(flags: int, dx: int = 0, dy: int = 0):
@@ -99,11 +101,18 @@ def postmessage_click(hwnd: int, client_x: int, client_y: int):
 
 
 def postmessage_drag(hwnd: int, x1: int, y1: int, x2: int, y2: int, steps: int = 20):
-    """通过 PostMessage 向窗口发送拖拽（不移动光标）"""
+    """通过 PostMessage 向窗口发送拖拽（不移动光标）
+
+    在 WM_LBUTTONDOWN 前先通过 SendMessage 发送 WM_NCHITTEST，
+    让目标窗口的 DefWindowProc 完成命中测试、建立正确的拖拽上下文，
+    避免与外部真实鼠标点击产生状态冲突。
+    """
     import time
     # 移动到起点
     _user32.PostMessageW(hwnd, _WM_MOUSEMOVE, 0, make_lparam(x1, y1))
     time.sleep(0.03)
+    # 命中测试：同步确认起点在客户区内（DefWindowProc 返回 HTCLIENT）
+    _user32.SendMessageW(hwnd, _WM_NCHITTEST, 0, make_lparam(x1, y1))
     # 按下
     _user32.PostMessageW(hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, make_lparam(x1, y1))
     time.sleep(0.05)

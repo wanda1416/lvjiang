@@ -151,6 +151,31 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
+- key: item_name
+  name: 道具名称
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: item_type
+  name: 道具类型
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: item_level
+  name: 道具等级
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: item_count
+  name: 持有数量
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: 道具操作
+  name: main_func
+  type: func
+  is_text: true
+  is_clickable: true
 panels:
 - key: bag_grid
   name: 背包

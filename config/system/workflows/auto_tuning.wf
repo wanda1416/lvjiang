@@ -1,0 +1,22 @@
+#% name: 自动调律
+#% description: 遍历背包所有装备 → 评估 → 对不合格品执行调律 → 输出候选列表
+#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail, equip_tune_detail, equip_tune_result]
+
+# ── 阶段 1：导航到背包页 ──
+call "subcall/nav_main_to_equip.wf"
+
+# ── 阶段 2：遍历背包，收集所有装备 ──
+call "subcall/bag_traverse.wf" read "bag_candidates" as $all_equips
+
+log concat("背包遍历完成，共发现 ", $all_equips, " 件装备")
+
+# ── 阶段 3：返回主界面 ──
+click [bag_equip_detail].[back]
+wait step_interval
+click [bag_equip_detail].[back]
+wait step_interval
+click [game_menu_page].[back]
+
+# ── 完成 ──
+log "自动调律流程结束"
+collect $all_equips

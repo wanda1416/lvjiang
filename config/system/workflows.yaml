@@ -63,6 +63,18 @@ flows:
     required_scenes:
       - game_main_page
 
+  - id: auto_tuning
+    name: 自动调律
+    wf_file: auto_tuning.wf
+    required_scenes:
+      - game_main_page
+      - game_menu_page
+      - bag_equip_detail
+      - equip_weapon_detail
+      - equip_armor_detail
+      - equip_tune_detail
+      - equip_tune_result
+
   - id: mengzhuzhengfeng
     name: 盟主争锋
     wf_file: mengzhuzhengfeng.wf

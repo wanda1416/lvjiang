@@ -19,6 +19,7 @@ start: (_NL | statement)*
           | eval_stmt
           | implicit_eval_stmt
           | default_stmt
+          | calibrate_stmt
           | call_stmt
           | if_stmt
           | for_stmt
@@ -30,15 +31,42 @@ start: (_NL | statement)*
 
 // ─── 基础指令 ─────────────────────────────────────────────
 
-// click 支持两种目标：scene.area 引用 或 画布归一化坐标点
-click_stmt: "click"i click_target _NL
-click_target: const_or_var "." const_or_var  -> click_scene_target
-            | coord_point                     -> click_coord_target
+// calibrate：触发 panel 区域截图 + 图像自校准，缓存格子坐标
+// 语法：calibrate [scene].[panel]
+calibrate_stmt: "calibrate"i bracket_expr "." bracket_expr _NL
 
-// drag 支持两种目标：scene.arrow 引用 或 两个坐标点
+// click 支持三种目标：
+//   1. [scene].[panel][row][col] — panel 三级索引（点击格子中心）
+//   2. [scene].[region] / $var.[region] / ... — scene.area 引用
+//   3. (rx, ry) — 画布归一化坐标点
+//
+// 注意：panel 与 scene.area 都以 [x].[y] 开头，必须用同一规则避免歧义。
+// transformer 根据 row/col 是否存在分派为 SceneRef 或 PanelRef。
+click_stmt: "click"i click_target _NL
+click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
+            | const_or_var "." const_or_var                          -> click_scene_target
+            | coord_point                                             -> click_coord_target
+
+// drag 支持三种目标：
+//   1. [scene].[panel][row][col] [up|down [n]] — panel 三级索引 + 可选方向距离
+//   2. scene.arrow — scene.arrow 引用
+//   3. (rx1, ry1) (rx2, ry2) — 两坐标点
 drag_stmt: "drag"i drag_target drag_duration? drag_hold? _NL
-drag_target: const_or_var "." const_or_var    -> drag_scene_target
-           | coord_point coord_point           -> drag_coord_target
+drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
+           | const_or_var "." const_or_var                          -> drag_scene_target
+           | coord_point coord_point                                -> drag_coord_target
+
+// panel 拖拽方向：up/down/left/right + 可选距离（默认 1，支持数值或变量）
+// up/down 按行计算，left/right 按列计算
+// 使用 DRAG_DIST 终端避免与 drag_duration 的 number 冲突
+// 优先级 .2 确保在 drag_direction 上下文中优先匹配
+drag_direction: DRAG_DIR DRAG_DIST?
+DRAG_DIR: /up/i | /down/i | /left/i | /right/i
+DRAG_DIST.2: /[0-9]+/ | /\$[a-zA-Z_][a-zA-Z0-9_]*/
+
+// panel 索引：[数字] 或 [$var]，显式包含括号以避免与 bracket_list 歧义
+panel_index: "[" INT "]" -> panel_index_int
+           | "[" var_ref "]" -> panel_index_var
 
 // 画布归一化坐标点：(rx, ry)，rx/ry ∈ [0,1]
 coord_point: "(" number "," number ")"
@@ -83,8 +111,8 @@ scene_target: scene_name "." var_ref         -> scene_target_dyn
 
 collect_stmt: "collect"i collect_source collect_as_clause? _NL
 
-// collect 源：变量引用或字段访问（如 session.equipped）
-?collect_source: var_ref | field_access
+// collect 源：变量引用、字段访问、或字面量（数字/字符串）
+?collect_source: var_ref | field_access | literal
 
 // collect as 支持字符串常量或变量
 collect_as_clause: "as"i (STRING | var_ref)
@@ -121,6 +149,7 @@ func_call: NAME "(" arg_list? ")"
 arg_list: arg ("," arg)*
 
 ?arg: STRING -> arg_lit
+    | number -> arg_num
     | field_access -> arg_field
     | var_ref -> arg_var
 
@@ -145,8 +174,15 @@ else_clause: "else"i _NL statement*
 
 for_stmt: "for"i NAME "in"i for_iter _NL statement* "end"i _NL
 
-for_iter: list_literal -> for_iter_static
+for_iter: for_range    -> for_iter_range
+        | func_call    -> for_iter_func
+        | list_literal -> for_iter_static
         | var_ref      -> for_iter_var
+
+// 范围迭代：[start...end] 闭区间，支持数字和变量
+for_range: "[" for_range_endpoint RANGE_OP for_range_endpoint "]"
+for_range_endpoint: number | var_ref
+RANGE_OP.2: /\.\.\./
 
 loop_stmt: "loop"i (number | NAME | var_ref) _NL statement* "end"i _NL
 
@@ -174,7 +210,10 @@ goto_stmt: "goto"i NAME _NL
 ?cond_atom: field_access "contains"i cond_text -> contains_op
           | field_access "equals"i cond_text -> equals_op
           | field_access "in"i list_literal -> in_op
+          | var_ref "equals"i cond_text -> equals_op
+          | var_ref "contains"i cond_text -> contains_op
           | var_ref "in"i list_literal -> in_op
+          | var_ref "is_empty"i -> is_empty_op
           | field_access "is_empty"i -> is_empty_op
           | field_access ">" number -> gt_op
           | field_access "<" number -> lt_op

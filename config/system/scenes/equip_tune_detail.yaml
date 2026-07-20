@@ -31,7 +31,7 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
-- key: one_click_add
+- key: auto_add
   name: 一键添加
   type: func
   is_text: true
@@ -73,6 +73,16 @@ regions:
   is_clickable: false
 - key: tune_btn
   name: 调律
+  type: func
+  is_text: false
+  is_clickable: true
+- key: auto_add_2
+  name: 未展开提示
+  type: func
+  is_text: true
+  is_clickable: true
+- key: expand
+  name: 展开
   type: func
   is_text: false
   is_clickable: true

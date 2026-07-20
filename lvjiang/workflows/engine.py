@@ -21,13 +21,15 @@ from .grammar import (
     parse_file,
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
-    If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
+    If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
+    SceneRef, PanelRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
+from .grammar.ast_nodes import Calibrate
 from .base import BaseWorkflow
+from .calibrate import detect_grid
 
 
 # ─── 用户可见的 DSL 错误 ──────────────────────────────────
@@ -88,6 +90,8 @@ class WorkflowEngine:
         self.output: dict = {}
         self._coord_meta: dict[str, dict] = {}
         self._base_dir: Path | None = None
+        # panel 校准缓存：(scene_key, panel_key) → list[(cx_ratio, cy_ratio)]（相对于 panel 区域）
+        self._panel_calibrations: dict[tuple[str, str], list[tuple[float, float]]] = {}
         # session / context（公开属性，UI 层注入）
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
@@ -222,6 +226,8 @@ class WorkflowEngine:
                 self._exec_drag(node)
             case Wait():
                 self._exec_wait(node)
+            case Calibrate():
+                self._exec_calibrate(node)
             case Scan():
                 self._exec_scan(node)
             case Recognize():
@@ -237,6 +243,8 @@ class WorkflowEngine:
                 self._exec_if(node)
             case For():
                 self._exec_for(node)
+            case ForRange():
+                self._exec_for_range(node)
             case Loop():
                 self._exec_loop(node)
             case Break():
@@ -259,12 +267,18 @@ class WorkflowEngine:
     # ─── 基础指令 ─────────────────────────────────────────
 
     def _exec_click(self, node: Click):
-        """click scene.coord — scene 和 coord 都可以是常量或变量。
+        """click scene.coord / scene.panel[row][col] — scene 和 coord 都可以是常量或变量。
         若 target 为 CoordPoint，则按画布归一化坐标反算后点击。
+        若 target 为 PanelRef，则查 panel 校准缓存获取格子中心坐标。
         """
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
             self._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
+            return
+        if isinstance(node.target, PanelRef):
+            x, y = self._panel_ref_to_screen(node.target)
+            if x is not None and y is not None:
+                self._input.click_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])")
             return
         if isinstance(node.target, SceneRef):
             # 解析 scene（可能是 str 或 VarRef）
@@ -298,8 +312,9 @@ class WorkflowEngine:
             logger.error(f"click: 未知目标类型 {type(node.target).__name__}")
 
     def _exec_drag(self, node: Drag):
-        """drag scene.arrow — scene 和 arrow 都可以是常量或变量。
+        """drag scene.arrow / scene.panel[row][col] — scene 和 arrow 都可以是常量或变量。
         若为坐标模式（from_point/to_point），则两端点按画布归一化坐标反算。
+        若为 panel 模式，则查校准缓存获取格子中心坐标。
         """
         if isinstance(node.from_point, CoordPoint) and isinstance(node.to_point, CoordPoint):
             x1, y1 = self._coord_ratio_to_screen(node.from_point.rx, node.from_point.ry)
@@ -308,6 +323,55 @@ class WorkflowEngine:
             self._input.drag_screen(
                 x1, y1, x2, y2,
                 f"coord({node.from_point.rx},{node.from_point.ry})->({node.to_point.rx},{node.to_point.ry})",
+                duration=duration, hold=node.hold,
+            )
+            return
+        if isinstance(node.scene, PanelRef):
+            x, y = self._panel_ref_to_screen(node.scene)
+            if x is None or y is None:
+                return
+            # panel drag：根据方向和距离计算拖拽终点
+            # up = 手指向上划 = 内容下移 = 显示上方内容
+            # down = 手指向下划 = 内容上移 = 显示下方内容
+            # left = 手指向左划 = 内容右移 = 显示左侧内容
+            # right = 手指向右划 = 内容左移 = 显示右侧内容
+            panel_obj = self._find_panel_in_layout(node.scene.scene, node.scene.panel)
+            if panel_obj is None:
+                return
+            # 解析 distance（支持 int 或 VarRef）
+            distance = node.distance
+            if isinstance(distance, VarRef):
+                distance = self.variables.get(distance.name, 1)
+            try:
+                distance = int(distance)
+            except (TypeError, ValueError):
+                logger.error(f"drag: 距离无效: {distance}")
+                return
+            w, h = self._capture.get_capture_size()
+            canvas = self._layout.get_canvas()
+            direction = node.direction or "down"
+            dx, dy = 0, 0
+            if direction in ("up", "down"):
+                # 垂直拖拽：按行高计算
+                row_h = panel_obj.h_ratio / max(panel_obj.rows, 1)
+                dy = int(row_h * canvas.h_ratio * h * distance)
+                if direction == "up":
+                    dy = -dy  # 手指向上划
+                if abs(dy) < 10:
+                    dy = 10 if dy >= 0 else -10
+            else:
+                # 水平拖拽：按列宽计算
+                col_w = panel_obj.w_ratio / max(panel_obj.cols, 1)
+                dx = int(col_w * canvas.w_ratio * w * distance)
+                if direction == "left":
+                    dx = -dx  # 手指向左划
+                if abs(dx) < 10:
+                    dx = 10 if dx >= 0 else -10
+            x2, y2 = x + dx, y + dy
+            duration = self._resolve_duration(node.duration) if node.duration else None
+            self._input.drag_screen(
+                x, y, x2, y2,
+                f"panel({node.scene.scene}.{node.scene.panel}[{node.scene.row}][{node.scene.col}]) {direction} {distance}",
                 duration=duration, hold=node.hold,
             )
             return
@@ -369,6 +433,127 @@ class WorkflowEngine:
                 self._ensure_workflow().wait_delay(str(val))
         else:
             self._ensure_workflow().wait_delay(str(delay))
+
+    # ─── Panel 校准与路由 ────────────────────────────────────
+
+    def _exec_calibrate(self, node: "Calibrate"):
+        """calibrate [scene].[panel] — 截图 panel 区域 + 运行图像自校准，缓存 slot 中心"""
+        scene_key = node.scene
+        panel_key = node.panel
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if panel_obj is None:
+            logger.error(f"calibrate: 场景 {scene_key} 未找到 panel {panel_key}")
+            return
+        # 截取 panel 区域图像
+        panel_img = self._capture_panel_image(panel_obj)
+        if panel_img is None:
+            logger.error(f"calibrate: 无法截取 panel {scene_key}.{panel_key}")
+            return
+        # 运行图像自校准
+        centers = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols)
+        if not centers:
+            logger.error(f"calibrate: panel {scene_key}.{panel_key} 未检测到 slot")
+            return
+        self._panel_calibrations[(scene_key, panel_key)] = centers
+        logger.info(
+            f"calibrate: {scene_key}.{panel_key} 已校准，"
+            f"检测到 {len(centers)} 个 slot 中心"
+        )
+
+    def _panel_ref_to_screen(self, ref: PanelRef) -> tuple[int | None, int | None]:
+        """PanelRef → 屏幕绝对坐标
+
+        若缓存未命中，自动触发一次 calibrate。
+        """
+        scene_key = ref.scene
+        panel_key = ref.panel
+        # 解析 row/col（支持 int 字面量或 $var）
+        row = self._resolve(ref.row) if isinstance(ref.row, VarRef) else ref.row
+        col = self._resolve(ref.col) if isinstance(ref.col, VarRef) else ref.col
+        try:
+            row_idx = int(float(row)) - 1  # DSL 1-based → 0-based
+            col_idx = int(float(col)) - 1
+        except (TypeError, ValueError):
+            logger.error(f"panel 索引非数值: row={row}, col={col}")
+            return None, None
+
+        # 缓存未命中 → 自动 calibrate
+        cache_key = (scene_key, panel_key)
+        if cache_key not in self._panel_calibrations:
+            logger.info(f"panel 缓存未命中，自动 calibrate: {scene_key}.{panel_key}")
+            auto_node = Calibrate(scene=scene_key, panel=panel_key)
+            self._exec_calibrate(auto_node)
+        centers = self._panel_calibrations.get(cache_key)
+        if not centers:
+            logger.error(f"panel 未校准: {scene_key}.{panel_key}")
+            return None, None
+
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if panel_obj is None:
+            return None, None
+
+        # 查表：centers 按「先行后列」顺序，index = row_idx * cols + col_idx
+        cols = panel_obj.cols
+        rows = panel_obj.rows
+        if not (0 <= row_idx < rows and 0 <= col_idx < cols):
+            logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
+                         f"panel 尺寸 {rows}×{cols}")
+            return None, None
+        idx = row_idx * cols + col_idx
+        if idx >= len(centers):
+            logger.error(f"panel 索引超出校准结果: idx={idx}, len={len(centers)}")
+            return None, None
+
+        cx_panel, cy_panel = centers[idx]  # 相对于 panel 区域
+        return self._panel_ratio_to_screen(panel_obj, cx_panel, cy_panel)
+
+    def _find_panel_in_layout(self, scene_key: str, panel_key: str):
+        """在 layout 中查找指定 panel 实例"""
+        panels = self._layout.get_scene_panels(scene_key)
+        return next((p for p in panels if p.key == panel_key), None)
+
+    def _capture_panel_image(self, panel_obj) -> "np.ndarray | None":
+        """截取 panel 区域图像（像素数组），用于校准"""
+        import numpy as np
+        full = self._capture.capture()
+        if full is None:
+            return None
+        w_cap, h_cap = self._capture.get_capture_size()
+        if w_cap == 0 or h_cap == 0:
+            return None
+        canvas = self._layout.get_canvas()
+        canvas_x = int(canvas.x_ratio * w_cap)
+        canvas_y = int(canvas.y_ratio * h_cap)
+        canvas_w = int(canvas.w_ratio * w_cap)
+        canvas_h = int(canvas.h_ratio * h_cap)
+        # panel 在画布内的像素区域
+        px = canvas_x + int(panel_obj.x_ratio * canvas_w)
+        py = canvas_y + int(panel_obj.y_ratio * canvas_h)
+        pw = max(1, int(panel_obj.w_ratio * canvas_w))
+        ph = max(1, int(panel_obj.h_ratio * canvas_h))
+        # 裁剪
+        h_img, w_img = full.shape[:2]
+        x1 = max(0, min(px, w_img))
+        y1 = max(0, min(py, h_img))
+        x2 = max(0, min(px + pw, w_img))
+        y2 = max(0, min(py + ph, h_img))
+        if x2 <= x1 or y2 <= y1:
+            return None
+        return full[y1:y2, x1:x2].copy()
+
+    def _panel_ratio_to_screen(
+        self, panel_obj, cx_panel: float, cy_panel: float
+    ) -> tuple[int, int]:
+        """panel 内归一化坐标 → 屏幕绝对坐标"""
+        w, h = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+        sx = canvas_x + (panel_obj.x_ratio + cx_panel * panel_obj.w_ratio) * canvas_w
+        sy = canvas_y + (panel_obj.y_ratio + cy_panel * panel_obj.h_ratio) * canvas_h
+        return int(self._window_left + sx), int(self._window_top + sy)
 
     def _exec_scan(self, node: Scan):
         # 解析场景名（可能是 str 或 VarRef）
@@ -443,7 +628,7 @@ class WorkflowEngine:
             self._coord_meta[var_name] = region_map     # {slot_key: Region}
 
     def _exec_collect(self, node: Collect):
-        """collect $var | field_access [as "label" | as $alias_var] — 将值存入输出 dict"""
+        """collect $var | field_access | literal [as "label" | as $alias_var] — 将值存入输出 dict"""
         if isinstance(node.source, VarRef):
             var_name = node.source.name
             value = self.variables.get(var_name)
@@ -461,6 +646,9 @@ class WorkflowEngine:
                 default_key = str(fn.value)
             else:
                 default_key = self._field_path(node.source)
+        elif isinstance(node.source, Literal):
+            value = node.source.value
+            default_key = "value"
         else:
             logger.warning(f"collect: 不支持的源类型 {type(node.source).__name__}")
             return
@@ -683,7 +871,7 @@ class WorkflowEngine:
             self._exec_body(node.else_body)
 
     def _exec_for(self, node: For):
-        # 解析迭代列表：支持静态列表和动态变量
+        # 解析迭代列表：支持静态列表、动态变量和函数调用
         if isinstance(node.iterable, VarRef):
             # 动态迭代：for $x in $list_var
             raw = self.variables.get(node.iterable.name)
@@ -694,6 +882,12 @@ class WorkflowEngine:
                 logger.error(f"for: ${node.iterable.name} 不是列表类型，无法迭代")
                 return
             items = raw
+        elif isinstance(node.iterable, FuncCall):
+            # 函数调用迭代：for i in range(1, 100)
+            items = self._call_func(node.iterable)
+            if not isinstance(items, list):
+                logger.error(f"for: 函数 {node.iterable.func_name}() 返回值不是列表类型")
+                return
         else:
             # 静态迭代：for $x in [a, b, c]
             items = [self._resolve(item) for item in node.iterable]
@@ -704,6 +898,32 @@ class WorkflowEngine:
                 logger.info("工作流被用户停止")
                 return
             # 设置循环变量
+            self.variables[node.var] = str(value)
+            try:
+                self._exec_body(node.body)
+            except _BreakSignal:
+                break
+
+    def _exec_for_range(self, node: ForRange):
+        """for i in [start...end] — 闭区间范围迭代"""
+        start_val = self._resolve(node.start)
+        end_val = self._resolve(node.end)
+        try:
+            start_int = int(float(start_val))
+            end_int = int(float(end_val))
+        except (TypeError, ValueError):
+            logger.error(f"for_range: 起止值非数值: start={start_val}, end={end_val}")
+            return
+        if start_int > end_int:
+            logger.error(f"for_range: 起始值大于结束值: {start_int} > {end_int}")
+            return
+        items = list(range(start_int, end_int + 1))  # 闭区间
+        logger.debug(f"for {node.var} in [{start_int}...{end_int}] → {items}")
+
+        for value in items:
+            if self._stop_check():
+                logger.info("工作流被用户停止")
+                return
             self.variables[node.var] = str(value)
             try:
                 self._exec_body(node.body)

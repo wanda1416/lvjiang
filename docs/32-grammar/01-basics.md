@@ -77,6 +77,9 @@ scan $scene.[area] as $var              # 变量场景 + 常量 Area
 scan "scene".$area as $var              # 字符串场景 + 变量 Area
 recognize $config.scene.[slot] as $var  # 字段访问作为场景名
 drag [scene].[arrow]                    # Action 名（Arrow）
+click [scene].[panel][1][1]             # Panel 三级索引（点击格子中心）
+drag [scene].[panel][1][1] down 3       # Panel 拖拽翻页
+calibrate [scene].[panel]               # 面板自校准
 ```
 
 变量只是**延迟求值的常量**，最终传给函数的都是字符串。
@@ -85,8 +88,8 @@ drag [scene].[arrow]                    # Action 名（Arrow）
 
 | 类型 | 语法 | 示例 | 可用位置 |
 |---|---|---|---|
-| 字符串 | `"..."` | `"武器"`, `"head"` | log、contains/equals 比较、eval 参数、collect alias、call 路径、eval 字面量赋值 |
-| 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、数值比较、eval 字面量赋值 |
+| 字符串 | `"..."` | `"武器"`, `"head"` | log、contains/equals 比较、eval 参数、collect alias/source、call 路径、eval 字面量赋值 |
+| 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、drag 行数、数值比较、eval 字面量赋值、collect source |
 | 空字典 | `{}` | `{}` | eval 字面量赋值（初始化空字典变量） |
 | 列表 | `[item, ...]` | `["a", "b"]`, `[1, 2, 3]` | eval 字面量赋值（列表元素支持字符串、数字、变量引用） |
 | 范围元组 | `(min, max)` | `(1, 2)`, `(0.5, 1.5)` | eval 字面量赋值、default 字面量赋值（存储为元组，用于随机等待等场景） |
@@ -203,6 +206,8 @@ eval $var = func(...)        ──→  variables[$var] = result
 collect $var                 ──→  output[var_name] = variables[$var]      # name reification
 collect $var as "label"      ──→  output["label"] = variables[$var]       # 静态 alias
 collect $var as $alias       ──→  output[resolve($alias)] = variables[$var]  # 动态 alias
+collect 0 as $exit_code      ──→  output["exit_code"] = 0.0               # 字面量数字
+collect "ok" as $result      ──→  output["result"] = "ok"                 # 字面量字符串
 
 call "sub.wf" read "k" as $v ──→  variables[$v] = sub_output["k"]
 ```

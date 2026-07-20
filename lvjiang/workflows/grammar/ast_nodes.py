@@ -4,13 +4,14 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log
+- 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log / Calibrate
          If / For / Loop / Break / Return / Label / Goto / Eval
-- 表达式：SceneRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
+- 表达式：SceneRef / PanelRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
 
 引用语义：
 - SceneRef → 静态配置引用（场景名/区域名），来自 yaml，语法 [scene].[region]
+- PanelRef → panel 三级索引（场景名/panel名/行/列），语法 [scene].[panel][row][col]
 - VarRef   → 运行时变量引用，来自 variables dict，语法 $var
 """
 
@@ -30,18 +31,32 @@ class Program:
 
 @dataclass(frozen=True)
 class Click:
-    target: Any     # SceneRef（静态 [scene].[region]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
+    target: Any     # SceneRef（静态 [scene].[region]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class Drag:
-    scene: Any      # SceneRef（静态 [scene].[region]）| None（坐标模式）
+    scene: Any      # SceneRef（静态 [scene].[region]）| PanelRef（panel 三级索引）| None（坐标模式）
     arrow: Any      # SceneRef | None（坐标模式）
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
     hold: float | None = None  # 到达目标后按住不放的时长（秒）
     from_point: Any = None  # CoordPoint | None（坐标模式起点）
     to_point: Any = None    # CoordPoint | None（坐标模式终点）
+    direction: str | None = None   # "up" | "down" | "left" | "right" | None（panel 拖拽方向）
+    distance: Any = 1              # 拖拽距离：int | VarRef（up/down 为行数，left/right 为列数，默认 1）
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Calibrate:
+    """calibrate [scene].[panel] — 触发 panel 区域截图 + 图像自校准
+
+    引擎在 panel 区域内运行方差分析/黑边检测，缓存每个 slot 的精确坐标，
+    后续 click [scene].[panel][row][col] 从缓存读取坐标。
+    """
+    scene: str      # 场景名（静态）
+    panel: str      # panel key（静态）
     line_no: int = 0
 
 
@@ -92,7 +107,7 @@ class ByClause:
 
 @dataclass(frozen=True)
 class Collect:
-    source: Any         # VarRef | FieldAccess（要收集的值）
+    source: Any         # VarRef | FieldAccess | Literal（要收集的值）
     alias: str | None = None      # 静态别名（字面量字符串）
     alias_var: Any | None = None  # 动态别名（VarRef）
     line_no: int = 0
@@ -116,6 +131,16 @@ class If:
 class For:
     var: str                    # 循环变量名（裸字符串）
     iterable: Any               # list[Literal]（静态列表）| VarRef（动态列表变量）
+    body: list = field(default_factory=list)
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class ForRange:
+    """for i in [start...end] — 闭区间范围迭代"""
+    var: str                    # 循环变量名
+    start: Any                  # 起始值（Literal | VarRef）
+    end: Any                    # 结束值（Literal | VarRef），闭区间
     body: list = field(default_factory=list)
     line_no: int = 0
 
@@ -190,6 +215,19 @@ class SceneRef:
     """静态配置引用：[scene] 或 [scene].[region]（region 支持 $var 动态引用）"""
     scene: str
     region: str | None = None  # str | VarRef | None
+
+
+@dataclass(frozen=True)
+class PanelRef:
+    """panel 三级索引：[scene].[panel][row][col]
+
+    scene/panel 为静态名称（str）；row/col 可为 int（字面量）或 VarRef（运行时变量）。
+    引擎执行时查 panel 校准缓存获取格子中心坐标。
+    """
+    scene: str
+    panel: str
+    row: Any      # int | VarRef
+    col: Any      # int | VarRef
 
 
 @dataclass(frozen=True)

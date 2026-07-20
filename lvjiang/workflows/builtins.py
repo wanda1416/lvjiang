@@ -11,11 +11,15 @@
 """
 
 from loguru import logger
+from pathlib import Path
 from typing import Callable
 
 
 # 全局函数注册表
 _FUNCTION_REGISTRY: dict[str, Callable] = {}
+
+# evaluate() 缓存的评估器实例
+_cached_evaluator = None
 
 
 def builtin_func(name: str):
@@ -73,6 +77,31 @@ def _concat(*args) -> str:
         eval $msg = concat("结果: ", $var, " 完成")
     """
     return "".join(str(arg) for arg in args)
+
+
+@builtin_func("range")
+def _range(*args) -> list:
+    """生成整数范围列表（闭区间）
+
+    .wf 用法:
+        eval $list = range(1, 100)     # [1, 2, ..., 100]
+        for i in range(1, 5)           # 迭代 1, 2, 3, 4, 5
+            ...
+        end
+
+    参数:
+        range(end)        → [1, 2, ..., end]
+        range(start, end) → [start, start+1, ..., end]
+    """
+    if len(args) == 1:
+        end = int(args[0])
+        return list(range(1, end + 1))
+    elif len(args) == 2:
+        start = int(args[0])
+        end = int(args[1])
+        return list(range(start, end + 1))
+    else:
+        raise ValueError(f"range() 需要 1-2 个参数，收到 {len(args)} 个")
 
 
 @builtin_func("contains")
@@ -241,6 +270,97 @@ def _is_good_equip(scan_result: dict, *args) -> bool:
 
     logger.info(f"is_good_equip: 命中 {hit_count} 条高价值词条 (阈值 2)")
     return hit_count >= 2
+
+
+# ─── 背包遍历函数 ─────────────────────────────────────────
+
+@builtin_func("make_fingerprint")
+def _make_fingerprint(equip_data: dict, *args) -> str:
+    """基于装备数据生成去重指纹
+
+    指纹由 type + level + quality + 前3条词条(name:value) 组成。
+    空数据或空字典返回空字符串。
+
+    .wf 用法:
+        eval $equip = to_equipment($scan)
+        eval $fp = make_fingerprint($equip)
+    """
+    if not isinstance(equip_data, dict) or not equip_data:
+        return ""
+    parts = [
+        str(equip_data.get("type", "") or ""),
+        str(equip_data.get("level", "") or ""),
+        str(equip_data.get("quality", "") or ""),
+    ]
+    # 词条以 affix_1 ~ affix_5 形式存储在 dict 中
+    for i in range(1, 4):
+        affix = equip_data.get(f"affix_{i}")
+        if isinstance(affix, dict) and affix.get("name"):
+            parts.append(f"{affix['name']}:{affix.get('value', '')}")
+    return "_".join(parts)
+
+
+@builtin_func("evaluate")
+def _evaluate(equip_data: dict, *args) -> dict:
+    """评估装备，返回评级结果 dict
+
+    使用当前流派规则（config/system/rules/ 下第一个 .yaml）进行评估。
+    返回 EvaluationResult.to_dict() 结果。
+
+    .wf 用法:
+        eval $equip = to_equipment($scan)
+        eval $result = evaluate($equip)
+        if $result.rating equals "heirloom"
+            log "传家宝！"
+        end
+    """
+    if not isinstance(equip_data, dict) or not equip_data:
+        return {"rating": "junk", "disqualified": True, "details": ["空数据"]}
+
+    from ..equip_parser.models import EquipmentData
+    from ..evaluator.rule_config import load_rule_config
+    from ..evaluator.generic_evaluator import GenericEvaluator
+
+    # 加载规则配置（缓存到模块级变量）
+    global _cached_evaluator
+    if _cached_evaluator is None:
+        rules_dir = Path(__file__).resolve().parent.parent.parent / "config" / "system" / "rules"
+        rule_files = list(rules_dir.glob("*.yaml"))
+        if not rule_files:
+            logger.warning("evaluate: 未找到规则配置文件")
+            return {"rating": "unknown", "details": ["无规则配置"]}
+        config = load_rule_config(rule_files[0])
+        _cached_evaluator = GenericEvaluator(config)
+        logger.info(f"evaluate: 加载规则 '{config.name}'")
+
+    # dict → EquipmentData
+    equip = EquipmentData.from_dict(equip_data)
+    result = _cached_evaluator.evaluate(equip)
+    return result.to_dict()
+
+
+@builtin_func("append")
+def _append(list_or_dict, *args) -> str:
+    """向列表追加元素，或向字典添加键值对
+
+    - append($list, $value) → 追加 value 到 list
+    - append($dict, $key, $value) → 设置 dict[key] = value
+
+    返回空字符串（副作用操作）。
+
+    .wf 用法:
+        eval append($candidates, $equip_data)
+        eval append($fingerprints, $slot, $fp)
+    """
+    if list_or_dict is None:
+        return ""
+    if isinstance(list_or_dict, list) and len(args) >= 1:
+        list_or_dict.append(args[0])
+    elif isinstance(list_or_dict, dict) and len(args) >= 2:
+        list_or_dict[str(args[0])] = args[1]
+    else:
+        logger.warning(f"append: 参数不匹配 list={isinstance(list_or_dict, list)} args={len(args)}")
+    return ""
 
 
 # ─── Session 持久化函数 ───────────────────────────────────

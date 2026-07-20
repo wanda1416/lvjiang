@@ -1,0 +1,56 @@
+#% name: 背包遍历
+#% description: 遍历装备背包，逐行处理 + 重叠滚动，收集所有装备数据
+#% required_scenes: [bag_equip_detail, equip_weapon_detail, equip_armor_detail]
+
+# ── 初始化 context ──
+eval context.bag_candidates = []
+eval context.seen_fps = {}
+
+# 先校准 panel（截图 + 图像自校准，缓存 slot 中心）
+calibrate [bag_equip_detail].[bag_grid]
+
+# ── 主遍历循环（最多滚动 10 次 = 覆盖 30 行）──
+for scroll_idx in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+    # -- 处理当前可见 3 行 × 6 列 --
+    for r in ["1", "2", "3"]
+        for c in ["1", "2", "3", "4", "5", "6"]
+            eval $cur_row = $r
+            eval $cur_col = $c
+            call "subcall/bag_process_slot.wf"
+        end
+    end
+
+    # -- 到底检测：检查第 3 行是否有新装备 --
+    eval $has_new = "0"
+    for c in ["1", "2", "3", "4", "5", "6"]
+        click [bag_equip_detail].[bag_grid][3][$c]
+        wait step_interval
+        scan [equip_weapon_detail].[equip_type] as $check
+        eval $check_fp = make_fingerprint($check)
+        if $check_fp equals ""
+            # 空格 → 到底标志
+        else
+            if context.seen_fps.$check_fp equals "1"
+                # 已见过
+            else
+                eval $has_new = "1"
+            end
+        end
+        click [bag_equip_detail].[back]
+        wait step_interval
+    end
+
+    if $has_new equals "0"
+        log "到底，遍历结束"
+        break
+    end
+
+    # -- 精确滚动一行（panel drag = 一整行高度）--
+    drag [bag_equip_detail].[bag_grid][2][3] hold 0.3
+    wait step_interval
+
+end
+
+# ── 输出结果 ──
+collect context.bag_candidates

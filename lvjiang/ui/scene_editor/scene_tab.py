@@ -1,4 +1,4 @@
-"""单个场景的编辑 Tab：左侧画布 + 右侧三 Tab（区域 / 坐标 / 方向）"""
+"""单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域 / 坐标 / 方向 / 面板）"""
 
 import numpy as np
 from PyQt6.QtWidgets import (
@@ -8,16 +8,17 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from ...core.scene_registry import (
-    Region, Point, Arrow, CanvasConfig,
+    Region, Point, Arrow, Panel, CanvasConfig,
     get_scene_regions, get_scene_point_pairs,
 )
 from .canvas import RegionCanvas, EditMode
 from .scene_region_panel import RegionPanelMixin
 from .scene_poi_panel import PoiPanelMixin
+from .scene_panel_editor import PanelEditorMixin
 
 
-class SceneTab(RegionPanelMixin, PoiPanelMixin, QWidget):
-    """单个场景的编辑 Tab：左侧画布 + 右侧三 Tab（区域列表 / 坐标列表 / 方向列表）"""
+class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
+    """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域列表 / 坐标列表 / 方向列表 / 面板列表）"""
 
     def __init__(self, scene_key: str, image: np.ndarray | None = None, parent=None):
         super().__init__(parent)
@@ -27,6 +28,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, QWidget):
 
         # 左侧：画布顶部工具栏 + 画布
         self._canvas = RegionCanvas()
+        self._canvas.set_scene_key(scene_key)
         if image is not None:
             self._canvas.set_image(image)
         self._canvas.set_current_regions(get_scene_regions(scene_key))
@@ -40,11 +42,12 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, QWidget):
         left_layout.addWidget(self._canvas)
         splitter.addWidget(left)
 
-        # 右侧三 Tab
+        # 右侧四 Tab
         self._right_tabs = QTabWidget()
         self._right_tabs.addTab(self._build_region_panel(), "区域列表")
         self._right_tabs.addTab(self._build_point_panel(), "坐标列表")
         self._right_tabs.addTab(self._build_arrow_panel(), "方向列表")
+        self._right_tabs.addTab(self._build_panel_panel(), "面板列表")
         splitter.addWidget(self._right_tabs)
         splitter.setSizes([650, 250])
 
@@ -55,8 +58,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, QWidget):
         self._refresh_region_list()
         self._refresh_point_list()
         self._refresh_arrow_list()
+        self._refresh_panel_list()
         self._canvas.on_region_changed = self._refresh_region_list
         self._canvas.on_poi_changed = self._on_poi_changed
+        self._canvas.on_panel_changed = self._on_panel_changed
 
     # ─── 面板构建 ────────────────────────────────────────
 
@@ -105,6 +110,15 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, QWidget):
         self._canvas.set_arrows(arrows)
         self._refresh_arrow_list()
 
+    # ─── panel 数据 ───────────────────────────────
+
+    def get_panels(self) -> list[Panel]:
+        return self._canvas.get_panels()
+
+    def set_panels(self, panels: list[Panel]):
+        self._canvas.set_panels(panels)
+        self._refresh_panel_list()
+
     # ─── 画布配置 / 模式 ─────────────────────────────────
 
     def set_canvas_config(self, config: CanvasConfig):
@@ -127,3 +141,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, QWidget):
         self._canvas.set_current_points(get_scene_point_pairs(self._scene_key))
         self._refresh_region_list()
         self._refresh_point_list()
+        self._refresh_panel_list()
+
+    def _on_panel_changed(self):
+        """画布 panel 数据变化时刷新面板列表"""
+        self._refresh_panel_list()

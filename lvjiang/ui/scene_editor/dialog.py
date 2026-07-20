@@ -216,7 +216,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
     # ─── Tab 操作 ────────────────────────────────────────
 
     def _apply_layout_to_tabs(self):
-        """将当前布局的区域/坐标/方向数据、画布配置、截图分发到各 Tab"""
+        """将当前布局的区域/坐标/方向/面板数据、画布配置、截图分发到各 Tab"""
         if self._current_layout is None:
             return
         canvas = self._current_layout.get_canvas()
@@ -225,9 +225,11 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             regions = self._current_layout.get_scene_regions(scene_key)
             points = self._current_layout.get_scene_points(scene_key)
             arrows = self._current_layout.get_scene_arrows(scene_key)
+            panels = self._current_layout.get_scene_panels(scene_key)
             tab.set_regions(regions)
             tab.set_points(points)
             tab.set_arrows(arrows)
+            tab.set_panels(panels)
             tab.set_canvas_config(canvas)
             screenshot = load_scene_screenshot(layout_name, scene_key)
             if screenshot is not None:
@@ -237,16 +239,18 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.canvas.on_region_changed = self._on_any_region_changed
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
             tab.canvas.on_poi_changed = self._on_any_poi_changed
+            tab.canvas.on_panel_changed = self._on_any_panel_changed
         self._set_dirty(False)
         self._status_bar.showMessage(f"当前布局: {layout_name}")
         self._update_info_label()
 
     def _clear_all_tabs(self):
-        """清空所有 Tab 的区域/坐标/方向"""
+        """清空所有 Tab 的区域/坐标/方向/面板"""
         for tab in self._tabs.values():
             tab.set_regions([])
             tab.set_points([])
             tab.set_arrows([])
+            tab.set_panels([])
 
     # ─── 刷新截图 ────────────────────────────────────────
 
@@ -318,6 +322,13 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         current = self._current_scene_tab()
         if current and hasattr(current, '_on_poi_changed'):
             current._on_poi_changed()
+
+    def _on_any_panel_changed(self):
+        """任一 Tab 的 panel 被修改时，标记 dirty + 刷新当前 Tab 的面板列表"""
+        self._set_dirty(True)
+        current = self._current_scene_tab()
+        if current and hasattr(current, '_on_panel_changed'):
+            current._on_panel_changed()
 
     def _set_dirty(self, dirty: bool):
         """设置/清除修改状态指示"""

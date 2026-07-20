@@ -2,7 +2,7 @@
 #% description: 点击当前 panel 格子 → OCR 装备详情 → 生成指纹 → 评估 → 返回背包
 #% 前置条件: context 中已初始化 bag_candidates / bag_seen_fps / _cur_row / _cur_col
 
-# 点击当前 panel 格子（calibrate 会在首次 click 时自动触发）
+# 点击当前 panel 格子（align 会在首次 click 时自动触发）
 click [bag_equip_detail].[bag_grid][$cur_row][$cur_col]
 wait step_interval
 

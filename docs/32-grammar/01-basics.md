@@ -79,7 +79,7 @@ recognize $config.scene.[slot] as $var  # 字段访问作为场景名
 drag [scene].[arrow]                    # Action 名（Arrow）
 click [scene].[panel][1][1]             # Panel 三级索引（点击格子中心）
 drag [scene].[panel][1][1] down 3       # Panel 拖拽翻页
-calibrate [scene].[panel]               # 面板自校准
+align [scene].[panel]               # 面板自对齐
 ```
 
 变量只是**延迟求值的常量**，最终传给函数的都是字符串。

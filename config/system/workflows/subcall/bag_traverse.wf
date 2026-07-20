@@ -6,8 +6,8 @@
 eval context.bag_candidates = []
 eval context.seen_fps = {}
 
-# 先校准 panel（截图 + 图像自校准，缓存 slot 中心）
-calibrate [bag_equip_detail].[bag_grid]
+# 先对齐 panel（截图 + 图像自对齐，缓存 slot 中心）
+align [bag_equip_detail].[bag_grid]
 
 # ── 主遍历循环（最多滚动 10 次 = 覆盖 30 行）──
 for scroll_idx in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]

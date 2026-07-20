@@ -41,9 +41,9 @@ class PanelDef:
     """单个 panel 的类型定义（声明式网格容器）
 
     描述「场景里存在这样一个网格区域」的类型信息（key/name/行列数）。
-    具体的格子坐标由引擎运行时通过图像自校准（方差分析 + 黑边检测）计算，
-    并缓存在 WorkflowEngine._panel_calibrations 中。
-    span（间距）由校准算法自动检测，无需手动指定。
+    具体的格子坐标由引擎运行时通过图像自对齐（方差分析 + 黑边检测）计算，
+    并缓存在 WorkflowEngine._panel_alignments 中。
+    span（间距）由对齐算法自动检测，无需手动指定。
     """
     key: str
     name: str

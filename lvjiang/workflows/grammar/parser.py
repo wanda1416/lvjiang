@@ -20,7 +20,7 @@ from .ast_nodes import (
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
-from .ast_nodes import Calibrate
+from .ast_nodes import Align
 
 # ─── Lark 实例（延迟初始化） ──────────────────────────────
 
@@ -145,15 +145,18 @@ class _DSLTransformer(Transformer):
         )
 
     def drag_direction(self, items):
-        """up|down [n | $var] → (direction_str, distance_int_or_VarRef)"""
+        """up|down [n | $var] → (direction_str, distance_float_or_VarRef)
+        
+        距离支持整数、浮点数（如 0.5 表示半行）、变量引用
+        """
         dir_token = str(items[0]).lower()
-        distance = 1
+        distance = 1.0
         if len(items) > 1:
             rows_str = str(items[1])
             if rows_str.startswith('$'):
                 distance = VarRef(name=rows_str[1:])  # 动态行数
             else:
-                distance = int(rows_str)  # 静态行数
+                distance = float(rows_str)  # 静态行数（支持浮点数，如 0.5）
         return (dir_token, distance)
 
     def drag_scene_target(self, items):
@@ -178,13 +181,13 @@ class _DSLTransformer(Transformer):
         """hold <seconds> → float"""
         return float(items[0])
 
-    # ─── calibrate 指令 ─────────────────────────────────────
+    # ─── align 指令 ─────────────────────────────────────
 
-    def calibrate_stmt(self, items):
-        """calibrate [scene].[panel] — 触发 panel 图像自校准"""
+    def align_stmt(self, items):
+        """align [scene].[panel] — 触发 panel 图像自对齐"""
         scene_name = str(items[0])
         panel_name = str(items[1])
-        return Calibrate(scene=scene_name, panel=panel_name, line_no=self._line(items))
+        return Align(scene=scene_name, panel=panel_name, line_no=self._line(items))
 
     # ─── panel 索引 ─────────────────────────────────────────
 

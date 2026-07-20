@@ -89,7 +89,7 @@ click [scene].[panel][$row][$col]             # 动态行列（变量指定）
 - `[scene].$var`：Area 名在运行时由变量值决定。引擎会先从 `_coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 Area
 - `click (rx, ry)`：**画布归一化坐标模式**。`rx`/`ry ∈ [0,1]`，表示画布内容区域内相对位置。回放时按「窗口偏移 + 画布原点 + 比例 × 画布尺寸」动态反算屏幕坐标，窗口缩放/移动后仍准确。这是录制功能（F8）生成的坐标字面量，可直接剪切复用，与 `scene.area` 引用形式混用
 - `[]` 和 `""` 在非赋值语境等价，都表示静态常量
-- `[scene].[panel][r][c]`：**Panel 三级索引模式**。`r`/`c` 从 1 开始计数。首次执行时自动触发图像自校准（`calibrate`），缓存格子中心坐标；后续点击直接查缓存。详见 [calibrate](#四calibrate--面板自校准)
+- `[scene].[panel][r][c]`：**Panel 三级索引模式**。`r`/`c` 从 1 开始计数。首次执行时自动触发图像自对齐（`align`），缓存格子中心坐标；后续点击直接查缓存。详见 [align](#四align--面板自对齐)
 
 ## 二、drag — 拖拽
 
@@ -190,26 +190,26 @@ wait (0.5, 1.5)             # 随机等待 0.5~1.5 秒
 - `$var` 的值可以是数字（固定等待）或元组 `(min, max)`（随机范围等待）
 - 配合 `eval $var = (min, max)` 或 `default $var = (min, max)` 赋值后使用
 
-## 四、calibrate — 面板自校准
+## 四、align — 面板自对齐
 
-对 Panel 进行图像自校准，计算实际网格间距并缓存格子中心坐标。
+对 Panel 进行图像自对齐，计算实际网格间距并缓存格子中心坐标。
 
-**语义**：`calibrate` 是 `calibrate_func(scene, panel)` 的语法糖。首次对 Panel 执行 `click [scene].[panel][r][c]` 时自动触发，无需手动调用。
+**语义**：`align` 是 `align_func(scene, panel)` 的语法糖。首次对 Panel 执行 `click [scene].[panel][r][c]` 时自动触发，无需手动调用。
 
 **语法**：
 
 ```
-calibrate [scene].[panel]         # 对指定 Panel 执行图像自校准
+align [scene].[panel]         # 对指定 Panel 执行图像自对齐
 ```
 
 **示例**：
 
 ```
-# 手动触发校准（通常不需要，click 会自动触发）
-calibrate [bag_equip_detail].[bag_grid]
+# 手动触发对齐（通常不需要，click 会自动触发）
+align [bag_equip_detail].[bag_grid]
 
 # 后续点击直接使用缓存坐标
-click [bag_equip_detail].[bag_grid][1][1]     # 不再触发校准
+click [bag_equip_detail].[bag_grid][1][1]     # 不再触发对齐
 click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 ```
 
@@ -222,6 +222,6 @@ click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 
 **说明**：
 
-- 校准结果缓存在 `_calibration_cache` 中，同一 Panel 只需校准一次
-- 窗口缩放、分辨率变化后需要重新校准（引擎会自动检测）
-- 校准算法基于方差分析，自动检测网格间距，无需手动指定 `h_span`/`v_span`
+- 对齐结果缓存在 `_alignment_cache` 中，同一 Panel 只需对齐一次
+- 窗口缩放、分辨率变化后需要重新对齐（引擎会自动检测）
+- 对齐算法基于方差分析，自动检测网格间距，无需手动指定 `h_span`/`v_span`

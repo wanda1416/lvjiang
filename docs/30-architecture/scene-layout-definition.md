@@ -174,14 +174,14 @@ panels:
 
 ### grid 型 Panel
 
-当前唯一实现的类型。Panel 定义 `rows`/`cols` 后，内部每个格子通过 `[r][c]` 二维索引寻址（从 1 开始计数）。首次访问时自动触发图像自校准（`calibrate`），缓存各格子中心坐标。
+当前唯一实现的类型。Panel 定义 `rows`/`cols` 后，内部每个格子通过 `[r][c]` 二维索引寻址（从 1 开始计数）。首次访问时自动触发图像自对齐（`align`），缓存各格子中心坐标。
 
 DSL 中的使用：
 
 ```
 click [scene].[panel][r][c]         # 点击格子中心
 drag [scene].[panel][r][c] up 3     # 从该格子向上拖拽 3 行
-calibrate [scene].[panel]           # 手动触发校准
+align [scene].[panel]           # 手动触发对齐
 ```
 
 ### regions 型 Panel（规划中）

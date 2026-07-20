@@ -226,8 +226,8 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 从第 1 行开始，当前可见行 = [1, 2, 3]
 
 循环处理当前可见的 3 行：
-    # 每次处理前先校准 panel（截图 + 方差分析）
-    calibrate [bag_equip_detail].[bag_grid]
+    # 每次处理前先对齐 panel（截图 + 方差分析）
+    align [bag_equip_detail].[bag_grid]
     
     for row = 1 to 3:
         for col = 1 to 6:
@@ -247,7 +247,7 @@ click [bag_equip_detail].[bag_grid][$row][$col]
         drag [bag_equip_detail].[scroll_down]
         wait step_interval
         
-        # 滚动后重新校准 panel → 自动检测新行位置
+        # 滚动后重新对齐 panel → 自动检测新行位置
         # 旧行 2 → 新行 1（已处理，跳过）
         # 旧行 3 → 新行 2（已处理，跳过）
         # 新行 3 → 全新内容（需要处理）
@@ -259,16 +259,16 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 
 ```
 初始状态：可见行 [1, 2, 3]
-  → calibrate panel → 处理全部 18 格
+  → align panel → 处理全部 18 格
 
 滚动一行后：可见行 [2, 3, 4]
-  → calibrate panel → 重新检测格子位置
+  → align panel → 重新检测格子位置
   行 1（原行 2）→ 指纹已记录，跳过
   行 2（原行 3）→ 指纹已记录，跳过
   行 3（新行 4）→ 新内容，处理
 
 再滚动一行后：可见行 [3, 4, 5]
-  → calibrate panel → 重新检测格子位置
+  → align panel → 重新检测格子位置
   行 1（原行 3）→ 跳过
   行 2（原行 4）→ 跳过
   行 3（新行 5）→ 新内容，处理
@@ -278,7 +278,7 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 
 **关键改进**：
 - 滚动不需要精确到像素级 — 只要不拖过头超过一行即可
-- 每次滚动后 calibrate 重新检测，拖拽误差自动修正
+- 每次滚动后 align 重新检测，拖拽误差自动修正
 - 即使拖拽偏了半行，方差分析仍能正确识别 3 个 slot 带
 
 ### 4.3 到底检测
@@ -288,7 +288,7 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 **信号 A — 新行全空**（最直接）
 
 ```
-calibrate panel
+align panel
 新一行（row 3）的 6 个 slot——若全部 OCR 详情为空
   → 已越过最后一件装备 → 到底
 ```
@@ -296,7 +296,7 @@ calibrate panel
 **信号 B — 新行无变化**（背包未填满整页、无法再滚时）
 
 ```
-calibrate panel
+align panel
 对新一行（row 3）的 6 个格子逐一检查：
     click [bag_grid][3][col] → 详情页 OCR → 生成指纹
     如果指纹 == 上次该位置指纹 → 无变化
@@ -490,8 +490,8 @@ eval context.bag_candidates = []
 eval $scroll_count = 0
 
 @traverse_loop
-# ── 校准 panel（截图 + 方差分析，获取格子精确坐标）──
-calibrate [bag_equip_detail].[bag_grid]
+# ── 对齐 panel（截图 + 方差分析，获取格子精确坐标）──
+align [bag_equip_detail].[bag_grid]
 
 # ── 处理当前可见 3 行 ──
 eval $row = 1
@@ -518,7 +518,7 @@ wait step_interval
 eval $scroll_count = $scroll_count + 1
 
 # ── 到底检测：检查新行（row 3）是否有变化 ──
-calibrate [bag_equip_detail].[bag_grid]
+align [bag_equip_detail].[bag_grid]
 eval $new_count = 0
 eval $col = 1
 @check_loop
@@ -692,7 +692,7 @@ panels:
 ```
 
 > 滚动箭头不需要精确到像素级 — 只要大致对应一行距离即可。
-> 偏半行无所谓，calibrate 会自动修正。
+> 偏半行无所谓，align 会自动修正。
 
 ### 9.3 Scene YAML — 新增 `panels` 段支持
 
@@ -708,7 +708,7 @@ panels:
 ### Phase 0：DSL / 引擎原语升级
 
 - [ ] **grammar 三级索引**：`click_target` / `bracket_expr` 支持 `[panel][row][col]`，且索引可为数字或 `$var`（现仅支持单个 NAME）
-- [ ] **`calibrate` 指令**：新增语句，触发 panel 区域截图 + 图像自校准
+- [ ] **`align` 指令**：新增语句，触发 panel 区域截图 + 图像自对齐
 - [ ] **context 字段赋值**：确认 `eval context.<field> = {}` / `context.<field>.$key = v` 可用（指纹存储依赖）
 - [ ] **context 初始化**：每次工作流启动自动建 `bag_fingerprints={}`、`bag_candidates=[]`
 
@@ -760,7 +760,7 @@ panels:
 | 回收后补位速度 | 装备被回收后，新装备补位是否需要额外等待 |
 | 到底检测保守度 | 当前设计为新一行 6 格全无变化即到底，是否需要连续 2 行无变化 |
 | 游戏背包排序功能 | 是否支持按品质/等级排序？排序后能否让同类型/同品阶装备连续排列？ |
-| calibrate 缓存策略 | 每次滚动后必须重新 calibrate，还是只有画面变化时才需要？ |
+| align 缓存策略 | 每次滚动后必须重新 align，还是只有画面变化时才需要？ |
 | Panel 通用性 | 除背包外，是否还有其他场景可用 panel（如材料栏、商店货架）？ |
 
 ---

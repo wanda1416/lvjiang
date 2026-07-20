@@ -1,4 +1,4 @@
-"""Panel 图像自校准 — 从 panel 截图中检测网格 slot 精确位置
+"""Panel 图像自对齐 — 从 panel 截图中检测网格 slot 精确位置
 
 核心思路（二值化 + 连续区间检测）：
 
@@ -25,9 +25,11 @@ from loguru import logger
 
 @dataclass(frozen=True)
 class SlotAxis:
-    """一个轴（行或列）的校准结果"""
+    """一个轴（行或列）的对齐结果"""
     centers: list[float]          # 归一化中心坐标 ∈ (0,1)
     boundaries: list[float]       # 归一化边界坐标，长度 = len(centers) + 1
+    slot_size: float = 0.0        # slot 实际尺寸（归一化）
+    span_size: float = 0.0        # span 实际尺寸（归一化）
 
 
 def _binary_axis(line_means: np.ndarray, black_threshold: float = 30.0) -> SlotAxis:
@@ -136,16 +138,28 @@ def _binary_axis(line_means: np.ndarray, black_threshold: float = 30.0) -> SlotA
     centers = [(boundaries[i] + boundaries[i + 1]) / 2.0
                for i in range(len(boundaries) - 1)]
 
-    return SlotAxis(centers=centers, boundaries=boundaries)
+    # slot / span 实际尺寸（归一化）
+    # slot = 有效 run 长度的中位数；span = 相邻 run 间隙的中位数
+    slot_sizes = [e - s for s, e in runs]
+    gap_sizes = [runs[i + 1][0] - runs[i][1] for i in range(len(runs) - 1)]
+    slot_size = float(np.median(slot_sizes)) / length
+    span_size = float(np.median(gap_sizes)) / length if gap_sizes else 0.0
+
+    return SlotAxis(centers=centers, boundaries=boundaries,
+                    slot_size=slot_size, span_size=span_size)
 
 
 @dataclass(frozen=True)
-class GridCalibration:
-    """grid 校准结果"""
+class GridAlignment:
+    """grid 对齐结果"""
     row_centers: list[float]       # 行中心（归一化）
     col_centers: list[float]       # 列中心（归一化）
     row_bounds: list[float]        # 行边界（归一化），长度 = len(row_centers) + 1
     col_bounds: list[float]        # 列边界（归一化），长度 = len(col_centers) + 1
+    row_slot: float = 0.0          # 行 slot 高度（归一化）
+    row_span: float = 0.0          # 行 span 高度（归一化）
+    col_slot: float = 0.0          # 列 slot 宽度（归一化）
+    col_span: float = 0.0          # 列 span 宽度（归一化）
 
     @property
     def n_rows(self) -> int:
@@ -177,7 +191,7 @@ def detect_grid(
     expected_rows: int = 3,
     expected_cols: int = 6,
     black_threshold: float = 30.0,
-) -> GridCalibration | None:
+) -> GridAlignment | None:
     """从 panel 截图中检测网格 slot 精确位置
 
     通过二值化每行/每列的平均亮度，找连续内容区间来确定 slot 位置。
@@ -189,7 +203,7 @@ def detect_grid(
         black_threshold: 黑边判定阈值（0-255），低于此值视为黑边
 
     Returns:
-        GridCalibration 或 None（检测失败时）
+        GridAlignment 或 None（检测失败时）
     """
     if image is None or image.size == 0:
         logger.error("detect_grid: 空图像")
@@ -215,11 +229,15 @@ def detect_grid(
         )
         return None
 
-    result = GridCalibration(
+    result = GridAlignment(
         row_centers=row_axis.centers,
         col_centers=col_axis.centers,
         row_bounds=row_axis.boundaries,
         col_bounds=col_axis.boundaries,
+        row_slot=row_axis.slot_size,
+        row_span=row_axis.span_size,
+        col_slot=col_axis.slot_size,
+        col_span=col_axis.span_size,
     )
 
     logger.info(

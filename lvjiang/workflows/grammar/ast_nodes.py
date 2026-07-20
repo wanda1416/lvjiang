@@ -4,7 +4,7 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log / Calibrate
+- 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log / Align
          If / For / Loop / Break / Return / Label / Goto / Eval
 - 表达式：SceneRef / PanelRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
@@ -44,13 +44,13 @@ class Drag:
     from_point: Any = None  # CoordPoint | None（坐标模式起点）
     to_point: Any = None    # CoordPoint | None（坐标模式终点）
     direction: str | None = None   # "up" | "down" | "left" | "right" | None（panel 拖拽方向）
-    distance: Any = 1              # 拖拽距离：int | VarRef（up/down 为行数，left/right 为列数，默认 1）
+    distance: Any = 1.0            # 拖拽距离：float | VarRef（支持整数、浮点数如 0.5、变量引用）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
-class Calibrate:
-    """calibrate [scene].[panel] — 触发 panel 区域截图 + 图像自校准
+class Align:
+    """align [scene].[panel] — 触发 panel 区域截图 + 图像自对齐
 
     引擎在 panel 区域内运行方差分析/黑边检测，缓存每个 slot 的精确坐标，
     后续 click [scene].[panel][row][col] 从缓存读取坐标。
@@ -234,12 +234,12 @@ class PanelRef:
 class PanelGridDrag:
     """panel grid 级拖拽：drag [scene].[panel] up|down|left|right [n]
 
-    起点为 panel 中心，拖拽距离按整行/列高度计算（非单格）。
+    起点为 panel 中心，拖拽距离按 slot+span/2 计算（支持浮点数，如 0.5 表示半行）。
     """
     scene: str
     panel: str
     direction: str        # "up" | "down" | "left" | "right"
-    distance: Any = 1     # int | VarRef
+    distance: Any = 1.0   # float | VarRef（支持整数、浮点数、变量引用）
     line_no: int = 0
 
 

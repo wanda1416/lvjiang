@@ -8,6 +8,7 @@
 import traceback
 from typing import Any, Callable
 
+import numpy as np
 from loguru import logger
 from pathlib import Path
 
@@ -27,9 +28,9 @@ from .grammar import (
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
-from .grammar.ast_nodes import Calibrate
+from .grammar.ast_nodes import Align
 from .base import BaseWorkflow
-from .calibrate import detect_grid, GridCalibration
+from .align import detect_grid, GridAlignment
 
 
 # ─── 用户可见的 DSL 错误 ──────────────────────────────────
@@ -90,8 +91,8 @@ class WorkflowEngine:
         self.output: dict = {}
         self._coord_meta: dict[str, dict] = {}
         self._base_dir: Path | None = None
-        # panel 校准缓存：(scene_key, panel_key) → GridCalibration
-        self._panel_calibrations: dict[tuple[str, str], GridCalibration] = {}
+        # panel 对齐缓存：(scene_key, panel_key) → GridAlignment
+        self._panel_alignments: dict[tuple[str, str], GridAlignment] = {}
         # session / context（公开属性，UI 层注入）
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
@@ -226,8 +227,8 @@ class WorkflowEngine:
                 self._exec_drag(node)
             case Wait():
                 self._exec_wait(node)
-            case Calibrate():
-                self._exec_calibrate(node)
+            case Align():
+                self._exec_align(node)
             case Scan():
                 self._exec_scan(node)
             case Recognize():
@@ -340,25 +341,44 @@ class WorkflowEngine:
             canvas = self._layout.get_canvas()
             x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
             y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
-            # 解析 distance
+            # 解析 distance（支持 int、float、VarRef）
             distance = grid.distance
             if isinstance(distance, VarRef):
-                distance = self.variables.get(distance.name, 1)
+                distance = self.variables.get(distance.name, 1.0)
             try:
-                distance = int(distance)
+                distance = float(distance)  # 支持浮点数（如 0.5 表示半行）
             except (TypeError, ValueError):
                 logger.error(f"drag grid: 距离无效: {distance}")
                 return
             dx, dy = 0, 0
             direction = grid.direction
+            # 距离基于 align 实测的 slot + span/2，避免声明尺寸的误差积累
+            # slot + span/2 = 从当前 slot 中心到相邻 span 中点的距离
+            # 缓存未命中 → 懒加载 align（初始化）
+            cache_key = (grid.scene, grid.panel)
+            if cache_key not in self._panel_alignments:
+                logger.info(f"drag grid: 缓存未命中，懒加载 align: {grid.scene}.{grid.panel}")
+                self._exec_align(Align(scene=grid.scene, panel=grid.panel))
+            cal = self._panel_alignments.get(cache_key)
+            # 无兜底逻辑：align 失败直接报错，不用 panel 高度兜底
+            if cal is None or cal.row_slot <= 0:
+                logger.error(f"drag grid: align 失败，无法计算拖拽距离: {grid.scene}.{grid.panel}")
+                return
             if direction in ("up", "down"):
-                dy = int(panel_obj.h_ratio * canvas.h_ratio * h * distance)
+                step_norm = cal.row_slot + cal.row_span / 2.0
+                panel_pixel_h = panel_obj.h_ratio * canvas.h_ratio * h
+                dy = int(step_norm * panel_pixel_h * distance)
                 if direction == "up":
                     dy = -dy
                 if abs(dy) < 10:
                     dy = 10 if dy >= 0 else -10
             else:
-                dx = int(panel_obj.w_ratio * canvas.w_ratio * w * distance)
+                if cal.col_slot <= 0:
+                    logger.error(f"drag grid: align 列数据无效: {grid.scene}.{grid.panel}")
+                    return
+                step_norm = cal.col_slot + cal.col_span / 2.0
+                panel_pixel_w = panel_obj.w_ratio * canvas.w_ratio * w
+                dx = int(step_norm * panel_pixel_w * distance)
                 if direction == "left":
                     dx = -dx
                 if abs(dx) < 10:
@@ -370,6 +390,10 @@ class WorkflowEngine:
                 f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
                 duration=duration, hold=node.hold,
             )
+            # drag 后界面已滚动，失效对齐缓存（不立即刷新，避免截到滚动动画残影）
+            # 下次访问时懒加载重新对齐（此时滚动动画已完成）
+            self._panel_alignments.pop(cache_key, None)
+            logger.debug(f"drag grid: 已失效对齐缓存: {grid.scene}.{grid.panel}")
             return
         if isinstance(node.scene, PanelRef):
             x, y = self._panel_ref_to_screen(node.scene)
@@ -383,31 +407,40 @@ class WorkflowEngine:
             panel_obj = self._find_panel_in_layout(node.scene.scene, node.scene.panel)
             if panel_obj is None:
                 return
-            # 解析 distance（支持 int 或 VarRef）
+            # 解析 distance（支持 int、float、VarRef）
             distance = node.distance
             if isinstance(distance, VarRef):
-                distance = self.variables.get(distance.name, 1)
+                distance = self.variables.get(distance.name, 1.0)
             try:
-                distance = int(distance)
+                distance = float(distance)  # 支持浮点数（如 0.5 表示半行）
             except (TypeError, ValueError):
                 logger.error(f"drag: 距离无效: {distance}")
                 return
             w, h = self._capture.get_capture_size()
             canvas = self._layout.get_canvas()
             direction = node.direction or "down"
+            # 距离基于 align 实测的 slot + span/2（与 grid drag 一致）
+            cache_key = (node.scene.scene, node.scene.panel)
+            cal = self._panel_alignments.get(cache_key)
+            # _panel_ref_to_screen 已触发懒加载，此处 cal 应有效
+            if cal is None:
+                logger.error(f"drag panel: align 失败: {node.scene.scene}.{node.scene.panel}")
+                return
             dx, dy = 0, 0
             if direction in ("up", "down"):
-                # 垂直拖拽：按行高计算
-                row_h = panel_obj.h_ratio / max(panel_obj.rows, 1)
-                dy = int(row_h * canvas.h_ratio * h * distance)
+                # 垂直拖拽：按实测行周期计算
+                step_norm = cal.row_slot + cal.row_span / 2.0
+                panel_pixel_h = panel_obj.h_ratio * canvas.h_ratio * h
+                dy = int(step_norm * panel_pixel_h * distance)
                 if direction == "up":
                     dy = -dy  # 手指向上划
                 if abs(dy) < 10:
                     dy = 10 if dy >= 0 else -10
             else:
-                # 水平拖拽：按列宽计算
-                col_w = panel_obj.w_ratio / max(panel_obj.cols, 1)
-                dx = int(col_w * canvas.w_ratio * w * distance)
+                # 水平拖拽：按实测列周期计算
+                step_norm = cal.col_slot + cal.col_span / 2.0
+                panel_pixel_w = panel_obj.w_ratio * canvas.w_ratio * w
+                dx = int(step_norm * panel_pixel_w * distance)
                 if direction == "left":
                     dx = -dx  # 手指向左划
                 if abs(dx) < 10:
@@ -419,6 +452,10 @@ class WorkflowEngine:
                 f"panel({node.scene.scene}.{node.scene.panel}[{node.scene.row}][{node.scene.col}]) {direction} {distance}",
                 duration=duration, hold=node.hold,
             )
+            # drag 后界面已滚动，失效对齐缓存（不立即刷新，避免截到滚动动画残影）
+            # 下次访问时懒加载重新对齐（此时滚动动画已完成）
+            self._panel_alignments.pop((node.scene.scene, node.scene.panel), None)
+            logger.debug(f"drag panel: 已失效对齐缓存: {node.scene.scene}.{node.scene.panel}")
             return
         if isinstance(node.scene, SceneRef):
             # 解析 scene（可能是 str 或 VarRef）
@@ -479,36 +516,36 @@ class WorkflowEngine:
         else:
             self._ensure_workflow().wait_delay(str(delay))
 
-    # ─── Panel 校准与路由 ────────────────────────────────────
+    # ─── Panel 对齐与路由 ────────────────────────────────────
 
-    def _exec_calibrate(self, node: "Calibrate"):
-        """calibrate [scene].[panel] — 截图 panel 区域 + 运行图像自校准，缓存 slot 中心"""
+    def _exec_align(self, node: "Align"):
+        """align [scene].[panel] — 截图 panel 区域 + 运行图像自对齐，缓存 slot 中心"""
         scene_key = node.scene
         panel_key = node.panel
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
-            logger.error(f"calibrate: 场景 {scene_key} 未找到 panel {panel_key}")
+            logger.error(f"align: 场景 {scene_key} 未找到 panel {panel_key}")
             return
         # 截取 panel 区域图像
         panel_img = self._capture_panel_image(panel_obj)
         if panel_img is None:
-            logger.error(f"calibrate: 无法截取 panel {scene_key}.{panel_key}")
+            logger.error(f"align: 无法截取 panel {scene_key}.{panel_key}")
             return
-        # 运行图像自校准
-        calibration = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols)
-        if calibration is None:
-            logger.error(f"calibrate: panel {scene_key}.{panel_key} 未检测到 slot")
+        # 运行图像自对齐
+        alignment = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols)
+        if alignment is None:
+            logger.error(f"align: panel {scene_key}.{panel_key} 未检测到 slot")
             return
-        self._panel_calibrations[(scene_key, panel_key)] = calibration
+        self._panel_alignments[(scene_key, panel_key)] = alignment
         logger.info(
-            f"calibrate: {scene_key}.{panel_key} 已校准，"
-            f"检测到 {calibration.total_slots} 个 slot 中心"
+            f"align: {scene_key}.{panel_key} 已对齐，"
+            f"检测到 {alignment.total_slots} 个 slot 中心"
         )
 
     def _panel_ref_to_screen(self, ref: PanelRef) -> tuple[int | None, int | None]:
         """PanelRef → 屏幕绝对坐标
 
-        若缓存未命中，自动触发一次 calibrate。
+        若缓存未命中，自动触发一次 align。
         """
         scene_key = ref.scene
         panel_key = ref.panel
@@ -522,25 +559,25 @@ class WorkflowEngine:
             logger.error(f"panel 索引非数值: row={row}, col={col}")
             return None, None
 
-        # 缓存未命中 → 自动 calibrate
+        # 缓存未命中 → 自动 align
         cache_key = (scene_key, panel_key)
-        if cache_key not in self._panel_calibrations:
-            logger.info(f"panel 缓存未命中，自动 calibrate: {scene_key}.{panel_key}")
-            auto_node = Calibrate(scene=scene_key, panel=panel_key)
-            self._exec_calibrate(auto_node)
-        cal = self._panel_calibrations.get(cache_key)
+        if cache_key not in self._panel_alignments:
+            logger.info(f"panel 缓存未命中，自动 align: {scene_key}.{panel_key}")
+            auto_node = Align(scene=scene_key, panel=panel_key)
+            self._exec_align(auto_node)
+        cal = self._panel_alignments.get(cache_key)
         if cal is None:
-            logger.error(f"panel 未校准: {scene_key}.{panel_key}")
+            logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
             return None, None
 
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
             return None, None
 
-        # 查表：用校准结果的行列数做越界检查
+        # 查表：用对齐结果的行列数做越界检查
         if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
             logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
-                         f"校准结果 {cal.n_rows}×{cal.n_cols}")
+                         f"对齐结果 {cal.n_rows}×{cal.n_cols}")
             return None, None
 
         cx, cy = cal.slot_center(row_idx, col_idx)  # 相对于 panel 区域
@@ -562,20 +599,20 @@ class WorkflowEngine:
             logger.error(f"panel 索引非数值: row={row}, col={col}")
             return None, "", 0, 0
 
-        # 自动 calibrate
+        # 自动 align
         cache_key = (scene_key, panel_key)
-        if cache_key not in self._panel_calibrations:
-            auto_node = Calibrate(scene=scene_key, panel=panel_key)
-            self._exec_calibrate(auto_node)
-        cal = self._panel_calibrations.get(cache_key)
+        if cache_key not in self._panel_alignments:
+            auto_node = Align(scene=scene_key, panel=panel_key)
+            self._exec_align(auto_node)
+        cal = self._panel_alignments.get(cache_key)
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if cal is None or panel_obj is None:
-            logger.error(f"panel 未校准: {scene_key}.{panel_key}")
+            logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
             return None, "", 0, 0
 
         if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
             logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
-                         f"校准结果 {cal.n_rows}×{cal.n_cols}")
+                         f"对齐结果 {cal.n_rows}×{cal.n_cols}")
             return None, "", 0, 0
 
         # 截取 panel 图像
@@ -584,7 +621,7 @@ class WorkflowEngine:
             return None, "", 0, 0
 
         ph, pw = panel_img.shape[:2]
-        # 用校准的实际边界裁剪（非等分）
+        # 用对齐的实际边界裁剪（非等分）
         x1_r, y1_r, x2_r, y2_r = cal.slot_bounds(row_idx, col_idx)
         x1 = max(0, int(x1_r * pw))
         y1 = max(0, int(y1_r * ph))

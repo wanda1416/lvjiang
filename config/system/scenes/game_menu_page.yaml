@@ -126,3 +126,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: user
+  name: 用户
+  type: attr
+  is_text: true
+  is_clickable: false

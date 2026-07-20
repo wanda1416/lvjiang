@@ -14,12 +14,13 @@ from lark import Lark, Transformer, Token, Tree
 from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
-    If, For, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
+    If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
+    SceneRef, PanelRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
+from .ast_nodes import Calibrate
 
 # ─── Lark 实例（延迟初始化） ──────────────────────────────
 
@@ -62,8 +63,20 @@ class _DSLTransformer(Transformer):
             return str(item)
 
     def click_stmt(self, items):
-        """click 目标（scene.area 引用 或 坐标点），目标已由子规则构造为 Click 节点"""
+        """click 目标（scene.area 引用 / panel 三级索引 / 坐标点），目标已由子规则构造为 Click 节点"""
         return items[0]
+
+    def click_panel_target(self, items):
+        """click [scene].[panel][row][col] — panel 三级索引
+
+        items: scene_const, panel_const, row_index, col_index
+        """
+        scene_val = self._resolve_const_or_var(items[0])
+        panel_val = self._resolve_const_or_var(items[1])
+        row = items[2]   # int | VarRef
+        col = items[3]   # int | VarRef
+        return Click(target=PanelRef(scene=scene_val, panel=panel_val, row=row, col=col),
+                     line_no=self._line(items))
 
     def click_scene_target(self, items):
         """click scene.coord — scene 和 coord 都可以是常量或变量"""
@@ -82,7 +95,7 @@ class _DSLTransformer(Transformer):
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
 
     def drag_stmt(self, items):
-        """drag 目标（scene.arrow 引用 或 两坐标点）+ 可选 duration/hold"""
+        """drag 目标（scene.arrow 引用 / panel 三级索引 / 两坐标点）+ 可选 duration/hold"""
         drag_node = items[0]  # 已由 drag_*_target 构造为 Drag
         duration = None
         hold = None
@@ -97,8 +110,37 @@ class _DSLTransformer(Transformer):
             scene=drag_node.scene, arrow=drag_node.arrow,
             duration=duration, hold=hold,
             from_point=drag_node.from_point, to_point=drag_node.to_point,
+            direction=drag_node.direction, distance=drag_node.distance,
             line_no=drag_node.line_no,
         )
+
+    def drag_panel_target(self, items):
+        """drag [scene].[panel][row][col] [up|down [n]] — panel 三级索引 + 可选方向距离"""
+        scene_val = self._resolve_const_or_var(items[0])
+        panel_val = self._resolve_const_or_var(items[1])
+        row = items[2]
+        col = items[3]
+        direction = None
+        distance = 1
+        # 可选的 drag_direction
+        if len(items) > 4:
+            dir_info = items[4]  # (direction_str, distance_int) or None
+            if dir_info is not None:
+                direction, distance = dir_info
+        panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
+        return Drag(scene=panel_ref, arrow=panel_ref, direction=direction, distance=distance, line_no=self._line(items))
+
+    def drag_direction(self, items):
+        """up|down [n | $var] → (direction_str, distance_int_or_VarRef)"""
+        dir_token = str(items[0]).lower()
+        distance = 1
+        if len(items) > 1:
+            rows_str = str(items[1])
+            if rows_str.startswith('$'):
+                distance = VarRef(name=rows_str[1:])  # 动态行数
+            else:
+                distance = int(rows_str)  # 静态行数
+        return (dir_token, distance)
 
     def drag_scene_target(self, items):
         """drag scene.arrow — scene 和 arrow 都可以是常量或变量"""
@@ -121,6 +163,32 @@ class _DSLTransformer(Transformer):
     def drag_hold(self, items):
         """hold <seconds> → float"""
         return float(items[0])
+
+    # ─── calibrate 指令 ─────────────────────────────────────
+
+    def calibrate_stmt(self, items):
+        """calibrate [scene].[panel] — 触发 panel 图像自校准"""
+        scene_name = str(items[0])
+        panel_name = str(items[1])
+        return Calibrate(scene=scene_name, panel=panel_name, line_no=self._line(items))
+
+    # ─── panel 索引 ─────────────────────────────────────────
+
+    def panel_index_int(self, items):
+        """panel 数字索引：[2] → int
+
+        语法："[" INT "]"，匿名终端 "[" "]" 不传入 transformer，
+        items 仅包含 INT token。
+        """
+        return int(str(items[0]))
+
+    def panel_index_var(self, items):
+        """panel 变量索引：[$var] → VarRef
+
+        语法："[" var_ref "]"，匿名终端不传入 transformer，
+        items 仅包含 VarRef。
+        """
+        return items[0]  # var_ref 已返回 VarRef
 
     def wait_stmt(self, items):
         arg = items[0]
@@ -245,9 +313,16 @@ class _DSLTransformer(Transformer):
         return str(item)  # bracket_expr
 
     def collect_stmt(self, items):
-        source = items[0]  # var_ref → VarRef
+        source = items[0]  # var_ref → VarRef, field_access → FieldAccess, literal → float/str/Token
         alias = None
         alias_var = None
+        # 将字面量包装为 Literal AST 节点
+        if isinstance(source, (float, int, str)) and not isinstance(source, (VarRef, FieldAccess)):
+            # 处理字符串 Token（需要 unquote）
+            if isinstance(source, Token) and source.type == 'STRING':
+                source = Literal(value=self._unquote(str(source)))
+            else:
+                source = Literal(value=source)
         if len(items) > 1:
             # collect_as_clause 返回 str 或 VarRef
             alias_item = items[1]
@@ -422,6 +497,10 @@ class _DSLTransformer(Transformer):
     def arg_lit(self, items):
         return Literal(value=self._unquote(str(items[0])))
 
+    def arg_num(self, items):
+        """number 作为函数参数 → float"""
+        return items[0]  # number 已返回 float
+
     def arg_var(self, items):
         """var_ref 作为函数参数 → VarRef"""
         return items[0]  # var_ref 已返回 VarRef
@@ -487,8 +566,12 @@ class _DSLTransformer(Transformer):
 
     def for_stmt(self, items):
         var_name = str(items[0])
-        iterable = items[1]  # for_iter → list[Literal] | VarRef
+        iterable = items[1]  # for_iter → list[Literal] | VarRef | FuncCall | ForRange
         body = [i for i in items[2:] if i is not None and not isinstance(i, Token)]
+        # 若 for_iter 返回 ForRange，直接设置 body 并返回
+        if isinstance(iterable, ForRange):
+            return ForRange(var=var_name, start=iterable.start, end=iterable.end,
+                           body=body, line_no=self._line(items))
         return For(var=var_name, iterable=iterable, body=body, line_no=self._line(items))
 
     def for_iter_static(self, items):
@@ -498,6 +581,25 @@ class _DSLTransformer(Transformer):
     def for_iter_var(self, items):
         """for_iter: var_ref → VarRef"""
         return items[0]  # var_ref 已返回 VarRef
+
+    def for_iter_func(self, items):
+        """for_iter: func_call → FuncCall（如 range(1, 100)）"""
+        return items[0]  # func_call 已返回 FuncCall
+
+    def for_iter_range(self, items):
+        """for_iter: for_range → ForRange（如 [1...100]）"""
+        return items[0]  # for_range 已返回 ForRange
+
+    def for_range(self, items):
+        """[start...end] 闭区间范围迭代"""
+        # items = [start_endpoint, RANGE_OP_token, end_endpoint]
+        # 过滤掉 RANGE_OP token
+        endpoints = [i for i in items if not isinstance(i, Token) or i.type != 'RANGE_OP']
+        return ForRange(var="", start=endpoints[0], end=endpoints[1], line_no=self._line(items))
+
+    def for_range_endpoint(self, items):
+        """范围端点：数字或变量引用"""
+        return items[0]  # number 返回 float，var_ref 返回 VarRef
 
     def loop_stmt(self, items):
         count_val = items[0]

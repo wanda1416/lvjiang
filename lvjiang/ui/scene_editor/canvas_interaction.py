@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QMouseEvent, QCursor, QWheelEvent
 from loguru import logger
 
-from ...core.scene_registry import Region, CanvasConfig
+from ...core.scene_registry import Region, Panel, CanvasConfig
 from .canvas_coords import CanvasCoordMixin
 
 
@@ -228,16 +228,22 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.RightButton:
-            # 检查是否点击了已选中的区域
             pos = event.position()
-            # POI（point）右键菜单优先：命中坐标点则弹出复制/删除
+            # Panel 右键菜单优先：命中已选中 panel 则弹出复制/删除
+            if self._panel_selected_idx >= 0 and self._panel_selected_idx < len(self._panels):
+                p = self._panels[self._panel_selected_idx]
+                rect = self._panel_rect_widget(p)
+                if rect.contains(pos):
+                    self._show_panel_context_menu(pos)
+                    return
+            # POI（point）右键菜单：命中坐标点则弹出复制/删除
             if self._edit_mode == EditMode.REGION and self._poi_handle_context_menu(pos):
                 return
+            # Region 右键菜单：命中已选中区域则弹出
             if self._selected_idx >= 0 and self._selected_idx < len(self._regions):
                 r = self._regions[self._selected_idx]
                 rect = self._region_rect_widget(r)
                 if rect.contains(pos):
-                    # 在已选中区域内右键，弹出菜单
                     self._show_context_menu(pos)
                     return
             # 否则开始拖拽平移
@@ -249,6 +255,39 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             super().mousePressEvent(event)
             return
         pos = event.position()
+
+        # ── Panel 放置模式优先介入 ──
+        if self._pending_panel_def is not None:
+            self._panel_drag_start = pos
+            self._panel_drag_current = pos
+            self.update()
+            return
+
+        # ── Panel 移动/缩放介入 ──
+        if self._edit_mode == EditMode.REGION and self._panels:
+            p_idx, p_handle = self._hit_panel_test(pos)
+            if p_idx >= 0:
+                self._panel_selected_idx = p_idx
+                if p_handle is not None:
+                    self._panel_edit_mode = DragMode.RESIZING
+                    self._panel_edit_handle = p_handle
+                else:
+                    self._panel_edit_mode = DragMode.MOVING
+                self._panel_edit_start = pos
+                p = self._panels[p_idx]
+                self._panel_edit_orig = Panel(
+                    key=p.key, x_ratio=p.x_ratio, y_ratio=p.y_ratio,
+                    w_ratio=p.w_ratio, h_ratio=p.h_ratio,
+                    cols=p.cols, rows=p.rows,
+                )
+                self._notify_panel_changed()
+                self.update()
+                return
+            # 点击空白处取消 panel 选中
+            if self._panel_selected_idx >= 0:
+                self._panel_selected_idx = -1
+                self._notify_panel_changed()
+                self.update()
 
         # ── POI（point/arrow）优先介入 ──
         if self._edit_mode == EditMode.REGION and self._poi_handle_press(event):
@@ -347,6 +386,28 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.update()
             return
 
+        # ── Panel 放置模式拖拽预览 ──
+        if self._panel_drag_start is not None:
+            self._panel_drag_current = pos
+            self.update()
+            return
+
+        # ── Panel 移动/缩放拖拽 ──
+        if self._panel_edit_mode is not None and self._panel_edit_orig is not None:
+            p = self._panels[self._panel_selected_idx]
+            o = self._panel_edit_orig
+            dx_n, dy_n = self._widget_to_norm(pos)
+            dx_n -= self._widget_to_norm(self._panel_edit_start)[0]
+            dy_n -= self._widget_to_norm(self._panel_edit_start)[1]
+            if self._panel_edit_mode == DragMode.MOVING:
+                p.x_ratio = max(0, min(1 - p.w_ratio, o.x_ratio + dx_n))
+                p.y_ratio = max(0, min(1 - p.h_ratio, o.y_ratio + dy_n))
+            elif self._panel_edit_mode == DragMode.RESIZING:
+                self._apply_panel_resize(p, o, pos)
+            self._notify_panel_changed()
+            self.update()
+            return
+
         # ── POI（point/arrow）优先介入 ──
         if self._edit_mode == EditMode.REGION and self._poi_handle_move(event):
             return
@@ -415,6 +476,43 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             super().mouseReleaseEvent(event)
             return
 
+        # ── Panel 放置模式完成 ──
+        if self._panel_drag_start is not None and self._pending_panel_def is not None:
+            end_pos = event.position()
+            # widget 坐标 -> 截图归一化 -> 画布归一化
+            sx0, sy0 = self._widget_to_norm(self._panel_drag_start)
+            sx1, sy1 = self._widget_to_norm(end_pos)
+            cx0, cy0 = self._screenshot_to_canvas_norm(sx0, sy0)
+            cx1, cy1 = self._screenshot_to_canvas_norm(sx1, sy1)
+            x = min(cx0, cx1)
+            y = min(cy0, cy1)
+            w = abs(cx1 - cx0)
+            h = abs(cy1 - cy0)
+            # 矩形太小则忽略
+            if w >= 0.01 and h >= 0.01:
+                from ...core.scene_registry import Panel
+                pd = self._pending_panel_def
+                panel = Panel(
+                    key=pd.key,
+                    x_ratio=x, y_ratio=y, w_ratio=w, h_ratio=h,
+                    cols=pd.cols, rows=pd.rows,
+                )
+                self._panels.append(panel)
+                self._panel_selected_idx = len(self._panels) - 1
+                self._notify_panel_changed()
+            self.cancel_panel_place()
+            self.update()
+            return
+
+        # ── Panel 移动/缩放完成 ──
+        if self._panel_edit_mode is not None:
+            self._panel_edit_mode = None
+            self._panel_edit_handle = None
+            self._panel_edit_orig = None
+            self._notify_panel_changed()
+            self.update()
+            return
+
         # ── POI（point/arrow）优先介入 ──
         if self._edit_mode == EditMode.REGION and self._poi_handle_release(event):
             return
@@ -467,6 +565,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
+            # 取消 panel 放置模式
+            if self._pending_panel_def is not None:
+                self.cancel_panel_place()
+                return
             if self._poi_handle_escape():
                 return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
@@ -565,6 +667,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _update_cursor(self, pos: QPointF):
         """根据鼠标位置更新光标"""
+        # Panel 光标优先（仅在区域编辑模式下）
+        if self._edit_mode == EditMode.REGION and self._panels:
+            p_idx, p_handle = self._hit_panel_test(pos)
+            if p_idx >= 0:
+                if p_handle is not None:
+                    self.setCursor(QCursor(HANDLE_CURSORS[p_handle]))
+                    return
+                self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
+                return
+
         if self._field_selected and self._selected_idx >= 0:
             # 单区域编辑模式：只对选中区域响应
             r = self._regions[self._selected_idx]
@@ -684,6 +796,46 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self._selected_idx = new_idx
             self._field_selected = True
             self.update()
+
+    # ─── Panel 右键菜单 ─────────────────────────────────
+
+    def _show_panel_context_menu(self, pos: QPointF):
+        """在指定位置显示 Panel 右键菜单"""
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu { background-color: #f0f0f0; padding: 4px; }"
+            "QMenu::item { padding: 4px 16px; }"
+            "QMenu::item:selected { background-color: #ddd; }"
+        )
+        copy_action = menu.addAction("复制 DSL 引用")
+        delete_action = menu.addAction("删除面板")
+        action = menu.exec(self.mapToGlobal(pos.toPoint()))
+        if action == copy_action:
+            self._copy_panel_key()
+        elif action == delete_action:
+            self._delete_selected_panel()
+
+    def _copy_panel_key(self):
+        """复制选中 Panel 的 DSL 引用到剪贴板"""
+        if self._panel_selected_idx < 0 or self._panel_selected_idx >= len(self._panels):
+            return
+        panel = self._panels[self._panel_selected_idx]
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        # 格式: [scene_key].[panel_key]
+        if self._scene_key:
+            clipboard.setText(f"[{self._scene_key}].[{panel.key}]")
+        else:
+            clipboard.setText(f"[{panel.key}]")
+
+    def _delete_selected_panel(self):
+        """删除选中的 Panel 实例（从布局中解绑）"""
+        if self._panel_selected_idx < 0 or self._panel_selected_idx >= len(self._panels):
+            return
+        del self._panels[self._panel_selected_idx]
+        self._panel_selected_idx = -1
+        self._notify_panel_changed()
+        self.update()
 
     # ─── 通知 ────────────────────────────────────────────
 

@@ -1,7 +1,6 @@
 key: bag_item_detail
 name: 道具背包
 regions:
-# ── 第1行 ──
 - key: bag_1_1
   name: 背包格1_1
   type: slot
@@ -32,7 +31,6 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
-# ── 第2行 ──
 - key: bag_2_1
   name: 背包格2_1
   type: slot
@@ -63,7 +61,6 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
-# ── 第3行 ──
 - key: bag_3_1
   name: 背包格3_1
   type: slot
@@ -94,7 +91,6 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
-# ── 第4行 ──
 - key: bag_4_1
   name: 背包格4_1
   type: slot
@@ -125,7 +121,6 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
-# ── 第5行 ──
 - key: bag_5_1
   name: 背包格5_1
   type: slot
@@ -156,3 +151,8 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
+panels:
+- key: bag_grid
+  name: 背包
+  cols: 6
+  rows: 5

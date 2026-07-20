@@ -37,12 +37,28 @@ class PointDef:
 
 
 @dataclass
+class PanelDef:
+    """单个 panel 的类型定义（声明式网格容器）
+
+    描述「场景里存在这样一个网格区域」的类型信息（key/name/行列数）。
+    具体的格子坐标由引擎运行时通过图像自校准（方差分析 + 黑边检测）计算，
+    并缓存在 WorkflowEngine._panel_calibrations 中。
+    span（间距）由校准算法自动检测，无需手动指定。
+    """
+    key: str
+    name: str
+    cols: int = 6                   # 列数
+    rows: int = 3                   # 行数
+
+
+@dataclass
 class SceneDef:
     """单个场景的完整定义"""
     key: str
     name: str
     regions: list[RegionDef] = field(default_factory=list)
     points: list[PointDef] = field(default_factory=list)
+    panels: list[PanelDef] = field(default_factory=list)
 
 
 class SceneRegistry:
@@ -153,13 +169,22 @@ class SceneRegistry:
                 is_clickable=pd.get("is_clickable", True),
             ))
 
+        panels = []
+        for pd in data.get("panels", []):
+            panels.append(PanelDef(
+                key=pd["key"],
+                name=pd.get("name", pd["key"]),
+                cols=int(pd.get("cols", 6)),
+                rows=int(pd.get("rows", 3)),
+            ))
+
         # region 与 point 同场景内 key 不得重复（共享命名空间）
-        all_keys = [r.key for r in regions] + [p.key for p in points]
+        all_keys = [r.key for r in regions] + [p.key for p in points] + [p.key for p in panels]
         dup = {k for k in all_keys if all_keys.count(k) > 1}
         if dup:
-            raise ValueError(f"场景 {key} 的 region/point key 重复: {dup}")
+            raise ValueError(f"场景 {key} 的 region/point/panel key 重复: {dup}")
 
-        return SceneDef(key=key, name=name, regions=regions, points=points)
+        return SceneDef(key=key, name=name, regions=regions, points=points, panels=panels)
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""
@@ -421,11 +446,45 @@ class SceneRegistry:
             raise ValueError(f"坐标点不存在: {old_key}")
         self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
 
+    def add_panel_to_scene(self, scene_key: str, panel_def: PanelDef):
+        """向场景 YAML 追加 panel 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        self._check_key_unique(scene, panel_def.key)
+        scene.panels.append(panel_def)
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def remove_panel_from_scene(self, scene_key: str, panel_key: str):
+        """从场景 YAML 移除 panel 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        scene.panels = [p for p in scene.panels if p.key != panel_key]
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
+    def update_panel_in_scene(self, scene_key: str, old_key: str, panel_def: PanelDef):
+        """更新场景中的 panel 定义"""
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        for i, p in enumerate(scene.panels):
+            if p.key == old_key:
+                scene.panels[i] = panel_def
+                break
+        else:
+            raise ValueError(f"面板不存在: {old_key}")
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+
     # ─── 内部方法 ─────────────────────────────────────────────
 
     def _check_key_unique(self, scene: SceneDef, new_key: str):
-        """检查 key 在场景内是否重复"""
-        all_keys = [r.key for r in scene.regions] + [p.key for p in scene.points]
+        """检查 key 在场景内是否重复（region/point/panel 共享命名空间）"""
+        all_keys = (
+            [r.key for r in scene.regions]
+            + [p.key for p in scene.points]
+            + [p.key for p in scene.panels]
+        )
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
 
@@ -453,6 +512,16 @@ class SceneRegistry:
                     "is_clickable": p.is_clickable,
                 }
                 for p in scene.points
+            ]
+        if scene.panels:
+            data["panels"] = [
+                {
+                    "key": p.key,
+                    "name": p.name,
+                    "cols": p.cols,
+                    "rows": p.rows,
+                }
+                for p in scene.panels
             ]
         path.write_text(
             yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),

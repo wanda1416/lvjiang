@@ -8,7 +8,7 @@ from PyQt6.QtGui import (
     QPaintEvent, QFont,
 )
 
-from ...core.scene_registry import Region, CanvasConfig, EQUIP_REGIONS
+from ...core.scene_registry import Region, CanvasConfig, EQUIP_REGIONS, Panel
 from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
 from .canvas_poi import CanvasPoiMixin
 
@@ -37,6 +37,9 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self.setMinimumSize(400, 300)
         self.setMouseTracking(True)
         self.setStyleSheet("background-color: #1e1e1e;")
+
+        # 当前场景 key（由外部设置，用于 DSL 引用复制）
+        self._scene_key: str = ""
 
         # 图片
         self._pixmap: QPixmap | None = None
@@ -71,6 +74,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         # 信号回调
         self.on_region_changed = None  # callable() -> None
         self.on_canvas_changed = None  # callable() -> None
+        self.on_panel_changed = None  # callable() -> None
 
         # 当前场景的区域列表（由外部设置）
         self._current_regions = EQUIP_REGIONS
@@ -78,6 +82,21 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         # 画布配置（布局级别，由外部设置）
         self._canvas_config = CanvasConfig()
         self._edit_mode = EditMode.REGION  # 当前编辑模式
+
+        # Panel 列表（布局级别实例数据）
+        self._panels: list[Panel] = []
+        self._panel_selected_idx: int = -1
+
+        # Panel 放置模式（框选矩形绑定到 PanelDef）
+        self._pending_panel_def = None  # PanelDef | None
+        self._panel_drag_start: QPointF | None = None  # widget 坐标
+        self._panel_drag_current: QPointF | None = None  # widget 坐标
+
+        # Panel 移动/缩放状态
+        self._panel_edit_mode = None  # DragMode (MOVING/RESIZING)
+        self._panel_edit_handle: HandlePos | None = None  # 拉伸手柄
+        self._panel_edit_start = QPointF()  # 拖拽起始 widget 坐标
+        self._panel_edit_orig: Panel | None = None  # 拖拽前的原始 panel
 
         # 画布编辑模式的交互状态
         self._canvas_drag_mode = None  # DragMode
@@ -131,6 +150,135 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._selected_idx = -1
         self._field_selected = False
         self.update()
+
+    # ─── Panel 管理 ───────────────────────────────
+
+    def set_scene_key(self, scene_key: str):
+        """设置当前场景 key（用于 DSL 引用复制）"""
+        self._scene_key = scene_key
+
+    def set_panels(self, panels: list[Panel]):
+        """设置面板列表（从布局加载）"""
+        self._panels = [Panel(**p.to_dict()) for p in panels]
+        self._panel_selected_idx = -1
+        self.update()
+
+    def get_panels(self) -> list[Panel]:
+        """获取当前面板列表"""
+        return [Panel(**p.to_dict()) for p in self._panels]
+
+    def select_panel_by_key(self, key: str):
+        """按 key 选中面板"""
+        for i, p in enumerate(self._panels):
+            if p.key == key:
+                self._panel_selected_idx = i
+                self.update()
+                return
+        self._panel_selected_idx = -1
+        self.update()
+
+    def _notify_panel_changed(self):
+        """通知面板变化"""
+        if self.on_panel_changed:
+            self.on_panel_changed()
+
+    def begin_place_panel(self, panel_def):
+        """进入面板放置模式：等待用户在画布上框选矩形区域绑定到 PanelDef"""
+        self._pending_panel_def = panel_def
+        self._panel_drag_start = None
+        self._panel_drag_current = None
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setFocus()  # 确保画布获得焦点以接收鼠标事件
+        self.update()
+
+    def cancel_panel_place(self):
+        """取消面板放置模式"""
+        self._pending_panel_def = None
+        self._panel_drag_start = None
+        self._panel_drag_current = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.update()
+
+    # ─── Panel 命中检测与移动/缩放 ─────────────────────
+
+    def _panel_rect_widget(self, p: Panel) -> QRectF:
+        """Panel 的 widget 坐标矩形"""
+        sx, sy = self._canvas_to_screenshot_norm(p.x_ratio, p.y_ratio)
+        sw, sh = self._canvas_to_screenshot_norm(
+            p.x_ratio + p.w_ratio, p.y_ratio + p.h_ratio
+        )
+        tl = self._norm_to_widget(sx, sy)
+        br = self._norm_to_widget(sw, sh)
+        return QRectF(tl, br)
+
+    def _panel_handle_positions(self, p: Panel) -> dict[HandlePos, QPointF]:
+        """获取 panel 的 8 个缩放手柄 widget 坐标"""
+        rect = self._panel_rect_widget(p)
+        cx = rect.center().x()
+        cy = rect.center().y()
+        return {
+            HandlePos.TOP_LEFT:     rect.topLeft(),
+            HandlePos.TOP:          QPointF(cx, rect.top()),
+            HandlePos.TOP_RIGHT:    rect.topRight(),
+            HandlePos.RIGHT:        QPointF(rect.right(), cy),
+            HandlePos.BOTTOM_RIGHT: rect.bottomRight(),
+            HandlePos.BOTTOM:       QPointF(cx, rect.bottom()),
+            HandlePos.BOTTOM_LEFT:  rect.bottomLeft(),
+            HandlePos.LEFT:         QPointF(rect.left(), cy),
+        }
+
+    def _hit_panel_handle(self, p: Panel, pos: QPointF) -> HandlePos | None:
+        """检测是否命中 panel 的缩放手柄"""
+        handles = self._panel_handle_positions(p)
+        for hpos, center in handles.items():
+            hr = QRectF(
+                center.x() - HANDLE_SIZE, center.y() - HANDLE_SIZE,
+                HANDLE_SIZE * 2, HANDLE_SIZE * 2,
+            )
+            if hr.contains(pos):
+                return hpos
+        return None
+
+    def _hit_panel_test(self, pos: QPointF) -> tuple[int, HandlePos | None]:
+        """测试鼠标位置命中了哪个 panel，返回 (panel_index, handle or None)"""
+        # 先检测手柄（优先级更高）
+        if self._panel_selected_idx >= 0:
+            p = self._panels[self._panel_selected_idx]
+            handle = self._hit_panel_handle(p, pos)
+            if handle is not None:
+                return self._panel_selected_idx, handle
+        # 再检测矩形
+        for i in range(len(self._panels) - 1, -1, -1):
+            rect = self._panel_rect_widget(self._panels[i])
+            if rect.contains(pos):
+                return i, None
+        return -1, None
+
+    def _apply_panel_resize(self, p: Panel, orig: Panel, pos: QPointF):
+        """根据拖拽手柄位置调整 panel 大小"""
+        # widget 位移 -> 归一化位移
+        dx_n, dy_n = self._widget_to_norm(pos)
+        dx_n -= self._widget_to_norm(self._panel_edit_start)[0]
+        dy_n -= self._widget_to_norm(self._panel_edit_start)[1]
+        handle = self._panel_edit_handle
+        x, y, w, h = orig.x_ratio, orig.y_ratio, orig.w_ratio, orig.h_ratio
+        min_size = 0.02
+        if handle in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT):
+            new_x = x + dx_n
+            new_w = w - dx_n
+            if new_w >= min_size:
+                p.x_ratio = new_x
+                p.w_ratio = new_w
+        if handle in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT):
+            p.w_ratio = max(min_size, w + dx_n)
+        if handle in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT):
+            new_y = y + dy_n
+            new_h = h - dy_n
+            if new_h >= min_size:
+                p.y_ratio = new_y
+                p.h_ratio = new_h
+        if handle in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT):
+            p.h_ratio = max(min_size, h + dy_n)
 
     # ─── 模式切换 ───────────────────────────────────
 
@@ -269,6 +417,30 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._draw_arrows(painter)
         self._draw_points(painter)
 
+        # 绘制 panel（在 point/arrow 之下，region 之上）
+        self._draw_panels(painter)
+
+        # 绘制 panel 放置模式的拖拽预览矩形
+        if self._panel_drag_start is not None and self._panel_drag_current is not None:
+            preview_rect = QRectF(self._panel_drag_start, self._panel_drag_current).normalized()
+            if preview_rect.width() > 1 and preview_rect.height() > 1:
+                painter.fillRect(preview_rect, QColor(0, 255, 255, 40))
+                pen = QPen(QColor(0, 255, 255), 2, Qt.PenStyle.DashLine)
+                painter.setPen(pen)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(preview_rect)
+                # 显示待绑定的 panel key
+                if self._pending_panel_def is not None:
+                    label = f"绑定: {self._pending_panel_def.key}"
+                    font = QFont("Microsoft YaHei", 10)
+                    painter.setFont(font)
+                    painter.setPen(QColor(255, 255, 255))
+                    painter.drawText(
+                        preview_rect.adjusted(4, 4, -4, -4),
+                        Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                        label,
+                    )
+
         painter.end()
 
     def _draw_placeholder(self, painter: QPainter):
@@ -386,6 +558,77 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             handles = self._get_handle_positions(r)
             painter.setPen(QPen(QColor(255, 255, 0), 1))
             painter.setBrush(QBrush(QColor(255, 255, 0)))
+            for center in handles.values():
+                painter.drawRect(
+                    QRectF(
+                        center.x() - HANDLE_SIZE, center.y() - HANDLE_SIZE,
+                        HANDLE_SIZE * 2, HANDLE_SIZE * 2,
+                    )
+                )
+            painter.restore()
+
+    def _draw_panels(self, painter: QPainter):
+        """绘制所有 panel（青色虚线矩形 + 网格线 + 标签）"""
+        for i, p in enumerate(self._panels):
+            self._draw_panel(painter, p, i == self._panel_selected_idx)
+
+    def _draw_panel(self, painter: QPainter, p: Panel, selected: bool):
+        """绘制单个 panel：虚线外框 + 内部网格线 + 标签"""
+        # 计算 panel 在 widget 中的矩形
+        sx, sy = self._canvas_to_screenshot_norm(p.x_ratio, p.y_ratio)
+        sw, sh = self._canvas_to_screenshot_norm(
+            p.x_ratio + p.w_ratio, p.y_ratio + p.h_ratio
+        )
+        tl = self._norm_to_widget(sx, sy)
+        br = self._norm_to_widget(sw, sh)
+        rect = QRectF(tl, br)
+        if rect.width() < 1 or rect.height() < 1:
+            return
+
+        # 半透明填充
+        fill_color = QColor(0, 200, 200, 30) if not selected else QColor(0, 255, 255, 50)
+        painter.fillRect(rect, fill_color)
+
+        # 虚线外框
+        pen_color = QColor(0, 220, 220) if not selected else QColor(0, 255, 255)
+        pen = QPen(pen_color, 2 if selected else 1, Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(rect)
+
+        # 内部网格线（cols/rows 分隔线）
+        if p.cols > 1 or p.rows > 1:
+            grid_pen = QPen(QColor(0, 200, 200, 100), 1, Qt.PenStyle.DotLine)
+            painter.setPen(grid_pen)
+            cell_w = rect.width() / max(p.cols, 1)
+            cell_h = rect.height() / max(p.rows, 1)
+            # 竖线
+            for c in range(1, p.cols):
+                x = rect.left() + c * cell_w
+                painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
+            # 横线
+            for r in range(1, p.rows):
+                y = rect.top() + r * cell_h
+                painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
+
+        # 标签
+        label = f"{p.key} ({p.rows}x{p.cols})"
+        font = QFont("Microsoft YaHei", 8)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        tw = fm.horizontalAdvance(label) + 8
+        th = fm.height() + 4
+        label_rect = QRectF(rect.x(), rect.y() - th, tw, th)
+        painter.fillRect(label_rect, QColor(0, 180, 180, 200))
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
+
+        # 选中时绘制缩放手柄
+        if selected:
+            painter.save()
+            handles = self._panel_handle_positions(p)
+            painter.setPen(QPen(QColor(0, 255, 255), 1))
+            painter.setBrush(QBrush(QColor(0, 255, 255)))
             for center in handles.values():
                 painter.drawRect(
                     QRectF(

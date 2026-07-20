@@ -10,12 +10,16 @@
 
 ```
 Scene（场景）          ← 逻辑定义层：游戏中一个界面
-  └── Area（区域）     ← 界面中的一个逻辑单元
-        ├── Point      ← 圆形交互锚点（点击/拖拽端点）
-        └── Region     ← 矩形识别区域（OCR / 材料识别 / 点击）
+  ├── Area（区域）     ← 界面中的一个逻辑单元
+  │     ├── Point      ← 圆形交互锚点（点击/拖拽端点）
+  │     └── Region     ← 矩形识别区域（OCR / 材料识别 / 点击）
+  └── Panel（容器）    ← 可寻址的复合区域（type 区分内部结构）
+        ├── grid       ← 行列网格，[r][c] 寻址（已实现）
+        └── regions    ← Region 集合，[name] 寻址（规划中）
 
 Layout（布局）          ← 物理绑定层：一套投屏方案
   ├── Area-Coord 绑定  ← 每个 Area 在屏幕上的实际坐标
+  ├── Panel-Coord 绑定  ← 每个 Panel 在屏幕上的实际坐标
   └── Action           ← 基于 Area 的交互动作
         └── Arrow      ← 拖拽（两点间拖拽）
 ```
@@ -55,6 +59,13 @@ points:                         # 圆形交互锚点
     is_text: false
     is_clickable: true
     # 注意：YAML 不定义 r_ratio，半径属于 Layout 实例数据
+
+panels:                         # 可寻址容器（默认 type=grid）
+  - key: panel_key
+    name: 面板名称
+    type: grid                  # grid（默认，可省略） / regions（规划中）
+    rows: 3
+    cols: 6
 ```
 
 ---
@@ -129,15 +140,68 @@ DSL 中通过 `click [game_main_page].[origin]` 点击坐标点中心（带半�
 
 ---
 
+## Panel — 可寻址容器
+
+Panel 是 Scene 层定义的**复合区域**，内部包含可寻址的子元素。与 Area（Point/Region）不同，Panel 不直接对应单个交互点，而是提供一个可索引的容器。
+
+### type — 容器类型
+
+Panel 通过 `type` 字段区分内部结构，不同 type 决定不同的寻址方式：
+
+| type | 语义 | 属性 | 寻址方式 | 状态 |
+|------|------|------|----------|------|
+| `grid` | 行列网格 | `rows`, `cols` | `[r][c]` | ✅ 已实现 |
+| `regions` | Region 集合 | `regions: [...]` | `[name]` | 🔜 规划中 |
+
+`type` 默认值为 `grid`，可省略。
+
+### YAML 定义
+
+```yaml
+panels:
+  # grid 型（默认，type 可省略）
+  - key: bag_grid
+    name: 背包网格
+    rows: 3
+    cols: 6
+
+  # regions 型（规划中）
+  - key: equip_slots
+    name: 装备槽位组
+    type: regions
+    regions: [main_weapon, sub_weapon, ring, pendant]
+```
+
+### grid 型 Panel
+
+当前唯一实现的类型。Panel 定义 `rows`/`cols` 后，内部每个格子通过 `[r][c]` 二维索引寻址（从 1 开始计数）。首次访问时自动触发图像自校准（`calibrate`），缓存各格子中心坐标。
+
+DSL 中的使用：
+
+```
+click [scene].[panel][r][c]         # 点击格子中心
+drag [scene].[panel][r][c] up 3     # 从该格子向上拖拽 3 行
+calibrate [scene].[panel]           # 手动触发校准
+```
+
+### regions 型 Panel（规划中）
+
+将多个已定义的 Region 合并到一个 Panel 中统一管理，通过 Region 的 key 名寻址。这样可以将逻辑上属于同一组的分散 Region 组合为一个可索引的整体。
+
+> **设计意图**：当一组 Region 在语义上属于同一容器（如装备槽位组），但物理位置上不连续或不等间距时，用 `type=regions` 将它们聚合到一个 Panel 下，统一通过 `[name]` 寻址。
+
+---
+
 ## Layout — 布局
 
 一个 Layout 对应一套投屏方案（特定设备/分辨率），全局唯一。每个布局独立保存各场景的实例数据。
 
-Layout 内部包含两个独立层次：
+Layout 内部包含三个独立层次：
 
 | 层次 | 职责 | 数据内容 |
 |------|------|----------|
 | **Area-Coord 绑定** | 位置 | 每个 Area（Point / Region）在屏幕上的归一化坐标 |
+| **Panel-Coord 绑定** | 位置 | 每个 Panel 在屏幕上的归一化坐标（grid 型还包含校准缓存） |
 | **Action → Arrow** | 行为 | 基于 Area 的拖拽动作（from → to） |
 
 ### Area-Coord 绑定
@@ -169,7 +233,7 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 
 ### 实例数据
 
-布局 JSON 存储上述两层数据（`config/local/layouts/{布局名}.json`）：
+布局 JSON 存储上述三层数据（`config/local/layouts/{布局名}.json`）：
 
 ```json
 {
@@ -184,6 +248,9 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
       ],
       "points": [
         { "key": "point_key", "cx_ratio": 0.5, "cy_ratio": 0.7, "r_ratio": 0.015 }
+      ],
+      "panels": [
+        { "key": "panel_key", "x_ratio": 0.1, "y_ratio": 0.3, "w_ratio": 0.8, "h_ratio": 0.4 }
       ],
       "arrows": [
         { "key": "arrow_key", "from_key": "point_a", "to_key": "point_b" }

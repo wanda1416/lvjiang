@@ -113,7 +113,7 @@ class LayoutOpsMixin:
         self._status_bar.showMessage(f"已新建布局「{name}」")
 
     def _on_save_layout(self):
-        """从所有 Tab 收集 regions + points + arrows + canvas，全量写入当前布局文件"""
+        """从所有 Tab 收集 regions + points + arrows + panels + canvas，全量写入当前布局文件"""
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
@@ -124,17 +124,19 @@ class LayoutOpsMixin:
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
             self._current_layout.set_scene_points(scene_key, tab.get_points())
             self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
+            self._current_layout.set_scene_panels(scene_key, tab.get_panels())
         self._manager.save_layout(self._current_layout)
         self._update_ui_state()
         total_r = sum(len(tab.get_regions()) for tab in self._tabs.values())
         total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
         total_a = sum(len(tab.get_arrows()) for tab in self._tabs.values())
+        total_pn = sum(len(tab.get_panels()) for tab in self._tabs.values())
         self._status_bar.showMessage(
-            f"已保存布局「{name}」，共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向"
+            f"已保存布局「{name}」，共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
         )
         self._set_dirty(False)
         logger.info(
-            f"布局已保存: {name}, {total_r} 区域 / {total_p} 坐标 / {total_a} 方向"
+            f"布局已保存: {name}, {total_r} 区域 / {total_p} 坐标 / {total_a} 方向 / {total_pn} 面板"
         )
 
     def _on_save_as_layout(self):
@@ -149,6 +151,7 @@ class LayoutOpsMixin:
             temp.set_scene_regions(scene_key, tab.get_regions())
             temp.set_scene_points(scene_key, tab.get_points())
             temp.set_scene_arrows(scene_key, tab.get_arrows())
+            temp.set_scene_panels(scene_key, tab.get_panels())
 
         existing = self._manager.list_layouts()
         name, ok = QInputDialog.getText(self, "另存为", "请输入布局名称：")

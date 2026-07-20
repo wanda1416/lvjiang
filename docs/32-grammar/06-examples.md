@@ -24,7 +24,7 @@ collect $sub_weapon
 
 ```
 @tune_start
-click [equip_tune_detail].[one_click_add]
+click [equip_tune_detail].[auto_add]
 wait step_interval
 click [equip_tune_detail].[tune_btn]
 wait after_tune_wait

@@ -47,14 +47,16 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
             | const_or_var "." const_or_var                          -> click_scene_target
             | coord_point                                             -> click_coord_target
 
-// drag 支持三种目标：
-//   1. [scene].[panel][row][col] [up|down [n]] — panel 三级索引 + 可选方向距离
-//   2. scene.arrow — scene.arrow 引用
-//   3. (rx1, ry1) (rx2, ry2) — 两坐标点
+// drag 支持四种目标：
+//   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽
+//   2. [scene].[panel] up|down|left|right [n]  — panel grid 级拖拽（中心起拖）
+//   3. scene.arrow — scene.arrow 引用
+//   4. (rx1, ry1) (rx2, ry2) — 两坐标点
 drag_stmt: "drag"i drag_target drag_duration? drag_hold? _NL
 drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
-           | const_or_var "." const_or_var                          -> drag_scene_target
-           | coord_point coord_point                                -> drag_coord_target
+           | const_or_var "." const_or_var drag_direction                       -> drag_grid_target
+           | const_or_var "." const_or_var                                      -> drag_scene_target
+           | coord_point coord_point                                            -> drag_coord_target
 
 // panel 拖拽方向：up/down/left/right + 可选距离（默认 1，支持数值或变量）
 // up/down 按行计算，left/right 按列计算
@@ -84,9 +86,17 @@ wait_stmt: "wait"i (NAME | number | bracket_expr | var_ref | wait_range) _NL
 
 wait_range: "(" number "," number ")"
 
+// scan 支持两种目标：
+//   1. [scene].[region] — 场景区域 OCR
+//   2. [scene].[panel][row][col] — panel cell 级 OCR
 scan_stmt: "scan"i scene_target "as"i var_ref by_clause? _NL
+         | "scan"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? _NL -> scan_panel_stmt
 
+// recognize 支持两种目标：
+//   1. [scene].[region] — 场景区域材料识别
+//   2. [scene].[panel][row][col] — panel cell 级材料识别
 recognize_stmt: "recognize"i scene_target "as"i var_ref by_clause? group_clause? _NL
+              | "recognize"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? group_clause? _NL -> recognize_panel_stmt
 
 // by 子句：短路识别模式
 // 有 by 时返回首个命中的字段名（str），无 by 时返回完整 dict

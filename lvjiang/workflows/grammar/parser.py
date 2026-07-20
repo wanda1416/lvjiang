@@ -15,7 +15,7 @@ from .ast_nodes import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, PanelRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
+    SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
@@ -130,6 +130,20 @@ class _DSLTransformer(Transformer):
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
         return Drag(scene=panel_ref, arrow=panel_ref, direction=direction, distance=distance, line_no=self._line(items))
 
+    def drag_grid_target(self, items):
+        """drag [scene].[panel] up|down|left|right [n] — panel grid 级拖拽（中心起拖）"""
+        scene_val = self._resolve_const_or_var(items[0])
+        panel_val = self._resolve_const_or_var(items[1])
+        direction, distance = items[2]  # drag_direction 返回 (str, int|VarRef)
+        return Drag(
+            scene=PanelGridDrag(scene=scene_val, panel=panel_val,
+                                direction=direction, distance=distance,
+                                line_no=self._line(items)),
+            arrow=None,
+            direction=direction, distance=distance,
+            line_no=self._line(items),
+        )
+
     def drag_direction(self, items):
         """up|down [n | $var] → (direction_str, distance_int_or_VarRef)"""
         dir_token = str(items[0]).lower()
@@ -235,6 +249,17 @@ class _DSLTransformer(Transformer):
         by_clause = items[2] if len(items) > 2 else None  # ByClause | None
         return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, line_no=self._line(items))
 
+    def scan_panel_stmt(self, items):
+        """scan [scene].[panel][row][col] as $var [by ...]"""
+        scene_val = self._resolve_const_or_var(items[0])
+        panel_val = self._resolve_const_or_var(items[1])
+        row = items[2]
+        col = items[3]
+        target = items[4]  # var_ref → VarRef
+        by_clause = items[5] if len(items) > 5 else None
+        panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
+        return Scan(scene=panel_ref, target=target, by=by_clause, line_no=self._line(items))
+
     def recognize_stmt(self, items):
         """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...]"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
@@ -258,6 +283,23 @@ class _DSLTransformer(Transformer):
             elif isinstance(item, (Literal, VarRef)):
                 group_clause = item  # group 子句返回的是 Literal 或 VarRef
         return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, line_no=self._line(items))
+
+    def recognize_panel_stmt(self, items):
+        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...]"""
+        scene_val = self._resolve_const_or_var(items[0])
+        panel_val = self._resolve_const_or_var(items[1])
+        row = items[2]
+        col = items[3]
+        target = items[4]  # var_ref → VarRef
+        by_clause = None
+        group_clause = None
+        for item in items[5:]:
+            if isinstance(item, ByClause):
+                by_clause = item
+            elif isinstance(item, (Literal, VarRef)):
+                group_clause = item
+        panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
+        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, line_no=self._line(items))
 
     # ─── by 子句（短路识别）───────────────────────────────
 

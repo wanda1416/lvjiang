@@ -6,56 +6,16 @@
 3. 真实词条名 → 配置类别名 映射
 
 数据来源：config/system/attributes.yaml
+映射关系通过 YAML 中每个类别的 _aliases 字段声明，支持 UI 动态管理。
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
-
-# ─── 真实词条 → 配置类别 映射 ──────────────────────────────
-
-_AFFIX_TO_CATEGORY: dict[str, str] = {
-    # 外功攻击类
-    "最大外功攻击": "外功攻击",
-    "最小外功攻击": "外功攻击",
-    # 属性攻击类
-    "最大无相攻击": "属性攻击",
-    "最小无相攻击": "属性攻击",
-    "最大牵丝攻击": "属性攻击",
-    "最小牵丝攻击": "属性攻击",
-    "最大鸣金攻击": "属性攻击",
-    "最小鸣金攻击": "属性攻击",
-    "最大裂石攻击": "属性攻击",
-    "最小裂石攻击": "属性攻击",
-    "最大破竹攻击": "属性攻击",
-    "最小破竹攻击": "属性攻击",
-    # 五维属性
-    "劲": "五维属性",
-    "势": "五维属性",
-    "敏": "五维属性",
-    "体": "五维属性",
-    "御": "五维属性",
-    # 三率（类别名 = 词条名）
-    "会意率": "会意率",
-    "会心率": "会心率",
-    "精准率": "精准率",
-    # 神力词条
-    "全武学增效": "全武学增效",
-    "扇武学增效": "扇武学增效",
-    "对首领单位增伤": "对单位增效",
-    "对玩家单位增效": "对单位增效",
-    "单体类奇术增伤": "奇术类增伤",
-    "群体类奇术增伤": "奇术类增伤",
-}
-
-# 武学增伤/增效动态匹配（如 "剑武学增伤" → "单武学增伤"）
-# 注意：扇武学增效是独立类别，已在上方精确映射
-_WUXUE_PATTERN = re.compile(r"^.+?武学增[伤效]$")
 
 # 承音比例
 _CHENGYIN_RATIO = 0.94
@@ -126,6 +86,8 @@ class AttrRuleManager:
         self._base_rules: dict[str, dict[int, LevelRule]] = {}
         # 词条上限：category → level → { cap, unit }
         self._affix_caps: dict[str, dict[int, dict]] = {}
+        # 词条映射：alias → category
+        self._alias_to_category: dict[str, str] = {}
 
         self._load()
 
@@ -162,7 +124,15 @@ class AttrRuleManager:
             self._affix_caps[category] = {}
             if not isinstance(levels, dict):
                 continue
+            # 解析 _aliases 字段，构建映射
+            aliases = levels.get("_aliases", [])
+            if isinstance(aliases, list):
+                for alias in aliases:
+                    self._alias_to_category[alias] = category
             for level_str, entry in levels.items():
+                # 跳过 _aliases 等非等级 key
+                if str(level_str).startswith("_"):
+                    continue
                 level = int(level_str)
                 if isinstance(entry, dict):
                     self._affix_caps[category][level] = {
@@ -182,17 +152,13 @@ class AttrRuleManager:
         """真实词条名 → 配置类别名
 
         无映射则原样返回。
-        武学增伤类统一映射为 "单武学增伤"（扇武学增效除外，单独映射）。
+        映射关系从 YAML 的 _aliases 字段加载。
         """
-        # 精确匹配（优先，包括 "扇武学增效" 等独立类别）
-        cat = _AFFIX_TO_CATEGORY.get(affix_name)
-        if cat is not None:
-            return cat
-        # 武学增伤/增效动态匹配
-        if _WUXUE_PATTERN.match(affix_name):
-            return "单武学增伤"
-        # 无映射，原样返回
-        return affix_name
+        return self._alias_to_category.get(affix_name, affix_name)
+
+    def get_aliases_for_category(self, category: str) -> list[str]:
+        """获取某类别下的所有别名"""
+        return [alias for alias, cat in self._alias_to_category.items() if cat == category]
 
     # ── 词条上限查询 ────────────────────────────────────────
 

@@ -190,6 +190,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
         self._script_text = QTextEdit()
         self._script_text.setPlaceholderText("输入 DSL 脚本内容...")
+        self._script_text.setAcceptRichText(False)
         self._script_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
         )

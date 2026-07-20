@@ -1,162 +1,199 @@
 """Panel 图像自校准 — 从 panel 截图中检测网格 slot 精确位置
 
-核心算法（valley-based，利用 span 比 slot 更稳定的特性）：
+核心思路（二值化 + 连续区间检测）：
 
   1. 截取 panel 区域图像
   2. 转灰度
-  3. 计算每行/每列像素方差 → 方差剖面
-  4. 平滑剖面
-  5. 找 N+1 个「低方差谷点」作为 slot 分隔器（含图像两端）
-     - slot 内部（含黑边）= 高方差
-     - span（纯色间隔）= 低方差
-     - 谷点 = 局部最小值，优先选 span 中心
-  6. 相邻谷点中点 = slot 中心
+  3. 对每行/每列计算平均亮度
+  4. 二值化：亮度 < 阈值 → 0（span 黑边），> 阈值 → 1（slot 内容）
+  5. 找连续 1 的区间 → 每个区间 = 一个 slot
+  6. 区间边界 = slot 边界，区间中点 = slot 中心
 
-为什么用谷点而不是峰点：
-  - slot 内部的黑边 + 图标都会产生高方差，峰点可能有多条（边框+内部）
-  - span 是整段低方差，谷点单一且稳定
-  - N 个 slot 必有 N+1 个分隔器（含两端），数量关系确定
+前提：
+  - grid 区域外围有黑色边框（span），所以图像边缘必然是黑色
+  - slot 内部有图标/文字，平均亮度显著高于纯黑
+  - span 是纯黑/深色，平均亮度接近 0
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numpy as np
 from loguru import logger
 
 
-def _smooth(variance: np.ndarray, kernel: int = 5) -> np.ndarray:
-    """轻度平滑，抑制像素级噪声"""
-    if variance.size >= kernel:
-        return np.convolve(variance, np.ones(kernel) / kernel, mode="same")
-    return variance.copy()
+@dataclass(frozen=True)
+class SlotAxis:
+    """一个轴（行或列）的校准结果"""
+    centers: list[float]          # 归一化中心坐标 ∈ (0,1)
+    boundaries: list[float]       # 归一化边界坐标，长度 = len(centers) + 1
 
 
-def _find_valleys(smoothed: np.ndarray, min_distance: int = 3) -> list[int]:
-    """找出所有局部最小值位置（严格小于两侧邻居）"""
-    valleys: list[int] = []
-    for i in range(1, len(smoothed) - 1):
-        if smoothed[i] < smoothed[i - 1] and smoothed[i] <= smoothed[i + 1]:
-            if not valleys or i - valleys[-1] >= min_distance:
-                valleys.append(i)
-            elif smoothed[i] < smoothed[valleys[-1]]:
-                valleys[-1] = i
-    return valleys
-
-
-def _fill_valleys(valleys: list[int], needed: int, length: int) -> list[int]:
-    """若谷点不足，递归细分最大间隔补齐"""
-    result = sorted(valleys)
-    while len(result) < needed and len(result) >= 2:
-        # 找最大间隔
-        max_gap = 0
-        max_idx = 0
-        for i in range(len(result) - 1):
-            gap = result[i + 1] - result[i]
-            if gap > max_gap:
-                max_gap = gap
-                max_idx = i
-        if max_gap < 2:
-            break
-        # 在最大间隔中点插入
-        result.insert(max_idx + 1, (result[max_idx] + result[max_idx + 1]) // 2)
-    # 极端回退：均匀分布
-    if len(result) < needed:
-        result = list(range(0, length, max(1, length // needed)))
-    return result[:needed]
-
-
-def find_slot_centers(
-    variance: np.ndarray,
-    expected_count: int,
-) -> list[float]:
-    """从方差剖面中提取 N 个 slot 中心（归一化到 [0,1]）
+def _binary_axis(line_means: np.ndarray, black_threshold: float = 30.0) -> SlotAxis:
+    """从一维亮度数组提取 slot 中心和边界
 
     算法：
-      1. 平滑剖面
-      2. 找所有局部最小值（谷点）
-      3. 取前 expected_count+1 个最低谷点作为分隔器
-      4. 按位置排序
-      5. 若谷点不足，递归细分最大间隔补齐
-      6. 加上两端（0, length-1）作为虚拟分隔器
-      7. 相邻分隔器中点 = slot 中心
+      1. 二值化：< threshold → 0（黑边），≥ threshold → 1（内容）
+      2. 找连续 1 的区间 → 每个 = 一个 slot
+      3. 区间起止 = slot 边界，区间中点 = slot 中心
 
     Args:
-        variance: 1D 数组，每行/每列的像素方差
-        expected_count: 期望的 slot 数量（行数或列数）
+        line_means: 1D 数组，每行/每列的平均亮度
+        black_threshold: 黑边判定阈值（0-255）
 
     Returns:
-        list[float]，长度 = expected_count，每个值为归一化中心坐标 ∈ (0,1)
+        SlotAxis(centers, boundaries)
     """
-    length = variance.size
-    if length == 0 or expected_count <= 0:
-        return []
-    if expected_count == 1:
-        return [0.5]
+    length = len(line_means)
+    if length == 0:
+        return SlotAxis(centers=[], boundaries=[])
 
-    smoothed = _smooth(variance)
+    # 二值化
+    binary = (line_means >= black_threshold).astype(np.int8)
 
-    # 找所有局部最小值
-    valleys = _find_valleys(smoothed, min_distance=max(1, length // (expected_count * 3)))
+    # 找连续 1 的区间（slot 区域）
+    runs: list[tuple[int, int]] = []  # (start, end) 像素坐标
+    in_run = False
+    run_start = 0
+    for i in range(length):
+        if binary[i] == 1 and not in_run:
+            run_start = i
+            in_run = True
+        elif binary[i] == 0 and in_run:
+            runs.append((run_start, i))
+            in_run = False
+    if in_run:
+        runs.append((run_start, length))
 
-    # 取最低的 N+1 个（span 是最低方差区域）
-    n_separators = expected_count + 1
-    if len(valleys) >= n_separators:
-        valleys.sort(key=lambda i: smoothed[i])
-        separators = sorted(valleys[:n_separators])
+    if not runs:
+        logger.warning("binary_axis: 未检测到任何内容区域")
+        return SlotAxis(centers=[], boundaries=[])
+
+    # 如果只有 1 个区间，无法区分 slot
+    if len(runs) == 1:
+        s, e = runs[0]
+        center = (s + e) / 2.0 / length
+        return SlotAxis(centers=[center], boundaries=[s / length, e / length])
+
+    # 过滤边缘短区间：如果边缘区间长度 < 95% 主区间长度，视为半截 slot
+    # 低于 95% 可见度的 slot 后续 OCR 不可靠，必须过滤
+    run_lengths = [e - s for s, e in runs]
+    median_length = float(np.median(run_lengths))
+    min_valid = 0.95 * median_length
+
+    # 检查首尾区间是否为短区间
+    filtered_runs = list(runs)
+    if len(filtered_runs) > 1 and (filtered_runs[0][1] - filtered_runs[0][0]) < min_valid:
+        logger.debug(
+            f"binary_axis: 合并首部短区间 "
+            f"(长度={filtered_runs[0][1] - filtered_runs[0][0]}, "
+            f"阈值={min_valid:.0f})"
+        )
+        filtered_runs.pop(0)
+    if len(filtered_runs) > 1 and (filtered_runs[-1][1] - filtered_runs[-1][0]) < min_valid:
+        logger.debug(
+            f"binary_axis: 合并尾部短区间 "
+            f"(长度={filtered_runs[-1][1] - filtered_runs[-1][0]}, "
+            f"阈值={min_valid:.0f})"
+        )
+        filtered_runs.pop()
+
+    runs = filtered_runs
+
+    # 构建边界
+    # 相邻 run 之间的 0 区域 = span，边界 = span 中点
+    boundaries: list[float] = []
+
+    # 首边界：第一个 run 之前的 span 中点
+    # 如果首部被过滤，用第一个 run 起始位置往前推半个周期
+    # 如果首部未被过滤（完整 slot），用 run 起始位置（span 中点）
+    first_run_start = runs[0][0]
+    if first_run_start > 0:
+        # 有前置 span，取 span 中点作为边界
+        # span 起点 ≈ 前一个 run 的结束位置，但我们不知道（已被过滤）
+        # 用当前 run 起始位置 - 半个 span 宽度估算
+        # 简化：直接用第一个 run 的起始位置作为边界（span 结束 = slot 开始）
+        boundaries.append(first_run_start / length)
     else:
-        separators = _fill_valleys(valleys, n_separators, length)
+        boundaries.append(0.0)
 
-    # 加上两端作为虚拟分隔器
-    full_seps = [0] + separators + [length - 1]
-    # 去重 + 排序
-    full_seps = sorted(set(full_seps))
-    # 确保至少有 2 个分隔器
-    if len(full_seps) < 2:
-        full_seps = [0, length - 1]
+    # 内部边界：相邻 run 之间的 span 中点
+    for i in range(len(runs) - 1):
+        gap_start = runs[i][1]      # 当前 slot 结束位置
+        gap_end = runs[i + 1][0]    # 下一个 slot 开始位置
+        boundary = (gap_start + gap_end) / 2.0 / length
+        boundaries.append(boundary)
 
-    # 相邻分隔器中点 = slot 中心
-    centers: list[float] = []
-    for i in range(len(full_seps) - 1):
-        center = (full_seps[i] + full_seps[i + 1]) / 2.0 / length
-        centers.append(center)
+    # 尾边界：最后一个 run 之后的 span 中点
+    last_run_end = runs[-1][1]
+    if last_run_end < length:
+        boundaries.append(last_run_end / length)
+    else:
+        boundaries.append(1.0)
 
-    # 若中心数多于期望，按方差峰值保留前 N 个
-    if len(centers) > expected_count:
-        # 评估每个中心附近方差总和，保留最高的 N 个
-        scored: list[tuple[float, int]] = []
-        for idx, c in enumerate(centers):
-            c_pixel = int(c * length)
-            window = max(1, length // (expected_count * 3))
-            lo = max(0, c_pixel - window)
-            hi = min(length, c_pixel + window)
-            score = float(np.sum(variance[lo:hi]))
-            scored.append((score, idx))
-        scored.sort(reverse=True)
-        keep_indices = sorted([idx for _, idx in scored[:expected_count]])
-        centers = [centers[i] for i in keep_indices]
+    # 中心 = 相邻边界的中点
+    centers = [(boundaries[i] + boundaries[i + 1]) / 2.0
+               for i in range(len(boundaries) - 1)]
 
-    return centers
+    return SlotAxis(centers=centers, boundaries=boundaries)
+
+
+@dataclass(frozen=True)
+class GridCalibration:
+    """grid 校准结果"""
+    row_centers: list[float]       # 行中心（归一化）
+    col_centers: list[float]       # 列中心（归一化）
+    row_bounds: list[float]        # 行边界（归一化），长度 = len(row_centers) + 1
+    col_bounds: list[float]        # 列边界（归一化），长度 = len(col_centers) + 1
+
+    @property
+    def n_rows(self) -> int:
+        return len(self.row_centers)
+
+    @property
+    def n_cols(self) -> int:
+        return len(self.col_centers)
+
+    @property
+    def total_slots(self) -> int:
+        return self.n_rows * self.n_cols
+
+    def slot_center(self, row_idx: int, col_idx: int) -> tuple[float, float]:
+        """获取 slot 中心 (cx, cy) 归一化坐标"""
+        return self.col_centers[col_idx], self.row_centers[row_idx]
+
+    def slot_bounds(self, row_idx: int, col_idx: int) -> tuple[float, float, float, float]:
+        """获取 slot 边界 (x1, y1, x2, y2) 归一化坐标"""
+        x1 = self.col_bounds[col_idx]
+        x2 = self.col_bounds[col_idx + 1]
+        y1 = self.row_bounds[row_idx]
+        y2 = self.row_bounds[row_idx + 1]
+        return x1, y1, x2, y2
 
 
 def detect_grid(
     image: np.ndarray,
     expected_rows: int = 3,
     expected_cols: int = 6,
-) -> list[tuple[float, float]]:
+    black_threshold: float = 30.0,
+) -> GridCalibration | None:
     """从 panel 截图中检测网格 slot 精确位置
+
+    通过二值化每行/每列的平均亮度，找连续内容区间来确定 slot 位置。
 
     Args:
         image: panel 区域的 BGR 图像（H×W×3 或 H×W）
-        expected_rows: 期望行数
-        expected_cols: 期望列数
+        expected_rows: 期望的行数（用于日志）
+        expected_cols: 期望的列数（用于日志）
+        black_threshold: 黑边判定阈值（0-255），低于此值视为黑边
 
     Returns:
-        slot_centers: list[(cx_ratio, cy_ratio)]，相对于 panel 区域，
-        按「先行后列」顺序（row 0 col 0, row 0 col 1, ..., row 1 col 0, ...）
+        GridCalibration 或 None（检测失败时）
     """
     if image is None or image.size == 0:
         logger.error("detect_grid: 空图像")
-        return []
+        return None
 
     # 转灰度
     if image.ndim == 3:
@@ -164,26 +201,29 @@ def detect_grid(
     else:
         gray = image.astype(np.float64)
 
-    # 每行/每列方差
-    row_var = np.var(gray, axis=1)
-    col_var = np.var(gray, axis=0)
+    # 每行/每列平均亮度
+    row_means = np.mean(gray, axis=1)  # 每行所有像素的平均亮度
+    col_means = np.mean(gray, axis=0)  # 每列所有像素的平均亮度
 
-    row_centers = find_slot_centers(row_var, expected_rows)
-    col_centers = find_slot_centers(col_var, expected_cols)
+    row_axis = _binary_axis(row_means, black_threshold)
+    col_axis = _binary_axis(col_means, black_threshold)
 
-    if not row_centers or not col_centers:
+    if not row_axis.centers or not col_axis.centers:
         logger.error(
-            f"detect_grid: 无法检测到网格（行中心={len(row_centers)}, 列中心={len(col_centers)}）"
+            f"detect_grid: 无法检测到网格"
+            f"（行={len(row_axis.centers)}, 列={len(col_axis.centers)}）"
         )
-        return []
+        return None
 
-    # 笛卡尔积：先行后列
-    centers: list[tuple[float, float]] = []
-    for cy in row_centers:
-        for cx in col_centers:
-            centers.append((cx, cy))
-
-    logger.debug(
-        f"detect_grid: 检测到 {len(row_centers)} 行 × {len(col_centers)} 列 = {len(centers)} 个 slot"
+    result = GridCalibration(
+        row_centers=row_axis.centers,
+        col_centers=col_axis.centers,
+        row_bounds=row_axis.boundaries,
+        col_bounds=col_axis.boundaries,
     )
-    return centers
+
+    logger.info(
+        f"detect_grid: 检测到 {result.n_rows}/{expected_rows} 行 × "
+        f"{result.n_cols}/{expected_cols} 列 = {result.total_slots} 个有效 slot"
+    )
+    return result

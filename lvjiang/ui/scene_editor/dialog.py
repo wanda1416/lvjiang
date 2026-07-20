@@ -50,6 +50,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._dirty = False
 
         self._setup_ui()
+        self._auto_load_script()
         self._auto_load_active()
 
     # ─── UI 构建 ───────────────────────────────────────────

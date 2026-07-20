@@ -20,9 +20,9 @@ venv/
 logs/
 
 # Local data (layouts, session, screenshots, etc.)
-config/local/
-data/
-config/system/workflows/_*.wf
+/config/local/
+/data/*
+/config/system/workflows/_*.wf
 
 # OS
 Thumbs.db

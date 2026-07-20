@@ -68,7 +68,7 @@ class Wait:
 
 @dataclass(frozen=True)
 class Scan:
-    scene: Any      # SceneRef（静态场景引用）
+    scene: Any      # SceneRef（静态场景引用）| PanelRef（panel cell 级）
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
@@ -78,7 +78,7 @@ class Scan:
 
 @dataclass(frozen=True)
 class Recognize:
-    scene: Any      # SceneRef（静态场景引用）
+    scene: Any      # SceneRef（静态场景引用）| PanelRef（panel cell 级）
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
@@ -228,6 +228,19 @@ class PanelRef:
     panel: str
     row: Any      # int | VarRef
     col: Any      # int | VarRef
+
+
+@dataclass(frozen=True)
+class PanelGridDrag:
+    """panel grid 级拖拽：drag [scene].[panel] up|down|left|right [n]
+
+    起点为 panel 中心，拖拽距离按整行/列高度计算（非单格）。
+    """
+    scene: str
+    panel: str
+    direction: str        # "up" | "down" | "left" | "right"
+    distance: Any = 1     # int | VarRef
+    line_no: int = 0
 
 
 @dataclass(frozen=True)

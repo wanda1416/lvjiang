@@ -37,6 +37,15 @@ class ScriptOpsMixin:
 
     # ─── 脚本文件 ────────────────────────────────────────
 
+    def _auto_load_script(self):
+        """自动加载 _editor_run.wf 到脚本编辑器"""
+        from pathlib import Path
+        script_path = SYSTEM_WORKFLOWS_DIR / "_editor_run.wf"
+        if script_path.exists():
+            content = script_path.read_text(encoding="utf-8")
+            self._script_text.setPlainText(content)
+            logger.info(f"已自动加载脚本: {script_path}")
+
     def _on_load_script_file(self):
         """加载 .wf 文件到脚本编辑器"""
         path, _ = QFileDialog.getOpenFileName(

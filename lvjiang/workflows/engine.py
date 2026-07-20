@@ -22,14 +22,14 @@ from .grammar import (
     Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
-    SceneRef, PanelRef, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
+    SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
     Not, And, Or,
 )
 from .grammar.ast_nodes import Calibrate
 from .base import BaseWorkflow
-from .calibrate import detect_grid
+from .calibrate import detect_grid, GridCalibration
 
 
 # ─── 用户可见的 DSL 错误 ──────────────────────────────────
@@ -90,8 +90,8 @@ class WorkflowEngine:
         self.output: dict = {}
         self._coord_meta: dict[str, dict] = {}
         self._base_dir: Path | None = None
-        # panel 校准缓存：(scene_key, panel_key) → list[(cx_ratio, cy_ratio)]（相对于 panel 区域）
-        self._panel_calibrations: dict[tuple[str, str], list[tuple[float, float]]] = {}
+        # panel 校准缓存：(scene_key, panel_key) → GridCalibration
+        self._panel_calibrations: dict[tuple[str, str], GridCalibration] = {}
         # session / context（公开属性，UI 层注入）
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
@@ -326,6 +326,51 @@ class WorkflowEngine:
                 duration=duration, hold=node.hold,
             )
             return
+        if isinstance(node.scene, PanelGridDrag):
+            # grid 级拖拽：起点为 panel 中心，距离按整行/列高度
+            grid = node.scene
+            panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
+            if panel_obj is None:
+                logger.error(f"drag grid: 未找到 panel {grid.scene}.{grid.panel}")
+                return
+            # panel 中心在截图中的归一化坐标
+            cx = panel_obj.x_ratio + panel_obj.w_ratio / 2
+            cy = panel_obj.y_ratio + panel_obj.h_ratio / 2
+            w, h = self._capture.get_capture_size()
+            canvas = self._layout.get_canvas()
+            x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
+            y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
+            # 解析 distance
+            distance = grid.distance
+            if isinstance(distance, VarRef):
+                distance = self.variables.get(distance.name, 1)
+            try:
+                distance = int(distance)
+            except (TypeError, ValueError):
+                logger.error(f"drag grid: 距离无效: {distance}")
+                return
+            dx, dy = 0, 0
+            direction = grid.direction
+            if direction in ("up", "down"):
+                dy = int(panel_obj.h_ratio * canvas.h_ratio * h * distance)
+                if direction == "up":
+                    dy = -dy
+                if abs(dy) < 10:
+                    dy = 10 if dy >= 0 else -10
+            else:
+                dx = int(panel_obj.w_ratio * canvas.w_ratio * w * distance)
+                if direction == "left":
+                    dx = -dx
+                if abs(dx) < 10:
+                    dx = 10 if dx >= 0 else -10
+            x2, y2 = x + dx, y + dy
+            duration = self._resolve_duration(node.duration) if node.duration else None
+            self._input.drag_screen(
+                x, y, x2, y2,
+                f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
+                duration=duration, hold=node.hold,
+            )
+            return
         if isinstance(node.scene, PanelRef):
             x, y = self._panel_ref_to_screen(node.scene)
             if x is None or y is None:
@@ -450,14 +495,14 @@ class WorkflowEngine:
             logger.error(f"calibrate: 无法截取 panel {scene_key}.{panel_key}")
             return
         # 运行图像自校准
-        centers = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols)
-        if not centers:
+        calibration = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols)
+        if calibration is None:
             logger.error(f"calibrate: panel {scene_key}.{panel_key} 未检测到 slot")
             return
-        self._panel_calibrations[(scene_key, panel_key)] = centers
+        self._panel_calibrations[(scene_key, panel_key)] = calibration
         logger.info(
             f"calibrate: {scene_key}.{panel_key} 已校准，"
-            f"检测到 {len(centers)} 个 slot 中心"
+            f"检测到 {calibration.total_slots} 个 slot 中心"
         )
 
     def _panel_ref_to_screen(self, ref: PanelRef) -> tuple[int | None, int | None]:
@@ -483,8 +528,8 @@ class WorkflowEngine:
             logger.info(f"panel 缓存未命中，自动 calibrate: {scene_key}.{panel_key}")
             auto_node = Calibrate(scene=scene_key, panel=panel_key)
             self._exec_calibrate(auto_node)
-        centers = self._panel_calibrations.get(cache_key)
-        if not centers:
+        cal = self._panel_calibrations.get(cache_key)
+        if cal is None:
             logger.error(f"panel 未校准: {scene_key}.{panel_key}")
             return None, None
 
@@ -492,20 +537,120 @@ class WorkflowEngine:
         if panel_obj is None:
             return None, None
 
-        # 查表：centers 按「先行后列」顺序，index = row_idx * cols + col_idx
-        cols = panel_obj.cols
-        rows = panel_obj.rows
-        if not (0 <= row_idx < rows and 0 <= col_idx < cols):
+        # 查表：用校准结果的行列数做越界检查
+        if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
             logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
-                         f"panel 尺寸 {rows}×{cols}")
-            return None, None
-        idx = row_idx * cols + col_idx
-        if idx >= len(centers):
-            logger.error(f"panel 索引超出校准结果: idx={idx}, len={len(centers)}")
+                         f"校准结果 {cal.n_rows}×{cal.n_cols}")
             return None, None
 
-        cx_panel, cy_panel = centers[idx]  # 相对于 panel 区域
-        return self._panel_ratio_to_screen(panel_obj, cx_panel, cy_panel)
+        cx, cy = cal.slot_center(row_idx, col_idx)  # 相对于 panel 区域
+        return self._panel_ratio_to_screen(panel_obj, cx, cy)
+
+    def _crop_slot_image(self, ref: PanelRef) -> "tuple[np.ndarray | None, str, int, int]":
+        """裁剪 panel cell 图像，返回 (slot_img, slot_key, row_idx, col_idx)
+
+        slot_key 格式: "r{row}c{col}"（1-based），用于结果字典的 key。
+        """
+        scene_key = ref.scene
+        panel_key = ref.panel
+        row = self._resolve(ref.row) if isinstance(ref.row, VarRef) else ref.row
+        col = self._resolve(ref.col) if isinstance(ref.col, VarRef) else ref.col
+        try:
+            row_idx = int(float(row)) - 1
+            col_idx = int(float(col)) - 1
+        except (TypeError, ValueError):
+            logger.error(f"panel 索引非数值: row={row}, col={col}")
+            return None, "", 0, 0
+
+        # 自动 calibrate
+        cache_key = (scene_key, panel_key)
+        if cache_key not in self._panel_calibrations:
+            auto_node = Calibrate(scene=scene_key, panel=panel_key)
+            self._exec_calibrate(auto_node)
+        cal = self._panel_calibrations.get(cache_key)
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if cal is None or panel_obj is None:
+            logger.error(f"panel 未校准: {scene_key}.{panel_key}")
+            return None, "", 0, 0
+
+        if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
+            logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
+                         f"校准结果 {cal.n_rows}×{cal.n_cols}")
+            return None, "", 0, 0
+
+        # 截取 panel 图像
+        panel_img = self._capture_panel_image(panel_obj)
+        if panel_img is None:
+            return None, "", 0, 0
+
+        ph, pw = panel_img.shape[:2]
+        # 用校准的实际边界裁剪（非等分）
+        x1_r, y1_r, x2_r, y2_r = cal.slot_bounds(row_idx, col_idx)
+        x1 = max(0, int(x1_r * pw))
+        y1 = max(0, int(y1_r * ph))
+        x2 = min(pw, int(x2_r * pw))
+        y2 = min(ph, int(y2_r * ph))
+        slot_img = panel_img[y1:y2, x1:x2]
+        if slot_img.size == 0:
+            logger.error(f"slot 裁剪为空: {scene_key}.{panel_key}[{row_idx+1}][{col_idx+1}]")
+            return None, "", 0, 0
+        slot_key = f"r{row_idx + 1}c{col_idx + 1}"
+        return slot_img, slot_key, row_idx, col_idx
+
+    def _scan_panel_cell(self, node: Scan):
+        """scan [scene].[panel][row][col] as $var [by ...]"""
+        ref: PanelRef = node.scene
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        slot_img, slot_key, _, _ = self._crop_slot_image(ref)
+        if slot_img is None:
+            self.variables[var_name] = ""
+            return
+        if node.by is not None:
+            # by 子句：短路匹配，返回是否命中
+            by_clause: ByClause = node.by
+            target_value = self._resolve(by_clause.target)
+            ocr_results = self._ocr.recognize(slot_img)
+            text = " ".join(r.text for r in ocr_results).strip()
+            matched = self._match_text(text, target_value, by_clause.match_mode)
+            self.variables[var_name] = text if matched else ""
+        else:
+            ocr_results = self._ocr.recognize(slot_img)
+            text = " ".join(r.text for r in ocr_results).strip()
+            self.variables[var_name] = {slot_key: text} if text else {slot_key: ""}
+        logger.info(f"scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
+
+    def _recognize_panel_cell(self, node: Recognize):
+        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...]"""
+        ref: PanelRef = node.scene
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        slot_img, slot_key, _, _ = self._crop_slot_image(ref)
+        if slot_img is None:
+            self.variables[var_name] = ""
+            return
+        group = self._resolve(node.group) if node.group is not None else None
+        if node.by is not None:
+            by_clause: ByClause = node.by
+            target_value = self._resolve(by_clause.target)
+            info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
+            matched = self._match_text(info.type, target_value, by_clause.match_mode)
+            self.variables[var_name] = info.type if matched else ""
+        else:
+            info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
+            self.variables[var_name] = {slot_key: info.type}
+        logger.info(f"recognize panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
+
+    def _match_text(self, text: str, target: str, mode: str) -> bool:
+        """文本匹配（用于 by 子句短路识别）"""
+        if mode == "equals":
+            return text == target
+        if mode == "contains":
+            return target in text
+        if mode == "equals_any":
+            return text in target if isinstance(target, list) else text == target
+        if mode == "contains_any":
+            items = target if isinstance(target, list) else [target]
+            return any(t in text for t in items)
+        return False
 
     def _find_panel_in_layout(self, scene_key: str, panel_key: str):
         """在 layout 中查找指定 panel 实例"""
@@ -556,6 +701,10 @@ class WorkflowEngine:
         return int(self._window_left + sx), int(self._window_top + sy)
 
     def _exec_scan(self, node: Scan):
+        # PanelRef: panel cell 级 OCR
+        if isinstance(node.scene, PanelRef):
+            self._scan_panel_cell(node)
+            return
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, SceneRef) else node.scene
         if isinstance(scene_ref, VarRef):
@@ -592,6 +741,10 @@ class WorkflowEngine:
 
     def _exec_recognize(self, node: Recognize):
         """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] — 图像识别场景中的材料"""
+        # PanelRef: panel cell 级材料识别
+        if isinstance(node.scene, PanelRef):
+            self._recognize_panel_cell(node)
+            return
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, SceneRef) else node.scene
         if isinstance(scene_ref, VarRef):

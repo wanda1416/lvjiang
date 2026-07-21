@@ -369,7 +369,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self._drag_start = QPointF(cx, cy)
         self._selected_idx = len(self._regions)
         self._regions.append(Region(
-            key="", name="新区域",
+            key="",
             x_ratio=cx, y_ratio=cy, w_ratio=0, h_ratio=0,
         ))
         self._notify_changed()
@@ -748,7 +748,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             idx = items.index(text)
             key, name = available[idx]
             self._regions[region_idx].key = key
-            self._regions[region_idx].name = name
             self._selected_idx = -1
             self._field_selected = False  # 创建完成后回到全局模式
         else:
@@ -783,7 +782,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         src = self._regions[self._selected_idx]
         # 创建新区域，位置相同
         new_region = Region(
-            key="", name="新区域",
+            key="",
             x_ratio=src.x_ratio, y_ratio=src.y_ratio,
             w_ratio=src.w_ratio, h_ratio=src.h_ratio,
         )

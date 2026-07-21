@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import QApplication
 from loguru import logger
 
-from ...core.scene_registry import get_scene_name, get_region_defs
+from ...core.scene_registry import get_scene_name, get_region_defs, get_region_name
 
 
 class RecognitionOpsMixin:
@@ -45,12 +45,7 @@ class RecognitionOpsMixin:
         # 展示结果
         self._result_text.clear()
         for key, text in results.items():
-            # 查找中文名
-            name = key
-            for r in regions:
-                if r.key == key:
-                    name = r.name
-                    break
+            name = get_region_name(current_tab.scene_key, key)
             self._result_text.append(f"{name}: {text or '(未识别到)'}")
 
         self._status_bar.showMessage(f"识别完成，共 {len(results)} 个字段")
@@ -109,7 +104,7 @@ class RecognitionOpsMixin:
             info = recognizer.recognize(crop)
 
             if not info.type:
-                line = f"{region.name}: (空槽)"
+                line = f"{get_region_name(current_tab.scene_key, region.key)}: (空槽)"
             else:
                 parts = [info.type]
                 if info.level is not None:
@@ -120,7 +115,7 @@ class RecognitionOpsMixin:
                         count_str += f"/{info.owned}"
                     parts.append(count_str)
                 parts.append(f"[{info.confidence:.0%}]")
-                line = f"{region.name}: {' '.join(parts)}"
+                line = f"{get_region_name(current_tab.scene_key, region.key)}: {' '.join(parts)}"
             self._result_text.append(line)
 
         self._status_bar.showMessage(f"材料识别完成，共 {len(slot_regions)} 个槽位")

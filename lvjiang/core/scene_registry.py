@@ -203,6 +203,16 @@ def get_button_regions(scene_key: str) -> set[str]:
     return {r.key for r in scene.regions if r.is_clickable and not r.is_text}
 
 
+def get_region_name(scene_key: str, region_key: str) -> str:
+    """通过 scene_key + region_key 查找区域中文名"""
+    scene = _registry.get_scene(scene_key)
+    if scene:
+        for r in scene.regions:
+            if r.key == region_key:
+                return r.name
+    return region_key
+
+
 def get_region_defs(scene_key: str) -> list[RegionDef]:
     """获取场景的完整区域定义列表"""
     scene = _registry.get_scene(scene_key)
@@ -278,9 +288,11 @@ class CanvasConfig:
 
 @dataclass
 class Region:
-    """单个区域定义（相对比例坐标）"""
+    """单个区域实例（归一化坐标）
+
+    仅存储位置数据，名称等元信息通过 key 从场景定义 (RegionDef) 获取。
+    """
     key: str
-    name: str
     x_ratio: float
     y_ratio: float
     w_ratio: float
@@ -291,7 +303,13 @@ class Region:
 
     @staticmethod
     def from_dict(d: dict) -> "Region":
-        return Region(**d)
+        return Region(
+            key=d["key"],
+            x_ratio=d["x_ratio"],
+            y_ratio=d["y_ratio"],
+            w_ratio=d["w_ratio"],
+            h_ratio=d["h_ratio"],
+        )
 
 
 @dataclass

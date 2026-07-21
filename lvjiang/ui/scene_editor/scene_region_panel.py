@@ -28,10 +28,13 @@ class RegionPanelMixin:
         self._region_table = QTableWidget()
         self._region_table.setColumnCount(5)
         self._region_table.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
-        # 列宽自适应拉伸
+        # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._region_table.horizontalHeader()
-        for col in range(5):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(3, 50)
+        header.resizeSection(4, 50)
         self._region_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._region_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._region_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)

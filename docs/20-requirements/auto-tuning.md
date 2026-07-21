@@ -787,7 +787,7 @@ wait step_interval
 click [game_menu_page].[back]
 
 # 汇总报告
-log concat("已处理候选装备数量: ", count($candidates))
+log concat("已处理候选装备数量: ", count_key($candidates))
 ```
 
 > 调律在 `bag_process_slot.wf` 中内联执行，**无需阶段二**；`$candidates` 仅用于最终报告。

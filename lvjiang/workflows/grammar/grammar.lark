@@ -135,6 +135,7 @@ log_stmt: "log"i log_arg _NL
 
 eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_func
          | "eval"i "$" NAME "=" literal _NL                    -> eval_assign_lit
+         | "eval"i "$" NAME "=" arith_expr _NL                 -> eval_assign_arith
          | "eval"i "$" NAME "=" field_access _NL               -> eval_assign_expr
          | "eval"i "$" NAME "=" var_ref _NL                    -> eval_assign_expr
          | "eval"i field_access "=" eval_rhs _NL               -> eval_field_assign
@@ -143,14 +144,15 @@ eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_fun
 // 隐式 eval：省略 eval 关键字，直接 $var = ...
 implicit_eval_stmt: "$" NAME "=" NAME "(" arg_list? ")" _NL    -> implicit_eval_assign_func
                   | "$" NAME "=" literal _NL                    -> implicit_eval_assign_lit
+                  | "$" NAME "=" arith_expr _NL                 -> implicit_eval_assign_arith
                   | "$" NAME "=" field_access _NL               -> implicit_eval_assign_expr
                   | "$" NAME "=" var_ref _NL                    -> implicit_eval_assign_expr
                   | field_access "=" eval_rhs _NL               -> implicit_eval_field_assign
 
 eval_rhs: NAME "(" arg_list? ")"  -> eval_rhs_func
-        | literal                   -> eval_rhs_lit
-        | field_access              -> eval_rhs_field
-        | var_ref                   -> eval_rhs_var
+        | arith_expr              -> eval_rhs_arith
+        | literal                 -> eval_rhs_lit
+        | field_access            -> eval_rhs_field
 
 // 默认值赋值：仅当变量未从外部传入时才赋值
 default_stmt: "default"i "$" NAME "=" literal _NL
@@ -221,23 +223,18 @@ goto_stmt: "goto"i NAME _NL
 ?cond_atom: field_access "contains"i cond_text -> contains_op
           | field_access "equals"i cond_text -> equals_op
           | field_access "in"i list_literal -> in_op
+          | field_access "is_empty"i -> is_empty_op
+          | arith_expr ">" arith_expr -> gt_op
+          | arith_expr "<" arith_expr -> lt_op
+          | arith_expr ">=" arith_expr -> ge_op
+          | arith_expr "<=" arith_expr -> le_op
+          | arith_expr "!=" arith_expr -> ne_op
+          | arith_expr "==" arith_expr -> eq_num_op
           | var_ref "equals"i cond_text -> equals_op
           | var_ref "contains"i cond_text -> contains_op
           | var_ref "in"i list_literal -> in_op
           | var_ref "is_empty"i -> is_empty_op
-          | field_access "is_empty"i -> is_empty_op
-          | field_access ">" number -> gt_op
-          | field_access "<" number -> lt_op
-          | field_access ">=" number -> ge_op
-          | field_access "<=" number -> le_op
-          | field_access "!=" number -> ne_op
-          | field_access "==" number -> eq_num_op
-          | var_ref ">" number -> gt_op
-          | var_ref "<" number -> lt_op
-          | var_ref ">=" number -> ge_op
-          | var_ref "<=" number -> le_op
-          | var_ref "!=" number -> ne_op
-          | var_ref "==" number -> eq_num_op
+          | field_access -> var_cond
           | var_ref -> var_cond
 
 // 条件中的文本操作数：支持 "string" 或 $var
@@ -267,6 +264,22 @@ field_access: field_access "." NAME -> field_chain
 // DSL 关键字引用：session / context（持久/临时状态入口）
 keyword_ref: "session" -> session_ref
            | "context" -> context_ref
+
+// 算术表达式（优先级：+ - < * /，支持 () 分组）
+// factor 包含所有原子表达式：数字、变量、字段访问、函数调用、括号分组
+?arith_expr: arith_expr "+" term -> arith_add
+           | arith_expr "-" term -> arith_sub
+           | term
+
+?term: term "*" factor -> arith_mul
+     | term "/" factor -> arith_div
+     | factor
+
+?factor: number
+       | var_ref
+       | field_access
+       | func_call
+       | "(" arith_expr ")"
 
 // 数值字面量：支持负数，统一为 number（float）
 ?number: FLOAT -> number_float

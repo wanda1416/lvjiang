@@ -319,49 +319,49 @@ class IsEmpty:
 
 @dataclass(frozen=True)
 class GreaterThan:
-    """$var > number 或 $var.field > number"""
+    """$var > expr 或 $var.field > expr"""
     left: Any  # VarRef | FieldAccess
-    right: float
+    right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class LessThan:
-    """$var < number 或 $var.field < number"""
+    """$var < expr 或 $var.field < expr"""
     left: Any  # VarRef | FieldAccess
-    right: float
+    right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class GreaterEqual:
-    """$var >= number 或 $var.field >= number"""
+    """$var >= expr 或 $var.field >= expr"""
     left: Any  # VarRef | FieldAccess
-    right: float
+    right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class LessEqual:
-    """$var <= number 或 $var.field <= number"""
+    """$var <= expr 或 $var.field <= expr"""
     left: Any  # VarRef | FieldAccess
-    right: float
+    right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class NotEqual:
-    """$var != number 或 $var.field != number"""
+    """$var != expr 或 $var.field != expr"""
     left: Any  # VarRef | FieldAccess
-    right: float
+    right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class NumericEqual:
-    """$var == number 或 $var.field == number"""
+    """$var == expr 或 $var.field == expr"""
     left: Any  # VarRef | FieldAccess
-    right: float
+    right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
 
 
@@ -380,6 +380,19 @@ class And:
 
 @dataclass(frozen=True)
 class Or:
+    left: Any
+    right: Any
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class ArithOp:
+    """算术二元运算：+ - * /
+
+    left/right 为任意可求值节点（Literal / VarRef / FieldAccess / ArithOp / FuncCall）。
+    引擎求值时统一走 _resolve → _to_number。
+    """
+    op: str           # "+" | "-" | "*" | "/"
     left: Any
     right: Any
     line_no: int = 0

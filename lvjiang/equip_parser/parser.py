@@ -53,16 +53,16 @@ class EquipmentParser:
 
         # base_attr
         if category == "weapon":
-            equip.base_attr_1 = self._parse_weapon_base(
+            equip.base_attr = self._parse_weapon_base(
                 raw.get("base_attr", "")
             )
         elif category == "jewelry":
-            equip.base_attr_1 = self._parse_jewelry_base(
+            equip.base_attr = self._parse_jewelry_base(
                 raw.get("base_attr", "")
             )
         else:  # armor / unknown
-            equip.base_attr_1 = self._parse_armor_base1(
-                raw.get("base_attr_1", "")
+            equip.base_attr = self._parse_armor_base1(
+                raw.get("base_attr", "")
             )
             equip.base_attr_2 = self._parse_armor_base2(
                 raw.get("base_attr_2", "")
@@ -85,9 +85,9 @@ class EquipmentParser:
 
     def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:
         """根据 type + level + base_attr 推断品阶"""
-        if not equip.type or not equip.level or not equip.base_attr_1:
+        if not equip.type or not equip.level or not equip.base_attr:
             return None
-        value = equip.base_attr_1.value
+        value = equip.base_attr.value
         # 武器 value 为 [min, max]，取 max
         if isinstance(value, list):
             value = value[1] if len(value) >= 2 else value[0]

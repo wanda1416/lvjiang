@@ -133,12 +133,14 @@ class WorkflowEngine:
             )
         return self._workflow
 
-    def execute(self, source: str | Path, *, initial_variables: dict | None = None) -> dict:
+    def execute(self, source, *, initial_variables: dict | None = None,
+                _reset_context: bool = True) -> dict:
         """统一执行入口
 
         Args:
-            source: .wf 文件路径（后续扩展 Python 类）
+            source: .wf 文件路径 或 BaseWorkflow 实例
             initial_variables: 外部注入的初始变量
+            _reset_context: 是否重置 context（仅顶层调用为 True）
 
         Returns:
             dict: collect 累积结果
@@ -146,9 +148,16 @@ class WorkflowEngine:
         if initial_variables:
             self.variables.update(initial_variables)
 
-        # context 每次执行重置为空 dict（临时状态）
-        self.context = {}
+        # context 是临时状态，仅顶层执行时重置
+        # 子工作流通过 _exec_call 共享父 context，不能重置
+        if _reset_context:
+            self.context = {}
 
+        # Python 工作流实例
+        if isinstance(source, BaseWorkflow):
+            return self._execute_python_workflow(source)
+
+        # DSL .wf 文件
         source_path = Path(source)
         if source_path.suffix == ".wf":
             return self._execute_dsl(source_path)
@@ -173,6 +182,19 @@ class WorkflowEngine:
 
         logger.info(f"=== DSL 工作流完成，收集到 {len(self.output)} 项数据 ===")
         return self.output
+
+    def _execute_python_workflow(self, workflow: BaseWorkflow) -> dict:
+        """执行 Python 工作流实例"""
+        workflow.reset_state()
+        workflow.variables.update(self.variables)
+        logger.info(f"=== Python 工作流开始: {workflow.__class__.__name__} ===")
+        try:
+            result = workflow.run()
+        except Exception as e:
+            logger.error(f"Python 工作流异常: {e}\n{traceback.format_exc()}")
+            result = workflow.output
+        logger.info(f"=== Python 工作流完成，收集到 {len(result)} 项数据 ===")
+        return result
 
     # ─── 语句执行 ──────────────────────────────────────────
 
@@ -576,7 +598,7 @@ class WorkflowEngine:
 
         # 查表：用对齐结果的行列数做越界检查
         if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
-            logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
+            logger.debug(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
                          f"对齐结果 {cal.n_rows}×{cal.n_cols}")
             return None, None
 
@@ -611,7 +633,7 @@ class WorkflowEngine:
             return None, "", 0, 0
 
         if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
-            logger.error(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
+            logger.debug(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
                          f"对齐结果 {cal.n_rows}×{cal.n_cols}")
             return None, "", 0, 0
 
@@ -1033,8 +1055,8 @@ class WorkflowEngine:
         sub_engine.session = self.session
         sub_engine.context = self.context
 
-        # 3. 运行子 wf
-        sub_output = sub_engine.execute(wf_path)
+        # 3. 运行子 wf（不重置 context，保持与父工作流的共享）
+        sub_output = sub_engine.execute(wf_path, _reset_context=False)
 
         # 4. 从子 engine output 提取 read 结果，写入父 context
         count = 0
@@ -1149,19 +1171,19 @@ class WorkflowEngine:
         """递归求值条件表达式 AST 节点"""
         match node:
             case Contains():
-                left = self._eval_field_access(node.left)
+                left = self._eval_var_or_field(node.left)
                 right = self._resolve(node.right)
                 return str(right) in str(left) if left else False
             case Equals():
-                left = self._eval_field_access(node.left)
+                left = self._eval_var_or_field(node.left)
                 right = self._resolve(node.right)
                 return str(left) == str(right)
             case InList():
-                left = self._eval_field_access(node.left)
+                left = self._eval_var_or_field(node.left)
                 right = [str(self._resolve(item)) for item in node.right]
                 return str(left) in right if left else False
             case IsEmpty():
-                left = self._eval_field_access(node.expr)
+                left = self._eval_var_or_field(node.expr)
                 return not left or str(left).strip() == ""
             case GreaterThan():
                 left = self._eval_var_or_field(node.left)

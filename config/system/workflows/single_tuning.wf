@@ -75,6 +75,7 @@ if not $tune_status
     goto tune_status
 end
 
+wait page_refresh_wait
 scan [equip_tune_detail].[auto_add, auto_add_2] as $add_scan
 
 # 调律材料区未展开

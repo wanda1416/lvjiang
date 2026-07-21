@@ -349,13 +349,17 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         # === 中部：左右分栏 ===
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # 左侧：配置区（可滚动）
-        left_scroll = QScrollArea()
-        left_scroll.setWidgetResizable(True)
-        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(4, 4, 4, 4)
+        # 左侧：多 Tab 配置区
+        self._left_tabs = QTabWidget()
+        self._left_tabs.setMinimumWidth(240)
+
+        # ── Tab 1: 日常 ──
+        daily_scroll = QScrollArea()
+        daily_scroll.setWidgetResizable(True)
+        daily_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        daily_panel = QWidget()
+        daily_layout = QVBoxLayout(daily_panel)
+        daily_layout.setContentsMargins(4, 4, 4, 4)
 
         # 工作流选择
         wf_group = QGroupBox("工作流")
@@ -364,7 +368,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.workflow_combo.setMinimumWidth(200)
         self.workflow_combo.currentIndexChanged.connect(self._rebuild_param_panel)
         wf_layout.addWidget(self.workflow_combo)
-        left_layout.addWidget(wf_group)
+        daily_layout.addWidget(wf_group)
 
         # 开始执行按钮
         self.btn_run_workflow = QPushButton("开始执行 (F9)")
@@ -372,7 +376,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.btn_run_workflow.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
         )
-        left_layout.addWidget(self.btn_run_workflow)
+        daily_layout.addWidget(self.btn_run_workflow)
 
         # 录制 + 加载工作流（各占一半）
         tools_row = QHBoxLayout()
@@ -393,17 +397,71 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         )
         tools_row.addWidget(self.btn_load_workflow)
 
-        left_layout.addLayout(tools_row)
+        daily_layout.addLayout(tools_row)
 
         # 工作流参数面板（动态生成）
         self._param_panel = QGroupBox("参数设置")
         self._param_layout = QFormLayout(self._param_panel)
         self._param_panel.setVisible(False)
-        left_layout.addWidget(self._param_panel)
+        daily_layout.addWidget(self._param_panel)
 
-        left_layout.addStretch()
+        daily_layout.addStretch()
+        daily_scroll.setWidget(daily_panel)
+        self._left_tabs.addTab(daily_scroll, "日常")
 
-        left_scroll.setWidget(left_panel)
+        # ── Tab 2: 调律 ──
+        tuning_scroll = QScrollArea()
+        tuning_scroll.setWidgetResizable(True)
+        tuning_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tuning_panel = QWidget()
+        tuning_layout = QVBoxLayout(tuning_panel)
+        tuning_layout.setContentsMargins(4, 4, 4, 4)
+
+        # 部位选择
+        tuning_layout.addWidget(QLabel("<b>选择调律部位：</b>"))
+        self._tuning_checkboxes = []
+        for group_name, slots in [("武器类", [("main_weapon", "主武器"), ("sub_weapon", "副武器"),
+                                               ("ring", "环佩"), ("pendant", "项链")]),
+                                   ("防具类", [("head", "头部"), ("chest", "胸部"),
+                                               ("leg", "腿部"), ("wrist", "腕部")])]:
+            grp = QGroupBox(group_name)
+            grp_layout = QVBoxLayout(grp)
+            for slot_key, slot_label in slots:
+                cb = QCheckBox(slot_label)
+                cb.setObjectName(slot_key)
+                cb.setChecked(True)
+                cb.stateChanged.connect(self._save_tuning_config)
+                grp_layout.addWidget(cb)
+                self._tuning_checkboxes.append(cb)
+            tuning_layout.addWidget(grp)
+
+        # 全选/取消全选
+        toggle_row = QHBoxLayout()
+        btn_select_all = QPushButton("全选")
+        btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
+        btn_select_all.setFixedWidth(70)
+        toggle_row.addWidget(btn_select_all)
+        btn_deselect_all = QPushButton("取消全选")
+        btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
+        btn_deselect_all.setFixedWidth(70)
+        toggle_row.addWidget(btn_deselect_all)
+        toggle_row.addStretch()
+        tuning_layout.addLayout(toggle_row)
+
+        # 开始调律按钮
+        self.btn_run_tuning = QPushButton("开始调律 (F9)")
+        self.btn_run_tuning.clicked.connect(self._on_run_tuning)
+        self.btn_run_tuning.setStyleSheet(
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+        )
+        tuning_layout.addWidget(self.btn_run_tuning)
+
+        tuning_layout.addStretch()
+        tuning_scroll.setWidget(tuning_panel)
+        self._left_tabs.addTab(tuning_scroll, "调律")
+
+        # 加载调律持久化配置
+        self._load_tuning_config()
 
         # 右侧：日志/预览区
         right_panel = QWidget()
@@ -421,7 +479,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
         right_layout.addWidget(self.tabs)
 
-        splitter.addWidget(left_scroll)
+        splitter.addWidget(self._left_tabs)
         splitter.addWidget(right_panel)
         splitter.setSizes([250, 750])
 
@@ -651,3 +709,58 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             pass
         self._overlay.destroy()
         super().closeEvent(event)
+
+    # ─── 调律 Tab 配置持久化 ────────────────────────────────
+
+    def _load_tuning_config(self):
+        """从 session.json 加载调律部位选择配置"""
+        from ..constants import SESSION_PATH
+        default_slots = ["main_weapon", "sub_weapon", "ring", "pendant",
+                         "head", "chest", "leg", "wrist"]
+        selected = default_slots
+        if SESSION_PATH.exists():
+            try:
+                import json
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+                saved = data.get("tuning", {}).get("selected_slots", [])
+                if saved:
+                    selected = saved
+            except Exception:
+                pass
+        for cb in self._tuning_checkboxes:
+            cb.blockSignals(True)
+            cb.setChecked(cb.objectName() in selected)
+            cb.blockSignals(False)
+
+    def _save_tuning_config(self):
+        """将调律部位选择配置保存到 session.json"""
+        from ..constants import SESSION_PATH, LOCAL_CONFIG_DIR
+        selected = self._get_tuning_selected_slots()
+        # 读取现有 session.json
+        data = {}
+        if SESSION_PATH.exists():
+            try:
+                import json
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        data.setdefault("tuning", {})["selected_slots"] = selected
+        try:
+            import json
+            LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SESSION_PATH.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存调律配置失败: {e}")
+
+    def _set_all_tuning_checks(self, checked: bool):
+        """全选/取消全选调律部位"""
+        for cb in self._tuning_checkboxes:
+            cb.setChecked(checked)
+        self._save_tuning_config()
+
+    def _get_tuning_selected_slots(self) -> list[str]:
+        """获取当前选中的调律部位列表"""
+        return [cb.objectName() for cb in self._tuning_checkboxes if cb.isChecked()]

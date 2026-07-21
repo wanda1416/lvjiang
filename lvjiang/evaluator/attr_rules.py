@@ -55,7 +55,7 @@ class LevelRule:
 _TYPE_TO_KEY = {
     # 武器类型 → weapon
     "陌刀": "weapon", "舞绫鼓": "weapon", "双刀": "weapon",
-    "绳镖": "weapon", "横刀": "weapon", "拳甲": "weapon",
+    "绳镖": "weapon", "横刀": "weapon", "手甲": "weapon",
     "剑": "weapon", "枪": "weapon", "扇": "weapon", "伞": "weapon",
     # 首饰
     "环": "ring",

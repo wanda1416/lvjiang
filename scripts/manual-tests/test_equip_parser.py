@@ -25,8 +25,8 @@ def print_equip(slot: str, equip):
     print(f"\n  [{slot}] {equip.name or '?'} | {equip.type or '?'} | "
           f"Lv{equip.level or '?'} | {'承音' if equip.is_chengyin else '普通'}")
 
-    if equip.base_attr_1:
-        print(f"    基础1: {equip.base_attr_1.name} {equip.base_attr_1.value}")
+    if equip.base_attr:
+        print(f"    基础1: {equip.base_attr.name} {equip.base_attr.value}")
     if equip.base_attr_2:
         print(f"    基础2: {equip.base_attr_2.name} {equip.base_attr_2.value}")
 

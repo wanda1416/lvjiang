@@ -382,7 +382,7 @@ class GenericEvaluator(BaseEvaluator):
             level=equip.level,
             quality=equip.quality,
             is_chengyin=equip.is_chengyin,
-            base_attr_1=equip.base_attr_1,
+            base_attr=equip.base_attr,
             base_attr_2=equip.base_attr_2,
             affixes=affixes,
         )

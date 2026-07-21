@@ -62,7 +62,7 @@ class EquipmentData:
         "level": 110,
         "quality": null,
         "is_chengyin": true,
-        "base_attr_1": { "name": "外功攻击", "value": [100, 232] },
+        "base_attr": { "name": "外功攻击", "value": [100, 232] },
         "base_attr_2": null,
         "affix_1": { "name": "最大外功攻击", "value": 114.1, "is_transferred": false },
         "affix_2": { "name": "会意率", "value": 6.6, "unit": "%", "is_transferred": false },
@@ -75,7 +75,7 @@ class EquipmentData:
     level: int | None = None
     quality: str | None = None     # gold/purple/blue/green，OCR 暂无法识别
     is_chengyin: bool = False
-    base_attr_1: EquipAttr | None = None
+    base_attr: EquipAttr | None = None
     base_attr_2: EquipAttr | None = None
     affixes: list[Affix] = field(default_factory=list)
     extra_data: dict = field(default_factory=dict)  # 辅助信息，如 {"affix_count": 5}
@@ -98,7 +98,7 @@ class EquipmentData:
             "level": self.level,
             "quality": self.quality,
             "is_chengyin": self.is_chengyin,
-            "base_attr_1": self.base_attr_1.to_dict() if self.base_attr_1 else None,
+            "base_attr": self.base_attr.to_dict() if self.base_attr else None,
             "base_attr_2": self.base_attr_2.to_dict() if self.base_attr_2 else None,
         }
         for i, affix in enumerate(self.affixes, 1):
@@ -127,7 +127,7 @@ class EquipmentData:
             level=d.get("level"),
             quality=d.get("quality"),
             is_chengyin=d.get("is_chengyin", False),
-            base_attr_1=EquipAttr.from_dict(d["base_attr_1"]) if d.get("base_attr_1") else None,
+            base_attr=EquipAttr.from_dict(d["base_attr"]) if d.get("base_attr") else None,
             base_attr_2=EquipAttr.from_dict(d["base_attr_2"]) if d.get("base_attr_2") else None,
             affixes=affixes,
             warnings=d.get("_warnings", []),

@@ -35,7 +35,7 @@ class MaterialGridConfig(BaseModel):
 
 
 class UserConfig(BaseModel):
-    """用户配置（从 preferences.yaml 加载）"""
+    """用户配置（从 preferences.yaml 加载，只读）"""
     adb_capture_streaming: bool = False    # ADB 模式是否启用 scrcpy 视频流截图（false 则用 screencap）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）

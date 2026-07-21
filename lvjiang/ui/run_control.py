@@ -73,7 +73,8 @@ class RunControlMixin:
                 self._workflow_configs.append({
                     "id": flow["id"],
                     "name": flow["name"],
-                    "wf_file": flow["wf_file"],
+                    "wf_file": flow.get("wf_file", ""),
+                    "class": flow.get("class", ""),
                     "required_scenes": flow.get("required_scenes", []),
                     "parameters": flow.get("parameters", []),
                 })
@@ -330,17 +331,37 @@ class RunControlMixin:
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
-        # 外部加载的工作流为绝对路径，否则相对于系统工作流目录
-        wf_file = flow_cfg["wf_file"]
-        wf_path = Path(wf_file)
-        if not wf_path.is_absolute():
-            wf_path = SYSTEM_WORKFLOWS_DIR / wf_file
         flow_params = self._collect_flow_params()
 
         self.log_text.append(f"[开始] {flow_name} 流程...")
         if flow_params:
             self.log_text.append(f"[参数] {flow_params}")
-        self._start_workflow(flow_id, flow_name, lambda: engine.execute(wf_path, initial_variables=flow_params))
+
+        # Python 代码工作流 vs DSL 工作流
+        wf_class_name = flow_cfg.get("class", "")
+        if wf_class_name:
+            from ..workflows.implementations import get_workflow_class
+            wf_class = get_workflow_class(wf_class_name)
+            wf_instance = wf_class(
+                capture=self._capture,
+                ocr=self._ocr,
+                input_ctrl=self._input,
+                layout=layout,
+                delay_config=self._user_config.input_delay,
+                window_left=window_left,
+                window_top=window_top,
+                stop_check=self._is_stopped,
+            )
+            self._start_workflow(flow_id, flow_name,
+                                 lambda: engine.execute(wf_instance, initial_variables=flow_params))
+        else:
+            # 原有 DSL 路径
+            wf_file = flow_cfg["wf_file"]
+            wf_path = Path(wf_file)
+            if not wf_path.is_absolute():
+                wf_path = SYSTEM_WORKFLOWS_DIR / wf_file
+            self._start_workflow(flow_id, flow_name,
+                                 lambda: engine.execute(wf_path, initial_variables=flow_params))
 
     # ─── 异步工作流执行 ────────────────────────────────────
 
@@ -412,28 +433,47 @@ class RunControlMixin:
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮。"""
         if self._running:
-            self.btn_run_workflow.setText("停止 (F10)")
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
-            )
+            stop_text = "停止 (F10)"
+            stop_style = "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+            self.btn_run_workflow.setText(stop_text)
+            self.btn_run_workflow.setStyleSheet(stop_style)
+            if hasattr(self, 'btn_run_tuning'):
+                self.btn_run_tuning.setText("停止 (F10)")
+                self.btn_run_tuning.setStyleSheet(
+                    "background-color: #f44336; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+                )
         elif not self._backend_ready():
-            self.btn_run_workflow.setText("未连接" if getattr(self, "_backend", "windows") == "adb" else "未定位")
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
-            )
+            label = "未连接" if getattr(self, "_backend", "windows") == "adb" else "未定位"
+            idle_style = "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
+            self.btn_run_workflow.setText(label)
+            self.btn_run_workflow.setStyleSheet(idle_style)
+            if hasattr(self, 'btn_run_tuning'):
+                self.btn_run_tuning.setText(label)
+                self.btn_run_tuning.setStyleSheet(
+                    "background-color: #FFC107; color: #333; font-weight: bold; padding: 10px; font-size: 14px;"
+                )
         else:
             self.btn_run_workflow.setText("开始执行 (F9)")
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
             )
+            if hasattr(self, 'btn_run_tuning'):
+                self.btn_run_tuning.setText("开始调律 (F9)")
+                self.btn_run_tuning.setStyleSheet(
+                    "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+                )
 
     # ─── 启停控制 ──────────────────────────────────────────
 
     def _on_start(self):
-        """开始执行（F9 快捷键转发）"""
+        """开始执行（F9 快捷键转发）根据当前左侧 Tab 分发"""
         if self._running:
             return
-        self._on_run_workflow()
+        # 检查当前 Tab：调律 Tab 索引为 1
+        if hasattr(self, '_left_tabs') and self._left_tabs.currentIndex() == 1:
+            self._on_run_tuning()
+        else:
+            self._on_run_workflow()
 
     def _on_stop(self):
         """停止执行（转发到统一停止入口）"""
@@ -444,4 +484,91 @@ class RunControlMixin:
         if self._running:
             self._request_stop()
         else:
-            self._on_run_workflow()
+            self._on_start()
+
+    # ─── 调律工作流执行 ────────────────────────────────────
+
+    def _on_run_tuning(self):
+        """执行自动调律工作流（异步）"""
+        if self._running:
+            self._request_stop()
+            return
+
+        if not self._backend_ready():
+            if getattr(self, "_backend", "windows") == "adb":
+                self.log_text.append("[错误] 请先连接设备")
+            else:
+                self.log_text.append("[错误] 请先定位窗口")
+            return
+
+        # 获取选中的部位
+        selected_slots = self._get_tuning_selected_slots() if hasattr(self, '_get_tuning_selected_slots') else []
+        if not selected_slots:
+            self.log_text.append("[错误] 请至少选择一个调律部位")
+            return
+
+        flow_name = "自动调律"
+        if not self._begin_automation(flow_name):
+            return
+
+        layout_name = self._layout_manager.get_active_layout_name()
+        layout = self._layout_manager.load_layout(layout_name)
+        if not layout:
+            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            self._end_automation(flow_name)
+            return
+
+        # 检查所需场景
+        required_scenes = [
+            "game_main_page", "game_menu_page", "bag_equip_detail",
+            "equip_weapon_detail", "equip_armor_detail",
+        ]
+        missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
+        if missing:
+            names = "、".join(missing)
+            self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
+            self._end_automation(flow_name)
+            return
+
+        # 窗口坐标
+        if getattr(self, "_backend", "windows") == "adb":
+            window_left, window_top = 0, 0
+        else:
+            if self._input.background_mode and self._target_window:
+                self._input.target_hwnd = self._target_window["hwnd"]
+            window_left = self._target_window["left"]
+            window_top = self._target_window["top"]
+
+        engine = WorkflowEngine(
+            capture=self._capture,
+            ocr=self._ocr,
+            input_ctrl=self._input,
+            layout=layout,
+            delay_config=self._user_config.input_delay,
+            window_left=window_left,
+            window_top=window_top,
+            stop_check=self._is_stopped,
+        )
+        username = self._user_manager.get_active_user_name()
+        engine.session = self._session_manager.load(username)
+        engine._save_callback = self._session_manager.save_fn(username, engine.session)
+        self._current_engine = engine
+
+        # 创建工作流实例
+        from ..workflows.implementations import get_workflow_class
+        wf_class = get_workflow_class("auto_tuning")
+        wf_instance = wf_class(
+            capture=self._capture,
+            ocr=self._ocr,
+            input_ctrl=self._input,
+            layout=layout,
+            delay_config=self._user_config.input_delay,
+            window_left=window_left,
+            window_top=window_top,
+            stop_check=self._is_stopped,
+        )
+        wf_instance._selected_slots = selected_slots
+
+        self.log_text.append(f"[开始] {flow_name} 流程，部位: {selected_slots}")
+        self._start_workflow("auto_tuning", flow_name,
+                             lambda: engine.execute(wf_instance))

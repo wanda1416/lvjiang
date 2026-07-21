@@ -255,31 +255,58 @@ click [bag_equip_detail].[bag_grid][$row][$col]
     检查新行 3 的 6 个格子是否到底（见 4.3）
 ```
 
-### 4.2 重叠滚动示意
+### 4.2 重叠滚动与滚动管理器
 
-```
-初始状态：可见行 [1, 2, 3]
-  → align panel → 处理全部 18 格
+#### 滚动管理器（ScrollManager）
 
-滚动一行后：可见行 [2, 3, 4]
-  → align panel → 重新检测格子位置
-  行 1（原行 2）→ 指纹已记录，跳过
-  行 2（原行 3）→ 指纹已记录，跳过
-  行 3（新行 4）→ 新内容，处理
+滚动管理器是内置模块，负责维护滚动过程中的指纹状态。核心职责：
+1. 记录每行第一列（col=1）的装备指纹，形成有序序列
+2. 滚动后通过比对 grid[1][1] 的新指纹与已知序列，判定偏移量
+3. 校验通过后推进状态（移除已滚出的行指纹）
 
-再滚动一行后：可见行 [3, 4, 5]
-  → align panel → 重新检测格子位置
-  行 1（原行 3）→ 跳过
-  行 2（原行 4）→ 跳过
-  行 3（新行 5）→ 新内容，处理
+**状态结构**（存储在 context 中）：
 
-...以此类推
+```python
+context._scroll_manager = {
+    "row_fps": [],          # 有序列表：每行 col=1 的指纹 [fp_row1, fp_row2, fp_row3]
+    "fingerprints": {},     # 集合：所有已处理装备的指纹（用于快速查找）
+    "scroll_count": 0,      # 已滚动次数
+}
 ```
 
-**关键改进**：
-- 滚动不需要精确到像素级 — 只要不拖过头超过一行即可
-- 每次滚动后 align 重新检测，拖拽误差自动修正
-- 即使拖拽偏了半行，方差分析仍能正确识别 3 个 slot 带
+#### 滚动校验流程
+
+```
+处理完 cols 行后：
+  row_fps = [fp_A, fp_B, fp_C]   ← 滚动管理器维护的行指纹序列
+
+执行 drag grid up 1 + align
+
+读取 grid[1][1] 的新指纹，与 row_fps 比对：
+
+  实际序列        grid[1][1] 看到    判定          返回
+  1 2 3 4 5 6    （已知序列）
+  ──────────────────────────────────────────────
+  _ 2 3 4 _ _    fp_B（原行2）    正常滚动        0
+  _ 3 4 5 _ _    fp_C（原行3）    滚动过头        -1
+  _ 1 2 3 _ _    fp_A（原行1）    没有滚动        +1
+  _ ? ? ? _ _    全不匹配        全部被回收/新内容  0
+```
+
+> **为什么必须 click 进详情才能校验？** 背包格仅显示图标，无法直接识别。
+> 唯一识别路径：click 格子 → 进详情页 → OCR → 解析装备 → 生成指纹。
+
+#### 微调策略
+
+根据 `check_scroll()` 返回的偏移量执行微调，最多重试 4 次：
+
+| 偏移量 | 含义 | 微调动作 |
+|---------|------|----------|
+| `0` | 滚动正确 | 继续处理 |
+| `1` | 没有滚动 | `drag grid up 0.2` |
+| `-1` | 滚动过头 | `drag grid down 0.2` |
+
+超过 4 次仍未到位 → 报错终止。
 
 ### 4.3 到底检测
 
@@ -289,7 +316,7 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 
 ```
 align panel
-新一行（row 3）的 6 个 slot——若全部 OCR 详情为空
+新一行（row 3）的 6 个 slot——若全部 click 进详情后 equip_type 为空
   → 已越过最后一件装备 → 到底
 ```
 
@@ -297,10 +324,9 @@ align panel
 
 ```
 align panel
-对新一行（row 3）的 6 个格子逐一检查：
-    click [bag_grid][3][col] → 详情页 OCR → 生成指纹
-    如果指纹 == 上次该位置指纹 → 无变化
-    否则 → 有新内容，更新指纹
+对新一行（row 3）的 6 个格子逐一 click 进详情 → 生成指纹
+  如果指纹 == context.bag_fingerprints 中该 slot_key 的旧指纹 → 无变化
+  否则 → 有新内容，更新指纹
 
 如果 6 个格子全部无变化 → 滚动未产生新内容 → 到底
 ```
@@ -317,55 +343,141 @@ align panel
 
 ### 5.1 指纹生成
 
-基于装备详情页 OCR 结果，由 `to_equipment()` 解析后生成：
+基于装备详情页 OCR 结果，由 `to_equipment()` 解析后生成完整指纹字符串，然后 MD5 取前 8 位十六进制：
 
 ```python
 def make_fingerprint(equip_data: dict) -> str:
-    """基于装备关键字段生成去重指纹"""
+    """基于装备关键字段生成去重指纹（MD5 前 8 位 hex）"""
+    import hashlib
     parts = [
-        equip_data.get("type", ""),
-        str(equip_data.get("level", "")),
-        str(equip_data.get("quality", "")),
+        equip_data.get("type", ""),           # 部位
+        str(equip_data.get("level", "")),      # 等级
+        str(equip_data.get("quality", "")),    # 品阶
+        str(equip_data.get("chengyin", "")),   # 是否承音
     ]
-    # 加前 3 条词条（名称+数值）确保区分度
-    for affix in equip_data.get("affixes", [])[:3]:
+    # 全部词条（名称:数值）
+    for affix in equip_data.get("affixes", []):
         parts.append(f"{affix['name']}:{affix['value']}")
-    return "_".join(parts)
+    raw = "+".join(parts)
+    return hashlib.md5(raw.encode()).hexdigest()[:8]
 ```
+
+> 解析装备信息时直接写入 `_extra.hash` 字段，后续 `make_fingerprint($equip)` 可直接读取。
 
 ### 5.2 指纹存储
 
 ```python
 # context（运行期临时状态，不持久化）
 context.bag_fingerprints = {
-    "r1c1": "横刀_110_gold_最大外功攻击:232_劲:45.2_势:32.1",
-    "r1c2": "剑_110_purple_最大外功攻击:198_剑武学增伤:8.5_...",
+    "r1c1": "a3f5b2c1",   # MD5 前 8 位 hex
+    "r1c2": "e7d9f4a0",
     ...
 }
 ```
 
 - **key** = `r{row}c{col}`（屏幕物理位置，如 r1c1 = 第 1 行第 1 列）
-- **value** = 指纹字符串
+- **value** = 指纹字符串（MD5 前 8 位 hex）
 - 每次滚动后，新行覆盖旧 slot_key 的指纹
 
-### 5.3 内置函数
+### 5.3 滚动管理器状态
+
+滚动管理器维护的状态也存储在 context 中（详见 §4.2）：
+
+```python
+context._scroll_manager = {
+    "row_fps": [],          # 有序列表：每行 col=1 的指纹
+    "fingerprints": {},     # 集合：所有已处理装备的指纹
+    "scroll_count": 0,      # 已滚动次数
+}
+```
+
+- `row_fps` 用于 `check_scroll()` 的偏移判定
+- `fingerprints` 用于快速判断一个指纹是否是“已知装备”
+- 每次处理完装备时通过 `notify_scroll(col, row, fp)` 更新
+- 每次滚动校验通过后通过 `scroll_advance()` 推进
+
+### 5.4 内置函数
+
+#### make_fingerprint
 
 ```python
 @builtin_func("make_fingerprint")
 def _make_fingerprint(equip_data: dict) -> str:
-    """基于装备数据生成去重指纹"""
+    """基于装备数据生成去重指纹（MD5 前 8 位 hex）"""
     if not isinstance(equip_data, dict) or not equip_data:
         return ""
+    import hashlib
     parts = [
         equip_data.get("type", ""),
         str(equip_data.get("level", "")),
         str(equip_data.get("quality", "")),
+        str(equip_data.get("chengyin", "")),
     ]
     affixes = equip_data.get("affixes", [])
-    for affix in affixes[:3]:
+    for affix in affixes:
         if isinstance(affix, dict):
             parts.append(f"{affix.get('name', '')}:{affix.get('value', '')}")
-    return "_".join(parts)
+    raw = "+".join(parts)
+    return hashlib.md5(raw.encode()).hexdigest()[:8]
+```
+
+#### check_scroll
+
+```python
+@builtin_func("check_scroll")
+def _check_scroll(engine, fingerprint: str) -> str:
+    """滚动校验：比对 grid[1][1] 指纹与滚动管理器预期。
+
+    Returns:
+        "0"  — 正常（指纹在已知序列中，偏移量符合预期）
+        "1"  — 没有滚动（指纹仍在行 1 位置）
+        "-1" — 滚动过头（指纹在行 3 位置）
+    """
+    manager = engine.context.get("_scroll_manager", {})
+    row_fps = manager.get("row_fps", [])
+    fingerprints = manager.get("fingerprints", {})
+
+    if not row_fps:
+        return "0"  # 无快照数据，跳过验证
+
+    # 全不匹配 = 全部被回收或新内容，视为正常
+    if fingerprint not in fingerprints:
+        return "0"
+
+    # 找到指纹在原序列中的位置
+    for i, fp in enumerate(row_fps):
+        if fp == fingerprint:
+            # 滚动 1 步后，行 1 应该是原行 2（i=1）
+            # offset = i - 1:  0=正常, -1=过头, +1=没滚
+            return str(i - 1)
+
+    return "0"
+```
+
+#### notify_scroll / scroll_advance
+
+```python
+@builtin_func("notify_scroll")
+def _notify_scroll(engine, col, row, fingerprint):
+    """记录已处理装备的指纹到滚动管理器"""
+    manager = engine.context.setdefault("_scroll_manager", {
+        "row_fps": [],
+        "fingerprints": {},
+        "scroll_count": 0,
+    })
+    manager["fingerprints"][fingerprint] = True
+    # 每行第一列（col=1）记录为行指纹
+    if str(col) == "1":
+        manager["row_fps"].append(fingerprint)
+
+@builtin_func("scroll_advance")
+def _scroll_advance(engine):
+    """滚动校验通过后，推进状态：移除已滚出的行指纹"""
+    manager = engine.context.get("_scroll_manager", {})
+    row_fps = manager.get("row_fps", [])
+    if row_fps:
+        row_fps.pop(0)
+    manager["scroll_count"] = manager.get("scroll_count", 0) + 1
 ```
 
 ---
@@ -486,8 +598,10 @@ end
 # 初始化 context（每次运行清空）
 eval context.bag_fingerprints = {}
 eval context.bag_candidates = []
+eval context._scroll_manager = {"row_fps": [], "fingerprints": {}, "scroll_count": 0}
 
 eval $scroll_count = 0
+eval $verify_retry = 0
 
 @traverse_loop
 # ── 对齐 panel（截图 + 方差分析，获取格子精确坐标）──
@@ -516,6 +630,41 @@ end
 drag [bag_equip_detail].[scroll_down] 0.3 hold 0.3
 wait step_interval
 eval $scroll_count = $scroll_count + 1
+
+# ── 滚动校验：click grid[1][1] → 读详情 → 生成指纹 → 比对 ──
+@verify_loop
+align [bag_equip_detail].[bag_grid]
+click [bag_equip_detail].[bag_grid][1][1]
+wait step_interval
+scan [equip_weapon_detail].[equip_type, equip_level,
+    affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $check_scan
+eval $check_equip = to_equipment($check_scan)
+eval $check_fp = make_fingerprint($check_equip)
+click [bag_equip_detail].[back]
+wait step_interval
+
+eval $offset = check_scroll($check_fp)
+
+if $offset equals "0"
+    # 滚动正确，推进滚动管理器
+    eval scroll_advance()
+else
+    # 微调
+    if $offset equals "1"
+        drag [bag_equip_detail].[scroll_down] 0.2 hold 0.3
+    end
+    if $offset equals "-1"
+        drag [bag_equip_detail].[scroll_up] 0.2 hold 0.3
+    end
+    wait step_interval
+    eval $verify_retry = $verify_retry + 1
+    if $verify_retry < 4
+        goto verify_loop
+    end
+    log "滚动校验失败：超过 4 次微调仍未到位"
+    collect context.bag_candidates
+    return
+end
 
 # ── 到底检测：检查新行（row 3）是否有变化 ──
 align [bag_equip_detail].[bag_grid]
@@ -561,7 +710,7 @@ collect context.bag_candidates
 
 > **武器/防具共用扫描字段。** 点击格子前无法知道是武器还是防具，但两个详情场景
 > （equip_weapon_detail / equip_armor_detail）的 `equip_type/equip_level/affix_*` 字段
-> **坐标完全相同**，仅基础属性不同（武器 `base_attr`，防具 `base_attr_1/2`）。
+> **坐标完全相同**，仅基础属性不同（武器 `base_attr`，防具 `base_attr/2`）。
 > 指纹与筛选只需共用字段，因此单次 scan 即可；如需完整解析基础属性再按 `equip_type` 分支。
 
 ```dsl
@@ -612,6 +761,7 @@ end
 
 # 记录指纹
 eval context.bag_fingerprints.$slot_key = $fp
+eval notify_scroll($col, $row, $fp)
 
 # 返回背包
 click [bag_equip_detail].[back]

@@ -11,7 +11,7 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
-- key: base_attr_1
+- key: base_attr
   name: 基础属性1
   type: attr
   is_text: true

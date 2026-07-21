@@ -1,22 +1,30 @@
 #% name: 自动调律
-#% description: 遍历背包所有装备 → 评估 → 对不合格品执行调律 → 输出候选列表
-#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail, equip_tune_detail, equip_tune_result]
+#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail]
 
-# ── 阶段 1：导航到背包页 ──
+# ── 导航到背包页 ──
 call "subcall/nav_main_to_equip.wf"
 
-# ── 阶段 2：遍历背包，收集所有装备 ──
-call "subcall/bag_traverse.wf" read "bag_candidates" as $all_equips
+# ── 武器类（equip_weapon_detail）──
+eval context.equip_scene = "equip_weapon_detail"
+eval $weapon_slots = ["main_weapon", "sub_weapon", "ring", "pendant"]
+for slot in $weapon_slots
+    click [bag_equip_detail].$slot
+    wait step_interval
+    call "subcall/bag_traverse.wf"
+end
 
-log concat("背包遍历完成，共发现 ", $all_equips, " 件装备")
+# ── 防具类（equip_armor_detail）──
+eval context.equip_scene = "equip_armor_detail"
+eval $armor_slots = ["head", "chest", "leg", "wrist"]
+for slot in $armor_slots
+    click [bag_equip_detail].$slot
+    wait step_interval
+    call "subcall/bag_traverse.wf"
+end
 
-# ── 阶段 3：返回主界面 ──
-click [bag_equip_detail].[back]
-wait step_interval
+# ── 返回主界面 ──
 click [bag_equip_detail].[back]
 wait step_interval
 click [game_menu_page].[back]
 
-# ── 完成 ──
-log "自动调律流程结束"
-collect $all_equips
+log "自动调律完成"

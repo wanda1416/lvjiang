@@ -65,7 +65,7 @@ class EquipWeaponDetail(EquipDetail):
 
 class EquipArmorDetail(EquipDetail):
     """防具详情：基础属性分为气血和防御两项"""
-    # common + base_attr_1/2 + affix + func = 15 字段
+    # common + base_attr/2 + affix + func = 15 字段
 ```
 
 ### 继承关系

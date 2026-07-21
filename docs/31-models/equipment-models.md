@@ -17,7 +17,7 @@
   "level": 110,
   "quality": "gold",
   "is_chengyin": true,
-  "base_attr_1": { "name": "外功攻击", "value": [100, 232] },
+  "base_attr": { "name": "外功攻击", "value": [100, 232] },
   "base_attr_2": null,
   "affix_1": { "name": "最大外功攻击", "value": 114.1, "is_transferred": false },
   "affix_2": { "name": "会意率", "value": 6.6, "unit": "%", "is_transferred": false },
@@ -62,7 +62,7 @@
 | 伞 | 牵丝·玉、牵丝·霖、破竹·尘 |
 | 绳镖 | 破竹·风、破竹·尘、破竹·鸢 |
 | 横刀 | 裂石·钧 |
-| 拳甲 | 破竹·鸢 |
+| 手甲 | 破竹·鸢 |
 | 舞绫鼓 | 牵丝·翊 |
 | 扇 | 牵丝·翊 |
 
@@ -86,7 +86,7 @@
 
 品阶从高到低为：金色 > 紫色 > 蓝色 > 绿色。
 
-### 2.5 基础属性1 `base_attr_1`
+### 2.5 基础属性1 `base_attr`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|

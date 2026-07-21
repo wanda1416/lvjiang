@@ -78,7 +78,7 @@
     识别以下字段：
         - equip_type（装备类型）
         - equip_level（装备等级）
-        - base_attr_1（基础属性1，如气血）
+        - base_attr（基础属性1，如气血）
         - base_attr_2（基础属性2，如防御）
         - affix_gong/shang/jue/zhi/yu（五词条）
     
@@ -214,7 +214,7 @@ WeaponEquipmentInfo = {
 ArmorEquipmentInfo = {
     "equip_type": str,      # 如 "冠胄"
     "equip_level": int,     # 如 100
-    "base_attr_1": int,     # 如气血
+    "base_attr": int,     # 如气血
     "base_attr_2": int,     # 如防御
     "affixes": {
         "gong": str,

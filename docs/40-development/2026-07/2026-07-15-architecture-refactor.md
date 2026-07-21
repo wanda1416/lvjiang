@@ -55,7 +55,7 @@
 
 ### 装备防具详情字段
 
-相比武器详情，`base_attr` 拆分为 `base_attr_1` 和 `base_attr_2`（防具有双基础属性）。
+相比武器详情，`base_attr` 拆分为 `base_attr` 和 `base_attr_2`（防具有双基础属性）。
 
 ---
 

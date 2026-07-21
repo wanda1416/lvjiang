@@ -1,42 +1,30 @@
 #% name: 处理单个背包槽位
-#% description: 点击当前 panel 格子 → OCR 装备详情 → 生成指纹 → 评估 → 返回背包
-#% 前置条件: context 中已初始化 bag_candidates / bag_seen_fps / _cur_row / _cur_col
+#% 前置条件: context._current_row / context._current_col / context.equip_scene 已设置
 
-# 点击当前 panel 格子（align 会在首次 click 时自动触发）
-click [bag_equip_detail].[bag_grid][$cur_row][$cur_col]
-wait step_interval
+eval $row = context._current_row
+eval $col = context._current_col
+eval $slot_key = concat("r", $row, "c", $col)
+eval $detail_scene = context.equip_scene
 
-# OCR 装备详情页
-scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $equip_scan
+@slot_start
+click [bag_equip_detail].[bag_grid][$row][$col]
+
+scan $detail_scene.[equip_type, equip_level, base_attr,
+    affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $equip_scan
 eval $equip = to_equipment($equip_scan)
 eval $fp = make_fingerprint($equip)
 
-# 空格检查：type 为空表示该槽位无装备
 if $equip.type is_empty
-    log concat("  空格 [", $cur_row, "][", $cur_col, "]")
-    click [bag_equip_detail].[back]
-    wait step_interval
     return
 end
 
-# 已处理检查：指纹已在 seen dict 中 → 跳过
-if context.seen_fps.$fp equals "1"
-    log concat("  已处理 [", $cur_row, "][", $cur_col, "] ", $equip.type)
-    click [bag_equip_detail].[back]
-    wait step_interval
+if context.bag_fingerprints.$slot_key equals $fp
     return
 end
 
-# 记录指纹
-eval context.seen_fps.$fp = "1"
+eval context.bag_fingerprints.$slot_key = $fp
 
-# 评估装备
-eval $eval_result = evaluate($equip)
-log concat("  [", $cur_row, "][", $cur_col, "] ", $equip.type, " → ", $eval_result.rating)
+log concat("  [", $row, "][", $col, "] ", $equip.type, " Lv.", $equip.level)
+log "装备调律完毕"
 
-# 记录候选
-eval append(context.bag_candidates, $equip)
-
-# 返回背包页
-click [bag_equip_detail].[back]
-wait step_interval
+goto slot_start

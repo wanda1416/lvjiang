@@ -882,11 +882,20 @@ class WorkflowEngine:
                 logger.debug(f"eval: {node.target} = {lit_val!r}")
             return
 
-        # 空字典初始化：eval $var = {}
+        # 空字典初始化：eval $var = {}（兼容旧规则）
         if node.func_name == "__empty_dict__":
             if node.target is not None:
                 self.variables[node.target] = {}
                 logger.debug(f"eval: {node.target} = {{}}")
+            return
+
+        # 字典字面量：eval $var = {"k": v, ...}
+        if node.func_name == "__dict__":
+            raw_dict = node.func_args[0]
+            dict_val = {k: self._resolve(v) for k, v in raw_dict.items()}
+            if node.target is not None:
+                self.variables[node.target] = dict_val
+                logger.debug(f"eval: {node.target} = {dict_val!r}")
             return
 
         # 列表赋值：eval $var = ["a", "b", $c]
@@ -987,7 +996,7 @@ class WorkflowEngine:
         if isinstance(node.value, FuncCall):
             value = self._call_func(node.value)
         elif isinstance(node.value, dict):
-            value = {}
+            value = {k: self._resolve(v) for k, v in node.value.items()}
         else:
             value = self._resolve(node.value)
         current[final_field] = value
@@ -1370,6 +1379,10 @@ class WorkflowEngine:
                 return self._call_func(node)
             case int() | float():
                 return node
+            case dict():
+                return {k: self._resolve(v) for k, v in node.items()}
+            case list():
+                return [self._resolve(item) for item in node]
             case _:
                 return str(node) if node is not None else ""
 

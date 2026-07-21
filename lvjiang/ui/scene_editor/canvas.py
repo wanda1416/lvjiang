@@ -8,7 +8,7 @@ from PyQt6.QtGui import (
     QPaintEvent, QFont,
 )
 
-from ...core.scene_registry import Region, CanvasConfig, EQUIP_REGIONS, Panel
+from ...core.scene_registry import Region, CanvasConfig, EQUIP_REGIONS, Panel, get_region_name
 from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
 from .canvas_poi import CanvasPoiMixin
 
@@ -538,9 +538,9 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         painter.setPen(pen)
         painter.drawRect(rect)
 
-        # 标签
-        if r.name:
-            label = r.name
+        # 标签（从场景定义获取名称）
+        label = get_region_name(self._scene_key, r.key)
+        if label:
             font = QFont("Microsoft YaHei", 9)
             painter.setFont(font)
             fm = painter.fontMetrics()

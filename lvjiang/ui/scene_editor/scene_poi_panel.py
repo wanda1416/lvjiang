@@ -45,10 +45,13 @@ class PoiPanelMixin:
         self._point_list = QTableWidget()
         self._point_list.setColumnCount(5)
         self._point_list.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
-        # 列宽自适应拉伸
+        # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._point_list.horizontalHeader()
-        for col in range(5):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(3, 50)
+        header.resizeSection(4, 50)
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)

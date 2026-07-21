@@ -33,10 +33,13 @@ class PanelEditorMixin:
         self._panel_table.setHorizontalHeaderLabels(
             ["名称", "Key", "行数", "列数"]
         )
-        # 列宽自适应拉伸：名称 3:Key 3:行数 2:列数 2
+        # 列宽：名称/Key 自适应内容，行数/列数固定窄宽
         header = self._panel_table.horizontalHeader()
-        for col in range(4):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(2, 50)
+        header.resizeSection(3, 50)
         self._panel_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )

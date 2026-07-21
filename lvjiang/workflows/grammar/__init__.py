@@ -16,7 +16,7 @@ from .ast_nodes import (
     SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    Not, And, Or,
+    Not, And, Or, ArithOp,
 )
 
 __all__ = [
@@ -28,5 +28,5 @@ __all__ = [
     "SceneRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause",
     "Contains", "Equals", "InList", "IsEmpty",
     "GreaterThan", "LessThan", "GreaterEqual", "LessEqual", "NotEqual", "NumericEqual",
-    "Not", "And", "Or",
+    "Not", "And", "Or", "ArithOp",
 ]

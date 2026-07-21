@@ -18,7 +18,7 @@ from .ast_nodes import (
     SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    Not, And, Or,
+    Not, And, Or, ArithOp,
 )
 from .ast_nodes import Align
 
@@ -429,6 +429,20 @@ class _DSLTransformer(Transformer):
         # 用 Eval 节点承载字面量赋值：func_name="__literal__"，func_args=[Literal(value)]
         return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
 
+    def eval_assign_arith(self, items):
+        """eval $var = arith_expr — 算术表达式赋值（含运算符或裸值）"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        target_name = str(tokens[0])
+        expr = items[1]
+        # ArithOp → 算术运算
+        if isinstance(expr, ArithOp):
+            return Eval(func_name="__arith__", func_args=[expr], target=target_name, line_no=self._line(items))
+        # float/int（来自 number）→ 字面量赋值
+        if isinstance(expr, (int, float)):
+            return Eval(func_name="__literal__", func_args=[Literal(value=expr)], target=target_name, line_no=self._line(items))
+        # VarRef / FieldAccess / FuncCall → 表达式赋值
+        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
+
     def eval_discard(self, items):
         """eval func($arg...) — 丢弃返回值"""
         tokens = [i for i in items if isinstance(i, Token)]
@@ -476,6 +490,17 @@ class _DSLTransformer(Transformer):
             lit_value = self._unquote(str(lit_value))
         return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
 
+    def implicit_eval_assign_arith(self, items):
+        """$var = arith_expr — 隐式算术表达式赋值"""
+        tokens = [i for i in items if isinstance(i, Token)]
+        target_name = str(tokens[0])
+        expr = items[1]
+        if isinstance(expr, ArithOp):
+            return Eval(func_name="__arith__", func_args=[expr], target=target_name, line_no=self._line(items))
+        if isinstance(expr, (int, float)):
+            return Eval(func_name="__literal__", func_args=[Literal(value=expr)], target=target_name, line_no=self._line(items))
+        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
+
     def implicit_eval_assign_expr(self, items):
         """$var = field_access | $other — 隐式表达式赋值"""
         tokens = [i for i in items if isinstance(i, Token)]
@@ -520,9 +545,28 @@ class _DSLTransformer(Transformer):
         """eval_rhs: field_access → FieldAccess"""
         return items[0]
 
-    def eval_rhs_var(self, items):
-        """eval_rhs: var_ref → VarRef"""
+    def eval_rhs_arith(self, items):
+        """eval_rhs: arith_expr → 透传算术表达式节点"""
         return items[0]
+
+    # ─── 算术表达式 ─────────────────────────────────────
+
+    def arith_add(self, items):
+        """arith_expr "+" term → ArithOp(+)
+        left/right 可能是 float（number 直出）、VarRef、FieldAccess、ArithOp 等"""
+        return ArithOp(op="+", left=items[0], right=items[1], line_no=self._line(items))
+
+    def arith_sub(self, items):
+        """arith_expr "-" term → ArithOp(-)"""
+        return ArithOp(op="-", left=items[0], right=items[1], line_no=self._line(items))
+
+    def arith_mul(self, items):
+        """term "*" factor → ArithOp(*)"""
+        return ArithOp(op="*", left=items[0], right=items[1], line_no=self._line(items))
+
+    def arith_div(self, items):
+        """term "/" factor → ArithOp(/)"""
+        return ArithOp(op="/", left=items[0], right=items[1], line_no=self._line(items))
 
     def func_call(self, items):
         """func_name(arg_list?) → FuncCall"""
@@ -792,28 +836,28 @@ class _DSLTransformer(Transformer):
         return FieldAccess(root=prev_access, field_name=kw_ref)
 
     def gt_op(self, items):
-        field_access, number = items
-        return GreaterThan(left=field_access, right=number, line_no=self._line(items))
+        left, right = items
+        return GreaterThan(left=left, right=right, line_no=self._line(items))
 
     def lt_op(self, items):
-        field_access, number = items
-        return LessThan(left=field_access, right=number, line_no=self._line(items))
+        left, right = items
+        return LessThan(left=left, right=right, line_no=self._line(items))
 
     def ge_op(self, items):
-        field_access, number = items
-        return GreaterEqual(left=field_access, right=number, line_no=self._line(items))
+        left, right = items
+        return GreaterEqual(left=left, right=right, line_no=self._line(items))
 
     def le_op(self, items):
-        field_access, number = items
-        return LessEqual(left=field_access, right=number, line_no=self._line(items))
+        left, right = items
+        return LessEqual(left=left, right=right, line_no=self._line(items))
 
     def ne_op(self, items):
-        field_access, number = items
-        return NotEqual(left=field_access, right=number, line_no=self._line(items))
+        left, right = items
+        return NotEqual(left=left, right=right, line_no=self._line(items))
 
     def eq_num_op(self, items):
-        field_access, number = items
-        return NumericEqual(left=field_access, right=number, line_no=self._line(items))
+        left, right = items
+        return NumericEqual(left=left, right=right, line_no=self._line(items))
 
     def number_float(self, items):
         return float(items[0])

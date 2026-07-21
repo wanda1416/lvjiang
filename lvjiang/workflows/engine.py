@@ -20,13 +20,12 @@ from ..core.scene_registry import Layout
 
 from .grammar import (
     parse_file,
-    Program,
     Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
     If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
     SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
     GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    Not, And, Or,
+    Not, And, Or, ArithOp,
 )
 from .grammar.ast_nodes import Align
 from .base import BaseWorkflow
@@ -926,6 +925,15 @@ class WorkflowEngine:
                 logger.debug(f"eval: {node.target} = {val!r}")
             return
 
+        # 算术表达式赋值：eval $var = $a + $b * 2
+        if node.func_name == "__arith__":
+            arith_node = node.func_args[0]
+            val = self._eval_arith(arith_node) if isinstance(arith_node, ArithOp) else self._resolve_arith(arith_node)
+            if node.target is not None:
+                self.variables[node.target] = val
+                logger.debug(f"eval: {node.target} = {val!r}")
+            return
+
         # 函数调用路径
         result = self._call_func_from_eval(node)
 
@@ -1186,29 +1194,29 @@ class WorkflowEngine:
                 left = self._eval_var_or_field(node.expr)
                 return not left or str(left).strip() == ""
             case GreaterThan():
-                left = self._eval_var_or_field(node.left)
-                num = self._to_number(left)
-                return num > node.right if num is not None else False
+                left = self._resolve_arith(node.left)
+                right = self._resolve_arith(node.right)
+                return left > right if left is not None and right is not None else False
             case LessThan():
-                left = self._eval_var_or_field(node.left)
-                num = self._to_number(left)
-                return num < node.right if num is not None else False
+                left = self._resolve_arith(node.left)
+                right = self._resolve_arith(node.right)
+                return left < right if left is not None and right is not None else False
             case GreaterEqual():
-                left = self._eval_var_or_field(node.left)
-                num = self._to_number(left)
-                return num >= node.right if num is not None else False
+                left = self._resolve_arith(node.left)
+                right = self._resolve_arith(node.right)
+                return left >= right if left is not None and right is not None else False
             case LessEqual():
-                left = self._eval_var_or_field(node.left)
-                num = self._to_number(left)
-                return num <= node.right if num is not None else False
+                left = self._resolve_arith(node.left)
+                right = self._resolve_arith(node.right)
+                return left <= right if left is not None and right is not None else False
             case NotEqual():
-                left = self._eval_var_or_field(node.left)
-                num = self._to_number(left)
-                return num != node.right if num is not None else True
+                left = self._resolve_arith(node.left)
+                right = self._resolve_arith(node.right)
+                return left != right if left is not None and right is not None else True
             case NumericEqual():
-                left = self._eval_var_or_field(node.left)
-                num = self._to_number(left)
-                return num == node.right if num is not None else False
+                left = self._resolve_arith(node.left)
+                right = self._resolve_arith(node.right)
+                return left == right if left is not None and right is not None else False
             case Not():
                 return not self._eval_condition(node.operand)
             case And():
@@ -1335,6 +1343,8 @@ class WorkflowEngine:
         KeywordRef → 返回 session/context 字典引用
         Literal → 直接返回值
         FieldAccess → 逐层遍历字典/列表
+        ArithOp → 算术表达式求值
+        int/float → 直接返回（来自 grammar number 规则）
         list 类型变量原样返回（支持 for 迭代）
         """
         match node:
@@ -1354,8 +1364,43 @@ class WorkflowEngine:
                 return node.value
             case FieldAccess():
                 return self._eval_field_raw(node)
+            case ArithOp():
+                return self._eval_arith(node)
+            case FuncCall():
+                return self._call_func(node)
+            case int() | float():
+                return node
             case _:
                 return str(node) if node is not None else ""
+
+    def _resolve_arith(self, node) -> float | None:
+        """解析算术表达式右侧为数值（用于条件比较）
+
+        支持：float 字面量、VarRef、FieldAccess、ArithOp
+        """
+        if isinstance(node, (int, float)):
+            return float(node)
+        val = self._resolve(node)
+        return self._to_number(val)
+
+    def _eval_arith(self, node: ArithOp) -> float:
+        """求值算术表达式节点
+
+        递归求值 left/right，统一转 float 后执行运算。
+        除法为浮点除，除 0 返回 0。
+        """
+        left = self._resolve_arith(node.left)
+        right = self._resolve_arith(node.right)
+        if left is None or right is None:
+            return 0.0
+        match node.op:
+            case "+": return left + right
+            case "-": return left - right
+            case "*": return left * right
+            case "/": return left / right if right != 0 else 0.0
+            case _:
+                logger.warning(f"未知算术运算符: {node.op}")
+                return 0.0
 
     def _resolve_param(self, node) -> str:
         """解析 click/scan 参数

@@ -290,7 +290,7 @@ keyword_ref: "session" -> session_ref
 // 任意字面量（用于 eval 赋值右侧）
 ?literal: STRING
         | number
-        | "{" "}" -> empty_dict
+        | dict_literal
         | list_literal
         | range_literal
 
@@ -303,6 +303,20 @@ list_literal: "[" [list_item ("," list_item)*] "]"
 ?list_item: STRING -> list_item_str
           | number -> list_item_num
           | var_ref -> list_item_var
+          | dict_literal -> list_item_dict
+          | list_literal -> list_item_list
+
+// 字典字面量：{"key": "value", "key2": $var, "nested": {"a": 1}, "list": [1, 2]}
+// key 限定字符串，value 支持字符串、数字、变量引用、嵌套字典、列表
+dict_literal: "{" [dict_pair ("," dict_pair)*] "}"
+
+dict_pair: STRING ":" dict_value
+
+?dict_value: STRING -> dict_val_str
+           | number -> dict_val_num
+           | var_ref -> dict_val_var
+           | dict_literal -> dict_val_dict
+           | list_literal -> dict_val_list
 
 // ─── 通用原子 ─────────────────────────────────────────────
 

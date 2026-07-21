@@ -411,13 +411,13 @@ class _DSLTransformer(Transformer):
         return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
     def eval_assign_lit(self, items):
-        """eval $var = "string" | 123 | -1.5 | {} | [list] | (min, max)"""
+        """eval $var = "string" | 123 | -1.5 | {} | {"k": v} | [list] | (min, max)"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])  # $ 后面的 NAME
         lit_value = items[1]
-        # 空字典快捷路径
+        # 字典快捷路径（空字典和非空字典统一处理）
         if isinstance(lit_value, dict):
-            return Eval(func_name="__empty_dict__", func_args=[], target=target_name, line_no=self._line(items))
+            return Eval(func_name="__dict__", func_args=[lit_value], target=target_name, line_no=self._line(items))
         # 列表快捷路径
         if isinstance(lit_value, list):
             return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
@@ -476,12 +476,12 @@ class _DSLTransformer(Transformer):
         return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
 
     def implicit_eval_assign_lit(self, items):
-        """$var = "string" | 123 | {} | [list] | (min, max) — 隐式字面量赋值"""
+        """$var = "string" | 123 | {} | {"k": v} | [list] | (min, max) — 隐式字面量赋值"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])
         lit_value = items[1]
         if isinstance(lit_value, dict):
-            return Eval(func_name="__empty_dict__", func_args=[], target=target_name, line_no=self._line(items))
+            return Eval(func_name="__dict__", func_args=[lit_value], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, list):
             return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
         if isinstance(lit_value, tuple):
@@ -533,10 +533,10 @@ class _DSLTransformer(Transformer):
         return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
 
     def eval_rhs_lit(self, items):
-        """eval_rhs: literal → Literal | dict"""
+        """eval_rhs: literal → Literal | dict | list"""
         val = items[0]
         if isinstance(val, dict):
-            return val  # 空字典
+            return val  # 字典（空或非空）
         if isinstance(val, Token):
             return Literal(value=self._unquote(str(val)))
         return val  # number (float)
@@ -577,8 +577,44 @@ class _DSLTransformer(Transformer):
         return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
 
     def empty_dict(self, items):
-        """{} → 空字典标记"""
+        """{} → 空字典（兼容旧规则，已由 dict_literal 替代）"""
         return {}
+
+    # ─── 字典字面量 ─────────────────────────────────────
+
+    def dict_literal(self, items):
+        """{"k": v, ...} → dict[str, AST节点]"""
+        result = {}
+        for pair in items:
+            if isinstance(pair, tuple):
+                result[pair[0]] = pair[1]
+        return result
+
+    def dict_pair(self, items):
+        """STRING ":" dict_value → (key_str, value_node)"""
+        key = self._unquote(str(items[0]))
+        value = items[1]
+        return (key, value)
+
+    def dict_val_str(self, items):
+        """字典值：字符串 → Literal"""
+        return Literal(value=self._unquote(str(items[0])))
+
+    def dict_val_num(self, items):
+        """字典值：数字 → Literal"""
+        return Literal(value=items[0])
+
+    def dict_val_var(self, items):
+        """字典值：变量引用 → VarRef"""
+        return items[0]  # var_ref 已返回 VarRef
+
+    def dict_val_dict(self, items):
+        """字典值：嵌套字典 → dict[str, AST节点]"""
+        return items[0]  # dict_literal 已返回 dict
+
+    def dict_val_list(self, items):
+        """字典值：列表 → list[AST节点]"""
+        return items[0]  # list_literal 已返回 list
 
     def arg_list(self, items):
         return list(items)
@@ -906,6 +942,14 @@ class _DSLTransformer(Transformer):
     def list_item_var(self, items):
         """变量列表项 → VarRef"""
         return items[0]  # var_ref 已返回 VarRef
+
+    def list_item_dict(self, items):
+        """列表项：嵌套字典 → dict[str, AST节点]"""
+        return items[0]  # dict_literal 已返回 dict
+
+    def list_item_list(self, items):
+        """列表项：嵌套列表 → list[AST节点]"""
+        return items[0]  # list_literal 已返回 list
 
     def field_list(self, items):
         """.[f1, f2, ...] → list[Literal]"""

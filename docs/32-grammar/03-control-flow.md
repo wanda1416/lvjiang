@@ -159,6 +159,7 @@ end
 | `$var.field is_empty` | 字段不存在或为空字符串 |
 | `$var.field > N` / `< N` / `>= N` / `<= N` / `== N` / `!= N` | 字段数值与 N 比较（N 为整数或浮点数） |
 | `$var > N` / `< N` / `>= N` / `<= N` / `== N` / `!= N` | 变量数值与 N 比较（变量值为数字或可转数字的字符串） |
+| `expr > expr` / `< / == / ...` | 算术表达式比较：两侧支持 `+` `-` `*` `/` 运算，如 `$a + 1 > $b * 2` |
 | `$var` | truthy 检查：变量存在且非空时为 true，不存在或为空时为 false |
 | `not <基础条件>` | 取反任意一种 |
 
@@ -193,3 +194,23 @@ if $scan.x is_empty or ($scan.y equals "A" and $scan.z contains "B")
     click [scene].[field]
 end
 ```
+
+### 8.3 算术表达式条件
+
+数值比较的两侧支持算术表达式（`+` `-` `*` `/`），可用括号改变优先级：
+
+```
+if $a + 1 > $b * 2
+    log "a+1 大于 b*2"
+end
+
+if ($x + $y) / 2 >= 60
+    log "平均值达标"
+end
+
+if $col + 1 == 6
+    log "已是最后一列"
+end
+```
+
+> 算术表达式的运算规则与 eval 赋值一致：浮点除法、除零返回 0。详见 [02-data-flow.md](02-data-flow.md#算术表达式)。

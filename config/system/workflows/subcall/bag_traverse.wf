@@ -19,7 +19,7 @@ eval $fp_r1 = context.bag_fingerprints."r1c1"
 eval $fp_r2 = context.bag_fingerprints."r2c1"
 eval $fp_r3 = context.bag_fingerprints."r3c1"
 
-# ── 第二步：滚动 + 只处理新行 ──
+# ── 第二步：滚动循环 ──
 @scroll_loop
 drag [bag_equip_detail].[bag_grid][2][3] up hold 0.3
 wait step_interval
@@ -32,23 +32,27 @@ scan $detail_scene.[equip_type, equip_level, base_attr,
 eval $check_equip = to_equipment($check_scan)
 eval $check_fp = make_fingerprint($check_equip)
 
-# 到底检测：grid[1][1] 为空 → 滚到底了
+# 到底检测 1：grid[1][1] 为空 → 绝对到底
 if $check_fp is_empty
-    log "该部位遍历结束"
+    log "该部位遍历结束（到底：空）"
     return
 end
 
-# 三路判定校验滚动
+# 到底检测 2：grid[1][1] == fp_r1 → 内容未移动 → 到底
+# 选定装备后 grid 无空行，内容撑满时 drag 完全无效
+if $check_fp equals $fp_r1
+    log "该部位遍历结束（到底：未移动）"
+    return
+end
+
+# 滚动校验：处理过头情况（fp_r1 和空值已在上方处理）
 eval $verify_retry = 0
 @verify_loop
 if $check_fp equals $fp_r2
     # 滚动正确：旧 row2 → 新 row1
 else
-    if $check_fp equals $fp_r1
-        drag [bag_equip_detail].[bag_grid][2][3] up 0.2
-    else
-        drag [bag_equip_detail].[bag_grid][2][3] down 0.2
-    end
+    # 过头：回调
+    drag [bag_equip_detail].[bag_grid][2][3] down 0.2
     wait step_interval
     eval $verify_retry = add($verify_retry, 1)
     if $verify_retry < 4
@@ -57,14 +61,34 @@ else
             affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $check_scan
         eval $check_equip = to_equipment($check_scan)
         eval $check_fp = make_fingerprint($check_equip)
-        # 微调后再次检测到底
         if $check_fp is_empty
-            log "该部位遍历结束"
+            log "该部位遍历结束（回调到底）"
             return
         end
         goto verify_loop
     end
     log "滚动校验失败"
+    return
+end
+
+# ── 确保 row 3 可见（处理部分滚动 0.8 行）──
+eval $nudge_retry = 0
+@nudge_loop
+click [bag_equip_detail].[bag_grid][3][1]
+scan $detail_scene.[equip_type, equip_level, base_attr,
+    affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $r3_scan
+eval $r3_equip = to_equipment($r3_scan)
+eval $r3_fp = make_fingerprint($r3_equip)
+if $r3_fp is_empty
+    # row 3 无内容，补滚一次
+    drag [bag_equip_detail].[bag_grid][2][3] up 0.3
+    wait step_interval
+    align [bag_equip_detail].[bag_grid]
+    eval $nudge_retry = add($nudge_retry, 1)
+    if $nudge_retry < 3
+        goto nudge_loop
+    end
+    log "该部位遍历结束（补滚后 row 3 仍无内容）"
     return
 end
 
@@ -76,12 +100,17 @@ eval $fp_r2 = $fp_r3
 align [bag_equip_detail].[bag_grid]
 eval $has_new = "0"
 for c in [1...6]
-    click [bag_equip_detail].[bag_grid][3][$c]
-    scan $detail_scene.[equip_type, equip_level, base_attr,
-        affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $check_scan
-    eval $equip = to_equipment($check_scan)
-    eval $fp = make_fingerprint($equip)
     eval $slot_key = concat("r3c", $c)
+    if $c == 1
+        # col=1 已在 nudge_loop 中读过
+        eval $fp = $r3_fp
+    else
+        click [bag_equip_detail].[bag_grid][3][$c]
+        scan $detail_scene.[equip_type, equip_level, base_attr,
+            affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $check_scan
+        eval $equip = to_equipment($check_scan)
+        eval $fp = make_fingerprint($equip)
+    end
     if context.bag_fingerprints.$slot_key equals $fp
         # 无变化
     else
@@ -95,7 +124,7 @@ end
 eval $fp_r3 = $fp
 
 if $has_new equals "0"
-    log "该部位遍历结束"
+    log "该部位遍历结束（无新内容）"
 else
     goto scroll_loop
 end

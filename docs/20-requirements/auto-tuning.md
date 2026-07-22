@@ -282,60 +282,75 @@ context._scroll_manager = {
 
 执行 drag grid up 1 + align
 
-读取 grid[1][1] 的新指纹，与 row_fps 比对：
+读取 grid[1][1] 的新指纹，按以下优先级判定：
 
-  实际序列        grid[1][1] 看到    判定          返回
-  1 2 3 4 5 6    （已知序列）
-  ──────────────────────────────────────────────
-  _ 2 3 4 _ _    fp_B（原行2）    正常滚动        0
-  _ 3 4 5 _ _    fp_C（原行3）    滚动过头        -1
-  _ 1 2 3 _ _    fp_A（原行1）    没有滚动        +1
-  _ ? ? ? _ _    全不匹配        全部被回收/新内容  0
+  grid[1][1]      判定                    处理
+  ─────────────────────────────────────────────────────
+  空              绝对到底                结束遍历
+  == fp_r1        内容未移动 → 到底        结束遍历（不再微调！）
+  == fp_r2        滚动正确                验证 row 3 可见 → 处理新行
+  其他            滚动过头                回调微调（drag down 0.2）
 ```
 
-> **为什么必须 click 进详情才能校验？** 背包格仅显示图标，无法直接识别。
-> 唯一识别路径：click 格子 → 进详情页 → OCR → 解析装备 → 生成指纹。
+> **关键约束**：选定装备后 grid 无空行，内容始终撑满 3 行。
+> 因此 `check_fp == fp_r1` 意味着 drag 完全无效（已到底），
+> 而非“没滚到位”，不应尝试微调。
 
-#### 微调策略
+#### 部分滚动处理（补滚机制）
 
-根据 `check_scroll()` 返回的偏移量执行微调，最多重试 4 次：
+滚动正确（check_fp == fp_r2）后，额外验证 grid[3][1] 是否有内容：
 
-| 偏移量 | 含义 | 微调动作 |
+```
+grid[3][1] 有内容 → 正常处理 row 3
+grid[3][1] 为空   → 部分滚动（如 0.8 行），row 3 尚未进入可视区
+                   → 小步补滚（drag up 0.3）+ align
+                   → 重试读取 grid[3][1]，最多 3 次
+                   → 仍为空 → 到底，结束
+```
+
+> 补滚距离 0.3 行，足以覆盖 0.8 行滚动的 0.2 行缺口。
+
+#### 微调策略（仅处理过头）
+
+根据 `check_fp` 与已知指纹的比对执行微调，最多重试 4 次：
+
+| 条件 | 含义 | 微调动作 |
 |---------|------|----------|
-| `0` | 滚动正确 | 继续处理 |
-| `1` | 没有滚动 | `drag grid up 0.2` |
-| `-1` | 滚动过头 | `drag grid down 0.2` |
+| `check_fp == fp_r2` | 滚动正确 | 继续处理 |
+| `check_fp == 其他` | 滚动过头 | `drag grid down 0.2` |
+
+> `check_fp == fp_r1` 和空值已在调用方处理为到底，不进入微调。
 
 超过 4 次仍未到位 → 报错终止。
 
 ### 4.3 到底检测
 
-两个独立的到底信号，任一成立即结束：
+三个独立的到底信号，任一成立即结束：
 
-**信号 A — 新行全空**（最直接）
+**信号 A — grid[1][1] 为空**（绝对到底）
 
 ```
-align panel
-新一行（row 3）的 6 个 slot——若全部 click 进详情后 equip_type 为空
+drag 后 grid[1][1] click 进详情 → equip_type 为空
   → 已越过最后一件装备 → 到底
 ```
 
-**信号 B — 新行无变化**（背包未填满整页、无法再滚时）
+**信号 B — 内容未移动**（grid 撑满，drag 无效）
+
+```
+drag 后 grid[1][1] 指纹 == fp_r1（滚动前的 row 1）
+  → 选定装备后 grid 无空行，内容撑满时 drag 完全无效
+  → 到底（不再尝试微调）
+```
+
+**信号 C — 新行无变化**（补滚后仍无新内容）
 
 ```
 align panel
-对新一行（row 3）的 6 个格子逐一 click 进详情 → 生成指纹
-  如果指纹 == context.bag_fingerprints 中该 slot_key 的旧指纹 → 无变化
-  否则 → 有新内容，更新指纹
-
-如果 6 个格子全部无变化 → 滚动未产生新内容 → 到底
+新一行（row 3）的 grid[3][1] 为空 → 补滚最多 3 次
+  补滚后仍为空 → 到底
+  补滚后有内容 → 处理 row 3 的 6 个格子
+  如果 6 个格子全部指纹无变化 → 到底
 ```
-
-> slot_key 始终是屏幕上的物理位置（r1c1 ~ r3c6），不随滚动改变含义。
-
-### 4.4 备选：更保守的到底判定
-
-如果担心偶发误差，可要求**连续 2 行**（12 个格子）全部无变化才判定到底。
 
 ---
 
@@ -592,114 +607,116 @@ end
 ### 8.1 遍历子工作流 `subcall/bag_traverse.wf`
 
 ```dsl
-#% name: 背包遍历
-#% required_scenes: [bag_equip_detail, equip_weapon_detail, equip_armor_detail]
+#% name: 背包遍历（单个装备部位）
 
-# 初始化 context（每次运行清空）
+# 初始化 context
 eval context.bag_fingerprints = {}
-eval context.bag_candidates = []
-eval context._scroll_manager = {"row_fps": [], "fingerprints": {}, "scroll_count": 0}
+eval $detail_scene = context.equip_scene
 
-eval $scroll_count = 0
-eval $verify_retry = 0
-
-@traverse_loop
-# ── 对齐 panel（截图 + 方差分析，获取格子精确坐标）──
+# ── 第一步：处理初始可见 3 行 ──
 align [bag_equip_detail].[bag_grid]
-
-# ── 处理当前可见 3 行 ──
-eval $row = 1
-@row_loop
-    eval $col = 1
-    @col_loop
-        eval context._current_row = $row
-        eval context._current_col = $col
-        call "subcall/bag_process_slot.wf"
-        eval $col = $col + 1
-        if $col <= 6
-            goto col_loop
-        end
-    end
-    eval $row = $row + 1
-    if $row <= 3
-        goto row_loop
+for r in [1...3]
+    for c in [1...6]
+        eval context._current_row = $r
+        eval context._current_col = $c
+        call "bag_process_slot.wf"
     end
 end
 
-# ── 滚动一行（不需要精确，偏半行无所谓）──
-drag [bag_equip_detail].[scroll_down] 0.3 hold 0.3
-wait step_interval
-eval $scroll_count = $scroll_count + 1
+# 记录三行指纹（col=1）
+eval $fp_r1 = context.bag_fingerprints."r1c1"
+eval $fp_r2 = context.bag_fingerprints."r2c1"
+eval $fp_r3 = context.bag_fingerprints."r3c1"
 
-# ── 滚动校验：click grid[1][1] → 读详情 → 生成指纹 → 比对 ──
-@verify_loop
+# ── 第二步：滚动循环 ──
+@scroll_loop
+drag [bag_equip_detail].[bag_grid][2][3] up hold 0.3
+wait step_interval
+
+# 读取 grid[1][1]
 align [bag_equip_detail].[bag_grid]
 click [bag_equip_detail].[bag_grid][1][1]
-wait step_interval
-scan [equip_weapon_detail].[equip_type, equip_level,
-    affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $check_scan
-eval $check_equip = to_equipment($check_scan)
-eval $check_fp = make_fingerprint($check_equip)
-click [bag_equip_detail].[back]
-wait step_interval
+scan $detail_scene.[...] as $check_scan
+eval $check_fp = make_fingerprint(to_equipment($check_scan))
 
-eval $offset = check_scroll($check_fp)
-
-if $offset equals "0"
-    # 滚动正确，推进滚动管理器
-    eval scroll_advance()
-else
-    # 微调
-    if $offset equals "1"
-        drag [bag_equip_detail].[scroll_down] 0.2 hold 0.3
-    end
-    if $offset equals "-1"
-        drag [bag_equip_detail].[scroll_up] 0.2 hold 0.3
-    end
-    wait step_interval
-    eval $verify_retry = $verify_retry + 1
-    if $verify_retry < 4
-        goto verify_loop
-    end
-    log "滚动校验失败：超过 4 次微调仍未到位"
-    collect context.bag_candidates
+# 到底检测 1：空 → 绝对到底
+if $check_fp is_empty
+    log "到底（空）"
     return
 end
 
-# ── 到底检测：检查新行（row 3）是否有变化 ──
-align [bag_equip_detail].[bag_grid]
-eval $new_count = 0
-eval $col = 1
-@check_loop
-    click [bag_equip_detail].[bag_grid][3][$col]
+# 到底检测 2：== fp_r1 → 内容未移动 → 到底
+if $check_fp equals $fp_r1
+    log "到底（未移动）"
+    return
+end
+
+# 滚动校验：仅处理过头
+eval $verify_retry = 0
+@verify_loop
+if $check_fp equals $fp_r2
+    # 滚动正确
+else
+    drag [bag_equip_detail].[bag_grid][2][3] down 0.2
     wait step_interval
-    scan [equip_weapon_detail].[equip_type, equip_level] as $check_scan
-    eval $equip = to_equipment($check_scan)
-    eval $fp = make_fingerprint($equip)
-    eval $slot_key = concat("r3c", $col)
+    eval $verify_retry = add($verify_retry, 1)
+    if $verify_retry < 4
+        # 重新读取...
+        goto verify_loop
+    end
+    log "滚动校验失败"
+    return
+end
+
+# ── 确保 row 3 可见（补滚机制）──
+eval $nudge_retry = 0
+@nudge_loop
+click [bag_equip_detail].[bag_grid][3][1]
+scan $detail_scene.[...] as $r3_scan
+eval $r3_fp = make_fingerprint(to_equipment($r3_scan))
+if $r3_fp is_empty
+    drag [bag_equip_detail].[bag_grid][2][3] up 0.3
+    wait step_interval
+    align [bag_equip_detail].[bag_grid]
+    eval $nudge_retry = add($nudge_retry, 1)
+    if $nudge_retry < 3
+        goto nudge_loop
+    end
+    log "到底（补滚后 row 3 仍无内容）"
+    return
+end
+
+# 滑动指纹窗口
+eval $fp_r1 = $fp_r2
+eval $fp_r2 = $fp_r3
+
+# 处理新行（row 3）
+align [bag_equip_detail].[bag_grid]
+eval $has_new = "0"
+for c in [1...6]
+    if $c == 1
+        eval $fp = $r3_fp   # 已在 nudge_loop 读过
+    else
+        click [bag_equip_detail].[bag_grid][3][$c]
+        scan $detail_scene.[...] as $check_scan
+        eval $fp = make_fingerprint(to_equipment($check_scan))
+    end
+    eval $slot_key = concat("r3c", $c)
     if context.bag_fingerprints.$slot_key equals $fp
         # 无变化
     else
-        eval $new_count = $new_count + 1
-        eval context.bag_fingerprints.$slot_key = $fp
-    end
-    click [bag_equip_detail].[back]
-    wait step_interval
-    eval $col = $col + 1
-    if $col <= 6
-        goto check_loop
+        eval $has_new = "1"
+        call "bag_process_slot.wf"
     end
 end
 
-if $new_count == 0
-    log "到底，遍历结束"
+eval $fp_r3 = $fp
+
+if $has_new equals "0"
+    log "到底（无新内容）"
 else
-    if $scroll_count < 50
-        goto traverse_loop
-    end
+    goto scroll_loop
 end
-
-collect context.bag_candidates
 ```
 
 ### 8.2 单槽位处理子工作流 `subcall/bag_process_slot.wf`

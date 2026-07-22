@@ -90,8 +90,8 @@ align [scene].[panel]               # 面板自对齐
 |---|---|---|---|
 | 字符串 | `"..."` | `"武器"`, `"head"` | log、contains/equals 比较、eval 参数、collect alias/source、call 路径、eval 字面量赋值 |
 | 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、drag 行数、数值比较、eval 字面量赋值、collect source |
-| 空字典 | `{}` | `{}` | eval 字面量赋值（初始化空字典变量） |
-| 列表 | `[item, ...]` | `["a", "b"]`, `[1, 2, 3]` | eval 字面量赋值（列表元素支持字符串、数字、变量引用） |
+| 字典 | `{"k": v, ...}` | `{}`, `{"a": "b", "count": 3, "ref": $var}` | eval 字面量赋值（key 为字符串，value 支持字符串、数字、变量引用、嵌套字典、列表） |
+| 列表 | `[item, ...]` | `["a", "b"]`, `[1, 2, 3]` | eval 字面量赋值（列表元素支持字符串、数字、变量引用、嵌套字典、列表） |
 | 范围元组 | `(min, max)` | `(1, 2)`, `(0.5, 1.5)` | eval 字面量赋值、default 字面量赋值（存储为元组，用于随机等待等场景） |
 
 **不支持**：布尔值、null；eval 函数参数不能直接传数字常量（只能传 `$var` 或 `"string"`）。
@@ -107,9 +107,10 @@ align [scene].[panel]               # 面板自对齐
 | scan 声明 | `scan scene_name as $var` | OCR 扫描结果存入 `$var`（dict，key 为 Area 名）。场景名支持 `[]`/`""`/`$var` |
 | eval 函数赋值 | `eval $var = func(args...)` | 内置函数返回值存入 `$var` |
 | eval 字面量赋值 | `eval $var = "str"` 或 `eval $var = 42` | 字面量直接存入 `$var` |
-| eval 列表赋值 | `eval $var = ["a", "b", $c]` | 列表存入 `$var`，元素支持字符串、数字、变量引用 |
+| eval 算术赋值 | `eval $var = $a + $b * 2` | 算术表达式求值后存入 `$var`（支持 `+` `-` `*` `/` 和 `()`） |
+| eval 列表赋值 | `eval $var = ["a", "b", $c]` | 列表存入 `$var`，元素支持字符串、数字、变量引用、嵌套字典/列表 |
 | eval 范围元组 | `eval $var = (1, 2)` | 范围元组存入 `$var`，用于 `wait $var` 随机等待 |
-| eval 空字典 | `eval $var = {}` | 初始化空字典，后续可通过 `eval $var.key = value` 逐字段赋值 |
+| eval 字典 | `eval $var = {"k": v}` | 字典存入 `$var`，key 为字符串，value 支持字符串、数字、变量引用、嵌套字典/列表；`{}` 为空字典 |
 | default 赋值 | `default $var = <literal>` | 仅当变量未从外部传入时才赋值，支持字符串、数字、范围元组等字面量 |
 | for 循环变量 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
 | call 提取 | `call "sub.wf" read "key" as $var` | 从子工作流输出中提取值 |
@@ -139,8 +140,9 @@ $var = "hello"               # 隐式 eval，效果完全相同
 | `eval $var = to_equipment(...)` | `dict` | 嵌套字典，支持链式字段访问 |
 | `eval $var = "hello"` | `str` | 字符串 |
 | `eval $var = 42` | `float` | 数字（内部统一为 float） |
-| `eval $var = {}` | `dict` | 空字典，后续通过 `eval $var.key = value` 填充 |
-| `eval $var = ["a", "b"]` | `list` | 列表，元素为字符串或数字 |
+| `eval $var = {}` | `dict` | 空字典，后续可通过 `eval $var.key = value` 填充 |
+| `eval $var = {"k": v}` | `dict` | 字典字面量，value 支持字符串、数字、变量引用、嵌套字典/列表 |
+| `eval $var = ["a", "b"]` | `list` | 列表，元素支持字符串、数字、变量引用、嵌套字典/列表 |
 | `eval $var = (1, 2)` | `tuple` | 范围元组，用于随机等待等场景 |
 | `eval $var = $other` | 同 `$other` | 变量引用赋值，类型跟随源变量 |
 | `eval $var = $dict.field` | 同字段值 | 字段访问赋值，类型跟随字段值 |

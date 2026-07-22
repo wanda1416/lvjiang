@@ -100,7 +100,15 @@ class AutoTuningWorkflow(BaseWorkflow):
     # ─── 背包遍历（核心滚动逻辑）──────────────────────────
 
     def _traverse_bag(self, detail_scene: str):
-        """单部位 grid 遍历：初始 3 行 + 滚动循环"""
+        """单部位 grid 遍历：初始 3 行 + 滚动循环
+
+        滚动状态机：
+            drag 后读 grid[1][1]：
+            - 空          → 到底，结束
+            - == fp_r1    → 内容未移动（grid 撑满），到底，结束
+            - == fp_r2    → 滚动成功，验证 row 3 可见后处理
+            - 其他        → 滚动过头，微调修正
+        """
         fingerprints: dict[str, str] = {}
 
         # 初始处理可见 3 行
@@ -128,14 +136,27 @@ class AutoTuningWorkflow(BaseWorkflow):
                 detail_scene, self.SCAN_FIELDS)
             check_fp = self._make_fingerprint(check_equip)
 
-            # 到底检测：grid[1][1] 为空 → 滚到底了
+            # ── 到底检测 ──
+            # 1) grid[1][1] 为空 → 绝对到底
             if not check_fp:
-                logger.info("该部位遍历结束（到底）")
+                logger.info("该部位遍历结束（到底：grid[1][1] 为空）")
                 return
 
-            # 三路校验
+            # 2) grid[1][1] == fp_r1 → 内容未移动 → 到底
+            #    选定装备后 grid 无空行，内容撑满时 drag 完全无效
+            if check_fp == fp_r1:
+                logger.info("该部位遍历结束（到底：内容未移动）")
+                return
+
+            # 3) 滚动校验（处理过头情况）
             if not self._verify_scroll(check_fp, fp_r1, fp_r2, detail_scene):
                 logger.info("该部位遍历结束（校验失败）")
+                return
+
+            # ── 确保 row 3 可见（处理部分滚动 0.8 行的情况）──
+            row3_ok, row3_fp = self._ensure_row3(detail_scene)
+            if not row3_ok:
+                logger.info("该部位遍历结束（到底：补滚后 row 3 仍无内容）")
                 return
 
             # 滑动指纹窗口
@@ -143,13 +164,17 @@ class AutoTuningWorkflow(BaseWorkflow):
 
             # 处理新行（row 3）
             has_new = False
-            last_fp = ""
+            last_fp = row3_fp
             for c in range(1, self.COLS + 1):
-                equip = self.scan_panel(
-                    self.GRID_SCENE, self.GRID_PANEL, 3, c,
-                    detail_scene, self.SCAN_FIELDS)
-                fp = self._make_fingerprint(equip)
                 slot_key = f"r3c{c}"
+                # col=1 已在 _ensure_row3 中读过，直接复用
+                if c == 1:
+                    fp = row3_fp
+                else:
+                    equip = self.scan_panel(
+                        self.GRID_SCENE, self.GRID_PANEL, 3, c,
+                        detail_scene, self.SCAN_FIELDS)
+                    fp = self._make_fingerprint(equip)
                 if fp and fingerprints.get(slot_key) != fp:
                     has_new = True
                     fingerprints[slot_key] = fp
@@ -164,23 +189,20 @@ class AutoTuningWorkflow(BaseWorkflow):
 
     def _verify_scroll(self, check_fp: str, fp_r1: str, fp_r2: str,
                        detail_scene: str, max_retry: int = 4) -> bool:
-        """三路指纹校验滚动是否正确
+        """校验滚动是否过头（fp_r1 和空值已在调用方处理）
 
         Returns:
-            True = 校验通过（滚动正确）
-            False = 校验失败或到底
+            True = check_fp 已确认为 fp_r2（滚动正确）
+            False = 校验失败
         """
         for attempt in range(max_retry):
             if check_fp == fp_r2:
                 return True  # 滚动正确：旧 row2 → 新 row1
 
-            # 微调
-            if check_fp == fp_r1:
-                self.drag_grid(self.GRID_SCENE, self.GRID_PANEL,
-                               2, 3, "up", distance=0.2)
-            else:
-                self.drag_grid(self.GRID_SCENE, self.GRID_PANEL,
-                               2, 3, "down", distance=0.2)
+            # 过头：grid[1][1] 不是 fp_r1 也不是 fp_r2 → 滚多了
+            logger.debug(f"滚动过头 (attempt {attempt + 1})，回调")
+            self.drag_grid(self.GRID_SCENE, self.GRID_PANEL,
+                           2, 3, "down", distance=0.2)
             self.wait_delay("step_interval")
 
             # 重新读取
@@ -193,8 +215,35 @@ class AutoTuningWorkflow(BaseWorkflow):
             if not check_fp:
                 return False  # 到底
 
-        logger.warning("滚动校验失败")
+        logger.warning("滚动校验失败：超过最大重试次数")
         return False
+
+    def _ensure_row3(self, detail_scene: str,
+                     max_nudge: int = 3) -> tuple[bool, str]:
+        """确保 grid[3][1] 有内容（处理部分滚动 0.8 行的情况）
+
+        部分滚动时 row 1-2 已正确（fp_r2/fp_r3），但 row 3 尚未完全进入可视区。
+        通过小步补滚使 row 3 可见。
+
+        Returns:
+            (True, fp)  — row 3 有内容，fp 为 grid[3][1] 的指纹
+            (False, "") — 补滚后仍无内容，判定到底
+        """
+        for _ in range(max_nudge):
+            equip = self.scan_panel(
+                self.GRID_SCENE, self.GRID_PANEL, 3, 1,
+                detail_scene, self.SCAN_FIELDS)
+            fp = self._make_fingerprint(equip)
+            if fp:
+                return True, fp  # row 3 有内容
+
+            # 小步补滚
+            self.drag_grid(self.GRID_SCENE, self.GRID_PANEL,
+                           2, 3, "up", distance=0.3)
+            self.wait_delay("step_interval")
+            self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
+
+        return False, ""  # 补滚失败，到底
 
     def _process_slot(self, row: int, col: int, detail_scene: str,
                       fingerprints: dict[str, str]):

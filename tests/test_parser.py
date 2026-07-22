@@ -3,7 +3,8 @@
 from pathlib import Path
 from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.grammar import (
-    Program, Click, Drag, Wait, Scan, Recognize, Collect, Log, Eval, Call,
+    Program, Click, Drag, Wait, Scan, Recognize, Collect, Log, Eval,
+    Import, ProcDef, CallProc,
     If, For, Loop, Break, Return, Label, Goto,
     Contains, Equals, InList, IsEmpty, FieldAccess, VarRef, Literal, SceneRef,
     Not, And, Or, GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
@@ -506,83 +507,103 @@ def test_conditions():
     print("  if not ...: OK")
 
 
-# ─── call 测试 ──────────────────────────────────────────────
+# ─── import / def / call proc 测试 ─────────────────────────────────
 
-def test_call_simple():
-    """测试 call 基本语法"""
-    print("\n=== 测试 call ===")
+def test_import_stmt():
+    """测试 import 语句"""
+    print("\n=== 测试 import ===")
 
-    # call "sub.wf"
-    program = parse_text('call "sub_workflow.wf"')
+    program = parse_text('import "subcall/utils.wf"')
+    assert len(program.imports) == 1
+    assert program.imports[0].path == "subcall/utils.wf"
+    print('  import "subcall/utils.wf": OK')
+
+    # 多个 import
+    program = parse_text('import "a.wf"\nimport "b.wf"')
+    assert len(program.imports) == 2
+    assert program.imports[1].path == "b.wf"
+    print('  multiple imports: OK')
+
+
+def test_def_stmt():
+    """测试 def 过程定义"""
+    print("\n=== 测试 def ===")
+
+    text = """\
+def greet($name)
+    log $name
+end
+"""
+    program = parse_text(text)
+    assert len(program.procs) == 1
+    assert "greet" in program.procs
+    proc = program.procs["greet"]
+    assert proc.params == ["name"]
+    assert len(proc.body) == 1
+    print("  def with params: OK")
+
+    # 无参数 def
+    text = """\
+def do_something()
+    log "hello"
+end
+"""
+    program = parse_text(text)
+    proc = program.procs["do_something"]
+    assert proc.params == []
+    print("  def without params: OK")
+
+
+def test_call_proc_stmt():
+    """测试 call proc 调用"""
+    print("\n=== 测试 call proc ===")
+
+    program = parse_text('call greet("world")')
     assert len(program.body) == 1
     n = program.body[0]
-    assert isinstance(n, Call)
-    assert isinstance(n.workflow, Literal)
-    assert n.workflow.value == "sub_workflow.wf"
-    assert n.args == []
-    assert n.reads == []
-    print('  call "sub.wf": OK')
-
-
-def test_call_with_args():
-    """测试 call with 参数传递"""
-    print("\n=== 测试 call with ===")
-
-    program = parse_text('call "sub.wf" with $slot as "target_slot", $data as "input_data"')
-    n = program.body[0]
-    assert isinstance(n, Call)
-    assert len(n.args) == 2
-    # 第一个参数
-    assert isinstance(n.args[0][0], VarRef)
-    assert n.args[0][0].name == "slot"
-    assert isinstance(n.args[0][1], Literal)
-    assert n.args[0][1].value == "target_slot"
-    # 第二个参数
-    assert isinstance(n.args[1][0], VarRef)
-    assert n.args[1][0].name == "data"
-    assert isinstance(n.args[1][1], Literal)
-    assert n.args[1][1].value == "input_data"
-    print('  call with $x as "arg": OK')
-
-
-def test_call_with_read():
-    """测试 call read 返回值"""
-    print("\n=== 测试 call read ===")
-
-    program = parse_text('call "sub.wf" read "main_weapon" as $weapon, "sub_weapon" as $sub')
-    n = program.body[0]
-    assert isinstance(n, Call)
-    assert len(n.reads) == 2
-    # 第一个 read
-    assert isinstance(n.reads[0][0], Literal)
-    assert n.reads[0][0].value == "main_weapon"
-    assert isinstance(n.reads[0][1], VarRef)
-    assert n.reads[0][1].name == "weapon"
-    # 第二个 read
-    assert isinstance(n.reads[1][0], Literal)
-    assert n.reads[1][0].value == "sub_weapon"
-    assert n.reads[1][1].name == "sub"
-    print('  call read "key" as $var: OK')
-
-
-def test_call_full():
-    """测试 call 完整形式"""
-    print("\n=== 测试 call 完整形式 ===")
-
-    program = parse_text('call "sub.wf" with $x as "arg1" read "result" as $out')
-    n = program.body[0]
-    assert isinstance(n, Call)
+    assert isinstance(n, CallProc)
+    assert n.name == "greet"
     assert len(n.args) == 1
-    assert len(n.reads) == 1
-    assert isinstance(n.args[0][0], VarRef)
-    assert n.args[0][0].name == "x"
-    assert isinstance(n.args[0][1], Literal)
-    assert n.args[0][1].value == "arg1"
-    assert isinstance(n.reads[0][0], Literal)
-    assert n.reads[0][0].value == "result"
-    assert isinstance(n.reads[0][1], VarRef)
-    assert n.reads[0][1].name == "out"
-    print('  call with + read: OK')
+    print('  call proc("arg"): OK')
+
+    # 多参数 call
+    program = parse_text('call process(1, $col, "scene")')
+    n = program.body[0]
+    assert isinstance(n, CallProc)
+    assert len(n.args) == 3
+    print('  call proc(1, $var, "str"): OK')
+
+    # 无参数 call
+    program = parse_text("call do_something()")
+    n = program.body[0]
+    assert isinstance(n, CallProc)
+    assert n.name == "do_something"
+    assert n.args == []
+    print("  call proc(): OK")
+
+
+def test_import_def_mixed():
+    """测试 import + def + call 混合"""
+    print("\n=== 测试 import + def + call 混合 ===")
+
+    text = """\
+import "subcall/utils.wf"
+
+def local_proc($x)
+    log $x
+end
+
+call local_proc("hello")
+call utils_func(1, 2)
+"""
+    program = parse_text(text)
+    assert len(program.imports) == 1
+    assert len(program.procs) == 1
+    assert "local_proc" in program.procs
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], CallProc)
+    assert isinstance(program.body[1], CallProc)
+    print("  import + def + call mixed: OK")
 
 
 # ─── 完整工作流测试 ─────────────────────────────────────────
@@ -732,7 +753,7 @@ def test_implicit_eval():
     program = parse_text("$data = {}")
     n = program.body[0]
     assert isinstance(n, Eval)
-    assert n.func_name == "__empty_dict__"
+    assert n.func_name == "__dict__"
     print("  $var = {}: OK")
 
     # $var = ["a", "b", "c"]
@@ -875,12 +896,16 @@ def test_scan_without_by():
 
 
 def test_find_tune_material_wf():
-    """验证改写后的 find_tune_material.wf 能正常解析"""
+    """验证改写后的 find_tune_material.wf 能正常解析（def 格式）"""
     print("\n=== 测试 find_tune_material.wf ===")
     path = Path("config/system/workflows/subcall/find_tune_material.wf")
     program = parse_file(path)
-    assert len(program.body) == 2  # recognize + collect
-    n = program.body[0]
+    assert len(program.body) == 0  # 内容在 def 内
+    assert "find_tune_material" in program.procs
+    proc = program.procs["find_tune_material"]
+    assert proc.params == ["material_name"]
+    assert len(proc.body) == 2  # recognize + eval
+    n = proc.body[0]
     assert isinstance(n, Recognize)
     assert n.by is not None
     assert n.by.match_mode == "equals"
@@ -952,7 +977,7 @@ eval $dict = {
     program = parse_text(text)
     n = program.body[0]
     assert isinstance(n, Eval)
-    assert n.func_name == "__empty_dict__"
+    assert n.func_name == "__dict__"
     print("  eval $dict = {\\n}: OK")
 
 
@@ -1044,11 +1069,11 @@ if __name__ == "__main__":
     # conditions
     test_conditions()
     
-    # call
-    test_call_simple()
-    test_call_with_args()
-    test_call_with_read()
-    test_call_full()
+    # import / def / call proc
+    test_import_stmt()
+    test_def_stmt()
+    test_call_proc_stmt()
+    test_import_def_mixed()
     
     # full workflow
     test_if_with_scan_as()

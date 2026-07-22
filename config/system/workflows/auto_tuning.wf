@@ -1,8 +1,11 @@
 #% name: 自动调律
 #% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail]
 
+import "subcall/nav_main_to_equip.wf"
+import "subcall/bag_traverse.wf"
+
 # ── 导航到背包页 ──
-call "subcall/nav_main_to_equip.wf"
+call nav_main_to_equip()
 
 # ── 武器类（equip_weapon_detail）──
 eval context.equip_scene = "equip_weapon_detail"
@@ -10,7 +13,7 @@ eval $weapon_slots = ["main_weapon", "sub_weapon", "ring", "pendant"]
 for slot in $weapon_slots
     click [bag_equip_detail].$slot
     wait step_interval
-    call "subcall/bag_traverse.wf"
+    call bag_traverse()
 end
 
 # ── 防具类（equip_armor_detail）──
@@ -19,7 +22,7 @@ eval $armor_slots = ["head", "chest", "leg", "wrist"]
 for slot in $armor_slots
     click [bag_equip_detail].$slot
     wait step_interval
-    call "subcall/bag_traverse.wf"
+    call bag_traverse()
 end
 
 # ── 返回主界面 ──

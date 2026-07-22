@@ -1,10 +1,12 @@
 #% name: 装备分析
 #% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail]
 
+import "subcall/nav_main_to_equip.wf"
+
 # 装备分析工作流
 # 读取角色已装备数据，写入 session.equipped 持久化
 
-call "subcall/nav_main_to_equip.wf"
+call nav_main_to_equip()
 
 # 初始化 session.equipped
 eval session.equipped = {}

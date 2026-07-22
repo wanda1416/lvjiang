@@ -417,9 +417,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         tuning_layout = QVBoxLayout(tuning_panel)
         tuning_layout.setContentsMargins(4, 4, 4, 4)
 
-        # 部位选择
+        # 部位选择：武器和防具并列左右
         tuning_layout.addWidget(QLabel("<b>选择调律部位：</b>"))
         self._tuning_checkboxes = []
+
+        # 水平布局：武器类 | 防具类
+        slots_row = QHBoxLayout()
         for group_name, slots in [("武器类", [("main_weapon", "主武器"), ("sub_weapon", "副武器"),
                                                ("ring", "环佩"), ("pendant", "项链")]),
                                    ("防具类", [("head", "头部"), ("chest", "胸部"),
@@ -433,7 +436,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
                 cb.stateChanged.connect(self._save_tuning_config)
                 grp_layout.addWidget(cb)
                 self._tuning_checkboxes.append(cb)
-            tuning_layout.addWidget(grp)
+            slots_row.addWidget(grp)
+        tuning_layout.addLayout(slots_row)
 
         # 全选/取消全选
         toggle_row = QHBoxLayout()

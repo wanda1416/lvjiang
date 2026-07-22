@@ -30,8 +30,6 @@ class AutoTuningWorkflow(BaseWorkflow):
 
     GRID_SCENE = "bag_equip_detail"
     GRID_PANEL = "bag_grid"
-    INITIAL_ROWS = 3
-    COLS = 6
 
     def run(self) -> dict:
         self._navigate_to_equip()
@@ -175,12 +173,21 @@ class AutoTuningWorkflow(BaseWorkflow):
             last_real_row  = 当前实际出现的最后一行逻辑行号
             fps            = 各逻辑行首列指纹（0 起始索引）
         """
+        # 从 panel 定义获取初始行列数
+        panel_obj = self._find_panel(self.GRID_SCENE, self.GRID_PANEL)
+        if panel_obj is None:
+            logger.error(f"未找到 panel {self.GRID_SCENE}.{self.GRID_PANEL}")
+            return
+        initial_rows = panel_obj.rows
+        cols = panel_obj.cols
+        logger.info(f"背包遍历开始: 初始行数={initial_rows}, 列数={cols}")
+
         fps: list[str] = []
 
-        # 初始扫描 = 处理第一批新行（row_index=0, first_real_row=1, real_rows=INITIAL_ROWS）
+        # 初始扫描 = 处理第一批新行（row_index=0, first_real_row=1, real_rows=initial_rows）
         self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
         logger.info("═══ 初始扫描 ═══")
-        row_index = self._process_new_rows(detail_scene, fps, 0, 1, self.INITIAL_ROWS)
+        row_index = self._process_new_rows(detail_scene, fps, 0, 1, initial_rows)
         first_real_row = 1
         logger.info(f"初始完成: row_index={row_index} first_real_row=1 fps={fps}")
         if row_index == 0:

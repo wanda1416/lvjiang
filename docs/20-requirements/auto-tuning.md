@@ -257,11 +257,11 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 
 ### 4.2 重叠滚动与滚动管理器
 
-#### 滚动管理器（ScrollManager）
+滚动管理器的详细算法设计见 [02-auto-tuning.md](../35-workflows/02-auto-tuning.md)。
 
-滚动管理器是内置模块，负责维护滚动过程中的指纹状态。核心职责：
+核心职责：
 1. 记录每行第一列（col=1）的装备指纹，形成有序序列
-2. 滚动后通过比对 grid[1][1] 的新指纹与已知序列，判定偏移量
+2. 滚动后通过比对 `grid[1][1]` 的新指纹与已知序列，判定偏移量
 3. 校验通过后推进状态（移除已滚出的行指纹）
 
 **状态结构**（存储在 context 中）：
@@ -274,110 +274,19 @@ context._scroll_manager = {
 }
 ```
 
-#### 滚动校验流程
-
-```
-处理完 cols 行后：
-  row_fps = [fp_A, fp_B, fp_C]   ← 滚动管理器维护的行指纹序列
-
-执行 drag grid up 1 + align
-
-读取 grid[1][1] 的新指纹，按以下优先级判定：
-
-  grid[1][1]      判定                    处理
-  ─────────────────────────────────────────────────────
-  空              绝对到底                结束遍历
-  == fp_r1        内容未移动 → 到底        结束遍历（不再微调！）
-  == fp_r2        滚动正确                验证 row 3 可见 → 处理新行
-  其他            滚动过头                回调微调（drag down 0.2）
-```
-
-> **关键约束**：选定装备后 grid 无空行，内容始终撑满 3 行。
-> 因此 `check_fp == fp_r1` 意味着 drag 完全无效（已到底），
-> 而非“没滚到位”，不应尝试微调。
-
-#### 部分滚动处理（补滚机制）
-
-滚动正确（check_fp == fp_r2）后，额外验证 grid[3][1] 是否有内容：
-
-```
-grid[3][1] 有内容 → 正常处理 row 3
-grid[3][1] 为空   → 部分滚动（如 0.8 行），row 3 尚未进入可视区
-                   → 小步补滚（drag up 0.3）+ align
-                   → 重试读取 grid[3][1]，最多 3 次
-                   → 仍为空 → 到底，结束
-```
-
-> 补滚距离 0.3 行，足以覆盖 0.8 行滚动的 0.2 行缺口。
-
-#### 微调策略（仅处理过头）
-
-根据 `check_fp` 与已知指纹的比对执行微调，最多重试 4 次：
-
-| 条件 | 含义 | 微调动作 |
-|---------|------|----------|
-| `check_fp == fp_r2` | 滚动正确 | 继续处理 |
-| `check_fp == 其他` | 滚动过头 | `drag grid down 0.2` |
-
-> `check_fp == fp_r1` 和空值已在调用方处理为到底，不进入微调。
-
-超过 4 次仍未到位 → 报错终止。
-
 ### 4.3 到底检测
 
-三个独立的到底信号，任一成立即结束：
-
-**信号 A — grid[1][1] 为空**（绝对到底）
-
-```
-drag 后 grid[1][1] click 进详情 → equip_type 为空
-  → 已越过最后一件装备 → 到底
-```
-
-**信号 B — 内容未移动**（grid 撑满，drag 无效）
-
-```
-drag 后 grid[1][1] 指纹 == fp_r1（滚动前的 row 1）
-  → 选定装备后 grid 无空行，内容撑满时 drag 完全无效
-  → 到底（不再尝试微调）
-```
-
-**信号 C — 新行无变化**（补滚后仍无新内容）
-
-```
-align panel
-新一行（row 3）的 grid[3][1] 为空 → 补滚最多 3 次
-  补滚后仍为空 → 到底
-  补滚后有内容 → 处理 row 3 的 6 个格子
-  如果 6 个格子全部指纹无变化 → 到底
-```
+三个独立的到底信号，任一成立即结束。详细判定逻辑见 [02-auto-tuning.md](../35-workflows/02-auto-tuning.md)。
 
 ---
 
 ## 5. 指纹模型
 
+指纹生成与存储的详细设计见 [02-auto-tuning.md](../35-workflows/02-auto-tuning.md)。
+
 ### 5.1 指纹生成
 
-基于装备详情页 OCR 结果，由 `to_equipment()` 解析后生成完整指纹字符串，然后 MD5 取前 8 位十六进制：
-
-```python
-def make_fingerprint(equip_data: dict) -> str:
-    """基于装备关键字段生成去重指纹（MD5 前 8 位 hex）"""
-    import hashlib
-    parts = [
-        equip_data.get("type", ""),           # 部位
-        str(equip_data.get("level", "")),      # 等级
-        str(equip_data.get("quality", "")),    # 品阶
-        str(equip_data.get("chengyin", "")),   # 是否承音
-    ]
-    # 全部词条（名称:数值）
-    for affix in equip_data.get("affixes", []):
-        parts.append(f"{affix['name']}:{affix['value']}")
-    raw = "+".join(parts)
-    return hashlib.md5(raw.encode()).hexdigest()[:8]
-```
-
-> 解析装备信息时直接写入 `_extra.hash` 字段，后续 `make_fingerprint($equip)` 可直接读取。
+基于装备详情页 OCR 结果，由 `to_equipment()` 解析后生成完整指纹字符串，然后 MD5 取前 8 位十六进制。
 
 ### 5.2 指纹存储
 
@@ -390,7 +299,7 @@ context.bag_fingerprints = {
 }
 ```
 
-- **key** = `r{row}c{col}`（屏幕物理位置，如 r1c1 = 第 1 行第 1 列）
+- **key** = `r{row}c{col}`（屏幕物理位置）
 - **value** = 指纹字符串（MD5 前 8 位 hex）
 - 每次滚动后，新行覆盖旧 slot_key 的指纹
 
@@ -406,94 +315,14 @@ context._scroll_manager = {
 }
 ```
 
-- `row_fps` 用于 `check_scroll()` 的偏移判定
-- `fingerprints` 用于快速判断一个指纹是否是“已知装备”
-- 每次处理完装备时通过 `notify_scroll(col, row, fp)` 更新
-- 每次滚动校验通过后通过 `scroll_advance()` 推进
-
 ### 5.4 内置函数
 
-#### make_fingerprint
-
-```python
-@builtin_func("make_fingerprint")
-def _make_fingerprint(equip_data: dict) -> str:
-    """基于装备数据生成去重指纹（MD5 前 8 位 hex）"""
-    if not isinstance(equip_data, dict) or not equip_data:
-        return ""
-    import hashlib
-    parts = [
-        equip_data.get("type", ""),
-        str(equip_data.get("level", "")),
-        str(equip_data.get("quality", "")),
-        str(equip_data.get("chengyin", "")),
-    ]
-    affixes = equip_data.get("affixes", [])
-    for affix in affixes:
-        if isinstance(affix, dict):
-            parts.append(f"{affix.get('name', '')}:{affix.get('value', '')}")
-    raw = "+".join(parts)
-    return hashlib.md5(raw.encode()).hexdigest()[:8]
-```
-
-#### check_scroll
-
-```python
-@builtin_func("check_scroll")
-def _check_scroll(engine, fingerprint: str) -> str:
-    """滚动校验：比对 grid[1][1] 指纹与滚动管理器预期。
-
-    Returns:
-        "0"  — 正常（指纹在已知序列中，偏移量符合预期）
-        "1"  — 没有滚动（指纹仍在行 1 位置）
-        "-1" — 滚动过头（指纹在行 3 位置）
-    """
-    manager = engine.context.get("_scroll_manager", {})
-    row_fps = manager.get("row_fps", [])
-    fingerprints = manager.get("fingerprints", {})
-
-    if not row_fps:
-        return "0"  # 无快照数据，跳过验证
-
-    # 全不匹配 = 全部被回收或新内容，视为正常
-    if fingerprint not in fingerprints:
-        return "0"
-
-    # 找到指纹在原序列中的位置
-    for i, fp in enumerate(row_fps):
-        if fp == fingerprint:
-            # 滚动 1 步后，行 1 应该是原行 2（i=1）
-            # offset = i - 1:  0=正常, -1=过头, +1=没滚
-            return str(i - 1)
-
-    return "0"
-```
-
-#### notify_scroll / scroll_advance
-
-```python
-@builtin_func("notify_scroll")
-def _notify_scroll(engine, col, row, fingerprint):
-    """记录已处理装备的指纹到滚动管理器"""
-    manager = engine.context.setdefault("_scroll_manager", {
-        "row_fps": [],
-        "fingerprints": {},
-        "scroll_count": 0,
-    })
-    manager["fingerprints"][fingerprint] = True
-    # 每行第一列（col=1）记录为行指纹
-    if str(col) == "1":
-        manager["row_fps"].append(fingerprint)
-
-@builtin_func("scroll_advance")
-def _scroll_advance(engine):
-    """滚动校验通过后，推进状态：移除已滚出的行指纹"""
-    manager = engine.context.get("_scroll_manager", {})
-    row_fps = manager.get("row_fps", [])
-    if row_fps:
-        row_fps.pop(0)
-    manager["scroll_count"] = manager.get("scroll_count", 0) + 1
-```
+| 函数 | 用途 |
+|---|---|
+| `make_fingerprint($equip)` | 基于装备数据生成去重指纹（MD5 前 8 位 hex） |
+| `check_scroll($fp)` | 滚动校验：比对指纹与滚动管理器预期，返回偏移量 |
+| `notify_scroll($col, $row, $fp)` | 记录已处理装备的指纹到滚动管理器 |
+| `scroll_advance()` | 滚动校验通过后，推进状态：移除已滚出的行指纹 |
 
 ---
 

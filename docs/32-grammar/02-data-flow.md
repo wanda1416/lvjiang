@@ -201,7 +201,7 @@ collect $result as $key_name      # output["weapon_data"] = $result（$key_name 
 
 ## 四、eval — 赋值与函数调用
 
-调用内置函数、字面量赋值、初始化字典/列表、字典字段赋值。
+调用内置函数、字面量赋值、算术运算、初始化字典/列表、字典字段赋值。
 
 **语法**：
 
@@ -210,11 +210,49 @@ eval $var = func(args...)         # 函数调用并赋值
 eval $var = "字符串"              # 字面量赋值
 eval $var = 123                   # 数字赋值
 eval $var = {}                    # 初始化空字典
+eval $var = {"k": v}              # 字典字面量（支持嵌套）
 eval $var = ["a", "b"]           # 列表赋值
+eval $var = $a + $b * 2           # 算术表达式
 eval $var.field = value           # 字典字段赋值（单层）
 eval $var.f1.f2 = value           # 字典链式字段赋值（自动创建中间层）
 eval $var.$key = value            # 动态字段名赋值
 eval func(args...)                # 调用函数，丢弃返回值
+```
+
+### 算术表达式
+
+eval 赋值右侧支持 `+` `-` `*` `/` 四则运算，运算两侧可以是数字、变量引用、字段访问、函数调用：
+
+```
+eval $x = 1 + 2                   # 数字常量运算 → 3.0
+eval $x = $a + $b                 # 变量间运算
+eval $x = $a * 2 + $b / 3        # 混合运算
+eval $x = ($a + $b) * ($c - 1)   # 括号改变优先级
+```
+
+**规则**：
+- 优先级：`*` `/` 高于 `+` `-`，支持 `()` 改变优先级
+- 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
+- 不支持 `mod` 运算符（可提供 `mod()` 函数）
+- 算术表达式也可用于 if 条件比较的两侧（见 [03-control-flow.md](03-control-flow.md)）
+
+### 字典字面量
+
+eval 赋值右侧支持字典字面量初始化，key 限定为字符串，value 支持多种类型：
+
+```
+eval $d = {}                                  # 空字典
+eval $d = {"a": "b", "c": "d"}              # 字符串值
+eval $d = {"count": 3, "name": $user}       # 数字值 + 变量引用
+eval $d = {"nested": {"k": "v"}}            # 嵌套字典
+eval $d = {"list": [1, 2, $var]}            # 列表值
+eval $d = {"a": "b"}                        # 隐式 eval 同样支持
+```
+
+列表字面量同样支持嵌套字典：
+
+```
+eval $list = [{"k": "v"}, {"k2": "v2"}]     # 列表含字典元素
 ```
 
 详细说明见 [04-functions.md](04-functions.md)。

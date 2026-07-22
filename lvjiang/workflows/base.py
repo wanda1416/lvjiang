@@ -126,7 +126,7 @@ class BaseWorkflow:
 
         result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key)
         fields_display = field_keys if field_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
-        logger.info(f"OCR [{scene_key}]:{fields_display} => {result}")
+        logger.debug(f"OCR [{scene_key}]:{fields_display} => {result}")
         return result
 
     def click_at(self, x: int, y: int):
@@ -297,10 +297,10 @@ class BaseWorkflow:
             ocr_results = self._ocr.recognize(crop)
             text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
             if self._match_text(text, target_value, mode):
-                logger.info(f"by OCR 命中: [{scene_key}].[{region.key}] text={text!r} mode={mode}")
+                logger.debug(f"by OCR 命中: [{scene_key}].[{region.key}] text={text!r} mode={mode}")
                 return region.key
 
-        logger.info(f"by OCR 未命中: [{scene_key}]:{field_keys} mode={mode}")
+        logger.debug(f"by OCR 未命中: [{scene_key}]:{field_keys} mode={mode}")
         return ""
 
     def recognize_materials_by(
@@ -631,10 +631,9 @@ class BaseWorkflow:
             return {}
         return self.call_function("to_equipment", [raw])
 
-    def drag_grid(self, scene_key: str, panel_key: str,
-                  row: int, col: int, direction: str,
+    def drag_grid(self, scene_key: str, panel_key: str, direction: str,
                   distance: float = 1.0, hold: float | None = None):
-        """在 panel 格子位置执行 grid 级拖拽（滚动），drag 后自动失效缓存"""
+        """按 panel 中心执行 grid 级拖拽（滚动），drag 后自动失效缓存"""
         panel_obj = self._find_panel(scene_key, panel_key)
         if panel_obj is None:
             logger.error(f"drag grid: 未找到 panel {scene_key}.{panel_key}")

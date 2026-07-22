@@ -145,6 +145,30 @@ def _binary_axis(line_means: np.ndarray, black_threshold: float = 30.0) -> SlotA
     slot_size = float(np.median(slot_sizes)) / length
     span_size = float(np.median(gap_sizes)) / length if gap_sizes else 0.0
 
+    # 等距补全：用周期推导被漏掉的 slot（首尾行/列装备少时会被亮度过滤漏掉）
+    # 约束：推导出的 slot 边缘（center ± period/2）不能超出 [0, 1]，否则边界不清晰
+    if len(centers) >= 2:
+        period = centers[1] - centers[0]
+        half_period = period / 2.0
+
+        # 向前推导（补全首部被漏掉的 slot）
+        prev_center = centers[0] - period
+        while prev_center - half_period >= 0:
+            centers.insert(0, prev_center)
+            prev_center -= period
+
+        # 向后推导（补全尾部被漏掉的 slot）
+        next_center = centers[-1] + period
+        while next_center + half_period <= 1.0:
+            centers.append(next_center)
+            next_center += period
+
+        # 重新计算 boundaries（保持和 centers 的关系一致）
+        boundaries = [centers[0] - half_period]
+        for i in range(len(centers) - 1):
+            boundaries.append((centers[i] + centers[i + 1]) / 2.0)
+        boundaries.append(centers[-1] + half_period)
+
     return SlotAxis(centers=centers, boundaries=boundaries,
                     slot_size=slot_size, span_size=span_size)
 
@@ -239,6 +263,23 @@ def detect_grid(
         col_slot=col_axis.slot_size,
         col_span=col_axis.span_size,
     )
+
+    if result.n_rows > expected_rows:
+        logger.error(
+            f"detect_grid: 检测到行数 {result.n_rows} 超过预期 {expected_rows}，"
+            f"可能是滚动过头或亮度剖面异常。"
+            f"行 centers={[f'{c:.4f}' for c in result.row_centers]}, "
+            f"bounds={[f'{b:.4f}' for b in result.row_bounds]}, "
+            f"slot={result.row_slot:.4f}, span={result.row_span:.4f}"
+        )
+    if result.n_cols > expected_cols:
+        logger.error(
+            f"detect_grid: 检测到列数 {result.n_cols} 超过预期 {expected_cols}，"
+            f"可能是亮度剖面异常。"
+            f"列 centers={[f'{c:.4f}' for c in result.col_centers]}, "
+            f"bounds={[f'{b:.4f}' for b in result.col_bounds]}, "
+            f"slot={result.col_slot:.4f}, span={result.col_span:.4f}"
+        )
 
     logger.info(
         f"detect_grid: 检测到 {result.n_rows}/{expected_rows} 行 × "

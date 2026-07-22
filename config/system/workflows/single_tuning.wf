@@ -39,7 +39,11 @@
 # 参数：$equip_slot — 装备部位（由 UI 参数面板注入）
 # 参数：$bag_row, $bag_col — 背包行列（由 UI 参数面板注入）
 
-call "subcall/nav_main_to_equip.wf"
+import "subcall/nav_main_to_equip.wf"
+import "subcall/nav_equip_to_tune.wf"
+import "subcall/find_tune_material.wf"
+
+call nav_main_to_equip()
 
 # 点击指定装备部位
 click [bag_equip_detail].$equip_slot
@@ -67,7 +71,8 @@ else
 end
 
 eval $result = {}
-call "subcall/nav_equip_to_tune.wf" read "status" as $tune_status
+call nav_equip_to_tune()
+eval $tune_status = context.status
 
 
 if not $tune_status
@@ -93,7 +98,8 @@ end
 if $status_1 == 1
     eval $should_tune = "yes"
     if $target_material
-        call "subcall/find_tune_material.wf" with $target_material as "material_name" read "slot_name" as $slot
+        call find_tune_material($target_material)
+        eval $slot = context.slot_name
         if $slot
             click [equip_tune_detail].$slot
             wait step_interval

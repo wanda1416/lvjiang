@@ -13,7 +13,8 @@ from lark import Lark, Transformer, Token, Tree
 
 from .ast_nodes import (
     Program,
-    Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
+    Click, Drag, Wait, Scan, Recognize, Collect, Log,
+    Import, ProcDef, CallProc,
     If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
     SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
@@ -47,9 +48,20 @@ class _DSLTransformer(Transformer):
     # ─── 程序入口 ─────────────────────────────────────────
 
     def start(self, items):
-        """过滤掉 None（空行），收集所有语句"""
-        stmts = [item for item in items if item is not None]
-        return Program(body=stmts)
+        """过滤掉 None（空行），分离 import / def / body"""
+        imports = []
+        procs = {}
+        stmts = []
+        for item in items:
+            if item is None:
+                continue
+            if isinstance(item, Import):
+                imports.append(item)
+            elif isinstance(item, ProcDef):
+                procs[item.name] = item
+            else:
+                stmts.append(item)
+        return Program(body=stmts, imports=imports, procs=procs)
 
     # ─── 基础指令 ─────────────────────────────────────────
 
@@ -634,37 +646,63 @@ class _DSLTransformer(Transformer):
         """field_access 作为函数参数 → FieldAccess"""
         return items[0]  # field_access 已返回 FieldAccess
 
-    # ─── 子工作流调用 ─────────────────────────────────────
+    # ─── 模块化：import / def / call proc ─────────────────
 
-    def call_stmt(self, items):
-        wf_path = self._ensure_literal(items[0])
-        args = []
-        reads = []
-        for item in items[1:]:
-            if isinstance(item, tuple) and len(item) == 2:
-                tag, pairs = item
-                if tag == "with":
-                    args = pairs
-                elif tag == "read":
-                    reads = pairs
-        return Call(workflow=wf_path, args=args, reads=reads, line_no=self._line(items))
+    def import_stmt(self, items):
+        """import "path.wf" — 引入外部文件的 def 定义"""
+        path = self._unquote(str(items[0]))
+        return Import(path=path, line_no=self._line(items))
 
-    def call_with_clause(self, items):
-        """with $x as "name" → ("with", [(left, right), ...])"""
-        return ("with", list(items))
+    def def_stmt(self, items):
+        """def proc_name($p1, $p2) ... end — 定义子过程
 
-    def call_read_clause(self, items):
-        """read "key" as $var → ("read", [(left, right), ...])"""
-        return ("read", list(items))
-
-    def as_var(self, items):
-        """$x as "name" 或 "key" as $var → (left_node, right_node)
-        
-        VarRef 原样保留，STRING Token 转为 Literal
+        items 结构: NAME Token, [def_param_list], body_stmts...
         """
-        left = items[0] if isinstance(items[0], VarRef) else self._ensure_literal(items[0])
-        right = items[1] if isinstance(items[1], VarRef) else self._ensure_literal(items[1])
-        return (left, right)
+        name = str(items[0])
+        params = []
+        body = []
+        for item in items[1:]:
+            if isinstance(item, list) and all(isinstance(p, str) for p in item):
+                params = item  # def_param_list 返回 list[str]
+            elif item is not None and not isinstance(item, Token):
+                body.append(item)
+        return ProcDef(name=name, params=params, body=body)
+
+    def def_param_list(self, items):
+        """$p1, $p2 → [str, str]"""
+        return [str(p) for p in items]
+
+    def def_param(self, items):
+        """$NAME → str(NAME)"""
+        return str(items[0])
+
+    def call_proc_stmt(self, items):
+        """call proc_name($arg1, "arg2", ...) — 调用过程"""
+        name = str(items[0])
+        args = []
+        for item in items[1:]:
+            if isinstance(item, list):
+                args = item  # call_arg_list 返回 list
+                break
+            elif item is not None and not isinstance(item, Token):
+                args.append(item)
+        return CallProc(name=name, args=args, line_no=self._line(items))
+
+    def call_arg_list(self, items):
+        """参数列表 → list"""
+        return list(items)
+
+    def call_arg_str(self, items):
+        """字符串参数 → Literal"""
+        return Literal(value=self._unquote(str(items[0])))
+
+    def call_arg_num(self, items):
+        """数字参数 → float"""
+        return items[0]
+
+    def call_arg_var(self, items):
+        """变量参数 → VarRef"""
+        return items[0]
 
     # ─── 控制流 ───────────────────────────────────────────
 
@@ -1047,4 +1085,4 @@ def parse_text(text: str, source: str = "<text>") -> Program:
         text += "\n"
     tree = parser.parse(text)
     program = _DSLTransformer().transform(tree)
-    return Program(body=program.body, source=source)
+    return Program(body=program.body, imports=program.imports, procs=program.procs, source=source)

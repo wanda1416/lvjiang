@@ -9,7 +9,8 @@ from .ast_nodes import (
     # 程序
     Program,
     # 语句节点
-    Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
+    Click, Drag, Wait, Scan, Recognize, Collect, Log,
+    Import, ProcDef, CallProc,
     If, For, ForRange, Loop, Break, Return, Label, Goto,
     Eval, EvalFieldChainAssign, FuncCall,
     # 表达式节点
@@ -22,7 +23,8 @@ from .ast_nodes import (
 __all__ = [
     "parse_file", "parse_text",
     "Program",
-    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log", "Call",
+    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log",
+    "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "Break", "Return", "Label", "Goto",
     "Eval", "EvalFieldChainAssign", "FuncCall",
     "SceneRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause",

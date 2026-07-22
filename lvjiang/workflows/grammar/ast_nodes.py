@@ -23,7 +23,9 @@ from typing import Any
 
 @dataclass(frozen=True)
 class Program:
-    body: list  # list[语句节点]
+    body: list  # list[语句节点]（不含 import/def）
+    imports: list = field(default_factory=list)  # list[Import]
+    procs: dict = field(default_factory=dict)    # dict[str, ProcDef]
     source: str = "<text>"
 
 
@@ -200,11 +202,25 @@ class FuncCall:
 
 
 @dataclass(frozen=True)
-class Call:
-    """call "sub.wf" with $x as "arg1" read "key" as $var"""
-    workflow: Any               # Literal（wf 文件路径）
-    args: list = field(default_factory=list)       # [(as_side, as_side), ...] with 传入参数
-    reads: list = field(default_factory=list)      # [(as_side, as_side), ...] read 读取返回值
+class Import:
+    """import "path.wf" — 引入外部文件的 def 定义"""
+    path: str
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class ProcDef:
+    """def proc_name($p1, $p2) ... end"""
+    name: str
+    params: list          # list[str] — 参数名列表
+    body: list            # list[statement]
+
+
+@dataclass(frozen=True)
+class CallProc:
+    """call proc_name($arg1, "arg2", ...)"""
+    name: str
+    args: list            # list[Literal | VarRef | number]
     line_no: int = 0
 
 

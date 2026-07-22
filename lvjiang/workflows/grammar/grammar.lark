@@ -20,7 +20,9 @@ start: (_NL | statement)*
           | implicit_eval_stmt
           | default_stmt
           | align_stmt
-          | call_stmt
+          | import_stmt
+          | def_stmt
+          | call_proc_stmt
           | if_stmt
           | for_stmt
           | loop_stmt
@@ -166,18 +168,22 @@ arg_list: arg ("," arg)*
     | field_access -> arg_field
     | var_ref -> arg_var
 
-// ─── 子工作流调用 ──────────────────────────────────────────
+// ─── 模块化：import / def / call proc ─────────────────────
 
-call_stmt: "call"i STRING call_with_clause? call_read_clause? _NL
+// import：引入外部文件的 def 定义，注册到当前命名空间
+import_stmt: "import"i STRING _NL
 
-call_with_clause: "with"i as_var ("," as_var)*
+// def：定义子过程（同文件内复用）
+def_stmt: "def"i NAME "(" [def_param_list] ")" _NL statement* "end"i _NL
+def_param_list: def_param ("," def_param)*
+def_param: "$" NAME
 
-call_read_clause: "read"i as_var ("," as_var)*
-
-// 对称结构：两侧均支持 $var 或 "string"
-as_var: as_side "as"i as_side
-
-?as_side: var_ref | STRING
+// call proc：调用过程（本地定义或 import 引入）
+call_proc_stmt: "call"i NAME "(" [call_arg_list] ")" _NL
+call_arg_list: call_arg ("," call_arg)*
+?call_arg: STRING -> call_arg_str
+         | number -> call_arg_num
+         | var_ref -> call_arg_var
 
 // ─── 控制流 ───────────────────────────────────────────────
 

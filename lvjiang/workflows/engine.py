@@ -2,7 +2,7 @@
 
 运行时主体：直接持有硬件后端，管理 session/context 生命周期，
 递归执行 AST 节点，支持完整控制流（if/for/loop/break/goto）。
-子工作流通过创建独立 engine 实例实现天然隔离，无需 save/restore。
+模块化通过 import/def/call proc 实现过程复用，变量隔离。
 """
 
 import traceback
@@ -20,7 +20,8 @@ from ..core.scene_registry import Layout
 
 from .grammar import (
     parse_file,
-    Click, Drag, Wait, Scan, Recognize, Collect, Log, Call,
+    Click, Drag, Wait, Scan, Recognize, Collect, Log,
+    Import, ProcDef, CallProc,
     If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
     SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
     Contains, Equals, InList, IsEmpty,
@@ -62,6 +63,7 @@ class WorkflowEngine:
 
     直接持有硬件后端，管理 session/context 生命周期。
     通过 _ensure_workflow() 懒创建 BaseWorkflow 作为游戏操作委托。
+    通过 import/def/call proc 实现模块化过程复用。
     """
 
     def __init__(
@@ -92,6 +94,8 @@ class WorkflowEngine:
         self._base_dir: Path | None = None
         # panel 对齐缓存：(scene_key, panel_key) → GridAlignment
         self._panel_alignments: dict[tuple[str, str], GridAlignment] = {}
+        # 过程定义索引：{name: ProcDef}，由 _execute_dsl 填充
+        self._procs: dict[str, ProcDef] = {}
         # session / context（公开属性，UI 层注入）
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
@@ -148,7 +152,7 @@ class WorkflowEngine:
             self.variables.update(initial_variables)
 
         # context 是临时状态，仅顶层执行时重置
-        # 子工作流通过 _exec_call 共享父 context，不能重置
+        # 过程中通过 context 共享引用传递数据
         if _reset_context:
             self.context = {}
 
@@ -168,7 +172,16 @@ class WorkflowEngine:
         resolved = Path(wf_path).resolve()
         self._base_dir = resolved.parent
         program = parse_file(resolved)
-        logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令) ===")
+
+        # 解析 import 链（含循环检测），收集所有 def 到 self._procs
+        self._procs = {}
+        import_stack = {str(resolved)}
+        self._resolve_imports(program, import_stack)
+        # 注册本地 def
+        for name, proc_def in program.procs.items():
+            self._procs[name] = proc_def
+
+        logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令, {len(self._procs)} 个过程) ===")
 
         try:
             self._exec_body(program.body)
@@ -181,6 +194,37 @@ class WorkflowEngine:
 
         logger.info(f"=== DSL 工作流完成，收集到 {len(self.output)} 项数据 ===")
         return self.output
+
+    def _resolve_imports(self, program, import_stack: set):
+        """递归解析 import 链，收集所有 def 到 self._procs
+
+        import_stack: 当前 import 链中的文件路径集合，用于循环检测。
+        """
+        for imp in program.imports:
+            imp_path = Path(imp.path)
+            if not imp_path.is_absolute() and self._base_dir:
+                imp_path = self._base_dir / imp_path
+            imp_resolved = str(imp_path.resolve())
+
+            # 循环检测
+            if imp_resolved in import_stack:
+                chain = " -> ".join(sorted(import_stack)) + f" -> {imp_resolved}"
+                raise WorkflowUserError(f"循环 import 检测: {chain}")
+
+            # 解析导入文件
+            imp_program = parse_file(imp_path)
+            new_stack = import_stack | {imp_resolved}
+
+            # 递归解析子文件的 import（临时切换 base_dir）
+            old_base = self._base_dir
+            self._base_dir = imp_path.parent
+            self._resolve_imports(imp_program, new_stack)
+            self._base_dir = old_base
+
+            # 收集子文件的 def（平铺到当前命名空间）
+            for name, proc_def in imp_program.procs.items():
+                self._procs[name] = proc_def
+            logger.debug(f"import: {imp.path} → 注册 {len(imp_program.procs)} 个过程")
 
     def _execute_python_workflow(self, workflow: BaseWorkflow) -> dict:
         """执行 Python 工作流实例"""
@@ -281,8 +325,10 @@ class WorkflowEngine:
                 self._exec_eval(node)
             case EvalFieldChainAssign():
                 self._exec_eval_field_assign(node)
-            case Call():
-                self._exec_call(node)
+            case Import():
+                pass  # import 在 _execute_dsl 中已处理，运行时跳过
+            case CallProc():
+                self._exec_call_proc(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
 
@@ -1039,54 +1085,33 @@ class WorkflowEngine:
         resolved_args = [self._resolve(arg) for arg in node.func_args]
         return self._ensure_workflow().call_function(node.func_name, resolved_args, engine=self)
 
-    def _exec_call(self, node: Call):
-        """call "sub.wf" with $x as "arg1" read "key" as $var
+    def _exec_call_proc(self, node: CallProc):
+        """call proc_name($arg1, "arg2", ...) — 调用子过程
 
-        创建独立子 engine，天然隔离变量空间，支持任意深度嵌套。
-        相对路径基于当前 wf 所在目录解析。
+        变量隔离：save/restore caller variables。
+        session/context/_coord_meta 共享引用，不隔离。
+        return 在过程中 = 退出过程（捕获 _ReturnSignal）。
         """
-        wf_path_str = self._resolve(node.workflow)
-        wf_path = Path(wf_path_str)
-        if not wf_path.is_absolute() and self._base_dir:
-            wf_path = self._base_dir / wf_path
-        logger.info(f"--- call 子工作流: {wf_path} ---")
-
-        # 1. 从父 context 取参数值，注入子 engine
-        arg_values = {}
-        for left, right in node.args:
-            val = self._resolve(left)
-            key = self._resolve(right)  # 右侧取值：$var → 变量值，"str" → 字符串
-            arg_values[str(key)] = val
-
-        # 2. 创建独立子 engine + 注入参数
-        sub_engine = WorkflowEngine(
-            capture=self._capture, ocr=self._ocr, input_ctrl=self._input,
-            layout=self._layout, delay_config=self._delay,
-            window_left=self._window_left, window_top=self._window_top,
-            stop_check=self._stop_check,
-        )
-        sub_engine.variables = dict(arg_values)
-        # coord_meta 全局共享：子工作流可访问父工作流 scan/recognize 的坐标元数据
-        sub_engine._coord_meta = self._coord_meta
-        # session/context 透传：子工作流可读写同一份持久/临时状态
-        sub_engine.session = self.session
-        sub_engine.context = self.context
-
-        # 3. 运行子 wf（不重置 context，保持与父工作流的共享）
-        sub_output = sub_engine.execute(wf_path, _reset_context=False)
-
-        # 4. 从子 engine output 提取 read 结果，写入父 context
-        count = 0
-        for left, right in node.reads:
-            key = self._resolve(left)
-            target_name = self._resolve_var_name(right)  # 右侧取变量名：$var → 变量名，"str" → 字符串
-            if isinstance(sub_output, dict) and key in sub_output:
-                self.variables[target_name] = sub_output[key]
-                count += 1
-            else:
-                logger.warning(f"call: 子工作流 output 中无 key '{key}'")
-
-        logger.info(f"--- call 返回，取回 {count} 个值 ---")
+        proc_def = self._procs.get(node.name)
+        if proc_def is None:
+            logger.error(f"call: 未定义的过程 {node.name}")
+            return
+        logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
+        # 1. 保存当前变量快照
+        saved_vars = dict(self.variables)
+        try:
+            # 2. 绑定参数
+            for i, param_name in enumerate(proc_def.params):
+                if i < len(node.args):
+                    self.variables[param_name] = self._resolve(node.args[i])
+            # 3. 执行过程体（return = 退出过程）
+            try:
+                self._exec_body(proc_def.body)
+            except _ReturnSignal:
+                pass  # 正常退出过程
+        finally:
+            # 4. 恢复变量（session/context 自然保留修改）
+            self.variables = saved_vars
 
     # ─── 控制流 ───────────────────────────────────────────
 

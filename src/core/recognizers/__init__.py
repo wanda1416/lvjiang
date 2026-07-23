@@ -8,6 +8,7 @@
 - ``Recognizer`` 协议
 - ``register_recognizer`` / ``get_recognizer`` / ``list_recognizers``
 - 内置识别器类：``OCRRecognizer`` / ``TemplateRecognizer`` / ``ColorRecognizer``
+- 参考图匹配器：``ReferenceMatcher`` / ``MatchResult``
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from ._registry import (
 from .ocr_recognizer import OCRRecognizer
 from .template_recognizer import TemplateRecognizer
 from .color_recognizer import ColorRecognizer
+from .reference_matcher import ReferenceMatcher, MatchResult
 
 __all__ = [
     "Recognizer",
@@ -31,6 +33,8 @@ __all__ = [
     "OCRRecognizer",
     "TemplateRecognizer",
     "ColorRecognizer",
+    "ReferenceMatcher",
+    "MatchResult",
 ]
 
 

@@ -1,7 +1,7 @@
 """通用主窗口。
 
 包含完整的基础功能：
-- 用户管理、场景管理、材料管理、图像识别测试
+- 用户管理、场景管理、图库管理、图像识别测试
 - 窗口/设备扫描与定位
 - 工作流加载、执行、录制
 - 运行日志面板
@@ -134,8 +134,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             QMenu::item:selected { background: #0078d4; color: white; }
         """)
 
-        # ── 设置 ──
-        settings_menu = menubar.addMenu("设置")
+        # ── 管理 ──
+        settings_menu = menubar.addMenu("管理")
 
         user_mgmt = QAction("用户管理", self)
         user_mgmt.setShortcut("F2")
@@ -147,10 +147,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         scene_editor.triggered.connect(self._open_scene_editor)
         settings_menu.addAction(scene_editor)
 
-        material_mgr = QAction("材料管理", self)
-        material_mgr.setShortcut("F4")
-        material_mgr.triggered.connect(self._open_material_manager)
-        settings_menu.addAction(material_mgr)
+        reference_mgr = QAction("图库管理", self)
+        reference_mgr.setShortcut("F4")
+        reference_mgr.triggered.connect(self._open_reference_manager)
+        settings_menu.addAction(reference_mgr)
 
         settings_menu.addSeparator()
 
@@ -205,15 +205,15 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         dialog.exec()
         self._refresh_layout_combo()
 
-    def _open_material_manager(self):
-        from .material_manager import MaterialManagerDialog
-        dialog = MaterialManagerDialog(parent=self)
+    def _open_reference_manager(self):
+        from .reference_manager import ReferenceManagerDialog
+        dialog = ReferenceManagerDialog(parent=self)
         dialog.exec()
         if dialog.data_changed:
             from ..workflows.base import BaseWorkflow
             if BaseWorkflow._shared_material_recognizer is not None:
                 BaseWorkflow._shared_material_recognizer.reload()
-                self.statusBar().showMessage("材料库已刷新", 3000)
+                self.statusBar().showMessage("图库已刷新", 3000)
 
     def _show_about(self):
         QMessageBox.about(

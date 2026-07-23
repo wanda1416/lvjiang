@@ -14,6 +14,7 @@
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
+| 2026-07-21 | [2026-07-21-project-evolution-summary.md](2026-07/2026-07-21-project-evolution-summary.md) | 项目演进总结（Phase 0~8 + 用户指令索引） |
 | 2026-07-16 | [2026-07-16-workflow-stability-and-evaluation.md](2026-07/2026-07-16-workflow-stability-and-evaluation.md) | 工作流稳定性与评估体系闭环 |
 | 2026-07-16 | [2026-07-16-scene-grouping.md](2026-07/2026-07-16-scene-grouping.md) | 场景分组管理功能 |
 | 2026-07-16 | [2026-07-16-dsl-refactor-and-crash-protection.md](2026-07/2026-07-16-dsl-refactor-and-crash-protection.md) | DSL 去隐式化重构与崩溃防护体系 |

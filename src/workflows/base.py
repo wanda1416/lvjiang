@@ -150,16 +150,16 @@ class BaseWorkflow:
         slot_keys: list[str] | None = None,
         group: str | None = None,
     ) -> tuple[dict[str, str], dict]:
-        """对指定场景的每个 slot 执行材料识别
+        """对指定场景的每个 slot 执行参考图匹配
 
         Args:
             scene_key: 场景 key
             slot_keys: 可选，只识别指定 slot
-            group: 可选，限定材料分组范围
+            group: 可选，限定参考图分组范围
 
         Returns:
             (result, region_map)
-            result: {slot_key: material_type, ...}  空槽为 ""
+            result: {slot_key: label, ...}  空槽为 ""
             region_map: {slot_key: Region, ...}  供 coord_meta 存储
         """
         img = self._capture.capture()
@@ -202,12 +202,12 @@ class BaseWorkflow:
             info = self.material_recognizer.recognize(slot_img, group=group)
             result[region.key] = info.type  # 空槽 info.type == ""
             logger.debug(
-                f"材料识别 [{scene_key}].[{region.key}]: "
-                f"type={info.type!r} level={info.level} count={info.count}"
+                f"参考图匹配 [{scene_key}].[{region.key}]: "
+                f"label={info.type!r} level={info.level} count={info.count}"
             )
 
         fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
-        logger.info(f"材料识别 [{scene_key}]:{fields_display} => {result}")
+        logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
     # ─── by 子句：短路识别 ──────────────────────────────────

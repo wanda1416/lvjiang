@@ -24,7 +24,7 @@ logs/
 /config/system/workflows/_*.wf
 
 # TODO 后期需要添加
-/data/materials
+/data/references
 
 # OS
 Thumbs.db

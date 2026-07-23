@@ -257,7 +257,7 @@ click [bag_equip_detail].[bag_grid][$row][$col]
 
 ### 4.2 重叠滚动与滚动管理器
 
-滚动管理器的详细算法设计见 [02-auto-tuning.md](../35-workflows/02-auto-tuning.md)。
+滚动管理器的详细算法设计见 [02-auto-tuning.md](../30-architecture/35-workflows/02-auto-tuning.md)。
 
 核心职责：
 1. 记录每行第一列（col=1）的装备指纹，形成有序序列
@@ -276,13 +276,13 @@ context._scroll_manager = {
 
 ### 4.3 到底检测
 
-三个独立的到底信号，任一成立即结束。详细判定逻辑见 [02-auto-tuning.md](../35-workflows/02-auto-tuning.md)。
+三个独立的到底信号，任一成立即结束。详细判定逻辑见 [02-auto-tuning.md](../30-architecture/35-workflows/02-auto-tuning.md)。
 
 ---
 
 ## 5. 指纹模型
 
-指纹生成与存储的详细设计见 [02-auto-tuning.md](../35-workflows/02-auto-tuning.md)。
+指纹生成与存储的详细设计见 [02-auto-tuning.md](../30-architecture/35-workflows/02-auto-tuning.md)。
 
 ### 5.1 指纹生成
 
@@ -766,6 +766,6 @@ panels:
 | 文档 | 内容 |
 |------|------|
 | [01-game-rules.md](01-game-rules.md) | 调律规则、评估标准 |
-| [../10-game/02-tuning-mechanics.md](../10-game/02-tuning-mechanics.md) | 调律机制详细说明 |
+| [../10-game/04-tuning-mechanics.md](../10-game/04-tuning-mechanics.md) | 调律机制详细说明 |
 | [../10-game/01-equipment-system.md](../10-game/01-equipment-system.md) | 装备系统介绍 |
-| [../35-workflows/01-current-equip-analysis.md](../35-workflows/01-current-equip-analysis.md) | 装备分析流程 |
+| [../30-architecture/35-workflows/01-current-equip-analysis.md](../30-architecture/35-workflows/01-current-equip-analysis.md) | 装备分析流程 |

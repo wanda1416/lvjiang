@@ -9,9 +9,9 @@
 | [01-main-window-state-flow.md](01-main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南 |
 
-> 场景系统文档已独立至 [34-scene/](../34-scene/) 目录。
+> 场景系统文档已独立至 [34-scene/](34-scene/) 目录。
 
-DSL 语法文档已拆分至 [`../32-grammar/`](../32-grammar/README.md)。
+DSL 语法文档已拆分至 [`32-grammar/`](32-grammar/README.md)。
 
 ## 待补充
 

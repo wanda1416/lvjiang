@@ -4,8 +4,8 @@
 
 ## 与场景的关系
 
-- **场景**（`docs/30-architecture/scene-layout-definition.md`）：定义单个游戏界面的逻辑结构（Scene / Area / Point / Region）
-- **场景实现**（`docs/31-models/scene-implementations.md`）：各场景的具体字段定义
+- **场景**（`docs/34-scene/01-scene-layout-definition.md`）：定义单个游戏界面的逻辑结构（Scene / Area / Point / Region）
+- **场景实现**（`docs/31-models/02-scene-implementations.md`）：各场景的具体字段定义
 - **流程**：编排多个场景的执行顺序，完成复杂任务
 
 ## 已有流程

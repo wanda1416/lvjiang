@@ -765,7 +765,7 @@ panels:
 
 | 文档 | 内容 |
 |------|------|
-| [game-rules.md](game-rules.md) | 调律规则、评估标准 |
-| [../10-game/tuning-mechanics.md](../10-game/tuning-mechanics.md) | 调律机制详细说明 |
-| [../10-game/equipment-system.md](../10-game/equipment-system.md) | 装备系统介绍 |
+| [01-game-rules.md](01-game-rules.md) | 调律规则、评估标准 |
+| [../10-game/02-tuning-mechanics.md](../10-game/02-tuning-mechanics.md) | 调律机制详细说明 |
+| [../10-game/01-equipment-system.md](../10-game/01-equipment-system.md) | 装备系统介绍 |
 | [../35-workflows/01-current-equip-analysis.md](../35-workflows/01-current-equip-analysis.md) | 装备分析流程 |

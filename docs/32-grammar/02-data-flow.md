@@ -234,7 +234,7 @@ eval $x = ($a + $b) * ($c - 1)   # 括号改变优先级
 - 优先级：`*` `/` 高于 `+` `-`，支持 `()` 改变优先级
 - 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
 - 不支持 `mod` 运算符（可提供 `mod()` 函数）
-- 算术表达式也可用于 if 条件比较的两侧（见 [03-control-flow.md](03-control-flow.md)）
+- 算术表达式也可用于 if 条件比较的两侧（见 [04-control-flow.md](04-control-flow.md)）
 
 ### 字典字面量
 
@@ -255,7 +255,7 @@ eval $d = {"a": "b"}                        # 隐式 eval 同样支持
 eval $list = [{"k": "v"}, {"k2": "v2"}]     # 列表含字典元素
 ```
 
-详细说明见 [04-functions.md](04-functions.md)。
+详细说明见 [05-functions.md](05-functions.md)。
 
 ### find_key — 查找字典中匹配项的 key
 
@@ -297,7 +297,7 @@ call "sub.wf" read "key" as $var                    # 提取返回值
 call "sub.wf" with $x as "arg1" read "key" as $var  # 传参 + 提取
 ```
 
-详细说明见 [05-subworkflows.md](05-subworkflows.md)。
+详细说明见 [06-subworkflows.md](06-subworkflows.md)。
 
 ## 六、log — 日志输出
 
@@ -321,4 +321,4 @@ log $result.status
 log concat("当前槽位：", $slot)
 ```
 
-控制流与条件表达式详见 [03-control-flow.md](03-control-flow.md)。
+控制流与条件表达式详见 [04-control-flow.md](04-control-flow.md)。

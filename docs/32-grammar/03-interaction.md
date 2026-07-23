@@ -51,7 +51,7 @@ panels:
     regions: [weapon, armor, accessory]
 ```
 
-> **注**：`type=regions` 允许将多个已定义的 Region 合并到一个 Panel 中统一管理，届时寻址方式将自动适配为 `[name]` 而非 `[r][c]`。详见 [scene-layout-definition.md](../30-architecture/scene-layout-definition.md)。
+> **注**：`type=regions` 允许将多个已定义的 Region 合并到一个 Panel 中统一管理，届时寻址方式将自动适配为 `[name]` 而非 `[r][c]`。详见 [01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)。
 
 ---
 

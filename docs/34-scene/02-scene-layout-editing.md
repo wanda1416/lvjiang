@@ -2,7 +2,7 @@
 
 本文档描述场景管理 UI 的交互方式和扩展新场景的步骤。
 
-语义模型定义见 [scene-layout-definition.md](scene-layout-definition.md)，各场景字段实现见 [31-models/scene-implementations.md](../31-models/scene-implementations.md)。
+语义模型定义见 [01-scene-layout-definition.md](01-scene-layout-definition.md)，各场景字段实现见 [31-models/02-scene-implementations.md](../31-models/02-scene-implementations.md)。
 
 ---
 

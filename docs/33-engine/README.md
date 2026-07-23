@@ -10,7 +10,7 @@
 
 | 文档 | 主题 |
 |------|------|
-| [screenshot-and-crop.md](screenshot-and-crop.md) | `scan` / `recognize` 的截图-裁剪-识别数据流,以及 DSL 写法对截屏次数的影响 |
+| [01-screenshot-and-crop.md](01-screenshot-and-crop.md) | `scan` / `recognize` 的截图-裁剪-识别数据流,以及 DSL 写法对截屏次数的影响 |
 
 ## 阅读建议
 

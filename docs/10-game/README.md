@@ -6,8 +6,10 @@
 
 | 文件 | 内容 |
 |------|------|
-| [equipment-system.md](equipment-system.md) | 装备系统：部位、品质、等级 |
-| [tuning-mechanics.md](tuning-mechanics.md) | 调律机制：流程、材料、规则 |
+| [01-equipment-system.md](01-equipment-system.md) | 装备系统：部位、品质、等级 |
+| [02-tuning-mechanics.md](02-tuning-mechanics.md) | 调律机制：流程、材料、规则 |
+| [03-damage-mechanics.md](03-damage-mechanics.md) | 伤害机制：计算公式、属性转换 |
+| [04-school-system.md](04-school-system.md) | 门派系统：流派定位、武学特色 |
 
 ## 待补充
 

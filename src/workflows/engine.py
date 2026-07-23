@@ -874,14 +874,14 @@ class WorkflowEngine:
             group = self._resolve(node.group)
 
         if node.by is not None:
-            # ── by 子句：短路材料识别，返回 slot 名 str ──
+            # ── by 子句：短路参考图匹配，返回 slot 名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             result = self._ensure_workflow().recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode, group=group)
             self.variables[var_name] = result  # str（命中 slot 名或 ""）
         else:
             result, region_map = self._ensure_workflow().recognize_materials(scene, field_keys, group=group)
-            self.variables[var_name] = result           # {slot_key: "材料类型"}
+            self.variables[var_name] = result           # {slot_key: "参考图标识"}
             self._coord_meta[var_name] = region_map     # {slot_key: Region}
 
     def _exec_collect(self, node: Collect):

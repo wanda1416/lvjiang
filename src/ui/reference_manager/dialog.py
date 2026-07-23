@@ -1,4 +1,4 @@
-"""材料管理对话框 - 新增材料与库存管理两个独立 Tab"""
+"""参考图管理对话框 - 新增参考图与参考图管理两个独立 Tab"""
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
@@ -18,23 +18,25 @@ from PyQt6.QtWidgets import (
 
 import numpy as np
 
-from src.core.material_db import MaterialDatabase
-from .canvas import MaterialCanvas
+from src.core.reference_db import ReferenceDatabase
+from .canvas import ReferenceCanvas
 from .grid_panel import GridPanel
 from .browser_panel import BrowserPanel
+from .meta_schema_panel import MetaSchemaPanel
 
 
-class MaterialManagerDialog(QDialog):
-    """材料管理对话框
+class ReferenceManagerDialog(QDialog):
+    """参考图管理对话框
 
-    两个顶级 Tab，完全独立的工作流：
-      - 新增材料：导入截图 → 网格切割 → 编辑 cell 信息 → 提交到库存
-      - 库存管理：按分组浏览、搜索、编辑已有材料
+    三个顶级 Tab，完全独立的工作流：
+      - 新增参考图：导入截图 → 网格切割 → 编辑 cell 信息 → 提交到图库
+      - 参考图管理：按分组浏览、搜索、编辑已有参考图
+      - 元数据定义：定义名称/分组之外的 meta 字段
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("材料管理")
+        self.setWindowTitle("参考图管理")
         self.resize(1200, 800)
         # 启用最小化/最大化按钮
         self.setWindowFlags(
@@ -47,7 +49,7 @@ class MaterialManagerDialog(QDialog):
         from src.config import load_user_config
         self._config = load_user_config()
 
-        self._db = MaterialDatabase()
+        self._db = ReferenceDatabase()
         self._db.load()
         self._source_name = ""
         self._data_changed = False  # 跟踪是否有数据变动
@@ -59,23 +61,28 @@ class MaterialManagerDialog(QDialog):
         # ── 顶级 Tab ──
         self._tabs = QTabWidget()
 
-        # Tab 1: 新增材料（完整编辑工作流）
+        # Tab 1: 新增参考图（完整编辑工作流）
         self._add_tab = self._build_add_tab()
-        self._tabs.addTab(self._add_tab, "新增材料")
+        self._tabs.addTab(self._add_tab, "新增参考图")
 
-        # Tab 2: 库存管理（浏览与编辑已有材料）
+        # Tab 2: 参考图管理（浏览与编辑已有参考图）
         self._browser = BrowserPanel(self._db)
         self._browser.set_known_groups(self._db.get_groups())
         self._browser.refresh()
         self._browser.data_changed.connect(self._on_data_changed)
-        self._tabs.addTab(self._browser, "库存管理")
+        self._tabs.addTab(self._browser, "参考图管理")
+
+        # Tab 3: 元数据定义（定义名称/分组之外的 meta 字段）
+        self._meta_panel = MetaSchemaPanel(self._db)
+        self._meta_panel.schema_changed.connect(self._on_schema_changed)
+        self._tabs.addTab(self._meta_panel, "元数据定义")
 
         main_layout.addWidget(self._tabs)
 
-    # ── Tab 1: 新增材料 ──
+    # ── Tab 1: 新增参考图 ──
 
     def _build_add_tab(self) -> QWidget:
-        """构建新增材料 Tab 的完整 UI"""
+        """构建新增参考图 Tab 的完整 UI"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
@@ -124,7 +131,7 @@ class MaterialManagerDialog(QDialog):
         self._info_label.setMaximumHeight(20)
         canvas_layout.addWidget(self._info_label)
 
-        self._canvas = MaterialCanvas()
+        self._canvas = ReferenceCanvas()
         self._canvas.region_changed.connect(self._on_region_changed)
         self._canvas.selection_changed.connect(self._on_selection_changed)
         canvas_layout.addWidget(self._canvas)
@@ -143,7 +150,9 @@ class MaterialManagerDialog(QDialog):
             width=self._config.material_grid.width,
         )
         # 初始化已知分组列表（供批量分组下拉使用）
-        self._grid_panel.set_known_groups(self._db.get_groups(), self._db.get_all_types_by_group())
+        self._grid_panel.set_known_groups(self._db.get_groups(), self._db.get_all_labels_by_group())
+        # 同步当前 meta 字段定义（供 cell 编辑器生成输入）
+        self._grid_panel.set_meta_fields(self._db.get_meta_schema())
         # 第一组：网格参数实时响应
         self._grid_panel.grid_params_changed.connect(self._on_grid_params_changed)
         # 第二组：生成网格
@@ -164,7 +173,7 @@ class MaterialManagerDialog(QDialog):
 
     def _on_import(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择材料图片", "",
+            self, "选择参考图片", "",
             "图片文件 (*.png *.jpg *.bmp *.webp)"
         )
         if not path:
@@ -306,7 +315,7 @@ class MaterialManagerDialog(QDialog):
         """执行切割：从画布获取已选 cell 图像，传递给编辑面板"""
         # 检查是否有选中的单元格
         if not self._canvas.has_selection():
-            QMessageBox.warning(self, "提示", "请至少选择一个材料")
+            QMessageBox.warning(self, "提示", "请至少选择一个参考图")
             return
 
         rows = self._grid_panel.rows
@@ -343,16 +352,18 @@ class MaterialManagerDialog(QDialog):
         """提交切割结果到数据库
 
         Args:
-            cells_data: list of (image, type, level, group)
+            cells_data: list of (image, label, group, meta)
         """
         count = 0
-        for image, mat_type, level, group in cells_data:
+        for image, label, group, cell_meta in cells_data:
             if image is None:
                 continue
+            meta = dict(cell_meta)
+            if group:
+                meta["group"] = group
             self._db.add_entry(
-                type=mat_type,
-                level=level,
-                group=group,
+                label=label,
+                meta=meta,
                 source=self._source_name,
                 image_data=image,
             )
@@ -360,30 +371,36 @@ class MaterialManagerDialog(QDialog):
 
         if count > 0:
             self._data_changed = True  # 标记数据已变动
-            # 刷新分组列表（新增材料面板 + 库存管理面板）
+            # 刷新分组列表（新增参考图面板 + 参考图管理面板）
             groups = self._db.get_groups()
-            types_by_group = self._db.get_all_types_by_group()
-            self._grid_panel.set_known_groups(groups, types_by_group)
+            labels_by_group = self._db.get_all_labels_by_group()
+            self._grid_panel.set_known_groups(groups, labels_by_group)
             self._browser.set_known_groups(groups)
-            # 刷新库存面板
+            # 刷新图库面板
             self._browser.refresh()
-            # 切换到库存管理 tab 查看结果
+            # 切换到参考图管理 tab 查看结果
             self._tabs.setCurrentIndex(1)
 
     def _on_data_changed(self):
-        """库存管理面板数据变动时标记"""
+        """参考图管理面板数据变动时标记"""
         self._data_changed = True
+
+    def _on_schema_changed(self):
+        """元数据定义变更时，重建动态字段并刷新"""
+        self._browser.rebuild_meta_fields()
+        self._browser.refresh()
+        self._grid_panel.set_meta_fields(self._db.get_meta_schema())
 
     @property
     def data_changed(self) -> bool:
-        """返回是否有数据变动（新增/修改/删除材料）"""
+        """返回是否有数据变动（新增/修改/删除参考图）"""
         return self._data_changed
 
     # ── 键盘事件 ──
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_V and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # 只在新增材料 tab 时响应粘贴
+            # 只在新增参考图 tab 时响应粘贴
             if self._tabs.currentIndex() == 0:
                 self._on_paste()
         else:

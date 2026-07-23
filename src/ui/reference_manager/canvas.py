@@ -1,4 +1,4 @@
-"""材料画布 - 图片显示 + 单区域框选 + 网格预览
+"""参考图画布 - 图片显示 + 单区域框选 + 网格预览
 
 简化版 RegionCanvas，仅支持：
 - 图片加载与显示（缩放/平移）
@@ -42,8 +42,8 @@ class HandlePos(Enum):
 HANDLE_SIZE = 8  # 手柄像素大小
 
 
-class MaterialCanvas(QWidget):
-    """材料画布 - 支持图片显示、单区域框选、网格预览、单元格选择"""
+class ReferenceCanvas(QWidget):
+    """参考图画布 - 支持图片显示、单区域框选、网格预览、单元格选择"""
 
     region_changed = pyqtSignal(float, float, float, float)  # x1, y1, x2, y2 normalized
     selection_changed = pyqtSignal()  # 单元格选择变化

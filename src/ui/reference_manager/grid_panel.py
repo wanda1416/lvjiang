@@ -18,16 +18,20 @@ from PyQt6.QtWidgets import (
 
 import numpy as np
 
+from src.core.reference_db import MetaFieldDef
+
 
 class CellEditor(QWidget):
-    """单个切割 cell 的编辑组件：缩略图 + 类型 + 等级 + 分组"""
+    """单个切割 cell 的编辑组件：缩略图 + 名称 + 分组 + 动态 meta 字段"""
 
-    def __init__(self, index: int, image: np.ndarray, parent=None):
+    def __init__(self, index: int, image: np.ndarray,
+                 meta_fields: list[MetaFieldDef] | None = None, parent=None):
         super().__init__(parent)
         self._index = index
         self._image = image  # BGR numpy
-        self._all_types: list[str] = []  # 所有类型列表
-        self._types_by_group: dict[str, list[str]] = {}  # 分组 -> 类型列表
+        self._all_labels: list[str] = []  # 所有名称列表
+        self._labels_by_group: dict[str, list[str]] = {}  # 分组 -> 名称列表
+        self._meta_edits: dict[str, QLineEdit] = {}  # key -> 输入框
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
@@ -45,21 +49,24 @@ class CellEditor(QWidget):
         info_layout.setSpacing(4)
 
         info_layout.addWidget(QLabel("名称:"), 0, 0)
-        self.type_edit = QComboBox()
-        self.type_edit.setEditable(True)
-        self.type_edit.setMinimumWidth(100)
-        info_layout.addWidget(self.type_edit, 0, 1)
-
-        info_layout.addWidget(QLabel("等级:"), 1, 0)
-        self.level_edit = QLineEdit()
-        self.level_edit.setPlaceholderText("如 100")
-        info_layout.addWidget(self.level_edit, 1, 1)
+        self.label_edit = QComboBox()
+        self.label_edit.setEditable(True)
+        self.label_edit.setMinimumWidth(100)
+        info_layout.addWidget(self.label_edit, 0, 1)
 
         self._group_label = QLabel("分组:")
-        info_layout.addWidget(self._group_label, 2, 0)
+        info_layout.addWidget(self._group_label, 1, 0)
         self.group_edit = QComboBox()
         self.group_edit.setEditable(True)
-        info_layout.addWidget(self.group_edit, 2, 1)
+        info_layout.addWidget(self.group_edit, 1, 1)
+
+        # 动态 meta 字段（文本），从第 2 行起依次排列
+        for offset, field in enumerate(meta_fields or []):
+            r = 2 + offset
+            info_layout.addWidget(QLabel(f"{field.name}:"), r, 0)
+            edit = QLineEdit()
+            info_layout.addWidget(edit, r, 1)
+            self._meta_edits[field.key] = edit
 
         # 分组变化时过滤名称下拉
         self.group_edit.currentTextChanged.connect(self._on_group_changed)
@@ -74,14 +81,14 @@ class CellEditor(QWidget):
     def _on_group_changed(self, group: str):
         """分组变化时更新名称下拉列表"""
         group = group.strip()
-        current = self.type_edit.currentText()
-        self.type_edit.clear()
-        if group and group in self._types_by_group:
-            self.type_edit.addItems(self._types_by_group[group])
-        elif self._all_types:
-            self.type_edit.addItems(self._all_types)
+        current = self.label_edit.currentText()
+        self.label_edit.clear()
+        if group and group in self._labels_by_group:
+            self.label_edit.addItems(self._labels_by_group[group])
+        elif self._all_labels:
+            self.label_edit.addItems(self._all_labels)
         # 恢复当前输入
-        self.type_edit.setEditText(current)
+        self.label_edit.setEditText(current)
 
     @staticmethod
     def _make_thumbnail(bgr: np.ndarray, size: int) -> QImage:
@@ -103,29 +110,32 @@ class CellEditor(QWidget):
         return self._image
 
     @property
-    def cell_type(self) -> str:
-        return self.type_edit.currentText().strip()
+    def cell_label(self) -> str:
+        return self.label_edit.currentText().strip()
 
     @property
-    def cell_level(self) -> int | None:
-        text = self.level_edit.text().strip()
-        if text.isdigit():
-            return int(text)
-        return None
+    def cell_meta(self) -> dict:
+        """收集动态 meta 字段的非空文本值"""
+        result = {}
+        for key, edit in self._meta_edits.items():
+            val = edit.text().strip()
+            if val:
+                result[key] = val
+        return result
 
     @property
     def cell_group(self) -> str:
         return self.group_edit.currentText().strip()
 
-    def set_group_suggestions(self, groups: list[str], types_by_group: dict[str, list[str]] | None = None):
-        """设置分组下拉建议和类型数据"""
-        if types_by_group:
-            self._types_by_group = types_by_group
-        # 收集所有类型
-        all_types = set()
-        for types in self._types_by_group.values():
-            all_types.update(types)
-        self._all_types = sorted(all_types)
+    def set_group_suggestions(self, groups: list[str], labels_by_group: dict[str, list[str]] | None = None):
+        """设置分组下拉建议和名称数据"""
+        if labels_by_group:
+            self._labels_by_group = labels_by_group
+        # 收集所有名称
+        all_labels = set()
+        for labels in self._labels_by_group.values():
+            all_labels.update(labels)
+        self._all_labels = sorted(all_labels)
 
         current = self.group_edit.currentText()
         self.group_edit.blockSignals(True)
@@ -145,7 +155,7 @@ class GridPanel(QWidget):
     generate_grid_requested = pyqtSignal(int, int, int, int, int)  # rows, cols, gap, height, width
     clear_grid_requested = pyqtSignal()  # 清除网格
     execute_requested = pyqtSignal()  # 执行切割
-    submit_cells = pyqtSignal(list)  # list of (image, type, level, group)
+    submit_cells = pyqtSignal(list)  # list of (image, label, group, meta: dict)
 
     def __init__(self, rows: int = 3, cols: int = 6, gap: int = 0,
                  height: int = 100, width: int = 100, parent=None):
@@ -158,7 +168,8 @@ class GridPanel(QWidget):
         self._init_ui()
         self._cell_editors: list[CellEditor] = []
         self._known_groups: list[str] = []
-        self._types_by_group: dict[str, list[str]] = {}
+        self._labels_by_group: dict[str, list[str]] = {}
+        self._meta_fields: list[MetaFieldDef] = []
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -255,7 +266,7 @@ class GridPanel(QWidget):
         batch_layout.addStretch()
         result_layout.addLayout(batch_layout)
 
-        self._submit_btn = QPushButton("提交到库存")
+        self._submit_btn = QPushButton("提交到图库")
         self._submit_btn.setEnabled(False)
         result_layout.addWidget(self._submit_btn)
 
@@ -299,14 +310,18 @@ class GridPanel(QWidget):
     def set_execute_enabled(self, enabled: bool):
         self._execute_btn.setEnabled(enabled)
 
-    def set_known_groups(self, groups: list[str], types_by_group: dict[str, list[str]] | None = None):
+    def set_known_groups(self, groups: list[str], labels_by_group: dict[str, list[str]] | None = None):
         """更新已知分组列表，同步到所有 cell 编辑器"""
         self._known_groups = list(groups)
-        self._types_by_group = types_by_group or {}
+        self._labels_by_group = labels_by_group or {}
         self._batch_group.clear()
         self._batch_group.addItems(groups)
         for editor in self._cell_editors:
-            editor.set_group_suggestions(groups, self._types_by_group)
+            editor.set_group_suggestions(groups, self._labels_by_group)
+
+    def set_meta_fields(self, fields: list[MetaFieldDef]):
+        """设置当前 meta 字段定义（应用于下一次切割的 cell 编辑器）"""
+        self._meta_fields = list(fields)
 
     # ── 槽函数 ──
 
@@ -344,8 +359,8 @@ class GridPanel(QWidget):
         """展示切割后的 cell 列表，供用户编辑"""
         self._clear_cells()
         for i, cell_img in enumerate(cells):
-            editor = CellEditor(i, cell_img, self)
-            editor.set_group_suggestions(self._known_groups, self._types_by_group)
+            editor = CellEditor(i, cell_img, self._meta_fields, self)
+            editor.set_group_suggestions(self._known_groups, self._labels_by_group)
             self._cell_editors.append(editor)
             # 插入到 stretch 之前
             self._cells_layout.insertWidget(self._cells_layout.count() - 1, editor)
@@ -359,13 +374,13 @@ class GridPanel(QWidget):
         for editor in self._cell_editors:
             results.append((
                 editor.image,
-                editor.cell_type,
-                editor.cell_level,
+                editor.cell_label,
                 editor.cell_group,
+                editor.cell_meta,
             ))
         self.submit_cells.emit(results)
         self._clear_cells()
-        self._result_info.setText(f"已提交 {len(results)} 个材料到库存")
+        self._result_info.setText(f"已提交 {len(results)} 个参考图到图库")
         self._submit_btn.setEnabled(False)
 
     def _clear_cells(self):

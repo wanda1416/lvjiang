@@ -1,6 +1,6 @@
 """测试 DSL 字典变量语法增强"""
-from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.grammar import Eval, EvalFieldChainAssign, FuncCall, Literal, Log
+from src.workflows.grammar import parse_text
+from src.workflows.grammar import Eval, EvalFieldChainAssign, FuncCall, Literal, Log
 
 
 def test_empty_dict():
@@ -8,7 +8,7 @@ def test_empty_dict():
     p = parse_text('eval $mydata = {}')
     n = p.body[0]
     assert isinstance(n, Eval)
-    assert n.func_name == '__empty_dict__'
+    assert n.func_name == '__dict__'
     assert n.target == 'mydata'
     print("  eval $dict = {}: OK")
 

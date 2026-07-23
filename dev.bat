@@ -1,3 +1,3 @@
 @echo off
 cd /d "%~dp0"
-python -m lvjiang
+python -m src -reg yysls

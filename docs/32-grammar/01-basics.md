@@ -256,4 +256,4 @@ click [bag_equip_detail].$equip_slot
 
 - **内置工作流**：仍以 `workflows.yaml` 为准（相对 `wf_file` 路径），无需迁移
 - **外部加载**：GUI「加载工作流」打开任意 `.wf` 时，从其 front-matter 提取名字与参数；缺失字段回退默认值（名字回退为 `[外部] 文件名`，场景/参数回退为空）
-- 解析入口：`lvjiang/workflows/metadata.py` 的 `parse_metadata` / `build_flow_config`
+- 解析入口：`src/workflows/metadata.py` 的 `parse_metadata` / `build_flow_config`

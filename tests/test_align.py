@@ -17,9 +17,9 @@ from unittest.mock import MagicMock, patch
 import cv2
 import pytest
 
-from lvjiang.workflows.engine import WorkflowEngine
-from lvjiang.workflows.grammar.ast_nodes import Align
-from lvjiang.core.scene_registry import Layout, Panel, CanvasConfig
+from src.workflows.engine import WorkflowEngine
+from src.workflows.grammar.ast_nodes import Align
+from src.core.scene_registry import Layout, Panel, CanvasConfig
 
 DATA_DIR = Path(__file__).parent / "data"
 

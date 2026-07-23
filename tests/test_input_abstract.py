@@ -9,8 +9,8 @@
 
 import pytest
 
-from lvjiang.config import DelayConfig
-from lvjiang.core.input_base import InputBackend
+from src.config import DelayConfig
+from src.core.input_base import InputBackend
 
 
 # ─── fake 子类 ────────────────────────────────────────────────
@@ -92,7 +92,7 @@ def test_drag_screen_dispatch():
 # ─── 桌面工厂 ─────────────────────────────────────────────────
 
 def test_desktop_factory_post_mode():
-    from lvjiang.core.desktop import create_input_backend, PostMessageInput
+    from src.core.desktop import create_input_backend, PostMessageInput
     backend = create_input_backend(mode="post")
     assert isinstance(backend, PostMessageInput)
     assert isinstance(backend, InputBackend)
@@ -100,7 +100,7 @@ def test_desktop_factory_post_mode():
 
 
 def test_desktop_factory_send_mode():
-    from lvjiang.core.desktop import create_input_backend, SendInputInput
+    from src.core.desktop import create_input_backend, SendInputInput
     backend = create_input_backend(mode="send")
     assert isinstance(backend, SendInputInput)
     assert isinstance(backend, InputBackend)
@@ -108,13 +108,13 @@ def test_desktop_factory_send_mode():
 
 
 def test_desktop_factory_unknown_mode_raises():
-    from lvjiang.core.desktop import create_input_backend
+    from src.core.desktop import create_input_backend
     with pytest.raises(ValueError):
         create_input_backend(mode="bogus")
 
 
 def test_desktop_factory_with_hwnd():
-    from lvjiang.core.desktop import create_input_backend, PostMessageInput
+    from src.core.desktop import create_input_backend, PostMessageInput
     backend = create_input_backend(mode="post", hwnd=0xABCD)
     assert isinstance(backend, PostMessageInput)
     assert backend.target_hwnd == 0xABCD
@@ -123,7 +123,7 @@ def test_desktop_factory_with_hwnd():
 # ─── AdbInput 抽象一致性 ──────────────────────────────────────
 
 def test_adb_input_is_input_backend():
-    from lvjiang.core.android.input import AdbInput
+    from src.core.android.input import AdbInput
 
     class _FakeDevice:
         def shell(self, *a, **kw): return ""
@@ -135,7 +135,7 @@ def test_adb_input_is_input_backend():
 
 
 def test_adb_input_delay_injection():
-    from lvjiang.core.android.input import AdbInput
+    from src.core.android.input import AdbInput
 
     class _FakeDevice:
         def shell(self, *a, **kw): return ""
@@ -146,7 +146,7 @@ def test_adb_input_delay_injection():
 
 
 def test_adb_factory_returns_input_backend():
-    from lvjiang.core.android import create_input_backend
+    from src.core.android import create_input_backend
 
     class _FakeDevice:
         def shell(self, *a, **kw): return ""
@@ -159,8 +159,8 @@ def test_adb_factory_returns_input_backend():
 
 def test_base_workflow_accepts_fake_input_backend():
     """验证 BaseWorkflow 只依赖抽象接口，fake 子类可无缝注入"""
-    from lvjiang.core.scene_registry import Layout, CanvasConfig
-    from lvjiang.workflows.base import BaseWorkflow
+    from src.core.scene_registry import Layout, CanvasConfig
+    from src.workflows.base import BaseWorkflow
 
     class _FakeCapture:
         def get_capture_size(self): return (1080, 1920)

@@ -15,9 +15,9 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from lvjiang.equip_parser import EquipmentParser, EquipmentData, Affix
-from lvjiang.evaluator import GenericEvaluator, load_rule_config
-from lvjiang.constants import SYSTEM_RULES_DIR
+from src.apps.yysls.equip_parser import EquipmentParser, EquipmentData, Affix
+from src.apps.yysls.evaluator import GenericEvaluator, load_rule_config
+from src.constants import SYSTEM_RULES_DIR
 
 
 # ── 常量 ──

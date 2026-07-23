@@ -27,16 +27,22 @@ base_attrs:
       gold: 199
       purple: 179
       blue: 159
+    105:
+      gold: 174
   armor_other:
     110:
       gold: 9723
       purple: 8750
       blue: 7778
+    105:
+      purple: 7402
   chest:
     110:
       gold: 19445
       purple: 17500
       blue: 15556
+    105:
+      gold: 16449
 affix_caps:
   外功攻击:
     _aliases:

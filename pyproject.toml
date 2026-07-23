@@ -5,7 +5,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 [project]
 name = "lvjiang"
 version = "0.1.0"
-description = "燕云十六声手游装备调律自动化工具"
+description = "通用视觉 RPA 引擎（支持插件扩展，燕云十六声装备调律工具）"
 requires-python = ">=3.10"
 dependencies = [
     "PyQt6>=6.6",
@@ -26,7 +26,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["lvjiang*"]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

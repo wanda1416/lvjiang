@@ -3,8 +3,8 @@
 import sys
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
 
-from lvjiang.workflows.grammar.parser import parse_text
-from lvjiang.workflows.grammar.ast_nodes import Import, ProcDef, CallProc
+from src.workflows.grammar.parser import parse_text
+from src.workflows.grammar.ast_nodes import Import, ProcDef, CallProc
 
 
 def test_basic_def():

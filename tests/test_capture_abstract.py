@@ -11,7 +11,7 @@
 import numpy as np
 import pytest
 
-from lvjiang.core.capture_base import CaptureBackend
+from src.core.capture_base import CaptureBackend
 
 
 # ─── fake 子类 ────────────────────────────────────────────────
@@ -78,7 +78,7 @@ def test_default_capture_to_file_returns_false_when_capture_fails():
 # ─── 桌面工厂 ─────────────────────────────────────────────────
 
 def test_desktop_capture_factory():
-    from lvjiang.core.desktop import create_capture_backend, DesktopCapture
+    from src.core.desktop import create_capture_backend, DesktopCapture
     backend = create_capture_backend()
     assert isinstance(backend, DesktopCapture)
     assert isinstance(backend, CaptureBackend)
@@ -90,19 +90,19 @@ def test_desktop_capture_factory():
 
 
 def test_desktop_capture_is_capture_backend():
-    from lvjiang.core.desktop import DesktopCapture
+    from src.core.desktop import DesktopCapture
     assert issubclass(DesktopCapture, CaptureBackend)
 
 
 # ─── AdbCapture 抽象一致性 ────────────────────────────────────
 
 def test_adb_capture_is_capture_backend_class():
-    from lvjiang.core.android.adb_capture import AdbCapture
+    from src.core.android.adb_capture import AdbCapture
     assert issubclass(AdbCapture, CaptureBackend)
 
 
 def test_adb_factory_returns_capture_backend():
-    from lvjiang.core.android import create_capture_backend, AdbCapture
+    from src.core.android import create_capture_backend, AdbCapture
 
     class _FakeDevice:
         def get_resolution(self): return (1080, 1920)
@@ -123,8 +123,8 @@ def test_adb_factory_returns_capture_backend():
 
 def test_base_workflow_accepts_fake_capture_backend():
     """验证 BaseWorkflow 只依赖抽象接口，fake 子类可无缝注入"""
-    from lvjiang.core.scene_registry import Layout, CanvasConfig, Region
-    from lvjiang.workflows.base import BaseWorkflow
+    from src.core.scene_registry import Layout, CanvasConfig, Region
+    from src.workflows.base import BaseWorkflow
 
     class _FakeInput:
         background_mode = False

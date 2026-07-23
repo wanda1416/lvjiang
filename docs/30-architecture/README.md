@@ -9,6 +9,7 @@
 | [main-window-state-flow.md](main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
 | [scene-layout-definition.md](scene-layout-definition.md) | 场景与布局：语义模型定义（Scene / Area / Layout） |
 | [scene-layout-editing.md](scene-layout-editing.md) | 场景与布局：编辑器操作手册 |
+| [plugin-system.md](plugin-system.md) | 插件系统架构与开发指南 |
 
 DSL 语法文档已拆分至 [`../32-grammar/`](../32-grammar/README.md)。
 

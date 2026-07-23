@@ -8,7 +8,6 @@ build/
 
 # Virtual environment
 .venv/
-venv/
 
 # IDE
 .idea/
@@ -21,8 +20,11 @@ logs/
 
 # Local data (layouts, session, screenshots, etc.)
 /config/local/
-/data/*
+/data/local
 /config/system/workflows/_*.wf
+
+# TODO 后期需要添加
+/data/materials
 
 # OS
 Thumbs.db

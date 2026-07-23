@@ -1,0 +1,110 @@
+# PolyForm Noncommercial License 1.0.0
+
+Copyright (c) 2026 律匠作者（lvjiang）
+
+<https://polyformproject.org/licenses/noncommercial/1.0.0/>
+
+## Acceptance
+
+In order to get any license under these terms, you must do
+everything listed below under "Acceptance" exactly as described.
+If you do not accept these terms, you may not use the software.
+
+## Copyright License
+
+As far as the licensor can, the licensor grants you a copyright
+license to do everything with the software that would otherwise
+infringe the licensor's copyright in it.
+
+## Patent License
+
+As far as the licensor can, the licensor grants you a patent
+license to make, have made, use, sell, offer to sell, import,
+and run the software, only to the extent necessary to exercise
+the copyright license above.
+
+## Noncommercial Purposes Only
+
+You may use the software only for noncommercial purposes.
+
+**Commercial purposes** include, but are not limited to:
+
+- using the software in the course of providing a product or
+  service to others for a fee, salary, or other compensation;
+- using the software in the course of providing a product or
+  service to others that is funded by advertising, sponsorship,
+  or other commercial arrangements;
+- using the software in the course of developing, manufacturing,
+  marketing, or selling a commercial product or service;
+- using the software to provide a commercial service to others,
+  including hosting, software-as-a-service, or processing;
+- using the software within a commercial organization, except
+  for internal research, development, or testing.
+
+**Noncommercial purposes** include, but are not limited to:
+
+- personal use;
+- academic research;
+- education;
+- personal development;
+- use by charitable organizations for their internal purposes.
+
+## Conditions
+
+In order to exercise the copyright license above, you must meet
+all of these conditions:
+
+### Notices
+
+You must ensure that anyone who gets a copy of any part of
+the software from you also gets a copy of these terms, along
+with the copyright notice above and the disclaimer below.
+
+### Changes
+
+You must mark any changes you make to the software with the
+date and a description.
+
+### Source Code
+
+If you distribute the software in compiled or binary form,
+you must also make the source code available to recipients
+under these same terms, or make it clear how they can obtain
+the source code.
+
+## Disclaimer
+
+**As far as the law allows, the software comes as is, without
+any warranty or condition, and the licensor will not be liable
+for any damage you may suffer resulting from its use, to the
+extent permitted by law.**
+
+---
+
+## 中文说明（非正式翻译，仅供参考）
+
+本软件采用 PolyForm Noncommercial License 1.0.0 协议发布。
+
+**允许的用途：**
+- 个人学习、研究、修改
+- 非商业性质的分发
+- 学术研究、教育
+- 慈善组织内部使用
+
+**禁止的用途：**
+- 任何形式的商业使用
+- 将本软件作为商业产品或服务的一部分
+- 将本软件用于提供商业服务（包括托管、SaaS、数据处理等）
+- 在商业组织内部使用（除内部研究、开发或测试外）
+- 基于本软件开发并销售商业产品
+
+**条件：**
+- 分发时必须保留本协议全文及版权声明
+- 修改时必须标注修改日期和内容
+- 分发二进制版本时必须同时提供源码
+
+**免责声明：**
+本软件按"原样"提供，不提供任何明示或暗示的保证。在适用法律允许的最大范围内，作者不对因使用本软件而产生的任何损害承担责任。
+
+**商业授权：**
+本项目不开放任何形式的商业授权。无论何种情况，均不允许将本软件用于商业用途。请勿联系作者申请商业授权，此类请求将不会被受理。

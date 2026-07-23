@@ -1,6 +1,6 @@
 """测试算术运算符语法解析"""
-from lvjiang.workflows.grammar import parse_text, ArithOp
-from lvjiang.workflows.grammar.ast_nodes import Eval, EvalFieldChainAssign, If, GreaterThan
+from src.workflows.grammar import parse_text, ArithOp
+from src.workflows.grammar.ast_nodes import Eval, EvalFieldChainAssign, If, GreaterThan
 
 
 def test(name, code):
@@ -54,7 +54,7 @@ test("$x = $a + 1", '$x = $a + 1\n')
 print("\n=== 引擎求值测试 ===")
 
 from unittest.mock import MagicMock
-from lvjiang.workflows.engine import WorkflowEngine
+from src.workflows.engine import WorkflowEngine
 
 
 def make_engine():

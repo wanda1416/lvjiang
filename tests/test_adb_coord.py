@@ -6,8 +6,8 @@ ADB 后端下截图与输入同为设备物理像素、原点左上，window_lef
 确保坐标链在 ADB 模式（无客户区偏移）下正确。
 """
 
-from lvjiang.core.scene_registry import Layout, CanvasConfig, Region, Point
-from lvjiang.workflows.base import BaseWorkflow
+from src.core.scene_registry import Layout, CanvasConfig, Region, Point
+from src.workflows.base import BaseWorkflow
 
 
 class _FakeCapture:
@@ -39,7 +39,7 @@ def _make_wf(device_size=(1080, 1920), canvas=None, regions=None, points=None):
 
 def test_region_to_screen_full_canvas_no_jitter():
     # 满画布、无抖动：区域中心归一化比例 × 设备分辨率
-    region = Region(key="r", name="r", x_ratio=0.5, y_ratio=0.5, w_ratio=0.1, h_ratio=0.1)
+    region = Region(key="r", x_ratio=0.5, y_ratio=0.5, w_ratio=0.1, h_ratio=0.1)
     wf = _make_wf(device_size=(1080, 1920), regions=[region])
     x, y = wf._region_to_screen(region, jitter=False)
     # 中心 = (0.5 + 0.1/2) = 0.55
@@ -75,7 +75,7 @@ def test_ratio_to_screen_offset_canvas():
 
 def test_region_to_screen_offset_canvas_no_jitter():
     canvas = CanvasConfig(x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8)
-    region = Region(key="r", name="r", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5)
+    region = Region(key="r", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5)
     wf = _make_wf(device_size=(1000, 2000), canvas=canvas, regions=[region])
     x, y = wf._region_to_screen(region, jitter=False)
     # canvas_x=100, canvas_w=800 ; cx = 100 + (0 + 0.25)*800 = 300

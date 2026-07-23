@@ -67,8 +67,6 @@ _registry = SceneRegistry(
 # 场景 → (场景中文名, [(region_key, region_name), ...])
 SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {}
 
-EQUIP_REGIONS: list[tuple[str, str]] = []
-
 # 场景 → [(point_key, point_name), ...]（来自 YAML 类型定义）
 SCENE_POINTS: dict[str, list[tuple[str, str]]] = {}
 
@@ -83,16 +81,13 @@ GROUP_ORDER: list[str] = []              # 分组顺序
 
 def _rebuild_scene_globals():
     """从 _registry 重建 SCENE_REGIONS / SCENE_POINTS / SCENE_PANELS / 分组缓存等全局字典"""
-    global SCENE_REGIONS, EQUIP_REGIONS, SCENE_POINTS, SCENE_PANELS
+    global SCENE_REGIONS, SCENE_POINTS, SCENE_PANELS
     global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
     SCENE_REGIONS.clear()
     SCENE_REGIONS.update({
         key: (scene.name, [(r.key, r.name) for r in scene.regions])
         for key, scene in _registry.all_scenes().items()
     })
-    _wpn = _registry.get_scene("equip_weapon_detail")
-    EQUIP_REGIONS.clear()
-    EQUIP_REGIONS.extend([(r.key, r.name) for r in _wpn.regions] if _wpn else [])
     SCENE_POINTS.clear()
     SCENE_POINTS.update({
         key: [(p.key, p.name) for p in scene.points]

@@ -8,7 +8,7 @@ from PyQt6.QtGui import (
     QPaintEvent, QFont,
 )
 
-from ...core.scene_registry import Region, CanvasConfig, EQUIP_REGIONS, Panel, get_region_name
+from ...core.scene_registry import Region, CanvasConfig, Panel, get_region_name
 from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
 from .canvas_poi import CanvasPoiMixin
 
@@ -76,8 +76,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self.on_canvas_changed = None  # callable() -> None
         self.on_panel_changed = None  # callable() -> None
 
-        # 当前场景的区域列表（由外部设置）
-        self._current_regions = EQUIP_REGIONS
+        # 当前场景的区域列表（由外部通过 set_regions 设置）
+        self._current_regions: list[tuple[str, str]] = []
 
         # 画布配置（布局级别，由外部设置）
         self._canvas_config = CanvasConfig()

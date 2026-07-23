@@ -140,7 +140,7 @@ class BaseWorkflow:
     def material_recognizer(self):
         """延迟构造 MaterialRecognizer（类级别共享，跨工作流运行复用）"""
         if BaseWorkflow._shared_material_recognizer is None:
-            from ..core.material_recognizer import MaterialRecognizer
+            from src.apps.yysls.core.material_recognizer import MaterialRecognizer
             BaseWorkflow._shared_material_recognizer = MaterialRecognizer(self._ocr)
         return BaseWorkflow._shared_material_recognizer
 

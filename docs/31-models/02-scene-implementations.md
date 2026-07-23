@@ -1,6 +1,6 @@
 # 场景实现定义
 
-本文档定义当前九个场景的具体字段实现。语义模型见 [30-architecture/scene-layout-definition.md](../30-architecture/scene-layout-definition.md)。
+本文档定义当前九个场景的具体字段实现。语义模型见 [34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)。
 
 ---
 

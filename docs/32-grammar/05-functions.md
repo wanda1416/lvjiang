@@ -74,7 +74,7 @@ eval $x = ($a + $b) * ($c - 1)     # 括号改变优先级
 ```
 
 - 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
-- if 条件比较的两侧也支持算术表达式（见 [03-control-flow.md](03-control-flow.md)）
+- if 条件比较的两侧也支持算术表达式（见 [04-control-flow.md](04-control-flow.md)）
 
 ### 运算函数
 

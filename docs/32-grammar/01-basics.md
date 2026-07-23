@@ -126,7 +126,7 @@ $var = "hello"               # 隐式 eval，效果完全相同
 
 变量**无需预先声明**，首次赋值即创建，后续引用即可。
 
-**外部参数注入**：工作流可以通过 `workflows.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [05-subworkflows.md](05-subworkflows.md#工作流参数声明)。也可直接在 `.wf` 文件内用 front-matter 声明（见下一节），便于外部加载。
+**外部参数注入**：工作流可以通过 `workflows.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [06-subworkflows.md](06-subworkflows.md#工作流参数声明)。也可直接在 `.wf` 文件内用 front-matter 声明（见下一节），便于外部加载。
 
 ### 2.2 变量类型
 

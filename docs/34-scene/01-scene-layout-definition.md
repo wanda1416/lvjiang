@@ -2,7 +2,7 @@
 
 本文档定义 Scene / Area / Layout 三层语义模型，描述数据结构和存储规范。
 
-编辑器操作手册见 [scene-layout-editing.md](scene-layout-editing.md)，各场景具体字段实现见 [31-models/scene-implementations.md](../31-models/scene-implementations.md)。
+编辑器操作手册见 [02-scene-layout-editing.md](02-scene-layout-editing.md)，各场景具体字段实现见 [31-models/02-scene-implementations.md](../31-models/02-scene-implementations.md)。
 
 ---
 

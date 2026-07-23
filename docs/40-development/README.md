@@ -14,12 +14,17 @@
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
-| 2026-07-15 | [2026-07/2026-07-15-scene-yaml-externalization.md](2026-07/2026-07-15-scene-yaml-externalization.md) | 场景定义 YAML 外部化、SceneRegistry、加载顺序控制 |
-| 2026-07-15 | [2026-07/2026-07-15-scene-class-refactor.md](2026-07/2026-07-15-scene-class-refactor.md) | 装备场景类化重构、功能按钮标记、区域复制修复 |
-| 2026-07-15 | [2026-07/2026-07-15-architecture-refactor.md](2026-07/2026-07-15-architecture-refactor.md) | 架构文档重构、场景标识符规范化、布局顺序管理、右键菜单 |
-| 2026-07-15 | [2026-07/2026-07-15-canvas-middle-layer.md](2026-07/2026-07-15-canvas-middle-layer.md) | 画布中间层坐标解耦（Canvas Middle Layer） |
-| 2026-07-14 | [2026-07/2026-07-14-overlay-dpi.md](2026-07/2026-07-14-overlay-dpi.md) | BorderOverlay 多 DPI 跨屏定位问题 |
-| 2026-07-14 | [2026-07/2026-07-14-layout-hierarchy-refactor.md](2026-07/2026-07-14-layout-hierarchy-refactor.md) | 区域配置布局层级重构（Layout → Scene → Region） |
+| 2026-07-16 | [2026-07-16-workflow-stability-and-evaluation.md](2026-07/2026-07-16-workflow-stability-and-evaluation.md) | 工作流稳定性与评估体系闭环 |
+| 2026-07-16 | [2026-07-16-scene-grouping.md](2026-07/2026-07-16-scene-grouping.md) | 场景分组管理功能 |
+| 2026-07-16 | [2026-07-16-dsl-refactor-and-crash-protection.md](2026-07/2026-07-16-dsl-refactor-and-crash-protection.md) | DSL 去隐式化重构与崩溃防护体系 |
+| 2026-07-16 | [2026-07-16-dsl-points-arrows-next-step.md](2026-07/2026-07-16-dsl-points-arrows-next-step.md) | DSL 消费 points/arrows 改造方案 |
+| 2026-07-15 | [2026-07-15-scene-yaml-externalization.md](2026-07/2026-07-15-scene-yaml-externalization.md) | 场景定义 YAML 外部化、SceneRegistry、加载顺序控制 |
+| 2026-07-15 | [2026-07-15-scene-class-refactor.md](2026-07/2026-07-15-scene-class-refactor.md) | 装备场景类化重构、功能按钮标记、区域复制修复 |
+| 2026-07-15 | [2026-07-15-architecture-refactor.md](2026-07/2026-07-15-architecture-refactor.md) | 架构文档重构、场景标识符规范化、布局顺序管理 |
+| 2026-07-15 | [2026-07-15-canvas-middle-layer.md](2026-07/2026-07-15-canvas-middle-layer.md) | 画布中间层坐标解耦 |
+| 2026-07-14 | [2026-07-14-equip-model-dedup-slot.md](2026-07/2026-07-14-equip-model-dedup-slot.md) | 装备模型去 slot 依赖全链路重构 |
+| 2026-07-14 | [2026-07-14-overlay-dpi.md](2026-07/2026-07-14-overlay-dpi.md) | BorderOverlay 多 DPI 跨屏定位问题 |
+| 2026-07-14 | [2026-07-14-layout-hierarchy-refactor.md](2026-07/2026-07-14-layout-hierarchy-refactor.md) | 区域配置布局层级重构 |
 
 ## 日志格式
 

@@ -266,6 +266,18 @@ class EquipmentParser:
                 cap = caps["cap"]
                 affix.cap_pct = round(affix.value / cap * 100, 1)
 
+    def parse_affix_text(self, text: str, level: int | None = None) -> Affix | None:
+        """解析单条词条文本（如调律结果弹窗的新词条）
+
+        提供 level 时同步计算 cap_pct。无法解析返回 None。
+        """
+        affix = self._parse_single_affix(text)
+        if affix and level:
+            caps = self._attr_config.get_affix_caps(level, affix.name)
+            if caps and caps.get("cap"):
+                affix.cap_pct = round(affix.value / caps["cap"] * 100, 1)
+        return affix
+
     # ─── affix 解析 ────────────────────────────────────────
 
     def _parse_affixes(
@@ -348,8 +360,8 @@ class EquipmentParser:
 
         # ── 1. 转律标记 ──
         # OCR 常将 ］/] 误识别为 1，兼容 ［转1 / [转1 等变体
-        is_transferred = bool(re.search(r"[［【\[]转[\]】\]1]", text))
-        text = re.sub(r"[［【\[]转[\]】\]1]", "", text)
+        is_transferred = bool(re.search(r"[［【\[]转[］\]】1]", text))
+        text = re.sub(r"[［【\[]转[］\]】1]", "", text)
 
         # ── 2. 过滤套装信息 ──
         if "套装" in text:

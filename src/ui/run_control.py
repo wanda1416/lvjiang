@@ -526,7 +526,7 @@ class RunControlMixin:
                 continue
             cls = SCHOOL_CLASSES[school]
             if cls.needs_sub_school and not cfg.get("sub_schools"):
-                self.log_text.append(f"[错误] 流派「{cls.school_name}」需至少勾选一个指定流派")
+                self.log_text.append(f"[错误] 流派「{cls.school_name}」需至少勾选一个子选项（{cls.sub_school_label.rstrip('：')}）")
                 return
             school_judges.append(get_school_judge(school, cfg))
         if not school_judges:

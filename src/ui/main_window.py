@@ -170,6 +170,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         ocr_test.triggered.connect(self._open_ocr_test)
         tools_menu.addAction(ocr_test)
 
+        # 插件扩展点：额外工具菜单项
+        for label, slot, shortcut in self._extra_tool_menu_items():
+            action = QAction(label, self)
+            if shortcut:
+                action.setShortcut(shortcut)
+            action.triggered.connect(slot)
+            tools_menu.addAction(action)
+
         # ── 帮助 ──
         help_menu = menubar.addMenu("帮助")
         about = QAction("关于", self)
@@ -186,6 +194,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
     def _extra_menu_items(self) -> list[tuple[str, Any, str]]:
         """子类覆盖：返回额外菜单项 [(label, slot, shortcut), ...]"""
+        return []
+
+    def _extra_tool_menu_items(self) -> list[tuple[str, Any, str]]:
+        """子类覆盖：返回额外「工具」菜单项 [(label, slot, shortcut), ...]"""
         return []
 
     # ─── 对话框 ──────────────────────────────────────────────

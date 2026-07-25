@@ -1,90 +1,36 @@
 """流派注册与判定器工厂
 
 流派清单来自 docs/10-game/04-tuning-mechanics.md「调律喜好配置」。
-目前仅 会意流派-通用 已实现，其余流派为空实现占位。
+目前 会意流派-通用、会心流派-大外流/小外流、
+治疗流派（纯奶/火拳奶子玩法合并）均已实现。
 """
 
-from .base import SchoolJudge
+from .base import Rating, SchoolJudge
+from .heal import HealJudge
 from .huiyi import HuiyiGeneralJudge
+from .huixin import (
+    SUB_SCHOOL_PLAYSTYLES, SUB_SCHOOLS, HuixinBigJudge, HuixinSmallJudge,
+)
 
-
-# ─── 会心流派二级配置（指定流派 + 玩法）──────────────
-
-# 指定流派 key → 显示名
-SUB_SCHOOLS: dict[str, str] = {
-    "lieshi": "裂石",
-    "pozhu": "破竹",
-    "qiansi": "牵丝",
-}
-
-# 指定流派 key → 玩法 key → 显示名（破竹无玩法区分，不列条目）
-SUB_SCHOOL_PLAYSTYLES: dict[str, dict[str, str]] = {
-    "lieshi": {"chuntang": "纯唐", "shuangqie": "双切"},
-    "qiansi": {"zoudi": "走地", "feitian": "飞天"},
-}
-
-
-# ─── 空实现占位流派 ────────────────────────────────────────
-
-class HuixinSmallJudge(SchoolJudge):
-    """会心流派-小外流（未实现）"""
-
-    school_key = "huixin_small"
-    school_name = "会心流派-小外流"
-    implemented = False
-    has_keep_pvp = True
-    needs_sub_school = True
-
-    def judge(self, equip):
-        raise NotImplementedError("会心流派-小外流 判定暂未实现")
-
-
-class HuixinBigJudge(SchoolJudge):
-    """会心流派-大外流（未实现）"""
-
-    school_key = "huixin_big"
-    school_name = "会心流派-大外流"
-    implemented = False
-    has_keep_pvp = True
-    needs_sub_school = True
-
-    def judge(self, equip):
-        raise NotImplementedError("会心流派-大外流 判定暂未实现")
-
-
-class HealPureJudge(SchoolJudge):
-    """治疗流派-纯奶（未实现）"""
-
-    school_key = "heal_pure"
-    school_name = "治疗流派-纯奶"
-    implemented = False
-
-    def judge(self, equip):
-        raise NotImplementedError("治疗流派-纯奶 判定暂未实现")
-
-
-class HealFireJudge(SchoolJudge):
-    """治疗流派-火拳奶（输出）（未实现）"""
-
-    school_key = "heal_fire"
-    school_name = "治疗流派-火拳奶（输出）"
-    implemented = False
-
-    def judge(self, equip):
-        raise NotImplementedError("治疗流派-火拳奶 判定暂未实现")
+# 会心二级配置 SUB_SCHOOLS / SUB_SCHOOL_PLAYSTYLES 已下沉到 huixin，
+# 此处再导出保持公共 API 不变。
+__all__ = [
+    "SUB_SCHOOLS", "SUB_SCHOOL_PLAYSTYLES", "SCHOOL_CLASSES", "SCHOOLS",
+    "is_school_implemented", "get_school_judge", "judge_tuning_worthiness",
+]
 
 
 # ─── 流派注册表 ────────────────────────────────────────────
 
-# key → 判定器类（UI 据类属性 has_keep_pvp/needs_sub_school 生成配置控件）
+# key → 判定器类（UI 据类属性 has_keep_pvp/needs_sub_school/
+# sub_school_options 生成配置控件）
 SCHOOL_CLASSES: dict[str, type[SchoolJudge]] = {
     cls.school_key: cls
     for cls in (
         HuiyiGeneralJudge,
         HuixinSmallJudge,
         HuixinBigJudge,
-        HealPureJudge,
-        HealFireJudge,
+        HealJudge,
     )
 }
 
@@ -115,3 +61,45 @@ def get_school_judge(school: str, config: dict | None = None) -> SchoolJudge:
     if cls is None:
         raise ValueError(f"未知流派: {school}")
     return cls(config)
+
+
+def judge_tuning_worthiness(
+    equip, configs: dict[str, dict] | None = None,
+    schools: list[str] | None = None,
+) -> tuple[bool, list[str]]:
+    """遍历全部流派做调律潜力判定（or 语义）
+
+    任一流派判定仍可达 顶级/优秀 → 值得调律。未实现的流派与
+    不覆盖该部位的流派（not_applicable）不参与判定（不是否决票）；
+    无任何流派能给出有效结论时判为不值得（直接结束）。
+
+    Args:
+        equip: EquipmentData
+        configs: 流派 key → 配置 dict（缺省用默认配置）
+        schools: 仅参与判定的流派 key 列表（None → 全部流派）
+
+    Returns:
+        (是否值得调律, 各流派判定明细文本)
+    """
+    worth = False
+    conclusive = False  # 是否有流派给出了有效结论
+    logs: list[str] = []
+    for key, cls in SCHOOL_CLASSES.items():
+        if schools is not None and key not in schools:
+            continue
+        try:
+            res = cls((configs or {}).get(key)).check_tuning_worthiness(equip)
+        except NotImplementedError:
+            continue
+        if res.not_applicable:
+            logs.append(f"{cls.school_name}: 不适用（{'；'.join(res.reasons)}）")
+            continue
+        conclusive = True
+        tag = "跳过" if res.skipped else res.rating.value
+        logs.append(f"{cls.school_name}: {tag}（{'；'.join(res.reasons)}）")
+        if not res.skipped and res.rating in (Rating.TOP, Rating.EXCELLENT):
+            worth = True
+    if not conclusive:
+        worth = False
+        logs.append("无已实现流派可判定该装备，结束调律")
+    return worth, logs

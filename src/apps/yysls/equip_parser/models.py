@@ -87,6 +87,18 @@ class EquipmentData:
         from .constants import infer_category
         return infer_category(self.type)
 
+    @property
+    def part(self) -> str:
+        """从 type 推断部位：武器（不分主/副）/ 环 / 佩 / 冠胄 / 胸甲 / 胫甲 / 腕甲 / unknown"""
+        from .constants import infer_part
+        return infer_part(self.type)
+
+    @property
+    def weapon(self) -> str | None:
+        """武器类型（剑/枪/扇/...）；部位非武器时为 None"""
+        from .constants import WEAPON_TYPES_SET
+        return self.type if self.type in WEAPON_TYPES_SET else None
+
     def to_dict(self) -> dict:
         """转换为标准装备领域模型 JSON dict
 

@@ -19,24 +19,27 @@ _QUALITY_COLORS = {
 # 装备槽位定义（2行×4列）
 # 左四：主武器、副武器、环、佩
 # 右四：冠胄、胸甲、胫甲、腕甲
+# part_label 为已装备时第一行展示的部位名（武器不区分主副）
 _SLOT_LAYOUT = [
-    # (row, col, slot_key, display_name)
-    (0, 0, "main_weapon", "主武器"),
-    (0, 1, "sub_weapon", "副武器"),
-    (0, 2, "head", "冠胄"),
-    (0, 3, "chest", "胸甲"),
-    (1, 0, "ring", "环"),
-    (1, 1, "pendant", "佩"),
-    (1, 2, "leg", "胫甲"),
-    (1, 3, "wrist", "腕甲"),
+    # (row, col, slot_key, display_name, part_label)
+    (0, 0, "main_weapon", "主武器", "武器"),
+    (0, 1, "sub_weapon", "副武器", "武器"),
+    (0, 2, "head", "冠胄", "冠胄"),
+    (0, 3, "chest", "胸甲", "胸甲"),
+    (1, 0, "ring", "环", "环"),
+    (1, 1, "pendant", "佩", "佩"),
+    (1, 2, "leg", "胫甲", "胫甲"),
+    (1, 3, "wrist", "腕甲", "腕甲"),
 ]
 
 
 class _EquipCard(QFrame):
     """单件装备卡片"""
 
-    def __init__(self, slot_name: str, parent=None):
+    def __init__(self, slot_name: str, part_label: str, parent=None):
         super().__init__(parent)
+        self._slot_name = slot_name
+        self._part_label = part_label
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet("""
             _EquipCard {
@@ -52,12 +55,12 @@ class _EquipCard(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(3)
 
-        # 第一行：部位名
+        # 第一行：部位 · 装备名（未装备时仅显示槽位名）
         self.lbl_slot = QLabel(slot_name)
         self.lbl_slot.setStyleSheet("font-weight: bold; font-size: 13px; color: #333333;")
         layout.addWidget(self.lbl_slot)
 
-        # 第二行：装备名 + 等级品阶
+        # 第二行：等级 + 承音标记
         self.lbl_info = QLabel("—")
         self.lbl_info.setStyleSheet("font-size: 12px; color: #666666;")
         layout.addWidget(self.lbl_info)
@@ -80,6 +83,8 @@ class _EquipCard(QFrame):
 
     def set_empty(self):
         """显示为空槽位"""
+        self.lbl_slot.setText(self._slot_name)
+        self.lbl_slot.setStyleSheet("font-weight: bold; font-size: 13px; color: #333333;")
         self.lbl_info.setText("未装备")
         self.lbl_info.setStyleSheet("font-size: 12px; color: #999999;")
         self._clear_affixes()
@@ -104,14 +109,18 @@ class _EquipCard(QFrame):
         quality = equip_data.get("quality")
         color = _QUALITY_COLORS.get(quality, "#888888")
 
-        # 装备名 + 等级
+        # 第一行：部位 · 装备名（武器不区分主副），按品质着色
         name = equip_data.get("name", "未知")
+        self.lbl_slot.setText(f"{self._part_label} · {name}")
+        self.lbl_slot.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {color};")
+
+        # 第二行：等级 + 承音标记
         level = equip_data.get("level", "?")
         is_chengyin = equip_data.get("is_chengyin", False)
-        chengyin_tag = " [承音]" if is_chengyin else ""
+        chengyin_tag = "  [承音]" if is_chengyin else ""
 
-        self.lbl_info.setText(f"{name}  Lv.{level}{chengyin_tag}")
-        self.lbl_info.setStyleSheet(f"font-size: 12px; color: {color}; font-weight: bold;")
+        self.lbl_info.setText(f"Lv{level}{chengyin_tag}")
+        self.lbl_info.setStyleSheet("font-size: 12px; color: #666666;")
 
         # 词条列表
         self._clear_affixes()
@@ -174,6 +183,31 @@ class _EquipCard(QFrame):
             lbl.setStyleSheet("font-size: 11px; color: #999999;")
             self.affix_layout.addWidget(lbl)
 
+        # 定音词条：与普通词条间用虚线分隔
+        dingyin = equip_data.get("dingyin")
+        if dingyin and dingyin.get("name"):
+            dash = QFrame()
+            dash.setFrameShape(QFrame.Shape.NoFrame)
+            dash.setStyleSheet("border: none; border-top: 1px dashed #adb5bd;")
+            dash.setFixedHeight(1)
+            self.affix_layout.addWidget(dash)
+
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(4)
+
+            lbl_name = QLabel(dingyin["name"])
+            lbl_name.setStyleSheet("font-size: 11px; color: #555555;")
+            row.addWidget(lbl_name, stretch=1)
+
+            dy_value = dingyin.get("value", "")
+            dy_val_str = f"{dy_value}%" if isinstance(dy_value, (int, float)) else str(dy_value)
+            lbl_val = QLabel(dy_val_str)
+            lbl_val.setStyleSheet("font-size: 11px; color: #333333; font-weight: bold;")
+            row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
+
+            self.affix_layout.addLayout(row)
+
 
 class EquipStatusPanel(QWidget):
     """装备状态面板（2行×4列）"""
@@ -219,8 +253,8 @@ class EquipStatusPanel(QWidget):
         grid = QGridLayout(container)
         grid.setSpacing(8)
 
-        for row, col, slot_key, display_name in _SLOT_LAYOUT:
-            card = _EquipCard(display_name)
+        for row, col, slot_key, display_name, part_label in _SLOT_LAYOUT:
+            card = _EquipCard(display_name, part_label)
             grid.addWidget(card, row, col)
             self._cards[slot_key] = card
 
@@ -229,7 +263,7 @@ class EquipStatusPanel(QWidget):
 
     def refresh(self, equipped_data: dict):
         """根据 equipped 字典刷新面板"""
-        for row, col, slot_key, display_name in _SLOT_LAYOUT:
+        for row, col, slot_key, display_name, part_label in _SLOT_LAYOUT:
             card = self._cards[slot_key]
             equip = equipped_data.get(slot_key)
             if equip:

@@ -2,12 +2,14 @@
 
 此前仅被判定器/解析器间接覆盖，本文件针对
 词条别名归一、上限查询（含承音值）与品阶推断补充直测。
-数值断言与 config/system/attributes.yaml 保持一致。
+数值断言与 config/system/yysls/attributes.yaml 保持一致。
 """
 
 import pytest
 
 from src.apps.yysls.evaluator.attr_rules import (
+    POOL_DINGYIN,
+    POOL_NORMAL,
     AttrRange,
     LevelRule,
     get_attr_rule_manager,
@@ -41,6 +43,43 @@ class TestResolveAffixCategory:
         assert set(aliases) == {"最大外功攻击", "最小外功攻击"}
 
 
+# ─── 词条分组（_aliases dict 形态）──────────────────────
+
+class TestAliasGroups:
+    def test_grouped_aliases_resolved(self, mgr):
+        # 指定技能增效 按十大流派分组，组内词条名同样归一到类别
+        assert mgr.resolve_affix_category("无名剑法武学技增伤") == "指定技能增效"
+        assert mgr.resolve_affix_category("千机索天重击增伤") == "指定技能增效"
+        assert mgr.resolve_affix_category("明川药典治疗技增疗") == "指定技能增效"
+
+    def test_grouped_alias_is_dingyin(self, mgr):
+        # 分组词条名归一后同样穿透到定音词库
+        assert mgr.is_dingyin_affix("积矩九剑流血增伤")
+
+    def test_grouped_alias_caps_lookup(self, mgr):
+        caps = mgr.get_affix_caps(110, "嗟夫刀法护盾增效")
+        assert caps["cap"] == 9.2
+        assert caps["chengyin"] == 9.2  # 定音承音 = cap
+
+    def test_get_alias_groups_structure(self, mgr):
+        groups = mgr.get_alias_groups("指定技能增效")
+        # 十大流派各一组，每组 5 个词条名
+        assert len(groups) == 10
+        assert all(len(names) == 5 for names in groups.values())
+        assert "鸣金·虹" in groups
+        assert "无名剑法武学技增伤" in groups["鸣金·虹"]
+
+    def test_ungrouped_category_returns_empty(self, mgr):
+        # 不分组类别（list 形态）返回空 dict
+        assert mgr.get_alias_groups("外功攻击") == {}
+        assert mgr.get_alias_groups("未知类别") == {}
+
+    def test_grouped_category_aliases_flattened(self, mgr):
+        # get_aliases_for_category 拍平返回全部组内词条名（10 组 × 5 条）
+        aliases = mgr.get_aliases_for_category("指定技能增效")
+        assert len(aliases) == 50
+
+
 # ─── 词条上限查询 ──────────────────────────────────────────
 
 class TestGetAffixCaps:
@@ -66,6 +105,35 @@ class TestGetAffixCaps:
         categories = mgr.get_all_affix_categories()
         assert "外功攻击" in categories
         assert "指定武学增效" in categories
+
+
+# ─── 词库类型（普通 / 定音）──────────────────────────────
+
+class TestAffixPool:
+    @pytest.mark.parametrize("name", ["外功增益", "属攻增益", "指定技能增效"])
+    def test_dingyin_categories(self, mgr, name):
+        assert mgr.get_affix_pool(name) == POOL_DINGYIN
+        assert mgr.is_dingyin_affix(name)
+
+    @pytest.mark.parametrize("name", ["会心率", "外功攻击", "未知词条"])
+    def test_normal_by_default(self, mgr, name):
+        assert mgr.get_affix_pool(name) == POOL_NORMAL
+        assert not mgr.is_dingyin_affix(name)
+
+    def test_alias_resolved_to_dingyin(self, mgr):
+        # 别名先归一到类别再查词库类型
+        assert mgr.is_dingyin_affix("外功穿透")
+        assert mgr.is_dingyin_affix("属攻穿透")
+
+    def test_dingyin_chengyin_equals_cap(self, mgr):
+        # 承音装备定音属性无限制，承音值 = cap（不乘 0.94）
+        caps = mgr.get_affix_caps(110, "外功增益")
+        assert caps["cap"] == 16.8
+        assert caps["chengyin"] == 16.8
+
+    def test_normal_chengyin_discounted(self, mgr):
+        caps = mgr.get_affix_caps(110, "会心率")
+        assert caps["chengyin"] == round(14 * 0.94, 2)
 
 
 # ─── 品阶推断 ──────────────────────────────────────────────

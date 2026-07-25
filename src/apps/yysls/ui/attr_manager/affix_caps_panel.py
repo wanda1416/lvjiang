@@ -1,8 +1,12 @@
-"""词条属性上限面板
+"""词条配置面板
 
 管理各词条在不同等级的最大值。
 左侧词条列表，右侧等级-上限表格。
-右侧顶部增加别名管理区域。
+右侧顶部为词条类型（普通词条 / 定音词条）+ 词条分组（不分组 / 分组）+ 词条名称区域。
+定音词条不受承音限制，表格隐藏承音列。
+词条名称支持分组（_aliases 为 dict 形态），分组后按 Tab 页展示，
+专为 指定技能增效 这类包含大量词条的类别设计（按十大流派分组）。
+双击词条类别 / 分组页签 / 词条名标签可打开对话框重命名。
 自动保存，删除时确认。
 """
 
@@ -15,14 +19,18 @@ from PyQt6.QtWidgets import (
     QListWidget, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QHeaderView, QLabel,
     QInputDialog, QComboBox, QFrame, QLayout,
+    QRadioButton, QButtonGroup, QTabWidget,
 )
 from PyQt6.QtCore import Qt, QRect, QSize
 
 # 配置文件路径
-_ATTRS_PATH = Path("config/system/attributes.yaml")
+_ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
 
 # 承音比例（默认 94%）
 _CHENGYIN_RATIO = 0.94
+
+# 词条类型（_pool 字段；缺省为普通词条）
+_POOL_DINGYIN = "dingyin"
 
 
 class _FlowLayout(QLayout):
@@ -97,6 +105,18 @@ class _FlowLayout(QLayout):
         return y + line_height - rect.y()
 
 
+class _AliasTag(QWidget):
+    """词条名标签（双击触发重命名）"""
+
+    def __init__(self, alias: str, on_double_click, parent=None):
+        super().__init__(parent)
+        self._alias = alias
+        self._on_double_click = on_double_click
+
+    def mouseDoubleClickEvent(self, event):
+        self._on_double_click(self._alias)
+
+
 class AffixCapsPanel(QWidget):
     """词条属性上限面板"""
 
@@ -122,6 +142,7 @@ class AffixCapsPanel(QWidget):
         
         self._affix_list = QListWidget()
         self._affix_list.currentRowChanged.connect(self._on_affix_changed)
+        self._affix_list.itemDoubleClicked.connect(self._rename_affix)
         left_layout.addWidget(self._affix_list)
 
         # 添加/删除词条按钮
@@ -138,12 +159,52 @@ class AffixCapsPanel(QWidget):
 
         splitter.addWidget(left_widget)
 
-        # 右侧：别名管理 + 表格 + 按钮
+        # 右侧：词条类型 + 词条分组 + 词条名称 + 表格 + 按钮
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ── 别名管理区域 ──
+        # ── 词条类型（单选：普通词条 / 定音词条）──
+        pool_frame = QFrame()
+        pool_frame.setStyleSheet(
+            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+        )
+        pool_layout = QHBoxLayout(pool_frame)
+        pool_layout.setContentsMargins(8, 4, 8, 4)
+        pool_layout.addWidget(QLabel("词条类型"))
+        self._radio_pool_normal = QRadioButton("普通词条")
+        self._radio_pool_dingyin = QRadioButton("定音词条")
+        self._pool_group = QButtonGroup(self)
+        self._pool_group.addButton(self._radio_pool_normal)
+        self._pool_group.addButton(self._radio_pool_dingyin)
+        self._radio_pool_normal.setChecked(True)
+        self._radio_pool_normal.toggled.connect(self._on_pool_changed)
+        pool_layout.addWidget(self._radio_pool_normal)
+        pool_layout.addWidget(self._radio_pool_dingyin)
+        pool_layout.addStretch()
+        right_layout.addWidget(pool_frame)
+
+        # ── 词条分组（单选：不分组 / 分组）──
+        group_frame = QFrame()
+        group_frame.setStyleSheet(
+            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+        )
+        group_mode_layout = QHBoxLayout(group_frame)
+        group_mode_layout.setContentsMargins(8, 4, 8, 4)
+        group_mode_layout.addWidget(QLabel("词条分组"))
+        self._radio_group_off = QRadioButton("不分组")
+        self._radio_group_on = QRadioButton("分组")
+        self._group_mode_group = QButtonGroup(self)
+        self._group_mode_group.addButton(self._radio_group_off)
+        self._group_mode_group.addButton(self._radio_group_on)
+        self._radio_group_off.setChecked(True)
+        self._radio_group_off.toggled.connect(self._on_group_mode_changed)
+        group_mode_layout.addWidget(self._radio_group_off)
+        group_mode_layout.addWidget(self._radio_group_on)
+        group_mode_layout.addStretch()
+        right_layout.addWidget(group_frame)
+
+        # ── 词条名称区域 ──
         self._alias_frame = QFrame()
         self._alias_frame.setStyleSheet(
             "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
@@ -153,18 +214,34 @@ class AffixCapsPanel(QWidget):
 
         # 标题行
         alias_title_row = QHBoxLayout()
-        alias_title_row.addWidget(QLabel("别名映射（原始词条名 → 当前类别）"))
+        alias_title_row.addWidget(QLabel("词条名称（原始词条名 → 当前类别）"))
         alias_title_row.addStretch()
-        self._btn_add_alias = QPushButton("+ 别名")
-        self._btn_add_alias.setFixedWidth(60)
+        self._btn_add_group = QPushButton("+ 分组")
+        self._btn_add_group.setFixedWidth(60)
+        self._btn_add_group.clicked.connect(self._add_group)
+        self._btn_add_group.setVisible(False)
+        alias_title_row.addWidget(self._btn_add_group)
+        self._btn_del_group = QPushButton("- 分组")
+        self._btn_del_group.setFixedWidth(60)
+        self._btn_del_group.clicked.connect(self._del_group)
+        self._btn_del_group.setVisible(False)
+        alias_title_row.addWidget(self._btn_del_group)
+        self._btn_add_alias = QPushButton("+ 词条名")
+        self._btn_add_alias.setFixedWidth(70)
         self._btn_add_alias.clicked.connect(self._add_alias)
         alias_title_row.addWidget(self._btn_add_alias)
         alias_layout.addLayout(alias_title_row)
 
-        # 别名标签容器（流式布局，支持自动换行）
+        # 不分组：词条名标签容器（流式布局，支持自动换行）
         self._alias_tags_widget = QWidget()
         self._alias_tags_layout = _FlowLayout(self._alias_tags_widget, spacing=6)
         alias_layout.addWidget(self._alias_tags_widget)
+
+        # 分组：按组 Tab 页展示词条名（双击页签重命名分组）
+        self._alias_group_tabs = QTabWidget()
+        self._alias_group_tabs.setVisible(False)
+        self._alias_group_tabs.tabBarDoubleClicked.connect(self._rename_group)
+        alias_layout.addWidget(self._alias_group_tabs)
 
         right_layout.addWidget(self._alias_frame)
 
@@ -222,15 +299,22 @@ class AffixCapsPanel(QWidget):
         if row < 0 or row >= len(affix_names):
             self._current_affix = None
             self._table.setRowCount(0)
+            self._refresh_pool_radios()
+            self._refresh_group_radios()
             self._refresh_alias_tags()
             return
 
         self._current_affix = affix_names[row]
+        self._refresh_pool_radios()
+        self._refresh_group_radios()
         self._refresh_table()
         self._refresh_alias_tags()
 
     def _refresh_table(self):
         """刷新表格内容"""
+        # 定音词条不受承音限制，直接隐藏承音列（无论是否有等级数据）
+        self._table.setColumnHidden(3, self._is_dingyin())
+
         if not self._current_affix:
             self._table.setRowCount(0)
             return
@@ -340,6 +424,30 @@ class AffixCapsPanel(QWidget):
         self._affix_list.setCurrentRow(self._affix_list.count() - 1)
         self._save_data()
 
+    def _rename_affix(self, item):
+        """双击词条类别重命名（保留在 YAML 中的键顺序）"""
+        old = item.text()
+        name, ok = QInputDialog.getText(self, "重命名词条", "词条名称:", text=old)
+        if not ok or not name:
+            return
+        name = name.strip()
+        if not name or name == old:
+            return
+
+        affix_caps = self._data.get("affix_caps", {})
+        if name in affix_caps:
+            QMessageBox.warning(self, "重复", f"词条 '{name}' 已存在")
+            return
+
+        # 保序重建 dict，只替换键名
+        self._data["affix_caps"] = {
+            (name if k == old else k): v for k, v in affix_caps.items()
+        }
+        if self._current_affix == old:
+            self._current_affix = name
+        item.setText(name)
+        self._save_data()
+
     def _del_affix(self):
         """删除当前词条"""
         if not self._current_affix:
@@ -432,12 +540,11 @@ class AffixCapsPanel(QWidget):
 
         affix_caps = self._data.setdefault("affix_caps", {})
         level_caps = affix_caps.setdefault(self._current_affix, {})
-        
-        # 保留 _aliases 等内部字段，只清除等级数据
-        aliases = level_caps.get("_aliases", [])
+
+        # 保留 _aliases / _pool 等内部字段，只清除等级数据
+        internal = {k: v for k, v in level_caps.items() if str(k).startswith("_")}
         level_caps.clear()
-        if aliases:
-            level_caps["_aliases"] = aliases
+        level_caps.update(internal)
         
         for row in range(self._table.rowCount()):
             level_item = self._table.item(row, 0)
@@ -477,37 +584,232 @@ class AffixCapsPanel(QWidget):
 
     # ── 别名管理 ──────────────────────────────────────────────
 
-    def _get_aliases(self) -> list[str]:
-        """获取当前类别的别名列表"""
+    def _is_dingyin(self) -> bool:
+        """当前词条是否定音词条"""
+        if not self._current_affix:
+            return False
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.get(self._current_affix, {})
+        return isinstance(category_data, dict) and category_data.get("_pool") == _POOL_DINGYIN
+
+    def _refresh_pool_radios(self):
+        """刷新词条类型单选框状态"""
+        self._saving = True
+        is_dingyin = self._is_dingyin()
+        self._radio_pool_dingyin.setChecked(is_dingyin)
+        self._radio_pool_normal.setChecked(not is_dingyin)
+        has_affix = self._current_affix is not None
+        self._radio_pool_normal.setEnabled(has_affix)
+        self._radio_pool_dingyin.setEnabled(has_affix)
+        self._saving = False
+
+    def _on_pool_changed(self):
+        """词条类型切换时保存并刷新承音列显隐"""
+        if self._saving or not self._current_affix:
+            return
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.setdefault(self._current_affix, {})
+        if self._radio_pool_dingyin.isChecked():
+            category_data["_pool"] = _POOL_DINGYIN
+        else:
+            category_data.pop("_pool", None)  # 普通词条为缺省，不写字段
+        self._refresh_table()
+        self._save_data()
+
+    def _refresh_group_radios(self):
+        """刷新词条分组单选框状态，并同步分组按钮可见性"""
+        self._saving = True
+        grouped = self._is_grouped()
+        self._radio_group_on.setChecked(grouped)
+        self._radio_group_off.setChecked(not grouped)
+        has_affix = self._current_affix is not None
+        self._radio_group_off.setEnabled(has_affix)
+        self._radio_group_on.setEnabled(has_affix)
+        self._btn_add_group.setVisible(grouped)
+        self._btn_del_group.setVisible(grouped)
+        self._saving = False
+
+    def _on_group_mode_changed(self):
+        """词条分组切换：_aliases 在 list（不分组）与 dict（分组）间互转"""
+        if self._saving or not self._current_affix:
+            return
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.setdefault(self._current_affix, {})
+        raw = category_data.get("_aliases", [])
+        if self._radio_group_on.isChecked():
+            # 开启分组：已有词条名归入默认组
+            if not isinstance(raw, dict):
+                aliases = raw if isinstance(raw, list) else []
+                category_data["_aliases"] = {"默认": aliases} if aliases else {}
+        else:
+            # 关闭分组：拍平所有组内词条名
+            if isinstance(raw, dict):
+                flat = [n for names in raw.values() if isinstance(names, list) for n in names]
+                if flat:
+                    category_data["_aliases"] = flat
+                else:
+                    category_data.pop("_aliases", None)
+        self._refresh_group_radios()
+        self._refresh_alias_tags()
+        self._save_data()
+
+    def _add_group(self):
+        """添加词条分组"""
+        if not self._current_affix or not self._is_grouped():
+            return
+        name, ok = QInputDialog.getText(self, "添加分组", "分组名称:")
+        if not ok or not name:
+            return
+        name = name.strip()
+        if not name:
+            return
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.setdefault(self._current_affix, {})
+        groups = category_data.setdefault("_aliases", {})
+        if not isinstance(groups, dict):
+            return
+        if name in groups:
+            QMessageBox.warning(self, "重复", f"分组 '{name}' 已存在")
+            return
+        groups[name] = []
+        self._refresh_alias_tags()
+        self._alias_group_tabs.setCurrentIndex(self._alias_group_tabs.count() - 1)
+        self._save_data()
+
+    def _rename_group(self, index: int):
+        """双击分组页签重命名（保序替换 _aliases dict 键名）"""
+        if index < 0 or not self._current_affix:
+            return
+        old = self._alias_group_tabs.tabText(index)
+        name, ok = QInputDialog.getText(self, "重命名分组", "分组名称:", text=old)
+        if not ok or not name:
+            return
+        name = name.strip()
+        if not name or name == old:
+            return
+
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.get(self._current_affix, {})
+        raw = category_data.get("_aliases", {})
+        if not isinstance(raw, dict) or old not in raw:
+            return
+        if name in raw:
+            QMessageBox.warning(self, "重复", f"分组 '{name}' 已存在")
+            return
+
+        category_data["_aliases"] = {
+            (name if g == old else g): v for g, v in raw.items()
+        }
+        self._alias_group_tabs.setTabText(index, name)
+        self._save_data()
+
+    def _del_group(self):
+        """删除当前分组（连同组内词条名）"""
+        if not self._current_affix or not self._is_grouped():
+            return
+        index = self._alias_group_tabs.currentIndex()
+        if index < 0:
+            return
+        group_name = self._alias_group_tabs.tabText(index)
+        count = len(self._get_alias_groups().get(group_name, []))
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要删除分组 '{group_name}'（含 {count} 个词条名）吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.get(self._current_affix, {})
+        raw = category_data.get("_aliases", {})
+        if isinstance(raw, dict) and group_name in raw:
+            del raw[group_name]
+            self._refresh_alias_tags()
+            self._save_data()
+
+    def _get_raw_aliases(self):
+        """获取当前类别的 _aliases 原始字段（list=不分组 / dict=分组）"""
         if not self._current_affix:
             return []
         affix_caps = self._data.get("affix_caps", {})
         category_data = affix_caps.get(self._current_affix, {})
-        aliases = category_data.get("_aliases", [])
-        return aliases if isinstance(aliases, list) else []
+        return category_data.get("_aliases", []) if isinstance(category_data, dict) else []
+
+    def _is_grouped(self) -> bool:
+        """当前词条的词条名称是否分组（_aliases 为 dict 形态）"""
+        return isinstance(self._get_raw_aliases(), dict)
+
+    def _get_alias_groups(self) -> dict[str, list[str]]:
+        """获取当前类别的词条分组（组名 → 词条名列表）"""
+        raw = self._get_raw_aliases()
+        if not isinstance(raw, dict):
+            return {}
+        return {g: names for g, names in raw.items() if isinstance(names, list)}
+
+    def _get_aliases(self) -> list[str]:
+        """获取当前类别的全部词条名（分组时拍平所有组）"""
+        raw = self._get_raw_aliases()
+        if isinstance(raw, dict):
+            return [n for names in raw.values() if isinstance(names, list) for n in names]
+        return raw if isinstance(raw, list) else []
 
     def _refresh_alias_tags(self):
-        """刷新别名标签显示"""
+        """刷新词条名称显示（不分组=流式标签 / 分组=Tab 页）"""
+        grouped = self._is_grouped()
+        self._alias_tags_widget.setVisible(not grouped)
+        self._alias_group_tabs.setVisible(grouped)
+
         # 清空现有标签
         while self._alias_tags_layout.count():
             item = self._alias_tags_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
+        if grouped:
+            self._rebuild_group_tabs()
+            return
+
         aliases = self._get_aliases()
         for alias in aliases:
             tag = self._create_alias_tag(alias)
             self._alias_tags_layout.addWidget(tag)
 
-        # 无别名时显示提示
+        # 无词条名时显示提示
         if not aliases:
-            hint = QLabel("（无别名，点击 '+ 别名' 添加）")
+            hint = QLabel("（无词条名，点击 '+ 词条名' 添加）")
             hint.setStyleSheet("color: #888; font-size: 12px;")
             self._alias_tags_layout.addWidget(hint)
 
+    def _rebuild_group_tabs(self):
+        """重建分组 Tab 页（保留当前选中组）"""
+        prev_index = self._alias_group_tabs.currentIndex()
+        prev_name = self._alias_group_tabs.tabText(prev_index) if prev_index >= 0 else None
+
+        while self._alias_group_tabs.count():
+            page = self._alias_group_tabs.widget(0)
+            self._alias_group_tabs.removeTab(0)
+            page.deleteLater()
+
+        for group_name, names in self._get_alias_groups().items():
+            page = QWidget()
+            flow = _FlowLayout(page, spacing=6)
+            for alias in names:
+                flow.addWidget(self._create_alias_tag(alias))
+            if not names:
+                hint = QLabel("（无词条名，点击 '+ 词条名' 添加）")
+                hint.setStyleSheet("color: #888; font-size: 12px;")
+                flow.addWidget(hint)
+            self._alias_group_tabs.addTab(page, group_name)
+
+        if prev_name:
+            for i in range(self._alias_group_tabs.count()):
+                if self._alias_group_tabs.tabText(i) == prev_name:
+                    self._alias_group_tabs.setCurrentIndex(i)
+                    break
+
     def _create_alias_tag(self, alias: str) -> QWidget:
-        """创建单个别名标签组件"""
-        tag_widget = QWidget()
+        """创建单个词条名标签组件（双击重命名）"""
+        tag_widget = _AliasTag(alias, self._rename_alias)
         tag_widget.setStyleSheet(
             "QWidget { background-color: #e0e0e0; border-radius: 3px; padding: 2px 6px; }"
         )
@@ -533,13 +835,48 @@ class AffixCapsPanel(QWidget):
 
         return tag_widget
 
+    def _rename_alias(self, alias: str):
+        """双击词条名标签重命名（原位替换，兼容分组/不分组形态）"""
+        name, ok = QInputDialog.getText(self, "重命名词条名", "原始词条名称:", text=alias)
+        if not ok or not name:
+            return
+        name = name.strip()
+        if not name or name == alias:
+            return
+
+        # 重复 / 跨类别冲突检查
+        if name in self._get_aliases():
+            QMessageBox.warning(self, "重复", f"词条名 '{name}' 已存在")
+            return
+        if name in self._get_all_aliases():
+            QMessageBox.warning(self, "冲突", f"词条名 '{name}' 已被其他类别使用")
+            return
+
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.get(self._current_affix, {})
+        raw = category_data.get("_aliases", [])
+        if isinstance(raw, dict):
+            for names in raw.values():
+                if isinstance(names, list) and alias in names:
+                    names[names.index(alias)] = name
+                    break
+            else:
+                return
+        elif isinstance(raw, list) and alias in raw:
+            raw[raw.index(alias)] = name
+        else:
+            return
+
+        self._refresh_alias_tags()
+        self._save_data()
+
     def _add_alias(self):
-        """添加新别名"""
+        """添加新词条名（分组模式下加入当前选中组）"""
         if not self._current_affix:
             QMessageBox.information(self, "提示", "请先选择词条类别")
             return
 
-        name, ok = QInputDialog.getText(self, "添加别名", "原始词条名称:")
+        name, ok = QInputDialog.getText(self, "添加词条名", "原始词条名称:")
         if not ok or not name:
             return
 
@@ -550,30 +887,38 @@ class AffixCapsPanel(QWidget):
         # 检查是否已存在
         aliases = self._get_aliases()
         if name in aliases:
-            QMessageBox.warning(self, "重复", f"别名 '{name}' 已存在")
+            QMessageBox.warning(self, "重复", f"词条名 '{name}' 已存在")
             return
 
         # 检查是否已被其他类别占用
         all_aliases = self._get_all_aliases()
         if name in all_aliases:
-            QMessageBox.warning(self, "冲突", f"别名 '{name}' 已被其他类别使用")
+            QMessageBox.warning(self, "冲突", f"词条名 '{name}' 已被其他类别使用")
             return
 
         # 添加到数据
         affix_caps = self._data.get("affix_caps", {})
         category_data = affix_caps.setdefault(self._current_affix, {})
-        if "_aliases" not in category_data:
-            category_data["_aliases"] = []
-        category_data["_aliases"].append(name)
+        if self._is_grouped():
+            index = self._alias_group_tabs.currentIndex()
+            if index < 0:
+                QMessageBox.information(self, "提示", "请先点击 '+ 分组' 创建分组")
+                return
+            group_name = self._alias_group_tabs.tabText(index)
+            category_data["_aliases"].setdefault(group_name, []).append(name)
+        else:
+            if "_aliases" not in category_data:
+                category_data["_aliases"] = []
+            category_data["_aliases"].append(name)
 
         self._refresh_alias_tags()
         self._save_data()
 
     def _remove_alias(self, alias: str):
-        """移除别名"""
+        """移除词条名（分组模式下自动定位所在组）"""
         reply = QMessageBox.question(
             self, "确认删除",
-            f"确定要移除别名 '{alias}' 吗？",
+            f"确定要移除词条名 '{alias}' 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -581,18 +926,33 @@ class AffixCapsPanel(QWidget):
 
         affix_caps = self._data.get("affix_caps", {})
         category_data = affix_caps.get(self._current_affix, {})
-        aliases = category_data.get("_aliases", [])
-        if alias in aliases:
-            aliases.remove(alias)
+        raw = category_data.get("_aliases", [])
+        if isinstance(raw, dict):
+            for names in raw.values():
+                if isinstance(names, list) and alias in names:
+                    names.remove(alias)
+                    self._refresh_alias_tags()
+                    self._save_data()
+                    return
+        elif isinstance(raw, list) and alias in raw:
+            raw.remove(alias)
             self._refresh_alias_tags()
             self._save_data()
 
     def _get_all_aliases(self) -> dict[str, str]:
-        """获取所有类别的别名映射 {alias: category}"""
+        """获取所有类别的词条名映射 {alias: category}（兼容分组形态）"""
         result = {}
         affix_caps = self._data.get("affix_caps", {})
         for category, data in affix_caps.items():
-            if isinstance(data, dict):
-                for alias in data.get("_aliases", []):
+            if not isinstance(data, dict):
+                continue
+            raw = data.get("_aliases", [])
+            if isinstance(raw, dict):
+                for names in raw.values():
+                    if isinstance(names, list):
+                        for alias in names:
+                            result[alias] = category
+            elif isinstance(raw, list):
+                for alias in raw:
                     result[alias] = category
         return result

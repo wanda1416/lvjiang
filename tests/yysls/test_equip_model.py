@@ -53,3 +53,18 @@ class TestEquipmentDataDimensions:
         assert e.part == "unknown"
         assert e.weapon is None
         assert e.category == "unknown"
+
+
+class TestDingyinSerialization:
+    def test_roundtrip(self):
+        e = EquipmentData(type="剑", dingyin={"name": "外功穿透", "value": 14.2})
+        d = e.to_dict()
+        assert d["dingyin"] == {"name": "外功穿透", "value": 14.2}
+        restored = EquipmentData.from_dict(d)
+        assert restored.dingyin == {"name": "外功穿透", "value": 14.2}
+
+    def test_empty_dingyin_serialized_as_none(self):
+        e = EquipmentData(type="剑")
+        d = e.to_dict()
+        assert d["dingyin"] is None
+        assert EquipmentData.from_dict(d).dingyin == {}

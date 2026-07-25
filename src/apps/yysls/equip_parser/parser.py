@@ -7,6 +7,8 @@ import re
 from loguru import logger
 
 from .models import EquipAttr, Affix, EquipmentData
+from .dingyin_parser import DingyinParser
+from .cleaner import clean_affix_text
 from .constants import (
     WEAPON_TYPES_SET,
     JEWELRY_TYPES_SET,
@@ -25,6 +27,7 @@ class EquipmentParser:
     def __init__(self):
         from ..evaluator.attr_rules import get_attr_rule_manager
         self._attr_config = get_attr_rule_manager()
+        self._dingyin_parser = DingyinParser()
 
     def parse(self, raw: dict) -> EquipmentData:
         """解析单件装备的 OCR 原始数据
@@ -64,6 +67,15 @@ class EquipmentParser:
 
         # 计算词条数值百分比（cap_pct）
         self._calc_affix_cap_pct(equip)
+
+        # 定音词条（委托 DingyinParser，按类别选择候选词条池）
+        dingyin_text = raw.get("dingyin", "").strip()
+        if dingyin_text:
+            result = self._dingyin_parser.parse(dingyin_text, category)
+            if result:
+                equip.dingyin = result
+            else:
+                equip.warnings.append(f"定音词条无法解析: {dingyin_text!r}")
 
         # 辅助信息
         equip.extra_data["affix_count"] = len(equip.affixes)
@@ -331,32 +343,23 @@ class EquipmentParser:
 
         return affixes, warnings
 
-    # OCR 常见误识别 → 正确文本（在词条匹配前修正）
-    _OCR_CORRECTIONS = {
-        "猜准率": "精准率",
-    }
-
     def _parse_single_affix(self, raw: str) -> Affix | None:
         """解析单条词条
 
         处理流程：
-        0. 修正已知 OCR 误识别
+        0. 数据清洗（委托 cleaner：误识别替换 + 噪声字符删除）
         1. 检测 [转] 转律标记
         2. 过滤套装信息
         3. 匹配已知词条名称（最长前缀优先）
-        4. 清洗 OCR 噪声
-        5. 提取数值和单位
+        4. 提取数值和单位
 
         Returns:
             Affix 或 None（无法解析时）
         """
-        text = raw.strip()
+        # ── 0. 数据清洗 ──
+        text = clean_affix_text(raw)
         if not text:
             return None
-
-        # ── 0. 修正已知 OCR 误识别 ──
-        for wrong, correct in self._OCR_CORRECTIONS.items():
-            text = text.replace(wrong, correct)
 
         # ── 1. 转律标记 ──
         # OCR 常将 ］/] 误识别为 1，兼容 ［转1 / [转1 等变体
@@ -367,10 +370,7 @@ class EquipmentParser:
         if "套装" in text:
             return None
 
-        # ── 3. 移除 OCR 噪声字符 "荐" ──
-        text = text.replace("荐", "")
-
-        # ── 4. 匹配已知词条名称 ──
+        # ── 3. 匹配已知词条名称 ──
         matched_name = None
         remainder = text
 
@@ -390,7 +390,7 @@ class EquipmentParser:
         if matched_name is None:
             return None
 
-        # ── 5. 提取数值 ──
+        # ── 4. 提取数值 ──
         # 移除空格和非中文字符（保留数字、小数点、%、+）
         clean = re.sub(r"[^\d.%+\u4e00-\u9fff]", "", remainder)
         # 再移除所有中文字符（OCR 噪声）
@@ -403,7 +403,7 @@ class EquipmentParser:
 
         value = float(num_m.group(1))
 
-        # ── 6. 单位检测 ──
+        # ── 5. 单位检测 ──
         unit = "%" if matched_name in PERCENT_AFFIXES else None
 
         return Affix(

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 # 配置文件路径
-_ATTRS_PATH = Path("config/system/attributes.yaml")
+_ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
 
 # 分类显示名称
 _CATEGORY_NAMES = {

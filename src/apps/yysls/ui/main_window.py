@@ -42,6 +42,18 @@ class MainWindow(GenericMainWindow):
         super()._build_left_tabs()  # 先建「日常」Tab
 
         # ── Tab 2: 调律 ──
+        # 顶部固定「开始调律」按钮 + 下方可滚动配置区（滚动时按钮始终可见）
+        tab_container = QWidget()
+        tab_layout = QVBoxLayout(tab_container)
+        tab_layout.setContentsMargins(4, 4, 4, 4)
+
+        self.btn_run_tuning = QPushButton("开始调律 (F9)")
+        self.btn_run_tuning.clicked.connect(self._on_run_tuning)
+        self.btn_run_tuning.setStyleSheet(
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+        )
+        tab_layout.addWidget(self.btn_run_tuning)
+
         tuning_scroll = QScrollArea()
         tuning_scroll.setWidgetResizable(True)
         tuning_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -49,7 +61,23 @@ class MainWindow(GenericMainWindow):
         tuning_layout = QVBoxLayout(tuning_panel)
         tuning_layout.setContentsMargins(4, 4, 4, 4)
 
-        tuning_layout.addWidget(QLabel("<b>选择调律部位：</b>"))
+        # ── 流派配置（每流派一个可勾选分组框，组内为该流派专属配置）──
+        tuning_layout.addWidget(QLabel("<b>流派配置（可多选）：</b>"))
+        self._build_school_config_ui(tuning_layout)
+
+        # ── 部位选择（标题行内嵌全选/取消全选，仅作用于部位复选框）──
+        slots_header = QHBoxLayout()
+        slots_header.addWidget(QLabel("<b>选择调律部位：</b>"))
+        slots_header.addStretch()
+        btn_select_all = QPushButton("全选")
+        btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
+        btn_select_all.setFixedWidth(70)
+        slots_header.addWidget(btn_select_all)
+        btn_deselect_all = QPushButton("取消全选")
+        btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
+        btn_deselect_all.setFixedWidth(70)
+        slots_header.addWidget(btn_deselect_all)
+        tuning_layout.addLayout(slots_header)
         self._tuning_checkboxes: list[QCheckBox] = []
 
         slots_row = QHBoxLayout()
@@ -71,30 +99,99 @@ class MainWindow(GenericMainWindow):
             slots_row.addWidget(grp)
         tuning_layout.addLayout(slots_row)
 
-        toggle_row = QHBoxLayout()
-        btn_select_all = QPushButton("全选")
-        btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
-        btn_select_all.setFixedWidth(70)
-        toggle_row.addWidget(btn_select_all)
-        btn_deselect_all = QPushButton("取消全选")
-        btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
-        btn_deselect_all.setFixedWidth(70)
-        toggle_row.addWidget(btn_deselect_all)
-        toggle_row.addStretch()
-        tuning_layout.addLayout(toggle_row)
-
-        self.btn_run_tuning = QPushButton("开始调律 (F9)")
-        self.btn_run_tuning.clicked.connect(self._on_run_tuning)
-        self.btn_run_tuning.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
-        )
-        tuning_layout.addWidget(self.btn_run_tuning)
-
         tuning_layout.addStretch()
         tuning_scroll.setWidget(tuning_panel)
-        self._left_tabs.addTab(tuning_scroll, "调律")
+        # 宽度自适应：滚动区最小宽 = 内容最小宽 + 垂直滚动条，
+        # 避免左侧分栏默认宽度下内容被裁切（水平滚动条已禁用）
+        scrollbar_w = tuning_scroll.verticalScrollBar().sizeHint().width()
+        tuning_scroll.setMinimumWidth(
+            tuning_panel.minimumSizeHint().width() + scrollbar_w + 8)
+        tab_layout.addWidget(tuning_scroll)
+        self._left_tabs.addTab(tab_container, "调律")
 
         self._load_tuning_config()
+
+    def _build_school_config_ui(self, parent_layout):
+        """生成层级流派配置：勾选分组框标题 = 启用流派，组内为该流派配置项；
+        未勾选流派时子配置整体隐藏（折叠为仅标题行）；
+        玩法复选框仅在对应指定流派勾选后显示。"""
+        from src.apps.yysls.evaluator import (
+            SCHOOL_CLASSES, SUB_SCHOOL_PLAYSTYLES, SUB_SCHOOLS,
+        )
+        # 流派 key → 控件集：{"group": QGroupBox, "content": QWidget|None,
+        #   "keep_pvp": QCheckBox|None, "sub_schools": {sub_key: QCheckBox},
+        #   "playstyles": {sub_key: {ps_key: QCheckBox}}, "playstyle_rows": {sub_key: QWidget}}
+        self._school_widgets: dict[str, dict] = {}
+        for key, cls in SCHOOL_CLASSES.items():
+            title = cls.school_name if cls.implemented else f"{cls.school_name}（未实现）"
+            grp = QGroupBox(title)
+            grp.setCheckable(True)
+            grp.setChecked(False)
+            grp.toggled.connect(
+                lambda checked, k=key: self._on_school_toggled(k))
+            grp_layout = QVBoxLayout(grp)
+            grp_layout.setContentsMargins(8, 4, 8, 4)
+            widgets: dict = {"group": grp, "content": None, "keep_pvp": None,
+                            "sub_schools": {}, "playstyles": {},
+                            "playstyle_rows": {}}
+            # 子配置容器：未勾选流派时整体隐藏
+            content = QWidget()
+            content_layout = QVBoxLayout(content)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            if cls.needs_sub_school:
+                content_layout.addWidget(QLabel("指定流派（必选）："))
+                for sub_key, sub_name in SUB_SCHOOLS.items():
+                    sub_cb = QCheckBox(sub_name)
+                    sub_cb.toggled.connect(
+                        lambda checked, k=key, sk=sub_key:
+                        self._on_sub_school_toggled(k, sk))
+                    content_layout.addWidget(sub_cb)
+                    widgets["sub_schools"][sub_key] = sub_cb
+                    playstyles = SUB_SCHOOL_PLAYSTYLES.get(sub_key)
+                    if not playstyles:
+                        continue  # 破竹无玩法区分
+                    ps_row = QWidget()
+                    ps_layout = QHBoxLayout(ps_row)
+                    ps_layout.setContentsMargins(24, 0, 0, 0)
+                    ps_layout.addWidget(QLabel("玩法："))
+                    widgets["playstyles"][sub_key] = {}
+                    for ps_key, ps_name in playstyles.items():
+                        ps_cb = QCheckBox(ps_name)
+                        ps_cb.stateChanged.connect(self._save_tuning_config)
+                        ps_layout.addWidget(ps_cb)
+                        widgets["playstyles"][sub_key][ps_key] = ps_cb
+                    ps_layout.addStretch()
+                    ps_row.setVisible(False)  # 未勾选指定流派时不出现玩法选项
+                    content_layout.addWidget(ps_row)
+                    widgets["playstyle_rows"][sub_key] = ps_row
+            if cls.has_keep_pvp:
+                pvp_cb = QCheckBox("保留 PVP 装备")
+                pvp_cb.stateChanged.connect(self._save_tuning_config)
+                content_layout.addWidget(pvp_cb)
+                widgets["keep_pvp"] = pvp_cb
+            if content_layout.count() > 0:
+                content.setVisible(False)  # 随流派勾选状态联动
+                grp_layout.addWidget(content)
+                widgets["content"] = content
+            parent_layout.addWidget(grp)
+            self._school_widgets[key] = widgets
+
+    def _on_school_toggled(self, school_key: str):
+        """流派勾选变化 → 子配置整体显隐并保存"""
+        widgets = self._school_widgets[school_key]
+        content = widgets["content"]
+        if content is not None:
+            content.setVisible(widgets["group"].isChecked())
+        self._save_tuning_config()
+
+    def _on_sub_school_toggled(self, school_key: str, sub_key: str):
+        """指定流派勾选变化 → 联动玩法行显隐并保存"""
+        widgets = self._school_widgets[school_key]
+        ps_row = widgets["playstyle_rows"].get(sub_key)
+        if ps_row is not None:
+            checked = widgets["sub_schools"][sub_key].isChecked()
+            ps_row.setVisible(checked)
+        self._save_tuning_config()
 
     # ─── 右侧 Tab 扩展 ───────────────────────────────────────
 
@@ -138,23 +235,61 @@ class MainWindow(GenericMainWindow):
         default_slots = ["main_weapon", "sub_weapon", "ring", "pendant",
                          "head", "chest", "leg", "wrist"]
         selected = default_slots
+        schools_cfg: dict = {"huiyi_general": {"enabled": True}}
         if SESSION_PATH.exists():
             try:
                 import json
                 data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-                saved = data.get("tuning", {}).get("selected_slots", [])
+                tuning = data.get("tuning", {})
+                saved = tuning.get("selected_slots", [])
                 if saved:
                     selected = saved
+                raw = tuning.get("schools")
+                if isinstance(raw, dict):
+                    schools_cfg = raw
+                elif isinstance(raw, list):
+                    # 旧 list 格式兼容：列表内流派视为启用（旧全局 keep_pvp 忽略）
+                    schools_cfg = {k: {"enabled": True} for k in raw}
             except Exception:
                 pass
         for cb in self._tuning_checkboxes:
             cb.blockSignals(True)
             cb.setChecked(cb.objectName() in selected)
             cb.blockSignals(False)
+        for key, widgets in self._school_widgets.items():
+            cfg = schools_cfg.get(key, {})
+            grp = widgets["group"]
+            enabled = bool(cfg.get("enabled", False))
+            grp.blockSignals(True)
+            grp.setChecked(enabled)
+            grp.blockSignals(False)
+            if widgets["content"] is not None:
+                widgets["content"].setVisible(enabled)
+            if widgets["keep_pvp"] is not None:
+                pvp_cb = widgets["keep_pvp"]
+                pvp_cb.blockSignals(True)
+                pvp_cb.setChecked(bool(cfg.get("keep_pvp", False)))
+                pvp_cb.blockSignals(False)
+            sub_selected = cfg.get("sub_schools", [])
+            playstyles_cfg = cfg.get("playstyles", {})
+            for sub_key, sub_cb in widgets["sub_schools"].items():
+                sub_cb.blockSignals(True)
+                sub_cb.setChecked(sub_key in sub_selected)
+                sub_cb.blockSignals(False)
+                ps_row = widgets["playstyle_rows"].get(sub_key)
+                if ps_row is not None:
+                    ps_row.setVisible(sub_key in sub_selected)
+            for sub_key, ps_boxes in widgets["playstyles"].items():
+                chosen = playstyles_cfg.get(sub_key, [])
+                for ps_key, ps_cb in ps_boxes.items():
+                    ps_cb.blockSignals(True)
+                    ps_cb.setChecked(ps_key in chosen)
+                    ps_cb.blockSignals(False)
 
     def _save_tuning_config(self):
         from src.constants import SESSION_PATH, LOCAL_CONFIG_DIR
         selected = self._get_tuning_selected_slots()
+        schools_cfg = self._get_tuning_school_config()
         data = {}
         if SESSION_PATH.exists():
             try:
@@ -162,7 +297,11 @@ class MainWindow(GenericMainWindow):
                 data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        data.setdefault("tuning", {})["selected_slots"] = selected
+        tuning = data.setdefault("tuning", {})
+        tuning["selected_slots"] = selected
+        tuning["schools"] = schools_cfg
+        tuning.pop("school", None)    # 清理旧格式残留键
+        tuning.pop("keep_pvp", None)
         try:
             import json
             LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -179,3 +318,22 @@ class MainWindow(GenericMainWindow):
 
     def _get_tuning_selected_slots(self) -> list[str]:
         return [cb.objectName() for cb in self._tuning_checkboxes if cb.isChecked()]
+
+    def _get_tuning_school_config(self) -> dict[str, dict]:
+        """从控件收集完整流派配置：{流派 key: 该流派配置 dict}"""
+        result: dict[str, dict] = {}
+        for key, widgets in self._school_widgets.items():
+            cfg: dict = {"enabled": widgets["group"].isChecked()}
+            if widgets["keep_pvp"] is not None:
+                cfg["keep_pvp"] = widgets["keep_pvp"].isChecked()
+            if widgets["sub_schools"]:
+                cfg["sub_schools"] = [
+                    sk for sk, cb in widgets["sub_schools"].items()
+                    if cb.isChecked()
+                ]
+                cfg["playstyles"] = {
+                    sk: [pk for pk, cb in ps_boxes.items() if cb.isChecked()]
+                    for sk, ps_boxes in widgets["playstyles"].items()
+                }
+            result[key] = cfg
+        return result

@@ -83,15 +83,15 @@ class AutoTuningWorkflow(BaseWorkflow):
 
     # ─── 背包遍历（按 tuning-mechanics.md 设计）──────────────
 
-    def _read_row(self, detail_scene: str, row: int) -> tuple[str, str]:
-        """点击指定行第1列，等面板刷新后 OCR，返回 (装备名, 指纹)"""
+    def _read_row(self, detail_scene: str, row: int) -> tuple[str, str, dict]:
+        """点击指定行第1列，等面板刷新后 OCR，返回 (装备名, 指纹, 装备dict)"""
         self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, 1)
         self.wait_delay("page_refresh_wait")
         raw = self.ocr_scene(detail_scene, self.SCAN_FIELDS)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
         name = equip.get("equip_type", "").split("|")[-1].strip() if equip else ""
         fp = self._make_fingerprint(equip)
-        return name, fp
+        return name, fp, equip
 
     def _process_new_rows(self, detail_scene: str, fps: list[str],
                           row_index: int, first_real_row: int,
@@ -106,12 +106,13 @@ class AutoTuningWorkflow(BaseWorkflow):
         processed = row_index
         for logical_row in range(row_index + 1, last_real_row + 1):
             win_row = logical_row - first_real_row + 1
-            name, fp = self._read_row(detail_scene, win_row)
+            name, fp, equip = self._read_row(detail_scene, win_row)
             if not fp:
                 logger.info(f"  新行{logical_row} grid[{win_row}][1] 空 slot → 到底")
                 break
             fps.append(fp)
             logger.info(f"  新行{logical_row} grid[{win_row}][1] {name} fp={fp}")
+            self._judge_equipment(name, equip)
             processed = logical_row
         return processed
 
@@ -133,7 +134,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         short_count = 0
         long_count = 0
         while not self.is_stopped:
-            _, nfp = self._read_row(detail_scene, 1)
+            _, nfp, _ = self._read_row(detail_scene, 1)
 
             # 空指纹 = 空行 = 到底（每行第一列不可能为空，空即超出最后一行）
             if not nfp:
@@ -239,6 +240,33 @@ class AutoTuningWorkflow(BaseWorkflow):
                     detail_scene, fps, row_index, first_real_row, last_real_rows)
                 logger.info(f"  剩余行处理完毕 row_index → {row_index}, fps={fps}")
 
+
+    # ─── 单件装备判定 ──────────────────────────────
+
+    def _judge_equipment(self, name: str, equip: dict):
+        """对扫描到的新装备逐个执行选中流派的判定，结果记入 output["judgements"]。
+
+        _school_judges 未注入时跳过（兼容测试）；判定异常仅告警不中断遍历。
+        """
+        judges = getattr(self, "_school_judges", None)
+        if not judges or not equip:
+            return
+        from src.apps.yysls.equip_parser.models import EquipmentData
+        equip_data = EquipmentData.from_dict(equip)
+        for judge in judges:
+            try:
+                result = judge.judge(equip_data)
+            except Exception as e:
+                logger.warning(f"  [判定] {name} [{judge.school_name}] 失败: {e}")
+                continue
+            tag = "跳过" if result.skipped else result.rating.value
+            reasons = "；".join(result.reasons)
+            logger.info(
+                f"  [判定] {name} | {equip.get('type', '')} | "
+                f"{judge.school_name}: {tag} | {reasons}")
+            entry = result.to_dict()
+            entry["school"] = judge.school_key
+            self.output.setdefault("judgements", []).append(entry)
 
     # ─── 工具方法 ──────────────────────────────────────────
 

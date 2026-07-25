@@ -507,6 +507,32 @@ class RunControlMixin:
             self.log_text.append("[错误] 请至少选择一个调律部位")
             return
 
+        # 获取流派配置（按流派分组的层级 dict）并创建判定器
+        from src.apps.yysls.evaluator import (
+            SCHOOL_CLASSES, SCHOOLS, get_school_judge, is_school_implemented,
+        )
+        if hasattr(self, '_get_tuning_school_config'):
+            schools_cfg = self._get_tuning_school_config()
+        else:
+            schools_cfg = {"huiyi_general": {"enabled": True}}
+        enabled = {k: cfg for k, cfg in schools_cfg.items() if cfg.get("enabled")}
+        if not enabled:
+            self.log_text.append("[错误] 请至少选择一个调律流派")
+            return
+        school_judges = []
+        for school, cfg in enabled.items():
+            if not is_school_implemented(school):
+                self.log_text.append(f"[警告] 流派「{SCHOOLS.get(school, school)}」判定暂未实现，已跳过")
+                continue
+            cls = SCHOOL_CLASSES[school]
+            if cls.needs_sub_school and not cfg.get("sub_schools"):
+                self.log_text.append(f"[错误] 流派「{cls.school_name}」需至少勾选一个指定流派")
+                return
+            school_judges.append(get_school_judge(school, cfg))
+        if not school_judges:
+            self.log_text.append("[错误] 选中的流派均未实现判定逻辑")
+            return
+
         flow_name = "自动调律"
         if not self._begin_automation(flow_name):
             return
@@ -568,7 +594,12 @@ class RunControlMixin:
             stop_check=self._is_stopped,
         )
         wf_instance._selected_slots = selected_slots
+        wf_instance._school_judges = school_judges
 
-        self.log_text.append(f"[开始] {flow_name} 流程，部位: {selected_slots}")
+        school_names = "、".join(
+            j.school_name + ("（保留PVP）" if j.keep_pvp else "")
+            for j in school_judges)
+        self.log_text.append(
+            f"[开始] {flow_name} 流程，流派: {school_names}，部位: {selected_slots}")
         self._start_workflow("auto_tuning", flow_name,
                              lambda: engine.execute(wf_instance))

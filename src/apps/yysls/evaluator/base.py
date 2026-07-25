@@ -1,6 +1,7 @@
-"""装备评估公共基类
+"""装备判定公共基类
 
-定义评估结果数据结构和评估器接口。
+定义四档评级、判定结果数据结构和流派判定器接口。
+评级采用穷举匹配制（参考 docs/10-game/11-调律说明文档/01-会意流派调律说明.md）。
 """
 
 from abc import ABC, abstractmethod
@@ -13,22 +14,27 @@ from src.apps.yysls.equip_parser import EquipmentData
 # ─── 评级枚举 ──────────────────────────────────────────────
 
 class Rating(Enum):
-    """装备评级（扣分制）"""
-    HEIRLOOM = "传家宝"       # 0 扣分
-    QUALIFIED = "合格装备"    # ≤ 1 扣分
-    MARGINAL = "凑合装备"     # ≤ 2 扣分
-    JUNK = "垃圾装备"         # > 2 扣分 或不合格
+    """装备评级（穷举匹配制四档）"""
+    TOP = "顶级"
+    EXCELLENT = "优秀"
+    USABLE = "能用"
+    JUNK = "垃圾"
 
+
+# ─── 判定结果 ──────────────────────────────────────────────
 
 @dataclass
-class EvaluationResult:
-    """单件装备评估结果"""
+class JudgeResult:
+    """单件装备判定结果
+
+    skipped=True 表示品阶/首词条不符，无调律价值（直接跳过，不参与评级）。
+    is_pvp=True 表示装备因 PVP 词条（单体奇术增伤/对玩家增效）被保留。
+    """
     equipment: EquipmentData
     rating: Rating = Rating.JUNK
-    deductions: int = 0
-    disqualified: bool = False
-    disqualify_reasons: list[str] = field(default_factory=list)
-    details: list[str] = field(default_factory=list)
+    skipped: bool = False
+    is_pvp: bool = False
+    reasons: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -37,93 +43,57 @@ class EvaluationResult:
             "level": self.equipment.level,
             "is_chengyin": self.equipment.is_chengyin,
             "rating": self.rating.value,
-            "deductions": self.deductions,
-            "disqualified": self.disqualified,
+            "skipped": self.skipped,
         }
-        if self.disqualify_reasons:
-            d["disqualify_reasons"] = self.disqualify_reasons
-        if self.details:
-            d["details"] = self.details
-        return d
-
-
-# ─── 调律建议 ──────────────────────────────────────────────
-
-@dataclass
-class TuningAdvice:
-    """调律过程中的实时判断建议
-
-    用于调律过程中，根据当前已出现的词条判断是否值得继续调律。
-    输入数据可能缺失后续字段（尚未转律的槽位为空）。
-    """
-    equipment: EquipmentData
-    should_continue: bool = True     # 是否值得继续调律
-    current_deductions: int = 0      # 当前扣分数
-    invalid_count: int = 0           # 当前不合格词条数（非首词条中）
-    reasons: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        d: dict = {
-            "name": self.equipment.name,
-            "type": self.equipment.type,
-            "should_continue": self.should_continue,
-            "current_deductions": self.current_deductions,
-            "invalid_count": self.invalid_count,
-        }
+        if self.is_pvp:
+            d["is_pvp"] = True
         if self.reasons:
             d["reasons"] = self.reasons
         return d
 
 
-# ─── 评估器基类 ────────────────────────────────────────────
+# ─── 流派判定器基类 ────────────────────────────────────────
 
-class BaseEvaluator(ABC):
-    """装备评估器公共基类
+class SchoolJudge(ABC):
+    """流派判定器公共基类
 
     子类需实现:
-    - evaluate: 对完整装备进行最终评分/评级
-    - check_tuning_worthiness: 调律过程中实时判断是否值得继续
+    - judge: 对完整装备进行穷举匹配定级
+
+    类属性:
+    - school_key: 流派标识（配置持久化用）
+    - school_name: 流派显示名
+    - implemented: 判定逻辑是否已实现（未实现的流派 judge 抛 NotImplementedError）
+    - has_keep_pvp: 该流派是否有「保留 PVP 装备」可选配置
+    - needs_sub_school: 该流派是否需要「指定流派 + 玩法」必选配置
     """
 
+    school_key: str = ""
+    school_name: str = ""
+    implemented: bool = False
+    has_keep_pvp: bool = False
+    needs_sub_school: bool = False
+
+    def __init__(self, config: dict | None = None):
+        self.config: dict = config or {}
+        self.keep_pvp: bool = bool(self.config.get("keep_pvp", False))
+
     @abstractmethod
-    def evaluate(self, equip: EquipmentData) -> EvaluationResult:
-        """评估单件装备（最终评级）
+    def judge(self, equip: EquipmentData) -> JudgeResult:
+        """判定单件装备评级
 
         Args:
             equip: 已解析的标准装备数据
 
         Returns:
-            EvaluationResult
+            JudgeResult
         """
         ...
 
-    @abstractmethod
-    def check_tuning_worthiness(
-        self, equip: EquipmentData
-    ) -> TuningAdvice:
-        """调律过程中实时判断是否值得继续
+    def check_tuning_worthiness(self, equip: EquipmentData) -> bool:
+        """调律熔断判定（预留接口，暂未实现）
 
-        传入的装备数据可能缺失后续字段（尚未转律的槽位为空）。
-        基于当前已出现的词条，判断是否值得继续调律。
-
-        熔断规则（参考 tuning-mechanics.md）:
-        - 第 2~5 条词条可以转律
-        - 出现 2 个不合格词条 → 停止
-        - 扣分已经 ≥ 2 → 停止
-
-        Args:
-            equip: 可能缺失后续字段的装备数据
-
-        Returns:
-            TuningAdvice
+        规格（01 文档第八节）：假设将当前非首词条中最差的一条替换为
+        转律词库中的最佳词条后重新定级，能达「能用」及以上则继续调律。
         """
-        ...
-
-    def evaluate_all(
-        self, equips: dict[str, EquipmentData]
-    ) -> dict[str, EvaluationResult]:
-        """批量评估所有部位"""
-        return {
-            slot: self.evaluate(equip)
-            for slot, equip in equips.items()
-        }
+        raise NotImplementedError("调律熔断判定暂未实现")

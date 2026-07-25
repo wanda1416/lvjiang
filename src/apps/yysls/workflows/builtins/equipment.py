@@ -161,45 +161,37 @@ def _is_good_equip(scan_result: dict, *args) -> bool:
 
 # ─── 装备评估 ───────────────────────────────────────────
 
-# evaluate() 缓存的评估器实例
-_cached_evaluator = None
+# evaluate() 缓存的判定器实例
+_cached_judge = None
 
 
 @builtin_func("evaluate")
 def _evaluate(equip_data: dict, *args) -> dict:
-    """评估装备，返回评级结果 dict
+    """判定装备，返回评级结果 dict
 
-    使用当前流派规则（config/system/rules/ 下第一个 .yaml）进行评估。
-    返回 EvaluationResult.to_dict() 结果。
+    使用穷举匹配制判定器（默认 会意流派-通用）。
+    返回 JudgeResult.to_dict() 结果。
 
     .wf 用法:
         eval $equip = to_equipment($scan)
         eval $result = evaluate($equip)
-        if $result.rating equals "heirloom"
-            log "传家宝！"
+        if $result.rating equals "顶级"
+            log "顶级装备！"
         end
     """
     if not isinstance(equip_data, dict) or not equip_data:
-        return {"rating": "junk", "disqualified": True, "details": ["空数据"]}
+        return {"rating": "垃圾", "skipped": True, "reasons": ["空数据"]}
 
     from ...equip_parser.models import EquipmentData
-    from ...evaluator.rule_config import load_rule_config
-    from ...evaluator.generic_evaluator import GenericEvaluator
+    from ...evaluator import get_school_judge
 
-    # 加载规则配置（缓存到模块级变量）
-    global _cached_evaluator
-    if _cached_evaluator is None:
-        from src.constants import PROJECT_ROOT
-        rules_dir = PROJECT_ROOT / "config" / "system" / "rules"
-        rule_files = list(rules_dir.glob("*.yaml"))
-        if not rule_files:
-            logger.warning("evaluate: 未找到规则配置文件")
-            return {"rating": "unknown", "details": ["无规则配置"]}
-        config = load_rule_config(rule_files[0])
-        _cached_evaluator = GenericEvaluator(config)
-        logger.info(f"evaluate: 加载规则 '{config.name}'")
+    # 判定器实例（缓存到模块级变量）
+    global _cached_judge
+    if _cached_judge is None:
+        _cached_judge = get_school_judge("huiyi_general")
+        logger.info(f"evaluate: 使用流派 '{_cached_judge.school_name}'")
 
     # dict → EquipmentData
     equip = EquipmentData.from_dict(equip_data)
-    result = _cached_evaluator.evaluate(equip)
+    result = _cached_judge.judge(equip)
     return result.to_dict()

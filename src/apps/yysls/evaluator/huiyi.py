@@ -17,7 +17,7 @@ from .base import JudgeResult, Rating, SchoolJudge, part_label
 
 # ─── 词条归一化 ────────────────────────────────────────────
 # 全称 → 模式符号；大无相在非武器部位表示大本属（鸣金虹即最大鸣金攻击）。
-# 「无相」「鸣金」是池内但不匹配任何模式槽位的符号（不判垃圾，最高能用）。
+# 错位属攻（武器上的鸣金、非武器上的无相）保留全称，不入池，直接判垃圾。
 
 _SYMBOL_MAP = {
     "最大外功攻击": "大外",
@@ -29,7 +29,7 @@ _SYMBOL_MAP = {
 }
 
 # 全局词条池（第四节）中的非神力符号；池外词条即垃圾词条
-_POOL_SYMBOLS = {"大外", "劲", "势", "会意", "会心", "精准", "大无相", "无相", "鸣金"}
+_POOL_SYMBOLS = {"大外", "劲", "势", "会意", "会心", "精准", "大无相"}
 
 # 可选候选池：(劲/势/会意/大无相) * N，允许重复
 _OPTIONAL_POOL = {"劲", "势", "会意", "大无相"}
@@ -42,13 +42,13 @@ _RANK = {Rating.JUNK: 0, Rating.USABLE: 1, Rating.EXCELLENT: 2, Rating.TOP: 3}
 
 
 def _normalize(name: str, category: str) -> str:
-    """词条全称 → 模式符号；神力词条及池外词条保留全称"""
+    """词条全称 → 模式符号；神力词条、错位属攻及池外词条保留全称"""
     if name in _SYMBOL_MAP:
         return _SYMBOL_MAP[name]
-    if name == "最大无相攻击":
-        return "大无相" if category == "weapon" else "无相"
-    if name == "最大鸣金攻击":
-        return "大无相" if category != "weapon" else "鸣金"
+    if name == "最大无相攻击" and category == "weapon":
+        return "大无相"
+    if name == "最大鸣金攻击" and category != "weapon":
+        return "大无相"
     return name
 
 
@@ -92,7 +92,7 @@ HUIYI_PART_PATTERNS: dict[str, dict] = {
         "required": [{"大外"}, {"全武学增效"}],
         "required_damage": {"全武学增效"},
         "optional_n": 2,
-        "top": _TOP_NO_HUIYI_DWX,
+        "top": _TOP_JIN_AND_SHI,
     },
     "冠胄": {
         "first": {"会意"},
@@ -105,9 +105,9 @@ HUIYI_PART_PATTERNS: dict[str, dict] = {
     "胫甲": {
         "first": {"劲"},
         "pattern_first": {"劲"},
-        "required": [{"对首领单位增伤"}, {"大外"}, {"劲", "势"}],
+        "required": [{"对首领单位增伤"}, {"大外"}],
         "required_damage": {"对首领单位增伤"},
-        "optional_n": 1,
+        "optional_n": 2,
         "top": _TOP_JIN_AND_SHI,
     },
 }

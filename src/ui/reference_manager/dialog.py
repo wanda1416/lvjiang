@@ -155,6 +155,8 @@ class ReferenceManagerDialog(QDialog):
         self._grid_panel.set_meta_fields(self._db.get_meta_schema())
         # 第一组：网格参数实时响应
         self._grid_panel.grid_params_changed.connect(self._on_grid_params_changed)
+        # 五项网格参数手动改动 → 落盘 session.json（下次打开作为默认值）
+        self._grid_panel.grid_defaults_changed.connect(self._on_grid_defaults_changed)
         # 第二组：生成网格
         self._grid_panel.generate_grid_requested.connect(self._on_generate_grid)
         self._grid_panel.clear_grid_requested.connect(self._on_clear_grid)
@@ -246,6 +248,11 @@ class ReferenceManagerDialog(QDialog):
         self._canvas.set_grid_size(rows, cols)
         self._canvas.set_grid_gap(gap)
         self._update_info_label()
+
+    def _on_grid_defaults_changed(self, grid: dict):
+        """五项网格参数手动改动后写入 session.json 的 material_grid 节点"""
+        from src.config import save_material_grid
+        save_material_grid(grid)
 
     def _on_generate_grid(self, rows: int, cols: int, gap: int, height: int, width: int):
         """根据单cell尺寸生成网格区域"""

@@ -1,12 +1,19 @@
-"""配置加载与 Pydantic 校验"""
+"""配置加载与 Pydantic 校验
 
+配置分层（后者覆盖前者）：
+1. 代码默认值（Pydantic 字段默认）
+2. local/session.json 的 settings / material_grid 节点（配置管理 / 图库管理写入）
+3. system/workflows.yaml 的顶层 input_delay 节点（与 flows 同级，配置管理写入）
+"""
+
+import json
 from pathlib import Path
 from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
 
-from .constants import SCENES_CONFIG_PATH, PREFERENCES_PATH
+from .constants import SESSION_PATH, WORKFLOWS_CONFIG_PATH
 
 
 class DelayConfig(BaseModel):
@@ -31,13 +38,13 @@ class MaterialGridConfig(BaseModel):
     rows: int = Field(default=3, ge=1)     # 默认行数
     cols: int = Field(default=6, ge=1)     # 默认列数
     gap: int = Field(default=0, ge=0)      # 默认间隔(px)
-    height: int = Field(default=100, ge=1) # 默认单cell高度(px)
-    width: int = Field(default=100, ge=1)  # 默认单cell宽度(px)
+    height: int = Field(default=122, ge=1) # 默认单cell高度(px)
+    width: int = Field(default=122, ge=1)  # 默认单cell宽度(px)
 
 
 class UserConfig(BaseModel):
-    """用户配置（从 preferences.yaml 加载，只读）"""
-    adb_capture_streaming: bool = False    # ADB 模式是否启用 scrcpy 视频流截图（false 则用 screencap）
+    """用户配置（代码默认值 + session.json / workflows.yaml 覆盖，只读）"""
+    adb_capture_streaming: bool = True     # ADB 模式是否启用 scrcpy 视频流截图（false 则用 screencap）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
     material_grid: MaterialGridConfig = Field(default_factory=MaterialGridConfig)
@@ -60,13 +67,95 @@ def save_yaml(path: Path, data: dict[str, Any]) -> None:
         yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
-def load_user_config(path: Path | None = None) -> UserConfig:
-    """加载用户配置（scenes.yaml 默认值 + preferences.yaml 覆盖）"""
-    if path:
-        data = load_yaml(path)
-    else:
-        # 先加载系统默认，再用用户偏好覆盖
-        data = load_yaml(SCENES_CONFIG_PATH)
-        prefs = load_yaml(PREFERENCES_PATH)
-        data.update(prefs)
+def load_user_config(session_path: Path | None = None,
+                     workflows_path: Path | None = None) -> UserConfig:
+    """加载用户配置（代码默认值 ← session.json ← workflows.yaml input_delay）"""
+    session_path = session_path or SESSION_PATH
+    workflows_path = workflows_path or WORKFLOWS_CONFIG_PATH
+
+    data: dict[str, Any] = {}
+    session = _read_json(session_path)
+    settings = session.get("settings")
+    if isinstance(settings, dict):
+        data.update(settings)
+    grid = session.get("material_grid")
+    if isinstance(grid, dict):
+        data["material_grid"] = grid
+    delay = load_yaml(workflows_path).get("input_delay")
+    if isinstance(delay, dict):
+        data["input_delay"] = delay
     return UserConfig(**data)
+
+
+# ── 配置保存 ──
+
+def _read_json(path: Path) -> dict[str, Any]:
+    """读 JSON 文件，不存在/损坏返回空 dict"""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _update_session_node(key: str, value: dict[str, Any],
+                         session_path: Path | None = None) -> None:
+    """读-改-写 session.json 的指定顶层节点（保留其他字段）"""
+    path = session_path or SESSION_PATH
+    data = _read_json(path)
+    data[key] = value
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def save_settings(settings: dict[str, Any], session_path: Path | None = None) -> None:
+    """保存基础配置到 session.json 的 settings 节点"""
+    _update_session_node("settings", settings, session_path)
+
+
+def save_material_grid(grid: dict[str, Any], session_path: Path | None = None) -> None:
+    """保存材料网格参数到 session.json 的 material_grid 节点"""
+    _update_session_node("material_grid", grid, session_path)
+
+
+def _format_delay_block(delay: dict[str, Any]) -> list[str]:
+    """生成 input_delay 顶层块的 YAML 文本行"""
+    lines = ["# 输入操作延迟参数（配置管理页写入，覆盖 DelayConfig 代码默认值）",
+             "input_delay:"]
+    for key, value in delay.items():
+        if isinstance(value, (list, tuple)):
+            lines.append(f"  {key}: [{', '.join(str(v) for v in value)}]")
+        else:
+            lines.append(f"  {key}: {value}")
+    return lines
+
+
+def save_input_delay(delay: dict[str, Any], workflows_path: Path | None = None) -> None:
+    """保存延迟参数到 workflows.yaml 顶层 input_delay 块（与 flows 同级）
+
+    文本级替换：存在则整块替换、不存在则末尾追加，
+    避免 yaml.dump 整体重写丢掉 flows 区的注释。
+    """
+    path = workflows_path or WORKFLOWS_CONFIG_PATH
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    lines = text.splitlines()
+    block = _format_delay_block(delay)
+
+    start = next((i for i, ln in enumerate(lines)
+                  if ln.strip() == "input_delay:" and not ln[:1].isspace()), None)
+    if start is None:
+        new_lines = lines + ([""] if lines and lines[-1].strip() else []) + block
+    else:
+        # 块范围：input_delay: 行及其后所有缩进行/空行；若紧邻上方是旧注释行一并替换
+        if start > 0 and lines[start - 1].lstrip().startswith("#"):
+            start -= 1
+        end = start + 1
+        while end < len(lines) and (not lines[end].strip() or lines[end][0] in " \t"
+                                    or lines[end].strip() == "input_delay:"):
+            end += 1
+        tail = lines[end:]
+        new_lines = lines[:start] + block + ([""] if tail else []) + tail
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(new_lines).rstrip("\n") + "\n", encoding="utf-8")

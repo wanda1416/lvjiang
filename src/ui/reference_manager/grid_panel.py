@@ -152,6 +152,7 @@ class GridPanel(QWidget):
 
     # 信号
     grid_params_changed = pyqtSignal(int, int, int)  # rows, cols, gap (实时响应)
+    grid_defaults_changed = pyqtSignal(dict)  # 五项网格参数任一手动改动（用于落盘）
     generate_grid_requested = pyqtSignal(int, int, int, int, int)  # rows, cols, gap, height, width
     clear_grid_requested = pyqtSignal()  # 清除网格
     execute_requested = pyqtSignal()  # 执行切割
@@ -277,6 +278,10 @@ class GridPanel(QWidget):
         self._rows_spin.valueChanged.connect(self._emit_grid_params)
         self._cols_spin.valueChanged.connect(self._emit_grid_params)
         self._gap_spin.valueChanged.connect(self._emit_grid_params)
+        # 五项参数改动落盘（rows/cols/gap/height/width）
+        for spin in (self._rows_spin, self._cols_spin, self._gap_spin,
+                     self._height_spin, self._width_spin):
+            spin.valueChanged.connect(self._emit_grid_defaults)
         # 第二组：生成网格
         self._generate_btn.clicked.connect(self._on_generate)
         self._clear_grid_btn.clicked.connect(self.clear_grid_requested.emit)
@@ -328,6 +333,16 @@ class GridPanel(QWidget):
     def _emit_grid_params(self):
         """发射网格参数变化信号（实时响应）"""
         self.grid_params_changed.emit(self.rows, self.cols, self.gap)
+
+    def _emit_grid_defaults(self):
+        """发射五项网格参数改动信号（由对话框落盘到 session.json）"""
+        self.grid_defaults_changed.emit({
+            "rows": self.rows,
+            "cols": self.cols,
+            "gap": self.gap,
+            "height": self.cell_height,
+            "width": self.cell_width,
+        })
 
     def _on_generate(self):
         """发射生成网格请求信号"""

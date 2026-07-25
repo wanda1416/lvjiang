@@ -5,7 +5,7 @@
 （has_keep_pvp / sub_school_options / sub_school_playstyles）
 生成该流派专属配置项。
 
-配置结构与 session.json tuning.schools 节点一致：
+配置结构与插件会话（config/local/yysls/session.json）tuning.schools 节点一致：
 {流派 key: {"enabled": bool, "keep_pvp": bool,
             "sub_schools": [...], "playstyles": {sub_key: [...]}}}
 """

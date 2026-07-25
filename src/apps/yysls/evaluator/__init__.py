@@ -7,7 +7,7 @@
 from .base import JudgeResult, Rating, SchoolJudge
 from .schools import (
     SCHOOL_CLASSES, SCHOOLS, SUB_SCHOOL_PLAYSTYLES, SUB_SCHOOLS,
-    get_school_judge, is_school_implemented,
+    get_school_judge, is_school_implemented, judge_tuning_worthiness,
 )
 from .attr_rules import get_attr_rule_manager
 
@@ -21,5 +21,6 @@ __all__ = [
     "SUB_SCHOOL_PLAYSTYLES",
     "get_school_judge",
     "is_school_implemented",
+    "judge_tuning_worthiness",
     "get_attr_rule_manager",
 ]

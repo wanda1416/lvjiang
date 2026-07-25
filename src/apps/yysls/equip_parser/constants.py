@@ -35,6 +35,21 @@ def infer_category(equip_type: str | None) -> str:
         return "armor"
     return "unknown"
 
+
+def infer_part(equip_type: str | None) -> str:
+    """从装备 type 推断部位（武器统一归为「武器」，不区分主/副）
+
+    部位与武器是两个独立维度：部位 ∈ {武器, 环, 佩, 冠胄, 胸甲,
+    胫甲, 腕甲}，具体武器类型（剑/枪/扇/...）由 type 单独表达。
+
+    Returns: "武器" / "环" / "佩" / "冠胄" / "胸甲" / "胫甲" / "腕甲" / "unknown"
+    """
+    if equip_type in WEAPON_TYPES_SET:
+        return "武器"
+    if equip_type in JEWELRY_TYPES_SET or equip_type in ARMOR_TYPES_SET:
+        return equip_type
+    return "unknown"
+
 # ─── 武器类型枚举 ──────────────────────────────────────────
 
 WEAPON_TYPES = [

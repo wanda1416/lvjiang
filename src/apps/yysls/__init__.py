@@ -20,6 +20,7 @@ hooks = AppHooks(
     # 复杂工作流实现
     workflow_implementations={
         "auto_tuning": "src.apps.yysls.workflows.implementations.auto_tuning.AutoTuningWorkflow",
+        "single_tuning": "src.apps.yysls.workflows.implementations.single_tuning.SingleTuningWorkflow",
     },
 
     # 燕云专属内置函数模块（导入即触发 @builtin_func 注册）

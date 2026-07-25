@@ -21,6 +21,13 @@ class Rating(Enum):
     JUNK = "垃圾"
 
 
+def part_label(equip: EquipmentData) -> str:
+    """部位/武器描述文案（部位为武器时给出具体武器类型）"""
+    if equip.part == "武器":
+        return f"武器 {equip.weapon}"
+    return f"部位 {equip.type}"
+
+
 # ─── 判定结果 ──────────────────────────────────────────────
 
 @dataclass
@@ -28,11 +35,14 @@ class JudgeResult:
     """单件装备判定结果
 
     skipped=True 表示品阶/首词条不符，无调律价值（直接跳过，不参与评级）。
+    not_applicable=True 表示该流派不覆盖此部位，无法给出结论
+    （不是否决票，多流派 or 判定时应忽略该结果）。
     is_pvp=True 表示装备因 PVP 词条（单体奇术增伤/对玩家增效）被保留。
     """
     equipment: EquipmentData
     rating: Rating = Rating.JUNK
     skipped: bool = False
+    not_applicable: bool = False
     is_pvp: bool = False
     reasons: list[str] = field(default_factory=list)
 
@@ -45,6 +55,8 @@ class JudgeResult:
             "rating": self.rating.value,
             "skipped": self.skipped,
         }
+        if self.not_applicable:
+            d["not_applicable"] = True
         if self.is_pvp:
             d["is_pvp"] = True
         if self.reasons:
@@ -65,7 +77,10 @@ class SchoolJudge(ABC):
     - school_name: 流派显示名
     - implemented: 判定逻辑是否已实现（未实现的流派 judge 抛 NotImplementedError）
     - has_keep_pvp: 该流派是否有「保留 PVP 装备」可选配置
-    - needs_sub_school: 该流派是否需要「指定流派 + 玩法」必选配置
+    - needs_sub_school: 该流派是否需要子选项必选配置（至少勾选一项）
+    - sub_school_options: 子选项 key → 显示名（UI 据此生成复选框）
+    - sub_school_playstyles: 子选项 key → 玩法 key → 显示名（无玩法不列）
+    - sub_school_label: 子选项分组的 UI 标签文本
     """
 
     school_key: str = ""
@@ -73,6 +88,9 @@ class SchoolJudge(ABC):
     implemented: bool = False
     has_keep_pvp: bool = False
     needs_sub_school: bool = False
+    sub_school_options: dict[str, str] = {}
+    sub_school_playstyles: dict[str, dict[str, str]] = {}
+    sub_school_label: str = "指定流派（必选）："
 
     def __init__(self, config: dict | None = None):
         self.config: dict = config or {}
@@ -90,10 +108,11 @@ class SchoolJudge(ABC):
         """
         ...
 
-    def check_tuning_worthiness(self, equip: EquipmentData) -> bool:
-        """调律熔断判定（预留接口，暂未实现）
+    def check_tuning_worthiness(self, equip: EquipmentData) -> JudgeResult:
+        """调律潜力判定：装备词条未满时判定是否值得（继续）调律
 
-        规格（01 文档第八节）：假设将当前非首词条中最差的一条替换为
-        转律词库中的最佳词条后重新定级，能达「能用」及以上则继续调律。
+        把剩余空词条槽视作可变成任意词条的万能牌，返回该装备能达到的
+        评级上限（rating）。rating ∈ {TOP, EXCELLENT} 且未 skipped
+        视为值得调律；未实现的流派抛 NotImplementedError（调用方跳过）。
         """
-        raise NotImplementedError("调律熔断判定暂未实现")
+        raise NotImplementedError(f"{self.school_name} 调律潜力判定暂未实现")

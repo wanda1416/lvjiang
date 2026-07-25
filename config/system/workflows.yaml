@@ -14,7 +14,8 @@ flows:
 
   - id: single_tuning
     name: 单件装备调律
-    wf_file: single_tuning.wf
+    # wf_file: single_tuning.wf  # 暂时屏蔽 .wf 实现，改由下方 class 引用的代码实现
+    class: single_tuning
     required_scenes:
       - game_main_page
       - game_menu_page
@@ -24,15 +25,8 @@ flows:
       - equip_tune_detail
       - equip_tune_result
     parameters:
-      - name: target_material
-        label: 目标材料
-        type: select
-        default: "紫狗粮"
-        options:
-          - { value: "", label: "不添加" }
-          - { value: "紫狗粮", label: "紫狗粮" }
-          - { value: "金狗粮", label: "金狗粮" }
-          - { value: "彩狗粮", label: "彩狗粮" }
+      # 狗粮添加已改为自动策略（首词条 >=90% 加金狗粮；否则金色不加、紫色加紫狗粮），
+      # 不再需要 target_material 参数
       - name: equip_slot
         label: 装备部位
         type: select

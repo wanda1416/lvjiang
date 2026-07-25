@@ -14,7 +14,7 @@ class AttrManagerDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("属性管理")
+        self.setWindowTitle("装备属性管理")
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(

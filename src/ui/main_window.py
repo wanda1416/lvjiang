@@ -1,7 +1,7 @@
 """通用主窗口。
 
 包含完整的基础功能：
-- 用户管理、场景管理、图库管理、图像识别测试
+- 用户管理、场景管理、图库管理、图像识别
 - 窗口/设备扫描与定位
 - 工作流加载、执行、录制
 - 运行日志面板
@@ -48,7 +48,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     """通用主窗口。
 
     从全局注册表读取扩展点，由插件在启动时注入。
-    子类可覆盖 ``_extra_menu_items`` / ``_extra_left_tabs`` / ``_extra_right_tabs``
+    子类可覆盖 ``_plugin_menu_spec`` / ``_extra_left_tabs`` / ``_extra_right_tabs``
     添加插件专属功能。
     """
 
@@ -134,8 +134,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             QMenu::item:selected { background: #0078d4; color: white; }
         """)
 
-        # ── 管理 ──
-        settings_menu = menubar.addMenu("管理")
+        # ── 通用 ──
+        settings_menu = menubar.addMenu("通用")
 
         user_mgmt = QAction("用户管理", self)
         user_mgmt.setShortcut("F2")
@@ -152,31 +152,24 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         reference_mgr.triggered.connect(self._open_reference_manager)
         settings_menu.addAction(reference_mgr)
 
-        settings_menu.addSeparator()
-
-        # 插件扩展点：额外菜单项
-        for label, slot, shortcut in self._extra_menu_items():
-            settings_menu.addSeparator() if shortcut == "---" else None
-            action = QAction(label, self)
-            if shortcut and shortcut != "---":
-                action.setShortcut(shortcut)
-            action.triggered.connect(slot)
-            settings_menu.addAction(action)
-
         # ── 工具 ──
         tools_menu = menubar.addMenu("工具")
 
-        ocr_test = QAction("图像识别测试", self)
+        ocr_test = QAction("图像识别", self)
         ocr_test.triggered.connect(self._open_ocr_test)
         tools_menu.addAction(ocr_test)
 
-        # 插件扩展点：额外工具菜单项
-        for label, slot, shortcut in self._extra_tool_menu_items():
-            action = QAction(label, self)
-            if shortcut:
-                action.setShortcut(shortcut)
-            action.triggered.connect(slot)
-            tools_menu.addAction(action)
+        # ── 插件专属菜单（第三列，帮助之前；一个插件一个菜单） ──
+        spec = self._plugin_menu_spec()
+        if spec:
+            menu_title, plugin_items = spec
+            plugin_menu = menubar.addMenu(menu_title)
+            for label, slot, shortcut in plugin_items:
+                action = QAction(label, self)
+                if shortcut:
+                    action.setShortcut(shortcut)
+                action.triggered.connect(slot)
+                plugin_menu.addAction(action)
 
         # ── 帮助 ──
         help_menu = menubar.addMenu("帮助")
@@ -192,13 +185,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             except Exception:  # noqa: BLE001
                 logger.exception("menu builder 执行失败")
 
-    def _extra_menu_items(self) -> list[tuple[str, Any, str]]:
-        """子类覆盖：返回额外菜单项 [(label, slot, shortcut), ...]"""
-        return []
+    def _plugin_menu_spec(self) -> tuple[str, list[tuple[str, Any, str]]] | None:
+        """子类覆盖：返回插件专属菜单 (菜单名, [(label, slot, shortcut), ...])。
 
-    def _extra_tool_menu_items(self) -> list[tuple[str, Any, str]]:
-        """子类覆盖：返回额外「工具」菜单项 [(label, slot, shortcut), ...]"""
-        return []
+        一个插件一个菜单，菜单名用插件名（如「燕云」），返回 None 则不创建。
+        """
+        return None
 
     # ─── 对话框 ──────────────────────────────────────────────
 
@@ -347,7 +339,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._build_right_tabs()
         splitter.addWidget(self.tabs)
 
-        splitter.setSizes([250, 750])
+        # 初始比例：左 1/3、右 2/3
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([333, 667])
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===

@@ -2,7 +2,7 @@
 
 包含两个 Tab 页：
 - 基础属性规则
-- 词条属性上限
+- 词条配置
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
@@ -29,8 +29,8 @@ class AttrManagerTab(QWidget):
         self._base_panel = BaseAttrPanel()
         self._tabs.addTab(self._base_panel, "基础属性")
 
-        # 词条上限面板
+        # 词条配置面板
         self._affix_panel = AffixCapsPanel()
-        self._tabs.addTab(self._affix_panel, "词条上限")
+        self._tabs.addTab(self._affix_panel, "词条配置")
 
         layout.addWidget(self._tabs)

@@ -5,7 +5,7 @@
 
 ## 简写与标准字段映射
 
-    本文档示例中的词条均为简写，实现时必须映射为 config/system/attributes.yaml
+    本文档示例中的词条均为简写，实现时必须映射为 config/system/yysls/attributes.yaml
     中 affix_caps._aliases 定义的标准字段名，不得使用 attributes.yaml 之外的词条名。
 
     | 简写 | 标准字段 | 说明 |

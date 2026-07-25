@@ -15,7 +15,7 @@ class OCRTestDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("图像识别测试")
+        self.setWindowTitle("图像识别")
         self.setMinimumSize(700, 600)
         self._image_label = None   # QLabel 显示图片
         self._result_text = None   # QTextEdit 显示结果

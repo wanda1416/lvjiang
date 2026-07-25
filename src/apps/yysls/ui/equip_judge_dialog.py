@@ -219,7 +219,7 @@ class EquipJudgeTestDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle("装备识别测试")
+        self.setWindowTitle("装备调律验证")
         self.resize(860, 620)
         layout = QHBoxLayout(self)
 

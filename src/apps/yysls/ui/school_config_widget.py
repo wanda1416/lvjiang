@@ -1,6 +1,6 @@
 """流派配置公共控件
 
-调律 Tab 与「装备识别测试」面板共用的层级流派配置 UI：
+调律 Tab 与「装备调律验证」面板共用的层级流派配置 UI：
 每流派一个可勾选分组框（勾选标题 = 启用流派），组内按流派声明
 （has_keep_pvp / sub_school_options / sub_school_playstyles）
 生成该流派专属配置项。

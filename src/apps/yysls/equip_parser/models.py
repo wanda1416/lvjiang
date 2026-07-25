@@ -67,6 +67,7 @@ class EquipmentData:
         "affix_1": { "name": "最大外功攻击", "value": 114.1, "is_transferred": false },
         "affix_2": { "name": "会意率", "value": 6.6, "unit": "%", "is_transferred": false },
         ...
+        "dingyin": { "name": "外功穿透", "value": 14.2 },
         "_warnings": []
     }
     """
@@ -78,6 +79,9 @@ class EquipmentData:
     base_attr: EquipAttr | None = None
     base_attr_2: EquipAttr | None = None
     affixes: list[Affix] = field(default_factory=list)
+    # 定音词条 {"name": 原始词条名, "value": 数值}；左四（武器/环/佩）为
+    # 外功增益/属攻增益的原始词条名，右四（防具）为指定技能增效的原始词条名
+    dingyin: dict = field(default_factory=dict)
     extra_data: dict = field(default_factory=dict)  # 辅助信息，如 {"affix_count": 5}
     warnings: list[str] = field(default_factory=list)
 
@@ -118,6 +122,7 @@ class EquipmentData:
             # 记录转律词条位置供 DSL 快速定位
             if affix.is_transferred:
                 self.extra_data["transferred_affix"] = f"affix_{i}"
+        d["dingyin"] = self.dingyin if self.dingyin else None
         if self.warnings:
             d["_warnings"] = self.warnings
         if self.extra_data:
@@ -142,6 +147,7 @@ class EquipmentData:
             base_attr=EquipAttr.from_dict(d["base_attr"]) if d.get("base_attr") else None,
             base_attr_2=EquipAttr.from_dict(d["base_attr_2"]) if d.get("base_attr_2") else None,
             affixes=affixes,
+            dingyin=d.get("dingyin") or {},
             warnings=d.get("_warnings", []),
             extra_data=d.get("_extra", {}),
         )

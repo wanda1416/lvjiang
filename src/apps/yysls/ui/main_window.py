@@ -1,7 +1,7 @@
 """燕云十六声主窗口 —— 继承通用 MainWindow，追加燕云专属功能。
 
 插件扩展点：
-- 菜单：属性管理（F5）
+- 「燕云」菜单：装备属性管理（F5）、装备调律验证
 - 左侧 Tab 2：调律（部位选择 + 开始调律）
 - 右侧 Tab 2：装备状态
 """
@@ -28,11 +28,11 @@ class MainWindow(GenericMainWindow):
 
     # ─── 菜单扩展 ────────────────────────────────────────────
 
-    def _extra_menu_items(self) -> list[tuple[str, Any, str]]:
-        return [("属性管理", self._open_attr_manager, "F5")]
-
-    def _extra_tool_menu_items(self) -> list[tuple[str, Any, str]]:
-        return [("装备识别测试", self._open_equip_judge_test, "")]
+    def _plugin_menu_spec(self) -> tuple[str, list[tuple[str, Any, str]]] | None:
+        return ("燕云", [
+            ("装备属性管理", self._open_attr_manager, "F5"),
+            ("装备调律验证", self._open_equip_judge_test, ""),
+        ])
 
     def _open_attr_manager(self):
         from .attr_manager import AttrManagerDialog

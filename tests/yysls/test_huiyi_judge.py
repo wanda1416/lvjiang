@@ -559,7 +559,7 @@ def _load_standard_names() -> set[str]:
     import yaml
 
     path = (Path(__file__).parents[2]
-            / "config" / "system" / "attributes.yaml")
+            / "config" / "system" / "yysls" / "attributes.yaml")
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     names: set[str] = set()
     for entry in data["affix_caps"].values():

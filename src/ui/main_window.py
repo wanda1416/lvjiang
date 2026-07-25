@@ -137,6 +137,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         # ── 通用 ──
         settings_menu = menubar.addMenu("通用")
 
+        settings_mgmt = QAction("配置管理", self)
+        settings_mgmt.triggered.connect(self._open_settings_manager)
+        settings_menu.addAction(settings_mgmt)
+
         user_mgmt = QAction("用户管理", self)
         user_mgmt.setShortcut("F2")
         user_mgmt.triggered.connect(self._open_user_manager)
@@ -234,6 +238,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         dialog = UserManagerDialog(self._user_manager, self)
         dialog.exec()
         self._refresh_user_combo()
+
+    def _open_settings_manager(self):
+        from .settings_dialog import SettingsDialog
+        dialog = SettingsDialog(self)
+        if dialog.exec():
+            # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
+            self._user_config = load_user_config()
+            self.statusBar().showMessage("配置已保存", 3000)
 
     def _on_toggle_preview(self, checked: bool):
         self.preview_label.setVisible(not checked)
@@ -343,12 +355,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([333, 667])
+        self._main_splitter = splitter
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
         self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 录制")
         self.adjustSize()
         self.setMinimumHeight(self.height())
+        self._restore_ui_state()
         self._setup_log_redirect()
 
     def _build_left_tabs(self):
@@ -406,6 +420,48 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self.log_text = TrimmedLogEdit()
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         self.tabs.addTab(self.log_text, "运行日志")
+
+    # ─── UI 状态持久化（session.json ui_state 节点）────────
+
+    def _restore_ui_state(self):
+        """启动时恢复窗口大小与左右分栏比例，免去每次手动拉伸"""
+        import json
+        from ..constants import SESSION_PATH
+        if not SESSION_PATH.exists():
+            return
+        try:
+            state = json.loads(
+                SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
+        except Exception:
+            return
+        size = state.get("window_size")
+        if isinstance(size, list) and len(size) == 2:
+            self.resize(int(size[0]), int(size[1]))
+        sizes = state.get("splitter_sizes")
+        if isinstance(sizes, list) and len(sizes) == 2 and all(s > 0 for s in sizes):
+            self._main_splitter.setSizes([int(s) for s in sizes])
+
+    def _save_ui_state(self):
+        """退出时统一写入 ui_state（保留 session.json 其他字段）"""
+        import json
+        from ..constants import SESSION_PATH, LOCAL_CONFIG_DIR
+        data = {}
+        if SESSION_PATH.exists():
+            try:
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        data["ui_state"] = {
+            "window_size": [self.width(), self.height()],
+            "splitter_sizes": self._main_splitter.sizes(),
+        }
+        try:
+            LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SESSION_PATH.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存 UI 状态失败: {e}")
 
     def _setup_log_redirect(self):
         self._log_bridge = _LogBridge(self)
@@ -548,6 +604,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
                 event.ignore()
                 return
             self._request_stop()
+        self._save_ui_state()
         if self._recorder is not None:
             try:
                 self._recorder.stop()

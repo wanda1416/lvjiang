@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from loguru import logger
 
-from ..constants import LOCAL_CONFIG_DIR, PREFERENCES_PATH
+from ..constants import LOCAL_CONFIG_DIR
 from .scene_registry import Layout, get_scene_name
 
 

@@ -64,6 +64,11 @@ class TestParse:
         result = dp.parse("荐外功穿透 +14.2%", "weapon")
         assert result == {"name": "外功穿透", "value": 14.2}
 
+    def test_cleaner_and_dot_normalized(self, dp):
+        # 真实脏数据：含噪声字符"荐" + 游戏内 武学·技能 间隔号
+        result = dp.parse("明川药典·治疗技增疗荐7.5%", "armor")
+        assert result == {"name": "明川药典治疗技增疗", "value": 7.5}
+
     def test_wrong_pool_rejected(self, dp):
         # 左四词条名不在右四词条池中，反之亦然
         assert dp.parse("外功穿透 +14.2%", "armor") is None

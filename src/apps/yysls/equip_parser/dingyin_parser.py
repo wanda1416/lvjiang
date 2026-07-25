@@ -17,6 +17,8 @@ import re
 
 from loguru import logger
 
+from .cleaner import clean_affix_text
+
 
 # 左四（武器/首饰）定音类别 与 右四（防具）定音类别
 _LEFT_CATEGORIES = ("外功增益", "属攻增益")
@@ -40,7 +42,10 @@ class DingyinParser:
         Returns:
             {"name": 原始词条名, "value": float} 或 None（为空 / 无法识别）
         """
-        text = raw.strip()
+        # 数据清洗（与普通词条同一套规则：误识别替换 + 噪声字符删除）
+        text = clean_affix_text(raw)
+        # 游戏内定音显示为 武学·技能（含间隔号），配置词条名为连写形态，去除后匹配
+        text = text.replace("·", "")
         if not text:
             return None
 

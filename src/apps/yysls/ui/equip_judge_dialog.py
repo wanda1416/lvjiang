@@ -1,7 +1,7 @@
 """装备识别测试对话框
 
 工具菜单入口：纯手工构造装备验证判定器。
-左侧为流派配置（SchoolConfigWidget，初值取自 session.json 调律配置，
+左侧为流派配置（SchoolConfigWidget，初值取自插件会话调律配置，
 改动不回写 session）；右侧手选 部位 + 品阶 + 词条 1-5（数值默认
 承音 94%），点「判定」输出调律潜力结论，词条满 5 条时追加各启用
 流派的完整定级。词条名一律为 attributes.yaml 标准字段。
@@ -249,19 +249,13 @@ class EquipJudgeTestDialog(QDialog):
 
     @staticmethod
     def _load_session_schools() -> dict:
-        """读取调律 Tab 已保存的流派配置作为初值"""
-        from src.constants import SESSION_PATH
-        if SESSION_PATH.exists():
-            try:
-                import json
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-                raw = data.get("tuning", {}).get("schools")
-                if isinstance(raw, dict):
-                    return raw
-                if isinstance(raw, list):  # 旧 list 格式兼容
-                    return {k: {"enabled": True} for k in raw}
-            except Exception:
-                pass
+        """读取调律 Tab 已保存的流派配置作为初值（插件会话）"""
+        from ..session import get_plugin_session
+        raw = get_plugin_session().get_section("tuning").get("schools")
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, list):  # 旧 list 格式兼容
+            return {k: {"enabled": True} for k in raw}
         return {}
 
     def _on_judge(self):

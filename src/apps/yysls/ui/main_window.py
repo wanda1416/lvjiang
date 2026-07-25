@@ -157,30 +157,22 @@ class MainWindow(GenericMainWindow):
             logger.error(f"加载用户装备数据失败: {e}")
             self.equip_status_panel.refresh({})
 
-    # ─── 调律配置持久化 ──────────────────────────────────────
+    # ─── 调律配置持久化（插件会话 config/local/yysls/session.json）──
 
     def _load_tuning_config(self):
-        from src.constants import SESSION_PATH
+        from ..session import get_plugin_session
         default_slots = ["main_weapon", "sub_weapon", "ring", "pendant",
                          "head", "chest", "leg", "wrist"]
-        selected = default_slots
-        schools_cfg: dict = {"huiyi_general": {"enabled": True}}
-        if SESSION_PATH.exists():
-            try:
-                import json
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-                tuning = data.get("tuning", {})
-                saved = tuning.get("selected_slots", [])
-                if saved:
-                    selected = saved
-                raw = tuning.get("schools")
-                if isinstance(raw, dict):
-                    schools_cfg = raw
-                elif isinstance(raw, list):
-                    # 旧 list 格式兼容：列表内流派视为启用（旧全局 keep_pvp 忽略）
-                    schools_cfg = {k: {"enabled": True} for k in raw}
-            except Exception:
-                pass
+        tuning = get_plugin_session().get_section("tuning")
+        selected = tuning.get("selected_slots") or default_slots
+        raw = tuning.get("schools")
+        if isinstance(raw, dict):
+            schools_cfg = raw
+        elif isinstance(raw, list):
+            # 旧 list 格式兼容：列表内流派视为启用（旧全局 keep_pvp 忽略）
+            schools_cfg = {k: {"enabled": True} for k in raw}
+        else:
+            schools_cfg = {"huiyi_general": {"enabled": True}}
         for cb in self._tuning_checkboxes:
             cb.blockSignals(True)
             cb.setChecked(cb.objectName() in selected)
@@ -188,29 +180,11 @@ class MainWindow(GenericMainWindow):
         self._school_config.set_config(schools_cfg)
 
     def _save_tuning_config(self):
-        from src.constants import SESSION_PATH, LOCAL_CONFIG_DIR
-        selected = self._get_tuning_selected_slots()
-        schools_cfg = self._get_tuning_school_config()
-        data = {}
-        if SESSION_PATH.exists():
-            try:
-                import json
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        tuning = data.setdefault("tuning", {})
-        tuning["selected_slots"] = selected
-        tuning["schools"] = schools_cfg
-        tuning.pop("school", None)    # 清理旧格式残留键
-        tuning.pop("keep_pvp", None)
-        try:
-            import json
-            LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            SESSION_PATH.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
-            )
-        except Exception as e:
-            logger.warning(f"保存调律配置失败: {e}")
+        from ..session import get_plugin_session
+        get_plugin_session().set_section("tuning", {
+            "selected_slots": self._get_tuning_selected_slots(),
+            "schools": self._get_tuning_school_config(),
+        })
 
     def _set_all_tuning_checks(self, checked: bool):
         for cb in self._tuning_checkboxes:

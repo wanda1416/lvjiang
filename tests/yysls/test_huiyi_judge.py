@@ -76,6 +76,11 @@ class TestQiang:
         e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "会意率", "最大无相攻击", "最大无相攻击"])
         assert judge.judge(e).rating == Rating.USABLE
 
+    def test_junk_mingjin_on_weapon(self, judge):
+        # 武器上出现 最大鸣金攻击，属错位属攻 → 垃圾
+        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "最大鸣金攻击"])
+        assert judge.judge(e).rating == Rating.JUNK
+
     def test_junk_qiang_wuxue(self, judge):
         e = make_equip("枪", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"])
         assert judge.judge(e).rating == Rating.JUNK
@@ -89,9 +94,19 @@ class TestJewelry:
         assert judge.judge(e).rating == Rating.TOP
 
     def test_excellent_dawuxiang(self, judge):
-        # 大无相在非武器部位即 最大鸣金攻击（大本属）
+        # 大无相在非武器部位即 最大鸣金攻击（大本属）；只有劲没有势 → 优秀
         e = make_equip("佩", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "最大鸣金攻击"])
         assert judge.judge(e).rating == Rating.EXCELLENT
+
+    def test_excellent_double_jin(self, judge):
+        # 池内重复取劲合法，但未同时出现 劲+势 → 优秀
+        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "劲"])
+        assert judge.judge(e).rating == Rating.EXCELLENT
+
+    def test_junk_wuxiang_on_jewelry(self, judge):
+        # 非武器上出现 最大无相攻击，属错位属攻 → 垃圾
+        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "最大无相攻击"])
+        assert judge.judge(e).rating == Rating.JUNK
 
     def test_junk_missing_quan_wuxue(self, judge):
         e = make_equip("环", ["最大外功攻击", "最大外功攻击", "劲", "势", "劲"])
@@ -138,9 +153,10 @@ class TestLegWrist:
         assert r.rating == Rating.TOP
         assert r.is_pvp
 
-    def test_usable_missing_jin_shi(self, judge):
+    def test_excellent_missing_jin_shi(self, judge):
+        # 可选槽=会意+大无相：命中模式但非首词条未同时出现 劲+势 → 优秀
         e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "会意率", "最大鸣金攻击"])
-        assert judge.judge(e).rating == Rating.USABLE
+        assert judge.judge(e).rating == Rating.EXCELLENT
 
     def test_junk_missing_boss_damage(self, judge):
         e = make_equip("胫甲", ["劲", "最大外功攻击", "劲", "势", "会意率"])
@@ -316,6 +332,11 @@ class TestTuningWorthiness:
     def test_leg_jin_shi_top_potential(self, judge):
         # 胫甲 劲首+对首领增伤：缺的 劲/势 可由 3 个空槽补 → 仍可达顶级
         e = make_equip("胫甲", ["劲", "对首领单位增伤"], quality="purple")
+        assert judge.check_tuning_worthiness(e).rating == Rating.TOP
+
+    def test_misplaced_attr_transmutable(self, judge):
+        # 环带 1 条错位无相（废词条）：可转律洗掉 → 仍可达顶级
+        e = make_equip("环", ["最大外功攻击", "最大无相攻击"])
         assert judge.check_tuning_worthiness(e).rating == Rating.TOP
 
     def test_full_equipment_degenerates_to_judge(self, judge):

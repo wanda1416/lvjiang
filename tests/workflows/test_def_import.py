@@ -1,8 +1,5 @@
 """测试 def / import / call proc 语法解析"""
 
-import sys
-sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
-
 from src.workflows.grammar.parser import parse_text
 from src.workflows.grammar.ast_nodes import Import, ProcDef, CallProc
 

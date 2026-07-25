@@ -150,14 +150,19 @@ class TestInferQuality:
         assert mgr.infer_quality("剑", 110, value) == expected
 
     def test_armor_exact_value(self, mgr):
-        # armor_other 单值规则：min=max
+        # head 单值规则：min=max
         assert mgr.infer_quality("冠胄", 110, 8750) == "purple"
         assert mgr.infer_quality("冠胄", 110, 8751) is None
 
+    def test_follow_parts_reuse_target_rules(self, mgr):
+        # 胫甲/腕甲 _follow: head，复用冠胄数值
+        assert mgr.infer_quality("胫甲", 110, 8750) == "purple"
+        assert mgr.infer_quality("腕甲", 110, 7778) == "blue"
+
     def test_unknown_type_greedy_fallback(self, mgr):
-        # 类型未知时贪婪遍历所有类别（防具气血值不重叠可唯一确定）
+        # 类型未知时贪婪遍历所有部位（防具气血值不重叠可唯一确定）
         assert mgr.infer_quality(None, 110, 19445) == "gold"   # chest
-        assert mgr.infer_quality(None, 110, 7778) == "blue"    # armor_other
+        assert mgr.infer_quality(None, 110, 7778) == "blue"    # head
 
     def test_unconfigured_level(self, mgr):
         assert mgr.infer_quality("剑", 42, 200) is None

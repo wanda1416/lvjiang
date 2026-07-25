@@ -1,9 +1,23 @@
 """可复用 UI 控件"""
 
 from PyQt6.QtGui import QTextCursor
-from PyQt6.QtWidgets import QTextEdit
+from PyQt6.QtWidgets import QDoubleSpinBox, QSpinBox, QTextEdit
 
 _MAX_LOG_LINES = 1000
+
+
+class NoWheelSpinBox(QSpinBox):
+    """禁用滚轮的整数输入框（避免滑动页面时误改数值）"""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoWheelDoubleSpinBox(QDoubleSpinBox):
+    """禁用滚轮的浮点数输入框（避免滑动页面时误改数值）"""
+
+    def wheelEvent(self, event):
+        event.ignore()
 
 
 class TrimmedLogEdit(QTextEdit):

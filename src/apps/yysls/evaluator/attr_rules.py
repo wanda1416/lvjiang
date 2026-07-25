@@ -60,17 +60,24 @@ class LevelRule:
 # ─── equip_type → 配置 key 映射 ─────────────────────────────
 
 _TYPE_TO_KEY = {
-    # 武器类型 → weapon
-    "陌刀": "weapon", "舞绫鼓": "weapon", "双刀": "weapon",
-    "绳镖": "weapon", "横刀": "weapon", "手甲": "weapon",
-    "剑": "weapon", "枪": "weapon", "扇": "weapon", "伞": "weapon",
+    # 武器类型 → main_weapon（副武器 sub_weapon 默认跟随主武器，
+    # 若独立配置则由贪婪匹配兜底）
+    "陌刀": "main_weapon", "舞绫鼓": "main_weapon", "双刀": "main_weapon",
+    "绳镖": "main_weapon", "横刀": "main_weapon", "手甲": "main_weapon",
+    "剑": "main_weapon", "枪": "main_weapon", "扇": "main_weapon", "伞": "main_weapon",
     # 首饰
     "环": "ring",
     "佩": "pendant",
     # 防具
-    "冠胄": "armor_other", "胫甲": "armor_other", "腕甲": "armor_other",
+    "冠胄": "head", "胫甲": "leg", "腕甲": "wrist",
     "胸甲": "chest",
 }
+
+# 八个装备部位（base_attrs 的全部 key，与 UI 展示顺序一致）
+BASE_ATTR_PARTS = (
+    "main_weapon", "sub_weapon", "ring", "pendant",
+    "head", "chest", "leg", "wrist",
+)
 
 
 # ─── 属性规则管理器 ─────────────────────────────────────────
@@ -115,11 +122,19 @@ class AttrRuleManager:
         self._alias_groups.clear()
 
         # ── base_attrs ──
+        # _follow: <目标部位> 声明该部位跟随目标部位的数值（单层解析）
         base_attrs = data.get("base_attrs", {})
-        for key in ("weapon", "ring", "pendant", "armor_other", "chest"):
-            section = base_attrs.get(key, {})
+        follows: dict[str, str] = {}
+        for key in BASE_ATTR_PARTS:
+            section = base_attrs.get(key, {}) or {}
+            target = section.get("_follow")
+            if target:
+                follows[key] = target
+                continue
             self._base_rules[key] = {}
             for level_str, qualities in section.items():
+                if str(level_str).startswith("_"):
+                    continue
                 level = int(level_str)
                 ranges = []
                 for q in ("gold", "purple", "blue"):
@@ -136,6 +151,10 @@ class AttrRuleManager:
                         val = int(v)
                         ranges.append(AttrRange(quality=q, min_val=val, max_val=val))
                 self._base_rules[key][level] = LevelRule(ranges=ranges)
+
+        # 跟随部位直接复用目标部位的规则对象
+        for key, target in follows.items():
+            self._base_rules[key] = self._base_rules.get(target, {})
 
         # ── affix_caps ──
         raw_caps = data.get("affix_caps", {})

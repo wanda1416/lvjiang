@@ -1,8 +1,14 @@
 """基础属性规则面板
 
 管理装备基础属性规则（用于品阶推断）。
-左侧分类列表，右侧等级×品阶表格。
-自动保存，删除时确认。
+左侧固定八个装备部位，右侧为属性跟随配置 + 基础属性说明 + 等级×品阶表格。
+属性跟随：勾选后该部位复用目标部位的数值（YAML 中记为 _follow），
+表格只读展示目标部位数据，避免重复配置（副武器跟随主武器、
+胫甲/腕甲跟随冠胄）。
+基础属性说明：部位数值对应的属性名由 YAML 的 _attr 声明，
+区间型部位（武器）由 _range: true 声明，品阶单元格改用
+最小/最大双数字输入框，不再手写 a~b 文本。
+自动保存，覆盖已有数值时确认。
 """
 
 from pathlib import Path
@@ -13,19 +19,26 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QListWidget, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QHeaderView, QLabel,
+    QCheckBox, QComboBox, QFrame,
 )
 from PyQt6.QtCore import Qt
+
+from src.apps.yysls.evaluator.attr_rules import BASE_ATTR_PARTS
+from src.ui.widgets import NoWheelSpinBox
 
 # 配置文件路径
 _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
 
-# 分类显示名称
-_CATEGORY_NAMES = {
-    "weapon": "武器",
-    "ring": "戒指",
-    "pendant": "佩饰",
-    "armor_other": "防具（非胸甲）",
+# 部位显示名称（顺序由 BASE_ATTR_PARTS 决定）
+_PART_NAMES = {
+    "main_weapon": "主武器",
+    "sub_weapon": "副武器",
+    "ring": "环",
+    "pendant": "佩",
+    "head": "冠胄",
     "chest": "胸甲",
+    "leg": "胫甲",
+    "wrist": "腕甲",
 }
 
 # 品阶显示名称
@@ -36,13 +49,66 @@ _QUALITY_NAMES = {
 }
 
 
+class _RangeCell(QWidget):
+    """区间值单元格（最小/最大双数字输入框，0 显示为 — 表示未配置）
+
+    使用禁滚轮输入框，避免滑动表格时误改数值。
+    """
+
+    def __init__(self, on_change, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(4, 0, 4, 0)
+        layout.setSpacing(2)
+
+        self._min = NoWheelSpinBox()
+        self._max = NoWheelSpinBox()
+        for sb in (self._min, self._max):
+            sb.setRange(0, 999999)
+            sb.setSpecialValueText("—")
+            sb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._min.setToolTip("最小值")
+        self._max.setToolTip("最大值")
+
+        layout.addWidget(self._min, 1)
+        layout.addWidget(QLabel("~"))
+        layout.addWidget(self._max, 1)
+
+        self._min.valueChanged.connect(on_change)
+        self._max.valueChanged.connect(on_change)
+
+    def set_value(self, q_data):
+        """填入数据（阻断信号），None 表示未配置"""
+        for sb in (self._min, self._max):
+            sb.blockSignals(True)
+        if isinstance(q_data, dict):
+            self._min.setValue(q_data.get("min") or 0)
+            self._max.setValue(q_data.get("max") or 0)
+        elif q_data is not None:
+            # 历史单值兼容展示：min=max
+            self._min.setValue(int(q_data))
+            self._max.setValue(int(q_data))
+        else:
+            self._min.setValue(0)
+            self._max.setValue(0)
+        for sb in (self._min, self._max):
+            sb.blockSignals(False)
+
+    def get_value(self) -> dict | None:
+        """读取数据，两端均未填返回 None"""
+        min_v, max_v = self._min.value(), self._max.value()
+        if min_v == 0 and max_v == 0:
+            return None
+        return {"min": min_v, "max": max_v}
+
+
 class BaseAttrPanel(QWidget):
     """基础属性规则面板"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data: dict = {}  # 完整配置数据
-        self._current_category: str | None = None
+        self._current_part: str | None = None
         self._saving = False  # 防止递归保存
         self._init_ui()
         self._load_data()
@@ -53,22 +119,58 @@ class BaseAttrPanel(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # 左侧：分类列表
+        # 左侧：部位列表（固定八个部位）
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("分类"))
-        
-        self._category_list = QListWidget()
-        self._category_list.currentRowChanged.connect(self._on_category_changed)
-        left_layout.addWidget(self._category_list)
+        left_layout.addWidget(QLabel("装备部位"))
+
+        self._part_list = QListWidget()
+        for part in BASE_ATTR_PARTS:
+            self._part_list.addItem(_PART_NAMES.get(part, part))
+        self._part_list.currentRowChanged.connect(self._on_part_changed)
+        left_layout.addWidget(self._part_list)
 
         splitter.addWidget(left_widget)
 
-        # 右侧：表格 + 按钮
+        # 右侧：属性跟随 + 表格 + 按钮
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ── 属性跟随（勾选后下拉选择跟随的目标部位）──
+        follow_frame = QFrame()
+        follow_frame.setStyleSheet(
+            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+        )
+        follow_layout = QHBoxLayout(follow_frame)
+        follow_layout.setContentsMargins(8, 4, 8, 4)
+        self._check_follow = QCheckBox("属性跟随")
+        self._check_follow.toggled.connect(self._on_follow_toggled)
+        follow_layout.addWidget(self._check_follow)
+
+        self._combo_follow = QComboBox()
+        self._combo_follow.setMinimumWidth(120)
+        self._combo_follow.currentIndexChanged.connect(self._on_follow_target_changed)
+        follow_layout.addWidget(self._combo_follow)
+
+        self._follow_hint = QLabel("")
+        self._follow_hint.setStyleSheet("color: #888;")
+        follow_layout.addWidget(self._follow_hint)
+        follow_layout.addStretch()
+        right_layout.addWidget(follow_frame)
+
+        # ── 基础属性说明（部位数值对应的属性名，来自 YAML _attr）──
+        attr_frame = QFrame()
+        attr_frame.setStyleSheet(
+            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+        )
+        attr_layout = QHBoxLayout(attr_frame)
+        attr_layout.setContentsMargins(8, 4, 8, 4)
+        self._attr_label = QLabel("")
+        attr_layout.addWidget(self._attr_label)
+        attr_layout.addStretch()
+        right_layout.addWidget(attr_frame)
 
         self._table = QTableWidget()
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -78,7 +180,7 @@ class BaseAttrPanel(QWidget):
         # 底部按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        
+
         self._btn_add_level = QPushButton("添加等级")
         self._btn_add_level.clicked.connect(self._add_level)
         btn_layout.addWidget(self._btn_add_level)
@@ -101,37 +203,198 @@ class BaseAttrPanel(QWidget):
                 logger.error(f"加载配置失败: {e}")
                 self._data = {"base_attrs": {}, "affix_caps": {}}
 
-        # 填充分类列表
-        self._category_list.clear()
-        base_attrs = self._data.get("base_attrs", {})
-        for cat_key in base_attrs.keys():
-            display_name = _CATEGORY_NAMES.get(cat_key, cat_key)
-            self._category_list.addItem(display_name)
+        if self._part_list.count() > 0:
+            self._part_list.setCurrentRow(0)
+            # currentRowChanged 不触发首行时手动刷新
+            if self._current_part is None:
+                self._on_part_changed(0)
 
-        if self._category_list.count() > 0:
-            self._category_list.setCurrentRow(0)
+    # ── 部位切换 ──────────────────────────────────────────────
 
-    def _on_category_changed(self, row: int):
-        """切换分类时更新表格"""
-        base_attrs = self._data.get("base_attrs", {})
-        categories = list(base_attrs.keys())
-        
-        if row < 0 or row >= len(categories):
-            self._current_category = None
+    def _on_part_changed(self, row: int):
+        """切换部位时更新跟随配置与表格"""
+        if row < 0 or row >= len(BASE_ATTR_PARTS):
+            self._current_part = None
             self._table.setRowCount(0)
             return
 
-        self._current_category = categories[row]
+        self._current_part = BASE_ATTR_PARTS[row]
+        self._refresh_follow_controls()
+        self._refresh_attr_label()
         self._refresh_table()
 
-    def _refresh_table(self):
-        """刷新表格内容"""
-        if not self._current_category:
+    # ── 基础属性说明 ──────────────────────────────────
+
+    def _effective_part(self) -> str | None:
+        """当前部位的数据来源部位（跟随时为目标部位）"""
+        if not self._current_part:
+            return None
+        return self._follow_target(self._current_part) or self._current_part
+
+    def _is_range_part(self) -> bool:
+        """当前部位（含跟随目标）是否为区间型数值"""
+        part = self._effective_part()
+        return bool(part and self._part_data(part).get("_range"))
+
+    def _refresh_attr_label(self):
+        """刷新基础属性说明（跟随时取目标部位的 _attr）"""
+        part = self._effective_part()
+        if not part:
+            self._attr_label.setText("")
+            return
+        attr_name = self._part_data(part).get("_attr")
+        if not attr_name:
+            self._attr_label.setText("基础属性：未声明（YAML 中通过 _attr 配置）")
+            return
+        kind = "区间值（最小~最大）" if self._is_range_part() else "单值"
+        self._attr_label.setText(f"基础属性：{attr_name}（{kind}）")
+
+    # ── 属性跟随 ──────────────────────────────────────────────
+
+    def _part_data(self, part: str) -> dict:
+        return self._data.get("base_attrs", {}).get(part) or {}
+
+    def _follow_target(self, part: str) -> str | None:
+        return self._part_data(part).get("_follow")
+
+    def _followers_of(self, part: str) -> list[str]:
+        """跟随指定部位的其他部位"""
+        return [p for p in BASE_ATTR_PARTS if self._follow_target(p) == part]
+
+    def _follow_candidates(self) -> list[str]:
+        """可作为跟随目标的部位（排除自身与已跟随他人的部位，防止链式跟随）"""
+        return [
+            p for p in BASE_ATTR_PARTS
+            if p != self._current_part and self._follow_target(p) is None
+        ]
+
+    def _refresh_follow_controls(self):
+        """刷新属性跟随勾选框与下拉框"""
+        if not self._current_part:
             return
 
-        base_attrs = self._data.get("base_attrs", {})
-        cat_data = base_attrs.get(self._current_category, {})
-        
+        self._saving = True
+        target = self._follow_target(self._current_part)
+
+        self._combo_follow.clear()
+        candidates = self._follow_candidates()
+        for p in candidates:
+            self._combo_follow.addItem(_PART_NAMES.get(p, p), p)
+        if target and target in candidates:
+            self._combo_follow.setCurrentIndex(candidates.index(target))
+
+        following = target is not None
+        self._check_follow.setChecked(following)
+        self._combo_follow.setEnabled(following)
+        if following:
+            self._follow_hint.setText("数值复用目标部位，表格只读")
+        else:
+            followers = self._followers_of(self._current_part)
+            if followers:
+                names = "、".join(_PART_NAMES.get(p, p) for p in followers)
+                self._follow_hint.setText(f"被跟随：{names}")
+            else:
+                self._follow_hint.setText("")
+        self._btn_add_level.setEnabled(not following)
+        self._saving = False
+
+    def _on_follow_toggled(self, checked: bool):
+        """勾选/取消属性跟随"""
+        if self._saving or not self._current_part:
+            return
+        part = self._current_part
+
+        if checked:
+            # 被其他部位跟随时不允许再跟随（防止链式/循环）
+            followers = self._followers_of(part)
+            if followers:
+                names = "、".join(_PART_NAMES.get(p, p) for p in followers)
+                QMessageBox.warning(
+                    self, "无法跟随",
+                    f"「{_PART_NAMES.get(part, part)}」正被 {names} 跟随，不能再跟随其他部位。",
+                )
+                self._revert_follow_check(False)
+                return
+
+            candidates = self._follow_candidates()
+            if not candidates:
+                QMessageBox.warning(self, "无法跟随", "没有可跟随的目标部位。")
+                self._revert_follow_check(False)
+                return
+
+            # 已有等级数值时确认覆盖
+            own_levels = {
+                k: v for k, v in self._part_data(part).items()
+                if not str(k).startswith("_")
+            }
+            if own_levels:
+                ret = QMessageBox.question(
+                    self, "确认跟随",
+                    f"「{_PART_NAMES.get(part, part)}」已配置等级数值，"
+                    "启用跟随将清除自身数值，是否继续？",
+                )
+                if ret != QMessageBox.StandardButton.Yes:
+                    self._revert_follow_check(False)
+                    return
+
+            target = self._combo_follow.currentData() or candidates[0]
+            self._set_part_data(part, {"_follow": target}, keep_meta=True)
+        else:
+            # 取消跟随：保留元信息，数值由用户自行填写
+            self._set_part_data(part, {}, keep_meta=True)
+
+        self._save_data()
+        self._refresh_follow_controls()
+        self._refresh_attr_label()
+        self._refresh_table()
+
+    def _revert_follow_check(self, checked: bool):
+        """回退勾选框状态（不触发信号）"""
+        self._saving = True
+        self._check_follow.setChecked(checked)
+        self._saving = False
+
+    def _on_follow_target_changed(self, index: int):
+        """切换跟随目标"""
+        if self._saving or not self._current_part or index < 0:
+            return
+        if not self._check_follow.isChecked():
+            return
+        target = self._combo_follow.currentData()
+        if not target:
+            return
+        self._set_part_data(self._current_part, {"_follow": target}, keep_meta=True)
+        self._save_data()
+        self._refresh_attr_label()
+        self._refresh_table()
+
+    def _set_part_data(self, part: str, new_data: dict, keep_meta: bool = False):
+        """写入部位数据，keep_meta 时保留原有 _attr/_range 等元信息"""
+        base_attrs = self._data.setdefault("base_attrs", {})
+        if keep_meta:
+            old = base_attrs.get(part) or {}
+            meta = {
+                k: v for k, v in old.items()
+                if str(k).startswith("_") and k != "_follow" and k not in new_data
+            }
+            new_data = {**meta, **new_data}
+        base_attrs[part] = new_data
+
+    # ── 表格 ──────────────────────────────────────────────────
+
+    def _refresh_table(self):
+        """刷新表格内容（跟随部位只读展示目标数据）"""
+        if not self._current_part:
+            return
+
+        target = self._follow_target(self._current_part)
+        following = target is not None
+        # 跟随时展示目标部位数据
+        cat_data = self._part_data(target if following else self._current_part)
+        cat_data = {k: v for k, v in cat_data.items() if not str(k).startswith("_")}
+
+        self._table.setEnabled(not following)
+
         if not cat_data:
             self._table.setRowCount(0)
             self._table.setColumnCount(0)
@@ -140,38 +403,45 @@ class BaseAttrPanel(QWidget):
         # 列：等级 + 各品阶
         qualities = ["gold", "purple", "blue"]
         columns = ["等级"] + [_QUALITY_NAMES.get(q, q) for q in qualities]
-        
+
         self._table.setColumnCount(len(columns))
         self._table.setHorizontalHeaderLabels(columns)
 
-        # 行：每个等级一行
+        # 行：每个等级一行（先清空，避免部位切换后残留旧单元格控件）
         levels = sorted(cat_data.keys(), key=lambda x: int(x) if str(x).isdigit() else 0, reverse=True)
+        self._table.setRowCount(0)
         self._table.setRowCount(len(levels))
 
         # 阻止 cellChanged 信号触发保存
         self._saving = True
-        
+        is_range = self._is_range_part()
+
         for row, level in enumerate(levels):
             level_data = cat_data[level]
-            
+
             # 等级列（可编辑）
             level_item = QTableWidgetItem(str(level))
             self._table.setItem(row, 0, level_item)
 
-            # 品阶列（可编辑）
+            # 品阶列：区间型用双输入框控件，单值型用文本单元格
             for col, quality in enumerate(qualities, start=1):
                 q_data = level_data.get(quality)
-                if q_data is None:
-                    text = ""
-                elif isinstance(q_data, dict):
-                    # 范围值 {min, max}
-                    text = f"{q_data.get('min', '')}~{q_data.get('max', '')}"
+                if is_range:
+                    cell = _RangeCell(self._on_range_cell_changed)
+                    cell.set_value(q_data)
+                    self._table.setCellWidget(row, col, cell)
                 else:
-                    # 单值
-                    text = str(q_data)
-                
-                item = QTableWidgetItem(text)
-                self._table.setItem(row, col, item)
+                    if q_data is None:
+                        text = ""
+                    elif isinstance(q_data, dict):
+                        # 历史区间值兼容展示
+                        text = f"{q_data.get('min', '')}~{q_data.get('max', '')}"
+                    else:
+                        # 单值
+                        text = str(q_data)
+
+                    item = QTableWidgetItem(text)
+                    self._table.setItem(row, col, item)
 
         self._saving = False
 
@@ -182,27 +452,50 @@ class BaseAttrPanel(QWidget):
         self._sync_table_to_data()
         self._save_data()
 
+    def _on_range_cell_changed(self):
+        """区间输入框改变时自动保存"""
+        if self._saving:
+            return
+        self._sync_table_to_data()
+        self._save_data()
+
     def _add_level(self):
         """添加新空行"""
-        if not self._current_category:
+        if not self._current_part:
             return
+        if self._follow_target(self._current_part):
+            return  # 跟随部位不可编辑
 
-        # 直接插入空行
+        # 首次添加时初始化列
+        if self._table.columnCount() == 0:
+            qualities = ["gold", "purple", "blue"]
+            columns = ["等级"] + [_QUALITY_NAMES.get(q, q) for q in qualities]
+            self._table.setColumnCount(len(columns))
+            self._table.setHorizontalHeaderLabels(columns)
+
+        # 直接插入空行，让用户填写
+        self._saving = True
         row = self._table.rowCount()
         self._table.insertRow(row)
-        
-        # 所有列留空，让用户填写
-        for col in range(self._table.columnCount()):
-            item = QTableWidgetItem("")
-            self._table.setItem(row, col, item)
+        self._table.setItem(row, 0, QTableWidgetItem(""))
+        for col in range(1, self._table.columnCount()):
+            if self._is_range_part():
+                cell = _RangeCell(self._on_range_cell_changed)
+                cell.set_value(None)
+                self._table.setCellWidget(row, col, cell)
+            else:
+                self._table.setItem(row, col, QTableWidgetItem(""))
+        self._saving = False
 
     def _sync_table_to_data(self):
-        """将表格数据同步回 _data"""
-        if not self._current_category:
+        """将表格数据同步回 _data（保留 _attr/_range 等元信息）"""
+        if not self._current_part:
             return
+        if self._follow_target(self._current_part):
+            return  # 跟随部位表格为只读展示，不回写
 
-        base_attrs = self._data.setdefault("base_attrs", {})
-        
+        is_range = self._is_range_part()
+
         # 从表格读取数据
         new_cat_data = {}
         for row in range(self._table.rowCount()):
@@ -212,7 +505,7 @@ class BaseAttrPanel(QWidget):
             level_text = level_item.text().strip()
             if not level_text:
                 continue  # 跳过空行
-            
+
             try:
                 level = int(level_text)
             except ValueError:
@@ -220,13 +513,21 @@ class BaseAttrPanel(QWidget):
 
             level_data = {}
             for col, quality in enumerate(["gold", "purple", "blue"], start=1):
+                if is_range:
+                    cell = self._table.cellWidget(row, col)
+                    if isinstance(cell, _RangeCell):
+                        value = cell.get_value()
+                        if value is not None:
+                            level_data[quality] = value
+                    continue
+
                 item = self._table.item(row, col)
                 if not item:
                     continue
                 text = item.text().strip()
                 if not text:
                     continue
-                
+
                 # 解析值：范围值 or 单值
                 if "~" in text:
                     parts = text.split("~")
@@ -249,7 +550,7 @@ class BaseAttrPanel(QWidget):
             if level_data:
                 new_cat_data[level] = level_data
 
-        base_attrs[self._current_category] = new_cat_data
+        self._set_part_data(self._current_part, new_cat_data, keep_meta=True)
 
     def _save_data(self):
         """保存数据到 YAML"""
@@ -257,5 +558,9 @@ class BaseAttrPanel(QWidget):
             with open(_ATTRS_PATH, "w", encoding="utf-8") as f:
                 yaml.dump(self._data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
             logger.debug(f"配置已保存: {_ATTRS_PATH}")
+            # 刷新 AttrRuleManager 单例
+            from src.apps.yysls.evaluator.attr_rules import get_attr_rule_manager
+            manager = get_attr_rule_manager()
+            manager._load()
         except Exception as e:
             logger.error(f"保存失败: {e}")

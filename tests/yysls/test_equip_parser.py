@@ -198,7 +198,7 @@ class TestParseFullChain:
             "base_attr": "气血最大值 8750",
             "affix_gong": "劲 +76.8",
         })
-        assert equip.quality == "purple"     # armor_other 110 purple=8750
+        assert equip.quality == "purple"     # head 110 purple=8750
         assert not equip.is_chengyin
 
     def test_cascade_discard_on_middle_empty(self, parser):

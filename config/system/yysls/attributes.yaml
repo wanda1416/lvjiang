@@ -1,5 +1,7 @@
 base_attrs:
-  weapon:
+  main_weapon:
+    _attr: 外功攻击
+    _range: true
     110:
       gold:
         min: 100
@@ -17,32 +19,55 @@ base_attrs:
       purple:
         min: 79
         max: 183
+      blue:
+        min: 70
+        max: 162
+  sub_weapon:
+    _follow: main_weapon
   ring:
+    _attr: 最小外功攻击
     110:
       gold: 133
       purple: 120
       blue: 106
+    105:
+      gold: 116
+      purple: 105
+      blue: 93
   pendant:
+    _attr: 最大外功攻击
     110:
       gold: 199
       purple: 179
       blue: 159
     105:
       gold: 174
-  armor_other:
+      purple: 157
+      blue: 139
+  head:
+    _attr: 气血最大值
     110:
       gold: 9723
       purple: 8750
       blue: 7778
     105:
+      gold: 8225
       purple: 7402
+      blue: 6580
   chest:
+    _attr: 气血最大值
     110:
       gold: 19445
       purple: 17500
       blue: 15556
     105:
       gold: 16449
+      purple: 14804
+      blue: 13160
+  leg:
+    _follow: head
+  wrist:
+    _follow: head
 affix_caps:
   外功攻击:
     _aliases:

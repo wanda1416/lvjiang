@@ -6,11 +6,12 @@
 """
 
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout,
+    QComboBox, QDialog, QFormLayout, QGroupBox,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
 )
 
 from ..config import load_user_config, save_input_delay, save_settings
+from .widgets import NoWheelDoubleSpinBox, NoWheelSpinBox
 
 # 延迟参数定义：(字段名, 显示标签)。二元组范围型用 min~max 两个输入框
 _RANGE_FIELDS = [
@@ -33,7 +34,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("配置管理")
         self.setMinimumWidth(420)
         self._config = load_user_config()
-        self._range_spins: dict[str, tuple[QDoubleSpinBox, QDoubleSpinBox]] = {}
+        self._range_spins: dict[str, tuple[NoWheelDoubleSpinBox, NoWheelDoubleSpinBox]] = {}
         self._setup_ui()
 
     def _setup_ui(self):
@@ -71,12 +72,12 @@ class SettingsDialog(QDialog):
             lo, hi = (value, value) if isinstance(value, (int, float)) else value
             delay_form.addRow(f"{label}:", self._build_range_row(name, lo, hi))
 
-        self._offset_spin = QSpinBox()
+        self._offset_spin = NoWheelSpinBox()
         self._offset_spin.setRange(0, 50)
         self._offset_spin.setValue(delay.click_random_offset)
         delay_form.addRow("坐标随机偏移(px):", self._offset_spin)
 
-        self._jitter_spin = QDoubleSpinBox()
+        self._jitter_spin = NoWheelDoubleSpinBox()
         self._jitter_spin.setRange(0.0, 0.49)
         self._jitter_spin.setSingleStep(0.01)
         self._jitter_spin.setDecimals(2)
@@ -98,12 +99,12 @@ class SettingsDialog(QDialog):
 
     def _build_range_row(self, name: str, lo: float, hi: float) -> QHBoxLayout:
         """构建 min~max 二元组输入行"""
-        lo_spin = QDoubleSpinBox()
+        lo_spin = NoWheelDoubleSpinBox()
         lo_spin.setRange(0.0, 60.0)
         lo_spin.setSingleStep(0.1)
         lo_spin.setDecimals(2)
         lo_spin.setValue(lo)
-        hi_spin = QDoubleSpinBox()
+        hi_spin = NoWheelDoubleSpinBox()
         hi_spin.setRange(0.0, 60.0)
         hi_spin.setSingleStep(0.1)
         hi_spin.setDecimals(2)

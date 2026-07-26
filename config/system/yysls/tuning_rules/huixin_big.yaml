@@ -23,14 +23,14 @@ own_attr: from_sub_schools
 weapons:
   lieshi.chuntang:
     main:
-      横刀: 唐横刀武学增伤
+      唐横刀: 唐横刀武学增伤
     sub:
     - 陌刀
   lieshi.shuangqie:
     main:
       陌刀: 陌刀武学增伤
     sub:
-    - 横刀
+    - 唐横刀
   pozhu:
     main:
       双刀: 双刀武学增伤
@@ -44,103 +44,101 @@ weapons:
       舞绫鼓: 舞绫鼓武学增伤
     sub:
     - 扇
-variants:
-  default:
-    transmute_priority:
-    - 大外
+transmute_priority:
+- 最大外功攻击
+- 劲
+- 敏
+- 会心率
+- 最小外功攻击
+- 最大无相攻击
+affix_pool:
+- 最大外功攻击
+- 劲
+- 敏
+- 会心率
+- 最小外功攻击
+- 最大无相攻击
+- 势
+- 精准率
+junk_rules: []
+patterns:
+  主武器:
+    first:
+    - 最大外功攻击
+    required:
+    - - DMG
+    - - 最大外功攻击
+    required_damage: DMG
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最小外功攻击
+      - 最大无相攻击
+      - 会心率
+      - 精准率
+      - 势
+  副武器:
+    first:
+    - 最大外功攻击
+    required:
+    - - 最大外功攻击
+    - - 劲
+    required_damage: null
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最小外功攻击
+      - 最大无相攻击
+      - 精准率
+  环:
+    first:
+    - 最大外功攻击
+    required:
+    - - 全武学增效
+    - - 最大外功攻击
+    required_damage: 全武学增效
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最小外功攻击
+      - 最大无相攻击
+      - 会心率
+      - 精准率
+      - 势
+  冠胄:
+    first:
+    - 会心率
+    - 精准率
+    required:
+    - - 最大外功攻击
+    - - 劲
+    required_damage: null
+    optional_n: 2
+    allowed_divine_pvp:
+    - 单体类奇术增伤
+    top:
+    - not_contains:
+      - 最小外功攻击
+      - 最大无相攻击
+      - 势
+    - count_max:
+        symbols:
+        - 精准率
+        max: 1
+        include_first: true
+  胫甲:
+    first:
     - 劲
-    - 敏
-    - 会心
-    - 小外
-    - 大无相
-    affix_pool:
-    - 大外
-    - 劲
-    - 敏
-    - 会心
-    - 小外
-    - 大无相
-    - 势
-    - 精准
-    junk_rules: []
-    patterns:
-      主武器:
-        first:
-        - 大外
-        required:
-        - - DMG
-        - - 大外
-        required_damage: DMG
-        optional_n: 2
-        top:
-        - not_contains:
-          - 小外
-          - 大无相
-          - 会心
-          - 精准
-          - 势
-      副武器:
-        first:
-        - 大外
-        required:
-        - - 大外
-        - - 劲
-        required_damage: null
-        optional_n: 2
-        top:
-        - not_contains:
-          - 小外
-          - 大无相
-          - 精准
-      环:
-        first:
-        - 大外
-        required:
-        - - 全武学增效
-        - - 大外
-        required_damage: 全武学增效
-        optional_n: 2
-        top:
-        - not_contains:
-          - 小外
-          - 大无相
-          - 会心
-          - 精准
-          - 势
-      冠胄:
-        first:
-        - 会心
-        - 精准
-        required:
-        - - 大外
-        - - 劲
-        required_damage: null
-        optional_n: 2
-        allowed_divine_pvp:
-        - 单体类奇术增伤
-        top:
-        - not_contains:
-          - 小外
-          - 大无相
-          - 势
-        - count_max:
-            symbols:
-            - 精准
-            max: 1
-            include_first: true
-      胫甲:
-        first:
-        - 劲
-        required:
-        - - 对首领单位增伤
-        - - 大外
-        required_damage: 对首领单位增伤
-        damage_pvp_substitute: 对玩家单位增效
-        optional_n: 2
-        top:
-        - not_contains:
-          - 小外
-          - 大无相
-          - 会心
-          - 精准
-          - 势
+    required:
+    - - 对首领单位增伤
+    - - 最大外功攻击
+    required_damage: 对首领单位增伤
+    damage_pvp_substitute: 对玩家单位增效
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最小外功攻击
+      - 最大无相攻击
+      - 会心率
+      - 精准率
+      - 势

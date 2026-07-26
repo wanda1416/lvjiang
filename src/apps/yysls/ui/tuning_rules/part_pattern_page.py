@@ -1,9 +1,10 @@
-"""部位模式页（变体级，每部位一页同构）
+"""部位模式页（规则顶层，每部位一页同构）
 
-自上而下：模式摘要行（00 文档语法实时渲染）、首词条符号行、
-必选槽列表（双击弹符号选择对话框）、增伤要求、PVP 行（仅
-keep_pvp 流派）、可选槽数、顶级判定条件。
-编辑共享 raw dict 的 variants.<key>.patterns.<part> 子树。
+自上而下：模式摘要行（00 文档语法实时渲染）、首词条选择行、
+必选槽列表（双击弹词条选择对话框）、增伤要求、PVP 行（仅
+keep_pvp 规则）、可选槽数、顶级判定条件。候选为标准词条全集
+（槽位与增伤处额外提供 DMG 占位符）。
+编辑共享 raw dict 顶层的 patterns.<part> 子树。
 """
 
 from __future__ import annotations
@@ -19,28 +20,24 @@ from PyQt6.QtWidgets import (
 from src.ui.widgets import NoWheelSpinBox
 
 from .condition_editor import (
-    DIVINE_CANDIDATES, DMG_PLACEHOLDER, SYMBOL_ORDER,
-    ConditionEditor, SymbolPickerDialog,
+    DMG_PLACEHOLDER, AffixPickerDialog, ConditionEditor,
 )
-
-# 增伤要求候选（无 / DMG 占位符 / 神力词条全称）
-_DAMAGE_OPTIONS = ["（无）", DMG_PLACEHOLDER] + DIVINE_CANDIDATES
-
-# 必选槽候选：符号 + DMG 占位符 + 神力词条
-_SLOT_CANDIDATES = SYMBOL_ORDER + [DMG_PLACEHOLDER] + DIVINE_CANDIDATES
 
 
 class PartPatternPage(QWidget):
     """单部位模式页"""
 
-    def __init__(self, part_key: str, title: str,
+    def __init__(self, part_key: str, title: str, candidates: list[str],
                  on_changed: Callable[[], None], has_keep_pvp: bool,
                  parent=None):
         super().__init__(parent)
         self._part_key = part_key
+        self._candidates = candidates
+        # 必选槽候选：DMG 占位符 + 标准词条全集
+        self._slot_candidates = [DMG_PLACEHOLDER] + candidates
         self._on_changed = on_changed
         self._has_keep_pvp = has_keep_pvp
-        self._variant: dict = {}
+        self._data: dict = {}
         self._loading = True
         self._init_ui(title)
         self._loading = False
@@ -65,15 +62,13 @@ class PartPatternPage(QWidget):
         body_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._body)
 
-        # ② 首词条
+        # ② 首词条（点击选择，候选为标准词条全集）
         first_box = QGroupBox("首词条（任一符合即可）")
         first_layout = QHBoxLayout(first_box)
-        self._first_checks: dict[str, QCheckBox] = {}
-        for name in SYMBOL_ORDER:
-            cb = QCheckBox(name)
-            cb.stateChanged.connect(lambda *_: self._apply())
-            first_layout.addWidget(cb)
-            self._first_checks[name] = cb
+        self._first: list[str] = []
+        self._first_btn = QPushButton("（点击选择）")
+        self._first_btn.clicked.connect(self._pick_first)
+        first_layout.addWidget(self._first_btn, 1)
         body_layout.addWidget(first_box)
 
         # ③ 必选槽列表
@@ -97,13 +92,14 @@ class PartPatternPage(QWidget):
 
         # ④ 增伤要求
         self._damage_combo = QComboBox()
-        self._damage_combo.addItems(_DAMAGE_OPTIONS)
+        self._damage_combo.addItems(
+            ["（无）", DMG_PLACEHOLDER] + self._candidates)
         self._damage_combo.currentIndexChanged.connect(self._apply)
         form.addRow("增伤要求（缺失即垃圾）：", self._damage_combo)
 
-        # ⑤ PVP 行（仅 keep_pvp 流派显示）
+        # ⑤ PVP 行（仅 keep_pvp 规则显示）
         self._pvp_sub_combo = QComboBox()
-        self._pvp_sub_combo.addItems(["（无）"] + DIVINE_CANDIDATES)
+        self._pvp_sub_combo.addItems(["（无）"] + self._candidates)
         self._pvp_sub_combo.currentIndexChanged.connect(self._apply)
         self._pvp_divine_btn = QPushButton("（点击选择）")
         self._pvp_divine_btn.clicked.connect(self._pick_pvp_divine)
@@ -125,7 +121,8 @@ class PartPatternPage(QWidget):
         # ⑦ 顶级判定条件
         top_box = QGroupBox("顶级判定条件（命中模式后全部满足 → 顶级，否则优秀）")
         top_layout = QVBoxLayout(top_box)
-        self._top_editor = ConditionEditor(allow_count_min=False)
+        self._top_editor = ConditionEditor(
+            self._candidates, allow_count_min=False)
         self._top_editor.changed.connect(self._apply)
         top_layout.addWidget(self._top_editor)
         body_layout.addWidget(top_box)
@@ -133,11 +130,11 @@ class PartPatternPage(QWidget):
 
     # ── 数据往返 ──
 
-    def load(self, variant: dict):
-        """回填变体子树（variants.<key> 的 raw dict 引用）"""
+    def load(self, data: dict):
+        """回填规则顶层 raw dict 引用"""
         self._loading = True
-        self._variant = variant
-        pattern = (variant.get("patterns") or {}).get(self._part_key)
+        self._data = data
+        pattern = (data.get("patterns") or {}).get(self._part_key)
         enabled = pattern is not None
         self._enable_check.blockSignals(True)
         self._enable_check.setChecked(enabled)
@@ -145,11 +142,8 @@ class PartPatternPage(QWidget):
         self._body.setEnabled(enabled)
         pattern = pattern or {}
 
-        first = set(pattern.get("first") or [])
-        for name, cb in self._first_checks.items():
-            cb.blockSignals(True)
-            cb.setChecked(name in first)
-            cb.blockSignals(False)
+        self._first = list(pattern.get("first") or [])
+        self._update_first_text()
 
         self._slots_list.clear()
         for slot in pattern.get("required") or []:
@@ -181,15 +175,14 @@ class PartPatternPage(QWidget):
     def _apply(self):
         if self._loading:
             return
-        patterns = self._variant.setdefault("patterns", {})
+        patterns = self._data.setdefault("patterns", {})
         if not self._enable_check.isChecked():
             patterns.pop(self._part_key, None)
             self._update_summary()
             self._on_changed()
             return
         pattern: dict = {
-            "first": [n for n, cb in self._first_checks.items()
-                      if cb.isChecked()],
+            "first": list(self._first),
             "required": self._collect_slots(),
         }
         damage = self._damage_combo.currentText()
@@ -206,6 +199,20 @@ class PartPatternPage(QWidget):
         self._update_summary()
         self._on_changed()
 
+    # ── 首词条 ──
+
+    def _pick_first(self):
+        dlg = AffixPickerDialog(self._candidates, self._first,
+                                "选择首词条候选", self)
+        if dlg.exec():
+            self._first = dlg.selected()
+            self._update_first_text()
+            self._apply()
+
+    def _update_first_text(self):
+        self._first_btn.setText(
+            "/".join(self._first) if self._first else "（点击选择）")
+
     # ── 必选槽 ──
 
     def _append_slot_item(self, symbols: list[str]):
@@ -219,7 +226,8 @@ class PartPatternPage(QWidget):
 
     def _edit_slot(self, item: QListWidgetItem):
         current = item.data(Qt.ItemDataRole.UserRole) or []
-        dlg = SymbolPickerDialog(_SLOT_CANDIDATES, current, "选择槽位候选", self)
+        dlg = AffixPickerDialog(self._slot_candidates, current,
+                                "选择槽位候选", self)
         if dlg.exec():
             chosen = dlg.selected()
             item.setData(Qt.ItemDataRole.UserRole, chosen)
@@ -227,7 +235,8 @@ class PartPatternPage(QWidget):
             self._apply()
 
     def _add_slot(self):
-        dlg = SymbolPickerDialog(_SLOT_CANDIDATES, [], "选择槽位候选", self)
+        dlg = AffixPickerDialog(self._slot_candidates, [],
+                                "选择槽位候选", self)
         if dlg.exec() and dlg.selected():
             self._append_slot_item(dlg.selected())
             self._apply()
@@ -241,8 +250,8 @@ class PartPatternPage(QWidget):
     # ── PVP 神力 ──
 
     def _pick_pvp_divine(self):
-        dlg = SymbolPickerDialog(DIVINE_CANDIDATES, self._pvp_divine,
-                                 "选择 PVP 允许神力词条", self)
+        dlg = AffixPickerDialog(self._candidates, self._pvp_divine,
+                                "选择 PVP 允许神力词条", self)
         if dlg.exec():
             self._pvp_divine = dlg.selected()
             self._pvp_divine_btn.setText(
@@ -258,12 +267,11 @@ class PartPatternPage(QWidget):
 
     def _update_summary(self):
         """用 00 文档语法渲染当前模式，如
-        [大外(首) + DMG + 大外] + 可用词条库 * 2"""
+        [最大外功攻击(首) + DMG + 最大外功攻击] + 可用词条库 * 2"""
         if not self._enable_check.isChecked():
             self._summary_label.setText("（该部位未定义模式，不参与判定）")
             return
-        first = "/".join(n for n, cb in self._first_checks.items()
-                         if cb.isChecked()) or "?"
+        first = "/".join(self._first) or "?"
         parts = [f"{first}(首)"]
         for slot in self._collect_slots():
             parts.append("/".join(slot) if slot else "?")

@@ -133,7 +133,7 @@ class TestHelmChest:
         e = make_equip("冠胄", ["会意率", "最大外功攻击", "会心率", "精准率", "劲"], quality="purple")
         r = judge.judge(e)
         assert r.rating == Rating.JUNK
-        assert any("会心/精准" in s for s in r.reasons)
+        assert any("会心率/精准率" in s for s in r.reasons)
 
 
 # ─── 第九节判定例子：胫甲、腕甲 ────────────────────────────
@@ -224,13 +224,15 @@ class TestKeepPvp:
 class TestSchools:
     def test_schools_registry(self):
         assert list(get_schools()) == [
-            "huiyi_general", "huixin_small", "huixin_big", "heal",
+            "huiyi_general", "huixin_small", "huixin_big",
+            "heal_pure", "heal_fire",
         ]
 
     def test_implemented_flags(self):
-        for key in ("huiyi_general", "huixin_small", "huixin_big", "heal"):
+        for key in ("huiyi_general", "huixin_small", "huixin_big",
+                    "heal_pure", "heal_fire"):
             assert is_school_implemented(key)
-        assert not is_school_implemented("heal_pure")  # 旧 key 已移除
+        assert not is_school_implemented("heal")  # 旧 key 已拆分移除
         assert not is_school_implemented("unknown")
 
     def test_unknown_school_raises(self):
@@ -247,11 +249,12 @@ class TestSchools:
             assert rules[key].sub_school_options == {
                 "lieshi": "裂石", "pozhu": "破竹", "qiansi": "牵丝",
             }
-        heal = rules["heal"]
-        assert not heal.has_keep_pvp
-        assert heal.needs_sub_school
-        assert list(heal.sub_school_options) == ["pure", "fire"]
-        assert heal.sub_school_playstyles == {}
+        for key in ("heal_pure", "heal_fire"):
+            heal = rules[key]
+            assert not heal.has_keep_pvp
+            assert not heal.needs_sub_school
+            assert heal.sub_school_options == {}
+            assert heal.sub_school_playstyles == {}
 
     def test_sub_school_playstyles(self):
         rule = get_school_rules()["huixin_big"]
@@ -439,7 +442,7 @@ class TestJudgeTuningWorthiness:
         e = make_equip("胫甲", ["劲", "对玩家单位增效", "体"], quality="purple")
         worth, logs = judge_tuning_worthiness(e)
         assert worth
-        assert any("治疗流派" in line for line in logs)
+        assert any("治疗-纯奶" in line for line in logs)
 
     def test_schools_filter_limits_participants(self):
         # schools 过滤：仅指定流派参与，会意流派不出现在明细中

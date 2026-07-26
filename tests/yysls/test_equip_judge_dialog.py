@@ -38,7 +38,7 @@ class TestEquipAffixEditor:
         assert "剑武学增伤" in items
         assert "唐横刀武学增伤" not in items
         assert "全武学增效" not in items
-        editor.part_combo.setCurrentText("横刀")
+        editor.part_combo.setCurrentText("唐横刀")
         items = _combo_items(editor._affix_combos[1])
         assert "唐横刀武学增伤" in items
         assert "剑武学增伤" not in items
@@ -149,33 +149,36 @@ class TestSchoolConfigWidget:
         w.set_config({"huiyi_general": {"enabled": True}})
         assert not fired
 
-    def test_heal_sub_options_from_metadata(self, qtbot):
-        # heal 子选项由基类 sub_school_options 元数据驱动生成
+    def test_heal_rules_no_sub_options(self, qtbot):
+        # heal 拆为两条独立规则：无子流派/keep_pvp/玩法配置项
         w = SchoolConfigWidget()
         qtbot.addWidget(w)
-        widgets = w._school_widgets["heal"]
-        assert set(widgets["sub_schools"]) == {"pure", "fire"}
-        assert widgets["sub_schools"]["pure"].text() == "纯奶"
-        assert widgets["sub_schools"]["fire"].text() == "火拳奶（输出）"
-        # 治疗流派无 keep_pvp、无玩法行
-        assert widgets["keep_pvp"] is None
-        assert widgets["playstyle_rows"] == {}
+        for key, title in (("heal_pure", "治疗-纯奶"),
+                           ("heal_fire", "治疗-火拳奶")):
+            widgets = w._school_widgets[key]
+            assert widgets["group"].title() == title
+            assert widgets["sub_schools"] == {}
+            assert widgets["keep_pvp"] is None
+            assert widgets["playstyle_rows"] == {}
 
-    def test_heal_roundtrip_multi_select(self, qtbot):
-        # 纯奶 + 火拳奶可同时勾选，set_config → get_config 一致
+    def test_heal_roundtrip_both_enabled(self, qtbot):
+        # 纯奶 + 火拳奶可同时启用，set_config → get_config 一致
         w = SchoolConfigWidget()
         qtbot.addWidget(w)
-        w.set_config({"heal": {"enabled": True, "sub_schools": ["pure", "fire"]}})
+        w.set_config({"heal_pure": {"enabled": True},
+                      "heal_fire": {"enabled": True}})
         result = w.get_config()
-        assert result["heal"]["enabled"]
-        assert result["heal"]["sub_schools"] == ["pure", "fire"]
-        assert "keep_pvp" not in result["heal"]
+        assert result["heal_pure"]["enabled"]
+        assert result["heal_fire"]["enabled"]
+        assert "keep_pvp" not in result["heal_pure"]
+        assert "sub_schools" not in result["heal_pure"]
 
-    def test_heal_roundtrip_single_select(self, qtbot):
+    def test_heal_roundtrip_single_enabled(self, qtbot):
         w = SchoolConfigWidget()
         qtbot.addWidget(w)
-        w.set_config({"heal": {"enabled": True, "sub_schools": ["fire"]}})
+        w.set_config({"heal_fire": {"enabled": True}})
         result = w.get_config()
-        assert result["heal"]["sub_schools"] == ["fire"]
+        assert result["heal_fire"]["enabled"]
+        assert not result["heal_pure"]["enabled"]
         # 未提及的流派保持未启用
         assert not result["huiyi_general"]["enabled"]

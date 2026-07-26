@@ -1,14 +1,16 @@
 """属性管理 - 主容器
 
-包含两个 Tab 页：
-- 基础属性规则
-- 词条配置
+包含三个 Tab 页：
+- 装备配置（基础属性规则 + 武器类型注册）
+- 词组配置
+- 流派配置
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 
 from .base_attr_panel import BaseAttrPanel
 from .affix_caps_panel import AffixCapsPanel
+from .school_panel import SchoolPanel
 
 
 class AttrManagerTab(QWidget):
@@ -25,12 +27,16 @@ class AttrManagerTab(QWidget):
         # Tab 页
         self._tabs = QTabWidget()
 
-        # 基础属性面板
+        # 装备配置面板（基础属性 + 武器类型）
         self._base_panel = BaseAttrPanel()
-        self._tabs.addTab(self._base_panel, "基础属性")
+        self._tabs.addTab(self._base_panel, "装备配置")
 
-        # 词条配置面板
+        # 词组配置面板
         self._affix_panel = AffixCapsPanel()
-        self._tabs.addTab(self._affix_panel, "词条配置")
+        self._tabs.addTab(self._affix_panel, "词组配置")
+
+        # 流派配置面板
+        self._school_panel = SchoolPanel()
+        self._tabs.addTab(self._school_panel, "流派配置")
 
         layout.addWidget(self._tabs)

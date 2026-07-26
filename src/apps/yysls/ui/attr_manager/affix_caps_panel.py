@@ -1,12 +1,12 @@
-"""词条配置面板
+"""词组配置面板
 
-管理各词条在不同等级的最大值。
-左侧词条列表，右侧等级-上限表格。
-右侧顶部为词条类型（普通词条 / 定音词条）+ 词条分组（不分组 / 分组）+ 词条名称区域。
-定音词条不受承音限制，表格隐藏承音列。
+管理各词组在不同等级的最大值。
+左侧词组列表，右侧等级-上限表格。
+右侧顶部为词组分类（普通词组 / 定音词组）+ 词组单位（空 / %）+ 词条分组（不分组 / 分组）+ 词条名称区域。
+定音词组不受承音限制，表格隐藏承音列。
 词条名称支持分组（_aliases 为 dict 形态），分组后按 Tab 页展示，
 专为 指定技能增效 这类包含大量词条的类别设计（按十大流派分组）。
-双击词条类别 / 分组页签 / 词条名标签可打开对话框重命名。
+双击词组类别 / 分组页签 / 词条名标签可打开对话框重命名。
 自动保存，删除时确认。
 """
 
@@ -134,24 +134,24 @@ class AffixCapsPanel(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # 左侧：词条列表
+        # 左侧：词组列表
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("词条类型"))
+        left_layout.addWidget(QLabel("词组类型"))
         
         self._affix_list = QListWidget()
         self._affix_list.currentRowChanged.connect(self._on_affix_changed)
         self._affix_list.itemDoubleClicked.connect(self._rename_affix)
         left_layout.addWidget(self._affix_list)
 
-        # 添加/删除词条按钮
+        # 添加/删除词组按钮
         affix_btn_layout = QHBoxLayout()
-        self._btn_add_affix = QPushButton("+ 词条")
+        self._btn_add_affix = QPushButton("+ 词组")
         self._btn_add_affix.clicked.connect(self._add_affix)
         affix_btn_layout.addWidget(self._btn_add_affix)
 
-        self._btn_del_affix = QPushButton("- 词条")
+        self._btn_del_affix = QPushButton("- 词组")
         self._btn_del_affix.clicked.connect(self._del_affix)
         affix_btn_layout.addWidget(self._btn_del_affix)
         
@@ -159,21 +159,22 @@ class AffixCapsPanel(QWidget):
 
         splitter.addWidget(left_widget)
 
-        # 右侧：词条类型 + 词条分组 + 词条名称 + 表格 + 按钮
+        # 右侧：词组分类 + 词组单位 + 词条分组 + 词条名称 + 表格 + 按钮
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ── 词条类型（单选：普通词条 / 定音词条）──
+        # ── 词组分类（单选：普通词组 / 定音词组）──
         pool_frame = QFrame()
+        pool_frame.setObjectName("poolFrame")
         pool_frame.setStyleSheet(
-            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame#poolFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
         )
         pool_layout = QHBoxLayout(pool_frame)
         pool_layout.setContentsMargins(8, 4, 8, 4)
-        pool_layout.addWidget(QLabel("词条类型"))
-        self._radio_pool_normal = QRadioButton("普通词条")
-        self._radio_pool_dingyin = QRadioButton("定音词条")
+        pool_layout.addWidget(QLabel("词组分类"))
+        self._radio_pool_normal = QRadioButton("普通词组")
+        self._radio_pool_dingyin = QRadioButton("定音词组")
         self._pool_group = QButtonGroup(self)
         self._pool_group.addButton(self._radio_pool_normal)
         self._pool_group.addButton(self._radio_pool_dingyin)
@@ -184,10 +185,27 @@ class AffixCapsPanel(QWidget):
         pool_layout.addStretch()
         right_layout.addWidget(pool_frame)
 
+        # ── 词组单位（下拉：空 / %）──
+        unit_frame = QFrame()
+        unit_frame.setObjectName("unitFrame")
+        unit_frame.setStyleSheet(
+            "QFrame#unitFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+        )
+        unit_layout = QHBoxLayout(unit_frame)
+        unit_layout.setContentsMargins(8, 4, 8, 4)
+        unit_layout.addWidget(QLabel("词组单位"))
+        self._unit_combo = QComboBox()
+        self._unit_combo.addItems(["", "%"])
+        self._unit_combo.currentTextChanged.connect(self._on_unit_combo_changed)
+        unit_layout.addWidget(self._unit_combo)
+        unit_layout.addStretch()
+        right_layout.addWidget(unit_frame)
+
         # ── 词条分组（单选：不分组 / 分组）──
         group_frame = QFrame()
+        group_frame.setObjectName("groupFrame")
         group_frame.setStyleSheet(
-            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame#groupFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
         )
         group_mode_layout = QHBoxLayout(group_frame)
         group_mode_layout.setContentsMargins(8, 4, 8, 4)
@@ -246,8 +264,8 @@ class AffixCapsPanel(QWidget):
         right_layout.addWidget(self._alias_frame)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(["等级", "上限", "单位", "承音"])
+        self._table.setColumnCount(3)
+        self._table.setHorizontalHeaderLabels(["等级", "上限", "承音"])
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._table.cellChanged.connect(self._on_cell_changed)
         right_layout.addWidget(self._table)
@@ -292,7 +310,7 @@ class AffixCapsPanel(QWidget):
             self._affix_list.setCurrentRow(0)
 
     def _on_affix_changed(self, row: int):
-        """切换词条时更新表格和别名"""
+        """切换词组时更新表格和别名"""
         affix_caps = self._data.get("affix_caps", {})
         affix_names = list(affix_caps.keys())
         
@@ -300,20 +318,22 @@ class AffixCapsPanel(QWidget):
             self._current_affix = None
             self._table.setRowCount(0)
             self._refresh_pool_radios()
+            self._refresh_unit_combo()
             self._refresh_group_radios()
             self._refresh_alias_tags()
             return
 
         self._current_affix = affix_names[row]
         self._refresh_pool_radios()
+        self._refresh_unit_combo()
         self._refresh_group_radios()
         self._refresh_table()
         self._refresh_alias_tags()
 
     def _refresh_table(self):
         """刷新表格内容"""
-        # 定音词条不受承音限制，直接隐藏承音列（无论是否有等级数据）
-        self._table.setColumnHidden(3, self._is_dingyin())
+        # 定音词组不受承音限制，直接隐藏承音列（无论是否有等级数据）
+        self._table.setColumnHidden(2, self._is_dingyin())
 
         if not self._current_affix:
             self._table.setRowCount(0)
@@ -343,10 +363,8 @@ class AffixCapsPanel(QWidget):
             # 兼容旧格式（直接是数值）
             if isinstance(entry, (int, float)):
                 cap = entry
-                unit = ""
             else:
                 cap = entry.get("cap", 0)
-                unit = entry.get("unit", "")
             
             # 计算承音值（94%）
             chengyin = round(cap * _CHENGYIN_RATIO, 2)
@@ -359,18 +377,11 @@ class AffixCapsPanel(QWidget):
             cap_item = QTableWidgetItem(str(cap))
             self._table.setItem(row, 1, cap_item)
 
-            # 单位（下拉选择）
-            unit_combo = QComboBox()
-            unit_combo.addItems(["", "%"])
-            unit_combo.setCurrentText(unit)
-            unit_combo.currentTextChanged.connect(lambda text, r=row: self._on_unit_changed(r, text))
-            self._table.setCellWidget(row, 2, unit_combo)
-
             # 承音（只读）
             chengyin_item = QTableWidgetItem(str(chengyin))
             chengyin_item.setFlags(chengyin_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             chengyin_item.setForeground(Qt.GlobalColor.gray)
-            self._table.setItem(row, 3, chengyin_item)
+            self._table.setItem(row, 2, chengyin_item)
 
         self._saving = False
 
@@ -393,20 +404,27 @@ class AffixCapsPanel(QWidget):
         try:
             cap = float(cap_item.text())
             chengyin = round(cap * _CHENGYIN_RATIO, 2)
-            chengyin_item = self._table.item(row, 3)
+            chengyin_item = self._table.item(row, 2)
             if chengyin_item:
                 chengyin_item.setText(str(chengyin))
         except ValueError:
             pass
 
-    def _on_unit_changed(self, row: int, text: str):
-        """单位改变时自动保存"""
-        self._sync_table_to_data()
+    def _on_unit_combo_changed(self, text: str):
+        """词组单位下拉改变时保存到 _unit 字段"""
+        if self._saving or not self._current_affix:
+            return
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.setdefault(self._current_affix, {})
+        if text:
+            category_data["_unit"] = text
+        else:
+            category_data.pop("_unit", None)
         self._save_data()
 
     def _add_affix(self):
-        """添加新词条"""
-        name, ok = QInputDialog.getText(self, "添加词条", "词条名称:")
+        """添加新词组"""
+        name, ok = QInputDialog.getText(self, "添加词组", "词组名称:")
         if not ok or not name:
             return
         
@@ -416,7 +434,7 @@ class AffixCapsPanel(QWidget):
 
         affix_caps = self._data.setdefault("affix_caps", {})
         if name in affix_caps:
-            QMessageBox.warning(self, "重复", f"词条 '{name}' 已存在")
+            QMessageBox.warning(self, "重复", f"词组 '{name}' 已存在")
             return
 
         affix_caps[name] = {}
@@ -425,9 +443,9 @@ class AffixCapsPanel(QWidget):
         self._save_data()
 
     def _rename_affix(self, item):
-        """双击词条类别重命名（保留在 YAML 中的键顺序）"""
+        """双击词组类别重命名（保留在 YAML 中的键顺序）"""
         old = item.text()
-        name, ok = QInputDialog.getText(self, "重命名词条", "词条名称:", text=old)
+        name, ok = QInputDialog.getText(self, "重命名词组", "词组名称:", text=old)
         if not ok or not name:
             return
         name = name.strip()
@@ -436,7 +454,7 @@ class AffixCapsPanel(QWidget):
 
         affix_caps = self._data.get("affix_caps", {})
         if name in affix_caps:
-            QMessageBox.warning(self, "重复", f"词条 '{name}' 已存在")
+            QMessageBox.warning(self, "重复", f"词组 '{name}' 已存在")
             return
 
         # 保序重建 dict，只替换键名
@@ -449,13 +467,13 @@ class AffixCapsPanel(QWidget):
         self._save_data()
 
     def _del_affix(self):
-        """删除当前词条"""
+        """删除当前词组"""
         if not self._current_affix:
             return
 
         reply = QMessageBox.question(
             self, "确认删除",
-            f"确定要删除词条 '{self._current_affix}' 吗？",
+            f"确定要删除词组 '{self._current_affix}' 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -485,12 +503,6 @@ class AffixCapsPanel(QWidget):
         for col in range(self._table.columnCount()):
             item = QTableWidgetItem("")
             self._table.setItem(row, col, item)
-        
-        # 单位列用下拉框
-        unit_combo = QComboBox()
-        unit_combo.addItems(["", "%"])
-        unit_combo.currentTextChanged.connect(lambda text, r=row: self._on_unit_changed(r, text))
-        self._table.setCellWidget(row, 2, unit_combo)
 
     def _del_level(self):
         """删除当前选中的等级"""
@@ -541,7 +553,7 @@ class AffixCapsPanel(QWidget):
         affix_caps = self._data.setdefault("affix_caps", {})
         level_caps = affix_caps.setdefault(self._current_affix, {})
 
-        # 保留 _aliases / _pool 等内部字段，只清除等级数据
+        # 保留 _aliases / _pool / _unit 等内部字段，只清除等级数据
         internal = {k: v for k, v in level_caps.items() if str(k).startswith("_")}
         level_caps.clear()
         level_caps.update(internal)
@@ -549,7 +561,6 @@ class AffixCapsPanel(QWidget):
         for row in range(self._table.rowCount()):
             level_item = self._table.item(row, 0)
             cap_item = self._table.item(row, 1)
-            unit_combo = self._table.cellWidget(row, 2)
             
             if not level_item or not cap_item:
                 continue
@@ -564,8 +575,7 @@ class AffixCapsPanel(QWidget):
                 # 如果是整数，存 int
                 if cap == int(cap):
                     cap = int(cap)
-                unit = unit_combo.currentText() if unit_combo else ""
-                level_caps[level] = {"cap": cap, "unit": unit}
+                level_caps[level] = {"cap": cap}
             except ValueError:
                 pass
 
@@ -585,7 +595,7 @@ class AffixCapsPanel(QWidget):
     # ── 别名管理 ──────────────────────────────────────────────
 
     def _is_dingyin(self) -> bool:
-        """当前词条是否定音词条"""
+        """当前词组是否定音词组"""
         if not self._current_affix:
             return False
         affix_caps = self._data.get("affix_caps", {})
@@ -593,7 +603,7 @@ class AffixCapsPanel(QWidget):
         return isinstance(category_data, dict) and category_data.get("_pool") == _POOL_DINGYIN
 
     def _refresh_pool_radios(self):
-        """刷新词条类型单选框状态"""
+        """刷新词组分类单选框状态"""
         self._saving = True
         is_dingyin = self._is_dingyin()
         self._radio_pool_dingyin.setChecked(is_dingyin)
@@ -604,7 +614,7 @@ class AffixCapsPanel(QWidget):
         self._saving = False
 
     def _on_pool_changed(self):
-        """词条类型切换时保存并刷新承音列显隐"""
+        """词组分类切换时保存并刷新承音列显隐"""
         if self._saving or not self._current_affix:
             return
         affix_caps = self._data.get("affix_caps", {})
@@ -612,9 +622,23 @@ class AffixCapsPanel(QWidget):
         if self._radio_pool_dingyin.isChecked():
             category_data["_pool"] = _POOL_DINGYIN
         else:
-            category_data.pop("_pool", None)  # 普通词条为缺省，不写字段
+            category_data.pop("_pool", None)  # 普通词组为缺省，不写字段
         self._refresh_table()
         self._save_data()
+
+    def _refresh_unit_combo(self):
+        """刷新词组单位下拉框状态"""
+        self._saving = True
+        if not self._current_affix:
+            self._unit_combo.setCurrentText("")
+            self._unit_combo.setEnabled(False)
+        else:
+            affix_caps = self._data.get("affix_caps", {})
+            category_data = affix_caps.get(self._current_affix, {})
+            unit = category_data.get("_unit", "") if isinstance(category_data, dict) else ""
+            self._unit_combo.setCurrentText(unit)
+            self._unit_combo.setEnabled(True)
+        self._saving = False
 
     def _refresh_group_radios(self):
         """刷新词条分组单选框状态，并同步分组按钮可见性"""
@@ -630,7 +654,7 @@ class AffixCapsPanel(QWidget):
         self._saving = False
 
     def _on_group_mode_changed(self):
-        """词条分组切换：_aliases 在 list（不分组）与 dict（分组）间互转"""
+        """词条分组切换：_aliases 在 list（不分组）与 dict（分组）间互转，同步写 _group 字段"""
         if self._saving or not self._current_affix:
             return
         affix_caps = self._data.get("affix_caps", {})
@@ -641,6 +665,7 @@ class AffixCapsPanel(QWidget):
             if not isinstance(raw, dict):
                 aliases = raw if isinstance(raw, list) else []
                 category_data["_aliases"] = {"默认": aliases} if aliases else {}
+            category_data["_group"] = True
         else:
             # 关闭分组：拍平所有组内词条名
             if isinstance(raw, dict):
@@ -649,6 +674,7 @@ class AffixCapsPanel(QWidget):
                     category_data["_aliases"] = flat
                 else:
                     category_data.pop("_aliases", None)
+            category_data.pop("_group", None)
         self._refresh_group_radios()
         self._refresh_alias_tags()
         self._save_data()
@@ -736,8 +762,18 @@ class AffixCapsPanel(QWidget):
         return category_data.get("_aliases", []) if isinstance(category_data, dict) else []
 
     def _is_grouped(self) -> bool:
-        """当前词条的词条名称是否分组（_aliases 为 dict 形态）"""
-        return isinstance(self._get_raw_aliases(), dict)
+        """当前词组的词条名称是否分组（优先读 _group 字段，兼容旧数据用 isinstance 推断）"""
+        if not self._current_affix:
+            return False
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.get(self._current_affix, {})
+        if not isinstance(category_data, dict):
+            return False
+        group_flag = category_data.get("_group")
+        if group_flag is not None:
+            return bool(group_flag)
+        # 兼容旧数据：无 _group 字段时按 _aliases 类型推断
+        return isinstance(category_data.get("_aliases", []), dict)
 
     def _get_alias_groups(self) -> dict[str, list[str]]:
         """获取当前类别的词条分组（组名 → 词条名列表）"""

@@ -75,28 +75,30 @@ affix_caps:
     - 最小外功攻击
     110:
       cap: 121.4
-      unit: ''
     105:
       cap: 105.6
-      unit: ''
   属性攻击:
+    _group: true
     _aliases:
-    - 最大无相攻击
-    - 最小无相攻击
-    - 最大牵丝攻击
-    - 最小牵丝攻击
-    - 最大鸣金攻击
-    - 最小鸣金攻击
-    - 最大裂石攻击
-    - 最小裂石攻击
-    - 最大破竹攻击
-    - 最小破竹攻击
+      通用:
+      - 最大无相攻击
+      - 最小无相攻击
+      鸣金:
+      - 最大鸣金攻击
+      - 最小鸣金攻击
+      牵丝:
+      - 最大牵丝攻击
+      - 最小牵丝攻击
+      裂石:
+      - 最大裂石攻击
+      - 最小裂石攻击
+      破竹:
+      - 最大破竹攻击
+      - 最小破竹攻击
     110:
       cap: 68.8
-      unit: ''
     105:
       cap: 59.8
-      unit: ''
   五维属性:
     _aliases:
     - 劲
@@ -106,44 +108,39 @@ affix_caps:
     - 御
     110:
       cap: 76.8
-      unit: ''
     105:
       cap: 66.8
-      unit: ''
   会意率:
+    _unit: '%'
     _aliases:
     - 会意率
     110:
       cap: 7
-      unit: '%'
     105:
       cap: 6
-      unit: '%'
   会心率:
+    _unit: '%'
     _aliases:
     - 会心率
     110:
       cap: 14
-      unit: '%'
     105:
       cap: 12.2
-      unit: '%'
   精准率:
+    _unit: '%'
     _aliases:
     - 精准率
     110:
       cap: 12.4
-      unit: '%'
     105:
       cap: 10.8
-      unit: '%'
   指定武学增效:
+    _unit: '%'
     _aliases:
     - 剑武学增伤
     - 枪武学增伤
     - 陌刀武学增伤
     - 唐横刀武学增伤
-    - 扇武学增伤
     - 伞武学增伤
     - 舞绫鼓武学增伤
     - 双刀武学增伤
@@ -152,74 +149,67 @@ affix_caps:
     - 扇武学增效
     110:
       cap: 9.8
-      unit: '%'
     105:
       cap: 8.6
-      unit: '%'
   全部武学增效:
+    _unit: '%'
     _aliases:
     - 全武学增效
     110:
       cap: 4.9
-      unit: '%'
     105:
       cap: 4.2
-      unit: '%'
   对单位增效:
+    _unit: '%'
     _aliases:
     - 对首领单位增伤
     - 对玩家单位增效
     110:
       cap: 5.1
-      unit: '%'
     105:
       cap: 4.4
-      unit: '%'
   奇术类增伤:
+    _unit: '%'
     _aliases:
     - 单体类奇术增伤
     - 群体类奇术增伤
     110:
       cap: 15
-      unit: '%'
     105:
       cap: 13.4
-      unit: '%'
   气血最大值:
     _aliases:
     - 气血最大值
     110:
       cap: 4010
-      unit: ''
   外功防御:
     _aliases:
     - 外功防御
     110:
       cap: 52.8
-      unit: ''
   外功增益:
     _pool: dingyin
+    _unit: '%'
     _aliases:
     - 外功穿透
     - 外功抗性
     110:
       cap: 16.8
-      unit: '%'
     105:
       cap: 14.6
-      unit: '%'
   属攻增益:
     _pool: dingyin
+    _unit: '%'
     _aliases:
     - 属攻穿透
     110:
       cap: 20
-      unit: '%'
     105:
       cap: 17.4
-      unit: '%'
   指定技能增效:
     _pool: dingyin
+    _group: true
+    _unit: '%'
     _aliases:
       鸣金·虹:
       - 无名剑法武学技增伤
@@ -285,7 +275,117 @@ affix_caps:
       - 千机索天特殊技增伤
     110:
       cap: 9.2
-      unit: '%'
     105:
       cap: 8
-      unit: '%'
+weapon_types:
+- 剑
+- 枪
+- 伞
+- 扇
+- 陌刀
+- 双刀
+- 绳镖
+- 唐横刀
+- 手甲
+- 舞绫鼓
+schools:
+  鸣金·虹:
+    attr: 鸣金
+    main:
+      weapon: 剑
+      martial_art: 无名剑法
+      affix: 剑武学增伤
+    sub:
+      weapon: 枪
+      martial_art: 无名枪法
+      affix: 枪武学增伤
+  鸣金·影:
+    attr: 鸣金
+    main:
+      weapon: 剑
+      martial_art: 积矩九剑
+      affix: 剑武学增伤
+    sub:
+      weapon: 枪
+      martial_art: 九曲惊神枪
+      affix: 枪武学增伤
+  裂石·威:
+    attr: 裂石
+    main:
+      weapon: 陌刀
+      martial_art: 嗟夫刀法
+      affix: 陌刀武学增伤
+    sub:
+      weapon: 枪
+      martial_art: 八方风雷枪
+      affix: 枪武学增伤
+  裂石·钧:
+    attr: 裂石
+    main:
+      weapon: 唐横刀
+      martial_art: 斩雪刀法
+      affix: 唐横刀武学增伤
+    sub:
+      weapon: 陌刀
+      martial_art: 十方破阵
+      affix: 陌刀武学增伤
+  牵丝·玉:
+    attr: 牵丝
+    main:
+      weapon: 伞
+      martial_art: 九重春色
+      affix: 伞武学增伤
+    sub:
+      weapon: 扇
+      martial_art: 青山执笔
+      affix: 扇武学增效
+  牵丝·霖:
+    attr: 牵丝
+    main:
+      weapon: 扇
+      martial_art: 明川药典
+      affix: 扇武学增效
+    sub:
+      weapon: 伞
+      martial_art: 千香引魂蛊
+      affix: 伞武学增伤
+  牵丝·翊:
+    attr: 牵丝
+    main:
+      weapon: 舞绫鼓
+      martial_art: 文动霓裳
+      affix: 舞绫鼓武学增伤
+    sub:
+      weapon: 扇
+      martial_art: 杏游草野
+      affix: 扇武学增效
+  破竹·风:
+    attr: 破竹
+    main:
+      weapon: 双刀
+      martial_art: 泥犁三垢
+      affix: 双刀武学增伤
+    sub:
+      weapon: 绳镖
+      martial_art: 粟子游尘
+      affix: 绳镖武学增伤
+  破竹·尘:
+    attr: 破竹
+    main:
+      weapon: 伞
+      martial_art: 醉梦游春
+      affix: 伞武学增伤
+    sub:
+      weapon: 绳镖
+      martial_art: 粟子行云
+      affix: 绳镖武学增伤
+  破竹·鸢:
+    attr: 破竹
+    main:
+      weapon: 手甲
+      martial_art: 天志垂象
+      affix: 手甲武学增伤
+    sub:
+      weapon: 绳镖
+      martial_art: 千机索天
+      affix: 绳镖武学增伤

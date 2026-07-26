@@ -1,7 +1,7 @@
 """燕云十六声主窗口 —— 继承通用 MainWindow，追加燕云专属功能。
 
 插件扩展点：
-- 「燕云」菜单：装备属性管理（F5）、装备调律规则（内含调律验证入口）
+- 「燕云」菜单：游戏配置（F5）、调律规则（F6，内含调律验证入口）
 - 左侧 Tab 2：调律（部位选择 + 开始调律）
 - 右侧 Tab 2：装备状态
 """
@@ -30,8 +30,8 @@ class MainWindow(GenericMainWindow):
 
     def _plugin_menu_spec(self) -> tuple[str, list[tuple[str, Any, str]]] | None:
         return ("燕云", [
-            ("装备属性管理", self._open_attr_manager, "F5"),
-            ("装备调律规则", self._open_tuning_rules, ""),
+            ("游戏配置", self._open_attr_manager, "F5"),
+            ("调律规则", self._open_tuning_rules, "F6"),
         ])
 
     def _open_attr_manager(self):

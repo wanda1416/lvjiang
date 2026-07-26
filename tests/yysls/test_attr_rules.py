@@ -169,6 +169,37 @@ class TestInferQuality:
         assert mgr.infer_quality("剑", 42, 200) is None
 
 
+# ─── 武器类型 / 流派配置（顶层 weapon_types / schools）────
+
+class TestWeaponTypesAndSchools:
+    def test_get_weapon_types(self, mgr):
+        types = mgr.get_weapon_types()
+        assert len(types) == 10
+        assert {"陌刀", "唐横刀", "剑", "枪", "扇", "伞"} <= set(types)
+
+    def test_get_schools_structure(self, mgr):
+        schools = mgr.get_schools()
+        assert len(schools) == 10
+        assert "裂石·钧" in schools
+        cfg = schools["裂石·钧"]
+        assert cfg["attr"] == "裂石"
+        assert cfg["main"] == {"weapon": "唐横刀", "martial_art": "斩雪刀法", "affix": "唐横刀武学增伤"}
+        assert cfg["sub"] == {"weapon": "陌刀", "martial_art": "十方破阵", "affix": "陌刀武学增伤"}
+
+    def test_school_bindings_valid(self, mgr):
+        # 属性合法；主/副武器须在注册表内，词条须属于 指定武学增效 类别
+        weapons = set(mgr.get_weapon_types())
+        for name, cfg in mgr.get_schools().items():
+            assert cfg.get("attr") in ("鸣金", "裂石", "破竹", "牵丝"), \
+                f"{name}: 属性 {cfg.get('attr')} 非法"
+            for key in ("main", "sub"):
+                group = cfg.get(key) or {}
+                weapon, affix = group.get("weapon"), group.get("affix")
+                assert weapon in weapons, f"{name}: {key} 武器 {weapon} 未注册"
+                assert mgr.resolve_affix_category(affix) == "指定武学增效", \
+                    f"{name}: 词条 {affix} 不属于指定武学增效"
+
+
 # ─── 数据结构单元 ──────────────────────────────────────────
 
 class TestLevelRule:

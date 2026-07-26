@@ -1,13 +1,16 @@
-"""基础属性规则面板
+"""基础属性规则面板（装备配置）
 
-管理装备基础属性规则（用于品阶推断）。
-左侧固定八个装备部位，右侧为属性跟随配置 + 基础属性说明 + 等级×品阶表格。
+管理装备基础属性规则（用于品阶推断）与武器类型注册表。
+左侧固定八个装备类型，右侧为属性跟随配置 + 基础属性说明 + 等级×品阶表格。
 属性跟随：勾选后该部位复用目标部位的数值（YAML 中记为 _follow），
 表格只读展示目标部位数据，避免重复配置（副武器跟随主武器、
 胫甲/腕甲跟随冠胄）。
 基础属性说明：部位数值对应的属性名由 YAML 的 _attr 声明，
 区间型部位（武器）由 _range: true 声明，品阶单元格改用
 最小/最大双数字输入框，不再手写 a~b 文本。
+武器类型：仅主武器部位展示，维护 attributes.yaml 顶层 weapon_types
+注册表（识别层为启动快照，新增武器需重启后方可参与识别），
+被流派配置引用的武器不允许删除。
 自动保存，覆盖已有数值时确认。
 """
 
@@ -19,7 +22,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QListWidget, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QHeaderView, QLabel,
-    QCheckBox, QComboBox, QFrame,
+    QCheckBox, QComboBox, QFrame, QInputDialog,
 )
 from PyQt6.QtCore import Qt
 
@@ -123,7 +126,7 @@ class BaseAttrPanel(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("装备部位"))
+        left_layout.addWidget(QLabel("装备类型"))
 
         self._part_list = QListWidget()
         for part in BASE_ATTR_PARTS:
@@ -159,6 +162,38 @@ class BaseAttrPanel(QWidget):
         follow_layout.addWidget(self._follow_hint)
         follow_layout.addStretch()
         right_layout.addWidget(follow_frame)
+
+        # ── 武器类型（仅主武器部位；维护 weapon_types 注册表）──
+        self._weapon_frame = QFrame()
+        self._weapon_frame.setObjectName("weaponFrame")
+        # 用 objectName 限定，避免样式级联到 QListWidget（其继承自 QFrame）
+        self._weapon_frame.setStyleSheet(
+            "QFrame#weaponFrame { background-color: #f5f5f5; "
+            "border-radius: 4px; padding: 4px; }"
+        )
+        weapon_layout = QVBoxLayout(self._weapon_frame)
+        weapon_layout.setContentsMargins(8, 4, 8, 4)
+
+        weapon_header = QHBoxLayout()
+        weapon_header.addWidget(QLabel("武器类型"))
+        hint = QLabel("新增武器重启后方可参与识别；被流派配置引用的武器不可删除")
+        hint.setStyleSheet("color: #888;")
+        weapon_header.addWidget(hint)
+        weapon_header.addStretch()
+        self._btn_add_weapon = QPushButton("添加")
+        self._btn_add_weapon.clicked.connect(self._on_add_weapon)
+        weapon_header.addWidget(self._btn_add_weapon)
+        self._btn_del_weapon = QPushButton("删除")
+        self._btn_del_weapon.clicked.connect(self._on_del_weapon)
+        weapon_header.addWidget(self._btn_del_weapon)
+        weapon_layout.addLayout(weapon_header)
+
+        self._weapon_list = QListWidget()
+        self._weapon_list.setMaximumHeight(300)
+        weapon_layout.addWidget(self._weapon_list)
+
+        self._weapon_frame.setVisible(False)
+        right_layout.addWidget(self._weapon_frame)
 
         # ── 基础属性说明（部位数值对应的属性名，来自 YAML _attr）──
         attr_frame = QFrame()
@@ -220,8 +255,74 @@ class BaseAttrPanel(QWidget):
 
         self._current_part = BASE_ATTR_PARTS[row]
         self._refresh_follow_controls()
+        self._refresh_weapon_types()
         self._refresh_attr_label()
         self._refresh_table()
+
+    # ── 武器类型（weapon_types 注册表）──────────────────
+
+    def _weapon_types(self) -> list[str]:
+        return list(self._data.get("weapon_types") or [])
+
+    def _refresh_weapon_types(self):
+        """刷新武器类型列表（仅主武器部位可见）"""
+        is_main = self._current_part == "main_weapon"
+        self._weapon_frame.setVisible(is_main)
+        if not is_main:
+            return
+        self._weapon_list.clear()
+        for name in self._weapon_types():
+            self._weapon_list.addItem(name)
+
+    def _schools_using_weapon(self, weapon: str) -> list[str]:
+        """引用指定武器的流派名列表（主/副武器均算引用）"""
+        result = []
+        for name, cfg in (self._data.get("schools") or {}).items():
+            cfg = cfg or {}
+            main = cfg.get("main") or {}
+            sub = cfg.get("sub") or {}
+            if weapon in (main.get("weapon"), sub.get("weapon")):
+                result.append(name)
+        return result
+
+    def _on_add_weapon(self):
+        """添加新武器类型"""
+        name, ok = QInputDialog.getText(self, "添加武器类型", "武器名称：")
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            return
+        types = self._weapon_types()
+        if name in types:
+            QMessageBox.warning(self, "无法添加", f"武器类型「{name}」已存在。")
+            return
+        types.append(name)
+        self._data["weapon_types"] = types
+        self._save_data()
+        self._refresh_weapon_types()
+
+    def _on_del_weapon(self):
+        """删除选中武器类型（被流派配置引用时拒绝）"""
+        item = self._weapon_list.currentItem()
+        if item is None:
+            return
+        name = item.text()
+        users = self._schools_using_weapon(name)
+        if users:
+            QMessageBox.warning(
+                self, "无法删除",
+                f"武器类型「{name}」正被流派 {'、'.join(users)} 引用，"
+                "请先在流派配置中解除绑定。",
+            )
+            return
+        ret = QMessageBox.question(self, "确认删除", f"确定删除武器类型「{name}」？")
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        types = [t for t in self._weapon_types() if t != name]
+        self._data["weapon_types"] = types
+        self._save_data()
+        self._refresh_weapon_types()
 
     # ── 基础属性说明 ──────────────────────────────────
 

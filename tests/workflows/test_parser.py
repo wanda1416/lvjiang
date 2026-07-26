@@ -205,6 +205,100 @@ def test_wait():
     print("  wait (1, 2): OK")
 
 
+# ─── click/drag wait 语法糖测试 ─────────────────────────────
+
+def test_click_after_wait():
+    """click ... after wait -> [Click, Wait]"""
+    program = parse_text("click [scene].[region] after wait step_interval")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Click)
+    assert isinstance(program.body[1], Wait)
+    assert isinstance(program.body[1].delay, Literal)
+    assert program.body[1].delay.value == "step_interval"
+
+
+def test_click_before_wait():
+    """click ... before wait -> [Wait, Click]"""
+    program = parse_text("click [scene].[region] before wait 0.5")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Click)
+    assert isinstance(program.body[0].delay, Literal)
+    assert program.body[0].delay.value == 0.5
+
+
+def test_click_around_wait():
+    """click ... around wait -> [Wait, Click, Wait]"""
+    program = parse_text("click [scene].[region] around wait (0.3, 0.8)")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Click)
+    assert isinstance(program.body[2], Wait)
+    # 同一参数：前后 Wait 的 delay 相同
+    assert program.body[0].delay == program.body[2].delay
+    assert program.body[0].delay == (0.3, 0.8)
+
+
+def test_click_after_wait_var():
+    """click ... after wait $var -> [Click, Wait(VarRef)]"""
+    program = parse_text("click [scene].[region] after wait $myvar")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Click)
+    assert isinstance(program.body[1], Wait)
+    assert isinstance(program.body[1].delay, VarRef)
+    assert program.body[1].delay.name == "myvar"
+
+
+def test_click_no_wait():
+    """无 wait 子句的 click 行为不变（返回单节点）"""
+    program = parse_text("click [scene].[region]")
+    assert len(program.body) == 1
+    assert isinstance(program.body[0], Click)
+
+
+def test_drag_after_wait():
+    """drag ... after wait -> [Drag, Wait]"""
+    program = parse_text("drag [scene].[panel] up 2 after wait step_interval")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Drag)
+    assert isinstance(program.body[1], Wait)
+    assert program.body[1].delay.value == "step_interval"
+
+
+def test_drag_before_wait():
+    """drag ... before wait -> [Wait, Drag]"""
+    program = parse_text("drag [scene].[panel] up 2 before wait step_interval")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Drag)
+
+
+def test_drag_around_wait():
+    """drag ... around wait -> [Wait, Drag, Wait]"""
+    program = parse_text("drag [scene].[panel] up 2 around wait step_interval")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Drag)
+    assert isinstance(program.body[2], Wait)
+
+
+def test_drag_with_duration_after_wait():
+    """drag ... 0.5 after wait -> [Drag(duration), Wait]"""
+    program = parse_text("drag [scene].[panel] 0.5 after wait step_interval")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Drag)
+    assert isinstance(program.body[1], Wait)
+    # duration 应被正确解析
+    assert program.body[0].duration is not None
+
+
+def test_drag_no_wait():
+    """无 wait 子句的 drag 行为不变"""
+    program = parse_text("drag [scene].[panel] up 2")
+    assert len(program.body) == 1
+    assert isinstance(program.body[0], Drag)
+
+
 # ─── scan/recognize 测试 ────────────────────────────────────
 
 def test_scan_as_required():

@@ -44,7 +44,7 @@ align_stmt: "align"i bracket_expr "." bracket_expr _NL
 //
 // 注意：panel 与 scene.area 都以 [x].[y] 开头，必须用同一规则避免歧义。
 // transformer 根据 row/col 是否存在分派为 SceneRef 或 PanelRef。
-click_stmt: "click"i click_target _NL
+click_stmt: "click"i click_target wait_clause? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var                          -> click_scene_target
             | coord_point                                             -> click_coord_target
@@ -54,7 +54,7 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 //   2. [scene].[panel] up|down|left|right [n]  — panel grid 级拖拽（中心起拖）
 //   3. scene.arrow — scene.arrow 引用
 //   4. (rx1, ry1) (rx2, ry2) — 两坐标点
-drag_stmt: "drag"i drag_target drag_duration? drag_hold? _NL
+drag_stmt: "drag"i drag_target drag_duration? drag_hold? wait_clause? _NL
 drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
            | const_or_var "." const_or_var drag_direction                       -> drag_grid_target
            | const_or_var "." const_or_var                                      -> drag_scene_target
@@ -86,6 +86,14 @@ drag_duration: number | bracket_list
 drag_hold: "hold"i number
 
 wait_stmt: "wait"i (NAME | number | bracket_expr | var_ref | wait_range) _NL
+
+// 后缀等待子句：用于 click/drag 的内联等待
+//   before wait xxx — 操作前等待
+//   after wait xxx  — 操作后等待
+//   around wait xxx  — 操作前后各等待一次（同一参数）
+// 参数形式与 wait_stmt 完全一致（命名延迟/数值/范围/变量）
+wait_clause: WAIT_TIMING "wait"i (NAME | number | bracket_expr | var_ref | wait_range)
+WAIT_TIMING: /before/i | /after/i | /around/i
 
 wait_range: "(" number "," number ")"
 

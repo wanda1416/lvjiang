@@ -24,12 +24,11 @@ def bag_traverse()
 
     # ── 第二步：滚动循环 ──
     @scroll_loop
-    drag [bag_equip_detail].[bag_grid][2][3] up hold 0.3
-    wait step_interval
+    drag [bag_equip_detail].[bag_grid][2][3] up hold 0.3 after wait step_interval
 
     # 读取滚动后 grid[1][1]
     align [bag_equip_detail].[bag_grid]
-    click [bag_equip_detail].[bag_grid][1][1]
+    click [bag_equip_detail].[bag_grid][1][1] after wait step_interval
     scan $detail_scene.[equip_type, equip_level, base_attr,
         affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $check_scan
     eval $check_equip = to_equipment($check_scan)
@@ -55,8 +54,7 @@ def bag_traverse()
         # 滚动正确：旧 row2 → 新 row1
     else
         # 过头：回调
-        drag [bag_equip_detail].[bag_grid][2][3] down 0.2
-        wait step_interval
+        drag [bag_equip_detail].[bag_grid][2][3] down 0.2 after wait step_interval
         eval $verify_retry = add($verify_retry, 1)
         if $verify_retry < 4
             click [bag_equip_detail].[bag_grid][1][1]
@@ -84,8 +82,7 @@ def bag_traverse()
     eval $r3_fp = make_fingerprint($r3_equip)
     if $r3_fp is_empty
         # row 3 无内容，补滚一次
-        drag [bag_equip_detail].[bag_grid][2][3] up 0.3
-        wait step_interval
+        drag [bag_equip_detail].[bag_grid][2][3] up 0.3 after wait step_interval
         align [bag_equip_detail].[bag_grid]
         eval $nudge_retry = add($nudge_retry, 1)
         if $nudge_retry < 3

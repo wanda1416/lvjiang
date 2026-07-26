@@ -12,7 +12,7 @@ layout_scenes:
   - bag_equip_detail
   - bag_item_detail
   group_4:
-  - xinde_exchage
+  - xinde_exchange
   group_5:
   - activity_mengzhu
 group_names:

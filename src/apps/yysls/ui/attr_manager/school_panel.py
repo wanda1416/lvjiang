@@ -3,11 +3,12 @@
 左侧为流派列表（对应游戏十大流派，可增删、直接编辑重命名），
 右侧为选中流派的配置表单，分三行：
 - 第一行：属性（下拉 鸣金 / 裂石 / 破竹 / 牵丝）；
-- 第二行：主武器（下拉）+ 主武学（文本框）+ 武学增效（下拉）；
-- 第三行：副武器（下拉）+ 副武学（文本框）+ 武学增效（下拉）。
-武器候选来自 weapon_types 注册表，增效词条候选来自 指定武学增效 类别的 _aliases。
+- 第二行：主武器（下拉）+ 主武学（文本框）；
+- 第三行：副武器（下拉）+ 副武学（文本框）。
+武学增效已移至装备配置的武器类型中，每个武器绑定一种武学增效。
+武器候选来自 weapon_types 注册表。
 数据存于 attributes.yaml 顶层 schools：
-    流派名 → {attr: 属性, main: {weapon, martial_art, affix}, sub: {weapon, martial_art, affix}}
+    流派名 → {attr: 属性, main: {weapon, martial_art}, sub: {weapon, martial_art}}
 修改即时写盘，并刷新 AttrRuleManager 单例。
 """
 
@@ -24,9 +25,6 @@ from PyQt6.QtCore import Qt
 
 # 配置文件路径
 _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
-
-# 武学增效词条候选所在的词条类别
-_WUXUE_CATEGORY = "指定武学增效"
 
 # 流派属性候选
 _SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
@@ -77,7 +75,7 @@ class SchoolPanel(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
 
         hint = QLabel(
-            "武器候选来自装备配置的武器类型，增效词条候选来自 指定武学增效 类别。"
+            "武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。"
         )
         hint.setStyleSheet("color: #888;")
         right_layout.addWidget(hint)
@@ -91,7 +89,7 @@ class SchoolPanel(QWidget):
         row_attr.addStretch()
         right_layout.addLayout(row_attr)
 
-        # 第二行：主武器 + 主武学 + 武学增效
+        # 第二行：主武器 + 主武学
         row_main = QHBoxLayout()
         row_main.setSpacing(4)
         row_main.addWidget(QLabel("主武器"))
@@ -104,13 +102,9 @@ class SchoolPanel(QWidget):
         self._edit_main_martial.setMaxLength(5)
         self._edit_main_martial.setFixedWidth(80)
         row_main.addWidget(self._edit_main_martial)
-        row_main.addSpacing(16)
-        row_main.addWidget(QLabel("武学增效"))
-        self._combo_main_affix = QComboBox()
-        row_main.addWidget(self._combo_main_affix)
         right_layout.addLayout(row_main)
 
-        # 第三行：副武器 + 副武学 + 武学增效
+        # 第三行：副武器 + 副武学
         row_sub = QHBoxLayout()
         row_sub.setSpacing(4)
         row_sub.addWidget(QLabel("副武器"))
@@ -123,10 +117,6 @@ class SchoolPanel(QWidget):
         self._edit_sub_martial.setMaxLength(5)
         self._edit_sub_martial.setFixedWidth(80)
         row_sub.addWidget(self._edit_sub_martial)
-        row_sub.addSpacing(16)
-        row_sub.addWidget(QLabel("武学增效"))
-        self._combo_sub_affix = QComboBox()
-        row_sub.addWidget(self._combo_sub_affix)
         right_layout.addLayout(row_sub)
 
         right_layout.addStretch()
@@ -143,15 +133,15 @@ class SchoolPanel(QWidget):
     def _combos(self) -> list[QComboBox]:
         return [
             self._combo_attr,
-            self._combo_main_weapon, self._combo_main_affix,
-            self._combo_sub_weapon, self._combo_sub_affix,
+            self._combo_main_weapon,
+            self._combo_sub_weapon,
         ]
 
     def _edits(self) -> list[QLineEdit]:
         return [self._edit_main_martial, self._edit_sub_martial]
 
     def showEvent(self, event):
-        """每次显示时重新加载（武器类型/词条可能已在其他面板变更）"""
+        """每次显示时重新加载（武器类型可能已在其他面板变更）"""
         super().showEvent(event)
         self._load_data()
 
@@ -175,15 +165,12 @@ class SchoolPanel(QWidget):
         return self._data.get("schools") or {}
 
     def _weapon_candidates(self) -> list[str]:
-        return list(self._data.get("weapon_types") or [])
-
-    def _affix_candidates(self) -> list[str]:
-        """增效词条候选（指定武学增效 类别的 _aliases）"""
-        category = (self._data.get("affix_caps") or {}).get(_WUXUE_CATEGORY) or {}
-        aliases = category.get("_aliases") or []
-        if isinstance(aliases, dict):
-            return [name for names in aliases.values() for name in names]
-        return list(aliases)
+        """武器候选：支持新格式（dict 列表）和旧格式（字符串列表）"""
+        raw = self._data.get("weapon_types") or []
+        return [
+            str(t["name"]) if isinstance(t, dict) else str(t)
+            for t in raw
+        ]
 
     # ── 左侧列表 ──────────────────────────────────────────────
 
@@ -221,14 +208,11 @@ class SchoolPanel(QWidget):
         prev_loading = self._loading  # 可能由 _refresh_list 嵌套触发，保持外层标志
         self._loading = True
         weapons = self._weapon_candidates()
-        affixes = self._affix_candidates()
         self._fill_combo(self._combo_attr, _SCHOOL_ATTRS, cfg.get("attr"))
         self._fill_combo(self._combo_main_weapon, weapons, main.get("weapon"))
         self._edit_main_martial.setText(main.get("martial_art", "") or "")
-        self._fill_combo(self._combo_main_affix, affixes, main.get("affix"))
         self._fill_combo(self._combo_sub_weapon, weapons, sub.get("weapon"))
         self._edit_sub_martial.setText(sub.get("martial_art", "") or "")
-        self._fill_combo(self._combo_sub_affix, affixes, sub.get("affix"))
         enabled = name is not None
         for combo in self._combos():
             combo.setEnabled(enabled)
@@ -308,9 +292,9 @@ class SchoolPanel(QWidget):
         attr = self._combo_attr.currentText()
         if attr:
             cfg["attr"] = attr
-        for key, combo_w, edit_m, combo_a in (
-            ("main", self._combo_main_weapon, self._edit_main_martial, self._combo_main_affix),
-            ("sub", self._combo_sub_weapon, self._edit_sub_martial, self._combo_sub_affix),
+        for key, combo_w, edit_m in (
+            ("main", self._combo_main_weapon, self._edit_main_martial),
+            ("sub", self._combo_sub_weapon, self._edit_sub_martial),
         ):
             group = {}
             if combo_w.currentText():
@@ -318,8 +302,6 @@ class SchoolPanel(QWidget):
             martial = edit_m.text().strip()
             if martial:
                 group["martial_art"] = martial
-            if combo_a.currentText():
-                group["affix"] = combo_a.currentText()
             if group:
                 cfg[key] = group
         self._data.setdefault("schools", {})[name] = cfg

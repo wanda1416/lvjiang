@@ -1,60 +1,27 @@
-# PROGRESS —— 游戏配置重构与流派配置（2026-07-21）
+# PROGRESS —— 跨对话进度快照
 
-> 用途：跨对话进度快照。开启新对话时先读本文件与 TODO.md。
+> 用途：开启新对话时先读本文件与 TODO.md。
 
 ## 一、当前状态
 
-「游戏配置重构与流派配置」计划已**全部完成**，全量 pytest **509 例全绿**。
+- 「游戏配置重构与流派配置」计划全部完成，pytest **509 例全绿**（2026-07-21）。
+- 「调律规则标准词条化重构」完成，pytest **528 例全绿**（2026-07-22）。
+- 全部改动已提交并推送至 `origin/master`。
+- 严禁自动提交；提交时中文信息须写入 UTF-8 文件后 `git commit -F`。
 
-**2026-07 追加：调律规则标准词条化重构完成**（全量 pytest 528 例全绿）：
-删除 SYMBOL_VOCAB/SYMBOL_MAP 符号层与 variants 层（字段上提 YAML 顶层），
-规则词条唯一来源 = `AttrRuleManager.get_normal_affix_names()` 标准全集（越界名拒存）；
-heal.yaml 拆为 heal_pure/heal_fire 两条独立规则；规则可新建/删除
-（TuningRuleManager.create_rule/delete_rule + 对话框 Tab 增删）；导航「流派设置」
-改「规则设置」；UI checkbox 网格改「已选列表 + AffixPickerDialog 添加/移除」
-（variant_pool_page.py → pool_page.py）；属攻归一化：非武器本属 → 无相，错位属攻
-（武器上流派属攻、非武器字面无相）加 `(错位)` 标记判垃圾（generic._normalize）。
+## 二、最近完成（详见 docs/40-development/2026-07/）
 
-## 二、本轮完成内容
-
-### 1. 菜单与快捷键
-- 「装备属性管理」→「游戏配置」（F5）、「装备调律规则」→「调律规则」（F6，QAction 窗口级）；
-- 全局热键收口为 F8-F10（pynput GlobalHotKeys），回调经 `_backend_ready()` 门控；
-  F9 启动共用 `_on_f9_start` 入口（运行中忽略）。
-
-### 2. 游戏配置对话框（AttrManagerDialog，3 Tab）
-- **Tab1 装备配置**（base_attr_panel.py）：左侧「装备类型」8 部位列表；
-  主武器详情页含「武器类型」编辑区——标题行 = 标签 + 灰色提示 + 添加/删除按钮（同一行右侧），
-  列表 QListWidget 单独占下方整行（maxHeight 300）；被流派主/副武器引用的武器不可删。
-- **Tab2 词条配置**（affix_caps_panel.py）：未动。
-- **Tab3 流派配置**（school_panel.py，本轮重写为左右分栏）：
-  - 左侧：流派列表（可增删、直接编辑重命名）+ 添加/删除按钮；
-  - 右侧表单依次为：属性（下拉 鸣金/裂石/破竹/牵丝）、主武器、主武器增效、副武器、副武器增效；
-  - 任一下拉变化即时写盘并刷新 AttrRuleManager 单例；showEvent 重载防跨面板脏数据。
-
-### 3. attributes.yaml（config/system/yysls/）顶层四键
-- `base_attrs`（8 部位）、`affix_caps`（15 类别）；
-- `weapon_types`：10 武器注册表，**「唐横刀」为正确名称（非「横刀」）**；
-- `schools`：**新 schema** `流派名 → {attr: 属性, main: {weapon, affix}, sub: {weapon, affix}}`，
-  预填十大流派（源自 docs/10-game/02-school-system.md L7-18）：
-  鸣金·虹、鸣金·影、裂石·威、裂石·钧、牵丝·玉、牵丝·霖、牵丝·翊、破竹·风、破竹·尘、破竹·鸢。
-  扇的增效词条是「扇武学增效」（非增伤），其余武器为「X武学增伤」。
-
-### 4. 横刀 → 唐横刀 全局改名（注册表驱动）
-同步了：constants.py `_DEFAULT_WEAPON_TYPES` 回退表、attr_rules.py `_TYPE_TO_KEY`、
-equip_judge_dialog.py `_WEAPON_WUXUE`、tuning_rules/huixin_big.yaml 与 huixin_small.yaml 的
-weapons 表、tests（test_huixin_judge / test_equip_model / test_equip_judge_dialog）。
-
-### 5. 武器类型动态化
-- constants.py `WEAPON_TYPES`/`WEAPON_TYPES_SET` = 模块加载时读 attributes.yaml 快照
-  （失败回退内置默认）→ **新增武器需重启才参与识别**；
-- AttrRuleManager 新增 `get_weapon_types()`/`get_schools()`（reload 后实时生效）。
-
-### 6. 测试
-- tests/yysls/test_attr_manager_ui.py：3 Tab 冒烟 + 武器增删往返 + 流派面板 4 用例
-  （预填 10 流派 / 选中联动表单 / 表单即存 / 增改删往返）；
-- tests/yysls/test_attr_rules.py：weapon_types/schools 新结构断言 + 绑定合法性校验；
-- tests/ui/test_main_window_hotkeys.py：热键门控桩测试 4 例（不实例化 MainWindow）。
+- **游戏配置重构**（2026-07-21）：新增游戏配置对话框（装备/词条/流派 3 Tab）；
+  attributes.yaml 顶层新增 `weapon_types` 与 `schools` 键；横刀 → 唐横刀全局改名；
+  武器类型动态化（从 attributes.yaml 加载）；菜单与热键收口（F5/F6/F8-F10）。
+- **调律规则标准词条化重构**（2026-07-22）：删除 SYMBOL_VOCAB/SYMBOL_MAP 符号层
+  与 variants 层（字段上提 YAML 顶层）；规则词条唯一来源 =
+  `AttrRuleManager.get_normal_affix_names()` 标准全集（越界名保存拒绝）；
+  heal.yaml 拆为 heal_pure/heal_fire 两条独立规则；规则可新建/删除
+  （TuningRuleManager.create_rule/delete_rule + 对话框 Tab 增删）；导航「流派设置」
+  改「规则设置」；UI checkbox 网格改「已选列表 + AffixPickerDialog 添加/移除」
+  （variant_pool_page.py → pool_page.py）；属攻归一化：非武器本属 → 无相，错位属攻
+  （武器上流派属攻、非武器字面无相）加 `(错位)` 标记判垃圾（generic._normalize）。
 
 ## 三、特别注意事项（下一对话必读）
 
@@ -72,9 +39,3 @@ weapons 表、tests（test_huixin_judge / test_equip_model / test_equip_judge_di
 6. school_panel 信号重入：`_refresh_list` 中 `clear()` 会嵌套触发 `_on_school_changed`，
    后者用 `prev_loading` 保存/恢复 `_loading` 标志，改动时勿破坏此约定。
 7. 用户约定：开发期配置重构**不写迁移兼容代码**（旧 schema 直接废弃）。
-
-## 四、下一步（TODO.md「打通阶段」剩余待办）
-
-1. tuning_rules 各 YAML 的 weapons 表改为引用 schools（当前仍各自硬编码，注意其结构还是
-   旧式 `{main: {武器: 词条}, sub: [武器]}`，与 attributes.yaml 新 schema 不同）；
-2. 两对话框互挂入口按钮成环。

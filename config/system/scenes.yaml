@@ -13,8 +13,11 @@ layout_scenes:
   - bag_item_detail
   group_4:
   - activity_mengzhu
+  group_5:
+  - xinde_exchage
 group_names:
   group_1: 通用
   group_2: 调律
   group_3: 背包
   group_4: 活动
+  group_5: 培养

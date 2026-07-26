@@ -45,7 +45,8 @@ class SceneOpsMixin:
             )
             scene_tab_widget.currentChanged.connect(self._update_info_label)
             self._group_tabs[group_key] = scene_tab_widget
-            self._group_tab_widget.addTab(scene_tab_widget, group_name)
+            idx = self._group_tab_widget.addTab(scene_tab_widget, group_name)
+            self._group_tab_widget.setTabToolTip(idx, group_key)
             # 构建该分组下的场景 Tab
             self._rebuild_scene_tabs(group_key)
         self._group_tab_widget.blockSignals(False)
@@ -62,7 +63,8 @@ class SceneOpsMixin:
             scene_name = get_scene_name(scene_key)
             tab = SceneTab(scene_key)
             self._tabs[scene_key] = tab
-            scene_tab_widget.addTab(tab, scene_name)
+            idx = scene_tab_widget.addTab(tab, scene_name)
+            scene_tab_widget.setTabToolTip(idx, scene_key)
         scene_tab_widget.blockSignals(False)
 
     # ─── 当前场景辅助 ────────────────────────────────────
@@ -100,6 +102,10 @@ class SceneOpsMixin:
         key_edit = QLineEdit()
         key_edit.setPlaceholderText("英文，如 my_scene")
         form.addRow("场景 Key:", key_edit)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #c62828;")
+        error_label.hide()
+        form.addRow("", error_label)
         name_edit = QLineEdit()
         name_edit.setPlaceholderText("中文名称")
         form.addRow("场景名称:", name_edit)
@@ -108,12 +114,32 @@ class SceneOpsMixin:
         )
         form.addRow(buttons)
 
-        # 实时校验：非空 + key 格式
+        # 实时校验：非空 + key 格式 + key 重复
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        registry = get_registry()
         def _validate():
             k = key_edit.text().strip()
             n = name_edit.text().strip()
-            ok_btn.setEnabled(bool(k and n and k.replace("_", "").isalnum()))
+            if not k:
+                ok_btn.setEnabled(False)
+                error_label.hide()
+                return
+            if not k.replace("_", "").isalnum():
+                ok_btn.setEnabled(False)
+                error_label.setText("Key 仅允许英文/数字/下划线")
+                error_label.show()
+                return
+            if registry.get_scene(k) is not None:
+                ok_btn.setEnabled(False)
+                error_label.setText(f"场景 Key 已存在: {k}")
+                error_label.show()
+                return
+            if not n:
+                ok_btn.setEnabled(False)
+                error_label.hide()
+                return
+            ok_btn.setEnabled(True)
+            error_label.hide()
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
         _validate()
@@ -146,6 +172,10 @@ class SceneOpsMixin:
         key_edit = QLineEdit()
         key_edit.setPlaceholderText("英文，如 my_group")
         form.addRow("分组 Key:", key_edit)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #c62828;")
+        error_label.hide()
+        form.addRow("", error_label)
         name_edit = QLineEdit()
         name_edit.setPlaceholderText("中文名称")
         form.addRow("分组名称:", name_edit)
@@ -153,12 +183,32 @@ class SceneOpsMixin:
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         form.addRow(buttons)
-        # 实时校验
+        # 实时校验：格式 + key 重复
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        registry = get_registry()
         def _validate():
             k = key_edit.text().strip()
             n = name_edit.text().strip()
-            ok_btn.setEnabled(bool(k and n and k.replace("_", "").isalnum()))
+            if not k:
+                ok_btn.setEnabled(False)
+                error_label.hide()
+                return
+            if not k.replace("_", "").isalnum():
+                ok_btn.setEnabled(False)
+                error_label.setText("Key 仅允许英文/数字/下划线")
+                error_label.show()
+                return
+            if k in registry.get_groups():
+                ok_btn.setEnabled(False)
+                error_label.setText(f"分组 Key 已存在: {k}")
+                error_label.show()
+                return
+            if not n:
+                ok_btn.setEnabled(False)
+                error_label.hide()
+                return
+            ok_btn.setEnabled(True)
+            error_label.hide()
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
         _validate()

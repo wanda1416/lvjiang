@@ -1,7 +1,7 @@
 import os, pathlib
 
 exts = ['.py', '.md']
-skip = {'__pycache__', '.idea', '.qoder', '.agents', 'node_modules'}
+skip = {'__pycache__', '.idea', '.qoder', '.agents', 'node_modules', '.venv'}
 results = {e: {'files': 0, 'lines': 0, 'chars': 0} for e in exts}
 details = {e: [] for e in exts}
 

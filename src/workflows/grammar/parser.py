@@ -48,14 +48,23 @@ class _DSLTransformer(Transformer):
     # ─── 程序入口 ─────────────────────────────────────────
 
     def start(self, items):
-        """过滤掉 None（空行），分离 import / def / body"""
+        """过滤掉 None（空行），分离 import / def / body；展平语法糖产生的列表"""
         imports = []
         procs = {}
         stmts = []
         for item in items:
             if item is None:
                 continue
-            if isinstance(item, Import):
+            if isinstance(item, list):
+                # 语法糖展开：click/drag + wait_clause -> 多条语句
+                for sub in item:
+                    if isinstance(sub, Import):
+                        imports.append(sub)
+                    elif isinstance(sub, ProcDef):
+                        procs[sub.name] = sub
+                    else:
+                        stmts.append(sub)
+            elif isinstance(item, Import):
                 imports.append(item)
             elif isinstance(item, ProcDef):
                 procs[item.name] = item
@@ -75,8 +84,17 @@ class _DSLTransformer(Transformer):
             return str(item)
 
     def click_stmt(self, items):
-        """click 目标（scene.area 引用 / panel 三级索引 / 坐标点），目标已由子规则构造为 Click 节点"""
-        return items[0]
+        """click 目标 [before|after|around wait 参数] — 有 wait_clause 时展开为多条语句"""
+        click_node = items[0]
+        if len(items) > 1 and isinstance(items[1], list) and len(items[1]) == 2 and isinstance(items[1][1], Wait):
+            timing, wait_node = items[1]
+            if timing == "before":
+                return [wait_node, click_node]
+            elif timing == "after":
+                return [click_node, wait_node]
+            else:  # "around" -> before + after 同一参数
+                return [wait_node, click_node, wait_node]
+        return click_node
 
     def click_panel_target(self, items):
         """click [scene].[panel][row][col] — panel 三级索引
@@ -107,7 +125,14 @@ class _DSLTransformer(Transformer):
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
 
     def drag_stmt(self, items):
-        """drag 目标（scene.arrow 引用 / panel 三级索引 / 两坐标点）+ 可选 duration/hold"""
+        """drag 目标 [duration] [hold] [before|after|around wait 参数] — 有 wait_clause 时展开为多条语句"""
+        # 检查末尾是否有 wait_clause 列表 [timing, Wait_node]
+        wait_timing = None
+        wait_node = None
+        if items and isinstance(items[-1], list) and len(items[-1]) == 2 and isinstance(items[-1][1], Wait):
+            wait_timing, wait_node = items[-1]
+            items = items[:-1]
+
         drag_node = items[0]  # 已由 drag_*_target 构造为 Drag
         duration = None
         hold = None
@@ -118,13 +143,21 @@ class _DSLTransformer(Transformer):
                 duration = item
             elif isinstance(item, float):
                 hold = item
-        return Drag(
+        result = Drag(
             scene=drag_node.scene, arrow=drag_node.arrow,
             duration=duration, hold=hold,
             from_point=drag_node.from_point, to_point=drag_node.to_point,
             direction=drag_node.direction, distance=drag_node.distance,
             line_no=drag_node.line_no,
         )
+        if wait_node:
+            if wait_timing == "before":
+                return [wait_node, result]
+            elif wait_timing == "after":
+                return [result, wait_node]
+            else:  # "around"
+                return [wait_node, result, wait_node]
+        return result
 
     def drag_panel_target(self, items):
         """drag [scene].[panel][row][col] [up|down [n]] — panel 三级索引 + 可选方向距离"""
@@ -221,6 +254,21 @@ class _DSLTransformer(Transformer):
 
     def wait_stmt(self, items):
         arg = items[0]
+        return self._build_wait_node(arg, items)
+
+    def wait_clause(self, items):
+        """后缀等待子句 — 返回 [timing_str, Wait_node]
+
+        timing_str: "before" / "after" / "around"
+        Wait_node 的参数处理与 wait_stmt 完全一致。
+        """
+        timing = str(items[0]).lower()  # "before" / "after" / "around"
+        arg = items[1]
+        wait_node = self._build_wait_node(arg, items)
+        return [timing, wait_node]
+
+    def _build_wait_node(self, arg, items):
+        """构造 Wait 节点（复用 wait_stmt / wait_clause 的参数解析逻辑）"""
         if isinstance(arg, tuple) and len(arg) == 2:
             # wait_range → (min, max) 随机范围
             return Wait(delay=arg, line_no=self._line(items))

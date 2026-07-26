@@ -1,0 +1,29 @@
+@todo 
+
+scan [xinde_exchange].[count] as $cnt
+if $cnt < 5
+   log "书票数量不足，结束"
+   return
+end
+
+scan [xinde_exchange].[sanben_1,sanben_2,sanben_3,sanben_4,sanben_5] as $btn by contains "自选"
+if not $btn
+   log "找不到自选散本，结束"
+   return
+end
+
+click [xinde_exchange].$btn after wait step_interval
+click [xinde_exchange].[add_all] after wait step_interval
+click [xinde_exchange].[purchase] after wait page_refresh_wait
+  
+click [xinde_exchange].[add_max] after wait step_interval
+click [xinde_exchange].[confirm] after wait page_refresh_wait
+  
+click [xinde_exchange].[blank] after wait step_interval
+
+click [xinde_exchange].[count] after wait step_interval
+click [xinde_exchange].[recycle_entry] after wait step_interval
+click [xinde_exchange].[recycle] after wait page_refresh_wait
+click [xinde_exchange].[confirm] after wait page_refresh_wait
+
+goto todo

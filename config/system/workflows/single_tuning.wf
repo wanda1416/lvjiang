@@ -46,13 +46,11 @@ import "subcall/find_tune_material.wf"
 call nav_main_to_equip()
 
 # 点击指定装备部位
-click [bag_equip_detail].$equip_slot
-wait step_interval
+click [bag_equip_detail].$equip_slot after wait step_interval
 
 # 拼接背包槽位名：bag_{row}_{col}
 eval $bag_slot = concat("bag_", $bag_row, "_", $bag_col)
-click [bag_equip_detail].$bag_slot
-wait step_interval
+click [bag_equip_detail].$bag_slot after wait step_interval
 
 scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu] as $main_weapon_scan
 eval $main_weapon = to_equipment($main_weapon_scan)
@@ -61,8 +59,7 @@ if $main_weapon.[_extra].[affix_count] < 5
 else 
     log "词条满了，不用调律了"
     loop 2
-        click [bag_equip_detail].[back]
-        wait step_interval
+        click [bag_equip_detail].[back] after wait step_interval
     end
     click [game_menu_page].[back]
     eval $exit_code = -1
@@ -86,8 +83,7 @@ scan [equip_tune_detail].[auto_add, auto_add_2] as $add_scan
 # 调律材料区未展开
 $status_1 = 0
 if $add_scan.auto_add_2 contains "添加"
-    click [equip_tune_detail].[expand]
-    wait page_refresh_wait
+    click [equip_tune_detail].[expand] after wait page_refresh_wait
     $status_1 = 1
 end
 
@@ -101,36 +97,29 @@ if $status_1 == 1
         call find_tune_material($target_material)
         eval $slot = context.slot_name
         if $slot
-            click [equip_tune_detail].$slot
-            wait step_interval
+            click [equip_tune_detail].$slot after wait step_interval
         else
             log concat($target_material, "材料不足，提前结束")
             eval $should_tune = ""
         end
     end
     if $should_tune
-        click [equip_tune_detail].[auto_add]
-        wait step_interval
-        click [equip_tune_detail].[tune_btn]
-        wait step_interval
+        click [equip_tune_detail].[auto_add] after wait step_interval
+        click [equip_tune_detail].[tune_btn] after wait step_interval
         wait after_tune_wait
         scan [equip_tune_result] as $result
         log "调律结果已识别"
-        click [equip_tune_result].[close_btn]
-        wait step_interval
+        click [equip_tune_result].[close_btn] after wait step_interval
     end 
 end
 
-click [equip_tune_detail].[back]
-wait step_interval
+click [equip_tune_detail].[back] after wait step_interval
 
 loop 3
-    click [bag_equip_detail].[back]
-    wait step_interval
+    click [bag_equip_detail].[back] after wait step_interval
 end
 
-click [game_menu_page].[back]
-wait step_interval
+click [game_menu_page].[back] after wait step_interval
 
 collect $result
 collect 0 as "exit_code"

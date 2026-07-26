@@ -11,8 +11,7 @@ call nav_main_to_equip()
 eval context.equip_scene = "equip_weapon_detail"
 eval $weapon_slots = ["main_weapon", "sub_weapon", "ring", "pendant"]
 for slot in $weapon_slots
-    click [bag_equip_detail].$slot
-    wait step_interval
+    click [bag_equip_detail].$slot after wait step_interval
     call bag_traverse()
 end
 
@@ -20,14 +19,12 @@ end
 eval context.equip_scene = "equip_armor_detail"
 eval $armor_slots = ["head", "chest", "leg", "wrist"]
 for slot in $armor_slots
-    click [bag_equip_detail].$slot
-    wait step_interval
+    click [bag_equip_detail].$slot after wait step_interval
     call bag_traverse()
 end
 
 # ── 返回主界面 ──
-click [bag_equip_detail].[back]
-wait step_interval
+click [bag_equip_detail].[back] after wait step_interval
 click [game_menu_page].[back]
 
 log "自动调律完成"

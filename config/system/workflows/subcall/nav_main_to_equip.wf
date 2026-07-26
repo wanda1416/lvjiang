@@ -7,19 +7,16 @@
 def nav_main_to_equip()
     scan [game_menu_page].[wulinlu] as $result
     if not $result.[wulinlu] equals "武林录"
-       click [game_main_page].[menu]
-       wait step_interval
+       click [game_main_page].[menu] after wait step_interval
     else 
        log "当前在菜单页" 
     end
 
-    click [game_menu_page].[bag]
-    wait step_interval
+    click [game_menu_page].[bag] after wait step_interval
 
     # 点击培养（可能点开包裹后在道具页等其他页面，需要判断当前）
     scan [bag_equip_detail].[sub_equip] as $bag_scan
     if not $bag_scan.sub_equip contains "装备"
-        click [bag_equip_detail].[training]
-        wait step_interval
+        click [bag_equip_detail].[training] after wait step_interval
     end
 end

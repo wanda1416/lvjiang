@@ -13,16 +13,14 @@ eval session.equipped = {}
 
 # 武器类（equip_weapon_detail）
 for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
-    click [bag_equip_detail].$slot
-    wait step_interval
+    click [bag_equip_detail].$slot after wait step_interval
     scan [equip_weapon_detail] as $scan_result
     eval session.equipped.$slot = to_equipment($scan_result)
 end
 
 # 防具类（equip_armor_detail）
 for slot in ["head", "chest", "leg", "wrist"]
-    click [bag_equip_detail].$slot
-    wait step_interval
+    click [bag_equip_detail].$slot after wait step_interval
     scan [equip_armor_detail] as $scan_result
     eval session.equipped.$slot = to_equipment($scan_result)
 end
@@ -31,11 +29,9 @@ end
 collect session.equipped
 
 # 返回主界面
-click [bag_equip_detail].[back]
-wait step_interval
+click [bag_equip_detail].[back] after wait step_interval
 
-click [bag_equip_detail].[back]
-wait step_interval
+click [bag_equip_detail].[back] after wait step_interval
 
 click [game_menu_page].[back]
 

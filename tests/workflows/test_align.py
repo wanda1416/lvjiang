@@ -15,8 +15,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import cv2
+import numpy as np
 import pytest
 
+from src.workflows.align import _binary_axis, detect_grid
 from src.workflows.engine import WorkflowEngine
 from src.workflows.grammar.ast_nodes import Align
 from src.core.scene_registry import Layout, Panel, CanvasConfig
@@ -239,3 +241,77 @@ class TestEngineSlotAccess:
                 x1, y1, x2, y2 = cal.slot_bounds(r, c)
                 assert x1 < cx < x2, f"row={r}, col={c}: cx={cx} not in ({x1}, {x2})"
                 assert y1 < cy < y2, f"row={r}, col={c}: cy={cy} not in ({y1}, {y2})"
+
+
+def _profile(length: int, bright_bands: list[tuple[int, int]],
+             bright: float = 160.0, dark: float = 8.0) -> np.ndarray:
+    """构造一维亮度剖面：bright_bands 区间内为亮，其余为黑边"""
+    arr = np.full(length, dark, dtype=np.float64)
+    for s, e in bright_bands:
+        arr[s:e] = bright
+    return arr
+
+
+class TestBinaryAxisLattice:
+    """周期点阵拟合：直接驱动 _binary_axis 锁定过检排除与漏检补全"""
+
+    def test_off_lattice_peek_excluded(self):
+        """点阵外的半周期偷看亮区→排除，不会过检为第 4 行"""
+        # 三个周期 slot（周期 100，宽 70）+ 底部半周期处的短偷看亮区
+        prof = _profile(300, [(15, 85), (115, 185), (215, 285), (293, 300)])
+        axis = _binary_axis(prof, expected_count=3)
+        assert len(axis.centers) == 3
+        # 三个中心落在周期点阵上（约 0.167 / 0.5 / 0.833），无 0.9+ 的伪行
+        assert all(c < 0.9 for c in axis.centers)
+        assert abs(axis.centers[1] - 0.5) < 0.02
+
+    def test_dark_sparse_row_filled(self):
+        """第三行整行偏暗（无 run）但在点阵上→被周期补出"""
+        # 只有前两行亮，第三行（215..285）保持黑暗，仍应被补为 3 行
+        prof = _profile(300, [(15, 85), (115, 185)])
+        axis = _binary_axis(prof, expected_count=3)
+        assert len(axis.centers) == 3
+        # 第三个中心落在 ≈ 0.833 的点阵位置
+        assert abs(axis.centers[2] - 0.833) < 0.03
+
+    def test_count_capped_at_expected(self):
+        """候选多于 expected_count → 数量封顶"""
+        prof = _profile(600, [(15, 85), (115, 185), (215, 285),
+                              (315, 385), (415, 485), (515, 585)])
+        axis = _binary_axis(prof, expected_count=3)
+        assert len(axis.centers) == 3
+
+
+class TestDetectGridDebugImage:
+    """detect_grid 异常时保存调试图片"""
+
+    def test_saves_debug_image_on_row_mismatch(self, load_test_image):
+        """检测到的行数既不是 expected 也不是 expected-1 → 保存调试图到 logs/image/"""
+        img = load_test_image("image1.png")  # 实际 5 行
+        saved = []
+
+        def fake_imwrite(p, _img):
+            saved.append(str(p))
+            return True
+
+        with patch("src.workflows.align.cv2.imwrite", side_effect=fake_imwrite):
+            result = detect_grid(img, expected_rows=10, expected_cols=6)
+
+        # 检测到 5 行，既不是 10 也不是 9 → 应触发保存
+        assert result is not None
+        assert result.n_rows == 5
+        assert len(saved) == 1
+        # 文件名带检测/预期信息
+        assert "rows5_of_10" in saved[0]
+        assert "cols6_of_6" in saved[0]
+
+    def test_no_debug_image_when_rows_ok(self, load_test_image):
+        """行数满足 expected 或 expected-1 → 不保存调试图"""
+        img = load_test_image("image1.png")  # 实际 5 行
+
+        with patch("src.workflows.align.cv2.imwrite") as mock_imwrite:
+            result = detect_grid(img, expected_rows=5, expected_cols=6)
+
+        assert result is not None
+        assert result.n_rows == 5
+        mock_imwrite.assert_not_called()

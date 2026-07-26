@@ -361,6 +361,42 @@ class AttrRuleManager:
                     return result
         return None
 
+    def infer_level_quality(
+        self, equip_type: str | None, value: int
+    ) -> tuple[int | None, str | None]:
+        """仅凭基础属性值反查 (等级, 品阶)
+
+        基础属性数值全局唯一（跨等级、跨品阶、跨部位均不重复），
+        故 OCR 漏识别等级时，仍可仅凭数值反查出等级与品阶。
+
+        Args:
+            equip_type: 装备类型，可为 None
+            value: 属性值（武器范围取 max）
+
+        Returns:
+            (level, quality)；无匹配返回 (None, None)
+
+        策略：
+            1. 若 equip_type 已知，先在其对应类别内遍历全部等级
+            2. 否则/失败则遍历所有类别 × 所有等级贪婪匹配
+        """
+        # 策略 1：type 已知，只在其类别内遍历所有等级
+        if equip_type:
+            key = _TYPE_TO_KEY.get(equip_type)
+            if key:
+                for level, rule in self._base_rules.get(key, {}).items():
+                    quality = rule.infer_quality(value)
+                    if quality:
+                        return level, quality
+
+        # 策略 2：遍历所有类别 × 所有等级
+        for level_rules in self._base_rules.values():
+            for level, rule in level_rules.items():
+                quality = rule.infer_quality(value)
+                if quality:
+                    return level, quality
+        return None, None
+
 
 # ─── 全局单例 ─────────────────────────────────────────────
 

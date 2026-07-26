@@ -124,7 +124,7 @@ class TestAffixPool:
     def test_alias_resolved_to_dingyin(self, mgr):
         # 别名先归一到类别再查词库类型
         assert mgr.is_dingyin_affix("外功穿透")
-        assert mgr.is_dingyin_affix("属攻穿透")
+        assert mgr.is_dingyin_affix("无相穿透")
 
     def test_dingyin_chengyin_equals_cap(self, mgr):
         # 承音装备定音属性无限制，承音值 = cap（不乘 0.94）
@@ -167,6 +167,22 @@ class TestInferQuality:
 
     def test_unconfigured_level(self, mgr):
         assert mgr.infer_quality("剑", 42, 200) is None
+
+
+# ─── 仅凭数值反查等级+品阶（equip_level OCR 缺失兵底）────
+
+class TestInferLevelQuality:
+    def test_recover_level_and_quality_by_type(self, mgr):
+        # 冠胄 110 阶 purple = 8750；type 已知，无需等级即可反查
+        assert mgr.infer_level_quality("冠胄", 8750) == (110, "purple")
+
+    def test_recover_by_greedy_when_type_unknown(self, mgr):
+        # 类型未知，仅凭数值全局反查（chest 110 gold=19445 / head 110 blue=7778）
+        assert mgr.infer_level_quality(None, 19445) == (110, "gold")
+        assert mgr.infer_level_quality(None, 7778) == (110, "blue")
+
+    def test_no_match_returns_none_pair(self, mgr):
+        assert mgr.infer_level_quality("冠胄", 1) == (None, None)
 
 
 # ─── 武器类型 / 流派配置（顶层 weapon_types / schools）────

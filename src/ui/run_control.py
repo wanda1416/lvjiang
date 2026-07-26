@@ -601,6 +601,12 @@ class RunControlMixin:
         )
         wf_instance._selected_slots = selected_slots
         wf_instance._school_judges = school_judges
+        # 潜力判定配置（形状与 single_tuning._load_school_config 一致，
+        # 对齐 UI 实时勾选）：供 auto_tuning 的 judge_tuning_worthiness/
+        # judge_equipment_potential 使用
+        wf_instance._judge_configs = {
+            k: {**cfg, "keep_pvp": keep_pvp} for k, cfg in enabled.items()}
+        wf_instance._judge_schools = list(enabled)
 
         school_names = "、".join(j.school_name for j in school_judges)
         if keep_pvp:

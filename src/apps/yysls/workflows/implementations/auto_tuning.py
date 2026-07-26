@@ -1,9 +1,22 @@
-"""自动调律工作流 — 滚动流程测试"""
+"""自动调律工作流 — 端到端流水线
+
+遍历背包各部位 → 对每件用潜力判定（judge_tuning_worthiness）决定是否
+值得调律 → 值得的实际调律到词条满 → 每件产出结构化 report 回报给遍历
+循环（output["tuning_reports"]），并为「垃圾胚子处理」与「调律后回背包页
+的回收/转律/装上」预留空接口（_on_junk_blank / _on_equipment_done）。
+
+实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含移植自
+single_tuning，single_tuning 保持不动。
+"""
 
 from enum import Enum
 
 from loguru import logger
 
+from src.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
+from src.apps.yysls.evaluator import (
+    judge_equipment_potential, judge_tuning_worthiness,
+)
 from src.workflows.base import BaseWorkflow
 
 
@@ -31,7 +44,15 @@ class AutoTuningWorkflow(BaseWorkflow):
     GRID_SCENE = "bag_equip_detail"
     GRID_PANEL = "bag_grid"
 
+    # 调律执行相关场景/材料（移植自 single_tuning）
+    TUNE_SCENE = "equip_tune_detail"
+    RESULT_SCENE = "equip_tune_result"
+    MATERIAL_SLOTS = [f"material_{i}" for i in range(1, 8)]
+    MATERIAL_GROUP = "调律材料"
+    MAX_AFFIX = 5
+
     def run(self) -> dict:
+        self._ensure_judge_config()
         self._navigate_to_equip()
 
         selected = getattr(self, '_selected_slots', None)
@@ -56,29 +77,30 @@ class AutoTuningWorkflow(BaseWorkflow):
         result = self.ocr_scene("game_menu_page", ["wulinlu"])
         if result.get("wulinlu") != "武林录":
             self.click_region("game_main_page", "menu")
-            self.wait_delay("step_interval")
+            self.wait_delay("page_refresh_wait")  # 主界面 → 菜单页
         else:
             logger.info("当前在菜单页")
 
         self.click_region("game_menu_page", "bag")
-        self.wait_delay("step_interval")
+        self.wait_delay("page_refresh_wait")  # 菜单页 → 背包页
 
         bag_scan = self.ocr_scene("bag_equip_detail", ["sub_equip"])
         if "装备" not in bag_scan.get("sub_equip", ""):
             self.click_region("bag_equip_detail", "training")
-            self.wait_delay("step_interval")
+            self.wait_delay("page_refresh_wait")  # 背包页 → 调律训练页
 
     def _navigate_back(self):
         self.click_region("bag_equip_detail", "back")
-        self.wait_delay("step_interval")
+        self.wait_delay("page_refresh_wait")  # 背包详情页 → 菜单页
         self.click_region("game_menu_page", "back")
+        self.wait_delay("page_refresh_wait")  # 菜单页 → 主界面
 
     # ─── 部位处理 ──────────────────────────────────────────
 
     def _process_slot_group(self, slot: str, detail_scene: str):
         logger.info(f"── 处理部位: {slot} ──")
         self.click_region(self.GRID_SCENE, slot)
-        self.wait_delay("step_interval")
+        self.wait_delay("page_refresh_wait")  # 背包浏览页 → 装备详情页
         self._traverse_bag(detail_scene)
 
     # ─── 背包遍历（按 tuning-mechanics.md 设计）──────────────
@@ -87,7 +109,9 @@ class AutoTuningWorkflow(BaseWorkflow):
         """点击指定行第1列，等面板刷新后 OCR，返回 (装备名, 指纹, 装备dict)"""
         self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, 1)
         self.wait_delay("page_refresh_wait")
-        raw = self.ocr_scene(detail_scene, self.SCAN_FIELDS)
+        fields = self.SCAN_FIELDS + (["base_attr_2"]
+                                     if detail_scene == self.ARMOR_DETAIL else [])
+        raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
         name = equip.get("equip_type", "").split("|")[-1].strip() if equip else ""
         fp = self._make_fingerprint(equip)
@@ -112,7 +136,12 @@ class AutoTuningWorkflow(BaseWorkflow):
                 break
             fps.append(fp)
             logger.info(f"  新行{logical_row} grid[{win_row}][1] {name} fp={fp}")
-            self._judge_equipment(name, equip)
+            new_fp = self._process_equipment(name, equip, detail_scene)
+            # 调律会给该行首列装备加词条 → 指纹变化；用调律后指纹覆盖。
+            # 背包中该件位置不变，后续滚动再 OCR 到它时即可匹配上。
+            if new_fp and new_fp != fp:
+                logger.info(f"  行{logical_row} 调律后指纹更新: {fp} → {new_fp}")
+                fps[-1] = new_fp
             processed = logical_row
         return processed
 
@@ -122,8 +151,8 @@ class AutoTuningWorkflow(BaseWorkflow):
 
         严格按 tuning-mechanics.md 设计，不加任何额外逻辑。
         正常步进：返回 PROCESS。
-        连续 4 次滚少了：返回 BOTTOM（到底）。
-        连续 4 次滚多了：抛 RuntimeError（不应发生）。
+        连续 3 次滚少了：返回 BOTTOM（到底）。
+        连续 3 次滚多了：抛 RuntimeError（不应发生）。
         未知 nfp / 越界：抛异常，暴露问题。
         """
         # 大幅步进（1 行）
@@ -146,19 +175,19 @@ class AutoTuningWorkflow(BaseWorkflow):
                 return ScrollState.PROCESS, alignment.n_rows
             elif nfp == fps[first_real_row - 1]:
                 short_count += 1
-                logger.info(f"  滚少了({short_count}/4): nfp={nfp} == fps[{first_real_row - 1}]，补滚 0.25")
-                if short_count >= 4:
-                    logger.info("连续4次滚少了 → 到底")
+                logger.info(f"  滚少了({short_count}/3): nfp={nfp} == fps[{first_real_row - 1}]，补滚 0.25")
+                if short_count >= 3:
+                    logger.info("连续3次滚少了 → 到底")
                     return ScrollState.BOTTOM, alignment.n_rows
                 self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "up", distance=0.25)
                 self.wait_delay("scroll_settle_wait")
                 alignment = self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
             elif nfp == fps[first_real_row + 1]:
                 long_count += 1
-                logger.info(f"  滚多了({long_count}/4): nfp={nfp} == fps[{first_real_row + 1}]，回滚 0.25")
-                if long_count >= 4:
+                logger.info(f"  滚多了({long_count}/3): nfp={nfp} == fps[{first_real_row + 1}]，回滚 0.25")
+                if long_count >= 3:
                     raise RuntimeError(
-                        f"连续4次判定滚多了，不应发生："
+                        f"连续3次判定滚多了，不应发生："
                         f"nfp={nfp} first_real_row={first_real_row} fps={fps}"
                     )
                 self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "down", distance=0.25)
@@ -241,32 +270,253 @@ class AutoTuningWorkflow(BaseWorkflow):
                 logger.info(f"  剩余行处理完毕 row_index → {row_index}, fps={fps}")
 
 
-    # ─── 单件装备判定 ──────────────────────────────
+    # ─── 单件装备处理（潜力判定 + 实际调律 + 回报）────────
 
-    def _judge_equipment(self, name: str, equip: dict):
-        """对扫描到的新装备逐个执行选中流派的判定，结果记入 output["judgements"]。
+    def _process_equipment(self, name: str, equip: dict, detail_scene: str) -> str:
+        """对一件装备走完整链路：潜力判定 → 值得则调律到满 → 终局判定 → 回报。
 
-        _school_judges 未注入时跳过（兼容测试）；判定异常仅告警不中断遍历。
+        进入时已停在 bag_equip_detail（含 detail 区，_read_row 已点选该件）。
+        未调律分支（already_full/junk_blank/no_tune_entry）保持在背包页；
+        已调律分支调完后单次 back 返回背包浏览页，供遍历继续滚动。
+        每件产出结构化 report 追加进 output["tuning_reports"]。
+        返回该件调律后（终态）指纹，供上层更新行指纹（背包位置不变、仅词条增加）。
         """
-        judges = getattr(self, "_school_judges", None)
-        if not judges or not equip:
-            return
-        from src.apps.yysls.equip_parser.models import EquipmentData
+        if not equip:
+            return ""
         equip_data = EquipmentData.from_dict(equip)
-        for judge in judges:
-            try:
-                result = judge.judge(equip_data)
-            except Exception as e:
-                logger.warning(f"  [判定] {name} [{judge.school_name}] 失败: {e}")
+        affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
+        report: dict = {
+            "name": name,
+            "type": equip.get("type"),
+            "quality": equip.get("quality"),
+            "affix_count": affix_count,
+        }
+
+        # A. 词条已满 → 终局判定，不进调律
+        if affix_count >= self.MAX_AFFIX:
+            logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
+            judgement = self._final_judge(equip_data)
+            report["status"] = "already_full"
+            report["final_judgement"] = judgement
+            self._on_equipment_done(equip_data, judgement, report)
+            self.output.setdefault("tuning_reports", []).append(report)
+            return self._make_fingerprint(equip_data.to_dict())
+
+        # B. 潜力判定：不值得 → 垃圾胚子
+        worth, logs = judge_tuning_worthiness(
+            equip_data, self._judge_configs, self._judge_schools)
+        for line in logs:
+            logger.info(f"  潜力判定 | {line}")
+        report["worthiness"] = logs
+        if not worth:
+            logger.info(f"  [{name}] 判定不值得调律（垃圾胚子）")
+            self._on_junk_blank(equip_data, logs)
+            report["status"] = "junk_blank"
+            self.output.setdefault("tuning_reports", []).append(report)
+            return self._make_fingerprint(equip_data.to_dict())
+
+        # C. 值得 → 实际调律
+        food = self._decide_food(equip)
+        if not self._nav_to_tune(detail_scene):
+            logger.info(f"  [{name}] 未找到调律入口，跳过")
+            report["status"] = "no_tune_entry"
+            self.output.setdefault("tuning_reports", []).append(report)
+            return self._make_fingerprint(equip_data.to_dict())
+
+        rounds = 0
+        while affix_count < self.MAX_AFFIX and not self.is_stopped:
+            logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
+                        f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
+            self.wait_delay("page_refresh_wait")
+            result = self._tune_once(food)
+            if result is None:
+                break
+            rounds += 1
+            affix_count += 1
+            self._collect_new_affix(equip_data, result.get("tune_affix", ""))
+            if affix_count >= self.MAX_AFFIX:
+                break
+            if not self._judge_worthiness(equip_data):
+                logger.info("  新词条加入后已不再可达 顶级/优秀，提前结束调律")
+                report["stop_reason"] = "判定不再可达顶级/优秀"
+                break
+
+        # 返回背包浏览页：调律页单次 back 即回到 bag_equip_detail（装备位置保持不变）。
+        # 因进调律前点过「更多」弹出子菜单，back 回来后弹窗仍在，
+        # 再点一次「更多」more_func 使其收起，保持背包页干净以继续遍历。
+        self.click_region(self.TUNE_SCENE, "back")
+        self.wait_delay("page_refresh_wait")  # 调律页 → 背包详情页（页面切换）
+        self.click_region(detail_scene, "more_func")
+        self.wait_delay("step_interval")
+
+        judgement = self._final_judge(equip_data)
+        report["status"] = "tuned"
+        report["rounds"] = rounds
+        report["final_affix_count"] = affix_count
+        report["final_judgement"] = judgement
+        logger.info(f"  [{name}] 调律结束：共 {rounds} 轮，词条 {affix_count}/{self.MAX_AFFIX}")
+        self._on_equipment_done(equip_data, judgement, report)
+        self.output.setdefault("tuning_reports", []).append(report)
+        return self._make_fingerprint(equip_data.to_dict())
+
+    # ─── 预留接口（本次留空，仅 log + pass）──────────────
+
+    def _on_junk_blank(self, equip_data: EquipmentData, logs: list[str]):
+        """调律前判定为垃圾胚子的后处理（预留：回收）。当前仅记录不动作。"""
+        logger.info(f"  [垃圾胚子] {equip_data.name or equip_data.type}"
+                    f" 判定不值得调律（后处理待实现）")
+
+    def _on_equipment_done(self, equip_data: EquipmentData,
+                           judgement: dict, report: dict):
+        """单件调律完成/词条已满、回到背包页后的后处理挂载点。
+
+        预留：垃圾→回收、优秀→转律、顶级→装上等。当前仅按各流派最优
+        评级记录一行后 pass。
+        """
+        best = ""
+        for r in (judgement or {}).values():
+            if r.get("skipped") or r.get("not_applicable"):
                 continue
-            tag = "跳过" if result.skipped else result.rating.value
-            reasons = "；".join(result.reasons)
+            best = best or r.get("rating", "")
+        logger.info(f"  [完成] {equip_data.name or equip_data.type}"
+                    f" 最优评级={best or '无'}（后处理待实现）")
+
+    # ─── 判定配置兜底 ──────────────────────────────────────
+
+    def _ensure_judge_config(self):
+        """保证 _judge_configs/_judge_schools 可用。
+
+        优先用 run_control 注入的实时 UI 配置；未注入时回退读插件会话
+        tuning.schools + tuning.keep_pvp（复刻 single_tuning._load_school_config），
+        无有效配置时回退 (None, None) 即全部流派默认配置。
+        """
+        if getattr(self, "_judge_configs", None) is not None or \
+                getattr(self, "_judge_schools", None) is not None:
+            return
+        self._judge_schools = None
+        self._judge_configs = None
+        try:
+            from src.apps.yysls.session import get_plugin_session
+            section = get_plugin_session().get_section("tuning")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"读取流派配置失败，按全部流派默认判定: {e}")
+            return
+        raw = section.get("schools")
+        if not isinstance(raw, dict):
+            return
+        keep_pvp = bool(section.get("keep_pvp", False))
+        enabled = {k: {**cfg, "keep_pvp": keep_pvp}
+                   for k, cfg in raw.items()
+                   if isinstance(cfg, dict) and cfg.get("enabled")}
+        if enabled:
+            self._judge_schools = list(enabled)
+            self._judge_configs = enabled
+
+    # ─── 调律执行（移植自 single_tuning，single_tuning 保持不动）──
+
+    @staticmethod
+    def _decide_food(equip: dict) -> str:
+        """按首词条数值百分比与品阶决定每轮添加的狗粮，返回材料 label（空串=不加）"""
+        affix_1 = equip.get("affix_1") or {}
+        cap_pct = affix_1.get("cap_pct")
+        quality = equip.get("quality")
+        if cap_pct is not None and cap_pct >= 90:
+            logger.info(f"狗粮策略: 首词条 {cap_pct}% >= 90% → 每轮添加 金狗粮")
+            return "金狗粮"
+        if quality == "purple":
+            logger.info(f"狗粮策略: 首词条 {cap_pct}% < 90%，紫色品阶 → 每轮添加 紫狗粮")
+            return "紫狗粮"
+        if quality == "gold":
+            logger.info(f"狗粮策略: 首词条 {cap_pct}% < 90%，金色品阶 → 不添加狗粮")
+            return ""
+        logger.warning(f"狗粮策略: 品阶未知（quality={quality}），保守不添加狗粮")
+        return ""
+
+    def _judge_worthiness(self, equip_data: EquipmentData) -> bool:
+        """多流派 or 潜力判定：任一流派仍可达 顶级/优秀 即值得调律"""
+        worth, logs = judge_tuning_worthiness(
+            equip_data, self._judge_configs, self._judge_schools)
+        for line in logs:
+            logger.info(f"  潜力判定 | {line}")
+        return worth
+
+    def _collect_new_affix(self, equip_data: EquipmentData, text: str):
+        """把调律结果的新词条补充进装备数据，供下一轮判定使用"""
+        affix = get_equipment_parser().parse_affix_text(text, equip_data.level)
+        if affix is None:
+            logger.warning(f"调律结果词条无法解析: {text!r}，该槽位按未知处理")
+            return
+        equip_data.affixes.append(affix)
+        equip_data.extra_data["affix_count"] = len(equip_data.affixes)
+        pct = f"（{affix.cap_pct}%）" if affix.cap_pct is not None else ""
+        logger.info(f"新词条: {affix.name} {affix.value}{affix.unit or ''}{pct}")
+
+    def _final_judge(self, equip_data: EquipmentData) -> dict:
+        """终局判定：含转律模拟的各流派评级上限，返回结构化结果供 report/hook 消费"""
+        results = judge_equipment_potential(
+            equip_data, self._judge_configs, self._judge_schools)
+        for r in results.values():
+            tag = ("不适用" if r["not_applicable"]
+                   else "跳过" if r["skipped"] else r["rating"])
             logger.info(
-                f"  [判定] {name} | {equip.get('type', '')} | "
-                f"{judge.school_name}: {tag} | {reasons}")
-            entry = result.to_dict()
-            entry["school"] = judge.school_key
-            self.output.setdefault("judgements", []).append(entry)
+                f"  终局判定 | {r['name']}: {tag}（{'；'.join(r['reasons'])}）")
+        return results
+
+    def _nav_to_tune(self, detail_scene: str) -> bool:
+        """从装备详情页进入调律页，失败时停留在详情页并返回 False"""
+        self.click_region(detail_scene, "more_func")
+        self.wait_delay("page_refresh_wait")  # 详情页 → 「更多」弹窗展开
+        tune_key = self.ocr_scene_by(
+            detail_scene,
+            ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
+            "调律", "contains")
+        if not tune_key:
+            logger.info("未找到调律按钮")
+            # 「更多」弹窗已开，再点一次 more_func 使其收起，保持背包页干净
+            self.click_region(detail_scene, "more_func")
+            self.wait_delay("step_interval")
+            return False
+        self.click_region(detail_scene, tune_key)
+        self.wait_delay("page_refresh_wait")  # 详情页 → 调律页（页面切换）
+        return True
+
+    def _tune_once(self, food: str) -> dict | None:
+        """执行一轮调律：展开材料区→按策略选狗粮→一键添加→调律→收结果。
+
+        返回调律结果 OCR dict；返回 None 表示应终止循环（无添加入口/材料不足）。
+        """
+        add_scan = self.ocr_scene(self.TUNE_SCENE, ["auto_add", "auto_add_2"])
+        can_add = "添加" in add_scan.get("auto_add", "")
+        if "添加" in add_scan.get("auto_add_2", ""):
+            self.click_region(self.TUNE_SCENE, "expand")
+            self.wait_delay("page_refresh_wait")
+            can_add = True
+        if not can_add:
+            logger.info("未找到「添加」入口，视为无法继续调律")
+            return None
+
+        if food:
+            slot = self.recognize_materials_by(
+                self.TUNE_SCENE, self.MATERIAL_SLOTS,
+                food, "equals", group=self.MATERIAL_GROUP)
+            if not slot:
+                logger.warning(f"{food} 材料不足，提前结束调律")
+                return None
+            self.click_region(self.TUNE_SCENE, slot)
+            self.wait_delay("step_interval")
+
+        self.click_region(self.TUNE_SCENE, "auto_add")
+        self.wait_delay("step_interval")
+        self.click_region(self.TUNE_SCENE, "tune_btn")
+        self.wait_delay("step_interval")
+        self.wait_delay("after_tune_wait")
+
+        result = self.ocr_scene(self.RESULT_SCENE, ["tune_affix", "tune_tip"])
+        logger.info(f"调律结果: {result}")
+        self.output.setdefault("tune_results", []).append(result)
+        self.click_region(self.RESULT_SCENE, "close_btn")
+        self.wait_delay("step_interval")
+        return result
 
     # ─── 工具方法 ──────────────────────────────────────────
 

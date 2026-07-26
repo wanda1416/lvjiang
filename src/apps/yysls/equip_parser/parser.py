@@ -83,18 +83,29 @@ class EquipmentParser:
         return equip
 
     def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:
-        """根据 level + base_attr 推断品阶
+        """根据 base_attr 推断品阶；等级缺失时由数值反查回填等级+品阶
 
-        不强制依赖 type，因为防具气血值在不同类别间不重叠，
-        可直接根据 base_attr 值贪婪匹配品阶。
+        基础属性数值全局唯一，故即便 OCR 漏识别 equip_level，
+        也能仅凭 base_attr 值反查出等级与品阶，并回填 equip.level。
         """
-        if not equip.level or not equip.base_attr:
+        if not equip.base_attr:
             return None
         value = equip.base_attr.value
         # 武器 value 为 [min, max]，取 max
         if isinstance(value, list):
             value = value[1] if len(value) >= 2 else value[0]
-        return self._attr_config.infer_quality(equip.type, equip.level, value)
+
+        # 等级已知：常规按 (type, level, value) 推断品阶
+        if equip.level:
+            return self._attr_config.infer_quality(equip.type, equip.level, value)
+
+        # 等级缺失（OCR 漏识别）：数值全局唯一 → 反查同时得到 等级+品阶
+        level, quality = self._attr_config.infer_level_quality(equip.type, value)
+        if level is not None:
+            equip.level = level
+            logger.info(
+                f"equip_level OCR 缺失，由基础属性值 {value} 反查得等级 {level}")
+        return quality
 
     def parse_slot(self, slot_key: str, raw: dict) -> EquipmentData:
         """向后兼容别名，新代码请用 parse()"""

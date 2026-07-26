@@ -17,8 +17,11 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
+import cv2
 import numpy as np
 from loguru import logger
 
@@ -32,145 +35,122 @@ class SlotAxis:
     span_size: float = 0.0        # span 实际尺寸（归一化）
 
 
-def _binary_axis(line_means: np.ndarray, black_threshold: float = 30.0) -> SlotAxis:
-    """从一维亮度数组提取 slot 中心和边界
+def _find_runs(binary: np.ndarray) -> list[tuple[int, int]]:
+    """找连续 1 的区间 [start, end)（像素坐标）"""
+    runs: list[tuple[int, int]] = []
+    in_run = False
+    start = 0
+    for i, v in enumerate(binary):
+        if v == 1 and not in_run:
+            start, in_run = i, True
+        elif v == 0 and in_run:
+            runs.append((start, i))
+            in_run = False
+    if in_run:
+        runs.append((start, len(binary)))
+    return runs
 
-    算法：
-      1. 二值化：< threshold → 0（黑边），≥ threshold → 1（内容）
-      2. 找连续 1 的区间 → 每个 = 一个 slot
-      3. 区间起止 = slot 边界，区间中点 = slot 中心
+
+def _binary_axis(
+    line_means: np.ndarray,
+    expected_count: int,
+    black_threshold: float = 30.0,
+) -> SlotAxis:
+    """从一维亮度剖面拟合「规则周期网格」的 slot 中心与边界。
+
+    不再假设「每个亮区 = 一个 slot」（稀疏行、半截行、杂散亮区都会破坏
+    该假设），而是充分利用已知的 expected_count：
+
+      1. 二值化找亮区 run，取足够长的 run 作为「可靠 slot」锚点（滤掉半截/噪声）；
+      2. 由可靠 slot 间距的中位数估算网格周期 p（个别稀疏行漏检只会产生 2p
+         的间距，被中位数抹掉），并用全部可靠中心最小二乘修正相位；
+      3. 以该相位 + 周期在 [0, L] 上枚举所有 slot 候选——即使某行只有一
+         列有装备（整行偏暗、无 run），也会被周期点阵补上；而落在点阵外的
+         杂散亮区（如半周期处的偷看行）自然被排除；
+      4. 只保留「内容完整落在 panel 内」的候选（容差 = 5% slot，对应 ≥95% 可见）；
+      5. 数量以 expected_count 封顶，超出时保留邻域平均亮度最高的若干个。
 
     Args:
         line_means: 1D 数组，每行/每列的平均亮度
+        expected_count: 该轴期望的 slot 数（行数或列数），用作数量上限
         black_threshold: 黑边判定阈值（0-255）
 
     Returns:
-        SlotAxis(centers, boundaries)
+        SlotAxis(centers, boundaries, slot_size, span_size)
     """
     length = len(line_means)
-    if length == 0:
+    if length == 0 or expected_count <= 0:
         return SlotAxis(centers=[], boundaries=[])
 
-    # 二值化
     binary = (line_means >= black_threshold).astype(np.int8)
-
-    # 找连续 1 的区间（slot 区域）
-    runs: list[tuple[int, int]] = []  # (start, end) 像素坐标
-    in_run = False
-    run_start = 0
-    for i in range(length):
-        if binary[i] == 1 and not in_run:
-            run_start = i
-            in_run = True
-        elif binary[i] == 0 and in_run:
-            runs.append((run_start, i))
-            in_run = False
-    if in_run:
-        runs.append((run_start, length))
-
+    runs = _find_runs(binary)
     if not runs:
         logger.warning("binary_axis: 未检测到任何内容区域")
         return SlotAxis(centers=[], boundaries=[])
 
-    # 如果只有 1 个区间，无法区分 slot
-    if len(runs) == 1:
-        s, e = runs[0]
-        center = (s + e) / 2.0 / length
-        return SlotAxis(centers=[center], boundaries=[s / length, e / length])
+    run_centers = np.array([(s + e) / 2.0 for s, e in runs])
+    run_lengths = np.array([e - s for s, e in runs], dtype=float)
+    median_len = float(np.median(run_lengths))
 
-    # 过滤边缘短区间：如果边缘区间长度 < 95% 主区间长度，视为半截 slot
-    # 低于 95% 可见度的 slot 后续 OCR 不可靠，必须过滤
-    run_lengths = [e - s for s, e in runs]
-    median_length = float(np.median(run_lengths))
-    min_valid = 0.95 * median_length
+    # 可靠 slot：长度 ≥ 60% 中位数（滤掉半截行/杂散噪声，仅用于定周期与相位）
+    reliable_mask = run_lengths >= 0.6 * median_len
+    reliable_centers = run_centers[reliable_mask]
+    reliable_lengths = run_lengths[reliable_mask]
+    if reliable_centers.size == 0:
+        reliable_centers, reliable_lengths = run_centers, run_lengths
 
-    # 检查首尾区间是否为短区间
-    filtered_runs = list(runs)
-    if len(filtered_runs) > 1 and (filtered_runs[0][1] - filtered_runs[0][0]) < min_valid:
-        logger.debug(
-            f"binary_axis: 合并首部短区间 "
-            f"(长度={filtered_runs[0][1] - filtered_runs[0][0]}, "
-            f"阈值={min_valid:.0f})"
-        )
-        filtered_runs.pop(0)
-    if len(filtered_runs) > 1 and (filtered_runs[-1][1] - filtered_runs[-1][0]) < min_valid:
-        logger.debug(
-            f"binary_axis: 合并尾部短区间 "
-            f"(长度={filtered_runs[-1][1] - filtered_runs[-1][0]}, "
-            f"阈值={min_valid:.0f})"
-        )
-        filtered_runs.pop()
-
-    runs = filtered_runs
-
-    # 构建边界
-    # 相邻 run 之间的 0 区域 = span，边界 = span 中点
-    boundaries: list[float] = []
-
-    # 首边界：第一个 run 之前的 span 中点
-    # 如果首部被过滤，用第一个 run 起始位置往前推半个周期
-    # 如果首部未被过滤（完整 slot），用 run 起始位置（span 中点）
-    first_run_start = runs[0][0]
-    if first_run_start > 0:
-        # 有前置 span，取 span 中点作为边界
-        # span 起点 ≈ 前一个 run 的结束位置，但我们不知道（已被过滤）
-        # 用当前 run 起始位置 - 半个 span 宽度估算
-        # 简化：直接用第一个 run 的起始位置作为边界（span 结束 = slot 开始）
-        boundaries.append(first_run_start / length)
+    # 估算周期 p（像素）
+    if reliable_centers.size >= 2:
+        gaps = np.diff(np.sort(reliable_centers))
+        period = float(np.median(gaps))
     else:
-        boundaries.append(0.0)
+        # 只有单个可靠 slot：退化为「满格时铺满 panel」假设
+        period = length / expected_count
+    if period <= 1e-6:
+        period = length / expected_count
 
-    # 内部边界：相邻 run 之间的 span 中点
-    for i in range(len(runs) - 1):
-        gap_start = runs[i][1]      # 当前 slot 结束位置
-        gap_end = runs[i + 1][0]    # 下一个 slot 开始位置
-        boundary = (gap_start + gap_end) / 2.0 / length
-        boundaries.append(boundary)
+    slot_len = min(float(np.median(reliable_lengths)), period)
+    half_slot = slot_len / 2.0
 
-    # 尾边界：最后一个 run 之后的 span 中点
-    last_run_end = runs[-1][1]
-    if last_run_end < length:
-        boundaries.append(last_run_end / length)
-    else:
-        boundaries.append(1.0)
+    # 用全部可靠中心最小二乘拟合相位（对齐到同一点阵，抗单点偏差）
+    a0 = float(reliable_centers[0])
+    ks = np.round((reliable_centers - a0) / period)
+    anchor = float(np.mean(reliable_centers - ks * period))
 
-    # 中心 = 相邻边界的中点
-    centers = [(boundaries[i] + boundaries[i + 1]) / 2.0
-               for i in range(len(boundaries) - 1)]
+    # 以 anchor 对齐相位，向前后枚举覆盖 [0, L] 的候选中心
+    k_lo = int(np.floor(-anchor / period)) - 1
+    k_hi = int(np.ceil((length - anchor) / period)) + 1
+    candidates = sorted(anchor + k * period for k in range(k_lo, k_hi + 1))
 
-    # slot / span 实际尺寸（归一化）
-    # slot = 有效 run 长度的中位数；span = 相邻 run 间隙的中位数
-    slot_sizes = [e - s for s, e in runs]
-    gap_sizes = [runs[i + 1][0] - runs[i][1] for i in range(len(runs) - 1)]
-    slot_size = float(np.median(slot_sizes)) / length
-    span_size = float(np.median(gap_sizes)) / length if gap_sizes else 0.0
+    # 可见性：slot 内容需完整落在 panel 内（容差 = 5% slot，对应「≥95% 可见」）
+    eps = 0.05 * slot_len
+    visible = [c for c in candidates
+               if c - half_slot >= -eps and c + half_slot <= length + eps]
+    if not visible:
+        logger.warning("binary_axis: 无完整可见 slot")
+        return SlotAxis(centers=[], boundaries=[])
 
-    # 等距补全：用周期推导被漏掉的 slot（首尾行/列装备少时会被亮度过滤漏掉）
-    # 约束：推导出的 slot 边缘（center ± period/2）不能超出 [0, 1]，否则边界不清晰
-    if len(centers) >= 2:
-        period = centers[1] - centers[0]
-        half_period = period / 2.0
+    # 数量封顶：超出 expected_count 时保留邻域平均亮度最高的若干个
+    if len(visible) > expected_count:
+        def _brightness(c: float) -> float:
+            lo, hi = max(0, int(c - half_slot)), min(length, int(c + half_slot))
+            return float(np.mean(line_means[lo:hi])) if hi > lo else 0.0
+        visible = sorted(sorted(visible, key=_brightness,
+                                reverse=True)[:expected_count])
 
-        # 向前推导（补全首部被漏掉的 slot）
-        prev_center = centers[0] - period
-        while prev_center - half_period >= 0:
-            centers.insert(0, prev_center)
-            prev_center -= period
+    centers = [c / length for c in visible]
+    half_p = (period / length) / 2.0
+    boundaries = [max(0.0, centers[0] - half_p)]
+    for i in range(len(centers) - 1):
+        boundaries.append((centers[i] + centers[i + 1]) / 2.0)
+    boundaries.append(min(1.0, centers[-1] + half_p))
 
-        # 向后推导（补全尾部被漏掉的 slot）
-        next_center = centers[-1] + period
-        while next_center + half_period <= 1.0:
-            centers.append(next_center)
-            next_center += period
-
-        # 重新计算 boundaries（保持和 centers 的关系一致）
-        boundaries = [centers[0] - half_period]
-        for i in range(len(centers) - 1):
-            boundaries.append((centers[i] + centers[i + 1]) / 2.0)
-        boundaries.append(centers[-1] + half_period)
-
-    return SlotAxis(centers=centers, boundaries=boundaries,
-                    slot_size=slot_size, span_size=span_size)
+    return SlotAxis(
+        centers=centers,
+        boundaries=boundaries,
+        slot_size=slot_len / length,
+        span_size=max(0.0, period - slot_len) / length,
+    )
 
 
 @dataclass(frozen=True)
@@ -243,8 +223,8 @@ def detect_grid(
     row_means = np.mean(gray, axis=1)  # 每行所有像素的平均亮度
     col_means = np.mean(gray, axis=0)  # 每列所有像素的平均亮度
 
-    row_axis = _binary_axis(row_means, black_threshold)
-    col_axis = _binary_axis(col_means, black_threshold)
+    row_axis = _binary_axis(row_means, expected_rows, black_threshold)
+    col_axis = _binary_axis(col_means, expected_cols, black_threshold)
 
     if not row_axis.centers or not col_axis.centers:
         logger.error(
@@ -285,4 +265,35 @@ def detect_grid(
         f"detect_grid: 检测到 {result.n_rows}/{expected_rows} 行 × "
         f"{result.n_cols}/{expected_cols} 列 = {result.total_slots} 个有效 slot"
     )
+
+    # 异常结果保存调试图片，便于后续分析算法
+    rows_ok = result.n_rows in (expected_rows, expected_rows - 1)
+    cols_ok = result.n_cols == expected_cols
+    if not (rows_ok and cols_ok):
+        _save_debug_image(
+            image,
+            f"rows{result.n_rows}_of_{expected_rows}_cols{result.n_cols}_of_{expected_cols}",
+        )
+
     return result
+
+
+def _save_debug_image(image: np.ndarray, tag: str) -> Path | None:
+    """保存 detect_grid 异常结果的原图到 logs/image/，便于离线分析算法。
+
+    文件名格式：{YYYYMMDD_HHMMSS}_{tag}.png
+    返回保存路径；保存失败返回 None（仅 log，不抛异常）。
+    """
+    try:
+        out_dir = Path("logs/image")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        out_path = out_dir / f"{ts}_{tag}.png"
+        if not cv2.imwrite(str(out_path), image):
+            logger.warning(f"detect_grid: 调试图片保存失败 {out_path}")
+            return None
+        logger.info(f"detect_grid: 异常结果已保存调试图 → {out_path}")
+        return out_path
+    except Exception as e:
+        logger.warning(f"detect_grid: 保存调试图片异常: {e}")
+        return None

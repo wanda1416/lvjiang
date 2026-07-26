@@ -166,9 +166,9 @@ class TestSchoolConfigWidget:
         # 分组标题 = 规则名；武器规则复选框文本含主副武器摘要
         w = SchoolConfigWidget()
         qtbot.addWidget(w)
-        for key, title in (("heal_pure", "治疗-纯奶"),
-                           ("heal_fire", "火拳奶"),
-                           ("lieshi_small", "裂石·小外")):
+        for key, title in (("heal_pure", "治疗纯奶"),
+                           ("heal_fire", "治疗火拳"),
+                           ("lieshi_small", "裂石小外")):
             assert w._school_widgets[key]["group"].title() == title
         cb = w._school_widgets["heal_pure"]["weapon_rules"]["纯奶"]
         assert cb.text() == "纯奶（主 扇 / 副 伞）"

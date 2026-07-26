@@ -222,7 +222,12 @@ class TestParseFullChain:
         assert len(equip.affixes) == 4
         assert equip.warnings == []
 
-    def test_no_level_no_quality_no_cap_pct(self, parser):
+    def test_level_recovered_from_base_attr_when_ocr_missing(self, parser):
+        # equip_level OCR 漏识别 → 基础属性值全局唯一，反查回填 等级+品阶
+        # base_attr max 232 属于 剑 110 阶 gold 区间 → 回填 level=110, quality=gold
         equip = parser.parse(_weapon_raw(equip_level=""))
-        assert equip.quality is None
-        assert all(a.cap_pct is None for a in equip.affixes)
+        assert equip.level == 110
+        assert equip.quality == "gold"
+        # 等级回填后 cap_pct 也能正常计算（后续链路受益）
+        assert equip.affixes[0].cap_pct == 100.0
+        assert equip.affixes[1].cap_pct == 50.0

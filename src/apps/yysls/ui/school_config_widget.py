@@ -29,14 +29,14 @@ class SchoolConfigWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        from src.apps.yysls.evaluator import SCHOOL_CLASSES
+        from src.apps.yysls.evaluator import get_school_rules
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         # 流派 key → 控件集：{"group": QGroupBox, "content": QWidget|None,
         #   "keep_pvp": QCheckBox|None, "sub_schools": {sub_key: QCheckBox},
         #   "playstyles": {sub_key: {ps_key: QCheckBox}}, "playstyle_rows": {sub_key: QWidget}}
         self._school_widgets: dict[str, dict] = {}
-        for key, cls in SCHOOL_CLASSES.items():
+        for key, cls in get_school_rules().items():
             title = cls.school_name if cls.implemented else f"{cls.school_name}（未实现）"
             grp = QGroupBox(title)
             grp.setCheckable(True)

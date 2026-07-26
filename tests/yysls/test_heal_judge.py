@@ -1,7 +1,8 @@
-"""治疗流派 判定器测试
+"""治疗流派（纯奶/火拳奶）判定器测试（通用规则引擎）
 
-覆盖 04-tuning-mechanics.md「治疗流派纯奶/火拳奶各部位词条要求」，
-以及子玩法合并择优、部位映射、调律潜力（万能牌+转律模拟）场景。
+覆盖 04-治疗纯奶调律说明.md / 05-治疗火拳奶调律说明.md
+第九节全部判定例子，以及双变体择优标签、品阶/首词条筛选、
+调律潜力判定等场景。
 """
 
 import pytest
@@ -26,7 +27,7 @@ def make_equip(equip_type: str, affix_names: list[str],
 
 @pytest.fixture
 def heal():
-    """默认配置：纯奶 + 火拳奶 全选"""
+    """未限定玩法（纯奶 + 火拳奶均激活，取评级最高）"""
     return get_school_judge("heal")
 
 
@@ -40,174 +41,208 @@ def fire():
     return get_school_judge("heal", {"sub_schools": ["fire"]})
 
 
-# ─── 主武器（扇） ──────────────────────────────────────────
+# ─── 04 文档第九节判定例子（纯奶） ─────────────────────────
 
-class TestMainWeapon:
-    def test_pure_top(self, heal):
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲",
-                              "最小外功攻击", "劲"])
+class TestPureDocExamples:
+    def test_1_fan_top(self, pure):
+        # 势 在纯奶词条库内且不被顶级条件排除
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "势"])
+        assert pure.judge(e).rating == Rating.TOP
+
+    def test_2_fan_huixin_excellent(self, pure):
+        # 主武器首词条 大外/小外 均可；会心破坏顶级条件 → 优秀
+        e = make_equip("扇", ["最小外功攻击", "扇武学增效", "最大外功攻击", "劲", "会心率"])
+        assert pure.judge(e).rating == Rating.EXCELLENT
+
+    def test_3_umbrella_min_huixin_excellent(self, pure):
+        # 敏+会心 同时出现 → 优秀
+        e = make_equip("伞", ["最大外功攻击", "最小外功攻击", "劲", "敏", "会心率"])
+        assert pure.judge(e).rating == Rating.EXCELLENT
+
+    def test_4_umbrella_top(self, pure):
+        e = make_equip("伞", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "敏"])
+        assert pure.judge(e).rating == Rating.TOP
+
+    def test_5_ring_top(self, pure):
+        # 无 敏 不触发 敏+会心 同现 → 顶级
+        e = make_equip("环", ["最小外功攻击", "全武学增效", "劲", "最大外功攻击", "会心率"])
+        assert pure.judge(e).rating == Rating.TOP
+
+    def test_6_ring_own_attr_excellent(self, pure):
+        # 最大牵丝攻击 → 大本属（大无相）→ 优秀
+        e = make_equip("环", ["最大外功攻击", "全武学增效", "劲", "敏", "最大牵丝攻击"])
+        assert pure.judge(e).rating == Rating.EXCELLENT
+
+    def test_7_helm_double_huixin_top(self, pure):
+        e = make_equip("冠胄", ["会心率", "最大外功攻击", "劲", "敏", "会心率"],
+                       quality="purple")
+        assert pure.judge(e).rating == Rating.TOP
+
+    def test_8_leg_top(self, pure):
+        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "势"],
+                       quality="purple")
+        assert pure.judge(e).rating == Rating.TOP
+
+    def test_9_leg_boss_damage_junk(self, pure):
+        # 纯奶胫甲不需要 对首领单位增伤 → 废神力词条 → 垃圾
+        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "敏"],
+                       quality="purple")
+        assert pure.judge(e).rating == Rating.JUNK
+
+    def test_10_wrist_jingzhun_junk(self, pure):
+        # 精准 不在纯奶词条库 → 垃圾
+        e = make_equip("腕甲", ["劲", "对玩家单位增效", "最大外功攻击", "精准率", "敏"],
+                       quality="purple")
+        assert pure.judge(e).rating == Rating.JUNK
+
+
+# ─── 05 文档第九节判定例子（火拳奶） ───────────────────────
+
+class TestFireDocExamples:
+    def test_1_fan_top(self, fire):
+        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "势"])
+        assert fire.judge(e).rating == Rating.TOP
+
+    def test_2_fan_zengxiao_junk(self, fire):
+        # 火拳奶不需要 扇武学增效 → 废神力词条 → 垃圾
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最大外功攻击", "劲", "敏"])
+        assert fire.judge(e).rating == Rating.JUNK
+
+    def test_3_umbrella_min_huixin_excellent(self, fire):
+        e = make_equip("伞", ["最大外功攻击", "最大外功攻击", "最小外功攻击", "敏", "会心率"])
+        assert fire.judge(e).rating == Rating.EXCELLENT
+
+    def test_4_ring_top(self, fire):
+        # 精准 在火拳奶词条库内且不被顶级条件排除
+        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "劲", "精准率", "会心率"])
+        assert fire.judge(e).rating == Rating.TOP
+
+    def test_5_ring_quanwuxue_junk(self, fire):
+        # 火拳奶环不需要 全武学增效 → 垃圾
+        e = make_equip("环", ["最大外功攻击", "全武学增效", "最大外功攻击", "劲", "敏"])
+        assert fire.judge(e).rating == Rating.JUNK
+
+    def test_6_helm_top(self, fire):
+        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "劲", "会心率"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.TOP
+
+    def test_7_helm_own_attr_excellent(self, fire):
+        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "敏", "最大牵丝攻击"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.EXCELLENT
+
+    def test_8_leg_top(self, fire):
+        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "势"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.TOP
+
+    def test_9_leg_jingzhun_excellent(self, fire):
+        # 胫甲顶级条件排除 会心/精准 → 优秀
+        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "敏", "精准率"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.EXCELLENT
+
+    def test_10_wrist_wuxiang_junk(self, fire):
+        # 防具上 最小无相攻击 属错位属攻 → 垃圾
+        e = make_equip("腕甲", ["劲", "对首领单位增伤", "最大外功攻击", "最小无相攻击", "敏"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.JUNK
+
+
+# ─── 双变体择优与标签 ──────────────────────────────────────
+
+class TestVariantSelection:
+    def test_fan_pure_top_with_label(self, heal):
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲", "最小外功攻击", "劲"])
         r = heal.judge(e)
         assert r.rating == Rating.TOP
-        assert any("纯奶" in s for s in r.reasons)
+        assert any(s.startswith("[纯奶]") for s in r.reasons)
 
-    def test_pure_excellent_with_wuxiang(self, heal):
-        # 可选槽被 大无相 占据：命中模式但顶级条件破 → 优秀
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲",
-                              "最小外功攻击", "最大无相攻击"])
-        assert heal.judge(e).rating == Rating.EXCELLENT
-
-    def test_fire_top_without_damage(self, heal):
-        # 火拳奶主武器无增伤要求；纯奶视角缺扇武学增效 → 取火拳最优
-        e = make_equip("扇", ["最大外功攻击", "劲", "劲", "敏", "敏"])
+    def test_fan_fire_top_with_label(self, heal):
+        # 纯奶主武器缺 扇武学增效 → 垃圾；火拳奶命中 → 择优火拳奶
+        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "敏", "敏"])
         r = heal.judge(e)
         assert r.rating == Rating.TOP
-        assert any("火拳奶" in s for s in r.reasons)
+        assert any(s.startswith("[火拳奶]") for s in r.reasons)
 
-    def test_pure_only_junk_without_damage(self, pure):
-        # 仅勾选纯奶：缺失扇武学增效直接垃圾
-        e = make_equip("扇", ["最大外功攻击", "劲", "劲", "敏", "敏"])
-        r = pure.judge(e)
-        assert r.rating == Rating.JUNK
-        assert any("增伤" in s for s in r.reasons)
+    def test_ring_pure_top(self, heal):
+        e = make_equip("环", ["最大外功攻击", "全武学增效", "劲", "劲", "会心率"])
+        r = heal.judge(e)
+        assert r.rating == Rating.TOP
+        assert any(s.startswith("[纯奶]") for s in r.reasons)
 
-    def test_main_pool_has_no_huixin(self, heal):
-        # 会心是池内词条但主武器无槽位 → 模式未命中，能用
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲",
-                              "劲", "会心率"])
-        assert heal.judge(e).rating == Rating.USABLE
+    def test_pendant_fire_top(self, heal):
+        # 佩归并为环：纯奶缺 全武学增效 → 垃圾；火拳奶命中
+        e = make_equip("佩", ["最大外功攻击", "最大外功攻击", "劲", "敏", "劲"])
+        r = heal.judge(e)
+        assert r.rating == Rating.TOP
+        assert any(s.startswith("[火拳奶]") for s in r.reasons)
 
-    def test_first_affix_mismatch_skipped(self, heal):
-        e = make_equip("扇", ["劲", "扇武学增效", "劲", "最大外功攻击", "劲"])
+
+# ─── 筛选与边界 ────────────────────────────────────────────
+
+class TestScreening:
+    def test_jin_first_fan_skipped(self, heal):
+        e = make_equip("扇", ["劲", "最大外功攻击", "劲", "敏", "势"])
         r = heal.judge(e)
         assert r.skipped and not r.not_applicable
 
     def test_purple_weapon_skipped(self, heal):
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲"],
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲", "最小外功攻击", "劲"],
                        quality="purple")
         assert heal.judge(e).skipped
 
-
-# ─── 副武器（伞）与首饰 ────────────────────────────────────
-
-class TestSubWeaponAndRing:
-    def test_umbrella_top(self, heal):
-        e = make_equip("伞", ["最小外功攻击", "劲", "最大外功攻击",
-                              "劲", "敏"])
-        assert heal.judge(e).rating == Rating.TOP
-
-    def test_umbrella_min_huixin_excellent(self, heal):
-        # 敏和会心同时出现 → 顶级条件破，优秀
-        e = make_equip("伞", ["最小外功攻击", "劲", "最大外功攻击",
-                              "会心率", "敏"])
-        assert heal.judge(e).rating == Rating.EXCELLENT
-
-    def test_umbrella_wuxue_junk(self, heal):
-        # 两个玩法均不需要伞武学增伤 → 垃圾
-        e = make_equip("伞", ["最大外功攻击", "伞武学增伤", "劲",
-                              "劲", "敏"])
-        assert heal.judge(e).rating == Rating.JUNK
-
-    def test_ring_pure_needs_quanwuxue(self, heal):
-        # 纯奶环需要全武学增效；火拳奶不需要（全武学在火拳视角是垃圾）
-        e = make_equip("环", ["最大外功攻击", "全武学增效", "劲",
-                              "劲", "会心率"])
+    def test_jian_not_applicable(self, heal):
+        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"])
         r = heal.judge(e)
-        assert r.rating == Rating.TOP
-        assert any("纯奶" in s for s in r.reasons)
+        assert r.skipped and r.not_applicable
 
-    def test_ring_fire_without_quanwuxue(self, heal):
-        e = make_equip("佩", ["最大外功攻击", "劲", "最小外功攻击",
-                              "敏", "劲"])
-        r = heal.judge(e)
-        assert r.rating == Rating.TOP
-        assert any("火拳奶" in s for s in r.reasons)
-
-    def test_ring_qiansi_attack_is_wuxiang(self, heal):
-        # 非武器部位 最大牵丝攻击 视作大无相：命中模式但顶级破 → 优秀
-        e = make_equip("环", ["最大外功攻击", "全武学增效", "劲",
-                              "最大牵丝攻击", "劲"])
-        assert heal.judge(e).rating == Rating.EXCELLENT
-
-
-# ─── 防具 ──────────────────────────────────────────────────
-
-class TestArmor:
-    def test_helm_pure_top(self, heal):
-        e = make_equip("冠胄", ["会心率", "劲", "最大外功攻击",
-                                "劲", "最小外功攻击"], quality="purple")
-        assert heal.judge(e).rating == Rating.TOP
-
-    def test_helm_fire_needs_qishu(self, fire):
-        # 火拳奶头盔必需 单体奇术增伤
-        e = make_equip("胸甲", ["会心率", "单体类奇术增伤", "劲",
-                                "最大外功攻击", "劲"])
-        assert fire.judge(e).rating == Rating.TOP
-        e2 = make_equip("胸甲", ["会心率", "劲", "最大外功攻击",
-                                 "劲", "敏"])
-        r = fire.judge(e2)
-        assert r.rating == Rating.JUNK
-        assert any("增伤" in s for s in r.reasons)
-
-    def test_leg_pure_needs_player_effect(self, pure):
-        # 纯奶胫甲必需 对玩家增效（核心词条而非 PVP 保留）
-        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击",
-                                "劲", "敏"])
+    def test_leg_player_effect_not_pvp_flag(self, pure):
+        # 对玩家增效是纯奶胫甲的必需词条而非 PVP 保留（heal 无 keep_pvp）
+        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击", "劲", "敏"],
+                       quality="purple")
         r = pure.judge(e)
         assert r.rating == Rating.TOP
         assert not r.is_pvp
 
-    def test_leg_fire_needs_boss_damage(self, heal):
-        e = make_equip("腕甲", ["劲", "对首领单位增伤", "劲",
-                                "敏", "会心率"])
-        r = heal.judge(e)
-        assert r.rating == Rating.EXCELLENT  # 敏+会心同时出现
-        assert any("火拳奶" in s for s in r.reasons)
 
-    def test_uncovered_weapon_not_applicable(self, heal):
-        e = make_equip("剑", ["最大外功攻击", "劲", "劲"])
-        r = heal.judge(e)
-        assert r.skipped and r.not_applicable
-
-
-# ─── 调律潜力（万能牌 + 转律模拟） ─────────────────────────
+# ─── 调律潜力判定 ──────────────────────────────────────────
 
 class TestTuningWorthiness:
-    def test_partial_top_potential(self, heal):
+    def test_fan_with_damage_top(self, heal):
         e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲"])
-        r = heal.check_tuning_worthiness(e)
-        assert r.rating == Rating.TOP
+        assert heal.check_tuning_worthiness(e).rating == Rating.TOP
 
-    def test_pure_only_missing_damage_fillable(self, pure):
-        # 缺扇武学增效但仍有空槽 → 万能牌可补足
+    def test_pure_fan_empty_slots_supply_damage(self, pure):
+        # 缺 扇武学增效 但有 2 个空槽可补 → 仍可达顶级
         e = make_equip("扇", ["最大外功攻击", "劲", "劲"])
         assert pure.check_tuning_worthiness(e).rating == Rating.TOP
 
-    def test_pure_only_missing_damage_full_slots(self, pure):
-        # 词条已满且缺扇武学增效：转律不产神力 → 上限能用
+    def test_pure_fan_full_slots_usable(self, pure):
+        # 满槽缺增伤：转律不产生神力词条 → 上限能用
         e = make_equip("扇", ["最大外功攻击", "劲", "劲", "敏", "敏"])
         assert pure.check_tuning_worthiness(e).rating == Rating.USABLE
 
     def test_junk_affix_transmutable(self, heal):
-        # 单条废词条（势 不在治疗词条池）可被转律洗掉
-        e = make_equip("伞", ["最大外功攻击", "劲", "势"])
+        # 会意率 在两变体库外，可转律洗掉 → 仍可达顶级
+        e = make_equip("伞", ["最大外功攻击", "劲", "会意率"])
         r = heal.check_tuning_worthiness(e)
         assert r.rating == Rating.TOP
         assert any("模拟转律" in s for s in r.reasons)
 
     def test_double_junk_ceiling(self, heal):
-        # 双废词条只能洗一条 → 垃圾
-        e = make_equip("伞", ["最大外功攻击", "劲", "势", "会意率"])
+        e = make_equip("伞", ["最大外功攻击", "劲", "会意率", "最大鸣金攻击"])
         assert heal.check_tuning_worthiness(e).rating == Rating.JUNK
 
-    def test_wuxiang_transmutable_to_top(self, heal):
-        # 大无相破顶级条件，转律洗掉后仍可达顶级
+    def test_dawuxiang_transmutable_top(self, heal):
+        # 大无相破坏顶级条件，可转律洗掉 → 仍可达顶级
         e = make_equip("伞", ["最大外功攻击", "劲", "最大无相攻击", "劲"])
         r = heal.check_tuning_worthiness(e)
         assert r.rating == Rating.TOP
         assert any("模拟转律" in s for s in r.reasons)
 
-    def test_or_judgment_includes_heal(self):
-        # 扇（会意不适用）由治疗流派给出值得结论
+    def test_worthiness_via_heal(self):
         e = make_equip("扇", ["最大外功攻击", "扇武学增效"])
         worth, logs = judge_tuning_worthiness(e, schools=["heal"])
         assert worth

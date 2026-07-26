@@ -72,7 +72,8 @@ class SchoolJudge(ABC):
     子类需实现:
     - judge: 对完整装备进行穷举匹配定级
 
-    类属性:
+    元数据（GenericSchoolJudge 构造时由规则填充为实例属性，
+    类属性仅作默认值）:
     - school_key: 流派标识（配置持久化用）
     - school_name: 流派显示名
     - implemented: 判定逻辑是否已实现（未实现的流派 judge 抛 NotImplementedError）

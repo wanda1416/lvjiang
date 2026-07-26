@@ -1,66 +1,53 @@
-"""流派注册与判定器工厂
+"""流派注册与判定器工厂（规则驱动）
 
-流派清单来自 docs/10-game/04-tuning-mechanics.md「调律喜好配置」。
-目前 会意流派-通用、会心流派-大外流/小外流、
-治疗流派（纯奶/火拳奶子玩法合并）均已实现。
+流派清单来自 config/system/yysls/tuning_rules/ 下的规则 YAML
+（TuningRuleManager 加载），判定统一由 GenericSchoolJudge 完成。
+规则变更（含 UI「装备调律规则」编辑保存）后 reload 即生效。
 """
 
 from .base import Rating, SchoolJudge
-from .heal import HealJudge
-from .huiyi import HuiyiGeneralJudge
-from .huixin import (
-    SUB_SCHOOL_PLAYSTYLES, SUB_SCHOOLS, HuixinBigJudge, HuixinSmallJudge,
-)
+from .generic import GenericSchoolJudge
+from .rules import SchoolRule, get_tuning_rule_manager
 
-# 会心二级配置 SUB_SCHOOLS / SUB_SCHOOL_PLAYSTYLES 已下沉到 huixin，
-# 此处再导出保持公共 API 不变。
 __all__ = [
-    "SUB_SCHOOLS", "SUB_SCHOOL_PLAYSTYLES", "SCHOOL_CLASSES", "SCHOOLS",
+    "get_school_rules", "get_schools",
     "is_school_implemented", "get_school_judge", "judge_tuning_worthiness",
 ]
 
 
-# ─── 流派注册表 ────────────────────────────────────────────
+# ─── 流派注册表（每次查询管理器，保证 reload 后不过期） ───
 
-# key → 判定器类（UI 据类属性 has_keep_pvp/needs_sub_school/
-# sub_school_options 生成配置控件）
-SCHOOL_CLASSES: dict[str, type[SchoolJudge]] = {
-    cls.school_key: cls
-    for cls in (
-        HuiyiGeneralJudge,
-        HuixinSmallJudge,
-        HuixinBigJudge,
-        HealJudge,
-    )
-}
+def get_school_rules() -> dict[str, SchoolRule]:
+    """key → SchoolRule（按规则 order 排序；UI 据其元数据属性
+    has_keep_pvp/needs_sub_school/sub_school_options 生成配置控件）"""
+    return get_tuning_rule_manager().get_rules()
 
-# key → 显示名（供 UI 使用，保持定义顺序）
-SCHOOLS: dict[str, str] = {
-    key: cls.school_name for key, cls in SCHOOL_CLASSES.items()
-}
+
+def get_schools() -> dict[str, str]:
+    """key → 显示名（供 UI 使用，保持规则 order 顺序）"""
+    return {key: rule.name for key, rule in get_school_rules().items()}
 
 
 def is_school_implemented(school: str) -> bool:
-    """流派判定逻辑是否已实现"""
-    cls = SCHOOL_CLASSES.get(school)
-    return cls is not None and cls.implemented
+    """流派判定逻辑是否已实现（规则加载成功即已实现）"""
+    return get_tuning_rule_manager().get_rule(school) is not None
 
 
 def get_school_judge(school: str, config: dict | None = None) -> SchoolJudge:
     """创建指定流派的判定器实例
 
     Args:
-        school: 流派标识（SCHOOLS 的 key）
+        school: 流派标识（规则 YAML 的 key）
         config: 该流派的配置 dict，如 {"keep_pvp": True,
             "sub_schools": [...], "playstyles": {...}}
 
     Raises:
         ValueError: 流派标识未注册
     """
-    cls = SCHOOL_CLASSES.get(school)
-    if cls is None:
+    rule = get_tuning_rule_manager().get_rule(school)
+    if rule is None:
         raise ValueError(f"未知流派: {school}")
-    return cls(config)
+    return GenericSchoolJudge(rule, config)
 
 
 def judge_tuning_worthiness(
@@ -84,19 +71,20 @@ def judge_tuning_worthiness(
     worth = False
     conclusive = False  # 是否有流派给出了有效结论
     logs: list[str] = []
-    for key, cls in SCHOOL_CLASSES.items():
+    for key, rule in get_school_rules().items():
         if schools is not None and key not in schools:
             continue
+        judge = GenericSchoolJudge(rule, (configs or {}).get(key))
         try:
-            res = cls((configs or {}).get(key)).check_tuning_worthiness(equip)
+            res = judge.check_tuning_worthiness(equip)
         except NotImplementedError:
             continue
         if res.not_applicable:
-            logs.append(f"{cls.school_name}: 不适用（{'；'.join(res.reasons)}）")
+            logs.append(f"{rule.name}: 不适用（{'；'.join(res.reasons)}）")
             continue
         conclusive = True
         tag = "跳过" if res.skipped else res.rating.value
-        logs.append(f"{cls.school_name}: {tag}（{'；'.join(res.reasons)}）")
+        logs.append(f"{rule.name}: {tag}（{'；'.join(res.reasons)}）")
         if not res.skipped and res.rating in (Rating.TOP, Rating.EXCELLENT):
             worth = True
     if not conclusive:

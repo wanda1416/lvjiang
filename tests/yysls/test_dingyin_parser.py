@@ -30,9 +30,9 @@ class TestCandidates:
         assert names == {"外功穿透", "外功抗性", "属攻穿透"}
         assert set(dp._candidates("jewelry")) == names
 
-    def test_right_pool_50_names(self, dp):
+    def test_right_pool_names(self, dp):
         names = dp._candidates("armor")
-        assert len(names) == 50
+        assert len(names) == 52
         assert "无名剑法武学技增伤" in names
         assert "千机索天重击增伤" in names
 

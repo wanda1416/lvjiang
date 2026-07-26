@@ -1,15 +1,16 @@
-"""会意流派-通用 判定器测试
+"""会意流派-通用 判定器测试（通用规则引擎）
 
 覆盖 01-会意流派调律说明.md 第九节全部判定例子，
 以及品阶/首词条筛选、keep_pvp、流派注册等边界场景。
+会心/治疗流派测试见 test_huixin_judge.py / test_heal_judge.py。
 """
 
 import pytest
 
 from src.apps.yysls.equip_parser.models import Affix, EquipmentData
 from src.apps.yysls.evaluator import (
-    SCHOOL_CLASSES, SCHOOLS, SUB_SCHOOL_PLAYSTYLES, SUB_SCHOOLS,
-    Rating, get_school_judge, is_school_implemented, judge_tuning_worthiness,
+    Rating, get_school_judge, get_school_rules, get_schools,
+    is_school_implemented, judge_tuning_worthiness,
 )
 
 
@@ -187,12 +188,11 @@ class TestScreening:
         e = make_equip("环", ["劲", "最大外功攻击", "全武学增效", "劲", "势"])
         assert judge.judge(e).skipped
 
-    def test_weapon_shi_first_usable_at_best(self, judge):
-        # 武器首词条次选势：通过筛选但模式只认大外(首)，最高能用
+    def test_weapon_shi_first_skipped(self, judge):
+        # 会意武器首词条只认大外（势次选已删除）：势首 → 跳过
         e = make_equip("剑", ["势", "剑武学增伤", "最大外功攻击", "劲", "势"])
         r = judge.judge(e)
-        assert not r.skipped
-        assert r.rating == Rating.USABLE
+        assert r.skipped and not r.not_applicable
 
     def test_undefined_type_skipped(self, judge):
         e = make_equip("陌刀", ["最大外功攻击", "最大外功攻击", "劲", "势", "会意率"])
@@ -219,11 +219,11 @@ class TestKeepPvp:
         assert judge.judge(e).rating == Rating.JUNK
 
 
-# ─── 流派注册与空实现 ──────────────────────────────────────
+# ─── 流派注册与规则元数据 ──────────────────────────────────
 
 class TestSchools:
     def test_schools_registry(self):
-        assert list(SCHOOLS) == [
+        assert list(get_schools()) == [
             "huiyi_general", "huixin_small", "huixin_big", "heal",
         ]
 
@@ -238,23 +238,28 @@ class TestSchools:
             get_school_judge("not_exist")
 
     def test_config_declarations(self):
-        assert SCHOOL_CLASSES["huiyi_general"].has_keep_pvp
-        assert not SCHOOL_CLASSES["huiyi_general"].needs_sub_school
+        rules = get_school_rules()
+        assert rules["huiyi_general"].has_keep_pvp
+        assert not rules["huiyi_general"].needs_sub_school
         for key in ("huixin_small", "huixin_big"):
-            assert SCHOOL_CLASSES[key].has_keep_pvp
-            assert SCHOOL_CLASSES[key].needs_sub_school
-            assert SCHOOL_CLASSES[key].sub_school_options == SUB_SCHOOLS
-        heal = SCHOOL_CLASSES["heal"]
+            assert rules[key].has_keep_pvp
+            assert rules[key].needs_sub_school
+            assert rules[key].sub_school_options == {
+                "lieshi": "裂石", "pozhu": "破竹", "qiansi": "牵丝",
+            }
+        heal = rules["heal"]
         assert not heal.has_keep_pvp
         assert heal.needs_sub_school
         assert list(heal.sub_school_options) == ["pure", "fire"]
         assert heal.sub_school_playstyles == {}
 
     def test_sub_school_playstyles(self):
-        assert list(SUB_SCHOOLS) == ["lieshi", "pozhu", "qiansi"]
-        assert list(SUB_SCHOOL_PLAYSTYLES["lieshi"]) == ["chuntang", "shuangqie"]
-        assert list(SUB_SCHOOL_PLAYSTYLES["qiansi"]) == ["zoudi", "feitian"]
-        assert "pozhu" not in SUB_SCHOOL_PLAYSTYLES  # 破竹无玩法区分
+        rule = get_school_rules()["huixin_big"]
+        assert list(rule.sub_school_options) == ["lieshi", "pozhu", "qiansi"]
+        playstyles = rule.sub_school_playstyles
+        assert list(playstyles["lieshi"]) == ["chuntang", "shuangqie"]
+        assert list(playstyles["qiansi"]) == ["zoudi", "feitian"]
+        assert "pozhu" not in playstyles  # 破竹无玩法区分
 
     def test_judge_config_passthrough(self):
         cfg = {"keep_pvp": True, "sub_schools": ["lieshi"],
@@ -318,12 +323,11 @@ class TestTuningWorthiness:
                               "精准率", "会心率"])
         assert judge.check_tuning_worthiness(e).rating == Rating.USABLE
 
-    def test_shi_first_weapon_usable_ceiling(self, judge):
-        # 势首武器：模式只认大外首 → 上限能用，不跳过
+    def test_shi_first_weapon_skipped(self, judge):
+        # 势首武器：模式只认大外首（势次选已删除）→ 跳过
         e = make_equip("剑", ["势", "剑武学增伤"])
         r = judge.check_tuning_worthiness(e)
-        assert not r.skipped
-        assert r.rating == Rating.USABLE
+        assert r.skipped and not r.not_applicable
 
     def test_purple_weapon_skipped(self, judge):
         e = make_equip("剑", ["最大外功攻击"], quality="purple")
@@ -456,164 +460,3 @@ class TestJudgeTuningWorthiness:
         e = make_equip("剑", ["最大外功攻击"])
         assert judge_tuning_worthiness(e, schools=None) == \
             judge_tuning_worthiness(e)
-
-
-# ─── 会心流派（大外流/小外流）──────────────────────
-
-@pytest.fixture
-def big():
-    return get_school_judge("huixin_big")
-
-
-@pytest.fixture
-def small():
-    return get_school_judge("huixin_small")
-
-
-class TestHuixinBig:
-    def test_main_weapon_top(self, big):
-        # 陌刀双切主武器：大外(首) + 增伤 + 大外 + 劲 + 敏
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤",
-                                "最大外功攻击", "劲", "敏"])
-        assert big.judge(e).rating == Rating.TOP
-
-    def test_main_weapon_missing_damage_junk(self, big):
-        # 双刀仅为破竹主武器，缺双刀武学增伤 → 垃圾
-        e = make_equip("双刀", ["最大外功攻击", "最大外功攻击",
-                                "劲", "敏", "势"])
-        r = big.judge(e)
-        assert r.rating == Rating.JUNK
-        assert any("增伤" in s for s in r.reasons)
-
-    def test_sub_weapon_top(self, big):
-        # 扇（牵丝副武器）：大外(首) + 大外 + 劲 + 敏 + 会心
-        e = make_equip("扇", ["最大外功攻击", "最大外功攻击",
-                              "劲", "敏", "会心率"])
-        assert big.judge(e).rating == Rating.TOP
-
-    def test_armor_own_attr_as_dawuxiang(self, big):
-        # 冠胄带 最大牵丝攻击：所选流派属攻视作大无相 → 命中模式
-        e = make_equip("冠胄", ["会心率", "精准率", "最大外功攻击",
-                                "劲", "最大牵丝攻击"], quality="purple")
-        assert big.judge(e).rating == Rating.TOP
-
-    def test_armor_unchecked_school_attr_junk(self):
-        # 只勾裂石时，最大牵丝攻击 不映射大无相 → 垃圾
-        j = get_school_judge("huixin_big", {"sub_schools": ["lieshi"]})
-        e = make_equip("冠胄", ["会心率", "精准率", "最大外功攻击",
-                                "劲", "最大牵丝攻击"], quality="purple")
-        assert j.judge(e).rating == Rating.JUNK
-
-    def test_ring_mingjin_junk(self, big):
-        # 环带 最大鸣金攻击：鸣金非会心流派本属 → 垃圾（实机日志复现）
-        e = make_equip("环", ["最大外功攻击", "最大鸣金攻击",
-                              "最小牵丝攻击"])
-        r = big.check_tuning_worthiness(e)
-        assert r.rating == Rating.JUNK
-
-    def test_fan_double_junk_affix(self, big):
-        # 扇上 会意率+鸣金属攻：转律只能洗掉一条 → 垃圾
-        e = make_equip("扇", ["最大外功攻击", "劲", "会意率", "最大鸣金攻击"])
-        r = big.check_tuning_worthiness(e)
-        assert r.rating == Rating.JUNK
-
-    def test_ring_single_junk_transmutable(self, big):
-        # 环带 1 条鸣金属攻：可转律洗掉 → 仍可达顶级
-        e = make_equip("环", ["最大外功攻击", "最大鸣金攻击"])
-        r = big.check_tuning_worthiness(e)
-        assert r.rating == Rating.TOP
-
-    def test_fan_partial_top_potential(self, big):
-        # 扇 3 词条：剩余 2 空槽可补 大外+敏 → 仍可达顶级
-        e = make_equip("扇", ["最大外功攻击", "劲", "会心率"])
-        r = big.check_tuning_worthiness(e)
-        assert not r.skipped and r.rating == Rating.TOP
-
-    def test_sub_school_narrowing(self, big):
-        # 只选裂石时，扇不在武器范围内 → 不适用
-        j = get_school_judge("huixin_big", {"sub_schools": ["lieshi"]})
-        e = make_equip("扇", ["最大外功攻击", "劲", "会心率"])
-        r = j.check_tuning_worthiness(e)
-        assert r.skipped and r.not_applicable
-
-    def test_keep_pvp_jingjia(self):
-        # 胫甲 对玩家增效顶替对首领增伤槽位
-        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击",
-                                "劲", "敏"], quality="purple")
-        assert get_school_judge("huixin_big").judge(e).rating == Rating.JUNK
-        r = get_school_judge("huixin_big", {"keep_pvp": True}).judge(e)
-        assert r.rating == Rating.TOP and r.is_pvp
-
-
-class TestHuixinSmall:
-    def test_sub_weapon_top(self, small):
-        # 绳镖（破竹副武器）：小外(首) + 小外 + 敏 + 大无相 + 会心
-        e = make_equip("绳镖", ["最小外功攻击", "最小外功攻击",
-                                "敏", "最大无相攻击", "会心率"])
-        assert small.judge(e).rating == Rating.TOP
-
-    def test_first_affix_mismatch_skipped(self, small):
-        # 小外流武器首词条必须为小外，大外首 → 跳过
-        e = make_equip("绳镖", ["最大外功攻击", "最小外功攻击", "敏"])
-        r = small.check_tuning_worthiness(e)
-        assert r.skipped and not r.not_applicable
-
-    def test_jingjia_partial(self, small):
-        # 小外流胫甲：会心(首) + 小外，剩余 3 空槽可补 → 仍可达顶级
-        e = make_equip("胫甲", ["会心率", "最小外功攻击"], quality="purple")
-        r = small.check_tuning_worthiness(e)
-        assert not r.skipped and r.rating == Rating.TOP
-
-    def test_ring_own_attr_fills_dawuxiang_slot(self, small):
-        # 小外流环：最大裂石攻击 视作大无相填槽 → 命中模式
-        e = make_equip("环", ["最小外功攻击", "最小外功攻击", "敏",
-                              "全武学增效", "最大裂石攻击"])
-        assert small.judge(e).rating == Rating.TOP
-
-
-# ─── 标准字段守护：实现引用的全称词条必须存在于 attributes.yaml ──
-
-def _load_standard_names() -> set[str]:
-    """attributes.yaml 中 affix_caps._aliases 定义的全部标准字段名"""
-    from pathlib import Path
-
-    import yaml
-
-    path = (Path(__file__).parents[2]
-            / "config" / "system" / "yysls" / "attributes.yaml")
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    names: set[str] = set()
-    for entry in data["affix_caps"].values():
-        names.update(entry.get("_aliases") or [])
-    return names
-
-
-class TestStandardFieldNames:
-
-    def test_huiyi_patterns_use_standard_names(self):
-        from src.apps.yysls.evaluator import huiyi
-
-        standard_names = _load_standard_names()
-        patterns = (list(huiyi.HUIYI_WEAPON_PATTERNS.values())
-                    + list(huiyi.HUIYI_PART_PATTERNS.values()))
-        for spec in patterns:
-            for slot in spec["required"]:
-                for name in slot - huiyi._POOL_SYMBOLS:
-                    assert name in standard_names, name
-        assert huiyi._PVP_NAMES <= standard_names
-
-    def test_huixin_patterns_use_standard_names(self):
-        from src.apps.yysls.evaluator import huixin
-
-        standard_names = _load_standard_names()
-        for patterns in (huixin._DAWAI_PATTERNS, huixin._XIAOWAI_PATTERNS):
-            for spec in patterns.values():
-                for slot in spec["required"]:
-                    if slot == "DMG":
-                        continue
-                    for name in slot - huixin._POOL_SYMBOLS:
-                        assert name in standard_names, name
-        for damages in huixin._MAIN_WEAPONS.values():
-            for candidates in damages.values():
-                assert candidates <= standard_names, candidates
-        assert huixin._PVP_NAMES <= standard_names

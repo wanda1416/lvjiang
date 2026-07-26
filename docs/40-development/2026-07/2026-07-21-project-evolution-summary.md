@@ -19,6 +19,7 @@
 | Phase 6 | 07-18~19 | 输入控制与稳定性 | SendInput 迁移 + PostMessage + 泄漏修复 |
 | Phase 7 | 07-19~20 | 装备调律业务 | 自动调律工作流 + 滚动校验 + 装备面板 |
 | Phase 8 | 07-20~21 | 架构通用化 | 插件化架构 + 模块解耦 + 文档规范化 |
+| Phase 9 | 07-21~22 | 游戏配置与调律规则重构 | 游戏配置对话框 + 流派配置 + 调律规则标准词条化 |
 
 ---
 
@@ -545,6 +546,49 @@ src/（新）
 
 ---
 
+## Phase 9：游戏配置与调律规则重构（07-21~22）
+
+**关键提交：**
+- `606e91d` **游戏配置重构 + 调律规则标准词条化重构**（39 files, +2603/-1358）
+- `e5bb2b3` docs: 清理 PROGRESS.md 已提交状态与未提交清单
+
+### 重构详情：游戏配置重构
+
+**背景：** 装备属性管理（attributes.yaml）与调律规则（tuning_rules/*.yaml）
+是上下游关系，两者原本各自为政，缺乏统一入口与共享词汇源。
+
+**重构内容：**
+- 新增「游戏配置」对话框（`AttrManagerDialog`，3 Tab）：装备配置 / 词条配置 /
+  流派配置（school_panel.py 重写为左右分栏）；
+- attributes.yaml 顶层新增 `weapon_types`（10 武器注册表）与 `schools`（新
+  schema `流派名 → {attr, main, sub}`，预填十大流派）；
+- 横刀 → 唐横刀 全局改名（注册表驱动）；
+- 武器类型动态化（constants.py 模块加载时读 attributes.yaml 快照）；
+- 菜单与热键收口（F5/F6/F8-F10）。
+
+### 重构详情：调律规则标准词条化重构
+
+**背景：** 调律规则 YAML 里混用符号（大外/小外/会意/会心/精准/大无相/小无相/
+小外属）与标准词条名，且 `variants` 层让 schema 嵌套过深。
+
+**重构内容：**
+- 删除 `SYMBOL_VOCAB`/`SYMBOL_MAP` 符号层与 `variants` 层（字段上提 YAML
+  顶层），规则词条唯一来源 = `AttrRuleManager.get_normal_affix_names()` 标准
+  全集（越界名保存拒绝）；
+- heal.yaml 拆为 heal_pure/heal_fire 两条独立规则；
+- 规则可新建/删除（TuningRuleManager.create_rule/delete_rule + 对话框 Tab
+  增删）；导航「流派设置」改「规则设置」；
+- UI checkbox 网格改「已选列表 + AffixPickerDialog 添加/移除」
+  （variant_pool_page.py → pool_page.py）；
+- 属攻归一化：非武器本属 → 无相，错位属攻（武器上流派属攻、非武器字面无相）
+  加 `(错位)` 标记判垃圾（generic._normalize）。
+
+**结果：** pytest 528 例全绿（yysls 342 例 + 全仓 528 例）。
+
+> 详细重构记录见 `2026-07-22-tuning-rules-standardization.md`。
+
+---
+
 ## 重构脉络总结
 
 ### 数据层解耦演进
@@ -554,6 +598,7 @@ Phase 2: 配置混放 → system/local/backup 三层分离
 Phase 2: 场景硬编码 → YAML 外部化 + Registry
 Phase 8: Layout JSON 冗余 name → 仅 key 关联，name 从 Scene 查
 Phase 8: scene_registry 绑定业务场景 → 移除硬编码，canvas 动态加载
+Phase 9: 调律规则符号层删除 → 标准词条全集（attributes.yaml _aliases）唯一来源
 ```
 
 ### 代码层拆分演进
@@ -565,6 +610,7 @@ Phase 4: region_editor → 4 个 Mixin（scene/recognition/script/layout）
 Phase 4: 语法文件散落 → grammar/ 子包
 Phase 7: builtins.py → builtins/ 子包（按功能分类）
 Phase 8: lvjiang/ → src/ + src/apps/yysls/（通用引擎 + 业务插件）
+Phase 9: tuning_rules UI checkbox 网格 → 列表 + AffixPickerDialog（variant_pool_page.py → pool_page.py）
 ```
 
 ### DSL 语法演进
@@ -629,8 +675,10 @@ Phase 8: call "file.wf" with → import/def/call proc 模块化
 ### 待处理
 - [ ] 工作流 DSL 文档持续补全
 - [ ] 自动调律工作流原型验证
-- [ ] 装备评估规则配置化
-- [ ] 插件化架构下业务模块迁移
+- [x] 装备评估规则配置化（2026-07-22 调律规则标准词条化重构完成）
+- [x] 插件化架构下业务模块迁移（2026-07-21 单包插件化架构重构完成）
+
+> 后续待办详见项目根目录 `TODO.md`。
 
 ---
 

@@ -140,7 +140,7 @@ affix_caps:
     - 剑武学增伤
     - 枪武学增伤
     - 陌刀武学增伤
-    - 唐横刀武学增伤
+    - 横刀武学增伤
     - 伞武学增伤
     - 舞绫鼓武学增伤
     - 双刀武学增伤
@@ -285,7 +285,7 @@ weapon_types:
 - 陌刀
 - 双刀
 - 绳镖
-- 唐横刀
+- 横刀
 - 手甲
 - 舞绫鼓
 schools:
@@ -322,9 +322,9 @@ schools:
   裂石·钧:
     attr: 裂石
     main:
-      weapon: 唐横刀
+      weapon: 横刀
       martial_art: 斩雪刀法
-      affix: 唐横刀武学增伤
+      affix: 横刀武学增伤
     sub:
       weapon: 陌刀
       martial_art: 十方破阵

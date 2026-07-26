@@ -23,14 +23,14 @@ own_attr: from_sub_schools
 weapons:
   lieshi.chuntang:
     main:
-      唐横刀: 唐横刀武学增伤
+      横刀: 横刀武学增伤
     sub:
     - 陌刀
   lieshi.shuangqie:
     main:
       陌刀: 陌刀武学增伤
     sub:
-    - 唐横刀
+    - 横刀
   pozhu:
     main:
       双刀: 双刀武学增伤

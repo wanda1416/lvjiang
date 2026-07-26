@@ -11,7 +11,8 @@ from .rules import SchoolRule, get_tuning_rule_manager
 
 __all__ = [
     "get_school_rules", "get_schools",
-    "is_school_implemented", "get_school_judge", "judge_tuning_worthiness",
+    "is_school_implemented", "get_school_judge",
+    "judge_equipment_potential", "judge_tuning_worthiness",
 ]
 
 
@@ -50,6 +51,45 @@ def get_school_judge(school: str, config: dict | None = None) -> SchoolJudge:
     return GenericSchoolJudge(rule, config)
 
 
+def judge_equipment_potential(
+    equip, configs: dict[str, dict] | None = None,
+    schools: list[str] | None = None,
+) -> dict[str, dict]:
+    """遍历全部流派做含转律模拟的评级上限判定（结构化结果）
+
+    与 judge_tuning_worthiness 同一判定内核（check_tuning_worthiness：
+    空槽万能牌 + 模拟转律；词条已满时即纯转律模拟），返回各流派
+    结构化评级，供单次调律终局分析与自动调律直接消费。
+
+    Args:
+        equip: EquipmentData
+        configs: 流派 key → 配置 dict（缺省用默认配置）
+        schools: 仅参与判定的流派 key 列表（None → 全部流派）
+
+    Returns:
+        流派 key → {"name", "rating", "skipped", "not_applicable",
+        "reasons"}（未实现判定的流派不在结果中；skipped/not_applicable
+        为 True 时 rating 无实际意义）
+    """
+    results: dict[str, dict] = {}
+    for key, rule in get_school_rules().items():
+        if schools is not None and key not in schools:
+            continue
+        judge = GenericSchoolJudge(rule, (configs or {}).get(key))
+        try:
+            res = judge.check_tuning_worthiness(equip)
+        except NotImplementedError:
+            continue
+        results[key] = {
+            "name": rule.name,
+            "rating": res.rating.value,
+            "skipped": res.skipped,
+            "not_applicable": res.not_applicable,
+            "reasons": res.reasons,
+        }
+    return results
+
+
 def judge_tuning_worthiness(
     equip, configs: dict[str, dict] | None = None,
     schools: list[str] | None = None,
@@ -71,21 +111,16 @@ def judge_tuning_worthiness(
     worth = False
     conclusive = False  # 是否有流派给出了有效结论
     logs: list[str] = []
-    for key, rule in get_school_rules().items():
-        if schools is not None and key not in schools:
-            continue
-        judge = GenericSchoolJudge(rule, (configs or {}).get(key))
-        try:
-            res = judge.check_tuning_worthiness(equip)
-        except NotImplementedError:
-            continue
-        if res.not_applicable:
-            logs.append(f"{rule.name}: 不适用（{'；'.join(res.reasons)}）")
+    for r in judge_equipment_potential(equip, configs, schools).values():
+        detail = '；'.join(r["reasons"])
+        if r["not_applicable"]:
+            logs.append(f"{r['name']}: 不适用（{detail}）")
             continue
         conclusive = True
-        tag = "跳过" if res.skipped else res.rating.value
-        logs.append(f"{rule.name}: {tag}（{'；'.join(res.reasons)}）")
-        if not res.skipped and res.rating in (Rating.TOP, Rating.EXCELLENT):
+        tag = "跳过" if r["skipped"] else r["rating"]
+        logs.append(f"{r['name']}: {tag}（{detail}）")
+        if not r["skipped"] and r["rating"] in (Rating.TOP.value,
+                                               Rating.EXCELLENT.value):
             worth = True
     if not conclusive:
         worth = False

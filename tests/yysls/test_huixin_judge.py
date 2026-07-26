@@ -56,13 +56,13 @@ class TestBigDocExamples:
         assert big_lieshi.judge(e).rating == Rating.EXCELLENT
 
     def test_3_hengdao_sub_top(self, big_lieshi):
-        # 唐横刀兼任纯唐主武器（缺唐横刀增伤→垃圾）与双切副武器，择优取副武器 TOP
-        e = make_equip("唐横刀", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
+        # 横刀兼任纯唐主武器（缺横刀增伤→垃圾）与双切副武器，择优取副武器 TOP
+        e = make_equip("横刀", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
         assert big_lieshi.judge(e).rating == Rating.TOP
 
     def test_4_hengdao_sub_shi_top(self, big_lieshi):
         # 副武器顶级条件不排除 势/会心
-        e = make_equip("唐横刀", ["最大外功攻击", "最大外功攻击", "劲", "势", "会心率"])
+        e = make_equip("横刀", ["最大外功攻击", "最大外功攻击", "劲", "势", "会心率"])
         assert big_lieshi.judge(e).rating == Rating.TOP
 
     def test_5_ring_top(self, big_lieshi):
@@ -110,12 +110,12 @@ class TestSmallDocExamples:
         assert small_lieshi.judge(e).rating == Rating.EXCELLENT
 
     def test_3_hengdao_sub_top(self, small_lieshi):
-        e = make_equip("唐横刀", ["最小外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"])
+        e = make_equip("横刀", ["最小外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"])
         assert small_lieshi.judge(e).rating == Rating.TOP
 
     def test_4_hengdao_xiaowuxiang_excellent(self, small_lieshi):
         # 武器上 最小无相攻击 → 小无相（库内），但顶级条件排除 → 优秀
-        e = make_equip("唐横刀", ["最小外功攻击", "最小外功攻击", "敏", "会心率", "最小无相攻击"])
+        e = make_equip("横刀", ["最小外功攻击", "最小外功攻击", "敏", "会心率", "最小无相攻击"])
         assert small_lieshi.judge(e).rating == Rating.EXCELLENT
 
     def test_5_ring_dawai_junk(self, small_lieshi):

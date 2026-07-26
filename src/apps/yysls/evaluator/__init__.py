@@ -12,7 +12,8 @@ from .rules import (
 )
 from .schools import (
     get_school_judge, get_school_rules, get_schools,
-    is_school_implemented, judge_tuning_worthiness,
+    is_school_implemented, judge_equipment_potential,
+    judge_tuning_worthiness,
 )
 from .attr_rules import get_attr_rule_manager
 
@@ -28,6 +29,7 @@ __all__ = [
     "get_schools",
     "get_school_judge",
     "is_school_implemented",
+    "judge_equipment_potential",
     "judge_tuning_worthiness",
     "get_attr_rule_manager",
 ]

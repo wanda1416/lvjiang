@@ -175,7 +175,7 @@ class TestWeaponTypesAndSchools:
     def test_get_weapon_types(self, mgr):
         types = mgr.get_weapon_types()
         assert len(types) == 10
-        assert {"陌刀", "唐横刀", "剑", "枪", "扇", "伞"} <= set(types)
+        assert {"陌刀", "横刀", "剑", "枪", "扇", "伞"} <= set(types)
 
     def test_get_schools_structure(self, mgr):
         schools = mgr.get_schools()
@@ -183,7 +183,7 @@ class TestWeaponTypesAndSchools:
         assert "裂石·钧" in schools
         cfg = schools["裂石·钧"]
         assert cfg["attr"] == "裂石"
-        assert cfg["main"] == {"weapon": "唐横刀", "martial_art": "斩雪刀法", "affix": "唐横刀武学增伤"}
+        assert cfg["main"] == {"weapon": "横刀", "martial_art": "斩雪刀法", "affix": "横刀武学增伤"}
         assert cfg["sub"] == {"weapon": "陌刀", "martial_art": "十方破阵", "affix": "陌刀武学增伤"}
 
     def test_school_bindings_valid(self, mgr):

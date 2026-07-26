@@ -1,0 +1,116 @@
+key: lieshi_small
+name: 裂石·小外
+order: 20
+weapon_rules:
+  纯唐:
+    main:
+      weapon: 横刀
+      damage: 横刀武学增伤
+    sub:
+      weapon: 陌刀
+      damage: null
+  双切:
+    main:
+      weapon: 陌刀
+      damage: 陌刀武学增伤
+    sub:
+      weapon: 横刀
+      damage: null
+  威威:
+    main:
+      weapon: 陌刀
+      damage: 陌刀武学增伤
+    sub:
+      weapon: 枪
+      damage: null
+transmute_priority:
+- 最小外功攻击
+- 敏
+- 最大无相攻击
+- 最大裂石攻击
+- 会心率
+affix_pool:
+- 最小外功攻击
+- 敏
+- 会心率
+- 精准率
+- 最大无相攻击
+- 最小无相攻击
+- 最大裂石攻击
+- 最小裂石攻击
+- 全武学增效
+- 对首领单位增伤
+patterns:
+  主武器:
+    first:
+    - 最小外功攻击
+    usable_conditions:
+    - not_contains:
+      - 最小外功攻击
+    top_conditions:
+    - not_contains:
+      - 最小无相攻击
+      - 最大裂石攻击
+      - 最小裂石攻击
+      - 精准率
+  副武器:
+    first:
+    - 最小外功攻击
+    usable_conditions:
+    - not_contains:
+      - 最小外功攻击
+    - not_contains:
+      - 敏
+    top_conditions:
+    - not_contains:
+      - 最小无相攻击
+      - 最大裂石攻击
+      - 最小裂石攻击
+      - 精准率
+  环:
+    first:
+    - 最小外功攻击
+    junk_conditions:
+    - not_contains:
+      - 全武学增效
+    usable_conditions:
+    - not_contains:
+      - 最小外功攻击
+    top_conditions:
+    - not_contains:
+      - 最小裂石攻击
+      - 精准率
+  冠胄:
+    first:
+    - 会心率
+    - 精准率
+    usable_conditions:
+    - not_contains:
+      - 最小外功攻击
+    - not_contains:
+      - 敏
+      - 最大裂石攻击
+    top_conditions:
+    - - not_contains:
+        - 最小裂石攻击
+      - count_max:
+          symbols:
+          - 精准率
+          max: 1
+          include_first: true
+  胫甲:
+    first:
+    - 会心率
+    - 精准率
+    junk_conditions:
+    - not_contains:
+      - 对首领单位增伤
+    usable_conditions:
+    - not_contains:
+      - 最小外功攻击
+    top_conditions:
+    - - not_contains:
+        - 最小裂石攻击
+      - not_contains:
+        - 会心率
+        - 精准率

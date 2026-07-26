@@ -77,21 +77,16 @@ class SchoolJudge(ABC):
     - school_key: 流派标识（配置持久化用）
     - school_name: 流派显示名
     - implemented: 判定逻辑是否已实现（未实现的流派 judge 抛 NotImplementedError）
-    - has_keep_pvp: 该流派是否有「保留 PVP 装备」可选配置
-    - needs_sub_school: 该流派是否需要子选项必选配置（至少勾选一项）
-    - sub_school_options: 子选项 key → 显示名（UI 据此生成复选框）
-    - sub_school_playstyles: 子选项 key → 玩法 key → 显示名（无玩法不列）
-    - sub_school_label: 子选项分组的 UI 标签文本
+    - weapon_rule_options: 武器规则名字 → 摘要（UI 据此生成复选框）
+
+    config 形状：{"weapon_rules": [...], "keep_pvp": bool}，其中
+    keep_pvp 为全局配置（由调用方注入）。
     """
 
     school_key: str = ""
     school_name: str = ""
     implemented: bool = False
-    has_keep_pvp: bool = False
-    needs_sub_school: bool = False
-    sub_school_options: dict[str, str] = {}
-    sub_school_playstyles: dict[str, dict[str, str]] = {}
-    sub_school_label: str = "指定流派（必选）："
+    weapon_rule_options: dict[str, str] = {}
 
     def __init__(self, config: dict | None = None):
         self.config: dict = config or {}

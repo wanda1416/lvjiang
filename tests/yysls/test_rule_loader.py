@@ -1,8 +1,9 @@
 """调律规则加载器测试
 
 覆盖 TuningRuleManager 的加载/排序/校验拒绝/保存与 get_raw 深拷贝、
-create_rule/delete_rule，以及规则内词条名与标准词条全集
-（attributes.yaml 普通词组 _aliases）的一致性守护。
+create_rule/delete_rule、weapon_rules 节与三档条件组语法解析，
+以及规则内词条名与标准词条全集（attributes.yaml 普通词组
+_aliases）的一致性守护。
 """
 
 from pathlib import Path
@@ -22,12 +23,21 @@ def minimal_rule(**overrides) -> dict:
     data = {
         "key": "t1",
         "name": "测试规则",
+        "weapon_rules": {
+            "测试": {
+                "main": {"weapon": "剑", "damage": "剑武学增伤"},
+                "sub": {"weapon": "枪", "damage": None},
+            },
+        },
         "affix_pool": ["最大外功攻击", "劲"],
         "patterns": {
             "环": {
                 "first": ["最大外功攻击"],
-                "required": [["最大外功攻击"], ["劲"]],
-                "optional_n": 2,
+                "junk_conditions": [{"not_contains": ["劲"]}],
+                "top_conditions": [
+                    [{"contains_all": ["劲"]},
+                     {"not_contains": ["最大外功攻击"]}],
+                ],
             },
         },
     }
@@ -49,7 +59,7 @@ class TestBuiltinRules:
         mgr = get_tuning_rule_manager()
         assert mgr.errors == {}
         assert list(mgr.get_rules()) == [
-            "huiyi_general", "huixin_small", "huixin_big",
+            "huiyi_general", "lieshi_small", "lieshi_big",
             "heal_pure", "heal_fire",
         ]
 
@@ -65,7 +75,19 @@ class TestBuiltinRules:
             assert rule.patterns
             for pattern in rule.patterns.values():
                 assert pattern.first
-                assert len(pattern.required) + pattern.optional_n == 4
+
+    def test_weapon_rules_per_plan(self):
+        rules = get_school_rules()
+        assert set(rules["huiyi_general"].weapon_rules) == {"会意"}
+        for key in ("lieshi_small", "lieshi_big"):
+            assert set(rules[key].weapon_rules) == {"纯唐", "双切", "威威"}
+        assert set(rules["heal_pure"].weapon_rules) == {"纯奶"}
+        assert set(rules["heal_fire"].weapon_rules) == {"火拳"}
+        # 摘要供 UI 勾选项展示
+        assert rules["lieshi_big"].weapon_rule_options["纯唐"] == "主 横刀 / 副 陌刀"
+        # 火拳主扇不需要增伤
+        fire = rules["heal_fire"].weapon_rules["火拳"]
+        assert fire.main.weapon == "扇" and fire.main.damage is None
 
 
 # ─── schema 校验拒绝 ───────────────────────────────────────
@@ -78,38 +100,54 @@ class TestValidation:
         assert list(mgr.get_rules()) == ["t1"]
 
     def test_empty_skeleton_valid(self, tmp_path):
-        """空 affix_pool/patterns 的骨架规则可保存（新建规则）"""
-        write_rule(tmp_path, minimal_rule(affix_pool=[], patterns={}))
+        """空 weapon_rules/affix_pool/patterns 的骨架规则可保存（新建规则）"""
+        write_rule(tmp_path, minimal_rule(
+            weapon_rules={}, affix_pool=[], patterns={}))
         mgr = TuningRuleManager(rules_dir=tmp_path)
         assert mgr.errors == {}
         rule = mgr.get_rule("t1")
+        assert rule.weapon_rules == {}
         assert rule.affix_pool == [] and rule.patterns == {}
+
+    def test_condition_group_syntax(self, tmp_path):
+        """单键 dict = 单条件组；嵌套 list = 组内 AND"""
+        write_rule(tmp_path, minimal_rule())
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        pattern = mgr.get_rule("t1").patterns["环"]
+        assert len(pattern.junk_conditions) == 1
+        assert len(pattern.junk_conditions[0]) == 1  # 单条件组
+        assert len(pattern.top_conditions) == 1
+        assert len(pattern.top_conditions[0]) == 2   # 组内 AND
+        assert pattern.usable_conditions == []
 
     @pytest.mark.parametrize("mutate", [
         # 缺少必填字段 key/name
         lambda d: d.pop("key"),
-        # 旧版 variants 结构不再支持
+        # 旧版 schema 字段不再支持
         lambda d: d.update(variants={"default": {}}),
+        lambda d: d.update(sub_schools={"lieshi": {"name": "裂石"}}),
+        lambda d: d.update(optional_pool=["劲"]),
+        lambda d: d.update(junk_rules=[{"not_contains": ["劲"]}]),
+        lambda d: d.update(has_keep_pvp=True),
         # affix_pool 词条不在标准词条全集
         lambda d: d["affix_pool"].append("大外"),
-        # 槽数不满足 必选+可选+首 == 5
-        lambda d: d["patterns"]["环"].update(optional_n=3),
+        # first 不能为空
+        lambda d: d["patterns"]["环"].update(first=[]),
         # not_together 须恰好 2 个词条
         lambda d: d["patterns"]["环"].update(
-            top=[{"not_together": ["最大外功攻击", "劲", "敏"]}]),
+            top_conditions=[{"not_together": ["最大外功攻击", "劲", "敏"]}]),
         # 未知条件原语
         lambda d: d["patterns"]["环"].update(
-            top=[{"unknown_kind": ["最大外功攻击"]}]),
+            top_conditions=[{"unknown_kind": ["最大外功攻击"]}]),
+        # 条件组必须是 dict 或 dict 列表
+        lambda d: d["patterns"]["环"].update(junk_conditions=["oops"]),
         # 未知部位 key
         lambda d: d["patterns"].update(
-            鞋子={"first": ["最大外功攻击"], "required": [["劲"]],
-                  "optional_n": 3}),
-        # weapons 引用未定义的子流派
-        lambda d: d.update(weapons={"nosub": {"main": {"剑": "剑武学增伤"}}}),
-        # own_attr 非法
-        lambda d: d.update(own_attr="外功"),
-        # optional_pool 超出 affix_pool
-        lambda d: d.update(optional_pool=["敏"]),
+            鞋子={"first": ["最大外功攻击"]}),
+        # weapon_rules 武器名不能为空
+        lambda d: d["weapon_rules"]["测试"]["main"].update(weapon=""),
+        # weapon_rules 增伤词条不在标准词条全集
+        lambda d: d["weapon_rules"]["测试"]["main"].update(damage="神速"),
     ])
     def test_invalid_rule_rejected(self, tmp_path, mutate):
         data = minimal_rule()
@@ -171,6 +209,7 @@ class TestCreateAndDelete:
         assert (tmp_path / "new_rule.yaml").exists()
         rule = mgr.get_rule("new_rule")
         assert rule.name == "新规则"
+        assert rule.weapon_rules == {}
         assert rule.affix_pool == [] and rule.patterns == {}
 
     @pytest.mark.parametrize("key,name", [
@@ -202,30 +241,67 @@ class TestCreateAndDelete:
         with pytest.raises(RuleValidationError):
             mgr.delete_rule("nope")
 
+    def test_rename_rule(self, tmp_path):
+        write_rule(tmp_path, minimal_rule())
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        mgr.rename_rule("t1", "t2")
+        # 文件重命名 + data 内 key 同步更新
+        assert not (tmp_path / "t1.yaml").exists()
+        assert (tmp_path / "t2.yaml").exists()
+        assert mgr.get_rule("t1") is None
+        rule = mgr.get_rule("t2")
+        assert rule.key == "t2"
+        assert rule.name == "测试规则"
+
+    def test_rename_same_key_noop(self, tmp_path):
+        write_rule(tmp_path, minimal_rule())
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        mgr.rename_rule("t1", "t1")  # 幂等
+        assert (tmp_path / "t1.yaml").exists()
+
+    @pytest.mark.parametrize("old,new", [
+        ("nope", "t2"),          # 旧 key 未注册
+        ("t1", "BadKey"),        # 新 key 非法
+        ("t1", ""),              # 空 key
+    ])
+    def test_rename_invalid(self, tmp_path, old, new):
+        write_rule(tmp_path, minimal_rule())
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        with pytest.raises(RuleValidationError):
+            mgr.rename_rule(old, new)
+
+    def test_rename_to_existing_rejected(self, tmp_path):
+        write_rule(tmp_path, minimal_rule())
+        write_rule(tmp_path, minimal_rule(key="t2", name="另一规则"),
+                   name="t2.yaml")
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        with pytest.raises(RuleValidationError):
+            mgr.rename_rule("t1", "t2")
+
 
 # ─── 标准词条名守护 ────────────────────────────────────────
 
 class TestStandardAffixNames:
     def test_rule_affix_names_are_standard(self):
-        # 规则内出现的词条名（DMG 占位符除外）必须在标准词条全集内，
+        # 规则内出现的词条名必须在标准词条全集内，
         # 否则判定时与 OCR 解析结果对不上
         standard = set(standard_affix_names())
         for rule in get_school_rules().values():
             used: set[str] = set()
             used.update(rule.transmute_priority)
             used.update(rule.affix_pool)
-            used.update(rule.optional_pool or [])
-            for entry in rule.weapons.values():
-                used.update(entry.main.values())
+            for wr in rule.weapon_rules.values():
+                for side in (wr.main, wr.sub):
+                    if side.damage:
+                        used.add(side.damage)
             for pattern in rule.patterns.values():
                 used.update(pattern.first)
-                for slot in pattern.required:
-                    used.update(c for c in slot if c != "DMG")
-                if pattern.required_damage not in (None, "DMG"):
-                    used.add(pattern.required_damage)
-                if pattern.damage_pvp_substitute:
-                    used.add(pattern.damage_pvp_substitute)
-                used.update(pattern.allowed_divine_pvp)
+                for tier in (pattern.junk_conditions,
+                             pattern.usable_conditions,
+                             pattern.top_conditions):
+                    for group in tier:
+                        for cond in group:
+                            used.update(cond.symbols)
             unknown = used - standard
             assert not unknown, f"{rule.key} 存在非标准词条名: {unknown}"
 

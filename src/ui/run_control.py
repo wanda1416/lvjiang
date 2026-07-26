@@ -522,15 +522,19 @@ class RunControlMixin:
             return
         school_judges = []
         school_rules = get_school_rules()
+        keep_pvp = (self._get_tuning_keep_pvp()
+                    if hasattr(self, '_get_tuning_keep_pvp') else False)
         for school, cfg in enabled.items():
             if not is_school_implemented(school):
                 self.log_text.append(f"[警告] 流派「{get_schools().get(school, school)}」判定暂未实现，已跳过")
                 continue
             rule = school_rules[school]
-            if rule.needs_sub_school and not cfg.get("sub_schools"):
-                self.log_text.append(f"[错误] 流派「{rule.school_name}」需至少勾选一个子选项（{rule.sub_school_label.rstrip('：')}）")
+            wr_cfg = cfg.get("weapon_rules")
+            if rule.weapon_rules and wr_cfg is not None and not wr_cfg:
+                self.log_text.append(f"[错误] 流派「{rule.school_name}」需至少勾选一个武器规则")
                 return
-            school_judges.append(get_school_judge(school, cfg))
+            school_judges.append(
+                get_school_judge(school, {**cfg, "keep_pvp": keep_pvp}))
         if not school_judges:
             self.log_text.append("[错误] 选中的流派均未实现判定逻辑")
             return
@@ -598,9 +602,9 @@ class RunControlMixin:
         wf_instance._selected_slots = selected_slots
         wf_instance._school_judges = school_judges
 
-        school_names = "、".join(
-            j.school_name + ("（保留PVP）" if j.keep_pvp else "")
-            for j in school_judges)
+        school_names = "、".join(j.school_name for j in school_judges)
+        if keep_pvp:
+            school_names += "（保留PVP）"
         self.log_text.append(
             f"[开始] {flow_name} 流程，流派: {school_names}，部位: {selected_slots}")
         self._start_workflow("auto_tuning", flow_name,

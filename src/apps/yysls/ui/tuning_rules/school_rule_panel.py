@@ -73,17 +73,17 @@ class SchoolRulePanel(QWidget):
         # ── 右侧详情页 ──
         self._stack = QStackedWidget()
         self._settings_page = SchoolSettingsPage(
-            self._data, self._on_changed, on_delete=self._request_delete)
+            self._data, self._on_changed, on_delete=self._request_delete,
+            on_rename=self._rename_rule)
         self._stack.addWidget(self._wrap_scroll(self._settings_page))
         self._pool_page = PoolPage(self._candidates, self._on_changed)
         self._stack.addWidget(self._wrap_scroll(self._pool_page))
         self._part_pages: list[PartPatternPage] = []
-        has_keep_pvp = bool(self._data.get("has_keep_pvp"))
         for title, part_key in _NAV_ITEMS:
             if part_key is None:
                 continue
             page = PartPatternPage(part_key, title, self._candidates,
-                                   self._on_changed, has_keep_pvp)
+                                   self._on_changed)
             self._part_pages.append(page)
             self._stack.addWidget(self._wrap_scroll(page))
         body.addWidget(self._stack, 1)
@@ -128,3 +128,17 @@ class SchoolRulePanel(QWidget):
         """规则设置页「删除本规则」→ 交由对话框执行删除并移除 Tab"""
         if self._on_delete is not None:
             self._on_delete(self._key)
+
+    def _rename_rule(self, old_key: str, new_key: str, new_name: str):
+        """规则设置页 key 变更 → 重命名文件并通知对话框更新 Tab"""
+        try:
+            self._manager.rename_rule(old_key, new_key)
+        except Exception as e:  # noqa: BLE001
+            self._status_cb(f"重命名失败：{e}", True)
+            raise
+        self._key = new_key
+        # 对话框在创建面板时注入 _dialog_rename_cb，用于更新 Tab 文本
+        cb = getattr(self, "_dialog_rename_cb", None)
+        if cb is not None:
+            cb(old_key, new_key, new_name)
+

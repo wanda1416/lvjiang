@@ -20,7 +20,7 @@ __all__ = [
 
 def get_school_rules() -> dict[str, SchoolRule]:
     """key → SchoolRule（按规则 order 排序；UI 据其元数据属性
-    has_keep_pvp/needs_sub_school/sub_school_options 生成配置控件）"""
+    weapon_rule_options 生成武器规则勾选控件）"""
     return get_tuning_rule_manager().get_rules()
 
 
@@ -39,8 +39,8 @@ def get_school_judge(school: str, config: dict | None = None) -> SchoolJudge:
 
     Args:
         school: 流派标识（规则 YAML 的 key）
-        config: 该流派的配置 dict，如 {"keep_pvp": True,
-            "sub_schools": [...], "playstyles": {...}}
+        config: 该流派的配置 dict，形状 {"weapon_rules": [...],
+            "keep_pvp": bool}（keep_pvp 为全局配置，由调用方注入）
 
     Raises:
         ValueError: 流派标识未注册

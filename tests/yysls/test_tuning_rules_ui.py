@@ -17,7 +17,7 @@ from src.apps.yysls.ui.tuning_rules.school_rule_panel import SchoolRulePanel
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
 
-ALL_KEYS = ["huiyi_general", "huixin_small", "huixin_big",
+ALL_KEYS = ["huiyi_general", "lieshi_small", "lieshi_big",
             "heal_pure", "heal_fire"]
 
 
@@ -34,7 +34,7 @@ class TestDialog:
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
         assert dialog._tabs.count() == len(ALL_KEYS)
-        assert dialog._tabs.tabText(0) == "会意流派-通用"
+        assert dialog._tabs.tabText(0) == "会意通用"
         # Tab 栏右上角：新增规则 + 调律验证入口
         corner = dialog._tabs.cornerWidget()
         texts = [b.text() for b in corner.findChildren(QPushButton)]
@@ -53,8 +53,7 @@ class TestPanelRoundtrip:
 
         appliers = [
             panel._settings_page._apply_basic,
-            panel._settings_page._apply_subs,
-            panel._settings_page._apply_weapons,
+            panel._settings_page._apply_weapon_rules,
             panel._pool_page._apply,
         ] + [page._apply for page in panel._part_pages]
         for apply in appliers:
@@ -62,21 +61,23 @@ class TestPanelRoundtrip:
             assert statuses and not statuses[-1][1], \
                 f"{key}: {statuses[-1][0]}"
 
-        # 往返后规则语义不变（池集合/转律优先级/模式各字段）
+        # 往返后规则语义不变（武器规则/池集合/转律优先级/三档条件）
         saved = tmp_manager.get_rule(key)
         assert saved.name == original.name
+        assert saved.weapon_rule_options == original.weapon_rule_options
         assert saved.pool_set == original.pool_set
-        assert saved.optional_pool_set == original.optional_pool_set
         assert saved.transmute_priority == original.transmute_priority
         assert set(saved.patterns) == set(original.patterns)
         for part, pattern in original.patterns.items():
             saved_p = saved.patterns[part]
             assert set(saved_p.first) == set(pattern.first)
-            assert sorted(map(sorted, saved_p.required)) == \
-                sorted(map(sorted, pattern.required))
-            assert saved_p.required_damage == pattern.required_damage
-            assert saved_p.optional_n == pattern.optional_n
-            assert len(saved_p.top) == len(pattern.top)
+            for tier in ("junk_conditions", "usable_conditions",
+                         "top_conditions"):
+                saved_groups = getattr(saved_p, tier)
+                orig_groups = getattr(pattern, tier)
+                assert len(saved_groups) == len(orig_groups)
+                assert [len(g) for g in saved_groups] == \
+                    [len(g) for g in orig_groups]
 
     def test_invalid_change_not_saved(self, qtbot, tmp_manager):
         # 制造非法改动（清空首词条）：校验失败、状态标错、不写盘

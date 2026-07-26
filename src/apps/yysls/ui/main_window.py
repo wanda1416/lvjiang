@@ -169,7 +169,7 @@ class MainWindow(GenericMainWindow):
         if isinstance(raw, dict):
             schools_cfg = raw
         elif isinstance(raw, list):
-            # 旧 list 格式兼容：列表内流派视为启用（旧全局 keep_pvp 忽略）
+            # 旧 list 格式兼容：列表内流派视为启用
             schools_cfg = {k: {"enabled": True} for k in raw}
         else:
             schools_cfg = {"huiyi_general": {"enabled": True}}
@@ -178,12 +178,14 @@ class MainWindow(GenericMainWindow):
             cb.setChecked(cb.objectName() in selected)
             cb.blockSignals(False)
         self._school_config.set_config(schools_cfg)
+        self._school_config.set_keep_pvp(bool(tuning.get("keep_pvp", False)))
 
     def _save_tuning_config(self):
         from ..session import get_plugin_session
         get_plugin_session().set_section("tuning", {
             "selected_slots": self._get_tuning_selected_slots(),
             "schools": self._get_tuning_school_config(),
+            "keep_pvp": self._get_tuning_keep_pvp(),
         })
 
     def _set_all_tuning_checks(self, checked: bool):
@@ -197,3 +199,7 @@ class MainWindow(GenericMainWindow):
     def _get_tuning_school_config(self) -> dict[str, dict]:
         """流派配置委托公共控件收集"""
         return self._school_config.get_config()
+
+    def _get_tuning_keep_pvp(self) -> bool:
+        """全局「保留 PVP 装备」开关（公共控件顶部复选框）"""
+        return self._school_config.get_keep_pvp()

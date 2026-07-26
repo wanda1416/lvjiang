@@ -5,9 +5,8 @@
 ## 一、当前状态
 
 「游戏配置重构与流派配置」计划已**全部完成**，全量 pytest **509 例全绿**。
-**所有改动未提交**（见文末 git 状态），等用户 /submit 指令——严禁自动提交。
 
-**2026-07 追加：调律规则标准词条化重构完成**（全量 pytest 528 例全绿，未提交）：
+**2026-07 追加：调律规则标准词条化重构完成**（全量 pytest 528 例全绿）：
 删除 SYMBOL_VOCAB/SYMBOL_MAP 符号层与 variants 层（字段上提 YAML 顶层），
 规则词条唯一来源 = `AttrRuleManager.get_normal_affix_names()` 标准全集（越界名拒存）；
 heal.yaml 拆为 heal_pure/heal_fire 两条独立规则；规则可新建/删除
@@ -74,21 +73,8 @@ weapons 表、tests（test_huixin_judge / test_equip_model / test_equip_judge_di
    后者用 `prev_loading` 保存/恢复 `_loading` 标志，改动时勿破坏此约定。
 7. 用户约定：开发期配置重构**不写迁移兼容代码**（旧 schema 直接废弃）。
 
-## 四、下一步（TODO.md「打通阶段」，未开工，需用户明确发起）
+## 四、下一步（TODO.md「打通阶段」剩余待办）
 
-1. 运行时校验打通：TuningRuleManager 校验引入 AttrRuleManager 标准词条全集，失配拒存/告警；
-2. 调律规则 UI 词条候选动态化（DIVINE_CANDIDATES/_DAMAGE_OPTIONS 等改从 AttrRuleManager 取）；
-3. tuning_rules 各 YAML 的 weapons 表改为引用 schools（当前仍各自硬编码，注意其结构还是
+1. tuning_rules 各 YAML 的 weapons 表改为引用 schools（当前仍各自硬编码，注意其结构还是
    旧式 `{main: {武器: 词条}, sub: [武器]}`，与 attributes.yaml 新 schema 不同）；
-4. 两对话框互挂入口按钮成环。
-
-## 五、未提交文件清单（git status）
-
-修改：attributes.yaml、tuning_rules/huixin_big.yaml、tuning_rules/huixin_small.yaml、
-constants.py、attr_rules.py、attr_dialog.py、attr_tab.py、base_attr_panel.py、
-equip_judge_dialog.py、src/apps/yysls/ui/main_window.py、rules_dialog.py、
-src/ui/main_window.py、test_attr_rules.py、test_equip_judge_dialog.py、
-test_equip_model.py、test_huixin_judge.py
-
-新增：TODO.md、src/apps/yysls/ui/attr_manager/school_panel.py、tests/ui/、
-tests/yysls/test_attr_manager_ui.py
+2. 两对话框互挂入口按钮成环。

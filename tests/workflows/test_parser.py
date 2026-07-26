@@ -299,6 +299,50 @@ def test_drag_no_wait():
     assert isinstance(program.body[0], Drag)
 
 
+def test_click_wait_in_for_loop():
+    """for 体内的 click ... after wait 应展平为多条语句"""
+    program = parse_text("for s in [\"a\", \"b\"]\nclick [a].[x] after wait 0.5\nend")
+    for_node = program.body[0]
+    assert isinstance(for_node, For)
+    # for 体应包含 2 条语句：Click + Wait（而非一个 list）
+    assert len(for_node.body) == 2
+    assert isinstance(for_node.body[0], Click)
+    assert isinstance(for_node.body[1], Wait)
+
+
+def test_click_wait_in_if_body():
+    """if 体内的 click ... before wait 应展平"""
+    program = parse_text("if $x\nclick [a].[b] before wait 0.3\nend")
+    if_node = program.body[0]
+    assert isinstance(if_node, If)
+    assert len(if_node.then_body) == 2
+    assert isinstance(if_node.then_body[0], Wait)
+    assert isinstance(if_node.then_body[1], Click)
+
+
+def test_click_wait_in_loop_body():
+    """loop 体内的 click ... around wait 应展平为 3 条语句"""
+    program = parse_text("loop 3\nclick [a].[b] around wait 0.5\nend")
+    loop_node = program.body[0]
+    assert isinstance(loop_node, Loop)
+    assert len(loop_node.body) == 3
+    assert isinstance(loop_node.body[0], Wait)
+    assert isinstance(loop_node.body[1], Click)
+    assert isinstance(loop_node.body[2], Wait)
+
+
+def test_click_wait_in_def_body():
+    """def 体内的 click ... after wait 应展平为多条语句"""
+    program = parse_text("def my_proc()\nclick [a].[b] after wait 0.5\nlog \"done\"\nend")
+    proc = program.procs["my_proc"]
+    assert isinstance(proc, ProcDef)
+    # def 体应包含 3 条语句：Click + Wait + Log（而非 list + Log）
+    assert len(proc.body) == 3
+    assert isinstance(proc.body[0], Click)
+    assert isinstance(proc.body[1], Wait)
+    assert isinstance(proc.body[2], Log)
+
+
 # ─── scan/recognize 测试 ────────────────────────────────────
 
 def test_scan_as_required():

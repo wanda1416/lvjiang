@@ -27,7 +27,7 @@ class TestCandidates:
     def test_left_pool(self, dp):
         # 左四 = 外功增益 + 属攻增益 的原始词条名
         names = set(dp._candidates("weapon"))
-        assert names == {"外功穿透", "外功抗性", "属攻穿透"}
+        assert names == {"外功穿透", "外功抗性", "无相穿透"}
         assert set(dp._candidates("jewelry")) == names
 
     def test_right_pool_names(self, dp):
@@ -46,7 +46,7 @@ class TestParse:
     @pytest.mark.parametrize("text,name,value", [
         ("外功穿透 +14.2%", "外功穿透", 14.2),
         ("外功抗性+9.6%", "外功抗性", 9.6),
-        ("属攻穿透 12.8", "属攻穿透", 12.8),
+        ("无相穿透 12.8", "无相穿透", 12.8),
     ])
     def test_weapon_side(self, dp, text, name, value):
         assert dp.parse(text, "weapon") == {"name": name, "value": value}

@@ -22,6 +22,10 @@ base_attrs:
       blue:
         min: 70
         max: 162
+    100:
+      gold:
+        min: 75
+        max: 175
   sub_weapon:
     _follow: main_weapon
   ring:
@@ -34,6 +38,11 @@ base_attrs:
       gold: 116
       purple: 105
       blue: 93
+    100:
+      gold: 100
+      purple: 90
+    96:
+      gold: 86
   pendant:
     _attr: 最大外功攻击
     110:
@@ -44,6 +53,10 @@ base_attrs:
       gold: 174
       purple: 157
       blue: 139
+    100:
+      gold: 150
+    96:
+      gold: 129
   head:
     _attr: 气血最大值
     110:
@@ -54,6 +67,11 @@ base_attrs:
       gold: 8225
       purple: 7402
       blue: 6580
+    100:
+      gold: 6879
+      purple: 6192
+    96:
+      gold: 5774
   chest:
     _attr: 气血最大值
     110:
@@ -64,6 +82,11 @@ base_attrs:
       gold: 16449
       purple: 14804
       blue: 13160
+    100:
+      gold: 13758
+      purple: 12383
+    96:
+      gold: 11547
   leg:
     _follow: head
   wrist:
@@ -77,6 +100,8 @@ affix_caps:
       cap: 121.4
     105:
       cap: 105.6
+    100:
+      cap: 90.6
   属性攻击:
     _group: true
     _aliases:
@@ -99,6 +124,8 @@ affix_caps:
       cap: 68.8
     105:
       cap: 59.8
+    100:
+      cap: 51.4
   五维属性:
     _aliases:
     - 劲
@@ -110,6 +137,8 @@ affix_caps:
       cap: 76.8
     105:
       cap: 66.8
+    100:
+      cap: 57.4
   会意率:
     _unit: '%'
     _aliases:
@@ -118,6 +147,8 @@ affix_caps:
       cap: 7
     105:
       cap: 6
+    100:
+      cap: 5.2
   会心率:
     _unit: '%'
     _aliases:
@@ -126,6 +157,8 @@ affix_caps:
       cap: 14
     105:
       cap: 12.2
+    100:
+      cap: 10.4
   精准率:
     _unit: '%'
     _aliases:
@@ -134,6 +167,8 @@ affix_caps:
       cap: 12.4
     105:
       cap: 10.8
+    100:
+      cap: 9.2
   指定武学增效:
     _unit: '%'
     _aliases:
@@ -201,11 +236,13 @@ affix_caps:
     _pool: dingyin
     _unit: '%'
     _aliases:
-    - 属攻穿透
+    - 无相穿透
     110:
       cap: 20
     105:
       cap: 17.4
+    100:
+      cap: 15.2
   指定技能增效:
     _pool: dingyin
     _group: true
@@ -277,6 +314,8 @@ affix_caps:
       cap: 9.2
     105:
       cap: 8
+    100:
+      cap: 7
 weapon_types:
 - name: 剑
   wuxue_affix: 剑武学增伤

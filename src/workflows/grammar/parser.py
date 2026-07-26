@@ -708,12 +708,14 @@ class _DSLTransformer(Transformer):
         """
         name = str(items[0])
         params = []
-        body = []
+        raw_body = []
         for item in items[1:]:
             if isinstance(item, list) and all(isinstance(p, str) for p in item):
                 params = item  # def_param_list 返回 list[str]
             elif item is not None and not isinstance(item, Token):
-                body.append(item)
+                raw_body.append(item)
+        # 展平语法糖产生的列表（click/drag + wait_clause）
+        body = self._flatten_body(raw_body)
         return ProcDef(name=name, params=params, body=body)
 
     def def_param_list(self, items):
@@ -754,6 +756,19 @@ class _DSLTransformer(Transformer):
 
     # ─── 控制流 ───────────────────────────────────────────
 
+    @staticmethod
+    def _flatten_body(items):
+        """展平复合语句体中的列表（语法糖 click/drag + wait_clause 展开产生）"""
+        result = []
+        for item in items:
+            if item is None or isinstance(item, Token):
+                continue
+            if isinstance(item, list):
+                result.extend(item)
+            else:
+                result.append(item)
+        return result
+
     def if_stmt(self, items):
         condition = items[0]
         then_body = []
@@ -762,12 +777,15 @@ class _DSLTransformer(Transformer):
         for item in items[1:]:
             if isinstance(item, tuple) and len(item) == 2 and item[0] == "else":
                 in_else = True
-                else_body = item[1]
+                else_body = item[1]  # else_clause 已经过展平
             elif item is not None and not isinstance(item, Token):
                 if in_else:
                     else_body.append(item)
                 else:
                     then_body.append(item)
+        # 展平语法糖产生的列表（click/drag + wait_clause）
+        then_body = self._flatten_body(then_body)
+        else_body = self._flatten_body(else_body)
         return If(condition=condition, then_body=then_body, else_body=else_body, line_no=self._line(items))
 
     def else_clause(self, items):
@@ -778,7 +796,7 @@ class _DSLTransformer(Transformer):
     def for_stmt(self, items):
         var_name = str(items[0])
         iterable = items[1]  # for_iter → list[Literal] | VarRef | FuncCall | ForRange
-        body = [i for i in items[2:] if i is not None and not isinstance(i, Token)]
+        body = self._flatten_body(items[2:])
         # 若 for_iter 返回 ForRange，直接设置 body 并返回
         if isinstance(iterable, ForRange):
             return ForRange(var=var_name, start=iterable.start, end=iterable.end,
@@ -822,7 +840,7 @@ class _DSLTransformer(Transformer):
             count = int(str(count_val))
         else:
             count = str(count_val)
-        body = [i for i in items[1:] if i is not None and not isinstance(i, Token)]
+        body = self._flatten_body(items[1:])
         return Loop(count=count, body=body, line_no=self._line(items))
 
     def break_stmt(self, items):

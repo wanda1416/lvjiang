@@ -2,11 +2,15 @@
 
 ConditionEditor：垂直行式条件列表（行间 AND 语义），每行由
 原语类型下拉 + 词条 tag 区 + 计数参数组成，产出/回填规则 YAML
-的条件原语原始 dict。顶级判定条件与流派附加垃圾规则共用。
+的条件原语原始 dict。
+
+ConditionGroupsEditor：条件组列表（组间 OR、组内 AND），三档
+判定条件（junk/usable/top）共用；单条件组产出单键 dict，
+多条件组产出原语 dict 列表（与 rules._parse_condition_groups 对应）。
 候选词条为标准词条全集，由构造方注入。
 
 AffixPickerDialog：标准词条多选对话框（带滚动的多列复选网格），
-包内复用（必选槽候选、条件词条、词条库添加等场景）。
+包内复用（首词条候选、条件词条、词条库添加等场景）。
 """
 
 from __future__ import annotations
@@ -14,13 +18,11 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-    QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QGroupBox, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
+    QWidget,
 )
 
 from src.ui.widgets import NoWheelSpinBox
-
-# DMG 占位符（由规则设置页的 weapons 表按武器角色解析）
-DMG_PLACEHOLDER = "DMG"
 
 # 原语类型 → 显示名
 _KIND_NAMES = {
@@ -182,19 +184,18 @@ class ConditionEditor(QWidget):
     changed = pyqtSignal()
 
     def __init__(self, candidates: list[str],
-                 allow_count_min: bool = False, parent=None):
+                 label: str | None = "条件列表（全部满足方成立）：",
+                 parent=None):
         super().__init__(parent)
         self._candidates = candidates
-        # 顶级条件不提供 count_min；junk_rules 处额外提供
         self._kinds = ["not_contains", "contains_all", "not_together",
-                       "count_max"]
-        if allow_count_min:
-            self._kinds.append("count_min")
+                       "count_max", "count_min"]
         self._rows: list[_ConditionRow] = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QLabel("条件列表（全部满足方成立）："))
+        if label:
+            layout.addWidget(QLabel(label))
         self._rows_layout = QVBoxLayout()
         self._rows_layout.setSpacing(2)
         layout.addLayout(self._rows_layout)
@@ -236,4 +237,91 @@ class ConditionEditor(QWidget):
             self._rows.remove(row)
             row.setParent(None)
             row.deleteLater()
+            self.changed.emit()
+
+
+class _ConditionGroupBox(QGroupBox):
+    """单条件组：组内条件列表（AND）+ 删除组"""
+
+    changed = pyqtSignal()
+    remove_requested = pyqtSignal(object)
+
+    def __init__(self, candidates: list[str], parent=None):
+        super().__init__("条件组（组内全部满足方命中）", parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 4)
+        self.editor = ConditionEditor(candidates, label=None)
+        self.editor.changed.connect(self.changed)
+        layout.addWidget(self.editor)
+        btn_del = QPushButton("删除本组")
+        btn_del.setFixedWidth(70)
+        btn_del.clicked.connect(lambda: self.remove_requested.emit(self))
+        layout.addWidget(btn_del, alignment=Qt.AlignmentFlag.AlignRight)
+
+
+class ConditionGroupsEditor(QWidget):
+    """条件组列表编辑器（组间 OR、组内 AND，空列表 = 该档不触发）
+
+    与规则 YAML 三档条件语法往返：单键 dict 视作单条件组，
+    list 为组内 AND；产出时单条件组压回单键 dict。
+    """
+
+    changed = pyqtSignal()
+
+    def __init__(self, candidates: list[str], parent=None):
+        super().__init__(parent)
+        self._candidates = candidates
+        self._groups: list[_ConditionGroupBox] = []
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._groups_layout = QVBoxLayout()
+        self._groups_layout.setSpacing(4)
+        layout.addLayout(self._groups_layout)
+
+        btn_add = QPushButton("+ 添加条件组")
+        btn_add.clicked.connect(self._add_group_clicked)
+        layout.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
+
+    # ── 数据往返 ──
+
+    def set_groups(self, raw_list: list):
+        for grp in self._groups:
+            grp.setParent(None)
+            grp.deleteLater()
+        self._groups.clear()
+        for raw in raw_list or []:
+            if isinstance(raw, dict):
+                raw = [raw]
+            if isinstance(raw, list):
+                self._append_group().editor.set_conditions(raw)
+
+    def get_groups(self) -> list:
+        result = []
+        for grp in self._groups:
+            conds = grp.editor.get_conditions()
+            if not conds:
+                continue  # 空组不产出（避免意外的永真/永假组）
+            result.append(conds[0] if len(conds) == 1 else conds)
+        return result
+
+    # ── 内部 ──
+
+    def _append_group(self) -> _ConditionGroupBox:
+        grp = _ConditionGroupBox(self._candidates)
+        grp.changed.connect(self.changed)
+        grp.remove_requested.connect(self._remove_group)
+        self._groups.append(grp)
+        self._groups_layout.addWidget(grp)
+        return grp
+
+    def _add_group_clicked(self):
+        self._append_group()
+        # 新组无条件，待用户添加条件后再触发 changed 保存
+
+    def _remove_group(self, grp: _ConditionGroupBox):
+        if grp in self._groups:
+            self._groups.remove(grp)
+            grp.setParent(None)
+            grp.deleteLater()
             self.changed.emit()

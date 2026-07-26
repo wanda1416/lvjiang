@@ -1,104 +1,149 @@
+# 会意通用 调律规则
+# 属攻限定鸣金：武器部位写 最大无相攻击，非武器部位写 最大鸣金攻击
 key: huiyi_general
-name: 会意流派-通用
+name: 会意通用
 order: 10
-has_keep_pvp: true
-needs_sub_school: false
-own_attr: 鸣金
-weapons:
-  default:
+weapon_rules:
+  会意:
     main:
-      剑: 剑武学增伤
+      weapon: 剑
+      damage: 剑武学增伤
     sub:
-    - 枪
+      weapon: 枪
+      damage: null
 transmute_priority:
 - 最大外功攻击
 - 势
 - 劲
 - 会意率
 - 最大无相攻击
+- 最大鸣金攻击
 affix_pool:
 - 最大外功攻击
 - 势
 - 劲
 - 会意率
 - 最大无相攻击
+- 最大鸣金攻击
 - 会心率
 - 精准率
-optional_pool:
-- 劲
-- 势
-- 会意率
-- 最大无相攻击
-junk_rules:
-- count_min:
-    symbols:
-    - 会心率
-    - 精准率
-    min: 2
+- 全武学增效
+- 对首领单位增伤
 patterns:
   主武器:
     first:
     - 最大外功攻击
-    required:
-    - - DMG
-    - - 最大外功攻击
-    - - 劲
+    junk_conditions:
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 2
+    usable_conditions:
+    - not_contains:
+      - 最大外功攻击
+    - not_contains:
+      - 劲
       - 势
-    required_damage: DMG
-    optional_n: 1
-    top:
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+    top_conditions:
     - not_contains:
       - 会意率
       - 最大无相攻击
+  副武器:
+    first:
+    - 最大外功攻击
+    junk_conditions:
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 2
+    usable_conditions:
+    - not_contains:
+      - 最大外功攻击
+    - not_contains:
+      - 劲
+      - 势
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 势
   环:
     first:
     - 最大外功攻击
-    required:
-    - - 最大外功攻击
-    - - 全武学增效
-    required_damage: 全武学增效
-    optional_n: 2
-    top:
+    junk_conditions:
+    - not_contains:
+      - 全武学增效
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 2
+    usable_conditions:
+    - not_contains:
+      - 最大外功攻击
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+    top_conditions:
     - contains_all:
       - 劲
       - 势
   冠胄:
     first:
     - 会意率
-    required:
-    - - 最大外功攻击
-    - - 劲
-      - 势
-    required_damage: null
-    optional_n: 2
-    allowed_divine_pvp:
-    - 单体类奇术增伤
-    top:
+    junk_conditions:
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 2
+    usable_conditions:
     - not_contains:
-      - 最大无相攻击
+      - 最大外功攻击
+    - not_contains:
+      - 劲
+      - 势
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+    top_conditions:
+    - not_contains:
+      - 最大鸣金攻击
   胫甲:
     first:
     - 劲
-    required:
-    - - 对首领单位增伤
-    - - 最大外功攻击
-    required_damage: 对首领单位增伤
-    damage_pvp_substitute: 对玩家单位增效
-    optional_n: 2
-    top:
-    - contains_all:
-      - 劲
-      - 势
-  副武器:
-    first:
-    - 最大外功攻击
-    required:
-    - - 最大外功攻击
-    - - 劲
-      - 势
-    required_damage: null
-    optional_n: 2
-    top:
+    junk_conditions:
+    - not_contains:
+      - 对首领单位增伤
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 2
+    usable_conditions:
+    - not_contains:
+      - 最大外功攻击
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+    top_conditions:
     - contains_all:
       - 劲
       - 势

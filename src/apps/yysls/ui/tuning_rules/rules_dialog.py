@@ -111,6 +111,7 @@ class TuningRulesDialog(QDialog):
     def _add_rule_tab(self, key: str, name: str) -> SchoolRulePanel:
         panel = SchoolRulePanel(key, self._manager, self._set_status,
                                 on_delete=self._delete_rule)
+        panel._dialog_rename_cb = self._rename_rule
         self._tabs.addTab(panel, name)
         return panel
 
@@ -141,6 +142,14 @@ class TuningRulesDialog(QDialog):
                 panel.deleteLater()
                 break
         self._set_status(f"已删除规则 {key}", False)
+
+    def _rename_rule(self, old_key: str, new_key: str, new_name: str):
+        """更新对应 Tab 的标题文本（由 panel 在 key/name 变更时回调）"""
+        for i in range(self._tabs.count()):
+            panel = self._tabs.widget(i)
+            if isinstance(panel, SchoolRulePanel) and panel.rule_key == new_key:
+                self._tabs.setTabText(i, new_name)
+                break
 
     # ── 其他 ──
 

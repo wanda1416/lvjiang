@@ -228,7 +228,9 @@ class EquipJudgeTestDialog(QDialog):
         left = QVBoxLayout()
         left.addWidget(QLabel("<b>流派配置（仅本次测试，不保存）：</b>"))
         self._school_config = SchoolConfigWidget()
-        self._school_config.set_config(self._load_session_schools())
+        schools_cfg, keep_pvp = self._load_session_tuning()
+        self._school_config.set_config(schools_cfg)
+        self._school_config.set_keep_pvp(keep_pvp)
         school_scroll = QScrollArea()
         school_scroll.setWidgetResizable(True)
         school_scroll.setWidget(self._school_config)
@@ -249,19 +251,21 @@ class EquipJudgeTestDialog(QDialog):
         layout.addLayout(right, stretch=1)
 
     @staticmethod
-    def _load_session_schools() -> dict:
-        """读取调律 Tab 已保存的流派配置作为初值（插件会话）"""
+    def _load_session_tuning() -> tuple[dict, bool]:
+        """读取调律 Tab 已保存的流派配置与全局 PVP 开关作为初值（插件会话）"""
         from ..session import get_plugin_session
-        raw = get_plugin_session().get_section("tuning").get("schools")
+        section = get_plugin_session().get_section("tuning")
+        keep_pvp = bool(section.get("keep_pvp", False))
+        raw = section.get("schools")
         if isinstance(raw, dict):
-            return raw
-        if isinstance(raw, list):  # 旧 list 格式兼容
-            return {k: {"enabled": True} for k in raw}
-        return {}
+            return raw, keep_pvp
+        return {}, keep_pvp
 
     def _on_judge(self):
+        keep_pvp = self._school_config.get_keep_pvp()
         configs = {
-            k: cfg for k, cfg in self._school_config.get_config().items()
+            k: {**cfg, "keep_pvp": keep_pvp}
+            for k, cfg in self._school_config.get_config().items()
             if cfg.get("enabled")
         }
         if not configs:

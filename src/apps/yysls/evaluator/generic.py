@@ -1,70 +1,40 @@
-"""通用流派判定器（规则驱动，穷举匹配制）
+"""通用流派判定器（规则驱动，三档条件线性判定制）
 
 GenericSchoolJudge 加载 SchoolRule（YAML 外置规则）完成 judge
 （完整定级）与 check_tuning_worthiness（调律潜力）。
-规则中的词条引用均为标准词条名；判定前仅做属攻归一化
-（本流派属攻 → 无相攻击，见 _normalize），无符号映射层。
+规则中的词条引用均为标准词条名，直接写具体属攻词条
+（如 最大无相攻击/最大鸣金攻击），无归一化与符号映射层。
 
-定级流程骨架（00-调律总说明.md 第七节）：
-1. 出现废词条（词条库以外的词条，或流派不需要的神力词条）→ 垃圾
-2. 部位明确需要的增伤词条缺失 → 垃圾
-3. 模式命中 → 按顶级判定条件区分 顶级/优秀
-4. 流派专属垃圾规则（junk_rules）触发 → 垃圾
-5. 必选缺失但无废词条 → 能用
+定级流程（线性，无模式匹配）：
+1. 首词条不在 first → 跳过（无调律价值）
+2. 非首词条存在 池外且非本次增伤 的词条 → 垃圾
+3. 本次武器规则要求增伤但词条缺失 → 垃圾
+4. junk_conditions 命中 → 垃圾；usable_conditions 命中 → 能用；
+   top_conditions 命中 → 顶级；全不命中 → 优秀
+   （每档条件组间 OR、组内 AND）
 
-多武器角色（会心的 流派×玩法）对激活组合逐一尝试，
-取评级最高的结果。
+武器部位按用户勾选的武器规则（如 纯唐/双切）逐一尝试，装备武器名
+匹配主/副武器即产生一次判定（携带该侧增伤要求），取评级最高者。
+
+全局 keep_pvp 开启时做部位级 PVP 词条等价处理：
+- 胫甲（含腕甲）：对玩家单位增效 视作 对首领单位增伤；
+- 冠胄（含头/胸甲）：单体类奇术增伤 临时并入词条库。
 """
 
 from __future__ import annotations
 
-import re
-
 from src.apps.yysls.equip_parser import EquipmentData
 
 from .base import JudgeResult, Rating, SchoolJudge, part_label
-from .matching import _match_partial, _match_pattern
-from .rules import (
-    PART_ALIAS, PVP_NAMES, SCHOOL_ATTRS,
-    Condition, PartPattern, SchoolRule,
-)
+from .rules import PART_ALIAS, PVP_NAMES, Condition, PartPattern, SchoolRule
 
-# 评级排序（多角色/转律模拟取评级上限最高的组合）
+# 评级排序（多武器规则/转律模拟取评级上限最高的组合）
 _RANK = {Rating.JUNK: 0, Rating.USABLE: 1, Rating.EXCELLENT: 2, Rating.TOP: 3}
 
-# 属攻词条全称（最大/最小 X 攻击）
-_ATTR_RE = re.compile(r"^(最[大小])(.+)攻击$")
 
-
-def _normalize(name: str, category: str, own_attrs: set[str]) -> str:
-    """属攻归一化：本流派属攻 → 无相攻击；错位属攻加标记
-
-    - 武器上：无相攻击保留全称（可命中规则）；任何流派属攻均为
-      错位（加标记后必然落在词条库外 → 判垃圾）；
-    - 非武器：大本属（own_attrs 内的属攻）→ 最大/最小无相攻击，
-      字面 无相攻击 为错位；其他流派属攻保留全称
-      （词条库列具体标准名时可命中）。
-    """
-    m = _ATTR_RE.match(name)
-    if not m:
-        return name
-    attr = m.group(2)
-    if category == "weapon":
-        return f"{name}(错位)" if attr in SCHOOL_ATTRS else name
-    if attr in own_attrs:
-        return f"{m.group(1)}无相攻击"
-    if attr == "无相":
-        return f"{name}(错位)"
-    return name
-
-
-def _cond_count(cond: Condition, first_token: str,
-                tokens: list[str]) -> int:
-    """计数类条件的实际计数（reason 文案用）"""
-    count = sum(1 for t in tokens if t in cond.symbols)
-    if cond.include_first and first_token in cond.symbols:
-        count += 1
-    return count
+def _group_text(group: list[Condition]) -> str:
+    """条件组 reason 文案"""
+    return "；".join(f"{c.kind}[{'/'.join(c.symbols)}]" for c in group)
 
 
 class GenericSchoolJudge(SchoolJudge):
@@ -77,13 +47,7 @@ class GenericSchoolJudge(SchoolJudge):
         self.school_key = rule.key
         self.school_name = rule.name
         self.implemented = True
-        self.has_keep_pvp = rule.has_keep_pvp
-        self.needs_sub_school = rule.needs_sub_school
-        self.sub_school_options = rule.sub_school_options
-        self.sub_school_playstyles = rule.sub_school_playstyles
-        self.sub_school_label = rule.sub_school_label
-        if not rule.has_keep_pvp:
-            self.keep_pvp = False
+        self.weapon_rule_options = rule.weapon_rule_options
 
     def judge(self, equip: EquipmentData) -> JudgeResult:
         return self._run(equip, partial=False)
@@ -121,12 +85,12 @@ class GenericSchoolJudge(SchoolJudge):
 
         n_free = (5 - len(equip.affixes)) if partial else 0
 
-        # 逐个武器角色组合尝试，取最优结果
+        # 逐个武器规则组合尝试，取最优结果
         best_label = ""
         best: JudgeResult | None = None
-        for label, pattern, damage, own_attrs in attempts:
+        for label, part_key, pattern, damage in attempts:
             res = self._judge_attempt(
-                equip, pattern, damage, own_attrs, partial, n_free)
+                equip, part_key, pattern, damage, partial, n_free)
             score = -1 if res.skipped else _RANK[res.rating]
             if best is None or score > (-1 if best.skipped else _RANK[best.rating]):
                 best, best_label = res, label
@@ -138,144 +102,112 @@ class GenericSchoolJudge(SchoolJudge):
             best.reasons = pre_reasons + best.reasons
         return best
 
-    def _judge_attempt(self, equip: EquipmentData,
-                       pattern: PartPattern, damage: set[str] | None,
-                       own_attrs: set[str], partial: bool,
-                       n_free: int) -> JudgeResult:
-        """按单个部位角色组合判定一次"""
+    def _judge_attempt(self, equip: EquipmentData, part_key: str,
+                       pattern: PartPattern, damage: str | None,
+                       partial: bool, n_free: int) -> JudgeResult:
+        """按单个部位/武器规则组合判定一次"""
         result = JudgeResult(equipment=equip)
         pool = self.rule.pool_set
-        optional_pool = self.rule.optional_pool_set
 
-        category = equip.category
-        first_token = _normalize(equip.affixes[0].name, category, own_attrs)
-        tokens = [_normalize(a.name, category, own_attrs)
-                  for a in equip.affixes[1:]]
+        first_token = equip.affixes[0].name
+        tokens = [a.name for a in equip.affixes[1:]]
 
         # 首词条判断（不符即跳过）
         if first_token not in pattern.first:
             result.skipped = True
-            result.reasons.append(
-                f"首词条 {equip.affixes[0].name} 不符合要求")
+            result.reasons.append(f"首词条 {first_token} 不符合要求")
             return result
 
-        # 解析 DMG 占位符 → 必选槽 / 必需增伤
-        dmg_set = set(damage or ())
-        required: list[set[str]] = []
-        for slot in pattern.required:
-            cands: set[str] = set()
-            for c in slot:
-                if c == "DMG":
-                    cands |= dmg_set
-                else:
-                    cands.add(c)
-            required.append(cands)
-        req_damage: set[str] | None = None
-        if pattern.required_damage == "DMG":
-            req_damage = dmg_set
-        elif pattern.required_damage:
-            req_damage = {pattern.required_damage}
-
-        # keep_pvp：PVP 增伤可顶替必需增伤槽位
-        substitute = pattern.damage_pvp_substitute
-        if self.keep_pvp and substitute and req_damage:
-            required = [slot | {substitute} if slot & req_damage else slot
-                        for slot in required]
-
-        # 允许的神力词条（必选槽候选并集 + keep_pvp 扩展）
-        allowed_divine = {c for slot in required for c in slot}
-        if req_damage:
-            allowed_divine |= req_damage
+        # 全局 keep_pvp：部位级 PVP 词条等价处理
+        pvp_hit = any(t in PVP_NAMES for t in tokens)
         if self.keep_pvp:
-            allowed_divine |= set(pattern.allowed_divine_pvp)
-            if substitute:
-                allowed_divine.add(substitute)
+            if part_key == "胫甲" and "对玩家单位增效" not in pool:
+                tokens = ["对首领单位增伤" if t == "对玩家单位增效" else t
+                          for t in tokens]
+            elif part_key == "冠胄":
+                pool = pool | {"单体类奇术增伤"}
 
         if partial:
             return self._eval_partial(
-                result, pattern, required, req_damage,
-                allowed_divine, first_token, tokens, n_free,
-                pool, optional_pool)
+                result, pattern, damage, pool,
+                first_token, tokens, n_free, pvp_hit)
 
         # ── 完整定级 ──
 
-        # 定级流程 1：废词条（库外词条或禁止的神力词条）→ 垃圾
-        junk = [t for t in tokens
-                if t not in pool and t not in allowed_divine]
+        # 流程 2：池外且非本次增伤的词条 → 垃圾
+        junk = [t for t in tokens if t not in pool and t != damage]
         if junk:
             result.rating = Rating.JUNK
             result.reasons.append(f"垃圾词条: {'、'.join(junk)}")
             return result
 
-        if self.keep_pvp and any(t in PVP_NAMES for t in tokens):
+        if self.keep_pvp and pvp_hit:
             result.is_pvp = True
             result.reasons.append("含 PVP 词条，保留")
 
-        # 定级流程 2：明确需要的增伤词条缺失 → 垃圾
-        if req_damage:
-            accepted = set(req_damage)
-            if self.keep_pvp and substitute:
-                accepted.add(substitute)
-            if not any(t in accepted for t in tokens):
-                result.rating = Rating.JUNK
-                result.reasons.append(
-                    f"缺失必需增伤词条: {'/'.join(sorted(req_damage))}")
-                return result
-
-        # 定级流程 3：模式命中 → 按顶级判定条件区分 顶级/优秀
-        if _match_pattern(tokens, required, pattern.optional_n,
-                          optional_pool):
-            if all(c.check(first_token, tokens) for c in pattern.top):
-                result.rating = Rating.TOP
-                result.reasons.append("命中模式，满足顶级判定条件")
-            else:
-                result.rating = Rating.EXCELLENT
-                result.reasons.append("命中模式，未满足顶级判定条件")
+        # 流程 3：本次武器规则要求增伤但词条缺失 → 垃圾
+        if damage and damage not in tokens:
+            result.rating = Rating.JUNK
+            result.reasons.append(f"缺失必需增伤词条: {damage}")
             return result
 
-        # 定级流程 4：流派专属垃圾规则 → 垃圾
-        for jr in self.rule.junk_rules:
-            if jr.check(first_token, tokens):
-                count = _cond_count(jr, first_token, tokens)
+        # 流程 4：三档条件 junk → usable → top，全不命中默认优秀
+        for group in pattern.junk_conditions:
+            if all(c.check(first_token, tokens) for c in group):
                 result.rating = Rating.JUNK
-                result.reasons.append(
-                    f"{'/'.join(jr.symbols)} 出现 {count} 条")
+                result.reasons.append(f"命中垃圾条件（{_group_text(group)}）")
                 return result
-
-        # 定级流程 5：必选缺失但无废词条 → 能用
-        result.rating = Rating.USABLE
-        result.reasons.append("模式未命中但无垃圾词条")
+        for group in pattern.usable_conditions:
+            if all(c.check(first_token, tokens) for c in group):
+                result.rating = Rating.USABLE
+                result.reasons.append(f"命中能用条件（{_group_text(group)}）")
+                return result
+        for group in pattern.top_conditions:
+            if all(c.check(first_token, tokens) for c in group):
+                result.rating = Rating.TOP
+                result.reasons.append("满足顶级判定条件")
+                return result
+        result.rating = Rating.EXCELLENT
+        result.reasons.append("词条合格，未满足顶级判定条件")
         return result
 
-    def _eval_partial(self, result: JudgeResult,
-                      pattern: PartPattern, required: list[set[str]],
-                      req_damage: set[str] | None, allowed_divine: set[str],
+    def _eval_partial(self, result: JudgeResult, pattern: PartPattern,
+                      damage: str | None, pool: set[str],
                       first_token: str, tokens: list[str], n_free: int,
-                      pool: set[str], optional_pool: set[str]) -> JudgeResult:
+                      pvp_hit: bool) -> JudgeResult:
         """潜力判定：万能牌 + 逐词条转律模拟，取评级上限最高者
 
         模拟转律（非首词条可选一条无限次转律，不产生神力词条），
-        废词条可被转律洗掉，不直接判垃圾。
+        废词条可被转律洗掉，不直接判垃圾；缺失增伤只能由空槽补
+        （转律不产生神力词条）。junk/usable 条件按 still_hits 求值
+        （空槽按最优填法仍无法解除命中才算命中），top 条件按
+        potential 求值（组内全部原语可满足才算组命中）。
         """
 
         def evaluate(toks: list[str], n_trans: int) -> tuple[Rating, str]:
-            junk = [t for t in toks
-                    if t not in pool and t not in allowed_divine]
+            junk = [t for t in toks if t not in pool and t != damage]
             if junk:
                 return Rating.JUNK, f"垃圾词条: {'、'.join(junk)}"
-            for jr in self.rule.junk_rules:
-                if jr.check(first_token, toks):
-                    count = _cond_count(jr, first_token, toks)
-                    return (Rating.JUNK,
-                            f"{'/'.join(jr.symbols)} 出现 {count} 条")
-            if not _match_partial(toks, required, pattern.optional_n,
-                                  n_free, n_trans, pool, optional_pool):
-                return Rating.USABLE, "已有词条无法全部落入模式槽位，上限为能用"
             n_avail = n_free + n_trans
-            if all(c.potential(first_token, toks, n_avail)
-                   for c in pattern.top):
-                return Rating.TOP, f"仍可达顶级（剩余 {n_free} 空槽）"
-            return Rating.EXCELLENT, f"仍可命中模式达优秀（剩余 {n_free} 空槽）"
+            if damage and damage not in toks:
+                if n_free < 1:
+                    return Rating.JUNK, f"缺失必需增伤词条: {damage}"
+                n_avail -= 1  # 一张万能牌用于补增伤
+            for group in pattern.junk_conditions:
+                if all(c.still_hits(first_token, toks, n_avail)
+                       for c in group):
+                    return (Rating.JUNK,
+                            f"命中垃圾条件（{_group_text(group)}）")
+            for group in pattern.usable_conditions:
+                if all(c.still_hits(first_token, toks, n_avail)
+                       for c in group):
+                    return (Rating.USABLE,
+                            f"上限为能用（{_group_text(group)}）")
+            for group in pattern.top_conditions:
+                if all(c.potential(first_token, toks, n_avail)
+                       for c in group):
+                    return Rating.TOP, f"仍可达顶级（剩余 {n_free} 空槽）"
+            return Rating.EXCELLENT, f"仍可达优秀（剩余 {n_free} 空槽）"
 
         # 不转律 + 逐一转掉某条非首词条，取评级上限最高者
         rating, reason = evaluate(tokens, 0)
@@ -284,8 +216,7 @@ class GenericSchoolJudge(SchoolJudge):
             if _RANK[r2] > _RANK[rating]:
                 rating, reason = r2, f"模拟转律 {t}：{why}"
 
-        if (rating is not Rating.JUNK and self.keep_pvp
-                and any(t in PVP_NAMES for t in tokens)):
+        if rating is not Rating.JUNK and self.keep_pvp and pvp_hit:
             result.is_pvp = True
             result.reasons.append("含 PVP 词条，保留")
 
@@ -293,87 +224,44 @@ class GenericSchoolJudge(SchoolJudge):
         result.reasons.append(reason)
         return result
 
-    # ─── 判定角色展开 ──────────────────────────────────────
+    # ─── 判定组合展开 ──────────────────────────────────────
 
     def _build_attempts(
             self, equip: EquipmentData,
-    ) -> list[tuple[str, PartPattern, set[str] | None, set[str]]]:
+    ) -> list[tuple[str, str, PartPattern, str | None]]:
         """展开该装备在当前配置下的全部判定组合
 
         Returns:
-            [(角色标签, 模式, 主武学增伤候选, 本属名集合), ...]
+            [(标签, 部位 key, 模式, 增伤词条名或 None), ...]
         """
-        # 角色：武器按 weapons 表展开主/副；非武器按归并部位
+        combos: list[tuple[str, str, str | None]] = []
         if equip.part == "武器":
-            roles = self._weapon_roles(equip.weapon or "")
+            weapon = equip.weapon or ""
+            for name in self._enabled_weapon_rules():
+                wr = self.rule.weapon_rules[name]
+                if weapon == wr.main.weapon:
+                    combos.append((f"{name} 主武器", "主武器", wr.main.damage))
+                if weapon == wr.sub.weapon:
+                    combos.append((f"{name} 副武器", "副武器", wr.sub.damage))
         else:
             part = PART_ALIAS.get(equip.part, equip.part)
-            if part not in ("环", "冠胄", "胫甲"):
-                return []
-            roles = [("", part, None, self._own_attrs_all())]
+            if part in ("环", "冠胄", "胫甲"):
+                combos.append(("", part, None))
 
         attempts = []
-        for role_label, part_key, damage, own_attrs in roles:
+        for label, part_key, damage in combos:
             pattern = self.rule.patterns.get(part_key)
             if pattern is None:
                 continue
-            attempts.append((role_label, pattern, damage, own_attrs))
+            attempts.append((label, part_key, pattern, damage))
         return attempts
 
-    def _weapon_roles(
-            self, weapon: str,
-    ) -> list[tuple[str, str, set[str] | None, set[str]]]:
-        """该武器在当前配置下的全部角色
-
-        weapons 表 key：default（恒启用）或 子流派[.玩法]（按勾选启用）。
-        """
-        roles: list[tuple[str, str, set[str] | None, set[str]]] = []
-        for entry_key, entry in self.rule.weapons.items():
-            if entry_key == "default":
-                prefix, own_attrs = "", self._own_attrs_all()
-            else:
-                school, _, ps = entry_key.partition(".")
-                if not self._role_enabled(school, ps):
-                    continue
-                sub = self.rule.sub_schools[school]
-                prefix = sub.name
-                if ps:
-                    prefix += f"-{sub.playstyles.get(ps, ps)}"
-                prefix += " "
-                own_attrs = {sub.name}
-            if weapon in entry.main:
-                roles.append((f"{prefix}主武器" if prefix else "",
-                              "主武器", {entry.main[weapon]}, own_attrs))
-            if weapon in entry.sub:
-                roles.append((f"{prefix}副武器" if prefix else "",
-                              "副武器", None, own_attrs))
-        return roles
-
-    def _role_enabled(self, school: str, ps: str) -> bool:
-        """武器角色条目 (子流派, 玩法) 是否被当前配置启用"""
-        if school not in self._enabled_subs():
-            return False
-        if not ps:
-            return True
-        playstyles = self.rule.sub_schools[school].playstyles
-        ps_cfg = (self.config.get("playstyles") or {}).get(school)
-        enabled_ps = [p for p in (ps_cfg or list(playstyles))
-                      if p in playstyles]
-        return ps in enabled_ps
-
-    def _enabled_subs(self) -> list[str]:
-        """所选子流派（未配置时默认全部，供潜力判定遍历）"""
-        keys = list(self.rule.sub_schools)
-        subs = self.config.get("sub_schools") or keys
-        chosen = [s for s in subs if s in self.rule.sub_schools]
-        return chosen or keys
-
-    def _own_attrs_all(self) -> set[str]:
-        """大本属名集合（own_attr 固定属名 或 跟随勾选的子流派名）"""
-        if self.rule.own_attr == "from_sub_schools":
-            return {self.rule.sub_schools[s].name
-                    for s in self._enabled_subs()}
-        return {self.rule.own_attr} if self.rule.own_attr else set()
+    def _enabled_weapon_rules(self) -> list[str]:
+        """所选武器规则名字（未配置时默认全部，供潜力判定遍历）"""
+        names = list(self.rule.weapon_rules)
+        chosen = [n for n in (self.config.get("weapon_rules") or names)
+                  if n in self.rule.weapon_rules]
+        return chosen or names
 
     # ─── 内部辅助 ──────────────────────────────────────────
 

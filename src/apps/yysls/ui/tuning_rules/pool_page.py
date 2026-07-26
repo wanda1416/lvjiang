@@ -1,9 +1,8 @@
 """转律与词条库页（规则顶层）
 
-转律优先级（可排序列表）、可用词条库、可选槽词条库均为
+转律优先级（可排序列表）、可用词条库均为
 「已选词条列表 + 添加（AffixPickerDialog）/移除」，候选为
-标准词条全集；流派附加垃圾规则（ConditionEditor）。
-编辑共享 raw dict 顶层字段，变更即回调保存。
+标准词条全集。编辑共享 raw dict 顶层字段，变更即回调保存。
 """
 
 from __future__ import annotations
@@ -11,11 +10,11 @@ from __future__ import annotations
 from typing import Callable
 
 from PyQt6.QtWidgets import (
-    QCheckBox, QGroupBox, QHBoxLayout, QListWidget,
+    QGroupBox, QHBoxLayout, QListWidget,
     QPushButton, QVBoxLayout, QWidget,
 )
 
-from .condition_editor import AffixPickerDialog, ConditionEditor
+from .condition_editor import AffixPickerDialog
 
 
 class _AffixListBox(QWidget):
@@ -118,32 +117,12 @@ class PoolPage(QWidget):
         layout.addWidget(prio_box)
 
         # ── 可用词条库 ──
-        pool_box = QGroupBox("可用词条库")
+        pool_box = QGroupBox("可用词条库（全局，各部位词条混放）")
         pool_layout = QVBoxLayout(pool_box)
         self._pool_list = _AffixListBox(
             self._candidates, self._apply, "可用词条库")
         pool_layout.addWidget(self._pool_list)
         layout.addWidget(pool_box)
-
-        # ── 可选槽词条库（可选限定） ──
-        opt_box = QGroupBox("可选槽词条库")
-        opt_layout = QVBoxLayout(opt_box)
-        self._opt_check = QCheckBox("限定可选槽候选（不勾选 = 同可用词条库）")
-        self._opt_check.stateChanged.connect(self._on_opt_toggled)
-        opt_layout.addWidget(self._opt_check)
-        self._opt_list = _AffixListBox(
-            self._candidates, self._apply, "可选槽词条库")
-        opt_layout.addWidget(self._opt_list)
-        layout.addWidget(opt_box)
-
-        # ── 附加垃圾规则 ──
-        junk_box = QGroupBox("流派附加垃圾规则（触发任一即判垃圾）")
-        junk_layout = QVBoxLayout(junk_box)
-        self._junk_editor = ConditionEditor(
-            self._candidates, allow_count_min=True)
-        self._junk_editor.changed.connect(self._apply)
-        junk_layout.addWidget(self._junk_editor)
-        layout.addWidget(junk_box)
         layout.addStretch()
 
     # ── 数据往返 ──
@@ -154,13 +133,6 @@ class PoolPage(QWidget):
         self._data = data
         self._prio_list.set_names(list(data.get("transmute_priority") or []))
         self._pool_list.set_names(list(data.get("affix_pool") or []))
-        optional_pool = data.get("optional_pool")
-        self._opt_check.blockSignals(True)
-        self._opt_check.setChecked(optional_pool is not None)
-        self._opt_check.blockSignals(False)
-        self._opt_list.setEnabled(optional_pool is not None)
-        self._opt_list.set_names(list(optional_pool or []))
-        self._junk_editor.set_conditions(list(data.get("junk_rules") or []))
         self._loading = False
 
     def _apply(self):
@@ -169,16 +141,4 @@ class PoolPage(QWidget):
         d = self._data
         d["transmute_priority"] = self._prio_list.get_names()
         d["affix_pool"] = self._pool_list.get_names()
-        if self._opt_check.isChecked():
-            d["optional_pool"] = self._opt_list.get_names()
-        else:
-            d.pop("optional_pool", None)
-        d["junk_rules"] = self._junk_editor.get_conditions()
         self._on_changed()
-
-    def _on_opt_toggled(self):
-        self._opt_list.setEnabled(self._opt_check.isChecked())
-        if self._opt_check.isChecked() and not self._opt_list.get_names():
-            # 初次开启时默认继承可用词条库
-            self._opt_list.set_names(self._pool_list.get_names())
-        self._apply()

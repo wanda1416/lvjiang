@@ -170,20 +170,24 @@ class SingleTuningWorkflow(BaseWorkflow):
                                        dict[str, dict] | None]:
         """临时复用调律 Tab（自动调律）的目标流派配置（不含部位）
 
-        读插件会话 tuning.schools（流派 key → 含 enabled/keep_pvp/
-        sub_schools/playstyles 的配置），仅保留已启用流派参与判定；
-        无有效配置时返回 (None, None) 回退为全部流派默认配置。
+        读插件会话 tuning.schools（流派 key → {"enabled": bool,
+        "weapon_rules": [名字]}），仅保留已启用流派参与判定，并合并
+        全局 tuning.keep_pvp 到各流派配置；无有效配置时返回
+        (None, None) 回退为全部流派默认配置。
 
         Returns:
             (参与判定的流派 key 列表, 流派 key → 配置 dict)
         """
         from src.apps.yysls.session import get_plugin_session
 
-        raw = get_plugin_session().get_section("tuning").get("schools")
+        section = get_plugin_session().get_section("tuning")
+        raw = section.get("schools")
         if not isinstance(raw, dict):
             logger.info("未找到目标流派配置，按全部流派默认配置判定")
             return None, None
-        enabled = {k: cfg for k, cfg in raw.items()
+        keep_pvp = bool(section.get("keep_pvp", False))
+        enabled = {k: {**cfg, "keep_pvp": keep_pvp}
+                   for k, cfg in raw.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if not enabled:
             logger.info("目标流派配置未启用任何流派，按全部流派默认配置判定")

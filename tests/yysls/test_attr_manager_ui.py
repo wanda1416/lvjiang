@@ -46,8 +46,8 @@ class TestDialog:
         assert dialog.windowTitle() == "游戏配置"
         tabs = dialog._tab._tabs
         assert tabs.count() == 3
-        assert tabs.tabText(0) == "装备配置"
-        assert tabs.tabText(1) == "词组配置"
+        assert tabs.tabText(0) == "词组配置"
+        assert tabs.tabText(1) == "装备配置"
         assert tabs.tabText(2) == "流派配置"
 
 
@@ -74,7 +74,8 @@ class TestWeaponTypes:
             staticmethod(lambda *a, **k: ("双剑", True)),
         )
         panel._on_add_weapon()
-        assert "双剑" in _load_yaml(tmp_attrs)["weapon_types"]
+        weapon_names = [t["name"] for t in _load_yaml(tmp_attrs)["weapon_types"]]
+        assert "双剑" in weapon_names
         assert panel._weapon_list.count() == 11
 
         # 删除「双剑」（确认对话框选是）
@@ -82,10 +83,11 @@ class TestWeaponTypes:
             base_attr_panel.QMessageBox, "question",
             staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes),
         )
-        items = panel._weapon_list.findItems("双剑", Qt.MatchFlag.MatchExactly)
+        items = panel._weapon_list.findItems("双剑", Qt.MatchFlag.MatchStartsWith)
         panel._weapon_list.setCurrentItem(items[0])
         panel._on_del_weapon()
-        assert "双剑" not in _load_yaml(tmp_attrs)["weapon_types"]
+        weapon_names = [t["name"] for t in _load_yaml(tmp_attrs)["weapon_types"]]
+        assert "双剑" not in weapon_names
         assert panel._weapon_list.count() == 10
 
     def test_delete_refused_when_referenced(self, qtbot, tmp_attrs, monkeypatch):
@@ -97,11 +99,12 @@ class TestWeaponTypes:
             staticmethod(lambda *a, **k: warnings.append(a[2] if len(a) > 2 else "")),
         )
         # 「剑」被流派「鸣金·虹」等引用，删除须被拒绝
-        items = panel._weapon_list.findItems("剑", Qt.MatchFlag.MatchExactly)
+        items = panel._weapon_list.findItems("剑", Qt.MatchFlag.MatchStartsWith)
         panel._weapon_list.setCurrentItem(items[0])
         panel._on_del_weapon()
         assert warnings and "鸣金·虹" in warnings[0]
-        assert "剑" in _load_yaml(tmp_attrs)["weapon_types"]
+        weapon_names = [t["name"] for t in _load_yaml(tmp_attrs)["weapon_types"]]
+        assert "剑" in weapon_names
 
 
 # ─── 流派配置行编辑往返 ────────────────────────────────────
@@ -122,10 +125,8 @@ class TestSchoolPanel:
         assert panel._combo_attr.currentText() == "裂石"
         assert panel._combo_main_weapon.currentText() == "横刀"
         assert panel._edit_main_martial.text() == "斩雪刀法"
-        assert panel._combo_main_affix.currentText() == "横刀武学增伤"
         assert panel._combo_sub_weapon.currentText() == "陌刀"
         assert panel._edit_sub_martial.text() == "十方破阵"
-        assert panel._combo_sub_affix.currentText() == "陌刀武学增伤"
 
     def test_field_edit_saves(self, qtbot, tmp_attrs):
         panel = SchoolPanel()
@@ -135,9 +136,9 @@ class TestSchoolPanel:
         panel._combo_sub_weapon.setCurrentText("伞")
         cfg = _load_yaml(tmp_attrs)["schools"]["鸣金·虹"]
         assert cfg["sub"]["weapon"] == "伞"
-        # 属性与主武器组不受影响
+        # 属性与主武器组不受影响（affix 已移至装备配置）
         assert cfg["attr"] == "鸣金"
-        assert cfg["main"] == {"weapon": "剑", "martial_art": "无名剑法", "affix": "剑武学增伤"}
+        assert cfg["main"] == {"weapon": "剑", "martial_art": "无名剑法"}
 
     def test_add_rename_delete_roundtrip(self, qtbot, tmp_attrs, monkeypatch):
         panel = SchoolPanel()

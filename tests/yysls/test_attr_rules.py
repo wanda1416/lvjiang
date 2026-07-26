@@ -177,27 +177,30 @@ class TestWeaponTypesAndSchools:
         assert len(types) == 10
         assert {"陌刀", "横刀", "剑", "枪", "扇", "伞"} <= set(types)
 
+    def test_get_weapon_wuxue_affix(self, mgr):
+        assert mgr.get_weapon_wuxue_affix("剑") == "剑武学增伤"
+        assert mgr.get_weapon_wuxue_affix("扇") == "扇武学增效"
+        assert mgr.get_weapon_wuxue_affix("未注册") == ""
+
     def test_get_schools_structure(self, mgr):
         schools = mgr.get_schools()
         assert len(schools) == 10
         assert "裂石·钧" in schools
         cfg = schools["裂石·钧"]
         assert cfg["attr"] == "裂石"
-        assert cfg["main"] == {"weapon": "横刀", "martial_art": "斩雪刀法", "affix": "横刀武学增伤"}
-        assert cfg["sub"] == {"weapon": "陌刀", "martial_art": "十方破阵", "affix": "陌刀武学增伤"}
+        assert cfg["main"] == {"weapon": "横刀", "martial_art": "斩雪刀法"}
+        assert cfg["sub"] == {"weapon": "陌刀", "martial_art": "十方破阵"}
 
     def test_school_bindings_valid(self, mgr):
-        # 属性合法；主/副武器须在注册表内，词条须属于 指定武学增效 类别
+        # 属性合法；主/副武器须在注册表内
         weapons = set(mgr.get_weapon_types())
         for name, cfg in mgr.get_schools().items():
             assert cfg.get("attr") in ("鸣金", "裂石", "破竹", "牵丝"), \
                 f"{name}: 属性 {cfg.get('attr')} 非法"
             for key in ("main", "sub"):
                 group = cfg.get(key) or {}
-                weapon, affix = group.get("weapon"), group.get("affix")
+                weapon = group.get("weapon")
                 assert weapon in weapons, f"{name}: {key} 武器 {weapon} 未注册"
-                assert mgr.resolve_affix_category(affix) == "指定武学增效", \
-                    f"{name}: 词条 {affix} 不属于指定武学增效"
 
 
 # ─── 数据结构单元 ──────────────────────────────────────────

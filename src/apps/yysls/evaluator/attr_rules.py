@@ -111,6 +111,8 @@ class AttrRuleManager:
         self._alias_groups: dict[str, dict[str, list[str]]] = {}
         # 武器类型注册表（顶层 weapon_types）
         self._weapon_types: list[str] = []
+        # 武器 → 武学增效词条映射（weapon_types 中每项的 wuxue_affix 字段）
+        self._weapon_wuxue_affixes: dict[str, str] = {}
         # 流派配置：流派名 → {main: {武器: 词条}, sub: [武器]}（顶层 schools）
         self._schools: dict[str, dict] = {}
 
@@ -127,7 +129,25 @@ class AttrRuleManager:
         self._affix_pools.clear()
         self._alias_to_category.clear()
         self._alias_groups.clear()
-        self._weapon_types = list(data.get("weapon_types") or [])
+        self._weapon_types.clear()
+        self._weapon_wuxue_affixes.clear()
+        self._schools.clear()
+
+        # ── weapon_types（支持 dict 列表格式：[{name, wuxue_affix}, ...]）──
+        raw_weapon_types = data.get("weapon_types") or []
+        for entry in raw_weapon_types:
+            if isinstance(entry, dict):
+                name = str(entry.get("name", ""))
+                if name:
+                    self._weapon_types.append(name)
+                    affix = entry.get("wuxue_affix")
+                    if affix:
+                        self._weapon_wuxue_affixes[name] = str(affix)
+            else:
+                # 兼容旧格式（纯字符串）
+                name = str(entry)
+                if name:
+                    self._weapon_types.append(name)
         self._schools = dict(data.get("schools") or {})
 
         # ── base_attrs ──
@@ -288,6 +308,17 @@ class AttrRuleManager:
     def get_weapon_types(self) -> list[str]:
         """武器类型注册表（顶层 weapon_types，reload 后实时生效）"""
         return list(self._weapon_types)
+
+    def get_weapon_wuxue_affix(self, weapon: str) -> str:
+        """武器对应的武学增效词条（来自 weapon_types 的 wuxue_affix 字段）
+
+        未配置时返回空字符串。
+        """
+        return self._weapon_wuxue_affixes.get(weapon, "")
+
+    def get_all_weapon_wuxue_affixes(self) -> dict[str, str]:
+        """全部武器 → 武学增效词条映射"""
+        return dict(self._weapon_wuxue_affixes)
 
     def get_schools(self) -> dict[str, dict]:
         """流派配置（顶层 schools：流派名 → {main: {武器: 词条}, sub: [武器]}）"""

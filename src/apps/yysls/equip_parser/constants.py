@@ -33,9 +33,17 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
         data = yaml.safe_load(f) or {}
 
     # ── weapon_types ──
-    weapon_types = data.get("weapon_types")
-    if not isinstance(weapon_types, list) or not weapon_types:
+    raw_weapon_types = data.get("weapon_types")
+    if not isinstance(raw_weapon_types, list) or not raw_weapon_types:
         raise RuntimeError(f"attributes.yaml 中 weapon_types 缺失或为空: {path}")
+
+    # 支持两种格式：
+    # - 旧格式：纯字符串列表 ["剑", "枪", ...]
+    # - 新格式：dict 列表 [{name: "剑", wuxue_affix: "剑武学增伤"}, ...]
+    weapon_types = [
+        str(t["name"]) if isinstance(t, dict) else str(t)
+        for t in raw_weapon_types
+    ]
 
     # ── affix_caps ──
     affix_caps = data.get("affix_caps") or {}
@@ -66,7 +74,7 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
         raise RuntimeError(f"attributes.yaml 的 affix_caps 未解析到任何词条别名: {path}")
 
     return (
-        [str(t) for t in weapon_types],
+        weapon_types,
         sorted(set(all_names), key=len, reverse=True),
         set(percent_names),
     )

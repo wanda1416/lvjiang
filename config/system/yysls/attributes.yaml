@@ -141,7 +141,7 @@ affix_caps:
     - 枪武学增伤
     - 陌刀武学增伤
     - 横刀武学增伤
-    - 伞武学增伤
+    - 伞武学增效
     - 舞绫鼓武学增伤
     - 双刀武学增伤
     - 绳镖武学增伤
@@ -278,114 +278,104 @@ affix_caps:
     105:
       cap: 8
 weapon_types:
-- 剑
-- 枪
-- 伞
-- 扇
-- 陌刀
-- 双刀
-- 绳镖
-- 横刀
-- 手甲
-- 舞绫鼓
+- name: 剑
+  wuxue_affix: 剑武学增伤
+- name: 枪
+  wuxue_affix: 枪武学增伤
+- name: 伞
+  wuxue_affix: 伞武学增效
+- name: 扇
+  wuxue_affix: 扇武学增效
+- name: 陌刀
+  wuxue_affix: 陌刀武学增伤
+- name: 双刀
+  wuxue_affix: 双刀武学增伤
+- name: 绳镖
+  wuxue_affix: 绳镖武学增伤
+- name: 横刀
+  wuxue_affix: 横刀武学增伤
+- name: 手甲
+  wuxue_affix: 手甲武学增伤
+- name: 舞绫鼓
+  wuxue_affix: 舞绫鼓武学增伤
 schools:
   鸣金·虹:
     attr: 鸣金
     main:
       weapon: 剑
       martial_art: 无名剑法
-      affix: 剑武学增伤
     sub:
       weapon: 枪
       martial_art: 无名枪法
-      affix: 枪武学增伤
   鸣金·影:
     attr: 鸣金
     main:
       weapon: 剑
       martial_art: 积矩九剑
-      affix: 剑武学增伤
     sub:
       weapon: 枪
       martial_art: 九曲惊神枪
-      affix: 枪武学增伤
   裂石·威:
     attr: 裂石
     main:
       weapon: 陌刀
       martial_art: 嗟夫刀法
-      affix: 陌刀武学增伤
     sub:
       weapon: 枪
       martial_art: 八方风雷枪
-      affix: 枪武学增伤
   裂石·钧:
     attr: 裂石
     main:
       weapon: 横刀
       martial_art: 斩雪刀法
-      affix: 横刀武学增伤
     sub:
       weapon: 陌刀
       martial_art: 十方破阵
-      affix: 陌刀武学增伤
   牵丝·玉:
     attr: 牵丝
     main:
       weapon: 伞
       martial_art: 九重春色
-      affix: 伞武学增伤
     sub:
       weapon: 扇
       martial_art: 青山执笔
-      affix: 扇武学增效
   牵丝·霖:
     attr: 牵丝
     main:
       weapon: 扇
       martial_art: 明川药典
-      affix: 扇武学增效
     sub:
       weapon: 伞
       martial_art: 千香引魂蛊
-      affix: 伞武学增伤
   牵丝·翊:
     attr: 牵丝
     main:
       weapon: 舞绫鼓
       martial_art: 文动霓裳
-      affix: 舞绫鼓武学增伤
     sub:
       weapon: 扇
       martial_art: 杏游草野
-      affix: 扇武学增效
   破竹·风:
     attr: 破竹
     main:
       weapon: 双刀
       martial_art: 泥犁三垢
-      affix: 双刀武学增伤
     sub:
       weapon: 绳镖
       martial_art: 粟子游尘
-      affix: 绳镖武学增伤
   破竹·尘:
     attr: 破竹
     main:
       weapon: 伞
       martial_art: 醉梦游春
-      affix: 伞武学增伤
     sub:
       weapon: 绳镖
       martial_art: 粟子行云
-      affix: 绳镖武学增伤
   破竹·鸢:
     attr: 破竹
     main:
       weapon: 手甲
       martial_art: 天志垂象
-      affix: 手甲武学增伤
     sub:
       weapon: 绳镖
       martial_art: 千机索天
-      affix: 绳镖武学增伤

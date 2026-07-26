@@ -10,7 +10,7 @@
 最小/最大双数字输入框，不再手写 a~b 文本。
 武器类型：仅主武器部位展示，维护 attributes.yaml 顶层 weapon_types
 注册表（识别层为启动快照，新增武器需重启后方可参与识别），
-被流派配置引用的武器不允许删除。
+每个武器可绑定一种武学增效词条，被流派配置引用的武器不允许删除。
 自动保存，覆盖已有数值时确认。
 """
 
@@ -50,6 +50,10 @@ _QUALITY_NAMES = {
     "purple": "紫装",
     "blue": "蓝装",
 }
+
+
+# 武学增效词条候选所在的词条类别
+_WUXUE_CATEGORY = "指定武学增效"
 
 
 class _RangeCell(QWidget):
@@ -190,7 +194,17 @@ class BaseAttrPanel(QWidget):
 
         self._weapon_list = QListWidget()
         self._weapon_list.setMaximumHeight(300)
+        self._weapon_list.currentRowChanged.connect(self._on_weapon_selected)
         weapon_layout.addWidget(self._weapon_list)
+
+        # 武学增效编辑区（选中武器后展示）
+        wuxue_layout = QHBoxLayout()
+        wuxue_layout.setContentsMargins(0, 4, 0, 0)
+        wuxue_layout.addWidget(QLabel("武学增效"))
+        self._combo_wuxue_affix = QComboBox()
+        self._combo_wuxue_affix.currentTextChanged.connect(self._on_wuxue_affix_changed)
+        wuxue_layout.addWidget(self._combo_wuxue_affix, 1)
+        weapon_layout.addLayout(wuxue_layout)
 
         self._weapon_frame.setVisible(False)
         right_layout.addWidget(self._weapon_frame)
@@ -262,7 +276,39 @@ class BaseAttrPanel(QWidget):
     # ── 武器类型（weapon_types 注册表）──────────────────
 
     def _weapon_types(self) -> list[str]:
-        return list(self._data.get("weapon_types") or [])
+        """武器名称列表（支持新旧两种格式）"""
+        raw = self._data.get("weapon_types") or []
+        return [
+            str(t["name"]) if isinstance(t, dict) else str(t)
+            for t in raw
+        ]
+
+    def _weapon_types_raw(self) -> list[dict]:
+        """武器类型原始数据（dict 列表格式）"""
+        raw = self._data.get("weapon_types") or []
+        result = []
+        for t in raw:
+            if isinstance(t, dict):
+                result.append(t)
+            else:
+                # 兼容旧格式：转换为 dict
+                result.append({"name": str(t)})
+        return result
+
+    def _wuxue_affix_candidates(self) -> list[str]:
+        """武学增效词条候选（指定武学增效 类别的 _aliases）"""
+        category = (self._data.get("affix_caps") or {}).get(_WUXUE_CATEGORY) or {}
+        aliases = category.get("_aliases") or []
+        if isinstance(aliases, dict):
+            return [name for names in aliases.values() for name in names]
+        return list(aliases)
+
+    def _get_weapon_wuxue_affix(self, name: str) -> str:
+        """获取指定武器的武学增效词条"""
+        for t in self._weapon_types_raw():
+            if t.get("name") == name:
+                return t.get("wuxue_affix", "")
+        return ""
 
     def _refresh_weapon_types(self):
         """刷新武器类型列表（仅主武器部位可见）"""
@@ -271,8 +317,62 @@ class BaseAttrPanel(QWidget):
         if not is_main:
             return
         self._weapon_list.clear()
-        for name in self._weapon_types():
-            self._weapon_list.addItem(name)
+        for t in self._weapon_types_raw():
+            name = t.get("name", "")
+            affix = t.get("wuxue_affix", "")
+            display = f"{name}（{affix}）" if affix else name
+            self._weapon_list.addItem(display)
+        self._refresh_wuxue_combo()
+
+    def _refresh_wuxue_combo(self):
+        """刷新武学增效下拉框（跟随当前选中的武器）"""
+        item = self._weapon_list.currentItem()
+        if item is None:
+            self._combo_wuxue_affix.setEnabled(False)
+            self._combo_wuxue_affix.clear()
+            return
+        # 从显示文本中提取武器名
+        display_text = item.text()
+        weapon_name = display_text.split("（")[0] if "（" in display_text else display_text
+        candidates = self._wuxue_affix_candidates()
+        current_affix = self._get_weapon_wuxue_affix(weapon_name)
+
+        self._saving = True
+        self._combo_wuxue_affix.setEnabled(True)
+        self._combo_wuxue_affix.clear()
+        self._combo_wuxue_affix.addItem("")  # 未配置占位
+        self._combo_wuxue_affix.addItems(candidates)
+        if current_affix and current_affix not in candidates:
+            self._combo_wuxue_affix.addItem(current_affix)
+        self._combo_wuxue_affix.setCurrentText(current_affix)
+        self._saving = False
+
+    def _on_weapon_selected(self, row: int):
+        """选中武器变化时刷新武学增效下拉框"""
+        self._refresh_wuxue_combo()
+
+    def _on_wuxue_affix_changed(self, text: str):
+        """武学增效下拉框变化时保存到数据"""
+        if self._saving:
+            return
+        item = self._weapon_list.currentItem()
+        if item is None:
+            return
+        display_text = item.text()
+        weapon_name = display_text.split("（")[0] if "（" in display_text else display_text
+        # 更新 weapon_types 中对应武器的 wuxue_affix
+        raw = self._weapon_types_raw()
+        for t in raw:
+            if t.get("name") == weapon_name:
+                if text:
+                    t["wuxue_affix"] = text
+                else:
+                    t.pop("wuxue_affix", None)
+                break
+        self._data["weapon_types"] = raw
+        self._save_data()
+        # 刷新列表展示
+        self._refresh_weapon_types()
 
     def _schools_using_weapon(self, weapon: str) -> list[str]:
         """引用指定武器的流派名列表（主/副武器均算引用）"""
@@ -297,8 +397,9 @@ class BaseAttrPanel(QWidget):
         if name in types:
             QMessageBox.warning(self, "无法添加", f"武器类型「{name}」已存在。")
             return
-        types.append(name)
-        self._data["weapon_types"] = types
+        raw = self._weapon_types_raw()
+        raw.append({"name": name})
+        self._data["weapon_types"] = raw
         self._save_data()
         self._refresh_weapon_types()
 
@@ -307,7 +408,8 @@ class BaseAttrPanel(QWidget):
         item = self._weapon_list.currentItem()
         if item is None:
             return
-        name = item.text()
+        display_text = item.text()
+        name = display_text.split("（")[0] if "（" in display_text else display_text
         users = self._schools_using_weapon(name)
         if users:
             QMessageBox.warning(
@@ -319,8 +421,8 @@ class BaseAttrPanel(QWidget):
         ret = QMessageBox.question(self, "确认删除", f"确定删除武器类型「{name}」？")
         if ret != QMessageBox.StandardButton.Yes:
             return
-        types = [t for t in self._weapon_types() if t != name]
-        self._data["weapon_types"] = types
+        raw = [t for t in self._weapon_types_raw() if t.get("name") != name]
+        self._data["weapon_types"] = raw
         self._save_data()
         self._refresh_weapon_types()
 

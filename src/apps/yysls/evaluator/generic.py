@@ -1,8 +1,9 @@
 """通用流派判定器（规则驱动，穷举匹配制）
 
 GenericSchoolJudge 加载 SchoolRule（YAML 外置规则）完成 judge
-（完整定级）与 check_tuning_worthiness（调律潜力），替代旧的
-huiyi/huixin/heal 三个硬编码判定器。
+（完整定级）与 check_tuning_worthiness（调律潜力）。
+规则中的词条引用均为标准词条名；判定前仅做属攻归一化
+（本流派属攻 → 无相攻击，见 _normalize），无符号映射层。
 
 定级流程骨架（00-调律总说明.md 第七节）：
 1. 出现废词条（词条库以外的词条，或流派不需要的神力词条）→ 垃圾
@@ -11,8 +12,8 @@ huiyi/huixin/heal 三个硬编码判定器。
 4. 流派专属垃圾规则（junk_rules）触发 → 垃圾
 5. 必选缺失但无废词条 → 能用
 
-多变体/多武器角色（会心的 流派×玩法、治疗的 纯奶/火拳）对激活
-组合逐一尝试，取评级最高的结果。
+多武器角色（会心的 流派×玩法）对激活组合逐一尝试，
+取评级最高的结果。
 """
 
 from __future__ import annotations
@@ -24,41 +25,36 @@ from src.apps.yysls.equip_parser import EquipmentData
 from .base import JudgeResult, Rating, SchoolJudge, part_label
 from .matching import _match_partial, _match_pattern
 from .rules import (
-    PART_ALIAS, PVP_NAMES, SCHOOL_ATTRS, SYMBOL_MAP, SYMBOL_VOCAB,
-    Condition, PartPattern, RuleVariant, SchoolRule,
+    PART_ALIAS, PVP_NAMES, SCHOOL_ATTRS,
+    Condition, PartPattern, SchoolRule,
 )
 
-# 评级排序（多角色/转律模拟取评级上限最高的变体）
+# 评级排序（多角色/转律模拟取评级上限最高的组合）
 _RANK = {Rating.JUNK: 0, Rating.USABLE: 1, Rating.EXCELLENT: 2, Rating.TOP: 3}
 
 # 属攻词条全称（最大/最小 X 攻击）
 _ATTR_RE = re.compile(r"^(最[大小])(.+)攻击$")
 
 
-def _normalize(name: str, category: str, own_attrs: set[str],
-               pool: set[str]) -> str:
-    """词条全称 → 模式符号；神力词条、错位属攻及库外词条保留全称
+def _normalize(name: str, category: str, own_attrs: set[str]) -> str:
+    """属攻归一化：本流派属攻 → 无相攻击；错位属攻加标记
 
-    - 武器上：无相攻击 → 大无相/小无相；任何流派属攻均为错位（保留全称）；
-    - 非武器：大本属（own_attrs 内的属攻）→ 大无相/小无相；
-      其他流派小属攻 → 小外属（仅当 小外属 在词条库内）；
-      无相攻击与其他流派大属攻为错位（保留全称）。
+    - 武器上：无相攻击保留全称（可命中规则）；任何流派属攻均为
+      错位（加标记后必然落在词条库外 → 判垃圾）；
+    - 非武器：大本属（own_attrs 内的属攻）→ 最大/最小无相攻击，
+      字面 无相攻击 为错位；其他流派属攻保留全称
+      （词条库列具体标准名时可命中）。
     """
-    if name in SYMBOL_MAP:
-        return SYMBOL_MAP[name]
     m = _ATTR_RE.match(name)
     if not m:
         return name
-    big = m.group(1) == "最大"
     attr = m.group(2)
     if category == "weapon":
-        if attr == "无相":
-            return "大无相" if big else "小无相"
-        return name
+        return f"{name}(错位)" if attr in SCHOOL_ATTRS else name
     if attr in own_attrs:
-        return "大无相" if big else "小无相"
-    if not big and attr in SCHOOL_ATTRS and "小外属" in pool:
-        return "小外属"
+        return f"{m.group(1)}无相攻击"
+    if attr == "无相":
+        return f"{name}(错位)"
     return name
 
 
@@ -125,12 +121,12 @@ class GenericSchoolJudge(SchoolJudge):
 
         n_free = (5 - len(equip.affixes)) if partial else 0
 
-        # 逐个 (变体, 角色) 组合尝试，取最优结果
+        # 逐个武器角色组合尝试，取最优结果
         best_label = ""
         best: JudgeResult | None = None
-        for label, variant, pattern, damage, own_attrs in attempts:
+        for label, pattern, damage, own_attrs in attempts:
             res = self._judge_attempt(
-                equip, variant, pattern, damage, own_attrs, partial, n_free)
+                equip, pattern, damage, own_attrs, partial, n_free)
             score = -1 if res.skipped else _RANK[res.rating]
             if best is None or score > (-1 if best.skipped else _RANK[best.rating]):
                 best, best_label = res, label
@@ -142,19 +138,18 @@ class GenericSchoolJudge(SchoolJudge):
             best.reasons = pre_reasons + best.reasons
         return best
 
-    def _judge_attempt(self, equip: EquipmentData, variant: RuleVariant,
+    def _judge_attempt(self, equip: EquipmentData,
                        pattern: PartPattern, damage: set[str] | None,
                        own_attrs: set[str], partial: bool,
                        n_free: int) -> JudgeResult:
-        """按单个 (变体, 部位角色) 组合判定一次"""
+        """按单个部位角色组合判定一次"""
         result = JudgeResult(equipment=equip)
-        pool = variant.pool_set
-        optional_pool = variant.optional_pool_set
+        pool = self.rule.pool_set
+        optional_pool = self.rule.optional_pool_set
 
         category = equip.category
-        first_token = _normalize(equip.affixes[0].name, category,
-                                 own_attrs, pool)
-        tokens = [_normalize(a.name, category, own_attrs, pool)
+        first_token = _normalize(equip.affixes[0].name, category, own_attrs)
+        tokens = [_normalize(a.name, category, own_attrs)
                   for a in equip.affixes[1:]]
 
         # 首词条判断（不符即跳过）
@@ -187,9 +182,8 @@ class GenericSchoolJudge(SchoolJudge):
             required = [slot | {substitute} if slot & req_damage else slot
                         for slot in required]
 
-        # 允许的神力词条（必选槽内的全称词条 + keep_pvp 扩展）
-        allowed_divine = {c for slot in required for c in slot
-                          if c not in SYMBOL_VOCAB}
+        # 允许的神力词条（必选槽候选并集 + keep_pvp 扩展）
+        allowed_divine = {c for slot in required for c in slot}
         if req_damage:
             allowed_divine |= req_damage
         if self.keep_pvp:
@@ -199,7 +193,7 @@ class GenericSchoolJudge(SchoolJudge):
 
         if partial:
             return self._eval_partial(
-                result, variant, pattern, required, req_damage,
+                result, pattern, required, req_damage,
                 allowed_divine, first_token, tokens, n_free,
                 pool, optional_pool)
 
@@ -240,7 +234,7 @@ class GenericSchoolJudge(SchoolJudge):
             return result
 
         # 定级流程 4：流派专属垃圾规则 → 垃圾
-        for jr in variant.junk_rules:
+        for jr in self.rule.junk_rules:
             if jr.check(first_token, tokens):
                 count = _cond_count(jr, first_token, tokens)
                 result.rating = Rating.JUNK
@@ -253,7 +247,7 @@ class GenericSchoolJudge(SchoolJudge):
         result.reasons.append("模式未命中但无垃圾词条")
         return result
 
-    def _eval_partial(self, result: JudgeResult, variant: RuleVariant,
+    def _eval_partial(self, result: JudgeResult,
                       pattern: PartPattern, required: list[set[str]],
                       req_damage: set[str] | None, allowed_divine: set[str],
                       first_token: str, tokens: list[str], n_free: int,
@@ -269,7 +263,7 @@ class GenericSchoolJudge(SchoolJudge):
                     if t not in pool and t not in allowed_divine]
             if junk:
                 return Rating.JUNK, f"垃圾词条: {'、'.join(junk)}"
-            for jr in variant.junk_rules:
+            for jr in self.rule.junk_rules:
                 if jr.check(first_token, toks):
                     count = _cond_count(jr, first_token, toks)
                     return (Rating.JUNK,
@@ -299,18 +293,16 @@ class GenericSchoolJudge(SchoolJudge):
         result.reasons.append(reason)
         return result
 
-    # ─── (变体, 角色) 展开 ─────────────────────────────────
+    # ─── 判定角色展开 ──────────────────────────────────────
 
     def _build_attempts(
             self, equip: EquipmentData,
-    ) -> list[tuple[str, RuleVariant, PartPattern, set[str] | None, set[str]]]:
+    ) -> list[tuple[str, PartPattern, set[str] | None, set[str]]]:
         """展开该装备在当前配置下的全部判定组合
 
         Returns:
-            [(角色标签, 变体, 模式, 主武学增伤候选, 本属名集合), ...]
+            [(角色标签, 模式, 主武学增伤候选, 本属名集合), ...]
         """
-        variants = self._active_variants()
-
         # 角色：武器按 weapons 表展开主/副；非武器按归并部位
         if equip.part == "武器":
             roles = self._weapon_roles(equip.weapon or "")
@@ -321,20 +313,12 @@ class GenericSchoolJudge(SchoolJudge):
             roles = [("", part, None, self._own_attrs_all())]
 
         attempts = []
-        for variant in variants:
-            for role_label, part_key, damage, own_attrs in roles:
-                pattern = variant.patterns.get(part_key)
-                if pattern is None:
-                    continue
-                label = " ".join(p for p in (variant.name, role_label) if p)
-                attempts.append((label, variant, pattern, damage, own_attrs))
+        for role_label, part_key, damage, own_attrs in roles:
+            pattern = self.rule.patterns.get(part_key)
+            if pattern is None:
+                continue
+            attempts.append((role_label, pattern, damage, own_attrs))
         return attempts
-
-    def _active_variants(self) -> list[RuleVariant]:
-        """激活的变体：default 恒激活；子流派同名变体按勾选激活"""
-        enabled = set(self._enabled_subs())
-        return [v for vk, v in self.rule.variants.items()
-                if vk == "default" or vk in enabled]
 
     def _weapon_roles(
             self, weapon: str,

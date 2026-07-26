@@ -1,7 +1,8 @@
-"""流派设置页（流派级字段，不随变体切换）
+"""规则设置页（规则级字段）
 
 key（只读）、名称、keep_pvp、own_attr（大本属来源）、
-子流派/玩法表、weapons 武器角色映射表。表格采用文本格式单元格：
+子流派/玩法表、weapons 武器角色映射表，及「删除本规则」入口。
+表格采用文本格式单元格：
 玩法 "key:名,key:名"、主武器 "武器:词条;武器:词条"、副武器逗号分隔。
 """
 
@@ -11,7 +12,8 @@ from typing import Callable
 
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QWidget,
 )
 
 # own_attr 候选：属名 / 跟随子流派勾选 / 无
@@ -48,13 +50,15 @@ def _parse_main(text: str) -> dict[str, str]:
 
 
 class SchoolSettingsPage(QWidget):
-    """流派级设置页（编辑共享 raw dict，变更即回调保存）"""
+    """规则级设置页（编辑共享 raw dict，变更即回调保存）"""
 
     def __init__(self, data: dict, on_changed: Callable[[], None],
+                 on_delete: Callable[[], None] | None = None,
                  parent=None):
         super().__init__(parent)
         self._data = data
         self._on_changed = on_changed
+        self._on_delete = on_delete
         self._loading = True
         self._init_ui()
         self._load()
@@ -69,7 +73,7 @@ class SchoolSettingsPage(QWidget):
 
         self._name_edit = QLineEdit()
         self._name_edit.editingFinished.connect(self._apply_basic)
-        form.addRow("流派名称：", self._name_edit)
+        form.addRow("规则名称：", self._name_edit)
 
         self._keep_pvp_check = QCheckBox("支持「保留 PVP 词条」配置")
         self._keep_pvp_check.stateChanged.connect(self._apply_basic)
@@ -102,6 +106,15 @@ class SchoolSettingsPage(QWidget):
         layout.addWidget(self._weapon_table)
         layout.addLayout(
             self._table_buttons(self._weapon_table, self._apply_weapons))
+
+        # ── 删除本规则 ──
+        del_row = QHBoxLayout()
+        btn_delete = QPushButton("删除本规则")
+        btn_delete.setStyleSheet("color: #c62828;")
+        btn_delete.clicked.connect(self._confirm_delete)
+        del_row.addWidget(btn_delete)
+        del_row.addStretch()
+        layout.addLayout(del_row)
         layout.addStretch()
 
     def _table_buttons(self, table: QTableWidget, apply) -> QHBoxLayout:
@@ -221,3 +234,15 @@ class SchoolSettingsPage(QWidget):
     def _cell(table: QTableWidget, row: int, col: int) -> str:
         item = table.item(row, col)
         return item.text().strip() if item else ""
+
+    # ── 删除 ──
+
+    def _confirm_delete(self):
+        if self._on_delete is None:
+            return
+        name = str(self._data.get("name") or self._data.get("key") or "")
+        ret = QMessageBox.question(
+            self, "删除规则",
+            f"确定删除调律规则「{name}」？规则文件将被删除，不可恢复。")
+        if ret == QMessageBox.StandardButton.Yes:
+            self._on_delete()

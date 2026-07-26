@@ -63,7 +63,7 @@ _TYPE_TO_KEY = {
     # 武器类型 → main_weapon（副武器 sub_weapon 默认跟随主武器，
     # 若独立配置则由贪婪匹配兜底）
     "陌刀": "main_weapon", "舞绫鼓": "main_weapon", "双刀": "main_weapon",
-    "绳镖": "main_weapon", "横刀": "main_weapon", "手甲": "main_weapon",
+    "绳镖": "main_weapon", "唐横刀": "main_weapon", "手甲": "main_weapon",
     "剑": "main_weapon", "枪": "main_weapon", "扇": "main_weapon", "伞": "main_weapon",
     # 首饰
     "环": "ring",
@@ -99,14 +99,20 @@ class AttrRuleManager:
 
         # 品阶推断：key → level → LevelRule
         self._base_rules: dict[str, dict[int, LevelRule]] = {}
-        # 词条上限：category → level → { cap, unit }
+        # 词条上限：category → level → { cap }
         self._affix_caps: dict[str, dict[int, dict]] = {}
+        # 词组单位：category → unit（"" 或 "%"）
+        self._affix_units: dict[str, str] = {}
         # 词库类型：category → POOL_NORMAL / POOL_DINGYIN
         self._affix_pools: dict[str, str] = {}
         # 词条映射：alias → category
         self._alias_to_category: dict[str, str] = {}
         # 词条分组：category → { 组名 → [词条名] }（不分组的类别不在其中）
         self._alias_groups: dict[str, dict[str, list[str]]] = {}
+        # 武器类型注册表（顶层 weapon_types）
+        self._weapon_types: list[str] = []
+        # 流派配置：流派名 → {main: {武器: 词条}, sub: [武器]}（顶层 schools）
+        self._schools: dict[str, dict] = {}
 
         self._load()
 
@@ -117,9 +123,12 @@ class AttrRuleManager:
         # 重置全部规则（_load 会在 UI 保存后重复调用，避免残留旧映射）
         self._base_rules.clear()
         self._affix_caps.clear()
+        self._affix_units.clear()
         self._affix_pools.clear()
         self._alias_to_category.clear()
         self._alias_groups.clear()
+        self._weapon_types = list(data.get("weapon_types") or [])
+        self._schools = dict(data.get("schools") or {})
 
         # ── base_attrs ──
         # _follow: <目标部位> 声明该部位跟随目标部位的数值（单层解析）
@@ -178,6 +187,8 @@ class AttrRuleManager:
             # 解析 _pool 字段（缺省普通词条）
             pool = levels.get("_pool", POOL_NORMAL)
             self._affix_pools[category] = pool if pool == POOL_DINGYIN else POOL_NORMAL
+            # 解析 _unit 字段（词组级单位，缺省空字符串）
+            self._affix_units[category] = levels.get("_unit", "")
             for level_str, entry in levels.items():
                 # 跳过 _aliases 等非等级 key
                 if str(level_str).startswith("_"):
@@ -186,13 +197,11 @@ class AttrRuleManager:
                 if isinstance(entry, dict):
                     self._affix_caps[category][level] = {
                         "cap": entry.get("cap", 0),
-                        "unit": entry.get("unit", ""),
                     }
                 else:
                     # 兼容旧格式（直接数值）
                     self._affix_caps[category][level] = {
                         "cap": entry,
-                        "unit": "",
                     }
 
     # ── 词条映射 ────────────────────────────────────────────
@@ -231,6 +240,14 @@ class AttrRuleManager:
         """是否定音词条"""
         return self.get_affix_pool(affix_name) == POOL_DINGYIN
 
+    def get_normal_affix_names(self) -> list[str]:
+        """全部普通词条标准名（非定音词组的 _aliases 并集，按 YAML 声明序）
+
+        调律规则校验与调律规则 UI 词条候选的唯一来源。
+        """
+        return [alias for alias, cat in self._alias_to_category.items()
+                if self._affix_pools.get(cat, POOL_NORMAL) != POOL_DINGYIN]
+
     # ── 词条上限查询 ────────────────────────────────────────
 
     def get_affix_caps(self, level: int, affix_name: str) -> dict | None:
@@ -244,6 +261,7 @@ class AttrRuleManager:
             {"cap": float, "unit": str, "chengyin": float} 或 None
 
         承音值：普通词条 = cap * 0.94；定音词条不受承音限制，承音值 = cap。
+        unit 从词组级别的 _unit 字段读取。
         """
         category = self.resolve_affix_category(affix_name)
         caps = self._affix_caps.get(category, {})
@@ -257,13 +275,23 @@ class AttrRuleManager:
             chengyin = round(cap * _CHENGYIN_RATIO, 2)
         return {
             "cap": cap,
-            "unit": entry["unit"],
+            "unit": self._affix_units.get(category, ""),
             "chengyin": chengyin,
         }
 
     def get_all_affix_categories(self) -> list[str]:
         """返回所有已配置的词条类别名"""
         return list(self._affix_caps.keys())
+
+    # ── 武器类型 / 流派配置 ────────────────────────
+
+    def get_weapon_types(self) -> list[str]:
+        """武器类型注册表（顶层 weapon_types，reload 后实时生效）"""
+        return list(self._weapon_types)
+
+    def get_schools(self) -> dict[str, dict]:
+        """流派配置（顶层 schools：流派名 → {main: {武器: 词条}, sub: [武器]}）"""
+        return dict(self._schools)
 
     # ── 品阶推断 ────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
 - 窗口/设备扫描与定位
 - 工作流加载、执行、录制
 - 运行日志面板
-- 全局热键（F9 执行、F10 停止、F8 录制）
+- 全局热键（仅 F8-F10：F9 执行、F10 停止、F8 录制；定位/连接后方生效）
 
 插件通过 hooks 机制扩展左侧/右侧 Tab 和菜单项。
 """
@@ -53,6 +53,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
     """
 
     # 全局热键信号
+    f9_pressed = pyqtSignal()
     f10_pressed = pyqtSignal()
     f8_pressed = pyqtSignal()
     _scrcpy_frame_ready = pyqtSignal(object)
@@ -103,11 +104,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._refresh_layout_combo()
         self._load_workflow_configs()
 
-        # ── 全局热键 ──
+        # ── 全局热键（仅 F8-F10；回调内按后端就绪门控，定位/连接后方生效）──
+        self.f9_pressed.connect(self._on_f9_start)
         self.f10_pressed.connect(self._request_stop)
         self.f8_pressed.connect(self._toggle_recording)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
+            "<f9>": self._on_global_f9,
             "<f10>": self._on_global_f10,
             "<f8>": self._on_global_f8,
         })
@@ -117,11 +120,25 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
     # ─── 热键回调 ────────────────────────────────────────────
 
+    def _on_global_f9(self):
+        if not self._backend_ready():
+            return
+        self.f9_pressed.emit()
+
     def _on_global_f10(self):
+        if not self._backend_ready():
+            return
         self.f10_pressed.emit()
 
     def _on_global_f8(self):
+        if not self._backend_ready():
+            return
         self.f8_pressed.emit()
+
+    def _on_f9_start(self):
+        """F9 启动入口（全局热键 / 窗口按键共用）"""
+        if not self._running:
+            self._on_start()
 
     # ─── 菜单栏 ──────────────────────────────────────────────
 
@@ -585,8 +602,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_F9:
-            if not self._running:
-                self._on_start()
+            self._on_f9_start()
         elif event.key() == Qt.Key.Key_F10:
             self._request_stop()
         else:

@@ -1,0 +1,113 @@
+# 治疗-纯奶（牵丝·霖）调律规则
+# 规格来源：docs/10-game/11-调律说明文档/04-治疗纯奶调律说明.md
+key: heal_pure
+name: 治疗-纯奶
+order: 40
+has_keep_pvp: false
+needs_sub_school: false
+own_attr: 牵丝
+weapons:
+  default:
+    main:
+      扇: 扇武学增效
+    sub:
+    - 伞
+transmute_priority:
+- 最大外功攻击
+- 劲
+- 最小外功攻击
+- 敏
+- 会心率
+- 最大无相攻击
+affix_pool:
+- 最大外功攻击
+- 劲
+- 最小外功攻击
+- 敏
+- 会心率
+- 最大无相攻击
+- 势
+junk_rules: []
+patterns:
+  主武器:
+    first:
+    - 最大外功攻击
+    - 最小外功攻击
+    required:
+    - - DMG
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    required_damage: DMG
+    optional_n: 2
+    top:
+    - not_contains:
+      - 会心率
+      - 最大无相攻击
+  副武器:
+    first:
+    - 最大外功攻击
+    - 最小外功攻击
+    required:
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    required_damage: null
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最大无相攻击
+    - not_together:
+      - 敏
+      - 会心率
+  环:
+    first:
+    - 最大外功攻击
+    - 最小外功攻击
+    required:
+    - - 全武学增效
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    required_damage: 全武学增效
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最大无相攻击
+    - not_together:
+      - 敏
+      - 会心率
+  冠胄:
+    first:
+    - 会心率
+    required:
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    required_damage: null
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最大无相攻击
+  胫甲:
+    first:
+    - 劲
+    required:
+    - - 对玩家单位增效
+    - - 最大外功攻击
+      - 最小外功攻击
+      - 劲
+    required_damage: 对玩家单位增效
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最大无相攻击
+    - not_together:
+      - 敏
+      - 会心率

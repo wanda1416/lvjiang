@@ -1,16 +1,21 @@
 """调律规则加载与管理
 
-规则全部外置为 YAML（config/system/yysls/tuning_rules/ 下每流派一个
-文件），本模块负责加载、schema 校验、缓存与保存。判定逻辑见
-generic.GenericSchoolJudge，规则变更零代码改动。
+规则全部外置为 YAML（config/system/yysls/tuning_rules/ 下每规则一个
+文件），本模块负责加载、schema 校验、缓存、创建/删除与保存。判定
+逻辑见 generic.GenericSchoolJudge，规则变更零代码改动。
 
-规则定义将持续频繁变更（04 文档），条件原语共 4 种 + junk 用的
-count_min，覆盖当前全部规则；将来不够时再扩原语。
+规则中的全部词条引用一律使用标准词条名（attributes.yaml 普通词组
+_aliases 全集，经 AttrRuleManager.get_normal_affix_names() 提供），
+校验失败即保存拒绝，消除符号二次映射与静默失配。
+
+语义约定：规则里的 最大/最小无相攻击 在判定时自动兼收本流派属攻
+（own_attr 展开），见 generic._normalize。
 """
 
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -19,24 +24,6 @@ from loguru import logger
 
 
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
-
-# 模式符号词汇表（全部流派共用）
-SYMBOL_VOCAB = {
-    "大外", "小外", "劲", "势", "敏", "会意", "会心", "精准",
-    "大无相", "小无相", "小外属",
-}
-
-# 词条全称 → 模式符号（属攻类归一化由 own_attr 参数化，见 generic）
-SYMBOL_MAP = {
-    "最大外功攻击": "大外",
-    "最小外功攻击": "小外",
-    "劲": "劲",
-    "势": "势",
-    "敏": "敏",
-    "会意率": "会意",
-    "会心率": "会心",
-    "精准率": "精准",
-}
 
 # 全部流派属名（own_attr 候选；用于识别属攻词条）
 SCHOOL_ATTRS = {"裂石", "牵丝", "破竹", "鸣金"}
@@ -57,6 +44,15 @@ PART_ALIAS = {"佩": "环", "胸甲": "冠胄", "腕甲": "胫甲"}
 # 模式部位 key 全集
 PART_KEYS = ("主武器", "副武器", "环", "冠胄", "胫甲")
 
+# 规则 key 合法性（作为 YAML 文件名）
+_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def standard_affix_names() -> list[str]:
+    """标准词条全集（普通词组 _aliases 并集，按 YAML 声明序）"""
+    from .attr_rules import get_attr_rule_manager
+    return get_attr_rule_manager().get_normal_affix_names()
+
 
 # ─── 规则数据结构 ──────────────────────────────────────────
 
@@ -64,6 +60,7 @@ PART_KEYS = ("主武器", "副武器", "环", "冠胄", "胫甲")
 class Condition:
     """条件原语（顶级判定条件行间 AND；junk_rules 用 count_min）
 
+    symbols 为标准词条名列表。
     - not_contains: 非首词条未出现任一 symbols
     - contains_all: 非首词条必须同时出现全部 symbols
     - not_together: symbols（恰 2 个）不同时出现
@@ -77,7 +74,7 @@ class Condition:
     include_first: bool = False
 
     def check(self, first_token: str, tokens: list[str]) -> bool:
-        """条件是否成立（tokens 为非首词条符号列表）"""
+        """条件是否成立（tokens 为归一化后的非首词条名列表）"""
         s = set(tokens)
         if self.kind == "not_contains":
             return not (s & set(self.symbols))
@@ -113,7 +110,7 @@ class PartPattern:
     """单部位模式：首词条 + 必选槽 + 可选槽 + 顶级条件"""
     first: list[str]
     required: list[list[str]]
-    required_damage: str | None = None       # DMG / 词条全称 / None
+    required_damage: str | None = None       # DMG / 标准词条名 / None
     damage_pvp_substitute: str | None = None  # keep_pvp 时可顶替增伤槽
     optional_n: int = 0
     allowed_divine_pvp: list[str] = field(default_factory=list)
@@ -121,10 +118,36 @@ class PartPattern:
 
 
 @dataclass
-class RuleVariant:
-    """规则变体（huiyi/huixin 单变体 default；heal 为 pure/fire）"""
+class SubSchool:
+    """子流派（会心的指定流派）"""
     key: str
-    name: str = ""
+    name: str
+    playstyles: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class WeaponRole:
+    """武器角色表条目：主武器 → 主武学增伤，副武器列表"""
+    main: dict[str, str] = field(default_factory=dict)
+    sub: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SchoolRule:
+    """单条调律规则（一个 YAML 文件，对应 UI 一个 Tab）
+
+    对 UI 暴露与旧判定器类属性同名的元数据接口
+    （school_name/implemented/sub_school_options 等）。
+    """
+    key: str
+    name: str
+    order: int = 100
+    has_keep_pvp: bool = False
+    needs_sub_school: bool = False
+    sub_school_label: str = "指定流派（必选）："
+    own_attr: str = ""                        # 属名 或 from_sub_schools
+    sub_schools: dict[str, SubSchool] = field(default_factory=dict)
+    weapons: dict[str, WeaponRole] = field(default_factory=dict)
     transmute_priority: list[str] = field(default_factory=list)
     affix_pool: list[str] = field(default_factory=list)
     optional_pool: list[str] | None = None    # 缺省 = affix_pool
@@ -140,40 +163,6 @@ class RuleVariant:
         if self.optional_pool is None:
             return set(self.affix_pool)
         return set(self.optional_pool)
-
-
-@dataclass
-class SubSchool:
-    """子流派（会心的指定流派 / 治疗的玩法）"""
-    key: str
-    name: str
-    playstyles: dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class WeaponRole:
-    """武器角色表条目：主武器 → 主武学增伤，副武器列表"""
-    main: dict[str, str] = field(default_factory=dict)
-    sub: list[str] = field(default_factory=list)
-
-
-@dataclass
-class SchoolRule:
-    """单流派完整规则（一个 YAML 文件）
-
-    对 UI 暴露与旧判定器类属性同名的元数据接口
-    （school_name/implemented/sub_school_options 等）。
-    """
-    key: str
-    name: str
-    order: int = 100
-    has_keep_pvp: bool = False
-    needs_sub_school: bool = False
-    sub_school_label: str = "指定流派（必选）："
-    own_attr: str = ""                        # 属名 或 from_sub_schools
-    sub_schools: dict[str, SubSchool] = field(default_factory=dict)
-    weapons: dict[str, WeaponRole] = field(default_factory=dict)
-    variants: dict[str, RuleVariant] = field(default_factory=dict)
 
     # ── UI 元数据接口（与旧判定器类属性同名） ──
 
@@ -201,7 +190,19 @@ class RuleValidationError(ValueError):
     """规则 schema 校验失败"""
 
 
-def _parse_condition(raw: dict, where: str) -> Condition:
+def _check_names(names: list, vocab: set[str], where: str,
+                 allow_dmg: bool = False) -> list[str]:
+    """词条名列表校验（须全部在标准词条全集内；槽位处允许 DMG）"""
+    items = list(names or [])
+    bad = [s for s in items
+           if s not in vocab and not (allow_dmg and s == DMG_PLACEHOLDER)]
+    if bad:
+        raise RuleValidationError(
+            f"{where}: 词条名不在标准词条全集内: {bad}")
+    return items
+
+
+def _parse_condition(raw: dict, vocab: set[str], where: str) -> Condition:
     """{原语类型: 参数} 单键 dict → Condition"""
     if not isinstance(raw, dict) or len(raw) != 1:
         raise RuleValidationError(f"{where}: 条件必须是单键 dict: {raw!r}")
@@ -221,35 +222,25 @@ def _parse_condition(raw: dict, where: str) -> Condition:
             "include_first": bool(args.get("include_first", False)),
         }
     if not symbols:
-        raise RuleValidationError(f"{where}: 条件 {kind} 符号列表为空")
-    bad = [s for s in symbols if s not in SYMBOL_VOCAB]
-    if bad:
-        raise RuleValidationError(f"{where}: 条件符号不在词汇表内: {bad}")
+        raise RuleValidationError(f"{where}: 条件 {kind} 词条列表为空")
+    _check_names(symbols, vocab, where)
     if kind == "not_together" and len(symbols) != 2:
-        raise RuleValidationError(f"{where}: not_together 须恰好 2 个符号")
+        raise RuleValidationError(f"{where}: not_together 须恰好 2 个词条")
     return Condition(kind=kind, symbols=symbols, **extra)
 
 
-def _check_symbols(symbols: list, where: str) -> list[str]:
-    """符号列表校验（须全部在词汇表内）"""
-    items = list(symbols or [])
-    bad = [s for s in items if s not in SYMBOL_VOCAB]
-    if bad:
-        raise RuleValidationError(f"{where}: 符号不在词汇表内: {bad}")
-    return items
-
-
-def _parse_pattern(raw: dict, where: str) -> PartPattern:
+def _parse_pattern(raw: dict, vocab: set[str], where: str) -> PartPattern:
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where}: 模式必须是 dict")
-    first = _check_symbols(raw.get("first"), f"{where}.first")
+    first = _check_names(raw.get("first"), vocab, f"{where}.first")
     if not first:
         raise RuleValidationError(f"{where}: first 不能为空")
 
     required_raw = raw.get("required") or []
     required: list[list[str]] = []
     for i, slot in enumerate(required_raw):
-        cands = list(slot or [])
+        cands = _check_names(slot, vocab, f"{where}.required[{i + 1}]",
+                             allow_dmg=True)
         if not cands:
             raise RuleValidationError(f"{where}: 必选槽 {i + 1} 为空")
         required.append(cands)
@@ -260,55 +251,26 @@ def _parse_pattern(raw: dict, where: str) -> PartPattern:
             f"{where}: 必选槽数 {len(required)} + 可选槽数 {optional_n} "
             f"+ 首词条 != 5")
 
-    top = [_parse_condition(c, f"{where}.top[{i}]")
+    required_damage = raw.get("required_damage")
+    if required_damage:
+        _check_names([required_damage], vocab,
+                     f"{where}.required_damage", allow_dmg=True)
+    substitute = raw.get("damage_pvp_substitute")
+    if substitute:
+        _check_names([substitute], vocab, f"{where}.damage_pvp_substitute")
+    allowed_divine_pvp = _check_names(
+        raw.get("allowed_divine_pvp"), vocab, f"{where}.allowed_divine_pvp")
+
+    top = [_parse_condition(c, vocab, f"{where}.top[{i}]")
            for i, c in enumerate(raw.get("top") or [])]
     return PartPattern(
         first=first,
         required=required,
-        required_damage=raw.get("required_damage"),
-        damage_pvp_substitute=raw.get("damage_pvp_substitute"),
+        required_damage=required_damage,
+        damage_pvp_substitute=substitute,
         optional_n=optional_n,
-        allowed_divine_pvp=list(raw.get("allowed_divine_pvp") or []),
+        allowed_divine_pvp=allowed_divine_pvp,
         top=top,
-    )
-
-
-def _parse_variant(key: str, raw: dict, where: str) -> RuleVariant:
-    if not isinstance(raw, dict):
-        raise RuleValidationError(f"{where}: 变体必须是 dict")
-    affix_pool = _check_symbols(raw.get("affix_pool"), f"{where}.affix_pool")
-    if not affix_pool:
-        raise RuleValidationError(f"{where}: affix_pool 不能为空")
-    priority = _check_symbols(raw.get("transmute_priority"),
-                              f"{where}.transmute_priority")
-    optional_pool = raw.get("optional_pool")
-    if optional_pool is not None:
-        optional_pool = _check_symbols(optional_pool,
-                                       f"{where}.optional_pool")
-        bad = [s for s in optional_pool if s not in affix_pool]
-        if bad:
-            raise RuleValidationError(
-                f"{where}: optional_pool 符号不在 affix_pool 内: {bad}")
-    junk_rules = [_parse_condition(c, f"{where}.junk_rules[{i}]")
-                  for i, c in enumerate(raw.get("junk_rules") or [])]
-
-    patterns_raw = raw.get("patterns") or {}
-    patterns: dict[str, PartPattern] = {}
-    for part, p_raw in patterns_raw.items():
-        if part not in PART_KEYS:
-            raise RuleValidationError(f"{where}: 未知部位 key {part!r}")
-        patterns[part] = _parse_pattern(p_raw, f"{where}.patterns.{part}")
-    if not patterns:
-        raise RuleValidationError(f"{where}: patterns 不能为空")
-
-    return RuleVariant(
-        key=key,
-        name=str(raw.get("name") or ""),
-        transmute_priority=priority,
-        affix_pool=affix_pool,
-        optional_pool=optional_pool,
-        junk_rules=junk_rules,
-        patterns=patterns,
     )
 
 
@@ -320,6 +282,13 @@ def parse_school_rule(data: dict) -> SchoolRule:
     name = data.get("name")
     if not key or not name:
         raise RuleValidationError("缺少必填字段 key/name")
+    if "variants" in data:
+        raise RuleValidationError(
+            "旧版 variants 结构不再支持，请将词条库与模式上提到顶层")
+
+    vocab = set(standard_affix_names())
+    if not vocab:
+        raise RuleValidationError("标准词条全集为空（attributes.yaml 异常）")
 
     sub_schools: dict[str, SubSchool] = {}
     for sk, s_raw in (data.get("sub_schools") or {}).items():
@@ -355,17 +324,25 @@ def parse_school_rule(data: dict) -> SchoolRule:
                 raise RuleValidationError(
                     f"weapons.{wk}: 子流派 {school!r} 未定义")
 
-    variants_raw = data.get("variants") or {}
-    if not variants_raw:
-        raise RuleValidationError("缺少 variants")
-    variants = {
-        vk: _parse_variant(vk, v_raw, f"variants.{vk}")
-        for vk, v_raw in variants_raw.items()
-    }
-    for vk in variants:
-        if vk != "default" and vk not in sub_schools:
+    # ── 词条库与模式（顶层，允许为空 = 新建骨架） ──
+    affix_pool = _check_names(data.get("affix_pool"), vocab, "affix_pool")
+    priority = _check_names(data.get("transmute_priority"), vocab,
+                            "transmute_priority")
+    optional_pool = data.get("optional_pool")
+    if optional_pool is not None:
+        optional_pool = _check_names(optional_pool, vocab, "optional_pool")
+        bad = [s for s in optional_pool if s not in affix_pool]
+        if bad:
             raise RuleValidationError(
-                f"variants.{vk}: 变体 key 须为 default 或子流派 key")
+                f"optional_pool 词条不在 affix_pool 内: {bad}")
+    junk_rules = [_parse_condition(c, vocab, f"junk_rules[{i}]")
+                  for i, c in enumerate(data.get("junk_rules") or [])]
+
+    patterns: dict[str, PartPattern] = {}
+    for part, p_raw in (data.get("patterns") or {}).items():
+        if part not in PART_KEYS:
+            raise RuleValidationError(f"未知部位 key {part!r}")
+        patterns[part] = _parse_pattern(p_raw, vocab, f"patterns.{part}")
 
     return SchoolRule(
         key=str(key),
@@ -378,7 +355,11 @@ def parse_school_rule(data: dict) -> SchoolRule:
         own_attr=own_attr,
         sub_schools=sub_schools,
         weapons=weapons,
-        variants=variants,
+        transmute_priority=priority,
+        affix_pool=affix_pool,
+        optional_pool=optional_pool,
+        junk_rules=junk_rules,
+        patterns=patterns,
     )
 
 
@@ -388,8 +369,8 @@ class TuningRuleManager:
     """调律规则管理器
 
     加载目录下全部 YAML，校验失败的文件记录错误并跳过；
-    提供按 order 排序的规则注册表、原始数据访问（UI 编辑用）
-    与保存 + reload。
+    提供按 order 排序的规则注册表、原始数据访问（UI 编辑用）、
+    创建/删除与保存 + reload。
     """
 
     def __init__(self, rules_dir: str | Path | None = None):
@@ -446,7 +427,7 @@ class TuningRuleManager:
         """加载失败的文件（文件名 stem → 错误信息）"""
         return dict(self._errors)
 
-    # ── 保存 ──
+    # ── 保存 / 创建 / 删除 ──
 
     def validate(self, data: dict) -> str | None:
         """校验原始 dict；返回错误文案（None 表示通过）"""
@@ -463,6 +444,50 @@ class TuningRuleManager:
         self._dir.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        self.reload()
+
+    def create_rule(self, key: str, name: str) -> None:
+        """新建规则（最小骨架 YAML），key 作为文件名
+
+        Raises:
+            RuleValidationError: key 非法 / 已存在 / 名称为空
+        """
+        key = key.strip()
+        name = name.strip()
+        if not _KEY_RE.match(key):
+            raise RuleValidationError(
+                "规则 key 须为小写字母开头的英文/数字/下划线")
+        if not name:
+            raise RuleValidationError("规则名称不能为空")
+        if key in self._paths or (self._dir / f"{key}.yaml").exists():
+            raise RuleValidationError(f"规则 key 已存在: {key}")
+        data = {
+            "key": key,
+            "name": name,
+            "order": 100,
+            "has_keep_pvp": False,
+            "needs_sub_school": False,
+            "transmute_priority": [],
+            "affix_pool": [],
+            "junk_rules": [],
+            "patterns": {},
+        }
+        parse_school_rule(data)  # 骨架自校验
+        self._dir.mkdir(parents=True, exist_ok=True)
+        with open(self._dir / f"{key}.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        self.reload()
+
+    def delete_rule(self, key: str) -> None:
+        """删除规则文件并 reload
+
+        Raises:
+            RuleValidationError: key 未注册
+        """
+        path = self._paths.get(key)
+        if path is None:
+            raise RuleValidationError(f"规则不存在: {key}")
+        path.unlink(missing_ok=True)
         self.reload()
 
 

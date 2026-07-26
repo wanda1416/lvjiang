@@ -1,6 +1,6 @@
-"""属性管理对话框
+"""游戏配置对话框
 
-独立窗口，管理装备基础属性规则和词条属性上限。
+独立窗口，管理装备配置、词条配置与流派配置。
 """
 
 from PyQt6.QtWidgets import QDialog, QVBoxLayout
@@ -10,11 +10,11 @@ from .attr_tab import AttrManagerTab
 
 
 class AttrManagerDialog(QDialog):
-    """属性管理对话框"""
+    """游戏配置对话框"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("装备属性管理")
+        self.setWindowTitle("游戏配置")
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(

@@ -1,11 +1,12 @@
-"""条件受限构造器与符号选择对话框
+"""条件受限构造器与词条选择对话框
 
 ConditionEditor：垂直行式条件列表（行间 AND 语义），每行由
-原语类型下拉 + 符号 tag 区 + 计数参数组成，产出/回填规则 YAML
+原语类型下拉 + 词条 tag 区 + 计数参数组成，产出/回填规则 YAML
 的条件原语原始 dict。顶级判定条件与流派附加垃圾规则共用。
+候选词条为标准词条全集，由构造方注入。
 
-SymbolPickerDialog：符号多选对话框，包内复用（必选槽候选、
-条件符号、允许神力等场景）。
+AffixPickerDialog：标准词条多选对话框（带滚动的多列复选网格），
+包内复用（必选槽候选、条件词条、词条库添加等场景）。
 """
 
 from __future__ import annotations
@@ -13,24 +14,12 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-    QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from src.ui.widgets import NoWheelSpinBox
 
-# 符号词汇表（展示顺序固定，与 rules.SYMBOL_VOCAB 一致）
-SYMBOL_ORDER = [
-    "大外", "小外", "劲", "势", "敏", "会意", "会心", "精准",
-    "大无相", "小无相", "小外属",
-]
-
-# 神力词条候选（必选槽 / 增伤要求 / 允许神力）
-DIVINE_CANDIDATES = [
-    "全武学增效", "扇武学增效", "对首领单位增伤",
-    "对玩家单位增效", "单体类奇术增伤",
-]
-
-# DMG 占位符（由流派设置页的 weapons 表按武器角色解析）
+# DMG 占位符（由规则设置页的 weapons 表按武器角色解析）
 DMG_PLACEHOLDER = "DMG"
 
 # 原语类型 → 显示名
@@ -43,26 +32,34 @@ _KIND_NAMES = {
 }
 
 
-class SymbolPickerDialog(QDialog):
-    """符号多选对话框（候选按传入顺序排列，复选框网格）"""
+class AffixPickerDialog(QDialog):
+    """标准词条多选对话框（候选按传入顺序排列，滚动多列复选网格）"""
+
+    _COLS = 3
 
     def __init__(self, candidates: list[str], selected: list[str],
-                 title: str = "选择符号", parent=None):
+                 title: str = "选择词条", parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(520)
         layout = QVBoxLayout(self)
 
-        grid = QGridLayout()
+        grid_host = QWidget()
+        grid = QGridLayout(grid_host)
         grid.setSpacing(6)
         self._checks: dict[str, QCheckBox] = {}
         chosen = set(selected)
         for i, name in enumerate(candidates):
             cb = QCheckBox(name)
             cb.setChecked(name in chosen)
-            grid.addWidget(cb, i // 3, i % 3)
+            grid.addWidget(cb, i // self._COLS, i % self._COLS)
             self._checks[name] = cb
-        layout.addLayout(grid)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(grid_host)
+        scroll.setMinimumHeight(320)
+        layout.addWidget(scroll)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -72,18 +69,19 @@ class SymbolPickerDialog(QDialog):
         layout.addWidget(buttons)
 
     def selected(self) -> list[str]:
-        """按候选顺序返回勾选的符号"""
+        """按候选顺序返回勾选的词条"""
         return [n for n, cb in self._checks.items() if cb.isChecked()]
 
 
 class _ConditionRow(QWidget):
-    """单条条件行：原语类型 + 符号 tag + 计数参数 + 删除"""
+    """单条条件行：原语类型 + 词条 tag + 计数参数 + 删除"""
 
     changed = pyqtSignal()
     remove_requested = pyqtSignal(object)
 
-    def __init__(self, kinds: list[str], parent=None):
+    def __init__(self, kinds: list[str], candidates: list[str], parent=None):
         super().__init__(parent)
+        self._candidates = candidates
         self._symbols: list[str] = []
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -94,7 +92,7 @@ class _ConditionRow(QWidget):
         self.kind_combo.currentIndexChanged.connect(self._on_kind_changed)
         layout.addWidget(self.kind_combo)
 
-        self.symbols_btn = QPushButton("（点击选择符号）")
+        self.symbols_btn = QPushButton("（点击选择词条）")
         self.symbols_btn.clicked.connect(self._pick_symbols)
         layout.addWidget(self.symbols_btn, 1)
 
@@ -166,8 +164,8 @@ class _ConditionRow(QWidget):
         self.first_check.setVisible(is_count)
 
     def _pick_symbols(self):
-        dlg = SymbolPickerDialog(SYMBOL_ORDER, self._symbols,
-                                 "选择条件符号", self)
+        dlg = AffixPickerDialog(self._candidates, self._symbols,
+                                "选择条件词条", self)
         if dlg.exec():
             self._symbols = dlg.selected()
             self._update_symbols_text()
@@ -175,7 +173,7 @@ class _ConditionRow(QWidget):
 
     def _update_symbols_text(self):
         self.symbols_btn.setText(
-            "/".join(self._symbols) if self._symbols else "（点击选择符号）")
+            "/".join(self._symbols) if self._symbols else "（点击选择词条）")
 
 
 class ConditionEditor(QWidget):
@@ -183,8 +181,10 @@ class ConditionEditor(QWidget):
 
     changed = pyqtSignal()
 
-    def __init__(self, allow_count_min: bool = False, parent=None):
+    def __init__(self, candidates: list[str],
+                 allow_count_min: bool = False, parent=None):
         super().__init__(parent)
+        self._candidates = candidates
         # 顶级条件不提供 count_min；junk_rules 处额外提供
         self._kinds = ["not_contains", "contains_all", "not_together",
                        "count_max"]
@@ -220,7 +220,7 @@ class ConditionEditor(QWidget):
     # ── 内部 ──
 
     def _append_row(self) -> _ConditionRow:
-        row = _ConditionRow(self._kinds)
+        row = _ConditionRow(self._kinds, self._candidates)
         row.changed.connect(self.changed)
         row.remove_requested.connect(self._remove_row)
         self._rows.append(row)
@@ -229,7 +229,7 @@ class ConditionEditor(QWidget):
 
     def _add_row_clicked(self):
         self._append_row()
-        # 新行符号为空，待用户选择后再触发 changed 保存
+        # 新行词条为空，待用户选择后再触发 changed 保存
 
     def _remove_row(self, row: _ConditionRow):
         if row in self._rows:

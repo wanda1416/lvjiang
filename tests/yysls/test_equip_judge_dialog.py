@@ -36,11 +36,11 @@ class TestEquipAffixEditor:
         editor.part_combo.setCurrentText("剑")
         items = _combo_items(editor._affix_combos[1])
         assert "剑武学增伤" in items
-        assert "唐横刀武学增伤" not in items
+        assert "横刀武学增伤" not in items
         assert "全武学增效" not in items
-        editor.part_combo.setCurrentText("唐横刀")
+        editor.part_combo.setCurrentText("横刀")
         items = _combo_items(editor._affix_combos[1])
-        assert "唐横刀武学增伤" in items
+        assert "横刀武学增伤" in items
         assert "剑武学增伤" not in items
 
     def test_part_specific_pool(self, editor):

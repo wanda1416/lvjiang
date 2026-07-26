@@ -63,7 +63,7 @@ _TYPE_TO_KEY = {
     # 武器类型 → main_weapon（副武器 sub_weapon 默认跟随主武器，
     # 若独立配置则由贪婪匹配兜底）
     "陌刀": "main_weapon", "舞绫鼓": "main_weapon", "双刀": "main_weapon",
-    "绳镖": "main_weapon", "唐横刀": "main_weapon", "手甲": "main_weapon",
+    "绳镖": "main_weapon", "横刀": "main_weapon", "手甲": "main_weapon",
     "剑": "main_weapon", "枪": "main_weapon", "扇": "main_weapon", "伞": "main_weapon",
     # 首饰
     "环": "ring",

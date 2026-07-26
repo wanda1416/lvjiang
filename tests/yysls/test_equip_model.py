@@ -12,7 +12,7 @@ from src.apps.yysls.equip_parser.models import EquipmentData
 
 class TestInferPart:
     @pytest.mark.parametrize("weapon_type", [
-        "陌刀", "舞绫鼓", "双刀", "绳镖", "唐横刀", "手甲",
+        "陌刀", "舞绫鼓", "双刀", "绳镖", "横刀", "手甲",
         "剑", "枪", "扇", "伞",
     ])
     def test_all_weapons_merge_into_one_part(self, weapon_type):

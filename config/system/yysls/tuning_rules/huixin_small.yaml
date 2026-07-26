@@ -1,5 +1,3 @@
-# 会心流派-小外流 调律规则
-# 规格来源：docs/10-game/11-调律说明文档/03-会心小外流调律说明.md
 key: huixin_small
 name: 会心流派-小外流
 order: 20
@@ -23,14 +21,14 @@ own_attr: from_sub_schools
 weapons:
   lieshi.chuntang:
     main:
-      唐横刀: 唐横刀武学增伤
+      横刀: 横刀武学增伤
     sub:
     - 陌刀
   lieshi.shuangqie:
     main:
       陌刀: 陌刀武学增伤
     sub:
-    - 唐横刀
+    - 横刀
   pozhu:
     main:
       双刀: 双刀武学增伤
@@ -56,29 +54,12 @@ affix_pool:
 - 精准率
 - 最大无相攻击
 - 最小无相攻击
-# 别派小属攻（本流派属攻会归一化为 最小无相攻击，字面名只命中别派）
 - 最小鸣金攻击
 - 最小裂石攻击
 - 最小破竹攻击
 - 最小牵丝攻击
 junk_rules: []
 patterns:
-  主武器:
-    first:
-    - 最小外功攻击
-    required:
-    - - DMG
-    - - 最小外功攻击
-    required_damage: DMG
-    optional_n: 2
-    top:
-    - not_contains:
-      - 最小无相攻击
-      - 最小鸣金攻击
-      - 最小裂石攻击
-      - 最小破竹攻击
-      - 最小牵丝攻击
-      - 精准率
   副武器:
     first:
     - 最小外功攻击
@@ -154,4 +135,20 @@ patterns:
       - 最小牵丝攻击
     - not_contains:
       - 会心率
+      - 精准率
+  主武器:
+    first:
+    - 最小外功攻击
+    required:
+    - - DMG
+    - - 最小外功攻击
+    required_damage: DMG
+    optional_n: 2
+    top:
+    - not_contains:
+      - 最小无相攻击
+      - 最小鸣金攻击
+      - 最小裂石攻击
+      - 最小破竹攻击
+      - 最小牵丝攻击
       - 精准率

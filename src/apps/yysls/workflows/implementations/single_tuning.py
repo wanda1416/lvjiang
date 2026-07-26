@@ -9,6 +9,11 @@
 3. 调律前及每轮结束后执行「是否值得调律」潜力判定：遍历全部流派判定器
    （未实现的跳过），任一流派仍可达 顶级/优秀 即继续；每轮调律产出的
    新词条会补充进装备数据参与下一轮判定，不再达标则提前结束。
+4. 调律结束后（含词条已满直接退出）执行终局判定：含转律模拟的各流派
+   评级上限写入 output["final_judgement"]，供后续自动调律直接消费。
+5. 临时复用调律 Tab（自动调律）的目标流派配置（不含部位）：潜力/终局
+   判定仅限已启用流派及其子选项配置，避免什么装备都能命中某个流派；
+   无有效配置时回退为全部流派默认配置。
 
 参数（由 workflows.yaml 参数面板注入 variables）：
     equip_slot — 装备部位 key（main_weapon/.../wrist）
@@ -18,7 +23,9 @@
 from loguru import logger
 
 from src.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
-from src.apps.yysls.evaluator import judge_tuning_worthiness
+from src.apps.yysls.evaluator import (
+    get_schools, judge_equipment_potential, judge_tuning_worthiness,
+)
 from src.workflows.base import BaseWorkflow
 
 
@@ -50,8 +57,10 @@ class SingleTuningWorkflow(BaseWorkflow):
         bag_col = str(self.get_variable("bag_col") or "1")
         detail_scene = (self.ARMOR_DETAIL if equip_slot in self.ARMOR_SLOTS
                         else self.WEAPON_DETAIL)
+        self._judge_schools, self._judge_configs = self._load_school_config()
 
-        self._navigate_to_equip()
+        # 暂时不切页面
+        # self._navigate_to_equip()
 
         # 选中部位 + 背包格子（沿用 .wf 的 bag_{row}_{col} 区域定位）
         self.click_region(self.GRID_SCENE, equip_slot)
@@ -78,6 +87,7 @@ class SingleTuningWorkflow(BaseWorkflow):
 
         if affix_count >= self.MAX_AFFIX:
             logger.info("词条满了，不用调律了")
+            self._final_judge(EquipmentData.from_dict(equip))
             self._exit_from_detail(back_times=2)
             self.output["exit_code"] = -1
             return self.output
@@ -125,6 +135,7 @@ class SingleTuningWorkflow(BaseWorkflow):
         self.output["rounds"] = rounds
         self.output["final_affix_count"] = affix_count
         self.output["exit_code"] = 0
+        self._final_judge(equip_data)
 
         # 退出导航（沿用 .wf 的返回序列）
         self.click_region(self.TUNE_SCENE, "back")
@@ -154,13 +165,42 @@ class SingleTuningWorkflow(BaseWorkflow):
 
     # ─── 值得调律判定 & 新词条收集 ───────────────────
 
+    @staticmethod
+    def _load_school_config() -> tuple[list[str] | None,
+                                       dict[str, dict] | None]:
+        """临时复用调律 Tab（自动调律）的目标流派配置（不含部位）
+
+        读插件会话 tuning.schools（流派 key → 含 enabled/keep_pvp/
+        sub_schools/playstyles 的配置），仅保留已启用流派参与判定；
+        无有效配置时返回 (None, None) 回退为全部流派默认配置。
+
+        Returns:
+            (参与判定的流派 key 列表, 流派 key → 配置 dict)
+        """
+        from src.apps.yysls.session import get_plugin_session
+
+        raw = get_plugin_session().get_section("tuning").get("schools")
+        if not isinstance(raw, dict):
+            logger.info("未找到目标流派配置，按全部流派默认配置判定")
+            return None, None
+        enabled = {k: cfg for k, cfg in raw.items()
+                   if isinstance(cfg, dict) and cfg.get("enabled")}
+        if not enabled:
+            logger.info("目标流派配置未启用任何流派，按全部流派默认配置判定")
+            return None, None
+        names = get_schools()
+        logger.info("目标流派配置（复用自动调律）: "
+                    + "、".join(names.get(k, k) for k in enabled))
+        return list(enabled), enabled
+
     def _judge_worthiness(self, equip_data: EquipmentData) -> bool:
         """多流派 or 判定：任一流派仍可达 顶级/优秀 即值得调律
 
         未实现/不覆盖该部位的流派不参与判定；无流派能给出结论时
         判为不值得（结束调律）。判定明细记入 output["worthiness"]。
         """
-        worth, logs = judge_tuning_worthiness(equip_data)
+        worth, logs = judge_tuning_worthiness(
+            equip_data, self._judge_configs, self._judge_schools)
         for line in logs:
             logger.info(f"潜力判定 | {line}")
         self.output["worthiness"] = logs
@@ -176,6 +216,21 @@ class SingleTuningWorkflow(BaseWorkflow):
         equip_data.extra_data["affix_count"] = len(equip_data.affixes)
         pct = f"（{affix.cap_pct}%）" if affix.cap_pct is not None else ""
         logger.info(f"新词条: {affix.name} {affix.value}{affix.unit or ''}{pct}")
+
+    def _final_judge(self, equip_data: EquipmentData):
+        """终局判定：含转律模拟的各流派评级上限，供自动调律消费
+
+        词条已满时判定内核退化为纯转律模拟（转掉一条非首词条取最优），
+        结构化结果写入 output["final_judgement"]。
+        """
+        results = judge_equipment_potential(
+            equip_data, self._judge_configs, self._judge_schools)
+        for r in results.values():
+            tag = ("不适用" if r["not_applicable"]
+                   else "跳过" if r["skipped"] else r["rating"])
+            logger.info(
+                f"终局判定 | {r['name']}: {tag}（{'；'.join(r['reasons'])}）")
+        self.output["final_judgement"] = results
 
     # ─── 导航（复刻 nav_main_to_equip.wf / nav_equip_to_tune.wf）───
 
@@ -214,6 +269,8 @@ class SingleTuningWorkflow(BaseWorkflow):
 
     def _exit_from_detail(self, back_times: int):
         """从装备详情/背包层层返回到主界面"""
+        if True:
+            return
         for _ in range(back_times):
             self.click_region(self.GRID_SCENE, "back")
             self.wait_delay("step_interval")

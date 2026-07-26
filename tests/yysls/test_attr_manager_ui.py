@@ -120,9 +120,9 @@ class TestSchoolPanel:
         names = [panel._school_list.item(i).text() for i in range(10)]
         panel._school_list.setCurrentRow(names.index("裂石·钧"))
         assert panel._combo_attr.currentText() == "裂石"
-        assert panel._combo_main_weapon.currentText() == "唐横刀"
+        assert panel._combo_main_weapon.currentText() == "横刀"
         assert panel._edit_main_martial.text() == "斩雪刀法"
-        assert panel._combo_main_affix.currentText() == "唐横刀武学增伤"
+        assert panel._combo_main_affix.currentText() == "横刀武学增伤"
         assert panel._combo_sub_weapon.currentText() == "陌刀"
         assert panel._edit_sub_martial.text() == "十方破阵"
         assert panel._combo_sub_affix.currentText() == "陌刀武学增伤"

@@ -63,9 +63,10 @@ class TestAliasGroups:
 
     def test_get_alias_groups_structure(self, mgr):
         groups = mgr.get_alias_groups("指定技能增效")
-        # 十大流派各一组，每组 5 个词条名
+        # 十大流派各一组，每组至少 5 个词条名（牵丝·玉 7 条）
         assert len(groups) == 10
-        assert all(len(names) == 5 for names in groups.values())
+        assert all(len(names) >= 5 for names in groups.values())
+        assert len(groups["牵丝·玉"]) == 7
         assert "鸣金·虹" in groups
         assert "无名剑法武学技增伤" in groups["鸣金·虹"]
 
@@ -75,9 +76,9 @@ class TestAliasGroups:
         assert mgr.get_alias_groups("未知类别") == {}
 
     def test_grouped_category_aliases_flattened(self, mgr):
-        # get_aliases_for_category 拍平返回全部组内词条名（10 组 × 5 条）
+        # get_aliases_for_category 拍平返回全部组内词条名（9 组 × 5 + 牵丝·玉 7）
         aliases = mgr.get_aliases_for_category("指定技能增效")
-        assert len(aliases) == 50
+        assert len(aliases) == 52
 
 
 # ─── 词条上限查询 ──────────────────────────────────────────

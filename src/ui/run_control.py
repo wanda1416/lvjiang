@@ -509,7 +509,8 @@ class RunControlMixin:
 
         # 获取流派配置（按流派分组的层级 dict）并创建判定器
         from src.apps.yysls.evaluator import (
-            SCHOOL_CLASSES, SCHOOLS, get_school_judge, is_school_implemented,
+            get_school_judge, get_school_rules, get_schools,
+            is_school_implemented,
         )
         if hasattr(self, '_get_tuning_school_config'):
             schools_cfg = self._get_tuning_school_config()
@@ -520,13 +521,14 @@ class RunControlMixin:
             self.log_text.append("[错误] 请至少选择一个调律流派")
             return
         school_judges = []
+        school_rules = get_school_rules()
         for school, cfg in enabled.items():
             if not is_school_implemented(school):
-                self.log_text.append(f"[警告] 流派「{SCHOOLS.get(school, school)}」判定暂未实现，已跳过")
+                self.log_text.append(f"[警告] 流派「{get_schools().get(school, school)}」判定暂未实现，已跳过")
                 continue
-            cls = SCHOOL_CLASSES[school]
-            if cls.needs_sub_school and not cfg.get("sub_schools"):
-                self.log_text.append(f"[错误] 流派「{cls.school_name}」需至少勾选一个子选项（{cls.sub_school_label.rstrip('：')}）")
+            rule = school_rules[school]
+            if rule.needs_sub_school and not cfg.get("sub_schools"):
+                self.log_text.append(f"[错误] 流派「{rule.school_name}」需至少勾选一个子选项（{rule.sub_school_label.rstrip('：')}）")
                 return
             school_judges.append(get_school_judge(school, cfg))
         if not school_judges:

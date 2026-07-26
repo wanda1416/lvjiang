@@ -1,0 +1,146 @@
+# 会心流派-大外流 调律规则
+# 规格来源：docs/10-game/11-调律说明文档/02-会心大外流调律说明.md
+key: huixin_big
+name: 会心流派-大外流
+order: 30
+has_keep_pvp: true
+needs_sub_school: true
+sub_school_label: 指定流派（必选）：
+sub_schools:
+  lieshi:
+    name: 裂石
+    playstyles:
+      chuntang: 纯唐
+      shuangqie: 双切
+  pozhu:
+    name: 破竹
+  qiansi:
+    name: 牵丝
+    playstyles:
+      zoudi: 走地
+      feitian: 飞天
+own_attr: from_sub_schools
+weapons:
+  lieshi.chuntang:
+    main:
+      横刀: 唐横刀武学增伤
+    sub:
+    - 陌刀
+  lieshi.shuangqie:
+    main:
+      陌刀: 陌刀武学增伤
+    sub:
+    - 横刀
+  pozhu:
+    main:
+      双刀: 双刀武学增伤
+      伞: 伞武学增伤
+      手甲: 手甲武学增伤
+    sub:
+    - 绳镖
+  qiansi:
+    main:
+      伞: 伞武学增伤
+      舞绫鼓: 舞绫鼓武学增伤
+    sub:
+    - 扇
+variants:
+  default:
+    transmute_priority:
+    - 大外
+    - 劲
+    - 敏
+    - 会心
+    - 小外
+    - 大无相
+    affix_pool:
+    - 大外
+    - 劲
+    - 敏
+    - 会心
+    - 小外
+    - 大无相
+    - 势
+    - 精准
+    junk_rules: []
+    patterns:
+      主武器:
+        first:
+        - 大外
+        required:
+        - - DMG
+        - - 大外
+        required_damage: DMG
+        optional_n: 2
+        top:
+        - not_contains:
+          - 小外
+          - 大无相
+          - 会心
+          - 精准
+          - 势
+      副武器:
+        first:
+        - 大外
+        required:
+        - - 大外
+        - - 劲
+        required_damage: null
+        optional_n: 2
+        top:
+        - not_contains:
+          - 小外
+          - 大无相
+          - 精准
+      环:
+        first:
+        - 大外
+        required:
+        - - 全武学增效
+        - - 大外
+        required_damage: 全武学增效
+        optional_n: 2
+        top:
+        - not_contains:
+          - 小外
+          - 大无相
+          - 会心
+          - 精准
+          - 势
+      冠胄:
+        first:
+        - 会心
+        - 精准
+        required:
+        - - 大外
+        - - 劲
+        required_damage: null
+        optional_n: 2
+        allowed_divine_pvp:
+        - 单体类奇术增伤
+        top:
+        - not_contains:
+          - 小外
+          - 大无相
+          - 势
+        - count_max:
+            symbols:
+            - 精准
+            max: 1
+            include_first: true
+      胫甲:
+        first:
+        - 劲
+        required:
+        - - 对首领单位增伤
+        - - 大外
+        required_damage: 对首领单位增伤
+        damage_pvp_substitute: 对玩家单位增效
+        optional_n: 2
+        top:
+        - not_contains:
+          - 小外
+          - 大无相
+          - 会心
+          - 精准
+          - 势

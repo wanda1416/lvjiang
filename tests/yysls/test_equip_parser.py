@@ -55,6 +55,16 @@ class TestParseEquipType:
         assert name == "神秘物品"
         assert equip_type is None
 
+    @pytest.mark.parametrize("raw,expected_type", [
+        ("吴钩霜甲 | 胸申", "胸甲"),   # "甲"错识别，"胸"单字命中
+        ("雁南飞 | 寇胄", "冠胄"),     # "冠"错识别，"胄"单字命中
+        ("流星珑 | 环", "环"),
+        ("玄玉 | 佩", "佩"),
+    ])
+    def test_type_segment_single_char_hit(self, parser, raw, expected_type):
+        # 类型段单字足以说明部位，容忍 OCR 错字
+        assert parser._parse_equip_type(raw)[1] == expected_type
+
 
 # ─── equip_level 解析 ──────────────────────────────────────
 
@@ -231,3 +241,26 @@ class TestParseFullChain:
         # 等级回填后 cap_pct 也能正常计算（后续链路受益）
         assert equip.affixes[0].cap_pct == 100.0
         assert equip.affixes[1].cap_pct == 50.0
+
+    def test_type_recovered_from_base_attr_when_ocr_missing(self, parser):
+        # equip_type 类型段 OCR 丢失且名称无部位关键字（如"吴钩霜甲"）
+        # → base_attr 19445 唯一命中 chest 110 gold，反查回填 type=胸甲
+        equip = parser.parse({
+            "equip_type": "吴钩霜甲",
+            "equip_level": "110阶",
+            "base_attr": "气血最大值 19445",
+            "affix_gong": "劲 +76.8",
+        })
+        assert equip.type == "胸甲"
+        assert equip.quality == "gold"
+
+    def test_type_not_recovered_when_ambiguous(self, parser):
+        # 冠/胫/腕数值相同（_follow），反查无法区分 → type 保持 None
+        equip = parser.parse({
+            "equip_type": "雁南飞",
+            "equip_level": "110阶",
+            "base_attr": "气血最大值 7778",
+            "affix_gong": "劲 +76.8",
+        })
+        assert equip.type is None
+        assert equip.quality == "blue"

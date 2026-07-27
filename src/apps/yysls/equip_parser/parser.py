@@ -24,6 +24,13 @@ from .constants import (
 class EquipmentParser:
     """装备 OCR 数据转换器"""
 
+    # 部位单字 → 类型（类型段单字足以说明部位，容忍 OCR 错字）
+    _PART_CHAR_TO_TYPE = {
+        "冠": "冠胄", "胄": "冠胄",
+        "胸": "胸甲", "胫": "胫甲", "腕": "腕甲",
+        "环": "环", "佩": "佩",
+    }
+
     def __init__(self):
         from ..evaluator.attr_rules import get_attr_rule_manager
         self._attr_config = get_attr_rule_manager()
@@ -83,10 +90,12 @@ class EquipmentParser:
         return equip
 
     def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:
-        """根据 base_attr 推断品阶；等级缺失时由数值反查回填等级+品阶
+        """根据 base_attr 推断品阶；等级/类型缺失时由数值反查回填
 
         基础属性值全局唯一，故即便 OCR 漏识别 equip_level，
-        也能仅凭 base_attr 值反查出等级与品阶，并回填 equip.level。
+        也能仅凭 base_attr 值反查出等级与品阶，并回填 equip.level；
+        类型缺失（OCR 漏读/错字）时同样按数值反查回填 equip.type
+        （仅数值唯一对应部位时回填；冠/胫/腕同值无法区分）。
 
         区间属性（武器）value 为 [min, max]，需与配置区间两端精确匹配；
         点值属性（首饰/防具）value 为标量。两者均直接透传。
@@ -95,16 +104,26 @@ class EquipmentParser:
             return None
         value = equip.base_attr.value
 
-        # 等级已知：常规按 (type, level, value) 推断品阶
         if equip.level:
-            return self._attr_config.infer_quality(equip.type, equip.level, value)
+            # 等级已知：常规按 (type, level, value) 推断品阶
+            quality = self._attr_config.infer_quality(
+                equip.type, equip.level, value)
+        else:
+            # 等级缺失（OCR 漏识别）：数值全局唯一 → 反查同时得到 等级+品阶
+            level, quality = self._attr_config.infer_level_quality(
+                equip.type, value)
+            if level is not None:
+                equip.level = level
+                logger.info(
+                    f"equip_level OCR 缺失，由基础属性值 {value} 反查得等级 {level}")
 
-        # 等级缺失（OCR 漏识别）：数值全局唯一 → 反查同时得到 等级+品阶
-        level, quality = self._attr_config.infer_level_quality(equip.type, value)
-        if level is not None:
-            equip.level = level
-            logger.info(
-                f"equip_level OCR 缺失，由基础属性值 {value} 反查得等级 {level}")
+        # 类型缺失：数值反查回填部位（避免下游判定拿到 部位 None）
+        if equip.type is None and quality:
+            inferred = self._attr_config.infer_type_by_value(value)
+            if inferred:
+                equip.type = inferred
+                logger.info(
+                    f"equip_type OCR 缺失，由基础属性值 {value} 反查回填部位 {inferred}")
         return quality
 
     def parse_slot(self, slot_key: str, raw: dict) -> EquipmentData:
@@ -190,10 +209,11 @@ class EquipmentParser:
         return None
 
     def _extract_weapon_type(self, text: str) -> str | None:
-        """从文本中提取武器类型或防具类别
+        """从文本中提取武器类型或防具/首饰类别
 
         "武器·剑" → "剑"
         "冠胄"    → "冠胄"
+        "胸申"    → "胸甲"  [OCR 错字，单字命中]
         "一杆"    → None（脏数据）
         """
         # 武器格式：武器·XX
@@ -203,11 +223,10 @@ class EquipmentParser:
                     return wt
             return None
 
-        # 防具/首饰：直接是类别名
-        armor_categories = ["冠胄", "胸甲", "胫甲", "腕甲"]
-        for cat in armor_categories:
-            if cat in text:
-                return cat
+        # 防具/首饰：单字足以说明部位，容忍 OCR 错字
+        for char, part_type in self._PART_CHAR_TO_TYPE.items():
+            if char in text:
+                return part_type
 
         return None
 

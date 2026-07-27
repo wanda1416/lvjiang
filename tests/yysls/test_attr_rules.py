@@ -188,6 +188,29 @@ class TestInferLevelQuality:
         assert mgr.infer_level_quality("冠胄", 1) == (None, None)
 
 
+# ─── 仅凭数值反查部位（equip_type OCR 缺失回填）─────────
+
+class TestInferTypeByValue:
+    def test_unique_hit_chest(self, mgr):
+        # chest 数值独立 → 唯一命中可回填（chest 110 gold=19445）
+        assert mgr.infer_type_by_value(19445) == "胸甲"
+
+    def test_unique_hit_jewelry(self, mgr):
+        assert mgr.infer_type_by_value(133) == "环"    # ring 110 gold
+        assert mgr.infer_type_by_value(199) == "佩"    # pendant 110 gold
+
+    def test_ambiguous_head_leg_wrist(self, mgr):
+        # 冠胄/胫甲/腕甲 _follow 同值，命中 3 个部位 → 无法区分
+        assert mgr.infer_type_by_value(7778) is None
+
+    def test_weapon_range_not_participating(self, mgr):
+        # 武器 key 对应多种武器类型，不参与反查
+        assert mgr.infer_type_by_value([100, 232]) is None
+
+    def test_no_match(self, mgr):
+        assert mgr.infer_type_by_value(1) is None
+
+
 # ─── 武器类型 / 流派配置（顶层 weapon_types / schools）────
 
 class TestWeaponTypesAndSchools:

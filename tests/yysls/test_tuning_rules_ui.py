@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from PyQt6.QtWidgets import QPushButton
 
+from src.apps.yysls.evaluator.attr_rules import get_attr_rule_manager
 from src.apps.yysls.evaluator.rules import TuningRuleManager
 from src.apps.yysls.ui.tuning_rules import TuningRulesDialog
 from src.apps.yysls.ui.tuning_rules.school_rule_panel import SchoolRulePanel
@@ -101,3 +102,41 @@ class TestPanelCreateDelete:
         qtbot.addWidget(panel)
         panel._request_delete()
         assert deleted == ["heal_pure"]
+
+
+class TestWeaponTableCombos:
+    """武器规则表：武器/增伤词条为下拉格，候选来自游戏配置数据源"""
+
+    def test_combo_candidates_from_data_source(self, qtbot, tmp_manager):
+        panel = SchoolRulePanel("heal_fire", tmp_manager, lambda t, e: None)
+        qtbot.addWidget(panel)
+        page = panel._settings_page
+        table = page._weapon_table
+        assert table.rowCount() >= 1
+
+        mgr = get_attr_rule_manager()
+        weapons = mgr.get_weapon_types()
+        wuxue = mgr.get_wuxue_affix_names()
+        for col, source in ((1, weapons), (2, wuxue),
+                            (3, weapons), (4, wuxue)):
+            combo = table.cellWidget(0, col)
+            items = [combo.itemText(i) for i in range(combo.count())]
+            assert items[0] == ""  # 留空候选
+            # 数据源候选全量在列（失效旧值可能额外追加在末尾）
+            assert items[1:1 + len(source)] == source
+
+    def test_combo_selection_saved(self, qtbot, tmp_manager):
+        statuses: list[tuple[str, bool]] = []
+        panel = SchoolRulePanel("heal_fire", tmp_manager,
+                                lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(panel)
+        page = panel._settings_page
+        mgr = get_attr_rule_manager()
+        affix = mgr.get_wuxue_affix_names()[0]
+
+        # 下拉选中主增伤词条 → 触发收集→校验→写盘
+        page._weapon_table.cellWidget(0, 2).setCurrentText(affix)
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        name = page._cell(page._weapon_table, 0, 0)
+        saved = tmp_manager.get_rule("heal_fire")
+        assert saved.weapon_rules[name].main.damage == affix

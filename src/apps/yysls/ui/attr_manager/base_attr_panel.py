@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from src.apps.yysls.evaluator.attr_rules import BASE_ATTR_PARTS
+from src.apps.yysls.evaluator.attr_rules import BASE_ATTR_PARTS, WUXUE_CATEGORY
 from src.ui.widgets import NoWheelSpinBox
 
 # 配置文件路径
@@ -50,10 +50,6 @@ _QUALITY_NAMES = {
     "purple": "紫装",
     "blue": "蓝装",
 }
-
-
-# 武学增效词条候选所在的词条类别
-_WUXUE_CATEGORY = "指定武学增效"
 
 
 class _RangeCell(QWidget):
@@ -297,7 +293,7 @@ class BaseAttrPanel(QWidget):
 
     def _wuxue_affix_candidates(self) -> list[str]:
         """武学增效词条候选（指定武学增效 类别的 _aliases）"""
-        category = (self._data.get("affix_caps") or {}).get(_WUXUE_CATEGORY) or {}
+        category = (self._data.get("affix_caps") or {}).get(WUXUE_CATEGORY) or {}
         aliases = category.get("_aliases") or []
         if isinstance(aliases, dict):
             return [name for names in aliases.values() for name in names]

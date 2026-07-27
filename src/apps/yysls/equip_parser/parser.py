@@ -85,15 +85,15 @@ class EquipmentParser:
     def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:
         """根据 base_attr 推断品阶；等级缺失时由数值反查回填等级+品阶
 
-        基础属性数值全局唯一，故即便 OCR 漏识别 equip_level，
+        基础属性值全局唯一，故即便 OCR 漏识别 equip_level，
         也能仅凭 base_attr 值反查出等级与品阶，并回填 equip.level。
+
+        区间属性（武器）value 为 [min, max]，需与配置区间两端精确匹配；
+        点值属性（首饰/防具）value 为标量。两者均直接透传。
         """
         if not equip.base_attr:
             return None
         value = equip.base_attr.value
-        # 武器 value 为 [min, max]，取 max
-        if isinstance(value, list):
-            value = value[1] if len(value) >= 2 else value[0]
 
         # 等级已知：常规按 (type, level, value) 推断品阶
         if equip.level:

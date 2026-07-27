@@ -141,13 +141,16 @@ class TestAffixPool:
 
 class TestInferQuality:
     @pytest.mark.parametrize("value,expected", [
-        (232, "gold"),      # 110 阶武器 gold max
-        (100, "gold"),      # gold min（区间重叠时 gold 优先）
-        (99, "purple"),     # 低于 gold min 落入 purple
-        (80, "blue"),       # blue min
-        (79, None),         # 低于全部区间
+        ([100, 232], "gold"),     # 110 阶武器 gold 区间精确匹配
+        ([90, 209], "purple"),    # purple 区间精确匹配
+        ([80, 186], "blue"),      # blue 区间精确匹配
+        ([100, 233], None),       # 上端不相等 → 不命中
+        ([99, 232], None),        # 下端不相等 → 不命中
+        (232, None),              # 标量不能命中区间属性
     ])
-    def test_weapon_range_boundaries(self, mgr, value, expected):
+    def test_weapon_range_exact_match(self, mgr, value, expected):
+        # 区间 [a,b] 含义：装备提供 +a 最小、+b 最大外功攻击，
+        # 解析出的区间必须两端都相等才算同一品阶，而非“落在区间内”
         assert mgr.infer_quality("剑", 110, value) == expected
 
     def test_armor_exact_value(self, mgr):
@@ -222,16 +225,28 @@ class TestWeaponTypesAndSchools:
 # ─── 数据结构单元 ──────────────────────────────────────────
 
 class TestLevelRule:
-    def test_attr_range_open_ends(self):
-        assert AttrRange("gold", min_val=None, max_val=100).contains(0)
-        assert AttrRange("gold", min_val=50, max_val=None).contains(9999)
-        assert not AttrRange("gold", min_val=50, max_val=100).contains(49)
+    def test_range_attr_exact_endpoints(self):
+        # 区间属性：两端都相等才命中
+        r = AttrRange("gold", min_val=100, max_val=232)
+        assert r.matches([100, 232])
+        assert not r.matches([100, 231])   # 上端不等
+        assert not r.matches([99, 232])    # 下端不等
+        assert not r.matches(232)          # 标量不命中区间
+
+    def test_point_attr_exact_value(self):
+        # 点值属性（min==max）：标量精确相等才命中
+        r = AttrRange("purple", min_val=8750, max_val=8750)
+        assert r.matches(8750)
+        assert not r.matches(8751)
+        assert r.matches([8750, 8750])     # 同值区间形式也命中
 
     def test_first_matching_range_wins(self):
+        # 精确匹配下相邻品阶区间不再互相遮蔽
         rule = LevelRule(ranges=[
             AttrRange("gold", 100, 232),
             AttrRange("purple", 90, 209),
         ])
-        assert rule.infer_quality(150) == "gold"   # 重叠区间取先声明者
-        assert rule.infer_quality(95) == "purple"
-        assert rule.infer_quality(50) is None
+        assert rule.infer_quality([100, 232]) == "gold"
+        assert rule.infer_quality([90, 209]) == "purple"
+        assert rule.infer_quality([100, 209]) is None   # 端点不成对
+        assert rule.infer_quality(150) is None           # 标量不匹配区间

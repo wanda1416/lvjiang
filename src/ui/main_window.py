@@ -3,9 +3,9 @@
 包含完整的基础功能：
 - 用户管理、场景管理、图库管理、图像识别
 - 窗口/设备扫描与定位
-- 工作流加载、执行、录制
+- 工作流加载、执行
 - 运行日志面板
-- 全局热键（仅 F8-F10：F9 执行、F10 停止、F8 录制；定位/连接后方生效）
+- 全局热键（仅 F8-F10：F9 执行、F10 停止、F8 脚本录制；定位/连接后方生效）
 
 插件通过 hooks 机制扩展左侧/右侧 Tab 和菜单项。
 """
@@ -77,7 +77,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._stop_requested = False
         self._current_worker = None
         self._overlay = BorderOverlay()
-        self._recorder = None
+        self._script_record_dialog = None
         self._capture = None
         self._last_capture = None
         self._region_layout = None
@@ -107,7 +107,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         # ── 全局热键（仅 F8-F10；回调内按后端就绪门控，定位/连接后方生效）──
         self.f9_pressed.connect(self._on_f9_start)
         self.f10_pressed.connect(self._request_stop)
-        self.f8_pressed.connect(self._toggle_recording)
+        self.f8_pressed.connect(self._on_f8_script_record)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
             "<f9>": self._on_global_f9,
@@ -180,6 +180,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         ocr_test.triggered.connect(self._open_ocr_test)
         tools_menu.addAction(ocr_test)
 
+        script_record = QAction("脚本录制", self)
+        script_record.triggered.connect(self._open_script_record)
+        tools_menu.addAction(script_record)
+
         # ── 插件专属菜单（第三列，帮助之前；一个插件一个菜单） ──
         spec = self._plugin_menu_spec()
         if spec:
@@ -219,6 +223,24 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         from .ocr_test_dialog import OCRTestDialog
         dialog = OCRTestDialog(self)
         dialog.exec()
+
+    def _open_script_record(self):
+        """打开脚本录制对话框（录制生命周期由对话框自管）"""
+        from .script_record_dialog import ScriptRecordDialog
+        dialog = ScriptRecordDialog(self)
+        self._script_record_dialog = dialog
+        try:
+            dialog.exec()
+        finally:
+            self._script_record_dialog = None
+
+    def _on_f8_script_record(self):
+        """F8：对话框已打开则切换录制，未打开则打开脚本录制对话框"""
+        dialog = self._script_record_dialog
+        if dialog is not None and dialog.isVisible():
+            dialog.toggle_recording()
+        else:
+            self._open_script_record()
 
     def _open_scene_editor(self):
         from .scene_editor.scene_editor import SceneEditorDialog
@@ -376,7 +398,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
-        self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 录制")
+        self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 脚本录制")
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._restore_ui_state()
@@ -393,11 +415,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         daily_layout.setContentsMargins(4, 4, 4, 4)
 
         wf_group = QGroupBox("工作流")
-        wf_layout = QVBoxLayout(wf_group)
+        wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
-        self.workflow_combo.setMinimumWidth(200)
+        self.workflow_combo.setMinimumWidth(150)
         self.workflow_combo.currentIndexChanged.connect(self._rebuild_param_panel)
-        wf_layout.addWidget(self.workflow_combo)
+        wf_layout.addWidget(self.workflow_combo, stretch=1)
+        self.btn_load_workflow = QPushButton("加载")
+        self.btn_load_workflow.setFixedWidth(64)
+        self.btn_load_workflow.clicked.connect(self._on_load_workflow)
+        self.btn_load_workflow.setStyleSheet(
+            "background-color: #607D8B; color: white; font-weight: bold; padding: 6px;"
+        )
+        wf_layout.addWidget(self.btn_load_workflow)
         daily_layout.addWidget(wf_group)
 
         self.btn_run_workflow = QPushButton("开始执行 (F9)")
@@ -406,22 +435,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
         )
         daily_layout.addWidget(self.btn_run_workflow)
-
-        tools_row = QHBoxLayout()
-        self.btn_record = QPushButton("录制 (F8)")
-        self.btn_record.clicked.connect(self._toggle_recording)
-        self.btn_record.setStyleSheet(
-            "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
-        )
-        tools_row.addWidget(self.btn_record)
-
-        self.btn_load_workflow = QPushButton("加载工作流")
-        self.btn_load_workflow.clicked.connect(self._on_load_workflow)
-        self.btn_load_workflow.setStyleSheet(
-            "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
-        )
-        tools_row.addWidget(self.btn_load_workflow)
-        daily_layout.addLayout(tools_row)
 
         self._param_panel = QGroupBox("参数设置")
         self._param_layout = QFormLayout(self._param_panel)
@@ -530,74 +543,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
                 self._param_layout.addRow(label + ":", combo)
         self._param_panel.setVisible(True)
 
-    # ─── 宏录制 ──────────────────────────────────────────────
-
-    def _toggle_recording(self):
-        if self._recorder is not None:
-            self._stop_recording()
-        else:
-            self._start_recording()
-
-    def _start_recording(self):
-        if self._running:
-            self.log_text.append("[录制] 工作流运行中，无法录制")
-            return
-        if self._backend == "adb":
-            self.log_text.append("[录制] ADB 模式暂不支持录制")
-            self.statusBar().showMessage("ADB 模式不支持录制")
-            return
-        if not self._target_window:
-            self.log_text.append("[录制] 请先定位窗口")
-            self.statusBar().showMessage("未定位窗口 | 请先扫描并定位窗口")
-            return
-        layout_name = self._layout_manager.get_active_layout_name()
-        layout = self._layout_manager.load_layout(layout_name)
-        if not layout:
-            self.log_text.append(f"[录制] 无法加载布局: {layout_name}")
-            return
-        w = self._target_window
-        if self._capture is None:
-            from ..core.desktop import DesktopCapture
-            self._capture = DesktopCapture()
-        self._capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
-        from ..macros import MacroRecorder
-        try:
-            self._recorder = MacroRecorder(
-                target_window=w, capture=self._capture, layout=layout,
-                win_left=w["left"], win_top=w["top"],
-            )
-            self._recorder.start()
-        except Exception as e:
-            self._recorder = None
-            self.log_text.append(f"[录制] 启动失败: {e}")
-            logger.error(f"录制启动失败: {e}")
-            return
-        self.btn_record.setText("停止录制 (F8)")
-        self.btn_record.setStyleSheet(
-            "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
-        )
-        self.statusBar().showMessage("录制中... | 在游戏窗口内点击/拖拽 | F8 停止")
-        self.log_text.append("[录制] 开始录制，在游戏窗口内点击/拖拽，按 F8 结束")
-
-    def _stop_recording(self):
-        recorder = self._recorder
-        self._recorder = None
-        self.btn_record.setText("录制 (F8)")
-        self.btn_record.setStyleSheet(
-            "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
-        )
-        self.statusBar().showMessage("录制结束")
-        if recorder is None:
-            return
-        dsl = recorder.stop()
-        if not dsl.strip():
-            self.log_text.append("[录制] 未捕获到有效操作")
-            return
-        self.log_text.append("[录制] 录制完成，已生成 DSL 语句")
-        from .macro_result_dialog import MacroResultDialog
-        dialog = MacroResultDialog(dsl, self)
-        dialog.exec()
-
     # ─── 快捷键 + 关闭 ───────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -621,12 +566,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
                 return
             self._request_stop()
         self._save_ui_state()
-        if self._recorder is not None:
-            try:
-                self._recorder.stop()
-            except Exception:
-                pass
-            self._recorder = None
         if self._backend == "adb":
             self._teardown_adb_backend()
         try:

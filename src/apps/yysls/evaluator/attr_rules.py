@@ -84,6 +84,13 @@ _TYPE_TO_KEY = {
     "胸甲": "chest",
 }
 
+# 配置 key → equip_type 反向映射（仅一一对应的首饰/防具；
+# 武器 key 对应多种武器类型，无法反推具体 type）
+_KEY_TO_TYPE = {
+    "ring": "环", "pendant": "佩",
+    "head": "冠胄", "chest": "胸甲", "leg": "胫甲", "wrist": "腕甲",
+}
+
 # 八个装备部位（base_attrs 的全部 key，与 UI 展示顺序一致）
 BASE_ATTR_PARTS = (
     "main_weapon", "sub_weapon", "ring", "pendant",
@@ -409,6 +416,30 @@ class AttrRuleManager:
                 if quality:
                     return level, quality
         return None, None
+
+    def infer_type_by_value(self, value: int | list | tuple) -> str | None:
+        """仅凭基础属性值反查装备部位 type（equip_type OCR 缺失时回填用）
+
+        遍历全部类别收集命中部位，仅唯一命中时返回：
+        - 胸甲/环/佩 数值独立，可唯一确定；
+        - 冠胄/胫甲/腕甲 数值相同（_follow），命中多个部位 → None；
+        - 武器 key 对应多种武器类型，不参与反查。
+
+        Returns:
+            部位 type（如 "胸甲"）；无命中或命中多个部位返回 None
+        """
+        matched: set[str] = set()
+        for key, level_rules in self._base_rules.items():
+            part_type = _KEY_TO_TYPE.get(key)
+            if part_type is None:
+                continue    # 武器类别不参与
+            for rule in level_rules.values():
+                if rule.infer_quality(value):
+                    matched.add(part_type)
+                    break
+        if len(matched) == 1:
+            return matched.pop()
+        return None
 
 
 # ─── 全局单例 ─────────────────────────────────────────────

@@ -191,6 +191,11 @@ class WorkflowEngine:
         except _ReturnSignal:
             logger.info(f"=== DSL 工作流正常返回，收集到 {len(self.output)} 项数据 ===")
             return self.output
+        except _BreakSignal:
+            # 停止请求在顶层语句边界触发时 _BreakSignal 会穿透到顶层，
+            # 同样视为正常停止，返回已收集的部分结果
+            logger.info(f"=== DSL 工作流被停止，收集到 {len(self.output)} 项数据 ===")
+            return self.output
 
         logger.info(f"=== DSL 工作流完成，收集到 {len(self.output)} 项数据 ===")
         return self.output

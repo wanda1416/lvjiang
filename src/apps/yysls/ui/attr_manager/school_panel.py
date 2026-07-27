@@ -3,8 +3,8 @@
 左侧为流派列表（对应游戏十大流派，可增删、直接编辑重命名），
 右侧为选中流派的配置表单，分三行：
 - 第一行：属性（下拉 鸣金 / 裂石 / 破竹 / 牵丝）；
-- 第二行：主武器（下拉）+ 主武学（文本框）；
-- 第三行：副武器（下拉）+ 副武学（文本框）。
+- 第二行：主武器（下拉）+ 主武学（文本框），两列等宽；
+- 第三行：副武器（下拉）+ 副武学（文本框），两列等宽。
 武学增效已移至装备配置的武器类型中，每个武器绑定一种武学增效。
 武器候选来自 weapon_types 注册表。
 数据存于 attributes.yaml 顶层 schools：
@@ -80,44 +80,47 @@ class SchoolPanel(QWidget):
         hint.setStyleSheet("color: #888;")
         right_layout.addWidget(hint)
 
-        # 第一行：属性
+        # 第一行：属性（标签后留两字宽，使下拉框与下方主/副武器列对齐）
         row_attr = QHBoxLayout()
-        row_attr.setSpacing(4)
+        row_attr.setSpacing(28)  # 属性(2字) + 2字间距 = 主武器(3字) + 1字间距
         row_attr.addWidget(QLabel("属性"))
         self._combo_attr = QComboBox()
+        self._combo_attr.setFixedWidth(100)
         row_attr.addWidget(self._combo_attr)
         row_attr.addStretch()
         right_layout.addLayout(row_attr)
 
-        # 第二行：主武器 + 主武学
-        row_main = QHBoxLayout()
-        row_main.setSpacing(4)
-        row_main.addWidget(QLabel("主武器"))
+        # 第二/三行：两列等宽网格（主武器+主武学 / 副武器+副武学）
+        # 每列内部：标签后紧接控件（约一个汉字间距），控件定宽，不贴右缘
         self._combo_main_weapon = QComboBox()
-        row_main.addWidget(self._combo_main_weapon)
-        row_main.addSpacing(16)
-        row_main.addWidget(QLabel("主武学"))
+        self._combo_main_weapon.setFixedWidth(100)
         self._edit_main_martial = QLineEdit()
         self._edit_main_martial.setPlaceholderText("武学名称")
-        self._edit_main_martial.setMaxLength(5)
-        self._edit_main_martial.setFixedWidth(80)
-        row_main.addWidget(self._edit_main_martial)
-        right_layout.addLayout(row_main)
-
-        # 第三行：副武器 + 副武学
-        row_sub = QHBoxLayout()
-        row_sub.setSpacing(4)
-        row_sub.addWidget(QLabel("副武器"))
+        self._edit_main_martial.setMaxLength(6)
+        self._edit_main_martial.setFixedWidth(100)
         self._combo_sub_weapon = QComboBox()
-        row_sub.addWidget(self._combo_sub_weapon)
-        row_sub.addSpacing(16)
-        row_sub.addWidget(QLabel("副武学"))
+        self._combo_sub_weapon.setFixedWidth(100)
         self._edit_sub_martial = QLineEdit()
         self._edit_sub_martial.setPlaceholderText("武学名称")
-        self._edit_sub_martial.setMaxLength(5)
-        self._edit_sub_martial.setFixedWidth(80)
-        row_sub.addWidget(self._edit_sub_martial)
-        right_layout.addLayout(row_sub)
+        self._edit_sub_martial.setMaxLength(6)
+        self._edit_sub_martial.setFixedWidth(100)
+
+        def _pair(label: str, widget) -> QHBoxLayout:
+            lay = QHBoxLayout()
+            lay.setSpacing(14)  # 约一个汉字宽度
+            lay.addWidget(QLabel(label))
+            lay.addWidget(widget)
+            lay.addStretch()
+            return lay
+
+        grid = QGridLayout()
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        grid.addLayout(_pair("主武器", self._combo_main_weapon), 0, 0)
+        grid.addLayout(_pair("主武学", self._edit_main_martial), 0, 1)
+        grid.addLayout(_pair("副武器", self._combo_sub_weapon), 1, 0)
+        grid.addLayout(_pair("副武学", self._edit_sub_martial), 1, 1)
+        right_layout.addLayout(grid)
 
         right_layout.addStretch()
 

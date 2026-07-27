@@ -29,12 +29,14 @@ class MacroRecorder:
     窗口缩放/移动后回放仍准确。仅录制落在目标窗口矩形内的操作。
     """
 
-    def __init__(self, target_window: dict, capture, layout, win_left: int, win_top: int):
+    def __init__(self, target_window: dict, capture, layout, win_left: int, win_top: int,
+                 on_line=None):
         self._win = target_window
         self._capture = capture
         self._layout = layout
         self._win_left = win_left
         self._win_top = win_top
+        self._on_line = on_line                # 每生成一行 DSL 的实时回调（监听线程内调用）
 
         self._listener = None
         self._lock = threading.Lock()
@@ -76,6 +78,15 @@ class MacroRecorder:
 
     # ─── 事件回调（监听线程） ──────────────────────────────
 
+    def _emit_line(self, line: str):
+        """追加一行 DSL 并触发实时回调（回调异常不影响录制）"""
+        self._lines.append(line)
+        if self._on_line is not None:
+            try:
+                self._on_line(line)
+            except Exception:  # noqa: BLE001
+                logger.exception("on_line 回调异常")
+
     def _on_click(self, sx, sy, button, pressed):
         """pynput 左键按下/松开回调"""
         if pynput_mouse is None or button != pynput_mouse.Button.left:
@@ -110,7 +121,7 @@ class MacroRecorder:
 
         if dist < _DRAG_THRESHOLD_PX:
             rx, ry = self._screen_to_canvas_ratio(px, py)
-            self._lines.append(f"click ({rx}, {ry})")
+            self._emit_line(f"click ({rx}, {ry})")
             logger.debug(f"录制点击: ({rx}, {ry})")
         else:
             rx1, ry1 = self._screen_to_canvas_ratio(px, py)
@@ -118,7 +129,7 @@ class MacroRecorder:
             duration = round(time.monotonic() - self._press_time, 2)
             if duration < _MIN_DRAG_DURATION:
                 duration = _MIN_DRAG_DURATION
-            self._lines.append(f"drag ({rx1}, {ry1}) ({rx2}, {ry2}) {duration}")
+            self._emit_line(f"drag ({rx1}, {ry1}) ({rx2}, {ry2}) {duration}")
             logger.debug(f"录制拖拽: ({rx1}, {ry1}) -> ({rx2}, {ry2}) {duration}s")
 
         self._last_action_time = time.monotonic()
@@ -129,7 +140,7 @@ class MacroRecorder:
             return
         gap = event_time - self._last_action_time
         if gap > _WAIT_THRESHOLD_S:
-            self._lines.append(f"wait {round(gap, 1)}")
+            self._emit_line(f"wait {round(gap, 1)}")
             logger.debug(f"录制等待: {round(gap, 1)}s")
 
     # ─── 坐标转换 ─────────────────────────────────────────

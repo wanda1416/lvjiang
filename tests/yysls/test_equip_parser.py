@@ -182,7 +182,7 @@ class TestParseFullChain:
         assert equip.type == "剑"
         assert equip.level == 110
         assert equip.is_chengyin
-        assert equip.quality == "gold"       # 110 阶武器 max 232 落在 gold 区间
+        assert equip.quality == "gold"       # 110 阶武器区间 [100,232] 精确等于 gold
         assert equip.extra_data["affix_count"] == 2
 
     def test_cap_pct_computed(self, parser):
@@ -224,7 +224,7 @@ class TestParseFullChain:
 
     def test_level_recovered_from_base_attr_when_ocr_missing(self, parser):
         # equip_level OCR 漏识别 → 基础属性值全局唯一，反查回填 等级+品阶
-        # base_attr max 232 属于 剑 110 阶 gold 区间 → 回填 level=110, quality=gold
+        # base_attr 区间 [100,232] 精确等于 剑 110 阶 gold → 回填 level=110, quality=gold
         equip = parser.parse(_weapon_raw(equip_level=""))
         assert equip.level == 110
         assert equip.quality == "gold"

@@ -32,17 +32,28 @@ POOL_DINGYIN = "dingyin"
 
 @dataclass
 class AttrRange:
-    """单个品阶的属性值范围"""
+    """单个品阶的属性值规则
+
+    区间属性（武器）：[min_val, max_val] 表示该品阶装备提供
+        +min_val 最小外功攻击、+max_val 最大外功攻击（并非取值区间）。
+    点值属性（首饰/防具）：min_val == max_val。
+    """
     quality: str           # gold / purple / blue
     min_val: int | None = None
     max_val: int | None = None
 
-    def contains(self, value: int) -> bool:
-        if self.min_val is not None and value < self.min_val:
-            return False
-        if self.max_val is not None and value > self.max_val:
-            return False
-        return True
+    def matches(self, value: int | list | tuple) -> bool:
+        """判定解析出的基础属性值是否精确命中本品阶。
+
+        区间属性：解析出的区间 [c, d] 必须 c==min_val 且 d==max_val，
+            而非“落在区间内”（因相邻品阶区间会重叠）。
+        点值属性：解析出的标量须精确等于该值（min_val==max_val）。
+        """
+        if isinstance(value, (list, tuple)):
+            return (len(value) >= 2
+                    and value[0] == self.min_val and value[1] == self.max_val)
+        # 标量：仅点值属性（min==max）可命中
+        return self.min_val == self.max_val == value
 
 
 @dataclass
@@ -50,9 +61,9 @@ class LevelRule:
     """某个分类在某个等级的品阶规则"""
     ranges: list[AttrRange] = field(default_factory=list)
 
-    def infer_quality(self, value: int) -> str | None:
+    def infer_quality(self, value: int | list | tuple) -> str | None:
         for r in self.ranges:
-            if r.contains(value):
+            if r.matches(value):
                 return r.quality
         return None
 
@@ -326,13 +337,15 @@ class AttrRuleManager:
 
     # ── 品阶推断 ────────────────────────────────────────────
 
-    def infer_quality(self, equip_type: str | None, level: int, value: int) -> str | None:
+    def infer_quality(self, equip_type: str | None, level: int,
+                      value: int | list | tuple) -> str | None:
         """根据基础属性推断品阶
 
         Args:
             equip_type: 装备类型（剑/枪/环/佩/冠胄/胸甲/...），可为 None
             level: 装备等级
-            value: 属性值（武器范围取 max）
+            value: 属性值——区间属性（武器）为 [min, max]，需两端精确匹配；
+                   点值属性（首饰/防具）为标量
 
         Returns:
             'gold' / 'purple' / 'blue' / None（无匹配）
@@ -362,16 +375,16 @@ class AttrRuleManager:
         return None
 
     def infer_level_quality(
-        self, equip_type: str | None, value: int
+        self, equip_type: str | None, value: int | list | tuple
     ) -> tuple[int | None, str | None]:
         """仅凭基础属性值反查 (等级, 品阶)
 
-        基础属性数值全局唯一（跨等级、跨品阶、跨部位均不重复），
+        基础属性值全局唯一（跨等级、跨品阶、跨部位均不重复），
         故 OCR 漏识别等级时，仍可仅凭数值反查出等级与品阶。
 
         Args:
             equip_type: 装备类型，可为 None
-            value: 属性值（武器范围取 max）
+            value: 属性值——区间属性为 [min, max]，点值属性为标量
 
         Returns:
             (level, quality)；无匹配返回 (None, None)

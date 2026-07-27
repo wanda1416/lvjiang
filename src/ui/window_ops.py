@@ -221,6 +221,9 @@ class WindowOpsMixin:
 
     def _teardown_adb_backend(self):
         """清理 ADB 后端资源，用于重连或退出（仅清理资源，不改 UI）"""
+        # 录屏进行中/待保存时先自动转正保存，再停止截图后端
+        if getattr(self, "_screen_recorder", None) is not None:
+            self._abort_screen_record("断连")
         self._device_ready = False
         self._scrcpy_streaming = False
         if self._capture is not None:
@@ -249,6 +252,9 @@ class WindowOpsMixin:
                 self.chk_bg_mode.setEnabled(True)
             if hasattr(self, "chk_scrcpy") and self.chk_scrcpy.isVisible():
                 self.chk_scrcpy.setEnabled(True)
+        # 采集面板（录屏/截屏）随连接态刷新可用性
+        if hasattr(self, "_apply_rec_state"):
+            self._apply_rec_state()
 
     def _on_disconnect(self):
         """通用断连：根据后端模式清理资源并恢复 UI"""
@@ -354,6 +360,10 @@ class WindowOpsMixin:
         """截图方式开关切换：在 screencap / scrcpy 之间重建截图后端"""
         method = "scrcpy" if state else "screencap"
 
+        # 录屏依赖流式推帧，切换前自动转正保存
+        if getattr(self, "_screen_recorder", None) is not None:
+            self._abort_screen_record("切换截图方式")
+
         if not self._device:
             # 未连接设备时仅更新内存配置
             self._user_config.adb_capture_streaming = state
@@ -392,6 +402,9 @@ class WindowOpsMixin:
             # 回退到 screencap
             self._capture = create_capture_backend(device=self._device, method="screencap")
             self._capture.start()
+        # 流式状态变化后刷新采集面板可用性
+        if hasattr(self, "_apply_rec_state"):
+            self._apply_rec_state()
 
     # ─── 截屏 ─────────────────────────────────────────────
 
@@ -495,9 +508,13 @@ class WindowOpsMixin:
     # ─── scrcpy 帧回调 ────────────────────────────────────
 
     def _on_scrcpy_frame(self, bgr: np.ndarray):
-        """scrcpy 解码线程回调：通过 Qt 信号将帧转发到 UI 线程"""
+        """scrcpy 解码线程回调：通过 Qt 信号将帧转发到 UI 线程，并分叉喂给录屏器"""
         if hasattr(self, "_scrcpy_frame_ready"):
             self._scrcpy_frame_ready.emit(bgr)
+        # 录屏分叉：push 仅入队不阻塞解码线程，暂停/停止态内部直接丢弃
+        rec = getattr(self, "_screen_recorder", None)
+        if rec is not None:
+            rec.push(bgr)
 
     def _on_scrcpy_frame_ui(self, bgr: np.ndarray):
         """UI 线程槽：更新预览区显示（由 _scrcpy_frame_ready 信号触发）

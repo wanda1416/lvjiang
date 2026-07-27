@@ -21,6 +21,8 @@ logs/
 # Local data (layouts, session, screenshots, etc.)
 /config/local/
 /data/local
+/data/video
+/data/picture
 /config/system/workflows/_*.wf
 
 # TODO 后期需要添加

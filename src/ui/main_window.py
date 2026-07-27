@@ -29,6 +29,7 @@ from src.apps import get_registry
 from .overlay import BorderOverlay
 from .window_ops import WindowOpsMixin
 from .run_control import RunControlMixin
+from .capture_ops import CaptureOpsMixin
 from .widgets import TrimmedLogEdit
 from ..config import load_user_config
 from ..core.user_config import UserConfigManager
@@ -44,7 +45,7 @@ class _LogBridge(QObject):
 DEFAULT_TITLE = "律匠 - 通用视觉 RPA 引擎"
 
 
-class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
+class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     """通用主窗口。
 
     从全局注册表读取扩展点，由插件在启动时注入。
@@ -287,7 +288,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
             self.statusBar().showMessage("配置已保存", 3000)
 
     def _on_toggle_preview(self, checked: bool):
-        self.preview_label.setVisible(not checked)
+        self.preview_container.setVisible(not checked)
         self.btn_hide_window.setText("显示预览" if checked else "隐藏预览")
 
     # ─── UI 构建 ─────────────────────────────────────────────
@@ -368,13 +369,22 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
         self._apply_backend_ui(self._backend)
         main_layout.addWidget(window_group)
 
-        # === 截屏预览区 ===
+        # === 截屏预览区（左：实时画面 / 右：采集控制面板）===
+        self.preview_container = QWidget()
+        self.preview_container.setFixedHeight(320)
+        preview_layout = QHBoxLayout(self.preview_container)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(6)
+
         self.preview_label = QLabel("定位窗口后自动截屏")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setFixedHeight(320)
         self.preview_label.setStyleSheet("background-color: #2b2b2b; color: #888; font-size: 14px;")
-        self.preview_label.setVisible(False)
-        main_layout.addWidget(self.preview_label)
+        preview_layout.addWidget(self.preview_label, stretch=1)
+
+        preview_layout.addWidget(self._build_capture_panel())
+
+        self.preview_container.setVisible(False)
+        main_layout.addWidget(self.preview_container)
 
         # === 中部：左右分栏 ===
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -566,6 +576,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, QMainWindow):
                 return
             self._request_stop()
         self._save_ui_state()
+        # 录屏进行中/待保存时自动转正保存，不丢数据
+        self._abort_screen_record("关闭程序")
         if self._backend == "adb":
             self._teardown_adb_backend()
         try:

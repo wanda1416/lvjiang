@@ -282,6 +282,59 @@ class TestBinaryAxisLattice:
         assert len(axis.centers) == 3
 
 
+class TestDetectGridMinVisible:
+    """min_visible 可配置：控制半截行是否计入有效行"""
+
+    def test_image4_default_excludes_partial_row(self, load_test_image):
+        """首行 3/4 可见，默认 0.95 → 排除，检测 4 行"""
+        img = load_test_image("image4.png")
+        result = detect_grid(img, expected_rows=5, expected_cols=6)
+        assert result is not None
+        assert result.n_rows == 4
+
+    def test_image4_lower_threshold_includes_partial_row(self, load_test_image):
+        """首行 3/4 可见，min_visible=0.55 → 75% ≥ 55% 计入，检测 5 行"""
+        img = load_test_image("image4.png")
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             min_visible=0.55)
+        assert result is not None
+        assert result.n_rows == 5
+
+    def test_image3_quarter_visible_top_excluded(self, load_test_image):
+        """首行仅 1/4 可见，min_visible=0.55 → 25% < 55% 顶部行仍排除；
+        底部 ~83% 可见的行 ≥ 55% 被计入 → 共 5 行，且首中心远离顶边"""
+        img = load_test_image("image3.png")
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             min_visible=0.55)
+        assert result is not None
+        assert result.n_rows == 5
+        assert result.row_centers[0] > 0.1   # 顶部 1/4 行未计入
+
+    def test_min_visible_clamped_to_half(self, load_test_image):
+        """传入 < 0.5 被钳位到 0.5（保证行中心可点击）：75% 可见行仍计入"""
+        img = load_test_image("image4.png")
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             min_visible=0.2)
+        assert result is not None
+        assert result.n_rows == 5
+
+
+class TestPanelMinVisible:
+    """Panel.min_visible 字段序列化兼容"""
+
+    def test_from_dict_default(self):
+        """旧布局 JSON 无 min_visible 字段 → 默认 0.95"""
+        p = Panel.from_dict({"key": "g", "x_ratio": 0.1, "y_ratio": 0.1,
+                             "w_ratio": 0.8, "h_ratio": 0.8})
+        assert p.min_visible == 0.95
+
+    def test_roundtrip(self):
+        """to_dict/from_dict 往返保留 min_visible"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8,
+                  h_ratio=0.8, min_visible=0.55)
+        assert Panel.from_dict(p.to_dict()).min_visible == 0.55
+
+
 class TestDetectGridDebugImage:
     """detect_grid 异常时保存调试图片"""
 
@@ -315,3 +368,42 @@ class TestDetectGridDebugImage:
         assert result is not None
         assert result.n_rows == 5
         mock_imwrite.assert_not_called()
+
+
+class TestPanelRatioClamp:
+    """_panel_ratio_to_screen 钳位：边缘 slot 中心不能落在 panel 边框上
+
+    min_visible 接近 0.5 时半可见行的中心恰在 panel 边缘，叠加底层
+    ±click_random_offset 随机偏移后 tap 会出界，必须钳位到内缩矩形内。
+    mock_engine: capture(1000,1000)，canvas 全屏，panel x/y∈[100,900]，
+    margin = click_random_offset(3) + 2 = 5。
+    """
+
+    @pytest.fixture
+    def sized_engine(self, mock_engine):
+        mock_engine._capture.get_capture_size.return_value = (1000, 1000)
+        return mock_engine
+
+    def _panel(self, engine):
+        return engine._find_panel_in_layout("test_scene", "test_panel")
+
+    def test_top_edge_center_clamped_inside(self, sized_engine):
+        """cy=0（半截首行中心压顶边）→ 钳位到 panel_top + margin"""
+        sx, sy = sized_engine._panel_ratio_to_screen(self._panel(sized_engine), 0.5, 0.0)
+        assert sy == 105
+        assert sx == 500
+
+    def test_bottom_edge_center_clamped_inside(self, sized_engine):
+        """cy=1（半截尾行中心压底边）→ 钳位到 panel_bottom - margin"""
+        _, sy = sized_engine._panel_ratio_to_screen(self._panel(sized_engine), 0.5, 1.0)
+        assert sy == 895
+
+    def test_slightly_out_of_range_center_clamped(self, sized_engine):
+        """eps 容差下中心略越界（cy<0）→ 同样钳回内缩矩形"""
+        _, sy = sized_engine._panel_ratio_to_screen(self._panel(sized_engine), 0.5, -0.02)
+        assert sy == 105
+
+    def test_interior_center_untouched(self, sized_engine):
+        """panel 内部正常 slot 中心不受钳位影响"""
+        sx, sy = sized_engine._panel_ratio_to_screen(self._panel(sized_engine), 0.5, 0.5)
+        assert (sx, sy) == (500, 500)

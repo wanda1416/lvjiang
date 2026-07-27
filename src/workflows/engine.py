@@ -793,16 +793,30 @@ class WorkflowEngine:
     def _panel_ratio_to_screen(
         self, panel_obj, cx_panel: float, cy_panel: float
     ) -> tuple[int, int]:
-        """panel 内归一化坐标 → 屏幕绝对坐标"""
+        """panel 内归一化坐标 → 屏幕绝对坐标（钳位到 panel 内缩边距内）
+
+        与 WorkflowBase._panel_ratio_to_screen 同步：半可见行的 slot 中心
+        可能压在 panel 边缘，叠加 ±click_random_offset 随机偏移后 tap 会
+        落到网格黑框之外，钳位到内缩 margin 矩形内保证点中可见部分。
+        """
         w, h = self._capture.get_capture_size()
         canvas = self._layout.get_canvas()
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
         canvas_w = canvas.w_ratio * w
         canvas_h = canvas.h_ratio * h
-        sx = canvas_x + (panel_obj.x_ratio + cx_panel * panel_obj.w_ratio) * canvas_w
-        sy = canvas_y + (panel_obj.y_ratio + cy_panel * panel_obj.h_ratio) * canvas_h
-        return int(self._window_left + sx), int(self._window_top + sy)
+        px = canvas_x + panel_obj.x_ratio * canvas_w
+        py = canvas_y + panel_obj.y_ratio * canvas_h
+        pw = panel_obj.w_ratio * canvas_w
+        ph = panel_obj.h_ratio * canvas_h
+        sx = px + cx_panel * pw
+        sy = py + cy_panel * ph
+        margin = self._delay.click_random_offset + 2
+        csx = max(px + margin, min(sx, px + pw - margin))
+        csy = max(py + margin, min(sy, py + ph - margin))
+        if (csx, csy) != (sx, sy):
+            logger.debug(f"panel 坐标钳位: ({sx:.0f},{sy:.0f}) → ({csx:.0f},{csy:.0f})")
+        return int(self._window_left + csx), int(self._window_top + csy)
 
     def _exec_scan(self, node: Scan):
         # PanelRef: panel cell 级 OCR

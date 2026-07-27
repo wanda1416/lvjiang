@@ -564,16 +564,31 @@ class BaseWorkflow:
         return full[y1:y2, x1:x2].copy()
 
     def _panel_ratio_to_screen(self, panel_obj, cx: float, cy: float) -> tuple[int, int]:
-        """panel 内归一化坐标 → 屏幕绝对坐标"""
+        """panel 内归一化坐标 → 屏幕绝对坐标（钳位到 panel 内缩边距内）
+
+        半可见行（min_visible 接近 0.5 时）的 slot 中心可能恰好压在 panel
+        边缘，叠加底层点击的 ±click_random_offset 随机偏移与取整误差后，
+        tap 会落到网格黑框之外导致点击静默失效。半截行的可见部分一定在
+        边缘内侧，统一钳位到 panel 内缩 margin 的矩形内即可保证点中该行。
+        """
         w, h = self._capture.get_capture_size()
         canvas = self._layout.get_canvas()
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
         canvas_w = canvas.w_ratio * w
         canvas_h = canvas.h_ratio * h
-        sx = canvas_x + (panel_obj.x_ratio + cx * panel_obj.w_ratio) * canvas_w
-        sy = canvas_y + (panel_obj.y_ratio + cy * panel_obj.h_ratio) * canvas_h
-        return int(self._window_left + sx), int(self._window_top + sy)
+        px = canvas_x + panel_obj.x_ratio * canvas_w
+        py = canvas_y + panel_obj.y_ratio * canvas_h
+        pw = panel_obj.w_ratio * canvas_w
+        ph = panel_obj.h_ratio * canvas_h
+        sx = px + cx * pw
+        sy = py + cy * ph
+        margin = self._delay.click_random_offset + 2
+        csx = max(px + margin, min(sx, px + pw - margin))
+        csy = max(py + margin, min(sy, py + ph - margin))
+        if (csx, csy) != (sx, sy):
+            logger.debug(f"panel 坐标钳位: ({sx:.0f},{sy:.0f}) → ({csx:.0f},{csy:.0f})")
+        return int(self._window_left + csx), int(self._window_top + csy)
 
     def align_panel(self, scene_key: str, panel_key: str) -> "GridAlignment | None":
         """对齐 panel 网格，缓存结果并返回 GridAlignment"""
@@ -585,7 +600,8 @@ class BaseWorkflow:
         if panel_img is None:
             logger.error(f"align: 无法截取 panel {scene_key}.{panel_key}")
             return None
-        alignment = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols)
+        alignment = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols,
+                                min_visible=getattr(panel_obj, "min_visible", 0.95))
         if alignment is None:
             logger.error(f"align: panel {scene_key}.{panel_key} 未检测到 slot")
             return None

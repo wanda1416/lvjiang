@@ -245,6 +245,24 @@ class TestWeaponTypesAndSchools:
                 assert weapon in weapons, f"{name}: {key} 武器 {weapon} 未注册"
 
 
+# ─── 指定武学增效词条数据源 ──────────────────────────
+
+class TestWuxueAffixNames:
+    def test_names_come_from_category(self, mgr):
+        # 调律规则 UI 增伤词条候选的唯一来源
+        names = mgr.get_wuxue_affix_names()
+        assert names, "指定武学增效词条不应为空"
+        assert "剑武学增伤" in names
+        assert all(mgr.resolve_affix_category(n) == "指定武学增效"
+                   for n in names)
+
+    def test_weapon_bound_affixes_within_names(self, mgr):
+        # 游戏配置中每个武器绑定的武学增效须在词条全集内
+        names = set(mgr.get_wuxue_affix_names())
+        for weapon, affix in mgr.get_all_weapon_wuxue_affixes().items():
+            assert affix in names, f"{weapon}: 绑定词条 {affix} 不在全集内"
+
+
 # ─── 数据结构单元 ──────────────────────────────────────────
 
 class TestLevelRule:

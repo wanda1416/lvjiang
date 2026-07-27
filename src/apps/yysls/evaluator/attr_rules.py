@@ -27,6 +27,10 @@ _CHENGYIN_RATIO = 0.94
 POOL_NORMAL = "normal"
 POOL_DINGYIN = "dingyin"
 
+# 武学增效词条所在的词条类别（affix_caps 节；
+# 游戏配置的武器绑定与调律规则的增伤词条候选共用）
+WUXUE_CATEGORY = "指定武学增效"
+
 
 # ─── 品阶推断数据结构 ──────────────────────────────────────
 
@@ -337,6 +341,13 @@ class AttrRuleManager:
     def get_all_weapon_wuxue_affixes(self) -> dict[str, str]:
         """全部武器 → 武学增效词条映射"""
         return dict(self._weapon_wuxue_affixes)
+
+    def get_wuxue_affix_names(self) -> list[str]:
+        """全部指定武学增效词条（affix_caps 该类别的 _aliases）
+
+        调律规则 UI 增伤词条候选的唯一来源。
+        """
+        return self.get_aliases_for_category(WUXUE_CATEGORY)
 
     def get_schools(self) -> dict[str, dict]:
         """流派配置（顶层 schools：流派名 → {main: {武器: 词条}, sub: [武器]}）"""

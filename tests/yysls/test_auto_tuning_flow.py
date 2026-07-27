@@ -151,7 +151,9 @@ def test_worth_tuned_to_full(patch_worth):
     # back 回背包后再点一次「更多」收起弹窗 → more_func 共 2 次（展开 + 收起）
     assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
     assert len(wf.done_calls) == 1
-    assert len(wf.output.get("tune_results", [])) == 3
+    # 每轮调律结果挂在本件 report 下，与装备一一对应（不再全局平铺）
+    assert len(reports[0]["tune_results"]) == 3
+    assert "tune_results" not in wf.output
 
 
 def test_material_shortage_stops(patch_worth):
@@ -196,7 +198,8 @@ def test_skip_tuning_switch(patch_worth):
     assert (TUNE_SCENE, "back") in wf.clicks
     assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
     # 未执行任何调律
-    assert not wf.output.get("tune_results")
+    assert "tune_results" not in reports[0]
+    assert "tune_results" not in wf.output
 
 
 def test_skip_tuning_full_affix_not_entered(monkeypatch):

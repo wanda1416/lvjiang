@@ -9,6 +9,7 @@
 - schools: {流派 key: {"enabled": bool, "weapon_rules": [名字]}}
   （weapon_rules 缺省 = 该规则声明的全部武器规则）
 - keep_pvp: 全局布尔，由 get_keep_pvp/set_keep_pvp 单独读写
+- skip_tuning: 全局布尔（临时测试开关），由 get_skip_tuning/set_skip_tuning 读写
 """
 from __future__ import annotations
 
@@ -38,6 +39,12 @@ class SchoolConfigWidget(QWidget):
         self._keep_pvp_cb.stateChanged.connect(
             lambda _state: self.config_changed.emit())
         layout.addWidget(self._keep_pvp_cb)
+
+        # ── 全局：跳过实际调律（临时测试开关，仅模拟进出调律页）──
+        self._skip_tuning_cb = QCheckBox("跳过实际调律（仅进出调律页，测试滚动用）")
+        self._skip_tuning_cb.stateChanged.connect(
+            lambda _state: self.config_changed.emit())
+        layout.addWidget(self._skip_tuning_cb)
 
         # 流派 key → 控件集：{"group": QGroupBox, "content": QWidget|None,
         #   "weapon_rules": {名字: QCheckBox}}
@@ -125,3 +132,13 @@ class SchoolConfigWidget(QWidget):
         self._keep_pvp_cb.blockSignals(True)
         self._keep_pvp_cb.setChecked(bool(value))
         self._keep_pvp_cb.blockSignals(False)
+
+    def get_skip_tuning(self) -> bool:
+        """全局「跳过实际调律」开关（临时测试用）"""
+        return self._skip_tuning_cb.isChecked()
+
+    def set_skip_tuning(self, value: bool):
+        """回填全局跳过调律开关（不触发 config_changed）"""
+        self._skip_tuning_cb.blockSignals(True)
+        self._skip_tuning_cb.setChecked(bool(value))
+        self._skip_tuning_cb.blockSignals(False)

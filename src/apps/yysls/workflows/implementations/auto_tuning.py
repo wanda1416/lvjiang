@@ -377,6 +377,8 @@ class AutoTuningWorkflow(BaseWorkflow):
         进入时已停在 bag_equip_detail（含 detail 区，_read_row 已点选该件）。
         未调律分支（already_full/junk_blank/no_tune_entry）保持在背包页；
         已调律分支调完后单次 back 返回背包浏览页，供遍历继续滚动。
+        skip_tuning 测试开关只拦截「值得调律且已进调律页」的装备：
+        词条已满/不值得/无入口仍走各自正常分支，不会统统进调律页。
         每件产出结构化 report 追加进 output["tuning_reports"]。
         返回该件调律后（终态）指纹，供上层更新行指纹（背包位置不变、仅词条增加）。
         """
@@ -422,6 +424,19 @@ class AutoTuningWorkflow(BaseWorkflow):
         if not self._nav_to_tune(detail_scene):
             logger.info(f"  [{name}] 未找到调律入口，跳过")
             report["status"] = "no_tune_entry"
+            self.output.setdefault("tuning_reports", []).append(report)
+            return self._make_fingerprint(equip_data.to_dict())
+
+        # 临时测试开关：只有词条未满、判定值得调律且找到入口的装备
+        # 才走到这里；真实进出调律页但不执行调律，供滚动遍历压测用。
+        # 装备未被改动，不走垃圾/完成后处理挂载点。
+        if getattr(self, "_skip_tuning", False):
+            logger.info(f"  [{name}] 值得调律，但跳过实际调律（测试开关）")
+            self.click_region(self.TUNE_SCENE, "back")
+            self.wait_delay("page_refresh_wait")  # 调律页 → 背包详情页
+            self.click_region(detail_scene, "more_func")
+            self.wait_delay("step_interval")
+            report["status"] = "skip_tuning"
             self.output.setdefault("tuning_reports", []).append(report)
             return self._make_fingerprint(equip_data.to_dict())
 

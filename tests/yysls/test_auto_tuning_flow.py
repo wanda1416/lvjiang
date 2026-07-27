@@ -181,6 +181,67 @@ def test_ensure_judge_config_keeps_injected():
     assert wf._judge_schools == ["huiyi"]
 
 
+def test_skip_tuning_switch(patch_worth):
+    """跳过实际调律开关：值得调律的装备才真实进出调律页但不调律"""
+    wf = FakeWF()
+    wf._skip_tuning = True
+    wf._process_equipment("测试剑", _equip(2), WEAPON_DETAIL)
+
+    reports = wf.output["tuning_reports"]
+    assert reports[0]["status"] == "skip_tuning"
+    assert reports[0]["worthiness"] == ["值得"]   # 潜力判定正常执行
+    # 装备未被改动：不走垃圾/完成后处理
+    assert not wf.junk_calls
+    assert not wf.done_calls
+    # 真实进出调律页：展开「更多」+ 调律入口 + back + 收起「更多」
+    assert (WEAPON_DETAIL, "sub_func_1") in wf.clicks
+    assert (TUNE_SCENE, "back") in wf.clicks
+    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    # 未执行任何调律
+    assert not wf.output.get("tune_results")
+
+
+def test_skip_tuning_full_affix_not_entered(monkeypatch):
+    """开关开启但词条已满 → 仍走 already_full，不进调律页"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: {})
+    wf = FakeWF()
+    wf._skip_tuning = True
+    wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
+
+    assert wf.output["tuning_reports"][0]["status"] == "already_full"
+    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (TUNE_SCENE, "back") not in wf.clicks
+
+
+def test_skip_tuning_junk_not_entered(monkeypatch):
+    """开关开启但潜力判定不值得 → 仍走 junk_blank，不进调律页"""
+    monkeypatch.setattr(auto_tuning, "judge_tuning_worthiness",
+                        lambda *a, **k: (False, ["不值得"]))
+    wf = FakeWF()
+    wf._skip_tuning = True
+    wf._process_equipment("垃圾胚子", _equip(2), WEAPON_DETAIL)
+
+    assert wf.output["tuning_reports"][0]["status"] == "junk_blank"
+    assert len(wf.junk_calls) == 1
+    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (TUNE_SCENE, "back") not in wf.clicks
+
+
+def test_skip_tuning_no_entry(patch_worth):
+    """开关开启且值得但无调律入口 → 仍走 no_tune_entry，不点 back"""
+    wf = FakeWF()
+    wf._skip_tuning = True
+    wf._nav_tune_ok = False
+    wf._process_equipment("无入口剑", _equip(2), WEAPON_DETAIL)
+
+    assert wf.output["tuning_reports"][0]["status"] == "no_tune_entry"
+    assert not wf.junk_calls
+    assert (TUNE_SCENE, "back") not in wf.clicks
+    # _nav_to_tune 失败分支自行收起弹窗 → more_func 共 2 次
+    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+
+
 class ScrollFakeWF(FakeWF):
     """专供 _scroll_and_verify_step 的替身：桩掉拖拽/对齐/读行原语"""
 

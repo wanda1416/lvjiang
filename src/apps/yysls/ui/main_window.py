@@ -179,6 +179,7 @@ class MainWindow(GenericMainWindow):
             cb.blockSignals(False)
         self._school_config.set_config(schools_cfg)
         self._school_config.set_keep_pvp(bool(tuning.get("keep_pvp", False)))
+        self._school_config.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
 
     def _save_tuning_config(self):
         from ..session import get_plugin_session
@@ -186,6 +187,7 @@ class MainWindow(GenericMainWindow):
             "selected_slots": self._get_tuning_selected_slots(),
             "schools": self._get_tuning_school_config(),
             "keep_pvp": self._get_tuning_keep_pvp(),
+            "skip_tuning": self._get_tuning_skip_tuning(),
         })
 
     def _set_all_tuning_checks(self, checked: bool):
@@ -203,3 +205,7 @@ class MainWindow(GenericMainWindow):
     def _get_tuning_keep_pvp(self) -> bool:
         """全局「保留 PVP 装备」开关（公共控件顶部复选框）"""
         return self._school_config.get_keep_pvp()
+
+    def _get_tuning_skip_tuning(self) -> bool:
+        """全局「跳过实际调律」开关（临时测试用，与 keep_pvp 同级）"""
+        return self._school_config.get_skip_tuning()

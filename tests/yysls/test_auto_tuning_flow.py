@@ -88,7 +88,7 @@ def patch_worth(monkeypatch):
 
 
 def test_already_full(monkeypatch):
-    """词条满 → already_full，不进调律，调 _on_equipment_done"""
+    """词条满 → 不进调律，调 _on_equipment_done，未处理过不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: {"s": {"name": "x", "rating": "顶级",
                                                "skipped": False,
@@ -97,26 +97,24 @@ def test_already_full(monkeypatch):
     wf = FakeWF()
     wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
 
-    reports = wf.output["tuning_reports"]
-    assert len(reports) == 1
-    assert reports[0]["status"] == "already_full"
-    assert reports[0]["final_judgement"]
+    assert not wf.output.get("tuning_reports")
     assert len(wf.done_calls) == 1
+    # 钩子仍能拿到完整 report（含终局判定）
+    assert wf.done_calls[0][2]["status"] == "already_full"
+    assert wf.done_calls[0][2]["final_judgement"]
     # 未进入调律导航
     assert (WEAPON_DETAIL, "more_func") not in wf.clicks
     assert not wf.junk_calls
 
 
 def test_junk_blank(monkeypatch):
-    """潜力判定不值得 → junk_blank，调 _on_junk_blank，不进调律"""
+    """潜力判定不值得 → 调 _on_junk_blank，不进调律，不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_tuning_worthiness",
                         lambda *a, **k: (False, ["不值得"]))
     wf = FakeWF()
     wf._process_equipment("垃圾胚子", _equip(2), WEAPON_DETAIL)
 
-    reports = wf.output["tuning_reports"]
-    assert reports[0]["status"] == "junk_blank"
-    assert reports[0]["worthiness"] == ["不值得"]
+    assert not wf.output.get("tuning_reports")
     assert len(wf.junk_calls) == 1
     assert not wf.done_calls
     assert (WEAPON_DETAIL, "more_func") not in wf.clicks
@@ -202,27 +200,28 @@ def test_skip_tuning_switch(patch_worth):
 
 
 def test_skip_tuning_full_affix_not_entered(monkeypatch):
-    """开关开启但词条已满 → 仍走 already_full，不进调律页"""
+    """开关开启但词条已满 → 仍走 already_full，不进调律页也不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: {})
     wf = FakeWF()
     wf._skip_tuning = True
     wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
 
-    assert wf.output["tuning_reports"][0]["status"] == "already_full"
+    assert not wf.output.get("tuning_reports")
+    assert len(wf.done_calls) == 1
     assert (WEAPON_DETAIL, "more_func") not in wf.clicks
     assert (TUNE_SCENE, "back") not in wf.clicks
 
 
 def test_skip_tuning_junk_not_entered(monkeypatch):
-    """开关开启但潜力判定不值得 → 仍走 junk_blank，不进调律页"""
+    """开关开启但潜力判定不值得 → 仍走垃圾胚子，不进调律页也不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_tuning_worthiness",
                         lambda *a, **k: (False, ["不值得"]))
     wf = FakeWF()
     wf._skip_tuning = True
     wf._process_equipment("垃圾胚子", _equip(2), WEAPON_DETAIL)
 
-    assert wf.output["tuning_reports"][0]["status"] == "junk_blank"
+    assert not wf.output.get("tuning_reports")
     assert len(wf.junk_calls) == 1
     assert (WEAPON_DETAIL, "more_func") not in wf.clicks
     assert (TUNE_SCENE, "back") not in wf.clicks

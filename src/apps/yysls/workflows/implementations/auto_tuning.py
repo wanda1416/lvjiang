@@ -1,8 +1,8 @@
 """自动调律工作流 — 端到端流水线
 
 遍历背包各部位 → 对每件用潜力判定（judge_tuning_worthiness）决定是否
-值得调律 → 值得的实际调律到词条满 → 每件产出结构化 report 回报给遍历
-循环（output["tuning_reports"]），并为「垃圾胚子处理」与「调律后回背包页
+值得调律 → 值得的实际调律到词条满，产出结构化 report 回报给遍历
+循环（output["tuning_reports"]，词条已满/垃圾胚子不收集）；并为「垃圾胚子处理」与「调律后回背包页
 的回收/转律/装上」预留空接口（_on_junk_blank / _on_equipment_done）。
 
 实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含移植自
@@ -379,7 +379,9 @@ class AutoTuningWorkflow(BaseWorkflow):
         已调律分支调完后单次 back 返回背包浏览页，供遍历继续滚动。
         skip_tuning 测试开关只拦截「值得调律且已进调律页」的装备：
         词条已满/不值得/无入口仍走各自正常分支，不会统统进调律页。
-        每件产出结构化 report 追加进 output["tuning_reports"]。
+        仅真正进过调律页的装备（tuned/skip_tuning）与异常的 no_tune_entry
+        产出 report 追加进 output["tuning_reports"]；词条已满/垃圾胚子未做
+        任何处理，不收集（一次遍历几百件时会淹没有效信息）。
         返回该件调律后（终态）指纹，供上层更新行指纹（背包位置不变、仅词条增加）。
         """
         if not equip:
@@ -396,17 +398,16 @@ class AutoTuningWorkflow(BaseWorkflow):
             "affix_count": affix_count,
         }
 
-        # A. 词条已满 → 终局判定，不进调律
+        # A. 词条已满 → 终局判定，不进调律；未处理过，不收集 report
         if affix_count >= self.MAX_AFFIX:
             logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
             judgement = self._final_judge(equip_data)
             report["status"] = "already_full"
             report["final_judgement"] = judgement
             self._on_equipment_done(equip_data, judgement, report)
-            self.output.setdefault("tuning_reports", []).append(report)
             return self._make_fingerprint(equip_data.to_dict())
 
-        # B. 潜力判定：不值得 → 垃圾胚子
+        # B. 潜力判定：不值得 → 垃圾胚子；未处理过，不收集 report
         worth, logs = judge_tuning_worthiness(
             equip_data, self._judge_configs, self._judge_schools)
         for line in logs:
@@ -415,8 +416,6 @@ class AutoTuningWorkflow(BaseWorkflow):
         if not worth:
             logger.info(f"  [{name}] 判定不值得调律（垃圾胚子）")
             self._on_junk_blank(equip_data, logs)
-            report["status"] = "junk_blank"
-            self.output.setdefault("tuning_reports", []).append(report)
             return self._make_fingerprint(equip_data.to_dict())
 
         # C. 值得 → 实际调律

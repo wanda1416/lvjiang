@@ -12,6 +12,7 @@ import pytest
 from src.apps.yysls.workflows.implementations import auto_tuning
 from src.apps.yysls.workflows.implementations.auto_tuning import (
     AutoTuningWorkflow,
+    ScrollState,
 )
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
@@ -178,3 +179,136 @@ def test_ensure_judge_config_keeps_injected():
     wf._judge_schools = ["huiyi"]
     wf._ensure_judge_config()
     assert wf._judge_schools == ["huiyi"]
+
+
+class ScrollFakeWF(FakeWF):
+    """专供 _scroll_and_verify_step 的替身：桩掉拖拽/对齐/读行原语"""
+
+    def __init__(self):
+        super().__init__()
+        self.row_fps: dict[int, str] = {}   # 窗口行号 -> 指纹
+        self._n_rows = 3
+        self.drags = 0
+
+    def drag_grid(self, *a, **k):
+        self.drags += 1
+
+    def align_panel(self, *a, **k):
+        class _A:
+            pass
+        obj = _A()
+        obj.n_rows = self._n_rows
+        return obj
+
+    def _read_row(self, detail_scene, row, col=1):
+        return ("name", self.row_fps.get(row, ""), {})
+
+
+def test_scroll_tolerates_fp_drift_when_second_row_confirms():
+    """首行指纹漂移但第二行==fps[+1] → 视为正常步进并更新指纹"""
+    wf = ScrollFakeWF()
+    fps = ["A", "B", "C"]
+    wf.row_fps = {1: "X", 2: "C"}   # 首行漂移为 X，第二行 == fps[2]
+    state, rows = wf._scroll_and_verify_step(WEAPON_DETAIL, fps,
+                                             first_real_row=1, panel_rows=3)
+    assert state == ScrollState.PROCESS
+    assert rows == 3
+    assert fps[1] == "X"            # 漂移指纹已更新
+
+
+def test_scroll_raises_when_second_row_mismatch():
+    """首行指纹不匹配且第二行也对不上 → 无法确认滚动 → 抛异常"""
+    wf = ScrollFakeWF()
+    fps = ["A", "B", "C"]
+    wf.row_fps = {1: "X", 2: "Z"}   # 第二行也对不上
+    with pytest.raises(RuntimeError, match="未知滚动状态"):
+        wf._scroll_and_verify_step(WEAPON_DETAIL, fps,
+                                   first_real_row=1, panel_rows=3)
+
+
+def test_scroll_frontier_unknown_fp_raises_runtime_not_index():
+    """前沿处（first_real_row==len(fps)-1）读到未知指纹
+    → 无 next 候选不得越界，应抛 RuntimeError 而非 IndexError（复现线上崩溃）"""
+    wf = ScrollFakeWF()
+    fps = ["A", "B"]
+    wf.row_fps = {1: "X"}           # 首行未知，fps 无 fps[2] 候选
+    with pytest.raises(RuntimeError, match="未知滚动状态"):
+        wf._scroll_and_verify_step(WEAPON_DETAIL, fps,
+                                   first_real_row=1, panel_rows=3)
+
+
+def test_scroll_short_full_window_bottom_after_two():
+    """滚少了且补滚后窗口仍满行（拖拽无效果）→ 第 2 次即确认到底"""
+    wf = ScrollFakeWF()
+    fps = ["A", "B", "C"]
+    wf.row_fps = {1: "A"}           # 首行始终 == fps[0]，滚不动
+    state, rows = wf._scroll_and_verify_step(WEAPON_DETAIL, fps,
+                                             first_real_row=1, panel_rows=3)
+    assert state == ScrollState.BOTTOM
+    assert wf.drags == 2            # 大步进 + 1 次补滚，第 2 次判定即结束
+
+
+def test_scroll_short_partial_window_needs_three():
+    """滚少了但窗口非满行（真滚少）→ 补滚到第 3 次仍滚少才按到底收束"""
+    wf = ScrollFakeWF()
+    wf._n_rows = 2                  # align 只检测到 2/3 行
+    fps = ["A", "B", "C"]
+    wf.row_fps = {1: "A"}
+    state, rows = wf._scroll_and_verify_step(WEAPON_DETAIL, fps,
+                                             first_real_row=1, panel_rows=3)
+    assert state == ScrollState.BOTTOM
+    assert wf.drags == 3            # 大步进 + 2 次补滚
+
+
+class RowColsFakeWF(FakeWF):
+    """专供列遍历的替身：按 (行,列) 脚本化读格，记录单件处理调用"""
+
+    def __init__(self):
+        super().__init__()
+        # (win_row, col) -> (名, 指纹, 装备dict)；缺省空 slot
+        self.cell_map: dict[tuple[int, int], tuple[str, str, dict]] = {}
+        self.processed: list[str] = []
+
+    def _read_row(self, detail_scene, row, col=1):
+        return self.cell_map.get((row, col), ("", "", {}))
+
+    def _process_equipment(self, name, equip, detail_scene):
+        self.processed.append(name)
+        return f"fp_{name}"   # 模拟调律后指纹变化
+
+
+def test_row_cols_processes_all_columns():
+    """第 2..cols 列逐个点击识别并处理"""
+    wf = RowColsFakeWF()
+    wf.cell_map = {
+        (1, 2): ("b", "FB", {"n": 2}),
+        (1, 3): ("c", "FC", {"n": 3}),
+    }
+    wf._process_row_cols(WEAPON_DETAIL, win_row=1, logical_row=1, cols=3)
+    assert wf.processed == ["b", "c"]
+
+
+def test_row_cols_stops_at_empty_slot():
+    """空 slot → 本行到此为止，后续列不再点击"""
+    wf = RowColsFakeWF()
+    wf.cell_map = {
+        (1, 3): ("c", "FC", {"n": 3}),   # 第 2 列空，第 3 列有装备也不应处理
+    }
+    wf._process_row_cols(WEAPON_DETAIL, win_row=1, logical_row=1, cols=3)
+    assert wf.processed == []
+
+
+def test_new_rows_full_row_traversal_first_col_fp_only():
+    """整行遍历：每行处理全部列，但仅首列指纹记入 fps（含调律后覆盖）"""
+    wf = RowColsFakeWF()
+    wf.cell_map = {
+        (1, 1): ("a1", "F11", {"n": 1}),
+        (1, 2): ("a2", "F12", {"n": 2}),
+        (2, 1): ("b1", "F21", {"n": 3}),
+        # (2, 2) 空 → 第 2 行只有首列
+    }
+    fps: list[str] = []
+    idx = wf._process_new_rows(WEAPON_DETAIL, fps, 0, 1, 2, cols=2)
+    assert idx == 2
+    assert wf.processed == ["a1", "a2", "b1"]      # 行内先首列后余列
+    assert fps == ["fp_a1", "fp_b1"]               # 仅首列指纹，已被调律后指纹覆盖

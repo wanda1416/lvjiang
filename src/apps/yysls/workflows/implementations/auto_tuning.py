@@ -105,24 +105,44 @@ class AutoTuningWorkflow(BaseWorkflow):
 
     # ─── 背包遍历（按 tuning-mechanics.md 设计）──────────────
 
-    def _read_row(self, detail_scene: str, row: int) -> tuple[str, str, dict]:
-        """点击指定行第1列，等面板刷新后 OCR，返回 (装备名, 指纹, 装备dict)"""
-        self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, 1)
+    @staticmethod
+    def _equip_label(equip: dict) -> str:
+        """日志用装备标识：name|type（缺失部分省略，全空返回'空'）"""
+        if not isinstance(equip, dict) or not equip:
+            return "空"
+        label = "|".join(
+            str(p) for p in (equip.get("name"), equip.get("type")) if p)
+        return label or "空"
+
+    def _read_row(self, detail_scene: str, row: int,
+                  col: int = 1) -> tuple[str, str, dict]:
+        """点击指定行/列 slot，等面板刷新后 OCR，返回 (装备名, 指纹, 装备dict)
+
+        默认第 1 列（行指纹/滚动校验链路）；列遍历时传入 col 读非首列。"""
+        self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
         self.wait_delay("page_refresh_wait")
         fields = self.SCAN_FIELDS + (["base_attr_2"]
                                      if detail_scene == self.ARMOR_DETAIL else [])
         raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
-        name = equip.get("equip_type", "").split("|")[-1].strip() if equip else ""
+        name = (equip.get("name") or "") if equip else ""
         fp = self._make_fingerprint(equip)
+        if fp:
+            logger.debug(
+                f"  读格 grid[{row}][{col}] → {self._equip_label(equip)} "
+                f"lv={equip.get('level')} fp={fp}")
+        else:
+            logger.debug(f"  读格 grid[{row}][{col}] → 空")
         return name, fp, equip
 
     def _process_new_rows(self, detail_scene: str, fps: list[str],
                           row_index: int, first_real_row: int,
-                          real_rows: int) -> int:
+                          real_rows: int, cols: int) -> int:
         """处理当前可见区中 row_index 之后的新行，返回更新后的 row_index。
 
         grid 第1行 = 逻辑行 first_real_row，win_row = logical_row - first_real_row + 1。
+        每行处理第 1..cols 全部列：第 1 列兼作行指纹（滚动校验锚点）；
+        第 2 列起由 _process_row_cols 遍历。
         遇到空行视为到底，立即停止（不 append 空串占位）。
         返回值 == 传入 row_index 表示没有新行被处理（调用方据此判断结束）。
         """
@@ -130,6 +150,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         processed = row_index
         for logical_row in range(row_index + 1, last_real_row + 1):
             win_row = logical_row - first_real_row + 1
+            # ── 第 1 列：读取兼作行指纹 ──
             name, fp, equip = self._read_row(detail_scene, win_row)
             if not fp:
                 logger.info(f"  新行{logical_row} grid[{win_row}][1] 空 slot → 到底")
@@ -142,28 +163,61 @@ class AutoTuningWorkflow(BaseWorkflow):
             if new_fp and new_fp != fp:
                 logger.info(f"  行{logical_row} 调律后指纹更新: {fp} → {new_fp}")
                 fps[-1] = new_fp
+            # ── 第 2..cols 列：遍历本行剩余列 ──
+            self._process_row_cols(detail_scene, win_row, logical_row, cols)
             processed = logical_row
         return processed
 
+    def _process_row_cols(self, detail_scene: str, win_row: int,
+                          logical_row: int, cols: int):
+        """遍历该行第 2..cols 列装备（第 1 列由行指纹链路处理）。
+
+        复用首列链路：click_panel grid[win_row][col] → OCR → _process_equipment。
+        非首列装备不参与滚动校验，无需记录指纹（锚点仍只用首列），
+        调律后指纹变化也无需回写。背包按行优先填充，空 slot 表示
+        该行装备到此为止，停止本行遍历。
+        """
+        for col in range(2, cols + 1):
+            if self.is_stopped:
+                break
+            name, fp, equip = self._read_row(detail_scene, win_row, col)
+            if not fp:
+                logger.info(
+                    f"  行{logical_row} grid[{win_row}][{col}] 空 slot → 本行到此为止")
+                break
+            logger.info(f"  行{logical_row} grid[{win_row}][{col}] {name} fp={fp}")
+            self._process_equipment(name, equip, detail_scene)
+
     def _scroll_and_verify_step(self, detail_scene: str, fps: list[str],
-                                first_real_row: int) -> tuple[ScrollState, int]:
+                                first_real_row: int,
+                                panel_rows: int) -> tuple[ScrollState, int]:
         """滚动一行 + 三向校验 + 小步修正，返回 (状态, 当前可见行数)。
 
-        严格按 tuning-mechanics.md 设计，不加任何额外逻辑。
         正常步进：返回 PROCESS。
-        连续 3 次滚少了：返回 BOTTOM（到底）。
+        滚少了：补滚后窗口仍满行（n_rows == panel_rows，拖拽已无效果）
+                → 第 2 次即确认到底；窗口非满行（真滚少了）→ 继续补滚，
+                连续 3 次仍滚少则按到底收束并记录异常。
         连续 3 次滚多了：抛 RuntimeError（不应发生）。
-        未知 nfp / 越界：抛异常，暴露问题。
+        未知 nfp：先用第二可见行反查——若确认滚动正常仅首列 OCR 抖动，
+                 则更新漂移指纹并按正常步进继续；否则抛异常暴露问题。
         """
         # 大幅步进（1 行）
         self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "up", hold=0.3)
         self.wait_delay("scroll_settle_wait")
         alignment = self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
 
+        # 对比现场：三向校验的候选指纹（next 在前沿处不存在）
+        next_fp = (fps[first_real_row + 1]
+                   if first_real_row + 1 < len(fps) else "无")
+        logger.info(
+            f"  滚动校验: first_real_row={first_real_row} len(fps)={len(fps)} "
+            f"窗口行数={alignment.n_rows} 候选 prev={fps[first_real_row - 1]} "
+            f"cur={fps[first_real_row]} next={next_fp}")
+
         short_count = 0
         long_count = 0
         while not self.is_stopped:
-            _, nfp, _ = self._read_row(detail_scene, 1)
+            _, nfp, equip1 = self._read_row(detail_scene, 1)
 
             # 空指纹 = 空行 = 到底（每行第一列不可能为空，空即超出最后一行）
             if not nfp:
@@ -175,16 +229,35 @@ class AutoTuningWorkflow(BaseWorkflow):
                 return ScrollState.PROCESS, alignment.n_rows
             elif nfp == fps[first_real_row - 1]:
                 short_count += 1
-                logger.info(f"  滚少了({short_count}/3): nfp={nfp} == fps[{first_real_row - 1}]，补滚 0.25")
+                logger.info(
+                    f"  滚少了({short_count}): nfp={nfp} == "
+                    f"fps[{first_real_row - 1}] 读到={self._equip_label(equip1)} "
+                    f"窗口行数={alignment.n_rows}/{panel_rows}")
+                if short_count >= 2 and alignment.n_rows >= panel_rows:
+                    # 补滚后窗口仍满行且首行未动 → 拖拽已无效果 = 硬到底，
+                    # 无需等满 3 次，第 2 次即可确认结束
+                    logger.info("  补滚后仍满行且首行未动 → 到底（提前确认）")
+                    return ScrollState.BOTTOM, alignment.n_rows
                 if short_count >= 3:
-                    logger.info("连续3次滚少了 → 到底")
+                    # 窗口非满行说明确实滚少了，补滚两次仍未步进不应发生：
+                    # 按到底收束避免死循环，但记录异常备查
+                    logger.error(
+                        f"  异常：连续3次滚少了且窗口非满行"
+                        f"({alignment.n_rows}/{panel_rows})，按到底收束："
+                        f"nfp={nfp} first_real_row={first_real_row} fps={fps}")
                     return ScrollState.BOTTOM, alignment.n_rows
                 self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "up", distance=0.25)
                 self.wait_delay("scroll_settle_wait")
                 alignment = self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
-            elif nfp == fps[first_real_row + 1]:
+            elif (first_real_row + 1 < len(fps)
+                    and nfp == fps[first_real_row + 1]):
+                # 边界守卫：前沿处（first_real_row 为最后一个已知行）无 next
+                # 候选，直接取下标会越界；未知指纹应落入 else 诊断分支。
                 long_count += 1
-                logger.info(f"  滚多了({long_count}/3): nfp={nfp} == fps[{first_real_row + 1}]，回滚 0.25")
+                logger.info(
+                    f"  滚多了({long_count}/3): nfp={nfp} == "
+                    f"fps[{first_real_row + 1}] 读到={self._equip_label(equip1)}，"
+                    f"回滚 0.25")
                 if long_count >= 3:
                     raise RuntimeError(
                         f"连续3次判定滚多了，不应发生："
@@ -194,8 +267,32 @@ class AutoTuningWorkflow(BaseWorkflow):
                 self.wait_delay("scroll_settle_wait")
                 alignment = self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
             else:
+                # nfp 与三候选都不匹配：大概率是首列装备 OCR 抖动（如武器名
+                # 舞鼓/舞绫鼓 截断）致指纹漂移，而非滚动出错。用第二可见行反查确认：
+                # 正常步进一行时第二行 = 逻辑行 first_real_row+1，应等于 fps[...+1]。
+                nfp2 = ""
+                equip2: dict = {}
+                if first_real_row + 1 < len(fps):
+                    _, nfp2, equip2 = self._read_row(detail_scene, 2)
+                if nfp2 and nfp2 == fps[first_real_row + 1]:
+                    logger.warning(
+                        f"  首行指纹漂移但滚动正常：nfp={nfp} ≠ "
+                        f"fps[{first_real_row}]={fps[first_real_row]}，"
+                        f"第二行 {nfp2} == fps[{first_real_row + 1}]，"
+                        f"更新指纹并按正常步进继续"
+                    )
+                    fps[first_real_row] = nfp
+                    return ScrollState.PROCESS, alignment.n_rows
+                # 抛异常前记录完整现场，便于事后定位（如滚进非本部位区域）
+                label = self._equip_label(equip1)
+                logger.error(
+                    f"  未知滚动状态现场: 首行={label} nfp={nfp} "
+                    f"第二行={self._equip_label(equip2)} nfp2={nfp2 or '未读/空'} "
+                    f"first_real_row={first_real_row} len(fps)={len(fps)} "
+                    f"窗口行数={alignment.n_rows}")
                 raise RuntimeError(
-                    f"未知滚动状态：nfp={nfp} first_real_row={first_real_row} fps={fps}"
+                    f"未知滚动状态：首行={label} nfp={nfp} "
+                    f"first_real_row={first_real_row} fps={fps}"
                 )
         return ScrollState.SKIP, 0  # is_stopped 中断
 
@@ -222,7 +319,8 @@ class AutoTuningWorkflow(BaseWorkflow):
         # 初始扫描 = 处理第一批新行（row_index=0, first_real_row=1, real_rows=initial_rows）
         self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
         logger.info("═══ 初始扫描 ═══")
-        row_index = self._process_new_rows(detail_scene, fps, 0, 1, initial_rows)
+        row_index = self._process_new_rows(
+            detail_scene, fps, 0, 1, initial_rows, cols)
         first_real_row = 1
         logger.info(f"初始完成: row_index={row_index} first_real_row=1 fps={fps}")
         if row_index == 0:
@@ -237,7 +335,7 @@ class AutoTuningWorkflow(BaseWorkflow):
             logger.info(f"═══ 滚动 #{scroll_round} ═══")
 
             state, real_rows = self._scroll_and_verify_step(
-                detail_scene, fps, first_real_row)
+                detail_scene, fps, first_real_row, initial_rows)
 
             if state == ScrollState.BOTTOM:
                 last_real_rows = real_rows
@@ -258,7 +356,7 @@ class AutoTuningWorkflow(BaseWorkflow):
                 continue
 
             row_index = self._process_new_rows(
-                detail_scene, fps, row_index, first_real_row, real_rows)
+                detail_scene, fps, row_index, first_real_row, real_rows, cols)
             logger.info(f"  row_index → {row_index}, fps={fps}")
 
         # 循环结束：处理剩余可见行（到底时处理，正常退出时 row_index==last_real_row 不处理）
@@ -266,7 +364,8 @@ class AutoTuningWorkflow(BaseWorkflow):
             final_last = first_real_row + last_real_rows - 1
             if row_index < final_last:
                 row_index = self._process_new_rows(
-                    detail_scene, fps, row_index, first_real_row, last_real_rows)
+                    detail_scene, fps, row_index, first_real_row, last_real_rows,
+                    cols)
                 logger.info(f"  剩余行处理完毕 row_index → {row_index}, fps={fps}")
 
 
@@ -285,6 +384,9 @@ class AutoTuningWorkflow(BaseWorkflow):
             return ""
         equip_data = EquipmentData.from_dict(equip)
         affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
+        logger.info(
+            f"  处理装备: {self._equip_label(equip)} "
+            f"quality={equip.get('quality')} affix_count={affix_count}")
         report: dict = {
             "name": name,
             "type": equip.get("type"),

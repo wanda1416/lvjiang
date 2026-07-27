@@ -623,6 +623,8 @@ class RunControlMixin:
         wf_instance._judge_schools = list(enabled)
         # 临时测试开关：跳过实际调律（仅模拟进出调律页，便于测试滚动）
         wf_instance._skip_tuning = skip_tuning
+        # 调律说明文档（logs/tuning/）的操作用户名
+        wf_instance._doc_username = username
 
         school_names = "、".join(j.school_name for j in school_judges)
         if keep_pvp:

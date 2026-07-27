@@ -13,6 +13,7 @@ __all__ = [
     "get_school_rules", "get_schools",
     "is_school_implemented", "get_school_judge",
     "judge_equipment_potential", "judge_tuning_worthiness",
+    "summarize_potential",
 ]
 
 
@@ -90,6 +91,34 @@ def judge_equipment_potential(
     return results
 
 
+def summarize_potential(results: dict[str, dict]) -> tuple[bool, list[str]]:
+    """把 judge_equipment_potential 的结构化结果归纳为 (是否值得, 明细文本)
+
+    任一流派评级为 顶级/优秀 → 值得调律。不适用流派不参与判定
+    （不是否决票）；无任何流派给出有效结论时判为不值得。
+    独立成函数供调用方对同一份结构化结果同时做文本归纳与筛选
+    （如说明文档只取命中的流派），避免二次判定。
+    """
+    worth = False
+    conclusive = False  # 是否有流派给出了有效结论
+    logs: list[str] = []
+    for r in results.values():
+        detail = '；'.join(r["reasons"])
+        if r["not_applicable"]:
+            logs.append(f"{r['name']}: 不适用（{detail}）")
+            continue
+        conclusive = True
+        tag = "跳过" if r["skipped"] else r["rating"]
+        logs.append(f"{r['name']}: {tag}（{detail}）")
+        if not r["skipped"] and r["rating"] in (Rating.TOP.value,
+                                               Rating.EXCELLENT.value):
+            worth = True
+    if not conclusive:
+        worth = False
+        logs.append("无已实现流派可判定该装备，结束调律")
+    return worth, logs
+
+
 def judge_tuning_worthiness(
     equip, configs: dict[str, dict] | None = None,
     schools: list[str] | None = None,
@@ -108,21 +137,5 @@ def judge_tuning_worthiness(
     Returns:
         (是否值得调律, 各流派判定明细文本)
     """
-    worth = False
-    conclusive = False  # 是否有流派给出了有效结论
-    logs: list[str] = []
-    for r in judge_equipment_potential(equip, configs, schools).values():
-        detail = '；'.join(r["reasons"])
-        if r["not_applicable"]:
-            logs.append(f"{r['name']}: 不适用（{detail}）")
-            continue
-        conclusive = True
-        tag = "跳过" if r["skipped"] else r["rating"]
-        logs.append(f"{r['name']}: {tag}（{detail}）")
-        if not r["skipped"] and r["rating"] in (Rating.TOP.value,
-                                               Rating.EXCELLENT.value):
-            worth = True
-    if not conclusive:
-        worth = False
-        logs.append("无已实现流派可判定该装备，结束调律")
-    return worth, logs
+    return summarize_potential(
+        judge_equipment_potential(equip, configs, schools))

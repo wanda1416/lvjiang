@@ -60,10 +60,41 @@ class LayoutOpsMixin:
         is_active = has_layout and self._current_layout.name == active
         self._btn_delete.setEnabled(has_layout and not is_active)
 
+    def _confirm_discard_changes(self, action: str) -> bool:
+        """存在未保存修改时弹窗确认
+
+        Returns:
+            True 表示可以继续（已保存或用户选择放弃），False 表示取消操作
+        """
+        if not self._dirty:
+            return True
+        reply = QMessageBox.question(
+            self, "未保存的修改",
+            f"当前布局存在未保存的修改，{action}将丢失这些修改。\n是否先保存？",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if reply == QMessageBox.StandardButton.Save:
+            self._on_save_layout()
+            return not self._dirty  # 保存成功后 dirty 已清除
+        return reply == QMessageBox.StandardButton.Discard
+
     def _on_combo_changed(self, index: int):
-        """下拉框切换时加载对应布局到画布（不激活）"""
+        """下拉框切换时加载对应布局到画布（不激活），切换前检查未保存修改"""
         name = self._layout_combo.currentText()
         if not name:
+            return
+        if (self._current_layout is not None
+                and name != self._current_layout.name
+                and not self._confirm_discard_changes(f"切换到布局「{name}」")):
+            # 取消：回退下拉框到当前布局，不触发重入
+            self._layout_combo.blockSignals(True)
+            idx = self._layout_combo.findText(self._current_layout.name)
+            if idx >= 0:
+                self._layout_combo.setCurrentIndex(idx)
+            self._layout_combo.blockSignals(False)
             return
         layout = self._manager.load_layout(name)
         if layout is None:
@@ -90,7 +121,9 @@ class LayoutOpsMixin:
     # ─── 布局 CRUD ────────────────────────────────────────
 
     def _on_new_layout(self):
-        """新建空布局并切换到画布（不自动激活）"""
+        """新建空布局并切换到画布（不自动激活），先检查未保存修改"""
+        if not self._confirm_discard_changes("新建布局"):
+            return
         name, ok = QInputDialog.getText(self, "新建布局", "请输入布局名称：")
         if not ok or not name:
             return

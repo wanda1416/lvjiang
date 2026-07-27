@@ -75,6 +75,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self.on_region_changed = None  # callable() -> None
         self.on_canvas_changed = None  # callable() -> None
         self.on_panel_changed = None  # callable() -> None
+        self.on_selection_changed = None  # callable() -> None（仅选中态变化，不代表数据修改，不应标记 dirty）
 
         # 当前场景的区域列表（由外部通过 set_regions 设置）
         self._current_regions: list[tuple[str, str]] = []

@@ -49,6 +49,7 @@ class PanelDef:
     name: str
     cols: int = 6                   # 列数
     rows: int = 3                   # 行数
+    min_visible: float = 0.95       # 行计入有效的最小可见比例（0.5-1.0）
 
 
 @dataclass
@@ -176,6 +177,7 @@ class SceneRegistry:
                 name=pd.get("name", pd["key"]),
                 cols=int(pd.get("cols", 6)),
                 rows=int(pd.get("rows", 3)),
+                min_visible=float(pd.get("min_visible", 0.95)),
             ))
 
         # region 与 point 同场景内 key 不得重复（共享命名空间）
@@ -520,6 +522,7 @@ class SceneRegistry:
                     "name": p.name,
                     "cols": p.cols,
                     "rows": p.rows,
+                    "min_visible": p.min_visible,
                 }
                 for p in scene.panels
             ]

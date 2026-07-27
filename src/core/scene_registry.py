@@ -369,6 +369,8 @@ class Panel:
     与 Region 类似，panel 在布局级别绑定一个矩形区域；
     额外携带 cols/rows，用于运行时图像自校准。
     span（间距）由校准算法自动检测，无需手动指定。
+    min_visible 控制行计入有效的最小可见比例（0.5-1.0，默认 0.95）：
+    调低可减少滚动半截行导致的少检一行，但必须 > 0.5 保证行中心可点击。
     """
     key: str
     x_ratio: float
@@ -377,6 +379,7 @@ class Panel:
     h_ratio: float
     cols: int = 6
     rows: int = 3
+    min_visible: float = 0.95
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -391,6 +394,7 @@ class Panel:
             h_ratio=d["h_ratio"],
             cols=int(d.get("cols", 6)),
             rows=int(d.get("rows", 3)),
+            min_visible=float(d.get("min_visible", 0.95)),
         )
 
 

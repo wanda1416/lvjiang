@@ -55,6 +55,7 @@ def _binary_axis(
     line_means: np.ndarray,
     expected_count: int,
     black_threshold: float = 30.0,
+    min_visible: float = 0.95,
 ) -> SlotAxis:
     """从一维亮度剖面拟合「规则周期网格」的 slot 中心与边界。
 
@@ -67,13 +68,14 @@ def _binary_axis(
       3. 以该相位 + 周期在 [0, L] 上枚举所有 slot 候选——即使某行只有一
          列有装备（整行偏暗、无 run），也会被周期点阵补上；而落在点阵外的
          杂散亮区（如半周期处的偷看行）自然被排除；
-      4. 只保留「内容完整落在 panel 内」的候选（容差 = 5% slot，对应 ≥95% 可见）；
+      4. 只保留「可见比例 ≥ min_visible」的候选（默认 0.95，即 ≥95% 落在 panel 内）；
       5. 数量以 expected_count 封顶，超出时保留邻域平均亮度最高的若干个。
 
     Args:
         line_means: 1D 数组，每行/每列的平均亮度
         expected_count: 该轴期望的 slot 数（行数或列数），用作数量上限
         black_threshold: 黑边判定阈值（0-255）
+        min_visible: slot 计入有效所需的最小可见比例（0.5-1.0）
 
     Returns:
         SlotAxis(centers, boundaries, slot_size, span_size)
@@ -122,8 +124,8 @@ def _binary_axis(
     k_hi = int(np.ceil((length - anchor) / period)) + 1
     candidates = sorted(anchor + k * period for k in range(k_lo, k_hi + 1))
 
-    # 可见性：slot 内容需完整落在 panel 内（容差 = 5% slot，对应「≥95% 可见」）
-    eps = 0.05 * slot_len
+    # 可见性：slot 可见比例需 ≥ min_visible（容差 = (1 - min_visible) * slot）
+    eps = (1.0 - min_visible) * slot_len
     visible = [c for c in candidates
                if c - half_slot >= -eps and c + half_slot <= length + eps]
     if not visible:
@@ -195,6 +197,7 @@ def detect_grid(
     expected_rows: int = 3,
     expected_cols: int = 6,
     black_threshold: float = 30.0,
+    min_visible: float = 0.95,
 ) -> GridAlignment | None:
     """从 panel 截图中检测网格 slot 精确位置
 
@@ -205,6 +208,9 @@ def detect_grid(
         expected_rows: 期望的行数（用于日志）
         expected_cols: 期望的列数（用于日志）
         black_threshold: 黑边判定阈值（0-255），低于此值视为黑边
+        min_visible: 行计入有效所需的最小可见比例，钳位到 [0.5, 1.0]。
+            仅作用于行轴（垂直滚动才会产生半截行）；必须 > 0.5，
+            否则半截行的中心可能落在 panel 外导致点击脱靶。
 
     Returns:
         GridAlignment 或 None（检测失败时）
@@ -212,6 +218,8 @@ def detect_grid(
     if image is None or image.size == 0:
         logger.error("detect_grid: 空图像")
         return None
+
+    min_visible = min(1.0, max(0.5, float(min_visible)))
 
     # 转灰度
     if image.ndim == 3:
@@ -223,7 +231,8 @@ def detect_grid(
     row_means = np.mean(gray, axis=1)  # 每行所有像素的平均亮度
     col_means = np.mean(gray, axis=0)  # 每列所有像素的平均亮度
 
-    row_axis = _binary_axis(row_means, expected_rows, black_threshold)
+    row_axis = _binary_axis(row_means, expected_rows, black_threshold,
+                            min_visible=min_visible)
     col_axis = _binary_axis(col_means, expected_cols, black_threshold)
 
     if not row_axis.centers or not col_axis.centers:

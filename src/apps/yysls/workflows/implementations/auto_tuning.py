@@ -2,7 +2,8 @@
 
 遍历背包各部位 → 对每件用潜力判定（judge_tuning_worthiness）决定是否
 值得调律 → 值得的实际调律到词条满，产出结构化 report 回报给遍历
-循环（output["tuning_reports"]，词条已满/垃圾胚子不收集）；并为「垃圾胚子处理」与「调律后回背包页
+循环（output["tuning_reports"]，词条已满/垃圾胚子不收集；每轮调律
+结果挂在本件 report 的 tune_results 下）；并为「垃圾胚子处理」与「调律后回背包页
 的回收/转律/装上」预留空接口（_on_junk_blank / _on_equipment_done）。
 
 实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含移植自
@@ -449,6 +450,8 @@ class AutoTuningWorkflow(BaseWorkflow):
                 break
             rounds += 1
             affix_count += 1
+            # 每轮结果挂在本件 report 下，与装备一一对应
+            report.setdefault("tune_results", []).append(result)
             self._collect_new_affix(equip_data, result.get("tune_affix", ""))
             if affix_count >= self.MAX_AFFIX:
                 break
@@ -599,7 +602,8 @@ class AutoTuningWorkflow(BaseWorkflow):
     def _tune_once(self, food: str) -> dict | None:
         """执行一轮调律：展开材料区→按策略选狗粮→一键添加→调律→收结果。
 
-        返回调律结果 OCR dict；返回 None 表示应终止循环（无添加入口/材料不足）。
+        返回调律结果 OCR dict（由调用方挂进本件 report 的 tune_results）；
+        返回 None 表示应终止循环（无添加入口/材料不足）。
         添加过狗粮时，关闭结果弹窗后还会补扫一次狗粮返还弹窗并补关。
         """
         add_scan = self.ocr_scene(self.TUNE_SCENE, ["auto_add", "auto_add_2"])
@@ -630,7 +634,6 @@ class AutoTuningWorkflow(BaseWorkflow):
 
         result = self.ocr_scene(self.RESULT_SCENE, ["tune_affix", "tune_tip"])
         logger.info(f"调律结果: {result}")
-        self.output.setdefault("tune_results", []).append(result)
         self.click_region(self.RESULT_SCENE, "close_btn")
         self.wait_delay("step_interval")
 

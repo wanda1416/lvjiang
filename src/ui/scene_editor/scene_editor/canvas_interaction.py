@@ -278,15 +278,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._panel_edit_orig = Panel(
                     key=p.key, x_ratio=p.x_ratio, y_ratio=p.y_ratio,
                     w_ratio=p.w_ratio, h_ratio=p.h_ratio,
-                    cols=p.cols, rows=p.rows,
+                    cols=p.cols, rows=p.rows, min_visible=p.min_visible,
                 )
-                self._notify_panel_changed()
+                # 仅选中，数据未变 → 不能标记 dirty
+                self._notify_selection_changed()
                 self.update()
                 return
             # 点击空白处取消 panel 选中
             if self._panel_selected_idx >= 0:
                 self._panel_selected_idx = -1
-                self._notify_panel_changed()
+                self._notify_selection_changed()
                 self.update()
 
         # ── POI（point/arrow）优先介入 ──
@@ -329,7 +330,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._drag_handle = handle
                 self._drag_start = pos
                 self._drag_orig = Region(**r.to_dict())
-                self._notify_changed()
                 self.update()
                 return
             rect = self._region_rect_widget(r)
@@ -337,7 +337,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._drag_mode = DragMode.MOVING
                 self._drag_start = pos
                 self._drag_orig = Region(**r.to_dict())
-                self._notify_changed()
                 self.update()
                 return
             # 点击空白：退出单区域模式，回到全局模式
@@ -372,7 +371,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             key="",
             x_ratio=cx, y_ratio=cy, w_ratio=0, h_ratio=0,
         ))
-        self._notify_changed()
+        # 刚开始框选，尚未产生有效数据（释放时才绑定字段），不标记 dirty
         self.update()
 
     def mouseMoveEvent(self, event: QMouseEvent):
@@ -496,6 +495,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                     key=pd.key,
                     x_ratio=x, y_ratio=y, w_ratio=w, h_ratio=h,
                     cols=pd.cols, rows=pd.rows,
+                    min_visible=getattr(pd, "min_visible", 0.95),
                 )
                 self._panels.append(panel)
                 self._panel_selected_idx = len(self._panels) - 1
@@ -506,10 +506,19 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
         # ── Panel 移动/缩放完成 ──
         if self._panel_edit_mode is not None:
+            # 与拖拽前备份比对：纯点击（未移动）不算数据变更
+            moved = False
+            if (self._panel_edit_orig is not None
+                    and 0 <= self._panel_selected_idx < len(self._panels)):
+                p = self._panels[self._panel_selected_idx]
+                moved = p.to_dict() != self._panel_edit_orig.to_dict()
             self._panel_edit_mode = None
             self._panel_edit_handle = None
             self._panel_edit_orig = None
-            self._notify_panel_changed()
+            if moved:
+                self._notify_panel_changed()
+            else:
+                self._notify_selection_changed()
             self.update()
             return
 
@@ -539,7 +548,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 # 弹出字段选择
                 self._prompt_field_selection(len(self._regions) - 1)
         elif self._drag_mode in (DragMode.MOVING, DragMode.RESIZING):
-            self._notify_changed()
+            # 与拖拽前备份比对：纯点击选中（几何未变）不算数据变更
+            changed = False
+            if (self._drag_orig is not None
+                    and 0 <= self._selected_idx < len(self._regions)):
+                r = self._regions[self._selected_idx]
+                changed = r.to_dict() != self._drag_orig.to_dict()
+            if changed:
+                self._notify_changed()
+            else:
+                self._notify_selection_changed()
             # 全局模式下移动/缩放后保留选中，以便用户再次点击获取手柄进行拉伸
 
         # 清除吸附参考线
@@ -750,13 +768,14 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self._regions[region_idx].key = key
             self._selected_idx = -1
             self._field_selected = False  # 创建完成后回到全局模式
+            self._notify_changed()
         else:
-            # 取消则删除该区域
+            # 取消则删除该区域：数据回到原状，不标记 dirty
             self._regions.pop(region_idx)
             self._selected_idx = -1
             self._field_selected = False
+            self._notify_selection_changed()
 
-        self._notify_changed()
         self.update()
 
     def _show_context_menu(self, pos: QPointF):
@@ -845,3 +864,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     def _notify_canvas_changed(self):
         if self.on_canvas_changed:
             self.on_canvas_changed()
+
+    def _notify_selection_changed(self):
+        """仅选中态变化（刷新列表高亮用），不代表数据修改"""
+        if self.on_selection_changed:
+            self.on_selection_changed()

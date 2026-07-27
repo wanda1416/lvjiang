@@ -95,6 +95,7 @@ class CanvasPoiMixin:
         self._arrow_snap_idx = -1
         self._arrow_last_move_ms = 0.0
         self._poi_drag_orig = None
+        self._poi_drag_moved = False
         # 通知回调：point/arrow 数据变化
         self.on_poi_changed = None
 
@@ -433,7 +434,9 @@ class CanvasPoiMixin:
             self._selected_point_idx = pidx
             self._selected_arrow_idx = -1
             self._poi_drag = PoiDrag.MOVE_POINT
-            self._notify_poi_changed()
+            self._poi_drag_moved = False
+            # 仅选中，数据未变 → 不能标记 dirty
+            self._notify_selection_changed()
             self.update()
             return True
 
@@ -444,7 +447,8 @@ class CanvasPoiMixin:
             a = self._arrows[aidx]
             if a.to_key is None:
                 self._poi_drag = PoiDrag.MOVE_ARROW_END
-            self._notify_poi_changed()
+                self._poi_drag_moved = False
+            self._notify_selection_changed()
             self.update()
             return True
 
@@ -462,6 +466,7 @@ class CanvasPoiMixin:
             cx, cy = self._widget_to_canvas_norm(pos)
             p = self._points[self._selected_point_idx]
             p.cx_ratio, p.cy_ratio = cx, cy
+            self._poi_drag_moved = True
             self.update()
             return True
 
@@ -473,6 +478,7 @@ class CanvasPoiMixin:
             base = min(rect.width(), rect.height())
             if base > 0:
                 p.r_ratio = max(0.003, min(0.2, dist / base))
+                self._poi_drag_moved = True
             self.update()
             return True
 
@@ -480,6 +486,7 @@ class CanvasPoiMixin:
             cx, cy = self._widget_to_canvas_norm(pos)
             a = self._arrows[self._selected_arrow_idx]
             a.to_cx_ratio, a.to_cy_ratio = cx, cy
+            self._poi_drag_moved = True
             self.update()
             return True
 
@@ -501,9 +508,15 @@ class CanvasPoiMixin:
         if event.button() != Qt.MouseButton.LeftButton:
             return False
         if self._poi_drag != PoiDrag.NONE:
+            moved = getattr(self, "_poi_drag_moved", False)
             self._poi_drag = PoiDrag.NONE
             self._poi_drag_orig = None
-            self._notify_poi_changed()
+            self._poi_drag_moved = False
+            # 纯点击（未拖动）不算数据变更
+            if moved:
+                self._notify_poi_changed()
+            else:
+                self._notify_selection_changed()
             self.update()
             return True
         return False

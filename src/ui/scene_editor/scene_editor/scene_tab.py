@@ -62,6 +62,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._canvas.on_region_changed = self._refresh_region_list
         self._canvas.on_poi_changed = self._on_poi_changed
         self._canvas.on_panel_changed = self._on_panel_changed
+        # 选中态变化只刷新列表高亮，不走 dialog 的 dirty 链路
+        self._canvas.on_selection_changed = self._on_selection_changed
 
     # ─── 面板构建 ────────────────────────────────────────
 
@@ -145,4 +147,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
 
     def _on_panel_changed(self):
         """画布 panel 数据变化时刷新面板列表"""
+        self._refresh_panel_list()
+
+    def _on_selection_changed(self):
+        """画布选中态变化（非数据修改）：仅刷新各列表显示"""
+        self._refresh_region_list()
+        self._on_poi_changed()
         self._refresh_panel_list()

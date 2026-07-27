@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QDialog, QFormLayout, QLineEdit, QSpinBox,
+    QDialog, QFormLayout, QLineEdit, QSpinBox, QDoubleSpinBox,
     QDialogButtonBox, QMessageBox,
 )
 from PyQt6.QtCore import Qt
@@ -29,17 +29,19 @@ class PanelEditorMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._panel_table = QTableWidget()
-        self._panel_table.setColumnCount(4)
+        self._panel_table.setColumnCount(5)
         self._panel_table.setHorizontalHeaderLabels(
-            ["名称", "Key", "行数", "列数"]
+            ["名称", "Key", "行数", "列数", "行可见比例"]
         )
-        # 列宽：名称/Key 自适应内容，行数/列数固定窄宽
+        # 列宽：名称/Key 自适应内容，行数/列数/可见比例固定窄宽
         header = self._panel_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         header.resizeSection(2, 50)
         header.resizeSection(3, 50)
+        header.resizeSection(4, 80)
         self._panel_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
@@ -112,6 +114,10 @@ class PanelEditorMixin:
             cols_item = QTableWidgetItem(str(panel_def.cols))
             cols_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._panel_table.setItem(row, 3, cols_item)
+            # 行最小可见比例
+            vis_item = QTableWidgetItem(f"{panel_def.min_visible:.2f}")
+            vis_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._panel_table.setItem(row, 4, vis_item)
         self._panel_table.blockSignals(False)
 
     # ─── 事件处理 ────────────────────────────────────────
@@ -143,6 +149,19 @@ class PanelEditorMixin:
         except ValueError as e:
             QMessageBox.warning(self, "更新失败", str(e))
             return
+        # 同步网格参数到已绑定的布局 Panel（几何不变，仅 cols/rows/min_visible），
+        # 否则弹窗改动只写入场景 YAML，运行时读的布局 Panel 不会生效
+        panels = self._canvas.get_panels()
+        changed = False
+        for p in panels:
+            if p.key == old_def.key:
+                p.cols, p.rows = new_def.cols, new_def.rows
+                p.min_visible = new_def.min_visible
+                changed = True
+        if changed:
+            self._canvas.set_panels(panels)
+            # 布局 Panel 数据已变，通知上层标记 dirty（需保存布局才落盘）
+            self._canvas._notify_panel_changed()
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
@@ -265,6 +284,18 @@ class PanelEditorMixin:
         rows_spin.setValue(panel_def.rows if panel_def else 3)
         form.addRow("行数:", rows_spin)
 
+        vis_spin = QDoubleSpinBox()
+        vis_spin.setRange(0.50, 1.00)
+        vis_spin.setSingleStep(0.05)
+        vis_spin.setDecimals(2)
+        vis_spin.setValue(panel_def.min_visible if panel_def else 0.95)
+        vis_spin.setToolTip(
+            "滚动时半截行计入有效行所需的最小可见比例：\n"
+            "0.95 = 基本完整才计入；调低（如 0.55）可减少少检一行，\n"
+            "但必须 > 0.5，否则行中心可能落在面板外导致点击脱靶"
+        )
+        form.addRow("行最小可见比例:", vis_spin)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -294,4 +325,5 @@ class PanelEditorMixin:
             name=name_edit.text().strip(),
             cols=cols_spin.value(),
             rows=rows_spin.value(),
+            min_visible=round(vis_spin.value(), 2),
         )

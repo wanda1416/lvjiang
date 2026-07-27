@@ -524,6 +524,8 @@ class RunControlMixin:
         school_rules = get_school_rules()
         keep_pvp = (self._get_tuning_keep_pvp()
                     if hasattr(self, '_get_tuning_keep_pvp') else False)
+        skip_tuning = (self._get_tuning_skip_tuning()
+                       if hasattr(self, '_get_tuning_skip_tuning') else False)
         for school, cfg in enabled.items():
             if not is_school_implemented(school):
                 self.log_text.append(f"[警告] 流派「{get_schools().get(school, school)}」判定暂未实现，已跳过")
@@ -607,10 +609,14 @@ class RunControlMixin:
         wf_instance._judge_configs = {
             k: {**cfg, "keep_pvp": keep_pvp} for k, cfg in enabled.items()}
         wf_instance._judge_schools = list(enabled)
+        # 临时测试开关：跳过实际调律（仅模拟进出调律页，便于测试滚动）
+        wf_instance._skip_tuning = skip_tuning
 
         school_names = "、".join(j.school_name for j in school_judges)
         if keep_pvp:
             school_names += "（保留PVP）"
+        if skip_tuning:
+            self.log_text.append("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律")
         self.log_text.append(
             f"[开始] {flow_name} 流程，流派: {school_names}，部位: {selected_slots}")
         self._start_workflow("auto_tuning", flow_name,

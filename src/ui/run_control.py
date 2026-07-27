@@ -384,18 +384,23 @@ class RunControlMixin:
             self.log_text.append(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
             logger.error(f"{flow_name}流程异常退出: {result_or_exception}")
             # 异常不保存 session
-        elif self._stop_requested:
-            self.log_text.append(f"[已停止] {flow_name}流程被用户中断")
-            # 用户中断不保存 session
         else:
             result = result_or_exception
-            self._save_workflow_result(flow_id, result)
-            # 正常结束 → 自动保存 session
-            self._auto_save_session()
+            interrupted = self._stop_requested
+            if interrupted:
+                # 中途停止（F10）是常态（如自动调律），已收集的结果
+                # 照常落盘输出；仅不保存 session（中断点状态不完整）
+                self.log_text.append(f"[已停止] {flow_name}流程被用户中断")
+            else:
+                # 正常结束 → 自动保存 session
+                self._auto_save_session()
+            self._save_workflow_result(flow_id, result, interrupted=interrupted)
             # 通用控制台输出
             serializable = _to_serializable(result)
-            logger.info(f"工作流 {flow_id} 结果: {json.dumps(serializable, ensure_ascii=False, indent=2)}")
-            self.log_text.append(f"[完成] {flow_name} 结果已保存")
+            tag = "（用户中断，部分结果）" if interrupted else ""
+            logger.info(f"工作流 {flow_id} 结果{tag}: {json.dumps(serializable, ensure_ascii=False, indent=2)}")
+            if not interrupted:
+                self.log_text.append(f"[完成] {flow_name} 结果已保存")
 
         self._end_automation(flow_name)
 
@@ -407,9 +412,15 @@ class RunControlMixin:
             if username:
                 self._session_manager.save(username, engine.session)
 
-    def _save_workflow_result(self, flow_id: str, result):
-        """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json"""
+    def _save_workflow_result(self, flow_id: str, result, interrupted: bool = False):
+        """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json
+
+        中断（F10）的部分结果同样落盘，文件名带 _interrupted 后缀；
+        中断且尚无任何已收集数据时不产生空文件。
+        """
         if not isinstance(result, (dict, list)):
+            return
+        if interrupted and not result:
             return
 
         serializable = _to_serializable(result)
@@ -420,13 +431,14 @@ class RunControlMixin:
         user_output_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = user_output_dir / f"{flow_id}_{timestamp}.json"
+        suffix = "_interrupted" if interrupted else ""
+        save_path = user_output_dir / f"{flow_id}_{timestamp}{suffix}.json"
         save_path.write_text(
             json.dumps(serializable, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {flow_id} → output/{username}/{flow_id}_{timestamp}.json")
+        self.log_text.append(f"[保存] {flow_id} → output/{username}/{save_path.name}")
 
     # ─── 运行按钮 ──────────────────────────────────────────
 

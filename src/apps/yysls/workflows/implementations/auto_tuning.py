@@ -601,6 +601,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         """执行一轮调律：展开材料区→按策略选狗粮→一键添加→调律→收结果。
 
         返回调律结果 OCR dict；返回 None 表示应终止循环（无添加入口/材料不足）。
+        添加过狗粮时，关闭结果弹窗后还会补扫一次狗粮返还弹窗并补关。
         """
         add_scan = self.ocr_scene(self.TUNE_SCENE, ["auto_add", "auto_add_2"])
         can_add = "添加" in add_scan.get("auto_add", "")
@@ -633,6 +634,17 @@ class AutoTuningWorkflow(BaseWorkflow):
         self.output.setdefault("tune_results", []).append(result)
         self.click_region(self.RESULT_SCENE, "close_btn")
         self.wait_delay("step_interval")
+
+        # 狗粮返还机制：添加过狗粮的轮次，关闭结果弹窗后可能命中概率返还，
+        # 再弹一个无边框弹窗（同样 tune_tip「点击空白区域关闭」）。若不补关，
+        # 它会挡住「一键添加」等后续点击，导致误判无法继续调律。
+        if food:
+            self.wait_delay("page_refresh_wait")
+            bonus = self.ocr_scene(self.RESULT_SCENE, ["tune_tip"])
+            if bonus.get("tune_tip"):
+                logger.info(f"检测到狗粮返还弹窗: {bonus}，补点一次关闭")
+                self.click_region(self.RESULT_SCENE, "close_btn")
+                self.wait_delay("step_interval")
         return result
 
     # ─── 工具方法 ──────────────────────────────────────────

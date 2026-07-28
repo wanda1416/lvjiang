@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QListWidget, QListWidgetItem,
     QInputDialog, QMessageBox, QFormLayout,
     QFrame, QScrollArea, QWidget, QSizePolicy,
+    QAbstractItemView,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -166,11 +167,16 @@ class UserManagerDialog(QDialog):
         toolbar.addStretch()
         layout.addLayout(toolbar)
 
-        # 用户列表
+        # 用户列表（支持拖拽排序）
         self._user_list = QListWidget()
         self._user_list.setObjectName("userList")
         self._user_list.setStyleSheet(_STYLE_LIST)
+        self._user_list.setDragDropMode(
+            QAbstractItemView.DragDropMode.InternalMove,
+        )
+        self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._user_list.currentRowChanged.connect(self._on_user_selected)
+        self._user_list.model().rowsMoved.connect(self._on_rows_moved)
         layout.addWidget(self._user_list, stretch=1)
 
         return panel
@@ -346,6 +352,14 @@ class UserManagerDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole)
 
     # ─── 操作 ────────────────────────────────────────────
+
+    def _on_rows_moved(self, *_args):
+        """拖拽排序后持久化新顺序"""
+        names = [
+            self._user_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(self._user_list.count())
+        ]
+        self._user_manager.reorder_users(names)
 
     def _on_create_user(self):
         """新建用户"""

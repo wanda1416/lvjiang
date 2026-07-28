@@ -92,9 +92,10 @@ user_config:
   
   # 延迟参数（模拟人类）
   delay:
-    before_click_wait: [0.1, 0.3]  # 点击前延迟
-    after_click_wait: [0.1, 0.2]   # 点击后延迟
-    after_tune_wait: 3.0           # 调律动画等待
+    before_click_wait: [0.1, 0.3]  # 点击前延迟（引擎级）
+    after_click_wait: [0.1, 0.2]   # 点击后延迟（引擎级）
+    custom:                        # 命名等待参数（供工作流 wait 按 key 引用）
+      page_refresh_wait: [2.0, 3.0]  # 页面切换/刷新、调律结果出现等待
 ```
 
 ---

@@ -17,6 +17,7 @@ from ..grammar import (
     Click, Drag, Wait, Scan, Recognize, Collect, Log,
     Import, ProcDef, CallProc,
     If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
+    Literal,
 )
 from ..grammar.ast_nodes import Align
 from ..base import BaseWorkflow
@@ -156,6 +157,9 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         for name, proc_def in program.procs.items():
             self._procs[name] = proc_def
 
+        # 静态校验：wait 引用的命名等待参数必须已定义，未定义直接报错不执行
+        self._validate_named_waits(program)
+
         logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令, {len(self._procs)} 个过程) ===")
 
         try:
@@ -205,6 +209,34 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             for name, proc_def in imp_program.procs.items():
                 self._procs[name] = proc_def
             logger.debug(f"import: {imp.path} → 注册 {len(imp_program.procs)} 个过程")
+
+    def _validate_named_waits(self, program):
+        """解析后静态校验：wait 引用的命名等待参数必须已定义
+
+        命名等待全部来自 DelayConfig.custom（配置管理「等待参数」页），
+        遍历顶层语句与所有过程体（含 import 引入的），引用未定义的 key
+        直接报错返回，不进入执行阶段。
+        """
+        missing: dict[str, int] = {}  # key → 首次出现行号
+        for body in [program.body, *(p.body for p in self._procs.values())]:
+            self._collect_missing_waits(body, missing)
+        if missing:
+            detail = "、".join(f"{name}(行 {line})" for name, line in missing.items())
+            raise WorkflowUserError(
+                f"wait 引用了未定义的等待参数: {detail}，请先在配置管理→等待参数中定义")
+
+    def _collect_missing_waits(self, stmts: list, missing: dict[str, int]):
+        """递归收集语句体中引用未定义命名等待的 Wait 节点"""
+        for node in stmts:
+            match node:
+                case Wait(delay=Literal(value=str() as name)):
+                    if name not in self._delay.custom:
+                        missing.setdefault(name, node.line_no)
+                case If():
+                    self._collect_missing_waits(node.then_body, missing)
+                    self._collect_missing_waits(node.else_body, missing)
+                case For() | ForRange() | Loop():
+                    self._collect_missing_waits(node.body, missing)
 
     def _execute_python_workflow(self, workflow: BaseWorkflow) -> dict:
         """执行 Python 工作流实例"""

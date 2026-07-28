@@ -27,7 +27,7 @@ collect $sub_weapon
 click [equip_tune_detail].[auto_add]
 wait step_interval
 click [equip_tune_detail].[tune_btn]
-wait after_tune_wait
+wait page_refresh_wait
 scan [equip_tune_result] as $tune_result
 
 if $tune_result.result equals "成功"

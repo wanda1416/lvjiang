@@ -1,0 +1,16 @@
+quality_thresholds:
+  armor:
+  - gold
+  - purple
+  default:
+  - gold
+pvp:
+  names:
+  - 单体类奇术增伤
+  - 对玩家单位增效
+  substitutions:
+    胫甲:
+      对玩家单位增效: 对首领单位增伤
+    冠胄:
+      add_to_pool:
+      - 单体类奇术增伤

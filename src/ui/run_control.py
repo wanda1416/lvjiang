@@ -519,38 +519,38 @@ class RunControlMixin:
             self.log_text.append("[错误] 请至少选择一个调律部位")
             return
 
-        # 获取流派配置（按流派分组的层级 dict）并创建判定器
+        # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
         from src.apps.yysls.evaluator import (
-            get_school_judge, get_school_rules, get_schools,
-            is_school_implemented,
+            get_tuning_judge, get_tuning_rules, get_rule_names,
+            is_rule_implemented,
         )
-        if hasattr(self, '_get_tuning_school_config'):
-            schools_cfg = self._get_tuning_school_config()
+        if hasattr(self, '_get_tuning_rule_config'):
+            rules_cfg = self._get_tuning_rule_config()
         else:
-            schools_cfg = {"huiyi_general": {"enabled": True}}
-        enabled = {k: cfg for k, cfg in schools_cfg.items() if cfg.get("enabled")}
+            rules_cfg = {"huiyi_general": {"enabled": True}}
+        enabled = {k: cfg for k, cfg in rules_cfg.items() if cfg.get("enabled")}
         if not enabled:
-            self.log_text.append("[错误] 请至少选择一个调律流派")
+            self.log_text.append("[错误] 请至少选择一个调律规则")
             return
-        school_judges = []
-        school_rules = get_school_rules()
+        rule_judges = []
+        rule_map = get_tuning_rules()
         keep_pvp = (self._get_tuning_keep_pvp()
                     if hasattr(self, '_get_tuning_keep_pvp') else False)
         skip_tuning = (self._get_tuning_skip_tuning()
                        if hasattr(self, '_get_tuning_skip_tuning') else False)
-        for school, cfg in enabled.items():
-            if not is_school_implemented(school):
-                self.log_text.append(f"[警告] 流派「{get_schools().get(school, school)}」判定暂未实现，已跳过")
+        for rule_key, cfg in enabled.items():
+            if not is_rule_implemented(rule_key):
+                self.log_text.append(f"[警告] 规则「{get_rule_names().get(rule_key, rule_key)}」判定暂未实现，已跳过")
                 continue
-            rule = school_rules[school]
-            wr_cfg = cfg.get("weapon_rules")
-            if rule.weapon_rules and wr_cfg is not None and not wr_cfg:
-                self.log_text.append(f"[错误] 流派「{rule.school_name}」需至少勾选一个武器规则")
+            rule = rule_map[rule_key]
+            wr_cfg = cfg.get("playstyles")
+            if rule.playstyles and wr_cfg is not None and not wr_cfg:
+                self.log_text.append(f"[错误] 规则「{rule.name}」需至少勾选一个玩法")
                 return
-            school_judges.append(
-                get_school_judge(school, {**cfg, "keep_pvp": keep_pvp}))
-        if not school_judges:
-            self.log_text.append("[错误] 选中的流派均未实现判定逻辑")
+            rule_judges.append(
+                get_tuning_judge(rule_key, {**cfg, "keep_pvp": keep_pvp}))
+        if not rule_judges:
+            self.log_text.append("[错误] 选中的规则均未实现判定逻辑")
             return
 
         flow_name = "自动调律"
@@ -614,24 +614,24 @@ class RunControlMixin:
             stop_check=self._is_stopped,
         )
         wf_instance._selected_slots = selected_slots
-        wf_instance._school_judges = school_judges
-        # 潜力判定配置（形状与 single_tuning._load_school_config 一致，
+        wf_instance._rule_judges = rule_judges
+        # 潜力判定配置（形状与 single_tuning._load_rule_config 一致，
         # 对齐 UI 实时勾选）：供 auto_tuning 的 judge_tuning_worthiness/
         # judge_equipment_potential 使用
         wf_instance._judge_configs = {
             k: {**cfg, "keep_pvp": keep_pvp} for k, cfg in enabled.items()}
-        wf_instance._judge_schools = list(enabled)
+        wf_instance._judge_rule_keys = list(enabled)
         # 临时测试开关：跳过实际调律（仅模拟进出调律页，便于测试滚动）
         wf_instance._skip_tuning = skip_tuning
         # 调律说明文档（logs/tuning/）的操作用户名
         wf_instance._doc_username = username
 
-        school_names = "、".join(j.school_name for j in school_judges)
+        rule_names_text = "、".join(j.rule_name for j in rule_judges)
         if keep_pvp:
-            school_names += "（保留PVP）"
+            rule_names_text += "（保留PVP）"
         if skip_tuning:
             self.log_text.append("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律")
         self.log_text.append(
-            f"[开始] {flow_name} 流程，流派: {school_names}，部位: {selected_slots}")
+            f"[开始] {flow_name} 流程，规则: {rule_names_text}，部位: {selected_slots}")
         self._start_workflow("auto_tuning", flow_name,
                              lambda: engine.execute(wf_instance))

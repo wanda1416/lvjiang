@@ -1,16 +1,16 @@
 """装备识别测试面板控件测试（pytest-qt）
 
 覆盖 EquipAffixEditor 的候选池/去重/默认承音值/装备构造，
-以及 SchoolConfigWidget 的配置读写往返。
+以及 TuningConfigWidget 的配置读写往返。
 """
 
 import pytest
 
-from src.apps.yysls.evaluator import get_attr_rule_manager
+from src.apps.yysls.game_config import get_game_config
 from src.apps.yysls.ui.equip_judge_dialog import (
     _NONE_ITEM, EQUIP_TYPES, EquipAffixEditor,
 )
-from src.apps.yysls.ui.school_config_widget import SchoolConfigWidget
+from src.apps.yysls.ui.tuning_config_widget import TuningConfigWidget
 
 
 def _combo_items(combo) -> list[str]:
@@ -82,7 +82,7 @@ class TestEquipAffixEditor:
 
     def test_selected_value_defaults_to_chengyin(self, editor):
         editor._affix_combos[1].setCurrentText("会心率")
-        caps = get_attr_rule_manager().get_affix_caps(110, "会心率")
+        caps = get_game_config().get_affix_caps(110, "会心率")
         assert editor._affix_spins[1].value() == caps["chengyin"]
 
     def test_rows_2_to_5_dedup(self, editor):
@@ -118,34 +118,34 @@ class TestEquipAffixEditor:
         assert equip.affixes[0].value > 0
 
 
-# ─── SchoolConfigWidget ────────────────────────────────────
+# ─── TuningConfigWidget ────────────────────────────────────
 
-class TestSchoolConfigWidget:
+class TestTuningConfigWidget:
     def test_set_get_roundtrip(self, qtbot):
-        w = SchoolConfigWidget()
+        w = TuningConfigWidget()
         qtbot.addWidget(w)
         cfg = {
             "huiyi_general": {"enabled": True},
-            "lieshi_big": {"enabled": True, "weapon_rules": ["双切"]},
+            "lieshi_big": {"enabled": True, "playstyles": ["双切"]},
         }
         w.set_config(cfg)
         result = w.get_config()
         assert result["huiyi_general"]["enabled"]
-        # 缺 weapon_rules 键 = 全选
-        assert result["huiyi_general"]["weapon_rules"] == ["会意"]
-        assert result["lieshi_big"]["weapon_rules"] == ["双切"]
+        # 缺 playstyles 键 = 全选
+        assert result["huiyi_general"]["playstyles"] == ["会意"]
+        assert result["lieshi_big"]["playstyles"] == ["双切"]
         assert not result["lieshi_small"]["enabled"]
 
-    def test_default_all_weapon_rules_checked(self, qtbot):
-        # 初始状态：武器规则全部勾选（缺省 = 全部）
-        w = SchoolConfigWidget()
+    def test_default_all_playstyles_checked(self, qtbot):
+        # 初始状态：玩法全部勾选（缺省 = 全部）
+        w = TuningConfigWidget()
         qtbot.addWidget(w)
         result = w.get_config()
-        assert result["lieshi_big"]["weapon_rules"] == ["纯唐", "双切", "威威"]
-        assert result["heal_pure"]["weapon_rules"] == ["纯奶"]
+        assert result["lieshi_big"]["playstyles"] == ["纯唐", "双切", "威威"]
+        assert result["heal_pure"]["playstyles"] == ["纯奶"]
 
     def test_set_config_does_not_emit(self, qtbot):
-        w = SchoolConfigWidget()
+        w = TuningConfigWidget()
         qtbot.addWidget(w)
         fired = []
         w.config_changed.connect(lambda: fired.append(1))
@@ -154,8 +154,8 @@ class TestSchoolConfigWidget:
         assert not fired
 
     def test_keep_pvp_roundtrip(self, qtbot):
-        # 全局 PVP 开关独立于流派配置读写
-        w = SchoolConfigWidget()
+        # 全局 PVP 开关独立于规则配置读写
+        w = TuningConfigWidget()
         qtbot.addWidget(w)
         assert not w.get_keep_pvp()
         w.set_keep_pvp(True)
@@ -163,22 +163,22 @@ class TestSchoolConfigWidget:
         assert "keep_pvp" not in w.get_config()["huiyi_general"]
 
     def test_group_titles_and_checkboxes(self, qtbot):
-        # 分组标题 = 规则名；武器规则复选框文本含主副武器摘要
-        w = SchoolConfigWidget()
+        # 分组标题 = 规则名；玩法复选框文本含主副武器摘要
+        w = TuningConfigWidget()
         qtbot.addWidget(w)
         for key, title in (("heal_pure", "治疗纯奶"),
                            ("heal_fire", "治疗火拳"),
                            ("lieshi_small", "裂石小外")):
-            assert w._school_widgets[key]["group"].title() == title
-        cb = w._school_widgets["heal_pure"]["weapon_rules"]["纯奶"]
+            assert w._rule_widgets[key]["group"].title() == title
+        cb = w._rule_widgets["heal_pure"]["playstyles"]["纯奶"]
         assert cb.text() == "纯奶（主 扇 / 副 伞）"
 
     def test_roundtrip_single_enabled(self, qtbot):
-        w = SchoolConfigWidget()
+        w = TuningConfigWidget()
         qtbot.addWidget(w)
         w.set_config({"heal_fire": {"enabled": True}})
         result = w.get_config()
         assert result["heal_fire"]["enabled"]
         assert not result["heal_pure"]["enabled"]
-        # 未提及的流派保持未启用
+        # 未提及的规则保持未启用
         assert not result["huiyi_general"]["enabled"]

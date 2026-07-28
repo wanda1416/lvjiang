@@ -12,10 +12,10 @@ import yaml
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox
 
-from src.apps.yysls.ui.attr_manager import AttrManagerDialog
-from src.apps.yysls.ui.attr_manager import affix_caps_panel, base_attr_panel, school_panel
-from src.apps.yysls.ui.attr_manager.base_attr_panel import BaseAttrPanel
-from src.apps.yysls.ui.attr_manager.school_panel import SchoolPanel
+from src.apps.yysls.ui.game_config import GameConfigDialog
+from src.apps.yysls.ui.game_config import affix_caps_panel, base_attr_panel, school_panel
+from src.apps.yysls.ui.game_config.base_attr_panel import BaseAttrPanel
+from src.apps.yysls.ui.game_config.school_panel import SchoolPanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 ATTRS_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"
@@ -41,7 +41,7 @@ def _load_yaml(path: Path) -> dict:
 
 class TestDialog:
     def test_dialog_tabs(self, qtbot, tmp_attrs):
-        dialog = AttrManagerDialog()
+        dialog = GameConfigDialog()
         qtbot.addWidget(dialog)
         assert dialog.windowTitle() == "游戏配置"
         tabs = dialog._tab._tabs

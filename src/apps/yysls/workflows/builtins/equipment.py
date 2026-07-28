@@ -89,8 +89,8 @@ def _affix_cap(affix_name: str, level, *args) -> float:
         level = int(level)
     except (ValueError, TypeError):
         return 0
-    from ...evaluator.attr_rules import get_attr_rule_manager
-    result = get_attr_rule_manager().get_affix_caps(level, str(affix_name))
+    from ...game_config import get_game_config
+    result = get_game_config().get_affix_caps(level, str(affix_name))
     if result is None:
         logger.debug(f"affix_cap: 未找到配置 affix={affix_name} level={level}")
         return 0
@@ -112,8 +112,8 @@ def _chengyin_cap(affix_name: str, level, *args) -> float:
         level = int(level)
     except (ValueError, TypeError):
         return 0
-    from ...evaluator.attr_rules import get_attr_rule_manager
-    result = get_attr_rule_manager().get_affix_caps(level, str(affix_name))
+    from ...game_config import get_game_config
+    result = get_game_config().get_affix_caps(level, str(affix_name))
     if result is None:
         return 0
     return result["chengyin"]
@@ -122,7 +122,7 @@ def _chengyin_cap(affix_name: str, level, *args) -> float:
 # ─── 装备判定 ───────────────────────────────────────────
 
 # 高价值词条关键词（用于 is_good_equip 判定）
-# TODO: 从流派规则配置中读取，当前为硬编码
+# TODO: 从调律规则配置中读取，当前为硬编码
 _HIGH_VALUE_KEYWORDS = [
     "大外攻", "会心", "会意", "三率",
     "劲", "敏", "势",
@@ -169,7 +169,7 @@ _cached_judge = None
 def _evaluate(equip_data: dict, *args) -> dict:
     """判定装备，返回评级结果 dict
 
-    使用穷举匹配制判定器（默认 会意流派-通用）。
+    使用穷举匹配制判定器（默认规则 huiyi_general 会意-通用）。
     返回 JudgeResult.to_dict() 结果。
 
     .wf 用法:
@@ -183,13 +183,13 @@ def _evaluate(equip_data: dict, *args) -> dict:
         return {"rating": "垃圾", "skipped": True, "reasons": ["空数据"]}
 
     from ...equip_parser.models import EquipmentData
-    from ...evaluator import get_school_judge
+    from ...evaluator import get_tuning_judge
 
     # 判定器实例（缓存到模块级变量）
     global _cached_judge
     if _cached_judge is None:
-        _cached_judge = get_school_judge("huiyi_general")
-        logger.info(f"evaluate: 使用流派 '{_cached_judge.school_name}'")
+        _cached_judge = get_tuning_judge("huiyi_general")
+        logger.info(f"evaluate: 使用规则 '{_cached_judge.rule_name}'")
 
     # dict → EquipmentData
     equip = EquipmentData.from_dict(equip_data)

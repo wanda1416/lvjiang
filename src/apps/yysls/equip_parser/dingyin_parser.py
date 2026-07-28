@@ -9,7 +9,7 @@ dingyin 字段文本，产出 {"name": 原始词条名, "value": 数值}。
 - 右边四件（防具）：指定技能增效 类别下的原始词条名
   （十大流派 × 5 条，共 50 条）
 
-候选词条名动态取自 AttrRuleManager（attributes.yaml 的 _aliases），
+候选词条名动态取自 GameConfigManager（attributes.yaml 的 _aliases），
 UI 增删定音词条后无需改代码。
 """
 
@@ -29,8 +29,8 @@ class DingyinParser:
     """定音词条解析器"""
 
     def __init__(self):
-        from ..evaluator.attr_rules import get_attr_rule_manager
-        self._attr_config = get_attr_rule_manager()
+        from ..game_config import get_game_config
+        self._attr_config = get_game_config()
 
     def parse(self, raw: str, category: str) -> dict | None:
         """解析定音文本

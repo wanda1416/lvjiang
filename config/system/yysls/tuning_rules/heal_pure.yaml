@@ -1,7 +1,7 @@
 key: heal_pure
 name: 治疗纯奶
 order: 40
-weapon_rules:
+playstyles:
   纯奶:
     main:
       weapon: 扇
@@ -9,6 +9,7 @@ weapon_rules:
     sub:
       weapon: 伞
       damage: null
+    attr: 牵丝
 transmute_priority:
 - 最大外功攻击
 - 劲
@@ -73,7 +74,7 @@ patterns:
       - 劲
     top_conditions:
     - - not_contains:
-        - 最大牵丝攻击
+        - 最大无相攻击
       - not_together:
         - 敏
         - 会心率
@@ -89,7 +90,7 @@ patterns:
         max: 1
     top_conditions:
     - not_contains:
-      - 最大牵丝攻击
+      - 最大无相攻击
   胫甲:
     first:
     - 劲
@@ -103,7 +104,7 @@ patterns:
       - 劲
     top_conditions:
     - - not_contains:
-        - 最大牵丝攻击
+        - 最大无相攻击
       - not_together:
         - 敏
         - 会心率

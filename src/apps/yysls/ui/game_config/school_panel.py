@@ -9,7 +9,7 @@
 武器候选来自 weapon_types 注册表。
 数据存于 attributes.yaml 顶层 schools：
     流派名 → {attr: 属性, main: {weapon, martial_art}, sub: {weapon, martial_art}}
-修改即时写盘，并刷新 AttrRuleManager 单例。
+修改即时写盘，并刷新 GameConfigManager 单例。
 """
 
 from pathlib import Path
@@ -51,7 +51,7 @@ class SchoolPanel(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("流派"))
+        left_layout.addWidget(QLabel("流派类型"))
 
         self._school_list = QListWidget()
         self._school_list.currentRowChanged.connect(self._on_school_changed)
@@ -313,12 +313,12 @@ class SchoolPanel(QWidget):
     # ── 保存 ──────────────────────────────────────────────────
 
     def _save_data(self):
-        """保存数据到 YAML 并刷新 AttrRuleManager 单例"""
+        """保存数据到 YAML 并刷新 GameConfigManager 单例"""
         try:
             with open(_ATTRS_PATH, "w", encoding="utf-8") as f:
                 yaml.dump(self._data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
             logger.debug(f"配置已保存: {_ATTRS_PATH}")
-            from src.apps.yysls.evaluator.attr_rules import get_attr_rule_manager
-            get_attr_rule_manager()._load()
+            from src.apps.yysls.game_config import get_game_config
+            get_game_config()._load()
         except Exception as e:
             logger.error(f"保存失败: {e}")

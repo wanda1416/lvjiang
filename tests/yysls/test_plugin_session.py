@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from src.apps.yysls.session import PluginSession
+from src.apps.yysls.plugin_session import PluginSession
 
 
 @pytest.fixture

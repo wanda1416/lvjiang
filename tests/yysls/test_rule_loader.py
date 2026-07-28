@@ -1,7 +1,7 @@
 """调律规则加载器测试
 
 覆盖 TuningRuleManager 的加载/排序/校验拒绝/保存与 get_raw 深拷贝、
-create_rule/delete_rule、weapon_rules 节与三档条件组语法解析，
+create_rule/delete_rule、playstyles 节（含 attr）与三档条件组语法解析，
 以及规则内词条名与标准词条全集（attributes.yaml 普通词组
 _aliases）的一致性守护。
 """
@@ -11,10 +11,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.apps.yysls.evaluator import get_school_rules
-from src.apps.yysls.evaluator.rules import (
+from src.apps.yysls.evaluator import get_tuning_rules
+from src.apps.yysls.evaluator.tuning_rules import (
     PVP_NAMES, RuleValidationError, TuningRuleManager,
-    get_tuning_rule_manager, standard_affix_names,
+    attr_equivalence, get_tuning_base, get_tuning_rule_manager,
+    parse_tuning_base, standard_affix_names, standard_playstyle_attrs,
 )
 
 
@@ -23,10 +24,11 @@ def minimal_rule(**overrides) -> dict:
     data = {
         "key": "t1",
         "name": "测试规则",
-        "weapon_rules": {
+        "playstyles": {
             "测试": {
                 "main": {"weapon": "剑", "damage": "剑武学增伤"},
                 "sub": {"weapon": "枪", "damage": None},
+                "attr": "通用",
             },
         },
         "affix_pool": ["最大外功攻击", "劲"],
@@ -64,30 +66,45 @@ class TestBuiltinRules:
         ]
 
     def test_order_ascending(self):
-        rules = get_school_rules()
+        rules = get_tuning_rules()
         orders = [r.order for r in rules.values()]
         assert orders == sorted(orders)
 
     def test_required_fields_present(self):
-        for rule in get_school_rules().values():
+        for rule in get_tuning_rules().values():
             assert rule.key and rule.name
             assert rule.affix_pool
             assert rule.patterns
             for pattern in rule.patterns.values():
                 assert pattern.first
 
-    def test_weapon_rules_per_plan(self):
-        rules = get_school_rules()
-        assert set(rules["huiyi_general"].weapon_rules) == {"会意"}
-        for key in ("lieshi_small", "lieshi_big"):
-            assert set(rules[key].weapon_rules) == {"纯唐", "双切", "威威"}
-        assert set(rules["heal_pure"].weapon_rules) == {"纯奶"}
-        assert set(rules["heal_fire"].weapon_rules) == {"火拳"}
-        # 摘要供 UI 勾选项展示
-        assert rules["lieshi_big"].weapon_rule_options["纯唐"] == "主 横刀 / 副 陌刀"
+    def test_playstyles_per_plan(self):
+        # 玩法定义持续变更：不硬编码内容，对照 YAML 原文校验解析
+        mgr = get_tuning_rule_manager()
+        for key, rule in get_tuning_rules().items():
+            raw = mgr.get_raw(key).get("playstyles") or {}
+            assert raw, key  # 每个规则至少一条玩法
+            assert set(rule.playstyles) == set(raw)
+            for name, ps in rule.playstyles.items():
+                assert ps.main.weapon == (raw[name]["main"].get("weapon") or "")
+                assert ps.main.damage == raw[name]["main"].get("damage")
+                # 摘要供 UI 勾选项展示
+                assert rule.playstyle_options[name] == (
+                    f"主 {ps.main.weapon} / 副 {ps.sub.weapon}")
         # 火拳主扇不需要增伤
-        fire = rules["heal_fire"].weapon_rules["火拳"]
+        fire = get_tuning_rules()["heal_fire"].playstyles["火拳"]
         assert fire.main.weapon == "扇" and fire.main.damage is None
+
+    def test_playstyle_attr_per_plan(self):
+        # attr 随配置变更：只校验解析值与 YAML 一致且在合法集内
+        mgr = get_tuning_rule_manager()
+        vocab = set(standard_playstyle_attrs())
+        for key, rule in get_tuning_rules().items():
+            raw = mgr.get_raw(key).get("playstyles") or {}
+            for name, ps in rule.playstyles.items():
+                assert ps.attr in vocab
+                expected = raw[name].get("attr") or "通用"
+                assert ps.attr == expected, (key, name)
 
 
 # ─── schema 校验拒绝 ───────────────────────────────────────
@@ -100,13 +117,13 @@ class TestValidation:
         assert list(mgr.get_rules()) == ["t1"]
 
     def test_empty_skeleton_valid(self, tmp_path):
-        """空 weapon_rules/affix_pool/patterns 的骨架规则可保存（新建规则）"""
+        """空 playstyles/affix_pool/patterns 的骨架规则可保存（新建规则）"""
         write_rule(tmp_path, minimal_rule(
-            weapon_rules={}, affix_pool=[], patterns={}))
+            playstyles={}, affix_pool=[], patterns={}))
         mgr = TuningRuleManager(rules_dir=tmp_path)
         assert mgr.errors == {}
         rule = mgr.get_rule("t1")
-        assert rule.weapon_rules == {}
+        assert rule.playstyles == {}
         assert rule.affix_pool == [] and rule.patterns == {}
 
     def test_condition_group_syntax(self, tmp_path):
@@ -144,10 +161,12 @@ class TestValidation:
         # 未知部位 key
         lambda d: d["patterns"].update(
             鞋子={"first": ["最大外功攻击"]}),
-        # weapon_rules 武器名不能为空
-        lambda d: d["weapon_rules"]["测试"]["main"].update(weapon=""),
-        # weapon_rules 增伤词条不在标准词条全集
-        lambda d: d["weapon_rules"]["测试"]["main"].update(damage="神速"),
+        # playstyles 武器名不能为空
+        lambda d: d["playstyles"]["测试"]["main"].update(weapon=""),
+        # playstyles 增伤词条不在标准词条全集
+        lambda d: d["playstyles"]["测试"]["main"].update(damage="神速"),
+        # playstyles.attr 不在属性攻击词组内
+        lambda d: d["playstyles"]["测试"].update(attr="不存在属性"),
     ])
     def test_invalid_rule_rejected(self, tmp_path, mutate):
         data = minimal_rule()
@@ -209,7 +228,7 @@ class TestCreateAndDelete:
         assert (tmp_path / "new_rule.yaml").exists()
         rule = mgr.get_rule("new_rule")
         assert rule.name == "新规则"
-        assert rule.weapon_rules == {}
+        assert rule.playstyles == {}
         assert rule.affix_pool == [] and rule.patterns == {}
 
     @pytest.mark.parametrize("key,name", [
@@ -286,11 +305,11 @@ class TestStandardAffixNames:
         # 规则内出现的词条名必须在标准词条全集内，
         # 否则判定时与 OCR 解析结果对不上
         standard = set(standard_affix_names())
-        for rule in get_school_rules().values():
+        for rule in get_tuning_rules().values():
             used: set[str] = set()
             used.update(rule.transmute_priority)
             used.update(rule.affix_pool)
-            for wr in rule.weapon_rules.values():
+            for wr in rule.playstyles.values():
                 for side in (wr.main, wr.sub):
                     if side.damage:
                         used.add(side.damage)
@@ -307,3 +326,80 @@ class TestStandardAffixNames:
 
     def test_pvp_names_are_standard(self):
         assert PVP_NAMES <= set(standard_affix_names())
+
+
+# ─── 属攻→无相等价 ───────────────────────────────
+
+class TestAttrEquivalence:
+    def test_generic_and_empty_return_empty(self):
+        # 通用/空/None 无需转换
+        assert attr_equivalence("通用") == {}
+        assert attr_equivalence("") == {}
+
+    def test_specific_maps_to_wuxiang(self):
+        # 裂石的最大/最小属攻 → 通用无相攻击（按声明序对齐）
+        eq = attr_equivalence("裂石")
+        assert eq["最大裂石攻击"] == "最大无相攻击"
+        assert eq["最小裂石攻击"] == "最小无相攻击"
+        # 目标均为标准词条
+        standard = set(standard_affix_names())
+        assert set(eq.values()) <= standard
+
+    def test_attr_candidates_include_generic_first(self):
+        attrs = standard_playstyle_attrs()
+        assert attrs[0] == "通用"
+        assert "裂石" in attrs and "鸣金" in attrs and "牵丝" in attrs
+
+
+# ─── 基础配置 tuning_base ─────────────────────────
+
+def _valid_base() -> dict:
+    return {
+        "quality_thresholds": {"armor": ["gold", "purple"], "default": ["gold"]},
+        "pvp": {
+            "names": ["单体类奇术增伤", "对玩家单位增效"],
+            "substitutions": {
+                "胫甲": {"对玩家单位增效": "对首领单位增伤"},
+                "冠胄": {"add_to_pool": ["单体类奇术增伤"]},
+            },
+        },
+    }
+
+
+class TestTuningBase:
+    def test_builtin_base_loaded(self):
+        base = get_tuning_base()
+        assert "default" in base.quality_thresholds
+        assert base.pvp_names  # 非空
+
+    def test_quality_ok_falls_back_to_default(self):
+        base = parse_tuning_base(_valid_base())
+        assert base.quality_ok("armor", "purple") is True
+        assert base.quality_ok("armor", "blue") is False
+        # weapon 未配置→回退 default
+        assert base.quality_ok("weapon", "gold") is True
+        assert base.quality_ok("weapon", "purple") is False
+
+    def test_pvp_part_rule_parsed(self):
+        base = parse_tuning_base(_valid_base())
+        assert base.pvp_parts["胫甲"].substitutions == {
+            "对玩家单位增效": "对首领单位增伤"}
+        assert base.pvp_parts["冠胄"].add_to_pool == ["单体类奇术增伤"]
+
+    def test_missing_default_rejected(self):
+        data = _valid_base()
+        data["quality_thresholds"].pop("default")
+        with pytest.raises(RuleValidationError):
+            parse_tuning_base(data)
+
+    def test_bad_quality_rejected(self):
+        data = _valid_base()
+        data["quality_thresholds"]["default"] = ["legendary"]
+        with pytest.raises(RuleValidationError):
+            parse_tuning_base(data)
+
+    def test_unknown_pvp_part_rejected(self):
+        data = _valid_base()
+        data["pvp"]["substitutions"]["鞋子"] = {"add_to_pool": ["劲"]}
+        with pytest.raises(RuleValidationError):
+            parse_tuning_base(data)

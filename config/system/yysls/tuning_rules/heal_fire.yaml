@@ -1,7 +1,7 @@
 key: heal_fire
 name: 治疗火拳
 order: 41
-weapon_rules:
+playstyles:
   火拳:
     main:
       weapon: 扇
@@ -9,6 +9,7 @@ weapon_rules:
     sub:
       weapon: 伞
       damage: null
+    attr: 牵丝
 transmute_priority:
 - 最大外功攻击
 - 劲
@@ -71,7 +72,7 @@ patterns:
       - 劲
     top_conditions:
     - - not_contains:
-        - 最大牵丝攻击
+        - 最大无相攻击
       - not_together:
         - 敏
         - 会心率
@@ -86,7 +87,7 @@ patterns:
       - 最大外功攻击
     top_conditions:
     - not_contains:
-      - 最大牵丝攻击
+      - 最大无相攻击
   胫甲:
     first:
     - 劲
@@ -98,6 +99,6 @@ patterns:
       - 最大外功攻击
     top_conditions:
     - not_contains:
-      - 最大牵丝攻击
+      - 最大无相攻击
       - 会心率
       - 精准率

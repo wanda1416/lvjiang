@@ -2,16 +2,18 @@
 
 规则全部外置为 YAML（config/system/yysls/tuning_rules/ 下每规则一个
 文件），本模块负责加载、schema 校验、缓存、创建/删除与保存。判定
-逻辑见 generic.GenericSchoolJudge，规则变更零代码改动。
+逻辑见 generic.GenericTuningJudge，规则变更零代码改动。
 
 规则中的全部词条引用一律使用标准词条名（attributes.yaml 普通词组
-_aliases 全集，经 AttrRuleManager.get_normal_affix_names() 提供），
+_aliases 全集，经 GameConfigManager.get_normal_affix_names() 提供），
 校验失败即保存拒绝，消除符号二次映射与静默失配。
 
 schema 要点：
-- weapon_rules: 名字 → {main/sub: {weapon, damage}}，damage 为具体
-  增伤词条名或 null（不需要增伤）；判定武器部位时按用户勾选的
-  名字展开尝试，装备武器名匹配主/副武器即产生一次判定；
+- playstyles: 名字 → {main/sub: {weapon, damage}, attr}，damage 为
+  具体增伤词条名或 null（不需要增伤），attr 为玩法属性（属性攻击
+  词组组名，通用/鸣金/牵丝/裂石/破竹）；判定武器部位时按用户勾选
+  的名字展开尝试，装备武器名匹配主/副武器即产生一次判定；非武器
+  部位判定时把玩法属性对应的属攻视作无相词条（属攻→无相等价）；
 - patterns.<部位>: first + 三档条件 junk/usable/top_conditions，
   每档为「条件组」列表：组间 OR（任一组命中即触发该档）、组内
   AND；单个条件 dict 视作单条件组。判定顺序 junk → usable → top，
@@ -31,8 +33,14 @@ from loguru import logger
 
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
-# PVP 词条（全局 keep_pvp 开启时按部位做等价处理）
+# PVP 词条（全局 keep_pvp 开启时按部位做等价处理）；
+# 实际取值由 tuning_base.yaml 提供，此处仅为兜底默认
 PVP_NAMES = {"单体类奇术增伤", "对玩家单位增效"}
+
+# 属性攻击词组类别（玩法属性候选 + 属攻→无相等价的数据源）
+ATTR_ATTACK_CATEGORY = "属性攻击"
+# 通用属性（其属攻即无相攻击，作为等价转换的目标）
+GENERIC_ATTR = "通用"
 
 # 条件原语类型
 COND_KINDS = {"not_contains", "contains_all", "not_together",
@@ -50,13 +58,39 @@ _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 # 已废弃的旧版 schema 顶层字段（出现即拒绝，提示迁移）
 _LEGACY_KEYS = ("variants", "sub_schools", "weapons", "own_attr",
                 "optional_pool", "junk_rules", "has_keep_pvp",
-                "needs_sub_school", "sub_school_label")
+                "needs_sub_school", "sub_school_label", "weapon_rules")
 
 
 def standard_affix_names() -> list[str]:
     """标准词条全集（普通词组 _aliases 并集，按 YAML 声明序）"""
-    from .attr_rules import get_attr_rule_manager
-    return get_attr_rule_manager().get_normal_affix_names()
+    from ..game_config import get_game_config
+    return get_game_config().get_normal_affix_names()
+
+
+def standard_playstyle_attrs() -> list[str]:
+    """玩法属性候选（属性攻击词组的组名，通用置首）"""
+    from ..game_config import get_game_config
+    groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
+    names = list(groups.keys())
+    if GENERIC_ATTR in names:
+        names.remove(GENERIC_ATTR)
+        names.insert(0, GENERIC_ATTR)
+    return names
+
+
+def attr_equivalence(attr: str) -> dict[str, str]:
+    """属攻→无相等价映射：玩法属性 attr 的最大/最小属攻 → 通用无相攻击
+
+    attr 为通用/空/未知时返回空 dict（无需转换）。映射按属性攻击
+    词组内的声明序位置对齐（最大↔最大、最小↔最小）。
+    """
+    if not attr or attr == GENERIC_ATTR:
+        return {}
+    from ..game_config import get_game_config
+    groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
+    generic = groups.get(GENERIC_ATTR) or []
+    specific = groups.get(attr) or []
+    return {s: generic[i] for i, s in enumerate(specific) if i < len(generic)}
 
 
 # ─── 规则数据结构 ──────────────────────────────────────────
@@ -145,11 +179,16 @@ class WeaponSide:
 
 
 @dataclass
-class WeaponRule:
-    """武器规则（如 纯唐/双切）：规定主/副武器及各自增伤要求"""
+class Playstyle:
+    """玩法设定（如 纯唐/双切）：规定主/副武器、各自增伤要求与玩法属性
+
+    attr 为属性攻击词组组名（通用/鸣金/牵丝/裂石/破竹），判定非武器
+    部位时把该属性的属攻视作无相词条。
+    """
     name: str
     main: WeaponSide
     sub: WeaponSide
+    attr: str = GENERIC_ATTR
 
     def summary(self) -> str:
         """UI 摘要文案"""
@@ -170,12 +209,12 @@ class PartPattern:
 
 
 @dataclass
-class SchoolRule:
+class TuningRule:
     """单条调律规则（一个 YAML 文件，对应 UI 一个 Tab）"""
     key: str
     name: str
     order: int = 100
-    weapon_rules: dict[str, WeaponRule] = field(default_factory=dict)
+    playstyles: dict[str, Playstyle] = field(default_factory=dict)
     transmute_priority: list[str] = field(default_factory=list)
     affix_pool: list[str] = field(default_factory=list)
     patterns: dict[str, PartPattern] = field(default_factory=dict)
@@ -187,17 +226,43 @@ class SchoolRule:
     # ── UI 元数据接口 ──
 
     @property
-    def school_name(self) -> str:
-        return self.name
-
-    @property
     def implemented(self) -> bool:
         return True
 
     @property
-    def weapon_rule_options(self) -> dict[str, str]:
-        """武器规则名字 → 摘要（UI 勾选项）"""
-        return {name: wr.summary() for name, wr in self.weapon_rules.items()}
+    def playstyle_options(self) -> dict[str, str]:
+        """玩法名字 → 摘要（UI 勾选项）"""
+        return {name: ps.summary() for name, ps in self.playstyles.items()}
+
+
+# ─── 基础配置（品阶门槛 + PVP 等价，全局） ──────────────
+
+@dataclass
+class PvpPartRule:
+    """单部位 PVP 等价处理
+
+    - substitutions: 词条替换（源词条 → 目标词条），仅当源词条
+      不在当前词条库时生效（否则词条已合法无需等价）；
+    - add_to_pool: 临时并入词条库的词条。
+    """
+    substitutions: dict[str, str] = field(default_factory=dict)
+    add_to_pool: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TuningBase:
+    """全局基础配置（品阶门槛 + PVP 词条集合与部位等价）"""
+    quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
+    pvp_names: set[str] = field(default_factory=set)
+    pvp_parts: dict[str, PvpPartRule] = field(default_factory=dict)
+
+    def quality_ok(self, category: str, quality: str | None) -> bool:
+        """品阶筛选：按装备类别（weapon/jewelry/armor）取允许品阶，
+        未配置的类别回退 default"""
+        allowed = self.quality_thresholds.get(category)
+        if allowed is None:
+            allowed = self.quality_thresholds.get("default", [])
+        return quality in allowed
 
 
 # ─── YAML 解析与校验 ───────────────────────────────────────
@@ -291,8 +356,8 @@ def _parse_pattern(raw: dict, vocab: set[str], where: str) -> PartPattern:
     )
 
 
-def parse_school_rule(data: dict) -> SchoolRule:
-    """原始 YAML dict → SchoolRule（校验失败抛 RuleValidationError）"""
+def parse_tuning_rule(data: dict) -> TuningRule:
+    """原始 YAML dict → TuningRule（校验失败抛 RuleValidationError）"""
     if not isinstance(data, dict):
         raise RuleValidationError("规则文件顶层必须是 dict")
     key = data.get("key")
@@ -303,27 +368,34 @@ def parse_school_rule(data: dict) -> SchoolRule:
     if legacy:
         raise RuleValidationError(
             f"旧版 schema 字段不再支持: {legacy}，请迁移到 "
-            "weapon_rules + 三档条件结构")
+            "playstyles + 三档条件结构")
 
     vocab = set(standard_affix_names())
     if not vocab:
         raise RuleValidationError("标准词条全集为空（attributes.yaml 异常）")
+    attr_vocab = set(standard_playstyle_attrs())
 
-    weapon_rules: dict[str, WeaponRule] = {}
-    for w_name, w_raw in (data.get("weapon_rules") or {}).items():
+    playstyles: dict[str, Playstyle] = {}
+    for w_name, w_raw in (data.get("playstyles") or {}).items():
         w_name = str(w_name).strip()
         if not w_name:
-            raise RuleValidationError("weapon_rules: 名字不能为空")
-        if w_name in weapon_rules:
+            raise RuleValidationError("playstyles: 名字不能为空")
+        if w_name in playstyles:
             raise RuleValidationError(
-                f"weapon_rules: 名字重复: {w_name}")
+                f"playstyles: 名字重复: {w_name}")
         w_raw = w_raw or {}
-        weapon_rules[w_name] = WeaponRule(
+        attr = str(w_raw.get("attr") or GENERIC_ATTR).strip() or GENERIC_ATTR
+        if attr_vocab and attr not in attr_vocab:
+            raise RuleValidationError(
+                f"playstyles.{w_name}.attr: 属性 {attr!r} 不在属性攻击词组内: "
+                f"{sorted(attr_vocab)}")
+        playstyles[w_name] = Playstyle(
             name=w_name,
             main=_parse_weapon_side(
-                w_raw.get("main"), vocab, f"weapon_rules.{w_name}.main"),
+                w_raw.get("main"), vocab, f"playstyles.{w_name}.main"),
             sub=_parse_weapon_side(
-                w_raw.get("sub"), vocab, f"weapon_rules.{w_name}.sub"),
+                w_raw.get("sub"), vocab, f"playstyles.{w_name}.sub"),
+            attr=attr,
         )
 
     # ── 词条库与模式（顶层，允许为空 = 新建骨架） ──
@@ -337,11 +409,11 @@ def parse_school_rule(data: dict) -> SchoolRule:
             raise RuleValidationError(f"未知部位 key {part!r}")
         patterns[part] = _parse_pattern(p_raw, vocab, f"patterns.{part}")
 
-    return SchoolRule(
+    return TuningRule(
         key=str(key),
         name=str(name),
         order=int(data.get("order", 100)),
-        weapon_rules=weapon_rules,
+        playstyles=playstyles,
         transmute_priority=priority,
         affix_pool=affix_pool,
         patterns=patterns,
@@ -363,7 +435,7 @@ class TuningRuleManager:
             from src.constants import SYSTEM_CONFIG_DIR
             rules_dir = SYSTEM_CONFIG_DIR / "yysls" / "tuning_rules"
         self._dir = Path(rules_dir)
-        self._rules: dict[str, SchoolRule] = {}
+        self._rules: dict[str, TuningRule] = {}
         self._raw: dict[str, dict] = {}
         self._paths: dict[str, Path] = {}
         self._errors: dict[str, str] = {}
@@ -375,12 +447,12 @@ class TuningRuleManager:
         self._raw.clear()
         self._paths.clear()
         self._errors.clear()
-        loaded: list[SchoolRule] = []
+        loaded: list[TuningRule] = []
         for path in sorted(self._dir.glob("*.yaml")):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                rule = parse_school_rule(data)
+                rule = parse_tuning_rule(data)
             except Exception as e:
                 logger.error(f"调律规则 {path.name} 加载失败，已跳过: {e}")
                 self._errors[path.stem] = str(e)
@@ -396,11 +468,11 @@ class TuningRuleManager:
 
     # ── 查询 ──
 
-    def get_rules(self) -> dict[str, SchoolRule]:
-        """key → SchoolRule（按 order 排序）"""
+    def get_rules(self) -> dict[str, TuningRule]:
+        """key → TuningRule（按 order 排序）"""
         return dict(self._rules)
 
-    def get_rule(self, key: str) -> SchoolRule | None:
+    def get_rule(self, key: str) -> TuningRule | None:
         return self._rules.get(key)
 
     def get_raw(self, key: str) -> dict:
@@ -417,14 +489,14 @@ class TuningRuleManager:
     def validate(self, data: dict) -> str | None:
         """校验原始 dict；返回错误文案（None 表示通过）"""
         try:
-            parse_school_rule(data)
+            parse_tuning_rule(data)
             return None
         except RuleValidationError as e:
             return str(e)
 
     def save_rule(self, key: str, data: dict) -> None:
         """校验并写盘（校验失败抛 RuleValidationError），然后 reload"""
-        parse_school_rule(data)  # 先校验
+        parse_tuning_rule(data)  # 先校验
         path = self._paths.get(key) or (self._dir / f"{key}.yaml")
         self._dir.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
@@ -450,12 +522,12 @@ class TuningRuleManager:
             "key": key,
             "name": name,
             "order": 100,
-            "weapon_rules": {},
+            "playstyles": {},
             "transmute_priority": [],
             "affix_pool": [],
             "patterns": {},
         }
-        parse_school_rule(data)  # 骨架自校验
+        parse_tuning_rule(data)  # 骨架自校验
         self._dir.mkdir(parents=True, exist_ok=True)
         with open(self._dir / f"{key}.yaml", "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
@@ -515,3 +587,122 @@ def get_tuning_rule_manager() -> TuningRuleManager:
     if _instance is None:
         _instance = TuningRuleManager()
     return _instance
+
+
+# ─── 基础配置加载（tuning_base.yaml） ──────────────────
+
+_VALID_QUALITIES = ("gold", "purple", "blue")
+
+
+def parse_tuning_base(data: dict) -> TuningBase:
+    """原始 tuning_base.yaml dict → TuningBase（校验失败抛 RuleValidationError）"""
+    if not isinstance(data, dict):
+        raise RuleValidationError("tuning_base 顶层必须是 dict")
+    vocab = set(standard_affix_names())
+
+    # ── quality_thresholds ──
+    raw_q = data.get("quality_thresholds") or {}
+    if not isinstance(raw_q, dict):
+        raise RuleValidationError("quality_thresholds 必须是 dict")
+    quality_thresholds: dict[str, list[str]] = {}
+    for cat, qs in raw_q.items():
+        items = list(qs or [])
+        bad = [q for q in items if q not in _VALID_QUALITIES]
+        if bad:
+            raise RuleValidationError(
+                f"quality_thresholds.{cat}: 非法品阶 {bad}（需为 "
+                f"{list(_VALID_QUALITIES)}）")
+        quality_thresholds[str(cat)] = items
+    if "default" not in quality_thresholds:
+        raise RuleValidationError("quality_thresholds 缺少 default 项")
+
+    # ── pvp ──
+    raw_pvp = data.get("pvp") or {}
+    if not isinstance(raw_pvp, dict):
+        raise RuleValidationError("pvp 必须是 dict")
+    pvp_names = list(raw_pvp.get("names") or [])
+    _check_names(pvp_names, vocab, "pvp.names")
+    pvp_parts: dict[str, PvpPartRule] = {}
+    raw_subs = raw_pvp.get("substitutions") or {}
+    if not isinstance(raw_subs, dict):
+        raise RuleValidationError("pvp.substitutions 必须是 dict")
+    for part, spec in raw_subs.items():
+        if part not in PART_KEYS:
+            raise RuleValidationError(f"pvp.substitutions: 未知部位 {part!r}")
+        spec = spec or {}
+        add_to_pool = list(spec.get("add_to_pool") or [])
+        _check_names(add_to_pool, vocab,
+                     f"pvp.substitutions.{part}.add_to_pool")
+        subs = {str(s): str(d) for s, d in spec.items()
+                if s != "add_to_pool"}
+        _check_names(list(subs.keys()), vocab,
+                     f"pvp.substitutions.{part}源词条")
+        _check_names(list(subs.values()), vocab,
+                     f"pvp.substitutions.{part}目标词条")
+        pvp_parts[part] = PvpPartRule(substitutions=subs,
+                                      add_to_pool=add_to_pool)
+
+    return TuningBase(
+        quality_thresholds=quality_thresholds,
+        pvp_names=set(pvp_names),
+        pvp_parts=pvp_parts,
+    )
+
+
+class TuningBaseManager:
+    """基础配置管理器（单文件 tuning_base.yaml）
+
+    提供加载、校验、原始数据访问（UI 编辑用）与保存 + reload。
+    """
+
+    def __init__(self, path: str | Path | None = None):
+        if path is None:
+            from src.constants import SYSTEM_CONFIG_DIR
+            path = SYSTEM_CONFIG_DIR / "yysls" / "tuning_base.yaml"
+        self._path = Path(path)
+        self._base = TuningBase()
+        self._raw: dict = {}
+        self.reload()
+
+    def reload(self) -> None:
+        with open(self._path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        self._raw = data
+        self._base = parse_tuning_base(data)
+
+    def get(self) -> TuningBase:
+        return self._base
+
+    def get_raw(self) -> dict:
+        return copy.deepcopy(self._raw)
+
+    def validate(self, data: dict) -> str | None:
+        try:
+            parse_tuning_base(data)
+            return None
+        except RuleValidationError as e:
+            return str(e)
+
+    def save(self, data: dict) -> None:
+        """校验并写盘（校验失败抛 RuleValidationError），然后 reload"""
+        parse_tuning_base(data)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self._path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        self.reload()
+
+
+_tuning_base_manager: TuningBaseManager | None = None
+
+
+def get_tuning_base_manager() -> TuningBaseManager:
+    """获取全局 TuningBaseManager 单例"""
+    global _tuning_base_manager
+    if _tuning_base_manager is None:
+        _tuning_base_manager = TuningBaseManager()
+    return _tuning_base_manager
+
+
+def get_tuning_base() -> TuningBase:
+    """获取全局基础配置（品阶门槛 + PVP 等价）"""
+    return get_tuning_base_manager().get()

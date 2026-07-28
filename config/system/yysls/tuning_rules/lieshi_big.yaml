@@ -1,7 +1,7 @@
 key: lieshi_big
 name: 裂石大外
 order: 30
-weapon_rules:
+playstyles:
   纯唐:
     main:
       weapon: 横刀
@@ -9,6 +9,7 @@ weapon_rules:
     sub:
       weapon: 陌刀
       damage: null
+    attr: 裂石
   双切:
     main:
       weapon: 陌刀
@@ -16,6 +17,7 @@ weapon_rules:
     sub:
       weapon: 横刀
       damage: null
+    attr: 裂石
   威威:
     main:
       weapon: 陌刀
@@ -23,6 +25,7 @@ weapon_rules:
     sub:
       weapon: 枪
       damage: null
+    attr: 裂石
 transmute_priority:
 - 最大外功攻击
 - 劲
@@ -84,7 +87,7 @@ patterns:
     top_conditions:
     - not_contains:
       - 最小外功攻击
-      - 最大裂石攻击
+      - 最大无相攻击
       - 会心率
       - 精准率
       - 势
@@ -100,7 +103,7 @@ patterns:
     top_conditions:
     - - not_contains:
         - 最小外功攻击
-        - 最大裂石攻击
+        - 最大无相攻击
         - 势
       - count_max:
           symbols:
@@ -119,7 +122,7 @@ patterns:
     top_conditions:
     - not_contains:
       - 最小外功攻击
-      - 最大裂石攻击
+      - 最大无相攻击
       - 会心率
       - 精准率
       - 势

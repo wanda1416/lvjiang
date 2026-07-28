@@ -1,10 +1,11 @@
-"""属性规则管理器
+"""游戏配置管理器
 
-统一管理：
+统一管理 attributes.yaml 中的游戏基础配置数据：
 1. 基础属性品阶推断（原 EquipAttrConfig）
 2. 词条上限查询（含承音值）
 3. 真实词条名 → 配置类别名 映射
 4. 词库类型查询（普通词条 / 定音词条，YAML 中用 _pool: dingyin 声明）
+5. 官方流派与武器注册表（schools 节，get_schools）
 
 数据来源：config/system/yysls/attributes.yaml
 映射关系通过 YAML 中每个类别的 _aliases 字段声明，支持 UI 动态管理。
@@ -104,7 +105,7 @@ BASE_ATTR_PARTS = (
 
 # ─── 属性规则管理器 ─────────────────────────────────────────
 
-class AttrRuleManager:
+class GameConfigManager:
     """属性规则管理器
 
     从 attributes.yaml 加载全部规则，提供：
@@ -455,12 +456,12 @@ class AttrRuleManager:
 
 # ─── 全局单例 ─────────────────────────────────────────────
 
-_instance: AttrRuleManager | None = None
+_instance: GameConfigManager | None = None
 
 
-def get_attr_rule_manager() -> AttrRuleManager:
-    """获取全局 AttrRuleManager 单例"""
+def get_game_config() -> GameConfigManager:
+    """获取全局 GameConfigManager 单例"""
     global _instance
     if _instance is None:
-        _instance = AttrRuleManager()
+        _instance = GameConfigManager()
     return _instance

@@ -1,36 +1,33 @@
 """装备判定模块
 
-提供穷举匹配制的四档评级（顶级/优秀/能用/垃圾）、规则驱动的
-通用流派判定器（GenericSchoolJudge + tuning_rules YAML）
-及词条规则管理（AttrRuleManager）。
+提供穷举匹配制的四档评级（顶级/优秀/能用/垃圾）与规则驱动的
+通用调律规则判定器（GenericTuningJudge + tuning_rules YAML）。
 """
 
-from .base import JudgeResult, Rating, SchoolJudge
-from .generic import GenericSchoolJudge
-from .rules import (
-    SchoolRule, TuningRuleManager, get_tuning_rule_manager,
+from .base import JudgeResult, Rating, TuningJudge
+from .judge import GenericTuningJudge
+from .tuning_rules import (
+    TuningRule, TuningRuleManager, get_tuning_rule_manager,
 )
-from .schools import (
-    get_school_judge, get_school_rules, get_schools,
-    is_school_implemented, judge_equipment_potential,
+from .registry import (
+    get_tuning_judge, get_tuning_rules, get_rule_names,
+    is_rule_implemented, judge_equipment_potential,
     judge_tuning_worthiness, summarize_potential,
 )
-from .attr_rules import get_attr_rule_manager
 
 __all__ = [
     "Rating",
     "JudgeResult",
-    "SchoolJudge",
-    "GenericSchoolJudge",
-    "SchoolRule",
+    "TuningJudge",
+    "GenericTuningJudge",
+    "TuningRule",
     "TuningRuleManager",
     "get_tuning_rule_manager",
-    "get_school_rules",
-    "get_schools",
-    "get_school_judge",
-    "is_school_implemented",
+    "get_tuning_rules",
+    "get_rule_names",
+    "get_tuning_judge",
+    "is_rule_implemented",
     "judge_equipment_potential",
     "judge_tuning_worthiness",
     "summarize_potential",
-    "get_attr_rule_manager",
 ]

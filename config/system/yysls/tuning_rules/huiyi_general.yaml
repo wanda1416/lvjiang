@@ -1,7 +1,7 @@
 key: huiyi_general
-name: 会意通用
+name: 通用会意
 order: 10
-weapon_rules:
+playstyles:
   会意:
     main:
       weapon: 剑
@@ -9,6 +9,7 @@ weapon_rules:
     sub:
       weapon: 枪
       damage: null
+    attr: 鸣金
 transmute_priority:
 - 最大外功攻击
 - 势
@@ -52,30 +53,6 @@ patterns:
     - not_contains:
       - 会意率
       - 最大无相攻击
-  副武器:
-    first:
-    - 最大外功攻击
-    junk_conditions:
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 2
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 劲
-      - 势
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
-    top_conditions:
-    - contains_all:
-      - 劲
-      - 势
   环:
     first:
     - 最大外功攻击
@@ -121,7 +98,7 @@ patterns:
         min: 1
     top_conditions:
     - not_contains:
-      - 最大鸣金攻击
+      - 最大无相攻击
   胫甲:
     first:
     - 劲
@@ -136,6 +113,30 @@ patterns:
     usable_conditions:
     - not_contains:
       - 最大外功攻击
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 势
+  副武器:
+    first:
+    - 最大外功攻击
+    junk_conditions:
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 2
+    usable_conditions:
+    - not_contains:
+      - 最大外功攻击
+    - not_contains:
+      - 劲
+      - 势
     - count_min:
         symbols:
         - 会心率

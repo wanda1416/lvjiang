@@ -173,7 +173,7 @@ class DispatchFakeWF(AutoTuningWorkflow):
 @pytest.fixture
 def stub_session(monkeypatch):
     """隔离插件 session：默认 tuning 节为空 dict，可由测试改写"""
-    import src.apps.yysls.session as session_mod
+    import src.apps.yysls.plugin_session as session_mod
     section = {}
 
     class _S:

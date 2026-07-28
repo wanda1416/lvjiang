@@ -1,17 +1,17 @@
-"""会意通用流派（huiyi_general）判定测试
+"""会意通用规则（huiyi_general）判定测试
 
 覆盖各部位三档条件（junk → usable → top 档序）、鸣金属性分部位
 （武器写 最大无相攻击 / 非武器写 最大鸣金攻击）、全局 keep_pvp
-开关、品阶/首词条筛选、流派注册与调律潜力判定。
-裂石/治疗流派测试见 test_lieshi_judge.py / test_heal_judge.py。
+开关、品阶/首词条筛选、规则注册与调律潜力判定。
+裂石/治疗规则测试见 test_lieshi_judge.py / test_heal_judge.py。
 """
 
 import pytest
 
 from src.apps.yysls.equip_parser.models import Affix, EquipmentData
 from src.apps.yysls.evaluator import (
-    Rating, get_school_judge, get_school_rules, get_schools,
-    is_school_implemented, judge_tuning_worthiness,
+    Rating, get_tuning_judge, get_tuning_rules, get_rule_names,
+    is_rule_implemented, judge_tuning_worthiness,
 )
 
 
@@ -29,12 +29,12 @@ def make_equip(equip_type: str, affix_names: list[str],
 
 @pytest.fixture
 def judge():
-    return get_school_judge("huiyi_general")
+    return get_tuning_judge("huiyi_general")
 
 
 @pytest.fixture
 def judge_pvp():
-    return get_school_judge("huiyi_general", {"keep_pvp": True})
+    return get_tuning_judge("huiyi_general", {"keep_pvp": True})
 
 
 # ─── 主武器（剑，会意规则需要 剑武学增伤） ─────────────────
@@ -206,23 +206,25 @@ class TestFilters:
         assert judge.judge(e).skipped
 
 
-# ─── 流派注册 ──────────────────────────────────────────────
+# ─── 规则注册 ──────────────────────────────────────────────
 
 class TestRegistry:
-    def test_get_schools_order(self):
-        assert list(get_schools()) == [
+    def test_get_rule_names_order(self):
+        assert list(get_rule_names()) == [
             "huiyi_general", "lieshi_small", "lieshi_big",
             "heal_pure", "heal_fire",
         ]
-        assert get_schools()["huiyi_general"] == "会意通用"
+        # 名称随规则文件 name 字段（可被用户改名），不硬编码
+        assert get_rule_names()["huiyi_general"] == \
+            get_tuning_rules()["huiyi_general"].name
 
     def test_all_implemented(self):
-        for key in get_school_rules():
-            assert is_school_implemented(key)
+        for key in get_tuning_rules():
+            assert is_rule_implemented(key)
 
-    def test_unknown_school_raises(self):
+    def test_unknown_rule_raises(self):
         with pytest.raises(ValueError):
-            get_school_judge("no_such_school")
+            get_tuning_judge("no_such_rule")
 
 
 # ─── 调律潜力（judge_tuning_worthiness 汇总） ──────────────
@@ -231,7 +233,7 @@ class TestWorthiness:
     def test_top_equipment_worth(self):
         e = make_equip("环", ["最大外功攻击", "全武学增效", "劲", "势"])
         worth, logs = judge_tuning_worthiness(
-            e, schools=["huiyi_general"])
+            e, rule_keys=["huiyi_general"])
         assert worth
         assert logs
 
@@ -239,13 +241,13 @@ class TestWorthiness:
         # 双废词条不可救 → 不值得
         e = make_equip("环", ["最大外功攻击", "最大裂石攻击", "最大牵丝攻击", "会心率", "精准率"])
         worth, _ = judge_tuning_worthiness(
-            e, schools=["huiyi_general"])
+            e, rule_keys=["huiyi_general"])
         assert not worth
 
     def test_not_applicable_not_veto(self):
         # 扇 不在会意判定范围 → 无有效结论 → 不值得
         e = make_equip("扇", ["最大外功攻击", "劲", "势"])
         worth, logs = judge_tuning_worthiness(
-            e, schools=["huiyi_general"])
+            e, rule_keys=["huiyi_general"])
         assert not worth
         assert any("不适用" in s for s in logs)

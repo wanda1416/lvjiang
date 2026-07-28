@@ -6,14 +6,14 @@
    - 初始词条数值（首词条 cap_pct）>= 90% → 每次添加 金狗粮；
    - 否则：金色品阶不加狗粮；紫色品阶添加 紫狗粮。
    律准石始终通过「一键添加」补足。
-3. 调律前及每轮结束后执行「是否值得调律」潜力判定：遍历全部流派判定器
-   （未实现的跳过），任一流派仍可达 顶级/优秀 即继续；每轮调律产出的
+3. 调律前及每轮结束后执行「是否值得调律」潜力判定：遍历全部调律规则判定器
+   （未实现的跳过），任一规则仍可达 顶级/优秀 即继续；每轮调律产出的
    新词条会补充进装备数据参与下一轮判定，不再达标则提前结束。
-4. 调律结束后（含词条已满直接退出）执行终局判定：含转律模拟的各流派
+4. 调律结束后（含词条已满直接退出）执行终局判定：含转律模拟的各规则
    评级上限写入 output["final_judgement"]，供后续自动调律直接消费。
-5. 临时复用调律 Tab（自动调律）的目标流派配置（不含部位）：潜力/终局
-   判定仅限已启用流派及其子选项配置，避免什么装备都能命中某个流派；
-   无有效配置时回退为全部流派默认配置。
+5. 临时复用调律 Tab（自动调律）的调律规则配置（不含部位）：潜力/终局
+   判定仅限已启用规则及其玩法配置，避免什么装备都能命中某个规则；
+   无有效配置时回退为全部规则默认配置。
 
 参数（由 workflows.yaml 参数面板注入 variables）：
     equip_slot — 装备部位 key（main_weapon/.../wrist）
@@ -24,7 +24,7 @@ from loguru import logger
 
 from src.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
 from src.apps.yysls.evaluator import (
-    get_schools, judge_equipment_potential, judge_tuning_worthiness,
+    get_rule_names, judge_equipment_potential, judge_tuning_worthiness,
 )
 from src.workflows.base import BaseWorkflow
 
@@ -57,7 +57,7 @@ class SingleTuningWorkflow(BaseWorkflow):
         bag_col = str(self.get_variable("bag_col") or "1")
         detail_scene = (self.ARMOR_DETAIL if equip_slot in self.ARMOR_SLOTS
                         else self.WEAPON_DETAIL)
-        self._judge_schools, self._judge_configs = self._load_school_config()
+        self._judge_rule_keys, self._judge_configs = self._load_rule_config()
 
         # 暂时不切页面
         # self._navigate_to_equip()
@@ -166,45 +166,45 @@ class SingleTuningWorkflow(BaseWorkflow):
     # ─── 值得调律判定 & 新词条收集 ───────────────────
 
     @staticmethod
-    def _load_school_config() -> tuple[list[str] | None,
+    def _load_rule_config() -> tuple[list[str] | None,
                                        dict[str, dict] | None]:
-        """临时复用调律 Tab（自动调律）的目标流派配置（不含部位）
+        """临时复用调律 Tab（自动调律）的目标规则配置（不含部位）
 
-        读插件会话 tuning.schools（流派 key → {"enabled": bool,
-        "weapon_rules": [名字]}），仅保留已启用流派参与判定，并合并
-        全局 tuning.keep_pvp 到各流派配置；无有效配置时返回
-        (None, None) 回退为全部流派默认配置。
+        读插件会话 tuning.rules（规则 key → {"enabled": bool,
+        "playstyles": [名字]}），仅保留已启用规则参与判定，并合并
+        全局 tuning.keep_pvp 到各规则配置；无有效配置时返回
+        (None, None) 回退为全部规则默认配置。
 
         Returns:
-            (参与判定的流派 key 列表, 流派 key → 配置 dict)
+            (参与判定的规则 key 列表, 规则 key → 配置 dict)
         """
-        from src.apps.yysls.session import get_plugin_session
+        from src.apps.yysls.plugin_session import get_plugin_session
 
         section = get_plugin_session().get_section("tuning")
-        raw = section.get("schools")
+        raw = section.get("rules")
         if not isinstance(raw, dict):
-            logger.info("未找到目标流派配置，按全部流派默认配置判定")
+            logger.info("未找到目标规则配置，按全部规则默认配置判定")
             return None, None
         keep_pvp = bool(section.get("keep_pvp", False))
         enabled = {k: {**cfg, "keep_pvp": keep_pvp}
                    for k, cfg in raw.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if not enabled:
-            logger.info("目标流派配置未启用任何流派，按全部流派默认配置判定")
+            logger.info("目标规则配置未启用任何规则，按全部规则默认配置判定")
             return None, None
-        names = get_schools()
-        logger.info("目标流派配置（复用自动调律）: "
+        names = get_rule_names()
+        logger.info("目标规则配置（复用自动调律）: "
                     + "、".join(names.get(k, k) for k in enabled))
         return list(enabled), enabled
 
     def _judge_worthiness(self, equip_data: EquipmentData) -> bool:
-        """多流派 or 判定：任一流派仍可达 顶级/优秀 即值得调律
+        """多规则 or 判定：任一规则仍可达 顶级/优秀 即值得调律
 
-        未实现/不覆盖该部位的流派不参与判定；无流派能给出结论时
+        未实现/不覆盖该部位的规则不参与判定；无规则能给出结论时
         判为不值得（结束调律）。判定明细记入 output["worthiness"]。
         """
         worth, logs = judge_tuning_worthiness(
-            equip_data, self._judge_configs, self._judge_schools)
+            equip_data, self._judge_configs, self._judge_rule_keys)
         for line in logs:
             logger.info(f"潜力判定 | {line}")
         self.output["worthiness"] = logs
@@ -222,13 +222,13 @@ class SingleTuningWorkflow(BaseWorkflow):
         logger.info(f"新词条: {affix.name} {affix.value}{affix.unit or ''}{pct}")
 
     def _final_judge(self, equip_data: EquipmentData):
-        """终局判定：含转律模拟的各流派评级上限，供自动调律消费
+        """终局判定：含转律模拟的各规则评级上限，供自动调律消费
 
         词条已满时判定内核退化为纯转律模拟（转掉一条非首词条取最优），
         结构化结果写入 output["final_judgement"]。
         """
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_schools)
+            equip_data, self._judge_configs, self._judge_rule_keys)
         for r in results.values():
             tag = ("不适用" if r["not_applicable"]
                    else "跳过" if r["skipped"] else r["rating"])

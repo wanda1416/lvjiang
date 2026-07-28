@@ -6,7 +6,7 @@
 - ``general``:    通用工具 (concat/range/count_key/contains/find_key/append)
 - ``system``:     系统与 UI (messagebox/save/panel_rows/panel_cols)
 
-燕云专属内置函数（``equipment`` / ``bag_traverse``）位于
+燕云专属内置函数（``equipment`` / ``bag_traversal``）位于
 ``src.apps.yysls.workflows.builtins``，由燕云插件在加载时注册。
 """
 

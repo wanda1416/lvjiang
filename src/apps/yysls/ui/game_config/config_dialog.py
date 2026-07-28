@@ -6,10 +6,10 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout
 from PyQt6.QtCore import Qt
 
-from .attr_tab import AttrManagerTab
+from .config_tab import GameConfigTab
 
 
-class AttrManagerDialog(QDialog):
+class GameConfigDialog(QDialog):
     """游戏配置对话框"""
 
     def __init__(self, parent=None):
@@ -26,5 +26,5 @@ class AttrManagerDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        self._tab = AttrManagerTab()
+        self._tab = GameConfigTab()
         layout.addWidget(self._tab)

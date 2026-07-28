@@ -137,6 +137,15 @@ class UserConfigManager:
         logger.info(f"用户已删除: {name}")
         return True
 
+    def reorder_users(self, names: list[str]) -> bool:
+        """按给定顺序重排用户，names 必须与现有用户完全一致"""
+        if len(names) != len(self._users) or set(names) != set(self._users):
+            return False
+        self._users = {name: self._users[name] for name in names}
+        self._save()
+        logger.info(f"用户顺序已更新: {names}")
+        return True
+
     # ─── 激活用户 ────────────────────────────────────────
 
     def get_active_user_name(self) -> str:

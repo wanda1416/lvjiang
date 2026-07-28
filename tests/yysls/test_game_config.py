@@ -8,6 +8,7 @@
 import pytest
 
 from src.apps.yysls.game_config import (
+    AFFIX_CATEGORY_NAMES,
     POOL_DINGYIN,
     POOL_NORMAL,
     AttrRange,
@@ -264,6 +265,44 @@ class TestWuxueAffixNames:
 
 
 # ─── 数据结构单元 ──────────────────────────────────────────
+
+class TestAffixCategories:
+    def test_categories_ordered_six(self, mgr):
+        # 固定 6 类归属，顺序与 AFFIX_CATEGORY_NAMES 一致
+        categories = mgr.get_affix_categories()
+        assert list(categories.keys()) == list(AFFIX_CATEGORY_NAMES)
+
+    def test_returns_copy_not_reference(self, mgr):
+        # 返回副本，外部修改不影响内部状态
+        first = mgr.get_affix_categories()
+        first["外功类"].append("污染项")
+        assert "污染项" not in mgr.get_affix_categories()["外功类"]
+
+    @pytest.mark.parametrize("affix,category", [
+        ("最大外功攻击", "外功类"),
+        ("劲", "外功类"),
+        ("势", "外功类"),
+        ("最大无相攻击", "属攻类"),
+        ("最大牵丝攻击", "属攻类"),
+        ("会意率", "三率类"),
+        ("全武学增效", "增效类"),
+        ("单体类奇术增伤", "增效类"),
+        ("剑武学增伤", "武器类"),
+        ("扇武学增效", "武器类"),
+        ("气血最大值", "生存类"),
+    ])
+    def test_affix_to_category_mapping(self, mgr, affix, category):
+        assert mgr.get_affix_category(affix) == category
+
+    def test_reverse_matches_forward(self, mgr):
+        # 正反映射一致：每类下的词条反查均归回该类
+        for cat, names in mgr.get_affix_categories().items():
+            for name in names:
+                assert mgr.get_affix_category(name) == cat
+
+    def test_unknown_affix_returns_empty(self, mgr):
+        assert mgr.get_affix_category("未归类词条") == ""
+
 
 class TestLevelRule:
     def test_range_attr_exact_endpoints(self):

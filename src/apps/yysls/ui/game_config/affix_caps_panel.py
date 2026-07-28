@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from src.ui.widgets import FlowLayout
+from src.apps.yysls.game_config import AFFIX_CATEGORY_NAMES
 
 # 配置文件路径
 _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
@@ -180,9 +180,11 @@ class AffixCapsPanel(QWidget):
         alias_title_row.addWidget(self._btn_add_alias)
         alias_layout.addLayout(alias_title_row)
 
-        # 不分组：词条名标签容器（流式布局，支持自动换行）
+        # 不分组：词条名逐行控件容器（每行：词条名 + 归属下拉 + 删除）
         self._alias_tags_widget = QWidget()
-        self._alias_tags_layout = FlowLayout(self._alias_tags_widget, spacing=6)
+        self._alias_tags_layout = QVBoxLayout(self._alias_tags_widget)
+        self._alias_tags_layout.setContentsMargins(0, 0, 0, 0)
+        self._alias_tags_layout.setSpacing(2)
         alias_layout.addWidget(self._alias_tags_widget)
 
         # 分组：按组 Tab 页展示词条名（双击页签重命名分组）
@@ -737,8 +739,7 @@ class AffixCapsPanel(QWidget):
 
         aliases = self._get_aliases()
         for alias in aliases:
-            tag = self._create_alias_tag(alias)
-            self._alias_tags_layout.addWidget(tag)
+            self._alias_tags_layout.addWidget(self._create_alias_row(alias))
 
         # 无词条名时显示提示
         if not aliases:
@@ -758,13 +759,16 @@ class AffixCapsPanel(QWidget):
 
         for group_name, names in self._get_alias_groups().items():
             page = QWidget()
-            flow = FlowLayout(page, spacing=6)
+            rows = QVBoxLayout(page)
+            rows.setContentsMargins(0, 0, 0, 0)
+            rows.setSpacing(2)
             for alias in names:
-                flow.addWidget(self._create_alias_tag(alias))
+                rows.addWidget(self._create_alias_row(alias))
             if not names:
                 hint = QLabel("（无词条名，点击 '+ 词条名' 添加）")
                 hint.setStyleSheet("color: #888; font-size: 12px;")
-                flow.addWidget(hint)
+                rows.addWidget(hint)
+            rows.addStretch()
             self._alias_group_tabs.addTab(page, group_name)
 
         if prev_name:
@@ -773,20 +777,42 @@ class AffixCapsPanel(QWidget):
                     self._alias_group_tabs.setCurrentIndex(i)
                     break
 
-    def _create_alias_tag(self, alias: str) -> QWidget:
-        """创建单个词条名标签组件（双击重命名）"""
-        tag_widget = _AliasTag(alias, self._rename_alias)
-        tag_widget.setStyleSheet(
-            "QWidget { background-color: #e0e0e0; border-radius: 3px; padding: 2px 6px; }"
-        )
-        tag_layout = QHBoxLayout(tag_widget)
-        tag_layout.setContentsMargins(6, 2, 4, 2)
-        tag_layout.setSpacing(4)
+    def _create_alias_row(self, alias: str) -> QWidget:
+        """创建单行词条名控件（词条名双击重命名 + 归属下拉 + 删除）"""
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(2, 1, 2, 1)
+        row_layout.setSpacing(6)
 
-        # 别名文本
+        # 词条名（双击重命名）
+        name_widget = _AliasTag(alias, self._rename_alias)
+        name_widget.setMinimumWidth(160)
+        name_widget.setStyleSheet(
+            "QWidget { background-color: #e0e0e0; border-radius: 3px; }"
+        )
+        name_layout = QHBoxLayout(name_widget)
+        name_layout.setContentsMargins(6, 2, 6, 2)
         label = QLabel(alias)
         label.setStyleSheet("background: transparent; font-size: 12px;")
-        tag_layout.addWidget(label)
+        name_layout.addWidget(label)
+        name_layout.addStretch()
+        row_layout.addWidget(name_widget)
+
+        # 归属下拉（空串 + 5 类；定音词组禁用并置空）
+        combo = QComboBox()
+        combo.setFixedWidth(90)
+        combo.addItem("")
+        combo.addItems(list(AFFIX_CATEGORY_NAMES))
+        if self._is_dingyin():
+            combo.setCurrentText("")
+            combo.setEnabled(False)
+        else:
+            combo.setCurrentText(self._get_affix_category(alias))
+            combo.currentTextChanged.connect(
+                lambda text, a=alias: self._on_category_changed(a, text))
+        row_layout.addWidget(combo)
+
+        row_layout.addStretch()
 
         # 删除按钮
         del_btn = QPushButton("×")
@@ -797,9 +823,29 @@ class AffixCapsPanel(QWidget):
             "QPushButton:hover { color: #c00; }"
         )
         del_btn.clicked.connect(lambda: self._remove_alias(alias))
-        tag_layout.addWidget(del_btn)
+        row_layout.addWidget(del_btn)
 
-        return tag_widget
+        return row
+
+    def _get_affix_category(self, alias: str) -> str:
+        """从 self._data['affix_categories'] 反查词条归属（无归属返回空串）"""
+        categories = self._data.get("affix_categories") or {}
+        for cat, names in categories.items():
+            if isinstance(names, list) and alias in names:
+                return cat
+        return ""
+
+    def _on_category_changed(self, alias: str, category: str):
+        """归属下拉切换：先从所有归属移除，再加入所选（空串=清除）"""
+        if self._saving:
+            return
+        categories = self._data.setdefault("affix_categories", {})
+        for names in categories.values():
+            if isinstance(names, list) and alias in names:
+                names.remove(alias)
+        if category:
+            categories.setdefault(category, []).append(alias)
+        self._save_data()
 
     def _rename_alias(self, alias: str):
         """双击词条名标签重命名（原位替换，兼容分组/不分组形态）"""

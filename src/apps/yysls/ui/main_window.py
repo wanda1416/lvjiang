@@ -1,7 +1,7 @@
 """燕云十六声主窗口 —— 继承通用 MainWindow，追加燕云专属功能。
 
 插件扩展点：
-- 「燕云」菜单：游戏配置（F5）、调律规则（F6，内含调律验证入口）
+- 「燕云」菜单：游戏配置（F5）、调律配置（F6，内含调律验证入口）
 - 左侧 Tab 2：调律（部位选择 + 开始调律）
 - 右侧 Tab 2：装备状态
 """
@@ -20,7 +20,7 @@ from loguru import logger
 
 from src.ui.main_window import MainWindow as GenericMainWindow
 from .equip_status_panel import EquipStatusPanel
-from .school_config_widget import SchoolConfigWidget
+from .tuning_config_widget import TuningConfigWidget
 
 
 class MainWindow(GenericMainWindow):
@@ -30,17 +30,17 @@ class MainWindow(GenericMainWindow):
 
     def _plugin_menu_spec(self) -> tuple[str, list[tuple[str, Any, str]]] | None:
         return ("燕云", [
-            ("游戏配置", self._open_attr_manager, "F5"),
-            ("调律规则", self._open_tuning_rules, "F6"),
+            ("游戏配置", self._open_game_config, "F5"),
+            ("调律配置", self._open_tuning_rules, "F6"),
         ])
 
-    def _open_attr_manager(self):
-        from .attr_manager import AttrManagerDialog
-        dialog = AttrManagerDialog(parent=self)
+    def _open_game_config(self):
+        from .game_config import GameConfigDialog
+        dialog = GameConfigDialog(parent=self)
         dialog.exec()
 
     def _open_tuning_rules(self):
-        from .tuning_rules import TuningRulesDialog
+        from .rules_editor import TuningRulesDialog
         dialog = TuningRulesDialog(parent=self)
         dialog.exec()
 
@@ -72,9 +72,9 @@ class MainWindow(GenericMainWindow):
 
         # ── 流派配置（公共控件，变更即持久化）──
         tuning_layout.addWidget(QLabel("<b>流派配置（可多选）：</b>"))
-        self._school_config = SchoolConfigWidget()
-        self._school_config.config_changed.connect(self._save_tuning_config)
-        tuning_layout.addWidget(self._school_config)
+        self._tuning_config = TuningConfigWidget()
+        self._tuning_config.config_changed.connect(self._save_tuning_config)
+        tuning_layout.addWidget(self._tuning_config)
 
         # ── 部位选择（标题行内嵌全选/取消全选，仅作用于部位复选框）──
         slots_header = QHBoxLayout()
@@ -160,32 +160,29 @@ class MainWindow(GenericMainWindow):
     # ─── 调律配置持久化（插件会话 config/local/yysls/session.json）──
 
     def _load_tuning_config(self):
-        from ..session import get_plugin_session
+        from ..plugin_session import get_plugin_session
         default_slots = ["main_weapon", "sub_weapon", "ring", "pendant",
                          "head", "chest", "leg", "wrist"]
         tuning = get_plugin_session().get_section("tuning")
         selected = tuning.get("selected_slots") or default_slots
-        raw = tuning.get("schools")
+        raw = tuning.get("rules")
         if isinstance(raw, dict):
-            schools_cfg = raw
-        elif isinstance(raw, list):
-            # 旧 list 格式兼容：列表内流派视为启用
-            schools_cfg = {k: {"enabled": True} for k in raw}
+            rules_cfg = raw
         else:
-            schools_cfg = {"huiyi_general": {"enabled": True}}
+            rules_cfg = {"huiyi_general": {"enabled": True}}
         for cb in self._tuning_checkboxes:
             cb.blockSignals(True)
             cb.setChecked(cb.objectName() in selected)
             cb.blockSignals(False)
-        self._school_config.set_config(schools_cfg)
-        self._school_config.set_keep_pvp(bool(tuning.get("keep_pvp", False)))
-        self._school_config.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
+        self._tuning_config.set_config(rules_cfg)
+        self._tuning_config.set_keep_pvp(bool(tuning.get("keep_pvp", False)))
+        self._tuning_config.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
 
     def _save_tuning_config(self):
-        from ..session import get_plugin_session
+        from ..plugin_session import get_plugin_session
         get_plugin_session().set_section("tuning", {
             "selected_slots": self._get_tuning_selected_slots(),
-            "schools": self._get_tuning_school_config(),
+            "rules": self._get_tuning_rule_config(),
             "keep_pvp": self._get_tuning_keep_pvp(),
             "skip_tuning": self._get_tuning_skip_tuning(),
         })
@@ -198,14 +195,14 @@ class MainWindow(GenericMainWindow):
     def _get_tuning_selected_slots(self) -> list[str]:
         return [cb.objectName() for cb in self._tuning_checkboxes if cb.isChecked()]
 
-    def _get_tuning_school_config(self) -> dict[str, dict]:
+    def _get_tuning_rule_config(self) -> dict[str, dict]:
         """流派配置委托公共控件收集"""
-        return self._school_config.get_config()
+        return self._tuning_config.get_config()
 
     def _get_tuning_keep_pvp(self) -> bool:
         """全局「保留 PVP 装备」开关（公共控件顶部复选框）"""
-        return self._school_config.get_keep_pvp()
+        return self._tuning_config.get_keep_pvp()
 
     def _get_tuning_skip_tuning(self) -> bool:
         """全局「跳过实际调律」开关（临时测试用，与 keep_pvp 同级）"""
-        return self._school_config.get_skip_tuning()
+        return self._tuning_config.get_skip_tuning()

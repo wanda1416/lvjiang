@@ -17,7 +17,7 @@ from loguru import logger
 
 from src.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
 from src.apps.yysls.evaluator import (
-    Rating, get_schools, judge_equipment_potential, summarize_potential,
+    Rating, get_rule_names, judge_equipment_potential, summarize_potential,
 )
 from src.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL, TRAVERSALS,
@@ -100,21 +100,21 @@ class AutoTuningWorkflow(BaseWorkflow):
         self._doc_seq = 0
         keep_pvp = any(bool(cfg.get("keep_pvp"))
                        for cfg in (self._judge_configs or {}).values())
-        self._doc.start_run(username, self._describe_schools(), slots, keep_pvp)
+        self._doc.start_run(username, self._describe_rules(), slots, keep_pvp)
         logger.info(f"调律说明文档: {self._doc.path}")
 
-    def _describe_schools(self) -> list[str]:
-        """由判定配置生成流派描述：显示名（武器规则：勾选项）"""
+    def _describe_rules(self) -> list[str]:
+        """由判定配置生成规则描述：显示名（玩法：勾选项）"""
         configs = self._judge_configs or {}
         if not configs:
             return []
-        names = get_schools()
+        names = get_rule_names()
         descs = []
         for key, cfg in configs.items():
             name = names.get(key, key)
-            rules = cfg.get("weapon_rules")
-            if rules:
-                name += f"（武器规则：{'、'.join(rules)}）"
+            playstyles = cfg.get("playstyles")
+            if playstyles:
+                name += f"（玩法：{'、'.join(playstyles)}）"
             descs.append(name)
         return descs
 
@@ -224,7 +224,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         key = getattr(self, "_scroll_strategy", "") or ""
         if not key:
             try:
-                from src.apps.yysls.session import get_plugin_session
+                from src.apps.yysls.plugin_session import get_plugin_session
                 key = (get_plugin_session().get_section("tuning")
                        .get("scroll_strategy") or "")
             except Exception as e:  # noqa: BLE001
@@ -278,7 +278,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         # B. 潜力判定：不值得 → 垃圾胚子；未处理过，不收集 report，
         #    也不写说明文档（只写实际进入调律的装备）
         potential = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_schools)
+            equip_data, self._judge_configs, self._judge_rule_keys)
         worth, logs = summarize_potential(potential)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
@@ -395,7 +395,7 @@ class AutoTuningWorkflow(BaseWorkflow):
                            judgement: dict, report: dict):
         """单件调律完成/词条已满、回到背包页后的后处理挂载点。
 
-        预留：垃圾→回收、优秀→转律、顶级→装上等。当前仅按各流派最优
+        预留：垃圾→回收、优秀→转律、顶级→装上等。当前仅按各规则最优
         评级记录一行后 pass。
         """
         best = ""
@@ -409,24 +409,24 @@ class AutoTuningWorkflow(BaseWorkflow):
     # ─── 判定配置兜底 ──────────────────────────────────────
 
     def _ensure_judge_config(self):
-        """保证 _judge_configs/_judge_schools 可用。
+        """保证 _judge_configs/_judge_rule_keys 可用。
 
         优先用 run_control 注入的实时 UI 配置；未注入时回退读插件会话
-        tuning.schools + tuning.keep_pvp（复刻 single_tuning._load_school_config），
-        无有效配置时回退 (None, None) 即全部流派默认配置。
+        tuning.rules + tuning.keep_pvp（复刻 single_tuning._load_rule_config），
+        无有效配置时回退 (None, None) 即全部规则默认配置。
         """
         if getattr(self, "_judge_configs", None) is not None or \
-                getattr(self, "_judge_schools", None) is not None:
+                getattr(self, "_judge_rule_keys", None) is not None:
             return
-        self._judge_schools = None
+        self._judge_rule_keys = None
         self._judge_configs = None
         try:
-            from src.apps.yysls.session import get_plugin_session
+            from src.apps.yysls.plugin_session import get_plugin_session
             section = get_plugin_session().get_section("tuning")
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"读取流派配置失败，按全部流派默认判定: {e}")
+            logger.warning(f"读取调律规则配置失败，按全部规则默认判定: {e}")
             return
-        raw = section.get("schools")
+        raw = section.get("rules")
         if not isinstance(raw, dict):
             return
         keep_pvp = bool(section.get("keep_pvp", False))
@@ -434,7 +434,7 @@ class AutoTuningWorkflow(BaseWorkflow):
                    for k, cfg in raw.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if enabled:
-            self._judge_schools = list(enabled)
+            self._judge_rule_keys = list(enabled)
             self._judge_configs = enabled
 
     # ─── 调律执行（移植自 single_tuning，single_tuning 保持不动）──
@@ -466,13 +466,13 @@ class AutoTuningWorkflow(BaseWorkflow):
         return "", reason
 
     def _judge_worthiness(self, equip_data: EquipmentData) -> tuple[bool, list[str]]:
-        """多流派 or 潜力判定：任一流派仍可达 顶级/优秀 即值得调律
+        """多规则 or 潜力判定：任一规则仍可达 顶级/优秀 即值得调律
 
         Returns:
-            (是否值得, 命中 顶级/优秀 的流派显示名列表，供说明文档)
+            (是否值得, 命中 顶级/优秀 的规则显示名列表，供说明文档)
         """
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_schools)
+            equip_data, self._judge_configs, self._judge_rule_keys)
         worth, logs = summarize_potential(results)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
@@ -501,9 +501,9 @@ class AutoTuningWorkflow(BaseWorkflow):
         return desc
 
     def _final_judge(self, equip_data: EquipmentData) -> dict:
-        """终局判定：含转律模拟的各流派评级上限，返回结构化结果供 report/hook 消费"""
+        """终局判定：含转律模拟的各规则评级上限，返回结构化结果供 report/hook 消费"""
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_schools)
+            equip_data, self._judge_configs, self._judge_rule_keys)
         for r in results.values():
             tag = ("不适用" if r["not_applicable"]
                    else "跳过" if r["skipped"] else r["rating"])

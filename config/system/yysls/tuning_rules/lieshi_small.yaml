@@ -1,7 +1,7 @@
 key: lieshi_small
 name: 裂石小外
 order: 20
-weapon_rules:
+playstyles:
   纯唐:
     main:
       weapon: 横刀
@@ -9,6 +9,7 @@ weapon_rules:
     sub:
       weapon: 陌刀
       damage: null
+    attr: 裂石
   双切:
     main:
       weapon: 陌刀
@@ -16,6 +17,7 @@ weapon_rules:
     sub:
       weapon: 横刀
       damage: null
+    attr: 裂石
   威威:
     main:
       weapon: 陌刀
@@ -23,6 +25,15 @@ weapon_rules:
     sub:
       weapon: 枪
       damage: null
+    attr: 裂石
+  破竹鸢:
+    main:
+      weapon: 手甲
+      damage: 手甲武学增伤
+    sub:
+      weapon: 绳镖
+      damage: null
+    attr: 破竹
 transmute_priority:
 - 最小外功攻击
 - 敏
@@ -78,7 +89,7 @@ patterns:
       - 最小外功攻击
     top_conditions:
     - not_contains:
-      - 最小裂石攻击
+      - 最小无相攻击
       - 精准率
   冠胄:
     first:
@@ -89,10 +100,10 @@ patterns:
       - 最小外功攻击
     - not_contains:
       - 敏
-      - 最大裂石攻击
+      - 最大无相攻击
     top_conditions:
     - - not_contains:
-        - 最小裂石攻击
+        - 最小无相攻击
       - count_max:
           symbols:
           - 精准率
@@ -110,7 +121,7 @@ patterns:
       - 最小外功攻击
     top_conditions:
     - - not_contains:
-        - 最小裂石攻击
+        - 最小无相攻击
       - not_contains:
         - 会心率
         - 精准率

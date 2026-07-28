@@ -1,25 +1,28 @@
-"""装备调律规则对话框
+"""装备调律配置对话框
 
-顶层 QTabWidget：每个调律规则一个 Tab（SchoolRulePanel）。
-Tab 栏右上角「＋ 新增规则」可添加规则 Tab、「装备调律验证」
-可在改规则后立即验证；规则设置页可删除本规则（移除 Tab）。
-底部状态栏显示校验错误（红色）/ 最后保存时间。自动保存，
-无手动保存按钮。
+左侧一级导航（基础配置 + 各规则）+ 右侧内容区（QStackedWidget）：
+- 基础配置：品阶门槛与 PVP 词条集合/部位等价（BaseConfigPage）；
+- 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
+  双击规则导航项弹窗修改规则名称（基础配置项不可改名）。
+左侧导航下方为「＋ 新增规则 / 装备调律验证」入口。
+底部状态栏显示校验错误（红色）/ 最后保存时间。自动保存，无手动保存按钮。
 """
 
 import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget,
+    QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog,
+    QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
+    QStackedWidget, QVBoxLayout,
 )
 
-from src.apps.yysls.evaluator.rules import (
-    RuleValidationError, get_tuning_rule_manager,
+from src.apps.yysls.evaluator.tuning_rules import (
+    RuleValidationError, get_tuning_base_manager, get_tuning_rule_manager,
 )
 
-from .school_rule_panel import SchoolRulePanel
+from .base_config_page import BaseConfigPage
+from .rule_panel import RulePanel
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -68,11 +71,11 @@ class _NewRuleDialog(QDialog):
 
 
 class TuningRulesDialog(QDialog):
-    """装备调律规则对话框"""
+    """装备调律配置对话框"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("调律规则")
+        self.setWindowTitle("调律配置")
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(
@@ -85,35 +88,74 @@ class TuningRulesDialog(QDialog):
         layout.setContentsMargins(8, 8, 8, 8)
 
         self._manager = get_tuning_rule_manager()
-        self._tabs = QTabWidget()
-        for key, rule in self._manager.get_rules().items():
-            self._add_rule_tab(key, rule.name)
+        self._base_manager = get_tuning_base_manager()
 
-        # Tab 栏右上角：新增规则 + 验证入口
-        corner = QWidget()
-        corner_layout = QHBoxLayout(corner)
-        corner_layout.setContentsMargins(0, 0, 0, 0)
-        corner_layout.setSpacing(4)
+        body = QHBoxLayout()
+
+        # ── 左侧一级导航 + 规则入口 ──
+        left = QVBoxLayout()
+        left.setContentsMargins(0, 0, 0, 0)
+        self._nav = QListWidget()
+        self._nav.setFixedWidth(180)
+        self._nav.currentRowChanged.connect(self._on_nav_changed)
+        self._nav.itemDoubleClicked.connect(self._on_nav_double_clicked)
+        left.addWidget(self._nav, 1)
         btn_new = QPushButton("＋ 新增规则")
         btn_new.clicked.connect(self._create_rule)
-        corner_layout.addWidget(btn_new)
+        left.addWidget(btn_new)
         btn_judge_test = QPushButton("装备调律验证")
         btn_judge_test.clicked.connect(self._open_judge_test)
-        corner_layout.addWidget(btn_judge_test)
-        self._tabs.setCornerWidget(corner, Qt.Corner.TopRightCorner)
-        layout.addWidget(self._tabs)
+        left.addWidget(btn_judge_test)
+        body.addLayout(left)
+
+        # ── 右侧内容区 ──
+        self._stack = QStackedWidget()
+        body.addWidget(self._stack, 1)
+        layout.addLayout(body, 1)
 
         self._status_label = QLabel("规则变更即校验，校验通过自动保存并生效")
         layout.addWidget(self._status_label)
 
-    # ── 规则 Tab 增删 ──
+        # 一级节点：基础配置 → 各规则
+        self._nav.addItem("基础配置")
+        self._stack.addWidget(BaseConfigPage(
+            self._base_manager, self._set_status))
+        for key, rule in self._manager.get_rules().items():
+            self._add_rule_page(key, rule.name)
+        self._nav.setCurrentRow(0)
 
-    def _add_rule_tab(self, key: str, name: str) -> SchoolRulePanel:
-        panel = SchoolRulePanel(key, self._manager, self._set_status,
+    # ── 规则页增删 ──
+
+    def _add_rule_page(self, key: str, name: str) -> RulePanel:
+        panel = RulePanel(key, self._manager, self._set_status,
                                 on_delete=self._delete_rule)
         panel._dialog_rename_cb = self._rename_rule
-        self._tabs.addTab(panel, name)
+        self._stack.addWidget(panel)
+        self._nav.addItem(name)
         return panel
+
+    def _on_nav_changed(self, row: int):
+        if row >= 0:
+            self._stack.setCurrentIndex(row)
+
+    def _on_nav_double_clicked(self, item):
+        """双击规则导航项 → 弹窗修改规则名称（基础配置不可改名）"""
+        row = self._nav.row(item)
+        if row < 1:
+            return
+        panel = self._stack.widget(row)
+        if not isinstance(panel, RulePanel):
+            return
+        old_name = panel.rule_name
+        new_name, ok = QInputDialog.getText(
+            self, "重命名规则", "规则名称：", text=old_name)
+        if not ok:
+            return
+        new_name = new_name.strip()
+        if not new_name or new_name == old_name:
+            return
+        panel.set_rule_name(new_name)
+        item.setText(new_name)
 
     def _create_rule(self):
         dlg = _NewRuleDialog(self)
@@ -125,8 +167,8 @@ class TuningRulesDialog(QDialog):
         except RuleValidationError as e:
             QMessageBox.warning(self, "新增调律规则", str(e))
             return
-        panel = self._add_rule_tab(key, name)
-        self._tabs.setCurrentWidget(panel)
+        self._add_rule_page(key, name)
+        self._nav.setCurrentRow(self._nav.count() - 1)
         self._set_status(f"已新增规则「{name}」", False)
 
     def _delete_rule(self, key: str):
@@ -135,20 +177,22 @@ class TuningRulesDialog(QDialog):
         except RuleValidationError as e:
             QMessageBox.warning(self, "删除规则", str(e))
             return
-        for i in range(self._tabs.count()):
-            panel = self._tabs.widget(i)
-            if isinstance(panel, SchoolRulePanel) and panel.rule_key == key:
-                self._tabs.removeTab(i)
+        for i in range(1, self._stack.count()):
+            panel = self._stack.widget(i)
+            if isinstance(panel, RulePanel) and panel.rule_key == key:
+                self._stack.removeWidget(panel)
                 panel.deleteLater()
+                self._nav.takeItem(i)
                 break
+        self._nav.setCurrentRow(0)
         self._set_status(f"已删除规则 {key}", False)
 
     def _rename_rule(self, old_key: str, new_key: str, new_name: str):
-        """更新对应 Tab 的标题文本（由 panel 在 key/name 变更时回调）"""
-        for i in range(self._tabs.count()):
-            panel = self._tabs.widget(i)
-            if isinstance(panel, SchoolRulePanel) and panel.rule_key == new_key:
-                self._tabs.setTabText(i, new_name)
+        """更新对应导航项的标题文本（由 panel 在 key/name 变更时回调）"""
+        for i in range(1, self._stack.count()):
+            panel = self._stack.widget(i)
+            if isinstance(panel, RulePanel) and panel.rule_key == new_key:
+                self._nav.item(i).setText(new_name)
                 break
 
     # ── 其他 ──

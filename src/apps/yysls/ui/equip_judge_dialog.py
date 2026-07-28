@@ -1,11 +1,11 @@
-"""装备识别测试对话框
+"""装备调律验证对话框
 
-装备调律规则对话框顶部按钮入口：纯手工构造装备验证判定器，
+装备调律配置对话框顶部按钮入口：纯手工构造装备验证判定器，
 改规则后可立即验证。
-左侧为流派配置（SchoolConfigWidget，初值取自插件会话调律配置，
+左侧为调律规则配置（TuningConfigWidget，初值取自插件会话调律配置，
 改动不回写 session）；右侧手选 部位 + 品阶 + 词条 1-5（数值默认
 承音 94%），点「判定」输出调律潜力结论，词条满 5 条时追加各启用
-流派的完整定级。词条名一律为 attributes.yaml 标准字段。
+规则的完整定级。词条名一律为 attributes.yaml 标准字段。
 """
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ from PyQt6.QtWidgets import (
 from src.apps.yysls.equip_parser.constants import WEAPON_TYPES
 from src.apps.yysls.equip_parser.models import Affix, EquipmentData
 from src.apps.yysls.evaluator import (
-    get_attr_rule_manager, get_school_judge, is_school_implemented,
-    judge_tuning_worthiness,
+    get_tuning_judge, is_rule_implemented, judge_tuning_worthiness,
 )
-from .school_config_widget import SchoolConfigWidget
+from src.apps.yysls.game_config import get_game_config
+from .tuning_config_widget import TuningConfigWidget
 
 
 # 部位下拉：10 武器 + 首饰 + 防具（共 16 项）
@@ -184,7 +184,7 @@ class EquipAffixEditor(QWidget):
             return
         name = self._affix_combos[row].currentText()
         if name != _NONE_ITEM:
-            caps = get_attr_rule_manager().get_affix_caps(_LEVEL, name)
+            caps = get_game_config().get_affix_caps(_LEVEL, name)
             if caps is not None:
                 self._affix_spins[row].setValue(caps["chengyin"])
         else:
@@ -195,7 +195,7 @@ class EquipAffixEditor(QWidget):
 
     def get_equipment(self) -> EquipmentData | None:
         """按当前选择构造装备（无任何词条时返回 None）"""
-        mgr = get_attr_rule_manager()
+        mgr = get_game_config()
         affixes: list[Affix] = []
         for combo, spin in zip(self._affix_combos, self._affix_spins):
             name = combo.currentText()
@@ -227,14 +227,14 @@ class EquipJudgeTestDialog(QDialog):
         # ── 左：流派配置（读 session 初值，不回写）──
         left = QVBoxLayout()
         left.addWidget(QLabel("<b>流派配置（仅本次测试，不保存）：</b>"))
-        self._school_config = SchoolConfigWidget()
-        schools_cfg, keep_pvp = self._load_session_tuning()
-        self._school_config.set_config(schools_cfg)
-        self._school_config.set_keep_pvp(keep_pvp)
-        school_scroll = QScrollArea()
-        school_scroll.setWidgetResizable(True)
-        school_scroll.setWidget(self._school_config)
-        left.addWidget(school_scroll)
+        self._tuning_config = TuningConfigWidget()
+        rules_cfg, keep_pvp = self._load_session_tuning()
+        self._tuning_config.set_config(rules_cfg)
+        self._tuning_config.set_keep_pvp(keep_pvp)
+        rules_scroll = QScrollArea()
+        rules_scroll.setWidgetResizable(True)
+        rules_scroll.setWidget(self._tuning_config)
+        left.addWidget(rules_scroll)
         layout.addLayout(left, stretch=1)
 
         # ── 右：装备编辑 + 判定 ──
@@ -252,24 +252,24 @@ class EquipJudgeTestDialog(QDialog):
 
     @staticmethod
     def _load_session_tuning() -> tuple[dict, bool]:
-        """读取调律 Tab 已保存的流派配置与全局 PVP 开关作为初值（插件会话）"""
-        from ..session import get_plugin_session
+        """读取调律 Tab 已保存的规则配置与全局 PVP 开关作为初值（插件会话）"""
+        from ..plugin_session import get_plugin_session
         section = get_plugin_session().get_section("tuning")
         keep_pvp = bool(section.get("keep_pvp", False))
-        raw = section.get("schools")
+        raw = section.get("rules")
         if isinstance(raw, dict):
             return raw, keep_pvp
         return {}, keep_pvp
 
     def _on_judge(self):
-        keep_pvp = self._school_config.get_keep_pvp()
+        keep_pvp = self._tuning_config.get_keep_pvp()
         configs = {
             k: {**cfg, "keep_pvp": keep_pvp}
-            for k, cfg in self._school_config.get_config().items()
+            for k, cfg in self._tuning_config.get_config().items()
             if cfg.get("enabled")
         }
         if not configs:
-            self.result_text.setPlainText("请先在左侧启用至少一个流派")
+            self.result_text.setPlainText("请先在左侧启用至少一个调律规则")
             return
         equip = self.editor.get_equipment()
         if equip is None:
@@ -277,7 +277,7 @@ class EquipJudgeTestDialog(QDialog):
             return
 
         worth, logs = judge_tuning_worthiness(
-            equip, configs, schools=list(configs))
+            equip, configs, rule_keys=list(configs))
         lines = [
             "【调律潜力】" + ("值得调律" if worth else "不值得调律"),
             *logs,
@@ -288,9 +288,9 @@ class EquipJudgeTestDialog(QDialog):
             lines.append("")
             lines.append("【完整定级】")
             for key, cfg in configs.items():
-                if not is_school_implemented(key):
+                if not is_rule_implemented(key):
                     continue
-                judge = get_school_judge(key, cfg)
+                judge = get_tuning_judge(key, cfg)
                 res = judge.judge(equip)
                 if res.not_applicable:
                     tag = "不适用"
@@ -299,5 +299,5 @@ class EquipJudgeTestDialog(QDialog):
                 else:
                     tag = res.rating.value
                 lines.append(
-                    f"{judge.school_name}: {tag}（{'；'.join(res.reasons)}）")
+                    f"{judge.rule_name}: {tag}（{'；'.join(res.reasons)}）")
         self.result_text.setPlainText("\n".join(lines))

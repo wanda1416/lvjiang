@@ -1,6 +1,6 @@
 """装备判定公共基类
 
-定义四档评级、判定结果数据结构和流派判定器接口。
+定义四档评级、判定结果数据结构和调律规则判定器接口。
 评级采用穷举匹配制（参考 docs/10-game/11-调律说明文档/01-会意流派调律说明.md）。
 """
 
@@ -35,8 +35,8 @@ class JudgeResult:
     """单件装备判定结果
 
     skipped=True 表示品阶/首词条不符，无调律价值（直接跳过，不参与评级）。
-    not_applicable=True 表示该流派不覆盖此部位，无法给出结论
-    （不是否决票，多流派 or 判定时应忽略该结果）。
+    not_applicable=True 表示该规则不覆盖此部位，无法给出结论
+    （不是否决票，多规则 or 判定时应忽略该结果）。
     is_pvp=True 表示装备因 PVP 词条（单体奇术增伤/对玩家增效）被保留。
     """
     equipment: EquipmentData
@@ -64,29 +64,29 @@ class JudgeResult:
         return d
 
 
-# ─── 流派判定器基类 ────────────────────────────────────────
+# ─── 调律规则判定器基类 ────────────────────────────────────────
 
-class SchoolJudge(ABC):
-    """流派判定器公共基类
+class TuningJudge(ABC):
+    """调律规则判定器公共基类
 
     子类需实现:
     - judge: 对完整装备进行穷举匹配定级
 
-    元数据（GenericSchoolJudge 构造时由规则填充为实例属性，
+    元数据（GenericTuningJudge 构造时由规则填充为实例属性，
     类属性仅作默认值）:
-    - school_key: 流派标识（配置持久化用）
-    - school_name: 流派显示名
-    - implemented: 判定逻辑是否已实现（未实现的流派 judge 抛 NotImplementedError）
-    - weapon_rule_options: 武器规则名字 → 摘要（UI 据此生成复选框）
+    - rule_key: 规则标识（配置持久化用）
+    - rule_name: 规则显示名
+    - implemented: 判定逻辑是否已实现（未实现的规则 judge 抛 NotImplementedError）
+    - playstyle_options: 玩法名字 → 摘要（UI 据此生成复选框）
 
-    config 形状：{"weapon_rules": [...], "keep_pvp": bool}，其中
+    config 形状：{"playstyles": [...], "keep_pvp": bool}，其中
     keep_pvp 为全局配置（由调用方注入）。
     """
 
-    school_key: str = ""
-    school_name: str = ""
+    rule_key: str = ""
+    rule_name: str = ""
     implemented: bool = False
-    weapon_rule_options: dict[str, str] = {}
+    playstyle_options: dict[str, str] = {}
 
     def __init__(self, config: dict | None = None):
         self.config: dict = config or {}
@@ -109,6 +109,6 @@ class SchoolJudge(ABC):
 
         把剩余空词条槽视作可变成任意词条的万能牌，返回该装备能达到的
         评级上限（rating）。rating ∈ {TOP, EXCELLENT} 且未 skipped
-        视为值得调律；未实现的流派抛 NotImplementedError（调用方跳过）。
+        视为值得调律；未实现的规则抛 NotImplementedError（调用方跳过）。
         """
-        raise NotImplementedError(f"{self.school_name} 调律潜力判定暂未实现")
+        raise NotImplementedError(f"{self.rule_name} 调律潜力判定暂未实现")

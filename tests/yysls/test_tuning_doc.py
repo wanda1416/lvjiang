@@ -1,6 +1,6 @@
 """TuningDocWriter（调律说明文档写手）单元测试
 
-覆盖：文档头内容与缺省口径、装备节、只写命中的流派（不适用/低评级
+覆盖：文档头内容与缺省口径、装备节、只写命中的规则（不适用/低评级
 被过滤）、轮次与继续/结束原因、收尾评级过滤、中断收尾、逐次 flush。
 全部写入 tmp_path，不触碰 logs/tuning/。
 """
@@ -43,20 +43,20 @@ class TestTuningDocWriter:
         assert writer.path.suffix == ".md"
 
     def test_header(self, writer):
-        writer.start_run("小明", ["血河（武器规则：长枪·破甲）", "素问"],
+        writer.start_run("小明", ["血河（玩法：长枪·破甲）", "素问"],
                          ["main_weapon", "head"], keep_pvp=False)
         text = _read(writer)
         assert text.startswith("# 调律说明 — ")
         assert "- 操作用户：小明" in text
-        assert "- 启用流派：血河（武器规则：长枪·破甲）、素问" in text
+        assert "- 启用规则：血河（玩法：长枪·破甲）、素问" in text
         assert "- 保留PVP词条：否" in text
         assert "- 调律部位：主武器、头部" in text
 
     def test_header_defaults(self, writer):
-        """空流派 → 全部流派；keep_pvp=True → 是；slot 中文映射"""
+        """空规则 → 全部规则；keep_pvp=True → 是；slot 中文映射"""
         writer.start_run("u", [], ["ring"], keep_pvp=True)
         text = _read(writer)
-        assert "- 启用流派：全部流派（默认配置）" in text
+        assert "- 启用规则：全部规则（默认配置）" in text
         assert "- 保留PVP词条：是" in text
         assert "- 调律部位：环佩" in text
 
@@ -81,7 +81,7 @@ class TestTuningDocWriter:
         assert "进入调律时词条（0/5）：" in text
 
     def test_worthiness_filters_unmatched(self, writer):
-        """只写命中 顶级/优秀 的流派；垃圾/跳过/不适用 均不写"""
+        """只写命中 顶级/优秀 的规则；垃圾/跳过/不适用 均不写"""
         results = {
             "a": {"name": "血河", "rating": "顶级", "skipped": False,
                   "not_applicable": False, "reasons": ["词条匹配", "武器匹配"]},

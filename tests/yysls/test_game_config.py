@@ -1,4 +1,4 @@
-"""AttrRuleManager（属性规则管理器）测试
+"""GameConfigManager（属性规则管理器）测试
 
 此前仅被判定器/解析器间接覆盖，本文件针对
 词条别名归一、上限查询（含承音值）与品阶推断补充直测。
@@ -7,18 +7,18 @@
 
 import pytest
 
-from src.apps.yysls.evaluator.attr_rules import (
+from src.apps.yysls.game_config import (
     POOL_DINGYIN,
     POOL_NORMAL,
     AttrRange,
     LevelRule,
-    get_attr_rule_manager,
+    get_game_config,
 )
 
 
 @pytest.fixture(scope="module")
 def mgr():
-    return get_attr_rule_manager()
+    return get_game_config()
 
 
 # ─── 词条别名归一 ──────────────────────────────────────────

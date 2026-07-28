@@ -16,12 +16,12 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from src.apps.yysls.evaluator.attr_rules import get_attr_rule_manager
-from src.apps.yysls.evaluator.rules import TuningRuleManager
+from src.apps.yysls.game_config import get_game_config
+from src.apps.yysls.evaluator.tuning_rules import TuningRuleManager
 
 from .part_pattern_page import PartPatternPage
 from .pool_page import PoolPage
-from .school_settings_page import SchoolSettingsPage
+from .rule_settings_page import RuleSettingsPage
 
 # 左侧导航条目：(标题, 部位 key（None = 非部位页）)
 _NAV_ITEMS: list[tuple[str, str | None]] = [
@@ -35,7 +35,7 @@ _NAV_ITEMS: list[tuple[str, str | None]] = [
 ]
 
 
-class SchoolRulePanel(QWidget):
+class RulePanel(QWidget):
     """单规则编辑面板（持有 raw dict 深拷贝为工作副本）"""
 
     def __init__(self, key: str, manager: TuningRuleManager,
@@ -49,13 +49,23 @@ class SchoolRulePanel(QWidget):
         self._on_delete = on_delete
         self._data = manager.get_raw(key)
         # 标准词条全集（调律规则候选的唯一来源）
-        self._candidates = get_attr_rule_manager().get_normal_affix_names()
+        self._candidates = get_game_config().get_normal_affix_names()
         self._init_ui()
         self._load_pages()
 
     @property
     def rule_key(self) -> str:
         return self._key
+
+    @property
+    def rule_name(self) -> str:
+        return str(self._data.get("name", ""))
+
+    def set_rule_name(self, name: str):
+        """对话框左侧导航双击重命名 → 写入工作副本并保存"""
+        self._data["name"] = name
+        self._settings_page.set_name(name)
+        self._on_changed()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -72,7 +82,7 @@ class SchoolRulePanel(QWidget):
 
         # ── 右侧详情页 ──
         self._stack = QStackedWidget()
-        self._settings_page = SchoolSettingsPage(
+        self._settings_page = RuleSettingsPage(
             self._data, self._on_changed, on_delete=self._request_delete,
             on_rename=self._rename_rule)
         self._stack.addWidget(self._wrap_scroll(self._settings_page))

@@ -1,4 +1,4 @@
-"""属性管理 - 主容器
+"""游戏配置 - 主容器
 
 包含三个 Tab 页：
 - 词组配置（最基础的配置，不依赖任何 tab）
@@ -13,8 +13,8 @@ from .affix_caps_panel import AffixCapsPanel
 from .school_panel import SchoolPanel
 
 
-class AttrManagerTab(QWidget):
-    """属性管理主面板"""
+class GameConfigTab(QWidget):
+    """游戏配置主面板"""
 
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -1,14 +1,14 @@
 """裂石流派（lieshi_small / lieshi_big）判定测试
 
 覆盖武器规则展开（纯唐/双切/威威 主副武器匹配与择优）、
-weapon_rules 配置过滤、增伤缺失判垃圾、三档条件顺序、
+playstyles 配置过滤、增伤缺失判垃圾、三档条件顺序、
 count_max include_first、品阶筛选与调律潜力判定。
 """
 
 import pytest
 
 from src.apps.yysls.equip_parser.models import Affix, EquipmentData
-from src.apps.yysls.evaluator import Rating, get_school_judge
+from src.apps.yysls.evaluator import Rating, get_tuning_judge
 
 
 def make_equip(equip_type: str, affix_names: list[str],
@@ -25,12 +25,12 @@ def make_equip(equip_type: str, affix_names: list[str],
 
 @pytest.fixture
 def big():
-    return get_school_judge("lieshi_big")
+    return get_tuning_judge("lieshi_big")
 
 
 @pytest.fixture
 def small():
-    return get_school_judge("lieshi_small")
+    return get_tuning_judge("lieshi_small")
 
 
 # ─── 大外：武器规则展开与择优 ──────────────────────────────
@@ -50,7 +50,7 @@ class TestBigWeaponRules:
 
     def test_modao_only_shuangqie_missing_damage_junk(self, big):
         # 只勾选 双切 时同一装备缺增伤 → 垃圾
-        judge = get_school_judge("lieshi_big", {"weapon_rules": ["双切"]})
+        judge = get_tuning_judge("lieshi_big", {"playstyles": ["双切"]})
         e = make_equip("陌刀", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
         r = judge.judge(e)
         assert r.rating == Rating.JUNK
@@ -183,12 +183,12 @@ class TestPotential:
 
     def test_weapon_full_missing_damage_junk(self, big):
         # 词条已满且缺增伤：转律不产生神力词条 → 垃圾
-        judge = get_school_judge("lieshi_big", {"weapon_rules": ["双切"]})
+        judge = get_tuning_judge("lieshi_big", {"playstyles": ["双切"]})
         e = make_equip("陌刀", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
         assert judge.check_tuning_worthiness(e).rating == Rating.JUNK
 
     def test_weapon_free_slot_fills_damage_top(self, big):
         # 有空槽可补增伤 → 仍可达顶级
-        judge = get_school_judge("lieshi_big", {"weapon_rules": ["双切"]})
+        judge = get_tuning_judge("lieshi_big", {"playstyles": ["双切"]})
         e = make_equip("陌刀", ["最大外功攻击", "最大外功攻击", "劲", "敏"])
         assert judge.check_tuning_worthiness(e).rating == Rating.TOP

@@ -8,7 +8,7 @@
 import pytest
 
 from src.apps.yysls.equip_parser.models import Affix, EquipmentData
-from src.apps.yysls.evaluator import Rating, get_school_judge
+from src.apps.yysls.evaluator import Rating, get_tuning_judge
 
 
 def make_equip(equip_type: str, affix_names: list[str],
@@ -25,12 +25,12 @@ def make_equip(equip_type: str, affix_names: list[str],
 
 @pytest.fixture
 def pure():
-    return get_school_judge("heal_pure")
+    return get_tuning_judge("heal_pure")
 
 
 @pytest.fixture
 def fire():
-    return get_school_judge("heal_fire")
+    return get_tuning_judge("heal_fire")
 
 
 # ─── 纯奶：主武器（扇，需 扇武学增效） ─────────────────────

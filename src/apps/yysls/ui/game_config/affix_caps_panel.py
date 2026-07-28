@@ -585,9 +585,9 @@ class AffixCapsPanel(QWidget):
             with open(_ATTRS_PATH, "w", encoding="utf-8") as f:
                 yaml.dump(self._data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
             logger.debug(f"配置已保存: {_ATTRS_PATH}")
-            # 刷新 AttrRuleManager 单例
-            from src.apps.yysls.evaluator.attr_rules import get_attr_rule_manager
-            manager = get_attr_rule_manager()
+            # 刷新 GameConfigManager 单例
+            from src.apps.yysls.game_config import get_game_config
+            manager = get_game_config()
             manager._load()
         except Exception as e:
             logger.error(f"保存失败: {e}")

@@ -36,7 +36,7 @@ class FakeWF(AutoTuningWorkflow):
     def __init__(self):
         self.output = {}
         self._judge_configs = {}
-        self._judge_schools = []
+        self._judge_rule_keys = []
         self._stopped = False
         self.clicks: list[tuple[str, str]] = []
         self.junk_calls: list = []
@@ -185,9 +185,9 @@ def test_ensure_judge_config_keeps_injected():
     """已注入 _judge_configs 时 _ensure_judge_config 不覆盖"""
     wf = FakeWF()
     wf._judge_configs = {"huiyi": {"enabled": True}}
-    wf._judge_schools = ["huiyi"]
+    wf._judge_rule_keys = ["huiyi"]
     wf._ensure_judge_config()
-    assert wf._judge_schools == ["huiyi"]
+    assert wf._judge_rule_keys == ["huiyi"]
 
 
 def test_skip_tuning_switch(patch_worth):

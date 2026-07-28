@@ -3,7 +3,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QMenu, QMessageBox, QTabWidget,
+    QMenu, QMessageBox, QTabWidget, QLabel,
 )
 from loguru import logger
 

@@ -18,10 +18,12 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QListWidget, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QHeaderView, QLabel,
-    QInputDialog, QComboBox, QFrame, QLayout,
+    QInputDialog, QComboBox, QFrame,
     QRadioButton, QButtonGroup, QTabWidget,
 )
-from PyQt6.QtCore import Qt, QRect, QSize
+from PyQt6.QtCore import Qt
+
+from src.ui.widgets import FlowLayout
 
 # 配置文件路径
 _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
@@ -31,78 +33,6 @@ _CHENGYIN_RATIO = 0.94
 
 # 词条类型（_pool 字段；缺省为普通词条）
 _POOL_DINGYIN = "dingyin"
-
-
-class _FlowLayout(QLayout):
-    """自动换行的流式布局"""
-
-    def __init__(self, parent=None, spacing=4):
-        super().__init__(parent)
-        self._items = []
-        self._spacing = spacing
-
-    def addItem(self, item):
-        self._items.append(item)
-
-    def count(self):
-        return len(self._items)
-
-    def itemAt(self, index):
-        if 0 <= index < len(self._items):
-            return self._items[index]
-        return None
-
-    def takeAt(self, index):
-        if 0 <= index < len(self._items):
-            return self._items.pop(index)
-        return None
-
-    def hasHeightForWidth(self):
-        return True
-
-    def heightForWidth(self, width):
-        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
-
-    def setGeometry(self, rect):
-        super().setGeometry(rect)
-        self._do_layout(rect, test_only=False)
-
-    def sizeHint(self):
-        return self.minimumSize()
-
-    def minimumSize(self):
-        size = QSize()
-        for item in self._items:
-            size = size.expandedTo(item.minimumSize())
-        return size
-
-    def _do_layout(self, rect, test_only=False):
-        x = rect.x()
-        y = rect.y()
-        line_height = 0
-
-        for item in self._items:
-            wid = item.widget()
-            if wid:
-                space = self._spacing
-                item_size = wid.sizeHint()
-            else:
-                continue
-
-            next_x = x + item_size.width() + space
-            if next_x - space > rect.right() and line_height > 0:
-                x = rect.x()
-                y = y + line_height + space
-                next_x = x + item_size.width() + space
-                line_height = 0
-
-            if not test_only:
-                item.setGeometry(QRect(x, y, item_size.width(), item_size.height()))
-
-            x = next_x
-            line_height = max(line_height, item_size.height())
-
-        return y + line_height - rect.y()
 
 
 class _AliasTag(QWidget):
@@ -252,7 +182,7 @@ class AffixCapsPanel(QWidget):
 
         # 不分组：词条名标签容器（流式布局，支持自动换行）
         self._alias_tags_widget = QWidget()
-        self._alias_tags_layout = _FlowLayout(self._alias_tags_widget, spacing=6)
+        self._alias_tags_layout = FlowLayout(self._alias_tags_widget, spacing=6)
         alias_layout.addWidget(self._alias_tags_widget)
 
         # 分组：按组 Tab 页展示词条名（双击页签重命名分组）
@@ -828,7 +758,7 @@ class AffixCapsPanel(QWidget):
 
         for group_name, names in self._get_alias_groups().items():
             page = QWidget()
-            flow = _FlowLayout(page, spacing=6)
+            flow = FlowLayout(page, spacing=6)
             for alias in names:
                 flow.addWidget(self._create_alias_tag(alias))
             if not names:

@@ -32,6 +32,16 @@ base_attrs:
       blue:
         min: 60
         max: 140
+    96:
+      gold:
+        min: 65
+        max: 151
+      purple:
+        min: 59
+        max: 136
+      blue:
+        min: 52
+        max: 121
   sub_weapon:
     _follow: main_weapon
   ring:

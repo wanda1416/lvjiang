@@ -15,6 +15,7 @@ layout_scenes:
   - xinde_exchange
   group_5:
   - activity_mengzhu
+  - jianghu_activity
 group_names:
   group_1: 通用
   group_2: 调律

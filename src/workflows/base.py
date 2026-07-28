@@ -355,15 +355,16 @@ class BaseWorkflow:
     # ─── 等待 ──────────────────────────────────────────────
 
     def wait_delay(self, delay_name: str):
-        """按命名延迟参数等待（可被停止请求打断）"""
-        delay_val = getattr(self._delay, delay_name, None)
-        if delay_val is None:
-            logger.error(f"未知的延迟参数: {delay_name}")
+        """按命名等待参数等待（可被停止请求打断）
+
+        参数在配置管理「等待参数」页维护（DelayConfig.custom），
+        按 key 查找，在定义的范围内随机取值。
+        """
+        custom = self._delay.custom.get(delay_name)
+        if custom is None:
+            logger.error(f"未知的等待参数: {delay_name}（请在配置管理→等待参数中定义）")
             return
-        if isinstance(delay_val, tuple):
-            actual = random.uniform(*delay_val)
-        else:
-            actual = float(delay_val)
+        actual = random.uniform(*custom.range)
         logger.debug(f"等待 {delay_name} = {actual:.2f}s")
         self.wait_seconds(actual)
 

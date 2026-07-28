@@ -564,7 +564,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         self.wait_delay("step_interval")
         self.click_region(self.TUNE_SCENE, "tune_btn")
         self.wait_delay("step_interval")
-        self.wait_delay("after_tune_wait")
+        self.wait_delay("page_refresh_wait")  # 调律结果出现（after_tune_wait 已废弃）
 
         result = self.ocr_scene(self.RESULT_SCENE, ["tune_affix", "tune_tip"])
         logger.info(f"调律结果: {result}")

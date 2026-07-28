@@ -145,19 +145,23 @@ python -m src -reg yysls
 ## ⚙️ 配置
 
 - **系统配置**（`config/system/`）：随版本发布的场景、工作流（`.wf`）与规则定义，通常无需手动修改。
-- **本地偏好**（`config/local/preferences.yaml`）：用户级配置，覆盖系统默认值，例如：
+- **本地偏好**（`config/local/session.json`）：用户级配置，由配置管理对话框写入，覆盖代码默认值，例如：
 
-```yaml
-adb_capture_streaming: false      # ADB 模式是否启用 scrcpy 视频流截图
-desktop_window_title: "投屏"       # 桌面模式投屏窗口标题关键字
-desktop_background_input: true    # 是否启用后台输入（PostMessage）
-material_grid:                    # 材料网格切割默认参数
-  rows: 3
-  cols: 6
-input_delay:                      # 拟人化延迟参数
-  before_click_wait: [0.1, 0.3]
-  after_click_wait: [0.1, 0.2]
-  after_tune_wait: 3.0
+```jsonc
+{
+  "settings": {
+    "adb_capture_streaming": false,   // ADB 模式是否启用 scrcpy 视频流截图
+    "desktop_window_title": "投屏",    // 桌面模式投屏窗口标题关键字
+    "desktop_background_input": true   // 是否启用后台输入（PostMessage）
+  },
+  "input_delay": {                     // 拟人化延迟参数
+    "before_click_wait": [0.1, 0.3],   // 引擎级：点击前延迟
+    "after_click_wait": [0.1, 0.2],    // 引擎级：点击后延迟
+    "custom": {                        // 命名等待参数（供工作流 wait 按 key 引用）
+      "page_refresh_wait": { "label": "页面刷新等待", "range": [2.0, 3.0] }
+    }
+  }
+}
 ```
 
 `config/local/` 下的所有内容（布局、会话、截图等）均为运行时生成，已在 `.gitignore` 中忽略。

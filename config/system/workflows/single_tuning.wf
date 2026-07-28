@@ -106,7 +106,7 @@ if $status_1 == 1
     if $should_tune
         click [equip_tune_detail].[auto_add] after wait step_interval
         click [equip_tune_detail].[tune_btn] after wait step_interval
-        wait after_tune_wait
+        wait page_refresh_wait
         scan [equip_tune_result] as $result
         log "调律结果已识别"
         click [equip_tune_result].[close_btn] after wait step_interval

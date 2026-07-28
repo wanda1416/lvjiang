@@ -23,6 +23,8 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
 可泛化到各属性流派）；武器部位保持字面属攻引用不做等价。
 
 品阶门槛与 keep_pvp 词条等价从 tuning_base.yaml 读取：
+- 品阶门槛按标准部位（武器/环/佩/防具四件）配置，规则级
+  quality_thresholds 可按部位覆盖全局默认；
 - 胫甲（含腕甲）：对玩家单位增效 视作 对首领单位增伤；
 - 冠胄（含头/胸甲）：单体类奇术增伤 临时并入词条库。
 """
@@ -83,7 +85,8 @@ class GenericTuningJudge(TuningJudge):
         pre_reasons: list[str] = []
         if equip.quality is None:
             pre_reasons.append("品阶未识别，跳过品阶筛选")
-        elif not get_tuning_base().quality_ok(equip.category, equip.quality):
+        elif not get_tuning_base().quality_ok(
+                equip.part, equip.quality, self.rule.quality_thresholds):
             result.skipped = True
             result.reasons.append(f"品阶 {equip.quality} 无调律价值")
             return result

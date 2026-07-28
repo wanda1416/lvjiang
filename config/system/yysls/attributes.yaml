@@ -60,6 +60,7 @@ base_attrs:
       blue: 80
     96:
       gold: 86
+      purple: 78
   pendant:
     _attr: 最大外功攻击
     110:
@@ -76,6 +77,7 @@ base_attrs:
       blue: 120
     96:
       gold: 129
+      purple: 116
       blue: 104
   head:
     _attr: 气血最大值
@@ -93,6 +95,8 @@ base_attrs:
       blue: 5504
     96:
       gold: 5774
+      purple: 5196
+      blue: 4619
   chest:
     _attr: 气血最大值
     110:
@@ -109,6 +113,7 @@ base_attrs:
       blue: 11007
     96:
       gold: 11547
+      purple: 10392
   leg:
     _follow: head
   wrist:

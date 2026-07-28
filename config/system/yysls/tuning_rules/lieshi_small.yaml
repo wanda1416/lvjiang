@@ -1,6 +1,10 @@
 key: lieshi_small
 name: 裂石小外
 order: 20
+quality_thresholds:
+  佩:
+  - gold
+  - purple
 playstyles:
   纯唐:
     main:

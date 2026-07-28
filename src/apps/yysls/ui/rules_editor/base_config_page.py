@@ -4,8 +4,8 @@
 pvp.substitutions）。沿用「变更即校验即保存」模式：控件变更即重建
 raw dict → 校验 → 通过才写盘并 reload，失败时状态栏红字提示。
 
-- 品阶门槛表：类别（weapon/jewelry/armor/default 等）× gold/purple/blue
-  勾选，须含 default；
+- 品阶门槛表：固定 7 个标准部位（QUALITY_PARTS，锁死不可增删）×
+  gold/purple/blue 勾选；规则级可在规则设置页按部位覆盖；
 - PVP 词条集合：命中即标记保留的词条（候选来自标准词条全集）；
 - PVP 部位替换：<部位> 的 源词条 → 目标词条（仅当源词条不在规则词条库
   时生效）；
@@ -18,13 +18,16 @@ from datetime import datetime
 from typing import Callable
 
 from loguru import logger
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox, QHBoxLayout, QLabel, QPushButton, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from src.apps.yysls.game_config import get_game_config
-from src.apps.yysls.evaluator.tuning_rules import PART_KEYS, TuningBaseManager
+from src.apps.yysls.evaluator.tuning_rules import (
+    PART_KEYS, QUALITY_PARTS, TuningBaseManager,
+)
 from src.ui.widgets import NoWheelComboBox
 
 _QUALITIES = ("gold", "purple", "blue")
@@ -50,19 +53,16 @@ class BaseConfigPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # 品阶门槛
+        # 品阶门槛（固定 7 个标准部位，锁死不可增删）
         layout.addWidget(QLabel(
-            "<b>品阶门槛</b>（类别 = weapon/jewelry/armor/default；"
-            "勾选有调律价值的品阶；未列类别回退 default，须保留 default 行）"))
+            "<b>品阶门槛</b>（固定标准部位；勾选有调律价值的品阶；"
+            "规则设置页可按部位覆盖本全局默认）"))
         self._q_table = QTableWidget(0, 4)
         self._q_table.setHorizontalHeaderLabels(
-            ["类别", "gold", "purple", "blue"])
+            ["部位", "gold", "purple", "blue"])
         for col, width in enumerate((160, 70, 70, 70)):
             self._q_table.setColumnWidth(col, width)
-        self._q_table.cellChanged.connect(self._apply)
         layout.addWidget(self._q_table)
-        layout.addLayout(self._table_buttons(
-            self._q_table, self._insert_quality_row))
 
         # PVP 词条集合
         layout.addWidget(QLabel(
@@ -134,12 +134,14 @@ class BaseConfigPage(QWidget):
         combo.currentTextChanged.connect(lambda _t: self._apply())
         return combo
 
-    def _insert_quality_row(self, row: int, cat: str = "",
+    def _insert_quality_row(self, row: int, part: str = "",
                             qualities: set[str] | None = None):
         qualities = qualities or set()
         table = self._q_table
         table.insertRow(row)
-        table.setItem(row, 0, QTableWidgetItem(cat))
+        item = QTableWidgetItem(part)
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        table.setItem(row, 0, item)
         for i, q in enumerate(_QUALITIES, start=1):
             cb = QCheckBox()
             cb.setChecked(q in qualities)
@@ -171,9 +173,9 @@ class BaseConfigPage(QWidget):
         q = d.get("quality_thresholds") or {}
         self._q_table.blockSignals(True)
         self._q_table.setRowCount(0)
-        for cat, qs in q.items():
+        for part in QUALITY_PARTS:
             self._insert_quality_row(
-                self._q_table.rowCount(), str(cat), set(qs or []))
+                self._q_table.rowCount(), part, set(q.get(part) or []))
         self._q_table.blockSignals(False)
 
         pvp = d.get("pvp") or {}
@@ -203,19 +205,19 @@ class BaseConfigPage(QWidget):
         return widget.currentText().strip() if widget else ""
 
     def _build(self) -> dict:
-        # 品阶门槛
+        # 品阶门槛（固定行，部位列只读）
         quality: dict[str, list[str]] = {}
         for r in range(self._q_table.rowCount()):
             item = self._q_table.item(r, 0)
-            cat = item.text().strip() if item else ""
-            if not cat:
+            part = item.text().strip() if item else ""
+            if not part:
                 continue
             chosen = []
             for i, q in enumerate(_QUALITIES, start=1):
                 cb = self._q_table.cellWidget(r, i)
                 if cb and cb.isChecked():
                     chosen.append(q)
-            quality[cat] = chosen
+            quality[part] = chosen
 
         names = []
         for r in range(self._names_table.rowCount()):

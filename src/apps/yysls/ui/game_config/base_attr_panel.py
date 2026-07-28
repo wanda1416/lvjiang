@@ -53,7 +53,7 @@ _QUALITY_NAMES = {
 
 
 class _RangeCell(QWidget):
-    """区间值单元格（最小/最大双数字输入框，0 显示为 — 表示未配置）
+    """区间值单元格（最小/最大双数字输入框，0 显示为空白表示未配置）
 
     使用禁滚轮输入框，避免滑动表格时误改数值。
     """
@@ -68,7 +68,7 @@ class _RangeCell(QWidget):
         self._max = NoWheelSpinBox()
         for sb in (self._min, self._max):
             sb.setRange(0, 999999)
-            sb.setSpecialValueText("—")
+            sb.setSpecialValueText(" ")  # 空串会退回显示 0，用空格实现空白
             sb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._min.setToolTip("最小值")
         self._max.setToolTip("最大值")

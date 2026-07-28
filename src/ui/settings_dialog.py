@@ -45,6 +45,7 @@ class SettingsDialog(QDialog):
         self._range_spins: dict[str, tuple[NoWheelDoubleSpinBox, NoWheelDoubleSpinBox]] = {}
         self._custom_rows: list[dict] = []
         self._setup_ui()
+        self._connect_dirty_signals()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -55,16 +56,44 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_wait_tab(), "等待参数")
         layout.addWidget(tabs)
 
-        # ── 底部按钮 ──
+        # ── 底部按钮：保存（左）与关闭（右）隔开，语义不同 ──
+        # 保存默认置灰，参数发生变更后启用；保存后不关闭对话框，可继续修改
         btn_row = QHBoxLayout()
+        self._save_btn = QPushButton("保存")
+        self._save_btn.setEnabled(False)
+        self._save_btn.clicked.connect(self._on_save)
+        btn_row.addWidget(self._save_btn)
         btn_row.addStretch()
-        save_btn = QPushButton("保存")
-        save_btn.clicked.connect(self._on_save)
-        btn_row.addWidget(save_btn)
-        cancel_btn = QPushButton("取消")
-        cancel_btn.clicked.connect(self.reject)
-        btn_row.addWidget(cancel_btn)
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
         layout.addLayout(btn_row)
+
+    # ─── 脏状态跟踪 ──────────────────────────────────
+
+    def _mark_dirty(self, *_args):
+        """任意参数变更后启用保存按钮"""
+        self._save_btn.setEnabled(True)
+
+    def _connect_dirty_signals(self):
+        """UI 构建完成后统一连接变更信号（避免初始赋值触发）"""
+        self._capture_combo.currentIndexChanged.connect(self._mark_dirty)
+        self._input_combo.currentIndexChanged.connect(self._mark_dirty)
+        self._title_edit.textChanged.connect(self._mark_dirty)
+        self._offset_spin.valueChanged.connect(self._mark_dirty)
+        self._jitter_spin.valueChanged.connect(self._mark_dirty)
+        for lo_spin, hi_spin in self._range_spins.values():
+            lo_spin.valueChanged.connect(self._mark_dirty)
+            hi_spin.valueChanged.connect(self._mark_dirty)
+        for entry in self._custom_rows:
+            self._connect_row_dirty(entry)
+
+    def _connect_row_dirty(self, entry: dict):
+        """连接单行等待参数的变更信号"""
+        entry["key"].textChanged.connect(self._mark_dirty)
+        entry["label"].textChanged.connect(self._mark_dirty)
+        entry["lo"].valueChanged.connect(self._mark_dirty)
+        entry["hi"].valueChanged.connect(self._mark_dirty)
 
     # ─── Tab1 基础配置 ─────────────────────────────────────
 
@@ -141,11 +170,11 @@ class SettingsDialog(QDialog):
         vbox.addLayout(self._custom_grid)
 
         for key, item in self._config.input_delay.custom.items():
-            self._add_custom_row(key, item.label, *item.range)
+            self._add_custom_row(key, item.label, *item.range, saved=True)
 
         add_row = QHBoxLayout()
         add_btn = QPushButton("添加参数")
-        add_btn.clicked.connect(lambda: self._add_custom_row())
+        add_btn.clicked.connect(self._on_add_custom_row)
         add_row.addWidget(add_btn)
         add_row.addStretch()
         vbox.addLayout(add_row)
@@ -202,9 +231,19 @@ class SettingsDialog(QDialog):
         lo_spin.valueChanged.connect(hi_spin.setMinimum)
         return lo_spin, hi_spin
 
+    def _on_add_custom_row(self):
+        """用户点击添加：新行未保存，删除无需确认，并视为变更"""
+        entry = self._add_custom_row()
+        self._connect_row_dirty(entry)
+        self._mark_dirty()
+
     def _add_custom_row(self, key: str = "", label: str = "",
-                        lo: float = 1.0, hi: float = 1.0):
-        """向共享网格追加一行等待参数：key + 名称 + min~max + 删除按钮"""
+                        lo: float = 1.0, hi: float = 1.0,
+                        saved: bool = False) -> dict:
+        """向共享网格追加一行等待参数：key + 名称 + min~max + 删除按钮
+
+        saved: 是否来自已保存的配置（删除时需二次确认）
+        """
         key_edit = QLineEdit(key)
         key_edit.setPlaceholderText("如 my_wait")
         key_edit.setMinimumWidth(100)
@@ -215,7 +254,8 @@ class SettingsDialog(QDialog):
 
         lo_spin, hi_spin = self._make_range_spins(lo, hi)
 
-        entry = {"key": key_edit, "label": label_edit, "lo": lo_spin, "hi": hi_spin}
+        entry = {"key": key_edit, "label": label_edit, "lo": lo_spin, "hi": hi_spin,
+                 "saved": saved}
         del_btn = QPushButton("删除")
         del_btn.clicked.connect(lambda: self._remove_custom_row(entry))
 
@@ -226,12 +266,25 @@ class SettingsDialog(QDialog):
             self._custom_grid.addWidget(widget, grid_row, col)
 
         self._custom_rows.append(entry)
+        return entry
 
     def _remove_custom_row(self, entry: dict):
+        """删除一行等待参数；已保存的行需二次确认"""
+        if entry["saved"]:
+            key = entry["key"].text().strip() or "(未命名)"
+            reply = QMessageBox.question(
+                self, "确认删除",
+                f"确定删除等待参数「{key}」吗？\n"
+                f"引用该参数的工作流将在加载时报错。",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if reply != QMessageBox.StandardButton.Yes:
+                return
         self._custom_rows.remove(entry)
         for widget in entry["widgets"]:
             self._custom_grid.removeWidget(widget)
             widget.deleteLater()
+        self._mark_dirty()
 
     # ─── 保存 ──────────────────────────────────────────────
 
@@ -281,4 +334,7 @@ class SettingsDialog(QDialog):
         delay["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
         delay["custom"] = custom
         save_input_delay(delay)
-        self.accept()
+        # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改
+        for entry in self._custom_rows:
+            entry["saved"] = bool(entry["key"].text().strip())
+        self._save_btn.setEnabled(False)

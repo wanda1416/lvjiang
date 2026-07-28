@@ -41,6 +41,9 @@ PART_ALIAS = {"佩": "环", "胸甲": "冠胄", "腕甲": "胫甲"}
 # 模式部位 key 全集
 PART_KEYS = ("主武器", "副武器", "环", "冠胄", "胫甲")
 
+# 品阶门槛部位全集（固定 7 项，与 equip_parser.infer_part 输出对齐）
+QUALITY_PARTS = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
+
 
 def standard_affix_names() -> list[str]:
     """标准词条全集（普通词组 _aliases 并集，按 YAML 声明序）"""
@@ -199,6 +202,8 @@ class TuningRule:
     transmute_priority: list[str] = field(default_factory=list)
     affix_pool: list[str] = field(default_factory=list)
     patterns: dict[str, PartPattern] = field(default_factory=dict)
+    # 品阶门槛覆盖（部位 → 允许品阶；未列部位沿用全局 tuning_base）
+    quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def pool_set(self) -> set[str]:
@@ -237,12 +242,13 @@ class TuningBase:
     pvp_names: set[str] = field(default_factory=set)
     pvp_parts: dict[str, PvpPartRule] = field(default_factory=dict)
 
-    def quality_ok(self, category: str, quality: str | None) -> bool:
-        """品阶筛选：按装备类别（weapon/jewelry/armor）取允许品阶，
-        未配置的类别回退 default"""
-        allowed = self.quality_thresholds.get(category)
+    def quality_ok(self, part: str, quality: str | None,
+                   overrides: dict[str, list[str]] | None = None) -> bool:
+        """品阶筛选：按标准部位名（QUALITY_PARTS）取允许品阶；
+        规则级 overrides 中列出的部位优先于全局配置"""
+        allowed = (overrides or {}).get(part)
         if allowed is None:
-            allowed = self.quality_thresholds.get("default", [])
+            allowed = self.quality_thresholds.get(part, [])
         return quality in allowed
 
 

@@ -13,9 +13,10 @@ import yaml
 
 from src.apps.yysls.evaluator import get_tuning_rules
 from src.apps.yysls.evaluator.tuning_rules import (
-    PVP_NAMES, RuleValidationError, TuningRuleManager,
+    PVP_NAMES, QUALITY_PARTS, RuleValidationError, TuningRuleManager,
     attr_equivalence, get_tuning_base, get_tuning_rule_manager,
-    parse_tuning_base, standard_affix_names, standard_playstyle_attrs,
+    parse_tuning_base, parse_tuning_rule, standard_affix_names,
+    standard_playstyle_attrs,
 )
 
 
@@ -354,8 +355,10 @@ class TestAttrEquivalence:
 # ─── 基础配置 tuning_base ─────────────────────────
 
 def _valid_base() -> dict:
+    thresholds = {p: ["gold"] for p in QUALITY_PARTS}
+    thresholds["冠胄"] = ["gold", "purple"]
     return {
-        "quality_thresholds": {"armor": ["gold", "purple"], "default": ["gold"]},
+        "quality_thresholds": thresholds,
         "pvp": {
             "names": ["单体类奇术增伤", "对玩家单位增效"],
             "substitutions": {
@@ -369,16 +372,25 @@ def _valid_base() -> dict:
 class TestTuningBase:
     def test_builtin_base_loaded(self):
         base = get_tuning_base()
-        assert "default" in base.quality_thresholds
+        # 品阶门槛锁死为固定 7 个标准部位
+        assert list(base.quality_thresholds) == list(QUALITY_PARTS)
         assert base.pvp_names  # 非空
 
-    def test_quality_ok_falls_back_to_default(self):
+    def test_quality_ok_by_part(self):
         base = parse_tuning_base(_valid_base())
-        assert base.quality_ok("armor", "purple") is True
-        assert base.quality_ok("armor", "blue") is False
-        # weapon 未配置→回退 default
-        assert base.quality_ok("weapon", "gold") is True
-        assert base.quality_ok("weapon", "purple") is False
+        assert base.quality_ok("冠胄", "purple") is True
+        assert base.quality_ok("冠胄", "blue") is False
+        assert base.quality_ok("武器", "gold") is True
+        assert base.quality_ok("武器", "purple") is False
+
+    def test_quality_ok_rule_overrides(self):
+        # 规则级覆盖：列出的部位优先，未列部位沿用全局
+        base = parse_tuning_base(_valid_base())
+        overrides = {"佩": ["gold", "purple"]}
+        assert base.quality_ok("佩", "purple", overrides) is True
+        assert base.quality_ok("佩", "purple") is False
+        assert base.quality_ok("环", "gold", overrides) is True
+        assert base.quality_ok("环", "purple", overrides) is False
 
     def test_pvp_part_rule_parsed(self):
         base = parse_tuning_base(_valid_base())
@@ -386,15 +398,21 @@ class TestTuningBase:
             "对玩家单位增效": "对首领单位增伤"}
         assert base.pvp_parts["冠胄"].add_to_pool == ["单体类奇术增伤"]
 
-    def test_missing_default_rejected(self):
+    def test_missing_part_rejected(self):
         data = _valid_base()
-        data["quality_thresholds"].pop("default")
+        data["quality_thresholds"].pop("佩")
+        with pytest.raises(RuleValidationError):
+            parse_tuning_base(data)
+
+    def test_unknown_part_rejected(self):
+        data = _valid_base()
+        data["quality_thresholds"]["default"] = ["gold"]
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
 
     def test_bad_quality_rejected(self):
         data = _valid_base()
-        data["quality_thresholds"]["default"] = ["legendary"]
+        data["quality_thresholds"]["武器"] = ["legendary"]
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
 
@@ -403,3 +421,32 @@ class TestTuningBase:
         data["pvp"]["substitutions"]["鞋子"] = {"add_to_pool": ["劲"]}
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
+
+
+# ─── 规则级品阶门槛覆盖 ─────────────────
+
+class TestRuleQualityThresholds:
+    def test_optional_and_subset_allowed(self):
+        rule = parse_tuning_rule(minimal_rule())
+        assert rule.quality_thresholds == {}
+        rule = parse_tuning_rule(minimal_rule(
+            quality_thresholds={"佩": ["gold", "purple"]}))
+        assert rule.quality_thresholds == {"佩": ["gold", "purple"]}
+
+    def test_unknown_part_rejected(self):
+        with pytest.raises(RuleValidationError):
+            parse_tuning_rule(minimal_rule(
+                quality_thresholds={"default": ["gold"]}))
+
+    def test_bad_quality_rejected(self):
+        with pytest.raises(RuleValidationError):
+            parse_tuning_rule(minimal_rule(
+                quality_thresholds={"佩": ["legendary"]}))
+
+    def test_builtin_examples_loaded(self):
+        # 内置示例：会意环 / 小外佩 金紫皆可
+        rules = get_tuning_rules()
+        assert rules["huiyi_general"].quality_thresholds == {
+            "环": ["gold", "purple"]}
+        assert rules["lieshi_small"].quality_thresholds == {
+            "佩": ["gold", "purple"]}

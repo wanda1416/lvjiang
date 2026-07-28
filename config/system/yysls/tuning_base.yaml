@@ -1,9 +1,22 @@
 quality_thresholds:
-  armor:
+  武器:
+  - gold
+  环:
+  - gold
+  佩:
+  - gold
+  冠胄:
   - gold
   - purple
-  default:
+  胸甲:
   - gold
+  - purple
+  胫甲:
+  - gold
+  - purple
+  腕甲:
+  - gold
+  - purple
 pvp:
   names:
   - 单体类奇术增伤

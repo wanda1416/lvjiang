@@ -19,11 +19,11 @@ from src.constants import PROJECT_ROOT
 # 文档输出目录（运行时自建；logs/ 不入库）
 TUNING_DOC_DIR = PROJECT_ROOT / "logs" / "tuning"
 
-# slot key → 中文名（与调律 Tab 部位勾选文案一致）
+# slot key → 标准部位名（与调律 Tab 部位勾选文案一致）
 SLOT_NAMES = {
     "main_weapon": "主武器", "sub_weapon": "副武器",
-    "ring": "环佩", "pendant": "项链",
-    "head": "头部", "chest": "胸部", "leg": "腿部", "wrist": "腕部",
+    "ring": "环", "pendant": "佩",
+    "head": "冠胄", "chest": "胸甲", "leg": "胫甲", "wrist": "腕甲",
 }
 
 # 品阶 key → 中文名

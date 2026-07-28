@@ -19,6 +19,7 @@ from .models import (
     PART_ALIAS,
     PART_KEYS,
     PVP_NAMES,
+    QUALITY_PARTS,
     Condition,
     PartPattern,
     Playstyle,
@@ -48,6 +49,7 @@ __all__ = [
     "PART_ALIAS",
     "PART_KEYS",
     "PVP_NAMES",
+    "QUALITY_PARTS",
     # 领域模型
     "Condition",
     "PartPattern",

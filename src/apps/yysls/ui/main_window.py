@@ -94,9 +94,9 @@ class MainWindow(GenericMainWindow):
         slots_row = QHBoxLayout()
         for group_name, slots in [
             ("武器类", [("main_weapon", "主武器"), ("sub_weapon", "副武器"),
-                       ("ring", "环佩"), ("pendant", "项链")]),
-            ("防具类", [("head", "头部"), ("chest", "胸部"),
-                       ("leg", "腿部"), ("wrist", "腕部")]),
+                       ("ring", "环"), ("pendant", "佩")]),
+            ("防具类", [("head", "冠胄"), ("chest", "胸甲"),
+                       ("leg", "胫甲"), ("wrist", "腕甲")]),
         ]:
             grp = QGroupBox(group_name)
             grp_layout = QVBoxLayout(grp)
@@ -105,6 +105,10 @@ class MainWindow(GenericMainWindow):
                 cb.setObjectName(slot_key)
                 cb.setChecked(True)
                 cb.stateChanged.connect(self._save_tuning_config)
+                if slot_key == "sub_weapon":
+                    # 主武器槽已展示全部武器，副武器无需遍历，强制禁用
+                    cb.setChecked(False)
+                    cb.setEnabled(False)
                 grp_layout.addWidget(cb)
                 self._tuning_checkboxes.append(cb)
             slots_row.addWidget(grp)
@@ -161,7 +165,7 @@ class MainWindow(GenericMainWindow):
 
     def _load_tuning_config(self):
         from ..plugin_session import get_plugin_session
-        default_slots = ["main_weapon", "sub_weapon", "ring", "pendant",
+        default_slots = ["main_weapon", "ring", "pendant",
                          "head", "chest", "leg", "wrist"]
         tuning = get_plugin_session().get_section("tuning")
         selected = tuning.get("selected_slots") or default_slots
@@ -172,7 +176,8 @@ class MainWindow(GenericMainWindow):
             rules_cfg = {"huiyi_general": {"enabled": True}}
         for cb in self._tuning_checkboxes:
             cb.blockSignals(True)
-            cb.setChecked(cb.objectName() in selected)
+            # 禁用项（副武器）不随会话配置回选
+            cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
             cb.blockSignals(False)
         self._tuning_config.set_config(rules_cfg)
         self._tuning_config.set_keep_pvp(bool(tuning.get("keep_pvp", False)))
@@ -189,7 +194,8 @@ class MainWindow(GenericMainWindow):
 
     def _set_all_tuning_checks(self, checked: bool):
         for cb in self._tuning_checkboxes:
-            cb.setChecked(checked)
+            if cb.isEnabled():
+                cb.setChecked(checked)
         self._save_tuning_config()
 
     def _get_tuning_selected_slots(self) -> list[str]:

@@ -1,6 +1,10 @@
 key: huiyi_general
 name: 通用会意
 order: 10
+quality_thresholds:
+  环:
+  - gold
+  - purple
 playstyles:
   会意:
     main:

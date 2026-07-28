@@ -12,6 +12,8 @@ key 与名称均为只读文本展示：key 重命名走展示区后的「重命
 属性列候选 = 属性攻击词组组名（通用/鸣金/牵丝/裂石/破竹）。
 增伤词条列候选随同侧武器收窄：武器已绑定武学增效词条
 （weapon_types.wuxue_affix）时仅保留留空 + 该绑定词条。
+另含品阶门槛覆盖表：按部位覆盖全局 tuning_base 默认，
+未列部位沿用基础配置（如 小外流佩/会意环 金紫皆可）。
 """
 
 from __future__ import annotations
@@ -21,19 +23,22 @@ from typing import Callable
 import re
 
 from PyQt6.QtWidgets import (
-    QFormLayout, QHBoxLayout, QInputDialog, QLabel, QMessageBox,
-    QPushButton, QTableWidget, QTableWidgetItem, QToolButton, QToolTip,
-    QVBoxLayout, QWidget,
+    QCheckBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
+    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QToolButton,
+    QToolTip, QVBoxLayout, QWidget,
 )
 
 from src.apps.yysls.game_config import get_game_config
 from src.apps.yysls.evaluator.tuning_rules import (
-    GENERIC_ATTR, standard_playstyle_attrs,
+    GENERIC_ATTR, QUALITY_PARTS, standard_playstyle_attrs,
 )
 from src.ui.widgets import NoWheelComboBox
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+# 品阶枚举（与 tuning_base 一致）
+_QUALITIES = ("gold", "purple", "blue")
 
 # 副增伤列留空项的展示文案（仅显示层，收集时仍写入空 = null）
 _NO_DAMAGE_LABEL = "- 无需增伤 -"
@@ -118,6 +123,22 @@ class RuleSettingsPage(QWidget):
         layout.addLayout(
             self._table_buttons(self._playstyle_table, self._apply_playstyles))
 
+        # ── 品阶门槛覆盖（只列出需覆盖全局默认的部位）──
+        q_title = QHBoxLayout()
+        q_title.addWidget(QLabel("<b>品阶门槛（覆盖）</b>"))
+        q_hint = QLabel("（仅列出的部位覆盖全局默认，未列部位沿用基础配置）")
+        q_hint.setStyleSheet("color: #888;")
+        q_title.addWidget(q_hint)
+        q_title.addStretch()
+        layout.addLayout(q_title)
+        self._quality_table = QTableWidget(0, 4)
+        self._quality_table.setHorizontalHeaderLabels(
+            ["部位", "gold", "purple", "blue"])
+        for col, width in enumerate((120, 70, 70, 70)):
+            self._quality_table.setColumnWidth(col, width)
+        layout.addWidget(self._quality_table)
+        layout.addLayout(self._quality_table_buttons())
+
         # ── 删除本规则 ──
         del_row = QHBoxLayout()
         btn_delete = QPushButton("删除本规则")
@@ -146,6 +167,63 @@ class RuleSettingsPage(QWidget):
         row.addWidget(btn_del)
         row.addStretch()
         return row
+
+    # ── 品阶门槛覆盖表 ──
+
+    def _quality_table_buttons(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        btn_add = QPushButton("添加行")
+        btn_add.clicked.connect(
+            lambda: (self._insert_quality_row(self._quality_table.rowCount()),
+                     self._apply_quality()))
+        btn_del = QPushButton("删除选中行")
+
+        def _delete():
+            r = self._quality_table.currentRow()
+            if r >= 0:
+                self._quality_table.removeRow(r)
+                self._apply_quality()
+
+        btn_del.clicked.connect(_delete)
+        row.addWidget(btn_add)
+        row.addWidget(btn_del)
+        row.addStretch()
+        return row
+
+    def _insert_quality_row(self, row: int, part: str = "",
+                            qualities: set[str] | None = None):
+        qualities = qualities or set()
+        table = self._quality_table
+        table.insertRow(row)
+        combo = NoWheelComboBox()
+        combo.addItems(list(QUALITY_PARTS))
+        combo.setCurrentText(part or QUALITY_PARTS[0])
+        combo.currentTextChanged.connect(lambda _t: self._apply_quality())
+        table.setCellWidget(row, 0, combo)
+        for i, q in enumerate(_QUALITIES, start=1):
+            cb = QCheckBox()
+            cb.setChecked(q in qualities)
+            cb.stateChanged.connect(lambda _s: self._apply_quality())
+            table.setCellWidget(row, i, cb)
+
+    def _apply_quality(self):
+        if self._loading:
+            return
+        table = self._quality_table
+        thresholds: dict[str, list[str]] = {}
+        for r in range(table.rowCount()):
+            combo = table.cellWidget(r, 0)
+            part = combo.currentText().strip() if combo else ""
+            if not part:
+                continue
+            chosen = [q for i, q in enumerate(_QUALITIES, start=1)
+                      if (cb := table.cellWidget(r, i)) and cb.isChecked()]
+            thresholds[part] = chosen
+        if thresholds:
+            self._data["quality_thresholds"] = thresholds
+        else:
+            self._data.pop("quality_thresholds", None)
+        self._on_changed()
 
     # ── 玩法设定表行构建（名字为文本格，其余列为下拉格）──
 
@@ -255,6 +333,14 @@ class RuleSettingsPage(QWidget):
                 str(sub.get("damage") or ""),
                 str(raw.get("attr") or GENERIC_ATTR)))
         self._playstyle_table.blockSignals(False)
+
+        thresholds = d.get("quality_thresholds") or {}
+        self._quality_table.setRowCount(0)
+        for part in QUALITY_PARTS:
+            if part in thresholds:
+                self._insert_quality_row(
+                    self._quality_table.rowCount(), part,
+                    set(thresholds.get(part) or []))
 
     # ── 收集（写回共享 dict） ──
 

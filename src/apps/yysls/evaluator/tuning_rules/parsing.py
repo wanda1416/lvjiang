@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from .models import (
-    COND_KINDS, GENERIC_ATTR, PART_KEYS,
+    COND_KINDS, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS,
     Condition, PartPattern, Playstyle, PvpPartRule, RuleValidationError,
     TuningBase, TuningRule, WeaponSide,
     standard_affix_names, standard_playstyle_attrs,
@@ -20,6 +20,35 @@ _LEGACY_KEYS = ("variants", "sub_schools", "weapons", "own_attr",
                 "needs_sub_school", "sub_school_label", "weapon_rules")
 
 _VALID_QUALITIES = ("gold", "purple", "blue")
+
+
+def _parse_quality_thresholds(raw, where: str,
+                              require_all: bool = False,
+                              ) -> dict[str, list[str]]:
+    """品阶门槛解析：部位 key 锁定 QUALITY_PARTS，品阶枚举校验
+
+    require_all=True（全局基础配置）时须列全 7 个部位；
+    False（规则级覆盖）时允许子集。返回按 QUALITY_PARTS 定序。
+    """
+    if not isinstance(raw, dict):
+        raise RuleValidationError(f"{where} 必须是 dict")
+    result: dict[str, list[str]] = {}
+    for part, qs in raw.items():
+        if part not in QUALITY_PARTS:
+            raise RuleValidationError(
+                f"{where}: 未知部位 {part!r}（须为 {list(QUALITY_PARTS)}）")
+        items = list(qs or [])
+        bad = [q for q in items if q not in _VALID_QUALITIES]
+        if bad:
+            raise RuleValidationError(
+                f"{where}.{part}: 非法品阶 {bad}（需为 "
+                f"{list(_VALID_QUALITIES)}）")
+        result[str(part)] = items
+    if require_all:
+        missing = [p for p in QUALITY_PARTS if p not in result]
+        if missing:
+            raise RuleValidationError(f"{where}: 缺少部位 {missing}")
+    return {p: result[p] for p in QUALITY_PARTS if p in result}
 
 
 def _check_names(names: list, vocab: set[str], where: str) -> list[str]:
@@ -168,6 +197,8 @@ def parse_tuning_rule(data: dict) -> TuningRule:
         transmute_priority=priority,
         affix_pool=affix_pool,
         patterns=patterns,
+        quality_thresholds=_parse_quality_thresholds(
+            data.get("quality_thresholds") or {}, "quality_thresholds"),
     )
 
 
@@ -177,21 +208,10 @@ def parse_tuning_base(data: dict) -> TuningBase:
         raise RuleValidationError("tuning_base 顶层必须是 dict")
     vocab = set(standard_affix_names())
 
-    # ── quality_thresholds ──
-    raw_q = data.get("quality_thresholds") or {}
-    if not isinstance(raw_q, dict):
-        raise RuleValidationError("quality_thresholds 必须是 dict")
-    quality_thresholds: dict[str, list[str]] = {}
-    for cat, qs in raw_q.items():
-        items = list(qs or [])
-        bad = [q for q in items if q not in _VALID_QUALITIES]
-        if bad:
-            raise RuleValidationError(
-                f"quality_thresholds.{cat}: 非法品阶 {bad}（需为 "
-                f"{list(_VALID_QUALITIES)}）")
-        quality_thresholds[str(cat)] = items
-    if "default" not in quality_thresholds:
-        raise RuleValidationError("quality_thresholds 缺少 default 项")
+    # ── quality_thresholds（固定 7 个标准部位，须列全）──
+    quality_thresholds = _parse_quality_thresholds(
+        data.get("quality_thresholds") or {}, "quality_thresholds",
+        require_all=True)
 
     # ── pvp ──
     raw_pvp = data.get("pvp") or {}

@@ -50,7 +50,7 @@ class TestTuningDocWriter:
         assert "- 操作用户：小明" in text
         assert "- 启用规则：血河（玩法：长枪·破甲）、素问" in text
         assert "- 保留PVP词条：否" in text
-        assert "- 调律部位：主武器、头部" in text
+        assert "- 调律部位：主武器、冠胄" in text
 
     def test_header_defaults(self, writer):
         """空规则 → 全部规则；keep_pvp=True → 是；slot 中文映射"""
@@ -58,7 +58,7 @@ class TestTuningDocWriter:
         text = _read(writer)
         assert "- 启用规则：全部规则（默认配置）" in text
         assert "- 保留PVP词条：是" in text
-        assert "- 调律部位：环佩" in text
+        assert "- 调律部位：环" in text
 
     def test_equipment_section(self, writer):
         equip = {

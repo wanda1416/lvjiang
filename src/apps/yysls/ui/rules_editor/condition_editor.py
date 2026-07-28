@@ -8,21 +8,19 @@ ConditionGroupsEditor：条件组列表（组间 OR、组内 AND），三档
 判定条件（junk/usable/top）共用；单条件组产出单键 dict，
 多条件组产出原语 dict 列表（与 rules._parse_condition_groups 对应）。
 候选词条为标准词条全集，由构造方注入。
-
-AffixPickerDialog：标准词条多选对话框（带滚动的多列复选网格），
-包内复用（首词条候选、条件词条、词条库添加等场景）。
 """
 
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-    QGroupBox, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
-    QWidget,
+    QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
+    QVBoxLayout, QWidget,
 )
 
 from src.ui.widgets import NoWheelSpinBox
+
+from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名
 _KIND_NAMES = {
@@ -32,47 +30,6 @@ _KIND_NAMES = {
     "count_max": "计数上限",
     "count_min": "计数下限",
 }
-
-
-class AffixPickerDialog(QDialog):
-    """标准词条多选对话框（候选按传入顺序排列，滚动多列复选网格）"""
-
-    _COLS = 3
-
-    def __init__(self, candidates: list[str], selected: list[str],
-                 title: str = "选择词条", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setMinimumWidth(520)
-        layout = QVBoxLayout(self)
-
-        grid_host = QWidget()
-        grid = QGridLayout(grid_host)
-        grid.setSpacing(6)
-        self._checks: dict[str, QCheckBox] = {}
-        chosen = set(selected)
-        for i, name in enumerate(candidates):
-            cb = QCheckBox(name)
-            cb.setChecked(name in chosen)
-            grid.addWidget(cb, i // self._COLS, i % self._COLS)
-            self._checks[name] = cb
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(grid_host)
-        scroll.setMinimumHeight(320)
-        layout.addWidget(scroll)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def selected(self) -> list[str]:
-        """按候选顺序返回勾选的词条"""
-        return [n for n, cb in self._checks.items() if cb.isChecked()]
 
 
 class _ConditionRow(QWidget):
@@ -166,8 +123,8 @@ class _ConditionRow(QWidget):
         self.first_check.setVisible(is_count)
 
     def _pick_symbols(self):
-        dlg = AffixPickerDialog(self._candidates, self._symbols,
-                                "选择条件词条", self)
+        dlg = AffixSelectSortDialog(self._candidates, self._symbols,
+                                    "选择条件词条", self)
         if dlg.exec():
             self._symbols = dlg.selected()
             self._update_symbols_text()

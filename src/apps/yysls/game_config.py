@@ -32,6 +32,9 @@ POOL_DINGYIN = "dingyin"
 # 游戏配置的武器绑定与调律规则的增伤词条候选共用）
 WUXUE_CATEGORY = "指定武学增效"
 
+# 词条归属分类（固定 6 类，与词组正交；定音词条不参与归属）
+AFFIX_CATEGORY_NAMES = ("外功类", "属攻类", "三率类", "增效类", "武器类", "生存类")
+
 
 # ─── 品阶推断数据结构 ──────────────────────────────────────
 
@@ -132,6 +135,10 @@ class GameConfigManager:
         self._alias_to_category: dict[str, str] = {}
         # 词条分组：category → { 组名 → [词条名] }（不分组的类别不在其中）
         self._alias_groups: dict[str, dict[str, list[str]]] = {}
+        # 词条归属：归属名 → [词条名]（顶层 affix_categories，固定 5 类）
+        self._affix_categories: dict[str, list[str]] = {}
+        # 词条归属反查：词条名 → 归属名
+        self._affix_to_category: dict[str, str] = {}
         # 武器类型注册表（顶层 weapon_types）
         self._weapon_types: list[str] = []
         # 武器 → 武学增效词条映射（weapon_types 中每项的 wuxue_affix 字段）
@@ -152,6 +159,8 @@ class GameConfigManager:
         self._affix_pools.clear()
         self._alias_to_category.clear()
         self._alias_groups.clear()
+        self._affix_categories.clear()
+        self._affix_to_category.clear()
         self._weapon_types.clear()
         self._weapon_wuxue_affixes.clear()
         self._schools.clear()
@@ -172,6 +181,15 @@ class GameConfigManager:
                 if name:
                     self._weapon_types.append(name)
         self._schools = dict(data.get("schools") or {})
+
+        # ── affix_categories（顶层；固定 5 类归属→词条名列表）──
+        raw_categories = data.get("affix_categories") or {}
+        for cat in AFFIX_CATEGORY_NAMES:
+            raw_names = raw_categories.get(cat)
+            names = [str(n) for n in raw_names] if isinstance(raw_names, list) else []
+            self._affix_categories[cat] = names
+            for name in names:
+                self._affix_to_category[name] = cat
 
         # ── base_attrs ──
         # _follow: <目标部位> 声明该部位跟随目标部位的数值（单层解析）
@@ -267,6 +285,17 @@ class GameConfigManager:
         未分组的类别返回空 dict。
         """
         return self._alias_groups.get(category, {})
+
+    # ── 词条归属（固定 5 类，与词组正交） ───────────────
+
+    def get_affix_categories(self) -> dict[str, list[str]]:
+        """词条归属映射（按 AFFIX_CATEGORY_NAMES 顺序：归属名 → 词条名列表副本）"""
+        return {cat: list(self._affix_categories.get(cat, []))
+                for cat in AFFIX_CATEGORY_NAMES}
+
+    def get_affix_category(self, affix_name: str) -> str:
+        """词条名 → 归属名（无归属返回空串）"""
+        return self._affix_to_category.get(affix_name, "")
 
     # ── 词库类型 ────────────────────────────────────────
 

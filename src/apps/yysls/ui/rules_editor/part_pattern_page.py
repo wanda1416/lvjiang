@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .condition_editor import AffixPickerDialog, ConditionGroupsEditor
+from .affix_picker import AffixSelectSortDialog
+from .condition_editor import ConditionGroupsEditor
 
 # 三档条件：(YAML 键, 分组框标题)
 _TIERS: list[tuple[str, str]] = [
@@ -124,8 +125,8 @@ class PartPatternPage(QWidget):
     # ── 首词条 ──
 
     def _pick_first(self):
-        dlg = AffixPickerDialog(self._candidates, self._first,
-                                "选择首词条候选", self)
+        dlg = AffixSelectSortDialog(self._candidates, self._first,
+                                    "选择首词条候选", self)
         if dlg.exec():
             self._first = dlg.selected()
             self._update_first_text()

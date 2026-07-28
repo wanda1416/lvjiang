@@ -47,6 +47,7 @@ base_attrs:
     100:
       gold: 100
       purple: 90
+      blue: 80
     96:
       gold: 86
   pendant:
@@ -61,8 +62,11 @@ base_attrs:
       blue: 139
     100:
       gold: 150
+      purple: 135
+      blue: 120
     96:
       gold: 129
+      blue: 104
   head:
     _attr: 气血最大值
     110:
@@ -76,6 +80,7 @@ base_attrs:
     100:
       gold: 6879
       purple: 6192
+      blue: 5504
     96:
       gold: 5774
   chest:
@@ -91,6 +96,7 @@ base_attrs:
     100:
       gold: 13758
       purple: 12383
+      blue: 11007
     96:
       gold: 11547
   leg:

@@ -15,10 +15,13 @@ layout_scenes:
   - xinde_exchange
   group_5:
   - activity_mengzhu
-  - jianghu_activity
+  - activity_jianghu
+  group_6:
+  - ui_waiguan_yigui
 group_names:
   group_1: 通用
   group_2: 调律
   group_3: 背包
   group_4: 培养
   group_5: 活动
+  group_6: 汇总

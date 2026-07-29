@@ -1,63 +1,68 @@
-key: jianghu_activity
+key: activity_jianghu
 name: 江湖号令
 regions:
 - key: label_1
   name: 标签1
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
 - key: label_2
   name: 标签2
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
 - key: label_3
   name: 标签3
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
 - key: label_4
   name: 标签4
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
 - key: label_5
   name: 标签5
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
 - key: label_6
   name: 标签6
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
 - key: btn_1
   name: 刷新1
   type: func
   is_text: false
-  is_clickable: false
+  is_clickable: true
 - key: btn_2
   name: 刷新2
   type: func
   is_text: false
-  is_clickable: false
+  is_clickable: true
 - key: btn_3
   name: 刷新3
   type: func
   is_text: false
-  is_clickable: false
+  is_clickable: true
 - key: btn_4
   name: 刷新4
   type: func
   is_text: false
-  is_clickable: false
+  is_clickable: true
 - key: btn_5
   name: 刷新5
   type: func
   is_text: false
-  is_clickable: false
+  is_clickable: true
 - key: btn_6
   name: 刷新6
   type: func
   is_text: false
-  is_clickable: false
+  is_clickable: true
+- key: goto
+  name: 前往
+  type: func
+  is_text: true
+  is_clickable: true

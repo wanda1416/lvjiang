@@ -57,6 +57,20 @@ flows:
     required_scenes:
       - game_main_page
 
+  - id: activity_jianghu
+    name: 江湖号令刷新
+    wf_file: activity_jianghu.wf
+    required_scenes:
+      - activity_jianghu
+      - ui_waiguan_yigui
+    parameters:
+      - name: max_refresh
+        label: 单任务最大刷新次数
+        type: number
+        default: 50
+        min: 1
+        max: 999
+
   - id: mengzhuzhengfeng
     name: 盟主争锋
     wf_file: mengzhuzhengfeng.wf

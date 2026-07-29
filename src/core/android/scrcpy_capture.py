@@ -221,8 +221,14 @@ class AndroidStreamCapture(CaptureBackend):
                     pass
             self._server_proc = None
 
+        decode_thread_stuck = False
         if self._decode_thread and self._decode_thread.is_alive():
             self._decode_thread.join(timeout=2.0)
+            if self._decode_thread.is_alive():
+                # 解码线程未按时退出（可能阻塞在 decoder.parse/decode），
+                # 此时不能清 _decoder，否则线程访问已释放对象触发 native crash
+                decode_thread_stuck = True
+                logger.warning("[AndroidStream] 解码线程 2s 内未退出，保留 decoder 引用避免竞态")
         self._decode_thread = None
 
         self._cleanup_forward()
@@ -232,7 +238,8 @@ class AndroidStreamCapture(CaptureBackend):
             capture_output=True, timeout=5,
         )
 
-        self._decoder = None
+        if not decode_thread_stuck:
+            self._decoder = None
         logger.debug("[AndroidStream] 已停止")
 
     # ─── 截图接口（继承 CaptureBackend）────────────────────

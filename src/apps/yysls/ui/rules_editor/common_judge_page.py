@@ -1,8 +1,9 @@
 """通用判定编辑页（规则编辑器）
 
 规则级四档判定条件，对所有部位生效（判定时逐档并入各部位模式的
-条件组、通用在前）。无首词条与默认判定，直接展示四档条件 Tab：
-垃圾 / 一般 / 优秀 / 顶级（各为条件组列表，组间 OR、组内 AND，
+条件组、通用在前）。无首词条与默认判定，直接展示判定条件 Tab：
+全部 / 垃圾 / 一般 / 优秀 / 顶级（「全部」按判定顺序纵向铺开四档，
+各档带配色标头区分；各档为条件组列表，组间 OR、组内 AND，
 组可绑定开关前提 when）。
 编辑共享 raw dict 顶层的 common_conditions 子树。
 """
@@ -11,10 +12,10 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PyQt6.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from .condition_editor import ConditionGroupsEditor
-from .part_pattern_page import _TIERS
+from .part_pattern_page import TierTabsWidget
 
 
 class CommonJudgePage(QWidget):
@@ -35,19 +36,13 @@ class CommonJudgePage(QWidget):
         layout.addWidget(QLabel(
             "<b>判定条件</b>（通用判定：这里的条件对所有部位都生效）"))
 
-        # 四档判定条件 Tab（顺序 junk → … → top）
-        self._tabs = QTabWidget()
-        layout.addWidget(self._tabs)
-        self._tier_editors: dict[str, ConditionGroupsEditor] = {}
-        for tier_key, tier_name in _TIERS:
-            page = QWidget()
-            page_layout = QVBoxLayout(page)
-            editor = ConditionGroupsEditor(self._candidates)
+        # 判定条件 Tab（全部 + 四档，顺序 junk → … → top）
+        self._tier_tabs = TierTabsWidget(self._candidates)
+        self._tier_editors: dict[str, ConditionGroupsEditor] = \
+            self._tier_tabs.editors
+        for editor in self._tier_editors.values():
             editor.changed.connect(self._apply)
-            page_layout.addWidget(editor)
-            page_layout.addStretch()
-            self._tabs.addTab(page, tier_name)
-            self._tier_editors[tier_key] = editor
+        layout.addWidget(self._tier_tabs)
         layout.addStretch()
 
     # ── 数据往返 ──

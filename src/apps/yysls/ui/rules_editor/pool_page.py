@@ -36,8 +36,11 @@ class _AffixListBox(QWidget):
         self._list.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection)
         self._list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        # 展示高度按行数折算固定，超出滚动
-        row_h = self._list.fontMetrics().height() + 4
+        # 展示高度按行数折算固定，超出滚动；用临时项测真实行高
+        # （fontMetrics 估算偏小，会导致实际可见行数不足 rows）
+        self._list.addItem("测高")
+        row_h = self._list.sizeHintForRow(0)
+        self._list.takeItem(0)
         self._list.setFixedHeight(
             rows * row_h + 2 * self._list.frameWidth())
         layout.addWidget(self._list, 1)

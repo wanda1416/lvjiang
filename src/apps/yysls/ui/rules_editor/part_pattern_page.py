@@ -2,7 +2,8 @@
 
 自上而下：首词条（提示 icon 点开说明 + 词条按钮点击编辑，
 首词条为空 = 本部位不参与判定）、默认判定（空 = 跟随规则设置）、
-四档判定条件 Tab：垃圾 / 一般 / 优秀 / 顶级（各为条件组列表，
+判定条件 Tab：全部 / 垃圾 / 一般 / 优秀 / 顶级（「全部」按判定顺序
+纵向铺开四档，各档带配色标头区分；各档为条件组列表，
 组间 OR、组内 AND，组可绑定开关前提 when）。
 判定顺序 junk → normal → excellent → top，全不命中取默认判定
 （部位级优先，缺省跟随规则设置页）；槽位全推导，无必选/可选槽
@@ -16,8 +17,8 @@ from typing import Callable
 
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLabel, QPushButton, QTabWidget, QToolButton,
-    QToolTip, QVBoxLayout, QWidget,
+    QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QTabBar,
+    QToolButton, QToolTip, QVBoxLayout, QWidget,
 )
 
 from src.apps.yysls.evaluator.tuning_rules import RATING_KEYS, RATING_LABELS
@@ -32,6 +33,61 @@ _TIERS: list[tuple[str, str]] = [
     ("excellent_conditions", "优秀"),
     ("top_conditions", "顶级"),
 ]
+
+# 档位标头配色（浅色背景可见，与品质/词条分级配色一致）
+_TIER_COLORS = {
+    "junk_conditions": "#888888",       # 灰
+    "normal_conditions": "#333333",     # 黑
+    "excellent_conditions": "#2563EB",  # 蓝
+    "top_conditions": "#B8860B",        # 暗金
+}
+
+
+class TierTabsWidget(QWidget):
+    """四档判定条件 Tab：首页「全部」按判定顺序纵向铺开四档
+    （各档带配色标头区分），其余 Tab 单档展示。单套编辑器实例，
+    Tab 仅切换可见性，两种视图天然同步。"""
+
+    def __init__(self, candidates: list[str], parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self._bar = QTabBar()
+        self._bar.setExpanding(False)
+        self._bar.addTab("全部")
+        for _tier_key, tier_name in _TIERS:
+            self._bar.addTab(tier_name)
+        layout.addWidget(self._bar)
+
+        body = QFrame()
+        body.setFrameShape(QFrame.Shape.StyledPanel)
+        body_layout = QVBoxLayout(body)
+        #: 档位 key → 编辑器（页面方由此连接 changed 与数据往返）
+        self.editors: dict[str, ConditionGroupsEditor] = {}
+        self._sections: list[tuple[QLabel, ConditionGroupsEditor]] = []
+        for tier_key, tier_name in _TIERS:
+            header = QLabel(f"■ {tier_name}条件")
+            header.setStyleSheet(
+                f"font-weight: bold; color: {_TIER_COLORS[tier_key]};")
+            editor = ConditionGroupsEditor(candidates)
+            body_layout.addWidget(header)
+            body_layout.addWidget(editor)
+            self.editors[tier_key] = editor
+            self._sections.append((header, editor))
+        layout.addWidget(body)
+
+        self._bar.currentChanged.connect(self._on_tab_changed)
+        self._on_tab_changed(0)
+
+    def _on_tab_changed(self, index: int):
+        # index 0 = 全部：四档纵向铺开；其余只显示对应档
+        for i, (header, editor) in enumerate(self._sections):
+            visible = index in (0, i + 1)
+            header.setVisible(visible)
+            editor.setVisible(visible)
+
 
 _FIRST_TIPS = (
     "首词条：装备第 1 条词条须在候选之内（任一符合即可），\n"
@@ -77,7 +133,7 @@ class PartPatternPage(QWidget):
 
         # ② 默认判定：全档不命中时的兜底档位（空 = 跟随规则设置页）
         rating_row = QHBoxLayout()
-        rating_row.addWidget(QLabel("默认判定："))
+        rating_row.addWidget(QLabel("<b>默认判定</b>"))
         self._rating_combo = QComboBox()
         self._rating_combo.addItem("（跟随规则设置）", "")
         for rating_key in RATING_KEYS:
@@ -88,20 +144,13 @@ class PartPatternPage(QWidget):
         rating_row.addStretch()
         layout.addLayout(rating_row)
 
-        # ③ 四档判定条件 Tab（顺序 junk → … → top）
+        # ③ 判定条件 Tab（全部 + 四档，顺序 junk → … → top）
         layout.addWidget(QLabel("<b>判定条件</b>"))
-        self._tabs = QTabWidget()
-        layout.addWidget(self._tabs)
-        self._tier_editors: dict[str, ConditionGroupsEditor] = {}
-        for tier_key, tier_name in _TIERS:
-            page = QWidget()
-            page_layout = QVBoxLayout(page)
-            editor = ConditionGroupsEditor(self._candidates)
+        self._tier_tabs = TierTabsWidget(self._candidates)
+        self._tier_editors = self._tier_tabs.editors
+        for editor in self._tier_editors.values():
             editor.changed.connect(self._apply)
-            page_layout.addWidget(editor)
-            page_layout.addStretch()
-            self._tabs.addTab(page, tier_name)
-            self._tier_editors[tier_key] = editor
+        layout.addWidget(self._tier_tabs)
         layout.addStretch()
 
     # ── 数据往返 ──
@@ -165,4 +214,4 @@ class PartPatternPage(QWidget):
     def _set_editing_enabled(self, enabled: bool):
         """首词条为空时锁定默认判定与条件编辑区"""
         self._rating_combo.setEnabled(enabled)
-        self._tabs.setEnabled(enabled)
+        self._tier_tabs.setEnabled(enabled)

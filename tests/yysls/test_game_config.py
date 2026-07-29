@@ -9,9 +9,11 @@ import pytest
 
 from src.apps.yysls.game_config import (
     AFFIX_CATEGORY_NAMES,
+    EQUIP_PART_NAMES,
     POOL_DINGYIN,
     POOL_NORMAL,
     AttrRange,
+    GameConfigManager,
     LevelRule,
     get_game_config,
 )
@@ -107,6 +109,33 @@ class TestGetAffixCaps:
         categories = mgr.get_all_affix_categories()
         assert "外功攻击" in categories
         assert "指定武学增效" in categories
+
+
+# ─── 词条部位（顶层 affix_parts）──────────────────────────
+
+class TestAffixParts:
+    def test_default_all_parts(self, mgr):
+        # 未配置的词条默认可出现在全部七个部位
+        assert mgr.get_affix_parts("会心率") == list(EQUIP_PART_NAMES)
+
+    def test_configured_subset(self, tmp_path):
+        yaml_text = (
+            "base_attrs: {}\n"
+            "affix_caps: {}\n"
+            "affix_parts:\n"
+            "  剑武学增伤: [武器]\n"
+            "  全武学增伤: [环, 佩]\n"
+            "  非法部位词条: [不存在部位]\n"
+            "  非法形态词条: 武器\n"
+        )
+        path = tmp_path / "attributes.yaml"
+        path.write_text(yaml_text, encoding="utf-8")
+        mgr = GameConfigManager(path)
+        assert mgr.get_affix_parts("剑武学增伤") == ["武器"]
+        assert mgr.get_affix_parts("全武学增伤") == ["环", "佩"]
+        # 非法部位名被过滤、非 list 形态被忽略 → 回退全部位
+        assert mgr.get_affix_parts("非法部位词条") == list(EQUIP_PART_NAMES)
+        assert mgr.get_affix_parts("非法形态词条") == list(EQUIP_PART_NAMES)
 
 
 # ─── 词库类型（普通 / 定音）──────────────────────────────

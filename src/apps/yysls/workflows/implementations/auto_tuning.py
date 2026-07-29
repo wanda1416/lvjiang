@@ -500,9 +500,13 @@ class AutoTuningWorkflow(BaseWorkflow):
         stocks: dict[str, int | None] = {}
         for info in (infos or {}).values():
             label = getattr(info, "type", "") or ""
-            if label:
-                stocks[label] = (info.owned if info.owned is not None
-                                 else info.count)
+            if not label:
+                continue
+            # 低置信度误匹配的同名幽灵槽（数量 None）不得覆盖真槽
+            if label in stocks and stocks[label] is not None:
+                continue
+            stocks[label] = (info.owned if info.owned is not None
+                             else info.count)
         decision = settings.decide_food(
             cap_pct, self._expect_rating, equip_data.quality, stocks)
         log = logger.warning if decision.action == "skip" else logger.info
@@ -653,8 +657,12 @@ class AutoTuningWorkflow(BaseWorkflow):
         food = decision.food if decision.action == "feed" else ""
         self._round_food = food
         if food:
-            slot = next((s for s, i in (infos or {}).items()
-                         if getattr(i, "type", "") == food), None)
+            # 同名幽灵槽防护：只认数量有效的槽位
+            slot = next(
+                (s for s, i in (infos or {}).items()
+                 if getattr(i, "type", "") == food
+                 and (getattr(i, "owned", None) is not None
+                      or getattr(i, "count", None) is not None)), None)
             if not slot:
                 logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
                 self._tune_abort_reason = f"{food} 材料槽位定位失败"

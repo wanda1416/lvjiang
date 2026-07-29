@@ -230,6 +230,32 @@ def test_no_recognition_when_stone_off_and_no_rules(patch_worth, monkeypatch):
     assert wf.output["tuning_reports"][0]["rounds"] == 3
 
 
+def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
+    """低置信度误匹配的同名幽灵槽（数量 None）不得覆盖真槽库存，
+    且狗粮点击定位到数量有效的真槽（复刻 20260730 雁南飞甲现场）"""
+    base = TuningBase(materials=MaterialSettings(food_rules=[
+        FoodRule(pct=90, min_expect="excellent", food="紫狗粮")]))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
+    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
+                                 "tune_tip": ""}
+    wf._material_infos = {
+        "material_1": _Stone(type="紫狗粮"),                     # 前置幽灵槽
+        "material_2": _Stone(type="紫狗粮", count=0, owned=103),  # 真槽
+        "material_6": _Stone(type="紫狗粮"),                     # 后置幽灵槽
+    }
+    wf._process_equipment("紫胸甲", _equip(2, quality="purple", cap_pct=95),
+                          WEAPON_DETAIL)
+
+    reports = wf.output["tuning_reports"]
+    assert reports[0]["status"] == "tuned"
+    assert reports[0]["rounds"] == 3
+    # 库存取真槽 owned=103 → 每轮都喂；点击落在真槽而非幽灵槽
+    assert wf.clicks.count((TUNE_SCENE, "material_2")) == 3
+    assert (TUNE_SCENE, "material_1") not in wf.clicks
+
+
 # ─── 大律准石数量检查 ─────────────────────────
 
 class _Stone:

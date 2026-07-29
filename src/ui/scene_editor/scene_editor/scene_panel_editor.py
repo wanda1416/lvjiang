@@ -9,10 +9,11 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from ....core.scene_registry import (
-    get_registry, sync_scene_cache, Panel,
+    get_registry, sync_scene_cache, Panel, is_view_visible,
 )
 from ....core.scene_loader import PanelDef
-from .scene_select import add_scene_combo_row
+from ...widgets import strip_focus_rect
+from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 
 
 class PanelEditorMixin:
@@ -52,6 +53,7 @@ class PanelEditorMixin:
         self._panel_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers
         )
+        strip_focus_rect(self._panel_table)
         self._panel_table.verticalHeader().setVisible(False)
         self._panel_table.currentCellChanged.connect(self._on_panel_table_selection)
         self._panel_table.cellDoubleClicked.connect(self._on_edit_panel_from_table)
@@ -94,6 +96,8 @@ class PanelEditorMixin:
             return
         bound_keys = {p.key for p in self._canvas.get_panels()}
         for panel_def in scene.panels:
+            if not is_view_visible(panel_def.view, self._current_view):
+                continue
             row = self._panel_table.rowCount()
             self._panel_table.insertRow(row)
             # 名称 + 绑定状态
@@ -128,26 +132,30 @@ class PanelEditorMixin:
         self._btn_del_panel.setEnabled(row >= 0)
         if row < 0:
             return
-        registry = get_registry()
-        scene = registry.get_scene(self._scene_key)
-        if not scene or row >= len(scene.panels):
+        # 表格已按视图过滤，row 不再对应 scene.panels 索引，改按 key
+        key_item = self._panel_table.item(row, 1)
+        if key_item is None:
             return
-        key = scene.panels[row].key
-        self._canvas.select_panel_by_key(key)
+        self._canvas.select_panel_by_key(key_item.text())
 
     def _on_edit_panel_from_table(self, row, col):
         """双击表格行编辑面板属性（场景变更时跨场景迁移）"""
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
-        if not scene or row >= len(scene.panels):
+        key_item = self._panel_table.item(row, 1)
+        if not scene or key_item is None:
             return
-        old_def = scene.panels[row]
+        old_def = next((p for p in scene.panels if p.key == key_item.text()), None)
+        if old_def is None:
+            return
         result = self._show_panel_edit_dialog(old_def)
         if result is None:
             return
         new_def, target_scene = result
         if target_scene != self._scene_key:
-            # 跨场景迁移：先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
+            # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
+            new_def.view = ""
+            # 先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
             try:
                 registry.add_panel_to_scene(target_scene, new_def)
             except ValueError as e:
@@ -219,9 +227,12 @@ class PanelEditorMixin:
             return
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
-        if not scene or row >= len(scene.panels):
+        key_item = self._panel_table.item(row, 1)
+        if not scene or key_item is None:
             return
-        panel_def = scene.panels[row]
+        panel_def = next((p for p in scene.panels if p.key == key_item.text()), None)
+        if panel_def is None:
+            return
         reply = QMessageBox.question(
             self,
             "确认删除",
@@ -321,6 +332,12 @@ class PanelEditorMixin:
         if panel_def is not None:
             scene_combo = add_scene_combo_row(form, self._scene_key)
 
+        # 多视图场景可选择归属视图；新建默认落在当前视图
+        view_combo = add_view_combo_row(
+            form, self._scene_key,
+            panel_def.view if panel_def else self._current_view,
+        )
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -354,4 +371,5 @@ class PanelEditorMixin:
             cols=cols_spin.value(),
             rows=rows_spin.value(),
             min_visible=round(vis_spin.value(), 2),
+            view=combo_view_value(view_combo, self._current_view),
         ), target_scene

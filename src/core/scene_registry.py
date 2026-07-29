@@ -6,7 +6,10 @@ from pathlib import Path
 from loguru import logger
 
 from ..constants import SYSTEM_SCENES_DIR, SCENES_CONFIG_PATH
-from .scene_loader import SceneRegistry, RegionDef, PointDef, PanelDef, SceneDef
+from .scene_loader import (
+    SceneRegistry, RegionDef, PointDef, PanelDef, SceneDef,
+    ViewDef, BASE_VIEW_KEY, BASE_VIEW_NAME,
+)
 
 
 def _load_scene_order() -> list[str] | None:
@@ -214,6 +217,37 @@ def get_region_defs(scene_key: str) -> list[RegionDef]:
     if not scene:
         return []
     return list(scene.regions)
+
+
+# ─── 视图 ───────────────────────────────────────────────
+
+def get_scene_views(scene_key: str) -> list[ViewDef]:
+    """获取场景视图列表（空 = 未开启多视图）"""
+    return _registry.get_scene_views(scene_key)
+
+
+def is_view_visible(item_view: str, current_view: str) -> bool:
+    """当前视图下某定义是否可见
+
+    current_view 为空 = 看全部；选定视图时只看基底视图 + 当前视图。
+    """
+    if not current_view:
+        return True
+    return item_view in ("", BASE_VIEW_KEY, current_view)
+
+
+def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:
+    """当前视图下可见的全部定义 key（看全部时返回 None 表示不过滤）"""
+    if not current_view:
+        return None
+    scene = _registry.get_scene(scene_key)
+    if not scene:
+        return set()
+    return {
+        i.key
+        for i in (*scene.regions, *scene.points, *scene.panels)
+        if is_view_visible(i.view, current_view)
+    }
 
 
 def get_scene_point_pairs(scene_key: str) -> list[tuple[str, str]]:

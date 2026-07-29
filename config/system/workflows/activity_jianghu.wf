@@ -1,5 +1,5 @@
 #% name: 江湖号令刷新
-#% required_scenes: [activity_jianghu, ui_waiguan_yigui, action_control, game_menu_page]
+#% required_scenes: [activity_jianghu, ui_waiguan_yigui, action_control, game_menu_page, game_main_page, general_control, ui_school_main]
 #% parameters:
 #%   - name: max_refresh
 #%     label: 单任务最大刷新次数
@@ -9,10 +9,12 @@
 # 江湖号令任务刷新流程
 #
 # 流程结构：
+#   0. 起始定位：读 label_0 判断在活动页还是首页，必要时先导航
 #   for 遍历 6 组 label_N / btn_N
 #      1. 识别 label_N 文本是否命中目标任务列表（contains_any 短路匹配）
 #      2. 命中 → 读取任务文本，分发执行对应动作
 #      3. 未命中 → 点击 btn_N 刷新，等待后重新识别，直到命中或达到刷新上限
+#   4. 收尾：若仍在活动页，退回游戏首页
 #
 # 参数：
 #   max_refresh — 单个任务最大刷新次数，默认 50
@@ -23,6 +25,19 @@ $step_interval = (1, 2)
 
 # 目标任务关键词列表
 eval $targets = ["合影", "换装", "情境", "东方", "醉意", "双人"]
+
+# 起始定位：用户可能在江湖号令活动页点 F9，也可能停在游戏首页
+# 读不到「号令」标题即视为在首页，先导航进活动页
+scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
+if not $at_haoling
+   log "未识别到号令标题，视为当前在游戏首页，先导航至江湖号令页"
+   call back_to_haoling()
+   scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
+   if not $at_haoling
+      log "导航后仍未进入江湖号令页，终止流程"
+      return
+   end
+end
 
 for idx in ["1", "2", "3", "4", "5", "6"]
 
@@ -59,7 +74,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
          call action_huanzhuang($label)
       end
       if $task_text contains "合影"
-         call action_heying($label)
+         call action_heying($label, $idx)
       end
       if $task_text contains "情境"
          call action_qingjing($label)
@@ -79,6 +94,15 @@ end
 
 log "六个任务刷新处理完成"
 
+# 收尾：末个任务非合影时仍停在江湖号令页，连点三次返回退回游戏首页
+scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
+if $at_haoling
+   log "仍在江湖号令页，退回游戏首页"
+   click [game_menu_page].[back] after wait $step_interval
+   click [game_menu_page].[back] after wait $step_interval
+   click [game_menu_page].[back] after wait $step_interval
+end
+
 
 # ─── 各活动动作过程 ────────────────────────────────────────
 # 每个 def 接收命中任务的 label region 名（如 "label_1"），
@@ -97,13 +121,39 @@ def action_huanzhuang($label)
 end
 
 # 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
-def action_heying($label)
+# 退出拍照会落到游戏首页，需再自行导航回江湖号令页（末个任务除外）
+def action_heying($label, $idx)
    click [activity_jianghu].$label after wait $step_interval
    click [activity_jianghu].[goto] after wait $step_interval
    click [action_control].[camera_shot] after wait $step_interval
    click [game_menu_page].[back] after wait $step_interval
    click [game_menu_page].[back] after wait $step_interval
    click [action_control].[back_confirm] after wait $step_interval
+
+   # 第六个任务已是最后一个，无需返回活动页
+   if $idx equals "6"
+      log "末个任务合影完成，无需返回江湖号令页"
+      return
+   end
+   call back_to_haoling()
+end
+
+# 首页 → 江湖号令页：菜单 → 上滑翻页（最多两次）识别门派 → 门派首页 → 江湖号令
+def back_to_haoling()
+   click [game_main_page].[menu] after wait $step_interval
+   loop 2
+      drag [general_control].[menu_up] after wait $step_interval
+      scan [game_menu_page].[menpai] as $menpai_key by contains "门派"
+      if $menpai_key
+         break
+      end
+   end
+   if not $menpai_key
+      log "菜单上滑两次仍未识别到门派，无法返回江湖号令页"
+      return
+   end
+   click [game_menu_page].$menpai_key after wait $step_interval
+   click [ui_school_main].[haoling] after wait $step_interval
 end
 
 # 情境：动作暂未实现

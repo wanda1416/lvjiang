@@ -293,13 +293,13 @@ class RunControlMixin:
             self._end_automation(flow_name)
             return
 
-        # 延迟校验：检查所需场景是否已绑定区域
+        # 延迟校验：检查所需场景是否已绑定坐标
         required_scenes = flow_cfg.get("required_scenes", [])
         if required_scenes:
             missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
             if missing:
                 names = "、".join(missing)
-                self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
+                self.log_text.append(f"[错误] 以下场景未绑定坐标: {names}")
                 self.statusBar().showMessage(f"场景缺失: {names}")
                 self._end_automation(flow_name)
                 return
@@ -527,7 +527,7 @@ class RunControlMixin:
             missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
             if missing:
                 names = "、".join(missing)
-                self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
+                self.log_text.append(f"[错误] 以下场景未绑定坐标: {names}")
                 self._end_automation(flow_name)
                 return
 

@@ -27,11 +27,25 @@ def layout_screenshots_dir(layout_name: str) -> Path:
     return SCREENSHOTS_DIR / _safe_name(layout_name)
 
 
+def scene_screenshot_name(scene_key: str, view: str = "") -> str:
+    """截图文件名：基底视图沿用场景名，其余视图加 __视图 key 后缀
+
+    同一场景的多个视图（同一页面的不同滚动态）各自一张底图，
+    否则无法在正确的背景上标定坐标。
+    """
+    from .scene_loader import BASE_VIEW_KEY
+    if not view or view == BASE_VIEW_KEY:
+        return f"{scene_key}.png"
+    return f"{scene_key}__{view}.png"
+
+
 # ─── 截图管理 ────────────────────────────────────────────
 
-def load_scene_screenshot(layout_name: str, scene_key: str) -> np.ndarray | None:
-    """读取布局下某场景的截图，不存在返回 None（支持中文路径）"""
-    path = layout_screenshots_dir(layout_name) / f"{scene_key}.png"
+def load_scene_screenshot(
+    layout_name: str, scene_key: str, view: str = ""
+) -> np.ndarray | None:
+    """读取布局下某场景（可选视图）的截图，不存在返回 None（支持中文路径）"""
+    path = layout_screenshots_dir(layout_name) / scene_screenshot_name(scene_key, view)
     if not path.exists():
         return None
     try:
@@ -49,15 +63,17 @@ def load_scene_screenshot(layout_name: str, scene_key: str) -> np.ndarray | None
         return None
 
 
-def save_scene_screenshot(layout_name: str, scene_key: str, image: np.ndarray):
-    """保存场景截图（支持中文路径）
+def save_scene_screenshot(
+    layout_name: str, scene_key: str, image: np.ndarray, view: str = ""
+):
+    """保存场景（可选视图）截图（支持中文路径）
 
     image: BGR numpy 数组（项目内部统一使用 BGR）
     """
     import cv2
     d = layout_screenshots_dir(layout_name)
     d.mkdir(parents=True, exist_ok=True)
-    path = d / f"{scene_key}.png"
+    path = d / scene_screenshot_name(scene_key, view)
     # image 已是 BGR，cv2.imencode 期望 BGR，无需翻转
     success, buf = cv2.imencode('.png', image)
     if success:
@@ -273,14 +289,23 @@ class LayoutConfigManager:
         return changed
 
     def check_scenes_valid(self, name: str, scene_keys: list[str]) -> list[str]:
-        """检查指定场景是否已绑定区域，返回缺失场景的名称列表"""
+        """检查指定场景是否已绑定坐标，返回缺失场景的名称列表
+
+        区域/坐标点/方向/面板任一非空即视为已绑定——有些场景（如通用控制）
+        本身只定义坐标点与方向，不含任何区域。
+        """
         layout = self.load_layout(name)
         if not layout:
             return [get_scene_name(k) for k in scene_keys]
         missing = []
         for scene_key in scene_keys:
-            regions = layout.scenes.get(scene_key, [])
-            if not regions:
+            bound = (
+                layout.get_scene_regions(scene_key)
+                or layout.get_scene_points(scene_key)
+                or layout.get_scene_arrows(scene_key)
+                or layout.get_scene_panels(scene_key)
+            )
+            if not bound:
                 missing.append(get_scene_name(scene_key))
         return missing
 

@@ -12,10 +12,11 @@ from PyQt6.QtCore import Qt
 
 from ....core.scene_registry import (
     get_scene_point_pairs, get_point_def,
-    get_registry, sync_scene_cache,
+    get_registry, sync_scene_cache, is_view_visible,
 )
 from ....core.scene_loader import PointDef, VALID_REGION_TYPES
-from .scene_select import add_scene_combo_row
+from ...widgets import strip_focus_rect
+from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -56,6 +57,7 @@ class PoiPanelMixin:
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        strip_focus_rect(self._point_list)
         self._point_list.verticalHeader().setVisible(False)
         self._point_list.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_point_selection(row))
         self._point_list.cellDoubleClicked.connect(self._on_edit_point_from_table)
@@ -91,6 +93,7 @@ class PoiPanelMixin:
         self._arrow_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._arrow_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._arrow_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        strip_focus_rect(self._arrow_list)
         self._arrow_list.verticalHeader().setVisible(False)
         self._arrow_list.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_arrow_selection(row))
         self._arrow_list.cellDoubleClicked.connect(self._on_edit_arrow_from_table)
@@ -123,6 +126,8 @@ class PoiPanelMixin:
             return
         placed = {p.key for p in self._canvas.get_points()}
         for point_def in scene.points:
+            if not is_view_visible(point_def.view, self._current_view):
+                continue
             row = self._point_list.rowCount()
             self._point_list.insertRow(row)
             # 名称
@@ -152,7 +157,7 @@ class PoiPanelMixin:
         """刷新方向列表"""
         self._arrow_list.blockSignals(True)
         self._arrow_list.setRowCount(0)
-        for a in self._canvas.get_arrows():
+        for a in self._canvas.get_visible_arrows():
             row = self._arrow_list.rowCount()
             self._arrow_list.insertRow(row)
             # Key
@@ -289,7 +294,9 @@ class PoiPanelMixin:
             sync_scene_cache(self._scene_key)
             self._refresh_lists()
             return
-        # 跨场景迁移：先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
+        # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
+        new_def.view = ""
+        # 先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
         try:
             registry.add_point_to_scene(target_scene, new_def)
         except ValueError as e:
@@ -429,6 +436,12 @@ class PoiPanelMixin:
         if point_def is not None:
             scene_combo = add_scene_combo_row(form, self._scene_key)
 
+        # 多视图场景可选择归属视图；新建默认落在当前视图
+        view_combo = add_view_combo_row(
+            form, self._scene_key,
+            point_def.view if point_def else self._current_view,
+        )
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -457,4 +470,5 @@ class PoiPanelMixin:
             type=type_combo.currentText(),
             is_text=is_text_check.isChecked(),
             is_clickable=is_clickable_check.isChecked(),
+            view=combo_view_value(view_combo, self._current_view),
         ), target_scene

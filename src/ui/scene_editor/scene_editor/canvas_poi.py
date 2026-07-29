@@ -82,6 +82,9 @@ class CanvasPoiMixin:
     def _init_poi_state(self):
         self._points = []
         self._arrows = []
+        # 被视图过滤隐藏的实例（数据仍保留，get_* 时一并返回）
+        self._hidden_points = []
+        self._hidden_arrows = []
         self._current_points = []
         self._selected_point_idx = -1
         self._selected_arrow_idx = -1
@@ -106,23 +109,65 @@ class CanvasPoiMixin:
         self._current_points = list(points)
 
     def set_points(self, points: list):
-        self._points = [Point.from_dict(p.to_dict()) for p in points]
+        self._points, self._hidden_points = self._split_by_filter(
+            [Point.from_dict(p.to_dict()) for p in points]
+        )
         self._selected_point_idx = -1
         self.update()
 
     def get_points(self) -> list:
-        return [Point.from_dict(p.to_dict()) for p in self._points]
+        """全部坐标点（含被视图过滤隐藏的，保存布局时不能写丢）"""
+        return [
+            Point.from_dict(p.to_dict())
+            for p in self._points + self._hidden_points
+        ]
 
     def set_arrows(self, arrows: list):
-        self._arrows = [Arrow.from_dict(a.to_dict()) for a in arrows]
+        self._arrows, self._hidden_arrows = self._split_arrows(
+            [Arrow.from_dict(a.to_dict()) for a in arrows]
+        )
         self._selected_arrow_idx = -1
         self.update()
 
     def get_arrows(self) -> list:
+        """全部方向（含被视图过滤隐藏的）"""
+        return [
+            Arrow.from_dict(a.to_dict())
+            for a in self._arrows + self._hidden_arrows
+        ]
+
+    def get_visible_arrows(self) -> list:
+        """当前视图下可见的方向（供列表展示）"""
         return [Arrow.from_dict(a.to_dict()) for a in self._arrows]
 
+    def _split_arrows(self, arrows: list) -> tuple[list, list]:
+        """方向没有独立的视图归属，跟随其起点坐标点的可见性
+
+        注意：依赖 _points 已按视图拆分完毕，故 set_points 必须先于 set_arrows 调用。
+        """
+        if self._visible_keys is None:
+            return list(arrows), []
+        visible_pt_keys = {p.key for p in self._points}
+        visible, hidden = [], []
+        for a in arrows:
+            (visible if a.from_key in visible_pt_keys else hidden).append(a)
+        return visible, hidden
+
+    def _apply_poi_filter(self):
+        """视图切换后重新拆分 point / arrow（由 set_view_filter 调用）"""
+        self._points, self._hidden_points = self._split_by_filter(
+            self._points + self._hidden_points
+        )
+        self._arrows, self._hidden_arrows = self._split_arrows(
+            self._arrows + self._hidden_arrows
+        )
+        self._selected_point_idx = -1
+        self._selected_arrow_idx = -1
+
     def _resolve_point(self, key: str) -> Point | None:
-        return next((p for p in self._points if p.key == key), None)
+        return next(
+            (p for p in self._points + self._hidden_points if p.key == key), None
+        )
 
     def _point_name(self, key: str) -> str:
         for k, n in self._current_points:
@@ -201,7 +246,7 @@ class CanvasPoiMixin:
     def _point_referenced_by_arrow(self, point_key: str) -> bool:
         return any(
             a.from_key == point_key or a.to_key == point_key
-            for a in self._arrows
+            for a in self._arrows + self._hidden_arrows
         )
 
     def delete_point_by_key(self, key: str) -> bool:

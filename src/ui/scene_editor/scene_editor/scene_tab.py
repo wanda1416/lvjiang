@@ -3,18 +3,20 @@
 import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QSplitter, QTabWidget,
+    QSplitter, QTabWidget, QComboBox, QPushButton,
 )
 from PyQt6.QtCore import Qt
 
 from ....core.scene_registry import (
     Region, Point, Arrow, Panel, CanvasConfig,
     get_scene_regions, get_scene_point_pairs,
+    get_scene_views, get_view_visible_keys,
 )
 from .canvas import RegionCanvas, EditMode
 from .scene_region_panel import RegionPanelMixin
 from .scene_poi_panel import PoiPanelMixin
 from .scene_panel_editor import PanelEditorMixin
+from .scene_view_dialog import ViewManagerDialog
 
 
 class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
@@ -25,6 +27,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._scene_key = scene_key
         # 跨场景迁移回调：(kind, key, source_scene, target_scene)，由 dialog 注入
         self.on_item_migrated = None
+        # 当前视图 key（空 = 看全部）；视图切换回调：(scene_key, view)，由 dialog 注入换底图
+        self._current_view: str = ""
+        self.on_view_changed = None
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -70,10 +75,70 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     # ─── 面板构建 ────────────────────────────────────────
 
     def _build_canvas_toolbar(self) -> QHBoxLayout:
-        """画布顶部工具栏（功能已移至各 Tab）"""
+        """画布顶部工具栏：视图选择器 + 管理入口"""
         bar = QHBoxLayout()
+        bar.addWidget(QLabel("视图"))
+        self._view_combo = QComboBox()
+        self._view_combo.setMinimumWidth(120)
+        self._view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
+        bar.addWidget(self._view_combo)
+        self._btn_manage_views = QPushButton("管理视图")
+        self._btn_manage_views.setToolTip("开启多视图、新增/重命名/删除视图")
+        self._btn_manage_views.clicked.connect(self._on_manage_views)
+        bar.addWidget(self._btn_manage_views)
         bar.addStretch()
+        self._refresh_view_combo()
         return bar
+
+    # ─── 视图 ────────────────────────────────────────────
+
+    @property
+    def current_view(self) -> str:
+        return self._current_view
+
+    def _refresh_view_combo(self):
+        """按场景视图定义重建下拉框：无多视图则只有「单视图」占位"""
+        combo = self._view_combo
+        combo.blockSignals(True)
+        combo.clear()
+        views = get_scene_views(self._scene_key)
+        if not views:
+            combo.addItem("单视图", userData="")
+            combo.setEnabled(False)
+        else:
+            combo.setEnabled(True)
+            combo.addItem("全部", userData="")
+            for v in views:
+                combo.addItem(v.name, userData=v.key)
+            # 尽量保持当前选中视图
+            idx = combo.findData(self._current_view)
+            combo.setCurrentIndex(idx if idx >= 0 else 0)
+        combo.blockSignals(False)
+        # 若原选中视图已不存在（被删除/取消多视图），回落到全部
+        if combo.findData(self._current_view) < 0:
+            self._current_view = ""
+
+    def _on_view_combo_changed(self, _idx: int):
+        self._current_view = self._view_combo.currentData() or ""
+        self._apply_view_filter()
+        self._refresh_region_list()
+        self._refresh_point_list()
+        self._refresh_arrow_list()
+        self._refresh_panel_list()
+        if self.on_view_changed:
+            self.on_view_changed(self._scene_key, self._current_view)
+
+    def _apply_view_filter(self):
+        """把当前视图的可见 key 集合下发给画布"""
+        visible = get_view_visible_keys(self._scene_key, self._current_view)
+        self._canvas.set_view_filter(visible)
+
+    def _on_manage_views(self):
+        dlg = ViewManagerDialog(self._scene_key, self)
+        dlg.exec()
+        if getattr(dlg, "_changed", False):
+            self._refresh_view_combo()
+            self._on_view_combo_changed(0)
 
     # ─── 属性 ────────────────────────────────────────────
 
@@ -93,6 +158,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
 
     def get_regions(self) -> list[Region]:
         return self._canvas.get_regions()
+
+    def get_visible_regions(self) -> list[Region]:
+        """当前视图下可见的区域（OCR/识别只应作用于可见区域）"""
+        return self._canvas.get_visible_regions()
 
     def set_regions(self, regions: list[Region]):
         self._canvas.set_regions(regions)

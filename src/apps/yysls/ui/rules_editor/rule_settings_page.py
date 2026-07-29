@@ -3,8 +3,8 @@
 key 与名称均为只读文本展示：key 重命名走展示区后的「重命名」按钮
 （弹窗提醒会修改 id，可能影响直接引用的代码）；名称修改走
 对话框左侧导航双击。playstyles 玩法设定表（名字/主武器/主增伤
-词条/副武器/副增伤词条/属性，增伤留空 = 不需要增伤，副增伤的
-留空项以「- 无需增伤 -」展示，说明文案收入标题旁「?」按钮点击
+词条/副武器/副增伤词条/属性，增伤留空 = 不需要增伤，主/副增伤
+的留空项均以「- 无需增伤 -」展示，说明文案收入标题旁「?」按钮点击
 展示），及「删除本规则」
 入口。武器与增伤词条为下拉选择，候选来自游戏配置数据源
 （GameConfigManager：weapon_types 注册表 / 指定武学增效词条），
@@ -40,7 +40,7 @@ _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 # 品阶枚举（与 tuning_base 一致）
 _QUALITIES = ("gold", "purple", "blue")
 
-# 副增伤列留空项的展示文案（仅显示层，收集时仍写入空 = null）
+# 增伤列留空项的展示文案（仅显示层，收集时仍写入空 = null）
 _NO_DAMAGE_LABEL = "- 无需增伤 -"
 
 # 玩法设定表说明（「?」按钮点击展示，不用悬停 tooltip）
@@ -261,10 +261,10 @@ class RuleSettingsPage(QWidget):
         """单元格下拉框：候选来自游戏配置数据源；
         失效旧值保留展示便于改正"""
         combo = QComboBox()
-        if col == 4:  # 副增伤留空项以占位文案展示（收集时仍写入空）
+        if col in (2, 4):  # 增伤留空项以占位文案展示（收集时仍写入空）
             combo.addItem(_NO_DAMAGE_LABEL)
         elif col != 5:  # 属性列必选（默认通用），无留空项
-            combo.addItem("")  # 留空 = 未配置 / 该侧不需要增伤
+            combo.addItem("")  # 留空 = 未配置
         if candidates is None:
             candidates = self._col_candidates[col]
         combo.addItems(candidates)
@@ -272,7 +272,7 @@ class RuleSettingsPage(QWidget):
             combo.addItem(value)
         if col == 5:
             combo.setCurrentText(value or GENERIC_ATTR)
-        elif col == 4:
+        elif col in (2, 4):
             combo.setCurrentText(value or _NO_DAMAGE_LABEL)
         else:
             combo.setCurrentText(value)
@@ -299,7 +299,7 @@ class RuleSettingsPage(QWidget):
         current = dmg.currentText()
         dmg.blockSignals(True)
         dmg.clear()
-        dmg.addItem(_NO_DAMAGE_LABEL if dmg_col == 4 else "")
+        dmg.addItem(_NO_DAMAGE_LABEL)
         dmg.addItems(
             self._damage_candidates(weapon_combo.currentText()))
         if dmg.findText(current) >= 0:

@@ -110,7 +110,7 @@ class TestPanelRoundtrip:
 
     def test_common_page_nav_and_layout(self, qtbot, tmp_manager):
         # 通用判定页：导航在分割线下、主武器之上，无首词条/默认判定，
-        # 直接展示四档条件 Tab
+        # 直接展示判定条件 Tab（全部 + 四档）
         panel = RulePanel("huiyi_general", tmp_manager, lambda t, e: None)
         qtbot.addWidget(panel)
         assert panel._nav.item(3).text() == "通用判定"
@@ -120,7 +120,23 @@ class TestPanelRoundtrip:
         page = panel._common_page
         assert not hasattr(page, "_first_btn")
         assert not hasattr(page, "_rating_combo")
-        assert page._tabs.count() == 4
+        bar = page._tier_tabs._bar
+        assert bar.count() == 5
+        assert bar.tabText(0) == "全部"
+        assert len(page._tier_editors) == 4
+
+    def test_tier_tabs_all_view_visibility(self, qtbot, tmp_manager):
+        # 「全部」页四档均可见；单档 Tab 只显示对应档
+        panel = RulePanel("huiyi_general", tmp_manager, lambda t, e: None)
+        qtbot.addWidget(panel)
+        tabs = panel._common_page._tier_tabs
+        assert tabs._bar.currentIndex() == 0
+        assert all(not e.isHidden() for e in tabs.editors.values())
+        tabs._bar.setCurrentIndex(1)  # 垃圾
+        hidden = [k for k, e in tabs.editors.items() if e.isHidden()]
+        assert not tabs.editors["junk_conditions"].isHidden()
+        assert set(hidden) == {"normal_conditions", "excellent_conditions",
+                               "top_conditions"}
 
     def test_common_page_apply_roundtrip(self, qtbot, tmp_manager):
         # 通用判定四档全空 = 不写 common_conditions；有组时写回并可解析
@@ -243,8 +259,8 @@ class TestPlaystyleTableCombos:
             assert bound  # 前提：配置中该武器已绑定
             combo = table.cellWidget(0, dmg_col)
             items = [combo.itemText(i) for i in range(combo.count())]
-            blank = "- 无需增伤 -" if dmg_col == 4 else ""
-            assert items == [blank, bound]
+            # 主/副增伤留空项均以占位文案展示
+            assert items == ["- 无需增伤 -", bound]
 
     def test_weapon_change_resets_invalid_damage(self, qtbot, tmp_manager):
         # 先选中绑定增伤，再换武器 → 旧增伤不在新候选内，
@@ -261,9 +277,10 @@ class TestPlaystyleTableCombos:
                           if w != old_weapon)
         table.cellWidget(0, 1).setCurrentText(new_weapon)
         combo = table.cellWidget(0, 2)
-        assert combo.currentText() == ""
+        assert combo.currentText() == "- 无需增伤 -"
         items = [combo.itemText(i) for i in range(combo.count())]
-        assert items == ["", mgr.get_weapon_wuxue_affix(new_weapon)]
+        assert items == ["- 无需增伤 -",
+                         mgr.get_weapon_wuxue_affix(new_weapon)]
         name = page._cell(table, 0, 0)
         saved = tmp_manager.get_rule("heal_fire")
         assert saved.playstyles[name].main.weapon == new_weapon

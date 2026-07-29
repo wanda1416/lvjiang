@@ -33,20 +33,23 @@ class TestDialog:
     def test_dialog_nav(self, qtbot):
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
-        # 左侧一级导航：基础配置 + 分割线 + 各规则；
-        # StackedWidget 不含分割线（导航行 = 栈页 + 1 偏移）
-        assert dialog._nav.count() == len(ALL_KEYS) + 2
-        assert dialog._stack.count() == len(ALL_KEYS) + 1
+        # 左侧一级导航：基础配置 + 材料配置 + 分割线 + 各规则；
+        # StackedWidget 不含分割线（行 0/1 = 栈页 0/1，行 ≥3 = 栈页 - 1）
+        assert dialog._nav.count() == len(ALL_KEYS) + 3
+        assert dialog._stack.count() == len(ALL_KEYS) + 2
         assert dialog._nav.item(0).text() == "基础配置"
+        assert dialog._nav.item(1).text() == "材料配置"
         # 分割线项不可选中
-        assert not dialog._nav.item(1).flags()
+        assert not dialog._nav.item(2).flags()
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         first_rule = next(iter(
             TuningRuleManager(rules_dir=RULES_DIR).get_rules().values()))
-        assert dialog._nav.item(2).text() == first_rule.name
+        assert dialog._nav.item(3).text() == first_rule.name
         # 导航切换驱动右侧内容区（跳过分割线偏移）
-        dialog._nav.setCurrentRow(2)
+        dialog._nav.setCurrentRow(1)
         assert dialog._stack.currentIndex() == 1
+        dialog._nav.setCurrentRow(3)
+        assert dialog._stack.currentIndex() == 2
 
 
 class TestPanelRoundtrip:

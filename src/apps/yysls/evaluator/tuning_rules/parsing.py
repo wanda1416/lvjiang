@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 
 from .models import (
-    COND_KINDS, DYNAMIC_AFFIXES, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS,
-    RATING_KEYS, TIER_KEYS, CommonConditions, Condition, ConditionGroup,
-    PartPattern, Playstyle, RuleValidationError, TuningBase, TuningRule,
-    WeaponSide, rule_affix_candidates, standard_playstyle_attrs,
+    COND_KINDS, DYNAMIC_AFFIXES, FOOD_LABELS, FOOD_QUALITIES, GENERIC_ATTR,
+    PART_KEYS, QUALITY_PARTS, RATING_KEYS, TIER_KEYS, CommonConditions,
+    Condition, ConditionGroup, MaterialSettings, PartPattern, Playstyle,
+    RuleValidationError, TuningBase, TuningRule, WeaponSide,
+    rule_affix_candidates, standard_playstyle_attrs,
 )
 
 # 规则 key / 开关 key 合法性（作为 YAML 文件名 / when 引用键）
@@ -318,6 +319,71 @@ def parse_tuning_rule(data: dict,
     return rule
 
 
+def _parse_materials(raw, where: str = "materials") -> MaterialSettings:
+    """材料设置解析：缺省段/缺省字段取 MaterialSettings 默认值
+
+    狗粮 label 锁定 FOOD_LABELS（空串=不加），品阶 key 锁定
+    FOOD_QUALITIES，数值字段拒绝 bool 伪装的 int。
+    """
+    if raw is None:
+        return MaterialSettings()
+    if not isinstance(raw, dict):
+        raise RuleValidationError(f"{where} 必须是 dict")
+    defaults = MaterialSettings()
+
+    def _int_field(value, name: str, lo: int, hi: int) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise RuleValidationError(f"{where}.{name} 必须是整数")
+        if not (lo <= value <= hi):
+            raise RuleValidationError(
+                f"{where}.{name} 超出范围 [{lo}, {hi}]: {value}")
+        return value
+
+    stone = raw.get("stone_check") or {}
+    if not isinstance(stone, dict):
+        raise RuleValidationError(f"{where}.stone_check 必须是 dict")
+    enabled = bool(stone.get("enabled", defaults.stone_check_enabled))
+    min_count = _int_field(
+        stone.get("min_count", defaults.stone_min_count),
+        "stone_check.min_count", 1, 99999)
+
+    food = raw.get("food_strategy") or {}
+    if not isinstance(food, dict):
+        raise RuleValidationError(f"{where}.food_strategy 必须是 dict")
+    high_pct = _int_field(
+        food.get("high_pct", defaults.high_pct),
+        "food_strategy.high_pct", 0, 100)
+    high_food = str(food.get("high_pct_food", defaults.high_pct_food))
+    if high_food not in FOOD_LABELS:
+        raise RuleValidationError(
+            f"{where}.food_strategy.high_pct_food 非法: {high_food!r}"
+            f"（须为 {list(FOOD_LABELS)}）")
+    quality_food = dict(defaults.quality_food)
+    raw_qf = food.get("quality_food") or {}
+    if not isinstance(raw_qf, dict):
+        raise RuleValidationError(
+            f"{where}.food_strategy.quality_food 必须是 dict")
+    for q, f_label in raw_qf.items():
+        if q not in FOOD_QUALITIES:
+            raise RuleValidationError(
+                f"{where}.food_strategy.quality_food: 未知品阶 {q!r}"
+                f"（须为 {list(FOOD_QUALITIES)}）")
+        f_label = str(f_label or "")
+        if f_label and f_label not in FOOD_LABELS:
+            raise RuleValidationError(
+                f"{where}.food_strategy.quality_food.{q} 非法: "
+                f"{f_label!r}（须为 {list(FOOD_LABELS)} 或空=不加）")
+        quality_food[str(q)] = f_label
+
+    return MaterialSettings(
+        stone_check_enabled=enabled,
+        stone_min_count=min_count,
+        high_pct=high_pct,
+        high_pct_food=high_food,
+        quality_food=quality_food,
+    )
+
+
 def parse_tuning_base(data: dict) -> TuningBase:
     """原始 tuning_base.yaml dict → TuningBase（校验失败抛 RuleValidationError）"""
     if not isinstance(data, dict):
@@ -352,4 +418,5 @@ def parse_tuning_base(data: dict) -> TuningBase:
     return TuningBase(
         quality_thresholds=quality_thresholds,
         switches=switches,
+        materials=_parse_materials(data.get("materials")),
     )

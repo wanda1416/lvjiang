@@ -35,6 +35,14 @@ playstyles:
       weapon: 绳镖
       damage: null
     attr: 破竹
+  走地玉:
+    main:
+      weapon: 伞
+      damage: 伞武学增效
+    sub:
+      weapon: 扇
+      damage: null
+    attr: 牵丝
 transmute_priority:
 - 最大外功攻击
 - 劲

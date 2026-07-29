@@ -20,3 +20,13 @@ quality_thresholds:
 switches:
   keep_pvp:
     name: 保留PVP装备
+materials:
+  stone_check:
+    enabled: false
+    min_count: 100
+  food_strategy:
+    high_pct: 90
+    high_pct_food: 金狗粮
+    quality_food:
+      purple: 紫狗粮
+      gold: ''

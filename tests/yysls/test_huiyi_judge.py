@@ -4,7 +4,7 @@
 鸣金属性分部位（武器写 最大无相攻击 / 非武器写 最大鸣金攻击）、
 开关 keep_pvp（条件组 when 语义）、品阶/首词条筛选、规则注册与
 调律潜力判定。
-裂石/治疗规则测试见 test_lieshi_judge.py / test_heal_judge.py。
+会心/治疗规则测试见 test_huixin_judge.py / test_heal_judge.py。
 """
 
 import pytest
@@ -214,7 +214,7 @@ class TestFilters:
 class TestRegistry:
     def test_get_rule_names_order(self):
         assert list(get_rule_names()) == [
-            "huiyi_general", "lieshi_small", "lieshi_big",
+            "huiyi_general", "huixin_small", "huixin_big",
             "heal_pure", "heal_fire",
         ]
         # 名称随规则文件 name 字段（可被用户改名），不硬编码

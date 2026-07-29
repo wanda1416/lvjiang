@@ -17,7 +17,7 @@ from src.apps.yysls.ui.rules_editor.rule_panel import RulePanel
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
 
-ALL_KEYS = ["huiyi_general", "lieshi_small", "lieshi_big",
+ALL_KEYS = ["huiyi_general", "huixin_small", "huixin_big",
             "heal_pure", "heal_fire"]
 
 

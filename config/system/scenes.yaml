@@ -4,6 +4,7 @@ layout_scenes:
   - game_menu_page
   - general_control
   - game_menu_page_2
+  - action_control
   group_2:
   - equip_weapon_detail
   - equip_armor_detail
@@ -26,4 +27,4 @@ group_names:
   group_3: 背包
   group_4: 培养
   group_5: 活动
-  group_6: 汇总
+  group_6: 界面

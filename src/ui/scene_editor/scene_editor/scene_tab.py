@@ -23,6 +23,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     def __init__(self, scene_key: str, image: np.ndarray | None = None, parent=None):
         super().__init__(parent)
         self._scene_key = scene_key
+        # 跨场景迁移回调：(kind, key, source_scene, target_scene)，由 dialog 注入
+        self.on_item_migrated = None
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 

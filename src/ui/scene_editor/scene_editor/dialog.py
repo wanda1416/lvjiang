@@ -13,8 +13,12 @@ from loguru import logger
 from ....core.scene_registry import (
     Layout,
     get_scene_name,
+    get_registry,
 )
-from ....core.layout_manager import LayoutConfigManager, load_scene_screenshot, save_scene_screenshot
+from ....core.layout_manager import (
+    LayoutConfigManager, load_scene_screenshot, save_scene_screenshot,
+    migrate_layout_item,
+)
 from .layout_ops import LayoutOpsMixin
 from .scene_ops import SceneOpsMixin
 from .recognition_ops import RecognitionOpsMixin
@@ -252,6 +256,49 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_points([])
             tab.set_arrows([])
             tab.set_panels([])
+
+    # ─── 跨场景迁移 ────────────────────────────────────
+
+    def _on_item_migrated(self, kind: str, key: str, source: str, target: str):
+        """编辑弹窗跨场景迁移后的同步（场景 YAML 已由弹窗侧迁移完成）
+
+        1. 磁盘：迁移全部布局 JSON 中的坐标数据
+        2. 内存：同步 source/target 两个 Tab 的画布数据，
+           否则「保存」的全量覆盖写盘会把迁移结果回滚
+        """
+        changed = self._manager.migrate_item_across_layouts(source, target, kind, key)
+        src_tab = self._tabs.get(source)
+        dst_tab = self._tabs.get(target)
+        if src_tab is not None and dst_tab is not None:
+            temp = Layout(name="")
+            for sk, tab in ((source, src_tab), (target, dst_tab)):
+                temp.set_scene_regions(sk, tab.get_regions())
+                temp.set_scene_points(sk, tab.get_points())
+                temp.set_scene_arrows(sk, tab.get_arrows())
+                temp.set_scene_panels(sk, tab.get_panels())
+            if migrate_layout_item(temp, source, target, kind, key):
+                for sk, tab in ((source, src_tab), (target, dst_tab)):
+                    tab.set_regions(temp.get_scene_regions(sk))
+                    tab.set_points(temp.get_scene_points(sk))
+                    tab.set_arrows(temp.get_scene_arrows(sk))
+                    tab.set_panels(temp.get_scene_panels(sk))
+            if kind == "panel":
+                # 网格参数同步到已迁移的画布 Panel（与同场景编辑行为一致）
+                scene = get_registry().get_scene(target)
+                pdef = next((p for p in scene.panels if p.key == key), None) if scene else None
+                if pdef is not None:
+                    panels = dst_tab.get_panels()
+                    for p in panels:
+                        if p.key == key:
+                            p.cols, p.rows = pdef.cols, pdef.rows
+                            p.min_visible = pdef.min_visible
+                    dst_tab.set_panels(panels)
+            dst_tab._refresh_lists()
+        self._status_bar.showMessage(
+            f"已将「{key}」从「{get_scene_name(source)}」迁移到「{get_scene_name(target)}」，"
+            f"同步更新 {len(changed)} 个布局"
+        )
+        logger.info(f"跨场景迁移完成: {kind}「{key}」 {source} -> {target}")
 
     # ─── 刷新截图 ────────────────────────────────────────
 

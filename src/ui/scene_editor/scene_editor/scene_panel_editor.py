@@ -12,6 +12,7 @@ from ....core.scene_registry import (
     get_registry, sync_scene_cache, Panel,
 )
 from ....core.scene_loader import PanelDef
+from .scene_select import add_scene_combo_row
 
 
 class PanelEditorMixin:
@@ -19,7 +20,7 @@ class PanelEditorMixin:
 
     依赖主类提供:
         _scene_key, _canvas, _panel_table,
-        _btn_del_panel, _refresh_lists()
+        _btn_del_panel, _refresh_lists(), on_item_migrated
     """
 
     # ─── 面板构建 ────────────────────────────────────────
@@ -135,14 +136,29 @@ class PanelEditorMixin:
         self._canvas.select_panel_by_key(key)
 
     def _on_edit_panel_from_table(self, row, col):
-        """双击表格行编辑面板属性"""
+        """双击表格行编辑面板属性（场景变更时跨场景迁移）"""
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
         if not scene or row >= len(scene.panels):
             return
         old_def = scene.panels[row]
-        new_def = self._show_panel_edit_dialog(old_def)
-        if new_def is None:
+        result = self._show_panel_edit_dialog(old_def)
+        if result is None:
+            return
+        new_def, target_scene = result
+        if target_scene != self._scene_key:
+            # 跨场景迁移：先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
+            try:
+                registry.add_panel_to_scene(target_scene, new_def)
+            except ValueError as e:
+                QMessageBox.warning(self, "迁移失败", str(e))
+                return
+            registry.remove_panel_from_scene(self._scene_key, old_def.key)
+            sync_scene_cache(self._scene_key)
+            sync_scene_cache(target_scene)
+            if self.on_item_migrated:
+                self.on_item_migrated("panel", new_def.key, self._scene_key, target_scene)
+            self._refresh_lists()
             return
         try:
             registry.update_panel_in_scene(self._scene_key, old_def.key, new_def)
@@ -183,9 +199,10 @@ class PanelEditorMixin:
 
     def _on_new_panel_def(self):
         """创建新面板定义"""
-        panel_def = self._show_panel_edit_dialog(None)
-        if panel_def is None:
+        result = self._show_panel_edit_dialog(None)
+        if result is None:
             return
+        panel_def, _ = result
         registry = get_registry()
         try:
             registry.add_panel_to_scene(self._scene_key, panel_def)
@@ -255,8 +272,11 @@ class PanelEditorMixin:
 
     def _show_panel_edit_dialog(
         self, panel_def: PanelDef | None
-    ) -> PanelDef | None:
-        """弹窗编辑面板属性，返回新的 PanelDef 或 None（取消）"""
+    ) -> tuple[PanelDef, str] | None:
+        """弹窗编辑面板属性，返回 (新 PanelDef, 目标场景 key) 或 None（取消）
+
+        仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
+        """
         dialog = QDialog(self)
         dialog.setWindowTitle("新建面板" if panel_def is None else "编辑面板")
         form = QFormLayout(dialog)
@@ -296,6 +316,11 @@ class PanelEditorMixin:
         )
         form.addRow("行最小可见比例:", vis_spin)
 
+        # 仅编辑模式可选择归属场景（跨场景迁移）
+        scene_combo = None
+        if panel_def is not None:
+            scene_combo = add_scene_combo_row(form, self._scene_key)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -320,10 +345,13 @@ class PanelEditorMixin:
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
+        target_scene = (
+            scene_combo.currentData() if scene_combo is not None else self._scene_key
+        )
         return PanelDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
             cols=cols_spin.value(),
             rows=rows_spin.value(),
             min_visible=round(vis_spin.value(), 2),
-        )
+        ), target_scene

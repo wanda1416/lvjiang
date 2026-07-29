@@ -1,0 +1,122 @@
+#% name: 江湖号令刷新
+#% required_scenes: [activity_jianghu, ui_waiguan_yigui]
+#% parameters:
+#%   - name: max_refresh
+#%     label: 单任务最大刷新次数
+#%     type: number
+#%     default: 50
+
+# 江湖号令任务刷新流程
+#
+# 流程结构：
+#   for 遍历 6 组 label_N / btn_N
+#      1. 识别 label_N 文本是否命中目标任务列表（contains_any 短路匹配）
+#      2. 命中 → 读取任务文本，分发执行对应动作
+#      3. 未命中 → 点击 btn_N 刷新，等待后重新识别，直到命中或达到刷新上限
+#
+# 参数：
+#   max_refresh — 单个任务最大刷新次数，默认 50
+
+default $max_refresh = 50
+
+$step_interval = (1, 2)
+
+# 目标任务关键词列表
+eval $targets = ["合影", "换装", "情境", "东方", "醉意", "双人"]
+
+for idx in ["1", "2", "3", "4", "5", "6"]
+
+   # 动态构造本组的 label / btn region 名
+   eval $label = concat("label_", $idx)
+   eval $btn = concat("btn_", $idx)
+
+   # 先识别当前任务是否已是目标任务
+   scan [activity_jianghu].$label as $hit by contains_any $targets
+   if $hit
+      log concat("任务 ", $idx, " 已是目标任务")
+   else
+      # 不断刷新直到命中目标任务
+      loop $max_refresh
+         click [activity_jianghu].$btn after wait $step_interval
+         scan [activity_jianghu].$label as $hit by contains_any $targets
+         if $hit
+            log concat("任务 ", $idx, " 刷新命中目标任务")
+            break
+         end
+      end
+      if not $hit
+         log concat("任务 ", $idx, " 达到刷新上限仍未命中，跳过")
+      end
+   end
+
+   # 命中目标任务 → 读取任务文本，分发执行对应动作
+   if $hit
+      scan [activity_jianghu].$label as $text_result
+      eval $task_text = $text_result.$label
+      log concat("任务 ", $idx, " 命中：", $task_text)
+
+      if $task_text contains "换装"
+         call action_huanzhuang($label)
+      end
+      if $task_text contains "合影"
+         call action_heying($label)
+      end
+      if $task_text contains "情境"
+         call action_qingjing($label)
+      end
+      if $task_text contains "东方"
+         call action_dongfang($label)
+      end
+      if $task_text contains "醉意"
+         call action_zuiyi($label)
+      end
+      if $task_text contains "双人"
+         call action_shuangren($label)
+      end
+   end
+
+end
+
+log "六个任务刷新处理完成"
+
+
+# ─── 各活动动作过程 ────────────────────────────────────────
+# 每个 def 接收命中任务的 label region 名（如 "label_1"），
+# 从江湖号令页面出发执行对应活动，完成后需回到本页面。
+
+# 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
+def action_huanzhuang($label)
+   click [activity_jianghu].$label after wait $step_interval
+   click [activity_jianghu].[goto] after wait $step_interval
+   click [ui_waiguan_yigui].[chuanda] after wait $step_interval
+   click [ui_waiguan_yigui].[fangan_1] after wait $step_interval
+   click [ui_waiguan_yigui].[taoyong] after wait $step_interval
+   click [ui_waiguan_yigui].[back_1] after wait $step_interval
+   click [ui_waiguan_yigui].[back_1] after wait $step_interval
+   click [ui_waiguan_yigui].[back_1] after wait $step_interval
+end
+
+# 合影拍照：动作暂未实现
+def action_heying($label)
+   log "合影动作暂未实现"
+end
+
+# 情境：动作暂未实现
+def action_qingjing($label)
+   log "情境动作暂未实现"
+end
+
+# 东方第一枝：动作暂未实现
+def action_dongfang($label)
+   log "东方动作暂未实现"
+end
+
+# 饮酒（醉意）：动作暂未实现
+def action_zuiyi($label)
+   log "醉意动作暂未实现"
+end
+
+# 双人：动作暂未实现
+def action_shuangren($label)
+   log "双人动作暂未实现"
+end

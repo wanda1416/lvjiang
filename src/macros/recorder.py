@@ -58,6 +58,9 @@ class MacroRecorder:
         self._press_pos = None
         self._last_action_time = None
         self._recording = True
+        # 防护补丁：避免退出竞态下 pynput 钩子回调返回 None（幂等）
+        from ..core.pynput_patch import install as _install_pynput_patch
+        _install_pynput_patch()
         self._listener = pynput_mouse.Listener(on_click=self._on_click)
         self._listener.start()
         logger.info("宏录制已开始")
@@ -69,7 +72,10 @@ class MacroRecorder:
         self._recording = False
         if self._listener is not None:
             try:
+                # stop() 只投递停止信号，必须 join 等监听线程卸载钩子，
+                # 否则残留钩子回调在退出时踩空
                 self._listener.stop()
+                self._listener.join(1.0)
             except Exception:
                 pass
             self._listener = None

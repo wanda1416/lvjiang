@@ -115,6 +115,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.f10_pressed.connect(self._request_stop)
         self.f8_pressed.connect(self._on_f8_script_record)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
+        # 防护补丁：修复 pynput SystemHook._handler 退出竞态下返回 None
+        # 导致的 ctypes 回调转换 TypeError（必须在 Listener 启动前安装）
+        from ..core.pynput_patch import install as _install_pynput_patch
+        _install_pynput_patch()
         self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
             "<f9>": self._on_global_f9,
             "<f10>": self._on_global_f10,
@@ -593,18 +597,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 event.ignore()
                 return
             self._request_stop()
+        # 全局热键最先停：stop() 只投递停止信号不等线程结束，必须 join
+        # 等钩子线程完成 UnhookWindowsHookEx；越早停，后续清理期间钩子
+        # 回调踩空（退出时 TypeError 噪声乃至 access violation）的窗口越小
+        try:
+            self._hotkey_listener.stop()
+            self._hotkey_listener.join(3.0)
+            if self._hotkey_listener.is_alive():
+                logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
+        except Exception:
+            pass
         self._save_ui_state()
         # 录屏进行中/待保存时自动转正保存，不丢数据
         self._abort_screen_record("关闭程序")
         if self._backend == "adb":
             self._teardown_adb_backend()
-        try:
-            # stop() 只投递停止信号不等线程结束；必须 join 等钩子线程
-            # 完成 UnhookWindowsHookEx，否则解释器销毁后 ctypes 回调踩空
-            # （退出时 TypeError 噪声乃至 access violation 的根因）
-            self._hotkey_listener.stop()
-            self._hotkey_listener.join(1.0)
-        except Exception:
-            pass
         self._overlay.destroy()
         super().closeEvent(event)

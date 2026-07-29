@@ -31,15 +31,17 @@ affix_pool:
 - 势
 - 最大无相攻击
 - 最大本属攻击
+common_conditions:
+  normal_conditions:
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0
 patterns:
   主武器:
     first:
     - 最大外功攻击
     normal_conditions:
-    - count_max:
-        symbols:
-        - 最大外功攻击
-        max: 0
     - count_max:
         symbols:
         - 最小外功攻击
@@ -59,10 +61,6 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最大外功攻击
-        max: 0
-    - count_max:
-        symbols:
         - 最小外功攻击
         - 劲
         max: 0
@@ -78,10 +76,6 @@ patterns:
     first:
     - 最大外功攻击
     normal_conditions:
-    - count_max:
-        symbols:
-        - 最大外功攻击
-        max: 0
     - count_max:
         symbols:
         - 最小外功攻击
@@ -102,11 +96,6 @@ patterns:
     - count_max:
         symbols:
         - 单体类奇术增伤
-        max: 0
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 最大外功攻击
         max: 0
     top_conditions:
     - count_max:
@@ -139,11 +128,6 @@ patterns:
           - 对首领单位增伤
           - 对玩家单位增效
           max: 0
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 最大外功攻击
-        max: 0
     top_conditions:
     - count_max:
         symbols:

@@ -40,12 +40,6 @@ patterns:
   主武器:
     first:
     - 最大外功攻击
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 劲
-        - 势
-        max: 0
     top_conditions:
     - contains_all:
       - 最大外功攻击
@@ -75,12 +69,6 @@ patterns:
           symbols:
           - 单体类奇术增伤
           min: 1
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 劲
-        - 势
-        max: 0
     top_conditions:
     - count_max:
         symbols:
@@ -112,12 +100,6 @@ patterns:
           - 对首领单位增伤
           - 对玩家单位增效
           max: 0
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 劲
-        - 势
-        max: 0
     top_conditions:
     - contains_all:
       - 劲
@@ -126,12 +108,6 @@ patterns:
   副武器:
     first:
     - 最大外功攻击
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 劲
-        - 势
-        max: 0
     top_conditions:
     - - contains_all:
         - 劲
@@ -158,4 +134,9 @@ common_conditions:
   - count_max:
       symbols:
       - 最大外功攻击
+      max: 0
+  - count_max:
+      symbols:
+      - 劲
+      - 势
       max: 0

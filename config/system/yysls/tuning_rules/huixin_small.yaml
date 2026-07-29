@@ -39,6 +39,14 @@ playstyles:
       weapon: 绳镖
       damage: null
     attr: 破竹
+  走地玉:
+    main:
+      weapon: 伞
+      damage: 伞武学增效
+    sub:
+      weapon: 扇
+      damage: null
+    attr: 牵丝
 transmute_priority:
 - 最小外功攻击
 - 敏
@@ -72,15 +80,14 @@ common_conditions:
       - 最小本属攻击
       - 最小外属攻击
       min: 1
+  - count_max:
+      symbols:
+      - 最小外功攻击
+      max: 0
 patterns:
   主武器:
     first:
     - 最小外功攻击
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 最小外功攻击
-        max: 0
     top_conditions:
     - count_max:
         symbols:
@@ -91,10 +98,6 @@ patterns:
     first:
     - 最小外功攻击
     normal_conditions:
-    - count_max:
-        symbols:
-        - 最小外功攻击
-        max: 0
     - count_max:
         symbols:
         - 敏
@@ -112,11 +115,6 @@ patterns:
     - count_max:
         symbols:
         - 全武学增效
-        max: 0
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 最小外功攻击
         max: 0
     top_conditions:
     - count_max:
@@ -137,10 +135,6 @@ patterns:
           - 单体类奇术增伤
           min: 1
     normal_conditions:
-    - count_max:
-        symbols:
-        - 最小外功攻击
-        max: 0
     - count_max:
         symbols:
         - 敏
@@ -183,11 +177,6 @@ patterns:
           - 对首领单位增伤
           - 对玩家单位增效
           max: 0
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 最小外功攻击
-        max: 0
     top_conditions:
     - - count_max:
           symbols:

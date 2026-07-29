@@ -63,6 +63,8 @@ flows:
     required_scenes:
       - activity_jianghu
       - ui_waiguan_yigui
+      - general_control
+      - game_menu_page
     parameters:
       - name: max_refresh
         label: 单任务最大刷新次数

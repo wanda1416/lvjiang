@@ -9,10 +9,15 @@ schema 要点：
   词组组名，通用/鸣金/牵丝/裂石/破竹）；判定武器部位时按用户勾选
   的名字展开尝试，装备武器名匹配主/副武器即产生一次判定；非武器
   部位判定时把玩法属性对应的属攻视作无相词条（属攻→无相等价）；
-- patterns.<部位>: first + 三档条件 junk/usable/top_conditions，
+- patterns.<部位>: first + 四档条件 junk/normal/excellent/top_conditions，
   每档为「条件组」列表：组间 OR（任一组命中即触发该档）、组内
-  AND；单个条件 dict 视作单条件组。判定顺序 junk → usable → top，
-  全不命中默认「优秀」。
+  AND；单个条件 dict 视作单条件组，{when, all} 形态可绑定开关前提
+  （when 全部匹配时条件组才参与判定）。判定顺序
+  junk → normal → excellent → top，全不命中取 default_rating；
+- default_rating: 四档 key（junk/normal/excellent/top）之一，缺省
+  excellent；patterns.<部位> 可选同名字段按部位覆盖；
+- 开关注册表在 tuning_base.yaml 的 switches 段（key → {name}），
+  条件组 when 只能引用已注册开关。
 """
 
 from __future__ import annotations
@@ -22,18 +27,19 @@ from dataclasses import dataclass, field
 
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
-# PVP 词条（全局 keep_pvp 开启时按部位做等价处理）；
-# 实际取值由 tuning_base.yaml 提供，此处仅为兜底默认
-PVP_NAMES = {"单体类奇术增伤", "对玩家单位增效"}
-
 # 属性攻击词组类别（玩法属性候选 + 属攻→无相等价的数据源）
 ATTR_ATTACK_CATEGORY = "属性攻击"
 # 通用属性（其属攻即无相攻击，作为等价转换的目标）
 GENERIC_ATTR = "通用"
 
 # 条件原语类型
-COND_KINDS = {"not_contains", "contains_all", "not_together",
-              "count_max", "count_min"}
+COND_KINDS = {"contains_all", "not_together", "count_max", "count_min"}
+
+# 评级档位 key（判定顺序 junk → normal → excellent → top）
+RATING_KEYS = ("junk", "normal", "excellent", "top")
+# 评级档位显示名
+RATING_LABELS = {"junk": "垃圾", "normal": "一般",
+                 "excellent": "优秀", "top": "顶级"}
 
 # 部位归并：佩→环、胸甲→冠胄、腕甲→胫甲
 PART_ALIAS = {"佩": "环", "胸甲": "冠胄", "腕甲": "胫甲"}
@@ -81,20 +87,26 @@ def attr_equivalence(attr: str) -> dict[str, str]:
 
 @dataclass
 class Condition:
-    """条件原语（三档条件组内 AND）
+    """条件原语（条件组内 AND）
 
-    symbols 为标准词条名列表。
-    - not_contains: 非首词条未出现任一 symbols
-    - contains_all: 非首词条必须同时出现全部 symbols
-    - not_together: symbols（恰 2 个）不同时出现
-    - count_max:    symbols 计数 ≤ max（include_first 时含首词条）
-    - count_min:    symbols 计数 ≥ min 即触发
+    symbols 为标准词条名列表；include_first=True 时首词条参与判断。
+    - contains_all: 必须同时出现（全部 symbols 各自出现，集合语义）
+    - not_together: 不得同时出现（symbols（≥2 个）全部同现即违反）
+    - count_max:    计数不得超过（symbols 计数 ≤ max，max=0 即
+                    「未出现任一」）
+    - count_min:    计数不得低于（symbols 计数 ≥ min 即触发）
     """
     kind: str
     symbols: list[str]
     max: int = 0
     min: int = 0
     include_first: bool = False
+
+    def _present(self, first_token: str, tokens: list[str]) -> set[str]:
+        s = set(tokens)
+        if self.include_first:
+            s.add(first_token)
+        return s
 
     def _count(self, first_token: str, tokens: list[str]) -> int:
         count = sum(1 for t in tokens if t in self.symbols)
@@ -104,13 +116,11 @@ class Condition:
 
     def check(self, first_token: str, tokens: list[str]) -> bool:
         """条件是否成立（tokens 为非首词条名列表）"""
-        s = set(tokens)
-        if self.kind == "not_contains":
-            return not (s & set(self.symbols))
         if self.kind == "contains_all":
-            return set(self.symbols) <= s
+            return set(self.symbols) <= self._present(first_token, tokens)
         if self.kind == "not_together":
-            return not (set(self.symbols) <= s)
+            return not (set(self.symbols)
+                        <= self._present(first_token, tokens))
         count = self._count(first_token, tokens)
         if self.kind == "count_max":
             return count <= self.max
@@ -118,41 +128,68 @@ class Condition:
             return count >= self.min
         return False
 
-    def potential(self, first_token: str, tokens: list[str],
-                  n_avail: int) -> bool:
-        """潜力求值：剩余 n_avail 张牌能否使条件仍有机会成立
+    def _fillable(self, missing: set[str], n_free: int, n_trans: int,
+                  obtainable: set[str]) -> bool:
+        """缺失词条能否用 空槽+转律 补齐
 
-        排除类条件（not_contains/not_together/count_max）当前已满足
-        即可（空槽按最优填法不会引入排除词条）；contains_all 缺失数
-        不超过可补牌数即可。
+        转律只能出转律词条库（obtainable）内词条，库外词条
+        只能由空槽补。
+        """
+        outside = sum(1 for m in missing if m not in obtainable)
+        return outside <= n_free and len(missing) <= n_free + n_trans
+
+    def potential(self, first_token: str, tokens: list[str], n_free: int,
+                  n_trans: int, obtainable: set[str]) -> bool:
+        """潜力求值：剩余 空槽/转律 牌能否使条件仍有机会成立
+
+        排除类条件（not_together/count_max）当前已满足即可（空槽按
+        最优填法不会引入排除词条）；contains_all 缺失词条须可补齐
+        （转律仅出转律词条库内词条）。
         """
         if self.kind == "contains_all":
-            missing = set(self.symbols) - set(tokens)
-            return len(missing) <= n_avail
+            missing = (set(self.symbols)
+                       - self._present(first_token, tokens))
+            return self._fillable(missing, n_free, n_trans, obtainable)
         return self.check(first_token, tokens)
 
-    def still_hits(self, first_token: str, tokens: list[str],
-                   n_avail: int) -> bool:
-        """潜力求值：n_avail 张万能牌按最优填法能否解除命中
+    def still_hits(self, first_token: str, tokens: list[str], n_free: int,
+                   n_trans: int, obtainable: set[str]) -> bool:
+        """潜力求值：空槽/转律 牌按最优填法能否解除命中
 
-        junk/usable 条件专用——补牌只增不减：
+        垃圾/一般/优秀档条件专用——补牌只增不减，且转律只能出
+        转律词条库内词条：
         - contains_all/count_min: 命中后加词条不会反转 → 维持命中；
-        - not_contains: 补 1 个 symbols 内词条即可解除；
-        - not_together: 补齐 2 词条同现即可解除；
-        - count_max: 补 symbols 内词条至超出上限即可解除。
+        - not_together: 补齐全部 symbols 同现即可解除；
+        - count_max: 补 symbols 内词条至超出上限即可解除（symbols
+          全在库外时只能靠空槽）。
         """
         if not self.check(first_token, tokens):
             return False
         if self.kind in ("contains_all", "count_min"):
             return True
-        if self.kind == "not_contains":
-            return n_avail < 1
         if self.kind == "not_together":
-            missing = len(set(self.symbols) - set(tokens))
-            return missing > n_avail
+            missing = (set(self.symbols)
+                       - self._present(first_token, tokens))
+            return not self._fillable(missing, n_free, n_trans, obtainable)
         # count_max：需补 max+1-count 个才能突破上限
         count = self._count(first_token, tokens)
-        return (self.max + 1 - count) > n_avail
+        capacity = n_free + (n_trans if set(self.symbols) & obtainable else 0)
+        return (self.max + 1 - count) > capacity
+
+
+@dataclass
+class ConditionGroup:
+    """条件组（组内 AND）：可选开关前提 when（开关 key → 期望值）
+
+    when 全部匹配（未配置的开关视作 False）时条件组才参与判定。
+    """
+    conditions: list[Condition] = field(default_factory=list)
+    when: dict[str, bool] = field(default_factory=dict)
+
+    def active(self, switches: dict[str, bool]) -> bool:
+        """按当前开关状态判断条件组是否参与判定"""
+        return all(bool(switches.get(k, False)) == v
+                   for k, v in self.when.items())
 
 
 @dataclass
@@ -181,15 +218,19 @@ class Playstyle:
 
 @dataclass
 class PartPattern:
-    """单部位模式：首词条 + 三档条件
+    """单部位模式：首词条 + 四档条件
 
-    三档均为条件组列表（组间 OR、组内 AND），判定顺序
-    junk → usable → top，全不命中默认「优秀」。
+    四档均为条件组列表（组间 OR、组内 AND，条件组可带开关前提），
+    判定顺序 junk → normal → excellent → top，全不命中取默认判定
+    （部位级 default_rating 优先，None = 跟随规则级）。
     """
     first: list[str]
-    junk_conditions: list[list[Condition]] = field(default_factory=list)
-    usable_conditions: list[list[Condition]] = field(default_factory=list)
-    top_conditions: list[list[Condition]] = field(default_factory=list)
+    junk_conditions: list[ConditionGroup] = field(default_factory=list)
+    normal_conditions: list[ConditionGroup] = field(default_factory=list)
+    excellent_conditions: list[ConditionGroup] = field(default_factory=list)
+    top_conditions: list[ConditionGroup] = field(default_factory=list)
+    # 部位级默认判定覆盖（RATING_KEYS 之一；None = 跟随规则级）
+    default_rating: str | None = None
 
 
 @dataclass
@@ -202,12 +243,26 @@ class TuningRule:
     transmute_priority: list[str] = field(default_factory=list)
     affix_pool: list[str] = field(default_factory=list)
     patterns: dict[str, PartPattern] = field(default_factory=dict)
+    # 四档条件全不命中时的默认判定（RATING_KEYS 之一）
+    default_rating: str = "excellent"
     # 品阶门槛覆盖（部位 → 允许品阶；未列部位沿用全局 tuning_base）
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def pool_set(self) -> set[str]:
         return set(self.affix_pool)
+
+    def referenced_switches(self) -> set[str]:
+        """全部条件组 when 引用的开关 key 集合"""
+        keys: set[str] = set()
+        for pattern in self.patterns.values():
+            for tier in (pattern.junk_conditions,
+                         pattern.normal_conditions,
+                         pattern.excellent_conditions,
+                         pattern.top_conditions):
+                for group in tier:
+                    keys.update(group.when)
+        return keys
 
     # ── UI 元数据接口 ──
 
@@ -221,26 +276,17 @@ class TuningRule:
         return {name: ps.summary() for name, ps in self.playstyles.items()}
 
 
-# ─── 基础配置（品阶门槛 + PVP 等价，全局） ──────────────
-
-@dataclass
-class PvpPartRule:
-    """单部位 PVP 等价处理
-
-    - substitutions: 词条替换（源词条 → 目标词条），仅当源词条
-      不在当前词条库时生效（否则词条已合法无需等价）；
-    - add_to_pool: 临时并入词条库的词条。
-    """
-    substitutions: dict[str, str] = field(default_factory=dict)
-    add_to_pool: list[str] = field(default_factory=list)
-
+# ─── 基础配置（品阶门槛 + 开关注册表，全局） ──────────────
 
 @dataclass
 class TuningBase:
-    """全局基础配置（品阶门槛 + PVP 词条集合与部位等价）"""
+    """全局基础配置（品阶门槛 + 开关注册表）
+
+    switches: 开关 key → 显示名；规则条件组 when 只能引用已注册
+    开关，主窗口按注册表渲染全局开关复选框。
+    """
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
-    pvp_names: set[str] = field(default_factory=set)
-    pvp_parts: dict[str, PvpPartRule] = field(default_factory=dict)
+    switches: dict[str, str] = field(default_factory=dict)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

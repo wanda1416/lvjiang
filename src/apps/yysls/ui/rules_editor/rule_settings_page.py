@@ -30,7 +30,8 @@ from PyQt6.QtWidgets import (
 
 from src.apps.yysls.game_config import get_game_config
 from src.apps.yysls.evaluator.tuning_rules import (
-    GENERIC_ATTR, QUALITY_PARTS, standard_playstyle_attrs,
+    GENERIC_ATTR, QUALITY_PARTS, RATING_KEYS, RATING_LABELS,
+    standard_playstyle_attrs,
 )
 from src.ui.widgets import NoWheelComboBox
 
@@ -100,6 +101,15 @@ class RuleSettingsPage(QWidget):
         name_row.addWidget(hint)
         name_row.addStretch()
         form.addRow("规则名称：", name_row)
+
+        # 默认判定：四档条件全不命中时的兜底档位
+        self._default_rating_combo = NoWheelComboBox()
+        for rating_key in RATING_KEYS:
+            self._default_rating_combo.addItem(
+                RATING_LABELS[rating_key], rating_key)
+        self._default_rating_combo.currentIndexChanged.connect(
+            self._apply_default_rating)
+        form.addRow("默认判定：", self._default_rating_combo)
         layout.addLayout(form)
 
         # ── playstyles 玩法设定（说明收入「?」按钮，点击展示）──
@@ -318,6 +328,12 @@ class RuleSettingsPage(QWidget):
         self._key_label.setText(str(d.get("key", "")))
         self._name_label.setText(str(d.get("name", "")))
 
+        rating = str(d.get("default_rating", "excellent"))
+        idx = self._default_rating_combo.findData(rating)
+        self._default_rating_combo.blockSignals(True)
+        self._default_rating_combo.setCurrentIndex(max(idx, 0))
+        self._default_rating_combo.blockSignals(False)
+
         rules = d.get("playstyles") or {}
         self._playstyle_table.blockSignals(True)
         self._playstyle_table.setRowCount(0)
@@ -380,6 +396,12 @@ class RuleSettingsPage(QWidget):
                 return
         self._data["key"] = new_key
         self._key_label.setText(new_key)
+        self._on_changed()
+
+    def _apply_default_rating(self, _index: int):
+        if self._loading:
+            return
+        self._data["default_rating"] = self._default_rating_combo.currentData()
         self._on_changed()
 
     def _apply_playstyles(self):

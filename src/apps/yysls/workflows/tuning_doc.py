@@ -68,15 +68,19 @@ class TuningDocWriter:
     # ─── 叙事 API ──────────────────────────────────────────
 
     def start_run(self, username: str, rules_desc: list[str],
-                  slots: list[str], keep_pvp: bool):
-        """文档头：开始时间、操作用户、启用规则及玩法、部位"""
+                  slots: list[str], switches: dict[str, bool]):
+        """文档头：开始时间、操作用户、启用规则及玩法、开关、部位
+
+        switches 为开关显示名 → 状态（调用方负责 key → 显示名映射）。
+        """
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._write(f"# 调律说明 — {now}")
         self._write()
         self._write(f"- 操作用户：{username}")
         rules_text = "、".join(rules_desc) if rules_desc else "全部规则（默认配置）"
         self._write(f"- 启用规则：{rules_text}")
-        self._write(f"- 保留PVP词条：{'是' if keep_pvp else '否'}")
+        for name, state in (switches or {}).items():
+            self._write(f"- 开关 {name}：{'是' if state else '否'}")
         slot_names = "、".join(SLOT_NAMES.get(s, s) for s in slots)
         self._write(f"- 调律部位：{slot_names}")
 

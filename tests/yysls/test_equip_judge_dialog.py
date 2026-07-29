@@ -150,16 +150,16 @@ class TestTuningConfigWidget:
         fired = []
         w.config_changed.connect(lambda: fired.append(1))
         w.set_config({"huiyi_general": {"enabled": True}})
-        w.set_keep_pvp(True)
+        w.set_switches({"keep_pvp": True})
         assert not fired
 
-    def test_keep_pvp_roundtrip(self, qtbot):
-        # 全局 PVP 开关独立于规则配置读写
+    def test_switches_roundtrip(self, qtbot):
+        # 全局开关独立于规则配置读写（注册表驱动）
         w = TuningConfigWidget()
         qtbot.addWidget(w)
-        assert not w.get_keep_pvp()
-        w.set_keep_pvp(True)
-        assert w.get_keep_pvp()
+        assert w.get_switches() == {"keep_pvp": False}
+        w.set_switches({"keep_pvp": True})
+        assert w.get_switches() == {"keep_pvp": True}
         assert "keep_pvp" not in w.get_config()["huiyi_general"]
 
     def test_group_titles_and_checkboxes(self, qtbot):
@@ -182,3 +182,32 @@ class TestTuningConfigWidget:
         assert not result["heal_pure"]["enabled"]
         # 未提及的规则保持未启用
         assert not result["huiyi_general"]["enabled"]
+
+
+# ─── EquipJudgeTestDialog 可转律开关 ──────────────────
+
+class TestCanTransmuteCheckbox:
+    def test_default_checked_and_injected(self, qtbot, monkeypatch):
+        from src.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
+        dialog = EquipJudgeTestDialog()
+        qtbot.addWidget(dialog)
+        # 默认勾选
+        assert dialog._chk_transmute.isChecked()
+
+        # 取消勾选后判定：每个规则 config 注入 can_transmute=False
+        captured: list[dict] = []
+
+        def fake_worthiness(equip, configs, rule_keys=None):
+            captured.append(configs)
+            return False, ["stub"]
+
+        monkeypatch.setattr(
+            "src.apps.yysls.ui.equip_judge_dialog.judge_tuning_worthiness",
+            fake_worthiness)
+        dialog._tuning_config.set_config(
+            {"huiyi_general": {"enabled": True}})
+        dialog.editor._affix_combos[0].setCurrentText("最大外功攻击")
+        dialog._chk_transmute.setChecked(False)
+        dialog._on_judge()
+        assert captured
+        assert captured[0]["huiyi_general"]["can_transmute"] is False

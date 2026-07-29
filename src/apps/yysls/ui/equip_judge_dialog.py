@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QLabel,
-    QComboBox, QDoubleSpinBox, QPushButton, QTextEdit, QScrollArea,
+    QCheckBox, QComboBox, QDoubleSpinBox, QPushButton, QTextEdit,
+    QScrollArea,
 )
 
 from src.apps.yysls.equip_parser.constants import WEAPON_TYPES
@@ -227,10 +228,14 @@ class EquipJudgeTestDialog(QDialog):
         # ── 左：流派配置（读 session 初值，不回写）──
         left = QVBoxLayout()
         left.addWidget(QLabel("<b>流派配置（仅本次测试，不保存）：</b>"))
+        # 可转律开关：取消后潜力判定放弃转律模拟（仅按空槽评估）
+        self._chk_transmute = QCheckBox("可转律（取消后不做转律模拟）")
+        self._chk_transmute.setChecked(True)
+        left.addWidget(self._chk_transmute)
         self._tuning_config = TuningConfigWidget()
-        rules_cfg, keep_pvp = self._load_session_tuning()
+        rules_cfg, switches = self._load_session_tuning()
         self._tuning_config.set_config(rules_cfg)
-        self._tuning_config.set_keep_pvp(keep_pvp)
+        self._tuning_config.set_switches(switches)
         rules_scroll = QScrollArea()
         rules_scroll.setWidgetResizable(True)
         rules_scroll.setWidget(self._tuning_config)
@@ -251,20 +256,22 @@ class EquipJudgeTestDialog(QDialog):
         layout.addLayout(right, stretch=1)
 
     @staticmethod
-    def _load_session_tuning() -> tuple[dict, bool]:
-        """读取调律 Tab 已保存的规则配置与全局 PVP 开关作为初值（插件会话）"""
+    def _load_session_tuning() -> tuple[dict, dict]:
+        """读取调律 Tab 已保存的规则配置与全局开关作为初值（插件会话）"""
         from ..plugin_session import get_plugin_session
         section = get_plugin_session().get_section("tuning")
-        keep_pvp = bool(section.get("keep_pvp", False))
+        switches = {str(k): bool(v)
+                    for k, v in (section.get("switches") or {}).items()}
         raw = section.get("rules")
         if isinstance(raw, dict):
-            return raw, keep_pvp
-        return {}, keep_pvp
+            return raw, switches
+        return {}, switches
 
     def _on_judge(self):
-        keep_pvp = self._tuning_config.get_keep_pvp()
+        switches = self._tuning_config.get_switches()
+        can_transmute = self._chk_transmute.isChecked()
         configs = {
-            k: {**cfg, "keep_pvp": keep_pvp}
+            k: {**cfg, "switches": switches, "can_transmute": can_transmute}
             for k, cfg in self._tuning_config.get_config().items()
             if cfg.get("enabled")
         }

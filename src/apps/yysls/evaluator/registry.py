@@ -41,7 +41,7 @@ def get_tuning_judge(rule_key: str, config: dict | None = None) -> TuningJudge:
     Args:
         rule_key: 规则标识（规则 YAML 的 key）
         config: 该规则的配置 dict，形状 {"playstyles": [...],
-            "keep_pvp": bool}（keep_pvp 为全局配置，由调用方注入）
+            "switches": {开关 key: bool}}（switches 为全局配置，由调用方注入）
 
     Raises:
         ValueError: 规则标识未注册

@@ -98,9 +98,18 @@ class AutoTuningWorkflow(BaseWorkflow):
             self._doc = None
             return
         self._doc_seq = 0
-        keep_pvp = any(bool(cfg.get("keep_pvp"))
-                       for cfg in (self._judge_configs or {}).values())
-        self._doc.start_run(username, self._describe_rules(), slots, keep_pvp)
+        # 各规则配置的开关聚合（any 语义），再映射为显示名 → 状态
+        merged: dict[str, bool] = {}
+        for cfg in (self._judge_configs or {}).values():
+            for k, v in (cfg.get("switches") or {}).items():
+                merged[str(k)] = merged.get(str(k), False) or bool(v)
+        try:
+            from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
+            names = get_tuning_base().switches
+        except Exception:
+            names = {}
+        switches = {names.get(k, k): v for k, v in merged.items()}
+        self._doc.start_run(username, self._describe_rules(), slots, switches)
         logger.info(f"调律说明文档: {self._doc.path}")
 
     def _describe_rules(self) -> list[str]:
@@ -412,7 +421,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         """保证 _judge_configs/_judge_rule_keys 可用。
 
         优先用 run_control 注入的实时 UI 配置；未注入时回退读插件会话
-        tuning.rules + tuning.keep_pvp（复刻 single_tuning._load_rule_config），
+        tuning.rules + tuning.switches（复刻 single_tuning._load_rule_config），
         无有效配置时回退 (None, None) 即全部规则默认配置。
         """
         if getattr(self, "_judge_configs", None) is not None or \
@@ -429,8 +438,9 @@ class AutoTuningWorkflow(BaseWorkflow):
         raw = section.get("rules")
         if not isinstance(raw, dict):
             return
-        keep_pvp = bool(section.get("keep_pvp", False))
-        enabled = {k: {**cfg, "keep_pvp": keep_pvp}
+        switches = {str(k): bool(v)
+                    for k, v in (section.get("switches") or {}).items()}
+        enabled = {k: {**cfg, "switches": switches}
                    for k, cfg in raw.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if enabled:

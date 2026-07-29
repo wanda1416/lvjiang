@@ -172,7 +172,7 @@ class SingleTuningWorkflow(BaseWorkflow):
 
         读插件会话 tuning.rules（规则 key → {"enabled": bool,
         "playstyles": [名字]}），仅保留已启用规则参与判定，并合并
-        全局 tuning.keep_pvp 到各规则配置；无有效配置时返回
+        全局 tuning.switches 到各规则配置；无有效配置时返回
         (None, None) 回退为全部规则默认配置。
 
         Returns:
@@ -185,8 +185,9 @@ class SingleTuningWorkflow(BaseWorkflow):
         if not isinstance(raw, dict):
             logger.info("未找到目标规则配置，按全部规则默认配置判定")
             return None, None
-        keep_pvp = bool(section.get("keep_pvp", False))
-        enabled = {k: {**cfg, "keep_pvp": keep_pvp}
+        switches = {str(k): bool(v)
+                    for k, v in (section.get("switches") or {}).items()}
+        enabled = {k: {**cfg, "switches": switches}
                    for k, cfg in raw.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if not enabled:

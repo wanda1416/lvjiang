@@ -65,7 +65,7 @@ class TestPanelRoundtrip:
             assert statuses and not statuses[-1][1], \
                 f"{key}: {statuses[-1][0]}"
 
-        # 往返后规则语义不变（玩法设定/池集合/转律优先级/三档条件）
+        # 往返后规则语义不变（玩法设定/池集合/转律词条库/四档条件）
         saved = tmp_manager.get_rule(key)
         assert saved.name == original.name
         assert saved.playstyle_options == original.playstyle_options
@@ -75,16 +75,19 @@ class TestPanelRoundtrip:
         for part, pattern in original.patterns.items():
             saved_p = saved.patterns[part]
             assert set(saved_p.first) == set(pattern.first)
-            for tier in ("junk_conditions", "usable_conditions",
-                         "top_conditions"):
+            assert saved_p.default_rating == pattern.default_rating
+            for tier in ("junk_conditions", "normal_conditions",
+                         "excellent_conditions", "top_conditions"):
                 saved_groups = getattr(saved_p, tier)
                 orig_groups = getattr(pattern, tier)
                 assert len(saved_groups) == len(orig_groups)
-                assert [len(g) for g in saved_groups] == \
-                    [len(g) for g in orig_groups]
+                assert [len(g.conditions) for g in saved_groups] == \
+                    [len(g.conditions) for g in orig_groups]
+                assert [g.when for g in saved_groups] == \
+                    [g.when for g in orig_groups]
 
-    def test_invalid_change_not_saved(self, qtbot, tmp_manager):
-        # 制造非法改动（清空首词条）：校验失败、状态标错、不写盘
+    def test_clear_first_removes_pattern(self, qtbot, tmp_manager):
+        # 首词条清空 = 该部位不定义模式：保存成功且模式移除
         statuses: list[tuple[str, bool]] = []
         panel = RulePanel("huiyi_general", tmp_manager,
                                 lambda t, e: statuses.append((t, e)))
@@ -92,9 +95,9 @@ class TestPanelRoundtrip:
         page = panel._part_pages[0]  # 主武器
         page._first = []
         page._apply()
-        assert statuses and statuses[-1][1]
+        assert statuses and not statuses[-1][1], statuses[-1][0]
         rule = tmp_manager.get_rule("huiyi_general")
-        assert rule.patterns["主武器"].first == ["最大外功攻击"]
+        assert "主武器" not in rule.patterns
 
 
 class TestPanelCreateDelete:

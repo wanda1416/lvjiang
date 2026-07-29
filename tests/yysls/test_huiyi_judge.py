@@ -1,8 +1,9 @@
 """会意通用规则（huiyi_general）判定测试
 
-覆盖各部位三档条件（junk → usable → top 档序）、鸣金属性分部位
-（武器写 最大无相攻击 / 非武器写 最大鸣金攻击）、全局 keep_pvp
-开关、品阶/首词条筛选、规则注册与调律潜力判定。
+覆盖各部位四档条件（junk → normal → excellent → top 档序）、
+鸣金属性分部位（武器写 最大无相攻击 / 非武器写 最大鸣金攻击）、
+开关 keep_pvp（条件组 when 语义）、品阶/首词条筛选、规则注册与
+调律潜力判定。
 裂石/治疗规则测试见 test_lieshi_judge.py / test_heal_judge.py。
 """
 
@@ -34,7 +35,8 @@ def judge():
 
 @pytest.fixture
 def judge_pvp():
-    return get_tuning_judge("huiyi_general", {"keep_pvp": True})
+    return get_tuning_judge("huiyi_general",
+                            {"switches": {"keep_pvp": True}})
 
 
 # ─── 主武器（剑，会意规则需要 剑武学增伤） ─────────────────
@@ -49,10 +51,10 @@ class TestJian:
         e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会意率"])
         assert judge.judge(e).rating == Rating.EXCELLENT
 
-    def test_usable_missing_jin_shi(self, judge):
-        # 劲/势 全缺 → 能用
+    def test_normal_missing_jin_shi(self, judge):
+        # 劲/势 全缺 → 一般
         e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会意率", "最大无相攻击"])
-        assert judge.judge(e).rating == Rating.USABLE
+        assert judge.judge(e).rating == Rating.NORMAL
 
     def test_junk_missing_damage(self, judge):
         e = make_equip("剑", ["最大外功攻击", "最大外功攻击", "劲", "势", "会意率"])
@@ -65,8 +67,8 @@ class TestJian:
         e = make_equip("剑", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"])
         assert judge.judge(e).rating == Rating.JUNK
 
-    def test_junk_before_usable(self, judge):
-        # 会心+精准 双出同时命中 垃圾(≥2) 与 能用(≥1) 条件 → 垃圾优先
+    def test_junk_before_normal(self, judge):
+        # 会心+精准 双出同时命中 垃圾(≥2) 与 一般(≥1) 条件 → 垃圾优先
         e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会心率", "精准率"])
         assert judge.judge(e).rating == Rating.JUNK
 
@@ -83,9 +85,9 @@ class TestQiang:
         e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "劲", "会意率"])
         assert judge.judge(e).rating == Rating.EXCELLENT
 
-    def test_usable_missing_jin_shi(self, judge):
+    def test_normal_missing_jin_shi(self, judge):
         e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "会意率", "最大无相攻击", "最大无相攻击"])
-        assert judge.judge(e).rating == Rating.USABLE
+        assert judge.judge(e).rating == Rating.NORMAL
 
     def test_junk_qiang_wuxue(self, judge):
         e = make_equip("枪", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"])
@@ -127,10 +129,10 @@ class TestHelm:
                        quality="purple")
         assert judge.judge(e).rating == Rating.EXCELLENT
 
-    def test_usable_single_huixin(self, judge):
+    def test_normal_single_huixin(self, judge):
         e = make_equip("冠胄", ["会意率", "会心率", "最大外功攻击", "劲", "势"],
                        quality="purple")
-        assert judge.judge(e).rating == Rating.USABLE
+        assert judge.judge(e).rating == Rating.NORMAL
 
     def test_junk_double_huixin(self, judge):
         e = make_equip("冠胄", ["会意率", "会心率", "精准率", "最大外功攻击", "劲"],
@@ -138,7 +140,7 @@ class TestHelm:
         assert judge.judge(e).rating == Rating.JUNK
 
 
-# ─── 胫甲（首词条 劲，必含 对首领单位增伤） ────────────────
+# ─── 胫甲（首词条 劲，对首领增要求挂 keep_pvp 开关） ──────
 
 class TestLeg:
     def test_top(self, judge):
@@ -152,23 +154,26 @@ class TestLeg:
         assert judge.judge(e).rating == Rating.JUNK
 
 
-# ─── 全局 keep_pvp 开关 ────────────────────────────────────
+# ─── 开关 keep_pvp（条件组 when） ────────────────────────────────────
 
 class TestKeepPvp:
     def test_leg_pvp_off_junk(self, judge):
-        # 未开启：对玩家单位增效 池外 → 垃圾
+        # 未开启：缺对首领增 + 出现对玩家增 → 垃圾（when off 组命中）
         e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击", "劲", "势"],
                        quality="purple")
         assert judge.judge(e).rating == Rating.JUNK
 
     def test_leg_pvp_on_top(self, judge_pvp):
-        # 开启：对玩家单位增效 视作 对首领单位增伤 → 顶级 + PVP 标记
+        # 开启：off 垃圾组失效，对玩家增视作有效增伤 → 顶级
         e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击", "劲", "势"],
                        quality="purple")
-        r = judge_pvp.judge(e)
-        assert r.rating == Rating.TOP
-        assert r.is_pvp
-        assert any("PVP" in s for s in r.reasons)
+        assert judge_pvp.judge(e).rating == Rating.TOP
+
+    def test_leg_pvp_on_both_missing_junk(self, judge_pvp):
+        # 开启：对首领增/对玩家增 两者皆缺 → 垃圾（when on 组命中）
+        e = make_equip("胫甲", ["劲", "最大外功攻击", "最大鸣金攻击", "劲", "势"],
+                       quality="purple")
+        assert judge_pvp.judge(e).rating == Rating.JUNK
 
     def test_helm_pvp_off_junk(self, judge):
         e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
@@ -176,12 +181,10 @@ class TestKeepPvp:
         assert judge.judge(e).rating == Rating.JUNK
 
     def test_helm_pvp_on_top(self, judge_pvp):
-        # 开启：单体类奇术增伤 临时并入词条库 → 顶级 + PVP 标记
+        # 开启：单体奇术垃圾组失效，池内词条不拖后腿 → 顶级
         e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
                        quality="purple")
-        r = judge_pvp.judge(e)
-        assert r.rating == Rating.TOP
-        assert r.is_pvp
+        assert judge_pvp.judge(e).rating == Rating.TOP
 
 
 # ─── 品阶与首词条筛选 ──────────────────────────────────────
@@ -251,3 +254,86 @@ class TestWorthiness:
             e, rule_keys=["huiyi_general"])
         assert not worth
         assert any("不适用" in s for s in logs)
+
+
+# ─── 潜力模拟：转律词条域 / 可转律开关 / 转律标注 ──────────
+
+class TestTransmuteSimulation:
+    def test_out_of_library_affix_not_obtainable(self, judge):
+        # 对首领单位增伤 不在转律词条库 → 转律补不出，垃圾封顶不可解除
+        e = make_equip("腕甲",
+                       ["劲", "最大外功攻击", "对玩家单位增效", "劲", "势"])
+        res = judge.check_tuning_worthiness(e)
+        text = "；".join(res.reasons)
+        assert res.rating == Rating.JUNK
+        assert "对首领单位增伤" in text
+        assert "转律为" not in text
+
+    def test_reason_tagged_with_transmute(self, judge):
+        # 转律变体胜出：标注「{转出} 转律为 {转入}」
+        e = make_equip("剑", ["最大外功攻击", "最大外功攻击", "最小外功攻击"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.TOP
+        assert "最小外功攻击 转律为" in "；".join(res.reasons)
+
+    def test_baseline_win_no_tag(self, judge_pvp):
+        # 基线（未转律）命中：不加转律标注
+        e = make_equip("腕甲",
+                       ["劲", "最大外功攻击", "对玩家单位增效", "劲", "势"])
+        res = judge_pvp.check_tuning_worthiness(e)
+        assert res.rating == Rating.TOP
+        assert "转律为" not in "；".join(res.reasons)
+
+    def test_can_transmute_off(self):
+        # 可转律关闭：放弃转律模拟，仅按空槽评估
+        judge = get_tuning_judge("huiyi_general", {"can_transmute": False})
+        e = make_equip("剑", ["最大外功攻击", "最大外功攻击", "最小外功攻击"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.JUNK
+        assert "垃圾词条" in "；".join(res.reasons)
+
+
+# ─── 部位级默认判定兜底 ────────────────────────────
+
+class TestPatternDefaultRating:
+    @staticmethod
+    def _make_judge(pattern_default: str | None):
+        from src.apps.yysls.evaluator.judge import GenericTuningJudge
+        from src.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        data = {
+            "key": "t1",
+            "name": "测试规则",
+            "playstyles": {"测试": {
+                "main": {"weapon": "剑", "damage": "剑武学增伤"},
+                "sub": {"weapon": "枪", "damage": None},
+                "attr": "通用"}},
+            "affix_pool": ["最大外功攻击", "劲"],
+            "patterns": {"环": {
+                "first": ["最大外功攻击"],
+                # 带 劲 时垃圾/顶级均不命中 → 落入默认判定
+                "junk_conditions": [
+                    {"count_max": {"symbols": ["劲"], "max": 0}}],
+                "top_conditions": [
+                    [{"contains_all": ["劲"]},
+                     {"count_max": {"symbols": ["最大外功攻击"],
+                                    "max": 0}}],
+                ],
+            }},
+        }
+        if pattern_default:
+            data["patterns"]["环"]["default_rating"] = pattern_default
+        return GenericTuningJudge(parse_tuning_rule(data))
+
+    def test_follow_rule_level_default(self):
+        # 部位未设置 → 跟随规则级默认（excellent）
+        e = make_equip("环", ["最大外功攻击", "劲", "最大外功攻击",
+                             "劲", "劲"])
+        res = self._make_judge(None).judge(e)
+        assert res.rating == Rating.EXCELLENT
+
+    def test_pattern_level_overrides(self):
+        # 部位级 default_rating=junk 覆盖规则级
+        e = make_equip("环", ["最大外功攻击", "劲", "最大外功攻击",
+                             "劲", "劲"])
+        res = self._make_judge("junk").judge(e)
+        assert res.rating == Rating.JUNK

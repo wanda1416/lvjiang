@@ -1,7 +1,7 @@
 """治疗流派（heal_pure / heal_fire）判定测试
 
 覆盖纯奶（主扇需 扇武学增效）与火拳奶（武器不需增伤）各部位
-三档条件、not_together/count_max 语义、两规则独立判定、
+四档条件、not_together/count_max 语义、两规则独立判定、
 胫甲 对玩家单位增效（纯奶池内词条）与调律潜力判定。
 """
 
@@ -64,10 +64,10 @@ class TestPureUmbrella:
         e = make_equip("伞", ["最大外功攻击", "最小外功攻击", "劲", "敏", "会心率"])
         assert pure.judge(e).rating == Rating.EXCELLENT
 
-    def test_usable_low_count(self, pure):
-        # 大外/小外/劲 计数 ≤ 1 → 能用
+    def test_normal_low_count(self, pure):
+        # 大外/小外/劲 计数 ≤ 1 → 一般
         e = make_equip("伞", ["最大外功攻击", "最大外功攻击", "敏", "势", "会心率"])
-        assert pure.judge(e).rating == Rating.USABLE
+        assert pure.judge(e).rating == Rating.NORMAL
 
 
 # ─── 纯奶：环、冠胄、胫甲 ──────────────────────────────────
@@ -92,18 +92,16 @@ class TestPureArmor:
                        quality="purple")
         assert pure.judge(e).rating == Rating.TOP
 
-    def test_helm_usable_low_count(self, pure):
+    def test_helm_normal_low_count(self, pure):
         e = make_equip("冠胄", ["会心率", "最大外功攻击", "敏", "会心率", "势"],
                        quality="purple")
-        assert pure.judge(e).rating == Rating.USABLE
+        assert pure.judge(e).rating == Rating.NORMAL
 
     def test_leg_top_without_keep_pvp(self, pure):
         # 对玩家单位增效 是纯奶池内必选词条：无需开启 keep_pvp 即顶级
         e = make_equip("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "势"],
                        quality="purple")
-        r = pure.judge(e)
-        assert r.rating == Rating.TOP
-        assert not r.is_pvp
+        assert pure.judge(e).rating == Rating.TOP
 
     def test_leg_missing_pvp_effect_junk(self, pure):
         e = make_equip("胫甲", ["劲", "最小外功攻击", "最大外功攻击", "势", "敏"],
@@ -124,10 +122,10 @@ class TestFire:
         e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "势", "精准率"])
         assert fire.judge(e).rating == Rating.TOP
 
-    def test_fan_usable_missing_min_jin(self, fire):
-        # 小外/劲 全缺 → 能用
+    def test_fan_normal_missing_min_jin(self, fire):
+        # 小外/劲 全缺 → 一般
         e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "势", "敏", "精准率"])
-        assert fire.judge(e).rating == Rating.USABLE
+        assert fire.judge(e).rating == Rating.NORMAL
 
     def test_fan_zengxiao_junk(self, fire):
         # 扇武学增效 不在火拳词条库（两规则独立）→ 垃圾
@@ -139,11 +137,11 @@ class TestFire:
                        quality="purple")
         assert fire.judge(e).rating == Rating.TOP
 
-    def test_helm_usable_missing_max(self, fire):
-        # 缺 最大外功攻击 → 能用
+    def test_helm_normal_missing_max(self, fire):
+        # 缺 最大外功攻击 → 一般
         e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "劲", "势", "敏"],
                        quality="purple")
-        assert fire.judge(e).rating == Rating.USABLE
+        assert fire.judge(e).rating == Rating.NORMAL
 
     def test_helm_missing_qishu_junk(self, fire):
         e = make_equip("冠胄", ["会心率", "最大外功攻击", "劲", "势", "敏"],

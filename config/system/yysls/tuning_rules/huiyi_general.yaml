@@ -1,6 +1,7 @@
 key: huiyi_general
 name: 通用会意
 order: 10
+default_rating: excellent
 quality_thresholds:
   环:
   - gold
@@ -22,6 +23,8 @@ transmute_priority:
 - 最大无相攻击
 - 最大鸣金攻击
 affix_pool:
+- 对首领单位增伤
+- 全武学增效
 - 最大外功攻击
 - 势
 - 劲
@@ -30,8 +33,8 @@ affix_pool:
 - 最大鸣金攻击
 - 会心率
 - 精准率
-- 全武学增效
-- 对首领单位增伤
+- 单体类奇术增伤
+- 对玩家单位增效
 patterns:
   主武器:
     first:
@@ -42,35 +45,44 @@ patterns:
         - 会心率
         - 精准率
         min: 2
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 劲
-      - 势
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 劲
+        - 势
+        max: 0
     - count_min:
         symbols:
         - 会心率
         - 精准率
         min: 1
     top_conditions:
-    - not_contains:
-      - 会意率
-      - 最大无相攻击
+    - contains_all:
+      - 最大外功攻击
+      - 势
+      - 劲
   环:
     first:
     - 最大外功攻击
     junk_conditions:
-    - not_contains:
-      - 全武学增效
+    - count_max:
+        symbols:
+        - 全武学增效
+        max: 0
     - count_min:
         symbols:
         - 会心率
         - 精准率
         min: 2
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
     - count_min:
         symbols:
         - 会心率
@@ -89,34 +101,69 @@ patterns:
         - 会心率
         - 精准率
         min: 2
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 劲
-      - 势
+    - when:
+        keep_pvp: false
+      all:
+      - count_min:
+          symbols:
+          - 单体类奇术增伤
+          min: 1
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 劲
+        - 势
+        max: 0
     - count_min:
         symbols:
         - 会心率
         - 精准率
         min: 1
     top_conditions:
-    - not_contains:
-      - 最大无相攻击
+    - count_max:
+        symbols:
+        - 最大无相攻击
+        max: 0
   胫甲:
     first:
     - 劲
     junk_conditions:
-    - not_contains:
-      - 对首领单位增伤
+    - when:
+        keep_pvp: false
+      all:
+      - count_max:
+          symbols:
+          - 对首领单位增伤
+          max: 0
+    - when:
+        keep_pvp: false
+      all:
+      - count_min:
+          symbols:
+          - 对玩家单位增效
+          min: 1
+    - when:
+        keep_pvp: true
+      all:
+      - count_max:
+          symbols:
+          - 对首领单位增伤
+          - 对玩家单位增效
+          max: 0
     - count_min:
         symbols:
         - 会心率
         - 精准率
         min: 2
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
     - count_min:
         symbols:
         - 会心率
@@ -135,18 +182,28 @@ patterns:
         - 会心率
         - 精准率
         min: 2
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 劲
-      - 势
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 劲
+        - 势
+        max: 0
     - count_min:
         symbols:
         - 会心率
         - 精准率
         min: 1
     top_conditions:
-    - contains_all:
-      - 劲
-      - 势
+    - - contains_all:
+        - 劲
+        - 势
+        - 最大外功攻击
+      - count_min:
+          symbols:
+          - 会意率
+          - 最大无相攻击
+          min: 1

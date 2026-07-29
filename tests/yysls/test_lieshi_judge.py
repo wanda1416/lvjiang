@@ -1,7 +1,7 @@
 """裂石流派（lieshi_small / lieshi_big）判定测试
 
 覆盖武器规则展开（纯唐/双切/威威 主副武器匹配与择优）、
-playstyles 配置过滤、增伤缺失判垃圾、三档条件顺序、
+playstyles 配置过滤、增伤缺失判垃圾、四档条件顺序、
 count_max include_first、品阶筛选与调律潜力判定。
 """
 
@@ -74,13 +74,13 @@ class TestBigWeaponRules:
         assert r.skipped and r.not_applicable
 
 
-# ─── 大外：三档条件与档序 ──────────────────────────────────
+# ─── 大外：四档条件与档序 ──────────────────────────────────
 
 class TestBigTiers:
-    def test_main_usable_before_top(self, big):
-        # 缺 最大外功攻击 命中能用条件；能用先于顶级判定
+    def test_main_normal_before_top(self, big):
+        # 缺 最大外功攻击 命中一般条件；一般先于顶级判定
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "劲", "劲", "敏"])
-        assert big.judge(e).rating == Rating.USABLE
+        assert big.judge(e).rating == Rating.NORMAL
 
     def test_main_excellent(self, big):
         # 势 破坏顶级排除条件 → 优秀

@@ -18,6 +18,7 @@ transmute_priority:
 - 敏
 - 会心率
 - 最大无相攻击
+- 最大本属攻击
 affix_pool:
 - 对玩家单位增效
 - 全武学增效
@@ -27,6 +28,7 @@ affix_pool:
 - 敏
 - 会心率
 - 最大无相攻击
+- 最大本属攻击
 - 势
 patterns:
   主武器:
@@ -84,7 +86,7 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大无相攻击
+          - 最大本属攻击
           max: 0
       - not_together:
         - 敏
@@ -110,7 +112,7 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大无相攻击
+        - 最大本属攻击
         max: 0
   胫甲:
     first:
@@ -130,7 +132,7 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大无相攻击
+          - 最大本属攻击
           max: 0
       - not_together:
         - 敏

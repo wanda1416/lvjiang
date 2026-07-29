@@ -1,8 +1,9 @@
 """词条选择 + 排序对话框（包内复用）
 
 上区展示已选词条，支持拖拽排序；下区两列：左列为词条归属分类
-（固定 5 类，来自 GameConfigManager.get_affix_categories），右列为
-该分类下且在候选集内的词条复选框网格。勾选即追加到上区末尾，
+（固定 5 类，来自 GameConfigManager.get_affix_categories；动态词条
+归入「动态类」桶，插在属攻类之后），右列为该分类下且在候选
+集内的词条复选框网格。勾选即追加到上区末尾，
 取消勾选即从上区移除。候选中无归属者归入末尾「未归类」桶。
 
 selected() 按上区当前顺序返回，供转律词条库 / 词条库 / 首词条 /
@@ -19,9 +20,15 @@ from PyQt6.QtWidgets import (
 )
 
 from src.apps.yysls.game_config import get_game_config
+from src.apps.yysls.evaluator.tuning_rules import (
+    DYNAMIC_AFFIXES, DYNAMIC_CATEGORY,
+)
 
 # 候选无归属时归入的兜底桶名
 _UNCATEGORIZED = "未归类"
+
+# 动态类展示位置锚点：插在该分类之后
+_DYNAMIC_ANCHOR = "属攻类"
 
 # 右列复选网格列数
 _COLS = 3
@@ -105,17 +112,28 @@ class AffixSelectSortDialog(QDialog):
     # ── 候选分类 ──
 
     def _group_candidates(self) -> dict[str, list[str]]:
-        """按归属把候选归类（保持候选声明序），无归属者入「未归类」"""
+        """按归属把候选归类（保持候选声明序），无归属者入「未归类」
+
+        动态词条（规则层词汇，不在游戏配置归属体系）特判归入
+        「动态类」桶，插在属攻类之后展示。
+        """
         cfg = get_game_config()
         buckets: dict[str, list[str]] = {}
         for name in self._candidates:
-            cat = cfg.get_affix_category(name) or _UNCATEGORIZED
+            if name in DYNAMIC_AFFIXES:
+                cat = DYNAMIC_CATEGORY
+            else:
+                cat = cfg.get_affix_category(name) or _UNCATEGORIZED
             buckets.setdefault(cat, []).append(name)
-        # 按 5 类固定顺序排列，未归类置末尾（仅当存在时）
+        # 按 5 类固定顺序排列（动态类紧随属攻类），未归类置末尾
         ordered: dict[str, list[str]] = {}
         for cat in cfg.get_affix_categories():
             if cat in buckets:
                 ordered[cat] = buckets[cat]
+            if cat == _DYNAMIC_ANCHOR and DYNAMIC_CATEGORY in buckets:
+                ordered[DYNAMIC_CATEGORY] = buckets[DYNAMIC_CATEGORY]
+        if DYNAMIC_CATEGORY in buckets and DYNAMIC_CATEGORY not in ordered:
+            ordered[DYNAMIC_CATEGORY] = buckets[DYNAMIC_CATEGORY]
         if _UNCATEGORIZED in buckets:
             ordered[_UNCATEGORIZED] = buckets[_UNCATEGORIZED]
         return ordered

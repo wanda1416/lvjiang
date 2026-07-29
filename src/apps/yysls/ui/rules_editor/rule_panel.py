@@ -17,8 +17,10 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from src.apps.yysls.game_config import get_game_config
-from src.apps.yysls.evaluator.tuning_rules import TuningRuleManager
+from src.apps.yysls.evaluator.tuning_rules import (
+    DYNAMIC_AFFIXES, GENERIC_ATTR, TuningRuleManager,
+    rule_affix_candidates,
+)
 
 from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
@@ -66,10 +68,23 @@ class RulePanel(QWidget):
         self._status_cb = status_cb
         self._on_delete = on_delete
         self._data = manager.get_raw(key)
-        # 标准词条全集（调律规则候选的唯一来源）
-        self._candidates = get_game_config().get_normal_affix_names()
+        # 规则可引用词表（校验与候选的统一来源）
+        self._candidates = self._build_candidates()
         self._init_ui()
         self._load_pages()
+
+    def _build_candidates(self) -> list[str]:
+        """含通用属性玩法（混搭流）时候选排除动态词条
+        （不做动态归类，引用属死引用；保存校验为兜底）"""
+        names = rule_affix_candidates()
+        playstyles = self._data.get("playstyles") or {}
+        has_generic = any(
+            (str((ps or {}).get("attr") or GENERIC_ATTR).strip()
+             or GENERIC_ATTR) == GENERIC_ATTR
+            for ps in playstyles.values())
+        if has_generic:
+            names = [n for n in names if n not in DYNAMIC_AFFIXES]
+        return names
 
     @property
     def rule_key(self) -> str:

@@ -5,10 +5,10 @@ from __future__ import annotations
 import re
 
 from .models import (
-    COND_KINDS, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS, RATING_KEYS,
-    TIER_KEYS, CommonConditions, Condition, ConditionGroup, PartPattern,
-    Playstyle, RuleValidationError, TuningBase, TuningRule, WeaponSide,
-    standard_affix_names, standard_playstyle_attrs,
+    COND_KINDS, DYNAMIC_AFFIXES, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS,
+    RATING_KEYS, TIER_KEYS, CommonConditions, Condition, ConditionGroup,
+    PartPattern, Playstyle, RuleValidationError, TuningBase, TuningRule,
+    WeaponSide, rule_affix_candidates, standard_playstyle_attrs,
 )
 
 # 规则 key / 开关 key 合法性（作为 YAML 文件名 / when 引用键）
@@ -52,12 +52,12 @@ def _parse_quality_thresholds(raw, where: str,
 
 
 def _check_names(names: list, vocab: set[str], where: str) -> list[str]:
-    """词条名列表校验（须全部在标准词条全集内）"""
+    """词条名列表校验（须全部在规则可引用词表内）"""
     items = list(names or [])
     bad = [s for s in items if s not in vocab]
     if bad:
         raise RuleValidationError(
-            f"{where}: 词条名不在标准词条全集内: {bad}")
+            f"{where}: 词条名不在规则可引用词表内: {bad}")
     return items
 
 
@@ -248,9 +248,9 @@ def parse_tuning_rule(data: dict,
             f"default_rating 非法: {default_rating!r}（须为 "
             f"{list(RATING_KEYS)}）")
 
-    vocab = set(standard_affix_names())
+    vocab = set(rule_affix_candidates())
     if not vocab:
-        raise RuleValidationError("标准词条全集为空（attributes.yaml 异常）")
+        raise RuleValidationError("规则可引用词表为空（attributes.yaml 异常）")
     attr_vocab = set(standard_playstyle_attrs())
 
     playstyles: dict[str, Playstyle] = {}
@@ -306,6 +306,15 @@ def parse_tuning_rule(data: dict,
             raise RuleValidationError(
                 f"when 引用了未注册的开关 key: {unknown}（请先在基础"
                 "配置的开关设定中注册）")
+    # 交叉校验：通用属性玩法（混搭流）不做动态归类，引用动态
+    # 词条属死引用（永不匹配），严格拒绝
+    if any(ps.attr == GENERIC_ATTR for ps in playstyles.values()):
+        used_dynamic = sorted(
+            rule.referenced_affixes() & set(DYNAMIC_AFFIXES))
+        if used_dynamic:
+            raise RuleValidationError(
+                f"通用属性玩法（混搭流）不允许使用动态属攻词条: "
+                f"{used_dynamic}")
     return rule
 
 

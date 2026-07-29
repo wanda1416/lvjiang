@@ -43,6 +43,7 @@ transmute_priority:
 - 最小外功攻击
 - 敏
 - 最大无相攻击
+- 最大本属攻击
 - 会心率
 affix_pool:
 - 对首领单位增伤
@@ -51,10 +52,26 @@ affix_pool:
 - 敏
 - 会心率
 - 最大无相攻击
+- 最大本属攻击
 - 精准率
 - 最小无相攻击
+- 最小本属攻击
+- 最小外属攻击
 - 单体类奇术增伤
 - 对玩家单位增效
+common_conditions:
+  junk_conditions:
+  - count_min:
+      symbols:
+      - 最小本属攻击
+      - 最小外属攻击
+      min: 2
+  normal_conditions:
+  - count_min:
+      symbols:
+      - 最小本属攻击
+      - 最小外属攻击
+      min: 1
 patterns:
   主武器:
     first:
@@ -104,7 +121,7 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最小无相攻击
+        - 最小本属攻击
         - 精准率
         max: 0
   冠胄:
@@ -127,12 +144,12 @@ patterns:
     - count_max:
         symbols:
         - 敏
-        - 最大无相攻击
+        - 最大本属攻击
         max: 0
     top_conditions:
     - - count_max:
           symbols:
-          - 最小无相攻击
+          - 最小本属攻击
           max: 0
       - count_max:
           symbols:
@@ -174,7 +191,7 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最小无相攻击
+          - 最小本属攻击
           max: 0
       - count_max:
           symbols:

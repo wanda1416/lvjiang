@@ -4,8 +4,8 @@
 create_rule/delete_rule、playstyles 节（含 attr）、4 条件原语与
 条件组三种形态（单键 dict / list=AND / when+all 开关组）解析、
 default_rating、tuning_base 开关注册表（switches），以及规则内
-词条名与标准词条全集（attributes.yaml 普通词组 _aliases）的
-一致性守护。
+词条名与规则可引用词表（rule_affix_candidates：标准词条全集
++ 四个动态词条）的一致性守护。
 """
 
 from pathlib import Path
@@ -15,10 +15,10 @@ import yaml
 
 from src.apps.yysls.evaluator import get_tuning_rules
 from src.apps.yysls.evaluator.tuning_rules import (
-    QUALITY_PARTS, RuleValidationError, TuningRuleManager,
-    attr_equivalence, get_tuning_base, get_tuning_rule_manager,
-    parse_tuning_base, parse_tuning_rule, standard_affix_names,
-    standard_playstyle_attrs,
+    DYNAMIC_AFFIXES, QUALITY_PARTS, RuleValidationError, TuningRuleManager,
+    dynamic_affix_map, get_tuning_base, get_tuning_rule_manager,
+    parse_tuning_base, parse_tuning_rule, rule_affix_candidates,
+    specific_attr_names, standard_affix_names, standard_playstyle_attrs,
 )
 
 
@@ -66,7 +66,7 @@ class TestBuiltinRules:
         mgr = get_tuning_rule_manager()
         assert mgr.errors == {}
         assert list(mgr.get_rules()) == [
-            "huiyi_general", "lieshi_small", "lieshi_big",
+            "huiyi_general", "huixin_small", "huixin_big",
             "heal_pure", "heal_fire",
         ]
 
@@ -335,6 +335,48 @@ class TestValidation:
         msg = mgr.validate(minimal_rule(affix_pool=["神速"]))
         assert msg and "神速" in msg
 
+    def test_specific_attr_allowed(self):
+        # 真实属攻词条合法：单一流派/混搭规则均可字面引用
+        rule = parse_tuning_rule(minimal_rule(
+            affix_pool=["最大外功攻击", "最大裂石攻击"]))
+        assert "最大裂石攻击" in rule.pool_set
+        data = minimal_rule()
+        data["affix_pool"].append("最小鸣金攻击")
+        data["patterns"]["环"]["junk_conditions"] = [
+            {"count_max": {"symbols": ["最小鸣金攻击"], "max": 0}}]
+        parse_tuning_rule(data)  # 不应抛出
+
+    def test_dynamic_affix_allowed_for_specific_attr(self):
+        # 具体属性玩法可引用动态词条
+        data = minimal_rule(affix_pool=[
+            "最大外功攻击", "最大本属攻击", "最小外属攻击"])
+        data["playstyles"]["测试"]["attr"] = "裂石"
+        rule = parse_tuning_rule(data)
+        assert "最大本属攻击" in rule.pool_set
+
+    def test_dynamic_affix_rejected_with_generic_playstyle(self):
+        # 含 attr=通用 玩法（混搭流）的规则禁用动态词条
+        # （minimal_rule 的玩法即通用）
+        with pytest.raises(RuleValidationError, match="混搭流"):
+            parse_tuning_rule(minimal_rule(
+                affix_pool=["最大外功攻击", "最大本属攻击"]))
+        # 四档条件中引用同样拒绝
+        data = minimal_rule()
+        data["patterns"]["环"]["junk_conditions"] = [
+            {"count_min": {"symbols": ["最小本属攻击", "最小外属攻击"],
+                           "min": 2}}]
+        with pytest.raises(RuleValidationError, match="动态属攻"):
+            parse_tuning_rule(data)
+        # 混合玩法（通用+具体）同样拒绝（严格口径）
+        data = minimal_rule(affix_pool=["最大外功攻击", "最大本属攻击"])
+        data["playstyles"]["另一个"] = {
+            "main": {"weapon": "剑", "damage": None},
+            "sub": {"weapon": "枪", "damage": None},
+            "attr": "裂石",
+        }
+        with pytest.raises(RuleValidationError, match="混搭流"):
+            parse_tuning_rule(data)
+
 
 # ─── 保存与 get_raw ────────────────────────────────────────
 
@@ -443,50 +485,56 @@ class TestCreateAndDelete:
             mgr.rename_rule("t1", "t2")
 
 
-# ─── 标准词条名守护 ────────────────────────────────────────
+# ─── 规则可引用词表守护 ────────────────────────────────────────
 
 class TestStandardAffixNames:
     def test_rule_affix_names_are_standard(self):
-        # 规则内出现的词条名必须在标准词条全集内，
-        # 否则判定时与 OCR 解析结果对不上
-        standard = set(standard_affix_names())
+        # 规则内出现的词条名必须在规则可引用词表内（标准词条
+        # 全集 + 动态词条），否则判定/校验对不上
+        candidates = set(rule_affix_candidates())
         for rule in get_tuning_rules().values():
-            used: set[str] = set()
-            used.update(rule.transmute_priority)
-            used.update(rule.affix_pool)
-            for wr in rule.playstyles.values():
-                for side in (wr.main, wr.sub):
-                    if side.damage:
-                        used.add(side.damage)
-            for pattern in rule.patterns.values():
-                used.update(pattern.first)
-                for tier in (pattern.junk_conditions,
-                             pattern.normal_conditions,
-                             pattern.excellent_conditions,
-                             pattern.top_conditions):
-                    for group in tier:
-                        for cond in group.conditions:
-                            used.update(cond.symbols)
-            unknown = used - standard
-            assert not unknown, f"{rule.key} 存在非标准词条名: {unknown}"
+            unknown = rule.referenced_affixes() - candidates
+            assert not unknown, f"{rule.key} 存在非法词条名: {unknown}"
+
+    def test_candidates_include_specific_attrs(self):
+        # 候选词表 = 标准词条全集（含 8 个具体属攻）+ 4 个动态词条
+        candidates = rule_affix_candidates()
+        specific = specific_attr_names()
+        assert len(specific) == 8
+        assert set(specific) <= set(candidates)
+        assert set(DYNAMIC_AFFIXES) <= set(candidates)
+        assert (set(candidates)
+                == set(standard_affix_names()) | set(DYNAMIC_AFFIXES))
+
+    def test_dynamic_affixes_follow_wuxiang(self):
+        # 动态词条插在最小无相攻击之后（价值语境相邻）
+        candidates = rule_affix_candidates()
+        at = candidates.index("最小无相攻击")
+        assert candidates[at + 1:at + 5] == list(DYNAMIC_AFFIXES)
 
 
-# ─── 属攻→无相等价 ───────────────────────────────
+# ─── 属攻→动态词条归类 ───────────────────────────────
 
-class TestAttrEquivalence:
+class TestDynamicAffixMap:
     def test_generic_and_empty_return_empty(self):
-        # 通用/空/None 无需转换
-        assert attr_equivalence("通用") == {}
-        assert attr_equivalence("") == {}
+        # 通用/空 不做任何归类（混搭流保持字面匹配）
+        assert dynamic_affix_map("通用") == {}
+        assert dynamic_affix_map("") == {}
 
-    def test_specific_maps_to_wuxiang(self):
-        # 裂石的最大/最小属攻 → 通用无相攻击（按声明序对齐）
-        eq = attr_equivalence("裂石")
-        assert eq["最大裂石攻击"] == "最大无相攻击"
-        assert eq["最小裂石攻击"] == "最小无相攻击"
-        # 目标均为标准词条
-        standard = set(standard_affix_names())
-        assert set(eq.values()) <= standard
+    def test_specific_maps_to_dynamic(self):
+        # 裂石视角：本属→最大/最小本属攻击，其余属性→最大/最小
+        # 外属攻击（多对一）
+        eq = dynamic_affix_map("裂石")
+        assert eq["最大裂石攻击"] == "最大本属攻击"
+        assert eq["最小裂石攻击"] == "最小本属攻击"
+        assert eq["最大破竹攻击"] == "最大外属攻击"
+        assert eq["最小牵丝攻击"] == "最小外属攻击"
+        # 无相词条不参与归类（字面语义，仅武器掉落）
+        assert "最大无相攻击" not in eq
+        assert "最小无相攻击" not in eq
+        # 映射源覆盖全部具体属攻，目标均为动态词条
+        assert set(eq) == set(specific_attr_names())
+        assert set(eq.values()) == set(DYNAMIC_AFFIXES)
 
     def test_attr_candidates_include_generic_first(self):
         attrs = standard_playstyle_attrs()
@@ -601,5 +649,5 @@ class TestRuleQualityThresholds:
         rules = get_tuning_rules()
         assert rules["huiyi_general"].quality_thresholds == {
             "环": ["gold", "purple"]}
-        assert rules["lieshi_small"].quality_thresholds == {
+        assert rules["huixin_small"].quality_thresholds == {
             "佩": ["gold", "purple"]}

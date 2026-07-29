@@ -152,15 +152,15 @@ class TestTuningConfigWidget:
         qtbot.addWidget(w)
         cfg = {
             "huiyi_general": {"enabled": True},
-            "lieshi_big": {"enabled": True, "playstyles": ["双切"]},
+            "huixin_big": {"enabled": True, "playstyles": ["双切"]},
         }
         w.set_config(cfg)
         result = w.get_config()
         assert result["huiyi_general"]["enabled"]
         # 缺 playstyles 键 = 全选
         assert result["huiyi_general"]["playstyles"] == ["会意"]
-        assert result["lieshi_big"]["playstyles"] == ["双切"]
-        assert not result["lieshi_small"]["enabled"]
+        assert result["huixin_big"]["playstyles"] == ["双切"]
+        assert not result["huixin_small"]["enabled"]
 
     def test_default_all_playstyles_checked(self, qtbot):
         # 初始状态：玩法全部勾选（缺省 = 全部）；玩法定义随 YAML
@@ -170,8 +170,8 @@ class TestTuningConfigWidget:
         qtbot.addWidget(w)
         result = w.get_config()
         rules = get_tuning_rules()
-        assert result["lieshi_big"]["playstyles"] == list(
-            rules["lieshi_big"].playstyles)
+        assert result["huixin_big"]["playstyles"] == list(
+            rules["huixin_big"].playstyles)
         assert result["heal_pure"]["playstyles"] == list(
             rules["heal_pure"].playstyles)
 
@@ -199,7 +199,7 @@ class TestTuningConfigWidget:
         qtbot.addWidget(w)
         for key, title in (("heal_pure", "治疗纯奶"),
                            ("heal_fire", "治疗火拳"),
-                           ("lieshi_small", "裂石小外")):
+                           ("huixin_small", "会心小外")):
             assert w._rule_widgets[key]["group"].title() == title
         cb = w._rule_widgets["heal_pure"]["playstyles"]["纯奶"]
         assert cb.text() == "纯奶（主 扇 / 副 伞）"

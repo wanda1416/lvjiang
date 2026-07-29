@@ -21,6 +21,7 @@ transmute_priority:
 - 劲
 - 会意率
 - 最大无相攻击
+- 最大鸣金攻击
 - 会心率
 affix_pool:
 - 对首领单位增伤
@@ -30,6 +31,7 @@ affix_pool:
 - 劲
 - 会意率
 - 最大无相攻击
+- 最大鸣金攻击
 - 会心率
 - 精准率
 - 单体类奇术增伤
@@ -41,18 +43,9 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最大外功攻击
-        max: 0
-    - count_max:
-        symbols:
         - 劲
         - 势
         max: 0
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
     top_conditions:
     - contains_all:
       - 最大外功攻击
@@ -66,20 +59,11 @@ patterns:
         symbols:
         - 全武学增效
         max: 0
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 最大外功攻击
-        max: 0
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
     top_conditions:
     - contains_all:
       - 劲
       - 势
+      - 最大外功攻击
   冠胄:
     first:
     - 会意率
@@ -94,22 +78,13 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最大外功攻击
-        max: 0
-    - count_max:
-        symbols:
         - 劲
         - 势
         max: 0
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
     top_conditions:
     - count_max:
         symbols:
-        - 最大无相攻击
+        - 最大本属攻击
         max: 0
   胫甲:
     first:
@@ -140,35 +115,23 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最大外功攻击
+        - 劲
+        - 势
         max: 0
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
     top_conditions:
     - contains_all:
       - 劲
       - 势
+      - 最大外功攻击
   副武器:
     first:
     - 最大外功攻击
     normal_conditions:
     - count_max:
         symbols:
-        - 最大外功攻击
-        max: 0
-    - count_max:
-        symbols:
         - 劲
         - 势
         max: 0
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
     top_conditions:
     - - contains_all:
         - 劲
@@ -186,3 +149,13 @@ common_conditions:
       - 会心率
       - 精准率
       min: 2
+  normal_conditions:
+  - count_min:
+      symbols:
+      - 会心率
+      - 精准率
+      min: 1
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0

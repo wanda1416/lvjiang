@@ -24,9 +24,29 @@ materials:
   stone_check:
     enabled: false
     min_count: 100
-  food_strategy:
-    high_pct: 90
-    high_pct_food: 金狗粮
-    quality_food:
-      purple: 紫狗粮
-      gold: ''
+  food_rules:
+  - pct: 98
+    min_expect: top
+    min_quality: gold
+    food: 彩狗粮
+    on_insufficient: continue
+  - pct: 90
+    min_expect: excellent
+    min_quality: gold
+    food: 金狗粮
+    on_insufficient: continue
+  - pct: 0
+    min_expect: normal
+    min_quality: gold
+    food: ''
+    on_insufficient: continue
+  - pct: 95
+    min_expect: top
+    min_quality: purple
+    food: 金狗粮
+    on_insufficient: continue
+  - pct: 0
+    min_expect: excellent
+    min_quality: purple
+    food: 紫狗粮
+    on_insufficient: continue

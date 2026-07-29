@@ -335,44 +335,108 @@ class TuningRule:
 # 调律材料组的参考图 label 严格一致，材料识别按 label 精确匹配）
 STONE_LABEL = "大律准石"
 FOOD_LABELS = ("金狗粮", "紫狗粮", "彩狗粮")
-# 狗粮策略可配置的品阶 key → 中文展示名
-FOOD_QUALITIES = {"purple": "紫色", "gold": "金色"}
+# 评级档位序（狗粮规则「期望 ≥」比较）
+RATING_RANK = {"junk": 0, "normal": 1, "excellent": 2, "top": 3}
+# 狗粮规则可选的期望档位（能进调律的装备至少优秀，
+# 一般≈不限；垃圾档无意义不开放）
+FOOD_EXPECT_KEYS = ("top", "excellent", "normal")
+# 品阶序与展示名（狗粮规则「品阶 ≥」比较；蓝=不限）
+QUALITY_RANK = {"blue": 0, "purple": 1, "gold": 2}
+QUALITY_LABELS = {"gold": "金色", "purple": "紫色", "blue": "蓝色"}
+# 材料不足时的行为：continue=继续走后续规则，skip=跳过该装备
+INSUFFICIENT_ACTIONS = ("continue", "skip")
+INSUFFICIENT_LABELS = {"continue": "继续走后续规则", "skip": "跳过该装备"}
+
+
+@dataclass
+class FoodRule:
+    """狗粮添加规则（有序规则表的一条）
+
+    三个条件全部满足时命中：首词条 cap_pct >= pct（pct=0 不限，
+    cap_pct 识别失败视为不达标）、装备期望评级 >= min_expect、
+    装备品阶 >= min_quality（blue=不限）。
+    food 空串 = 命中即明确不添加（终止规则，可表达「金品阶不喂」）。
+    on_insufficient：命中但持有量不足（读不到即没有）时，
+    continue=fall through 下一条规则，skip=放弃该装备继续遍历。
+    """
+    pct: int = 0
+    min_expect: str = "normal"
+    min_quality: str = "blue"
+    food: str = ""
+    on_insufficient: str = "continue"
+
+    def summary(self) -> str:
+        """条件摘要文本（日志与说明文档）"""
+        return (f"首词条≥{self.pct}% 且 期望≥"
+                f"{RATING_LABELS.get(self.min_expect, self.min_expect)} 且 "
+                f"品阶≥{QUALITY_LABELS.get(self.min_quality, self.min_quality)}")
+
+
+@dataclass
+class FoodDecision:
+    """狗粮规则表的单轮决策结果
+
+    action：feed=添加 food，none=不添加，skip=放弃该装备。
+    """
+    action: str
+    food: str = ""
+    reason: str = ""
+
+
+def default_food_rules() -> list[FoodRule]:
+    """默认狗粮规则：极品胚子喂彩狗粮，优秀期望喂金狗粮"""
+    return [
+        FoodRule(pct=98, min_expect="top", food="彩狗粮"),
+        FoodRule(pct=90, min_expect="excellent", food="金狗粮"),
+    ]
 
 
 @dataclass
 class MaterialSettings:
-    """材料设置（大律准石数量检查 + 狗粮添加规则）
+    """材料设置（大律准石数量检查 + 狗粮规则表）
 
     stone_check_enabled: 调律时检查大律准石持有量，低于基准判
     材料不足并全部退出；默认关闭（用户自行保证材料充足）。
-    狗粮规则：首词条 cap_pct >= high_pct 时每轮加 high_pct_food，
-    否则按品阶查 quality_food（空串=不加），品阶未配置保守不加。
+    food_rules: 有序狗粮规则表，逐轮顺序判定首条完全满足（条件
+    命中 + 材料充足）的规则；全部走完无命中 → 不添加。
     """
     stone_check_enabled: bool = False
     stone_min_count: int = 100
-    high_pct: int = 90
-    high_pct_food: str = "金狗粮"
-    quality_food: dict[str, str] = field(
-        default_factory=lambda: {"purple": "紫狗粮", "gold": ""})
+    food_rules: list[FoodRule] = field(default_factory=default_food_rules)
 
-    def decide_food(self, cap_pct: int | None,
-                    quality: str | None) -> tuple[str, str]:
-        """按首词条数值百分比与品阶决定每轮添加的狗粮
+    def decide_food(self, cap_pct: int | None, expect: str | None,
+                    quality: str | None,
+                    stocks: dict[str, int | None]) -> FoodDecision:
+        """逐轮狗粮决策：顺序扫规则表，首条完全满足即生效
 
-        Returns:
-            (材料 label，空串=不加, 决策说明文本，供说明文档与日志)
+        Args:
+            cap_pct: 首词条数值百分比（None=识别失败，仅 pct=0 可命中）
+            expect: 装备期望评级 key（RATING_RANK；None 保守不命中）
+            quality: 装备品阶 key（QUALITY_RANK；未知保守不命中）
+            stocks: 材料 label → 持有量（缺 key/None/<1 均视为不足）
         """
-        if cap_pct is not None and cap_pct >= self.high_pct:
-            return self.high_pct_food, (
-                f"首词条 {cap_pct}% >= {self.high_pct}% → "
-                f"每轮添加 {self.high_pct_food}")
-        if quality in self.quality_food:
-            food = self.quality_food[quality]
-            label = FOOD_QUALITIES.get(quality, quality)
-            action = f"每轮添加 {food}" if food else "不添加狗粮"
-            return food, (f"首词条 {cap_pct}% < {self.high_pct}%，"
-                          f"{label}品阶 → {action}")
-        return "", f"品阶未知（quality={quality}），保守不添加狗粮"
+        expect_rank = RATING_RANK.get(expect or "", -1)
+        quality_rank = QUALITY_RANK.get(quality or "", -1)
+        for idx, rule in enumerate(self.food_rules, start=1):
+            if rule.pct > 0 and (cap_pct is None or cap_pct < rule.pct):
+                continue
+            if expect_rank < RATING_RANK.get(rule.min_expect, 99):
+                continue
+            if quality_rank < QUALITY_RANK.get(rule.min_quality, 99):
+                continue
+            desc = f"规则{idx}（{rule.summary()}）命中"
+            if not rule.food:
+                return FoodDecision("none", "", f"{desc} → 不添加狗粮")
+            stock = stocks.get(rule.food)
+            if stock is None or stock < 1:
+                if rule.on_insufficient == "skip":
+                    return FoodDecision(
+                        "skip", rule.food,
+                        f"{desc}但 {rule.food} 持有量不足 → 跳过该装备")
+                continue  # 继续走后续规则
+            return FoodDecision(
+                "feed", rule.food, f"{desc} → 每轮添加 {rule.food}")
+        return FoodDecision("none", "", "无狗粮规则命中 → 不添加")
 
 
 @dataclass

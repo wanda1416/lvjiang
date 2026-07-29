@@ -11,7 +11,7 @@ already_full / junk_blank / no_tune_entry / tuned（含材料不足提前
 import pytest
 
 from src.apps.yysls.evaluator.tuning_rules import (
-    MaterialSettings, TuningBase,
+    FoodRule, MaterialSettings, TuningBase,
 )
 from src.apps.yysls.workflows.implementations import auto_tuning
 from src.apps.yysls.workflows.implementations.auto_tuning import (
@@ -174,20 +174,60 @@ def test_worth_tuned_to_full(patch_worth):
     assert "tune_results" not in wf.output
 
 
-def test_material_shortage_stops(patch_worth):
-    """紫色需加紫狗粮但材料不足 → _tune_once 返回 None，rounds=0 提前结束"""
+def test_food_skip_rule_stops_equipment(patch_worth, monkeypatch):
+    """狗粮规则命中但库存不足且 on_insufficient=skip → 跳过该装备（rounds=0）"""
+    base = TuningBase(materials=MaterialSettings(food_rules=[
+        FoodRule(food="紫狗粮", on_insufficient="skip")]))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-    wf._material_result = {}   # 任何狗粮都识别不到 → 材料不足
+    wf._material_infos = {}   # 材料区读不到紫狗粮 → 不足
     wf._process_equipment("缺料剑", _equip(2, quality="purple", cap_pct=50),
                           WEAPON_DETAIL)
 
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
     assert reports[0]["rounds"] == 0
+    assert "跳过" in reports[0]["stop_reason"]
     assert (TUNE_SCENE, "back") in wf.clicks
     assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
     assert len(wf.done_calls) == 1
+    assert not wf._materials_exhausted   # 只跳过该装备，遍历继续
+
+
+def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
+    """规则命中且库存充足 → 每轮先点狗粮槽位再一键添加"""
+    base = TuningBase(materials=MaterialSettings(food_rules=[
+        FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
+    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
+                                 "tune_tip": ""}
+    wf._material_infos = {"material_3": _Stone(type="金狗粮", count=42)}
+    wf._process_equipment("高分剑", _equip(2, quality="gold", cap_pct=95),
+                          WEAPON_DETAIL)
+
+    reports = wf.output["tuning_reports"]
+    assert reports[0]["status"] == "tuned"
+    assert reports[0]["rounds"] == 3
+    # 每轮：共用一次材料识别 + 点狗粮槽位
+    assert wf.material_info_calls == 3
+    assert wf.clicks.count((TUNE_SCENE, "material_3")) == 3
+
+
+def test_no_recognition_when_stone_off_and_no_rules(patch_worth, monkeypatch):
+    """石头检查关闭且无狗粮规则 → 全程不识别材料区"""
+    base = TuningBase(materials=MaterialSettings(food_rules=[]))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
+    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
+                                 "tune_tip": ""}
+    wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
+
+    assert wf.material_info_calls == 0
+    assert wf.output["tuning_reports"][0]["rounds"] == 3
 
 
 # ─── 大律准石数量检查 ─────────────────────────
@@ -203,67 +243,69 @@ class _Stone:
 
 @pytest.fixture
 def stone_check_on(monkeypatch):
-    """打开石头检查开关（基准 100），狗粮策略保持默认"""
+    """打开石头检查开关（基准 100），狗粮规则保持默认"""
     base = TuningBase(materials=MaterialSettings(
         stone_check_enabled=True, stone_min_count=100))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
 
 
-def test_stone_check_disabled_skips_recognition():
-    """开关关闭（内置配置默认）→ 不识别材料区直接放行"""
+# _check_stone_stock 单测直接传 settings + infos（识别已上提到 _tune_once）
+_STONE_ON = MaterialSettings(stone_check_enabled=True, stone_min_count=100)
+
+
+def test_stone_check_disabled_passes():
+    """开关关闭（内置配置默认）→ 不看 infos 直接放行"""
     wf = FakeWF()
-    assert wf._check_stone_stock() is True
-    assert wf.material_info_calls == 0
+    assert wf._check_stone_stock(MaterialSettings(), None) is True
     assert not wf._materials_exhausted
 
 
-def test_stone_check_enough_passes(stone_check_on):
+def test_stone_check_enough_passes():
     """库存 ≥ 基准 → 放行；无斜杠样式取 count（×1253）"""
     wf = FakeWF()
-    wf._material_infos = {"material_2": _Stone(count=1253)}
-    assert wf._check_stone_stock() is True
-    assert wf.material_info_calls == 1
+    infos = {"material_2": _Stone(count=1253)}
+    assert wf._check_stone_stock(_STONE_ON, infos) is True
     assert not wf._materials_exhausted
 
 
-def test_stone_check_owned_priority(stone_check_on):
+def test_stone_check_owned_priority():
     """x/y 样式 owned 优先：count=7 但 owned=117 ≥ 100 → 放行"""
     wf = FakeWF()
-    wf._material_infos = {"material_2": _Stone(count=7, owned=117)}
-    assert wf._check_stone_stock() is True
+    infos = {"material_2": _Stone(count=7, owned=117)}
+    assert wf._check_stone_stock(_STONE_ON, infos) is True
     assert not wf._materials_exhausted
 
 
-def test_stone_check_ocr_fail_passes(stone_check_on):
+def test_stone_check_ocr_fail_passes():
     """找到大律准石但数量 OCR 失败 → 警告放行不误杀"""
     wf = FakeWF()
-    wf._material_infos = {"material_2": _Stone(count=None, owned=None)}
-    assert wf._check_stone_stock() is True
+    infos = {"material_2": _Stone(count=None, owned=None)}
+    assert wf._check_stone_stock(_STONE_ON, infos) is True
     assert not wf._materials_exhausted
 
 
-def test_stone_check_low_stops_all(stone_check_on):
+def test_stone_check_low_stops_all():
     """库存 < 基准 → 置标志全退，记 stop_reason，触发不足钩子"""
     wf = FakeWF()
-    wf._material_infos = {
+    infos = {
         "material_1": _Stone(type="小律准石", count=8),
         "material_2": _Stone(count=50),
     }
     hook_calls = []
     wf._on_materials_insufficient = \
         lambda stock, baseline: hook_calls.append((stock, baseline))
-    assert wf._check_stone_stock() is False
+    assert wf._check_stone_stock(_STONE_ON, infos) is False
     assert wf._materials_exhausted
     assert "大律准石 50" in wf.output["stop_reason"]
     assert "材料不足" in wf._tune_abort_reason
     assert hook_calls == [(50, 100)]
 
 
-def test_stone_check_missing_slot_stops(stone_check_on):
+def test_stone_check_missing_slot_stops():
     """材料区没有大律准石 → 视为已耗尽（stock=0）全退"""
     wf = FakeWF()
-    wf._material_infos = {"material_1": _Stone(type="小律准石", count=8)}
-    assert wf._check_stone_stock() is False
+    infos = {"material_1": _Stone(type="小律准石", count=8)}
+    assert wf._check_stone_stock(_STONE_ON, infos) is False
     assert wf._materials_exhausted
     assert "大律准石 0" in wf.output["stop_reason"]
 
@@ -280,6 +322,8 @@ def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
     assert reports[0]["rounds"] == 0
     assert wf._materials_exhausted
     assert wf.output["stop_reason"]
+    # 石头检查与狗粮决策共用同一次识别
+    assert wf.material_info_calls == 1
     # 退出路径仍收束：调律页 back 正常点击
     assert (TUNE_SCENE, "back") in wf.clicks
 

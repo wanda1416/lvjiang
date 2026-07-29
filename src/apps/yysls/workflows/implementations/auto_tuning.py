@@ -19,7 +19,10 @@ from src.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
 from src.apps.yysls.evaluator import (
     Rating, get_rule_names, judge_equipment_potential, summarize_potential,
 )
-from src.apps.yysls.evaluator.tuning_rules import STONE_LABEL, get_tuning_base
+from src.apps.yysls.evaluator.tuning_rules import (
+    RATING_LABELS, RATING_RANK, STONE_LABEL, FoodDecision, MaterialSettings,
+    get_tuning_base,
+)
 from src.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL, TRAVERSALS,
 )
@@ -57,6 +60,9 @@ class AutoTuningWorkflow(BaseWorkflow):
     _doc_seq = 0                # 说明文档中的装备序号
     _tune_abort_reason = ""     # _tune_once 返回 None 时的原因文案
     _materials_exhausted = False  # 大律准石低于基准，全部退出
+    _expect_rating: str | None = None  # 当前装备期望评级 key（适用规则最高档）
+    _round_food = ""            # 本轮实际添加的狗粮 label（空=不添加）
+    _round_food_reason = ""     # 本轮狗粮决策说明（供说明文档/日志）
 
     @property
     def is_stopped(self) -> bool:
@@ -297,6 +303,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         potential = judge_equipment_potential(
             equip_data, self._judge_configs, self._judge_rule_keys)
         worth, logs = summarize_potential(potential)
+        self._expect_rating = self._expect_key(potential)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         report["worthiness"] = logs
@@ -310,9 +317,6 @@ class AutoTuningWorkflow(BaseWorkflow):
             self._doc_seq += 1
             self._doc.start_equipment(self._doc_seq, equip)
             self._doc.worthiness_matched(potential)
-        food, food_reason = self._decide_food(equip)
-        if self._doc:
-            self._doc.food_strategy(food_reason)
         if not self._nav_to_tune(detail_scene):
             logger.info(f"  [{name}] 未找到调律入口，跳过")
             report["status"] = "no_tune_entry"
@@ -338,11 +342,12 @@ class AutoTuningWorkflow(BaseWorkflow):
 
         rounds = 0
         stop_reason = ""
+        last_food_reason = ""
         while affix_count < self.MAX_AFFIX and not self.is_stopped:
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
             self.wait_delay("page_refresh_wait")
-            result = self._tune_once(food)
+            result = self._tune_once(equip_data)
             if result is None:
                 stop_reason = self._tune_abort_reason or "无法继续调律"
                 report["stop_reason"] = stop_reason
@@ -357,7 +362,10 @@ class AutoTuningWorkflow(BaseWorkflow):
                 equip_data, result.get("tune_affix", "")) \
                 or result.get("tune_affix", "")
             if self._doc:
-                self._doc.tune_round(rounds, food, new_affix)
+                if self._round_food_reason != last_food_reason:
+                    self._doc.food_strategy(self._round_food_reason)
+                    last_food_reason = self._round_food_reason
+                self._doc.tune_round(rounds, self._round_food, new_affix)
             if affix_count >= self.MAX_AFFIX:
                 stop_reason = "词条已满，调律完成"
                 if self._doc:
@@ -464,39 +472,59 @@ class AutoTuningWorkflow(BaseWorkflow):
     # ─── 调律执行（移植自 single_tuning，single_tuning 保持不动）──
 
     @staticmethod
-    def _decide_food(equip: dict) -> tuple[str, str]:
-        """按基础配置材料设置（tuning_base.materials）决定每轮添加的狗粮
+    def _expect_key(results: dict) -> str | None:
+        """从潜力判定结果提取装备期望评级 key（适用规则最高档）
 
-        Returns:
-            (材料 label，空串=不加, 决策说明文本，供说明文档与日志)
+        跳过/不适用的规则不参与；无任何适用规则时返回 None
+        （狗粮规则的期望条件永不命中）。
         """
-        affix_1 = equip.get("affix_1") or {}
-        quality = equip.get("quality")
-        food, reason = get_tuning_base().materials.decide_food(
-            affix_1.get("cap_pct"), quality)
-        log = logger.info if (food or quality in ("purple", "gold")) \
-            else logger.warning
-        log(f"狗粮策略: {reason}")
-        return food, reason
+        label_to_key = {v: k for k, v in RATING_LABELS.items()}
+        best: str | None = None
+        for r in (results or {}).values():
+            if r.get("skipped") or r.get("not_applicable"):
+                continue
+            key = label_to_key.get(r.get("rating", ""))
+            if key and (best is None or RATING_RANK[key] > RATING_RANK[best]):
+                best = key
+        return best
 
-    def _check_stone_stock(self) -> bool:
+    def _decide_food_round(self, equip_data: EquipmentData,
+                           settings: MaterialSettings,
+                           infos: dict | None) -> FoodDecision:
+        """逐轮狗粮决策：按材料设置规则表（首词条/期望/品阶三条件）
+        与本轮材料区持有量决策（与石头检查共用同一次识别）"""
+        if not settings.food_rules:
+            return FoodDecision("none", "", "未配置狗粮规则 → 不添加")
+        cap_pct = (equip_data.affixes[0].cap_pct
+                   if equip_data.affixes else None)
+        stocks: dict[str, int | None] = {}
+        for info in (infos or {}).values():
+            label = getattr(info, "type", "") or ""
+            if label:
+                stocks[label] = (info.owned if info.owned is not None
+                                 else info.count)
+        decision = settings.decide_food(
+            cap_pct, self._expect_rating, equip_data.quality, stocks)
+        log = logger.warning if decision.action == "skip" else logger.info
+        log(f"狗粮策略: {decision.reason}")
+        return decision
+
+    def _check_stone_stock(self, settings: MaterialSettings,
+                           infos: dict | None) -> bool:
         """大律准石数量检查（材料设置可开关，默认关闭）
 
-        在调律页识别材料区，取大律准石持有量（x/y 优先取 y，
-        无斜杠取显示数字）；低于基准判材料不足，置
-        _materials_exhausted 使 is_stopped 恒真，全部退出。
-        材料区找不到大律准石视为已耗尽；数量 OCR 失败时警告
-        放行（识别波动不误杀整次运行）。
+        基于调律页材料区识别结果（infos，与逐轮狗粮决策共用同一次
+        识别），取大律准石持有量（x/y 优先取 y，无斜杠取显示数字）；
+        低于基准判材料不足，置 _materials_exhausted 使 is_stopped 恒真，
+        全部退出。材料区找不到大律准石视为已耗尽；数量 OCR 失败时
+        警告放行（识别波动不误杀整次运行）。
 
         Returns:
             True=可继续调律；False=材料不足，应终止全部流程
         """
-        settings = get_tuning_base().materials
         if not settings.stone_check_enabled:
             return True
-        infos = self.recognize_materials_info(
-            self.TUNE_SCENE, self.MATERIAL_SLOTS, group=self.MATERIAL_GROUP)
-        stone = next((i for i in infos.values()
+        stone = next((i for i in (infos or {}).values()
                       if getattr(i, "type", "") == STONE_LABEL), None)
         if stone is None:
             stock = 0  # 材料区无大律准石，视为已耗尽
@@ -527,6 +555,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         results = judge_equipment_potential(
             equip_data, self._judge_configs, self._judge_rule_keys)
         worth, logs = summarize_potential(results)
+        self._expect_rating = self._expect_key(results)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         matched = [r["name"] for r in results.values()
@@ -582,15 +611,19 @@ class AutoTuningWorkflow(BaseWorkflow):
         self.wait_delay("page_refresh_wait")  # 详情页 → 调律页（页面切换）
         return True
 
-    def _tune_once(self, food: str) -> dict | None:
-        """执行一轮调律：展开材料区→按策略选狗粮→一键添加→调律→收结果。
+    def _tune_once(self, equip_data: EquipmentData) -> dict | None:
+        """执行一轮调律：展开材料区→逐轮狗粮决策→一键添加→调律→收结果。
 
+        石头检查与狗粮决策共用同一次材料区识别；决策结果存入
+        _round_food/_round_food_reason 供调用方写说明文档。
         返回调律结果 OCR dict（由调用方挂进本件 report 的 tune_results）；
-        返回 None 表示应终止循环（无添加入口/材料不足，原因文案存入
-        _tune_abort_reason 供说明文档）。
+        返回 None 表示应终止循环（无添加入口/材料不足/规则判跳过装备，
+        原因文案存入 _tune_abort_reason 供说明文档）。
         添加过狗粮时，关闭结果弹窗后还会补扫一次狗粮返还弹窗并补关。
         """
         self._tune_abort_reason = ""
+        self._round_food = ""
+        self._round_food_reason = ""
         add_scan = self.ocr_scene(self.TUNE_SCENE, ["auto_add", "auto_add_2"])
         can_add = "添加" in add_scan.get("auto_add", "")
         if "添加" in add_scan.get("auto_add_2", ""):
@@ -602,17 +635,29 @@ class AutoTuningWorkflow(BaseWorkflow):
             self._tune_abort_reason = "未找到「添加」入口"
             return None
 
-        # 大律准石数量检查（开关默认关闭）：不足则全部退出
-        if not self._check_stone_stock():
+        # 一次材料区识别：大律准石检查 + 逐轮狗粮决策共用
+        settings = get_tuning_base().materials
+        infos = None
+        if settings.stone_check_enabled or settings.food_rules:
+            infos = self.recognize_materials_info(
+                self.TUNE_SCENE, self.MATERIAL_SLOTS,
+                group=self.MATERIAL_GROUP)
+        if not self._check_stone_stock(settings, infos):
             return None
 
+        decision = self._decide_food_round(equip_data, settings, infos)
+        self._round_food_reason = decision.reason
+        if decision.action == "skip":
+            self._tune_abort_reason = decision.reason
+            return None
+        food = decision.food if decision.action == "feed" else ""
+        self._round_food = food
         if food:
-            slot = self.recognize_materials_by(
-                self.TUNE_SCENE, self.MATERIAL_SLOTS,
-                food, "equals", group=self.MATERIAL_GROUP)
+            slot = next((s for s, i in (infos or {}).items()
+                         if getattr(i, "type", "") == food), None)
             if not slot:
-                logger.warning(f"{food} 材料不足，提前结束调律")
-                self._tune_abort_reason = f"{food} 材料不足"
+                logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
+                self._tune_abort_reason = f"{food} 材料槽位定位失败"
                 return None
             self.click_region(self.TUNE_SCENE, slot)
             self.wait_delay("step_interval")

@@ -661,8 +661,43 @@ class TestTuningDocIntegration:
         assert "## 运行结束" in text
         assert "（正常完成）" in text
         assert "- 实际调律 1 件，共 3 轮" in text
+        # 成品清单：好剑终局顶级 → 入选，含首词条与其余词条
+        assert "### 成品清单（一般及以上）" in text
+        assert "1. 好剑 · 剑（110级 金色）— 血河：顶级" in text
+        assert "   - 首词条：最大外功攻击 100（50%）" in text
+        assert "   - 其余词条：劲 10" in text
         # 被判定不值得的装备完全不写
         assert "垃圾剑" not in text
+
+    def test_summary_items_filter(self):
+        """_summary_items：按适用规则最高评级筛一般及以上；
+        跳过/不适用规则不参与；垃圾/无适用规则排除"""
+        def _report(name, judgement):
+            return {"name": name, "type": "剑", "level": 110,
+                    "quality": "gold", "final_judgement": judgement,
+                    "final_affixes": [{"name": "劲", "value": 10}]}
+
+        def _j(rating, skipped=False, na=False):
+            return {"name": "血河", "rating": rating,
+                    "skipped": skipped, "not_applicable": na,
+                    "reasons": []}
+
+        tuned = [
+            _report("顶级剑", {"s": _j("顶级")}),
+            _report("一般剑", {"s": _j("一般")}),
+            _report("垃圾剑", {"s": _j("垃圾")}),
+            _report("跳过剑", {"s": _j("顶级", skipped=True)}),
+            _report("不适用剑", {"s": _j("顶级", na=True)}),
+            _report("双规则剑", {"a": _j("垃圾"),
+                     "b": {"name": "会意", "rating": "优秀",
+                           "skipped": False, "not_applicable": False,
+                           "reasons": []}}),
+        ]
+        items = AutoTuningWorkflow._summary_items(tuned)
+        assert [i["name"] for i in items] == ["顶级剑", "一般剑", "双规则剑"]
+        assert items[0]["rating_text"] == "血河：顶级"
+        # 双规则：最高档优秀入选，rating_text 罗列全部适用规则
+        assert items[2]["rating_text"] == "血河：垃圾；会意：优秀"
 
     def test_doc_none_when_not_opened(self, monkeypatch):
         """未走 run()/_open_doc（_doc 为 None）时各插桩点静默跳过"""

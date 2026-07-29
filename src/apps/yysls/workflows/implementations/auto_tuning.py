@@ -142,15 +142,49 @@ class AutoTuningWorkflow(BaseWorkflow):
         return descs
 
     def _close_doc(self):
-        """写运行小结（含 F10 中断标记）并关闭文档"""
+        """写运行小结（含 F10 中断标记）+ 成品清单并关闭文档"""
         if self._doc is None:
             return
         reports = self.output.get("tuning_reports") or []
         tuned = [r for r in reports if r.get("status") == "tuned"]
         total_rounds = sum(int(r.get("rounds") or 0) for r in tuned)
         self._doc.end_run(self.is_stopped, len(tuned), total_rounds)
+        self._doc.run_summary(self._summary_items(tuned))
         self._doc.close()
         self._doc = None
+
+    @staticmethod
+    def _summary_items(tuned: list[dict]) -> list[dict]:
+        """从已调律 report 筛选最终评级一般及以上的成品清单项
+
+        取各适用规则（非跳过/非不适用）的最高评级为准；
+        rating_text 罗列各适用规则的评级结论。
+        """
+        label_to_key = {v: k for k, v in RATING_LABELS.items()}
+        items: list[dict] = []
+        for r in tuned:
+            ratings: list[str] = []
+            best: str | None = None
+            for j in (r.get("final_judgement") or {}).values():
+                if j.get("skipped") or j.get("not_applicable"):
+                    continue
+                rating = j.get("rating", "")
+                ratings.append(f"{j.get('name', '')}：{rating}")
+                key = label_to_key.get(rating)
+                if key and (best is None
+                            or RATING_RANK[key] > RATING_RANK[best]):
+                    best = key
+            if best is None or RATING_RANK[best] < RATING_RANK["normal"]:
+                continue
+            items.append({
+                "name": r.get("name"),
+                "type": r.get("type"),
+                "level": r.get("level"),
+                "quality": r.get("quality"),
+                "rating_text": "；".join(ratings),
+                "affixes": r.get("final_affixes") or [],
+            })
+        return items
 
     # ─── 导航 ──────────────────────────────────────────────
 
@@ -285,6 +319,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         report: dict = {
             "name": name,
             "type": equip.get("type"),
+            "level": equip.get("level"),
             "quality": equip.get("quality"),
             "affix_count": affix_count,
         }
@@ -398,6 +433,8 @@ class AutoTuningWorkflow(BaseWorkflow):
         report["rounds"] = rounds
         report["final_affix_count"] = affix_count
         report["final_judgement"] = judgement
+        # 终态词条（含逐轮新增），供运行结束时的成品清单
+        report["final_affixes"] = [a.to_dict() for a in equip_data.affixes]
         logger.info(f"  [{name}] 调律结束：共 {rounds} 轮，词条 {affix_count}/{self.MAX_AFFIX}")
         if self._doc:
             if not stop_reason:

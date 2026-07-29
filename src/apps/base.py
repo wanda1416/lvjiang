@@ -17,21 +17,18 @@ class AppHooks:
     # 插件显示名（例如 "燕云十六声"）
     name: str = ""
 
-    # 覆盖主窗口标题（None 表示使用通用默认标题）
+    # 覆盖主窗口标题（None 表示使用通用默认标题；多插件时后注册者覆盖）
     window_title: str | None = None
 
-    # 自定义主窗口类（继承自 src.ui.main_window.MainWindow）。
-    # 支持实际类或字符串路径（延迟导入）。None 表示使用通用 MainWindow。
-    main_window_class: type | str | None = None
-
     # 左侧 Tab 构建器：[(label, builder), ...]
-    # builder 签名：(parent: QWidget) -> QWidget
+    # builder 签名：(host: MainWindow) -> QWidget，函数体内延迟 import PyQt6
     left_tab_builders: list[tuple[str, Callable[..., Any]]] = field(default_factory=list)
 
-    # 右侧 Tab 构建器：[(label, builder), ...]
+    # 右侧 Tab 构建器：[(label, builder), ...]，签名同上
     right_tab_builders: list[tuple[str, Callable[..., Any]]] = field(default_factory=list)
 
-    # 菜单栏扩展：[fn(menubar: QMenuBar) -> None, ...]
+    # 菜单栏扩展：[fn(host: MainWindow, menubar: QMenuBar) -> None, ...]
+    # 插入位置在「帮助」菜单之前；弹对话框用 host 作 parent
     menu_builders: list[Callable[..., None]] = field(default_factory=list)
 
     # 识别器类列表（实现 src.core.recognizers 协议的类）

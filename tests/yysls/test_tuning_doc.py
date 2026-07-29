@@ -107,13 +107,13 @@ class TestTuningDocWriter:
         assert "九灵" not in text
 
     def test_rounds_and_decision(self, writer):
-        writer.food_strategy("首词条 92% >= 90% → 每轮添加 金狗粮")
+        writer.food_strategy("首词条 92% >= 90% → 本轮添加 金狗粮")
         writer.tune_round(1, "金狗粮", "无视防御 8%（76%）")
         writer.round_decision("仍可达 顶级/优秀（血河），继续")
         writer.tune_round(2, "", "拆招 5%（40%）")
         writer.round_decision("新词条加入后不再可达 顶级/优秀，结束调律")
         text = _read(writer)
-        assert "狗粮策略：首词条 92% >= 90% → 每轮添加 金狗粮" in text
+        assert "狗粮策略：首词条 92% >= 90% → 本轮添加 金狗粮" in text
         assert "第 1 轮：添加 金狗粮 + 一键添加律准石 → 新词条「无视防御 8%（76%）」" in text
         assert "  → 仍可达 顶级/优秀（血河），继续" in text
         # 无狗粮轮次不出现"添加  +"式的残缺措辞

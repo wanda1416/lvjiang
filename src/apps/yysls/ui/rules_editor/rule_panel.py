@@ -11,14 +11,16 @@ from datetime import datetime
 from typing import Callable
 
 from loguru import logger
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QListWidget, QScrollArea, QStackedWidget,
-    QVBoxLayout, QWidget,
+    QFrame, QHBoxLayout, QListWidget, QListWidgetItem, QScrollArea,
+    QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from src.apps.yysls.game_config import get_game_config
 from src.apps.yysls.evaluator.tuning_rules import TuningRuleManager
 
+from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
 from .pool_page import PoolPage
 from .rule_settings_page import RuleSettingsPage
@@ -26,13 +28,29 @@ from .rule_settings_page import RuleSettingsPage
 # 左侧导航条目：(标题, 部位 key（None = 非部位页）)
 _NAV_ITEMS: list[tuple[str, str | None]] = [
     ("规则设置", None),
-    ("转律与词条库", None),
+    ("词条库设置", None),
+    ("通用判定", None),
     ("主武器", "主武器"),
     ("副武器", "副武器"),
     ("环 · 佩", "环"),
     ("冠胄 · 胸甲", "冠胄"),
     ("胫甲 · 腕甲", "胫甲"),
 ]
+
+# 分割线插入位置：「词条库设置」之下（全局区 / 判定区语义分隔）
+_SEP_ROW = 2
+
+
+def add_nav_separator(nav: QListWidget) -> None:
+    """导航列表分割线：不可选中的横线项，用于语义分区"""
+    item = QListWidgetItem()
+    item.setFlags(Qt.ItemFlag.NoItemFlags)
+    item.setSizeHint(QSize(0, 9))
+    nav.addItem(item)
+    line = QFrame()
+    line.setFrameShape(QFrame.Shape.HLine)
+    line.setFrameShadow(QFrame.Shadow.Sunken)
+    nav.setItemWidget(item, line)
 
 
 class RulePanel(QWidget):
@@ -75,7 +93,10 @@ class RulePanel(QWidget):
 
         # ── 左侧导航 ──
         self._nav = QListWidget()
-        self._nav.addItems([title for title, _ in _NAV_ITEMS])
+        for row, (title, _) in enumerate(_NAV_ITEMS):
+            self._nav.addItem(title)
+            if row == _SEP_ROW - 1:
+                add_nav_separator(self._nav)
         self._nav.setFixedWidth(140)
         self._nav.currentRowChanged.connect(self._on_nav_changed)
         body.addWidget(self._nav)
@@ -88,6 +109,9 @@ class RulePanel(QWidget):
         self._stack.addWidget(self._wrap_scroll(self._settings_page))
         self._pool_page = PoolPage(self._candidates, self._on_changed)
         self._stack.addWidget(self._wrap_scroll(self._pool_page))
+        self._common_page = CommonJudgePage(self._candidates,
+                                            self._on_changed)
+        self._stack.addWidget(self._wrap_scroll(self._common_page))
         self._part_pages: list[PartPatternPage] = []
         for title, part_key in _NAV_ITEMS:
             if part_key is None:
@@ -111,12 +135,15 @@ class RulePanel(QWidget):
 
     def _load_pages(self):
         self._pool_page.load(self._data)
+        self._common_page.load(self._data)
         for page in self._part_pages:
             page.load(self._data)
 
     def _on_nav_changed(self, row: int):
-        if row >= 0:
-            self._stack.setCurrentIndex(row)
+        item = self._nav.item(row)
+        if row < 0 or item is None or not item.flags():
+            return  # 分割线项不响应
+        self._stack.setCurrentIndex(row if row < _SEP_ROW else row - 1)
 
     # ── 收集 → 校验 → 写盘 → reload ──
 

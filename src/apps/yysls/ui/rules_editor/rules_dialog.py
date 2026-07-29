@@ -22,7 +22,7 @@ from src.apps.yysls.evaluator.tuning_rules import (
 )
 
 from .base_config_page import BaseConfigPage
-from .rule_panel import RulePanel
+from .rule_panel import RulePanel, add_nav_separator
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -116,8 +116,9 @@ class TuningRulesDialog(QDialog):
         self._status_label = QLabel("规则变更即校验，校验通过自动保存并生效")
         layout.addWidget(self._status_label)
 
-        # 一级节点：基础配置 → 各规则
+        # 一级节点：基础配置 → 分割线 → 各规则（导航行 = 栈页 + 1 偏移）
         self._nav.addItem("基础配置")
+        add_nav_separator(self._nav)
         self._stack.addWidget(BaseConfigPage(
             self._base_manager, self._set_status))
         for key, rule in self._manager.get_rules().items():
@@ -135,15 +136,17 @@ class TuningRulesDialog(QDialog):
         return panel
 
     def _on_nav_changed(self, row: int):
-        if row >= 0:
-            self._stack.setCurrentIndex(row)
+        item = self._nav.item(row)
+        if row < 0 or item is None or not item.flags():
+            return  # 分割线项不响应
+        self._stack.setCurrentIndex(row if row == 0 else row - 1)
 
     def _on_nav_double_clicked(self, item):
         """双击规则导航项 → 弹窗修改规则名称（基础配置不可改名）"""
         row = self._nav.row(item)
-        if row < 1:
+        if row < 2:  # 基础配置与分割线
             return
-        panel = self._stack.widget(row)
+        panel = self._stack.widget(row - 1)
         if not isinstance(panel, RulePanel):
             return
         old_name = panel.rule_name
@@ -182,7 +185,7 @@ class TuningRulesDialog(QDialog):
             if isinstance(panel, RulePanel) and panel.rule_key == key:
                 self._stack.removeWidget(panel)
                 panel.deleteLater()
-                self._nav.takeItem(i)
+                self._nav.takeItem(i + 1)  # 导航含分割线，行号 +1
                 break
         self._nav.setCurrentRow(0)
         self._set_status(f"已删除规则 {key}", False)
@@ -192,7 +195,7 @@ class TuningRulesDialog(QDialog):
         for i in range(1, self._stack.count()):
             panel = self._stack.widget(i)
             if isinstance(panel, RulePanel) and panel.rule_key == new_key:
-                self._nav.item(i).setText(new_name)
+                self._nav.item(i + 1).setText(new_name)  # 含分割线偏移
                 break
 
     # ── 其他 ──

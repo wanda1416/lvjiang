@@ -6,15 +6,22 @@
 
 import pytest
 
+from src.apps.yysls.equip_parser.constants import WEAPON_TYPES
 from src.apps.yysls.game_config import get_game_config
 from src.apps.yysls.ui.equip_judge_dialog import (
-    _NONE_ITEM, EQUIP_TYPES, EquipAffixEditor,
+    _NONE_ITEM, PART_ITEMS, PART_WEAPON, EquipAffixEditor,
 )
 from src.apps.yysls.ui.tuning_config_widget import TuningConfigWidget
 
 
 def _combo_items(combo) -> list[str]:
     return [combo.itemText(i) for i in range(combo.count())]
+
+
+def _select_weapon(editor, name: str):
+    """选中具体武器：部位选「武器」+ 二级下拉选武器名"""
+    editor.part_combo.setCurrentText(PART_WEAPON)
+    editor.weapon_combo.setCurrentText(name)
 
 
 @pytest.fixture
@@ -27,18 +34,29 @@ def editor(qtbot):
 # ─── EquipAffixEditor ──────────────────────────────────────
 
 class TestEquipAffixEditor:
-    def test_part_list_covers_16_types(self, editor):
-        assert _combo_items(editor.part_combo) == EQUIP_TYPES
-        assert len(EQUIP_TYPES) == 16
+    def test_part_list_merged_weapon(self, editor):
+        # 部位仅 7 项（武器合并）；具体武器在二级下拉
+        assert _combo_items(editor.part_combo) == PART_ITEMS
+        assert len(PART_ITEMS) == 7
+        assert _combo_items(editor.weapon_combo) == WEAPON_TYPES
+        assert len(WEAPON_TYPES) == 10
+
+    def test_weapon_combo_visibility(self, editor):
+        # 部位为武器时显示二级下拉，其他部位隐藏
+        assert not editor.weapon_combo.isHidden()
+        editor.part_combo.setCurrentText("环")
+        assert editor.weapon_combo.isHidden()
+        editor.part_combo.setCurrentText(PART_WEAPON)
+        assert not editor.weapon_combo.isHidden()
 
     def test_weapon_wuxue_only_on_matching_weapon(self, editor):
         # 神力仅在调律词条（2-5）候选中，且仅限对应武器
-        editor.part_combo.setCurrentText("剑")
+        _select_weapon(editor, "剑")
         items = _combo_items(editor._affix_combos[1])
         assert "剑武学增伤" in items
         assert "横刀武学增伤" not in items
         assert "全武学增效" not in items
-        editor.part_combo.setCurrentText("横刀")
+        _select_weapon(editor, "横刀")
         items = _combo_items(editor._affix_combos[1])
         assert "横刀武学增伤" in items
         assert "剑武学增伤" not in items
@@ -57,7 +75,7 @@ class TestEquipAffixEditor:
 
     def test_initial_pool_follows_doc(self, editor):
         # 词条1（初始词条）候选遵循 01-equipment-system.md 三.1 各部位初始池
-        editor.part_combo.setCurrentText("剑")
+        _select_weapon(editor, "剑")
         items = _combo_items(editor._affix_combos[0])
         assert "最大无相攻击" in items
         assert "会心率" not in items       # 武器初始池无三率
@@ -79,6 +97,14 @@ class TestEquipAffixEditor:
         editor.part_combo.setCurrentText("环")
         assert editor._affix_combos[0].currentText() == _NONE_ITEM
         assert editor._affix_spins[0].value() == 0
+
+    def test_weapon_change_clears_selection(self, editor):
+        # 二级武器切换同样重建候选并清空已选
+        _select_weapon(editor, "剑")
+        editor._affix_combos[1].setCurrentText("剑武学增伤")
+        editor.weapon_combo.setCurrentText("枪")
+        assert editor._affix_combos[1].currentText() == _NONE_ITEM
+        assert editor._affix_spins[1].value() == 0
 
     def test_selected_value_defaults_to_chengyin(self, editor):
         editor._affix_combos[1].setCurrentText("会心率")
@@ -104,7 +130,7 @@ class TestEquipAffixEditor:
         assert editor.get_equipment() is None
 
     def test_get_equipment_structure(self, editor):
-        editor.part_combo.setCurrentText("剑")
+        _select_weapon(editor, "剑")
         editor.quality_combo.setCurrentText("紫色")
         editor._affix_combos[0].setCurrentText("最大外功攻击")
         editor._affix_combos[2].setCurrentText("会心率")  # 跳过词条2
@@ -137,12 +163,17 @@ class TestTuningConfigWidget:
         assert not result["lieshi_small"]["enabled"]
 
     def test_default_all_playstyles_checked(self, qtbot):
-        # 初始状态：玩法全部勾选（缺省 = 全部）
+        # 初始状态：玩法全部勾选（缺省 = 全部）；玩法定义随 YAML
+        # 变更，不硬编码内容，对照规则定义校验
+        from src.apps.yysls.evaluator import get_tuning_rules
         w = TuningConfigWidget()
         qtbot.addWidget(w)
         result = w.get_config()
-        assert result["lieshi_big"]["playstyles"] == ["纯唐", "双切", "威威"]
-        assert result["heal_pure"]["playstyles"] == ["纯奶"]
+        rules = get_tuning_rules()
+        assert result["lieshi_big"]["playstyles"] == list(
+            rules["lieshi_big"].playstyles)
+        assert result["heal_pure"]["playstyles"] == list(
+            rules["heal_pure"].playstyles)
 
     def test_set_config_does_not_emit(self, qtbot):
         w = TuningConfigWidget()

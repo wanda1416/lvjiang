@@ -33,16 +33,19 @@ class TestDialog:
     def test_dialog_nav(self, qtbot):
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
-        # 左侧一级导航：基础配置 + 各规则；StackedWidget 页数一致
-        assert dialog._nav.count() == len(ALL_KEYS) + 1
+        # 左侧一级导航：基础配置 + 分割线 + 各规则；
+        # StackedWidget 不含分割线（导航行 = 栈页 + 1 偏移）
+        assert dialog._nav.count() == len(ALL_KEYS) + 2
         assert dialog._stack.count() == len(ALL_KEYS) + 1
         assert dialog._nav.item(0).text() == "基础配置"
+        # 分割线项不可选中
+        assert not dialog._nav.item(1).flags()
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         first_rule = next(iter(
             TuningRuleManager(rules_dir=RULES_DIR).get_rules().values()))
-        assert dialog._nav.item(1).text() == first_rule.name
-        # 导航切换驱动右侧内容区
-        dialog._nav.setCurrentRow(1)
+        assert dialog._nav.item(2).text() == first_rule.name
+        # 导航切换驱动右侧内容区（跳过分割线偏移）
+        dialog._nav.setCurrentRow(2)
         assert dialog._stack.currentIndex() == 1
 
 
@@ -59,6 +62,7 @@ class TestPanelRoundtrip:
         appliers = [
             panel._settings_page._apply_playstyles,
             panel._pool_page._apply,
+            panel._common_page._apply,
         ] + [page._apply for page in panel._part_pages]
         for apply in appliers:
             apply()
@@ -71,6 +75,11 @@ class TestPanelRoundtrip:
         assert saved.playstyle_options == original.playstyle_options
         assert saved.pool_set == original.pool_set
         assert saved.transmute_priority == original.transmute_priority
+        for tier in ("junk_conditions", "normal_conditions",
+                     "excellent_conditions", "top_conditions"):
+            # 通用判定往返不变
+            assert len(getattr(saved.common, tier)) == \
+                len(getattr(original.common, tier))
         assert set(saved.patterns) == set(original.patterns)
         for part, pattern in original.patterns.items():
             saved_p = saved.patterns[part]
@@ -98,6 +107,38 @@ class TestPanelRoundtrip:
         assert statuses and not statuses[-1][1], statuses[-1][0]
         rule = tmp_manager.get_rule("huiyi_general")
         assert "主武器" not in rule.patterns
+
+    def test_common_page_nav_and_layout(self, qtbot, tmp_manager):
+        # 通用判定页：导航在分割线下、主武器之上，无首词条/默认判定，
+        # 直接展示四档条件 Tab
+        panel = RulePanel("huiyi_general", tmp_manager, lambda t, e: None)
+        qtbot.addWidget(panel)
+        assert panel._nav.item(3).text() == "通用判定"
+        assert panel._nav.item(4).text() == "主武器"
+        panel._nav.setCurrentRow(3)
+        assert panel._stack.currentIndex() == 2
+        page = panel._common_page
+        assert not hasattr(page, "_first_btn")
+        assert not hasattr(page, "_rating_combo")
+        assert page._tabs.count() == 4
+
+    def test_common_page_apply_roundtrip(self, qtbot, tmp_manager):
+        # 通用判定四档全空 = 不写 common_conditions；有组时写回并可解析
+        statuses: list[tuple[str, bool]] = []
+        panel = RulePanel("huiyi_general", tmp_manager,
+                                lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(panel)
+        page = panel._common_page
+        page._apply()
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        assert "common_conditions" not in tmp_manager.get_raw("huiyi_general")
+
+        editor = page._tier_editors["junk_conditions"]
+        editor.set_groups([{"contains_all": ["劲"]}])
+        page._apply()
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        rule = tmp_manager.get_rule("huiyi_general")
+        assert len(rule.common.junk_conditions) == 1
 
 
 class TestPanelCreateDelete:

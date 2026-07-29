@@ -6,8 +6,8 @@ import re
 
 from .models import (
     COND_KINDS, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS, RATING_KEYS,
-    Condition, ConditionGroup, PartPattern, Playstyle, RuleValidationError,
-    TuningBase, TuningRule, WeaponSide,
+    TIER_KEYS, CommonConditions, Condition, ConditionGroup, PartPattern,
+    Playstyle, RuleValidationError, TuningBase, TuningRule, WeaponSide,
     standard_affix_names, standard_playstyle_attrs,
 )
 
@@ -173,6 +173,23 @@ def _parse_weapon_side(raw, vocab: set[str], where: str) -> WeaponSide:
     return WeaponSide(weapon=weapon, damage=damage or None)
 
 
+def _parse_common(raw, vocab: set[str]) -> CommonConditions:
+    """通用判定解析：只允许四档条件键（无 first/default_rating）"""
+    if raw is None:
+        return CommonConditions()
+    if not isinstance(raw, dict):
+        raise RuleValidationError("common_conditions 必须是 dict")
+    unknown = set(raw) - set(TIER_KEYS)
+    if unknown:
+        raise RuleValidationError(
+            f"common_conditions: 只允许四档条件键 {list(TIER_KEYS)}，"
+            f"多余: {sorted(unknown)}")
+    return CommonConditions(**{
+        tier_key: _parse_condition_groups(
+            raw.get(tier_key), vocab, f"common_conditions.{tier_key}")
+        for tier_key in TIER_KEYS})
+
+
 def _parse_pattern(raw: dict, vocab: set[str], where: str) -> PartPattern:
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where}: 模式必须是 dict")
@@ -278,6 +295,7 @@ def parse_tuning_rule(data: dict,
         transmute_priority=priority,
         affix_pool=affix_pool,
         patterns=patterns,
+        common=_parse_common(data.get("common_conditions"), vocab),
         default_rating=default_rating,
         quality_thresholds=_parse_quality_thresholds(
             data.get("quality_thresholds") or {}, "quality_thresholds"),

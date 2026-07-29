@@ -215,6 +215,45 @@ class TestValidation:
         data["patterns"]["环"]["default_rating"] = "top"
         assert parse_tuning_rule(data).patterns["环"].default_rating == "top"
 
+    def test_common_conditions_parsed(self):
+        """通用判定：规则级四档条件解析，when 引用计入开关校验"""
+        data = minimal_rule(common_conditions={
+            "junk_conditions": [{"contains_all": ["劲"]}],
+            "top_conditions": [
+                {"when": {"keep_pvp": True},
+                 "all": [{"contains_all": ["劲"]}]},
+            ],
+        })
+        rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
+        assert len(rule.common.junk_conditions) == 1
+        assert rule.common.normal_conditions == []
+        assert rule.common.excellent_conditions == []
+        assert rule.common.top_conditions[0].when == {"keep_pvp": True}
+        assert "keep_pvp" in rule.referenced_switches()
+        # when 引用未注册开关同样拒绝
+        with pytest.raises(RuleValidationError, match="未注册"):
+            parse_tuning_rule(data, switch_keys=set())
+
+    def test_common_conditions_default_empty(self):
+        """缺省无通用判定：四档均为空"""
+        rule = parse_tuning_rule(minimal_rule())
+        assert rule.common.junk_conditions == []
+        assert rule.common.normal_conditions == []
+        assert rule.common.excellent_conditions == []
+        assert rule.common.top_conditions == []
+
+    def test_common_conditions_rejects_bad_shape(self):
+        """通用判定只允许四档条件键（无 first/default_rating）"""
+        with pytest.raises(RuleValidationError, match="common_conditions"):
+            parse_tuning_rule(minimal_rule(
+                common_conditions={"first": ["劲"]}))
+        with pytest.raises(RuleValidationError, match="common_conditions"):
+            parse_tuning_rule(minimal_rule(
+                common_conditions={"default_rating": "top"}))
+        with pytest.raises(RuleValidationError, match="common_conditions"):
+            parse_tuning_rule(minimal_rule(
+                common_conditions=[{"contains_all": ["劲"]}]))
+
     @pytest.mark.parametrize("mutate", [
         # 缺少必填字段 key/name
         lambda d: d.pop("key"),

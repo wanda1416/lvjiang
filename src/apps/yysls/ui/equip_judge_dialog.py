@@ -24,8 +24,10 @@ from src.apps.yysls.game_config import get_game_config
 from .tuning_config_widget import TuningConfigWidget
 
 
-# 部位下拉：10 武器 + 首饰 + 防具（共 16 项）
-EQUIP_TYPES: list[str] = [*WEAPON_TYPES, "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲"]
+# 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
+# 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
+PART_WEAPON = "武器"
+PART_ITEMS: list[str] = [PART_WEAPON, "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲"]
 
 # 调律词条池（词条 2-5，全部位可出，attributes.yaml 标准字段名）
 _COMMON_AFFIXES: list[str] = [
@@ -87,8 +89,10 @@ _AFFIX_ROWS = 5
 
 
 class EquipAffixEditor(QWidget):
-    """手工装备编辑器：部位 + 品阶 + 词条 1-5
+    """手工装备编辑器：部位（+武器二级选择）+ 品阶 + 词条 1-5
 
+    - 部位下拉仅 7 项（武器/环/佩/冠胄/胸甲/胫甲/腕甲），
+      选「武器」时出现二级下拉选具体武器；
     - 词条 1 为初始词条，候选仅为各部位初始词条池（增伤类神力
       词条不会是首词条）；词条 2-5 为调律词条，候选为通用调律池
       + 对应部位神力；
@@ -104,9 +108,17 @@ class EquipAffixEditor(QWidget):
         form.setContentsMargins(0, 0, 0, 0)
 
         self.part_combo = QComboBox()
-        self.part_combo.addItems(EQUIP_TYPES)
-        self.part_combo.currentIndexChanged.connect(self._rebuild_affix_options)
+        self.part_combo.addItems(PART_ITEMS)
+        self.part_combo.currentIndexChanged.connect(self._on_part_changed)
         form.addRow("部位：", self.part_combo)
+
+        # 二级选择：部位为「武器」时显示，选具体武器
+        self._weapon_label = QLabel("武器：")
+        self.weapon_combo = QComboBox()
+        self.weapon_combo.addItems(WEAPON_TYPES)
+        self.weapon_combo.currentIndexChanged.connect(
+            self._rebuild_affix_options)
+        form.addRow(self._weapon_label, self.weapon_combo)
 
         self.quality_combo = QComboBox()
         self.quality_combo.addItem("金色", "gold")
@@ -132,18 +144,32 @@ class EquipAffixEditor(QWidget):
             self._affix_combos.append(combo)
             self._affix_spins.append(spin)
 
-        self._rebuild_affix_options()
+        self._on_part_changed()
 
     # ─── 候选池 ──────────────────────────────────────────────
 
+    def current_type(self) -> str:
+        """当前装备类型：部位为武器时取二级下拉的具体武器"""
+        part = self.part_combo.currentText()
+        return (self.weapon_combo.currentText()
+                if part == PART_WEAPON else part)
+
+    def _on_part_changed(self):
+        """部位变更：切换二级武器下拉可见性并重建词条候选"""
+        is_weapon = self.part_combo.currentText() == PART_WEAPON
+        self._weapon_label.setVisible(is_weapon)
+        self.weapon_combo.setVisible(is_weapon)
+        self._rebuild_affix_options()
+
     def _divine_affixes(self) -> list[str]:
         """当前部位的专属神力词条（仅调律可得，不会是首词条）"""
-        part = self.part_combo.currentText()
-        return _WEAPON_WUXUE.get(part) or _PART_EXTRA.get(part) or []
+        equip_type = self.current_type()
+        return (_WEAPON_WUXUE.get(equip_type)
+                or _PART_EXTRA.get(equip_type) or [])
 
     def _initial_candidates(self) -> list[str]:
         """词条 1 候选：仅部位初始词条池"""
-        return list(_INITIAL_AFFIXES.get(self.part_combo.currentText(), []))
+        return list(_INITIAL_AFFIXES.get(self.current_type(), []))
 
     def _tuning_candidates(self) -> list[str]:
         """词条 2-5 候选：通用调律池 + 部位神力"""
@@ -208,7 +234,7 @@ class EquipAffixEditor(QWidget):
         if not affixes:
             return None
         return EquipmentData(
-            type=self.part_combo.currentText(),
+            type=self.current_type(),
             name="测试装备",
             level=_LEVEL,
             quality=self.quality_combo.currentData(),

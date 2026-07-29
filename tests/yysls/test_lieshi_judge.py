@@ -172,8 +172,10 @@ class TestFilters:
 
 class TestPotential:
     def test_ring_transmute_waste_top(self, big):
-        # 池外词条可被转律洗掉，剩余空槽补齐 → 仍可达顶级
-        e = make_equip("环", ["最大外功攻击", "最大鸣金攻击"])
+        # 池外词条可被转律洗掉，剩余空槽按价值序补齐 → 仍可达顶级
+        # （全武学增效在 lieshi 价值序靠后不会被填充，需装备自带
+        # 才能逃离环垃圾条件 count_max[全武学增效]）
+        e = make_equip("环", ["最大外功攻击", "最大鸣金攻击", "全武学增效"])
         assert big.check_tuning_worthiness(e).rating == Rating.TOP
 
     def test_ring_double_waste_junk(self, big):

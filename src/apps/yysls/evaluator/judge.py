@@ -15,6 +15,10 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
    default_rating 优先，缺省跟随规则级）。条件组先按开关状态过滤：
    when 全部匹配才参与判定（未配置的开关视作 False）。
 
+潜力判定（check_tuning_worthiness）按可用词条库（affix_pool，
+声明序即全局价值序）填充空槽、模拟一次转律后复用同一套完整
+定级，返回评级上限（详见 _eval_partial）。
+
 武器部位按用户勾选的玩法设定（如 纯唐/双切）逐一尝试，装备武器名
 匹配主/副武器即产生一次判定（携带该侧增伤要求与玩法属性），取评级
 最高者。非武器部位按勾选玩法的不同属性去重展开（各属性各跑一次取
@@ -74,7 +78,7 @@ class GenericTuningJudge(TuningJudge):
         return self._run(equip, partial=False)
 
     def check_tuning_worthiness(self, equip: EquipmentData) -> JudgeResult:
-        """调律潜力判定：空词条槽视作万能牌 + 模拟转律，返回评级上限"""
+        """调律潜力判定：价值序填充空槽 + 模拟一次转律，返回评级上限"""
         return self._run(equip, partial=True)
 
     # ─── 主流程 ────────────────────────────────────────────
@@ -129,7 +133,6 @@ class GenericTuningJudge(TuningJudge):
                        attr: str, partial: bool, n_free: int) -> JudgeResult:
         """按单个部位/玩法组合判定一次"""
         result = JudgeResult(equipment=equip)
-        pool = self.rule.pool_set
 
         first_token = equip.affixes[0].name
         tokens = [a.name for a in equip.affixes[1:]]
@@ -141,6 +144,7 @@ class GenericTuningJudge(TuningJudge):
             return result
 
         # 非武器部位：按玩法属性做「属攻→无相」等价
+        equiv: dict[str, str] = {}
         if part_key not in _WEAPON_PARTS:
             equiv = attr_equivalence(attr)
             if equiv:
@@ -149,23 +153,31 @@ class GenericTuningJudge(TuningJudge):
 
         if partial:
             return self._eval_partial(
-                result, pattern, damage, pool,
+                result, pattern, damage, equiv,
                 first_token, tokens, n_free)
 
-        # ── 完整定级 ──
+        rating, reason = self._grade(pattern, damage, first_token, tokens)
+        result.rating = rating
+        result.reasons.append(reason)
+        return result
+
+    def _grade(self, pattern: PartPattern, damage: str | None,
+               first_token: str, tokens: list[str]) -> tuple[Rating, str]:
+        """完整定级核心（流程 2/3/4），潜力判定的填充/转律变体复用
+
+        Returns:
+            (评级, 判定理由)
+        """
+        pool = self.rule.pool_set
 
         # 流程 2：池外且非本次增伤的词条 → 垃圾
         junk = [t for t in tokens if t not in pool and t != damage]
         if junk:
-            result.rating = Rating.JUNK
-            result.reasons.append(f"垃圾词条: {'、'.join(junk)}")
-            return result
+            return Rating.JUNK, f"垃圾词条: {'、'.join(junk)}"
 
         # 流程 3：本次武器规则要求增伤但词条缺失 → 垃圾
         if damage and damage not in tokens:
-            result.rating = Rating.JUNK
-            result.reasons.append(f"缺失必需增伤词条: {damage}")
-            return result
+            return Rating.JUNK, f"缺失必需增伤词条: {damage}"
 
         # 流程 4：四档条件 junk → normal → excellent → top，
         # 条件组先按开关状态过滤，全不命中取默认判定（部位级优先）
@@ -175,16 +187,12 @@ class GenericTuningJudge(TuningJudge):
                     continue
                 if all(c.check(first_token, tokens)
                        for c in group.conditions):
-                    result.rating = _RATING_BY_KEY[tier_key]
-                    result.reasons.append(
-                        f"命中{RATING_LABELS[tier_key]}条件"
-                        f"（{_group_text(group)}）")
-                    return result
+                    return (_RATING_BY_KEY[tier_key],
+                            f"命中{RATING_LABELS[tier_key]}条件"
+                            f"（{_group_text(group)}）")
         default = pattern.default_rating or self.rule.default_rating
-        result.rating = _RATING_BY_KEY[default]
-        result.reasons.append(
-            f"四档条件均未命中，默认判定为{RATING_LABELS[default]}")
-        return result
+        return (_RATING_BY_KEY[default],
+                f"四档条件均未命中，默认判定为{RATING_LABELS[default]}")
 
     def _tiers(self, pattern: PartPattern
                ) -> tuple[tuple[str, list[ConditionGroup]], ...]:
@@ -202,83 +210,94 @@ class GenericTuningJudge(TuningJudge):
             ("top", common.top_conditions + pattern.top_conditions))
 
     def _eval_partial(self, result: JudgeResult, pattern: PartPattern,
-                      damage: str | None, pool: set[str],
+                      damage: str | None, equiv: dict[str, str],
                       first_token: str, tokens: list[str],
                       n_free: int) -> JudgeResult:
-        """潜力判定：空槽万能牌 + 以 transmute_priority 为序的转律模拟
+        """潜力判定：按可用词条库价值序填充空槽 + 模拟一次转律
 
-        模拟转律：非首词条可选一条无限次转律（不产生神力词条），
-        转出选择按价值最低者：先转池外垃圾词条，其次转
-        transmute_priority 排位最靠后（价值最低）的普通词条；转入
-        仅能得到转律词条库（transmute_priority）内词条，空槽则视作
-        万能牌（可出任意词条，含神力）。增伤词条不参与转出；缺失
-        增伤只能由空槽补（转律不产生神力词条）。垃圾/一般/优秀档
-        条件按 still_hits 求值（评级封顶），顶级档按 potential 求值；
-        条件组同样先按开关状态过滤。
+        填充（best-case 上限）：遍历 affix_pool（声明序即价值序），
+        按原始词条名过滤装备部位，再做属攻→无相等价，剔除已出现
+        的非首词条（允许与首词条重复）得到填充候选；本次武器规则
+        要求增伤且缺失时第一个空槽先补增伤（n_free=0 时由 _grade
+        判垃圾），其余空槽按候选价值序填满（候选耗尽则留空）。
+
+        模拟转律：非首词条（存在+填充）中按价值挑最差一条转出
+        （池外词条最优先，池内按 affix_pool 排位靠后者优先；增伤
+        词条豁免），转入取转律词条库（transmute_priority，同样经
+        部位过滤+等价）中未出现的最高优先级词条，替换后再定级，
+        与不转律基线取评级较高者。填充与转律后均复用 _grade
+        （与完整定级同一套条件求值）。
         """
-        obtainable = set(self.rule.transmute_priority)
+        from ..game_config import get_game_config
+        gc = get_game_config()
+        part = result.equipment.part
 
-        def evaluate(toks: list[str], n_trans: int) -> tuple[Rating, str]:
-            junk = [t for t in toks if t not in pool and t != damage]
-            if junk:
-                return Rating.JUNK, f"垃圾词条: {'、'.join(junk)}"
-            n_slots = n_free
-            if damage and damage not in toks:
-                if n_free < 1:
-                    return Rating.JUNK, f"缺失必需增伤词条: {damage}"
-                n_slots -= 1  # 一个空槽用于补增伤（转律不出神力）
-            for tier_key, groups in self._tiers(pattern):
-                is_top = tier_key == "top"
-                for group in groups:
-                    if not group.active(self.switches):
-                        continue
-                    hit = all(
-                        (c.potential if is_top else c.still_hits)(
-                            first_token, toks, n_slots, n_trans,
-                            obtainable)
-                        for c in group.conditions)
-                    if not hit:
-                        continue
-                    if is_top:
-                        return (Rating.TOP,
-                                f"仍可达顶级（剩余 {n_free} 空槽）")
-                    return (_RATING_BY_KEY[tier_key],
-                            f"上限为{RATING_LABELS[tier_key]}"
-                            f"（{_group_text(group)}）")
-            default = pattern.default_rating or self.rule.default_rating
-            return (_RATING_BY_KEY[default],
-                    f"仍可达{RATING_LABELS[default]}"
-                    f"（剩余 {n_free} 空槽）")
+        def part_ok(name: str) -> bool:
+            return part in gc.get_affix_parts(name)
 
-        priority = self.rule.transmute_priority
+        # 填充候选：价值序 + 部位过滤（原名）+ 等价 + 非首词条去重
+        candidates: list[str] = []
+        for name in self.rule.affix_pool:
+            if not part_ok(name):
+                continue
+            g = equiv.get(name, name)
+            if g in tokens or g in candidates:
+                continue
+            candidates.append(g)
 
-        def sac_score(t: str) -> int:
-            """转出优先级（越大越该转出）；增伤词条不参与转出"""
-            if t == damage:
-                return -1
-            if t not in pool:
-                return 10000  # 池外垃圾优先转出
-            if t in priority:
-                return priority.index(t)  # 价值降序：靠后 = 越该转
-            return 1000  # 池内但未列入优先级：低价值
+        # 顺序填充空槽（缺增伤先占一槽；候选耗尽则留空）
+        filled = list(tokens)
+        fill_log: list[str] = []
+        slots = n_free
+        if damage and slots >= 1 and damage not in filled:
+            filled.append(damage)
+            fill_log.append(damage)
+            slots -= 1
+        for cand in candidates:
+            if slots <= 0:
+                break
+            filled.append(cand)
+            fill_log.append(cand)
+            slots -= 1
 
-        # 不转律基线 + 转掉「最该转出」的一条，取评级上限最高者；
-        # can_transmute=False 时放弃转律验证（仅按空槽评估）
-        rating, reason = evaluate(tokens, 0)
-        if tokens and self.config.get("can_transmute", True):
-            idx = max(range(len(tokens)), key=lambda i: sac_score(tokens[i]))
-            if sac_score(tokens[idx]) >= 0:  # 存在可转出词条（非增伤）
-                rest = tokens[:idx] + tokens[idx + 1:]
-                r2, why = evaluate(rest, 1)
-                if _RANK[r2] > _RANK[rating]:
-                    # 展示用最优转入：转律词条库中价值最高且尚缺的
-                    target = next(
-                        (p for p in priority
-                         if p != first_token and p not in rest),
-                        priority[0] if priority else None)
-                    tag = (f"{tokens[idx]} 转律为 {target}，" if target
-                           else f"{tokens[idx]} 转律，")
-                    rating, reason = r2, tag + why
+        def label(base: str) -> str:
+            return (f"填充 {'、'.join(fill_log)} 后{base}"
+                    if fill_log else base)
+
+        # 不转律基线
+        rating, why = self._grade(pattern, damage, first_token, filled)
+        reason = label(why)
+
+        # 转律分支：转掉最差一条换转律库最高优先级，取评级较高者
+        if filled and self.config.get("can_transmute", True):
+            pool = self.rule.pool_set
+            order = self.rule.affix_pool
+
+            def sac_score(t: str) -> int:
+                """转出优先级（越大越该转出）；增伤词条豁免"""
+                if t == damage:
+                    return -1
+                if t not in pool:
+                    return 10 ** 6  # 池外垃圾最优先转出
+                return order.index(t) if t in order else 10 ** 3
+
+            idx = max(range(len(filled)),
+                      key=lambda i: sac_score(filled[i]))
+            dropped = filled[idx]
+            if sac_score(dropped) >= 0:  # 存在可转出词条（非增伤）
+                rest = filled[:idx] + filled[idx + 1:]
+                gain = next(
+                    (g for g in (equiv.get(n, n)
+                                 for n in self.rule.transmute_priority
+                                 if part_ok(n))
+                     if g not in rest and g != dropped), None)
+                if gain:
+                    r2, why2 = self._grade(
+                        pattern, damage, first_token, rest + [gain])
+                    if _RANK[r2] > _RANK[rating]:
+                        rating = r2
+                        reason = label(
+                            f"{dropped} 转律为 {gain}，{why2}")
 
         result.rating = rating
         result.reasons.append(reason)

@@ -18,6 +18,9 @@ schema 要点：
   首词条/默认判定，判定时逐档并入所有部位的条件组（通用在前）；
 - default_rating: 四档 key（junk/normal/excellent/top）之一，缺省
   excellent；patterns.<部位> 可选同名字段按部位覆盖；
+- affix_pool: 可用词条库（全局），声明序即价值序（越靠前越优先
+  保留与填充），潜力判定据此填充空槽；transmute_priority 独立
+  （转律只能转出库内词条，转入取库中最高优先级）；
 - 开关注册表在 tuning_base.yaml 的 switches 段（key → {name}），
   条件组 when 只能引用已注册开关。
 """
@@ -132,54 +135,6 @@ class Condition:
         if self.kind == "count_min":
             return count >= self.min
         return False
-
-    def _fillable(self, missing: set[str], n_free: int, n_trans: int,
-                  obtainable: set[str]) -> bool:
-        """缺失词条能否用 空槽+转律 补齐
-
-        转律只能出转律词条库（obtainable）内词条，库外词条
-        只能由空槽补。
-        """
-        outside = sum(1 for m in missing if m not in obtainable)
-        return outside <= n_free and len(missing) <= n_free + n_trans
-
-    def potential(self, first_token: str, tokens: list[str], n_free: int,
-                  n_trans: int, obtainable: set[str]) -> bool:
-        """潜力求值：剩余 空槽/转律 牌能否使条件仍有机会成立
-
-        排除类条件（not_together/count_max）当前已满足即可（空槽按
-        最优填法不会引入排除词条）；contains_all 缺失词条须可补齐
-        （转律仅出转律词条库内词条）。
-        """
-        if self.kind == "contains_all":
-            missing = (set(self.symbols)
-                       - self._present(first_token, tokens))
-            return self._fillable(missing, n_free, n_trans, obtainable)
-        return self.check(first_token, tokens)
-
-    def still_hits(self, first_token: str, tokens: list[str], n_free: int,
-                   n_trans: int, obtainable: set[str]) -> bool:
-        """潜力求值：空槽/转律 牌按最优填法能否解除命中
-
-        垃圾/一般/优秀档条件专用——补牌只增不减，且转律只能出
-        转律词条库内词条：
-        - contains_all/count_min: 命中后加词条不会反转 → 维持命中；
-        - not_together: 补齐全部 symbols 同现即可解除；
-        - count_max: 补 symbols 内词条至超出上限即可解除（symbols
-          全在库外时只能靠空槽）。
-        """
-        if not self.check(first_token, tokens):
-            return False
-        if self.kind in ("contains_all", "count_min"):
-            return True
-        if self.kind == "not_together":
-            missing = (set(self.symbols)
-                       - self._present(first_token, tokens))
-            return not self._fillable(missing, n_free, n_trans, obtainable)
-        # count_max：需补 max+1-count 个才能突破上限
-        count = self._count(first_token, tokens)
-        capacity = n_free + (n_trans if set(self.symbols) & obtainable else 0)
-        return (self.max + 1 - count) > capacity
 
 
 @dataclass

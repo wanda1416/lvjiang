@@ -293,6 +293,47 @@ class TestTransmuteSimulation:
         assert "垃圾词条" in "；".join(res.reasons)
 
 
+# ─── 填充式潜力：价值序填空槽 + 部位过滤 + 缺增伤占槽 ──────
+
+class TestFillSimulation:
+    def test_qiang_free_slots_fill_huixin_top(self, judge):
+        # 副武器枪回归：空槽按价值序填 势/会意率 → 顶级双条件
+        # contains_all[劲,势,最大外功攻击] + count_min[会意率,最大无相]≥1 命中
+        e = make_equip("枪", ["最大外功攻击", "劲"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.TOP
+
+    def test_fill_part_filter_quan_wuxue(self, judge):
+        # 环空槽可填 全武学增效（环/佩专属，武器专属的最大无相被过滤）
+        # → 逃离环垃圾条件并命中顶级
+        e = make_equip("环", ["最大外功攻击"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.TOP
+        assert "全武学增效" in "；".join(res.reasons)
+
+    def test_weapon_free_slot_fills_damage_top(self, judge):
+        # 主武器剑缺增伤：第一个空槽补 剑武学增伤 → 顶级
+        e = make_equip("剑", ["最大外功攻击", "最大外功攻击", "劲", "势"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.TOP
+        assert "剑武学增伤" in "；".join(res.reasons)
+
+    def test_weapon_full_missing_damage_junk(self, judge):
+        # 词条已满且缺增伤：无空槽补增伤 → 垃圾
+        e = make_equip("剑",
+                       ["最大外功攻击", "最大外功攻击", "劲", "势", "会意率"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.JUNK
+        assert any("增伤" in s for s in res.reasons)
+
+    def test_transmute_gain_skips_existing(self, judge):
+        # 转出池外 最小外功攻击、转入跳过已存在（势）取次高 劲 → 顶级
+        e = make_equip("剑", ["最大外功攻击", "势", "最小外功攻击"])
+        res = judge.check_tuning_worthiness(e)
+        assert res.rating == Rating.TOP
+        assert "最小外功攻击 转律为 劲" in "；".join(res.reasons)
+
+
 # ─── 部位级默认判定兜底 ────────────────────────────
 
 class TestPatternDefaultRating:
@@ -395,7 +436,7 @@ class TestCommonConditionsJudge:
         assert judge_on.judge(e).rating == Rating.JUNK
 
     def test_common_in_potential_eval(self):
-        # 调律潜力判定同样并入通用条件（垃圾档 still_hits 封顶）
+        # 调律潜力判定同样并入通用条件（填充后复用完整定级）
         judge = self._make_judge(
             {"junk_conditions": [{"contains_all": ["势"]}]},
             {"can_transmute": False})

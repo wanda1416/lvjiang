@@ -162,3 +162,34 @@ class TuningDocWriter:
         self._write()
         self._write(f"- 结束时间：{now}（{state}）")
         self._write(f"- 实际调律 {tuned_count} 件，共 {total_rounds} 轮")
+
+    def run_summary(self, items: list[dict]):
+        """成品清单：本次调律完成且最终评级一般及以上的装备
+
+        每项 dict：name/type/level/quality/rating_text/affixes（首词条
+        单独列出，其余词条合并一行）；筛选与排序由调用方负责。
+        """
+        self._write()
+        self._write("### 成品清单（一般及以上）")
+        self._write()
+        if not items:
+            self._write("本次无一般及以上成品。")
+            return
+        for i, it in enumerate(items, start=1):
+            name = it.get("name") or "未知装备"
+            etype = it.get("type") or "未知类型"
+            level = it.get("level")
+            quality = _QUALITY_NAMES.get(
+                it.get("quality"), it.get("quality") or "品阶未知")
+            level_txt = f"{level}级 " if level else ""
+            rating = it.get("rating_text") or "无有效结论"
+            self._write(f"{i}. {name} · {etype}（{level_txt}{quality}）"
+                        f"— {rating}")
+            affixes = [a for a in (it.get("affixes") or [])
+                       if isinstance(a, dict) and a.get("name")]
+            if not affixes:
+                self._write("   - 词条未记录")
+                continue
+            self._write(f"   - 首词条：{format_affix(affixes[0])}")
+            rest = "、".join(format_affix(a) for a in affixes[1:])
+            self._write(f"   - 其余词条：{rest if rest else '无'}")

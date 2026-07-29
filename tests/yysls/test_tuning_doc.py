@@ -157,3 +157,38 @@ class TestTuningDocWriter:
         """未 close 即可从磁盘读到已写内容（中断/崩溃不丢）"""
         writer.start_run("小明", [], ["head"], {})
         assert "- 操作用户：小明" in _read(writer)
+
+
+class TestRunSummary:
+    """成品清单：首词条单独列出，其余词条合并一行"""
+
+    def test_lists_items(self, writer):
+        writer.run_summary([{
+            "name": "雁南飞甲", "type": "胸甲", "level": 105,
+            "quality": "purple", "rating_text": "通用会意：优秀",
+            "affixes": [
+                {"name": "会意率", "value": 4.2, "unit": "%",
+                 "cap_pct": 70.0},
+                {"name": "势", "value": 49.8, "cap_pct": 74.6},
+                {"name": "外功防御", "value": 40.8},
+            ],
+        }])
+        text = _read(writer)
+        assert "### 成品清单（一般及以上）" in text
+        assert "1. 雁南飞甲 · 胸甲（105级 紫色）— 通用会意：优秀" in text
+        assert "   - 首词条：会意率 4.2%（70.0%）" in text
+        assert "   - 其余词条：势 49.8（74.6%）、外功防御 40.8" in text
+
+    def test_single_affix_rest_empty(self, writer):
+        writer.run_summary([{
+            "name": "剑", "type": "剑", "quality": "gold",
+            "rating_text": "血河：一般",
+            "affixes": [{"name": "劲", "value": 10}],
+        }])
+        text = _read(writer)
+        assert "   - 首词条：劲 10" in text
+        assert "   - 其余词条：无" in text
+
+    def test_empty_items(self, writer):
+        writer.run_summary([])
+        assert "本次无一般及以上成品。" in _read(writer)

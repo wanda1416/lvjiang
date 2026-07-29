@@ -23,7 +23,7 @@ class _AffixListBox(QWidget):
 
     def __init__(self, candidates: list[str],
                  on_changed: Callable[[], None],
-                 title: str, parent=None):
+                 title: str, rows: int = 7, parent=None):
         super().__init__(parent)
         self._candidates = candidates
         self._on_changed = on_changed
@@ -36,6 +36,10 @@ class _AffixListBox(QWidget):
         self._list.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection)
         self._list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        # 展示高度按行数折算固定，超出滚动
+        row_h = self._list.fontMetrics().height() + 4
+        self._list.setFixedHeight(
+            rows * row_h + 2 * self._list.frameWidth())
         layout.addWidget(self._list, 1)
 
         btn_col = QVBoxLayout()
@@ -87,7 +91,7 @@ class PoolPage(QWidget):
         prio_box = QGroupBox("转律词条库（全局，优先级从高到低）")
         prio_layout = QVBoxLayout(prio_box)
         self._prio_list = _AffixListBox(
-            self._candidates, self._apply, "转律词条库")
+            self._candidates, self._apply, "转律词条库", rows=7)
         prio_layout.addWidget(self._prio_list)
         layout.addWidget(prio_box)
 
@@ -95,7 +99,7 @@ class PoolPage(QWidget):
         pool_box = QGroupBox("可用词条库（全局，各部位词条混放）")
         pool_layout = QVBoxLayout(pool_box)
         self._pool_list = _AffixListBox(
-            self._candidates, self._apply, "可用词条库")
+            self._candidates, self._apply, "可用词条库", rows=10)
         pool_layout.addWidget(self._pool_list)
         note = QLabel(
             "可用词条库为全局价值序（越靠前越优先保留与填充）；"

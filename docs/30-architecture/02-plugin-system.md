@@ -24,14 +24,36 @@ python -m src -reg foo -reg bar  # 多插件同时加载
 @dataclass
 class AppHooks:
     name: str                                  # 插件显示名
-    window_title: str | None = None            # 覆盖主窗口标题
-    main_window_class: type | str | None = None  # 自定义主窗口类（支持字符串路径延迟导入）
+    window_title: str | None = None            # 覆盖主窗口标题（多插件时后注册者覆盖）
     left_tab_builders: list = field(default_factory=list)   # [(label, builder), ...]
-    right_tab_builders: list = field(default_factory=list)
-    menu_builders: list = field(default_factory=list)       # [fn(menubar), ...]
+    right_tab_builders: list = field(default_factory=list)  # builder(host) -> QWidget
+    menu_builders: list = field(default_factory=list)       # [fn(host, menubar), ...]
     recognizer_classes: list = field(default_factory=list)
     workflow_implementations: dict = field(default_factory=dict)
     builtin_modules: list = field(default_factory=list)
+```
+
+主应用创建唯一的通用 MainWindow；插件**不能替换主窗口类**，只能通过
+builder 注入左/右 Tab 与菜单。多插件的 Tab/菜单按 `-reg` 顺序叠加。
+
+builder 约定：
+
+- Tab builder 签名 `builder(host: MainWindow) -> QWidget`，菜单 builder 签名
+  `fn(host: MainWindow, menubar: QMenuBar) -> None`（插入位置在「帮助」菜单之前）
+- builder 必须是顶层轻函数，函数体内延迟 import 实际类（保持「插件 import
+  不触发 PyQt6」约定）
+- 单个 builder 抛异常只记日志不中断其他插件
+
+宿主 API（插件页面通过 host 使用，不摸私有属性）：
+
+- `host.active_user_name() -> str`：当前活跃用户名
+- `host.is_running` / `host.request_stop()`：自动化运行状态与停止
+- `host.append_log(text)`：写运行日志
+- `host.run_workflow_implementation(impl_name, flow_name, required_scenes, configure)`：
+  启动已注册工作流（通用脚手架 + `configure(wf_instance, engine)` 回调写入专属参数）
+- 信号 `automation_state_changed(str)`（"running"/"not_ready"/"ready"）、
+  `user_changed(str)`
+- F9 分发：当前左侧 Tab 若实现 `f9_run()` 则交由其处理，否则走通用工作流
 ```
 
 ## 插件目录结构
@@ -44,8 +66,7 @@ src/apps/<name>/
 ├── workflows/
 │   ├── implementations/  # 复杂工作流实现
 │   └── builtins/         # 插件专属内置函数
-└── ui/                # 插件专属 UI 组件
-    └── main_window.py # 自定义主窗口（可选）
+└── ui/                # 插件专属 UI 组件（Tab 页面、对话框、菜单 builder）
 ```
 
 ## 开发新插件
@@ -74,19 +95,25 @@ _APP_REGISTRY: dict[str, str] = {
 # src/apps/mygame/__init__.py
 from ..base import AppHooks
 
+
+def _build_auto_tab(host):
+    from .ui.auto_tab import AutoTab   # 函数体内延迟 import，避免插件 import 触发 PyQt6
+    return AutoTab(host)
+
+
+def _build_menu(host, menubar):
+    from .ui.menus import build_menu
+    build_menu(host, menubar)
+
+
 hooks = AppHooks(
     name="我的游戏",
     window_title="律匠 - 我的游戏自动化工具",
-    # 可选：自定义主窗口（字符串路径延迟导入，避免 import 时触发 PyQt6）
-    main_window_class="src.apps.mygame.ui.main_window.MainWindow",
-    # 可选：左侧 Tab
+    # 可选：左/右 Tab 与菜单（注入通用 MainWindow）
     left_tab_builders=[
-        ("自动化", build_auto_panel),
+        ("自动化", _build_auto_tab),
     ],
-    # 可选：右侧 Tab
-    right_tab_builders=[
-        ("状态", build_status_panel),
-    ],
+    menu_builders=[_build_menu],
     # 可选：识别器
     recognizer_classes=[MyGameRecognizer],
     # 可选：复杂工作流
@@ -147,7 +174,8 @@ class AutoFarmWorkflow(BaseWorkflow):
 1. **识别器**：调用 `src.core.recognizers.register_recognizer()` 注册
 2. **工作流**：调用 `src.workflows.implementations.register_workflow()` 注册
 3. **内置函数**：导入 `builtin_modules` 中的模块，触发 `@builtin_func` 装饰器注册
-4. **UI 扩展**：将 tab/menu builders 注入通用 MainWindow
+4. **UI 扩展**：将 tab/menu builders 收集到注册表，由通用 MainWindow 构建时消费
+   （多插件 extend 叠加，按 `-reg` 顺序）
 
 ## 设计决策
 
@@ -155,7 +183,7 @@ class AutoFarmWorkflow(BaseWorkflow):
 2. **`-reg` 参数**：显式注册，避免自动发现带来的意外加载
 3. **全局 config/data**：所有插件共用一份配置，避免配置分散
 4. **AppHooks 数据类**：插件通过数据声明扩展点，而非覆盖通用代码
-5. **延迟导入**：`main_window_class` 支持字符串路径，避免 import 时触发 PyQt6
+5. **注入式 UI**：插件只能注入 Tab/菜单，不能替换主窗口类，保证多插件共存
 
 ## 现有插件
 

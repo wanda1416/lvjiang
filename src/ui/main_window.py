@@ -48,9 +48,11 @@ DEFAULT_TITLE = "律匠 - 通用视觉 RPA 引擎"
 class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     """通用主窗口。
 
-    从全局注册表读取扩展点，由插件在启动时注入。
-    子类可覆盖 ``_plugin_menu_spec`` / ``_extra_left_tabs`` / ``_extra_right_tabs``
-    添加插件专属功能。
+    从全局注册表读取扩展点，由插件在启动时注入：
+    ``left_tab_builders`` / ``right_tab_builders`` / ``menu_builders``。
+    插件页面通过宿主 API（active_user_name / is_running / request_stop /
+    append_log / run_workflow_implementation）与信号（automation_state_changed /
+    user_changed）与主窗口交互，不直接触碰私有属性。
     """
 
     # 全局热键信号
@@ -58,6 +60,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     f10_pressed = pyqtSignal()
     f8_pressed = pyqtSignal()
     _scrcpy_frame_ready = pyqtSignal(object)
+    # 宿主信号：自动化状态（"running" / "not_ready" / "ready"）与用户切换
+    automation_state_changed = pyqtSignal(str)
+    user_changed = pyqtSignal(str)
 
     def __init__(self, hooks_list: list[Any] | None = None) -> None:
         super().__init__()
@@ -185,38 +190,19 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         script_record.triggered.connect(self._open_script_record)
         tools_menu.addAction(script_record)
 
-        # ── 插件专属菜单（第三列，帮助之前；一个插件一个菜单） ──
-        spec = self._plugin_menu_spec()
-        if spec:
-            menu_title, plugin_items = spec
-            plugin_menu = menubar.addMenu(menu_title)
-            for label, slot, shortcut in plugin_items:
-                action = QAction(label, self)
-                if shortcut:
-                    action.setShortcut(shortcut)
-                action.triggered.connect(slot)
-                plugin_menu.addAction(action)
+        # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
+        registry = get_registry()
+        for builder in registry.get("menu_builders", []):
+            try:
+                builder(self, menubar)
+            except Exception:  # noqa: BLE001
+                logger.exception("menu builder 执行失败")
 
         # ── 帮助 ──
         help_menu = menubar.addMenu("帮助")
         about = QAction("关于", self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
-
-        # 插件 menu builders（兼容旧机制）
-        registry = get_registry()
-        for builder in registry.get("menu_builders", []):
-            try:
-                builder(menubar)
-            except Exception:  # noqa: BLE001
-                logger.exception("menu builder 执行失败")
-
-    def _plugin_menu_spec(self) -> tuple[str, list[tuple[str, Any, str]]] | None:
-        """子类覆盖：返回插件专属菜单 (菜单名, [(label, slot, shortcut), ...])。
-
-        一个插件一个菜单，菜单名用插件名（如「燕云」），返回 None 则不创建。
-        """
-        return None
 
     # ─── 对话框 ──────────────────────────────────────────────
 
@@ -415,7 +401,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._setup_log_redirect()
 
     def _build_left_tabs(self):
-        """构建左侧 Tab（通用：日常）。子类覆盖可追加。"""
+        """构建左侧 Tab（通用：日常），再追加插件注入的 Tab。"""
         # ── Tab 1: 日常 ──
         daily_scroll = QScrollArea()
         daily_scroll.setWidgetResizable(True)
@@ -455,11 +441,44 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         daily_scroll.setWidget(daily_panel)
         self._left_tabs.addTab(daily_scroll, "日常")
 
+        # ── 插件注入的左侧 Tab（按 -reg 顺序追加）──
+        self._add_plugin_tabs(self._left_tabs, "left_tab_builders")
+
     def _build_right_tabs(self):
-        """构建右侧 Tab（通用：运行日志）。子类覆盖可追加。"""
+        """构建右侧 Tab（通用：运行日志），再追加插件注入的 Tab。"""
         self.log_text = TrimmedLogEdit()
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         self.tabs.addTab(self.log_text, "运行日志")
+
+        # ── 插件注入的右侧 Tab（按 -reg 顺序追加）──
+        self._add_plugin_tabs(self.tabs, "right_tab_builders")
+
+    def _add_plugin_tabs(self, tab_widget: QTabWidget, registry_key: str):
+        """消费注册表中的插件 Tab builder；单个失败只记日志不中断。"""
+        for label, builder in get_registry().get(registry_key, []):
+            try:
+                tab_widget.addTab(builder(self), label)
+            except Exception:  # noqa: BLE001
+                logger.exception(f"插件 Tab「{label}」构建失败")
+
+    # ─── 宿主 API（供插件页面使用）──────────────────────
+
+    def active_user_name(self) -> str:
+        """当前激活用户名（无用户时返回空串）"""
+        return self._user_manager.get_active_user_name() or ""
+
+    @property
+    def is_running(self) -> bool:
+        """当前是否有自动化在运行"""
+        return self._running
+
+    def request_stop(self):
+        """请求停止当前自动化（等价 F10）"""
+        self._request_stop()
+
+    def append_log(self, text: str):
+        """向运行日志面板追加一行消息"""
+        self.log_text.append(text)
 
     # ─── UI 状态持久化（session.json ui_state 节点）────────
 
@@ -580,7 +599,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if self._backend == "adb":
             self._teardown_adb_backend()
         try:
+            # stop() 只投递停止信号不等线程结束；必须 join 等钩子线程
+            # 完成 UnhookWindowsHookEx，否则解释器销毁后 ctypes 回调踩空
+            # （退出时 TypeError 噪声乃至 access violation 的根因）
             self._hotkey_listener.stop()
+            self._hotkey_listener.join(1.0)
         except Exception:
             pass
         self._overlay.destroy()

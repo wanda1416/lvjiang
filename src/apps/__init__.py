@@ -68,18 +68,6 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         registry["window_title"] = hooks.window_title
         logger.info("[plugin]   window_title = %s", hooks.window_title)
 
-    if hooks.main_window_class is not None:
-        # 支持字符串路径延迟导入
-        if isinstance(hooks.main_window_class, str):
-            module_path, _, class_name = hooks.main_window_class.rpartition(".")
-            mod = importlib.import_module(module_path)
-            cls = getattr(mod, class_name)
-            registry["main_window_class"] = cls
-            logger.info("[plugin]   main_window_class = %s (lazy)", class_name)
-        else:
-            registry["main_window_class"] = hooks.main_window_class
-            logger.info("[plugin]   main_window_class = %s", hooks.main_window_class.__name__)
-
     if hooks.left_tab_builders:
         registry.setdefault("left_tab_builders", []).extend(hooks.left_tab_builders)
         logger.info("[plugin]   left tabs: %s", [label for label, _ in hooks.left_tab_builders])

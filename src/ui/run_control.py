@@ -175,8 +175,8 @@ class RunControlMixin:
                 logger.info(f"用户切换前已保存 session: {old_name}")
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
-        # 刷新装备状态面板
-        self._refresh_equip_status()
+        # 通知插件页面（如装备状态）刷新
+        self.user_changed.emit(self._user_manager.get_active_user_name() or "")
 
     # ─── 布局选择器 ────────────────────────────────────────
 
@@ -443,47 +443,40 @@ class RunControlMixin:
     # ─── 运行按钮 ──────────────────────────────────────────
 
     def _refresh_run_button(self):
-        """根据运行状态和定位状态刷新运行按钮。"""
+        """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         if self._running:
-            stop_text = "停止 (F10)"
-            stop_style = "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
-            self.btn_run_workflow.setText(stop_text)
-            self.btn_run_workflow.setStyleSheet(stop_style)
-            if hasattr(self, 'btn_run_tuning'):
-                self.btn_run_tuning.setText("停止 (F10)")
-                self.btn_run_tuning.setStyleSheet(
-                    "background-color: #f44336; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
-                )
+            state = "running"
+            self.btn_run_workflow.setText("停止 (F10)")
+            self.btn_run_workflow.setStyleSheet(
+                "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+            )
         elif not self._backend_ready():
+            state = "not_ready"
             label = "未连接" if getattr(self, "_backend", "windows") == "adb" else "未定位"
-            idle_style = "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
             self.btn_run_workflow.setText(label)
-            self.btn_run_workflow.setStyleSheet(idle_style)
-            if hasattr(self, 'btn_run_tuning'):
-                self.btn_run_tuning.setText(label)
-                self.btn_run_tuning.setStyleSheet(
-                    "background-color: #FFC107; color: #333; font-weight: bold; padding: 10px; font-size: 14px;"
-                )
+            self.btn_run_workflow.setStyleSheet(
+                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
+            )
         else:
+            state = "ready"
             self.btn_run_workflow.setText("开始执行 (F9)")
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
             )
-            if hasattr(self, 'btn_run_tuning'):
-                self.btn_run_tuning.setText("开始调律 (F9)")
-                self.btn_run_tuning.setStyleSheet(
-                    "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
-                )
+        self.automation_state_changed.emit(state)
 
     # ─── 启停控制 ──────────────────────────────────────────
 
     def _on_start(self):
-        """开始执行（F9 快捷键转发）根据当前左侧 Tab 分发"""
+        """开始执行（F9 快捷键转发）按当前左侧 Tab 分发：
+        插件 Tab 实现 ``f9_run()`` 则交由其处理，否则走通用工作流。"""
         if self._running:
             return
-        # 检查当前 Tab：调律 Tab 索引为 1
-        if hasattr(self, '_left_tabs') and self._left_tabs.currentIndex() == 1:
-            self._on_run_tuning()
+        tabs = getattr(self, '_left_tabs', None)
+        widget = tabs.currentWidget() if tabs is not None else None
+        runner = getattr(widget, 'f9_run', None)
+        if callable(runner):
+            runner()
         else:
             self._on_run_workflow()
 
@@ -498,20 +491,16 @@ class RunControlMixin:
         else:
             self._on_start()
 
-    # ─── 调律工作流执行 ────────────────────────────────────
+    # ─── 插件工作流执行 ────────────────────────────────────
 
-    @staticmethod
-    def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
-        """开启的开关 key → 注册表显示名（注册表不可用时退回 key）"""
-        try:
-            from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
-            names = get_tuning_base().switches
-        except Exception:
-            names = {}
-        return [names.get(k, k) for k, v in switches.items() if v]
+    def run_workflow_implementation(self, impl_name: str, flow_name: str,
+                                    required_scenes: list[str], configure):
+        """插件页面启动已注册工作流实现的通用入口（异步）。
 
-    def _on_run_tuning(self):
-        """执行自动调律工作流（异步）"""
+        通用脚手架：backend/布局/场景校验 → 创建引擎与工作流实例 →
+        session 接线 → 回调 ``configure(wf_instance, engine)`` 由插件
+        写入专属参数并输出开始日志 → 启动工作流线程。
+        """
         if self._running:
             self._request_stop()
             return
@@ -523,48 +512,6 @@ class RunControlMixin:
                 self.log_text.append("[错误] 请先定位窗口")
             return
 
-        # 获取选中的部位
-        selected_slots = self._get_tuning_selected_slots() if hasattr(self, '_get_tuning_selected_slots') else []
-        if not selected_slots:
-            self.log_text.append("[错误] 请至少选择一个调律部位")
-            return
-
-        # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
-        from src.apps.yysls.evaluator import (
-            get_tuning_judge, get_tuning_rules, get_rule_names,
-            is_rule_implemented,
-        )
-        if hasattr(self, '_get_tuning_rule_config'):
-            rules_cfg = self._get_tuning_rule_config()
-        else:
-            rules_cfg = {"huiyi_general": {"enabled": True}}
-        enabled = {k: cfg for k, cfg in rules_cfg.items() if cfg.get("enabled")}
-        if not enabled:
-            self.log_text.append("[错误] 请至少选择一个调律规则")
-            return
-        rule_judges = []
-        rule_map = get_tuning_rules()
-        keep = (self._get_tuning_switches()
-                if hasattr(self, '_get_tuning_switches') else {})
-        switches = {str(k): bool(v) for k, v in keep.items()}
-        skip_tuning = (self._get_tuning_skip_tuning()
-                       if hasattr(self, '_get_tuning_skip_tuning') else False)
-        for rule_key, cfg in enabled.items():
-            if not is_rule_implemented(rule_key):
-                self.log_text.append(f"[警告] 规则「{get_rule_names().get(rule_key, rule_key)}」判定暂未实现，已跳过")
-                continue
-            rule = rule_map[rule_key]
-            wr_cfg = cfg.get("playstyles")
-            if rule.playstyles and wr_cfg is not None and not wr_cfg:
-                self.log_text.append(f"[错误] 规则「{rule.name}」需至少勾选一个玩法")
-                return
-            rule_judges.append(
-                get_tuning_judge(rule_key, {**cfg, "switches": switches}))
-        if not rule_judges:
-            self.log_text.append("[错误] 选中的规则均未实现判定逻辑")
-            return
-
-        flow_name = "自动调律"
         if not self._begin_automation(flow_name):
             return
 
@@ -576,16 +523,13 @@ class RunControlMixin:
             return
 
         # 检查所需场景
-        required_scenes = [
-            "game_main_page", "game_menu_page", "bag_equip_detail",
-            "equip_weapon_detail", "equip_armor_detail",
-        ]
-        missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
-        if missing:
-            names = "、".join(missing)
-            self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
-            self._end_automation(flow_name)
-            return
+        if required_scenes:
+            missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
+            if missing:
+                names = "、".join(missing)
+                self.log_text.append(f"[错误] 以下场景未绑定区域: {names}")
+                self._end_automation(flow_name)
+                return
 
         # 窗口坐标
         if getattr(self, "_backend", "windows") == "adb":
@@ -613,7 +557,7 @@ class RunControlMixin:
 
         # 创建工作流实例
         from ..workflows.implementations import get_workflow_class
-        wf_class = get_workflow_class("auto_tuning")
+        wf_class = get_workflow_class(impl_name)
         wf_instance = wf_class(
             capture=self._capture,
             ocr=self._ocr,
@@ -624,26 +568,9 @@ class RunControlMixin:
             window_top=window_top,
             stop_check=self._is_stopped,
         )
-        wf_instance._selected_slots = selected_slots
-        wf_instance._rule_judges = rule_judges
-        # 潜力判定配置（形状与 single_tuning._load_rule_config 一致，
-        # 对齐 UI 实时勾选）：供 auto_tuning 的 judge_tuning_worthiness/
-        # judge_equipment_potential 使用
-        wf_instance._judge_configs = {
-            k: {**cfg, "switches": switches} for k, cfg in enabled.items()}
-        wf_instance._judge_rule_keys = list(enabled)
-        # 临时测试开关：跳过实际调律（仅模拟进出调律页，便于测试滚动）
-        wf_instance._skip_tuning = skip_tuning
-        # 调律说明文档（logs/tuning/）的操作用户名
-        wf_instance._doc_username = username
 
-        rule_names_text = "、".join(j.rule_name for j in rule_judges)
-        on_names = self._tuning_switch_names(switches)
-        if on_names:
-            rule_names_text += f"（开关：{'、'.join(on_names)}）"
-        if skip_tuning:
-            self.log_text.append("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律")
-        self.log_text.append(
-            f"[开始] {flow_name} 流程，规则: {rule_names_text}，部位: {selected_slots}")
-        self._start_workflow("auto_tuning", flow_name,
+        # 插件写入专属参数（如判定器、部位选择等）并输出开始日志
+        configure(wf_instance, engine)
+
+        self._start_workflow(impl_name, flow_name,
                              lambda: engine.execute(wf_instance))

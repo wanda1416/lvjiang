@@ -15,11 +15,11 @@ import yaml
 
 from src.apps.yysls.evaluator import get_tuning_rules
 from src.apps.yysls.evaluator.tuning_rules import (
-    DYNAMIC_AFFIXES, QUALITY_PARTS, MaterialSettings, RuleValidationError,
-    TuningRuleManager, dynamic_affix_map, get_tuning_base,
-    get_tuning_rule_manager, parse_tuning_base, parse_tuning_rule,
-    rule_affix_candidates, specific_attr_names, standard_affix_names,
-    standard_playstyle_attrs,
+    DYNAMIC_AFFIXES, QUALITY_PARTS, FoodRule, MaterialSettings,
+    RuleValidationError, TuningRuleManager, default_food_rules,
+    dynamic_affix_map, get_tuning_base, get_tuning_rule_manager,
+    parse_tuning_base, parse_tuning_rule, rule_affix_candidates,
+    specific_attr_names, standard_affix_names, standard_playstyle_attrs,
 )
 
 
@@ -629,44 +629,53 @@ class TestTuningBase:
 
 class TestMaterialSettings:
     def test_defaults_when_section_missing(self):
-        # materials 段缺省 → 全部默认值（与原硬编码行为一致）
+        # materials 段缺省 → 全部默认值（默认两条狗粮规则）
         m = parse_tuning_base(_valid_base()).materials
         assert m.stone_check_enabled is False
         assert m.stone_min_count == 100
-        assert m.high_pct == 90
-        assert m.high_pct_food == "金狗粮"
-        assert m.quality_food == {"purple": "紫狗粮", "gold": ""}
+        assert m.food_rules == default_food_rules()
 
     def test_full_section_parsed(self):
         data = _valid_base()
         data["materials"] = {
             "stone_check": {"enabled": True, "min_count": 500},
-            "food_strategy": {
-                "high_pct": 80,
-                "high_pct_food": "彩狗粮",
-                "quality_food": {"purple": "金狗粮", "gold": "紫狗粮"},
-            },
+            "food_rules": [
+                {"pct": 95, "min_expect": "top", "min_quality": "gold",
+                 "food": "彩狗粮", "on_insufficient": "skip"},
+                {"pct": 0, "min_expect": "normal", "min_quality": "purple",
+                 "food": "紫狗粮"},
+                {"food": ""},                     # 终止规则：命中即不添加
+            ],
         }
         m = parse_tuning_base(data).materials
         assert m.stone_check_enabled is True
         assert m.stone_min_count == 500
-        assert m.high_pct == 80
-        assert m.high_pct_food == "彩狗粮"
-        assert m.quality_food == {"purple": "金狗粮", "gold": "紫狗粮"}
+        assert m.food_rules == [
+            FoodRule(pct=95, min_expect="top", min_quality="gold",
+                     food="彩狗粮", on_insufficient="skip"),
+            FoodRule(pct=0, min_expect="normal", min_quality="purple",
+                     food="紫狗粮"),
+            FoodRule(),
+        ]
 
-    def test_partial_quality_food_merges_defaults(self):
-        # 只覆盖 gold → purple 沿用默认紫狗粮；空串=不加合法
+    def test_empty_rules_legal(self):
+        # 空列表合法 = 从不添加狗粮
         data = _valid_base()
-        data["materials"] = {
-            "food_strategy": {"quality_food": {"gold": "彩狗粮"}}}
-        m = parse_tuning_base(data).materials
-        assert m.quality_food == {"purple": "紫狗粮", "gold": "彩狗粮"}
+        data["materials"] = {"food_rules": []}
+        assert parse_tuning_base(data).materials.food_rules == []
+
+    def test_legacy_food_strategy_rejected(self):
+        # 旧 food_strategy 段已废弃，出现即报错提示新写法
+        data = _valid_base()
+        data["materials"] = {"food_strategy": {"high_pct": 90}}
+        with pytest.raises(RuleValidationError, match="已废弃"):
+            parse_tuning_base(data)
 
     def test_builtin_base_materials_loaded(self):
         # 内置 tuning_base.yaml 的 materials 段可正常解析
         m = get_tuning_base().materials
         assert isinstance(m, MaterialSettings)
-        assert m.high_pct_food in ("金狗粮", "紫狗粮", "彩狗粮")
+        assert all(isinstance(r, FoodRule) for r in m.food_rules)
 
     @pytest.mark.parametrize("materials", [
         ["not", "a", "dict"],                          # 段须为 dict
@@ -674,12 +683,14 @@ class TestMaterialSettings:
         {"stone_check": {"min_count": 0}},             # 低于下界
         {"stone_check": {"min_count": "100"}},         # 字符串伪整数
         {"stone_check": {"min_count": True}},          # bool 伪装 int
-        {"food_strategy": {"high_pct": 101}},          # 超出上界
-        {"food_strategy": {"high_pct_food": "神狗粮"}},  # 非法 label
-        {"food_strategy": {"high_pct_food": ""}},      # 高档狗粮不可为空
-        {"food_strategy": {"quality_food": {"blue": "紫狗粮"}}},   # 未知品阶
-        {"food_strategy": {"quality_food": {"purple": "神狗粮"}}},  # 非法 label
-        {"food_strategy": {"quality_food": ["紫狗粮"]}},  # 须为 dict
+        {"food_rules": {"pct": 90}},                    # 须为 list
+        {"food_rules": ["金狗粮"]},                     # 元素须为 dict
+        {"food_rules": [{"pct": 101}]},                 # 超出上界
+        {"food_rules": [{"pct": True}]},                # bool 伪装 int
+        {"food_rules": [{"min_expect": "junk"}]},       # 期望档位非法
+        {"food_rules": [{"min_quality": "green"}]},     # 品阶非法
+        {"food_rules": [{"food": "神狗粮"}]},           # 非法 label
+        {"food_rules": [{"on_insufficient": "abort"}]},  # 行为非法
     ])
     def test_bad_materials_rejected(self, materials):
         data = _valid_base()
@@ -687,34 +698,84 @@ class TestMaterialSettings:
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
 
-    def test_decide_food_high_pct(self):
-        m = MaterialSettings()
-        food, reason = m.decide_food(90, "purple")
-        assert food == "金狗粮"
-        assert "90%" in reason
 
-    def test_decide_food_by_quality(self):
-        m = MaterialSettings()
-        assert m.decide_food(50, "purple")[0] == "紫狗粮"
-        food, reason = m.decide_food(50, "gold")
-        assert food == ""                      # 金色默认不加
-        assert "不添加" in reason
+class TestDecideFood:
+    """decide_food 新语义：三条件顺序匹配 + 持有量判定 + 不足策略"""
 
-    def test_decide_food_unknown_quality(self):
-        m = MaterialSettings()
-        food, reason = m.decide_food(50, "blue")
-        assert food == ""
-        assert "保守" in reason
-        # cap_pct 缺失（OCR 失败）也走保守分支
-        assert m.decide_food(None, None)[0] == ""
+    STOCKS = {"彩狗粮": 5, "金狗粮": 3, "紫狗粮": 0}
 
-    def test_decide_food_custom_config(self):
-        m = MaterialSettings(high_pct=80, high_pct_food="彩狗粮",
-                             quality_food={"gold": "金狗粮"})
-        assert m.decide_food(85, "gold")[0] == "彩狗粮"
-        assert m.decide_food(50, "gold")[0] == "金狗粮"
-        # 品阶未配置（purple 被自定义配置移除）→ 保守不加
-        assert m.decide_food(50, "purple")[0] == ""
+    def test_first_rule_hit(self):
+        # 默认规则1：首词条≥98 且期望≥顶级 → 彩狗粮
+        d = MaterialSettings().decide_food(98, "top", "gold", self.STOCKS)
+        assert (d.action, d.food) == ("feed", "彩狗粮")
+
+    def test_second_rule_hit(self):
+        # 规则1 不命中（cap 92 < 98）→ 顺序落到规则2 金狗粮
+        d = MaterialSettings().decide_food(
+            92, "excellent", "purple", self.STOCKS)
+        assert (d.action, d.food) == ("feed", "金狗粮")
+
+    def test_no_rule_hit(self):
+        d = MaterialSettings().decide_food(50, "top", "gold", self.STOCKS)
+        assert (d.action, d.food) == ("none", "")
+
+    def test_pct_zero_unlimited(self):
+        # pct=0 不限首词条：cap_pct 识别失败（None）也可命中
+        m = MaterialSettings(food_rules=[FoodRule(food="金狗粮")])
+        d = m.decide_food(None, "normal", "blue", {"金狗粮": 1})
+        assert (d.action, d.food) == ("feed", "金狗粮")
+
+    def test_cap_pct_none_fails_positive_pct(self):
+        # pct>0 时 cap_pct 识别失败视为不达标
+        d = MaterialSettings().decide_food(None, "top", "gold", self.STOCKS)
+        assert d.action == "none"
+
+    def test_expect_none_never_hits(self):
+        # 无任何适用规则（expect=None）→ 期望条件永不命中
+        d = MaterialSettings().decide_food(98, None, "gold", self.STOCKS)
+        assert d.action == "none"
+
+    def test_quality_terminator_ordering(self):
+        # 「品阶≥金→不添加」排在「品阶≥紫→紫狗粮」前：
+        # 金不喂、紫喂紫、蓝全部不命中
+        m = MaterialSettings(food_rules=[
+            FoodRule(min_quality="gold"),
+            FoodRule(min_quality="purple", food="紫狗粮"),
+        ])
+        stocks = {"紫狗粮": 9}
+        assert m.decide_food(50, "normal", "gold", stocks).action == "none"
+        d = m.decide_food(50, "normal", "purple", stocks)
+        assert (d.action, d.food) == ("feed", "紫狗粮")
+        assert m.decide_food(50, "normal", "blue", stocks).action == "none"
+
+    def test_insufficient_continue_falls_through(self):
+        # 命中但库存不足（读不到）→ continue 落到下一条
+        m = MaterialSettings(food_rules=[
+            FoodRule(food="彩狗粮"),
+            FoodRule(food="金狗粮"),
+        ])
+        d = m.decide_food(50, "normal", "blue", {"金狗粮": 2})
+        assert (d.action, d.food) == ("feed", "金狗粮")
+
+    def test_insufficient_skip_aborts_equipment(self):
+        m = MaterialSettings(food_rules=[
+            FoodRule(food="彩狗粮", on_insufficient="skip"),
+            FoodRule(food="金狗粮"),
+        ])
+        d = m.decide_food(50, "normal", "blue", {"金狗粮": 2})
+        assert d.action == "skip"
+        assert "跳过" in d.reason
+
+    def test_zero_stock_is_insufficient(self):
+        # 数量 0 与读不到同义：狗粮每轮只消耗一个，<1 即不足
+        m = MaterialSettings(food_rules=[FoodRule(food="紫狗粮")])
+        d = m.decide_food(50, "normal", "blue", {"紫狗粮": 0})
+        assert d.action == "none"
+
+    def test_empty_rules_never_feed(self):
+        m = MaterialSettings(food_rules=[])
+        d = m.decide_food(99, "top", "gold", {"彩狗粮": 9})
+        assert d.action == "none"
 
 
 # ─── 规则级品阶门槛覆盖 ─────────────────

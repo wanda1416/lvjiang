@@ -5,11 +5,11 @@ from __future__ import annotations
 import re
 
 from .models import (
-    COND_KINDS, DYNAMIC_AFFIXES, FOOD_LABELS, FOOD_QUALITIES, GENERIC_ATTR,
-    PART_KEYS, QUALITY_PARTS, RATING_KEYS, TIER_KEYS, CommonConditions,
-    Condition, ConditionGroup, MaterialSettings, PartPattern, Playstyle,
-    RuleValidationError, TuningBase, TuningRule, WeaponSide,
-    rule_affix_candidates, standard_playstyle_attrs,
+    COND_KINDS, DYNAMIC_AFFIXES, FOOD_EXPECT_KEYS, FOOD_LABELS, GENERIC_ATTR,
+    INSUFFICIENT_ACTIONS, PART_KEYS, QUALITY_PARTS, QUALITY_RANK, RATING_KEYS,
+    TIER_KEYS, CommonConditions, Condition, ConditionGroup, FoodRule,
+    MaterialSettings, PartPattern, Playstyle, RuleValidationError, TuningBase,
+    TuningRule, WeaponSide, rule_affix_candidates, standard_playstyle_attrs,
 )
 
 # 规则 key / 开关 key 合法性（作为 YAML 文件名 / when 引用键）
@@ -319,11 +319,45 @@ def parse_tuning_rule(data: dict,
     return rule
 
 
+def _parse_food_rule(raw, where: str) -> FoodRule:
+    """单条狗粮规则解析：字段可缺省（落 FoodRule 默认值）"""
+    if not isinstance(raw, dict):
+        raise RuleValidationError(f"{where} 必须是 dict")
+    defaults = FoodRule()
+    pct = raw.get("pct", defaults.pct)
+    if isinstance(pct, bool) or not isinstance(pct, int):
+        raise RuleValidationError(f"{where}.pct 必须是整数")
+    if not (0 <= pct <= 100):
+        raise RuleValidationError(f"{where}.pct 超出范围 [0, 100]: {pct}")
+    expect = str(raw.get("min_expect", defaults.min_expect))
+    if expect not in FOOD_EXPECT_KEYS:
+        raise RuleValidationError(
+            f"{where}.min_expect 非法: {expect!r}"
+            f"（须为 {list(FOOD_EXPECT_KEYS)}）")
+    quality = str(raw.get("min_quality", defaults.min_quality))
+    if quality not in QUALITY_RANK:
+        raise RuleValidationError(
+            f"{where}.min_quality 非法: {quality!r}"
+            f"（须为 {list(QUALITY_RANK)}）")
+    food = str(raw.get("food") or "")
+    if food and food not in FOOD_LABELS:
+        raise RuleValidationError(
+            f"{where}.food 非法: {food!r}"
+            f"（须为 {list(FOOD_LABELS)} 或空=不添加）")
+    action = str(raw.get("on_insufficient", defaults.on_insufficient))
+    if action not in INSUFFICIENT_ACTIONS:
+        raise RuleValidationError(
+            f"{where}.on_insufficient 非法: {action!r}"
+            f"（须为 {list(INSUFFICIENT_ACTIONS)}）")
+    return FoodRule(pct=pct, min_expect=expect, min_quality=quality,
+                    food=food, on_insufficient=action)
+
+
 def _parse_materials(raw, where: str = "materials") -> MaterialSettings:
     """材料设置解析：缺省段/缺省字段取 MaterialSettings 默认值
 
-    狗粮 label 锁定 FOOD_LABELS（空串=不加），品阶 key 锁定
-    FOOD_QUALITIES，数值字段拒绝 bool 伪装的 int。
+    food_rules 为有序规则列表（可空列表=从不添加；缺省落默认
+    两条），各字段枚举锁定，数值字段拒绝 bool 伪装的 int。
     """
     if raw is None:
         return MaterialSettings()
@@ -347,40 +381,24 @@ def _parse_materials(raw, where: str = "materials") -> MaterialSettings:
         stone.get("min_count", defaults.stone_min_count),
         "stone_check.min_count", 1, 99999)
 
-    food = raw.get("food_strategy") or {}
-    if not isinstance(food, dict):
-        raise RuleValidationError(f"{where}.food_strategy 必须是 dict")
-    high_pct = _int_field(
-        food.get("high_pct", defaults.high_pct),
-        "food_strategy.high_pct", 0, 100)
-    high_food = str(food.get("high_pct_food", defaults.high_pct_food))
-    if high_food not in FOOD_LABELS:
+    if "food_strategy" in raw:
         raise RuleValidationError(
-            f"{where}.food_strategy.high_pct_food 非法: {high_food!r}"
-            f"（须为 {list(FOOD_LABELS)}）")
-    quality_food = dict(defaults.quality_food)
-    raw_qf = food.get("quality_food") or {}
-    if not isinstance(raw_qf, dict):
-        raise RuleValidationError(
-            f"{where}.food_strategy.quality_food 必须是 dict")
-    for q, f_label in raw_qf.items():
-        if q not in FOOD_QUALITIES:
-            raise RuleValidationError(
-                f"{where}.food_strategy.quality_food: 未知品阶 {q!r}"
-                f"（须为 {list(FOOD_QUALITIES)}）")
-        f_label = str(f_label or "")
-        if f_label and f_label not in FOOD_LABELS:
-            raise RuleValidationError(
-                f"{where}.food_strategy.quality_food.{q} 非法: "
-                f"{f_label!r}（须为 {list(FOOD_LABELS)} 或空=不加）")
-        quality_food[str(q)] = f_label
+            f"{where}.food_strategy 已废弃，请改用 food_rules 规则表")
+    raw_rules = raw.get("food_rules")
+    if raw_rules is None:
+        food_rules = defaults.food_rules
+    elif isinstance(raw_rules, list):
+        food_rules = [
+            _parse_food_rule(item, f"{where}.food_rules[{i}]")
+            for i, item in enumerate(raw_rules)
+        ]
+    else:
+        raise RuleValidationError(f"{where}.food_rules 必须是 list")
 
     return MaterialSettings(
         stone_check_enabled=enabled,
         stone_min_count=min_count,
-        high_pct=high_pct,
-        high_pct_food=high_food,
-        quality_food=quality_food,
+        food_rules=food_rules,
     )
 
 

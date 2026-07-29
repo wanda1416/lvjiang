@@ -62,7 +62,8 @@ class BaseConfigPage(QWidget):
             self._q_table.setColumnWidth(col, width)
         layout.addWidget(self._q_table)
 
-        # 开关设定
+        # 开关设定（标题顶部留半个字高度）
+        layout.addSpacing(self.fontMetrics().height() // 2)
         layout.addWidget(QLabel(
             "<b>开关设定</b>（开关 key → 显示名；规则条件组 when 引用的"
             "开关禁止删除）"))

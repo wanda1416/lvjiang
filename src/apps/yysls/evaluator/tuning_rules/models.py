@@ -329,17 +329,62 @@ class TuningRule:
         return {name: ps.summary() for name, ps in self.playstyles.items()}
 
 
-# ─── 基础配置（品阶门槛 + 开关注册表，全局） ──────────────
+# ─── 基础配置（品阶门槛 + 开关注册表 + 材料设置，全局） ──────
+
+# 大律准石（数量检查目标）与狗粮材料 label（须与 references.yaml
+# 调律材料组的参考图 label 严格一致，材料识别按 label 精确匹配）
+STONE_LABEL = "大律准石"
+FOOD_LABELS = ("金狗粮", "紫狗粮", "彩狗粮")
+# 狗粮策略可配置的品阶 key → 中文展示名
+FOOD_QUALITIES = {"purple": "紫色", "gold": "金色"}
+
+
+@dataclass
+class MaterialSettings:
+    """材料设置（大律准石数量检查 + 狗粮添加规则）
+
+    stone_check_enabled: 调律时检查大律准石持有量，低于基准判
+    材料不足并全部退出；默认关闭（用户自行保证材料充足）。
+    狗粮规则：首词条 cap_pct >= high_pct 时每轮加 high_pct_food，
+    否则按品阶查 quality_food（空串=不加），品阶未配置保守不加。
+    """
+    stone_check_enabled: bool = False
+    stone_min_count: int = 100
+    high_pct: int = 90
+    high_pct_food: str = "金狗粮"
+    quality_food: dict[str, str] = field(
+        default_factory=lambda: {"purple": "紫狗粮", "gold": ""})
+
+    def decide_food(self, cap_pct: int | None,
+                    quality: str | None) -> tuple[str, str]:
+        """按首词条数值百分比与品阶决定每轮添加的狗粮
+
+        Returns:
+            (材料 label，空串=不加, 决策说明文本，供说明文档与日志)
+        """
+        if cap_pct is not None and cap_pct >= self.high_pct:
+            return self.high_pct_food, (
+                f"首词条 {cap_pct}% >= {self.high_pct}% → "
+                f"每轮添加 {self.high_pct_food}")
+        if quality in self.quality_food:
+            food = self.quality_food[quality]
+            label = FOOD_QUALITIES.get(quality, quality)
+            action = f"每轮添加 {food}" if food else "不添加狗粮"
+            return food, (f"首词条 {cap_pct}% < {self.high_pct}%，"
+                          f"{label}品阶 → {action}")
+        return "", f"品阶未知（quality={quality}），保守不添加狗粮"
+
 
 @dataclass
 class TuningBase:
-    """全局基础配置（品阶门槛 + 开关注册表）
+    """全局基础配置（品阶门槛 + 开关注册表 + 材料设置）
 
     switches: 开关 key → 显示名；规则条件组 when 只能引用已注册
     开关，主窗口按注册表渲染全局开关复选框。
     """
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
+    materials: MaterialSettings = field(default_factory=MaterialSettings)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

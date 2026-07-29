@@ -3,6 +3,8 @@
 编辑品阶门槛（quality_thresholds）与开关注册表（switches）。
 沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
+`_build()` 以管理器最新 raw 为底、只替换本页负责的段，
+与材料配置页（materials 段）互不覆盖。
 
 - 品阶门槛表：固定 7 个标准部位（QUALITY_PARTS，锁死不可增删）×
   gold/purple/blue 勾选；规则级可在规则设置页按部位覆盖；
@@ -19,8 +21,8 @@ from typing import Callable
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QLabel, QPushButton, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QCheckBox, QHBoxLayout, QLabel, QPushButton,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from src.apps.yysls.evaluator.tuning_rules import (
@@ -181,10 +183,12 @@ class BaseConfigPage(QWidget):
                 continue  # 全空行忽略（新增未填）
             switches[key] = {"name": name}
 
-        return {
-            "quality_thresholds": quality,
-            "switches": switches,
-        }
+        # 以最新 raw 为底只替换本页负责的段，保留材料配置页负责的
+        # materials 段等其他内容
+        data = self._manager.get_raw()
+        data["quality_thresholds"] = quality
+        data["switches"] = switches
+        return data
 
     def _apply(self):
         if self._loading:

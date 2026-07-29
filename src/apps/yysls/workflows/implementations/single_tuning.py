@@ -2,9 +2,8 @@
 
 改造点（相对 single_tuning.wf）：
 1. 不再只调一次，而是循环调律直到 5 条词条全部出齐；
-2. 狗粮添加不再由参数指定，按 04-tuning-mechanics.md「调律材料添加说明」自动决策：
-   - 初始词条数值（首词条 cap_pct）>= 90% → 每次添加 金狗粮；
-   - 否则：金色品阶不加狗粮；紫色品阶添加 紫狗粮。
+2. 狗粮添加不再由参数指定，按基础配置材料设置（tuning_base.materials
+   的 food_strategy，见「基础配置 → 材料设置」）自动决策；
    律准石始终通过「一键添加」补足。
 3. 调律前及每轮结束后执行「是否值得调律」潜力判定：遍历全部调律规则判定器
    （未实现的跳过），任一规则仍可达 顶级/优秀 即继续；每轮调律产出的
@@ -143,25 +142,20 @@ class SingleTuningWorkflow(BaseWorkflow):
         self._exit_from_detail(back_times=3)
         return self.output
 
-    # ─── 狗粮策略（04-tuning-mechanics.md 调律材料添加说明）───
+    # ─── 狗粮策略（基础配置材料设置 tuning_base.materials）───
 
     @staticmethod
     def _decide_food(equip: dict) -> str:
-        """根据首词条数值百分比与品阶决定每轮添加的狗粮，返回材料 label（空串=不添加）"""
+        """按基础配置材料设置决定每轮添加的狗粮，返回材料 label（空串=不添加）"""
+        from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
         affix_1 = equip.get("affix_1") or {}
-        cap_pct = affix_1.get("cap_pct")
         quality = equip.get("quality")
-        if cap_pct is not None and cap_pct >= 90:
-            logger.info(f"狗粮策略: 首词条 {cap_pct}% >= 90% → 每轮添加 金狗粮")
-            return "金狗粮"
-        if quality == "purple":
-            logger.info(f"狗粮策略: 首词条 {cap_pct}% < 90%，紫色品阶 → 每轮添加 紫狗粮")
-            return "紫狗粮"
-        if quality == "gold":
-            logger.info(f"狗粮策略: 首词条 {cap_pct}% < 90%，金色品阶 → 不添加狗粮")
-            return ""
-        logger.warning(f"狗粮策略: 品阶未知（quality={quality}），保守不添加狗粮")
-        return ""
+        food, reason = get_tuning_base().materials.decide_food(
+            affix_1.get("cap_pct"), quality)
+        log = logger.info if (food or quality in ("purple", "gold")) \
+            else logger.warning
+        log(f"狗粮策略: {reason}")
+        return food
 
     # ─── 值得调律判定 & 新词条收集 ───────────────────
 

@@ -68,8 +68,14 @@ class TestBigWeaponRules:
         e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
         assert big.judge(e).rating == Rating.TOP
 
-    def test_fan_not_applicable(self, big):
+    def test_fan_zoudiyu_sub_top(self, big):
+        # 扇命中 走地玉 副武器（不需增伤），同 威威 副武器写法
         e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
+        assert big.judge(e).rating == Rating.TOP
+
+    def test_unlisted_weapon_not_applicable(self, big):
+        # 剑不在任何玩法的主/副武器内 → 不适用
+        e = make_equip("剑", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
         r = big.judge(e)
         assert r.skipped and r.not_applicable
 
@@ -179,9 +185,11 @@ class TestPotential:
         assert big.check_tuning_worthiness(e).rating == Rating.TOP
 
     def test_ring_double_waste_junk(self, big):
-        # 两条池外词条，仅可转律一条 → 垃圾
+        # 两条池外词条，仅可转律一条 → 垃圾（限定裂石玩法：
+        # 全选时 走地玉（牵丝）会把 最大牵丝攻击 归类为池内本属）
+        judge = get_tuning_judge("huixin_big", {"playstyles": ["双切"]})
         e = make_equip("环", ["最大外功攻击", "最大鸣金攻击", "最大牵丝攻击"])
-        assert big.check_tuning_worthiness(e).rating == Rating.JUNK
+        assert judge.check_tuning_worthiness(e).rating == Rating.JUNK
 
     def test_weapon_full_missing_damage_junk(self, big):
         # 词条已满且缺增伤：转律不产生神力词条 → 垃圾

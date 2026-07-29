@@ -19,6 +19,7 @@ from src.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
 from src.apps.yysls.evaluator import (
     Rating, get_rule_names, judge_equipment_potential, summarize_potential,
 )
+from src.apps.yysls.evaluator.tuning_rules import STONE_LABEL, get_tuning_base
 from src.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL, TRAVERSALS,
 )
@@ -55,8 +56,16 @@ class AutoTuningWorkflow(BaseWorkflow):
     _doc: TuningDocWriter | None = None
     _doc_seq = 0                # 说明文档中的装备序号
     _tune_abort_reason = ""     # _tune_once 返回 None 时的原因文案
+    _materials_exhausted = False  # 大律准石低于基准，全部退出
+
+    @property
+    def is_stopped(self) -> bool:
+        """停止请求或材料耗尽（大律准石低于基准）都视为停止，
+        背包遍历与部位循环全部收束，复用 F10 中断的退出路径"""
+        return self._materials_exhausted or super().is_stopped
 
     def run(self) -> dict:
+        self._materials_exhausted = False
         self._ensure_judge_config()
 
         selected = getattr(self, '_selected_slots', None)
@@ -104,7 +113,6 @@ class AutoTuningWorkflow(BaseWorkflow):
             for k, v in (cfg.get("switches") or {}).items():
                 merged[str(k)] = merged.get(str(k), False) or bool(v)
         try:
-            from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
             names = get_tuning_base().switches
         except Exception:
             names = {}
@@ -400,6 +408,12 @@ class AutoTuningWorkflow(BaseWorkflow):
         logger.info(f"  [垃圾胚子] {equip_data.name or equip_data.type}"
                     f" 判定不值得调律（后处理待实现）")
 
+    def _on_materials_insufficient(self, stock: int, baseline: int):
+        """大律准石低于基准的后处理挂载点（预留：补货/兑换）。
+        当前仅记录不动作，全部退出由 _materials_exhausted 驱动。"""
+        logger.info(f"  [材料不足] 大律准石 {stock}/基准 {baseline}"
+                    f"（不足处理待实现）")
+
     def _on_equipment_done(self, equip_data: EquipmentData,
                            judgement: dict, report: dict):
         """单件调律完成/词条已满、回到背包页后的后处理挂载点。
@@ -451,29 +465,58 @@ class AutoTuningWorkflow(BaseWorkflow):
 
     @staticmethod
     def _decide_food(equip: dict) -> tuple[str, str]:
-        """按首词条数值百分比与品阶决定每轮添加的狗粮
+        """按基础配置材料设置（tuning_base.materials）决定每轮添加的狗粮
 
         Returns:
             (材料 label，空串=不加, 决策说明文本，供说明文档与日志)
         """
         affix_1 = equip.get("affix_1") or {}
-        cap_pct = affix_1.get("cap_pct")
         quality = equip.get("quality")
-        if cap_pct is not None and cap_pct >= 90:
-            reason = f"首词条 {cap_pct}% >= 90% → 每轮添加 金狗粮"
-            logger.info(f"狗粮策略: {reason}")
-            return "金狗粮", reason
-        if quality == "purple":
-            reason = f"首词条 {cap_pct}% < 90%，紫色品阶 → 每轮添加 紫狗粮"
-            logger.info(f"狗粮策略: {reason}")
-            return "紫狗粮", reason
-        if quality == "gold":
-            reason = f"首词条 {cap_pct}% < 90%，金色品阶 → 不添加狗粮"
-            logger.info(f"狗粮策略: {reason}")
-            return "", reason
-        reason = f"品阶未知（quality={quality}），保守不添加狗粮"
-        logger.warning(f"狗粮策略: {reason}")
-        return "", reason
+        food, reason = get_tuning_base().materials.decide_food(
+            affix_1.get("cap_pct"), quality)
+        log = logger.info if (food or quality in ("purple", "gold")) \
+            else logger.warning
+        log(f"狗粮策略: {reason}")
+        return food, reason
+
+    def _check_stone_stock(self) -> bool:
+        """大律准石数量检查（材料设置可开关，默认关闭）
+
+        在调律页识别材料区，取大律准石持有量（x/y 优先取 y，
+        无斜杠取显示数字）；低于基准判材料不足，置
+        _materials_exhausted 使 is_stopped 恒真，全部退出。
+        材料区找不到大律准石视为已耗尽；数量 OCR 失败时警告
+        放行（识别波动不误杀整次运行）。
+
+        Returns:
+            True=可继续调律；False=材料不足，应终止全部流程
+        """
+        settings = get_tuning_base().materials
+        if not settings.stone_check_enabled:
+            return True
+        infos = self.recognize_materials_info(
+            self.TUNE_SCENE, self.MATERIAL_SLOTS, group=self.MATERIAL_GROUP)
+        stone = next((i for i in infos.values()
+                      if getattr(i, "type", "") == STONE_LABEL), None)
+        if stone is None:
+            stock = 0  # 材料区无大律准石，视为已耗尽
+        else:
+            stock = stone.owned if stone.owned is not None else stone.count
+            if stock is None:
+                logger.warning("大律准石数量识别失败，本轮跳过数量检查")
+                return True
+        if stock >= settings.stone_min_count:
+            logger.debug(
+                f"大律准石库存 {stock} >= 基准 {settings.stone_min_count}")
+            return True
+        reason = (f"大律准石 {stock} < 基准 "
+                  f"{settings.stone_min_count}，材料不足")
+        logger.warning(f"{reason}，终止全部调律")
+        self._tune_abort_reason = reason
+        self._materials_exhausted = True
+        self.output["stop_reason"] = reason
+        self._on_materials_insufficient(stock, settings.stone_min_count)
+        return False
 
     def _judge_worthiness(self, equip_data: EquipmentData) -> tuple[bool, list[str]]:
         """多规则 or 潜力判定：任一规则仍可达 顶级/优秀 即值得调律
@@ -557,6 +600,10 @@ class AutoTuningWorkflow(BaseWorkflow):
         if not can_add:
             logger.info("未找到「添加」入口，视为无法继续调律")
             self._tune_abort_reason = "未找到「添加」入口"
+            return None
+
+        # 大律准石数量检查（开关默认关闭）：不足则全部退出
+        if not self._check_stone_stock():
             return None
 
         if food:

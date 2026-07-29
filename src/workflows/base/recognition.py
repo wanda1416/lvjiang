@@ -108,6 +108,55 @@ class _RecognitionMixin:
         logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
+    def recognize_materials_info(
+        self,
+        scene_key: str,
+        slot_keys: list[str] | None = None,
+        group: str | None = None,
+    ) -> dict[str, object]:
+        """完整材料识别：一次截图，逐 slot 返回识别结果对象
+
+        与 recognize_materials 只返 label 不同，保留识别器结果的全部
+        字段（type/level/count/owned/confidence），供数量检查等策略
+        消费；裁切失败的 slot 不入结果。
+
+        Args:
+            scene_key: 场景 key
+            slot_keys: 可选，只识别指定 slot
+            group: 可选，限定参考图分组范围
+
+        Returns:
+            {slot_key: MaterialInfo, ...}
+        """
+        img = self._capture.capture()
+        if img is None:
+            logger.error("截图失败")
+            return {}
+
+        canvas = self._layout.get_canvas()
+        regions = self._layout.get_scene_regions(scene_key)
+        if not regions:
+            logger.warning(f"场景 {scene_key} 没有定义区域")
+            return {}
+        if slot_keys:
+            regions = [r for r in regions if r.key in slot_keys]
+
+        infos: dict[str, object] = {}
+        for region in regions:
+            crop = self._crop_region(img, region, canvas)
+            if crop is None:
+                logger.warning(f"slot {region.key} 裁切为空，跳过")
+                continue
+            info = self.material_recognizer.recognize(crop, group=group)
+            infos[region.key] = info
+
+        summary = {k: (f"{i.type}×{i.count}"
+                       + (f"/{i.owned}" if i.owned is not None else "")
+                       if i.type else "空")
+                   for k, i in infos.items()}
+        logger.info(f"材料识别 [{scene_key}]:{list(infos)} => {summary}")
+        return infos
+
     # ─── by 子句：短路识别 ──────────────────────────────────
 
     @staticmethod

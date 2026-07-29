@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QApplication
 
 from src.apps import get_registry
 from .ui.main_window import MainWindow as DefaultMainWindow
+from .ui.widgets import install_wheel_guard
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,8 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     logger.info("[app] 启动主窗口: %s", window_class.__name__)
 
     app = QApplication(sys.argv)
+    # 全局屏蔽下拉框/数字输入框的滚轮改值（防滑动页面时误改）
+    install_wheel_guard(app)
 
     # 根据主窗口类的签名决定是否传入 hooks_list
     sig = inspect.signature(window_class.__init__)

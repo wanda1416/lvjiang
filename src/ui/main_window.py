@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
     QTabWidget, QSplitter, QMessageBox, QFormLayout, QScrollArea,
-    QCheckBox, QStatusBar, QMenuBar,
+    QCheckBox, QStatusBar, QMenuBar, QSpinBox,
 )
 from loguru import logger
 
@@ -524,7 +524,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if not params:
             self._param_panel.setVisible(False)
             return
-        from PyQt6.QtWidgets import QSpinBox
         for param_def in params:
             name = param_def["name"]
             label = param_def.get("label", name)

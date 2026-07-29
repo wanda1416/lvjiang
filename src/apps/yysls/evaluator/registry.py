@@ -59,8 +59,8 @@ def judge_equipment_potential(
     """遍历全部调律规则做含转律模拟的评级上限判定（结构化结果）
 
     与 judge_tuning_worthiness 同一判定内核（check_tuning_worthiness：
-    空槽万能牌 + 模拟转律；词条已满时即纯转律模拟），返回各规则
-    结构化评级，供单次调律终局分析与自动调律直接消费。
+    按可用词条库价值序填充空槽 + 模拟一次转律后复用完整定级），
+    返回各规则结构化评级，供单次调律终局分析与自动调律直接消费。
 
     Args:
         equip: EquipmentData

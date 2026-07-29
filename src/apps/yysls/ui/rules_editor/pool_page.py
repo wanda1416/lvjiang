@@ -11,7 +11,7 @@ from typing import Callable
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QGroupBox, QHBoxLayout, QListWidget,
+    QAbstractItemView, QGroupBox, QHBoxLayout, QLabel, QListWidget,
     QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -97,6 +97,13 @@ class PoolPage(QWidget):
         self._pool_list = _AffixListBox(
             self._candidates, self._apply, "可用词条库")
         pool_layout.addWidget(self._pool_list)
+        note = QLabel(
+            "可用词条库为全局价值序（越靠前越优先保留与填充）；"
+            "武学增伤不在此填写——玩法指定武器的武学增伤自动视为"
+            "最高优先级，未指定时按垃圾词条处理。")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: gray; font-size: 12px;")
+        pool_layout.addWidget(note)
         layout.addWidget(pool_box)
         layout.addStretch()
 

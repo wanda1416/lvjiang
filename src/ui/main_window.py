@@ -194,6 +194,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         script_record.triggered.connect(self._open_script_record)
         tools_menu.addAction(script_record)
 
+        script_config = QAction("脚本配置", self)
+        script_config.triggered.connect(self._open_script_config)
+        tools_menu.addAction(script_config)
+
         # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
         registry = get_registry()
         for builder in registry.get("menu_builders", []):
@@ -232,6 +236,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             dialog.toggle_recording()
         else:
             self._open_script_record()
+
+    def _open_script_config(self):
+        """打开脚本配置对话框；保存后刷新日常页脚本下拉。"""
+        from .script_config_dialog import ScriptConfigDialog
+        dialog = ScriptConfigDialog(self)
+        if dialog.exec():
+            self._load_workflow_configs()
 
     def _open_scene_editor(self):
         from .scene_editor.scene_editor import SceneEditorDialog
@@ -414,7 +425,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         daily_layout = QVBoxLayout(daily_panel)
         daily_layout.setContentsMargins(4, 4, 4, 4)
 
-        wf_group = QGroupBox("工作流")
+        wf_group = QGroupBox("脚本")
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.setMinimumWidth(150)

@@ -1,5 +1,4 @@
 #% name: 查找调律材料
-#% required_scenes: [equip_tune_detail]
 
 # 在调律页材料格中寻找指定材料（一次截图，短路识别）
 # input: $material_name — 目标材料名称

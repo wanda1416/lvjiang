@@ -1,5 +1,4 @@
 #% name: 江湖号令刷新
-#% required_scenes: [activity_jianghu, ui_waiguan_yigui, action_control, game_menu_page, game_main_page, general_control, ui_school_main]
 #% parameters:
 #%   - name: max_refresh
 #%     label: 单任务最大刷新次数

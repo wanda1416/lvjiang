@@ -57,37 +57,54 @@ class RunControlMixin:
     # ─── 工作流配置加载 ──────────────────────────────────
 
     def _load_workflow_configs(self):
-        """读取 workflows.yaml，填充 workflow_combo"""
+        """发现全部脚本，按 workflows.yaml 的 exposed/overrides 过滤排序后填充下拉。
+
+        脚本本体（.wf + 内置类）由发现层自动扫描；workflows.yaml 只决定日常页
+        暴露哪些脚本、顺序、以及可选的显示名覆盖。
+        """
+        from ..workflows.discovery import discover_scripts
+
         self._workflow_configs: list[dict] = []
         self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
-        yaml_path = SYSTEM_CONFIG_DIR / "workflows.yaml"
-
-        if not yaml_path.exists():
-            logger.warning(f"工作流配置文件不存在: {yaml_path}")
-            return
 
         try:
-            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-            flows = data.get("flows", [])
-            for flow in flows:
-                self._workflow_configs.append({
-                    "id": flow["id"],
-                    "name": flow["name"],
-                    "wf_file": flow.get("wf_file", ""),
-                    "class": flow.get("class", ""),
-                    "required_scenes": flow.get("required_scenes", []),
-                    "parameters": flow.get("parameters", []),
-                })
+            discovered = {cfg["id"]: cfg for cfg in discover_scripts()}
         except Exception as e:
-            logger.error(f"加载工作流配置失败: {e}")
+            logger.error(f"发现脚本失败: {e}")
             return
+
+        exposed, overrides = self._load_script_exposure()
+        # exposed 缺失/为空 → 展示全部；否则仅展示且按其顺序
+        order = [i for i in exposed if i in discovered] if exposed else sorted(discovered)
+
+        for sid in order:
+            cfg = dict(discovered[sid])
+            ov = overrides.get(sid) or {}
+            if ov.get("name"):
+                cfg["name"] = ov["name"]
+            self._workflow_configs.append(cfg)
 
         # 填充下拉列表
         self.workflow_combo.clear()
         for cfg in self._workflow_configs:
             self.workflow_combo.addItem(cfg["name"], cfg["id"])
 
-        logger.info(f"已加载 {len(self._workflow_configs)} 个工作流配置")
+        logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
+
+    def _load_script_exposure(self) -> tuple[list, dict]:
+        """读取 workflows.yaml 的 exposed 列表与 overrides 映射。"""
+        yaml_path = SYSTEM_CONFIG_DIR / "workflows.yaml"
+        if not yaml_path.exists():
+            logger.warning(f"脚本暴露配置文件不存在: {yaml_path}")
+            return [], {}
+        try:
+            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+        except Exception as e:
+            logger.error(f"加载脚本暴露配置失败: {e}")
+            return [], {}
+        exposed = data.get("exposed") or []
+        overrides = data.get("overrides") or {}
+        return exposed, overrides
 
     def _on_load_workflow(self):
         """加载任意 .wf 文件为临时工作流项（非常驻，打开新文件会覆盖）
@@ -293,16 +310,8 @@ class RunControlMixin:
             self._end_automation(flow_name)
             return
 
-        # 延迟校验：检查所需场景是否已绑定坐标
-        required_scenes = flow_cfg.get("required_scenes", [])
-        if required_scenes:
-            missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
-            if missing:
-                names = "、".join(missing)
-                self.log_text.append(f"[错误] 以下场景未绑定坐标: {names}")
-                self.statusBar().showMessage(f"场景缺失: {names}")
-                self._end_automation(flow_name)
-                return
+        # 场景绑定校验：DSL 脚本由 engine 执行时按 AST 搜集场景自动校验；
+        # 内置类脚本不做预校验（缺场景运行到该指令再报错）。
 
         # 后台模式下（windows），刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
         # ADB 模式无窗口句柄，且坐标为设备物理像素（原点左上），window_left/top 恒为 0
@@ -494,12 +503,15 @@ class RunControlMixin:
     # ─── 插件工作流执行 ────────────────────────────────────
 
     def run_workflow_implementation(self, impl_name: str, flow_name: str,
-                                    required_scenes: list[str], configure):
+                                    configure):
         """插件页面启动已注册工作流实现的通用入口（异步）。
 
-        通用脚手架：backend/布局/场景校验 → 创建引擎与工作流实例 →
+        通用脚手架：backend/布局校验 → 创建引擎与工作流实例 →
         session 接线 → 回调 ``configure(wf_instance, engine)`` 由插件
         写入专属参数并输出开始日志 → 启动工作流线程。
+
+        内置类工作流不做场景预校验（无 DSL AST 可静态搜集），
+        缺场景时运行到对应指令再报错。
         """
         if self._running:
             self._request_stop()
@@ -521,15 +533,6 @@ class RunControlMixin:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
             self._end_automation(flow_name)
             return
-
-        # 检查所需场景
-        if required_scenes:
-            missing = self._layout_manager.check_scenes_valid(layout_name, required_scenes)
-            if missing:
-                names = "、".join(missing)
-                self.log_text.append(f"[错误] 以下场景未绑定坐标: {names}")
-                self._end_automation(flow_name)
-                return
 
         # 窗口坐标
         if getattr(self, "_backend", "windows") == "adb":

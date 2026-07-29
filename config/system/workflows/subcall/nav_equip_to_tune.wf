@@ -1,5 +1,4 @@
 #% name: 导航至调律页
-#% required_scenes: [equip_weapon_detail, equip_tune_detail]
 
 # 从装备详情页进入调律页面
 # 前置：在装备详情页（equip_weapon_detail）

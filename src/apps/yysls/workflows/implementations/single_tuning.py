@@ -37,6 +37,41 @@ from src.workflows.base import BaseWorkflow
 class SingleTuningWorkflow(BaseWorkflow):
     """单件装备调律工作流"""
 
+    # 脚本元数据（供发现层暴露到日常下拉，取代旧 workflows.yaml 声明）
+    DISPLAY_NAME = "单件装备调律"
+    PARAMETERS = [
+        {
+            "name": "equip_slot",
+            "label": "装备部位",
+            "type": "select",
+            "default": "main_weapon",
+            "options": [
+                {"value": "main_weapon", "label": "主武器"},
+                {"value": "sub_weapon", "label": "副武器"},
+                {"value": "ring", "label": "环"},
+                {"value": "pendant", "label": "佩"},
+                {"value": "head", "label": "头部"},
+                {"value": "chest", "label": "胸部"},
+                {"value": "leg", "label": "腿部"},
+                {"value": "wrist", "label": "腕部"},
+            ],
+        },
+        {
+            "name": "bag_row",
+            "label": "背包行号",
+            "type": "select",
+            "default": "1",
+            "options": ["1", "2", "3"],
+        },
+        {
+            "name": "bag_col",
+            "label": "背包列号",
+            "type": "select",
+            "default": "1",
+            "options": ["1", "2", "3", "4", "5", "6"],
+        },
+    ]
+
     WEAPON_SLOTS = ["main_weapon", "sub_weapon", "ring", "pendant"]
     ARMOR_SLOTS = ["head", "chest", "leg", "wrist"]
     WEAPON_DETAIL = "equip_weapon_detail"

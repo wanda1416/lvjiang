@@ -1,90 +1,21 @@
-# 工作流注册配置
+# 脚本暴露配置
 #
-# 简单工作流只需在此声明 wf_file 和所需场景，即可在 GUI 下拉列表中选择执行。
-# 复杂工作流通过 Python Workflow 实例在代码启动时自注册，不在此文件中声明。
+# 脚本本体（.wf 文件 + 内置类实现）由发现层自动扫描（见 src/workflows/discovery.py）：
+#   - config/system/workflows/ 顶层 *.wf（跳过 _ 前缀与子目录），name/参数取自 #% front-matter
+#   - 已注册内置类实现，name/参数取自类属性 DISPLAY_NAME / PARAMETERS
+# 本文件只负责「暴露」：决定日常页下拉展示哪些脚本、顺序、以及可选的显示名覆盖。
+# 可在「工具 → 脚本配置」中可视化编辑本文件。
+#
+# 语义：exposed 缺失/为空 → 展示全部已发现脚本；否则仅展示且按其顺序。
 
-flows:
-  - id: equip_analysis
-    name: 当前装备分析
-    wf_file: equip_analysis.wf
-    required_scenes:
-      - bag_equip_detail
-      - equip_weapon_detail
-      - equip_armor_detail
+exposed:            # 日常下拉展示的脚本 id，按此顺序
+  - equip_analysis
+  - single_tuning
+  - auto_purchase_xinde
+  - activity_jianghu
+  - mengzhuzhengfeng
 
-  - id: single_tuning
-    name: 单件装备调律
-    # wf_file: single_tuning.wf  # 暂时屏蔽 .wf 实现，改由下方 class 引用的代码实现
-    class: single_tuning
-    required_scenes:
-      - game_main_page
-      - game_menu_page
-      - bag_equip_detail
-      - equip_weapon_detail
-      - equip_armor_detail
-      - equip_tune_detail
-      - equip_tune_result
-    parameters:
-      # 狗粮添加已改为自动策略（首词条 >=90% 加金狗粮；否则金色不加、紫色加紫狗粮），
-      # 不再需要 target_material 参数
-      - name: equip_slot
-        label: 装备部位
-        type: select
-        default: "main_weapon"
-        options:
-          - { value: "main_weapon", label: "主武器" }
-          - { value: "sub_weapon", label: "副武器" }
-          - { value: "ring", label: "环" }
-          - { value: "pendant", label: "佩" }
-          - { value: "head", label: "头部" }
-          - { value: "chest", label: "胸部" }
-          - { value: "leg", label: "腿部" }
-          - { value: "wrist", label: "腕部" }
-      - name: bag_row
-        label: 背包行号
-        type: select
-        default: "1"
-        options: ["1", "2", "3"]
-      - name: bag_col
-        label: 背包列号
-        type: select
-        default: "1"
-        options: ["1", "2", "3", "4", "5", "6"]
-
-  - id: auto_purchase_xinde
-    name: 购买武学心得
-    wf_file: auto_purchase_xinde.wf
-    required_scenes:
-      - game_main_page
-
-  - id: activity_jianghu
-    name: 江湖号令
-    wf_file: activity_jianghu.wf
-    required_scenes:
-      - activity_jianghu
-      - ui_waiguan_yigui
-      - action_control
-      - game_menu_page
-      - game_main_page
-      - general_control
-      - ui_school_main
-    parameters:
-      - name: max_refresh
-        label: 单任务最大刷新次数
-        type: number
-        default: 50
-        min: 1
-        max: 999
-
-  - id: mengzhuzhengfeng
-    name: 盟主争锋
-    wf_file: mengzhuzhengfeng.wf
-    required_scenes:
-      - activity_mengzhu
-    parameters:
-      - name: execute_times
-        label: 执行次数
-        type: number
-        default: 10
-        min: 1
-        max: 999
+overrides:          # 可选：覆盖发现层得到的显示名
+  equip_analysis: { name: 当前装备分析 }
+  auto_purchase_xinde: { name: 购买武学心得 }
+  activity_jianghu: { name: 江湖号令 }

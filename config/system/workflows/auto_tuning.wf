@@ -1,5 +1,4 @@
 #% name: 自动调律
-#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_armor_detail]
 
 import "subcall/nav_main_to_equip.wf"
 import "subcall/bag_traverse.wf"

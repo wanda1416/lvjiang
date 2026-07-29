@@ -41,9 +41,8 @@ class _FakeHost(QObject):
     def active_user_name(self) -> str:
         return "测试用户"
 
-    def run_workflow_implementation(self, impl_name, flow_name,
-                                    required_scenes, configure):
-        self.run_calls.append((impl_name, flow_name, required_scenes, configure))
+    def run_workflow_implementation(self, impl_name, flow_name, configure):
+        self.run_calls.append((impl_name, flow_name, configure))
 
 
 @pytest.fixture
@@ -159,13 +158,9 @@ class TestF9Run:
         tab.f9_run()
 
         assert len(host.run_calls) == 1
-        impl_name, flow_name, required_scenes, configure = host.run_calls[0]
+        impl_name, flow_name, configure = host.run_calls[0]
         assert impl_name == "auto_tuning"
         assert flow_name == "自动调律"
-        assert required_scenes == [
-            "game_main_page", "game_menu_page", "bag_equip_detail",
-            "equip_weapon_detail", "equip_armor_detail",
-        ]
 
         # configure 回调向工作流实例注入专属参数并输出开始日志
         class _Wf:

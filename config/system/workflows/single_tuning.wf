@@ -1,5 +1,4 @@
 #% name: 单次调律
-#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail, equip_weapon_detail, equip_tune_detail, equip_tune_result]
 #% parameters:
 #%   - name: target_material
 #%     label: 目标材料

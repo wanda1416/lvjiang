@@ -10,7 +10,7 @@ from ...config import DelayConfig
 from ...core.capture_base import CaptureBackend
 from ...core.ocr import OCREngine
 from ...core.input_base import InputBackend
-from ...core.scene_registry import Layout
+from ...core.scene_registry import Layout, get_scene_name
 
 from ..grammar import (
     parse_file,
@@ -20,6 +20,7 @@ from ..grammar import (
     Literal,
 )
 from ..grammar.ast_nodes import Align
+from ..scene_scan import collect_scene_keys
 from ..base import BaseWorkflow
 from ..align import GridAlignment
 
@@ -159,6 +160,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
         # 静态校验：wait 引用的命名等待参数必须已定义，未定义直接报错不执行
         self._validate_named_waits(program)
+        # 静态校验：脚本引用的场景必须已在当前布局绑定坐标（取代手写 required_scenes）
+        self._validate_scenes_bound(program)
 
         logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令, {len(self._procs)} 个过程) ===")
 
@@ -209,6 +212,22 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             for name, proc_def in imp_program.procs.items():
                 self._procs[name] = proc_def
             logger.debug(f"import: {imp.path} → 注册 {len(imp_program.procs)} 个过程")
+
+    def _validate_scenes_bound(self, program):
+        """解析后静态校验：脚本引用的场景必须已在当前布局绑定坐标
+
+        遍历顶层语句与所有过程体（含 import 引入的），搜集全部静态场景引用；
+        区域/坐标点/方向/面板任一非空即视为已绑定。缺失直接报错不执行。
+        """
+        scenes = collect_scene_keys(program.body, self._procs)
+        missing = [
+            k for k in sorted(scenes)
+            if not (self._layout.get_scene_regions(k) or self._layout.get_scene_points(k)
+                    or self._layout.get_scene_arrows(k) or self._layout.get_scene_panels(k))
+        ]
+        if missing:
+            names = "、".join(get_scene_name(k) for k in missing)
+            raise WorkflowUserError(f"以下场景未绑定坐标: {names}")
 
     def _validate_named_waits(self, program):
         """解析后静态校验：wait 引用的命名等待参数必须已定义

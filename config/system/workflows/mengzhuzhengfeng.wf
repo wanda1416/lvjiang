@@ -1,5 +1,4 @@
 #% name: 盟主争锋
-#% required_scenes: [activity_mengzhu]
 #% parameters:
 #%   - name: execute_times
 #%     label: 执行局数

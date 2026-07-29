@@ -180,10 +180,6 @@ class TuningTab(QWidget):
             return
 
         flow_name = "自动调律"
-        required_scenes = [
-            "game_main_page", "game_menu_page", "bag_equip_detail",
-            "equip_weapon_detail", "equip_armor_detail",
-        ]
 
         def configure(wf_instance, engine):
             wf_instance._selected_slots = selected_slots
@@ -209,7 +205,7 @@ class TuningTab(QWidget):
                 f"[开始] {flow_name} 流程，规则: {rule_names_text}，部位: {selected_slots}")
 
         host.run_workflow_implementation(
-            "auto_tuning", flow_name, required_scenes, configure)
+            "auto_tuning", flow_name, configure)
 
     # ─── 调律配置持久化（插件会话 config/local/yysls/session.json）──
 

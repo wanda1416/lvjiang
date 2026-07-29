@@ -1,5 +1,4 @@
 #% name: 导航至装备页
-#% required_scenes: [game_main_page, game_menu_page, bag_equip_detail]
 
 # 从主界面导航到装备培养页面
 # 路径：主界面 → 菜单 → 包裹 → 培养（如不在装备页则自动切换）

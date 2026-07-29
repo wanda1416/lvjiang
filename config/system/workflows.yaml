@@ -51,14 +51,14 @@ flows:
         default: "1"
         options: ["1", "2", "3", "4", "5", "6"]
 
-  - id: move_forward_test
-    name: 向前移动测试
-    wf_file: move_forward_test.wf
+  - id: auto_purchase_xinde
+    name: 购买武学心得
+    wf_file: auto_purchase_xinde.wf
     required_scenes:
       - game_main_page
 
   - id: activity_jianghu
-    name: 江湖号令刷新
+    name: 江湖号令
     wf_file: activity_jianghu.wf
     required_scenes:
       - activity_jianghu

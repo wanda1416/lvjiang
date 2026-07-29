@@ -1,7 +1,7 @@
 @todo 
 
-scan [xinde_exchange].[count] as $cnt
-if $cnt < 5
+scan [xinde_exchange].[count] as $result
+if $result.count is_empty or $result.count < 5
    log "书票数量不足，结束"
    return
 end

@@ -3,6 +3,7 @@ layout_scenes:
   - game_main_page
   - game_menu_page
   - general_control
+  - game_menu_page_2
   group_2:
   - equip_weapon_detail
   - equip_armor_detail
@@ -18,6 +19,7 @@ layout_scenes:
   - activity_jianghu
   group_6:
   - ui_waiguan_yigui
+  - game_temp_page
 group_names:
   group_1: 通用
   group_2: 调律

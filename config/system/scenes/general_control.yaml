@@ -42,3 +42,13 @@ points:
   type: slot
   is_text: false
   is_clickable: true
+- key: menu_point_1
+  name: 菜单点1
+  type: func
+  is_text: false
+  is_clickable: true
+- key: menu_point_2
+  name: 菜单点2
+  type: func
+  is_text: false
+  is_clickable: true

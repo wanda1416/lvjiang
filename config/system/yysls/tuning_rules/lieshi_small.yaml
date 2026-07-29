@@ -1,6 +1,7 @@
 key: lieshi_small
 name: 裂石小外
 order: 20
+default_rating: excellent
 quality_thresholds:
   佩:
   - gold
@@ -55,59 +56,91 @@ affix_pool:
 - 最小裂石攻击
 - 全武学增效
 - 对首领单位增伤
+- 单体类奇术增伤
+- 对玩家单位增效
 patterns:
   主武器:
     first:
     - 最小外功攻击
-    usable_conditions:
-    - not_contains:
-      - 最小外功攻击
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        max: 0
     top_conditions:
-    - not_contains:
-      - 最小无相攻击
-      - 最大裂石攻击
-      - 最小裂石攻击
-      - 精准率
+    - count_max:
+        symbols:
+        - 最小无相攻击
+        - 最大裂石攻击
+        - 最小裂石攻击
+        - 精准率
+        max: 0
   副武器:
     first:
     - 最小外功攻击
-    usable_conditions:
-    - not_contains:
-      - 最小外功攻击
-    - not_contains:
-      - 敏
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 敏
+        max: 0
     top_conditions:
-    - not_contains:
-      - 最小无相攻击
-      - 最大裂石攻击
-      - 最小裂石攻击
-      - 精准率
+    - count_max:
+        symbols:
+        - 最小无相攻击
+        - 最大裂石攻击
+        - 最小裂石攻击
+        - 精准率
+        max: 0
   环:
     first:
     - 最小外功攻击
     junk_conditions:
-    - not_contains:
-      - 全武学增效
-    usable_conditions:
-    - not_contains:
-      - 最小外功攻击
+    - count_max:
+        symbols:
+        - 全武学增效
+        max: 0
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        max: 0
     top_conditions:
-    - not_contains:
-      - 最小无相攻击
-      - 精准率
+    - count_max:
+        symbols:
+        - 最小无相攻击
+        - 精准率
+        max: 0
   冠胄:
     first:
     - 会心率
     - 精准率
-    usable_conditions:
-    - not_contains:
-      - 最小外功攻击
-    - not_contains:
-      - 敏
-      - 最大无相攻击
+    junk_conditions:
+    - when:
+        keep_pvp: false
+      all:
+      - count_min:
+          symbols:
+          - 单体类奇术增伤
+          min: 1
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 敏
+        - 最大无相攻击
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最小无相攻击
+    - - count_max:
+          symbols:
+          - 最小无相攻击
+          max: 0
       - count_max:
           symbols:
           - 精准率
@@ -118,14 +151,40 @@ patterns:
     - 会心率
     - 精准率
     junk_conditions:
-    - not_contains:
-      - 对首领单位增伤
-    usable_conditions:
-    - not_contains:
-      - 最小外功攻击
+    - when:
+        keep_pvp: false
+      all:
+      - count_max:
+          symbols:
+          - 对首领单位增伤
+          max: 0
+    - when:
+        keep_pvp: false
+      all:
+      - count_min:
+          symbols:
+          - 对玩家单位增效
+          min: 1
+    - when:
+        keep_pvp: true
+      all:
+      - count_max:
+          symbols:
+          - 对首领单位增伤
+          - 对玩家单位增效
+          max: 0
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最小无相攻击
-      - not_contains:
-        - 会心率
-        - 精准率
+    - - count_max:
+          symbols:
+          - 最小无相攻击
+          max: 0
+      - count_max:
+          symbols:
+          - 会心率
+          - 精准率
+          max: 0

@@ -44,21 +44,27 @@ class TestTuningDocWriter:
 
     def test_header(self, writer):
         writer.start_run("小明", ["血河（玩法：长枪·破甲）", "素问"],
-                         ["main_weapon", "head"], keep_pvp=False)
+                         ["main_weapon", "head"],
+                         {"保留PVP装备": False})
         text = _read(writer)
         assert text.startswith("# 调律说明 — ")
         assert "- 操作用户：小明" in text
         assert "- 启用规则：血河（玩法：长枪·破甲）、素问" in text
-        assert "- 保留PVP词条：否" in text
+        assert "- 开关 保留PVP装备：否" in text
         assert "- 调律部位：主武器、冠胄" in text
 
     def test_header_defaults(self, writer):
-        """空规则 → 全部规则；keep_pvp=True → 是；slot 中文映射"""
-        writer.start_run("u", [], ["ring"], keep_pvp=True)
+        """空规则 → 全部规则；开关逐个输出；slot 中文映射"""
+        writer.start_run("u", [], ["ring"], {"保留PVP装备": True})
         text = _read(writer)
         assert "- 启用规则：全部规则（默认配置）" in text
-        assert "- 保留PVP词条：是" in text
+        assert "- 开关 保留PVP装备：是" in text
         assert "- 调律部位：环" in text
+
+    def test_header_no_switches(self, writer):
+        """无开关时不输出开关行"""
+        writer.start_run("u", [], ["ring"], {})
+        assert "- 开关 " not in _read(writer)
 
     def test_equipment_section(self, writer):
         equip = {
@@ -149,5 +155,5 @@ class TestTuningDocWriter:
 
     def test_flush_immediate(self, writer):
         """未 close 即可从磁盘读到已写内容（中断/崩溃不丢）"""
-        writer.start_run("小明", [], ["head"], keep_pvp=False)
+        writer.start_run("小明", [], ["head"], {})
         assert "- 操作用户：小明" in _read(writer)

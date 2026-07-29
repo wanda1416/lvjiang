@@ -1,6 +1,6 @@
 """转律与词条库页（规则顶层）
 
-转律优先级、可用词条库均为「已选词条纯展示 + 编辑
+转律词条库、可用词条库均为「已选词条纯展示 + 编辑
 （AffixSelectSortDialog）」，候选为标准词条全集。选择与排序
 均在对话框内完成。编辑共享 raw dict 顶层字段，变更即回调保存。
 """
@@ -83,11 +83,11 @@ class PoolPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # ── 转律优先级 ──
-        prio_box = QGroupBox("转律优先级（从高到低）")
+        # ── 转律词条库 ──
+        prio_box = QGroupBox("转律词条库（全局，优先级从高到低）")
         prio_layout = QVBoxLayout(prio_box)
         self._prio_list = _AffixListBox(
-            self._candidates, self._apply, "转律优先级")
+            self._candidates, self._apply, "转律词条库")
         prio_layout.addWidget(self._prio_list)
         layout.addWidget(prio_box)
 

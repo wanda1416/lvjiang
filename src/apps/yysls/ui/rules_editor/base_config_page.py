@@ -1,15 +1,14 @@
 """基础配置页（全局 tuning_base.yaml）
 
-编辑品阶门槛（quality_thresholds）与 PVP 词条等价（pvp.names /
-pvp.substitutions）。沿用「变更即校验即保存」模式：控件变更即重建
-raw dict → 校验 → 通过才写盘并 reload，失败时状态栏红字提示。
+编辑品阶门槛（quality_thresholds）与开关注册表（switches）。
+沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
+通过才写盘并 reload，失败时状态栏红字提示。
 
 - 品阶门槛表：固定 7 个标准部位（QUALITY_PARTS，锁死不可增删）×
   gold/purple/blue 勾选；规则级可在规则设置页按部位覆盖；
-- PVP 词条集合：命中即标记保留的词条（候选来自标准词条全集）；
-- PVP 部位替换：<部位> 的 源词条 → 目标词条（仅当源词条不在规则词条库
-  时生效）；
-- PVP 部位并库：<部位> 临时并入词条库的词条。
+- 开关设定表：开关 key → 显示名；规则条件组 when 引用的开关
+  禁止删除（保存时由管理器校验拦截）；
+- 装备评级：四档判定机制的只读说明（置底宽敞展示）。
 """
 
 from __future__ import annotations
@@ -24,11 +23,9 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from src.apps.yysls.game_config import get_game_config
 from src.apps.yysls.evaluator.tuning_rules import (
-    PART_KEYS, QUALITY_PARTS, TuningBaseManager,
+    QUALITY_PARTS, TuningBaseManager,
 )
-from src.ui.widgets import NoWheelComboBox
 
 _QUALITIES = ("gold", "purple", "blue")
 
@@ -42,7 +39,6 @@ class BaseConfigPage(QWidget):
         self._manager = manager
         self._status_cb = status_cb
         self._data = manager.get_raw()
-        self._affixes = get_game_config().get_normal_affix_names()
         self._loading = True
         self._init_ui()
         self._load()
@@ -64,37 +60,31 @@ class BaseConfigPage(QWidget):
             self._q_table.setColumnWidth(col, width)
         layout.addWidget(self._q_table)
 
-        # PVP 词条集合
+        # 开关设定
         layout.addWidget(QLabel(
-            "<b>PVP 词条集合</b>（keep_pvp 开启时命中即标记保留）"))
-        self._names_table = QTableWidget(0, 1)
-        self._names_table.setHorizontalHeaderLabels(["词条"])
-        self._names_table.setColumnWidth(0, 200)
-        layout.addWidget(self._names_table)
+            "<b>开关设定</b>（开关 key → 显示名；规则条件组 when 引用的"
+            "开关禁止删除）"))
+        self._sw_table = QTableWidget(0, 2)
+        self._sw_table.setHorizontalHeaderLabels(["开关 key", "名称"])
+        for col, width in enumerate((160, 200)):
+            self._sw_table.setColumnWidth(col, width)
+        self._sw_table.itemChanged.connect(lambda _i: self._apply())
+        layout.addWidget(self._sw_table)
         layout.addLayout(self._table_buttons(
-            self._names_table, self._insert_name_row))
+            self._sw_table, self._insert_switch_row))
 
-        # PVP 部位替换
-        layout.addWidget(QLabel(
-            "<b>PVP 部位替换</b>（源词条不在规则词条库时视作目标词条）"))
-        self._subs_table = QTableWidget(0, 3)
-        self._subs_table.setHorizontalHeaderLabels(["部位", "源词条", "目标词条"])
-        for col, width in enumerate((90, 200, 200)):
-            self._subs_table.setColumnWidth(col, width)
-        layout.addWidget(self._subs_table)
-        layout.addLayout(self._table_buttons(
-            self._subs_table, self._insert_sub_row))
-
-        # PVP 部位并库
-        layout.addWidget(QLabel(
-            "<b>PVP 部位并库</b>（keep_pvp 开启时临时并入该部位词条库）"))
-        self._pool_table = QTableWidget(0, 2)
-        self._pool_table.setHorizontalHeaderLabels(["部位", "词条"])
-        for col, width in enumerate((90, 200)):
-            self._pool_table.setColumnWidth(col, width)
-        layout.addWidget(self._pool_table)
-        layout.addLayout(self._table_buttons(
-            self._pool_table, self._insert_pool_row))
+        # 装备评级（四档判定机制只读说明，置底宽敞展示）
+        rating_label = QLabel(
+            "<b>装备评级</b>（机制说明，不可配置）<br><br>"
+            "• 四档：垃圾 / 一般 / 优秀 / 顶级<br><br>"
+            "• 每档由若干条件组定义：组间 OR、组内 AND，"
+            "条件组可绑定开关前提 when<br><br>"
+            "• 判定顺序：垃圾 → 一般 → 优秀 → 顶级，命中即定档<br><br>"
+            "• 全部未命中时取「默认判定」：部位页可按部位设置，"
+            "未设置则跟随规则设置页")
+        rating_label.setWordWrap(True)
+        rating_label.setContentsMargins(4, 16, 4, 8)
+        layout.addWidget(rating_label)
         layout.addStretch()
 
     def _table_buttons(self, table: QTableWidget, insert) -> QHBoxLayout:
@@ -117,23 +107,6 @@ class BaseConfigPage(QWidget):
 
     # ── 行构建 ──
 
-    def _affix_combo(self, value: str = "") -> NoWheelComboBox:
-        combo = NoWheelComboBox()
-        combo.addItem("")
-        combo.addItems(self._affixes)
-        if value and value not in self._affixes:
-            combo.addItem(value)
-        combo.setCurrentText(value)
-        combo.currentTextChanged.connect(lambda _t: self._apply())
-        return combo
-
-    def _part_combo(self, value: str = "") -> NoWheelComboBox:
-        combo = NoWheelComboBox()
-        combo.addItems(list(PART_KEYS))
-        combo.setCurrentText(value or PART_KEYS[0])
-        combo.currentTextChanged.connect(lambda _t: self._apply())
-        return combo
-
     def _insert_quality_row(self, row: int, part: str = "",
                             qualities: set[str] | None = None):
         qualities = qualities or set()
@@ -148,23 +121,13 @@ class BaseConfigPage(QWidget):
             cb.stateChanged.connect(lambda _s: self._apply())
             table.setCellWidget(row, i, cb)
 
-    def _insert_name_row(self, row: int, value: str = ""):
-        self._names_table.insertRow(row)
-        self._names_table.setCellWidget(row, 0, self._affix_combo(value))
-
-    def _insert_sub_row(self, row: int, part: str = "",
-                        src: str = "", dst: str = ""):
-        table = self._subs_table
+    def _insert_switch_row(self, row: int, key: str = "", name: str = ""):
+        table = self._sw_table
+        table.blockSignals(True)
         table.insertRow(row)
-        table.setCellWidget(row, 0, self._part_combo(part))
-        table.setCellWidget(row, 1, self._affix_combo(src))
-        table.setCellWidget(row, 2, self._affix_combo(dst))
-
-    def _insert_pool_row(self, row: int, part: str = "", affix: str = ""):
-        table = self._pool_table
-        table.insertRow(row)
-        table.setCellWidget(row, 0, self._part_combo(part))
-        table.setCellWidget(row, 1, self._affix_combo(affix))
+        table.setItem(row, 0, QTableWidgetItem(key))
+        table.setItem(row, 1, QTableWidgetItem(name))
+        table.blockSignals(False)
 
     # ── 回填 ──
 
@@ -177,32 +140,21 @@ class BaseConfigPage(QWidget):
             self._insert_quality_row(
                 self._q_table.rowCount(), part, set(q.get(part) or []))
         self._q_table.blockSignals(False)
+        # 行数锁死 7 行，默认高度直接容纳全部部位，不留滚动
+        vh = self._q_table.verticalHeader()
+        height = (self._q_table.horizontalHeader().sizeHint().height()
+                  + sum(vh.sectionSize(r)
+                        for r in range(self._q_table.rowCount()))
+                  + 2 * self._q_table.frameWidth())
+        self._q_table.setMinimumHeight(height)
 
-        pvp = d.get("pvp") or {}
-        self._names_table.setRowCount(0)
-        for name in (pvp.get("names") or []):
-            self._insert_name_row(self._names_table.rowCount(), str(name))
-
-        subs = pvp.get("substitutions") or {}
-        self._subs_table.setRowCount(0)
-        self._pool_table.setRowCount(0)
-        for part, spec in subs.items():
-            spec = spec or {}
-            for src, dst in spec.items():
-                if src == "add_to_pool":
-                    continue
-                self._insert_sub_row(
-                    self._subs_table.rowCount(), str(part),
-                    str(src), str(dst))
-            for affix in (spec.get("add_to_pool") or []):
-                self._insert_pool_row(
-                    self._pool_table.rowCount(), str(part), str(affix))
+        self._sw_table.setRowCount(0)
+        for key, spec in (d.get("switches") or {}).items():
+            name = spec.get("name") if isinstance(spec, dict) else ""
+            self._insert_switch_row(
+                self._sw_table.rowCount(), str(key), str(name or ""))
 
     # ── 收集 → 校验 → 写盘 → reload ──
-
-    def _combo_text(self, table: QTableWidget, row: int, col: int) -> str:
-        widget = table.cellWidget(row, col)
-        return widget.currentText().strip() if widget else ""
 
     def _build(self) -> dict:
         # 品阶门槛（固定行，部位列只读）
@@ -219,33 +171,19 @@ class BaseConfigPage(QWidget):
                     chosen.append(q)
             quality[part] = chosen
 
-        names = []
-        for r in range(self._names_table.rowCount()):
-            name = self._combo_text(self._names_table, r, 0)
-            if name and name not in names:
-                names.append(name)
-
-        substitutions: dict[str, dict] = {}
-        for r in range(self._subs_table.rowCount()):
-            part = self._combo_text(self._subs_table, r, 0)
-            src = self._combo_text(self._subs_table, r, 1)
-            dst = self._combo_text(self._subs_table, r, 2)
-            if not (part and src and dst):
-                continue
-            substitutions.setdefault(part, {})[src] = dst
-        for r in range(self._pool_table.rowCount()):
-            part = self._combo_text(self._pool_table, r, 0)
-            affix = self._combo_text(self._pool_table, r, 1)
-            if not (part and affix):
-                continue
-            spec = substitutions.setdefault(part, {})
-            spec.setdefault("add_to_pool", [])
-            if affix not in spec["add_to_pool"]:
-                spec["add_to_pool"].append(affix)
+        switches: dict[str, dict] = {}
+        for r in range(self._sw_table.rowCount()):
+            key_item = self._sw_table.item(r, 0)
+            name_item = self._sw_table.item(r, 1)
+            key = key_item.text().strip() if key_item else ""
+            name = name_item.text().strip() if name_item else ""
+            if not (key or name):
+                continue  # 全空行忽略（新增未填）
+            switches[key] = {"name": name}
 
         return {
             "quality_thresholds": quality,
-            "pvp": {"names": names, "substitutions": substitutions},
+            "switches": switches,
         }
 
     def _apply(self):

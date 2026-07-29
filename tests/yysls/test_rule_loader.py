@@ -1,9 +1,11 @@
 """调律规则加载器测试
 
 覆盖 TuningRuleManager 的加载/排序/校验拒绝/保存与 get_raw 深拷贝、
-create_rule/delete_rule、playstyles 节（含 attr）与三档条件组语法解析，
-以及规则内词条名与标准词条全集（attributes.yaml 普通词组
-_aliases）的一致性守护。
+create_rule/delete_rule、playstyles 节（含 attr）、4 条件原语与
+条件组三种形态（单键 dict / list=AND / when+all 开关组）解析、
+default_rating、tuning_base 开关注册表（switches），以及规则内
+词条名与标准词条全集（attributes.yaml 普通词组 _aliases）的
+一致性守护。
 """
 
 from pathlib import Path
@@ -13,7 +15,7 @@ import yaml
 
 from src.apps.yysls.evaluator import get_tuning_rules
 from src.apps.yysls.evaluator.tuning_rules import (
-    PVP_NAMES, QUALITY_PARTS, RuleValidationError, TuningRuleManager,
+    QUALITY_PARTS, RuleValidationError, TuningRuleManager,
     attr_equivalence, get_tuning_base, get_tuning_rule_manager,
     parse_tuning_base, parse_tuning_rule, standard_affix_names,
     standard_playstyle_attrs,
@@ -36,10 +38,12 @@ def minimal_rule(**overrides) -> dict:
         "patterns": {
             "环": {
                 "first": ["最大外功攻击"],
-                "junk_conditions": [{"not_contains": ["劲"]}],
+                "junk_conditions": [
+                    {"count_max": {"symbols": ["劲"], "max": 0}}],
                 "top_conditions": [
                     [{"contains_all": ["劲"]},
-                     {"not_contains": ["最大外功攻击"]}],
+                     {"count_max": {"symbols": ["最大外功攻击"],
+                                    "max": 0}}],
                 ],
             },
         },
@@ -107,6 +111,12 @@ class TestBuiltinRules:
                 expected = raw[name].get("attr") or "通用"
                 assert ps.attr == expected, (key, name)
 
+    def test_when_references_registered_switches(self):
+        # 内置规则条件组 when 引用的开关全部已在注册表登记
+        registered = set(get_tuning_base().switches)
+        for key, rule in get_tuning_rules().items():
+            assert rule.referenced_switches() <= registered, key
+
 
 # ─── schema 校验拒绝 ───────────────────────────────────────
 
@@ -133,10 +143,77 @@ class TestValidation:
         mgr = TuningRuleManager(rules_dir=tmp_path)
         pattern = mgr.get_rule("t1").patterns["环"]
         assert len(pattern.junk_conditions) == 1
-        assert len(pattern.junk_conditions[0]) == 1  # 单条件组
+        assert len(pattern.junk_conditions[0].conditions) == 1  # 单条件组
+        assert pattern.junk_conditions[0].when == {}  # 无前提 = 恒生效
         assert len(pattern.top_conditions) == 1
-        assert len(pattern.top_conditions[0]) == 2   # 组内 AND
-        assert pattern.usable_conditions == []
+        assert len(pattern.top_conditions[0].conditions) == 2   # 组内 AND
+        assert pattern.normal_conditions == []
+        assert pattern.excellent_conditions == []
+
+    def test_when_group_syntax(self):
+        """{when: {...}, all: [...]} = 带开关前提的条件组"""
+        data = minimal_rule()
+        data["patterns"]["环"]["junk_conditions"] = [
+            {"when": {"keep_pvp": False},
+             "all": [{"contains_all": ["劲"]}]},
+        ]
+        rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
+        group = rule.patterns["环"].junk_conditions[0]
+        assert group.when == {"keep_pvp": False}
+        assert len(group.conditions) == 1
+        assert group.conditions[0].kind == "contains_all"
+        # active：when 全匹配才参与，未配置的开关视作 False
+        assert group.active({}) is True
+        assert group.active({"keep_pvp": False}) is True
+        assert group.active({"keep_pvp": True}) is False
+
+    def test_when_unknown_switch(self):
+        """when 引用未注册开关：传 switch_keys 时报错，None 跳过校验"""
+        data = minimal_rule()
+        data["patterns"]["环"]["junk_conditions"] = [
+            {"when": {"nonexistent": True},
+             "all": [{"contains_all": ["劲"]}]},
+        ]
+        parse_tuning_rule(data)  # 离线解析不校验
+        with pytest.raises(RuleValidationError, match="未注册"):
+            parse_tuning_rule(data, switch_keys={"keep_pvp"})
+
+    def test_include_first_all_kinds(self):
+        """include_first 全原语可用：集合式原语的 dict 形态"""
+        data = minimal_rule()
+        data["patterns"]["环"]["excellent_conditions"] = [
+            [{"contains_all": {"symbols": ["劲"], "include_first": True}},
+             {"count_min": {"symbols": ["劲"], "min": 1,
+                            "include_first": True}}],
+        ]
+        rule = parse_tuning_rule(data)
+        conds = rule.patterns["环"].excellent_conditions[0].conditions
+        assert conds[0].kind == "contains_all"
+        assert conds[0].include_first is True
+        assert conds[1].kind == "count_min" and conds[1].min == 1
+        assert conds[1].include_first is True
+
+    def test_not_together_three_symbols_valid(self):
+        """not_together 放开为 ≥2 词条"""
+        data = minimal_rule()
+        data["patterns"]["环"]["top_conditions"] = [
+            {"not_together": ["最大外功攻击", "劲", "剑武学增伤"]}]
+        rule = parse_tuning_rule(data)
+        cond = rule.patterns["环"].top_conditions[0].conditions[0]
+        assert cond.kind == "not_together" and len(cond.symbols) == 3
+
+    def test_default_rating_parsed(self):
+        assert parse_tuning_rule(minimal_rule()).default_rating == "excellent"
+        rule = parse_tuning_rule(minimal_rule(default_rating="junk"))
+        assert rule.default_rating == "junk"
+
+    def test_pattern_default_rating_parsed(self):
+        """部位级默认判定：缺省 None（跟随规则级），可覆盖为四档之一"""
+        assert parse_tuning_rule(
+            minimal_rule()).patterns["环"].default_rating is None
+        data = minimal_rule()
+        data["patterns"]["环"]["default_rating"] = "top"
+        assert parse_tuning_rule(data).patterns["环"].default_rating == "top"
 
     @pytest.mark.parametrize("mutate", [
         # 缺少必填字段 key/name
@@ -145,20 +222,48 @@ class TestValidation:
         lambda d: d.update(variants={"default": {}}),
         lambda d: d.update(sub_schools={"lieshi": {"name": "裂石"}}),
         lambda d: d.update(optional_pool=["劲"]),
-        lambda d: d.update(junk_rules=[{"not_contains": ["劲"]}]),
+        lambda d: d.update(junk_rules=[]),
         lambda d: d.update(has_keep_pvp=True),
+        # default_rating 非四档枚举
+        lambda d: d.update(default_rating="great"),
+        # 部位级 default_rating 非四档枚举
+        lambda d: d["patterns"]["环"].update(default_rating="great"),
         # affix_pool 词条不在标准词条全集
         lambda d: d["affix_pool"].append("大外"),
         # first 不能为空
         lambda d: d["patterns"]["环"].update(first=[]),
-        # not_together 须恰好 2 个词条
+        # not_contains 已废弃（改用 count_max max=0）
         lambda d: d["patterns"]["环"].update(
-            top_conditions=[{"not_together": ["最大外功攻击", "劲", "敏"]}]),
+            junk_conditions=[{"not_contains": ["劲"]}]),
+        # usable_conditions 已废弃（改用 normal_conditions）
+        lambda d: d["patterns"]["环"].update(
+            usable_conditions=[{"contains_all": ["劲"]}]),
+        # not_together 须至少 2 个词条
+        lambda d: d["patterns"]["环"].update(
+            top_conditions=[{"not_together": ["劲"]}]),
         # 未知条件原语
         lambda d: d["patterns"]["环"].update(
             top_conditions=[{"unknown_kind": ["最大外功攻击"]}]),
+        # 计数原语参数必须是 dict
+        lambda d: d["patterns"]["环"].update(
+            top_conditions=[{"count_max": ["劲"]}]),
+        # 条件词条列表不能为空
+        lambda d: d["patterns"]["环"].update(
+            top_conditions=[{"contains_all": []}]),
         # 条件组必须是 dict 或 dict 列表
         lambda d: d["patterns"]["环"].update(junk_conditions=["oops"]),
+        # when 开关 key 格式非法
+        lambda d: d["patterns"]["环"].update(junk_conditions=[
+            {"when": {"Bad-Key": True},
+             "all": [{"contains_all": ["劲"]}]}]),
+        # when 期望值必须是 bool
+        lambda d: d["patterns"]["环"].update(junk_conditions=[
+            {"when": {"keep_pvp": "yes"},
+             "all": [{"contains_all": ["劲"]}]}]),
+        # 开关条件组只允许 when/all 键
+        lambda d: d["patterns"]["环"].update(junk_conditions=[
+            {"when": {"keep_pvp": True},
+             "all": [{"contains_all": ["劲"]}], "extra": 1}]),
         # 未知部位 key
         lambda d: d["patterns"].update(
             鞋子={"first": ["最大外功攻击"]}),
@@ -317,16 +422,14 @@ class TestStandardAffixNames:
             for pattern in rule.patterns.values():
                 used.update(pattern.first)
                 for tier in (pattern.junk_conditions,
-                             pattern.usable_conditions,
+                             pattern.normal_conditions,
+                             pattern.excellent_conditions,
                              pattern.top_conditions):
                     for group in tier:
-                        for cond in group:
+                        for cond in group.conditions:
                             used.update(cond.symbols)
             unknown = used - standard
             assert not unknown, f"{rule.key} 存在非标准词条名: {unknown}"
-
-    def test_pvp_names_are_standard(self):
-        assert PVP_NAMES <= set(standard_affix_names())
 
 
 # ─── 属攻→无相等价 ───────────────────────────────
@@ -359,13 +462,7 @@ def _valid_base() -> dict:
     thresholds["冠胄"] = ["gold", "purple"]
     return {
         "quality_thresholds": thresholds,
-        "pvp": {
-            "names": ["单体类奇术增伤", "对玩家单位增效"],
-            "substitutions": {
-                "胫甲": {"对玩家单位增效": "对首领单位增伤"},
-                "冠胄": {"add_to_pool": ["单体类奇术增伤"]},
-            },
-        },
+        "switches": {"keep_pvp": {"name": "保留PVP装备"}},
     }
 
 
@@ -374,7 +471,8 @@ class TestTuningBase:
         base = get_tuning_base()
         # 品阶门槛锁死为固定 7 个标准部位
         assert list(base.quality_thresholds) == list(QUALITY_PARTS)
-        assert base.pvp_names  # 非空
+        # 开关注册表含 keep_pvp（保留PVP装备）
+        assert base.switches.get("keep_pvp")
 
     def test_quality_ok_by_part(self):
         base = parse_tuning_base(_valid_base())
@@ -392,11 +490,14 @@ class TestTuningBase:
         assert base.quality_ok("环", "gold", overrides) is True
         assert base.quality_ok("环", "purple", overrides) is False
 
-    def test_pvp_part_rule_parsed(self):
+    def test_switches_parsed(self):
         base = parse_tuning_base(_valid_base())
-        assert base.pvp_parts["胫甲"].substitutions == {
-            "对玩家单位增效": "对首领单位增伤"}
-        assert base.pvp_parts["冠胄"].add_to_pool == ["单体类奇术增伤"]
+        assert base.switches == {"keep_pvp": "保留PVP装备"}
+
+    def test_switches_optional(self):
+        data = _valid_base()
+        data.pop("switches")
+        assert parse_tuning_base(data).switches == {}
 
     def test_missing_part_rejected(self):
         data = _valid_base()
@@ -416,9 +517,22 @@ class TestTuningBase:
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
 
-    def test_unknown_pvp_part_rejected(self):
+    def test_pvp_section_rejected(self):
+        # 旧版 pvp 段已废弃，出现即报错提示新写法
         data = _valid_base()
-        data["pvp"]["substitutions"]["鞋子"] = {"add_to_pool": ["劲"]}
+        data["pvp"] = {"names": ["单体类奇术增伤"]}
+        with pytest.raises(RuleValidationError, match="switches"):
+            parse_tuning_base(data)
+
+    @pytest.mark.parametrize("switches", [
+        {"BadKey": {"name": "非法大写"}},
+        {"1abc": {"name": "数字开头"}},
+        {"keep_pvp": {"name": ""}},      # name 不能为空
+        {"keep_pvp": "保留PVP装备"},      # spec 必须是 dict
+    ])
+    def test_bad_switches_rejected(self, switches):
+        data = _valid_base()
+        data["switches"] = switches
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
 

@@ -34,17 +34,18 @@ class TuningRuleManager:
         self.reload()
 
     def reload(self) -> None:
-        """重新加载目录下全部规则文件"""
+        """重新加载目录下全部规则文件（含 when 开关引用校验）"""
         self._rules.clear()
         self._raw.clear()
         self._paths.clear()
         self._errors.clear()
+        switch_keys = self._switch_keys()
         loaded: list[TuningRule] = []
         for path in sorted(self._dir.glob("*.yaml")):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                rule = parse_tuning_rule(data)
+                rule = parse_tuning_rule(data, switch_keys)
             except Exception as e:
                 logger.error(f"调律规则 {path.name} 加载失败，已跳过: {e}")
                 self._errors[path.stem] = str(e)
@@ -57,6 +58,15 @@ class TuningRuleManager:
             self._paths[rule.key] = path
         for rule in sorted(loaded, key=lambda r: (r.order, r.key)):
             self._rules[rule.key] = rule
+
+    @staticmethod
+    def _switch_keys() -> set[str] | None:
+        """已注册开关 key 全集（tuning_base 加载失败时 None = 跳过校验）"""
+        try:
+            return set(get_tuning_base().switches)
+        except Exception as e:
+            logger.error(f"tuning_base 加载失败，跳过 when 开关校验: {e}")
+            return None
 
     # ── 查询 ──
 
@@ -81,14 +91,14 @@ class TuningRuleManager:
     def validate(self, data: dict) -> str | None:
         """校验原始 dict；返回错误文案（None 表示通过）"""
         try:
-            parse_tuning_rule(data)
+            parse_tuning_rule(data, self._switch_keys())
             return None
         except RuleValidationError as e:
             return str(e)
 
     def save_rule(self, key: str, data: dict) -> None:
         """校验并写盘（校验失败抛 RuleValidationError），然后 reload"""
-        parse_tuning_rule(data)  # 先校验
+        parse_tuning_rule(data, self._switch_keys())  # 先校验
         path = self._paths.get(key) or (self._dir / f"{key}.yaml")
         self._dir.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
@@ -118,6 +128,7 @@ class TuningRuleManager:
             "transmute_priority": [],
             "affix_pool": [],
             "patterns": {},
+            "default_rating": "excellent",
         }
         parse_tuning_rule(data)  # 骨架自校验
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -218,12 +229,24 @@ class TuningBaseManager:
             return str(e)
 
     def save(self, data: dict) -> None:
-        """校验并写盘（校验失败抛 RuleValidationError），然后 reload"""
-        parse_tuning_base(data)
+        """校验并写盘（校验失败抛 RuleValidationError），然后 reload
+
+        被规则条件组 when 引用的开关禁止删除。
+        """
+        base = parse_tuning_base(data)
+        referenced: set[str] = set()
+        for rule in get_tuning_rule_manager().get_rules().values():
+            referenced |= rule.referenced_switches()
+        removed = sorted(referenced - set(base.switches))
+        if removed:
+            raise RuleValidationError(
+                f"开关仍被规则条件组引用，禁止删除: {removed}")
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
         self.reload()
+        # 开关集变更后重新校验全部规则的 when 引用
+        get_tuning_rule_manager().reload()
 
 
 _tuning_base_manager: TuningBaseManager | None = None
@@ -238,5 +261,5 @@ def get_tuning_base_manager() -> TuningBaseManager:
 
 
 def get_tuning_base() -> TuningBase:
-    """获取全局基础配置（品阶门槛 + PVP 等价）"""
+    """获取全局基础配置（品阶门槛 + 开关注册表）"""
     return get_tuning_base_manager().get()

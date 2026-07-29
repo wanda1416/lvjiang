@@ -1,6 +1,7 @@
 key: heal_fire
 name: 治疗火拳
 order: 41
+default_rating: excellent
 playstyles:
   火拳:
     main:
@@ -30,49 +31,68 @@ affix_pool:
 - 势
 - 单体类奇术增伤
 - 对首领单位增伤
+- 对玩家单位增效
 patterns:
   主武器:
     first:
     - 最大外功攻击
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 最小外功攻击
-      - 劲
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        - 劲
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最大无相攻击
+    - - count_max:
+          symbols:
+          - 最大无相攻击
+          max: 0
       - not_together:
         - 敏
         - 会心率
   副武器:
     first:
     - 最大外功攻击
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 最小外功攻击
-      - 劲
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        - 劲
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最大无相攻击
+    - - count_max:
+          symbols:
+          - 最大无相攻击
+          max: 0
       - not_together:
         - 敏
         - 会心率
   环:
     first:
     - 最大外功攻击
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-    - not_contains:
-      - 最小外功攻击
-      - 劲
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
+    - count_max:
+        symbols:
+        - 最小外功攻击
+        - 劲
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最大无相攻击
+    - - count_max:
+          symbols:
+          - 最大无相攻击
+          max: 0
       - not_together:
         - 敏
         - 会心率
@@ -80,25 +100,55 @@ patterns:
     first:
     - 会心率
     junk_conditions:
-    - not_contains:
-      - 单体类奇术增伤
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
+    - count_max:
+        symbols:
+        - 单体类奇术增伤
+        max: 0
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
     top_conditions:
-    - not_contains:
-      - 最大无相攻击
+    - count_max:
+        symbols:
+        - 最大无相攻击
+        max: 0
   胫甲:
     first:
     - 劲
     junk_conditions:
-    - not_contains:
-      - 对首领单位增伤
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
+    - when:
+        keep_pvp: false
+      all:
+      - count_max:
+          symbols:
+          - 对首领单位增伤
+          max: 0
+    - when:
+        keep_pvp: false
+      all:
+      - count_min:
+          symbols:
+          - 对玩家单位增效
+          min: 1
+    - when:
+        keep_pvp: true
+      all:
+      - count_max:
+          symbols:
+          - 对首领单位增伤
+          - 对玩家单位增效
+          max: 0
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        max: 0
     top_conditions:
-    - not_contains:
-      - 最大无相攻击
-      - 会心率
-      - 精准率
+    - count_max:
+        symbols:
+        - 最大无相攻击
+        - 会心率
+        - 精准率
+        max: 0

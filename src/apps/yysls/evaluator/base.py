@@ -17,7 +17,7 @@ class Rating(Enum):
     """装备评级（穷举匹配制四档）"""
     TOP = "顶级"
     EXCELLENT = "优秀"
-    USABLE = "能用"
+    NORMAL = "一般"
     JUNK = "垃圾"
 
 
@@ -37,13 +37,11 @@ class JudgeResult:
     skipped=True 表示品阶/首词条不符，无调律价值（直接跳过，不参与评级）。
     not_applicable=True 表示该规则不覆盖此部位，无法给出结论
     （不是否决票，多规则 or 判定时应忽略该结果）。
-    is_pvp=True 表示装备因 PVP 词条（单体奇术增伤/对玩家增效）被保留。
     """
     equipment: EquipmentData
     rating: Rating = Rating.JUNK
     skipped: bool = False
     not_applicable: bool = False
-    is_pvp: bool = False
     reasons: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -57,8 +55,6 @@ class JudgeResult:
         }
         if self.not_applicable:
             d["not_applicable"] = True
-        if self.is_pvp:
-            d["is_pvp"] = True
         if self.reasons:
             d["reasons"] = self.reasons
         return d
@@ -79,8 +75,9 @@ class TuningJudge(ABC):
     - implemented: 判定逻辑是否已实现（未实现的规则 judge 抛 NotImplementedError）
     - playstyle_options: 玩法名字 → 摘要（UI 据此生成复选框）
 
-    config 形状：{"playstyles": [...], "keep_pvp": bool}，其中
-    keep_pvp 为全局配置（由调用方注入）。
+    config 形状：{"playstyles": [...], "switches": {开关 key: bool}}，
+    其中 switches 为全局开关状态（由调用方注入，未配置的开关视作
+    False）。
     """
 
     rule_key: str = ""
@@ -90,7 +87,9 @@ class TuningJudge(ABC):
 
     def __init__(self, config: dict | None = None):
         self.config: dict = config or {}
-        self.keep_pvp: bool = bool(self.config.get("keep_pvp", False))
+        self.switches: dict[str, bool] = {
+            str(k): bool(v)
+            for k, v in (self.config.get("switches") or {}).items()}
 
     @abstractmethod
     def judge(self, equip: EquipmentData) -> JudgeResult:

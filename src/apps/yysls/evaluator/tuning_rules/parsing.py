@@ -5,13 +5,13 @@ from __future__ import annotations
 import re
 
 from .models import (
-    COND_KINDS, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS,
-    Condition, PartPattern, Playstyle, PvpPartRule, RuleValidationError,
+    COND_KINDS, GENERIC_ATTR, PART_KEYS, QUALITY_PARTS, RATING_KEYS,
+    Condition, ConditionGroup, PartPattern, Playstyle, RuleValidationError,
     TuningBase, TuningRule, WeaponSide,
     standard_affix_names, standard_playstyle_attrs,
 )
 
-# 规则 key 合法性（作为 YAML 文件名）
+# 规则 key / 开关 key 合法性（作为 YAML 文件名 / when 引用键）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 # 已废弃的旧版 schema 顶层字段（出现即拒绝，提示迁移）
@@ -62,15 +62,30 @@ def _check_names(names: list, vocab: set[str], where: str) -> list[str]:
 
 
 def _parse_condition(raw: dict, vocab: set[str], where: str) -> Condition:
-    """{原语类型: 参数} 单键 dict → Condition"""
+    """{原语类型: 参数} 单键 dict → Condition
+
+    集合式原语（contains_all/not_together）参数为词条 list 或
+    {symbols, include_first}；计数式原语（count_max/count_min）参数为
+    {symbols, max/min, include_first}。
+    """
     if not isinstance(raw, dict) or len(raw) != 1:
         raise RuleValidationError(f"{where}: 条件必须是单键 dict: {raw!r}")
     kind, args = next(iter(raw.items()))
+    if kind == "not_contains":
+        raise RuleValidationError(
+            f"{where}: not_contains 已废弃，请改用 "
+            "count_max（symbols + max: 0）")
     if kind not in COND_KINDS:
         raise RuleValidationError(f"{where}: 未知条件原语 {kind!r}")
-    if kind in ("not_contains", "contains_all", "not_together"):
-        symbols = list(args or [])
-        extra: dict = {}
+    if kind in ("contains_all", "not_together"):
+        if isinstance(args, dict):
+            symbols = list(args.get("symbols") or [])
+            extra: dict = {
+                "include_first": bool(args.get("include_first", False)),
+            }
+        else:
+            symbols = list(args or [])
+            extra = {}
     else:
         if not isinstance(args, dict):
             raise RuleValidationError(f"{where}: {kind} 参数必须是 dict")
@@ -83,24 +98,64 @@ def _parse_condition(raw: dict, vocab: set[str], where: str) -> Condition:
     if not symbols:
         raise RuleValidationError(f"{where}: 条件 {kind} 词条列表为空")
     _check_names(symbols, vocab, where)
-    if kind == "not_together" and len(symbols) != 2:
-        raise RuleValidationError(f"{where}: not_together 须恰好 2 个词条")
+    if kind == "not_together" and len(symbols) < 2:
+        raise RuleValidationError(f"{where}: not_together 须至少 2 个词条")
     return Condition(kind=kind, symbols=symbols, **extra)
 
 
+def _parse_when(raw, where: str) -> dict[str, bool]:
+    """条件组开关前提解析：{开关 key: bool}，key 格式校验
+
+    key 是否已注册由 manager 层在全部规则加载后统一校验。
+    """
+    if not isinstance(raw, dict) or not raw:
+        raise RuleValidationError(f"{where}: when 必须是非空 dict")
+    result: dict[str, bool] = {}
+    for k, v in raw.items():
+        k = str(k).strip()
+        if not _KEY_RE.match(k):
+            raise RuleValidationError(
+                f"{where}: when 开关 key 非法: {k!r}（须为小写字母开头"
+                "的英文/数字/下划线）")
+        if not isinstance(v, bool):
+            raise RuleValidationError(
+                f"{where}: when.{k} 期望值必须是 true/false")
+        result[k] = v
+    return result
+
+
 def _parse_condition_groups(raw: list | None, vocab: set[str],
-                            where: str) -> list[list[Condition]]:
-    """条件组列表解析：单键 dict 视作单条件组，list 为组内 AND"""
-    groups: list[list[Condition]] = []
+                            where: str) -> list[ConditionGroup]:
+    """条件组列表解析（三种形态）
+
+    - 单键条件 dict：视作单条件组；
+    - list：组内 AND；
+    - {when: {...}, all: [...]}：带开关前提的条件组。
+    """
+    groups: list[ConditionGroup] = []
     for i, g_raw in enumerate(raw or []):
-        if isinstance(g_raw, dict):
+        when: dict[str, bool] = {}
+        if isinstance(g_raw, dict) and ("when" in g_raw or "all" in g_raw):
+            extra_keys = set(g_raw) - {"when", "all"}
+            if extra_keys:
+                raise RuleValidationError(
+                    f"{where}[{i}]: 开关条件组只允许 when/all 键，"
+                    f"多余: {sorted(extra_keys)}")
+            if "when" in g_raw:
+                when = _parse_when(g_raw.get("when"), f"{where}[{i}]")
+            g_raw = g_raw.get("all")
+        elif isinstance(g_raw, dict):
             g_raw = [g_raw]
         if not isinstance(g_raw, list) or not g_raw:
             raise RuleValidationError(
-                f"{where}[{i}]: 条件组必须是条件 dict 或条件 dict 列表")
-        groups.append([
-            _parse_condition(c, vocab, f"{where}[{i}][{j}]")
-            for j, c in enumerate(g_raw)])
+                f"{where}[{i}]: 条件组必须是条件 dict、条件 dict 列表或 "
+                "{when, all} 形态")
+        groups.append(ConditionGroup(
+            conditions=[
+                _parse_condition(c, vocab, f"{where}[{i}][{j}]")
+                for j, c in enumerate(g_raw)],
+            when=when,
+        ))
     return groups
 
 
@@ -121,23 +176,43 @@ def _parse_weapon_side(raw, vocab: set[str], where: str) -> WeaponSide:
 def _parse_pattern(raw: dict, vocab: set[str], where: str) -> PartPattern:
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where}: 模式必须是 dict")
+    if "usable_conditions" in raw:
+        raise RuleValidationError(
+            f"{where}: usable_conditions 已废弃，请改用 normal_conditions")
     first = _check_names(raw.get("first"), vocab, f"{where}.first")
     if not first:
         raise RuleValidationError(f"{where}: first 不能为空")
+    # 部位级默认判定覆盖（可选，缺省跟随规则级）
+    default_rating = raw.get("default_rating")
+    if default_rating is not None:
+        default_rating = str(default_rating)
+        if default_rating not in RATING_KEYS:
+            raise RuleValidationError(
+                f"{where}.default_rating 非法: {default_rating!r}（须为 "
+                f"{list(RATING_KEYS)}）")
     return PartPattern(
         first=first,
+        default_rating=default_rating,
         junk_conditions=_parse_condition_groups(
             raw.get("junk_conditions"), vocab, f"{where}.junk_conditions"),
-        usable_conditions=_parse_condition_groups(
-            raw.get("usable_conditions"), vocab,
-            f"{where}.usable_conditions"),
+        normal_conditions=_parse_condition_groups(
+            raw.get("normal_conditions"), vocab,
+            f"{where}.normal_conditions"),
+        excellent_conditions=_parse_condition_groups(
+            raw.get("excellent_conditions"), vocab,
+            f"{where}.excellent_conditions"),
         top_conditions=_parse_condition_groups(
             raw.get("top_conditions"), vocab, f"{where}.top_conditions"),
     )
 
 
-def parse_tuning_rule(data: dict) -> TuningRule:
-    """原始 YAML dict → TuningRule（校验失败抛 RuleValidationError）"""
+def parse_tuning_rule(data: dict,
+                      switch_keys: set[str] | None = None) -> TuningRule:
+    """原始 YAML dict → TuningRule（校验失败抛 RuleValidationError）
+
+    switch_keys 为已注册开关 key 全集（来自 tuning_base.switches），
+    传入时校验全部条件组 when 引用；None 跳过（单测/离线解析）。
+    """
     if not isinstance(data, dict):
         raise RuleValidationError("规则文件顶层必须是 dict")
     key = data.get("key")
@@ -148,7 +223,13 @@ def parse_tuning_rule(data: dict) -> TuningRule:
     if legacy:
         raise RuleValidationError(
             f"旧版 schema 字段不再支持: {legacy}，请迁移到 "
-            "playstyles + 三档条件结构")
+            "playstyles + 四档条件结构")
+
+    default_rating = str(data.get("default_rating", "excellent"))
+    if default_rating not in RATING_KEYS:
+        raise RuleValidationError(
+            f"default_rating 非法: {default_rating!r}（须为 "
+            f"{list(RATING_KEYS)}）")
 
     vocab = set(standard_affix_names())
     if not vocab:
@@ -189,7 +270,7 @@ def parse_tuning_rule(data: dict) -> TuningRule:
             raise RuleValidationError(f"未知部位 key {part!r}")
         patterns[part] = _parse_pattern(p_raw, vocab, f"patterns.{part}")
 
-    return TuningRule(
+    rule = TuningRule(
         key=str(key),
         name=str(name),
         order=int(data.get("order", 100)),
@@ -197,50 +278,51 @@ def parse_tuning_rule(data: dict) -> TuningRule:
         transmute_priority=priority,
         affix_pool=affix_pool,
         patterns=patterns,
+        default_rating=default_rating,
         quality_thresholds=_parse_quality_thresholds(
             data.get("quality_thresholds") or {}, "quality_thresholds"),
     )
+    if switch_keys is not None:
+        unknown = sorted(rule.referenced_switches() - switch_keys)
+        if unknown:
+            raise RuleValidationError(
+                f"when 引用了未注册的开关 key: {unknown}（请先在基础"
+                "配置的开关设定中注册）")
+    return rule
 
 
 def parse_tuning_base(data: dict) -> TuningBase:
     """原始 tuning_base.yaml dict → TuningBase（校验失败抛 RuleValidationError）"""
     if not isinstance(data, dict):
         raise RuleValidationError("tuning_base 顶层必须是 dict")
-    vocab = set(standard_affix_names())
+    if "pvp" in data:
+        raise RuleValidationError(
+            "pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when")
 
     # ── quality_thresholds（固定 7 个标准部位，须列全）──
     quality_thresholds = _parse_quality_thresholds(
         data.get("quality_thresholds") or {}, "quality_thresholds",
         require_all=True)
 
-    # ── pvp ──
-    raw_pvp = data.get("pvp") or {}
-    if not isinstance(raw_pvp, dict):
-        raise RuleValidationError("pvp 必须是 dict")
-    pvp_names = list(raw_pvp.get("names") or [])
-    _check_names(pvp_names, vocab, "pvp.names")
-    pvp_parts: dict[str, PvpPartRule] = {}
-    raw_subs = raw_pvp.get("substitutions") or {}
-    if not isinstance(raw_subs, dict):
-        raise RuleValidationError("pvp.substitutions 必须是 dict")
-    for part, spec in raw_subs.items():
-        if part not in PART_KEYS:
-            raise RuleValidationError(f"pvp.substitutions: 未知部位 {part!r}")
-        spec = spec or {}
-        add_to_pool = list(spec.get("add_to_pool") or [])
-        _check_names(add_to_pool, vocab,
-                     f"pvp.substitutions.{part}.add_to_pool")
-        subs = {str(s): str(d) for s, d in spec.items()
-                if s != "add_to_pool"}
-        _check_names(list(subs.keys()), vocab,
-                     f"pvp.substitutions.{part}源词条")
-        _check_names(list(subs.values()), vocab,
-                     f"pvp.substitutions.{part}目标词条")
-        pvp_parts[part] = PvpPartRule(substitutions=subs,
-                                      add_to_pool=add_to_pool)
+    # ── switches（开关注册表：key → {name}）──
+    raw_switches = data.get("switches") or {}
+    if not isinstance(raw_switches, dict):
+        raise RuleValidationError("switches 必须是 dict")
+    switches: dict[str, str] = {}
+    for k, spec in raw_switches.items():
+        k = str(k).strip()
+        if not _KEY_RE.match(k):
+            raise RuleValidationError(
+                f"switches: 开关 key 非法: {k!r}（须为小写字母开头"
+                "的英文/数字/下划线）")
+        if not isinstance(spec, dict):
+            raise RuleValidationError(f"switches.{k} 必须是 dict（name）")
+        sw_name = str(spec.get("name") or "").strip()
+        if not sw_name:
+            raise RuleValidationError(f"switches.{k}.name 不能为空")
+        switches[k] = sw_name
 
     return TuningBase(
         quality_thresholds=quality_thresholds,
-        pvp_names=set(pvp_names),
-        pvp_parts=pvp_parts,
+        switches=switches,
     )

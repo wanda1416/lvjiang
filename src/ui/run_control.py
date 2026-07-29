@@ -500,6 +500,16 @@ class RunControlMixin:
 
     # ─── 调律工作流执行 ────────────────────────────────────
 
+    @staticmethod
+    def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
+        """开启的开关 key → 注册表显示名（注册表不可用时退回 key）"""
+        try:
+            from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
+            names = get_tuning_base().switches
+        except Exception:
+            names = {}
+        return [names.get(k, k) for k, v in switches.items() if v]
+
     def _on_run_tuning(self):
         """执行自动调律工作流（异步）"""
         if self._running:
@@ -534,8 +544,9 @@ class RunControlMixin:
             return
         rule_judges = []
         rule_map = get_tuning_rules()
-        keep_pvp = (self._get_tuning_keep_pvp()
-                    if hasattr(self, '_get_tuning_keep_pvp') else False)
+        keep = (self._get_tuning_switches()
+                if hasattr(self, '_get_tuning_switches') else {})
+        switches = {str(k): bool(v) for k, v in keep.items()}
         skip_tuning = (self._get_tuning_skip_tuning()
                        if hasattr(self, '_get_tuning_skip_tuning') else False)
         for rule_key, cfg in enabled.items():
@@ -548,7 +559,7 @@ class RunControlMixin:
                 self.log_text.append(f"[错误] 规则「{rule.name}」需至少勾选一个玩法")
                 return
             rule_judges.append(
-                get_tuning_judge(rule_key, {**cfg, "keep_pvp": keep_pvp}))
+                get_tuning_judge(rule_key, {**cfg, "switches": switches}))
         if not rule_judges:
             self.log_text.append("[错误] 选中的规则均未实现判定逻辑")
             return
@@ -619,7 +630,7 @@ class RunControlMixin:
         # 对齐 UI 实时勾选）：供 auto_tuning 的 judge_tuning_worthiness/
         # judge_equipment_potential 使用
         wf_instance._judge_configs = {
-            k: {**cfg, "keep_pvp": keep_pvp} for k, cfg in enabled.items()}
+            k: {**cfg, "switches": switches} for k, cfg in enabled.items()}
         wf_instance._judge_rule_keys = list(enabled)
         # 临时测试开关：跳过实际调律（仅模拟进出调律页，便于测试滚动）
         wf_instance._skip_tuning = skip_tuning
@@ -627,8 +638,9 @@ class RunControlMixin:
         wf_instance._doc_username = username
 
         rule_names_text = "、".join(j.rule_name for j in rule_judges)
-        if keep_pvp:
-            rule_names_text += "（保留PVP）"
+        on_names = self._tuning_switch_names(switches)
+        if on_names:
+            rule_names_text += f"（开关：{'、'.join(on_names)}）"
         if skip_tuning:
             self.log_text.append("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律")
         self.log_text.append(

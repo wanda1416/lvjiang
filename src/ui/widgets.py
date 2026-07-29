@@ -1,10 +1,48 @@
 """可复用 UI 控件"""
 
-from PyQt6.QtCore import QRect, QSize
-from PyQt6.QtGui import QTextCursor
-from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QLayout, QSpinBox, QTextEdit
+from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize
+from PyQt6.QtGui import QTextCursor, QWheelEvent
+from PyQt6.QtWidgets import (
+    QAbstractSpinBox, QApplication, QComboBox, QDoubleSpinBox, QLayout,
+    QSpinBox, QTextEdit,
+)
 
 _MAX_LOG_LINES = 1000
+
+
+class WheelGuard(QObject):
+    """应用级滚轮拦截器：下拉框/数字输入框一律屏蔽滚轮改值
+
+    装到 QApplication 上，全局生效（含未换 NoWheel* 的存量控件
+    与后续新控件）；滚轮事件交回父级滚动区域，页面滚动不受影响。
+    """
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if (event.type() == QEvent.Type.Wheel
+                and isinstance(obj, (QComboBox, QAbstractSpinBox))):
+            # 克隆后沿父链上抛至被接收：页面照常滚动，控件值不变
+            parent = obj.parentWidget()
+            while parent is not None:
+                pos = parent.mapFromGlobal(
+                    event.globalPosition().toPoint())
+                clone = QWheelEvent(
+                    QPointF(pos), event.globalPosition(),
+                    event.pixelDelta(), event.angleDelta(),
+                    event.buttons(), event.modifiers(),
+                    event.phase(), event.inverted())
+                QApplication.sendEvent(parent, clone)
+                if clone.isAccepted():
+                    break
+                parent = parent.parentWidget()
+            return True
+        return super().eventFilter(obj, event)
+
+
+def install_wheel_guard(app) -> WheelGuard:
+    """在 QApplication 上安装全局滚轮拦截器（返回值需持有防回收）"""
+    guard = WheelGuard(app)
+    app.installEventFilter(guard)
+    return guard
 
 
 class NoWheelSpinBox(QSpinBox):

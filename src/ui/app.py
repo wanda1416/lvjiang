@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QApplication
 from loguru import logger
 
 from .main_window import MainWindow
+from .widgets import install_wheel_guard
 
 
 def run_app():
@@ -14,6 +15,8 @@ def run_app():
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    # 全局屏蔽下拉框/数字输入框的滚轮改值（防滑动页面时误改）
+    install_wheel_guard(app)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

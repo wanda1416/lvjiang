@@ -1,14 +1,14 @@
 """调律规则配置公共控件
 
 调律 Tab 与「装备调律验证」面板共用的调律规则配置 UI：
-顶部全局「保留 PVP 装备」复选框 + 每规则一个可勾选分组框
-（勾选标题 = 启用规则），组内按规则声明（playstyle_options）
-生成玩法复选框（名字 + 主副武器摘要）。
+顶部按开关注册表（tuning_base.yaml switches 段）动态渲染的全局
+开关复选框 + 每规则一个可勾选分组框（勾选标题 = 启用规则），
+组内按规则声明（playstyle_options）生成玩法复选框（名字 + 主副武器摘要）。
 
 配置结构与插件会话（config/local/yysls/session.json）tuning 节点一致：
 - rules: {规则 key: {"enabled": bool, "playstyles": [名字]}}
   （playstyles 缺省 = 该规则声明的全部玩法）
-- keep_pvp: 全局布尔，由 get_keep_pvp/set_keep_pvp 单独读写
+- switches: {开关 key: bool}，由 get_switches/set_switches 单独读写
 - skip_tuning: 全局布尔（临时测试开关），由 get_skip_tuning/set_skip_tuning 读写
 """
 from __future__ import annotations
@@ -34,11 +34,15 @@ class TuningConfigWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # ── 全局：保留 PVP 装备 ──
-        self._keep_pvp_cb = QCheckBox("保留 PVP 装备（全局）")
-        self._keep_pvp_cb.stateChanged.connect(
-            lambda _state: self.config_changed.emit())
-        layout.addWidget(self._keep_pvp_cb)
+        # ── 全局开关（按 tuning_base.yaml 开关注册表动态渲染）──
+        from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
+        self._switch_cbs: dict[str, QCheckBox] = {}
+        for switch_key, switch_name in get_tuning_base().switches.items():
+            cb = QCheckBox(f"{switch_name}（全局）")
+            cb.stateChanged.connect(
+                lambda _state: self.config_changed.emit())
+            layout.addWidget(cb)
+            self._switch_cbs[switch_key] = cb
 
         # ── 全局：跳过实际调律（临时测试开关，仅模拟进出调律页）──
         self._skip_tuning_cb = QCheckBox("跳过实际调律（仅进出调律页，测试滚动用）")
@@ -123,15 +127,17 @@ class TuningConfigWidget(QWidget):
                 cb.setChecked(selected is None or name in selected)
                 cb.blockSignals(False)
 
-    def get_keep_pvp(self) -> bool:
-        """全局「保留 PVP 装备」开关"""
-        return self._keep_pvp_cb.isChecked()
+    def get_switches(self) -> dict[str, bool]:
+        """全局开关状态：{开关 key: 是否开启}"""
+        return {key: cb.isChecked() for key, cb in self._switch_cbs.items()}
 
-    def set_keep_pvp(self, value: bool):
-        """回填全局 PVP 开关（不触发 config_changed）"""
-        self._keep_pvp_cb.blockSignals(True)
-        self._keep_pvp_cb.setChecked(bool(value))
-        self._keep_pvp_cb.blockSignals(False)
+    def set_switches(self, switches: dict[str, bool]):
+        """回填全局开关（不触发 config_changed；未配置的开关视为关闭）"""
+        switches = switches or {}
+        for key, cb in self._switch_cbs.items():
+            cb.blockSignals(True)
+            cb.setChecked(bool(switches.get(key, False)))
+            cb.blockSignals(False)
 
     def get_skip_tuning(self) -> bool:
         """全局「跳过实际调律」开关（临时测试用）"""

@@ -1,13 +1,16 @@
 """条件受限构造器与词条选择对话框
 
 ConditionEditor：垂直行式条件列表（行间 AND 语义），每行由
-原语类型下拉 + 词条 tag 区 + 计数参数组成，产出/回填规则 YAML
-的条件原语原始 dict。
+原语类型下拉（4 原语）+ 词条 tag 区 + 计数参数 + 含首词条勾选
+组成，产出/回填规则 YAML 的条件原语原始 dict。
 
-ConditionGroupsEditor：条件组列表（组间 OR、组内 AND），三档
-判定条件（junk/usable/top）共用；单条件组产出单键 dict，
-多条件组产出原语 dict 列表（与 rules._parse_condition_groups 对应）。
-候选词条为标准词条全集，由构造方注入。
+ConditionGroupsEditor：条件组列表（组间 OR、组内 AND，组可绑定
+开关前提 when），四档判定条件（junk/normal/excellent/top）共用；
+无 when 时单条件组产出单键 dict、多条件组产出原语 dict 列表，
+带 when 时产出 {when: {开关key: bool}, all: [...]}
+（与 parsing._parse_condition_groups 三种形态对应）。
+候选词条为标准词条全集，由构造方注入；开关候选来自
+ tuning_base 开关注册表。
 """
 
 from __future__ import annotations
@@ -18,17 +21,16 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from src.ui.widgets import NoWheelSpinBox
+from src.ui.widgets import NoWheelComboBox, NoWheelSpinBox
 
 from .affix_picker import AffixSelectSortDialog
 
-# 原语类型 → 显示名
+# 原语类型 → 显示名（4 原语，include_first 全原语可勾）
 _KIND_NAMES = {
-    "not_contains": "未出现任一",
-    "contains_all": "必须同时出现",
-    "not_together": "不同时出现",
-    "count_max": "计数上限",
-    "count_min": "计数下限",
+    "contains_all": "全部同时出现",
+    "not_together": "没有全部出现",
+    "count_max": "计数小于等于",
+    "count_min": "计数大于等于",
 }
 
 
@@ -56,7 +58,7 @@ class _ConditionRow(QWidget):
         layout.addWidget(self.symbols_btn, 1)
 
         self.count_spin = NoWheelSpinBox()
-        self.count_spin.setRange(1, 5)
+        self.count_spin.setRange(0, 5)
         self.count_spin.valueChanged.connect(self.changed)
         layout.addWidget(self.count_spin)
 
@@ -80,35 +82,40 @@ class _ConditionRow(QWidget):
         self.kind_combo.blockSignals(True)
         self.kind_combo.setCurrentIndex(max(idx, 0))
         self.kind_combo.blockSignals(False)
+        include_first = False
         if kind in ("count_max", "count_min"):
             args = args or {}
             self._symbols = list(args.get("symbols") or [])
+            include_first = bool(args.get("include_first"))
             self.count_spin.blockSignals(True)
             self.count_spin.setValue(
                 int(args.get("max" if kind == "count_max" else "min", 1)))
             self.count_spin.blockSignals(False)
-            self.first_check.blockSignals(True)
-            self.first_check.setChecked(bool(args.get("include_first")))
-            self.first_check.blockSignals(False)
+        elif isinstance(args, dict):
+            # 集合式原语的 dict 形态（symbols + include_first）
+            self._symbols = list(args.get("symbols") or [])
+            include_first = bool(args.get("include_first"))
         else:
             self._symbols = list(args or [])
+        self.first_check.blockSignals(True)
+        self.first_check.setChecked(include_first)
+        self.first_check.blockSignals(False)
         self._update_symbols_text()
         self._update_visibility()
 
     def get_condition(self) -> dict:
         kind = self.kind_combo.currentData()
-        if kind == "count_max":
-            return {"count_max": {
-                "symbols": list(self._symbols),
-                "max": self.count_spin.value(),
-                "include_first": self.first_check.isChecked(),
-            }}
-        if kind == "count_min":
+        if kind in ("count_max", "count_min"):
             args: dict = {"symbols": list(self._symbols),
-                          "min": self.count_spin.value()}
+                          ("max" if kind == "count_max" else "min"):
+                              self.count_spin.value()}
             if self.first_check.isChecked():
                 args["include_first"] = True
-            return {"count_min": args}
+            return {kind: args}
+        # 集合式原语：含首词条时用 dict 形态，否则保持简洁 list
+        if self.first_check.isChecked():
+            return {kind: {"symbols": list(self._symbols),
+                           "include_first": True}}
         return {kind: list(self._symbols)}
 
     # ── 内部 ──
@@ -118,9 +125,9 @@ class _ConditionRow(QWidget):
         self.changed.emit()
 
     def _update_visibility(self):
+        # 计数参数仅计数原语可见；含首词条全原语可勾
         is_count = self.kind_combo.currentData() in ("count_max", "count_min")
         self.count_spin.setVisible(is_count)
-        self.first_check.setVisible(is_count)
 
     def _pick_symbols(self):
         dlg = AffixSelectSortDialog(self._candidates, self._symbols,
@@ -145,7 +152,7 @@ class ConditionEditor(QWidget):
                  parent=None):
         super().__init__(parent)
         self._candidates = candidates
-        self._kinds = ["not_contains", "contains_all", "not_together",
+        self._kinds = ["contains_all", "not_together",
                        "count_max", "count_min"]
         self._rows: list[_ConditionRow] = []
 
@@ -198,15 +205,35 @@ class ConditionEditor(QWidget):
 
 
 class _ConditionGroupBox(QGroupBox):
-    """单条件组：组内条件列表（AND）+ 删除组"""
+    """单条件组：开关前提（when，可空 = 恒生效）+ 组内条件列表（AND）
+    + 删除组"""
 
     changed = pyqtSignal()
     remove_requested = pyqtSignal(object)
 
-    def __init__(self, candidates: list[str], parent=None):
+    def __init__(self, candidates: list[str], switch_keys: list[str],
+                 parent=None):
         super().__init__("条件组（组内全部满足方命中）", parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
+        # 开关前提：绑定开关 key + 期望值，不绑定 = 恒生效
+        when_row = QHBoxLayout()
+        when_row.addWidget(QLabel("开关前提："))
+        self.when_combo = NoWheelComboBox()
+        self.when_combo.addItem("（无，恒生效）", "")
+        for key in switch_keys:
+            self.when_combo.addItem(key, key)
+        self.when_combo.currentIndexChanged.connect(self._on_when_changed)
+        when_row.addWidget(self.when_combo)
+        self.expect_combo = NoWheelComboBox()
+        self.expect_combo.addItem("开启时生效", True)
+        self.expect_combo.addItem("关闭时生效", False)
+        self.expect_combo.currentIndexChanged.connect(
+            lambda _i: self.changed.emit())
+        self.expect_combo.setVisible(False)
+        when_row.addWidget(self.expect_combo)
+        when_row.addStretch()
+        layout.addLayout(when_row)
         self.editor = ConditionEditor(candidates, label=None)
         self.editor.changed.connect(self.changed)
         layout.addWidget(self.editor)
@@ -215,12 +242,42 @@ class _ConditionGroupBox(QGroupBox):
         btn_del.clicked.connect(lambda: self.remove_requested.emit(self))
         layout.addWidget(btn_del, alignment=Qt.AlignmentFlag.AlignRight)
 
+    # ── when 往返（UI 约束单开关绑定，与现有规则形态一致）──
+
+    def set_when(self, raw_when: dict):
+        key, expected = "", True
+        if raw_when:
+            key = str(next(iter(raw_when)))
+            expected = bool(raw_when[key])
+        idx = self.when_combo.findData(key)
+        if idx < 0:  # 注册表缺失的 key 保留展示便于改正
+            self.when_combo.addItem(key, key)
+            idx = self.when_combo.count() - 1
+        self.when_combo.blockSignals(True)
+        self.when_combo.setCurrentIndex(idx)
+        self.when_combo.blockSignals(False)
+        self.expect_combo.blockSignals(True)
+        self.expect_combo.setCurrentIndex(0 if expected else 1)
+        self.expect_combo.blockSignals(False)
+        self.expect_combo.setVisible(bool(key))
+
+    def get_when(self) -> dict:
+        key = self.when_combo.currentData()
+        if not key:
+            return {}
+        return {key: bool(self.expect_combo.currentData())}
+
+    def _on_when_changed(self):
+        self.expect_combo.setVisible(bool(self.when_combo.currentData()))
+        self.changed.emit()
+
 
 class ConditionGroupsEditor(QWidget):
     """条件组列表编辑器（组间 OR、组内 AND，空列表 = 该档不触发）
 
-    与规则 YAML 三档条件语法往返：单键 dict 视作单条件组，
-    list 为组内 AND；产出时单条件组压回单键 dict。
+    与规则 YAML 四档条件语法往返：单键 dict 视作单条件组，
+    list 为组内 AND，{when, all} 为带开关前提组；产出时无 when 的
+    单条件组压回单键 dict、带 when 的组始终产出 {when, all}。
     """
 
     changed = pyqtSignal()
@@ -228,6 +285,12 @@ class ConditionGroupsEditor(QWidget):
     def __init__(self, candidates: list[str], parent=None):
         super().__init__(parent)
         self._candidates = candidates
+        # 开关候选来自注册表（加载失败时退化为无候选，仅影响新绑）
+        try:
+            from src.apps.yysls.evaluator.tuning_rules import get_tuning_base
+            self._switch_keys = list(get_tuning_base().switches)
+        except Exception:  # noqa: BLE001
+            self._switch_keys = []
         self._groups: list[_ConditionGroupBox] = []
 
         layout = QVBoxLayout(self)
@@ -248,10 +311,16 @@ class ConditionGroupsEditor(QWidget):
             grp.deleteLater()
         self._groups.clear()
         for raw in raw_list or []:
-            if isinstance(raw, dict):
+            when: dict = {}
+            if isinstance(raw, dict) and ("when" in raw or "all" in raw):
+                when = dict(raw.get("when") or {})
+                raw = list(raw.get("all") or [])
+            elif isinstance(raw, dict):
                 raw = [raw]
             if isinstance(raw, list):
-                self._append_group().editor.set_conditions(raw)
+                grp = self._append_group()
+                grp.set_when(when)
+                grp.editor.set_conditions(raw)
 
     def get_groups(self) -> list:
         result = []
@@ -259,13 +328,17 @@ class ConditionGroupsEditor(QWidget):
             conds = grp.editor.get_conditions()
             if not conds:
                 continue  # 空组不产出（避免意外的永真/永假组）
-            result.append(conds[0] if len(conds) == 1 else conds)
+            when = grp.get_when()
+            if when:
+                result.append({"when": when, "all": conds})
+            else:
+                result.append(conds[0] if len(conds) == 1 else conds)
         return result
 
     # ── 内部 ──
 
     def _append_group(self) -> _ConditionGroupBox:
-        grp = _ConditionGroupBox(self._candidates)
+        grp = _ConditionGroupBox(self._candidates, self._switch_keys)
         grp.changed.connect(self.changed)
         grp.remove_requested.connect(self._remove_group)
         self._groups.append(grp)

@@ -1,6 +1,7 @@
 key: heal_pure
 name: 治疗纯奶
 order: 40
+default_rating: excellent
 playstyles:
   纯奶:
     main:
@@ -34,20 +35,24 @@ patterns:
     first:
     - 最大外功攻击
     - 最小外功攻击
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-      - 最小外功攻击
-      - 劲
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        - 最小外功攻击
+        - 劲
+        max: 0
     top_conditions:
-    - not_contains:
-      - 会心率
-      - 最大无相攻击
+    - count_max:
+        symbols:
+        - 会心率
+        - 最大无相攻击
+        max: 0
   副武器:
     first:
     - 最大外功攻击
     - 最小外功攻击
-    usable_conditions:
+    normal_conditions:
     - count_max:
         symbols:
         - 最大外功攻击
@@ -55,8 +60,10 @@ patterns:
         - 劲
         max: 1
     top_conditions:
-    - - not_contains:
-        - 最大无相攻击
+    - - count_max:
+          symbols:
+          - 最大无相攻击
+          max: 0
       - not_together:
         - 敏
         - 会心率
@@ -65,23 +72,37 @@ patterns:
     - 最大外功攻击
     - 最小外功攻击
     junk_conditions:
-    - not_contains:
-      - 全武学增效
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-      - 最小外功攻击
-      - 劲
+    - count_max:
+        symbols:
+        - 全武学增效
+        max: 0
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        - 最小外功攻击
+        - 劲
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最大无相攻击
+    - - count_max:
+          symbols:
+          - 最大无相攻击
+          max: 0
       - not_together:
         - 敏
         - 会心率
   冠胄:
     first:
     - 会心率
-    usable_conditions:
+    junk_conditions:
+    - when:
+        keep_pvp: false
+      all:
+      - count_min:
+          symbols:
+          - 单体类奇术增伤
+          min: 1
+    normal_conditions:
     - count_max:
         symbols:
         - 最大外功攻击
@@ -89,22 +110,30 @@ patterns:
         - 劲
         max: 1
     top_conditions:
-    - not_contains:
-      - 最大无相攻击
+    - count_max:
+        symbols:
+        - 最大无相攻击
+        max: 0
   胫甲:
     first:
     - 劲
     junk_conditions:
-    - not_contains:
-      - 对玩家单位增效
-    usable_conditions:
-    - not_contains:
-      - 最大外功攻击
-      - 最小外功攻击
-      - 劲
+    - count_max:
+        symbols:
+        - 对玩家单位增效
+        max: 0
+    normal_conditions:
+    - count_max:
+        symbols:
+        - 最大外功攻击
+        - 最小外功攻击
+        - 劲
+        max: 0
     top_conditions:
-    - - not_contains:
-        - 最大无相攻击
+    - - count_max:
+          symbols:
+          - 最大无相攻击
+          max: 0
       - not_together:
         - 敏
         - 会心率

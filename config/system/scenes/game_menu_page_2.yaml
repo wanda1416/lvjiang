@@ -1,0 +1,43 @@
+key: game_menu_page_2
+name: 菜单二页
+regions:
+- key: social
+  name: 社交
+  type: func
+  is_text: true
+  is_clickable: true
+- key: menpai
+  name: 门派
+  type: func
+  is_text: true
+  is_clickable: true
+- key: yingsheng
+  name: 营生
+  type: func
+  is_text: true
+  is_clickable: true
+- key: shilian
+  name: 试炼
+  type: func
+  is_text: true
+  is_clickable: true
+- key: bowuzhi
+  name: 博物志
+  type: func
+  is_text: true
+  is_clickable: true
+- key: xiyue
+  name: 戏乐
+  type: func
+  is_text: true
+  is_clickable: true
+- key: wanxiangji
+  name: 万象集
+  type: func
+  is_text: true
+  is_clickable: true
+- key: xuanshang
+  name: 悬赏
+  type: func
+  is_text: true
+  is_clickable: true

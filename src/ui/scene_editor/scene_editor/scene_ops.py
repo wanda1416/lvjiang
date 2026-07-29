@@ -62,6 +62,7 @@ class SceneOpsMixin:
         for scene_key in registry.get_group_scenes(group_key):
             scene_name = get_scene_name(scene_key)
             tab = SceneTab(scene_key)
+            tab.on_item_migrated = self._on_item_migrated
             self._tabs[scene_key] = tab
             idx = scene_tab_widget.addTab(tab, scene_name)
             scene_tab_widget.setTabToolTip(idx, scene_key)

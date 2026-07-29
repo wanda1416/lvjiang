@@ -87,6 +87,70 @@ def delete_screenshots(layout_name: str):
         logger.info(f"截图目录已删除: {d}")
 
 
+# ─── 跨场景迁移 ──────────────────────────────────────────
+
+def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key: str) -> bool:
+    """将布局中指定 key 的 region/point/panel 从 source 场景迁移到 target 场景
+
+    kind="point" 时联动处理箭头：
+    - source 中 from_key == key 的箭头随点迁移到 target
+    - source 中 to_key == key 的箭头烘焙为绝对坐标，避免悬空引用
+
+    Returns:
+        是否发生了改动
+    """
+    if kind == "region":
+        src_list = layout.get_scene_regions(source)
+        item = next((r for r in src_list if r.key == key), None)
+        if item is None:
+            return False
+        layout.set_scene_regions(source, [r for r in src_list if r.key != key])
+        # target 已有同 key 的陈旧项先移除
+        dst_list = [r for r in layout.get_scene_regions(target) if r.key != key]
+        dst_list.append(item)
+        layout.set_scene_regions(target, dst_list)
+        return True
+
+    if kind == "point":
+        src_list = layout.get_scene_points(source)
+        item = next((p for p in src_list if p.key == key), None)
+        if item is None:
+            return False
+        layout.set_scene_points(source, [p for p in src_list if p.key != key])
+        dst_list = [p for p in layout.get_scene_points(target) if p.key != key]
+        dst_list.append(item)
+        layout.set_scene_points(target, dst_list)
+        # 箭头联动：from_key 随迁，to_key 烘焙为绝对坐标
+        src_arrows = layout.get_scene_arrows(source)
+        moved = [a for a in src_arrows if a.from_key == key]
+        remain = [a for a in src_arrows if a.from_key != key]
+        for a in remain:
+            if a.to_key == key:
+                a.to_key = None
+                a.to_cx_ratio = item.cx_ratio
+                a.to_cy_ratio = item.cy_ratio
+        layout.set_scene_arrows(source, remain)
+        if moved:
+            moved_keys = {a.key for a in moved}
+            dst_arrows = [a for a in layout.get_scene_arrows(target) if a.key not in moved_keys]
+            dst_arrows.extend(moved)
+            layout.set_scene_arrows(target, dst_arrows)
+        return True
+
+    if kind == "panel":
+        src_list = layout.get_scene_panels(source)
+        item = next((p for p in src_list if p.key == key), None)
+        if item is None:
+            return False
+        layout.set_scene_panels(source, [p for p in src_list if p.key != key])
+        dst_list = [p for p in layout.get_scene_panels(target) if p.key != key]
+        dst_list.append(item)
+        layout.set_scene_panels(target, dst_list)
+        return True
+
+    raise ValueError(f"未知迁移类型: {kind}")
+
+
 # ─── 布局配置管理器 ──────────────────────────────────────
 
 class LayoutConfigManager:
@@ -189,6 +253,24 @@ class LayoutConfigManager:
             self._save_config()
         logger.info(f"布局已删除: {name}")
         return True
+
+    def migrate_item_across_layouts(self, source: str, target: str, kind: str, key: str) -> list[str]:
+        """在所有布局文件中把指定 key 的 region/point/panel 从 source 场景迁到 target 场景
+
+        Returns:
+            实际发生改动并已写盘的布局名称列表
+        """
+        changed = []
+        for name in self.list_layouts():
+            layout = self.load_layout(name)
+            if layout is None:
+                continue
+            if migrate_layout_item(layout, source, target, kind, key):
+                self.save_layout(layout)
+                changed.append(name)
+        if changed:
+            logger.info(f"跨场景迁移 {kind}「{key}」: {source} -> {target}, 更新布局: {changed}")
+        return changed
 
     def check_scenes_valid(self, name: str, scene_keys: list[str]) -> list[str]:
         """检查指定场景是否已绑定区域，返回缺失场景的名称列表"""

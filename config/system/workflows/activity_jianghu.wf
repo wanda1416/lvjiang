@@ -1,5 +1,5 @@
 #% name: 江湖号令刷新
-#% required_scenes: [activity_jianghu, ui_waiguan_yigui, general_control, game_menu_page]
+#% required_scenes: [activity_jianghu, ui_waiguan_yigui, action_control, game_menu_page]
 #% parameters:
 #%   - name: max_refresh
 #%     label: 单任务最大刷新次数
@@ -96,14 +96,14 @@ def action_huanzhuang($label)
    click [ui_waiguan_yigui].[back_1] after wait $step_interval
 end
 
-# 合影拍照：点击任务 → 前往 → 拍照页面（通用控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 通用控制·返回确认
+# 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
 def action_heying($label)
    click [activity_jianghu].$label after wait $step_interval
    click [activity_jianghu].[goto] after wait $step_interval
-   click [general_control].[camera_shot] after wait $step_interval
+   click [action_control].[camera_shot] after wait $step_interval
    click [game_menu_page].[back] after wait $step_interval
    click [game_menu_page].[back] after wait $step_interval
-   click [general_control].[back_confirm] after wait $step_interval
+   click [action_control].[back_confirm] after wait $step_interval
 end
 
 # 情境：动作暂未实现

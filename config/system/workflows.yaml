@@ -63,7 +63,7 @@ flows:
     required_scenes:
       - activity_jianghu
       - ui_waiguan_yigui
-      - general_control
+      - action_control
       - game_menu_page
     parameters:
       - name: max_refresh

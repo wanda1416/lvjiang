@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt
 
 from ....core.scene_registry import get_registry, sync_scene_cache
 from ....core.scene_loader import RegionDef, VALID_REGION_TYPES
+from .scene_select import add_scene_combo_row
 
 
 class RegionPanelMixin:
@@ -17,7 +18,7 @@ class RegionPanelMixin:
 
     依赖主类提供:
         _scene_key, _canvas, _region_table,
-        _btn_del_region, _refresh_lists()
+        _btn_del_region, _refresh_lists(), on_item_migrated
     """
 
     # ─── 面板构建 ────────────────────────────────────────
@@ -117,21 +118,36 @@ class RegionPanelMixin:
                 return
 
     def _on_edit_region_from_table(self, row, col):
-        """双击表格行编辑区域"""
+        """双击表格行编辑区域（场景变更时跨场景迁移）"""
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
         if not scene or row >= len(scene.regions):
             return
         old_def = scene.regions[row]
-        new_def = self._show_region_edit_dialog(old_def)
-        if new_def is None:
+        result = self._show_region_edit_dialog(old_def)
+        if result is None:
             return
+        new_def, target_scene = result
+        if target_scene == self._scene_key:
+            try:
+                registry.update_region_in_scene(self._scene_key, old_def.key, new_def)
+            except ValueError as e:
+                QMessageBox.warning(self, "更新失败", str(e))
+                return
+            sync_scene_cache(self._scene_key)
+            self._refresh_lists()
+            return
+        # 跨场景迁移：先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
         try:
-            registry.update_region_in_scene(self._scene_key, old_def.key, new_def)
+            registry.add_region_to_scene(target_scene, new_def)
         except ValueError as e:
-            QMessageBox.warning(self, "更新失败", str(e))
+            QMessageBox.warning(self, "迁移失败", str(e))
             return
+        registry.remove_region_from_scene(self._scene_key, old_def.key)
         sync_scene_cache(self._scene_key)
+        sync_scene_cache(target_scene)
+        if self.on_item_migrated:
+            self.on_item_migrated("region", new_def.key, self._scene_key, target_scene)
         self._refresh_lists()
 
     def _on_region_table_context_menu(self, pos):
@@ -153,9 +169,10 @@ class RegionPanelMixin:
 
     def _on_new_region(self):
         """创建新区域定义"""
-        region_def = self._show_region_edit_dialog(None)
-        if region_def is None:
+        result = self._show_region_edit_dialog(None)
+        if result is None:
             return
+        region_def, _ = result
         registry = get_registry()
         try:
             registry.add_region_to_scene(self._scene_key, region_def)
@@ -192,8 +209,11 @@ class RegionPanelMixin:
 
     # ─── 编辑弹窗 ────────────────────────────────────────
 
-    def _show_region_edit_dialog(self, region_def: RegionDef | None) -> RegionDef | None:
-        """弹窗编辑区域属性，返回新的 RegionDef 或 None（取消）"""
+    def _show_region_edit_dialog(self, region_def: RegionDef | None) -> tuple[RegionDef, str] | None:
+        """弹窗编辑区域属性，返回 (新 RegionDef, 目标场景 key) 或 None（取消）
+
+        仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
+        """
         dialog = QDialog(self)
         dialog.setWindowTitle("新建区域" if region_def is None else "编辑区域")
         form = QFormLayout(dialog)
@@ -229,6 +249,11 @@ class RegionPanelMixin:
             is_clickable_check.setChecked(region_def.is_clickable)
         form.addRow(is_clickable_check)
 
+        # 仅编辑模式可选择归属场景（跨场景迁移）
+        scene_combo = None
+        if region_def is not None:
+            scene_combo = add_scene_combo_row(form, self._scene_key)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -248,10 +273,13 @@ class RegionPanelMixin:
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
+        target_scene = (
+            scene_combo.currentData() if scene_combo is not None else self._scene_key
+        )
         return RegionDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
             type=type_combo.currentText(),
             is_text=is_text_check.isChecked(),
             is_clickable=is_clickable_check.isChecked(),
-        )
+        ), target_scene

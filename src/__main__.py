@@ -7,10 +7,11 @@
 
 本模块职责：
 1. 锁定 DPI 感知（Windows）
-2. 配置 loguru / logging
-3. 解析命令行参数（-reg）
-4. 按顺序加载插件并注册 hooks
-5. 调用 run_app() 启动 GUI
+2. 配置 loguru / logging（含 logs/ 文件落盘）
+3. 安装崩溃防护（logs/crashes/）
+4. 解析命令行参数（-reg）
+5. 按顺序加载插件并注册 hooks
+6. 调用 run_app() 启动 GUI
 """
 from __future__ import annotations
 
@@ -42,7 +43,24 @@ def _configure_dpi() -> None:
 
 
 def _configure_logging() -> None:
-    """配置基础 logging（后续可接入 loguru / 崩溃处理）。"""
+    """配置 loguru（控制台 + logs/ 落盘），标准库 logging 保底控制台。"""
+    from loguru import logger
+
+    logger.remove()  # 移除默认 handler
+    logger.add(
+        sys.stderr,
+        format="<green>{time:HH:mm:ss}</green> | <level>{level:<7}</level> | {message}",
+        level="DEBUG",
+    )
+    logger.add(
+        "logs/lvjiang_{time:YYYY-MM-DD}.log",
+        rotation="1 day",
+        retention="7 days",
+        encoding="utf-8",
+        level="DEBUG",
+        enqueue=True,  # 异步写入，防止进程崩溃时缓冲丢失
+    )
+    # 少量模块仍用标准库 logging，保底输出到控制台
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -71,6 +89,10 @@ def main() -> int:
 
     args = _parse_args()
     logger = logging.getLogger("src.__main__")
+
+    # 崩溃防护：必须在所有 C 扩展（mss 等）加载之前安装
+    from src.core.crash_handler import install as install_crash_handler
+    install_crash_handler()
 
     # 延迟导入 PyQt6 / 内部模块，确保 logging 先配置好
     from .app import run_app

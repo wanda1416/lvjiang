@@ -1,5 +1,5 @@
-key: lieshi_small
-name: 裂石小外
+key: huixin_small
+name: 会心小外
 order: 20
 default_rating: excellent
 quality_thresholds:
@@ -43,19 +43,16 @@ transmute_priority:
 - 最小外功攻击
 - 敏
 - 最大无相攻击
-- 最大裂石攻击
 - 会心率
 affix_pool:
+- 对首领单位增伤
+- 全武学增效
 - 最小外功攻击
 - 敏
 - 会心率
-- 精准率
 - 最大无相攻击
+- 精准率
 - 最小无相攻击
-- 最大裂石攻击
-- 最小裂石攻击
-- 全武学增效
-- 对首领单位增伤
 - 单体类奇术增伤
 - 对玩家单位增效
 patterns:
@@ -71,8 +68,6 @@ patterns:
     - count_max:
         symbols:
         - 最小无相攻击
-        - 最大裂石攻击
-        - 最小裂石攻击
         - 精准率
         max: 0
   副武器:
@@ -91,8 +86,6 @@ patterns:
     - count_max:
         symbols:
         - 最小无相攻击
-        - 最大裂石攻击
-        - 最小裂石攻击
         - 精准率
         max: 0
   环:

@@ -1,5 +1,5 @@
-key: lieshi_big
-name: 裂石大外
+key: huixin_big
+name: 会心大外
 order: 30
 default_rating: excellent
 playstyles:
@@ -42,19 +42,17 @@ transmute_priority:
 - 会心率
 - 最小外功攻击
 - 最大无相攻击
-- 最大裂石攻击
 affix_pool:
+- 对首领单位增伤
+- 全武学增效
 - 最大外功攻击
 - 劲
 - 敏
 - 会心率
+- 精准率
 - 最小外功攻击
 - 最大无相攻击
-- 最大裂石攻击
 - 势
-- 精准率
-- 全武学增效
-- 对首领单位增伤
 - 单体类奇术增伤
 - 对玩家单位增效
 patterns:
@@ -71,7 +69,6 @@ patterns:
         symbols:
         - 最小外功攻击
         - 最大无相攻击
-        - 最大裂石攻击
         - 会心率
         - 精准率
         - 势
@@ -93,7 +90,6 @@ patterns:
         symbols:
         - 最小外功攻击
         - 最大无相攻击
-        - 最大裂石攻击
         - 精准率
         max: 0
   环:

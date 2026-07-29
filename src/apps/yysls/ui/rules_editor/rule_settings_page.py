@@ -23,7 +23,7 @@ from typing import Callable
 import re
 
 from PyQt6.QtWidgets import (
-    QCheckBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
+    QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
     QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QToolButton,
     QToolTip, QVBoxLayout, QWidget,
 )
@@ -33,7 +33,6 @@ from src.apps.yysls.evaluator.tuning_rules import (
     GENERIC_ATTR, QUALITY_PARTS, RATING_KEYS, RATING_LABELS,
     standard_playstyle_attrs,
 )
-from src.ui.widgets import NoWheelComboBox
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -103,7 +102,7 @@ class RuleSettingsPage(QWidget):
         form.addRow("规则名称：", name_row)
 
         # 默认判定：四档条件全不命中时的兜底档位
-        self._default_rating_combo = NoWheelComboBox()
+        self._default_rating_combo = QComboBox()
         for rating_key in RATING_KEYS:
             self._default_rating_combo.addItem(
                 RATING_LABELS[rating_key], rating_key)
@@ -205,7 +204,7 @@ class RuleSettingsPage(QWidget):
         qualities = qualities or set()
         table = self._quality_table
         table.insertRow(row)
-        combo = NoWheelComboBox()
+        combo = QComboBox()
         combo.addItems(list(QUALITY_PARTS))
         combo.setCurrentText(part or QUALITY_PARTS[0])
         combo.currentTextChanged.connect(lambda _t: self._apply_quality())
@@ -258,10 +257,10 @@ class RuleSettingsPage(QWidget):
 
     def _make_cell_combo(self, col: int, value: str,
                          candidates: list[str] | None = None,
-                         ) -> NoWheelComboBox:
+                         ) -> QComboBox:
         """单元格下拉框：候选来自游戏配置数据源；
         失效旧值保留展示便于改正"""
-        combo = NoWheelComboBox()
+        combo = QComboBox()
         if col == 4:  # 副增伤留空项以占位文案展示（收集时仍写入空）
             combo.addItem(_NO_DAMAGE_LABEL)
         elif col != 5:  # 属性列必选（默认通用），无留空项
@@ -281,13 +280,13 @@ class RuleSettingsPage(QWidget):
             lambda _text: self._on_combo_changed(combo, col))
         return combo
 
-    def _on_combo_changed(self, combo: NoWheelComboBox, col: int):
+    def _on_combo_changed(self, combo: QComboBox, col: int):
         # 武器列变更时先收窄同侧增伤列候选，再统一收集保存
         if col in (1, 3):
             self._sync_damage_candidates(combo, col)
         self._apply_playstyles()
 
-    def _sync_damage_candidates(self, weapon_combo: NoWheelComboBox,
+    def _sync_damage_candidates(self, weapon_combo: QComboBox,
                                 weapon_col: int):
         """重建同侧增伤列候选；现值不在新候选内则重置为留空"""
         row = self._find_widget_row(weapon_combo, weapon_col)

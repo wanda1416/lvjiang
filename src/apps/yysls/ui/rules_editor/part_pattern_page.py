@@ -16,12 +16,11 @@ from typing import Callable
 
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QLabel, QPushButton, QTabWidget, QToolButton, QToolTip,
-    QVBoxLayout, QWidget,
+    QComboBox, QHBoxLayout, QLabel, QPushButton, QTabWidget, QToolButton,
+    QToolTip, QVBoxLayout, QWidget,
 )
 
 from src.apps.yysls.evaluator.tuning_rules import RATING_KEYS, RATING_LABELS
-from src.ui.widgets import NoWheelComboBox
 
 from .affix_picker import AffixSelectSortDialog
 from .condition_editor import ConditionGroupsEditor
@@ -79,7 +78,7 @@ class PartPatternPage(QWidget):
         # ② 默认判定：全档不命中时的兜底档位（空 = 跟随规则设置页）
         rating_row = QHBoxLayout()
         rating_row.addWidget(QLabel("默认判定："))
-        self._rating_combo = NoWheelComboBox()
+        self._rating_combo = QComboBox()
         self._rating_combo.addItem("（跟随规则设置）", "")
         for rating_key in RATING_KEYS:
             self._rating_combo.addItem(RATING_LABELS[rating_key], rating_key)

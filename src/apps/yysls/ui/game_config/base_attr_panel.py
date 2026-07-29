@@ -21,12 +21,11 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QListWidget, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QHeaderView, QLabel,
-    QCheckBox, QComboBox, QFrame, QInputDialog,
+    QCheckBox, QComboBox, QFrame, QInputDialog, QSpinBox,
 )
 from PyQt6.QtCore import Qt
 
 from src.apps.yysls.game_config import BASE_ATTR_PARTS, WUXUE_CATEGORY
-from src.ui.widgets import NoWheelSpinBox
 
 # 配置文件路径
 _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
@@ -62,8 +61,8 @@ class _RangeCell(QWidget):
         layout.setContentsMargins(4, 0, 4, 0)
         layout.setSpacing(2)
 
-        self._min = NoWheelSpinBox()
-        self._max = NoWheelSpinBox()
+        self._min = QSpinBox()
+        self._max = QSpinBox()
         for sb in (self._min, self._max):
             sb.setRange(0, 999999)
             sb.setSpecialValueText(" ")  # 空串会退回显示 0，用空格实现空白

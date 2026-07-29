@@ -8,13 +8,12 @@ Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待�
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QFormLayout, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPushButton, QTabWidget, QToolButton,
-    QToolTip, QVBoxLayout, QWidget,
+    QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGridLayout, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QTabWidget,
+    QToolButton, QToolTip, QVBoxLayout, QWidget,
 )
 
 from ..config import load_user_config, save_input_delay, save_settings
-from .widgets import NoWheelDoubleSpinBox, NoWheelSpinBox
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -42,7 +41,7 @@ class SettingsDialog(QDialog):
         self.setMinimumSize(720, 480)
         self.resize(760, 520)
         self._config = load_user_config()
-        self._range_spins: dict[str, tuple[NoWheelDoubleSpinBox, NoWheelDoubleSpinBox]] = {}
+        self._range_spins: dict[str, tuple[QDoubleSpinBox, QDoubleSpinBox]] = {}
         self._custom_rows: list[dict] = []
         self._setup_ui()
         self._connect_dirty_signals()
@@ -130,14 +129,14 @@ class SettingsDialog(QDialog):
             lo, hi = getattr(delay, name)
             form.addRow(f"{label}:", self._build_range_row(name, lo, hi, tip))
 
-        self._offset_spin = NoWheelSpinBox()
+        self._offset_spin = QSpinBox()
         self._offset_spin.setRange(0, 50)
         self._offset_spin.setValue(delay.click_random_offset)
         self._offset_spin.setFixedWidth(_SPIN_WIDTH)
         form.addRow("坐标随机偏移(px):", self._spin_with_tip(
             self._offset_spin, "点击坐标附加 ±N 像素的随机偏移"))
 
-        self._jitter_spin = NoWheelDoubleSpinBox()
+        self._jitter_spin = QDoubleSpinBox()
         self._jitter_spin.setRange(0.0, 0.49)
         self._jitter_spin.setSingleStep(0.01)
         self._jitter_spin.setDecimals(2)
@@ -215,11 +214,11 @@ class SettingsDialog(QDialog):
         return row
 
     @staticmethod
-    def _make_range_spins(lo: float, hi: float) -> tuple[NoWheelDoubleSpinBox, NoWheelDoubleSpinBox]:
+    def _make_range_spins(lo: float, hi: float) -> tuple[QDoubleSpinBox, QDoubleSpinBox]:
         """创建 min~max 一对输入框：max 下限跟随 min，输入期即阻止 max < min"""
         spins = []
         for value in (lo, hi):
-            spin = NoWheelDoubleSpinBox()
+            spin = QDoubleSpinBox()
             spin.setRange(0.0, 60.0)
             spin.setSingleStep(0.1)
             spin.setDecimals(2)

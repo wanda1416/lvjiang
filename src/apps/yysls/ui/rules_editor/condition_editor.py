@@ -18,10 +18,8 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-    QVBoxLayout, QWidget,
+    QSpinBox, QVBoxLayout, QWidget,
 )
-
-from src.ui.widgets import NoWheelComboBox, NoWheelSpinBox
 
 from .affix_picker import AffixSelectSortDialog
 
@@ -57,7 +55,7 @@ class _ConditionRow(QWidget):
         self.symbols_btn.clicked.connect(self._pick_symbols)
         layout.addWidget(self.symbols_btn, 1)
 
-        self.count_spin = NoWheelSpinBox()
+        self.count_spin = QSpinBox()
         self.count_spin.setRange(0, 5)
         self.count_spin.valueChanged.connect(self.changed)
         layout.addWidget(self.count_spin)
@@ -219,13 +217,13 @@ class _ConditionGroupBox(QGroupBox):
         # 开关前提：绑定开关 key + 期望值，不绑定 = 恒生效
         when_row = QHBoxLayout()
         when_row.addWidget(QLabel("开关前提："))
-        self.when_combo = NoWheelComboBox()
+        self.when_combo = QComboBox()
         self.when_combo.addItem("（无，恒生效）", "")
         for key in switch_keys:
             self.when_combo.addItem(key, key)
         self.when_combo.currentIndexChanged.connect(self._on_when_changed)
         when_row.addWidget(self.when_combo)
-        self.expect_combo = NoWheelComboBox()
+        self.expect_combo = QComboBox()
         self.expect_combo.addItem("开启时生效", True)
         self.expect_combo.addItem("关闭时生效", False)
         self.expect_combo.currentIndexChanged.connect(

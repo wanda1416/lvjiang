@@ -3,8 +3,7 @@
 from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize
 from PyQt6.QtGui import QTextCursor, QWheelEvent
 from PyQt6.QtWidgets import (
-    QAbstractSpinBox, QApplication, QComboBox, QDoubleSpinBox, QLayout,
-    QSpinBox, QTextEdit,
+    QAbstractSpinBox, QApplication, QComboBox, QLayout, QTextEdit,
 )
 
 _MAX_LOG_LINES = 1000
@@ -13,8 +12,8 @@ _MAX_LOG_LINES = 1000
 class WheelGuard(QObject):
     """应用级滚轮拦截器：下拉框/数字输入框一律屏蔽滚轮改值
 
-    装到 QApplication 上，全局生效（含未换 NoWheel* 的存量控件
-    与后续新控件）；滚轮事件交回父级滚动区域，页面滚动不受影响。
+    装到 QApplication 上，全局生效（含后续新增控件，无需逐个
+    定制控件类）；滚轮事件交回父级滚动区域，页面滚动不受影响。
     """
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
@@ -43,27 +42,6 @@ def install_wheel_guard(app) -> WheelGuard:
     guard = WheelGuard(app)
     app.installEventFilter(guard)
     return guard
-
-
-class NoWheelSpinBox(QSpinBox):
-    """禁用滚轮的整数输入框（避免滑动页面时误改数值）"""
-
-    def wheelEvent(self, event):
-        event.ignore()
-
-
-class NoWheelDoubleSpinBox(QDoubleSpinBox):
-    """禁用滚轮的浮点数输入框（避免滑动页面时误改数值）"""
-
-    def wheelEvent(self, event):
-        event.ignore()
-
-
-class NoWheelComboBox(QComboBox):
-    """禁用滚轮的下拉框（避免滑动页面时误改选项）"""
-
-    def wheelEvent(self, event):
-        event.ignore()
 
 
 class TrimmedLogEdit(QTextEdit):

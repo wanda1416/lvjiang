@@ -79,11 +79,10 @@ class LevelRule:
 # ─── equip_type → 配置 key 映射 ─────────────────────────────
 
 _TYPE_TO_KEY = {
-    # 武器类型 → main_weapon（副武器 sub_weapon 默认跟随主武器，
-    # 若独立配置则由贪婪匹配兜底）
-    "陌刀": "main_weapon", "舞绫鼓": "main_weapon", "双刀": "main_weapon",
-    "绳镖": "main_weapon", "横刀": "main_weapon", "手甲": "main_weapon",
-    "剑": "main_weapon", "枪": "main_weapon", "扇": "main_weapon", "伞": "main_weapon",
+    # 武器类型 → weapon
+    "陌刀": "weapon", "舞绫鼓": "weapon", "双刀": "weapon",
+    "绳镖": "weapon", "横刀": "weapon", "手甲": "weapon",
+    "剑": "weapon", "枪": "weapon", "扇": "weapon", "伞": "weapon",
     # 首饰
     "环": "ring",
     "佩": "pendant",
@@ -99,11 +98,15 @@ _KEY_TO_TYPE = {
     "head": "冠胄", "chest": "胸甲", "leg": "胫甲", "wrist": "腕甲",
 }
 
-# 八个装备部位（base_attrs 的全部 key，与 UI 展示顺序一致）
+# 七个装备部位（base_attrs 的全部 key，与 UI 展示顺序一致）
 BASE_ATTR_PARTS = (
-    "main_weapon", "sub_weapon", "ring", "pendant",
+    "weapon", "ring", "pendant",
     "head", "chest", "leg", "wrist",
 )
+
+# 七个装备部位的标准中文名（词条部位候选，与 BASE_ATTR_PARTS 同序，
+# 与 tuning_rules.models.QUALITY_PARTS 对齐）
+EQUIP_PART_NAMES = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
 
 
 # ─── 属性规则管理器 ─────────────────────────────────────────
@@ -139,6 +142,8 @@ class GameConfigManager:
         self._affix_categories: dict[str, list[str]] = {}
         # 词条归属反查：词条名 → 归属名
         self._affix_to_category: dict[str, str] = {}
+        # 词条部位：词条名 → [部位中文名]（顶层 affix_parts，缺省全部位）
+        self._affix_parts: dict[str, list[str]] = {}
         # 武器类型注册表（顶层 weapon_types）
         self._weapon_types: list[str] = []
         # 武器 → 武学增效词条映射（weapon_types 中每项的 wuxue_affix 字段）
@@ -161,6 +166,7 @@ class GameConfigManager:
         self._alias_groups.clear()
         self._affix_categories.clear()
         self._affix_to_category.clear()
+        self._affix_parts.clear()
         self._weapon_types.clear()
         self._weapon_wuxue_affixes.clear()
         self._schools.clear()
@@ -190,6 +196,15 @@ class GameConfigManager:
             self._affix_categories[cat] = names
             for name in names:
                 self._affix_to_category[name] = cat
+
+        # ── affix_parts（顶层；词条名→可出现部位列表，未配置=全部位）──
+        raw_parts = data.get("affix_parts") or {}
+        for name, parts in raw_parts.items():
+            if not isinstance(parts, list):
+                continue
+            valid = [p for p in parts if p in EQUIP_PART_NAMES]
+            if valid:
+                self._affix_parts[str(name)] = valid
 
         # ── base_attrs ──
         # _follow: <目标部位> 声明该部位跟随目标部位的数值（单层解析）
@@ -296,6 +311,10 @@ class GameConfigManager:
     def get_affix_category(self, affix_name: str) -> str:
         """词条名 → 归属名（无归属返回空串）"""
         return self._affix_to_category.get(affix_name, "")
+
+    def get_affix_parts(self, affix_name: str) -> list[str]:
+        """词条可出现的装备部位（未配置 = 全部七个部位）"""
+        return list(self._affix_parts.get(affix_name) or EQUIP_PART_NAMES)
 
     # ── 词库类型 ────────────────────────────────────────
 

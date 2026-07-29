@@ -129,6 +129,8 @@ class TestPanelRoundtrip:
                                 lambda t, e: statuses.append((t, e)))
         qtbot.addWidget(panel)
         page = panel._common_page
+        for editor in page._tier_editors.values():
+            editor.set_groups([])
         page._apply()
         assert statuses and not statuses[-1][1], statuses[-1][0]
         assert "common_conditions" not in tmp_manager.get_raw("huiyi_general")

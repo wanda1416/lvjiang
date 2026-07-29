@@ -12,8 +12,10 @@ import yaml
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox
 
+from src.apps.yysls.game_config import EQUIP_PART_NAMES
 from src.apps.yysls.ui.game_config import GameConfigDialog
 from src.apps.yysls.ui.game_config import affix_caps_panel, base_attr_panel, school_panel
+from src.apps.yysls.ui.game_config.affix_caps_panel import AffixCapsPanel
 from src.apps.yysls.ui.game_config.base_attr_panel import BaseAttrPanel
 from src.apps.yysls.ui.game_config.school_panel import SchoolPanel
 
@@ -54,14 +56,14 @@ class TestDialog:
 # ─── 武器类型增删往返 ──────────────────────────────────────
 
 class TestWeaponTypes:
-    def test_weapon_frame_only_on_main_weapon(self, qtbot, tmp_attrs):
+    def test_weapon_frame_only_on_weapon_part(self, qtbot, tmp_attrs):
         panel = BaseAttrPanel()
         qtbot.addWidget(panel)
-        # 默认选中首行 main_weapon
+        # 默认选中首行 weapon
         assert not panel._weapon_frame.isHidden()
         assert panel._weapon_list.count() == 10
         # 切到环：武器类型区块隐藏
-        panel._part_list.setCurrentRow(2)
+        panel._part_list.setCurrentRow(1)
         assert panel._weapon_frame.isHidden()
 
     def test_add_and_delete_roundtrip(self, qtbot, tmp_attrs, monkeypatch):
@@ -105,6 +107,49 @@ class TestWeaponTypes:
         assert warnings and "鸣金·虹" in warnings[0]
         weapon_names = [t["name"] for t in _load_yaml(tmp_attrs)["weapon_types"]]
         assert "剑" in weapon_names
+
+
+# ─── 词条部位往返 ────────────────────────────────────
+
+class TestAffixParts:
+    def test_default_all_and_format(self, qtbot, tmp_attrs):
+        panel = AffixCapsPanel()
+        qtbot.addWidget(panel)
+        # 未配置时默认全部位，展示「全部」
+        assert panel._get_affix_parts("测试词条") == list(EQUIP_PART_NAMES)
+        assert panel._format_parts(list(EQUIP_PART_NAMES)) == "全部"
+        assert panel._format_parts(["环", "佩"]) == "环/佩"
+
+    def test_parts_save_roundtrip(self, qtbot, tmp_attrs):
+        panel = AffixCapsPanel()
+        qtbot.addWidget(panel)
+        # 隔离掉真实配置中已有的 affix_parts，验证单键往返
+        panel._data.pop("affix_parts", None)
+        panel._data.setdefault("affix_parts", {})["测试词条"] = ["环", "佩"]
+        panel._save_data()
+        assert _load_yaml(tmp_attrs)["affix_parts"]["测试词条"] == ["环", "佩"]
+        assert panel._get_affix_parts("测试词条") == ["环", "佩"]
+        # 移除配置：affix_parts 清空后顶层键一并移除，不落盘
+        panel._drop_affix_parts("测试词条")
+        panel._save_data()
+        assert "affix_parts" not in _load_yaml(tmp_attrs)
+        assert panel._get_affix_parts("测试词条") == list(EQUIP_PART_NAMES)
+
+    def test_rename_alias_migrates_parts(self, qtbot, tmp_attrs, monkeypatch):
+        panel = AffixCapsPanel()
+        qtbot.addWidget(panel)
+        # 选中含「会心率」的普通词组并配置部位
+        rows = [panel._affix_list.item(i).text()
+                for i in range(panel._affix_list.count())]
+        panel._affix_list.setCurrentRow(rows.index("会心率"))
+        panel._data.setdefault("affix_parts", {})["会心率"] = ["武器"]
+        monkeypatch.setattr(
+            affix_caps_panel.QInputDialog, "getText",
+            staticmethod(lambda *a, **k: ("会心率X", True)),
+        )
+        panel._rename_alias("会心率")
+        parts = _load_yaml(tmp_attrs)["affix_parts"]
+        assert parts.get("会心率X") == ["武器"] and "会心率" not in parts
 
 
 # ─── 流派配置行编辑往返 ────────────────────────────────────

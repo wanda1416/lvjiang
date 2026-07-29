@@ -4,6 +4,8 @@
 左侧词组列表，右侧等级-上限表格。
 右侧顶部为词组分类（普通词组 / 定音词组）+ 词组单位（空 / %）+ 词条分组（不分组 / 分组）+ 词条名称区域。
 定音词组不受承音限制，表格隐藏承音列。
+普通词组的每个词条可配置归属与词条部位（可出现的装备部位，
+顶层 affix_parts，全选展示「全部」且不落盘）。
 词条名称支持分组（_aliases 为 dict 形态），分组后按 Tab 页展示，
 专为 指定技能增效 这类包含大量词条的类别设计（按十大流派分组）。
 双击词组类别 / 分组页签 / 词条名标签可打开对话框重命名。
@@ -20,10 +22,11 @@ from PyQt6.QtWidgets import (
     QPushButton, QMessageBox, QHeaderView, QLabel,
     QInputDialog, QComboBox, QFrame,
     QRadioButton, QButtonGroup, QTabWidget,
+    QCheckBox, QDialog, QDialogButtonBox, QGridLayout,
 )
 from PyQt6.QtCore import Qt
 
-from src.apps.yysls.game_config import AFFIX_CATEGORY_NAMES
+from src.apps.yysls.game_config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
 # 配置文件路径
 _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
@@ -45,6 +48,53 @@ class _AliasTag(QWidget):
 
     def mouseDoubleClickEvent(self, event):
         self._on_double_click(self._alias)
+
+
+class _PartsDialog(QDialog):
+    """词条部位多选对话框（七个装备部位，全选 = 不限部位）"""
+
+    def __init__(self, selected: list[str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("选择词条部位")
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("勾选该词条可出现的装备部位（全选 = 全部）"))
+
+        self._checks: list[QCheckBox] = []
+        grid = QGridLayout()
+        grid.setSpacing(6)
+        for i, part in enumerate(EQUIP_PART_NAMES):
+            cb = QCheckBox(part)
+            cb.setChecked(part in selected)
+            grid.addWidget(cb, i // 4, i % 4)
+            self._checks.append(cb)
+        layout.addLayout(grid)
+
+        btn_row = QHBoxLayout()
+        btn_all = QPushButton("全选")
+        btn_all.setFixedWidth(60)
+        btn_all.clicked.connect(
+            lambda: [cb.setChecked(True) for cb in self._checks])
+        btn_row.addWidget(btn_all)
+        btn_invert = QPushButton("反选")
+        btn_invert.setFixedWidth(60)
+        btn_invert.clicked.connect(
+            lambda: [cb.setChecked(not cb.isChecked()) for cb in self._checks])
+        btn_row.addWidget(btn_invert)
+        btn_row.addStretch()
+        btn_row_widget = QWidget()
+        btn_row_widget.setLayout(btn_row)
+        layout.addWidget(btn_row_widget)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected(self) -> list[str]:
+        """已勾选部位（按 EQUIP_PART_NAMES 定序）"""
+        return [cb.text() for cb in self._checks if cb.isChecked()]
 
 
 class AffixCapsPanel(QWidget):
@@ -778,7 +828,7 @@ class AffixCapsPanel(QWidget):
                     break
 
     def _create_alias_row(self, alias: str) -> QWidget:
-        """创建单行词条名控件（词条名双击重命名 + 归属下拉 + 删除）"""
+        """创建单行词条名控件（词条名双击重命名 + 归属下拉 + 部位按钮 + 删除）"""
         row = QWidget()
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(2, 1, 2, 1)
@@ -812,6 +862,16 @@ class AffixCapsPanel(QWidget):
                 lambda text, a=alias: self._on_category_changed(a, text))
         row_layout.addWidget(combo)
 
+        # 词条部位（点击弹七部位多选；全选展示「全部」；仅普通词组启用）
+        parts_btn = QPushButton(self._format_parts(self._get_affix_parts(alias)))
+        parts_btn.setFixedWidth(130)
+        if self._is_dingyin():
+            parts_btn.setEnabled(False)
+        else:
+            parts_btn.clicked.connect(
+                lambda _c, a=alias, b=parts_btn: self._pick_affix_parts(a, b))
+        row_layout.addWidget(parts_btn)
+
         row_layout.addStretch()
 
         # 删除按钮
@@ -834,6 +894,44 @@ class AffixCapsPanel(QWidget):
             if isinstance(names, list) and alias in names:
                 return cat
         return ""
+
+    def _get_affix_parts(self, alias: str) -> list[str]:
+        """从 self._data['affix_parts'] 读词条部位（未配置 = 全部位）"""
+        parts = (self._data.get("affix_parts") or {}).get(alias)
+        if isinstance(parts, list):
+            valid = [p for p in EQUIP_PART_NAMES if p in parts]
+            if valid:
+                return valid
+        return list(EQUIP_PART_NAMES)
+
+    @staticmethod
+    def _format_parts(parts: list[str]) -> str:
+        """部位按钮文本：全选展示「全部」，否则 / 拼接（如 环/佩）"""
+        if len(parts) >= len(EQUIP_PART_NAMES):
+            return "全部"
+        return "/".join(parts)
+
+    def _pick_affix_parts(self, alias: str, btn: QPushButton):
+        """弹部位多选对话框；全选（或全不选）视为不限部位，不落盘"""
+        dlg = _PartsDialog(self._get_affix_parts(alias), self)
+        if not dlg.exec():
+            return
+        parts = dlg.selected()
+        if not parts or len(parts) >= len(EQUIP_PART_NAMES):
+            self._drop_affix_parts(alias)
+            btn.setText("全部")
+        else:
+            self._data.setdefault("affix_parts", {})[alias] = parts
+            btn.setText(self._format_parts(parts))
+        self._save_data()
+
+    def _drop_affix_parts(self, alias: str):
+        """移除词条的部位配置（affix_parts 空时连顶层键一并移除）"""
+        affix_parts = self._data.get("affix_parts")
+        if affix_parts and alias in affix_parts:
+            affix_parts.pop(alias)
+            if not affix_parts:
+                self._data.pop("affix_parts", None)
 
     def _on_category_changed(self, alias: str, category: str):
         """归属下拉切换：先从所有归属移除，再加入所选（空串=清除）"""
@@ -878,6 +976,11 @@ class AffixCapsPanel(QWidget):
             raw[raw.index(alias)] = name
         else:
             return
+
+        # 部位配置随词条名同步迁移
+        affix_parts = self._data.get("affix_parts") or {}
+        if alias in affix_parts:
+            affix_parts[name] = affix_parts.pop(alias)
 
         self._refresh_alias_tags()
         self._save_data()
@@ -943,11 +1046,13 @@ class AffixCapsPanel(QWidget):
             for names in raw.values():
                 if isinstance(names, list) and alias in names:
                     names.remove(alias)
+                    self._drop_affix_parts(alias)
                     self._refresh_alias_tags()
                     self._save_data()
                     return
         elif isinstance(raw, list) and alias in raw:
             raw.remove(alias)
+            self._drop_affix_parts(alias)
             self._refresh_alias_tags()
             self._save_data()
 

@@ -1,14 +1,13 @@
 """基础属性规则面板（装备配置）
 
 管理装备基础属性规则（用于品阶推断）与武器类型注册表。
-左侧固定八个装备类型，右侧为属性跟随配置 + 基础属性说明 + 等级×品阶表格。
+左侧固定七个装备类型，右侧为属性跟随配置 + 基础属性说明 + 等级×品阶表格。
 属性跟随：勾选后该部位复用目标部位的数值（YAML 中记为 _follow），
-表格只读展示目标部位数据，避免重复配置（副武器跟随主武器、
-胫甲/腕甲跟随冠胄）。
+表格只读展示目标部位数据，避免重复配置（胫甲/腕甲跟随冠胄）。
 基础属性说明：部位数值对应的属性名由 YAML 的 _attr 声明，
 区间型部位（武器）由 _range: true 声明，品阶单元格改用
 最小/最大双数字输入框，不再手写 a~b 文本。
-武器类型：仅主武器部位展示，维护 attributes.yaml 顶层 weapon_types
+武器类型：仅武器部位展示，维护 attributes.yaml 顶层 weapon_types
 注册表（识别层为启动快照，新增武器需重启后方可参与识别），
 每个武器可绑定一种武学增效词条，被流派配置引用的武器不允许删除。
 自动保存，覆盖已有数值时确认。
@@ -34,8 +33,7 @@ _ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
 
 # 部位显示名称（顺序由 BASE_ATTR_PARTS 决定）
 _PART_NAMES = {
-    "main_weapon": "主武器",
-    "sub_weapon": "副武器",
+    "weapon": "武器",
     "ring": "环",
     "pendant": "佩",
     "head": "冠胄",
@@ -122,7 +120,7 @@ class BaseAttrPanel(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # 左侧：部位列表（固定八个部位）
+        # 左侧：部位列表（固定七个部位）
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -307,10 +305,10 @@ class BaseAttrPanel(QWidget):
         return ""
 
     def _refresh_weapon_types(self):
-        """刷新武器类型列表（仅主武器部位可见）"""
-        is_main = self._current_part == "main_weapon"
-        self._weapon_frame.setVisible(is_main)
-        if not is_main:
+        """刷新武器类型列表（仅武器部位可见）"""
+        is_weapon = self._current_part == "weapon"
+        self._weapon_frame.setVisible(is_weapon)
+        if not is_weapon:
             return
         self._weapon_list.clear()
         for t in self._weapon_types_raw():

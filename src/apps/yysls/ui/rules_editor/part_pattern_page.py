@@ -90,6 +90,7 @@ class PartPatternPage(QWidget):
         layout.addLayout(rating_row)
 
         # ③ 四档判定条件 Tab（顺序 junk → … → top）
+        layout.addWidget(QLabel("<b>判定条件</b>"))
         self._tabs = QTabWidget()
         layout.addWidget(self._tabs)
         self._tier_editors: dict[str, ConditionGroupsEditor] = {}

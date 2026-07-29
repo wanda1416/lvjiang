@@ -1,4 +1,4 @@
-"""转律与词条库页（规则顶层）
+"""词条库设置页（规则顶层）
 
 转律词条库、可用词条库均为「已选词条纯展示 + 编辑
 （AffixSelectSortDialog）」，候选为标准词条全集。选择与排序
@@ -68,7 +68,7 @@ class _AffixListBox(QWidget):
 
 
 class PoolPage(QWidget):
-    """转律与词条库页"""
+    """词条库设置页"""
 
     def __init__(self, candidates: list[str],
                  on_changed: Callable[[], None], parent=None):

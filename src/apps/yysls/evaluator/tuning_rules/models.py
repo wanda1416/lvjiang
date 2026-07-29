@@ -14,6 +14,8 @@ schema 要点：
   AND；单个条件 dict 视作单条件组，{when, all} 形态可绑定开关前提
   （when 全部匹配时条件组才参与判定）。判定顺序
   junk → normal → excellent → top，全不命中取 default_rating；
+- common_conditions: 通用判定（规则级四档条件，键同上四档），无
+  首词条/默认判定，判定时逐档并入所有部位的条件组（通用在前）；
 - default_rating: 四档 key（junk/normal/excellent/top）之一，缺省
   excellent；patterns.<部位> 可选同名字段按部位覆盖；
 - 开关注册表在 tuning_base.yaml 的 switches 段（key → {name}），
@@ -37,6 +39,9 @@ COND_KINDS = {"contains_all", "not_together", "count_max", "count_min"}
 
 # 评级档位 key（判定顺序 junk → normal → excellent → top）
 RATING_KEYS = ("junk", "normal", "excellent", "top")
+# 四档条件字段 key（patterns.<部位> 与 common_conditions 共用）
+TIER_KEYS = ("junk_conditions", "normal_conditions",
+             "excellent_conditions", "top_conditions")
 # 评级档位显示名
 RATING_LABELS = {"junk": "垃圾", "normal": "一般",
                  "excellent": "优秀", "top": "顶级"}
@@ -234,6 +239,19 @@ class PartPattern:
 
 
 @dataclass
+class CommonConditions:
+    """通用判定：规则级四档条件，对所有部位生效
+
+    无首词条/默认判定，判定时逐档并入各部位模式的条件组
+    （通用条件组在前，组间仍为 OR）。
+    """
+    junk_conditions: list[ConditionGroup] = field(default_factory=list)
+    normal_conditions: list[ConditionGroup] = field(default_factory=list)
+    excellent_conditions: list[ConditionGroup] = field(default_factory=list)
+    top_conditions: list[ConditionGroup] = field(default_factory=list)
+
+
+@dataclass
 class TuningRule:
     """单条调律规则（一个 YAML 文件，对应 UI 一个 Tab）"""
     key: str
@@ -243,6 +261,8 @@ class TuningRule:
     transmute_priority: list[str] = field(default_factory=list)
     affix_pool: list[str] = field(default_factory=list)
     patterns: dict[str, PartPattern] = field(default_factory=dict)
+    # 通用判定（规则级四档条件，对所有部位生效）
+    common: CommonConditions = field(default_factory=CommonConditions)
     # 四档条件全不命中时的默认判定（RATING_KEYS 之一）
     default_rating: str = "excellent"
     # 品阶门槛覆盖（部位 → 允许品阶；未列部位沿用全局 tuning_base）
@@ -253,14 +273,11 @@ class TuningRule:
         return set(self.affix_pool)
 
     def referenced_switches(self) -> set[str]:
-        """全部条件组 when 引用的开关 key 集合"""
+        """全部条件组 when 引用的开关 key 集合（含通用判定）"""
         keys: set[str] = set()
-        for pattern in self.patterns.values():
-            for tier in (pattern.junk_conditions,
-                         pattern.normal_conditions,
-                         pattern.excellent_conditions,
-                         pattern.top_conditions):
-                for group in tier:
+        for holder in (self.common, *self.patterns.values()):
+            for tier_key in TIER_KEYS:
+                for group in getattr(holder, tier_key):
                     keys.update(group.when)
         return keys
 

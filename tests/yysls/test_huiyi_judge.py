@@ -337,3 +337,67 @@ class TestPatternDefaultRating:
                              "劲", "劲"])
         res = self._make_judge("junk").judge(e)
         assert res.rating == Rating.JUNK
+
+
+# ─── 通用判定（规则级四档条件，对所有部位生效） ────
+
+class TestCommonConditionsJudge:
+    @staticmethod
+    def _make_judge(common: dict | None, config: dict | None = None):
+        from src.apps.yysls.evaluator.judge import GenericTuningJudge
+        from src.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        data = {
+            "key": "t1",
+            "name": "测试规则",
+            "playstyles": {"测试": {
+                "main": {"weapon": "剑", "damage": "剑武学增伤"},
+                "sub": {"weapon": "枪", "damage": None},
+                "attr": "通用"}},
+            "affix_pool": ["最大外功攻击", "劲", "势"],
+            "patterns": {"环": {
+                "first": ["最大外功攻击"],
+                "top_conditions": [{"contains_all": ["劲"]}],
+            }},
+        }
+        if common:
+            data["common_conditions"] = common
+        return GenericTuningJudge(parse_tuning_rule(data), config)
+
+    def test_common_junk_applies_to_part(self):
+        # 部位未定义垃圾档：通用判定的垃圾条件仍逐档并入生效
+        judge = self._make_judge(
+            {"junk_conditions": [{"contains_all": ["势"]}]})
+        e = make_equip("环", ["最大外功攻击", "势", "劲"])
+        res = judge.judge(e)
+        assert res.rating == Rating.JUNK
+        assert "命中垃圾条件" in "；".join(res.reasons)
+        # 未触发通用条件时照常走部位条件（命中顶级）
+        e2 = make_equip("环", ["最大外功攻击", "劲"])
+        assert judge.judge(e2).rating == Rating.TOP
+
+    def test_without_common_part_tier_only(self):
+        # 无通用判定：同装备仅按部位条件判定
+        judge = self._make_judge(None)
+        e = make_equip("环", ["最大外功攻击", "势", "劲"])
+        assert judge.judge(e).rating == Rating.TOP
+
+    def test_common_group_respects_when(self):
+        # 通用条件组同样支持开关前提 when
+        common = {"junk_conditions": [
+            {"when": {"keep_pvp": True},
+             "all": [{"contains_all": ["势"]}]}]}
+        e = make_equip("环", ["最大外功攻击", "势", "劲"])
+        # 开关关闭（缺省 False）：条件组不参与 → 顶级
+        assert self._make_judge(common).judge(e).rating == Rating.TOP
+        # 开关打开：通用垃圾条件生效
+        judge_on = self._make_judge(
+            common, {"switches": {"keep_pvp": True}})
+        assert judge_on.judge(e).rating == Rating.JUNK
+
+    def test_common_in_potential_eval(self):
+        # 调律潜力判定同样并入通用条件（垃圾档 still_hits 封顶）
+        judge = self._make_judge(
+            {"junk_conditions": [{"contains_all": ["势"]}]},
+            {"can_transmute": False})
+        e = make_equip("环", ["最大外功攻击", "势", "劲", "劲", "劲"])
+        assert judge.check_tuning_worthiness(e).rating == Rating.JUNK

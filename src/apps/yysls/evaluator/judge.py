@@ -10,7 +10,8 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
 2. 非首词条存在 池外且非本次增伤 的词条 → 垃圾
 3. 本次武器规则要求增伤但词条缺失 → 垃圾
 4. 四档条件按 垃圾 → 一般 → 优秀 → 顶级 顺序求值（每档条件
-   组间 OR、组内 AND），命中即定档；全不命中取默认判定（部位级
+   组间 OR、组内 AND，规则级通用判定条件组逐档并入所有部位、
+   通用在前），命中即定档；全不命中取默认判定（部位级
    default_rating 优先，缺省跟随规则级）。条件组先按开关状态过滤：
    when 全部匹配才参与判定（未配置的开关视作 False）。
 
@@ -185,14 +186,20 @@ class GenericTuningJudge(TuningJudge):
             f"四档条件均未命中，默认判定为{RATING_LABELS[default]}")
         return result
 
-    @staticmethod
-    def _tiers(pattern: PartPattern
+    def _tiers(self, pattern: PartPattern
                ) -> tuple[tuple[str, list[ConditionGroup]], ...]:
-        """四档条件按判定顺序展开（档位 key, 条件组列表）"""
-        return (("junk", pattern.junk_conditions),
-                ("normal", pattern.normal_conditions),
-                ("excellent", pattern.excellent_conditions),
-                ("top", pattern.top_conditions))
+        """四档条件按判定顺序展开（档位 key, 条件组列表）
+
+        逐档并入规则级通用判定条件组（对所有部位生效，通用在前，
+        组间仍为 OR）。
+        """
+        common = self.rule.common
+        return (
+            ("junk", common.junk_conditions + pattern.junk_conditions),
+            ("normal", common.normal_conditions + pattern.normal_conditions),
+            ("excellent",
+             common.excellent_conditions + pattern.excellent_conditions),
+            ("top", common.top_conditions + pattern.top_conditions))
 
     def _eval_partial(self, result: JudgeResult, pattern: PartPattern,
                       damage: str | None, pool: set[str],

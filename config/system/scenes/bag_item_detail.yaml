@@ -1,5 +1,5 @@
 key: bag_item_detail
-name: 道具背包
+name: 道具
 regions:
 - key: bag_1_1
   name: 背包格1_1
@@ -181,3 +181,4 @@ panels:
   name: 背包
   cols: 6
   rows: 5
+  min_visible: 0.95

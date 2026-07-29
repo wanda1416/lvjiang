@@ -1,0 +1,13 @@
+key: bag_wallet_detail
+name: 钱袋
+panels:
+- key: region_money
+  name: 区域货币
+  cols: 4
+  rows: 1
+  min_visible: 0.95
+- key: other_money
+  name: 其他货币
+  cols: 6
+  rows: 3
+  min_visible: 0.95

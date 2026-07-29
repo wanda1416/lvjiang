@@ -1,5 +1,12 @@
 key: game_menu_page
 name: 游戏菜单
+views:
+- key: base
+  name: 基底
+- key: page_1
+  name: 菜单顶页
+- key: page_2
+  name: 菜单底页
 regions:
 - key: back
   name: 返回
@@ -61,66 +68,79 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: train
   name: 培养
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: wulinlu
   name: 武林录
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: shop
   name: 商店
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: activity
   name: 活动
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: appearance
   name: 外观
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: bu_gan
   name: 不肝
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: harmony
   name: 和鸣
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: travel
   name: 同游
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: business
   name: 百业
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: character
   name: 角色
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: quest
   name: 任务
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: battle_pass
   name: 战令
   type: func
   is_text: true
   is_clickable: true
+  view: page_1
 - key: avatar
   name: 头像
   type: func
@@ -131,3 +151,51 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: social
+  name: 社交
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: menpai
+  name: 门派
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: yingsheng
+  name: 营生
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: shilian
+  name: 试炼
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: bowuzhi
+  name: 博物志
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: xiyue
+  name: 戏乐
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: wanxiangji
+  name: 万象集
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2
+- key: xuanshang
+  name: 悬赏
+  type: func
+  is_text: true
+  is_clickable: true
+  view: page_2

@@ -21,7 +21,7 @@ class RecognitionOpsMixin:
         current_tab = self._tabs.get(self._current_scene_key)
         if current_tab is None:
             return
-        regions = current_tab.get_regions()
+        regions = current_tab.get_visible_regions()
         if not regions:
             self._status_bar.showMessage("没有已定义的区域")
             return
@@ -60,7 +60,7 @@ class RecognitionOpsMixin:
         current_tab = self._tabs.get(self._current_scene_key)
         if current_tab is None:
             return
-        regions = current_tab.get_regions()
+        regions = current_tab.get_visible_regions()
         if not regions:
             self._status_bar.showMessage("没有已定义的区域")
             return

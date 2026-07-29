@@ -57,6 +57,12 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._selected_idx: int = -1  # 当前选中区域索引
         self._field_selected: bool = False  # 是否由右侧字段列表选中（单区域编辑模式）
 
+        # 视图过滤：None = 不过滤；否则只显示 key 在集合内的定义
+        # 被过滤掉的实例暂存在 _hidden_*，get_* 时仍会一并返回
+        self._visible_keys: set[str] | None = None
+        self._hidden_regions: list[Region] = []
+        self._hidden_panels: list[Panel] = []
+
         # 交互状态
         self._drag_mode = None  # DragMode
         self._drag_handle: HandlePos | None = None
@@ -121,14 +127,54 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     def set_regions(self, regions: list[Region]):
         """设置区域列表（从预设加载）"""
-        self._regions = [Region(**r.to_dict()) for r in regions]
+        self._regions, self._hidden_regions = self._split_by_filter(
+            [Region(**r.to_dict()) for r in regions]
+        )
         self._selected_idx = -1
         self._field_selected = False
         self.update()
 
     def get_regions(self) -> list[Region]:
-        """获取当前区域列表"""
+        """获取全部区域列表（含被视图过滤隐藏的，保存布局时不能写丢）"""
+        return [
+            Region(**r.to_dict())
+            for r in self._regions + self._hidden_regions
+            if r.key
+        ]
+
+    def get_visible_regions(self) -> list[Region]:
+        """获取当前视图下可见的区域列表（识别/OCR 只应作用于可见区域）"""
         return [Region(**r.to_dict()) for r in self._regions if r.key]
+
+    # ─── 视图过滤 ─────────────────────────────────────────
+
+    def _split_by_filter(self, items: list) -> tuple[list, list]:
+        """按当前视图过滤把定义拆成 (可见, 隐藏) 两份"""
+        if self._visible_keys is None:
+            return list(items), []
+        visible, hidden = [], []
+        for it in items:
+            (visible if it.key in self._visible_keys else hidden).append(it)
+        return visible, hidden
+
+    def set_view_filter(self, visible_keys: set[str] | None):
+        """设置视图过滤（None = 显示全部）
+
+        隐藏的实例只是移出渲染与命中检测，数据仍保留在画布内，
+        get_regions/get_points/... 会连同隐藏项一起返回。
+        """
+        self._visible_keys = set(visible_keys) if visible_keys is not None else None
+        self._regions, self._hidden_regions = self._split_by_filter(
+            self._regions + self._hidden_regions
+        )
+        self._panels, self._hidden_panels = self._split_by_filter(
+            self._panels + self._hidden_panels
+        )
+        self._apply_poi_filter()
+        self._selected_idx = -1
+        self._field_selected = False
+        self._panel_selected_idx = -1
+        self.update()
 
     def select_region(self, idx: int):
         """从外部（右侧字段列表）选中某区域，进入单区域编辑模式"""
@@ -160,13 +206,15 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     def set_panels(self, panels: list[Panel]):
         """设置面板列表（从布局加载）"""
-        self._panels = [Panel(**p.to_dict()) for p in panels]
+        self._panels, self._hidden_panels = self._split_by_filter(
+            [Panel(**p.to_dict()) for p in panels]
+        )
         self._panel_selected_idx = -1
         self.update()
 
     def get_panels(self) -> list[Panel]:
-        """获取当前面板列表"""
-        return [Panel(**p.to_dict()) for p in self._panels]
+        """获取全部面板列表（含被视图过滤隐藏的）"""
+        return [Panel(**p.to_dict()) for p in self._panels + self._hidden_panels]
 
     def select_panel_by_key(self, key: str):
         """按 key 选中面板"""

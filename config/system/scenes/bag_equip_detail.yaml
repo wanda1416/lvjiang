@@ -1,5 +1,5 @@
 key: bag_equip_detail
-name: 装备背包
+name: 装备
 regions:
 - key: back
   name: 返回

@@ -3,7 +3,6 @@ layout_scenes:
   - game_main_page
   - game_menu_page
   - general_control
-  - game_menu_page_2
   - action_control
   group_2:
   - equip_weapon_detail
@@ -13,6 +12,7 @@ layout_scenes:
   group_3:
   - bag_equip_detail
   - bag_item_detail
+  - bag_wallet_detail
   group_4:
   - xinde_exchange
   group_5:
@@ -21,6 +21,7 @@ layout_scenes:
   group_6:
   - ui_waiguan_yigui
   - game_temp_page
+  - ui_school_main
 group_names:
   group_1: 通用
   group_2: 调律

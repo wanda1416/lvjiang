@@ -8,9 +8,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from ....core.scene_registry import get_registry, sync_scene_cache
+from ....core.scene_registry import get_registry, sync_scene_cache, is_view_visible
 from ....core.scene_loader import RegionDef, VALID_REGION_TYPES
-from .scene_select import add_scene_combo_row
+from ...widgets import strip_focus_rect
+from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 
 
 class RegionPanelMixin:
@@ -39,6 +40,7 @@ class RegionPanelMixin:
         self._region_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._region_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._region_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        strip_focus_rect(self._region_table)
         self._region_table.verticalHeader().setVisible(False)
         self._region_table.currentCellChanged.connect(self._on_region_table_selection)
         self._region_table.cellDoubleClicked.connect(self._on_edit_region_from_table)
@@ -72,6 +74,8 @@ class RegionPanelMixin:
         assigned = self._canvas.get_regions()
         assigned_keys = {r.key for r in assigned}
         for region_def in scene.regions:
+            if not is_view_visible(region_def.view, self._current_view):
+                continue
             row = self._region_table.rowCount()
             self._region_table.insertRow(row)
             # 名称
@@ -102,17 +106,15 @@ class RegionPanelMixin:
     def _on_region_table_selection(self, row, col, prev_row, prev_col):
         """表格行选中时更新删除按钮状态"""
         self._btn_del_region.setEnabled(row >= 0)
-        # 同步画布选中
+        # 同步画布选中（表格已按视图过滤，row 不再对应 scene.regions 索引，改按 key 查）
         if row < 0:
             return
-        registry = get_registry()
-        scene = registry.get_scene(self._scene_key)
-        if not scene or row >= len(scene.regions):
+        key_item = self._region_table.item(row, 1)
+        if key_item is None:
             return
-        key = scene.regions[row].key
-        # 在画布的已绑定区域中查找索引
-        canvas_regions = self._canvas.get_regions()
-        for i, r in enumerate(canvas_regions):
+        key = key_item.text()
+        # 在画布可见区域中查找索引（select_region 按 _regions 可见列表定位）
+        for i, r in enumerate(self._canvas.get_visible_regions()):
             if r.key == key:
                 self._canvas.select_region(i)
                 return
@@ -121,9 +123,12 @@ class RegionPanelMixin:
         """双击表格行编辑区域（场景变更时跨场景迁移）"""
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
-        if not scene or row >= len(scene.regions):
+        key_item = self._region_table.item(row, 1)
+        if not scene or key_item is None:
             return
-        old_def = scene.regions[row]
+        old_def = next((r for r in scene.regions if r.key == key_item.text()), None)
+        if old_def is None:
+            return
         result = self._show_region_edit_dialog(old_def)
         if result is None:
             return
@@ -137,7 +142,9 @@ class RegionPanelMixin:
             sync_scene_cache(self._scene_key)
             self._refresh_lists()
             return
-        # 跨场景迁移：先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
+        # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
+        new_def.view = ""
+        # 先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
         try:
             registry.add_region_to_scene(target_scene, new_def)
         except ValueError as e:
@@ -189,9 +196,12 @@ class RegionPanelMixin:
             return
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
-        if not scene or row >= len(scene.regions):
+        key_item = self._region_table.item(row, 1)
+        if not scene or key_item is None:
             return
-        region_def = scene.regions[row]
+        region_def = next((r for r in scene.regions if r.key == key_item.text()), None)
+        if region_def is None:
+            return
         reply = QMessageBox.question(
             self, "确认删除",
             f"确定要从场景定义中删除区域「{region_def.name}」({region_def.key}) 吗？",
@@ -254,6 +264,12 @@ class RegionPanelMixin:
         if region_def is not None:
             scene_combo = add_scene_combo_row(form, self._scene_key)
 
+        # 多视图场景可选择归属视图；新建默认落在当前视图
+        view_combo = add_view_combo_row(
+            form, self._scene_key,
+            region_def.view if region_def else self._current_view,
+        )
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -282,4 +298,5 @@ class RegionPanelMixin:
             type=type_combo.currentText(),
             is_text=is_text_check.isChecked(),
             is_clickable=is_clickable_check.isChecked(),
+            view=combo_view_value(view_combo, self._current_view),
         ), target_scene

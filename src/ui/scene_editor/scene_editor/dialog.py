@@ -236,7 +236,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_arrows(arrows)
             tab.set_panels(panels)
             tab.set_canvas_config(canvas)
-            screenshot = load_scene_screenshot(layout_name, scene_key)
+            screenshot = load_scene_screenshot(layout_name, scene_key, tab.current_view)
             if screenshot is not None:
                 tab.canvas.set_image(screenshot)
             else:
@@ -245,6 +245,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
             tab.canvas.on_poi_changed = self._on_any_poi_changed
             tab.canvas.on_panel_changed = self._on_any_panel_changed
+            tab.on_view_changed = self._on_tab_view_changed
         self._set_dirty(False)
         self._status_bar.showMessage(f"当前布局: {layout_name}")
         self._update_info_label()
@@ -256,6 +257,20 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_points([])
             tab.set_arrows([])
             tab.set_panels([])
+
+    def _on_tab_view_changed(self, scene_key: str, view: str):
+        """某 Tab 切换视图：换上该视图的底图"""
+        if self._current_layout is None:
+            return
+        tab = self._tabs.get(scene_key)
+        if tab is None:
+            return
+        img = load_scene_screenshot(self._current_layout.name, scene_key, view)
+        if img is not None:
+            tab.canvas.set_image(img)
+        else:
+            tab.canvas.clear_image()
+        self._update_info_label()
 
     # ─── 跨场景迁移 ────────────────────────────────────
 
@@ -315,8 +330,9 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         if new_image is not None:
             scene_key = self._current_scene_key
             layout_name = self._current_layout.name
-            save_scene_screenshot(layout_name, scene_key, new_image)
             current_tab = self._tabs.get(scene_key)
+            view = current_tab.current_view if current_tab else ""
+            save_scene_screenshot(layout_name, scene_key, new_image, view)
             if current_tab:
                 current_tab.canvas.set_image(new_image)
             scene_name = get_scene_name(scene_key)

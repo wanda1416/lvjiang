@@ -66,3 +66,8 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: label_0
+  name: 号令
+  type: attr
+  is_text: true
+  is_clickable: false

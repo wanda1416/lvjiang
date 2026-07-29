@@ -3,7 +3,8 @@
 from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize
 from PyQt6.QtGui import QTextCursor, QWheelEvent
 from PyQt6.QtWidgets import (
-    QAbstractSpinBox, QApplication, QComboBox, QLayout, QTextEdit,
+    QAbstractSpinBox, QApplication, QComboBox, QLayout, QStyle,
+    QStyledItemDelegate, QTextEdit,
 )
 
 _MAX_LOG_LINES = 1000
@@ -42,6 +43,24 @@ def install_wheel_guard(app) -> WheelGuard:
     guard = WheelGuard(app)
     app.installEventFilter(guard)
     return guard
+
+
+class NoFocusRectDelegate(QStyledItemDelegate):
+    """去掉单元格的虚线焦点框（只读列表靠选中底色区分即可）"""
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        option.state &= ~QStyle.StateFlag.State_HasFocus
+
+
+def strip_focus_rect(view) -> None:
+    """只读表格/列表：移除点击后的虚线焦点框，仅保留选中底色
+
+    内容不可就地编辑（双击弹对话框）的列表，虚线框只会干扰视觉。
+    注意：会覆盖视图上已设的 item delegate，有自定义 delegate 的
+    视图应直接继承 NoFocusRectDelegate 而不是调本函数。
+    """
+    view.setItemDelegate(NoFocusRectDelegate(view))
 
 
 class TrimmedLogEdit(QTextEdit):

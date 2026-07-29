@@ -10,6 +10,25 @@ from loguru import logger
 # 合法的 region type 枚举
 VALID_REGION_TYPES = {"attr", "slot", "func"}
 
+# 基底视图：开启多视图后永远存在的第一个视图，任何视图下都可见
+# （定义的 view 字段为空等价于归属基底视图）
+BASE_VIEW_KEY = "base"
+BASE_VIEW_NAME = "基底"
+
+
+@dataclass
+class ViewDef:
+    """场景内的一个视图（同一页面的一个可见态，典型场景：滚动后的另一屏）
+
+    视图只影响编辑期的可见性与底图，不进入运行时寻址：
+    key 仍在整个场景内全局唯一，DSL 依旧写 [scene].[key]。
+    """
+    key: str
+    name: str
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "name": self.name}
+
 
 @dataclass
 class RegionDef:
@@ -19,6 +38,7 @@ class RegionDef:
     type: str = "attr"                # attr/slot/func
     is_text: bool = True              # 是否需要文字识别（OCR）
     is_clickable: bool = False        # 是否可点击
+    view: str = ""                    # 归属视图 key，空 = 基底视图
 
 
 @dataclass
@@ -34,6 +54,7 @@ class PointDef:
     type: str = "func"              # attr/slot/func
     is_text: bool = False           # 是否需要文字识别（OCR）
     is_clickable: bool = True       # 是否可点击
+    view: str = ""                  # 归属视图 key，空 = 基底视图
 
 
 @dataclass
@@ -50,16 +71,27 @@ class PanelDef:
     cols: int = 6                   # 列数
     rows: int = 3                   # 行数
     min_visible: float = 0.95       # 行计入有效的最小可见比例（0.5-1.0）
+    view: str = ""                  # 归属视图 key，空 = 基底视图
 
 
 @dataclass
 class SceneDef:
-    """单个场景的完整定义"""
+    """单个场景的完整定义
+
+    views 为空表示未开启多视图（场景只有一层定义，与旧行为一致）；
+    开启后 views[0] 恒为基底视图。
+    """
     key: str
     name: str
     regions: list[RegionDef] = field(default_factory=list)
     points: list[PointDef] = field(default_factory=list)
     panels: list[PanelDef] = field(default_factory=list)
+    views: list[ViewDef] = field(default_factory=list)
+
+    @property
+    def multi_view(self) -> bool:
+        """是否已开启多视图"""
+        return bool(self.views)
 
 
 class SceneRegistry:
@@ -144,6 +176,22 @@ class SceneRegistry:
         if not key or not name:
             raise ValueError("场景必须包含 key 和 name")
 
+        views = []
+        for vd in data.get("views", []):
+            views.append(ViewDef(key=vd["key"], name=vd.get("name", vd["key"])))
+        view_keys = {v.key for v in views}
+
+        def _view_of(d: dict) -> str:
+            """读取并校验定义的归属视图（未开启多视图时一律视为基底）"""
+            v = d.get("view", "") or ""
+            if not views or v in ("", BASE_VIEW_KEY):
+                return "" if not views else v
+            if v not in view_keys:
+                raise ValueError(
+                    f"定义 {d.get('key')} 的 view '{v}' 未在场景 views 中声明"
+                )
+            return v
+
         regions = []
         for rd in data.get("regions", []):
             rtype = rd.get("type", "info")
@@ -155,6 +203,7 @@ class SceneRegistry:
                 type=rtype,
                 is_text=rd.get("is_text", True),
                 is_clickable=rd.get("is_clickable", False),
+                view=_view_of(rd),
             ))
 
         points = []
@@ -168,6 +217,7 @@ class SceneRegistry:
                 type=ptype,
                 is_text=pd.get("is_text", False),
                 is_clickable=pd.get("is_clickable", True),
+                view=_view_of(pd),
             ))
 
         panels = []
@@ -178,6 +228,7 @@ class SceneRegistry:
                 cols=int(pd.get("cols", 6)),
                 rows=int(pd.get("rows", 3)),
                 min_visible=float(pd.get("min_visible", 0.95)),
+                view=_view_of(pd),
             ))
 
         # region 与 point 同场景内 key 不得重复（共享命名空间）
@@ -186,7 +237,8 @@ class SceneRegistry:
         if dup:
             raise ValueError(f"场景 {key} 的 region/point/panel key 重复: {dup}")
 
-        return SceneDef(key=key, name=name, regions=regions, points=points, panels=panels)
+        return SceneDef(key=key, name=name, regions=regions, points=points,
+                        panels=panels, views=views)
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""
@@ -386,6 +438,82 @@ class SceneRegistry:
             self._group_scenes[gk] = new_list
         self.save_group_config(scenes_config_path)
 
+    # ─── 视图管理 ─────────────────────────────────────────────
+
+    def get_scene_views(self, scene_key: str) -> list[ViewDef]:
+        """获取场景的视图列表（空列表 = 未开启多视图）"""
+        scene = self._scenes.get(scene_key)
+        return list(scene.views) if scene else []
+
+    def enable_scene_views(self, scene_key: str) -> list[ViewDef]:
+        """把场景改为多视图：生成基底视图，已有定义全部归属基底（view 留空即基底）"""
+        scene = self._require_scene(scene_key)
+        if scene.views:
+            return list(scene.views)
+        scene.views = [ViewDef(key=BASE_VIEW_KEY, name=BASE_VIEW_NAME)]
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        logger.info(f"场景 {scene_key} 已开启多视图")
+        return list(scene.views)
+
+    def disable_scene_views(self, scene_key: str):
+        """取消多视图（仅剩基底视图时可用）"""
+        scene = self._require_scene(scene_key)
+        if len(scene.views) > 1:
+            raise ValueError(f"仍存在 {len(scene.views) - 1} 个非基底视图，无法取消多视图")
+        scene.views = []
+        for item in (*scene.regions, *scene.points, *scene.panels):
+            item.view = ""
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        logger.info(f"场景 {scene_key} 已取消多视图")
+
+    def add_scene_view(self, scene_key: str, view_key: str, view_name: str) -> ViewDef:
+        """新增视图（未开启多视图时自动先开启）"""
+        scene = self._require_scene(scene_key)
+        if view_key == BASE_VIEW_KEY:
+            raise ValueError(f"{BASE_VIEW_KEY} 是基底视图的保留 key")
+        if not scene.views:
+            self.enable_scene_views(scene_key)
+        if any(v.key == view_key for v in scene.views):
+            raise ValueError(f"视图 key 已存在: {view_key}")
+        view = ViewDef(key=view_key, name=view_name)
+        scene.views.append(view)
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        logger.info(f"场景 {scene_key} 新增视图: {view_key} ({view_name})")
+        return view
+
+    def rename_scene_view(self, scene_key: str, view_key: str, new_name: str):
+        """重命名视图（key 不可变）"""
+        scene = self._require_scene(scene_key)
+        view = next((v for v in scene.views if v.key == view_key), None)
+        if view is None:
+            raise ValueError(f"视图不存在: {view_key}")
+        view.name = new_name
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        logger.info(f"场景 {scene_key} 视图重命名: {view_key} -> {new_name}")
+
+    def delete_scene_view(self, scene_key: str, view_key: str):
+        """删除空视图（视图下仍有定义时抛异常，基底视图不可删）"""
+        scene = self._require_scene(scene_key)
+        if view_key == BASE_VIEW_KEY:
+            raise ValueError("基底视图不可删除，如需取消分层请取消多视图")
+        if not any(v.key == view_key for v in scene.views):
+            raise ValueError(f"视图不存在: {view_key}")
+        used = [
+            i.key for i in (*scene.regions, *scene.points, *scene.panels)
+            if i.view == view_key
+        ]
+        if used:
+            raise ValueError(f"视图非空，无法删除: {view_key}（包含 {len(used)} 个定义）")
+        scene.views = [v for v in scene.views if v.key != view_key]
+        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        logger.info(f"场景 {scene_key} 已删除视图: {view_key}")
+
+    def _require_scene(self, scene_key: str) -> SceneDef:
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        return scene
+
     # ─── 区域/坐标 编辑 ───────────────────────────────────────
 
     def add_region_to_scene(self, scene_key: str, region_def: RegionDef):
@@ -493,6 +621,8 @@ class SceneRegistry:
     def _save_scene_yaml(self, path: Path, scene: SceneDef):
         """将场景定义写入 YAML 文件"""
         data = {"key": scene.key, "name": scene.name}
+        if scene.views:
+            data["views"] = [v.to_dict() for v in scene.views]
         if scene.regions:
             data["regions"] = [
                 {
@@ -501,6 +631,7 @@ class SceneRegistry:
                     "type": r.type,
                     "is_text": r.is_text,
                     "is_clickable": r.is_clickable,
+                    **({"view": r.view} if r.view else {}),
                 }
                 for r in scene.regions
             ]
@@ -512,6 +643,7 @@ class SceneRegistry:
                     "type": p.type,
                     "is_text": p.is_text,
                     "is_clickable": p.is_clickable,
+                    **({"view": p.view} if p.view else {}),
                 }
                 for p in scene.points
             ]
@@ -523,6 +655,7 @@ class SceneRegistry:
                     "cols": p.cols,
                     "rows": p.rows,
                     "min_visible": p.min_visible,
+                    **({"view": p.view} if p.view else {}),
                 }
                 for p in scene.panels
             ]

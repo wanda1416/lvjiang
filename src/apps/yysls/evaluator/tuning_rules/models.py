@@ -435,7 +435,7 @@ class MaterialSettings:
                         f"{desc}但 {rule.food} 持有量不足 → 跳过该装备")
                 continue  # 继续走后续规则
             return FoodDecision(
-                "feed", rule.food, f"{desc} → 每轮添加 {rule.food}")
+                "feed", rule.food, f"{desc} → 本轮添加 {rule.food}")
         return FoodDecision("none", "", "无狗粮规则命中 → 不添加")
 
 

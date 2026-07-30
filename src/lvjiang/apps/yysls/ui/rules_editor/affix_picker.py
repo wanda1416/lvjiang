@@ -1,10 +1,13 @@
 """词条选择 + 排序对话框（包内复用）
 
-上区展示已选词条，支持拖拽排序；下区两列：左列为词条归属分类
-（固定 5 类，来自 GameConfigManager.get_affix_categories；动态词条
-归入「动态类」桶，插在属攻类之后），右列为该分类下且在候选
-集内的词条复选框网格。勾选即追加到上区末尾，
-取消勾选即从上区移除。候选中无归属者归入末尾「未归类」桶。
+上区展示已选词条，支持拖拽排序；下区两种形态：
+- 默认（两级）：左列为词条归属分类（固定 5 类，来自
+  GameConfigManager.get_affix_categories；动态词条归入「动态类」桶，
+  插在属攻类之后），右列为该分类下且在候选集内的词条复选框网格；
+- flat=True（平铺，供判定区等候选已收窄到可用词条库的场景）：
+  无分类列，全部候选按归类顺序摊平为单一复选框网格。
+勾选即追加到上区末尾，取消勾选即从上区移除。
+候选中无归属者归入末尾「未归类」桶。
 
 selected() 按上区当前顺序返回，供转律词条库 / 词条库 / 首词条 /
 条件词条等场景统一复用。
@@ -14,15 +17,26 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QGridLayout,
-    QHBoxLayout, QLabel, QListWidget, QPushButton, QScrollArea, QSplitter,
-    QVBoxLayout, QWidget,
+    QAbstractItemView,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QPushButton,
+    QScrollArea,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
 
-from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    DYNAMIC_AFFIXES, DYNAMIC_CATEGORY,
+    DYNAMIC_AFFIXES,
+    DYNAMIC_CATEGORY,
 )
+from lvjiang.apps.yysls.game_config import get_game_config
 
 # 候选无归属时归入的兜底桶名
 _UNCATEGORIZED = "未归类"
@@ -35,10 +49,12 @@ _COLS = 3
 
 
 class AffixSelectSortDialog(QDialog):
-    """词条选择 + 排序对话框（上区拖拽排序，下区按归属勾选）"""
+    """词条选择 + 排序对话框（上区拖拽排序，下区按归属勾选，
+    flat=True 时下区按归类顺序平铺）"""
 
     def __init__(self, candidates: list[str], selected: list[str],
-                 title: str = "选择词条", parent=None):
+                 title: str = "选择词条", parent=None, *,
+                 flat: bool = False):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setMinimumSize(560, 560)
@@ -75,17 +91,19 @@ class AffixSelectSortDialog(QDialog):
         top_layout.addWidget(self._selected_list, 1)
         splitter.addWidget(top_widget)
 
-        # ── 下区：左列分类 + 右列词条复选 ──
+        # ── 下区：两级（左列分类 + 右列复选）或平铺（单网格）──
         bottom_widget = QWidget()
         bottom_layout = QHBoxLayout(bottom_widget)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._cat_list = QListWidget()
-        self._cat_list.setFixedWidth(120)
-        self._cat_list.currentTextChanged.connect(self._show_category)
-        for cat in self._by_category:
-            self._cat_list.addItem(cat)
-        bottom_layout.addWidget(self._cat_list)
+        self._cat_list: QListWidget | None = None
+        if not flat:
+            self._cat_list = QListWidget()
+            self._cat_list.setFixedWidth(120)
+            self._cat_list.currentTextChanged.connect(self._show_category)
+            for cat in self._by_category:
+                self._cat_list.addItem(cat)
+            bottom_layout.addWidget(self._cat_list)
 
         self._grid_host = QWidget()
         self._grid = QGridLayout(self._grid_host)
@@ -106,7 +124,11 @@ class AffixSelectSortDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-        if self._cat_list.count() > 0:
+        if flat:
+            # 平铺：全部候选按归类顺序摊平为单一网格
+            self._fill_grid([n for names in self._by_category.values()
+                             for n in names])
+        elif self._cat_list is not None and self._cat_list.count() > 0:
             self._cat_list.setCurrentRow(0)
 
     # ── 候选分类 ──
@@ -141,14 +163,18 @@ class AffixSelectSortDialog(QDialog):
     # ── 右列渲染 ──
 
     def _show_category(self, category: str):
-        """切换分类：重建右列复选网格，勾选态与上区当前选择同步"""
+        """切换分类：重建右列复选网格（两级形态）"""
+        self._fill_grid(self._by_category.get(category, []))
+
+    def _fill_grid(self, names: list[str]):
+        """重建复选网格，勾选态与上区当前选择同步"""
         while self._grid.count():
             item = self._grid.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         self._checks.clear()
         chosen = set(self._current_selected())
-        for i, name in enumerate(self._by_category.get(category, [])):
+        for i, name in enumerate(names):
             cb = QCheckBox(name)
             cb.setChecked(name in chosen)
             cb.toggled.connect(lambda checked, n=name: self._on_toggled(n, checked))

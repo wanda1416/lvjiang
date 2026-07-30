@@ -13,13 +13,24 @@ import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog,
-    QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
-    QStackedWidget, QVBoxLayout,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    RuleValidationError, get_tuning_base_manager, get_tuning_rule_manager,
+    RuleValidationError,
+    get_tuning_base_manager,
+    get_tuning_rule_manager,
 )
 
 from .base_config_page import BaseConfigPage
@@ -211,7 +222,11 @@ class TuningRulesDialog(QDialog):
         dialog = EquipJudgeTestDialog(parent=self)
         dialog.exec()
 
-    def _set_status(self, text: str, is_error: bool):
-        color = "#c62828" if is_error else "#2e7d32"
+    def _set_status(self, text: str, is_error: bool | str):
+        # is_error: True=红（错误）/ False=绿（正常）/ "warn"=黄（软警告）
+        if is_error == "warn":
+            color = "#f9a825"
+        else:
+            color = "#c62828" if is_error else "#2e7d32"
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(text)

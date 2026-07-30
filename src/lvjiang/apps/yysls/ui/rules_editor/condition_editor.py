@@ -17,8 +17,15 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
 from .affix_picker import AffixSelectSortDialog
@@ -129,7 +136,7 @@ class _ConditionRow(QWidget):
 
     def _pick_symbols(self):
         dlg = AffixSelectSortDialog(self._candidates, self._symbols,
-                                    "选择条件词条", self)
+                                    "选择条件词条", self, flat=True)
         if dlg.exec():
             self._symbols = dlg.selected()
             self._update_symbols_text()

@@ -264,6 +264,58 @@ def _run_config() -> str:
     report.append(f"\n{_LINE}\n结论：{'配置加载全部通过' if ok else '存在失败步骤（见上方 FAILED）'}")
     return "\n".join(report)
 
+
+def _run_workflow() -> str:
+    """工作流引擎自检：验证模块导入 + 布局加载 + .wf 解析"""
+    report = _Report(["=== 设备端工作流引擎自检 target=workflow ==="])
+    _log(report[0])
+
+    ok, _ = _step(report, "1/4 运行时与依赖版本", lambda: _env_info(report))
+
+    if ok:
+        def check_loguru(report):
+            import loguru
+            report.append(f"loguru  {loguru.__version__}")
+        ok, _ = _step(report, "2/4 loguru 可用", lambda: check_loguru(report))
+
+    if ok:
+        def check_layout(report):
+            import json
+            from ...constants import PROJECT_ROOT
+            from ...core.scene_registry import Layout
+            layout_path = PROJECT_ROOT / "config" / "local" / "layouts" / "手机直控.json"
+            if not layout_path.exists():
+                raise RuntimeError(f"布局文件不存在: {layout_path}")
+            data = json.loads(layout_path.read_text(encoding="utf-8"))
+            layout = Layout.from_dict("手机直控", data)
+            scene_count = len(set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels))
+            report.append(f"布局文件    {layout_path.name}")
+            report.append(f"场景数      {scene_count}")
+            report.append(f"canvas      {layout.canvas}")
+            return layout
+        ok, layout = _step(report, "3/4 布局加载", lambda: check_layout(report))
+
+    if ok:
+        def check_wf_parse(report):
+            from ...constants import SYSTEM_CONFIG_DIR
+            from ...workflows.grammar import parse_file
+            wf_dir = SYSTEM_CONFIG_DIR / "workflows"
+            wf_files = sorted(wf_dir.glob("*.wf"))
+            if not wf_files:
+                raise RuntimeError(f"workflows/ 下没有 .wf 文件: {wf_dir}")
+            # 只解析第一个，验证语法解析器可用
+            wf = wf_files[0]
+            program = parse_file(wf)
+            report.append(f"解析        {wf.name}")
+            report.append(f"顶层语句数  {len(program.body)}")
+            report.append(f"过程定义数  {len(program.procs)}")
+            report.append(f"import 数   {len(program.imports)}")
+        ok, _ = _step(report, "4/4 .wf 文件解析", lambda: check_wf_parse(report))
+
+    report.append(f"\n{_LINE}\n结论：{'工作流引擎自检通过' if ok else '存在失败步骤（见上方 FAILED）'}")
+    return "\n".join(report)
+
+
 def run(target: str = "ocr") -> str:
     """自检入口，返回完整报告文本（同时已逐行落盘 + 打进 logcat）
 
@@ -273,7 +325,8 @@ def run(target: str = "ocr") -> str:
     Args:
         target: "ocr" 只验 OCR 链路（合成图，不需要 Shizuku）；
             "e2e" 验完整三通道闭环（截图 → OCR → 点击 → 再截图确认生效）；
-            "config" 验系统配置加载链路（PROJECT_ROOT / scenes.yaml / workflows）。
+            "config" 验系统配置加载链路（PROJECT_ROOT / scenes.yaml / workflows）；
+            "workflow" 验工作流引擎（loguru / 布局加载 / .wf 解析）。
     """
     _reset_log()
     try:
@@ -281,6 +334,8 @@ def run(target: str = "ocr") -> str:
             return _run_e2e()
         if target == "config":
             return _run_config()
+        if target == "workflow":
+            return _run_workflow()
         return _run_ocr(target)
     except Exception:
         text = "自检自身异常：\n" + traceback.format_exc().rstrip()

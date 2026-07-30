@@ -80,6 +80,8 @@ chaquopy {
             install("opencv-python==4.5.1.48")
             install("Pillow==11.0.0")
             install("PyYAML==6.0.1")
+            install("loguru==0.7.3")
+            install("lark==1.3.1")
         }
     }
 
@@ -114,6 +116,13 @@ val syncSystemConfig = tasks.register<Sync>("syncSystemConfig") {
     from(rootProject.file("../config/system"))
     into(layout.buildDirectory.dir("generated/lvjiang_assets/config/system"))
 }
+// 布局文件（手机直控.json）随 APK 分发：从仓库 config/local/layouts 同步进 assets，
+// App 启动时解压到 filesDir/lvjiang/config/local/layouts。
+val syncLayoutConfig = tasks.register<Sync>("syncLayoutConfig") {
+    from(rootProject.file("../config/local/layouts"))
+    include("手机直控.json")
+    into(layout.buildDirectory.dir("generated/lvjiang_assets/config/local/layouts"))
+}
 android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/lvjiang_assets"))
 tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(syncSystemConfig) }
+    .configureEach { dependsOn(syncSystemConfig, syncLayoutConfig) }

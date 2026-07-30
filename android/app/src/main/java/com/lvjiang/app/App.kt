@@ -34,7 +34,7 @@ class App : Application() {
     }
 
     /**
-     * 把 assets/config/system 解压到 filesDir/lvjiang/config/system。
+     * 把 assets/config/system 和 assets/config/local/layouts 解压到 filesDir/lvjiang/。
      *
      * 只在 APK 升级后首次启动时执行（versionCode 变化）；同版本重复启动跳过。
      * 不删旧文件再写——直接覆盖同名，残留的旧文件不影响（Python 侧按名字找）。
@@ -48,18 +48,22 @@ class App : Application() {
             }
         } catch (_: Exception) { 0 }
 
-        val target = File(filesDir, "lvjiang/config/system")
-        if (lastVersion == currentVersion && target.isDirectory) {
-            return  // 同版本且目录已在，跳过
+        val systemTarget = File(filesDir, "lvjiang/config/system")
+        val layoutTarget = File(filesDir, "lvjiang/config/local/layouts")
+        if (lastVersion == currentVersion && systemTarget.isDirectory && layoutTarget.isDirectory) {
+            return  // 同版本且目录均在，跳过
         }
 
         try {
-            target.mkdirs()
-            copyAssetDir("config/system", target)
+            systemTarget.mkdirs()
+            copyAssetDir("config/system", systemTarget)
+            layoutTarget.mkdirs()
+            copyAssetDir("config/local/layouts", layoutTarget)
             prefs.edit().putInt(KEY_VERSION, currentVersion).apply()
-            Log.i(TAG, "系统配置已解压到 ${target.absolutePath}（version=$currentVersion）")
+            Log.i(TAG, "系统配置已解压到 ${systemTarget.absolutePath}（version=$currentVersion）")
+            Log.i(TAG, "布局文件已解压到 ${layoutTarget.absolutePath}")
         } catch (e: Exception) {
-            Log.e(TAG, "系统配置解压失败", e)
+            Log.e(TAG, "配置解压失败", e)
         }
     }
 

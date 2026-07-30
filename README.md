@@ -22,9 +22,10 @@
 - **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放。
 - **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。
 - **装备评分规则**：可配置的词条上限（cap）、品阶推断、流派权重，支持鸣金 / 通用等评估器。
-- **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/35-workflows/02-auto-tuning.md)）。
+- **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/30-architecture/35-workflows/02-auto-tuning.md)）。
 - **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
 - **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
+- **安卓独立执行端（开发中）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [todo-android.md](todo-android.md)）。
 
 ---
 
@@ -50,21 +51,25 @@ PC 端投屏窗口 或 ADB 连接
 | 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、运行控制 |
 | 插件 | `src/lvjiang/apps/<name>/` | 游戏/场景专属插件（识别器、工作流、UI Tab） |
 | 燕云插件 | `src/lvjiang/apps/yysls/` | 装备解析、评分、调律、材料识别、专属 UI |
+| 设备端 | `src/lvjiang/core/ondevice/`、`android/` | 安卓独立执行端：无障碍截图/手势桥接、rapidocr 设备端适配、Kotlin 宿主工程 |
 
-更多细节见 [架构文档](docs/30-architecture/README.md) 与 [DSL 语法文档](docs/32-grammar/README.md)。
+更多细节见 [架构文档](docs/30-architecture/README.md) 与 [DSL 语法文档](docs/30-architecture/32-grammar/README.md)。
 
 ---
 
 ## 📂 目录结构
 
 ```
-yysls-lvjiang/
-├── src/                       # 通用视觉 RPA 引擎
-│   ├── __main__.py            # 启动入口（python -m src [-reg <plugin>]）
+lvjiang/
+├── src/lvjiang/               # 通用视觉 RPA 引擎（src-layout，唯一可导入包）
+│   ├── __main__.py            # 启动入口（python -m lvjiang [-reg <plugin>]）
 │   ├── app.py                 # QApplication 入口
 │   ├── config.py              # 配置加载与 Pydantic 校验
 │   ├── constants.py           # 路径与常量定义
 │   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局
+│   │   ├── desktop/           # 桌面投屏窗口后端
+│   │   ├── android/           # ADB / scrcpy 后端
+│   │   ├── ondevice/          # 设备端（Chaquopy）无障碍截图/输入与 OCR 适配
 │   │   └── recognizers/       # 可插拔识别器插件包
 │   ├── workflows/             # 工作流 DSL 语法、引擎与通用内置函数
 │   ├── ui/                    # PyQt6 通用图形界面
@@ -75,15 +80,16 @@ yysls-lvjiang/
 │           ├── evaluator/     # 评分与规则引擎
 │           ├── workflows/     # 燕云专属工作流与内置函数
 │           └── ui/            # 燕云专属 UI Tab
+├── android/                   # 安卓独立执行端（Kotlin + Chaquopy 宿主工程）
 ├── config/
-│   ├── system/            # 随版本发布的场景 / 工作流 / 规则配置
-│   └── local/             # 运行时生成的本地数据（已 .gitignore）
-├── data/                  # 材料模板图、scrcpy-server 等资源
-├── docs/                  # 分层文档（游戏机制 / 需求 / 架构 / 语法 / 流程）
-├── scripts/               # 辅助脚本与手动测试
-├── tests/                 # pytest 测试
-├── dev.bat                # Windows 快捷启动脚本
-└── pyproject.toml         # 项目元数据与依赖
+│   ├── system/                # 随版本发布的场景 / 工作流 / 规则配置
+│   └── local/                 # 运行时生成的本地数据（已 .gitignore）
+├── data/                      # 材料模板图、scrcpy-server 等资源
+├── docs/                      # 分层文档（游戏机制 / 需求 / 架构 / 开发日志）
+├── scripts/                   # 辅助脚本与手动测试
+├── tests/                     # pytest 测试（按 src 三层结构分包）
+├── dev.bat                    # Windows 快捷启动脚本
+└── pyproject.toml             # 项目元数据与依赖
 ```
 
 ---
@@ -102,8 +108,8 @@ yysls-lvjiang/
 
 ```powershell
 # 1. 克隆仓库
-git clone <repo-url>
-cd yysls-lvjiang
+git clone git@github.com:wanda1416/lvjiang.git
+cd lvjiang
 
 # 2. 创建并激活虚拟环境
 python -m venv .venv
@@ -121,14 +127,16 @@ pip install -e ".[dev]"
 
 ```powershell
 # 方式一：纯通用模式（场景编辑 + 识别测试）
-python -m src
+python -m lvjiang
 
 # 方式二：加载燕云插件（通用引擎 + 燕云装备调律）
-python -m src -reg yysls
+python -m lvjiang -reg yysls
 
-# 方式三：Windows 快捷脚本（默认加载燕云插件）
+# 方式三：Windows 快捷脚本（默认加载燕云插件，自动设置 PYTHONPATH）
 .\dev.bat
 ```
+
+> src-layout 下 `lvjiang` 包位于 `src/` 内：已 `pip install -e .` 则直接可用；否则需先将 `src` 加入 `PYTHONPATH`（`dev.bat` 已处理）。
 
 启动后进入 PyQt6 主窗口，基本流程：
 
@@ -138,7 +146,7 @@ python -m src -reg yysls
 4. **选择部位与模式**：勾选需要处理的调律部位（武器类 / 防具类），选择批量筛选或精调。
 5. **开始执行**：实时查看画面预览、识别叠加与运行日志。
 
-> 详细业务流程见 [当前装备分析](docs/35-workflows/01-current-equip-analysis.md) 与 [自动调律流程](docs/35-workflows/02-auto-tuning.md)。
+> 详细业务流程见 [当前装备分析](docs/30-architecture/35-workflows/01-current-equip-analysis.md) 与 [自动调律流程](docs/30-architecture/35-workflows/02-auto-tuning.md)。
 
 ---
 
@@ -174,8 +182,8 @@ python -m src -reg yysls
 # 运行测试
 pytest
 
-# 运行单个测试文件
-pytest tests/test_parser.py
+# 运行单个测试文件（测试目录按 core / ui / workflows / yysls 分包）
+pytest tests/workflows/test_parser.py
 ```
 
 测试基线要求干净：`pyproject.toml` 中已将未处理警告升级为错误（`filterwarnings = ["error"]`）。
@@ -188,19 +196,22 @@ pytest tests/test_parser.py
 
 | 目录 | 内容 |
 |------|------|
-| [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、调律 / 转律规则 |
+| [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
+| [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
 | [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型 |
-| [`docs/30-architecture/`](docs/30-architecture/README.md) | 技术架构：主窗口状态机、场景 / 布局定义与编辑 |
-| [`docs/31-models/`](docs/31-models/) | 数据模型：装备模型、场景实现、会话与上下文 |
-| [`docs/32-grammar/`](docs/32-grammar/README.md) | 工作流 DSL 语法规范 |
-| [`docs/33-engine/`](docs/33-engine/README.md) | 引擎细节：截图与裁剪 |
-| [`docs/35-workflows/`](docs/35-workflows/README.md) | 业务流程编排 |
+| [`docs/30-architecture/`](docs/30-architecture/README.md) | 技术架构：主窗口状态机、插件系统 |
+| [`docs/30-architecture/31-models/`](docs/30-architecture/31-models/README.md) | 数据模型：装备模型、场景实现、会话与上下文 |
+| [`docs/30-architecture/32-grammar/`](docs/30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
+| [`docs/30-architecture/33-engine/`](docs/30-architecture/33-engine/README.md) | 引擎细节：截图与裁剪 |
+| [`docs/30-architecture/34-scene/`](docs/30-architecture/34-scene/README.md) | 场景 / 布局定义与编辑 |
+| [`docs/30-architecture/35-workflows/`](docs/30-architecture/35-workflows/README.md) | 业务流程编排 |
+| [`docs/40-development/`](docs/40-development/README.md) | 开发日志：按月归档的重构 / 决策记录 |
 
 ---
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善。完整路线见 [roadmap](docs/00-meta/roadmap.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（进行中）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)，安卓端迁移进度见 [todo-android.md](todo-android.md)。
 
 ---
 

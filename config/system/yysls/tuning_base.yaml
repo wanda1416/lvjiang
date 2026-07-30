@@ -29,22 +29,22 @@ materials:
     min_expect: top
     min_quality: gold
     food: 彩狗粮
-    on_insufficient: continue
-  - pct: 90
+    on_insufficient: skip
+  - pct: 88
     min_expect: excellent
     min_quality: gold
     food: 金狗粮
-    on_insufficient: continue
+    on_insufficient: skip
   - pct: 0
     min_expect: normal
     min_quality: gold
     food: ''
     on_insufficient: continue
-  - pct: 95
+  - pct: 92
     min_expect: top
     min_quality: purple
     food: 金狗粮
-    on_insufficient: continue
+    on_insufficient: skip
   - pct: 0
     min_expect: excellent
     min_quality: purple

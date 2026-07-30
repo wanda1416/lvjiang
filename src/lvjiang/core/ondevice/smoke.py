@@ -316,6 +316,54 @@ def _run_workflow() -> str:
     return "\n".join(report)
 
 
+def _run_execute() -> str:
+    """实际执行一个测试工作流，验证引擎执行链路"""
+    report = _Report(["=== 设备端工作流执行自检 target=run ==="])
+    _log(report[0])
+
+    ok, _ = _step(report, "1/3 运行时与依赖版本", lambda: _env_info(report))
+
+    if ok:
+        def create_and_run(report):
+            from ...constants import PROJECT_ROOT
+            from .workflow_runner import create_engine
+
+            # 创建工作流引擎
+            engine = create_engine()
+            report.append("引擎创建成功")
+
+            # 执行测试工作流
+            wf_path = PROJECT_ROOT / "config" / "system" / "workflows" / "_device_smoke_test.wf"
+            if not wf_path.exists():
+                raise RuntimeError(f"测试工作流不存在: {wf_path}")
+
+            report.append(f"开始执行: {wf_path.name}")
+            result = engine.execute(wf_path)
+            report.append(f"执行完成，结果: {result}")
+            report.append(f"变量表: {engine.variables}")
+            return engine
+
+        ok, engine = _step(report, "2/3 执行测试工作流", lambda: create_and_run(report))
+
+    if ok:
+        def verify_result(report):
+            # 验证循环计数正确（DSL 的 eval 算术返回 float）
+            count = engine.variables.get("count")
+            if count != 5 and count != 5.0:
+                raise RuntimeError(f"count 应为 5，实际为 {count}")
+            report.append(f"count = {count} [OK]")
+
+            msg = engine.variables.get("msg")
+            if msg != "hello from device":
+                raise RuntimeError(f"msg 应为 'hello from device'，实际为 {msg}")
+            report.append(f"msg = {msg!r} [OK]")
+
+        ok, _ = _step(report, "3/3 验证执行结果", lambda: verify_result(report))
+
+    report.append(f"\n{_LINE}\n结论：{'工作流执行通过' if ok else '存在失败步骤（见上方 FAILED）'}")
+    return "\n".join(report)
+
+
 def run(target: str = "ocr") -> str:
     """自检入口，返回完整报告文本（同时已逐行落盘 + 打进 logcat）
 
@@ -326,7 +374,8 @@ def run(target: str = "ocr") -> str:
         target: "ocr" 只验 OCR 链路（合成图，不需要 Shizuku）；
             "e2e" 验完整三通道闭环（截图 → OCR → 点击 → 再截图确认生效）；
             "config" 验系统配置加载链路（PROJECT_ROOT / scenes.yaml / workflows）；
-            "workflow" 验工作流引擎（loguru / 布局加载 / .wf 解析）。
+            "workflow" 验工作流引擎（loguru / 布局加载 / .wf 解析）；
+            "run" 实际执行测试工作流（变量赋值 + 循环 + 日志）。
     """
     _reset_log()
     try:
@@ -336,6 +385,8 @@ def run(target: str = "ocr") -> str:
             return _run_config()
         if target == "workflow":
             return _run_workflow()
+        if target == "run":
+            return _run_execute()
         return _run_ocr(target)
     except Exception:
         text = "自检自身异常：\n" + traceback.format_exc().rstrip()

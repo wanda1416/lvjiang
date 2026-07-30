@@ -1,4 +1,9 @@
-"""基础操作：点击 / point / arrow 拖拽 / 等待"""
+"""基础操作：点击 / point / arrow 拖拽 / 等待
+
+定位失败（区域 / point / arrow 在当前布局没绑定、等待参数未定义）一律
+抛错：这类失败意味着脚本或布局配错了，静默空转只会让后续步骤在错误
+的页面上继续乱点，比当场停下来危险得多。
+"""
 
 import random
 import time
@@ -16,13 +21,12 @@ class _ActionMixin:
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == field_key), None)
         if region is None:
-            logger.error(f"场景 {scene_key} 没有定义区域: {field_key}")
-            return
+            raise ValueError(
+                f"场景 {scene_key} 的区域未绑定坐标: {field_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
 
         screen_x, screen_y = self._region_to_screen(region, jitter)
-        if screen_x is None:
-            return
-
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{field_key}")
 
@@ -45,18 +49,18 @@ class _ActionMixin:
         if point is not None:
             self.click_point(scene_key, key)
             return
-        logger.error(f"场景 {scene_key} 没有定义 region 或 point: {key}")
+        raise ValueError(
+            f"场景 {scene_key} 的 region / point 未绑定坐标: {key}，"
+            f"请在场景布局编辑器中绑定后重试"
+        )
 
     def click_point(self, scene_key: str, point_key: str):
         """点击 point 中心（带半径内随机偏移）"""
         points = self._layout.get_scene_points(scene_key)
         point = next((p for p in points if p.key == point_key), None)
         if point is None:
-            logger.error(f"场景 {scene_key} 没有定义 point: {point_key}")
-            return
+            raise ValueError(f"场景 {scene_key} 的坐标点未绑定: {point_key}")
         screen_x, screen_y = self._point_to_screen(point)
-        if screen_x is None:
-            return
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}")
 
@@ -70,26 +74,21 @@ class _ActionMixin:
         arrows = self._layout.get_scene_arrows(scene_key)
         arrow = next((a for a in arrows if a.key == arrow_key), None)
         if arrow is None:
-            logger.error(f"场景 {scene_key} 没有定义 arrow: {arrow_key}")
-            return
+            raise ValueError(f"场景 {scene_key} 的方向未绑定: {arrow_key}")
         points = self._layout.get_scene_points(scene_key)
         from_point = next((p for p in points if p.key == arrow.from_key), None)
         if from_point is None:
-            logger.error(f"arrow {arrow_key} 的起点 point {arrow.from_key} 未定义")
-            return
+            raise ValueError(f"方向 {arrow_key} 的起点坐标点未定义: {arrow.from_key}")
         # 终点：吸附态动态查 point，绝对态直接用坐标
         if arrow.to_key is not None:
             to_point = next((p for p in points if p.key == arrow.to_key), None)
             if to_point is None:
-                logger.error(f"arrow {arrow_key} 的终点 point {arrow.to_key} 未定义")
-                return
+                raise ValueError(f"方向 {arrow_key} 的终点坐标点未定义: {arrow.to_key}")
             to_cx, to_cy = to_point.cx_ratio, to_point.cy_ratio
         else:
             to_cx, to_cy = arrow.to_cx_ratio, arrow.to_cy_ratio
         fx, fy = self._point_to_screen(from_point)
         tx, ty = self._ratio_to_screen(to_cx, to_cy)
-        if fx is None or tx is None:
-            return
         logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})" + (f" hold {hold}s" if hold else ""))
         self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration, hold=hold)
 
@@ -103,8 +102,9 @@ class _ActionMixin:
         """
         custom = self._delay.custom.get(delay_name)
         if custom is None:
-            logger.error(f"未知的等待参数: {delay_name}（请在配置管理→等待参数中定义）")
-            return
+            raise ValueError(
+                f"未知的等待参数: {delay_name}，请先在配置管理→等待参数中定义"
+            )
         actual = random.uniform(*custom.range)
         logger.debug(f"等待 {delay_name} = {actual:.2f}s")
         self.wait_seconds(actual)

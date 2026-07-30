@@ -6,10 +6,7 @@
   - [by 子句（短路识别）](#by-子句短路识别)
 - [二、recognize — 图像识别](#二recognize--图像识别)
 - [三、collect — 收集输出](#三collect--收集输出)
-- [四、eval — 赋值与函数调用](#四eval--赋值与函数调用)
-  - [算术表达式](#算术表达式)
-  - [字典字面量](#字典字面量)
-  - [find_key — 查找字典中匹配项的 key](#find_key--查找字典中匹配项的-key)
+- [四、eval — 赋值](#四eval--赋值)
 - [五、call — 调用子工作流](#五call--调用子工作流)
 - [六、log — 日志输出](#六log--日志输出)
 
@@ -31,11 +28,6 @@ scan scene_name.[a1, a2, ...] as $var by equals "文本"
 scan scene_name.[a1, a2, ...] as $var by contains "文本"
 scan scene_name.[a1, a2, ...] as $var by equals_any $list
 scan scene_name.[a1, a2, ...] as $var by contains_any $list
-
-# scene_name 可以是：
-#   [scene]    — 括号常量
-#   "scene"    — 字符串常量（等价于 [scene]）
-#   $var       — 变量引用（运行时解析为场景名）
 ```
 
 **示例**：
@@ -48,10 +40,6 @@ scan [equip_weapon_detail].[affix_1, affix_2] as $scan_result
 # 动态场景名
 eval $scene_name = "equip_weapon_detail"
 scan $scene_name.[affix_1] as $scan_result
-scan $scene_name.$region as $result
-
-# 字符串常量场景名
-scan "equip_weapon_detail".[affix_1] as $scan_result
 
 # by 子句短路识别
 scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3] as $key by contains "调律"
@@ -97,23 +85,12 @@ if $tune_key
     click [equip_weapon_detail].$tune_key
 end
 
-# 在材料格中找到指定材料
-recognize [equip_tune_detail].[material_1, material_2, material_3] as $slot by equals $material_name
-if $slot
-    click [equip_tune_detail].$slot
-end
-
 # 匹配多个目标之一
 eval $keywords = ["攻击", "防御"]
 scan [scene].[field_1, field_2, field_3] as $found by contains_any $keywords
 ```
 
-> **与 find_key 的关系**：`by` 子句是 `scan` + `find_key` 的语法糖。以下两行等价：
-> ```
-> scan [scene].[a, b, c] as $key by contains "文本"
-> scan [scene].[a, b, c] as $tmp / eval $key = find_key($tmp, "文本")
-> ```
-> 推荐使用 `by` 子句，更简洁且只需一次截图。
+> **与 find_key 的关系**：`by` 子句是 `scan` + `find_key` 的语法糖。推荐使用 `by` 子句，更简洁且只需一次截图。
 
 ## 二、recognize — 图像识别
 
@@ -126,20 +103,15 @@ scan [scene].[field_1, field_2, field_3] as $found by contains_any $keywords
 ```
 recognize scene_name as $var                   # 识别场景所有 slot
 recognize scene_name.[a1, a2] as $var          # 仅识别指定 Area
-recognize scene_name.$var as $result           # 动态 Area（变量指定单个 Area 名）
+recognize scene_name.$var as $result           # 动态 Area
 
-# 带 by 子句（短路识别，返回字段名）
+# 带 by 子句（短路识别）
 recognize scene_name.[a1, a2] as $var by equals "文本"
 recognize scene_name.[a1, a2] as $var by contains "文本"
 
 # 带 on group 子句（限定材料分组范围）
 recognize scene_name.[a1, a2] as $var on group "分组名"
 recognize scene_name.[a1, a2] as $var by equals $name on group "分组名"
-
-# scene_name 可以是：
-#   [scene]    — 括号常量
-#   "scene"    — 字符串常量（等价于 [scene]）
-#   $var       — 变量引用（运行时解析为场景名）
 ```
 
 **示例**：
@@ -152,14 +124,8 @@ recognize [material_grid].[slot_1, slot_2] as $mats
 # 动态场景名
 eval $scene = "material_grid"
 recognize $scene.[slot_1] as $mats
-recognize $scene.$slot_var as $result
 
-# by 子句短路识别（一次截图，找到首个匹配的材料格）
-recognize [equip_tune_detail].[
-        material_1, material_2, material_3
-    ] as $slot by equals $material_name
-
-# on group 子句限定分组范围（仅在指定分组的材料中匹配）
+# by 子句 + on group
 recognize [equip_tune_detail].[
         material_1, material_2, material_3
     ] as $slot by equals $material_name on group "调律材料"
@@ -169,8 +135,7 @@ recognize [equip_tune_detail].[
 
 - 识别结果 `$var` 为字典，key 为 Area 名，value 为材料类型名
 - 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `_coord_meta`
-- 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
-- **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str），详见上方 [by 子句说明](#by-子句短路识别)
+- **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str）
 - **on group 子句**：限定材料识别的分组范围，仅在指定分组的参考材料中匹配。支持字符串常量和变量引用
 
 ## 三、collect — 收集输出
@@ -193,16 +158,14 @@ collect "ok" as $result           # 字面量字符串存入
 ```
 collect $main_weapon              # output["main_weapon"] = $main_weapon
 collect $result as "status"       # output["status"] = $result
-collect session.equipped          # output["equipped"] = session.equipped
 
 # 字面量
 collect 0 as $exit_code           # output["exit_code"] = 0.0
 collect "ok" as $result           # output["result"] = "ok"
-collect 1 as $success             # output["success"] = 1.0
 
 # 动态 alias
 eval $key_name = "weapon_data"
-collect $result as $key_name      # output["weapon_data"] = $result（$key_name 的值作为 key）
+collect $result as $key_name      # output["weapon_data"] = $result
 ```
 
 **说明**：
@@ -210,11 +173,11 @@ collect $result as $key_name      # output["weapon_data"] = $result（$key_name 
 - 不带 `as`：将源值以变量名/字段名为 key 存入输出字典（name reification）
 - 带 `as "label"`：以静态字符串为 key 存入
 - 带 `as $alias`：以 `$alias` 的运行时值为 key 存入
-- 字面量源：支持数字（`0`、`3.14`）和字符串（`"ok"`），直接存入指定 key。字面量源必须带 `as` 子句，否则默认 key 为 `"value"`
+- 字面量源必须带 `as` 子句，否则默认 key 为 `"value"`
 
-## 四、eval — 赋值与函数调用
+## 四、eval — 赋值
 
-调用内置函数、字面量赋值、算术运算、初始化字典/列表、字典字段赋值。
+调用内置函数、字面量赋值、字典字段赋值。
 
 **语法**：
 
@@ -225,29 +188,13 @@ eval $var = 123                   # 数字赋值
 eval $var = {}                    # 初始化空字典
 eval $var = {"k": v}              # 字典字面量（支持嵌套）
 eval $var = ["a", "b"]           # 列表赋值
-eval $var = $a + $b * 2           # 算术表达式
 eval $var.field = value           # 字典字段赋值（单层）
 eval $var.f1.f2 = value           # 字典链式字段赋值（自动创建中间层）
 eval $var.$key = value            # 动态字段名赋值
 eval func(args...)                # 调用函数，丢弃返回值
 ```
 
-### 算术表达式
-
-eval 赋值右侧支持 `+` `-` `*` `/` 四则运算，运算两侧可以是数字、变量引用、字段访问、函数调用：
-
-```
-eval $x = 1 + 2                   # 数字常量运算 → 3.0
-eval $x = $a + $b                 # 变量间运算
-eval $x = $a * 2 + $b / 3        # 混合运算
-eval $x = ($a + $b) * ($c - 1)   # 括号改变优先级
-```
-
-**规则**：
-- 优先级：`*` `/` 高于 `+` `-`，支持 `()` 改变优先级
-- 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
-- 不支持 `mod` 运算符（可提供 `mod()` 函数）
-- 算术表达式也可用于 if 条件比较的两侧（见 [04-control-flow.md](04-control-flow.md)）
+> 算术表达式（`+` `-` `*` `/`）和隐式 eval 的详细说明见 [01-basics.md](01-basics.md#四表达式)。
 
 ### 字典字面量
 
@@ -259,7 +206,6 @@ eval $d = {"a": "b", "c": "d"}              # 字符串值
 eval $d = {"count": 3, "name": $user}       # 数字值 + 变量引用
 eval $d = {"nested": {"k": "v"}}            # 嵌套字典
 eval $d = {"list": [1, 2, $var]}            # 列表值
-eval $d = {"a": "b"}                        # 隐式 eval 同样支持
 ```
 
 列表字面量同样支持嵌套字典：
@@ -268,34 +214,7 @@ eval $d = {"a": "b"}                        # 隐式 eval 同样支持
 eval $list = [{"k": "v"}, {"k2": "v2"}]     # 列表含字典元素
 ```
 
-详细说明见 [05-functions.md](05-functions.md)。
-
-### find_key — 查找字典中匹配项的 key
-
-在 `scan` / `recognize` 产出的字典中查找 value 包含目标文本的项，返回其 key 名。
-
-```
-eval $key = find_key($scan_result, "调律")     # 找到则返回 key 名，否则返回 ""
-```
-
-配合 `click [scene].$key` 使用：
-
-```
-scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_scan
-eval $tune_key = find_key($tune_scan, "调律")
-if $tune_key
-    click [equip_weapon_detail].$tune_key
-end
-```
-
-> **推荐**：上述模式可用 `by` 子句一步完成，无需中间字典变量：
-> ```
-> scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
-> if $tune_key
->     click [equip_weapon_detail].$tune_key
-> end
-> ```
-> `find_key` 仍适用于需要对扫描结果做多次查找或复杂处理的场景。
+内置函数全集见 [06-functions.md](06-functions.md)。
 
 ## 五、call — 调用子工作流
 
@@ -310,7 +229,7 @@ call "sub.wf" read "key" as $var                    # 提取返回值
 call "sub.wf" with $x as "arg1" read "key" as $var  # 传参 + 提取
 ```
 
-详细说明见 [06-subworkflows.md](06-subworkflows.md)。
+详细说明见 [07-subworkflows.md](07-subworkflows.md)。
 
 ## 六、log — 日志输出
 
@@ -334,4 +253,4 @@ log $result.status
 log concat("当前槽位：", $slot)
 ```
 
-控制流与条件表达式详见 [04-control-flow.md](04-control-flow.md)。
+控制流与条件表达式详见 [05-control-flow.md](05-control-flow.md)。

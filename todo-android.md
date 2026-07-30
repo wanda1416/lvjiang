@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-30（Phase 2 进行中：pydantic 剥离 + 基类继承已实机验证）
+> 最后更新：2026-07-30（Phase 2 进行中：配置加载链路 4 步全绿，session 写入链路待补）
 
 ---
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | Phase 0：环境 + 骨架 + 悬浮服务 | ✅ 完成 | JDK/SDK/Gradle 便携化、Chaquopy 接入、悬浮窗、Shizuku 通道 |
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
-| Phase 2：核心逻辑移植与配置分层 | 🔧 进行中 | pydantic 已剥离（dataclass），基类继承与 DelayConfig 注入已上设备 |
+| Phase 2：核心逻辑移植与配置分层 | 🔧 进行中 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发均已实机验证 |
 | Phase 3：工作流引擎设备端跑通 | ⏳ 未开始 | |
 | Phase 4：打包发布与稳定性 | ⏳ 未开始 | |
 
@@ -103,10 +103,23 @@
   - 设备端 e2e 自检重跑全绿，新继承链实机验证通过
 - [x] 修复重装后无障碍不重新绑定：`enable_a11y.py` 改为「先摘除再写回」强制刷新
   （重装后 settings 残留条目不触发绑定，vivo 实测）
-- [ ] 配置层搬上设备：设备端 session/YAML 的存放与加载（config.py 已可导入，
-  SESSION_PATH 不存在时走默认值；还缺设备端写入/下发链路）
-- [ ] 工作流 YAML 下发到设备应用私有目录（`filesDir`，不污染用户数据目录）
-- [ ] 场景定义 / 区域配置的设备端加载
+- [x] 系统配置随 APK 分发（2026-07-30）
+  - `build.gradle.kts` 加 Sync 任务：`config/system/` → APK assets（构建时自动同步）
+  - `App.kt` 加 `syncSystemConfig()`：首次启动 / APK 升级后解压到 `filesDir/lvjiang/config/system/`
+    （用 versionCode 做 stamp，同版本重复启动跳过）
+  - `constants.py` 的 `_project_root()` 在安卓端返回 `$HOME/lvjiang`
+    （Chaquopy 的 `HOME` = `/data/user/0/com.lvjiang.app/files`）
+  - 实机验证：`scenes.yaml` + `workflows/`（10 个文件）+ `yysls/` 全部到位
+- [x] 重装后 e2e 自检再次全绿（2026-07-30 第二轮）
+  - pm install 绕过安装确认框 → enable_a11y 强制刷新绑定 → e2e 13s 完成
+  - 截图 1260x2800 / OCR 1.72s / 点击生效确认 3.15s
+- [x] 场景定义 / 区域配置的设备端加载（2026-07-30）
+  - `target=config` 自检 4 步全绿：constants 路径解析 → scenes.yaml 解析（16 个场景文件）
+    → workflows.yaml 解析（8 个工作流文件）
+- [x] 工作流 YAML 的设备端加载验证（2026-07-30）
+  - `workflows/*.wf` 已随 assets 解压，`load_yaml` 可正确解析
+- [ ] session.json 设备端写入链路：设备端没有桌面 UI 的「配置管理」页，
+  需要确定 session 的初始值来源（默认空 / 随 APK 分发一份种子 / 首次运行自动生成）
 
 ## Phase 3 待办：工作流引擎设备端跑通
 
@@ -127,19 +140,19 @@
 
 ```
 git status:
- M .gitignore
- M config/system/scenes/game_menu_page.yaml
- M scripts/count_file_and_code.py
+ M android/app/build.gradle.kts    ← Sync 任务：config/system → assets
+ M src/lvjiang/constants.py         ← _project_root() 安卓端分支
+ M android/app/src/main/java/com/lvjiang/app/App.kt  ← syncSystemConfig() 解压逻辑
 ?? android/                          ← 整个 Android 工程（含 Kotlin + 资源 + pystubs）
 ?? src/lvjiang/core/ondevice/        ← 设备端 Python 模块（8 个文件）
 ```
 
-`.tooling/` 下的脚本（enable_a11y.py、run_selftest.py 等）也是新增，但 .tooling 本身可能已 gitignore。
+`.tooling/` 下的脚本（enable_a11y.py、run_selftest.py 等）也是新增，但 .tooling 本身已 gitignore。
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **提交 Phase 2 阶段性成果**（pydantic 剥离 + 基类继承 + enable_a11y 修复）
-2. **配置层设备端落地**：session/工作流 YAML 的存放位置与下发链路
-3. **场景定义设备端加载** → 进入 Phase 3（DSL 引擎设备端跑通）
+1. **session.json 策略确定**：设备端初始 session 来源（默认空 vs 种子文件）
+2. **工作流 DSL 引擎设备端跑通**（Phase 3）
+3. **提交 Phase 2 阶段性成果**（constants + App.kt + build.gradle.kts + config 自检）

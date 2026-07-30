@@ -208,6 +208,62 @@ def _recognize(report: list[str], engine):
     return [text for _, text, _ in result]
 
 
+# ─── 配置加载链路验证（Phase 2）────────────────────────────────────
+#
+# 验证 App.kt 解压的 assets 能被 Python 侧正确找到并解析。
+# 不需要无障碍/Shizuku，纯文件系统 + YAML 解析。
+
+def _run_config() -> str:
+    report = _Report(["=== 设备端配置加载自检 target=config ==="])
+    _log(report[0])
+
+    ok, _ = _step(report, "1/4 运行时与依赖版本", lambda: _env_info(report))
+
+    if ok:
+        def check_constants(report):
+            from ...constants import PROJECT_ROOT, SYSTEM_CONFIG_DIR, SCENES_CONFIG_PATH
+            report.append(f"PROJECT_ROOT       {PROJECT_ROOT}")
+            report.append(f"SYSTEM_CONFIG_DIR  {SYSTEM_CONFIG_DIR}")
+            report.append(f"SCENES_CONFIG_PATH {SCENES_CONFIG_PATH}")
+            if not SYSTEM_CONFIG_DIR.is_dir():
+                raise RuntimeError(f"SYSTEM_CONFIG_DIR 不存在: {SYSTEM_CONFIG_DIR}")
+            children = sorted(p.name for p in SYSTEM_CONFIG_DIR.iterdir())
+            report.append(f"内容             {children}")
+        ok, _ = _step(report, "2/4 constants 路径解析", lambda: check_constants(report))
+
+    if ok:
+        def check_scenes(report):
+            from ...constants import SCENES_CONFIG_PATH, SYSTEM_CONFIG_DIR
+            from ...config import load_yaml
+            data = load_yaml(SCENES_CONFIG_PATH)
+            if not data:
+                raise RuntimeError(f"scenes.yaml 为空或解析失败: {SCENES_CONFIG_PATH}")
+            keys = list(data.keys())
+            report.append(f"scenes.yaml 顶层 key  {keys}")
+            # 检查场景定义子目录
+            scenes_dir = SYSTEM_CONFIG_DIR / "scenes"
+            if not scenes_dir.is_dir():
+                raise RuntimeError(f"scenes/ 目录不存在: {scenes_dir}")
+            scene_files = sorted(p.name for p in scenes_dir.glob("*.yaml"))
+            report.append(f"scenes/ 文件数      {len(scene_files)}")
+            report.append(f"scenes/ 前 5 个     {scene_files[:5]}")
+        ok, _ = _step(report, "3/4 scenes.yaml 解析", lambda: check_scenes(report))
+
+    if ok:
+        def check_workflows(report):
+            from ...constants import SYSTEM_CONFIG_DIR, WORKFLOWS_CONFIG_PATH
+            from ...config import load_yaml
+            data = load_yaml(WORKFLOWS_CONFIG_PATH)
+            report.append(f"workflows.yaml 顶层 key  {list(data.keys())}")
+            wf_dir = SYSTEM_CONFIG_DIR / "workflows"
+            wf_files = sorted(p.name for p in wf_dir.glob("*.wf"))
+            report.append(f"workflows/*.wf 数         {len(wf_files)}")
+            report.append(f"workflows/ 前 5 个        {wf_files[:5]}")
+        ok, _ = _step(report, "4/4 workflows 解析", lambda: check_workflows(report))
+
+    report.append(f"\n{_LINE}\n结论：{'配置加载全部通过' if ok else '存在失败步骤（见上方 FAILED）'}")
+    return "\n".join(report)
+
 def run(target: str = "ocr") -> str:
     """自检入口，返回完整报告文本（同时已逐行落盘 + 打进 logcat）
 
@@ -216,11 +272,16 @@ def run(target: str = "ocr") -> str:
 
     Args:
         target: "ocr" 只验 OCR 链路（合成图，不需要 Shizuku）；
-            "e2e" 验完整三通道闭环（截图 → OCR → 点击 → 再截图确认生效）。
+            "e2e" 验完整三通道闭环（截图 → OCR → 点击 → 再截图确认生效）；
+            "config" 验系统配置加载链路（PROJECT_ROOT / scenes.yaml / workflows）。
     """
     _reset_log()
     try:
-        return _run_e2e() if target == "e2e" else _run_ocr(target)
+        if target == "e2e":
+            return _run_e2e()
+        if target == "config":
+            return _run_config()
+        return _run_ocr(target)
     except Exception:
         text = "自检自身异常：\n" + traceback.format_exc().rstrip()
         _log(text)

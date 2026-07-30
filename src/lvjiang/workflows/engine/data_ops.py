@@ -19,11 +19,26 @@ from ..grammar import (
     SceneRef,
     VarRef,
 )
-from .signals import _ReturnSignal
+from .signals import WorkflowUserError, _ReturnSignal
 
 
 class _DataOpsMixin:
     """数据指令执行：OCR/识别取数、collect 输出、eval 赋值、过程调用"""
+
+    def _dynamic_field_keys(self, region_var) -> list[str]:
+        """[scene].$var 动态区域 → 字段 key 列表
+
+        变量未定义/为空时 str(None) 会变成 "None" 这种永远查不到的假 key，
+        识别层只能报「区域未绑定坐标」，看不出根因是变量没值，故先拦一道。
+        """
+        region_key = self._resolve(region_var)
+        if region_key is None or region_key == "" or region_key == []:
+            desc = getattr(region_var, "name", region_var)
+            raise WorkflowUserError(f"动态区域 ${desc} 取到空值，无法定位区域")
+        if isinstance(region_key, list):
+            # 列表变量：展开为多字段 key
+            return [str(k) for k in region_key]
+        return [str(region_key)]
 
     def _exec_scan(self, node: Scan):
         # PanelRef: panel cell 级 OCR
@@ -41,12 +56,7 @@ class _DataOpsMixin:
             field_keys = [self._resolve(f) for f in node.fields]
         elif node.region_var:
             # 动态 region：[scene].$var → 解析变量值
-            region_key = self._resolve(node.region_var)
-            if isinstance(region_key, list):
-                # 列表变量：展开为多字段 key
-                field_keys = [str(k) for k in region_key]
-            else:
-                field_keys = [str(region_key)]
+            field_keys = self._dynamic_field_keys(node.region_var)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
 
         if node.by is not None:
@@ -82,12 +92,7 @@ class _DataOpsMixin:
             field_keys = [self._resolve(f) for f in node.fields]
         elif node.region_var:
             # 动态 region：[scene].$var → 解析变量值
-            region_key = self._resolve(node.region_var)
-            if isinstance(region_key, list):
-                # 列表变量：展开为多字段 key
-                field_keys = [str(k) for k in region_key]
-            else:
-                field_keys = [str(region_key)]
+            field_keys = self._dynamic_field_keys(node.region_var)
 
         # 解析可选的 group 子句
         group = None

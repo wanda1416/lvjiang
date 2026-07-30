@@ -7,7 +7,8 @@
 组间 OR、组内 AND，组可绑定开关前提 when）。
 判定顺序 junk → normal → excellent → top，全不命中取默认判定
 （部位级优先，缺省跟随规则设置页）；槽位全推导，无必选/可选槽
-声明。候选为标准词条全集。
+声明。候选为当前可用词条库（首词条不豁免，池外词条无法参与
+判定），选择对话框按归类顺序平铺。
 编辑共享 raw dict 顶层的 patterns.<part> 子树。
 """
 
@@ -17,8 +18,16 @@ from typing import Callable
 
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QTabBar,
-    QToolButton, QToolTip, QVBoxLayout, QWidget,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTabBar,
+    QToolButton,
+    QToolTip,
+    QVBoxLayout,
+    QWidget,
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import RATING_KEYS, RATING_LABELS
@@ -199,7 +208,7 @@ class PartPatternPage(QWidget):
 
     def _pick_first(self):
         dlg = AffixSelectSortDialog(self._candidates, self._first,
-                                    "选择首词条候选", self)
+                                    "选择首词条候选", self, flat=True)
         if dlg.exec():
             self._first = dlg.selected()
             self._update_first_text()

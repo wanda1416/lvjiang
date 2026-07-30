@@ -13,13 +13,22 @@ from typing import Callable
 from loguru import logger
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
-    QFrame, QHBoxLayout, QListWidget, QListWidgetItem, QScrollArea,
-    QStackedWidget, QVBoxLayout, QWidget,
+    QFrame,
+    QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    DYNAMIC_AFFIXES, GENERIC_ATTR, TuningRuleManager,
+    DYNAMIC_AFFIXES,
+    GENERIC_ATTR,
+    TuningRuleManager,
     rule_affix_candidates,
+    specific_attr_names,
 )
 
 from .common_judge_page import CommonJudgePage
@@ -59,7 +68,7 @@ class RulePanel(QWidget):
     """单规则编辑面板（持有 raw dict 深拷贝为工作副本）"""
 
     def __init__(self, key: str, manager: TuningRuleManager,
-                 status_cb: Callable[[str, bool], None],
+                 status_cb: Callable[[str, bool | str], None],
                  on_delete: Callable[[str], None] | None = None,
                  parent=None):
         super().__init__(parent)
@@ -68,8 +77,13 @@ class RulePanel(QWidget):
         self._status_cb = status_cb
         self._on_delete = on_delete
         self._data = manager.get_raw(key)
-        # 规则可引用词表（校验与候选的统一来源）
+        # 规则可引用词表（校验与池/转律库候选的统一来源）
         self._candidates = self._build_candidates()
+        # 判定区（首词条/四档条件）候选：收窄为当前可用词条库。
+        # 各页共享同一 list 实例，池变更后在 _on_changed 原地刷新，
+        # 选择对话框打开时即读到最新池内容
+        self._judge_candidates: list[str] = list(
+            self._data.get("affix_pool") or [])
         self._init_ui()
         self._load_pages()
 
@@ -124,14 +138,14 @@ class RulePanel(QWidget):
         self._stack.addWidget(self._wrap_scroll(self._settings_page))
         self._pool_page = PoolPage(self._candidates, self._on_changed)
         self._stack.addWidget(self._wrap_scroll(self._pool_page))
-        self._common_page = CommonJudgePage(self._candidates,
+        self._common_page = CommonJudgePage(self._judge_candidates,
                                             self._on_changed)
         self._stack.addWidget(self._wrap_scroll(self._common_page))
         self._part_pages: list[PartPatternPage] = []
         for title, part_key in _NAV_ITEMS:
             if part_key is None:
                 continue
-            page = PartPatternPage(part_key, title, self._candidates,
+            page = PartPatternPage(part_key, title, self._judge_candidates,
                                    self._on_changed)
             self._part_pages.append(page)
             self._stack.addWidget(self._wrap_scroll(page))
@@ -163,6 +177,8 @@ class RulePanel(QWidget):
     # ── 收集 → 校验 → 写盘 → reload ──
 
     def _on_changed(self):
+        # 池可能刚被编辑：原地刷新判定区共享候选
+        self._judge_candidates[:] = list(self._data.get("affix_pool") or [])
         err = self._manager.validate(self._data)
         if err:
             self._status_cb(f"校验失败（未保存）：{err}", True)
@@ -174,7 +190,19 @@ class RulePanel(QWidget):
             self._status_cb(f"保存失败：{e}", True)
             return
         now = datetime.now().strftime("%H:%M:%S")
-        self._status_cb(f"已保存并生效（{now}）", False)
+        warn = self._soft_pool_warning()
+        if warn:
+            self._status_cb(f"已保存并生效（{now}）；{warn}", "warn")
+        else:
+            self._status_cb(f"已保存并生效（{now}）", False)
+
+    def _soft_pool_warning(self) -> str | None:
+        """软校验（不阻止保存）：可用词条库同时含动态属攻与
+        真实属攻（非无相）时提醒统一风格，避免名实混用"""
+        pool = set(self._data.get("affix_pool") or [])
+        if pool & set(DYNAMIC_AFFIXES) and pool & set(specific_attr_names()):
+            return "发现同时配置 动态属攻和真实属攻，建议修正"
+        return None
 
     def _request_delete(self):
         """规则设置页「删除本规则」→ 交由对话框执行删除并移除 Tab"""

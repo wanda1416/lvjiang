@@ -18,3 +18,8 @@ regions:
   is_text: false
   is_clickable: true
   view: camera
+- key: back
+  name: 返回
+  type: func
+  is_text: false
+  is_clickable: true

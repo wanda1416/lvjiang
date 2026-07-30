@@ -125,8 +125,8 @@ def action_heying($label, $idx)
    click [activity_jianghu].$label after wait $step_interval
    click [activity_jianghu].[goto] after wait $step_interval
    click [action_control].[camera_shot] after wait $step_interval
-   click [game_menu_page].[back] after wait $step_interval
-   click [game_menu_page].[back] after wait $step_interval
+   click [action_control].[back] after wait $step_interval
+   click [action_control].[back] after wait $step_interval
    click [action_control].[back_confirm] after wait $step_interval
 
    # 第六个任务已是最后一个，无需返回活动页
@@ -152,7 +152,15 @@ def back_to_haoling()
       return
    end
    click [game_menu_page].$menpai_key after wait $step_interval
-   click [ui_school_main].[haoling] after wait $step_interval
+   # 门派页两种形态：有门派（基底，入口文字「江湖号令」）
+   # / 无门无派（no_school 视图，入口换成 haoling_2）
+   scan [ui_school_main].[haoling] as $haoling_key by contains "江湖号令"
+   if $haoling_key
+      click [ui_school_main].$haoling_key after wait $step_interval
+   else
+      log "未读到江湖号令，按无门无派处理，改点号令入口"
+      click [ui_school_main].[haoling_2] after wait $step_interval
+   end
 end
 
 # 情境：点击任务 → 弹出情境视图（确认×2 → 展开 → 前往编辑情境）
@@ -160,7 +168,7 @@ end
 # → 情境基底返回退回号令页 → 号令页连点两次返回回到号令主页面
 def action_qingjing($label)
    click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[confirm] after wait $step_interval
+   click [activity_jianghu].[goto] after wait $step_interval
    click [activity_jianghu].[confirm] after wait $step_interval
    click [activity_jianghu].[expand_up] after wait $step_interval
    click [activity_jianghu].[goto_edit_qingjing] after wait $step_interval

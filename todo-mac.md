@@ -51,28 +51,28 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 | `ui/main_window.py` pynput 全局热键 F8-F10 | mac 需「输入监控+辅助功能」权限，F 键默认媒体键 | 权限未授予时降级为窗口内热键（`keyPressEvent` 已处理），启动时提示 |
 | `_backend` 默认值 `"windows"`（散布约 10 处 `getattr(self, "_backend", "windows")`） | mac 上应默认 `"adb"` 并隐藏窗口扫描入口 | UI 层小改 |
 
-### 依赖版本下限（"较早的 mac" 的真正约束）
+### 依赖版本下限（2026-07-31 macOS 12.7.6 x86_64 实测更新）
 
-| 依赖 | 约束 | 影响 |
+| 依赖 | 约束（macOS 12 实测） | 影响 |
 |---|---|---|
-| PyQt6>=6.6（Qt 6.6） | **需 macOS 11 Big Sur+** | 最硬的下限。支持 10.14/10.15 须降到 PyQt6 6.4.x（Qt 6.4 支持 10.14+），且要验证 UI 代码在 6.4 下无 API 缺口 |
-| onnxruntime 1.20 | 1.19+ 疑似要求 macOS 13.3+（待实测 wheel 的 `MACOSX_DEPLOYMENT_TARGET`） | 老系统可能要 pin 到 1.16/1.17，连带调整 rapidocr 版本 |
-| av / mss / pynput / numpy | 下限宽松（~10.13+） | 无风险 |
-| Python 3.10+ | python.org 安装包支持 10.9+ | 无风险 |
+| PyQt6 | **6.8+ 需 macOS 13+**；macOS 12 须 pin `<6.8`（实测 6.7.1 OK） | pyproject 已加平台标记 |
+| onnxruntime | **1.20+ 需 macOS 13+**；macOS 12 回退到 1.19.2 | pyproject 已放宽到 `>=1.19,<1.21` |
+| opencv-python | **4.11+/5.x 需 macOS 13-14+**；macOS 12 须 pin `==4.10.0.84` | pyproject 已加平台标记 |
+| Python | 3.12（onnxruntime 1.19 支持的最高版本） | — |
+| av / mss / pynput / numpy | 无风险 | — |
 
-**建议支持基线：macOS 11 Big Sur**（2013 年后绝大多数机型可升级到 11）。
-如确有 10.15 及以下需求，成本跳升（双版本依赖矩阵 + Qt 6.4 回归），建议明确排除。
+**实测结论：macOS 12 Monterey 可用，但需多包版本约束。建议支持基线仍为 macOS 11+，但 macOS 12/13 的依赖矩阵已验证。**
 
 ---
 
-## Phase 0 待办：依赖可行性验证（0.5~1 天，需 mac 真机）
+## Phase 0 待办：依赖可行性验证（✅ 2026-07-31 完成）
 
-- [ ] **P0-a** 目标 mac 上安装 Python 3.10+，`pip install -e ".[dev]"` 全部依赖
-  - 重点：onnxruntime + rapidocr-onnxruntime 在该 macOS 版本上的可装版本组合
-  - 若 onnxruntime 1.20 装不上，测试 pin 1.17/1.16 的组合，记录 pyproject 需要的平台条件依赖
-- [ ] **P0-b** 跑全量 `pytest tests`（约 833 例，DSL/OCR 逻辑纯 Python，预期全绿）
-- [ ] **P0-c** 单独验证 OCR 实链路：rapidocr 加载模型 + 对 `data/references/` 任一图片推理
-- [ ] **P0-d** 产出结论：实际支持的最低 macOS 版本 + 依赖 pin 矩阵（写回本文档）
+- [x] **P0-a** ✅ macOS 12.7.6 x86_64 上安装 Python 3.12 + 全部依赖
+  - onnxruntime 1.19.2 + rapidocr-onnxruntime 1.4.4 + opencv-python 4.10.0.84 + PyQt6 6.7.1
+  - pyproject.toml 已加平台条件依赖（macOS 专属版本约束）
+- [x] **P0-b** ✅ 跑全量 `pytest tests`：**880 例全绿**（53.6s）
+- [x] **P0-c** ✅ OCR 实链路验证：rapidocr 模型加载 + 推理 OK
+- [x] **P0-d** ✅ 产出结论：macOS 12+ 可用，依赖 pin 矩阵见上表
 
 ## Phase 1 待办：ADB 模式跑通（2~3 天）
 
@@ -131,17 +131,21 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 
 1. ~~**P1-a ~ P1-f**：平台门控改动~~ ✅ 已完成（2026-07-31）
 2. ~~**P1-f.2**：平台适配层重构~~ ✅ 已完成（2026-07-31）
-3. **P0 全部**：拿到目标 mac（macOS 11+）后做依赖验证，产出 onnxruntime pin 矩阵
-4. **P1-g**：mac 真机跑通 ADB 模式全链路
+3. ~~**P0 全部**：mac 真机依赖验证~~ ✅ 已完成（2026-07-31，macOS 12.7.6 x86_64）
+4. **P1-g 续**：连接 Android 设备 → scrcpy 流截图 → OCR → 跑一条完整调律工作流
 
-### 实施备注（2026-07-31）
+### 实施备注（2026-07-31 更新）
 
+- **pyproject.toml 已更新**：
+  - `PyQt6>=6.6,<6.8; sys_platform == 'darwin'`（macOS 专属）
+  - `onnxruntime>=1.19,<1.21`（放宽以支持 macOS 12）
+  - `opencv-python==4.10.0.84; sys_platform == 'darwin'`（macOS 专属）
+  - `lark>=1.1`（补漏的 DSL 解析器依赖）
+- **启动验证**：应用可正常启动，仅有预期警告（Consolas 字体、pynput 权限）
 - `_backend` 未改默认值：仍为 `None`（未选模式），非 Windows 上因「扫描窗口」入口已隐藏，
   用户只能走「扫描设备」→ `_backend = "adb"`，无需硬编码默认值
 - 脚本录制（script_record_dialog）依赖桌面投屏模式，ADB 模式本就禁用，mac 上自然不可用
 - `ui/overlay.py`（Win32 边框层）所有方法均有 `_hwnd` 门控，mac 上从不创建窗口，无需改动
-- 依赖均有 mac wheel（universal2/x86_64），pyproject 无需平台标记；onnxruntime 能否在
-  macOS 11 装上待 Phase 0 实测（风险清单 #1）
 - 主流程平台差异已收口到 `core/platforms.py` 适配层（桌面输入后端创建、全局热键
   启动策略、原生弹窗回退、adb 候选路径、投屏入口可见性）；具体实现内部的门控
   （win32_util、capture、pynput_patch 等）保持原位不抽象

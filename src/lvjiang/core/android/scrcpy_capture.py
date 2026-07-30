@@ -524,8 +524,8 @@ class AndroidStreamCapture(CaptureBackend):
             if len(buf) > 1024 * 1024:
                 buf = buf[-65536:]
 
-        # flush
-        if self._decoder:
+        # flush decoder 仅在正常退出时执行（非停止信号触发），避免退出时阻塞
+        if self._running and self._decoder:
             try:
                 for frame in self._decoder.decode():
                     bgr = self._frame_to_bgr(frame)

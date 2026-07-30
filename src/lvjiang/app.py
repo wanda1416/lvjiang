@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
+import time
 from typing import Any
 
 from PyQt6.QtWidgets import QApplication
@@ -15,6 +17,30 @@ from .ui.main_window import MainWindow
 from .ui.widgets import install_wheel_guard
 
 logger = logging.getLogger(__name__)
+
+
+def _wait_for_threads(timeout: float = 5.0) -> None:
+    """等待所有非主线程退出，避免退出时 native crash。
+
+    PyQt6/SIP 在 QApplication 析构时会清理 Qt 包装器，如果此时还有
+    后台线程（如 PyAV 解码线程）在访问 C 扩展对象，会导致段错误。
+    此函数在 aboutToQuit 时调用，确保线程先于 Qt 清理退出。
+    """
+    main_thread = threading.current_thread()
+    pending = [
+        t for t in threading.enumerate()
+        if t is not main_thread and t.is_alive() and t.daemon
+    ]
+    if not pending:
+        return
+
+    logger.debug(f"[app] 等待 {len(pending)} 个后台线程退出 (timeout={timeout}s)...")
+    deadline = time.monotonic() + timeout
+    for t in pending:
+        remaining = max(0.1, deadline - time.monotonic())
+        t.join(timeout=remaining)
+        if t.is_alive():
+            logger.warning(f"[app] 线程 {t.name} 未按时退出，强制继续")
 
 
 def run_app(hooks_list: list[Any] | None = None) -> int:
@@ -37,5 +63,8 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     window = MainWindow(hooks_list=hooks_list)
     window.show()
+
+    # 退出前等待后台线程，避免 PyQt6/SIP 清理时的 native crash
+    app.aboutToQuit.connect(_wait_for_threads)
 
     return app.exec()

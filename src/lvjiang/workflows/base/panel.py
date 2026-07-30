@@ -72,11 +72,18 @@ class _PanelMixin:
         return int(self._window_left + csx), int(self._window_top + csy)
 
     def align_panel(self, scene_key: str, panel_key: str) -> "GridAlignment | None":
-        """对齐 panel 网格，缓存结果并返回 GridAlignment"""
+        """对齐 panel 网格，缓存结果并返回 GridAlignment
+
+        panel 没在布局里定义是配置错误，直接抛错；截图失败 / 未检测到
+        slot 属于运行时情况（列表为空、页面未加载完），继续返回 None
+        交由调用方判断。
+        """
         panel_obj = self._find_panel(scene_key, panel_key)
         if panel_obj is None:
-            logger.error(f"align: 场景 {scene_key} 未找到 panel {panel_key}")
-            return None
+            raise ValueError(
+                f"align: 布局中未定义 panel {scene_key}.{panel_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
         panel_img = self._capture_panel_image(panel_obj)
         if panel_img is None:
             logger.error(f"align: 无法截取 panel {scene_key}.{panel_key}")
@@ -102,7 +109,11 @@ class _PanelMixin:
         self._panel_alignments.pop((scene_key, panel_key), None)
 
     def click_panel(self, scene_key: str, panel_key: str, row: int, col: int) -> bool:
-        """点击 panel 中指定格子（1-based），返回是否成功"""
+        """点击 panel 中指定格子（1-based），返回是否成功
+
+        未对齐 / 索引越界返回 False 而不抛错：调用方把越界当作遍历网格
+        的终止条件。panel 本身没绑定则由 align_panel 抛错。
+        """
         cal = self._ensure_aligned(scene_key, panel_key)
         if cal is None:
             return False
@@ -111,8 +122,6 @@ class _PanelMixin:
             logger.debug(f"panel 索引越界: [{row}][{col}]，对齐结果 {cal.n_rows}×{cal.n_cols}")
             return False
         panel_obj = self._find_panel(scene_key, panel_key)
-        if panel_obj is None:
-            return False
         cx, cy = cal.slot_center(row_idx, col_idx)
         sx, sy = self._panel_ratio_to_screen(panel_obj, cx, cy)
         self._input.click_screen(sx, sy, f"panel({scene_key}.{panel_key}[{row}][{col}])")
@@ -133,8 +142,10 @@ class _PanelMixin:
         """按 panel 中心执行 grid 级拖拽（滚动），drag 后自动失效缓存"""
         panel_obj = self._find_panel(scene_key, panel_key)
         if panel_obj is None:
-            logger.error(f"drag grid: 未找到 panel {scene_key}.{panel_key}")
-            return
+            raise ValueError(
+                f"drag grid: 布局中未定义 panel {scene_key}.{panel_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
         cal = self._ensure_aligned(scene_key, panel_key)
         if cal is None or cal.row_slot <= 0:
             logger.error(f"drag grid: align 失败: {scene_key}.{panel_key}")
@@ -158,6 +169,7 @@ class _PanelMixin:
                 dy = 10 if dy >= 0 else -10
         else:
             if cal.col_slot <= 0:
+                logger.error(f"drag grid: align 列数据无效: {scene_key}.{panel_key}")
                 return
             step_norm = cal.col_slot + cal.col_span / 2.0
             panel_pixel_w = panel_obj.w_ratio * canvas.w_ratio * w

@@ -1,9 +1,11 @@
-"""归一化坐标 → 屏幕绝对坐标换算"""
+"""归一化坐标 → 屏幕绝对坐标换算
+
+拿不到截屏尺寸意味着截屏后端不可用，此时任何坐标都是错的，
+直接抛错而不是返回 None 让调用方静默跳过。
+"""
 
 import math
 import random
-
-from loguru import logger
 
 from ...core.scene_registry import Point, Region
 
@@ -11,9 +13,16 @@ from ...core.scene_registry import Point, Region
 class _CoordMixin:
     """region / point / 画布归一化坐标到屏幕坐标的换算"""
 
-    def _region_to_screen(self, region: Region, jitter: bool = True) -> tuple[int | None, int | None]:
+    def _capture_size(self) -> tuple[int, int]:
+        """取截屏尺寸，拿不到就抛错"""
+        size = self._capture.get_capture_size()
+        if size == (0, 0):
+            raise ValueError("无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）")
+        return size
+
+    def _region_to_screen(self, region: Region, jitter: bool = True) -> tuple[int, int]:
         """区域坐标 → 屏幕坐标"""
-        w, h = self._capture.get_capture_size()
+        w, h = self._capture_size()
         canvas = self._layout.get_canvas()
 
         canvas_x = canvas.x_ratio * w
@@ -33,13 +42,9 @@ class _CoordMixin:
 
         return int(self._window_left + cx), int(self._window_top + cy)
 
-    def _point_to_screen(self, point: Point) -> tuple[int | None, int | None]:
+    def _point_to_screen(self, point: Point) -> tuple[int, int]:
         """point 中心 → 屏幕坐标（带半径内随机偏移）"""
-        size = self._capture.get_capture_size()
-        if size == (0, 0):
-            logger.error("无法获取截屏尺寸")
-            return None, None
-        w, h = size
+        w, h = self._capture_size()
         canvas = self._layout.get_canvas()
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
@@ -55,13 +60,9 @@ class _CoordMixin:
         cy += dist * math.sin(angle)
         return int(self._window_left + cx), int(self._window_top + cy)
 
-    def _ratio_to_screen(self, cx_ratio: float, cy_ratio: float) -> tuple[int | None, int | None]:
+    def _ratio_to_screen(self, cx_ratio: float, cy_ratio: float) -> tuple[int, int]:
         """画布内归一化坐标 → 屏幕坐标"""
-        size = self._capture.get_capture_size()
-        if size == (0, 0):
-            logger.error("无法获取截屏尺寸")
-            return None, None
-        w, h = size
+        w, h = self._capture_size()
         canvas = self._layout.get_canvas()
         sx = canvas.x_ratio + cx_ratio * canvas.w_ratio
         sy = canvas.y_ratio + cy_ratio * canvas.h_ratio

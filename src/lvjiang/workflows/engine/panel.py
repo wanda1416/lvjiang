@@ -1,4 +1,9 @@
-"""Panel 对齐与 cell 级操作 Mixin"""
+"""Panel 对齐与 cell 级操作 Mixin
+
+panel 没在布局里定义、行列索引不是数值都是脚本 / 布局配错，抛错中断；
+未对齐与索引越界属于运行时状态，仍返回空值——脚本把越界当作遍历
+网格的终止条件。
+"""
 
 import numpy as np
 from loguru import logger
@@ -12,6 +17,7 @@ from ..grammar import (
     VarRef,
 )
 from ..grammar.ast_nodes import Align
+from .signals import WorkflowUserError
 
 
 class _PanelMixin:
@@ -23,8 +29,10 @@ class _PanelMixin:
         panel_key = node.panel
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
-            logger.error(f"align: 场景 {scene_key} 未找到 panel {panel_key}")
-            return
+            raise WorkflowUserError(
+                f"align: 布局中未定义 panel {scene_key}.{panel_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
         # 截取 panel 区域图像
         panel_img = self._capture_panel_image(panel_obj)
         if panel_img is None:
@@ -55,8 +63,7 @@ class _PanelMixin:
             row_idx = int(float(row)) - 1  # DSL 1-based → 0-based
             col_idx = int(float(col)) - 1
         except (TypeError, ValueError):
-            logger.error(f"panel 索引非数值: row={row}, col={col}")
-            return None, None
+            raise WorkflowUserError(f"panel 索引非数值: row={row}, col={col}") from None
 
         # 缓存未命中 → 自动 align
         cache_key = (scene_key, panel_key)
@@ -71,7 +78,10 @@ class _PanelMixin:
 
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
-            return None, None
+            raise WorkflowUserError(
+                f"布局中未定义 panel {scene_key}.{panel_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
 
         # 查表：用对齐结果的行列数做越界检查
         if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
@@ -95,8 +105,7 @@ class _PanelMixin:
             row_idx = int(float(row)) - 1
             col_idx = int(float(col)) - 1
         except (TypeError, ValueError):
-            logger.error(f"panel 索引非数值: row={row}, col={col}")
-            return None, "", 0, 0
+            raise WorkflowUserError(f"panel 索引非数值: row={row}, col={col}") from None
 
         # 自动 align
         cache_key = (scene_key, panel_key)
@@ -105,7 +114,12 @@ class _PanelMixin:
             self._exec_align(auto_node)
         cal = self._panel_alignments.get(cache_key)
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
-        if cal is None or panel_obj is None:
+        if panel_obj is None:
+            raise WorkflowUserError(
+                f"布局中未定义 panel {scene_key}.{panel_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
+        if cal is None:
             logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
             return None, "", 0, 0
 

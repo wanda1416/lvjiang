@@ -1,4 +1,11 @@
-"""基础指令 Mixin：click / drag / wait"""
+"""基础指令 Mixin：click / drag / wait
+
+报错还是跳过，按失败原因分：
+- 脚本 / 布局配错（变量未定义、panel 不在布局里、距离参数非数值、
+  未知目标类型）→ 抛错中断，否则后续步骤会在错误的页面上继续乱点
+- 运行时状态（panel 尚未对齐、索引越界）→ 记日志后跳过，越界本身
+  就是脚本遍历网格时的终止条件
+"""
 
 from loguru import logger
 
@@ -14,6 +21,7 @@ from ..grammar import (
     Wait,
 )
 from ..grammar.ast_nodes import Align
+from .signals import WorkflowUserError
 
 
 class _ActionsMixin:
@@ -41,8 +49,9 @@ class _ActionsMixin:
             if isinstance(node.target.scene, VarRef):
                 scene = self.variables.get(node.target.scene.name)
                 if scene is None:
-                    logger.error(f"变量 ${node.target.scene.name} 未定义，无法点击")
-                    return
+                    raise WorkflowUserError(
+                        f"变量 ${node.target.scene.name} 未定义，无法点击"
+                    )
             else:
                 scene = node.target.scene
 
@@ -51,21 +60,19 @@ class _ActionsMixin:
             if isinstance(region, VarRef):
                 region_val = self.variables.get(region.name)
                 if region_val is None:
-                    logger.error(f"变量 ${region.name} 未定义，无法点击")
-                    return
+                    raise WorkflowUserError(f"变量 ${region.name} 未定义，无法点击")
                 # 尝试从 coord_meta 查找该 key 对应的 Region
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
-                    if x is not None and y is not None:
-                        self._input.click_screen(x, y, f"{scene}/{region_val}")
-                        return
+                    self._input.click_screen(x, y, f"{scene}/{region_val}")
+                    return
                 # 回退：作为 region key 名查场景配置
                 self._ensure_workflow().click_any(str(scene), str(region_val))
             else:
                 self._ensure_workflow().click_any(str(scene), region)
         else:
-            logger.error(f"click: 未知目标类型 {type(node.target).__name__}")
+            raise WorkflowUserError(f"click: 未知目标类型 {type(node.target).__name__}")
 
     def _exec_drag(self, node: Drag):
         """drag scene.arrow / scene.panel[row][col] — scene 和 arrow 都可以是常量或变量。
@@ -87,8 +94,9 @@ class _ActionsMixin:
             grid = node.scene
             panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
             if panel_obj is None:
-                logger.error(f"drag grid: 未找到 panel {grid.scene}.{grid.panel}")
-                return
+                raise WorkflowUserError(
+                    f"drag grid: 布局中未定义 panel {grid.scene}.{grid.panel}"
+                )
             # panel 中心在截图中的归一化坐标
             cx = panel_obj.x_ratio + panel_obj.w_ratio / 2
             cy = panel_obj.y_ratio + panel_obj.h_ratio / 2
@@ -103,8 +111,7 @@ class _ActionsMixin:
             try:
                 distance = float(distance)  # 支持浮点数（如 0.5 表示半行）
             except (TypeError, ValueError):
-                logger.error(f"drag grid: 距离无效: {distance}")
-                return
+                raise WorkflowUserError(f"drag grid: 距离无效: {distance}") from None
             dx, dy = 0, 0
             direction = grid.direction
             # 距离基于 align 实测的 slot + span/2，避免声明尺寸的误差积累
@@ -161,7 +168,10 @@ class _ActionsMixin:
             # right = 手指向右划 = 内容左移 = 显示右侧内容
             panel_obj = self._find_panel_in_layout(node.scene.scene, node.scene.panel)
             if panel_obj is None:
-                return
+                raise WorkflowUserError(
+                    f"drag panel: 布局中未定义 panel "
+                    f"{node.scene.scene}.{node.scene.panel}"
+                )
             # 解析 distance（支持 int、float、VarRef）
             distance = node.distance
             if isinstance(distance, VarRef):
@@ -169,8 +179,7 @@ class _ActionsMixin:
             try:
                 distance = float(distance)  # 支持浮点数（如 0.5 表示半行）
             except (TypeError, ValueError):
-                logger.error(f"drag: 距离无效: {distance}")
-                return
+                raise WorkflowUserError(f"drag: 距离无效: {distance}") from None
             w, h = self._capture.get_capture_size()
             canvas = self._layout.get_canvas()
             direction = node.direction or "down"
@@ -217,8 +226,9 @@ class _ActionsMixin:
             if isinstance(node.scene.scene, VarRef):
                 scene = self.variables.get(node.scene.scene.name)
                 if scene is None:
-                    logger.error(f"变量 ${node.scene.scene.name} 未定义，无法拖拽")
-                    return
+                    raise WorkflowUserError(
+                        f"变量 ${node.scene.scene.name} 未定义，无法拖拽"
+                    )
             else:
                 scene = node.scene.scene
 
@@ -227,15 +237,14 @@ class _ActionsMixin:
             if isinstance(arrow, VarRef):
                 arrow_val = self.variables.get(arrow.name)
                 if arrow_val is None:
-                    logger.error(f"变量 ${arrow.name} 未定义，无法拖拽")
-                    return
+                    raise WorkflowUserError(f"变量 ${arrow.name} 未定义，无法拖拽")
                 arrow = arrow_val
 
             duration = self._resolve_duration(node.duration) if node.duration else None
             hold = node.hold
             self._ensure_workflow().drag_arrow(str(scene), str(arrow), duration=duration, hold=hold)
         else:
-            logger.error(f"drag: 未知目标类型 {type(node.scene).__name__}")
+            raise WorkflowUserError(f"drag: 未知目标类型 {type(node.scene).__name__}")
 
     def _exec_wait(self, node: Wait):
         delay = node.delay
@@ -260,7 +269,9 @@ class _ActionsMixin:
                 self._ensure_workflow().wait_seconds(float(val))
                 logger.debug(f"动态等待 ${delay.name} = {val}s")
             else:
-                logger.error(f"wait ${delay.name} 不是数值或范围类型: {val}")
+                raise WorkflowUserError(
+                    f"wait ${delay.name} 不是数值或范围类型: {val}"
+                )
         elif isinstance(delay, Literal):
             val = delay.value
             if isinstance(val, (int, float)):

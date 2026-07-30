@@ -22,6 +22,8 @@ dependencies = [
 dev = [
     "pytest>=7.0",
     "pytest-qt>=4.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
 ]
 
 # src-layout：`src/` 只是源根，不是包；可导入的包是 src/lvjiang/。
@@ -47,3 +49,33 @@ addopts = "-ra -q"
 qt_api = "pyqt6"
 # 把未处理警告升级为错误，保障回归基线干净（具体需要时再单独放行）
 filterwarnings = ["error"]
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+# E501：存量长行较多，避免一次性全仓重排；新代码自觉控制行宽
+ignore = ["E501"]
+
+# mypy 先覆盖非 UI 纯逻辑区（workflows + core），UI 层后续再收编
+[tool.mypy]
+files = ["src/lvjiang/workflows", "src/lvjiang/core"]
+ignore_missing_imports = true
+# attr-defined/has-type：Mixin 拆分架构下宿主属性在组装类才存在，
+# 单文件视角必然报未定义，属架构噪音；待 Protocol 声明宿主接口后再启用
+disable_error_code = ["attr-defined", "has-type", "annotation-unchecked"]
+
+# 棘轮豁免清单：存量类型问题文件，只减不增；新模块不得加入
+[[tool.mypy.overrides]]
+module = [
+    "lvjiang.workflows.engine.evaluation",
+    "lvjiang.workflows.base.core",
+    "lvjiang.core.layout_manager",
+    "lvjiang.core.scene_loader",
+    "lvjiang.core.reference_db",
+    "lvjiang.core.android.scrcpy_capture",
+    "lvjiang.core.android.adb_capture",
+    "lvjiang.core.recognizers.reference_matcher",
+]
+ignore_errors = true

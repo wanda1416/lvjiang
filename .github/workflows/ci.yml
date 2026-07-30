@@ -23,5 +23,13 @@ jobs:
       - name: Install dependencies
         run: pip install -e .[dev]
 
+      # ruff 全仓阻断；规则集与豁免见 pyproject.toml [tool.ruff]
+      - name: Lint (ruff)
+        run: python -m ruff check src tests
+
+      # mypy 只查非 UI 区（workflows + core），存量豁免见 [tool.mypy] 棘轮清单
+      - name: Type check (mypy)
+        run: python -m mypy
+
       - name: Run tests
         run: python -m pytest tests

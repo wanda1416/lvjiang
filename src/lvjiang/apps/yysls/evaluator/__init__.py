@@ -6,13 +6,19 @@
 
 from .base import JudgeResult, Rating, TuningJudge
 from .judge import GenericTuningJudge
-from .tuning_rules import (
-    TuningRule, TuningRuleManager, get_tuning_rule_manager,
-)
 from .registry import (
-    get_tuning_judge, get_tuning_rules, get_rule_names,
-    is_rule_implemented, judge_equipment_potential,
-    judge_tuning_worthiness, summarize_potential,
+    get_rule_names,
+    get_tuning_judge,
+    get_tuning_rules,
+    is_rule_implemented,
+    judge_equipment_potential,
+    judge_tuning_worthiness,
+    summarize_potential,
+)
+from .tuning_rules import (
+    TuningRule,
+    TuningRuleManager,
+    get_tuning_rule_manager,
 )
 
 __all__ = [

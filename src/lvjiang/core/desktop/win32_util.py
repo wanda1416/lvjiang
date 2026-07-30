@@ -9,7 +9,6 @@ from ctypes import wintypes
 
 from loguru import logger
 
-
 # ─── SendInput 基础设施 ────────────────────────────────────────
 
 _user32 = ctypes.windll.user32

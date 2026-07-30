@@ -19,7 +19,6 @@ from loguru import logger
 
 from .cleaner import clean_affix_text
 
-
 # 左四（武器/首饰）定音类别 与 右四（防具）定音类别
 _LEFT_CATEGORIES = ("外功增益", "属攻增益")
 _RIGHT_CATEGORY = "指定技能增效"

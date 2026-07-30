@@ -1,21 +1,33 @@
 """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域 / 坐标 / 方向 / 面板）"""
 
 import numpy as np
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QSplitter, QTabWidget, QComboBox, QPushButton,
-)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ....core.scene_registry import (
-    Region, Point, Arrow, Panel, CanvasConfig,
-    get_scene_regions, get_scene_point_pairs,
-    get_scene_views, get_view_visible_keys,
+    Arrow,
+    CanvasConfig,
+    Panel,
+    Point,
+    Region,
+    get_scene_point_pairs,
+    get_scene_regions,
+    get_scene_views,
+    get_view_visible_keys,
 )
-from .canvas import RegionCanvas, EditMode
-from .scene_region_panel import RegionPanelMixin
-from .scene_poi_panel import PoiPanelMixin
+from .canvas import EditMode, RegionCanvas
 from .scene_panel_editor import PanelEditorMixin
+from .scene_poi_panel import PoiPanelMixin
+from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 

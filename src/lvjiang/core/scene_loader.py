@@ -6,7 +6,6 @@ from pathlib import Path
 import yaml
 from loguru import logger
 
-
 # 合法的 region type 枚举
 VALID_REGION_TYPES = {"attr", "slot", "func"}
 

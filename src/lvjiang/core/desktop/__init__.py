@@ -13,9 +13,9 @@
 
 from ...config import DelayConfig
 from ..input_base import InputBackend
-from .send_input import SendInputInput
-from .post_message import PostMessageInput
 from .capture import DesktopCapture
+from .post_message import PostMessageInput
+from .send_input import SendInputInput
 from .win32_util import list_visible_windows
 
 

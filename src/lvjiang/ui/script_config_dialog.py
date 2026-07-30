@@ -10,17 +10,24 @@
 """
 from __future__ import annotations
 
+import yaml
+from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView,
+    QAbstractItemView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
     QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
-from loguru import logger
-
-import yaml
 
 from lvjiang.constants import SYSTEM_CONFIG_DIR
+
 from ..workflows.discovery import discover_scripts
 
 _YAML_HEADER = """\

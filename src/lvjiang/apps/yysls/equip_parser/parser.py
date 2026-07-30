@@ -4,21 +4,19 @@
 """
 
 import re
+
 from loguru import logger
 
-from .models import EquipAttr, Affix, EquipmentData
-from .dingyin_parser import DingyinParser
 from .cleaner import clean_affix_text
 from .constants import (
-    WEAPON_TYPES_SET,
-    JEWELRY_TYPES_SET,
-    ARMOR_TYPES_SET,
-    WEAPON_TYPES,
     AFFIX_NAMES,
-    WUXUE_PATTERN,
     PERCENT_AFFIXES,
+    WEAPON_TYPES,
+    WUXUE_PATTERN,
     infer_category,
 )
+from .dingyin_parser import DingyinParser
+from .models import Affix, EquipAttr, EquipmentData
 
 
 class EquipmentParser:
@@ -343,7 +341,7 @@ class EquipmentParser:
         affixes: list[Affix] = []
         warnings: list[str] = []
 
-        for i, (key, cn_name) in enumerate(zip(AFFIX_KEYS, KEY_NAMES)):
+        for i, (key, cn_name) in enumerate(zip(AFFIX_KEYS, KEY_NAMES, strict=False)):
             text = raw.get(key, "").strip()
 
             if not text:

@@ -5,12 +5,11 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from loguru import logger
-from PyQt6.QtCore import QThread, pyqtSignal, QObject
-
 import yaml
+from loguru import logger
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from ..constants import SYSTEM_WORKFLOWS_DIR, SYSTEM_CONFIG_DIR
+from ..constants import SYSTEM_CONFIG_DIR, SYSTEM_WORKFLOWS_DIR
 from ..workflows.engine import WorkflowEngine
 
 
@@ -71,7 +70,7 @@ class _UIHelper(QObject):
             req["done"].set()
 
     def _show(self, action: str, kwargs: dict):
-        from PyQt6.QtWidgets import QMessageBox, QInputDialog
+        from PyQt6.QtWidgets import QInputDialog, QMessageBox
         if action == "confirm":
             box = QMessageBox(
                 QMessageBox.Icon.Question, "工作流确认",
@@ -178,6 +177,7 @@ class RunControlMixin:
         名字/参数/可选项从 .wf 文件顶部的 `#%` front-matter 元数据提取。
         """
         from PyQt6.QtWidgets import QFileDialog
+
         from ..workflows.metadata import build_flow_config
         path, _ = QFileDialog.getOpenFileName(
             self, "加载工作流文件", str(SYSTEM_WORKFLOWS_DIR),
@@ -289,7 +289,7 @@ class RunControlMixin:
     def _begin_automation(self, name: str) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
-            self.log_text.append(f"[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止")
+            self.log_text.append("[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止")
             self.statusBar().showMessage("自动化运行中 | F10 停止")
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False

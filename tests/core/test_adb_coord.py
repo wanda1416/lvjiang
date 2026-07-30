@@ -6,7 +6,7 @@ ADB 后端下截图与输入同为设备物理像素、原点左上，window_lef
 确保坐标链在 ADB 模式（无客户区偏移）下正确。
 """
 
-from lvjiang.core.scene_registry import Layout, CanvasConfig, Region, Point
+from lvjiang.core.scene_registry import CanvasConfig, Layout, Point, Region
 from lvjiang.workflows.base import BaseWorkflow
 
 

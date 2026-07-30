@@ -1,6 +1,7 @@
 """OCR 引擎封装 - RapidOCR (ONNX Runtime) 封装，懒加载"""
 
 from dataclasses import dataclass
+
 import numpy as np
 from loguru import logger
 

@@ -3,9 +3,21 @@
 from loguru import logger
 
 from ..grammar import (
-    Scan, Recognize, Collect, Eval, EvalFieldChainAssign, CallProc,
-    SceneRef, PanelRef, VarRef, KeywordRef, Literal, FieldAccess, ByClause,
-    FuncCall, ArithOp,
+    ArithOp,
+    ByClause,
+    CallProc,
+    Collect,
+    Eval,
+    EvalFieldChainAssign,
+    FieldAccess,
+    FuncCall,
+    KeywordRef,
+    Literal,
+    PanelRef,
+    Recognize,
+    Scan,
+    SceneRef,
+    VarRef,
 )
 from .signals import _ReturnSignal
 

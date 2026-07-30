@@ -19,11 +19,10 @@ scrcpy 4.1 协议要点（已通过源码 + 实测验证）：
 - 后续 media packet：12 字节帧头（flags + PTS + size）+ H.264 payload
 """
 
-import os
 import random
 import socket
-import subprocess
 import struct
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -447,7 +446,6 @@ class AndroidStreamCapture(CaptureBackend):
         - byte 8-11: packet size (H.264 payload 大小，big-endian)
         - byte 12+: raw H.264 payload
         """
-        import av
 
         frame_interval = 1.0 / self._max_fps if self._max_fps > 0 else 0.0
         last_frame_time = 0.0
@@ -479,21 +477,21 @@ class AndroidStreamCapture(CaptureBackend):
                 # 解析 12 字节帧头
                 # byte 8-11: payload size (big-endian)
                 payload_size = struct.unpack(">I", buf[8:12])[0]
-                
+
                 # 检查 buffer 是否包含完整 packet
                 if len(buf) < 12 + payload_size:
                     break  # 等待更多数据
-                
+
                 # 提取 H.264 payload
                 h264_data = buf[12:12 + payload_size]
                 buf = buf[12 + payload_size:]  # 移除已处理的 packet
-                
+
                 # 解码 H.264 帧
                 try:
                     packets = self._decoder.parse(h264_data)
                 except Exception:
                     continue
-                
+
                 for pkt in packets:
                     try:
                         frames = self._decoder.decode(pkt)

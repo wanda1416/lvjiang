@@ -1,17 +1,25 @@
 """场景管理混入类 - 分组/场景 CRUD、右键菜单、Tab 排序"""
 
+from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QMenu, QMessageBox, QTabWidget, QLabel,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QTabWidget,
 )
-from loguru import logger
 
-from ....core.scene_registry import (
-    get_scene_name, get_registry, reload_scene_registry,
-    get_group_name,
-)
 from ....constants import SCENES_CONFIG_PATH
+from ....core.scene_registry import (
+    get_group_name,
+    get_registry,
+    get_scene_name,
+    reload_scene_registry,
+)
 from .scene_tab import SceneTab
 
 

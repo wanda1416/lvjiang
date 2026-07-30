@@ -14,9 +14,9 @@
 
 from datetime import datetime
 
+from loguru import logger
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
-from loguru import logger
 
 from ..constants import PICTURE_DIR, VIDEO_DIR
 

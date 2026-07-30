@@ -8,7 +8,6 @@ UI 新增武器后需重启方可参与识别）。
 
 import re
 
-
 # ─── 部位分类（旧，仅 parser 内部用于 base_attr 分派） ────
 
 WEAPON_SLOTS = {"main_weapon", "sub_weapon"}
@@ -27,6 +26,7 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
     配置文件缺失或关键字段为空时直接抛异常。
     """
     import yaml
+
     from lvjiang.constants import PROJECT_ROOT
     path = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"
     with open(path, "r", encoding="utf-8") as f:

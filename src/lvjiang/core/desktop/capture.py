@@ -12,9 +12,9 @@ import queue
 import threading
 import time
 
-import numpy as np
 import mss
 import mss.tools
+import numpy as np
 from loguru import logger
 
 from ..capture_base import CaptureBackend

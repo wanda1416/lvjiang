@@ -5,8 +5,8 @@
 """
 from unittest.mock import MagicMock
 
-from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.engine import WorkflowEngine
+from lvjiang.workflows.grammar import parse_text
 
 
 def make_engine() -> WorkflowEngine:

@@ -1,8 +1,8 @@
 """AdbDevice - adb 可执行/serial 解析、shell/forward/push、设备属性查询"""
 
+import re
 import shutil
 import subprocess
-import re
 
 from loguru import logger
 

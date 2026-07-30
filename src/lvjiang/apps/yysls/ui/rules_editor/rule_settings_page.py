@@ -18,21 +18,34 @@ key 与名称均为只读文本展示：key 重命名走展示区后的「重命
 
 from __future__ import annotations
 
+import re
 from typing import Callable
 
-import re
-
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-    QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QToolButton,
-    QToolTip, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QToolButton,
+    QToolTip,
+    QVBoxLayout,
+    QWidget,
 )
 
-from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    GENERIC_ATTR, QUALITY_PARTS, RATING_KEYS, RATING_LABELS,
+    GENERIC_ATTR,
+    QUALITY_PARTS,
+    RATING_KEYS,
+    RATING_LABELS,
     standard_playstyle_attrs,
 )
+from lvjiang.apps.yysls.game_config import get_game_config
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")

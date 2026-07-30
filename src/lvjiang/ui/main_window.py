@@ -13,28 +13,39 @@ from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
-from PyQt6.QtGui import QKeyEvent, QAction
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QComboBox, QGroupBox, QTextEdit,
-    QTabWidget, QSplitter, QMessageBox, QFormLayout, QScrollArea,
-    QCheckBox, QStatusBar, QMenuBar, QSpinBox,
-)
 from loguru import logger
-
 from pynput import keyboard as pynput_keyboard
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QKeyEvent
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from lvjiang.apps import get_registry
-from .overlay import BorderOverlay
-from .window_ops import WindowOpsMixin
-from .run_control import RunControlMixin
-from .capture_ops import CaptureOpsMixin
-from .widgets import TrimmedLogEdit
+
 from ..config import load_user_config
-from ..core.user_config import UserConfigManager
-from ..core.session_manager import SessionManager
 from ..core.layout_manager import LayoutConfigManager
+from ..core.session_manager import SessionManager
+from ..core.user_config import UserConfigManager
+from .capture_ops import CaptureOpsMixin
+from .overlay import BorderOverlay
+from .run_control import RunControlMixin
+from .widgets import TrimmedLogEdit
+from .window_ops import WindowOpsMixin
 
 
 class _LogBridge(QObject):
@@ -500,6 +511,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def _restore_ui_state(self):
         """启动时恢复窗口大小与左右分栏比例，免去每次手动拉伸"""
         import json
+
         from ..constants import SESSION_PATH
         if not SESSION_PATH.exists():
             return
@@ -518,7 +530,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def _save_ui_state(self):
         """退出时统一写入 ui_state（保留 session.json 其他字段）"""
         import json
-        from ..constants import SESSION_PATH, LOCAL_CONFIG_DIR
+
+        from ..constants import LOCAL_CONFIG_DIR, SESSION_PATH
         data = {}
         if SESSION_PATH.exists():
             try:

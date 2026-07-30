@@ -10,13 +10,19 @@
 from enum import Enum, auto
 
 import numpy as np
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal
+from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QImage, QPixmap, QPainter, QPen, QBrush, QColor,
-    QPaintEvent, QMouseEvent, QWheelEvent,
+    QBrush,
+    QColor,
+    QImage,
+    QMouseEvent,
+    QPainter,
+    QPaintEvent,
+    QPen,
+    QPixmap,
+    QWheelEvent,
 )
-from loguru import logger
+from PyQt6.QtWidgets import QWidget
 
 
 class DragMode(Enum):
@@ -656,23 +662,7 @@ class ReferenceCanvas(QWidget):
             ).normalized()
 
         elif self._drag_mode == DragMode.MOVING and self._drag_orig:
-            delta = norm - self._widget_to_normalized(
-                self._drag_start.x() if hasattr(self, '_drag_start_widget') else pos.x(),
-                self._drag_start.y() if hasattr(self, '_drag_start_widget') else pos.y(),
-            )
-            # 简化：直接用归一化差值
-            orig = self._drag_orig
-            new_rect = QRectF(
-                max(0, min(1 - orig.width(), orig.x() + (norm.x() - self._widget_to_normalized(
-                    pos.x() - (pos.x() - self._normalized_to_widget(orig.x(), orig.y()).x()),
-                    0,
-                ).x()))),
-                max(0, min(1 - orig.height(), orig.y())),
-                orig.width(),
-                orig.height(),
-            )
-            # 更简单的移动逻辑
-            self._grid_rect = self._move_rect(orig, norm, self._drag_start)
+            self._grid_rect = self._move_rect(self._drag_orig, norm, self._drag_start)
 
         elif self._drag_mode == DragMode.RESIZING and self._drag_orig:
             self._grid_rect = self._resize_rect(self._drag_orig, self._drag_handle, norm)

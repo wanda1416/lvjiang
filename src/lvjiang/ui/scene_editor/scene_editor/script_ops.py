@@ -1,7 +1,7 @@
 """脚本测试混入类 - DSL 脚本测试器"""
 
-from PyQt6.QtWidgets import QPushButton, QTextEdit, QFileDialog
 from loguru import logger
+from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
 
 from ....constants import SYSTEM_WORKFLOWS_DIR
 
@@ -39,7 +39,6 @@ class ScriptOpsMixin:
 
     def _auto_load_script(self):
         """自动加载 _editor_run.wf 到脚本编辑器"""
-        from pathlib import Path
         script_path = SYSTEM_WORKFLOWS_DIR / "_editor_run.wf"
         if script_path.exists():
             content = script_path.read_text(encoding="utf-8")
@@ -149,6 +148,7 @@ class ScriptOpsMixin:
 
             # 输出结果到左侧结果区
             import json
+
             from ...run_control import _to_serializable
             serializable = _to_serializable(result)
             self._result_text.setPlainText(

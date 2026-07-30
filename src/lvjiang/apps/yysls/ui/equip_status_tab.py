@@ -22,6 +22,7 @@ class EquipStatusTab(EquipStatusPanel):
     def refresh_from_user(self):
         """从当前用户的本地配置加载已装备数据并刷新面板"""
         import json
+
         from lvjiang.constants import LOCAL_CONFIG_DIR
 
         user_name = self._host.active_user_name()

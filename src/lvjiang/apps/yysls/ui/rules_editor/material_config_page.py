@@ -18,13 +18,26 @@ from typing import Callable
 
 from loguru import logger
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QHBoxLayout, QHeaderView, QLabel, QPushButton,
-    QSpinBox, QTableWidget, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    FOOD_EXPECT_KEYS, FOOD_LABELS, INSUFFICIENT_LABELS, QUALITY_LABELS,
-    RATING_LABELS, FoodRule, TuningBaseManager,
+    FOOD_EXPECT_KEYS,
+    FOOD_LABELS,
+    INSUFFICIENT_LABELS,
+    QUALITY_LABELS,
+    RATING_LABELS,
+    FoodRule,
+    TuningBaseManager,
 )
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）

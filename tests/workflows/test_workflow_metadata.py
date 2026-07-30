@@ -1,7 +1,6 @@
 """工作流 front-matter 元数据解析测试"""
 
-from lvjiang.workflows.metadata import parse_metadata, build_flow_config
-
+from lvjiang.workflows.metadata import build_flow_config, parse_metadata
 
 SAMPLE = """\
 #% name: 单件装备调律

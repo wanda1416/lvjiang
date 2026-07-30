@@ -6,7 +6,7 @@
 
 import re
 
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,8 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.core.reference_db import ReferenceDatabase, MetaFieldDef
-
+from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase
 
 # 内置固定字段（只读展示，不可编辑/删除）
 # (显示名, key, filterable, type, sort_by)

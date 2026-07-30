@@ -2,22 +2,35 @@
 
 import re
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QMessageBox, QInputDialog, QComboBox, QCheckBox,
-)
 from PyQt6.QtCore import Qt
-
-from ....core.scene_registry import (
-    get_scene_point_pairs, get_point_def,
-    get_registry, sync_scene_cache, is_view_visible,
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from ....core.scene_loader import PointDef, VALID_REGION_TYPES
+
+from ....core.scene_loader import VALID_REGION_TYPES, PointDef
+from ....core.scene_registry import (
+    get_point_def,
+    get_registry,
+    get_scene_point_pairs,
+    is_view_visible,
+    sync_scene_cache,
+)
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
-
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 

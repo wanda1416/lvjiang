@@ -4,21 +4,61 @@
 引擎通过此模块感知语法，无需关注解析细节。
 """
 
-from .parser import parse_file, parse_text
 from .ast_nodes import (
+    And,
+    ArithOp,
+    Break,
+    ByClause,
+    CallProc,
+    # 语句节点
+    Click,
+    Collect,
+    Contains,
+    Continue,
+    CoordPoint,
+    Drag,
+    Equals,
+    Eval,
+    EvalFieldChainAssign,
+    FieldAccess,
+    For,
+    ForRange,
+    FuncCall,
+    Goto,
+    GreaterEqual,
+    GreaterThan,
+    If,
+    Import,
+    InList,
+    IsEmpty,
+    KeywordRef,
+    Label,
+    LessEqual,
+    LessThan,
+    Literal,
+    Log,
+    Loop,
+    Not,
+    NotEqual,
+    NumericEqual,
+    Or,
+    PanelGridDrag,
+    PanelRef,
+    ProcDef,
     # 程序
     Program,
-    # 语句节点
-    Click, Drag, Wait, Scan, Recognize, Collect, Log,
-    Import, ProcDef, CallProc,
-    If, For, ForRange, Loop, WhileLoop, UntilLoop, Break, Continue, Return, Label, Goto, Try,
-    Eval, EvalFieldChainAssign, FuncCall,
+    Recognize,
+    Return,
+    Scan,
     # 表达式节点
-    SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
-    Contains, Equals, InList, IsEmpty,
-    GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    Not, And, Or, ArithOp,
+    SceneRef,
+    Try,
+    UntilLoop,
+    VarRef,
+    Wait,
+    WhileLoop,
 )
+from .parser import parse_file, parse_text
 
 __all__ = [
     "parse_file", "parse_text",

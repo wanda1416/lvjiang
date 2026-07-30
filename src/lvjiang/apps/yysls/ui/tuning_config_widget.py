@@ -15,7 +15,10 @@ from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QGroupBox, QCheckBox,
+    QCheckBox,
+    QGroupBox,
+    QVBoxLayout,
+    QWidget,
 )
 
 

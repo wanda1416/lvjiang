@@ -6,10 +6,10 @@
 - 流派配置
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
+from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
-from .base_attr_panel import BaseAttrPanel
 from .affix_caps_panel import AffixCapsPanel
+from .base_attr_panel import BaseAttrPanel
 from .school_panel import SchoolPanel
 
 

@@ -9,12 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
 from lvjiang.config import DelayConfig
+from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
+from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.scene_scan import collect_scene_keys
-from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
-
 
 # ─── collect_scene_keys 单元测试 ──────────────────────────
 

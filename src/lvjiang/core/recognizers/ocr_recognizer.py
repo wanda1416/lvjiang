@@ -9,8 +9,8 @@ from typing import Any
 
 import numpy as np
 
-from ._registry import register_recognizer
 from ..ocr import OCREngine
+from ._registry import register_recognizer
 
 
 @register_recognizer

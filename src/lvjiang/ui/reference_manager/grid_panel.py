@@ -1,22 +1,21 @@
 """网格操作面板 - 设置网格参数、切割、编辑切割结果"""
 
+import numpy as np
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QLineEdit,
-    QGridLayout,
 )
-
-import numpy as np
 
 from lvjiang.core.reference_db import MetaFieldDef
 

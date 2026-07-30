@@ -1,16 +1,45 @@
 """DSL 解析器验证测试"""
 
 from pathlib import Path
-from lvjiang.workflows.grammar import parse_file, parse_text
-from lvjiang.workflows.grammar import (
-    Program, Click, Drag, Wait, Scan, Recognize, Collect, Log, Eval,
-    Import, ProcDef, CallProc,
-    If, For, Loop, Break, Return, Label, Goto,
-    Contains, Equals, InList, IsEmpty, FieldAccess, VarRef, Literal, SceneRef,
-    Not, And, Or, GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    EvalFieldChainAssign, FuncCall, ByClause,
-)
 
+import pytest
+from lark.exceptions import LarkError
+
+from lvjiang.workflows.grammar import (
+    And,
+    ByClause,
+    CallProc,
+    Click,
+    Collect,
+    Contains,
+    Drag,
+    Equals,
+    Eval,
+    EvalFieldChainAssign,
+    FieldAccess,
+    For,
+    FuncCall,
+    Goto,
+    GreaterThan,
+    If,
+    InList,
+    IsEmpty,
+    Label,
+    Literal,
+    Log,
+    Loop,
+    Not,
+    NumericEqual,
+    ProcDef,
+    Program,
+    Recognize,
+    Scan,
+    SceneRef,
+    VarRef,
+    Wait,
+    parse_file,
+    parse_text,
+)
 
 # ─── 现有 .wf 文件验证 ─────────────────────────────────────
 
@@ -30,13 +59,13 @@ def test_workflow_parser():
     wf_dir = Path("config/system/workflows")
     wf_files = list(wf_dir.rglob("*.wf"))
     print(f"  找到 {len(wf_files)} 个 .wf 文件")
-    
+
     for wf_path in sorted(wf_files):
         program = parse_file(wf_path)
         stmt_count = len(program.body)
         print(f"  ✓ {wf_path} ({stmt_count} statements)")
         assert isinstance(program, Program)
-    
+
     print(f"  全部 {len(wf_files)} 个文件解析成功")
 
 
@@ -74,7 +103,7 @@ def test_click_dynamic_region():
 def test_click_const_or_var():
     """测试 click 支持 const_or_var 统一语法"""
     print("\n=== 测试 click const_or_var ===")
-    
+
     # click [scene].[region]
     program = parse_text("click [scene].[region]")
     n = program.body[0]
@@ -83,7 +112,7 @@ def test_click_const_or_var():
     assert n.target.scene == "scene"
     assert n.target.region == "region"
     print("  click [scene].[region]: OK")
-    
+
     # click "scene"."region"
     program = parse_text('click "scene"."region"')
     n = program.body[0]
@@ -92,7 +121,7 @@ def test_click_const_or_var():
     assert n.target.scene == "scene"
     assert n.target.region == "region"
     print('  click "scene"."region": OK')
-    
+
     # click $scene.$region
     program = parse_text("click $scene.$region")
     n = program.body[0]
@@ -103,7 +132,7 @@ def test_click_const_or_var():
     assert isinstance(n.target.region, VarRef)
     assert n.target.region.name == "region"
     print("  click $scene.$region: OK")
-    
+
     # click [scene].$var
     program = parse_text("click [scene].$var")
     n = program.body[0]
@@ -120,7 +149,7 @@ def test_click_const_or_var():
 def test_drag_const_or_var():
     """测试 drag 支持 const_or_var 统一语法"""
     print("\n=== 测试 drag const_or_var ===")
-    
+
     # drag [scene].[arrow]
     program = parse_text("drag [scene].[arrow]")
     n = program.body[0]
@@ -129,7 +158,7 @@ def test_drag_const_or_var():
     assert n.scene.scene == "scene"
     assert n.scene.region == "arrow"
     print("  drag [scene].[arrow]: OK")
-    
+
     # drag "scene"."arrow"
     program = parse_text('drag "scene"."arrow"')
     n = program.body[0]
@@ -138,7 +167,7 @@ def test_drag_const_or_var():
     assert n.scene.scene == "scene"
     assert n.scene.region == "arrow"
     print('  drag "scene"."arrow": OK')
-    
+
     # drag $scene.$arrow
     program = parse_text("drag $scene.$arrow")
     n = program.body[0]
@@ -149,7 +178,7 @@ def test_drag_const_or_var():
     assert isinstance(n.scene.region, VarRef)
     assert n.scene.region.name == "arrow"
     print("  drag $scene.$arrow: OK")
-    
+
     # drag with duration
     program = parse_text("drag [scene].[arrow] 0.5")
     n = program.body[0]
@@ -157,7 +186,7 @@ def test_drag_const_or_var():
     assert isinstance(n.duration, Literal)
     assert n.duration.value == 0.5
     print("  drag [scene].[arrow] 0.5: OK")
-    
+
     # drag with hold
     program = parse_text("drag [scene].[arrow] 0.5 hold 0.2")
     n = program.body[0]
@@ -171,7 +200,7 @@ def test_drag_const_or_var():
 def test_wait():
     """测试 wait 支持多种延迟形式"""
     print("\n=== 测试 wait ===")
-    
+
     # wait 固定秒数
     program = parse_text("wait 1.5")
     n = program.body[0]
@@ -179,7 +208,7 @@ def test_wait():
     assert isinstance(n.delay, Literal)
     assert n.delay.value == 1.5
     print("  wait 1.5: OK")
-    
+
     # wait 命名延迟
     program = parse_text("wait page_refresh")
     n = program.body[0]
@@ -187,7 +216,7 @@ def test_wait():
     assert isinstance(n.delay, Literal)
     assert n.delay.value == "page_refresh"
     print("  wait page_refresh: OK")
-    
+
     # wait $var
     program = parse_text("wait $interval")
     n = program.body[0]
@@ -195,7 +224,7 @@ def test_wait():
     assert isinstance(n.delay, VarRef)
     assert n.delay.name == "interval"
     print("  wait $interval: OK")
-    
+
     # wait (min, max)
     program = parse_text("wait (1, 2)")
     n = program.body[0]
@@ -359,17 +388,15 @@ def test_scan_as_required():
     print("  scan as $var: OK")
 
     # 不带 as 的 scan 应该解析失败
-    try:
+    with pytest.raises(LarkError):
         parse_text("scan [scene1]")
-        assert False, "应该解析失败"
-    except Exception:
-        print("  scan 无 as 正确报错: OK")
+    print("  scan 无 as 正确报错: OK")
 
 
 def test_scan_dynamic_scene():
     """测试 scan 支持动态场景名"""
     print("\n=== 测试 scan 动态场景名 ===")
-    
+
     # scan $scene.[field] as $var
     program = parse_text("scan $scene.[field] as $result")
     n = program.body[0]
@@ -378,7 +405,7 @@ def test_scan_dynamic_scene():
     assert isinstance(n.scene.scene, VarRef)
     assert n.scene.scene.name == "scene"
     print("  scan $scene.[field] as $var: OK")
-    
+
     # scan "scene".[field] as $var
     program = parse_text('scan "scene".[field] as $result')
     n = program.body[0]
@@ -403,17 +430,15 @@ def test_recognize():
     print('  recognize [material_grid] as $mats: OK')
 
     # 不带 as 的 recognize 应该解析失败
-    try:
+    with pytest.raises(LarkError):
         parse_text("recognize [material_grid]")
-        assert False, "应该解析失败"
-    except Exception:
-        print("  recognize 无 as 正确报错: OK")
+    print("  recognize 无 as 正确报错: OK")
 
 
 def test_recognize_dynamic_scene():
     """测试 recognize 支持动态场景名"""
     print("\n=== 测试 recognize 动态场景名 ===")
-    
+
     # recognize $scene.[field] as $var
     program = parse_text("recognize $scene.[field] as $result")
     n = program.body[0]
@@ -449,7 +474,7 @@ def test_collect():
     assert n.alias == "label"
     assert n.alias_var is None
     print('  collect $var as "label": OK')
-    
+
     # collect $var as $alias（动态别名）
     program = parse_text("collect $result as $alias")
     n = program.body[0]
@@ -467,7 +492,7 @@ def test_collect():
 def test_log():
     """测试 log 支持多种参数形式"""
     print("\n=== 测试 log ===")
-    
+
     # log "string"
     program = parse_text('log "hello"')
     n = program.body[0]
@@ -475,7 +500,7 @@ def test_log():
     assert isinstance(n.message, Literal)
     assert n.message.value == "hello"
     print('  log "string": OK')
-    
+
     # log $var
     program = parse_text("log $var")
     n = program.body[0]
@@ -483,14 +508,14 @@ def test_log():
     assert isinstance(n.message, VarRef)
     assert n.message.name == "var"
     print("  log $var: OK")
-    
+
     # log $dict.field
     program = parse_text("log $dict.field")
     n = program.body[0]
     assert isinstance(n, Log)
     assert isinstance(n.message, FieldAccess)
     print("  log $dict.field: OK")
-    
+
     # log func(...)
     program = parse_text('log concat("a", "b")')
     n = program.body[0]
@@ -521,32 +546,32 @@ def test_eval_with_var():
 def test_eval_field_assign():
     """测试 eval 字段赋值"""
     print("\n=== 测试 eval 字段赋值 ===")
-    
+
     # eval $dict.key = value
     program = parse_text('eval $dict.key = "value"')
     n = program.body[0]
     assert isinstance(n, EvalFieldChainAssign)
     assert isinstance(n.target, FieldAccess)
     print("  eval $dict.key = value: OK")
-    
+
     # eval $dict.$key = value（动态 key）
     program = parse_text('eval $dict.$key = "value"')
     n = program.body[0]
     assert isinstance(n, EvalFieldChainAssign)
     print("  eval $dict.$key = value: OK")
-    
+
     # eval $dict."key" = value
     program = parse_text('eval $dict."key" = "value"')
     n = program.body[0]
     assert isinstance(n, EvalFieldChainAssign)
     print('  eval $dict."key" = value: OK')
-    
+
     # eval $dict.[key] = value
     program = parse_text('eval $dict.[key] = "value"')
     n = program.body[0]
     assert isinstance(n, EvalFieldChainAssign)
     print("  eval $dict.[key] = value: OK")
-    
+
     # eval $dict.a.b.c = value（链式赋值）
     program = parse_text('eval $dict.a.b.c = "value"')
     n = program.body[0]
@@ -560,21 +585,21 @@ def test_eval_field_assign():
 def test_for():
     """测试 for 循环"""
     print("\n=== 测试 for ===")
-    
+
     # for with static list (quoted strings)
     program = parse_text('for x in ["a", "b", "c"]\n    log $x\nend')
     n = program.body[0]
     assert isinstance(n, For)
     assert n.var == "x"
     print('  for x in ["a", "b", "c"]: OK')
-    
+
     # for with $var
     program = parse_text("for x in $list\n    log $x\nend")
     n = program.body[0]
     assert isinstance(n, For)
     assert isinstance(n.iterable, VarRef)
     print("  for x in $list: OK")
-    
+
     # for with mixed list
     program = parse_text('for x in ["a", $var, "c"]\n    log $x\nend')
     n = program.body[0]
@@ -587,56 +612,56 @@ def test_for():
 def test_conditions():
     """测试条件表达式"""
     print("\n=== 测试条件表达式 ===")
-    
+
     # contains
     program = parse_text('if $var.field contains "text"\n    log "ok"\nend')
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, Contains)
     print("  if $var.field contains: OK")
-    
+
     # equals
     program = parse_text('if $var.field equals "text"\n    log "ok"\nend')
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, Equals)
     print("  if $var.field equals: OK")
-    
+
     # in
     program = parse_text('if $var.field in ["a", "b"]\n    log "ok"\nend')
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, InList)
     print('  if $var.field in [...]: OK')
-    
+
     # $var in list
     program = parse_text('if $var in ["a", "b"]\n    log "ok"\nend')
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, InList)
     print('  if $var in [...]: OK')
-    
+
     # is_empty
     program = parse_text("if $var.field is_empty\n    log \"ok\"\nend")
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, IsEmpty)
     print("  if $var.field is_empty: OK")
-    
+
     # numeric comparisons
     program = parse_text("if $var.field > 100\n    log \"ok\"\nend")
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, GreaterThan)
     print("  if $var.field > 100: OK")
-    
+
     # and/or
     program = parse_text('if $a.field contains "x" and $b.field equals "y"\n    log "ok"\nend')
     n = program.body[0]
     assert isinstance(n, If)
     assert isinstance(n.condition, And)
     print("  if ... and ...: OK")
-    
+
     # not
     program = parse_text('if not $var.field contains "x"\n    log "ok"\nend')
     n = program.body[0]
@@ -1153,35 +1178,35 @@ if __name__ == "__main__":
     # 现有文件验证
     test_existing_wf_files()
     test_workflow_parser()
-    
+
     # click
     test_click_scene_ref()
     test_click_dynamic_region()
     test_click_const_or_var()
-    
+
     # drag
     test_drag_const_or_var()
-    
+
     # wait
     test_wait()
-    
+
     # scan/recognize
     test_scan_as_required()
     test_scan_dynamic_scene()
     test_recognize()
     test_recognize_dynamic_scene()
-    
+
     # collect
     test_collect()
-    
+
     # log
     test_log()
-    
+
     # eval
     test_eval_with_var()
     test_eval_field_assign()
     test_implicit_eval()
-    
+
     # scan/recognize by 子句
     test_scan_by_equals()
     test_scan_by_contains()
@@ -1189,7 +1214,7 @@ if __name__ == "__main__":
     test_recognize_by_contains_any()
     test_scan_without_by()
     test_find_tune_material_wf()
-    
+
     # 换行续行
     test_explicit_line_continuation()
     test_implicit_line_continuation_brackets()
@@ -1197,28 +1222,28 @@ if __name__ == "__main__":
     test_implicit_line_continuation_braces()
     test_mixed_line_continuation()
     test_no_continuation_outside_brackets()
-    
+
     # scan/recognize list var
     test_scan_list_var()
-    
+
     # for
     test_for()
-    
+
     # conditions
     test_conditions()
-    
+
     # import / def / call proc
     test_import_stmt()
     test_def_stmt()
     test_call_proc_stmt()
     test_import_def_mixed()
-    
+
     # full workflow
     test_if_with_scan_as()
     test_full_workflow()
     test_comment_in_if_body()
     test_goto_with_if_else()
-    
+
     print("\n" + "=" * 50)
     print("ALL TESTS PASSED")
     print("=" * 50)

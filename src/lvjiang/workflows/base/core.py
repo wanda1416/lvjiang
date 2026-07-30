@@ -4,15 +4,15 @@ from typing import Callable, Optional
 
 from ...config import DelayConfig
 from ...core.capture_base import CaptureBackend
-from ...core.ocr import OCREngine
 from ...core.input_base import InputBackend
+from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout
 from .. import builtins  # noqa: F401  触发内置函数注册
 from ..align import GridAlignment
-from .recognition import _RecognitionMixin
 from .actions import _ActionMixin
 from .coords import _CoordMixin
 from .panel import _PanelMixin
+from .recognition import _RecognitionMixin
 
 
 class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):

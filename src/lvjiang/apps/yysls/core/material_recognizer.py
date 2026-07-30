@@ -11,16 +11,14 @@
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 import cv2
 import numpy as np
 from loguru import logger
-from PIL import Image
 
 from lvjiang.core.ocr import OCREngine
-from lvjiang.core.reference_db import ReferenceDatabase
 from lvjiang.core.recognizers.reference_matcher import ReferenceMatcher
+from lvjiang.core.reference_db import ReferenceDatabase
 
 
 @dataclass
@@ -63,7 +61,7 @@ class MaterialRecognizer:
     ):
         self._ocr = ocr_engine
         self._db = reference_db or ReferenceDatabase()
-        
+
         # 使用通用 ReferenceMatcher 做类型识别
         self._matcher = ReferenceMatcher(self._db)
 

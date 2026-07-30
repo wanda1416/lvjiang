@@ -3,8 +3,9 @@
 筛选栏与编辑区中“名称、分组”之外的字段由 meta_schema 动态驱动。
 """
 
-from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect
-from PyQt6.QtGui import QImage, QPixmap, QIcon, QPainter
+import numpy as np
+from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QIcon, QImage, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -20,10 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-import numpy as np
-
-from lvjiang.core.reference_db import ReferenceDatabase, ReferenceEntry, MetaFieldDef
-
+from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
 
 THUMB_SIZE = 96  # 图库缩略图尺寸
 _CHECK_SIZE = 20  # 批量模式复选框尺寸

@@ -6,11 +6,11 @@
 
 # 直接从新模块导入所有定义
 from lvjiang.core.reference_db import (
-    ReferenceEntry,
-    ReferenceDatabase,
+    MaterialDatabase,
     # 向后兼容别名
     MaterialEntry,
-    MaterialDatabase,
+    ReferenceDatabase,
+    ReferenceEntry,
 )
 
 __all__ = [

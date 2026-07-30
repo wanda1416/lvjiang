@@ -1,13 +1,19 @@
 """图像识别测试对话框 - 粘贴截图，支持 OCR 文字识别和材料识别"""
 
 import numpy as np
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QTextEdit, QApplication, QFileDialog,
-)
+from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
-from loguru import logger
+from PyQt6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 
 class OCRTestDialog(QDialog):
@@ -130,7 +136,6 @@ class OCRTestDialog(QDialog):
     def _set_pixmap(self, pixmap: QPixmap):
         """设置当前图片并刷新显示"""
         self._current_pixmap = pixmap
-        w, h = pixmap.width(), pixmap.height()
         scaled = pixmap.scaled(
             self._image_label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
@@ -185,8 +190,10 @@ class OCRTestDialog(QDialog):
         bgr = self._pixmap_to_bgr(self._current_pixmap)
 
         try:
+            from lvjiang.apps.yysls.core.material_recognizer import (
+                MaterialRecognizer,  # 插件专属
+            )
             from lvjiang.core.ocr import OCREngine
-            from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer  # noqa: 插件专属
 
             ocr = OCREngine()
             recognizer = MaterialRecognizer(ocr)

@@ -7,12 +7,19 @@ recorder.stop() 全文兜底刷新，文本可编辑后再保存为 .wf。
 
 from pathlib import Path
 
+from loguru import logger
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QFileDialog, QMessageBox, QApplication,
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
 )
-from loguru import logger
 
 from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
 

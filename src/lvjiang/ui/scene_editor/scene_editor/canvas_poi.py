@@ -10,13 +10,12 @@ import re
 import time
 from enum import Enum, auto
 
-from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
-from PyQt6.QtCore import Qt, QRectF, QPointF
-from PyQt6.QtGui import QPen, QBrush, QColor, QFont, QPainter, QPolygonF, QCursor
 from loguru import logger
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QBrush, QColor, QCursor, QFont, QPainter, QPen, QPolygonF
+from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 
-from ....core.scene_registry import Point, Arrow
-
+from ....core.scene_registry import Arrow, Point
 
 # ─── 常量 ────────────────────────────────────────────────
 

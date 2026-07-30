@@ -24,7 +24,7 @@ class _DSLTransformer(_StmtMixin, _ExprMixin, _ModuleControlMixin, Transformer):
         """从子节点中提取行号"""
         for item in items:
             if isinstance(item, Token) and hasattr(item, 'line'):
-                return item.line
+                return item.line or 0
             if hasattr(item, 'line_no') and item.line_no:
                 return item.line_no
             if isinstance(item, Tree) and hasattr(item, 'meta') and item.meta:

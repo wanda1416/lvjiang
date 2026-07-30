@@ -5,11 +5,26 @@ from typing import Any
 from loguru import logger
 
 from ..grammar import (
+    And,
+    ArithOp,
+    Contains,
+    Equals,
+    FieldAccess,
+    FuncCall,
+    GreaterEqual,
+    GreaterThan,
+    InList,
+    IsEmpty,
+    KeywordRef,
     Label,
-    VarRef, KeywordRef, Literal, FieldAccess,
-    Contains, Equals, InList, IsEmpty,
-    GreaterThan, LessThan, GreaterEqual, LessEqual, NotEqual, NumericEqual,
-    Not, And, Or, ArithOp, FuncCall,
+    LessEqual,
+    LessThan,
+    Literal,
+    Not,
+    NotEqual,
+    NumericEqual,
+    Or,
+    VarRef,
 )
 from .signals import WorkflowUserError
 
@@ -255,10 +270,14 @@ class _EvalMixin:
         if right is None:
             right = 0.0
         match node.op:
-            case "+": return left + right
-            case "-": return left - right
-            case "*": return left * right
-            case "/": return left / right if right != 0 else 0.0
+            case "+":
+                return left + right
+            case "-":
+                return left - right
+            case "*":
+                return left * right
+            case "/":
+                return left / right if right != 0 else 0.0
             case _:
                 logger.warning(f"未知算术运算符: {node.op}")
                 return 0.0
@@ -310,7 +329,7 @@ class _EvalMixin:
         scan/recognize 会将 {key: Region} 存入 coord_meta，
         此方法遍历所有条目，找到第一个匹配的 Region。
         """
-        for var_name, region_map in self._coord_meta.items():
+        for _var_name, region_map in self._coord_meta.items():
             if isinstance(region_map, dict) and key in region_map:
                 return region_map[key]
         return None

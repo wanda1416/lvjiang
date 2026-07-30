@@ -1,11 +1,16 @@
 """装备状态面板 - 展示用户当前穿戴的八件装备"""
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout,
-    QFrame, QScrollArea, QPushButton,
-)
 from PyQt6.QtCore import Qt, pyqtSignal
-
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 # 品质颜色映射（适配浅色背景）
 _QUALITY_COLORS = {
@@ -263,7 +268,7 @@ class EquipStatusPanel(QWidget):
 
     def refresh(self, equipped_data: dict):
         """根据 equipped 字典刷新面板"""
-        for row, col, slot_key, display_name, part_label in _SLOT_LAYOUT:
+        for _row, _col, slot_key, _display_name, _part_label in _SLOT_LAYOUT:
             card = self._cards[slot_key]
             equip = equipped_data.get(slot_key)
             if equip:

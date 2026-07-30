@@ -13,7 +13,6 @@ from lvjiang.apps.base import AppHooks
 from lvjiang.ui.main_window import MainWindow
 from lvjiang.ui.run_control import RunControlMixin
 
-
 # ─── register_hooks 多插件叠加 ─────────────────────────────
 
 class TestRegisterHooksStacking:

@@ -12,7 +12,6 @@ import pytest
 from lvjiang.config import DelayConfig
 from lvjiang.core.input_base import InputBackend
 
-
 # ─── fake 子类 ────────────────────────────────────────────────
 
 class _FakeInput(InputBackend):
@@ -92,7 +91,7 @@ def test_drag_screen_dispatch():
 # ─── 桌面工厂 ─────────────────────────────────────────────────
 
 def test_desktop_factory_post_mode():
-    from lvjiang.core.desktop import create_input_backend, PostMessageInput
+    from lvjiang.core.desktop import PostMessageInput, create_input_backend
     backend = create_input_backend(mode="post")
     assert isinstance(backend, PostMessageInput)
     assert isinstance(backend, InputBackend)
@@ -100,7 +99,7 @@ def test_desktop_factory_post_mode():
 
 
 def test_desktop_factory_send_mode():
-    from lvjiang.core.desktop import create_input_backend, SendInputInput
+    from lvjiang.core.desktop import SendInputInput, create_input_backend
     backend = create_input_backend(mode="send")
     assert isinstance(backend, SendInputInput)
     assert isinstance(backend, InputBackend)
@@ -114,7 +113,7 @@ def test_desktop_factory_unknown_mode_raises():
 
 
 def test_desktop_factory_with_hwnd():
-    from lvjiang.core.desktop import create_input_backend, PostMessageInput
+    from lvjiang.core.desktop import PostMessageInput, create_input_backend
     backend = create_input_backend(mode="post", hwnd=0xABCD)
     assert isinstance(backend, PostMessageInput)
     assert backend.target_hwnd == 0xABCD
@@ -159,7 +158,7 @@ def test_adb_factory_returns_input_backend():
 
 def test_base_workflow_accepts_fake_input_backend():
     """验证 BaseWorkflow 只依赖抽象接口，fake 子类可无缝注入"""
-    from lvjiang.core.scene_registry import Layout, CanvasConfig
+    from lvjiang.core.scene_registry import CanvasConfig, Layout
     from lvjiang.workflows.base import BaseWorkflow
 
     class _FakeCapture:

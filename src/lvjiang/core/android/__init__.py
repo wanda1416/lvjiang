@@ -13,11 +13,11 @@
 """
 
 from ...config import DelayConfig
-from ..input_base import InputBackend
 from ..capture_base import CaptureBackend
+from ..input_base import InputBackend
+from .adb_capture import AdbCapture
 from .device import AdbDevice, list_adb_devices
 from .input import AdbInput
-from .adb_capture import AdbCapture
 from .scrcpy_capture import AndroidStreamCapture
 
 

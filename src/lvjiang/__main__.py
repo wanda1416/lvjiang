@@ -95,8 +95,9 @@ def main() -> int:
     install_crash_handler()
 
     # 延迟导入 PyQt6 / 内部模块，确保 logging 先配置好
-    from .app import run_app
     from lvjiang.apps import load_app, register_hooks
+
+    from .app import run_app
 
     hooks_list = []
     for name in args.apps or []:

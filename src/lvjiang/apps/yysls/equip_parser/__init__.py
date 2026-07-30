@@ -17,10 +17,10 @@
                   base_attr, base_attr_2, affixes, warnings)
 """
 
-from .models import EquipAttr, Affix, EquipmentData
-from .parser import EquipmentParser, get_equipment_parser
-from .dingyin_parser import DingyinParser, get_dingyin_parser
 from .cleaner import clean_affix_text
+from .dingyin_parser import DingyinParser, get_dingyin_parser
+from .models import Affix, EquipAttr, EquipmentData
+from .parser import EquipmentParser, get_equipment_parser
 
 __all__ = [
     "EquipAttr",

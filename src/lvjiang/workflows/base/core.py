@@ -100,12 +100,11 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         if fn is None:
             available = ", ".join(builtins.list_functions())
             raise ValueError(f"未知内置函数: {func_name}，可用函数: {available}")
-        # 检查函数是否需要 engine 注入（第一参数名为 _engine）
-        import inspect
-        sig = inspect.signature(fn)
-        params = list(sig.parameters.keys())
-        if params and params[0] == '_engine' and engine is not None:
+        # 注入类型已在注册时缓存到 fn._inject，无需每次反射
+        inject = getattr(fn, '_inject', None)
+        if inject == 'engine':
+            # engine 为 None 时也要占位注入，否则用户参数会错位绑到 _engine 形参上
             return fn(engine, *args)
-        if params and params[0] == '_wf':
+        if inject == 'wf':
             return fn(self, *args)
         return fn(*args)

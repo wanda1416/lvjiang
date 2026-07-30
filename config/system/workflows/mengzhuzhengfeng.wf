@@ -36,7 +36,7 @@ $skip_confirm = 0
 scan [activity_mengzhu].[start_new] as $scan_result
 if not $scan_result.[start_new] contains "开始匹配"
    if not $scan_result.[start_new] contains "继续对局"
-      eval messagebox("请在初始界面开始执行")
+      eval pause("请在初始界面开始执行")
       return
    else
       # 可以跳过确认选择

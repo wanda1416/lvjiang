@@ -11,11 +11,13 @@ from ._registry import builtin_func
 def _concat(*args) -> str:
     """拼接多个参数为字符串
 
+    null 参数视为空字符串，与字符串上下文行为一致。
+
     .wf 用法:
         log concat("当前数据: ", $dict.key)
         eval $msg = concat("结果: ", $var, " 完成")
     """
-    return "".join(str(arg) for arg in args)
+    return "".join("" if arg is None else str(arg) for arg in args)
 
 
 # ─── 范围 ───────────────────────────────────────────────
@@ -126,3 +128,109 @@ def _append(list_or_dict, *args) -> str:
     else:
         logger.warning(f"append: 参数不匹配 list={isinstance(list_or_dict, list)} args={len(args)}")
     return ""
+
+
+# ─── 字典/列表扩展 ─────────────────────────────────────
+
+@builtin_func("len")
+def _len(obj) -> int:
+    """返回长度
+
+    - dict: 返回 key 数（含空值）
+    - list: 返回元素数
+    - str: 返回字符数
+    - 其他: 返回 0
+
+    .wf 用法:
+        eval $n = len($dict)
+        eval $n = len($list)
+        if len($list) > 0
+            ...
+        end
+    """
+    if isinstance(obj, (dict, list, str)):
+        return len(obj)
+    return 0
+
+
+@builtin_func("keys")
+def _keys(obj, *args) -> list:
+    """返回字典所有 key 的列表
+
+    非字典返回空列表。常用于 for 迭代：
+        for k in keys($dict)
+            ...
+        end
+    """
+    if isinstance(obj, dict):
+        return list(obj.keys())
+    return []
+
+
+@builtin_func("values")
+def _values(obj, *args) -> list:
+    """返回字典所有 value 的列表
+
+    非字典返回空列表。
+    """
+    if isinstance(obj, dict):
+        return list(obj.values())
+    return []
+
+
+@builtin_func("has_key")
+def _has_key(obj, *args) -> bool:
+    """检查字典是否包含指定 key
+
+    .wf 用法:
+        if has_key($dict, "target_key")
+            ...
+        end
+    """
+    if not isinstance(obj, dict) or not args:
+        return False
+    return str(args[0]) in obj
+
+
+@builtin_func("del_key")
+def _del_key(obj, *args) -> str:
+    """删除字典指定 key（不存在不报错）
+
+    返回空字符串（副作用操作）。
+    """
+    if isinstance(obj, dict) and args:
+        obj.pop(str(args[0]), None)
+    return ""
+
+
+@builtin_func("remove")
+def _remove(obj, *args) -> str:
+    """删除列表中首个匹配元素
+
+    返回空字符串（副作用操作）。
+    """
+    if isinstance(obj, list) and args:
+        try:
+            obj.remove(args[0])
+        except ValueError:
+            pass
+    return ""
+
+
+@builtin_func("slice")
+def _slice(obj, *args) -> list:
+    """列表切片（闭区间）
+
+    - slice($list, start, end) → list[start:end+1]
+    - start/end 支持负数索引（Python 语义）
+    - 越界自动截断，不报错
+    - 非列表返回空列表
+    """
+    if not isinstance(obj, list) or len(args) < 2:
+        return []
+    try:
+        start = int(args[0])
+        end = int(args[1])
+    except (TypeError, ValueError):
+        return []
+    return obj[start:end + 1]

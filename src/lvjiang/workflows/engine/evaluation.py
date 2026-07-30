@@ -13,11 +13,19 @@ from ..grammar import (
 )
 from .signals import WorkflowUserError
 
+# 数值相等容差：== / != 统一用容差比较，避免浮点误差（如 0.1+0.2 != 0.3）
+_NUM_EQ_EPSILON = 1e-9
+
 
 class _EvalMixin:
     """条件求值 / 变量与表达式解析 / 坐标与工具方法"""
 
     # ─── 条件求值 ─────────────────────────────────────────
+
+    @staticmethod
+    def _str_or_empty(val) -> str:
+        """将值转为字符串，null 视为空字符串"""
+        return "" if val is None else str(val)
 
     def _eval_condition(self, node) -> bool:
         """递归求值条件表达式 AST 节点"""
@@ -25,18 +33,18 @@ class _EvalMixin:
             case Contains():
                 left = self._eval_var_or_field(node.left)
                 right = self._resolve(node.right)
-                return str(right) in str(left) if left else False
+                return self._str_or_empty(right) in left if left else False
             case Equals():
                 left = self._eval_var_or_field(node.left)
                 right = self._resolve(node.right)
-                return str(left) == str(right)
+                return left == self._str_or_empty(right)
             case InList():
                 left = self._eval_var_or_field(node.left)
-                right = [str(self._resolve(item)) for item in node.right]
-                return str(left) in right if left else False
+                right = [self._str_or_empty(self._resolve(item)) for item in node.right]
+                return left in right if left else False
             case IsEmpty():
                 left = self._eval_var_or_field(node.expr)
-                return not left or str(left).strip() == ""
+                return not left or left.strip() == ""
             case GreaterThan():
                 left = self._resolve_arith(node.left)
                 right = self._resolve_arith(node.right)
@@ -56,11 +64,15 @@ class _EvalMixin:
             case NotEqual():
                 left = self._resolve_arith(node.left)
                 right = self._resolve_arith(node.right)
-                return left != right if left is not None and right is not None else True
+                if left is None or right is None:
+                    return True
+                return abs(left - right) >= _NUM_EQ_EPSILON
             case NumericEqual():
                 left = self._resolve_arith(node.left)
                 right = self._resolve_arith(node.right)
-                return left == right if left is not None and right is not None else False
+                if left is None or right is None:
+                    return False
+                return abs(left - right) < _NUM_EQ_EPSILON
             case Not():
                 return not self._eval_condition(node.operand)
             case And():
@@ -114,12 +126,14 @@ class _EvalMixin:
 
     def _eval_field_access(self, node: FieldAccess) -> str:
         """求值字段访问链：$var.f1.f2.f3 → 逐层遍历，返回字符串"""
-        return str(self._eval_field_raw(node))
+        val = self._eval_field_raw(node)
+        return "" if val is None else str(val)
 
     def _eval_var_or_field(self, node) -> str:
         """求值变量或字段访问：支持 VarRef 和 FieldAccess"""
         if isinstance(node, VarRef):
-            return str(self.variables.get(node.name, ""))
+            val = self.variables.get(node.name)
+            return "" if val is None else str(val)
         elif isinstance(node, FieldAccess):
             return self._eval_field_access(node)
         return ""
@@ -160,14 +174,14 @@ class _EvalMixin:
 
         # dict 按 key 取
         if isinstance(current, dict):
-            return current.get(key, "")
+            return current.get(key)  # 缺失 key → None（null）
         # list 按 index 取（key 需为整数）
         if isinstance(current, list):
             try:
                 idx = int(key)
-                return current[idx] if 0 <= idx < len(current) else ""
+                return current[idx] if 0 <= idx < len(current) else None
             except (ValueError, TypeError):
-                return ""
+                return None
         # str 类型不支持字段访问（by 子句返回 str，用户误用 .field 时应报错）
         if isinstance(current, str):
             var_desc = self._field_path(node)
@@ -176,14 +190,14 @@ class _EvalMixin:
                 f"不能使用 .{key} 访问字段。"
                 f"by 子句返回的是字段名（str），不是 dict。"
             )
-        return ""
+        return None
 
     # ─── 变量解析 ─────────────────────────────────────────
 
     def _resolve(self, node) -> Any:
         """解析表达式节点为运行时值
 
-        VarRef → 查变量表（找不到则返回 name 本身作为字面量回退）
+        VarRef → 查变量表（找不到返回 None 即 null）
         KeywordRef → 返回 session/context 字典引用
         Literal → 直接返回值
         FieldAccess → 逐层遍历字典/列表
@@ -193,11 +207,7 @@ class _EvalMixin:
         """
         match node:
             case VarRef():
-                val = self.variables.get(node.name)
-                if val is not None:
-                    return val  # 保留原始类型（包括 list）
-                # 回退：未定义的变量视为字面量
-                return node.name
+                return self.variables.get(node.name)  # 未定义 → None（null）
             case KeywordRef():
                 if node.name == "session":
                     return self.session
@@ -219,7 +229,7 @@ class _EvalMixin:
             case list():
                 return [self._resolve(item) for item in node]
             case _:
-                return str(node) if node is not None else ""
+                return None
 
     def _resolve_arith(self, node) -> float | None:
         """解析算术表达式右侧为数值（用于条件比较）
@@ -235,12 +245,15 @@ class _EvalMixin:
         """求值算术表达式节点
 
         递归求值 left/right，统一转 float 后执行运算。
-        除法为浮点除，除 0 返回 0。
+        null 操作数视为 0.0，除法为浮点除，除 0 返回 0。
         """
         left = self._resolve_arith(node.left)
         right = self._resolve_arith(node.right)
-        if left is None or right is None:
-            return 0.0
+        # null 操作数视为 0.0
+        if left is None:
+            left = 0.0
+        if right is None:
+            right = 0.0
         match node.op:
             case "+": return left + right
             case "-": return left - right

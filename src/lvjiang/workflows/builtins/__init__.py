@@ -4,7 +4,8 @@
 
 - ``arithmetic``: 基础运算 (add/sub/mul/div/mod/min/max/abs)
 - ``general``:    通用工具 (concat/range/count_key/contains/find_key/append)
-- ``system``:     系统与 UI (messagebox/save/panel_rows/panel_cols)
+- ``strings``:    字符串处理 (substr/split/replace/match/trim/upper/lower/to_num)
+- ``system``:     系统与 UI (confirm/pause/notify/input/save/panel_rows/panel_cols)
 
 燕云专属内置函数（``equipment`` / ``bag_traversal``）位于
 ``lvjiang.apps.yysls.workflows.builtins``，由燕云插件在加载时注册。
@@ -16,4 +17,5 @@ from ._registry import builtin_func, get_function, list_functions  # noqa: F401
 # 导入子模块触发函数注册
 from . import arithmetic   # noqa: F401
 from . import general      # noqa: F401
+from . import strings      # noqa: F401
 from . import system       # noqa: F401

@@ -95,3 +95,19 @@ class TestArithEval:
         engine.variables = dict(variables)
         prog = parse_text('if $a + 1 == $b * 2\n    log "eq"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is expected
+
+    def test_float_equality_tolerance(self):
+        """== 用容差比较，避免浮点误差：0.1+0.2 == 0.3 应为 true"""
+        engine = make_engine()
+        engine.variables = {}
+        prog = parse_text('if 0.1 + 0.2 == 0.3\n    log "eq"\nend\n')
+        assert engine._eval_condition(prog.body[0].condition) is True
+
+    def test_float_inequality_tolerance(self):
+        """!= 与 == 互补：0.1+0.2 != 0.3 应为 false，真差异仍为 true"""
+        engine = make_engine()
+        engine.variables = {}
+        prog = parse_text('if 0.1 + 0.2 != 0.3\n    log "ne"\nend\n')
+        assert engine._eval_condition(prog.body[0].condition) is False
+        prog = parse_text('if 0.1 + 0.2 != 0.4\n    log "ne"\nend\n')
+        assert engine._eval_condition(prog.body[0].condition) is True

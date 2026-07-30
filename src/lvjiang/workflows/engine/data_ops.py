@@ -97,10 +97,10 @@ class _DataOpsMixin:
         """collect $var | field_access | literal [as "label" | as $alias_var] — 将值存入输出 dict"""
         if isinstance(node.source, VarRef):
             var_name = node.source.name
-            value = self.variables.get(var_name)
-            if value is None:
+            if var_name not in self.variables:
                 logger.warning(f"collect: 变量 ${var_name} 未定义，跳过")
                 return
+            value = self.variables[var_name]  # 可能是 None（null）
             default_key = var_name
         elif isinstance(node.source, FieldAccess):
             value = self._resolve(node.source)

@@ -35,6 +35,23 @@ class _ExprMixin:
     """by 子句、collect/log、eval 赋值全组、算术、字典、条件表达式、
     field_access/keyword_ref 链与通用原子回调"""
 
+    # 哨兵值：用于区分“列表/字典中的 null 字面量”和“回调无返回值”
+    _MISSING = object()
+
+    # ─── null / bool 字面量 ────────────────────────────────
+
+    def null_literal(self, items):
+        """null → Python None"""
+        return None
+
+    def true_literal(self, items):
+        """true → Python True"""
+        return True
+
+    def false_literal(self, items):
+        """false → Python False"""
+        return False
+
     # ─── by 子句（短路识别）───────────────────────────────
 
     def by_clause(self, items):
@@ -264,12 +281,14 @@ class _ExprMixin:
         return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
 
     def eval_rhs_lit(self, items):
-        """eval_rhs: literal → Literal | dict | list"""
+        """eval_rhs: literal → Literal | dict | list | null | bool"""
         val = items[0]
         if isinstance(val, dict):
             return val  # 字典（空或非空）
         if isinstance(val, Token):
             return Literal(value=self._unquote(str(val)))
+        if val is None or isinstance(val, bool):
+            return Literal(value=val)  # null / true / false
         return val  # number (float)
 
     def eval_rhs_field(self, items):
@@ -334,6 +353,18 @@ class _ExprMixin:
     def dict_val_num(self, items):
         """字典值：数字 → Literal"""
         return Literal(value=items[0])
+
+    def dict_val_null(self, items):
+        """字典值：null → Literal(None)"""
+        return Literal(value=None)
+
+    def dict_val_true(self, items):
+        """字典值：true → Literal(True)"""
+        return Literal(value=True)
+
+    def dict_val_false(self, items):
+        """字典值：false → Literal(False)"""
+        return Literal(value=False)
 
     def dict_val_var(self, items):
         """字典值：变量引用 → VarRef"""
@@ -543,7 +574,7 @@ class _ExprMixin:
 
     def list_literal(self, items):
         """[item1, item2, ...] → list[Literal | VarRef]"""
-        return [item for item in items if item is not None]
+        return [item for item in items if item is not self._MISSING]
 
     def list_item_str(self, items):
         """字符串列表项 → Literal"""
@@ -552,6 +583,18 @@ class _ExprMixin:
     def list_item_num(self, items):
         """数字列表项 → Literal"""
         return Literal(value=items[0])
+
+    def list_item_null(self, items):
+        """null 列表项 → Literal(None)"""
+        return Literal(value=None)
+
+    def list_item_true(self, items):
+        """true 列表项 → Literal(True)"""
+        return Literal(value=True)
+
+    def list_item_false(self, items):
+        """false 列表项 → Literal(False)"""
+        return Literal(value=False)
 
     def list_item_var(self, items):
         """变量列表项 → VarRef"""

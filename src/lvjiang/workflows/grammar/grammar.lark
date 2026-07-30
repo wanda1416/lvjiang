@@ -25,11 +25,15 @@ start: (_NL | statement)*
           | call_proc_stmt
           | if_stmt
           | for_stmt
-          | loop_stmt
+          | loop_count_stmt
+          | loop_while_stmt
+          | loop_until_stmt
           | break_stmt
+          | continue_stmt
           | return_stmt
           | label_stmt
           | goto_stmt
+          | try_stmt
 
 // ─── 基础指令 ─────────────────────────────────────────────
 
@@ -211,15 +215,27 @@ for_range: "[" for_range_endpoint RANGE_OP for_range_endpoint "]"
 for_range_endpoint: number | var_ref
 RANGE_OP.2: /\.\.\./
 
-loop_stmt: "loop"i (number | NAME | var_ref) _NL statement* "end"i _NL
+loop_count_stmt: "loop"i (number | NAME | var_ref) _NL statement* "end"i _NL
+
+loop_while_stmt: "loop"i "while"i condition _NL statement* "end"i _NL
+
+loop_until_stmt: "loop"i "until"i condition _NL statement* "end"i _NL
 
 break_stmt: "break"i _NL
+
+continue_stmt: "continue"i _NL
 
 return_stmt: "return"i _NL
 
 label_stmt: "@" NAME _NL
 
 goto_stmt: "goto"i NAME _NL
+
+// try/catch：异常处理
+// catch 后可选绑定一个变量名，接收错误消息字符串
+// 控制流信号（break/return/goto）穿透 try/catch，不被捕获
+try_stmt: "try"i _NL statement* catch_clause? "end"i _NL
+catch_clause: "catch"i var_ref? _NL statement*
 
 // ─── 条件表达式（优先级：or < and < not < atom）──────────
 
@@ -304,6 +320,9 @@ keyword_ref: "session" -> session_ref
 // 任意字面量（用于 eval 赋值右侧）
 ?literal: STRING
         | number
+        | "null"i -> null_literal
+        | "true"i -> true_literal
+        | "false"i -> false_literal
         | dict_literal
         | list_literal
         | range_literal
@@ -316,6 +335,9 @@ list_literal: "[" [list_item ("," list_item)*] "]"
 
 ?list_item: STRING -> list_item_str
           | number -> list_item_num
+          | "null"i -> list_item_null
+          | "true"i -> list_item_true
+          | "false"i -> list_item_false
           | var_ref -> list_item_var
           | dict_literal -> list_item_dict
           | list_literal -> list_item_list
@@ -328,6 +350,9 @@ dict_pair: STRING ":" dict_value
 
 ?dict_value: STRING -> dict_val_str
            | number -> dict_val_num
+           | "null"i -> dict_val_null
+           | "true"i -> dict_val_true
+           | "false"i -> dict_val_false
            | var_ref -> dict_val_var
            | dict_literal -> dict_val_dict
            | list_literal -> dict_val_list

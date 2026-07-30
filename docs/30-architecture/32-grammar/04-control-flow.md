@@ -1,5 +1,26 @@
 # DSL 控制流与条件表达式
 
+## 目录
+
+- [一、控制流指令总览](#一控制流指令总览)
+- [二、if / else — 条件分支](#二if--else--条件分支)
+- [三、for — 枚举循环](#三for--枚举循环)
+- [四、loop — 计数与条件循环](#四loop--计数与条件循环)
+  - [loop N — 计数循环](#loop-n--计数循环)
+  - [loop while — 条件为真时循环](#loop-while--条件为真时循环)
+  - [loop until — 条件为真时退出](#loop-until--条件为真时退出至少执行一次)
+- [五、default — 默认值赋值](#五default--默认值赋值)
+- [六、break / continue — 循环控制](#六break--continue--循环控制)
+  - [break — 跳出循环](#break--跳出循环)
+  - [continue — 跳过当前迭代](#continue--跳过当前迭代)
+- [七、try / catch — 异常处理](#七try--catch--异常处理)
+- [八、return — 结束工作流](#八return--结束工作流)
+- [九、label / goto — 标签跳转](#九label--goto--标签跳转)
+- [十、条件表达式](#十条件表达式)
+  - [10.1 基础条件](#101-基础条件)
+  - [10.2 组合条件](#102-组合条件)
+  - [10.3 算术表达式条件](#103-算术表达式条件)
+
 ## 一、控制流指令总览
 
 | 指令 | 语法 | 说明 |
@@ -7,7 +28,11 @@
 | if | `if <cond> ... [else ...] end` | 条件分支，可嵌套 |
 | for | `for $var in [a, b, c] ... end` 或 `for $var in $list ... end` | 枚举循环，迭代静态列表或列表变量 |
 | loop | `loop <N> ... end` | 计数循环，N 为正整数或变量引用 |
+| loop while | `loop while <cond> ... end` | 条件循环，每轮前求值，truthy 则执行 |
+| loop until | `loop until <cond> ... end` | 条件循环，先执行再求值，truthy 则退出（至少执行一次） |
 | break | `break` | 跳出最内层 for/loop |
+| continue | `continue` | 跳过当前迭代，进入下一轮 |
+| try/catch | `try ... catch [$err] ... end` | 异常捕获与兜底 |
 | return | `return` | 提前结束当前工作流 |
 | label | `@label_name` | 标签，goto 的目标 |
 | goto | `goto label_name` | 同文件内无条件跳转 |
@@ -62,7 +87,9 @@ end
 
 循环变量在循环体内通过 `$var` 引用。
 
-## 四、loop — 计数循环
+## 四、loop — 计数与条件循环
+
+### loop N — 计数循环
 
 重复执行指定次数。N 可以是数字字面量或变量引用：
 
@@ -78,6 +105,34 @@ loop $execute_times
     # ... 执行逻辑
 end
 ```
+
+### loop while — 条件为真时循环
+
+每次迭代前求值条件，结果为 truthy 则执行循环体，为 falsy 则退出：
+
+```
+eval $x = 0
+loop while $x < 10
+    eval $x = $x + 1
+end
+# $x == 10
+```
+
+### loop until — 条件为真时退出（至少执行一次）
+
+先执行循环体，再求值条件；条件为 truthy 则退出，为 falsy 则继续：
+
+```
+eval $x = 0
+loop until $x >= 5
+    eval $x = $x + 1
+end
+# $x == 5
+```
+
+选择 `loop while` / `loop until` 而非独立关键字 `while` / `until`，与现有 `loop N` 同族，词法不增加新关键字。
+
+> **安全限制**：`loop while` / `loop until` 均有 1,000,000 次迭代上限，超过后强制退出并记录错误日志，防止死循环。
 
 ## 五、default — 默认值赋值
 
@@ -107,9 +162,11 @@ end
 
 > **与 `eval` 的区别**：`eval $var = 10` 每次都会覆盖变量值；`default $var = 10` 仅在变量不存在时赋值，保留外部传入的值。
 
-## 六、break — 跳出循环
+## 六、break / continue — 循环控制
 
-跳出最内层的 `for` 或 `loop`：
+### break — 跳出循环
+
+跳出最内层的 `for` 或 `loop`（含 `loop while` / `loop until`）：
 
 ```
 loop 10
@@ -120,7 +177,74 @@ loop 10
 end
 ```
 
-## 七、return — 结束工作流
+### continue — 跳过当前迭代
+
+在 `for` / `loop` / `loop while` / `loop until` 的循环体内使用，立即跳过当前迭代剩余语句，进入下一轮迭代。嵌套循环中只影响最内层：
+
+```
+eval $sum = 0
+for item in $items
+    if $item equals "skip"
+        continue
+    end
+    eval $sum = $sum + 1
+end
+```
+
+> `continue` 在非循环上下文中使用会导致运行时错误。
+
+## 七、try / catch — 异常处理
+
+```
+try
+    # 可能出错的代码
+catch $err
+    # 出错时的兜底逻辑，$err 接收错误消息
+end
+```
+
+- `catch` 后可选绑定一个变量名，接收错误消息字符串。
+- `catch` 子句本身可选——不写 `catch` 则仅静默吞掉异常。
+
+### 捕获范围
+
+| 异常类型 | 是否捕获 | 说明 |
+|---|---|---|
+| `WorkflowUserError` | 是 | DSL 用户可见错误（如字符串字段访问） |
+| `KeyError` / `ValueError` / `TypeError` | 是 | 字典 key 不存在、值转换失败、类型不匹配 |
+| 控制流信号（break/return/goto/continue） | **否** | 穿透 try/catch，否则在 try 块内会失效 |
+| `KeyboardInterrupt` | **否** | 系统中断，穿透 |
+
+### 示例
+
+```
+# 基本捕获
+try
+    eval $x = $result.not_exist_field
+catch $err
+    log concat("捕获错误: ", $err)
+end
+
+# 无变量绑定
+try
+    eval $x = $data.missing_key
+catch
+    log "出错了，使用默认值"
+    eval $x = "default"
+end
+
+# try 内 break 穿透：直接退出 loop，不被 catch 拦截
+loop 10
+    try
+        eval $x = $data.risky_field
+        break
+    catch $err
+        log $err
+    end
+end
+```
+
+## 八、return — 结束工作流
 
 提前结束当前工作流的执行。若当前是子工作流，则返回到调用方：
 
@@ -131,7 +255,7 @@ if not $gold_pos
 end
 ```
 
-## 八、label / goto — 标签跳转
+## 九、label / goto — 标签跳转
 
 `@label` 定义跳转目标，`goto` 无条件跳转到该标签。仅限同一工作流文件内：
 
@@ -146,9 +270,9 @@ if $result.result contains "失败"
 end
 ```
 
-## 九、条件表达式
+## 十、条件表达式
 
-### 8.1 基础条件
+### 10.1 基础条件
 
 | 形式 | 说明 |
 |---|---|
@@ -157,7 +281,7 @@ end
 | `$var.field in ["文本1", "文本2", ...]` | 字段值等于列表中任一项（等价于多个 equals 的 or 组合） |
 | `$var in ["文本1", "文本2", ...]` | 变量值等于列表中任一项 |
 | `$var.field is_empty` | 字段不存在或为空字符串 |
-| `$var.field > N` / `< N` / `>= N` / `<= N` / `== N` / `!= N` | 字段数值与 N 比较（N 为整数或浮点数） |
+| `$var.field > N` / `< N` / `>= N` / `<= N` / `== N` / `!= N` | 字段数值与 N 比较（N 为整数或浮点数）。`==` / `!=` 为容差比较（差值 < 1e-9 视为相等），避免浮点误差（如 `0.1 + 0.2 == 0.3` 为 true） |
 | `$var > N` / `< N` / `>= N` / `<= N` / `== N` / `!= N` | 变量数值与 N 比较（变量值为数字或可转数字的字符串） |
 | `expr > expr` / `< / == / ...` | 算术表达式比较：两侧支持 `+` `-` `*` `/` 运算，如 `$a + 1 > $b * 2` |
 | `$var` | truthy 检查：变量存在且非空时为 true，不存在或为空时为 false |
@@ -179,7 +303,7 @@ if not $result
 end
 ```
 
-### 8.2 组合条件
+### 10.2 组合条件
 
 - `and`：逻辑与，优先级高于 `or`
 - `or`：逻辑或
@@ -195,7 +319,7 @@ if $scan.x is_empty or ($scan.y equals "A" and $scan.z contains "B")
 end
 ```
 
-### 8.3 算术表达式条件
+### 10.3 算术表达式条件
 
 数值比较的两侧支持算术表达式（`+` `-` `*` `/`），可用括号改变优先级：
 

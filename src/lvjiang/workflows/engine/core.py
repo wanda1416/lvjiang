@@ -16,15 +16,15 @@ from ..grammar import (
     parse_file,
     Click, Drag, Wait, Scan, Recognize, Collect, Log,
     Import, ProcDef, CallProc,
-    If, For, ForRange, Loop, Break, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
+    If, For, ForRange, Loop, WhileLoop, UntilLoop, Break, Continue, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
     Literal,
 )
-from ..grammar.ast_nodes import Align
+from ..grammar.ast_nodes import Align, Try
 from ..scene_scan import collect_scene_keys
 from ..base import BaseWorkflow
 from ..align import GridAlignment
 
-from .signals import WorkflowUserError, _BreakSignal, _ReturnSignal, _GotoSignal
+from .signals import WorkflowUserError, _BreakSignal, _ReturnSignal, _GotoSignal, _ContinueSignal
 from .actions import _ActionsMixin
 from .panel import _PanelMixin
 from .data_ops import _DataOpsMixin
@@ -77,6 +77,13 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
         self._save_callback: Callable | None = None
+        # UI 交互回调（UI 层注入，解决工作流线程不能直接弹对话框的问题）
+        # 签名: (action, **kwargs) → result
+        #   action="confirm": message → bool
+        #   action="pause":   message → None
+        #   action="notify":  message → None
+        #   action="input":   prompt  → str | None
+        self._ui_callback: Callable | None = None
         # 游戏操作委托（execute 时懒创建）
         self._workflow: BaseWorkflow | None = None
 
@@ -254,8 +261,11 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 case If():
                     self._collect_missing_waits(node.then_body, missing)
                     self._collect_missing_waits(node.else_body, missing)
-                case For() | ForRange() | Loop():
+                case For() | ForRange() | Loop() | WhileLoop() | UntilLoop():
                     self._collect_missing_waits(node.body, missing)
+                case Try():
+                    self._collect_missing_waits(node.body, missing)
+                    self._collect_missing_waits(node.catch_body, missing)
 
     def _execute_python_workflow(self, workflow: BaseWorkflow) -> dict:
         """执行 Python 工作流实例"""
@@ -303,6 +313,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 raise  # return 直接穿透，不记错误日志
             except _BreakSignal:
                 raise  # break 直接穿透，由 loop/for 处理
+            except _ContinueSignal:
+                raise  # continue 直接穿透，由循环处理
             except BaseException as e:
                 line_info = f"(行 {node.line_no})" if hasattr(node, 'line_no') and node.line_no else ""
                 logger.error(f"DSL 执行异常 {line_info}: {e}")
@@ -335,7 +347,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 if isinstance(node.message, FuncCall):
                     logger.info(str(self._call_func(node.message)))
                 else:
-                    logger.info(self._resolve(node.message))
+                    val = self._resolve(node.message)
+                    logger.info("null" if val is None else val)
             case If():
                 self._exec_if(node)
             case For():
@@ -344,8 +357,14 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_for_range(node)
             case Loop():
                 self._exec_loop(node)
+            case WhileLoop():
+                self._exec_while_loop(node)
+            case UntilLoop():
+                self._exec_until_loop(node)
             case Break():
                 raise _BreakSignal()
+            case Continue():
+                raise _ContinueSignal()
             case Return():
                 raise _ReturnSignal()
             case Label():
@@ -360,5 +379,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 pass  # import 在 _execute_dsl 中已处理，运行时跳过
             case CallProc():
                 self._exec_call_proc(node)
+            case Try():
+                self._exec_try(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")

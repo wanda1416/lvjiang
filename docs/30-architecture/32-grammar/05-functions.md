@@ -2,22 +2,48 @@
 
 DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗、装备解析、条件判定、背包遍历等能力。eval 语法详见 [01-basics.md](01-basics.md#二变量系统)。
 
+## 目录
+
+- [一、速查表](#一速查表)
+  - [基础运算（8）](#基础运算8)
+  - [通用工具（6）](#通用工具6)
+  - [字典/列表操作（7）](#字典列表操作7)
+  - [字符串处理（8）](#字符串处理8)
+  - [装备处理（6）](#装备处理6)
+  - [背包遍历（3）](#背包遍历3)
+  - [系统与用户交互（7）](#系统与用户交互7)
+- [二、基础运算](#二基础运算)
+  - [算术运算符（推荐）](#算术运算符推荐)
+  - [运算函数](#运算函数)
+- [三、通用工具](#三通用工具)
+- [四、字典/列表与字符串函数](#四字典列表与字符串函数)
+  - [字典/列表操作](#字典列表操作)
+  - [字符串处理](#字符串处理)
+  - [类型不匹配时的行为](#类型不匹配时的行为)
+- [五、装备处理](#五装备处理)
+- [六、背包遍历](#六背包遍历)
+- [七、用户交互函数](#七用户交互函数)
+- [八、系统函数](#八系统函数)
+- [九、综合示例](#九综合示例)
+
+---
+
 ## 一、速查表
 
-共 27 个内置函数，按功能分为 5 类：
+共 45 个内置函数，按功能分为 7 类：
 
 ### 基础运算（8）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `add` | `(a, b) -> int` | 两数相加 |
-| `sub` | `(a, b) -> int` | 两数相减 |
-| `mul` | `(a, b) -> int` | 两数相乘 |
-| `div` | `(a, b) -> int` | 整除，除数为 0 返回 0 |
-| `mod` | `(a, b) -> int` | 取模，除数为 0 返回 0 |
-| `min` | `(a, b) -> int` | 取较小值 |
-| `max` | `(a, b) -> int` | 取较大值 |
-| `abs` | `(a) -> int` | 取绝对值 |
+| `add` | `(a, b) -> number` | 两数相加 |
+| `sub` | `(a, b) -> number` | 两数相减 |
+| `mul` | `(a, b) -> number` | 两数相乘 |
+| `div` | `(a, b) -> number` | 浮点除，除数为 0 返回 0 |
+| `mod` | `(a, b) -> number` | 取模，除数为 0 返回 0 |
+| `min` | `(a, b, ...) -> number` | 取最小值（支持两个以上参数） |
+| `max` | `(a, b, ...) -> number` | 取最大值（支持两个以上参数） |
+| `abs` | `(a) -> number` | 取绝对值 |
 
 ### 通用工具（6）
 
@@ -29,6 +55,31 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `contains` | `(dict, str) -> bool` | 检查字典中是否有任意 value 包含指定文本 |
 | `find_key` | `(dict, str) -> str` | 查找 value 包含指定文本的 key，找不到返回 `""` |
 | `append` | `(list, val) / (dict, key, val) -> ""` | 向列表追加或向字典写入（副作用操作） |
+
+### 字典/列表操作（7）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `len` | `(dict\|list\|str) -> int` | 长度：dict 返回 key 数（含空值），list 返回元素数，str 返回字符数 |
+| `keys` | `(dict) -> list` | 返回字典所有 key 的列表，可用于 `for k in keys($d)` |
+| `values` | `(dict) -> list` | 返回字典所有 value 的列表 |
+| `has_key` | `(dict, str) -> bool` | 检查字典是否包含指定 key |
+| `del_key` | `(dict, str) -> ""` | 删除字典指定 key（不存在不报错），副作用 |
+| `remove` | `(list, val) -> ""` | 删除列表中首个匹配元素，副作用 |
+| `slice` | `(list, start, end) -> list` | 列表切片（闭区间，与 range 一致） |
+
+### 字符串处理（8）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `substr` | `(str, start, end?) -> str` | 子串，start/end 为索引（闭区间），end 缺省到末尾，支持负数索引 |
+| `split` | `(str, sep) -> list` | 按分隔符拆分，返回列表 |
+| `replace` | `(str, old, new) -> str` | 替换所有匹配 |
+| `match` | `(str, regex) -> bool` | 正则匹配（Python `re.search`），非法正则返回 False |
+| `trim` | `(str) -> str` | 去除两端空白 |
+| `upper` | `(str) -> str` | 转大写 |
+| `lower` | `(str) -> str` | 转小写 |
+| `to_num` | `(str) -> float` | 字符串转数字，失败返回 0 |
 
 ### 装备处理（6）
 
@@ -49,11 +100,14 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `notify_scroll` | `(col, row, fingerprint) -> ""` | 记录已处理装备指纹到滚动管理器 |
 | `scroll_advance` | `() -> ""` | 校验通过后推进状态，移除已滚出的行指纹 |
 
-### 系统交互（4）
+### 系统与用户交互（7）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `messagebox` | `(str) -> str` | 弹出 Windows 消息框，阻塞直到点击确定 |
+| `confirm` | `(str) -> bool` | 弹出确认对话框（是/否），详见[七、用户交互函数](#七用户交互函数) |
+| `pause` | `(str?) -> ""` | 暂停执行直到用户点击确定 |
+| `notify` | `(str) -> ""` | 非阻塞通知（5 秒自动关闭） |
+| `input` | `(str) -> str \| null` | 弹出输入对话框，取消返回 null |
 | `save` | `() -> ""` | 强制保存 session 到磁盘 |
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
@@ -78,20 +132,21 @@ eval $x = ($a + $b) * ($c - 1)     # 括号改变优先级
 
 ### 运算函数
 
-运算函数内部做 `int()` 转换，参数类型不匹配时返回 0。适用于需要整数运算或函数式风格的场景：
+运算函数统一 number（float）语义：参数宽容转 float，返回 float，类型不匹配时返回 0。适用于需要取模/最值/绝对值或函数式风格的场景：
 
 ```
 eval $counter = add($counter, 1)          # 自增
 eval $remain = sub($total, $used)         # 相减
 eval $double = mul($val, 2)              # 翻倍
-eval $half = div($total, 2)              # 整除
+eval $half = div($total, 2)              # 浮点除
 eval $r = mod($index, 3)                 # 取模（判断是否行首等）
 eval $clamped = min($val, 100)           # 限制上限
+eval $lowest = min($a, $b, $c)           # 多参最小值
 eval $at_least = max($val, 1)            # 限制下限
 eval $diff = abs($a - $b)                # 绝对值（支持运算符）
 ```
 
-> **运算符 vs 函数**：`$a + $b` 和 `add($a, $b)` 等价，但运算符版本为浮点除，函数版本为整数除。简单运算推荐用运算符，需要取模/最值/绝对值时用函数。
+> **运算符 vs 函数**：`$a + $b` 和 `add($a, $b)` 完全等价，均为 number（float）语义。简单四则运算推荐用运算符，需要取模/最值/绝对值时用函数。DSL 层暂无取整函数，需要向下取整时可用 `sub($x, mod($x, 1))` 组合实现。
 
 ---
 
@@ -165,7 +220,77 @@ eval append($fingerprints, $slot, $fp)          # 字典写入
 
 ---
 
-## 四、装备处理
+## 四、字典/列表与字符串函数
+
+### 字典/列表操作
+
+```
+# 统计字典 key 数
+eval $n = len($config)
+
+# 遍历字典所有 key
+for k in keys($scores)
+    log concat(k, ": ", $scores.$k)
+end
+
+# 检查 key 存在
+eval $exists = has_key($data, "target")
+
+# 删除 key
+eval del_key($data, "obsolete")
+
+# 列表切片
+eval $part = slice($items, 0, 4)
+```
+
+> **与 count_key 的区别**：`len($dict)` 返回**全部** key 数（含空值字段），`count_key($dict)` 统计**非空**字段。两者共存，不替换。
+
+### 字符串处理
+
+```
+# 子串
+eval $name = substr($full_name, 0, 2)
+
+# 拆分 + 遍历
+for part in split($csv_line, ",")
+    log part
+end
+
+# 替换
+eval $clean = replace($raw, " ", "_")
+
+# 正则匹配
+eval $is_num = match($input, "^\d+$")
+
+# 大小写
+eval $tag = upper($category)
+
+# 字符串转数字
+eval $price = to_num($price_str)
+```
+
+**注意事项**：
+
+- DSL 字符串字面量**不做转义处理**，`"\d"` 就是两个字符 `\` 和 `d`，可直接用于正则。
+- `substr` 使用**闭区间** `[start, end]`，与 `slice` / `range` 一致。
+- `match` 使用 `re.search`（部分匹配），不是 `re.match`（全匹配）。
+- 非字符串参数会先 `str()` 转换，`null` 转为空字符串。
+
+### 类型不匹配时的行为
+
+字典/列表与字符串函数对类型不匹配采用宽容策略：
+
+| 输入 | len | keys | has_key | substr | split |
+|---|---|---|---|---|---|
+| `dict` | key 数 | key 列表 | 正常 | str() 后截取 | str() 后拆分 |
+| `list` | 元素数 | `[]` | `False` | str() 后截取 | str() 后拆分 |
+| `str` | 字符数 | `[]` | `False` | 正常 | 正常 |
+| `int/float` | `0` | `[]` | `False` | str() 后截取 | str() 后拆分 |
+| `null` | `0` | `[]` | `False` | `""` | `[""]` |
+
+---
+
+## 五、装备处理
 
 ### to_equipment — 装备解析
 
@@ -233,7 +358,7 @@ end
 
 ---
 
-## 五、背包遍历
+## 六、背包遍历
 
 用于 grid 滚动遍历场景的指纹管理三件套，配合 `check_scroll` → 处理 → `notify_scroll` → `scroll_advance` 流程使用。
 
@@ -266,18 +391,101 @@ eval scroll_advance()
 
 ---
 
-## 六、系统交互
+## 七、用户交互函数
 
-### messagebox — 消息弹窗
+运行中与用户交互的内置函数。`confirm`/`pause`/`input` 通过 Qt 主线程回调机制实现，可在工作流子线程中安全调用；`notify` 使用 Win32 超时 API，不阻塞工作流。
 
-弹出 Windows 消息框，阻塞直到用户点击确定。可在工作流子线程中安全调用。常用于流程异常时提示用户。
+> 旧版 `messagebox` 函数已移除，等价功能请使用 `pause`。
+
+### confirm — 确认对话框
+
+弹出"是/否"对话框，返回 `true`（是）或 `false`（否）。
 
 ```
-if not $found
-    eval messagebox(concat("未找到: ", $target_name))
-    return
+eval $ok = confirm("确认开始批量调律？")
+if $ok
+    log "用户确认，开始执行"
+else
+    log "用户取消"
 end
 ```
+
+### pause — 暂停执行
+
+阻塞工作流直到用户点击"确定"。用于需要用户手动介入的场景：
+
+```
+try
+    scan [target_scene] as $result
+catch $err
+    eval pause(concat("扫描失败: ", $err, "，请手动处理后点击确定"))
+end
+```
+
+无参数调用使用默认消息：`eval pause()` 显示"工作流已暂停，点击确定继续"。
+
+### notify — 非阻塞通知
+
+弹出通知消息框，5 秒后自动关闭，工作流线程立即继续执行：
+
+```
+eval notify("第一批调律完成")
+# 继续执行后续步骤
+```
+
+### input — 输入对话框
+
+弹出文本输入框，返回用户输入的字符串。用户取消或关闭对话框返回 `null`：
+
+```
+eval $name = input("请输入角色名:")
+if $name is_empty
+    log "用户取消输入"
+    return
+end
+log concat("角色名: ", $name)
+```
+
+### 线程安全
+
+`confirm`/`pause`/`input` 通过 `engine._ui_callback` 机制实现。UI 层在创建引擎时注入回调，内部使用常驻主线程的 `QObject` 信号桥 + `threading.Event` 机制：工作流线程发信号携带请求 dict → 主线程槽显示 Qt 对话框并回填结果 → `Event.set()` 唤醒等待中的工作流线程。无竞态、无需事件循环。
+
+按 F10 停止时，UI 层会主动关闭当前活动对话框（`confirm` 返回 `false`、`input` 返回 `null`、`pause` 立即返回），避免工作流阻塞在弹窗上无法响应停止。
+
+`notify` 在后台守护线程中调用 Win32 `MessageBoxTimeoutW`（自带超时自动关闭），工作流线程立即返回，无需 Qt 回调。
+
+无回调时（如测试环境），`confirm`/`pause` 回退到 Win32 MessageBoxW，`input` 返回 `null`。
+
+### 异常处理场景示例
+
+```
+# 重试 + 用户介入 + 兜底
+eval $attempt = 0
+eval $max_retry = 3
+eval $success = false
+
+loop while $attempt < $max_retry
+    eval $attempt = $attempt + 1
+    try
+        scan [target] as $result
+        eval $success = true
+        break
+    catch $err
+        eval $need_help = confirm(concat("第 ", $attempt, " 次失败: ", $err, "\n是否重试？"))
+        if not $need_help
+            break
+        end
+    end
+end
+
+if not $success
+    eval pause("自动流程失败，请手动完成后点击确定")
+end
+```
+
+---
+
+## 八、系统函数
 
 ### save — 手动保存 session
 
@@ -298,7 +506,7 @@ eval $cols = panel_cols("bag_equip_detail", "bag_grid")
 
 ---
 
-## 七、综合示例
+## 九、综合示例
 
 ### 装备扫描 → 解析 → 评估 → 收集
 

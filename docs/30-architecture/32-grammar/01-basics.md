@@ -2,6 +2,24 @@
 
 `.wf` 文件为纯文本工作流描述，存放于 `config/system/workflows/`。支持顺序执行、条件分支、循环、跳转等控制流。
 
+## 目录
+
+- [一、基础约定](#一基础约定)
+  - [换行与续行](#换行与续行)
+  - [核心指令语义模型](#核心指令语义模型)
+  - [常量类型](#常量类型)
+- [二、变量系统](#二变量系统)
+  - [2.1 声明方式](#21-声明方式)
+  - [2.2 变量类型](#22-变量类型)
+  - [2.3 字段访问](#23-字段访问)
+  - [2.4 类型系统与 null 语义](#24-类型系统与-null-语义)
+  - [2.5 引用规则](#25-引用规则)
+  - [2.6 运行时状态](#26-运行时状态)
+- [三、文件元数据（front-matter）](#三文件元数据front-matter)
+  - [3.1 语法](#31-语法)
+  - [3.2 示例](#32-示例)
+  - [3.3 与 workflows.yaml 的关系](#33-与-workflowsyaml-的关系)
+
 ## 一、基础约定
 
 - **注释**：`#` 开头整行为注释
@@ -89,12 +107,14 @@ align [scene].[panel]               # 面板自对齐
 | 类型 | 语法 | 示例 | 可用位置 |
 |---|---|---|---|
 | 字符串 | `"..."` | `"武器"`, `"head"` | log、contains/equals 比较、eval 参数、collect alias/source、call 路径、eval 字面量赋值 |
-| 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、drag 行数、数值比较、eval 字面量赋值、collect source |
-| 字典 | `{"k": v, ...}` | `{}`, `{"a": "b", "count": 3, "ref": $var}` | eval 字面量赋值（key 为字符串，value 支持字符串、数字、变量引用、嵌套字典、列表） |
-| 列表 | `[item, ...]` | `["a", "b"]`, `[1, 2, 3]` | eval 字面量赋值（列表元素支持字符串、数字、变量引用、嵌套字典、列表） |
+| 数字 | 整数或小数，支持负号 | `3`, `0.5`, `-10`, `-3.14` | loop 次数、wait 秒数、drag/hold 时长、drag 行数、数值比较、eval 字面量赋值、collect source、函数参数 |
+| 布尔 | `true` / `false` | `eval $flag = true` | eval 字面量赋值、字典值、列表元素 |
+| 空值 | `null` | `eval $x = null` | eval 字面量赋值、字典值、列表元素 |
+| 字典 | `{"k": v, ...}` | `{}`, `{"a": "b", "count": 3, "ref": $var}` | eval 字面量赋值（key 为字符串，value 支持字符串、数字、bool、null、变量引用、嵌套字典、列表） |
+| 列表 | `[item, ...]` | `["a", "b"]`, `[1, null, true]` | eval 字面量赋值（元素支持字符串、数字、bool、null、变量引用、嵌套字典、列表） |
 | 范围元组 | `(min, max)` | `(1, 2)`, `(0.5, 1.5)` | eval 字面量赋值、default 字面量赋值（存储为元组，用于随机等待等场景） |
 
-**不支持**：布尔值、null；eval 函数参数不能直接传数字常量（只能传 `$var` 或 `"string"`）。
+**函数参数形式**：`func(...)` 的参数支持 `"string"`、数字常量、`$var`、`$var.field` 字段访问四种形式，如 `substr($text, 0, 4)`、`add($count, 1)`。
 
 ## 二、变量系统
 
@@ -140,6 +160,8 @@ $var = "hello"               # 隐式 eval，效果完全相同
 | `eval $var = to_equipment(...)` | `dict` | 嵌套字典，支持链式字段访问 |
 | `eval $var = "hello"` | `str` | 字符串 |
 | `eval $var = 42` | `float` | 数字（内部统一为 float） |
+| `eval $var = true` | `bool` | 布尔字面量 `true` / `false` |
+| `eval $var = null` | `null` | 空值字面量 |
 | `eval $var = {}` | `dict` | 空字典，后续可通过 `eval $var.key = value` 填充 |
 | `eval $var = {"k": v}` | `dict` | 字典字面量，value 支持字符串、数字、变量引用、嵌套字典/列表 |
 | `eval $var = ["a", "b"]` | `list` | 列表，元素支持字符串、数字、变量引用、嵌套字典/列表 |
@@ -178,13 +200,50 @@ $list[0]                 # 静态索引（数字）
 
 **语义区分**：`.` 表示成员/键访问（dict），`[]` 直接表示索引访问（list）。字段访问返回的是原始值（可能是 dict、str、int、float），在条件比较时自动转换为对应类型。
 
-### 2.4 引用规则
+### 2.4 类型系统与 null 语义
 
-- `$name` 在运行时从 `variables` 字典中查找，找不到则报错
+DSL 支持 6 种值类型：
+
+| 类型 | DSL 字面量 | Python 对应 | 示例 |
+|---|---|---|---|
+| `null` | `null` | `None` | `eval $x = null` |
+| `bool` | `true` / `false` | `True` / `False` | `eval $flag = true` |
+| `number` | `123` / `1.5` / `-3` | `float` | `eval $n = 42` |
+| `str` | `"hello"` | `str` | `eval $s = "hello"` |
+| `dict` | `{"k": "v"}` | `dict` | `eval $d = {"a": 1}` |
+| `list` | `[1, 2, 3]` | `list` | `eval $l = [1, "a", null]` |
+
+**null 的产生途径**：
+
+- 显式赋值：`eval $x = null`，字典值 / 列表元素也可为 null
+- 未定义变量引用返回 `null`（不回退为变量名字符串）：`eval $x = $undefined_var` → `$x = null`
+- 缺失字段 / 列表越界返回 `null`：`eval $val = $dict.missing_key` → `null`
+- `input()` 对话框取消返回 `null`
+
+**null 在各上下文的行为**：
+
+| 上下文 | null 行为 | 示例 |
+|---|---|---|
+| 条件判断 | falsy | `if $null_var` → 不进入 |
+| `is_empty` | 视为空 | `$null_var is_empty` → true |
+| 算术运算 | 视为 0.0 | `null + 5` → 5.0 |
+| `concat` | 视为空字符串 | `concat("a", null, "b")` → "ab" |
+| `equals` 比较 | 两侧 null 相等 | `null equals null` → true |
+| 字符串字段访问 | 转为空字符串 | 字段链中 null → "" |
+| `log` | 显示 "null" | `log $null_var` → 输出 "null" |
+| `collect` | 收集 null 值 | `collect $null_var` → output 含 null |
+
+**bool 的使用**：bool 值直接用于条件判断（`if $flag`）；部分内置函数返回 bool，如 `has_key`、`confirm`、`match`。
+
+> **与旧行为的差异**：未定义 `$x` 旧版返回 `"x"` 字符串、`$dict.missing` 旧版返回 `""`，现均返回 `null`。字符串上下文中 `str(null)` = `""` 保持一致，仅极少数依赖变量名回退的脚本需改为显式字符串。
+
+### 2.5 引用规则
+
+- `$name` 在运行时从 `variables` 字典中查找，找不到返回 `null`
 - 变量名遵循标识符规则：`[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*`
 - 变量作用域为当前工作流文件内，子工作流通过 `with/read` 显式传参，不共享变量
 
-### 2.5 运行时状态
+### 2.6 运行时状态
 
 引擎持有三个核心状态：
 

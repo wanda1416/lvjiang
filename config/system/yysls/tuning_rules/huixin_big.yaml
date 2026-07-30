@@ -71,6 +71,10 @@ common_conditions:
       symbols:
       - 最大外功攻击
       max: 0
+  - count_max:
+      symbols:
+      - 劲
+      max: 0
 patterns:
   主武器:
     first:
@@ -87,11 +91,6 @@ patterns:
   副武器:
     first:
     - 最大外功攻击
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 劲
-        max: 0
     top_conditions:
     - count_max:
         symbols:
@@ -128,11 +127,6 @@ patterns:
           symbols:
           - 单体类奇术增伤
           min: 1
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 劲
-        max: 0
     top_conditions:
     - - count_max:
           symbols:

@@ -18,7 +18,7 @@ transmute_priority:
 - 敏
 - 会心率
 - 最大无相攻击
-- 最大本属攻击
+- 最大牵丝攻击
 affix_pool:
 - 对玩家单位增效
 - 全武学增效
@@ -28,7 +28,7 @@ affix_pool:
 - 敏
 - 会心率
 - 最大无相攻击
-- 最大本属攻击
+- 最大牵丝攻击
 - 势
 patterns:
   主武器:
@@ -86,7 +86,7 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大牵丝攻击
           max: 0
       - not_together:
         - 敏
@@ -94,14 +94,6 @@ patterns:
   冠胄:
     first:
     - 会心率
-    junk_conditions:
-    - when:
-        keep_pvp: false
-      all:
-      - count_min:
-          symbols:
-          - 单体类奇术增伤
-          min: 1
     normal_conditions:
     - count_max:
         symbols:
@@ -112,7 +104,7 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大本属攻击
+        - 最大牵丝攻击
         max: 0
   胫甲:
     first:
@@ -132,8 +124,25 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大牵丝攻击
           max: 0
       - not_together:
         - 敏
         - 会心率
+common_conditions:
+  junk_conditions:
+  - count_min:
+      symbols:
+      - 势
+      - 最大无相攻击
+      - 最大牵丝攻击
+      min: 2
+  normal_conditions:
+  - contains_all:
+    - 势
+    - 会心率
+  excellent_conditions:
+  - count_min:
+      symbols:
+      - 势
+      min: 1

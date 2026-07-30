@@ -5,13 +5,20 @@
 """
 
 import ctypes
+import sys
 from ctypes import wintypes
 
 from loguru import logger
 
 # ─── SendInput 基础设施 ────────────────────────────────────────
 
-_user32 = ctypes.windll.user32
+# 非 Windows 平台允许 import（常量/结构体均为纯 ctypes），
+# 但实际调用任一 Win32 函数会因 _user32 为 None 报错——
+# 调用方（桌面后端）已在 UI 层按平台门控，正常不会走到这里
+if sys.platform == "win32":
+    _user32 = ctypes.windll.user32
+else:
+    _user32 = None
 
 PUL = ctypes.POINTER(ctypes.c_ulong)
 

@@ -6,20 +6,16 @@ import subprocess
 
 from loguru import logger
 
+from ..platforms import adb_path_candidates
+
 
 def _resolve_adb_path() -> str:
-    """解析 adb 可执行路径：优先 PATH，其次常见安装位置，找不到返回 'adb'"""
+    """解析 adb 可执行路径：优先 PATH，其次平台常见安装位置，找不到返回 'adb'"""
     found = shutil.which("adb")
     if found:
         return found
-    # 常见 SDK platform-tools 位置（Windows）
     import os
-    candidates = [
-        os.path.expandvars(r"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"),
-        os.path.expandvars(r"%ANDROID_HOME%\platform-tools\adb.exe"),
-        os.path.expandvars(r"%ANDROID_SDK_ROOT%\platform-tools\adb.exe"),
-    ]
-    for c in candidates:
+    for c in adb_path_candidates():
         if c and "%" not in c and os.path.exists(c):
             return c
     return "adb"

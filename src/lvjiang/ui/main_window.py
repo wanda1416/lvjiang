@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Any
 
 from loguru import logger
-from pynput import keyboard as pynput_keyboard
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QKeyEvent
 from PyQt6.QtWidgets import (
@@ -109,8 +108,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # ── OCR / 输入 ──
         from ..core.ocr import OCREngine
         self._ocr = OCREngine()
-        from ..core.desktop import create_input_backend as _create_desktop_input
-        self._win_input = _create_desktop_input(mode="post", delay_config=self._user_config.input_delay)
+        # 非 Windows 时返回 None（无桌面投屏后端，仅支持 ADB 模式）
+        from ..core.platforms import create_desktop_input
+        self._win_input = create_desktop_input(delay_config=self._user_config.input_delay)
         self._input = self._win_input
 
         # ── 构建 UI ──
@@ -126,16 +126,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.f10_pressed.connect(self._request_stop)
         self.f8_pressed.connect(self._on_f8_script_record)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
-        # 防护补丁：修复 pynput SystemHook._handler 退出竞态下返回 None
-        # 导致的 ctypes 回调转换 TypeError（必须在 Listener 启动前安装）
-        from ..core.pynput_patch import install as _install_pynput_patch
-        _install_pynput_patch()
-        self._hotkey_listener = pynput_keyboard.GlobalHotKeys({
+        # 启动全局热键（内部先安装 pynput 防护补丁）；
+        # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 已处理 F8-F10）
+        from ..core.platforms import start_global_hotkeys
+        self._hotkey_listener = start_global_hotkeys({
             "<f9>": self._on_global_f9,
             "<f10>": self._on_global_f10,
             "<f8>": self._on_global_f8,
         })
-        self._hotkey_listener.start()
 
         logger.info("主窗口已初始化")
 
@@ -335,6 +333,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.btn_scan_window = QPushButton("扫描窗口")
         self.btn_scan_window.setFixedWidth(90)
         self.btn_scan_window.clicked.connect(self._on_scan_window)
+        from ..core.platforms import DESKTOP_BACKEND_AVAILABLE
+        if not DESKTOP_BACKEND_AVAILABLE:
+            # 非 Windows 仅支持 ADB 模式，隐藏窗口投屏入口
+            self.btn_scan_window.setVisible(False)
         row1.addWidget(self.btn_scan_window)
 
         self.btn_scan_device = QPushButton("扫描设备")
@@ -624,13 +626,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # 全局热键最先停：stop() 只投递停止信号不等线程结束，必须 join
         # 等钩子线程完成 UnhookWindowsHookEx；越早停，后续清理期间钩子
         # 回调踩空（退出时 TypeError 噪声乃至 access violation）的窗口越小
-        try:
-            self._hotkey_listener.stop()
-            self._hotkey_listener.join(3.0)
-            if self._hotkey_listener.is_alive():
-                logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
-        except Exception:
-            pass
+        if self._hotkey_listener is not None:
+            try:
+                self._hotkey_listener.stop()
+                self._hotkey_listener.join(3.0)
+                if self._hotkey_listener.is_alive():
+                    logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
+            except Exception:
+                pass
         self._save_ui_state()
         # 录屏进行中/待保存时自动转正保存，不丢数据
         self._abort_screen_record("关闭程序")

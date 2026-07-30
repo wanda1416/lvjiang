@@ -38,6 +38,11 @@ class WindowOpsMixin:
 
     def _on_scan_window(self):
         """扫描所有可见窗口，填充列表（切换到 Windows 投屏模式）"""
+        from ..core.platforms import DESKTOP_BACKEND_AVAILABLE
+        if not DESKTOP_BACKEND_AVAILABLE:
+            # 按钮在非 Windows 已隐藏，此处为防御：投屏模式依赖 Win32 API
+            self.log_text.append("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」")
+            return
         if self._running:
             self.log_text.append("[提示] 请先停止当前任务，再重新扫描窗口")
             return

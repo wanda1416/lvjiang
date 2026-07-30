@@ -37,7 +37,7 @@ def fire():
 
 class TestPureFan:
     def test_top(self, pure):
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "势"])
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "敏"])
         assert pure.judge(e).rating == Rating.TOP
 
     def test_min_first_huixin_excellent(self, pure):
@@ -99,7 +99,7 @@ class TestPureArmor:
 
     def test_leg_top_without_keep_pvp(self, pure):
         # 对玩家单位增效 是纯奶池内必选词条：无需开启 keep_pvp 即顶级
-        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "势"],
+        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "敏"],
                        quality="purple")
         assert pure.judge(e).rating == Rating.TOP
 
@@ -119,12 +119,12 @@ class TestPureArmor:
 
 class TestFire:
     def test_fan_top(self, fire):
-        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "势", "精准率"])
+        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "精准率"])
         assert fire.judge(e).rating == Rating.TOP
 
-    def test_fan_normal_missing_min_jin(self, fire):
-        # 小外/劲 全缺 → 一般
-        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "势", "敏", "精准率"])
+    def test_fan_normal_missing_jin_dawai(self, fire):
+        # 非首无劲且无大外 → 一般
+        e = make_equip("扇", ["最大外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"])
         assert fire.judge(e).rating == Rating.NORMAL
 
     def test_fan_zengxiao_junk(self, fire):
@@ -133,7 +133,7 @@ class TestFire:
         assert fire.judge(e).rating == Rating.JUNK
 
     def test_helm_top(self, fire):
-        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
+        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "劲", "敏"],
                        quality="purple")
         assert fire.judge(e).rating == Rating.TOP
 
@@ -149,7 +149,7 @@ class TestFire:
         assert fire.judge(e).rating == Rating.JUNK
 
     def test_leg_top(self, fire):
-        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "势"],
+        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "敏"],
                        quality="purple")
         assert fire.judge(e).rating == Rating.TOP
 
@@ -157,6 +157,44 @@ class TestFire:
         e = make_equip("胫甲", ["劲", "最大外功攻击", "劲", "势", "敏"],
                        quality="purple")
         assert fire.judge(e).rating == Rating.JUNK
+
+
+# ─── 势语义：势与三率同现降一般，仅带势/首词条三率封顶优秀 ──────────
+
+class TestShiSemantics:
+    def test_pure_fan_shi_without_rate_excellent(self, pure):
+        # 武器：带势且无三率同现 → 优秀（封顶，不再顶级）
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "势"])
+        assert pure.judge(e).rating == Rating.EXCELLENT
+
+    def test_pure_fan_shi_with_rate_normal(self, pure):
+        # 武器：势与会心率同现 → 一般
+        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "劲", "势", "会心率"])
+        assert pure.judge(e).rating == Rating.NORMAL
+
+    def test_pure_leg_shi_only_excellent(self, pure):
+        # 腿手：没出现三率只有势 → 优秀
+        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "势"],
+                       quality="purple")
+        assert pure.judge(e).rating == Rating.EXCELLENT
+
+    def test_fire_fan_shi_with_rate_normal(self, fire):
+        # 武器：势与精准率同现 → 一般
+        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "势", "精准率"])
+        assert fire.judge(e).rating == Rating.NORMAL
+
+    def test_fire_helm_shi_excellent(self, fire):
+        # 头：首词条会心率不参与同现判定（include_first 默认 false），
+        # 带势 → 优秀
+        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.EXCELLENT
+
+    def test_fire_leg_shi_only_excellent(self, fire):
+        # 腿手：只有势无三率 → 优秀
+        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "势"],
+                       quality="purple")
+        assert fire.judge(e).rating == Rating.EXCELLENT
 
 
 # ─── 调律潜力判定 ──────────────────────────────────────────

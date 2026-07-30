@@ -18,7 +18,7 @@ transmute_priority:
 - 敏
 - 会心率
 - 最大无相攻击
-- 最大本属攻击
+- 最大牵丝攻击
 affix_pool:
 - 对首领单位增伤
 - 单体类奇术增伤
@@ -28,15 +28,20 @@ affix_pool:
 - 敏
 - 会心率
 - 精准率
-- 势
 - 最大无相攻击
-- 最大本属攻击
+- 最大牵丝攻击
+- 势
 common_conditions:
   normal_conditions:
   - count_max:
       symbols:
       - 最大外功攻击
       max: 0
+  excellent_conditions:
+  - count_min:
+      symbols:
+      - 势
+      min: 1
 patterns:
   主武器:
     first:
@@ -44,9 +49,18 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最小外功攻击
         - 劲
+        - 最大外功攻击
         max: 0
+    - - count_min:
+          symbols:
+          - 势
+          min: 1
+      - count_min:
+          symbols:
+          - 会心率
+          - 精准率
+          min: 1
     top_conditions:
     - - count_max:
           symbols:
@@ -61,9 +75,18 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最小外功攻击
         - 劲
+        - 最大外功攻击
         max: 0
+    - - count_min:
+          symbols:
+          - 势
+          min: 1
+      - count_min:
+          symbols:
+          - 会心率
+          - 精准率
+          min: 1
     top_conditions:
     - - count_max:
           symbols:
@@ -78,13 +101,23 @@ patterns:
     normal_conditions:
     - count_max:
         symbols:
-        - 最小外功攻击
         - 劲
+        - 最大外功攻击
         max: 0
+    - - count_min:
+          symbols:
+          - 势
+          min: 1
+      - count_min:
+          symbols:
+          - 会心率
+          - 精准率
+          min: 1
     top_conditions:
     - - count_max:
           symbols:
           - 最大本属攻击
+          - 最大牵丝攻击
           max: 0
       - not_together:
         - 敏
@@ -106,28 +139,10 @@ patterns:
     first:
     - 劲
     junk_conditions:
-    - when:
-        keep_pvp: false
-      all:
-      - count_max:
-          symbols:
-          - 对首领单位增伤
-          max: 0
-    - when:
-        keep_pvp: false
-      all:
-      - count_min:
-          symbols:
-          - 对玩家单位增效
-          min: 1
-    - when:
-        keep_pvp: true
-      all:
-      - count_max:
-          symbols:
-          - 对首领单位增伤
-          - 对玩家单位增效
-          max: 0
+    - count_max:
+        symbols:
+        - 对首领单位增伤
+        max: 0
     top_conditions:
     - count_max:
         symbols:

@@ -93,6 +93,7 @@ patterns:
         symbols:
         - 最小无相攻击
         - 精准率
+        - 会心率
         max: 0
   副武器:
     first:
@@ -103,11 +104,15 @@ patterns:
         - 敏
         max: 0
     top_conditions:
-    - count_max:
-        symbols:
-        - 最小无相攻击
-        - 精准率
-        max: 0
+    - - contains_all:
+        - 最小外功攻击
+        - 敏
+        - 最大无相攻击
+      - count_min:
+          symbols:
+          - 会心率
+          - 精准率
+          min: 1
   环:
     first:
     - 最小外功攻击

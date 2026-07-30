@@ -72,7 +72,7 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大本属攻击
+        - 最大鸣金攻击
         max: 0
   胫甲:
     first:

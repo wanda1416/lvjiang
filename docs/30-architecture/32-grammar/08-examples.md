@@ -36,7 +36,7 @@ click [equip_tune_detail].[auto_add]
 wait step_interval
 click [equip_tune_detail].[tune_btn]
 wait page_refresh_wait
-scan [equip_tune_result] as $tune_result
+scan [equip_tune_detail].[tune_affix, tune_tip] as $tune_result
 
 if $tune_result.result equals "成功"
     log "调律成功"
@@ -55,7 +55,7 @@ log "未知结果，停止"
 break
 
 @tune_done
-click [equip_tune_result].[close_btn]
+click [equip_tune_detail].[close_btn]
 ```
 
 ## 三、批量调律（for + list + call）

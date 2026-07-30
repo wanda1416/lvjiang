@@ -1,5 +1,10 @@
 key: equip_tune_detail
 name: 调律
+views:
+- key: base
+  name: 基底
+- key: result
+  name: 调律结果
 regions:
 - key: back
   name: 返回
@@ -86,3 +91,21 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: tune_affix
+  name: 调律词条
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: result
+- key: tune_tip
+  name: 调律提示
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: result
+- key: close_btn
+  name: 关闭
+  type: func
+  is_text: false
+  is_clickable: true
+  view: result

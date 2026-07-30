@@ -66,7 +66,6 @@ layout_scenes:
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail
-  - equip_tune_result
   - game_main_page
   - game_menu_page
   - general_control

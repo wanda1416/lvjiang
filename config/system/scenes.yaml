@@ -8,7 +8,6 @@ layout_scenes:
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail
-  - equip_tune_result
   - xinde_exchange
   group_3:
   - bag_equip_detail

@@ -64,13 +64,17 @@ def test_collect_empty_when_no_scene_ref():
 # ─── 与旧 required_scenes 等价性验证 ──────────────────────
 
 def test_activity_jianghu_matches_legacy_required_scenes():
-    """activity_jianghu.wf 搜集结果应与原手写 required_scenes 一致"""
+    """activity_jianghu.wf 搜集结果应与原手写 required_scenes 一致
+
+    ui_waiguan_qingjing 为情境动作落地后新增的依赖。
+    """
     wf = SYSTEM_WORKFLOWS_DIR / "activity_jianghu.wf"
     program = parse_file(wf)
     scenes = collect_scene_keys(program.body, program.procs)
     assert scenes == {
-        "activity_jianghu", "ui_waiguan_yigui", "action_control",
-        "game_menu_page", "game_main_page", "general_control", "ui_school_main",
+        "activity_jianghu", "ui_waiguan_yigui", "ui_waiguan_qingjing",
+        "action_control", "game_menu_page", "game_main_page",
+        "general_control", "ui_school_main",
     }
 
 

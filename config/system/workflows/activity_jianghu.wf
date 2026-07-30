@@ -97,8 +97,8 @@ log "六个任务刷新处理完成"
 scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
 if $at_haoling
    log "仍在江湖号令页，退回游戏首页"
-   click [game_menu_page].[back] after wait $step_interval
-   click [game_menu_page].[back] after wait $step_interval
+   click [activity_jianghu].[back] after wait $step_interval
+   click [ui_school_main].[back] after wait $step_interval
    click [game_menu_page].[back] after wait $step_interval
 end
 
@@ -155,9 +155,29 @@ def back_to_haoling()
    click [ui_school_main].[haoling] after wait $step_interval
 end
 
-# 情境：动作暂未实现
+# 情境：点击任务 → 弹出情境视图（确认×2 → 展开 → 前往编辑情境）
+# → 情境编辑视图（保存 → 取消按钮出现则点一次 → 等 6s）
+# → 情境基底返回退回号令页 → 号令页连点两次返回回到号令主页面
 def action_qingjing($label)
-   log "情境动作暂未实现"
+   click [activity_jianghu].$label after wait $step_interval
+   click [activity_jianghu].[confirm] after wait $step_interval
+   click [activity_jianghu].[confirm] after wait $step_interval
+   click [activity_jianghu].[expand_up] after wait $step_interval
+   click [activity_jianghu].[goto_edit_qingjing] after wait $step_interval
+
+   click [ui_waiguan_qingjing].[save] after wait $step_interval
+   # 保存后可能弹出二次确认，识别到取消按钮才点一次
+   scan [ui_waiguan_qingjing].[cancel] as $has_cancel by contains "取消"
+   if $has_cancel
+      log "情境保存弹出取消按钮，点击一次"
+      click [ui_waiguan_qingjing].[cancel] after wait $step_interval
+   end
+   # 保存生效需时间，固定等 6 秒再退出
+   wait 6
+
+   click [ui_waiguan_qingjing].[back] after wait $step_interval
+   click [activity_jianghu].[返回] after wait $step_interval
+   click [activity_jianghu].[返回] after wait $step_interval
 end
 
 # 东方第一枝：动作暂未实现

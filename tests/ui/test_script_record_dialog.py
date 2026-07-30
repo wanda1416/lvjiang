@@ -7,7 +7,7 @@
 
 import time
 
-from src.macros.recorder import MacroRecorder
+from lvjiang.macros.recorder import MacroRecorder
 
 
 class _Capture:

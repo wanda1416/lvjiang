@@ -8,11 +8,11 @@ DedupTraversal 用轮次脚本驱动：windows[i] = 第 i 次拖拽后窗口各�
 
 import pytest
 
-from src.apps.yysls.workflows.implementations import auto_tuning
-from src.apps.yysls.workflows.implementations.auto_tuning import (
+from lvjiang.apps.yysls.workflows.implementations import auto_tuning
+from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
     AutoTuningWorkflow,
 )
-from src.apps.yysls.workflows.implementations.bag_traversal import (
+from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     BagTraversal,
     DedupTraversal,
     DEFAULT_TRAVERSAL,
@@ -173,7 +173,7 @@ class DispatchFakeWF(AutoTuningWorkflow):
 @pytest.fixture
 def stub_session(monkeypatch):
     """隔离插件 session：默认 tuning 节为空 dict，可由测试改写"""
-    import src.apps.yysls.plugin_session as session_mod
+    import lvjiang.apps.yysls.plugin_session as session_mod
     section = {}
 
     class _S:

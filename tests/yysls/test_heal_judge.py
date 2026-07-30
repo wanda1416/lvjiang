@@ -7,8 +7,8 @@
 
 import pytest
 
-from src.apps.yysls.equip_parser.models import Affix, EquipmentData
-from src.apps.yysls.evaluator import Rating, get_tuning_judge
+from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
+from lvjiang.apps.yysls.evaluator import Rating, get_tuning_judge
 
 
 def make_equip(equip_type: str, affix_names: list[str],

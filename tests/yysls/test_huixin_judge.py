@@ -7,8 +7,8 @@ count_max include_first、品阶筛选与调律潜力判定。
 
 import pytest
 
-from src.apps.yysls.equip_parser.models import Affix, EquipmentData
-from src.apps.yysls.evaluator import Rating, get_tuning_judge
+from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
+from lvjiang.apps.yysls.evaluator import Rating, get_tuning_judge
 
 
 def make_equip(equip_type: str, affix_names: list[str],
@@ -259,8 +259,8 @@ class TestLiteralSpecificAttr:
 
     @staticmethod
     def _make_judge(pool_symbol: str):
-        from src.apps.yysls.evaluator.judge import GenericTuningJudge
-        from src.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.evaluator.judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",
             "name": "字面属攻规则",

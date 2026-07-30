@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from src.apps.yysls.game_config import get_game_config
-from src.apps.yysls.evaluator.tuning_rules import TuningRuleManager
-from src.apps.yysls.ui.rules_editor import TuningRulesDialog
-from src.apps.yysls.ui.rules_editor.rule_panel import RulePanel
+from lvjiang.apps.yysls.game_config import get_game_config
+from lvjiang.apps.yysls.evaluator.tuning_rules import TuningRuleManager
+from lvjiang.apps.yysls.ui.rules_editor import TuningRulesDialog
+from lvjiang.apps.yysls.ui.rules_editor.rule_panel import RulePanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
@@ -205,7 +205,7 @@ class TestSettingsPageBasics:
 
     def test_rename_key_via_button(self, qtbot, tmp_manager, monkeypatch):
         # 「重命名」按钮弹窗确认后：文件改名、新 key 生效、展示同步
-        from src.apps.yysls.ui.rules_editor import rule_settings_page
+        from lvjiang.apps.yysls.ui.rules_editor import rule_settings_page
         monkeypatch.setattr(
             rule_settings_page.QInputDialog, "getText",
             staticmethod(lambda *a, **k: ("heal_pure2", True)))
@@ -219,7 +219,7 @@ class TestSettingsPageBasics:
         assert tmp_manager.get_rule("heal_pure") is None
 
     def test_rename_key_cancel_noop(self, qtbot, tmp_manager, monkeypatch):
-        from src.apps.yysls.ui.rules_editor import rule_settings_page
+        from lvjiang.apps.yysls.ui.rules_editor import rule_settings_page
         monkeypatch.setattr(
             rule_settings_page.QInputDialog, "getText",
             staticmethod(lambda *a, **k: ("whatever", False)))
@@ -302,7 +302,7 @@ class TestPlaystyleTableCombos:
 
     def test_attr_column_candidates(self, qtbot, tmp_manager):
         # 属性列（col 5）候选 = 属性攻击组名，无留空项
-        from src.apps.yysls.evaluator.tuning_rules import standard_playstyle_attrs
+        from lvjiang.apps.yysls.evaluator.tuning_rules import standard_playstyle_attrs
         panel = RulePanel("heal_fire", tmp_manager, lambda t, e: None)
         qtbot.addWidget(panel)
         table = panel._settings_page._playstyle_table

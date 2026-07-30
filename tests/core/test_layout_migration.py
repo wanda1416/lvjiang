@@ -7,9 +7,9 @@
 
 import pytest
 
-from src.core import layout_manager
-from src.core.layout_manager import LayoutConfigManager, migrate_layout_item
-from src.core.scene_registry import Layout, Region, Point, Arrow, Panel
+from lvjiang.core import layout_manager
+from lvjiang.core.layout_manager import LayoutConfigManager, migrate_layout_item
+from lvjiang.core.scene_registry import Layout, Region, Point, Arrow, Panel
 
 
 def _make_layout(name: str = "test") -> Layout:
@@ -91,7 +91,7 @@ class TestMigrateAcrossLayouts:
     @pytest.fixture
     def manager(self, tmp_path, monkeypatch):
         """LAYOUTS_DIR / SESSION_PATH 指向 tmp_path 的独立管理器"""
-        import src.constants as constants
+        import lvjiang.constants as constants
         monkeypatch.setattr(layout_manager, "LAYOUTS_DIR", tmp_path / "layouts")
         monkeypatch.setattr(layout_manager, "LOCAL_CONFIG_DIR", tmp_path)
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")

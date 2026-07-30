@@ -7,7 +7,7 @@ import pytest
 
 pytest.importorskip("av")
 
-from src.core.screen_recorder import PART_SUFFIX, ScreenRecorder
+from lvjiang.core.screen_recorder import PART_SUFFIX, ScreenRecorder
 
 
 def _frame(w: int = 64, h: int = 48, color: int = 128) -> np.ndarray:

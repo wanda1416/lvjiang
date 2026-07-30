@@ -6,7 +6,7 @@
 未绑定方法验证门控逻辑。
 """
 
-from src.ui.main_window import MainWindow
+from lvjiang.ui.main_window import MainWindow
 
 
 class _Signal:

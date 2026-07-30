@@ -14,13 +14,13 @@ import sys
 sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from src.__main__ import _configure_dpi  # noqa: E402
+from lvjiang.__main__ import _configure_dpi  # noqa: E402
 
 _configure_dpi()
 
 
 def _configure_logging(enqueue: bool) -> None:
-    """复刻 src.__main__._configure_logging，仅 enqueue 可控"""
+    """复刻 lvjiang.__main__._configure_logging，仅 enqueue 可控"""
     import logging
     from loguru import logger
 
@@ -39,12 +39,12 @@ def main() -> int:
     print(f"[repro] enqueue={enqueue} no_hotkey={no_hotkey}", flush=True)
 
     _configure_logging(enqueue)
-    from src.core.crash_handler import install as install_crash_handler
+    from lvjiang.core.crash_handler import install as install_crash_handler
     install_crash_handler()
 
     if no_hotkey:
         # 全局热键置换为空启动，隔离 pynput 因素
-        from src.ui import main_window as mw
+        from lvjiang.ui import main_window as mw
 
         class _DummyHotKeys:
             def __init__(self, *_a, **_k):
@@ -64,15 +64,15 @@ def main() -> int:
 
         mw.pynput_keyboard.GlobalHotKeys = _DummyHotKeys
 
-    from src.apps import load_app, register_hooks
+    from lvjiang.apps import load_app, register_hooks
     hooks = load_app("yysls")
     register_hooks(hooks)
 
     from PyQt6.QtCore import QTimer
     from PyQt6.QtWidgets import QApplication
 
-    from src.ui.main_window import MainWindow
-    from src.ui.widgets import install_wheel_guard
+    from lvjiang.ui.main_window import MainWindow
+    from lvjiang.ui.widgets import install_wheel_guard
 
     app = QApplication(sys.argv)
     install_wheel_guard(app)

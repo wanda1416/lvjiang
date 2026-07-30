@@ -6,8 +6,8 @@
 
 import pytest
 
-from src.apps.yysls.equip_parser.constants import infer_part
-from src.apps.yysls.equip_parser.models import EquipmentData
+from lvjiang.apps.yysls.equip_parser.constants import infer_part
+from lvjiang.apps.yysls.equip_parser.models import EquipmentData
 
 
 class TestInferPart:

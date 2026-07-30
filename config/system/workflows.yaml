@@ -1,6 +1,6 @@
 # 脚本暴露配置
 #
-# 脚本本体（.wf 文件 + 内置类实现）由发现层自动扫描（见 src/workflows/discovery.py）：
+# 脚本本体（.wf 文件 + 内置类实现）由发现层自动扫描（见 src/lvjiang/workflows/discovery.py）：
 #   - config/system/workflows/ 顶层 *.wf（跳过 _ 前缀与子目录），name/参数取自 #% front-matter
 #   - 已注册内置类实现，name/参数取自类属性 DISPLAY_NAME / PARAMETERS
 # 本文件只负责「暴露」：决定日常页下拉展示哪些脚本、顺序、以及可选的显示名覆盖。

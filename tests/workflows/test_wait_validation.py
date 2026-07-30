@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.config import DelayConfig
-from src.workflows.engine import WorkflowEngine, WorkflowUserError
+from lvjiang.config import DelayConfig
+from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 
 
 def make_engine(custom: dict | None = None) -> WorkflowEngine:

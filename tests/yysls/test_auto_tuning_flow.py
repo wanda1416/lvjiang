@@ -10,14 +10,14 @@ already_full / junk_blank / no_tune_entry / tuned（含材料不足提前
 
 import pytest
 
-from src.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.evaluator.tuning_rules import (
     FoodRule, MaterialSettings, TuningBase,
 )
-from src.apps.yysls.workflows.implementations import auto_tuning
-from src.apps.yysls.workflows.implementations.auto_tuning import (
+from lvjiang.apps.yysls.workflows.implementations import auto_tuning
+from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
     AutoTuningWorkflow,
 )
-from src.apps.yysls.workflows.implementations.bag_traversal import (
+from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     PositionalTraversal,
     ScrollState,
 )

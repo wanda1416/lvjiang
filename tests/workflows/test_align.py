@@ -18,10 +18,10 @@ import cv2
 import numpy as np
 import pytest
 
-from src.workflows.align import _binary_axis, detect_grid
-from src.workflows.engine import WorkflowEngine
-from src.workflows.grammar.ast_nodes import Align
-from src.core.scene_registry import Layout, Panel, CanvasConfig
+from lvjiang.workflows.align import _binary_axis, detect_grid
+from lvjiang.workflows.engine import WorkflowEngine
+from lvjiang.workflows.grammar.ast_nodes import Align
+from lvjiang.core.scene_registry import Layout, Panel, CanvasConfig
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -347,7 +347,7 @@ class TestDetectGridDebugImage:
             saved.append(str(p))
             return True
 
-        with patch("src.workflows.align.cv2.imwrite", side_effect=fake_imwrite):
+        with patch("lvjiang.workflows.align.cv2.imwrite", side_effect=fake_imwrite):
             result = detect_grid(img, expected_rows=10, expected_cols=6)
 
         # 检测到 5 行，既不是 10 也不是 9 → 应触发保存
@@ -362,7 +362,7 @@ class TestDetectGridDebugImage:
         """行数满足 expected 或 expected-1 → 不保存调试图"""
         img = load_test_image("image1.png")  # 实际 5 行
 
-        with patch("src.workflows.align.cv2.imwrite") as mock_imwrite:
+        with patch("lvjiang.workflows.align.cv2.imwrite") as mock_imwrite:
             result = detect_grid(img, expected_rows=5, expected_cols=6)
 
         assert result is not None

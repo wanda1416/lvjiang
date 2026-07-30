@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-30
+> 最后更新：2026-07-30（Phase 2 进行中：pydantic 剥离 + 基类继承已实机验证）
 
 ---
 
@@ -9,8 +9,8 @@
 | Phase | 状态 | 说明 |
 |---|---|---|
 | Phase 0：环境 + 骨架 + 悬浮服务 | ✅ 完成 | JDK/SDK/Gradle 便携化、Chaquopy 接入、悬浮窗、Shizuku 通道 |
-| Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿（截图→OCR→点击→回显确认），待提交检查点 2 |
-| Phase 2：核心逻辑移植与配置分层 | ⏳ 未开始 | pydantic 是硬障碍 |
+| Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
+| Phase 2：核心逻辑移植与配置分层 | 🔧 进行中 | pydantic 已剥离（dataclass），基类继承与 DelayConfig 注入已上设备 |
 | Phase 3：工作流引擎设备端跑通 | ⏳ 未开始 | |
 | Phase 4：打包发布与稳定性 | ⏳ 未开始 | |
 
@@ -86,17 +86,27 @@
 - [x] **P1-f** 三通道闭环验证通过（2026-07-30）
   - e2e 7 步全绿：截图 1260x2800 → OCR#1 2.08s/10 框命中「自检：点击回显」→ dispatchGesture 点击 → OCR#2 0.96s 确认「已生效」
   - 附加项 Shizuku shell 通道 FAILED 属预期（已降级为可选通道，未激活）
-  - 报告存 `.tooling/selftest_report.txt`，待提交检查点 2
+  - 报告存 `.tooling/selftest_report.txt`，检查点 2 已提交（`926d55e`）
 
 ---
 
-## Phase 2 待办：核心逻辑移植与配置分层
+## Phase 2 进展：核心逻辑移植与配置分层
 
-- [ ] 解决 pydantic 在设备端的可用性（找 Android wheel 或剥离 pydantic 依赖）
-- [ ] 配置层搬上设备（`config.py` → 设备端 YAML 配置，`DelayConfig` 等注入到 `input.py`）
+- [x] 解决 pydantic 在设备端的可用性（2026-07-30）
+  - 方案：**剥离 pydantic 换 dataclass**（而非找 wheel）。理由：v2 核心是 Rust 扩展
+    pydantic-core，Chaquopy 无法安装；v1 纯 Python 能装但双版本 API 不一致是长期坑；
+    使用面只有 config.py 一处（4 个模型 + ge/lt 约束），__post_init__ 完全等价
+  - 卸载 pydantic 后全量 pytest 仍全绿；pyproject 已移除依赖
+- [x] `CaptureBackend` / `InputBackend` 基类设备端可继承（2026-07-30）
+  - `ondevice/input.py` 改为继承 InputBackend，删除写死的延迟常量，
+    DelayConfig 经 `_inject_delay_config` 统一注入（与 PC 端同源）
+  - 设备端 e2e 自检重跑全绿，新继承链实机验证通过
+- [x] 修复重装后无障碍不重新绑定：`enable_a11y.py` 改为「先摘除再写回」强制刷新
+  （重装后 settings 残留条目不触发绑定，vivo 实测）
+- [ ] 配置层搬上设备：设备端 session/YAML 的存放与加载（config.py 已可导入，
+  SESSION_PATH 不存在时走默认值；还缺设备端写入/下发链路）
 - [ ] 工作流 YAML 下发到设备应用私有目录（`filesDir`，不污染用户数据目录）
 - [ ] 场景定义 / 区域配置的设备端加载
-- [ ] `CaptureBackend` / `InputBackend` 基类在设备端可继承（解决 pydantic 后）
 
 ## Phase 3 待办：工作流引擎设备端跑通
 
@@ -130,8 +140,6 @@ git status:
 
 ## 下一步操作（按顺序）
 
-1. ~~构建 + 装包~~ ✅ 2026-07-30
-2. ~~装包后开启无障碍~~ ✅
-3. ~~跑 e2e 自检~~ ✅ 7 步全绿
-4. **提交检查点 2**（待用户确认）
-5. **进入 Phase 2**：首要障碍是 pydantic 设备端可用性
+1. **提交 Phase 2 阶段性成果**（pydantic 剥离 + 基类继承 + enable_a11y 修复）
+2. **配置层设备端落地**：session/工作流 YAML 的存放位置与下发链路
+3. **场景定义设备端加载** → 进入 Phase 3（DSL 引擎设备端跑通）

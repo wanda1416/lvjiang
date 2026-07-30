@@ -52,6 +52,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._group_tabs: dict[str, QTabWidget] = {}  # group_key -> QTabWidget
         self._current_layout: Layout | None = None
         self._dirty = False
+        # 截图懒加载：(layout_name, scene_key, view) -> ndarray|None 缓存；
+        # _loaded_scenes 记录当前布局下已上屏底图的场景，布局切换时重置
+        self._img_cache: dict[tuple[str, str, str], object] = {}
+        self._loaded_scenes: set[str] = set()
 
         self._setup_ui()
         self._auto_load_script()
@@ -221,11 +225,16 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
     # ─── Tab 操作 ────────────────────────────────────────
 
     def _apply_layout_to_tabs(self):
-        """将当前布局的区域/坐标/方向/面板数据、画布配置、截图分发到各 Tab"""
+        """将当前布局的区域/坐标/方向/面板数据、画布配置分发到各 Tab
+
+        向量数据（区域/坐标/方向/面板）低廉，仍全量下发；截图（磁盘读 + 解码）
+        改为懒加载：仅加载当前可见 Tab，其余等切到时再加载。
+        """
         if self._current_layout is None:
             return
         canvas = self._current_layout.get_canvas()
         layout_name = self._current_layout.name
+        self._loaded_scenes = set()  # 布局变更，所有底图待重新加载
         for scene_key, tab in self._tabs.items():
             regions = self._current_layout.get_scene_regions(scene_key)
             points = self._current_layout.get_scene_points(scene_key)
@@ -236,11 +245,6 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_arrows(arrows)
             tab.set_panels(panels)
             tab.set_canvas_config(canvas)
-            screenshot = load_scene_screenshot(layout_name, scene_key, tab.current_view)
-            if screenshot is not None:
-                tab.canvas.set_image(screenshot)
-            else:
-                tab.canvas.clear_image()
             tab.canvas.on_region_changed = self._on_any_region_changed
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
             tab.canvas.on_poi_changed = self._on_any_poi_changed
@@ -248,6 +252,34 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.on_view_changed = self._on_tab_view_changed
         self._set_dirty(False)
         self._status_bar.showMessage(f"当前布局: {layout_name}")
+        # 只加载当前可见 Tab 的底图，其余在切到时懒加载
+        self._ensure_tab_image(self._current_scene_key)
+        self._update_info_label()
+
+    def _get_cached_screenshot(self, layout_name: str, scene_key: str, view: str):
+        """取截图，命中缓存则直接返回；None（无图）也缓存以免反复读盘"""
+        cache_key = (layout_name, scene_key, view)
+        if cache_key not in self._img_cache:
+            self._img_cache[cache_key] = load_scene_screenshot(layout_name, scene_key, view)
+        return self._img_cache[cache_key]
+
+    def _ensure_tab_image(self, scene_key: str):
+        """按需为指定场景 Tab 加载底图（懒加载），已加载则跳过"""
+        if self._current_layout is None or not scene_key:
+            return
+        tab = self._tabs.get(scene_key)
+        if tab is None or scene_key in self._loaded_scenes:
+            return
+        img = self._get_cached_screenshot(self._current_layout.name, scene_key, tab.current_view)
+        if img is not None:
+            tab.canvas.set_image(img)
+        else:
+            tab.canvas.clear_image()
+        self._loaded_scenes.add(scene_key)
+
+    def _on_scene_tab_changed(self, _idx: int = 0):
+        """二级场景 Tab 切换：按需加载底图 + 刷新尺寸信息"""
+        self._ensure_tab_image(self._current_scene_key)
         self._update_info_label()
 
     def _clear_all_tabs(self):
@@ -259,13 +291,13 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_panels([])
 
     def _on_tab_view_changed(self, scene_key: str, view: str):
-        """某 Tab 切换视图：换上该视图的底图"""
+        """某 Tab 切换视图：换上该视图的底图（走缓存）"""
         if self._current_layout is None:
             return
         tab = self._tabs.get(scene_key)
         if tab is None:
             return
-        img = load_scene_screenshot(self._current_layout.name, scene_key, view)
+        img = self._get_cached_screenshot(self._current_layout.name, scene_key, view)
         if img is not None:
             tab.canvas.set_image(img)
         else:
@@ -333,6 +365,8 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             current_tab = self._tabs.get(scene_key)
             view = current_tab.current_view if current_tab else ""
             save_scene_screenshot(layout_name, scene_key, new_image, view)
+            self._img_cache[(layout_name, scene_key, view)] = new_image
+            self._loaded_scenes.add(scene_key)
             if current_tab:
                 current_tab.canvas.set_image(new_image)
             scene_name = get_scene_name(scene_key)

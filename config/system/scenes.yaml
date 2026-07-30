@@ -20,7 +20,6 @@ layout_scenes:
   - activity_jianghu
   group_6:
   - ui_waiguan_yigui
-  - game_temp_page
   - ui_school_main
 group_names:
   group_1: 通用

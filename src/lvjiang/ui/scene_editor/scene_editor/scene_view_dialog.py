@@ -5,9 +5,12 @@ import re
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -37,7 +40,7 @@ class ViewManagerDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
             "视图用于把同一页面的多个滚动态分屏排布，避免坐标叠在一起。\n"
-            "选定视图时只展示基底视图 + 当前视图的定义。"
+            "选定视图时只展示该视图自身的定义，选「全部」才展示所有视图。"
         ))
 
         self._list = QListWidget()
@@ -96,23 +99,66 @@ class ViewManagerDialog(QDialog):
     # ─── 操作 ────────────────────────────────────────────
 
     def _on_add(self):
-        key, ok = QInputDialog.getText(
-            self, "新增视图", "视图 key（小写字母开头，仅含小写字母/数字/下划线）："
+        """新增视图：单对话框同时输入 key 与名称，实时校验"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("新增视图")
+        form = QFormLayout(dialog)
+        key_edit = QLineEdit()
+        key_edit.setPlaceholderText("小写字母开头，仅含小写字母/数字/下划线")
+        form.addRow("视图 Key:", key_edit)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #c62828;")
+        error_label.hide()
+        form.addRow("", error_label)
+        name_edit = QLineEdit()
+        name_edit.setPlaceholderText("留空则与 key 相同")
+        form.addRow("视图名称:", name_edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
         )
-        if not ok:
+        form.addRow(buttons)
+
+        # 实时校验：key 格式 + 保留 key + 重复
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        existing = {v.key for v in
+                    self._registry.get_scene_views(self._scene_key)}
+
+        def _validate():
+            k = key_edit.text().strip()
+            if not k:
+                ok_btn.setEnabled(False)
+                error_label.hide()
+                return
+            if not _RE_VIEW_KEY.match(k):
+                ok_btn.setEnabled(False)
+                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
+                error_label.show()
+                return
+            if k == BASE_VIEW_KEY:
+                ok_btn.setEnabled(False)
+                error_label.setText(f"{BASE_VIEW_KEY} 是基底视图的保留 key")
+                error_label.show()
+                return
+            if k in existing:
+                ok_btn.setEnabled(False)
+                error_label.setText(f"视图 key 已存在: {k}")
+                error_label.show()
+                return
+            ok_btn.setEnabled(True)
+            error_label.hide()
+
+        key_edit.textChanged.connect(_validate)
+        _validate()
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        key = key.strip()
-        if not _RE_VIEW_KEY.match(key):
-            QMessageBox.warning(self, "命名非法", "key 必须以小写字母开头，仅含小写字母/数字/下划线。")
-            return
-        if key == BASE_VIEW_KEY:
-            QMessageBox.warning(self, "命名非法", f"{BASE_VIEW_KEY} 是基底视图的保留 key。")
-            return
-        name, ok = QInputDialog.getText(self, "新增视图", "视图名称：", text=key)
-        if not ok:
-            return
+        key = key_edit.text().strip()
+        name = name_edit.text().strip() or key
         try:
-            self._registry.add_scene_view(self._scene_key, key, name.strip() or key)
+            self._registry.add_scene_view(self._scene_key, key, name)
         except ValueError as e:
             QMessageBox.warning(self, "新增失败", str(e))
             return

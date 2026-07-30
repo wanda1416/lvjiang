@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -244,6 +245,10 @@ class RegionPanelMixin:
             key_edit.setText(region_def.key)
             key_edit.setReadOnly(True)
         form.addRow("Key:", key_edit)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #c62828;")
+        error_label.hide()
+        form.addRow("", error_label)
 
         name_edit = QLineEdit()
         name_edit.setPlaceholderText("中文名称")
@@ -285,10 +290,22 @@ class RegionPanelMixin:
         )
         form.addRow(buttons)
 
-        # 实时校验：key 和 name 非空才启用 OK
+        # 实时校验：key/name 非空 + 新建时 key 不与现有区域重复
+        # （重复时红字提示并禁用 OK，避免提交后才报错且对话框已关闭）
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        scene = get_registry().get_scene(self._scene_key)
+        existing = {r.key for r in scene.regions} if scene else set()
+
         def _validate():
-            ok_btn.setEnabled(bool(key_edit.text().strip() and name_edit.text().strip()))
+            k = key_edit.text().strip()
+            if region_def is None and k in existing:
+                ok_btn.setEnabled(False)
+                error_label.setText(f"key 已被使用: {k}")
+                error_label.show()
+                return
+            error_label.hide()
+            ok_btn.setEnabled(bool(k and name_edit.text().strip()))
+
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
         _validate()

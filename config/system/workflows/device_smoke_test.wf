@@ -1,0 +1,17 @@
+# 设备端引擎冒烟测试 — 纯计算，不点击游戏
+# 验证：变量赋值 + 日志输出 + for 循环 整条执行链路贯通
+
+log "=== 设备端工作流引擎冒烟测试开始 ==="
+
+eval $msg = "hello from device"
+log $msg
+
+eval $count = 0
+for i in [1...5]
+    eval $count = $count + 1
+end
+
+log "loop finished"
+log $count
+
+log "=== 设备端工作流引擎冒烟测试完成 ==="

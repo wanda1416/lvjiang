@@ -333,7 +333,7 @@ def _run_execute() -> str:
             report.append("引擎创建成功")
 
             # 执行测试工作流
-            wf_path = PROJECT_ROOT / "config" / "system" / "workflows" / "_device_smoke_test.wf"
+            wf_path = PROJECT_ROOT / "config" / "system" / "workflows" / "device_smoke_test.wf"
             if not wf_path.exists():
                 raise RuntimeError(f"测试工作流不存在: {wf_path}")
 

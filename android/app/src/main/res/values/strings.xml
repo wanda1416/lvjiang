@@ -2,8 +2,9 @@
     <string name="app_name">律匠</string>
     <string name="status_placeholder">权限状态检测中…</string>
     <string name="btn_overlay">1. 授予悬浮窗权限</string>
-    <string name="btn_shizuku">2. 授予 Shizuku 权限</string>
-    <string name="btn_notification">3. 授予通知权限</string>
+    <string name="btn_a11y">2. 开启无障碍服务（必需）</string>
+    <string name="btn_shizuku">3. 授予 Shizuku 权限（可选）</string>
+    <string name="btn_notification">4. 授予通知权限</string>
     <string name="btn_start_float">启动悬浮图标</string>
     <string name="btn_stop_float">停止悬浮图标</string>
     <string name="btn_test_shell">自检：shell 通道（id）</string>

@@ -203,7 +203,7 @@ def _recognize(report: list[str], engine):
         raise RuntimeError("识别结果为空：det 没框到任何文字")
 
     report.append(f"识别到 {len(result)} 个文本框：")
-    for box, text, score in result:
+    for _box, text, score in result:
         report.append(f"  {score:.3f}  {text!r}")
     return [text for _, text, _ in result]
 
@@ -221,7 +221,7 @@ def _run_config() -> str:
 
     if ok:
         def check_constants(report):
-            from ...constants import PROJECT_ROOT, SYSTEM_CONFIG_DIR, SCENES_CONFIG_PATH
+            from ...constants import PROJECT_ROOT, SCENES_CONFIG_PATH, SYSTEM_CONFIG_DIR
             report.append(f"PROJECT_ROOT       {PROJECT_ROOT}")
             report.append(f"SYSTEM_CONFIG_DIR  {SYSTEM_CONFIG_DIR}")
             report.append(f"SCENES_CONFIG_PATH {SCENES_CONFIG_PATH}")
@@ -233,8 +233,8 @@ def _run_config() -> str:
 
     if ok:
         def check_scenes(report):
-            from ...constants import SCENES_CONFIG_PATH, SYSTEM_CONFIG_DIR
             from ...config import load_yaml
+            from ...constants import SCENES_CONFIG_PATH, SYSTEM_CONFIG_DIR
             data = load_yaml(SCENES_CONFIG_PATH)
             if not data:
                 raise RuntimeError(f"scenes.yaml 为空或解析失败: {SCENES_CONFIG_PATH}")
@@ -251,8 +251,8 @@ def _run_config() -> str:
 
     if ok:
         def check_workflows(report):
-            from ...constants import SYSTEM_CONFIG_DIR, WORKFLOWS_CONFIG_PATH
             from ...config import load_yaml
+            from ...constants import SYSTEM_CONFIG_DIR, WORKFLOWS_CONFIG_PATH
             data = load_yaml(WORKFLOWS_CONFIG_PATH)
             report.append(f"workflows.yaml 顶层 key  {list(data.keys())}")
             wf_dir = SYSTEM_CONFIG_DIR / "workflows"
@@ -281,6 +281,7 @@ def _run_workflow() -> str:
     if ok:
         def check_layout(report):
             import json
+
             from ...constants import PROJECT_ROOT
             from ...core.scene_registry import Layout
             layout_path = PROJECT_ROOT / "config" / "local" / "layouts" / "手机直控.json"
@@ -364,6 +365,100 @@ def _run_execute() -> str:
     return "\n".join(report)
 
 
+#: task 自检用的任务 id（config/system/workflows/device_smoke_test.wf，纯计算不点游戏）
+_TASK_ID = "device_smoke_test"
+
+#: 轮询上限。首次跑要含 OCR 模型加载（秒级），给足余量
+_TASK_TIMEOUT = 90.0
+
+
+def _run_task() -> str:
+    """走悬浮图标同一条路径的自检
+
+    target=run 验的是「引擎能不能执行 .wf」，这里验的是「悬浮图标点下去后
+    那整条链能不能跑」：task_runner 的发现 / 启动 / 轮询 / 终态 / 互斥。
+    Kotlin 侧只是把这几个函数的 JSON 结果画成按钮，所以这一步全绿就意味着
+    任务入口可用，不需要靠手点验证。
+    """
+    import json
+
+    from . import task_runner
+
+    report = _Report(["=== 设备端任务入口自检 target=task ==="])
+    _log(report[0])
+
+    ok, _ = _step(report, "1/5 运行时与依赖版本", lambda: _env_info(report))
+
+    if ok:
+        def check_list(report):
+            data = json.loads(task_runner.list_tasks())
+            if not data["ok"]:
+                raise RuntimeError(f"任务清单获取失败: {data['error']}")
+            ids = [t["id"] for t in data["tasks"]]
+            report.append(f"任务数      {len(ids)}")
+            for t in data["tasks"]:
+                report.append(f"  {t['source']:5s} {t['id']:24s} {t['name']}")
+            if _TASK_ID not in ids:
+                raise RuntimeError(f"清单里没有 {_TASK_ID}，已有：{ids}")
+
+        ok, _ = _step(report, "2/5 任务清单", lambda: check_list(report))
+
+    if ok:
+        def check_start(report):
+            data = json.loads(task_runner.start_task(_TASK_ID))
+            report.append(f"start_task -> {data}")
+            if not data["ok"]:
+                raise RuntimeError(data["message"])
+
+        ok, _ = _step(report, f"3/5 启动任务 {_TASK_ID}", lambda: check_start(report))
+
+    final = None
+    if ok:
+        def poll(report):
+            # 这里故意不直接 join 任务线程：Kotlin 侧看到的就是轮询出来的状态，
+            # 自检也走同一条路径，才能暴露「状态永远不收敛」这类问题。
+            deadline = time.time() + _TASK_TIMEOUT
+            seen_running = False
+            while time.time() < deadline:
+                status = json.loads(task_runner.get_status())
+                state = status["state"]
+                if state == "running":
+                    seen_running = True
+                elif state != "idle":
+                    report.append(f"终态        {state}（耗时 {status['elapsed']}s）")
+                    report.append(f"消息        {status['message']}")
+                    for line in status["logs"][-6:]:
+                        report.append(f"  {line}")
+                    if not seen_running:
+                        report.append("注：未捕获到 running 中间态（任务太快）")
+                    return status
+                time.sleep(0.3)
+            raise RuntimeError(f"{_TASK_TIMEOUT}s 内未收敛到终态")
+
+        ok, final = _step(report, "4/5 轮询至终态", lambda: poll(report))
+
+    if ok:
+        def verify(report):
+            if final["state"] != "done":
+                raise RuntimeError(f"终态应为 done，实际为 {final['state']}：{final['message']}")
+            report.append("终态 done [OK]")
+
+            # 空闲时请求停止应该被拒，否则 Kotlin 侧会把已经结束的任务报成「已停止」
+            stopped = json.loads(task_runner.stop_task())
+            if stopped["ok"]:
+                raise RuntimeError(f"空闲时 stop_task 应返回 ok=false，实际 {stopped}")
+            report.append(f"空闲时 stop_task 被拒 [OK]：{stopped['message']}")
+
+            if task_runner.is_running():
+                raise RuntimeError("is_running 应为 False")
+            report.append("is_running = False [OK]")
+
+        ok, _ = _step(report, "5/5 验证终态与互斥", lambda: verify(report))
+
+    report.append(f"\n{_LINE}\n结论：{'任务入口链路通过' if ok else '存在失败步骤（见上方 FAILED）'}")
+    return "\n".join(report)
+
+
 def run(target: str = "ocr") -> str:
     """自检入口，返回完整报告文本（同时已逐行落盘 + 打进 logcat）
 
@@ -375,7 +470,8 @@ def run(target: str = "ocr") -> str:
             "e2e" 验完整三通道闭环（截图 → OCR → 点击 → 再截图确认生效）；
             "config" 验系统配置加载链路（PROJECT_ROOT / scenes.yaml / workflows）；
             "workflow" 验工作流引擎（loguru / 布局加载 / .wf 解析）；
-            "run" 实际执行测试工作流（变量赋值 + 循环 + 日志）。
+            "run" 实际执行测试工作流（变量赋值 + 循环 + 日志）；
+            "task" 验悬浮图标的任务入口链路（清单 / 启动 / 轮询 / 终态）。
     """
     _reset_log()
     try:
@@ -387,6 +483,8 @@ def run(target: str = "ocr") -> str:
             return _run_workflow()
         if target == "run":
             return _run_execute()
+        if target == "task":
+            return _run_task()
         return _run_ocr(target)
     except Exception:
         text = "自检自身异常：\n" + traceback.format_exc().rstrip()

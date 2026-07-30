@@ -12,7 +12,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | ⏳ 未开始 | |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | 任务入口 + 无障碍恢复引导已完成；体积优化与签名构建待做 |
 
 ---
 
@@ -145,15 +145,46 @@
 
 ## Phase 4 待办：打包发布与稳定性
 
-- [ ] APK 体积优化（当前 72MB+，主要来自 rapidocr 模型 + onnxruntime-android）
-- [ ] 异常恢复机制（无障碍服务被系统关掉后的自动重连）
+- [x] **悬浮服务作为任务入口**（2026-07-31）
+  - `task_runner.py`（335 行）：任务生命周期管理，对外四个 JSON 接口
+    （`list_tasks` / `start_task` / `stop_task` / `get_status`）；状态机
+    idle→running→done/failed/stopped，日志环形缓冲 200 行，引擎跳任务复用
+  - `PyBridge.kt`：Chaquopy 调用唯一入口，`ensureStarted` 幂等化消除 Python.start 竞态
+  - `FloatService.kt`（163 → 437 行）：任务面板 + 状态色图标 + 1s 轮询（仅运行中）
+  - 停止走引擎已有的 `stop_check` 协作式回调，不强杀线程
+  - 实机验证：面板列出 7 个任务 → 点「设备端冒烟测试」→ 状态行「已完成」+ 日志两行 + 图标转蓝
+- [x] **异常恢复：无障碍掉线检测与设置页引导**（2026-07-31）
+  - 系统不开放自动重连 API，可做的是尽早拦住并把人送到开关页：
+    `MainActivity` 新增无障碍状态行 + `btn_a11y` 跳转；`FloatService.launchTask`
+    启动前先查；`task_runner.start_task` 再查一道
+  - `A11yCapture` 截图重试：节流退避 3 次 × 0.4s；掉线是硬故障，不重试直接报清楚
+- [ ] APK 体积优化（当前 77MB，主要来自 rapidocr 模型 + onnxruntime-android）
 - [ ] Release 签名构建
 - [ ] 用户引导流程（首次启动 → 开无障碍 → 开始使用）
-- [ ] 悬浮服务作为任务入口（FloatService → workflow_runner）
+
+### 本轮新增验证设施
+
+| 文件 | 作用 |
+|---|---|
+| `tests/core/test_task_runner.py` (18 用例) | 状态机 / JSON 协议 / 并发互斥 / 真引擎跑 .wf，把 DSL 语法错拦在 PC 上 |
+| `smoke.py target=task` (5 步) | 设备端走悬浮图标同一条路的自检，不靠手点 |
+| `.tooling/verify_panel.py` | 面板 UI 验证：坐标从 dumpsys/uiautomator 现算，不写死 |
+| `.tooling/run_selftest.py --no-install` | 同一 APK 连跑多个 target，避免反复装包 |
+
+### 实机验证踩到的两个坑
+
+- **写死坐标会点到应用外**：`MainActivity` 的状态文本会被自检报告撑长，把下方按钮
+  全部往下推（启动悬浮图标从 968 移到 1091）。第一下点空之后第二下落到桌面，
+  误开了用户的闹钟应用。现已改为从 dump 现算，找不到就中止、绝不盲点。
+- **悬浮窗在 uiautomator dump 里不存在**：它是 `FLAG_NOT_FOCUSABLE`，不是 active
+  window。只能从 `dumpsys window` 的 `type=2038 ... frame=` 取；且 `LayoutParams`
+  里写的 y 不等于实际 y（`FLAG_LAYOUT_NO_LIMITS` 下 40/400 实测落到 40/547）。
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **悬浮服务作为任务入口**（FloatService → workflow_runner → 执行实际工作流）
-2. **Phase 4 稳定性与发布准备**
+1. **发布准备**：Release 签名构建 + APK 体积优化
+2. **首次启动引导流程**（权限一步步过）
+3. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
+

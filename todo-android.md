@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-30（Phase 3 进行中：工作流引擎装配 + 布局分发 + 自检目标）
+> 最后更新：2026-07-30（Phase 3 完成：工作流引擎设备端执行验证通过）
 
 ---
 
@@ -11,7 +11,7 @@
 | Phase 0：环境 + 骨架 + 悬浮服务 | ✅ 完成 | JDK/SDK/Gradle 便携化、Chaquopy 接入、悬浮窗、Shizuku 通道 |
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
-| Phase 3：工作流引擎设备端跑通 | 🔧 进行中 | loguru 加入依赖 + workflow_runner + 布局加载 + .wf 解析自检 |
+| Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
 | Phase 4：打包发布与稳定性 | ⏳ 未开始 | |
 
 ---
@@ -121,11 +121,11 @@
 - [x] **Phase 2 提交**（2026-07-30，`1c0b754`）
   - 含：constants.py + App.kt + build.gradle.kts + smoke.py（config 自检）+ todo-android.md
 
-## Phase 3 进行中：工作流引擎设备端跑通
+## Phase 3 完成：工作流引擎设备端跑通
 
-- [x] loguru 加入设备端依赖（2026-07-30）
-  - `build.gradle.kts` pip 块新增 `loguru==0.7.3`
-  - 工作流引擎 + scene_registry 等 15 处引用，纯 Python 无原生扩展
+- [x] loguru + lark 加入设备端依赖（2026-07-30）
+  - `build.gradle.kts` pip 块新增 `loguru==0.7.3` + `lark==1.3.1`
+  - 工作流引擎 + scene_registry + grammar parser 全部可用
 - [x] 布局文件随 APK 分发（2026-07-30）
   - `build.gradle.kts` 新增 `syncLayoutConfig` Sync 任务：`config/local/layouts/手机直控.json` → APK assets
   - `App.kt` `syncSystemConfig()` 同时解压系统配置和布局文件到 `filesDir/lvjiang/config/local/layouts/`
@@ -135,12 +135,13 @@
 - [x] 工作流引擎自检目标（2026-07-30）
   - `smoke.py` 新增 `target=workflow`：4 步验证（loguru → 布局加载 → .wf 解析）
   - 验证 DSL 语法解析器在设备端可用
-
-### 待完成
-
-- [ ] 实机验证 `target=workflow` 自检全绿
-- [ ] 实际执行一个简单工作流（如 `equip_analysis.wf`）
-- [ ] 悬浮服务作为任务入口（FloatService → workflow_runner）
+- [x] 实际执行测试工作流（2026-07-30）
+  - `smoke.py` 新增 `target=run`：3 步验证（引擎创建 → 工作流执行 → 变量验证）
+  - `device_smoke_test.wf`：纯计算测试（变量赋值 + for 循环 + log，不点击游戏）
+  - 实机验证 3 步全绿：count=5.0, msg='hello from device'
+- [x] **Phase 3 提交**（2026-07-30，`a3052ec` + `9aa140a`）
+  - versionCode bump 到 2 触发配置重新解压
+  - workflow_runner.py 修复 OCR 初始化
 
 ## Phase 4 待办：打包发布与稳定性
 
@@ -148,23 +149,11 @@
 - [ ] 异常恢复机制（无障碍服务被系统关掉后的自动重连）
 - [ ] Release 签名构建
 - [ ] 用户引导流程（首次启动 → 开无障碍 → 开始使用）
-
----
-
-## 未提交的变更
-
-```
-git status:
- M android/app/build.gradle.kts    ← Sync 任务新增 syncLayoutConfig + loguru 依赖
- M android/app/src/main/java/com/lvjiang/app/App.kt  ← syncSystemConfig() 同时解压布局
- M src/lvjiang/core/ondevice/smoke.py  ← 新增 target=workflow 自检
-?? src/lvjiang/core/ondevice/workflow_runner.py  ← 设备端工作流引擎装配
-```
+- [ ] 悬浮服务作为任务入口（FloatService → workflow_runner）
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **构建 + 装包 + 验证 `target=workflow` 自检**
-2. **实际执行一个简单工作流**
-3. **悬浮服务作为任务入口**
+1. **悬浮服务作为任务入口**（FloatService → workflow_runner → 执行实际工作流）
+2. **Phase 4 稳定性与发布准备**

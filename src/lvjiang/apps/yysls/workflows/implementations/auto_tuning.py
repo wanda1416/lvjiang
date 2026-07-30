@@ -17,20 +17,29 @@ from loguru import logger
 
 from lvjiang.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
 from lvjiang.apps.yysls.evaluator import (
-    Rating, get_rule_names, judge_equipment_potential, summarize_potential,
+    Rating,
+    get_rule_names,
+    judge_equipment_potential,
+    summarize_potential,
 )
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    RATING_LABELS, RATING_RANK, STONE_LABEL, FoodDecision, MaterialSettings,
+    RATING_LABELS,
+    RATING_RANK,
+    STONE_LABEL,
+    FoodDecision,
+    MaterialSettings,
     get_tuning_base,
 )
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
-    DEFAULT_TRAVERSAL, TRAVERSALS,
+    DEFAULT_TRAVERSAL,
+    TRAVERSALS,
 )
+from lvjiang.apps.yysls.workflows.run_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
 from lvjiang.workflows.base import BaseWorkflow
 
 
-class AutoTuningWorkflow(BaseWorkflow):
+class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     """自动调律工作流"""
 
     WEAPON_SLOTS = ["main_weapon", "sub_weapon", "ring", "pendant"]
@@ -74,7 +83,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         self._materials_exhausted = False
         self._ensure_judge_config()
 
-        selected = getattr(self, '_selected_slots', None)
+        selected = self.ctx.selected_slots
         if not selected:
             selected = self.WEAPON_SLOTS + self.ARMOR_SLOTS
 
@@ -101,13 +110,12 @@ class AutoTuningWorkflow(BaseWorkflow):
     def _open_doc(self, slots: list[str]):
         """创建本次运行的说明文档并写文档头；失败只警告不中断流程。
 
-        操作用户名由 run_control 注入 _doc_username；输出目录可用
-        _doc_dir 覆盖（供测试），缺省 logs/tuning/。
+        操作用户名由 run_control 注入 ctx.doc_username；输出目录可用
+        ctx.doc_dir 覆盖（供测试），缺省 logs/tuning/。
         """
-        username = getattr(self, "_doc_username", "") or "default"
+        username = self.ctx.doc_username or "default"
         try:
-            self._doc = TuningDocWriter(
-                username, getattr(self, "_doc_dir", None))
+            self._doc = TuningDocWriter(username, self.ctx.doc_dir)
         except OSError as e:
             logger.warning(f"调律说明文档创建失败，本次不生成说明: {e}")
             self._doc = None
@@ -115,7 +123,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         self._doc_seq = 0
         # 各规则配置的开关聚合（any 语义），再映射为显示名 → 状态
         merged: dict[str, bool] = {}
-        for cfg in (self._judge_configs or {}).values():
+        for cfg in (self.ctx.judge_configs or {}).values():
             for k, v in (cfg.get("switches") or {}).items():
                 merged[str(k)] = merged.get(str(k), False) or bool(v)
         try:
@@ -128,7 +136,7 @@ class AutoTuningWorkflow(BaseWorkflow):
 
     def _describe_rules(self) -> list[str]:
         """由判定配置生成规则描述：显示名（玩法：勾选项）"""
-        configs = self._judge_configs or {}
+        configs = self.ctx.judge_configs or {}
         if not configs:
             return []
         names = get_rule_names()
@@ -273,12 +281,12 @@ class AutoTuningWorkflow(BaseWorkflow):
     def _traverse_bag(self, detail_scene: str):
         """按配置选择遍历策略并执行（策略实现见 bag_traversal）
 
-        优先级：注入属性 _scroll_strategy > 插件 session tuning 节的
+        优先级：注入配置 ctx.scroll_strategy > 插件 session tuning 节的
         scroll_strategy > 默认 DEFAULT_TRAVERSAL。回切旧方案：在
         config/local/yysls/session.json 的 tuning 节配
         "scroll_strategy": "positional"。
         """
-        key = getattr(self, "_scroll_strategy", "") or ""
+        key = self.ctx.scroll_strategy or ""
         if not key:
             try:
                 from lvjiang.apps.yysls.plugin_session import get_plugin_session
@@ -336,7 +344,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         # B. 潜力判定：不值得 → 垃圾胚子；未处理过，不收集 report，
         #    也不写说明文档（只写实际进入调律的装备）
         potential = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_rule_keys)
+            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         worth, logs = summarize_potential(potential)
         self._expect_rating = self._expect_key(potential)
         for line in logs:
@@ -363,7 +371,7 @@ class AutoTuningWorkflow(BaseWorkflow):
         # 临时测试开关：只有词条未满、判定值得调律且找到入口的装备
         # 才走到这里；真实进出调律页但不执行调律，供滚动遍历压测用。
         # 装备未被改动，不走垃圾/完成后处理挂载点。
-        if getattr(self, "_skip_tuning", False):
+        if self.ctx.skip_tuning:
             logger.info(f"  [{name}] 值得调律，但跳过实际调律（测试开关）")
             if self._doc:
                 self._doc.note("值得调律，但测试开关已启用，跳过实际调律")
@@ -477,17 +485,15 @@ class AutoTuningWorkflow(BaseWorkflow):
     # ─── 判定配置兜底 ──────────────────────────────────────
 
     def _ensure_judge_config(self):
-        """保证 _judge_configs/_judge_rule_keys 可用。
+        """保证 ctx.judge_configs/judge_rule_keys 可用。
 
         优先用 run_control 注入的实时 UI 配置；未注入时回退读插件会话
         tuning.rules + tuning.switches（复刻 single_tuning._load_rule_config），
         无有效配置时回退 (None, None) 即全部规则默认配置。
         """
-        if getattr(self, "_judge_configs", None) is not None or \
-                getattr(self, "_judge_rule_keys", None) is not None:
+        ctx = self.ctx
+        if ctx.judge_configs is not None or ctx.judge_rule_keys is not None:
             return
-        self._judge_rule_keys = None
-        self._judge_configs = None
         try:
             from lvjiang.apps.yysls.plugin_session import get_plugin_session
             section = get_plugin_session().get_section("tuning")
@@ -503,8 +509,8 @@ class AutoTuningWorkflow(BaseWorkflow):
                    for k, cfg in raw.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if enabled:
-            self._judge_rule_keys = list(enabled)
-            self._judge_configs = enabled
+            ctx.judge_rule_keys = list(enabled)
+            ctx.judge_configs = enabled
 
     # ─── 调律执行（移植自 single_tuning，single_tuning 保持不动）──
 
@@ -594,7 +600,7 @@ class AutoTuningWorkflow(BaseWorkflow):
             (是否值得, 命中 顶级/优秀 的规则显示名列表，供说明文档)
         """
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_rule_keys)
+            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         worth, logs = summarize_potential(results)
         self._expect_rating = self._expect_key(results)
         for line in logs:
@@ -626,7 +632,7 @@ class AutoTuningWorkflow(BaseWorkflow):
     def _final_judge(self, equip_data: EquipmentData) -> dict:
         """终局判定：含转律模拟的各规则评级上限，返回结构化结果供 report/hook 消费"""
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_rule_keys)
+            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         for r in results.values():
             tag = ("不适用" if r["not_applicable"]
                    else "跳过" if r["skipped"] else r["rating"])

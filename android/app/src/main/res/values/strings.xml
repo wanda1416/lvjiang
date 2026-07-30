@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">律匠</string>
+    <string name="status_placeholder">权限状态检测中…</string>
+    <string name="btn_overlay">1. 授予悬浮窗权限</string>
+    <string name="btn_shizuku">2. 授予 Shizuku 权限</string>
+    <string name="btn_notification">3. 授予通知权限</string>
+    <string name="btn_start_float">启动悬浮图标</string>
+    <string name="btn_stop_float">停止悬浮图标</string>
+    <string name="btn_test_shell">自检：shell 通道（id）</string>
+    <string name="btn_test_python">自检：Python 运行时</string>
+    <string name="btn_test_click">自检：点击回显</string>
+    <!-- 故意不包含任何按钮文案里出现过的字：闭环自检靠「已生效」是否出现判定点击落地 -->
+    <string name="status_click_ok">点击已生效</string>
+    <string name="a11y_label">律匠自动操作</string>
+    <string name="a11y_description">用于截取屏幕内容识别游戏界面，并执行你显式发起的自动点击与滑动。不读取任何界面文本内容，也不在后台监听操作。</string>
+</resources>

@@ -1,0 +1,4 @@
+<resources>
+    <!-- 深浅色自适应，AppCompat DayNight -->
+    <style name="Theme.Lvjiang" parent="Theme.AppCompat.DayNight" />
+</resources>

@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-30（Phase 2 进行中：配置加载链路 4 步全绿，session 写入链路待补）
+> 最后更新：2026-07-30（Phase 3 进行中：工作流引擎装配 + 布局分发 + 自检目标）
 
 ---
 
@@ -10,8 +10,8 @@
 |---|---|---|
 | Phase 0：环境 + 骨架 + 悬浮服务 | ✅ 完成 | JDK/SDK/Gradle 便携化、Chaquopy 接入、悬浮窗、Shizuku 通道 |
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
-| Phase 2：核心逻辑移植与配置分层 | 🔧 进行中 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发均已实机验证 |
-| Phase 3：工作流引擎设备端跑通 | ⏳ 未开始 | |
+| Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
+| Phase 3：工作流引擎设备端跑通 | 🔧 进行中 | loguru 加入依赖 + workflow_runner + 布局加载 + .wf 解析自检 |
 | Phase 4：打包发布与稳定性 | ⏳ 未开始 | |
 
 ---
@@ -118,14 +118,29 @@
     → workflows.yaml 解析（8 个工作流文件）
 - [x] 工作流 YAML 的设备端加载验证（2026-07-30）
   - `workflows/*.wf` 已随 assets 解压，`load_yaml` 可正确解析
-- [ ] session.json 设备端写入链路：设备端没有桌面 UI 的「配置管理」页，
-  需要确定 session 的初始值来源（默认空 / 随 APK 分发一份种子 / 首次运行自动生成）
+- [x] **Phase 2 提交**（2026-07-30，`1c0b754`）
+  - 含：constants.py + App.kt + build.gradle.kts + smoke.py（config 自检）+ todo-android.md
 
-## Phase 3 待办：工作流引擎设备端跑通
+## Phase 3 进行中：工作流引擎设备端跑通
 
-- [ ] DSL 引擎在设备端 Python 运行
-- [ ] 场景识别 → 决策 → 操作的完整循环
-- [ ] 悬浮服务作为任务入口
+- [x] loguru 加入设备端依赖（2026-07-30）
+  - `build.gradle.kts` pip 块新增 `loguru==0.7.3`
+  - 工作流引擎 + scene_registry 等 15 处引用，纯 Python 无原生扩展
+- [x] 布局文件随 APK 分发（2026-07-30）
+  - `build.gradle.kts` 新增 `syncLayoutConfig` Sync 任务：`config/local/layouts/手机直控.json` → APK assets
+  - `App.kt` `syncSystemConfig()` 同时解压系统配置和布局文件到 `filesDir/lvjiang/config/local/layouts/`
+- [x] 设备端工作流引擎装配（2026-07-30）
+  - `workflow_runner.py`：把 A11yCapture / A11yInput / OCREngine / Layout / WorkflowEngine 串起来
+  - 提供 `create_engine()` 和 `run_workflow(wf_name)` 两个入口
+- [x] 工作流引擎自检目标（2026-07-30）
+  - `smoke.py` 新增 `target=workflow`：4 步验证（loguru → 布局加载 → .wf 解析）
+  - 验证 DSL 语法解析器在设备端可用
+
+### 待完成
+
+- [ ] 实机验证 `target=workflow` 自检全绿
+- [ ] 实际执行一个简单工作流（如 `equip_analysis.wf`）
+- [ ] 悬浮服务作为任务入口（FloatService → workflow_runner）
 
 ## Phase 4 待办：打包发布与稳定性
 
@@ -140,19 +155,16 @@
 
 ```
 git status:
- M android/app/build.gradle.kts    ← Sync 任务：config/system → assets
- M src/lvjiang/constants.py         ← _project_root() 安卓端分支
- M android/app/src/main/java/com/lvjiang/app/App.kt  ← syncSystemConfig() 解压逻辑
-?? android/                          ← 整个 Android 工程（含 Kotlin + 资源 + pystubs）
-?? src/lvjiang/core/ondevice/        ← 设备端 Python 模块（8 个文件）
+ M android/app/build.gradle.kts    ← Sync 任务新增 syncLayoutConfig + loguru 依赖
+ M android/app/src/main/java/com/lvjiang/app/App.kt  ← syncSystemConfig() 同时解压布局
+ M src/lvjiang/core/ondevice/smoke.py  ← 新增 target=workflow 自检
+?? src/lvjiang/core/ondevice/workflow_runner.py  ← 设备端工作流引擎装配
 ```
-
-`.tooling/` 下的脚本（enable_a11y.py、run_selftest.py 等）也是新增，但 .tooling 本身已 gitignore。
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **session.json 策略确定**：设备端初始 session 来源（默认空 vs 种子文件）
-2. **工作流 DSL 引擎设备端跑通**（Phase 3）
-3. **提交 Phase 2 阶段性成果**（constants + App.kt + build.gradle.kts + config 自检）
+1. **构建 + 装包 + 验证 `target=workflow` 自检**
+2. **实际执行一个简单工作流**
+3. **悬浮服务作为任务入口**

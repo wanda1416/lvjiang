@@ -736,13 +736,26 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _prompt_field_selection(self, region_idx: int):
         """弹出区域选择对话框"""
-        # 获取未绑定的区域（使用当前场景的区域列表）
-        assigned = {r.key for i, r in enumerate(self._regions) if i != region_idx and r.key}
-        available = [(k, n) for k, n in self._current_regions if k not in assigned]
+        # 已绑定集合必须含被视图过滤隐藏的实例（_hidden_regions），
+        # 否则在非基底视图下新建区域时，其他视图已绑定的区域会被当成未绑定重复出现
+        new_region = self._regions[region_idx]
+        assigned = {
+            r.key for r in (self._regions + self._hidden_regions)
+            if r is not new_region and r.key
+        }
+        # 候选仅限当前视图可见的字段（基底 + 当前视图，即 _visible_keys）：
+        # 选定非基底视图时不应允许绑定当前不可见视图的字段（_visible_keys 为 None = 看全部）
+        available = [
+            (k, n) for k, n in self._current_regions
+            if k not in assigned
+            and (self._visible_keys is None or k in self._visible_keys)
+        ]
         logger.debug(f"区域选择: current_regions={self._current_regions}, available={available}")
 
         if not available:
-            logger.warning("所有区域已分配，请先删除已有区域")
+            msg = "当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）"
+            logger.warning(msg)
+            self._notify_status(msg)
             self._regions.pop(region_idx)
             self._selected_idx = -1
             self._field_selected = False
@@ -860,6 +873,11 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     def _notify_changed(self):
         if self.on_region_changed:
             self.on_region_changed()
+
+    def _notify_status(self, message: str):
+        """向对话框状态栏推送面向用户的提示（无回调时静默）"""
+        if self.on_status_message:
+            self.on_status_message(message)
 
     def _notify_canvas_changed(self):
         if self.on_canvas_changed:

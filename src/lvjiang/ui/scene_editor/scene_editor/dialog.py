@@ -249,6 +249,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
             tab.canvas.on_poi_changed = self._on_any_poi_changed
             tab.canvas.on_panel_changed = self._on_any_panel_changed
+            tab.canvas.on_status_message = lambda msg: self._status_bar.showMessage(msg, 5000)
             tab.on_view_changed = self._on_tab_view_changed
         self._set_dirty(False)
         self._status_bar.showMessage(f"当前布局: {layout_name}")

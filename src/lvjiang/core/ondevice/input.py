@@ -7,29 +7,20 @@
 主通道选无障碍而不是 Shizuku：后者必须由 adb 引导启动，手机重启一次就失效，
 要用户重新配对无线调试；无障碍开关开一次即长期有效。
 
-刻意不继承 InputBackend：那个基类会 `from ..config import DelayConfig`，而
-config.py 依赖 pydantic —— 设备端依赖矩阵里还没有它。等 Phase 2 把配置层搬上设备
-（届时必须解决 pydantic 的 Android wheel 问题）再改为继承，接口签名此处已按基类
-对齐，改动只是加一行 class 声明。
-
-延迟与随机偏移的语义与 PC 端一致（拟人化，避免固定节奏），但参数暂用写死的默认值，
-同样等 DelayConfig 上设备后再注入。
+继承 InputBackend：config.py 已去 pydantic（dataclass 实现），基类与 DelayConfig
+在设备端可直接导入，延迟/拟人化参数由 DelayConfig 统一注入，与 PC 端同源。
 """
 
 import random
 import time
 
+from ...config import DelayConfig
+from ..input_base import InputBackend
 from . import a11y, shell
 
-# 与 config.DelayConfig 的默认值保持一致；Phase 2 接上配置后删除
-_BEFORE_CLICK = (0.05, 0.15)
-_AFTER_CLICK = (0.1, 0.25)
-_MOVE_DURATION = (0.3, 0.6)
-_RANDOM_OFFSET = 3
 
-
-class _GestureInput:
-    """点击/拖拽的共同逻辑（签名对齐 InputBackend）
+class _GestureInput(InputBackend):
+    """点击/拖拽的共同逻辑
 
     随机偏移、前后延迟、拖拽时长换算这些是与通道无关的策略，两条通道必须表现
     一致，否则换通道会连带改变操作节奏。子类只实现 _tap / _swipe 两个原语。
@@ -38,15 +29,12 @@ class _GestureInput:
     #: 日志前缀，用于在报告里区分实际走的哪条通道
     name = "_GestureInput"
 
-    def __init__(self):
+    def __init__(self, delay_config: DelayConfig | None = None):
         # 供 run_control 访问：设备端无窗口概念，与 AdbInput 取同样的恒定值
         self.background_mode = True
         self.target_hwnd = None
 
-        self.before_click_wait = _BEFORE_CLICK
-        self.after_click_wait = _AFTER_CLICK
-        self.mouse_move_duration = _MOVE_DURATION
-        self.click_random_offset = _RANDOM_OFFSET
+        self._inject_delay_config(self, delay_config)
 
     def _tap(self, x: int, y: int) -> None:
         raise NotImplementedError

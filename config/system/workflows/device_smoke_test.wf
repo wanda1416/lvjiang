@@ -1,3 +1,4 @@
+#% name: 设备端冒烟测试
 # 设备端引擎冒烟测试 — 纯计算，不点击游戏
 # 验证：变量赋值 + 日志输出 + for 循环 整条执行链路贯通
 
@@ -13,5 +14,9 @@ end
 
 log "loop finished"
 log $count
+
+# collect 一份结果：任务入口靠 result 非空确认「执行确实产出了东西」，
+# 而不是只看状态机走到了 done
+collect $count as "count"
 
 log "=== 设备端工作流引擎冒烟测试完成 ==="

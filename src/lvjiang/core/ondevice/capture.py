@@ -11,6 +11,8 @@
 错误通过返回 None + print 暴露。
 """
 
+import time
+
 import numpy as np
 
 from ..capture_base import CaptureBackend
@@ -28,18 +30,16 @@ class A11yCapture(CaptureBackend):
     MediaProjection（它底层就是 scrcpy 那套 VirtualDisplay，不限频）。
     """
 
+    #: 节流退避：takeScreenshot 的最小间隔是数百毫秒级，失败后干等一下大多能成
+    _RETRY_DELAY = 0.4
+    _MAX_ATTEMPTS = 3
+
     def __init__(self):
         self._size: tuple[int, int] | None = None
 
     def capture(self, timeout: float = 10.0) -> np.ndarray | None:
-        try:
-            got = a11y.screenshot_rgba(int(timeout * 1000))
-        except Exception as e:
-            print(f"[A11yCapture] takeScreenshot 调用异常: {e}")
-            return None
-
+        got = self._grab(timeout)
         if got is None:
-            print("[A11yCapture] 截图失败（无障碍开关未开？或调用太密被节流）")
             return None
 
         width, height, data = got
@@ -55,6 +55,34 @@ class A11yCapture(CaptureBackend):
         img = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
         self._size = (width, height)
         return img
+
+    def _grab(self, timeout: float):
+        """取一帧 RGBA，失败时重试；返回 (宽, 高, 字节) 或 None
+
+        分两种失败区别对待：无障碍服务掉线是硬故障（重试没有意义，直接报清楚，
+        由上层引导用户去开开关）；返回 None 但服务在线则大概率是截图节流，
+        退避一下再试。长任务里连续截图撞上节流是常态，不重试就会中途莫名失败。
+        """
+        for attempt in range(1, self._MAX_ATTEMPTS + 1):
+            if not a11y.is_ready():
+                print("[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启")
+                return None
+
+            try:
+                got = a11y.screenshot_rgba(int(timeout * 1000))
+            except Exception as e:
+                print(f"[A11yCapture] takeScreenshot 调用异常: {e}")
+                return None
+
+            if got is not None:
+                return got
+
+            if attempt < self._MAX_ATTEMPTS:
+                print(f"[A11yCapture] 截图失败（疑似节流），{self._RETRY_DELAY}s 后重试 {attempt}/{self._MAX_ATTEMPTS - 1}")
+                time.sleep(self._RETRY_DELAY)
+
+        print(f"[A11yCapture] 截图连续 {self._MAX_ATTEMPTS} 次失败")
+        return None
 
     def get_capture_size(self) -> tuple[int, int]:
         if self._size is None:

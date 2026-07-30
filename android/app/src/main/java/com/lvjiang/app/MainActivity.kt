@@ -10,7 +10,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 import java.util.concurrent.Executors
 
 /**
@@ -48,6 +47,18 @@ class MainActivity : AppCompatActivity() {
                 )
             } else {
                 toast("悬浮窗权限已授予")
+            }
+        }
+
+        findViewById<Button>(R.id.btn_a11y).setOnClickListener {
+            if (A11yBridge.isReady()) {
+                toast("无障碍服务已连接")
+                refreshStatus()
+            } else {
+                // 系统不允许应用自己打开无障碍开关，只能把用户送到设置页。
+                // 这也是运行期唯一的恢复手段：服务被系统清掉后没有自动重连的 API。
+                toast("请在列表中找到「律匠自动操作」并开启")
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
 
@@ -98,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_test_python).setOnClickListener {
             executor.execute {
                 val result = try {
-                    if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+                    PyBridge.ensureStarted(this)?.let { throw IllegalStateException(it) }
                     Python.getInstance().getModule("hello").callAttr("smoke_test").toString()
                 } catch (e: Throwable) {
                     "Python 启动失败：$e"
@@ -131,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         val logFile = java.io.File(filesDir, SELFTEST_LOG)
         executor.execute {
             val report = try {
-                if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+                PyBridge.ensureStarted(this)?.let { throw IllegalStateException(it) }
                 Python.getInstance()
                     .getModule("lvjiang.core.ondevice.smoke")
                     .callAttr("run", target)
@@ -161,12 +172,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val overlay = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
+        val a11y = if (A11yBridge.isReady()) "已连接" else "未开启（必需）"
         val shizuku = when {
             !ShellBridge.isShizukuAlive() -> "未运行"
             ShellBridge.hasPermission() -> "已授权"
             else -> "未授权"
         }
-        statusText.text = "悬浮窗：$overlay\nShizuku：$shizuku"
+        statusText.text = "悬浮窗：$overlay\n无障碍：$a11y\nShizuku：$shizuku（可选）"
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()

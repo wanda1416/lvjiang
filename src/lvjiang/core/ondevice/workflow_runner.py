@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Callable
 
 from loguru import logger
 
@@ -25,7 +26,6 @@ from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout
 from ...workflows.engine import WorkflowEngine
-
 from .capture import A11yCapture
 from .input import A11yInput
 
@@ -68,12 +68,14 @@ def _load_layout(name: str = "手机直控") -> Layout:
 def create_engine(
     layout_name: str = "手机直控",
     delay_config: DelayConfig | None = None,
+    stop_check: Callable[[], bool] | None = None,
 ) -> WorkflowEngine:
     """创建设备端工作流引擎
 
     Args:
         layout_name: 布局文件名（不含 .json）
         delay_config: 延迟配置，None 则用默认值
+        stop_check: 停止判据，引擎每条语句前轮询一次；None 表示不可停止
 
     Returns:
         装配好的 WorkflowEngine 实例
@@ -91,6 +93,7 @@ def create_engine(
         delay_config=delay_config or DelayConfig(),
         window_left=0,
         window_top=0,
+        stop_check=stop_check,
     )
     return engine
 

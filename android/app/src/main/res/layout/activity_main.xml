@@ -24,6 +24,12 @@
             android:text="@string/btn_overlay" />
 
         <Button
+            android:id="@+id/btn_a11y"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_a11y" />
+
+        <Button
             android:id="@+id/btn_shizuku"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

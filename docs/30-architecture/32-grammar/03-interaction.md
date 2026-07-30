@@ -1,68 +1,13 @@
 # DSL 交互指令
 
+> 操作对象（Area / Action / Panel）的概念说明见 [02-concepts.md](02-concepts.md)。
+
 ## 目录
 
-- [操作对象语义](#操作对象语义)
-  - [Panel — 通用容器](#panel--通用容器)
 - [一、click — 点击](#一click--点击)
 - [二、drag — 拖拽](#二drag--拖拽)
 - [三、wait — 等待](#三wait--等待)
 - [四、align — 面板自对齐](#四align--面板自对齐)
-
-## 操作对象语义
-
-DSL 指令操作两类本质不同的对象：**Area**（空间实体）和 **Action**（行为实体）。
-
-| | Area | Action |
-|---|------|--------|
-| 本质 | **空间实体**（有位置、形状） | **行为实体**（定义一次交互） |
-| 定义层 | Scene 层定义，Layout 层绑定坐标 | 纯 Layout 层定义 |
-| 可执行操作 | click / scan / recognize（对空间做的事） | execute（执行该行为） |
-| 不可执行操作 | 不能 drag 一个 Area | 不能 scan / click 一个 Action |
-
-两类对象的操作集**完全正交**，不存在跨类操作。
-
-| 指令 | 操作对象 | 对象类型 | 说明 |
-|------|----------|----------|------|
-| `click [scene].[area]` | **Area** | 空间实体 | 点击区域中心（Region 或 Point） |
-| `scan [scene].[area]` | **Area** | 空间实体 | 对区域执行 OCR（当前仅支持 Region，未来可扩展 Point） |
-| `recognize [scene].[area]` | **Area** | 空间实体 | 对区域执行图像识别（当前仅支持 Region，未来可扩展 Point） |
-| `drag [scene].[action]` | **Action** | 行为实体 | 执行拖拽动作（Arrow） |
-
-> **注**：`scan` / `recognize` 当前实现仅支持 Region 类型的 Area，但语义上允许未来扩展到 Point 类型（对坐标点周围区域做 OCR）。
-
-### Panel — 通用容器
-
-Panel 是 Scene 层定义的一种特殊 Area，作为**可寻址的容器**存在。Panel 通过 `type` 字段区分内部结构：
-
-| type | 语义 | 寻址方式 | 当前状态 |
-|------|------|----------|----------|
-| `grid` | 行列网格 | `[r][c]` | ✅ 已实现 |
-| `regions` | 多个 Region 的集合 | `[name]` | 🔜 规划中 |
-
-当前所有 Panel 均为 `type=grid`（默认值，可省略），具有 `rows`/`cols` 属性，通过 `[r][c]` 二维索引寻址。
-
-```yaml
-# 当前（隐式 grid，type 可省略）
-panels:
-  - key: bag_grid
-    rows: 3
-    cols: 6
-
-# 未来（显式 type）
-panels:
-  - key: bag_grid
-    type: grid            # 网格型（默认）
-    rows: 3
-    cols: 6
-  - key: equip_slots
-    type: regions         # Region 集合型
-    regions: [weapon, armor, accessory]
-```
-
-> **注**：`type=regions` 允许将多个已定义的 Region 合并到一个 Panel 中统一管理，届时寻址方式将自动适配为 `[name]` 而非 `[r][c]`。详见 [01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)。
-
----
 
 ## 一、click — 点击
 
@@ -122,8 +67,6 @@ drag [scene].[panel][r][c] left [n]            # 左翻 n 列（默认 1）
 drag [scene].[panel][r][c] right [n]           # 右翻 n 列（默认 1）
 drag [scene].[panel][r][c] up $var             # 上翻 $var 行（动态）
 drag [scene].[panel][r][c] down $var           # 下翻 $var 行（动态）
-drag [scene].[panel][r][c] left $var           # 左翻 $var 列（动态）
-drag [scene].[panel][r][c] right $var          # 右翻 $var 列（动态）
 ```
 
 **示例**：
@@ -134,18 +77,14 @@ drag [scene].[arrow]                            # 常量.常量
 drag [scene]."arrow"                            # 常量.字符串
 drag [scene].$var                               # 常量.变量
 drag $scene.[arrow]                             # 变量.常量
-drag $scene.$arrow                              # 变量.变量
 drag [scene].[arrow] 0.5                        # 指定时长
 drag [scene].[arrow] 0.5 hold 0.2               # 拖拽后按住
 drag (0.52, 0.45) (0.52, 0.22)                  # 画布归一化坐标（录制产物）
 drag (0.52, 0.45) (0.52, 0.22) 0.4              # 坐标模式 + 指定时长
 
 # Panel 拖拽（翻页）
-drag [bag_equip_detail].[bag_grid][1][1] down   # 下翻 1 行（显示下方内容）
-drag [bag_equip_detail].[bag_grid][1][1] up     # 上翻 1 行（显示上方内容）
-drag [bag_equip_detail].[bag_grid][1][1] down 3 # 下翻 3 行
+drag [bag_equip_detail].[bag_grid][1][1] down   # 下翻 1 行
 drag [bag_equip_detail].[bag_grid][1][1] up $n  # 上翻 $n 行（动态）
-drag [bag_equip_detail].[bag_grid][1][1] left   # 左翻 1 列（显示左侧内容）
 drag [bag_equip_detail].[bag_grid][1][1] right 2 # 右翻 2 列
 ```
 
@@ -164,8 +103,7 @@ drag [bag_equip_detail].[bag_grid][1][1] right 2 # 右翻 2 列
 
 - `up` = 手指从下往上划 = 内容向下滚动 = 看上面的内容（类似 PageUp）
 - `down` = 手指从上往下划 = 内容向上滚动 = 看下面的内容（类似 PageDown）
-- `left` = 手指从左往右划 = 内容向左滚动 = 看左侧的内容
-- `right` = 手指从右往左划 = 内容向右滚动 = 看右侧的内容
+- `left` / `right` 类推
 - 拖拽起点为指定格子中心
 - 垂直拖拽距离 = 行数 × 单行高度（panel 高度 / 行数）
 - 水平拖拽距离 = 列数 × 单列宽度（panel 宽度 / 列数）
@@ -188,10 +126,8 @@ wait (min, max)         # 随机范围等待（在 min~max 秒之间随机取值
 ```
 wait page_refresh_wait      # 命名延迟（从配置读取）
 wait 1.5                    # 固定等待 1.5 秒
-wait 10                     # 固定等待 10 秒
 wait $interval              # 动态等待，$interval 的值是秒数
 wait (1, 2)                 # 随机等待 1~2 秒
-wait (0.5, 1.5)             # 随机等待 0.5~1.5 秒
 ```
 
 **说明**：
@@ -222,15 +158,9 @@ click [bag_equip_detail].[bag_grid][1][1]     # 不再触发对齐
 click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 ```
 
-**工作原理**：
-
-1. 对 Panel 区域截图
-2. 通过图像处理算法（方差分析）检测实际网格间距
-3. 计算每个格子的中心坐标并缓存
-4. 后续 `click [scene].[panel][r][c]` 直接查缓存，无需重复截图
-
 **说明**：
 
 - 对齐结果缓存在 `_alignment_cache` 中，同一 Panel 只需对齐一次
 - 窗口缩放、分辨率变化后需要重新对齐（引擎会自动检测）
-- 对齐算法基于方差分析，自动检测网格间距，无需手动指定 `h_span`/`v_span`
+- 对齐算法基于方差分析，自动检测网格间距
+- 详见 [02-concepts.md — 自对齐机制](02-concepts.md#自对齐机制)

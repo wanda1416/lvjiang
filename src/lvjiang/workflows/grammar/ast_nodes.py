@@ -155,7 +155,43 @@ class Loop:
 
 
 @dataclass(frozen=True)
+class WhileLoop:
+    """loop while <condition> ... end — 条件循环（条件为真继续）"""
+    condition: Any  # 条件表达式节点
+    body: list = field(default_factory=list)
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class UntilLoop:
+    """loop until <condition> ... end — 条件循环（条件为假继续，即条件为真退出）"""
+    condition: Any  # 条件表达式节点
+    body: list = field(default_factory=list)
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Break:
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Continue:
+    """continue — 跳过当前循环迭代，进入下一轮"""
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Try:
+    """try ... catch $err ... end — 异常处理
+
+    body: try 块内的语句列表
+    catch_body: catch 块内的语句列表（可选，无 catch 子句时为空）
+    err_var: catch 绑定的错误消息变量名（可选，无绑定则为 None）
+    """
+    body: list = field(default_factory=list)
+    catch_body: list = field(default_factory=list)
+    err_var: str | None = None
     line_no: int = 0
 
 
@@ -288,8 +324,8 @@ class KeywordRef:
 
 @dataclass(frozen=True)
 class Literal:
-    """字面量字符串"""
-    value: str
+    """字面量（字符串、数字、null、bool）"""
+    value: Any
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 """DSL 内置函数测试（_registry / arithmetic / general）
 
 ee855a7 内置函数模块化拆分后无直测，本文件补充回归保护。
-system 模块（messagebox/save/panel_rows）依赖 engine 与 GUI，不纳入。
+system 模块（confirm/pause/save/panel_rows）依赖 engine 与 GUI，不纳入。
 """
 
 import pytest
@@ -42,9 +42,11 @@ class TestRegistry:
 class TestArithmetic:
     @pytest.mark.parametrize("name,a,b,expected", [
         ("add", 2, 3, 5),
+        ("add", 3, 0.5, 3.5),
         ("sub", 10, 4, 6),
         ("mul", 3, 4, 12),
-        ("div", 7, 2, 3),      # 整除
+        ("mul", 3, 0.5, 1.5),
+        ("div", 7, 2, 3.5),   # 浮点除
         ("mod", 7, 3, 1),
         ("min", 5, 9, 5),
         ("max", 5, 9, 9),
@@ -52,9 +54,14 @@ class TestArithmetic:
     def test_binary_ops(self, name, a, b, expected):
         assert _fn(name)(a, b) == expected
 
+    def test_min_max_variadic(self):
+        assert _fn("min")(5, 9, 2, 7) == 2
+        assert _fn("max")(5, 9, 2, 7) == 9
+
     def test_string_numbers_coerced(self):
         # DSL 变量常以字符串形态传入
         assert _fn("add")("2", "3") == 5
+        assert _fn("add")("2.5", "0.5") == 3.0
 
     @pytest.mark.parametrize("name", ["div", "mod"])
     def test_divide_by_zero_returns_zero(self, name):

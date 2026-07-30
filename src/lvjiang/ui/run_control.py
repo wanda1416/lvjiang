@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from loguru import logger
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal, QObject
 
 import yaml
 
@@ -42,6 +42,72 @@ class WorkflowWorker(QThread):
             tb = traceback.format_exc()
             logger.error(f"工作流 {self.flow_id} 异常退出:\n{tb}")
             self.finished.emit(self.flow_id, e)
+
+
+class _UIHelper(QObject):
+    """工作流线程 → 主线程的对话框桥（confirm/pause/input）
+
+    请求以 dict 携带（信号用 object 签名，避免 QVariant 拷贝、保持引用）：
+    主线程槽弹对话框 → 写 req["result"] → set req["done"]，
+    工作流线程用 threading.Event 等待，无竞态、无需事件循环。
+    槽是 QObject 方法，AutoConnection 跨线程投递行为确定为 Queued。
+    """
+    request = pyqtSignal(object)
+
+    def __init__(self, window=None):
+        super().__init__()
+        self._window = window
+        self._active_dialog = None
+        self.request.connect(self._on_request)
+
+    def _on_request(self, req: dict):
+        """主线程：显示对话框并回填结果，无论成败都唤醒工作流线程"""
+        try:
+            req["result"] = self._show(req["action"], req["kwargs"])
+        except Exception as e:
+            logger.error(f"UI 交互对话框异常: {e}")
+        finally:
+            self._active_dialog = None
+            req["done"].set()
+
+    def _show(self, action: str, kwargs: dict):
+        from PyQt6.QtWidgets import QMessageBox, QInputDialog
+        if action == "confirm":
+            box = QMessageBox(
+                QMessageBox.Icon.Question, "工作流确认",
+                kwargs.get("message", ""),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                self._window,
+            )
+            self._active_dialog = box
+            return box.exec() == QMessageBox.StandardButton.Yes
+        if action == "pause":
+            box = QMessageBox(
+                QMessageBox.Icon.Information, "工作流暂停",
+                kwargs.get("message", ""),
+                QMessageBox.StandardButton.Ok, self._window,
+            )
+            self._active_dialog = box
+            box.exec()
+            return None
+        if action == "input":
+            dlg = QInputDialog(self._window)
+            dlg.setWindowTitle("工作流输入")
+            dlg.setLabelText(kwargs.get("prompt", ""))
+            self._active_dialog = dlg
+            ok = dlg.exec()
+            return dlg.textValue() if ok else None
+        logger.warning(f"未知 UI 交互类型: {action}")
+        return None
+
+    def close_active_dialog(self):
+        """主线程：关闭当前活动对话框（F10 停止时调用）
+
+        confirm 返回 false、input 返回 null、pause 立即返回，
+        使阻塞在对话框上的工作流能响应停止请求。
+        """
+        if self._active_dialog is not None:
+            self._active_dialog.reject()
 
 
 class RunControlMixin:
@@ -248,6 +314,28 @@ class RunControlMixin:
         """工作流回调：检查是否请求了停止"""
         return self._stop_requested
 
+    def _create_ui_callback(self):
+        """创建线程安全的 UI 交互回调（confirm/pause/input）
+
+        _UIHelper 常驻主线程，工作流线程发信号请求弹窗，
+        用 threading.Event 等待结果，避免 QEventLoop 的
+        "结果先于 exec() 到达"竞态。notify 不经回调（内置函数
+        直接用 Win32 后台线程弹出）。
+        """
+        import threading
+
+        helper = _UIHelper(self)
+        self._ui_helper = helper
+
+        def callback(action: str, **kwargs):
+            req = {"action": action, "kwargs": kwargs,
+                   "result": None, "done": threading.Event()}
+            helper.request.emit(req)
+            req["done"].wait()
+            return req["result"]
+
+        return callback
+
     def _request_stop(self):
         """统一停止入口（F10 / 停止按钮）。只设标志，不立即改 running。"""
         self.log_text.append("[操作] 收到停止请求")
@@ -256,6 +344,10 @@ class RunControlMixin:
             self.log_text.append("[提示] 当前没有正在运行的自动化")
             return
         self._stop_requested = True
+        # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
+        helper = getattr(self, '_ui_helper', None)
+        if helper is not None:
+            helper.close_active_dialog()
         self.statusBar().showMessage("停止中... | 等待当前步骤结束")
         # 占位主流程（_on_start）没有工作流线程，直接复位
         if self._current_worker is None:
@@ -338,6 +430,7 @@ class RunControlMixin:
         engine.session = self._session_manager.load(username)
         # context 由 execute() 自动初始化为空 dict
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
+        engine._ui_callback = self._create_ui_callback()
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
         flow_params = self._collect_flow_params()
@@ -556,6 +649,7 @@ class RunControlMixin:
         username = self._user_manager.get_active_user_name()
         engine.session = self._session_manager.load(username)
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
+        engine._ui_callback = self._create_ui_callback()
         self._current_engine = engine
 
         # 创建工作流实例

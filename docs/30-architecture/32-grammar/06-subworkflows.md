@@ -1,5 +1,20 @@
 # DSL 模块化：import / def / call
 
+## 目录
+
+- [一、概述](#一概述)
+- [二、import — 引入外部 def 定义](#二import--引入外部-def-定义)
+- [三、def — 定义子过程](#三def--定义子过程)
+- [四、call — 执行调用](#四call--执行调用)
+  - [变量隔离](#变量隔离)
+  - [返回值传递](#返回值传递)
+- [五、完整示例](#五完整示例)
+- [六、工作流参数声明](#六工作流参数声明)
+  - [6.1 参数声明语法](#61-参数声明语法)
+  - [6.2 参数类型](#62-参数类型)
+  - [6.3 工作流中使用](#63-工作流中使用)
+  - [6.4 数据流](#64-数据流)
+
 ## 一、概述
 
 DSL 通过三个正交指令实现代码复用和模块化：
@@ -148,49 +163,11 @@ def nav_equip_to_tune()
 end
 ```
 
-## 六、迁移指南
-
-### 旧语法 → 新语法
-
-| 旧语法 | 新语法 |
-|---|---|
-| `call "sub.wf"` | `import "sub.wf"` + `call proc_name()` |
-| `call "sub.wf" with $x as "p"` | `def proc_name($p)` + `call proc_name($x)` |
-| `call "sub.wf" read "k" as $v` | `eval context.k = value` + `call proc()` + `eval $v = context.k` |
-
-### 子工作流文件改造
-
-将原有顶层代码包入 `def` ... `end`：
-
-```diff
-- # sub.wf（旧：顶层代码）
-- click [scene].[area]
-- scan [scene] as $result
-- collect $result as "output"
-
-+ # sub.wf（新：def 包裹）
-+ def my_proc()
-+     click [scene].[area]
-+     scan [scene] as $result
-+     eval context.output = $result
-+ end
-```
-
-### 调用方改造
-
-```diff
-- call "subcall/sub.wf" with $x as "input" read "output" as $result
-
-+ import "subcall/sub.wf"
-+ call my_proc($x)
-+ eval $result = context.output
-```
-
-## 七、工作流参数声明
+## 六、工作流参数声明
 
 工作流可以通过 `workflows.yaml` 声明外部参数，由 UI 参数面板提供配置界面，运行时注入到工作流变量系统中。
 
-### 7.1 参数声明语法
+### 6.1 参数声明语法
 
 在 `config/system/workflows.yaml` 的 flow 条目下新增 `parameters` 字段：
 
@@ -215,7 +192,7 @@ flows:
           - { value: "bag_1_2", label: "位置 2" }
 ```
 
-### 7.2 参数类型
+### 6.2 参数类型
 
 支持 `select`（下拉枚举）和 `number`（数字输入）两种类型：
 
@@ -246,7 +223,7 @@ parameters:
     options: ["金色狗粮", "紫色狗粮"]
 ```
 
-### 7.3 工作流中使用
+### 6.3 工作流中使用
 
 声明参数后，工作流内直接通过 `$name` 引用，无需 `eval` 赋值：
 
@@ -271,7 +248,7 @@ end
 + click [bag_equip_detail].$bag_slot  # 动态 Area，由参数注入
 ```
 
-### 7.4 数据流
+### 6.4 数据流
 
 ```
 workflows.yaml (声明 parameters)

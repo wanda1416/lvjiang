@@ -13,6 +13,10 @@ class _BreakSignal(Exception):
     """break 语句触发的跳出信号"""
 
 
+class _ContinueSignal(Exception):
+    """continue 语句触发的跳过当前迭代信号"""
+
+
 class _ReturnSignal(Exception):
     """return 语句触发的正常退出信号"""
 

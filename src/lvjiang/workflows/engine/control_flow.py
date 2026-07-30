@@ -1,9 +1,10 @@
-"""控制流 Mixin：if / for / for-range / loop"""
+"""控制流 Mixin：if / for / for-range / loop / loop-while / loop-until / continue / try-catch"""
 
 from loguru import logger
 
-from ..grammar import If, For, ForRange, Loop, VarRef, FuncCall
-from .signals import _BreakSignal
+from ..grammar import If, For, ForRange, Loop, WhileLoop, UntilLoop, VarRef, FuncCall
+from ..grammar.ast_nodes import Try
+from .signals import _BreakSignal, _ContinueSignal, WorkflowUserError
 
 
 class _ControlFlowMixin:
@@ -51,6 +52,8 @@ class _ControlFlowMixin:
                 self._exec_body(node.body)
             except _BreakSignal:
                 break
+            except _ContinueSignal:
+                continue
 
     def _exec_for_range(self, node: ForRange):
         """for i in [start...end] — 闭区间范围迭代"""
@@ -77,6 +80,8 @@ class _ControlFlowMixin:
                 self._exec_body(node.body)
             except _BreakSignal:
                 break
+            except _ContinueSignal:
+                continue
 
     def _exec_loop(self, node: Loop):
         # 解析循环次数
@@ -100,3 +105,62 @@ class _ControlFlowMixin:
                 self._exec_body(node.body)
             except _BreakSignal:
                 break
+            except _ContinueSignal:
+                continue
+
+    def _exec_while_loop(self, node: WhileLoop):
+        """loop while <condition> ... end — 条件为真继续"""
+        logger.debug("loop while 开始")
+        safety_counter = 0
+        while self._eval_condition(node.condition):
+            if self._stop_check():
+                logger.info("工作流被用户停止")
+                return
+            try:
+                self._exec_body(node.body)
+            except _BreakSignal:
+                break
+            except _ContinueSignal:
+                continue
+            safety_counter += 1
+            if safety_counter > 1_000_000:
+                logger.error("loop while 超过 1,000,000 次迭代，强制退出防止死循环")
+                break
+
+    def _exec_until_loop(self, node: UntilLoop):
+        """loop until <condition> ... end — 条件为假继续（条件为真退出），至少执行一次"""
+        logger.debug("loop until 开始")
+        safety_counter = 0
+        while True:
+            if self._stop_check():
+                logger.info("工作流被用户停止")
+                return
+            try:
+                self._exec_body(node.body)
+            except _BreakSignal:
+                break
+            except _ContinueSignal:
+                # continue 跳过本轮剩余语句，直接进入下一轮条件检查
+                continue
+            # 本轮正常完成，检查退出条件
+            if self._eval_condition(node.condition):
+                break
+            safety_counter += 1
+            if safety_counter > 1_000_000:
+                logger.error("loop until 超过 1,000,000 次迭代，强制退出防止死循环")
+                break
+
+    def _exec_try(self, node: Try):
+        """try ... catch $err ... end — 异常处理
+
+        捕获 WorkflowUserError / KeyError / ValueError / TypeError，
+        控制流信号（_BreakSignal / _ReturnSignal / _GotoSignal / _ContinueSignal）穿透不捕获。
+        """
+        try:
+            self._exec_body(node.body)
+        except (WorkflowUserError, KeyError, ValueError, TypeError) as e:
+            logger.debug(f"try: 捕获异常 {type(e).__name__}: {e}")
+            if node.err_var is not None:
+                self.variables[node.err_var] = str(e)
+            if node.catch_body:
+                self._exec_body(node.catch_body)

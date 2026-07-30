@@ -11,7 +11,7 @@ from .ast_nodes import (
     # 语句节点
     Click, Drag, Wait, Scan, Recognize, Collect, Log,
     Import, ProcDef, CallProc,
-    If, For, ForRange, Loop, Break, Return, Label, Goto,
+    If, For, ForRange, Loop, WhileLoop, UntilLoop, Break, Continue, Return, Label, Goto, Try,
     Eval, EvalFieldChainAssign, FuncCall,
     # 表达式节点
     SceneRef, PanelRef, PanelGridDrag, VarRef, KeywordRef, Literal, FieldAccess, CoordPoint, ByClause,
@@ -25,7 +25,7 @@ __all__ = [
     "Program",
     "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log",
     "Import", "ProcDef", "CallProc",
-    "If", "For", "ForRange", "Loop", "Break", "Return", "Label", "Goto",
+    "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",
     "SceneRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause",
     "Contains", "Equals", "InList", "IsEmpty",

@@ -1,5 +1,13 @@
 # DSL 完整示例
 
+## 目录
+
+- [一、装备分析（if/else + 顺序执行）](#一装备分析ifelse--顺序执行)
+- [二、调律决策树骨架（loop + if + goto + break）](#二调律决策树骨架loop--if--goto--break)
+- [三、批量调律（for + list + call）](#三批量调律for--list--call)
+- [四、重试 + 兜底 + 字典聚合（新语法协同）](#四重试--兜底--字典聚合新语法协同)
+- [五、异常重试 + 用户介入（try/catch + confirm + pause）](#五异常重试--用户介入trycatch--confirm--pause)
+
 ## 一、装备分析（if/else + 顺序执行）
 
 ```
@@ -63,5 +71,76 @@ eval $all_slots = [
 for $slot in $all_slots
     eval $bag_slot = $slot
     call "subcall/single_tuning.wf"
+end
+```
+
+## 四、重试 + 兜底 + 字典聚合（新语法协同）
+
+```
+# 重试扫描，最多 3 次，失败走兜底逻辑
+eval $attempt = 0
+eval $success = 0
+
+loop while $attempt < 3
+    eval $attempt = $attempt + 1
+    try
+        scan [target_scene] as $scan_result
+        eval $success = 1
+        break
+    catch $err
+        log concat("第 ", $attempt, " 次失败: ", $err)
+        wait retry_interval
+    end
+end
+
+if $success equals 0
+    log "扫描全部失败，执行兜底"
+    goto fallback_handler
+end
+
+# 字典聚合：统计各分类数量
+eval $counts = {}
+for item in $items
+    eval $cat = $item.category
+    eval $has = has_key($counts, $cat)
+    if $has
+        eval $counts.$cat = $counts.$cat + 1
+    else
+        eval $counts.$cat = 1
+    end
+end
+
+# 遍历结果
+for k in keys($counts)
+    log concat(k, ": ", $counts.$k)
+end
+
+@fallback_handler
+log "兜底处理完成"
+```
+
+## 五、异常重试 + 用户介入（try/catch + confirm + pause）
+
+```
+# 重试扫描，失败时询问用户是否重试，最终兜底
+eval $attempt = 0
+eval $success = false
+
+loop while $attempt < 3
+    eval $attempt = $attempt + 1
+    try
+        scan [target_scene] as $result
+        eval $success = true
+        break
+    catch $err
+        eval $retry = confirm(concat("第 ", $attempt, " 次失败: ", $err, "\n是否重试？"))
+        if not $retry
+            break
+        end
+    end
+end
+
+if not $success
+    eval pause("自动流程失败，请手动完成后点击确定")
 end
 ```

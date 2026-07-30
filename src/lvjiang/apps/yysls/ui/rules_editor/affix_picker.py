@@ -15,7 +15,8 @@ selected() 按上区当前顺序返回，供转律词条库 / 词条库 / 首词
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QRect, Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -28,6 +29,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStyledItemDelegate,
     QVBoxLayout,
     QWidget,
 )
@@ -46,6 +48,26 @@ _DYNAMIC_ANCHOR = "属攻类"
 
 # 右列复选网格列数
 _COLS = 3
+
+# 已选列表项右侧 ✕ 点击热区宽度（px）
+_X_ZONE = 28
+
+
+class _RemoveXDelegate(QStyledItemDelegate):
+    """已选列表项右侧绘制 ✕（快速移除入口，点击判定在对话框
+    viewport 事件过滤器中）。用 delegate 绘制而非 item widget：
+    InternalMove 拖拽会重建 item，item widget 会丢失"""
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+        r = option.rect
+        painter.save()
+        painter.setPen(QColor("#c62828"))
+        painter.drawText(
+            QRect(r.right() - _X_ZONE, r.top(), _X_ZONE - 10, r.height()),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+            "✕")
+        painter.restore()
 
 
 class AffixSelectSortDialog(QDialog):
@@ -86,6 +108,9 @@ class AffixSelectSortDialog(QDialog):
             QAbstractItemView.DragDropMode.InternalMove)
         self._selected_list.setSelectionMode(
             QAbstractItemView.SelectionMode.SingleSelection)
+        self._selected_list.setItemDelegate(
+            _RemoveXDelegate(self._selected_list))
+        self._selected_list.viewport().installEventFilter(self)
         for name in selected:
             self._selected_list.addItem(name)
         top_layout.addWidget(self._selected_list, 1)
@@ -183,6 +208,18 @@ class AffixSelectSortDialog(QDialog):
 
     # ── 交互 ──
 
+    def eventFilter(self, obj, event):
+        """已选列表 ✕ 热区点击 → 移除该行（吃掉事件，不触发选中/拖拽）"""
+        if (obj is self._selected_list.viewport()
+                and event.type() == QEvent.Type.MouseButtonPress):
+            pos = event.position().toPoint()
+            index = self._selected_list.indexAt(pos)
+            if (index.isValid() and pos.x()
+                    >= self._selected_list.visualRect(index).right() - _X_ZONE):
+                self._remove_row(index.row())
+                return True
+        return super().eventFilter(obj, event)
+
     def _on_toggled(self, name: str, checked: bool):
         if checked:
             if name not in self._current_selected():
@@ -195,8 +232,12 @@ class AffixSelectSortDialog(QDialog):
 
     def _remove_selected(self):
         row = self._selected_list.currentRow()
-        if row < 0:
-            return
+        if row >= 0:
+            self._remove_row(row)
+
+    def _remove_row(self, row: int):
+        """移除已选行并同步取消下区复选（池外遗留词条无复选框，
+        直接移除）"""
         name = self._selected_list.item(row).text()
         self._selected_list.takeItem(row)
         cb = self._checks.get(name)

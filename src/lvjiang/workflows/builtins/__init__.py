@@ -12,10 +12,11 @@
 """
 
 # 导出注册表核心接口（base.py 通过 builtins.get_function() 调用）
-from ._registry import builtin_func, get_function, list_functions  # noqa: F401
-
 # 导入子模块触发函数注册
-from . import arithmetic   # noqa: F401
-from . import general      # noqa: F401
-from . import strings      # noqa: F401
-from . import system       # noqa: F401
+from . import (
+    arithmetic,  # noqa: F401
+    general,  # noqa: F401
+    strings,  # noqa: F401
+    system,  # noqa: F401
+)
+from ._registry import builtin_func, get_function, list_functions  # noqa: F401

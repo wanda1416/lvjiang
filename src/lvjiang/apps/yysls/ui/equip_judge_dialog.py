@@ -10,19 +10,30 @@
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
-    QDialog, QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QLabel,
-    QCheckBox, QComboBox, QDoubleSpinBox, QPushButton, QTextEdit,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
     QScrollArea,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
 from lvjiang.apps.yysls.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.evaluator import (
-    get_tuning_judge, is_rule_implemented, judge_tuning_worthiness,
+    get_tuning_judge,
+    is_rule_implemented,
+    judge_tuning_worthiness,
 )
 from lvjiang.apps.yysls.game_config import get_game_config
-from .tuning_config_widget import TuningConfigWidget
 
+from .tuning_config_widget import TuningConfigWidget
 
 # 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
 # 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
@@ -181,7 +192,7 @@ class EquipAffixEditor(QWidget):
         initial = self._initial_candidates()
         tuning = self._tuning_candidates()
         for i, (combo, spin) in enumerate(
-                zip(self._affix_combos, self._affix_spins)):
+                zip(self._affix_combos, self._affix_spins, strict=False)):
             combo.clear()
             combo.addItem(_NONE_ITEM)
             combo.addItems(initial if i == 0 else tuning)
@@ -224,7 +235,8 @@ class EquipAffixEditor(QWidget):
         """按当前选择构造装备（无任何词条时返回 None）"""
         mgr = get_game_config()
         affixes: list[Affix] = []
-        for combo, spin in zip(self._affix_combos, self._affix_spins):
+        for combo, spin in zip(self._affix_combos, self._affix_spins,
+                               strict=False):
             name = combo.currentText()
             if name == _NONE_ITEM:
                 continue

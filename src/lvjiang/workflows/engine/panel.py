@@ -3,12 +3,15 @@
 import numpy as np
 from loguru import logger
 
+from ..align import detect_grid
 from ..grammar import (
-    Scan, Recognize,
-    PanelRef, VarRef, ByClause,
+    ByClause,
+    PanelRef,
+    Recognize,
+    Scan,
+    VarRef,
 )
 from ..grammar.ast_nodes import Align
-from ..align import detect_grid
 
 
 class _PanelMixin:
@@ -192,7 +195,6 @@ class _PanelMixin:
 
     def _capture_panel_image(self, panel_obj) -> "np.ndarray | None":
         """截取 panel 区域图像（像素数组），用于校准"""
-        import numpy as np
         full = self._capture.capture()
         if full is None:
             return None

@@ -3,8 +3,13 @@
 from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize
 from PyQt6.QtGui import QTextCursor, QWheelEvent
 from PyQt6.QtWidgets import (
-    QAbstractSpinBox, QApplication, QComboBox, QLayout, QStyle,
-    QStyledItemDelegate, QTextEdit,
+    QAbstractSpinBox,
+    QApplication,
+    QComboBox,
+    QLayout,
+    QStyle,
+    QStyledItemDelegate,
+    QTextEdit,
 )
 
 _MAX_LOG_LINES = 1000

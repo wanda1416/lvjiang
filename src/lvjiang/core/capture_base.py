@@ -77,7 +77,8 @@ class CaptureBackend(ABC):
         ADB：返回设备物理分辨率。
         """
 
-    def set_capture_region(self, left: int, top: int, width: int, height: int):
+    # 可选 hook 而非抽象方法：ADB 等全屏后端无需覆盖
+    def set_capture_region(self, left: int, top: int, width: int, height: int):  # noqa: B027
         """设置捕获区域
 
         桌面 mss 子类覆盖实现；ADB 子类为 no-op（设备全屏截图）。

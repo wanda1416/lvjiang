@@ -12,10 +12,9 @@ from loguru import logger
 from ...config import DelayConfig
 from ..input_base import InputBackend
 from .win32_util import (
-    make_lparam,
-    screen_to_client,
     postmessage_click,
     postmessage_drag,
+    screen_to_client,
 )
 
 

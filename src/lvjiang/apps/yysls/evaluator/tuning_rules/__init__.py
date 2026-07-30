@@ -12,6 +12,13 @@
 manager（加载缓存 + 持久化 + 单例），外部一律经本 __init__ 导入。
 """
 
+from .manager import (
+    TuningBaseManager,
+    TuningRuleManager,
+    get_tuning_base,
+    get_tuning_base_manager,
+    get_tuning_rule_manager,
+)
 from .models import (
     ATTR_ATTACK_CATEGORY,
     COND_KINDS,
@@ -52,13 +59,6 @@ from .models import (
     standard_playstyle_attrs,
 )
 from .parsing import parse_tuning_base, parse_tuning_rule
-from .manager import (
-    TuningBaseManager,
-    TuningRuleManager,
-    get_tuning_base,
-    get_tuning_base_manager,
-    get_tuning_rule_manager,
-)
 
 __all__ = [
     # 固定词汇

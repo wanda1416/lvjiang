@@ -28,10 +28,10 @@ class MatchResult:
 
 class ReferenceMatcher:
     """通用参考图匹配器
-    
+
     使用 ORB 特征匹配 + Lab 颜色相似度进行图像识别。
     对局部遮挡有容忍度，只要未遮挡区域有足够特征点匹配即可识别。
-    
+
     用法：
         db = ReferenceDatabase()
         matcher = ReferenceMatcher(db)
@@ -60,7 +60,7 @@ class ReferenceMatcher:
         self._db = db
         self._threshold = threshold
         self._target_size = target_size
-        
+
         # 预计算缓存
         self._features: list[tuple[ReferenceEntry, np.ndarray | None, int, np.ndarray]] = []
         # [(entry, descriptors, kp_count, lab_avg), ...]
@@ -88,7 +88,7 @@ class ReferenceMatcher:
 
         self._orb = cv2.ORB.create(nfeatures=self.NFEATURES)
         self._features.clear()
-        
+
         # 确定目标尺寸
         if self._target_size is None:
             for entry in entries:
@@ -101,7 +101,7 @@ class ReferenceMatcher:
                         break
                     except Exception:
                         continue
-        
+
         if self._target_size is None:
             logger.warning("无法确定参考图尺寸")
             return
@@ -112,17 +112,17 @@ class ReferenceMatcher:
             if not path.exists():
                 logger.warning(f"参考图不存在，跳过: {entry.file}")
                 continue
-            
+
             try:
                 img = self._load_image(path)
                 resized = cv2.resize(img, self._target_size, interpolation=cv2.INTER_AREA)
-                
+
                 kp, des = self._orb.detectAndCompute(resized, None)
                 kp_count = len(kp) if kp else 0
-                
+
                 lab = cv2.cvtColor(resized, cv2.COLOR_BGR2Lab).astype(np.float32)
                 lab_avg = lab.mean(axis=(0, 1))
-                
+
                 self._features.append((entry, des, kp_count, lab_avg))
                 loaded_count += 1
             except Exception as e:

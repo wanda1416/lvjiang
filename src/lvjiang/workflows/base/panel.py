@@ -1,8 +1,15 @@
 """Panel 对齐与格子级操作原语"""
 
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
 from ..align import detect_grid
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from ..align import GridAlignment
 
 
 class _PanelMixin:

@@ -6,10 +6,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.grammar.ast_nodes import WhileLoop, UntilLoop, Continue, For, If, Try
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.engine.signals import _ReturnSignal
+from lvjiang.workflows.grammar import parse_text
+from lvjiang.workflows.grammar.ast_nodes import (
+    Continue,
+    For,
+    If,
+    Try,
+    UntilLoop,
+    WhileLoop,
+)
 
 
 def make_engine() -> WorkflowEngine:

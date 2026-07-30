@@ -8,9 +8,22 @@ Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待�
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QTabWidget,
-    QToolButton, QToolTip, QVBoxLayout, QWidget,
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
+    QToolButton,
+    QToolTip,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ..config import load_user_config, save_input_delay, save_settings

@@ -1,14 +1,17 @@
 """POI 区域配置 - 数据模型 + 场景注册表全局函数"""
 
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
 
 from loguru import logger
 
-from ..constants import SYSTEM_SCENES_DIR, SCENES_CONFIG_PATH
+from ..constants import SCENES_CONFIG_PATH, SYSTEM_SCENES_DIR
 from .scene_loader import (
-    SceneRegistry, RegionDef, PointDef, PanelDef, SceneDef,
-    ViewDef, BASE_VIEW_KEY, BASE_VIEW_NAME,
+    BASE_VIEW_KEY,
+    PanelDef,
+    PointDef,
+    RegionDef,
+    SceneRegistry,
+    ViewDef,
 )
 
 

@@ -3,7 +3,7 @@
 import numpy as np
 from loguru import logger
 
-from ...core.scene_registry import Region, CanvasConfig
+from ...core.scene_registry import CanvasConfig, Region
 
 
 class _RecognitionMixin:

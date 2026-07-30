@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.evaluator.tuning_rules import TuningRuleManager
+from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.ui.rules_editor import TuningRulesDialog
 from lvjiang.apps.yysls.ui.rules_editor.rule_panel import RulePanel
 

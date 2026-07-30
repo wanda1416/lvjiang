@@ -2,9 +2,9 @@
 
 from loguru import logger
 
-from ..grammar import If, For, ForRange, Loop, WhileLoop, UntilLoop, VarRef, FuncCall
+from ..grammar import For, ForRange, FuncCall, If, Loop, UntilLoop, VarRef, WhileLoop
 from ..grammar.ast_nodes import Try
-from .signals import _BreakSignal, _ContinueSignal, WorkflowUserError
+from .signals import WorkflowUserError, _BreakSignal, _ContinueSignal
 
 
 class _ControlFlowMixin:

@@ -8,8 +8,8 @@ DPI 时从屏幕 0 标记屏幕 1 出现偏移。
 
 import ctypes
 from ctypes import wintypes
-from loguru import logger
 
+from loguru import logger
 
 HINSTANCE = getattr(wintypes, "HINSTANCE", wintypes.HANDLE)
 HICON = getattr(wintypes, "HICON", wintypes.HANDLE)

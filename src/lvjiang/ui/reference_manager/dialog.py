@@ -1,5 +1,6 @@
 """参考图管理对话框 - 新增参考图与参考图管理两个独立 Tab"""
 
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import (
@@ -13,15 +14,13 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QVBoxLayout,
     QWidget,
-    QHBoxLayout,
 )
 
-import numpy as np
-
 from lvjiang.core.reference_db import ReferenceDatabase
+
+from .browser_panel import BrowserPanel
 from .canvas import ReferenceCanvas
 from .grid_panel import GridPanel
-from .browser_panel import BrowserPanel
 from .meta_schema_panel import MetaSchemaPanel
 
 

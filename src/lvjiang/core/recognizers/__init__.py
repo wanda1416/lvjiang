@@ -14,15 +14,15 @@ from __future__ import annotations
 
 from ._registry import (
     Recognizer,
-    register_recognizer,
+    clear_recognizers,
     get_recognizer,
     list_recognizers,
-    clear_recognizers,
+    register_recognizer,
 )
-from .ocr_recognizer import OCRRecognizer
-from .template_recognizer import TemplateRecognizer
 from .color_recognizer import ColorRecognizer
-from .reference_matcher import ReferenceMatcher, MatchResult
+from .ocr_recognizer import OCRRecognizer
+from .reference_matcher import MatchResult, ReferenceMatcher
+from .template_recognizer import TemplateRecognizer
 
 __all__ = [
     "Recognizer",

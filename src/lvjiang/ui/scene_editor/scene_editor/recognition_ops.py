@@ -1,9 +1,9 @@
 """识别混入类 - OCR 文字识别 + 材料识别"""
 
-from PyQt6.QtWidgets import QApplication
 from loguru import logger
+from PyQt6.QtWidgets import QApplication
 
-from ....core.scene_registry import get_scene_name, get_region_defs, get_region_name
+from ....core.scene_registry import get_region_defs, get_region_name, get_scene_name
 
 
 class RecognitionOpsMixin:
@@ -83,6 +83,7 @@ class RecognitionOpsMixin:
         QApplication.processEvents()
 
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+
         from ....core.ocr import OCREngine
         ocr_engine = OCREngine()
         recognizer = MaterialRecognizer(ocr_engine)

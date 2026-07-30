@@ -171,7 +171,7 @@ class _StmtMixin:
 
     def drag_direction(self, items):
         """up|down [n | $var] → (direction_str, distance_float_or_VarRef)
-        
+
         距离支持整数、浮点数（如 0.5 表示半行）、变量引用
         """
         dir_token = str(items[0]).lower()

@@ -1,8 +1,8 @@
 """画布坐标转换混入类"""
 
-from PyQt6.QtCore import QRectF, QPointF
+from PyQt6.QtCore import QPointF, QRectF
 
-from ....core.scene_registry import Region, CanvasConfig, Point
+from ....core.scene_registry import CanvasConfig, Point, Region
 
 
 class CanvasCoordMixin:

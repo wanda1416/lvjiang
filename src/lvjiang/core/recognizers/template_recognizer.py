@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 
 from ._registry import register_recognizer
-from .reference_matcher import ReferenceMatcher, MatchResult
+from .reference_matcher import MatchResult, ReferenceMatcher
 
 
 @register_recognizer
@@ -17,7 +17,7 @@ class TemplateRecognizer:
     """模板匹配识别器。
 
     名字：``template``
-    
+
     基于 ReferenceMatcher 实现，需要预先配置参考图库。
     """
 
@@ -33,12 +33,12 @@ class TemplateRecognizer:
 
     def recognize(self, image: np.ndarray, **kwargs: Any) -> MatchResult | dict:
         """识别图像
-        
+
         Args:
             image: 查询图像（BGR numpy 数组）
             **kwargs: 可选参数
                 - group: 限定匹配分组
-        
+
         Returns:
             MatchResult 或 dict（如果没有配置 matcher）
         """
@@ -47,6 +47,6 @@ class TemplateRecognizer:
                 "TemplateRecognizer 需要配置 ReferenceMatcher。"
                 "请通过构造函数传入 matcher 参数。"
             )
-        
+
         group = kwargs.get("group")
         return self._matcher.match(image, group=group)

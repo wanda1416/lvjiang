@@ -2,28 +2,38 @@
 
 from math import gcd
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
-    QPushButton, QComboBox, QStatusBar, QTextEdit,
-    QTabWidget, QSplitter,
-)
-from PyQt6.QtCore import Qt
 from loguru import logger
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSplitter,
+    QStatusBar,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
+from ....core.layout_manager import (
+    LayoutConfigManager,
+    load_scene_screenshot,
+    migrate_layout_item,
+    save_scene_screenshot,
+)
 from ....core.scene_registry import (
     Layout,
-    get_scene_name,
     get_registry,
-)
-from ....core.layout_manager import (
-    LayoutConfigManager, load_scene_screenshot, save_scene_screenshot,
-    migrate_layout_item,
+    get_scene_name,
 )
 from .layout_ops import LayoutOpsMixin
-from .scene_ops import SceneOpsMixin
 from .recognition_ops import RecognitionOpsMixin
-from .script_ops import ScriptOpsMixin, _SceneKeyButton
+from .scene_ops import SceneOpsMixin
 from .scene_tab import SceneTab
+from .script_ops import ScriptOpsMixin, _SceneKeyButton
 
 
 class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, ScriptOpsMixin, QDialog):
@@ -463,7 +473,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
         ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
         cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
-        
+
         self._info_label.setText(
             f'<span style="color:#ccc;">截图</span> '
             f'<b style="color:#4da6ff;">{ss_txt}</b>'

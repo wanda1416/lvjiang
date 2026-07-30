@@ -1,17 +1,29 @@
 """面板编辑混入类 - Panel 列表构建、刷新、CRUD、编辑弹窗"""
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QDialog, QFormLayout, QLineEdit, QSpinBox, QDoubleSpinBox,
-    QDialogButtonBox, QMessageBox,
-)
 from PyQt6.QtCore import Qt
-
-from ....core.scene_registry import (
-    get_registry, sync_scene_cache, Panel, is_view_visible,
+from PyQt6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
+
 from ....core.scene_loader import PanelDef
+from ....core.scene_registry import (
+    get_registry,
+    is_view_visible,
+    sync_scene_cache,
+)
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 

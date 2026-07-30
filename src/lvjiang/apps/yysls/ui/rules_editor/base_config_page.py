@@ -21,12 +21,19 @@ from typing import Callable
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QCheckBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    QUALITY_PARTS, TuningBaseManager,
+    QUALITY_PARTS,
+    TuningBaseManager,
 )
 
 _QUALITIES = ("gold", "purple", "blue")

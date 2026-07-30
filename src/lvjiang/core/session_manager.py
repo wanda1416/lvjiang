@@ -64,7 +64,7 @@ class SessionManager:
 
         Args:
             username: 用户名
-            session_ref: session 字典引用（通常是 engine._session）
+            session_ref: session 字典引用（通常是 engine.session）
 
         Returns:
             Callable: 无参保存函数

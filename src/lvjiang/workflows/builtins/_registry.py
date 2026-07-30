@@ -5,7 +5,6 @@
 
 from typing import Callable
 
-
 # 全局函数注册表
 _FUNCTION_REGISTRY: dict[str, Callable] = {}
 

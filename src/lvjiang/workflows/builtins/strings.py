@@ -1,10 +1,10 @@
 """内置函数 - 字符串处理"""
 
 import re
+
 from loguru import logger
 
 from ._registry import builtin_func
-
 
 # ─── 字符串 ─────────────────────────────────────────────
 

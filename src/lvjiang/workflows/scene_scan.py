@@ -10,8 +10,19 @@ required_scenes 声明。
 from __future__ import annotations
 
 from .grammar.ast_nodes import (
-    Align, Click, Drag, ForRange, If, For, Loop, PanelGridDrag,
-    PanelRef, ProcDef, Recognize, Scan, SceneRef,
+    Align,
+    Click,
+    Drag,
+    For,
+    ForRange,
+    If,
+    Loop,
+    PanelGridDrag,
+    PanelRef,
+    ProcDef,
+    Recognize,
+    Scan,
+    SceneRef,
 )
 
 

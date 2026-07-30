@@ -1,17 +1,22 @@
 """画布组件 - 可交互的图片画布，支持框选/拖拽/缩放矩形"""
 
 import numpy as np
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtCore import Qt, QRectF, QPointF, QTimer
+from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
 from PyQt6.QtGui import (
-    QImage, QPixmap, QPainter, QPen, QBrush, QColor,
-    QPaintEvent, QFont,
+    QBrush,
+    QColor,
+    QFont,
+    QImage,
+    QPainter,
+    QPaintEvent,
+    QPen,
+    QPixmap,
 )
+from PyQt6.QtWidgets import QWidget
 
-from ....core.scene_registry import Region, CanvasConfig, Panel, get_region_name
-from .canvas_interaction import CanvasInteractionMixin, EditMode, HandlePos, HANDLE_SIZE
+from ....core.scene_registry import CanvasConfig, Panel, Region, get_region_name
+from .canvas_interaction import HANDLE_SIZE, CanvasInteractionMixin, EditMode, HandlePos
 from .canvas_poi import CanvasPoiMixin
-
 
 # ─── 颜色方案 ────────────────────────────────────────────
 

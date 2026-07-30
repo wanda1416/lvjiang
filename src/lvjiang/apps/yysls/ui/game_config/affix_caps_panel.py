@@ -16,15 +16,30 @@ from pathlib import Path
 
 import yaml
 from loguru import logger
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QListWidget, QTableWidget, QTableWidgetItem,
-    QPushButton, QMessageBox, QHeaderView, QLabel,
-    QInputDialog, QComboBox, QFrame,
-    QRadioButton, QButtonGroup, QTabWidget,
-    QCheckBox, QDialog, QDialogButtonBox, QGridLayout,
-)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from lvjiang.apps.yysls.game_config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
@@ -119,7 +134,7 @@ class AffixCapsPanel(QWidget):
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(QLabel("词组类型"))
-        
+
         self._affix_list = QListWidget()
         self._affix_list.currentRowChanged.connect(self._on_affix_changed)
         self._affix_list.itemDoubleClicked.connect(self._rename_affix)
@@ -134,7 +149,7 @@ class AffixCapsPanel(QWidget):
         self._btn_del_affix = QPushButton("- 词组")
         self._btn_del_affix.clicked.connect(self._del_affix)
         affix_btn_layout.addWidget(self._btn_del_affix)
-        
+
         left_layout.addLayout(affix_btn_layout)
 
         splitter.addWidget(left_widget)
@@ -255,7 +270,7 @@ class AffixCapsPanel(QWidget):
         # 底部按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        
+
         self._btn_add_level = QPushButton("添加等级")
         self._btn_add_level.clicked.connect(self._add_level)
         btn_layout.addWidget(self._btn_add_level)
@@ -295,7 +310,7 @@ class AffixCapsPanel(QWidget):
         """切换词组时更新表格和别名"""
         affix_caps = self._data.get("affix_caps", {})
         affix_names = list(affix_caps.keys())
-        
+
         if row < 0 or row >= len(affix_names):
             self._current_affix = None
             self._table.setRowCount(0)
@@ -323,7 +338,7 @@ class AffixCapsPanel(QWidget):
 
         affix_caps = self._data.get("affix_caps", {})
         level_data = affix_caps.get(self._current_affix, {})
-        
+
         if not level_data:
             self._table.setRowCount(0)
             return
@@ -338,16 +353,16 @@ class AffixCapsPanel(QWidget):
 
         # 阻止 cellChanged 信号触发保存
         self._saving = True
-        
+
         for row, level in enumerate(levels):
             entry = level_data[level]
-            
+
             # 兼容旧格式（直接是数值）
             if isinstance(entry, (int, float)):
                 cap = entry
             else:
                 cap = entry.get("cap", 0)
-            
+
             # 计算承音值（94%）
             chengyin = round(cap * _CHENGYIN_RATIO, 2)
 
@@ -409,7 +424,7 @@ class AffixCapsPanel(QWidget):
         name, ok = QInputDialog.getText(self, "添加词组", "词组名称:")
         if not ok or not name:
             return
-        
+
         name = name.strip()
         if not name:
             return
@@ -480,7 +495,7 @@ class AffixCapsPanel(QWidget):
         # 直接插入空行
         row = self._table.rowCount()
         self._table.insertRow(row)
-        
+
         # 所有列留空，让用户填写
         for col in range(self._table.columnCount()):
             item = QTableWidgetItem("")
@@ -508,7 +523,7 @@ class AffixCapsPanel(QWidget):
         except ValueError:
             self._table.removeRow(row)
             return
-        
+
         reply = QMessageBox.question(
             self, "确认删除",
             f"确定要删除等级 {level} 吗？",
@@ -539,18 +554,18 @@ class AffixCapsPanel(QWidget):
         internal = {k: v for k, v in level_caps.items() if str(k).startswith("_")}
         level_caps.clear()
         level_caps.update(internal)
-        
+
         for row in range(self._table.rowCount()):
             level_item = self._table.item(row, 0)
             cap_item = self._table.item(row, 1)
-            
+
             if not level_item or not cap_item:
                 continue
-            
+
             level_text = level_item.text().strip()
             if not level_text:
                 continue  # 跳过空行
-            
+
             try:
                 level = int(level_text)
                 cap = float(cap_item.text())

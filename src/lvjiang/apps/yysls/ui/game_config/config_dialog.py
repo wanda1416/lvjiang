@@ -3,8 +3,8 @@
 独立窗口，管理装备配置、词条配置与流派配置。
 """
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
 from .config_tab import GameConfigTab
 

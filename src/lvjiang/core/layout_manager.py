@@ -10,7 +10,6 @@ from loguru import logger
 from ..constants import LOCAL_CONFIG_DIR
 from .scene_registry import Layout, get_scene_name
 
-
 # ─── 路径常量 ────────────────────────────────────────────
 
 LAYOUTS_DIR = LOCAL_CONFIG_DIR / "layouts"

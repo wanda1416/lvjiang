@@ -2,14 +2,21 @@
 
 import re
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-    QListWidget, QListWidgetItem, QLabel, QInputDialog, QMessageBox,
-)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+)
 
-from ....core.scene_registry import get_registry, sync_scene_cache
 from ....core.scene_loader import BASE_VIEW_KEY
+from ....core.scene_registry import get_registry, sync_scene_cache
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 

@@ -10,7 +10,6 @@ from enum import Enum
 
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 
-
 # ─── 评级枚举 ──────────────────────────────────────────────
 
 class Rating(Enum):

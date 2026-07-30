@@ -1,6 +1,12 @@
 """测试 DSL 字典变量语法增强"""
-from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.grammar import Eval, EvalFieldChainAssign, FuncCall, Literal, Log
+from lvjiang.workflows.grammar import (
+    Eval,
+    EvalFieldChainAssign,
+    FuncCall,
+    Literal,
+    Log,
+    parse_text,
+)
 
 
 def test_empty_dict():

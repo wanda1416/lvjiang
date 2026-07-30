@@ -18,10 +18,10 @@ import cv2
 import numpy as np
 import pytest
 
+from lvjiang.core.scene_registry import CanvasConfig, Layout, Panel
 from lvjiang.workflows.align import _binary_axis, detect_grid
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar.ast_nodes import Align
-from lvjiang.core.scene_registry import Layout, Panel, CanvasConfig
 
 DATA_DIR = Path(__file__).parent / "data"
 

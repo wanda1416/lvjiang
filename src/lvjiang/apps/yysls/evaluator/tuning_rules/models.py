@@ -35,7 +35,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
 # 属性攻击词组类别（玩法属性候选 + 属攻→无相等价的数据源）

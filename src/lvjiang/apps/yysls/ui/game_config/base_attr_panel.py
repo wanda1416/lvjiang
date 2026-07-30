@@ -17,13 +17,25 @@ from pathlib import Path
 
 import yaml
 from loguru import logger
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QListWidget, QTableWidget, QTableWidgetItem,
-    QPushButton, QMessageBox, QHeaderView, QLabel,
-    QCheckBox, QComboBox, QFrame, QInputDialog, QSpinBox,
-)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from lvjiang.apps.yysls.game_config import BASE_ATTR_PARTS, WUXUE_CATEGORY
 

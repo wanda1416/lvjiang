@@ -1,36 +1,60 @@
 """WorkflowEngine 主类：生命周期、执行入口与语句分发"""
 
 import traceback
+from pathlib import Path
 from typing import Callable
 
 from loguru import logger
-from pathlib import Path
 
 from ...config import DelayConfig
 from ...core.capture_base import CaptureBackend
-from ...core.ocr import OCREngine
 from ...core.input_base import InputBackend
+from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout, get_scene_name
-
+from ..align import GridAlignment
+from ..base import BaseWorkflow
 from ..grammar import (
-    parse_file,
-    Click, Drag, Wait, Scan, Recognize, Collect, Log,
-    Import, ProcDef, CallProc,
-    If, For, ForRange, Loop, WhileLoop, UntilLoop, Break, Continue, Return, Label, Goto, Eval, EvalFieldChainAssign, FuncCall,
+    Break,
+    CallProc,
+    Click,
+    Collect,
+    Continue,
+    Drag,
+    Eval,
+    EvalFieldChainAssign,
+    For,
+    ForRange,
+    FuncCall,
+    Goto,
+    If,
+    Import,
+    Label,
     Literal,
+    Log,
+    Loop,
+    ProcDef,
+    Recognize,
+    Return,
+    Scan,
+    UntilLoop,
+    Wait,
+    WhileLoop,
+    parse_file,
 )
 from ..grammar.ast_nodes import Align, Try
 from ..scene_scan import collect_scene_keys
-from ..base import BaseWorkflow
-from ..align import GridAlignment
-
-from .signals import WorkflowUserError, _BreakSignal, _ReturnSignal, _GotoSignal, _ContinueSignal
 from .actions import _ActionsMixin
-from .panel import _PanelMixin
-from .data_ops import _DataOpsMixin
 from .control_flow import _ControlFlowMixin
+from .data_ops import _DataOpsMixin
 from .evaluation import _EvalMixin
-
+from .panel import _PanelMixin
+from .signals import (
+    WorkflowUserError,
+    _BreakSignal,
+    _ContinueSignal,
+    _GotoSignal,
+    _ReturnSignal,
+)
 
 # ─── 引擎 ─────────────────────────────────────────────────
 
@@ -86,24 +110,6 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._ui_callback: Callable | None = None
         # 游戏操作委托（execute 时懒创建）
         self._workflow: BaseWorkflow | None = None
-
-    @property
-    def _session(self) -> dict:
-        """兼容旧访问方式，DSL 内部使用"""
-        return self.session
-
-    @_session.setter
-    def _session(self, value: dict | None):
-        self.session = value if value is not None else {}
-
-    @property
-    def _context(self) -> dict:
-        """兼容旧访问方式，DSL 内部使用"""
-        return self.context
-
-    @_context.setter
-    def _context(self, value: dict | None):
-        self.context = value if value is not None else {}
 
     def _ensure_workflow(self) -> BaseWorkflow:
         """懒创建 BaseWorkflow 作为游戏操作委托"""

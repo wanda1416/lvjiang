@@ -12,11 +12,11 @@ from loguru import logger
 from ...config import DelayConfig
 from ..input_base import InputBackend
 from .win32_util import (
+    _MOUSEEVENTF_LEFTDOWN,
+    _MOUSEEVENTF_LEFTUP,
     _user32,
     send_mouse_event,
     smooth_move_to,
-    _MOUSEEVENTF_LEFTDOWN,
-    _MOUSEEVENTF_LEFTUP,
 )
 
 

@@ -4,7 +4,6 @@ from loguru import logger
 
 from ._registry import builtin_func
 
-
 # ─── 字符串 ─────────────────────────────────────────────
 
 @builtin_func("concat")

@@ -11,8 +11,12 @@ import pytest
 
 from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.evaluator import (
-    Rating, get_tuning_judge, get_tuning_rules, get_rule_names,
-    is_rule_implemented, judge_tuning_worthiness,
+    Rating,
+    get_rule_names,
+    get_tuning_judge,
+    get_tuning_rules,
+    is_rule_implemented,
+    judge_tuning_worthiness,
 )
 
 

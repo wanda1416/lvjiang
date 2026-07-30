@@ -5,11 +5,30 @@ from __future__ import annotations
 import re
 
 from .models import (
-    COND_KINDS, DYNAMIC_AFFIXES, FOOD_EXPECT_KEYS, FOOD_LABELS, GENERIC_ATTR,
-    INSUFFICIENT_ACTIONS, PART_KEYS, QUALITY_PARTS, QUALITY_RANK, RATING_KEYS,
-    TIER_KEYS, CommonConditions, Condition, ConditionGroup, FoodRule,
-    MaterialSettings, PartPattern, Playstyle, RuleValidationError, TuningBase,
-    TuningRule, WeaponSide, rule_affix_candidates, standard_playstyle_attrs,
+    COND_KINDS,
+    DYNAMIC_AFFIXES,
+    FOOD_EXPECT_KEYS,
+    FOOD_LABELS,
+    GENERIC_ATTR,
+    INSUFFICIENT_ACTIONS,
+    PART_KEYS,
+    QUALITY_PARTS,
+    QUALITY_RANK,
+    RATING_KEYS,
+    TIER_KEYS,
+    CommonConditions,
+    Condition,
+    ConditionGroup,
+    FoodRule,
+    MaterialSettings,
+    PartPattern,
+    Playstyle,
+    RuleValidationError,
+    TuningBase,
+    TuningRule,
+    WeaponSide,
+    rule_affix_candidates,
+    standard_playstyle_attrs,
 )
 
 # 规则 key / 开关 key 合法性（作为 YAML 文件名 / when 引用键）

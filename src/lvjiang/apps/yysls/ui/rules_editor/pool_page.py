@@ -11,8 +11,14 @@ from typing import Callable
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QGroupBox, QHBoxLayout, QLabel, QListWidget,
-    QPushButton, QVBoxLayout, QWidget,
+    QAbstractItemView,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 from .affix_picker import AffixSelectSortDialog

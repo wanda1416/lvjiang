@@ -4,9 +4,9 @@ import ctypes
 from ctypes import wintypes
 
 import numpy as np
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QImage, QPixmap
 from loguru import logger
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QImage, QPixmap
 
 
 class WindowOpsMixin:
@@ -166,8 +166,11 @@ class WindowOpsMixin:
         d = self.window_combo.currentData()
         if not d:
             return
-        from ..core.android import AdbDevice
-        from ..core.android import create_capture_backend, create_input_backend
+        from ..core.android import (
+            AdbDevice,
+            create_capture_backend,
+            create_input_backend,
+        )
 
         # 若已连接旧设备，先清理资源
         self._teardown_adb_backend()

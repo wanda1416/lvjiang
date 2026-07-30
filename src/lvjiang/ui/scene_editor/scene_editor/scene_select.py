@@ -1,9 +1,9 @@
 """场景选择下拉框 helper - 供编辑弹窗做跨场景迁移、视图归属使用"""
 
-from PyQt6.QtWidgets import QFormLayout, QComboBox
+from PyQt6.QtWidgets import QComboBox, QFormLayout
 
-from ....core.scene_registry import get_registry, get_scene_views
 from ....core.scene_loader import BASE_VIEW_KEY
+from ....core.scene_registry import get_registry, get_scene_views
 
 
 def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:

@@ -20,7 +20,6 @@ from pathlib import Path
 
 import yaml
 
-
 # 承音比例
 _CHENGYIN_RATIO = 0.94
 
@@ -433,7 +432,7 @@ class GameConfigManager:
                         return result
 
         # 策略 2：贪婪匹配（遍历所有类别）
-        for key, level_rules in self._base_rules.items():
+        for _key, level_rules in self._base_rules.items():
             rule = level_rules.get(level)
             if rule:
                 result = rule.infer_quality(value)

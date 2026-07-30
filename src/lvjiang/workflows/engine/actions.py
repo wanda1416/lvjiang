@@ -3,8 +3,15 @@
 from loguru import logger
 
 from ..grammar import (
-    Click, Drag, Wait,
-    SceneRef, PanelRef, PanelGridDrag, VarRef, Literal, CoordPoint,
+    Click,
+    CoordPoint,
+    Drag,
+    Literal,
+    PanelGridDrag,
+    PanelRef,
+    SceneRef,
+    VarRef,
+    Wait,
 )
 from ..grammar.ast_nodes import Align
 
@@ -38,7 +45,7 @@ class _ActionsMixin:
                     return
             else:
                 scene = node.target.scene
-            
+
             # 解析 region（可能是 str 或 VarRef）
             region = node.target.region
             if isinstance(region, VarRef):
@@ -214,7 +221,7 @@ class _ActionsMixin:
                     return
             else:
                 scene = node.scene.scene
-            
+
             # 解析 arrow（可能是 str 或 VarRef）
             arrow = node.scene.region
             if isinstance(arrow, VarRef):
@@ -223,7 +230,7 @@ class _ActionsMixin:
                     logger.error(f"变量 ${arrow.name} 未定义，无法拖拽")
                     return
                 arrow = arrow_val
-            
+
             duration = self._resolve_duration(node.duration) if node.duration else None
             hold = node.hold
             self._ensure_workflow().drag_arrow(str(scene), str(arrow), duration=duration, hold=hold)

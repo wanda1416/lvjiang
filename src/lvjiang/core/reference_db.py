@@ -6,15 +6,19 @@ references.yaml 是参考图库的唯一数据源，存放于 config/system/ 目
 """
 
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from loguru import logger
 
+from lvjiang.constants import PROJECT_ROOT as _PROJECT_ROOT
+
+if TYPE_CHECKING:
+    import numpy as np
 
 # 默认路径
-from lvjiang.constants import PROJECT_ROOT as _PROJECT_ROOT
 _DEFAULT_YAML_PATH = _PROJECT_ROOT / "config" / "system" / "references.yaml"
 _DEFAULT_REFERENCES_DIR = _PROJECT_ROOT / "data" / "references"
 
@@ -46,7 +50,7 @@ class MetaFieldDef:
 @dataclass
 class ReferenceEntry:
     """单条参考图记录
-    
+
     Attributes:
         file: 图片相对路径（如 "调律材料/001.png"）
         label: 主标识（如 "定音石"、"Boss图标"）
@@ -61,12 +65,12 @@ class ReferenceEntry:
     notes: str = ""
 
     # ─── 便捷属性（访问 meta 中的常用字段）─────────────────
-    
+
     @property
     def group(self) -> str:
         """元数据中的分组字段"""
         return self.meta.get("group", "")
-    
+
     @group.setter
     def group(self, value: str):
         self.meta["group"] = value
@@ -75,7 +79,7 @@ class ReferenceEntry:
     def level(self) -> int | None:
         """元数据中的等级字段"""
         return self.meta.get("level")
-    
+
     @level.setter
     def level(self, value: int | None):
         if value is None:
@@ -264,11 +268,11 @@ class ReferenceDatabase:
         for entry in self._entries:
             if entry.file == filename:
                 old_group = entry.group
-                
+
                 # 处理 meta 更新
                 if "meta" in kwargs:
                     entry.meta.update(kwargs.pop("meta"))
-                
+
                 # 处理其他字段
                 for key, value in kwargs.items():
                     if hasattr(entry, key) and key != "meta":

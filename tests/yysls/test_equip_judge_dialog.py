@@ -9,7 +9,10 @@ import pytest
 from lvjiang.apps.yysls.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.ui.equip_judge_dialog import (
-    _NONE_ITEM, PART_ITEMS, PART_WEAPON, EquipAffixEditor,
+    _NONE_ITEM,
+    PART_ITEMS,
+    PART_WEAPON,
+    EquipAffixEditor,
 )
 from lvjiang.apps.yysls.ui.tuning_config_widget import TuningConfigWidget
 

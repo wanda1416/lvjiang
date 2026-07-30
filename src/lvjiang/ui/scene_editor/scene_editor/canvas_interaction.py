@@ -3,14 +3,13 @@
 from enum import Enum, auto
 from typing import Callable
 
-from PyQt6.QtWidgets import QInputDialog, QMenu
-from PyQt6.QtCore import Qt, QRectF, QPointF
-from PyQt6.QtGui import QMouseEvent, QCursor, QWheelEvent
 from loguru import logger
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
+from PyQt6.QtWidgets import QInputDialog, QMenu
 
-from ....core.scene_registry import Region, Panel, CanvasConfig
+from ....core.scene_registry import CanvasConfig, Panel, Region
 from .canvas_coords import CanvasCoordMixin
-
 
 # ─── 枚举定义 ────────────────────────────────────────────
 

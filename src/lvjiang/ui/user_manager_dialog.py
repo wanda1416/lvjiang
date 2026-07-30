@@ -1,18 +1,27 @@
 """用户管理对话框 - 左右分列式布局"""
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QListWidget, QListWidgetItem,
-    QInputDialog, QMessageBox, QFormLayout,
-    QFrame, QScrollArea, QWidget, QSizePolicy,
-    QAbstractItemView,
-)
+from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-from loguru import logger
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from lvjiang.core.user_config import UserConfigManager
-
 
 # ─── 样式常量 ────────────────────────────────────────────
 

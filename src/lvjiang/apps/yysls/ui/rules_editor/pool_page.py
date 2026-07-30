@@ -25,11 +25,16 @@ from .affix_picker import AffixSelectSortDialog
 
 
 class _AffixListBox(QWidget):
-    """已选词条纯展示 + 编辑（选择与排序均在对话框内完成）"""
+    """已选词条纯展示 + 编辑（选择与排序均在对话框内完成）
+
+    fill=False 时高度按 rows 行数固定；fill=True 时 rows 仅作最小
+    高度，列表随页面剩余空间拉伸（填满到底部）。
+    """
 
     def __init__(self, candidates: list[str],
                  on_changed: Callable[[], None],
-                 title: str, rows: int = 7, parent=None):
+                 title: str, rows: int = 7, fill: bool = False,
+                 parent=None):
         super().__init__(parent)
         self._candidates = candidates
         self._on_changed = on_changed
@@ -42,13 +47,17 @@ class _AffixListBox(QWidget):
         self._list.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection)
         self._list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        # 展示高度按行数折算固定，超出滚动；用临时项测真实行高
-        # （fontMetrics 估算偏小，会导致实际可见行数不足 rows）
+        # 展示高度按行数折算（fill 时为最小值，否则固定，超出滚动）；
+        # 用临时项测真实行高（fontMetrics 估算偏小，会导致实际
+        # 可见行数不足 rows）
         self._list.addItem("测高")
         row_h = self._list.sizeHintForRow(0)
         self._list.takeItem(0)
-        self._list.setFixedHeight(
-            rows * row_h + 2 * self._list.frameWidth())
+        height = rows * row_h + 2 * self._list.frameWidth()
+        if fill:
+            self._list.setMinimumHeight(height)
+        else:
+            self._list.setFixedHeight(height)
         layout.addWidget(self._list, 1)
 
         btn_col = QVBoxLayout()
@@ -104,12 +113,12 @@ class PoolPage(QWidget):
         prio_layout.addWidget(self._prio_list)
         layout.addWidget(prio_box)
 
-        # ── 可用词条库 ──
+        # ── 可用词条库（填满剩余高度）──
         pool_box = QGroupBox("可用词条库（全局，各部位词条混放）")
         pool_layout = QVBoxLayout(pool_box)
         self._pool_list = _AffixListBox(
-            self._candidates, self._apply, "可用词条库", rows=10)
-        pool_layout.addWidget(self._pool_list)
+            self._candidates, self._apply, "可用词条库", rows=7, fill=True)
+        pool_layout.addWidget(self._pool_list, 1)
         note = QLabel(
             "可用词条库为全局价值序（越靠前越优先保留与填充）；"
             "武学增伤不在此填写——玩法指定武器的武学增伤自动视为"
@@ -117,8 +126,7 @@ class PoolPage(QWidget):
         note.setWordWrap(True)
         note.setStyleSheet("color: gray; font-size: 12px;")
         pool_layout.addWidget(note)
-        layout.addWidget(pool_box)
-        layout.addStretch()
+        layout.addWidget(pool_box, 1)
 
     # ── 数据往返 ──
 

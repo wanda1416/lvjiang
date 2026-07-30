@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.workflows.grammar import parse_text
-from src.workflows.engine import WorkflowEngine
+from lvjiang.workflows.grammar import parse_text
+from lvjiang.workflows.engine import WorkflowEngine
 
 
 # ─── 语法解析 ──────────────────────────────────────────────

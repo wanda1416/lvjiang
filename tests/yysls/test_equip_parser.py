@@ -10,7 +10,7 @@
 
 import pytest
 
-from src.apps.yysls.equip_parser.parser import EquipmentParser
+from lvjiang.apps.yysls.equip_parser.parser import EquipmentParser
 
 
 @pytest.fixture(scope="module")

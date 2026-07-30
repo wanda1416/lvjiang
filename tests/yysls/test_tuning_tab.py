@@ -10,9 +10,9 @@ import json
 import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
 
-import src.apps.yysls.plugin_session as ps_module
-from src.apps.yysls.plugin_session import PluginSession
-from src.apps.yysls.ui.tuning_tab import TuningTab
+import lvjiang.apps.yysls.plugin_session as ps_module
+from lvjiang.apps.yysls.plugin_session import PluginSession
+from lvjiang.apps.yysls.ui.tuning_tab import TuningTab
 
 
 class _FakeHost(QObject):

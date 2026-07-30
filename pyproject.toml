@@ -25,12 +25,21 @@ dev = [
     "pytest-qt>=4.0",
 ]
 
+# src-layout：`src/` 只是源根，不是包；可导入的包是 src/lvjiang/。
+# 这样打包边界可枚举（源根下只有 lvjiang 一个子项），Android 侧 Chaquopy 的
+# srcDir 才能直接指向 src/ 而不会把 config/ data/ docs/ 一并卷进 APK。
 [tool.setuptools.packages.find]
-include = ["src*"]
+where = ["src"]
+
+# grammar.lark 是 DSL 解析器运行时要读的文件，不声明的话非 editable 安装会缺它
+[tool.setuptools.package-data]
+lvjiang = ["workflows/grammar/*.lark"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
+# 让裸检出（未 pip install -e .）也能直接跑 pytest：把源根加进 sys.path
+pythonpath = ["src"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

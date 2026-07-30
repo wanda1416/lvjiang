@@ -9,8 +9,8 @@
 
 import pytest
 
-from src.apps.yysls.equip_parser.models import Affix, EquipmentData
-from src.apps.yysls.evaluator import (
+from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
+from lvjiang.apps.yysls.evaluator import (
     Rating, get_tuning_judge, get_tuning_rules, get_rule_names,
     is_rule_implemented, judge_tuning_worthiness,
 )
@@ -339,8 +339,8 @@ class TestFillSimulation:
 class TestPatternDefaultRating:
     @staticmethod
     def _make_judge(pattern_default: str | None):
-        from src.apps.yysls.evaluator.judge import GenericTuningJudge
-        from src.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.evaluator.judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",
             "name": "测试规则",
@@ -385,8 +385,8 @@ class TestPatternDefaultRating:
 class TestCommonConditionsJudge:
     @staticmethod
     def _make_judge(common: dict | None, config: dict | None = None):
-        from src.apps.yysls.evaluator.judge import GenericTuningJudge
-        from src.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.evaluator.judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",
             "name": "测试规则",

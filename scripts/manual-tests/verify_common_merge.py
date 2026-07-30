@@ -14,8 +14,8 @@ sys.path.insert(0, os.path.abspath(
 
 import yaml  # noqa: E402
 
-from src.apps.yysls.evaluator.tuning_rules.models import TIER_KEYS  # noqa: E402
-from src.apps.yysls.evaluator.tuning_rules.parsing import parse_tuning_rule  # noqa: E402
+from lvjiang.apps.yysls.evaluator.tuning_rules.models import TIER_KEYS  # noqa: E402
+from lvjiang.apps.yysls.evaluator.tuning_rules.parsing import parse_tuning_rule  # noqa: E402
 
 RULE_DIR = "config/system/yysls/tuning_rules"
 FILES = ["heal_fire.yaml", "heal_pure.yaml", "huixin_big.yaml",

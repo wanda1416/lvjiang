@@ -5,7 +5,7 @@
 律匠采用「通用引擎 + 插件」的单包架构：
 
 - `src/`：通用视觉 RPA 引擎（截图、OCR、输入、场景、DSL 引擎、通用 GUI）
-- `src/apps/<name>/`：游戏/场景专属插件
+- `src/lvjiang/apps/<name>/`：游戏/场景专属插件
 - `config/`、`data/`：全局共享，所有插件共用
 
 启动方式：
@@ -20,7 +20,7 @@ python -m src -reg foo -reg bar  # 多插件同时加载
 插件通过 `AppHooks` 数据类向引擎声明扩展点：
 
 ```python
-# src/apps/base.py
+# src/lvjiang/apps/base.py
 @dataclass
 class AppHooks:
     name: str                                  # 插件显示名
@@ -59,7 +59,7 @@ builder 约定：
 ## 插件目录结构
 
 ```
-src/apps/<name>/
+src/lvjiang/apps/<name>/
 ├── __init__.py        # 导出 hooks: AppHooks 实例
 ├── constants.py       # 插件专属常量
 ├── core/              # 插件专属能力（识别器、数据库等）
@@ -74,25 +74,25 @@ src/apps/<name>/
 ### 1. 创建插件目录
 
 ```bash
-mkdir -p src/apps/mygame
-touch src/apps/mygame/__init__.py
+mkdir -p src/lvjiang/apps/mygame
+touch src/lvjiang/apps/mygame/__init__.py
 ```
 
 ### 2. 注册插件
 
-在 `src/apps/__init__.py` 的 `_APP_REGISTRY` 中添加：
+在 `src/lvjiang/apps/__init__.py` 的 `_APP_REGISTRY` 中添加：
 
 ```python
 _APP_REGISTRY: dict[str, str] = {
-    "yysls": "src.apps.yysls",
-    "mygame": "src.apps.mygame",  # 新增
+    "yysls": "lvjiang.apps.yysls",
+    "mygame": "lvjiang.apps.mygame",  # 新增
 }
 ```
 
 ### 3. 实现 hooks
 
 ```python
-# src/apps/mygame/__init__.py
+# src/lvjiang/apps/mygame/__init__.py
 from ..base import AppHooks
 
 
@@ -118,11 +118,11 @@ hooks = AppHooks(
     recognizer_classes=[MyGameRecognizer],
     # 可选：复杂工作流
     workflow_implementations={
-        "auto_farm": "src.apps.mygame.workflows.implementations.auto_farm.AutoFarmWorkflow",
+        "auto_farm": "lvjiang.apps.mygame.workflows.implementations.auto_farm.AutoFarmWorkflow",
     },
     # 可选：内置函数模块（导入即触发 @builtin_func 注册）
     builtin_modules=[
-        "src.apps.mygame.workflows.builtins.items",
+        "lvjiang.apps.mygame.workflows.builtins.items",
     ],
 )
 ```
@@ -130,8 +130,8 @@ hooks = AppHooks(
 ### 4. 添加识别器（可选）
 
 ```python
-# src/apps/mygame/core/recognizer.py
-from src.core.recognizers._registry import Recognizer
+# src/lvjiang/apps/mygame/core/recognizer.py
+from lvjiang.core.recognizers._registry import Recognizer
 
 class MyGameRecognizer:
     name = "mygame_recognizer"
@@ -144,8 +144,8 @@ class MyGameRecognizer:
 ### 5. 添加内置函数（可选）
 
 ```python
-# src/apps/mygame/workflows/builtins/items.py
-from src.workflows.builtins._registry import builtin_func
+# src/lvjiang/apps/mygame/workflows/builtins/items.py
+from lvjiang.workflows.builtins._registry import builtin_func
 
 @builtin_func("get_item_name")
 def _get_item_name(_engine, item_id: str) -> str:
@@ -156,8 +156,8 @@ def _get_item_name(_engine, item_id: str) -> str:
 ### 6. 添加复杂工作流（可选）
 
 ```python
-# src/apps/mygame/workflows/implementations/auto_farm.py
-from src.workflows.base import BaseWorkflow
+# src/lvjiang/apps/mygame/workflows/implementations/auto_farm.py
+from lvjiang.workflows.base import BaseWorkflow
 
 class AutoFarmWorkflow(BaseWorkflow):
     """自动 farming 工作流"""
@@ -171,8 +171,8 @@ class AutoFarmWorkflow(BaseWorkflow):
 
 插件加载时，`register_hooks()` 会自动：
 
-1. **识别器**：调用 `src.core.recognizers.register_recognizer()` 注册
-2. **工作流**：调用 `src.workflows.implementations.register_workflow()` 注册
+1. **识别器**：调用 `lvjiang.core.recognizers.register_recognizer()` 注册
+2. **工作流**：调用 `lvjiang.workflows.implementations.register_workflow()` 注册
 3. **内置函数**：导入 `builtin_modules` 中的模块，触发 `@builtin_func` 装饰器注册
 4. **UI 扩展**：将 tab/menu builders 收集到注册表，由通用 MainWindow 构建时消费
    （多插件 extend 叠加，按 `-reg` 顺序）
@@ -189,7 +189,7 @@ class AutoFarmWorkflow(BaseWorkflow):
 
 ### 燕云十六声（yysls）
 
-- **路径**：`src/apps/yysls/`
+- **路径**：`src/lvjiang/apps/yysls/`
 - **功能**：装备词条解析、评分规则、自动调律、材料识别
 - **工作流**：`auto_tuning`（自动调律）
 - **内置函数**：`to_equipment`、`check_scroll`、`traverse_bag` 等

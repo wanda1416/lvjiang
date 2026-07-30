@@ -7,7 +7,7 @@
 
 import pytest
 
-from src.apps.yysls.workflows.tuning_doc import (
+from lvjiang.apps.yysls.workflows.tuning_doc import (
     TuningDocWriter,
     format_affix,
 )

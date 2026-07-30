@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from src.config import (
+from lvjiang.config import (
     load_user_config,
     save_input_delay,
     save_material_grid,

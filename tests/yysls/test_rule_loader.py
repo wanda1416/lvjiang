@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.apps.yysls.evaluator import get_tuning_rules
-from src.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.evaluator import get_tuning_rules
+from lvjiang.apps.yysls.evaluator.tuning_rules import (
     DYNAMIC_AFFIXES, QUALITY_PARTS, FoodRule, MaterialSettings,
     RuleValidationError, TuningRuleManager, default_food_rules,
     dynamic_affix_map, get_tuning_base, get_tuning_rule_manager,

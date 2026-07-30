@@ -6,7 +6,7 @@ system 模块（messagebox/save/panel_rows）依赖 engine 与 GUI，不纳入�
 
 import pytest
 
-from src.workflows.builtins import builtin_func, get_function, list_functions
+from lvjiang.workflows.builtins import builtin_func, get_function, list_functions
 
 
 def _fn(name):

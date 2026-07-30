@@ -7,8 +7,8 @@
 
 import pytest
 
-from src.apps.yysls.equip_parser.cleaner import clean_affix_text
-from src.apps.yysls.equip_parser.parser import EquipmentParser
+from lvjiang.apps.yysls.equip_parser.cleaner import clean_affix_text
+from lvjiang.apps.yysls.equip_parser.parser import EquipmentParser
 
 
 @pytest.fixture(scope="module")

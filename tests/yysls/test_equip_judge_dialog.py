@@ -6,12 +6,12 @@
 
 import pytest
 
-from src.apps.yysls.equip_parser.constants import WEAPON_TYPES
-from src.apps.yysls.game_config import get_game_config
-from src.apps.yysls.ui.equip_judge_dialog import (
+from lvjiang.apps.yysls.equip_parser.constants import WEAPON_TYPES
+from lvjiang.apps.yysls.game_config import get_game_config
+from lvjiang.apps.yysls.ui.equip_judge_dialog import (
     _NONE_ITEM, PART_ITEMS, PART_WEAPON, EquipAffixEditor,
 )
-from src.apps.yysls.ui.tuning_config_widget import TuningConfigWidget
+from lvjiang.apps.yysls.ui.tuning_config_widget import TuningConfigWidget
 
 
 def _combo_items(combo) -> list[str]:
@@ -165,7 +165,7 @@ class TestTuningConfigWidget:
     def test_default_all_playstyles_checked(self, qtbot):
         # 初始状态：玩法全部勾选（缺省 = 全部）；玩法定义随 YAML
         # 变更，不硬编码内容，对照规则定义校验
-        from src.apps.yysls.evaluator import get_tuning_rules
+        from lvjiang.apps.yysls.evaluator import get_tuning_rules
         w = TuningConfigWidget()
         qtbot.addWidget(w)
         result = w.get_config()
@@ -219,7 +219,7 @@ class TestTuningConfigWidget:
 
 class TestCanTransmuteCheckbox:
     def test_default_checked_and_injected(self, qtbot, monkeypatch):
-        from src.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
+        from lvjiang.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
         dialog = EquipJudgeTestDialog()
         qtbot.addWidget(dialog)
         # 默认勾选
@@ -233,7 +233,7 @@ class TestCanTransmuteCheckbox:
             return False, ["stub"]
 
         monkeypatch.setattr(
-            "src.apps.yysls.ui.equip_judge_dialog.judge_tuning_worthiness",
+            "lvjiang.apps.yysls.ui.equip_judge_dialog.judge_tuning_worthiness",
             fake_worthiness)
         dialog._tuning_config.set_config(
             {"huiyi_general": {"enabled": True}})

@@ -7,11 +7,11 @@
 - RunControlMixin._on_start：F9 按当前左侧 Tab 的 f9_run 鸭子类型分发
 """
 
-import src.ui.main_window as mw_module
-from src.apps import register_hooks
-from src.apps.base import AppHooks
-from src.ui.main_window import MainWindow
-from src.ui.run_control import RunControlMixin
+import lvjiang.ui.main_window as mw_module
+from lvjiang.apps import register_hooks
+from lvjiang.apps.base import AppHooks
+from lvjiang.ui.main_window import MainWindow
+from lvjiang.ui.run_control import RunControlMixin
 
 
 # ─── register_hooks 多插件叠加 ─────────────────────────────

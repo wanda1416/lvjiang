@@ -1,7 +1,7 @@
 """测试 def / import / call proc 语法解析"""
 
-from src.workflows.grammar.parser import parse_text
-from src.workflows.grammar.ast_nodes import Import, ProcDef, CallProc
+from lvjiang.workflows.grammar.parser import parse_text
+from lvjiang.workflows.grammar.ast_nodes import Import, ProcDef, CallProc
 
 
 def test_basic_def():

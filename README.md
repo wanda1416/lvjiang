@@ -42,14 +42,14 @@ PC 端投屏窗口 或 ADB 连接
 
 | 层 | 模块 | 职责 |
 |----|------|------|
-| 捕获 / 输入 | `src/core/capture_base.py`、`src/core/desktop/`、`src/core/android/` | 截图与点击的统一抽象，桌面窗口与 ADB / scrcpy 后端 |
-| OCR | `src/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
-| 场景 / 布局 | `src/core/scene_*.py`、`src/core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
-| 识别器 | `src/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征） |
-| 工作流 | `src/workflows/` | `.wf` DSL 语法解析、执行引擎、通用内置函数 |
-| 界面 | `src/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、运行控制 |
-| 插件 | `src/apps/<name>/` | 游戏/场景专属插件（识别器、工作流、UI Tab） |
-| 燕云插件 | `src/apps/yysls/` | 装备解析、评分、调律、材料识别、专属 UI |
+| 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`src/lvjiang/core/desktop/`、`src/lvjiang/core/android/` | 截图与点击的统一抽象，桌面窗口与 ADB / scrcpy 后端 |
+| OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
+| 场景 / 布局 | `src/lvjiang/core/scene_*.py`、`src/lvjiang/core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
+| 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征） |
+| 工作流 | `src/lvjiang/workflows/` | `.wf` DSL 语法解析、执行引擎、通用内置函数 |
+| 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、运行控制 |
+| 插件 | `src/lvjiang/apps/<name>/` | 游戏/场景专属插件（识别器、工作流、UI Tab） |
+| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备解析、评分、调律、材料识别、专属 UI |
 
 更多细节见 [架构文档](docs/30-architecture/README.md) 与 [DSL 语法文档](docs/32-grammar/README.md)。
 

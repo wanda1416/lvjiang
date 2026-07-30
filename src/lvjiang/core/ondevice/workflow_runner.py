@@ -28,7 +28,6 @@ from ...workflows.engine import WorkflowEngine
 
 from .capture import A11yCapture
 from .input import A11yInput
-from .rapidocr_adapter import patch_all as patch_rapidocr_all
 
 
 def _create_capture() -> CaptureBackend:
@@ -43,8 +42,8 @@ def _create_input() -> InputBackend:
 
 def _create_ocr() -> OCREngine:
     """创建设备端 OCR 引擎（已 patch RapidOCR）"""
-    from .onnx_bridge import create_session_factory
-    patch_rapidocr_all(create_session_factory)
+    from .onnx_session import install
+    install()
     return OCREngine()
 
 

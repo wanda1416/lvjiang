@@ -12,7 +12,7 @@ android {
         applicationId = "com.lvjiang.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = "0.1.0"
         // 设备为 arm64（vivo V2415A），Chaquopy 按 ABI 打包 Python 运行时
         ndk { abiFilters += listOf("arm64-v8a") }

@@ -59,6 +59,7 @@ base_attrs:
     96:
       gold: 86
       purple: 78
+      blue: 69
   pendant:
     _attr: 最大外功攻击
     110:
@@ -112,6 +113,7 @@ base_attrs:
     96:
       gold: 11547
       purple: 10392
+      blue: 9238
   leg:
     _follow: head
   wrist:

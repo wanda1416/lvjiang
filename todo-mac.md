@@ -1,6 +1,6 @@
 # macOS 平台支持 — 计划与进度
 
-> 最后更新：2026-07-31（Phase 1 平台门控部分完成，待 mac 真机验证）
+> 最后更新：2026-07-31（Phase 1 平台门控 + 平台适配层重构完成，待 mac 真机验证）
 >
 > **已定案：支持基线 macOS 11 Big Sur+，明确排除 10.x**（避免 Qt 6.4 双版本依赖矩阵）
 
@@ -17,7 +17,7 @@
 | Phase | 状态 | 说明 |
 |---|---|---|
 | Phase 0：依赖可行性验证（需 mac 真机） | ⏳ 未开始 | 基线已定 macOS 11+，待实测 onnxruntime 版本矩阵 |
-| Phase 1：ADB 模式跑通 | 🔶 大部完成 | P1-a~P1-f 已完成（Windows 上开发自测），仅剩 P1-g 真机验证 |
+| Phase 1：ADB 模式跑通 | 🔶 大部完成 | 平台门控 + 适配层重构已完成，仅剩 P1-g 真机验证 |
 | Phase 2：窗口模式（Quartz） | ⏳ 未开始 | 可无限期后置 |
 | Phase 3：打包分发（可选） | ⏳ 未开始 | Gatekeeper 签名/公证，独立课题 |
 
@@ -90,6 +90,10 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
   `_on_scan_window` 加防御门控；pynput 热键启动 try/except 降级 + 日志提示（窗口内热键兜底；2026-07-31）
 - [x] **P1-f** Windows 回归：ruff / mypy / 全量 pytest 全绿；离屏导入冒烟 ok；
   伪 darwin 冒烟（`.tooling/verify_mac_gates.py`：win32_util import、adb 路径、system 回退分支）全过（2026-07-31）
+- [x] **P1-f.2** 平台适配层重构（2026-07-31）：
+  新增 `core/platforms.py` 统一收口主流程平台差异（桌面输入后端创建、全局热键启动策略、
+  原生弹窗回退、adb 候选路径、投屏入口可见性）；`main_window` / `system.py` / `device.py` /
+  `window_ops` 的 `sys.platform` 分支全部改读适配层；Windows 行为语义零变化
 - [ ] **P1-g** mac 真机验证（依赖 Phase 0）：
   连设备 → scrcpy 流截图 → OCR → 跑一条完整调律工作流
 
@@ -126,8 +130,9 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 ## 下一步操作（按顺序）
 
 1. ~~**P1-a ~ P1-f**：平台门控改动~~ ✅ 已完成（2026-07-31）
-2. **P0 全部**：拿到目标 mac（macOS 11+）后做依赖验证，产出 onnxruntime pin 矩阵
-3. **P1-g**：mac 真机跑通 ADB 模式全链路
+2. ~~**P1-f.2**：平台适配层重构~~ ✅ 已完成（2026-07-31）
+3. **P0 全部**：拿到目标 mac（macOS 11+）后做依赖验证，产出 onnxruntime pin 矩阵
+4. **P1-g**：mac 真机跑通 ADB 模式全链路
 
 ### 实施备注（2026-07-31）
 

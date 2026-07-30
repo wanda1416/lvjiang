@@ -232,11 +232,14 @@ def get_scene_views(scene_key: str) -> list[ViewDef]:
 def is_view_visible(item_view: str, current_view: str) -> bool:
     """当前视图下某定义是否可见
 
-    current_view 为空 = 看全部；选定视图时只看基底视图 + 当前视图。
+    current_view 为空 = 看全部；选定视图时只看该视图自身的定义
+    （基底是普通视图，不叠加展示；定义的 view 字段为空等价于归属基底）。
     """
     if not current_view:
         return True
-    return item_view in ("", BASE_VIEW_KEY, current_view)
+    if current_view == BASE_VIEW_KEY:
+        return item_view in ("", BASE_VIEW_KEY)
+    return item_view == current_view
 
 
 def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:

@@ -9,6 +9,37 @@ from ...core.scene_registry import CanvasConfig, Region
 class _RecognitionMixin:
     """截图与识别能力（OCR / 参考图匹配 / by 短路）"""
 
+    # ─── 区域解析 ──────────────────────────────────────────
+
+    def _require_regions(
+        self,
+        scene_key: str,
+        field_keys: list[str],
+        regions: list[Region],
+    ) -> list[Region]:
+        """按 field_keys 顺序取出 region，任一 key 未绑定坐标即报错
+
+        显式点名的字段（含 [scene].$var 动态解析出来的）一旦在布局里
+        找不到，静默跳过会让 by 子句退化成「未命中」、普通 OCR 少字段，
+        流程照旧往下走，日志上完全看不出是绑定丢了。故缺失即抛错中断。
+
+        Args:
+            scene_key: 场景 key
+            field_keys: 点名的字段列表（非空）
+            regions: 该场景在当前布局已绑定的区域
+
+        Returns:
+            与 field_keys 同序的 Region 列表
+        """
+        region_map = {r.key: r for r in regions}
+        missing = [k for k in field_keys if k not in region_map]
+        if missing:
+            raise ValueError(
+                f"场景 {scene_key} 的区域未绑定坐标: {'、'.join(missing)}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
+        return [region_map[k] for k in field_keys]
+
     # ─── 截图与 OCR ────────────────────────────────────────
 
     def ocr_scene(self, scene_key: str, field_keys: list[str] | None = None) -> dict[str, str]:
@@ -28,12 +59,11 @@ class _RecognitionMixin:
 
         canvas = self._layout.get_canvas()
         regions = self._layout.get_scene_regions(scene_key)
-        if not regions:
+        if field_keys:
+            regions = self._require_regions(scene_key, field_keys, regions)
+        elif not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return {}
-
-        if field_keys:
-            regions = [r for r in regions if r.key in field_keys]
 
         result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key)
         fields_display = field_keys if field_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
@@ -67,12 +97,11 @@ class _RecognitionMixin:
 
         canvas = self._layout.get_canvas()
         regions = self._layout.get_scene_regions(scene_key)
-        if not regions:
+        if slot_keys:
+            regions = self._require_regions(scene_key, slot_keys, regions)
+        elif not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return {}, {}
-
-        if slot_keys:
-            regions = [r for r in regions if r.key in slot_keys]
 
         # 建立 region_map（供 coord_meta 存储）
         region_map = {r.key: r for r in regions}
@@ -135,11 +164,11 @@ class _RecognitionMixin:
 
         canvas = self._layout.get_canvas()
         regions = self._layout.get_scene_regions(scene_key)
-        if not regions:
+        if slot_keys:
+            regions = self._require_regions(scene_key, slot_keys, regions)
+        elif not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return {}
-        if slot_keys:
-            regions = [r for r in regions if r.key in slot_keys]
 
         infos: dict[str, object] = {}
         for region in regions:
@@ -218,6 +247,9 @@ class _RecognitionMixin:
 
         Returns:
             首个命中的 field_key（str），全部未命中返回 ""
+
+        Raises:
+            ValueError: field_keys 里有 key 在当前布局未绑定坐标
         """
         self._validate_by_target(target_value, mode)
 
@@ -228,13 +260,14 @@ class _RecognitionMixin:
 
         canvas = self._layout.get_canvas()
         regions = self._layout.get_scene_regions(scene_key)
-        if not regions:
+        if field_keys:
+            # 按 field_keys 顺序识别，未绑定的 key 直接报错（否则会被当成未命中）
+            ordered_regions = self._require_regions(scene_key, field_keys, regions)
+        elif not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return ""
-
-        # 按 field_keys 顺序过滤并排序
-        region_map = {r.key: r for r in regions}
-        ordered_regions = [region_map[k] for k in field_keys if k in region_map]
+        else:
+            ordered_regions = regions
 
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
@@ -269,6 +302,9 @@ class _RecognitionMixin:
 
         Returns:
             首个命中的 slot_key（str），全部未命中返回 ""
+
+        Raises:
+            ValueError: field_keys 里有 key 在当前布局未绑定坐标
         """
         self._validate_by_target(target_value, mode)
 
@@ -279,12 +315,13 @@ class _RecognitionMixin:
 
         canvas = self._layout.get_canvas()
         regions = self._layout.get_scene_regions(scene_key)
-        if not regions:
+        if field_keys:
+            ordered_regions = self._require_regions(scene_key, field_keys, regions)
+        elif not regions:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return ""
-
-        region_map = {r.key: r for r in regions}
-        ordered_regions = [region_map[k] for k in field_keys if k in region_map]
+        else:
+            ordered_regions = regions
 
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)

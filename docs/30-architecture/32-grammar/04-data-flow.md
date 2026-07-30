@@ -92,6 +92,11 @@ scan [scene].[field_1, field_2, field_3] as $found by contains_any $keywords
 
 > **与 find_key 的关系**：`by` 子句是 `scan` + `find_key` 的语法糖。推荐使用 `by` 子句，更简洁且只需一次截图。
 
+> **未绑定的区域直接报错**：点名的字段（含 `[scene].$var` 动态解析出的 key）
+> 若在当前布局里没绑定坐标，`scan` / `recognize` 立即抛错终止，而不是静默跳过
+> 退化成「未命中」——否则绑定丢失会被当成正常分支，流程带着错误状态跑下去。
+> `[scene].$var` 的变量取到空值时同样报错。
+
 ## 二、recognize — 图像识别
 
 对指定场景中的 Area 截图，逐 slot 裁切后通过 ORB 特征匹配识别材料类型，结果存入变量。

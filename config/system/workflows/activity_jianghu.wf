@@ -181,11 +181,11 @@ def action_qingjing($label)
       click [ui_waiguan_qingjing].[cancel] after wait $step_interval
    end
    # 保存生效需时间，固定等 6 秒再退出
-   wait 6
+   wait 8
 
    click [ui_waiguan_qingjing].[back] after wait $step_interval
-   click [activity_jianghu].[返回] after wait $step_interval
-   click [activity_jianghu].[返回] after wait $step_interval
+   click [activity_jianghu].[back] after wait $step_interval
+   click [activity_jianghu].[back] after wait $step_interval
 end
 
 # 东方第一枝：动作暂未实现

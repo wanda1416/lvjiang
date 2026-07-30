@@ -61,6 +61,14 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"
             tools:ignore="ExportedContentProvider" />
 
+        <!-- 自检报告只读回读通道：release 包 run-as 不可用，adb 经此读 selftest.log。
+             仅限 shell/root uid，校验在 SelfTestProvider.openFile 里 -->
+        <provider
+            android:name=".SelfTestProvider"
+            android:authorities="${applicationId}.selftest"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
+
     </application>
 
 </manifest>

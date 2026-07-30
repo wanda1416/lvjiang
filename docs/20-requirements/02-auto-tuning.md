@@ -619,7 +619,7 @@ wait step_interval
 ```dsl
 #% name: 自动调律
 #% required_scenes: [game_main_page, game_menu_page, bag_equip_detail,
-#%   equip_weapon_detail, equip_armor_detail, equip_tune_detail, equip_tune_result]
+#%   equip_weapon_detail, equip_armor_detail, equip_tune_detail]
 
 # 导航到背包页
 call "subcall/nav_main_to_equip.wf"

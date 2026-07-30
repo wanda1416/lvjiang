@@ -58,7 +58,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     # 调律执行相关场景/材料（移植自 single_tuning）
     TUNE_SCENE = "equip_tune_detail"
-    RESULT_SCENE = "equip_tune_result"
+    # 调律结果弹窗已并入调律页（result 视图），运行时同场景寻址
+    RESULT_SCENE = "equip_tune_detail"
     MATERIAL_SLOTS = [f"material_{i}" for i in range(1, 8)]
     MATERIAL_GROUP = "调律材料"
     MAX_AFFIX = 5

@@ -12,8 +12,7 @@
 | `bag_item_detail` | 道具背包 | 识别道具背包格 |
 | `equip_weapon_detail` | 装备武器详情 | 识别武器的基础信息和词条分布 |
 | `equip_armor_detail` | 装备防具详情 | 识别防具的基础信息和词条分布 |
-| `equip_tune_detail` | 装备调律详情 | 识别调律后的词条变化 |
-| `equip_tune_result` | 调律结果 | 识别调律结果页面的词条和关闭按钮 |
+| `equip_tune_detail` | 调律 | 调律页词条与材料格，`result` 视图为调律结果弹窗 |
 | `game_main_page` | 游戏主页 | 主界面功能按钮 + 移动坐标点 |
 | `game_menu_page` | 游戏菜单 | 菜单页功能按钮 |
 | `general_control` | 通用控制 | 跨场景复用的预定义坐标点 |
@@ -93,32 +92,26 @@
 
 ---
 
-## 装备调律详情 (equip_tune_detail)
+## 调律 (equip_tune_detail)
 
 **游戏内位置**：调律界面 → 放入装备后 → 显示调律结果
 
 **截图时机**：调律完成后、结果展示界面截图
 
-| 字段 Key | 字段名称 | 说明 |
-|----------|----------|------|
-| `affix_gong` | 词条宫 | 调律后宫位词条 |
-| `affix_shang` | 词条商 | 调律后商位词条 |
-| `affix_jue` | 词条角 | 调律后角位词条 |
-| `affix_zhi` | 词条徵 | 调律后徵位词条 |
-| `affix_yu` | 词条羽 | 调律后羽位词条 |
+该场景分两个视图：`base`（调律页本身）与 `result`（调律结果弹窗，
+叠在调律页之上，各自一张底图 `equip_tune_detail__result.png`）。
+视图不参与运行时寻址，.wf 与内置类统一按 `[equip_tune_detail].[region]` 引用。
 
----
-
-## 调律结果 (equip_tune_result)
-
-**游戏内位置**：调律完成后 → 结果展示弹窗
-
-**截图时机**：调律结果弹窗显示时截图
-
-| 字段 Key | 字段名称 | 说明 |
-|----------|----------|------|
-| `tune_affix` | 调律词条 | 调律后获得的词条 |
-| `close_btn` | 关闭 | 关闭按钮（功能按钮，不 OCR） |
+| 字段 Key | 字段名称 | 视图 | 说明 |
+|----------|----------|------|------|
+| `affix_gong` | 词条宫 | base | 调律后宫位词条 |
+| `affix_shang` | 词条商 | base | 调律后商位词条 |
+| `affix_jue` | 词条角 | base | 调律后角位词条 |
+| `affix_zhi` | 词条徵 | base | 调律后徵位词条 |
+| `affix_yu` | 词条羽 | base | 调律后羽位词条 |
+| `tune_affix` | 调律词条 | result | 调律后获得的词条 |
+| `tune_tip` | 调律提示 | result | 弹窗提示文字（判弹窗是否存在） |
+| `close_btn` | 关闭 | result | 关闭按钮（功能按钮，不 OCR） |
 
 ---
 

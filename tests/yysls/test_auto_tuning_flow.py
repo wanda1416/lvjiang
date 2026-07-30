@@ -26,8 +26,9 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
 from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
+# 调律页与调律结果弹窗已合并为同一场景（结果在 result 视图），
+# 故 _ocr_map 里两者字段共用一个场景条目
 TUNE_SCENE = AutoTuningWorkflow.TUNE_SCENE
-RESULT_SCENE = AutoTuningWorkflow.RESULT_SCENE
 
 # judge_equipment_potential 的结构化结果样本：命中顶级 / 判为垃圾
 _WORTHY = {"s": {"name": "血河", "rating": "顶级", "skipped": False,
@@ -63,7 +64,10 @@ class FakeWF(AutoTuningWorkflow):
         self.clicks.append((scene_key, field_key))
 
     def ocr_scene(self, scene_key, field_keys=None):
-        return dict(self._ocr_map.get(scene_key, {}))
+        data = dict(self._ocr_map.get(scene_key, {}))
+        if field_keys:
+            return {k: v for k, v in data.items() if k in field_keys}
+        return data
 
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode):
         return "sub_func_1" if self._nav_tune_ok else ""
@@ -158,8 +162,8 @@ def test_worth_tuned_to_full(patch_worth):
     """值得 → 调律循环到 5 条 → tuned + 返回 back + _on_equipment_done"""
     wf = FakeWF()
     # gold + cap_pct 50 → 不加狗粮，_tune_once 走无材料路径
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100", "tune_tip": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                               "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._process_equipment("待调剑", _equip(2, quality="gold", cap_pct=50),
                           WEAPON_DETAIL)
 
@@ -203,9 +207,8 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
         FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
-                                 "tune_tip": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                               "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._material_infos = {"material_3": _Stone(type="金狗粮", count=42)}
     wf._process_equipment("高分剑", _equip(2, quality="gold", cap_pct=95),
                           WEAPON_DETAIL)
@@ -223,9 +226,8 @@ def test_no_recognition_when_stone_off_and_no_rules(patch_worth, monkeypatch):
     base = TuningBase(materials=MaterialSettings(food_rules=[]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
-                                 "tune_tip": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                               "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
 
     assert wf.material_info_calls == 0
@@ -239,9 +241,8 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
         FoodRule(pct=90, min_expect="excellent", food="紫狗粮")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-    wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
-                                 "tune_tip": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                               "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._material_infos = {
         "material_1": _Stone(type="紫狗粮"),                     # 前置幽灵槽
         "material_2": _Stone(type="紫狗粮", count=0, owned=103),  # 真槽
@@ -633,9 +634,9 @@ class TestTuningDocIntegration:
         wf = FakeWF()
         wf.ctx.doc_username = "小明"
         wf.ctx.doc_dir = tmp_path
-        wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-        wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
-                                     "tune_tip": ""}
+        wf._ocr_map[TUNE_SCENE] = {
+            "auto_add": "一键添加", "auto_add_2": "",
+            "tune_affix": "最大外功攻击 100", "tune_tip": ""}
 
         wf._open_doc(["main_weapon"])
         wf._process_equipment(
@@ -706,9 +707,9 @@ class TestTuningDocIntegration:
         monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                             lambda *a, **k: dict(_WORTHY))
         wf = FakeWF()
-        wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
-        wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
-                                     "tune_tip": ""}
+        wf._ocr_map[TUNE_SCENE] = {
+            "auto_add": "一键添加", "auto_add_2": "",
+            "tune_affix": "最大外功攻击 100", "tune_tip": ""}
         wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
         assert wf.output["tuning_reports"][0]["status"] == "tuned"
 

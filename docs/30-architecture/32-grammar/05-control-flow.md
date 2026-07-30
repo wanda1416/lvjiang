@@ -170,7 +170,7 @@ end
 
 ```
 loop 10
-    scan [equip_tune_result] as $result
+    scan [equip_tune_detail].[tune_tip] as $result
     if $result.result equals "成功"
         break
     end
@@ -263,7 +263,7 @@ end
 @tune_start
 click [equip_tune_detail].[tune_btn]
 wait (1, 2)
-scan [equip_tune_result] as $result
+scan [equip_tune_detail].[tune_tip] as $result
 
 if $result.result contains "失败"
     goto tune_start

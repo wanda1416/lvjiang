@@ -43,7 +43,7 @@ class SceneOpsMixin:
             scene_tab_widget.tabBar().tabMoved.connect(
                 lambda from_idx, to_idx, gk=group_key: self._on_scene_tab_moved(from_idx, to_idx, gk)
             )
-            scene_tab_widget.currentChanged.connect(self._update_info_label)
+            scene_tab_widget.currentChanged.connect(self._on_scene_tab_changed)
             self._group_tabs[group_key] = scene_tab_widget
             idx = self._group_tab_widget.addTab(scene_tab_widget, group_name)
             self._group_tab_widget.setTabToolTip(idx, group_key)
@@ -91,6 +91,31 @@ class SceneOpsMixin:
         if 0 <= idx < len(groups):
             return groups[idx][0]
         return groups[0][0] if groups else ""
+
+    def _select_scene(self, scene_key: str):
+        """重建 Tab 后将选中态定位到指定场景（一级分组 + 二级场景）
+
+        Tab 顺序与 registry.get_groups() / get_group_scenes() 一致，据此换算索引。
+        """
+        if not scene_key:
+            return
+        registry = get_registry()
+        group_key = registry.get_scene_group(scene_key)
+        if not group_key:
+            return
+        groups = registry.get_groups()
+        group_idx = next(
+            (i for i, (gk, _) in enumerate(groups) if gk == group_key), -1
+        )
+        if group_idx < 0:
+            return
+        self._group_tab_widget.setCurrentIndex(group_idx)
+        scene_tab_widget = self._group_tabs.get(group_key)
+        if scene_tab_widget is None:
+            return
+        scene_keys = registry.get_group_scenes(group_key)
+        if scene_key in scene_keys:
+            scene_tab_widget.setCurrentIndex(scene_keys.index(scene_key))
 
     # ─── 场景 CRUD ────────────────────────────────────────
 
@@ -161,6 +186,7 @@ class SceneOpsMixin:
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
+        self._select_scene(key)
         self._status_bar.showMessage(f"已创建场景: {name}")
 
     # ─── 分组管理 ────────────────────────────────────────
@@ -331,8 +357,13 @@ class SceneOpsMixin:
         logger.info(f"分组顺序已更新: {new_order}")
 
     def _on_group_tab_changed(self, index: int):
-        """分组 Tab 切换时，应用布局数据"""
-        self._apply_layout_to_tabs()
+        """分组 Tab 切换：按需加载新可见场景的底图 + 刷新尺寸信息
+
+        向量数据已在 _apply_layout_to_tabs 时全量下发，无需重新应用布局（
+        重新应用会抹除未保存编辑并重读全部截图），只需懒加载当前底图。
+        """
+        self._ensure_tab_image(self._get_current_scene_key())
+        self._update_info_label()
 
     # ─── 场景 Tab 右键菜单 ────────────────────────────────
 
@@ -381,6 +412,7 @@ class SceneOpsMixin:
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
+        self._select_scene(scene_key)
         target_name = get_group_name(target_group)
         scene_name = get_scene_name(scene_key)
         self._status_bar.showMessage(f"已移动场景「{scene_name}」到分组「{target_name}」")
@@ -420,6 +452,7 @@ class SceneOpsMixin:
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
+        self._select_scene(scene_key)
         self._status_bar.showMessage(f"已重命名场景: {new_name}")
 
     def _do_delete_scene(self, scene_key: str):
@@ -434,6 +467,10 @@ class SceneOpsMixin:
         if reply != QMessageBox.StandardButton.Yes:
             return
         registry = get_registry()
+        # 删除前记录同分组相邻场景，供删除后定位
+        group_key = registry.get_scene_group(scene_key)
+        siblings = registry.get_group_scenes(group_key) if group_key else []
+        pos = siblings.index(scene_key) if scene_key in siblings else -1
         try:
             registry.delete_scene(scene_key)
         except ValueError as e:
@@ -443,6 +480,10 @@ class SceneOpsMixin:
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
+        # 定位到相邻场景（优先同位置，否则末尾）
+        remaining = [s for s in siblings if s != scene_key]
+        if remaining and pos >= 0:
+            self._select_scene(remaining[min(pos, len(remaining) - 1)])
         self._status_bar.showMessage(f"已删除场景: {scene_name}")
 
     def _on_scene_tab_moved(self, from_index: int, to_index: int, group_key: str):

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -13,18 +14,19 @@ import com.chaquo.python.Python
 import java.util.concurrent.Executors
 
 /**
- * MainActivity — 权限引导与自检页。
+ * MainActivity — 首次启动引导与开发者自检页。
  *
- * Phase 0 功能：
- * 1. 权限状态一览：悬浮窗 / Shizuku / 通知；
- * 2. 一键申请各项权限；
- * 3. 启动/停止悬浮图标服务；
- * 4. Python 运行时冒烟测试（Chaquopy）；
- * 5. Shizuku 通道自检（id 命令 → 应输出 uid=2000(shell)）。
+ * 引导区（普通用户可见面）：权限清单 + 一颗主按钮，按钮永远指向下一件
+ * 要做的事（无障碍 → 悬浮窗 → 启动悬浮图标），每步附一行操作提示。
+ * 通知权限不单独设步：不是硬门槛（缺了只是前台通知不显示），在启动
+ * 悬浮图标时顺带申请一次。
+ *
+ * 高级面板（默认折叠）：Phase 0 以来的开发者自检按钮全部在这里。
  *
  * 另外接受一个由 adb 触发的自检入口，用于不依赖手点按钮的验证：
  *   adb shell am start -n com.lvjiang.app/.MainActivity --es selftest ocr
- * 报告逐行写入 logcat 的 LvjiangSelfTest 标签。
+ * 自检模式下隐藏引导区、展开高级面板：布局回到与实机验证过的旧版一致，
+ * e2e 闭环的 OCR 目标（「自检：点击回显」按钮与状态行）不受引导文案干扰。
  */
 class MainActivity : AppCompatActivity() {
 
@@ -36,6 +38,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         statusText = findViewById(R.id.status_text)
+
+        findViewById<TextView>(R.id.advanced_toggle).setOnClickListener { toggleAdvanced() }
+        findViewById<Button>(R.id.btn_next).setOnClickListener { onNextStep() }
 
         findViewById<Button>(R.id.btn_overlay).setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
@@ -127,6 +132,104 @@ class MainActivity : AppCompatActivity() {
         handleSelfTest(intent)
     }
 
+    // ── 首次启动引导 ──────────────────────────────────────
+
+    /** 当前引导进度：主按钮永远指向第一个未完成项 */
+    private enum class GuideStep { A11Y, OVERLAY, FLOAT, READY }
+
+    private fun currentStep(): GuideStep = when {
+        !A11yBridge.isReady() -> GuideStep.A11Y
+        !Settings.canDrawOverlays(this) -> GuideStep.OVERLAY
+        !FloatService.isRunning -> GuideStep.FLOAT
+        else -> GuideStep.READY
+    }
+
+    private fun refreshGuide() {
+        val a11y = A11yBridge.isReady()
+        val overlay = Settings.canDrawOverlays(this)
+        val notif = notificationGranted()
+
+        findViewById<TextView>(R.id.check_a11y).text =
+            "${mark(a11y)} 无障碍服务（必需，截屏与点击都靠它）"
+        findViewById<TextView>(R.id.check_overlay).text =
+            "${mark(overlay)} 悬浮窗（必需，悬浮图标的容身之处）"
+        findViewById<TextView>(R.id.check_notification).text =
+            "${mark(notif)} 通知（建议，缺了只是看不到运行状态通知）"
+
+        val btn = findViewById<Button>(R.id.btn_next)
+        val hint = findViewById<TextView>(R.id.guide_hint)
+        when (currentStep()) {
+            GuideStep.A11Y -> {
+                btn.text = getString(R.string.guide_step_a11y)
+                hint.text = getString(R.string.guide_hint_a11y)
+            }
+            GuideStep.OVERLAY -> {
+                btn.text = getString(R.string.guide_step_overlay)
+                hint.text = getString(R.string.guide_hint_overlay)
+            }
+            GuideStep.FLOAT -> {
+                btn.text = getString(R.string.guide_step_float)
+                hint.text = getString(R.string.guide_hint_float)
+            }
+            GuideStep.READY -> {
+                btn.text = getString(R.string.guide_all_ready)
+                hint.text = getString(R.string.guide_hint_float)
+            }
+        }
+    }
+
+    private fun onNextStep() {
+        when (currentStep()) {
+            GuideStep.A11Y -> {
+                toast("请在列表里找到「律匠自动操作」并开启")
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            GuideStep.OVERLAY -> startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                )
+            )
+            GuideStep.FLOAT -> {
+                // 通知权限顺带申请，不单独设步：拒授也不阻塞使用
+                if (!notificationGranted()) {
+                    requestPermissions(
+                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
+                }
+                startForegroundService(Intent(this, FloatService::class.java))
+                // isRunning 要等 onCreate 跑完才翻真，稍等一拍再刷新
+                statusText.postDelayed({ refreshGuide() }, 500)
+            }
+            GuideStep.READY -> toast("悬浮图标已在运行，可直接使用")
+        }
+    }
+
+    private fun notificationGranted(): Boolean =
+        android.os.Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    private fun mark(ok: Boolean) = if (ok) "✅" else "⬜"
+
+    private fun toggleAdvanced() {
+        val panel = findViewById<View>(R.id.advanced_panel)
+        val expanded = panel.visibility == View.VISIBLE
+        panel.visibility = if (expanded) View.GONE else View.VISIBLE
+        findViewById<TextView>(R.id.advanced_toggle).text =
+            getString(if (expanded) R.string.advanced_collapsed else R.string.advanced_expanded)
+    }
+
+    /** 自检模式：隐藏引导区、展开高级面板，让布局回到实机验证过的旧版形态 */
+    private fun enterSelfTestLayout() {
+        for (id in intArrayOf(
+            R.id.guide_title, R.id.guide_subtitle, R.id.check_a11y,
+            R.id.check_overlay, R.id.check_notification, R.id.btn_next, R.id.guide_hint,
+        )) findViewById<View>(id).visibility = View.GONE
+        findViewById<View>(R.id.advanced_panel).visibility = View.VISIBLE
+        findViewById<TextView>(R.id.advanced_toggle).text =
+            getString(R.string.advanced_expanded)
+    }
+
     // launchMode 是默认的 standard，重复 am start 通常会走 onCreate；
     // 但若系统复用了实例则只有这里会被调到，两处都接上才不会出现「命令没反应」。
     override fun onNewIntent(intent: Intent) {
@@ -138,6 +241,7 @@ class MainActivity : AppCompatActivity() {
     /** 响应 `--es selftest <target>`，在后台线程跑 Python 自检并把报告落盘 */
     private fun handleSelfTest(intent: Intent?) {
         val target = intent?.getStringExtra("selftest") ?: return
+        enterSelfTestLayout()
         // 与 Python 侧 smoke._log_path() 同一个文件（HOME 就是 filesDir）
         val logFile = java.io.File(filesDir, SELFTEST_LOG)
         executor.execute {
@@ -166,6 +270,7 @@ class MainActivity : AppCompatActivity() {
         // 自检期间不刷状态：刷一下就会把「点击已生效」或报告正文覆掉，
         // 而闭环自检正是靠读屏幕上的这些字来判定的
         if (intent?.getStringExtra("selftest") == null) {
+            refreshGuide()
             refreshStatus()
         }
     }

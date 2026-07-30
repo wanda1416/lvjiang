@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -25,9 +27,39 @@ android {
         buildConfig = true // AGP 8 默认关闭，ShellBridge 需要 BuildConfig.APPLICATION_ID
     }
 
+    // 签名配置：从 android/keystore.properties 读取，文件不存在时 release 走 debug 签名
+    // （assembleRelease 仍能跑，但产物无法直接发布；首次发布前用户需生成 keystore
+    // 并写入 keystore.properties，详见 android/README-signing.md）。
+    val ksPropsFile = rootProject.file("keystore.properties")
+    if (ksPropsFile.exists()) {
+        val ksProps = Properties()
+        ksPropsFile.inputStream().use { ksProps.load(it) }
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file(ksProps.getProperty("storeFile"))
+                storePassword = ksProps.getProperty("storePassword")
+                keyAlias = ksProps.getProperty("keyAlias")
+                keyPassword = ksProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 代码缩减 + 资源压缩：debug 77MB → 预期 40-50MB
+            // 主要收益：移除未用 Kotlin 字节码、压缩 assets、合并重复资源
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // 签名可选：keystore.properties 存在则签，否则走 debug 签名兜底
+            if (ksPropsFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -126,5 +158,8 @@ val syncLayoutConfig = tasks.register<Sync>("syncLayoutConfig") {
     into(layout.buildDirectory.dir("generated/lvjiang_assets/config/local/layouts"))
 }
 android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/lvjiang_assets"))
-tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(syncSystemConfig, syncLayoutConfig) }
+// 把 sync 任务挂到 preBuild 上：AGP 8 + Gradle 8.10 的 strict task validation 会抓
+// generateReleaseLintVitalReportModel 等任务对 assets 目录的隐式依赖，只挂 generate*Assets
+// 不够（lint 任务不走这条命名规则）。preBuild 是构建生命周期的最早任务，所有下游都会
+// 等它完成，依赖关系因此显式化。
+tasks.named("preBuild") { dependsOn(syncSystemConfig, syncLayoutConfig) }

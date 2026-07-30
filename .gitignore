@@ -40,5 +40,8 @@ Desktop.ini
 .tooling/
 android/.gradle/
 android/local.properties
+android/keystore.properties
+*.jks
+*.keystore
 android/**/build/
 android/**/.cxx/

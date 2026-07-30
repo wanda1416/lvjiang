@@ -9,22 +9,21 @@ layout_scenes:
   - equip_armor_detail
   - equip_tune_detail
   - equip_tune_result
+  - xinde_exchange
   group_3:
   - bag_equip_detail
   - bag_item_detail
   - bag_wallet_detail
-  group_4:
-  - xinde_exchange
+  group_6:
+  - ui_school_main
+  - ui_waiguan_yigui
+  - ui_waiguan_qingjing
   group_5:
   - activity_mengzhu
   - activity_jianghu
-  group_6:
-  - ui_waiguan_yigui
-  - ui_school_main
 group_names:
   group_1: 通用
-  group_2: 调律
+  group_2: 培养
   group_3: 背包
-  group_4: 培养
-  group_5: 活动
   group_6: 界面
+  group_5: 活动

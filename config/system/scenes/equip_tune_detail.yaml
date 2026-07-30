@@ -1,5 +1,5 @@
 key: equip_tune_detail
-name: 调律详情
+name: 调律
 regions:
 - key: back
   name: 返回

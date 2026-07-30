@@ -1,5 +1,5 @@
 key: equip_weapon_detail
-name: 武器详情
+name: 武器
 regions:
 - key: equip_type
   name: 装备类型

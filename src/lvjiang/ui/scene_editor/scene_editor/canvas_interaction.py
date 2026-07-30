@@ -742,8 +742,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             r.key for r in (self._regions + self._hidden_regions)
             if r is not new_region and r.key
         }
-        # 候选仅限当前视图可见的字段（基底 + 当前视图，即 _visible_keys）：
-        # 选定非基底视图时不应允许绑定当前不可见视图的字段（_visible_keys 为 None = 看全部）
+        # 候选仅限当前视图可见的字段（即 _visible_keys，基底不叠加）：
+        # 选定视图时不应允许绑定其他视图的字段（_visible_keys 为 None = 看全部）
         available = [
             (k, n) for k, n in self._current_regions
             if k not in assigned

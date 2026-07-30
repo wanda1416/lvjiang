@@ -1,6 +1,23 @@
 <resources>
     <string name="app_name">律匠</string>
     <string name="status_placeholder">权限状态检测中…</string>
+
+    <!-- 首次启动引导。注意：这里的文案不能出现「已生效」三个字，
+         e2e 闭环自检靠它在点击前不存在来判定点击落地 -->
+    <string name="guide_title">欢迎使用律匠</string>
+    <string name="guide_subtitle">完成下列准备后，悬浮图标会常驻屏幕边缘，随时可发起自动操作</string>
+    <string name="guide_step_a11y">开启无障碍服务</string>
+    <string name="guide_step_overlay">授予悬浮窗权限</string>
+    <string name="guide_step_float">启动悬浮图标，开始使用</string>
+    <string name="guide_all_ready">悬浮图标运行中，可直接使用</string>
+    <string name="guide_hint_a11y">点按钮后会跳到系统设置，请在列表里找到「律匠自动操作」并打开开关，然后返回本页</string>
+    <string name="guide_hint_overlay">点按钮后会跳到授权页，允许「律匠」显示在其他应用上层，然后返回本页</string>
+    <string name="guide_hint_float">悬浮图标可拖动；点开它选择任务，在游戏界面里也能随时操作</string>
+
+    <!-- 高级面板折叠开关 -->
+    <string name="advanced_collapsed">▸ 高级（开发者自检）</string>
+    <string name="advanced_expanded">▾ 高级（开发者自检）</string>
+
     <string name="btn_overlay">1. 授予悬浮窗权限</string>
     <string name="btn_a11y">2. 开启无障碍服务（必需）</string>
     <string name="btn_shizuku">3. 授予 Shizuku 权限（可选）</string>

@@ -202,6 +202,6 @@ class TestF9Dispatch:
 
     def test_no_left_tabs_falls_back(self):
         stub = _DispatchStub(object())
-        del stub._left_tabs
+        stub._left_tabs = None  # 对齐 Mixin 类属性兜底：页签未构建时为 None
         RunControlMixin._on_start(stub)
         assert stub.generic_runs == 1

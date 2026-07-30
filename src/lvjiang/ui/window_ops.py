@@ -20,6 +20,9 @@ class WindowOpsMixin:
         主类需定义 _scrcpy_frame_ready = pyqtSignal(object) 并连接 _on_scrcpy_frame_ui
     """
 
+    # 流式截图态的类级兜底：连接成功前被读也有明确默认值
+    _scrcpy_streaming = False
+
     # ─── 后端模式切换 ──────────────────────────────────────
 
     def _apply_backend_ui(self, mode: str):
@@ -225,7 +228,7 @@ class WindowOpsMixin:
     def _teardown_adb_backend(self):
         """清理 ADB 后端资源，用于重连或退出（仅清理资源，不改 UI）"""
         # 录屏进行中/待保存时先自动转正保存，再停止截图后端
-        if getattr(self, "_screen_recorder", None) is not None:
+        if self._screen_recorder is not None:
             self._abort_screen_record("断连")
         self._device_ready = False
         self._scrcpy_streaming = False
@@ -296,7 +299,7 @@ class WindowOpsMixin:
             # 已连接/已定位 → 断连
             self._on_disconnect()
             return
-        if getattr(self, "_backend", "windows") == "adb":
+        if self._backend == "adb":
             self._on_connect_device()
             return
         w = self.window_combo.currentData()
@@ -364,7 +367,7 @@ class WindowOpsMixin:
         method = "scrcpy" if state else "screencap"
 
         # 录屏依赖流式推帧，切换前自动转正保存
-        if getattr(self, "_screen_recorder", None) is not None:
+        if self._screen_recorder is not None:
             self._abort_screen_record("切换截图方式")
 
         if not self._device:
@@ -438,7 +441,7 @@ class WindowOpsMixin:
 
     def _grab_capture_image(self) -> np.ndarray | None:
         """按 backend 获取一帧截图（numpy BGR），失败返回 None"""
-        if getattr(self, "_backend", "windows") == "adb":
+        if self._backend == "adb":
             if not self._device_ready or self._capture is None:
                 return None
             return self._capture.capture()
@@ -460,7 +463,7 @@ class WindowOpsMixin:
         """重新截取当前窗口/设备截图（用于场景编辑器刷新）
         返回 (image, error_message)，成功时 error_message 为 None
         """
-        if getattr(self, "_backend", "windows") == "adb":
+        if self._backend == "adb":
             if not self._device_ready or self._capture is None:
                 return None, "请先在主窗口连接设备"
             img = self._capture.capture()
@@ -515,7 +518,7 @@ class WindowOpsMixin:
         if hasattr(self, "_scrcpy_frame_ready"):
             self._scrcpy_frame_ready.emit(bgr)
         # 录屏分叉：push 仅入队不阻塞解码线程，暂停/停止态内部直接丢弃
-        rec = getattr(self, "_screen_recorder", None)
+        rec = self._screen_recorder
         if rec is not None:
             rec.push(bgr)
 

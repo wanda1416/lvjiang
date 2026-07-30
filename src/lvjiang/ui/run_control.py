@@ -119,6 +119,12 @@ class RunControlMixin:
         _param_panel, log_text, statusBar()
     """
 
+    # 运行态属性的类级兜底：实例赋值前直接访问也有明确默认值
+    _current_engine = None      # 运行中的 WorkflowEngine（_execute_workflow 赋值）
+    _ui_helper = None           # 工作流交互对话框 helper（运行期注入）
+    _param_panel = None         # 参数面板（MainWindow._setup_ui 构建）
+    _left_tabs = None           # 左侧页签（MainWindow._setup_ui 构建）
+
     # ─── 工作流配置加载 ──────────────────────────────────
 
     def _load_workflow_configs(self):
@@ -213,7 +219,7 @@ class RunControlMixin:
         if not flow_cfg:
             return {}
         params = {}
-        panel = getattr(self, '_param_panel', None)
+        panel = self._param_panel
         if panel is None:
             return params
         from PyQt6.QtWidgets import QComboBox, QSpinBox
@@ -253,7 +259,7 @@ class RunControlMixin:
         old_name = self._user_manager.get_active_user_name()
         if name and name != old_name:
             # 切换前：如果有正在运行的工作流，先保存旧用户的 session
-            if getattr(self, '_current_engine', None) is not None and self._running:
+            if self._current_engine is not None and self._running:
                 self._session_manager.save(old_name, self._current_engine.session)
                 logger.info(f"用户切换前已保存 session: {old_name}")
             self._user_manager.set_active_user(name)
@@ -345,7 +351,7 @@ class RunControlMixin:
             return
         self._stop_requested = True
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
-        helper = getattr(self, '_ui_helper', None)
+        helper = self._ui_helper
         if helper is not None:
             helper.close_active_dialog()
         self.statusBar().showMessage("停止中... | 等待当前步骤结束")
@@ -361,8 +367,8 @@ class RunControlMixin:
 
     def _backend_ready(self) -> bool:
         """当前后端是否就绪（adb：设备已连接；windows：已定位窗口）"""
-        if getattr(self, "_backend", "windows") == "adb":
-            return bool(getattr(self, "_device_ready", False))
+        if self._backend == "adb":
+            return bool(self._device_ready)
         return self._target_window is not None
 
     # ─── 通用工作流执行 ────────────────────────────────────
@@ -375,7 +381,7 @@ class RunControlMixin:
             return
 
         if not self._backend_ready():
-            if getattr(self, "_backend", "windows") == "adb":
+            if self._backend == "adb":
                 self.log_text.append("[错误] 请先连接设备")
                 self.statusBar().showMessage("未连接设备 | 请先扫描并连接设备")
             else:
@@ -407,7 +413,7 @@ class RunControlMixin:
 
         # 后台模式下（windows），刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
         # ADB 模式无窗口句柄，且坐标为设备物理像素（原点左上），window_left/top 恒为 0
-        if getattr(self, "_backend", "windows") == "adb":
+        if self._backend == "adb":
             window_left, window_top = 0, 0
         else:
             if self._input.background_mode and self._target_window:
@@ -508,7 +514,7 @@ class RunControlMixin:
 
     def _auto_save_session(self):
         """正常结束时自动保存 session"""
-        engine = getattr(self, '_current_engine', None)
+        engine = self._current_engine
         if engine is not None:
             username = self._user_manager.get_active_user_name()
             if username:
@@ -554,7 +560,7 @@ class RunControlMixin:
             )
         elif not self._backend_ready():
             state = "not_ready"
-            label = "未连接" if getattr(self, "_backend", "windows") == "adb" else "未定位"
+            label = "未连接" if self._backend == "adb" else "未定位"
             self.btn_run_workflow.setText(label)
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
@@ -574,7 +580,7 @@ class RunControlMixin:
         插件 Tab 实现 ``f9_run()`` 则交由其处理，否则走通用工作流。"""
         if self._running:
             return
-        tabs = getattr(self, '_left_tabs', None)
+        tabs = self._left_tabs
         widget = tabs.currentWidget() if tabs is not None else None
         runner = getattr(widget, 'f9_run', None)
         if callable(runner):
@@ -611,7 +617,7 @@ class RunControlMixin:
             return
 
         if not self._backend_ready():
-            if getattr(self, "_backend", "windows") == "adb":
+            if self._backend == "adb":
                 self.log_text.append("[错误] 请先连接设备")
             else:
                 self.log_text.append("[错误] 请先定位窗口")
@@ -628,7 +634,7 @@ class RunControlMixin:
             return
 
         # 窗口坐标
-        if getattr(self, "_backend", "windows") == "adb":
+        if self._backend == "adb":
             window_left, window_top = 0, 0
         else:
             if self._input.background_mode and self._target_window:

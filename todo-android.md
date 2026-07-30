@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-30（Phase 3 完成：工作流引擎设备端执行验证通过）
+> 最后更新：2026-07-31（Phase 4 进行中：APK 体积优化 + Release 签名基础设施已就位，待实机复验 release 包）
 
 ---
 
@@ -12,7 +12,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | 🚧 进行中 | 任务入口 + 无障碍恢复引导已完成；体积优化与签名构建待做 |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | R8 + 签名基础设施已就位；release 实机复验 + 引导流程待做 |
 
 ---
 
@@ -158,9 +158,27 @@
     `MainActivity` 新增无障碍状态行 + `btn_a11y` 跳转；`FloatService.launchTask`
     启动前先查；`task_runner.start_task` 再查一道
   - `A11yCapture` 截图重试：节流退避 3 次 × 0.4s；掉线是硬故障，不重试直接报清楚
-- [ ] APK 体积优化（当前 77MB，主要来自 rapidocr 模型 + onnxruntime-android）
-- [ ] Release 签名构建
-- [ ] 用户引导流程（首次启动 → 开无障碍 → 开始使用）
+- [x] **APK 体积优化**（2026-07-31）
+  - `build.gradle.kts` release 开 `isMinifyEnabled = true` + `isShrinkResources = true`
+  - 新增 `android/app/proguard-rules.pro`：保留 Chaquopy 反射访问的 Kotlin object
+    （A11yBridge / OnnxBridge 的 INSTANCE 字段与公开方法）、服务构造器、AIDL Stub、
+    ONNX Runtime JNI
+  - `syncSystemConfig` / `syncLayoutConfig` 改挂到 `preBuild`：AGP 8 + Gradle 8.10
+    strict task validation 抓 `generateReleaseLintVitalReportModel` 对 assets 目录的
+    隐式依赖，原 `generate*Assets` 匹配模式不够（lint 不走这条命名规则）
+  - debug 74.03 MB → release 70.01 MB（约 5%）；大头是 Chaquopy 打包的 Python
+    运行时 + rapidocr 模型 + onnxruntime-android，这些 assets R8 动不了，进一步
+    压缩需要裁剪 Python 包或换 onnxruntime-android 的 slim 产物
+- [x] **Release 签名构建基础设施**（2026-07-31）
+  - `build.gradle.kts`：从 `android/keystore.properties` 读取 storeFile / 密码，
+    文件存在则签 release，不存在则走 debug 签名兜底（`assembleRelease` 始终能跑）
+  - `.gitignore` 新增 `android/keystore.properties` / `*.jks` / `*.keystore`，
+    避免密钥材料入库
+  - 用户侧待办：`keytool -genkeypair -v -keystore lvjiang.jks -keyalg RSA \
+    -keysize 2048 -validity 10000 -alias lvjiang`，再把路径与密码写入
+    `android/keystore.properties`（待补 `android/README-signing.md` 说明文档）
+- [ ] 用户引导流程（首次启动 → 开无障碍 → 悬浮窗权限 → 开始使用）
+- [ ] release 包实机复验（当前无障碍绑定在 vivo 上被厂商策略拦下，需手动确认一次）
 
 ### 本轮新增验证设施
 
@@ -170,6 +188,8 @@
 | `smoke.py target=task` (5 步) | 设备端走悬浮图标同一条路的自检，不靠手点 |
 | `.tooling/verify_panel.py` | 面板 UI 验证：坐标从 dumpsys/uiautomator 现算，不写死 |
 | `.tooling/run_selftest.py --no-install` | 同一 APK 连跑多个 target，避免反复装包 |
+| `.tooling/run_selftest.py --release` | 用 release APK 装包跑自检，验证 R8 没砍反射 |
+| `android/app/proguard-rules.pro` | R8 keep 规则：Chaquopy 反射访问面 + 服务构造器 + AIDL + ONNX |
 
 ### 实机验证踩到的两个坑
 
@@ -184,7 +204,9 @@
 
 ## 下一步操作（按顺序）
 
-1. **发布准备**：Release 签名构建 + APK 体积优化
-2. **首次启动引导流程**（权限一步步过）
+1. **release 包实机复验**：手动确认一次「设置 → 无障碍 → 律匠自动操作」开关后，
+   跑 `run_selftest.py task --release`，确认 R8 没把 Chaquopy 反射面砍掉
+2. **首次启动引导流程**（权限一步步过：无障碍 → 悬浮窗 → 主界面）
 3. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
+4. **正式签名**：生成 keystore + 写 `android/README-signing.md` 说明文档
 

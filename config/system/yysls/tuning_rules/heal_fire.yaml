@@ -116,7 +116,6 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大本属攻击
           - 最大牵丝攻击
           max: 0
       - not_together:
@@ -133,7 +132,7 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大本属攻击
+        - 最大牵丝攻击
         max: 0
   胫甲:
     first:
@@ -146,7 +145,7 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大本属攻击
         - 会心率
         - 精准率
+        - 最大牵丝攻击
         max: 0

@@ -1,6 +1,8 @@
 # macOS 平台支持 — 计划与进度
 
-> 最后更新：2026-07-30（计划制定，未开始实施）
+> 最后更新：2026-07-31（Phase 1 平台门控部分完成，待 mac 真机验证）
+>
+> **已定案：支持基线 macOS 11 Big Sur+，明确排除 10.x**（避免 Qt 6.4 双版本依赖矩阵）
 
 ---
 
@@ -14,8 +16,8 @@
 
 | Phase | 状态 | 说明 |
 |---|---|---|
-| Phase 0：依赖可行性验证（需 mac 真机） | ⏳ 未开始 | 确定实际支持的最低 macOS 版本 |
-| Phase 1：ADB 模式跑通 | ⏳ 未开始 | 平台门控改动可先在 Windows 上开发 |
+| Phase 0：依赖可行性验证（需 mac 真机） | ⏳ 未开始 | 基线已定 macOS 11+，待实测 onnxruntime 版本矩阵 |
+| Phase 1：ADB 模式跑通 | 🔶 大部完成 | P1-a~P1-f 已完成（Windows 上开发自测），仅剩 P1-g 真机验证 |
 | Phase 2：窗口模式（Quartz） | ⏳ 未开始 | 可无限期后置 |
 | Phase 3：打包分发（可选） | ⏳ 未开始 | Gatekeeper 签名/公证，独立课题 |
 
@@ -76,17 +78,18 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 
 平台门控部分不依赖 mac 真机，可先在 Windows 上开发自测：
 
-- [ ] **P1-a** `core/desktop/win32_util.py` 模块级 `ctypes.windll` 移入函数（或平台门控），
-  杜绝非 Windows 平台 import 即崩
-- [ ] **P1-b** `ui/main_window.py` 启动路径按平台懒加载：
-  非 Windows 时不 import `core.desktop`，`_win_input = None`，`_backend` 默认 `"adb"`
-- [ ] **P1-c** `workflows/builtins/system.py` 三个 MessageBox 回退分支加 `sys.platform` 门控
-  （mac 回退用 `osascript -e 'display dialog ...'`，或直接降级为 log 输出）
-- [ ] **P1-d** `core/android/device.py` `_resolve_adb_path` 补 mac 候选路径：
-  `~/Library/Android/sdk/platform-tools/adb`、`/opt/homebrew/bin/adb`、`/usr/local/bin/adb`
-- [ ] **P1-e** UI 适配：mac 上隐藏「扫描窗口」「后台模式」入口；
-  pynput 热键权限缺失时 try/except 降级 + 启动提示（窗口内热键兜底）
-- [ ] **P1-f** Windows 回归：上述改动后全量 pytest + Windows 实机冒烟（两种后端均正常）
+- [x] **P1-a** `core/desktop/win32_util.py` 模块级 `ctypes.windll` 加平台门控
+  （非 Windows 下 `_user32 = None`，import 不再崩；2026-07-31）
+- [x] **P1-b** `ui/main_window.py` 启动路径按平台懒加载：
+  非 Windows 不 import `core.desktop`，`_win_input = None`（2026-07-31）
+- [x] **P1-c** `workflows/builtins/system.py` 三个 MessageBox 回退分支加 `sys.platform` 门控
+  （mac 用 osascript：confirm/pause 用 display dialog，notify 用通知中心；其他平台降级为 log；2026-07-31）
+- [x] **P1-d** `core/android/device.py` `_resolve_adb_path` 补 mac 候选路径：
+  `~/Library/Android/sdk/platform-tools/adb`、`/opt/homebrew/bin/adb`、`/usr/local/bin/adb`、`$ANDROID_HOME`（2026-07-31）
+- [x] **P1-e** UI 适配：非 Windows 隐藏「扫描窗口」按钮（后台模式开关随之不会显示），
+  `_on_scan_window` 加防御门控；pynput 热键启动 try/except 降级 + 日志提示（窗口内热键兜底；2026-07-31）
+- [x] **P1-f** Windows 回归：ruff / mypy / 全量 pytest 全绿；离屏导入冒烟 ok；
+  伪 darwin 冒烟（`.tooling/verify_mac_gates.py`：win32_util import、adb 路径、system 回退分支）全过（2026-07-31）
 - [ ] **P1-g** mac 真机验证（依赖 Phase 0）：
   连设备 → scrcpy 流截图 → OCR → 跑一条完整调律工作流
 
@@ -122,6 +125,18 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 
 ## 下一步操作（按顺序）
 
-1. **P1-a ~ P1-f**：平台门控改动（Windows 上即可开发，不依赖 mac 真机）
-2. **P0 全部**：拿到目标 mac 后做依赖验证，产出最低版本结论
+1. ~~**P1-a ~ P1-f**：平台门控改动~~ ✅ 已完成（2026-07-31）
+2. **P0 全部**：拿到目标 mac（macOS 11+）后做依赖验证，产出 onnxruntime pin 矩阵
 3. **P1-g**：mac 真机跑通 ADB 模式全链路
+
+### 实施备注（2026-07-31）
+
+- `_backend` 未改默认值：仍为 `None`（未选模式），非 Windows 上因「扫描窗口」入口已隐藏，
+  用户只能走「扫描设备」→ `_backend = "adb"`，无需硬编码默认值
+- 脚本录制（script_record_dialog）依赖桌面投屏模式，ADB 模式本就禁用，mac 上自然不可用
+- `ui/overlay.py`（Win32 边框层）所有方法均有 `_hwnd` 门控，mac 上从不创建窗口，无需改动
+- 依赖均有 mac wheel（universal2/x86_64），pyproject 无需平台标记；onnxruntime 能否在
+  macOS 11 装上待 Phase 0 实测（风险清单 #1）
+- 主流程平台差异已收口到 `core/platforms.py` 适配层（桌面输入后端创建、全局热键
+  启动策略、原生弹窗回退、adb 候选路径、投屏入口可见性）；具体实现内部的门控
+  （win32_util、capture、pynput_patch 等）保持原位不抽象

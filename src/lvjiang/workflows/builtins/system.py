@@ -2,6 +2,7 @@
 
 from loguru import logger
 
+from ...core.platforms import native_confirm, native_notify, native_pause
 from ._registry import builtin_func
 
 
@@ -20,7 +21,7 @@ def _confirm(_engine=None, message: str = "", *args) -> bool:
     """弹出确认对话框（是/否），返回 bool
 
     通过 engine._ui_callback 调度到 Qt 主线程显示。
-    无回调时回退到 Win32 MessageBoxW。
+    无回调时回退到平台原生弹窗（Win32 MessageBoxW / macOS osascript）。
 
     .wf 用法:
         eval $ok = confirm("确认执行？")
@@ -31,10 +32,8 @@ def _confirm(_engine=None, message: str = "", *args) -> bool:
     text = _build_text(message, args)
     if _engine is not None and getattr(_engine, '_ui_callback', None) is not None:
         return bool(_engine._ui_callback("confirm", message=text))
-    # 回退：Win32（无 Qt 环境）
-    import ctypes
-    result = ctypes.windll.user32.MessageBoxW(0, text, "工作流确认", 4 | 32)
-    return result == 6
+    # 回退：平台原生弹窗（无 Qt 环境）
+    return native_confirm(text)
 
 
 @builtin_func("pause")
@@ -51,9 +50,8 @@ def _pause(_engine=None, message: str = "", *args) -> str:
     if _engine is not None and getattr(_engine, '_ui_callback', None) is not None:
         _engine._ui_callback("pause", message=text)
         return ""
-    # 回退：Win32
-    import ctypes
-    ctypes.windll.user32.MessageBoxW(0, text, "工作流暂停", 0x40)
+    # 回退：平台原生弹窗
+    native_pause(text)
     return ""
 
 
@@ -61,27 +59,15 @@ def _pause(_engine=None, message: str = "", *args) -> str:
 def _notify(message: str = "", *args) -> str:
     """非阻塞通知（5 秒后自动关闭）
 
-    后台守护线程中调用 Win32 MessageBoxTimeoutW，超时自动关闭，
+    Windows 在后台守护线程调用 Win32 MessageBoxTimeoutW，超时自动关闭；
+    macOS 走系统通知中心（display notification，天然非阻塞）。
     工作流线程立即返回，不被阻塞。
 
     .wf 用法:
         eval notify("步骤完成")
     """
-    import ctypes
-    import threading
     text = _build_text(message, args)
-
-    def _show():
-        try:
-            # MessageBoxTimeoutW(hwnd, text, caption, type, wLanguageId, dwMilliseconds)
-            # 未文档化但自 Win2000 起稳定导出；wLanguageId=0 表示默认语言
-            ctypes.windll.user32.MessageBoxTimeoutW(
-                0, text, "工作流通知", 0x40, 0, 5000
-            )
-        except Exception as e:
-            logger.warning(f"notify 弹窗失败: {e}")
-
-    threading.Thread(target=_show, daemon=True, name="wf-notify").start()
+    native_notify(text)
     return ""
 
 

@@ -1,0 +1,2 @@
+# shell 脚本强制 LF：CRLF 会让 bash 报 "\r: command not found"
+*.sh text eol=lf

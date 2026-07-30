@@ -106,3 +106,14 @@ dependencies {
     // ONNX Runtime：Phase 1 起承载 RapidOCR 同款模型推理
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }
+
+// 系统配置（场景/工作流 YAML）随 APK 分发：从仓库 config/system 同步进 assets，
+// App 启动时解压到 filesDir/lvjiang/config/system（见 App.kt）。
+// 用 Sync 任务而非手拷一份：仓库里只有 config/system 一个数据源，不会两处失同步。
+val syncSystemConfig = tasks.register<Sync>("syncSystemConfig") {
+    from(rootProject.file("../config/system"))
+    into(layout.buildDirectory.dir("generated/lvjiang_assets/config/system"))
+}
+android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/lvjiang_assets"))
+tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(syncSystemConfig) }

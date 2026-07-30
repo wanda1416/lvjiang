@@ -3,10 +3,31 @@
 燕云专属常量（如 ``EQUIP_SLOT_NAMES``）请放到 ``lvjiang.apps.yysls.constants``。
 """
 
+import os
+import sys
 from pathlib import Path
 
-# 项目根目录（src/ 的父级；本文件位于 src/lvjiang/ 下，故上溯两层）
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+def _project_root() -> Path:
+    """项目根目录（config/ data/ logs/ 等可写数据的总根）
+
+    桌面端：仓库根（src/ 的父级；本文件位于 src/lvjiang/ 下，故上溯两层）。
+
+    安卓端（Chaquopy）：__file__ 落在 APK 解压目录，只读且路径随版本变，
+    不能当根用。AndroidPlatform 会把 HOME 指到应用 filesDir，故改用
+    $HOME/lvjiang；系统配置由 App 启动时从 assets 解压到这里（见 App.kt）。
+
+    LVJIANG_ROOT 环境变量可在两端显式覆盖（测试/多实例隔离用）。
+    """
+    override = os.environ.get("LVJIANG_ROOT")
+    if override:
+        return Path(override)
+    if hasattr(sys, "getandroidapilevel"):
+        return Path(os.environ["HOME"]) / "lvjiang"
+    return Path(__file__).parent.parent.parent
+
+
+PROJECT_ROOT = _project_root()
 CONFIG_DIR = PROJECT_ROOT / "config"
 
 # 系统配置（随版本发布）

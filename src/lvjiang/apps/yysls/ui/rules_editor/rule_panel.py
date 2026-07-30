@@ -67,6 +67,9 @@ def add_nav_separator(nav: QListWidget) -> None:
 class RulePanel(QWidget):
     """单规则编辑面板（持有 raw dict 深拷贝为工作副本）"""
 
+    # 对话框在创建面板时注入，用于重命名后更新 Tab 文本
+    _dialog_rename_cb = None
+
     def __init__(self, key: str, manager: TuningRuleManager,
                  status_cb: Callable[[str, bool | str], None],
                  on_delete: Callable[[str], None] | None = None,
@@ -218,7 +221,7 @@ class RulePanel(QWidget):
             raise
         self._key = new_key
         # 对话框在创建面板时注入 _dialog_rename_cb，用于更新 Tab 文本
-        cb = getattr(self, "_dialog_rename_cb", None)
+        cb = self._dialog_rename_cb
         if cb is not None:
             cb(old_key, new_key, new_name)
 

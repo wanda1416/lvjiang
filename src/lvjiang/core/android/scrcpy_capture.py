@@ -93,6 +93,11 @@ class AndroidStreamCapture(CaptureBackend):
         self._decode_thread: threading.Thread | None = None
         self._size: tuple[int, int] | None = None
 
+    @property
+    def max_fps(self) -> int:
+        """帧率上限（供录屏等外部消费方读取）"""
+        return self._max_fps
+
     # ─── 生命周期 ─────────────────────────────────────────
 
     def start(self) -> bool:

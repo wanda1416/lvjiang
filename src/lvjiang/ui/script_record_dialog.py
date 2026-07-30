@@ -96,13 +96,13 @@ class ScriptRecordDialog(QDialog):
 
     def _start_recording(self):
         main = self._main
-        if getattr(main, "_running", False):
+        if main._running:
             self.lbl_status.setText("工作流运行中，无法录制")
             return
-        if getattr(main, "_backend", None) == "adb":
+        if main._backend == "adb":
             self.lbl_status.setText("ADB 模式暂不支持录制")
             return
-        w = getattr(main, "_target_window", None)
+        w = main._target_window
         if not w:
             self.lbl_status.setText("请先在主窗口扫描并定位窗口")
             return
@@ -160,7 +160,7 @@ class ScriptRecordDialog(QDialog):
         else:
             self.btn_record.setText("● 录制脚本 (F8)")
             self.btn_record.setStyleSheet(_STYLE_IDLE)
-        self.btn_record.setEnabled(not getattr(self._main, "_running", False))
+        self.btn_record.setEnabled(not self._main._running)
         for btn in (self.btn_save, self.btn_copy, self.btn_clear):
             btn.setEnabled(not recording and has_text)
         self.text_edit.setReadOnly(recording)

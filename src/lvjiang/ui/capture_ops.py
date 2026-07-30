@@ -50,6 +50,11 @@ _STYLE_DISCARD = _cap_btn_style("#757575")
 class CaptureOpsMixin:
     """录屏/截屏采集面板混入类"""
 
+    # 录制态的类级兜底：面板构建（_build_capture_panel）前被读也有明确默认值
+    _screen_recorder = None
+    _rec_state = "idle"
+    _rec_timer = None
+
     # ─── 面板构建 ─────────────────────────────────────────
 
     def _build_capture_panel(self) -> QFrame:
@@ -125,12 +130,12 @@ class CaptureOpsMixin:
 
     def _apply_rec_state(self):
         """根据录制状态 + 连接态统一刷新面板控件（唯一 UI 更新入口）"""
-        state = getattr(self, "_rec_state", "idle")
+        state = self._rec_state
         connected = (
-            getattr(self, "_device_ready", False)
-            or getattr(self, "_target_window", None) is not None
+            self._device_ready
+            or self._target_window is not None
         )
-        streaming = bool(getattr(self, "_scrcpy_streaming", False))
+        streaming = bool(self._scrcpy_streaming)
 
         if state == "idle":
             self.lbl_rec_dot.setStyleSheet("color: #666; font-size: 14px;")
@@ -179,7 +184,7 @@ class CaptureOpsMixin:
 
     def _refresh_rec_time(self):
         """刷新时长显示（视频时间，暂停期间不增长）"""
-        rec = getattr(self, "_screen_recorder", None)
+        rec = self._screen_recorder
         secs = int(rec.elapsed_video_seconds()) if rec is not None else 0
         self.lbl_rec_time.setText(f"{secs // 60:02d}:{secs % 60:02d}")
 
@@ -193,7 +198,7 @@ class CaptureOpsMixin:
             self._stop_screen_record()
 
     def _start_screen_record(self):
-        if not getattr(self, "_scrcpy_streaming", False) or self._capture is None:
+        if not self._scrcpy_streaming or self._capture is None:
             self.log_text.append("[录屏] 仅流式截图模式支持录屏")
             return
         w, h = self._capture.get_capture_size()
@@ -201,7 +206,8 @@ class CaptureOpsMixin:
             self.log_text.append("[录屏] 无法获取画面尺寸")
             return
         from ..core.screen_recorder import ScreenRecorder
-        fps = getattr(self._capture, "_max_fps", 15)
+        # 流式模式已确认，_capture 必为 AndroidStreamCapture
+        fps = self._capture.max_fps
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = VIDEO_DIR / f"recording_{ts}.mp4"
         recorder = ScreenRecorder(path, w, h, fps=fps)
@@ -270,13 +276,13 @@ class CaptureOpsMixin:
 
     def _abort_screen_record(self, reason: str):
         """强制中断守卫：断连/切换截图方式/关闭程序时自动停录并转正保存（不丢数据）"""
-        rec = getattr(self, "_screen_recorder", None)
+        rec = self._screen_recorder
         if rec is None:
             return
         final = rec.finalize()  # 内部先 stop() 再转正
         self._screen_recorder = None
         self._rec_state = "idle"
-        if getattr(self, "_rec_timer", None) is not None:
+        if self._rec_timer is not None:
             self._rec_timer.stop()
         if final is not None:
             self.log_text.append(f"[录屏] 录制已随{reason}自动保存: {final}")

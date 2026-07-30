@@ -175,7 +175,7 @@ class CanvasPoiMixin:
         return key
 
     def _notify_poi_changed(self):
-        if getattr(self, "on_poi_changed", None):
+        if self.on_poi_changed:
             self.on_poi_changed()
 
     # ─── 外部触发：进入创建模式 ───────────────────────────
@@ -552,7 +552,7 @@ class CanvasPoiMixin:
         if event.button() != Qt.MouseButton.LeftButton:
             return False
         if self._poi_drag != PoiDrag.NONE:
-            moved = getattr(self, "_poi_drag_moved", False)
+            moved = self._poi_drag_moved
             self._poi_drag = PoiDrag.NONE
             self._poi_drag_orig = None
             self._poi_drag_moved = False

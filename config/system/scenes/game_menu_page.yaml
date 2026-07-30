@@ -1,5 +1,5 @@
 key: game_menu_page
-name: 游戏菜单
+name: 菜单
 views:
 - key: base
   name: 基底

@@ -1,5 +1,5 @@
 key: equip_armor_detail
-name: 防具详情
+name: 防具
 regions:
 - key: equip_type
   name: 装备类型

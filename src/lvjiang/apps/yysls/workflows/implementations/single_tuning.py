@@ -25,16 +25,22 @@ from loguru import logger
 
 from lvjiang.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
 from lvjiang.apps.yysls.evaluator import (
-    get_rule_names, judge_equipment_potential, summarize_potential,
+    get_rule_names,
+    judge_equipment_potential,
+    summarize_potential,
 )
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    RATING_LABELS, RATING_RANK, FoodDecision, MaterialSettings,
+    RATING_LABELS,
+    RATING_RANK,
+    FoodDecision,
+    MaterialSettings,
     get_tuning_base,
 )
+from lvjiang.apps.yysls.workflows.run_context import TuningContextMixin
 from lvjiang.workflows.base import BaseWorkflow
 
 
-class SingleTuningWorkflow(BaseWorkflow):
+class SingleTuningWorkflow(TuningContextMixin, BaseWorkflow):
     """单件装备调律工作流"""
 
     # 脚本元数据（供发现层暴露到日常下拉，取代旧 workflows.yaml 声明）
@@ -99,7 +105,7 @@ class SingleTuningWorkflow(BaseWorkflow):
         bag_col = str(self.get_variable("bag_col") or "1")
         detail_scene = (self.ARMOR_DETAIL if equip_slot in self.ARMOR_SLOTS
                         else self.WEAPON_DETAIL)
-        self._judge_rule_keys, self._judge_configs = self._load_rule_config()
+        self.ctx.judge_rule_keys, self.ctx.judge_configs = self._load_rule_config()
 
         # 暂时不切页面
         # self._navigate_to_equip()
@@ -270,7 +276,7 @@ class SingleTuningWorkflow(BaseWorkflow):
         同时刷新 _expect_rating（供逐轮狗粮决策的期望条件）。
         """
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_rule_keys)
+            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         worth, logs = summarize_potential(results)
         self._expect_rating = self._expect_key(results)
         for line in logs:
@@ -296,7 +302,7 @@ class SingleTuningWorkflow(BaseWorkflow):
         结构化结果写入 output["final_judgement"]。
         """
         results = judge_equipment_potential(
-            equip_data, self._judge_configs, self._judge_rule_keys)
+            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         for r in results.values():
             tag = ("不适用" if r["not_applicable"]
                    else "跳过" if r["skipped"] else r["rating"])
@@ -353,23 +359,23 @@ class SingleTuningWorkflow(BaseWorkflow):
 
     def _tune_once(self, equip_data: EquipmentData) -> dict | None:
         """执行一轮调律：展开材料区 → 逐轮狗粮决策 → 一键添加 → 调律 → 收结果。
-    
+
         返回调律结果 OCR dict；返回 None 表示应终止循环（无添加入口 /
         材料不足 / 规则判跳过装备，原因写入 output["stop_reason"]）。
         """
         add_scan = self.ocr_scene(self.TUNE_SCENE, ["auto_add", "auto_add_2"])
-    
+
         # 材料区未展开时先展开
         can_add = "添加" in add_scan.get("auto_add", "")
         if "添加" in add_scan.get("auto_add_2", ""):
             self.click_region(self.TUNE_SCENE, "expand")
             self.wait_delay("page_refresh_wait")
             can_add = True
-    
+
         if not can_add:
             logger.info("未找到「添加」入口，视为无法继续调律")
             return None
-    
+
         # 逐轮狗粮决策：每轮识别材料区持有量后按规则表决策
         settings = get_tuning_base().materials
         infos = None
@@ -395,14 +401,14 @@ class SingleTuningWorkflow(BaseWorkflow):
                 return None
             self.click_region(self.TUNE_SCENE, slot)
             self.wait_delay("step_interval")
-    
+
         # 一键添加律准石 + 调律
         self.click_region(self.TUNE_SCENE, "auto_add")
         self.wait_delay("step_interval")
         self.click_region(self.TUNE_SCENE, "tune_btn")
         self.wait_delay("step_interval")
         self.wait_delay("page_refresh_wait")  # 调律结果出现（after_tune_wait 已废弃）
-    
+
         # 收取调律结果并关闭弹窗
         result = self.ocr_scene(self.RESULT_SCENE, ["tune_affix", "tune_tip"])
         logger.info(f"调律结果: {result}")

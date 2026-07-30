@@ -13,11 +13,11 @@ from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
     AutoTuningWorkflow,
 )
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
+    DEFAULT_TRAVERSAL,
+    TRAVERSALS,
     BagTraversal,
     DedupTraversal,
-    DEFAULT_TRAVERSAL,
     PositionalTraversal,
-    TRAVERSALS,
 )
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
@@ -211,7 +211,7 @@ def test_dispatch_default_is_dedup(stub_session, spy_traversals):
 
 def test_dispatch_injected_positional(stub_session, spy_traversals):
     wf = DispatchFakeWF()
-    wf._scroll_strategy = "positional"
+    wf.ctx.scroll_strategy = "positional"
     wf._traverse_bag(WEAPON_DETAIL)
     assert spy_traversals == ["positional"]
 
@@ -225,7 +225,7 @@ def test_dispatch_session_config(stub_session, spy_traversals):
 
 def test_dispatch_unknown_key_falls_back(stub_session, spy_traversals):
     wf = DispatchFakeWF()
-    wf._scroll_strategy = "bogus"
+    wf.ctx.scroll_strategy = "bogus"
     wf._traverse_bag(WEAPON_DETAIL)
     assert spy_traversals == ["dedup"]
 

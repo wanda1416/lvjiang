@@ -10,9 +10,14 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QGroupBox, QScrollArea,
     QCheckBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 from .tuning_config_widget import TuningConfigWidget
@@ -152,7 +157,9 @@ class TuningTab(QWidget):
 
         # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
         from ..evaluator import (
-            get_tuning_judge, get_tuning_rules, get_rule_names,
+            get_rule_names,
+            get_tuning_judge,
+            get_tuning_rules,
             is_rule_implemented,
         )
         rules_cfg = self._get_tuning_rule_config()
@@ -182,18 +189,20 @@ class TuningTab(QWidget):
         flow_name = "自动调律"
 
         def configure(wf_instance, engine):
-            wf_instance._selected_slots = selected_slots
-            wf_instance._rule_judges = rule_judges
-            # 潜力判定配置（形状与 single_tuning._load_rule_config 一致，
-            # 对齐 UI 实时勾选）：供 auto_tuning 的 judge_tuning_worthiness/
-            # judge_equipment_potential 使用
-            wf_instance._judge_configs = {
-                k: {**cfg, "switches": switches} for k, cfg in enabled.items()}
-            wf_instance._judge_rule_keys = list(enabled)
-            # 临时测试开关：跳过实际调律（仅模拟进出调律页，便于测试滚动）
-            wf_instance._skip_tuning = skip_tuning
-            # 调律说明文档（logs/tuning/）的操作用户名
-            wf_instance._doc_username = host.active_user_name()
+            from ..workflows.run_context import TuningRunContext
+            # 运行上下文一次性收口注入（字段契约见 TuningRunContext）：
+            # judge_configs 形状与 single_tuning._load_rule_config 一致，
+            # 对齐 UI 实时勾选，供 judge_equipment_potential 使用；
+            # skip_tuning 为临时测试开关（仅模拟进出调律页，便于测试滚动）
+            wf_instance.run_ctx = TuningRunContext(
+                selected_slots=selected_slots,
+                rule_judges=rule_judges,
+                judge_configs={
+                    k: {**cfg, "switches": switches} for k, cfg in enabled.items()},
+                judge_rule_keys=list(enabled),
+                skip_tuning=skip_tuning,
+                doc_username=host.active_user_name(),
+            )
 
             rule_names_text = "、".join(j.rule_name for j in rule_judges)
             on_names = _tuning_switch_names(switches)

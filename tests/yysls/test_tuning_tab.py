@@ -162,13 +162,13 @@ class TestF9Run:
         assert impl_name == "auto_tuning"
         assert flow_name == "自动调律"
 
-        # configure 回调向工作流实例注入专属参数并输出开始日志
+        # configure 回调向工作流实例注入运行上下文并输出开始日志
         class _Wf:
             pass
         wf = _Wf()
         configure(wf, engine=None)
-        assert wf._selected_slots == tab._get_tuning_selected_slots()
-        assert wf._rule_judges
-        assert wf._judge_rule_keys
-        assert wf._doc_username == "测试用户"
+        assert wf.run_ctx.selected_slots == tab._get_tuning_selected_slots()
+        assert wf.run_ctx.rule_judges
+        assert wf.run_ctx.judge_rule_keys
+        assert wf.run_ctx.doc_username == "测试用户"
         assert any(m.startswith("[开始] 自动调律") for m in host.logs)

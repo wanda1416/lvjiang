@@ -11,7 +11,9 @@ already_full / junk_blank / no_tune_entry / tuned（含材料不足提前
 import pytest
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    FoodRule, MaterialSettings, TuningBase,
+    FoodRule,
+    MaterialSettings,
+    TuningBase,
 )
 from lvjiang.apps.yysls.workflows.implementations import auto_tuning
 from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
@@ -21,6 +23,7 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     PositionalTraversal,
     ScrollState,
 )
+from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
 TUNE_SCENE = AutoTuningWorkflow.TUNE_SCENE
@@ -38,8 +41,7 @@ class FakeWF(AutoTuningWorkflow):
 
     def __init__(self):
         self.output = {}
-        self._judge_configs = {}
-        self._judge_rule_keys = []
+        self.run_ctx = TuningRunContext(judge_configs={}, judge_rule_keys=[])
         self._stopped = False
         self.clicks: list[tuple[str, str]] = []
         self.junk_calls: list = []
@@ -355,18 +357,18 @@ def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
 
 
 def test_ensure_judge_config_keeps_injected():
-    """已注入 _judge_configs 时 _ensure_judge_config 不覆盖"""
+    """已注入 judge_configs 时 _ensure_judge_config 不覆盖"""
     wf = FakeWF()
-    wf._judge_configs = {"huiyi": {"enabled": True}}
-    wf._judge_rule_keys = ["huiyi"]
+    wf.run_ctx = TuningRunContext(
+        judge_configs={"huiyi": {"enabled": True}}, judge_rule_keys=["huiyi"])
     wf._ensure_judge_config()
-    assert wf._judge_rule_keys == ["huiyi"]
+    assert wf.ctx.judge_rule_keys == ["huiyi"]
 
 
 def test_skip_tuning_switch(patch_worth):
     """跳过实际调律开关：值得调律的装备才真实进出调律页但不调律"""
     wf = FakeWF()
-    wf._skip_tuning = True
+    wf.ctx.skip_tuning = True
     wf._process_equipment("测试剑", _equip(2), WEAPON_DETAIL)
 
     reports = wf.output["tuning_reports"]
@@ -389,7 +391,7 @@ def test_skip_tuning_full_affix_not_entered(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: {})
     wf = FakeWF()
-    wf._skip_tuning = True
+    wf.ctx.skip_tuning = True
     wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
 
     assert not wf.output.get("tuning_reports")
@@ -403,7 +405,7 @@ def test_skip_tuning_junk_not_entered(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
     wf = FakeWF()
-    wf._skip_tuning = True
+    wf.ctx.skip_tuning = True
     wf._process_equipment("垃圾胚子", _equip(2), WEAPON_DETAIL)
 
     assert not wf.output.get("tuning_reports")
@@ -415,7 +417,7 @@ def test_skip_tuning_junk_not_entered(monkeypatch):
 def test_skip_tuning_no_entry(patch_worth):
     """开关开启且值得但无调律入口 → 仍走 no_tune_entry，不点 back"""
     wf = FakeWF()
-    wf._skip_tuning = True
+    wf.ctx.skip_tuning = True
     wf._nav_tune_ok = False
     wf._process_equipment("无入口剑", _equip(2), WEAPON_DETAIL)
 
@@ -620,7 +622,7 @@ def test_new_rows_full_row_traversal_first_col_fp_only():
 
 
 class TestTuningDocIntegration:
-    """调律说明文档端到端：假流程注入 _doc_dir 后跑通并检查叙事内容"""
+    """调律说明文档端到端：假流程注入 ctx.doc_dir 后跑通并检查叙事内容"""
 
     def test_doc_written_only_for_tuned(self, monkeypatch, tmp_path):
         """好剑调律到满写入文档；垃圾剑被跳过完全不出现在文档中"""
@@ -629,8 +631,8 @@ class TestTuningDocIntegration:
             lambda equip_data, *a, **k: dict(
                 _WORTHY if equip_data.name == "好剑" else _JUNK))
         wf = FakeWF()
-        wf._doc_username = "小明"
-        wf._doc_dir = tmp_path
+        wf.ctx.doc_username = "小明"
+        wf.ctx.doc_dir = tmp_path
         wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
         wf._ocr_map[RESULT_SCENE] = {"tune_affix": "最大外功攻击 100",
                                      "tune_tip": ""}

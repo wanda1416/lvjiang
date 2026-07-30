@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31（Phase 4 进行中：APK 体积优化 + Release 签名基础设施已就位，待实机复验 release 包）
+> 最后更新：2026-07-31（Phase 4 进行中：release 包实机复验通过，R8 未破坏 Chaquopy 反射面）
 
 ---
 
@@ -177,8 +177,14 @@
   - 用户侧待办：`keytool -genkeypair -v -keystore lvjiang.jks -keyalg RSA \
     -keysize 2048 -validity 10000 -alias lvjiang`，再把路径与密码写入
     `android/keystore.properties`（待补 `android/README-signing.md` 说明文档）
+- [x] **release 包实机复验**（2026-07-31）
+  - 新增 `SelfTestProvider.kt`：release 包不可调试，`run-as` 读报告直接拒绝
+    （"package not debuggable"），改走 ContentProvider 只读通道：
+    `adb shell content read --uri content://com.lvjiang.app.selftest/log`，
+    openFile 里校验调用方必须是 shell/root uid；`run_selftest.py` 自动降级
+  - `task` 自检 5 步全绿：任务清单 7 项 → start_task ok → 0.7s 跑完
+    device_smoke_test → 终态 done → 互斥校验通过，R8 没砍 Chaquopy 反射面
 - [ ] 用户引导流程（首次启动 → 开无障碍 → 悬浮窗权限 → 开始使用）
-- [ ] release 包实机复验（当前无障碍绑定在 vivo 上被厂商策略拦下，需手动确认一次）
 
 ### 本轮新增验证设施
 
@@ -191,7 +197,7 @@
 | `.tooling/run_selftest.py --release` | 用 release APK 装包跑自检，验证 R8 没砍反射 |
 | `android/app/proguard-rules.pro` | R8 keep 规则：Chaquopy 反射访问面 + 服务构造器 + AIDL + ONNX |
 
-### 实机验证踩到的两个坑
+### 实机验证踩到的坑
 
 - **写死坐标会点到应用外**：`MainActivity` 的状态文本会被自检报告撑长，把下方按钮
   全部往下推（启动悬浮图标从 968 移到 1091）。第一下点空之后第二下落到桌面，
@@ -199,14 +205,21 @@
 - **悬浮窗在 uiautomator dump 里不存在**：它是 `FLAG_NOT_FOCUSABLE`，不是 active
   window。只能从 `dumpsys window` 的 `type=2038 ... frame=` 取；且 `LayoutParams`
   里写的 y 不等于实际 y（`FLAG_LAYOUT_NO_LIMITS` 下 40/400 实测落到 40/547）。
+- **vivo 开始拦 adb 写无障碍开关**（2026-07-31 起）：`settings put` 写入成功但
+  系统不绑定（dumpsys 无命中），必须在设置页手动开一次；开过之后重启保留，
+  但重装 APK 仍会撤销。`run_selftest.py` 的自动刷绑定在这台设备上已不可靠。
+- **静默装包也被拦**：`adb install` / `pm install` 都弹确认框（INSTALL_FAILED_ABORTED），
+  需要在手机上点「继续安装」。
+- **重复 `am start` 同一 Activity 不触发自检**：目标已在栈顶且 intent 匹配时，
+  AM 只报「delivered to top-most instance」但 onCreate/onNewIntent 都不走
+  （standard launchMode 无 SINGLE_TOP flag）。先 BACK 销毁实例再 start 即可，
+  不必 force-stop（那会连无障碍服务一起杀掉）。
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **release 包实机复验**：手动确认一次「设置 → 无障碍 → 律匠自动操作」开关后，
-   跑 `run_selftest.py task --release`，确认 R8 没把 Chaquopy 反射面砍掉
-2. **首次启动引导流程**（权限一步步过：无障碍 → 悬浮窗 → 主界面）
-3. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
-4. **正式签名**：生成 keystore + 写 `android/README-signing.md` 说明文档
+1. **首次启动引导流程**（权限一步步过：无障碍 → 悬浮窗 → 主界面）
+2. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
+3. **正式签名**：生成 keystore + 写 `android/README-signing.md` 说明文档
 

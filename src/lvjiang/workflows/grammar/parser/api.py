@@ -36,20 +36,26 @@ def _preprocess_line_continuation(text: str) -> str:
 
     1. 显式续行：行尾反斜杠 \\ → 与下一行拼接
     2. 隐式续行：{} [] () 内部的换行视为空格（不终结语句）
-    """
-    # 第一步：显式续行 — 行尾 \\ 后紧跟换行，拼接两行
-    text = text.replace("\\\n", " ")
 
-    # 第二步：隐式续行 — 跟踪括号深度，深度 > 0 时换行替换为空格
-    result = []
+    被吐掉的换行会在逻辑行结束后补回（以空行形式），保证后续语句
+    的行号与源文件一致 —— 静态校验的报错要报真实行号。
+    """
+    result: list[str] = []
     depth = 0
     in_string = False
+    pending_nl = 0  # 当前逻辑行内吐掉的换行数
     i = 0
     while i < len(text):
         ch = text[i]
         if ch == '"' and (i == 0 or text[i - 1] != '\\'):
             in_string = not in_string
             result.append(ch)
+        elif not in_string and ch == '\\' and text[i + 1:i + 2] == '\n':
+            # 显式续行
+            result.append(' ')
+            pending_nl += 1
+            i += 2
+            continue
         elif not in_string:
             if ch in ('(', '[', '{'):
                 depth += 1
@@ -60,11 +66,18 @@ def _preprocess_line_continuation(text: str) -> str:
             elif ch == '\n' and depth > 0:
                 # 括号内换行 → 空格
                 result.append(' ')
+                pending_nl += 1
+            elif ch == '\n':
+                # 逻辑行结束：补回吐掉的换行，保住总行数
+                result.append('\n' * (1 + pending_nl))
+                pending_nl = 0
             else:
                 result.append(ch)
         else:
             result.append(ch)
         i += 1
+    if pending_nl:
+        result.append('\n' * pending_nl)
     return ''.join(result)
 
 

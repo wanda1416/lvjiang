@@ -11,6 +11,7 @@
 | 文档 | 主题 |
 |------|------|
 | [01-screenshot-and-crop.md](01-screenshot-and-crop.md) | `scan` / `recognize` 的截图-裁剪-识别数据流,以及 DSL 写法对截屏次数的影响 |
+| [02-static-check.md](02-static-check.md) | 跑脚本前的静态检查:引用搜集范围、比对规则与报错形式 |
 
 ## 阅读建议
 

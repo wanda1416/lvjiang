@@ -189,3 +189,8 @@ click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 - Panel 对齐失败（页面未加载完、列表为空，`detect_grid` 检测不到 slot）
 
 抛出的错误可以被 `try` / `catch` 捕获，需要容错的片段自行包裹即可。
+
+上表前两行（未绑定的 Region / Point / Arrow / Panel）在**执行前**就会被静态
+检查拦下：引擎解析完 `.wf` 先把全部静态引用与当前布局比一遍，一次性列出
+所有问题（含文件名与行号），不等执行到那一行；这一层报错在 `try` 之前，
+捕获不到。详见 [33-engine/02-static-check.md](../33-engine/02-static-check.md)。

@@ -17,11 +17,26 @@ from .statements import _StmtMixin
 class _DSLTransformer(_StmtMixin, _ExprMixin, _ModuleControlMixin, Transformer):
     """将 Lark 解析树转换为 DSL AST 节点"""
 
+    def __init__(self):
+        super().__init__()
+        self._meta_line = 0
+
+    def _call_userfunc(self, tree, new_children=None):
+        """规则回调前记下本子树的起始行号，供 _line 兜底
+
+        Lark 自底向上转换，规则回调拿到的子节点多已是 AST 对象，Token 已
+        消失，_line 从中取不到行号（恒 0）。转换器本身持有 parse tree，
+        propagate_positions=True 又保证 meta 带位置，故在派发前留一份。
+        """
+        meta = getattr(tree, "meta", None)
+        if meta is not None and not getattr(meta, "empty", True):
+            self._meta_line = getattr(meta, "line", 0) or 0
+        return super()._call_userfunc(tree, new_children)
+
     # ─── 工具方法 ─────────────────────────────────────────
 
-    @staticmethod
-    def _line(items) -> int:
-        """从子节点中提取行号"""
+    def _line(self, items) -> int:
+        """从子节点中提取行号，取不到则用当前规则子树的起始行"""
         for item in items:
             if isinstance(item, Token) and hasattr(item, 'line'):
                 return item.line or 0
@@ -29,7 +44,7 @@ class _DSLTransformer(_StmtMixin, _ExprMixin, _ModuleControlMixin, Transformer):
                 return item.line_no
             if isinstance(item, Tree) and hasattr(item, 'meta') and item.meta:
                 return getattr(item.meta, 'line', 0)
-        return 0
+        return self._meta_line
 
     @staticmethod
     def _unquote(s: str) -> str:

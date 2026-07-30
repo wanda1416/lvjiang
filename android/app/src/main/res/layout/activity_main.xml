@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/status_placeholder"
+            android:textSize="15sp"
+            android:paddingBottom="16dp" />
+
+        <Button
+            android:id="@+id/btn_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_overlay" />
+
+        <Button
+            android:id="@+id/btn_shizuku"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_shizuku" />
+
+        <Button
+            android:id="@+id/btn_notification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_notification" />
+
+        <Button
+            android:id="@+id/btn_start_float"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_start_float" />
+
+        <Button
+            android:id="@+id/btn_stop_float"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_stop_float" />
+
+        <Button
+            android:id="@+id/btn_test_shell"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_test_shell" />
+
+        <Button
+            android:id="@+id/btn_test_python"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_test_python" />
+
+        <!-- 三通道闭环自检的被点目标：点中后上方状态行会出现「已生效」，
+             而这三个字在点击前的界面上不存在，因此 OCR 自己就能判定点击是否真的落地 -->
+        <Button
+            android:id="@+id/btn_test_click"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_test_click" />
+
+    </LinearLayout>
+</ScrollView>

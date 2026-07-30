@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    无障碍服务配置。
+
+    本服务不做界面朗读、不监听内容变化，只借用两项能力：
+      canTakeScreenshot  -> AccessibilityService.takeScreenshot()
+      canPerformGestures -> AccessibilityService.dispatchGesture()
+
+    canTakeScreenshot 从 Android 14 起是强制声明项，不写则 takeScreenshot
+    直接返回失败。accessibilityEventTypes 只留 typeWindowStateChanged：
+    完全设 none 在部分系统上会导致服务不出现在设置列表里，而窗口切换事件
+    频率极低，开销可以忽略（onAccessibilityEvent 里也什么都不做）。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
+    android:description="@string/a11y_description"
+    android:notificationTimeout="100" />

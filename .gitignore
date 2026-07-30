@@ -35,3 +35,10 @@ Desktop.ini
 
 # Qoder
 .qoder/
+
+# Android 构建（工具链自包含在 .tooling/，不入库）
+.tooling/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/**/.cxx/

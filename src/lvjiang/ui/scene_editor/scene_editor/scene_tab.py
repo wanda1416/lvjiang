@@ -212,6 +212,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         """刷新区域和坐标列表（场景定义变化后调用）"""
         self._canvas.set_current_regions(get_scene_regions(self._scene_key))
         self._canvas.set_current_points(get_scene_point_pairs(self._scene_key))
+        # 归属视图可能变更（如区域改到另一视图），重新下发视图过滤，
+        # 否则画布仍按旧可见集继续绘制已移出当前视图的实例
+        self._apply_view_filter()
         self._refresh_region_list()
         self._refresh_point_list()
         self._refresh_panel_list()

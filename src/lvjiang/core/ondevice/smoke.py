@@ -12,6 +12,7 @@ target="e2e" 则跑完整的三通道闭环：真实截屏 → 整屏 OCR（含�
 的按钮 → 再截一张确认点击真的生效，需要 Shizuku 已授权。
 """
 
+import tempfile
 import time
 import traceback
 from pathlib import Path
@@ -21,6 +22,43 @@ _TAG = "LvjiangSelfTest"
 
 #: 报告结束哨兵，adb 侧靠它判断已经输出完整，不必等固定秒数
 END = "=== SELFTEST END ==="
+
+#: 冒烟自检用的纯计算 DSL（原 config/system/workflows/device_smoke_test.wf，
+#: 已内联进代码，不再作为分发物污染发现层 / 任务清单）。不截图不点击，
+#: 只走「变量赋值 + for 循环 + 日志 + collect」验证引擎执行链路贯通。
+#: run / task 两条自检链路与 task_runner 共用这一份源码。
+SMOKE_WF_DSL = '''\
+log "=== 设备端工作流引擎冒烟测试开始 ==="
+
+eval $msg = "hello from device"
+log $msg
+
+eval $count = 0
+for i in [1...5]
+    eval $count = $count + 1
+end
+
+log "loop finished"
+log $count
+
+collect $count as "count"
+
+log "=== 设备端工作流引擎冒烟测试完成 ==="
+'''
+
+
+def write_smoke_wf() -> Path:
+    """把内联冒烟 DSL 落成临时 .wf 文件，返回路径
+
+    引擎 execute 只认 .wf 路径（或 BaseWorkflow 实例），不直接吃字符串，
+    故内联源码在执行前写到临时文件。临时目录由系统回收，不手动清理。
+    """
+    fp = tempfile.NamedTemporaryFile(
+        "w", suffix=".wf", prefix="lvjiang_smoke_", delete=False, encoding="utf-8"
+    )
+    fp.write(SMOKE_WF_DSL)
+    fp.close()
+    return Path(fp.name)
 
 
 def _log_path() -> Path:
@@ -323,19 +361,15 @@ def _run_execute() -> str:
 
     if ok:
         def create_and_run(report):
-            from ..config_resolver import get_resolver
             from .workflow_runner import create_engine
 
             # 创建工作流引擎
             engine = create_engine()
             report.append("引擎创建成功")
 
-            # 执行测试工作流
-            wf_path = get_resolver().resolve_read("workflows/device_smoke_test.wf")
-            if wf_path is None:
-                raise RuntimeError("测试工作流不存在: workflows/device_smoke_test.wf")
-
-            report.append(f"开始执行: {wf_path.name}")
+            # 执行内联冒烟 DSL（落成临时 .wf，引擎只认路径）
+            wf_path = write_smoke_wf()
+            report.append(f"开始执行: {wf_path.name}（内联 DSL）")
             result = engine.execute(wf_path)
             report.append(f"执行完成，结果: {result}")
             report.append(f"变量表: {engine.variables}")
@@ -362,7 +396,7 @@ def _run_execute() -> str:
     return "\n".join(report)
 
 
-#: task 自检用的任务 id（config/system/workflows/device_smoke_test.wf，纯计算不点游戏）
+#: task 自检用的任务 id（源码内联于 SMOKE_WF_DSL，由 task_runner 内置合成，纯计算不点游戏）
 _TASK_ID = "device_smoke_test"
 
 #: 轮询上限。首次跑要含 OCR 模型加载（秒级），给足余量
@@ -395,8 +429,8 @@ def _run_task() -> str:
             report.append(f"任务数      {len(ids)}")
             for t in data["tasks"]:
                 report.append(f"  {t['source']:5s} {t['id']:24s} {t['name']}")
-            if _TASK_ID not in ids:
-                raise RuntimeError(f"清单里没有 {_TASK_ID}，已有：{ids}")
+            # 冒烟任务不再出现在清单里（由 task_runner._resolve_task 内置合成），
+            # 这里只验清单本身可读，不再断言 _TASK_ID 在列。
 
         ok, _ = _step(report, "2/5 任务清单", lambda: check_list(report))
 

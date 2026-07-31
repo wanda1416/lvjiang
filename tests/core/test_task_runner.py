@@ -370,20 +370,17 @@ def test_state_snapshot_is_thread_safe():
 # ─── 真引擎集成 ────────────────────────────────────────────
 
 def test_device_smoke_wf_runs_through_task_runner(monkeypatch):
-    """用真引擎跑一遍设备端冒烟 .wf
+    """用真引擎跑一遍设备端冒烟 DSL
 
-    这条是为了把「DSL 写错了」这类错误拦在 PC 上。冒烟 .wf 是纯计算的
-    （不截图不点击），所以换上 MagicMock 后端就能完整执行；否则一个拼错的
-    collect 语法要等到装包上机才能发现，一轮往返好几分钟。
+    这条是为了把「DSL 写错了」这类错误拦在 PC 上。冒烟源码已内联于
+    smoke.SMOKE_WF_DSL（不再是分发 .wf），由 _resolve_task 内置合成、
+    _build_source 落临时文件执行。它是纯计算的（不截图不点击），所以换上
+    MagicMock 后端就能完整执行；否则一个拼错的 collect 语法要等到装包上机
+    才能发现，一轮往返好几分钟。
     """
     from unittest.mock import MagicMock
 
-    from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
     from lvjiang.workflows.engine import WorkflowEngine
-
-    wf = SYSTEM_WORKFLOWS_DIR / "device_smoke_test.wf"
-    if not wf.exists():
-        pytest.skip(f"冒烟工作流不存在: {wf}")
 
     layout = MagicMock()
     layout.get_canvas.return_value = MagicMock(
@@ -394,9 +391,8 @@ def test_device_smoke_wf_runs_through_task_runner(monkeypatch):
         stop_check=task_runner._STATE.should_stop,
     )
 
-    _patch_discovery(monkeypatch, _fake_tasks(
-        {"id": "device_smoke_test", "name": "设备端冒烟测试"}
-    ))
+    # 冒烟任务不走发现层（_resolve_task 内置合成），故无需 _patch_discovery；
+    # 也不 patch _build_source，正好验证内联 DSL 落临时文件这条真实路径。
     _patch_engine(monkeypatch, engine)
 
     assert json.loads(task_runner.start_task("device_smoke_test"))["ok"] is True

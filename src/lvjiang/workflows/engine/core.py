@@ -166,10 +166,25 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             return self._execute_dsl(source_path)
         raise ValueError(f"不支持的执行源: {source}")
 
-    def _execute_dsl(self, wf_path: Path) -> dict:
-        """加载并执行 .wf 文件"""
-        self._ensure_workflow()
-        resolved = Path(wf_path).resolve()
+    def validate_only(self, wf_path: Path | str) -> None:
+        """只解析与静态校验 .wf，不执行任何动作
+
+        供上机前预检与 CI 门禁使用：布局漏绑区域、key 拼错、命名等待参数未
+        定义这类错误，过去只有真执行到那一行才炸 —— 而实机失败时游戏已经被
+        点到别处去了。校验通过返回 None，不通过抛 WorkflowUserError（消息含
+        全部问题清单）。
+
+        判据与 _execute_dsl 共用 _load_and_validate，不会出现「预检放过、
+        上机仍炸」的偏差。
+        """
+        self._load_and_validate(Path(wf_path).resolve())
+
+    def _load_and_validate(self, resolved: Path):
+        """解析 .wf（含 import 链与 def 注册）并跑两道静态校验，返回 program
+
+        _execute_dsl 与 validate_only 共用此方法：两者对「什么算合法脚本」的
+        判据必须是同一份。
+        """
         self._base_dir = resolved.parent
         self._wf_rel_dir = self._workflows_rel_dir(resolved)
         program = parse_file(resolved)
@@ -188,6 +203,13 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._validate_named_waits(program)
         # 静态校验：脚本引用的场景 / 区域 / 方向 / 面板必须已在当前布局绑定坐标
         self._validate_refs_bound(program)
+        return program
+
+    def _execute_dsl(self, wf_path: Path) -> dict:
+        """加载并执行 .wf 文件"""
+        self._ensure_workflow()
+        resolved = Path(wf_path).resolve()
+        program = self._load_and_validate(resolved)
 
         logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令, {len(self._procs)} 个过程) ===")
 

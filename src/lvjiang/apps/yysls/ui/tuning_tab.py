@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 from .tuning_config_widget import TuningConfigWidget, TuningGlobalsWidget
 
 
@@ -110,19 +111,14 @@ class TuningTab(QWidget):
         self._tuning_checkboxes: list[QCheckBox] = []
 
         slots_row = QHBoxLayout()
-        for group_name, slots in [
-            ("武器类", [("main_weapon", "主武器"), ("sub_weapon", "副武器"),
-                       ("ring", "环"), ("pendant", "佩")]),
-            ("防具类", [("head", "冠胄"), ("chest", "胸甲"),
-                       ("leg", "胫甲"), ("wrist", "腕甲")]),
-        ]:
+        for group_name, slots in SLOT_GROUPS:
             grp = QGroupBox(group_name)
             grp_layout = QVBoxLayout(grp)
             for slot_key, slot_label in slots:
                 cb = QCheckBox(slot_label)
                 cb.setObjectName(slot_key)
                 cb.setChecked(True)
-                if slot_key == "sub_weapon":
+                if slot_key in LOCKED_SLOTS:
                     # 主武器槽已展示全部武器，副武器无需遍历，强制禁用
                     cb.setChecked(False)
                     cb.setEnabled(False)
@@ -249,10 +245,8 @@ class TuningTab(QWidget):
 
     def _load_tuning_config(self):
         from ..plugin_session import get_plugin_session
-        default_slots = ["main_weapon", "ring", "pendant",
-                         "head", "chest", "leg", "wrist"]
         tuning = get_plugin_session().get_section("tuning")
-        selected = tuning.get("selected_slots") or default_slots
+        selected = tuning.get("selected_slots") or list(DEFAULT_SLOTS)
         raw = tuning.get("rules")
         if isinstance(raw, dict):
             rules_cfg = raw

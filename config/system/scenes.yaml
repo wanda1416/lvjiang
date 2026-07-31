@@ -8,7 +8,7 @@ layout_scenes:
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail
-  - xinde_exchange
+  - training_xinde
   group_3:
   - bag_equip_detail
   - bag_item_detail

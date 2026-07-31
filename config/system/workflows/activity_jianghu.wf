@@ -79,7 +79,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
          call action_qingjing($label)
       end
       if $task_text contains "东方"
-         call action_dongfang($label)
+         call action_dongfang($label, $idx)
       end
       if $task_text contains "醉意"
          call action_zuiyi($label)
@@ -132,9 +132,9 @@ def action_heying($label, $idx)
    # 第六个任务已是最后一个，无需返回活动页
    if $idx equals "6"
       log "末个任务合影完成，无需返回江湖号令页"
-      return
+   else
+      call back_to_haoling()
    end
-   call back_to_haoling()
 end
 
 # 首页 → 江湖号令页：菜单 → 上滑翻页（最多两次）识别门派 → 门派首页 → 江湖号令
@@ -188,9 +188,47 @@ def action_qingjing($label)
    click [activity_jianghu].[back] after wait $step_interval
 end
 
-# 东方第一枝：动作暂未实现
-def action_dongfang($label)
-   log "东方动作暂未实现"
+# 东方第一枝（看报）：点击任务 → 前往 → 立刻进入表情动作视图
+# → 整面板扫描 actions 定位「看报」格子并点击 → 等 5s 弹出报纸阅读视图
+# → 点第一个选择 → 连点两次返回回到游戏首页（末个任务除外，需导航回号令页）
+def action_dongfang($label, $idx)
+   click [activity_jianghu].$label after wait $step_interval
+   click [activity_jianghu].[goto] after wait $step_interval
+
+   # 整面板扫描动作列表，定位「看报」所在行列
+   scan [action_control].[actions] as $acts
+   eval $fr = ""
+   for r in [1...2]
+      for c in [1...6]
+         if $acts.$r.$c contains "看报"
+            eval $fr = $r
+            eval $fc = $c
+         end
+      end
+   end
+
+   if $fr is_empty
+      # 扫描读不到时回退默认位置：看报固定在 1 行 3 列
+      log "动作列表未识别到「看报」，按默认位置 [1][3] 处理"
+      eval notify("东方第一枝：未识别到「看报」，按默认位置 [1][3] 处理")
+      eval $fr = 1
+      eval $fc = 3
+   end
+
+   click [action_control].[actions][$fr][$fc] after wait $step_interval
+   # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
+   wait 5
+   click [action_control].[choose_1] after wait $step_interval
+   click [action_control].[back] after wait $step_interval
+   click [action_control].[back] after wait $step_interval
+
+   # 末个任务已是最后一个，无需返回活动页
+   if $idx equals "6"
+      log "末个任务看报完成，无需返回江湖号令页"
+   else
+      call back_to_haoling()
+   end
+   
 end
 
 # 饮酒（醉意）：动作暂未实现

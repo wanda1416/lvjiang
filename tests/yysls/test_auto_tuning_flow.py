@@ -1507,3 +1507,131 @@ class TestResolveSelectedSlots:
         session.set_section("tuning",
                             {"selected_slots": ["ring", "bogus"]})
         assert self._device_wf()._resolve_selected_slots() == ["ring"]
+
+
+# ─── 滚动定位 / 指定调律 / 初始跳过 ─────────────────────
+
+
+class SkipTargetFakeWF(FakeWF):
+    """扩展 FakeWF：支持 drag_grid/align_panel/_read_row 记录"""
+
+    def __init__(self):
+        super().__init__()
+        self.drags = 0
+        self.aligns = 0
+        self.read_row_calls: list[tuple] = []
+        self.process_equipment_calls: list[tuple] = []
+        self.traverse_calls: list[str] = []
+        # 脚本化 _read_row 返回
+        self._read_row_result: tuple[str, str, dict] = ("", "", {})
+
+    def drag_grid(self, scene, panel, direction, hold=0.3):
+        self.drags += 1
+
+    def align_panel(self, scene, panel):
+        self.aligns += 1
+
+        class _A:
+            n_rows = 3
+        return _A()
+
+    def _find_panel(self, scene, panel):
+        class _P:
+            rows = 3
+            cols = 6
+        return _P()
+
+    def _read_row(self, detail_scene, row, col=1):
+        self.read_row_calls.append((detail_scene, row, col))
+        return self._read_row_result
+
+    def _process_equipment(self, name, equip, detail_scene, row=None, col=1):
+        self.process_equipment_calls.append((name, equip, detail_scene, row, col))
+        return "fp_after"
+
+    def _traverse_bag(self, detail_scene):
+        self.traverse_calls.append(detail_scene)
+
+    def _navigate_to_equip(self):
+        pass
+
+    def _navigate_back(self):
+        self.clicks.append(("nav", "back"))
+
+    def _open_doc(self, slots):
+        pass
+
+    def _close_doc(self):
+        pass
+
+    def _ensure_judge_config(self):
+        pass
+
+
+class TestScrollToRow:
+    def test_no_scroll_for_row_1(self):
+        wf = SkipTargetFakeWF()
+        wf._scroll_to_row(1)
+        assert wf.drags == 0
+
+    def test_scroll_count_equals_target_minus_1(self):
+        wf = SkipTargetFakeWF()
+        wf._scroll_to_row(5)
+        assert wf.drags == 4
+        assert wf.aligns == 1  # 滚动结束后对齐一次
+
+    def test_scroll_stops_when_stopped(self):
+        wf = SkipTargetFakeWF()
+        wf._stopped = True
+        wf._scroll_to_row(10)
+        assert wf.drags == 0  # is_stopped 立即中断
+
+
+class TestProcessSingleTarget:
+    def test_processes_equipment_at_target(self):
+        wf = SkipTargetFakeWF()
+        wf._read_row_result = ("测试剑", "fp123", _equip(3))
+        wf._process_single_target(WEAPON_DETAIL, 3, 2)
+        assert wf.drags == 2  # 滚到第 3 行
+        assert wf.read_row_calls == [(WEAPON_DETAIL, 1, 2)]  # 可见区第 1 行、第 2 列
+        assert len(wf.process_equipment_calls) == 1
+        assert wf.process_equipment_calls[0][0] == "测试剑"
+
+    def test_empty_target_skips_processing(self):
+        wf = SkipTargetFakeWF()
+        wf._read_row_result = ("", "", {})  # 空格
+        wf._process_single_target(WEAPON_DETAIL, 2, 1)
+        assert wf.process_equipment_calls == []
+
+
+class TestRunWithTargetCell:
+    def test_target_cell_processes_one_and_ends(self):
+        wf = SkipTargetFakeWF()
+        wf.run_ctx = TuningRunContext(
+            selected_slots=["main_weapon", "ring"],
+            target_cell=(2, 3),
+        )
+        wf._read_row_result = ("目标剑", "fp_x", _equip(3))
+        wf.run()
+        # 只处理了一件装备
+        assert len(wf.process_equipment_calls) == 1
+        assert wf.process_equipment_calls[0][0] == "目标剑"
+        # 没有遍历背包
+        assert wf.traverse_calls == []
+        # 已导航返回
+        assert ("nav", "back") in wf.clicks
+
+
+class TestRunWithSkipStart:
+    def test_skip_start_scrolls_first_slot_only(self):
+        wf = SkipTargetFakeWF()
+        wf.run_ctx = TuningRunContext(
+            selected_slots=["main_weapon", "head"],
+            skip_start=(4, 1),
+        )
+        wf.run()
+        # 第一个部位：先滚动再遍历
+        assert wf.drags == 3  # row 4 - 1 = 3
+        assert wf.traverse_calls == [WEAPON_DETAIL, "equip_armor_detail"]
+        # 第二个部位不滚动（总 drags 仍为 3）
+        assert wf.drags == 3

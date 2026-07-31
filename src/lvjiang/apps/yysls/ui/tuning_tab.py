@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -128,6 +129,51 @@ class TuningTab(QWidget):
                 self._tuning_checkboxes.append(cb)
             slots_row.addWidget(grp)
         layout.addLayout(slots_row)
+
+        # ── 初始跳过 / 指定调律（互斥）────────────────────
+        skip_group = QHBoxLayout()
+        self._cb_skip = QCheckBox("初始跳过")
+        self._sp_skip_row = QSpinBox()
+        self._sp_skip_row.setRange(1, 99)
+        self._sp_skip_row.setPrefix("行 ")
+        self._sp_skip_col = QSpinBox()
+        self._sp_skip_col.setRange(1, 6)
+        self._sp_skip_col.setPrefix("列 ")
+        skip_group.addWidget(self._cb_skip)
+        skip_group.addWidget(self._sp_skip_row)
+        skip_group.addWidget(self._sp_skip_col)
+        skip_group.addStretch()
+        layout.addLayout(skip_group)
+
+        target_group = QHBoxLayout()
+        self._cb_target = QCheckBox("指定调律")
+        self._sp_target_row = QSpinBox()
+        self._sp_target_row.setRange(1, 99)
+        self._sp_target_row.setPrefix("行 ")
+        self._sp_target_col = QSpinBox()
+        self._sp_target_col.setRange(1, 6)
+        self._sp_target_col.setPrefix("列 ")
+        target_group.addWidget(self._cb_target)
+        target_group.addWidget(self._sp_target_row)
+        target_group.addWidget(self._sp_target_col)
+        target_group.addStretch()
+        layout.addLayout(target_group)
+
+        # 互斥联动
+        self._cb_skip.toggled.connect(self._on_skip_target_toggled)
+        self._cb_target.toggled.connect(self._on_skip_target_toggled)
+        # 变更即持久化
+        self._cb_skip.toggled.connect(lambda: self._save_tuning_config())
+        self._cb_target.toggled.connect(lambda: self._save_tuning_config())
+        for sp in (self._sp_skip_row, self._sp_skip_col,
+                   self._sp_target_row, self._sp_target_col):
+            sp.valueChanged.connect(lambda: self._save_tuning_config())
+        # 初始状态：SpinBox 随 checkbox 勾选才可用
+        self._sp_skip_row.setEnabled(False)
+        self._sp_skip_col.setEnabled(False)
+        self._sp_target_row.setEnabled(False)
+        self._sp_target_col.setEnabled(False)
+
         layout.addStretch()
         return self._wrap_scroll(panel)
 
@@ -219,6 +265,12 @@ class TuningTab(QWidget):
             # judge_configs 形状与 single_tuning._load_rule_config 一致，
             # 对齐 UI 实时勾选，供 judge_equipment_potential 使用；
             # skip_tuning 为临时测试开关（仅模拟进出调律页，便于测试滚动）
+            skip_start = None
+            if self._cb_skip.isChecked() and self._cb_skip.isEnabled():
+                skip_start = (self._sp_skip_row.value(), self._sp_skip_col.value())
+            target_cell = None
+            if self._cb_target.isChecked() and self._cb_target.isEnabled():
+                target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
             wf_instance.run_ctx = TuningRunContext(
                 selected_slots=selected_slots,
                 rule_judges=rule_judges,
@@ -227,6 +279,8 @@ class TuningTab(QWidget):
                 judge_rule_keys=list(enabled),
                 skip_tuning=skip_tuning,
                 doc_username=host.active_user_name(),
+                skip_start=skip_start,
+                target_cell=target_cell,
             )
 
             rule_names_text = "、".join(j.rule_name for j in rule_judges)
@@ -260,14 +314,41 @@ class TuningTab(QWidget):
         self._tuning_config.set_config(rules_cfg)
         self._tuning_globals.set_switches(tuning.get("switches") or {})
         self._tuning_globals.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
+        # 初始跳过 / 指定调律
+        for key, cb, sp_row, sp_col in (
+            ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
+            ("target_cell", self._cb_target, self._sp_target_row, self._sp_target_col),
+        ):
+            val = tuning.get(key)
+            cb.blockSignals(True)
+            sp_row.blockSignals(True)
+            sp_col.blockSignals(True)
+            if isinstance(val, (list, tuple)) and len(val) == 2:
+                cb.setChecked(True)
+                sp_row.setValue(int(val[0]))
+                sp_col.setValue(int(val[1]))
+            else:
+                cb.setChecked(False)
+            cb.blockSignals(False)
+            sp_row.blockSignals(False)
+            sp_col.blockSignals(False)
+        self._on_skip_target_toggled()
 
     def _save_tuning_config(self):
         from ..plugin_session import get_plugin_session
+        skip_start = None
+        if self._cb_skip.isChecked():
+            skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]
+        target_cell = None
+        if self._cb_target.isChecked():
+            target_cell = [self._sp_target_row.value(), self._sp_target_col.value()]
         get_plugin_session().set_section("tuning", {
             "selected_slots": self._get_tuning_selected_slots(),
             "rules": self._get_tuning_rule_config(),
             "switches": self._get_tuning_switches(),
             "skip_tuning": self._get_tuning_skip_tuning(),
+            "skip_start": skip_start,
+            "target_cell": target_cell,
         })
 
     def _set_all_tuning_checks(self, checked: bool):
@@ -275,6 +356,17 @@ class TuningTab(QWidget):
             if cb.isEnabled():
                 cb.setChecked(checked)
         self._save_tuning_config()
+
+    def _on_skip_target_toggled(self):
+        """初始跳过 / 指定调律互斥联动：勾一个另一个置灰"""
+        skip_on = self._cb_skip.isChecked()
+        target_on = self._cb_target.isChecked()
+        self._cb_target.setEnabled(not skip_on)
+        self._sp_target_row.setEnabled(not skip_on and target_on)
+        self._sp_target_col.setEnabled(not skip_on and target_on)
+        self._cb_skip.setEnabled(not target_on)
+        self._sp_skip_row.setEnabled(skip_on and not target_on)
+        self._sp_skip_col.setEnabled(skip_on and not target_on)
 
     def _get_tuning_selected_slots(self) -> list[str]:
         return [cb.objectName() for cb in self._tuning_checkboxes if cb.isChecked()]

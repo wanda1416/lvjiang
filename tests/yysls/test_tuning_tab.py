@@ -207,3 +207,90 @@ class TestConfigTabs:
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
         assert saved["tuning"]["skip_tuning"] is True
+
+
+# ─── 初始跳过 / 指定调律（互斥 + 持久化 + 注入）───────────
+
+class TestSkipTarget:
+    def test_mutual_exclusion_skip_disables_target(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._cb_skip.setChecked(True)
+        assert not tab._cb_target.isEnabled()
+        assert not tab._sp_target_row.isEnabled()
+        assert not tab._sp_target_col.isEnabled()
+        # 自己的 spinbox 可用
+        assert tab._sp_skip_row.isEnabled()
+        assert tab._sp_skip_col.isEnabled()
+
+    def test_mutual_exclusion_target_disables_skip(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._cb_target.setChecked(True)
+        assert not tab._cb_skip.isEnabled()
+        assert not tab._sp_skip_row.isEnabled()
+        assert not tab._sp_skip_col.isEnabled()
+        assert tab._sp_target_row.isEnabled()
+        assert tab._sp_target_col.isEnabled()
+
+    def test_uncheck_restores_other(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._cb_skip.setChecked(True)
+        assert not tab._cb_target.isEnabled()
+        tab._cb_skip.setChecked(False)
+        assert tab._cb_target.isEnabled()
+
+    def test_persistence_roundtrip(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._cb_skip.setChecked(True)
+        tab._sp_skip_row.setValue(5)
+        tab._sp_skip_col.setValue(3)
+
+        saved = json.loads(session_path.read_text(encoding="utf-8"))
+        assert saved["tuning"]["skip_start"] == [5, 3]
+        assert saved["tuning"]["target_cell"] is None
+
+    def test_load_from_session(self, qtbot, host, session_path):
+        session_path.write_text(json.dumps({
+            "tuning": {"target_cell": [7, 2]},
+        }), encoding="utf-8")
+        ps_module._session = PluginSession(session_path)
+
+        tab = _make_tab(qtbot, host)
+        assert tab._cb_target.isChecked()
+        assert tab._sp_target_row.value() == 7
+        assert tab._sp_target_col.value() == 2
+        assert not tab._cb_skip.isChecked()
+        # 互斥状态正确
+        assert not tab._cb_skip.isEnabled()
+
+    def test_configure_injects_skip_start(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._cb_skip.setChecked(True)
+        tab._sp_skip_row.setValue(4)
+        tab._sp_skip_col.setValue(2)
+        tab.f9_run()
+
+        assert len(host.run_calls) == 1
+        _, _, configure = host.run_calls[0]
+
+        class _Wf:
+            pass
+        wf = _Wf()
+        configure(wf, engine=None)
+        assert wf.run_ctx.skip_start == (4, 2)
+        assert wf.run_ctx.target_cell is None
+
+    def test_configure_injects_target_cell(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._cb_target.setChecked(True)
+        tab._sp_target_row.setValue(3)
+        tab._sp_target_col.setValue(5)
+        tab.f9_run()
+
+        _, _, configure = host.run_calls[0]
+
+        class _Wf:
+            pass
+        wf = _Wf()
+        configure(wf, engine=None)
+        assert wf.run_ctx.target_cell == (3, 5)
+        assert wf.run_ctx.skip_start is None

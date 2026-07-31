@@ -1,9 +1,10 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31 傍晚（装备分析上机测试已启动：release APK v10 出包完成但**尚未安装**，
-> 阻塞在设备无障碍未绑定，详见「上机测试执行记录」一节，新会话可照该节直接接上）
+> 最后更新：2026-08-01（调律参数 UI 上机首验：v11 已装、配置页可用；修了两个 bug——
+> 部位不生效（selected_slots 缺会话回退）+ 开配置页游戏被 LMK 杀（改透明悬浮层主题）。
+> 待最终验证：透明配置页下游戏存活 + 只调勾选部位 + equip_analysis 首跑）
 >
-> 上一次：六主题变更已提交并推送至 `20acde0`；装备分析上机前依赖面预检全绿，坐标绑定风险已排除
+> 上一次：调律参数 UI 路线 B 实现（`5d51117`）+ 用户指南（`efaa41e`）+ 透明主题（`92fcb8e`），master 与 origin 已同步
 
 ---
 
@@ -388,100 +389,89 @@
   同一套 keystore 出 release。**别为了装 debug 包去卸载** —— 卸载会连带清掉设备端
   `config/local`（session、设备上标定的布局），而 release 包不可调试、`run-as` 用不了，
   卸载前根本没法备份那批数据，属于不可逆动作。
+- **不透明 Activity 会杀游戏**（2026-08-01）：全屏不透明 Activity（如配置页）把游戏
+  挤到后台，11.6GB 设备可用仅 1.5GB 时 LMK 秒回收游戏（`am_low_memory` 计数飙到 86）。
+  游戏工具的 UI 必须叠在游戏上面、不能遮挡全屏：改 `windowIsTranslucent` 主题后游戏
+  留在 visible 层不再被杀。律匠自身 PSS≈1GB（Chaquopy + onnxruntime + opencv）
+- **息屏装包被 vivo 拒绝**：`adb install` 时屏幕必须亮着（`mWakefulness=Awake`），
+  否则直接 `INSTALL_FAILED_ABORTED: User rejected permissions`，不弹框。
+  装前先 `adb shell input keyevent KEYCODE_WAKEUP`
+- **C 盘满会伪装成各种诡异故障**（2026-08-01，已清理到 249GB）：R8 阶段报“原生内存
+  mmap 失败”（实为 pagefile 无法增长）、pytest 批量 `OSError [Errno 28]`、gradle daemon
+  起不来——构建环境出怪先查磁盘
 
 ---
 
-## 上机测试执行记录（2026-07-31 傍晚，中断在安装前）
-
-本节是**断点续跑清单**，新会话照着往下走即可，不用重新摸环境。
-
-### 已完成
+## 上机测试执行记录（2026-07-31 → 08-01，环境已就绪）
 
 | 步骤 | 结论 |
 |---|---|
-| 设备连接 | `192.168.0.103:5555`，vivo V2415A（`product:PD2415`），无线 adb 在线 |
-| 查已装版本 | `versionCode=8`、release 签名（`run-as` 报 not debuggable），装于 11:22:04 |
-| 判定须重装 | 代码侧 `versionCode=10`；v8 缺 `9ecb626` 的 `ensure_loaded()` 修复，`to_equipment` 会报未知函数，v8 上跑 `equip_analysis` 必失败 |
-| debug 包试装 | ❌ `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，签名不匹配（详见踩坑最后一条） |
-| 出 release 包 | ✅ `BUILD SUCCESSFUL in 3m 26s`，产物 `android/app/build/outputs/apk/release/app-release.apk`（71.8MB，17:52:18，versionCode 10） |
-| 查游戏前台 | `com.netease.yyslscn/com.netease.game.MessiahNativeActivity` 在前台 |
-| 查 `equip_analysis` 入口 | `workflows.yaml` exposed **第一项**，显示名「当前装备分析」 |
-| 查脚本前置 | 首行 `call nav_main_to_equip()` → 游戏必须停在**主界面**（游戏世界画面，不能在任何子菜单里） |
+| 设备连接 | `192.168.0.103:5555`，vivo V2415A，无线 adb 在线（会话间会断，`adb connect` 重连即可） |
+| release v11 安装 | ✅ 覆盖安装成功（**屏幕必须亮着**，息屏装包被 vivo 直接拒，见踩坑） |
+| 无障碍绑定 | ✅ `enable_a11y.py` 一次成功（本次未被 vivo 拦截；覆盖安装后绑定会丢，需重跑） |
+| 调律配置页首验 | ✅ 能打开、能保存；发现两个 bug 并已修复（见下） |
+| 内存问题定位 | 设备 11.6GB / 可用仅 1.5GB，律匠 PSS≈1GB；不透明 Activity 把游戏挤到后台 → LMK 秒杀游戏 |
 
-### 未完成 / 阻塞点
+### 本轮修复（已提交）
 
-1. **APK 未安装**（包已就绪）。装包会在手机上弹「继续安装」确认框，需要手动点。
-2. **无障碍服务未绑定**：`settings get secure enabled_accessibility_services` 当前只有
-   `hello.litiaotiao.app/.LttService`（李跳跳）和 `com.wtkj.app.clicker/.service.ClickerService`
-   （点击器），**没有 `com.lvjiang.app/.A11yService`**。截图与点击两个通道都依赖它，不开
-   跑不了。vivo 从 2026-07-31 起拦 adb 写这个开关（写入成功但系统不绑定），需在
-   「设置 → 无障碍」里手动开一次「律匠自动操作」。
-   - `.tooling/enable_a11y.py` 已核对过是**追加**语义（`others` 列表保留原有条目），
-     不会关掉李跳跳和点击器，可以先跑它试一次，不成再手动开。
+1. **部位配置不生效**（`5d51117` 同批）：设备端经 task_runner 启动 auto_tuning 时
+   run_ctx 未注入，`selected_slots` 恒为 None → 回退全部 8 部位，从不读插件会话。
+   补上 `_resolve_selected_slots()` 会话回退（与 `_ensure_judge_config` 读
+   rules/switches 对称）
+2. **开配置页游戏被杀**（`92fcb8e`）：TuningConfigActivity 改透明悬浮层主题
+   （`windowIsTranslucent` + 80% 黑底 + `localNightMode=YES`），游戏窗口保持
+   可见、进程留在 visible 层
+
+### 待最终验证
+
+- 透明配置页打开/保存后游戏存活
+- 只勾部分部位 → 跑调律 → 只调勾选部位
+- `equip_analysis` 首跑（见「下一步操作」第 1 项）
 
 ### 断点续跑命令
 
 ```powershell
 $adb = ".tooling\android-sdk\platform-tools\adb.exe"
 
-# 1. 装包（手机上点「继续安装」）。包已存在则不必重新构建
+# 0. 无线 adb 会话间会断，先重连
+& $adb connect 192.168.0.103:5555
+
+# 1. 装包（屏幕必须亮着，先 WAKEUP；手机上点「继续安装」）
+& $adb shell input keyevent KEYCODE_WAKEUP
 & $adb install -r android\app\build\outputs\apk\release\app-release.apk
 
-# 2. 开无障碍（先自动试，输出「服务已绑定」才算成功；失败就去设置页手动开）
+# 2. 开无障碍（覆盖安装后绑定会丢，需重跑；输出「服务已绑定」才算成功）
 .venv\Scripts\python.exe .tooling\enable_a11y.py
-
-# 3. 校验：应能看到 com.lvjiang.app 命中
-& $adb shell settings get secure enabled_accessibility_services
 
 # 需要重新出包时（改了 src/ 下的 Python 代码就要）：
 #   pwsh -NoProfile -File .tooling\gradle-bg.ps1 :app:assembleRelease
-#   日志 .tooling/gradle-bg.log，轮询 BUILD SUCCESSFUL，全量约 3.5 分钟
+#   日志 .tooling/gradle-bg.log，轮询 BUILD SUCCESSFUL，增量约 3 分钟
 ```
 
 随后：启动律匠 App → 点「启动悬浮图标」（覆盖安装会杀掉悬浮服务，必须重点一次）
 → **把游戏切回主界面** → 悬浮面板选「当前装备分析」→ 跑。
 
-观察重点见「下一步操作」第 1 项。
-
 ---
 
 ## 下一步操作（按顺序）
 
-1. **`equip_analysis` 实机验证**（🚧 已启动，卡在安装 + 无障碍，见上节断点续跑清单）：
-   读装备详情 + OCR 词条，属识别类，风险低，宜先跑。坐标绑定风险已由上机前预检排除，
-   剩下的只有运行期问题：
+1. **`equip_analysis` 实机验证**（🚧 环境已就绪：v11 已装 + 无障碍已绑，待跑）：
+   读装备详情 + OCR 词条，属识别类，风险低，宜先跑。前置：游戏停在**主界面**
+   （首行 `call nav_main_to_equip()`）。运行期观察点：
    - `to_equipment` 是插件 builtin，靠 `9ecb626` 的 `ensure_loaded()` 修复才在设备端可用，
      这次是它的**首次真实验证**
    - OCR 词条识别在手机分辨率下的准确率未验过，看 `collect session.equipped` 的输出对不对
    - 建议先只跑这一个，不要与调律链路混在一起
-2. **桌面下拉回归确认**（阻塞项，等用户表态）：已查实事实如下，差异不会报错，纯属误导：
-   - `run_control._load_workflow_configs` 直接拿 `list_exposed_scripts()` 填下拉，所以
-     桌面**必然**多出一项「自动调律」，与调律 Tab 并列成第二个入口
-   - 调律 Tab 是在 `configure` 回调里注入 `TuningRunContext`（部位/规则配置/开关/
-     `doc_username`）；下拉这条路不走 `configure`，`run_ctx` 为 None → `self.ctx` 惰性
-     建全默认实例，即全部 8 部位 + 回退插件 session 的规则判定，且 `doc_username=""`
-     （调律说明文档缺操作用户名）
-   - `TuningRunContext` 每个字段都有兜底，所以不会崩 —— 问题是用户分不清两个入口的区别
-   - exposed 是双端共用的，若不希望桌面出现这个入口，需把暴露层拆成双端各一份
-3. **调律参数 UI**（✅ 代码已实现，待上机验证，versionCode 10→11）：两条路线中选定
-   **路线 B**（原生配置页写插件 session）—— 理由：路线 A（扩 `PARAMETERS`
-   schema）改动横跨五层且悬浮小面板放不下多规则多玩法的复杂表单；路线 B
-   写 `config/session/yysls/session.json` tuning 节，`_ensure_judge_config` 已有
-   回退路径直接消费，工作流零改动。本次改动清单：
-   - Python：新增 `core/ondevice/tuning_config.py`（`get_tuning_config` /
-     `save_tuning_config`，JSON 文本约定同 task_runner；校验与桌面
-     `_start_tuning` 一致：部位非空 / 启用规则非空 / 启用规则玩法非空；
-     `skip_tuning` 不进 UI，保存时保留原值）；部位常量抽到
-     `apps/yysls/slots.py`（无 PyQt 依赖，桌面 tuning_tab 同步改引用）
-   - Kotlin：`TuningConfigActivity`（全屏单列三区块：规则卡片 Switch+玩法复选 /
-     武器防具两组 8 部位复选 sub_weapon 置灰 / 开关注册表动态渲染，条目全部
-     代码生成不写死清单）；`PyBridge` 加 `getTuningConfig`/`saveTuningConfig`；
-     MainActivity 主页化（权限状态卡 + 功能区：配置入口 + 悬浮启停合一按钮，
-     自检模式改为整卡隐藏）；悬浮面板空闲态追加「调律配置」入口
-     （FLAG_ACTIVITY_NEW_TASK）
-   - 上机验证项：主页进配置页 → 改动保存 → 读设备端 session.json 确认 tuning
-     节格式与桌面一致 → 悬浮面板入口可达 → 自检模式（`--es selftest`）布局
-     仍与旧版一致（e2e OCR 闭环不受新区块干扰）
+2. **桌面下拉回归确认**（等用户表态）：下拉路径不走 `configure`，`run_ctx` 为 None →
+   此前恒按全部 8 部位；`_resolve_selected_slots()` 修复后改为回退读插件会话
+   tuning.selected_slots（与设备端配置页保存值一致），剩余差异仅 `doc_username=""`
+   （说明文档缺操作用户名）。是否保留桌面下拉里的「自动调律」入口仍待决
+   （exposed 双端共用，拆分暴露层才能只在一端隐藏）
+3. **调律参数 UI**（✅ 已上机首验 + 修复两个 bug，待最终确认）：路线 B（原生配置页
+   写插件 session）。上机首验发现并修复：
+   - 部位不生效 → `_resolve_selected_slots()` 会话回退（`5d51117` 同批）
+   - 开配置页游戏被 LMK 杀 → 透明悬浮层主题（`92fcb8e`）
+   - 待确认：透明页下游戏存活 + 只调勾选部位 + 自检模式（`--es selftest`）布局兼容
 
 ### 待 ① 跑通后才推进的其余上机项
 
@@ -493,19 +483,12 @@ $adb = ".tooling\android-sdk\platform-tools\adb.exe"
 
 ### 遗留待决（与 Phase 4 上机不相干）
 
-- **仓库已分叉：`master` ahead 8 / behind 1**（截至 2026-07-31 傍晚）。本地 8 个未推：
-  `cd32c46` PyInstaller 打包 → `ab1901c` adb 子进程 CREATE_NO_WINDOW → `0b1286b` 定音词条
-  全量池匹配 → `e499166` 内置 adb 随包分发 → `80dba3f` 顶档/普通条件结构演进 →
-  `e1d3dbc` 调律说明文档同步 → `25d9d4c` `validate_only` + 引用门禁 + 上机预检脚本 →
-  `cef0020` gitignore 补 mypy/ruff 缓存。远端有 1 个未合入：`feb7518` fix `_wait_for_threads`
-  排除 `_DummyThread`。**推送前必须先处理这个分叉**（rebase 或 merge，由用户定）。
-- 当前工作区未提交：`tuning_rules/` 下 3 个 yaml + `tests/yysls/test_huixin_judge.py`
-  （属并行进行的调律规则改动，不是上机相关）+ 本文件。
+- ~~仓库分叉~~ ✅ 已解决：master 与 origin/master 已同步（含调律 UI `5d51117` +
+  用户指南 `efaa41e` + 透明主题 `92fcb8e`）
 - `.git-mypy-base/` worktree （detached HEAD `33c1baf`）**仍在**，是做 mypy 基线对比时建的，待清：
   `git worktree remove --force .git-mypy-base`
 - **CI 的 mypy 门禁在远端已经是红的**：裸 `python -m mypy` 报 2 个错（`engine/core.py:347`
-  的 `workflow._engine = self`、`ondevice/workflow_runner.py:151`），在 `origin/master` 与当前
-  HEAD 都存在，是既有存量、非新引入。注意给 mypy 传路径参数会**覆盖**
-  `[tool.mypy] files` 清单（`mypy src/lvjiang` 报 145 错，不是门禁基线）；同理 ruff 的
-  门禁范围只是 `src tests`，加上 `scripts` 会多出 42 个既有错。
+  的 `workflow._engine = self`、`ondevice/workflow_runner.py:151`），是既有存量、非新引入。
+  注意给 mypy 传路径参数会**覆盖** `[tool.mypy] files` 清单；同理 ruff 门禁范围只是
+  `src tests`，加上 `scripts` 会多出 42 个既有错。
 

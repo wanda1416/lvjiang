@@ -1,8 +1,9 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31（六主题变更已提交并推送至 `20acde0`；装备分析上机前依赖面预检全绿，坐标绑定风险已排除）
+> 最后更新：2026-07-31 傍晚（装备分析上机测试已启动：release APK v10 出包完成但**尚未安装**，
+> 阻塞在设备无障碍未绑定，详见「上机测试执行记录」一节，新会话可照该节直接接上）
 >
-> 上一次：配置架构重构完成（input_delay 拆 input_sim + delay_params，app.yaml 走 system/local 分层）
+> 上一次：六主题变更已提交并推送至 `20acde0`；装备分析上机前依赖面预检全绿，坐标绑定风险已排除
 
 ---
 
@@ -14,7 +15,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名 + 江湖号令实机跑通 + 悬浮面板打磨；剩其余业务流上机（上机前预检已就位，下一个跑 `equip_analysis`） |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名 + 江湖号令实机跑通 + 悬浮面板打磨；剩其余业务流上机（`equip_analysis` 上机已启动，release v10 待安装） |
 
 ---
 
@@ -381,13 +382,74 @@
 - **覆盖安装（`pm install -r`）不撤销无障碍授权**：2026-07-31 实测两次覆盖安装
   后无障碍/悬浮窗/通知全部保留，且未弹确认框；之前「重装撤销授权」的记录
   针对的是卸载重装场景。悬浮服务会被杀掉，需重新点「启动悬浮图标」。
+- **上机必须出 release 包，不能图省事用 debug 包**：设备上装的是 release 签名包，
+  `adb install -r` 一个 debug 包会直接 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
+  （signatures do not match）。签名冲突无法用参数绕过，唯一的原地升级办法就是用
+  同一套 keystore 出 release。**别为了装 debug 包去卸载** —— 卸载会连带清掉设备端
+  `config/local`（session、设备上标定的布局），而 release 包不可调试、`run-as` 用不了，
+  卸载前根本没法备份那批数据，属于不可逆动作。
+
+---
+
+## 上机测试执行记录（2026-07-31 傍晚，中断在安装前）
+
+本节是**断点续跑清单**，新会话照着往下走即可，不用重新摸环境。
+
+### 已完成
+
+| 步骤 | 结论 |
+|---|---|
+| 设备连接 | `192.168.0.103:5555`，vivo V2415A（`product:PD2415`），无线 adb 在线 |
+| 查已装版本 | `versionCode=8`、release 签名（`run-as` 报 not debuggable），装于 11:22:04 |
+| 判定须重装 | 代码侧 `versionCode=10`；v8 缺 `9ecb626` 的 `ensure_loaded()` 修复，`to_equipment` 会报未知函数，v8 上跑 `equip_analysis` 必失败 |
+| debug 包试装 | ❌ `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，签名不匹配（详见踩坑最后一条） |
+| 出 release 包 | ✅ `BUILD SUCCESSFUL in 3m 26s`，产物 `android/app/build/outputs/apk/release/app-release.apk`（71.8MB，17:52:18，versionCode 10） |
+| 查游戏前台 | `com.netease.yyslscn/com.netease.game.MessiahNativeActivity` 在前台 |
+| 查 `equip_analysis` 入口 | `workflows.yaml` exposed **第一项**，显示名「当前装备分析」 |
+| 查脚本前置 | 首行 `call nav_main_to_equip()` → 游戏必须停在**主界面**（游戏世界画面，不能在任何子菜单里） |
+
+### 未完成 / 阻塞点
+
+1. **APK 未安装**（包已就绪）。装包会在手机上弹「继续安装」确认框，需要手动点。
+2. **无障碍服务未绑定**：`settings get secure enabled_accessibility_services` 当前只有
+   `hello.litiaotiao.app/.LttService`（李跳跳）和 `com.wtkj.app.clicker/.service.ClickerService`
+   （点击器），**没有 `com.lvjiang.app/.A11yService`**。截图与点击两个通道都依赖它，不开
+   跑不了。vivo 从 2026-07-31 起拦 adb 写这个开关（写入成功但系统不绑定），需在
+   「设置 → 无障碍」里手动开一次「律匠自动操作」。
+   - `.tooling/enable_a11y.py` 已核对过是**追加**语义（`others` 列表保留原有条目），
+     不会关掉李跳跳和点击器，可以先跑它试一次，不成再手动开。
+
+### 断点续跑命令
+
+```powershell
+$adb = ".tooling\android-sdk\platform-tools\adb.exe"
+
+# 1. 装包（手机上点「继续安装」）。包已存在则不必重新构建
+& $adb install -r android\app\build\outputs\apk\release\app-release.apk
+
+# 2. 开无障碍（先自动试，输出「服务已绑定」才算成功；失败就去设置页手动开）
+.venv\Scripts\python.exe .tooling\enable_a11y.py
+
+# 3. 校验：应能看到 com.lvjiang.app 命中
+& $adb shell settings get secure enabled_accessibility_services
+
+# 需要重新出包时（改了 src/ 下的 Python 代码就要）：
+#   pwsh -NoProfile -File .tooling\gradle-bg.ps1 :app:assembleRelease
+#   日志 .tooling/gradle-bg.log，轮询 BUILD SUCCESSFUL，全量约 3.5 分钟
+```
+
+随后：启动律匠 App → 点「启动悬浮图标」（覆盖安装会杀掉悬浮服务，必须重点一次）
+→ **把游戏切回主界面** → 悬浮面板选「当前装备分析」→ 跑。
+
+观察重点见「下一步操作」第 1 项。
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **`equip_analysis` 实机验证**（需游戏环境，用户侧操作）：读装备详情 + OCR 词条，
-   属识别类，风险低，宜先跑。坐标绑定风险已由上机前预检排除，剩下的只有运行期问题：
+1. **`equip_analysis` 实机验证**（🚧 已启动，卡在安装 + 无障碍，见上节断点续跑清单）：
+   读装备详情 + OCR 词条，属识别类，风险低，宜先跑。坐标绑定风险已由上机前预检排除，
+   剩下的只有运行期问题：
    - `to_equipment` 是插件 builtin，靠 `9ecb626` 的 `ensure_loaded()` 修复才在设备端可用，
      这次是它的**首次真实验证**
    - OCR 词条识别在手机分辨率下的准确率未验过，看 `collect session.equipped` 的输出对不对
@@ -419,14 +481,19 @@
 
 ### 遗留待决（与 Phase 4 上机不相干）
 
-- `.git-mypy-base/` worktree 是做 mypy 基线对比时建的，待清：
+- **仓库已分叉：`master` ahead 8 / behind 1**（截至 2026-07-31 傍晚）。本地 8 个未推：
+  `cd32c46` PyInstaller 打包 → `ab1901c` adb 子进程 CREATE_NO_WINDOW → `0b1286b` 定音词条
+  全量池匹配 → `e499166` 内置 adb 随包分发 → `80dba3f` 顶档/普通条件结构演进 →
+  `e1d3dbc` 调律说明文档同步 → `25d9d4c` `validate_only` + 引用门禁 + 上机预检脚本 →
+  `cef0020` gitignore 补 mypy/ruff 缓存。远端有 1 个未合入：`feb7518` fix `_wait_for_threads`
+  排除 `_DummyThread`。**推送前必须先处理这个分叉**（rebase 或 merge，由用户定）。
+- 当前工作区未提交：`tuning_rules/` 下 3 个 yaml + `tests/yysls/test_huixin_judge.py`
+  （属并行进行的调律规则改动，不是上机相关）+ 本文件。
+- `.git-mypy-base/` worktree （detached HEAD `33c1baf`）**仍在**，是做 mypy 基线对比时建的，待清：
   `git worktree remove --force .git-mypy-base`
-- **CI 的 mypy 门禁在远端已经是红的**：裸 `python -m mypy` 报 2 个错，在 `origin/master`
-  与当前 HEAD 都存在，是既有存量、非新引入。注意给 mypy 传路径参数会**覆盖**
-  `[tool.mypy] files` 清单（`mypy src/lvjiang` 报 145 错，不是门禁基线）
-- 工作区未提交批次：Windows PyInstaller 打包（`constants.py` 的 `sys.frozen` 分支 +
-  `packaging/launcher.py` + `lvjiang.spec` + `package.bat`，另有 `core/android/device.py` /
-  `scrcpy_capture.py` / `platforms.py`）+ 预检设施（两个 `scripts/manual-tests/preflight_*.py`
-  + `engine/core.py` 的 `validate_only` 抽取 + `test_system_wf_refs_gate.py`）。其中
-  `.package_build.log` 是构建日志，`.gitignore` 未覆盖，不应进版本库
+- **CI 的 mypy 门禁在远端已经是红的**：裸 `python -m mypy` 报 2 个错（`engine/core.py:347`
+  的 `workflow._engine = self`、`ondevice/workflow_runner.py:151`），在 `origin/master` 与当前
+  HEAD 都存在，是既有存量、非新引入。注意给 mypy 传路径参数会**覆盖**
+  `[tool.mypy] files` 清单（`mypy src/lvjiang` 报 145 错，不是门禁基线）；同理 ruff 的
+  门禁范围只是 `src tests`，加上 `scripts` 会多出 42 个既有错。
 

@@ -138,3 +138,7 @@ common_conditions:
       - 会心率
       - 精准率
       min: 1
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0

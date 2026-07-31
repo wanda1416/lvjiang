@@ -438,9 +438,158 @@ class MaterialSettings:
         return FoodDecision("none", "", "无狗粮规则命中 → 不添加")
 
 
+# ─── 行为配置（状态机三行为点：扫描处理 / 材料处理 / 结束处理）──
+
+# 行为动作：continue=继续调律（仅结束处理、词条未满）、
+# reset=重置调律、recycle=回收、ignore=不动作（扫描=保留跳过、
+# 结束=结束保留）
+BEHAVIOR_ACTIONS = ("continue", "reset", "recycle", "ignore")
+BEHAVIOR_ACTION_LABELS = {"continue": "继续调律", "reset": "重置调律",
+                          "recycle": "回收", "ignore": "忽略"}
+# 各行为点允许的动作（材料处理由 MaterialSettings 承担，不入表）
+BEHAVIOR_STAGE_ACTIONS = {
+    "scan": ("recycle", "ignore"),
+    "tune": ("continue", "reset", "recycle", "ignore"),
+}
+BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "结束处理"}
+# 判定规则语义：预期评级识别用哪个流派规则集
+JUDGE_SCOPES = ("incoming", "all", "custom")
+JUDGE_SCOPE_LABELS = {"incoming": "传入规则", "all": "全部规则",
+                      "custom": "自选规则"}
+# 游戏内单件装备重置调律次数上限（按钮文本实读剩余次数兼作硬门）
+MAX_TUNE_RESETS = 3
+
+
+@dataclass
+class BehaviorRule:
+    """行为决策规则（有序规则表的一条，自上而下首条命中即生效）
+
+    四条件全部满足时命中，品阶/数值/评级为有序 ≤ 门槛
+    （取最高档 = 不限）：
+    - parts: 部位集合（QUALITY_PARTS 子集，空 = 不限）；
+    - max_quality: 品阶 ≤（gold = 不限）；
+    - max_pct: 首词条初始数值 cap_pct ≤（100 = 不限；
+      识别失败视为不达标）；
+    - max_rating: 预期评级 ≤（top = 不限；按行为点声明的判定
+      语义取各适用规则最高档，无任何适用规则时仅能命中
+      不限评级的规则）。
+    """
+    parts: list[str] = field(default_factory=list)
+    max_quality: str = "gold"
+    max_pct: int = 100
+    max_rating: str = "top"
+    action: str = "ignore"
+
+    def matches(self, part: str | None, quality: str | None,
+                cap_pct: float | None, rating: str | None) -> bool:
+        """四条件 AND 判定（未知部位/品阶/评级仅命中不限条件）"""
+        if self.parts and (part or "") not in self.parts:
+            return False
+        if self.max_quality != "gold":
+            rank = QUALITY_RANK.get(quality or "", -1)
+            if rank < 0 or rank > QUALITY_RANK[self.max_quality]:
+                return False
+        if self.max_pct < 100 and (cap_pct is None
+                                   or cap_pct > self.max_pct):
+            return False
+        if self.max_rating != "top":
+            rank = RATING_RANK.get(rating or "", -1)
+            if rank < 0 or rank > RATING_RANK[self.max_rating]:
+                return False
+        return True
+
+    def summary(self) -> str:
+        """条件摘要文本（日志与说明文档）"""
+        parts = "/".join(self.parts) if self.parts else "不限部位"
+        quals = (f"品阶≤{QUALITY_LABELS.get(self.max_quality, self.max_quality)}"
+                 if self.max_quality != "gold" else "不限品阶")
+        pct = (f"首词条≤{self.max_pct}%" if self.max_pct < 100
+               else "首词条不限")
+        ratings = (f"评级≤{RATING_LABELS.get(self.max_rating, self.max_rating)}"
+                   if self.max_rating != "top" else "不限评级")
+        return f"{parts} 且 {quals} 且 {pct} 且 {ratings}"
+
+
+@dataclass
+class ScanBehavior:
+    """扫描处理（进调律前的行为点）
+
+    entry_min_rating: 进入门槛 —— 传入规则预期评级 ≥ 该档即进入
+    调律（固定用传入规则判定，调律目标就是运行期所选流派）；
+    judge_scope/judge_rules: 处置表评级判定语义（incoming=传入
+    规则 / all=全部规则 / custom=自选 judge_rules）；
+    rules: 不进调律装备的处置表（首条命中；无命中=忽略保留）。
+    """
+    enabled: bool = True
+    entry_min_rating: str = "excellent"
+    judge_scope: str = "incoming"
+    judge_rules: list[str] = field(default_factory=list)
+    rules: list[BehaviorRule] = field(default_factory=list)
+
+    def decide(self, part: str | None, quality: str | None,
+               cap_pct: float | None,
+               rating: str | None) -> tuple[str, str]:
+        """返回 (动作, 决策说明)；未启用/无命中时为 ("ignore", 说明)"""
+        if not self.enabled:
+            return "ignore", "扫描处置未启用 → 保留"
+        for idx, rule in enumerate(self.rules, start=1):
+            if rule.matches(part, quality, cap_pct, rating):
+                label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
+                return rule.action, (
+                    f"规则{idx}（{rule.summary()}）命中 → {label}")
+        return "ignore", "无处置规则命中 → 保留"
+
+
+@dataclass
+class TuneBehavior:
+    """结束处理（每轮调律结束后的行为点）
+
+    每轮按 judge_scope 刷新预期评级后 decide；词条满为边界条件：
+    full=True 时 continue 规则跳过匹配（不可再调）。无命中默认：
+    未满=继续调律、满=结束保留；未启用同默认。
+    max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
+    硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
+    reset_exhausted_action: 规则命中重置但次数已用尽（含 OCR
+    读不到次数）时的转处置动作：recycle / ignore。
+    """
+    enabled: bool = False
+    judge_scope: str = "incoming"
+    judge_rules: list[str] = field(default_factory=list)
+    rules: list[BehaviorRule] = field(default_factory=list)
+    max_resets: int = MAX_TUNE_RESETS
+    reset_exhausted_action: str = "ignore"
+
+    def decide(self, part: str | None, quality: str | None,
+               cap_pct: float | None, rating: str | None,
+               full: bool) -> tuple[str, str]:
+        """返回 (动作, 决策说明)；无命中默认未满=continue、满=ignore"""
+        default = (("ignore", "词条已满，无行为规则命中 → 结束保留")
+                   if full else ("continue", "无行为规则命中 → 继续调律"))
+        if not self.enabled:
+            return default
+        for idx, rule in enumerate(self.rules, start=1):
+            if full and rule.action == "continue":
+                continue  # 词条已满不可再调，继续调律规则跳过
+            if rule.matches(part, quality, cap_pct, rating):
+                label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
+                return rule.action, (
+                    f"规则{idx}（{rule.summary()}）命中 → {label}")
+        return default
+
+
+@dataclass
+class BehaviorSettings:
+    """行为配置（状态机行为点：扫描处理 + 结束处理）
+
+    材料处理（每轮调律开始前）由 MaterialSettings 承担。
+    """
+    scan: ScanBehavior = field(default_factory=ScanBehavior)
+    tune: TuneBehavior = field(default_factory=TuneBehavior)
+
+
 @dataclass
 class TuningBase:
-    """全局基础配置（品阶门槛 + 开关注册表 + 材料设置）
+    """全局基础配置（品阶门槛 + 开关注册表 + 材料设置 + 行为配置）
 
     switches: 开关 key → 显示名；规则条件组 when 只能引用已注册
     开关，主窗口按注册表渲染全局开关复选框。
@@ -448,6 +597,7 @@ class TuningBase:
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
     materials: MaterialSettings = field(default_factory=MaterialSettings)
+    behavior: BehaviorSettings = field(default_factory=BehaviorSettings)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

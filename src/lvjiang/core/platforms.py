@@ -17,7 +17,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from pynput.keyboard import GlobalHotKeys
 
-    from ..config import DelayConfig
+    from ..config import InputSimConfig
     from .input_base import InputBackend
 
 IS_WINDOWS = sys.platform == "win32"
@@ -30,7 +30,7 @@ DESKTOP_BACKEND_AVAILABLE = IS_WINDOWS
 
 # ─── 桌面输入后端 ─────────────────────────────────────────
 
-def create_desktop_input(delay_config: "DelayConfig | None" = None) -> "InputBackend | None":
+def create_desktop_input(input_sim: "InputSimConfig | None" = None) -> "InputBackend | None":
     """创建桌面输入后端（PostMessage 后台模式）；非 Windows 返回 None。
 
     非 Windows 平台不 import core.desktop，避免触碰 Win32 基础设施。
@@ -38,7 +38,7 @@ def create_desktop_input(delay_config: "DelayConfig | None" = None) -> "InputBac
     if not IS_WINDOWS:
         return None
     from .desktop import create_input_backend
-    return create_input_backend(mode="post", delay_config=delay_config)
+    return create_input_backend(mode="post", input_sim=input_sim)
 
 
 # ─── 全局热键 ─────────────────────────────────────────────

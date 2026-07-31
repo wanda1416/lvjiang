@@ -1,8 +1,8 @@
 """配置管理对话框（多 Tab）
 
 Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）。
-所有配置写入 session.json（settings / input_delay 节点），
-保存后以配置文件为准覆盖代码默认值。
+Tab1 写 session.json（settings 节点）；Tab2/Tab3 写 app.yaml（input_simulation / delay_params，
+system ← local 合并），保存后以配置文件为准覆盖代码默认值。
 """
 
 from PyQt6.QtCore import Qt
@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..config import load_user_config, save_input_delay, save_settings
+from ..config import load_user_config, save_app_config, save_settings
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -36,9 +36,9 @@ _RANGE_FIELDS = [
     ("mouse_move_duration", "鼠标移动时长(秒)", "鼠标/触控移动到目标位置的耗时"),
 ]
 
-# 等待参数不可占用的保留 key（DelayConfig 引擎级固定字段）
+# 等待参数不可占用的保留 key（InputSimConfig 引擎级固定字段）
 _RESERVED_KEYS = {name for name, *_ in _RANGE_FIELDS} | {
-    "click_random_offset", "region_jitter_ratio", "custom",
+    "click_random_offset", "region_jitter_ratio",
 }
 
 # 数值输入框统一定宽，避免被布局拉满整行
@@ -136,15 +136,15 @@ class SettingsDialog(QDialog):
     def _build_input_tab(self) -> QWidget:
         tab = QWidget()
         form = QFormLayout(tab)
-        delay = self._config.input_delay
+        sim = self._config.input_sim
 
         for name, label, tip in _RANGE_FIELDS:
-            lo, hi = getattr(delay, name)
+            lo, hi = getattr(sim, name)
             form.addRow(f"{label}:", self._build_range_row(name, lo, hi, tip))
 
         self._offset_spin = QSpinBox()
         self._offset_spin.setRange(0, 50)
-        self._offset_spin.setValue(delay.click_random_offset)
+        self._offset_spin.setValue(sim.click_random_offset)
         self._offset_spin.setFixedWidth(_SPIN_WIDTH)
         form.addRow("坐标随机偏移(px):", self._spin_with_tip(
             self._offset_spin, "点击坐标附加 ±N 像素的随机偏移"))
@@ -153,7 +153,7 @@ class SettingsDialog(QDialog):
         self._jitter_spin.setRange(0.0, 0.49)
         self._jitter_spin.setSingleStep(0.01)
         self._jitter_spin.setDecimals(2)
-        self._jitter_spin.setValue(delay.region_jitter_ratio)
+        self._jitter_spin.setValue(sim.region_jitter_ratio)
         self._jitter_spin.setFixedWidth(_SPIN_WIDTH)
         form.addRow("区域中心偏移比例:", self._spin_with_tip(
             self._jitter_spin,
@@ -181,7 +181,7 @@ class SettingsDialog(QDialog):
         self._custom_grid.addWidget(QLabel("等待范围(秒)"), 0, 2, 1, 3)
         vbox.addLayout(self._custom_grid)
 
-        for key, item in self._config.input_delay.custom.items():
+        for key, item in self._config.delay_params.items():
             self._add_custom_row(key, item.label, *item.range, saved=True)
 
         add_row = QHBoxLayout()
@@ -327,25 +327,24 @@ class SettingsDialog(QDialog):
         return custom
 
     def _on_save(self):
-        custom = self._collect_custom()
-        if custom is None:
+        delay_params = self._collect_custom()
+        if delay_params is None:
             return
         save_settings({
             "adb_capture_streaming": self._capture_combo.currentData(),
             "desktop_background_input": self._input_combo.currentData(),
             "desktop_window_title": self._title_edit.text().strip(),
         })
-        delay: dict = {}
+        input_sim: dict = {}
         for name, *_ in _RANGE_FIELDS:
             lo_spin, hi_spin = self._range_spins[name]
             lo, hi = lo_spin.value(), hi_spin.value()
             if hi < lo:
                 hi = lo
-            delay[name] = [round(lo, 2), round(hi, 2)]
-        delay["click_random_offset"] = self._offset_spin.value()
-        delay["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
-        delay["custom"] = custom
-        save_input_delay(delay)
+            input_sim[name] = [round(lo, 2), round(hi, 2)]
+        input_sim["click_random_offset"] = self._offset_spin.value()
+        input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
+        save_app_config(input_sim, delay_params)
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改
         for entry in self._custom_rows:
             entry["saved"] = bool(entry["key"].text().strip())

@@ -88,6 +88,10 @@ def _patch_discovery(monkeypatch, tasks):
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.discover_scripts", lambda: tasks
     )
+    # list_tasks 现在直接调 list_exposed_scripts，绕过 workflows.yaml 过滤
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.list_exposed_scripts", lambda: tasks
+    )
 
 
 def _patch_engine(monkeypatch, engine):
@@ -374,7 +378,6 @@ def test_device_smoke_wf_runs_through_task_runner(monkeypatch):
     """
     from unittest.mock import MagicMock
 
-    from lvjiang.config import DelayConfig
     from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
     from lvjiang.workflows.engine import WorkflowEngine
 
@@ -387,7 +390,7 @@ def test_device_smoke_wf_runs_through_task_runner(monkeypatch):
         x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
     engine = WorkflowEngine(
         capture=MagicMock(), ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout, delay_config=DelayConfig(),
+        layout=layout, input_sim=MagicMock(), delay_params={},
         stop_check=task_runner._STATE.should_stop,
     )
 

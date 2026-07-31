@@ -110,7 +110,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._ocr = OCREngine()
         # 非 Windows 时返回 None（无桌面投屏后端，仅支持 ADB 模式）
         from ..core.platforms import create_desktop_input
-        self._win_input = create_desktop_input(delay_config=self._user_config.input_delay)
+        self._win_input = create_desktop_input(input_sim=self._user_config.input_sim)
         self._input = self._win_input
 
         # ── 构建 UI ──

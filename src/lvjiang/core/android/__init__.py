@@ -8,11 +8,11 @@
 - bootstrap.py     : 已废弃（保留为兼容桩）
 
 工厂函数：
-- create_input_backend(device, delay_config)：创建 ADB 输入后端
+- create_input_backend(device, input_sim)：创建 ADB 输入后端
 - create_capture_backend(device, method)：创建截图后端（screencap 或 scrcpy）
 """
 
-from ...config import DelayConfig
+from ...config import InputSimConfig
 from ..capture_base import CaptureBackend
 from ..input_base import InputBackend
 from .adb_capture import AdbCapture
@@ -23,18 +23,18 @@ from .scrcpy_capture import AndroidStreamCapture
 
 def create_input_backend(
     device: AdbDevice,
-    delay_config: DelayConfig | None = None,
+    input_sim: InputSimConfig | None = None,
 ) -> InputBackend:
     """创建 ADB 输入后端
 
     Args:
         device: AdbDevice 实例
-        delay_config: 延迟参数
+        input_sim: 输入模拟参数
 
     Returns:
         AdbInput 实例
     """
-    return AdbInput(device=device, delay_config=delay_config)
+    return AdbInput(device=device, input_sim=input_sim)
 
 
 def create_capture_backend(device: AdbDevice, method: str = "screencap") -> CaptureBackend:

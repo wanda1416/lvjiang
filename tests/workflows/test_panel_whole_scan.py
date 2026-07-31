@@ -11,7 +11,6 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from lvjiang.config import DelayConfig
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import Eval, FieldAccess, Literal, VarRef, parse_text
 from lvjiang.workflows.scene_scan import collect_refs
@@ -84,7 +83,7 @@ def _make_engine():
         SimpleNamespace(text=f"t{next(counter)}")]
     engine = WorkflowEngine(
         capture=capture, ocr=ocr, input_ctrl=MagicMock(),
-        layout=layout, delay_config=DelayConfig(),
+        layout=layout, input_sim=MagicMock(), delay_params={},
     )
     # 预置对齐结果，绕开真实 detect_grid
     engine._panel_alignments[("s", "actions")] = _FakeCal()
@@ -225,7 +224,7 @@ def test_region_key_still_goes_region_path(tmp_path):
     layout.get_scene_panels.return_value = []
     engine = WorkflowEngine(
         capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout, delay_config=DelayConfig(),
+        layout=layout, input_sim=MagicMock(), delay_params={},
     )
     workflow = MagicMock()
     workflow.ocr_scene.return_value = {"title": "背包"}

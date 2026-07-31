@@ -97,15 +97,15 @@ class _ActionMixin:
     def wait_delay(self, delay_name: str):
         """按命名等待参数等待（可被停止请求打断）
 
-        参数在配置管理「等待参数」页维护（DelayConfig.custom），
+        参数在配置管理「等待参数」页维护（app.yaml delay_params），
         按 key 查找，在定义的范围内随机取值。
         """
-        custom = self._delay.custom.get(delay_name)
-        if custom is None:
+        param = self._delay_params.get(delay_name)
+        if param is None:
             raise ValueError(
                 f"未知的等待参数: {delay_name}，请先在配置管理→等待参数中定义"
             )
-        actual = random.uniform(*custom.range)
+        actual = random.uniform(*param.range)
         logger.debug(f"等待 {delay_name} = {actual:.2f}s")
         self.wait_seconds(actual)
 

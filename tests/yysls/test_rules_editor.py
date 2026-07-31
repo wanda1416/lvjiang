@@ -9,13 +9,21 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.apps.yysls.evaluator.tuning_rules import TuningRuleManager
+from lvjiang.apps.yysls.evaluator.tuning_rules import (
+    TuningBaseManager,
+    TuningRuleManager,
+)
 from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.ui.rules_editor import TuningRulesDialog
+from lvjiang.apps.yysls.ui.rules_editor.behavior_pages import (
+    ScanBehaviorPage,
+    TuneBehaviorPage,
+)
 from lvjiang.apps.yysls.ui.rules_editor.rule_panel import RulePanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
+BASE_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_base.yaml"
 
 ALL_KEYS = ["huiyi_general", "huixin_small", "huixin_big",
             "heal_pure", "heal_fire"]
@@ -29,27 +37,93 @@ def tmp_manager(tmp_path):
     return TuningRuleManager(rules_dir=tmp_path)
 
 
+@pytest.fixture
+def tmp_base_manager(tmp_path):
+    """真实基础配置的 tmp 副本管理器（写盘不影响真实配置）"""
+    dst = tmp_path / "tuning_base.yaml"
+    shutil.copy(BASE_FILE, dst)
+    return TuningBaseManager(path=dst)
+
+
 class TestDialog:
     def test_dialog_nav(self, qtbot):
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
-        # 左侧一级导航：基础配置 + 材料配置 + 分割线 + 各规则；
-        # StackedWidget 不含分割线（行 0/1 = 栈页 0/1，行 ≥3 = 栈页 - 1）
-        assert dialog._nav.count() == len(ALL_KEYS) + 3
-        assert dialog._stack.count() == len(ALL_KEYS) + 2
+        # 左侧一级导航：基础配置 + 状态机三行为点 + 分割线 + 各规则；
+        # StackedWidget 不含分割线（行 0-3 = 栈页 0-3，行 ≥5 = 栈页 - 1）
+        assert dialog._nav.count() == len(ALL_KEYS) + 5
+        assert dialog._stack.count() == len(ALL_KEYS) + 4
         assert dialog._nav.item(0).text() == "基础配置"
-        assert dialog._nav.item(1).text() == "材料配置"
+        assert dialog._nav.item(1).text() == "扫描处理"
+        assert dialog._nav.item(2).text() == "材料处理"
+        assert dialog._nav.item(3).text() == "结束处理"
         # 分割线项不可选中
-        assert not dialog._nav.item(2).flags()
+        assert not dialog._nav.item(4).flags()
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         first_rule = next(iter(
             TuningRuleManager(rules_dir=RULES_DIR).get_rules().values()))
-        assert dialog._nav.item(3).text() == first_rule.name
+        assert dialog._nav.item(5).text() == first_rule.name
         # 导航切换驱动右侧内容区（跳过分割线偏移）
-        dialog._nav.setCurrentRow(1)
-        assert dialog._stack.currentIndex() == 1
         dialog._nav.setCurrentRow(3)
-        assert dialog._stack.currentIndex() == 2
+        assert dialog._stack.currentIndex() == 3
+        dialog._nav.setCurrentRow(5)
+        assert dialog._stack.currentIndex() == 4
+
+
+class TestBehaviorPages:
+    """行为处理页 smoke：真实配置回填 + 变更即校验即保存"""
+
+    def test_scan_page_roundtrip(self, qtbot, tmp_base_manager):
+        statuses: list[tuple[str, bool]] = []
+        page = ScanBehaviorPage(tmp_base_manager,
+                                lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(page)
+        scan = tmp_base_manager.get().behavior.scan
+        # 回填与真实配置一致
+        assert page._enabled_cb.isChecked() == scan.enabled
+        assert page._entry_combo.currentData() == scan.entry_min_rating
+        assert page._judge.scope() == scan.judge_scope
+        assert page._table.rowCount() == len(scan.rules)
+
+        # 变更进入门槛 → 校验通过自动保存并生效
+        page._entry_combo.setCurrentIndex(page._entry_combo.findData("top"))
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        assert (tmp_base_manager.get().behavior.scan.entry_min_rating
+                == "top")
+
+    def test_scan_page_add_delete_rule(self, qtbot, tmp_base_manager):
+        statuses: list[tuple[str, bool]] = []
+        page = ScanBehaviorPage(tmp_base_manager,
+                                lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(page)
+        before = len(tmp_base_manager.get().behavior.scan.rules)
+        page._on_add_rule()
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        assert len(tmp_base_manager.get().behavior.scan.rules) == before + 1
+        page._table.setCurrentCell(before, 0)
+        page._on_del_rule()
+        assert len(tmp_base_manager.get().behavior.scan.rules) == before
+
+    def test_tune_page_roundtrip(self, qtbot, tmp_base_manager):
+        statuses: list[tuple[str, bool]] = []
+        page = TuneBehaviorPage(tmp_base_manager,
+                                lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(page)
+        tune = tmp_base_manager.get().behavior.tune
+        assert page._enabled_cb.isChecked() == tune.enabled
+        assert page._resets_spin.value() == tune.max_resets
+        assert (page._exhausted_combo.currentData()
+                == tune.reset_exhausted_action)
+
+        # 启用 + 上限调整 → 保存生效，且不覆盖 scan 子段
+        scan_before = tmp_base_manager.get_raw()["behavior"]["scan"]
+        page._enabled_cb.setChecked(True)
+        page._resets_spin.setValue(1)
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        saved = tmp_base_manager.get().behavior.tune
+        assert saved.enabled is True
+        assert saved.max_resets == 1
+        assert tmp_base_manager.get_raw()["behavior"]["scan"] == scan_before
 
 
 class TestPanelRoundtrip:

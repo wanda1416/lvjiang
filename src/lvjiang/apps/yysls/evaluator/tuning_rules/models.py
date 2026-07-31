@@ -346,6 +346,11 @@ QUALITY_LABELS = {"gold": "金色", "purple": "紫色", "blue": "蓝色"}
 # 材料不足时的行为：continue=继续走后续规则，skip=跳过该装备
 INSUFFICIENT_ACTIONS = ("continue", "skip")
 INSUFFICIENT_LABELS = {"continue": "继续走后续规则", "skip": "跳过该装备"}
+# 大律准石不足时的处理：skip=跳过该装备（继续遍历），abort=结束
+# 全部调律，ask=confirm 弹窗询问（确认继续后本次运行不再检查）
+STONE_ACTIONS = ("skip", "abort", "ask")
+STONE_ACTION_LABELS = {"skip": "跳过该装备", "abort": "结束全部调律",
+                       "ask": "询问是否继续"}
 
 
 @dataclass
@@ -396,12 +401,16 @@ class MaterialSettings:
     """材料设置（大律准石数量检查 + 狗粮规则表）
 
     stone_check_enabled: 调律时检查大律准石持有量，低于基准判
-    材料不足并全部退出；默认关闭（用户自行保证材料充足）。
+    材料不足，按 stone_insufficient_action 执行不足处理；默认
+    关闭（用户自行保证材料充足）。
+    stone_insufficient_action: 不足处理（STONE_ACTIONS：跳过该
+    装备 / 结束全部调律 / 询问是否继续），默认结束全部调律。
     food_rules: 有序狗粮规则表，逐轮顺序判定首条完全满足（条件
     命中 + 材料充足）的规则；全部走完无命中 → 不添加。
     """
     stone_check_enabled: bool = False
     stone_min_count: int = 100
+    stone_insufficient_action: str = "abort"
     food_rules: list[FoodRule] = field(default_factory=default_food_rules)
 
     def decide_food(self, cap_pct: int | None, expect: str | None,
@@ -618,11 +627,14 @@ class BehaviorSettings:
 
 @dataclass
 class TuningBase:
-    """全局基础配置（品阶门槛 + 开关注册表 + 材料设置 + 行为配置）
+    """全局基础配置（等级门槛 + 品阶门槛 + 开关注册表 + 材料设置 + 行为配置）
 
+    min_level: 等级门槛，低于该等级的装备不允许进入调律，
+    直接跳过（不走扫描处置等任何判定）。
     switches: 开关 key → 显示名；规则条件组 when 只能引用已注册
     开关，主窗口按注册表渲染全局开关复选框。
     """
+    min_level: int = 100
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
     materials: MaterialSettings = field(default_factory=MaterialSettings)

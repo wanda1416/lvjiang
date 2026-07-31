@@ -7,14 +7,14 @@
 主通道选无障碍而不是 Shizuku：后者必须由 adb 引导启动，手机重启一次就失效，
 要用户重新配对无线调试；无障碍开关开一次即长期有效。
 
-继承 InputBackend：config.py 已去 pydantic（dataclass 实现），基类与 DelayConfig
-在设备端可直接导入，延迟/拟人化参数由 DelayConfig 统一注入，与 PC 端同源。
+继承 InputBackend：config.py 已去 pydantic（dataclass 实现），基类与 InputSimConfig
+在设备端可直接导入，延迟/拟人化参数由 InputSimConfig 统一注入，与 PC 端同源。
 """
 
 import random
 import time
 
-from ...config import DelayConfig
+from ...config import InputSimConfig
 from ..input_base import InputBackend
 from . import a11y, shell
 
@@ -29,12 +29,12 @@ class _GestureInput(InputBackend):
     #: 日志前缀，用于在报告里区分实际走的哪条通道
     name = "_GestureInput"
 
-    def __init__(self, delay_config: DelayConfig | None = None):
+    def __init__(self, input_sim: InputSimConfig | None = None):
         # 供 run_control 访问：设备端无窗口概念，与 AdbInput 取同样的恒定值
         self.background_mode = True
         self.target_hwnd = None
 
-        self._inject_delay_config(self, delay_config)
+        self._inject_input_sim(self, input_sim)
 
     def _tap(self, x: int, y: int) -> None:
         raise NotImplementedError

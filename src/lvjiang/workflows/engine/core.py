@@ -7,7 +7,7 @@ from typing import Callable
 
 from loguru import logger
 
-from ...config import DelayConfig
+from ...config import DelayParam, InputSimConfig
 from ...core.capture_base import CaptureBackend
 from ...core.config_resolver import get_resolver
 from ...core.input_base import InputBackend
@@ -77,7 +77,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         ocr: OCREngine,
         input_ctrl: InputBackend,
         layout: Layout,
-        delay_config: DelayConfig | None = None,
+        input_sim: InputSimConfig | None = None,
+        delay_params: dict[str, DelayParam] | None = None,
         window_left: int = 0,
         window_top: int = 0,
         stop_check: Callable[[], bool] | None = None,
@@ -87,7 +88,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._ocr = ocr
         self._input = input_ctrl
         self._layout = layout
-        self._delay = delay_config or DelayConfig()
+        self._input_sim = input_sim or InputSimConfig()
+        self._delay_params = delay_params or {}
         self._window_left = window_left
         self._window_top = window_top
         self._stop_check = stop_check or (lambda: False)
@@ -126,7 +128,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 ocr=self._ocr,
                 input_ctrl=self._input,
                 layout=self._layout,
-                delay_config=self._delay,
+                input_sim=self._input_sim,
+                delay_params=self._delay_params,
                 window_left=self._window_left,
                 window_top=self._window_top,
                 stop_check=self._stop_check,
@@ -285,7 +288,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
     def _validate_named_waits(self, program):
         """解析后静态校验：wait 引用的命名等待参数必须已定义
 
-        命名等待全部来自 DelayConfig.custom（配置管理「等待参数」页），
+        命名等待全部来自 delay_params（配置管理「等待参数」页，app.yaml delay_params 节），
         遍历顶层语句与所有过程体（含 import 引入的），引用未定义的 key
         直接报错返回，不进入执行阶段。
         """
@@ -302,7 +305,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         for node in stmts:
             match node:
                 case Wait(delay=Literal(value=str() as name)):
-                    if name not in self._delay.custom:
+                    if name not in self._delay_params:
                         missing.setdefault(name, node.line_no)
                 case If():
                     self._collect_missing_waits(node.then_body, missing)
@@ -317,6 +320,9 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         """执行 Python 工作流实例"""
         workflow.reset_state()
         workflow.variables.update(self.variables)
+        # 注入引擎引用，使工作流内调用的 UI 交互内置函数
+        # （confirm/pause/input）能经 _ui_callback 走 Qt 主线程桥
+        workflow._engine = self
         logger.info(f"=== Python 工作流开始: {workflow.__class__.__name__} ===")
         try:
             result = workflow.run()

@@ -9,7 +9,7 @@ import time
 
 from loguru import logger
 
-from ...config import DelayConfig
+from ...config import InputSimConfig
 from ..input_base import InputBackend
 from .win32_util import (
     _MOUSEEVENTF_LEFTDOWN,
@@ -23,8 +23,8 @@ from .win32_util import (
 class SendInputInput(InputBackend):
     """基于 SendInput 的输入后端（移动真实光标）"""
 
-    def __init__(self, delay_config: DelayConfig | None = None):
-        self._inject_delay_config(self, delay_config)
+    def __init__(self, input_sim: InputSimConfig | None = None):
+        self._inject_input_sim(self, input_sim)
         # 兼容属性：SendInput 模式无后台概念
         self.background_mode = False
         self.target_hwnd = None

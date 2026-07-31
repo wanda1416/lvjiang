@@ -54,4 +54,5 @@ DATA_DIR = PROJECT_ROOT / "data"
 VIDEO_DIR = DATA_DIR / "video"
 PICTURE_DIR = DATA_DIR / "picture"
 
-# 延迟参数已统一到 config.py 的 DelayConfig，不再在此处定义默认值
+# 延迟参数与输入模拟参数已拆分到 config.py 的 delay_params / InputSimConfig，
+# 由 app.yaml 统一加载，不再在此处定义默认值

@@ -10,7 +10,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.config import DelayConfig
 from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
@@ -157,7 +156,7 @@ def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,
     layout.get_scene_panels.side_effect = lambda k: list((panels or {}).get(k, []))
     return WorkflowEngine(
         capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout, delay_config=DelayConfig(),
+        layout=layout, input_sim=MagicMock(), delay_params={},
     )
 
 

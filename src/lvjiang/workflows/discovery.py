@@ -70,3 +70,39 @@ def discover_scripts() -> list[dict]:
     merged = _discover_wf_scripts()
     merged.update(_discover_class_scripts())  # class 覆盖同 id 的 .wf
     return [merged[k] for k in sorted(merged)]
+
+
+def _load_exposure() -> tuple[list, dict]:
+    """读取 workflows.yaml（合并视图）的 exposed 列表与 overrides 映射。"""
+    try:
+        data = get_resolver().load_merged("workflows.yaml")
+    except Exception as e:
+        logger.error(f"加载脚本暴露配置失败: {e}")
+        return [], {}
+    if not data:
+        return [], {}
+    return (data.get("exposed") or []), (data.get("overrides") or {})
+
+
+def list_exposed_scripts() -> list[dict]:
+    """发现全部脚本后，按 workflows.yaml 的 exposed/overrides 过滤+排序+改名。
+
+    这是「暴露层」：``discover_scripts()`` 给全集，本函数决定日常展示哪些、
+    顺序、以及显示名覆盖。语义与桌面「工具 → 脚本配置」一致：
+    exposed 缺失/为空 → 展示全部（按 id 排序）；否则仅展示且按其顺序。
+    桌面下拉与设备端悬浮面板共用本函数，避免两处各写一份暴露逻辑。
+
+    Returns:
+        脚本配置列表，shape 同 ``discover_scripts()``，name 已套用 overrides。
+    """
+    discovered = {cfg["id"]: cfg for cfg in discover_scripts()}
+    exposed, overrides = _load_exposure()
+    order = [i for i in exposed if i in discovered] if exposed else sorted(discovered)
+    result: list[dict] = []
+    for sid in order:
+        cfg = dict(discovered[sid])
+        ov = overrides.get(sid) or {}
+        if ov.get("name"):
+            cfg["name"] = ov["name"]
+        result.append(cfg)
+    return result

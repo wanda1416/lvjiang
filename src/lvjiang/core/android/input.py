@@ -14,7 +14,7 @@ import time
 
 from loguru import logger
 
-from ...config import DelayConfig
+from ...config import InputSimConfig
 from ..input_base import InputBackend
 from .device import AdbDevice
 
@@ -22,8 +22,8 @@ from .device import AdbDevice
 class AdbInput(InputBackend):
     """基于 adb shell input 的输入后端（接口继承 InputBackend）"""
 
-    def __init__(self, device: AdbDevice, delay_config: DelayConfig | None = None):
-        self._inject_delay_config(self, delay_config)
+    def __init__(self, device: AdbDevice, input_sim: InputSimConfig | None = None):
+        self._inject_input_sim(self, input_sim)
         self._device = device
 
         # 兼容 InputBackend 公开面：ADB 无窗口/后台概念，恒定值供上层访问

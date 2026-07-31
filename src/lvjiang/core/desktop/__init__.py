@@ -7,11 +7,11 @@
 - list_visible_windows：枚举所有可见窗口
 
 工厂函数：
-- create_input_backend(mode, delay_config, hwnd)：按 mode 创建输入后端
+- create_input_backend(mode, input_sim, hwnd)：按 mode 创建输入后端
 - create_capture_backend()：创建桌面截图后端
 """
 
-from ...config import DelayConfig
+from ...config import InputSimConfig
 from ..input_base import InputBackend
 from .capture import DesktopCapture
 from .post_message import PostMessageInput
@@ -21,23 +21,23 @@ from .win32_util import list_visible_windows
 
 def create_input_backend(
     mode: str = "post",
-    delay_config: DelayConfig | None = None,
+    input_sim: InputSimConfig | None = None,
     hwnd: int | None = None,
 ) -> InputBackend:
     """创建桌面端输入后端
 
     Args:
         mode: "send"（SendInput，前台）或 "post"（PostMessage，后台，默认）
-        delay_config: 延迟参数
+        input_sim: 输入模拟参数
         hwnd: 目标窗口句柄（PostMessage 模式使用）
 
     Returns:
         SendInputInput 或 PostMessageInput 实例
     """
     if mode == "send":
-        return SendInputInput(delay_config=delay_config)
+        return SendInputInput(input_sim=input_sim)
     elif mode == "post":
-        return PostMessageInput(delay_config=delay_config, hwnd=hwnd)
+        return PostMessageInput(input_sim=input_sim, hwnd=hwnd)
     else:
         raise ValueError(f"未知的桌面输入模式: {mode!r}，可选: 'send', 'post'")
 

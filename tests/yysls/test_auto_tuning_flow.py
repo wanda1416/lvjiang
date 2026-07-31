@@ -67,6 +67,9 @@ class FakeWF(AutoTuningWorkflow):
     def wait_delay(self, name: str):
         pass
 
+    def wait_seconds(self, seconds: float):
+        pass
+
     def click_region(self, scene_key, field_key, jitter: bool = True):
         self.clicks.append((scene_key, field_key))
 
@@ -874,7 +877,7 @@ def test_tune_skip_ends_keeps(monkeypatch):
 
 
 def test_tune_reset_restores_and_retunes(monkeypatch):
-    """重置调律：词条快照恢复后继续调到满，词条满默认跳过该装备"""
+    """重置调律：清空至只剩首词条后继续调到满，词条满默认跳过该装备"""
     calls = {"n": 0}
 
     def judge(*a, **k):
@@ -897,7 +900,7 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
     assert reports[0]["resets"] == 1
-    assert reports[0]["rounds"] == 4              # 首轮重置 + 2→5 共 3 轮
+    assert reports[0]["rounds"] == 5              # 首轮重置后只剩首词条，1→5 共 4 轮
     assert reports[0]["final_affix_count"] == 5   # 重置后继续调到满
     assert "跳过该装备" in reports[0]["stop_reason"]  # 词条满默认
     assert (TUNE_SCENE, "reset_tune") in wf.clicks
@@ -936,7 +939,7 @@ def test_tune_reset_blocked_ocr_zero(monkeypatch):
 
 
 def test_tune_reset_local_cap(monkeypatch):
-    """本地计数达 max_resets 上限 → 不再重置，按转处置默认保留结束"""
+    """冷却期硬限：即使 max_resets 更大，本件也只重置一次，后续按转处置默认保留结束"""
     calls = {"n": 0}
 
     def judge(*a, **k):
@@ -946,7 +949,7 @@ def test_tune_reset_local_cap(monkeypatch):
     base = _behavior_base(tune=TuneBehavior(
         enabled=True,
         rules=[BehaviorRule(ratings=["junk"], action="reset")],
-        max_resets=1))
+        max_resets=3))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
@@ -957,7 +960,7 @@ def test_tune_reset_local_cap(monkeypatch):
 
     reports = wf.output["tuning_reports"]
     assert reports[0]["resets"] == 1
-    assert reports[0]["rounds"] == 2      # 重置一轮 + 上限后结束一轮
+    assert reports[0]["rounds"] == 2      # 重置一轮 + 冷却硬限后结束一轮
     assert wf.clicks.count((TUNE_SCENE, "reset_confirm")) == 1
     assert "recycled_items" not in wf.output
 

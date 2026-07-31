@@ -455,7 +455,7 @@ class MaterialSettings:
 
 # 行为动作（结束处理 tune 的四个动作）：
 # - continue: 继续调律（词条满时自动结束，无需单独配置）
-# - reset: 重置装备（恢复基线词条后继续）
+# - reset: 重置装备（清空首词条以外全部词条后继续，冷却期限制每件限一次）
 # - recycle: 回收装备
 # - skip: 跳过该装备（结束保留在背包）
 # - tune_full_recycle: 调满后回收（金装专用，仅扫描处理可用）
@@ -478,7 +478,7 @@ BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "结束处理"}
 # 动作说明（供 UI tooltip 显示）
 BEHAVIOR_ACTION_TOOLTIPS = {
     "continue": "继续调律：词条满时自动结束",
-    "reset": "重置装备：恢复基线词条快照后继续",
+    "reset": "重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）",
     "recycle": "回收装备：分解为材料",
     "skip": "跳过该装备：结束保留在背包",
     "tune_full_recycle": "调满后回收：金装专用，跳过狗粮与规则判定，调满5词条后回收",

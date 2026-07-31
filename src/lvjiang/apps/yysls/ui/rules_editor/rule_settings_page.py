@@ -102,6 +102,11 @@ class RuleSettingsPage(QWidget):
         btn_rename_key.clicked.connect(self._rename_key)
         key_row.addWidget(btn_rename_key)
         key_row.addStretch()
+        # 删除入口收在首行最右，避免与表格编辑区混排误触
+        btn_delete = QPushButton("删除本规则")
+        btn_delete.setStyleSheet("color: #c62828;")
+        btn_delete.clicked.connect(self._confirm_delete)
+        key_row.addWidget(btn_delete)
         form.addRow("标识 key：", key_row)
 
         # 名称只读展示（修改走对话框左侧导航双击）
@@ -141,6 +146,7 @@ class RuleSettingsPage(QWidget):
         for col, width in enumerate((100, 90, 200, 90, 200, 90)):
             self._playstyle_table.setColumnWidth(col, width)
         self._playstyle_table.cellChanged.connect(self._apply_playstyles)
+        self._fix_table_height(self._playstyle_table, 10)
         layout.addWidget(self._playstyle_table)
         layout.addLayout(
             self._table_buttons(self._playstyle_table, self._apply_playstyles))
@@ -158,18 +164,18 @@ class RuleSettingsPage(QWidget):
             ["部位", "gold", "purple", "blue"])
         for col, width in enumerate((120, 70, 70, 70)):
             self._quality_table.setColumnWidth(col, width)
+        self._fix_table_height(self._quality_table, 3)
         layout.addWidget(self._quality_table)
         layout.addLayout(self._quality_table_buttons())
-
-        # ── 删除本规则 ──
-        del_row = QHBoxLayout()
-        btn_delete = QPushButton("删除本规则")
-        btn_delete.setStyleSheet("color: #c62828;")
-        btn_delete.clicked.connect(self._confirm_delete)
-        del_row.addWidget(btn_delete)
-        del_row.addStretch()
-        layout.addLayout(del_row)
         layout.addStretch()
+
+    @staticmethod
+    def _fix_table_height(table: QTableWidget, rows: int):
+        """表格默认展示区固定为 rows 行高（超出行数走滚动条）"""
+        header_h = table.horizontalHeader().sizeHint().height()
+        row_h = table.verticalHeader().defaultSectionSize()
+        table.setFixedHeight(
+            header_h + row_h * rows + 2 * table.frameWidth())
 
     def _table_buttons(self, table: QTableWidget, apply) -> QHBoxLayout:
         row = QHBoxLayout()

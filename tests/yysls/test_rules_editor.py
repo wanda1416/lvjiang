@@ -15,6 +15,9 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 )
 from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.ui.rules_editor import TuningRulesDialog
+from lvjiang.apps.yysls.ui.rules_editor.base_config_page import (
+    BaseConfigPage,
+)
 from lvjiang.apps.yysls.ui.rules_editor.behavior_pages import (
     ScanBehaviorPage,
     TuneBehaviorPage,
@@ -73,27 +76,51 @@ class TestDialog:
 class TestBehaviorPages:
     """行为处理页 smoke：真实配置回填 + 变更即校验即保存"""
 
+    def test_base_page_entry_rating_roundtrip(self, qtbot,
+                                              tmp_base_manager):
+        """调律门槛（基础配置页）：回填 + 变更写回 behavior.scan，
+        不碰处置表其他字段"""
+        statuses: list[tuple[str, bool]] = []
+        page = BaseConfigPage(tmp_base_manager,
+                              lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(page)
+        scan = tmp_base_manager.get().behavior.scan
+        assert page._entry_combo.currentData() == scan.entry_min_rating
+
+        page._entry_combo.setCurrentIndex(page._entry_combo.findData("top"))
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        after = tmp_base_manager.get().behavior.scan
+        assert after.entry_min_rating == "top"
+        # 处置表其他字段不受影响
+        assert after.enabled == scan.enabled
+        assert after.rules == scan.rules
+
     def test_scan_page_roundtrip(self, qtbot, tmp_base_manager):
         statuses: list[tuple[str, bool]] = []
         page = ScanBehaviorPage(tmp_base_manager,
                                 lambda t, e: statuses.append((t, e)))
         qtbot.addWidget(page)
         scan = tmp_base_manager.get().behavior.scan
-        # 回填与真实配置一致
+        # 回填与真实配置一致（调律门槛已移至基础配置页）
         assert page._enabled_cb.isChecked() == scan.enabled
-        assert page._entry_combo.currentData() == scan.entry_min_rating
         assert page._table.rowCount() == len(scan.rules)
-        # 判定语义已下沉为表格列（第 4 列），逐行回填
+        # 判定语义与仅首词条已下沉为表格列（列索引经 _ci 取），
+        # 逐行回填
         for i, rule in enumerate(scan.rules):
-            judge = page._table.cellWidget(i, 4)
+            judge = page._table.cellWidget(i, page._ci["judge"])
             assert judge.scope() == rule.judge_scope
             assert judge.rules() == rule.judge_rules
+            fao = page._table.cellWidget(i, page._ci["first_affix"])
+            assert fao.isChecked() == rule.first_affix_only
 
-        # 变更进入门槛 → 校验通过自动保存并生效
-        page._entry_combo.setCurrentIndex(page._entry_combo.findData("top"))
+        # 变更首行「仅首词条」→ 校验通过自动保存并生效，且门槛不丢
+        first = scan.rules[0].first_affix_only
+        page._table.cellWidget(0, page._ci["first_affix"]).setChecked(
+            not first)
         assert statuses and not statuses[-1][1], statuses[-1][0]
-        assert (tmp_base_manager.get().behavior.scan.entry_min_rating
-                == "top")
+        after = tmp_base_manager.get().behavior.scan
+        assert after.rules[0].first_affix_only == (not first)
+        assert after.entry_min_rating == scan.entry_min_rating
 
     def test_scan_page_add_delete_rule(self, qtbot, tmp_base_manager):
         statuses: list[tuple[str, bool]] = []

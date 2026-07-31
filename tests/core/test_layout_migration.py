@@ -97,6 +97,9 @@ class TestMigrateAcrossLayouts:
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
         monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
+        # 重置 resolver 单例以使用新路径
+        import lvjiang.core.config_resolver as cr
+        monkeypatch.setattr(cr, "_resolver", None)
         mgr = LayoutConfigManager()
         for name in ("布局A", "布局B"):
             mgr.save_layout(_make_layout(name))
@@ -116,7 +119,9 @@ class TestMigrateAcrossLayouts:
 
     def test_unrelated_layout_untouched(self, manager):
         from lvjiang.core.config_resolver import get_resolver
-        path = get_resolver().resolve_read("layouts/布局C.json")
+        # 读取布局C 场景文件的当前内容
+        path = get_resolver().resolve_read("layouts/布局C/src.json")
+        assert path is not None
         before = path.read_text(encoding="utf-8")
         manager.migrate_item_across_layouts("src", "dst", "region", "btn")
         assert path.read_text(encoding="utf-8") == before

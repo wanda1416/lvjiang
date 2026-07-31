@@ -9,13 +9,10 @@ test_scene_scan.py 用最小假布局覆盖 collect_refs / check_refs 的单元�
 config/local 影子文件影响，CI 与开发机结论一致。
 """
 
-import json
-
 import pytest
 
 from lvjiang.config import load_user_config
 from lvjiang.constants import SYSTEM_LAYOUTS_DIR, SYSTEM_WORKFLOWS_DIR
-from lvjiang.core.scene_registry import Layout
 from lvjiang.workflows.engine import WorkflowEngine
 
 
@@ -33,21 +30,29 @@ def _system_wf_files() -> list:
     )
 
 
-def _system_layouts() -> list:
-    return sorted(SYSTEM_LAYOUTS_DIR.glob("*.json"))
+def _system_layouts() -> list[str]:
+    """系统布局名册（目录化结构：layouts/{name}/ 目录）"""
+    if not SYSTEM_LAYOUTS_DIR.is_dir():
+        return []
+    return sorted(
+        p.name for p in SYSTEM_LAYOUTS_DIR.iterdir()
+        if p.is_dir() and not p.name.startswith("_")
+    )
 
 
-def _validator(layout_path) -> WorkflowEngine:
+def _validator(layout_name: str) -> WorkflowEngine:
     """装配「只校验」的引擎：后端全为 None，validate_only 不触碰它们
 
     delay_params 必须取真实配置 —— 命名等待校验比对的就是它，传空会把
     `wait step_interval` 全判成未定义。
     """
-    data = json.loads(layout_path.read_text(encoding="utf-8"))
+    from lvjiang.core.layout_manager import load_layout_by_name
+    layout = load_layout_by_name(layout_name)
+    assert layout is not None, f"布局加载失败: {layout_name}"
     user_config = load_user_config()
     return WorkflowEngine(
         capture=None, ocr=None, input_ctrl=None,
-        layout=Layout.from_dict(layout_path.stem, data),
+        layout=layout,
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
         window_left=0, window_top=0,
@@ -60,13 +65,13 @@ def test_system_layouts_and_workflows_exist():
     assert _system_wf_files(), "config/system/workflows 下没有 .wf"
 
 
-@pytest.mark.parametrize("layout_path", _system_layouts(), ids=lambda p: p.stem)
+@pytest.mark.parametrize("layout_name", _system_layouts())
 @pytest.mark.parametrize(
     "wf_path", _system_wf_files(),
     ids=lambda p: p.relative_to(SYSTEM_WORKFLOWS_DIR).as_posix())
-def test_wf_refs_all_bound(wf_path, layout_path):
+def test_wf_refs_all_bound(wf_path, layout_name):
     """每个系统 .wf 引用的场景/区域/坐标点/方向/面板都已在该布局绑定
 
     失败信息即 format_problems 的清单（含文件名:行号），直接照着补绑即可。
     """
-    _validator(layout_path).validate_only(wf_path)
+    _validator(layout_name).validate_only(wf_path)

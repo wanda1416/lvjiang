@@ -1,0 +1,7 @@
+layouts:
+  默认布局:
+    canvas:
+      x_ratio: 0.0
+      y_ratio: 0.0
+      w_ratio: 1.0
+      h_ratio: 1.0

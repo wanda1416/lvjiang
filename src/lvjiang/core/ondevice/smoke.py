@@ -280,19 +280,14 @@ def _run_workflow() -> str:
 
     if ok:
         def check_layout(report):
-            import json
-
-            from ...core.scene_registry import Layout
-            from ..config_resolver import get_resolver
+            from ..layout_manager import load_layout_by_name
             from .workflow_runner import _default_layout_name
             name = _default_layout_name()
-            layout_path = get_resolver().resolve_read(f"layouts/{name}.json")
-            if layout_path is None:
-                raise RuntimeError(f"布局文件不存在: layouts/{name}.json")
-            data = json.loads(layout_path.read_text(encoding="utf-8"))
-            layout = Layout.from_dict(name, data)
+            layout = load_layout_by_name(name)
+            if layout is None:
+                raise RuntimeError(f"布局不存在: {name}")
             scene_count = len(set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels))
-            report.append(f"布局文件    {layout_path.name}")
+            report.append(f"布局名称    {name}")
             report.append(f"场景数      {scene_count}")
             report.append(f"canvas      {layout.canvas}")
             return layout

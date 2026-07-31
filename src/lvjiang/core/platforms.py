@@ -48,9 +48,18 @@ def start_global_hotkeys(hotkeys: dict[str, Callable]) -> "GlobalHotKeys | None"
 
     - 启动前自动安装 pynput 钩子防护补丁（必须在 Listener 启动前）
     - Windows 上失败直接抛出（历史行为，不静默吞错）
+    - macOS 上 pynput 的 CGEventTap 实现会导致 libffi 500+ 层递归，
+      长时间运行触发 use-after-free 崩溃，因此直接跳过，降级为窗口内热键
     - macOS 需「输入监控/辅助功能」权限，未授权时返回 None，
       由调用方降级为窗口内热键
     """
+    if IS_MACOS:
+        # macOS 上 pynput GlobalHotKeys 使用 CGEventTap + libffi，
+        # 事件回调深度递归（500+ 层 ffi_call_int），
+        # 长时间运行后触发 native crash（EXC_BAD_ACCESS）。
+        # 直接跳过，由调用方降级为 Qt keyPressEvent 窗口内热键。
+        logger.info("macOS 上跳过 pynput 全局热键（libffi 递归问题），使用窗口内热键")
+        return None
     from .pynput_patch import install as _install_pynput_patch
     _install_pynput_patch()
     try:

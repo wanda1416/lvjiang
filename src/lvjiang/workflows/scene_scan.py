@@ -37,6 +37,7 @@ KIND_LABELS = {
     "arrow": "方向",
     "panel": "面板",
     "region": "区域",
+    "scan": "区域/面板",
 }
 
 
@@ -98,8 +99,10 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
         elif isinstance(scene_ref, SceneRef):
             # fields 为识别的区域 key 列表；无 fields（或动态 region）时为整场景识别
             if stmt.fields:
+                # 单一 key 运行时可能分派为整面板识别，放宽为 区域/面板
+                kind = "scan" if len(stmt.fields) == 1 else "region"
                 for field in stmt.fields:
-                    _add(acc, scene_ref.scene, field, "region", line)
+                    _add(acc, scene_ref.scene, field, kind, line)
             else:
                 _add(acc, scene_ref.scene, None, "region", line)
     elif isinstance(stmt, (Align, PanelGridDrag)):

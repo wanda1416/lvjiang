@@ -274,17 +274,20 @@ catch_clause: "catch"i var_ref? _NL statement*
 // $var.$key 支持动态字典访问（用 . 代替 Python 的 dict[] 语法）
 // $var[$i] 支持列表索引访问（直接 [] 表示 index）
 // $var."key" / $var.[key] 支持静态字面量访问（"" 与 [] 在非赋值语境等价）
+// $var.[1] 支持数字字面量 key（整面板扫描结果按 行.列 取值）
 // session.field / context.field 支持关键字作为字段访问根（KeywordRef）
 field_access: field_access "." NAME -> field_chain
             | field_access "." var_ref -> field_var_chain
             | field_access "[" var_ref "]" -> field_index_chain
             | field_access "." STRING -> field_str_chain
             | field_access "." "[" NAME "]" -> field_bracket_chain
+            | field_access "." "[" INT "]" -> field_bracket_chain
             | var_ref "." NAME -> field_base
             | var_ref "." var_ref -> field_var_base
             | var_ref "[" var_ref "]" -> field_index_base
             | var_ref "." STRING -> field_str_base
             | var_ref "." "[" NAME "]" -> field_bracket_base
+            | var_ref "." "[" INT "]" -> field_bracket_base
             | keyword_ref "." NAME -> kw_field_base
             | keyword_ref "." var_ref -> kw_field_var_base
             | keyword_ref "." STRING -> kw_field_str_base

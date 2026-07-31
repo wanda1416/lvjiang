@@ -128,3 +128,9 @@ regions:
   is_text: true
   is_clickable: true
   view: reset_tune
+- key: check_1
+  name: 冷静期检查
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: reset_tune

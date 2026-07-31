@@ -171,14 +171,16 @@ def test_no_tune_entry(patch_worth):
     assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
 
 
-def test_worth_tuned_to_full(patch_worth):
+def test_worth_tuned_to_full(patch_worth, monkeypatch):
     """值得 → 调律循环到 5 条 → tuned + 返回 back。
 
     结束处理默认关 → 每轮走默认「继续调律」，词条满走默认「结束保留」。
+    石头检查等材料配置注入代码默认值，不读真实 yaml（开关变更不应破测）。
     """
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: TuningBase())
     wf = FakeWF()
     # gold + cap_pct 50 → 不加狗粮，_tune_once 走无材料路径
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._process_equipment("待调剑", _equip(2, quality="gold", cap_pct=50),
                           WEAPON_DETAIL)
@@ -204,7 +206,7 @@ def test_food_skip_rule_stops_equipment(patch_worth, monkeypatch):
         FoodRule(food="紫狗粮", on_insufficient="skip")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
     wf._material_infos = {}   # 材料区读不到紫狗粮 → 不足
     wf._process_equipment("缺料剑", _equip(2, quality="purple", cap_pct=50),
                           WEAPON_DETAIL)
@@ -225,7 +227,7 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
         FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._material_infos = {"material_3": _Stone(type="金狗粮", count=42)}
     wf._process_equipment("高分剑", _equip(2, quality="gold", cap_pct=95),
@@ -244,7 +246,7 @@ def test_no_recognition_when_stone_off_and_no_rules(patch_worth, monkeypatch):
     base = TuningBase(materials=MaterialSettings(food_rules=[]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
 
@@ -259,7 +261,7 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
         FoodRule(pct=90, min_expect="excellent", food="紫狗粮")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._material_infos = {
         "material_1": _Stone(type="紫狗粮"),                     # 前置幽灵槽
@@ -357,10 +359,56 @@ def test_stone_check_missing_slot_stops():
     assert "大律准石 0" in wf.output["stop_reason"]
 
 
+def test_stone_check_skip_action():
+    """不足处理 skip → 本件终止但不全退，不足钩子仍触发"""
+    wf = FakeWF()
+    settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
+                                stone_insufficient_action="skip")
+    hook_calls = []
+    wf._on_materials_insufficient = \
+        lambda stock, baseline: hook_calls.append((stock, baseline))
+    assert wf._check_stone_stock(
+        settings, {"material_2": _Stone(count=50)}) is False
+    assert not wf._materials_exhausted
+    assert "stop_reason" not in wf.output
+    assert "跳过该装备" in wf._tune_abort_reason
+    assert hook_calls == [(50, 100)]
+
+
+def test_stone_check_ask_continue():
+    """不足处理 ask + 用户确认 → 放行，本次运行不再检查不再询问"""
+    wf = FakeWF()
+    settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
+                                stone_insufficient_action="ask")
+    asked = []
+    wf._confirm_continue = lambda msg: asked.append(msg) or True
+    infos = {"material_2": _Stone(count=50)}
+    assert wf._check_stone_stock(settings, infos) is True
+    assert wf._stone_check_waived
+    assert not wf._materials_exhausted
+    assert len(asked) == 1 and "大律准石 50" in asked[0]
+    # 后续轮次直接放行，不再弹窗
+    assert wf._check_stone_stock(settings, infos) is True
+    assert len(asked) == 1
+
+
+def test_stone_check_ask_decline():
+    """不足处理 ask + 用户拒绝 → 同 abort 全退"""
+    wf = FakeWF()
+    settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
+                                stone_insufficient_action="ask")
+    wf._confirm_continue = lambda msg: False
+    assert wf._check_stone_stock(
+        settings, {"material_2": _Stone(count=50)}) is False
+    assert wf._materials_exhausted
+    assert not wf._stone_check_waived
+    assert "材料不足" in wf.output["stop_reason"]
+
+
 def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
     """集成：调律循环内石头不足 → rounds=0，仍正常 back 退出调律页"""
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
     wf._material_infos = {"material_2": _Stone(count=3)}
     wf._process_equipment("缺石剑", _equip(2, quality="gold", cap_pct=50),
                           WEAPON_DETAIL)
@@ -372,6 +420,111 @@ def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
     # 石头检查与狗粮决策共用同一次识别
     assert wf.material_info_calls == 1
     # 退出路径仍收束：调律页 back 正常点击
+    assert (TUNE_SCENE, "back") in wf.clicks
+
+
+def test_stone_low_skip_continues_flow(patch_worth, monkeypatch):
+    """集成：不足处理 skip → 本件 rounds=0 结束，不置全退标志，
+    遍历可继续（is_stopped 仍为假）"""
+    base = TuningBase(materials=MaterialSettings(
+        stone_check_enabled=True, stone_min_count=100,
+        stone_insufficient_action="skip"))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
+    wf._material_infos = {"material_2": _Stone(count=3)}
+    wf._process_equipment("缺石剑", _equip(2, quality="gold", cap_pct=50),
+                          WEAPON_DETAIL)
+
+    reports = wf.output["tuning_reports"]
+    assert reports[0]["rounds"] == 0
+    assert "跳过该装备" in reports[0]["stop_reason"]
+    assert not wf._materials_exhausted
+    assert not wf.is_stopped
+    assert "stop_reason" not in wf.output
+    assert (TUNE_SCENE, "back") in wf.clicks
+
+
+# ─── 一键添加后「调律」按钮就绪检查 ─────────────────
+
+
+def test_tune_btn_not_ready_default_skips():
+    """按钮未就绪 + 石头检查未启用 → 兜底 skip：本件终止不全退"""
+    wf = FakeWF()   # _ocr_map 无 tune_btn → OCR 为空 → 重扫后仍未就绪
+    assert wf._ensure_tune_ready(MaterialSettings()) is False
+    assert not wf._materials_exhausted
+    assert "stop_reason" not in wf.output
+    assert "未就绪" in wf._tune_abort_reason
+    assert "结束本件调律" in wf._tune_abort_reason
+
+
+def test_tune_btn_not_ready_abort():
+    """按钮未就绪 + 不足处理 abort → 置标志全退，记 stop_reason"""
+    wf = FakeWF()
+    settings = MaterialSettings(stone_check_enabled=True,
+                                stone_insufficient_action="abort")
+    assert wf._ensure_tune_ready(settings) is False
+    assert wf._materials_exhausted
+    assert "未就绪" in wf.output["stop_reason"]
+
+
+def test_tune_btn_not_ready_ask_continue():
+    """按钮未就绪 + ask 确认 → 按 skip 跳过本件，本次运行不再询问"""
+    wf = FakeWF()
+    settings = MaterialSettings(stone_check_enabled=True,
+                                stone_insufficient_action="ask")
+    asked = []
+    wf._confirm_continue = lambda msg: asked.append(msg) or True
+    assert wf._ensure_tune_ready(settings) is False
+    assert not wf._materials_exhausted
+    assert wf._tune_ready_waived
+    assert len(asked) == 1 and "未就绪" in asked[0]
+    # 后续装备再次未就绪：直接按跳过处理，不再弹窗
+    assert wf._ensure_tune_ready(settings) is False
+    assert len(asked) == 1
+    assert not wf._materials_exhausted
+
+
+def test_tune_btn_not_ready_ask_decline():
+    """按钮未就绪 + ask 拒绝 → 同 abort 全退"""
+    wf = FakeWF()
+    settings = MaterialSettings(stone_check_enabled=True,
+                                stone_insufficient_action="ask")
+    wf._confirm_continue = lambda msg: False
+    assert wf._ensure_tune_ready(settings) is False
+    assert wf._materials_exhausted
+    assert not wf._tune_ready_waived
+    assert "未就绪" in wf.output["stop_reason"]
+
+
+def test_tune_btn_retry_recovers():
+    """首扫未就绪、重扫变「调律」 → 放行（防 UI 刷新慢/OCR 波动误杀）"""
+    wf = FakeWF()
+    scans = [{"tune_btn": ""}, {"tune_btn": "调律"}]
+    wf.ocr_scene = lambda scene, keys=None: scans.pop(0)
+    assert wf._ensure_tune_ready(MaterialSettings()) is True
+    assert not scans          # 恰好扫了两次
+    assert not wf._materials_exhausted
+
+
+def test_tune_btn_not_ready_flow(patch_worth, monkeypatch):
+    """集成：一键添加后按钮没变「调律」→ 本件 rounds=0 结束，
+    未启用石头检查也兜底：不盲点调律、不全退，仍正常 back 退出"""
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: TuningBase())
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                               "tune_btn": "一键添加"}   # 添加失败，文字未变
+    wf._process_equipment("无料剑", _equip(2, quality="gold", cap_pct=50),
+                          WEAPON_DETAIL)
+
+    reports = wf.output["tuning_reports"]
+    assert reports[0]["rounds"] == 0
+    assert "未就绪" in reports[0]["stop_reason"]
+    assert not wf._materials_exhausted
+    assert not wf.is_stopped
+    # 点了一键添加，但没有盲点调律按钮
+    assert (TUNE_SCENE, "auto_add") in wf.clicks
+    assert (TUNE_SCENE, "tune_btn") not in wf.clicks
     assert (TUNE_SCENE, "back") in wf.clicks
 
 
@@ -445,6 +598,54 @@ def test_skip_tuning_no_entry(patch_worth):
     assert (TUNE_SCENE, "back") not in wf.clicks
     # _nav_to_tune 失败分支自行收起弹窗 → more_func 共 2 次
     assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+
+
+# ─── 等级门槛 + 品阶异常前置拦截 ───────────────────
+
+
+def test_below_min_level_skips(monkeypatch):
+    """等级低于门槛 → 直接跳过，不走任何行为判定"""
+    base = TuningBase(min_level=120)
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    fp = wf._process_equipment_once("低级剑", _equip(2, name="低级剑"),
+                                    WEAPON_DETAIL)
+
+    assert fp   # 保留装备，返回指纹
+    assert not wf.output.get("tuning_reports")   # 不进调律
+    assert not wf.scan_reject_calls   # 不走扫描处置
+    assert not wf.full_calls   # 不走已满处理
+    assert (WEAPON_DETAIL, "more_func") not in wf.clicks   # 不触发回收
+
+
+def test_quality_unrecognized_skips(monkeypatch):
+    """品阶识别失败（quality 为空）→ 视为异常直接跳过"""
+    wf = FakeWF()
+    equip = _equip(2, name="异常剑")
+    equip["quality"] = None   # 模拟品阶识别失败
+    fp = wf._process_equipment_once("异常剑", equip, WEAPON_DETAIL)
+
+    assert fp   # 保留装备，返回指纹
+    assert not wf.output.get("tuning_reports")
+    assert not wf.scan_reject_calls
+    assert not wf.full_calls
+    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+
+
+def test_min_level_default_100_passes(monkeypatch):
+    """默认门槛 100，等级 110 装备正常通过"""
+    monkeypatch.setattr(auto_tuning, "get_tuning_base",
+                        lambda: TuningBase())   # min_level 默认 100
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_WORTHY))
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                               "tune_btn": "调律", "tune_affix": "",
+                               "tune_tip": ""}
+    fp = wf._process_equipment_once("满级剑", _equip(2), WEAPON_DETAIL)
+
+    assert fp   # 正常处理，未被等级门槛拦截
+    assert wf.output.get("tuning_reports")   # 进了调律
 
 
 # ─── 行为处置（behavior 扫描处理 / 结束处理）──────────────
@@ -589,7 +790,7 @@ def test_tune_recycles_after_hit(monkeypatch):
                                             rules=_RECYCLE_ALL))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": ""}
     fp = wf._process_equipment("命中剑", _equip(2, quality="gold",
@@ -615,7 +816,7 @@ def test_tune_ignore_ends_keeps(monkeypatch):
         enabled=True, rules=[BehaviorRule(action="ignore")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": ""}
     fp = wf._process_equipment("保留剑", _equip(2, quality="gold",
@@ -642,7 +843,7 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
         max_resets=3))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律(3)"}
     fp = wf._process_equipment("可救剑", _equip(2, quality="gold",
@@ -674,7 +875,7 @@ def test_tune_reset_blocked_ocr_zero(monkeypatch):
         rules=[BehaviorRule(max_rating="junk", action="reset")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律"}
     fp = wf._process_equipment("次数耗尽剑", _equip(2, quality="gold",
@@ -704,7 +905,7 @@ def test_tune_reset_local_cap(monkeypatch):
         max_resets=1))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律 3/3"}
     wf._process_equipment("重置一次剑", _equip(2, quality="gold",
@@ -731,7 +932,7 @@ def test_tune_reset_exhausted_recycles(monkeypatch):
         reset_exhausted_action="recycle"))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律"}
     fp = wf._process_equipment("用尽剑", _equip(2, quality="gold",
@@ -777,7 +978,7 @@ def test_materials_block_no_behavior(monkeypatch):
             tune=TuneBehavior(enabled=True, rules=_RECYCLE_ALL)))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": ""}
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
     wf._material_infos = {"material_2": _Stone(count=3)}
     fp = wf._process_equipment("缺石剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
@@ -984,7 +1185,17 @@ class RowColsFakeWF(FakeWF):
                            row=None, col=1):
         self.processed.append(name)
         if name in self.recycled_names:
-            return ""   # 回收后该格已空（无装备补位）
+            self._equipment_recycled = True
+            # 模拟回收后背包补位：移除当前格，后续列前移
+            if row is not None and col is not None:
+                self.cell_map.pop((row, col), None)
+                for c in range(col + 1, 10):
+                    item = self.cell_map.pop((row, c), None)
+                    if item is None:
+                        break
+                    self.cell_map[(row, c - 1)] = item
+            return ""   # 回收后该格已空（由上层重读判断）
+        self._equipment_recycled = False
         return f"fp_{name}"   # 模拟调律后指纹变化
 
 
@@ -1007,6 +1218,35 @@ def test_row_cols_stops_at_empty_slot():
     }
     wf._process_row_cols(WEAPON_DETAIL, win_row=1, logical_row=1, cols=3)
     assert wf.processed == []
+
+
+def test_row_cols_recycle_stays_at_column():
+    """非首列回收 → 补位装备前移到当前列 → 留在当前列继续处理而非跳下一列"""
+    wf = RowColsFakeWF()
+    wf.cell_map = {
+        (1, 2): ("a", "FA", {"n": 1}),   # 第 2 列：装备 a（将被回收）
+        (1, 3): ("b", "FB", {"n": 2}),   # 第 3 列：装备 b（a 回收后补位到第 2 列）
+    }
+    wf.recycled_names = {"a"}   # a 被回收
+    wf._process_row_cols(WEAPON_DETAIL, win_row=1, logical_row=1, cols=3)
+    # a 在第 2 列被回收 → b 补位到第 2 列 → 留在第 2 列处理 b
+    # → 第 3 列已空 → 本行结束
+    assert wf.processed == ["a", "b"]
+
+
+def test_row_cols_recycle_cascade_stays_at_column():
+    """连续回收：第 2 列回收后补位也被回收，再次留在当前列"""
+    wf = RowColsFakeWF()
+    wf.cell_map = {
+        (1, 2): ("a", "FA", {"n": 1}),
+        (1, 3): ("b", "FB", {"n": 2}),
+        (1, 4): ("c", "FC", {"n": 3}),
+    }
+    wf.recycled_names = {"a", "b"}   # a 和 b 都会被回收
+    wf._process_row_cols(WEAPON_DETAIL, win_row=1, logical_row=1, cols=4)
+    # a 回收 → b 补位到 col 2 → b 也回收 → c 补位到 col 2 → c 保留
+    # → col 3 空 → 结束
+    assert wf.processed == ["a", "b", "c"]
 
 
 def test_new_rows_full_row_traversal_first_col_fp_only():
@@ -1047,6 +1287,8 @@ class TestTuningDocIntegration:
 
     def test_doc_written_only_for_tuned(self, monkeypatch, tmp_path):
         """好剑调律到满写入文档；垃圾剑被跳过完全不出现在文档中"""
+        monkeypatch.setattr(auto_tuning, "get_tuning_base",
+                            lambda: TuningBase())
         monkeypatch.setattr(
             auto_tuning, "judge_equipment_potential",
             lambda equip_data, *a, **k: dict(
@@ -1055,7 +1297,7 @@ class TestTuningDocIntegration:
         wf.ctx.doc_username = "小明"
         wf.ctx.doc_dir = tmp_path
         wf._ocr_map[TUNE_SCENE] = {
-            "auto_add": "一键添加", "auto_add_2": "",
+            "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
             "tune_affix": "最大外功攻击 100", "tune_tip": ""}
 
         wf._open_doc(["main_weapon"])
@@ -1125,11 +1367,13 @@ class TestTuningDocIntegration:
 
     def test_doc_none_when_not_opened(self, monkeypatch):
         """未走 run()/_open_doc（_doc 为 None）时各插桩点静默跳过"""
+        monkeypatch.setattr(auto_tuning, "get_tuning_base",
+                            lambda: TuningBase())
         monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                             lambda *a, **k: dict(_WORTHY))
         wf = FakeWF()
         wf._ocr_map[TUNE_SCENE] = {
-            "auto_add": "一键添加", "auto_add_2": "",
+            "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
             "tune_affix": "最大外功攻击 100", "tune_tip": ""}
         wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
         assert wf.output["tuning_reports"][0]["status"] == "tuned"

@@ -79,9 +79,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _doc_seq = 0                # 说明文档中的装备序号
     _tune_abort_reason = ""     # _tune_once 返回 None 时的原因文案
     _materials_exhausted = False  # 大律准石低于基准，全部退出
+    _stone_check_waived = False   # 询问后用户确认继续，本次运行不再检查
+    _tune_ready_waived = False    # 按钮未就绪询问后确认继续，本次运行不再询问
     _expect_rating: str | None = None  # 当前装备期望评级 key（适用规则最高档）
     _round_food = ""            # 本轮实际添加的狗粮 label（空=不添加）
     _round_food_reason = ""     # 本轮狗粮决策说明（供说明文档/日志）
+    _equipment_recycled = False  # 最近一次 _process_equipment 是否触发了回收
 
     @property
     def is_stopped(self) -> bool:
@@ -91,6 +94,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def run(self) -> dict:
         self._materials_exhausted = False
+        self._stone_check_waived = False
+        self._tune_ready_waived = False
         self._ensure_judge_config()
 
         selected = self.ctx.selected_slots
@@ -109,8 +114,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 elif slot in self.ARMOR_SLOTS:
                     self._process_slot_group(slot, self.ARMOR_DETAIL)
 
-            self._navigate_back()
-            logger.info("自动调律完成")
+            if self.is_stopped:
+                logger.info("自动调律被中断（F10/材料耗尽），保留当前页面")
+                if "stop_reason" not in self.output:
+                    self.output["stop_reason"] = "用户中断（F10）"
+            else:
+                self._navigate_back()
+                logger.info("自动调律完成")
         finally:
             self._close_doc()
         return self.output
@@ -265,7 +275,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if fp:
             logger.debug(
                 f"  读格 grid[{row}][{col}] → {self._equip_label(equip)} "
-                f"lv={equip.get('level')} fp={fp}")
+                f"lv={equip.get('level')} quality={equip.get('quality')} fp={fp}")
         else:
             logger.debug(f"  读格 grid[{row}][{col}] → 空")
         return name, fp, equip
@@ -278,8 +288,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         非首列装备不参与滚动校验，无需记录指纹（锚点仍只用首列），
         调律后指纹变化也无需回写。背包按行优先填充，空 slot 表示
         该行装备到此为止，停止本行遍历。
+        回收后后续装备前移补位到当前列，需留在当前列继续处理，
+        而非跳到下一列（否则漏件）。
         """
-        for col in range(2, cols + 1):
+        col = 2
+        while col <= cols:
             if self.is_stopped:
                 break
             name, fp, equip = self._read_row(detail_scene, win_row, col)
@@ -290,6 +303,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.info(f"  行{logical_row} grid[{win_row}][{col}] {name} fp={fp}")
             self._process_equipment(name, equip, detail_scene,
                                     row=win_row, col=col)
+            if self._equipment_recycled:
+                # 回收使后续装备前移补位到当前列，留在当前列继续处理
+                if not fp:
+                    break   # 安全兜底：回收后同列读空 → 本行结束
+                continue
+            col += 1
 
     def _traverse_bag(self, detail_scene: str):
         """按配置选择遍历策略并执行（策略实现见 bag_traversal）
@@ -325,11 +344,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         有格位时重读同格续处理（保险丝防死循环）；row=None 表示调用方
         无格位信息，回收后无法回读，返回空指纹由上层按空 slot 处理。
         返回最终占位装备的（终态）指纹，供上层更新行指纹。
+        设置 _equipment_recycled 标记供 _process_row_cols 判断是否
+        需要在同一列继续处理（补位导致后续装备前移）。
         """
+        self._equipment_recycled = False
         fp, recycled = self._process_equipment_once(name, equip, detail_scene)
         if not recycled:
             return fp
         if row is None:
+            self._equipment_recycled = True
             return ""
         for _ in range(200):
             if self.is_stopped:
@@ -337,12 +360,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             name, fp, equip = self._read_row(detail_scene, row, col)
             if not fp:
                 logger.info(f"  grid[{row}][{col}] 回收后已空，该格结束")
+                self._equipment_recycled = True
                 return ""
             logger.info(f"  回收补位 grid[{row}][{col}] → {name} fp={fp}")
             fp, recycled = self._process_equipment_once(name, equip,
                                                         detail_scene)
             if not recycled:
+                self._equipment_recycled = True
                 return fp
+        self._equipment_recycled = True
         return ""
 
     def _process_equipment_once(self, name: str, equip: dict,
@@ -362,6 +388,22 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """
         if not equip:
             return "", False
+
+        # 前置拦截 0：等级门槛 — 低于 min_level 直接跳过，不走任何判定
+        level = equip.get("level") or 0
+        min_level = get_tuning_base().min_level
+        if level < min_level:
+            logger.info(
+                f"  [{name}] 等级 {level} < 门槛 {min_level}，直接跳过")
+            return self._make_fingerprint(equip), False
+
+        # 前置拦截 1：品阶识别异常 — 无法识别品阶说明 OCR 有问题，直接跳过
+        quality = equip.get("quality")
+        if not quality:
+            logger.warning(
+                f"  [{name}] 品阶识别失败（quality 为空），视为异常直接跳过")
+            return self._make_fingerprint(equip), False
+
         equip_data = EquipmentData.from_dict(equip)
         affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
         logger.info(
@@ -614,9 +656,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _on_materials_insufficient(self, stock: int, baseline: int):
         """大律准石低于基准的后处理挂载点（预留：补货/兑换）。
-        当前仅记录不动作，全部退出由 _materials_exhausted 驱动。"""
+        当前仅记录不动作；不足处理（跳过/结束/询问）由
+        _check_stone_stock 按配置执行。"""
         logger.info(f"  [材料不足] 大律准石 {stock}/基准 {baseline}"
-                    f"（不足处理待实现）")
+                    f"（补货/兑换后处理待实现，仅记录）")
 
     def _on_full_equipment(self, equip_data: EquipmentData,
                            judgement: dict, report: dict,
@@ -816,14 +859,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         基于调律页材料区识别结果（infos，与逐轮狗粮决策共用同一次
         识别），取大律准石持有量（x/y 优先取 y，无斜杠取显示数字）；
-        低于基准判材料不足，置 _materials_exhausted 使 is_stopped 恒真，
-        全部退出。材料区找不到大律准石视为已耗尽；数量 OCR 失败时
-        警告放行（识别波动不误杀整次运行）。
+        低于基准判材料不足，按配置的不足处理执行：skip=跳过该装备
+        （继续遍历）；ask=confirm 弹窗询问，确认继续则本次运行不再
+        检查，拒绝同 abort；abort=置 _materials_exhausted 使 is_stopped
+        恒真，全部退出。材料区找不到大律准石视为已耗尽；数量 OCR
+        失败时警告放行（识别波动不误杀整次运行）。
 
         Returns:
-            True=可继续调律；False=材料不足，应终止全部流程
+            True=可继续调律；False=材料不足，本件终止（是否全退
+            由 _materials_exhausted 决定）
         """
-        if not settings.stone_check_enabled:
+        if not settings.stone_check_enabled or self._stone_check_waived:
             return True
         stone = next((i for i in (infos or {}).values()
                       if getattr(i, "type", "") == STONE_LABEL), None)
@@ -840,11 +886,78 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return True
         reason = (f"大律准石 {stock} < 基准 "
                   f"{settings.stone_min_count}，材料不足")
+        action = settings.stone_insufficient_action
+        if action == "ask" and self._confirm_continue(
+                f"{reason}，是否继续调律？"):
+            logger.warning(f"{reason}，用户确认继续，本次运行不再检查")
+            self._stone_check_waived = True
+            return True
+        if action == "skip":
+            logger.warning(f"{reason}，跳过该装备")
+            self._tune_abort_reason = f"{reason}，跳过该装备"
+            self._on_materials_insufficient(stock, settings.stone_min_count)
+            return False
+        # abort / ask 拒绝 → 全部退出
         logger.warning(f"{reason}，终止全部调律")
         self._tune_abort_reason = reason
         self._materials_exhausted = True
         self.output["stop_reason"] = reason
         self._on_materials_insufficient(stock, settings.stone_min_count)
+        return False
+
+    def _confirm_continue(self, message: str) -> bool:
+        """走 DSL confirm 内置函数弹窗询问用户
+
+        有 engine 引用时经 engine._ui_callback 调度到 Qt 主线程，
+        无则回退平台原生弹窗（confirm 内置函数自行处理）。
+        """
+        return bool(self.call_function("confirm", [message],
+                                       engine=self._engine))
+
+    def _ensure_tune_ready(self, settings: MaterialSettings) -> bool:
+        """一键添加后确认「调律」按钮已就绪（文字含「调律」）
+
+        添加失败时按钮文字不变——多半是材料不足（一键添加无可用
+        材料），盲点「调律」只会空转。未就绪先等一拍重扫一次（防 UI
+        刷新慢 / OCR 波动误杀），仍未就绪走材料不足处理：本件必然
+        结束（按钮点不动），是否全退按石头检查的不足处理决定；
+        未启用检查时也要兜底，按 skip 语义只跳过本件。ask 确认继续
+        后本次运行不再重复询问（后续未就绪直接按跳过处理）。
+
+        Returns:
+            True=按钮就绪可点击；False=本件终止（是否全退由
+            _materials_exhausted 决定），原因已存 _tune_abort_reason
+        """
+        btn = ""
+        for attempt in range(2):
+            if attempt:
+                self.wait_delay("page_refresh_wait")
+            btn = self.ocr_scene(self.TUNE_SCENE, ["tune_btn"]).get(
+                "tune_btn", "") or ""
+            if "调律" in btn:
+                return True
+        reason = (f"一键添加后「调律」按钮未就绪"
+                  f"（OCR: {btn or '空'}），疑似材料不足")
+        action = (settings.stone_insufficient_action
+                  if settings.stone_check_enabled else "skip")
+        if action == "ask":
+            if self._tune_ready_waived:
+                action = "skip"
+            elif self._confirm_continue(
+                    f"{reason}，是否跳过本件继续处理后续装备？"):
+                self._tune_ready_waived = True
+                action = "skip"
+            else:
+                action = "abort"
+        if action == "skip":
+            logger.warning(f"{reason}，结束本件调律")
+            self._tune_abort_reason = f"{reason}，结束本件调律"
+            return False
+        # abort / ask 拒绝 → 全部退出
+        logger.warning(f"{reason}，终止全部调律")
+        self._tune_abort_reason = reason
+        self._materials_exhausted = True
+        self.output["stop_reason"] = reason
         return False
 
     def _refresh_expectation(self, equip_data: EquipmentData) -> dict:
@@ -966,6 +1079,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         self.click_region(self.TUNE_SCENE, "auto_add")
         self.wait_delay("step_interval")
+        # 添加后确认按钮真的变成了「调律」，未就绪走材料不足处理
+        if not self._ensure_tune_ready(settings):
+            return None
         self.click_region(self.TUNE_SCENE, "tune_btn")
         self.wait_delay("step_interval")
         self.wait_delay("page_refresh_wait")  # 调律结果出现（after_tune_wait 已废弃）

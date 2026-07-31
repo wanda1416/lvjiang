@@ -11,11 +11,13 @@
 模式判定：LVJIANG_DEV_MODE 环境变量（1/0）强制覆盖 > PROJECT_ROOT/.git 探测。
 
 两档合并语义：
-- 实体文件（一物一文件：scenes/*.yaml、workflows/*.wf、layouts/*.json、
-  yysls/tuning_rules/*.yaml、references/**/*.png）→ 整文件影子 + 墓碑
+- 实体文件（一物一文件：scenes/*.yaml、workflows/*.wf、
+  layouts/{name}/{scene}.json、yysls/tuning_rules/*.yaml、
+  references/**/*.png）→ 整文件影子 + 墓碑
   （local/<rel>.deleted 空标记文件）
-- 聚合键值文件（scenes.yaml、workflows.yaml、yysls/attributes.yaml、
-  yysls/tuning_base.yaml）→ 键级 diff 深合并；dict 递归、列表与标量整键替换；
+- 聚合键值文件（scenes.yaml、workflows.yaml、layouts.yaml、
+  yysls/attributes.yaml、yysls/tuning_base.yaml）→ 键级 diff 深合并；
+  dict 递归、列表与标量整键替换；
   每层 dict 支持 "__deleted__": [key, ...] 删除键
 """
 from __future__ import annotations

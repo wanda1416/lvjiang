@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31（Phase 4 进行中：正式签名完成，只剩真实业务工作流上机）
+> 最后更新：2026-07-31（配置架构重构完成：input_delay 拆 input_sim + delay_params，app.yaml 走 system/local 分层）
 
 ---
 
@@ -12,7 +12,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名完成；剩真实业务上机 |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名 + 江湖号令实机跑通 + 悬浮面板打磨；剩其余业务流上机 |
 
 ---
 
@@ -205,6 +205,52 @@
     `OnnxOutput` 字段被砍（`'q' object has no attribute 'data'`）、`ShellBridge`
     类名被混淆（`No module named 'com'`），proguard-rules.pro 已补 keep 并复验
 - [x] versionCode 4 已上机（config 变更随之重新解压）
+- [x] **江湖号令实机跑通**（2026-07-31）
+  - 依赖面核查全绿：`activity_jianghu.wf` 纯 click/drag + OCR scan（无图像匹配、不需
+    Shizuku），8 个场景 YAML + `默认布局.json`（18 场景，activity_jianghu 18 region 零缺失）
+    随 config/system 分发，配置重构后新机无需 local 补齐
+  - versionCode 升 5，卸载重装正式签名包，中文 OCR 实机 0.97-1.0
+  - 悬浮面板点「江湖号令」→ 游戏内完整走完刷新→分发动作→退回首页，用户确认可用
+- [x] **悬浮面板 UI 打磨**（2026-07-31，versionCode 6→8）
+  - **紧凑化**：状态/日志/按钮字号下调，行高从 dp(30) 再砍到 dp(15)（Button 默认内
+    边距显式压到 setPadding(12,2,12,2)），滚动区 260→170dp，横屏一屏能放下
+  - **启动即收圆点**：`launchTask` 成功后 `closePanel()` 只留一个圆点，图标颜色反映
+    运行态（绿/蓝/红/橙），不遮挡游戏；面板关了仍继续轮询给图标上色
+  - **面板贴近图标**：新增 `anchorPanelToIcon()`，面板据图标当前 x/y 定位——图标在
+    左半屏则面板贴右侧、右半屏贴左侧，纵向与图标顶端对齐并按屏高 clamp 防越界
+- [x] **悬浮清单接暴露层**（2026-07-31）
+  - 病灶：设备端 `task_runner.list_tasks()` 直接用发现层全集，绕过了 `workflows.yaml`
+    的 exposed/overrides——冒出 `auto_purchase_xinde` 等原始 id、还混进 `auto_tuning`/
+    `device_smoke_test` 等不该给日常用户看的脚本
+  - 修复：把桌面 `run_control` 的暴露逻辑抽成 `discovery.list_exposed_scripts()`，
+    桌面下拉与设备端悬浮面板共用同一套（避免两处各写一份）；`list_tasks()` 改用它，
+    并单独把 `device_smoke_test` 补到末尾（smoke.py 自检链路硬依赖它出现在清单中）
+  - 结果：面板只展示 5 个暴露脚本（含中文显示名：当前装备分析/单次调律/自动购买心法/
+    江湖号令/盟主争锋）+ 末尾冒烟测试项
+
+- [x] **配置架构重构**（2026-07-31，versionCode 8→9）
+  - `DelayConfig` → `InputSimConfig`（去 `custom` 字段）+ `DelayParam`（原 `CustomDelay`）
+  - `input_delay` 从 session.json 迁到 `config/system/app.yaml`（system/local 分层：
+    开发者放 system，用户改动提交到 local，随 APK 分发）
+  - `input_delay` 拆为两个独立 dict：`input_simulation`（输入模拟参数）+
+    `delay_params`（命名等待参数）
+  - 引擎构造器参数 `delay_config` 拆为 `input_sim` + `delay_params`
+  - Mixin 字段 `_delay.custom` → `_delay_params`，`_delay.jitter/offset` → `_input_sim`
+  - 注入方法 `_inject_delay_config` → `_inject_input_sim`
+  - settings_dialog 读写改 app.yaml；session.json 的 input_delay 节点已删除
+  - workflow_runner.create_engine 从 app.yaml 加载（修设备端 step_interval 缺失 bug）
+  - 受影响测试全部更新（10 个测试文件 + 3 处源码注释）
+  - ruff + pytest 全绿回归通过
+
+### 本轮改动文件（未提交）
+
+| 文件 | 改动 |
+|---|---|
+| `src/lvjiang/workflows/discovery.py` | 新增 `list_exposed_scripts()` + `_load_exposure()` 暴露层 |
+| `src/lvjiang/core/ondevice/task_runner.py` | `list_tasks()` 改走暴露层 + 补冒烟测试项 |
+| `src/lvjiang/ui/run_control.py` | `_load_workflow_configs` 改用共享暴露层，删重复逻辑 |
+| `android/.../FloatService.kt` | 紧凑化 + 启动收圆点 + `anchorPanelToIcon` 面板贴图标 |
+| `android/app/build.gradle.kts` | versionCode 4→8 |
 
 ### 本轮新增验证设施
 
@@ -246,6 +292,16 @@
 
 ## 下一步操作（按顺序）
 
-1. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）；
-   上机时顺带：卸载重装正式签名包 + 重开无障碍
+1. **本轮改动提交**（等用户明确指示）：配置架构重构 + 暴露层 + 悬浮面板 UI + versionCode，
+   涉及 config.py / config/system/app.yaml / engine / mixins / input backends / 调用点 /
+   settings_dialog / discovery.py / task_runner.py / run_control.py / FloatService.kt /
+   build.gradle.kts / 10 个测试文件
+2. **其余业务工作流上机**（自动调律 / 装备分析，需游戏环境）：
+   - 装备分析（`equip_analysis`）：读装备详情 + OCR 词条，属识别类，风险低，宜先跑
+   - 自动调律（`auto_tuning` / `single_tuning`）：含滚动校验 + 状态机，链路最长，
+     实机可能踩背包滚动、详情刷新延迟等既有坑，需重点观察
+   - 盟主争锋（`mengzhuzhengfeng`）、自动购买心法（`auto_purchase_xinde`）：
+     纯点击/识别类，可仿江湖号令快速验证
+3. **桌面下拉回归确认**：暴露层重构后桌面 `run_control` 下拉行为应与改动前一致
+   （5 个暴露脚本、中文名、顺序），上机前顺带在 PC 端点一遍确认没回归
 

@@ -107,9 +107,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self._tune_ready_waived = False
         self._ensure_judge_config()
 
-        selected = self.ctx.selected_slots
-        if not selected:
-            selected = self.WEAPON_SLOTS + self.ARMOR_SLOTS
+        selected = self._resolve_selected_slots()
 
         self._open_doc(selected)
         try:
@@ -870,6 +868,27 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if enabled:
             ctx.judge_rule_keys = list(enabled)
             ctx.judge_configs = enabled
+
+    def _resolve_selected_slots(self) -> list[str]:
+        """调律部位：优先 UI 注入的 ctx.selected_slots；设备端经 task_runner
+        启动时 ctx 未注入（selected_slots=None），回退读插件会话
+        tuning.selected_slots（与 _ensure_judge_config 读 rules/switches 对称）；
+        仍无有效配置时按全部部位。"""
+        selected = self.ctx.selected_slots
+        if selected is None:
+            try:
+                from lvjiang.apps.yysls.plugin_session import get_plugin_session
+                raw = (get_plugin_session().get_section("tuning")
+                       .get("selected_slots"))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"读取调律部位配置失败，按全部部位: {e}")
+                raw = None
+            if isinstance(raw, list):
+                valid = set(self.WEAPON_SLOTS) | set(self.ARMOR_SLOTS)
+                selected = [s for s in raw if s in valid]
+        if not selected:
+            selected = self.WEAPON_SLOTS + self.ARMOR_SLOTS
+        return selected
 
     # ─── 调律执行（移植自 single_tuning，single_tuning 保持不动）──
 

@@ -22,6 +22,7 @@ object PyBridge {
 
     private const val TAG = "PyBridge"
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
+    private const val TUNING_MODULE = "lvjiang.core.ondevice.tuning_config"
 
     @Volatile
     private var startFailure: String? = null
@@ -42,9 +43,9 @@ object PyBridge {
         }
     }
 
-    private fun module(context: Context): PyObject {
+    private fun module(context: Context, name: String = MODULE): PyObject {
         ensureStarted(context)?.let { throw IllegalStateException(it) }
-        return Python.getInstance().getModule(MODULE)
+        return Python.getInstance().getModule(name)
     }
 
     /**
@@ -54,9 +55,14 @@ object PyBridge {
      * 能抛到这里的只有「解释器/模块层面就没起来」，统一包装成
      * `{ok:false, message:...}`，调用方不必再写一层 try。
      */
-    private fun callJson(context: Context, fn: String, vararg args: Any?): JSONObject {
+    private fun callJson(
+        context: Context,
+        fn: String,
+        vararg args: Any?,
+        moduleName: String = MODULE,
+    ): JSONObject {
         return try {
-            JSONObject(module(context).callAttr(fn, *args).toString())
+            JSONObject(module(context, moduleName).callAttr(fn, *args).toString())
         } catch (e: Throwable) {
             Log.e(TAG, "调用 $fn 失败", e)
             JSONObject().apply {
@@ -79,4 +85,12 @@ object PyBridge {
 
     /** 状态快照：`{state, task_name, message, elapsed, stopping, logs}` */
     fun status(context: Context): JSONObject = callJson(context, "get_status")
+
+    /** 调律配置合并视图：`{ok, rules, slot_groups, switches, error}` */
+    fun getTuningConfig(context: Context): JSONObject =
+        callJson(context, "get_tuning_config", moduleName = TUNING_MODULE)
+
+    /** 保存调律配置：`{ok, message}`。ok=false 时 message 为校验失败原因。 */
+    fun saveTuningConfig(context: Context, payload: String): JSONObject =
+        callJson(context, "save_tuning_config", payload, moduleName = TUNING_MODULE)
 }

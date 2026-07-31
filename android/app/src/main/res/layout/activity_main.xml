@@ -10,59 +10,103 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- ── 首次启动引导区：一行一个权限，主按钮永远指向下一件要做的事 ── -->
+        <!-- ── 权限状态卡：一行一个权限，主按钮永远指向下一件要做的事。
+             自检模式整卡隐藏（enterSelfTestLayout），布局回到旧版形态 ── -->
 
-        <TextView
-            android:id="@+id/guide_title"
+        <LinearLayout
+            android:id="@+id/guide_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/guide_title"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:paddingBottom="4dp" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp">
 
-        <TextView
-            android:id="@+id/guide_subtitle"
+            <TextView
+                android:id="@+id/guide_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/guide_title"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/guide_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/guide_subtitle"
+                android:textSize="14sp"
+                android:paddingBottom="16dp" />
+
+            <TextView
+                android:id="@+id/check_a11y"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:paddingBottom="6dp" />
+
+            <TextView
+                android:id="@+id/check_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:paddingBottom="6dp" />
+
+            <TextView
+                android:id="@+id/check_notification"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:paddingBottom="16dp" />
+
+            <Button
+                android:id="@+id/btn_next"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/guide_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:paddingTop="8dp" />
+
+        </LinearLayout>
+
+        <!-- ── 功能区：配置入口 + 悬浮图标启停（自检模式同样整体隐藏） ── -->
+
+        <LinearLayout
+            android:id="@+id/features_section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/guide_subtitle"
-            android:textSize="14sp"
-            android:paddingBottom="16dp" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp">
 
-        <TextView
-            android:id="@+id/check_a11y"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="15sp"
-            android:paddingBottom="6dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_features"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="4dp" />
 
-        <TextView
-            android:id="@+id/check_overlay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="15sp"
-            android:paddingBottom="6dp" />
+            <Button
+                android:id="@+id/btn_tuning_config"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_tuning_config" />
 
-        <TextView
-            android:id="@+id/check_notification"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="15sp"
-            android:paddingBottom="16dp" />
+            <Button
+                android:id="@+id/btn_float_toggle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_start_float" />
 
-        <Button
-            android:id="@+id/btn_next"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="16sp" />
-
-        <TextView
-            android:id="@+id/guide_hint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:paddingTop="8dp"
-            android:paddingBottom="16dp" />
+        </LinearLayout>
 
         <!-- ── 状态行：自检报告回填 + 点击回显目标，e2e 闭环靠 OCR 读这里 ── -->
 
@@ -115,18 +159,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/btn_notification" />
-
-            <Button
-                android:id="@+id/btn_start_float"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_start_float" />
-
-            <Button
-                android:id="@+id/btn_stop_float"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_stop_float" />
 
             <Button
                 android:id="@+id/btn_test_shell"

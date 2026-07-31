@@ -298,7 +298,14 @@ class LayoutConfigManager:
 
     def get_active_layout_name(self) -> str:
         self._reload_config()
-        return self._config.get("active_layout", "")
+        name = self._config.get("active_layout", "")
+        # 未指定时自动回退到第一个可用布局
+        if not name:
+            layouts = self.list_layouts()
+            if layouts:
+                name = layouts[0]
+                logger.info(f"未指定 active_layout，自动使用: {name}")
+        return name
 
     def set_active_layout(self, name: str):
         self._config["active_layout"] = name

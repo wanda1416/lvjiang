@@ -11,6 +11,7 @@
 exposed:            # 日常下拉展示的脚本 id，按此顺序
   - equip_analysis
   - single_tuning
+  - auto_tuning
   - auto_purchase_xinde
   - activity_jianghu
   - mengzhuzhengfeng

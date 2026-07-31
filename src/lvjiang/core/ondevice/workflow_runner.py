@@ -99,6 +99,12 @@ def create_engine(
     Returns:
         装配好的 WorkflowEngine 实例
     """
+    # 先加插件：.wf 里的游戏专属内置函数（to_equipment 等）靠插件导入时注册，
+    # 未加载则 DSL 调用直接报未知函数（见 plugins 模块说明）。
+    from .plugins import ensure_loaded
+
+    ensure_loaded()
+
     capture = _create_capture()
     ocr = _create_ocr()
     layout = _load_layout(layout_name or _default_layout_name())

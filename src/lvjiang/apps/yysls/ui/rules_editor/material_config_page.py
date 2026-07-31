@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Callable
 
 from loguru import logger
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -47,8 +48,9 @@ _NO_FOOD = "- 不添加 -"
 # 品阶下拉候选（按品阶从低到高，blue=不限）
 _QUALITY_KEYS = ("blue", "purple", "gold")
 
-# 规则表列定义
-_COLS = ("首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")
+# 规则表列定义（第一列为排序按钮）
+_SORT_COL = 0
+_COLS = ("", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")
 
 
 class MaterialConfigPage(QWidget):
@@ -106,7 +108,11 @@ class MaterialConfigPage(QWidget):
         self._table.setHorizontalHeaderLabels(list(_COLS))
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
-        self._table.verticalHeader().setVisible(True)
+        # 排序列固定宽度，隐藏序号列
+        self._table.horizontalHeader().setSectionResizeMode(
+            _SORT_COL, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(_SORT_COL, 28)
+        self._table.verticalHeader().setVisible(False)
         layout.addWidget(self._table)
 
         btn_row = QHBoxLayout()
@@ -125,27 +131,46 @@ class MaterialConfigPage(QWidget):
         row = self._table.rowCount()
         self._table.insertRow(row)
 
+        # 排序按钮列（上三角 + 下三角）
+        sort_widget = QWidget()
+        sort_layout = QVBoxLayout(sort_widget)
+        sort_layout.setContentsMargins(2, 2, 2, 2)
+        sort_layout.setSpacing(1)
+        up_btn = QPushButton("▲")
+        up_btn.setFixedSize(22, 16)
+        up_btn.setToolTip("上移")
+        up_btn.clicked.connect(lambda: self._on_move_up(row))
+        sort_layout.addWidget(up_btn)
+        down_btn = QPushButton("▼")
+        down_btn.setFixedSize(22, 16)
+        down_btn.setToolTip("下移")
+        down_btn.clicked.connect(lambda: self._on_move_down(row))
+        sort_layout.addWidget(down_btn)
+        sort_layout.addStretch()
+        sort_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self._table.setCellWidget(row, _SORT_COL, sort_widget)
+
         pct = QSpinBox()
         pct.setRange(0, 100)
         pct.setSuffix(" %")
         pct.setToolTip("0 = 不限首词条")
         pct.setValue(rule.pct)
         pct.valueChanged.connect(lambda _v: self._apply())
-        self._table.setCellWidget(row, 0, pct)
+        self._table.setCellWidget(row, 1, pct)
 
         expect = QComboBox()
         for key in FOOD_EXPECT_KEYS:
             expect.addItem(RATING_LABELS.get(key, key), key)
         expect.setCurrentIndex(max(expect.findData(rule.min_expect), 0))
         expect.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 1, expect)
+        self._table.setCellWidget(row, 2, expect)
 
         quality = QComboBox()
         for key in _QUALITY_KEYS:
             quality.addItem(QUALITY_LABELS.get(key, key), key)
         quality.setCurrentIndex(max(quality.findData(rule.min_quality), 0))
         quality.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 2, quality)
+        self._table.setCellWidget(row, 3, quality)
 
         food = QComboBox()
         food.addItem(_NO_FOOD, "")
@@ -153,14 +178,14 @@ class MaterialConfigPage(QWidget):
             food.addItem(label, label)
         food.setCurrentIndex(max(food.findData(rule.food), 0))
         food.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 3, food)
+        self._table.setCellWidget(row, 4, food)
 
         action = QComboBox()
         for key, label in INSUFFICIENT_LABELS.items():
             action.addItem(label, key)
         action.setCurrentIndex(max(action.findData(rule.on_insufficient), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 4, action)
+        self._table.setCellWidget(row, 5, action)
 
     # ── 回填 ──
 
@@ -192,15 +217,51 @@ class MaterialConfigPage(QWidget):
         self._table.removeRow(row)
         self._apply()
 
+    def _on_move_up(self, row: int):
+        if row <= 0:
+            self._status_cb("已是第一条规则，无法上移", True)
+            return
+        self._swap_rows(row, row - 1)
+        self._table.selectRow(row - 1)
+        self._apply()
+
+    def _on_move_down(self, row: int):
+        if row < 0 or row >= self._table.rowCount() - 1:
+            self._status_cb("已是最后一条规则，无法下移", True)
+            return
+        self._swap_rows(row, row + 1)
+        self._table.selectRow(row + 1)
+        self._apply()
+
+    def _swap_rows(self, row_a: int, row_b: int) -> None:
+        """交换两行的规则数据（含所有控件值）"""
+        values_a = self._row_rule(row_a)
+        values_b = self._row_rule(row_b)
+        self._set_row_values(row_a, values_b)
+        self._set_row_values(row_b, values_a)
+
+    def _set_row_values(self, row: int, values: dict) -> None:
+        """将 raw dict 写回指定行的控件"""
+        pct: QSpinBox = self._table.cellWidget(row, 1)
+        pct.setValue(values["pct"])
+        expect: QComboBox = self._table.cellWidget(row, 2)
+        expect.setCurrentIndex(max(expect.findData(values["min_expect"]), 0))
+        quality: QComboBox = self._table.cellWidget(row, 3)
+        quality.setCurrentIndex(max(quality.findData(values["min_quality"]), 0))
+        food: QComboBox = self._table.cellWidget(row, 4)
+        food.setCurrentIndex(max(food.findData(values["food"]), 0))
+        action: QComboBox = self._table.cellWidget(row, 5)
+        action.setCurrentIndex(max(action.findData(values["on_insufficient"]), 0))
+
     # ── 收集 → 校验 → 写盘 → reload ──
 
     def _row_rule(self, row: int) -> dict:
         """收集一行的规则控件值为 raw dict"""
-        pct: QSpinBox = self._table.cellWidget(row, 0)
-        expect: QComboBox = self._table.cellWidget(row, 1)
-        quality: QComboBox = self._table.cellWidget(row, 2)
-        food: QComboBox = self._table.cellWidget(row, 3)
-        action: QComboBox = self._table.cellWidget(row, 4)
+        pct: QSpinBox = self._table.cellWidget(row, 1)
+        expect: QComboBox = self._table.cellWidget(row, 2)
+        quality: QComboBox = self._table.cellWidget(row, 3)
+        food: QComboBox = self._table.cellWidget(row, 4)
+        action: QComboBox = self._table.cellWidget(row, 5)
         return {
             "pct": pct.value(),
             "min_expect": expect.currentData(),

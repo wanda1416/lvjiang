@@ -242,6 +242,33 @@
   - 受影响测试全部更新（10 个测试文件 + 3 处源码注释）
   - ruff + pytest 全绿回归通过
 
+- [x] **设备端插件加载缺失修复 + 自动调律暴露**（2026-07-31，versionCode 9→10）
+  - 病灶：桌面由 `__main__.py` 按 `-reg yysls` 加载插件，设备端入口是 Chaquopy 直连
+    `task_runner`/`workflow_runner`，**从不加载插件**，导致两类静默故障：
+    1. `implementations.list_workflows()` 为空 → 发现层的 class 来源全空 →
+       `single_tuning`/`auto_tuning` 退化解析成 `config/system/workflows/` 下的
+       **同名旧 DSL 文件**（`auto_tuning.wf` 仅 879 字节，只做背包遍历，无潜力判定/
+       材料检查/说明文档，与类实现完全不是一回事）
+    2. 燕云 `builtin_modules` 未导入 → `to_equipment` 等未注册 →
+       `single_tuning.wf:55` 调用即报未知函数，**设备端必然失败**（此前未实机跑过，
+       故一直没暴露）
+  - 修复：新增 `core/ondevice/plugins.py` 的幂等 `ensure_loaded()`（登记
+    `DEVICE_APPS=("yysls",)`），在 `list_tasks()` / `_resolve_task()` /
+    `create_engine()` 三个入口调用。插件模块顶层刻意不 import PyQt6（builder 内
+    延迟导入）、`register_hooks` 只存不调 tab/menu builder，故设备端加载安全
+  - `auto_tuning` 加 `DISPLAY_NAME = "自动调律"` 并入 `workflows.yaml` 的 exposed；
+    暂不定义 `PARAMETERS`——其配置面（部位多选 + 每规则玩法多选 + 全局开关）超出
+    现有 select/number 参数 schema 的表达力，设备端先按内置默认配置运行
+  - 无 run_ctx 注入时的默认行为已逐条查实可用：`TuningContextMixin.ctx` 惰性建全默认
+    实例 → `selected_slots=None` 即全部 8 部位；`judge_configs=None` →
+    `_ensure_judge_config()` 读插件 session，设备端该文件不存在时 `get_section`
+    返回空 dict → 回退全部规则默认判定；`rule_judges` 空列表无影响（契约注明
+    「暂未消费，仅记录」）；文档目录 `PROJECT_ROOT/logs/tuning` 在设备端即
+    `$HOME/lvjiang/logs/tuning`，可写且创建失败只警告不中断
+  - 验证：`list_tasks()` 裸进程实测 `single_tuning`/`auto_tuning` 的 source 由
+    `wf` 变 `class`、`to_equipment` 已注册、`PyQt6 not in sys.modules`；
+    ruff + pytest（exit 0）全绿
+
 ### 本轮改动文件（未提交）
 
 | 文件 | 改动 |
@@ -250,7 +277,11 @@
 | `src/lvjiang/core/ondevice/task_runner.py` | `list_tasks()` 改走暴露层 + 补冒烟测试项 |
 | `src/lvjiang/ui/run_control.py` | `_load_workflow_configs` 改用共享暴露层，删重复逻辑 |
 | `android/.../FloatService.kt` | 紧凑化 + 启动收圆点 + `anchorPanelToIcon` 面板贴图标 |
-| `android/app/build.gradle.kts` | versionCode 4→8 |
+| `src/lvjiang/core/ondevice/plugins.py` | 新增：设备端幂等插件加载 `ensure_loaded()` |
+| `src/lvjiang/core/ondevice/workflow_runner.py` | `create_engine` 先 `ensure_loaded()` |
+| `src/lvjiang/apps/yysls/.../auto_tuning.py` | 加 `DISPLAY_NAME`（暂不加 PARAMETERS） |
+| `config/system/workflows.yaml` | exposed 加 `auto_tuning` |
+| `android/app/build.gradle.kts` | versionCode 4→10（改了 config/system，必须 bump 才重解压） |
 
 ### 本轮新增验证设施
 
@@ -296,12 +327,22 @@
    涉及 config.py / config/system/app.yaml / engine / mixins / input backends / 调用点 /
    settings_dialog / discovery.py / task_runner.py / run_control.py / FloatService.kt /
    build.gradle.kts / 10 个测试文件
-2. **其余业务工作流上机**（自动调律 / 装备分析，需游戏环境）：
+2. **其余业务工作流上机**（需游戏环境）：
    - 装备分析（`equip_analysis`）：读装备详情 + OCR 词条，属识别类，风险低，宜先跑
-   - 自动调律（`auto_tuning` / `single_tuning`）：含滚动校验 + 状态机，链路最长，
-     实机可能踩背包滚动、详情刷新延迟等既有坑，需重点观察
+   - 自动调律（`auto_tuning`）：已按内置默认配置暴露（全部 8 部位 + 全部规则默认
+     判定），含滚动校验 + 状态机，链路最长，实机可能踩背包滚动、详情刷新延迟等
+     既有坑，需重点观察；`single_tuning` 修了插件加载后才第一次真正可运行
    - 盟主争锋（`mengzhuzhengfeng`）、自动购买心法（`auto_purchase_xinde`）：
      纯点击/识别类，可仿江湖号令快速验证
-3. **桌面下拉回归确认**：暴露层重构后桌面 `run_control` 下拉行为应与改动前一致
-   （5 个暴露脚本、中文名、顺序），上机前顺带在 PC 端点一遍确认没回归
+3. **桌面下拉回归确认**：暴露层重构 + 新增 `auto_tuning` 后，桌面 `run_control`
+   下拉会多出一项「自动调律」。注意这是与调律 Tab **并列的第二个入口**，且该路径
+   不注入 run_ctx（跑的是全默认配置）——exposed 是双端共用的，若不希望桌面出现
+   这个入口，需把暴露层拆成双端各一份
+4. **调律参数 UI（后置）**：待自动调律实机跑通后再做。两条路线：
+   - 扩 `PARAMETERS` schema 加 `multiselect`/`bool`，双端按元数据动态渲染表单（桌面
+     `main_window._rebuild_param_panel` 已是这个模式）；配套需 `list_tasks()` 带出
+     `parameters`（当前丢了）、`PyBridge.startTask` 加参数（当前硬传 `""`）、
+     `auto_tuning.run()` 从 `get_variable` 组装 `TuningRunContext`
+   - Android 原生调律配置页写设备端 `config/session/yysls/session.json`，
+     走 `_ensure_judge_config` 已有的 session 回退路径（可持久化，但要重造规则表编辑器）
 

@@ -37,7 +37,11 @@ def _wait_for_threads(timeout: float = 5.0) -> None:
     main_thread = threading.current_thread()
     pending = [
         t for t in threading.enumerate()
-        if t is not main_thread and t.is_alive() and t.daemon
+        if t is not main_thread
+        and t.is_alive()
+        and t.daemon
+        # 排除 native 线程的 _DummyThread 包装（不支持 join）
+        and not isinstance(t, threading._DummyThread)  # noqa: SLF001
     ]
     if not pending:
         return

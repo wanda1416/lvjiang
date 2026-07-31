@@ -15,6 +15,7 @@ from .models import (
     JUDGE_SCOPES,
     MAX_TUNE_RESETS,
     PART_KEYS,
+    PCT_OPS,
     QUALITY_PARTS,
     QUALITY_RANK,
     RATING_KEYS,
@@ -48,6 +49,9 @@ _LEGACY_KEYS = ("variants", "sub_schools", "weapons", "own_attr",
                 "needs_sub_school", "sub_school_label", "weapon_rules")
 
 _VALID_QUALITIES = ("gold", "purple", "blue")
+
+# 行为规则的品阶条件额外支持 gold_only（仅金装精确匹配）
+_VALID_RULE_QUALITIES = ("gold", "gold_only", "purple", "blue")
 
 
 def _parse_quality_thresholds(raw, where: str,
@@ -437,8 +441,10 @@ def _parse_materials(raw, where: str = "materials") -> MaterialSettings:
 
 
 def _parse_behavior_rule(raw, where: str,
-                         allowed_actions: tuple[str, ...]) -> BehaviorRule:
-    """单条行为规则解析：条件字段可缺省（=不限/最高档），action 必填"""
+                         allowed_actions: tuple[str, ...],
+                         allow_first_affix: bool) -> BehaviorRule:
+    """单条行为规则解析：条件字段可缺省（=不限/最高档），action 必填；
+    first_affix_only 仅扫描处置表可声明"""
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     parts = list(raw.get("parts") or [])
@@ -447,30 +453,74 @@ def _parse_behavior_rule(raw, where: str,
         raise RuleValidationError(
             f"{where}.parts: 未知部位 {bad}（须为 {list(QUALITY_PARTS)}）")
     max_quality = raw.get("max_quality", "gold")
-    if max_quality not in _VALID_QUALITIES:
+    if max_quality not in _VALID_RULE_QUALITIES:
         raise RuleValidationError(
             f"{where}.max_quality 非法: {max_quality!r}（须为 "
-            f"{list(_VALID_QUALITIES)}）")
-    max_pct = raw.get("max_pct", 100)
-    if isinstance(max_pct, bool) or not isinstance(max_pct, int):
-        raise RuleValidationError(f"{where}.max_pct 必须是整数")
-    if not (0 <= max_pct <= 100):
-        raise RuleValidationError(
-            f"{where}.max_pct 超出范围 [0, 100]: {max_pct}")
-    max_rating = raw.get("max_rating", "top")
-    if max_rating not in RATING_KEYS:
-        raise RuleValidationError(
-            f"{where}.max_rating 非法: {max_rating!r}（须为 "
-            f"{list(RATING_KEYS)}）")
+            f"{list(_VALID_RULE_QUALITIES)}）")
+    pct_op, pct = _parse_rule_pct(raw, where)
+    ratings = _parse_rule_ratings(raw, where)
     scope, keys = _parse_judge(raw, where)
+    first_affix = bool(raw.get("first_affix_only", False))
+    if first_affix and not allow_first_affix:
+        raise RuleValidationError(
+            f"{where}.first_affix_only 仅扫描处置表规则可声明")
     action = str(raw.get("action") or "")
     if action not in allowed_actions:
         raise RuleValidationError(
             f"{where}.action 非法: {action!r}（须为 {list(allowed_actions)}）")
     return BehaviorRule(parts=parts, max_quality=max_quality,
-                        max_pct=max_pct, max_rating=max_rating,
+                        pct_op=pct_op, pct=pct, ratings=ratings,
                         judge_scope=scope, judge_rules=keys,
-                        action=action)
+                        first_affix_only=first_affix, action=action)
+
+
+def _parse_rule_pct(raw: dict, where: str) -> tuple[str, int]:
+    """首词条条件解析：pct_op（le/ge）+ pct（[0, 100] 整数）
+
+    兼容历史字段 max_pct（固定 ≤ 语义）：换算为 pct_op=le。
+    """
+    pct_op = raw.get("pct_op", "le")
+    if pct_op not in PCT_OPS:
+        raise RuleValidationError(
+            f"{where}.pct_op 非法: {pct_op!r}（须为 {list(PCT_OPS)}）")
+    key = "pct" if "pct" in raw else "max_pct"
+    default = 100 if pct_op == "le" else 0
+    pct = raw.get(key, default)
+    if isinstance(pct, bool) or not isinstance(pct, int):
+        raise RuleValidationError(f"{where}.{key} 必须是整数")
+    if not (0 <= pct <= 100):
+        raise RuleValidationError(
+            f"{where}.{key} 超出范围 [0, 100]: {pct}")
+    return pct_op, pct
+
+
+def _parse_rule_ratings(raw: dict, where: str) -> list[str]:
+    """评级条件解析：ratings 档位集合（自由多选，空/全选 = 不限）
+
+    全选归一化为空（不限 = 不取评级，未知评级也命中）；去重
+    并按 RATING_KEYS 声明序归一。兼容历史字段 max_rating（≤
+    语义）：top → 不限，其余 → 该档及以下的档位集合。
+    """
+    raw_ratings = raw.get("ratings")
+    if raw_ratings is not None:
+        if not isinstance(raw_ratings, list):
+            raise RuleValidationError(f"{where}.ratings 必须是 list")
+        bad = [r for r in raw_ratings if r not in RATING_KEYS]
+        if bad:
+            raise RuleValidationError(
+                f"{where}.ratings 非法: {bad}（须为 {list(RATING_KEYS)}）")
+        keys = [r for r in RATING_KEYS if r in raw_ratings]
+        return [] if len(keys) == len(RATING_KEYS) else keys
+    # 历史字段 max_rating（≤ 语义）自动换算
+    max_rating = raw.get("max_rating", "top")
+    if max_rating not in RATING_KEYS:
+        raise RuleValidationError(
+            f"{where}.max_rating 非法: {max_rating!r}（须为 "
+            f"{list(RATING_KEYS)}）")
+    if max_rating == "top":
+        return []
+    cut = RATING_KEYS.index(max_rating)
+    return list(RATING_KEYS[:cut + 1])
 
 
 def _parse_judge(raw: dict, where: str) -> tuple[str, list[str]]:
@@ -513,7 +563,8 @@ def _parse_behavior_rules(raw, where: str, stage: str) -> list[BehaviorRule]:
     if not isinstance(raw, list):
         raise RuleValidationError(f"{where} 必须是 list")
     return [
-        _parse_behavior_rule(item, f"{where}[{i}]", allowed)
+        _parse_behavior_rule(item, f"{where}[{i}]", allowed,
+                             allow_first_affix=(stage == "scan"))
         for i, item in enumerate(raw)
     ]
 
@@ -528,13 +579,17 @@ def _reject_stage_judge(raw: dict, where: str) -> None:
 
 
 def _parse_scan(raw, where: str) -> ScanBehavior:
-    """扫描处理解析：{enabled, entry_min_rating, rules}；
-    缺省段取 ScanBehavior 默认值"""
+    """扫描处理解析：{enabled, entry_min_rating, rules}；缺省段取
+    ScanBehavior 默认值"""
     if raw is None:
         return ScanBehavior()
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     _reject_stage_judge(raw, where)
+    if "first_affix_only" in raw:
+        raise RuleValidationError(
+            f"{where}.first_affix_only 已废弃，改为逐条规则声明"
+            f"（{where}.rules[].first_affix_only）")
     entry = raw.get("entry_min_rating", "excellent")
     if entry not in RATING_KEYS:
         raise RuleValidationError(
@@ -563,11 +618,11 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
         raise RuleValidationError(
             f"{where}.max_resets 超出范围 [0, {MAX_TUNE_RESETS}]: "
             f"{max_resets}")
-    exhausted = raw.get("reset_exhausted_action", "ignore")
-    if exhausted not in ("recycle", "ignore"):
+    exhausted = raw.get("reset_exhausted_action", "skip")
+    if exhausted not in ("recycle", "skip"):
         raise RuleValidationError(
             f"{where}.reset_exhausted_action 非法: {exhausted!r}"
-            "（须为 ['recycle', 'ignore']）")
+            "（须为 ['recycle', 'skip']）")
     return TuneBehavior(
         enabled=bool(raw.get("enabled", False)),
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",

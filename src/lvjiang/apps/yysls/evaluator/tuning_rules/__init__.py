@@ -22,6 +22,7 @@ from .manager import (
 from .models import (
     ATTR_ATTACK_CATEGORY,
     BEHAVIOR_ACTION_LABELS,
+    BEHAVIOR_ACTION_TOOLTIPS,
     BEHAVIOR_ACTIONS,
     BEHAVIOR_STAGE_ACTIONS,
     BEHAVIOR_STAGE_LABELS,
@@ -38,6 +39,8 @@ from .models import (
     MAX_TUNE_RESETS,
     PART_ALIAS,
     PART_KEYS,
+    PCT_OP_LABELS,
+    PCT_OPS,
     QUALITY_LABELS,
     QUALITY_PARTS,
     QUALITY_RANK,
@@ -78,6 +81,7 @@ __all__ = [
     # 固定词汇
     "ATTR_ATTACK_CATEGORY",
     "BEHAVIOR_ACTION_LABELS",
+    "BEHAVIOR_ACTION_TOOLTIPS",
     "BEHAVIOR_ACTIONS",
     "BEHAVIOR_STAGE_ACTIONS",
     "BEHAVIOR_STAGE_LABELS",
@@ -94,6 +98,8 @@ __all__ = [
     "MAX_TUNE_RESETS",
     "PART_ALIAS",
     "PART_KEYS",
+    "PCT_OP_LABELS",
+    "PCT_OPS",
     "QUALITY_LABELS",
     "QUALITY_PARTS",
     "QUALITY_RANK",

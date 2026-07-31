@@ -11,9 +11,10 @@ import java.io.FileOutputStream
  * App — 应用入口：通知渠道注册 + 系统配置解压。
  * Shizuku Binder 由 ShizukuProvider 自动接收，无需手动初始化。
  *
- * 系统配置（config/system 下的场景/工作流 YAML）由 Gradle Sync 任务打进 APK assets，
- * onCreate 时解压到 filesDir/lvjiang/config/system——Python 侧 constants.PROJECT_ROOT
- * 在安卓端指向 filesDir/lvjiang，两条路径在此汇合。
+ * 系统配置（config/system 下的场景/工作流 YAML/布局/参照图）由 Gradle Sync
+ * 任务打进 APK assets，onCreate 时解压到 filesDir/lvjiang/config/system——
+ * Python 侧 constants.PROJECT_ROOT 在安卓端指向 filesDir/lvjiang，两条路径在此汇合。
+ * 用户修改落 config/local（无 .git → 用户模式），不会被升级解压覆盖。
  *
  * 解压策略：用 versionCode 做 stamp，每次升级 APK 后首次启动全量重解；
  * 同一版本重复启动不重复写（跳过已存在目录）。
@@ -34,7 +35,7 @@ class App : Application() {
     }
 
     /**
-     * 把 assets/config/system 和 assets/config/local/layouts 解压到 filesDir/lvjiang/。
+     * 把 assets/config/system 解压到 filesDir/lvjiang/。
      *
      * 只在 APK 升级后首次启动时执行（versionCode 变化）；同版本重复启动跳过。
      * 不删旧文件再写——直接覆盖同名，残留的旧文件不影响（Python 侧按名字找）。
@@ -49,19 +50,15 @@ class App : Application() {
         } catch (_: Exception) { 0 }
 
         val systemTarget = File(filesDir, "lvjiang/config/system")
-        val layoutTarget = File(filesDir, "lvjiang/config/local/layouts")
-        if (lastVersion == currentVersion && systemTarget.isDirectory && layoutTarget.isDirectory) {
-            return  // 同版本且目录均在，跳过
+        if (lastVersion == currentVersion && systemTarget.isDirectory) {
+            return  // 同版本且目录在，跳过
         }
 
         try {
             systemTarget.mkdirs()
             copyAssetDir("config/system", systemTarget)
-            layoutTarget.mkdirs()
-            copyAssetDir("config/local/layouts", layoutTarget)
             prefs.edit().putInt(KEY_VERSION, currentVersion).apply()
             Log.i(TAG, "系统配置已解压到 ${systemTarget.absolutePath}（version=$currentVersion）")
-            Log.i(TAG, "布局文件已解压到 ${layoutTarget.absolutePath}")
         } catch (e: Exception) {
             Log.e(TAG, "配置解压失败", e)
         }

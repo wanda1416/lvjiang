@@ -17,5 +17,5 @@ exposed:            # 日常下拉展示的脚本 id，按此顺序
 
 overrides:          # 可选：覆盖发现层得到的显示名
   equip_analysis: { name: 当前装备分析 }
-  auto_purchase_xinde: { name: 购买武学心得 }
+  auto_purchase_xinde: { name: 自动购买心法 }
   activity_jianghu: { name: 江湖号令 }

@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
+from ..core.config_resolver import get_resolver
 
 _STYLE_IDLE = (
     "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
@@ -173,8 +173,8 @@ class ScriptRecordDialog(QDialog):
     # ─── 保存 / 复制 / 清除 ───────────────────────────────
 
     def _on_save(self):
-        """保存当前文本为 .wf 文件（默认目录为系统工作流目录）"""
-        default_path = str(SYSTEM_WORKFLOWS_DIR / "recorded.wf")
+        """保存当前文本为 .wf 文件（默认目录为当前模式的可写 workflows 目录）"""
+        default_path = str(get_resolver().write_dir("workflows") / "recorded.wf")
         path, _ = QFileDialog.getSaveFileName(
             self, "保存为工作流文件", default_path,
             "工作流文件 (*.wf);;所有文件 (*)")

@@ -120,13 +120,19 @@ class DedupTraversal(BagTraversal):
             new_count += 1
             self._seq += 1
             logger.info(f"  新行{self._seq} grid[{row}][1] {name} fp={fp}")
-            new_fp = wf._process_equipment(name, equip, detail_scene)
+            new_fp = wf._process_equipment(name, equip, detail_scene, row=row)
+            if not new_fp:
+                # 回收链后该格已空（无装备补位）→ 背包尽头
+                if wf.is_stopped:
+                    break
+                logger.info(f"  grid[{row}][1] 回收后已空 → 背包尽头")
+                return window, new_count, True
             wf._process_row_cols(detail_scene, row, self._seq, cols)
-            if new_fp and new_fp != fp:
-                # 调律改动了装备 → 回读首列取实际 OCR 指纹
+            if new_fp != fp:
+                # 调律/回收改动了该格 → 回读首列取实际 OCR 指纹
                 _, refp, _ = wf._read_row(detail_scene, row)
                 logger.info(
-                    f"  行{self._seq} 调律后指纹回读: {fp} → {refp or new_fp}")
+                    f"  行{self._seq} 处理后指纹回读: {fp} → {refp or new_fp}")
                 window.append(refp or new_fp)
             else:
                 window.append(fp)

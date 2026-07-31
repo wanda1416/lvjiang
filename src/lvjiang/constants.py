@@ -30,19 +30,24 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 CONFIG_DIR = PROJECT_ROOT / "config"
 
-# 系统配置（随版本发布）
+# 系统配置（出厂默认，随版本发布，进 git）
 SYSTEM_CONFIG_DIR = CONFIG_DIR / "system"
 SYSTEM_SCENES_DIR = SYSTEM_CONFIG_DIR / "scenes"
 SYSTEM_WORKFLOWS_DIR = SYSTEM_CONFIG_DIR / "workflows"
-SYSTEM_RULES_DIR = SYSTEM_CONFIG_DIR / "rules"
+SYSTEM_LAYOUTS_DIR = SYSTEM_CONFIG_DIR / "layouts"
+SYSTEM_REFERENCES_DIR = SYSTEM_CONFIG_DIR / "references"
 SCENES_CONFIG_PATH = SYSTEM_CONFIG_DIR / "scenes.yaml"
 WORKFLOWS_CONFIG_PATH = SYSTEM_CONFIG_DIR / "workflows.yaml"
+REFERENCES_CONFIG_PATH = SYSTEM_CONFIG_DIR / "references.yaml"
 
-# 本地数据（运行时生成，.gitignore）
+# 用户覆盖层（影子文件 + 键级 diff + 墓碑，目录镜像 system，.gitignore）
 LOCAL_CONFIG_DIR = CONFIG_DIR / "local"
-SESSION_PATH = LOCAL_CONFIG_DIR / "session.json"
-USERS_DIR = LOCAL_CONFIG_DIR / "users"
-OUTPUT_DIR = LOCAL_CONFIG_DIR / "output"
+
+# 纯运行态（会话/用户/产出/截图，.gitignore）
+SESSION_CONFIG_DIR = CONFIG_DIR / "session"
+SESSION_PATH = SESSION_CONFIG_DIR / "session.json"
+USERS_DIR = SESSION_CONFIG_DIR / "users"
+OUTPUT_DIR = SESSION_CONFIG_DIR / "output"
 
 # 用户采集产出（录屏/截屏，与场景布局截图、工作流产出分开）
 DATA_DIR = PROJECT_ROOT / "data"

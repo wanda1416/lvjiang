@@ -18,15 +18,13 @@ build/
 # Logs
 logs/
 
-# Local data (layouts, session, screenshots, etc.)
+# Local data (user overlay / session runtime)
 /config/local/
+/config/session/
 /data/local
 /data/video
 /data/picture
-/config/system/workflows/_*.wf
-
-# TODO 后期需要添加
-/data/references
+/config/system/workflows/_*
 
 # OS
 Thumbs.db

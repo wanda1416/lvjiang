@@ -11,6 +11,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executors
@@ -52,6 +53,9 @@ class TuningConfigActivity : AppCompatActivity() {
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 透明主题叠在游戏画面上，底色恒为暗色 → 本页强制深色模式，
+        // 让 CheckBox/Switch/TextView 的默认文字色走浅色系（仅本页生效）
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_YES
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_tuning_config)
 

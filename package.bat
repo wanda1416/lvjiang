@@ -12,8 +12,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem 出厂配置与 scrcpy 放 exe 旁（用户可见，由 config/local 覆盖机制管理）
+rem 出厂配置与 adb/scrcpy 放 exe 旁（用户可见，由 config/local 覆盖机制管理）
 xcopy /e /i /y config\system dist\lvjiang\config\system >nul
+if errorlevel 1 exit /b 1
+xcopy /e /i /y data\adb dist\lvjiang\data\adb >nul
 if errorlevel 1 exit /b 1
 xcopy /e /i /y data\scrcpy dist\lvjiang\data\scrcpy >nul
 if errorlevel 1 exit /b 1

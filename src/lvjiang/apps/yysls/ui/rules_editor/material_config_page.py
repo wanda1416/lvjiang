@@ -1,7 +1,8 @@
 """调律配置对话框 —— 材料处理页（全局 tuning_base.yaml 的 materials 段）
 
 状态机行为点「材料处理」（每轮调律开始前的行为）：
-- 大律准石数量检查：开关 + 数量基准（低于基准判材料不足，全部退出）；
+- 大律准石数量检查：开关 + 数量基准 + 不足处理（低于基准判材料
+  不足，按不足处理执行：跳过该装备 / 结束全部调律 / 询问是否继续）；
 - 狗粮添加规则：有序规则表（可自由增删行），每条规则 = 三条件
   （首词条百分比 / 装备期望 / 装备品阶）+ 动作（添加狗粮或不添加）
   + 材料不足时行为（继续走后续规则 / 跳过该装备）。
@@ -36,6 +37,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     INSUFFICIENT_LABELS,
     QUALITY_LABELS,
     RATING_LABELS,
+    STONE_ACTION_LABELS,
     FoodRule,
     TuningBaseManager,
 )
@@ -73,7 +75,7 @@ class MaterialConfigPage(QWidget):
             "律准石数量检查、狗粮检查与添加"))
         layout.addWidget(QLabel(
             "<b>大律准石数量检查</b>（调律前识别材料区数量，"
-            "低于基准判材料不足，全部退出）"))
+            "低于基准判材料不足，按不足处理执行）"))
         stone_row = QHBoxLayout()
         self._stone_cb = QCheckBox("启用检查")
         self._stone_cb.stateChanged.connect(lambda _s: self._apply())
@@ -83,6 +85,15 @@ class MaterialConfigPage(QWidget):
         self._stone_min.setRange(1, 99999)
         self._stone_min.valueChanged.connect(lambda _v: self._apply())
         stone_row.addWidget(self._stone_min)
+        stone_row.addWidget(QLabel("不足时"))
+        self._stone_action = QComboBox()
+        for key, label in STONE_ACTION_LABELS.items():
+            self._stone_action.addItem(label, key)
+        self._stone_action.setToolTip(
+            "询问是否继续：弹窗确认，继续则本次运行不再检查")
+        self._stone_action.currentIndexChanged.connect(
+            lambda _i: self._apply())
+        stone_row.addWidget(self._stone_action)
         stone_row.addStretch()
         layout.addLayout(stone_row)
 
@@ -159,6 +170,8 @@ class MaterialConfigPage(QWidget):
         m = self._manager.get().materials
         self._stone_cb.setChecked(m.stone_check_enabled)
         self._stone_min.setValue(m.stone_min_count)
+        self._stone_action.setCurrentIndex(max(
+            self._stone_action.findData(m.stone_insufficient_action), 0))
         self._table.setRowCount(0)
         for rule in m.food_rules:
             self._make_row_widgets(rule)
@@ -204,6 +217,7 @@ class MaterialConfigPage(QWidget):
             "stone_check": {
                 "enabled": self._stone_cb.isChecked(),
                 "min_count": self._stone_min.value(),
+                "insufficient_action": self._stone_action.currentData(),
             },
             "food_rules": [
                 self._row_rule(row) for row in range(self._table.rowCount())

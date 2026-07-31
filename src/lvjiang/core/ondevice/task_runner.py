@@ -327,9 +327,9 @@ def _build_source(task: dict, engine):
             stop_check=_STATE.should_stop,
         )
 
-    from ...constants import SYSTEM_WORKFLOWS_DIR
+    from ..config_resolver import get_resolver
 
-    wf_path = SYSTEM_WORKFLOWS_DIR / task["wf_file"]
-    if not wf_path.exists():
-        raise FileNotFoundError(f"工作流文件不存在: {wf_path}")
+    wf_path = get_resolver().resolve_read(f"workflows/{task['wf_file']}")
+    if wf_path is None:
+        raise FileNotFoundError(f"工作流文件不存在: {task['wf_file']}")
     return wf_path

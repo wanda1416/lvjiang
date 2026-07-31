@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -54,6 +55,20 @@ class MetaSchemaPanel(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
+
+        # 匹配度阈值配置（写入 references.yaml 的 match_threshold，随模式路由）
+        threshold_row = QHBoxLayout()
+        threshold_row.addWidget(QLabel("匹配度阈值"))
+        self._threshold_spin = QDoubleSpinBox()
+        self._threshold_spin.setRange(0.0, 1.0)
+        self._threshold_spin.setSingleStep(0.01)
+        self._threshold_spin.setDecimals(2)
+        self._threshold_spin.setToolTip(
+            "图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格"
+        )
+        threshold_row.addWidget(self._threshold_spin)
+        threshold_row.addStretch()
+        layout.addLayout(threshold_row)
 
         hint = QLabel(
             "定义“名称、分组”之外的元数据字段。值统一按文本存储；"
@@ -101,7 +116,8 @@ class MetaSchemaPanel(QWidget):
     # ── 数据加载 ──
 
     def reload(self):
-        """从数据库重新加载 schema 到表格"""
+        """从数据库重新加载 schema 与匹配度阈值到界面"""
+        self._threshold_spin.setValue(self._db.get_match_threshold())
         self._table.setRowCount(0)
         # 内置行（锁定）
         for name, key, filterable, ftype, sort_by in _BUILTIN_ROWS:
@@ -244,6 +260,7 @@ class MetaSchemaPanel(QWidget):
         schema = self._collect_schema()
         if schema is None:
             return
+        self._db.set_match_threshold(self._threshold_spin.value())
         self._db.set_meta_schema(schema)
         self.schema_changed.emit()
         QMessageBox.information(self, "已保存", "元数据字段定义已保存")

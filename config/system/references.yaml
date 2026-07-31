@@ -11,11 +11,11 @@ meta_schema:
   type: number
   sort_by: asc
 references:
-- file: 装备材料/475BF859.png
+- file: 装备培养/475BF859.png
   label: 装备碎片
   meta:
     level: 110
-    group: 装备材料
+    group: 装备培养
   source: clipboard
   notes: ''
 - file: 调律材料/D90CF5A6.png
@@ -32,11 +32,11 @@ references:
     group: 调律材料
   source: clipboard
   notes: ''
-- file: 装备材料/DBFA2793.png
+- file: 装备培养/DBFA2793.png
   label: 装备碎片
   meta:
     level: 105
-    group: 装备材料
+    group: 装备培养
   source: clipboard
   notes: ''
 - file: 调律材料/F2130E50.png
@@ -53,11 +53,11 @@ references:
     group: 调律材料
   source: clipboard
   notes: ''
-- file: 装备材料/24CCB99E.png
+- file: 装备培养/24CCB99E.png
   label: 装备碎片
   meta:
     level: 100
-    group: 装备材料
+    group: 装备培养
   source: clipboard
   notes: ''
 - file: 调律材料/7D3E1342.png
@@ -67,11 +67,11 @@ references:
     group: 调律材料
   source: clipboard
   notes: ''
-- file: 装备材料/28ED555E.png
+- file: 装备培养/28ED555E.png
   label: 装备碎片
   meta:
     level: 96
-    group: 装备材料
+    group: 装备培养
   source: clipboard
   notes: ''
 - file: 调律材料/895530AE.png
@@ -88,11 +88,11 @@ references:
     group: 调律材料
   source: clipboard
   notes: ''
-- file: 装备材料/5EE6F5A4.png
+- file: 装备培养/5EE6F5A4.png
   label: 装备碎片
   meta:
     level: 91
-    group: 装备材料
+    group: 装备培养
   source: clipboard
   notes: ''
 - file: 调律材料/DA54B4BF.png
@@ -107,54 +107,6 @@ references:
   meta:
     level: 91
     group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 装备材料/CD8CEA8A.png
-  label: 装备碎片
-  meta:
-    level: 86
-    group: 装备材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/0B20A87D.png
-  label: 金狗粮
-  meta:
-    level: 86
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/E90F8B8F.png
-  label: 彩狗粮
-  meta:
-    level: 81
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/B12F39AF.png
-  label: 金狗粮
-  meta:
-    level: 81
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/5BB3DEEB.png
-  label: 金狗粮
-  meta:
-    level: 71
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/39B2C751.png
-  label: 金狗粮
-  meta:
-    level: 51
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 其他培养/C784A025.png
-  label: 奇术丹
-  meta:
-    group: 其他培养
   source: clipboard
   notes: ''
 - file: 定音转律/7CB8171A.png
@@ -395,76 +347,6 @@ references:
     group: 调律材料
   source: clipboard
   notes: ''
-- file: 定音转律/2B787250.png
-  label: 定音石
-  meta:
-    level: 86
-    group: 定音转律
-  source: clipboard
-  notes: ''
-- file: 装备培养/94AB92E9.png
-  label: 啸玉
-  meta:
-    level: 86
-    group: 装备培养
-  source: clipboard
-  notes: ''
-- file: 定音转律/54290841.png
-  label: 变音石
-  meta:
-    level: 86
-    group: 定音转律
-  source: clipboard
-  notes: ''
-- file: 定音转律/064943B5.png
-  label: 转律石
-  meta:
-    level: 86
-    group: 定音转律
-  source: clipboard
-  notes: ''
-- file: 调律材料/9BE9F463.png
-  label: 紫狗粮
-  meta:
-    level: 86
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 定音转律/1FE6527B.png
-  label: 变音石
-  meta:
-    level: 81
-    group: 定音转律
-  source: clipboard
-  notes: ''
-- file: 定音转律/7D77B9D2.png
-  label: 转律石
-  meta:
-    level: 81
-    group: 定音转律
-  source: clipboard
-  notes: ''
-- file: 定音转律/FD42CCB6.png
-  label: 定音石
-  meta:
-    level: 61
-    group: 定音转律
-  source: clipboard
-  notes: ''
-- file: 调律材料/45D8E60A.png
-  label: 紫狗粮
-  meta:
-    level: 61
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 定音转律/688A96C4.png
-  label: 定音石
-  meta:
-    level: 51
-    group: 定音转律
-  source: clipboard
-  notes: ''
 - file: 调律材料/26A86377.png
   label: 大律准石
   meta:
@@ -497,48 +379,6 @@ references:
   label: 大律准石
   meta:
     level: 91
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/E2CB0994.png
-  label: 大律准石
-  meta:
-    level: 86
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/1D6B1C00.png
-  label: 大律准石
-  meta:
-    level: 81
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/3C7C4C01.png
-  label: 大律准石
-  meta:
-    level: 71
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/5AFABDB7.png
-  label: 大律准石
-  meta:
-    level: 61
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/C8FFCA19.png
-  label: 大律准石
-  meta:
-    level: 56
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/F3768512.png
-  label: 大律准石
-  meta:
-    level: 51
     group: 调律材料
   source: clipboard
   notes: ''
@@ -592,27 +432,6 @@ references:
   label: 小律准石
   meta:
     level: 91
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/8D149098.png
-  label: 小律准石
-  meta:
-    level: 86
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/161CF0A6.png
-  label: 小律准石
-  meta:
-    level: 56
-    group: 调律材料
-  source: clipboard
-  notes: ''
-- file: 调律材料/685989EA.png
-  label: 小律准石
-  meta:
-    level: 51
     group: 调律材料
   source: clipboard
   notes: ''

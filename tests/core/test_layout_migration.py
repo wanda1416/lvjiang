@@ -90,12 +90,13 @@ class TestMigrateLayoutItem:
 class TestMigrateAcrossLayouts:
     @pytest.fixture
     def manager(self, tmp_path, monkeypatch):
-        """LAYOUTS_DIR / SESSION_PATH 指向 tmp_path 的独立管理器"""
+        """resolver 三层根指向 tmp_path 的独立管理器（开发模式写 system）"""
         import lvjiang.constants as constants
-        monkeypatch.setattr(layout_manager, "LAYOUTS_DIR", tmp_path / "layouts")
-        monkeypatch.setattr(layout_manager, "LOCAL_CONFIG_DIR", tmp_path)
+        monkeypatch.setattr(constants, "SYSTEM_CONFIG_DIR", tmp_path / "system")
+        monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
-        monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", tmp_path)
+        monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
+        monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
         mgr = LayoutConfigManager()
         for name in ("布局A", "布局B"):
             mgr.save_layout(_make_layout(name))
@@ -114,7 +115,8 @@ class TestMigrateAcrossLayouts:
             assert [r.key for r in layout.get_scene_regions("dst")] == ["btn"]
 
     def test_unrelated_layout_untouched(self, manager):
-        path = manager._layout_path("布局C")
+        from lvjiang.core.config_resolver import get_resolver
+        path = get_resolver().resolve_read("layouts/布局C.json")
         before = path.read_text(encoding="utf-8")
         manager.migrate_item_across_layouts("src", "dst", "region", "btn")
         assert path.read_text(encoding="utf-8") == before

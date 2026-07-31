@@ -252,11 +252,11 @@ def _run_config() -> str:
     if ok:
         def check_workflows(report):
             from ...config import load_yaml
-            from ...constants import SYSTEM_CONFIG_DIR, WORKFLOWS_CONFIG_PATH
+            from ...constants import WORKFLOWS_CONFIG_PATH
+            from ..config_resolver import get_resolver
             data = load_yaml(WORKFLOWS_CONFIG_PATH)
             report.append(f"workflows.yaml 顶层 key  {list(data.keys())}")
-            wf_dir = SYSTEM_CONFIG_DIR / "workflows"
-            wf_files = sorted(p.name for p in wf_dir.glob("*.wf"))
+            wf_files = get_resolver().enumerate_entities("workflows", "*.wf")
             report.append(f"workflows/*.wf 数         {len(wf_files)}")
             report.append(f"workflows/ 前 5 个        {wf_files[:5]}")
         ok, _ = _step(report, "4/4 workflows 解析", lambda: check_workflows(report))
@@ -282,13 +282,15 @@ def _run_workflow() -> str:
         def check_layout(report):
             import json
 
-            from ...constants import PROJECT_ROOT
             from ...core.scene_registry import Layout
-            layout_path = PROJECT_ROOT / "config" / "local" / "layouts" / "手机直控.json"
-            if not layout_path.exists():
-                raise RuntimeError(f"布局文件不存在: {layout_path}")
+            from ..config_resolver import get_resolver
+            from .workflow_runner import _default_layout_name
+            name = _default_layout_name()
+            layout_path = get_resolver().resolve_read(f"layouts/{name}.json")
+            if layout_path is None:
+                raise RuntimeError(f"布局文件不存在: layouts/{name}.json")
             data = json.loads(layout_path.read_text(encoding="utf-8"))
-            layout = Layout.from_dict("手机直控", data)
+            layout = Layout.from_dict(name, data)
             scene_count = len(set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels))
             report.append(f"布局文件    {layout_path.name}")
             report.append(f"场景数      {scene_count}")
@@ -298,14 +300,14 @@ def _run_workflow() -> str:
 
     if ok:
         def check_wf_parse(report):
-            from ...constants import SYSTEM_CONFIG_DIR
             from ...workflows.grammar import parse_file
-            wf_dir = SYSTEM_CONFIG_DIR / "workflows"
-            wf_files = sorted(wf_dir.glob("*.wf"))
-            if not wf_files:
-                raise RuntimeError(f"workflows/ 下没有 .wf 文件: {wf_dir}")
+            from ..config_resolver import get_resolver
+            resolver = get_resolver()
+            wf_names = resolver.enumerate_entities("workflows", "*.wf")
+            if not wf_names:
+                raise RuntimeError("workflows/ 下没有 .wf 文件")
             # 只解析第一个，验证语法解析器可用
-            wf = wf_files[0]
+            wf = resolver.resolve_read(f"workflows/{wf_names[0]}")
             program = parse_file(wf)
             report.append(f"解析        {wf.name}")
             report.append(f"顶层语句数  {len(program.body)}")
@@ -326,7 +328,7 @@ def _run_execute() -> str:
 
     if ok:
         def create_and_run(report):
-            from ...constants import PROJECT_ROOT
+            from ..config_resolver import get_resolver
             from .workflow_runner import create_engine
 
             # 创建工作流引擎
@@ -334,9 +336,9 @@ def _run_execute() -> str:
             report.append("引擎创建成功")
 
             # 执行测试工作流
-            wf_path = PROJECT_ROOT / "config" / "system" / "workflows" / "device_smoke_test.wf"
-            if not wf_path.exists():
-                raise RuntimeError(f"测试工作流不存在: {wf_path}")
+            wf_path = get_resolver().resolve_read("workflows/device_smoke_test.wf")
+            if wf_path is None:
+                raise RuntimeError("测试工作流不存在: workflows/device_smoke_test.wf")
 
             report.append(f"开始执行: {wf_path.name}")
             result = engine.execute(wf_path)

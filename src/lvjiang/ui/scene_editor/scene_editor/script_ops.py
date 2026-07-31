@@ -3,7 +3,7 @@
 from loguru import logger
 from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
 
-from ....constants import SYSTEM_WORKFLOWS_DIR
+from ....core.config_resolver import get_resolver
 
 
 class _SceneKeyButton(QPushButton):
@@ -38,9 +38,9 @@ class ScriptOpsMixin:
     # ─── 脚本文件 ────────────────────────────────────────
 
     def _auto_load_script(self):
-        """自动加载 _editor_run.wf 到脚本编辑器"""
-        script_path = SYSTEM_WORKFLOWS_DIR / "_editor_run.wf"
-        if script_path.exists():
+        """自动加载 _editor_run.wf 到脚本编辑器（local 影子优先）"""
+        script_path = get_resolver().resolve_read("workflows/_editor_run.wf")
+        if script_path is not None:
             content = script_path.read_text(encoding="utf-8")
             self._script_text.setPlainText(content)
             logger.info(f"已自动加载脚本: {script_path}")
@@ -49,7 +49,7 @@ class ScriptOpsMixin:
         """加载 .wf 文件到脚本编辑器"""
         path, _ = QFileDialog.getOpenFileName(
             self, "选择脚本文件",
-            str(SYSTEM_WORKFLOWS_DIR),
+            str(get_resolver().write_dir("workflows")),
             "工作流文件 (*.wf);;所有文件 (*)",
         )
         if not path:
@@ -67,7 +67,7 @@ class ScriptOpsMixin:
             return
         path, _ = QFileDialog.getSaveFileName(
             self, "保存脚本文件",
-            str(SYSTEM_WORKFLOWS_DIR),
+            str(get_resolver().write_dir("workflows")),
             "工作流文件 (*.wf)",
         )
         if not path:
@@ -139,9 +139,9 @@ class ScriptOpsMixin:
             engine.session = main_win._session_manager.load(username)
             # context 由 execute() 自动初始化为空 dict
 
-            # 写入临时 .wf 文件
-            temp_wf = SYSTEM_WORKFLOWS_DIR / "_editor_run.wf"
-            temp_wf.write_text(script, encoding="utf-8")
+            # 写入临时 .wf 文件（按模式落可写层）
+            temp_wf = get_resolver().write_entity(
+                "workflows/_editor_run.wf", script)
 
             # 同步执行
             result = engine.execute(temp_wf)

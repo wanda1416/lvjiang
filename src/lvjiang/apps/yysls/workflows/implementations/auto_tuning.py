@@ -51,6 +51,13 @@ from lvjiang.workflows.base import BaseWorkflow
 class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     """自动调律工作流"""
 
+    # 脚本元数据（供发现层暴露到日常下拉与设备端悬浮面板）。
+    # 暂不定义 PARAMETERS：本流程的配置面（部位多选 + 每规则玩法多选 + 全局开关）
+    # 超出现有 select/number 参数 schema 的表达力，设备端先按内置默认配置运行
+    # （全部部位 + 全部规则默认判定，见 _ensure_judge_config 的回退），
+    # 细粒度配置仍只在桌面调律 Tab 经 run_ctx 注入。
+    DISPLAY_NAME = "自动调律"
+
     WEAPON_SLOTS = ["main_weapon", "sub_weapon", "ring", "pendant"]
     ARMOR_SLOTS = ["head", "chest", "leg", "wrist"]
     WEAPON_DETAIL = "equip_weapon_detail"
@@ -85,6 +92,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _round_food = ""            # 本轮实际添加的狗粮 label（空=不添加）
     _round_food_reason = ""     # 本轮狗粮决策说明（供说明文档/日志）
     _equipment_recycled = False  # 最近一次 _process_equipment 是否触发了回收
+    _tune_full_recycle_mode = False  # 调满后回收模式（跳过狗粮与规则判定，调满后回收）
 
     @property
     def is_stopped(self) -> bool:
@@ -441,6 +449,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         report["worthiness"] = logs
+        # 重置调满后回收模式标记（每件装备重新判断）
+        self._tune_full_recycle_mode = False
         if (expect is None or RATING_RANK[expect]
                 < RATING_RANK[scan_cfg.entry_min_rating]):
             entry_label = RATING_LABELS.get(scan_cfg.entry_min_rating,
@@ -449,7 +459,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                         f"（≥{entry_label}），不进调律")
             if self._on_scan_reject(equip_data, potential, detail_scene):
                 return "", True
-            return self._make_fingerprint(equip_data.to_dict()), False
+            # 调满后回收模式：继续走调律流程
+            if self._tune_full_recycle_mode:
+                logger.info(f"  [{name}] 进入调满后回收模式")
+            else:
+                return self._make_fingerprint(equip_data.to_dict()), False
 
         # C. 值得 → 实际调律；说明文档开装备节（只写命中的规则）
         if self._doc:
@@ -516,6 +530,23 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # （供狗粮决策与说明文档）→ 行为表决策，评级按各规则
             # 自身判定语义懒取；词条满为边界条件（continue 不可达）
             full = affix_count >= self.MAX_AFFIX
+            # 调满后回收模式：跳过规则判定，调满即回收
+            if self._tune_full_recycle_mode:
+                if full:
+                    why = "调满后回收模式：词条已满，执行回收"
+                    logger.info(f"  [结束处理] {why}")
+                    tune_recycle_reason = why
+                    stop_reason = why
+                    report["stop_reason"] = stop_reason
+                    if self._doc:
+                        self._doc.round_decision(why)
+                    break
+                else:
+                    why = f"调满后回收模式：继续调律（{affix_count}/{self.MAX_AFFIX}）"
+                    logger.info(f"  [结束处理] {why}")
+                    if self._doc:
+                        self._doc.round_decision(why)
+                    continue
             incoming = self._refresh_expectation(equip_data)
             part, quality, cap_pct = self._recycle_inputs(equip_data)
             rating_of = self._rating_provider(equip_data, incoming)
@@ -542,7 +573,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 if action == "recycle":
                     why = f"重置次数已用尽转回收（{why}）"
                     logger.info(f"  [结束处理] {why}")
-            # 回收延到 back 回背包页后执行；ignore = 结束保留
+            # 回收延到 back 回背包页后执行；skip = 结束保留
             if action == "recycle":
                 tune_recycle_reason = why
             stop_reason = why
@@ -591,8 +622,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """未达进入门槛装备的扫描处置（scan 行为点）。
 
         处置表评级按各规则自身判定语义懒取（incoming 复用进入
-        决策的判定结果，all/custom 按需另跑潜力判定并缓存）→
-        处置表首条命中；仅 recycle 动作落地，其余保留。
+        决策的判定结果，all/custom 按需另跑潜力判定并缓存；
+        逐规则声明的 first_affix_only 由评级提供者注入首词条）→
+        处置表首条命中；仅 recycle 动作落地，tune_full_recycle
+        设置标记后返回 False（继续走调律流程），其余保留。
 
         Returns: True=已回收（该格已被补位装备占据）。
         """
@@ -604,6 +637,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         part, quality, cap_pct = self._recycle_inputs(equip_data)
         action, why = cfg.decide(part, quality, cap_pct,
                                  self._rating_provider(equip_data, potential))
+        if action == "tune_full_recycle":
+            # 调满后回收模式：设置标记，继续走调律流程
+            logger.info(f"  [扫描处理] {label} {why}（调满后回收模式）")
+            self._tune_full_recycle_mode = True
+            return False
         if action != "recycle":
             logger.info(f"  [扫描处理] {label} {why}")
             return False
@@ -636,19 +674,36 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                          incoming: dict | None = None) -> RatingProvider:
         """构造行为表的评级提供者（同一装备当前词条状态内缓存）
 
-        各规则按自身判定语义懒算评级（缓存键 (scope, keys)）；
-        incoming 为已有的传入规则判定结果，作种子避免重复跑。
-        无任何适用规则（部位/品阶不在任何判定范围）= 无调律
-        价值，按业务约定兜底为垃圾档。
+        各规则按自身判定语义懒算评级（缓存键 (scope, keys,
+        仅首词条)）；incoming 为已有的传入规则判定结果，作种子
+        避免重复跑（基于全词条，仅首词条时不可复用）。
+        first_affix_only 时只注入首词条（其余槽视作空槽由潜力
+        判定自由填充），避免回收掉非首词条已成垃圾但可重置
+        调律的装备。无任何适用规则（部位/品阶不在任何判定
+        范围）= 无调律价值，按业务约定兜底为垃圾档。
         """
         cache: dict[tuple, str] = {}
         if incoming is not None:
-            cache[("incoming", ())] = self._expect_key(incoming) or "junk"
+            cache[("incoming", (), False)] = (
+                self._expect_key(incoming) or "junk")
+        label = equip_data.name or equip_data.type
 
-        def rating_of(scope: str, keys: list[str]) -> str:
-            ck = (scope, tuple(keys))
+        def rating_of(scope: str, keys: list[str],
+                      first_affix_only: bool = False) -> str:
+            # 单词条装备无需构造副本，归一到全词条缓存键
+            fao = first_affix_only and len(equip_data.affixes) > 1
+            ck = (scope, tuple(keys), fao)
             if ck not in cache:
-                results = self._judge_by_scope(equip_data, scope, keys)
+                target = equip_data
+                if fao:
+                    target = replace(
+                        equip_data, affixes=equip_data.affixes[:1],
+                        extra_data={**equip_data.extra_data,
+                                    "affix_count": 1})
+                    logger.info(
+                        f"  [行为评级] {label} 仅按首词条判定评级"
+                        f"（忽略其他 {len(equip_data.affixes) - 1} 条）")
+                results = self._judge_by_scope(target, scope, keys)
                 cache[ck] = self._expect_key(results) or "junk"
             return cache[ck]
 
@@ -1056,13 +1111,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if not self._check_stone_stock(settings, infos):
             return None
 
-        decision = self._decide_food_round(equip_data, settings, infos)
-        self._round_food_reason = decision.reason
-        if decision.action == "skip":
-            self._tune_abort_reason = decision.reason
-            return None
-        food = decision.food if decision.action == "feed" else ""
-        self._round_food = food
+        # 调满后回收模式：跳过狗粮决策
+        food = ""
+        if self._tune_full_recycle_mode:
+            self._round_food = ""
+            self._round_food_reason = "调满后回收模式，跳过狗粮添加"
+            logger.info(f"狗粮策略: {self._round_food_reason}")
+        else:
+            decision = self._decide_food_round(equip_data, settings, infos)
+            self._round_food_reason = decision.reason
+            if decision.action == "skip":
+                self._tune_abort_reason = decision.reason
+                return None
+            food = decision.food if decision.action == "feed" else ""
+            self._round_food = food
         if food:
             # 同名幽灵槽防护：只认数量有效的槽位
             slot = next(

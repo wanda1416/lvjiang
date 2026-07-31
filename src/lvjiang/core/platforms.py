@@ -1,7 +1,7 @@
 """平台差异适配层——主流程中 Windows/macOS 的行为差异统一收口。
 
 只收「主流程分支」：桌面输入后端创建、全局热键启停策略、
-工作流原生弹窗回退、adb 候选路径、桌面投屏入口可见性。
+工作流原生弹窗回退、adb 候选路径、后台子进程窗口抑制、桌面投屏入口可见性。
 
 窗口截图/输入注入等具体实现本身已按平台拆分
 （core/desktop/ 仅 Windows；core/android/ 跨平台），
@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import subprocess
 import sys
 from typing import TYPE_CHECKING, Callable
 
@@ -26,6 +27,14 @@ IS_MACOS = sys.platform == "darwin"
 # 桌面投屏模式（窗口扫描/定位/Win32 输入）仅 Windows 可用；
 # 非 Windows 只支持 ADB 模式（UI 层据此隐藏窗口扫描入口）
 DESKTOP_BACKEND_AVAILABLE = IS_WINDOWS
+
+# 后台 CLI 子进程（adb 等）统一附加参数：Windows 下 windowed（console=False）
+# 打包运行时进程自身无控制台，每次 subprocess 都会给子进程新开控制台窗口，
+# 必须用 CREATE_NO_WINDOW 抑制；开发模式/非 Windows 无副作用。
+# 用法：subprocess.run([...], **SUBPROCESS_NO_WINDOW)
+SUBPROCESS_NO_WINDOW: dict = (
+    {"creationflags": subprocess.CREATE_NO_WINDOW} if IS_WINDOWS else {}
+)
 
 
 # ─── 桌面输入后端 ─────────────────────────────────────────
@@ -83,7 +92,6 @@ def _osa_quote(text: str) -> str:
 
 def _osascript(script: str, blocking: bool = True) -> str:
     """执行 osascript（macOS），阻塞时返回 stdout，非阻塞立即返回空串"""
-    import subprocess
     cmd = ["osascript", "-e", script]
     if not blocking:
         subprocess.Popen(cmd)

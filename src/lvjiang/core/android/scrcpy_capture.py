@@ -32,6 +32,7 @@ from loguru import logger
 
 from ...constants import PROJECT_ROOT
 from ..capture_base import CaptureBackend
+from ..platforms import SUBPROCESS_NO_WINDOW
 from .device import AdbDevice
 
 # scrcpy server jar 本地路径（相对于项目 data 目录）
@@ -132,7 +133,7 @@ class AndroidStreamCapture(CaptureBackend):
             r = subprocess.run(
                 [*self._device._base(), "forward",
                  f"tcp:{_VIDEO_PORT}", f"localabstract:{self._socket_name}"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
             )
             if r.returncode != 0:
                 logger.error(f"[AndroidStream] adb forward 失败: {r.stderr.strip()}")
@@ -242,7 +243,7 @@ class AndroidStreamCapture(CaptureBackend):
         # 清理设备端 server 进程
         subprocess.run(
             [*self._device._base(), "shell", "pkill", "-f", "scrcpy-server"],
-            capture_output=True, timeout=5,
+            capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
         )
 
         if not decode_thread_stuck:
@@ -326,7 +327,7 @@ class AndroidStreamCapture(CaptureBackend):
             return False
         r = subprocess.run(
             [*self._device._base(), "push", str(self._jar_local), _REMOTE_JAR_PATH],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=30, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.error(f"[AndroidStream] 推送 jar 失败: {r.stderr.strip()}")
@@ -350,6 +351,7 @@ class AndroidStreamCapture(CaptureBackend):
             self._server_proc = subprocess.Popen(
                 [*self._device._base(), "shell", shell_cmd],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                **SUBPROCESS_NO_WINDOW,
             )
             logger.debug(f"[AndroidStream] server 进程已启动 pid={self._server_proc.pid}")
         except Exception as e:
@@ -566,5 +568,5 @@ class AndroidStreamCapture(CaptureBackend):
         """清理 adb forward 规则"""
         subprocess.run(
             [*self._device._base(), "forward", "--remove-all"],
-            capture_output=True, timeout=5,
+            capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
         )

@@ -25,7 +25,7 @@ materials:
   stone_check:
     enabled: true
     min_count: 80
-    insufficient_action: skip
+    insufficient_action: ask
   food_rules:
   - pct: 98
     min_expect: top
@@ -112,6 +112,22 @@ behavior:
   tune:
     enabled: true
     rules:
+    - parts:
+      - 武器
+      - 环
+      - 佩
+      - 冠胄
+      - 胸甲
+      - 胫甲
+      - 腕甲
+      max_quality: gold_only
+      pct_op: ge
+      pct: 92
+      ratings:
+      - junk
+      judge_scope: incoming
+      judge_rules: []
+      action: reset
     - parts:
       - 武器
       - 环

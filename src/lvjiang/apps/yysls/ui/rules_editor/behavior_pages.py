@@ -10,8 +10,7 @@
   边界条件：继续调律不可达，无命中默认结束保留；未满默认
   继续调律）；另有单件重置次数上限 + 次数用尽转处置动作。
 每条规则 = 部位多选（至少勾一项，全选展示 - 全部 -）
-+ 品阶（扫描处理：不限/金装/紫装及以下/蓝装及以下；结束
-处理：≤ 门槛）+ 首词条初始数值（≥/≤ 方向可选 + 数值，
++ 品阶（不限/金装/紫装及以下/蓝装及以下）+ 首词条初始数值（≥/≤ 方向可选 + 数值，
 ≤ 100 / ≥ 0 = 不限）+ 判定评级多选
 （四档自由勾选，全选 = 不限）+ 仅首词条（仅扫描处理，
 取评级时只注入首词条）+ 判定语义（预期评级识别用
@@ -58,7 +57,6 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     MAX_TUNE_RESETS,
     PCT_OP_LABELS,
     PCT_OPS,
-    QUALITY_LABELS,
     QUALITY_PARTS,
     RATING_KEYS,
     RATING_LABELS,
@@ -66,11 +64,9 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuningBaseManager,
 )
 
-# 品阶 ≤ 门槛候选（从高到低，最高档 = 不限）
-# 扫描处理用 SCAN_QUALITY_KEYS（含金装专用），结束处理用 QUALITY_KEYS
-_QUALITY_KEYS = ("gold", "purple", "blue")
-_SCAN_QUALITY_KEYS = ("gold", "gold_only", "purple", "blue")
-_SCAN_QUALITY_LABELS = {
+# 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）
+_QUALITY_KEYS = ("gold", "gold_only", "purple", "blue")
+_QUALITY_LABELS = {
     "gold": "- 不限 -",
     "gold_only": "金装",
     "purple": "紫装及以下",
@@ -83,7 +79,7 @@ _SORT_COL = 0
 _BASE_COL_KEYS = ("sort", "parts", "quality", "pct", "ratings",
                   "judge", "action")
 _COL_TITLES = {
-    "sort": "", "parts": "部位", "quality": "品阶 ≤",
+    "sort": "", "parts": "部位", "quality": "品阶",
     "pct": "首词条 %", "ratings": "评级", "first_affix": "仅首词条",
     "judge": "判定语义", "action": "动作",
 }
@@ -332,12 +328,10 @@ class _BehaviorPageBase(QWidget):
 
         self._init_head(layout)
 
-        # 扫描处理：品阶列标题为「品阶」（含金装专用），且多
-        # 「仅首词条」列；结束处理为「品阶 ≤」标准列
+        # 扫描处理多「仅首词条」列
         keys = list(_BASE_COL_KEYS)
         titles = dict(_COL_TITLES)
         if self.STAGE == "scan":
-            titles["quality"] = "品阶"  # 扫描处理品阶列不用 ≤ 语义
             keys.insert(keys.index("judge"), "first_affix")
         self._ci = {k: i for i, k in enumerate(keys)}
         self._table = QTableWidget(0, len(keys))
@@ -402,17 +396,10 @@ class _BehaviorPageBase(QWidget):
         parts.set_selected(rule.parts)
         table.setCellWidget(row, self._ci["parts"], parts)
 
-        # 品阶/评级是有序量表 → 门槛单选
-        # 扫描处理：不限 / 金装 / 紫装及以下 / 蓝装及以下
-        # 结束处理：- 不限 - / ≤ 紫色 / ≤ 蓝色
+        # 品阶候选（不限/金装/紫装及以下/蓝装及以下）
         quals = QComboBox()
-        if self.STAGE == "scan":
-            for q in _SCAN_QUALITY_KEYS:
-                quals.addItem(_SCAN_QUALITY_LABELS.get(q, q), q)
-        else:
-            for q in _QUALITY_KEYS:
-                label = QUALITY_LABELS.get(q, q)
-                quals.addItem("- 不限 -" if q == "gold" else f"≤ {label}", q)
+        for q in _QUALITY_KEYS:
+            quals.addItem(_QUALITY_LABELS.get(q, q), q)
         quals.setCurrentIndex(max(quals.findData(rule.max_quality), 0))
         quals.currentIndexChanged.connect(lambda _i: self._apply())
         table.setCellWidget(row, self._ci["quality"], quals)

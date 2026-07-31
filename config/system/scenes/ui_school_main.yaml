@@ -5,6 +5,8 @@ views:
   name: 基底
 - key: no_school
   name: 无门无派
+- key: wenjin
+  name: 文津馆
 regions:
 - key: mengui
   name: 门规
@@ -42,3 +44,14 @@ regions:
   is_text: true
   is_clickable: true
   view: no_school
+- key: menpai
+  name: 门派
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: haoling_3
+  name: 号令
+  type: func
+  is_text: true
+  is_clickable: true
+  view: wenjin

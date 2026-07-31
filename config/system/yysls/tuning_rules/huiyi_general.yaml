@@ -70,10 +70,17 @@ patterns:
           - 单体类奇术增伤
           min: 1
     top_conditions:
-    - count_max:
-        symbols:
-        - 最大鸣金攻击
-        max: 0
+    - - contains_all:
+        - 最大外功攻击
+      - count_min:
+          symbols:
+          - 劲
+          - 势
+          min: 1
+      - count_max:
+          symbols:
+          - 最大鸣金攻击
+          max: 0
   胫甲:
     first:
     - 劲
@@ -131,12 +138,3 @@ common_conditions:
       - 会心率
       - 精准率
       min: 1
-  - count_max:
-      symbols:
-      - 最大外功攻击
-      max: 0
-  - count_max:
-      symbols:
-      - 劲
-      - 势
-      max: 0

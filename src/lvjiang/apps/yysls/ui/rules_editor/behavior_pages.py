@@ -9,11 +9,11 @@
   按预期评级决策 继续调律/重置调律/回收/结束保留（词条满为
   边界条件：继续调律不可达，无命中默认结束保留；未满默认
   继续调律）；另有单件重置次数上限 + 次数用尽转处置动作。
-两页均有「判定规则语义」（预期评级识别用哪个流派规则集）：
-传入规则（运行期勾选）/ 全部规则 / 自选规则（附规则多选）。
 每条规则 = 部位多选（至少勾一项，全选展示 - 全部 -）
 + 品阶/首词条初始数值/判定评级三个有序 ≤ 门槛（单选，
-取最高档 = 不限）+ 动作（候选按行为点白名单锁定）。
+取最高档 = 不限）+ 判定语义（预期评级识别用哪个流派规则集：
+传入规则/全部规则/自选规则，自选经弹窗勾选）+ 动作（候选按
+行为点白名单锁定）。
 沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、各自只替换 behavior.scan /
@@ -30,6 +30,8 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -61,7 +63,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 _QUALITY_KEYS = ("gold", "purple", "blue")
 
 # 规则表列定义
-_COLS = ("部位", "品阶 ≤", "首词条 ≤ %", "评级 ≤", "动作")
+_COLS = ("部位", "品阶 ≤", "首词条 ≤ %", "评级 ≤", "判定语义", "动作")
 
 # tune 行为点的 ignore 语义是「结束保留」，动作文案按行为点区分
 _STAGE_ACTION_LABELS = {
@@ -133,51 +135,95 @@ class _MultiSelect(QPushButton):
             self.setText("/".join(labels))
 
 
-class _JudgeScopeSelect(QWidget):
-    """「判定规则语义」组合控件：三选一下拉 + 自选时的规则多选
+class _JudgeRulesDialog(QDialog):
+    """自选判定规则弹窗：勾选流派规则（至少一项才可确定）"""
 
-    scope=custom 时显示流派规则 _MultiSelect，其余隐藏；
-    rules() 仅 custom 时返回勾选 key（其余返回空列表，与解析层
-    「judge_rules 仅 custom 可声明」的约束对齐）。
+    def __init__(self, checked: list[str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("自选判定规则")
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("预期评级识别使用勾选的流派规则："))
+        self._boxes: dict[str, QCheckBox] = {}
+        for key, name in get_rule_names().items():
+            cb = QCheckBox(name)
+            cb.setChecked(key in checked)
+            cb.toggled.connect(lambda _c: self._sync_ok())
+            layout.addWidget(cb)
+            self._boxes[key] = cb
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        self._buttons.accepted.connect(self.accept)
+        self._buttons.rejected.connect(self.reject)
+        layout.addWidget(self._buttons)
+        self._sync_ok()
+
+    def selected(self) -> list[str]:
+        return [k for k, cb in self._boxes.items() if cb.isChecked()]
+
+    def _sync_ok(self):
+        ok = self._buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok.setEnabled(bool(self.selected()))
+
+
+class _JudgeScopeCell(QComboBox):
+    """规则行「判定语义」单元格：三选一下拉，自选经弹窗勾选
+
+    选中「自选规则」时弹出勾选对话框（取消则回退原语义）；
+    custom 项文本动态显示摘要（「{首个规则名} 等X个」）。
+    rules() 仅 custom 时返回勾选 key，与解析层「judge_rules 仅
+    custom 可声明」的约束对齐。
     """
 
     def __init__(self, changed: Callable[[], None], parent=None):
         super().__init__(parent)
         self._changed = changed
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
-        self._combo = QComboBox()
+        self._keys: list[str] = []
+        self._prev = 0
         for scope in JUDGE_SCOPES:
-            self._combo.addItem(JUDGE_SCOPE_LABELS.get(scope, scope), scope)
-        self._combo.setToolTip(
-            "预期评级识别用哪个流派规则集：传入规则=运行期勾选的规则；"
-            "全部规则；自选规则=右侧多选声明")
-        self._combo.currentIndexChanged.connect(self._on_scope_changed)
-        row.addWidget(self._combo)
-        self._rules = _MultiSelect(
-            [(k, name) for k, name in get_rule_names().items()], changed)
-        row.addWidget(self._rules)
-        self._sync_visible()
+            self.addItem(JUDGE_SCOPE_LABELS.get(scope, scope), scope)
+        self.setToolTip(
+            "本条规则的评级用哪个流派规则集：传入规则=运行期勾选的"
+            "规则；全部规则；自选规则=弹窗勾选")
+        self.activated.connect(self._on_activated)
 
     def scope(self) -> str:
-        return self._combo.currentData()
+        return self.currentData()
 
     def rules(self) -> list[str]:
-        return self._rules.selected() if self.scope() == "custom" else []
+        return list(self._keys) if self.scope() == "custom" else []
 
     def set_value(self, scope: str, keys: list[str]):
-        self._combo.blockSignals(True)
-        self._combo.setCurrentIndex(max(self._combo.findData(scope), 0))
-        self._combo.blockSignals(False)
-        self._rules.set_selected(keys)
-        self._sync_visible()
+        self._keys = list(keys)
+        self.blockSignals(True)
+        self.setCurrentIndex(max(self.findData(scope), 0))
+        self.blockSignals(False)
+        self._prev = self.currentIndex()
+        self._refresh_summary()
 
-    def _on_scope_changed(self, _i):
-        self._sync_visible()
+    def _on_activated(self, index: int):
+        if self.itemData(index) == "custom":
+            dlg = _JudgeRulesDialog(self._keys, self)
+            if dlg.exec():
+                self._keys = dlg.selected()
+            else:
+                # 取消弹窗：回退原判定语义，不触发保存
+                self.setCurrentIndex(self._prev)
+                return
+        self._prev = self.currentIndex()
+        self._refresh_summary()
         self._changed()
 
-    def _sync_visible(self):
-        self._rules.setVisible(self.scope() == "custom")
+    def _refresh_summary(self):
+        idx = self.findData("custom")
+        if not self._keys:
+            text = JUDGE_SCOPE_LABELS["custom"]
+        else:
+            names = get_rule_names()
+            first = names.get(self._keys[0], self._keys[0])
+            text = (first if len(self._keys) == 1
+                    else f"{first} 等{len(self._keys)}个")
+        self.setItemText(idx, text)
 
 
 class _BehaviorPageBase(QWidget):
@@ -273,13 +319,17 @@ class _BehaviorPageBase(QWidget):
         ratings.currentIndexChanged.connect(lambda _i: self._apply())
         table.setCellWidget(row, 3, ratings)
 
+        judge = _JudgeScopeCell(self._apply)
+        judge.set_value(rule.judge_scope, rule.judge_rules)
+        table.setCellWidget(row, 4, judge)
+
         action = QComboBox()
         labels = _STAGE_ACTION_LABELS[self.STAGE]
         for key in BEHAVIOR_STAGE_ACTIONS[self.STAGE]:
             action.addItem(labels.get(key, key), key)
         action.setCurrentIndex(max(action.findData(rule.action), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
-        table.setCellWidget(row, 4, action)
+        table.setCellWidget(row, 5, action)
 
     # ── 行增删 ──
 
@@ -320,12 +370,15 @@ class _BehaviorPageBase(QWidget):
         quals: QComboBox = table.cellWidget(row, 1)
         pct: QSpinBox = table.cellWidget(row, 2)
         ratings: QComboBox = table.cellWidget(row, 3)
-        action: QComboBox = table.cellWidget(row, 4)
+        judge: _JudgeScopeCell = table.cellWidget(row, 4)
+        action: QComboBox = table.cellWidget(row, 5)
         return {
             "parts": parts.selected(),
             "max_quality": quals.currentData(),
             "max_pct": pct.value(),
             "max_rating": ratings.currentData(),
+            "judge_scope": judge.scope(),
+            "judge_rules": judge.rules(),
             "action": action.currentData(),
         }
 
@@ -372,16 +425,10 @@ class ScanBehaviorPage(_BehaviorPageBase):
             "<b>扫描处理</b>（进调律前的行为点）：传入规则预期评级 ≥ "
             "进入门槛 → 进入调律；未达门槛的装备按下表处置"
             "（首条命中；无命中 = 保留）"))
-        half_line = self.fontMetrics().height() // 2
 
-        head = QHBoxLayout()
-        self._enabled_cb = QCheckBox("启用处置表")
-        self._enabled_cb.setToolTip(
-            "停用后不进调律的装备一律保留（进入门槛仍生效）")
-        self._enabled_cb.stateChanged.connect(lambda _s: self._apply())
-        head.addWidget(self._enabled_cb)
-        head.addSpacing(half_line)
-        head.addWidget(QLabel("进入门槛"))
+        # 第一行：进入门槛（独立于处置表，停用处置表仍生效）
+        entry_row = QHBoxLayout()
+        entry_row.addWidget(QLabel("进入门槛"))
         self._entry_combo = QComboBox()
         for r in reversed(RATING_KEYS):
             label = RATING_LABELS.get(r, r)
@@ -390,11 +437,18 @@ class ScanBehaviorPage(_BehaviorPageBase):
             "传入规则（运行期勾选）预期评级达到该档才进入调律")
         self._entry_combo.currentIndexChanged.connect(
             lambda _i: self._apply())
-        head.addWidget(self._entry_combo)
-        head.addSpacing(half_line)
-        head.addWidget(QLabel("判定规则语义"))
-        self._judge = _JudgeScopeSelect(self._apply)
-        head.addWidget(self._judge)
+        entry_row.addWidget(self._entry_combo)
+        entry_row.addStretch()
+        layout.addLayout(entry_row)
+
+        # 处置表区：与门槛行拉开距离，启用开关紧贴规则表
+        layout.addSpacing(self.fontMetrics().height())
+        head = QHBoxLayout()
+        self._enabled_cb = QCheckBox("启用处置表")
+        self._enabled_cb.setToolTip(
+            "停用后不进调律的装备一律保留（进入门槛仍生效）")
+        self._enabled_cb.stateChanged.connect(lambda _s: self._apply())
+        head.addWidget(self._enabled_cb)
         head.addStretch()
         layout.addLayout(head)
 
@@ -402,14 +456,11 @@ class ScanBehaviorPage(_BehaviorPageBase):
         self._enabled_cb.setChecked(stage.enabled)
         idx = self._entry_combo.findData(stage.entry_min_rating)
         self._entry_combo.setCurrentIndex(max(idx, 0))
-        self._judge.set_value(stage.judge_scope, stage.judge_rules)
 
     def _stage_raw(self) -> dict:
         return {
             "enabled": self._enabled_cb.isChecked(),
             "entry_min_rating": self._entry_combo.currentData(),
-            "judge_scope": self._judge.scope(),
-            "judge_rules": self._judge.rules(),
             "rules": self._rules_raw(),
         }
 
@@ -431,10 +482,6 @@ class TuneBehaviorPage(_BehaviorPageBase):
         self._enabled_cb.setToolTip("停用后按无命中默认行为执行")
         self._enabled_cb.stateChanged.connect(lambda _s: self._apply())
         head.addWidget(self._enabled_cb)
-        head.addSpacing(half_line)
-        head.addWidget(QLabel("判定规则语义"))
-        self._judge = _JudgeScopeSelect(self._apply)
-        head.addWidget(self._judge)
         head.addSpacing(half_line)
         head.addWidget(QLabel("单件重置次数上限"))
         self._resets_spin = QSpinBox()
@@ -458,7 +505,6 @@ class TuneBehaviorPage(_BehaviorPageBase):
 
     def _load_stage(self, stage) -> None:
         self._enabled_cb.setChecked(stage.enabled)
-        self._judge.set_value(stage.judge_scope, stage.judge_rules)
         self._resets_spin.setValue(stage.max_resets)
         idx = self._exhausted_combo.findData(stage.reset_exhausted_action)
         self._exhausted_combo.setCurrentIndex(max(idx, 0))
@@ -466,8 +512,6 @@ class TuneBehaviorPage(_BehaviorPageBase):
     def _stage_raw(self) -> dict:
         return {
             "enabled": self._enabled_cb.isChecked(),
-            "judge_scope": self._judge.scope(),
-            "judge_rules": self._judge.rules(),
             "rules": self._rules_raw(),
             "max_resets": self._resets_spin.value(),
             "reset_exhausted_action": self._exhausted_combo.currentData(),

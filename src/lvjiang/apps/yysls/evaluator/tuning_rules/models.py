@@ -34,6 +34,7 @@ schema 要点：
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Callable
 
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
@@ -470,14 +471,18 @@ class BehaviorRule:
     - max_quality: 品阶 ≤（gold = 不限）；
     - max_pct: 首词条初始数值 cap_pct ≤（100 = 不限；
       识别失败视为不达标）；
-    - max_rating: 预期评级 ≤（top = 不限；按行为点声明的判定
-      语义取各适用规则最高档，无任何适用规则时仅能命中
-      不限评级的规则）。
+    - max_rating: 预期评级 ≤（top = 不限；按本规则声明的判定
+      语义 judge_scope/judge_rules 取各适用规则最高档；无任何
+      适用规则 = 无调律价值，由评级提供者兜底为垃圾档）。
+    判定语义逐规则声明：incoming=传入规则 / all=全部规则 /
+    custom=自选 judge_rules（仅 custom 可声明）。
     """
     parts: list[str] = field(default_factory=list)
     max_quality: str = "gold"
     max_pct: int = 100
     max_rating: str = "top"
+    judge_scope: str = "incoming"
+    judge_rules: list[str] = field(default_factory=list)
     action: str = "ignore"
 
     def matches(self, part: str | None, quality: str | None,
@@ -505,9 +510,36 @@ class BehaviorRule:
                  if self.max_quality != "gold" else "不限品阶")
         pct = (f"首词条≤{self.max_pct}%" if self.max_pct < 100
                else "首词条不限")
-        ratings = (f"评级≤{RATING_LABELS.get(self.max_rating, self.max_rating)}"
-                   if self.max_rating != "top" else "不限评级")
+        if self.max_rating != "top":
+            scope = JUDGE_SCOPE_LABELS.get(self.judge_scope, self.judge_scope)
+            ratings = (f"评级≤"
+                       f"{RATING_LABELS.get(self.max_rating, self.max_rating)}"
+                       f"（按{scope}）")
+        else:
+            ratings = "不限评级"
         return f"{parts} 且 {quals} 且 {pct} 且 {ratings}"
+
+
+# 评级提供者：(判定语义, 自选规则 key 集) → 预期评级；由调用方
+# 实现（工作流内带同一装备的语义级缓存，无任何适用规则时兜底
+# 返回垃圾档；返回 None 保守视为未知，仅命中不限评级规则）
+RatingProvider = Callable[[str, list[str]], str | None]
+
+
+def _first_hit(rules: list[BehaviorRule], part: str | None,
+               quality: str | None, cap_pct: float | None,
+               rating_of: RatingProvider,
+               skip: Callable[[BehaviorRule], bool] | None = None,
+               ) -> tuple[int, BehaviorRule] | None:
+    """有序规则表首条命中（评级按各规则自身判定语义懒取）"""
+    for idx, rule in enumerate(rules, start=1):
+        if skip and skip(rule):
+            continue
+        rating = (rating_of(rule.judge_scope, rule.judge_rules)
+                  if rule.max_rating != "top" else None)
+        if rule.matches(part, quality, cap_pct, rating):
+            return idx, rule
+    return None
 
 
 @dataclass
@@ -516,27 +548,25 @@ class ScanBehavior:
 
     entry_min_rating: 进入门槛 —— 传入规则预期评级 ≥ 该档即进入
     调律（固定用传入规则判定，调律目标就是运行期所选流派）；
-    judge_scope/judge_rules: 处置表评级判定语义（incoming=传入
-    规则 / all=全部规则 / custom=自选 judge_rules）；
-    rules: 不进调律装备的处置表（首条命中；无命中=忽略保留）。
+    rules: 不进调律装备的处置表（首条命中；无命中=忽略保留），
+    评级判定语义逐规则声明（BehaviorRule.judge_scope）。
     """
     enabled: bool = True
     entry_min_rating: str = "excellent"
-    judge_scope: str = "incoming"
-    judge_rules: list[str] = field(default_factory=list)
     rules: list[BehaviorRule] = field(default_factory=list)
 
     def decide(self, part: str | None, quality: str | None,
                cap_pct: float | None,
-               rating: str | None) -> tuple[str, str]:
+               rating_of: RatingProvider) -> tuple[str, str]:
         """返回 (动作, 决策说明)；未启用/无命中时为 ("ignore", 说明)"""
         if not self.enabled:
             return "ignore", "扫描处置未启用 → 保留"
-        for idx, rule in enumerate(self.rules, start=1):
-            if rule.matches(part, quality, cap_pct, rating):
-                label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
-                return rule.action, (
-                    f"规则{idx}（{rule.summary()}）命中 → {label}")
+        hit = _first_hit(self.rules, part, quality, cap_pct, rating_of)
+        if hit:
+            idx, rule = hit
+            label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
+            return rule.action, (
+                f"规则{idx}（{rule.summary()}）命中 → {label}")
         return "ignore", "无处置规则命中 → 保留"
 
 
@@ -544,36 +574,35 @@ class ScanBehavior:
 class TuneBehavior:
     """结束处理（每轮调律结束后的行为点）
 
-    每轮按 judge_scope 刷新预期评级后 decide；词条满为边界条件：
-    full=True 时 continue 规则跳过匹配（不可再调）。无命中默认：
-    未满=继续调律、满=结束保留；未启用同默认。
+    每轮 decide 时评级按各规则自身判定语义懒取；词条满为边界
+    条件：full=True 时 continue 规则跳过匹配（不可再调）。无命中
+    默认：未满=继续调律、满=结束保留；未启用同默认。
     max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
     硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
     reset_exhausted_action: 规则命中重置但次数已用尽（含 OCR
     读不到次数）时的转处置动作：recycle / ignore。
     """
     enabled: bool = False
-    judge_scope: str = "incoming"
-    judge_rules: list[str] = field(default_factory=list)
     rules: list[BehaviorRule] = field(default_factory=list)
     max_resets: int = MAX_TUNE_RESETS
     reset_exhausted_action: str = "ignore"
 
     def decide(self, part: str | None, quality: str | None,
-               cap_pct: float | None, rating: str | None,
+               cap_pct: float | None, rating_of: RatingProvider,
                full: bool) -> tuple[str, str]:
         """返回 (动作, 决策说明)；无命中默认未满=continue、满=ignore"""
         default = (("ignore", "词条已满，无行为规则命中 → 结束保留")
                    if full else ("continue", "无行为规则命中 → 继续调律"))
         if not self.enabled:
             return default
-        for idx, rule in enumerate(self.rules, start=1):
-            if full and rule.action == "continue":
-                continue  # 词条已满不可再调，继续调律规则跳过
-            if rule.matches(part, quality, cap_pct, rating):
-                label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
-                return rule.action, (
-                    f"规则{idx}（{rule.summary()}）命中 → {label}")
+        # 词条已满不可再调，继续调律规则跳过
+        hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
+                         skip=(lambda r: full and r.action == "continue"))
+        if hit:
+            idx, rule = hit
+            label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
+            return rule.action, (
+                f"规则{idx}（{rule.summary()}）命中 → {label}")
         return default
 
 

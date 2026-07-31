@@ -54,8 +54,6 @@ behavior:
   scan:
     enabled: true
     entry_min_rating: normal
-    judge_scope: incoming
-    judge_rules: []
     rules:
     - parts:
       - 武器
@@ -68,11 +66,11 @@ behavior:
       max_quality: purple
       max_pct: 100
       max_rating: junk
+      judge_scope: all
+      judge_rules: []
       action: recycle
   tune:
-    enabled: true
-    judge_scope: incoming
-    judge_rules: []
+    enabled: false
     rules:
     - parts:
       - 武器
@@ -85,6 +83,8 @@ behavior:
       max_quality: purple
       max_pct: 100
       max_rating: junk
+      judge_scope: incoming
+      judge_rules: []
       action: recycle
     max_resets: 3
     reset_exhausted_action: recycle

@@ -36,6 +36,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     STONE_LABEL,
     FoodDecision,
     MaterialSettings,
+    RatingProvider,
     get_tuning_base,
 )
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
@@ -469,13 +470,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     self._doc.food_strategy(self._round_food_reason)
                     last_food_reason = self._round_food_reason
                 self._doc.tune_round(rounds, self._round_food, new_affix)
-            # 结束处理（tune 行为点）：按判定语义刷新预期评级 →
-            # 行为表决策；词条满为边界条件（continue 不可达）
+            # 结束处理（tune 行为点）：传入规则口径刷新预期评级
+            # （供狗粮决策与说明文档）→ 行为表决策，评级按各规则
+            # 自身判定语义懒取；词条满为边界条件（continue 不可达）
             full = affix_count >= self.MAX_AFFIX
-            rating = self._refresh_expectation(
-                equip_data, tune_cfg.judge_scope, tune_cfg.judge_rules)
+            incoming = self._refresh_expectation(equip_data)
             part, quality, cap_pct = self._recycle_inputs(equip_data)
-            action, why = tune_cfg.decide(part, quality, cap_pct, rating,
+            rating_of = self._rating_provider(equip_data, incoming)
+            action, why = tune_cfg.decide(part, quality, cap_pct, rating_of,
                                           full)
             logger.info(f"  [结束处理] {why}")
             if action == "continue":
@@ -546,9 +548,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                         detail_scene: str | None = None) -> bool:
         """未达进入门槛装备的扫描处置（scan 行为点）。
 
-        处置用预期评级按 scan.judge_scope 计算（incoming 直接复用
-        进入决策的判定结果，all/custom 另跑一次潜力判定）→ 处置表
-        首条命中；仅 recycle 动作落地，其余保留。
+        处置表评级按各规则自身判定语义懒取（incoming 复用进入
+        决策的判定结果，all/custom 按需另跑潜力判定并缓存）→
+        处置表首条命中；仅 recycle 动作落地，其余保留。
 
         Returns: True=已回收（该格已被补位装备占据）。
         """
@@ -557,14 +559,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if detail_scene is None or not cfg.enabled:
             logger.info(f"  [扫描处理] {label} 不进调律（处置未启用，保留）")
             return False
-        if cfg.judge_scope == "incoming":
-            results = potential
-        else:
-            results = self._judge_by_scope(equip_data, cfg.judge_scope,
-                                           cfg.judge_rules)
         part, quality, cap_pct = self._recycle_inputs(equip_data)
         action, why = cfg.decide(part, quality, cap_pct,
-                                 self._expect_key(results))
+                                 self._rating_provider(equip_data, potential))
         if action != "recycle":
             logger.info(f"  [扫描处理] {label} {why}")
             return False
@@ -593,6 +590,28 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 use_keys = None
         return judge_equipment_potential(equip_data, None, use_keys)
 
+    def _rating_provider(self, equip_data: EquipmentData,
+                         incoming: dict | None = None) -> RatingProvider:
+        """构造行为表的评级提供者（同一装备当前词条状态内缓存）
+
+        各规则按自身判定语义懒算评级（缓存键 (scope, keys)）；
+        incoming 为已有的传入规则判定结果，作种子避免重复跑。
+        无任何适用规则（部位/品阶不在任何判定范围）= 无调律
+        价值，按业务约定兜底为垃圾档。
+        """
+        cache: dict[tuple, str] = {}
+        if incoming is not None:
+            cache[("incoming", ())] = self._expect_key(incoming) or "junk"
+
+        def rating_of(scope: str, keys: list[str]) -> str:
+            ck = (scope, tuple(keys))
+            if ck not in cache:
+                results = self._judge_by_scope(equip_data, scope, keys)
+                cache[ck] = self._expect_key(results) or "junk"
+            return cache[ck]
+
+        return rating_of
+
     def _on_materials_insufficient(self, stock: int, baseline: int):
         """大律准石低于基准的后处理挂载点（预留：补货/兑换）。
         当前仅记录不动作，全部退出由 _materials_exhausted 驱动。"""
@@ -616,11 +635,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return False
         if self.is_stopped:
             return False  # 材料不足/用户中断属阻断，不处置
-        if cfg.judge_scope == "incoming":
-            results = judgement
-        else:
-            results = self._judge_by_scope(equip_data, cfg.judge_scope,
-                                           cfg.judge_rules)
         if any(r.action == "reset" for r in cfg.rules):
             logger.warning("已满装备不支持重置调律（无基线词条快照），"
                            "reset 规则跳过")
@@ -628,7 +642,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                   if r.action != "reset"])
         part, quality, cap_pct = self._recycle_inputs(equip_data)
         action, why = cfg.decide(part, quality, cap_pct,
-                                 self._expect_key(results), full=True)
+                                 self._rating_provider(equip_data, judgement),
+                                 full=True)
         if action != "recycle":
             logger.info(f"  [结束处理] {label} {why}")
             return False
@@ -832,18 +847,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self._on_materials_insufficient(stock, settings.stone_min_count)
         return False
 
-    def _refresh_expectation(self, equip_data: EquipmentData, scope: str,
-                             keys: list[str]) -> str | None:
-        """按判定语义刷新装备预期评级（每轮调律结束后取值）
+    def _refresh_expectation(self, equip_data: EquipmentData) -> dict:
+        """按传入规则刷新装备预期评级（每轮调律结束后取值）
 
-        同步写入 _expect_rating（供狗粮决策与说明文档）。
+        同步写入 _expect_rating（供狗粮决策与说明文档）；行为表
+        评级另经评级提供者按各规则判定语义懒取。
+
+        Returns: 传入规则判定结果（供评级提供者作 incoming 种子）。
         """
-        results = self._judge_by_scope(equip_data, scope, keys)
+        results = self._judge_by_scope(equip_data, "incoming", [])
         _, logs = summarize_potential(results)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         self._expect_rating = self._expect_key(results)
-        return self._expect_rating
+        return results
 
     def _collect_new_affix(self, equip_data: EquipmentData, text: str) -> str:
         """把调律结果的新词条补充进装备数据，供下一轮判定使用

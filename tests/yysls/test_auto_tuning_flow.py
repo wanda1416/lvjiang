@@ -482,6 +482,29 @@ def test_scan_recycles_junk(monkeypatch):
     assert not wf.output.get("tuning_reports")
 
 
+def test_scan_recycles_when_no_applicable_rule(monkeypatch):
+    """无任何适用规则（全部跳过/不适用，如紫色武器）= 无调律
+    价值兜底垃圾档 → 评级≤垃圾 的处置规则命中回收"""
+    skipped = {"s": {"name": "通用会意", "rating": "",
+                     "skipped": True, "not_applicable": False,
+                     "reasons": ["品阶 purple 无调律价值"]}}
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(skipped))
+    base = _behavior_base(scan=ScanBehavior(
+        enabled=True,
+        rules=[BehaviorRule(max_quality="purple", max_rating="junk",
+                            action="recycle")]))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    fp = wf._process_equipment("紫色武器", _equip(1, quality="purple"),
+                               WEAPON_DETAIL)
+
+    assert fp == ""
+    assert (WEAPON_DETAIL, "recycle_confirm") in wf.clicks
+    items = wf.output["recycled_items"]
+    assert len(items) == 1 and items[0]["stage"] == "scan"
+
+
 def test_scan_custom_scope_protects(monkeypatch):
     """custom 判定语义下他流派好胚不误收：自选规则判仍有潜力 → 保留"""
     def judge(equip_data, configs=None, keys=None):
@@ -492,8 +515,9 @@ def test_scan_custom_scope_protects(monkeypatch):
     monkeypatch.setattr(auto_tuning, "get_rule_names",
                         lambda: {"huiyi": "会意"})
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, judge_scope="custom", judge_rules=["huiyi"],
-        rules=[BehaviorRule(max_rating="junk", action="recycle")]))
+        enabled=True,
+        rules=[BehaviorRule(max_rating="junk", judge_scope="custom",
+                            judge_rules=["huiyi"], action="recycle")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
     fp = wf._process_equipment("他派好胚", _equip(2), WEAPON_DETAIL)

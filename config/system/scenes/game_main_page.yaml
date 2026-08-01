@@ -1,5 +1,12 @@
 key: game_main_page
 name: 主页
+views:
+- key: base
+  name: 基底
+- key: jiugongge
+  name: 九宫格
+- key: more
+  name: 更多
 regions:
 - key: menu
   name: 菜单
@@ -66,6 +73,72 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: north
+  name: 正北方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: east_north
+  name: 东北方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: east
+  name: 正东方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: east_south
+  name: 东南方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: south
+  name: 正南方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: west_south
+  name: 西南方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: west
+  name: 正西方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: west_north
+  name: 西北方
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: center
+  name: 中央
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: jiugongge
+- key: check_left
+  name: 确认左区
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: more
+- key: check_right
+  name: 确认右区
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: more
 points:
 - key: origin
   name: 起点

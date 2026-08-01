@@ -38,12 +38,14 @@ class Click:
 
 @dataclass(frozen=True)
 class Drag:
-    scene: Any      # SceneRef（静态 [scene].[region]）| PanelRef（panel 三级索引）| None（坐标模式）
-    arrow: Any      # SceneRef | None（坐标模式）
+    scene: Any      # SceneRef（静态 [scene].[region]）| PanelRef（panel 三级索引）| None（坐标/点对模式）
+    arrow: Any      # SceneRef | None（坐标/点对模式）
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
     hold: float | None = None  # 到达目标后按住不放的时长（秒）
     from_point: Any = None  # CoordPoint | None（坐标模式起点）
     to_point: Any = None    # CoordPoint | None（坐标模式终点）
+    from_scene_ref: Any = None  # SceneRef | None（点对模式起点）
+    to_scene_ref: Any = None    # SceneRef | None（点对模式终点）
     direction: str | None = None   # "up" | "down" | "left" | "right" | None（panel 拖拽方向）
     distance: Any = 1.0            # 拖拽距离：float | VarRef（支持整数、浮点数如 0.5、变量引用）
     line_no: int = 0
@@ -85,6 +87,22 @@ class Recognize:
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
     group: Any = None  # Literal | VarRef | None（group 子句：限定材料分组）
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Find:
+    """find 指令：在指定区域或全画布 OCR 搜索目标文字，产出可点击的 FoundRegion
+
+    与 scan/recognize 共享 scene_target + by_clause 语法。
+    search_scene / search_region: 搜索区域（均为 None 时搜索全画布）
+    var_name: 结果变量名（as $var）
+    by: ByClause（必填，指定匹配模式和搜索目标）
+    """
+    var_name: str       # 结果变量名（不含 $ 前缀）
+    by: Any             # ByClause（必填）
+    search_scene: Any = None    # str | VarRef | None（搜索场景名）
+    search_region: Any = None   # str | VarRef | None（搜索区域名）
     line_no: int = 0
 
 

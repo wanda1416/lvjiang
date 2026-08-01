@@ -8,6 +8,7 @@ from ..ast_nodes import (
     Click,
     CoordPoint,
     Drag,
+    Find,
     Import,
     Literal,
     PanelGridDrag,
@@ -100,6 +101,11 @@ class _StmtMixin:
         cp = items[0]  # CoordPoint
         return Click(target=cp, line_no=0)
 
+    def click_var_target(self, items):
+        """click $var — 裸变量引用（find 指令产出的 FoundRegion）"""
+        var_ref = items[0]  # VarRef
+        return Click(target=var_ref, line_no=self._line(items))
+
     def coord_point(self, items):
         """(rx, ry) → CoordPoint，number 规则已转为 float"""
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
@@ -127,6 +133,7 @@ class _StmtMixin:
             scene=drag_node.scene, arrow=drag_node.arrow,
             duration=duration, hold=hold,
             from_point=drag_node.from_point, to_point=drag_node.to_point,
+            from_scene_ref=drag_node.from_scene_ref, to_scene_ref=drag_node.to_scene_ref,
             direction=drag_node.direction, distance=drag_node.distance,
             line_no=drag_node.line_no,
         )
@@ -191,6 +198,17 @@ class _StmtMixin:
         scene_ref = SceneRef(scene=scene_val, region=arrow_val)
         return Drag(scene=scene_ref, arrow=scene_ref, line_no=self._line(items))
 
+    def drag_point_pair_target(self, items):
+        """drag [scene].[point_1] [scene].[point_2] — 两个命名点之间拖拽"""
+        from_scene = self._resolve_const_or_var(items[0])
+        from_point = self._resolve_const_or_var(items[1])
+        to_scene = self._resolve_const_or_var(items[2])
+        to_point = self._resolve_const_or_var(items[3])
+        from_ref = SceneRef(scene=from_scene, region=from_point)
+        to_ref = SceneRef(scene=to_scene, region=to_point)
+        return Drag(scene=None, arrow=None, from_scene_ref=from_ref, to_scene_ref=to_ref,
+                    line_no=self._line(items))
+
     def drag_coord_target(self, items):
         """drag (rx1, ry1) (rx2, ry2) — 两个画布归一化坐标点"""
         from_point, to_point = items  # 两个 CoordPoint
@@ -213,6 +231,42 @@ class _StmtMixin:
         scene_name = str(items[0])
         panel_name = str(items[1])
         return Align(scene=scene_name, panel=panel_name, line_no=self._line(items))
+
+    # ─── find 指令 ─────────────────────────────────────────
+
+    def find_stmt_area(self, items):
+        """find [scene].[area] as $var by ... — 指定区域搜索"""
+        scene_target = items[0]  # tuple: (scene_name, fields_or_var)
+        scene_name = scene_target[0]
+        var_ref = items[1]       # var_ref → VarRef
+        var_name = var_ref.name
+        by_clause = items[2]     # ByClause（必填）
+        # 解析搜索区域（与 scan 一致）
+        search_region = None
+        if len(scene_target) > 1 and scene_target[1] is not None:
+            second = scene_target[1]
+            if isinstance(second, list):
+                # field_list → 取第一个字段
+                if second:
+                    search_region = second[0].value if hasattr(second[0], 'value') else str(second[0])
+            elif isinstance(second, VarRef):
+                search_region = second  # 动态 region
+        return Find(
+            var_name=var_name, by=by_clause,
+            search_scene=scene_name, search_region=search_region,
+            line_no=self._line(items),
+        )
+
+    def find_stmt_full(self, items):
+        """find as $var by ... — 全画布搜索"""
+        var_ref = items[0]       # var_ref → VarRef
+        var_name = var_ref.name
+        by_clause = items[1]     # ByClause（必填）
+        return Find(
+            var_name=var_name, by=by_clause,
+            search_scene=None, search_region=None,
+            line_no=self._line(items),
+        )
 
     # ─── panel 索引 ─────────────────────────────────────────
 

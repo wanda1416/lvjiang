@@ -155,6 +155,31 @@ def _binary_axis(
     )
 
 
+def _even_axis(count: int) -> SlotAxis:
+    """将 [0,1] 等分为 count 个格子（无间隔）
+
+    用于 panel 无法通过图像检测识别 slot 边界时的降级方案：
+    直接按声明的 rows/cols 均匀分割 panel 区域。
+
+    Args:
+        count: 该轴的格子数（行数或列数）
+
+    Returns:
+        SlotAxis(centers, boundaries, slot_size=1/count, span_size=0)
+    """
+    if count <= 0:
+        return SlotAxis(centers=[], boundaries=[])
+    step = 1.0 / count
+    centers = [step * (i + 0.5) for i in range(count)]
+    boundaries = [step * i for i in range(count + 1)]
+    return SlotAxis(
+        centers=centers,
+        boundaries=boundaries,
+        slot_size=step,
+        span_size=0.0,
+    )
+
+
 @dataclass(frozen=True)
 class GridAlignment:
     """grid 对齐结果"""
@@ -192,12 +217,30 @@ class GridAlignment:
         return x1, y1, x2, y2
 
 
+def _make_even_alignment(expected_rows: int, expected_cols: int) -> GridAlignment:
+    """构造等分模式的 GridAlignment（无图像检测）"""
+    row_axis = _even_axis(expected_rows)
+    col_axis = _even_axis(expected_cols)
+    return GridAlignment(
+        row_centers=row_axis.centers,
+        col_centers=col_axis.centers,
+        row_bounds=row_axis.boundaries,
+        col_bounds=col_axis.boundaries,
+        row_slot=row_axis.slot_size,
+        row_span=0.0,
+        col_slot=col_axis.slot_size,
+        col_span=0.0,
+    )
+
+
 def detect_grid(
     image: np.ndarray,
     expected_rows: int = 3,
     expected_cols: int = 6,
     black_threshold: float = 30.0,
     min_visible: float = 0.95,
+    fallback: bool = False,
+    scroll_direction: str = "vertical",
 ) -> GridAlignment | None:
     """从 panel 截图中检测网格 slot 精确位置
 
@@ -211,12 +254,23 @@ def detect_grid(
         min_visible: 行计入有效所需的最小可见比例，钳位到 [0.5, 1.0]。
             仅作用于行轴（垂直滚动才会产生半截行）；必须 > 0.5，
             否则半截行的中心可能落在 panel 外导致点击脱靶。
+        fallback: 检测失败时是否降级为等分模式。True 时图像检测失败
+            返回按 expected_rows/expected_cols 等分的 GridAlignment，
+            而非 None。
+        scroll_direction: 滚动方向，决定 rows/cols 的容差判断：
+            - "vertical"：rows 允许 expected-1，cols 必须精确
+            - "horizontal"：cols 允许 expected-1，rows 必须精确
+            - "both"：rows/cols 都允许 expected-1
+            - "none"：rows/cols 都必须精确
 
     Returns:
-        GridAlignment 或 None（检测失败时）
+        GridAlignment 或 None（检测失败且 fallback=False 时）
     """
     if image is None or image.size == 0:
         logger.error("detect_grid: 空图像")
+        if fallback:
+            logger.warning(f"detect_grid: 降级为等分模式（{expected_rows}×{expected_cols}）")
+            return _make_even_alignment(expected_rows, expected_cols)
         return None
 
     min_visible = min(1.0, max(0.5, float(min_visible)))
@@ -240,6 +294,9 @@ def detect_grid(
             f"detect_grid: 无法检测到网格"
             f"（行={len(row_axis.centers)}, 列={len(col_axis.centers)}）"
         )
+        if fallback:
+            logger.warning(f"detect_grid: 降级为等分模式（{expected_rows}×{expected_cols}）")
+            return _make_even_alignment(expected_rows, expected_cols)
         return None
 
     result = GridAlignment(
@@ -275,14 +332,31 @@ def detect_grid(
         f"{result.n_cols}/{expected_cols} 列 = {result.total_slots} 个有效 slot"
     )
 
+    # 根据 scroll_direction 判断 rows/cols 是否可接受
+    if scroll_direction in ("vertical", "both"):
+        rows_ok = result.n_rows in (expected_rows, expected_rows - 1)
+    else:
+        rows_ok = result.n_rows == expected_rows
+
+    if scroll_direction in ("horizontal", "both"):
+        cols_ok = result.n_cols in (expected_cols, expected_cols - 1)
+    else:
+        cols_ok = result.n_cols == expected_cols
+
     # 异常结果保存调试图片，便于后续分析算法
-    rows_ok = result.n_rows in (expected_rows, expected_rows - 1)
-    cols_ok = result.n_cols == expected_cols
     if not (rows_ok and cols_ok):
         _save_debug_image(
             image,
             f"rows{result.n_rows}_of_{expected_rows}_cols{result.n_cols}_of_{expected_cols}",
         )
+        # fallback 模式：检测结果不符合预期时降级为等分
+        if fallback:
+            logger.warning(
+                f"detect_grid: 检测结果不符合预期 "
+                f"(rows={result.n_rows}/{expected_rows}, cols={result.n_cols}/{expected_cols}, "
+                f"scroll={scroll_direction})，降级为等分模式"
+            )
+            return _make_even_alignment(expected_rows, expected_cols)
 
     return result
 

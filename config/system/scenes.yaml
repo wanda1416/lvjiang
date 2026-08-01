@@ -4,6 +4,7 @@ layout_scenes:
   - game_menu_page
   - general_control
   - action_control
+  - game_login_page
   group_2:
   - equip_weapon_detail
   - equip_armor_detail

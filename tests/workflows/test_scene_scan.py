@@ -86,7 +86,7 @@ def test_collect_empty_when_no_scene_ref():
 
 
 def test_ref_kind_by_statement():
-    """kind 决定该 key 在布局里查哪类对象：click 查区域/坐标点，drag 查方向"""
+    """kind 决定该 key 在布局里查哪类对象：click 查区域/坐标点/面板，drag 查方向/区域"""
     refs = _refs(
         'click [s].[btn]\n'
         'drag [s].[menu_up]\n'
@@ -95,7 +95,7 @@ def test_ref_kind_by_statement():
     )
     got = {(r.key, r.kind) for r in refs}
     assert got == {
-        ("btn", "click"), ("menu_up", "arrow"), ("grid", "panel"),
+        ("btn", "click_target"), ("menu_up", "drag_target"), ("grid", "panel"),
         ("f1", "region"), ("f2", "region"),
     }
 
@@ -139,7 +139,7 @@ def test_activity_jianghu_matches_legacy_required_scenes():
 # ─── engine 启动期绑定校验（集成） ────────────────────────
 
 def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,
-                 panels=None) -> WorkflowEngine:
+                 panels=None, regions=None) -> WorkflowEngine:
     """构造最小引擎；bound_scenes 中的场景视为绑定了区域 btn，其余为空。
 
     静态检查只读绑定对象的 key / from_key / to_key，用最小对象充当即可。
@@ -149,8 +149,11 @@ def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,
     layout = MagicMock()
     layout.get_canvas.return_value = MagicMock(
         x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
+    # 默认 region 包含完整属性，供运行时使用
+    default_region = SimpleNamespace(key="btn", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5)
     layout.get_scene_regions.side_effect = lambda k: (
-        [SimpleNamespace(key="btn")] if k in bound_scenes else [])
+        [regions.get(k, default_region)] if k in bound_scenes else []) if regions else (
+        [default_region] if k in bound_scenes else [])
     layout.get_scene_points.side_effect = lambda k: list((points or {}).get(k, []))
     layout.get_scene_arrows.side_effect = lambda k: list((arrows or {}).get(k, []))
     layout.get_scene_panels.side_effect = lambda k: list((panels or {}).get(k, []))
@@ -222,11 +225,19 @@ def test_missing_key_in_imported_proc_reports_that_file(tmp_path):
     assert "lib.wf:2" in str(ei.value)
 
 
-def test_drag_key_checked_against_arrows(tmp_path):
-    """drag 查的是方向，绑成同名区域不算绑定"""
+def test_drag_key_checked_against_arrows_and_regions(tmp_path):
+    """drag 查的是方向/区域，绑了 region 就算绑定"""
     wf = _write_wf(tmp_path, 'drag [game_main_page].[btn]\n')
     engine = _make_engine(bound_scenes={"game_main_page"})
-    with pytest.raises(WorkflowUserError, match="方向未绑定"):
+    # btn 作为 region 已绑定，静态检查应通过
+    engine.execute(wf)
+
+
+def test_drag_key_unbound_raises(tmp_path):
+    """drag 查的是方向/区域，都没绑才报错"""
+    wf = _write_wf(tmp_path, 'drag [game_main_page].[unknown]\n')
+    engine = _make_engine(bound_scenes={"game_main_page"})
+    with pytest.raises(WorkflowUserError, match="方向/区域未绑定"):
         engine.execute(wf)
 
 

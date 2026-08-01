@@ -16,10 +16,11 @@ SCENE = "activity_jianghu"
 
 
 class _FakeLayout:
-    def __init__(self, regions=None, points=None, arrows=None):
+    def __init__(self, regions=None, points=None, arrows=None, panels=None):
         self._regions = regions or []
         self._points = points or []
         self._arrows = arrows or []
+        self._panels = panels or []
 
     def get_canvas(self):
         return CanvasConfig()
@@ -32,6 +33,9 @@ class _FakeLayout:
 
     def get_scene_arrows(self, scene_key):
         return list(self._arrows) if scene_key == SCENE else []
+
+    def get_scene_panels(self, scene_key):
+        return list(self._panels) if scene_key == SCENE else []
 
 
 class _FakeCapture:

@@ -10,6 +10,7 @@ from ..grammar import (
     Eval,
     EvalFieldChainAssign,
     FieldAccess,
+    Find,
     FuncCall,
     KeywordRef,
     Literal,
@@ -370,3 +371,59 @@ class _DataOpsMixin:
         finally:
             # 4. 恢复变量（session/context 自然保留修改）
             self.variables = saved_vars
+
+    def _exec_find(self, node: Find):
+        """find [scene].[area] as $var by ... — 在指定区域或全画布 OCR 搜索目标文字
+
+        与 scan/recognize 共享 scene_target + by_clause 语义。
+        未找到时变量存入空字符串 ""（falsy），可用 if $var 判断。
+        支持 region 和 panel 作为搜索区域（两者都有矩形坐标，对 find 等价）。
+        """
+        from ...core.scene_registry import Region
+
+        # 解析 by 子句（必填）：匹配模式 + 搜索目标
+        by_clause: ByClause = node.by
+        match_mode = by_clause.match_mode
+        match_target = self._resolve(by_clause.target)
+
+        # 解析搜索区域（支持 region 和 panel）
+        search_region: Region | None = None
+        if node.search_scene is not None and node.search_region is not None:
+            # 解析场景名
+            if isinstance(node.search_scene, VarRef):
+                scene = self.variables.get(node.search_scene.name, "")
+            else:
+                scene = str(node.search_scene)
+            # 解析区域名
+            if isinstance(node.search_region, VarRef):
+                region_key = self.variables.get(node.search_region.name, "")
+            else:
+                region_key = str(node.search_region)
+            # 先查 region（region 优先），再查 panel
+            regions = self._layout.get_scene_regions(scene)
+            region_map = {r.key: r for r in regions}
+            if region_key in region_map:
+                search_region = region_map[region_key]
+            else:
+                # 尝试作为 panel 查找
+                panel_obj = self._find_panel_in_layout(scene, region_key)
+                if panel_obj is not None:
+                    # Panel 转 Region：只取矩形坐标，忽略 rows/cols
+                    search_region = Region(
+                        key=panel_obj.key,
+                        x_ratio=panel_obj.x_ratio,
+                        y_ratio=panel_obj.y_ratio,
+                        w_ratio=panel_obj.w_ratio,
+                        h_ratio=panel_obj.h_ratio,
+                    )
+                else:
+                    raise WorkflowUserError(
+                        f"find: 搜索区域 [{scene}].[{region_key}] 在当前布局未绑定坐标"
+                    )
+
+        # 执行搜索
+        result = self._ensure_workflow().find_text_in_region(
+            match_target, match_mode, search_region
+        )
+        # 结果存入变量：FoundRegion（找到）或 ""（未找到，falsy）
+        self.variables[node.var_name] = result

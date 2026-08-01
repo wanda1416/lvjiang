@@ -255,7 +255,9 @@
       "h_ratio": 0.5253360263608167,
       "cols": 6,
       "rows": 5,
-      "min_visible": 0.95
+      "min_visible": 0.95,
+      "calibration": "auto",
+      "scroll_direction": "vertical"
     }
   ]
 }

@@ -12,7 +12,7 @@ import json
 from urllib.request import Request, urlopen
 
 from loguru import logger
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QUrl, pyqtSignal
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QDialog,
@@ -55,6 +55,7 @@ def _get_version() -> str:
     # 3. 从 pyproject.toml 读取（开发环境）
     try:
         from pathlib import Path
+
         import tomllib
         # __file__ = src/lvjiang/ui/about_dialog.py
         # 需要向上 4 级到项目根目录
@@ -114,7 +115,7 @@ class AboutDialog(QDialog):
 
         # ─── 标题与版本 ───
         version = _get_version()
-        title_label = QLabel(f"<h2>律匠</h2>")
+        title_label = QLabel("<h2>律匠</h2>")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
@@ -209,7 +210,7 @@ class AboutDialog(QDialog):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if result == QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(download_url)
+                QDesktopServices.openUrl(QUrl(download_url))
         else:
             QMessageBox.information(
                 self,
@@ -225,4 +226,4 @@ class AboutDialog(QDialog):
 
     def _open_github(self):
         """打开 GitHub 仓库页面"""
-        QDesktopServices.openUrl(f"https://github.com/{GITHUB_REPO}")
+        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}"))

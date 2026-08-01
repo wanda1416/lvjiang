@@ -608,6 +608,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def _save_daily_config(self):
         """保存日常页脚本选择与参数到 session.json 的 daily 节点"""
         import json as _json
+
         from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
 
         flow_cfg = self._get_selected_flow_config()
@@ -644,6 +645,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def _restore_daily_config(self):
         """启动时恢复日常页脚本选择与参数"""
         import json as _json
+
         from ..constants import SESSION_PATH
 
         # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建

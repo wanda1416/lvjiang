@@ -339,7 +339,6 @@ class LayoutConfigManager:
 
     def save_layout(self, layout: Layout):
         resolver = get_resolver()
-        safe = _safe_name(layout.name)
 
         # 1. 更新 layouts.yaml 中的 canvas 条目
         merged = resolver.load_merged(_LAYOUTS_YAML_REL)

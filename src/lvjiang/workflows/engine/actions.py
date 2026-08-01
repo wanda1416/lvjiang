@@ -138,7 +138,6 @@ class _ActionsMixin:
             grid = node.scene
             # 先尝试作为 panel 查找
             panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
-            is_region = False
             if panel_obj is None:
                 # 未找到 panel，尝试作为 region 查找
                 regions = self._layout.get_scene_regions(grid.scene)
@@ -147,7 +146,6 @@ class _ActionsMixin:
                     raise WorkflowUserError(
                         f"drag grid: 布局中未定义 panel/region {grid.scene}.{grid.panel}"
                     )
-                is_region = True
                 # region 中心在截图中的归一化坐标
                 cx = region_obj.x_ratio + region_obj.w_ratio / 2
                 cy = region_obj.y_ratio + region_obj.h_ratio / 2

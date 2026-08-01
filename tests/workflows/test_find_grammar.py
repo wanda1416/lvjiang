@@ -2,8 +2,8 @@
 
 import pytest
 
-from lvjiang.workflows.grammar import parse_text, Find, VarRef
-from lvjiang.workflows.grammar.ast_nodes import ByClause, Literal, Click
+from lvjiang.workflows.grammar import Find, VarRef, parse_text
+from lvjiang.workflows.grammar.ast_nodes import ByClause, Click, Literal
 
 
 class TestFindGrammar:
@@ -95,7 +95,7 @@ end
 
     def test_by_clause_required(self):
         """find 必须有 by 子句"""
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017  验证解析失败即可，不限定具体异常类型
             parse_text('find as $found\n')
 
     def test_area_with_field_list(self):

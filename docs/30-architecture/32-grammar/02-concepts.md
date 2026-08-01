@@ -111,6 +111,47 @@ click [bag_equip_detail].[bag_grid][1][1]     # 点击第 1 行第 1 列格子�
 drag [bag_equip_detail].[bag_grid][1][1] down 3  # 下翻 3 行
 ```
 
+### Panel 校准模式
+
+Panel 支持三种校准模式（`calibration` 字段），控制网格检测方式：
+
+| 模式 | 说明 |
+|------|------|
+| `auto` | 先图像检测，失败降级为等分（默认） |
+| `even` | 跳过图像检测，直接等分 |
+| `image` | 仅图像检测，失败返回 None |
+
+```yaml
+# 等分模式（跳过图像检测）
+panels:
+  - key: bag_grid
+    rows: 3
+    cols: 6
+    calibration: even
+```
+
+### Panel 滚动方向
+
+Panel 支持四种滚动方向（`scroll_direction` 字段），影响对齐判断时的行/列容差：
+
+| 方向 | 说明 |
+|------|------|
+| `vertical` | 纵向滚动，允许行数少 1（默认） |
+| `horizontal` | 横向滚动，允许列数少 1 |
+| `both` | 双向滚动，行/列都允许少 1 |
+| `none` | 不可滚动，行/列必须精确匹配 |
+
+**约束**：`rows=1` 禁止 `vertical`/`both`，`cols=1` 禁止 `horizontal`/`both`。
+
+```yaml
+# 横向滚动面板
+panels:
+  - key: action_bar
+    rows: 1
+    cols: 6
+    scroll_direction: horizontal
+```
+
 ### regions 型（规划中）
 
 `type=regions` 允许将多个已定义的 Region 合并到一个 Panel 中统一管理，寻址方式为 `[name]`：

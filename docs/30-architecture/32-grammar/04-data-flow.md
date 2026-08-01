@@ -237,9 +237,10 @@ end
 |---|---|---|
 | 全画布 | `find as $var by ...` | 在整个屏幕截图中搜索 |
 | 指定区域 | `find [scene].[area] as $var by ...` | 仅在布局定义的区域内搜索 |
+| 指定面板 | `find [scene].[panel] as $var by ...` | 仅在布局定义的面板内搜索（与 region 等价） |
 | 动态区域 | `find $scene.$region as $var by ...` | 场景和区域由变量指定 |
 
-指定区域搜索时，`[scene].[area]` 必须在当前布局中绑定坐标，否则报错。
+指定区域搜索时，`[scene].[area]` 必须在当前布局中绑定坐标（region 或 panel 均可），否则报错。Region 和 Panel 对 find 等价，都提供矩形裁剪区域。
 
 ### by 子句
 

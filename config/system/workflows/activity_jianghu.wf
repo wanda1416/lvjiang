@@ -115,41 +115,6 @@ if $at_haoling
    click [game_menu_page].[back] after wait $step_interval
 end
 
-
-# ─── 各活动动作过程 ────────────────────────────────────────
-# 每个 def 接收命中任务的 label region 名（如 "label_1"），
-# 从江湖号令页面出发执行对应活动，完成后需回到本页面。
-
-# 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
-def action_huanzhuang($label)
-   click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[goto] after wait $step_interval
-   click [ui_waiguan_yigui].[chuanda] after wait $step_interval
-   click [ui_waiguan_yigui].[fangan_1] after wait $step_interval
-   click [ui_waiguan_yigui].[taoyong] after wait $step_interval
-   click [ui_waiguan_yigui].[back_1] after wait $step_interval
-   click [ui_waiguan_yigui].[back_1] after wait $step_interval
-   click [ui_waiguan_yigui].[back_1] after wait $step_interval
-end
-
-# 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
-# 退出拍照会落到游戏首页，需再自行导航回江湖号令页（末个任务除外）
-def action_heying($label, $idx)
-   click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[goto] after wait $step_interval
-   click [action_control].[camera_shot] after wait $step_interval
-   click [action_control].[back] after wait $step_interval
-   click [action_control].[back] after wait $step_interval
-   click [action_control].[back_confirm] after wait $step_interval
-
-   # 第六个任务已是最后一个，无需返回活动页
-   if $idx equals "6"
-      log "末个任务合影完成，无需返回江湖号令页"
-   else
-      call back_to_haoling()
-   end
-end
-
 # 首页 → 江湖号令页：菜单 → 上滑翻页（最多两次）识别门派 → 门派首页 → 江湖号令
 def back_to_haoling()
    click [game_main_page].[menu] after wait $step_interval
@@ -184,17 +149,52 @@ def back_to_haoling()
 end
 
 # 领取奖励：动作完成后再次点击任务标签领取
-# 任务 1-5 动作结束后停在号令页，直接点标签即可；
-# 第六个任务（合影/看报）结束后落在桌面，需先返回号令页领取；
-# 领取后停在号令页，由收尾逻辑统一退回游戏首页
+# 调用时必定已在号令页（状态由各动作保证：非末个任务动作结束后
+# 主动返回；末个任务需领奖时动作内也已返回），无需再扫描定位。
+# 领奖后会弹出一个奖励窗口：末个任务领完即进入收尾，
+# 需多点一次返回先关闭弹窗，收尾才能顺利退回游戏首页
 def claim_reward($label, $idx)
-   scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
-   if not $at_haoling
-      log concat("任务 ", $idx, " 完成后不在号令页，先返回号令页领取")
-      call back_to_haoling()
-   end
    click [activity_jianghu].$label after wait $step_interval
    log concat("任务 ", $idx, " 奖励已领取")
+   if $idx equals "6"
+      click [activity_jianghu].[back] after wait $step_interval
+      log "末个任务领奖弹出奖励窗口，多点一次返回关闭"
+   end
+end
+
+# ─── 各活动动作过程 ────────────────────────────────────────
+# 每个 def 接收命中任务的 label region 名（如 "label_1"），
+# 从江湖号令页面出发执行对应活动，完成后需回到本页面。
+
+# 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
+def action_huanzhuang($label)
+   click [activity_jianghu].$label after wait $step_interval
+   click [activity_jianghu].[goto] after wait $step_interval
+   click [ui_waiguan_yigui].[chuanda] after wait $step_interval
+   click [ui_waiguan_yigui].[fangan_1] after wait $step_interval
+   click [ui_waiguan_yigui].[taoyong] after wait $step_interval
+   click [ui_waiguan_yigui].[back_1] after wait $step_interval
+   click [ui_waiguan_yigui].[back_1] after wait $step_interval
+   click [ui_waiguan_yigui].[back_1] after wait $step_interval
+end
+
+# 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
+# 退出拍照会落到游戏首页（桌面），拍照结束后主动返回号令页；
+# 末个任务仅在需要领奖时才返回，否则留在桌面
+def action_heying($label, $idx)
+   click [activity_jianghu].$label after wait $step_interval
+   click [activity_jianghu].[goto] after wait $step_interval
+   click [action_control].[camera_shot] after wait $step_interval
+   click [action_control].[back] after wait $step_interval
+   click [action_control].[back] after wait $step_interval
+   click [action_control].[back_confirm] after wait $step_interval
+
+   # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
+   if $idx equals "6" and not $claim_reward
+      log "末个任务合影完成且无需领奖，留在桌面"
+   else
+      call back_to_haoling()
+   end
 end
 
 # 情境：点击任务 → 弹出情境视图（确认×2 → 展开 → 前往编辑情境）
@@ -224,7 +224,8 @@ end
 
 # 东方第一枝（看报）：点击任务 → 前往 → 立刻进入表情动作视图
 # → 整面板扫描 actions 定位「看报」格子并点击 → 等 5s 弹出报纸阅读视图
-# → 点第一个选择 → 连点两次返回回到游戏首页（末个任务除外，需导航回号令页）
+# → 点第一个选择 → 连点两次返回回到游戏首页（桌面），看报结束后主动返回号令页；
+# 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_dongfang($label, $idx)
    click [activity_jianghu].$label after wait $step_interval
    click [activity_jianghu].[goto] after wait $step_interval
@@ -256,13 +257,12 @@ def action_dongfang($label, $idx)
    click [action_control].[back] after wait $step_interval
    click [action_control].[back] after wait $step_interval
 
-   # 末个任务已是最后一个，无需返回活动页
-   if $idx equals "6"
-      log "末个任务看报完成，无需返回江湖号令页"
+   # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
+   if $idx equals "6" and not $claim_reward
+      log "末个任务看报完成且无需领奖，留在桌面"
    else
       call back_to_haoling()
    end
-   
 end
 
 # 饮酒（醉意）：动作暂未实现

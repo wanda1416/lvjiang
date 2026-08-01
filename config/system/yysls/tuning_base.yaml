@@ -156,6 +156,7 @@ behavior:
       pct_op: le
       pct: 100
       ratings:
+      - normal
       - junk
       judge_scope: incoming
       judge_rules: []

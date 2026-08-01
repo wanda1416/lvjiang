@@ -4,6 +4,10 @@
 #%     label: 单任务最大刷新次数
 #%     type: number
 #%     default: 50
+#%   - name: claim_reward
+#%     label: 领取奖励
+#%     type: bool
+#%     default: false
 
 # 江湖号令任务刷新流程
 #
@@ -17,8 +21,12 @@
 #
 # 参数：
 #   max_refresh — 单个任务最大刷新次数，默认 50
+#   claim_reward — 是否领取奖励，默认 false；勾选后每个任务完成
+#                  切到下一个 label 前再点一次领取。第六个任务若落在
+#                  桌面（合影/看报），会先返回号令页领取再由收尾退回桌面
 
 default $max_refresh = 50
+default $claim_reward = false
 
 $step_interval = (1, 2)
 
@@ -86,6 +94,11 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       end
       if $task_text contains "双人"
          call action_shuangren($label)
+      end
+
+      # 领取奖励（勾选时）：动作完成后、切到下一个 label 前再点一次任务标签
+      if $claim_reward
+         call claim_reward($label, $idx)
       end
    end
 
@@ -168,6 +181,20 @@ def back_to_haoling()
          click [ui_school_main].[haoling_3] after wait $step_interval
       end
    end
+end
+
+# 领取奖励：动作完成后再次点击任务标签领取
+# 任务 1-5 动作结束后停在号令页，直接点标签即可；
+# 第六个任务（合影/看报）结束后落在桌面，需先返回号令页领取；
+# 领取后停在号令页，由收尾逻辑统一退回游戏首页
+def claim_reward($label, $idx)
+   scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
+   if not $at_haoling
+      log concat("任务 ", $idx, " 完成后不在号令页，先返回号令页领取")
+      call back_to_haoling()
+   end
+   click [activity_jianghu].$label after wait $step_interval
+   log concat("任务 ", $idx, " 奖励已领取")
 end
 
 # 情境：点击任务 → 弹出情境视图（确认×2 → 展开 → 前往编辑情境）

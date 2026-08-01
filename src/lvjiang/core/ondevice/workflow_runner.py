@@ -143,6 +143,7 @@ def run_workflow(
         collect 累积的结果字典
     """
     # 解析工作流路径（跨层：local 影子优先 → system）
+    wf_path: Path | None
     if Path(wf_name).is_absolute():
         wf_path = Path(wf_name)
         if not wf_path.exists():

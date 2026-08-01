@@ -275,14 +275,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 self.statusBar().showMessage("图库已刷新", 3000)
 
     def _show_about(self):
-        QMessageBox.about(
-            self, "关于律匠",
-            "<h3>律匠 v0.1.0</h3>"
-            "<p>通用视觉 RPA 引擎</p>"
-            "<p>功能：窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行</p>"
-            "<hr>"
-            "<p style='color: gray;'>基于 PyQt6 + RapidOCR</p>",
-        )
+        from .about_dialog import AboutDialog
+        dialog = AboutDialog(self)
+        dialog.exec()
 
     def _open_user_manager(self):
         from .user_manager_dialog import UserManagerDialog

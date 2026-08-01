@@ -7,13 +7,19 @@
 - load_layout_by_name 模块级函数
 """
 
-import json
 
 import pytest
 
 from lvjiang.core import layout_manager
 from lvjiang.core.layout_manager import LayoutConfigManager, load_layout_by_name
-from lvjiang.core.scene_registry import Arrow, CanvasConfig, Layout, Panel, Point, Region
+from lvjiang.core.scene_registry import (
+    Arrow,
+    CanvasConfig,
+    Layout,
+    Panel,
+    Point,
+    Region,
+)
 
 
 def _make_layout(name: str = "测试布局") -> Layout:

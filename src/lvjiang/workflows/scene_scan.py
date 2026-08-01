@@ -15,6 +15,7 @@ from .grammar.ast_nodes import (
     Align,
     Click,
     Drag,
+    Find,
     For,
     ForRange,
     If,
@@ -33,11 +34,14 @@ from .grammar.ast_nodes import (
 
 # 引用类别 → 需要在布局中查找的对象类型说明（错误提示用）
 KIND_LABELS = {
-    "click": "区域/坐标点",
+    "click_target": "区域/坐标点/面板",
+    "drag_target": "方向/区域",
+    "drag_grid_target": "面板/区域",
     "arrow": "方向",
     "panel": "面板",
     "region": "区域",
     "scan": "区域/面板",
+    "point": "坐标点",
 }
 
 
@@ -80,18 +84,25 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
     if isinstance(stmt, Click):
         target = stmt.target
         if isinstance(target, SceneRef):
-            # click_any 先查 region 再查 point
-            _add(acc, target.scene, target.region, "click", line)
+            # click_any 先查 region 再查 point 再查 panel
+            _add(acc, target.scene, target.region, "click_target", line)
         elif isinstance(target, PanelRef):
             _add(acc, target.scene, target.panel, "panel", line)
     elif isinstance(stmt, Drag):
         # scene / arrow 对场景与 panel 目标是同一节点，去重后只留一条
         for ref in (stmt.scene, stmt.arrow):
             if isinstance(ref, SceneRef):
-                # drag 的 key 查的是布局 arrows
-                _add(acc, ref.scene, ref.region, "arrow", line)
-            elif isinstance(ref, (PanelRef, PanelGridDrag)):
+                # drag 的 key 查的是布局 arrows 或 regions
+                _add(acc, ref.scene, ref.region, "drag_target", line)
+            elif isinstance(ref, PanelRef):
                 _add(acc, ref.scene, ref.panel, "panel", line)
+            elif isinstance(ref, PanelGridDrag):
+                # panel grid 拖拽也支持 region
+                _add(acc, ref.scene, ref.panel, "drag_grid_target", line)
+        # 点对模式：drag [scene1].[point1] [scene2].[point2]
+        for ref in (stmt.from_scene_ref, stmt.to_scene_ref):
+            if isinstance(ref, SceneRef):
+                _add(acc, ref.scene, ref.region, "point", line)
     elif isinstance(stmt, (Scan, Recognize)):
         scene_ref = stmt.scene
         if isinstance(scene_ref, PanelRef):
@@ -105,6 +116,16 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
                     _add(acc, scene_ref.scene, field, kind, line)
             else:
                 _add(acc, scene_ref.scene, None, "region", line)
+    elif isinstance(stmt, Find):
+        # find 指令的搜索区域（若有）需要校验绑定
+        # 支持 region 和 panel（两者对 find 等价，都提供矩形裁剪区域）
+        if stmt.search_scene is not None and stmt.search_region is not None:
+            # 只有静态场景名和区域名才能校验
+            if isinstance(stmt.search_scene, str) and isinstance(stmt.search_region, str):
+                _add(acc, stmt.search_scene, stmt.search_region, "scan", line)
+            elif isinstance(stmt.search_scene, str):
+                # 静态场景 + 动态区域：只校验场景
+                _add(acc, stmt.search_scene, None, "scan", line)
     elif isinstance(stmt, (Align, PanelGridDrag)):
         # scene / panel 均为裸字符串
         _add(acc, stmt.scene, stmt.panel, "panel", line)

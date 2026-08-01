@@ -24,6 +24,7 @@ from ..grammar import (
     Drag,
     Eval,
     EvalFieldChainAssign,
+    Find,
     For,
     ForRange,
     FuncCall,
@@ -415,6 +416,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_scan(node)
             case Recognize():
                 self._exec_recognize(node)
+            case Find():
+                self._exec_find(node)
             case Collect():
                 self._exec_collect(node)
             case Log():

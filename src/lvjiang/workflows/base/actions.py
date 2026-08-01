@@ -38,7 +38,7 @@ class _ActionMixin:
     # ─── Point / Arrow 操作 ────────────────────────────────
 
     def click_any(self, scene_key: str, key: str):
-        """点击 region 或 point（自动识别，region 优先）"""
+        """点击 region / point / panel（自动识别，region → point → panel 顺序）"""
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == key), None)
         if region is not None:
@@ -49,8 +49,19 @@ class _ActionMixin:
         if point is not None:
             self.click_point(scene_key, key)
             return
+        # 尝试作为 panel 查找，点击面板中心
+        panels = self._layout.get_scene_panels(scene_key)
+        panel = next((p for p in panels if p.key == key), None)
+        if panel is not None:
+            # 面板中心点坐标
+            cx = panel.x_ratio + panel.w_ratio / 2
+            cy = panel.y_ratio + panel.h_ratio / 2
+            screen_x, screen_y = self._ratio_to_screen(cx, cy)
+            logger.debug(f"点击 panel 中心: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
+            self._input.click_screen(screen_x, screen_y, f"{scene_key}/{key}(panel)")
+            return
         raise ValueError(
-            f"场景 {scene_key} 的 region / point 未绑定坐标: {key}，"
+            f"场景 {scene_key} 的 region / point / panel 未绑定坐标: {key}，"
             f"请在场景布局编辑器中绑定后重试"
         )
 

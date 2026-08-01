@@ -495,6 +495,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                     x_ratio=x, y_ratio=y, w_ratio=w, h_ratio=h,
                     cols=pd.cols, rows=pd.rows,
                     min_visible=getattr(pd, "min_visible", 0.95),
+                    calibration=getattr(pd, "calibration", "auto"),
+                    scroll_direction=getattr(pd, "scroll_direction", "vertical"),
                 )
                 self._panels.append(panel)
                 self._panel_selected_idx = len(self._panels) - 1

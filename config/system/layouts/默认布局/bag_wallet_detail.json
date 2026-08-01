@@ -9,7 +9,9 @@
       "h_ratio": 0.10796654062922634,
       "cols": 4,
       "rows": 1,
-      "min_visible": 0.95
+      "min_visible": 0.95,
+      "calibration": "auto",
+      "scroll_direction": "horizontal"
     },
     {
       "key": "other_money",
@@ -19,7 +21,9 @@
       "h_ratio": 0.3146519037356349,
       "cols": 6,
       "rows": 3,
-      "min_visible": 0.95
+      "min_visible": 0.95,
+      "calibration": "auto",
+      "scroll_direction": "vertical"
     }
   ]
 }

@@ -1,6 +1,9 @@
 """工作流基类主体 - 生命周期、变量、内置函数调用，组合各操作 Mixin"""
 
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    from ..engine.core import WorkflowEngine
 
 from ...config import DelayParam, InputSimConfig
 from ...core.capture_base import CaptureBackend
@@ -28,7 +31,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
 
     # 执行引擎引用（engine._execute_python_workflow 注入，供内置
     # 函数的 UI 交互 confirm/pause/input 走 Qt 主线程桥）
-    _engine = None
+    _engine: Optional["WorkflowEngine"] = None
 
     def __init__(
         self,

@@ -262,8 +262,7 @@ class TuningTab(QWidget):
         def configure(wf_instance, engine):
             from ..workflows.run_context import TuningRunContext
             # 运行上下文一次性收口注入（字段契约见 TuningRunContext）：
-            # judge_configs 形状与 single_tuning._load_rule_config 一致，
-            # 对齐 UI 实时勾选，供 judge_equipment_potential 使用；
+            # judge_configs 对齐 UI 实时勾选，供 judge_equipment_potential 使用；
             # skip_tuning 为临时测试开关（仅模拟进出调律页，便于测试滚动）
             skip_start = None
             if self._cb_skip.isChecked() and self._cb_skip.isEnabled():

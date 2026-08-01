@@ -11,8 +11,7 @@
   同一路径（tune_full_recycle 视为直接回收）。
 回收后背包补位，由 _process_equipment 就地重读同格续处理。
 
-实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含移植自
-single_tuning，single_tuning 保持不动。
+实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含于本类。
 
 背包滚动遍历抽象为策略类（bag_traversal：dedup 滑动窗口去重 /
 positional 位置对齐三向校验），_traverse_bag 按配置调度，默认 dedup。
@@ -73,7 +72,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     GRID_SCENE = "bag_equip_detail"
     GRID_PANEL = "bag_grid"
 
-    # 调律执行相关场景/材料（移植自 single_tuning）
+    # 调律执行相关场景/材料
     TUNE_SCENE = "equip_tune_detail"
     # 调律结果弹窗已并入调律页（result 视图），运行时同场景寻址
     RESULT_SCENE = "equip_tune_detail"
@@ -898,7 +897,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """保证 ctx.judge_configs/judge_rule_keys 可用。
 
         优先用 run_control 注入的实时 UI 配置；未注入时回退读插件会话
-        tuning.rules + tuning.switches（复刻 single_tuning._load_rule_config），
+        tuning.rules + tuning.switches，
         无有效配置时回退 (None, None) 即全部规则默认配置。
         """
         ctx = self.ctx
@@ -943,7 +942,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             selected = self.WEAPON_SLOTS + self.ARMOR_SLOTS
         return selected
 
-    # ─── 调律执行（移植自 single_tuning，single_tuning 保持不动）──
+    # ─── 调律执行 ──
 
     @staticmethod
     def _expect_key(results: dict) -> str | None:

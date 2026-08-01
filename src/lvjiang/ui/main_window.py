@@ -120,6 +120,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._refresh_user_combo()
         self._refresh_layout_combo()
         self._load_workflow_configs()
+        self._restore_daily_config()
 
         # ── 全局热键（仅 F8-F10；回调内按后端就绪门控，定位/连接后方生效）──
         self.f9_pressed.connect(self._on_f9_start)
@@ -442,7 +443,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.setMinimumWidth(150)
-        self.workflow_combo.currentIndexChanged.connect(self._rebuild_param_panel)
+        self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
         wf_layout.addWidget(self.workflow_combo, stretch=1)
         self.btn_load_workflow = QPushButton("加载")
         self.btn_load_workflow.setFixedWidth(64)
@@ -565,6 +566,118 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         sink = QtSink(self._log_bridge)
         logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
 
+    # ─── 日常页配置持久化（session.json daily 节点）───────
+
+    def _on_workflow_combo_changed(self, index: int):
+        """脚本下拉切换：先保存旧脚本参数，重建参数面板，再保存新状态"""
+        # 面板仍显示旧脚本控件，用 _displayed_script_id 定位旧配置
+        self._save_displayed_params()
+        self._rebuild_param_panel()
+        # 更新追踪为当前脚本
+        flow_cfg = self._get_selected_flow_config()
+        self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
+        self._save_daily_config()
+
+    def _save_displayed_params(self):
+        """将当前参数面板的值写入 _displayed_script_id 对应的配置项"""
+        sid = getattr(self, '_displayed_script_id', None)
+        if not sid or not self._param_panel or not self._param_panel.isVisible():
+            return
+        # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
+        target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
+        if not target_cfg:
+            return
+        params = {}
+        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox
+        for param_def in target_cfg.get("parameters", []):
+            name = param_def["name"]
+            widget = self._param_panel.findChild(QSpinBox, name)
+            if widget is not None:
+                params[name] = str(widget.value())
+                continue
+            widget = self._param_panel.findChild(QCheckBox, name)
+            if widget is not None:
+                params[name] = widget.isChecked()
+                continue
+            widget = self._param_panel.findChild(QComboBox, name)
+            if widget is not None:
+                data = widget.currentData()
+                params[name] = data if data is not None else widget.currentText()
+        target_cfg["_saved_params"] = params
+
+    def _save_daily_config(self):
+        """保存日常页脚本选择与参数到 session.json 的 daily 节点"""
+        import json as _json
+        from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
+
+        flow_cfg = self._get_selected_flow_config()
+        if not flow_cfg:
+            return
+
+        # 汇总各脚本已保存的参数
+        params_map: dict[str, dict] = {}
+        for cfg in self._workflow_configs:
+            saved = cfg.get("_saved_params")
+            if saved:
+                params_map[cfg["id"]] = saved
+
+        daily = {
+            "workflow_id": flow_cfg["id"],
+            "params": params_map,
+        }
+
+        data = {}
+        if SESSION_PATH.exists():
+            try:
+                data = _json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        data["daily"] = daily
+        try:
+            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SESSION_PATH.write_text(
+                _json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存日常配置失败: {e}")
+
+    def _restore_daily_config(self):
+        """启动时恢复日常页脚本选择与参数"""
+        import json as _json
+        from ..constants import SESSION_PATH
+
+        # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
+        workflow_id = None
+        params_map = {}
+
+        if SESSION_PATH.exists():
+            try:
+                data = _json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+                daily = data.get("daily", {})
+                workflow_id = daily.get("workflow_id")
+                params_map = daily.get("params", {})
+            except Exception:
+                pass
+
+        # 将保存的参数回写到 _workflow_configs 供 _rebuild_param_panel 使用
+        for cfg in self._workflow_configs:
+            saved = params_map.get(cfg["id"])
+            if saved:
+                cfg["_saved_params"] = saved
+
+        # 选中上次使用的脚本
+        if workflow_id:
+            idx = self.workflow_combo.findData(workflow_id)
+            if idx >= 0:
+                self.workflow_combo.blockSignals(True)
+                self.workflow_combo.setCurrentIndex(idx)
+                self.workflow_combo.blockSignals(False)
+
+        # 统一设置追踪变量并构建参数面板
+        flow_cfg = self._get_selected_flow_config()
+        self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
+        self._rebuild_param_panel()
+
     def _rebuild_param_panel(self):
         while self._param_layout.rowCount() > 0:
             self._param_layout.removeRow(0)
@@ -573,11 +686,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if not params:
             self._param_panel.setVisible(False)
             return
+        saved = flow_cfg.get("_saved_params", {}) if flow_cfg else {}
         for param_def in params:
             name = param_def["name"]
             label = param_def.get("label", name)
             param_type = param_def.get("type", "select")
-            default = param_def.get("default")
+            # 已保存值优先于定义默认值
+            default = saved.get(name, param_def.get("default"))
             options = param_def.get("options", [])
             if param_type == "number":
                 spin = QSpinBox()
@@ -642,6 +757,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                     logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
             except Exception:
                 pass
+        self._save_displayed_params()
+        self._save_daily_config()
         self._save_ui_state()
         # 录屏进行中/待保存时自动转正保存，不丢数据
         self._abort_screen_record("关闭程序")

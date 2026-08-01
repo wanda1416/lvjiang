@@ -47,6 +47,9 @@ class TuningTab(QWidget):
         self._build_ui()
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
+        # 基础配置变更时刷新「更多」页开关（新增/删除开关即时生效）
+        from ....core.config_resolver import get_resolver
+        get_resolver().add_change_listener(self._on_base_config_changed)
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
@@ -207,6 +210,13 @@ class TuningTab(QWidget):
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
             )
+
+    # ─── 配置变更监听 ────────────────────────────────────────
+
+    def _on_base_config_changed(self, rel_path: str):
+        """配置变更监听回调：tuning_base.yaml 变化时刷新开关复选框"""
+        if rel_path == "yysls/tuning_base.yaml":
+            self._tuning_globals.refresh_switches()
 
     # ─── 启停入口（F9 快捷键 / 按钮点击共用）───────────────────
 

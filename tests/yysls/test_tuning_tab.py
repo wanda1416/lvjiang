@@ -71,7 +71,7 @@ def _make_tab(qtbot, host):
 class TestSessionRoundtrip:
     def test_load_selected_slots_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "tuning": {"selected_slots": ["ring", "head"]},
+            "yysls": {"tuning": {"selected_slots": ["ring", "head"]}},
         }), encoding="utf-8")
         ps_module._session = PluginSession(session_path)  # 重新加载文件内容
 
@@ -90,11 +90,11 @@ class TestSessionRoundtrip:
         cb.setChecked(False)  # stateChanged → _save_tuning_config 落盘
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
-        assert "ring" not in saved["tuning"]["selected_slots"]
+        assert "ring" not in saved["yysls"]["tuning"]["selected_slots"]
 
     def test_sub_weapon_stays_disabled(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "tuning": {"selected_slots": ["sub_weapon", "ring"]},
+            "yysls": {"tuning": {"selected_slots": ["sub_weapon", "ring"]}},
         }), encoding="utf-8")
         ps_module._session = PluginSession(session_path)
 
@@ -193,7 +193,7 @@ class TestConfigTabs:
 
     def test_more_page_loads_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "tuning": {"switches": {"keep_pvp": True}, "skip_tuning": True},
+            "yysls": {"tuning": {"switches": {"keep_pvp": True}, "skip_tuning": True}},
         }), encoding="utf-8")
         ps_module._session = PluginSession(session_path)
 
@@ -206,7 +206,7 @@ class TestConfigTabs:
         tab._tuning_globals._skip_tuning_cb.setChecked(True)  # 变更即落盘
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
-        assert saved["tuning"]["skip_tuning"] is True
+        assert saved["yysls"]["tuning"]["skip_tuning"] is True
 
 
 # ─── 初始跳过 / 指定调律（互斥 + 持久化 + 注入）───────────
@@ -245,12 +245,12 @@ class TestSkipTarget:
         tab._sp_skip_col.setValue(3)
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
-        assert saved["tuning"]["skip_start"] == [5, 3]
-        assert saved["tuning"]["target_cell"] is None
+        assert saved["yysls"]["tuning"]["skip_start"] == [5, 3]
+        assert saved["yysls"]["tuning"]["target_cell"] is None
 
     def test_load_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "tuning": {"target_cell": [7, 2]},
+            "yysls": {"tuning": {"target_cell": [7, 2]}},
         }), encoding="utf-8")
         ps_module._session = PluginSession(session_path)
 

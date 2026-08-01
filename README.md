@@ -25,7 +25,7 @@
 - **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/30-architecture/35-workflows/02-auto-tuning.md)）。
 - **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
 - **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
-- **安卓独立执行端（开发中）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [todo-android.md](todo-android.md)）。
+- **安卓独立执行端（开发中）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [安卓迁移进度](docs/todo-android.md)）。
 
 ---
 
@@ -64,7 +64,7 @@ lvjiang/
 ├── src/lvjiang/               # 通用视觉 RPA 引擎（src-layout，唯一可导入包）
 │   ├── __main__.py            # 启动入口（python -m lvjiang [-reg <plugin>]）
 │   ├── app.py                 # QApplication 入口
-│   ├── config.py              # 配置加载与 Pydantic 校验
+│   ├── config.py              # 配置加载与校验
 │   ├── constants.py           # 路径与常量定义
 │   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局
 │   │   ├── desktop/           # 桌面投屏窗口后端
@@ -85,7 +85,8 @@ lvjiang/
 │   ├── system/                # 随版本发布的场景 / 工作流 / 规则配置
 │   └── local/                 # 运行时生成的本地数据（已 .gitignore）
 ├── data/                      # 材料模板图、scrcpy-server 等资源
-├── docs/                      # 分层文档（游戏机制 / 需求 / 架构 / 开发日志）
+├── docs/                      # 分层文档（用户指南 / 游戏机制 / 需求 / 架构 / 开发日志 / 进度追踪）
+├── packaging/                 # PyInstaller 打包配置与脚本
 ├── scripts/                   # 辅助脚本与手动测试
 ├── tests/                     # pytest 测试（按 src 三层结构分包）
 ├── dev.bat                    # Windows 快捷启动脚本
@@ -125,6 +126,8 @@ pip install -e ".[dev]"
 
 ## ▶️ 使用
 
+> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/user-guide.md)——从连接手机、启动程序到运行自动调律的完整步骤。
+
 ```powershell
 # 方式一：纯通用模式（场景编辑 + 识别测试）
 python -m lvjiang
@@ -152,27 +155,33 @@ python -m lvjiang -reg yysls
 
 ## ⚙️ 配置
 
-- **系统配置**（`config/system/`）：随版本发布的场景、工作流（`.wf`）与规则定义，通常无需手动修改。
-- **本地偏好**（`config/local/session.json`）：用户级配置，由配置管理对话框写入，覆盖代码默认值，例如：
+配置采用三层分离：出厂默认 → 用户覆盖 → 运行时会话，读取恒为合并视图。
 
-```jsonc
-{
-  "settings": {
-    "adb_capture_streaming": false,   // ADB 模式是否启用 scrcpy 视频流截图
-    "desktop_window_title": "投屏",    // 桌面模式投屏窗口标题关键字
-    "desktop_background_input": true   // 是否启用后台输入（PostMessage）
-  },
-  "input_delay": {                     // 拟人化延迟参数
-    "before_click_wait": [0.1, 0.3],   // 引擎级：点击前延迟
-    "after_click_wait": [0.1, 0.2],    // 引擎级：点击后延迟
-    "custom": {                        // 命名等待参数（供工作流 wait 按 key 引用）
-      "page_refresh_wait": { "label": "页面刷新等待", "range": [2.0, 3.0] }
-    }
-  }
-}
+| 层 | 路径 | 内容 | 入库 |
+|---|---|---|---|
+| 系统默认 | `config/system/` | 场景 / 工作流（`.wf`）/ 布局 / 输入参数 / 调律规则 / 参考图 | ✅ |
+| 用户覆盖 | `config/local/` | 用户对 `app.yaml` 的键级 diff（配置管理对话框写入） | ❌ |
+| 运行时会话 | `config/session/` | `session.json`（当前状态）、用户数据、工作流输出日志 | ❌ |
+
+`config/system/app.yaml` 示例（输入模拟 + 命名延迟参数）：
+
+```yaml
+input_simulation:
+  before_click_wait: [0.1, 0.3]     # 点击前随机延迟（秒）
+  after_click_wait: [0.1, 0.3]      # 点击后随机延迟（秒）
+  click_random_offset: 5            # 坐标随机偏移像素
+  region_jitter_ratio: 0.25         # 区域中心抖动比例
+
+delay_params:
+  page_refresh_wait:
+    label: 页面刷新等待
+    range: [2.0, 3.0]
+  scroll_settle_wait:
+    label: 滚动惯性等待
+    range: [3.0, 4.0]
 ```
 
-`config/local/` 下的所有内容（布局、会话、截图等）均为运行时生成，已在 `.gitignore` 中忽略。
+工作流通过 `wait <key>`（DSL）/ `wait_delay(key)`（代码）按 key 引用命名延迟参数。
 
 ---
 
@@ -212,7 +221,7 @@ pytest tests/workflows/test_parser.py
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（进行中）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)，安卓端迁移进度见 [todo-android.md](todo-android.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（进行中）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)，安卓端迁移进度见 [todo-android](docs/todo-android.md)。
 
 ---
 

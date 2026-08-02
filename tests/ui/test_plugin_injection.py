@@ -107,7 +107,7 @@ class TestSetupMenuInjection:
         for name in ("_open_settings_manager", "_open_user_manager",
                      "_open_scene_editor", "_open_reference_manager",
                      "_open_ocr_test", "_open_script_record", "_open_script_config",
-                     "_show_about"):
+                     "_open_batch_config", "_show_about"):
             setattr(win, name, lambda: None)
         return win
 

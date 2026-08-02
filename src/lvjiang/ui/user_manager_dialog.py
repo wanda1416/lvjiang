@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -243,18 +242,6 @@ class UserManagerDialog(QDialog):
         self._lbl_name = QLabel("-")
         form.addRow(self._field_label("用户名"), self._lbl_name)
 
-        self._edit_game_account = QLineEdit()
-        self._edit_game_account.setPlaceholderText(
-            "游戏账号选择界面显示的名称（批量切换用）")
-        self._edit_game_account.editingFinished.connect(self._on_game_info_edited)
-        form.addRow(self._field_label("游戏账号"), self._edit_game_account)
-
-        self._edit_game_character = QLineEdit()
-        self._edit_game_character.setPlaceholderText(
-            "角色选择界面显示的名称（批量切换用）")
-        self._edit_game_character.editingFinished.connect(self._on_game_info_edited)
-        form.addRow(self._field_label("角色名"), self._edit_game_character)
-
         self._lbl_created = QLabel("-")
         form.addRow(self._field_label("创建时间"), self._lbl_created)
 
@@ -357,12 +344,6 @@ class UserManagerDialog(QDialog):
         self._lbl_title.setText(user.name)
         self._badge_active.setVisible(is_active)
         self._lbl_name.setText(user.name)
-        self._edit_game_account.blockSignals(True)
-        self._edit_game_account.setText(user.game_account)
-        self._edit_game_account.blockSignals(False)
-        self._edit_game_character.blockSignals(True)
-        self._edit_game_character.setText(user.game_character)
-        self._edit_game_character.blockSignals(False)
         self._lbl_created.setText(_format_iso_time(user.created_at))
 
     def _clear_detail(self):
@@ -370,12 +351,6 @@ class UserManagerDialog(QDialog):
         self._lbl_title.setText("-")
         self._badge_active.setVisible(False)
         self._lbl_name.setText("-")
-        self._edit_game_account.blockSignals(True)
-        self._edit_game_account.clear()
-        self._edit_game_account.blockSignals(False)
-        self._edit_game_character.blockSignals(True)
-        self._edit_game_character.clear()
-        self._edit_game_character.blockSignals(False)
         self._lbl_created.setText("-")
 
     def _current_user_name(self) -> str | None:
@@ -386,17 +361,6 @@ class UserManagerDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole)
 
     # ─── 操作 ────────────────────────────────────────────
-
-    def _on_game_info_edited(self):
-        """游戏账号/角色名编辑完成 → 即时保存"""
-        name = self._current_user_name()
-        if name is None:
-            return
-        self._user_manager.update_user(
-            name,
-            game_account=self._edit_game_account.text(),
-            game_character=self._edit_game_character.text(),
-        )
 
     def _on_rows_moved(self, *_args):
         """拖拽排序后持久化新顺序"""

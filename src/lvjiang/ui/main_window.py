@@ -559,7 +559,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._left_tabs.addTab(daily_scroll, "日常")
 
         # ── Tab 2: 批量 ──
-        from .batch_tab import BatchTab
+        from .batch import BatchTab
         self._batch_tab = BatchTab(host=self)
         self._left_tabs.addTab(self._batch_tab, "批量")
 
@@ -604,8 +604,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     # ─── 批处理执行 ───────────────────────────────────────
 
-    def run_batch(self, entries, scripts) -> bool:
-        """启动批量执行，返回是否成功"""
+    def run_batch(self, enabled_rows, scripts) -> bool:
+        """启动批量执行，返回是否成功
+
+        enabled_rows: list[tuple[int, dict]] - [(index, row_data), ...]
+        """
         if not self._backend_ready():
             if self._backend == "adb":
                 self.log_text.append("[错误] 请先连接设备")
@@ -631,7 +634,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             window_left = self._target_window["left"]
             window_top = self._target_window["top"]
 
-        from .batch_runner import BatchContext, BatchWorker
+        from ..core.batch_config import load_batch_config
+        from .batch import BatchContext, BatchWorker
 
         ctx = BatchContext(
             capture=self._capture,
@@ -644,18 +648,28 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             window_top=window_top,
         )
 
+        # 获取当前配置
+        cfg = load_batch_config()
+        config = cfg.get_active()
+        if not config:
+            self.log_text.append("[错误] 暂无配置，请先通过 工具 → 批量配置 添加")
+            self._end_automation("批量执行")
+            return False
+
         worker = BatchWorker(
-            entries=entries,
+            enabled_rows=enabled_rows,
             scripts=scripts,
+            config=config,
             ctx=ctx,
             user_manager=self._user_manager,
             session_manager=self._session_manager,
             stop_check=self._is_stopped,
         )
 
-        # 信号连接：进度 → batch_tab，日志 → log_text
+        # 信号连接：进度 → batch_tab，日志 → log_text，用户切换 → 刷新用户下拉
         worker.progress.connect(self._batch_tab.update_progress)
         worker.log.connect(self.log_text.append)
+        worker.user_changed.connect(lambda _: self._refresh_user_combo())
         worker.finished_all.connect(self._batch_tab.on_batch_finished)
         worker.finished_all.connect(
             lambda _: self._end_automation("批量执行")
@@ -667,7 +681,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _open_batch_config(self):
         """工具菜单 → 批量配置：打开配置对话框"""
-        from .batch_config_dialog import BatchConfigDialog
+        from .batch import BatchConfigDialog
         dlg = BatchConfigDialog(self)
         if dlg.exec():
             # 保存后刷新批量 Tab 的条目概览和脚本勾选

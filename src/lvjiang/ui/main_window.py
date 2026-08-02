@@ -852,5 +852,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._abort_screen_record("关闭程序")
         if self._backend == "adb":
             self._teardown_adb_backend()
+        else:
+            self._stop_capture_backend()
         self._overlay.destroy()
         super().closeEvent(event)

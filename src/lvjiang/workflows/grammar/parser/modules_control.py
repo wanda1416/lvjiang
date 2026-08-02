@@ -59,31 +59,41 @@ class _ModuleControlMixin:
         return str(items[0])
 
     def call_proc_stmt(self, items):
-        """call proc_name($arg1, "arg2", ...) — 调用过程"""
+        """call proc_name($arg1, "arg2", ...) [as $output] — 调用过程"""
         name = str(items[0])
         args = []
+        output_var = None
         for item in items[1:]:
             if isinstance(item, list):
                 args = item  # call_arg_list 返回 list
-                break
+            elif isinstance(item, str) and not isinstance(item, Token):
+                # call_output_as 返回 str（变量名）
+                output_var = item
             elif item is not None and not isinstance(item, Token):
                 args.append(item)
-        return CallProc(name=name, args=args, line_no=self._line(items))
+        return CallProc(name=name, args=args, output_var=output_var, line_no=self._line(items))
 
     def call_proc_assign_stmt(self, items):
-        """call $result = proc_name($arg1, "arg2", ...) — 调用过程并绑定返回值"""
-        # 语法: "call" "$" NAME "=" NAME "(" [call_arg_list] ")"
-        # items: [result_var_name, proc_name, ...args]
+        """call $result = proc_name($arg1, "arg2", ...) [as $output] — 调用过程并绑定返回值"""
+        # 语法: "call" "$" NAME "=" NAME "(" [call_arg_list] ")" [call_output_clause]
+        # items: [result_var_name, proc_name, ...args, output_var?]
         result_var = str(items[0])
         proc_name = str(items[1])
         args = []
+        output_var = None
         for item in items[2:]:
             if isinstance(item, list):
                 args = item  # call_arg_list 返回 list
-                break
+            elif isinstance(item, str) and not isinstance(item, Token):
+                # call_output_as 返回 str（变量名）
+                output_var = item
             elif item is not None and not isinstance(item, Token):
                 args.append(item)
-        return CallProc(name=proc_name, args=args, result_var=result_var, line_no=self._line(items))
+        return CallProc(name=proc_name, args=args, result_var=result_var, output_var=output_var, line_no=self._line(items))
+
+    def call_output_as(self, items):
+        """as $output → str(变量名)"""
+        return str(items[0])
 
     def call_arg_list(self, items):
         """参数列表 → list"""

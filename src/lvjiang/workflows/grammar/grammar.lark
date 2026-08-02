@@ -204,8 +204,10 @@ def_param_list: def_param ("," def_param)*
 def_param: "$" NAME
 
 // call proc：调用过程（本地定义或 import 引入）
-call_proc_stmt: "call"i NAME "(" [call_arg_list] ")" _NL
-              | "call"i "$" NAME "=" NAME "(" [call_arg_list] ")" _NL  -> call_proc_assign_stmt
+// 可选 as $output 获取子过程的 output dict
+call_proc_stmt: "call"i NAME "(" [call_arg_list] ")" [call_output_clause] _NL
+              | "call"i "$" NAME "=" NAME "(" [call_arg_list] ")" [call_output_clause] _NL  -> call_proc_assign_stmt
+call_output_clause: "as"i "$" NAME  -> call_output_as
 call_arg_list: call_arg ("," call_arg)*
 ?call_arg: STRING -> call_arg_str
          | number -> call_arg_num

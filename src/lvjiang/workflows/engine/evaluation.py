@@ -225,6 +225,7 @@ class _EvalMixin:
         FieldAccess → 逐层遍历字典/列表
         ArithOp → 算术表达式求值
         int/float → 直接返回（来自 grammar number 规则）
+        str/Token → 直接返回字符串（来自 grammar STRING）
         list 类型变量原样返回（支持 for 迭代）
         """
         match node:
@@ -246,6 +247,8 @@ class _EvalMixin:
                 return self._call_func(node)
             case int() | float():
                 return node
+            case str():
+                return node  # STRING token 已解包为 str
             case dict():
                 return {k: self._resolve(v) for k, v in node.items()}
             case list():

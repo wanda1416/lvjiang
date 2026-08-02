@@ -31,5 +31,8 @@ def run(code: str, initial: dict | None = None) -> dict:
     """执行 DSL 片段并返回变量表"""
     eng = make_engine()
     eng.variables = dict(initial or {})
-    eng._exec_body(parse_text(code).body)
+    program = parse_text(code)
+    # 注册 def 定义
+    eng._procs = dict(program.procs)
+    eng._exec_body(program.body)
     return eng.variables

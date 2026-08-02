@@ -18,7 +18,10 @@ class _ContinueSignal(Exception):
 
 
 class _ReturnSignal(Exception):
-    """return 语句触发的正常退出信号"""
+    """return 语句触发的正常退出信号，可携带返回值"""
+
+    def __init__(self, value=None):
+        self.value = value
 
 
 class _GotoSignal(Exception):

@@ -1,7 +1,10 @@
-"""批量执行 Tab — 脚本勾选 + 触发 + 进度
+"""批量执行 Tab — 进度 / 脚本 / 配置 三页子 Tab
 
 挂载于主窗口左侧 Tab「批量」。
-条目配置由工具菜单「批量配置」对话框管理，本 Tab 只负责触发与进度展示。
+仿照调律 Tab 结构：顶部开始/停止按钮 + 三页子 Tab。
+- 进度：执行进度表
+- 脚本：勾选要执行的脚本
+- 配置：勾选要执行的条目（用户/角色）
 """
 
 from __future__ import annotations
@@ -9,11 +12,14 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -67,7 +73,7 @@ class BatchTab(QWidget):
         host.automation_state_changed.connect(self._on_automation_state)
 
         self._refresh_script_list()
-        self._refresh_entry_summary()
+        self._refresh_entry_list()
 
     # ─── UI 构建 ─────────────────────────────────────────
 
@@ -82,20 +88,18 @@ class BatchTab(QWidget):
         self._btn_run.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._btn_run)
 
-        # ── 条目概览 ──
-        self._lbl_summary = QLabel()
-        self._lbl_summary.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
-        layout.addWidget(self._lbl_summary)
+        # ── 三页子 Tab ──
+        self._sub_tabs = QTabWidget()
+        self._sub_tabs.addTab(self._build_progress_page(), "进度")
+        self._sub_tabs.addTab(self._build_script_page(), "脚本")
+        self._sub_tabs.addTab(self._build_config_page(), "配置")
+        layout.addWidget(self._sub_tabs)
 
-        # ── 脚本列表 ──
-        layout.addWidget(self._section_label("执行脚本（勾选）"))
-
-        self._script_list = QListWidget()
-        self._script_list.setMaximumHeight(140)
-        layout.addWidget(self._script_list)
-
-        # ── 进度表 ──
-        layout.addWidget(self._section_label("执行进度"))
+    def _build_progress_page(self) -> QWidget:
+        """进度页：执行进度表"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(4, 4, 4, 4)
 
         self._progress_table = QTableWidget(0, 3)
         self._progress_table.setHorizontalHeaderLabels(["条目", "脚本", "状态"])
@@ -107,26 +111,102 @@ class BatchTab(QWidget):
         )
         self._progress_table.verticalHeader().setVisible(False)
         layout.addWidget(self._progress_table, stretch=1)
+        return widget
 
-    @staticmethod
-    def _section_label(text: str) -> QLabel:
-        label = QLabel(text)
-        label.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
-        return label
+    def _build_script_page(self) -> QWidget:
+        """脚本页：勾选要执行的脚本"""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-    # ─── 条目概览 ─────────────────────────────────────────
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(4, 4, 4, 4)
 
-    def _refresh_entry_summary(self):
-        """刷新条目概览（从 batch_config 读取）"""
+        layout.addWidget(QLabel("<b>勾选要执行的脚本：</b>"))
+        self._script_list = QListWidget()
+        layout.addWidget(self._script_list)
+        layout.addStretch()
+
+        scroll.setWidget(widget)
+        return scroll
+
+    def _build_config_page(self) -> QWidget:
+        """配置页：勾选要执行的条目（用户/角色）"""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        # 标题行
+        header = QHBoxLayout()
+        header.addWidget(QLabel("<b>选择要执行的条目：</b>"))
+        header.addStretch()
+        btn_all = QPushButton("全选")
+        btn_all.setFixedWidth(60)
+        btn_all.clicked.connect(lambda: self._set_all_entries_checked(True))
+        header.addWidget(btn_all)
+        btn_none = QPushButton("全不选")
+        btn_none.setFixedWidth(60)
+        btn_none.clicked.connect(lambda: self._set_all_entries_checked(False))
+        header.addWidget(btn_none)
+        layout.addLayout(header)
+
+        # 条目勾选列表
+        self._entry_checkboxes: list[tuple[QCheckBox, int]] = []  # (checkbox, entry_index)
+        self._entry_container = QVBoxLayout()
+        layout.addLayout(self._entry_container)
+        layout.addStretch()
+
+        scroll.setWidget(widget)
+        return scroll
+
+    # ─── 条目列表 ─────────────────────────────────────────
+
+    def _refresh_entry_list(self):
+        """刷新配置页的条目勾选列表"""
+        # 清空旧控件
+        while self._entry_container.count():
+            item = self._entry_container.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._entry_checkboxes.clear()
+
         cfg = load_batch_config()
-        n = len(cfg.entries)
-        if n == 0:
-            self._lbl_summary.setText("暂无执行条目（工具 → 批量配置）")
-        else:
-            accounts = sorted(set(e.account for e in cfg.entries))
-            self._lbl_summary.setText(
-                f"已配置 {n} 个条目（{len(accounts)} 个账号）— 工具 → 批量配置"
-            )
+        if not cfg.entries:
+            lbl = QLabel("暂无条目，请通过 工具 → 批量配置 添加")
+            lbl.setStyleSheet("color: #999;")
+            self._entry_container.addWidget(lbl)
+            return
+
+        for i, entry in enumerate(cfg.entries):
+            cb = QCheckBox(f"{entry.account} / {entry.role}（角色{entry.role_index}）")
+            cb.setChecked(entry.enabled)
+            cb.stateChanged.connect(self._on_entry_check_changed)
+            self._entry_container.addWidget(cb)
+            self._entry_checkboxes.append((cb, i))
+
+    def _on_entry_check_changed(self):
+        """条目勾选变更 → 保存到 batch_config"""
+        cfg = load_batch_config()
+        for cb, idx in self._entry_checkboxes:
+            if 0 <= idx < len(cfg.entries):
+                cfg.entries[idx].enabled = cb.isChecked()
+        save_batch_config(cfg)
+
+    def _set_all_entries_checked(self, checked: bool):
+        """全选/全不选条目"""
+        for cb, _ in self._entry_checkboxes:
+            cb.setChecked(checked)
+        self._on_entry_check_changed()
+
+    def _get_enabled_entries(self) -> list[BatchEntry]:
+        """获取已启用的条目列表"""
+        cfg = load_batch_config()
+        return [e for e in cfg.entries if e.enabled]
 
     # ─── 脚本列表 ─────────────────────────────────────────
 
@@ -198,18 +278,18 @@ class BatchTab(QWidget):
         self._start_batch()
 
     def _start_batch(self):
-        cfg = load_batch_config()
-        entries = cfg.entries
+        entries = self._get_enabled_entries()
         scripts = self._checked_scripts()
 
         if not entries:
-            self._host.append_log("[批量] 暂无执行条目，请先通过 工具 → 批量配置 添加")
+            self._host.append_log("[批量] 暂无启用的条目，请到「配置」页勾选")
             return
         if not scripts:
             self._host.append_log("[批量] 请至少勾选一个脚本")
             return
 
         # 保存脚本勾选到 batch_config
+        cfg = load_batch_config()
         cfg.script_ids = self._checked_script_ids()
         save_batch_config(cfg)
 
@@ -267,9 +347,9 @@ class BatchTab(QWidget):
         self._refresh_run_button("ready")
 
     def refresh_config(self):
-        """外部配置变更后调用，刷新条目概览 + 脚本勾选"""
-        self._refresh_entry_summary()
+        """外部配置变更后调用，刷新脚本 + 条目列表"""
         self._refresh_script_list()
+        self._refresh_entry_list()
 
     # ─── 状态联动 ─────────────────────────────────────────
 
@@ -294,5 +374,7 @@ class BatchTab(QWidget):
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
 
     def _set_config_enabled(self, enabled: bool):
-        """运行期间锁定配置区域"""
+        """运行期间锁定脚本页和配置页"""
         self._script_list.setEnabled(enabled)
+        for cb, _ in self._entry_checkboxes:
+            cb.setEnabled(enabled)

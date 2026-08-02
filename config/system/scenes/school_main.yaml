@@ -1,4 +1,4 @@
-key: ui_school_main
+key: school_main
 name: 门派
 views:
 - key: base

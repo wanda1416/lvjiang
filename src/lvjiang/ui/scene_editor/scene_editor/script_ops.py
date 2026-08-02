@@ -6,6 +6,22 @@ from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
 from ....core.config_resolver import get_resolver
 
 
+def _format_value(value) -> str:
+    """格式化单个值为可读字符串"""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return f'"{value}"'
+    if isinstance(value, (list, dict)):
+        import json
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
 class _SceneKeyButton(QPushButton):
     """场景 key 按钮：点击后在脚本编辑器光标处插入当前场景 key"""
 
@@ -146,15 +162,31 @@ class ScriptOpsMixin:
 
             # 同步执行
             result = engine.execute(temp_wf)
+            return_value = engine.return_value
 
-            # 输出结果到左侧结果区
+            # 格式化输出结果到左侧结果区
             import json
 
             from ...run_control import _to_serializable
-            serializable = _to_serializable(result)
-            self._result_text.setPlainText(
-                json.dumps(serializable, ensure_ascii=False, indent=2)
-            )
+            
+            # 构建显示内容
+            lines = []
+            
+            # 返回值
+            if return_value is not None:
+                lines.append(f"返回值：{_format_value(return_value)}")
+            else:
+                lines.append("返回值：(无)")
+            
+            # 结果集
+            if result:
+                lines.append("结果集：")
+                serializable = _to_serializable(result)
+                lines.append(json.dumps(serializable, ensure_ascii=False, indent=2))
+            else:
+                lines.append("结果集：(空)")
+            
+            self._result_text.setPlainText("\n".join(lines))
             self._status_bar.showMessage("脚本测试完成")
 
         except Exception as e:

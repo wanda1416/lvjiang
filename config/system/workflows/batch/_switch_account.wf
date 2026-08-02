@@ -1,55 +1,47 @@
-#% name: 切换账号登录
-#% parameters:
-#%   - name: target_phone_tail
-#%     label: 手机尾号（OCR 匹配）
-#%     type: string
-#%   - name: role_idx
-#%     label: 角色下标（1-4）
-#%     type: number
-#%     default: 1
+# 公共子过程：完整账号切换流程
+# 登录页 → 选账号 → 登录 → 选角色 → 进入游戏
 
-# 完整账号切换流程：登录页 → 选账号 → 登录 → 选角色 → 进入游戏
+import "_select_role.wf"
 
-import "_common.wf"
+def _switch_account($tail, $role_index)
+    log concat("当前匹配", $tail)
+    log concat("当前下标", $role_index)
 
-# ─── 主流程 ─────────────────────────────────────────────
-log concat("当前匹配", $target_phone_tail)
-log concat("当前角色", $role_idx)
-
-# 1. 登录页 → 用户切换视图
-click [game_login_page].[more_user]
-wait (1, 2)
-
-click [game_login_page].[users_icon]
-wait (1, 2)
-
-click [game_login_page].[switch_user]
-wait (1, 2)
-
-click [game_login_page].[tap_user]
-wait (1, 2)
-
-# 2. 查找目标账号（最多滚动 5 次）
-eval $found_user = ""
-loop 5
-    find [game_login_page].[user_list] as $found_user by contains $target_phone_tail
-    if $found_user
-        click $found_user
-        goto account_selected
-    end
-    drag [game_login_page].[point_2] [game_login_page].[point_1]
+    # 1. 登录页 → 用户切换视图
+    click [game_login_page].[more_user]
     wait (1, 2)
+
+    click [game_login_page].[users_icon]
+    wait (1, 2)
+
+    click [game_login_page].[switch_user]
+    wait (1, 2)
+
+    click [game_login_page].[tap_user]
+    wait (1, 2)
+
+    # 2. 查找目标账号（最多滚动 5 次）
+    eval $found_user = ""
+    loop 5
+        find [game_login_page].[user_list] as $found_user by contains $tail
+        if $found_user
+            click $found_user
+            goto account_selected
+        end
+        drag [game_login_page].[point_2] [game_login_page].[point_1]
+        wait (1, 2)
+    end
+
+    # 找不到 → 暂停手动处理
+    eval pause("未找到账号，请手动选定后点击确定")
+
+    @account_selected
+    wait (1, 2)
+
+    # 3. 登录
+    click [game_login_page].[login]
+    wait (2, 3)
+
+    # 4. 选角色 + 进入游戏
+    call _select_role($role_index)
 end
-
-# 找不到 → 暂停手动处理
-eval pause("未找到账号，请手动选定后点击确定")
-
-@account_selected
-wait (1, 2)
-
-# 3. 登录
-click [game_login_page].[login]
-wait (2, 3)
-
-# 4. 选角色 + 进入游戏（复用公共子过程）
-call select_role_and_enter($role_idx)

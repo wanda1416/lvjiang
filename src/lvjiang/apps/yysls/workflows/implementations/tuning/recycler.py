@@ -73,7 +73,7 @@ class TuningRecycler:
         # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
         check_text = wf.ocr_scene(wf.TUNE_SCENE, ["check_1"]).get(
             "check_1", "") or ""
-        if "可调律重置" not in check_text:
+        if "可重置" not in check_text:
             logger.info(f"  冷却期检查未通过（check_1={check_text!r}），"
                         "装备在冷却期，降级跳过")
             wf.click_region(wf.TUNE_SCENE, "back")  # 关闭弹窗回调律页

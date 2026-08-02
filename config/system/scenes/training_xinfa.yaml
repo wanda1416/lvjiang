@@ -88,3 +88,24 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: detail
+  name: 详情
+  type: func
+  is_text: true
+  is_clickable: true
+- key: exchange
+  name: 置换
+  type: func
+  is_text: true
+  is_clickable: true
+- key: swap
+  name: 转换
+  type: func
+  is_text: true
+  is_clickable: true
+- key: num
+  name: 可换数量
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: zhihuan

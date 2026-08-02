@@ -378,32 +378,37 @@ class _DataOpsMixin:
             logger.error(f"call: 未定义的过程 {node.name}")
             return
         logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
-        # 1. 保存当前变量和 output 快照，进入干净作用域
+        # 1. 先在调用方作用域中解析参数值
+        resolved_args = []
+        for i, param_name in enumerate(proc_def.params):
+            if i < len(node.args):
+                resolved_args.append(self._resolve(node.args[i]))
+            # 未传参数保持未定义状态（访问时返回 null）
+        # 2. 保存当前变量和 output 快照，进入干净作用域
         saved_vars = dict(self.variables)
         saved_output = dict(self.output)
         self.variables = {}  # 子过程从干净变量表开始（作用域隔离）
         self.output = {}  # type: ignore[var-annotated]  # 子过程从空 output 开始
         return_value = None
         try:
-            # 2. 绑定参数（只绑定声明的参数）
+            # 3. 绑定参数（使用预解析的值）
             for i, param_name in enumerate(proc_def.params):
-                if i < len(node.args):
-                    self.variables[param_name] = self._resolve(node.args[i])
-                # 未传参数保持未定义状态（访问时返回 null）
-            # 3. 执行过程体（return = 退出过程）
+                if i < len(resolved_args):
+                    self.variables[param_name] = resolved_args[i]
+            # 4. 执行过程体（return = 退出过程）
             try:
                 self._exec_body(proc_def.body)
             except _ReturnSignal as e:
                 return_value = e.value  # 捕获返回值
         finally:
-            # 4. 捕获子过程的 output，然后恢复调用方的变量和 output
+            # 5. 捕获子过程的 output，然后恢复调用方的变量和 output
             callee_output = dict(self.output)
             self.variables = saved_vars
             self.output = saved_output
-        # 5. 绑定返回值到调用方变量
+        # 6. 绑定返回值到调用方变量
         if node.result_var is not None:
             self.variables[node.result_var] = return_value
-        # 6. 绑定子过程 output 到调用方变量
+        # 7. 绑定子过程 output 到调用方变量
         if node.output_var is not None:
             self.variables[node.output_var] = callee_output
 

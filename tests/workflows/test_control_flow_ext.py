@@ -331,6 +331,40 @@ call $r = outer()
         v = run(code)
         assert v["r"] == "from_inner"
 
+    def test_call_with_variable_args(self):
+        """call proc($var) 传递变量作为参数"""
+        code = '''def greet($name)
+    log concat("Hello, ", $name)
+end
+eval $my_name = "World"
+call greet($my_name)
+'''
+        v = run(code)
+        # 变量应正确传递到子过程
+        assert v["my_name"] == "World"
+
+    def test_call_with_variable_args_from_initial(self):
+        """call proc($var) 传递 initial 注入的变量"""
+        code = '''def show($val)
+    collect $val as "captured"
+end
+call show($injected) as $out
+'''
+        v = run(code, initial={"injected": "test_value"})
+        assert v["out"]["captured"] == "test_value"
+
+    def test_call_with_multiple_variable_args(self):
+        """call proc($a, $b) 传递多个变量参数"""
+        code = '''def add($x, $y)
+    return $x + $y
+end
+eval $a = 10
+eval $b = 20
+call $sum = add($a, $b)
+'''
+        v = run(code)
+        assert v["sum"] == 30.0
+
 
 class TestCallOutputBinding:
     """call proc() as $output 语法：获取子过程的 output dict"""

@@ -1,5 +1,10 @@
 key: bag_item_detail
 name: 道具
+views:
+- key: base
+  name: 基底
+- key: detail
+  name: 道具详情
 regions:
 - key: bag_1_1
   name: 背包格1_1
@@ -156,29 +161,34 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+  view: detail
 - key: item_type
   name: 道具类型
   type: attr
   is_text: true
   is_clickable: false
+  view: detail
 - key: item_level
   name: 道具等级
   type: attr
   is_text: true
   is_clickable: false
+  view: detail
 - key: item_count
   name: 持有数量
   type: attr
   is_text: true
   is_clickable: false
-- key: 道具操作
-  name: main_func
+  view: detail
+- key: main_func
+  name: 道具操作
   type: func
   is_text: true
   is_clickable: true
+  view: detail
 panels:
 - key: bag_grid
   name: 背包
   cols: 6
   rows: 5
-  min_visible: 0.95
+  min_visible: 0.85

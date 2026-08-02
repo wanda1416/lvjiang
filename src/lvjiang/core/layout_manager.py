@@ -108,6 +108,52 @@ def delete_screenshots(layout_name: str):
         logger.info(f"截图目录已删除: {d}")
 
 
+def rename_scene_screenshots(old_key: str, new_key: str):
+    """重命名所有布局下的场景截图文件（含多视图后缀）
+
+    匹配规则：{old_key}.png 和 {old_key}__*.png
+    """
+    if old_key == new_key:
+        return
+    screenshots_base = SCREENSHOTS_DIR
+    if not screenshots_base.exists():
+        return
+    for layout_dir in screenshots_base.iterdir():
+        if not layout_dir.is_dir():
+            continue
+        # 匹配 {old_key}.png 和 {old_key}__*.png
+        for png in layout_dir.glob(f"{old_key}*.png"):
+            suffix = png.stem[len(old_key):]  # 空或 "__view_key"
+            new_name = f"{new_key}{suffix}.png"
+            png.rename(layout_dir / new_name)
+            logger.info(f"截图已重命名: {png.name} -> {new_name}")
+
+
+def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str):
+    """重命名单个布局下某场景的 JSON 文件（内容不变，仅改文件名）"""
+    if old_key == new_key:
+        return
+    resolver = get_resolver()
+    old_rel = _scene_rel(layout_name, old_key)
+    new_rel = _scene_rel(layout_name, new_key)
+    old_path = resolver.resolve_read(old_rel)
+    if old_path and old_path.exists():
+        content = old_path.read_text(encoding="utf-8")
+        resolver.delete_entity(old_rel)
+        resolver.write_entity(new_rel, content)
+        logger.info(f"布局场景文件已重命名: {old_key}.json -> {new_key}.json ({layout_name})")
+
+
+def rename_scene_across_all_layouts(old_key: str, new_key: str):
+    """遍历所有布局，重命名场景 JSON 文件 + 截图文件"""
+    if old_key == new_key:
+        return
+    manager = LayoutConfigManager()
+    for layout_name in manager.list_layouts():
+        rename_layout_scene_key(layout_name, old_key, new_key)
+    rename_scene_screenshots(old_key, new_key)
+
+
 # ─── 跨场景迁移 ──────────────────────────────────────────
 
 def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key: str) -> bool:

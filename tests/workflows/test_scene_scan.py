@@ -131,7 +131,7 @@ def test_activity_jianghu_matches_legacy_required_scenes():
     scenes = collect_scene_keys(program.body, program.procs)
     assert scenes == {
         "activity_jianghu", "waiguan_yigui", "waiguan_qingjing",
-        "action_control", "game_menu_page", "game_main_page",
+        "general_action", "game_menu_page", "game_main_page",
         "general_control", "school_main",
     }
 

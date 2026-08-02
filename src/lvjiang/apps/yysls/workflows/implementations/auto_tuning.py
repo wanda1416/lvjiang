@@ -469,6 +469,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "level": equip.get("level"),
             "quality": equip.get("quality"),
             "affix_count": affix_count,
+            "resets": 0,
         }
 
         # A. 词条已满 → 终局判定 + 扫描处理（已满不进调律，

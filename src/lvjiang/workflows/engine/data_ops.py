@@ -45,7 +45,6 @@ class _DataOpsMixin:
         """单一 key 且指向 panel（而非 region）时返回 panel key，否则 None
 
         region 与 panel 同名时 region 优先（保持既有语义）。
-        整面板结果是行列嵌套 dict，与 by 短路返回字段名的语义不兼容，直接拦住。
         """
         if not field_keys or len(field_keys) != 1:
             return None
@@ -54,11 +53,6 @@ class _DataOpsMixin:
             return None
         if self._find_panel_in_layout(scene, key) is None:
             return None
-        if by is not None:
-            raise WorkflowUserError(
-                f"整面板 {verb} [{scene}].[{key}] 不支持 by 子句，"
-                f"请用 [{scene}].[{key}][行][列] 单格形式"
-            )
         return key
 
     def _exec_scan(self, node: Scan):
@@ -83,7 +77,11 @@ class _DataOpsMixin:
         # 单一 key 指向 panel → 整面板逐格 OCR（$var.[行].[列] 取值）
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "scan")
         if panel_key is not None:
-            self._scan_panel_whole(scene, panel_key, var_name)
+            if node.by is not None:
+                # 整面板 + by：返回首个命中的行列 {row, col}
+                self._scan_panel_by(scene, panel_key, var_name, node.by)
+            else:
+                self._scan_panel_whole(scene, panel_key, var_name)
             return
 
         if node.by is not None:
@@ -129,7 +127,11 @@ class _DataOpsMixin:
         # 单一 key 指向 panel → 整面板逐格材料识别（$var.[行].[列] 取值）
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "recognize")
         if panel_key is not None:
-            self._recognize_panel_whole(scene, panel_key, var_name, group=group)
+            if node.by is not None:
+                # 整面板 + by：返回首个命中的行列 {row, col}
+                self._recognize_panel_by(scene, panel_key, var_name, node.by, group=group)
+            else:
+                self._recognize_panel_whole(scene, panel_key, var_name, group=group)
             return
 
         if node.by is not None:

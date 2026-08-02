@@ -3,13 +3,15 @@
 ## 目录
 
 - [一、scan — OCR 扫描](#一scan--ocr-扫描)
-  - [整面板扫描](#整面板扫描)
+  - [返回值语义](#返回值语义)
   - [by 子句（短路识别）](#by-子句短路识别)
 - [二、recognize — 图像识别](#二recognize--图像识别)
+  - [返回值语义](#返回值语义-1)
+  - [by 子句](#by-子句-1)
 - [三、find — 文字定位](#三find--文字定位)
+  - [返回值语义](#返回值语义-2)
   - [搜索区域](#搜索区域)
-  - [by 子句](#by-子句)
-  - [结果与点击](#结果与点击)
+  - [by 子句](#by-子句-2)
 - [四、collect — 收集输出](#四collect--收集输出)
 - [五、eval — 赋值](#五eval--赋值)
 - [六、call — 调用子工作流](#六call--调用子工作流)
@@ -53,47 +55,57 @@ if $key
 end
 ```
 
-**说明**：
+### 返回值语义
 
-- 扫描结果 `$var` 为字典，key 为 Area 名，value 为 OCR 识别文本
-- 引擎自动将 Region 坐标元数据存入内部 `_coord_meta`，供后续 `click [scene].$key` 解析坐标
-- 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
+`scan` 的返回值取决于 **目标类型**（region / panel）和 **是否带 by 子句**，共四种组合：
 
-### 整面板扫描
+| 目标 | 无 by | 有 by |
+|---|---|---|
+| **Region**（一个或多个） | `dict` — `{area_key: ocr_text}` | `str` — 首个命中的 area_key，未命中为 `""` |
+| **Panel 整面板** | `dict` — `{行: {列: ocr_text}}` 行列嵌套 | `dict` — `{"row": 行号, "col": 列号}`，未命中为 `{}` |
 
-`scan [scene].[key]` 的 key 命中场景的 **panel**（而非 region）时，自动分派为
-整面板逐格 OCR：自动 align 对齐后只截一次图，所有格从同一帧裁剪识别。
+**Region 无 by**（最常见）：
 
-**结果结构**：行列嵌套 dict，key 为 1-based 数字字符串，用 `$var.[行].[列]` 取值：
+```
+scan [equip_weapon_detail] as $result
+# $result = {"affix_1": "攻击+10", "affix_2": "防御+5", ...}
+# 可用 $result.affix_1 取值，click [equip_weapon_detail].$key 点击
+```
+
+**Region 有 by**（短路匹配）：
+
+```
+scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3] as $key by contains "调律"
+# $key = "sub_func_2"（首个命中的 area_key）或 ""（未命中）
+# 直接 click [equip_weapon_detail].$key
+```
+
+**Panel 整面板无 by**（网格 OCR）：
 
 ```
 scan [general_action].[actions] as $bags   # actions 是 6×2 panel
-collect $bags                              # {"1": {"1": "抱拳", "2": "作揖", ...}, "2": {...}}
-
-log $bags.[1].[2]                          # 1 行 2 列的文本（静态数字 key）
-
-for r in [1...2]                           # 动态遍历：$r/$c 是 int，自动归一化命中 "1" 字符串 key
-    for c in [1...6]
-        log $bags.$r.$c
-    end
-end
-
-if $bags.[1].[2] contains "背包"           # 命中后可直接点对应格
-    click [general_action].[actions][1][2]
-end
+# $bags = {"1": {"1": "抱拳", "2": "作揖", ...}, "2": {...}}
+# 用 $bags.[1].[2] 或 $bags.$r.$c 取值
+# 用 [general_action].[actions][1][2] 点击对应格
 ```
+
+**Panel 整面板有 by**（位置匹配）：
+
+```
+scan [general_action].[actions] as $pos by contains "背包"
+# $pos = {"row": 1, "col": 2}（首个命中的行列位置）或 {}（未命中）
+# 可用 $pos.row、$pos.col 取值
+# 可点击：click [general_action].[actions][$pos.row][$pos.col]
+```
+
+> 整面板 + by 返回的是**位置**而非文本，与 Region + by 返回字段名的语义不同。
 
 **说明**：
 
-- 行列数取自对齐结果（实际检测到的网格），而非配置的 rows/cols
-- 空格 value 为空字符串 `""`
+- 引擎自动将 Region 坐标元数据存入内部 `_coord_meta`，供后续 `click [scene].$key` 解析坐标
+- 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
 - region 与 panel 同名时 region 优先（保持既有语义）
-- `[scene].[panel][行][列]` 单格形式是对整面板结果的 **key 过滤**，
-  结果为该格文本（str），与 `$var.[行].[列]` 取值格式一致
-- 整面板扫描**不支持 by 子句**（嵌套 dict 与短路返回字段名语义不兼容），
-  需要短路匹配时用 `[scene].[panel][行][列]` 单格形式
-- `recognize [scene].[panel名]` 同样支持整面板分派，结果结构一致，value 为材料类型名；
-  单格 `recognize [scene].[panel][行][列]` 结果为该格材料类型名（str）
+- `[scene].[panel][行][列]` 单格形式是对整面板结果的 **key 过滤**，结果为该格文本（str）
 
 ### by 子句（短路识别）
 
@@ -109,13 +121,6 @@ end
 | `contains "文本"` | 字段 OCR 文本包含目标子串 | 字符串 |
 | `equals_any $list` | 字段 OCR 文本等于列表中任一项 | 列表变量 |
 | `contains_any $list` | 字段 OCR 文本包含列表中任一项 | 列表变量 |
-
-**返回值类型契约**：
-
-| 形式 | `$var` 类型 | 含义 |
-|---|---|---|
-| `scan ... as $var` | `dict` | `{area_key: ocr_text}` |
-| `scan ... as $var by ...` | `str` | 首个命中的 area_key，未命中为空字符串 `""` |
 
 **示例**：
 
@@ -160,29 +165,59 @@ recognize scene_name.[a1, a2] as $var on group "分组名"
 recognize scene_name.[a1, a2] as $var by equals $name on group "分组名"
 ```
 
-**示例**：
+### 返回值语义
+
+`recognize` 的返回值与 `scan` 完全对称，区别仅在于 value 是**材料类型名**而非 OCR 文本：
+
+| 目标 | 无 by | 有 by |
+|---|---|---|
+| **Region**（一个或多个） | `dict` — `{slot_key: material_type}` | `str` — 首个命中的 slot_key，未命中为 `""` |
+| **Panel 整面板** | `dict` — `{行: {列: material_type}}` 行列嵌套 | `dict` — `{"row": 行号, "col": 列号}`，未命中为 `{}` |
+
+**Region 无 by**（最常见）：
 
 ```
-# 静态场景名
 recognize [material_grid] as $mats
-recognize [material_grid].[slot_1, slot_2] as $mats
-
-# 动态场景名
-eval $scene = "material_grid"
-recognize $scene.[slot_1] as $mats
-
-# by 子句 + on group
-recognize [equip_tune_detail].[
-        material_1, material_2, material_3
-    ] as $slot by equals $material_name on group "调律材料"
+# $mats = {"slot_1": "玄铁", "slot_2": "精金", ...}
+# 可用 $mats.slot_1 取值，click [material_grid].$key 点击
 ```
+
+**Region 有 by**（短路匹配）：
+
+```
+recognize [equip_tune_detail].[material_1, material_2, material_3] as $slot by equals $material_name on group "调律材料"
+# $slot = "material_2"（首个命中的 slot_key）或 ""（未命中）
+```
+
+**Panel 整面板无 by**（网格材料识别）：
+
+```
+recognize [bag_item_detail].[bag_grid] as $grid
+# $grid = {"1": {"1": "金狗粮", "2": "玄铁", ...}, "2": {...}}
+# 用 $grid.[1].[2] 或 $grid.$r.$c 取值
+# 用 [bag_item_detail].[bag_grid][1][2] 点击对应格
+```
+
+**Panel 整面板有 by**（位置匹配）：
+
+```
+recognize [bag_item_detail].[bag_grid] as $pos by equals "金狗粮" on group "食物"
+# $pos = {"row": 1, "col": 2}（首个命中的行列位置）或 {}（未命中）
+# 可点击：click [bag_item_detail].[bag_grid][$pos.row][$pos.col]
+```
+
+### by 子句
+
+`recognize` 的 `by` 子句与 `scan` 完全一致，将结果从 dict 变为 str（首个命中的 slot_key）。
+四种匹配模式（`equals`、`contains`、`equals_any`、`contains_any`）和返回值语义参见 [scan by 子句](#by-子句短路识别)。
 
 **说明**：
 
-- 识别结果 `$var` 为字典，key 为 Area 名，value 为材料类型名
 - 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `_coord_meta`
-- 与 `scan` 一样，单一 key 命中 panel 时分派为整面板逐格识别（见[整面板扫描](#整面板扫描)）
-- **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str）
+- 与 `scan` 一样，单一 key 命中 panel 时分派为整面板逐格识别
+- 行列数取自对齐结果（实际检测到的网格），而非配置的 rows/cols
+- 空格 value 为空字符串 `""`
+- region 与 panel 同名时 region 优先
 - **on group 子句**：限定材料识别的分组范围，仅在指定分组的参考材料中匹配。支持字符串常量和变量引用
 
 ## 三、find — 文字定位
@@ -204,6 +239,35 @@ find [scene].[area] as $var by contains "文字"
 find as $var by contains_any $list
 find [scene].[area] as $var by equals_any $list
 ```
+
+### 返回值语义
+
+`find` 的返回值与 `scan`/`recognize` 不同——它始终返回**坐标对象**而非文本或材料名：
+
+| 情况 | `$var` 类型 | 含义 | 条件判断 |
+|---|---|---|---|
+| 找到文字 | `FoundRegion` | 匹配区域的画布归一化坐标 | truthy |
+| 未找到 | `str` | 空字符串 `""` | falsy |
+
+`FoundRegion` 可直接用于 `click`：
+
+```
+find as $found by contains "调律"
+# $found = FoundRegion(x=0.5, y=0.3, ...) 或 ""
+if $found
+    click $found                   # 直接点击找到的文字位置
+end
+```
+
+与 `scan`/`recognize` 的对比：
+
+| 指令 | 无 by | 有 by |
+|---|---|---|
+| `scan` | `dict` — `{area_key: ocr_text}` | `str` — 首个命中的 area_key |
+| `recognize` | `dict` — `{slot_key: material_type}` | `str` — 首个命中的 slot_key |
+| `find` | — | `FoundRegion` 或 `""` |
+
+> `find` 必须带 `by` 子句（指定搜索目标），没有「无 by」形式。
 
 **示例**：
 
@@ -254,33 +318,6 @@ end
 | `contains_any $list` | OCR 文本包含列表中任一项 | 列表变量 |
 
 `contains_any` / `equals_any` 支持**顺序匹配**：按列表顺序逐个尝试，返回第一个命中的文字位置。
-
-### 结果与点击
-
-`find` 的结果变量是 `FoundRegion` 类型，存储文字区域的画布归一化坐标。可以直接用于 `click`：
-
-```
-find as $found by contains "调律"
-click $found                   # 直接点击找到的文字位置
-```
-
-**结果变量行为**：
-
-| 情况 | 变量值 | 条件判断 |
-|---|---|---|
-| 找到文字 | `FoundRegion` 对象 | truthy |
-| 未找到 | 空字符串 `""` | falsy |
-
-因此可以直接用 `if $found` 判断是否找到。
-
-**与 scan 的关系**：
-
-| 特性 | `find` | `scan` |
-|---|---|---|
-| 语法风格 | 共享 `scene_target` + `by_clause` | 相同 |
-| 返回类型 | `FoundRegion` 或 `""` | `dict` 或 `str`（by 子句） |
-| 适用场景 | 文字定位 + 点击 | 批量区域 OCR |
-| 可直接点击 | `click $found` | `click [scene].$key` |
 
 ## 四、collect — 收集输出
 

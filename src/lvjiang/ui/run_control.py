@@ -553,20 +553,20 @@ class RunControlMixin:
             state = "running"
             self.btn_run_workflow.setText("停止 (F10)")
             self.btn_run_workflow.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         elif not self._backend_ready():
             state = "not_ready"
             label = "未连接" if self._backend == "adb" else "未定位"
             self.btn_run_workflow.setText(label)
             self.btn_run_workflow.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
+                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         else:
             state = "ready"
             self.btn_run_workflow.setText("开始执行 (F9)")
             self.btn_run_workflow.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         self.automation_state_changed.emit(state)
 

@@ -9,12 +9,11 @@
 #%     default: 1
 
 # 完整账号切换流程：登录页 → 选账号 → 登录 → 选角色 → 进入游戏
-#
-# 参数：
-#   target_phone_tail — 手机尾号，用于在用户列表中 OCR 匹配
-#   role_idx          — 角色下标 1-4，对应 role_list panel 的行号
 
-log concat("当前用户", $target_phone_tail)
+import "_common.wf"
+
+# ─── 主流程 ─────────────────────────────────────────────
+log concat("当前匹配", $target_phone_tail)
 log concat("当前角色", $role_idx)
 
 # 1. 登录页 → 用户切换视图
@@ -52,26 +51,5 @@ wait (1, 2)
 click [game_login_page].[login]
 wait (2, 3)
 
-click [game_login_page].[switch_role]
-wait (1, 2)
-
-# 4. 选角色（role_list: 1列4行，role_idx 1-4 → panel 行 1-4）
-click [game_login_page].[role_list][$role_idx][1]
-wait (1, 2)
-
-# 5. 进入游戏
-click [game_login_page].[enter]
-wait (3, 5)
-
-# 6. 等待主页（检测菜单标识，最多 30 秒）
-loop 15
-    scan [game_main_page].[menu] as $menu by contains "菜单"
-    if $menu
-        goto login_done
-    end
-    wait 4
-end
-eval pause("等待进入游戏超时，请手动确认后点击确定")
-
-@login_done
-wait (1, 2)
+# 4. 选角色 + 进入游戏（复用公共子过程）
+call select_role_and_enter($role_idx)

@@ -26,7 +26,7 @@ def _build_menu(host, menubar):
 
 hooks = AppHooks(
     name="燕云十六声",
-    window_title="律匠 - 燕云十六声装备调律工具 v0.1.0",
+    window_title="律匠 - 燕云十六声装备调律工具 v0.1.1",
 
     # 注入通用 MainWindow 的 Tab / 菜单
     left_tab_builders=[("调律", _build_tuning_tab)],

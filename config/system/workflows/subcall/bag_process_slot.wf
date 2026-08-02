@@ -14,11 +14,11 @@ def process_slot($row, $col)
     eval $fp = make_fingerprint($equip)
 
     if $equip.type is_empty
-        return
+        return -1
     end
 
     if context.bag_fingerprints.$slot_key equals $fp
-        return
+        return -1
     end
 
     eval context.bag_fingerprints.$slot_key = $fp

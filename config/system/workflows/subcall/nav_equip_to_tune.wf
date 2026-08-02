@@ -12,7 +12,7 @@ def nav_equip_to_tune()
     scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
     if not $tune_key
         log "未找到调律按钮"
-        return
+        return -1
     end
 
     click [equip_detail].$tune_key after wait step_interval

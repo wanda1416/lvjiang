@@ -260,7 +260,7 @@ def back_to_menpai()
    end
    if not $found
       log "仍未找到门派，无法前往江湖号令页"
-      return
+      return -1
    end
    click $found after wait $step_interval
 
@@ -296,7 +296,7 @@ def back_to_haoling_1()
    end
    if not $found
       log "仍未找到江湖号令入口"
-      return
+      return -1
    end
    click $found after wait $step_interval
 end

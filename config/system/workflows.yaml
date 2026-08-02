@@ -1,12 +1,11 @@
 exposed:
 - equip_analysis
-- auto_purchase_xinde
+- auto_purchase_xinfa
 - activity_jianghu
-- mengzhuzhengfeng
 overrides:
   equip_analysis:
     name: 当前装备分析
-  auto_purchase_xinde:
+  auto_purchase_xinfa:
     name: 循环购买心法
   activity_jianghu:
     name: 每日江湖号令

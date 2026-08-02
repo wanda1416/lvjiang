@@ -11,9 +11,8 @@ from unittest.mock import MagicMock
 
 import cv2
 import numpy as np
-import pytest
 
-from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
+from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import Eval, FieldAccess, Literal, VarRef, parse_text
 from lvjiang.workflows.scene_scan import collect_refs
 
@@ -260,9 +259,9 @@ class TestRealImageRecognition:
 
     def test_image1_row2_col1_is_cai_gouliang(self):
         """image1.png 第2行第1列应为彩狗粮"""
-        from lvjiang.workflows.align import detect_grid
-        from lvjiang.core.ocr import OCREngine
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+        from lvjiang.core.ocr import OCREngine
+        from lvjiang.workflows.align import detect_grid
 
         img_path = DATA_DIR / "image1.png"
         img = cv2.imread(str(img_path))
@@ -288,9 +287,9 @@ class TestRealImageRecognition:
 
     def test_image1_row2_col2_is_jin_gouliang(self):
         """image1.png 第2行第2列应为金狗粮"""
-        from lvjiang.workflows.align import detect_grid
-        from lvjiang.core.ocr import OCREngine
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+        from lvjiang.core.ocr import OCREngine
+        from lvjiang.workflows.align import detect_grid
 
         img_path = DATA_DIR / "image1.png"
         img = cv2.imread(str(img_path))

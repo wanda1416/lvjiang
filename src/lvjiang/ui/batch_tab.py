@@ -19,14 +19,18 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QScrollArea,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from ..core.batch_config import BatchConfig, BatchEntry, load_batch_config, save_batch_config
+from ..core.batch_config import (
+    BatchEntry,
+    load_batch_config,
+    save_batch_config,
+)
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,

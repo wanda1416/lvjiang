@@ -168,16 +168,16 @@ class ScriptOpsMixin:
             import json
 
             from ...run_control import _to_serializable
-            
+
             # 构建显示内容
             lines = []
-            
+
             # 返回值
             if return_value is not None:
                 lines.append(f"返回值：{_format_value(return_value)}")
             else:
                 lines.append("返回值：(无)")
-            
+
             # 结果集
             if result:
                 lines.append("结果集：")
@@ -185,7 +185,7 @@ class ScriptOpsMixin:
                 lines.append(json.dumps(serializable, ensure_ascii=False, indent=2))
             else:
                 lines.append("结果集：(空)")
-            
+
             self._result_text.setPlainText("\n".join(lines))
             self._status_bar.showMessage("脚本测试完成")
 

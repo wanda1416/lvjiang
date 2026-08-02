@@ -11,8 +11,8 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPushButton,
     QTableWidget,
@@ -20,7 +20,12 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core.batch_config import BatchConfig, BatchEntry, load_batch_config, save_batch_config
+from ..core.batch_config import (
+    BatchConfig,
+    BatchEntry,
+    load_batch_config,
+    save_batch_config,
+)
 
 _COLUMNS = ["账号全称", "手机尾号", "角色名", "角色下标(1-4)"]
 _COL_ACCOUNT = 0

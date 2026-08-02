@@ -10,6 +10,7 @@ layout_scenes:
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail
+  - traning_main
   - training_xinfa
   group_3:
   - bag_equip_detail

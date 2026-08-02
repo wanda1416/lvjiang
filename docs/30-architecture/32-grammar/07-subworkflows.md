@@ -148,10 +148,10 @@ end
 # ── 子过程文件：subcall/nav_equip_to_tune.wf ──
 
 def nav_equip_to_tune()
-    click [equip_weapon_detail].[more_func]
+    click [equip_detail].[more_func]
     wait step_interval
 
-    scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+    scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
     if not $tune_key
         log "未找到调律按钮"
         return

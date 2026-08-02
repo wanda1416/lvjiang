@@ -5,8 +5,8 @@ views:
   name: 基底
 - key: users
   name: 切换用户
-- key: login_in
-  name: 已登录
+- key: loading
+  name: 登录画面
 - key: roles
   name: 切换角色
 regions:
@@ -66,13 +66,13 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-  view: login_in
+  view: loading
 - key: loading
   name: 加载中
   type: attr
   is_text: true
   is_clickable: false
-  view: login_in
+  view: loading
 points:
 - key: point_1
   name: 点1

@@ -407,3 +407,109 @@ call $result = outer() as $outer_out
         assert v["result"]["source"] == "inner"
         # 调用方获取的是 outer 的 output
         assert v["outer_out"]["source"] == "outer"
+
+
+# ─── 子过程变量作用域隔离 ───────────────────────────────────
+
+class TestVariableScopeIsolation:
+    """子过程变量作用域隔离测试"""
+
+    def test_subprocess_cannot_see_caller_variables(self):
+        """子过程不应读到调用方的同名变量"""
+        code = '''def child()
+    collect $caller_secret as "leaked"
+end
+eval $caller_secret = "oops"
+call child() as $out
+'''
+        v = run(code)
+        # $caller_secret 在子过程中未定义，collect 应跳过
+        assert "leaked" not in v["out"]
+
+    def test_subprocess_only_sees_passed_params(self):
+        """子过程只能访问传入的参数"""
+        code = '''def greet($name)
+    collect $name as "greeting"
+    collect $extra as "extra"
+end
+eval $extra = "caller_data"
+call greet("world") as $out
+'''
+        v = run(code)
+        assert v["out"]["greeting"] == "world"
+        assert "extra" not in v["out"]
+
+    def test_nested_subprocess_isolation(self):
+        """嵌套子过程的作用域完全隔离"""
+        code = '''def inner()
+    collect $x as "inner_x"
+end
+def outer()
+    eval $x = "outer_value"
+    call inner() as $inner_out
+    collect $inner_out as "inner_result"
+    collect $x as "outer_x"
+end
+eval $x = "caller_value"
+call outer() as $outer_out
+'''
+        v = run(code)
+        # inner 看不到 outer 的 $x，所以 inner_out 为空
+        assert "inner_x" not in v["outer_out"]["inner_result"]
+        # outer 的 $x 是 "outer_value"
+        assert v["outer_out"]["outer_x"] == "outer_value"
+
+
+# ─── default 递归解析 dict/list 内变量 ─────────────────────
+
+def run_with_output(code: str, initial: dict | None = None) -> tuple[dict, dict]:
+    """执行 DSL 片段并返回 (变量表, output dict)"""
+    eng = make_engine()
+    eng.variables = dict(initial or {})
+    program = parse_text(code)
+    eng._procs = dict(program.procs)
+    eng._exec_body(program.body)
+    return eng.variables, eng.output
+
+
+class TestDefaultWithDictList:
+    """default 语句递归解析 dict/list 内变量"""
+
+    def test_default_dict_with_var(self):
+        """default $d = {"x": $v} 应解析 $v 的值"""
+        code = '''eval $v = "resolved"
+default $d = {"x": $v}
+collect $d as "result"
+'''
+        variables, output = run_with_output(code)
+        assert output["result"]["x"] == "resolved"
+
+    def test_default_list_with_var(self):
+        """default $l = [$a, $b] 应解析变量"""
+        code = '''eval $a = 1
+eval $b = 2
+default $l = [$a, $b]
+collect $l as "result"
+'''
+        variables, output = run_with_output(code)
+        assert output["result"] == [1.0, 2.0]
+
+    def test_default_nested_dict_with_var(self):
+        """default 嵌套 dict 内的变量也应解析"""
+        code = '''eval $inner = "value"
+default $d = {"outer": {"inner": $inner}}
+collect $d as "result"
+'''
+        variables, output = run_with_output(code)
+        assert output["result"]["outer"]["inner"] == "value"
+
+    def test_default_only_applies_when_undefined(self):
+        """default 只在变量未定义时才赋值"""
+        code = '''eval $v = "original"
+eval $d = {"x": "existing"}
+default $d = {"x": $v}
+collect $d as "result"
+'''
+        variables, output = run_with_output(code)
+        # $d 已存在，default 不应覆盖
+        assert output["result"]["x"] == "existing"

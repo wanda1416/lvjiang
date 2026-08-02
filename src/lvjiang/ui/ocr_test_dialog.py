@@ -15,9 +15,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
-    QInputDialog,
     QLabel,
-    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -130,6 +128,7 @@ class OCRTestDialog(QDialog):
         self._repl_table.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.Stretch
         )
+        self._repl_table.cellChanged.connect(self._on_repl_cell_changed)
         repl_layout.addWidget(self._repl_table)
 
         repl_btn_row = QHBoxLayout()
@@ -156,6 +155,7 @@ class OCRTestDialog(QDialog):
         self._pattern_table.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.Stretch
         )
+        self._pattern_table.cellChanged.connect(self._on_pattern_cell_changed)
         pattern_layout.addWidget(self._pattern_table)
 
         pattern_btn_row = QHBoxLayout()
@@ -214,68 +214,98 @@ class OCRTestDialog(QDialog):
         repls = cleaner.get_replacements()
         self._repl_table.setRowCount(len(repls))
         for i, (wrong, correct) in enumerate(repls.items()):
-            item_wrong = QTableWidgetItem(wrong)
-            item_wrong.setFlags(item_wrong.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self._repl_table.setItem(i, 0, item_wrong)
+            self._repl_table.setItem(i, 0, QTableWidgetItem(wrong))
             self._repl_table.setItem(i, 1, QTableWidgetItem(correct))
 
         # 正则替换
         patterns = cleaner.get_patterns()
         self._pattern_table.setRowCount(len(patterns))
-        for i, rule in enumerate(patterns):
-            item_pattern = QTableWidgetItem(rule.get("pattern", ""))
-            item_pattern.setFlags(item_pattern.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self._pattern_table.setItem(i, 0, item_pattern)
-            self._pattern_table.setItem(i, 1, QTableWidgetItem(rule.get("replacement", "")))
+        for i, (pattern, replacement) in enumerate(patterns.items()):
+            self._pattern_table.setItem(i, 0, QTableWidgetItem(pattern))
+            self._pattern_table.setItem(i, 1, QTableWidgetItem(replacement))
 
     # ─── 清洗规则操作 ────────────────────────────────────────
 
+    def _sync_repl_table(self):
+        """将文本替换表格内容同步到清洗器"""
+        cleaner = OCRCleaner()
+        # 读取表格当前数据
+        new_repls = {}
+        for r in range(self._repl_table.rowCount()):
+            key_item = self._repl_table.item(r, 0)
+            val_item = self._repl_table.item(r, 1)
+            key = key_item.text() if key_item else ""
+            val = val_item.text() if val_item else ""
+            if key:
+                new_repls[key] = val
+        # 批量写入，只保存一次
+        cleaner.set_replacements(new_repls)
+
+    def _sync_pattern_table(self):
+        """将正则替换表格内容同步到清洗器"""
+        cleaner = OCRCleaner()
+        import re
+        # 读取表格当前数据
+        new_patterns = {}
+        for r in range(self._pattern_table.rowCount()):
+            key_item = self._pattern_table.item(r, 0)
+            val_item = self._pattern_table.item(r, 1)
+            key = key_item.text() if key_item else ""
+            val = val_item.text() if val_item else ""
+            if key:
+                try:
+                    re.compile(key)
+                except re.error:
+                    self._status_label.setText(f"行 {r + 1}: 无效的正则表达式")
+                    return
+                new_patterns[key] = val
+        # 批量写入，只保存一次
+        cleaner.set_patterns(new_patterns)
+        self._status_label.setText("规则已保存")
+
     def _on_add_replacement(self):
-        """添加文本替换规则"""
-        wrong, ok = QInputDialog.getText(self, "添加替换规则", "原始文本（将被替换的）:")
-        if not ok or not wrong:
-            return
-        correct, ok = QInputDialog.getText(self, "添加替换规则", f"将 \"{wrong}\" 替换为:")
-        if not ok:
-            return
-        OCRCleaner().add_replacement(wrong, correct)
-        self._refresh_rules_tables()
+        """添加文本替换规则：插入空行供编辑"""
+        row = self._repl_table.rowCount()
+        self._repl_table.insertRow(row)
+        self._repl_table.setItem(row, 0, QTableWidgetItem(""))
+        self._repl_table.setItem(row, 1, QTableWidgetItem(""))
+        self._repl_table.scrollToBottom()
+        self._repl_table.setCurrentCell(row, 0)
+        self._repl_table.editItem(self._repl_table.item(row, 0))
 
     def _on_delete_replacement(self):
         """删除选中的替换规则"""
         row = self._repl_table.currentRow()
         if row < 0:
             return
-        item = self._repl_table.item(row, 0)
-        if item:
-            OCRCleaner().remove_replacement(item.text())
-            self._refresh_rules_tables()
+        self._repl_table.removeRow(row)
+        self._sync_repl_table()
+
+    def _on_repl_cell_changed(self, row: int, col: int):
+        """文本替换表格单元格修改后同步"""
+        self._sync_repl_table()
 
     def _on_add_pattern(self):
-        """添加正则替换规则"""
-        pattern, ok = QInputDialog.getText(self, "添加正则规则", "正则表达式:")
-        if not ok or not pattern:
-            return
-        # 验证正则
-        try:
-            import re
-            re.compile(pattern)
-        except re.error as e:
-            QMessageBox.warning(self, "正则错误", f"无效的正则表达式:\n{e}")
-            return
-        replacement, ok = QInputDialog.getText(self, "添加正则规则", "替换为:")
-        if not ok:
-            return
-        OCRCleaner().add_pattern(pattern, replacement)
-        self._refresh_rules_tables()
+        """添加正则替换规则：插入空行供编辑"""
+        row = self._pattern_table.rowCount()
+        self._pattern_table.insertRow(row)
+        self._pattern_table.setItem(row, 0, QTableWidgetItem(""))
+        self._pattern_table.setItem(row, 1, QTableWidgetItem(""))
+        self._pattern_table.scrollToBottom()
+        self._pattern_table.setCurrentCell(row, 0)
+        self._pattern_table.editItem(self._pattern_table.item(row, 0))
 
     def _on_delete_pattern(self):
         """删除选中的正则规则"""
         row = self._pattern_table.currentRow()
         if row < 0:
             return
-        OCRCleaner().remove_pattern(row)
-        self._refresh_rules_tables()
+        self._pattern_table.removeRow(row)
+        self._sync_pattern_table()
+
+    def _on_pattern_cell_changed(self, row: int, col: int):
+        """正则替换表格单元格修改后同步"""
+        self._sync_pattern_table()
 
     def _on_test_clean(self):
         """测试清洗效果"""

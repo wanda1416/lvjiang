@@ -6,7 +6,7 @@
 
 规则类型：
 - replacements: 文本替换 {"错误文本": "正确文本"} 或 {"噪声": ""}
-- patterns: 正则替换 [{"pattern": "正则", "replacement": "替换"}]
+- patterns: 正则替换 {"正则": "替换"}
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class OCRCleaner:
                 logger.warning(f"加载本地 OCR 清洗配置失败: {e}")
 
         logger.debug(f"OCR 清洗器加载完成: {len(self._config.get('replacements', {}))} 条替换规则, "
-                     f"{len(self._config.get('patterns', []))} 条正则规则")
+                     f"{len(self._config.get('patterns', {}))} 条正则规则")
 
     def _merge_config(self, local: dict[str, Any]):
         """合并本地配置到当前配置"""
@@ -72,9 +72,9 @@ class OCRCleaner:
         if "replacements" in local:
             self._config.setdefault("replacements", {}).update(local["replacements"])
 
-        # patterns: 追加
+        # patterns: 直接合并（本地覆盖系统）
         if "patterns" in local:
-            self._config.setdefault("patterns", []).extend(local["patterns"])
+            self._config.setdefault("patterns", {}).update(local["patterns"])
 
     def reload(self):
         """重新加载配置"""
@@ -104,9 +104,7 @@ class OCRCleaner:
             result = result.replace(wrong, correct)
 
         # 2. 正则替换
-        for rule in self._config.get("patterns", []):
-            pattern = rule.get("pattern", "")
-            replacement = rule.get("replacement", "")
+        for pattern, replacement in self._config.get("patterns", {}).items():
             if pattern:
                 try:
                     result = re.sub(pattern, replacement, result)
@@ -121,9 +119,9 @@ class OCRCleaner:
         """获取所有文本替换规则"""
         return dict(self._config.get("replacements", {}))
 
-    def get_patterns(self) -> list[dict[str, str]]:
+    def get_patterns(self) -> dict[str, str]:
         """获取所有正则替换规则"""
-        return list(self._config.get("patterns", []))
+        return dict(self._config.get("patterns", {}))
 
     def add_replacement(self, wrong: str, correct: str):
         """添加文本替换规则并保存到本地配置"""
@@ -136,20 +134,27 @@ class OCRCleaner:
             del self._config["replacements"][wrong]
             self._save_local_config()
 
-    def add_pattern(self, pattern: str, replacement: str):
-        """添加正则替换规则并保存到本地配置"""
-        self._config.setdefault("patterns", []).append({
-            "pattern": pattern,
-            "replacement": replacement,
-        })
+    def set_replacements(self, replacements: dict[str, str]):
+        """批量设置文本替换规则并保存一次"""
+        self._config["replacements"] = dict(replacements)
         self._save_local_config()
 
-    def remove_pattern(self, index: int):
+    def add_pattern(self, pattern: str, replacement: str):
+        """添加正则替换规则并保存到本地配置"""
+        self._config.setdefault("patterns", {})[pattern] = replacement
+        self._save_local_config()
+
+    def remove_pattern(self, pattern: str):
         """删除正则替换规则并保存到本地配置"""
-        patterns = self._config.get("patterns", [])
-        if 0 <= index < len(patterns):
-            patterns.pop(index)
+        patterns = self._config.get("patterns", {})
+        if pattern in patterns:
+            del patterns[pattern]
             self._save_local_config()
+
+    def set_patterns(self, patterns: dict[str, str]):
+        """批量设置正则替换规则并保存一次"""
+        self._config["patterns"] = dict(patterns)
+        self._save_local_config()
 
     def _save_local_config(self):
         """保存当前配置到本地文件"""
@@ -161,7 +166,7 @@ class OCRCleaner:
         if replacements:
             local_cfg["replacements"] = replacements
 
-        patterns = self._config.get("patterns", [])
+        patterns = self._config.get("patterns", {})
         if patterns:
             local_cfg["patterns"] = patterns
 

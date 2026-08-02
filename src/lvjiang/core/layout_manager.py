@@ -154,6 +154,37 @@ def rename_scene_across_all_layouts(old_key: str, new_key: str):
     rename_scene_screenshots(old_key, new_key)
 
 
+def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str):
+    """重命名所有布局下某视图的截图文件
+
+    截图命名规则：
+    - 基底视图 (view="" 或 view="base"): {scene_key}.png
+    - 其他视图: {scene_key}__{view_key}.png
+    """
+    if old_view_key == new_view_key:
+        return
+    from .scene_loader import BASE_VIEW_KEY
+    screenshots_base = SCREENSHOTS_DIR
+    if not screenshots_base.exists():
+        return
+    for layout_dir in screenshots_base.iterdir():
+        if not layout_dir.is_dir():
+            continue
+        # 确定旧文件名和新文件名
+        if old_view_key == BASE_VIEW_KEY or old_view_key == "":
+            old_name = f"{scene_key}.png"
+        else:
+            old_name = f"{scene_key}__{old_view_key}.png"
+        if new_view_key == BASE_VIEW_KEY or new_view_key == "":
+            new_name = f"{scene_key}.png"
+        else:
+            new_name = f"{scene_key}__{new_view_key}.png"
+        old_path = layout_dir / old_name
+        if old_path.exists() and old_name != new_name:
+            old_path.rename(layout_dir / new_name)
+            logger.info(f"视图截图已重命名: {old_name} -> {new_name}")
+
+
 # ─── 跨场景迁移 ──────────────────────────────────────────
 
 def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key: str) -> bool:

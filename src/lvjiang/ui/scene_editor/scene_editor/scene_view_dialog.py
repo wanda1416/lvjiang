@@ -1,4 +1,4 @@
-"""视图管理对话框 - 开启/取消多视图，新增/重命名/删除视图"""
+"""视图管理对话框 - 开启/取消多视图，新增/重命名/删除视图，调整顺序"""
 
 import re
 
@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -18,6 +17,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ....core.layout_manager import rename_view_screenshots
 from ....core.scene_loader import BASE_VIEW_KEY
 from ....core.scene_registry import get_registry, sync_scene_cache
 
@@ -45,6 +45,7 @@ class ViewManagerDialog(QDialog):
 
         self._list = QListWidget()
         self._list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self._list.currentRowChanged.connect(self._update_move_buttons)
         layout.addWidget(self._list)
 
         btn_row = QHBoxLayout()
@@ -58,6 +59,17 @@ class ViewManagerDialog(QDialog):
         self._btn_delete.clicked.connect(self._on_delete)
         btn_row.addWidget(self._btn_delete)
         btn_row.addStretch()
+        # 上移/下移按钮
+        self._btn_up = QPushButton("↑")
+        self._btn_up.setFixedWidth(32)
+        self._btn_up.setToolTip("上移视图")
+        self._btn_up.clicked.connect(lambda: self._on_move(-1))
+        btn_row.addWidget(self._btn_up)
+        self._btn_down = QPushButton("↓")
+        self._btn_down.setFixedWidth(32)
+        self._btn_down.setToolTip("下移视图")
+        self._btn_down.clicked.connect(lambda: self._on_move(1))
+        btn_row.addWidget(self._btn_down)
         layout.addLayout(btn_row)
 
         bottom_row = QHBoxLayout()
@@ -89,6 +101,8 @@ class ViewManagerDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, v.key)
             self._list.addItem(item)
         self._btn_disable.setEnabled(len(views) == 1)
+        # 更新上移/下移按钮状态
+        self._update_move_buttons()
 
     def _selected_view_key(self) -> str | None:
         item = self._list.currentItem()
@@ -167,17 +181,73 @@ class ViewManagerDialog(QDialog):
         self._refresh()
 
     def _on_rename(self):
-        key = self._selected_view_key()
-        if key is None:
+        """重命名视图：支持修改 key 和名称"""
+        old_key = self._selected_view_key()
+        if old_key is None:
             return
-        name, ok = QInputDialog.getText(self, "重命名视图", "新的视图名称：")
-        if not ok or not name.strip():
+        views = self._registry.get_scene_views(self._scene_key)
+        old_view = next((v for v in views if v.key == old_key), None)
+        if old_view is None:
             return
+        # 构建重命名对话框
+        dialog = QDialog(self)
+        dialog.setWindowTitle("重命名视图")
+        form = QFormLayout(dialog)
+        key_edit = QLineEdit(old_key)
+        key_edit.setPlaceholderText("小写字母开头，仅含小写字母/数字/下划线")
+        form.addRow("视图 Key:", key_edit)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #c62828;")
+        error_label.hide()
+        form.addRow("", error_label)
+        name_edit = QLineEdit(old_view.name)
+        name_edit.setPlaceholderText("留空则与 key 相同")
+        form.addRow("视图名称:", name_edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        form.addRow(buttons)
+        # 实时校验
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        existing = {v.key for v in views if v.key != old_key}
+
+        def _validate():
+            k = key_edit.text().strip()
+            if not k:
+                ok_btn.setEnabled(False)
+                error_label.hide()
+                return
+            if not _RE_VIEW_KEY.match(k):
+                ok_btn.setEnabled(False)
+                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
+                error_label.show()
+                return
+            if k in existing:
+                ok_btn.setEnabled(False)
+                error_label.setText(f"视图 key 已存在: {k}")
+                error_label.show()
+                return
+            ok_btn.setEnabled(True)
+            error_label.hide()
+
+        key_edit.textChanged.connect(_validate)
+        _validate()
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        new_key = key_edit.text().strip()
+        new_name = name_edit.text().strip() or new_key
+        key_changed = new_key != old_key
         try:
-            self._registry.rename_scene_view(self._scene_key, key, name.strip())
+            self._registry.rename_scene_view_key(self._scene_key, old_key, new_key, new_name)
         except ValueError as e:
             QMessageBox.warning(self, "重命名失败", str(e))
             return
+        # key 变更时同步重命名截图文件
+        if key_changed:
+            rename_view_screenshots(self._scene_key, old_key, new_key)
         sync_scene_cache(self._scene_key)
         self._changed = True
         self._refresh()
@@ -204,3 +274,33 @@ class ViewManagerDialog(QDialog):
         sync_scene_cache(self._scene_key)
         self._changed = True
         self._refresh()
+
+    def _update_move_buttons(self):
+        """根据当前选中视图的位置更新上移/下移按钮状态"""
+        views = self._registry.get_scene_views(self._scene_key)
+        key = self._selected_view_key()
+        if key is None or len(views) <= 1:
+            self._btn_up.setEnabled(False)
+            self._btn_down.setEnabled(False)
+            return
+        idx = next((i for i, v in enumerate(views) if v.key == key), -1)
+        self._btn_up.setEnabled(idx > 0)
+        self._btn_down.setEnabled(0 <= idx < len(views) - 1)
+
+    def _on_move(self, direction: int):
+        """调整视图顺序（direction: -1=上移, +1=下移）"""
+        key = self._selected_view_key()
+        if key is None:
+            return
+        try:
+            self._registry.move_scene_view(self._scene_key, key, direction)
+        except ValueError as e:
+            QMessageBox.warning(self, "移动失败", str(e))
+            return
+        self._changed = True
+        self._refresh()
+        # 重新选中移动后的项
+        views = self._registry.get_scene_views(self._scene_key)
+        idx = next((i for i, v in enumerate(views) if v.key == key), -1)
+        if idx >= 0:
+            self._list.setCurrentRow(idx)

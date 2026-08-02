@@ -16,6 +16,7 @@ start: (_NL | statement)*
           | recognize_stmt
           | collect_stmt
           | log_stmt
+          | screenshot_stmt
           | eval_stmt
           | implicit_eval_stmt
           | default_stmt
@@ -159,6 +160,10 @@ log_stmt: "log"i log_arg _NL
 
 // log 参数：任何能求值为字符串的表达式
 ?log_arg: STRING | func_call | var_ref | field_access
+
+// screenshot：截取当前画面并保存到 logs/image/
+// 语法：screenshot
+screenshot_stmt: "screenshot"i _NL
 
 eval_stmt: "eval"i "$" NAME "=" NAME "(" arg_list? ")" _NL    -> eval_assign_func
          | "eval"i "$" NAME "=" literal _NL                    -> eval_assign_lit

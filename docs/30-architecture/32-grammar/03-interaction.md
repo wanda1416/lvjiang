@@ -8,7 +8,8 @@
 - [二、drag — 拖拽](#二drag--拖拽)
 - [三、wait — 等待](#三wait--等待)
 - [四、align — 面板自对齐](#四align--面板自对齐)
-- [五、失败语义](#五失败语义)
+- [五、screenshot — 截图](#五screenshot--截图)
+- [六、失败语义](#六失败语义)
 
 ## 一、click — 点击
 
@@ -199,7 +200,33 @@ click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 - 对齐算法基于方差分析，自动检测网格间距
 - 详见 [02-concepts.md — 自对齐机制](02-concepts.md#自对齐机制)
 
-## 五、失败语义
+## 五、screenshot — 截图
+
+截取当前画面并保存到 `logs/image/` 目录，用于调试和记录。
+
+**语法**：
+
+```
+screenshot
+```
+
+**示例**：
+
+```
+# 在关键步骤后截图，便于调试
+scan [equip_detail].[affixes] as $affixes
+screenshot                    # 保存当前画面
+click [equip_detail].[confirm]
+```
+
+**说明**：
+
+- 文件命名格式：`image_YYYYMMDD_HHMMSS_mmm.png`（精确到毫秒）
+- 保存目录：`logs/image/`（自动创建）
+- 日志输出保存的文件名，便于事后查找
+- 截图失败时仅记录警告，不中断执行
+
+## 六、失败语义
 
 交互指令的失败按原因分两类，不再混作一谈：
 

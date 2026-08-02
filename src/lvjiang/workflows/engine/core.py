@@ -2,9 +2,11 @@
 
 import posixpath
 import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+import cv2
 from loguru import logger
 
 from ...config import DelayParam, InputSimConfig
@@ -39,6 +41,7 @@ from ..grammar import (
     Recognize,
     Return,
     Scan,
+    Screenshot,
     UntilLoop,
     Wait,
     WhileLoop,
@@ -428,6 +431,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 else:
                     val = self._resolve(node.message)
                     logger.info("null" if val is None else val)
+            case Screenshot():
+                self._exec_screenshot()
             case If():
                 self._exec_if(node)
             case For():
@@ -463,3 +468,22 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_try(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
+
+    def _exec_screenshot(self):
+        """截取当前画面并保存到 logs/image/"""
+        img = self._capture.capture()
+        if img is None:
+            logger.warning("screenshot: 截图失败")
+            return
+
+        # 生成文件名：image + 日期时间精确到毫秒
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # 毫秒
+        filename = f"image_{timestamp}.png"
+
+        # 保存目录
+        out_dir = Path("logs/image")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / filename
+
+        cv2.imwrite(str(out_path), img)
+        logger.info(f"screenshot: 已保存 {filename}")

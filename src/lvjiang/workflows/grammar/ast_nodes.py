@@ -214,6 +214,8 @@ class Try:
 
 @dataclass(frozen=True)
 class Return:
+    """return [value] — 返回值可选"""
+    value: Any = None  # 返回值表达式（arith_expr 节点），None 表示无返回值
     line_no: int = 0
 
 
@@ -271,9 +273,10 @@ class ProcDef:
 
 @dataclass(frozen=True)
 class CallProc:
-    """call proc_name($arg1, "arg2", ...)"""
+    """call proc_name($arg1, "arg2", ...) 或 call $result = proc_name(...)"""
     name: str
     args: list            # list[Literal | VarRef | number]
+    result_var: str | None = None  # 返回值绑定变量名，None 表示不绑定
     line_no: int = 0
 
 

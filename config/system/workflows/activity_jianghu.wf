@@ -262,7 +262,7 @@ def back_to_menpai()
       log "仍未找到门派，无法前往江湖号令页"
       return -1
    end
-   click $found after wait step_interval
+   click $found after wait (2, 3)
 
    call back_to_haoling()
 end
@@ -271,7 +271,7 @@ def back_to_haoling()
    # 门派页三种形态：有门派（基底，入口文字「江湖号令」）
    # / 无门无派（no_school 视图，入口换成 haoling_2）
    # / 问津（wenjin 视图，入口换成 haoling_3）
-   scan [school_main].[haoling] as $haoling_key by contains "江湖号令"
+   scan [school_main].[haoling] as $haoling_key by contains "号令"
    if $haoling_key
       click [school_main].$haoling_key after wait step_interval
    else

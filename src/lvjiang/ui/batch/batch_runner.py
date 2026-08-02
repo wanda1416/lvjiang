@@ -170,13 +170,13 @@ class BatchWorker(QThread):
         summary["stopped"] = self._stopped
         tag = "（用户中断）" if self._stopped else ""
         self.log.emit(f"[批量] 全部结束{tag}")
-        
+
         # 5. 调用后处理 wf（如果定义）
         postprocess_wf = self._config.workflows.postprocess
         if postprocess_wf:
             self.log.emit(f"[批量] 执行后处理: {postprocess_wf}")
             self._run_switch_wf(postprocess_wf, -1, {})
-        
+
         self.finished_all.emit(summary)
 
     # ─── 切换逻辑 ───────────────────────────────────────
@@ -203,7 +203,7 @@ class BatchWorker(QThread):
 
     def _get_role_from_row(self, row_data: dict) -> str | None:
         """根据配置的 user_column 获取用户名（用于 session 切换）
-        
+
         如果未配置 user_column，返回 None（不切换用户）
         """
         if not self._config.user_column:

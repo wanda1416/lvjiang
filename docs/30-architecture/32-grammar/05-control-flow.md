@@ -346,12 +346,12 @@ end
 - 列表索引：`$list[$i]`（直接 `[]` 表示索引）
 - 链式嵌套：`$var.f1.f2.f3`，每层从上一层结果中取字段
 
-`$var` 的 truthy 检查常用于判断子工作流是否成功返回值：
+`$var` 的 truthy 检查常用于判断子过程是否成功返回值：
 
 ```
-call "sub.wf" read "status" as $result
+call $result = my_proc()
 if not $result
-    log "子工作流未返回 status，执行失败"
+    log "子过程未返回 status，执行失败"
     return
 end
 ```

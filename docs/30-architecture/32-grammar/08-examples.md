@@ -68,9 +68,11 @@ eval $all_slots = [
     "bag_3_1", "bag_3_2", "bag_3_3", "bag_3_4", "bag_3_5", "bag_3_6"
 ]
 
+import "subcall/single_tuning.wf"
+
 for $slot in $all_slots
     eval $bag_slot = $slot
-    call "subcall/single_tuning.wf"
+    call single_tuning()
 end
 ```
 

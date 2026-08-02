@@ -367,7 +367,7 @@ eval $var = func(args...)         # 函数调用并赋值
 eval $var = "字符串"              # 字面量赋值
 eval $var = 123                   # 数字赋值
 eval $var = {}                    # 初始化空字典
-eval $var = {"k": v}              # 字典字面量（支持嵌套）
+eval $var = {"k": "v"}              # 字典字面量（支持嵌套）
 eval $var = ["a", "b"]           # 列表赋值
 eval $var.field = value           # 字典字段赋值（单层）
 eval $var.f1.f2 = value           # 字典链式字段赋值（自动创建中间层）
@@ -397,17 +397,18 @@ eval $list = [{"k": "v"}, {"k2": "v2"}]     # 列表含字典元素
 
 内置函数全集见 [06-functions.md](06-functions.md)。
 
-## 六、call — 调用子工作流
+## 六、call — 调用子过程
 
-调用另一个 `.wf` 文件作为子工作流，支持传入参数和提取返回值。
+调用同文件内 `def` 定义的子过程，或 `import` 引入的外部子过程。
 
 **语法**：
 
 ```
-call "sub.wf"                                       # 简单调用
-call "sub.wf" with $x as "arg1"                     # 传入参数
-call "sub.wf" read "key" as $var                    # 提取返回值
-call "sub.wf" with $x as "arg1" read "key" as $var  # 传参 + 提取
+call proc_name()                                  # 简单调用
+call proc_name($arg1, $arg2)                      # 传入参数
+call $result = proc_name()                        # 获取返回值
+call proc_name() as $output                       # 获取 output dict
+call $result = proc_name() as $output             # 同时获取返回值与 output
 ```
 
 详细说明见 [07-subworkflows.md](07-subworkflows.md)。

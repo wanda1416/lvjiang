@@ -273,10 +273,11 @@ class ProcDef:
 
 @dataclass(frozen=True)
 class CallProc:
-    """call proc_name($arg1, "arg2", ...) 或 call $result = proc_name(...)"""
+    """call proc_name($arg1, "arg2", ...) 或 call $result = proc_name(...) [as $output]"""
     name: str
     args: list            # list[Literal | VarRef | number]
     result_var: str | None = None  # 返回值绑定变量名，None 表示不绑定
+    output_var: str | None = None  # output dict 绑定变量名，None 表示丢弃
     line_no: int = 0
 
 

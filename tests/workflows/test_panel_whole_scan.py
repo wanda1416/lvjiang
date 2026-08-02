@@ -5,15 +5,19 @@ scan [scene].[key] 的 key 命中 panel（而非 region）时分派为整面板�
 数字 key 与 $var.$r 动态数字 key（for 循环 int 归一化为 "1" 字符串）取值。
 """
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import cv2
 import numpy as np
 import pytest
 
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import Eval, FieldAccess, Literal, VarRef, parse_text
 from lvjiang.workflows.scene_scan import collect_refs
+
+DATA_DIR = Path(__file__).parent / "data"
 
 # ─── 语法：数字字面量 key ─────────────────────────────────
 
@@ -142,11 +146,25 @@ def test_whole_panel_scan_for_loop_access(tmp_path):
     assert output["joined"] == "t1,t2,t3,t4,"
 
 
-def test_whole_panel_scan_rejects_by_clause(tmp_path):
-    """整面板结果是嵌套 dict，与 by 短路语义不兼容，明确报错"""
-    wf = _write_wf(tmp_path, 'scan [s].[actions] as $x by contains "背包"\n')
-    with pytest.raises(WorkflowUserError, match="不支持 by 子句"):
-        _make_engine().execute(wf)
+def test_whole_panel_scan_with_by_clause_returns_position(tmp_path):
+    """整面板 + by 返回首个命中的行列位置 {row, col}，未命中返回 {}"""
+    wf = _write_wf(tmp_path, (
+        'scan [s].[actions] as $pos by contains "t2"\n'
+        'collect $pos\n'
+    ))
+    output = _make_engine().execute(wf)
+    # t2 在 1 行 2 列
+    assert output["pos"] == {"row": 1, "col": 2}
+
+
+def test_whole_panel_scan_with_by_clause_no_match(tmp_path):
+    """整面板 + by 未命中返回空 dict"""
+    wf = _write_wf(tmp_path, (
+        'scan [s].[actions] as $pos by contains "不存在"\n'
+        'collect $pos\n'
+    ))
+    output = _make_engine().execute(wf)
+    assert output["pos"] == {}
 
 
 # ─── 单格 [r][c]：key 过滤，结果为该格文本 ──────────────
@@ -233,3 +251,63 @@ def test_region_key_still_goes_region_path(tmp_path):
     output = engine.execute(wf)
     workflow.ocr_scene.assert_called_once_with("s", ["title"])
     assert output["x"] == {"title": "背包"}
+
+
+# ─── 实测图片：材料识别集成测试 ─────────────────────────────
+
+class TestRealImageRecognition:
+    """使用实测图片验证整面板识别流程"""
+
+    def test_image1_row2_col1_is_cai_gouliang(self):
+        """image1.png 第2行第1列应为彩狗粮"""
+        from lvjiang.workflows.align import detect_grid
+        from lvjiang.core.ocr import OCREngine
+        from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+
+        img_path = DATA_DIR / "image1.png"
+        img = cv2.imread(str(img_path))
+        assert img is not None, f"无法读取图片: {img_path}"
+
+        # 检测网格
+        cal = detect_grid(img, expected_rows=5, expected_cols=6)
+        assert cal is not None, "未检测到网格"
+        assert cal.n_rows == 5
+        assert cal.n_cols == 6
+
+        # 提取第2行第1列的 slot 图片（0-indexed: row=1, col=0）
+        h, w = img.shape[:2]
+        x1, y1, x2, y2 = cal.slot_bounds(1, 0)
+        slot_img = img[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)]
+
+        # 材料识别
+        ocr = OCREngine()
+        recognizer = MaterialRecognizer(ocr)
+        result = recognizer.recognize(slot_img, group="调律材料")
+
+        assert result.type == "彩狗粮", f"期望彩狗粮，实际识别为 {result.type!r}"
+
+    def test_image1_row2_col2_is_jin_gouliang(self):
+        """image1.png 第2行第2列应为金狗粮"""
+        from lvjiang.workflows.align import detect_grid
+        from lvjiang.core.ocr import OCREngine
+        from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+
+        img_path = DATA_DIR / "image1.png"
+        img = cv2.imread(str(img_path))
+        assert img is not None, f"无法读取图片: {img_path}"
+
+        # 检测网格
+        cal = detect_grid(img, expected_rows=5, expected_cols=6)
+        assert cal is not None, "未检测到网格"
+
+        # 提取第2行第2列的 slot 图片（0-indexed: row=1, col=1）
+        h, w = img.shape[:2]
+        x1, y1, x2, y2 = cal.slot_bounds(1, 1)
+        slot_img = img[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)]
+
+        # 材料识别
+        ocr = OCREngine()
+        recognizer = MaterialRecognizer(ocr)
+        result = recognizer.recognize(slot_img, group="调律材料")
+
+        assert result.type == "金狗粮", f"期望金狗粮，实际识别为 {result.type!r}"

@@ -53,19 +53,19 @@ class TuningNavigator:
     def nav_to_tune(self, detail_scene: str) -> bool:
         """从装备详情页进入调律页，失败时停留在详情页并返回 False"""
         wf = self._wf
-        wf.click_region(detail_scene, "more_func")
+        wf.click_region(wf.EQUIP_DETAIL, "more_func")
         wf.wait_delay("page_refresh_wait")  # 详情页 → 「更多」弹窗展开
         tune_key = wf.ocr_scene_by(
-            detail_scene,
+            wf.EQUIP_DETAIL,
             ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
             "调律", "contains")
         if not tune_key:
             logger.info("未找到调律按钮")
             # 「更多」弹窗已开，再点一次 more_func 使其收起，保持背包页干净
-            wf.click_region(detail_scene, "more_func")
+            wf.click_region(wf.EQUIP_DETAIL, "more_func")
             wf.wait_delay("step_interval")
             return False
-        wf.click_region(detail_scene, tune_key)
+        wf.click_region(wf.EQUIP_DETAIL, tune_key)
         wf.wait_delay("page_refresh_wait")  # 详情页 → 调律页（页面切换）
         return True
 

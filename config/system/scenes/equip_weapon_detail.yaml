@@ -41,41 +41,6 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
-- key: main_func
-  name: 主功能
-  type: func
-  is_text: true
-  is_clickable: true
-- key: more_func
-  name: 更多功能
-  type: func
-  is_text: false
-  is_clickable: true
-- key: sub_func_1
-  name: 次功能1
-  type: func
-  is_text: true
-  is_clickable: true
-- key: sub_func_2
-  name: 次功能2
-  type: func
-  is_text: true
-  is_clickable: true
-- key: sub_func_3
-  name: 次功能3
-  type: func
-  is_text: true
-  is_clickable: true
-- key: sub_func_4
-  name: 次功能4
-  type: func
-  is_text: true
-  is_clickable: true
-- key: recycle_confirm
-  name: 回收确认
-  type: func
-  is_text: true
-  is_clickable: true
 - key: dingyin
   name: 定音
   type: attr

@@ -91,3 +91,11 @@ class CaptureBackend(ABC):
         桌面 mss 子类覆盖实现；ADB 子类为 no-op 返回 False。
         """
         return False
+
+    def stop(self):  # noqa: B027
+        """释放截图后端持有的后台线程、socket 或系统资源。
+
+        默认 no-op，供无常驻资源的后端继承。UI 层在断连、切换后端和
+        退出程序时会统一调用此方法。
+        """
+        pass

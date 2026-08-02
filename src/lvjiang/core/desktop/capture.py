@@ -34,6 +34,8 @@ class DesktopCapture(CaptureBackend):
         self._main_sct = None  # 主线程 mss 实例（仅用于 list_monitors / get_capture_size）
         self._task_queue: queue.Queue = queue.Queue(maxsize=2)
         self._consecutive_timeouts = 0  # 连续超时计数
+        self._closed = False
+        self._lifecycle_lock = threading.Lock()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="DesktopCapture")
         self._worker.start()
 
@@ -67,6 +69,8 @@ class DesktopCapture(CaptureBackend):
     @property
     def _sct(self):
         """主线程 mss 实例（惰性创建，仅用于 list_monitors / get_capture_size）"""
+        if self._closed:
+            raise RuntimeError("DesktopCapture 已停止")
         if self._main_sct is None:
             self._main_sct = mss.mss()
         return self._main_sct
@@ -103,6 +107,8 @@ class DesktopCapture(CaptureBackend):
         旧的死锁线程作为 daemon 线程会被遗弃，进程退出时自动回收。
         新建队列确保新线程不会收到旧任务。
         """
+        if self._closed:
+            return
         logger.warning("截屏工作线程疑似死锁，正在重建...")
         self._task_queue = queue.Queue(maxsize=2)
         self._consecutive_timeouts = 0
@@ -122,9 +128,14 @@ class DesktopCapture(CaptureBackend):
             timeout: 超时秒数（默认 5s）。mss.grab 底层调用 Win32 GDI，
                      可能因显示状态变化而永久阻塞，需要超时保护。
         """
+        if self._closed:
+            logger.debug("DesktopCapture 已停止，跳过捕获")
+            return None
         if not self._worker.is_alive():
             logger.warning("截屏工作线程已退出，尝试重建")
             self._restart_worker()
+            if self._closed:
+                return None
 
         result_holder: list = [None]
 
@@ -161,6 +172,44 @@ class DesktopCapture(CaptureBackend):
         # 成功：重置连续超时计数
         self._consecutive_timeouts = 0
         return result_holder[0]
+
+    def stop(self, timeout: float = 3.0):
+        """停止桌面截图工作线程并释放 mss 资源。
+
+        工作线程平时阻塞在 ``Queue.get()`` 等待截图任务；stop() 必须显式
+        投递 ``None`` 哨兵，否则应用退出时只能等 join 超时。
+        """
+        with self._lifecycle_lock:
+            if self._closed:
+                return
+            self._closed = True
+
+            worker = self._worker
+            if worker is not None and worker.is_alive():
+                self._send_stop_sentinel()
+                worker.join(timeout=timeout)
+                if worker.is_alive():
+                    logger.warning(f"DesktopCapture 工作线程 {timeout:.1f}s 内未退出")
+
+            if self._main_sct is not None:
+                try:
+                    self._main_sct.close()
+                except Exception:
+                    pass
+                self._main_sct = None
+
+    def _send_stop_sentinel(self):
+        """尽力把停止哨兵放入任务队列；队列满时丢弃旧任务让出空间。"""
+        for _ in range(3):
+            try:
+                self._task_queue.put_nowait(None)
+                return
+            except queue.Full:
+                try:
+                    self._task_queue.get_nowait()
+                except queue.Empty:
+                    pass
+        logger.warning("DesktopCapture 停止信号投递失败：任务队列仍然满")
 
     def capture_to_file(self, path: str) -> bool:
         """截屏并保存为 PNG 文件（使用 mss.tools.to_png）"""

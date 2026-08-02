@@ -68,12 +68,21 @@ class TestParse:
 # ─── EquipmentParser 委托整链 ──────────────────────────────
 
 class TestParserDelegation:
+    # 满词条测试数据（5 条词条才可能有定音）
+    _FULL_AFFIXES = {
+        "affix_gong": "最大外功攻击 +121.4",
+        "affix_shang": "劲 +50.0",
+        "affix_jue": "敏 +40.0",
+        "affix_zhi": "气血最大值 +500",
+        "affix_yu": "外功防御 +30.0",
+    }
+
     def test_weapon_dingyin_parsed(self, parser):
         equip = parser.parse({
             "equip_type": "踏雪含光 | 武器·剑",
             "equip_level": "承音 | 110阶",
             "base_attr": "外功攻击 100~232",
-            "affix_gong": "最大外功攻击 +121.4",
+            **self._FULL_AFFIXES,
             "dingyin": "外功穿透 +14.2%",
         })
         assert equip.dingyin == {"name": "外功穿透", "value": 14.2}
@@ -85,6 +94,10 @@ class TestParserDelegation:
             "equip_level": "110阶",
             "base_attr": "气血最大值 8750",
             "affix_gong": "劲 +76.8",
+            "affix_shang": "敏 +50.0",
+            "affix_jue": "气血最大值 +300",
+            "affix_zhi": "外功防御 +40.0",
+            "affix_yu": "体 +20.0",
             "dingyin": "千机索天重击增伤 +6.4%",
         })
         assert equip.dingyin == {"name": "千机索天重击增伤", "value": 6.4}
@@ -104,8 +117,22 @@ class TestParserDelegation:
             "equip_type": "踏雪含光 | 武器·剑",
             "equip_level": "110阶",
             "base_attr": "外功攻击 100~232",
-            "affix_gong": "最大外功攻击 +121.4",
+            **self._FULL_AFFIXES,
             "dingyin": "乱码噪声",
         })
         assert equip.dingyin == {}
         assert any("定音词条无法解析" in w for w in equip.warnings)
+
+    def test_affixes_less_than_5_skips_dingyin(self, parser):
+        """词条不满 5 个时，即使有 dingyin 字段也跳过解析"""
+        equip = parser.parse({
+            "equip_type": "踏雪含光 | 武器·剑",
+            "equip_level": "110阶",
+            "base_attr": "外功攻击 100~232",
+            "affix_gong": "最大外功攻击 +121.4",
+            "affix_shang": "劲 +50.0",
+            # 只有 2 条词条，不满 5 条
+            "dingyin": "外功穿透 +14.2%",
+        })
+        assert equip.dingyin == {}  # 不应解析定音
+        assert len(equip.affixes) == 2

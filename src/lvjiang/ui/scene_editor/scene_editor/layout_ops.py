@@ -12,7 +12,8 @@ class LayoutOpsMixin:
 
     依赖主类提供:
         _manager, _current_layout, _tabs, _layout_combo, _status_bar,
-        _btn_save, _btn_save_as, _btn_delete, _dirty, _set_dirty(),
+        _btn_save, _btn_save_as, _btn_delete, _dirty_scenes,
+        _set_dirty(), _mark_all_scenes_clean(), _get_dirty_scene_names(),
         _apply_layout_to_tabs(), _clear_all_tabs(), _update_ui_state()
     """
 
@@ -66,11 +67,14 @@ class LayoutOpsMixin:
         Returns:
             True 表示可以继续（已保存或用户选择放弃），False 表示取消操作
         """
-        if not self._dirty:
+        if not self._dirty_scenes:
             return True
+        dirty_names = self._get_dirty_scene_names()
+        msg = f"当前布局存在未保存的修改，{action}将丢失这些修改。\n是否先保存？"
+        if dirty_names:
+            msg += f"\n\n当前有如下场景发生变更：{dirty_names}"
         reply = QMessageBox.question(
-            self, "未保存的修改",
-            f"当前布局存在未保存的修改，{action}将丢失这些修改。\n是否先保存？",
+            self, "未保存的修改", msg,
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel,
@@ -78,7 +82,7 @@ class LayoutOpsMixin:
         )
         if reply == QMessageBox.StandardButton.Save:
             self._on_save_layout()
-            return not self._dirty  # 保存成功后 dirty 已清除
+            return not self._dirty_scenes  # 保存成功后 dirty_scenes 已清空
         return reply == QMessageBox.StandardButton.Discard
 
     def _on_combo_changed(self, index: int):
@@ -146,30 +150,36 @@ class LayoutOpsMixin:
         self._status_bar.showMessage(f"已新建布局「{name}」")
 
     def _on_save_layout(self):
-        """从所有 Tab 收集 regions + points + arrows + panels + canvas，全量写入当前布局文件"""
+        """从所有 Tab 收集数据，增量写入变更的场景文件"""
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
         name = self._current_layout.name
         current_tab = next(iter(self._tabs.values()))
         self._current_layout.set_canvas(current_tab.get_canvas_config())
+        # 从所有 Tab 收集数据到 Layout 对象（内存操作，始终全量）
         for scene_key, tab in self._tabs.items():
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
             self._current_layout.set_scene_points(scene_key, tab.get_points())
             self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
             self._current_layout.set_scene_panels(scene_key, tab.get_panels())
-        self._manager.save_layout(self._current_layout)
+        # 增量写盘：只写变更的场景文件
+        changed = set(self._dirty_scenes) if self._dirty_scenes else None
+        self._manager.save_layout(self._current_layout, changed_scenes=changed)
         self._update_ui_state()
         total_r = sum(len(tab.get_regions()) for tab in self._tabs.values())
         total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
         total_a = sum(len(tab.get_arrows()) for tab in self._tabs.values())
         total_pn = sum(len(tab.get_panels()) for tab in self._tabs.values())
+        saved_info = f"{len(changed)} 个场景" if changed else "全部"
         self._status_bar.showMessage(
-            f"已保存布局「{name}」，共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
+            f"已保存布局「{name}」（{saved_info}），"
+            f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
         )
-        self._set_dirty(False)
+        self._mark_all_scenes_clean()
         logger.info(
-            f"布局已保存: {name}, {total_r} 区域 / {total_p} 坐标 / {total_a} 方向 / {total_pn} 面板"
+            f"布局已保存: {name} ({saved_info}), "
+            f"{total_r} 区域 / {total_p} 坐标 / {total_a} 方向 / {total_pn} 面板"
         )
 
     def _on_save_as_layout(self):
@@ -216,7 +226,7 @@ class LayoutOpsMixin:
         self._update_ui_state()
         total = sum(len(r) for r in temp.scenes.values())
         self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
-        self._set_dirty(False)
+        self._mark_all_scenes_clean()
         logger.info(f"布局已另存为: {name}, {total} 个区域")
 
     def _on_delete_layout(self):

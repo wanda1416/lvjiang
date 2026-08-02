@@ -50,11 +50,13 @@ def _preprocess_line_continuation(text: str) -> str:
         if ch == '"' and (i == 0 or text[i - 1] != '\\'):
             in_string = not in_string
             result.append(ch)
-        elif not in_string and ch == '\\' and text[i + 1:i + 2] == '\n':
-            # 显式续行
+        elif not in_string and ch == '\\' and text[i + 1:i + 2] in ('\n', '\r'):
+            # 显式续行：\\\n 或 \\\r\n
             result.append(' ')
             pending_nl += 1
             i += 2
+            if text[i - 1] == '\r' and text[i:i + 1] == '\n':
+                i += 1  # 跳过 \r\n 的 \n
             continue
         elif not in_string:
             if ch in ('(', '[', '{'):

@@ -1229,6 +1229,22 @@ scan [scene].[f2] as $r2
     print("  括号外换行 = 语句终结: OK")
 
 
+def test_crlf_line_continuation():
+    """测试 CRLF 换行符的显式续行"""
+    print("\n=== 测试 CRLF 续行 ===")
+    # CRLF 续行：\\\r\n
+    program = parse_text('scan [scene].\\\r\n[f1, f2] as $result')
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    print("  scan [scene].\\\\\\r\\n[f1, f2]: OK")
+
+    # 多行 CRLF 续行
+    program = parse_text('eval $list = [\\\r\n"a",\\\r\n"b"\\\r\n]')
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    print("  eval $list = [\\\\\\r\\n...\\\\\\r\\n]: OK")
+
+
 # ─── 主入口 ─────────────────────────────────────────────────
 
 if __name__ == "__main__":

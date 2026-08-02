@@ -9,6 +9,7 @@ import pytest
 
 from lvjiang.apps.yysls.equip_parser.dingyin_parser import DingyinParser
 from lvjiang.apps.yysls.equip_parser.parser import EquipmentParser
+from lvjiang.core.ocr_cleaner import OCRCleaner
 
 
 @pytest.fixture(scope="module")
@@ -19,6 +20,17 @@ def dp():
 @pytest.fixture(scope="module")
 def parser():
     return EquipmentParser()
+
+
+@pytest.fixture(autouse=True)
+def reset_cleaner():
+    """每个测试前重置单例，确保加载最新配置"""
+    OCRCleaner.reset_instance()
+
+
+def clean(text: str) -> str:
+    """模拟 OCR 引擎清洗"""
+    return OCRCleaner().clean(text)
 
 
 # ─── 候选词条池 ────────────────────────────────────────────
@@ -48,13 +60,13 @@ class TestParse:
         assert dp.parse(text) == {"name": name, "value": value}
 
     def test_prefix_noise_substring_match(self, dp):
-        # OCR 前缀噪声 → 子串匹配兜底
-        result = dp.parse("荐外功穿透 +14.2%")
+        # OCR 前缀噪声 → 子串匹配兜底（由 OCR 引擎清洗）
+        result = dp.parse(clean("荐外功穿透 +14.2%"))
         assert result == {"name": "外功穿透", "value": 14.2}
 
     def test_cleaner_and_dot_normalized(self, dp):
-        # 真实脏数据：含噪声字符"荐" + 游戏内 武学·技能 间隔号
-        result = dp.parse("明川药典·治疗技增疗荐7.5%")
+        # 真实脏数据：含噪声字符"荐" + 游戏内 武学·技能 间隔号（由 OCR 引擎清洗）
+        result = dp.parse(clean("明川药典·治疗技增疗荐7.5%"))
         assert result == {"name": "明川药典治疗技增疗", "value": 7.5}
 
     def test_empty_and_garbage(self, dp):

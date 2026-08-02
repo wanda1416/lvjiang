@@ -7,7 +7,6 @@ import re
 
 from loguru import logger
 
-from .cleaner import clean_affix_text, clean_equip_type_text
 from .constants import (
     AFFIX_NAMES,
     PERCENT_AFFIXES,
@@ -156,7 +155,6 @@ class EquipmentParser:
         Returns:
             (name, type)
         """
-        raw = clean_equip_type_text(raw)
         if not raw:
             return None, None
 
@@ -384,19 +382,15 @@ class EquipmentParser:
         Returns:
             Affix 或 None（无法解析时）
         """
-        # ── 0. 数据清洗 ──
-        text = clean_affix_text(raw)
+        # 输入应由 OCR 引擎清洗，此处直接使用
+        text = raw.strip() if raw else ""
         if not text:
             return None
 
-        # ── 1. 转律标记 ──
-        # OCR 常将 ］/] 误识别为 1，兼容 ［转1 / [转1 等变体
-        is_transferred = bool(re.search(r"[［【\[]转[］\]】1]", text))
-        text = re.sub(r"[［【\[]转[］\]】1]", "", text)
-        # OCR 容错：【转 无闭合括号（漏识别）
-        if not is_transferred and text.startswith(("【转", "［转", "[转")):
-            is_transferred = True
-            text = re.sub(r"^[［【\[]转", "", text)
+        # ── 1. 转律标记检测与移除 ──
+        # 符号已统一为英文括号，匹配 [转1] / [转] / [转1 / [转 等变体
+        is_transferred = bool(re.search(r"\[转[1\]]?", text))
+        text = re.sub(r"\[转[1\]]?", "", text)
 
         # ── 2. 过滤套装信息 ──
         if "套装" in text:

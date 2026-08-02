@@ -15,8 +15,6 @@ import re
 
 from loguru import logger
 
-from .cleaner import clean_affix_text
-
 # 定音词条所在的全部类别（增益类 + 指定技能增效）
 _DINGYIN_CATEGORIES = ("外功增益", "属攻增益", "指定技能增效")
 
@@ -37,10 +35,8 @@ class DingyinParser:
         Returns:
             {"name": 原始词条名, "value": float} 或 None（为空 / 无法识别）
         """
-        # 数据清洗（与普通词条同一套规则：误识别替换 + 噪声字符删除）
-        text = clean_affix_text(raw)
-        # 游戏内定音显示为 武学·技能（含间隔号），配置词条名为连写形态，去除后匹配
-        text = text.replace("·", "")
+        # 输入应由 OCR 引擎清洗，此处直接使用
+        text = raw.strip() if raw else ""
         if not text:
             return None
 

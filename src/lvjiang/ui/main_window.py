@@ -207,9 +207,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # ── 工具 ──
         tools_menu = menubar.addMenu("工具")
 
-        ocr_test = QAction("图像识别", self)
-        ocr_test.triggered.connect(self._open_ocr_test)
-        tools_menu.addAction(ocr_test)
+        ocr_action = QAction("图像识别", self)
+        ocr_action.triggered.connect(self._open_ocr_dialog)
+        tools_menu.addAction(ocr_action)
 
         script_record = QAction("脚本录制", self)
         script_record.triggered.connect(self._open_script_record)
@@ -254,9 +254,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     # ─── 对话框 ──────────────────────────────────────────────
 
-    def _open_ocr_test(self):
-        from .ocr_test_dialog import OCRTestDialog
-        dialog = OCRTestDialog(self)
+    def _open_ocr_dialog(self):
+        from .ocr_dialog import OCRDialog
+        dialog = OCRDialog(self)
         dialog.exec()
 
     def _open_script_record(self):

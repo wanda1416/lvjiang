@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QPushButton,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -26,15 +27,16 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.ocr_cleaner import OCRCleaner
+from .ocr_canvas import OCRBox, OCRCanvas
 
 
-class OCRTestDialog(QDialog):
+class OCRDialog(QDialog):
     """图像识别对话框：图像识别 + 清洗规则管理"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("图像识别")
-        self.setMinimumSize(750, 650)
+        self.setMinimumSize(1000, 700)
         self._current_pixmap = None
         self._setup_ui()
 
@@ -59,14 +61,17 @@ class OCRTestDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # 图片显示区
-        self._image_label = QLabel("Ctrl+V 粘贴截图，或点击「上传图片」加载文件")
-        self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._image_label.setMinimumHeight(250)
-        self._image_label.setStyleSheet(
-            "background-color: #2b2b2b; color: #888; font-size: 14px;"
-        )
-        layout.addWidget(self._image_label)
+        # 左右分割：左侧画布，右侧结果文本
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # 左侧：画布（支持缩放/平移 + OCR 标注）
+        self._canvas = OCRCanvas()
+        splitter.addWidget(self._canvas)
+
+        # 右侧：识别结果文本
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
 
         # 按钮栏
         btn_row = QHBoxLayout()
@@ -87,18 +92,21 @@ class OCRTestDialog(QDialog):
         self._btn_clear = QPushButton("清空")
         self._btn_clear.clicked.connect(self._on_clear)
         btn_row.addWidget(self._btn_clear)
-
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
+        right_layout.addLayout(btn_row)
 
         # 识别结果
-        layout.addWidget(QLabel("识别结果（已应用清洗规则）："))
+        right_layout.addWidget(QLabel("识别结果（已应用清洗规则）："))
         self._result_text = QTextEdit()
         self._result_text.setReadOnly(True)
         self._result_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
         )
-        layout.addWidget(self._result_text)
+        right_layout.addWidget(self._result_text)
+
+        splitter.addWidget(right_panel)
+        splitter.setStretchFactor(0, 3)  # 画布占 3/4
+        splitter.setStretchFactor(1, 1)  # 文本占 1/4
+        layout.addWidget(splitter, stretch=1)  # splitter 占满剩余空间
 
         # 状态栏
         self._status_label = QLabel("就绪")
@@ -373,12 +381,7 @@ class OCRTestDialog(QDialog):
     def _set_pixmap(self, pixmap: QPixmap):
         """设置当前图片并刷新显示"""
         self._current_pixmap = pixmap
-        scaled = pixmap.scaled(
-            self._image_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self._image_label.setPixmap(scaled)
+        self._canvas.set_pixmap(pixmap)
         self._btn_ocr.setEnabled(True)
         self._btn_material.setEnabled(True)
 
@@ -400,14 +403,21 @@ class OCRTestDialog(QDialog):
             self._result_text.clear()
             if not results:
                 self._result_text.append("未识别到文字")
+                self._canvas.set_ocr_boxes([])
             else:
+                # 构建画布标注
+                boxes = []
                 for i, r in enumerate(results, 1):
+                    boxes.append(OCRBox(
+                        text=r.text, confidence=r.confidence, bbox=r.bbox
+                    ))
                     self._result_text.append(
                         f"[{i}] {r.text}  (置信度: {r.confidence:.3f})"
                     )
                     pts = " ".join(f"({x},{y})" for x, y in r.bbox)
                     self._result_text.append(f"    位置: {pts}")
                     self._result_text.append("")
+                self._canvas.set_ocr_boxes(boxes)
 
             self._status_label.setText(f"文字识别完成，共 {len(results)} 条结果")
             logger.info(f"OCR 测试：识别到 {len(results)} 条文字")
@@ -476,7 +486,7 @@ class OCRTestDialog(QDialog):
     def _on_clear(self):
         """清空图片和结果"""
         self._current_pixmap = None
-        self._image_label.setText("Ctrl+V 粘贴截图（支持剪贴板中的图片）")
+        self._canvas.clear()
         self._result_text.clear()
         self._btn_ocr.setEnabled(False)
         self._btn_material.setEnabled(False)

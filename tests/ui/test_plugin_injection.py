@@ -106,7 +106,7 @@ class TestSetupMenuInjection:
         # _setup_menu 只 connect 不调用这些处理器，桩为空函数即可
         for name in ("_open_settings_manager", "_open_user_manager",
                      "_open_scene_editor", "_open_reference_manager",
-                     "_open_ocr_test", "_open_script_record", "_open_script_config",
+                     "_open_ocr_dialog", "_open_script_record", "_open_script_config",
                      "_open_batch_config", "_show_about", "_check_update",
                      "_open_docs", "_open_feedback"):
             setattr(win, name, lambda: None)

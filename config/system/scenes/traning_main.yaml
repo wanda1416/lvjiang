@@ -1,0 +1,9 @@
+key: traning_main
+name: 培养
+views:
+- key: gongfa
+  name: 功法
+- key: equip
+  name: 装备
+- key: talent
+  name: 天赋

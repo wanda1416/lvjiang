@@ -33,5 +33,3 @@ click [bag_equip_detail].[back] after wait step_interval
 click [bag_equip_detail].[back] after wait step_interval
 
 click [game_menu_page].[back]
-
-collect 0 as "exit_code"

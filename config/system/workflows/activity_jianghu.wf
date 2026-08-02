@@ -151,10 +151,10 @@ end
 def action_heying($label, $idx)
    click [activity_jianghu].$label after wait $step_interval
    click [activity_jianghu].[goto] after wait $step_interval
-   click [action_control].[camera_shot] after wait $step_interval
-   click [action_control].[back] after wait $step_interval
-   click [action_control].[back] after wait $step_interval
-   click [action_control].[back_confirm] after wait $step_interval
+   click [general_action].[camera_shot] after wait $step_interval
+   click [general_action].[back] after wait $step_interval
+   click [general_action].[back] after wait $step_interval
+   click [general_action].[back_confirm] after wait $step_interval
 
    # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward
@@ -198,7 +198,7 @@ def action_dongfang($label, $idx)
    click [activity_jianghu].[goto] after wait $step_interval
 
    # 整面板扫描动作列表，定位「看报」所在行列
-   scan [action_control].[actions] as $acts
+   scan [general_action].[actions] as $acts
    eval $fr = ""
    for r in [1...2]
       for c in [1...6]
@@ -217,12 +217,12 @@ def action_dongfang($label, $idx)
       eval $fc = 3
    end
 
-   click [action_control].[actions][$fr][$fc] after wait $step_interval
+   click [general_action].[actions][$fr][$fc] after wait $step_interval
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
-   click [action_control].[choose_1] after wait $step_interval
-   click [action_control].[back] after wait $step_interval
-   click [action_control].[back] after wait $step_interval
+   click [general_action].[choose_1] after wait $step_interval
+   click [general_action].[back] after wait $step_interval
+   click [general_action].[back] after wait $step_interval
 
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward

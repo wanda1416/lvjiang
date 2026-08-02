@@ -47,18 +47,18 @@ class PanelEditorMixin:
         self._panel_table = QTableWidget()
         self._panel_table.setColumnCount(7)
         self._panel_table.setHorizontalHeaderLabels(
-            ["名称", "Key", "行数", "列数", "行可见比例", "校准模式", "滚动方向"]
+            ["名称", "Key", "行数", "列数", "比例", "校准模式", "滚动方向"]
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         for col in (2, 3, 4, 5, 6):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 50)   # 行数
-        header.resizeSection(3, 50)   # 列数
-        header.resizeSection(4, 80)   # 行可见比例
-        header.resizeSection(5, 70)   # 校准模式
-        header.resizeSection(6, 80)   # 滚动方向
+        header.resizeSection(2, 40)   # 行数
+        header.resizeSection(3, 40)   # 列数
+        header.resizeSection(4, 40)   # 行可见比例
+        header.resizeSection(5, 60)   # 校准模式
+        header.resizeSection(6, 60)   # 滚动方向
         self._panel_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )

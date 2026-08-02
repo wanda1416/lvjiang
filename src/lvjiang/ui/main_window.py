@@ -447,7 +447,16 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         daily_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         daily_panel = QWidget()
         daily_layout = QVBoxLayout(daily_panel)
-        daily_layout.setContentsMargins(4, 4, 4, 4)
+        daily_layout.setContentsMargins(8, 8, 8, 8)
+        daily_layout.setSpacing(8)
+
+        # 开始/停止按钮（第一行）
+        self.btn_run_workflow = QPushButton("开始执行 (F9)")
+        self.btn_run_workflow.clicked.connect(self._on_run_workflow)
+        self.btn_run_workflow.setStyleSheet(
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+        )
+        daily_layout.addWidget(self.btn_run_workflow)
 
         wf_group = QGroupBox("脚本")
         wf_layout = QHBoxLayout(wf_group)
@@ -463,13 +472,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         )
         wf_layout.addWidget(self.btn_load_workflow)
         daily_layout.addWidget(wf_group)
-
-        self.btn_run_workflow = QPushButton("开始执行 (F9)")
-        self.btn_run_workflow.clicked.connect(self._on_run_workflow)
-        self.btn_run_workflow.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
-        )
-        daily_layout.addWidget(self.btn_run_workflow)
 
         self._param_panel = QGroupBox("参数设置")
         self._param_layout = QFormLayout(self._param_panel)

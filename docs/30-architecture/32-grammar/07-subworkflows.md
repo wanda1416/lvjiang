@@ -149,7 +149,24 @@ end
 **约定**：
 - `return -1`（或任意 `< 0` 的数值）：异常/失败返回
 - `return 0` 或正数：正常返回（也可用于传递状态码）
-- `return null`：无返回值或空结果（语义上不同于错误）
+- `return null` 或 bare `return`：无返回值或空结果（语义上不同于错误）
+
+**默认返回值**：当子过程执行完毕但没有显式 `return` 值时，`call $var = proc()` 会将 `$var` 绑定为 `null`。这包括以下情况：
+- 子过程没有 `return` 语句，自然执行完毕
+- 子过程使用 bare `return`（不带值）退出
+
+调用方可以通过检查返回值判断执行结果：
+
+```
+call $result = some_proc()
+if $result < 0
+    log "执行失败"
+else if $result is null
+    log "无返回值"
+else
+    log concat("成功: ", $result)
+end
+```
 
 不绑定返回值时，`call proc()` 正常工作，返回值被丢弃：
 

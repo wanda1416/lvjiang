@@ -508,7 +508,7 @@ class SceneRegistry:
         return view
 
     def rename_scene_view(self, scene_key: str, view_key: str, new_name: str):
-        """重命名视图（key 不可变）"""
+        """重命名视图名称（key 不变）"""
         scene = self._require_scene(scene_key)
         view = next((v for v in scene.views if v.key == view_key), None)
         if view is None:
@@ -516,6 +516,46 @@ class SceneRegistry:
         view.name = new_name
         self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 视图重命名: {view_key} -> {new_name}")
+
+    def rename_scene_view_key(self, scene_key: str, old_key: str, new_key: str, new_name: str):
+        """重命名视图 key 和名称（需同步更新所有引用的 region/point/panel）"""
+        scene = self._require_scene(scene_key)
+        if old_key == new_key:
+            # key 不变，只改名称
+            self.rename_scene_view(scene_key, old_key, new_name)
+            return
+        # 检查新 key 是否已存在
+        if any(v.key == new_key for v in scene.views):
+            raise ValueError(f"视图 key 已存在: {new_key}")
+        # 找到并更新视图
+        view = next((v for v in scene.views if v.key == old_key), None)
+        if view is None:
+            raise ValueError(f"视图不存在: {old_key}")
+        view.key = new_key
+        view.name = new_name
+        # 更新所有引用该视图的 region/point/panel
+        for item in (*scene.regions, *scene.points, *scene.panels):
+            if item.view == old_key:
+                item.view = new_key
+            # 空字符串等价于基底视图 key，需要同步更新
+            elif old_key == BASE_VIEW_KEY and item.view == "":
+                item.view = new_key
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} 视图 key 重命名: {old_key} -> {new_key}")
+
+    def move_scene_view(self, scene_key: str, view_key: str, direction: int):
+        """调整视图顺序（direction: -1=上移, +1=下移）"""
+        scene = self._require_scene(scene_key)
+        idx = next((i for i, v in enumerate(scene.views) if v.key == view_key), -1)
+        if idx < 0:
+            raise ValueError(f"视图不存在: {view_key}")
+        new_idx = idx + direction
+        if new_idx < 0 or new_idx >= len(scene.views):
+            return  # 已在边界，不移动
+        # 交换位置
+        scene.views[idx], scene.views[new_idx] = scene.views[new_idx], scene.views[idx]
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} 视图顺序调整: {view_key} {'上移' if direction < 0 else '下移'}")
 
     def delete_scene_view(self, scene_key: str, view_key: str):
         """删除空视图（视图下仍有定义时抛异常，基底视图不可删）"""

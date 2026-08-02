@@ -7,7 +7,7 @@ import re
 
 from loguru import logger
 
-from .cleaner import clean_affix_text
+from .cleaner import clean_affix_text, clean_equip_type_text
 from .constants import (
     AFFIX_NAMES,
     PERCENT_AFFIXES,
@@ -156,7 +156,7 @@ class EquipmentParser:
         Returns:
             (name, type)
         """
-        raw = raw.strip()
+        raw = clean_equip_type_text(raw)
         if not raw:
             return None, None
 

@@ -209,7 +209,7 @@ $list[0]                 # 静态索引（数字）
 | default | `default $var = <literal>` | 仅当变量未从外部传入时赋值 |
 | scan | `scan scene as $var` | OCR 扫描结果存入 `$var`（dict） |
 | for 循环 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
-| call 提取 | `call proc() / eval $v = context.k` | 从过程返回值中提取 |
+| call 返回值 | `call $v = proc()` | 从子过程调用中接收返回值 |
 
 **隐式 eval**：任何没有指令关键字开头的语句，解析器自动视为 `eval`。以下两行完全等价：
 

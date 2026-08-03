@@ -24,6 +24,12 @@
 |------|------|------|
 | 2026-07-31 | [2026-07-31-dsl-docs-reorg-tuning-rules-platform.md](2026-07/2026-07-31-dsl-docs-reorg-tuning-rules-platform.md) | DSL 文档重组 + 调律规则模型大重构 + 平台适配层 + macOS 支持 |
 | 2026-07-30 | [2026-07-30-tuning-materials-and-crash-fix.md](2026-07/2026-07-30-tuning-materials-and-crash-fix.md) | 属攻词条双重身份 + 调律材料策略 + 狗粮规则引擎 + 退出崩溃根治 |
+| 2026-07-26 | [2026-07-26-config-engine-and-attrs.md](2026-07/2026-07-26-config-engine-and-attrs.md) | 配置引擎 + 属性管理 |
+| 2026-07-26 | [2026-07-26-tuning-switch-refactor.md](2026-07/2026-07-26-tuning-switch-refactor.md) | 调律切换重构 |
+| 2026-07-25 | [2026-07-25-tuning-school-exhaustive-match.md](2026-07/2026-07-25-tuning-school-exhaustive-match.md) | 调律流派判定体系重构（穷举匹配制） |
+| 2026-07-24 | [2026-07-24-plugin-arch-references-docs.md](2026-07/2026-07-24-plugin-arch-references-docs.md) | 单包插件化架构重构 + 参考图管理 + 文档结构重构 |
+| 2026-07-23 | [2026-07-23-equip-parser-ui-layout.md](2026-07/2026-07-23-equip-parser-ui-layout.md) | 装备解析与 UI 布局优化 |
+| 2026-07-22 | [2026-07-22-tuning-rules-standardization.md](2026-07/2026-07-22-tuning-rules-standardization.md) | 调律规则标准化 |
 | 2026-07-21 | [2026-07-21-project-evolution-summary.md](2026-07/2026-07-21-project-evolution-summary.md) | 项目演进总结（Phase 0~8 + 用户指令索引） |
 | 2026-07-16 | [2026-07-16-workflow-stability-and-evaluation.md](2026-07/2026-07-16-workflow-stability-and-evaluation.md) | 工作流稳定性与评估体系闭环 |
 | 2026-07-16 | [2026-07-16-scene-grouping.md](2026-07/2026-07-16-scene-grouping.md) | 场景分组管理功能 |

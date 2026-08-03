@@ -154,6 +154,76 @@ def rename_scene_across_all_layouts(old_key: str, new_key: str):
     rename_scene_screenshots(old_key, new_key)
 
 
+def rename_item_key_across_all_layouts(scene_key: str, kind: str, old_key: str, new_key: str):
+    """遍历所有布局，重命名指定场景下某实例的 key
+
+    Args:
+        scene_key: 场景 key
+        kind: 实例类型 ("region" | "point" | "panel")
+        old_key: 旧 key
+        new_key: 新 key
+
+    对于 point 重命名，同步更新 Arrow 的 from_key/to_key 引用。
+    """
+    if old_key == new_key:
+        return
+    manager = LayoutConfigManager()
+    for layout_name in manager.list_layouts():
+        _rename_layout_item_key(layout_name, scene_key, kind, old_key, new_key)
+
+
+def _rename_layout_item_key(layout_name: str, scene_key: str, kind: str, old_key: str, new_key: str):
+    """重命名单个布局中某场景下指定类型实例的 key"""
+    resolver = get_resolver()
+    scene_rel = _scene_rel(layout_name, scene_key)
+    scene_path = resolver.resolve_read(scene_rel)
+    if scene_path is None or not scene_path.exists():
+        return  # 该布局下没有此场景的文件，跳过
+
+    # 加载场景 JSON
+    try:
+        data = json.loads(scene_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error(f"加载布局场景文件失败 {scene_path}: {e}")
+        return
+
+    changed = False
+
+    if kind == "region":
+        for region in data.get("regions", []):
+            if region.get("key") == old_key:
+                region["key"] = new_key
+                changed = True
+
+    elif kind == "point":
+        for point in data.get("points", []):
+            if point.get("key") == old_key:
+                point["key"] = new_key
+                changed = True
+        # 同步更新 Arrow 的 from_key/to_key 引用
+        for arrow in data.get("arrows", []):
+            if arrow.get("from_key") == old_key:
+                arrow["from_key"] = new_key
+                changed = True
+            if arrow.get("to_key") == old_key:
+                arrow["to_key"] = new_key
+                changed = True
+
+    elif kind == "panel":
+        for panel in data.get("panels", []):
+            if panel.get("key") == old_key:
+                panel["key"] = new_key
+                changed = True
+
+    else:
+        logger.warning(f"未知的实例类型: {kind}")
+        return
+
+    if changed:
+        resolver.write_entity(scene_rel, json.dumps(data, ensure_ascii=False, indent=2))
+        logger.info(f"布局 {layout_name} 场景 {scene_key} 中 {kind} key 重命名: {old_key} -> {new_key}")
+
+
 def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str):
     """重命名所有布局下某视图的截图文件
 

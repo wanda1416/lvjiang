@@ -672,6 +672,51 @@ class SceneRegistry:
             raise ValueError(f"面板不存在: {old_key}")
         self._save_scene_yaml(scene)
 
+    def rename_region_key(self, scene_key: str, old_key: str, new_key: str):
+        """重命名场景内 region 的 key（region/point/panel 共享命名空间）"""
+        scene = self._require_scene(scene_key)
+        if old_key == new_key:
+            return
+        # 查找 region
+        region = next((r for r in scene.regions if r.key == old_key), None)
+        if region is None:
+            raise ValueError(f"区域不存在: {old_key}")
+        # 校验新 key 唯一性（排除自身）
+        self._check_key_unique_excluding(scene, new_key, old_key)
+        region.key = new_key
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} region key 重命名: {old_key} -> {new_key}")
+
+    def rename_point_key(self, scene_key: str, old_key: str, new_key: str):
+        """重命名场景内 point 的 key（region/point/panel 共享命名空间）"""
+        scene = self._require_scene(scene_key)
+        if old_key == new_key:
+            return
+        # 查找 point
+        point = next((p for p in scene.points if p.key == old_key), None)
+        if point is None:
+            raise ValueError(f"坐标点不存在: {old_key}")
+        # 校验新 key 唯一性（排除自身）
+        self._check_key_unique_excluding(scene, new_key, old_key)
+        point.key = new_key
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} point key 重命名: {old_key} -> {new_key}")
+
+    def rename_panel_key(self, scene_key: str, old_key: str, new_key: str):
+        """重命名场景内 panel 的 key（region/point/panel 共享命名空间）"""
+        scene = self._require_scene(scene_key)
+        if old_key == new_key:
+            return
+        # 查找 panel
+        panel = next((p for p in scene.panels if p.key == old_key), None)
+        if panel is None:
+            raise ValueError(f"面板不存在: {old_key}")
+        # 校验新 key 唯一性（排除自身）
+        self._check_key_unique_excluding(scene, new_key, old_key)
+        panel.key = new_key
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} panel key 重命名: {old_key} -> {new_key}")
+
     # ─── 内部方法 ─────────────────────────────────────────────
 
     def _check_key_unique(self, scene: SceneDef, new_key: str):
@@ -680,6 +725,16 @@ class SceneRegistry:
             [r.key for r in scene.regions]
             + [p.key for p in scene.points]
             + [p.key for p in scene.panels]
+        )
+        if new_key in all_keys:
+            raise ValueError(f"key 已存在: {new_key}")
+
+    def _check_key_unique_excluding(self, scene: SceneDef, new_key: str, exclude_key: str):
+        """检查 key 在场景内是否重复，但排除指定的旧 key（用于重命名场景）"""
+        all_keys = (
+            [r.key for r in scene.regions if r.key != exclude_key]
+            + [p.key for p in scene.points if p.key != exclude_key]
+            + [p.key for p in scene.panels if p.key != exclude_key]
         )
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")

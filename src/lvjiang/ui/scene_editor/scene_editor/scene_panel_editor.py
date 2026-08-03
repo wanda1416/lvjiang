@@ -26,6 +26,7 @@ from ....core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
+from ....core.layout_manager import rename_item_key_across_all_layouts
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 
@@ -175,6 +176,10 @@ class PanelEditorMixin:
         if result is None:
             return
         new_def, target_scene = result
+        old_key = old_def.key
+        new_key = new_def.key
+        key_changed = new_key != old_key
+
         if target_scene != self._scene_key:
             # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
             new_def.view = ""
@@ -184,33 +189,52 @@ class PanelEditorMixin:
             except ValueError as e:
                 QMessageBox.warning(self, "迁移失败", str(e))
                 return
-            registry.remove_panel_from_scene(self._scene_key, old_def.key)
+            registry.remove_panel_from_scene(self._scene_key, old_key)
             sync_scene_cache(self._scene_key)
             sync_scene_cache(target_scene)
             if self.on_item_migrated:
-                self.on_item_migrated("panel", new_def.key, self._scene_key, target_scene)
+                self.on_item_migrated("panel", new_key, self._scene_key, target_scene)
             self._refresh_lists()
             return
+
         try:
-            registry.update_panel_in_scene(self._scene_key, old_def.key, new_def)
+            if key_changed:
+                # key 变更：更新场景定义 + 所有布局
+                registry.rename_panel_key(self._scene_key, old_key, new_key)
+                rename_item_key_across_all_layouts(self._scene_key, "panel", old_key, new_key)
+                # 更新其他属性
+                registry.update_panel_in_scene(self._scene_key, new_key, new_def)
+                # 同步画布数据中的 key
+                panels = self._canvas.get_panels()
+                for p in panels:
+                    if p.key == old_key:
+                        p.key = new_key
+                        # 同步网格参数
+                        p.cols, p.rows = new_def.cols, new_def.rows
+                        p.min_visible = new_def.min_visible
+                        p.calibration = new_def.calibration
+                        p.scroll_direction = new_def.scroll_direction
+                self._canvas.set_panels(panels)
+                self._canvas._notify_panel_changed()
+            else:
+                # key 不变：只更新其他属性
+                registry.update_panel_in_scene(self._scene_key, old_key, new_def)
+                # 同步网格参数到已绑定的布局 Panel
+                panels = self._canvas.get_panels()
+                changed = False
+                for p in panels:
+                    if p.key == old_key:
+                        p.cols, p.rows = new_def.cols, new_def.rows
+                        p.min_visible = new_def.min_visible
+                        p.calibration = new_def.calibration
+                        p.scroll_direction = new_def.scroll_direction
+                        changed = True
+                if changed:
+                    self._canvas.set_panels(panels)
+                    self._canvas._notify_panel_changed()
         except ValueError as e:
             QMessageBox.warning(self, "更新失败", str(e))
             return
-        # 同步网格参数到已绑定的布局 Panel（几何不变，仅 cols/rows/min_visible/calibration/scroll_direction），
-        # 否则弹窗改动只写入场景 YAML，运行时读的布局 Panel 不会生效
-        panels = self._canvas.get_panels()
-        changed = False
-        for p in panels:
-            if p.key == old_def.key:
-                p.cols, p.rows = new_def.cols, new_def.rows
-                p.min_visible = new_def.min_visible
-                p.calibration = new_def.calibration
-                p.scroll_direction = new_def.scroll_direction
-                changed = True
-        if changed:
-            self._canvas.set_panels(panels)
-            # 布局 Panel 数据已变，通知上层标记 dirty（需保存布局才落盘）
-            self._canvas._notify_panel_changed()
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
@@ -321,7 +345,7 @@ class PanelEditorMixin:
         key_edit.setPlaceholderText("英文，如 bag_grid")
         if panel_def:
             key_edit.setText(panel_def.key)
-            key_edit.setReadOnly(True)
+            # 允许编辑 key，但需要校验唯一性
         form.addRow("Key:", key_edit)
 
         name_edit = QLineEdit()
@@ -427,10 +451,23 @@ class PanelEditorMixin:
 
         # 实时校验
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        scene = get_registry().get_scene(self._scene_key)
+        # region/point/panel 共享命名空间
+        existing = set()
+        if scene:
+            existing = {r.key for r in scene.regions} | {p.key for p in scene.points} | {p.key for p in scene.panels}
+        # 编辑模式下，排除自身的 key（允许保持不变）
+        old_key = panel_def.key if panel_def else None
 
         def _validate():
+            k = key_edit.text().strip()
+            # 检查 key 是否被占用（新建时检查全部，编辑时排除自身）
+            if k in existing and k != old_key:
+                ok_btn.setEnabled(False)
+                scroll_error_label.hide()  # 清除残留的滚动错误提示
+                return
             ok_btn.setEnabled(
-                bool(key_edit.text().strip() and name_edit.text().strip())
+                bool(k and name_edit.text().strip())
                 and _validate_scroll()
             )
 

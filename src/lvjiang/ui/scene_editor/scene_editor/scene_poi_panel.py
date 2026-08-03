@@ -29,6 +29,7 @@ from ....core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
+from ....core.layout_manager import rename_item_key_across_all_layouts
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 
@@ -298,9 +299,35 @@ class PoiPanelMixin:
         if result is None:
             return
         new_def, target_scene = result
+        old_key = old_def.key
+        new_key = new_def.key
+        key_changed = new_key != old_key
+
         if target_scene == self._scene_key:
             try:
-                registry.update_point_in_scene(self._scene_key, key, new_def)
+                if key_changed:
+                    # key 变更：更新场景定义 + 所有布局（含 Arrow 引用）
+                    registry.rename_point_key(self._scene_key, old_key, new_key)
+                    rename_item_key_across_all_layouts(self._scene_key, "point", old_key, new_key)
+                    # 更新其他属性
+                    registry.update_point_in_scene(self._scene_key, new_key, new_def)
+                    # 同步画布数据中的 key（包括 point 和 arrow 引用）
+                    points = self._canvas.get_points()
+                    for p in points:
+                        if p.key == old_key:
+                            p.key = new_key
+                    self._canvas.set_points(points)
+                    # 更新 arrow 的 from_key/to_key 引用
+                    arrows = self._canvas.get_arrows()
+                    for a in arrows:
+                        if a.from_key == old_key:
+                            a.from_key = new_key
+                        if a.to_key == old_key:
+                            a.to_key = new_key
+                    self._canvas.set_arrows(arrows)
+                else:
+                    # key 不变：只更新其他属性
+                    registry.update_point_in_scene(self._scene_key, old_key, new_def)
             except ValueError as e:
                 QMessageBox.warning(self, "更新失败", str(e))
                 return
@@ -315,11 +342,11 @@ class PoiPanelMixin:
         except ValueError as e:
             QMessageBox.warning(self, "迁移失败", str(e))
             return
-        registry.remove_point_from_scene(self._scene_key, key)
+        registry.remove_point_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
         sync_scene_cache(target_scene)
         if self.on_item_migrated:
-            self.on_item_migrated("point", new_def.key, self._scene_key, target_scene)
+            self.on_item_migrated("point", new_key, self._scene_key, target_scene)
         self._refresh_lists()
 
     def _on_point_table_context_menu(self, pos):
@@ -417,7 +444,7 @@ class PoiPanelMixin:
         key_edit.setPlaceholderText("英文，如 my_point")
         if point_def:
             key_edit.setText(point_def.key)
-            key_edit.setReadOnly(True)
+            # 允许编辑 key，但需要校验唯一性
         form.addRow("Key:", key_edit)
 
         name_edit = QLineEdit()
@@ -462,8 +489,21 @@ class PoiPanelMixin:
 
         # 实时校验
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        scene = get_registry().get_scene(self._scene_key)
+        # region/point/panel 共享命名空间
+        existing = set()
+        if scene:
+            existing = {r.key for r in scene.regions} | {p.key for p in scene.points} | {p.key for p in scene.panels}
+        # 编辑模式下，排除自身的 key（允许保持不变）
+        old_key = point_def.key if point_def else None
+
         def _validate():
-            ok_btn.setEnabled(bool(key_edit.text().strip() and name_edit.text().strip()))
+            k = key_edit.text().strip()
+            # 检查 key 是否被占用（新建时检查全部，编辑时排除自身）
+            if k in existing and k != old_key:
+                ok_btn.setEnabled(False)
+                return
+            ok_btn.setEnabled(bool(k and name_edit.text().strip()))
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
         _validate()

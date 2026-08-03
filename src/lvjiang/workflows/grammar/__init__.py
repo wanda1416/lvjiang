@@ -58,6 +58,7 @@ from .ast_nodes import (
     UntilLoop,
     VarRef,
     Wait,
+    WhereClause,
     WhileLoop,
 )
 from .parser import parse_file, parse_text
@@ -69,7 +70,7 @@ __all__ = [
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",
-    "SceneRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause",
+    "SceneRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause", "WhereClause",
     "Contains", "Equals", "InList", "IsEmpty",
     "GreaterThan", "LessThan", "GreaterEqual", "LessEqual", "NotEqual", "NumericEqual",
     "Not", "And", "Or", "ArithOp",

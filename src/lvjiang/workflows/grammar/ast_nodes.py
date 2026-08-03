@@ -76,6 +76,7 @@ class Scan:
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
+    where: Any = None  # WhereClause | None（where 子句：识别结果过滤）
     line_no: int = 0
 
 
@@ -87,6 +88,7 @@ class Recognize:
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
     group: Any = None  # Literal | VarRef | None（group 子句：限定材料分组）
+    where: Any = None  # WhereClause | None（where 子句：识别结果过滤）
     line_no: int = 0
 
 
@@ -98,11 +100,13 @@ class Find:
     search_scene / search_region: 搜索区域（均为 None 时搜索全画布）
     var_name: 结果变量名（as $var）
     by: ByClause（必填，指定匹配模式和搜索目标）
+    where: WhereClause | None（可选，识别结果过滤）
     """
     var_name: str       # 结果变量名（不含 $ 前缀）
     by: Any             # ByClause（必填）
     search_scene: Any = None    # str | VarRef | None（搜索场景名）
     search_region: Any = None   # str | VarRef | None（搜索区域名）
+    where: Any = None           # WhereClause | None（where 子句：识别结果过滤）
     line_no: int = 0
 
 
@@ -122,6 +126,19 @@ class ByClause:
     """
     match_mode: str
     target: Any     # Literal | VarRef
+
+
+@dataclass(frozen=True)
+class WhereClause:
+    """scan/recognize/find 的 where 子句 —— 识别结果纯过滤（不改变返回语义）
+
+    当前仅支持 confidence >= threshold：
+        where confidence >= 0.8
+        where confidence >= $var
+
+    语义：过滤掉置信度低于阈值的 OCR 结果，不参与文本拼接或匹配。
+    """
+    min_confidence: Any  # Literal（数字）| VarRef（运行时变量）
 
 
 @dataclass(frozen=True)

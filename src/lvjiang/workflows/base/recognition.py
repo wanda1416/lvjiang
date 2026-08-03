@@ -42,12 +42,13 @@ class _RecognitionMixin:
 
     # ─── 截图与 OCR ────────────────────────────────────────
 
-    def ocr_scene(self, scene_key: str, field_keys: list[str] | None = None) -> dict[str, str]:
+    def ocr_scene(self, scene_key: str, field_keys: list[str] | None = None, min_confidence: float | None = None) -> dict[str, str]:
         """对指定场景执行截图 + OCR
 
         Args:
             scene_key: 场景 key
             field_keys: 可选，只 OCR 指定字段列表
+            min_confidence: 可选，置信度阈值，过滤低于阈值的 OCR 结果
 
         Returns:
             {field_key: ocr_text, ...}
@@ -65,7 +66,7 @@ class _RecognitionMixin:
             logger.warning(f"场景 {scene_key} 没有定义区域")
             return {}
 
-        result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key)
+        result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key, min_confidence=min_confidence)
         fields_display = field_keys if field_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
         logger.debug(f"OCR [{scene_key}]:{fields_display} => {result}")
         return result
@@ -77,6 +78,7 @@ class _RecognitionMixin:
         scene_key: str,
         slot_keys: list[str] | None = None,
         group: str | None = None,
+        min_confidence: float | None = None,
     ) -> tuple[dict[str, str], dict]:
         """对指定场景的每个 slot 执行参考图匹配
 
@@ -84,6 +86,7 @@ class _RecognitionMixin:
             scene_key: 场景 key
             slot_keys: 可选，只识别指定 slot
             group: 可选，限定参考图分组范围
+            min_confidence: 可选，置信度阈值，低于阈值的视为未识别
 
         Returns:
             (result, region_map)
@@ -127,7 +130,10 @@ class _RecognitionMixin:
                 continue
 
             info = self.material_recognizer.recognize(slot_img, group=group)
-            result[region.key] = info.type  # 空槽 info.type == ""
+            if min_confidence is not None and info.confidence < min_confidence:
+                result[region.key] = ""
+            else:
+                result[region.key] = info.type  # 空槽 info.type == ""
             logger.debug(
                 f"参考图匹配 [{scene_key}].[{region.key}]: "
                 f"label={info.type!r} level={info.level} count={info.count}"
@@ -236,6 +242,7 @@ class _RecognitionMixin:
         field_keys: list[str],
         target_value,
         mode: str,
+        min_confidence: float | None = None,
     ) -> str:
         """短路 OCR：一次截图，逐字段识别，首个命中即返回字段名
 
@@ -244,6 +251,7 @@ class _RecognitionMixin:
             field_keys: 要识别的字段列表
             target_value: 匹配目标值（str 或 list，由 mode 决定）
             mode: equals | contains | equals_any | contains_any
+            min_confidence: 可选，置信度阈值，过滤低于阈值的 OCR 结果
 
         Returns:
             首个命中的 field_key（str），全部未命中返回 ""
@@ -275,6 +283,8 @@ class _RecognitionMixin:
                 logger.debug(f"by OCR: region {region.key} 裁剪为空，跳过")
                 continue
             ocr_results = self._ocr.recognize(crop)
+            if min_confidence is not None:
+                ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
             text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
             if self._match_text(text, target_value, mode):
                 logger.debug(f"by OCR 命中: [{scene_key}].[{region.key}] text={text!r} mode={mode}")
@@ -290,6 +300,7 @@ class _RecognitionMixin:
         target_value,
         mode: str,
         group: str | None = None,
+        min_confidence: float | None = None,
     ) -> str:
         """短路材料识别：一次截图，逐 slot 识别，首个命中即返回 slot 名
 
@@ -299,6 +310,7 @@ class _RecognitionMixin:
             target_value: 匹配目标值（str 或 list，由 mode 决定）
             mode: equals | contains | equals_any | contains_any
             group: 可选，限定材料分组范围
+            min_confidence: 可选，置信度阈值，低于阈值的视为未识别
 
         Returns:
             首个命中的 slot_key（str），全部未命中返回 ""
@@ -329,6 +341,9 @@ class _RecognitionMixin:
                 logger.debug(f"by 材料识别: region {region.key} 裁剪为空，跳过")
                 continue
             info = self.material_recognizer.recognize(crop, group=group)
+            if min_confidence is not None and info.confidence < min_confidence:
+                logger.debug(f"by 材料识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
+                continue
             if self._match_text(info.type, target_value, mode):
                 logger.info(f"by 材料识别命中: [{scene_key}].[{region.key}] type={info.type!r} mode={mode} group={group}")
                 return region.key
@@ -343,6 +358,7 @@ class _RecognitionMixin:
         target_value,
         mode: str,
         search_region: Region | None = None,
+        min_confidence: float | None = None,
     ) -> FoundRegion | str:
         """在指定区域或全画布搜索目标文字，返回文字的画布归一化坐标区域
 
@@ -350,6 +366,7 @@ class _RecognitionMixin:
             target_value: 搜索目标（str 或 list，由 mode 决定）
             mode: equals | contains | equals_any | contains_any
             search_region: 搜索区域（None 表示搜索全画布）
+            min_confidence: 可选，置信度阈值，过滤低于阈值的 OCR 结果
 
         Returns:
             命中: FoundRegion（画布归一化坐标）
@@ -391,6 +408,13 @@ class _RecognitionMixin:
         if not ocr_results:
             logger.debug("find: OCR 无结果")
             return ""
+
+        # 置信度过滤
+        if min_confidence is not None:
+            ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
+            if not ocr_results:
+                logger.debug(f"find: 置信度过滤后无结果（阈值 {min_confidence}）")
+                return ""
 
         # 遍历 OCR 结果，找第一个匹配的文字
         for ocr_result in ocr_results:

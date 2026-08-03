@@ -10,12 +10,13 @@
   边界条件：继续调律不可达，无命中默认结束保留；未满默认
   继续调律）；另有单件重置次数上限 + 次数用尽转处置动作。
 每条规则 = 部位多选（至少勾一项，全选展示 - 全部 -）
-+ 品阶（不限/金装/紫装及以下/蓝装及以下）+ 首词条初始数值（≥/≤ 方向可选 + 数值，
-≤ 100 / ≥ 0 = 不限）+ 判定评级多选
-（四档自由勾选，全选 = 不限）+ 仅首词条（仅扫描处理，
-取评级时只注入首词条）+ 判定语义（预期评级识别用
-哪个流派规则集：传入规则/全部规则/自选规则，自选经弹窗
-勾选）+ 动作（候选按行为点白名单锁定）。
++ 品阶（不限/金装/紫色/紫装及以下/蓝装及以下）+ 首词条初始数值（≥/≤ 方向可选 + 数值，
+≤ 100 / ≥ 0 = 不限）+ 判定结果多选
+（候选域随判定语义联动：评级四档 ↔ 自选词条词条集）
++ 仅首词条（仅扫描处理，取评级时只注入首词条）
++ 判定语义（四选一：传入规则/全部规则/自选规则/自选词条；
+自选经弹窗勾选；自选词条不跑潜力判定，按装备词条名匹配）
++ 动作（候选按行为点白名单锁定）。
 沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、各自只替换 behavior.scan /
@@ -62,13 +63,15 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_LABELS,
     BehaviorRule,
     TuningBaseManager,
+    rule_affix_candidates,
 )
 
 # 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）
-_QUALITY_KEYS = ("gold", "gold_only", "purple", "blue")
+_QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
 _QUALITY_LABELS = {
     "gold": "- 不限 -",
     "gold_only": "金装",
+    "purple_only": "紫色",
     "purple": "紫装及以下",
     "blue": "蓝装及以下",
 }
@@ -80,7 +83,7 @@ _BASE_COL_KEYS = ("sort", "parts", "quality", "judge", "ratings",
                   "pct", "action")
 _COL_TITLES = {
     "sort": "", "parts": "部位", "quality": "品阶",
-    "judge": "判定规则", "ratings": "判定结果", "first_affix": "仅首词条",
+    "judge": "判定语义", "ratings": "判定结果", "first_affix": "仅首词条",
     "pct": "首词条 %", "action": "动作",
 }
 
@@ -113,14 +116,20 @@ class _MultiSelect(QPushButton):
         super().__init__(parent)
         self._changed = changed
         self._menu = _CheckMenu(self)
-        self._actions: dict[str, QAction] = {}
+        self.setMenu(self._menu)
+        self.set_items(items)
+
+    def set_items(self, items: list[tuple[str, str]]):
+        """重建候选项（判定语义切换候选域用，保留 changed 回调）；
+        重建后全部未勾选，调用方须随后 set_selected 指定选中集"""
+        self._menu.clear()
+        self._actions = {}
         for key, label in items:
             act = QAction(label, self._menu)
             act.setCheckable(True)
             act.toggled.connect(self._on_toggled)
             self._menu.addAction(act)
             self._actions[key] = act
-        self.setMenu(self._menu)
         self._refresh_text()
 
     def selected(self) -> list[str]:
@@ -233,25 +242,121 @@ class _JudgeRulesDialog(QDialog):
         ok.setEnabled(bool(self.selected()))
 
 
-class _JudgeScopeCell(QComboBox):
-    """规则行「判定语义」单元格：三选一下拉，自选经弹窗勾选
+class _AffixEntriesDialog(QDialog):
+    """自选词条弹窗：勾选装备词条名（至少一项才可确定）"""
 
-    选中「自选规则」时弹出勾选对话框（取消则回退原语义）；
-    custom 项文本动态显示摘要（「{首个规则名} 等X个」）。
-    rules() 仅 custom 时返回勾选 key，与解析层「judge_rules 仅
-    custom 可声明」的约束对齐。
+    def __init__(self, items: list[tuple[str, str]], checked: list[str],
+                 parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("自选词条")
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("勾选装备词条名（至少一项）："))
+        # 词条数量较多（41 项），使用滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        self._boxes: dict[str, QCheckBox] = {}
+        for key, label in items:
+            cb = QCheckBox(label)
+            cb.setChecked(key in checked)
+            cb.toggled.connect(lambda _c: self._sync_ok())
+            scroll_layout.addWidget(cb)
+            self._boxes[key] = cb
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        self._buttons.accepted.connect(self.accept)
+        self._buttons.rejected.connect(self.reject)
+        layout.addWidget(self._buttons)
+        self._sync_ok()
+
+    def selected(self) -> list[str]:
+        return [k for k, cb in self._boxes.items() if cb.isChecked()]
+
+    def _sync_ok(self):
+        ok = self._buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok.setEnabled(bool(self.selected()))
+
+
+class _AffixEntriesButton(QPushButton):
+    """按钮式词条多选：点击弹出勾选对话框（至少保留一项）
+
+    接口与 _MultiSelect 对齐：selected() / set_selected() / set_items()
     """
 
-    def __init__(self, changed: Callable[[], None], parent=None):
+    def __init__(self, items: list[tuple[str, str]],
+                 changed: Callable[[], None], parent=None):
+        super().__init__(parent)
+        self._items = items
+        self._checked: set[str] = set()
+        self._changed = changed
+        self.clicked.connect(self._on_clicked)
+        self._refresh_text()
+
+    def selected(self) -> list[str]:
+        return [k for k, _ in self._items if k in self._checked]
+
+    def set_selected(self, keys: list[str]):
+        # 空入参回退到首个候选（至少保留一项）
+        if keys:
+            self._checked = set(keys)
+        elif self._items:
+            self._checked = {self._items[0][0]}
+        else:
+            self._checked = set()
+        self._refresh_text()
+
+    def set_items(self, items: list[tuple[str, str]]):
+        self._items = items
+        self._checked = set()
+        self._refresh_text()
+
+    def _on_clicked(self):
+        dlg = _AffixEntriesDialog(self._items, list(self._checked), self)
+        if dlg.exec():
+            self._checked = set(dlg.selected())
+            self._refresh_text()
+            self._changed()
+
+    def _refresh_text(self):
+        labels = [label for key, label in self._items if key in self._checked]
+        if len(labels) == len(self._items) and self._items:
+            self.setText("- 全部 -")
+        elif labels:
+            self.setText("/".join(labels))
+        else:
+            self.setText("")
+
+
+class _JudgeScopeCell(QComboBox):
+    """规则行「判定语义」单元格：四选一下拉，自选经弹窗勾选
+
+    选中「自选规则」时弹出勾选对话框（取消则回退原语义）；
+    切到「自选词条」不弹窗（词条勾选在判定结果列完成）。
+    custom 项文本动态显示摘要（「{首个规则名} 等X个」）。
+    rules() 仅 custom 时返回勾选 key，与解析层「judge_rules 仅
+    custom 可声明」的约束对齐。on_scope_changed 回调供行内
+    联动重置判定结果候选域（在保存前触发）。
+    """
+
+    def __init__(self, changed: Callable[[], None],
+                 on_scope_changed: Callable[[str], None] | None = None,
+                 parent=None):
         super().__init__(parent)
         self._changed = changed
+        self._on_scope_changed = on_scope_changed or (lambda _s: None)
         self._keys: list[str] = []
         self._prev = 0
         for scope in JUDGE_SCOPES:
             self.addItem(JUDGE_SCOPE_LABELS.get(scope, scope), scope)
         self.setToolTip(
-            "本条规则的评级用哪个流派规则集：传入规则=运行期勾选的"
-            "规则；全部规则；自选规则=弹窗勾选")
+            "本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；"
+            "自选规则=弹窗勾选；自选词条=判定结果列改勾词条，"
+            "按装备词条名匹配，不跑潜力判定")
         self.activated.connect(self._on_activated)
 
     def scope(self) -> str:
@@ -279,6 +384,7 @@ class _JudgeScopeCell(QComboBox):
                 return
         self._prev = self.currentIndex()
         self._refresh_summary()
+        self._on_scope_changed(self.scope())
         self._changed()
 
     def _refresh_summary(self):
@@ -367,6 +473,33 @@ class _BehaviorPageBase(QWidget):
     def _init_head(self, layout: QVBoxLayout):
         raise NotImplementedError
 
+    def _apply_ratings_domain(self, ratings, scope: str,
+                              selected: list[str]) -> None:
+        """按判定语义切换判定结果控件候选域：affix → 词条全集
+        （选中集非空，空入参回退首个候选）；其余 → 评级四档
+        （空入参 = 全选 = 不限），tooltip 同步切换"""
+        if scope == "affix":
+            vocab = rule_affix_candidates()
+            ratings.set_items([(n, n) for n in vocab])
+            ratings.setToolTip(
+                "命中条件：装备任一条题名属于勾选词条\n"
+                "（勾选仅首词条时只判定装备首词条）；\n"
+                "自选词条语义不跑潜力判定")
+            ratings.set_selected(selected or vocab[:1])
+            return
+        ratings.set_items(
+            [(r, RATING_LABELS.get(r, r)) for r in reversed(RATING_KEYS)])
+        ratings.setToolTip(
+            "命中条件：预期评级属于勾选档位（全选 = 不限，"
+            "不取评级）")
+        ratings.set_selected(selected)
+
+    def _create_ratings_widget(self, scope: str):
+        """根据判定语义创建对应的判定结果控件：affix → 弹窗勾选，其余 → 下拉菜单"""
+        if scope == "affix":
+            return _AffixEntriesButton([], self._apply)
+        return _MultiSelect([], self._apply)
+
     def _make_row_widgets(self, rule: BehaviorRule) -> None:
         """在规则表尾新增一行并填充该规则的编辑控件"""
         table = self._table
@@ -396,7 +529,7 @@ class _BehaviorPageBase(QWidget):
         parts.set_selected(rule.parts)
         table.setCellWidget(row, self._ci["parts"], parts)
 
-        # 品阶候选（不限/金装/紫装及以下/蓝装及以下）
+        # 品阶候选（不限/金装/紫色/紫装及以下/蓝装及以下）
         quals = QComboBox()
         for q in _QUALITY_KEYS:
             quals.addItem(_QUALITY_LABELS.get(q, q), q)
@@ -407,13 +540,10 @@ class _BehaviorPageBase(QWidget):
         pct_widget = _PctCell(rule.pct_op, rule.pct, self._apply)
         table.setCellWidget(row, self._ci["pct"], pct_widget)
 
-        ratings = _MultiSelect(
-            [(r, RATING_LABELS.get(r, r)) for r in reversed(RATING_KEYS)],
-            self._apply)
-        ratings.setToolTip(
-            "命中条件：预期评级属于勾选档位（全选 = 不限，"
-            "不取评级）")
-        ratings.set_selected(rule.ratings)
+        ratings = self._create_ratings_widget(rule.judge_scope)
+        # 初始候选域按规则自身判定语义决定（affix → 词条集）
+        self._apply_ratings_domain(ratings, rule.judge_scope,
+                                   rule.ratings)
         table.setCellWidget(row, self._ci["ratings"], ratings)
 
         if "first_affix" in self._ci:
@@ -426,7 +556,13 @@ class _BehaviorPageBase(QWidget):
             fao.stateChanged.connect(lambda _s: self._apply())
             table.setCellWidget(row, self._ci["first_affix"], fao)
 
-        judge = _JudgeScopeCell(self._apply)
+        judge = _JudgeScopeCell(
+            self._apply,
+            # 语义切换时重置判定结果候选域（跨域旧值无效，
+            # 选中集重置：affix → 首个候选；其余 → 全选 = 不限）
+            on_scope_changed=lambda scope: self._apply_ratings_domain(
+                ratings, scope, []),
+        )
         judge.set_value(rule.judge_scope, rule.judge_rules)
         table.setCellWidget(row, self._ci["judge"], judge)
 
@@ -490,8 +626,9 @@ class _BehaviorPageBase(QWidget):
         quals.setCurrentIndex(max(quals.findData(values["max_quality"]), 0))
         pct: _PctCell = table.cellWidget(row, self._ci["pct"])
         pct.set_value(values["pct_op"], values["pct"])
-        ratings: _MultiSelect = table.cellWidget(row, self._ci["ratings"])
-        ratings.set_selected(values["ratings"])
+        ratings = table.cellWidget(row, self._ci["ratings"])
+        self._apply_ratings_domain(ratings, values["judge_scope"],
+                                   values["ratings"])
         if "first_affix" in self._ci:
             fao: QCheckBox = table.cellWidget(row, self._ci["first_affix"])
             fao.setChecked(values.get("first_affix_only", False))
@@ -522,7 +659,7 @@ class _BehaviorPageBase(QWidget):
         parts: _MultiSelect = table.cellWidget(row, self._ci["parts"])
         quals: QComboBox = table.cellWidget(row, self._ci["quality"])
         pct: _PctCell = table.cellWidget(row, self._ci["pct"])
-        ratings: _MultiSelect = table.cellWidget(row, self._ci["ratings"])
+        ratings = table.cellWidget(row, self._ci["ratings"])
         judge: _JudgeScopeCell = table.cellWidget(row, self._ci["judge"])
         action: QComboBox = table.cellWidget(row, self._ci["action"])
         rule = {

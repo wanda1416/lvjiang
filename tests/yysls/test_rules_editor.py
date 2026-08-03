@@ -156,6 +156,45 @@ class TestBehaviorPages:
         assert saved.max_resets == 1
         assert tmp_base_manager.get_raw()["behavior"]["scan"] == scan_before
 
+    def test_scan_scope_switch_resets_ratings_domain(self, qtbot,
+                                                      tmp_base_manager):
+        """判定语义切换时判定结果候选域联动重置：affix → 词条
+        候选（选中首个）；切离 → 评级四档（全选 = 不限）"""
+        from lvjiang.apps.yysls.evaluator.tuning_rules import (
+            rule_affix_candidates,
+        )
+        statuses: list[tuple[str, bool]] = []
+        page = ScanBehaviorPage(tmp_base_manager,
+                                lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(page)
+        page._on_add_rule()
+        row = page._table.rowCount() - 1
+        judge = page._table.cellWidget(row, page._ci["judge"])
+        ratings = page._table.cellWidget(row, page._ci["ratings"])
+        vocab = rule_affix_candidates()
+
+        # 切到自选词条：候选换成词条全集，选中集重置为首个词条，
+        # 校验通过自动保存
+        judge.setCurrentIndex(judge.findData("affix"))
+        judge._on_activated(judge.currentIndex())
+        assert [a.text() for a in ratings._actions.values()] == vocab
+        assert ratings.selected() == vocab[:1]
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        saved = tmp_base_manager.get().behavior.scan.rules[-1]
+        assert saved.judge_scope == "affix"
+        assert saved.ratings == vocab[:1]
+
+        # 切离 affix：候选换回评级四档，选中集重置为全选（= 不限，
+        # 收集归一为空）
+        judge.setCurrentIndex(judge.findData("incoming"))
+        judge._on_activated(judge.currentIndex())
+        assert len(ratings._actions) == 4
+        assert len(ratings.selected()) == 4
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        saved = tmp_base_manager.get().behavior.scan.rules[-1]
+        assert saved.judge_scope == "incoming"
+        assert saved.ratings == []
+
 
 class TestPanelRoundtrip:
     @pytest.mark.parametrize("key", ALL_KEYS)

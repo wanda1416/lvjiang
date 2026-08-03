@@ -95,6 +95,8 @@ class TuningRecycler:
 
         进入时背包详情页无弹窗；未找到回收按钮时收起弹窗返回
         False（装备保留原地）。成功后背包刷新、后续装备前移补位。
+        装备锁定检测：确认弹窗内无「确认」字样 = 装备被锁定，
+        收起弹窗返回 False。
         """
         wf = self._wf
         label = equip_data.name or equip_data.type
@@ -113,6 +115,17 @@ class TuningRecycler:
             return False
         wf.click_region(wf.EQUIP_DETAIL, key)
         wf.wait_delay("page_refresh_wait")  # 回收确认弹窗
+        # 装备锁定检测：确认弹窗内应含「确认」，否则装备被锁定
+        confirm_text = wf.ocr_scene(wf.EQUIP_DETAIL,
+                                    ["recycle_confirm"]).get(
+            "recycle_confirm", "") or ""
+        if "确认" not in confirm_text:
+            logger.warning(f"  回收确认弹窗未识别到「确认」"
+                           f"（recycle_confirm={confirm_text!r}），"
+                           f"装备被锁定，保留")
+            wf.click_region(wf.EQUIP_DETAIL, "more_func")
+            wf.wait_delay("step_interval")
+            return False
         wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
         wf.wait_delay("page_refresh_wait")  # 回收完成，背包刷新补位
         if report is not None:

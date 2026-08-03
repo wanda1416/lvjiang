@@ -96,3 +96,46 @@ class TestArithEval:
         assert engine._eval_condition(prog.body[0].condition) is False
         prog = parse_text('if 0.1 + 0.2 != 0.4\n    log "ne"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is True
+
+
+# ─── 字符串拼接 ──────────────────────────────────────────────
+
+
+class TestStringConcat:
+    @pytest.mark.parametrize("code,variables,expected", [
+        # 字面量拼接
+        ('eval $x = "hello" + " world"', {}, "hello world"),
+        # 变量 + 字面量
+        ('eval $x = $name + "!"', {"name": "hi"}, "hi!"),
+        # 字面量 + 变量
+        ('eval $x = "prefix_" + $val', {"val": "test"}, "prefix_test"),
+        # 变量 + 变量
+        ('eval $x = $a + $b', {"a": "foo", "b": "bar"}, "foobar"),
+        # 数字 + 字符串（数字转字符串）
+        ('eval $x = $n + " items"', {"n": 3}, "3 items"),
+        # 字符串 + 数字
+        ('eval $x = "count: " + $n', {"n": 42}, "count: 42"),
+        # null + 字符串（null 视为空串）
+        ('eval $x = $null + "text"', {}, "text"),
+        # 字符串 + null
+        ('eval $x = "text" + $null', {}, "text"),
+        # 链式拼接
+        ('eval $x = "a" + "b" + "c"', {}, "abc"),
+        # 纯数字仍走算术
+        ('eval $x = 1 + 2', {}, 3.0),
+        # 数值字符串走算术（for 循环变量场景）
+        ('eval $x = $a + $b', {"a": "1.0", "b": "2.0"}, 3.0),
+        # 混合：数值字符串 + 数字
+        ('eval $x = $a + 1', {"a": "5"}, 6.0),
+        # 混合：数字 + 数值字符串
+        ('eval $x = 1 + $b', {"b": "5"}, 6.0),
+        # null + 数值字符串 → 拼接（null 视为空串，不应走算术）
+        ('eval $x = $null + "5"', {}, "5"),
+        ('eval $x = "5" + $null', {}, "5"),
+    ])
+    def test_string_concat(self, code, variables, expected):
+        engine = make_engine()
+        engine.variables = dict(variables)
+        for stmt in parse_text(code).body:
+            engine._exec_stmt(stmt)
+        assert engine.variables.get("x") == expected

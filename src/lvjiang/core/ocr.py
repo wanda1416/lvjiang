@@ -100,6 +100,7 @@ class OCREngine:
         canvas: CanvasConfig,
         regions: list[Region],
         scene_key: str,
+        min_confidence: float | None = None,
     ) -> dict[str, str]:
         """
         对指定场景的所有区域逐个裁剪 OCR。
@@ -111,6 +112,7 @@ class OCREngine:
             canvas: 画布配置（用于坐标变换）
             regions: 该场景的区域列表
             scene_key: 场景 key，用于获取字段定义
+            min_confidence: 可选，置信度阈值，过滤低于阈值的 OCR 结果
 
         Returns:
             dict[region.key, ocr_text]
@@ -138,6 +140,8 @@ class OCREngine:
 
             crop = image[y1:y2, x1:x2]
             ocr_results = self.recognize(crop)
+            if min_confidence is not None:
+                ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
             text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
             results[region.key] = text
 

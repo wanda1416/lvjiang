@@ -29,6 +29,7 @@ from ..ast_nodes import (
     Or,
     Screenshot,
     VarRef,
+    WhereClause,
 )
 
 
@@ -85,6 +86,18 @@ class _ExprMixin:
             return target_node
         else:
             return Literal(value=self._unquote(str(target_node)))
+
+    def where_clause(self, items):
+        """where confidence >= <threshold> → WhereClause
+
+        threshold 支持数字字面量和变量引用。
+        """
+        threshold = items[0]  # float（number 规则返回）| VarRef
+        if isinstance(threshold, VarRef):
+            min_conf = threshold
+        else:
+            min_conf = Literal(value=float(threshold))
+        return WhereClause(min_confidence=min_conf)
 
     def scene_target_static(self, items):
         """[scene] 或 [scene].[f1, f2] 或 $var.[f1] 等"""
@@ -193,6 +206,9 @@ class _ExprMixin:
         # float/int（来自 number）→ 字面量赋值
         if isinstance(expr, (int, float)):
             return Eval(func_name="__literal__", func_args=[Literal(value=expr)], target=target_name, line_no=self._line(items))
+        # Literal（来自 string_atom 裸字符串）→ 字面量赋值
+        if isinstance(expr, Literal):
+            return Eval(func_name="__literal__", func_args=[expr], target=target_name, line_no=self._line(items))
         # VarRef / FieldAccess / FuncCall → 表达式赋值
         return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
 
@@ -252,6 +268,8 @@ class _ExprMixin:
             return Eval(func_name="__arith__", func_args=[expr], target=target_name, line_no=self._line(items))
         if isinstance(expr, (int, float)):
             return Eval(func_name="__literal__", func_args=[Literal(value=expr)], target=target_name, line_no=self._line(items))
+        if isinstance(expr, Literal):
+            return Eval(func_name="__literal__", func_args=[expr], target=target_name, line_no=self._line(items))
         return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
 
     def implicit_eval_assign_expr(self, items):
@@ -322,6 +340,10 @@ class _ExprMixin:
     def arith_div(self, items):
         """term "/" factor → ArithOp(/)"""
         return ArithOp(op="/", left=items[0], right=items[1], line_no=self._line(items))
+
+    def string_atom(self, items):
+        """STRING → Literal（算术表达式中的字符串字面量，去引号）"""
+        return Literal(value=self._unquote(str(items[0])))
 
     def func_call(self, items):
         """func_name(arg_list?) → FuncCall"""

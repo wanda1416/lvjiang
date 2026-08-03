@@ -248,7 +248,7 @@ def test_region_key_still_goes_region_path(tmp_path):
     engine._workflow = workflow
     wf = _write_wf(tmp_path, 'scan [s].[title] as $x\ncollect $x\n')
     output = engine.execute(wf)
-    workflow.ocr_scene.assert_called_once_with("s", ["title"])
+    workflow.ocr_scene.assert_called_once_with("s", ["title"], min_confidence=None)
     assert output["x"] == {"title": "背包"}
 
 

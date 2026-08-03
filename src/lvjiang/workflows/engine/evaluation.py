@@ -266,12 +266,33 @@ class _EvalMixin:
         val = self._resolve(node)
         return self._to_number(val)
 
-    def _eval_arith(self, node: ArithOp) -> float:
+    def _eval_arith(self, node: ArithOp) -> float | str:
         """求值算术表达式节点
 
         递归求值 left/right，统一转 float 后执行运算。
         null 操作数视为 0.0，除法为浮点除，除 0 返回 0。
+        `+` 运算符支持字符串拼接：仅当操作数含非数值字符串时执行拼接，
+        数值字符串（如 "1.0"）仍走算术加法。
         """
+        # `+` 运算符：检查是否需要字符串拼接
+        if node.op == "+":
+            left_raw = self._resolve(node.left)
+            right_raw = self._resolve(node.right)
+            # 判断是否为字符串拼接场景：至少一个是字符串，且至少有一个不能转为数字
+            l_is_str = isinstance(left_raw, str)
+            r_is_str = isinstance(right_raw, str)
+            if l_is_str or r_is_str:
+                # 尝试将两个操作数转为数字（None 保留为 None，不特殊化为 0.0）
+                l_num = self._to_number(left_raw) if left_raw is not None else None
+                r_num = self._to_number(right_raw) if right_raw is not None else None
+                # 如果两个都能转为数字（非 None），走算术加法
+                if l_num is not None and r_num is not None:
+                    return l_num + r_num
+                # 否则走字符串拼接
+                left_str = left_raw if left_raw is not None else ""
+                right_str = right_raw if right_raw is not None else ""
+                return str(left_str) + str(right_str)
+
         left = self._resolve_arith(node.left)
         right = self._resolve_arith(node.right)
         # null 操作数视为 0.0

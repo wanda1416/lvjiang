@@ -57,6 +57,15 @@ class _DataOpsMixin:
             return [str(k) for k in region_key]
         return [str(region_key)]
 
+    def _resolve_min_confidence(self, where) -> float | None:
+        """解析 where 子句中的置信度阈值，返回 float 或 None（无 where 子句）"""
+        if where is None:
+            return None
+        val = self._resolve(where.min_confidence)
+        if val is None:
+            return None
+        return float(val)
+
     def _whole_panel_key(self, scene: str, field_keys, by, verb: str) -> str | None:
         """单一 key 且指向 panel（而非 region）时返回 panel key，否则 None
 
@@ -89,25 +98,29 @@ class _DataOpsMixin:
             # 动态 region：[scene].$var → 解析变量值
             field_keys = self._dynamic_field_keys(node.region_var)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        min_conf = self._resolve_min_confidence(node.where)
 
         # 单一 key 指向 panel → 整面板逐格 OCR（$var.[行].[列] 取值）
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "scan")
         if panel_key is not None:
             if node.by is not None:
                 # 整面板 + by：返回首个命中的行列 {row, col}
-                self._scan_panel_by(scene, panel_key, var_name, node.by)
+                self._scan_panel_by(scene, panel_key, var_name, node.by, min_confidence=min_conf)
             else:
-                self._scan_panel_whole(scene, panel_key, var_name)
+                self._scan_panel_whole(scene, panel_key, var_name, min_confidence=min_conf)
             return
 
         if node.by is not None:
             # ── by 子句：短路 OCR，返回字段名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            result = self._ensure_workflow().ocr_scene_by(scene, field_keys or [], target_value, by_clause.match_mode)
+            result = self._ensure_workflow().ocr_scene_by(
+                scene, field_keys or [], target_value, by_clause.match_mode,
+                min_confidence=min_conf,
+            )
             self.variables[var_name] = result  # str（命中字段名或 ""）
         else:
-            result = self._ensure_workflow().ocr_scene(scene, field_keys)
+            result = self._ensure_workflow().ocr_scene(scene, field_keys, min_confidence=min_conf)
             self.variables[var_name] = result  # dict
             # 存 region 元数据，供 click [scene].$key 解析坐标
             regions = self._layout.get_scene_regions(scene)
@@ -116,7 +129,7 @@ class _DataOpsMixin:
             self._coord_meta[var_name] = {r.key: r for r in regions}
 
     def _exec_recognize(self, node: Recognize):
-        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] — 图像识别场景中的材料"""
+        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] [where ...] — 图像识别场景中的材料"""
         # PanelRef: panel cell 级材料识别
         if isinstance(node.scene, PanelRef):
             self._recognize_panel_cell(node)
@@ -139,25 +152,31 @@ class _DataOpsMixin:
         group = None
         if node.group is not None:
             group = self._resolve(node.group)
+        min_conf = self._resolve_min_confidence(node.where)
 
         # 单一 key 指向 panel → 整面板逐格材料识别（$var.[行].[列] 取值）
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "recognize")
         if panel_key is not None:
             if node.by is not None:
                 # 整面板 + by：返回首个命中的行列 {row, col}
-                self._recognize_panel_by(scene, panel_key, var_name, node.by, group=group)
+                self._recognize_panel_by(scene, panel_key, var_name, node.by, group=group, min_confidence=min_conf)
             else:
-                self._recognize_panel_whole(scene, panel_key, var_name, group=group)
+                self._recognize_panel_whole(scene, panel_key, var_name, group=group, min_confidence=min_conf)
             return
 
         if node.by is not None:
             # ── by 子句：短路参考图匹配，返回 slot 名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            result = self._ensure_workflow().recognize_materials_by(scene, field_keys or [], target_value, by_clause.match_mode, group=group)
+            result = self._ensure_workflow().recognize_materials_by(
+                scene, field_keys or [], target_value, by_clause.match_mode,
+                group=group, min_confidence=min_conf,
+            )
             self.variables[var_name] = result  # str（命中 slot 名或 ""）
         else:
-            result, region_map = self._ensure_workflow().recognize_materials(scene, field_keys, group=group)
+            result, region_map = self._ensure_workflow().recognize_materials(
+                scene, field_keys, group=group, min_confidence=min_conf,
+            )
             self.variables[var_name] = result           # {slot_key: "参考图标识"}
             self._coord_meta[var_name] = region_map     # {slot_key: Region}
 
@@ -422,7 +441,7 @@ class _DataOpsMixin:
         return return_value, callee_output
 
     def _exec_find(self, node: Find):
-        """find [scene].[area] as $var by ... — 在指定区域或全画布 OCR 搜索目标文字
+        """find [scene].[area] as $var by ... [where ...] — 在指定区域或全画布 OCR 搜索目标文字
 
         与 scan/recognize 共享 scene_target + by_clause 语义。
         未找到时变量存入空字符串 ""（falsy），可用 if $var 判断。
@@ -434,6 +453,7 @@ class _DataOpsMixin:
         by_clause: ByClause = node.by
         match_mode = by_clause.match_mode
         match_target = self._resolve(by_clause.target)
+        min_conf = self._resolve_min_confidence(node.where)
 
         # 解析搜索区域（支持 region 和 panel）
         search_region: Region | None = None
@@ -472,7 +492,8 @@ class _DataOpsMixin:
 
         # 执行搜索
         result = self._ensure_workflow().find_text_in_region(
-            match_target, match_mode, search_region
+            match_target, match_mode, search_region,
+            min_confidence=min_conf,
         )
         # 结果存入变量：FoundRegion（找到）或 ""（未找到，falsy）
         self.variables[node.var_name] = result

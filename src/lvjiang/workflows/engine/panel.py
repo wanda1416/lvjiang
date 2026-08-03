@@ -179,7 +179,7 @@ class _PanelMixin:
         return slot_img, slot_key, row_idx, col_idx
 
     def _scan_panel_cell(self, node: Scan):
-        """scan [scene].[panel][row][col] as $var [by ...]
+        """scan [scene].[panel][row][col] as $var [by ...] [where ...]
 
         [row][col] 是对整面板结果的 key 过滤，结果为该格文本（str），
         与整面板 $var.[行].[列] 取值格式一致。
@@ -190,22 +190,27 @@ class _PanelMixin:
         if slot_img is None:
             self.variables[var_name] = ""
             return
+        min_conf = self._resolve_min_confidence(node.where)
         if node.by is not None:
             # by 子句：短路匹配，返回是否命中
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             ocr_results = self._ocr.recognize(slot_img)
+            if min_conf is not None:
+                ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
             text = " ".join(r.text for r in ocr_results).strip()
             matched = self._match_text(text, target_value, by_clause.match_mode)
             self.variables[var_name] = text if matched else ""
         else:
             ocr_results = self._ocr.recognize(slot_img)
+            if min_conf is not None:
+                ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
             text = " ".join(r.text for r in ocr_results).strip()
             self.variables[var_name] = text
         logger.info(f"scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _recognize_panel_cell(self, node: Recognize):
-        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...]
+        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...] [where ...]
 
         [row][col] 是 key 过滤，结果为该格材料类型名（str）。
         """
@@ -216,15 +221,22 @@ class _PanelMixin:
             self.variables[var_name] = ""
             return
         group = self._resolve(node.group) if node.group is not None else None
+        min_conf = self._resolve_min_confidence(node.where)
         if node.by is not None:
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
-            matched = self._match_text(info.type, target_value, by_clause.match_mode)
-            self.variables[var_name] = info.type if matched else ""
+            if min_conf is not None and info.confidence < min_conf:
+                self.variables[var_name] = ""
+            else:
+                matched = self._match_text(info.type, target_value, by_clause.match_mode)
+                self.variables[var_name] = info.type if matched else ""
         else:
             info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
-            self.variables[var_name] = info.type
+            if min_conf is not None and info.confidence < min_conf:
+                self.variables[var_name] = ""
+            else:
+                self.variables[var_name] = info.type
         logger.info(f"recognize panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _aligned_panel_image(self, scene_key: str, panel_key: str):
@@ -261,8 +273,8 @@ class _PanelMixin:
                 slot_img = panel_img[y1:y2, x1:x2]
                 yield r, c, (slot_img if slot_img.size else None)
 
-    def _scan_panel_whole(self, scene_key: str, panel_key: str, var_name: str):
-        """scan [scene].[panel] as $var — 整面板逐格 OCR
+    def _scan_panel_whole(self, scene_key: str, panel_key: str, var_name: str, min_confidence: float | None = None):
+        """scan [scene].[panel] as $var [where ...] — 整面板逐格 OCR
 
         结果为行列嵌套 dict（key 为 1-based 字符串）：$var.[1].[2] 取 1 行 2 列文本。
         整面板只截一次图，所有格从同一帧裁剪，避免逐格重截的耗时与画面漂移。
@@ -276,13 +288,15 @@ class _PanelMixin:
             text = ""
             if slot_img is not None:
                 ocr_results = self._ocr.recognize(slot_img)
+                if min_confidence is not None:
+                    ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
                 text = " ".join(t.text for t in ocr_results).strip()
             result.setdefault(str(r + 1), {})[str(c + 1)] = text
         self.variables[var_name] = result
         logger.info(f"scan panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
-    def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None):
-        """recognize [scene].[panel] as $var [on group ...] — 整面板逐格材料识别
+    def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None, min_confidence: float | None = None):
+        """recognize [scene].[panel] as $var [on group ...] [where ...] — 整面板逐格材料识别
 
         结果结构与 _scan_panel_whole 一致：$var.[行].[列] 取材料类型名。
         """
@@ -295,13 +309,17 @@ class _PanelMixin:
         for r, c, slot_img in self._iter_slot_images(panel_img, cal):
             mat_type = ""
             if slot_img is not None:
-                mat_type = recognizer.recognize(slot_img, group=group).type
+                info = recognizer.recognize(slot_img, group=group)
+                if min_confidence is not None and info.confidence < min_confidence:
+                    mat_type = ""
+                else:
+                    mat_type = info.type
             result.setdefault(str(r + 1), {})[str(c + 1)] = mat_type
         self.variables[var_name] = result
         logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
-    def _scan_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None):
-        """scan [scene].[panel] as $var by ... — 整面板 OCR + by 短路匹配
+    def _scan_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
+        """scan [scene].[panel] as $var by ... [where ...] — 整面板 OCR + by 短路匹配
 
         返回首个命中的行列位置 {"row": 行号, "col": 列号}，未命中返回空 dict {}。
         行列号为 1-based 整数。
@@ -316,6 +334,8 @@ class _PanelMixin:
             text = ""
             if slot_img is not None:
                 ocr_results = self._ocr.recognize(slot_img)
+                if min_confidence is not None:
+                    ocr_results = [o for o in ocr_results if o.confidence >= min_confidence]
                 text = " ".join(t.text for t in ocr_results).strip()
             if self._match_text(text, target_value, match_mode):
                 self.variables[var_name] = {"row": r + 1, "col": c + 1}
@@ -324,8 +344,8 @@ class _PanelMixin:
         self.variables[var_name] = {}
         logger.info(f"scan panel by [{scene_key}.{panel_key}] no match")
 
-    def _recognize_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None):
-        """recognize [scene].[panel] as $var by ... [on group ...] — 整面板材料识别 + by 短路匹配
+    def _recognize_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
+        """recognize [scene].[panel] as $var by ... [on group ...] [where ...] — 整面板材料识别 + by 短路匹配
 
         返回首个命中的行列位置 {"row": 行号, "col": 列号}，未命中返回空 dict {}。
         行列号为 1-based 整数。
@@ -340,7 +360,11 @@ class _PanelMixin:
         for r, c, slot_img in self._iter_slot_images(panel_img, cal):
             mat_type = ""
             if slot_img is not None:
-                mat_type = recognizer.recognize(slot_img, group=group).type
+                info = recognizer.recognize(slot_img, group=group)
+                if min_confidence is not None and info.confidence < min_confidence:
+                    mat_type = ""
+                else:
+                    mat_type = info.type
             if self._match_text(mat_type, target_value, match_mode):
                 self.variables[var_name] = {"row": r + 1, "col": c + 1}
                 logger.info(f"recognize panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {mat_type!r}")

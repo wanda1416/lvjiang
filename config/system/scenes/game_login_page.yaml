@@ -5,10 +5,10 @@ views:
   name: 基底
 - key: users
   name: 切换用户
-- key: loading
-  name: 登录画面
 - key: roles
   name: 切换角色
+- key: loading
+  name: 登录画面
 regions:
 - key: more_user
   name: 更多用户

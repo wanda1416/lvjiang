@@ -3,6 +3,8 @@ name: 道具
 views:
 - key: base
   name: 基底
+- key: bag_detail
+  name: 背包格
 - key: detail
   name: 道具详情
 - key: yangcheng
@@ -15,151 +17,181 @@ regions:
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_1_2
   name: 背包格1_2
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_1_3
   name: 背包格1_3
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_1_4
   name: 背包格1_4
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_1_5
   name: 背包格1_5
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_1_6
   name: 背包格1_6
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_2_1
   name: 背包格2_1
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_2_2
   name: 背包格2_2
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_2_3
   name: 背包格2_3
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_2_4
   name: 背包格2_4
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_2_5
   name: 背包格2_5
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_2_6
   name: 背包格2_6
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_3_1
   name: 背包格3_1
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_3_2
   name: 背包格3_2
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_3_3
   name: 背包格3_3
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_3_4
   name: 背包格3_4
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_3_5
   name: 背包格3_5
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_3_6
   name: 背包格3_6
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_4_1
   name: 背包格4_1
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_4_2
   name: 背包格4_2
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_4_3
   name: 背包格4_3
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_4_4
   name: 背包格4_4
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_4_5
   name: 背包格4_5
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_4_6
   name: 背包格4_6
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_5_1
   name: 背包格5_1
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_5_2
   name: 背包格5_2
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_5_3
   name: 背包格5_3
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_5_4
   name: 背包格5_4
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_5_5
   name: 背包格5_5
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: bag_5_6
   name: 背包格5_6
   type: slot
   is_text: false
   is_clickable: true
+  view: bag_detail
 - key: item_name
   name: 道具名称
   type: attr
@@ -196,9 +228,41 @@ regions:
   is_text: false
   is_clickable: true
   view: detail
+- key: sub_func_area
+  name: 子功能区
+  type: func
+  is_text: true
+  is_clickable: true
+  view: detail
+- key: putong
+  name: 普通道具
+  type: func
+  is_text: true
+  is_clickable: true
+- key: yangcheng
+  name: 养成材料
+  type: func
+  is_text: true
+  is_clickable: true
+- key: huodong
+  name: 活动道具
+  type: func
+  is_text: true
+  is_clickable: true
+- key: zhizao
+  name: 制造
+  type: func
+  is_text: true
+  is_clickable: true
+- key: zhengli
+  name: 整理背包
+  type: func
+  is_text: true
+  is_clickable: true
 panels:
 - key: bag_grid
   name: 背包
   cols: 6
   rows: 5
   min_visible: 0.85
+  view: bag_detail

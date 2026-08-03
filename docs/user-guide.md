@@ -189,7 +189,7 @@ python -m lvjiang -reg yysls
 | 文档 | 内容 |
 |------|------|
 | [README](../README.md) | 项目简介、安装、技术架构 |
-| [02-auto-tuning.md](20-requirements/02-auto-tuning.md) | 自动调律需求与行为规则细节 |
+| [01-auto-tuning.md](20-requirements/01-auto-tuning.md) | 自动调律需求与行为规则细节 |
 | [04-tuning-mechanics.md](10-game/04-tuning-mechanics.md) | 游戏调律机制说明 |
 | [DSL 语法](30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
 | [主窗口状态流](30-architecture/01-main-window-state-flow.md) | 定位/连接状态机 |

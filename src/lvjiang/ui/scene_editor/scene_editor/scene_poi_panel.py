@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ....core.layout_manager import rename_item_key_across_all_layouts
 from ....core.scene_loader import VALID_REGION_TYPES, PointDef
 from ....core.scene_registry import (
     get_point_def,
@@ -29,7 +30,6 @@ from ....core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
-from ....core.layout_manager import rename_item_key_across_all_layouts
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 

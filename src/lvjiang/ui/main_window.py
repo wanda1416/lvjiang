@@ -149,6 +149,34 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         logger.info("主窗口已初始化")
 
+    # ─── 启动时检查更新 ────────────────────────────────────────
+
+    def check_update_on_startup(self):
+        """启动时检查更新（窗口显示后调用）"""
+        from ..core.update import UpdateChecker, should_prompt_update
+
+        checker = UpdateChecker(self)
+
+        def on_finished(latest_version: str, download_url: str):
+            if not should_prompt_update(latest_version):
+                return  # 用户已选择跳过此版本
+
+            from .update_dialog import UpdateDialog
+            dialog = UpdateDialog(latest_version, download_url, self)
+            dialog.exec()
+
+            if dialog.action == UpdateDialog.ACTION_EXIT:
+                from PyQt6.QtWidgets import QApplication
+                QApplication.quit()
+
+        def on_error(_error_msg: str):
+            pass  # 启动时检查失败静默忽略
+
+        checker.finished.connect(on_finished)
+        checker.error.connect(on_error)
+        checker.start()
+        self._startup_update_checker = checker  # 防止被 GC
+
     # ─── 热键回调 ────────────────────────────────────────────
 
     def _on_global_f9(self):
@@ -310,25 +338,19 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         dialog.exec()
 
     def _check_update(self):
-        """直接检查更新（复用 AboutDialog 的更新检查逻辑）"""
+        """直接检查更新（帮助菜单 → 检查更新）"""
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtWidgets import QMessageBox
 
-        from .about_dialog import _get_version, _UpdateChecker
+        from ..core.update import UpdateChecker, get_version, is_newer_version
 
-        checker = _UpdateChecker(self)
+        checker = UpdateChecker(self)
 
         def on_finished(latest_version: str, download_url: str):
-            current_version = _get_version()
-            try:
-                current_parts = [int(x) for x in current_version.split(".")]
-                latest_parts = [int(x) for x in latest_version.split(".")]
-                is_newer = latest_parts > current_parts
-            except (ValueError, AttributeError):
-                is_newer = latest_version != current_version
+            current_version = get_version()
 
-            if is_newer:
+            if is_newer_version(latest_version, current_version):
                 result = QMessageBox.information(
                     self,
                     "发现新版本",

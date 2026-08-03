@@ -165,7 +165,7 @@
 
 ---
 
-## 6. Level 3：语义智能（待实现）
+## 6. Level 3：语义智能
 
 ### 6.1 P0 — 高价值基础校验
 
@@ -174,28 +174,28 @@
 | 功能 | 说明 | 依赖模块 | 状态 |
 |------|------|----------|------|
 | **关键字拼写模糊匹配** | 标识符与 DSL 关键字编辑距离 ≤ 2 时发布 Warning | AST NAME 节点遍历 + Levenshtein 距离 | ✅ 已实现 |
-| **场景名存在性检查** | `main_menu.btn_start` 中的 `main_menu` 不存在时报警 | `scenes.yaml` 注册表 | 🔲 待实现 |
-| **区域 key 检查** | `main_menu.btn_start` 中的 `btn_start` 在该场景下不存在时报警 | `static_check.check_refs()` | 🔲 待实现 |
-| **过程调用存在性检查** | `call my_proc()` 中 `my_proc` 未定义时报警 | AST 遍历 `proc` 定义 | 🔲 待实现 |
-| **import 文件检查** | `import "some/path.wf"` 的文件不存在时报警 | 文件系统 `Path.exists()` | 🔲 待实现 |
+| **场景名存在性检查** | `[scene].[key]` 中的 `scene` 不存在于 `scenes.yaml` 时报错 | `SceneRegistry.all_scene_keys()` | ✅ 已实现 |
+| **区域 key 检查** | `[scene].[key]` 中的 `key` 在该场景下不存在时报错 | `static_check.check_refs()` + layout | 🔲 待实现（需 layout 上下文） |
+| **过程调用存在性检查** | `call proc()` 中 `proc` 未定义时报错 | AST 遍历 `ProcDef` | ✅ 已实现 |
+| **import 文件检查** | `import "path.wf"` 的文件不存在时报错 | 文件系统 `Path.exists()` | ✅ 已实现 |
 
 ### 6.2 P1 — 中级语义校验
 
-| 功能 | 说明 |
-|------|------|
-| **变量作用域检查** | 使用未声明变量时警告（过程参数 / `for` 循环变量 / `this`） |
-| **过程参数数量检查** | `call proc(a, b)` 的参数数量与 `proc` 定义不匹配时报错 |
-| **重复过程名检查** | 同一文件中出现同名 `proc` 定义时报错 |
+| 功能 | 说明 | 状态 |
+|------|------|------|
+| **变量作用域检查** | 使用未声明变量时警告（过程参数 / `for` 循环变量 / `this`） | 🔲 待实现 |
+| **过程参数数量检查** | `call proc(a, b)` 的参数数量与 `proc` 定义不匹配时报错 | ✅ 已实现 |
+| **重复过程名检查** | 同一文件中出现同名 `def` 定义时报错 | 🔲 待实现（解析器已处理覆盖） |
 
 ### 6.3 P2 — 编辑器体验增强
 
-| 功能 | 说明 |
-|------|------|
-| **代码折叠** | `proc`/`main` 块、`if`/`elif`/`else` 块、`while`/`for` 块可折叠 |
-| **文档符号大纲** | 在 Outline 面板显示所有 `proc`/`main` 定义 |
-| **跳转定义** | Ctrl+点击场景引用跳转到对应 `scenes.yaml` 或 `.wf` 过程定义 |
-| **悬停提示** | 鼠标悬停场景引用时显示区域坐标信息 |
-| **代码片段** | 输入 `proc` 自动展开为过程定义模板 |
+| 功能 | 说明 | 状态 |
+|------|------|------|
+| **代码折叠** | `def`/`if`/`loop`/`try` 块可折叠 | ✅ 已实现 |
+| **文档符号大纲** | 在 Outline 面板显示所有 `def` 定义 | ✅ 已实现 |
+| **跳转定义** | Ctrl+点击场景引用跳转到对应 `scenes.yaml` 或 `.wf` 过程定义 | 🔲 待实现 |
+| **悬停提示** | 鼠标悬停过程名显示参数列表，悬停关键字显示提示 | ✅ 已实现 |
+| **代码片段** | 输入 `def`/`if`/`while`/`try`/`click`/`scan` 等自动展开为模板 | ✅ 已实现 |
 
 ---
 
@@ -254,9 +254,14 @@ install.bat [vscode|qoder|cursor]
 | Level 2 Python 环境检测 | ✅ 已实现 | 四级 fallback 自动检测 |
 | Level 2 多编辑器支持 | ✅ 已实现 | install.bat 支持 vscode/qoder/cursor |
 | Level 3 关键字拼写模糊匹配 | ✅ 已实现 | 编辑距离 ≤ 2 时发布 Warning 提示 |
-| Level 3 场景名存在性检查 | 🔲 待实现 | 需接入场景注册表 |
-| Level 3 区域 key 检查 | 🔲 待实现 | 需接入 `static_check.check_refs()` |
-| Level 3 过程调用存在性检查 | 🔲 待实现 | 需 AST 遍历 |
-| Level 3 import 文件检查 | 🔲 待实现 | 需文件系统查询 |
-| Level 3 变量/参数校验 | 🔲 待实现 | 需作用域分析 |
-| Level 3 代码折叠/大纲/跳转 | 🔲 待实现 | 需实现对应 LSP 协议方法 |
+| Level 3 场景名存在性检查 | ✅ 已实现 | 接入 SceneRegistry，检查场景是否存在 |
+| Level 3 过程调用存在性检查 | ✅ 已实现 | AST 遍历 CallProc，检查过程是否定义 |
+| Level 3 import 文件检查 | ✅ 已实现 | 文件系统 Path.exists() 检查 |
+| Level 3 过程参数数量检查 | ✅ 已实现 | 比对 CallProc.args 与 ProcDef.params |
+| Level 3 代码折叠 | ✅ 已实现 | def/if/loop/try 块可折叠 |
+| Level 3 文档符号大纲 | ✅ 已实现 | Outline 面板显示所有 def 定义 |
+| Level 3 悬停提示 | ✅ 已实现 | 悬停过程名显示参数列表 |
+| Level 3 代码片段 | ✅ 已实现 | def/if/while/try/click/scan 等模板 |
+| Level 3 区域 key 检查 | 🔲 待实现 | 需 layout 上下文 |
+| Level 3 跳转定义 | 🔲 待实现 | 需实现 textDocument/definition |
+| Level 3 变量作用域检查 | 🔲 待实现 | 需符号表与嵌套作用域分析 |

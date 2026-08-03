@@ -204,7 +204,7 @@ arg_list: arg ("," arg)*
 import_stmt: "import"i STRING _NL
 
 // def：定义子过程（同文件内复用）
-def_stmt: "def"i NAME "(" [def_param_list] ")" _NL statement* "end"i _NL
+def_stmt: "def"i NAME "(" [def_param_list] ")" _NL (_NL | statement)* "end"i _NL
 def_param_list: def_param ("," def_param)*
 def_param: "$" NAME
 
@@ -220,11 +220,11 @@ call_arg_list: call_arg ("," call_arg)*
 
 // ─── 控制流 ───────────────────────────────────────────────
 
-if_stmt: "if"i condition _NL statement* else_clause? "end"i _NL
+if_stmt: "if"i condition _NL (_NL | statement)* else_clause? "end"i _NL
 
-else_clause: "else"i _NL statement*
+else_clause: "else"i _NL (_NL | statement)*
 
-for_stmt: "for"i NAME "in"i for_iter _NL statement* "end"i _NL
+for_stmt: "for"i NAME "in"i for_iter _NL (_NL | statement)* "end"i _NL
 
 for_iter: for_range    -> for_iter_range
         | func_call    -> for_iter_func
@@ -236,11 +236,11 @@ for_range: "[" for_range_endpoint RANGE_OP for_range_endpoint "]"
 for_range_endpoint: number | var_ref
 RANGE_OP.2: /\.\.\./
 
-loop_count_stmt: "loop"i (number | NAME | var_ref) _NL statement* "end"i _NL
+loop_count_stmt: "loop"i (number | NAME | var_ref) _NL (_NL | statement)* "end"i _NL
 
-loop_while_stmt: "loop"i "while"i condition _NL statement* "end"i _NL
+loop_while_stmt: "loop"i "while"i condition _NL (_NL | statement)* "end"i _NL
 
-loop_until_stmt: "loop"i "until"i condition _NL statement* "end"i _NL
+loop_until_stmt: "loop"i "until"i condition _NL (_NL | statement)* "end"i _NL
 
 break_stmt: "break"i _NL
 
@@ -255,8 +255,8 @@ goto_stmt: "goto"i NAME _NL
 // try/catch：异常处理
 // catch 后可选绑定一个变量名，接收错误消息字符串
 // 控制流信号（break/return/goto）穿透 try/catch，不被捕获
-try_stmt: "try"i _NL statement* catch_clause? "end"i _NL
-catch_clause: "catch"i var_ref? _NL statement*
+try_stmt: "try"i _NL (_NL | statement)* catch_clause? "end"i _NL
+catch_clause: "catch"i var_ref? _NL (_NL | statement)*
 
 // ─── 条件表达式（优先级：or < and < not < atom）──────────
 

@@ -156,7 +156,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: training
+- key: peiyang
   name: 培养
   type: func
   is_text: false
@@ -166,12 +166,12 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: task
+- key: renwu
   name: 任务
   type: func
   is_text: false
   is_clickable: true
-- key: wallet
+- key: qiandai
   name: 钱袋
   type: func
   is_text: false

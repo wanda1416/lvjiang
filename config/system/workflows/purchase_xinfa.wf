@@ -1,6 +1,6 @@
 # ─── 导航：从首页到心法置换视图 ─────────────────────────
 click [game_main_page].[menu] after wait page_refresh_wait
-click [game_menu_page].[train] after wait page_refresh_wait
+click [game_menu_page].[peiyang] after wait page_refresh_wait
 click [training_main].[gongfa] after wait step_interval
 click [training_main].[xinfa] after wait page_refresh_wait
 click [training_xinfa].[exchange] after wait page_refresh_wait

@@ -16,7 +16,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: coin
+- key: daibi
   name: 代币
   type: attr
   is_text: true

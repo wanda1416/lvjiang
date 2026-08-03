@@ -73,15 +73,15 @@ _QUALITY_LABELS = {
     "blue": "蓝装及以下",
 }
 
-# 规则表列定义（第一列为排序按钮；扫描处理在评级后多一列
+# 规则表列定义（第一列为排序按钮；扫描处理在判定结果后多一列
 # 「仅首词条」，列索引经 self._ci 按列 key 取）
 _SORT_COL = 0
-_BASE_COL_KEYS = ("sort", "parts", "quality", "pct", "ratings",
-                  "judge", "action")
+_BASE_COL_KEYS = ("sort", "parts", "quality", "judge", "ratings",
+                  "pct", "action")
 _COL_TITLES = {
     "sort": "", "parts": "部位", "quality": "品阶",
-    "pct": "首词条 %", "ratings": "评级", "first_affix": "仅首词条",
-    "judge": "判定语义", "action": "动作",
+    "judge": "判定规则", "ratings": "判定结果", "first_affix": "仅首词条",
+    "pct": "首词条 %", "action": "动作",
 }
 
 # 各行为点的动作标签（统一使用 BEHAVIOR_ACTION_LABELS）
@@ -328,11 +328,11 @@ class _BehaviorPageBase(QWidget):
 
         self._init_head(layout)
 
-        # 扫描处理多「仅首词条」列
+        # 扫描处理多「仅首词条」列（插入在判定结果后、首词条%前）
         keys = list(_BASE_COL_KEYS)
         titles = dict(_COL_TITLES)
         if self.STAGE == "scan":
-            keys.insert(keys.index("judge"), "first_affix")
+            keys.insert(keys.index("pct"), "first_affix")
         self._ci = {k: i for i, k in enumerate(keys)}
         self._table = QTableWidget(0, len(keys))
         self._table.setHorizontalHeaderLabels([titles[k] for k in keys])

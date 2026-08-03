@@ -3,7 +3,7 @@
 按功能分类组织（仅通用部分）：
 
 - ``arithmetic``: 基础运算 (add/sub/mul/div/mod/min/max/abs)
-- ``general``:    通用工具 (concat/range/count_key/contains/find_key/append)
+- ``general``:    通用工具 (concat/range/count_nonempty/contains/find_key/append)
 - ``strings``:    字符串处理 (substr/split/replace/match/trim/upper/lower/to_num)
 - ``system``:     系统与 UI (confirm/pause/notify/input/save/panel_rows/panel_cols)
 

@@ -48,17 +48,17 @@ def _range(*args) -> list:
 
 # ─── 字典 ───────────────────────────────────────────────
 
-@builtin_func("count_key")
-def _count_key(scan_result, *args) -> int:
-    """统计数量
+@builtin_func("count_nonempty")
+def _count_nonempty(scan_result, *args) -> int:
+    """统计非空项数量
 
-    - dict: 统计非空字段数量
+    - dict: 统计非空值字段数量（空字符串/纯空白不计）
     - list: 统计元素数量
     - 其他: 返回 0
 
     .wf 用法:
-        eval n = count_key(result)
-        eval n = count_key($list)
+        eval n = count_nonempty($result)
+        eval n = count_nonempty($list)
     """
     if isinstance(scan_result, list):
         return len(scan_result)

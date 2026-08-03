@@ -19,16 +19,16 @@ if $prev_index >= 0
     eval $prev_account = $prev_row.account
 end
 
-log concat("当前账号：", $account)
-log concat("上次账号：", $prev_account)
+log "当前账号：" + $account
+log "上次账号：" + $prev_account
 
 # 3. 根据比对结果决定流程
 if $prev_account equals $account
     # 同账号：直接选角色
-    log concat("同账号切换，直接选角色: ", $role)
+    log "同账号切换，直接选角色: " + $role
     call _select_role($role_index)
 else
     # 不同账号：选账号 + 登录 + 选角色
-    log concat("不同账号切换，重新登录: ", $role)
+    log "不同账号切换，重新登录: " + $role
     call _switch_account($tail, $role_index)
 end

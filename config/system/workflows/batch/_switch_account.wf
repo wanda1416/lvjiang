@@ -4,8 +4,8 @@
 import "_select_role.wf"
 
 def _switch_account($tail, $role_index)
-    log concat("当前匹配", $tail)
-    log concat("当前下标", $role_index)
+    log "当前匹配" + $tail
+    log "当前下标" + $role_index
 
     # 1. 登录页 → 用户切换视图
     click [game_login_page].[more_user]

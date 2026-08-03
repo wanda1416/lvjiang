@@ -10,10 +10,20 @@
 
 ## 已有日志
 
+### 2026-08
+
+| 日期 | 文件 | 主题 |
+|------|------|------|
+| 2026-08-03 | [2026-08-03-screenshot-ocr-canvas-v011.md](2026-08/2026-08-03-screenshot-ocr-canvas-v011.md) | screenshot 指令 + OCR 画布可视化 + v0.1.1 发布 |
+| 2026-08-02 | [2026-08-02-scene-editor-batch-dsl-ocr.md](2026-08/2026-08-02-scene-editor-batch-dsl-ocr.md) | 场景编辑器增强 + 批处理完善 + DSL 语法扩展 + OCR 清洗架构 |
+| 2026-08-01 | [2026-08-01-layout-split-batch-mvp-v010.md](2026-08/2026-08-01-layout-split-batch-mvp-v010.md) | 布局拆分 + 批处理 MVP + 调律冷却期 + v0.1.0 发布 |
+
 ### 2026-07
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
+| 2026-07-31 | [2026-07-31-dsl-docs-reorg-tuning-rules-platform.md](2026-07/2026-07-31-dsl-docs-reorg-tuning-rules-platform.md) | DSL 文档重组 + 调律规则模型大重构 + 平台适配层 + macOS 支持 |
+| 2026-07-30 | [2026-07-30-tuning-materials-and-crash-fix.md](2026-07/2026-07-30-tuning-materials-and-crash-fix.md) | 属攻词条双重身份 + 调律材料策略 + 狗粮规则引擎 + 退出崩溃根治 |
 | 2026-07-21 | [2026-07-21-project-evolution-summary.md](2026-07/2026-07-21-project-evolution-summary.md) | 项目演进总结（Phase 0~8 + 用户指令索引） |
 | 2026-07-16 | [2026-07-16-workflow-stability-and-evaluation.md](2026-07/2026-07-16-workflow-stability-and-evaluation.md) | 工作流稳定性与评估体系闭环 |
 | 2026-07-16 | [2026-07-16-scene-grouping.md](2026-07/2026-07-16-scene-grouping.md) | 场景分组管理功能 |

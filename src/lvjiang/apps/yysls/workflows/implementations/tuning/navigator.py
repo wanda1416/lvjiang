@@ -1,7 +1,9 @@
 """导航与装备操作 — TuningNavigator
 
 页面导航（主界面→背包、详情页→调律页）与词条收集。
-通过 wf 引用访问 UI 操作原语。
+导航序列的唯一事实来源是 DSL subcall 文件（config/system/workflows/
+subcall/），经引擎 load_subcalls / call_subcall 桥调用，避免 Python 与
+DSL 两处重复维护同一操作序列。
 """
 
 from __future__ import annotations
@@ -17,6 +19,11 @@ if TYPE_CHECKING:
         AutoTuningWorkflow,
     )
 
+# 导航 subcall 文件（相对 workflows 根）与过程名
+_NAV_MAIN_TO_EQUIP = ("subcall/nav_main_to_equip.wf", "nav_main_to_equip")
+_NAV_EQUIP_TO_TUNE = ("subcall/nav_equip_to_tune.wf", "nav_equip_to_tune")
+_NAV_BACK_TO_MAIN = ("subcall/nav_back_to_main.wf", "nav_back_to_main")
+
 
 class TuningNavigator:
     """导航与装备操作：页面跳转、调律入口、词条收集"""
@@ -24,50 +31,45 @@ class TuningNavigator:
     def __init__(self, wf: AutoTuningWorkflow):
         self._wf = wf
 
+    def load_dependencies(self) -> None:
+        """加载导航所需的 DSL subcall 文件
+
+        在工作流启动时调用一次，确保后续导航操作能正确执行。
+        每次运行都重新加载，保证文件修改立即生效。
+        """
+        engine = self._wf.engine
+        if engine is None:
+            raise RuntimeError(
+                "TuningNavigator.load_dependencies: 未注入 WorkflowEngine，"
+                "无法加载导航 subcall")
+        for wf_file, _ in (_NAV_MAIN_TO_EQUIP, _NAV_EQUIP_TO_TUNE, _NAV_BACK_TO_MAIN):
+            engine.load_subcalls(wf_file)
+
+    def _call_subcall(self, proc_name: str, args: list | None = None):
+        """经引擎桥调用已加载的 DSL 子过程"""
+        engine = self._wf.engine
+        if engine is None:
+            raise RuntimeError(
+                f"TuningNavigator.{proc_name}: 未注入 WorkflowEngine，"
+                "导航 subcall 无法执行")
+        return engine.call_subcall(proc_name, args)
+
     def navigate_to_equip(self):
-        """从主界面导航到背包装备页"""
-        wf = self._wf
-        result = wf.ocr_scene("game_menu_page", ["wulinlu"])
-        if result.get("wulinlu") != "武林录":
-            wf.click_region("game_main_page", "menu")
-            wf.wait_delay("page_refresh_wait")  # 主界面 → 菜单页
-        else:
-            logger.info("当前在菜单页")
-
-        wf.click_region("game_menu_page", "baoguo")
-        wf.wait_delay("page_refresh_wait")  # 菜单页 → 背包页
-
-        bag_scan = wf.ocr_scene("bag_equip_detail", ["sub_equip"])
-        if "装备" not in bag_scan.get("sub_equip", ""):
-            wf.click_region("bag_equip_detail", "peiyang")
-            wf.wait_delay("page_refresh_wait")  # 背包页 → 调律训练页
+        """从主界面导航到背包装备页（DSL subcall nav_main_to_equip）"""
+        self._call_subcall(_NAV_MAIN_TO_EQUIP[1])
 
     def navigate_back(self):
-        """从背包详情页返回主界面"""
-        wf = self._wf
-        wf.click_region("bag_equip_detail", "back")
-        wf.wait_delay("page_refresh_wait")  # 背包详情页 → 菜单页
-        wf.click_region("game_menu_page", "back")
-        wf.wait_delay("page_refresh_wait")  # 菜单页 → 主界面
+        """从背包详情页返回主界面（DSL subcall nav_back_to_main）"""
+        self._call_subcall(_NAV_BACK_TO_MAIN[1])
 
-    def nav_to_tune(self, detail_scene: str) -> bool:
-        """从装备详情页进入调律页，失败时停留在详情页并返回 False"""
-        wf = self._wf
-        wf.click_region(wf.EQUIP_DETAIL, "more_func")
-        wf.wait_delay("page_refresh_wait")  # 详情页 → 「更多」弹窗展开
-        tune_key = wf.ocr_scene_by(
-            wf.EQUIP_DETAIL,
-            ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
-            "调律", "contains")
-        if not tune_key:
-            logger.info("未找到调律按钮")
-            # 「更多」弹窗已开，再点一次 more_func 使其收起，保持背包页干净
-            wf.click_region(wf.EQUIP_DETAIL, "more_func")
-            wf.wait_delay("step_interval")
-            return False
-        wf.click_region(wf.EQUIP_DETAIL, tune_key)
-        wf.wait_delay("page_refresh_wait")  # 详情页 → 调律页（页面切换）
-        return True
+    def nav_to_tune(self) -> bool:
+        """从装备详情页进入调律页（DSL subcall nav_equip_to_tune）
+
+        失败时停留在详情页（弹窗已收起）并返回 False；返回值语义遵循
+        DSL 约定：子过程 return < 0 表示错误。
+        """
+        result = self._call_subcall(_NAV_EQUIP_TO_TUNE[1])
+        return not (isinstance(result, (int, float)) and result < 0)
 
     def collect_new_affix(self, equip_data: EquipmentData, text: str) -> str:
         """把调律结果的新词条补充进装备数据，供下一轮判定使用

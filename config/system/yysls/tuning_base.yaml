@@ -76,6 +76,20 @@ behavior:
       first_affix_only: true
     - parts:
       - 武器
+      max_quality: purple
+      pct_op: ge
+      pct: 90
+      ratings:
+      - top
+      - excellent
+      - normal
+      - junk
+      judge_scope: all
+      judge_rules: []
+      action: skip
+      first_affix_only: true
+    - parts:
+      - 武器
       - 环
       - 佩
       - 冠胄

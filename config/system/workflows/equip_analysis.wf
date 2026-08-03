@@ -1,35 +1,35 @@
 #% name: 装备分析
 
 import "subcall/nav_main_to_equip.wf"
+import "subcall/nav_back_to_main.wf"
 
 # 装备分析工作流
 # 读取角色已装备数据，写入 session.equipped 持久化
 
 call nav_main_to_equip()
 
-# 初始化 session.equipped
-eval session.equipped = {}
+# 用局部 dict 收集，结束后一次性写入 session（避免中途失败污染 session）
+eval $equipped = {}
 
 # 武器类（equip_weapon_detail）
 for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
     click [bag_equip_detail].$slot after wait step_interval
     scan [equip_weapon_detail] as $scan_result
-    eval session.equipped.$slot = to_equipment($scan_result)
+    eval $equipped.$slot = to_equipment($scan_result)
 end
 
 # 防具类（equip_armor_detail）
 for slot in ["head", "chest", "leg", "wrist"]
     click [bag_equip_detail].$slot after wait step_interval
     scan [equip_armor_detail] as $scan_result
-    eval session.equipped.$slot = to_equipment($scan_result)
+    eval $equipped.$slot = to_equipment($scan_result)
 end
 
+# 结束后一次性写入 session
+eval session.equipped = $equipped
+
 # 输出装备数据（供调用方 read 取用）
-collect session.equipped
+collect $equipped
 
 # 返回主界面
-click [bag_equip_detail].[back] after wait step_interval
-
-click [bag_equip_detail].[back] after wait step_interval
-
-click [game_menu_page].[back]
+call nav_back_to_main()

@@ -73,7 +73,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._restore_window_size()
 
     def _restore_window_size(self):
-        """从 session.json 恢复窗口大小"""
+        """从 session.json 恢复窗口大小 + 分割器尺寸"""
         import json
 
         from ....constants import SESSION_PATH
@@ -87,9 +87,19 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         size = state.get("scene_editor_size")
         if isinstance(size, list) and len(size) == 2:
             self.resize(int(size[0]), int(size[1]))
+        # 垂直分割器（上 Tab + 下面板）
+        vs = state.get("scene_editor_vsplit")
+        if isinstance(vs, list) and len(vs) == 2 and all(s > 0 for s in vs):
+            self._splitter.setSizes([int(s) for s in vs])
+        # 水平分割器（左 OCR + 右脚本）
+        hs = state.get("scene_editor_hsplit")
+        if isinstance(hs, list) and len(hs) == 2 and all(s > 0 for s in hs):
+            self._bottom_splitter.setSizes([int(s) for s in hs])
+        # Tab 内部分割器（画布 vs 右侧列表）—— 延迟到 Tab 创建后应用
+        self._pending_tab_split = state.get("scene_editor_tab_split")
 
     def _save_window_size(self):
-        """保存窗口大小到 session.json"""
+        """保存窗口大小 + 分割器尺寸到 session.json"""
         import json
 
         from ....constants import SESSION_CONFIG_DIR, SESSION_PATH
@@ -99,7 +109,14 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        data.setdefault("ui_state", {})["scene_editor_size"] = [self.width(), self.height()]
+        ui = data.setdefault("ui_state", {})
+        ui["scene_editor_size"] = [self.width(), self.height()]
+        ui["scene_editor_vsplit"] = self._splitter.sizes()
+        ui["scene_editor_hsplit"] = self._bottom_splitter.sizes()
+        # Tab 内部分割器（取第一个可用 Tab）
+        for tab in self._tabs.values():
+            ui["scene_editor_tab_split"] = tab._splitter.sizes()
+            break
         try:
             SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             SESSION_PATH.write_text(
@@ -198,7 +215,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._rebuild_group_tabs()
 
         # 底部面板：左侧 OCR 结果区 + 右侧脚本测试器
-        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # ── 左侧：OCR 结果区 ──
         ocr_panel = QWidget()
@@ -212,6 +229,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._btn_recognize_mat = QPushButton("识别全部材料")
         self._btn_recognize_mat.clicked.connect(self._on_recognize_materials)
         btn_row.addWidget(self._btn_recognize_mat)
+        from PyQt6.QtWidgets import QCheckBox
+        self._chk_live_image = QCheckBox("使用实时图像")
+        self._chk_live_image.setToolTip("勾选后直接从设备实时截屏进行识别，不保存到场景文件")
+        btn_row.addWidget(self._chk_live_image)
         btn_row.addStretch()
         ocr_layout.addLayout(btn_row)
 
@@ -224,7 +245,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._result_text.setPlaceholderText("点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果")
         ocr_layout.addWidget(self._result_text)
 
-        bottom_splitter.addWidget(ocr_panel)
+        self._bottom_splitter.addWidget(ocr_panel)
 
         # ── 右侧：脚本测试器 ──
         script_panel = QWidget()
@@ -259,10 +280,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         # 设置按钮目标为脚本编辑器
         self._scene_key_btn.set_target(self._script_text)
 
-        bottom_splitter.addWidget(script_panel)
-        bottom_splitter.setSizes([500, 500])
+        self._bottom_splitter.addWidget(script_panel)
+        self._bottom_splitter.setSizes([500, 500])
 
-        self._splitter.addWidget(bottom_splitter)
+        self._splitter.addWidget(self._bottom_splitter)
         self._splitter.setStretchFactor(0, 2)
         self._splitter.setStretchFactor(1, 1)
 

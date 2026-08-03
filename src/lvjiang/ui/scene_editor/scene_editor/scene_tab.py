@@ -43,7 +43,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._current_view: str = ""
         self.on_view_changed = None
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # 左侧：画布顶部工具栏 + 画布
         self._canvas = RegionCanvas()
@@ -59,7 +59,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         left_layout.setSpacing(2)
         left_layout.addLayout(self._build_canvas_toolbar())
         left_layout.addWidget(self._canvas)
-        splitter.addWidget(left)
+        self._splitter.addWidget(left)
 
         # 右侧四 Tab
         self._right_tabs = QTabWidget()
@@ -67,12 +67,12 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._right_tabs.addTab(self._build_point_panel(), "坐标列表")
         self._right_tabs.addTab(self._build_arrow_panel(), "方向列表")
         self._right_tabs.addTab(self._build_panel_panel(), "面板列表")
-        splitter.addWidget(self._right_tabs)
-        splitter.setSizes([650, 250])
+        self._splitter.addWidget(self._right_tabs)
+        self._splitter.setSizes([650, 250])
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(splitter)
+        outer.addWidget(self._splitter)
 
         self._refresh_region_list()
         self._refresh_point_list()
@@ -199,6 +199,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
 
     def get_panels(self) -> list[Panel]:
         return self._canvas.get_panels()
+
+    def get_visible_panels(self) -> list[Panel]:
+        """当前视图下可见的面板（OCR/识别只应作用于可见面板）"""
+        return self._canvas.get_visible_panels()
 
     def set_panels(self, panels: list[Panel]):
         self._canvas.set_panels(panels)

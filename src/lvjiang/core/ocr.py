@@ -146,3 +146,67 @@ class OCREngine:
             results[region.key] = text
 
         return results
+
+    def ocr_single(self, image: np.ndarray, min_confidence: float | None = None) -> str:
+        """对单张小图做 OCR，返回清洗后的文本（多条用 | 分隔）"""
+        ocr_results = self.recognize(image)
+        if min_confidence is not None:
+            ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
+        return " | ".join(r.text for r in ocr_results) if ocr_results else ""
+
+    def calibrate_panel_cells(
+        self,
+        image: np.ndarray,
+        canvas: CanvasConfig,
+        panel,
+    ) -> list[tuple[int, int, int, int]]:
+        """校准面板网格，返回每个 cell 的像素坐标 (x1, y1, x2, y2)
+
+        Args:
+            image: 全截图 numpy 数组 (BGR)
+            canvas: 画布配置（用于坐标变换）
+            panel: Panel 对象（携带 rows/cols/calibration 等参数）
+
+        Returns:
+            list of (x1, y1, x2, y2) 像素坐标，按 row-major 顺序
+        """
+        from ..workflows.align import _make_even_alignment, detect_grid
+
+        h, w = image.shape[:2]
+        # panel 区域像素坐标
+        px1 = int(canvas.x_ratio * w + panel.x_ratio * canvas.w_ratio * w)
+        py1 = int(canvas.y_ratio * h + panel.y_ratio * canvas.h_ratio * h)
+        px2 = int(canvas.x_ratio * w + (panel.x_ratio + panel.w_ratio) * canvas.w_ratio * w)
+        py2 = int(canvas.y_ratio * h + (panel.y_ratio + panel.h_ratio) * canvas.h_ratio * h)
+        panel_img = image[py1:py2, px1:px2]
+
+        # 校准模式
+        calibration = getattr(panel, "calibration", "auto")
+        if calibration == "even":
+            alignment = _make_even_alignment(panel.rows, panel.cols)
+        else:
+            fallback = (calibration == "auto")
+            alignment = detect_grid(
+                panel_img,
+                expected_rows=panel.rows,
+                expected_cols=panel.cols,
+                fallback=fallback,
+                scroll_direction=getattr(panel, "scroll_direction", "vertical"),
+            )
+
+        if alignment is None:
+            return []
+
+        # 将归一化 cell 坐标转为全图像素坐标
+        cells = []
+        panel_w = px2 - px1
+        panel_h = py2 - py1
+        for r in range(alignment.n_rows):
+            for c in range(alignment.n_cols):
+                nx1, ny1, nx2, ny2 = alignment.slot_bounds(r, c)
+                cx1 = px1 + int(nx1 * panel_w)
+                cy1 = py1 + int(ny1 * panel_h)
+                cx2 = px1 + int(nx2 * panel_w)
+                cy2 = py1 + int(ny2 * panel_h)
+                cells.append((cx1, cy1, cx2, cy2))
+        return cells

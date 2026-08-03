@@ -28,7 +28,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: time
+- key: shijian
   name: 时间
   type: func
   is_text: false
@@ -38,12 +38,12 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: action
+- key: dongzuo
   name: 动作
   type: func
   is_text: false
   is_clickable: true
-- key: questionnaire
+- key: wenjuan
   name: 问卷
   type: func
   is_text: false
@@ -53,7 +53,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: feedback
+- key: fankui
   name: 反馈
   type: func
   is_text: false
@@ -63,13 +63,13 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: bag
+- key: baoguo
   name: 包裹
   type: func
   is_text: true
   is_clickable: true
   view: page_1
-- key: train
+- key: peiyang
   name: 培养
   type: func
   is_text: true
@@ -87,13 +87,13 @@ regions:
   is_text: true
   is_clickable: true
   view: page_1
-- key: activity
+- key: huodong
   name: 活动
   type: func
   is_text: true
   is_clickable: true
   view: page_1
-- key: appearance
+- key: waiguan
   name: 外观
   type: func
   is_text: true
@@ -105,43 +105,43 @@ regions:
   is_text: true
   is_clickable: true
   view: page_1
-- key: harmony
+- key: heming
   name: 和鸣
   type: func
   is_text: true
   is_clickable: true
   view: page_1
-- key: travel
+- key: tongyou
   name: 同游
   type: func
   is_text: true
   is_clickable: true
   view: page_1
-- key: business
+- key: baiye
   name: 百业
   type: func
   is_text: true
   is_clickable: true
   view: page_1
-- key: character
+- key: juese
   name: 角色
   type: func
   is_text: true
   is_clickable: true
   view: page_2
-- key: quest
+- key: renwu
   name: 任务
   type: func
   is_text: true
   is_clickable: true
   view: page_2
-- key: battle_pass
+- key: zhanling
   name: 战令
   type: func
   is_text: true
   is_clickable: true
   view: page_2
-- key: avatar
+- key: touxiang
   name: 头像
   type: func
   is_text: false
@@ -151,7 +151,7 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
-- key: social
+- key: shejiao
   name: 社交
   type: func
   is_text: true
@@ -199,13 +199,13 @@ regions:
   is_text: true
   is_clickable: true
   view: page_2
-- key: home
+- key: jiaye
   name: 家业
   type: func
   is_text: true
   is_clickable: true
   view: page_1
-- key: pets
+- key: huoban
   name: 伙伴
   type: func
   is_text: true
@@ -216,7 +216,7 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
-- key: mode
+- key: moshi
   name: 模式
   type: func
   is_text: true

@@ -34,12 +34,12 @@ class TuningNavigator:
         else:
             logger.info("当前在菜单页")
 
-        wf.click_region("game_menu_page", "bag")
+        wf.click_region("game_menu_page", "baoguo")
         wf.wait_delay("page_refresh_wait")  # 菜单页 → 背包页
 
         bag_scan = wf.ocr_scene("bag_equip_detail", ["sub_equip"])
         if "装备" not in bag_scan.get("sub_equip", ""):
-            wf.click_region("bag_equip_detail", "training")
+            wf.click_region("bag_equip_detail", "peiyang")
             wf.wait_delay("page_refresh_wait")  # 背包页 → 调律训练页
 
     def navigate_back(self):

@@ -273,7 +273,7 @@ class TuningExecutor:
         """
         wf = self._wf
         return bool(wf.call_function("confirm", [message],
-                                     engine=wf._engine))
+                                     engine=wf.engine))
 
     def _on_materials_insufficient(self, stock: int, baseline: int):
         """大律准石低于基准的后处理挂载点（预留：补货/兑换）。

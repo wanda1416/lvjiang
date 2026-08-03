@@ -19,9 +19,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ....core.layout_manager import rename_item_key_across_all_layouts
 from ....core.scene_loader import VALID_REGION_TYPES, RegionDef
 from ....core.scene_registry import get_registry, is_view_visible, sync_scene_cache
-from ....core.layout_manager import rename_item_key_across_all_layouts
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
 
@@ -319,7 +319,7 @@ class RegionPanelMixin:
             existing = {r.key for r in scene.regions} | {p.key for p in scene.points} | {p.key for p in scene.panels}
         # 编辑模式下，排除自身的 key（允许保持不变）
         old_key = region_def.key if region_def else None
-        
+
         def _validate():
             k = key_edit.text().strip()
             # 检查 key 是否被占用（新建时检查全部，编辑时排除自身）

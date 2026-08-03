@@ -76,15 +76,13 @@ behavior:
       first_affix_only: true
     - parts:
       - 武器
-      max_quality: purple
+      max_quality: purple_only
       pct_op: ge
       pct: 90
       ratings:
-      - top
-      - excellent
-      - normal
-      - junk
-      judge_scope: all
+      - 最大外功攻击
+      - 最小外功攻击
+      judge_scope: affix
       judge_rules: []
       action: skip
       first_affix_only: true

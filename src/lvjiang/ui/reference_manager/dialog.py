@@ -113,7 +113,12 @@ class ReferenceManagerDialog(QDialog):
         btn_new_space = QPushButton("新建空间")
         btn_new_space.clicked.connect(self._on_new_space)
         space_bar.addWidget(btn_new_space)
+        btn_activate_space = QPushButton("激活空间")
+        btn_activate_space.clicked.connect(self._on_activate_space)
+        space_bar.addWidget(btn_activate_space)
         space_bar.addStretch()
+        self._active_space_label = QLabel(f"当前激活空间：{self._db.get_active_space()}")
+        space_bar.addWidget(self._active_space_label)
         main_layout.addLayout(space_bar)
 
         # ── 顶级 Tab ──
@@ -150,6 +155,15 @@ class ReferenceManagerDialog(QDialog):
             return
         self._refresh_panels()
 
+    def _on_activate_space(self):
+        """激活当前下拉选中的空间（显式确认）"""
+        name = self._space_combo.currentText()
+        if not name or name == self._db.get_active_space():
+            return
+        if not self._db.set_active_space(name):
+            return
+        self._refresh_panels()
+
     def _on_new_space(self):
         """新建空间：创建空空间 + 激活 + 刷新下拉与面板"""
         name, ok = QInputDialog.getText(self, "新建图库空间", "空间名:")
@@ -181,6 +195,7 @@ class ReferenceManagerDialog(QDialog):
         self._meta_panel.reload()
         self._grid_panel.set_known_groups(groups, self._db.get_all_labels_by_group())
         self._grid_panel.set_meta_fields(self._db.get_meta_schema())
+        self._active_space_label.setText(f"当前激活空间：{self._db.get_active_space()}")
 
     # ── Tab 1: 新增参考图 ──
 

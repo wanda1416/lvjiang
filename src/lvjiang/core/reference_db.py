@@ -357,7 +357,7 @@ class ReferenceDatabase:
             space_yaml.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "version": 1,
-                "meta_schema": [self._schema_to_dict(f) for f in self._seed_schema()],
+                "meta_schema": [],
                 "references": [],
             }
             with open(space_yaml, "w", encoding="utf-8") as f:

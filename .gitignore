@@ -55,3 +55,4 @@ android/.kotlin/
 # VS Code extension build artifacts
 editors/vscode/lvjiang-wf/out/
 editors/vscode/lvjiang-wf/node_modules/
+editors/vscode/lvjiang-wf/*.vsix

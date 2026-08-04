@@ -170,15 +170,17 @@ class TuningExecutor:
             return FoodDecision("none", "", "未配置狗粮规则 → 不添加")
         cap_pct = (equip_data.affixes[0].cap_pct
                    if equip_data.affixes else None)
-        stocks: dict[str, int | None] = {}
+        stocks: dict[str, int] = {}
         for info in (infos or {}).values():
             label = getattr(info, "type", "") or ""
             if not label:
                 continue
-            # 低置信度误匹配的同名幽灵槽（数量 None）不得覆盖真槽
-            if label in stocks and stocks[label] is not None:
+            # 数量 None = 该材料是装备而非狗粮，视为已耗尽（count=0）
+            count = info.count if info.count is not None else 0
+            # 低置信度误匹配的同名幽灵槽（数量 0）不得覆盖真槽
+            if label in stocks and stocks[label] > 0:
                 continue
-            stocks[label] = info.count
+            stocks[label] = count
         decision = settings.decide_food(
             cap_pct, expect_rating, equip_data.quality, stocks)
         log = logger.warning if decision.action == "skip" else logger.info
@@ -210,8 +212,9 @@ class TuningExecutor:
         else:
             stock = stone.count
             if stock is None:
-                logger.warning("大律准石数量识别失败，本轮跳过数量检查")
-                return True
+                # 数量识别失败 = 该材料是装备而非调律石，视为已耗尽
+                logger.warning("大律准石数量识别失败（实为装备），视为材料不足")
+                stock = 0
         if stock >= settings.stone_min_count:
             logger.debug(
                 f"大律准石库存 {stock} >= 基准 {settings.stone_min_count}")
@@ -219,11 +222,25 @@ class TuningExecutor:
         reason = (f"大律准石 {stock} < 基准 "
                   f"{settings.stone_min_count}，材料不足")
         action = settings.stone_insufficient_action
-        if action == "ask" and self._confirm_continue(
-                f"{reason}，是否继续调律？"):
-            logger.warning(f"{reason}，用户确认继续，本次运行不再检查")
-            self._stone_check_waived = True
-            return True
+        if action == "ask":
+            choice = self._confirm_material_insufficient(
+                f"{reason}，请选择：")
+            if choice == "continue":
+                logger.warning(f"{reason}，用户确认继续，本次运行不再检查")
+                self._stone_check_waived = True
+                return True
+            elif choice == "skip":
+                logger.warning(f"{reason}，用户选择跳过该装备")
+                self.abort_reason = f"{reason}，跳过该装备"
+                self._on_materials_insufficient(stock, settings.stone_min_count)
+                return False
+            else:  # end
+                logger.warning(f"{reason}，用户选择结束本次调律")
+                self.abort_reason = reason
+                self.materials_exhausted = True
+                self._wf.output["stop_reason"] = reason
+                self._on_materials_insufficient(stock, settings.stone_min_count)
+                return False
         if action == "skip":
             logger.warning(f"{reason}，跳过该装备")
             self.abort_reason = f"{reason}，跳过该装备"
@@ -267,12 +284,16 @@ class TuningExecutor:
         if action == "ask":
             if self._tune_ready_waived:
                 action = "skip"
-            elif self._confirm_continue(
-                    f"{reason}，是否跳过本件继续处理后续装备？"):
-                self._tune_ready_waived = True
-                action = "skip"
             else:
-                action = "abort"
+                choice = self._confirm_material_insufficient(
+                    f"{reason}，请选择：")
+                if choice == "continue":
+                    self._tune_ready_waived = True
+                    action = "skip"
+                elif choice == "skip":
+                    action = "skip"
+                else:  # end
+                    action = "abort"
         if action == "skip":
             logger.warning(f"{reason}，结束本件调律")
             self.abort_reason = f"{reason}，结束本件调律"
@@ -284,15 +305,19 @@ class TuningExecutor:
         wf.output["stop_reason"] = reason
         return False
 
-    def _confirm_continue(self, message: str) -> bool:
-        """走 DSL confirm 内置函数弹窗询问用户
+    def _confirm_material_insufficient(self, message: str) -> str:
+        """材料不足时三选项确认：continue/skip/end
 
-        有 engine 引用时经 engine._ui_callback 调度到 Qt 主线程，
-        无则回退平台原生弹窗（confirm 内置函数自行处理）。
+        经 engine._ui_callback 调度到 Qt 主线程弹三按钮对话框，
+        无回调时回退为拒绝（按 end 处理）。
         """
         wf = self._wf
-        return bool(wf.call_function("confirm", [message],
-                                     engine=wf.engine))
+        if wf.engine is None or wf.engine._ui_callback is None:
+            logger.warning("无 UI 回调，材料不足对话框无法弹出，按结束处理")
+            return "end"
+        result = wf.engine._ui_callback(
+            "confirm3", message=message)
+        return result if result in ("continue", "skip", "end") else "end"
 
     def _on_materials_insufficient(self, stock: int, baseline: int):
         """大律准石低于基准的后处理挂载点（预留：补货/兑换）。

@@ -403,11 +403,11 @@ def test_stone_check_count_as_stock():
 
 
 def test_stone_check_ocr_fail_passes():
-    """找到大律准石但数量 OCR 失败 → 警告放行不误杀"""
+    """找到大律准石但数量 OCR 失败 → 视为装备而非调律石，按材料不足处理"""
     wf = FakeWF()
     infos = {(1, 2): _Stone(count=None, devoted=None)}
-    assert wf.executor._check_stone_stock(_STONE_ON, infos) is True
-    assert not wf.executor.materials_exhausted
+    assert wf.executor._check_stone_stock(_STONE_ON, infos) is False
+    assert wf.executor.materials_exhausted
 
 
 def test_stone_check_low_stops_all():
@@ -458,7 +458,7 @@ def test_stone_check_ask_continue():
     settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
                                 stone_insufficient_action="ask")
     asked = []
-    wf.executor._confirm_continue = lambda msg: asked.append(msg) or True
+    wf.executor._confirm_material_insufficient = lambda msg: asked.append(msg) or "continue"
     infos = {(1, 2): _Stone(count=50)}
     assert wf.executor._check_stone_stock(settings, infos) is True
     assert wf.executor._stone_check_waived
@@ -474,7 +474,7 @@ def test_stone_check_ask_decline():
     wf = FakeWF()
     settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
                                 stone_insufficient_action="ask")
-    wf.executor._confirm_continue = lambda msg: False
+    wf.executor._confirm_material_insufficient = lambda msg: "end"
     assert wf.executor._check_stone_stock(
         settings, {(1, 2): _Stone(count=50)}) is False
     assert wf.executor.materials_exhausted
@@ -552,7 +552,7 @@ def test_tune_btn_not_ready_ask_continue():
     settings = MaterialSettings(stone_check_enabled=True,
                                 stone_insufficient_action="ask")
     asked = []
-    wf.executor._confirm_continue = lambda msg: asked.append(msg) or True
+    wf.executor._confirm_material_insufficient = lambda msg: asked.append(msg) or "continue"
     assert wf.executor._ensure_tune_ready(settings) is False
     assert not wf.executor.materials_exhausted
     assert wf.executor._tune_ready_waived
@@ -568,7 +568,7 @@ def test_tune_btn_not_ready_ask_decline():
     wf = FakeWF()
     settings = MaterialSettings(stone_check_enabled=True,
                                 stone_insufficient_action="ask")
-    wf.executor._confirm_continue = lambda msg: False
+    wf.executor._confirm_material_insufficient = lambda msg: "end"
     assert wf.executor._ensure_tune_ready(settings) is False
     assert wf.executor.materials_exhausted
     assert not wf.executor._tune_ready_waived

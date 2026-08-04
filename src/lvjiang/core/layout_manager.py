@@ -3,6 +3,10 @@
 存储结构（目录化）：
 - layouts.yaml          名册 + canvas 内联（聚合键值，local diff 合并）
 - layouts/{name}/{scene_key}.json  每场景独立文件（实体影子 + 墓碑）
+
+布局别名（extends）：条目带 `extends: 根布局名` 时，scene 全部复用根布局
+目录，仅 canvas 独立；别名自身不产生任何 scene 文件。
+严格约束：extends 只能指向根布局（禁止多级继承）。
 """
 
 import json
@@ -15,6 +19,7 @@ from loguru import logger
 from ..constants import SESSION_CONFIG_DIR
 from .config_resolver import get_resolver
 from .scene_registry import (
+    CanvasConfig,
     Layout,
     get_panel_defs,
     get_point_defs,
@@ -55,8 +60,22 @@ def scene_screenshot_name(scene_key: str, view: str = "") -> str:
 def load_scene_screenshot(
     layout_name: str, scene_key: str, view: str = ""
 ) -> np.ndarray | None:
-    """读取布局下某场景（可选视图）的截图，不存在返回 None（支持中文路径）"""
-    path = layout_screenshots_dir(layout_name) / scene_screenshot_name(scene_key, view)
+    """读取布局下某场景（可选视图）的截图，不存在返回 None（支持中文路径）
+
+    别名布局（extends）自动重定向到父布局的截图目录。
+    """
+    # 别名布局重定向到父布局的截图
+    actual_layout = layout_name
+    try:
+        resolver = get_resolver()
+        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        entry = merged.get("layouts", {}).get(layout_name) or {}
+        if entry.get("extends"):
+            actual_layout = entry["extends"]
+    except Exception:
+        pass  # 加载失败时保持原行为
+
+    path = layout_screenshots_dir(actual_layout) / scene_screenshot_name(scene_key, view)
     if not path.exists():
         return None
     try:
@@ -361,37 +380,65 @@ def _enumerate_scene_files(name: str) -> list[str]:
     return alive
 
 
+def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str] | None:
+    """解析布局条目，返回 (canvas_dict, scene 目录所属布局名)
+
+    支持别名布局：条目带 extends 时，scene 文件目录指向根布局。
+    严格约束：extends 只能指向根布局（目标自身不得再带 extends）。
+
+    Returns:
+        None 表示条目无效（extends 目标不存在或多级继承）
+    """
+    entry = layouts_doc.get(name) or {}
+    extends = entry.get("extends")
+    if not extends:
+        return entry.get("canvas", {}), name
+    if extends not in layouts_doc:
+        logger.error(f"布局 [{name}] 的 extends 目标不存在: {extends}")
+        return None
+    if (layouts_doc.get(extends) or {}).get("extends"):
+        logger.error(f"布局 [{name}] 的 extends 只能指向根布局，禁止多级继承: {extends}")
+        return None
+    return entry.get("canvas", {}), extends
+
+
 def load_layout_by_name(name: str) -> Layout | None:
     """模块级布局加载（无 session 依赖，供 workflow_runner / smoke 使用）
 
     从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
+    别名布局（带 extends）的 scene 从根布局目录加载，canvas 取自身条目。
     """
     from .scene_registry import Arrow, Panel, Point, Region
 
     resolver = get_resolver()
     merged = resolver.load_merged(_LAYOUTS_YAML_REL)
     layouts_doc = merged.get("layouts", {})
+
+    resolved = _resolve_layout_entry(layouts_doc, name)
+    if resolved is None:
+        return None
+    canvas_dict, scene_dir_name = resolved
+
     if name not in layouts_doc:
         # 回退：目录存在但 yaml 未登记（兼容迁移中间态）
         scene_keys = _enumerate_scene_files(name)
         if not scene_keys:
             return None
     else:
-        scene_keys = _enumerate_scene_files(name)
+        scene_keys = _enumerate_scene_files(scene_dir_name)
 
-    # canvas
+    # canvas（始终取自身条目）
     from .scene_registry import CanvasConfig
-    canvas_dict = layouts_doc.get(name, {}).get("canvas", {})
     canvas = CanvasConfig.from_dict(canvas_dict) if canvas_dict else CanvasConfig()
 
-    # 逐场景加载
+    # 逐场景加载（别名布局从根布局目录读）
     scenes: dict[str, list[Region]] = {}
     points: dict[str, list[Point]] = {}
     arrows: dict[str, list[Arrow]] = {}
     panels: dict[str, list[Panel]] = {}
 
     for scene_key in scene_keys:
-        path = resolver.resolve_read(_scene_rel(name, scene_key))
+        path = resolver.resolve_read(_scene_rel(scene_dir_name, scene_key))
         if path is None:
             continue
         try:
@@ -426,19 +473,36 @@ class LayoutConfigManager:
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
+        """加载 session.json，仅提取 active_layout 字段
+
+        layout_manager 只管理 active_layout，不应保留 session.json 中的其他字段
+        （如 layouts、users 等），避免误写回造成数据污染。
+        """
         from ..constants import SESSION_PATH
         if SESSION_PATH.exists():
             try:
-                return json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+                # 仅提取 active_layout，不保留其他字段
+                return {"active_layout": data.get("active_layout", "")}
             except Exception as e:
                 logger.error(f"加载 session.json 失败: {e}")
         return {"active_layout": ""}
 
     def _save_config(self):
+        """保存 active_layout 到 session.json（read-modify-write，保留其他字段）"""
         from ..constants import SESSION_PATH
         SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        # 先读取现有内容
+        data = {}
+        if SESSION_PATH.exists():
+            try:
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        # 仅更新 active_layout，保留其他字段
+        data["active_layout"] = self._config.get("active_layout", "")
         SESSION_PATH.write_text(
-            json.dumps(self._config, ensure_ascii=False, indent=2),
+            json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
@@ -472,7 +536,14 @@ class LayoutConfigManager:
         return sorted(names)
 
     def new_layout(self, name: str) -> Layout:
-        """创建空布局（所有场景初始为空 regions）"""
+        """创建空布局（所有场景初始为空 regions）
+
+        Raises:
+            ValueError: 布局名已存在（含别名）时。新建撞名别名会把空场景
+                全量写入根布局目录，造成根布局数据被清空，必须拒绝。
+        """
+        if name in self.list_layouts():
+            raise ValueError(f"布局已存在，无法新建: {name}")
         from .scene_registry import SCENE_REGIONS
         layout = Layout(name=name)
         for scene_key in SCENE_REGIONS:
@@ -480,6 +551,47 @@ class LayoutConfigManager:
         self.save_layout(layout)
         self.set_active_layout(name)
         logger.info(f"布局已新建: {name}")
+        return layout
+
+    def is_alias_layout(self, name: str) -> bool:
+        """判断布局是否为别名（yaml 条目带 extends）"""
+        resolver = get_resolver()
+        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        entry = merged.get("layouts", {}).get(name) or {}
+        return bool(entry.get("extends"))
+
+    def create_alias_layout(self, name: str, extends_name: str, canvas: CanvasConfig) -> Layout | None:
+        """创建别名布局：仅 yaml 条目（extends + canvas），无 scene 文件
+
+        Args:
+            name: 新布局名称
+            extends_name: 继承的根布局名称
+            canvas: 画布配置
+
+        Returns:
+            创建的 Layout 对象，失败时返回 None
+        """
+        if name in self.list_layouts():
+            logger.error(f"布局已存在，无法创建别名: {name}")
+            return None
+        if extends_name not in self.list_layouts():
+            logger.error(f"继承目标不存在: {extends_name}")
+            return None
+        if self.is_alias_layout(extends_name):
+            logger.error(f"继承目标必须是根布局，不能是别名: {extends_name}")
+            return None
+
+        # 写入 yaml 条目
+        resolver = get_resolver()
+        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        layouts_doc = merged.setdefault("layouts", {})
+        layouts_doc[name] = {"extends": extends_name, "canvas": canvas.to_dict()}
+        resolver.save_merged(_LAYOUTS_YAML_REL, merged)
+
+        # 加载并返回（scene 从根布局读取）
+        layout = self.load_layout(name)
+        if layout:
+            logger.info(f"别名布局已创建: {name} (extends {extends_name})")
         return layout
 
     def load_layout(self, name: str) -> "Layout | None":
@@ -498,16 +610,32 @@ class LayoutConfigManager:
             changed_scenes: 需要写盘的场景 key 集合。
                 None = 全量写盘（新建布局、另存为等场景）；
                 set = 增量写盘，只写指定场景的 JSON 文件。
+
+        别名布局（yaml 条目带 extends）：保留 extends 字段，
+        scene 文件写入根布局目录（别名自身不维护 scene）。
+        extends 条目非法（目标缺失/多级继承）时拒绝写盘。
         """
         resolver = get_resolver()
 
-        # 1. 更新 layouts.yaml 中的 canvas 条目
+        # 1. 校验 extends 合法性（与加载侧对称：目标缺失/多级继承拒绝写盘）
         merged = resolver.load_merged(_LAYOUTS_YAML_REL)
         layouts_doc = merged.setdefault("layouts", {})
-        layouts_doc[layout.name] = {"canvas": layout.canvas.to_dict()}
+        resolved = _resolve_layout_entry(layouts_doc, layout.name)
+        if resolved is None:
+            logger.error(f"布局 [{layout.name}] 的 extends 条目非法，拒绝保存")
+            return
+        _, scene_dir_name = resolved
+
+        # 2. 更新 layouts.yaml 中的条目（别名布局保留 extends）
+        existing = layouts_doc.get(layout.name) or {}
+        entry_out: dict = {}
+        if existing.get("extends"):
+            entry_out["extends"] = existing["extends"]
+        entry_out["canvas"] = layout.canvas.to_dict()
+        layouts_doc[layout.name] = entry_out
         resolver.save_merged(_LAYOUTS_YAML_REL, merged)
 
-        # 2. 写场景 JSON 文件（增量或全量）
+        # 3. 写场景 JSON 文件（增量或全量）；别名布局落到根布局目录
         all_scene_keys = set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels)
         scene_keys = all_scene_keys if changed_scenes is None else (changed_scenes & all_scene_keys)
         for sk in scene_keys:
@@ -528,7 +656,7 @@ class LayoutConfigManager:
                 panel_order = {p.key: i for i, p in enumerate(get_panel_defs(sk))}
                 entry["panels"] = [p.to_dict() for p in sorted(pnls, key=lambda p: panel_order.get(p.key, 999))]
             resolver.write_entity(
-                _scene_rel(layout.name, sk),
+                _scene_rel(scene_dir_name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),
             )
         mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else "全量"
@@ -541,6 +669,13 @@ class LayoutConfigManager:
         layouts_doc = merged.get("layouts", {})
         scene_keys = _enumerate_scene_files(name)
         if name not in layouts_doc and not scene_keys:
+            return False
+
+        # 拒绝删除被别名引用的根布局（避免悬空 extends）
+        referencing = [n for n, e in layouts_doc.items()
+                       if isinstance(e, dict) and e.get("extends") == name]
+        if referencing:
+            logger.error(f"布局 [{name}] 被别名布局引用: {referencing}，拒绝删除")
             return False
 
         # 删除场景文件

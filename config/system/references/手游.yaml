@@ -1,0 +1,140 @@
+version: 1
+meta_schema:
+- key: level
+  name: 等级
+  filterable: true
+  type: number
+  sort_by: desc
+  scope: input
+- key: levels
+  name: 等级区域
+  filterable: false
+  type: text
+  sort_by: asc
+  scope: output
+  crop:
+  - 0.0
+  - 0.0
+  - 1.0
+  - 0.5
+- key: counts
+  name: 数量区域
+  filterable: false
+  type: text
+  sort_by: asc
+  scope: output
+  crop:
+  - 0.0
+  - 0.5
+  - 1.0
+  - 0.5
+references:
+- file: 调律材料/94A752E3.png
+  label: 彩狗粮
+  meta:
+    group: 调律材料
+    level: '110'
+  source: screenshot
+  notes: ''
+- file: 装备培养/D9C93ECE.png
+  label: 装备碎片
+  meta:
+    level: '110'
+    group: 装备培养
+  source: screenshot
+  notes: ''
+- file: 调律材料/4E8AEBCB.png
+  label: 金狗粮
+  meta:
+    level: '110'
+    group: 调律材料
+  source: screenshot
+  notes: ''
+- file: 定音转律/CDC5D1DF.png
+  label: 止戈定音石
+  meta:
+    level: '110'
+    group: 定音转律
+  source: screenshot
+  notes: ''
+- file: 装备培养/D65E7DA0.png
+  label: 啸玉
+  meta:
+    level: '110'
+    group: 装备培养
+  source: screenshot
+  notes: ''
+- file: 定音转律/AF81246E.png
+  label: 定音石
+  meta:
+    level: '110'
+    group: 定音转律
+  source: screenshot
+  notes: ''
+- file: 装备培养/1D6D85DB.png
+  label: 传律石
+  meta:
+    level: '110'
+    group: 装备培养
+  source: screenshot
+  notes: ''
+- file: 装备培养/71F982EC.png
+  label: 承音石
+  meta:
+    level: '110'
+    group: 装备培养
+  source: screenshot
+  notes: ''
+- file: 定音转律/B3D1F2D7.png
+  label: 止戈变音石
+  meta:
+    level: '110'
+    group: 定音转律
+  source: screenshot
+  notes: ''
+- file: 定音转律/3C2AFA55.png
+  label: 转律石
+  meta:
+    level: '110'
+    group: 定音转律
+  source: screenshot
+  notes: ''
+- file: 调律材料/4BC52A1E.png
+  label: 紫狗粮
+  meta:
+    level: '110'
+    group: 调律材料
+  source: screenshot
+  notes: ''
+- file: 调律材料/655A3918.png
+  label: 大律准石
+  meta:
+    level: '110'
+    group: 调律材料
+  source: screenshot
+  notes: ''
+- file: 装备培养/F77FFD73.png
+  label: 溯玉
+  meta:
+    group: 装备培养
+  source: screenshot
+  notes: ''
+- file: 调律材料/242A2902.png
+  label: 律准石
+  meta:
+    group: 调律材料
+  source: screenshot
+  notes: ''
+- file: 装备培养/8CFB38DD.png
+  label: 振玉
+  meta:
+    group: 装备培养
+  source: screenshot
+  notes: ''
+- file: 调律材料/453D365A.png
+  label: 小律准石
+  meta:
+    level: '110'
+    group: 调律材料
+  source: screenshot
+  notes: ''

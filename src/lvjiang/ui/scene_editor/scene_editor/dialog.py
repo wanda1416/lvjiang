@@ -78,30 +78,38 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
         from ....constants import SESSION_PATH
         if not SESSION_PATH.exists():
+            logger.debug("场景编辑器恢复：session.json 不存在")
             return
         try:
             state = json.loads(
                 SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
         except Exception:
+            logger.debug("场景编辑器恢复：读取 session.json 失败")
             return
+        logger.debug(f"场景编辑器恢复：ui_state = {state}")
         # 窗口位置
         pos = state.get("scene_editor_pos")
         if isinstance(pos, list) and len(pos) == 2:
+            logger.debug(f"场景编辑器恢复位置：{pos}")
             self.move(int(pos[0]), int(pos[1]))
         # 窗口大小
         size = state.get("scene_editor_size")
         if isinstance(size, list) and len(size) == 2:
+            logger.debug(f"场景编辑器恢复大小：{size}")
             self.resize(int(size[0]), int(size[1]))
         # 垂直分割器（上 Tab + 下面板）
         vs = state.get("scene_editor_vsplit")
         if isinstance(vs, list) and len(vs) == 2 and all(s > 0 for s in vs):
+            logger.debug(f"场景编辑器恢复垂直分割器：{vs}")
             self._splitter.setSizes([int(s) for s in vs])
         # 水平分割器（左 OCR + 右脚本）
         hs = state.get("scene_editor_hsplit")
         if isinstance(hs, list) and len(hs) == 2 and all(s > 0 for s in hs):
+            logger.debug(f"场景编辑器恢复水平分割器：{hs}")
             self._bottom_splitter.setSizes([int(s) for s in hs])
         # Tab 内部分割器（画布 vs 右侧列表）—— 延迟到 Tab 创建后应用
         self._pending_tab_split = state.get("scene_editor_tab_split")
+        logger.debug(f"场景编辑器恢复 Tab 分割器（延迟）：{self._pending_tab_split}")
 
     def _save_window_size(self):
         """保存窗口位置 + 大小 + 分割器尺寸到 session.json"""
@@ -123,6 +131,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         for tab in self._tabs.values():
             ui["scene_editor_tab_split"] = tab._splitter.sizes()
             break
+        logger.debug(f"场景编辑器保存：ui_state = {ui}")
         try:
             SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             SESSION_PATH.write_text(
@@ -200,12 +209,24 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
         layout.addLayout(top_bar)
 
-        # ─── 尺寸信息栏（当前 TAB 截图 / 画布尺寸与横纵比）───
+        # ─── 第二行：继承标识 + 尺寸信息栏 ───
+        second_line = QHBoxLayout()
+
+        # 继承标识（别名布局时显示）
+        self._inherit_label = QLabel()
+        self._inherit_label.setStyleSheet("color: #888; font-size: 11px;")
+        self._inherit_label.hide()
+        second_line.addWidget(self._inherit_label)
+
+        # 尺寸信息栏（当前 TAB 截图 / 画布尺寸与横纵比）
         self._info_label = QLabel()
         self._info_label.setTextFormat(Qt.TextFormat.RichText)
         self._info_label.setStyleSheet("font-size: 12px; padding: 2px 2px 4px 2px;")
-        self._info_label.setText('<span style="color:#888;">截图：—　　画布：—</span>')
-        layout.addWidget(self._info_label)
+        self._info_label.setText('<span style="color:#888;">截图：—  画布：—</span>')
+        second_line.addWidget(self._info_label)
+        second_line.addStretch()
+
+        layout.addLayout(second_line)
 
         # ─── 主分割器：分组 Tab + OCR 结果区 ───
         self._splitter = QSplitter(Qt.Orientation.Vertical)

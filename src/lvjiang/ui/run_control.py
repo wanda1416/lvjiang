@@ -79,6 +79,25 @@ class _UIHelper(QObject):
             )
             self._active_dialog = box
             return box.exec() == QMessageBox.StandardButton.Yes
+        if action == "confirm3":
+            # 三选项确认对话框（用于材料不足等场景）
+            box = QMessageBox(self._window)
+            box.setIcon(QMessageBox.Icon.Question)
+            box.setWindowTitle("工作流确认")
+            box.setText(kwargs.get("message", ""))
+            btn_continue = box.addButton("继续调律", QMessageBox.ButtonRole.AcceptRole)
+            btn_skip = box.addButton("跳过当前装备", QMessageBox.ButtonRole.DestructiveRole)
+            btn_end = box.addButton("结束本次调律", QMessageBox.ButtonRole.RejectRole)  # noqa: F841
+            box.setDefaultButton(btn_continue)
+            self._active_dialog = box
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked == btn_continue:
+                return "continue"
+            elif clicked == btn_skip:
+                return "skip"
+            else:  # btn_end or dialog closed
+                return "end"
         if action == "pause":
             box = QMessageBox(
                 QMessageBox.Icon.Information, "工作流暂停",

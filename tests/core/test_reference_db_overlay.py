@@ -3,12 +3,15 @@
 全部在 tmp_path 上用显式 override 构造，不触碰真实 config 目录。
 """
 
+import json
+
 import numpy as np
 import pytest
 import yaml
 
 from lvjiang.core.reference_db import (
     DEFAULT_MATCH_THRESHOLD,
+    DEFAULT_SPACE,
     MetaFieldDef,
     ReferenceDatabase,
 )
@@ -35,10 +38,19 @@ def layers(tmp_path):
 
 def _make_db(layers, dev_mode: bool) -> ReferenceDatabase:
     system_dir, system_yaml, local_dir, local_yaml = layers
+    # 名册/session 同步隔离到 tmp_path（避免读真实 config）：
+    # 名册写入 DEFAULT_SPACE，与旧测试的空间级 yaml override 对齐
+    system_spaces_yaml = system_dir.parent / "spaces.yaml"
+    _write_yaml(system_spaces_yaml, {"version": 1, "spaces": [DEFAULT_SPACE]})
+    local_spaces_yaml = local_dir.parent / "spaces.yaml"
+    session_path = system_dir.parent / "session.json"
     return ReferenceDatabase(
         system_dir=system_dir, system_yaml=system_yaml,
         local_dir=local_dir, local_yaml=local_yaml,
         dev_mode=dev_mode,
+        system_spaces_yaml=system_spaces_yaml,
+        local_spaces_yaml=local_spaces_yaml,
+        session_path=session_path,
     )
 
 
@@ -324,3 +336,168 @@ class TestMetaSchemaScope:
         assert "crop" not in fields["level"]           # input 字段不写 crop
         assert fields["level"]["scope"] == "input"
         assert fields["levels"]["crop"] == [0.0, 0.0, 1.0, 0.5]
+
+
+# ─── 图库空间 ────────────────────────────────────────
+
+@pytest.fixture
+def space_env(tmp_path, monkeypatch):
+    """图库空间相关常量全部重定向到 tmp_path（完整路由隔离）"""
+    from lvjiang import constants
+    system_ref = tmp_path / "system" / "references"
+    local_dir = tmp_path / "local"
+    session = tmp_path / "session" / "session.json"
+    monkeypatch.setattr(constants, "SYSTEM_REFERENCES_DIR", system_ref)
+    monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", local_dir)
+    monkeypatch.setattr(constants, "REFERENCES_CONFIG_PATH",
+                        tmp_path / "system" / "references.yaml")
+    monkeypatch.setattr(constants, "SESSION_PATH", session)
+    return {
+        "tmp": tmp_path,
+        "system_ref": system_ref,          # system 空间 yaml + 图片根目录
+        "local_ref": local_dir / "references",
+        "system_roster": tmp_path / "system" / "references.yaml",
+        "local_roster": local_dir / "references.yaml",
+        "session": session,
+    }
+
+
+def _write_roster(path, spaces):
+    _write_yaml(path, {"version": 1, "spaces": spaces})
+
+
+class TestReferenceSpaces:
+    def test_roster_merge_dedup_keep_order(self, space_env):
+        """空间列表 = system 名册 ∪ local 名册，保序去重"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        _write_roster(space_env["local_roster"], ["空间A", "空间B"])
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.get_spaces() == [DEFAULT_SPACE, "空间A", "空间B"]
+
+    def test_empty_roster_falls_back_default(self, space_env):
+        """名册全空回退 DEFAULT_SPACE"""
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.get_spaces() == [DEFAULT_SPACE]
+        assert db.get_active_space() == DEFAULT_SPACE
+
+    def test_old_format_roster_detected_as_empty(self, space_env):
+        """旧格式 references.yaml（含 references 键）不视为名册"""
+        _write_yaml(space_env["system_roster"], {"version": 1, "references": []})
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.get_spaces() == [DEFAULT_SPACE]
+
+    def test_active_space_from_session(self, space_env):
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["session"].write_text(
+            json.dumps({"active_space": "空间A"}), encoding="utf-8")
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.get_active_space() == "空间A"
+
+    def test_active_space_missing_or_invalid_falls_back_first(self, space_env):
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.get_active_space() == DEFAULT_SPACE  # 无 session
+        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["session"].write_text(
+            json.dumps({"active_space": "不存在"}), encoding="utf-8")
+        db2 = ReferenceDatabase(dev_mode=False)
+        assert db2.get_active_space() == DEFAULT_SPACE  # 非法回退名册首个
+
+    def test_space_yaml_load_routing(self, space_env):
+        """不同空间加载各自 yaml：条目互不可见"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        _write_yaml(space_env["system_ref"] / f"{DEFAULT_SPACE}.yaml",
+                    {"version": 1, "references": [_entry("g/A.png", "甲")]})
+        _write_yaml(space_env["system_ref"] / "空间A.yaml",
+                    {"version": 1, "references": [_entry("g/B.png", "乙")]})
+        db = ReferenceDatabase(dev_mode=False)
+        assert [e.label for e in db.entries] == ["甲"]
+        assert db.set_active_space("空间A") is True
+        db.load()
+        assert [e.label for e in db.entries] == ["乙"]
+
+    def test_set_active_space_persists_session(self, space_env):
+        """切换写 session.json（保留其他字段）；非法名拒绝"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["session"].write_text(
+            json.dumps({"active_user": "tester"}), encoding="utf-8")
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.set_active_space("幽灵") is False  # 名册外拒绝
+        assert db.set_active_space("空间A") is True
+        data = json.loads(space_env["session"].read_text(encoding="utf-8"))
+        assert data["active_space"] == "空间A"
+        assert data["active_user"] == "tester"
+
+    def test_save_writes_active_space_yaml(self, space_env):
+        """dev 模式 save 落盘到激活空间的 yaml"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["session"].write_text(
+            json.dumps({"active_space": "空间A"}), encoding="utf-8")
+        db = ReferenceDatabase(dev_mode=True)
+        img = np.zeros((2, 2, 3), dtype=np.uint8)
+        entry = db.add_entry(label="甲", meta={"group": "g"}, image_data=img)
+        # 条目与图片都落在空间A 目录下（分组结构保留）
+        doc = yaml.safe_load((space_env["system_ref"] / "空间A.yaml")
+                             .read_text(encoding="utf-8"))
+        assert [e["file"] for e in doc["references"]] == [entry.file]
+        assert (space_env["system_ref"] / "空间A" / entry.file).exists()
+
+    def test_image_path_resolves_within_active_space(self, space_env):
+        """图片路径按激活空间解析，local 优先"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
+        (space_env["system_ref"] / "空间A" / "g").mkdir(parents=True)
+        (space_env["system_ref"] / "空间A" / "g" / "X.png").write_bytes(b"sys")
+        (space_env["local_ref"] / "空间A" / "g").mkdir(parents=True)
+        (space_env["local_ref"] / "空间A" / "g" / "X.png").write_bytes(b"loc")
+        db = ReferenceDatabase(dev_mode=False)
+        db.set_active_space("空间A")
+        db.load()
+        assert db.image_path("g/X.png") == (
+            space_env["local_ref"] / "空间A" / "g" / "X.png")
+        # local 缺失时回退 system
+        assert db.image_path("g/Y.png") == (
+            space_env["system_ref"] / "空间A" / "g" / "Y.png")
+
+    def test_create_space_user_mode(self, space_env):
+        """用户模式新建空间：yaml 落 local 层并注册 local 名册"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE])
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.create_space("新空间") is True
+        assert db.create_space("新空间") is False  # 重名拒绝
+        space_yaml = space_env["local_ref"] / "新空间.yaml"
+        assert space_yaml.exists()
+        doc = yaml.safe_load(space_yaml.read_text(encoding="utf-8"))
+        assert doc["references"] == []
+        assert doc["meta_schema"]  # 种子 schema
+        local_roster = yaml.safe_load(
+            space_env["local_roster"].read_text(encoding="utf-8"))
+        assert local_roster["spaces"] == ["新空间"]
+        assert db.get_spaces() == [DEFAULT_SPACE, "新空间"]
+
+    def test_create_space_dev_mode(self, space_env):
+        """开发模式新建空间：yaml 落 system 层并注册 system 名册"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE])
+        db = ReferenceDatabase(dev_mode=True)
+        assert db.create_space("新空间") is True
+        assert (space_env["system_ref"] / "新空间.yaml").exists()
+        roster = yaml.safe_load(
+            space_env["system_roster"].read_text(encoding="utf-8"))
+        assert roster["spaces"] == [DEFAULT_SPACE, "新空间"]
+
+    def test_create_space_rejects_old_format_roster(self, space_env):
+        """旧格式名册（未迁移的覆盖层）拒绝覆写，数据不被销毁"""
+        _write_roster(space_env["system_roster"], [DEFAULT_SPACE])
+        legacy = {"version": 1,
+                  "references": [_entry("g/A.png", "甲")],
+                  "deleted": ["g/B.png"]}
+        _write_yaml(space_env["local_roster"], legacy)
+        db = ReferenceDatabase(dev_mode=False)  # 用户模式走 local 名册
+        assert db.create_space("新空间") is False
+        # 旧文件原样保留，空间 yaml 也不落盘
+        assert yaml.safe_load(space_env["local_roster"].read_text(
+            encoding="utf-8")) == legacy
+        assert not (space_env["local_ref"] / "新空间.yaml").exists()
+        assert "新空间" not in db.get_spaces()

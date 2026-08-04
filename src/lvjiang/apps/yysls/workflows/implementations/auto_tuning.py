@@ -133,7 +133,26 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         背包遍历与部位循环全部收束，复用 F10 中断的退出路径"""
         return self.executor.materials_exhausted or super().is_stopped
 
+    @staticmethod
+    def _missing_output_fields() -> list[str]:
+        """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
+        from lvjiang.apps.yysls.core.material_recognizer import (
+            get_missing_output_fields,
+        )
+        from lvjiang.core.reference_db import ReferenceDatabase
+        db = ReferenceDatabase()
+        db.load()
+        return get_missing_output_fields(db)
+
     def run(self) -> dict:
+        # 预检：当前图库空间必须满足调律输出字段契约（levels/counts）
+        missing = self._missing_output_fields()
+        if missing:
+            msg = (f"当前图库空间缺少输出字段 {'、'.join(missing)}，"
+                   f"无法启动自动调律（请在图库元数据定义中补充）")
+            logger.error(msg)
+            return {"error": msg}
+
         self.executor.reset_state()
         self._ensure_judge_config()
         # 加载导航所需的 DSL subcall 文件（每次运行都重新加载，保证修改立即生效）

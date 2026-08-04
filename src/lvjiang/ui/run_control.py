@@ -491,6 +491,12 @@ class RunControlMixin:
             # 异常不保存 session
         else:
             result = result_or_exception
+            # 工作流预检失败返回 {"error": ...}：拒绝启动，不按正常完成处理
+            if isinstance(result, dict) and result.get("error"):
+                self.log_text.append(f"[错误] {flow_name}: {result['error']}")
+                logger.error(f"工作流 {flow_id} 启动被拒绝: {result['error']}")
+                self._end_automation(flow_name)
+                return
             interrupted = self._stop_requested
             if interrupted:
                 # 中途停止（F10）是常态（如自动调律），已收集的结果

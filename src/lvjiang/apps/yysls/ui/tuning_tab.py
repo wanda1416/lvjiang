@@ -221,6 +221,16 @@ class TuningTab(QWidget):
 
     # ─── 启停入口（F9 快捷键 / 按钮点击共用）───────────────────
 
+    @staticmethod
+    def _missing_tuning_output_fields() -> list[str]:
+        """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
+        from lvjiang.core.reference_db import ReferenceDatabase
+
+        from ..core.material_recognizer import get_missing_output_fields
+        db = ReferenceDatabase()
+        db.load()
+        return get_missing_output_fields(db)
+
     def f9_run(self):
         """运行中 → 停止；否则收集配置启动自动调律"""
         if self._host.is_running:
@@ -231,6 +241,11 @@ class TuningTab(QWidget):
     def _start_tuning(self):
         """收集并校验调律配置，通过宿主启动 auto_tuning 工作流"""
         host = self._host
+
+        # 图库空间预检（UI 即时反馈，与工作流 run() 预检同契约）
+        if self._missing_tuning_output_fields():
+            host.append_log("[错误] 当前图库空间缺少 levels/counts 输出字段，无法启动自动调律")
+            return
 
         selected_slots = self._get_tuning_selected_slots()
         if not selected_slots:

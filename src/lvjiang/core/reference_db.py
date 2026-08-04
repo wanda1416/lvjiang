@@ -1,15 +1,23 @@
-"""图像参考库 - 基于 references.yaml 的参考图元数据管理
+"""图像参考库 - 基于图库空间的参考图元数据管理
 
-参考图是配置资产，走 system/local 双层：
-- 作者层：config/system/references.yaml + config/system/references/{group}/*.png
-- 用户层：config/local/references.yaml（条目级 diff：references + deleted）
-          + config/local/references/{group}/*.png
+图库空间（space）：图库内部完全独立的配置集（各自拥有 meta_schema、
+引用条目与参考图），用户选择激活一个空间，外部消费方无感。
+
+参考图是配置资产，走 system/local 双层，每层均按空间组织：
+- 名册：config/system/references.yaml（spaces 列表）
+        + config/local/references.yaml（仅本地新建的空间）
+- 作者层：config/system/references/{space}.yaml
+          + config/system/references/{space}/{group}/*.png
+- 用户层：config/local/references/{space}.yaml（条目级 diff：references + deleted）
+          + config/local/references/{space}/{group}/*.png
+- 激活空间：config/session/session.json 的 active_space 字段（纯运行态）
 
 读取恒为合并视图：system 条目（deleted 剔除、同 file 被 local 条目替换）
 + local 独有条目；meta_schema 用户层存在即整列表替换。
 写入按模式路由（开发→system，用户→local），与 ConfigResolver 同一套模式判定。
 """
 
+import json
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -31,6 +39,9 @@ _SEED_META_SCHEMA = [
 
 # 预制输入字段 key（图库内部使用，不参与业务展示）
 _PREDEFINED_INPUT_KEYS = frozenset({"label", "group", "notes"})
+
+# 默认图库空间名（名册缺失时的回退空间）
+DEFAULT_SPACE = "默认"
 
 
 def validate_crop(values: list[float]) -> list[float] | None:
@@ -129,12 +140,23 @@ class ReferenceDatabase:
         local_dir: Path | str | None = None,
         local_yaml: Path | str | None = None,
         dev_mode: bool | None = None,
+        system_spaces_yaml: Path | str | None = None,
+        local_spaces_yaml: Path | str | None = None,
+        session_path: Path | str | None = None,
     ):
         self._system_dir_override = Path(system_dir) if system_dir else None
         self._system_yaml_override = Path(system_yaml) if system_yaml else None
         self._local_dir_override = Path(local_dir) if local_dir else None
         self._local_yaml_override = Path(local_yaml) if local_yaml else None
         self._dev_mode = dev_mode
+        self._system_spaces_yaml_override = (
+            Path(system_spaces_yaml) if system_spaces_yaml else None)
+        self._local_spaces_yaml_override = (
+            Path(local_spaces_yaml) if local_spaces_yaml else None)
+        self._session_path_override = Path(session_path) if session_path else None
+        # 空间状态
+        self._spaces: list[str] = []
+        self._space: str = DEFAULT_SPACE
         # 分层状态
         self._system_entries: list[ReferenceEntry] = []
         self._local_entries: list[ReferenceEntry] = []
@@ -152,31 +174,59 @@ class ReferenceDatabase:
 
     @property
     def system_dir(self) -> Path:
+        """激活空间的 system 层图片目录"""
         if self._system_dir_override is not None:
             return self._system_dir_override
         from lvjiang import constants
-        return constants.SYSTEM_REFERENCES_DIR
+        return constants.SYSTEM_REFERENCES_DIR / self._space
 
     @property
     def local_dir(self) -> Path:
+        """激活空间的 local 层图片目录"""
         if self._local_dir_override is not None:
             return self._local_dir_override
         from lvjiang import constants
-        return constants.LOCAL_CONFIG_DIR / "references"
+        return constants.LOCAL_CONFIG_DIR / "references" / self._space
 
     @property
     def system_yaml_path(self) -> Path:
+        """激活空间的 system 层配置 yaml"""
         if self._system_yaml_override is not None:
             return self._system_yaml_override
+        from lvjiang import constants
+        return constants.SYSTEM_REFERENCES_DIR / f"{self._space}.yaml"
+
+    @property
+    def local_yaml_path(self) -> Path:
+        """激活空间的 local 层配置 yaml"""
+        if self._local_yaml_override is not None:
+            return self._local_yaml_override
+        from lvjiang import constants
+        return constants.LOCAL_CONFIG_DIR / "references" / f"{self._space}.yaml"
+
+    @property
+    def system_spaces_yaml_path(self) -> Path:
+        """system 层空间名册 yaml"""
+        if self._system_spaces_yaml_override is not None:
+            return self._system_spaces_yaml_override
         from lvjiang import constants
         return constants.REFERENCES_CONFIG_PATH
 
     @property
-    def local_yaml_path(self) -> Path:
-        if self._local_yaml_override is not None:
-            return self._local_yaml_override
+    def local_spaces_yaml_path(self) -> Path:
+        """local 层空间名册 yaml（仅本地新建的空间）"""
+        if self._local_spaces_yaml_override is not None:
+            return self._local_spaces_yaml_override
         from lvjiang import constants
         return constants.LOCAL_CONFIG_DIR / "references.yaml"
+
+    @property
+    def session_path(self) -> Path:
+        """激活空间持久化位置（session.json）"""
+        if self._session_path_override is not None:
+            return self._session_path_override
+        from lvjiang import constants
+        return constants.SESSION_PATH
 
     @property
     def yaml_path(self) -> Path:
@@ -200,6 +250,155 @@ class ReferenceDatabase:
         self._ensure_loaded()
         return list(self._entries)
 
+    # ─── 图库空间 ────────────────────────────────────
+
+    @staticmethod
+    def _parse_roster(path: Path) -> list[str]:
+        """解析空间名册 yaml 的 spaces 列表，缺失/非法返回空列表"""
+        if not path.exists():
+            return []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.error(f"空间名册解析失败: {path}: {e}")
+            return []
+        spaces = data.get("spaces")
+        if not isinstance(spaces, list):
+            if data.get("references") is not None or data.get("meta_schema") is not None:
+                logger.error(
+                    f"检测到旧格式 references.yaml，请先运行迁移脚本 "
+                    f".tooling/migrate_references_spaces.py: {path}"
+                )
+            return []
+        return [str(s).strip() for s in spaces if str(s).strip()]
+
+    def _read_session_active_space(self) -> str:
+        """从 session.json 读取 active_space，缺失/非法返回空串"""
+        try:
+            data = json.loads(self.session_path.read_text(encoding="utf-8"))
+        except Exception:
+            return ""
+        return str(data.get("active_space") or "")
+
+    def _write_session_active_space(self, name: str) -> None:
+        """写 active_space 到 session.json（read-modify-write，保留其他字段）"""
+        data: dict = {}
+        if self.session_path.exists():
+            try:
+                data = json.loads(self.session_path.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+        data["active_space"] = name
+        self.session_path.parent.mkdir(parents=True, exist_ok=True)
+        self.session_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _resolve_space(self) -> None:
+        """解析激活空间：session.json → 名册首个 → DEFAULT_SPACE"""
+        saved = self._read_session_active_space()
+        if saved and saved in self._spaces:
+            self._space = saved
+        else:
+            self._space = self._spaces[0] if self._spaces else DEFAULT_SPACE
+
+    def get_spaces(self) -> list[str]:
+        """空间列表（system 名册 ∪ local 名册，保序去重；名册全空回退 DEFAULT_SPACE）"""
+        self._ensure_loaded()
+        return list(self._spaces)
+
+    def get_active_space(self) -> str:
+        """当前激活的图库空间名"""
+        self._ensure_loaded()
+        return self._space
+
+    def set_active_space(self, name: str) -> bool:
+        """切换激活空间（持久化到 session.json）；非法名拒绝
+
+        切换成功后自动 load() 重载新空间，避免旧空间内存态
+        被后续 save() 写进新空间 yaml。
+        """
+        self._ensure_loaded()
+        name = str(name or "").strip()
+        if name not in self._spaces:
+            logger.warning(f"图库空间不存在，无法切换: {name!r}")
+            return False
+        self._write_session_active_space(name)
+        self._space = name
+        self._loaded = False
+        self.load()
+        logger.info(f"图库空间已切换: {name}")
+        return True
+
+    def create_space(self, name: str) -> bool:
+        """新建空图库空间（种子 meta_schema + 空条目）并注册名册
+
+        空间 yaml 按模式写入可写层（dev→system，user→local）。
+        """
+        self._ensure_loaded()
+        name = str(name or "").strip()
+        if not name:
+            logger.warning("图库空间名不能为空")
+            return False
+        if name in self._spaces:
+            logger.warning(f"图库空间已存在: {name}")
+            return False
+        if self._is_dev():
+            base = self.system_yaml_path.parent
+            roster_path = self.system_spaces_yaml_path
+        else:
+            base = self.local_yaml_path.parent
+            roster_path = self.local_spaces_yaml_path
+        space_yaml = base / f"{name}.yaml"
+        # 先注册名册（旧格式名册会被拒绝覆写，避免销毁未迁移的覆盖层数据）
+        if not self._register_space(roster_path, name):
+            return False
+        if not space_yaml.exists():
+            space_yaml.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "version": 1,
+                "meta_schema": [self._schema_to_dict(f) for f in self._seed_schema()],
+                "references": [],
+            }
+            with open(space_yaml, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True,
+                          default_flow_style=False, sort_keys=False)
+        self._spaces.append(name)
+        logger.info(f"新建图库空间: {name} -> {space_yaml}")
+        return True
+
+    @staticmethod
+    def _register_space(roster_path: Path, name: str) -> bool:
+        """将空间名追加到名册 yaml（保留已有名）；旧格式名册拒绝覆写
+
+        local 层名册路径与旧版覆盖层文件同路径：未迁移的旧格式文件
+        含用户定制条目与 deleted 墓碑，覆写会造成数据丢失，必须先跑迁移脚本。
+        """
+        spaces: list[str] = []
+        if roster_path.exists():
+            try:
+                with open(roster_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+            except Exception:
+                data = {}
+            raw = data.get("spaces")
+            if isinstance(raw, list):
+                spaces = [str(s).strip() for s in raw if str(s).strip()]
+            elif data.get("references") is not None or data.get("meta_schema") is not None:
+                logger.error(
+                    f"检测到旧格式名册，拒绝覆写，请先运行迁移脚本 "
+                    f".tooling/migrate_references_spaces.py: {roster_path}"
+                )
+                return False
+        if name in spaces:
+            return True
+        spaces.append(name)
+        roster_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(roster_path, "w", encoding="utf-8") as f:
+            yaml.dump({"version": 1, "spaces": spaces}, f,
+                      allow_unicode=True, default_flow_style=False, sort_keys=False)
+        return True
+
     # ─── 加载 / 保存 ─────────────────────────────────────
 
     def _ensure_loaded(self):
@@ -220,7 +419,15 @@ class ReferenceDatabase:
         return entries
 
     def load(self):
-        """加载 system 层与 local 覆盖层，重建合并视图"""
+        """加载空间名册 + 激活空间的 system 层与 local 覆盖层，重建合并视图"""
+        # 空间名册与激活空间（路径属性依赖 self._space，必须最先解析）
+        system_spaces = self._parse_roster(self.system_spaces_yaml_path)
+        local_spaces = self._parse_roster(self.local_spaces_yaml_path)
+        merged_spaces = list(system_spaces)
+        merged_spaces.extend(s for s in local_spaces if s not in merged_spaces)
+        self._spaces = merged_spaces or [DEFAULT_SPACE]
+        self._resolve_space()
+
         # system 层
         if self.system_yaml_path.exists():
             with open(self.system_yaml_path, "r", encoding="utf-8") as f:
@@ -251,7 +458,7 @@ class ReferenceDatabase:
         self._rebuild_merged()
         self._loaded = True
         logger.info(
-            f"参考图库加载完成: 合并 {len(self._entries)} 条"
+            f"参考图库加载完成（空间={self._space}）: 合并 {len(self._entries)} 条"
             f"（system {len(self._system_entries)} / local {len(self._local_entries)}"
             f" / 删除 {len(self._deleted)}）"
         )
@@ -333,6 +540,7 @@ class ReferenceDatabase:
 
     def save(self):
         """按模式落盘：开发→system 全量；用户→local 条目级 diff（空则删覆盖文件）"""
+        self._ensure_loaded()
         if self._is_dev():
             self.system_yaml_path.parent.mkdir(parents=True, exist_ok=True)
             data = {

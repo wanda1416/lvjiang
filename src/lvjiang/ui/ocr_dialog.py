@@ -573,6 +573,11 @@ class OCRDialog(QDialog):
 
             ocr = OCREngine()
             recognizer = MaterialRecognizer(ocr)
+            # 输入字段 key -> 显示名（用于展示匹配条目的元数据）
+            input_fields = recognizer.reference_db.get_custom_input_fields()
+            input_names = {f.key: f.name for f in input_fields}
+            # 输出字段 key -> 显示名（用于展示 OCR 结果）
+            output_names = {f.key: f.name for f in recognizer.reference_db.get_output_fields()}
             # 获取选中的分组（None 表示全部）
             group = self._group_combo.currentData()
             results = recognizer.recognize_top_n(image, n=5, group=group)
@@ -587,16 +592,16 @@ class OCRDialog(QDialog):
                     if not result.type:
                         self._result_text.append(f"[{i}] 空槽  (置信度: {result.confidence:.3f})")
                     else:
-                        # 第一行显示 名称_等级（有等级时）
-                        display_name = result.type
-                        if result.level_text:
-                            display_name = f"{result.type}_{result.level_text}"
-                        self._result_text.append(f"[{i}] {display_name}")
-                        self._result_text.append(f"  等级文本: {result.level_text or '(无)'}")
-                        self._result_text.append(f"  数量文本: {result.count_text or '(无)'}")
-                        self._result_text.append(f"  等级: {result.level if result.level is not None else '无'}")
-                        self._result_text.append(f"  数量: {result.count if result.count is not None else '无'}")
-                        self._result_text.append(f"  投入: {result.devoted if result.devoted is not None else '无'}")
+                        self._result_text.append(f"[{i}] {result.type}")
+                        # 输入元数据（匹配条目的属性，如等级: 110）
+                        for key, name in input_names.items():
+                            value = result.meta.get(key)
+                            if value is not None:
+                                self._result_text.append(f"  {name}: {value}")
+                        # 输出元数据 OCR 结果（按 schema 输出字段展示名）
+                        for key, text in result.ocr_texts.items():
+                            name = output_names.get(key, key)
+                            self._result_text.append(f"  {name}: {text or '(无)'}")
                         self._result_text.append(f"  匹配置信度: {result.confidence:.3f}")
 
             best_type = results[0].type if results else ""

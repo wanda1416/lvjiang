@@ -29,6 +29,21 @@ _SEED_META_SCHEMA = [
     {"key": "level", "name": "等级", "filterable": True, "type": "number", "sort_by": "asc"},
 ]
 
+# 预制输入字段 key（图库内部使用，不参与业务展示）
+_PREDEFINED_INPUT_KEYS = frozenset({"label", "group", "notes"})
+
+
+def validate_crop(values: list[float]) -> list[float] | None:
+    """校验 crop [x, y, w, h] 归一化坐标，非法返回 None"""
+    if len(values) != 4:
+        return None
+    if any(v < 0.0 or v > 1.0 for v in values):
+        return None
+    x, y, w, h = values
+    if x + w > 1.0 or y + h > 1.0:
+        return None
+    return values
+
 # 匹配度阈值默认值（ORB+颜色综合置信度下限，yaml 未配置时使用）
 # 实测真实匹配分布 0.46~0.67（n=893），0.35 留误拒余量同时拦纯颜色巧合
 DEFAULT_MATCH_THRESHOLD = 0.35
@@ -44,12 +59,17 @@ class MetaFieldDef:
         filterable: 是否在筛选栏展示
         type: 值类型，"text" 或 "number"
         sort_by: 排序方向，"asc" 或 "desc"
+        scope: 元数据场景，"input"（用户填写、用于筛选管理）
+            或 "output"（识别时按 crop 区域 OCR 产出）
+        crop: output 字段专属的裁剪区域 [x, y, w, h]（归一化坐标），input 为 None
     """
     key: str
     name: str = ""
     filterable: bool = False
     type: str = "text"
     sort_by: str = "asc"
+    scope: str = "input"
+    crop: list[float] | None = None
 
 
 @dataclass
@@ -289,8 +309,27 @@ class ReferenceDatabase:
                 filterable=bool(item.get("filterable", False)),
                 type=ftype,
                 sort_by=sort_by,
+                scope=self._parse_scope(item.get("scope")),
+                crop=self._parse_crop(item.get("crop")),
             ))
         return result or self._seed_schema()
+
+    @staticmethod
+    def _parse_scope(raw) -> str:
+        """解析 scope，非法/缺失默认 input"""
+        scope = str(raw or "input").strip().lower()
+        return scope if scope in ("input", "output") else "input"
+
+    @staticmethod
+    def _parse_crop(raw) -> list[float] | None:
+        """解析 crop 区域 [x, y, w, h]（归一化），非法返回 None"""
+        if not isinstance(raw, (list, tuple)) or len(raw) != 4:
+            return None
+        try:
+            values = [float(v) for v in raw]
+        except (TypeError, ValueError):
+            return None
+        return validate_crop(values)
 
     def save(self):
         """按模式落盘：开发→system 全量；用户→local 条目级 diff（空则删覆盖文件）"""
@@ -298,7 +337,7 @@ class ReferenceDatabase:
             self.system_yaml_path.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "version": 1,
-                "meta_schema": [asdict(f) for f in self._system_schema],
+                "meta_schema": [self._schema_to_dict(f) for f in self._system_schema],
                 "references": [asdict(e) for e in self._system_entries],
             }
             if self._system_threshold is not None:
@@ -321,7 +360,7 @@ class ReferenceDatabase:
             "deleted": sorted(self._deleted),
         }
         if self._local_schema is not None:
-            overlay["meta_schema"] = [asdict(f) for f in self._local_schema]
+            overlay["meta_schema"] = [self._schema_to_dict(f) for f in self._local_schema]
         if self._local_threshold is not None:
             overlay["match_threshold"] = self._local_threshold
         self.local_yaml_path.parent.mkdir(parents=True, exist_ok=True)
@@ -331,6 +370,14 @@ class ReferenceDatabase:
             f"参考图库覆盖层保存完成: {len(self._local_entries)} 条"
             f" + 删除 {len(self._deleted)} -> {self.local_yaml_path}"
         )
+
+    @staticmethod
+    def _schema_to_dict(f: MetaFieldDef) -> dict:
+        """序列化字段定义：crop 为 None 时省略该键"""
+        d = asdict(f)
+        if d.get("crop") is None:
+            d.pop("crop", None)
+        return d
 
     @staticmethod
     def _find(entries: list[ReferenceEntry], filename: str) -> "ReferenceEntry | None":
@@ -552,6 +599,18 @@ class ReferenceDatabase:
         self.save()
         self._rebuild_merged()
         logger.debug(f"更新 meta_schema: {[f.key for f in schema]}")
+
+    def get_output_fields(self) -> list[MetaFieldDef]:
+        """返回输出元数据字段（scope=output 且 crop 有效），按定义顺序"""
+        self._ensure_loaded()
+        return [f for f in self._meta_schema
+                if f.scope == "output" and f.crop is not None]
+
+    def get_custom_input_fields(self) -> list[MetaFieldDef]:
+        """返回非预制的输入元数据字段（排除 label/group/notes）"""
+        self._ensure_loaded()
+        return [f for f in self._meta_schema
+                if f.scope == "input" and f.key not in _PREDEFINED_INPUT_KEYS]
 
     # ─── 匹配度阈值 ───────────────────────────────────
 

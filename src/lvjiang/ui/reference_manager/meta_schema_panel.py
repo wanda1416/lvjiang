@@ -1,7 +1,9 @@
-"""元数据定义面板 - 定义图库的 meta 语义字段（显示名 / 标识 / 可筛选）
+"""元数据定义面板 - 定义图库的 meta 语义字段
 
-名称、分组、备注为内置固定字段，以只读锁定行展示作为上下文；
-其余 meta 字段由用户在此定义，值统一按文本存储。
+元数据分两种场景：
+- 输入元数据：用户填写、用于筛选管理参考图（显示名 / 标识 / 类型 / 排序 / 可筛选）。
+  名称、分组、备注为内置固定字段，以只读锁定行展示作为上下文。
+- 输出元数据：识别时按裁剪区域 OCR 产出（显示名 / 标识 / 裁剪区域），用户可编辑。
 """
 
 import re
@@ -22,7 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase
+from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, validate_crop
 
 # 内置固定字段（只读展示，不可编辑/删除）
 # (显示名, key, filterable, type, sort_by)
@@ -38,11 +40,34 @@ _SORT_OPTIONS = [("升序", "asc"), ("降序", "desc")]
 _KEY_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
+def format_crop(crop: list[float] | None) -> str:
+    """crop [x, y, w, h] -> 显示文本 'x, y, w, h'"""
+    if not crop:
+        return ""
+    return ", ".join(f"{v:g}" for v in crop)
+
+
+def parse_crop(text: str) -> list[float] | None:
+    """解析 'x, y, w, h' 文本，非法返回 None
+
+    要求：4 个 0~1 数值，且 x+w<=1、y+h<=1。
+    """
+    parts = [p.strip() for p in text.strip().split(",") if p.strip()]
+    if len(parts) != 4:
+        return None
+    try:
+        values = [float(p) for p in parts]
+    except ValueError:
+        return None
+    return validate_crop(values)
+
+
 class MetaSchemaPanel(QWidget):
     """元数据定义面板
 
-    表格列：显示名 | 字段标识(key) | 可筛选(复选)
-    顶部内置行锁定展示 名称/分组/备注；其下为用户可编辑的 meta 字段。
+    输入元数据表：显示名 | 字段标识(key) | 类型 | 排序 | 可筛选
+    （顶部内置行锁定展示 名称/分组/备注）
+    输出元数据表：显示名 | 字段标识(key) | 裁剪区域
     """
 
     schema_changed = pyqtSignal()  # 保存后发射
@@ -71,14 +96,14 @@ class MetaSchemaPanel(QWidget):
         layout.addLayout(threshold_row)
 
         hint = QLabel(
-            "定义“名称、分组”之外的元数据字段。值统一按文本存储；"
-            "勾选“可筛选”的字段才会出现在图库管理的顶部筛选栏。"
+            "输入元数据：用户填写，用于筛选管理参考图；勾选“可筛选”的字段才会出现在顶部筛选栏。\n"
+            "输出元数据：识别材料后按裁剪区域（x, y, w, h，归一化 0~1）OCR 产出并回传调用方。"
         )
         hint.setStyleSheet("color: #888; font-size: 12px;")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
-        # 工具栏
+        # 工具栏（新增/删除作用于当前聚焦的表格）
         toolbar = QHBoxLayout()
         self._add_btn = QPushButton("新增字段")
         self._add_btn.clicked.connect(self._on_add_field)
@@ -99,40 +124,60 @@ class MetaSchemaPanel(QWidget):
         toolbar.addWidget(self._save_btn)
         layout.addLayout(toolbar)
 
-        # 表格
-        self._table = QTableWidget(0, 5)
-        self._table.setHorizontalHeaderLabels(
+        # ── 输入元数据表 ──
+        layout.addWidget(QLabel("输入元数据（用于筛选管理）"))
+        self._input_table = QTableWidget(0, 5)
+        self._input_table.setHorizontalHeaderLabels(
             ["显示名", "字段标识 (key)", "类型", "排序", "可筛选"]
         )
-        header = self._table.horizontalHeader()
+        header = self._input_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self._table.verticalHeader().setVisible(False)
-        layout.addWidget(self._table)
+        self._input_table.verticalHeader().setVisible(False)
+        layout.addWidget(self._input_table)
+
+        # ── 输出元数据表 ──
+        layout.addWidget(QLabel("输出元数据（识别时按区域 OCR）"))
+        self._output_table = QTableWidget(0, 3)
+        self._output_table.setHorizontalHeaderLabels(
+            ["显示名", "字段标识 (key)", "裁剪区域 (x, y, w, h)"]
+        )
+        out_header = self._output_table.horizontalHeader()
+        out_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        out_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        out_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self._output_table.verticalHeader().setVisible(False)
+        layout.addWidget(self._output_table)
 
     # ── 数据加载 ──
 
     def reload(self):
         """从数据库重新加载 schema 与匹配度阈值到界面"""
         self._threshold_spin.setValue(self._db.get_match_threshold())
-        self._table.setRowCount(0)
+
+        self._input_table.setRowCount(0)
         # 内置行（锁定）
         for name, key, filterable, ftype, sort_by in _BUILTIN_ROWS:
-            self._append_row(name, key, filterable, ftype, sort_by, builtin=True)
-        # 用户 schema 行
-        for field in self._db.get_meta_schema():
-            self._append_row(
-                field.name, field.key, field.filterable,
-                field.type, field.sort_by, builtin=False,
-            )
+            self._append_input_row(name, key, filterable, ftype, sort_by, builtin=True)
 
-    def _append_row(self, name: str, key: str, filterable: bool,
-                    ftype: str, sort_by: str, builtin: bool):
-        row = self._table.rowCount()
-        self._table.insertRow(row)
+        self._output_table.setRowCount(0)
+        # 用户 schema 行按 scope 分发
+        for field in self._db.get_meta_schema():
+            if field.scope == "output":
+                self._append_output_row(field.name, field.key, format_crop(field.crop))
+            else:
+                self._append_input_row(
+                    field.name, field.key, field.filterable,
+                    field.type, field.sort_by, builtin=False,
+                )
+
+    def _append_input_row(self, name: str, key: str, filterable: bool,
+                          ftype: str, sort_by: str, builtin: bool):
+        row = self._input_table.rowCount()
+        self._input_table.insertRow(row)
 
         name_item = QTableWidgetItem(name + ("（内置）" if builtin else ""))
         key_item = QTableWidgetItem(key)
@@ -144,8 +189,8 @@ class MetaSchemaPanel(QWidget):
             name_item.setToolTip("内置字段，不可编辑或删除")
         # 用 UserRole 标记是否内置
         name_item.setData(Qt.ItemDataRole.UserRole, builtin)
-        self._table.setItem(row, 0, name_item)
-        self._table.setItem(row, 1, key_item)
+        self._input_table.setItem(row, 0, name_item)
+        self._input_table.setItem(row, 1, key_item)
 
         # 类型下拉（col 2）
         type_combo = QComboBox()
@@ -155,7 +200,7 @@ class MetaSchemaPanel(QWidget):
             max(0, next((i for i, (_, v) in enumerate(_TYPE_OPTIONS) if v == ftype), 0))
         )
         type_combo.setEnabled(not builtin)
-        self._table.setCellWidget(row, 2, type_combo)
+        self._input_table.setCellWidget(row, 2, type_combo)
 
         # 排序下拉（col 3）
         sort_combo = QComboBox()
@@ -165,7 +210,7 @@ class MetaSchemaPanel(QWidget):
             max(0, next((i for i, (_, v) in enumerate(_SORT_OPTIONS) if v == sort_by), 0))
         )
         sort_combo.setEnabled(not builtin)
-        self._table.setCellWidget(row, 3, sort_combo)
+        self._input_table.setCellWidget(row, 3, sort_combo)
 
         # 可筛选复选框（col 4，居中）
         check = QCheckBox()
@@ -176,83 +221,131 @@ class MetaSchemaPanel(QWidget):
         wl.setContentsMargins(0, 0, 0, 0)
         wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         wl.addWidget(check)
-        self._table.setCellWidget(row, 4, wrapper)
+        self._input_table.setCellWidget(row, 4, wrapper)
+
+    def _append_output_row(self, name: str, key: str, crop_text: str):
+        row = self._output_table.rowCount()
+        self._output_table.insertRow(row)
+        self._output_table.setItem(row, 0, QTableWidgetItem(name))
+        self._output_table.setItem(row, 1, QTableWidgetItem(key))
+        crop_item = QTableWidgetItem(crop_text)
+        crop_item.setToolTip("归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5")
+        self._output_table.setItem(row, 2, crop_item)
 
     def _is_builtin_row(self, row: int) -> bool:
-        item = self._table.item(row, 0)
+        item = self._input_table.item(row, 0)
         return bool(item and item.data(Qt.ItemDataRole.UserRole))
 
-    def _row_checkbox(self, row: int) -> QCheckBox | None:
-        wrapper = self._table.cellWidget(row, 4)
+    def _focused_table(self) -> QTableWidget:
+        """返回当前聚焦的表格（默认输入表）"""
+        if self._output_table.hasFocus():
+            return self._output_table
+        return self._input_table
+
+    def _input_row_checkbox(self, row: int) -> QCheckBox | None:
+        wrapper = self._input_table.cellWidget(row, 4)
         if wrapper is None:
             return None
         return wrapper.findChild(QCheckBox)
 
-    def _row_type(self, row: int) -> str:
-        combo = self._table.cellWidget(row, 2)
+    def _input_row_type(self, row: int) -> str:
+        combo = self._input_table.cellWidget(row, 2)
         return combo.currentData() if isinstance(combo, QComboBox) else "text"
 
-    def _row_sort_by(self, row: int) -> str:
-        combo = self._table.cellWidget(row, 3)
+    def _input_row_sort_by(self, row: int) -> str:
+        combo = self._input_table.cellWidget(row, 3)
         return combo.currentData() if isinstance(combo, QComboBox) else "asc"
 
     # ── 槽函数 ──
 
     def _on_add_field(self):
-        self._append_row("", "", False, "text", "asc", builtin=False)
-        # 聚焦到新行的显示名单元格
-        row = self._table.rowCount() - 1
-        self._table.setCurrentCell(row, 0)
-        self._table.editItem(self._table.item(row, 0))
+        table = self._focused_table()
+        if table is self._output_table:
+            self._append_output_row("", "", "")
+            row = self._output_table.rowCount() - 1
+            self._output_table.setCurrentCell(row, 0)
+            self._output_table.editItem(self._output_table.item(row, 0))
+        else:
+            self._append_input_row("", "", False, "text", "asc", builtin=False)
+            row = self._input_table.rowCount() - 1
+            self._input_table.setCurrentCell(row, 0)
+            self._input_table.editItem(self._input_table.item(row, 0))
 
     def _on_delete_field(self):
-        row = self._table.currentRow()
+        table = self._focused_table()
+        row = table.currentRow()
         if row < 0:
             return
-        if self._is_builtin_row(row):
+        if table is self._input_table and self._is_builtin_row(row):
             QMessageBox.information(self, "提示", "内置字段不可删除")
             return
-        self._table.removeRow(row)
+        table.removeRow(row)
 
     def _collect_schema(self) -> list[MetaFieldDef] | None:
-        """从表格收集用户字段，校验后返回；校验失败返回 None"""
+        """从两表收集字段，校验后返回；校验失败返回 None"""
         result: list[MetaFieldDef] = []
         seen_keys: set[str] = set()
         builtin_keys = {key for _, key, *_ in _BUILTIN_ROWS}
 
-        for row in range(self._table.rowCount()):
+        def _check_key(name: str, key: str, table_label: str) -> str | None:
+            """校验 key 合法性，返回错误信息或 None"""
+            if not key:
+                return f"{table_label}：字段标识不能为空"
+            if not _KEY_PATTERN.match(key):
+                return f"字段标识 “{key}” 非法：需以字母开头，仅含字母/数字/下划线"
+            if key in builtin_keys:
+                return f"字段标识 “{key}” 与内置字段冲突"
+            if key in seen_keys:
+                return f"字段标识 “{key}” 重复"
+            if not name:
+                return f"字段 “{key}” 的显示名不能为空"
+            return None
+
+        # 输入元数据
+        for row in range(self._input_table.rowCount()):
             if self._is_builtin_row(row):
                 continue
-            name = (self._table.item(row, 0).text() if self._table.item(row, 0) else "").strip()
-            key = (self._table.item(row, 1).text() if self._table.item(row, 1) else "").strip()
-            check = self._row_checkbox(row)
-            filterable = bool(check and check.isChecked())
-            ftype = self._row_type(row)
-            sort_by = self._row_sort_by(row)
-
-            if not key:
-                QMessageBox.warning(self, "校验失败", f"第 {row + 1} 行：字段标识不能为空")
+            name = (self._input_table.item(row, 0).text()
+                    if self._input_table.item(row, 0) else "").strip()
+            key = (self._input_table.item(row, 1).text()
+                   if self._input_table.item(row, 1) else "").strip()
+            error = _check_key(name, key, f"输入元数据第 {row + 1} 行")
+            if error:
+                QMessageBox.warning(self, "校验失败", error)
                 return None
-            if not _KEY_PATTERN.match(key):
+            seen_keys.add(key)
+            check = self._input_row_checkbox(row)
+            result.append(MetaFieldDef(
+                key=key, name=name,
+                filterable=bool(check and check.isChecked()),
+                type=self._input_row_type(row),
+                sort_by=self._input_row_sort_by(row),
+                scope="input",
+            ))
+
+        # 输出元数据
+        for row in range(self._output_table.rowCount()):
+            name = (self._output_table.item(row, 0).text()
+                    if self._output_table.item(row, 0) else "").strip()
+            key = (self._output_table.item(row, 1).text()
+                   if self._output_table.item(row, 1) else "").strip()
+            crop_text = (self._output_table.item(row, 2).text()
+                         if self._output_table.item(row, 2) else "").strip()
+            error = _check_key(name, key, f"输出元数据第 {row + 1} 行")
+            if error:
+                QMessageBox.warning(self, "校验失败", error)
+                return None
+            crop = parse_crop(crop_text)
+            if crop is None:
                 QMessageBox.warning(
                     self, "校验失败",
-                    f"字段标识 “{key}” 非法：需以字母开头，仅含字母/数字/下划线"
+                    f"输出字段 “{key}” 的裁剪区域非法：需 4 个 0~1 数值 "
+                    f"(x, y, w, h)，且 x+w≤1、y+h≤1"
                 )
                 return None
-            if key in builtin_keys:
-                QMessageBox.warning(self, "校验失败", f"字段标识 “{key}” 与内置字段冲突")
-                return None
-            if key in seen_keys:
-                QMessageBox.warning(self, "校验失败", f"字段标识 “{key}” 重复")
-                return None
-            if not name:
-                QMessageBox.warning(self, "校验失败", f"字段 “{key}” 的显示名不能为空")
-                return None
-
             seen_keys.add(key)
             result.append(MetaFieldDef(
-                key=key, name=name, filterable=filterable,
-                type=ftype, sort_by=sort_by,
+                key=key, name=name, scope="output", crop=crop,
             ))
         return result
 

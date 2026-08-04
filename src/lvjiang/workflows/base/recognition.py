@@ -152,7 +152,7 @@ class _RecognitionMixin:
         """完整材料识别：一次截图，逐 slot 返回识别结果对象
 
         与 recognize_materials 只返 label 不同，保留识别器结果的全部
-        字段（type/level/count/owned/confidence），供数量检查等策略
+        字段（type/level/count/devoted/count_text/confidence），供数量检查等策略
         消费；裁切失败的 slot 不入结果。
 
         Args:
@@ -185,9 +185,8 @@ class _RecognitionMixin:
             info = self.material_recognizer.recognize(crop, group=group)
             infos[region.key] = info
 
-        summary = {k: (f"{i.type}×{i.count}"
-                       + (f"/{i.owned}" if i.owned is not None else "")
-                       if i.type else "空")
+        summary = {k: (f"{i.type}×{i.count}" if i.count is not None else i.type)
+                   if i.type else "空"
                    for k, i in infos.items()}
         logger.info(f"材料识别 [{scene_key}]:{list(infos)} => {summary}")
         return infos

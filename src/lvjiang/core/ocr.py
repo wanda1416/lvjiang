@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from loguru import logger
 
+from ..workflows.align import GridAlignment
 from .ocr_cleaner import OCRCleaner
 from .scene_registry import CanvasConfig, Region, get_region_defs
 
@@ -182,6 +183,7 @@ class OCREngine:
 
         # 校准模式
         calibration = getattr(panel, "calibration", "auto")
+        alignment: GridAlignment | None
         if calibration == "even":
             alignment = _make_even_alignment(panel.rows, panel.cols)
         else:

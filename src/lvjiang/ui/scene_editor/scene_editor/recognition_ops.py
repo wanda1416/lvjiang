@@ -84,11 +84,13 @@ class RecognitionOpsMixin:
 
         results = engine.ocr_scene_regions(image, canvas, regions, current_tab.scene_key)
 
-        # 展示结果（按 key 排序，使输出按自然顺序排列）
+        # 展示结果（按场景定义顺序，仅显示 is_text=True 的区域）
         self._result_text.clear()
-        for key in sorted(results.keys()):
-            text = results[key]
-            name = get_region_name(current_tab.scene_key, key)
+        for region in regions:
+            if region.key not in results:
+                continue
+            text = results[region.key]
+            name = get_region_name(current_tab.scene_key, region.key)
             self._result_text.append(f"{name}: {text or '(未识别到)'}")
 
         self._status_bar.showMessage(f"识别完成，共 {len(results)} 个字段")

@@ -1,6 +1,7 @@
 """参考图管理对话框 - 新增参考图与参考图管理两个独立 Tab"""
 
 import json
+from typing import Callable
 
 import numpy as np
 from loguru import logger
@@ -36,7 +37,7 @@ class ReferenceManagerDialog(QDialog):
       - 元数据定义：定义名称/分组之外的 meta 字段
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, screenshot_callback: Callable | None = None):
         super().__init__(parent)
         self.setWindowTitle("参考图管理")
         self.resize(1200, 800)
@@ -55,6 +56,7 @@ class ReferenceManagerDialog(QDialog):
         self._db.load()
         self._source_name = ""
         self._data_changed = False  # 跟踪是否有数据变动
+        self._screenshot_callback = screenshot_callback
         self._init_ui()
         self._restore_window_size()
 
@@ -134,6 +136,10 @@ class ReferenceManagerDialog(QDialog):
         self._paste_btn = QPushButton("粘贴 (Ctrl+V)")
         self._paste_btn.clicked.connect(self._on_paste)
         toolbar.addWidget(self._paste_btn)
+
+        self._screenshot_btn = QPushButton("截图")
+        self._screenshot_btn.clicked.connect(self._on_screenshot)
+        toolbar.addWidget(self._screenshot_btn)
 
         self._clear_btn = QPushButton("清空画布")
         self._clear_btn.clicked.connect(self._on_clear)
@@ -254,6 +260,29 @@ class ReferenceManagerDialog(QDialog):
         self._source_name = "clipboard"
         self._canvas.set_image(bgr)
         self._update_source_label()
+
+    def _on_screenshot(self):
+        """通过回调截取当前窗口/设备截图，加载到画布"""
+        if self._screenshot_callback is None:
+            QMessageBox.information(self, "提示", "截图功能不可用，请先在主窗口定位窗口或连接设备")
+            return
+
+        try:
+            result = self._screenshot_callback()
+        except Exception as e:
+            logger.error(f"截图回调异常: {e}")
+            QMessageBox.warning(self, "截图失败", f"截图过程出错: {e}")
+            return
+
+        new_image, error_msg = result if isinstance(result, tuple) else (result, None)
+        if new_image is None:
+            QMessageBox.warning(self, "截图失败", error_msg or "无法获取截图")
+            return
+
+        self._source_name = "screenshot"
+        self._canvas.set_image(new_image)
+        self._update_source_label()
+        logger.info(f"参考图管理：截图载入画布 {new_image.shape[1]}x{new_image.shape[0]}")
 
     def _on_clear(self):
         self._canvas.clear_image()

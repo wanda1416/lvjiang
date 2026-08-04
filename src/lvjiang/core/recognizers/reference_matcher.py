@@ -240,6 +240,85 @@ class ReferenceMatcher:
             meta=dict(best_entry.meta),
         )
 
+    def match_top_n(
+        self,
+        query: np.ndarray,
+        n: int = 5,
+        group: str | None = None,
+    ) -> list[MatchResult]:
+        """匹配查询图像，返回置信度最高的 N 个结果
+
+        Args:
+            query: 查询图像（BGR numpy 数组）
+            n: 返回结果数量
+            group: 限定匹配范围到指定分组
+
+        Returns:
+            按置信度降序排列的 MatchResult 列表
+        """
+        self._ensure_loaded()
+
+        if not self._features or self._target_size is None:
+            return []
+
+        if self._bf is None:
+            self._bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+
+        # 缩放查询图到统一尺寸
+        resized = cv2.resize(query, self._target_size, interpolation=cv2.INTER_AREA)
+
+        # 计算查询图特征
+        kp, des = self._orb.detectAndCompute(resized, None)
+        if des is None or len(kp) < 5:
+            return []
+
+        # 计算查询图 Lab 均值
+        lab1 = cv2.cvtColor(resized, cv2.COLOR_BGR2Lab).astype(np.float32).mean(axis=(0, 1))
+
+        # 过滤候选
+        candidates = self._features
+        if group:
+            candidates = [f for f in self._features if f[0].group == group]
+            if not candidates:
+                return []
+
+        # 计算所有候选的得分
+        scored: list[tuple[float, ReferenceEntry]] = []
+        for entry, des2, kp2_count, lab2 in candidates:
+            if des2 is None or kp2_count < 5:
+                continue
+
+            # ORB 匹配
+            matches = self._bf.knnMatch(des, des2, k=2)
+            good = sum(
+                1 for pair in matches
+                if len(pair) == 2 and pair[0].distance < 0.75 * pair[1].distance
+            )
+            orb_score = min(good / kp2_count, 1.0) if good else 0.0
+
+            # 颜色相似度
+            dist = np.sqrt(np.sum((lab1 - lab2) ** 2))
+            color_sim = max(1.0 - dist / 100.0, 0.0)
+
+            # 综合得分
+            score = 0.5 * orb_score + 0.5 * color_sim
+            scored.append((score, entry))
+
+        # 按得分降序排序，取前 N 个
+        scored.sort(key=lambda x: x[0], reverse=True)
+        top_n = scored[:n]
+
+        results = []
+        for score, entry in top_n:
+            results.append(MatchResult(
+                entry=entry,
+                label=entry.label,
+                confidence=score,
+                meta=dict(entry.meta),
+            ))
+
+        return results
+
     def match_batch(
         self,
         queries: dict[str, np.ndarray],

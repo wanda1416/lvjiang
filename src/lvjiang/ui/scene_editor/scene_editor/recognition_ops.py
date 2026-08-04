@@ -182,6 +182,8 @@ class RecognitionOpsMixin:
         from ....core.ocr import OCREngine
         ocr_engine = OCREngine()
         recognizer = MaterialRecognizer(ocr_engine)
+        # 非预制输入字段（用于展示匹配条目的元数据）
+        input_fields = recognizer.reference_db.get_custom_input_fields()
         canvas = current_tab.get_canvas_config()
         h, w = image.shape[:2]
         canvas_x = canvas.x_ratio * w
@@ -203,10 +205,14 @@ class RecognitionOpsMixin:
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: (空槽)"
             else:
                 parts = [info.type]
-                if info.level is not None:
-                    parts.append(f"{info.level}级")
-                if info.count is not None:
-                    parts.append(f"×{info.count}")
+                # 输入元数据（匹配条目的属性，如 level=110）
+                for f in input_fields:
+                    value = info.meta.get(f.key)
+                    if value is not None:
+                        parts.append(f"{f.key}={value}")
+                # 输出元数据 OCR 原始文本（如 levels=110阶 counts=0/691）
+                for key, text in info.ocr_texts.items():
+                    parts.append(f"{key}={text or '(无)'}")
                 parts.append(f"[{info.confidence:.0%}]")
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: {' '.join(parts)}"
             self._result_text.append(line)
@@ -239,6 +245,8 @@ class RecognitionOpsMixin:
 
         ocr_engine = OCREngine()
         recognizer = MaterialRecognizer(ocr_engine)
+        # 非预制输入字段（用于展示匹配条目的元数据）
+        input_fields = recognizer.reference_db.get_custom_input_fields()
         canvas_config = current_tab.get_canvas_config()
 
         self._result_text.clear()
@@ -261,10 +269,14 @@ class RecognitionOpsMixin:
                     self._result_text.append(f"  cell[{row}][{col}]: (空)")
                 else:
                     parts = [info.type]
-                    if info.level is not None:
-                        parts.append(f"{info.level}级")
-                    if info.count is not None:
-                        parts.append(f"×{info.count}")
+                    # 输入元数据（匹配条目的属性，如 level=110）
+                    for f in input_fields:
+                        value = info.meta.get(f.key)
+                        if value is not None:
+                            parts.append(f"{f.key}={value}")
+                    # 输出元数据 OCR 原始文本
+                    for key, text in info.ocr_texts.items():
+                        parts.append(f"{key}={text or '(无)'}")
                     self._result_text.append(f"  cell[{row}][{col}]: {' '.join(parts)}")
                 total_cells += 1
 

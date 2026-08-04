@@ -82,6 +82,8 @@ class TuningExecutor:
             infos = wf.recognize_materials_info(
                 wf.TUNE_SCENE, wf.MATERIAL_SLOTS,
                 group=wf.MATERIAL_GROUP)
+            # 调律流程特有校验：投入必须为 0（材料通过点击/一键添加投入）
+            infos = self._validate_tuning_materials(infos)
         if not self._check_stone_stock(settings, infos):
             return None
 
@@ -105,8 +107,7 @@ class TuningExecutor:
             slot = next(
                 (s for s, i in (infos or {}).items()
                  if getattr(i, "type", "") == food
-                 and (getattr(i, "owned", None) is not None
-                      or getattr(i, "count", None) is not None)), None)
+                 and getattr(i, "count", None) is not None), None)
             if not slot:
                 logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
                 self.abort_reason = f"{food} 材料槽位定位失败"
@@ -140,6 +141,24 @@ class TuningExecutor:
                 wf.wait_delay("step_interval")
         return result
 
+    def _validate_tuning_materials(self, infos: dict | None) -> dict | None:
+        """调律流程材料校验：投入必须为 0（仅记录 error，不阻断）
+
+        调律时材料通过点击/一键添加投入，识别时投入数量必然为 0。
+        若识别到投入 > 0，记录 error 供后续分析，但数据照常传递。
+        """
+        if not infos:
+            return infos
+        for slot_key, info in infos.items():
+            if not getattr(info, "type", ""):
+                continue
+            devoted = getattr(info, "devoted", None)
+            if devoted is not None and devoted != 0:
+                logger.error(
+                    f"材料校验异常: {slot_key} devoted={devoted} != 0，"
+                    f"数量识别可能有误（仅记录，不阻断）")
+        return infos
+
     def _decide_food_round(self, equip_data: EquipmentData,
                            settings: MaterialSettings,
                            infos: dict | None,
@@ -158,8 +177,7 @@ class TuningExecutor:
             # 低置信度误匹配的同名幽灵槽（数量 None）不得覆盖真槽
             if label in stocks and stocks[label] is not None:
                 continue
-            stocks[label] = (info.owned if info.owned is not None
-                             else info.count)
+            stocks[label] = info.count
         decision = settings.decide_food(
             cap_pct, expect_rating, equip_data.quality, stocks)
         log = logger.warning if decision.action == "skip" else logger.info
@@ -171,7 +189,7 @@ class TuningExecutor:
         """大律准石数量检查（材料设置可开关，默认关闭）
 
         基于调律页材料区识别结果（infos，与逐轮狗粮决策共用同一次
-        识别），取大律准石持有量（x/y 优先取 y，无斜杠取显示数字）；
+        识别），取大律准石持有量（count 字段）；
         低于基准判材料不足，按配置的不足处理执行：skip=跳过该装备
         （继续遍历）；ask=confirm 弹窗询问，确认继续则本次运行不再
         检查，拒绝同 abort；abort=置 materials_exhausted 使 is_stopped
@@ -189,7 +207,7 @@ class TuningExecutor:
         if stone is None:
             stock = 0  # 材料区无大律准石，视为已耗尽
         else:
-            stock = stone.owned if stone.owned is not None else stone.count
+            stock = stone.count
             if stock is None:
                 logger.warning("大律准石数量识别失败，本轮跳过数量检查")
                 return True

@@ -5,8 +5,11 @@
 
 截图来源：config/session/screenshots/默认布局/bag_item_detail__bag_detail.png
 标准结果：人工标注的 30 个格子（5 行 × 6 列）
+
+注意：依赖 RapidOCR（ONNX Runtime），CI 环境可能不支持，仅本地运行。
 """
 
+import os
 from pathlib import Path
 
 import cv2
@@ -16,6 +19,12 @@ import pytest
 from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
 from lvjiang.core.ocr import OCREngine
 from lvjiang.core.scene_registry import Region
+
+# CI 环境（GitHub Actions 等）可能不支持 ONNX Runtime，跳过整组测试
+pytestmark = pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="背包识别测试依赖 RapidOCR，CI 环境不支持 ONNX Runtime",
+)
 
 # ─── 测试数据 ──────────────────────────────────────────────
 

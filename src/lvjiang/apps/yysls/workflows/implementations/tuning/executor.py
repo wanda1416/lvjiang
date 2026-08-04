@@ -79,8 +79,8 @@ class TuningExecutor:
         settings = get_tuning_base().materials
         infos = None
         if settings.stone_check_enabled or settings.food_rules:
-            infos = wf.recognize_materials_info(
-                wf.TUNE_SCENE, wf.MATERIAL_SLOTS,
+            infos = wf.recognize_materials_info_panel(
+                wf.TUNE_SCENE, wf.MATERIAL_PANEL,
                 group=wf.MATERIAL_GROUP)
             # 调律流程特有校验：投入必须为 0（材料通过点击/一键添加投入）
             infos = self._validate_tuning_materials(infos)
@@ -105,14 +105,15 @@ class TuningExecutor:
         if food:
             # 同名幽灵槽防护：只认数量有效的槽位
             slot = next(
-                (s for s, i in (infos or {}).items()
+                ((r, c) for (r, c), i in (infos or {}).items()
                  if getattr(i, "type", "") == food
                  and getattr(i, "count", None) is not None), None)
             if not slot:
                 logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
                 self.abort_reason = f"{food} 材料槽位定位失败"
                 return None
-            wf.click_region(wf.TUNE_SCENE, slot)
+            row, col = slot
+            wf.click_panel(wf.TUNE_SCENE, wf.MATERIAL_PANEL, row, col)
             wf.wait_delay("step_interval")
 
         wf.click_region(wf.TUNE_SCENE, "auto_add")

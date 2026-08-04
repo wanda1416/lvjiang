@@ -6,8 +6,8 @@
 """
 from __future__ import annotations
 
-from ..base import AppHooks
 from ..._version import __version__
+from ..base import AppHooks
 
 
 def _build_tuning_tab(host):

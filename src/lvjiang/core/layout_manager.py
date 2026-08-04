@@ -14,7 +14,13 @@ from loguru import logger
 
 from ..constants import SESSION_CONFIG_DIR
 from .config_resolver import get_resolver
-from .scene_registry import Layout, get_scene_name
+from .scene_registry import (
+    Layout,
+    get_panel_defs,
+    get_point_defs,
+    get_region_defs,
+    get_scene_name,
+)
 
 # ─── 路径常量 ────────────────────────────────────────────
 
@@ -506,17 +512,21 @@ class LayoutConfigManager:
         scene_keys = all_scene_keys if changed_scenes is None else (changed_scenes & all_scene_keys)
         for sk in scene_keys:
             entry: dict = {}
+            # 按场景定义顺序排序 regions/points/panels，避免编辑顺序影响输出
+            region_order = {r.key: i for i, r in enumerate(get_region_defs(sk))}
             regions = layout.scenes.get(sk) or []
-            entry["regions"] = [r.to_dict() for r in regions]
+            entry["regions"] = [r.to_dict() for r in sorted(regions, key=lambda r: region_order.get(r.key, 999))]
             pts = layout.points.get(sk) or []
             if pts:
-                entry["points"] = [p.to_dict() for p in pts]
+                point_order = {p.key: i for i, p in enumerate(get_point_defs(sk))}
+                entry["points"] = [p.to_dict() for p in sorted(pts, key=lambda p: point_order.get(p.key, 999))]
             arrs = layout.arrows.get(sk) or []
             if arrs:
-                entry["arrows"] = [a.to_dict() for a in arrs]
+                entry["arrows"] = [a.to_dict() for a in arrs]  # arrows 无定义顺序，保持原样
             pnls = layout.panels.get(sk) or []
             if pnls:
-                entry["panels"] = [p.to_dict() for p in pnls]
+                panel_order = {p.key: i for i, p in enumerate(get_panel_defs(sk))}
+                entry["panels"] = [p.to_dict() for p in sorted(pnls, key=lambda p: panel_order.get(p.key, 999))]
             resolver.write_entity(
                 _scene_rel(layout.name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),

@@ -17,7 +17,8 @@ import numpy as np
 from loguru import logger
 
 from ..constants import SESSION_CONFIG_DIR
-from .config_resolver import get_resolver
+from .config.resolver import get_resolver
+from .config.session import get_session_store
 from .scene_registry import (
     CanvasConfig,
     Layout,
@@ -393,7 +394,7 @@ def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str] | No
 
 
 def load_layout_by_name(name: str) -> Layout | None:
-    """模块级布局加载（无 session 依赖，供 workflow_runner / smoke 使用）
+    """模块级布局加载（无 session 依赖，供 workflow_runner 使用）
 
     从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
     别名布局（带 extends）的 scene 从根布局目录加载，canvas 取自身条目。
@@ -463,38 +464,16 @@ class LayoutConfigManager:
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
-        """加载 session.json，仅提取 active_layout 字段
+        """从 session.json 读 active_layout（经 SessionStore 统一入口）
 
-        layout_manager 只管理 active_layout，不应保留 session.json 中的其他字段
-        （如 layouts、users 等），避免误写回造成数据污染。
+        layout_manager 只管理 active_layout，不触碰 session.json 其他节点。
         """
-        from ..constants import SESSION_PATH
-        if SESSION_PATH.exists():
-            try:
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-                # 仅提取 active_layout，不保留其他字段
-                return {"active_layout": data.get("active_layout", "")}
-            except Exception as e:
-                logger.error(f"加载 session.json 失败: {e}")
-        return {"active_layout": ""}
+        return {"active_layout": get_session_store().get_node("active_layout", "")}
 
     def _save_config(self):
-        """保存 active_layout 到 session.json（read-modify-write，保留其他字段）"""
-        from ..constants import SESSION_PATH
-        SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        # 先读取现有内容
-        data = {}
-        if SESSION_PATH.exists():
-            try:
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        # 仅更新 active_layout，保留其他字段
-        data["active_layout"] = self._config.get("active_layout", "")
-        SESSION_PATH.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        """保存 active_layout 到 session.json（经 SessionStore，不影响其他节点）"""
+        get_session_store().set_node(
+            "active_layout", self._config.get("active_layout", ""))
 
     def _reload_config(self):
         """从文件重新加载配置（多实例同步）"""

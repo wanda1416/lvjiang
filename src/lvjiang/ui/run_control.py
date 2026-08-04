@@ -8,7 +8,7 @@ from pathlib import Path
 from loguru import logger
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from ..core.config_resolver import get_resolver
+from ..core.config.resolver import get_resolver
 from ..workflows.engine import WorkflowEngine
 
 

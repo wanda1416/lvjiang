@@ -23,19 +23,18 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
     - weapon_types：武器类型注册表。
     - affix_names：所有普通词条别名，按长度降序。
     - percent_affixes：_unit='%' 且 _pool 非 dingyin 的全部别名。
-    配置文件缺失或关键字段为空时直接抛异常。
+    经 ConfigResolver 读 system←local 合并视图（用户模式 local 覆盖生效）；
+    配置缺失或关键字段为空时直接抛异常。
     """
-    import yaml
+    from lvjiang.core.config import get_resolver
 
-    from lvjiang.constants import PROJECT_ROOT
-    path = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"
-    with open(path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
+    rel = "yysls/attributes.yaml"
+    data = get_resolver().load_merged(rel)
 
     # ── weapon_types ──
     raw_weapon_types = data.get("weapon_types")
     if not isinstance(raw_weapon_types, list) or not raw_weapon_types:
-        raise RuntimeError(f"attributes.yaml 中 weapon_types 缺失或为空: {path}")
+        raise RuntimeError(f"attributes.yaml 中 weapon_types 缺失或为空: {rel}")
 
     # 支持两种格式：
     # - 旧格式：纯字符串列表 ["剑", "枪", ...]
@@ -48,7 +47,7 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
     # ── affix_caps ──
     affix_caps = data.get("affix_caps") or {}
     if not affix_caps:
-        raise RuntimeError(f"attributes.yaml 中 affix_caps 缺失或为空: {path}")
+        raise RuntimeError(f"attributes.yaml 中 affix_caps 缺失或为空: {rel}")
 
     all_names: list[str] = []
     percent_names: list[str] = []
@@ -71,7 +70,7 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
             percent_names.extend(cat_aliases)
 
     if not all_names:
-        raise RuntimeError(f"attributes.yaml 的 affix_caps 未解析到任何词条别名: {path}")
+        raise RuntimeError(f"attributes.yaml 的 affix_caps 未解析到任何词条别名: {rel}")
 
     return (
         weapon_types,

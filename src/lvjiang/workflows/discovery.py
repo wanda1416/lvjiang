@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from loguru import logger
 
-from ..core.config_resolver import get_resolver
+from ..core.config.resolver import get_resolver
 from . import implementations
 from .metadata import parse_metadata_file
 

@@ -74,17 +74,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
     def _restore_window_size(self):
         """从 session.json 恢复窗口位置 + 大小 + 分割器尺寸"""
-        import json
-
-        from ....constants import SESSION_PATH
-        if not SESSION_PATH.exists():
-            logger.debug("场景编辑器恢复：session.json 不存在")
-            return
-        try:
-            state = json.loads(
-                SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
-        except Exception:
-            logger.debug("场景编辑器恢复：读取 session.json 失败")
+        from ....core.config import get_session_store
+        state = get_session_store().get_node("ui_state", {})
+        if not isinstance(state, dict):
+            logger.debug("场景编辑器恢复：ui_state 非 dict")
             return
         logger.debug(f"场景编辑器恢复：ui_state = {state}")
         # 窗口位置
@@ -112,31 +105,21 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         logger.debug(f"场景编辑器恢复 Tab 分割器（延迟）：{self._pending_tab_split}")
 
     def _save_window_size(self):
-        """保存窗口位置 + 大小 + 分割器尺寸到 session.json"""
-        import json
-
-        from ....constants import SESSION_CONFIG_DIR, SESSION_PATH
-        data = {}
-        if SESSION_PATH.exists():
-            try:
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        ui = data.setdefault("ui_state", {})
-        ui["scene_editor_pos"] = [self.x(), self.y()]
-        ui["scene_editor_size"] = [self.width(), self.height()]
-        ui["scene_editor_vsplit"] = self._splitter.sizes()
-        ui["scene_editor_hsplit"] = self._bottom_splitter.sizes()
+        """保存窗口位置 + 大小 + 分割器尺寸到 session.json（浅合并 ui_state）"""
+        from ....core.config import get_session_store
+        patch = {
+            "scene_editor_pos": [self.x(), self.y()],
+            "scene_editor_size": [self.width(), self.height()],
+            "scene_editor_vsplit": self._splitter.sizes(),
+            "scene_editor_hsplit": self._bottom_splitter.sizes(),
+        }
         # Tab 内部分割器（取第一个可用 Tab）
         for tab in self._tabs.values():
-            ui["scene_editor_tab_split"] = tab._splitter.sizes()
+            patch["scene_editor_tab_split"] = tab._splitter.sizes()
             break
-        logger.debug(f"场景编辑器保存：ui_state = {ui}")
+        logger.debug(f"场景编辑器保存：ui_state = {patch}")
         try:
-            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            SESSION_PATH.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
-            )
+            get_session_store().update_node("ui_state", patch)
         except Exception as e:
             logger.warning(f"保存场景编辑器窗口大小失败: {e}")
 

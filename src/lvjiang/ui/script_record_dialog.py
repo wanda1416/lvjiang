@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core.config_resolver import get_resolver
+from ..core.config.resolver import get_resolver
 
 _STYLE_IDLE = (
     "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"

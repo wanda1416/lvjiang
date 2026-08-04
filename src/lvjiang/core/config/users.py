@@ -1,4 +1,4 @@
-"""Session 持久化管理器
+"""用户 Session 持久化管理器
 
 负责从 users/{username}.json 加载/保存 session 数据。
 UI 层在 Engine 创建后注入 session，并在正常结束时调用 save。
@@ -10,14 +10,15 @@ from typing import Callable
 
 from loguru import logger
 
-from ..constants import USERS_DIR
-
 
 class SessionManager:
     """Session 持久化管理器"""
 
     def __init__(self, users_dir: Path | None = None):
-        self._users_dir = users_dir or USERS_DIR
+        if users_dir is None:
+            from ...constants import USERS_DIR
+            users_dir = USERS_DIR
+        self._users_dir = users_dir
         self._users_dir.mkdir(parents=True, exist_ok=True)
 
     def load(self, username: str) -> dict:

@@ -9,8 +9,6 @@
 
 from __future__ import annotations
 
-import json
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -29,12 +27,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...constants import SESSION_CONFIG_DIR, SESSION_PATH
 from ...core.batch_config import (
     BatchConfigItem,
     load_batch_config,
     save_batch_config,
 )
+from ...core.config.session import get_session_store
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
@@ -69,28 +67,18 @@ _STYLE_BTN_NOT_READY = (
 
 def _load_enabled_rows() -> dict[str, list[bool]]:
     """从 session.json 读取各配置的 enabled 状态"""
-    if not SESSION_PATH.exists():
+    batch = get_session_store().get_node("batch", {})
+    if not isinstance(batch, dict):
         return {}
-    try:
-        data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-        return data.get("batch", {}).get("enabled_rows", {})
-    except Exception:
-        return {}
+    return batch.get("enabled_rows", {})
 
 
 def _save_enabled_rows(enabled_rows: dict[str, list[bool]]) -> None:
-    """保存 enabled 状态到 session.json（read-modify-write）"""
-    data: dict = {}
-    if SESSION_PATH.exists():
-        try:
-            data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    data.setdefault("batch", {})["enabled_rows"] = enabled_rows
-    SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    SESSION_PATH.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    """保存 enabled 状态到 session.json 的 batch.enabled_rows（不影响其他节点）"""
+    get_session_store().mutate_node(
+        "batch",
+        lambda old: {**(old if isinstance(old, dict) else {}),
+                     "enabled_rows": enabled_rows},
     )
 
 

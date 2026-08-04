@@ -33,9 +33,6 @@ STATE_STOPPED = "stopped"
 #: 日志环形缓冲容量。悬浮面板只显示最后几行，留 200 行够回溯一段流程。
 _LOG_CAPACITY = 200
 
-#: 冒烟自检任务 id。源码内联于 smoke.SMOKE_WF_DSL（不再是分发 .wf），
-#: 不出现在日常清单里，由 _resolve_task 内置合成、_build_source 落临时文件执行。
-_SMOKE_TASK_ID = "device_smoke_test"
 
 
 class _TaskState:
@@ -284,16 +281,6 @@ def _resolve_task(task_id: str) -> dict:
     from ...workflows.discovery import discover_scripts
     from .plugins import ensure_loaded
 
-    # 冒烟任务源码内联，不走发现层，直接合成一条空壳配置（_build_source 靠 id 识别）
-    if task_id == _SMOKE_TASK_ID:
-        return {
-            "id": _SMOKE_TASK_ID,
-            "name": "设备端冒烟测试",
-            "wf_file": "",
-            "class": "",
-            "parameters": [],
-        }
-
     ensure_loaded()  # 同 list_tasks：class 型脚本要靠插件注册表才解析成类实现
 
     for item in discover_scripts():
@@ -360,13 +347,7 @@ def _build_source(task: dict, engine):
             stop_check=_STATE.should_stop,
         )
 
-    # 冒烟任务：源码内联于 smoke.SMOKE_WF_DSL，落成临时 .wf 给引擎执行
-    if task.get("id") == _SMOKE_TASK_ID and not task.get("wf_file"):
-        from .smoke import write_smoke_wf
-
-        return write_smoke_wf()
-
-    from ..config_resolver import get_resolver
+    from ..config.resolver import get_resolver
 
     wf_path = get_resolver().resolve_read(f"workflows/{task['wf_file']}")
     if wf_path is None:

@@ -45,7 +45,7 @@ def _make_layout(name: str = "测试布局") -> Layout:
 def env(tmp_path, monkeypatch):
     """隔离的三层配置环境（开发模式）"""
     import lvjiang.constants as constants
-    import lvjiang.core.config_resolver as cr
+    import lvjiang.core.config.resolver as cr
 
     monkeypatch.setattr(constants, "SYSTEM_CONFIG_DIR", tmp_path / "system")
     monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", tmp_path / "local")
@@ -137,7 +137,7 @@ class TestDeleteLayout:
 
     def test_user_mode_tombstones(self, env, monkeypatch):
         """用户模式删除：system 布局落墓碑，yaml diff 删键"""
-        import lvjiang.core.config_resolver as cr
+        import lvjiang.core.config.resolver as cr
 
         # 先在开发模式写 system
         mgr = LayoutConfigManager()

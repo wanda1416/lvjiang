@@ -1,7 +1,16 @@
 """布局管理混入类 - 布局 CRUD、下拉框、UI 状态"""
 
 from loguru import logger
-from PyQt6.QtWidgets import QInputDialog, QMessageBox
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QInputDialog,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from ....core.layout_manager import copy_screenshots, delete_screenshots
 from ....core.scene_registry import Layout
@@ -52,7 +61,7 @@ class LayoutOpsMixin:
         self._layout_combo.blockSignals(False)
 
     def _update_ui_state(self):
-        """统一刷新所有 UI 状态：下拉框、按钮可用性"""
+        """统一刷新所有 UI 状态：下拉框、按钮可用性、继承标识"""
         self._refresh_combo()
         active = self._manager.get_active_layout_name()
         has_layout = self._current_layout is not None
@@ -60,6 +69,23 @@ class LayoutOpsMixin:
         self._btn_save_as.setEnabled(has_layout)
         is_active = has_layout and self._current_layout.name == active
         self._btn_delete.setEnabled(has_layout and not is_active)
+
+        # 更新继承标识
+        if hasattr(self, "_inherit_label"):
+            if has_layout and self._manager.is_alias_layout(self._current_layout.name):
+                # 获取父布局名称
+                from ....core.config_resolver import get_resolver
+                resolver = get_resolver()
+                merged = resolver.load_merged("layouts.yaml")
+                entry = merged.get("layouts", {}).get(self._current_layout.name) or {}
+                parent = entry.get("extends", "")
+                if parent:
+                    self._inherit_label.setText(f"布局继承自：{parent}")
+                    self._inherit_label.show()
+                else:
+                    self._inherit_label.hide()
+            else:
+                self._inherit_label.hide()
 
     def _confirm_discard_changes(self, action: str) -> bool:
         """存在未保存修改时弹窗确认
@@ -137,7 +163,11 @@ class LayoutOpsMixin:
         if not self._validate_layout_name(name):
             return
         prev_active = self._manager.get_active_layout_name()
-        layout = self._manager.new_layout(name)
+        try:
+            layout = self._manager.new_layout(name)
+        except ValueError as e:
+            QMessageBox.warning(self, "新建失败", str(e))
+            return
         if prev_active and prev_active != name:
             self._manager.set_active_layout(prev_active)
         self._current_layout = layout
@@ -184,30 +214,65 @@ class LayoutOpsMixin:
         )
 
     def _on_save_as_layout(self):
-        """另存为：输入新名称，若已存在则提示确认覆盖"""
+        """另存为：输入新名称，可选继承当前布局（创建别名）"""
         if self._current_layout is None:
             self._status_bar.showMessage("没有已加载的布局")
             return
-        temp = Layout(name="")
-        current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
-        temp.set_canvas(current_tab.get_canvas_config())
-        for scene_key, tab in self._tabs.items():
-            temp.set_scene_regions(scene_key, tab.get_regions())
-            temp.set_scene_points(scene_key, tab.get_points())
-            temp.set_scene_arrows(scene_key, tab.get_arrows())
-            temp.set_scene_panels(scene_key, tab.get_panels())
-
-        existing = self._manager.list_layouts()
-        name, ok = QInputDialog.getText(self, "另存为", "请输入布局名称：")
-        if not ok or not name:
+        # 别名布局禁止另存为
+        if self._manager.is_alias_layout(self._current_layout.name):
+            QMessageBox.warning(
+                self, "另存为失败",
+                "别名布局禁止另存为，请使用原布局另存或者新建布局。",
+            )
             return
-        name = name.strip()
+
+        # 自定义对话框：名称 + 继承复选框
+        dialog = QDialog(self)
+        dialog.setWindowTitle("另存为")
+        layout = QVBoxLayout(dialog)
+
+        name_input = QLineEdit()
+        name_input.setPlaceholderText("请输入布局名称")
+        layout.addWidget(name_input)
+
+        inherit_checkbox = QCheckBox(f"继承自当前布局「{self._current_layout.name}」")
+        inherit_checkbox.setToolTip(
+            "勾选后创建别名布局：仅保存画布配置，场景数据继承自根布局。\n"
+            "取消勾选则创建独立副本（包含所有场景数据）。"
+        )
+        layout.addWidget(inherit_checkbox)
+
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("确定")
+        cancel_button = QPushButton("取消")
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+
+        ok_button.clicked.connect(dialog.accept)
+        cancel_button.clicked.connect(dialog.reject)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        name = name_input.text().strip()
         if not name:
             return
         if not self._validate_layout_name(name):
             return
 
+        inherit = inherit_checkbox.isChecked()
+        existing = self._manager.list_layouts()
+
         if name in existing:
+            # 别名布局不可被另存为覆盖（会把场景写入根布局目录，破坏继承语义）
+            if self._manager.is_alias_layout(name):
+                QMessageBox.warning(
+                    self, "另存为失败",
+                    f"布局「{name}」是别名布局（继承自根布局），不可被另存为覆盖。\n"
+                    f"请使用其他名称。",
+                )
+                return
             reply = QMessageBox.question(
                 self, "确认覆盖",
                 f"布局「{name}」已存在，是否覆盖？",
@@ -216,19 +281,55 @@ class LayoutOpsMixin:
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
-        temp.name = name
-        self._manager.save_layout(temp)
-        copy_screenshots(self._current_layout.name, name)
-        self._current_layout = temp
-        self._refresh_combo()
-        idx = self._layout_combo.findText(name)
-        if idx >= 0:
-            self._layout_combo.setCurrentIndex(idx)
-        self._update_ui_state()
-        total = sum(len(r) for r in temp.scenes.values())
-        self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
-        self._mark_all_scenes_clean()
-        logger.info(f"布局已另存为: {name}, {total} 个区域")
+        if inherit:
+            # 创建别名布局
+            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
+            canvas = current_tab.get_canvas_config()
+            extends_name = self._current_layout.name
+            # 如果当前是别名，继承目标必须是根布局
+            if self._manager.is_alias_layout(extends_name):
+                QMessageBox.warning(
+                    self, "继承失败",
+                    f"当前布局「{extends_name}」是别名布局，不能作为继承目标。\n"
+                    f"请切换到根布局后再试。",
+                )
+                return
+            new_layout = self._manager.create_alias_layout(name, extends_name, canvas)
+            if new_layout is None:
+                QMessageBox.warning(self, "创建失败", "别名布局创建失败，请检查日志。")
+                return
+            self._current_layout = new_layout
+            self._refresh_combo()
+            idx = self._layout_combo.findText(name)
+            if idx >= 0:
+                self._layout_combo.setCurrentIndex(idx)
+            self._update_ui_state()
+            self._status_bar.showMessage(f"已创建别名布局「{name}」（继承自「{extends_name}」）")
+            logger.info(f"别名布局已创建: {name} (extends {extends_name})")
+        else:
+            # 正常另存为：独立副本
+            temp = Layout(name="")
+            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
+            temp.set_canvas(current_tab.get_canvas_config())
+            for scene_key, tab in self._tabs.items():
+                temp.set_scene_regions(scene_key, tab.get_regions())
+                temp.set_scene_points(scene_key, tab.get_points())
+                temp.set_scene_arrows(scene_key, tab.get_arrows())
+                temp.set_scene_panels(scene_key, tab.get_panels())
+
+            temp.name = name
+            self._manager.save_layout(temp)
+            copy_screenshots(self._current_layout.name, name)
+            self._current_layout = temp
+            self._refresh_combo()
+            idx = self._layout_combo.findText(name)
+            if idx >= 0:
+                self._layout_combo.setCurrentIndex(idx)
+            self._update_ui_state()
+            total = sum(len(r) for r in temp.scenes.values())
+            self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
+            self._mark_all_scenes_clean()
+            logger.info(f"布局已另存为: {name}, {total} 个区域")
 
     def _on_delete_layout(self):
         """删除当前下拉框选中的布局（激活的不可删除）"""
@@ -264,4 +365,5 @@ class LayoutOpsMixin:
             self._update_ui_state()
             self._status_bar.showMessage(f"已删除布局「{name}」，已切换到默认布局")
         else:
-            self._status_bar.showMessage(f"删除失败：布局「{name}」不存在")
+            self._status_bar.showMessage(
+                f"删除失败：布局「{name}」不存在或被别名布局引用")

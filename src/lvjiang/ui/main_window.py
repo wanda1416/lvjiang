@@ -741,10 +741,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        data["ui_state"] = {
-            "window_size": [self.width(), self.height()],
-            "splitter_sizes": self._main_splitter.sizes(),
-        }
+        # 仅更新主窗口 UI 状态，保留其他组件的 ui_state（如 scene_editor_*）
+        ui = data.setdefault("ui_state", {})
+        ui["window_size"] = [self.width(), self.height()]
+        ui["splitter_sizes"] = self._main_splitter.sizes()
         try:
             SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             SESSION_PATH.write_text(

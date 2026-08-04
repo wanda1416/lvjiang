@@ -62,20 +62,10 @@ def load_scene_screenshot(
 ) -> np.ndarray | None:
     """读取布局下某场景（可选视图）的截图，不存在返回 None（支持中文路径）
 
-    别名布局（extends）自动重定向到父布局的截图目录。
+    别名布局使用自己的截图目录（按布局名），不重定向到父布局，
+    避免截图操作污染父布局。
     """
-    # 别名布局重定向到父布局的截图
-    actual_layout = layout_name
-    try:
-        resolver = get_resolver()
-        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
-        entry = merged.get("layouts", {}).get(layout_name) or {}
-        if entry.get("extends"):
-            actual_layout = entry["extends"]
-    except Exception:
-        pass  # 加载失败时保持原行为
-
-    path = layout_screenshots_dir(actual_layout) / scene_screenshot_name(scene_key, view)
+    path = layout_screenshots_dir(layout_name) / scene_screenshot_name(scene_key, view)
     if not path.exists():
         return None
     try:

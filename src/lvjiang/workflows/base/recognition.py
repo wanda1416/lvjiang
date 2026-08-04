@@ -143,52 +143,60 @@ class _RecognitionMixin:
         logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
-    def recognize_materials_info(
+    def recognize_materials_info_panel(
         self,
         scene_key: str,
-        slot_keys: list[str] | None = None,
+        panel_key: str,
         group: str | None = None,
-    ) -> dict[str, object]:
-        """完整材料识别：一次截图，逐 slot 返回识别结果对象
+    ) -> dict[tuple[int, int], object]:
+        """Panel grid 模式材料识别：一次截图，逐 cell 返回识别结果对象
 
-        与 recognize_materials 只返 label 不同，保留识别器结果的全部
-        字段（type/level/count/devoted/count_text/confidence），供数量检查等策略
-        消费；裁切失败的 slot 不入结果。
+        使用 panel grid 裁剪每个 cell，适用于材料槽以网格形式排列的场景。
+        保留识别器结果的全部字段（type/level/count/devoted/count_text/confidence），
+        供数量检查等策略消费；裁切失败的 cell 不入结果。
 
         Args:
             scene_key: 场景 key
-            slot_keys: 可选，只识别指定 slot
+            panel_key: panel key
             group: 可选，限定参考图分组范围
 
         Returns:
-            {slot_key: MaterialInfo, ...}
+            {(row, col): MaterialInfo, ...}，row/col 均为 1-based
         """
         img = self._capture.capture()
         if img is None:
             logger.error("截图失败")
             return {}
 
-        canvas = self._layout.get_canvas()
-        regions = self._layout.get_scene_regions(scene_key)
-        if slot_keys:
-            regions = self._require_regions(scene_key, slot_keys, regions)
-        elif not regions:
-            logger.warning(f"场景 {scene_key} 没有定义区域")
+        # 获取 panel 对象
+        panel_obj = self._find_panel(scene_key, panel_key)
+        if panel_obj is None:
+            logger.warning(f"panel {scene_key}/{panel_key} 未找到")
             return {}
 
-        infos: dict[str, object] = {}
-        for region in regions:
-            crop = self._crop_region(img, region, canvas)
-            if crop is None:
-                logger.warning(f"slot {region.key} 裁切为空，跳过")
+        # 校准 panel 网格，获取每个 cell 的像素坐标 (row-major flat list)
+        canvas = self._layout.get_canvas()
+        cells_list = self._ocr.calibrate_panel_cells(img, canvas, panel_obj)
+        if not cells_list:
+            logger.warning(f"panel {scene_key}/{panel_key} 无有效 cell")
+            return {}
+
+        # row-major list → (row, col) dict，转为 1-based
+        infos: dict[tuple[int, int], object] = {}
+        cols = panel_obj.cols
+        for idx, (x1, y1, x2, y2) in enumerate(cells_list):
+            row, col = idx // cols + 1, idx % cols + 1
+            crop = img[y1:y2, x1:x2]
+            if crop.size == 0:
+                logger.warning(f"cell ({row},{col}) 裁切为空，跳过")
                 continue
             info = self.material_recognizer.recognize(crop, group=group)
-            infos[region.key] = info
+            infos[(row, col)] = info
 
-        summary = {k: (f"{i.type}×{i.count}" if i.count is not None else i.type)
+        summary = {f"({r},{c})": (f"{i.type}×{i.count}" if i.count is not None else i.type)
                    if i.type else "空"
-                   for k, i in infos.items()}
-        logger.info(f"材料识别 [{scene_key}]:{list(infos)} => {summary}")
+                   for (r, c), i in infos.items()}
+        logger.info(f"材料识别 panel [{scene_key}/{panel_key}]: => {summary}")
         return infos
 
     # ─── by 子句：短路识别 ──────────────────────────────────

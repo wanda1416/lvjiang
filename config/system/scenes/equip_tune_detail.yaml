@@ -43,41 +43,6 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-- key: material_1
-  name: 材料格1
-  type: slot
-  is_text: false
-  is_clickable: false
-- key: material_2
-  name: 材料格2
-  type: slot
-  is_text: false
-  is_clickable: false
-- key: material_3
-  name: 材料格3
-  type: slot
-  is_text: false
-  is_clickable: false
-- key: material_4
-  name: 材料格4
-  type: slot
-  is_text: false
-  is_clickable: false
-- key: material_5
-  name: 材料格5
-  type: slot
-  is_text: false
-  is_clickable: false
-- key: material_6
-  name: 材料格6
-  type: slot
-  is_text: false
-  is_clickable: false
-- key: material_7
-  name: 材料格7
-  type: slot
-  is_text: false
-  is_clickable: false
 - key: tune_btn
   name: 调律
   type: func
@@ -134,3 +99,11 @@ regions:
   is_text: true
   is_clickable: false
   view: reset_tune
+panels:
+- key: materials
+  name: 材料格
+  cols: 7
+  rows: 1
+  min_visible: 0.95
+  calibration: even
+  scroll_direction: none

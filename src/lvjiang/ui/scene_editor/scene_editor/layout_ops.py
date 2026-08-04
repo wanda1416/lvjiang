@@ -74,7 +74,7 @@ class LayoutOpsMixin:
         if hasattr(self, "_inherit_label"):
             if has_layout and self._manager.is_alias_layout(self._current_layout.name):
                 # 获取父布局名称
-                from ....core.config_resolver import get_resolver
+                from ....core.config.resolver import get_resolver
                 resolver = get_resolver()
                 merged = resolver.load_merged("layouts.yaml")
                 entry = merged.get("layouts", {}).get(self._current_layout.name) or {}

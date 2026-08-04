@@ -342,22 +342,25 @@ class TestMetaSchemaScope:
 
 @pytest.fixture
 def space_env(tmp_path, monkeypatch):
-    """图库空间相关常量全部重定向到 tmp_path（完整路由隔离）"""
+    """图库空间相关路径全部重定向到 tmp_path（完整路由隔离）
+
+    reference_db 的层路径经 ConfigResolver 派生，打层根
+    SYSTEM_CONFIG_DIR / LOCAL_CONFIG_DIR 即可（属性懒求值，monkeypatch 友好）。
+    """
     from lvjiang import constants
-    system_ref = tmp_path / "system" / "references"
-    local_dir = tmp_path / "local"
+    system_root = tmp_path / "system"
+    local_root = tmp_path / "local"
     session = tmp_path / "session" / "session.json"
-    monkeypatch.setattr(constants, "SYSTEM_REFERENCES_DIR", system_ref)
-    monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", local_dir)
-    monkeypatch.setattr(constants, "REFERENCES_CONFIG_PATH",
-                        tmp_path / "system" / "references.yaml")
+    monkeypatch.setattr(constants, "SYSTEM_CONFIG_DIR", system_root)
+    monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", local_root)
     monkeypatch.setattr(constants, "SESSION_PATH", session)
+    system_ref = system_root / "references"
     return {
         "tmp": tmp_path,
         "system_ref": system_ref,          # system 空间 yaml + 图片根目录
-        "local_ref": local_dir / "references",
-        "system_roster": tmp_path / "system" / "references.yaml",
-        "local_roster": local_dir / "references.yaml",
+        "local_ref": local_root / "references",
+        "system_roster": system_root / "references.yaml",
+        "local_roster": local_root / "references.yaml",
         "session": session,
     }
 

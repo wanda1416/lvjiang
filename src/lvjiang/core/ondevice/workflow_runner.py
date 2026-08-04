@@ -13,7 +13,6 @@
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Callable
 
@@ -21,7 +20,8 @@ from loguru import logger
 
 from ...config import load_user_config
 from ...core.capture_base import CaptureBackend
-from ...core.config_resolver import get_resolver
+from ...core.config.resolver import get_resolver
+from ...core.config.session import get_session_store
 from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout
@@ -53,15 +53,9 @@ def _default_layout_name() -> str:
     Raises:
         RuntimeError: 无任何可用布局时
     """
-    from ...constants import SESSION_PATH
-    if SESSION_PATH.exists():
-        try:
-            name = json.loads(
-                SESSION_PATH.read_text(encoding="utf-8")).get("active_layout", "")
-            if name:
-                return name
-        except Exception as e:  # noqa: BLE001 session 损坏不应阻断回退枚举
-            logger.warning(f"读取 session.json 失败: {e}")
+    name = get_session_store().get_node("active_layout", "")
+    if name:
+        return name
     merged = get_resolver().load_merged("layouts.yaml")
     names = sorted(merged.get("layouts", {}).keys())
     if names:

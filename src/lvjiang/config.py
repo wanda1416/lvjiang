@@ -4,22 +4,18 @@
 1. 代码默认值（dataclass 字段默认）
 2. session.json 的 settings / material_grid 节点（纯运行态，配置管理 / 图库管理写入）
 3. app.yaml 的 input_simulation / delay_params 节点（system 出厂默认 ← local 用户覆盖，
-   随版本分发，见 core.config_resolver）
+   随版本分发，见 core.config）
 
 不用 pydantic：它的 v2 核心是 Rust 扩展（pydantic-core），安卓设备端（Chaquopy）
 无法安装；本模块只需要默认值 + 少量范围校验 + 嵌套 dict 转换，__post_init__
 足以覆盖，桌面端与设备端共用同一份实现。
 """
 
-import json
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
-import yaml
 from loguru import logger
-
-from .constants import SESSION_PATH
 
 
 def _pair(value: Any) -> tuple[float, float]:
@@ -92,7 +88,7 @@ class UserConfig:
 
     settings / material_grid 来自 config/session/session.json（纯运行态）；
     输入模拟 input_sim + 延迟参数 delay_params 来自 config/**/app.yaml
-    （system 出厂默认 ← local 用户覆盖，随版本分发，见 config_resolver）。
+    （system 出厂默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
     adb_capture_streaming: bool = True     # ADB 模式是否启用 scrcpy 视频流截图（false 则用 screencap）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
@@ -109,32 +105,24 @@ class UserConfig:
         self.delay_params = parse_delay_params(self.delay_params)
 
 
-def load_yaml(path: Path) -> dict[str, Any]:
-    """加载 YAML 文件"""
-    if not path.exists():
-        return {}
-    with open(path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data if data else {}
 
-
-def save_yaml(path: Path, data: dict[str, Any]) -> None:
-    """保存 YAML 文件"""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+def _session_store(session_path: Path | None = None):
+    """session.json 读写入口：缺省用全局单例 SessionStore，测试传路径时构造独立实例"""
+    from .core.config.session import SessionStore, get_session_store
+    if session_path is None:
+        return get_session_store()
+    return SessionStore(session_path)
 
 
 def load_user_config(session_path: Path | None = None) -> UserConfig:
     """加载用户配置：session.json（settings/material_grid）+ app.yaml（输入模拟/延迟参数）"""
-    session_path = session_path or SESSION_PATH
+    store = _session_store(session_path)
 
     data: dict[str, Any] = {}
-    session = _read_json(session_path)
-    settings = session.get("settings")
+    settings = store.get_node("settings")
     if isinstance(settings, dict):
         data.update(settings)
-    grid = session.get("material_grid")
+    grid = store.get_node("material_grid")
     if isinstance(grid, dict):
         data["material_grid"] = grid
     # 输入模拟 + 延迟参数：app.yaml 合并视图（system ← local）
@@ -152,25 +140,10 @@ def load_user_config(session_path: Path | None = None) -> UserConfig:
 
 # ── 配置保存 ──
 
-def _read_json(path: Path) -> dict[str, Any]:
-    """读 JSON 文件，不存在/损坏返回空 dict"""
-    if not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
 def _update_session_node(key: str, value: dict[str, Any],
                          session_path: Path | None = None) -> None:
-    """读-改-写 session.json 的指定顶层节点（保留其他字段）"""
-    path = session_path or SESSION_PATH
-    data = _read_json(path)
-    data[key] = value
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    """整节点替换 session.json 的指定顶层节点（保留其他节点）"""
+    _session_store(session_path).set_node(key, value)
 
 
 def save_settings(settings: dict[str, Any], session_path: Path | None = None) -> None:
@@ -191,7 +164,7 @@ APP_CONFIG_REL = "app.yaml"
 def _load_app_config() -> dict[str, Any]:
     """读取 app.yaml 的 system←local 合并视图（解析失败返回空 dict）"""
     try:
-        from .core.config_resolver import get_resolver
+        from .core.config.resolver import get_resolver
         return get_resolver().load_merged(APP_CONFIG_REL)
     except Exception as e:  # noqa: BLE001 配置缺失/损坏不应阻断启动
         logger.error(f"加载 app.yaml 失败: {e}")
@@ -200,7 +173,7 @@ def _load_app_config() -> dict[str, Any]:
 
 def save_app_config(input_sim: dict[str, Any], delay_params: dict[str, Any]) -> None:
     """保存输入模拟 + 延迟参数到 app.yaml（开发模式写 system 全量，用户模式写 local diff）"""
-    from .core.config_resolver import get_resolver
+    from .core.config.resolver import get_resolver
     get_resolver().save_merged(APP_CONFIG_REL, {
         "input_simulation": input_sim,
         "delay_params": delay_params,

@@ -37,8 +37,8 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps import get_registry
 
 from ..config import load_user_config
+from ..core.config.users import SessionManager
 from ..core.layout_manager import LayoutConfigManager
-from ..core.session_manager import SessionManager
 from ..core.user_config import UserConfigManager
 from .capture_ops import CaptureOpsMixin
 from .overlay import BorderOverlay
@@ -713,15 +713,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _restore_ui_state(self):
         """启动时恢复窗口大小与左右分栏比例，免去每次手动拉伸"""
-        import json
-
-        from ..constants import SESSION_PATH
-        if not SESSION_PATH.exists():
-            return
-        try:
-            state = json.loads(
-                SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
-        except Exception:
+        from ..core.config import get_session_store
+        state = get_session_store().get_node("ui_state", {})
+        if not isinstance(state, dict):
             return
         size = state.get("window_size")
         if isinstance(size, list) and len(size) == 2:
@@ -731,25 +725,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             self._main_splitter.setSizes([int(s) for s in sizes])
 
     def _save_ui_state(self):
-        """退出时统一写入 ui_state（保留 session.json 其他字段）"""
-        import json
-
-        from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
-        data = {}
-        if SESSION_PATH.exists():
-            try:
-                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        # 仅更新主窗口 UI 状态，保留其他组件的 ui_state（如 scene_editor_*）
-        ui = data.setdefault("ui_state", {})
-        ui["window_size"] = [self.width(), self.height()]
-        ui["splitter_sizes"] = self._main_splitter.sizes()
+        """退出时统一写入 ui_state（浅合并，保留其他组件的 ui_state 如 scene_editor_*）"""
+        from ..core.config import get_session_store
         try:
-            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            SESSION_PATH.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
-            )
+            get_session_store().update_node("ui_state", {
+                "window_size": [self.width(), self.height()],
+                "splitter_sizes": self._main_splitter.sizes(),
+            })
         except Exception as e:
             logger.warning(f"保存 UI 状态失败: {e}")
 
@@ -807,9 +789,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _save_daily_config(self):
         """保存日常页脚本选择与参数到 session.json 的 daily 节点"""
-        import json as _json
-
-        from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
+        from ..core.config import get_session_store
 
         flow_cfg = self._get_selected_flow_config()
         if not flow_cfg:
@@ -827,39 +807,21 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             "params": params_map,
         }
 
-        data = {}
-        if SESSION_PATH.exists():
-            try:
-                data = _json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        data["daily"] = daily
         try:
-            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            SESSION_PATH.write_text(
-                _json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
-            )
+            get_session_store().set_node("daily", daily)
         except Exception as e:
             logger.warning(f"保存日常配置失败: {e}")
 
     def _restore_daily_config(self):
         """启动时恢复日常页脚本选择与参数"""
-        import json as _json
-
-        from ..constants import SESSION_PATH
+        from ..core.config import get_session_store
 
         # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
-        workflow_id = None
-        params_map = {}
-
-        if SESSION_PATH.exists():
-            try:
-                data = _json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-                daily = data.get("daily", {})
-                workflow_id = daily.get("workflow_id")
-                params_map = daily.get("params", {})
-            except Exception:
-                pass
+        daily = get_session_store().get_node("daily", {})
+        if not isinstance(daily, dict):
+            daily = {}
+        workflow_id = daily.get("workflow_id")
+        params_map = daily.get("params", {})
 
         # 将保存的参数回写到 _workflow_configs 供 _rebuild_param_panel 使用
         for cfg in self._workflow_configs:

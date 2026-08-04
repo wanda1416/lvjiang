@@ -17,16 +17,15 @@
 写入按模式路由（开发→system，用户→local），与 ConfigResolver 同一套模式判定。
 """
 
-import json
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
 from loguru import logger
 
-from lvjiang.core.config_resolver import get_resolver
+from lvjiang.core.config import load_yaml, save_yaml
+from lvjiang.core.config.resolver import get_resolver
 
 if TYPE_CHECKING:
     import numpy as np
@@ -154,6 +153,7 @@ class ReferenceDatabase:
         self._local_spaces_yaml_override = (
             Path(local_spaces_yaml) if local_spaces_yaml else None)
         self._session_path_override = Path(session_path) if session_path else None
+        self._session_store_cache = None  # 仅 session_path override 时使用的独立 store
         # 空间状态
         self._spaces: list[str] = []
         self._space: str = DEFAULT_SPACE
@@ -177,48 +177,42 @@ class ReferenceDatabase:
         """激活空间的 system 层图片目录"""
         if self._system_dir_override is not None:
             return self._system_dir_override
-        from lvjiang import constants
-        return constants.SYSTEM_REFERENCES_DIR / self._space
+        return get_resolver().system_dir / "references" / self._space
 
     @property
     def local_dir(self) -> Path:
         """激活空间的 local 层图片目录"""
         if self._local_dir_override is not None:
             return self._local_dir_override
-        from lvjiang import constants
-        return constants.LOCAL_CONFIG_DIR / "references" / self._space
+        return get_resolver().local_dir / "references" / self._space
 
     @property
     def system_yaml_path(self) -> Path:
         """激活空间的 system 层配置 yaml"""
         if self._system_yaml_override is not None:
             return self._system_yaml_override
-        from lvjiang import constants
-        return constants.SYSTEM_REFERENCES_DIR / f"{self._space}.yaml"
+        return get_resolver().system_dir / "references" / f"{self._space}.yaml"
 
     @property
     def local_yaml_path(self) -> Path:
         """激活空间的 local 层配置 yaml"""
         if self._local_yaml_override is not None:
             return self._local_yaml_override
-        from lvjiang import constants
-        return constants.LOCAL_CONFIG_DIR / "references" / f"{self._space}.yaml"
+        return get_resolver().local_dir / "references" / f"{self._space}.yaml"
 
     @property
     def system_spaces_yaml_path(self) -> Path:
         """system 层空间名册 yaml"""
         if self._system_spaces_yaml_override is not None:
             return self._system_spaces_yaml_override
-        from lvjiang import constants
-        return constants.REFERENCES_CONFIG_PATH
+        return get_resolver().system_dir / "references.yaml"
 
     @property
     def local_spaces_yaml_path(self) -> Path:
         """local 层空间名册 yaml（仅本地新建的空间）"""
         if self._local_spaces_yaml_override is not None:
             return self._local_spaces_yaml_override
-        from lvjiang import constants
-        return constants.LOCAL_CONFIG_DIR / "references.yaml"
+        return get_resolver().local_dir / "references.yaml"
 
     @property
     def session_path(self) -> Path:
@@ -258,8 +252,7 @@ class ReferenceDatabase:
         if not path.exists():
             return []
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+            data = load_yaml(path)
         except Exception as e:
             logger.error(f"空间名册解析失败: {path}: {e}")
             return []
@@ -273,26 +266,24 @@ class ReferenceDatabase:
             return []
         return [str(s).strip() for s in spaces if str(s).strip()]
 
+    def _get_session_store(self):
+        """session.json 读写入口：缺省路径用全局单例，override 时用独立实例（测试隔离）"""
+        if self._session_path_override is not None:
+            if self._session_store_cache is None:
+                from lvjiang.core.config.session import SessionStore
+                self._session_store_cache = SessionStore(self._session_path_override)
+            return self._session_store_cache
+        from lvjiang.core.config.session import get_session_store
+        return get_session_store()
+
     def _read_session_active_space(self) -> str:
         """从 session.json 读取 active_space，缺失/非法返回空串"""
-        try:
-            data = json.loads(self.session_path.read_text(encoding="utf-8"))
-        except Exception:
-            return ""
-        return str(data.get("active_space") or "")
+        value = self._get_session_store().get_node("active_space")
+        return str(value) if value else ""
 
     def _write_session_active_space(self, name: str) -> None:
-        """写 active_space 到 session.json（read-modify-write，保留其他字段）"""
-        data: dict = {}
-        if self.session_path.exists():
-            try:
-                data = json.loads(self.session_path.read_text(encoding="utf-8"))
-            except Exception:
-                data = {}
-        data["active_space"] = name
-        self.session_path.parent.mkdir(parents=True, exist_ok=True)
-        self.session_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        """写 active_space 到 session.json（经 SessionStore，不影响其他节点）"""
+        self._get_session_store().set_node("active_space", name)
 
     def _resolve_space(self) -> None:
         """解析激活空间：session.json → 名册首个 → DEFAULT_SPACE"""
@@ -354,15 +345,11 @@ class ReferenceDatabase:
         if not self._register_space(roster_path, name):
             return False
         if not space_yaml.exists():
-            space_yaml.parent.mkdir(parents=True, exist_ok=True)
-            data = {
+            save_yaml(space_yaml, {
                 "version": 1,
                 "meta_schema": [],
                 "references": [],
-            }
-            with open(space_yaml, "w", encoding="utf-8") as f:
-                yaml.dump(data, f, allow_unicode=True,
-                          default_flow_style=False, sort_keys=False)
+            })
         self._spaces.append(name)
         logger.info(f"新建图库空间: {name} -> {space_yaml}")
         return True
@@ -377,8 +364,7 @@ class ReferenceDatabase:
         spaces: list[str] = []
         if roster_path.exists():
             try:
-                with open(roster_path, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f) or {}
+                data = load_yaml(roster_path)
             except Exception:
                 data = {}
             raw = data.get("spaces")
@@ -393,10 +379,7 @@ class ReferenceDatabase:
         if name in spaces:
             return True
         spaces.append(name)
-        roster_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(roster_path, "w", encoding="utf-8") as f:
-            yaml.dump({"version": 1, "spaces": spaces}, f,
-                      allow_unicode=True, default_flow_style=False, sort_keys=False)
+        save_yaml(roster_path, {"version": 1, "spaces": spaces})
         return True
 
     # ─── 加载 / 保存 ─────────────────────────────────────
@@ -430,8 +413,7 @@ class ReferenceDatabase:
 
         # system 层
         if self.system_yaml_path.exists():
-            with open(self.system_yaml_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+            data = load_yaml(self.system_yaml_path)
             self._system_entries = self._parse_entries(data.get("references"))
             self._system_schema = self._parse_schema(data.get("meta_schema"))
             self._system_threshold = self._parse_threshold(data.get("match_threshold"))
@@ -447,8 +429,7 @@ class ReferenceDatabase:
         self._local_schema = None
         self._local_threshold = None
         if self.local_yaml_path.exists():
-            with open(self.local_yaml_path, "r", encoding="utf-8") as f:
-                overlay = yaml.safe_load(f) or {}
+            overlay = load_yaml(self.local_yaml_path)
             self._local_entries = self._parse_entries(overlay.get("references"))
             self._deleted = {str(x) for x in overlay.get("deleted") or []}
             if overlay.get("meta_schema"):
@@ -542,7 +523,6 @@ class ReferenceDatabase:
         """按模式落盘：开发→system 全量；用户→local 条目级 diff（空则删覆盖文件）"""
         self._ensure_loaded()
         if self._is_dev():
-            self.system_yaml_path.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "version": 1,
                 "meta_schema": [self._schema_to_dict(f) for f in self._system_schema],
@@ -550,8 +530,7 @@ class ReferenceDatabase:
             }
             if self._system_threshold is not None:
                 data["match_threshold"] = self._system_threshold
-            with open(self.system_yaml_path, "w", encoding="utf-8") as f:
-                yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            save_yaml(self.system_yaml_path, data)
             logger.info(f"参考图库保存完成: {len(self._system_entries)} 条记录 -> {self.system_yaml_path}")
             return
 
@@ -571,9 +550,7 @@ class ReferenceDatabase:
             overlay["meta_schema"] = [self._schema_to_dict(f) for f in self._local_schema]
         if self._local_threshold is not None:
             overlay["match_threshold"] = self._local_threshold
-        self.local_yaml_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.local_yaml_path, "w", encoding="utf-8") as f:
-            yaml.dump(overlay, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        save_yaml(self.local_yaml_path, overlay)
         logger.info(
             f"参考图库覆盖层保存完成: {len(self._local_entries)} 条"
             f" + 删除 {len(self._deleted)} -> {self.local_yaml_path}"

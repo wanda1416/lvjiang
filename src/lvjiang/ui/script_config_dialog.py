@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core.config_resolver import get_resolver
+from ..core.config.resolver import get_resolver
 from ..workflows.discovery import discover_scripts
 
 

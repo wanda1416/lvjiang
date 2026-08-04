@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from lvjiang.config import load_user_config  # noqa: E402
-from lvjiang.core.config_resolver import get_resolver  # noqa: E402
+from lvjiang.core.config.resolver import get_resolver  # noqa: E402
 from lvjiang.core.ondevice.plugins import ensure_loaded  # noqa: E402
 from lvjiang.core.ondevice.workflow_runner import (  # noqa: E402
     _default_layout_name,

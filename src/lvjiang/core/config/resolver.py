@@ -3,7 +3,7 @@
 三层目录职责：
 - config/system  出厂默认（进 git，用户模式下只读）
 - config/local   用户覆盖层：影子文件 + 键级 diff + 墓碑（目录结构镜像 system）
-- config/session 纯运行态（不经本模块，见 constants.SESSION_CONFIG_DIR）
+- config/session 纯运行态（不经本模块，见 core.config.session.SessionStore）
 
 读语义（两模式一致）：恒为 local 覆盖 system 的合并视图。
 写语义（按模式路由）：开发模式写 system，用户模式写 local。
@@ -109,7 +109,7 @@ class ConfigResolver:
             return True
         if env in ("0", "false", "no"):
             return False
-        from .. import constants
+        from ... import constants
         return (constants.PROJECT_ROOT / ".git").exists()
 
     # ─── 层根目录与模式 ─────────────────────────────────
@@ -118,14 +118,14 @@ class ConfigResolver:
     def system_dir(self) -> Path:
         if self._system_dir is not None:
             return self._system_dir
-        from .. import constants
+        from ... import constants
         return constants.SYSTEM_CONFIG_DIR
 
     @property
     def local_dir(self) -> Path:
         if self._local_dir is not None:
             return self._local_dir
-        from .. import constants
+        from ... import constants
         return constants.LOCAL_CONFIG_DIR
 
     def is_dev_mode(self) -> bool:

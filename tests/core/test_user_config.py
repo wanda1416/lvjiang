@@ -2,11 +2,11 @@
 
 覆盖链路：
 - 代码默认值 ← session.json（settings/material_grid）
-- 代码默认值 ← app.yaml（input_simulation/delay_params，经 config_resolver 合并）
+- 代码默认值 ← app.yaml（input_simulation/delay_params，经 core.config 合并）
 
 保存函数：
 - save_settings / save_material_grid（读改写 session.json 对应顶层节点）
-- save_app_config（经 config_resolver 写入 app.yaml）
+- save_app_config（经 core.config 写入 app.yaml）
 """
 
 import json
@@ -126,7 +126,7 @@ class TestSaveAppConfig:
     DELAY_PARAMS = {"my_wait": {"label": "自定义", "range": [1.0, 2.0]}}
 
     def test_save_writes_via_resolver(self, tmp_path, monkeypatch):
-        """save_app_config 经 config_resolver 写入，且可被重新加载"""
+        """save_app_config 经 core.config 写入，且可被重新加载"""
         captured = {}
 
         def fake_save_merged(self, rel, data):
@@ -139,7 +139,7 @@ class TestSaveAppConfig:
                 "delay_params": self.DELAY_PARAMS,
             })
         monkeypatch.setattr(
-            "lvjiang.core.config_resolver.get_resolver",
+            "lvjiang.core.config.resolver.get_resolver",
             lambda: type("R", (), {"save_merged": fake_save_merged})())
 
         save_app_config(self.INPUT_SIM, self.DELAY_PARAMS)

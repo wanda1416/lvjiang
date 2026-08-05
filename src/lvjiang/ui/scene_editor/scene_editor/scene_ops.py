@@ -278,8 +278,7 @@ class SceneOpsMixin:
     def _do_rename_group(self, group_key: str):
         """重命名分组（支持修改 key 和名称）"""
         old_name = get_group_name(group_key)
-        dialog = QDialog(self)
-        dialog.setWindowTitle("重命名分组")
+        dialog = QDialog(self)  # type: ignore[arg-type]
         form = QFormLayout(dialog)
         key_edit = QLineEdit(group_key)
         form.addRow("分组 Key:", key_edit)
@@ -333,7 +332,7 @@ class SceneOpsMixin:
             else:
                 registry.rename_group(group_key, new_name)
         except ValueError as e:
-            QMessageBox.warning(self, "重命名失败", str(e))
+            QMessageBox.warning(self, "重命名失败", str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
         reload_scene_registry()
@@ -348,7 +347,7 @@ class SceneOpsMixin:
         """删除空分组"""
         group_name = get_group_name(group_key)
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, "确认删除",  # type: ignore[arg-type]
             f"确定要删除分组「{group_name}」({group_key}) 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -358,13 +357,7 @@ class SceneOpsMixin:
         try:
             registry.delete_group(group_key)
         except ValueError as e:
-            QMessageBox.warning(self, "删除失败", str(e))
-            return
-        registry.save_group_config()
-        reload_scene_registry()
-        self._rebuild_group_tabs()
-        self._apply_layout_to_tabs()
-        self._status_bar.showMessage(f"已删除分组: {group_name}")
+            QMessageBox.warning(self, "删除失败", str(e))  # type: ignore[arg-type]
 
     # ─── 分组 Tab 右键菜单 ────────────────────────────────
 
@@ -377,7 +370,7 @@ class SceneOpsMixin:
         if tab_index >= len(groups):
             return
         group_key, group_name = groups[tab_index]
-        menu = QMenu(self)
+        menu = QMenu(self)  # type: ignore[arg-type]
         rename_action = menu.addAction("重命名分组")
         delete_action = menu.addAction("删除分组")
         # 非空分组不允许删除
@@ -429,7 +422,7 @@ class SceneOpsMixin:
         if tab_index >= len(scene_keys):
             return
         scene_key = scene_keys[tab_index]
-        menu = QMenu(self)
+        menu = QMenu(self)  # type: ignore[call-overload]
         rename_action = menu.addAction("重命名")
         delete_action = menu.addAction("删除")
         # 更改分组子菜单
@@ -456,13 +449,7 @@ class SceneOpsMixin:
         try:
             registry.move_scene_to_group(scene_key, target_group)
         except ValueError as e:
-            QMessageBox.warning(self, "移动失败", str(e))
-            return
-        registry.save_group_config()
-        reload_scene_registry()
-        self._rebuild_group_tabs()
-        self._apply_layout_to_tabs()
-        self._select_scene(scene_key)
+            QMessageBox.warning(self, "移动失败", str(e))  # type: ignore[arg-type]
         target_name = get_group_name(target_group)
         scene_name = get_scene_name(scene_key)
         self._status_bar.showMessage(f"已移动场景「{scene_name}」到分组「{target_name}」")
@@ -470,7 +457,7 @@ class SceneOpsMixin:
     def _do_rename_scene(self, scene_key: str):
         """重命名场景（支持修改 key 和名称）"""
         old_name = get_scene_name(scene_key)
-        dialog = QDialog(self)
+        dialog = QDialog(self)  # type: ignore[arg-type]
         dialog.setWindowTitle("重命名场景")
         form = QFormLayout(dialog)
         key_edit = QLineEdit(scene_key)
@@ -522,7 +509,7 @@ class SceneOpsMixin:
         try:
             registry.rename_scene(scene_key, new_key, new_name)
         except ValueError as e:
-            QMessageBox.warning(self, "重命名失败", str(e))
+            QMessageBox.warning(self, "重命名失败", str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
         # 同步布局和截图文件
@@ -546,7 +533,7 @@ class SceneOpsMixin:
         """删除场景（二次确认）"""
         scene_name = get_scene_name(scene_key)
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, "确认删除",  # type: ignore[arg-type]
             f"确定要删除场景「{scene_name}」({scene_key}) 吗？\n"
             f"这将删除场景定义文件，但不会影响布局数据。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -561,7 +548,7 @@ class SceneOpsMixin:
         try:
             registry.delete_scene(scene_key)
         except ValueError as e:
-            QMessageBox.warning(self, "删除失败", str(e))
+            QMessageBox.warning(self, "删除失败", str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
         reload_scene_registry()

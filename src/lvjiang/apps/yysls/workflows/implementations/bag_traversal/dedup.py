@@ -8,6 +8,7 @@ from loguru import logger
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal.base import (
     BagTraversal,
 )
+from lvjiang.workflows.align import GridAlignment
 
 if TYPE_CHECKING:  # pragma: no cover - 仅类型标注，防循环导入
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
@@ -74,7 +75,9 @@ class DedupTraversal(BagTraversal):
             logger.info(f"═══ 滚动 #{rounds} ═══")
             wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
             wf.wait_delay("scroll_settle_wait")
-            alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+            alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+            assert alignment_raw is not None, "对齐失败：alignment 为 None"
+            alignment: GridAlignment = alignment_raw
             recent, new_count, hit_empty = self._scan_window(
                 wf, detail_scene, alignment.n_rows, cols, recent)
             if hit_empty:

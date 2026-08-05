@@ -110,7 +110,9 @@ class AffixSelectSortDialog(QDialog):
             QAbstractItemView.SelectionMode.SingleSelection)
         self._selected_list.setItemDelegate(
             _RemoveXDelegate(self._selected_list))
-        self._selected_list.viewport().installEventFilter(self)
+        vp = self._selected_list.viewport()
+        assert vp is not None
+        vp.installEventFilter(self)
         for name in selected:
             self._selected_list.addItem(name)
         top_layout.addWidget(self._selected_list, 1)
@@ -195,8 +197,10 @@ class AffixSelectSortDialog(QDialog):
         """重建复选网格，勾选态与上区当前选择同步"""
         while self._grid.count():
             item = self._grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            assert item is not None
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
         self._checks.clear()
         chosen = set(self._current_selected())
         for i, name in enumerate(names):
@@ -226,7 +230,8 @@ class AffixSelectSortDialog(QDialog):
                 self._selected_list.addItem(name)
         else:
             for row in range(self._selected_list.count()):
-                if self._selected_list.item(row).text() == name:
+                it = self._selected_list.item(row)
+                if it is not None and it.text() == name:
                     self._selected_list.takeItem(row)
                     break
 
@@ -238,7 +243,9 @@ class AffixSelectSortDialog(QDialog):
     def _remove_row(self, row: int):
         """移除已选行并同步取消下区复选（池外遗留词条无复选框，
         直接移除）"""
-        name = self._selected_list.item(row).text()
+        it = self._selected_list.item(row)
+        assert it is not None
+        name = it.text()
         self._selected_list.takeItem(row)
         cb = self._checks.get(name)
         if cb is not None:
@@ -247,8 +254,12 @@ class AffixSelectSortDialog(QDialog):
             cb.blockSignals(False)
 
     def _current_selected(self) -> list[str]:
-        return [self._selected_list.item(i).text()
-                for i in range(self._selected_list.count())]
+        result = []
+        for i in range(self._selected_list.count()):
+            it = self._selected_list.item(i)
+            if it is not None:
+                result.append(it.text())
+        return result
 
     # ── 结果 ──
 

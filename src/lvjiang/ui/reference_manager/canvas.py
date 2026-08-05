@@ -106,7 +106,7 @@ class ReferenceCanvas(QWidget):
 
         # 转 RGB -> QImage -> QPixmap
         rgb = image[:, :, ::-1].copy()
-        qimg = QImage(rgb.copy().data, w, h, 3 * w, QImage.Format.Format_RGB888)
+        qimg = QImage(bytes(rgb.copy().data), w, h, 3 * w, QImage.Format.Format_RGB888)
         self._pixmap = QPixmap.fromImage(qimg)
 
         self._grid_rect = None
@@ -404,7 +404,7 @@ class ReferenceCanvas(QWidget):
 
     # ─── 绘制 ─────────────────────────────────────────────
 
-    def paintEvent(self, event: QPaintEvent):
+    def paintEvent(self, event: QPaintEvent):  # type: ignore[override]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -582,7 +582,7 @@ class ReferenceCanvas(QWidget):
 
     # ─── 鼠标事件 ─────────────────────────────────────────
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event: QMouseEvent):  # type: ignore[override]
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.position()
             handle = self._hit_handle(pos)
@@ -616,7 +616,7 @@ class ReferenceCanvas(QWidget):
                 self._panning = True
                 self._pan_start = pos
 
-    def mouseMoveEvent(self, event: QMouseEvent):
+    def mouseMoveEvent(self, event: QMouseEvent):  # type: ignore[override]
         pos = event.position()
 
         # 如果有待处理的单元格切换，但鼠标移动了，则取消（说明是拖拽而非单击）
@@ -669,7 +669,7 @@ class ReferenceCanvas(QWidget):
 
         self.update()
 
-    def mouseReleaseEvent(self, event: QMouseEvent):
+    def mouseReleaseEvent(self, event: QMouseEvent):  # type: ignore[override]
         if event.button() == Qt.MouseButton.LeftButton:
             # 处理待处理的单元格切换（单击切换，拖拽则不切换）
             if self._pending_cell_toggle is not None:
@@ -751,7 +751,7 @@ class ReferenceCanvas(QWidget):
 
     # ─── 滚轮缩放（以鼠标位置为中心）──────────────────────
 
-    def wheelEvent(self, event: QWheelEvent):
+    def wheelEvent(self, event: QWheelEvent):  # type: ignore[override]
         if self._pixmap is None:
             return
         pos = event.position()

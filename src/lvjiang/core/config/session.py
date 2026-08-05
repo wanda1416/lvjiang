@@ -33,7 +33,7 @@ class SessionStore:
     def __init__(self, path: Path | str | None = None):
         self._path_override = Path(path) if path else None
         self._lock = threading.RLock()
-        self._data: dict | None = None  # 懒加载内存态
+        self._data: dict = self._read_disk()  # 构造时立即加载
 
     # ─── 路径与加载 ──────────────────────────────────────
 
@@ -43,11 +43,6 @@ class SessionStore:
             return self._path_override
         from ... import constants
         return constants.SESSION_PATH
-
-    def _ensure_loaded(self):
-        """懒加载内存态（调用方须已持锁）"""
-        if self._data is None:
-            self._data = self._read_disk()
 
     def _read_disk(self) -> dict:
         path = self.path
@@ -85,16 +80,12 @@ class SessionStore:
     def get_node(self, key: str, default: Any = None) -> Any:
         """读顶层节点（返回深拷贝，调用方改不坏内部态）"""
         with self._lock:
-            self._ensure_loaded()
-            assert self._data is not None
             value = self._data.get(key)
             return deepcopy(value) if value is not None else default
 
     def set_node(self, key: str, value: Any):
         """整节点替换并落盘"""
         with self._lock:
-            self._ensure_loaded()
-            assert self._data is not None
             self._data[key] = value
             self._flush()
 
@@ -104,8 +95,6 @@ class SessionStore:
         节点缺失或不是 dict 时视为空 dict 重建。
         """
         with self._lock:
-            self._ensure_loaded()
-            assert self._data is not None
             node = self._data.get(key)
             node = node if isinstance(node, dict) else {}
             node.update(patch)
@@ -118,8 +107,6 @@ class SessionStore:
         返回写入的新值。供需要 get+set 原子性的调用方（如插件节点）。
         """
         with self._lock:
-            self._ensure_loaded()
-            assert self._data is not None
             new_value = fn(self._data.get(key))
             self._data[key] = new_value
             self._flush()
@@ -128,16 +115,14 @@ class SessionStore:
     def delete_node(self, key: str):
         """删除顶层节点并落盘（不存在时静默）"""
         with self._lock:
-            self._ensure_loaded()
-            assert self._data is not None
             if key in self._data:
                 del self._data[key]
                 self._flush()
 
     def reload(self):
-        """丢弃内存态，下次访问重新读盘"""
+        """重新读盘，刷新内存态"""
         with self._lock:
-            self._data = None
+            self._data = self._read_disk()
 
 
 # ─── 模块级单例 ──────────────────────────────────────────

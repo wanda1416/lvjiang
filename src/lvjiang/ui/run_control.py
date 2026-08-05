@@ -4,6 +4,7 @@ import json
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
@@ -138,7 +139,7 @@ class RunControlMixin:
     """
 
     # 运行态属性的类级兜底：实例赋值前直接访问也有明确默认值
-    _current_engine = None      # 运行中的 WorkflowEngine（_execute_workflow 赋值）
+    _current_engine = None      # type: ignore[assignment]  # 运行中的 WorkflowEngine（_execute_workflow 赋值）
     _ui_helper = None           # 工作流交互对话框 helper（运行期注入）
     _param_panel = None         # 参数面板（MainWindow._setup_ui 构建）
     _left_tabs = None           # 左侧页签（MainWindow._setup_ui 构建）
@@ -218,7 +219,7 @@ class RunControlMixin:
         flow_cfg = self._get_selected_flow_config()
         if not flow_cfg:
             return {}
-        params = {}
+        params: dict[str, Any] = {}
         panel = self._param_panel
         if panel is None:
             return params
@@ -494,7 +495,7 @@ class RunControlMixin:
         """启动工作流线程"""
         worker = WorkflowWorker(flow_id, workflow_fn)
         worker.finished.connect(self._on_workflow_finished)
-        self._current_worker = worker  # 保持引用防止被垃圾回收
+        self._current_worker = worker  # type: ignore[assignment]  # 保持引用防止被垃圾回收
         # 在 worker 上附加 flow_name 以便日志显示
         worker._flow_name = flow_name
         worker.start()
@@ -680,9 +681,7 @@ class RunControlMixin:
         engine.session = self._session_manager.load(username)
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
         engine._ui_callback = self._create_ui_callback()
-        self._current_engine = engine
-
-        # 创建工作流实例
+        self._current_engine = engine  # type: ignore[assignment]
         from ..workflows.implementations import get_workflow_class
         wf_class = get_workflow_class(impl_name)
         wf_instance = wf_class(

@@ -109,7 +109,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._panel_edit_mode = None  # DragMode (MOVING/RESIZING)
         self._panel_edit_handle: HandlePos | None = None  # 拉伸手柄
         self._panel_edit_start = QPointF()  # 拖拽起始 widget 坐标
-        self._panel_edit_orig: Panel | None = None  # 拖拽前的原始 panel
+        self._panel_edit_orig: Panel | None = None  # type: ignore[assignment]
 
         # 画布编辑模式的交互状态
         self._canvas_drag_mode = None  # DragMode
@@ -158,7 +158,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         """按当前视图过滤把定义拆成 (可见, 隐藏) 两份"""
         if self._visible_keys is None:
             return list(items), []
-        visible, hidden = [], []
+        visible: list[Region] = []
+        hidden: list[Region] = []
         for it in items:
             (visible if it.key in self._visible_keys else hidden).append(it)
         return visible, hidden

@@ -340,11 +340,11 @@ class BatchTab(QWidget):
             configs = list_exposed_scripts()
         except Exception:
             configs = []
-        for cfg in configs:
-            item = QListWidgetItem(cfg["name"])
-            item.setData(Qt.ItemDataRole.UserRole, cfg)
+        for script_cfg in configs:
+            item = QListWidgetItem(script_cfg["name"])
+            item.setData(Qt.ItemDataRole.UserRole, script_cfg)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            checked = cfg["id"] in checked_ids
+            checked = script_cfg["id"] in checked_ids
             item.setCheckState(
                 Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
             )

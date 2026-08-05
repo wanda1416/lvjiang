@@ -248,7 +248,7 @@ class PositionalTraversal(BagTraversal):
                     )
                 wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "down", distance=0.25)
                 wf.wait_delay("scroll_settle_wait")
-                alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+                alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)  # type: ignore[assignment]
             else:
                 # nfp 与三候选都不匹配：滚动一行后首行必然是已见过的装备
                 # （每轮 _process_new_rows 会把可见区全部行记入 fps），故

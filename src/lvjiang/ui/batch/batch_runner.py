@@ -219,11 +219,11 @@ class BatchWorker(QThread):
         """创建新引擎（共享后端引用，每个脚本独立实例）"""
         ctx = self._ctx
         return WorkflowEngine(
-            capture=ctx.capture,
-            ocr=ctx.ocr,
-            input_ctrl=ctx.input_ctrl,
-            layout=ctx.layout,
-            input_sim=ctx.input_sim,
+            capture=ctx.capture,  # type: ignore[arg-type]
+            ocr=ctx.ocr,  # type: ignore[arg-type]
+            input_ctrl=ctx.input_ctrl,  # type: ignore[arg-type]
+            layout=ctx.layout,  # type: ignore[arg-type]
+            input_sim=ctx.input_sim,  # type: ignore[arg-type]
             delay_params=ctx.delay_params,
             window_left=ctx.window_left,
             window_top=ctx.window_top,

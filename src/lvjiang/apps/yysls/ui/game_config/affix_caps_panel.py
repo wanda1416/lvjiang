@@ -40,6 +40,16 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.game_config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
+
+def _selectAll(checks: list) -> None:
+    for cb in checks:
+        cb.setChecked(True)
+
+
+def _invertChecks(checks: list) -> None:
+    for cb in checks:
+        cb.setChecked(not cb.isChecked())
+
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/attributes.yaml"
 
@@ -85,12 +95,12 @@ class _PartsDialog(QDialog):
         btn_all = QPushButton("全选")
         btn_all.setFixedWidth(60)
         btn_all.clicked.connect(
-            lambda: [cb.setChecked(True) for cb in self._checks])
+            lambda: _selectAll(self._checks))
         btn_row.addWidget(btn_all)
         btn_invert = QPushButton("反选")
         btn_invert.setFixedWidth(60)
         btn_invert.clicked.connect(
-            lambda: [cb.setChecked(not cb.isChecked()) for cb in self._checks])
+            lambda: _invertChecks(self._checks))
         btn_row.addWidget(btn_invert)
         btn_row.addStretch()
         btn_row_widget = QWidget()

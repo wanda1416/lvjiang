@@ -70,10 +70,12 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _snap_lines_y: list[float]
     _current_regions: list[tuple[str, str]]
     _edit_mode: EditMode
-    _canvas_drag_mode: DragMode
+    _canvas_drag_mode: DragMode | None
     _canvas_drag_handle: HandlePos | None
     _canvas_drag_start: QPointF
     _canvas_drag_orig: CanvasConfig | None
+    _panel_drag_start: QPointF | None
+    _panel_drag_current: QPointF | None
     on_region_changed: Callable | None
     on_canvas_changed: Callable | None
 
@@ -251,7 +253,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
             return
         if event.button() != Qt.MouseButton.LeftButton:
-            super().mousePressEvent(event)
+            super().mousePressEvent(event)  # type: ignore[misc]
             return
         pos = event.position()
 
@@ -474,7 +476,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._update_cursor(event.position())
             return
         if event.button() != Qt.MouseButton.LeftButton:
-            super().mouseReleaseEvent(event)
+            super().mouseReleaseEvent(event)  # type: ignore[misc]
             return
 
         # ── Panel 放置模式完成 ──
@@ -516,9 +518,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                     and 0 <= self._panel_selected_idx < len(self._panels)):
                 p = self._panels[self._panel_selected_idx]
                 moved = p.to_dict() != self._panel_edit_orig.to_dict()
-            self._panel_edit_mode = None
+            self._panel_edit_mode = None  # type: ignore[assignment]
             self._panel_edit_handle = None
-            self._panel_edit_orig = None
+            self._panel_edit_orig = None  # type: ignore[assignment]
             if moved:
                 self._notify_panel_changed()
             else:
@@ -800,7 +802,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _show_context_menu(self, pos: QPointF):
         """在指定位置显示右键菜单"""
-        menu = QMenu(self)
+        menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: #f0f0f0; padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
@@ -839,7 +841,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _show_panel_context_menu(self, pos: QPointF):
         """在指定位置显示 Panel 右键菜单"""
-        menu = QMenu(self)
+        menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: #f0f0f0; padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"

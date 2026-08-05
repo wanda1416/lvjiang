@@ -157,7 +157,7 @@ class TuningRulesDialog(QDialog):
     def _add_rule_page(self, key: str, name: str) -> RulePanel:
         panel = RulePanel(key, self._manager, self._set_status,
                                 on_delete=self._delete_rule)
-        panel._dialog_rename_cb = self._rename_rule
+        panel._dialog_rename_cb = self._rename_rule  # type: ignore[assignment]
         self._stack.addWidget(panel)
         self._nav.addItem(name)
         return panel

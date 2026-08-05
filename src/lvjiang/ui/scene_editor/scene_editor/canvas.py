@@ -14,7 +14,8 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from ....core.scene_registry import CanvasConfig, Panel, Region, get_region_name
+from ....core.layout_models import CanvasConfig, Panel, Region
+from ....core.scene_registry import get_region_name
 from .canvas_interaction import HANDLE_SIZE, CanvasInteractionMixin, EditMode, HandlePos
 from .canvas_poi import CanvasPoiMixin
 

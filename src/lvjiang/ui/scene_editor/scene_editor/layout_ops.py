@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ....core.layout_manager import copy_screenshots, delete_screenshots
-from ....core.scene_registry import Layout
+from ....core.layout_models import Layout
 
 
 class LayoutOpsMixin:

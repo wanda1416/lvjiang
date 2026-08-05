@@ -29,7 +29,7 @@ _FoundRegion = None
 def _get_found_region_cls():
     global _FoundRegion
     if _FoundRegion is None:
-        from ...core.scene_registry import FoundRegion
+        from ...core.layout_models import FoundRegion
         _FoundRegion = FoundRegion
     return _FoundRegion
 

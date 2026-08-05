@@ -7,7 +7,7 @@ by 子句因此退化成「未命中」、普通 OCR 悄悄少字段，现在一
 import numpy as np
 import pytest
 
-from lvjiang.core.scene_registry import CanvasConfig, Region
+from lvjiang.core.layout_models import CanvasConfig, Region
 from lvjiang.workflows.base.recognition import _RecognitionMixin
 
 SCENE = "activity_jianghu"

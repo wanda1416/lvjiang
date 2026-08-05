@@ -12,7 +12,7 @@ import pytest
 
 from lvjiang.core import layout_manager
 from lvjiang.core.layout_manager import LayoutConfigManager, load_layout_by_name
-from lvjiang.core.scene_registry import (
+from lvjiang.core.layout_models import (
     Arrow,
     CanvasConfig,
     Layout,

@@ -1,4 +1,4 @@
-"""装备调律规则 UI 冒烟测试
+"""装备调律配置 UI 冒烟测试
 
 对话框实例化 + 各页面 收集→校验→写盘 往返（在 tmp 目录副本上
 执行，不触碰真实规则文件），保证 UI 管线不破坏规则语义。
@@ -14,15 +14,15 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuningRuleManager,
 )
 from lvjiang.apps.yysls.game_config import get_game_config
-from lvjiang.apps.yysls.ui.rules_editor import TuningRulesDialog
-from lvjiang.apps.yysls.ui.rules_editor.base_config_page import (
+from lvjiang.apps.yysls.ui.tune_config import TuningRulesDialog
+from lvjiang.apps.yysls.ui.tune_config.base_config_page import (
     BaseConfigPage,
 )
-from lvjiang.apps.yysls.ui.rules_editor.behavior_pages import (
+from lvjiang.apps.yysls.ui.tune_config.behavior_pages import (
     ScanBehaviorPage,
     TuneBehaviorPage,
 )
-from lvjiang.apps.yysls.ui.rules_editor.rule_panel import RulePanel
+from lvjiang.apps.yysls.ui.tune_config.rule_panel import RulePanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
@@ -87,7 +87,7 @@ class TestBehaviorPages:
         scan = tmp_base_manager.get().behavior.scan
         assert page._entry_combo.currentData() == scan.entry_min_rating
 
-        # 变更到不同于默认值的选项（默认配置为 top，故切换到 excellent）
+        # 变更到不同于当前值的选项（当前为 top，切换到 excellent）
         page._entry_combo.setCurrentIndex(page._entry_combo.findData("excellent"))
         assert statuses and not statuses[-1][1], statuses[-1][0]
         after = tmp_base_manager.get().behavior.scan
@@ -350,7 +350,7 @@ class TestSettingsPageBasics:
 
     def test_rename_key_via_button(self, qtbot, tmp_manager, monkeypatch):
         # 「重命名」按钮弹窗确认后：文件改名、新 key 生效、展示同步
-        from lvjiang.apps.yysls.ui.rules_editor import rule_settings_page
+        from lvjiang.apps.yysls.ui.tune_config import rule_settings_page
         monkeypatch.setattr(
             rule_settings_page.QInputDialog, "getText",
             staticmethod(lambda *a, **k: ("heal_pure2", True)))
@@ -364,7 +364,7 @@ class TestSettingsPageBasics:
         assert tmp_manager.get_rule("heal_pure") is None
 
     def test_rename_key_cancel_noop(self, qtbot, tmp_manager, monkeypatch):
-        from lvjiang.apps.yysls.ui.rules_editor import rule_settings_page
+        from lvjiang.apps.yysls.ui.tune_config import rule_settings_page
         monkeypatch.setattr(
             rule_settings_page.QInputDialog, "getText",
             staticmethod(lambda *a, **k: ("whatever", False)))

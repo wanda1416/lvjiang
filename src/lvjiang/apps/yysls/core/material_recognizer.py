@@ -35,7 +35,10 @@ def get_missing_output_fields(db: ReferenceDatabase) -> list[str]:
 
 
 def _parse_number(text: str) -> int | None:
-    """解析数字文本，支持 '123'、'1.5万'、'12万' 等格式（yysls 游戏专属）"""
+    """解析数字文本，支持 '123'、'1.5万'、'12万' 等格式（yysls 游戏专属）
+
+    含多段数字时取最后一段（OCR 噪声如 '0/1 1092' 取 1092）
+    """
     text = text.strip()
     if not text:
         return None
@@ -47,7 +50,7 @@ def _parse_number(text: str) -> int | None:
         return int(float(text) * multiplier)
     except ValueError:
         nums = re.findall(r"\d+", text)
-        return int(nums[0]) * multiplier if nums else None
+        return int(nums[-1]) * multiplier if nums else None
 
 
 @dataclass

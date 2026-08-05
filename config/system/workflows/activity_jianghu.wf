@@ -173,6 +173,14 @@ def action_qingjing($label)
    click [activity_jianghu].[expand_up] after wait step_interval
    click [activity_jianghu].[goto_qingjing] after wait page_refresh_wait
 
+   # 检查是否在衣柜页面（识别到"穿搭"），如果是则导航回情境页面
+   scan [waiguan_yigui].[chuanda] as $in_yigui by contains "穿搭"
+   if $in_yigui
+      log "检测到在衣柜页面，导航回情境编辑页面"
+      click [waiguan_qingjing].[qingjing] after wait step_interval
+      click [waiguan_qingjing].[goto_editing] after wait page_refresh_wait
+   end
+
    click [waiguan_qingjing].[save] after wait step_interval
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
    scan [waiguan_qingjing].[cancel] as $has_cancel by contains "取消"

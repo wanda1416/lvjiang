@@ -182,7 +182,7 @@ class SettingsDialog(QDialog):
         vbox.addLayout(self._custom_grid)
 
         for key, item in self._config.delay_params.items():
-            self._add_custom_row(key, item.label, *item.range, saved=True)
+            self._add_custom_row(key, item.label, *item.range, saved=True)  # type: ignore[misc]
 
         add_row = QHBoxLayout()
         add_btn = QPushButton("添加参数")

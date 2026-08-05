@@ -337,7 +337,7 @@ class ConditionGroupsEditor(QWidget):
             if when:
                 result.append({"when": when, "all": conds})
             else:
-                result.append(conds[0] if len(conds) == 1 else conds)
+                result.append(conds[0] if len(conds) == 1 else conds)  # type: ignore[arg-type]
         return result
 
     # ── 内部 ──

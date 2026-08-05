@@ -453,7 +453,7 @@ class OCRDialog(QDialog):
         bpl = qimg.bytesPerLine()
         buf = qimg.constBits()
         buf.setsize(qimg.sizeInBytes())
-        arr = np.frombuffer(buf, dtype=np.uint8).reshape(h, bpl)
+        arr = np.frombuffer(bytes(buf), dtype=np.uint8).reshape(h, bpl)  # type: ignore[call-overload]
         rgb = arr[:, :w * 3].reshape(h, w, 3)
         return rgb[:, :, ::-1].copy()
 

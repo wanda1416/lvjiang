@@ -1,6 +1,6 @@
 """系统布局 × 系统 .wf 的静态引用集成门禁
 
-test_scene_scan.py 用最小假布局覆盖 collect_refs / check_refs 的单元行为，
+test_workflow_references.py 用最小假布局覆盖 collect_refs / check_refs 的单元行为，
 但「布局漏绑某个 key」「改了区域 key 忘同步脚本」这类错只有拿真实布局比对真实
 脚本才能发现 —— 过去要等上机执行到那一行才炸，而实机失败时游戏已经被点到别处
 去了（曾因此误开用户的闹钟应用）。

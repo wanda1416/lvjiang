@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ....core.layout_manager import rename_item_key_across_all_layouts
-from ....core.scene_loader import VALID_REGION_TYPES, RegionDef
+from ....core.scene_definition import VALID_REGION_TYPES, RegionDef
 from ....core.scene_registry import get_registry, is_view_visible, sync_scene_cache
 from ...widgets import strip_focus_rect
 from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value

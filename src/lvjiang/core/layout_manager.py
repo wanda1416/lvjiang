@@ -19,9 +19,8 @@ from loguru import logger
 from ..constants import SESSION_CONFIG_DIR
 from .config.resolver import get_resolver
 from .config.session import get_session_store
+from .layout_models import CanvasConfig, Layout
 from .scene_registry import (
-    CanvasConfig,
-    Layout,
     get_panel_defs,
     get_point_defs,
     get_region_defs,
@@ -49,7 +48,7 @@ def scene_screenshot_name(scene_key: str, view: str = "") -> str:
     同一场景的多个视图（同一页面的不同滚动态）各自一张底图，
     否则无法在正确的背景上标定坐标。
     """
-    from .scene_loader import BASE_VIEW_KEY
+    from .scene_definition_models import BASE_VIEW_KEY
     if not view or view == BASE_VIEW_KEY:
         return f"{scene_key}.png"
     return f"{scene_key}__{view}.png"
@@ -248,7 +247,7 @@ def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str
     """
     if old_view_key == new_view_key:
         return
-    from .scene_loader import BASE_VIEW_KEY
+    from .scene_definition_models import BASE_VIEW_KEY
     screenshots_base = SCREENSHOTS_DIR
     if not screenshots_base.exists():
         return
@@ -398,7 +397,7 @@ def load_layout_by_name(name: str) -> Layout | None:
     从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
     别名布局（带 extends）的 scene 从根布局目录加载，canvas 取自身条目。
     """
-    from .scene_registry import Arrow, Panel, Point, Region
+    from .layout_models import Arrow, Panel, Point, Region
 
     resolver = get_resolver()
     merged = resolver.load_merged(_LAYOUTS_YAML_REL)
@@ -418,7 +417,7 @@ def load_layout_by_name(name: str) -> Layout | None:
         scene_keys = _enumerate_scene_files(scene_dir_name)
 
     # canvas（始终取自身条目）
-    from .scene_registry import CanvasConfig
+    from .layout_models import CanvasConfig
     canvas = CanvasConfig.from_dict(canvas_dict) if canvas_dict else CanvasConfig()
 
     # 逐场景加载（别名布局从根布局目录读）

@@ -13,12 +13,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....core.scene_registry import (
+from ....core.layout_models import (
     Arrow,
     CanvasConfig,
     Panel,
     Point,
     Region,
+)
+from ....core.scene_registry import (
     get_scene_point_pairs,
     get_scene_regions,
     get_scene_views,

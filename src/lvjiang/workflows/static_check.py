@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .scene_scan import KIND_LABELS, RefUse
+from .workflow_references import KIND_LABELS, RefUse
 
 
 @dataclass(frozen=True)

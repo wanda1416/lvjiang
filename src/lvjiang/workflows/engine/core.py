@@ -13,8 +13,8 @@ from ...core.capture_base import CaptureBackend
 from ...core.config import DelayParam, InputSimConfig
 from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend
+from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
-from ...core.scene_registry import Layout
 from ..align import GridAlignment
 from ..base import BaseWorkflow
 from ..grammar import (
@@ -48,8 +48,8 @@ from ..grammar import (
     parse_file,
 )
 from ..grammar.ast_nodes import Align, Try
-from ..scene_scan import collect_refs
 from ..static_check import check_refs, format_problems
+from ..workflow_references import collect_refs
 from .actions import _ActionsMixin
 from .control_flow import _ControlFlowMixin
 from .data_ops import _DataOpsMixin

@@ -67,7 +67,7 @@ from lvjiang.workflows.grammar.ast_nodes import (  # noqa: E402
     UntilLoop,
     WhileLoop,
 )
-from lvjiang.workflows.scene_scan import collect_refs  # noqa: E402
+from lvjiang.workflows.workflow_references import collect_refs  # noqa: E402
 from lark.exceptions import (  # noqa: E402
     LarkError,
     UnexpectedCharacters,

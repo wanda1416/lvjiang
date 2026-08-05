@@ -80,7 +80,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     # 调律结果弹窗已并入调律页（result 视图），运行时同场景寻址
     RESULT_SCENE = "equip_tune_detail"
     MATERIAL_PANEL = "materials"  # 材料区 panel key（7 列 1 行 grid）
-    MATERIAL_COLS = 7  # 材料格列数
     MATERIAL_GROUP = "调律材料"
     MAX_AFFIX = 5
 

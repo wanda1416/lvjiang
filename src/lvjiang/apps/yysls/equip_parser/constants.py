@@ -11,7 +11,6 @@ import re
 # ─── 部位分类（旧，仅 parser 内部用于 base_attr 分派） ────
 
 WEAPON_SLOTS = {"main_weapon", "sub_weapon"}
-JEWELRY_SLOTS = {"ring", "pendant"}
 ARMOR_SLOTS = {"head", "chest", "leg", "wrist"}
 
 # ─── 从 attributes.yaml 一次性加载全部动态配置 ────

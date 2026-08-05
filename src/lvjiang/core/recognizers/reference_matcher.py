@@ -15,7 +15,6 @@ from loguru import logger
 from PIL import Image
 
 from lvjiang.core.reference_db import (
-    DEFAULT_MATCH_THRESHOLD,
     ReferenceDatabase,
     ReferenceEntry,
 )
@@ -44,8 +43,6 @@ class ReferenceMatcher:
         # result.confidence -> 0.85
     """
 
-    # ORB 特征匹配最低置信度（兼容别名，实际默认值读图库配置）
-    DEFAULT_THRESHOLD = DEFAULT_MATCH_THRESHOLD
     # ORB 特征点数量
     NFEATURES = 300
 
@@ -72,10 +69,6 @@ class ReferenceMatcher:
         self._orb: cv2.ORB | None = None
         self._bf: cv2.BFMatcher | None = None
         self._loaded = False
-
-    @property
-    def database(self) -> ReferenceDatabase:
-        return self._db
 
     @property
     def threshold(self) -> float:
@@ -318,19 +311,3 @@ class ReferenceMatcher:
             ))
 
         return results
-
-    def match_batch(
-        self,
-        queries: dict[str, np.ndarray],
-        group: str | None = None,
-    ) -> dict[str, MatchResult]:
-        """批量匹配多个查询图像
-
-        Args:
-            queries: {key: query_image, ...}
-            group: 限定匹配范围
-
-        Returns:
-            {key: MatchResult, ...}
-        """
-        return {key: self.match(img, group) for key, img in queries.items()}

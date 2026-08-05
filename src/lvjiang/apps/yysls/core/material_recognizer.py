@@ -246,23 +246,6 @@ class MaterialRecognizer:
 
         return results
 
-    def recognize_batch(
-        self,
-        slot_images: dict[str, np.ndarray],
-    ) -> dict[str, MaterialInfo]:
-        """批量识别多个材料槽
-
-        Args:
-            slot_images: {slot_key: slot_img, ...}
-
-        Returns:
-            {slot_key: MaterialInfo, ...}
-        """
-        return {
-            key: self.recognize(img)
-            for key, img in slot_images.items()
-        }
-
     # ─── 空槽检测（游戏专属）───────────────────────────────────
 
     def _is_empty(self, img: np.ndarray) -> bool:
@@ -324,10 +307,6 @@ class MaterialRecognizer:
         return " ".join(r.text for r in results)
 
     # ─── 工具方法 ──────────────────────────────────────────
-
-    def list_types(self) -> list[str]:
-        """返回参考库中所有材料标识"""
-        return self._db.get_labels()
 
     def reload(self):
         """强制重新加载参考库"""

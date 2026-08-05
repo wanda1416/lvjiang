@@ -11,8 +11,6 @@
 """
 from __future__ import annotations
 
-from typing import Any
-
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QKeyEvent
@@ -85,9 +83,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     automation_state_changed = pyqtSignal(str)
     user_changed = pyqtSignal(str)
 
-    def __init__(self, hooks_list: list[Any] | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._hooks_list = hooks_list or []
         registry = get_registry()
 
         # 标题
@@ -107,7 +104,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._script_record_dialog = None
         self._capture = None
         self._last_capture = None
-        self._region_layout = None
 
         # ── 管理器 ──
         self._user_manager = UserConfigManager()

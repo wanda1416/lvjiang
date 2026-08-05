@@ -11,7 +11,6 @@
 
 import queue
 import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,7 +61,6 @@ class ScreenRecorder:
         self._dropped = 0
         self._error: str | None = None
         self._thread: threading.Thread | None = None
-        self._start_time = 0.0
 
     # ─── 生命周期 ─────────────────────────────────────────
 
@@ -83,7 +81,6 @@ class ScreenRecorder:
             return False
 
         self._running = True
-        self._start_time = time.monotonic()
         self._thread = threading.Thread(
             target=self._encode_loop, daemon=True, name="screen-recorder-encode"
         )

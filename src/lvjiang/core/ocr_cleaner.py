@@ -123,33 +123,12 @@ class OCRCleaner:
         """获取所有正则替换规则"""
         return dict(self._config.get("patterns", {}))
 
-    def add_replacement(self, wrong: str, correct: str):
-        """添加文本替换规则并保存到本地配置"""
-        self._config.setdefault("replacements", {})[wrong] = correct
-        self._save_local_config()
-
-    def remove_replacement(self, wrong: str):
-        """删除文本替换规则并保存到本地配置"""
-        if wrong in self._config.get("replacements", {}):
-            del self._config["replacements"][wrong]
-            self._save_local_config()
 
     def set_replacements(self, replacements: dict[str, str]):
         """批量设置文本替换规则并保存一次"""
         self._config["replacements"] = dict(replacements)
         self._save_local_config()
 
-    def add_pattern(self, pattern: str, replacement: str):
-        """添加正则替换规则并保存到本地配置"""
-        self._config.setdefault("patterns", {})[pattern] = replacement
-        self._save_local_config()
-
-    def remove_pattern(self, pattern: str):
-        """删除正则替换规则并保存到本地配置"""
-        patterns = self._config.get("patterns", {})
-        if pattern in patterns:
-            del patterns[pattern]
-            self._save_local_config()
 
     def set_patterns(self, patterns: dict[str, str]):
         """批量设置正则替换规则并保存一次"""

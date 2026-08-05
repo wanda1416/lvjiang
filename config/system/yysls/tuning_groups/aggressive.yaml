@@ -149,7 +149,6 @@ tune:
     pct_op: le
     pct: 100
     ratings:
-    - excellent
     - normal
     - junk
     judge_scope: incoming

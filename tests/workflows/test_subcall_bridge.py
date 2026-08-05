@@ -6,7 +6,7 @@
 
 import pytest
 
-from lvjiang.config import load_user_config
+from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_name
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from tests.workflows.conftest import make_engine

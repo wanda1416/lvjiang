@@ -51,7 +51,7 @@ class ReferenceManagerDialog(QDialog):
         )
 
         # 加载用户配置
-        from lvjiang.config import load_user_config
+        from lvjiang.core.config import load_user_config
         self._config = load_user_config()
 
         self._db = ReferenceDatabase()
@@ -382,7 +382,7 @@ class ReferenceManagerDialog(QDialog):
 
     def _on_grid_defaults_changed(self, grid: dict):
         """五项网格参数手动改动后写入 session.json 的 material_grid 节点"""
-        from lvjiang.config import save_material_grid
+        from lvjiang.core.config import save_material_grid
         save_material_grid(grid)
 
     def _on_generate_grid(self, rows: int, cols: int, gap: int, height: int, width: int):

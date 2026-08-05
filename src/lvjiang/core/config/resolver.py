@@ -284,3 +284,25 @@ def get_resolver() -> ConfigResolver:
     if _resolver is None:
         _resolver = ConfigResolver()
     return _resolver
+
+
+# ─── 便捷函数：app.yaml ────────────────────────────────
+
+_APP_CONFIG_REL = "app.yaml"
+
+
+def load_app_config() -> dict:
+    """读取 app.yaml 的 system←local 合并视图（解析失败返回空 dict）"""
+    try:
+        return get_resolver().load_merged(_APP_CONFIG_REL)
+    except Exception as e:  # noqa: BLE001 配置缺失/损坏不应阻断启动
+        logger.error(f"加载 app.yaml 失败: {e}")
+        return {}
+
+
+def save_app_config(input_sim: dict, delay_params: dict) -> None:
+    """保存输入模拟 + 延迟参数到 app.yaml（开发模式写 system 全量，用户模式写 local diff）"""
+    get_resolver().save_merged(_APP_CONFIG_REL, {
+        "input_simulation": input_sim,
+        "delay_params": delay_params,
+    })

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Callable, Optional
 if TYPE_CHECKING:
     from ..engine.core import WorkflowEngine
 
-from ...config import DelayParam, InputSimConfig
 from ...core.capture_base import CaptureBackend
+from ...core.config import DelayParam, InputSimConfig
 from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout

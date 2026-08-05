@@ -9,7 +9,7 @@ import time
 
 from loguru import logger
 
-from ...config import InputSimConfig
+from ...core.config import InputSimConfig
 from ..input_base import InputBackend
 from .win32_util import (
     _MOUSEEVENTF_LEFTDOWN,

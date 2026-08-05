@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..config import load_user_config, save_app_config, save_settings
+from ..core.config import load_user_config, save_app_config, save_settings
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看

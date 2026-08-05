@@ -1,4 +1,4 @@
-"""装备调律规则编辑 UI 包
+"""装备调律配置编辑 UI 包
 
 「燕云 → 装备调律规则」菜单入口，对 config/system/yysls/
 tuning_rules/ 下的规则 YAML 做全量结构化编辑（自动保存 + reload）。

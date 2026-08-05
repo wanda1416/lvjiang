@@ -1,0 +1,7 @@
+key: bugan_detail
+name: 不肝
+views:
+- key: base
+  name: 基底
+- key: shangdian
+  name: 不肝商店

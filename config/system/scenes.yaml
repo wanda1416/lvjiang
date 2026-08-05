@@ -17,7 +17,8 @@ layout_scenes:
   - bag_equip_detail
   - bag_item_detail
   - bag_wallet_detail
-  group_6:
+  - bugan_detail
+  group_4:
   - school_main
   - waiguan_yigui
   - waiguan_qingjing
@@ -28,6 +29,6 @@ layout_scenes:
 group_names:
   group_1: 通用
   group_2: 培养
-  group_3: 背包
-  group_6: 社交
+  group_3: 物资
+  group_4: 社交
   group_5: 活动

@@ -7,6 +7,8 @@ views:
   name: 调律结果
 - key: reset_tune
   name: 重置调律
+- key: reset_confrim
+  name: 重置确认
 regions:
 - key: back
   name: 返回
@@ -92,13 +94,25 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-  view: reset_tune
-- key: check_1
+  view: reset_confrim
+- key: reset_check
   name: 冷静期检查
   type: attr
   is_text: true
   is_clickable: false
   view: reset_tune
+- key: reset_info
+  name: 材料信息
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: reset_tune
+- key: reset_cancel_2
+  name: 重置取消
+  type: attr
+  is_text: true
+  is_clickable: true
+  view: reset_confrim
 panels:
 - key: materials
   name: 材料格

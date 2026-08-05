@@ -12,8 +12,8 @@ import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QTabWidget
 
-import lvjiang.apps.yysls.plugin_session as ps_module
-from lvjiang.apps.yysls.plugin_session import PluginSession
+import lvjiang.apps.yysls.session as ps_module
+from lvjiang.apps.yysls.session import PluginSession
 from lvjiang.apps.yysls.ui.tuning_tab import TuningTab
 
 
@@ -50,8 +50,10 @@ class _FakeHost(QObject):
 @pytest.fixture
 def session_path(tmp_path, monkeypatch):
     """把插件 session 单例替换为 tmp_path 下的隔离实例"""
+    import lvjiang.apps.yysls.tune_config as tc_module
     path = tmp_path / "session.json"
     monkeypatch.setattr(ps_module, "_session", PluginSession(path))
+    monkeypatch.setattr(tc_module, "_instance", None)
     return path
 
 

@@ -45,7 +45,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
     TuningNavigator,
     TuningRecycler,
 )
-from lvjiang.apps.yysls.workflows.run_context import TuningContextMixin
+from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
 from lvjiang.workflows.base import BaseWorkflow
 
@@ -408,9 +408,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         key = self.ctx.scroll_strategy or ""
         if not key:
             try:
-                from lvjiang.apps.yysls.plugin_session import get_plugin_session
-                key = (get_plugin_session().get_section("tuning")
-                       .get("scroll_strategy") or "")
+                from lvjiang.apps.yysls.tune_config import get_tune_config
+                key = get_tune_config().scroll_strategy
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"读取遍历策略配置失败，用默认: {e}")
         if key and key not in TRAVERSALS:
@@ -920,18 +919,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if ctx.judge_configs is not None or ctx.judge_rule_keys is not None:
             return
         try:
-            from lvjiang.apps.yysls.plugin_session import get_plugin_session
-            section = get_plugin_session().get_section("tuning")
+            from lvjiang.apps.yysls.tune_config import get_tune_config
+            tc = get_tune_config()
         except Exception as e:  # noqa: BLE001
             logger.warning(f"读取调律规则配置失败，按全部规则默认判定: {e}")
             return
-        raw = section.get("rules")
-        if not isinstance(raw, dict):
+        if not tc.rules:
             return
-        switches = {str(k): bool(v)
-                    for k, v in (section.get("switches") or {}).items()}
-        enabled = {k: {**cfg, "switches": switches}
-                   for k, cfg in raw.items()
+        enabled = {k: {**cfg, "switches": tc.switches}
+                   for k, cfg in tc.rules.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if enabled:
             ctx.judge_rule_keys = list(enabled)
@@ -945,9 +941,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         selected = self.ctx.selected_slots
         if selected is None:
             try:
-                from lvjiang.apps.yysls.plugin_session import get_plugin_session
-                raw = (get_plugin_session().get_section("tuning")
-                       .get("selected_slots"))
+                from lvjiang.apps.yysls.tune_config import get_tune_config
+                raw = get_tune_config().selected_slots
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"读取调律部位配置失败，按全部部位: {e}")
                 raw = None

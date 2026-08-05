@@ -279,7 +279,7 @@ class TestLiteralSpecificAttr:
 
     @staticmethod
     def _make_judge(pool_symbol: str):
-        from lvjiang.apps.yysls.evaluator.judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
         from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",

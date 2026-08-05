@@ -41,7 +41,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
 from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
     TuningNavigator,
 )
-from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
+from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_name
 from lvjiang.workflows.engine import WorkflowEngine
@@ -1704,10 +1704,12 @@ class TestResolveSelectedSlots:
 
     @pytest.fixture
     def session(self, tmp_path, monkeypatch):
-        import lvjiang.apps.yysls.plugin_session as ps_module
-        from lvjiang.apps.yysls.plugin_session import PluginSession
+        import lvjiang.apps.yysls.session as ps_module
+        import lvjiang.apps.yysls.tune_config as tc_module
+        from lvjiang.apps.yysls.session import PluginSession
         sess = PluginSession(tmp_path / "session.json")
         monkeypatch.setattr(ps_module, "_session", sess)
+        monkeypatch.setattr(tc_module, "_instance", None)
         return sess
 
     def _device_wf(self):

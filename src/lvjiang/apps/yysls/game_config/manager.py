@@ -1,134 +1,31 @@
 """游戏配置管理器
 
-统一管理 attributes.yaml 中的游戏基础配置数据：
-1. 基础属性品阶推断（原 EquipAttrConfig）
-2. 词条上限查询（含承音值）
-3. 真实词条名 → 配置类别名 映射
-4. 词库类型查询（普通词条 / 定音词条，YAML 中用 _pool: dingyin 声明）
-5. 官方流派与武器注册表（schools 节，get_schools）
+从 attributes.yaml 加载全部规则，提供品阶推断、词条上限查询、
+词条名映射、流派注册表等功能。
 
 数据来源：config/system/yysls/attributes.yaml
-映射关系通过 YAML 中每个类别的 _aliases 字段声明，支持 UI 动态管理。
-_aliases 支持两种形态：list（不分组）或 dict（分组：组名 → 词条名列表，
-如 指定技能增效 按十大流派分组）。
 """
 
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
-# 承音比例
-_CHENGYIN_RATIO = 0.94
-
-# 词库类型（_pool 字段取值；缺省为普通词条）
-POOL_NORMAL = "normal"
-POOL_DINGYIN = "dingyin"
-
-# 武学增效词条所在的词条类别（affix_caps 节；
-# 游戏配置的武器绑定与调律规则的增伤词条候选共用）
-WUXUE_CATEGORY = "指定武学增效"
-
-# 词条归属分类（固定 6 类，与词组正交；定音词条不参与归属）
-AFFIX_CATEGORY_NAMES = ("外功类", "属攻类", "三率类", "增效类", "武器类", "生存类")
-
-
-# ─── 等级配置数据结构 ──────────────────────────────────────
-
-@dataclass
-class LevelConfig:
-    """单等级配置条目
-
-    level: 装备等级（必填）
-    allow_reset: 该等级是否支持重置调律（可选，None 表示未设置）
-    min_material_count: 该等级要求的最低材料数量（可选，None 表示未设置）
-    judge_resistance: 判定抗性百分比（可选，>= 0）
-    buff_resistance: 增益抗性百分比（可选，>= 0）
-    """
-    level: int = 0
-    allow_reset: bool | None = None
-    min_material_count: int | None = None
-    judge_resistance: int | None = None
-    buff_resistance: int | None = None
-
-
-# ─── 品阶推断数据结构 ──────────────────────────────────────
-
-@dataclass
-class AttrRange:
-    """单个品阶的属性值规则
-
-    区间属性（武器）：[min_val, max_val] 表示该品阶装备提供
-        +min_val 最小外功攻击、+max_val 最大外功攻击（并非取值区间）。
-    点值属性（首饰/防具）：min_val == max_val。
-    """
-    quality: str           # gold / purple / blue
-    min_val: int | None = None
-    max_val: int | None = None
-
-    def matches(self, value: int | list | tuple) -> bool:
-        """判定解析出的基础属性值是否精确命中本品阶。
-
-        区间属性：解析出的区间 [c, d] 必须 c==min_val 且 d==max_val，
-            而非“落在区间内”（因相邻品阶区间会重叠）。
-        点值属性：解析出的标量须精确等于该值（min_val==max_val）。
-        """
-        if isinstance(value, (list, tuple)):
-            return (len(value) >= 2
-                    and value[0] == self.min_val and value[1] == self.max_val)
-        # 标量：仅点值属性（min==max）可命中
-        return self.min_val == self.max_val == value
-
-
-@dataclass
-class LevelRule:
-    """某个分类在某个等级的品阶规则"""
-    ranges: list[AttrRange] = field(default_factory=list)
-
-    def infer_quality(self, value: int | list | tuple) -> str | None:
-        for r in self.ranges:
-            if r.matches(value):
-                return r.quality
-        return None
-
-
-# ─── equip_type → 配置 key 映射 ─────────────────────────────
-
-_TYPE_TO_KEY = {
-    # 武器类型 → weapon
-    "陌刀": "weapon", "舞绫鼓": "weapon", "双刀": "weapon",
-    "绳镖": "weapon", "横刀": "weapon", "手甲": "weapon",
-    "剑": "weapon", "枪": "weapon", "扇": "weapon", "伞": "weapon",
-    # 首饰
-    "环": "ring",
-    "佩": "pendant",
-    # 防具
-    "冠胄": "head", "胫甲": "leg", "腕甲": "wrist",
-    "胸甲": "chest",
-}
-
-# 配置 key → equip_type 反向映射（仅一一对应的首饰/防具；
-# 武器 key 对应多种武器类型，无法反推具体 type）
-_KEY_TO_TYPE = {
-    "ring": "环", "pendant": "佩",
-    "head": "冠胄", "chest": "胸甲", "leg": "胫甲", "wrist": "腕甲",
-}
-
-# 七个装备部位（base_attrs 的全部 key，与 UI 展示顺序一致）
-BASE_ATTR_PARTS = (
-    "weapon", "ring", "pendant",
-    "head", "chest", "leg", "wrist",
+from .constants import (
+    _CHENGYIN_RATIO,
+    _KEY_TO_TYPE,
+    _TYPE_TO_KEY,
+    AFFIX_CATEGORY_NAMES,
+    BASE_ATTR_PARTS,
+    EQUIP_PART_NAMES,
+    POOL_DINGYIN,
+    POOL_NORMAL,
+    WUXUE_CATEGORY,
 )
+from .models import AttrRange, LevelConfig, LevelRule
 
-# 七个装备部位的标准中文名（词条部位候选，与 BASE_ATTR_PARTS 同序，
-# 与 tuning_rules.models.QUALITY_PARTS 对齐）
-EQUIP_PART_NAMES = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
-
-
-# ─── 属性规则管理器 ─────────────────────────────────────────
 
 class GameConfigManager:
     """属性规则管理器
@@ -438,7 +335,7 @@ class GameConfigManager:
         return dict(self._weapon_wuxue_affixes)
 
     def get_wuxue_affix_names(self) -> list[str]:
-        """全部指定武学增效词条（affix_caps 该类别的 _aliases）
+        """全部指定武学增效词条（affix_caps 这类别的 _aliases）
 
         调律规则 UI 增伤词条候选的唯一来源。
         """

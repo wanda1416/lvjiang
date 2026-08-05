@@ -1,9 +1,9 @@
 """游戏配置管理器
 
-从 attributes.yaml 加载全部规则，提供品阶推断、词条上限查询、
+从 game_config.yaml 加载全部规则，提供品阶推断、词条上限查询、
 词条名映射、流派注册表等功能。
 
-数据来源：config/system/yysls/attributes.yaml
+数据来源：config/system/yysls/game_config.yaml
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from .models import AttrRange, LevelConfig, LevelRule
 class GameConfigManager:
     """属性规则管理器
 
-    从 attributes.yaml 加载全部规则，提供：
+    从 game_config.yaml 加载全部规则，提供：
     - 品阶推断（base_attrs）
     - 词条上限查询（affix_caps）
     - 词条名映射（真实词条 → 配置类别）
@@ -76,7 +76,7 @@ class GameConfigManager:
                 data = yaml.safe_load(f)
         else:
             from lvjiang.core.config.resolver import get_resolver
-            data = get_resolver().load_merged("yysls/attributes.yaml")
+            data = get_resolver().load_merged("yysls/game_config.yaml")
         self._raw = data
 
         # 重置全部规则（_load 会在 UI 保存后重复调用，避免残留旧映射）
@@ -376,7 +376,7 @@ class GameConfigManager:
                 yaml.dump(data, f, allow_unicode=True, sort_keys=False)
         else:
             from lvjiang.core.config.resolver import get_resolver
-            get_resolver().save_merged("yysls/attributes.yaml", data)
+            get_resolver().save_merged("yysls/game_config.yaml", data)
         # 重新加载
         self._load()
 

@@ -25,6 +25,7 @@ class TuneConfig:
     skip_start:      初始跳过 (row, col)；None 表示不跳过
     target_cell:     指定调律 (row, col)；None 表示不指定
     scroll_strategy: 背包遍历策略 key（空=读默认）
+    base_group:      基础规则组 key
     """
 
     selected_slots: list[str] = field(default_factory=list)
@@ -34,6 +35,7 @@ class TuneConfig:
     skip_start: list[int] | None = None
     target_cell: list[int] | None = None
     scroll_strategy: str = ""
+    base_group: str = ""
 
     # ─── 持久化 ──────────────────────────────────────
 
@@ -51,6 +53,7 @@ class TuneConfig:
             skip_start=data.get("skip_start"),
             target_cell=data.get("target_cell"),
             scroll_strategy=data.get("scroll_strategy") or "",
+            base_group=data.get("base_group") or "",
         )
 
     def save(self) -> None:
@@ -64,6 +67,7 @@ class TuneConfig:
             "skip_start": self.skip_start,
             "target_cell": self.target_cell,
             "scroll_strategy": self.scroll_strategy,
+            "base_group": self.base_group,
         })
         # 同步单例，防止 get_tune_config() 返回过期数据
         global _instance

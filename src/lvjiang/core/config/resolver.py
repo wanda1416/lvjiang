@@ -16,7 +16,7 @@
   references/**/*.png）→ 整文件影子 + 墓碑
   （local/<rel>.deleted 空标记文件）
 - 聚合键值文件（scenes.yaml、workflows.yaml、layouts.yaml、
-  yysls/attributes.yaml、yysls/tuning_base.yaml）→ 键级 diff 深合并；
+  yysls/game_config.yaml、yysls/tune_config.yaml）→ 键级 diff 深合并；
   dict 递归、列表与标量整键替换；
   每层 dict 支持 "__deleted__": [key, ...] 删除键
 """

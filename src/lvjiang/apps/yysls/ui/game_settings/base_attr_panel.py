@@ -37,7 +37,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps.yysls.game_config import BASE_ATTR_PARTS, WUXUE_CATEGORY
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
-_ATTRS_REL = "yysls/attributes.yaml"
+_ATTRS_REL = "yysls/game_config.yaml"
 
 # 部位显示名称（顺序由 BASE_ATTR_PARTS 决定）
 _PART_NAMES = {

@@ -1,4 +1,4 @@
-"""调律配置对话框 —— 材料处理页（全局 tuning_base.yaml 的 materials 段）
+"""调律配置对话框 —— 材料处理页（基础规则组的 materials 段）
 
 状态机行为点「材料处理」（每轮调律开始前的行为）：
 - 大律准石数量检查：开关 + 数量基准 + 不足处理（低于基准判材料
@@ -9,7 +9,8 @@
 沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、只替换 materials 段，
-与基础配置页各管各段互不覆盖。
+与基础规则页各管各段互不覆盖。
+页面对准当前选中的基础规则组（set_group 切换后重载）。
 """
 
 from __future__ import annotations
@@ -40,7 +41,8 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_LABELS,
     STONE_ACTION_LABELS,
     FoodRule,
-    TuningBaseManager,
+    TuningGroup,
+    TuningGroupManager,
 )
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）
@@ -54,17 +56,36 @@ _COLS = ("#", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "�
 
 
 class MaterialConfigPage(QWidget):
-    """全局材料配置编辑页（只负责 materials 段）"""
+    """材料配置编辑页（只负责当前规则组的 materials 段）"""
 
-    def __init__(self, manager: TuningBaseManager,
+    def __init__(self, manager: TuningGroupManager, group_key: str,
                  status_cb: Callable[[str, bool], None], parent=None):
         super().__init__(parent)
         self._manager = manager
+        self._group_key = group_key
         self._status_cb = status_cb
         self._loading = True
         self._init_ui()
         self._load()
         self._loading = False
+
+    # ── 规则组切换 ──
+
+    def set_group(self, group_key: str):
+        """切换目标基础规则组并重载本页控件"""
+        self._group_key = group_key
+        self._loading = True
+        self._load()
+        self._loading = False
+
+    def _current_group(self) -> TuningGroup:
+        group = self._manager.get_group(self._group_key)
+        if group is None:
+            groups = self._manager.get_groups()
+            first_key = next(iter(groups), "")
+            group = (self._manager.get_group(first_key)
+                     or TuningGroup())
+        return group
 
     # ── UI 构建 ──
 
@@ -192,7 +213,7 @@ class MaterialConfigPage(QWidget):
     def _load(self):
         # 用管理器已解析的 MaterialSettings 回填（缺省段/字段已在
         # 解析层落到默认值，无需重复处理）
-        m = self._manager.get().materials
+        m = self._current_group().materials
         self._stone_cb.setChecked(m.stone_check_enabled)
         self._stone_min.setValue(m.stone_min_count)
         self._stone_action.setCurrentIndex(max(
@@ -294,9 +315,9 @@ class MaterialConfigPage(QWidget):
         }
 
     def _build(self) -> dict:
-        # 以最新 raw 为底只替换 materials 段，保留基础配置页负责的
-        # quality_thresholds / switches 等其他段
-        data = self._manager.get_raw()
+        # 以最新 raw 为底只替换 materials 段，保留基础规则页负责的
+        # min_level / behavior 等其他段
+        data = self._manager.get_raw(self._group_key)
         data["materials"] = {
             "stone_check": {
                 "enabled": self._stone_cb.isChecked(),
@@ -318,7 +339,7 @@ class MaterialConfigPage(QWidget):
             self._status_cb(f"校验失败（未保存）：{err}", True)
             return
         try:
-            self._manager.save(data)
+            self._manager.save_group(self._group_key, data)
         except Exception as e:  # noqa: BLE001
             logger.exception("材料配置保存失败")
             self._status_cb(f"保存失败：{e}", True)

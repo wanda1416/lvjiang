@@ -395,14 +395,6 @@ class FoodDecision:
     reason: str = ""
 
 
-def default_food_rules() -> list[FoodRule]:
-    """默认狗粮规则：极品胚子喂彩狗粮，优秀期望喂金狗粮"""
-    return [
-        FoodRule(pct=98, min_expect="top", food="彩狗粮"),
-        FoodRule(pct=90, min_expect="excellent", food="金狗粮"),
-    ]
-
-
 @dataclass
 class MaterialSettings:
     """材料设置（大律准石数量检查 + 狗粮规则表）
@@ -418,7 +410,7 @@ class MaterialSettings:
     stone_check_enabled: bool = False
     stone_min_count: int = 100
     stone_insufficient_action: str = "abort"
-    food_rules: list[FoodRule] = field(default_factory=default_food_rules)
+    food_rules: list[FoodRule] = field(default_factory=list)
 
     def decide_food(self, cap_pct: int | None, expect: str | None,
                     quality: str | None,
@@ -651,12 +643,14 @@ def _first_hit(rules: list[BehaviorRule], part: str | None,
 class ScanBehavior:
     """扫描处理（进调律前的行为点）
 
-    entry_min_rating: 进入门槛 —— 传入规则预期评级 ≥ 该档即进入
+    min_level: 等级门槛 —— 低于该等级的装备直接跳过
+    entry_min_rating: 调律门槛 —— 传入规则预期评级 ≥ 该档即进入
     调律（固定用传入规则判定，调律目标就是运行期所选流派）；
     rules: 不进调律装备的处置表（首条命中；无命中=跳过该装备），
     评级判定语义与仅注入首词条均逐规则声明（BehaviorRule）。
     """
     enabled: bool = True
+    min_level: int = 100
     entry_min_rating: str = "excellent"
     rules: list[BehaviorRule] = field(default_factory=list)
 
@@ -721,29 +715,31 @@ class TuneBehavior:
 
 
 @dataclass
-class BehaviorSettings:
-    """行为配置（状态机行为点：扫描处理 + 结束处理）
+class TuningGroup:
+    """基础规则组（tuning_groups/ 下一个 YAML 文件，可多套切换）
 
-    材料处理（每轮调律开始前）由 MaterialSettings 承担。
+    承载单次调律运行的策略基线：材料设置 + 行为配置
+    （扫描/结束处理）。激进/保守等账号策略差异体现在不同规则组，
+    启动时经 TuningRunContext 注入工作流。
     """
+    key: str = "default"
+    name: str = "基础规则"
+    materials: MaterialSettings = field(default_factory=MaterialSettings)
     scan: ScanBehavior = field(default_factory=ScanBehavior)
     tune: TuneBehavior = field(default_factory=TuneBehavior)
 
 
 @dataclass
-class TuningBase:
-    """全局基础配置（等级门槛 + 品阶门槛 + 开关注册表 + 材料设置 + 行为配置）
+class TuneConfig:
+    """全局调律配置（品阶门槛 + 开关注册表 + 基础规则组声明，tune_config.yaml）
 
-    min_level: 等级门槛，低于该等级的装备不允许进入调律，
-    直接跳过（不走扫描处置等任何判定）。
-    switches: 开关 key → 显示名；规则条件组 when 只能引用已注册
-    开关，主窗口按注册表渲染全局开关复选框。
+    base_rules: 基础规则组 key 列表，顺序即 UI 展示顺序。
+    quality_thresholds: 品阶门槛，部位 → 允许品阶列表。
+    switches: 开关注册表，key → 显示名。
     """
-    min_level: int = 100
+    base_rules: list[str] = field(default_factory=list)
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
-    materials: MaterialSettings = field(default_factory=MaterialSettings)
-    behavior: BehaviorSettings = field(default_factory=BehaviorSettings)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

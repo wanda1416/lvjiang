@@ -15,6 +15,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
     TuningNavigator,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning.recycler import (
+    RecycleOutcome,
     TuningRecycler,
 )
 
@@ -22,5 +23,6 @@ __all__ = [
     "TuningExecutor",
     "TuningJudge",
     "TuningNavigator",
+    "RecycleOutcome",
     "TuningRecycler",
 ]

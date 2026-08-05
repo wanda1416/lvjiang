@@ -24,8 +24,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
-from .tuning_config_widget import TuningConfigWidget, TuningGlobalsWidget
+from ..tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+from .tune_config_widget import TuningConfigWidget, TuningGlobalsWidget
 
 
 def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
@@ -288,7 +288,7 @@ class TuningTab(QWidget):
         flow_name = "自动调律"
 
         def configure(wf_instance, engine):
-            from ..workflows.run_context import TuningRunContext
+            from ..workflows.tuning_context import TuningRunContext
             # 运行上下文一次性收口注入（字段契约见 TuningRunContext）：
             # judge_configs 对齐 UI 实时勾选，供 judge_equipment_potential 使用；
             # skip_tuning 为临时测试开关（仅模拟进出调律页，便于测试滚动）
@@ -325,28 +325,23 @@ class TuningTab(QWidget):
     # ─── 调律配置持久化（插件会话 config/session/yysls/session.json）──
 
     def _load_tuning_config(self):
-        from ..plugin_session import get_plugin_session
-        tuning = get_plugin_session().get_section("tuning")
-        selected = tuning.get("selected_slots") or list(DEFAULT_SLOTS)
-        raw = tuning.get("rules")
-        if isinstance(raw, dict):
-            rules_cfg = raw
-        else:
-            rules_cfg = {"huiyi_general": {"enabled": True}}
+        from ..tune_config import TuneConfig
+        tc = TuneConfig.load()
+        selected = tc.selected_slots or list(DEFAULT_SLOTS)
+        rules_cfg = tc.rules or {"huiyi_general": {"enabled": True}}
         for cb in self._tuning_checkboxes:
             cb.blockSignals(True)
             # 禁用项（副武器）不随会话配置回选
             cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
             cb.blockSignals(False)
         self._tuning_config.set_config(rules_cfg)
-        self._tuning_globals.set_switches(tuning.get("switches") or {})
-        self._tuning_globals.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
+        self._tuning_globals.set_switches(tc.switches)
+        self._tuning_globals.set_skip_tuning(tc.skip_tuning)
         # 初始跳过 / 指定调律
-        for key, cb, sp_row, sp_col in (
-            ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
-            ("target_cell", self._cb_target, self._sp_target_row, self._sp_target_col),
+        for val, cb, sp_row, sp_col in (
+            (tc.skip_start, self._cb_skip, self._sp_skip_row, self._sp_skip_col),
+            (tc.target_cell, self._cb_target, self._sp_target_row, self._sp_target_col),
         ):
-            val = tuning.get(key)
             cb.blockSignals(True)
             sp_row.blockSignals(True)
             sp_col.blockSignals(True)
@@ -362,21 +357,21 @@ class TuningTab(QWidget):
         self._on_skip_target_toggled()
 
     def _save_tuning_config(self):
-        from ..plugin_session import get_plugin_session
+        from ..tune_config import TuneConfig
         skip_start = None
         if self._cb_skip.isChecked():
             skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]
         target_cell = None
         if self._cb_target.isChecked():
             target_cell = [self._sp_target_row.value(), self._sp_target_col.value()]
-        get_plugin_session().set_section("tuning", {
-            "selected_slots": self._get_tuning_selected_slots(),
-            "rules": self._get_tuning_rule_config(),
-            "switches": self._get_tuning_switches(),
-            "skip_tuning": self._get_tuning_skip_tuning(),
-            "skip_start": skip_start,
-            "target_cell": target_cell,
-        })
+        TuneConfig(
+            selected_slots=self._get_tuning_selected_slots(),
+            rules=self._get_tuning_rule_config(),
+            switches=self._get_tuning_switches(),
+            skip_tuning=self._get_tuning_skip_tuning(),
+            skip_start=skip_start,
+            target_cell=target_cell,
+        ).save()
 
     def _set_all_tuning_checks(self, checked: bool):
         for cb in self._tuning_checkboxes:

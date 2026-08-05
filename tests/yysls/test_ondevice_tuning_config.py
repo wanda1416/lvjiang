@@ -9,9 +9,9 @@ import json
 
 import pytest
 
-import lvjiang.apps.yysls.plugin_session as ps_module
+import lvjiang.apps.yysls.session as ps_module
 import lvjiang.core.ondevice.plugins as plugins_module
-from lvjiang.apps.yysls.plugin_session import PluginSession
+from lvjiang.apps.yysls.session import PluginSession
 from lvjiang.core.ondevice.tuning_config import (
     get_tuning_config,
     save_tuning_config,
@@ -21,9 +21,11 @@ from lvjiang.core.ondevice.tuning_config import (
 @pytest.fixture
 def session_path(tmp_path, monkeypatch):
     """插件 session 单例 → tmp_path 隔离实例；ensure_loaded → 空操作"""
+    import lvjiang.apps.yysls.tune_config as tc_module
     path = tmp_path / "session.json"
     monkeypatch.setattr(ps_module, "_session", PluginSession(path))
     monkeypatch.setattr(plugins_module, "ensure_loaded", lambda: None)
+    monkeypatch.setattr(tc_module, "_instance", None)
     return path
 
 

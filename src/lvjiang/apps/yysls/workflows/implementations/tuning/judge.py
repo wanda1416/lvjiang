@@ -24,7 +24,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 )
 
 if TYPE_CHECKING:
-    from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
+    from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 
 
 class TuningJudge:

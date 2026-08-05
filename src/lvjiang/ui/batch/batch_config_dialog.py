@@ -26,7 +26,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...constants import SYSTEM_WORKFLOWS_DIR
 from ...core.batch_config import (
     BatchConfigItem,
     BatchWorkflows,
@@ -180,7 +179,9 @@ class BatchConfigDialog(QDialog):
 
     def _browse_wf(self, line_edit: QLineEdit):
         """浏览选择 wf 文件"""
-        start_dir = str(SYSTEM_WORKFLOWS_DIR) if SYSTEM_WORKFLOWS_DIR.exists() else ""
+        from ...core.config import get_resolver
+        workflows_dir = get_resolver().system_dir / "workflows"
+        start_dir = str(workflows_dir) if workflows_dir.exists() else ""
         path, _ = QFileDialog.getOpenFileName(
             self, "选择工作流文件", start_dir,
             "工作流文件 (*.wf);;所有文件 (*)"
@@ -189,7 +190,7 @@ class BatchConfigDialog(QDialog):
             # 转换为相对于 workflows 目录的路径
             try:
                 from pathlib import Path
-                rel = Path(path).relative_to(SYSTEM_WORKFLOWS_DIR)
+                rel = Path(path).relative_to(workflows_dir)
                 line_edit.setText(str(rel).replace("\\", "/"))
             except ValueError:
                 # 不在 workflows 目录下，使用绝对路径

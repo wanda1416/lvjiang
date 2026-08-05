@@ -35,13 +35,7 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 CONFIG_DIR = PROJECT_ROOT / "config"
 
-# 系统配置（出厂默认，随版本发布，进 git）
-SYSTEM_CONFIG_DIR = CONFIG_DIR / "system"
-SYSTEM_WORKFLOWS_DIR = SYSTEM_CONFIG_DIR / "workflows"
-SYSTEM_LAYOUTS_DIR = SYSTEM_CONFIG_DIR / "layouts"
-
-# 用户覆盖层（影子文件 + 键级 diff + 墓碑，目录镜像 system，.gitignore）
-LOCAL_CONFIG_DIR = CONFIG_DIR / "local"
+# system/local 层根目录已收拢至 core.config.resolver，外部经 ConfigResolver API 访问
 
 # 纯运行态（会话/用户/产出/截图，.gitignore）
 SESSION_CONFIG_DIR = CONFIG_DIR / "session"

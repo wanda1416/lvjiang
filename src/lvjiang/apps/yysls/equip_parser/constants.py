@@ -27,7 +27,7 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
     """
     from lvjiang.core.config import get_resolver
 
-    rel = "yysls/attributes.yaml"
+    rel = "yysls/game_config.yaml"
     data = get_resolver().load_merged(rel)
 
     # ── weapon_types ──

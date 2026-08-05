@@ -1,7 +1,7 @@
 """游戏配置对话框 UI 冒烟测试
 
 对话框 3 Tab 冒烟 + 武器类型增删往返 + 流派配置行编辑往返
-（在 tmp 目录的 attributes.yaml 副本上执行，不触碰真实配置）。
+（在 tmp 目录的 game_config.yaml 副本上执行，不触碰真实配置）。
 """
 
 import shutil
@@ -24,14 +24,14 @@ from lvjiang.apps.yysls.ui.game_settings.base_attr_panel import BaseAttrPanel
 from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
-ATTRS_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"
+ATTRS_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "game_config.yaml"
 
 
 @pytest.fixture
 def tmp_attrs(tmp_path, monkeypatch):
-    """真实 attributes.yaml 的 tmp 副本（resolver 根指向 tmp，开发模式直写 system）"""
+    """真实 game_config.yaml 的 tmp 副本（resolver 根指向 tmp，开发模式直写 system）"""
     import lvjiang.core.config.resolver as cr
-    dst = tmp_path / "system" / "yysls" / "attributes.yaml"
+    dst = tmp_path / "system" / "yysls" / "game_config.yaml"
     dst.parent.mkdir(parents=True)
     shutil.copy(ATTRS_FILE, dst)
     monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")

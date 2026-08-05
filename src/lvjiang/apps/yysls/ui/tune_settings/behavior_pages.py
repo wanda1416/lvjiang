@@ -1,6 +1,6 @@
 """调律配置对话框 —— 行为处理页（扫描处理 / 结束处理）
 
-状态机行为点配置（behavior 段），每页一张有序条件规则表
+状态机行为点配置（基础规则组 behavior 段），每页一张有序条件规则表
 （自上而下首条命中即生效）：
 - 扫描处理（ScanBehaviorPage，behavior.scan）：进调律前，
   传入规则预期评级 ≥ 进入门槛即进入调律；未达门槛的装备按
@@ -20,7 +20,8 @@
 沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、各自只替换 behavior.scan /
-behavior.tune 子段，与基础/材料配置页各管各段互不覆盖。
+behavior.tune 子段，与基础规则/材料配置页各管各段互不覆盖。
+页面对准当前选中的基础规则组（set_group 切换后重载）。
 """
 
 from __future__ import annotations
@@ -62,7 +63,8 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_KEYS,
     RATING_LABELS,
     BehaviorRule,
-    TuningBaseManager,
+    TuningGroup,
+    TuningGroupManager,
     rule_affix_candidates,
 )
 
@@ -410,15 +412,39 @@ class _BehaviorPageBase(QWidget):
 
     STAGE = ""
 
-    def __init__(self, manager: TuningBaseManager,
+    def __init__(self, manager: TuningGroupManager, group_key: str,
                  status_cb: Callable[[str, bool], None], parent=None):
         super().__init__(parent)
         self._manager = manager
+        self._group_key = group_key
         self._status_cb = status_cb
+        self._save_cb: Callable[[], None] | None = None
         self._loading = True
         self._init_ui()
         self._load()
         self._loading = False
+
+    def set_save_callback(self, cb: Callable[[], None]):
+        """设置保存成功后的回调（用于通知其他页面刷新）"""
+        self._save_cb = cb
+
+    # ── 规则组切换 ──
+
+    def set_group(self, group_key: str):
+        """切换目标基础规则组并重载本页控件"""
+        self._group_key = group_key
+        self._loading = True
+        self._load()
+        self._loading = False
+
+    def _current_group(self) -> TuningGroup:
+        group = self._manager.get_group(self._group_key)
+        if group is None:
+            groups = self._manager.get_groups()
+            first_key = next(iter(groups), "")
+            group = (self._manager.get_group(first_key)
+                     or TuningGroup())
+        return group
 
     # ── UI 构建 ──
 
@@ -664,9 +690,9 @@ class _BehaviorPageBase(QWidget):
     # ── 回填 ──
 
     def _load(self):
-        # 用管理器已解析的 BehaviorSettings 回填（缺省段/字段已在
+        # 用管理器已解析的 ScanBehavior/TuneBehavior 回填（缺省段/字段已在
         # 解析层落到默认值，无需重复处理）
-        stage = getattr(self._manager.get().behavior, self.STAGE)
+        stage = getattr(self._current_group(), self.STAGE)
         self._load_stage(stage)
         self._table.setRowCount(0)
         for rule in stage.rules:
@@ -709,11 +735,10 @@ class _BehaviorPageBase(QWidget):
         raise NotImplementedError
 
     def _build(self) -> dict:
-        # 以最新 raw 为底只替换 behavior.<stage> 子段，保留其他页
+        # 以最新 raw 为底只替换 <stage> 顶级段，保留其他页
         # 负责的段与另一行为点子段
-        data = self._manager.get_raw()
-        behavior = data.setdefault("behavior", {})
-        behavior[self.STAGE] = self._stage_raw()
+        data = self._manager.get_raw(self._group_key)
+        data[self.STAGE] = self._stage_raw()
         return data
 
     def _apply(self):
@@ -725,13 +750,16 @@ class _BehaviorPageBase(QWidget):
             self._status_cb(f"校验失败（未保存）：{err}", True)
             return
         try:
-            self._manager.save(data)
+            self._manager.save_group(self._group_key, data)
         except Exception as e:  # noqa: BLE001
             logger.exception("行为配置保存失败")
             self._status_cb(f"保存失败：{e}", True)
             return
         now = datetime.now().strftime("%H:%M:%S")
         self._status_cb(f"已保存并生效（{now}）", False)
+        # 通知其他页面刷新（如基础规则页展示门槛值）
+        if self._save_cb is not None:
+            self._save_cb()
 
 
 class ScanBehaviorPage(_BehaviorPageBase):
@@ -745,6 +773,28 @@ class ScanBehaviorPage(_BehaviorPageBase):
             "按下表处置，自上而下首条命中即生效并阻断后续规则；"
             "无命中 = 保留"))
 
+        # 门槛设置区（位于处置表启用开关上方）
+        half_line = self.fontMetrics().height() // 2
+        threshold_row = QHBoxLayout()
+        threshold_row.addWidget(QLabel("等级门槛"))
+        self._min_level_spin = QSpinBox()
+        self._min_level_spin.setRange(1, 999)
+        self._min_level_spin.setToolTip("低于该等级的装备直接跳过，不进入任何判定")
+        self._min_level_spin.valueChanged.connect(lambda _v: self._apply())
+        threshold_row.addWidget(self._min_level_spin)
+        threshold_row.addSpacing(half_line)
+        threshold_row.addWidget(QLabel("调律门槛"))
+        self._entry_combo = QComboBox()
+        # 从高到低：顶级 → 优秀 → 一般 → 垃圾
+        for key in reversed(RATING_KEYS):
+            self._entry_combo.addItem(RATING_LABELS.get(key, key), key)
+        self._entry_combo.setToolTip("预期评级 ≥ 该档即进入调律（固定用传入规则判定）")
+        self._entry_combo.currentIndexChanged.connect(lambda _i: self._apply())
+        threshold_row.addWidget(self._entry_combo)
+        threshold_row.addStretch()
+        layout.addLayout(threshold_row)
+        layout.addSpacing(half_line)
+
         # 处置表区：启用开关紧贴规则表
         layout.addSpacing(self.fontMetrics().height())
         head = QHBoxLayout()
@@ -757,15 +807,16 @@ class ScanBehaviorPage(_BehaviorPageBase):
         layout.addLayout(head)
 
     def _load_stage(self, stage) -> None:
+        self._min_level_spin.setValue(stage.min_level)
+        idx = self._entry_combo.findData(stage.entry_min_rating)
+        self._entry_combo.setCurrentIndex(max(idx, 0))
         self._enabled_cb.setChecked(stage.enabled)
 
     def _stage_raw(self) -> dict:
-        # 调律门槛已移至基础配置页，整段重建时透传最新值避免丢失
-        scan = ((self._manager.get_raw().get("behavior") or {})
-                .get("scan") or {})
         return {
             "enabled": self._enabled_cb.isChecked(),
-            "entry_min_rating": scan.get("entry_min_rating", "excellent"),
+            "min_level": self._min_level_spin.value(),
+            "entry_min_rating": self._entry_combo.currentData(),
             "rules": self._rules_raw(),
         }
 

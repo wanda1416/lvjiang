@@ -14,10 +14,13 @@ manager（加载缓存 + 持久化 + 单例），外部一律经本 __init__ 导
 
 from ...game_config import LevelConfig
 from .manager import (
-    TuningBaseManager,
+    TuneConfigManager,
+    TuningGroupManager,
     TuningRuleManager,
-    get_tuning_base,
-    get_tuning_base_manager,
+    get_tune_config,
+    get_tune_config_manager,
+    get_tuning_group,
+    get_tuning_group_manager,
     get_tuning_rule_manager,
 )
 from .models import (
@@ -53,7 +56,6 @@ from .models import (
     STONE_LABEL,
     TIER_KEYS,
     BehaviorRule,
-    BehaviorSettings,
     CommonConditions,
     Condition,
     ConditionGroup,
@@ -66,17 +68,21 @@ from .models import (
     RuleValidationError,
     ScanBehavior,
     TuneBehavior,
-    TuningBase,
+    TuneConfig,
+    TuningGroup,
     TuningRule,
     WeaponSide,
-    default_food_rules,
     dynamic_affix_map,
     rule_affix_candidates,
     specific_attr_names,
     standard_affix_names,
     standard_playstyle_attrs,
 )
-from .parsing import parse_tuning_base, parse_tuning_rule
+from .parsing import (
+    parse_tune_config,
+    parse_tuning_group,
+    parse_tuning_rule,
+)
 
 __all__ = [
     # 固定词汇
@@ -113,7 +119,6 @@ __all__ = [
     "TIER_KEYS",
     # 领域模型
     "BehaviorRule",
-    "BehaviorSettings",
     "CommonConditions",
     "Condition",
     "ConditionGroup",
@@ -126,24 +131,28 @@ __all__ = [
     "RatingProvider",
     "ScanBehavior",
     "TuneBehavior",
-    "TuningBase",
+    "TuneConfig",
+    "TuningGroup",
     "TuningRule",
     "WeaponSide",
     "RuleValidationError",
     # 词汇/等价工具
-    "default_food_rules",
     "dynamic_affix_map",
     "rule_affix_candidates",
     "specific_attr_names",
     "standard_affix_names",
     "standard_playstyle_attrs",
     # 解析
-    "parse_tuning_base",
+    "parse_tune_config",
+    "parse_tuning_group",
     "parse_tuning_rule",
     # 管理器与单例
-    "TuningBaseManager",
+    "TuneConfigManager",
+    "TuningGroupManager",
     "TuningRuleManager",
-    "get_tuning_base",
-    "get_tuning_base_manager",
+    "get_tune_config",
+    "get_tune_config_manager",
+    "get_tuning_group",
+    "get_tuning_group_manager",
     "get_tuning_rule_manager",
 ]

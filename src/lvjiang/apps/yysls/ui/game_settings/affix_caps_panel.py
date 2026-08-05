@@ -51,7 +51,7 @@ def _invertChecks(checks: list) -> None:
         cb.setChecked(not cb.isChecked())
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
-_ATTRS_REL = "yysls/attributes.yaml"
+_ATTRS_REL = "yysls/game_config.yaml"
 
 # 承音比例（默认 94%）
 _CHENGYIN_RATIO = 0.94

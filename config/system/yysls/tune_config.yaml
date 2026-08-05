@@ -1,0 +1,25 @@
+base_rules:
+- default
+- aggressive
+quality_thresholds:
+  武器:
+  - gold
+  环:
+  - gold
+  佩:
+  - gold
+  冠胄:
+  - gold
+  - purple
+  胸甲:
+  - gold
+  - purple
+  胫甲:
+  - gold
+  - purple
+  腕甲:
+  - gold
+  - purple
+switches:
+  keep_pvp:
+    name: 保留PVP装备

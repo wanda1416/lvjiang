@@ -12,11 +12,13 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QRadioButton,
     QScrollArea,
     QSpinBox,
     QTabWidget,
@@ -31,8 +33,8 @@ from .tune_config_widget import TuningConfigWidget, TuningGlobalsWidget
 def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
     """开启的开关 key → 注册表显示名（注册表不可用时退回 key）"""
     try:
-        from ..evaluator.tuning_rules import get_tuning_base
-        names = get_tuning_base().switches
+        from ..evaluator.tuning_rules import get_tune_config
+        names = get_tune_config().switches
     except Exception:
         names = {}
     return [names.get(k, k) for k, v in switches.items() if v]
@@ -86,16 +88,70 @@ class TuningTab(QWidget):
         return scroll
 
     def _build_rules_page(self) -> QWidget:
-        """「规则」页：调律规则与玩法（公共控件，变更即持久化）"""
+        """「规则」页：基础规则单选 + 流派规则与玩法（变更即持久化）"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.addWidget(QLabel("<b>流派配置（可多选）：</b>"))
+        layout.addWidget(QLabel("<b>基础规则（单选）：</b>"))
+        self._base_group_key = ""
+        self._button_group: QButtonGroup | None = None
+        self._group_container = QWidget()
+        self._group_layout = QVBoxLayout(self._group_container)
+        self._group_layout.setContentsMargins(0, 0, 0, 0)
+        self._group_layout.setSpacing(2)
+        self._refresh_base_group_radios()
+        layout.addWidget(self._group_container)
+        layout.addWidget(QLabel("<b>流派规则（可多选）：</b>"))
         self._tuning_config = TuningConfigWidget(show_globals=False)
         self._tuning_config.config_changed.connect(self._save_tuning_config)
         layout.addWidget(self._tuning_config)
         layout.addStretch()
         return self._wrap_scroll(panel)
+
+    def _refresh_base_group_radios(self):
+        """重建基础规则单选组（遍历全部规则组，选中项保持不变）"""
+        from ..evaluator.tuning_rules import get_tuning_group_manager
+        groups = get_tuning_group_manager().get_groups()
+        # 当前 key 不在时取第一个可用组
+        if self._base_group_key not in groups:
+            self._base_group_key = next(iter(groups), "")
+        while self._group_layout.count():
+            item = self._group_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._group_radios: dict[str, QRadioButton] = {}
+        self._button_group = QButtonGroup(self)
+        for key, group in groups.items():
+            rb = QRadioButton(group.name)
+            rb.setToolTip("F6 调律配置可新增/编辑规则组")
+            rb.setChecked(key == self._base_group_key)
+            rb.toggled.connect(
+                lambda checked, k=key: self._on_base_group_toggled(k, checked))
+            self._group_layout.addWidget(rb)
+            self._group_radios[key] = rb
+            self._button_group.addButton(rb)
+
+    def _on_base_group_toggled(self, key: str, checked: bool):
+        """基础规则单选变更即落盘（session，启动时注入工作流）"""
+        if not checked:
+            return
+        self._base_group_key = key
+        self._save_tuning_config()
+
+    def _select_base_group_radio(self, key: str):
+        """按 key 选中单选按钮（不存在时取第一个）"""
+        rb = self._group_radios.get(key)
+        if rb is None:
+            rb = next(iter(self._group_radios.values()), None)
+        if rb is None:
+            return
+        actual_key = next(
+            (k for k, v in self._group_radios.items() if v is rb), "")
+        self._base_group_key = actual_key
+        rb.blockSignals(True)
+        rb.setChecked(True)
+        rb.blockSignals(False)
 
     def _build_slots_page(self) -> QWidget:
         """「部位」页：调律部位选择（标题行内嵌全选/取消全选）"""
@@ -217,9 +273,11 @@ class TuningTab(QWidget):
     # ─── 配置变更监听 ────────────────────────────────────────
 
     def _on_base_config_changed(self, rel_path: str):
-        """配置变更监听回调：tuning_base.yaml 变化时刷新开关复选框"""
-        if rel_path == "yysls/tuning_base.yaml":
+        """配置变更监听回调：tune_config/规则组变化时刷新对应控件"""
+        if rel_path == "yysls/tune_config.yaml":
             self._tuning_globals.refresh_switches()
+        elif rel_path.startswith("yysls/tuning_groups/"):
+            self._refresh_base_group_radios()
 
     # ─── 启停入口（F9 快捷键 / 按钮点击共用）───────────────────
 
@@ -287,6 +345,20 @@ class TuningTab(QWidget):
 
         flow_name = "自动调律"
 
+        # 基础规则组（启动时快照注入）
+        from ..evaluator.tuning_rules import (
+            TuningGroup,
+            get_tuning_group,
+            get_tuning_group_manager,
+        )
+        group_key = self._base_group_key
+        base_group = get_tuning_group(group_key) if group_key else None
+        if base_group is None:
+            # 回退到第一个可用组，或空实例
+            groups = get_tuning_group_manager().get_groups()
+            first_key = next(iter(groups), "")
+            base_group = get_tuning_group(first_key) or TuningGroup()
+
         def configure(wf_instance, engine):
             from ..workflows.tuning_context import TuningRunContext
             # 运行上下文一次性收口注入（字段契约见 TuningRunContext）：
@@ -304,6 +376,7 @@ class TuningTab(QWidget):
                 judge_configs={
                     k: {**cfg, "switches": switches} for k, cfg in enabled.items()},
                 judge_rule_keys=list(enabled),
+                base_group=base_group,
                 skip_tuning=skip_tuning,
                 doc_username=host.active_user_name(),
                 skip_start=skip_start,
@@ -317,7 +390,8 @@ class TuningTab(QWidget):
             if skip_tuning:
                 host.append_log("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律")
             host.append_log(
-                f"[开始] {flow_name} 流程，规则: {rule_names_text}，部位: {selected_slots}")
+                f"[开始] {flow_name} 流程，基础规则: {base_group.name}，"
+                f"规则: {rule_names_text}，部位: {selected_slots}")
 
         host.run_workflow_implementation(
             "auto_tuning", flow_name, configure)
@@ -335,6 +409,9 @@ class TuningTab(QWidget):
             cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
             cb.blockSignals(False)
         self._tuning_config.set_config(rules_cfg)
+        # 基础规则单选（无持久值时选第一个可用组）
+        self._base_group_key = tc.base_group
+        self._select_base_group_radio(self._base_group_key)
         self._tuning_globals.set_switches(tc.switches)
         self._tuning_globals.set_skip_tuning(tc.skip_tuning)
         # 初始跳过 / 指定调律
@@ -368,6 +445,7 @@ class TuningTab(QWidget):
             selected_slots=self._get_tuning_selected_slots(),
             rules=self._get_tuning_rule_config(),
             switches=self._get_tuning_switches(),
+            base_group=self._base_group_key,
             skip_tuning=self._get_tuning_skip_tuning(),
             skip_start=skip_start,
             target_cell=target_cell,
@@ -394,7 +472,7 @@ class TuningTab(QWidget):
         return [cb.objectName() for cb in self._tuning_checkboxes if cb.isChecked()]
 
     def _get_tuning_rule_config(self) -> dict[str, dict]:
-        """流派配置委托公共控件收集"""
+        """流派规则配置委托公共控件收集"""
         return self._tuning_config.get_config()
 
     def _get_tuning_switches(self) -> dict[str, bool]:

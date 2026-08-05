@@ -52,7 +52,7 @@ from .tuning_rules import (
     PartPattern,
     TuningRule,
     dynamic_affix_map,
-    get_tuning_base,
+    get_tune_config,
 )
 
 # 评级排序（多玩法/转律模拟取评级上限最高的组合）
@@ -109,7 +109,7 @@ class GenericTuningJudge(TuningJudge):
         pre_reasons: list[str] = []
         if equip.quality is None:
             pre_reasons.append("品阶未识别，跳过品阶筛选")
-        elif not get_tuning_base().quality_ok(
+        elif not get_tune_config().quality_ok(
                 equip.part, equip.quality, self.rule.quality_thresholds):
             result.skipped = True
             result.reasons.append(f"品阶 {equip.quality} 无调律价值")

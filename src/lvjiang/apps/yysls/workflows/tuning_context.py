@@ -11,6 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..evaluator.tuning_rules import TuningGroup
 
 
 @dataclass
@@ -32,6 +36,7 @@ class TuningRunContext:
     scroll_strategy: str = ""                 # 背包遍历策略 key（空=读 session/默认）
     skip_start: tuple[int, int] | None = None    # 初始跳过 (row, col)；None=不跳过
     target_cell: tuple[int, int] | None = None   # 指定调律 (row, col)；None=不指定
+    base_group: TuningGroup | None = None        # 基础规则组（None=回退 session）
 
 
 class TuningContextMixin:

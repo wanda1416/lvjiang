@@ -1,6 +1,6 @@
 """自动调律工作流 — 端到端流水线（编排层）
 
-状态机三行为点（tuning_base.behavior + materials）驱动流程决策，
+状态机三行为点（基础规则组 behavior + materials）驱动流程决策，
 流派规则仅作装备预期识别（输入装备 → 输出预期评级上限）：
 - 扫描处理（behavior.scan）：进调律前，传入规则预期 ≥ 进入门槛
   即进调律；未达门槛按处置表决定回收/保留（_on_scan_reject）；
@@ -32,7 +32,8 @@ from lvjiang.apps.yysls.evaluator import (
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_LABELS,
     RATING_RANK,
-    get_tuning_base,
+    TuningGroup,
+    get_tune_config,
 )
 from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
@@ -156,6 +157,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         self.executor.reset_state()
         self._ensure_judge_config()
+        group = self._ensure_base_group()
+        logger.info(f"基础规则组: {group.name}")
         # 加载导航所需的 DSL subcall 文件（每次运行都重新加载，保证修改立即生效）
         self.navigator.load_dependencies()
 
@@ -234,7 +237,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             for k, v in (cfg.get("switches") or {}).items():
                 merged[str(k)] = merged.get(str(k), False) or bool(v)
         try:
-            names = get_tuning_base().switches
+            names = get_tune_config().switches
         except Exception:
             names = {}
         switches = {names.get(k, k): v for k, v in merged.items()}
@@ -476,7 +479,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         # 前置拦截 0：等级门槛 — 低于 min_level 直接跳过，不走任何判定
         level = equip.get("level") or 0
-        min_level = get_tuning_base().min_level
+        min_level = self.base_group.scan.min_level
         if level < min_level:
             logger.info(
                 f"  [{name}] 等级 {level} < 门槛 {min_level}，直接跳过")
@@ -518,7 +521,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # B. 进入决策（scan 行为点）：传入规则预期评级 ≥ 进入门槛
         #    → 进调律；未达门槛按扫描处置表决定回收/保留。
         #    未处理过，不收集 report，也不写说明文档
-        scan_cfg = get_tuning_base().behavior.scan
+        scan_cfg = self.base_group.scan
         potential = judge_equipment_potential(
             equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         _, logs = summarize_potential(potential)
@@ -575,7 +578,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return self._make_fingerprint(equip_data.to_dict()), False
 
         # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
-        tune_cfg = get_tuning_base().behavior.tune
+        tune_cfg = self.base_group.tune
         base_affixes = list(equip_data.affixes)
         resets_used = 0
         tune_recycle_reason = ""
@@ -836,7 +839,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         Returns: True=已回收（该格已被补位装备占据）。
         """
         label = equip_data.name or equip_data.type
-        cfg = get_tuning_base().behavior.scan
+        cfg = self.base_group.scan
         if detail_scene is None or not cfg.enabled:
             logger.info(f"  [扫描处理] {label} 不进调律（处置未启用，保留）")
             return False
@@ -907,6 +910,25 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         return label or "空"
 
     # ─── 判定配置兜底 ──────────────────────────────────────
+
+    @property
+    def base_group(self):
+        """当前基础规则组（启动时经 run() 解析；未注入时惰性兜底）"""
+        group = self.ctx.base_group
+        return group if group is not None else self._ensure_base_group()
+
+    def _ensure_base_group(self):
+        """保证 ctx.base_group 可用。
+
+        仅使用启动时注入的规则组；未注入则用空 TuningGroup()，
+        不回退读盘取任何预置规则组。
+        """
+        group = self.ctx.base_group
+        if group is not None:
+            return group
+        group = TuningGroup()
+        self.ctx.base_group = group
+        return group
 
     def _ensure_judge_config(self):
         """保证 ctx.judge_configs/judge_rule_keys 可用。

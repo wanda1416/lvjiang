@@ -49,9 +49,9 @@ class TuningGlobalsWidget(QWidget):
         self._build_switches()
 
     def _build_switches(self):
-        """按当前 get_tuning_base().switches 构建开关复选框"""
-        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
-        for switch_key, switch_name in get_tuning_base().switches.items():
+        """按当前 get_tune_config().switches 构建开关复选框"""
+        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+        for switch_key, switch_name in get_tune_config().switches.items():
             cb = QCheckBox(f"{switch_name}（全局）")
             cb.stateChanged.connect(
                 lambda _state: self.config_changed.emit())
@@ -60,8 +60,8 @@ class TuningGlobalsWidget(QWidget):
 
     def refresh_switches(self):
         """重新读取开关注册表，增量更新复选框（保留已有值）"""
-        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
-        current = get_tuning_base().switches
+        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+        current = get_tune_config().switches
         # 移除已不存在的开关
         removed = [k for k in self._switch_cbs if k not in current]
         for k in removed:

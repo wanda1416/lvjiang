@@ -1,10 +1,13 @@
 """装备调律配置对话框
 
-左侧一级导航（基础配置 + 状态机三行为点 + 各规则）+ 右侧内容区（QStackedWidget）：
-- 基础配置：品阶门槛与开关设定（BaseConfigPage）；
+左侧一级导航（基础规则组 + 状态机三行为点 ｜ 流派规则 + 各规则）
++ 右侧内容区（QStackedWidget）：
+- 基础规则：规则组切换/新增/复制/删除 + 等级/调律门槛
+  （BaseRuleGroupPage），切换后三个行为页同步对准该组；
 - 扫描处理：进调律前的进入门槛与处置表（ScanBehaviorPage）；
 - 材料处理：每轮调律开始前的律准石检查与狗粮规则（MaterialConfigPage）；
 - 结束处理：每轮调律结束后的行为表与重置设置（TuneBehaviorPage）；
+- 流派规则：品阶门槛与开关设定（PlaystyleConfigPage，全局不随组切换）；
 - 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
   双击规则导航项弹窗修改规则名称（配置页项不可改名）。
 左侧导航下方为「＋ 新增规则 / 装备调律验证」入口。
@@ -31,13 +34,16 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RuleValidationError,
-    get_tuning_base_manager,
+    get_tune_config_manager,
+    get_tuning_group_manager,
     get_tuning_rule_manager,
 )
+from lvjiang.apps.yysls.tune_config import get_tune_config
 
-from .base_config_page import BaseConfigPage
+from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
+from .playstyle_config_page import PlaystyleConfigPage
 from .rule_panel import RulePanel, add_nav_separator
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
@@ -104,7 +110,13 @@ class TuningRulesDialog(QDialog):
         layout.setContentsMargins(8, 8, 8, 8)
 
         self._manager = get_tuning_rule_manager()
-        self._base_manager = get_tuning_base_manager()
+        self._config_manager = get_tune_config_manager()
+        self._group_manager = get_tuning_group_manager()
+        # 初始规则组：session 持久值，组不存在取第一个可用
+        group_key = get_tune_config().base_group
+        if self._group_manager.get_group(group_key) is None:
+            groups = self._group_manager.get_groups()
+            group_key = next(iter(groups), "")
 
         body = QHBoxLayout()
 
@@ -132,22 +144,33 @@ class TuningRulesDialog(QDialog):
         self._status_label = QLabel("规则变更即校验，校验通过自动保存并生效")
         layout.addWidget(self._status_label)
 
-        # 一级节点：基础配置 → 扫描处理 → 材料处理 → 结束处理 →
-        # 分割线 → 各规则（导航含分割线：行 0-3 = 栈页 0-3，
+        # 一级节点：基础规则 → 扫描处理 → 材料处理 → 结束处理 →
+        # 分割线 → 流派规则 → 各规则（导航含分割线：行 0-3 = 栈页 0-3，
         # 行 ≥5 = 栈页 - 1）
-        self._nav.addItem("基础配置")
+        self._nav.addItem("基础规则")
         self._nav.addItem("扫描处理")
         self._nav.addItem("材料处理")
         self._nav.addItem("结束处理")
         add_nav_separator(self._nav)
-        self._stack.addWidget(BaseConfigPage(
-            self._base_manager, self._set_status))
-        self._stack.addWidget(ScanBehaviorPage(
-            self._base_manager, self._set_status))
-        self._stack.addWidget(MaterialConfigPage(
-            self._base_manager, self._set_status))
-        self._stack.addWidget(TuneBehaviorPage(
-            self._base_manager, self._set_status))
+        self._nav.addItem("流派规则")
+        self._base_page = BaseRuleGroupPage(
+            self._group_manager, group_key, self._set_status)
+        self._stack.addWidget(self._base_page)
+        self._scan_page = ScanBehaviorPage(
+            self._group_manager, group_key, self._set_status)
+        self._stack.addWidget(self._scan_page)
+        self._material_page = MaterialConfigPage(
+            self._group_manager, group_key, self._set_status)
+        self._stack.addWidget(self._material_page)
+        self._tune_page = TuneBehaviorPage(
+            self._group_manager, group_key, self._set_status)
+        self._stack.addWidget(self._tune_page)
+        self._stack.addWidget(PlaystyleConfigPage(
+            self._config_manager, self._set_status))
+        # 规则组切换后三个行为页同步重载
+        self._base_page.set_switch_callback(self._on_group_switched)
+        # 扫描处理页保存后通知基础规则页刷新展示（门槛值同步）
+        self._scan_page.set_save_callback(self._base_page.refresh)
         for key, rule in self._manager.get_rules().items():
             self._add_rule_page(key, rule.name)
         self._nav.setCurrentRow(0)
@@ -168,10 +191,16 @@ class TuningRulesDialog(QDialog):
             return  # 分割线项不响应
         self._stack.setCurrentIndex(row if row <= 3 else row - 1)
 
+    def _on_group_switched(self, group_key: str):
+        """基础规则组切换 → 三个行为页对准新组并重载"""
+        self._scan_page.set_group(group_key)
+        self._material_page.set_group(group_key)
+        self._tune_page.set_group(group_key)
+
     def _on_nav_double_clicked(self, item):
         """双击规则导航项 → 弹窗修改规则名称（配置页不可改名）"""
         row = self._nav.row(item)
-        if row < 5:  # 四张配置页与分割线
+        if row < 6:  # 四张基础规则/行为页 + 分割线 + 流派规则页
             return
         panel = self._stack.widget(row - 1)
         if not isinstance(panel, RulePanel):
@@ -207,7 +236,7 @@ class TuningRulesDialog(QDialog):
         except RuleValidationError as e:
             QMessageBox.warning(self, "删除规则", str(e))
             return
-        for i in range(4, self._stack.count()):
+        for i in range(5, self._stack.count()):
             panel = self._stack.widget(i)
             if isinstance(panel, RulePanel) and panel.rule_key == key:
                 self._stack.removeWidget(panel)
@@ -219,7 +248,7 @@ class TuningRulesDialog(QDialog):
 
     def _rename_rule(self, old_key: str, new_key: str, new_name: str):
         """更新对应导航项的标题文本（由 panel 在 key/name 变更时回调）"""
-        for i in range(4, self._stack.count()):
+        for i in range(5, self._stack.count()):
             panel = self._stack.widget(i)
             if isinstance(panel, RulePanel) and panel.rule_key == new_key:
                 self._nav.item(i + 1).setText(new_name)  # 含分割线偏移

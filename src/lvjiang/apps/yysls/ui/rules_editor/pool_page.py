@@ -74,8 +74,12 @@ class _AffixListBox(QWidget):
         self._list.addItems(list(names or []))
 
     def get_names(self) -> list[str]:
-        return [self._list.item(i).text()
-                for i in range(self._list.count())]
+        result = []
+        for i in range(self._list.count()):
+            it = self._list.item(i)
+            if it is not None:
+                result.append(it.text())
+        return result
 
     # ── 操作 ──
 

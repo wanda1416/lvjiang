@@ -539,10 +539,12 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 if isinstance(w, SceneTab) and w.scene_key == scene_key:
                     base_name = get_scene_name(scene_key)
                     tab_widget.setTabText(i, f"{base_name} ●" if dirty else base_name)
+                    tabBar = tab_widget.tabBar()
+                    assert tabBar is not None
                     if dirty:
-                        tab_widget.tabBar().setTabTextColor(i, Qt.GlobalColor.green)
+                        tabBar.setTabTextColor(i, Qt.GlobalColor.green)
                     else:
-                        tab_widget.tabBar().setTabTextColor(i, Qt.GlobalColor.black)
+                        tabBar.setTabTextColor(i, Qt.GlobalColor.black)
                     return
 
     def _get_dirty_scene_names(self) -> str:

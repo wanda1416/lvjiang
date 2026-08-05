@@ -52,6 +52,7 @@ class PanelEditorMixin:
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
+        assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         for col in (2, 3, 4, 5, 6):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
@@ -70,7 +71,9 @@ class PanelEditorMixin:
             QTableWidget.EditTrigger.NoEditTriggers
         )
         strip_focus_rect(self._panel_table)
-        self._panel_table.verticalHeader().setVisible(False)
+        vheader = self._panel_table.verticalHeader()
+        assert vheader is not None
+        vheader.setVisible(False)
         self._panel_table.currentCellChanged.connect(self._on_panel_table_selection)
         self._panel_table.cellDoubleClicked.connect(self._on_edit_panel_from_table)
         self._panel_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -337,7 +340,7 @@ class PanelEditorMixin:
 
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
         """
-        dialog = QDialog(self)
+        dialog = QDialog(self)  # type: ignore[arg-type]
         dialog.setWindowTitle("新建面板" if panel_def is None else "编辑面板")
         form = QFormLayout(dialog)
 

@@ -185,7 +185,9 @@ class UserManagerDialog(QDialog):
         )
         self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._user_list.currentRowChanged.connect(self._on_user_selected)
-        self._user_list.model().rowsMoved.connect(self._on_rows_moved)
+        model = self._user_list.model()
+        assert model is not None
+        model.rowsMoved.connect(self._on_rows_moved)
         layout.addWidget(self._user_list, stretch=1)
 
         return panel
@@ -331,6 +333,7 @@ class UserManagerDialog(QDialog):
             return
 
         item = self._user_list.item(row)
+        assert item is not None
         name = item.data(Qt.ItemDataRole.UserRole)
         user = self._user_manager.get_user(name)
         if user is None:

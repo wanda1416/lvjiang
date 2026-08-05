@@ -339,10 +339,11 @@ class RunControlMixin:
         self._ui_helper = helper
 
         def callback(action: str, **kwargs):
+            done_event = threading.Event()
             req = {"action": action, "kwargs": kwargs,
-                   "result": None, "done": threading.Event()}
+                   "result": None, "done": done_event}
             helper.request.emit(req)
-            req["done"].wait()
+            done_event.wait()
             return req["result"]
 
         return callback

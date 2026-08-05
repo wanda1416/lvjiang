@@ -34,14 +34,14 @@ class LayoutOpsMixin:
         for ch in invalid_chars:
             if ch in name:
                 QMessageBox.warning(
-                    self, "名称不合法",
+                    self, "名称不合法",  # type: ignore[arg-type]
                     f"布局名称不能包含字符: {ch}\n"
                     f"禁用字符: \\ / : * ? \" < > |",
                 )
                 return False
         if name.startswith(' ') or name.startswith('.'):
             QMessageBox.warning(
-                self, "名称不合法",
+                self, "名称不合法",  # type: ignore[arg-type]
                 "布局名称不能以空格或点开头",
             )
             return False
@@ -100,7 +100,7 @@ class LayoutOpsMixin:
         if dirty_names:
             msg += f"\n\n当前有如下场景发生变更：{dirty_names}"
         reply = QMessageBox.question(
-            self, "未保存的修改", msg,
+            self, "未保存的修改", msg,  # type: ignore[arg-type]
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel,

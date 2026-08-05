@@ -44,6 +44,7 @@ class RegionPanelMixin:
         self._region_table.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
         # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._region_table.horizontalHeader()
+        assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
@@ -53,7 +54,9 @@ class RegionPanelMixin:
         self._region_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._region_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         strip_focus_rect(self._region_table)
-        self._region_table.verticalHeader().setVisible(False)
+        vheader = self._region_table.verticalHeader()
+        assert vheader is not None
+        vheader.setVisible(False)
         self._region_table.currentCellChanged.connect(self._on_region_table_selection)
         self._region_table.cellDoubleClicked.connect(self._on_edit_region_from_table)
         self._region_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -254,7 +257,7 @@ class RegionPanelMixin:
 
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
         """
-        dialog = QDialog(self)
+        dialog = QDialog(self)  # type: ignore[arg-type]
         dialog.setWindowTitle("新建区域" if region_def is None else "编辑区域")
         form = QFormLayout(dialog)
 

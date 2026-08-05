@@ -35,7 +35,7 @@ class ThumbnailCheckboxDelegate(QStyledItemDelegate):
         self._checked = checked_items  # 共享的已勾选 filename 集合
         self._batch_mode_ref = batch_mode_ref  # 共享的批量模式状态引用 [bool]
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):  # type: ignore[override]
         # 先绘制默认样式（含缩略图、文本、选中背景）
         super().paint(painter, option, index)
         # 非批量模式不绘制复选框
@@ -593,7 +593,7 @@ class BrowserPanel(QWidget):
             new_w, new_h = int(w * scale), int(h * scale)
             resized = cv2.resize(bgr, (new_w, new_h))
             rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-            return QImage(rgb.copy().data, new_w, new_h, new_w * 3, QImage.Format.Format_RGB888)
+            return QImage(bytes(rgb.copy().data), new_w, new_h, new_w * 3, QImage.Format.Format_RGB888)
         except Exception:
             return None
 

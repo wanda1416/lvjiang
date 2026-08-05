@@ -148,6 +148,7 @@ class _MultiSelect(QPushButton):
         if not checked and not self.selected():
             # 至少保留一项：取消最后一项时回弹，不触发保存
             act = self.sender()
+            assert act is not None
             act.blockSignals(True)
             act.setChecked(True)
             act.blockSignals(False)

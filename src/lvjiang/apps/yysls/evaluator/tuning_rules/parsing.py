@@ -654,6 +654,7 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
                                     "tune"),
         max_resets=max_resets,
         reset_exhausted_action=exhausted,
+        initial_check=bool(raw.get("initial_check", False)),
     )
 
 

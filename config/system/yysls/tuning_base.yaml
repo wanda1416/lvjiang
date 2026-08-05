@@ -176,3 +176,4 @@ behavior:
       action: skip
     max_resets: 3
     reset_exhausted_action: recycle
+    initial_check: false

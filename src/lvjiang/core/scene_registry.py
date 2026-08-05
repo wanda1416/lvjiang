@@ -138,16 +138,6 @@ def _on_config_change(rel_path: str):
 get_resolver().add_change_listener(_on_config_change)
 
 
-def sync_group_cache():
-    """仅刷新分组缓存（分组变更后调用）"""
-    global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
-    SCENE_GROUPS_META.clear()
-    GROUP_SCENES.clear()
-    GROUP_ORDER.clear()
-    for gk, gname in _registry.get_groups():
-        SCENE_GROUPS_META[gk] = gname
-        GROUP_SCENES[gk] = _registry.get_group_scenes(gk)
-        GROUP_ORDER.append(gk)
 
 
 def get_group_name(group_key: str) -> str:
@@ -193,12 +183,6 @@ def get_scene_regions(scene_key: str) -> list[tuple[str, str]]:
     return []
 
 
-def get_button_regions(scene_key: str) -> set[str]:
-    """获取场景的纯功能按钮区域集合（is_clickable 且非 is_text）"""
-    scene = _registry.get_scene(scene_key)
-    if not scene:
-        return set()
-    return {r.key for r in scene.regions if r.is_clickable and not r.is_text}
 
 
 def get_region_name(scene_key: str, region_key: str) -> str:
@@ -274,9 +258,6 @@ def get_point_def(scene_key: str, point_key: str) -> PointDef | None:
     return next((p for p in scene.points if p.key == point_key), None)
 
 
-def get_scene_panel_pairs(scene_key: str) -> list[tuple[str, str]]:
-    """获取场景的 (key, name) 面板列表（来自 YAML 定义）"""
-    return SCENE_PANELS.get(scene_key, [])
 
 
 def get_panel_defs(scene_key: str) -> list[PanelDef]:
@@ -287,12 +268,6 @@ def get_panel_defs(scene_key: str) -> list[PanelDef]:
     return list(scene.panels)
 
 
-def get_panel_def(scene_key: str, panel_key: str) -> PanelDef | None:
-    """获取场景内指定 panel 的类型定义"""
-    scene = _registry.get_scene(scene_key)
-    if not scene:
-        return None
-    return next((p for p in scene.panels if p.key == panel_key), None)
 
 
 # ─── 数据类 ──────────────────────────────────────────────

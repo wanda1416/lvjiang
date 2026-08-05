@@ -125,18 +125,6 @@ class OCRCanvas(QWidget):
         """获取原始截图 numpy 数组（供 OCR 裁剪）"""
         return self._original_image
 
-    def set_pixmap(self, pixmap: QPixmap):
-        """设置图片并重置视图"""
-        self._pixmap = pixmap
-        self._img_w = pixmap.width()
-        self._img_h = pixmap.height()
-        self._zoom = 1.0
-        self._ocr_boxes.clear()
-        self._selection = None
-        self._original_image = None  # QPixmap 路径无法提供 numpy 数组
-        self._fit_to_widget()
-        self.update()
-
     def set_ocr_boxes(self, boxes: list[OCRBox]):
         """设置 OCR 识别结果并刷新"""
         self._ocr_boxes = boxes
@@ -169,11 +157,6 @@ class OCRCanvas(QWidget):
         w = int(self._selection.width() * self._img_w)
         h = int(self._selection.height() * self._img_h)
         return (x, y, x + w, y + h)
-
-    def set_placeholder(self, text: str):
-        """设置提示文字"""
-        self._placeholder = text
-        self.update()
 
     # ─── 坐标变换 ────────────────────────────────────────
 

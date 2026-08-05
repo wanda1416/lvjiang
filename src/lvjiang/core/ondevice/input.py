@@ -14,7 +14,7 @@
 import random
 import time
 
-from ...config import InputSimConfig
+from ...core.config import InputSimConfig
 from ..input_base import InputBackend
 from . import a11y, shell
 

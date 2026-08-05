@@ -11,7 +11,7 @@
 - create_capture_backend()：创建桌面截图后端
 """
 
-from ...config import InputSimConfig
+from ...core.config import InputSimConfig
 from ..input_base import InputBackend
 from .capture import DesktopCapture
 from .post_message import PostMessageInput

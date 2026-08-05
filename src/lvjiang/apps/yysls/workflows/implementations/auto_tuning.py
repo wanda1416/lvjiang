@@ -34,6 +34,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_RANK,
     get_tuning_base,
 )
+from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -91,6 +92,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _doc_seq = 0                # 说明文档中的装备序号
     _equipment_recycled = False  # 最近一次 _process_equipment 是否触发了回收
     _tune_full_recycle_mode = False  # 调满后回收模式（跳过狗粮与规则判定，调满后回收）
+    _force_tune_mode = False  # 强制调律模式（扫描处理 tune_this：无视门槛进入调律页，配合初始判定重置）
     _expect_rating: str | None = None  # 当前装备期望评级 key（适用规则最高档）
 
     # ─── 功能组件（懒初始化）──────────────────────────────
@@ -526,8 +528,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         report["worthiness"] = logs
-        # 重置调满后回收模式标记（每件装备重新判断）
+        # 重置调满后回收模式标记与强制调律标记（每件装备重新判断）
         self._tune_full_recycle_mode = False
+        self._force_tune_mode = False
         if (expect is None or RATING_RANK[expect]
                 < RATING_RANK[scan_cfg.entry_min_rating]):
             entry_label = RATING_LABELS.get(scan_cfg.entry_min_rating,
@@ -539,6 +542,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # 调满后回收模式：继续走调律流程
             if self._tune_full_recycle_mode:
                 logger.info(f"  [{name}] 进入调满后回收模式")
+            elif self._force_tune_mode:
+                logger.info(f"  [{name}] 扫描处理强制调律，进入调律页")
             else:
                 return self._make_fingerprint(equip_data.to_dict()), False
 
@@ -576,10 +581,33 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         resets_used = 0
         tune_recycle_reason = ""
 
-        rounds = 0
+        # ── 初始判定（initial_check）：第一次调律前先执行一次结束处理 ──
+        # 用于垃圾金装复用：先走结束处理重置清空词条，再开始正常调律
+        skip_tune_loop = False
         stop_reason = ""
+        if tune_cfg.initial_check and tune_cfg.enabled:
+            logger.info(f"  ═══ [{name}] 初始判定（第一次调律前执行结束处理）═══")
+            action, why, resets_used, affix_count = self._execute_end_processing(
+                tune_cfg, equip_data, affix_count, resets_used, base_affixes,
+                potential=potential, is_initial_check=True)
+            if self._doc:
+                self._doc.note(f"初始判定：{why}")
+            if action == "continue":
+                # 放行或重置成功，进入正常调律循环
+                if resets_used > 0:
+                    report["resets"] = resets_used
+            else:
+                # skip 或 recycle → 结束调律循环
+                skip_tune_loop = True
+                if action == "recycle":
+                    tune_recycle_reason = f"初始判定：{why}"
+                stop_reason = f"初始判定：{why}"
+                report["stop_reason"] = stop_reason
+
+        rounds = 0
+        stop_reason = stop_reason or ""
         last_food_reason = ""
-        while not self.is_stopped:
+        while not self.is_stopped and not skip_tune_loop:
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
             self.wait_delay("page_refresh_wait")
@@ -604,64 +632,19 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     last_food_reason = self.executor.round_food_reason
                 self._doc.tune_round(rounds, self.executor.round_food,
                                      new_affix)
-            # 结束处理（tune 行为点）：传入规则口径刷新预期评级
-            # （供狗粮决策与说明文档）→ 行为表决策，评级按各规则
-            # 自身判定语义懒取；词条满为边界条件（continue 不可达）
-            full = affix_count >= self.MAX_AFFIX
-            # 调满后回收模式：跳过规则判定，调满即回收
-            if self._tune_full_recycle_mode:
-                if full:
-                    why = "调满后回收模式：词条已满，执行回收"
-                    logger.info(f"  [结束处理] {why}")
-                    tune_recycle_reason = why
-                    stop_reason = why
-                    report["stop_reason"] = stop_reason
-                    if self._doc:
-                        self._doc.round_decision(why)
-                    break
-                else:
-                    why = f"调满后回收模式：继续调律（{affix_count}/{self.MAX_AFFIX}）"
-                    logger.info(f"  [结束处理] {why}")
-                    if self._doc:
-                        self._doc.round_decision(why)
-                    continue
-            incoming, self._expect_rating = self.judge.refresh_expectation(
-                equip_data)
-            part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
-            rating_of = self.judge.rating_provider(equip_data, incoming)
-            action, why = tune_cfg.decide(part, quality, cap_pct, rating_of,
-                                          full,
-                                          [a.name
-                                           for a in equip_data.affixes])
-            logger.info(f"  [结束处理] {why}")
+            # 结束处理（tune 行为点）：调用公共结束处理逻辑
+            action, why, resets_used, affix_count = self._execute_end_processing(
+                tune_cfg, equip_data, affix_count, resets_used, base_affixes,
+                is_initial_check=False)
             if action == "continue":
+                # 放行或重置成功，继续调律循环
+                if resets_used > 0:
+                    report["resets"] = resets_used
+                    if self._doc:
+                        self._doc.note(f"重置调律（第 {resets_used} 次）：{why}")
                 if self._doc:
                     self._doc.round_decision(why)
                 continue
-            if action == "reset":
-                result = self.recycler.try_reset_tune(
-                    tune_cfg, resets_used, why)
-                if result is True:
-                    resets_used += 1
-                    report["resets"] = resets_used
-                    # 重置清空首词条以外全部词条 → 只剩首词条
-                    equip_data.affixes = base_affixes[:1]
-                    equip_data.extra_data["affix_count"] = 1
-                    affix_count = 1
-                    if self._doc:
-                        self._doc.note(
-                            f"重置调律（第 {resets_used} 次）：{why}")
-                    continue
-                if isinstance(result, str):
-                    # 冷却期拒绝 → 强制跳过（不走 reset_exhausted_action）
-                    action = "skip"
-                    why = result
-                else:
-                    # 重置次数已用尽（本地上限或按钮无次数）→ 按配置转处置
-                    action = tune_cfg.reset_exhausted_action
-                    if action == "recycle":
-                        why = f"重置次数已用尽转回收（{why}）"
-                        logger.info(f"  [结束处理] {why}")
             # 回收延到 back 回背包页后执行；skip = 结束保留
             if action == "recycle":
                 tune_recycle_reason = why
@@ -704,6 +687,135 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return "", True
         return self._make_fingerprint(equip_data.to_dict()), False
 
+    # ─── 结束处理公共逻辑（初始判定 + 每轮结束共用）──────────
+
+    def _execute_end_processing(
+        self, tune_cfg, equip_data: EquipmentData, affix_count: int,
+        resets_used: int, base_affixes: list, potential: dict | None = None,
+        is_initial_check: bool = False
+    ) -> tuple[str, str, int, int]:
+        """执行结束处理逻辑（初始判定或每轮结束后调用）
+
+        Args:
+            tune_cfg: 调律行为配置
+            equip_data: 装备数据
+            affix_count: 当前词条数
+            resets_used: 当前已重置次数
+            base_affixes: 首词条快照（重置后仅剩首词条）
+            potential: 初始判定时使用的潜力数据（仅初始判定需要）
+            is_initial_check: 是否为初始判定模式
+
+        Returns:
+            (action, why, new_resets_used, new_affix_count):
+            - action: "continue"=继续调律
+                      "recycle"=回收该装备
+                      "skip"=跳过/结束该装备
+            - why: 最终原因
+            - new_resets_used: 更新后的重置次数
+            - new_affix_count: 更新后的词条数（重置后为1）
+        """
+        prefix = "初始判定" if is_initial_check else "结束处理"
+        full = affix_count >= self.MAX_AFFIX
+
+        # 调满后回收模式：跳过规则判定，调满即回收
+        if self._tune_full_recycle_mode and not is_initial_check:
+            if full:
+                why = "调满后回收模式：词条已满，执行回收"
+                logger.info(f"  [{prefix}] {why}")
+                return "recycle", why, resets_used, affix_count
+            else:
+                why = f"调满后回收模式：继续调律（{affix_count}/{self.MAX_AFFIX}）"
+                logger.info(f"  [{prefix}] {why}")
+                return "continue", why, resets_used, affix_count
+
+        # 刷新预期评级（结束处理时更新，初始判定时使用传入的 potential）
+        if is_initial_check:
+            incoming = potential
+        else:
+            incoming, self._expect_rating = self.judge.refresh_expectation(equip_data)
+
+        # 获取判定输入并决策
+        part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
+        rating_of = self.judge.rating_provider(equip_data, incoming)
+        action, why = tune_cfg.decide(
+            part, quality, cap_pct, rating_of, full,
+            [a.name for a in equip_data.affixes])
+        logger.info(f"  [{prefix}] {why}")
+
+        # 处理各动作
+        if action == "continue":
+            return "continue", why, resets_used, affix_count
+
+        if action == "reset":
+            # 调用重置公共逻辑
+            action, why, resets_used = self._execute_reset_action(
+                tune_cfg, equip_data, resets_used, why, prefix=prefix)
+            if action == "continue":
+                # 重置成功，更新装备状态
+                equip_data.affixes = base_affixes[:1]
+                equip_data.extra_data["affix_count"] = 1
+                return "continue", why, resets_used, 1
+            # skip 或 recycle → 直接返回
+            return action, why, resets_used, affix_count
+
+        # recycle 或 skip → 直接返回
+        return action, why, resets_used, affix_count
+
+    # ─── 重置调律公共逻辑（等级配置检查 + 重置执行）──────────
+
+    def _execute_reset_action(
+        self, tune_cfg, equip_data: EquipmentData, resets_used: int,
+        why: str, prefix: str = "结束处理"
+    ) -> tuple[str, str, int]:
+        """执行重置调律的公共逻辑（等级配置检查 + 重置执行）
+
+        Args:
+            tune_cfg: 调律行为配置
+            equip_data: 装备数据
+            resets_used: 当前已重置次数
+            why: 触发重置的原因
+            prefix: 日志前缀（"初始判定" 或 "结束处理"）
+
+        Returns:
+            (action, why, new_resets_used):
+            - action: "continue"=重置成功继续调律
+                      "skip"=跳过该装备
+                      "recycle"=回收该装备
+            - why: 最终原因
+            - new_resets_used: 更新后的重置次数
+        """
+        # 等级配置检查：该等级是否允许重置
+        game_cfg = get_game_config()
+        level_cfg = game_cfg.level_config_for(equip_data.level or 0)
+        if level_cfg is None:
+            # 等级配置不存在 → 异常，跳过该装备
+            logger.error(
+                f"  [{prefix}] 等级配置缺失（level={equip_data.level}），"
+                "视为异常，跳过该装备")
+            return "skip", f"等级配置缺失（level={equip_data.level}）", resets_used
+        if level_cfg.allow_reset is False:
+            # 该等级不支持重置 → 视为重置次数用尽
+            action = tune_cfg.reset_exhausted_action
+            why = (f"等级 {equip_data.level} 不支持重置"
+                   f"（视为重置次数用尽）转{action}")
+            logger.info(f"  [{prefix}] {why}")
+            return action, why, resets_used
+        # 等级配置允许重置，继续正常重置流程
+        result = self.recycler.try_reset_tune(
+            tune_cfg, resets_used, why,
+            min_material_count=level_cfg.min_material_count)
+        if result is True:
+            return "continue", why, resets_used + 1
+        if isinstance(result, str):
+            # 冷却期/材料不足拒绝 → 强制跳过（不走 reset_exhausted_action）
+            return "skip", result, resets_used
+        # 重置次数已用尽（本地上限或按钮无次数）→ 按配置转处置
+        action = tune_cfg.reset_exhausted_action
+        if action == "recycle":
+            why = f"重置次数已用尽转回收（{why}）"
+            logger.info(f"  [{prefix}] {why}")
+        return action, why, resets_used
+
     # ─── 行为处置（按 tuning_base.behavior 行为点配置驱动）──────
 
     def _on_scan_reject(self, equip_data: EquipmentData, potential: dict,
@@ -736,13 +848,19 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                  [a.name for a in equip_data.affixes])
         if action == "tune_full_recycle":
             if already_full:
-                # 已满装备无需再调，"调满后回收"意图等价于直接回收
+                # 已满装备无需再调，“调满后回收”意图等价于直接回收
                 logger.info(f"  [扫描处理] {label} {why}（已满，直接回收）")
                 return self.recycler.recycle_current(equip_data, detail_scene,
                                                      "scan", why)
             # 未满：设置标记，继续走调律流程
             logger.info(f"  [扫描处理] {label} {why}（调满后回收模式）")
             self._tune_full_recycle_mode = True
+            return False
+        if action == "tune_this":
+            # 强制调律：无视进入门槛，强制进入调律页
+            # 配合结束处理「启用初始判定」实现调废装备重置复用
+            logger.info(f"  [扫描处理] {label} {why}（强制调律模式）")
+            self._force_tune_mode = True
             return False
         if action != "recycle":
             logger.info(f"  [扫描处理] {label} {why}")

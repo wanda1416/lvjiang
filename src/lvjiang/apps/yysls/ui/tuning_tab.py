@@ -346,18 +346,12 @@ class TuningTab(QWidget):
         flow_name = "自动调律"
 
         # 基础规则组（启动时快照注入）
-        from ..evaluator.tuning_rules import (
-            TuningGroup,
-            get_tuning_group,
-            get_tuning_group_manager,
-        )
+        from ..evaluator.tuning_rules import get_tuning_group
         group_key = self._base_group_key
         base_group = get_tuning_group(group_key) if group_key else None
         if base_group is None:
-            # 回退到第一个可用组，或空实例
-            groups = get_tuning_group_manager().get_groups()
-            first_key = next(iter(groups), "")
-            base_group = get_tuning_group(first_key) or TuningGroup()
+            host.append_log(f"[错误] 基础规则组 '{group_key}' 不存在，拒绝启动")
+            return
 
         def configure(wf_instance, engine):
             from ..workflows.tuning_context import TuningRunContext

@@ -32,6 +32,7 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     PositionalTraversal,
     ScrollState,
 )
+from lvjiang.apps.yysls.workflows.implementations.tuning import TuningRecorder
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
     judge as tuning_judge,
 )
@@ -829,8 +830,6 @@ def test_scan_custom_scope_protects(monkeypatch):
         return dict(_WORTHY) if configs is None else dict(_JUNK)
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    monkeypatch.setattr(auto_tuning, "get_rule_names",
-                        lambda: {"huiyi": "会意"})
     monkeypatch.setattr(tuning_judge, "get_rule_names",
                         lambda: {"huiyi": "会意"})
     base = _behavior_base(scan=ScanBehavior(
@@ -944,8 +943,6 @@ def test_judge_by_scope_filter(monkeypatch):
         return {}
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    monkeypatch.setattr(auto_tuning, "get_rule_names",
-                        lambda: {"huiyi": "会意"})
     monkeypatch.setattr(tuning_judge, "get_rule_names",
                         lambda: {"huiyi": "会意"})
     wf = FakeWF()
@@ -1495,7 +1492,7 @@ class RowColsFakeWF(FakeWF):
                            row=None, col=1):
         self.processed.append(name)
         if name in self.recycled_names:
-            self._equipment_recycled = True
+            self.recorder.equipment_recycled = True
             # 模拟回收后背包补位：移除当前格，后续列前移
             if row is not None and col is not None:
                 self.cell_map.pop((row, col), None)
@@ -1505,7 +1502,7 @@ class RowColsFakeWF(FakeWF):
                         break
                     self.cell_map[(row, c - 1)] = item
             return ""   # 回收后该格已空（由上层重读判断）
-        self._equipment_recycled = False
+        self.recorder.equipment_recycled = False
         return f"fp_{name}"   # 模拟调律后指纹变化
 
 
@@ -1667,7 +1664,7 @@ class TestTuningDocIntegration:
                            "skipped": False, "not_applicable": False,
                            "reasons": []}}),
         ]
-        items = AutoTuningWorkflow._summary_items(tuned)
+        items = TuningRecorder.summary_items(tuned)
         assert [i["name"] for i in items] == ["顶级剑", "一般剑", "双规则剑"]
         assert items[0]["rating_text"] == "血河：顶级"
         # 双规则：最高档优秀入选，rating_text 罗列全部适用规则
@@ -1691,7 +1688,7 @@ class TestTuningDocIntegration:
         monkeypatch.setattr(auto_tuning, "TuningDocWriter", boom)
         wf = FakeWF()
         wf._open_doc(["main_weapon"])
-        assert wf._doc is None
+        assert wf.recorder.doc is None
         wf._close_doc()   # 幂等，不抛
 
 

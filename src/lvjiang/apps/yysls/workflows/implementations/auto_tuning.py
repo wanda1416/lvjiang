@@ -372,16 +372,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _traverse_bag(self, detail_scene: str):
         """按配置选择遍历策略并执行（策略实现见 bag_traversal）
 
-        优先级：注入配置 ctx.scroll_strategy > 插件 session tuning 节的
-        scroll_strategy > 默认 DEFAULT_TRAVERSAL。回切旧方案：在
-        config/session/yysls/session.json 的 tuning 节配
-        "scroll_strategy": "positional"。
+        优先级：注入配置 ctx.scroll_strategy > 统一存储 wf_configs 的
+        scroll_strategy > 默认 DEFAULT_TRAVERSAL。
         """
         key = self.ctx.scroll_strategy or ""
         if not key:
             try:
-                from lvjiang.apps.yysls.tune_config import get_tune_config
-                key = get_tune_config().scroll_strategy
+                from lvjiang.core.config.wf_configs import get_wf_config
+                key = get_wf_config("auto_tuning").get("scroll_strategy", "")
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"读取遍历策略配置失败，用默认: {e}")
         if key and key not in TRAVERSALS:
@@ -911,23 +909,25 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _ensure_judge_config(self):
         """保证 ctx.judge_configs/judge_rule_keys 可用。
 
-        优先用 run_control 注入的实时 UI 配置；未注入时回退读插件会话
-        tuning.rules + tuning.switches，
+        优先用 run_control 注入的实时 UI 配置；未注入时回退读统一存储
+        wf_configs["auto_tuning"] 的 rules + switches，
         无有效配置时回退 (None, None) 即全部规则默认配置。
         """
         ctx = self.ctx
         if ctx.judge_configs is not None or ctx.judge_rule_keys is not None:
             return
         try:
-            from lvjiang.apps.yysls.tune_config import get_tune_config
-            tc = get_tune_config()
+            from lvjiang.core.config.wf_configs import get_wf_config
+            tc = get_wf_config("auto_tuning")
         except Exception as e:  # noqa: BLE001
             logger.warning(f"读取调律规则配置失败，按全部规则默认判定: {e}")
             return
-        if not tc.rules:
+        rules = tc.get("rules", {})
+        if not rules:
             return
-        enabled = {k: {**cfg, "switches": tc.switches}
-                   for k, cfg in tc.rules.items()
+        switches = tc.get("switches", {})
+        enabled = {k: {**cfg, "switches": switches}
+                   for k, cfg in rules.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if enabled:
             ctx.judge_rule_keys = list(enabled)
@@ -935,14 +935,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _resolve_selected_slots(self) -> list[str]:
         """调律部位：优先 UI 注入的 ctx.selected_slots；设备端经 task_runner
-        启动时 ctx 未注入（selected_slots=None），回退读插件会话
-        tuning.selected_slots（与 _ensure_judge_config 读 rules/switches 对称）；
+        启动时 ctx 未注入（selected_slots=None），回退读统一存储
+        wf_configs["auto_tuning"].selected_slots；
         仍无有效配置时按全部部位。"""
         selected = self.ctx.selected_slots
         if selected is None:
             try:
-                from lvjiang.apps.yysls.tune_config import get_tune_config
-                raw = get_tune_config().selected_slots
+                from lvjiang.core.config.wf_configs import get_wf_config
+                raw = get_wf_config("auto_tuning").get("selected_slots")
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"读取调律部位配置失败，按全部部位: {e}")
                 raw = None

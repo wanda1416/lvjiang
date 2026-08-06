@@ -213,12 +213,12 @@ class BaseRuleGroupPage(QWidget):
         if not key or key == self._group_key:
             return
         self._group_key = key
-        # 持久化到 session（调律任务启动时的回退依据）
+        # 持久化到统一存储（调律任务启动时的回退依据）
         try:
-            from lvjiang.apps.yysls.tune_config import get_tune_config
-            cfg = get_tune_config()
-            cfg.base_group = key
-            cfg.save()
+            from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
+            cfg = get_wf_config("auto_tuning")
+            cfg["base_group"] = key
+            set_wf_config("auto_tuning", cfg)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"基础规则组选择持久化失败: {e}")
         self._loading = True

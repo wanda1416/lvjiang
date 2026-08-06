@@ -23,7 +23,12 @@ from ....core.layout_manager import rename_item_key_across_all_layouts
 from ....core.scene_definition import VALID_REGION_TYPES, RegionDef
 from ....core.scene_registry import get_registry, is_view_visible, sync_scene_cache
 from ...widgets import strip_focus_rect
-from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
+from .scene_select import (
+    add_scene_combo_row,
+    add_view_combo_row,
+    combo_view_value,
+    connect_scene_view_sync,
+)
 
 
 class RegionPanelMixin:
@@ -306,6 +311,10 @@ class RegionPanelMixin:
             form, self._scene_key,
             region_def.view if region_def else self._current_view,
         )
+
+        # 场景切换时同步更新视图下拉框
+        if scene_combo is not None:
+            connect_scene_view_sync(scene_combo, view_combo)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel

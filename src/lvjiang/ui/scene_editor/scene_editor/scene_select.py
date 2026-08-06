@@ -29,17 +29,41 @@ def add_view_combo_row(
     条目显示视图名，userData 存 view key（基底视图为 BASE_VIEW_KEY）。
     selected_view 空视为基底。
     """
-    views = get_scene_views(scene_key)
-    if not views:
-        return None
     combo = QComboBox()
-    for v in views:
-        combo.addItem(v.name, userData=v.key)
-        is_base = v.key == BASE_VIEW_KEY
-        if v.key == selected_view or (not selected_view and is_base):
-            combo.setCurrentIndex(combo.count() - 1)
+    _populate_view_combo(combo, scene_key, selected_view)
     form.addRow("视图:", combo)
     return combo
+
+
+def _populate_view_combo(combo: QComboBox, scene_key: str, selected_view: str):
+    """填充视图下拉框：无多视图则清空并禁用"""
+    combo.blockSignals(True)
+    combo.clear()
+    views = get_scene_views(scene_key)
+    if not views:
+        combo.addItem("单视图", userData="")
+        combo.setEnabled(False)
+    else:
+        combo.setEnabled(True)
+        for v in views:
+            combo.addItem(v.name, userData=v.key)
+            is_base = v.key == BASE_VIEW_KEY
+            if v.key == selected_view or (not selected_view and is_base):
+                combo.setCurrentIndex(combo.count() - 1)
+    combo.blockSignals(False)
+
+
+def connect_scene_view_sync(scene_combo: QComboBox, view_combo: QComboBox | None):
+    """连接场景切换信号，同步更新视图下拉框"""
+    if view_combo is None:
+        return
+
+    def _on_scene_changed(index: int):
+        new_scene_key = scene_combo.currentData()
+        if new_scene_key:
+            _populate_view_combo(view_combo, new_scene_key, "")
+
+    scene_combo.currentIndexChanged.connect(_on_scene_changed)
 
 
 def combo_view_value(combo: QComboBox | None, fallback: str) -> str:

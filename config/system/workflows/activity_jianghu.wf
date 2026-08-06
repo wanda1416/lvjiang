@@ -229,8 +229,16 @@ def action_dongfang($label, $idx)
    click [general_action].[actions][$fr][$fc] after wait step_interval
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
-   click [general_action].[choose_1] after wait step_interval
-   click [general_action].[back] after wait step_interval
+   click [general_action].[choose_1] after wait page_refresh_wait
+   click [general_action].[back] after wait page_refresh_wait
+
+   # 投票后可能弹出确认弹窗，识别到“确认”则点击“取消”关闭
+   scan [general_control].[confirm] as $has_confirm by contains "确认"
+   if $has_confirm
+      log "检测到确认弹窗，点击取消关闭"
+      click [general_control].[cancel] after wait step_interval
+   end
+
    click [general_action].[back] after wait step_interval
 
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回

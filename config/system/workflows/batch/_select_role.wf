@@ -31,9 +31,9 @@ def _select_role($role_index)
 
     # 等待主页加载完成：检测菜单、活动、武林录任一文字
     # 能读到 → 登录完成；否则关闭活动弹窗
-    eval $main_items = ["菜单", "活动", "武林录"]
+    eval $main_items = ["菜单", "活动", "武林录", "限时"]
     loop 8
-        scan [game_main_page].[menu, huodong, wulinlu] as $found by contains_any $main_items
+        scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
         if $found
             log "主页加载完成，检测到：" + $found
             goto all_done

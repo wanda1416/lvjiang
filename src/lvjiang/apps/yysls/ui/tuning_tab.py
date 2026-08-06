@@ -299,7 +299,7 @@ class TuningTab(QWidget):
         self._start_tuning()
 
     def _start_tuning(self):
-        """收集并校验调律配置，通过宿主启动 auto_tuning 工作流"""
+        """从统一存储读取调律配置，校验后启动 auto_tuning 工作流"""
         host = self._host
 
         # 图库空间预检（UI 即时反馈，与工作流 run() 预检同契约）
@@ -307,7 +307,11 @@ class TuningTab(QWidget):
             host.append_log("[错误] 当前图库空间缺少 levels/counts 输出字段，无法启动自动调律")
             return
 
-        selected_slots = self._get_tuning_selected_slots()
+        # ── 从统一存储读取配置 ──
+        from ....core.config.wf_configs import get_wf_config
+        tc = get_wf_config("auto_tuning")
+
+        selected_slots = tc.get("selected_slots") or []
         if not selected_slots:
             host.append_log("[错误] 请至少选择一个调律部位")
             return
@@ -319,15 +323,15 @@ class TuningTab(QWidget):
             get_tuning_rules,
             is_rule_implemented,
         )
-        rules_cfg = self._get_tuning_rule_config()
+        rules_cfg = tc.get("rules", {})
         enabled = {k: cfg for k, cfg in rules_cfg.items() if cfg.get("enabled")}
         if not enabled:
             host.append_log("[错误] 请至少选择一个调律规则")
             return
         rule_judges = []
         rule_map = get_tuning_rules()
-        switches = {str(k): bool(v) for k, v in self._get_tuning_switches().items()}
-        skip_tuning = self._get_tuning_skip_tuning()
+        switches = {str(k): bool(v) for k, v in tc.get("switches", {}).items()}
+        skip_tuning = bool(tc.get("skip_tuning", False))
         for rule_key, cfg in enabled.items():
             if not is_rule_implemented(rule_key):
                 host.append_log(f"[警告] 规则「{get_rule_names().get(rule_key, rule_key)}」判定暂未实现，已跳过")
@@ -347,23 +351,22 @@ class TuningTab(QWidget):
 
         # 基础规则组（启动时快照注入）
         from ..evaluator.tuning_rules import get_tuning_group
-        group_key = self._base_group_key
+        group_key = tc.get("base_group", "")
         base_group = get_tuning_group(group_key) if group_key else None
         if base_group is None:
             host.append_log(f"[错误] 基础规则组 '{group_key}' 不存在，拒绝启动")
             return
 
+        # 运行时瞬态字段（启动时从 UI 即时读取，保存时也会持久化）
+        skip_start = None
+        if self._cb_skip.isChecked() and self._cb_skip.isEnabled():
+            skip_start = (self._sp_skip_row.value(), self._sp_skip_col.value())
+        target_cell = None
+        if self._cb_target.isChecked() and self._cb_target.isEnabled():
+            target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
+
         def configure(wf_instance, engine):
             from ..workflows.tuning_context import TuningRunContext
-            # 运行上下文一次性收口注入（字段契约见 TuningRunContext）：
-            # judge_configs 对齐 UI 实时勾选，供 judge_equipment_potential 使用；
-            # skip_tuning 为临时测试开关（仅模拟进出调律页，便于测试滚动）
-            skip_start = None
-            if self._cb_skip.isChecked() and self._cb_skip.isEnabled():
-                skip_start = (self._sp_skip_row.value(), self._sp_skip_col.value())
-            target_cell = None
-            if self._cb_target.isChecked() and self._cb_target.isEnabled():
-                target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
             wf_instance.run_ctx = TuningRunContext(
                 selected_slots=selected_slots,
                 rule_judges=rule_judges,
@@ -393,10 +396,10 @@ class TuningTab(QWidget):
     # ─── 调律配置持久化（插件会话 config/session/yysls/session.json）──
 
     def _load_tuning_config(self):
-        from ..tune_config import TuneConfig
-        tc = TuneConfig.load()
-        selected = tc.selected_slots or list(DEFAULT_SLOTS)
-        rules_cfg = tc.rules or {"huiyi_general": {"enabled": True}}
+        from ....core.config.wf_configs import get_wf_config
+        tc = get_wf_config("auto_tuning")
+        selected = tc.get("selected_slots") or list(DEFAULT_SLOTS)
+        rules_cfg = tc.get("rules") or {"huiyi_general": {"enabled": True}}
         for cb in self._tuning_checkboxes:
             cb.blockSignals(True)
             # 禁用项（副武器）不随会话配置回选
@@ -404,15 +407,16 @@ class TuningTab(QWidget):
             cb.blockSignals(False)
         self._tuning_config.set_config(rules_cfg)
         # 基础规则单选（无持久值时选第一个可用组）
-        self._base_group_key = tc.base_group
+        self._base_group_key = tc.get("base_group", "")
         self._select_base_group_radio(self._base_group_key)
-        self._tuning_globals.set_switches(tc.switches)
-        self._tuning_globals.set_skip_tuning(tc.skip_tuning)
+        self._tuning_globals.set_switches(tc.get("switches", {}))
+        self._tuning_globals.set_skip_tuning(bool(tc.get("skip_tuning", False)))
         # 初始跳过 / 指定调律
-        for val, cb, sp_row, sp_col in (
-            (tc.skip_start, self._cb_skip, self._sp_skip_row, self._sp_skip_col),
-            (tc.target_cell, self._cb_target, self._sp_target_row, self._sp_target_col),
+        for key, cb, sp_row, sp_col in (
+            ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
+            ("target_cell", self._cb_target, self._sp_target_row, self._sp_target_col),
         ):
+            val = tc.get(key)
             cb.blockSignals(True)
             sp_row.blockSignals(True)
             sp_col.blockSignals(True)
@@ -428,22 +432,25 @@ class TuningTab(QWidget):
         self._on_skip_target_toggled()
 
     def _save_tuning_config(self):
-        from ..tune_config import TuneConfig
+        from ....core.config.wf_configs import get_wf_config, set_wf_config
         skip_start = None
         if self._cb_skip.isChecked():
             skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]
         target_cell = None
         if self._cb_target.isChecked():
             target_cell = [self._sp_target_row.value(), self._sp_target_col.value()]
-        TuneConfig(
-            selected_slots=self._get_tuning_selected_slots(),
-            rules=self._get_tuning_rule_config(),
-            switches=self._get_tuning_switches(),
-            base_group=self._base_group_key,
-            skip_tuning=self._get_tuning_skip_tuning(),
-            skip_start=skip_start,
-            target_cell=target_cell,
-        ).save()
+        # 保留设备端写入的非 UI 字段（如 scroll_strategy）
+        old = get_wf_config("auto_tuning")
+        set_wf_config("auto_tuning", {
+            "selected_slots": self._get_tuning_selected_slots(),
+            "rules": self._get_tuning_rule_config(),
+            "switches": self._get_tuning_switches(),
+            "base_group": self._base_group_key,
+            "skip_tuning": self._get_tuning_skip_tuning(),
+            "skip_start": skip_start,
+            "target_cell": target_cell,
+            "scroll_strategy": old.get("scroll_strategy", ""),
+        })
 
     def _set_all_tuning_checks(self, checked: bool):
         for cb in self._tuning_checkboxes:

@@ -43,6 +43,12 @@ from .session import (
     save_settings,
 )
 from .users import SessionManager
+from .wf_configs import (
+    delete_wf_config,
+    get_all_wf_configs,
+    get_wf_config,
+    set_wf_config,
+)
 
 __all__ = [
     # 基础设施
@@ -71,6 +77,11 @@ __all__ = [
     "load_material_grid",
     "save_material_grid",
     "load_user_config",
+    # 工作流配置统一存储
+    "get_wf_config",
+    "set_wf_config",
+    "delete_wf_config",
+    "get_all_wf_configs",
 ]
 
 

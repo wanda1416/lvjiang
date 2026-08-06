@@ -1702,13 +1702,12 @@ class TestResolveSelectedSlots:
 
     @pytest.fixture
     def session(self, tmp_path, monkeypatch):
-        import lvjiang.apps.yysls.session as ps_module
-        import lvjiang.apps.yysls.tune_config as tc_module
-        from lvjiang.apps.yysls.session import PluginSession
-        sess = PluginSession(tmp_path / "session.json")
-        monkeypatch.setattr(ps_module, "_session", sess)
-        monkeypatch.setattr(tc_module, "_instance", None)
-        return sess
+        import lvjiang.constants as constants_mod
+        import lvjiang.core.config.session as store_mod
+        path = tmp_path / "session.json"
+        monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
+        store_mod.reset_session_store()
+        return store_mod.get_session_store()
 
     def _device_wf(self):
         wf = FakeWF()
@@ -1716,7 +1715,7 @@ class TestResolveSelectedSlots:
         return wf
 
     def test_device_reads_session(self, session):
-        session.set_section("tuning", {"selected_slots": ["ring", "head"]})
+        session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring", "head"]}})
         assert self._device_wf()._resolve_selected_slots() == ["ring", "head"]
 
     def test_empty_session_falls_back_to_all(self, session):
@@ -1725,14 +1724,14 @@ class TestResolveSelectedSlots:
             wf.WEAPON_SLOTS + wf.ARMOR_SLOTS)
 
     def test_injected_ctx_ignores_session(self, session):
-        session.set_section("tuning", {"selected_slots": ["ring"]})
+        session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring"]}})
         wf = self._device_wf()
         wf.run_ctx = TuningRunContext(selected_slots=["main_weapon"])  # UI 已注入
         assert wf._resolve_selected_slots() == ["main_weapon"]
 
     def test_unknown_slot_keys_dropped(self, session):
-        session.set_section("tuning",
-                            {"selected_slots": ["ring", "bogus"]})
+        session.set_node("wf_configs",
+                         {"auto_tuning": {"selected_slots": ["ring", "bogus"]}})
         assert self._device_wf()._resolve_selected_slots() == ["ring"]
 
 

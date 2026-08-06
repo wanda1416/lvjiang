@@ -32,7 +32,7 @@ DSL 通过三个正交指令实现代码复用和模块化：
 
 ```
 import "subcall/bag_process_slot.wf"
-import "subcall/nav.wf"
+import "subcall/navigation.wf"
 ```
 
 - 路径基于**当前 wf 所在目录**解析（相对路径）
@@ -182,8 +182,7 @@ call do_something()  # 不关心返回值
 # ── 主工作流：single_tuning.wf ──
 
 # 导入依赖
-import "subcall/nav_main_to_equip.wf"
-import "subcall/nav_equip_to_tune.wf"
+import "subcall/navigation.wf"
 import "subcall/find_tune_material.wf"
 
 # 调用导航过程
@@ -209,7 +208,7 @@ end
 ```
 
 ```
-# ── 子过程文件：subcall/nav_equip_to_tune.wf ──
+# ── 子过程文件：subcall/navigation.wf 中的 nav_equip_to_tune ──
 
 def nav_equip_to_tune()
     click [equip_detail].[more_func]

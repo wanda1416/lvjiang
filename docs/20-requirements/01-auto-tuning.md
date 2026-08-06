@@ -16,7 +16,7 @@
 | `equip_analysis.wf` | 扫描身上已穿戴的 8 件装备 |
 | `single_tuning.wf` | 对指定背包格装备执行一次调律 |
 | `MingHongEvaluator` | 装备评估（品阶/首词条/神力/扣分/评级）+ 调律熔断判断 |
-| `nav_main_to_equip.wf` / `nav_equip_to_tune.wf` | 导航子流程 |
+| `navigation.wf` | 导航子流程（含 nav_main_to_equip / nav_equip_to_tune / nav_back_to_main） |
 | `AttrRuleManager` | 词条上限查询、品阶推断、词条分类映射（全局单例） |
 | `affix_cap` / `chengyin_cap` | DSL 内置函数，查询词条上限 |
 
@@ -348,10 +348,11 @@ src/lvjiang/apps/yysls/workflows/implementations/
 导航逻辑通过 DSL subcall 文件实现，避免 Python 与 DSL 两处重复维护：
 
 ```python
-# 导航 subcall 文件
-_NAV_MAIN_TO_EQUIP = ("subcall/nav_main_to_equip.wf", "nav_main_to_equip")
-_NAV_EQUIP_TO_TUNE = ("subcall/nav_equip_to_tune.wf", "nav_equip_to_tune")
-_NAV_BACK_TO_MAIN = ("subcall/nav_back_to_main.wf", "nav_back_to_main")
+# 导航 subcall 文件（统一在 navigation.wf 中定义）
+_NAV_FILE = "subcall/navigation.wf"
+_NAV_MAIN_TO_EQUIP = (_NAV_FILE, "nav_main_to_equip")
+_NAV_EQUIP_TO_TUNE = (_NAV_FILE, "nav_equip_to_tune")
+_NAV_BACK_TO_MAIN = (_NAV_FILE, "nav_back_to_main")
 ```
 
 引擎通过 `load_subcalls()` 加载，`call_subcall()` 桥调用。

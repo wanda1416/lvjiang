@@ -82,9 +82,7 @@ def test_real_nav_subcalls_loadable():
     assert layout is not None
     eng = make_engine(layout=layout,
                       delay_params=load_user_config().delay_params)
-    eng.load_subcalls("subcall/nav_main_to_equip.wf")
-    eng.load_subcalls("subcall/nav_equip_to_tune.wf")
-    eng.load_subcalls("subcall/nav_back_to_main.wf")
+    eng.load_subcalls("subcall/navigation.wf")
     assert "nav_main_to_equip" in eng._procs
     assert "nav_equip_to_tune" in eng._procs
     assert "nav_back_to_main" in eng._procs

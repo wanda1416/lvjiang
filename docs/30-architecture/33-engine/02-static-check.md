@@ -46,7 +46,7 @@ DSL 只认 key，不认场景定义里的中文名 —— `[返回]` 写成字�
 ```
 静态检查未通过，脚本有 2 处引用在当前布局中找不到：
   activity_jianghu.wf:187  [activity_jianghu].[返回] — 区域/坐标点未绑定
-  nav_main_to_equip.wf:12  [game_menu_page].[bag] — 区域/坐标点未绑定
+  navigation.wf:12  [game_menu_page].[bag] — 区域/坐标点未绑定
 请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定
 ```
 

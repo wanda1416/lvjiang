@@ -411,7 +411,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if row is None:
             self.recorder.equipment_recycled = True
             return ""
-        for _ in range(200):
+        # 回收补位循环上限
+        max_recycles = self.base_group.scan.max_consecutive_recycles
+        for _ in range(max_recycles):
             if self.is_stopped:
                 break
             name, fp, equip = self._read_row(detail_scene, row, col)

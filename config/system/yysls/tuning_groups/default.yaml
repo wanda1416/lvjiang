@@ -35,6 +35,7 @@ scan:
   enabled: true
   min_level: 100
   entry_min_rating: top
+  max_consecutive_recycles: 50
   rules:
   - parts:
     - 武器

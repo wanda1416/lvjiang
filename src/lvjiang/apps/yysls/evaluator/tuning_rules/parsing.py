@@ -260,7 +260,7 @@ def parse_tuning_rule(data: dict,
                       switch_keys: set[str] | None = None) -> TuningRule:
     """原始 YAML dict → TuningRule（校验失败抛 RuleValidationError）
 
-    switch_keys 为已注册开关 key 全集（来自 tuning_base.switches），
+    switch_keys 为已注册开关 key 全集（来自 tune_config.switches），
     传入时校验全部条件组 when 引用；None 跳过（单测/离线解析）。
     """
     if not isinstance(data, dict):

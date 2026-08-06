@@ -27,7 +27,7 @@ schema 要点：
   保留与填充），潜力判定据此填充空槽；transmute_priority 独立
   （转律只能转出库内词条，转入取库中最高优先级）；字面无相与
   动态词条可在库内并存（经部位过滤互不干扰）；
-- 开关注册表在 tuning_base.yaml 的 switches 段（key → {name}），
+- 开关注册表在 tune_config.yaml 的 switches 段（key → {name}），
   条件组 when 只能引用已注册开关。
 """
 
@@ -285,7 +285,7 @@ class TuningRule:
     common: CommonConditions = field(default_factory=CommonConditions)
     # 四档条件全不命中时的默认判定（RATING_KEYS 之一）
     default_rating: str = "excellent"
-    # 品阶门槛覆盖（部位 → 允许品阶；未列部位沿用全局 tuning_base）
+    # 品阶门槛覆盖（部位 → 允许品阶；未列部位沿用全局 tune_config）
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
 
     @property

@@ -1,10 +1,20 @@
 #% name: 装备分析
 
-import "subcall/nav_main_to_equip.wf"
-import "subcall/nav_back_to_main.wf"
+import "subcall/navigation.wf"
 
 # 装备分析工作流
-# 读取角色已装备数据，写入 session.equipped 持久化
+#
+# 流程结构：
+#   1. 导航：从首页进入装备页面（调用 nav_main_to_equip）
+#   2. 读取武器类装备：主武器、副武器、戒指、吊坠
+#   3. 读取防具类装备：冠胄、胸甲、胫甲、腕甲
+#   4. 将读取结果写入 session.equipped 持久化
+#   5. 输出装备数据供调用方使用（collect）
+#   6. 返回主界面（调用 nav_back_to_main）
+#
+# 输出：
+#   session.equipped — 字典，key 为槽位名，value 为装备解析结果
+#   collect 输出 — 同上字典，供工作流调用方 read 取用
 
 call nav_main_to_equip()
 

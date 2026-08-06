@@ -20,6 +20,16 @@ def _build_equip_status_tab(host):
     return EquipStatusTab(host)
 
 
+def _build_profile_overview_tab(host):
+    from .ui.profile_tab import ProfileOverviewTab
+    return ProfileOverviewTab(host)
+
+
+def _build_profile_tab(host):
+    from .ui.profile_tab import ProfileTab
+    return ProfileTab(host)
+
+
 def _build_menu(host, menubar):
     from .ui.menus import build_menu
     build_menu(host, menubar)
@@ -31,7 +41,11 @@ hooks = AppHooks(
 
     # 注入通用 MainWindow 的 Tab / 菜单
     left_tab_builders=[("调律", _build_tuning_tab)],
-    right_tab_builders=[("装备状态", _build_equip_status_tab)],
+    right_tab_builders=[
+        ("角色总览", _build_profile_overview_tab),
+        ("装备状态", _build_equip_status_tab),
+        ("角色状态", _build_profile_tab),
+    ],
     menu_builders=[_build_menu],
 
     # 识别器：燕云材料识别器（模板匹配 + OCR）

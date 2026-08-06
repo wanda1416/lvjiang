@@ -648,10 +648,12 @@ class ScanBehavior:
     调律（固定用传入规则判定，调律目标就是运行期所选流派）；
     rules: 不进调律装备的处置表（首条命中；无命中=跳过该装备），
     评级判定语义与仅注入首词条均逐规则声明（BehaviorRule）。
+    max_consecutive_recycles: 回收补位循环上限
     """
     enabled: bool = True
     min_level: int = 100
     entry_min_rating: str = "excellent"
+    max_consecutive_recycles: int = 50
     rules: list[BehaviorRule] = field(default_factory=list)
 
     def decide(self, part: str | None, quality: str | None,

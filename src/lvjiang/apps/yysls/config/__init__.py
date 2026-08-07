@@ -2,7 +2,7 @@
 
 统一管理游戏配置与玩家信息元数据：
 - game_config.yaml: 游戏基础配置（属性品阶、词条上限、流派等）
-- profile.yaml: 玩家信息字段定义与分组
+- profile.yaml: 玩家数据模型定义（按模型归档）
 
 数据来源：
 - config/system/yysls/game_config.yaml
@@ -19,12 +19,20 @@ from .constants import (
 )
 from .manager import GameConfigManager, get_game_config
 from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
+from .profile_models import (
+    ALL_MODELS,
+    MODEL_LABELS,
+    ActivityKeyDef,
+    DailyKeyDef,
+    KeyDef,
+    RealtimeKeyDef,
+    ResourceKeyDef,
+)
 from .user_profile import (
-    FieldDef,
-    GroupDef,
-    ProfileConfig,
+    ProfileSchema,
     get_profile_config,
     reload_profile_config,
+    save_profile_config,
 )
 
 __all__ = [
@@ -43,10 +51,16 @@ __all__ = [
     # 游戏配置管理器
     "GameConfigManager",
     "get_game_config",
-    # 玩家信息元数据
-    "FieldDef",
-    "GroupDef",
-    "ProfileConfig",
+    # 玩家数据模型
+    "ALL_MODELS",
+    "MODEL_LABELS",
+    "KeyDef",
+    "DailyKeyDef",
+    "RealtimeKeyDef",
+    "ResourceKeyDef",
+    "ActivityKeyDef",
+    "ProfileSchema",
     "get_profile_config",
     "reload_profile_config",
+    "save_profile_config",
 ]

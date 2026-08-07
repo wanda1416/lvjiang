@@ -490,7 +490,7 @@ class LayoutConfigManager:
             or (resolver.local_dir / _LAYOUTS_YAML_REL).exists()
         )
         if yaml_exists:
-            return sorted(layouts.keys())
+            return list(layouts.keys())  # 保持 YAML 定义顺序，不排序
         # 回退：枚举目录（兼容迁移前）
         names: set[str] = set()
         for root in (resolver.system_dir, resolver.local_dir):

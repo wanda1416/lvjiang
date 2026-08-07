@@ -4,7 +4,12 @@
 每个 wf 接收 (batch_table, batch_index, batch_row) 变量。
 
 线程模型：单个 BatchWorker(QThread) 串行执行，与主窗口
-"同一时刻仅一个自动化" 约束一致。
+“同一时刻仅一个自动化”约束一致。
+
+⚠️ 警告：批量引擎不负责传递脚本参数
+批量引擎只负责遍历批量上下文 + 传递（任务 ID + 用户）。
+脚本参数由单次任务执行时从 wf_configs 按 script.id 加载。
+禁止在 BatchScript 中携带参数，禁止批量层读取 wf_configs 并传递。
 """
 
 from __future__ import annotations
@@ -35,12 +40,15 @@ ST_SKIPPED = "跳过"
 
 @dataclass
 class BatchScript:
-    """批量执行中的脚本描述"""
+    """批量执行中的脚本描述
+
+    ⚠️ 不含 params 字段：脚本参数由 _run_script 执行时从 wf_configs 加载，
+    批量层不负责传递参数。
+    """
     id: str
     name: str
     wf_file: str = ""       # DSL 工作流文件（相对 workflows/ 或绝对路径）
     class_name: str = ""    # Python 类实现（与 wf_file 二选一）
-    params: dict | None = None
 
 
 @dataclass
@@ -263,10 +271,16 @@ class BatchWorker(QThread):
             return False
 
     def _run_script(self, script: BatchScript, session: dict) -> dict:
-        """执行单个脚本，返回 collect 结果"""
+        """执行单个脚本，返回 collect 结果
+
+        参数从 wf_configs 按 script.id 加载，批量层不传递参数。
+        """
         engine = self._create_engine()
         engine.session = session
-        params = script.params or {}
+
+        # 参数由执行时从 wf_configs 加载，而非批量层传递
+        from ...core.config.wf_configs import get_wf_config
+        params = get_wf_config(script.id) or {}
 
         if script.class_name:
             from ...workflows.implementations import get_workflow_class

@@ -10,3 +10,5 @@ overrides:
     name: 循环购买心法
   activity_jianghu:
     name: 每日江湖号令
+  auto_tuning:
+    scope: dedicated

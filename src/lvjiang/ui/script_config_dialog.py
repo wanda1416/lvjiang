@@ -1,11 +1,17 @@
-"""脚本配置对话框 - 管理日常页暴露哪些脚本、顺序、显示名
+"""脚本配置对话框 - 管理日常页暴露哪些脚本、顺序、显示名、脚本性质
 
 从「工具 → 脚本配置」打开，作为手写 workflows.yaml 的可视化替代方案。
 
 脚本本体（.wf 文件 + 内置类实现）由发现层 ``discover_scripts()`` 自动扫描，
-本对话框只负责「暴露」：勾选是否在日常下拉展示、调整顺序、覆盖显示名。
+本对话框只负责「暴露」：勾选是否在日常下拉展示、调整顺序、覆盖显示名、
+设置脚本性质（日常 / 专用）。
 保存后经 resolver 聚合接口写回 ``workflows.yaml`` 的 ``exposed`` + ``overrides``
 （开发→system 全量，用户→local 键级 diff）。
+
+脚本性质：
+- 日常（daily）：日常 Tab 负责绘制参数面板 + 读写参数
+- 专用（dedicated）：日常 Tab 不碰其配置，不画参数面板；
+  由专属配置页面自行管理，执行引擎从 wf_configs 自行加载
 
 参数本身不在此编辑（来自 .wf front-matter 或内置类属性，由源头维护）。
 """
@@ -15,6 +21,7 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QDialog,
     QHBoxLayout,
     QHeaderView,
@@ -36,9 +43,13 @@ class ScriptConfigDialog(QDialog):
     # 列索引
     COL_EXPOSE = 0
     COL_NAME = 1
-    COL_SOURCE = 2
-    COL_ID = 3
-    COL_PARAMS = 4
+    COL_SCOPE = 2
+    COL_SOURCE = 3
+    COL_ID = 4
+    COL_PARAMS = 5
+
+    # 脚本性质选项
+    SCOPE_LABELS = {"daily": "日常", "dedicated": "专用"}
 
     def __init__(self, main_window):
         super().__init__(main_window)
@@ -55,16 +66,17 @@ class ScriptConfigDialog(QDialog):
         layout = QVBoxLayout(self)
 
         hint = QLabel(
-            "勾选「暴露」决定日常页下拉是否展示；用上移/下移调整暴露顺序；"
-            "显示名可双击编辑（留空恢复默认）。参数来自脚本源头，此处不编辑。"
+            "勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数："
+            "日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。"
+            "用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。"
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #666;")
         layout.addWidget(hint)
 
-        self._table = QTableWidget(0, 5)
+        self._table = QTableWidget(0, 6)
         self._table.setHorizontalHeaderLabels(
-            ["暴露", "显示名", "来源", "id", "参数数"])
+            ["暴露", "显示名", "脚本性质", "来源", "id", "参数数"])
         self._table.verticalHeader().setVisible(False)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -112,10 +124,13 @@ class ScriptConfigDialog(QDialog):
         self._table.setRowCount(len(ordered_ids))
         for row, sid in enumerate(ordered_ids):
             s = scripts[sid]
+            ov = (overrides.get(sid) or {})
             self._fill_row(row, s, checked=sid in exposed_set,
-                           display=(overrides.get(sid) or {}).get("name") or s["name"])
+                           display=ov.get("name") or s["name"],
+                           scope=ov.get("scope", "daily"))
 
-    def _fill_row(self, row: int, script: dict, checked: bool, display: str):
+    def _fill_row(self, row: int, script: dict, checked: bool, display: str,
+                  scope: str = "daily"):
         sid = script["id"]
 
         expose_item = QTableWidgetItem()
@@ -127,6 +142,13 @@ class ScriptConfigDialog(QDialog):
         name_item = QTableWidgetItem(display)
         name_item.setData(Qt.ItemDataRole.UserRole, sid)  # 行标识：脚本 id
         self._table.setItem(row, self.COL_NAME, name_item)
+
+        # 脚本性质：下拉框（日常 / 专用）
+        scope_combo = QComboBox()
+        for key, label in self.SCOPE_LABELS.items():
+            scope_combo.addItem(label, key)
+        scope_combo.setCurrentIndex(max(scope_combo.findData(scope), 0))
+        self._table.setCellWidget(row, self.COL_SCOPE, scope_combo)
 
         source = f".wf: {script['wf_file']}" if script.get("wf_file") else f"内置类: {script['class']}"
         source_item = QTableWidgetItem(source)
@@ -155,11 +177,22 @@ class ScriptConfigDialog(QDialog):
         self._table.setCurrentCell(target, self.COL_NAME)
 
     def _swap_rows(self, a: int, b: int):
+        # 交换 QTableWidgetItem
         for col in range(self._table.columnCount()):
             item_a = self._table.takeItem(a, col)
             item_b = self._table.takeItem(b, col)
             self._table.setItem(a, col, item_b)
             self._table.setItem(b, col, item_a)
+        # 交换 cell widget（QComboBox 等，takeItem 无法移动）
+        for col in range(self._table.columnCount()):
+            w_a = self._table.cellWidget(a, col)
+            w_b = self._table.cellWidget(b, col)
+            self._table.removeCellWidget(a, col)
+            self._table.removeCellWidget(b, col)
+            if w_b is not None:
+                self._table.setCellWidget(a, col, w_b)
+            if w_a is not None:
+                self._table.setCellWidget(b, col, w_a)
 
     # ─── 读写 workflows.yaml ─────────────────────────────
     def _read_yaml(self) -> tuple[list, dict]:
@@ -180,8 +213,17 @@ class ScriptConfigDialog(QDialog):
                 exposed.append(sid)
             display = (name_item.text() or "").strip()
             base = self._base_names.get(sid, "")
+            # 读取脚本性质
+            scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
+            scope = scope_combo.currentData() if scope_combo else "daily"
+            # 构建 override 条目
+            ov: dict = {}
             if display and display != base:
-                overrides[sid] = {"name": display}
+                ov["name"] = display
+            if scope and scope != "daily":
+                ov["scope"] = scope
+            if ov:
+                overrides[sid] = ov
 
         try:
             get_resolver().save_merged(
@@ -189,5 +231,5 @@ class ScriptConfigDialog(QDialog):
         except OSError as e:
             QMessageBox.warning(self, "保存失败", f"写入 workflows.yaml 失败：{e}")
             return
-        logger.info(f"脚本暴露配置已保存：exposed={exposed}")
+        logger.info(f"脚本暴露配置已保存：exposed={exposed}, overrides={overrides}")
         self.accept()

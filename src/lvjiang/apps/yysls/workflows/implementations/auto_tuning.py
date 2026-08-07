@@ -19,6 +19,13 @@
 
 背包滚动遍历抽象为策略类（bag_traversal：dedup 滑动窗口去重 /
 positional 位置对齐三向校验），_traverse_bag 按配置调度，默认 dedup。
+
+⚠️ 警告：禁止擅自软降级或吞异常
+本工作流的所有配置缺失/无效场景必须抛异常中断，不得静默回落
+到“合理默认值”。配置错误应当立即暴露给用户修正，而不是用
+猜测的默认值继续运行导致调律结果不可预期。涉及方法：
+_traverse_bag、_ensure_base_group、_ensure_judge_config、
+_resolve_selected_slots。
 """
 
 from loguru import logger

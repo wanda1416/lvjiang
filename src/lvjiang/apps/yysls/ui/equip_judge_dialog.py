@@ -33,6 +33,7 @@ from lvjiang.apps.yysls.evaluator import (
 )
 from lvjiang.apps.yysls.game_config import get_game_config
 
+from .game_settings.level_combo import LevelCombo
 from .tune_config_widget import TuningConfigWidget
 
 # 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
@@ -95,7 +96,6 @@ _PART_EXTRA: dict[str, list[str]] = {
 }
 
 _NONE_ITEM = "（未选）"
-_LEVEL = 110
 _AFFIX_ROWS = 5
 
 
@@ -135,6 +135,10 @@ class EquipAffixEditor(QWidget):
         self.quality_combo.addItem("金色", "gold")
         self.quality_combo.addItem("紫色", "purple")
         form.addRow("品阶：", self.quality_combo)
+
+        # 等级选择（从等级配置中选择）
+        self._level_combo = LevelCombo(allow_empty=False)
+        form.addRow("等级：", self._level_combo)
 
         # 词条 1-5 行：下拉 + 数值
         self._affix_combos: list[QComboBox] = []
@@ -222,7 +226,8 @@ class EquipAffixEditor(QWidget):
             return
         name = self._affix_combos[row].currentText()
         if name != _NONE_ITEM:
-            caps = get_game_config().get_affix_caps(_LEVEL, name)
+            level = self._level_combo.get_level()
+            caps = get_game_config().get_affix_caps(level, name) if level else None
             if caps is not None:
                 self._affix_spins[row].setValue(caps["chengyin"])
         else:
@@ -240,7 +245,8 @@ class EquipAffixEditor(QWidget):
             name = combo.currentText()
             if name == _NONE_ITEM:
                 continue
-            caps = mgr.get_affix_caps(_LEVEL, name)
+            level = self._level_combo.get_level()
+            caps = mgr.get_affix_caps(level, name) if level else None
             unit = caps["unit"] or None if caps else None
             affixes.append(Affix(name=name, value=spin.value(), unit=unit))
         if not affixes:
@@ -248,7 +254,7 @@ class EquipAffixEditor(QWidget):
         return EquipmentData(
             type=self.current_type(),
             name="测试装备",
-            level=_LEVEL,
+            level=self._level_combo.get_level() or 0,
             quality=self.quality_combo.currentData(),
             affixes=affixes,
         )

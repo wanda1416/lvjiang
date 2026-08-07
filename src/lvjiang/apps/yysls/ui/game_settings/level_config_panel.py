@@ -15,7 +15,7 @@
 from datetime import datetime
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -42,6 +42,9 @@ _COLS = ("#", "等级", "支持重置", "最低材料数量", "判定抗性(%)",
 
 class LevelConfigPanel(QWidget):
     """等级配置面板（表格形式，按等级区分重置支持、材料要求与抗性）"""
+
+    # 等级配置保存后发出信号，通知其他面板刷新 LevelCombo
+    level_configs_saved = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -324,6 +327,8 @@ class LevelConfigPanel(QWidget):
             logger.exception("等级配置保存失败")
             self._set_status(f"保存失败：{e}", True)
             return
+        # 通知其他面板刷新 LevelCombo
+        self.level_configs_saved.emit()
         now = datetime.now().strftime("%H:%M:%S")
         self._set_status(f"已保存并生效（{now}）", False)
 

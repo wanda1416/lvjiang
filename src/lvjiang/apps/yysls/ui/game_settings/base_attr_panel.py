@@ -36,6 +36,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.game_config import BASE_ATTR_PARTS, WUXUE_CATEGORY
 
+from .level_combo import LevelCombo
+
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config.yaml"
 
@@ -622,9 +624,11 @@ class BaseAttrPanel(QWidget):
         for row, level in enumerate(levels):
             level_data = cat_data[level]
 
-            # 等级列（可编辑）
-            level_item = QTableWidgetItem(str(level))
-            self._table.setItem(row, 0, level_item)
+            # 等级列（下拉选择）
+            level_combo = LevelCombo(allow_empty=False)
+            level_combo.set_level(int(level) if str(level).isdigit() else None)
+            level_combo.currentIndexChanged.connect(lambda _v, r=row: self._on_cell_changed(r, 0))
+            self._table.setCellWidget(row, 0, level_combo)
 
             # 品阶列：区间型用双输入框控件，单值型用文本单元格
             for col, quality in enumerate(qualities, start=1):
@@ -676,11 +680,13 @@ class BaseAttrPanel(QWidget):
             self._table.setColumnCount(len(columns))
             self._table.setHorizontalHeaderLabels(columns)
 
-        # 直接插入空行，让用户填写
+        # 直接插入空行，让用户选择等级
         self._saving = True
         row = self._table.rowCount()
         self._table.insertRow(row)
-        self._table.setItem(row, 0, QTableWidgetItem(""))
+        level_combo = LevelCombo(allow_empty=True)
+        level_combo.currentIndexChanged.connect(lambda _v: self._on_cell_changed(row, 0))
+        self._table.setCellWidget(row, 0, level_combo)
         for col in range(1, self._table.columnCount()):
             if self._is_range_part():
                 cell = _RangeCell(self._on_range_cell_changed)
@@ -702,17 +708,12 @@ class BaseAttrPanel(QWidget):
         # 从表格读取数据
         new_cat_data = {}
         for row in range(self._table.rowCount()):
-            level_item = self._table.item(row, 0)
-            if not level_item:
+            level_combo = self._table.cellWidget(row, 0)
+            if not isinstance(level_combo, LevelCombo):
                 continue
-            level_text = level_item.text().strip()
-            if not level_text:
-                continue  # 跳过空行
-
-            try:
-                level = int(level_text)
-            except ValueError:
-                continue  # 跳过无效等级
+            level = level_combo.get_level()
+            if level is None:
+                continue  # 跳过未选择等级的行
 
             level_data = {}
             for col, quality in enumerate(["gold", "purple", "blue"], start=1):
@@ -767,3 +768,10 @@ class BaseAttrPanel(QWidget):
             manager._load()
         except Exception as e:
             logger.error(f"保存失败: {e}")
+
+    def refresh_level_combos(self):
+        """刷新表格中的等级下拉列表（等级配置变更后调用）"""
+        for row in range(self._table.rowCount()):
+            combo = self._table.cellWidget(row, 0)
+            if isinstance(combo, LevelCombo):
+                combo.refresh()

@@ -67,6 +67,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuningGroupManager,
     rule_affix_candidates,
 )
+from lvjiang.apps.yysls.ui.game_settings.level_combo import LevelCombo
 
 # 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）
 _QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
@@ -777,11 +778,10 @@ class ScanBehaviorPage(_BehaviorPageBase):
         half_line = self.fontMetrics().height() // 2
         threshold_row = QHBoxLayout()
         threshold_row.addWidget(QLabel("等级门槛"))
-        self._min_level_spin = QSpinBox()
-        self._min_level_spin.setRange(1, 999)
-        self._min_level_spin.setToolTip("低于该等级的装备直接跳过，不进入任何判定")
-        self._min_level_spin.valueChanged.connect(lambda _v: self._apply())
-        threshold_row.addWidget(self._min_level_spin)
+        self._min_level_combo = LevelCombo(allow_empty=False)
+        self._min_level_combo.setToolTip("低于该等级的装备直接跳过，不进入任何判定")
+        self._min_level_combo.currentIndexChanged.connect(lambda _v: self._apply())
+        threshold_row.addWidget(self._min_level_combo)
         threshold_row.addSpacing(half_line)
         threshold_row.addWidget(QLabel("调律门槛"))
         self._entry_combo = QComboBox()
@@ -820,7 +820,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
         layout.addLayout(head)
 
     def _load_stage(self, stage) -> None:
-        self._min_level_spin.setValue(stage.min_level)
+        self._min_level_combo.set_level(stage.min_level)
         idx = self._entry_combo.findData(stage.entry_min_rating)
         self._entry_combo.setCurrentIndex(max(idx, 0))
         self._max_recycle_spin.setValue(stage.max_consecutive_recycles)
@@ -829,7 +829,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
     def _stage_raw(self) -> dict:
         return {
             "enabled": self._enabled_cb.isChecked(),
-            "min_level": self._min_level_spin.value(),
+            "min_level": self._min_level_combo.get_level() or 100,
             "entry_min_rating": self._entry_combo.currentData(),
             "max_consecutive_recycles": self._max_recycle_spin.value(),
             "rules": self._rules_raw(),

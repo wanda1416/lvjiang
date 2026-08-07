@@ -31,6 +31,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.game_config import SeasonConfig, get_game_config
 
+from .level_combo import LevelCombo
+
 
 def _today_qdate() -> QDate:
     """返回今天的 QDate"""
@@ -188,15 +190,12 @@ class SeasonConfigPanel(QWidget):
         first_half_edit.dateChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _FIRST_HALF_COL, first_half_edit)
 
-        # 装备等级
-        level_spin = QSpinBox()
-        level_spin.setRange(0, 999)
-        level_spin.setSpecialValueText("")
-        level_spin.setToolTip("当前赛季装备等级（如 90, 96, 100）")
-        if cfg.equip_level is not None:
-            level_spin.setValue(cfg.equip_level)
-        level_spin.valueChanged.connect(lambda _v: self._apply())
-        self._table.setCellWidget(row, _EQUIP_LEVEL_COL, level_spin)
+        # 装备等级（下拉选择）
+        level_combo = LevelCombo(allow_empty=True)
+        level_combo.setToolTip("当前赛季装备等级（从等级配置中选择）")
+        level_combo.set_level(cfg.equip_level)
+        level_combo.currentIndexChanged.connect(lambda _v: self._apply())
+        self._table.setCellWidget(row, _EQUIP_LEVEL_COL, level_combo)
 
     # ── 行增删移动 ──
 
@@ -275,7 +274,7 @@ class SeasonConfigPanel(QWidget):
         start_date_edit: QDateEdit = self._table.cellWidget(row, _START_DATE_COL)
         end_date_edit: QDateEdit = self._table.cellWidget(row, _END_DATE_COL)
         first_half_edit: QDateEdit = self._table.cellWidget(row, _FIRST_HALF_COL)
-        level_spin: QSpinBox = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
+        level_combo: LevelCombo = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
 
         # 转换 QDate 到 date
         def qdate_to_date(qd: QDate) -> date | None:
@@ -289,7 +288,7 @@ class SeasonConfigPanel(QWidget):
             "start_date": qdate_to_date(start_date_edit.date()),
             "end_date": qdate_to_date(end_date_edit.date()),
             "first_half_end_date": qdate_to_date(first_half_edit.date()),
-            "equip_level": level_spin.value() if level_spin.value() > 0 else None,
+            "equip_level": level_combo.get_level(),
         }
 
     def _set_row_values(self, row: int, values: dict) -> None:
@@ -324,11 +323,10 @@ class SeasonConfigPanel(QWidget):
         first_half_edit.setDate(date_to_qdate(values.get("first_half_end_date")))
         first_half_edit.blockSignals(False)
 
-        level_spin: QSpinBox = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
-        level_spin.blockSignals(True)
-        level_val = values.get("equip_level")
-        level_spin.setValue(level_val if level_val is not None else 0)
-        level_spin.blockSignals(False)
+        level_combo: LevelCombo = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
+        level_combo.blockSignals(True)
+        level_combo.set_level(values.get("equip_level"))
+        level_combo.blockSignals(False)
 
     # ── 校验 ──
 
@@ -410,3 +408,10 @@ class SeasonConfigPanel(QWidget):
         color = "#c62828" if is_error else "#2e7d32"
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(text)
+
+    def refresh_level_combos(self):
+        """刷新所有行的装备等级下拉列表（等级配置变更后调用）"""
+        for row in range(self._table.rowCount()):
+            combo = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
+            if isinstance(combo, LevelCombo):
+                combo.refresh()

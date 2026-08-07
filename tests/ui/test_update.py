@@ -6,7 +6,6 @@ from unittest.mock import patch
 import pytest
 
 from lvjiang.core.update import (
-    _UPDATE_CONFIG,
     get_skip_version,
     is_newer_version,
     parse_version,
@@ -16,13 +15,15 @@ from lvjiang.core.update import (
 
 
 @pytest.fixture(autouse=True)
-def cleanup_update_config():
-    """每个测试前后清理 update.json"""
-    if _UPDATE_CONFIG.exists():
-        _UPDATE_CONFIG.unlink()
+def cleanup_server_config(tmp_path, monkeypatch):
+    """每个测试前后清理 session.json 的 server_config 节点"""
+    import lvjiang.constants as constants_mod
+    import lvjiang.core.config.session as store_mod
+    path = tmp_path / "session.json"
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
+    store_mod.reset_session_store()
     yield
-    if _UPDATE_CONFIG.exists():
-        _UPDATE_CONFIG.unlink()
+    store_mod.reset_session_store()
 
 
 class TestParseVersion:
@@ -64,11 +65,14 @@ class TestSkipVersion:
         set_skip_version("0.1.2")
         assert get_skip_version() == "0.1.2"
 
-    def test_config_file_created(self):
+    def test_config_stored_in_session(self, tmp_path, monkeypatch):
+        """验证 skip_version 存储在 session.json 的 server_config 节点"""
+        from lvjiang.core.config.session import get_session_store
         set_skip_version("0.1.2")
-        assert _UPDATE_CONFIG.exists()
-        data = json.loads(_UPDATE_CONFIG.read_text(encoding="utf-8"))
-        assert data["skip_version"] == "0.1.2"
+        store = get_session_store()
+        node = store.get_node("server_config")
+        assert node is not None
+        assert node["skip_version"] == "0.1.2"
 
 
 class TestShouldPromptUpdate:

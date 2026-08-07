@@ -448,6 +448,10 @@ class RunControlMixin:
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
         flow_params = self._collect_flow_params()
+        # 专用脚本的参数面板由日常页隐藏，执行时从 wf_configs 加载
+        if not flow_params and flow_cfg.get("scope", "daily") != "daily":
+            from ..core.config.wf_configs import get_wf_config
+            flow_params = get_wf_config(flow_cfg["id"]) or {}
         # 执行前持久化当前参数，确保下次启动恢复最新值
         if hasattr(self, '_save_displayed_params'):
             self._save_displayed_params()

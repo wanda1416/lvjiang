@@ -106,15 +106,13 @@ class OCRCleaner:
         self._save_config()
 
     def _save_config(self):
-        """通过 ConfigResolver 保存配置（开发→system，用户→local diff）"""
+        """通过 ConfigResolver 保存完整配置（开发→system，用户→local diff）
+
+        必须保存 self._config 全量内容，而非仅已知键；
+        否则开发模式下 save_merged 全量写 system 会丢失未来新增的键。
+        """
         from .config import get_resolver
-        doc: dict[str, Any] = {}
-        replacements = self._config.get("replacements", {})
-        if replacements:
-            doc["replacements"] = replacements
-        patterns = self._config.get("patterns", {})
-        if patterns:
-            doc["patterns"] = patterns
+        doc: dict[str, Any] = {k: v for k, v in self._config.items() if v is not None}
         try:
             get_resolver().save_merged(_REL_PATH, doc)
         except Exception as e:

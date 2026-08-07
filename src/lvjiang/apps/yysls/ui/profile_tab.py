@@ -1,7 +1,7 @@
-"""燕云「档案总览」与「角色状态」Tab
+"""燕云「档案总览」与「其他信息」Tab
 
 档案总览：宽表展示所有角色的概要信息，交互式列头配置
-角色状态：按角色分 Tab 展示详细信息
+其他信息：展示当前用户的详细信息
 """
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -64,21 +63,16 @@ class ProfileOverviewTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # 标题行
-        title_row = QHBoxLayout()
-        title = QLabel("档案总览")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #333333;")
-        title_row.addWidget(title)
-        title_row.addStretch()
-
+        # 刷新按钮（右上角）
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
         btn_refresh = QPushButton("刷新")
         btn_refresh.setFixedWidth(60)
         btn_refresh.setToolTip("重新读取角色数据")
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self.refresh)
-        title_row.addWidget(btn_refresh)
-
-        layout.addLayout(title_row)
+        btn_row.addWidget(btn_refresh)
+        layout.addLayout(btn_row)
 
         # 表格
         self._table = QTableWidget()
@@ -493,63 +487,55 @@ class ProfileOverviewTab(QWidget):
 
 
 class ProfileTab(QWidget):
-    """角色状态 Tab - 按角色分 Tab 展示详细信息"""
+    """其他信息 Tab - 展示当前用户的详细信息"""
 
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
+        self._detail_page: _DetailPage | None = None
         self._setup_ui()
+        self._refresh_current_user()
+        # 订阅宿主用户切换
+        host.user_changed.connect(lambda _name: self._refresh_current_user())
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # 标题行
-        title_row = QHBoxLayout()
-        title = QLabel("角色详情")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #333333;")
-        title_row.addWidget(title)
-        title_row.addStretch()
-
+        # 刷新按钮（右上角）
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
         btn_refresh = QPushButton("刷新")
         btn_refresh.setFixedWidth(60)
         btn_refresh.setToolTip("重新读取角色数据")
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
-        btn_refresh.clicked.connect(self._refresh_all)
-        title_row.addWidget(btn_refresh)
+        btn_refresh.clicked.connect(self._refresh_current_user)
+        btn_row.addWidget(btn_refresh)
+        layout.addLayout(btn_row)
 
-        layout.addLayout(title_row)
+        # 详情容器（动态替换）
+        self._detail_container = QVBoxLayout()
+        layout.addLayout(self._detail_container, stretch=1)
 
-        # Tab 容器
-        self._tab_widget = QTabWidget()
-        self._tab_widget.setTabsClosable(False)
-        self._tab_widget.setMovable(True)
-        layout.addWidget(self._tab_widget, stretch=1)
+    def _refresh_current_user(self):
+        """根据当前用户重建详情页"""
+        # 清除旧详情页
+        while self._detail_container.count() > 0:
+            item = self._detail_container.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
 
-        # 加载角色 Tab
-        self._refresh_character_tabs()
+        user_name = self._host.active_user_name()
+        if not user_name:
+            placeholder = QLabel("请先选择用户")
+            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            placeholder.setStyleSheet("color: #999; font-size: 14px; padding: 40px;")
+            self._detail_container.addWidget(placeholder)
+            return
 
-    def _refresh_character_tabs(self):
-        """从用户管理加载所有角色，按定义顺序创建 Tab"""
-        while self._tab_widget.count() > 0:
-            self._tab_widget.removeTab(0)
-
-        user_mgr = UserConfigManager()
-        ordered_names = user_mgr.list_users()
-
-        for user_name in ordered_names:
-            user_file = USERS_DIR / f"{user_name}.json"
-            if not user_file.exists():
-                continue
-            detail_page = _DetailPage(user_name)
-            self._tab_widget.addTab(detail_page, user_name)
-
-    def _refresh_all(self):
-        """刷新所有角色详情页"""
-        for i in range(self._tab_widget.count()):
-            page = self._tab_widget.widget(i)
-            if isinstance(page, _DetailPage):
-                page.refresh()
+        self._detail_page = _DetailPage(user_name)
+        self._detail_container.addWidget(self._detail_page)
 
 
 # ─── 角色详情页 ──────────────────────────────────────────────

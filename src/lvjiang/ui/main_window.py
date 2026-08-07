@@ -111,6 +111,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._layout_manager = LayoutConfigManager()
         self._user_config = load_user_config()
         self._backend = None
+        self._cleanup_callbacks: list = []  # 插件注册的关闭时清理回调
 
         # ── OCR / 输入 ──
         from ..core.ocr import OCREngine
@@ -624,6 +625,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     # ─── 宿主 API（供插件页面使用）──────────────────────
 
+    def register_cleanup(self, callback) -> None:
+        """注册关闭时清理回调（插件在初始化时调用）"""
+        self._cleanup_callbacks.append(callback)
+
+    @property
+    def user_manager(self) -> "UserConfigManager":
+        """用户配置管理器（只读）"""
+        return self._user_manager
+
+    @property
+    def session_manager(self) -> "SessionManager":
+        """会话数据管理器（只读）"""
+        return self._session_manager
+
     def active_user_name(self) -> str:
         """当前激活用户名（无用户时返回空串）"""
         return self._user_manager.get_active_user_name() or ""
@@ -1024,6 +1039,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._save_displayed_params()
         self._save_daily_config()
         self._save_ui_state()
+        # 插件清理回调（如 ProfileEngine 停止）
+        for cb in self._cleanup_callbacks:
+            try:
+                cb()
+            except Exception as e:
+                logger.warning(f"插件清理回调失败: {e}")
         # 录屏进行中/待保存时自动转正保存，不丢数据
         self._abort_screen_record("关闭程序")
         if self._backend == "adb":

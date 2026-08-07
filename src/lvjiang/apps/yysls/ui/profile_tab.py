@@ -1,8 +1,20 @@
 """燕云「档案总览」与「其他信息」Tab
 
 档案总览：宽表展示所有角色的概要信息，交互式列头配置
-其他信息：展示当前用户的详细信息
+其他信息：展示当前用户的详细信息（按模型类型分区）
+
+数据来源：user.json 的 profile 节点
+    profile:
+      daily:
+        key_name: { value: ..., updated_at: ... }
+      realtime:
+        key_name: { value: ..., updated_at: ... }
+      resource:
+        key_name: { value: ..., updated_at: ... }
+      activity:
+        key_name: { value: ..., total: ..., updated_at: ... }
 """
+
 from __future__ import annotations
 
 from loguru import logger
@@ -24,8 +36,21 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.constants import USERS_DIR
-from lvjiang.core.config import SessionManager, get_session_store
+from lvjiang.core.config import get_session_store
 from lvjiang.core.user_config import UserConfigManager
+
+from ..config.profile_models import (
+    MODEL_ACTIVITY,
+    MODEL_DAILY,
+    MODEL_LABELS,
+    MODEL_REALTIME,
+    MODEL_RESOURCE,
+    ActivityKeyDef,
+    DailyKeyDef,
+    KeyDef,
+    RealtimeKeyDef,
+)
+from ..config.user_profile import read_profile_entry
 
 # 统一的刷新按钮样式
 _REFRESH_BTN_STYLE = (
@@ -44,7 +69,7 @@ def _get_overview_columns() -> list[str]:
 
 
 def _set_overview_columns(columns: list[str]) -> None:
-    """保存总览页列配置到 session.json"""
+    """保存总览列配置到 session.json"""
     get_session_store().set_node(_OVERVIEW_COLUMNS_KEY, columns)
 
 
@@ -102,9 +127,9 @@ class ProfileOverviewTab(QWidget):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
-        btn_settings = QPushButton("元数据")
+        btn_settings = QPushButton("数据模型")
         btn_settings.setFixedWidth(70)
-        btn_settings.setToolTip("定义字段元数据")
+        btn_settings.setToolTip("定义数据模型 key")
         btn_settings.clicked.connect(self._open_metadata_dialog)
         btn_row.addWidget(btn_settings)
 
@@ -121,18 +146,18 @@ class ProfileOverviewTab(QWidget):
         config = get_profile_config()
         column_keys = _get_overview_columns()
 
-        # 过滤掉不存在的字段
-        valid_keys = [k for k in column_keys if config.get_field(k)]
+        # 过滤掉不存在的 key
+        valid_keys = [k for k in column_keys if config.get_key(k)]
         if valid_keys != column_keys:
             _set_overview_columns(valid_keys)
             column_keys = valid_keys
 
-        fields = [config.get_field(k) for k in column_keys]
+        key_defs = [config.get_key(k) for k in column_keys]
 
-        # 第一列固定为角色名，后续列为配置的字段
-        col_count = 1 + len(fields)
+        # 第一列固定为角色名，后续列为配置的 key
+        col_count = 1 + len(key_defs)
         self._table.setColumnCount(col_count)
-        headers = ["角色名"] + [f.label for f in fields]
+        headers = ["角色名"] + [kd.label for kd in key_defs]
         self._table.setHorizontalHeaderLabels(headers)
 
         # 加载所有用户数据
@@ -148,17 +173,12 @@ class ProfileOverviewTab(QWidget):
             name_item.setForeground(Qt.GlobalColor.darkGray)
             self._table.setItem(row, 0, name_item)
 
-            # 后续列：配置的字段
-            for col, field_def in enumerate(fields):
-                value = self._get_field_value(field_def, name, data)
-                item = QTableWidgetItem(str(value))
+            # 后续列：配置的 key
+            for col, kd in enumerate(key_defs):
+                model_type = config.get_model_type(kd.key) or ""
+                value = self._format_profile_value(kd, model_type, data)
+                item = QTableWidgetItem(value)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-
-                # 只读字段不可编辑
-                if field_def.readonly:
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    item.setForeground(Qt.GlobalColor.darkGray)
-
                 self._table.setItem(row, col + 1, item)
 
         # 调整列宽
@@ -166,6 +186,37 @@ class ProfileOverviewTab(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(True)
         self._loading = False
+
+    def _format_profile_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
+        """根据模型类型格式化 profile 值用于总览显示"""
+        entry = read_profile_entry(data, model_type, kd.key)
+        if not entry:
+            return ""
+
+        value = entry.get("value")
+        if value is None:
+            return ""
+
+        if model_type == MODEL_DAILY:
+            if isinstance(kd, DailyKeyDef) and kd.cap:
+                return f"{value}/{kd.cap}"
+            return str(value)
+
+        if model_type == MODEL_REALTIME:
+            if isinstance(kd, RealtimeKeyDef) and kd.cap:
+                return f"{value}/{kd.cap}"
+            return str(value)
+
+        if model_type == MODEL_RESOURCE:
+            return str(value)
+
+        if model_type == MODEL_ACTIVITY:
+            total = entry.get("total", 0)
+            if isinstance(kd, ActivityKeyDef):
+                return f"{value}/{kd.period_cap}  ({total}/{kd.lifetime_cap})"
+            return str(value)
+
+        return str(value)
 
     def _on_header_context_menu(self, pos):
         """表头右键菜单"""
@@ -190,20 +241,20 @@ class ProfileOverviewTab(QWidget):
 
         from ..config import get_profile_config
         config = get_profile_config()
-        all_fields = config.get_all_fields()
+        all_keys = config.get_all_keys()
 
-        if not all_fields:
-            QMessageBox.information(self, "提示", "没有可用的元数据字段，请先在元数据定义中添加")
+        if not all_keys:
+            QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
 
-        # 获取当前列的字段 key（用于过滤和预选）
+        # 获取当前列的 key
         column_keys = _get_overview_columns()
         current_key = column_keys[logical_index - 1] if logical_index - 1 < len(column_keys) else ""
 
-        # 过滤掉已被其他列使用的字段（保留当前列的字段）
-        available_fields = [
-            f for f in all_fields
-            if f.key not in column_keys or f.key == current_key
+        # 过滤掉已被其他列使用的 key（保留当前列）
+        available = [
+            kd for kd in all_keys
+            if kd.key not in column_keys or kd.key == current_key
         ]
 
         # 创建下拉选择对话框
@@ -211,15 +262,17 @@ class ProfileOverviewTab(QWidget):
 
         dialog = QDialog(self)
         dialog.setWindowTitle("选择字段")
-        dialog.setMinimumWidth(200)
+        dialog.setMinimumWidth(250)
         layout = QVBoxLayout(dialog)
 
         combo = QComboBox()
         combo.addItem("（请选择）", "")
-        for f in available_fields:
-            combo.addItem(f"{f.label} ({f.key})", f.key)
+        for kd in available:
+            model_type = config.get_model_type(kd.key) or ""
+            model_label = MODEL_LABELS.get(model_type, model_type)
+            combo.addItem(f"[{model_label}] {kd.label} ({kd.key})", kd.key)
 
-        # 预选当前字段
+        # 预选当前 key
         if current_key:
             idx = combo.findData(current_key)
             if idx >= 0:
@@ -246,18 +299,18 @@ class ProfileOverviewTab(QWidget):
         """在指定列后新增一列"""
         from ..config import get_profile_config
         config = get_profile_config()
-        all_fields = config.get_all_fields()
+        all_keys = config.get_all_keys()
 
-        if not all_fields:
-            QMessageBox.information(self, "提示", "没有可用的元数据字段，请先在元数据定义中添加")
+        if not all_keys:
+            QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
 
-        # 过滤掉已使用的字段
+        # 过滤掉已使用的 key
         column_keys = _get_overview_columns()
-        available_fields = [f for f in all_fields if f.key not in column_keys]
+        available = [kd for kd in all_keys if kd.key not in column_keys]
 
-        if not available_fields:
-            QMessageBox.information(self, "提示", "所有元数据字段都已被使用")
+        if not available:
+            QMessageBox.information(self, "提示", "所有数据模型 key 都已被使用")
             return
 
         # 弹出选择对话框
@@ -265,12 +318,14 @@ class ProfileOverviewTab(QWidget):
 
         dialog = QDialog(self)
         dialog.setWindowTitle("选择字段")
-        dialog.setMinimumWidth(200)
+        dialog.setMinimumWidth(250)
         layout = QVBoxLayout(dialog)
 
         combo = QComboBox()
-        for f in available_fields:
-            combo.addItem(f"{f.label} ({f.key})", f.key)
+        for kd in available:
+            model_type = config.get_model_type(kd.key) or ""
+            model_label = MODEL_LABELS.get(model_type, model_type)
+            combo.addItem(f"[{model_label}] {kd.label} ({kd.key})", kd.key)
         layout.addWidget(combo)
 
         btn_row = QHBoxLayout()
@@ -286,10 +341,9 @@ class ProfileOverviewTab(QWidget):
         if dialog.exec():
             selected_key = combo.currentData()
             if selected_key:
-                # 检查是否重复
                 column_keys = _get_overview_columns()
                 if selected_key in column_keys:
-                    QMessageBox.warning(self, "重复", f"字段 '{selected_key}' 已在其他列中显示")
+                    QMessageBox.warning(self, "重复", f"Key '{selected_key}' 已在其他列中显示")
                     return
                 column_keys.insert(after_index, selected_key)
                 _set_overview_columns(column_keys)
@@ -298,7 +352,7 @@ class ProfileOverviewTab(QWidget):
     def _remove_column(self, logical_index: int):
         """删除指定列"""
         column_keys = _get_overview_columns()
-        col_idx = logical_index - 1  # 减去角色名列
+        col_idx = logical_index - 1
         if 0 <= col_idx < len(column_keys):
             del column_keys[col_idx]
             _set_overview_columns(column_keys)
@@ -309,11 +363,10 @@ class ProfileOverviewTab(QWidget):
         column_keys = _get_overview_columns()
         col_idx = logical_index - 1
         if not (0 <= col_idx < len(column_keys)):
-            return  # 不应通过 set_column_field 扩展列
+            return
 
-        # 检查是否重复
         if field_key in column_keys and column_keys.index(field_key) != col_idx:
-            QMessageBox.warning(self, "重复", f"字段 '{field_key}' 已在其他列中显示")
+            QMessageBox.warning(self, "重复", f"Key '{field_key}' 已在其他列中显示")
             return
 
         column_keys[col_idx] = field_key
@@ -321,14 +374,13 @@ class ProfileOverviewTab(QWidget):
         self.refresh()
 
     def _on_item_changed(self, item: QTableWidgetItem):
-        """单元格编辑完成后回写到 JSON"""
+        """单元格编辑完成后回写到 profile 节点"""
         if self._loading:
             return
 
         row = item.row()
         col = item.column()
 
-        # 第一列是角色名，不可编辑，跳过
         if col < 1:
             return
 
@@ -340,12 +392,14 @@ class ProfileOverviewTab(QWidget):
         if field_idx >= len(column_keys):
             return
 
-        field_key = column_keys[field_idx]
-        field_def = config.get_field(field_key)
-        if not field_def or field_def.readonly:
+        key_str = column_keys[field_idx]
+        kd = config.get_key(key_str)
+        if not kd:
             return
 
-        # 获取角色名（第一列）
+        model_type = config.get_model_type(key_str) or ""
+
+        # 获取角色名
         name_item = self._table.item(row, 0)
         if not name_item:
             return
@@ -353,61 +407,71 @@ class ProfileOverviewTab(QWidget):
 
         # 解析新值
         raw_value = item.text()
-        parsed_value: str | int | bool = raw_value
-        if field_def.type == "int":
-            try:
-                parsed_value = int(raw_value) if raw_value else 0
-            except ValueError:
-                QMessageBox.warning(self, "输入错误", f"{field_def.label} 必须是整数")
-                self._loading = True
-                item.setText(str(self._get_field_value(field_def, user_name, self._load_user_data(user_name))))
-                self._loading = False
-                return
-        elif field_def.type == "bool":
-            upper = raw_value.upper()
+        parsed_value = self._parse_value(raw_value, model_type, kd)
+        if parsed_value is _PARSE_ERROR:
+            self._loading = True
+            user_data = self._load_user_data(user_name)
+            item.setText(self._format_profile_value(kd, model_type, user_data))
+            self._loading = False
+            return
+
+        # 回写到 profile 节点
+        self._write_profile_entry(user_name, model_type, key_str, parsed_value)
+
+    @staticmethod
+    def _parse_value(raw: str, model_type: str, kd: KeyDef):
+        """解析用户输入值，返回解析后的值或 _PARSE_ERROR"""
+        if model_type == MODEL_DAILY:
+            # daily 可以是 int 或 bool（如 shop_of_week）
+            if isinstance(kd, DailyKeyDef) and kd.cap is not None:
+                try:
+                    return int(raw) if raw else 0
+                except ValueError:
+                    QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                    return _PARSE_ERROR
+            # 无 cap 的 daily 可能是 bool
+            upper = raw.upper()
+            if upper in ("Y", "TRUE", "1", "是", "YES"):
+                return True
             if upper in ("", "N", "FALSE", "0", "否", "NO"):
-                parsed_value = False
-            elif upper in ("Y", "TRUE", "1", "是", "YES"):
-                parsed_value = True
-            else:
-                QMessageBox.warning(self, "输入错误", f"{field_def.label} 必须是布尔值（Y/N）")
-                self._loading = True
-                item.setText(str(self._get_field_value(field_def, user_name, self._load_user_data(user_name))))
-                self._loading = False
-                return
+                return False
+            try:
+                return int(raw)
+            except ValueError:
+                return raw
 
-        # 回写到 JSON
-        self._write_field_value(user_name, field_def, parsed_value)
+        if model_type == MODEL_REALTIME:
+            try:
+                return int(raw) if raw else 0
+            except ValueError:
+                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                return _PARSE_ERROR
 
-    def _write_field_value(self, user_name: str, field_def, value):
-        """将字段值写回用户 JSON 文件"""
-        import json
+        if model_type == MODEL_RESOURCE:
+            try:
+                return int(raw) if raw else 0
+            except ValueError:
+                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                return _PARSE_ERROR
 
-        user_file = USERS_DIR / f"{user_name}.json"
+        if model_type == MODEL_ACTIVITY:
+            try:
+                return int(raw) if raw else 0
+            except ValueError:
+                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                return _PARSE_ERROR
+
+        return raw
+
+    def _write_profile_entry(self, user_name: str, model_type: str, key: str, value):
+        """将值写入 user.json 的 profile 节点（通过 SessionManager，与引擎统一写入通道）"""
         try:
-            # 加载数据
-            data = json.loads(user_file.read_text(encoding="utf-8")) if user_file.exists() else {}
-
-            source = field_def.source
-            if not source:
-                data[field_def.key] = value
-            else:
-                parts = source.split(".")
-                obj = data
-                # 验证路径存在性，不静默创建
-                for part in parts[:-1]:
-                    if part not in obj:
-                        logger.warning(f"source 路径 '{source}' 中 '{part}' 不存在，跳过写入")
-                        return
-                    if not isinstance(obj[part], dict):
-                        logger.warning(f"source 路径 '{source}' 中 '{part}' 不是 dict，跳过写入")
-                        return
-                    obj = obj[part]
-                obj[parts[-1]] = value
-
-            # 直接写入以便捕获异常
-            user_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-            logger.debug(f"已回写 {user_name}.{field_def.key} = {value}")
+            mgr = self._host.session_manager
+            data = mgr.load(user_name)
+            from ..config.user_profile import write_profile_entry as _write_entry
+            _write_entry(data, model_type, key, value)
+            mgr.save(user_name, data)
+            logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
         except Exception as e:
             logger.error(f"回写失败: {e}")
             QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
@@ -421,7 +485,7 @@ class ProfileOverviewTab(QWidget):
         user_mgr = UserConfigManager()
         ordered_names = user_mgr.list_users()
 
-        mgr = SessionManager()
+        mgr = self._host.session_manager
         for user_name in ordered_names:
             user_file = USERS_DIR / f"{user_name}.json"
             if not user_file.exists():
@@ -440,55 +504,31 @@ class ProfileOverviewTab(QWidget):
         if not USERS_DIR.exists():
             return {}
         try:
-            mgr = SessionManager()
+            mgr = self._host.session_manager
             return mgr.load(user_name)
         except Exception as e:
             logger.warning(f"加载用户 {user_name} 失败: {e}")
             return {}
 
-    def _get_field_value(self, field_def, user_name: str, data: dict) -> str:
-        """从用户数据中提取字段值"""
-        key = field_def.key
-        source = field_def.source
-
-        # computed/duration 类型暂无数据源
-        if field_def.type in ("computed", "duration"):
-            return ""
-
-        # 按 source 路径提取
-        if not source:
-            value = data.get(key)
-        else:
-            parts = source.split(".")
-            value = data
-            for part in parts:
-                if isinstance(value, dict):
-                    value = value.get(part)
-                else:
-                    return ""
-                if value is None:
-                    return ""
-
-        # 格式化
-        if field_def.type == "bool":
-            return "Y" if value else ""
-        return str(value) if value is not None else ""
-
     def _open_metadata_dialog(self):
-        """打开元数据定义对话框"""
-        from .profile_settings_dialog import MetadataDialog
-        dialog = MetadataDialog(self)
+        """打开数据模型定义对话框"""
+        from .profile_settings_dialog import ProfileDefinitionDialog
+        dialog = ProfileDefinitionDialog(self)
         if dialog.exec():
             from ..config import reload_profile_config
             reload_profile_config()
             self.refresh()
 
 
+# 哨兵值：表示解析失败
+_PARSE_ERROR = object()
+
+
 # ─── 角色状态 Tab ────────────────────────────────────────────
 
 
 class ProfileTab(QWidget):
-    """其他信息 Tab - 展示当前用户的详细信息"""
+    """其他信息 Tab - 展示当前用户的详细信息（按模型类型分区）"""
 
     def __init__(self, host, parent=None):
         super().__init__(parent)
@@ -496,14 +536,13 @@ class ProfileTab(QWidget):
         self._detail_page: _DetailPage | None = None
         self._setup_ui()
         self._refresh_current_user()
-        # 订阅宿主用户切换
         host.user_changed.connect(lambda _name: self._refresh_current_user())
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # 刷新按钮（右上角）
+        # 刷新按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         btn_refresh = QPushButton("刷新")
@@ -514,13 +553,12 @@ class ProfileTab(QWidget):
         btn_row.addWidget(btn_refresh)
         layout.addLayout(btn_row)
 
-        # 详情容器（动态替换）
+        # 详情容器
         self._detail_container = QVBoxLayout()
         layout.addLayout(self._detail_container, stretch=1)
 
     def _refresh_current_user(self):
         """根据当前用户重建详情页"""
-        # 清除旧详情页
         while self._detail_container.count() > 0:
             item = self._detail_container.takeAt(0)
             w = item.widget()
@@ -535,7 +573,7 @@ class ProfileTab(QWidget):
             self._detail_container.addWidget(placeholder)
             return
 
-        self._detail_page = _DetailPage(user_name)
+        self._detail_page = _DetailPage(user_name, self._host.session_manager)
         self._detail_container.addWidget(self._detail_page)
 
 
@@ -543,20 +581,19 @@ class ProfileTab(QWidget):
 
 
 class _DetailPage(QWidget):
-    """角色详情页 - 按分组展示单个角色的完整信息"""
+    """角色详情页 - 按模型类型分区展示单个角色的完整信息"""
 
-    def __init__(self, user_name: str, parent=None):
+    def __init__(self, user_name: str, session_manager, parent=None):
         super().__init__(parent)
         self._user_name = user_name
-        self._group_boxes: dict[str, QGroupBox] = {}
-        self._field_labels: dict[str, QLabel] = {}
+        self._session_manager = session_manager
+        self._value_labels: dict[str, QLabel] = {}
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # 滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -567,23 +604,22 @@ class _DetailPage(QWidget):
         scroll.setWidget(self._container)
         layout.addWidget(scroll)
 
-        # 初始加载
         self._build_form()
         self.refresh()
 
     def _build_form(self):
-        """根据 profile.yaml 构建分组表单"""
+        """按模型类型分区构建表单"""
         from ..config import get_profile_config
 
         config = get_profile_config()
-        groups = config.get_sorted_groups()
 
-        for group_def in groups:
-            fields = config.get_fields_by_group(group_def.key)
-            if not fields:
+        for model_type in (MODEL_DAILY, MODEL_REALTIME, MODEL_RESOURCE, MODEL_ACTIVITY):
+            keys = config.get_keys_by_model(model_type)
+            if not keys:
                 continue
 
-            box = QGroupBox(group_def.label)
+            model_label = MODEL_LABELS.get(model_type, model_type)
+            box = QGroupBox(model_label)
             box.setStyleSheet("""
                 QGroupBox {
                     font-weight: bold;
@@ -602,19 +638,18 @@ class _DetailPage(QWidget):
             form = QFormLayout(box)
             form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
-            for field_def in fields:
-                label = QLabel("—")
+            for kd in keys:
+                label = QLabel("")
                 label.setStyleSheet("color: #333333;")
-                form.addRow(f"{field_def.label}:", label)
-                self._field_labels[field_def.key] = label
+                form.addRow(f"{kd.label}:", label)
+                self._value_labels[kd.key] = label
 
-            self._group_boxes[group_def.key] = box
             self._form_layout.addWidget(box)
 
         self._form_layout.addStretch()
 
     def refresh(self):
-        """从用户 JSON 文件加载数据并刷新表单"""
+        """从用户 JSON 文件加载数据并刷新"""
         if not USERS_DIR.exists():
             return
 
@@ -623,43 +658,53 @@ class _DetailPage(QWidget):
             return
 
         try:
-            mgr = SessionManager()
-            data = mgr.load(self._user_name)
+            data = self._session_manager.load(self._user_name)
         except Exception as e:
             logger.warning(f"加载用户 {self._user_name} 失败: {e}")
             return
 
-        for key, label in self._field_labels.items():
-            value = self._get_field_value(key, data)
-            label.setText(str(value) if value else "—")
-
-    def _get_field_value(self, key: str, data: dict) -> str:
-        """从用户数据中提取字段值"""
         from ..config import get_profile_config
-
         config = get_profile_config()
-        field_def = config.get_field(key)
-        if not field_def:
+
+        for key, label in self._value_labels.items():
+            model_type = config.get_model_type(key) or ""
+            kd = config.get_key(key)
+            if not kd:
+                label.setText("")
+                continue
+
+            text = self._format_detail_value(kd, model_type, data)
+            label.setText(text)
+
+    def _format_detail_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
+        """格式化详情页的值显示"""
+        entry = read_profile_entry(data, model_type, kd.key)
+        if not entry:
             return ""
 
-        # computed/duration 暂无数据
-        if field_def.type in ("computed", "duration"):
+        value = entry.get("value")
+        if value is None:
             return ""
 
-        source = field_def.source
-        if not source:
-            value = data.get(key)
-        else:
-            parts = source.split(".")
-            value = data
-            for part in parts:
-                if isinstance(value, dict):
-                    value = value.get(part)
-                else:
-                    return ""
-                if value is None:
-                    return ""
+        if model_type == MODEL_DAILY:
+            if isinstance(kd, DailyKeyDef) and kd.cap:
+                return f"{value} / {kd.cap}  (周期: {kd.period})"
+            if isinstance(value, bool):
+                return "已完成" if value else "未完成"
+            return str(value)
 
-        if field_def.type == "bool":
-            return "Y" if value else ""
-        return str(value) if value is not None else ""
+        if model_type == MODEL_REALTIME:
+            if isinstance(kd, RealtimeKeyDef):
+                return f"{value} / {kd.cap}  (回复: {kd.regen_rate}/min)"
+            return str(value)
+
+        if model_type == MODEL_RESOURCE:
+            return str(value)
+
+        if model_type == MODEL_ACTIVITY:
+            total = entry.get("total", 0)
+            if isinstance(kd, ActivityKeyDef):
+                return f"当期: {value}/{kd.period_cap}  总计: {total}/{kd.lifetime_cap}"
+            return str(value)
+
+        return str(value)

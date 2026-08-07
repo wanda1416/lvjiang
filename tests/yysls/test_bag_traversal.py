@@ -233,11 +233,12 @@ def test_dispatch_session_config(stub_session, spy_traversals):
     assert spy_traversals == ["positional"]
 
 
-def test_dispatch_unknown_key_falls_back(stub_session, spy_traversals):
+def test_dispatch_unknown_key_raises(stub_session, spy_traversals):
+    """未知策略抛异常，不默认回落"""
     wf = DispatchFakeWF()
     wf.ctx.scroll_strategy = "bogus"
-    wf._traverse_bag(WEAPON_DETAIL)
-    assert spy_traversals == ["dedup"]
+    with pytest.raises(ValueError, match="未知遍历策略"):
+        wf._traverse_bag(WEAPON_DETAIL)
 
 
 def test_registry_contains_both():

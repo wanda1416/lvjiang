@@ -8,7 +8,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QInputDialog, QMenu
 
-from ....core.layout_models import CanvasConfig, Panel, Region
+from ...core.layout_models import CanvasConfig, Panel, Region
 from .canvas_coords import CanvasCoordMixin
 
 # ─── 枚举定义 ────────────────────────────────────────────
@@ -493,7 +493,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             h = abs(cy1 - cy0)
             # 矩形太小则忽略
             if w >= 0.01 and h >= 0.01:
-                from ....core.layout_models import Panel
+                from ...core.layout_models import Panel
                 pd = self._pending_panel_def
                 panel = Panel(
                     key=pd.key,

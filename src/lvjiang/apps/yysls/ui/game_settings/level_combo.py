@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import QComboBox, QWidget
 
-from lvjiang.apps.yysls.game_config import get_game_config
+from lvjiang.apps.yysls.config import get_game_config
 
 
 class LevelCombo(QComboBox):

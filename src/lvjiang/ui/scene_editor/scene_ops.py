@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 
-from ....core.layout_manager import rename_scene_across_all_layouts
-from ....core.scene_registry import (
+from ...core.layout_manager import rename_scene_across_all_layouts
+from ...core.scene_registry import (
     get_group_name,
     get_registry,
     get_scene_name,

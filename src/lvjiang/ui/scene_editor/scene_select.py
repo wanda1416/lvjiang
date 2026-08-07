@@ -2,8 +2,8 @@
 
 from PyQt6.QtWidgets import QComboBox, QFormLayout
 
-from ....core.scene_definition import BASE_VIEW_KEY
-from ....core.scene_registry import get_registry, get_scene_views
+from ...core.scene_definition import BASE_VIEW_KEY
+from ...core.scene_registry import get_registry, get_scene_views
 
 
 def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:

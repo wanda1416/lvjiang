@@ -1,4 +1,4 @@
-"""基础规则组管理页（tuning_groups/ 目录）
+"""基础规则组管理页（base_groups/ 目录）
 
 规则组 CRUD 与切换入口：
 - 当前规则下拉：切换即激活（持久化到 session，并通知三个行为页重载）；
@@ -252,10 +252,8 @@ class BaseRuleGroupPage(QWidget):
         self._group_key = key
         # 持久化到统一存储（调律任务启动时的回退依据）
         try:
-            from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
-            cfg = get_wf_config("auto_tuning")
-            cfg["base_group"] = key
-            set_wf_config("auto_tuning", cfg)
+            from lvjiang.core.config.wf_configs import update_wf_config
+            update_wf_config("auto_tuning", {"base_group": key})
         except Exception as e:  # noqa: BLE001
             logger.warning(f"基础规则组选择持久化失败: {e}")
         self._loading = True

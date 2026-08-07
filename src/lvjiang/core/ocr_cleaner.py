@@ -1,8 +1,9 @@
 """OCR 文本通用清洗器
 
-配置合并：system < local
+配置通过 ConfigResolver 双层合并读写：
 - config/system/ocr_rules.yaml  系统默认规则（随代码分发）
 - config/local/ocr_rules.yaml   用户自定义规则（覆盖系统默认）
+开发模式写入 system，用户模式写入 local diff。
 
 规则类型：
 - replacements: 文本替换 {"错误文本": "正确文本"} 或 {"噪声": ""}
@@ -12,15 +13,12 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Any
 
-import yaml
 from loguru import logger
 
-# 配置文件路径
-_SYSTEM_CONFIG = Path("config/system/ocr_rules.yaml")
-_LOCAL_CONFIG = Path("config/local/ocr_rules.yaml")
+# 配置文件相对路径（相对于 config 层根）
+_REL_PATH = "ocr_rules.yaml"
 
 
 class OCRCleaner:
@@ -42,39 +40,11 @@ class OCRCleaner:
         self._load_config()
 
     def _load_config(self):
-        """加载并合并配置：system < local"""
-        self._config = {}
-
-        # 1. 系统默认配置
-        if _SYSTEM_CONFIG.exists():
-            try:
-                cfg = yaml.safe_load(_SYSTEM_CONFIG.read_text(encoding="utf-8"))
-                if cfg:
-                    self._config = cfg
-            except Exception as e:
-                logger.warning(f"加载系统 OCR 清洗配置失败: {e}")
-
-        # 2. 用户本地配置（覆盖）
-        if _LOCAL_CONFIG.exists():
-            try:
-                local_cfg = yaml.safe_load(_LOCAL_CONFIG.read_text(encoding="utf-8"))
-                if local_cfg:
-                    self._merge_config(local_cfg)
-            except Exception as e:
-                logger.warning(f"加载本地 OCR 清洗配置失败: {e}")
-
+        """通过 ConfigResolver 加载并合并配置：system < local"""
+        from .config import get_resolver
+        self._config = get_resolver().load_merged(_REL_PATH)
         logger.debug(f"OCR 清洗器加载完成: {len(self._config.get('replacements', {}))} 条替换规则, "
                      f"{len(self._config.get('patterns', {}))} 条正则规则")
-
-    def _merge_config(self, local: dict[str, Any]):
-        """合并本地配置到当前配置"""
-        # replacements: 直接合并（本地覆盖系统）
-        if "replacements" in local:
-            self._config.setdefault("replacements", {}).update(local["replacements"])
-
-        # patterns: 直接合并（本地覆盖系统）
-        if "patterns" in local:
-            self._config.setdefault("patterns", {}).update(local["patterns"])
 
     def reload(self):
         """重新加载配置"""
@@ -127,34 +97,26 @@ class OCRCleaner:
     def set_replacements(self, replacements: dict[str, str]):
         """批量设置文本替换规则并保存一次"""
         self._config["replacements"] = dict(replacements)
-        self._save_local_config()
+        self._save_config()
 
 
     def set_patterns(self, patterns: dict[str, str]):
         """批量设置正则替换规则并保存一次"""
         self._config["patterns"] = dict(patterns)
-        self._save_local_config()
+        self._save_config()
 
-    def _save_local_config(self):
-        """保存当前配置到本地文件"""
-        _LOCAL_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-
-        local_cfg: dict[str, Any] = {}
-
+    def _save_config(self):
+        """通过 ConfigResolver 保存配置（开发→system，用户→local diff）"""
+        from .config import get_resolver
+        doc: dict[str, Any] = {}
         replacements = self._config.get("replacements", {})
         if replacements:
-            local_cfg["replacements"] = replacements
-
+            doc["replacements"] = replacements
         patterns = self._config.get("patterns", {})
         if patterns:
-            local_cfg["patterns"] = patterns
-
+            doc["patterns"] = patterns
         try:
-            _LOCAL_CONFIG.write_text(
-                yaml.dump(local_cfg, allow_unicode=True, default_flow_style=False),
-                encoding="utf-8",
-            )
-            logger.debug(f"OCR 清洗配置已保存: {_LOCAL_CONFIG}")
+            get_resolver().save_merged(_REL_PATH, doc)
         except Exception as e:
             logger.error(f"保存 OCR 清洗配置失败: {e}")
 

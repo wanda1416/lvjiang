@@ -25,7 +25,7 @@ from .parsing import (
 
 # 规则目录相对 config 层根的路径
 _RULES_REL_DIR = "yysls/tuning_rules"
-_GROUPS_REL_DIR = "yysls/tuning_groups"
+_GROUPS_REL_DIR = "yysls/base_groups"
 _CONFIG_REL_PATH = "yysls/tune_config.yaml"
 
 # ─── 规则管理器 ──────────────────────────────────────────────
@@ -221,7 +221,7 @@ def get_tuning_rule_manager() -> TuningRuleManager:
     return _instance
 
 
-# ─── 基础规则组管理器（tuning_groups/） ──────────────────────
+# ─── 基础规则组管理器（base_groups/） ──────────────────────
 
 class TuningGroupManager:
     """基础规则组管理器（目录型，一组一个 YAML）

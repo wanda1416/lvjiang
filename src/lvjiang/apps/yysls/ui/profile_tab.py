@@ -116,7 +116,7 @@ class ProfileOverviewTab(QWidget):
 
     def refresh(self):
         """刷新表格数据"""
-        from ..profile import get_profile_config
+        from ..config import get_profile_config
 
         config = get_profile_config()
         column_keys = _get_overview_columns()
@@ -188,7 +188,7 @@ class ProfileOverviewTab(QWidget):
         if logical_index < 1:
             return
 
-        from ..profile import get_profile_config
+        from ..config import get_profile_config
         config = get_profile_config()
         all_fields = config.get_all_fields()
 
@@ -244,7 +244,7 @@ class ProfileOverviewTab(QWidget):
 
     def _add_column(self, after_index: int):
         """在指定列后新增一列"""
-        from ..profile import get_profile_config
+        from ..config import get_profile_config
         config = get_profile_config()
         all_fields = config.get_all_fields()
 
@@ -332,7 +332,7 @@ class ProfileOverviewTab(QWidget):
         if col < 1:
             return
 
-        from ..profile import get_profile_config
+        from ..config import get_profile_config
         config = get_profile_config()
 
         column_keys = _get_overview_columns()
@@ -352,10 +352,11 @@ class ProfileOverviewTab(QWidget):
         user_name = name_item.text()
 
         # 解析新值
-        new_value = item.text()
+        raw_value = item.text()
+        parsed_value: str | int | bool = raw_value
         if field_def.type == "int":
             try:
-                new_value = int(new_value) if new_value else 0
+                parsed_value = int(raw_value) if raw_value else 0
             except ValueError:
                 QMessageBox.warning(self, "输入错误", f"{field_def.label} 必须是整数")
                 self._loading = True
@@ -363,11 +364,11 @@ class ProfileOverviewTab(QWidget):
                 self._loading = False
                 return
         elif field_def.type == "bool":
-            upper = new_value.upper()
+            upper = raw_value.upper()
             if upper in ("", "N", "FALSE", "0", "否", "NO"):
-                new_value = False
+                parsed_value = False
             elif upper in ("Y", "TRUE", "1", "是", "YES"):
-                new_value = True
+                parsed_value = True
             else:
                 QMessageBox.warning(self, "输入错误", f"{field_def.label} 必须是布尔值（Y/N）")
                 self._loading = True
@@ -376,7 +377,7 @@ class ProfileOverviewTab(QWidget):
                 return
 
         # 回写到 JSON
-        self._write_field_value(user_name, field_def, new_value)
+        self._write_field_value(user_name, field_def, parsed_value)
 
     def _write_field_value(self, user_name: str, field_def, value):
         """将字段值写回用户 JSON 文件"""
@@ -413,7 +414,7 @@ class ProfileOverviewTab(QWidget):
 
     def _load_all_users(self) -> dict[str, dict]:
         """加载所有用户数据（按用户管理定义的顺序）"""
-        result = {}
+        result: dict[str, dict] = {}
         if not USERS_DIR.exists():
             return result
 
@@ -478,7 +479,7 @@ class ProfileOverviewTab(QWidget):
         from .profile_settings_dialog import MetadataDialog
         dialog = MetadataDialog(self)
         if dialog.exec():
-            from ..profile import reload_profile_config
+            from ..config import reload_profile_config
             reload_profile_config()
             self.refresh()
 
@@ -571,8 +572,8 @@ class _DetailPage(QWidget):
         self.refresh()
 
     def _build_form(self):
-        """根据 profiles.yaml 构建分组表单"""
-        from ..profile import get_profile_config
+        """根据 profile.yaml 构建分组表单"""
+        from ..config import get_profile_config
 
         config = get_profile_config()
         groups = config.get_sorted_groups()
@@ -634,7 +635,7 @@ class _DetailPage(QWidget):
 
     def _get_field_value(self, key: str, data: dict) -> str:
         """从用户数据中提取字段值"""
-        from ..profile import get_profile_config
+        from ..config import get_profile_config
 
         config = get_profile_config()
         field_def = config.get_field(key)

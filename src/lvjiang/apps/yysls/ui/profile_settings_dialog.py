@@ -1,6 +1,6 @@
 """玩家信息元数据定义对话框
 
-编辑 profiles.yaml，定义 user.json 中可能存在的字段及其属性。
+编辑 profile.yaml，定义 user.json 中可能存在的字段及其属性。
 分组以顶部 Tab 形式展示，支持右键新建/删除/重命名分组。
 字段表格支持新增/删除字段、修改 key、调整分组、调整排序。
 """
@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.constants import SESSION_CONFIG_DIR
 from lvjiang.core.config import load_yaml, save_yaml
 
-_PROFILES_PATH = SESSION_CONFIG_DIR / "profiles.yaml"
+_PROFILE_PATH = SESSION_CONFIG_DIR / "profile.yaml"
 
 
 class _GroupTab(QWidget):
@@ -106,7 +106,7 @@ class _GroupTab(QWidget):
         parent = self.parent()
         while parent and not isinstance(parent, MetadataDialog):
             parent = parent.parent()
-        return parent
+        return parent if isinstance(parent, MetadataDialog) else None
 
     def _add_field(self):
         """新增字段（通过父级对话框触发）"""
@@ -222,14 +222,14 @@ class MetadataDialog(QDialog):
         layout.addLayout(btn_row)
 
     def _load_data(self):
-        """加载 profiles.yaml"""
-        if not _PROFILES_PATH.exists():
+        """加载 profile.yaml"""
+        if not _PROFILE_PATH.exists():
             return
 
         try:
-            self._data = load_yaml(_PROFILES_PATH)
+            self._data = load_yaml(_PROFILE_PATH)
         except Exception as e:
-            logger.error(f"加载 profiles.yaml 失败: {e}")
+            logger.error(f"加载 profile.yaml 失败: {e}")
             return
 
         self._rebuild_tabs()
@@ -316,7 +316,7 @@ class MetadataDialog(QDialog):
         # 收集新的字段顺序和数据
         new_group_fields = []
         for local_row in range(tab.table.rowCount()):
-            row_data = {}
+            row_data: dict[str, str | bool] = {}
 
             # 字段 key
             key_item = tab.table.item(local_row, 0)
@@ -366,8 +366,8 @@ class MetadataDialog(QDialog):
         """立即同步并保存"""
         self._sync_all_tabs()
         try:
-            save_yaml(_PROFILES_PATH, self._data)
-            logger.debug("已实时保存 profiles.yaml")
+            save_yaml(_PROFILE_PATH, self._data)
+            logger.debug("已实时保存 profile.yaml")
         except Exception as e:
             logger.error(f"实时保存失败: {e}")
 
@@ -581,9 +581,9 @@ class MetadataDialog(QDialog):
             return
 
         try:
-            save_yaml(_PROFILES_PATH, self._data)
-            logger.info("已保存 profiles.yaml")
+            save_yaml(_PROFILE_PATH, self._data)
+            logger.info("已保存 profile.yaml")
             self.accept()
         except Exception as e:
-            logger.error(f"保存 profiles.yaml 失败: {e}")
-            QMessageBox.warning(self, "保存失败", f"保存 profiles.yaml 失败:\n{e}")
+            logger.error(f"保存 profile.yaml 失败: {e}")
+            QMessageBox.warning(self, "保存失败", f"保存 profile.yaml 失败:\n{e}")

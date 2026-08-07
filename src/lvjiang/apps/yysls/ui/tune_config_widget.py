@@ -8,7 +8,7 @@
   show_globals=True（默认）时顶部内嵌全局区并委托其读写接口，
   调律 Tab 传 False 将全局区独立放到「更多」页。
 
-配置结构与插件会话（config/session/yysls/session.json）tuning 节点一致：
+配置结构与 wf_configs["auto_tuning"] 一致：
 - rules: {规则 key: {"enabled": bool, "playstyles": [名字]}}
   （playstyles 缺省 = 该规则声明的全部玩法）
 - switches: {开关 key: bool}，由 get_switches/set_switches 单独读写

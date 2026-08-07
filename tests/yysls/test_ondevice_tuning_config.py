@@ -79,7 +79,7 @@ class TestSaveRoundtrip:
         assert saved["selected_slots"] == ["ring", "head"]
         assert saved["rules"]["huiyi_general"]["enabled"] is True
         assert saved["switches"] == {"keep_pvp": True}
-        assert saved["skip_tuning"] is False
+        assert "skip_tuning" not in saved
 
         view = json.loads(get_tuning_config())
         assert view["ok"] is True

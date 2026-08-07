@@ -173,7 +173,7 @@ def get_device_ip(adb: str, serial: str) -> str | None:
 def enable_tcpip(adb: str, serial: str, port: int) -> bool:
     """开启设备的 ADB TCP 模式（用于 USB 转无线）"""
     out = run_adb(adb, "-s", serial, "tcpip", str(port))
-    return "restarting" in out.lower() or port in out
+    return "restarting" in out.lower() or str(port) in out
 
 
 def scan_and_connect_wireless(

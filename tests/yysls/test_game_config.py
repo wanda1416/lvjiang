@@ -7,7 +7,7 @@
 
 import pytest
 
-from lvjiang.apps.yysls.game_config import (
+from lvjiang.apps.yysls.config import (
     AFFIX_CATEGORY_NAMES,
     EQUIP_PART_NAMES,
     POOL_DINGYIN,

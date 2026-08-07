@@ -3,7 +3,7 @@
 from loguru import logger
 from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
 
-from ....core.config.resolver import get_resolver
+from ...core.config.resolver import get_resolver
 
 
 def _format_value(value) -> str:
@@ -129,7 +129,7 @@ class ScriptOpsMixin:
 
         try:
             # 构建 WorkflowEngine
-            from ....workflows.engine import WorkflowEngine
+            from ...workflows.engine import WorkflowEngine
             layout_name = self._current_layout.name if self._current_layout else ""
             if not layout_name:
                 self._result_text.setPlainText("[错误] 没有已加载的布局")

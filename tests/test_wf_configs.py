@@ -11,6 +11,7 @@ from lvjiang.core.config.wf_configs import (
     get_all_wf_configs,
     get_wf_config,
     set_wf_config,
+    update_wf_config,
 )
 
 # ─── 基本读写 ──────────────────────────────────────────────
@@ -50,6 +51,19 @@ class TestBasicOperations:
         set_wf_config("wf", {"v": 1})
         set_wf_config("wf", {"v": 2})
         assert get_wf_config("wf") == {"v": 2}
+
+    def test_update_merges_fields_for_single_wf(self, session_store):
+        set_wf_config("wf", {"owned": 1, "foreign": {"keep": True}})
+        updated = update_wf_config("wf", {"owned": 2})
+        assert updated == {"owned": 2, "foreign": {"keep": True}}
+        assert get_wf_config("wf") == {"owned": 2, "foreign": {"keep": True}}
+
+    def test_update_does_not_affect_other_wf(self, session_store):
+        set_wf_config("wf_a", {"a": 1})
+        set_wf_config("wf_b", {"b": 1})
+        update_wf_config("wf_a", {"a": 2})
+        assert get_wf_config("wf_a") == {"a": 2}
+        assert get_wf_config("wf_b") == {"b": 1}
 
 
 # ─── 深拷贝隔离 ────────────────────────────────────────────

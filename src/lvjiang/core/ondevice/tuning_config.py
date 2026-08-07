@@ -135,7 +135,7 @@ def save_tuning_config(payload: str) -> str:
             get_tuning_group_manager,
         )
         from ...apps.yysls.tune_slots import LOCKED_SLOTS, SLOT_LABELS
-        from ...core.config.wf_configs import get_wf_config, set_wf_config
+        from ...core.config.wf_configs import get_wf_config, update_wf_config
 
         data = json.loads(payload)
         if not isinstance(data, dict):
@@ -198,15 +198,11 @@ def save_tuning_config(payload: str) -> str:
             base_group = raw_group
         else:
             base_group = old.get("base_group", "")
-        set_wf_config("auto_tuning", {
+        update_wf_config("auto_tuning", {
             "selected_slots": selected_slots,
             "rules": rules_cfg,
             "switches": switches,
             "base_group": base_group,
-            "skip_tuning": old.get("skip_tuning", False),
-            "skip_start": old.get("skip_start"),
-            "target_cell": old.get("target_cell"),
-            "scroll_strategy": old.get("scroll_strategy", ""),
         })
         return json.dumps({"ok": True, "message": "已保存"}, ensure_ascii=False)
     except Exception as e:

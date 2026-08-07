@@ -3,7 +3,7 @@
 提供：
 - 版本号获取（打包/开发环境）
 - GitHub Release 更新检查（后台线程）
-- 跳过版本持久化（用户选择"此版本不再询问"后存储）
+- 跳过版本持久化（用户选择"此版本不再询问"后存储到 session.json 的 server_config 节点）
 """
 from __future__ import annotations
 
@@ -18,9 +18,6 @@ from PyQt6.QtCore import QThread, pyqtSignal
 GITHUB_REPO = "wanda1416/lvjiang"
 GITHUB_RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-
-# 跳过版本配置文件
-_UPDATE_CONFIG = Path("config/local/update.json")
 
 
 def get_version() -> str:
@@ -75,28 +72,20 @@ def is_newer_version(latest: str, current: str) -> bool:
     return parse_version(latest) > parse_version(current)
 
 
-# ─── 跳过版本管理 ─────────────────────────────────────────
+# ─── 跳过版本管理（存储于 session.json 的 server_config 节点）────────────
 
 
 def get_skip_version() -> str:
     """获取用户选择跳过的版本号"""
-    if _UPDATE_CONFIG.exists():
-        try:
-            data = json.loads(_UPDATE_CONFIG.read_text(encoding="utf-8"))
-            return data.get("skip_version", "")
-        except Exception:
-            pass
-    return ""
+    from .config.session import get_session_store
+    node = get_session_store().get_node("server_config") or {}
+    return node.get("skip_version", "")
 
 
 def set_skip_version(version: str) -> None:
     """设置用户选择跳过的版本号"""
-    _UPDATE_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    data = {"skip_version": version}
-    _UPDATE_CONFIG.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    from .config.session import get_session_store
+    get_session_store().update_node("server_config", {"skip_version": version})
 
 
 def should_prompt_update(latest_version: str) -> bool:

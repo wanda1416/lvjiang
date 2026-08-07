@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.game_config import SeasonConfig, get_game_config
+from lvjiang.apps.yysls.config import SeasonConfig, get_game_config
 
 from .level_combo import LevelCombo
 

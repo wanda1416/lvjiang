@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.game_config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
+from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
 from .level_combo import LevelCombo
 
@@ -599,7 +599,7 @@ class AffixCapsPanel(QWidget):
             get_resolver().save_merged(_ATTRS_REL, self._data)
             logger.debug(f"配置已保存: {_ATTRS_REL}")
             # 刷新 GameConfigManager 单例
-            from lvjiang.apps.yysls.game_config import get_game_config
+            from lvjiang.apps.yysls.config import get_game_config
             manager = get_game_config()
             manager._load()
         except Exception as e:

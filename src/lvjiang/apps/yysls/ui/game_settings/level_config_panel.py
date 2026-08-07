@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.game_config import LevelConfig, get_game_config
+from lvjiang.apps.yysls.config import LevelConfig, get_game_config
 
 # 列定义
 _SEQ_COL = 0

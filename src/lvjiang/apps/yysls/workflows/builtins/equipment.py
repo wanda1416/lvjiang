@@ -87,7 +87,7 @@ def _affix_cap(affix_name: str, level, *args) -> float:
         level = int(level)
     except (ValueError, TypeError):
         return 0
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     result = get_game_config().get_affix_caps(level, str(affix_name))
     if result is None:
         logger.debug(f"affix_cap: 未找到配置 affix={affix_name} level={level}")
@@ -110,7 +110,7 @@ def _chengyin_cap(affix_name: str, level, *args) -> float:
         level = int(level)
     except (ValueError, TypeError):
         return 0
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     result = get_game_config().get_affix_caps(level, str(affix_name))
     if result is None:
         return 0

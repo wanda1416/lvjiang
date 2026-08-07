@@ -5,8 +5,149 @@ from ctypes import wintypes
 
 import numpy as np
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
+
+
+class _DeviceWorker(QObject):
+    """后台线程：扫描或连接 ADB 设备（互斥，不会同时运行）"""
+    scan_finished = pyqtSignal(list)  # devices
+    wireless_finished = pyqtSignal(list)  # devices (无线扫描结果)
+    wireless_progress = pyqtSignal(str, int, int)  # message, current, total
+    connect_finished = pyqtSignal(object, object, str, int, int)  # device, capture, method, w, h
+    error = pyqtSignal(str)
+
+    def __init__(self, task: str, serial: str = "", capture_method: str = ""):
+        super().__init__()
+        self._task = task
+        self._serial = serial
+        self._capture_method = capture_method
+
+    def run(self):
+        try:
+            if self._task == "scan":
+                self._do_scan()
+            elif self._task == "wireless_scan":
+                self._do_wireless_scan()
+            else:
+                self._do_connect()
+        except Exception as e:
+            self.error.emit(str(e))
+
+    def _do_scan(self):
+        from ..core.android import list_adb_devices
+        devices = list_adb_devices()
+        self.scan_finished.emit(devices)
+
+    def _do_wireless_scan(self):
+        from ..core.android import scan_and_connect_wireless
+        devices = scan_and_connect_wireless(progress_cb=self._on_progress)
+        self.wireless_finished.emit(devices)
+
+    def _on_progress(self, message: str, current: int, total: int):
+        """进度回调（后台线程），通过信号发送到主线程"""
+        self.wireless_progress.emit(message, current, total)
+
+    def _do_connect(self):
+        from ..core.android import AdbDevice, create_capture_backend
+
+        device = AdbDevice(serial=self._serial)
+        w, h = device.get_resolution()
+        if w <= 0 or h <= 0:
+            self.error.emit("无法获取设备分辨率")
+            return
+
+        capture = create_capture_backend(device=device, method=self._capture_method)
+        if not capture.start():
+            self.error.emit(f"{self._capture_method} 截图后端不可用")
+            return
+
+        self.connect_finished.emit(device, capture, self._capture_method, w, h)
+
+
+class _WirelessScanDialog(QObject):
+    """局域网扫描对话框：带进度条和状态反馈"""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        from PyQt6.QtWidgets import (
+            QDialog,
+            QHBoxLayout,
+            QLabel,
+            QProgressBar,
+            QPushButton,
+            QVBoxLayout,
+        )
+        self._dialog = QDialog(parent)
+        self._dialog.setWindowTitle("未发现 ADB 设备")
+        self._dialog.setMinimumWidth(400)
+
+        layout = QVBoxLayout(self._dialog)
+
+        # 提示文字
+        self._msg_label = QLabel(
+            "未发现 USB 连接的 ADB 设备。\n\n"
+            "是否扫描局域网并尝试无线连接？\n"
+            "（设备需已开启无线调试）"
+        )
+        layout.addWidget(self._msg_label)
+
+        # 进度条（初始隐藏）
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setVisible(False)
+        layout.addWidget(self._progress_bar)
+
+        # 状态标签（初始隐藏）
+        self._status_label = QLabel("")
+        self._status_label.setVisible(False)
+        self._status_label.setStyleSheet("color: gray;")
+        layout.addWidget(self._status_label)
+
+        # 按钮
+        btn_layout = QHBoxLayout()
+        self._scan_btn = QPushButton("扫描")
+        self._cancel_btn = QPushButton("取消")
+        btn_layout.addStretch()
+        btn_layout.addWidget(self._scan_btn)
+        btn_layout.addWidget(self._cancel_btn)
+        layout.addLayout(btn_layout)
+
+        # 信号连接
+        self._scan_btn.clicked.connect(self._on_scan_clicked)
+        self._cancel_btn.clicked.connect(self._dialog.reject)
+
+        # 回调
+        self._on_scan_callback = None
+
+    def _on_scan_clicked(self):
+        """点击扫描按钮"""
+        self._scan_btn.setEnabled(False)
+        self._scan_btn.setText("扫描中...")
+        self._cancel_btn.setEnabled(False)
+        self._progress_bar.setVisible(True)
+        self._status_label.setVisible(True)
+        if self._on_scan_callback:
+            self._on_scan_callback()
+
+    def update_progress(self, message: str, current: int, total: int):
+        """更新进度"""
+        self._progress_bar.setMaximum(total)
+        self._progress_bar.setValue(current)
+        self._status_label.setText(message)
+
+    def exec(self, on_scan_callback) -> bool:
+        """显示对话框，返回是否点击了扫描"""
+        from PyQt6.QtWidgets import QDialog
+        self._on_scan_callback = on_scan_callback
+        return self._dialog.exec() == QDialog.DialogCode.Accepted
+
+    def accept(self):
+        """接受对话框（扫描完成）"""
+        self._dialog.accept()
+
+    def reject(self):
+        """拒绝对话框（取消）"""
+        self._dialog.reject()
 
 
 class WindowOpsMixin:
@@ -145,19 +286,37 @@ class WindowOpsMixin:
 
         self._device_ready = False
         self.btn_locate.setEnabled(False)
+        self.btn_scan_device.setEnabled(False)
+        self.btn_scan_device.setText("扫描中...")
         self.lbl_window_info.setText("未连接设备")
         self.lbl_window_info.setStyleSheet("color: gray;")
         self.statusBar().showMessage("正在扫描设备...")
         self._refresh_run_button()
 
-        from ..core.android import list_adb_devices
-        devices = list_adb_devices()
+        # 异步扫描
+        self._wait_device_thread()
+        self._device_thread = QThread()
+        self._device_worker = _DeviceWorker(task="scan")
+        self._device_worker.moveToThread(self._device_thread)
+        self._device_thread.started.connect(self._device_worker.run)
+        self._device_worker.scan_finished.connect(self._on_scan_devices_done)
+        self._device_worker.error.connect(self._on_scan_devices_error)
+        self._device_worker.scan_finished.connect(self._device_thread.quit)
+        self._device_worker.error.connect(self._device_thread.quit)
+        self._device_thread.start()
+
+    def _on_scan_devices_done(self, devices: list):
+        """扫描完成回调（主线程）"""
+        self.btn_scan_device.setEnabled(True)
+        self.btn_scan_device.setText("扫描设备")
         self._scanned_windows = devices
         self.window_combo.clear()
 
         if not devices:
-            self.log_text.append("[错误] 未找到 ADB 设备，请确认已连接并开启 USB 调试授权")
-            self.statusBar().showMessage("未连接设备 | 未找到 ADB 设备")
+            self.log_text.append("[提示] 未发现 USB 连接的 ADB 设备")
+            self.statusBar().showMessage("未发现设备 | 可尝试局域网扫描")
+            # 弹出对话框询问是否扫描局域网
+            self._ask_wireless_scan()
             return
 
         for d in devices:
@@ -169,40 +328,145 @@ class WindowOpsMixin:
         self.log_text.append(f"[扫描] 找到 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage("已扫描设备 | 请选择设备并点击连接")
 
+    def _ask_wireless_scan(self):
+        """询问用户是否扫描局域网 ADB 设备"""
+        self._wireless_dialog = _WirelessScanDialog(self)
+        # 延迟到下一轮事件循环显示模态对话框，确保调用栈已返回事件循环
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._show_wireless_dialog)
+
+    def _show_wireless_dialog(self):
+        """显示局域网扫描对话框"""
+        result = self._wireless_dialog.exec(on_scan_callback=self._start_wireless_scan)
+        if not result:
+            # 用户取消 — 断开 worker 信号，防止过期回调更新 UI
+            if hasattr(self, '_device_worker') and self._device_worker:
+                for sig in [self._device_worker.wireless_finished,
+                            self._device_worker.wireless_progress,
+                            self._device_worker.error]:
+                    try:
+                        sig.disconnect()
+                    except TypeError:
+                        pass
+            self.btn_scan_device.setEnabled(True)
+            self.btn_scan_device.setText("扫描设备")
+            self.statusBar().showMessage("已取消扫描")
+
+    def _wait_device_thread(self):
+        """等待可能存在的旧设备线程退出"""
+        if hasattr(self, '_device_thread') and self._device_thread.isRunning():
+            self._device_thread.quit()
+            self._device_thread.wait(3000)
+
+    def _start_wireless_scan(self):
+        """启动局域网 ADB 扫描（异步）"""
+        self.btn_scan_device.setEnabled(False)
+        self.btn_scan_device.setText("扫描局域网...")
+        self.statusBar().showMessage("正在扫描局域网...")
+        self.log_text.append("[扫描] 正在扫描局域网 ADB 设备...")
+
+        self._wait_device_thread()
+        self._device_thread = QThread()
+        self._device_worker = _DeviceWorker(task="wireless_scan")
+        self._device_worker.moveToThread(self._device_thread)
+        self._device_thread.started.connect(self._device_worker.run)
+        self._device_worker.wireless_finished.connect(self._on_wireless_scan_done)
+        self._device_worker.wireless_progress.connect(self._on_wireless_scan_progress)
+        self._device_worker.error.connect(self._on_wireless_scan_error)
+        self._device_worker.wireless_finished.connect(self._device_thread.quit)
+        self._device_worker.error.connect(self._device_thread.quit)
+        self._device_thread.start()
+
+    def _on_wireless_scan_progress(self, message: str, current: int, total: int):
+        """局域网扫描进度回调（主线程）"""
+        if hasattr(self, "_wireless_dialog") and self._wireless_dialog:
+            self._wireless_dialog.update_progress(message, current, total)
+
+    def _on_wireless_scan_done(self, devices: list):
+        """局域网扫描完成回调（主线程）"""
+        from PyQt6.QtWidgets import QMessageBox
+        self.btn_scan_device.setEnabled(True)
+        self.btn_scan_device.setText("扫描设备")
+        self.window_combo.clear()
+
+        # 关闭对话框
+        if hasattr(self, "_wireless_dialog") and self._wireless_dialog:
+            self._wireless_dialog.accept()
+
+        if not devices:
+            self.log_text.append("[扫描] 局域网内未发现可连接的 ADB 设备")
+            self.statusBar().showMessage("未发现设备 | 请确认设备已开启无线调试")
+            QMessageBox.warning(
+                self, "未发现设备",
+                "局域网内未发现可连接的 ADB 设备。\n\n"
+                "请确认：\n"
+                "1. 设备与电脑在同一局域网\n"
+                "2. 设备已开启无线调试（开发者选项）",
+            )
+            return
+
+        self._scanned_windows = devices
+        for d in devices:
+            label = d["serial"] + (f"  ({d['model']})" if d.get("model") else "")
+            self.window_combo.addItem(label, d)
+        self.btn_locate.setEnabled(True)
+        self.lbl_window_info.setText(f"已发现 {len(devices)} 台设备，请选择并点击连接")
+        self.lbl_window_info.setStyleSheet("color: green;")
+        self.log_text.append(f"[扫描] 局域网发现 {len(devices)} 台设备，请选择并点击连接")
+        self.statusBar().showMessage(f"已发现 {len(devices)} 台设备 | 请选择并点击连接")
+
+    def _on_wireless_scan_error(self, error_msg: str):
+        """局域网扫描失败回调（主线程）"""
+        self.btn_scan_device.setEnabled(True)
+        self.btn_scan_device.setText("扫描设备")
+        # 关闭对话框
+        if hasattr(self, "_wireless_dialog") and self._wireless_dialog:
+            self._wireless_dialog.reject()
+        logger.error(f"局域网扫描失败: {error_msg}")
+        self.log_text.append(f"[错误] 局域网扫描失败: {error_msg}")
+        self.statusBar().showMessage("扫描失败 | 详见日志")
+
+    def _on_scan_devices_error(self, error_msg: str):
+        """扫描失败回调（主线程）"""
+        self.btn_scan_device.setEnabled(True)
+        self.btn_scan_device.setText("扫描设备")
+        logger.error(f"扫描设备失败: {error_msg}")
+        self.log_text.append(f"[错误] 扫描设备失败: {error_msg}")
+        self.statusBar().showMessage("扫描失败 | 详见日志")
+
     def _on_connect_device(self):
-        """ADB 模式：连接选中设备（adb shell input + adb screencap/scrcpy）"""
+        """ADB 模式：异步连接选中设备（adb shell input + adb screencap/scrcpy）"""
         d = self.window_combo.currentData()
         if not d:
             return
-        from ..core.android import (
-            AdbDevice,
-            create_capture_backend,
-            create_input_backend,
-        )
 
         # 若已连接旧设备，先清理资源
         self._teardown_adb_backend()
 
-        try:
-            device = AdbDevice(serial=d["serial"])
-            w, h = device.get_resolution()
-            if w <= 0 or h <= 0:
-                self.log_text.append("[错误] 无法获取设备分辨率")
-                self.statusBar().showMessage("连接失败 | 无法获取分辨率")
-                return
-        except Exception as e:
-            logger.error(f"连接设备失败: {e}")
-            self.log_text.append(f"[错误] 连接设备失败: {e}")
-            self.statusBar().showMessage("连接失败 | 详见日志")
-            return
+        # UI 进入连接中状态
+        self.btn_locate.setEnabled(False)
+        self.btn_locate.setText("连接中...")
+        self.statusBar().showMessage("正在连接设备...")
 
-        # 创建截图后端（根据配置选择 screencap 或 scrcpy）
         capture_method = "scrcpy" if self._user_config.adb_capture_streaming else "screencap"
-        self._capture = create_capture_backend(device=device, method=capture_method)
-        if not self._capture.start():
-            self.log_text.append(f"[错误] {capture_method} 截图后端不可用")
-            self.statusBar().showMessage(f"连接失败 | {capture_method} 不可用")
-            return
+
+        # 异步连接
+        self._wait_device_thread()
+        self._device_thread = QThread()
+        self._device_worker = _DeviceWorker(task="connect", serial=d["serial"], capture_method=capture_method)
+        self._device_worker.moveToThread(self._device_thread)
+        self._device_thread.started.connect(self._device_worker.run)
+        self._device_worker.connect_finished.connect(
+            lambda device, capture, method, w, h: self._on_connect_done(d, device, capture, method, w, h)
+        )
+        self._device_worker.error.connect(self._on_connect_error)
+        self._device_worker.connect_finished.connect(self._device_thread.quit)
+        self._device_worker.error.connect(self._device_thread.quit)
+        self._device_thread.start()
+
+    def _on_connect_done(self, combo_data, device, capture, capture_method, w, h):
+        """连接成功回调（主线程）"""
+        from ..core.android import create_input_backend
 
         # 创建输入控制器（adb shell input）
         self._input = create_input_backend(device=device, input_sim=self._user_config.input_sim)
@@ -211,24 +475,34 @@ class WindowOpsMixin:
         self._scrcpy_streaming = False
         if capture_method == "scrcpy":
             from ..core.android import AndroidStreamCapture
-            if isinstance(self._capture, AndroidStreamCapture):
-                self._capture.set_on_frame(self._on_scrcpy_frame)
+            if isinstance(capture, AndroidStreamCapture):
+                capture.set_on_frame(self._on_scrcpy_frame)
                 self._scrcpy_streaming = True
                 logger.info("[连接] scrcpy 视频流预览已启用")
 
+        self._capture = capture
         self._device = device
         self._device_ready = True
         method_label = "scrcpy" if capture_method == "scrcpy" else "screencap"
-        self.lbl_window_info.setText(f"已连接: {d['serial']}  |  分辨率: {w}x{h}  |  {method_label}")
+        self.lbl_window_info.setText(f"已连接: {combo_data['serial']}  |  分辨率: {w}x{h}  |  {method_label}")
         self.lbl_window_info.setStyleSheet("color: green;")
-        self.log_text.append(f"[连接成功] {d['serial']} ({w}x{h}) [{method_label}]")
-        self.statusBar().showMessage(f"已连接设备 {d['serial']} | F9 开始 | F10 停止")
+        self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
+        self.statusBar().showMessage(f"已连接设备 {combo_data['serial']} | F9 开始 | F10 停止")
         self.btn_locate.setText("断连")
+        self.btn_locate.setEnabled(True)
         self._set_connected_ui(True)
         self._refresh_run_button()
         # screencap 模式手动刷新预览；scrcpy 模式自动推帧
         if not self._scrcpy_streaming:
             self._capture_preview()
+
+    def _on_connect_error(self, error_msg: str):
+        """连接失败回调（主线程）"""
+        logger.error(f"连接设备失败: {error_msg}")
+        self.log_text.append(f"[错误] 连接设备失败: {error_msg}")
+        self.statusBar().showMessage("连接失败 | 详见日志")
+        self.btn_locate.setText("连接")
+        self.btn_locate.setEnabled(True)
 
     def _stop_capture_backend(self):
         """停止并丢弃当前截图后端（桌面/ADB/scrcpy 共用）。"""
@@ -251,6 +525,8 @@ class WindowOpsMixin:
         self._stop_capture_backend()
         self._input = None
         self._device = None
+        # 停止后台扫描/连接线程
+        self._wait_device_thread()
 
     def _set_connected_ui(self, connected: bool):
         """连接/断连后统一更新 UI 控件可用性"""

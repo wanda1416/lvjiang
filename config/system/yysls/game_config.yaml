@@ -605,3 +605,10 @@ level_configs:
   min_material_count: 2
   judge_resistance: 145
   buff_resistance: 15
+season_configs:
+- season_number: 1
+  name: 蕤宾叠奏
+  start_date: '2026-06-26'
+  end_date: '2026-09-24'
+  first_half_end_date: '2026-08-07'
+  equip_level: 110

@@ -49,7 +49,9 @@ def get_tuning_config() -> str:
         if group_key not in groups:
             group_key = next(iter(groups), "")
         base_groups = [
-            {"key": key, "name": group.name, "checked": key == group_key}
+            {"key": key, "name": group.name,
+             "description": group.description,
+             "checked": key == group_key}
             for key, group in get_tuning_group_manager().get_groups().items()
         ]
 

@@ -2,7 +2,7 @@
 
 规则组 CRUD 与切换入口：
 - 当前规则下拉：切换即激活（持久化到 session，并通知三个行为页重载）；
-- 规则组列表：规则组名 / 等级门槛 / 调律门槛 概览；
+- 规则组列表：规则组名 / 等级门槛 / 调律门槛 / 规则说明 概览；
 - 新增（key+名称对话框，key 走 _KEY_RE，空白组）/
   复制（需选中，独立副本）/ 删除（需选中，default 禁删）；
 - 等级门槛（min_level）与调律门槛（scan.entry_min_rating）
@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Callable
 
 from loguru import logger
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -143,19 +144,21 @@ class BaseRuleGroupPage(QWidget):
         combo_row.addStretch()
         layout.addLayout(combo_row)
 
-        # 规则组列表（规则组名 / 等级门槛 / 调律门槛）
-        self._table = QTableWidget(0, 3)
+        # 规则组列表（规则组名 / 等级门槛 / 调律门槛 / 规则说明）
+        self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels(
-            ["规则组名", "等级门槛", "调律门槛"])
-        for col, width in enumerate((220, 100, 120)):
+            ["规则组名", "等级门槛", "调律门槛", "规则说明"])
+        for col, width in enumerate((220, 100, 120, 300)):
             self._table.setColumnWidth(col, width)
         self._table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers)
+            QTableWidget.EditTrigger.DoubleClicked
+            | QTableWidget.EditTrigger.EditKeyPressed)
+        self._table.cellChanged.connect(self._on_cell_changed)
         self._table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(
             QTableWidget.SelectionMode.SingleSelection)
-        self._table.setToolTip("选中一行后可复制/删除该规则组")
+        self._table.setToolTip("双击「规则说明」列可编辑，选中一行后可复制/删除该规则组")
         layout.addWidget(self._table)
 
         btn_row = QHBoxLayout()
@@ -192,19 +195,53 @@ class BaseRuleGroupPage(QWidget):
         self._table.blockSignals(True)
         self._table.setRowCount(0)
         select_row = -1
+        _readonly = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        _editable = _readonly | Qt.ItemFlag.ItemIsEditable
         for i, g in enumerate(groups.values()):
             row = self._table.rowCount()
             self._table.insertRow(row)
-            self._table.setItem(row, 0, QTableWidgetItem(g.name))
-            self._table.setItem(row, 1, QTableWidgetItem(str(g.scan.min_level)))
-            entry = g.scan.entry_min_rating
-            self._table.setItem(
-                row, 2, QTableWidgetItem(f"预期 ≥ {RATING_LABELS.get(entry, entry)}"))
+            # 列 0-2 只读，列 3（规则说明）可编辑
+            for col, text in enumerate((
+                    g.name,
+                    str(g.scan.min_level),
+                    f"预期 ≥ {RATING_LABELS.get(g.scan.entry_min_rating, g.scan.entry_min_rating)}",
+                    g.description)):
+                item = QTableWidgetItem(text)
+                item.setFlags(_editable if col == 3 else _readonly)
+                self._table.setItem(row, col, item)
             if g.key == self._group_key:
                 select_row = i
         self._table.blockSignals(False)
         if select_row >= 0:
             self._table.selectRow(select_row)
+
+    # ── 规则说明编辑 ──
+
+    def _on_cell_changed(self, row: int, col: int):
+        """规则说明列（col=3）编辑完成即校验写盘"""
+        if col != 3 or self._loading:
+            return
+        groups = self._manager.get_groups()
+        keys = list(groups)
+        if row >= len(keys):
+            return
+        key = keys[row]
+        new_desc = (self._table.item(row, col).text().strip()
+                    if self._table.item(row, col) else "")
+        # 更新 raw dict 的 description 字段
+        raw = self._manager.get_raw(key)
+        raw["description"] = new_desc
+        err = self._manager.validate(raw)
+        if err:
+            self._status_cb(f"校验失败（未保存）：{err}", True)
+            return
+        try:
+            self._manager.save_group(key, raw)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("规则说明保存失败")
+            self._status_cb(f"保存失败：{e}", True)
+            return
+        self._set_saved_status(f"规则说明已保存（{key}）")
 
     # ── 规则组切换 ──
 

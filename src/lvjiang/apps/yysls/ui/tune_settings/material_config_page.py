@@ -92,10 +92,14 @@ class MaterialConfigPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # 页面说明 + 大律准石数量检查
+        # 页面标题
         layout.addWidget(QLabel(
             "<b>材料处理</b>（每轮调律开始前的行为点）："
             "律准石数量检查、狗粮检查与添加"))
+        half_line = self.fontMetrics().height() // 2
+        layout.addSpacing(half_line)
+
+        # 大律准石数量检查
         layout.addWidget(QLabel(
             "<b>大律准石数量检查</b>（调律前识别材料区数量，"
             "低于基准判材料不足，按不足处理执行）"))
@@ -121,7 +125,7 @@ class MaterialConfigPage(QWidget):
         layout.addLayout(stone_row)
 
         # 狗粮添加规则（标题顶部留半个字高度）
-        layout.addSpacing(self.fontMetrics().height() // 2)
+        layout.addSpacing(half_line)
         layout.addWidget(QLabel(
             "<b>狗粮添加规则</b>（每轮调律自上而下匹配，首条命中即生效；"
             "全部不命中则不添加）"))

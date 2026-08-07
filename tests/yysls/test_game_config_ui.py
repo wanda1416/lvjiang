@@ -53,11 +53,12 @@ class TestDialog:
         qtbot.addWidget(dialog)
         assert dialog.windowTitle() == "游戏配置"
         tabs = dialog._tab._tabs
-        assert tabs.count() == 4
+        assert tabs.count() == 5
         assert tabs.tabText(0) == "词组配置"
         assert tabs.tabText(1) == "装备配置"
         assert tabs.tabText(2) == "流派配置"
         assert tabs.tabText(3) == "等级配置"
+        assert tabs.tabText(4) == "赛季配置"
 
 
 # ─── 武器类型增删往返 ──────────────────────────────────────

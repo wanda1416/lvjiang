@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -84,6 +84,15 @@ def _save_column_widths(widths: dict) -> None:
     """保存各分组列宽到 ui_state"""
     get_session_store().update_node("ui_state", {_COLUMN_WIDTHS_KEY: widths})
 
+
+def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> QTimer:
+    """创建一个单次触发的防抖定时器"""
+    timer = QTimer(parent)
+    timer.setSingleShot(True)
+    timer.setInterval(interval_ms)
+    timer.timeout.connect(callback)
+    return timer
+
 # ─── 档案总览 Tab ────────────────────────────────────────────
 
 
@@ -98,6 +107,7 @@ class ProfileOverviewTab(QWidget):
         self._editing_cap_cell = False
         self._restoring_widths = False
         self._reordering = False
+        self._refresh_timer = _make_debounce_timer(self, self.refresh)
         migrate_from_legacy()
         self._setup_ui()
         self._connect_profile_engine()
@@ -107,9 +117,14 @@ class ProfileOverviewTab(QWidget):
         try:
             from ..profile.profile_engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
-            engine.data_updated.connect(lambda _user_name: self.refresh())
+            engine.data_updated.connect(lambda _user_name: self._schedule_refresh())
         except Exception as e:
             logger.debug(f"ProfileOverviewTab 连接 ProfileEngine 失败: {e}")
+
+    def _schedule_refresh(self) -> None:
+        """合并后台批量更新，避免每个用户更新都刷新整张总览表。"""
+        if not self._refresh_timer.isActive():
+            self._refresh_timer.start()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -857,10 +872,12 @@ class ProfileOverviewTab(QWidget):
         """将值写入 user.json 的 profile 节点（通过 SessionManager，与引擎统一写入通道）"""
         try:
             mgr = self._host.session_manager
-            data = mgr.load(user_name)
             from ..config.user_profile import write_profile_entry as _write_entry
-            _write_entry(data, model_type, key, value)
-            mgr.save(user_name, data)
+
+            def mutate(data: dict) -> None:
+                _write_entry(data, model_type, key, value)
+
+            mgr.update(user_name, mutate)
             logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
         except Exception as e:
             logger.error(f"回写失败: {e}")
@@ -1278,6 +1295,10 @@ class ProfileTab(QWidget):
         super().__init__(parent)
         self._host = host
         self._detail_page: _DetailPage | None = None
+        self._pending_detail_refresh = False
+        self._detail_refresh_timer = _make_debounce_timer(
+            self, self._refresh_pending_detail
+        )
         self._setup_ui()
         self._refresh_current_user()
         host.user_changed.connect(lambda _name: self._refresh_current_user())
@@ -1293,8 +1314,15 @@ class ProfileTab(QWidget):
             logger.debug(f"ProfileTab 连接 ProfileEngine 失败: {e}")
 
     def _on_profile_data_updated(self, user_name: str) -> None:
-        if user_name == self._host.active_user_name() and self._detail_page is not None:
+        if user_name == self._host.active_user_name():
+            self._pending_detail_refresh = True
+            if not self._detail_refresh_timer.isActive():
+                self._detail_refresh_timer.start()
+
+    def _refresh_pending_detail(self) -> None:
+        if self._pending_detail_refresh and self._detail_page is not None:
             self._detail_page.refresh()
+        self._pending_detail_refresh = False
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)

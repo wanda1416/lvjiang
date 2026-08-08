@@ -582,6 +582,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # ── 插件注入的左侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self._left_tabs, "left_tab_builders")
 
+        # 连接 Tab 切换信号，保存当前页签
+        self._left_tabs.currentChanged.connect(self._save_tab_indices)
+
     def _build_right_tabs(self):
         """构建右侧 Tab（通用：运行日志），再追加插件注入的 Tab。"""
         self._log_buffer: list[tuple[int, str]] = []  # (level, text)
@@ -614,6 +617,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         # ── 插件注入的右侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self.tabs, "right_tab_builders")
+
+        # 连接 Tab 切换信号，保存当前页签
+        self.tabs.currentChanged.connect(self._save_tab_indices)
 
     def _add_plugin_tabs(self, tab_widget: QTabWidget, registry_key: str):
         """消费注册表中的插件 Tab builder；单个失败只记日志不中断。"""
@@ -803,7 +809,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             store.set_node("ui_state", state)
 
     def _restore_ui_state(self):
-        """启动时恢复窗口大小与左右分栏比例，免去每次手动拉伸"""
+        """启动时恢复窗口大小、左右分栏比例和当前 Tab 页签"""
         from ..core.config import get_session_store
         state = get_session_store().get_node("ui_state", {})
         if not isinstance(state, dict):
@@ -817,6 +823,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         sizes = page.get("splitter_sizes")
         if isinstance(sizes, list) and len(sizes) == 2 and all(s > 0 for s in sizes):
             self._main_splitter.setSizes([int(s) for s in sizes])
+        # 恢复左右 Tab 页签
+        left_idx = page.get("left_tab_index", 0)
+        right_idx = page.get("right_tab_index", 0)
+        if 0 <= left_idx < self._left_tabs.count():
+            self._left_tabs.setCurrentIndex(left_idx)
+        if 0 <= right_idx < self.tabs.count():
+            self.tabs.setCurrentIndex(right_idx)
 
     def _save_ui_state(self):
         """退出时写入 ui_state.main_page（浅合并，各页面写各自子节点互不干扰）"""
@@ -826,10 +839,25 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 "main_page": {
                     "window_size": [self.width(), self.height()],
                     "splitter_sizes": self._main_splitter.sizes(),
+                    "left_tab_index": self._left_tabs.currentIndex(),
+                    "right_tab_index": self.tabs.currentIndex(),
                 },
             })
         except Exception as e:
             logger.warning(f"保存 UI 状态失败: {e}")
+
+    def _save_tab_indices(self):
+        """Tab 切换时保存当前左右页签索引"""
+        from ..core.config import get_session_store
+        try:
+            get_session_store().update_node("ui_state", {
+                "main_page": {
+                    "left_tab_index": self._left_tabs.currentIndex(),
+                    "right_tab_index": self.tabs.currentIndex(),
+                },
+            })
+        except Exception as e:
+            logger.warning(f"保存 Tab 页签失败: {e}")
 
     def _setup_log_redirect(self):
         self._log_bridge = _LogBridge(self)

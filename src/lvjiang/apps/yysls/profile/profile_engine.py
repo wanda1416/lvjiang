@@ -243,19 +243,18 @@ def _count_daily_regens(
     hour, minute = _parse_reset_time(reset_time)
 
     today_reset = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    prev_reset = prev_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    prev_day_reset = prev_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
     # 上界：now 已过今日重置点 → 计入今天；否则 → 截止到昨天
     if now >= today_reset:
-        effective_today = today_reset
+        end_reset_ordinal = today_reset.toordinal()
     else:
-        effective_today = today_reset - timedelta(days=1)
+        end_reset_ordinal = (today_reset - timedelta(days=1)).toordinal()
 
-    prev_ordinal = prev_reset.toordinal()
-    if prev_time >= today_reset:
-        prev_ordinal = effective_today.toordinal()
+    # 下界：prev_time 所属的重置日（当天重置点，不论是否已过）
+    start_reset_ordinal = prev_day_reset.toordinal()
 
-    return max(effective_today.toordinal() - prev_ordinal, 0)
+    return max(end_reset_ordinal - start_reset_ordinal, 0)
 
 
 # ─── 提醒去重 ────────────────────────────────────────────────

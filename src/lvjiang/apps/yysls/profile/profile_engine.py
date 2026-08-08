@@ -3,7 +3,6 @@
 低频后台线程，每 60 秒 tick 一次，负责：
 1. 周期检查与重置（daily / activity 的 period 到期清零）
 2. 实时计算（realtime 按 regen_rate 回复，封顶 cap）
-3. 活动进度检查（period_cap / lifetime_cap 阈值提醒）
 
 Signals:
     alert_triggered(key, label, message): 提醒触发
@@ -12,6 +11,7 @@ Signals:
 
 from __future__ import annotations
 
+import calendar
 import time
 from datetime import datetime, timedelta
 
@@ -23,7 +23,6 @@ from lvjiang.core.config import SessionManager, get_session_store
 from lvjiang.core.user_config import UserConfigManager
 
 from ..config.profile_models import (
-    ActivityKeyDef,
     RealtimeKeyDef,
 )
 from ..config.user_profile import (
@@ -45,11 +44,17 @@ def _parse_reset_time(reset_time: str) -> tuple[int, int]:
     return int(parts[0]), int(parts[1])
 
 
-def _get_period_boundary(period: str, reset_time: str, now: datetime) -> datetime:
+def _get_period_boundary(
+    period: str, reset_time: str, now: datetime, reset_day: int = 0
+) -> datetime:
     """获取当前周期的起始边界（即上一个重置时刻）
 
     若 now 已越过本次重置点，返回本次重置点（表示当前周期从此开始）；
     若 now 尚未到达本次重置点，返回上次重置点。
+
+    reset_day:
+        week 周期: 1=周一 ... 7=周日（0 → 默认周一）
+        month 周期: 1-31（0 → 默认 1 号）
     """
     hour, minute = _parse_reset_time(reset_time)
 
@@ -60,30 +65,42 @@ def _get_period_boundary(period: str, reset_time: str, now: datetime) -> datetim
         return reset_today - timedelta(days=1)
 
     if period == "week":
-        # Python weekday(): Monday=0 ... Sunday=6
-        # 约定 reset_time 在周一 05:00
+        # reset_day: 1=周一 ... 7=周日，0 → 默认 1（周一）
+        target_wd = reset_day if 1 <= reset_day <= 7 else 1
+        # Python isoweekday(): Monday=1 ... Sunday=7
+        current_wd = now.isoweekday()
+        days_diff = current_wd - target_wd
         reset_today = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        days_since_monday = now.weekday()
-        this_monday = now.date() - timedelta(days=days_since_monday)
-        reset_monday = datetime.combine(this_monday, datetime.min.time()).replace(
+        reset_date = now.date() - timedelta(days=days_diff)
+        reset_dt = datetime.combine(reset_date, datetime.min.time()).replace(
             hour=hour, minute=minute
         )
-        if now >= reset_monday:
-            return reset_monday
-        return reset_monday - timedelta(weeks=1)
+        if now >= reset_dt:
+            return reset_dt
+        return reset_dt - timedelta(weeks=1)
 
     if period == "month":
-        # month 周期统一使用每月 1 日 reset_time 重置
-        reset_this_month = now.replace(day=1, hour=hour, minute=minute, second=0, microsecond=0)
+        # reset_day: 1-31，0 → 默认 1
+        target_day_raw = reset_day if 1 <= reset_day <= 31 else 1
+        # 钳位到当月最大天数
+        max_day_this = calendar.monthrange(now.year, now.month)[1]
+        target_day = min(target_day_raw, max_day_this)
+        reset_this_month = now.replace(
+            day=target_day, hour=hour, minute=minute, second=0, microsecond=0
+        )
         if now >= reset_this_month:
             return reset_this_month
-        # 上月 1 日
+        # 上月 target_day（同样钳位）
         if now.month == 1:
-            last_month_start = now.replace(year=now.year - 1, month=12, day=1,
-                                           hour=hour, minute=minute, second=0, microsecond=0)
+            prev_year, prev_month = now.year - 1, 12
         else:
-            last_month_start = now.replace(month=now.month - 1, day=1,
-                                           hour=hour, minute=minute, second=0, microsecond=0)
+            prev_year, prev_month = now.year, now.month - 1
+        max_day_prev = calendar.monthrange(prev_year, prev_month)[1]
+        last_month_start = now.replace(
+            year=prev_year, month=prev_month,
+            day=min(target_day_raw, max_day_prev),
+            hour=hour, minute=minute, second=0, microsecond=0,
+        )
         return last_month_start
 
     if period in ("season", "half_season"):
@@ -165,6 +182,34 @@ def _compute_realtime_value(
     if cap is not None:
         return int(min(computed, cap))
     return int(computed)
+
+
+def _count_daily_regens(
+    prev_time: datetime, now: datetime, reset_time: str
+) -> int:
+    """计算两个时间点之间经过了多少个 reset_time 重置边界
+
+    例如 reset_time="05:00" 时，每天 05:00 是一个边界。
+    prev_time 在昨天 03:00、now 在今天 10:00 → 经过 1 个边界（今天 05:00）。
+    prev_time 在前天 20:00、now 在今天 10:00 → 经过 2 个边界。
+    prev_time 在前天 03:00、now 在今天 03:00 → 经过 1 个边界（昨天 05:00，今天还没到）。
+    """
+    hour, minute = _parse_reset_time(reset_time)
+
+    today_reset = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    prev_reset = prev_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    # 上界：now 已过今日重置点 → 计入今天；否则 → 截止到昨天
+    if now >= today_reset:
+        effective_today = today_reset
+    else:
+        effective_today = today_reset - timedelta(days=1)
+
+    prev_ordinal = prev_reset.toordinal()
+    if prev_time >= today_reset:
+        prev_ordinal = effective_today.toordinal()
+
+    return max(effective_today.toordinal() - prev_ordinal, 0)
 
 
 # ─── 提醒去重 ────────────────────────────────────────────────
@@ -299,7 +344,9 @@ class ProfileEngine(QThread):
                 entry = read_profile_entry(data, model_type, kd.key)
                 updated_at_str = entry.get("updated_at", "")
 
-                boundary = _get_period_boundary(kd.period, kd.reset_time, now)
+                boundary = _get_period_boundary(
+                    kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
+                )
                 if not _should_reset(updated_at_str, boundary):
                     continue
 
@@ -310,13 +357,9 @@ class ProfileEngine(QThread):
                     modified = True
 
                 elif model_type == "activity":
-                    current_value = entry.get("value", 0)
-                    current_total = entry.get("total", 0)
-                    new_total = current_total + current_value
-                    write_profile_entry(data, "activity", kd.key, 0, total=new_total)
+                    write_profile_entry(data, "activity", kd.key, 0)
                     logger.debug(
-                        f"[ProfileEngine] {user_name} activity.{kd.key} "
-                        f"周期重置 (total: {current_value} → {new_total})"
+                        f"[ProfileEngine] {user_name} activity.{kd.key} 周期重置"
                     )
                     modified = True
 
@@ -333,12 +376,13 @@ class ProfileEngine(QThread):
                 stored_value, updated_at_str, kd.regen_rate, kd.cap
             )
 
-            # 每日补充：检测跨天时加上 regen_daily
+            # 每日补充：计算经过了多少个 reset_time 边界，每次加 regen_daily
             if kd.regen_daily > 0 and updated_at_str:
                 try:
                     prev_time = datetime.fromisoformat(updated_at_str)
-                    if prev_time.date() < now.date():
-                        computed += kd.regen_daily
+                    days_crossed = _count_daily_regens(prev_time, now, kd.reset_time)
+                    if days_crossed > 0:
+                        computed += kd.regen_daily * days_crossed
                         if kd.cap is not None:
                             computed = min(computed, kd.cap)
                 except ValueError:
@@ -356,40 +400,6 @@ class ProfileEngine(QThread):
                         kd.label,
                         f"{kd.label} 已达 {computed}，超过阈值 {kd.alert_above}",
                     )
-
-        # ── Step 3: 活动进度检查（activity）──
-        activity_keys = config.get_keys_by_model("activity")
-        for kd in activity_keys:
-            if not isinstance(kd, ActivityKeyDef):
-                continue
-            entry = read_profile_entry(data, "activity", kd.key)
-            value = entry.get("value", 0)
-            total = entry.get("total", 0)
-
-            # 周期限额检查
-            if kd.period_cap > 0 and kd.alert_near_period_cap is not None:
-                threshold = kd.period_cap * kd.alert_near_period_cap
-                if value >= threshold:
-                    period_key = f"period_{_get_period_boundary(kd.period, kd.reset_time, now).isoformat()}"
-                    if _check_and_mark_alert(user_name, kd.key, "near_period_cap", period_key):
-                        self.alert_triggered.emit(
-                            kd.key,
-                            kd.label,
-                            f"{kd.label} 当期进度 {value}/{kd.period_cap}，"
-                            f"已接近周期限额",
-                        )
-
-            # 总上限检查
-            if kd.lifetime_cap > 0 and kd.alert_near_lifetime_cap is not None:
-                threshold = kd.lifetime_cap * kd.alert_near_lifetime_cap
-                if total >= threshold:
-                    if _check_and_mark_alert(user_name, kd.key, "near_lifetime_cap", "total"):
-                        self.alert_triggered.emit(
-                            kd.key,
-                            kd.label,
-                            f"{kd.label} 总累积 {total}/{kd.lifetime_cap}，"
-                            f"已接近账号总上限",
-                        )
 
         # ── 写入变更 ──
         if modified:

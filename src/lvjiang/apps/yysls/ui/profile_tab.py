@@ -25,12 +25,14 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -59,72 +61,125 @@ _REFRESH_BTN_STYLE = (
     "QPushButton:hover { background-color: #78909C; }"
 )
 
-# 总览列配置在 session.json 中的 key
-_OVERVIEW_COLUMNS_KEY = "profile_overview_columns"
+# 总览分组配置在 session.json 中的 key
+_GROUPS_KEY = "profile_overview_groups"
+_ACTIVE_GROUP_KEY = "profile_overview_active_group"
+_COLUMN_WIDTHS_KEY = "profile_overview_column_widths"
 
 
-def _get_overview_columns() -> list[str]:
-    """从 session.json 获取总览页列配置"""
-    return get_session_store().get_node(_OVERVIEW_COLUMNS_KEY, [])
+def _get_groups() -> dict:
+    """从 session.json 获取总览分组配置
+
+    返回 {group_name: {"columns": [key, ...]}, ...}
+    """
+    return get_session_store().get_node(_GROUPS_KEY, {})
 
 
-def _set_overview_columns(columns: list[str]) -> None:
-    """保存总览列配置到 session.json"""
-    get_session_store().set_node(_OVERVIEW_COLUMNS_KEY, columns)
+def _save_groups(groups: dict) -> None:
+    """保存总览分组配置到 session.json"""
+    get_session_store().set_node(_GROUPS_KEY, groups)
 
+
+def _get_active_group() -> str:
+    """获取当前活跃的分组名"""
+    return get_session_store().get_node(_ACTIVE_GROUP_KEY, "")
+
+
+def _set_active_group(name: str) -> None:
+    """保存当前活跃分组名"""
+    get_session_store().set_node(_ACTIVE_GROUP_KEY, name)
+
+
+def _get_column_widths() -> dict:
+    """获取各分组列宽配置 {group_name: [width, ...]}"""
+    ui_state = get_session_store().get_node("ui_state", {})
+    if isinstance(ui_state, dict):
+        return ui_state.get(_COLUMN_WIDTHS_KEY, {})
+    return {}
+
+
+def _save_column_widths(widths: dict) -> None:
+    """保存各分组列宽到 ui_state"""
+    get_session_store().update_node("ui_state", {_COLUMN_WIDTHS_KEY: widths})
+
+
+def _migrate_old_columns() -> None:
+    """一次性迁移：将旧的 profile_overview_columns 扁平列表转为分组格式"""
+    store = get_session_store()
+    old_columns = store.get_node("profile_overview_columns", None)
+    groups = store.get_node(_GROUPS_KEY, None)
+
+    if groups:
+        # 已有新格式，清理旧 key
+        if old_columns is not None:
+            store.delete_node("profile_overview_columns")
+        return
+
+    # 无新格式，从旧格式迁移
+    if old_columns and isinstance(old_columns, list):
+        store.set_node(_GROUPS_KEY, {"默认": {"columns": old_columns}})
+        store.set_node(_ACTIVE_GROUP_KEY, "默认")
+    else:
+        store.set_node(_GROUPS_KEY, {"默认": {"columns": []}})
+        store.set_node(_ACTIVE_GROUP_KEY, "默认")
+
+    # 删除旧 key
+    store.delete_node("profile_overview_columns")
 
 # ─── 档案总览 Tab ────────────────────────────────────────────
 
 
 class ProfileOverviewTab(QWidget):
-    """档案总览 Tab - 宽表展示所有角色，交互式列头配置"""
+    """档案总览 Tab - QTabWidget 分组展示，每组一个表格，角色名固定首列"""
 
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
+        self._tables: dict[str, QTableWidget] = {}
+        self._loading = False
+        self._editing_cap_cell = False
+        self._restoring_widths = False
+        _migrate_old_columns()
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # 刷新按钮（右上角）
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
+        # ── 工具栏：刷新 + 分组管理 ──
+        toolbar = QHBoxLayout()
+
         btn_refresh = QPushButton("刷新")
         btn_refresh.setFixedWidth(60)
         btn_refresh.setToolTip("重新读取角色数据")
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self.refresh)
-        btn_row.addWidget(btn_refresh)
-        layout.addLayout(btn_row)
+        toolbar.addWidget(btn_refresh)
 
-        # 表格
-        self._table = QTableWidget()
-        self._table.setAlternatingRowColors(True)
-        self._table.setShowGrid(True)
-        self._table.verticalHeader().setDefaultSectionSize(24)
-        self._table.verticalHeader().setVisible(False)
-        self._table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
-        )
-        self._table.itemChanged.connect(self._on_item_changed)
-        self._table.cellDoubleClicked.connect(self._on_cell_double_clicked)
+        btn_add_group = QPushButton("新建分组")
+        btn_add_group.setFixedWidth(70)
+        btn_add_group.clicked.connect(self._add_group)
+        toolbar.addWidget(btn_add_group)
 
-        # 表头交互：右键菜单 + 双击选择字段
-        self._table.horizontalHeader().setContextMenuPolicy(
-            Qt.ContextMenuPolicy.CustomContextMenu
-        )
-        self._table.horizontalHeader().customContextMenuRequested.connect(
-            self._on_header_context_menu
-        )
-        self._table.horizontalHeader().sectionDoubleClicked.connect(
-            self._on_header_double_clicked
-        )
+        btn_rename_group = QPushButton("重命名分组")
+        btn_rename_group.setFixedWidth(80)
+        btn_rename_group.clicked.connect(self._rename_group)
+        toolbar.addWidget(btn_rename_group)
 
-        layout.addWidget(self._table, stretch=1)
+        btn_remove_group = QPushButton("删除分组")
+        btn_remove_group.setFixedWidth(70)
+        btn_remove_group.clicked.connect(self._remove_group)
+        toolbar.addWidget(btn_remove_group)
 
-        # 底部按钮行
+        toolbar.addStretch()
+        layout.addLayout(toolbar)
+
+        # ── QTabWidget：每个分组一个 Tab ──
+        self._tab_widget = QTabWidget()
+        self._tab_widget.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self._tab_widget, stretch=1)
+
+        # ── 底部按钮行 ──
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
@@ -136,58 +191,128 @@ class ProfileOverviewTab(QWidget):
 
         layout.addLayout(btn_row)
 
-        # 初始加载
-        self._loading = False
-        self._editing_cap_cell = False  # 标记正在编辑带 cap 的单元格
-        self.refresh()
+        self._build_groups()
+
+    # ─── 分组构建与刷新 ────────────────────────────────────────
+
+    def _build_groups(self):
+        """根据分组数据重建所有 Tab 页签和表格"""
+        self._tab_widget.blockSignals(True)
+        self._tab_widget.clear()
+        self._tables.clear()
+
+        groups = _get_groups()
+        if not groups:
+            groups = {"默认": {"columns": []}}
+            _save_groups(groups)
+
+        active_group = _get_active_group()
+        active_idx = 0
+
+        for idx, (group_name, _group_data) in enumerate(groups.items()):
+            table = self._create_table_for_group(group_name)
+            self._tables[group_name] = table
+            self._tab_widget.addTab(table, group_name)
+            if group_name == active_group:
+                active_idx = idx
+
+        self._tab_widget.blockSignals(False)
+        if self._tab_widget.count() > 0:
+            self._tab_widget.setCurrentIndex(active_idx)
+            # _on_tab_changed 会自动调用 _set_active_group
+
+    def _create_table_for_group(self, group_name: str) -> QTableWidget:
+        """为指定分组创建并绑定一个 QTableWidget"""
+        table = QTableWidget()
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(True)
+        v_header = table.verticalHeader()
+        assert v_header is not None
+        v_header.setDefaultSectionSize(24)
+        v_header.setVisible(False)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+
+        # 绑定信号（通过 lambda 携带 group_name）
+        table.itemChanged.connect(lambda item, gn=group_name: self._on_item_changed(item, gn))
+        table.cellDoubleClicked.connect(
+            lambda row, col, gn=group_name: self._on_cell_double_clicked(row, col, gn)
+        )
+
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        h_header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        h_header.setSectionsMovable(True)  # 允许拖拽列头调整顺序
+        h_header.customContextMenuRequested.connect(
+            lambda pos, gn=group_name: self._on_header_context_menu(pos, gn)
+        )
+        h_header.sectionDoubleClicked.connect(
+            lambda idx, gn=group_name: self._on_header_double_clicked(idx, gn)
+        )
+        h_header.sectionMoved.connect(
+            lambda _logical, _old, _new, gn=group_name, t=table: self._on_columns_reordered(gn, t)
+        )
+        h_header.sectionResized.connect(
+            lambda _logical, _old, _new, gn=group_name, t=table: self._on_column_resized(gn, t)
+        )
+
+        self._refresh_group(group_name, table)
+        return table
 
     def refresh(self):
-        """刷新表格数据"""
+        """刷新所有分组的表格数据"""
+        for group_name, table in self._tables.items():
+            self._refresh_group(group_name, table)
+
+    def _refresh_group(self, group_name: str, table: QTableWidget):
+        """刷新指定分组的表格数据"""
         from ..config import get_profile_config
 
         config = get_profile_config()
-        column_keys = _get_overview_columns()
+        groups = _get_groups()
+        group_data = groups.get(group_name, {})
+        column_keys = group_data.get("columns", [])
 
         # 过滤掉不存在的 key
         valid_keys = [k for k in column_keys if config.get_key(k)]
         if valid_keys != column_keys:
-            _set_overview_columns(valid_keys)
+            group_data["columns"] = valid_keys
+            groups[group_name] = group_data
+            _save_groups(groups)
             column_keys = valid_keys
 
-        key_defs = [config.get_key(k) for k in column_keys]
+        key_defs = [kd for kd in (config.get_key(k) for k in column_keys) if kd is not None]
 
-        # 第一列固定为角色名，后续列为配置的 key
+        # 第一列固定为角色名
         col_count = 1 + len(key_defs)
-        self._table.setColumnCount(col_count)
+        table.setColumnCount(col_count)
         headers = ["角色名"] + [kd.label for kd in key_defs]
-        self._table.setHorizontalHeaderLabels(headers)
+        table.setHorizontalHeaderLabels(headers)
 
-        # 加载所有用户数据
         users_data = self._load_all_users()
 
         self._loading = True
-        self._table.setRowCount(len(users_data))
+        table.setRowCount(len(users_data))
         for row, (name, data) in enumerate(users_data.items()):
-            # 第一列：角色名（不可编辑）
             name_item = QTableWidgetItem(name)
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             name_item.setForeground(Qt.GlobalColor.darkGray)
-            self._table.setItem(row, 0, name_item)
+            table.setItem(row, 0, name_item)
 
-            # 后续列：配置的 key
             for col, kd in enumerate(key_defs):
                 model_type = config.get_model_type(kd.key) or ""
                 value = self._format_profile_value(kd, model_type, data)
                 item = QTableWidgetItem(value)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._table.setItem(row, col + 1, item)
+                table.setItem(row, col + 1, item)
 
-        # 调整列宽
-        header = self._table.horizontalHeader()
+        header = table.horizontalHeader()
+        assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        header.setStretchLastSection(True)
+        header.setDefaultSectionSize(120)
+        header.setStretchLastSection(False)
         self._loading = False
+        self._restore_column_widths(group_name, table)
 
     def _format_profile_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
         """根据模型类型格式化 profile 值用于总览显示"""
@@ -213,30 +338,79 @@ class ProfileOverviewTab(QWidget):
             return str(value)
 
         if model_type == MODEL_ACTIVITY:
-            total = entry.get("total", 0)
-            if isinstance(kd, ActivityKeyDef):
-                return f"{value}/{kd.period_cap}  ({total}/{kd.lifetime_cap})"
+            if isinstance(kd, ActivityKeyDef) and kd.cap:
+                return f"{value}/{kd.cap}"
             return str(value)
 
         return str(value)
 
-    def _on_header_context_menu(self, pos):
-        """表头右键菜单"""
+    def _on_columns_reordered(self, group_name: str, table: QTableWidget):
+        """拖拽列头后持久化新顺序"""
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        groups = _get_groups()
+        group_data = groups.get(group_name, {"columns": []})
+        column_keys = group_data.get("columns", [])
+        # 跳过第 0 列（角色名），从第 1 列开始读取新的视觉顺序
+        new_order = []
+        for visual_idx in range(1, h_header.count()):
+            logical_idx = h_header.logicalIndex(visual_idx)
+            if 0 <= logical_idx - 1 < len(column_keys):
+                new_order.append(column_keys[logical_idx - 1])
+
+        if column_keys != new_order:
+            group_data["columns"] = new_order
+            groups[group_name] = group_data
+            _save_groups(groups)
+            self._refresh_group(group_name, table)
+
+    def _on_column_resized(self, group_name: str, table: QTableWidget):
+        """列宽拖拽调整后持久化"""
+        if self._restoring_widths or self._loading:
+            return
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        widths = [h_header.sectionSize(i) for i in range(h_header.count())]
+        all_widths = _get_column_widths()
+        all_widths[group_name] = widths
+        _save_column_widths(all_widths)
+
+    def _restore_column_widths(self, group_name: str, table: QTableWidget):
+        """恢复指定分组的列宽配置"""
+        all_widths = _get_column_widths()
+        widths = all_widths.get(group_name)
+        if not widths:
+            return
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        if len(widths) != h_header.count():
+            return
+        self._restoring_widths = True
+        for idx, w in enumerate(widths):
+            h_header.resizeSection(idx, w)
+        self._restoring_widths = False
+
+    def _on_header_context_menu(self, pos, group_name: str):
+        """表头右键菜单（分组上下文）"""
         from PyQt6.QtWidgets import QMenu
 
-        logical_index = self._table.horizontalHeader().logicalIndexAt(pos)
+        table = self._tables.get(group_name)
+        if not table:
+            return
+
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        logical_index = h_header.logicalIndexAt(pos)
         menu = QMenu(self)
 
-        # 新增列（在右侧）
-        menu.addAction("右侧新增列", lambda: self._add_column(logical_index))
+        menu.addAction("右侧新增列", lambda: self._add_column(group_name, logical_index))
 
-        # 删除当前列（角色名列不可删除）
         if logical_index > 0:
-            menu.addAction("删除当前列", lambda: self._remove_column(logical_index))
+            menu.addAction("删除当前列", lambda: self._remove_column(group_name, logical_index))
 
-        menu.exec(self._table.horizontalHeader().mapToGlobal(pos))
+        menu.exec(h_header.mapToGlobal(pos))
 
-    def _on_header_double_clicked(self, logical_index):
+    def _on_header_double_clicked(self, logical_index: int, group_name: str):
         """表头双击：选择字段（角色名列不可修改）"""
         if logical_index < 1:
             return
@@ -249,17 +423,10 @@ class ProfileOverviewTab(QWidget):
             QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
 
-        # 获取当前列的 key
-        column_keys = _get_overview_columns()
+        groups = _get_groups()
+        column_keys = groups.get(group_name, {}).get("columns", [])
         current_key = column_keys[logical_index - 1] if logical_index - 1 < len(column_keys) else ""
 
-        # 过滤掉已被其他列使用的 key（保留当前列）
-        available = [
-            kd for kd in all_keys
-            if kd.key not in column_keys or kd.key == current_key
-        ]
-
-        # 创建下拉选择对话框
         from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
         dialog = QDialog(self)
@@ -269,12 +436,11 @@ class ProfileOverviewTab(QWidget):
 
         combo = QComboBox()
         combo.addItem("（请选择）", "")
-        for kd in available:
+        for kd in all_keys:
             model_type = config.get_model_type(kd.key) or ""
             model_label = MODEL_LABELS.get(model_type, model_type)
             combo.addItem(f"[{model_label}] {kd.label} ({kd.key})", kd.key)
 
-        # 预选当前 key
         if current_key:
             idx = combo.findData(current_key)
             if idx >= 0:
@@ -295,27 +461,23 @@ class ProfileOverviewTab(QWidget):
         if dialog.exec():
             selected_key = combo.currentData()
             if selected_key:
-                self._set_column_field(logical_index, selected_key)
+                self._set_column_field(group_name, logical_index, selected_key)
 
-    def _add_column(self, after_index: int):
-        """在指定列后新增一列"""
+    def _add_column(self, group_name: str, after_index: int):
+        """在指定分组的指定列后新增一列"""
         from ..config import get_profile_config
         config = get_profile_config()
-        all_keys = config.get_all_keys()
+
+        # 过滤掉该分组已有的 key
+        groups = _get_groups()
+        group_data = groups.get(group_name, {"columns": []})
+        used_keys = set(group_data.get("columns", []))
+        all_keys = [kd for kd in config.get_all_keys() if kd.key not in used_keys]
 
         if not all_keys:
             QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
 
-        # 过滤掉已使用的 key
-        column_keys = _get_overview_columns()
-        available = [kd for kd in all_keys if kd.key not in column_keys]
-
-        if not available:
-            QMessageBox.information(self, "提示", "所有数据模型 key 都已被使用")
-            return
-
-        # 弹出选择对话框
         from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
         dialog = QDialog(self)
@@ -324,7 +486,7 @@ class ProfileOverviewTab(QWidget):
         layout = QVBoxLayout(dialog)
 
         combo = QComboBox()
-        for kd in available:
+        for kd in all_keys:
             model_type = config.get_model_type(kd.key) or ""
             model_label = MODEL_LABELS.get(model_type, model_type)
             combo.addItem(f"[{model_label}] {kd.label} ({kd.key})", kd.key)
@@ -343,46 +505,60 @@ class ProfileOverviewTab(QWidget):
         if dialog.exec():
             selected_key = combo.currentData()
             if selected_key:
-                column_keys = _get_overview_columns()
+                groups = _get_groups()
+                group_data = groups.get(group_name, {"columns": []})
+                column_keys = group_data.get("columns", [])
                 if selected_key in column_keys:
-                    QMessageBox.warning(self, "重复", f"Key '{selected_key}' 已在其他列中显示")
+                    QMessageBox.warning(self, "重复", f"Key '{selected_key}' 已在该分组中显示")
                     return
-                column_keys.insert(after_index, selected_key)
-                _set_overview_columns(column_keys)
-                self.refresh()
+                insert_idx = max(0, min(after_index, len(column_keys)))
+                column_keys.insert(insert_idx, selected_key)
+                group_data["columns"] = column_keys
+                groups[group_name] = group_data
+                _save_groups(groups)
+                self._refresh_group(group_name, self._tables[group_name])
 
-    def _remove_column(self, logical_index: int):
-        """删除指定列"""
-        column_keys = _get_overview_columns()
+    def _remove_column(self, group_name: str, logical_index: int):
+        """从指定分组中删除指定列"""
+        groups = _get_groups()
+        group_data = groups.get(group_name, {"columns": []})
+        column_keys = group_data.get("columns", [])
         col_idx = logical_index - 1
         if 0 <= col_idx < len(column_keys):
             del column_keys[col_idx]
-            _set_overview_columns(column_keys)
-            self.refresh()
+            group_data["columns"] = column_keys
+            groups[group_name] = group_data
+            _save_groups(groups)
+            self._refresh_group(group_name, self._tables[group_name])
 
-    def _set_column_field(self, logical_index: int, field_key: str):
-        """设置指定列的字段"""
-        column_keys = _get_overview_columns()
+    def _set_column_field(self, group_name: str, logical_index: int, field_key: str):
+        """设置指定分组的指定列字段"""
+        groups = _get_groups()
+        group_data = groups.get(group_name, {"columns": []})
+        column_keys = group_data.get("columns", [])
         col_idx = logical_index - 1
         if not (0 <= col_idx < len(column_keys)):
             return
 
         if field_key in column_keys and column_keys.index(field_key) != col_idx:
-            QMessageBox.warning(self, "重复", f"Key '{field_key}' 已在其他列中显示")
+            QMessageBox.warning(self, "重复", f"Key '{field_key}' 已在该分组中显示")
             return
 
         column_keys[col_idx] = field_key
-        _set_overview_columns(column_keys)
-        self.refresh()
+        group_data["columns"] = column_keys
+        groups[group_name] = group_data
+        _save_groups(groups)
+        self._refresh_group(group_name, self._tables[group_name])
 
-    def _on_cell_double_clicked(self, row: int, col: int):
+    def _on_cell_double_clicked(self, row: int, col: int, group_name: str):
         """单元格双击：对有 cap 的列，剥离 /cap 后缀再进入编辑"""
         if col < 1 or self._loading:
             return
 
         from ..config import get_profile_config
         config = get_profile_config()
-        column_keys = _get_overview_columns()
+        groups = _get_groups()
+        column_keys = groups.get(group_name, {}).get("columns", [])
         field_idx = col - 1
         if field_idx >= len(column_keys):
             return
@@ -399,11 +575,13 @@ class ProfileOverviewTab(QWidget):
         if not has_cap:
             return
 
-        item = self._table.item(row, col)
+        table = self._tables.get(group_name)
+        if not table:
+            return
+        item = table.item(row, col)
         if not item:
             return
 
-        # 从 "500/600" 提取 "500"，让用户只编辑当前值
         text = item.text()
         if "/" in text:
             value_part = text.split("/")[0].strip()
@@ -411,7 +589,7 @@ class ProfileOverviewTab(QWidget):
             item.setText(value_part)
             self._editing_cap_cell = False
 
-    def _on_item_changed(self, item: QTableWidgetItem):
+    def _on_item_changed(self, item: QTableWidgetItem, group_name: str):
         """单元格编辑完成后回写到 profile 节点"""
         if self._loading or self._editing_cap_cell:
             return
@@ -425,7 +603,8 @@ class ProfileOverviewTab(QWidget):
         from ..config import get_profile_config
         config = get_profile_config()
 
-        column_keys = _get_overview_columns()
+        groups = _get_groups()
+        column_keys = groups.get(group_name, {}).get("columns", [])
         field_idx = col - 1
         if field_idx >= len(column_keys):
             return
@@ -437,13 +616,15 @@ class ProfileOverviewTab(QWidget):
 
         model_type = config.get_model_type(key_str) or ""
 
-        # 获取角色名
-        name_item = self._table.item(row, 0)
+        table = self._tables.get(group_name)
+        if not table:
+            return
+
+        name_item = table.item(row, 0)
         if not name_item:
             return
         user_name = name_item.text()
 
-        # 解析新值
         raw_value = item.text()
         parsed_value = self._parse_value(raw_value, model_type, kd)
         if parsed_value is _PARSE_ERROR:
@@ -453,10 +634,8 @@ class ProfileOverviewTab(QWidget):
             self._loading = False
             return
 
-        # 回写到 profile 节点
         self._write_profile_entry(user_name, model_type, key_str, parsed_value)
 
-        # 刷新单元格显示（恢复 value/cap 格式）
         self._loading = True
         user_data = self._load_user_data(user_name)
         item.setText(self._format_profile_value(kd, model_type, user_data))
@@ -561,7 +740,114 @@ class ProfileOverviewTab(QWidget):
         if dialog.exec():
             from ..config import reload_profile_config
             reload_profile_config()
-            self.refresh()
+            self._build_groups()
+
+    # ─── 分组管理 ──────────────────────────────────────────────
+
+    def _get_current_group_name(self) -> str:
+        """获取当前 Tab 对应的分组名"""
+        idx = self._tab_widget.currentIndex()
+        if idx < 0:
+            return ""
+        return self._tab_widget.tabText(idx)
+
+    def _add_group(self):
+        """新建分组"""
+        groups = _get_groups()
+        name, ok = QInputDialog.getText(self, "新建分组", "分组名称:")
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            QMessageBox.warning(self, "错误", "分组名不能为空")
+            return
+        if name in groups:
+            QMessageBox.warning(self, "错误", f"分组 '{name}' 已存在")
+            return
+
+        groups[name] = {"columns": []}
+        _save_groups(groups)
+        _set_active_group(name)
+        self._build_groups()
+
+    def _rename_group(self):
+        """重命名当前分组"""
+        groups = _get_groups()
+        if not groups:
+            return
+        old_name = self._get_current_group_name()
+        if not old_name:
+            return
+
+        new_name, ok = QInputDialog.getText(
+            self, "重命名分组", "新名称:", text=old_name
+        )
+        if not ok:
+            return
+        new_name = new_name.strip()
+        if not new_name:
+            QMessageBox.warning(self, "错误", "分组名不能为空")
+            return
+        if new_name == old_name:
+            return
+        if new_name in groups:
+            QMessageBox.warning(self, "错误", f"分组 '{new_name}' 已存在")
+            return
+
+        # 保持插入顺序：用新 key 替换旧 key
+        new_groups = {}
+        for k, v in groups.items():
+            if k == old_name:
+                new_groups[new_name] = v
+            else:
+                new_groups[k] = v
+        _save_groups(new_groups)
+        # 同步更新列宽字典的 key
+        all_widths = _get_column_widths()
+        if old_name in all_widths:
+            all_widths[new_name] = all_widths.pop(old_name)
+            _save_column_widths(all_widths)
+        if _get_active_group() == old_name:
+            _set_active_group(new_name)
+        self._build_groups()
+
+    def _remove_group(self):
+        """删除当前分组"""
+        groups = _get_groups()
+        if not groups:
+            return
+
+        group_name = self._get_current_group_name()
+        if not group_name:
+            return
+
+        if len(groups) <= 1:
+            QMessageBox.warning(self, "错误", "至少保留一个分组")
+            return
+
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要删除分组 '{group_name}' 吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        group_names = list(groups.keys())
+        idx = group_names.index(group_name)
+        del groups[group_name]
+        _save_groups(groups)
+
+        # 切换到相邻分组
+        new_names = list(groups.keys())
+        new_idx = min(idx, len(new_names) - 1)
+        _set_active_group(new_names[new_idx])
+        self._build_groups()
+
+    def _on_tab_changed(self, index: int):
+        """Tab 切换时记录活跃分组"""
+        if 0 <= index < self._tab_widget.count():
+            _set_active_group(self._tab_widget.tabText(index))
 
 
 # 哨兵值：表示解析失败
@@ -746,9 +1032,10 @@ class _DetailPage(QWidget):
             return str(value)
 
         if model_type == MODEL_ACTIVITY:
-            total = entry.get("total", 0)
-            if isinstance(kd, ActivityKeyDef):
-                return f"当期: {value}/{kd.period_cap}  总计: {total}/{kd.lifetime_cap}"
+            if isinstance(kd, ActivityKeyDef) and kd.cap:
+                return f"{value} / {kd.cap}  (周期: {kd.period})"
+            if isinstance(value, bool):
+                return "已完成" if value else "未完成"
             return str(value)
 
         return str(value)

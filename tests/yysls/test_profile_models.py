@@ -29,19 +29,16 @@ class TestKeyDef:
         kd = KeyDef()
         assert kd.key == ""
         assert kd.label == ""
-        assert kd.source == ""
         assert kd.description == ""
 
     def test_from_dict(self):
         kd = KeyDef.from_dict({
             "key": "test_key",
             "label": "测试",
-            "source": "api.path",
             "description": "描述",
         })
         assert kd.key == "test_key"
         assert kd.label == "测试"
-        assert kd.source == "api.path"
         assert kd.description == "描述"
 
     def test_from_dict_missing_fields(self):
@@ -53,14 +50,8 @@ class TestKeyDef:
         kd = KeyDef(key="k", label="l")
         d = kd.to_dict()
         assert d == {"key": "k", "label": "l"}
-        # source="" 和 description="" 是默认值，不输出
-        assert "source" not in d
+        # description="" 是默认值，不输出
         assert "description" not in d
-
-    def test_to_dict_with_source(self):
-        kd = KeyDef(key="k", label="l", source="api.path")
-        d = kd.to_dict()
-        assert d["source"] == "api.path"
 
 
 # ─── DailyKeyDef ─────────────────────────────────────────────
@@ -141,10 +132,9 @@ class TestResourceKeyDef:
         kd = ResourceKeyDef.from_dict({
             "key": "baoqian",
             "label": "宝钱",
-            "source": "currencies.baoqian",
         })
         assert kd.key == "baoqian"
-        assert kd.source == "currencies.baoqian"
+        assert kd.label == "宝钱"
 
     def test_to_dict_minimal(self):
         kd = ResourceKeyDef(key="k", label="l")
@@ -159,25 +149,21 @@ class TestActivityKeyDef:
     def test_defaults(self):
         kd = ActivityKeyDef()
         assert kd.period == "week"
-        assert kd.period_cap == 0
-        assert kd.lifetime_cap == 0
-        assert kd.alert_near_period_cap is None
-        assert kd.alert_near_lifetime_cap is None
+        assert kd.cap is None
+        assert kd.reset_time == "05:00"
+        assert kd.reset_day == 0
 
     def test_from_dict(self):
         kd = ActivityKeyDef.from_dict({
             "key": "map",
             "label": "地图活动",
             "period": "week",
-            "period_cap": 1000,
-            "lifetime_cap": 10000,
-            "alert_near_period_cap": 0.8,
-            "alert_near_lifetime_cap": 0.9,
+            "cap": 2000,
+            "reset_time": "05:00",
+            "reset_day": 5,
         })
-        assert kd.period_cap == 1000
-        assert kd.lifetime_cap == 10000
-        assert kd.alert_near_period_cap == 0.8
-        assert kd.alert_near_lifetime_cap == 0.9
+        assert kd.cap == 2000
+        assert kd.reset_day == 5
 
 
 # ─── parse_key_def ───────────────────────────────────────────
@@ -199,9 +185,9 @@ class TestParseKeyDef:
         assert isinstance(kd, ResourceKeyDef)
 
     def test_activity(self):
-        kd = parse_key_def("activity", {"key": "k", "label": "l", "period_cap": 1000})
+        kd = parse_key_def("activity", {"key": "k", "label": "l", "cap": 2000})
         assert isinstance(kd, ActivityKeyDef)
-        assert kd.period_cap == 1000
+        assert kd.cap == 2000
 
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="未知模型类型"):

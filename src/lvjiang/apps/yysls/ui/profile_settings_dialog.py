@@ -56,6 +56,9 @@ _PERIOD_OPTIONS = [
     ("half_season", "半赛季"),
 ]
 
+# 周几选项（isoweekday: 1=周一 ... 7=周日）
+_WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
 
 class _ModelTab(QWidget):
     """单个模型类型的 key 编辑页"""
@@ -226,6 +229,11 @@ class ProfileDefinitionDialog(QDialog):
         """生成 key 的详情摘要"""
         if isinstance(kd, DailyKeyDef):
             parts = [f"周期:{kd.period}"]
+            if kd.reset_day and kd.period in ("week", "month"):
+                if kd.period == "week" and 1 <= kd.reset_day <= 7:
+                    parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
+                elif kd.period == "month" and 1 <= kd.reset_day <= 31:
+                    parts.append(f"重置日:{kd.reset_day}号")
             if kd.cap is not None:
                 parts.append(f"上限:{kd.cap}")
             parts.append(f"重置:{kd.reset_time}")
@@ -240,18 +248,18 @@ class ProfileDefinitionDialog(QDialog):
             return ", ".join(parts)
 
         if isinstance(kd, ResourceKeyDef):
-            return kd.source or ""
+            return kd.description or kd.key or ""
 
         if isinstance(kd, ActivityKeyDef):
-            parts = [
-                f"周期:{kd.period}",
-                f"周限:{kd.period_cap}",
-                f"总限:{kd.lifetime_cap}",
-            ]
-            if kd.alert_near_period_cap is not None:
-                parts.append(f"周限提醒:{kd.alert_near_period_cap:.0%}")
-            if kd.alert_near_lifetime_cap is not None:
-                parts.append(f"总限提醒:{kd.alert_near_lifetime_cap:.0%}")
+            parts = [f"周期:{kd.period}"]
+            if kd.reset_day and kd.period in ("week", "month"):
+                if kd.period == "week" and 1 <= kd.reset_day <= 7:
+                    parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
+                elif kd.period == "month" and 1 <= kd.reset_day <= 31:
+                    parts.append(f"重置日:{kd.reset_day}号")
+            if kd.cap is not None:
+                parts.append(f"上限:{kd.cap}")
+            parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
         return ""
@@ -333,16 +341,12 @@ class ProfileDefinitionDialog(QDialog):
 
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
-        key_input.setPlaceholderText("英文，如 niaoniao_of_week")
+        key_input.setPlaceholderText("英文，如 ")
         layout.addRow("Key:", key_input)
 
         label_input = QLineEdit(existing.label if existing else "")
         label_input.setPlaceholderText("中文，如 袅袅(本周)")
         layout.addRow("标签:", label_input)
-
-        source_input = QLineEdit(existing.source if existing else "")
-        source_input.setPlaceholderText("可选，API 来源路径")
-        layout.addRow("来源:", source_input)
 
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
@@ -369,6 +373,31 @@ class ProfileDefinitionDialog(QDialog):
             reset_input.setFixedWidth(80)
             layout.addRow("重置时刻:", reset_input)
             widgets["reset_time"] = reset_input
+
+            reset_day_spin = QSpinBox()
+            reset_day_spin.setRange(0, 31)
+            reset_day_spin.setSpecialValueText("默认")
+            reset_day_spin.setValue(kd.reset_day)
+            reset_day_label = QLabel()
+            widgets["reset_day"] = reset_day_spin
+            widgets["reset_day_label"] = reset_day_label
+            layout.addRow(reset_day_label, reset_day_spin)
+
+            def _update_reset_day_visibility():
+                p = period_combo.currentData()
+                is_week = p == "week"
+                is_month = p == "month"
+                visible = is_week or is_month
+                reset_day_spin.setVisible(visible)
+                reset_day_label.setVisible(visible)
+                if is_week:
+                    reset_day_spin.setRange(0, 7)
+                    reset_day_label.setText("重置日(周几):")
+                elif is_month:
+                    reset_day_spin.setRange(0, 31)
+                    reset_day_label.setText("重置日(几号):")
+            period_combo.currentIndexChanged.connect(_update_reset_day_visibility)
+            _update_reset_day_visibility()
 
         elif model_type == MODEL_REALTIME:
             rt_kd = existing if isinstance(existing, RealtimeKeyDef) else RealtimeKeyDef()
@@ -407,7 +436,7 @@ class ProfileDefinitionDialog(QDialog):
             widgets["alert_above"] = alert_spin
 
         elif model_type == MODEL_RESOURCE:
-            pass  # 只有 source，已在通用字段中
+            pass  # Resource 无模型专属字段
 
         elif model_type == MODEL_ACTIVITY:
             act_kd = existing if isinstance(existing, ActivityKeyDef) else ActivityKeyDef()
@@ -421,40 +450,42 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("周期:", period_combo)
             widgets["period"] = period_combo
 
-            period_cap_spin = QSpinBox()
-            period_cap_spin.setRange(0, 999999)
-            period_cap_spin.setValue(act_kd.period_cap)
-            layout.addRow("周期限额:", period_cap_spin)
-            widgets["period_cap"] = period_cap_spin
-
-            lifetime_spin = QSpinBox()
-            lifetime_spin.setRange(0, 9999999)
-            lifetime_spin.setValue(act_kd.lifetime_cap)
-            layout.addRow("总上限:", lifetime_spin)
-            widgets["lifetime_cap"] = lifetime_spin
+            cap_spin = QSpinBox()
+            cap_spin.setRange(0, 999999)
+            cap_spin.setSpecialValueText("无上限")
+            cap_spin.setValue(act_kd.cap or 0)
+            layout.addRow("上限:", cap_spin)
+            widgets["cap"] = cap_spin
 
             reset_input = QLineEdit(act_kd.reset_time)
             reset_input.setFixedWidth(80)
             layout.addRow("重置时刻:", reset_input)
             widgets["reset_time"] = reset_input
 
-            alert_period_spin = QDoubleSpinBox()
-            alert_period_spin.setRange(0.0, 1.0)
-            alert_period_spin.setDecimals(2)
-            alert_period_spin.setSingleStep(0.05)
-            alert_period_spin.setValue(act_kd.alert_near_period_cap if act_kd.alert_near_period_cap is not None else 0.0)
-            alert_period_spin.setSpecialValueText("不提醒")
-            layout.addRow("接近周限比例:", alert_period_spin)
-            widgets["alert_near_period_cap"] = alert_period_spin
+            reset_day_spin = QSpinBox()
+            reset_day_spin.setRange(0, 31)
+            reset_day_spin.setSpecialValueText("默认")
+            reset_day_spin.setValue(act_kd.reset_day)
+            reset_day_label = QLabel()
+            widgets["reset_day"] = reset_day_spin
+            widgets["reset_day_label"] = reset_day_label
+            layout.addRow(reset_day_label, reset_day_spin)
 
-            alert_lifetime_spin = QDoubleSpinBox()
-            alert_lifetime_spin.setRange(0.0, 1.0)
-            alert_lifetime_spin.setDecimals(2)
-            alert_lifetime_spin.setSingleStep(0.05)
-            alert_lifetime_spin.setValue(act_kd.alert_near_lifetime_cap if act_kd.alert_near_lifetime_cap is not None else 0.0)
-            alert_lifetime_spin.setSpecialValueText("不提醒")
-            layout.addRow("接近总限比例:", alert_lifetime_spin)
-            widgets["alert_near_lifetime_cap"] = alert_lifetime_spin
+            def _update_act_reset_day_visibility():
+                p = period_combo.currentData()
+                is_week = p == "week"
+                is_month = p == "month"
+                visible = is_week or is_month
+                reset_day_spin.setVisible(visible)
+                reset_day_label.setVisible(visible)
+                if is_week:
+                    reset_day_spin.setRange(0, 7)
+                    reset_day_label.setText("重置日(周几):")
+                elif is_month:
+                    reset_day_spin.setRange(0, 31)
+                    reset_day_label.setText("重置日(几号):")
+            period_combo.currentIndexChanged.connect(_update_act_reset_day_visibility)
+            _update_act_reset_day_visibility()
 
         # 按钮行
         btn_row = QHBoxLayout()
@@ -476,7 +507,6 @@ class ProfileDefinitionDialog(QDialog):
         def on_accept():
             key = key_input.text().strip()
             label = label_input.text().strip()
-            source = source_input.text().strip()
 
             if not key:
                 error_label.setText("请输入 Key")
@@ -504,15 +534,16 @@ class ProfileDefinitionDialog(QDialog):
             if model_type == MODEL_DAILY:
                 cap_val = widgets["cap"].value()
                 kd = DailyKeyDef(
-                    key=key, label=label, source=source,
+                    key=key, label=label,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
+                    reset_day=widgets["reset_day"].value(),
                 )
             elif model_type == MODEL_REALTIME:
                 alert_val = widgets["alert_above"].value()
                 kd = RealtimeKeyDef(
-                    key=key, label=label, source=source,
+                    key=key, label=label,
                     cap=widgets["cap"].value(),
                     regen_rate=widgets["regen_rate"].value(),
                     regen_daily=widgets["regen_daily"].value(),
@@ -520,21 +551,18 @@ class ProfileDefinitionDialog(QDialog):
                     alert_above=alert_val if alert_val > 0 else None,
                 )
             elif model_type == MODEL_RESOURCE:
-                kd = ResourceKeyDef(key=key, label=label, source=source)
+                kd = ResourceKeyDef(key=key, label=label)
             elif model_type == MODEL_ACTIVITY:
-                ap_val = widgets["alert_near_period_cap"].value()
-                al_val = widgets["alert_near_lifetime_cap"].value()
+                cap_val = widgets["cap"].value()
                 kd = ActivityKeyDef(
-                    key=key, label=label, source=source,
+                    key=key, label=label,
                     period=widgets["period"].currentData(),
-                    period_cap=widgets["period_cap"].value(),
-                    lifetime_cap=widgets["lifetime_cap"].value(),
+                    cap=cap_val if cap_val > 0 else None,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
-                    alert_near_period_cap=ap_val if ap_val > 0 else None,
-                    alert_near_lifetime_cap=al_val if al_val > 0 else None,
+                    reset_day=widgets["reset_day"].value(),
                 )
             else:
-                kd = KeyDef(key=key, label=label, source=source)
+                kd = KeyDef(key=key, label=label)
 
             result_kd[0] = kd
             dialog.accept()

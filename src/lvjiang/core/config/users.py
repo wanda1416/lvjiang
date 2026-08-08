@@ -5,10 +5,61 @@ UI 层在 Engine 创建后注入 session，并在正常结束时调用 save。
 """
 
 import json
+import os
+import tempfile
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
 
 from loguru import logger
+
+
+@contextmanager
+def _session_file_lock(path: Path, timeout: float = 5.0):
+    """跨进程互斥锁，保护单个用户 session 文件读写。
+
+    使用独立 .lock 文件，避免 Windows 下锁住目标 json 后无法 os.replace。
+    """
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = open(lock_path, "a+b")
+    start = time.monotonic()
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            while True:
+                try:
+                    lock_file.seek(0)
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() - start >= timeout:
+                        raise TimeoutError(f"等待 session 文件锁超时: {lock_path}") from None
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            while True:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() - start >= timeout:
+                        raise TimeoutError(f"等待 session 文件锁超时: {lock_path}") from None
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    finally:
+        lock_file.close()
 
 
 class SessionManager:
@@ -21,6 +72,44 @@ class SessionManager:
         self._users_dir = users_dir
         self._users_dir.mkdir(parents=True, exist_ok=True)
 
+    def _default_session(self, username: str) -> dict:
+        return {"current_user": username}
+
+    def _load_unlocked(self, username: str, path: Path) -> dict:
+        if not path.exists():
+            return self._default_session(username)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        logger.debug(f"已加载 session: {username} ({len(data)} 个字段)")
+        return data
+
+    def _save_unlocked(self, path: Path, session: dict) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(session, ensure_ascii=False, indent=2)
+        fd, tmp = tempfile.mkstemp(
+            dir=str(path.parent),
+            prefix=f".{path.stem}_",
+            suffix=".tmp",
+        )
+        tmp_path = Path(tmp)
+        try:
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(payload)
+            except BaseException:
+                # os.fdopen 失败时 fd 未被接管，需手动关闭
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                raise
+            os.replace(tmp_path, path)
+        except BaseException:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+            raise
+
     def load(self, username: str) -> dict:
         """从 users/{username}.json 加载 session
 
@@ -31,15 +120,13 @@ class SessionManager:
             dict: session 数据（至少包含 current_user 字段）
         """
         path = self._users_dir / f"{username}.json"
-        if path.exists():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                logger.debug(f"已加载 session: {username} ({len(data)} 个字段)")
-                return data
-            except Exception as e:
-                logger.error(f"加载 session 失败: {e}")
+        try:
+            with _session_file_lock(path):
+                return self._load_unlocked(username, path)
+        except Exception as e:
+            logger.error(f"加载 session 失败: {e}")
         # 默认 session
-        return {"current_user": username}
+        return self._default_session(username)
 
     def save(self, username: str, session: dict):
         """保存 session 到 users/{username}.json
@@ -50,13 +137,27 @@ class SessionManager:
         """
         path = self._users_dir / f"{username}.json"
         try:
-            path.write_text(
-                json.dumps(session, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            with _session_file_lock(path):
+                self._save_unlocked(path, session)
             logger.debug(f"已保存 session: {username}")
         except Exception as e:
             logger.error(f"保存 session 失败: {e}")
+
+    def update(self, username: str, mutator: Callable[[dict], None]) -> dict:
+        """在同一把跨进程锁内 read-modify-write。
+
+        用于多个入口可能同时修改同一用户 session 的场景。mutator 只修改
+        自己负责的节点，可降低旧快照整文件覆盖风险。
+
+        失败时抛出异常，调用方应自行 try/except 处理。
+        """
+        path = self._users_dir / f"{username}.json"
+        with _session_file_lock(path):
+            session = self._load_unlocked(username, path)
+            mutator(session)
+            self._save_unlocked(path, session)
+        logger.debug(f"已更新 session: {username}")
+        return session
 
     def save_fn(self, username: str, session_ref: dict) -> Callable:
         """返回一个绑定了用户名和 session 引用的保存回调

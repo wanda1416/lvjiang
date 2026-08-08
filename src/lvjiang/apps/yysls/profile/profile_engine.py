@@ -450,6 +450,7 @@ class ProfileEngine(QThread):
 
         now = datetime.now()
         modified = False
+        profile_changes: list[tuple[str, str, float | int, str | None]] = []
 
         # ── Step 1: 周期检查与重置（daily）──
         daily_keys = config.get_keys_by_model("daily")
@@ -463,8 +464,8 @@ class ProfileEngine(QThread):
             if not _should_reset(updated_at_str, boundary):
                 continue
 
-            # 周期已过期，执行重置
-            write_profile_entry(data, "daily", kd.key, 0)
+            # 周期已过期，记录重置变更（由 mutate 回调写入磁盘）
+            profile_changes.append(("daily", kd.key, 0, None))
             logger.debug(f"[ProfileEngine] {user_name} daily.{kd.key} 周期重置")
             modified = True
 
@@ -480,9 +481,7 @@ class ProfileEngine(QThread):
             computed, new_ts = compute_realtime_entry(entry, kd)
 
             if computed != stored_value or new_ts != updated_at_str:
-                write_profile_entry(
-                    data, "realtime", kd.key, computed, updated_at=new_ts
-                )
+                profile_changes.append(("realtime", kd.key, computed, new_ts))
                 modified = True
 
             # 检查 alert_above
@@ -497,7 +496,13 @@ class ProfileEngine(QThread):
         # ── 写入变更 ──
         if modified:
             try:
-                self._session_manager.save(user_name, data)
+                def mutate(latest: dict) -> None:
+                    for model_type, key, value, updated_at in profile_changes:
+                        write_profile_entry(
+                            latest, model_type, key, value, updated_at=updated_at
+                        )
+
+                self._session_manager.update(user_name, mutate)
                 self.data_updated.emit(user_name)
             except Exception as e:
                 logger.error(f"保存用户 {user_name} profile 数据失败: {e}")

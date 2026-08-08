@@ -107,15 +107,17 @@ drag_hold: "hold"i number
 wait_stmt: "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range) _NL
 
 // wait stable：等待画面稳定（连续截图对比，差异低于阈值持续 stable_duration 秒）
-// 语法：wait stable <timeout> [threshold <value>] [interval <value>] [stable <value>]
+// 语法：wait stable <timeout> [threshold <value>] [interval <value>] [duration <value>] [least <value>]
 wait_stable_stmt: "wait"i "stable"i number wait_stable_opts? _NL
 wait_stable_opts: wait_stable_opt+
 wait_stable_opt: wait_stable_threshold
                | wait_stable_interval
                | wait_stable_duration
+               | wait_stable_least
 wait_stable_threshold: "threshold"i number
 wait_stable_interval: "interval"i number
 wait_stable_duration: "duration"i number
+wait_stable_least: "least"i number
 
 // 命名延迟引用：@delay_name（从延迟参数配置中查找）
 delay_ref: "@" NAME

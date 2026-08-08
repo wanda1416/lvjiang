@@ -136,18 +136,23 @@ class _ActionMixin:
             time.sleep(min(0.05, max(0.0, remaining)))
 
     def wait_stable(self, timeout: float, threshold: float = 0.02,
-                    interval: float = 0.3, stable_duration: float = 0.5):
+                    interval: float = 0.3, stable_duration: float = 0.5,
+                    least: float = 0.5):
         """等待画面稳定（连续截图对比）
 
         每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
         视为「画面没变」。连续稳定时长达到 stable_duration 秒后返回。
         总超时 timeout 秒内未稳定则抛出 TimeoutError。
 
+        least 参数：点击后至少等待这么入再开始稳定检测。
+        防止转场动画未开始就被误判为「画面已稳定」。
+
         与 wait_seconds 相同，期间持续检查停止标志。
         """
         import cv2
 
         deadline = time.monotonic() + max(0.0, timeout)
+        least_until = time.monotonic() + max(0.0, least)
         prev = None
         stable_since = None
 
@@ -161,7 +166,8 @@ class _ActionMixin:
                 time.sleep(interval)
                 continue
 
-            if prev is not None:
+            # least 期间：只截图建立基准，不判断稳定
+            if prev is not None and time.monotonic() >= least_until:
                 diff = float(cv2.absdiff(prev, img).mean()) / 255.0
                 if diff < threshold:
                     if stable_since is None:

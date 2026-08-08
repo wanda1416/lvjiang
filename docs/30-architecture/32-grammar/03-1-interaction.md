@@ -191,7 +191,7 @@ wait stable <timeout> threshold <v> interval <v> duration <v> least <v>    # 任
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `timeout` | （必填） | 最大等待秒数，超时未稳定则报错终止 |
+| `timeout` | （必填） | 等待预算秒数；预算内未稳定则记警告并继续执行（不报错） |
 | `threshold` | 0.02 | 像素差异率阈值（0~1），低于此值认为「画面没变」 |
 | `interval` | 0.3 | 截图对比间隔秒数 |
 | `duration` | 0.5 | 画面需持续稳定的时长（秒），连续差异低于阈值达到此时长后返回 |
@@ -206,14 +206,18 @@ wait stable 10 interval 0.5      # 每 0.5 秒检测一次，最多等 10 秒
 wait stable 5 duration 1.0       # 画面需连续稳定 1 秒才算完成
 wait stable 5 least 1.0          # 点击后至少等 1 秒再开始检测（慢加载页面）
 wait stable 10 threshold 0.03 interval 0.5 duration 1.0 least 0.3  # 完整参数
+
+# 也可作为 click/drag 的内联等待子句（before/after/around 均可）
+click [activity_jianghu].[btn] after wait stable 8 least 0.5
 ```
 
 **说明**：
 
 - 工作原理：每 `interval` 秒截图一次，与上一帧计算像素差异率（`cv2.absdiff.mean() / 255`），连续差异低于 `threshold` 的时长达到 `duration` 后返回
+- `timeout` 是等待预算而非硬性断言：预算耗尽仍未稳定时记录警告并继续执行。游戏画面常有持续动画，永远达不到阈值是常态；实际书写时建议把 `timeout` 设得宽裕些（如 8~10），至少不会比固定等待差
 - `least` 期间只截图建立基准，不进行稳定判定。防止点击后转场动画尚未开始，画面恰好「没变」就被误判为稳定
-- 超时未稳定时抛出 `WorkflowUserError` 终止工作流
 - 等待期间持续检查停止标志，F10 / 停止按钮可立即中断
+- 可作为 click/drag 的后缀等待子句：`click ... after wait stable <timeout> ...`，与普通 wait 子句展开规则一致（around 前后各执行一次）
 - 所有参数均为字面量数值，不支持变量引用
 - `threshold`、`interval`、`duration` 和 `least` 可以任意顺序书写
 

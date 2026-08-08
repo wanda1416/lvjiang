@@ -69,7 +69,7 @@ class _StmtMixin:
     def click_stmt(self, items):
         """click 目标 [before|after|around wait 参数] — 有 wait_clause 时展开为多条语句"""
         click_node = items[0]
-        if len(items) > 1 and isinstance(items[1], list) and len(items[1]) == 2 and isinstance(items[1][1], Wait):
+        if len(items) > 1 and isinstance(items[1], list) and len(items[1]) == 2 and isinstance(items[1][1], (Wait, WaitStable)):
             timing, wait_node = items[1]
             if timing == "before":
                 return [wait_node, click_node]
@@ -117,7 +117,7 @@ class _StmtMixin:
         # 检查末尾是否有 wait_clause 列表 [timing, Wait_node]
         wait_timing = None
         wait_node = None
-        if items and isinstance(items[-1], list) and len(items[-1]) == 2 and isinstance(items[-1][1], Wait):
+        if items and isinstance(items[-1], list) and len(items[-1]) == 2 and isinstance(items[-1][1], (Wait, WaitStable)):
             wait_timing, wait_node = items[-1]
             items = items[:-1]
 
@@ -300,10 +300,13 @@ class _StmtMixin:
         """后缀等待子句 — 返回 [timing_str, Wait_node]
 
         timing_str: "before" / "after" / "around"
-        Wait_node 的参数处理与 wait_stmt 完全一致。
+        Wait_node 的参数处理与 wait_stmt 完全一致；另支持 wait stable 透传。
         """
         timing = str(items[0]).lower()  # "before" / "after" / "around"
         arg = items[1]
+        if isinstance(arg, WaitStable):
+            # wait stable 已是完整节点，直接透传
+            return [timing, arg]
         wait_node = self._build_wait_node(arg, items)
         return [timing, wait_node]
 
@@ -339,7 +342,11 @@ class _StmtMixin:
     # ─── wait stable ───────────────────────────────────────
 
     def wait_stable_stmt(self, items):
-        """wait stable <timeout> [threshold <v>] [interval <v>] [duration <v>] [least <v>]"""
+        """wait stable ... → WaitStable 节点（透传 wait_stable_ref 结果）"""
+        return items[0]
+
+    def wait_stable_ref(self, items):
+        """stable <timeout> [threshold <v>] [interval <v>] [duration <v>] [least <v>] → WaitStable"""
         timeout = float(items[0])  # number 已转为 float
         threshold = 0.02
         interval = 0.3

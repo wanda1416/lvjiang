@@ -108,7 +108,8 @@ wait_stmt: "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range) _N
 
 // wait stable：等待画面稳定（连续截图对比，差异低于阈值持续 stable_duration 秒）
 // 语法：wait stable <timeout> [threshold <value>] [interval <value>] [duration <value>] [least <value>]
-wait_stable_stmt: "wait"i "stable"i number wait_stable_opts? _NL
+wait_stable_stmt: "wait"i wait_stable_ref _NL
+wait_stable_ref: "stable"i number wait_stable_opts?
 wait_stable_opts: wait_stable_opt+
 wait_stable_opt: wait_stable_threshold
                | wait_stable_interval
@@ -126,8 +127,8 @@ delay_ref: "@" NAME
 //   before wait xxx — 操作前等待
 //   after wait xxx  — 操作后等待
 //   around wait xxx  — 操作前后各等待一次（同一参数）
-// 参数形式与 wait_stmt 完全一致（命名延迟/数值/范围/变量）
-wait_clause: WAIT_TIMING "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range)
+// 参数形式与 wait_stmt 完全一致（命名延迟/数值/范围/变量），另支持 wait stable
+wait_clause: WAIT_TIMING "wait"i (wait_stable_ref | delay_ref | number | bracket_expr | var_ref | wait_range)
 WAIT_TIMING: /before/i | /after/i | /around/i
 
 wait_range: "(" number "," number ")"

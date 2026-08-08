@@ -76,6 +76,21 @@ class TestWaitStableExecution:
         wf = _workflow_with_capture(_SeqCapture(frames))
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.05, stable_duration=0.1)
 
+    def test_least_prevents_false_stable(self):
+        """least 期间即使画面相同也不判定为稳定"""
+        # 前 10 帧全部相同（模拟点击后画面还没开始变化）
+        # 之后帧变化，再稳定
+        frames = [
+            *[_frame(100) for _ in range(10)],  # 相同帧（least 期间应忽略）
+            _frame(200),                         # 变化
+            *[_frame(200) for _ in range(20)],   # 稳定
+        ]
+        wf = _workflow_with_capture(_SeqCapture(frames))
+        # least=0.5s，在 least 期间前 10 帧（0.05s * 10 = 0.5s）不应触发稳定判定
+        # 之后帧变化再稳定，应正常返回
+        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.05,
+                       stable_duration=0.1, least=0.5)
+
 
 class TestWaitStableDSL:
     """端到端：DSL wait stable 语句通过引擎执行"""

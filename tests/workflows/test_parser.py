@@ -340,25 +340,27 @@ def test_wait_stable_with_interval():
 
 
 def test_wait_stable_full():
-    """wait stable 5 threshold 0.03 interval 0.5 duration 1.0"""
-    program = parse_text("wait stable 5 threshold 0.03 interval 0.5 duration 1.0")
+    """wait stable 5 threshold 0.03 interval 0.5 duration 1.0 least 0.3"""
+    program = parse_text("wait stable 5 threshold 0.03 interval 0.5 duration 1.0 least 0.3")
     n = program.body[0]
     assert isinstance(n, WaitStable)
     assert n.timeout == 5.0
     assert n.threshold == 0.03
     assert n.interval == 0.5
     assert n.stable_duration == 1.0
+    assert n.least == 0.3
 
 
 def test_wait_stable_reversed_opts():
-    """wait stable 5 duration 0.5 interval 0.3 threshold 0.01 — 选项顺序可互换"""
-    program = parse_text("wait stable 5 duration 0.5 interval 0.3 threshold 0.01")
+    """wait stable 5 least 0.3 duration 0.5 interval 0.3 threshold 0.01 — 选项顺序可互换"""
+    program = parse_text("wait stable 5 least 0.3 duration 0.5 interval 0.3 threshold 0.01")
     n = program.body[0]
     assert isinstance(n, WaitStable)
     assert n.timeout == 5.0
     assert n.threshold == 0.01
     assert n.interval == 0.3
     assert n.stable_duration == 0.5
+    assert n.least == 0.3
 
 
 # ─── click/drag wait 语法糖测试 ─────────────────────────────

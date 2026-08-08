@@ -94,7 +94,7 @@ DSL_KEYWORDS = {
     # Timing
     "before", "after", "around",
     # wait stable
-    "stable", "threshold", "interval", "duration",
+    "stable", "threshold", "interval", "duration", "least",
     # Match patterns
     "equals", "contains", "equals_any", "contains_any",
     # Clause keywords

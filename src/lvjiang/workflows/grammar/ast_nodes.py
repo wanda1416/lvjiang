@@ -76,6 +76,7 @@ class WaitStable:
     threshold: float = 0.02   # 像素差异率阈值
     interval: float = 0.3     # 截图对比间隔秒数
     stable_duration: float = 0.5  # 画面需持续稳定的时长（秒）
+    least: float = 0.5        # 最低等待秒数（点击后至少等这么久再开始检测稳定）
     line_no: int = 0
 
 

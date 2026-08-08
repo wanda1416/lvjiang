@@ -62,13 +62,17 @@ def write_profile_entry(
     key: str,
     value,
     total: int | None = None,
+    updated_at: str | None = None,
 ) -> None:
-    """向 user.json 数据中写入 profile 节点值（就地修改 data）"""
+    """向 user.json 数据中写入 profile 节点值（就地修改 data）
+
+    updated_at: 可选，指定写入的时间戳；为 None 时使用当前时间。
+    """
     profile = data.setdefault("profile", {})
     model_data = profile.setdefault(model_type, {})
     entry = model_data.setdefault(key, {})
     entry["value"] = value
-    entry["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    entry["updated_at"] = updated_at or datetime.now().isoformat(timespec="seconds")
     if total is not None:
         entry["total"] = total
 

@@ -1,11 +1,11 @@
 """用户配置加载链与保存函数测试
 
 覆盖链路：
-- 代码默认值 ← session.json（settings/material_grid）
+- 代码默认值 ← session.json（settings 及其 material_grid 子节点）
 - 代码默认值 ← app.yaml（input_simulation/delay_params，经 core.config 合并）
 
 保存函数：
-- save_settings / save_material_grid（读改写 session.json 对应顶层节点）
+- save_settings / save_material_grid（读改写 session.json 的 settings 节点，各自保留对方字段）
 - save_app_config（经 core.config 写入 app.yaml）
 """
 
@@ -66,11 +66,11 @@ class TestLoadUserConfig:
         assert config.desktop_background_input is True  # 未配置项保持默认
 
     def test_session_material_grid_override(self, session_env, monkeypatch):
-        """session.json 的 material_grid 节点覆盖网格常量"""
+        """session.json 的 settings.material_grid 节点覆盖网格常量"""
         monkeypatch.setattr(
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
-            "material_grid": {"rows": 4, "cols": 5, "height": 100}
+            "settings": {"material_grid": {"rows": 4, "cols": 5, "height": 100}}
         }), encoding="utf-8")
         reset_session_store()
         config = load_user_config()
@@ -125,7 +125,7 @@ class TestSaveSessionNodes:
         grid = {"rows": 2, "cols": 3, "gap": 1, "height": 80, "width": 90}
         save_material_grid(grid)
         data = json.loads(session_env.read_text(encoding="utf-8"))
-        assert data == {"material_grid": grid}
+        assert data == {"settings": {"material_grid": grid}}
 
 
 class TestSaveAppConfig:

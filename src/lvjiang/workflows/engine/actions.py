@@ -408,17 +408,15 @@ class _ActionsMixin:
             self._ensure_workflow().wait_delay(str(delay))
 
     def _exec_wait_stable(self, node: WaitStable):
-        """等待画面稳定：连续截图对比，差异低于阈值持续 stable_duration 秒后继续"""
-        try:
-            self._ensure_workflow().wait_stable(
-                timeout=node.timeout,
-                threshold=node.threshold,
-                interval=node.interval,
-                stable_duration=node.stable_duration,
-                least=node.least,
-            )
-        except TimeoutError as e:
-            raise WorkflowUserError(str(e)) from None
+        """等待画面稳定：连续截图对比，差异低于阈值持续 stable_duration 秒后继续；
+        超时仅记警告不中断流程"""
+        self._ensure_workflow().wait_stable(
+            timeout=node.timeout,
+            threshold=node.threshold,
+            interval=node.interval,
+            stable_duration=node.stable_duration,
+            least=node.least,
+        )
 
     def _found_region_to_screen(self, found_region, jitter: bool = True) -> tuple[int, int]:
         """FoundRegion → 屏幕坐标（取区域中心，可选抖动）"""

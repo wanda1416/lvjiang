@@ -283,10 +283,15 @@ class TestComputeRealtimeValue:
 
     def test_day_regen(self):
         """天回复：跨越 05:00 边界 * 450"""
-        now = datetime.now()
-        yesterday_3am = (now - timedelta(days=1)).replace(hour=3, minute=0, second=0)
+        from unittest.mock import patch
+        # 使用固定的 now 时间（10:00，确保在 05:00 之后）
+        fixed_now = datetime(2026, 8, 8, 10, 0, 0)
+        yesterday_3am = datetime(2026, 8, 7, 3, 0, 0)
         updated_at = yesterday_3am.isoformat(timespec="seconds")
-        val, ts = _compute_realtime_value(100, updated_at, "day", 450, 2500, "05:00")
+        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            mock_dt.fromisoformat = datetime.fromisoformat
+            val, ts = _compute_realtime_value(100, updated_at, "day", 450, 2500, "05:00")
         # Should have crossed at least 1 day boundary
         assert val >= 550  # 100 + 1 * 450
 

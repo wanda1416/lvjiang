@@ -56,7 +56,10 @@ class SessionStore:
             return {}
 
     def _flush(self):
-        """原子落盘：tmp 文件 + os.replace（调用方须已持锁）"""
+        """原子落盘：tmp 文件 + os.replace（调用方须已持锁）
+
+        Windows 下目标文件被锁定时会重试 3 次，仍失败则降级为直接写入。
+        """
         path = self.path
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +68,24 @@ class SessionStore:
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     json.dump(self._data, f, ensure_ascii=False, indent=2)
-                os.replace(tmp, path)
+                # Windows 下文件被锁定时重试 3 次
+                import time
+                for attempt in range(3):
+                    try:
+                        os.replace(tmp, path)
+                        break
+                    except PermissionError:
+                        if attempt < 2:
+                            time.sleep(0.1)
+                        else:
+                            # 重试失败，降级为直接写入
+                            logger.warning(f"原子写入失败，降级为直接写入: {path}")
+                            with open(path, "w", encoding="utf-8") as f:
+                                json.dump(self._data, f, ensure_ascii=False, indent=2)
+                            try:
+                                os.unlink(tmp)
+                            except OSError:
+                                pass
             except BaseException:
                 try:
                     os.unlink(tmp)

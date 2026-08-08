@@ -11,8 +11,6 @@
         key_name: { value: ..., updated_at: ... }
       resource:
         key_name: { value: ..., updated_at: ... }
-      activity:
-        key_name: { value: ..., total: ..., updated_at: ... }
 """
 
 from __future__ import annotations
@@ -44,15 +42,14 @@ from lvjiang.core.config import get_session_store
 from lvjiang.core.user_config import UserConfigManager
 
 from ..config.profile_models import (
-    MODEL_ACTIVITY,
     MODEL_DAILY,
     MODEL_LABELS,
     MODEL_REALTIME,
     MODEL_RESOURCE,
-    ActivityKeyDef,
     DailyKeyDef,
     KeyDef,
     RealtimeKeyDef,
+    ResourceKeyDef,
 )
 from ..config.profile_store import (
     get_active_group,
@@ -62,7 +59,7 @@ from ..config.profile_store import (
     set_active_group,
 )
 from ..config.user_profile import read_profile_entry
-from ..profile.profile_engine import _compute_realtime_value
+from ..profile.profile_engine import compute_realtime_entry
 
 # 统一的刷新按钮样式
 _REFRESH_BTN_STYLE = (
@@ -103,6 +100,16 @@ class ProfileOverviewTab(QWidget):
         self._reordering = False
         migrate_from_legacy()
         self._setup_ui()
+        self._connect_profile_engine()
+
+    def _connect_profile_engine(self) -> None:
+        """让后台 profile 更新能刷新总览 UI。"""
+        try:
+            from ..profile.profile_engine import get_or_create_engine
+            engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
+            engine.data_updated.connect(lambda _user_name: self.refresh())
+        except Exception as e:
+            logger.debug(f"ProfileOverviewTab 连接 ProfileEngine 失败: {e}")
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -265,6 +272,17 @@ class ProfileOverviewTab(QWidget):
         table.setColumnCount(0)
         table.setColumnCount(col_count)
         table.setHorizontalHeaderLabels(headers)
+
+        # 设置表头字体为粗体
+        h_header = table.horizontalHeader()
+        if h_header:
+            bold_font = QFont(h_header.font())
+            bold_font.setBold(True)
+            for col in range(col_count):
+                header_item = table.horizontalHeaderItem(col)
+                if header_item:
+                    header_item.setFont(bold_font)
+
         table.setRowCount(len(users_data))
         for row, (name, data) in enumerate(users_data.items()):
             name_item = QTableWidgetItem(name)
@@ -294,7 +312,7 @@ class ProfileOverviewTab(QWidget):
     def _format_profile_cell(self, kd: KeyDef, model_type: str, data: dict) -> tuple[str, str]:
         """根据模型类型格式化 profile 值用于总览显示
 
-        返回 (display_text, style)，style 为 "" | "red_bold" | "orange_bold"
+        返回 (display_text, style)，style 为 "" | "red_bold" | "orange_bold" | "green_bold"
         """
         entry = read_profile_entry(data, model_type, kd.key)
         if not entry:
@@ -306,18 +324,17 @@ class ProfileOverviewTab(QWidget):
 
         if model_type == MODEL_DAILY:
             if isinstance(kd, DailyKeyDef) and kd.show_cap and kd.cap:
-                return f"{int(value)}/{kd.cap}", ""
+                style = "green_bold" if value >= kd.cap else ""
+                return f"{int(value)}/{kd.cap}", style
+            # 即使不展示上限，达标时也显示绿色
+            if isinstance(kd, DailyKeyDef) and kd.cap is not None and value >= kd.cap:
+                return str(int(value)), "green_bold"
             return str(int(value)), ""
 
         if model_type == MODEL_REALTIME:
             if isinstance(kd, RealtimeKeyDef):
-                # 实时计算当前值
-                updated_at_str = entry.get("updated_at", "")
-                computed, _ = _compute_realtime_value(
-                    value, updated_at_str,
-                    kd.regen_period, kd.regen_value, kd.cap,
-                    kd.reset_time,
-                )
+                # 实时计算当前值；小数部分表示未展示的恢复进度。
+                computed, _ = compute_realtime_entry(entry, kd)
                 int_value = int(computed)
                 style = ""
                 if kd.cap is not None and computed >= kd.cap:
@@ -330,18 +347,24 @@ class ProfileOverviewTab(QWidget):
             return str(int(value)), ""
 
         if model_type == MODEL_RESOURCE:
-            return str(int(value)), ""
-
-        if model_type == MODEL_ACTIVITY:
-            if isinstance(kd, ActivityKeyDef) and kd.show_cap and kd.cap:
-                return f"{int(value)}/{kd.cap}", ""
+            if isinstance(kd, ResourceKeyDef) and kd.cap is not None:
+                if kd.show_cap and kd.cap:
+                    if value >= kd.cap:
+                        style = "red_bold" if not kd.soft else "orange_bold"
+                        return f"{int(value)}/{kd.cap}", style
+                    return f"{int(value)}/{kd.cap}", ""
+                # 不展示上限但达到上限时
+                if value >= kd.cap:
+                    style = "red_bold" if not kd.soft else "orange_bold"
+                    return str(int(value)), style
+            # 资源模型无上限时纯数字
             return str(int(value)), ""
 
         return str(value), ""
 
     @staticmethod
     def _apply_cell_style(item: QTableWidgetItem, style: str) -> None:
-        """应用单元格样式: '' | 'red_bold' | 'orange_bold'"""
+        """应用单元格样式: '' | 'red_bold' | 'orange_bold' | 'green_bold'"""
         if style == "red_bold":
             font = QFont(item.font())
             font.setBold(True)
@@ -352,6 +375,11 @@ class ProfileOverviewTab(QWidget):
             font.setBold(True)
             item.setFont(font)
             item.setForeground(QColor(255, 165, 0))  # 橙色
+        elif style == "green_bold":
+            font = QFont(item.font())
+            font.setBold(True)
+            item.setFont(font)
+            item.setForeground(QColor(34, 139, 34))  # 森林绿
 
     def _format_cell_tooltip(self, kd: KeyDef, model_type: str, data: dict) -> str:
         """生成单元格悬停提示，显示元信息（更新时间等）"""
@@ -368,14 +396,18 @@ class ProfileOverviewTab(QWidget):
 
         # 实时模型显示额外信息
         if model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
-            period_labels = {"minute": "分钟", "hour": "小时", "day": "天"}
+            computed, new_ts = compute_realtime_entry(entry, kd)
+            period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
             period_label = period_labels.get(kd.regen_period, kd.regen_period)
             lines.append(f"回复周期: 每{period_label}")
             lines.append(f"每次回复: {kd.regen_value}")
+            lines.append(f"精确值: {computed:.4f}".rstrip("0").rstrip("."))
+            if new_ts and new_ts != updated_at:
+                lines.append(f"已计入至: {new_ts}")
             if kd.cap is not None:
                 lines.append(f"上限: {kd.cap}")
 
-        # 日常模型显示周期和上限
+        # 日常模型显示周期、上限、同步信息
         if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
             period_labels = {
                 "week": "每周", "month": "每月", "season": "每赛季",
@@ -384,12 +416,8 @@ class ProfileOverviewTab(QWidget):
             period_label = period_labels.get(kd.period, kd.period)
             if kd.cap is not None:
                 lines.append(f"{period_label}上限: {kd.cap}")
-
-        # 活动模型显示总数
-        if model_type == MODEL_ACTIVITY:
-            total = entry.get("total")
-            if total is not None:
-                lines.append(f"总计: {total}")
+            if kd.sync_to:
+                lines.append(f"同步到: {kd.sync_to}")
 
         return "\n".join(lines) if len(lines) > 1 else ""
 
@@ -461,12 +489,44 @@ class ProfileOverviewTab(QWidget):
             return
         h_header = table.horizontalHeader()
         assert h_header is not None
-        if len(widths) != h_header.count():
-            return
+        col_count = h_header.count()
+        if len(widths) != col_count:
+            default_w = h_header.defaultSectionSize()
+            widths = [*widths[:col_count], *([default_w] * max(0, col_count - len(widths)))]
+            all_widths[group_name] = widths
+            _save_column_widths(all_widths)
         self._restoring_widths = True
         for idx, w in enumerate(widths):
             h_header.resizeSection(idx, w)
         self._restoring_widths = False
+
+    def _insert_column_width(self, group_name: str, data_insert_idx: int, table: QTableWidget) -> None:
+        """新增数据列时同步列宽数组；第 0 列为角色名。"""
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        all_widths = _get_column_widths()
+        widths = list(all_widths.get(group_name) or [])
+        if not widths:
+            widths = [h_header.sectionSize(i) for i in range(h_header.count())]
+        width_idx = max(1, min(data_insert_idx + 1, len(widths)))
+        new_width = h_header.defaultSectionSize()
+        widths.insert(width_idx, new_width)
+        all_widths[group_name] = widths
+        _save_column_widths(all_widths)
+
+    def _remove_column_width(self, group_name: str, data_idx: int, table: QTableWidget) -> None:
+        """删除数据列时同步列宽数组；第 0 列为角色名。"""
+        h_header = table.horizontalHeader()
+        assert h_header is not None
+        all_widths = _get_column_widths()
+        widths = list(all_widths.get(group_name) or [])
+        if not widths:
+            widths = [h_header.sectionSize(i) for i in range(h_header.count())]
+        width_idx = data_idx + 1
+        if 0 <= width_idx < len(widths):
+            del widths[width_idx]
+            all_widths[group_name] = widths
+            _save_column_widths(all_widths)
 
     def _on_header_context_menu(self, pos, group_name: str):
         """表头右键菜单（分组上下文）"""
@@ -597,11 +657,12 @@ class ProfileOverviewTab(QWidget):
                 if selected_key in column_keys:
                     QMessageBox.warning(self, "重复", f"Key '{selected_key}' 已在该分组中显示")
                     return
-                insert_idx = max(0, min(after_index, len(column_keys)))
+                insert_idx = max(0, min(after_index + 1, len(column_keys)))
                 column_keys.insert(insert_idx, selected_key)
                 group_data["columns"] = column_keys
                 groups[group_name] = group_data
                 save_groups(groups)
+                self._insert_column_width(group_name, insert_idx, self._tables[group_name])
                 self._refresh_group(group_name, self._tables[group_name])
 
     def _remove_column(self, group_name: str, logical_index: int):
@@ -614,6 +675,7 @@ class ProfileOverviewTab(QWidget):
             group_data["columns"] = column_keys
             groups[group_name] = group_data
             save_groups(groups)
+            self._remove_column_width(group_name, logical_index, self._tables[group_name])
             self._refresh_group(group_name, self._tables[group_name])
 
     def _set_column_field(self, group_name: str, logical_index: int, field_key: str):
@@ -715,6 +777,35 @@ class ProfileOverviewTab(QWidget):
             self._loading = False
             return
 
+        # 硬上限约束检查
+        if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
+            if kd.cap is not None and not kd.soft and parsed_value > kd.cap:
+                QMessageBox.warning(
+                    None, "超出上限",
+                    f"{kd.label} 硬上限为 {kd.cap}，无法设置为 {parsed_value}"
+                )
+                self._loading = True
+                user_data = self._load_user_data(user_name)
+                text, style = self._format_profile_cell(kd, model_type, user_data)
+                item.setText(text)
+                self._apply_cell_style(item, style)
+                self._loading = False
+                return
+
+        if model_type == MODEL_RESOURCE and isinstance(kd, ResourceKeyDef):
+            if kd.cap is not None and not kd.soft and parsed_value > kd.cap:
+                QMessageBox.warning(
+                    None, "超出上限",
+                    f"{kd.label} 硬上限为 {kd.cap}，无法设置为 {parsed_value}"
+                )
+                self._loading = True
+                user_data = self._load_user_data(user_name)
+                text, style = self._format_profile_cell(kd, model_type, user_data)
+                item.setText(text)
+                self._apply_cell_style(item, style)
+                self._loading = False
+                return
+
         self._write_profile_entry(user_name, model_type, key_str, parsed_value)
 
         self._loading = True
@@ -754,13 +845,6 @@ class ProfileOverviewTab(QWidget):
                 return _PARSE_ERROR
 
         if model_type == MODEL_RESOURCE:
-            try:
-                return int(raw) if raw else 0
-            except ValueError:
-                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
-                return _PARSE_ERROR
-
-        if model_type == MODEL_ACTIVITY:
             try:
                 return int(raw) if raw else 0
             except ValueError:
@@ -807,10 +891,6 @@ class ProfileOverviewTab(QWidget):
 
         model_type = config.get_model_type(key_str) or ""
 
-        # 资源模型不支持增减
-        if model_type == MODEL_RESOURCE:
-            return
-
         name_item = table.item(row, 0)
         if not name_item:
             return
@@ -822,44 +902,75 @@ class ProfileOverviewTab(QWidget):
         current_value = entry.get("value", 0)
         if current_value is None:
             current_value = 0
+        if model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
+            current_value, _ = compute_realtime_entry(entry, kd)
 
         # 构建菜单
         menu = QMenu(self)
         menu.setTitle(f"{kd.label} ({user_name})")
 
-        # 增减选项
-        steps = [1, 10, 100]
-        for step in steps:
-            # 增加
-            action_up = menu.addAction(f"+{step}")
-            if action_up:
-                action_up.triggered.connect(
-                    lambda checked, s=step: self._adjust_value(
-                        user_name, model_type, key_str, kd, current_value, s
+        # 获取该字段的自定义 steps（Daily 和 Realtime 模型支持）
+        kd_steps: list[int] = []
+        kd_increment_only = False
+        if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
+            kd_steps = kd.steps
+            kd_increment_only = kd.increment_only
+        elif model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
+            kd_steps = kd.steps
+
+        if kd_steps:
+            # 有自定义 steps：只展示用户定义的幅度
+            for step in kd_steps:
+                if step > 0:
+                    label = f"+{step}"
+                elif step < 0:
+                    label = str(step)
+                else:
+                    continue
+                action = menu.addAction(label)
+                if action:
+                    action.triggered.connect(
+                        lambda checked, s=step: self._adjust_value(
+                            user_name, model_type, key_str, kd, current_value, s,
+                            is_action=True,
+                        )
+                    )
+            menu.addSeparator()
+            # 始终提供自定义输入入口
+            action_inc = menu.addAction("增加...")
+            if action_inc:
+                action_inc.triggered.connect(
+                    lambda: self._adjust_value_custom(
+                        user_name, model_type, key_str, kd, current_value, direction=1
                     )
                 )
-
-        menu.addSeparator()
-
-        for step in steps:
-            # 减少
-            action_down = menu.addAction(f"-{step}")
-            if action_down:
-                action_down.triggered.connect(
-                    lambda checked, s=step: self._adjust_value(
-                        user_name, model_type, key_str, kd, current_value, -s
+            # 单向增加模式下不提供减少
+            if not kd_increment_only:
+                action_dec = menu.addAction("减少...")
+                if action_dec:
+                    action_dec.triggered.connect(
+                        lambda: self._adjust_value_custom(
+                            user_name, model_type, key_str, kd, current_value, direction=-1
+                        )
+                    )
+        else:
+            # 无自定义 steps：只提供自定义输入
+            action_inc = menu.addAction("增加...")
+            if action_inc:
+                action_inc.triggered.connect(
+                    lambda: self._adjust_value_custom(
+                        user_name, model_type, key_str, kd, current_value, direction=1
                     )
                 )
-
-        # 自定义增减
-        menu.addSeparator()
-        action_custom = menu.addAction("自定义增减...")
-        if action_custom:
-            action_custom.triggered.connect(
-                lambda: self._adjust_value_custom(
-                    user_name, model_type, key_str, kd, current_value
-                )
-            )
+            # 单向增加模式下不提供减少
+            if not kd_increment_only:
+                action_dec = menu.addAction("减少...")
+                if action_dec:
+                    action_dec.triggered.connect(
+                        lambda: self._adjust_value_custom(
+                            user_name, model_type, key_str, kd, current_value, direction=-1
+                        )
+                    )
 
         viewport = table.viewport()
         if viewport:
@@ -873,25 +984,66 @@ class ProfileOverviewTab(QWidget):
         kd,
         current_value,
         delta: int | float,
+        is_action: bool = True,
     ):
-        """增减数值并写回"""
+        """增减数值并写回
+
+        is_action: True 表示通过 steps 按钮触发（会触发 Daily->Resource 同步），
+                     False 表示手动编辑（不触发同步）。
+        """
         new_value = current_value + delta
 
         # 下限：0
         new_value = max(0, new_value)
 
-        # 上限：cap
-        cap = getattr(kd, "cap", None)
-        if cap is not None:
-            new_value = min(new_value, cap)
+        # 上限：硬上限才 clamp，软上限仅提醒
+        if model_type == MODEL_DAILY:
+            cap = getattr(kd, "cap", None)
+            soft = getattr(kd, "soft", False)
+            if cap is not None and not soft:
+                new_value = min(new_value, cap)
+
+        if model_type == MODEL_REALTIME:
+            cap = getattr(kd, "cap", None)
+            if cap is not None:
+                new_value = min(new_value, cap)
+            if abs(new_value - int(new_value)) < 1e-9:
+                new_value = float(int(new_value))
+
+        if model_type == MODEL_RESOURCE:
+            cap = getattr(kd, "cap", None)
+            soft = getattr(kd, "soft", False)
+            if cap is not None and not soft:
+                new_value = min(new_value, cap)
 
         self._write_profile_entry(user_name, model_type, key, new_value)
+
+        # Daily -> Resource 单向同步（仅 steps 动作触发）
+        if (
+            is_action
+            and model_type == MODEL_DAILY
+            and isinstance(kd, DailyKeyDef)
+            and kd.sync_to
+        ):
+            self._sync_to_resource(user_name, kd, delta)
 
         # 刷新表格
         current_group = self._get_current_group_name()
         table = self._tables.get(current_group)
         if table:
             self._refresh_group(current_group, table)
+
+    def _sync_to_resource(self, user_name: str, daily_kd: DailyKeyDef, delta: int | float) -> None:
+        """将 Daily 的变更同步到关联的 Resource"""
+        user_data = self._load_user_data(user_name)
+        resource_entry = user_data.get("profile", {}).get(MODEL_RESOURCE, {}).get(daily_kd.sync_to, {})
+        current_resource = resource_entry.get("value", 0) or 0
+        new_resource = max(0, current_resource + delta)
+        self._write_profile_entry(user_name, MODEL_RESOURCE, daily_kd.sync_to, new_resource)
+        logger.debug(
+            f"[ProfileTab] {user_name} daily.{daily_kd.key} 同步 {delta:+d} 到 "
+            f"resource.{daily_kd.sync_to} = {new_resource}"
+        )
 
     def _adjust_value_custom(
         self,
@@ -900,17 +1052,33 @@ class ProfileOverviewTab(QWidget):
         key: str,
         kd,
         current_value,
+        direction: int = 0,
     ):
-        """自定义增减数值"""
+        """自定义增减数值
+
+        direction: 1=增加，-1=减少，0=双向（输入正负值）
+        """
         from PyQt6.QtWidgets import QInputDialog
 
+        # 根据 direction 设置输入范围和提示
+        if direction > 0:
+            min_val = 0
+            prompt = "输入增加量:"
+        elif direction < 0:
+            min_val = 0
+            prompt = "输入减少量:"
+        else:
+            min_val = -999999
+            prompt = "输入增减量（正数增加，负数减少）:"
+
         if model_type == MODEL_REALTIME:
+            current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
             delta, ok = QInputDialog.getDouble(
                 self,
                 f"自定义增减 - {kd.label}",
-                f"当前值: {current_value}\n输入增减量（正数增加，负数减少）:",
+                f"当前值: {current_text}\n{prompt}",
                 0,
-                -999999,
+                min_val,
                 999999,
                 4,
             )
@@ -918,16 +1086,32 @@ class ProfileOverviewTab(QWidget):
             delta, ok = QInputDialog.getInt(
                 self,
                 f"自定义增减 - {kd.label}",
-                f"当前值: {int(current_value)}\n输入增减量（正数增加，负数减少）:",
+                f"当前值: {int(current_value)}\n{prompt}",
                 0,
-                -999999,
+                min_val,
                 999999,
                 1,
             )
         if not ok:
             return
 
-        self._adjust_value(user_name, model_type, key, kd, current_value, delta)
+        # 根据 direction 调整 delta 符号
+        if direction > 0:
+            delta = abs(delta)
+        elif direction < 0:
+            delta = -abs(delta)
+
+        # 检查减少后是否小于 0
+        new_value = current_value + delta
+        if new_value < 0:
+            QMessageBox.warning(
+                None, "数值无效",
+                f"减少后数值不能小于 0（当前值: {int(current_value)}，输入: {int(abs(delta))}）"
+            )
+            return
+
+        # 自定义增减属于 action，触发 Daily->Resource 同步
+        self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=True)
 
     def _load_all_users(self) -> dict[str, dict]:
         """加载所有用户数据（按用户管理定义的顺序）"""
@@ -1097,6 +1281,20 @@ class ProfileTab(QWidget):
         self._setup_ui()
         self._refresh_current_user()
         host.user_changed.connect(lambda _name: self._refresh_current_user())
+        self._connect_profile_engine()
+
+    def _connect_profile_engine(self) -> None:
+        """让后台 profile 更新能刷新当前用户详情。"""
+        try:
+            from ..profile.profile_engine import get_or_create_engine
+            engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
+            engine.data_updated.connect(self._on_profile_data_updated)
+        except Exception as e:
+            logger.debug(f"ProfileTab 连接 ProfileEngine 失败: {e}")
+
+    def _on_profile_data_updated(self, user_name: str) -> None:
+        if user_name == self._host.active_user_name() and self._detail_page is not None:
+            self._detail_page.refresh()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -1173,7 +1371,7 @@ class _DetailPage(QWidget):
 
         config = get_profile_config()
 
-        for model_type in (MODEL_DAILY, MODEL_REALTIME, MODEL_RESOURCE, MODEL_ACTIVITY):
+        for model_type in (MODEL_DAILY, MODEL_REALTIME, MODEL_RESOURCE):
             keys = config.get_keys_by_model(model_type)
             if not keys:
                 continue
@@ -1255,27 +1453,16 @@ class _DetailPage(QWidget):
 
         if model_type == MODEL_REALTIME:
             if isinstance(kd, RealtimeKeyDef):
-                updated_at_str = entry.get("updated_at", "")
-                computed, _ = _compute_realtime_value(
-                    value, updated_at_str,
-                    kd.regen_period, kd.regen_value, kd.cap,
-                    kd.reset_time,
-                )
+                computed, _ = compute_realtime_entry(entry, kd)
                 int_value = int(computed)
-                period_labels = {"minute": "分钟", "hour": "小时", "day": "天"}
+                period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
                 period_text = period_labels.get(kd.regen_period, kd.regen_period)
                 cap_text = f" / {kd.cap}" if kd.cap else ""
-                return f"{int_value}{cap_text}  (回复: {kd.regen_value}/{period_text})"
+                exact = f"{computed:.4f}".rstrip("0").rstrip(".")
+                return f"{int_value}{cap_text}  (精确: {exact}, 回复: {kd.regen_value}/{period_text})"
             return str(int(value))
 
         if model_type == MODEL_RESOURCE:
-            return str(value)
-
-        if model_type == MODEL_ACTIVITY:
-            if isinstance(kd, ActivityKeyDef) and kd.cap:
-                return f"{value} / {kd.cap}  (周期: {kd.period})"
-            if isinstance(value, bool):
-                return "已完成" if value else "未完成"
             return str(value)
 
         return str(value)

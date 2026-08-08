@@ -1,7 +1,7 @@
 """玩家数据模型后台计算引擎
 
 低频后台线程，每 60 秒 tick 一次，负责：
-1. 周期检查与重置（daily / activity 的 period 到期清零）
+1. 周期检查与重置（daily 的 period 到期清零）
 2. 实时计算（realtime 按 regen_period + regen_value 回复，封顶 cap）
 
 Signals:
@@ -170,19 +170,21 @@ def _compute_realtime_value(
     regen_value: float,
     cap: int | None,
     reset_time: str = "05:00",
+    reset_day: int = 0,
 ) -> tuple[float, str]:
     """根据回复周期和回复数值计算当前实时值
 
     返回 (computed_value, new_updated_at)。
     - minute/hour: 按整分钟/整小时计算，小数部分不累计
     - day: 按每日重置边界计算
+    - week: 按每周重置边界计算（reset_day 指定周几）
     """
     now = datetime.now()
 
     if regen_value <= 0 or not updated_at_str:
         return float(stored_value), updated_at_str
 
-    if regen_period not in ("minute", "hour", "day"):
+    if regen_period not in ("minute", "hour", "day", "week"):
         logger.error(f"非法 regen_period={regen_period!r}，不计算回复")
         return float(stored_value), updated_at_str
 
@@ -196,6 +198,15 @@ def _compute_realtime_value(
         if cap is not None:
             computed = min(computed, cap)
         # 推进时间戳到 now，避免下次 tick 重复计入已计算的边界
+        return computed, now.isoformat(timespec="seconds")
+
+    if regen_period == "week":
+        weeks = _count_weekly_regens(stored_ts, now, reset_time, reset_day)
+        if weeks <= 0:
+            return float(stored_value), updated_at_str
+        computed = stored_value + weeks * regen_value
+        if cap is not None:
+            computed = min(computed, cap)
         return computed, now.isoformat(timespec="seconds")
 
     # minute / hour
@@ -230,15 +241,34 @@ def _compute_realtime_value(
     return computed, new_ts_str
 
 
+def compute_realtime_entry(entry: dict, key_def: RealtimeKeyDef) -> tuple[float, str]:
+    """按 RealtimeKeyDef 计算一个 profile entry 的当前值。
+
+    entry["value"] 允许带小数；对 minute/hour 来说，小数用于表达已经累计、
+    但总览按整数展示的进度。
+    """
+    stored_value = entry.get("value", 0) or 0
+    updated_at_str = entry.get("updated_at", "")
+    return _compute_realtime_value(
+        stored_value,
+        updated_at_str,
+        key_def.regen_period,
+        key_def.regen_value,
+        key_def.cap,
+        key_def.reset_time,
+        key_def.reset_day,
+    )
+
+
 def _count_daily_regens(
     prev_time: datetime, now: datetime, reset_time: str
 ) -> int:
     """计算两个时间点之间经过了多少个 reset_time 重置边界
 
     例如 reset_time="05:00" 时，每天 05:00 是一个边界。
-    prev_time 在昨天 03:00、now 在今天 10:00 → 经过 1 个边界（今天 05:00）。
+    prev_time 在昨天 03:00、now 在今天 10:00 → 经过 2 个边界（昨天和今天 05:00）。
     prev_time 在前天 20:00、now 在今天 10:00 → 经过 2 个边界。
-    prev_time 在前天 03:00、now 在今天 03:00 → 经过 1 个边界（昨天 05:00，今天还没到）。
+    prev_time 在前天 03:00、now 在今天 03:00 → 经过 2 个边界（前天和昨天 05:00）。
     """
     hour, minute = _parse_reset_time(reset_time)
 
@@ -251,10 +281,56 @@ def _count_daily_regens(
     else:
         end_reset_ordinal = (today_reset - timedelta(days=1)).toordinal()
 
-    # 下界：prev_time 所属的重置日（当天重置点，不论是否已过）
-    start_reset_ordinal = prev_day_reset.toordinal()
+    # 下界：prev_time 之前最近一次重置点。
+    # 例如 prev=04:40、now=05:09 时，今天 05:00 必须计入一次；
+    # 因此 prev 尚未越过当天重置点时，下界应回退到前一天。
+    if prev_time >= prev_day_reset:
+        start_reset_ordinal = prev_day_reset.toordinal()
+    else:
+        start_reset_ordinal = (prev_day_reset - timedelta(days=1)).toordinal()
 
     return max(end_reset_ordinal - start_reset_ordinal, 0)
+
+
+def _count_weekly_regens(
+    prev_time: datetime, now: datetime, reset_time: str, reset_day: int = 0
+) -> int:
+    """计算两个时间点之间经过了多少个每周重置边界
+
+    reset_day: 1=周一 ... 7=周日（0 或未设置 → 默认周一）
+    例如 reset_day=1, reset_time="05:00" 时，每周一 05:00 是一个边界。
+    """
+    if reset_day < 1 or reset_day > 7:
+        reset_day = 1  # 默认周一
+
+    hour, minute = _parse_reset_time(reset_time)
+
+    def get_week_reset_boundary(dt: datetime) -> datetime:
+        """获取 dt 所在周的重置边界（reset_day 那天的 reset_time）"""
+        # isoweekday: 1=周一 ... 7=周日
+        current_weekday = dt.isoweekday()
+        days_diff = reset_day - current_weekday
+        reset_dt = dt.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        reset_dt = reset_dt + timedelta(days=days_diff)
+        return reset_dt
+
+    # 上界：now 已过本周重置点 → 计入本周；否则 → 截止到上周
+    this_week_reset = get_week_reset_boundary(now)
+    if now >= this_week_reset:
+        end_reset_boundary = this_week_reset
+    else:
+        end_reset_boundary = this_week_reset - timedelta(weeks=1)
+
+    # 下界：prev_time 之前最近一次重置点
+    prev_week_reset = get_week_reset_boundary(prev_time)
+    if prev_time >= prev_week_reset:
+        start_reset_boundary = prev_week_reset
+    else:
+        start_reset_boundary = prev_week_reset - timedelta(weeks=1)
+
+    # 计算经过了多少周
+    weeks_diff = (end_reset_boundary - start_reset_boundary).days // 7
+    return max(weeks_diff, 0)
 
 
 # ─── 提醒去重 ────────────────────────────────────────────────
@@ -375,31 +451,22 @@ class ProfileEngine(QThread):
         now = datetime.now()
         modified = False
 
-        # ── Step 1: 周期检查与重置（daily + activity）──
-        for model_type in ("daily", "activity"):
-            keys = config.get_keys_by_model(model_type)
-            for kd in keys:
-                entry = read_profile_entry(data, model_type, kd.key)
-                updated_at_str = entry.get("updated_at", "")
+        # ── Step 1: 周期检查与重置（daily）──
+        daily_keys = config.get_keys_by_model("daily")
+        for kd in daily_keys:
+            entry = read_profile_entry(data, "daily", kd.key)
+            updated_at_str = entry.get("updated_at", "")
 
-                boundary = _get_period_boundary(
-                    kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
-                )
-                if not _should_reset(updated_at_str, boundary):
-                    continue
+            boundary = _get_period_boundary(
+                kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
+            )
+            if not _should_reset(updated_at_str, boundary):
+                continue
 
-                # 周期已过期，执行重置
-                if model_type == "daily":
-                    write_profile_entry(data, "daily", kd.key, 0)
-                    logger.debug(f"[ProfileEngine] {user_name} daily.{kd.key} 周期重置")
-                    modified = True
-
-                elif model_type == "activity":
-                    write_profile_entry(data, "activity", kd.key, 0)
-                    logger.debug(
-                        f"[ProfileEngine] {user_name} activity.{kd.key} 周期重置"
-                    )
-                    modified = True
+            # 周期已过期，执行重置
+            write_profile_entry(data, "daily", kd.key, 0)
+            logger.debug(f"[ProfileEngine] {user_name} daily.{kd.key} 周期重置")
+            modified = True
 
         # ── Step 2: 实时计算（realtime）──
         realtime_keys = config.get_keys_by_model("realtime")
@@ -410,11 +477,7 @@ class ProfileEngine(QThread):
             stored_value = entry.get("value", 0)
             updated_at_str = entry.get("updated_at", "")
 
-            computed, new_ts = _compute_realtime_value(
-                stored_value, updated_at_str,
-                kd.regen_period, kd.regen_value, kd.cap,
-                kd.reset_time,
-            )
+            computed, new_ts = compute_realtime_entry(entry, kd)
 
             if computed != stored_value or new_ts != updated_at_str:
                 write_profile_entry(

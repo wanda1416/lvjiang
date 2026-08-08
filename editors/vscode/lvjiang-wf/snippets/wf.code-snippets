@@ -74,9 +74,23 @@
   "wait": {
     "prefix": "wait",
     "body": [
-      "wait ${1:delay_name}"
+      "wait @${1:delay_name}"
     ],
-    "description": "等待指定时间"
+    "description": "等待命名延迟参数"
+  },
+  "wait_seconds": {
+    "prefix": "wait",
+    "body": [
+      "wait ${1:seconds}"
+    ],
+    "description": "等待固定秒数"
+  },
+  "wait_stable": {
+    "prefix": "waitstable",
+    "body": [
+      "wait stable ${1:timeout}"
+    ],
+    "description": "等待画面稳定"
   },
   "import": {
     "prefix": "import",

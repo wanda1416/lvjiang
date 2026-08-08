@@ -93,6 +93,8 @@ DSL_KEYWORDS = {
     "and", "or", "not",
     # Timing
     "before", "after", "around",
+    # wait stable
+    "stable", "threshold", "interval", "duration",
     # Match patterns
     "equals", "contains", "equals_any", "contains_any",
     # Clause keywords

@@ -14,13 +14,13 @@
 # 装备分析工作流（逐个点击扫描）
 
 click [bag_equip_detail].[main_weapon]
-wait page_refresh_wait
+wait @page_refresh_wait
 scan [equip_weapon_detail] as $main_weapon_scan
 eval $main_weapon = to_equipment($main_weapon_scan)
 collect $main_weapon
 
 click [bag_equip_detail].[sub_weapon]
-wait page_refresh_wait
+wait @page_refresh_wait
 scan [equip_weapon_detail] as $sub_weapon_scan
 eval $sub_weapon = to_equipment($sub_weapon_scan)
 collect $sub_weapon
@@ -33,9 +33,9 @@ collect $sub_weapon
 ```
 @tune_start
 click [equip_tune_detail].[auto_add]
-wait step_interval
+wait @step_interval
 click [equip_tune_detail].[tune_btn]
-wait page_refresh_wait
+wait @page_refresh_wait
 scan [equip_tune_detail].[tune_affix, tune_tip] as $tune_result
 
 if $tune_result.result equals "成功"
@@ -46,7 +46,7 @@ end
 if $tune_result.result contains "失败"
     loop 3
         click [equip_tune_detail].[retry]
-        wait step_interval
+        wait @step_interval
     end
     goto tune_start
 end
@@ -91,7 +91,7 @@ loop while $attempt < 3
         break
     catch $err
         log concat("第 ", $attempt, " 次失败: ", $err)
-        wait retry_interval
+        wait @retry_interval
     end
 end
 

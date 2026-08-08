@@ -190,7 +190,7 @@ call nav_main_to_equip()
 
 # 点击装备并扫描
 click [bag_equip_detail].$equip_slot
-wait step_interval
+wait @step_interval
 scan [equip_weapon_detail] as $scan_result
 
 # 导航到调律页（带返回值检测）
@@ -212,7 +212,7 @@ end
 
 def nav_equip_to_tune()
     click [equip_detail].[more_func]
-    wait step_interval
+    wait @step_interval
 
     scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
     if not $tune_key
@@ -221,7 +221,7 @@ def nav_equip_to_tune()
     end
 
     click [equip_weapon_detail].$tune_key
-    wait step_interval
+    wait @step_interval
     return true
 end
 ```

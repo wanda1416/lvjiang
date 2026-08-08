@@ -21,7 +21,7 @@ SAMPLE = """\
 
 # 这是普通注释，不应被采集
 click [scene].[area]
-wait step_interval
+wait @step_interval
 """
 
 

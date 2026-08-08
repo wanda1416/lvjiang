@@ -37,6 +37,7 @@ from lvjiang.workflows.grammar import (
     SceneRef,
     VarRef,
     Wait,
+    WaitStable,
     parse_file,
     parse_text,
 )
@@ -245,7 +246,7 @@ def test_drag_point_pair():
     print("  drag 点对带 duration + hold: OK")
 
     # 带 wait 子句
-    program = parse_text("drag [s].[p1] [s].[p2] after wait step_interval")
+    program = parse_text("drag [s].[p1] [s].[p2] after wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Drag)
     assert isinstance(program.body[1], Wait)
@@ -267,12 +268,12 @@ def test_wait():
     print("  wait 1.5: OK")
 
     # wait 命名延迟
-    program = parse_text("wait page_refresh")
+    program = parse_text("wait @page_refresh")
     n = program.body[0]
     assert isinstance(n, Wait)
     assert isinstance(n.delay, Literal)
     assert n.delay.value == "page_refresh"
-    print("  wait page_refresh: OK")
+    print("  wait @page_refresh: OK")
 
     # wait $var
     program = parse_text("wait $interval")
@@ -291,11 +292,80 @@ def test_wait():
     print("  wait (1, 2): OK")
 
 
+def test_bare_named_delay_is_syntax_error():
+    """裸标识符（无 @ 前缀）应为语法错误"""
+    from lark.exceptions import UnexpectedCharacters
+    with pytest.raises(UnexpectedCharacters):
+        parse_text("wait step_interval")
+
+
+def test_bare_delay_in_clause_is_syntax_error():
+    """click ... after wait step_interval（无 @）也应为语法错误"""
+    from lark.exceptions import UnexpectedCharacters
+    with pytest.raises(UnexpectedCharacters):
+        parse_text("click [s].[r] after wait step_interval")
+
+
+# ─── wait stable 指令测试 ─────────────────────────────────
+
+def test_wait_stable_basic():
+    """wait stable 5 → WaitStable(timeout=5.0)"""
+    program = parse_text("wait stable 5")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 5.0
+    assert n.threshold == 0.02
+    assert n.interval == 0.3
+    assert n.stable_duration == 0.5
+
+
+def test_wait_stable_with_threshold():
+    """wait stable 3 threshold 0.05"""
+    program = parse_text("wait stable 3 threshold 0.05")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 3.0
+    assert n.threshold == 0.05
+    assert n.interval == 0.3
+
+
+def test_wait_stable_with_interval():
+    """wait stable 3 interval 0.5"""
+    program = parse_text("wait stable 3 interval 0.5")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 3.0
+    assert n.threshold == 0.02
+    assert n.interval == 0.5
+
+
+def test_wait_stable_full():
+    """wait stable 5 threshold 0.03 interval 0.5 duration 1.0"""
+    program = parse_text("wait stable 5 threshold 0.03 interval 0.5 duration 1.0")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 5.0
+    assert n.threshold == 0.03
+    assert n.interval == 0.5
+    assert n.stable_duration == 1.0
+
+
+def test_wait_stable_reversed_opts():
+    """wait stable 5 duration 0.5 interval 0.3 threshold 0.01 — 选项顺序可互换"""
+    program = parse_text("wait stable 5 duration 0.5 interval 0.3 threshold 0.01")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 5.0
+    assert n.threshold == 0.01
+    assert n.interval == 0.3
+    assert n.stable_duration == 0.5
+
+
 # ─── click/drag wait 语法糖测试 ─────────────────────────────
 
 def test_click_after_wait():
     """click ... after wait -> [Click, Wait]"""
-    program = parse_text("click [scene].[region] after wait step_interval")
+    program = parse_text("click [scene].[region] after wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Click)
     assert isinstance(program.body[1], Wait)
@@ -344,7 +414,7 @@ def test_click_no_wait():
 
 def test_drag_after_wait():
     """drag ... after wait -> [Drag, Wait]"""
-    program = parse_text("drag [scene].[panel] up 2 after wait step_interval")
+    program = parse_text("drag [scene].[panel] up 2 after wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Drag)
     assert isinstance(program.body[1], Wait)
@@ -353,7 +423,7 @@ def test_drag_after_wait():
 
 def test_drag_before_wait():
     """drag ... before wait -> [Wait, Drag]"""
-    program = parse_text("drag [scene].[panel] up 2 before wait step_interval")
+    program = parse_text("drag [scene].[panel] up 2 before wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Wait)
     assert isinstance(program.body[1], Drag)
@@ -361,7 +431,7 @@ def test_drag_before_wait():
 
 def test_drag_around_wait():
     """drag ... around wait -> [Wait, Drag, Wait]"""
-    program = parse_text("drag [scene].[panel] up 2 around wait step_interval")
+    program = parse_text("drag [scene].[panel] up 2 around wait @step_interval")
     assert len(program.body) == 3
     assert isinstance(program.body[0], Wait)
     assert isinstance(program.body[1], Drag)
@@ -370,7 +440,7 @@ def test_drag_around_wait():
 
 def test_drag_with_duration_after_wait():
     """drag ... 0.5 after wait -> [Drag(duration), Wait]"""
-    program = parse_text("drag [scene].[panel] 0.5 after wait step_interval")
+    program = parse_text("drag [scene].[panel] 0.5 after wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Drag)
     assert isinstance(program.body[1], Wait)

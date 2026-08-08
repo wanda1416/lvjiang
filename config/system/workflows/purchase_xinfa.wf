@@ -14,23 +14,23 @@
 #   3. 重复步骤 2 直到无法继续购买
 
 # ─── 导航：从首页到心法置换视图 ─────────────────────────
-click [game_main_page].[menu] after wait page_refresh_wait
-click [game_menu_page].[peiyang] after wait page_refresh_wait
-click [training_main].[gongfa] after wait step_interval
-click [training_main].[xinfa] after wait page_refresh_wait
-click [training_xinfa].[exchange] after wait page_refresh_wait
+click [game_main_page].[menu] after wait @page_refresh_wait
+click [game_menu_page].[peiyang] after wait @page_refresh_wait
+click [training_main].[gongfa] after wait @step_interval
+click [training_main].[xinfa] after wait @page_refresh_wait
+click [training_xinfa].[exchange] after wait @page_refresh_wait
 
 # ─── 返回导航 ────────────────────────────────────────────
 def go_back()
-    click [training_xinfa].[back] after wait page_refresh_wait
-    click [training_main].[back] after wait page_refresh_wait
-    click [game_menu_page].[back] after wait page_refresh_wait
+    click [training_xinfa].[back] after wait @page_refresh_wait
+    click [training_main].[back] after wait @page_refresh_wait
+    click [game_menu_page].[back] after wait @page_refresh_wait
 end
 
 # 循环购买心法
 loop while 1 == 1
     # 检查有没有找到自选标记
-    wait step_interval
+    wait @step_interval
     scan [training_xinfa].[sanben_1,sanben_2,sanben_3,sanben_4,sanben_5] as $zixuan by contains "自选"
     if not $zixuan
        log "找不到自选散本，结束"
@@ -39,14 +39,14 @@ loop while 1 == 1
     end
 
     # 先走一遍回收，避免书票不足，心法过多
-    click [training_xinfa].[count] after wait step_interval
-    click [training_xinfa].[recycle_entry] after wait step_interval
-    click [training_xinfa].[recycle] after wait step_interval
-    click [training_xinfa].[confirm] after wait page_refresh_wait
+    click [training_xinfa].[count] after wait @step_interval
+    click [training_xinfa].[recycle_entry] after wait @step_interval
+    click [training_xinfa].[recycle] after wait @step_interval
+    click [training_xinfa].[confirm] after wait @page_refresh_wait
 
-    click [training_xinfa].$zixuan after wait step_interval
-    click [training_xinfa].[add_all] after wait step_interval
-    click [training_xinfa].[purchase] after wait page_refresh_wait
+    click [training_xinfa].$zixuan after wait @step_interval
+    click [training_xinfa].[add_all] after wait @step_interval
+    click [training_xinfa].[purchase] after wait @page_refresh_wait
 
     # 检查购买后是否出现确认按钮（未出现则数量不足）
     scan [training_xinfa].[confirm] as $confirm by contains "确认"
@@ -56,8 +56,8 @@ loop while 1 == 1
        return -1
     end
 
-    click [training_xinfa].[add_max] after wait step_interval
-    click [training_xinfa].[confirm] after wait page_refresh_wait
+    click [training_xinfa].[add_max] after wait @step_interval
+    click [training_xinfa].[confirm] after wait @page_refresh_wait
 
-    click [training_xinfa].[blank] after wait step_interval
+    click [training_xinfa].[blank] after wait @step_interval
 end

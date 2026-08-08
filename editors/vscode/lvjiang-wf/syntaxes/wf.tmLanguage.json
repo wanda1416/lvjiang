@@ -34,6 +34,9 @@
       "include": "#keywords-timing"
     },
     {
+      "include": "#keywords-wait-stable"
+    },
+    {
       "include": "#keywords-match"
     },
     {
@@ -104,6 +107,10 @@
     "keywords-timing": {
       "name": "keyword.other.timing.wf",
       "match": "\\b(before|after|around)\\b"
+    },
+    "keywords-wait-stable": {
+      "name": "keyword.other.wait-stable.wf",
+      "match": "\\b(stable|threshold|interval|duration)\\b"
     },
     "keywords-match": {
       "name": "keyword.operator.match.wf",

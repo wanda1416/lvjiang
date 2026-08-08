@@ -70,6 +70,16 @@ class Wait:
 
 
 @dataclass(frozen=True)
+class WaitStable:
+    """wait stable — 等待画面稳定（连续截图对比，差异低于阈值持续 stable_duration 秒）"""
+    timeout: float            # 最大等待秒数（总超时）
+    threshold: float = 0.02   # 像素差异率阈值
+    interval: float = 0.3     # 截图对比间隔秒数
+    stable_duration: float = 0.5  # 画面需持续稳定的时长（秒）
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Scan:
     scene: Any      # SceneRef（静态场景引用）| PanelRef（panel cell 级）
     target: Any     # VarRef（$var，as 子句）

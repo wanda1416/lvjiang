@@ -44,6 +44,7 @@ from ..grammar import (
     Screenshot,
     UntilLoop,
     Wait,
+    WaitStable,
     WhileLoop,
     parse_file,
 )
@@ -514,6 +515,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_drag(node)
             case Wait():
                 self._exec_wait(node)
+            case WaitStable():
+                self._exec_wait_stable(node)
             case Align():
                 self._exec_align(node)
             case Scan():

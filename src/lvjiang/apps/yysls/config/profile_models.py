@@ -41,11 +41,13 @@ class KeyDef:
     """所有模型共有的基础字段
 
     不含 model 字段 — 模型类型由 profile.yaml 的父节点决定。
+    show_cap: 是否在总览中展示上限（value/cap），默认否。
     """
 
     key: str = ""
     label: str = ""
     description: str = ""
+    show_cap: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KeyDef:
@@ -53,6 +55,7 @@ class KeyDef:
             key=data.get("key", ""),
             label=data.get("label", ""),
             description=data.get("description", ""),
+            show_cap=data.get("show_cap", False),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -88,6 +91,7 @@ class DailyKeyDef(KeyDef):
             key=data.get("key", ""),
             label=data.get("label", ""),
             description=data.get("description", ""),
+            show_cap=data.get("show_cap", False),
             period=data.get("period", "week"),
             cap=data.get("cap"),
             reset_time=data.get("reset_time", "05:00"),
@@ -99,12 +103,15 @@ class DailyKeyDef(KeyDef):
 class RealtimeKeyDef(KeyDef):
     """实时数据模型 — 实时状态
 
-    按规则回复，有上限。引擎根据 updated_at + regen_rate 计算当前值。
+    按回复周期和回复数值计算回复，有上限。
+    regen_period: 回复周期单位 ("minute" | "hour" | "day")
+    regen_value: 每个周期的回复量（允许小数）
+    reset_time: 仅 day 周期使用，指定每日重置时刻
     """
 
     cap: int | None = None
-    regen_rate: float = 0.0
-    regen_daily: int = 0
+    regen_period: str = "minute"
+    regen_value: float = 0.0
     reset_time: str = "05:00"
     alert_above: int | None = None
 
@@ -114,9 +121,10 @@ class RealtimeKeyDef(KeyDef):
             key=data.get("key", ""),
             label=data.get("label", ""),
             description=data.get("description", ""),
+            show_cap=data.get("show_cap", False),
             cap=data.get("cap"),
-            regen_rate=data.get("regen_rate", 0.0),
-            regen_daily=data.get("regen_daily", 0),
+            regen_period=data.get("regen_period", "minute"),
+            regen_value=data.get("regen_value", 0.0),
             reset_time=data.get("reset_time", "05:00"),
             alert_above=data.get("alert_above"),
         )
@@ -135,6 +143,7 @@ class ResourceKeyDef(KeyDef):
             key=data.get("key", ""),
             label=data.get("label", ""),
             description=data.get("description", ""),
+            show_cap=data.get("show_cap", False),
         )
 
 
@@ -161,6 +170,7 @@ class ActivityKeyDef(KeyDef):
             key=data.get("key", ""),
             label=data.get("label", ""),
             description=data.get("description", ""),
+            show_cap=data.get("show_cap", False),
             period=data.get("period", "week"),
             cap=data.get("cap"),
             reset_time=data.get("reset_time", "05:00"),

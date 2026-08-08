@@ -109,6 +109,7 @@ class ProfileOverviewTab(QWidget):
             QTableWidget.SelectionBehavior.SelectRows
         )
         self._table.itemChanged.connect(self._on_item_changed)
+        self._table.cellDoubleClicked.connect(self._on_cell_double_clicked)
 
         # 表头交互：右键菜单 + 双击选择字段
         self._table.horizontalHeader().setContextMenuPolicy(
@@ -137,6 +138,7 @@ class ProfileOverviewTab(QWidget):
 
         # 初始加载
         self._loading = False
+        self._editing_cap_cell = False  # 标记正在编辑带 cap 的单元格
         self.refresh()
 
     def refresh(self):
@@ -373,9 +375,45 @@ class ProfileOverviewTab(QWidget):
         _set_overview_columns(column_keys)
         self.refresh()
 
+    def _on_cell_double_clicked(self, row: int, col: int):
+        """单元格双击：对有 cap 的列，剥离 /cap 后缀再进入编辑"""
+        if col < 1 or self._loading:
+            return
+
+        from ..config import get_profile_config
+        config = get_profile_config()
+        column_keys = _get_overview_columns()
+        field_idx = col - 1
+        if field_idx >= len(column_keys):
+            return
+
+        kd = config.get_key(column_keys[field_idx])
+        if not kd:
+            return
+
+        model_type = config.get_model_type(column_keys[field_idx]) or ""
+        has_cap = (
+            (model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef) and kd.cap is not None)
+            or (model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef) and kd.cap is not None)
+        )
+        if not has_cap:
+            return
+
+        item = self._table.item(row, col)
+        if not item:
+            return
+
+        # 从 "500/600" 提取 "500"，让用户只编辑当前值
+        text = item.text()
+        if "/" in text:
+            value_part = text.split("/")[0].strip()
+            self._editing_cap_cell = True
+            item.setText(value_part)
+            self._editing_cap_cell = False
+
     def _on_item_changed(self, item: QTableWidgetItem):
         """单元格编辑完成后回写到 profile 节点"""
-        if self._loading:
+        if self._loading or self._editing_cap_cell:
             return
 
         row = item.row()
@@ -417,6 +455,12 @@ class ProfileOverviewTab(QWidget):
 
         # 回写到 profile 节点
         self._write_profile_entry(user_name, model_type, key_str, parsed_value)
+
+        # 刷新单元格显示（恢复 value/cap 格式）
+        self._loading = True
+        user_data = self._load_user_data(user_name)
+        item.setText(self._format_profile_value(kd, model_type, user_data))
+        self._loading = False
 
     @staticmethod
     def _parse_value(raw: str, model_type: str, kd: KeyDef):

@@ -1,6 +1,5 @@
 """版本检查与跳过版本逻辑测试"""
 
-import json
 from unittest.mock import patch
 
 import pytest

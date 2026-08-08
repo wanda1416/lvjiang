@@ -7,13 +7,11 @@ import pytest
 
 from lvjiang.apps.yysls.config.profile_models import (
     ALL_MODELS,
-    MODEL_ACTIVITY,
     MODEL_CLASSES,
     MODEL_DAILY,
     MODEL_REALTIME,
     MODEL_RESOURCE,
     VALID_PERIODS,
-    ActivityKeyDef,
     DailyKeyDef,
     KeyDef,
     RealtimeKeyDef,
@@ -62,6 +60,8 @@ class TestDailyKeyDef:
         kd = DailyKeyDef()
         assert kd.period == "week"
         assert kd.cap is None
+        assert kd.steps == []
+        assert kd.sync_to == ""
         assert kd.reset_time == "05:00"
 
     def test_from_dict(self):
@@ -81,13 +81,47 @@ class TestDailyKeyDef:
         kd = DailyKeyDef.from_dict({"key": "k", "label": "l"})
         assert kd.period == "week"
         assert kd.cap is None
+        assert kd.steps == []
+        assert kd.sync_to == ""
         assert kd.reset_time == "05:00"
+
+    def test_from_dict_with_steps_and_sync(self):
+        kd = DailyKeyDef.from_dict({
+            "key": "zhige",
+            "label": "止戈",
+            "cap": 4200,
+            "steps": [100, 500],
+            "sync_to": "zhige_balance",
+        })
+        assert kd.steps == [100, 500]
+        assert kd.sync_to == "zhige_balance"
+
+    def test_from_dict_steps_non_list(self):
+        """steps 非 list 时应默认为空列表"""
+        kd = DailyKeyDef.from_dict({"key": "k", "label": "l", "steps": "invalid"})
+        assert kd.steps == []
 
     def test_to_dict(self):
         kd = DailyKeyDef(key="k", label="l", period="month", cap=500)
         d = kd.to_dict()
         assert d["period"] == "month"
         assert d["cap"] == 500
+
+    def test_to_dict_with_steps_and_sync(self):
+        kd = DailyKeyDef(
+            key="k", label="l", cap=100,
+            steps=[1, 10], sync_to="res",
+        )
+        d = kd.to_dict()
+        assert d["steps"] == [1, 10]
+        assert d["sync_to"] == "res"
+
+    def test_to_dict_default_steps_not_output(self):
+        """steps=[] 是默认值，不输出"""
+        kd = DailyKeyDef(key="k", label="l")
+        d = kd.to_dict()
+        assert "steps" not in d
+        assert "sync_to" not in d
 
 
 # ─── RealtimeKeyDef ──────────────────────────────────────────
@@ -145,30 +179,6 @@ class TestResourceKeyDef:
         assert d == {"key": "k", "label": "l"}
 
 
-# ─── ActivityKeyDef ──────────────────────────────────────────
-
-
-class TestActivityKeyDef:
-    def test_defaults(self):
-        kd = ActivityKeyDef()
-        assert kd.period == "week"
-        assert kd.cap is None
-        assert kd.reset_time == "05:00"
-        assert kd.reset_day == 0
-
-    def test_from_dict(self):
-        kd = ActivityKeyDef.from_dict({
-            "key": "map",
-            "label": "地图活动",
-            "period": "week",
-            "cap": 2000,
-            "reset_time": "05:00",
-            "reset_day": 5,
-        })
-        assert kd.cap == 2000
-        assert kd.reset_day == 5
-
-
 # ─── parse_key_def ───────────────────────────────────────────
 
 
@@ -187,11 +197,6 @@ class TestParseKeyDef:
         kd = parse_key_def("resource", {"key": "k", "label": "l"})
         assert isinstance(kd, ResourceKeyDef)
 
-    def test_activity(self):
-        kd = parse_key_def("activity", {"key": "k", "label": "l", "cap": 2000})
-        assert isinstance(kd, ActivityKeyDef)
-        assert kd.cap == 2000
-
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="未知模型类型"):
             parse_key_def("unknown", {"key": "k"})
@@ -202,17 +207,15 @@ class TestParseKeyDef:
 
 class TestConstants:
     def test_all_models(self):
-        assert len(ALL_MODELS) == 4
+        assert len(ALL_MODELS) == 3
         assert MODEL_DAILY in ALL_MODELS
         assert MODEL_REALTIME in ALL_MODELS
         assert MODEL_RESOURCE in ALL_MODELS
-        assert MODEL_ACTIVITY in ALL_MODELS
 
     def test_model_classes(self):
         assert MODEL_CLASSES[MODEL_DAILY] is DailyKeyDef
         assert MODEL_CLASSES[MODEL_REALTIME] is RealtimeKeyDef
         assert MODEL_CLASSES[MODEL_RESOURCE] is ResourceKeyDef
-        assert MODEL_CLASSES[MODEL_ACTIVITY] is ActivityKeyDef
 
     def test_valid_periods(self):
         assert "day" in VALID_PERIODS

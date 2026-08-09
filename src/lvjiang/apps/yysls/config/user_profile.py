@@ -47,7 +47,7 @@ _config: ProfileSchema | None = None
 def read_profile_entry(data: dict, model_type: str, key: str) -> dict:
     """从 user.json 数据中读取 profile 节点值
 
-    Returns: {"value": ..., "total": ..., "updated_at": ...} 或空 dict
+    Returns: {"value": ..., "updated_at": ...} 或空 dict
     """
     profile = data.get("profile", {})
     model_data = profile.get(model_type, {})
@@ -59,11 +59,11 @@ def write_profile_entry(
     model_type: str,
     key: str,
     value,
-    total: int | None = None,
     updated_at: str | None = None,
 ) -> None:
-    """向 user.json 数据中写入 profile 节点值（就地修改 data）
+    """[Deprecated] 向 user.json 数据中写入 profile 节点值（就地修改 data）
 
+    新代码应使用 profile_db.db_upsert() 替代。
     updated_at: 可选，指定写入的时间戳；为 None 时使用当前时间。
     """
     profile = data.setdefault("profile", {})
@@ -71,8 +71,6 @@ def write_profile_entry(
     entry = model_data.setdefault(key, {})
     entry["value"] = value
     entry["updated_at"] = updated_at or datetime.now().isoformat(timespec="seconds")
-    if total is not None:
-        entry["total"] = total
 
 
 @dataclass

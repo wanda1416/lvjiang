@@ -11,3 +11,9 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: qiandao
+  name: 签到
+  type: attr
+  is_text: true
+  is_clickable: true
+  view: zhaoxi

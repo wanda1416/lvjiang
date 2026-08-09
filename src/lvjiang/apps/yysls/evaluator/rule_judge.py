@@ -125,9 +125,10 @@ class GenericTuningJudge(TuningJudge):
         # 逐个武器规则组合尝试，取最优结果
         best_label = ""
         best: JudgeResult | None = None
-        for label, part_key, pattern, damage, attr in attempts:
+        for label, part_key, pattern, damage, attr, ps_switch in attempts:
             res = self._judge_attempt(
-                equip, part_key, pattern, damage, attr, partial, n_free)
+                equip, part_key, pattern, damage, attr, partial, n_free,
+                ps_switch=ps_switch)
             score = -1 if res.skipped else _RANK[res.rating]
             if best is None or score > (-1 if best.skipped else _RANK[best.rating]):
                 best, best_label = res, label
@@ -141,8 +142,18 @@ class GenericTuningJudge(TuningJudge):
 
     def _judge_attempt(self, equip: EquipmentData, part_key: str,
                        pattern: PartPattern, damage: str | None,
-                       attr: str, partial: bool, n_free: int) -> JudgeResult:
-        """按单个部位/玩法组合判定一次"""
+                       attr: str, partial: bool, n_free: int,
+                       ps_switch: str | None = None) -> JudgeResult:
+        """按单个部位/玩法组合判定一次
+
+        ps_switch 为玩法绑定开关 key：非 None 时在有效开关上下文中
+        视为 true（覆盖全局状态）。
+        """
+        # 构建有效开关上下文：全局开关 + 玩法绑定开关覆盖
+        effective_switches = dict(self.switches)
+        if ps_switch:
+            effective_switches[ps_switch] = True
+
         result = JudgeResult(equipment=equip)
 
         first_token = equip.affixes[0].name
@@ -165,24 +176,30 @@ class GenericTuningJudge(TuningJudge):
         if partial:
             return self._eval_partial(
                 result, pattern, damage, equiv,
-                first_token, tokens, n_free)
+                first_token, tokens, n_free,
+                switches=effective_switches)
 
         rating, reason = self._grade(
-            pattern, damage, first_token, tokens, equiv)
+            pattern, damage, first_token, tokens, equiv,
+            switches=effective_switches)
         result.rating = rating
         result.reasons.append(reason)
         return result
 
     def _grade(self, pattern: PartPattern, damage: str | None,
                first_token: str, tokens: list[str],
-               alias: dict[str, str]) -> tuple[Rating, str]:
+               alias: dict[str, str],
+               switches: dict[str, bool] | None = None
+               ) -> tuple[Rating, str]:
         """完整定级核心（流程 2/3/4），潜力判定的填充/转律变体复用
 
         alias 为字面名→动态归类名映射（双重身份，武器部位为空）。
+        switches 为有效开关上下文（None = 使用 self.switches）。
 
         Returns:
             (评级, 判定理由)
         """
+        sw = switches if switches is not None else self.switches
         pool = self.rule.pool_set
 
         # 流程 2：池外且非本次增伤的词条 → 垃圾（任一身份在池即在池）
@@ -200,7 +217,7 @@ class GenericTuningJudge(TuningJudge):
         # 条件组先按开关状态过滤，全不命中取默认判定（部位级优先）
         for tier_key, groups in self._tiers(pattern):
             for group in groups:
-                if not group.active(self.switches):
+                if not group.active(sw):
                     continue
                 if all(c.check(first_token, tokens, alias)
                        for c in group.conditions):
@@ -229,7 +246,8 @@ class GenericTuningJudge(TuningJudge):
     def _eval_partial(self, result: JudgeResult, pattern: PartPattern,
                       damage: str | None, equiv: dict[str, str],
                       first_token: str, tokens: list[str],
-                      n_free: int) -> JudgeResult:
+                      n_free: int,
+                      switches: dict[str, bool] | None = None) -> JudgeResult:
         """潜力判定：按可用词条库价值序填充空槽 + 模拟一次转律
 
         填充（best-case 上限）：遍历 affix_pool（声明序即价值序），
@@ -300,7 +318,8 @@ class GenericTuningJudge(TuningJudge):
             return f"{head}：{base}"
 
         # 不转律基线
-        rating, why = self._grade(pattern, damage, first_token, filled, equiv)
+        rating, why = self._grade(pattern, damage, first_token, filled, equiv,
+                                  switches=switches)
         reason = label(why)
 
         # 转律分支：转掉最差一条换转律库最高优先级，取评级较高者
@@ -331,7 +350,8 @@ class GenericTuningJudge(TuningJudge):
                      if part_ok(n) and not ids(n) & excluded), None)
                 if gain:
                     r2, why2 = self._grade(
-                        pattern, damage, first_token, rest + [gain], equiv)
+                        pattern, damage, first_token, rest + [gain], equiv,
+                        switches=switches)
                     if _RANK[r2] > _RANK[rating]:
                         rating = r2
                         reason = label(
@@ -345,35 +365,40 @@ class GenericTuningJudge(TuningJudge):
 
     def _build_attempts(
             self, equip: EquipmentData,
-    ) -> list[tuple[str, str, PartPattern, str | None, str]]:
+    ) -> list[tuple[str, str, PartPattern, str | None, str, str | None]]:
         """展开该装备在当前配置下的全部判定组合
 
         Returns:
-            [(标签, 部位 key, 模式, 增伤词条名或 None, 玩法属性), ...]
+            [(标签, 部位 key, 模式, 增伤词条名或 None, 玩法属性,
+              玩法绑定开关 key 或 None), ...]
         """
-        combos: list[tuple[str, str, str | None, str]] = []
+        combos: list[tuple[str, str, str | None, str, str | None]] = []
         if equip.part == "武器":
             weapon = equip.weapon or ""
             for name in self._enabled_playstyles():
                 ps = self.rule.playstyles[name]
                 if weapon == ps.main.weapon:
                     combos.append(
-                        (f"{name} 主武器", "主武器", ps.main.damage, ps.attr))
+                        (f"{name} 主武器", "主武器", ps.main.damage,
+                         ps.attr, ps.switch))
                 if weapon == ps.sub.weapon:
                     combos.append(
-                        (f"{name} 副武器", "副武器", ps.sub.damage, ps.attr))
+                        (f"{name} 副武器", "副武器", ps.sub.damage,
+                         ps.attr, ps.switch))
         else:
             part = PART_ALIAS.get(equip.part, equip.part)
             if part in ("环", "冠胄", "胫甲"):
-                for attr in self._enabled_attrs():
-                    combos.append(("", part, None, attr))
+                for name in self._enabled_playstyles():
+                    ps = self.rule.playstyles[name]
+                    combos.append(
+                        (name, part, None, ps.attr, ps.switch))
 
         attempts = []
-        for label, part_key, damage, attr in combos:
+        for label, part_key, damage, attr, ps_switch in combos:
             pattern = self.rule.patterns.get(part_key)
             if pattern is None:
                 continue
-            attempts.append((label, part_key, pattern, damage, attr))
+            attempts.append((label, part_key, pattern, damage, attr, ps_switch))
         return attempts
 
     def _enabled_playstyles(self) -> list[str]:

@@ -300,6 +300,16 @@ def parse_tuning_rule(data: dict,
             raise RuleValidationError(
                 f"playstyles.{w_name}.attr: 属性 {attr!r} 不在属性攻击词组内: "
                 f"{sorted(attr_vocab)}")
+        # 可选绑定开关 key
+        ps_switch = w_raw.get("switch")
+        if ps_switch is not None:
+            ps_switch = str(ps_switch).strip()
+            if not ps_switch:
+                ps_switch = None
+            elif not _KEY_RE.match(ps_switch):
+                raise RuleValidationError(
+                    f"playstyles.{w_name}.switch: 开关 key 非法: {ps_switch!r}"
+                    "（须为小写字母开头的英文/数字/下划线）")
         playstyles[w_name] = Playstyle(
             name=w_name,
             main=_parse_weapon_side(
@@ -307,6 +317,7 @@ def parse_tuning_rule(data: dict,
             sub=_parse_weapon_side(
                 w_raw.get("sub"), vocab, f"playstyles.{w_name}.sub"),
             attr=attr,
+            switch=ps_switch,
         )
 
     # ── 词条库与模式（顶层，允许为空 = 新建骨架） ──

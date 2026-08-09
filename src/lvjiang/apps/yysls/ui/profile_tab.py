@@ -5,11 +5,11 @@
 
 数据来源：user.json 的 profile 节点
     profile:
-      daily:
+      quota:
         key_name: { value: ..., updated_at: ... }
-      realtime:
+      regen:
         key_name: { value: ..., updated_at: ... }
-      resource:
+      stock:
         key_name: { value: ..., updated_at: ... }
 """
 
@@ -41,14 +41,14 @@ from lvjiang.core.config import get_session_store
 from lvjiang.core.user_config import UserConfigManager
 
 from ..config.profile_models import (
-    MODEL_DAILY,
     MODEL_LABELS,
-    MODEL_REALTIME,
-    MODEL_RESOURCE,
-    DailyKeyDef,
+    MODEL_QUOTA,
+    MODEL_REGEN,
+    MODEL_STOCK,
     KeyDef,
-    RealtimeKeyDef,
-    ResourceKeyDef,
+    QuotaKeyDef,
+    RegenKeyDef,
+    StockKeyDef,
 )
 from ..config.profile_store import (
     get_active_group,
@@ -58,7 +58,7 @@ from ..config.profile_store import (
     set_active_group,
 )
 from ..profile.profile_db import db_read_all, db_upsert
-from ..profile.profile_engine import compute_realtime_entry
+from ..profile.profile_engine import compute_regen_entry
 
 # 统一的刷新按钮样式
 _REFRESH_BTN_STYLE = (
@@ -336,19 +336,19 @@ class ProfileOverviewTab(QWidget):
         if value is None:
             return "", ""
 
-        if model_type == MODEL_DAILY:
-            if isinstance(kd, DailyKeyDef) and kd.show_cap and kd.cap:
+        if model_type == MODEL_QUOTA:
+            if isinstance(kd, QuotaKeyDef) and kd.show_cap and kd.cap:
                 style = "green_bold" if value >= kd.cap else ""
                 return f"{int(value)}/{kd.cap}", style
             # 即使不展示上限，达标时也显示绿色
-            if isinstance(kd, DailyKeyDef) and kd.cap is not None and value >= kd.cap:
+            if isinstance(kd, QuotaKeyDef) and kd.cap is not None and value >= kd.cap:
                 return str(int(value)), "green_bold"
             return str(int(value)), ""
 
-        if model_type == MODEL_REALTIME:
-            if isinstance(kd, RealtimeKeyDef):
-                # 实时计算当前值；小数部分表示未展示的恢复进度。
-                computed, _ = compute_realtime_entry(entry, kd)
+        if model_type == MODEL_REGEN:
+            if isinstance(kd, RegenKeyDef):
+                # 再生计算当前值；小数部分表示未展示的恢复进度。
+                computed, _ = compute_regen_entry(entry, kd)
                 int_value = int(computed)
                 style = ""
                 if kd.cap is not None and computed >= kd.cap:
@@ -360,8 +360,8 @@ class ProfileOverviewTab(QWidget):
                 return str(int_value), style
             return str(int(value)), ""
 
-        if model_type == MODEL_RESOURCE:
-            if isinstance(kd, ResourceKeyDef) and kd.cap is not None:
+        if model_type == MODEL_STOCK:
+            if isinstance(kd, StockKeyDef) and kd.cap is not None:
                 if kd.show_cap and kd.cap:
                     if value >= kd.cap:
                         style = "red_bold" if not kd.soft else "orange_bold"
@@ -371,7 +371,7 @@ class ProfileOverviewTab(QWidget):
                 if value >= kd.cap:
                     style = "red_bold" if not kd.soft else "orange_bold"
                     return str(int(value)), style
-            # 资源模型无上限时纯数字
+            # 存量模型无上限时纯数字
             return str(int(value)), ""
 
         return str(value), ""
@@ -408,9 +408,9 @@ class ProfileOverviewTab(QWidget):
         if updated_at:
             lines.append(f"更新时间: {updated_at}")
 
-        # 实时模型显示额外信息
-        if model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
-            computed, new_ts = compute_realtime_entry(entry, kd)
+        # 再生模型显示额外信息
+        if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+            computed, new_ts = compute_regen_entry(entry, kd)
             period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
             period_label = period_labels.get(kd.regen_period, kd.regen_period)
             lines.append(f"回复周期: 每{period_label}")
@@ -421,8 +421,8 @@ class ProfileOverviewTab(QWidget):
             if kd.cap is not None:
                 lines.append(f"上限: {kd.cap}")
 
-        # 日常模型显示周期、上限、同步信息
-        if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
+        # 配额模型显示周期、上限、同步信息
+        if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
             period_labels = {
                 "week": "每周", "month": "每月", "season": "每赛季",
                 "half_season": "每半赛季", "day": "每日",
@@ -731,8 +731,8 @@ class ProfileOverviewTab(QWidget):
 
         model_type = config.get_model_type(column_keys[col]) or ""
         has_cap = (
-            (model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef) and kd.cap is not None)
-            or (model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef) and kd.cap is not None)
+            (model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and kd.cap is not None)
+            or (model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef) and kd.cap is not None)
         )
         if not has_cap:
             return
@@ -795,7 +795,7 @@ class ProfileOverviewTab(QWidget):
             return
 
         # 硬上限约束检查
-        if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
+        if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
             if kd.cap is not None and not kd.soft and parsed_value > kd.cap:
                 QMessageBox.warning(
                     None, "超出上限",
@@ -809,7 +809,7 @@ class ProfileOverviewTab(QWidget):
                 self._loading = False
                 return
 
-        if model_type == MODEL_RESOURCE and isinstance(kd, ResourceKeyDef):
+        if model_type == MODEL_STOCK and isinstance(kd, StockKeyDef):
             if kd.cap is not None and not kd.soft and parsed_value > kd.cap:
                 QMessageBox.warning(
                     None, "超出上限",
@@ -824,7 +824,7 @@ class ProfileOverviewTab(QWidget):
                 return
 
         self._write_profile_entry(user_name, model_type, key_str, parsed_value,
-                                   change_type="manual", detail="覆盖")
+                                   change_type="override", detail=f"override:{parsed_value}")
 
         self._loading = True
         user_data = self._load_user_data(user_name)
@@ -836,15 +836,15 @@ class ProfileOverviewTab(QWidget):
     @staticmethod
     def _parse_value(raw: str, model_type: str, kd: KeyDef):
         """解析用户输入值，返回解析后的值或 _PARSE_ERROR"""
-        if model_type == MODEL_DAILY:
-            # daily 可以是 int 或 bool（如 shop_of_week）
-            if isinstance(kd, DailyKeyDef) and kd.cap is not None:
+        if model_type == MODEL_QUOTA:
+            # quota 可以是 int 或 bool（如 shop_of_week）
+            if isinstance(kd, QuotaKeyDef) and kd.cap is not None:
                 try:
                     return int(raw) if raw else 0
                 except ValueError:
                     QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
                     return _PARSE_ERROR
-            # 无 cap 的 daily 可能是 bool
+            # 无 cap 的 quota 可能是 bool
             upper = raw.upper()
             if upper in ("Y", "TRUE", "1", "是", "YES"):
                 return True
@@ -855,14 +855,14 @@ class ProfileOverviewTab(QWidget):
             except ValueError:
                 return raw
 
-        if model_type == MODEL_REALTIME:
+        if model_type == MODEL_REGEN:
             try:
                 return float(raw) if raw else 0.0
             except ValueError:
                 QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
                 return _PARSE_ERROR
 
-        if model_type == MODEL_RESOURCE:
+        if model_type == MODEL_STOCK:
             try:
                 return int(raw) if raw else 0
             except ValueError:
@@ -877,7 +877,7 @@ class ProfileOverviewTab(QWidget):
         model_type: str,
         key: str,
         value,
-        change_type: str = "manual",
+        change_type: str = "override",
         detail: str = "",
     ):
         """将值写入 profile DB（带变更历史记录）"""
@@ -927,20 +927,20 @@ class ProfileOverviewTab(QWidget):
         current_value = entry.get("value", 0)
         if current_value is None:
             current_value = 0
-        if model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
-            current_value, _ = compute_realtime_entry(entry, kd)
+        if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+            current_value, _ = compute_regen_entry(entry, kd)
 
         # 构建菜单
         menu = QMenu(self)
         menu.setTitle(f"{kd.label} ({user_name})")
 
-        # 获取该字段的自定义 steps（Daily 和 Realtime 模型支持）
+        # 获取该字段的自定义 steps（Quota 和 Regen 模型支持）
         kd_steps: list[int] = []
         kd_increment_only = False
-        if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
+        if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
             kd_steps = kd.steps
             kd_increment_only = kd.increment_only
-        elif model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
+        elif model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             kd_steps = kd.steps
 
         if kd_steps:
@@ -1022,20 +1022,20 @@ class ProfileOverviewTab(QWidget):
         new_value = max(0, new_value)
 
         # 上限：硬上限才 clamp，软上限仅提醒
-        if model_type == MODEL_DAILY:
+        if model_type == MODEL_QUOTA:
             cap = getattr(kd, "cap", None)
             soft = getattr(kd, "soft", False)
             if cap is not None and not soft:
                 new_value = min(new_value, cap)
 
-        if model_type == MODEL_REALTIME:
+        if model_type == MODEL_REGEN:
             cap = getattr(kd, "cap", None)
             if cap is not None:
                 new_value = min(new_value, cap)
             if abs(new_value - int(new_value)) < 1e-9:
                 new_value = float(int(new_value))
 
-        if model_type == MODEL_RESOURCE:
+        if model_type == MODEL_STOCK:
             cap = getattr(kd, "cap", None)
             soft = getattr(kd, "soft", False)
             if cap is not None and not soft:
@@ -1043,24 +1043,24 @@ class ProfileOverviewTab(QWidget):
 
         # 确定 detail 信息
         if is_action:
-            detail = f"{delta:+g}"
+            detail = f"delta:{delta:+g}"
         else:
-            detail = ""
+            detail = f"override:{new_value}"
 
         self._write_profile_entry(
             user_name, model_type, key, new_value,
-            change_type="action" if is_action else "manual",
+            change_type="action" if is_action else "override",
             detail=detail,
         )
 
-        # Daily -> Resource 单向同步（仅 steps 动作触发）
+        # Quota -> Stock 单向同步（仅 steps 动作触发）
         if (
             is_action
-            and model_type == MODEL_DAILY
-            and isinstance(kd, DailyKeyDef)
+            and model_type == MODEL_QUOTA
+            and isinstance(kd, QuotaKeyDef)
             and kd.sync_to
         ):
-            self._sync_to_resource(user_name, kd, delta)
+            self._sync_to_stock(user_name, kd, delta)
 
         # 刷新表格
         current_group = self._get_current_group_name()
@@ -1068,19 +1068,19 @@ class ProfileOverviewTab(QWidget):
         if table:
             self._refresh_group(current_group, table)
 
-    def _sync_to_resource(self, user_name: str, daily_kd: DailyKeyDef, delta: int | float) -> None:
-        """将 Daily 的变更同步到关联的 Resource"""
-        resource_data = db_read_all(user_name).get(MODEL_RESOURCE, {})
-        resource_entry = resource_data.get(daily_kd.sync_to, {})
-        current_resource = resource_entry.get("value", 0) or 0
-        new_resource = max(0, current_resource + delta)
+    def _sync_to_stock(self, user_name: str, quota_kd: QuotaKeyDef, delta: int | float) -> None:
+        """将 Quota 的变更同步到关联的 Stock"""
+        stock_data = db_read_all(user_name).get(MODEL_STOCK, {})
+        stock_entry = stock_data.get(quota_kd.sync_to, {})
+        current_stock = stock_entry.get("value", 0) or 0
+        new_stock = max(0, current_stock + delta)
         self._write_profile_entry(
-            user_name, MODEL_RESOURCE, daily_kd.sync_to, new_resource,
-            change_type="action", detail=f"sync_from:{daily_kd.key}",
+            user_name, MODEL_STOCK, quota_kd.sync_to, new_stock,
+            change_type="action", detail=f"sync_from:{quota_kd.key}",
         )
         logger.debug(
-            f"[ProfileTab] {user_name} daily.{daily_kd.key} 同步 {delta:+d} 到 "
-            f"resource.{daily_kd.sync_to} = {new_resource}"
+            f"[ProfileTab] {user_name} quota.{quota_kd.key} 同步 {delta:+d} 到 "
+            f"stock.{quota_kd.sync_to} = {new_stock}"
         )
 
     def _adjust_value_custom(
@@ -1109,7 +1109,7 @@ class ProfileOverviewTab(QWidget):
             min_val = -999999
             prompt = "输入增减量（正数增加，负数减少）:"
 
-        if model_type == MODEL_REALTIME:
+        if model_type == MODEL_REGEN:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
             delta, ok = QInputDialog.getDouble(
                 self,
@@ -1148,7 +1148,7 @@ class ProfileOverviewTab(QWidget):
             )
             return
 
-        # 自定义增减属于 action，触发 Daily->Resource 同步
+        # 自定义增减属于 action，触发 Quota->Stock 同步
         self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=True)
 
     def _load_all_users(self) -> dict[str, dict]:
@@ -1409,7 +1409,7 @@ class _DetailPage(QWidget):
 
         config = get_profile_config()
 
-        for model_type in (MODEL_DAILY, MODEL_REALTIME, MODEL_RESOURCE):
+        for model_type in (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK):
             keys = config.get_keys_by_model(model_type)
             if not keys:
                 continue
@@ -1475,16 +1475,16 @@ class _DetailPage(QWidget):
         if value is None:
             return ""
 
-        if model_type == MODEL_DAILY:
-            if isinstance(kd, DailyKeyDef) and kd.cap:
+        if model_type == MODEL_QUOTA:
+            if isinstance(kd, QuotaKeyDef) and kd.cap:
                 return f"{value} / {kd.cap}  (周期: {kd.period})"
             if isinstance(value, bool):
                 return "已完成" if value else "未完成"
             return str(value)
 
-        if model_type == MODEL_REALTIME:
-            if isinstance(kd, RealtimeKeyDef):
-                computed, _ = compute_realtime_entry(entry, kd)
+        if model_type == MODEL_REGEN:
+            if isinstance(kd, RegenKeyDef):
+                computed, _ = compute_regen_entry(entry, kd)
                 int_value = int(computed)
                 period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
                 period_text = period_labels.get(kd.regen_period, kd.regen_period)
@@ -1493,7 +1493,7 @@ class _DetailPage(QWidget):
                 return f"{int_value}{cap_text}  (精确: {exact}, 回复: {kd.regen_value}/{period_text})"
             return str(int(value))
 
-        if model_type == MODEL_RESOURCE:
+        if model_type == MODEL_STOCK:
             return str(value)
 
         return str(value)

@@ -8,14 +8,14 @@ import pytest
 from lvjiang.apps.yysls.config.profile_models import (
     ALL_MODELS,
     MODEL_CLASSES,
-    MODEL_DAILY,
-    MODEL_REALTIME,
-    MODEL_RESOURCE,
+    MODEL_QUOTA,
+    MODEL_REGEN,
+    MODEL_STOCK,
     VALID_PERIODS,
-    DailyKeyDef,
     KeyDef,
-    RealtimeKeyDef,
-    ResourceKeyDef,
+    QuotaKeyDef,
+    RegenKeyDef,
+    StockKeyDef,
     parse_key_def,
 )
 
@@ -52,12 +52,12 @@ class TestKeyDef:
         assert "description" not in d
 
 
-# ─── DailyKeyDef ─────────────────────────────────────────────
+# ─── QuotaKeyDef ─────────────────────────────────────────────
 
 
-class TestDailyKeyDef:
+class TestQuotaKeyDef:
     def test_defaults(self):
-        kd = DailyKeyDef()
+        kd = QuotaKeyDef()
         assert kd.period == "week"
         assert kd.cap is None
         assert kd.steps == []
@@ -65,7 +65,7 @@ class TestDailyKeyDef:
         assert kd.reset_time == "05:00"
 
     def test_from_dict(self):
-        kd = DailyKeyDef.from_dict({
+        kd = QuotaKeyDef.from_dict({
             "key": "niaoniao",
             "label": "袅袅",
             "period": "week",
@@ -78,7 +78,7 @@ class TestDailyKeyDef:
         assert kd.reset_time == "05:00"
 
     def test_from_dict_defaults(self):
-        kd = DailyKeyDef.from_dict({"key": "k", "label": "l"})
+        kd = QuotaKeyDef.from_dict({"key": "k", "label": "l"})
         assert kd.period == "week"
         assert kd.cap is None
         assert kd.steps == []
@@ -86,7 +86,7 @@ class TestDailyKeyDef:
         assert kd.reset_time == "05:00"
 
     def test_from_dict_with_steps_and_sync(self):
-        kd = DailyKeyDef.from_dict({
+        kd = QuotaKeyDef.from_dict({
             "key": "zhige",
             "label": "止戈",
             "cap": 4200,
@@ -98,17 +98,17 @@ class TestDailyKeyDef:
 
     def test_from_dict_steps_non_list(self):
         """steps 非 list 时应默认为空列表"""
-        kd = DailyKeyDef.from_dict({"key": "k", "label": "l", "steps": "invalid"})
+        kd = QuotaKeyDef.from_dict({"key": "k", "label": "l", "steps": "invalid"})
         assert kd.steps == []
 
     def test_to_dict(self):
-        kd = DailyKeyDef(key="k", label="l", period="month", cap=500)
+        kd = QuotaKeyDef(key="k", label="l", period="month", cap=500)
         d = kd.to_dict()
         assert d["period"] == "month"
         assert d["cap"] == 500
 
     def test_to_dict_with_steps_and_sync(self):
-        kd = DailyKeyDef(
+        kd = QuotaKeyDef(
             key="k", label="l", cap=100,
             steps=[1, 10], sync_to="res",
         )
@@ -118,25 +118,25 @@ class TestDailyKeyDef:
 
     def test_to_dict_default_steps_not_output(self):
         """steps=[] 是默认值，不输出"""
-        kd = DailyKeyDef(key="k", label="l")
+        kd = QuotaKeyDef(key="k", label="l")
         d = kd.to_dict()
         assert "steps" not in d
         assert "sync_to" not in d
 
 
-# ─── RealtimeKeyDef ──────────────────────────────────────────
+# ─── RegenKeyDef ──────────────────────────────────────────
 
 
-class TestRealtimeKeyDef:
+class TestRegenKeyDef:
     def test_defaults(self):
-        kd = RealtimeKeyDef()
+        kd = RegenKeyDef()
         assert kd.cap is None
         assert kd.regen_period == "minute"
         assert kd.regen_value == 0.0
         assert kd.alert_above is None
 
     def test_from_dict(self):
-        kd = RealtimeKeyDef.from_dict({
+        kd = RegenKeyDef.from_dict({
             "key": "tili",
             "label": "体力",
             "cap": 2500,
@@ -150,23 +150,23 @@ class TestRealtimeKeyDef:
         assert kd.alert_above == 2150
 
     def test_to_dict(self):
-        kd = RealtimeKeyDef(key="tili", label="体力", cap=2500, regen_period="day", regen_value=450)
+        kd = RegenKeyDef(key="tili", label="体力", cap=2500, regen_period="day", regen_value=450)
         d = kd.to_dict()
         assert d["cap"] == 2500
         assert d["regen_period"] == "day"
         assert d["regen_value"] == 450
         # regen_period="minute" 是默认值，不输出
-        kd2 = RealtimeKeyDef(key="xinli", label="心力", regen_value=0.125)
+        kd2 = RegenKeyDef(key="xinli", label="心力", regen_value=0.125)
         d2 = kd2.to_dict()
         assert "regen_period" not in d2
 
 
-# ─── ResourceKeyDef ──────────────────────────────────────────
+# ─── StockKeyDef ──────────────────────────────────────────
 
 
-class TestResourceKeyDef:
+class TestStockKeyDef:
     def test_from_dict(self):
-        kd = ResourceKeyDef.from_dict({
+        kd = StockKeyDef.from_dict({
             "key": "baoqian",
             "label": "宝钱",
         })
@@ -174,7 +174,7 @@ class TestResourceKeyDef:
         assert kd.label == "宝钱"
 
     def test_to_dict_minimal(self):
-        kd = ResourceKeyDef(key="k", label="l")
+        kd = StockKeyDef(key="k", label="l")
         d = kd.to_dict()
         assert d == {"key": "k", "label": "l"}
 
@@ -183,19 +183,19 @@ class TestResourceKeyDef:
 
 
 class TestParseKeyDef:
-    def test_daily(self):
-        kd = parse_key_def("daily", {"key": "k", "label": "l", "period": "week"})
-        assert isinstance(kd, DailyKeyDef)
+    def test_quota(self):
+        kd = parse_key_def("quota", {"key": "k", "label": "l", "period": "week"})
+        assert isinstance(kd, QuotaKeyDef)
         assert kd.period == "week"
 
-    def test_realtime(self):
-        kd = parse_key_def("realtime", {"key": "k", "label": "l", "cap": 2500})
-        assert isinstance(kd, RealtimeKeyDef)
+    def test_regen(self):
+        kd = parse_key_def("regen", {"key": "k", "label": "l", "cap": 2500})
+        assert isinstance(kd, RegenKeyDef)
         assert kd.cap == 2500
 
-    def test_resource(self):
-        kd = parse_key_def("resource", {"key": "k", "label": "l"})
-        assert isinstance(kd, ResourceKeyDef)
+    def test_stock(self):
+        kd = parse_key_def("stock", {"key": "k", "label": "l"})
+        assert isinstance(kd, StockKeyDef)
 
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="未知模型类型"):
@@ -208,14 +208,14 @@ class TestParseKeyDef:
 class TestConstants:
     def test_all_models(self):
         assert len(ALL_MODELS) == 3
-        assert MODEL_DAILY in ALL_MODELS
-        assert MODEL_REALTIME in ALL_MODELS
-        assert MODEL_RESOURCE in ALL_MODELS
+        assert MODEL_QUOTA in ALL_MODELS
+        assert MODEL_REGEN in ALL_MODELS
+        assert MODEL_STOCK in ALL_MODELS
 
     def test_model_classes(self):
-        assert MODEL_CLASSES[MODEL_DAILY] is DailyKeyDef
-        assert MODEL_CLASSES[MODEL_REALTIME] is RealtimeKeyDef
-        assert MODEL_CLASSES[MODEL_RESOURCE] is ResourceKeyDef
+        assert MODEL_CLASSES[MODEL_QUOTA] is QuotaKeyDef
+        assert MODEL_CLASSES[MODEL_REGEN] is RegenKeyDef
+        assert MODEL_CLASSES[MODEL_STOCK] is StockKeyDef
 
     def test_valid_periods(self):
         assert "day" in VALID_PERIODS

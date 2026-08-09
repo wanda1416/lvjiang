@@ -263,7 +263,7 @@ class ProfileDefinitionDialog(QDialog):
             if kd.steps:
                 parts.append(f"幅度:{kd.steps}")
             if kd.alert_above:
-                parts.append(f"提醒:>{kd.alert_above}")
+                parts.append(f"提醒:>={kd.alert_above}")
             return ", ".join(parts)
 
         if isinstance(kd, StockKeyDef):
@@ -273,9 +273,11 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append(f"{cap_type}上限:{kd.cap}")
             if kd.show_cap:
                 parts.append("展示上限")
+            if kd.steps:
+                parts.append(f"幅度:{kd.steps}")
             if kd.description:
                 parts.append(kd.description)
-            return ", ".join(parts) if parts else (kd.description or kd.key or "")
+            return ", ".join(parts)
 
         return ""
 
@@ -554,6 +556,12 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow(show_cap_check)
             widgets["show_cap"] = show_cap_check
 
+            # 自定义增减幅度
+            steps_input = QLineEdit(",".join(str(s) for s in res_kd.steps) if res_kd.steps else "")
+            steps_input.setPlaceholderText("如: 1,10,100 或 -1")
+            layout.addRow("增减幅度:", steps_input)
+            widgets["steps"] = steps_input
+
         # 按钮行
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -653,11 +661,24 @@ class ProfileDefinitionDialog(QDialog):
                 )
             elif model_type == MODEL_STOCK:
                 cap_val = widgets["cap"].value()
+                # 解析 steps
+                steps_raw = widgets["steps"].text().strip()
+                steps_list: list[int] = []
+                if steps_raw:
+                    for part in steps_raw.split(","):
+                        part = part.strip()
+                        if part:
+                            try:
+                                steps_list.append(int(part))
+                            except ValueError:
+                                error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
+                                return
                 kd = StockKeyDef(
                     key=key, label=label,
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),
+                    steps=steps_list,
                 )
             else:
                 kd = KeyDef(key=key, label=label)

@@ -1,6 +1,7 @@
 exposed:
 - equip_analysis
 - purchase_xinfa
+- purchase_bugan
 - daily_jianghu
 - daily_checkin
 - auto_tuning
@@ -9,6 +10,8 @@ overrides:
     name: 当前装备分析
   purchase_xinfa:
     name: 循环购买心法
+  purchase_bugan:
+    name: 自动购买不肝
   daily_jianghu:
     name: 每日江湖号令
   daily_checkin:

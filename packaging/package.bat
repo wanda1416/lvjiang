@@ -40,12 +40,12 @@ if errorlevel 1 exit /b 1
 xcopy /e /i /y data\scrcpy dist\lvjiang\data\scrcpy >nul
 if errorlevel 1 exit /b 1
 
-powershell -NoProfile -Command "Compress-Archive -Path dist/lvjiang -DestinationPath dist/lvjiang-win64.zip -Force"
+powershell -NoProfile -Command "Compress-Archive -Path dist/lvjiang -DestinationPath dist/lvjiang-v%APP_VERSION%-win64.zip -Force"
 if errorlevel 1 exit /b 1
 
 echo.
 echo [package] Output: dist\lvjiang\lvjiang.exe
-echo [package] Output: dist\lvjiang-win64.zip
+echo [package] Output: dist\lvjiang-v%APP_VERSION%-win64.zip
 
 rem --- Inno Setup installer ---
 rem Try PATH first, then default install locations
@@ -70,4 +70,4 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [package] Output: dist\lvjiang-win64-setup.exe
+echo [package] Output: dist\lvjiang-v%APP_VERSION%-win64-setup.exe

@@ -63,6 +63,10 @@ class _FakeCal:
     def slot_bounds(r, c):
         return (c * 0.5, r * 0.5, (c + 1) * 0.5, (r + 1) * 0.5)
 
+    @staticmethod
+    def slot_center(r, c):
+        return (c * 0.5 + 0.25, r * 0.5 + 0.25)
+
 
 def _make_engine():
     """最小引擎：场景 s 只绑一个 2×2 panel actions，无 region"""
@@ -164,6 +168,36 @@ def test_whole_panel_scan_with_by_clause_no_match(tmp_path):
     ))
     output = _make_engine().execute(wf)
     assert output["pos"] == {}
+
+
+# ─── 动态 panel 引用：[scene].$panel ───────────────────
+
+def test_whole_panel_scan_with_dynamic_panel_key(tmp_path):
+    """scan [s].$pk — panel 名由变量解析，结果与静态引用一致"""
+    wf = _write_wf(tmp_path, (
+        'eval $pk = "actions"\n'
+        'scan [s].$pk as $bags\n'
+        'collect $bags\n'
+    ))
+    output = _make_engine().execute(wf)
+    assert output["bags"] == {
+        "1": {"1": "t1", "2": "t2"},
+        "2": {"1": "t3", "2": "t4"},
+    }
+
+
+def test_click_cell_with_dynamic_panel_key(tmp_path):
+    """click [s].$pk[1][1] — panel 名由变量解析后查对齐缓存点击格子中心"""
+    wf = _write_wf(tmp_path, (
+        'eval $pk = "actions"\n'
+        'click [s].$pk[1][1]\n'
+    ))
+    engine = _make_engine()
+    engine._input_sim.click_random_offset = 0
+    engine.execute(wf)
+    x, y = engine._input.click_screen.call_args.args[:2]
+    # 100×100 画布上 2×2 等分，第 1 行第 1 列格子中心 (25, 25)
+    assert (x, y) == (25, 25)
 
 
 # ─── 单格 [r][c]：key 过滤，结果为该格文本 ──────────────

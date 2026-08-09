@@ -329,7 +329,8 @@ class SceneRef:
 class PanelRef:
     """panel 三级索引：[scene].[panel][row][col]
 
-    scene/panel 为静态名称（str）；row/col 可为 int（字面量）或 VarRef（运行时变量）。
+    scene/panel 为静态名称（str）或 VarRef（运行时变量）；
+    row/col 可为 int（字面量）或 VarRef（运行时变量）。
     引擎执行时查 panel 校准缓存获取格子中心坐标。
     """
     scene: str

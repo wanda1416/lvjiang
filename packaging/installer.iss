@@ -26,7 +26,7 @@ AllowNoIcons=yes
 
 ; 输出
 OutputDir=..\dist
-OutputBaseFilename=lvjiang-win64-setup
+OutputBaseFilename=lvjiang-v{#AppVersion}-win64-setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 

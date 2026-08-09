@@ -1,0 +1,64 @@
+#% name: 每日自动签到
+
+# 每日自动签到流程
+#
+# 流程结构：
+#   1. 从游戏首页进入菜单 → 活动页面
+#   2. 依次调用各活动签到过程（当前仅朝夕共赏，后续可扩展）
+#   3. 全部完成后从菜单退回主页
+#
+# 各活动过程前置：在活动列表页
+# 各活动过程后置：退回菜单页（找不到活动时原地不动）
+
+# ─── 从游戏首页进入活动页面 ─────────────────────────────
+click [game_main_page].[menu] after wait @page_refresh_wait
+click [game_menu_page].[huodong] after wait @page_refresh_wait
+
+# ─── 各活动签到 ──────────────────────────────────────
+call checkin_zhaoxi()
+
+# TODO: 后续在此添加更多活动签到过程
+# call checkin_xxx()
+
+# ─── 从菜单退回主页 ──────────────────────────────────────
+click [game_menu_page].[back] after wait @step_interval
+log "每日签到流程结束。"
+
+# ─── 朝夕共赏 ──────────────────────────────────────────
+# 在活动列表中查找朝夕共赏 → 进入 → 签到 → 退回菜单页
+def checkin_zhaoxi()
+   # 最多滚动 2 次，加上初始位置共 3 次查找机会
+   $found = ""
+   wait @step_interval
+   loop 3
+      find [activity_main].[liebiao] as $found by contains "朝夕"
+      if $found
+         log "定位到朝夕共赏，准备领奖。"
+         break
+      end
+      drag [activity_main].[liebiao] up 1 after wait @step_interval
+   end
+
+   if not $found
+      log "未找到朝夕共赏活动，可能未开放或已结束。"
+      return -1
+   end
+
+   click $found after wait @page_refresh_wait
+
+   scan [activity_main].[qiandao] as $sign by contains "签到"
+   if $sign
+      log "检测到签到按钮，点击签到领奖。"
+      click [activity_main].[qiandao] after wait @page_refresh_wait
+      log "签到完成！"
+
+      # 签到后：两次 back 退回菜单页
+      click [activity_main].[back] after wait @step_interval
+      click [activity_main].[back] after wait @step_interval
+   else
+      log "今日已签到，无需重复操作。"
+
+      # 已签到：一次 back 退回菜单页
+      click [activity_main].[back] after wait @step_interval
+   end
+end

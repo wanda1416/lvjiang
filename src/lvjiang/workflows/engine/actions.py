@@ -250,16 +250,19 @@ class _ActionsMixin:
             x, y = self._panel_ref_to_screen(node.scene)
             if x is None or y is None:
                 return
+            # scene / panel 支持静态字符串或 $var（与 SceneRef 动态引用语义一致）
+            scene_key = self._resolve(node.scene.scene) if isinstance(node.scene.scene, VarRef) else node.scene.scene
+            panel_key = self._resolve(node.scene.panel) if isinstance(node.scene.panel, VarRef) else node.scene.panel
             # panel drag：根据方向和距离计算拖拽终点
             # up = 手指向上划 = 内容下移 = 显示上方内容
             # down = 手指向下划 = 内容上移 = 显示下方内容
             # left = 手指向左划 = 内容右移 = 显示左侧内容
             # right = 手指向右划 = 内容左移 = 显示右侧内容
-            panel_obj = self._find_panel_in_layout(node.scene.scene, node.scene.panel)
+            panel_obj = self._find_panel_in_layout(scene_key, panel_key)
             if panel_obj is None:
                 raise WorkflowUserError(
                     f"drag panel: 布局中未定义 panel "
-                    f"{node.scene.scene}.{node.scene.panel}"
+                    f"{scene_key}.{panel_key}"
                 )
             # 解析 distance（支持 int、float、VarRef）
             distance = node.distance
@@ -273,11 +276,11 @@ class _ActionsMixin:
             canvas = self._layout.get_canvas()
             direction = node.direction or "down"
             # 距离基于 align 实测的 slot + span/2（与 grid drag 一致）
-            cache_key = (node.scene.scene, node.scene.panel)
+            cache_key = (scene_key, panel_key)
             cal = self._panel_alignments.get(cache_key)
             # _panel_ref_to_screen 已触发懒加载，此处 cal 应有效
             if cal is None:
-                logger.error(f"drag panel: align 失败: {node.scene.scene}.{node.scene.panel}")
+                logger.error(f"drag panel: align 失败: {scene_key}.{panel_key}")
                 return
             dx, dy = 0, 0
             if direction in ("up", "down"):

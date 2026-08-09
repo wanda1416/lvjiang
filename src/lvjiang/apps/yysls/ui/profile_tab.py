@@ -37,7 +37,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.constants import USERS_DIR
 from lvjiang.core.config import get_session_store
 from lvjiang.core.user_config import UserConfigManager
 
@@ -58,7 +57,7 @@ from ..config.profile_store import (
     save_groups,
     set_active_group,
 )
-from ..config.user_profile import read_profile_entry
+from ..profile.profile_db import db_read_all, db_upsert
 from ..profile.profile_engine import compute_realtime_entry
 
 # 统一的刷新按钮样式
@@ -329,7 +328,7 @@ class ProfileOverviewTab(QWidget):
 
         返回 (display_text, style)，style 为 "" | "red_bold" | "orange_bold" | "green_bold"
         """
-        entry = read_profile_entry(data, model_type, kd.key)
+        entry = data.get(model_type, {}).get(kd.key, {})
         if not entry:
             return "", ""
 
@@ -398,7 +397,7 @@ class ProfileOverviewTab(QWidget):
 
     def _format_cell_tooltip(self, kd: KeyDef, model_type: str, data: dict) -> str:
         """生成单元格悬停提示，显示元信息（更新时间等）"""
-        entry = read_profile_entry(data, model_type, kd.key)
+        entry = data.get(model_type, {}).get(kd.key, {})
         if not entry:
             return ""
 
@@ -432,7 +431,10 @@ class ProfileOverviewTab(QWidget):
             if kd.cap is not None:
                 lines.append(f"{period_label}上限: {kd.cap}")
             if kd.sync_to:
-                lines.append(f"同步到: {kd.sync_to}")
+                from ..config import get_profile_config
+                sync_kd = get_profile_config().get_key(kd.sync_to)
+                sync_label = sync_kd.label if sync_kd else kd.sync_to
+                lines.append(f"同步到: {sync_label}")
 
         return "\n".join(lines) if len(lines) > 1 else ""
 
@@ -821,7 +823,8 @@ class ProfileOverviewTab(QWidget):
                 self._loading = False
                 return
 
-        self._write_profile_entry(user_name, model_type, key_str, parsed_value)
+        self._write_profile_entry(user_name, model_type, key_str, parsed_value,
+                                   change_type="manual", detail="覆盖")
 
         self._loading = True
         user_data = self._load_user_data(user_name)
@@ -868,16 +871,21 @@ class ProfileOverviewTab(QWidget):
 
         return raw
 
-    def _write_profile_entry(self, user_name: str, model_type: str, key: str, value):
-        """将值写入 user.json 的 profile 节点（通过 SessionManager，与引擎统一写入通道）"""
+    def _write_profile_entry(
+        self,
+        user_name: str,
+        model_type: str,
+        key: str,
+        value,
+        change_type: str = "manual",
+        detail: str = "",
+    ):
+        """将值写入 profile DB（带变更历史记录）"""
         try:
-            mgr = self._host.session_manager
-            from ..config.user_profile import write_profile_entry as _write_entry
-
-            def mutate(data: dict) -> None:
-                _write_entry(data, model_type, key, value)
-
-            mgr.update(user_name, mutate)
+            db_upsert(
+                user_name, model_type, key, value,
+                change_type=change_type, detail=detail,
+            )
             logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
         except Exception as e:
             logger.error(f"回写失败: {e}")
@@ -913,9 +921,9 @@ class ProfileOverviewTab(QWidget):
             return
         user_name = name_item.text()
 
-        # 获取当前值
-        user_data = self._load_user_data(user_name)
-        entry = user_data.get("profile", {}).get(model_type, {}).get(key_str, {})
+        # 获取当前值（从 DB 读取）
+        profile_data = db_read_all(user_name)
+        entry = profile_data.get(model_type, {}).get(key_str, {})
         current_value = entry.get("value", 0)
         if current_value is None:
             current_value = 0
@@ -1033,7 +1041,17 @@ class ProfileOverviewTab(QWidget):
             if cap is not None and not soft:
                 new_value = min(new_value, cap)
 
-        self._write_profile_entry(user_name, model_type, key, new_value)
+        # 确定 detail 信息
+        if is_action:
+            detail = f"{delta:+g}"
+        else:
+            detail = ""
+
+        self._write_profile_entry(
+            user_name, model_type, key, new_value,
+            change_type="action" if is_action else "manual",
+            detail=detail,
+        )
 
         # Daily -> Resource 单向同步（仅 steps 动作触发）
         if (
@@ -1052,11 +1070,14 @@ class ProfileOverviewTab(QWidget):
 
     def _sync_to_resource(self, user_name: str, daily_kd: DailyKeyDef, delta: int | float) -> None:
         """将 Daily 的变更同步到关联的 Resource"""
-        user_data = self._load_user_data(user_name)
-        resource_entry = user_data.get("profile", {}).get(MODEL_RESOURCE, {}).get(daily_kd.sync_to, {})
+        resource_data = db_read_all(user_name).get(MODEL_RESOURCE, {})
+        resource_entry = resource_data.get(daily_kd.sync_to, {})
         current_resource = resource_entry.get("value", 0) or 0
         new_resource = max(0, current_resource + delta)
-        self._write_profile_entry(user_name, MODEL_RESOURCE, daily_kd.sync_to, new_resource)
+        self._write_profile_entry(
+            user_name, MODEL_RESOURCE, daily_kd.sync_to, new_resource,
+            change_type="action", detail=f"sync_from:{daily_kd.key}",
+        )
         logger.debug(
             f"[ProfileTab] {user_name} daily.{daily_kd.key} 同步 {delta:+d} 到 "
             f"resource.{daily_kd.sync_to} = {new_resource}"
@@ -1131,37 +1152,27 @@ class ProfileOverviewTab(QWidget):
         self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=True)
 
     def _load_all_users(self) -> dict[str, dict]:
-        """加载所有用户数据（按用户管理定义的顺序）"""
+        """加载所有用户 profile 数据（从 DB 读取）"""
         result: dict[str, dict] = {}
-        if not USERS_DIR.exists():
-            return result
 
         user_mgr = UserConfigManager()
         ordered_names = user_mgr.list_users()
 
-        mgr = self._host.session_manager
         for user_name in ordered_names:
-            user_file = USERS_DIR / f"{user_name}.json"
-            if not user_file.exists():
-                continue
             try:
-                data = mgr.load(user_name)
-                result[user_name] = data
+                result[user_name] = db_read_all(user_name)
             except Exception as e:
-                logger.warning(f"加载用户 {user_name} 失败: {e}")
+                logger.warning(f"加载用户 {user_name} profile 失败: {e}")
                 result[user_name] = {}
 
         return result
 
     def _load_user_data(self, user_name: str) -> dict:
-        """加载单个用户数据"""
-        if not USERS_DIR.exists():
-            return {}
+        """加载单个用户 profile 数据（从 DB 读取）"""
         try:
-            mgr = self._host.session_manager
-            return mgr.load(user_name)
+            return db_read_all(user_name)
         except Exception as e:
-            logger.warning(f"加载用户 {user_name} 失败: {e}")
+            logger.warning(f"加载用户 {user_name} profile 失败: {e}")
             return {}
 
     def _open_metadata_dialog(self):
@@ -1359,7 +1370,7 @@ class ProfileTab(QWidget):
             self._detail_container.addWidget(placeholder)
             return
 
-        self._detail_page = _DetailPage(user_name, self._host.session_manager)
+        self._detail_page = _DetailPage(user_name)
         self._detail_container.addWidget(self._detail_page)
 
 
@@ -1369,10 +1380,9 @@ class ProfileTab(QWidget):
 class _DetailPage(QWidget):
     """角色详情页 - 按模型类型分区展示单个角色的完整信息"""
 
-    def __init__(self, user_name: str, session_manager, parent=None):
+    def __init__(self, user_name: str, parent=None):
         super().__init__(parent)
         self._user_name = user_name
-        self._session_manager = session_manager
         self._value_labels: dict[str, QLabel] = {}
         self._setup_ui()
 
@@ -1435,18 +1445,11 @@ class _DetailPage(QWidget):
         self._form_layout.addStretch()
 
     def refresh(self):
-        """从用户 JSON 文件加载数据并刷新"""
-        if not USERS_DIR.exists():
-            return
-
-        user_file = USERS_DIR / f"{self._user_name}.json"
-        if not user_file.exists():
-            return
-
+        """从 profile DB 加载数据并刷新"""
         try:
-            data = self._session_manager.load(self._user_name)
+            data = db_read_all(self._user_name)
         except Exception as e:
-            logger.warning(f"加载用户 {self._user_name} 失败: {e}")
+            logger.warning(f"加载用户 {self._user_name} profile 失败: {e}")
             return
 
         from ..config import get_profile_config
@@ -1464,7 +1467,7 @@ class _DetailPage(QWidget):
 
     def _format_detail_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
         """格式化详情页的值显示"""
-        entry = read_profile_entry(data, model_type, kd.key)
+        entry = data.get(model_type, {}).get(kd.key, {})
         if not entry:
             return ""
 

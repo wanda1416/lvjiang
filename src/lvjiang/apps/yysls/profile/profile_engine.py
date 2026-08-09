@@ -12,13 +12,13 @@ Signals:
 from __future__ import annotations
 
 import calendar
+import sqlite3
 import time
 from datetime import datetime, timedelta
 
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from lvjiang.constants import USERS_DIR
 from lvjiang.core.config import SessionManager
 from lvjiang.core.user_config import UserConfigManager
 
@@ -31,9 +31,8 @@ from ..config.profile_store import (
 )
 from ..config.user_profile import (
     get_profile_config,
-    read_profile_entry,
-    write_profile_entry,
 )
+from .profile_db import db_read_all, db_upsert
 
 # ─── 周期边界计算 ────────────────────────────────────────────
 
@@ -437,25 +436,22 @@ class ProfileEngine(QThread):
             self._last_clean = now
 
     def _tick_user(self, user_name: str, config) -> None:
-        """处理单个用户的一次 tick"""
-        user_file = USERS_DIR / f"{user_name}.json"
-        if not user_file.exists():
-            return
+        """处理单个用户的一次 tick
 
-        try:
-            data = self._session_manager.load(user_name)
-        except Exception as e:
-            logger.warning(f"加载用户 {user_name} 失败: {e}")
+        从 DB 读取 profile 数据，逐条计算并 upsert。
+        锁冲突时放弃单条 entry，下轮重试。
+        """
+        profile_data = db_read_all(user_name)
+        if not profile_data:
             return
 
         now = datetime.now()
         modified = False
-        profile_changes: list[tuple[str, str, float | int, str | None]] = []
 
         # ── Step 1: 周期检查与重置（daily）──
         daily_keys = config.get_keys_by_model("daily")
         for kd in daily_keys:
-            entry = read_profile_entry(data, "daily", kd.key)
+            entry = profile_data.get("daily", {}).get(kd.key, {})
             updated_at_str = entry.get("updated_at", "")
 
             boundary = _get_period_boundary(
@@ -464,27 +460,46 @@ class ProfileEngine(QThread):
             if not _should_reset(updated_at_str, boundary):
                 continue
 
-            # 周期已过期，记录重置变更（由 mutate 回调写入磁盘）
-            profile_changes.append(("daily", kd.key, 0, None))
-            logger.debug(f"[ProfileEngine] {user_name} daily.{kd.key} 周期重置")
-            modified = True
+            # 周期已过期，尝试重置到 DB
+            try:
+                db_upsert(
+                    user_name, "daily", kd.key, 0,
+                    change_type="tick", detail="周期重置",
+                )
+                logger.debug(f"[ProfileEngine] {user_name} daily.{kd.key} 周期重置")
+                modified = True
+            except sqlite3.OperationalError:
+                logger.warning(
+                    f"{user_name} daily.{kd.key} 写入冲突，放弃本轮"
+                )
 
         # ── Step 2: 实时计算（realtime）──
         realtime_keys = config.get_keys_by_model("realtime")
         for kd in realtime_keys:
             if not isinstance(kd, RealtimeKeyDef):
                 continue
-            entry = read_profile_entry(data, "realtime", kd.key)
+            entry = profile_data.get("realtime", {}).get(kd.key, {})
             stored_value = entry.get("value", 0)
             updated_at_str = entry.get("updated_at", "")
 
             computed, new_ts = compute_realtime_entry(entry, kd)
 
             if computed != stored_value or new_ts != updated_at_str:
-                profile_changes.append(("realtime", kd.key, computed, new_ts))
-                modified = True
+                delta = computed - (stored_value or 0)
+                try:
+                    db_upsert(
+                        user_name, "realtime", kd.key, computed,
+                        updated_at=new_ts,
+                        change_type="tick",
+                        detail=f"regen:{delta:+.4f}",
+                    )
+                    modified = True
+                except sqlite3.OperationalError:
+                    logger.warning(
+                        f"{user_name} realtime.{kd.key} 写入冲突，放弃本轮"
+                    )
 
-            # 检查 alert_above
+            # 检查 alert_above（用最新计算值，不论是否写入成功）
             if kd.alert_above is not None and computed >= kd.alert_above:
                 if _check_and_mark_alert(user_name, kd.key, "above", "current"):
                     self.alert_triggered.emit(
@@ -493,19 +508,9 @@ class ProfileEngine(QThread):
                         f"{kd.label} 已达 {int(computed)}，超过阈值 {kd.alert_above}",
                     )
 
-        # ── 写入变更 ──
+        # ── 通知 UI 刷新 ──
         if modified:
-            try:
-                def mutate(latest: dict) -> None:
-                    for model_type, key, value, updated_at in profile_changes:
-                        write_profile_entry(
-                            latest, model_type, key, value, updated_at=updated_at
-                        )
-
-                self._session_manager.update(user_name, mutate)
-                self.data_updated.emit(user_name)
-            except Exception as e:
-                logger.error(f"保存用户 {user_name} profile 数据失败: {e}")
+            self.data_updated.emit(user_name)
 
 
 # ─── 引擎单例管理 ────────────────────────────────────────────

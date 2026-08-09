@@ -16,8 +16,8 @@ from lvjiang.apps.yysls.config.user_profile import (
     write_profile_entry,
 )
 from lvjiang.apps.yysls.profile.profile_engine import (
-    _compute_realtime_value,
-    _count_daily_regens,
+    _compute_regen_value,
+    _count_quota_regens,
     _get_period_boundary,
     _parse_reset_time,
     _should_reset,
@@ -196,7 +196,7 @@ class TestShouldReset:
         assert _should_reset("not-a-date", datetime.now()) is True
 
 
-# ─── _count_daily_regens ────────────────────────────────────────
+# ─── _count_quota_regens ────────────────────────────────────────
 
 
 class TestCountDailyRegens:
@@ -204,71 +204,71 @@ class TestCountDailyRegens:
         """同一天，都在 05:00 之前 → 0"""
         prev = datetime(2026, 8, 8, 3, 0)
         now = datetime(2026, 8, 8, 4, 59)
-        assert _count_daily_regens(prev, now, "05:00") == 0
+        assert _count_quota_regens(prev, now, "05:00") == 0
 
     def test_same_day_after_reset(self):
         """同一天，都在 05:00 之后 → 0"""
         prev = datetime(2026, 8, 8, 6, 0)
         now = datetime(2026, 8, 8, 10, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 0
+        assert _count_quota_regens(prev, now, "05:00") == 0
 
     def test_same_day_cross_reset(self):
         """同一天 05:00 前 → 05:00 后，应计入今天重置点"""
         prev = datetime(2026, 8, 8, 4, 40)
         now = datetime(2026, 8, 8, 5, 9)
-        assert _count_daily_regens(prev, now, "05:00") == 1
+        assert _count_quota_regens(prev, now, "05:00") == 1
 
     def test_cross_one_reset(self):
         """昨天 03:00 → 今天 10:00，经过昨天和今天两个 05:00 → 2"""
         prev = datetime(2026, 8, 7, 3, 0)
         now = datetime(2026, 8, 8, 10, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 2
+        assert _count_quota_regens(prev, now, "05:00") == 2
 
     def test_cross_two_resets(self):
         """前天 20:00 → 今天 10:00，经过昨天和今天两个 05:00 → 2"""
         prev = datetime(2026, 8, 6, 20, 0)
         now = datetime(2026, 8, 8, 10, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 2
+        assert _count_quota_regens(prev, now, "05:00") == 2
 
     def test_prev_after_today_reset(self):
         """prev 在今天 05:00 之后，now 也在今天 → 0"""
         prev = datetime(2026, 8, 8, 8, 0)
         now = datetime(2026, 8, 8, 12, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 0
+        assert _count_quota_regens(prev, now, "05:00") == 0
 
     def test_cross_reset_with_different_time(self):
         """reset_time=00:30 的跨天场景"""
         prev = datetime(2026, 8, 7, 23, 0)
         now = datetime(2026, 8, 8, 1, 0)
-        assert _count_daily_regens(prev, now, "00:30") == 1
+        assert _count_quota_regens(prev, now, "00:30") == 1
 
     def test_cross_month_boundary(self):
         """跨月：1月31日 20:00 → 2月2日 10:00，经过 2 个 05:00 → 2"""
         prev = datetime(2026, 1, 31, 20, 0)
         now = datetime(2026, 2, 2, 10, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 2
+        assert _count_quota_regens(prev, now, "05:00") == 2
 
     def test_now_before_today_reset(self):
         """now 在今天 05:00 之前，今天重置尚未到达，不应计入"""
         # 前天 03:00 → 今天 03:00，经过前天和昨天两个 05:00 边界
         prev = datetime(2026, 8, 6, 3, 0)
         now = datetime(2026, 8, 8, 3, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 2
+        assert _count_quota_regens(prev, now, "05:00") == 2
 
     def test_now_before_today_reset_one_day(self):
         """昨天 03:00 → 今天 03:00，今天 05:00 还没到，但昨天 05:00 已过 → 1"""
         prev = datetime(2026, 8, 7, 3, 0)
         now = datetime(2026, 8, 8, 3, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 1
+        assert _count_quota_regens(prev, now, "05:00") == 1
 
 
-# ─── _compute_realtime_value ─────────────────────────────────
+# ─── _compute_regen_value ─────────────────────────────────
 
 
 class TestComputeRealtimeValue:
     def test_no_regen(self):
         """regen_value=0 不回复"""
-        val, ts = _compute_realtime_value(100, "2026-08-08T10:00:00", "minute", 0.0, 2500)
+        val, ts = _compute_regen_value(100, "2026-08-08T10:00:00", "minute", 0.0, 2500)
         assert val == 100
         assert ts == "2026-08-08T10:00:00"
 
@@ -276,14 +276,14 @@ class TestComputeRealtimeValue:
         """分钟回复：60 分钟 * 0.125 = 7.5"""
         now = datetime.now()
         updated_at = (now - timedelta(minutes=60)).isoformat(timespec="seconds")
-        val, new_ts = _compute_realtime_value(100, updated_at, "minute", 0.125, 2500)
+        val, new_ts = _compute_regen_value(100, updated_at, "minute", 0.125, 2500)
         assert val == 107.5  # 100 + 60 * 0.125
 
     def test_hour_regen(self):
         """小时回复：2 小时 * 10 = 20"""
         now = datetime.now()
         updated_at = (now - timedelta(minutes=150)).isoformat(timespec="seconds")
-        val, new_ts = _compute_realtime_value(100, updated_at, "hour", 10, 2500)
+        val, new_ts = _compute_regen_value(100, updated_at, "hour", 10, 2500)
         # 150 分钟 = 2 整小时
         assert val == 120  # 100 + 2 * 10
 
@@ -297,7 +297,7 @@ class TestComputeRealtimeValue:
         with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val, ts = _compute_realtime_value(100, updated_at, "day", 450, 2500, "05:00")
+            val, ts = _compute_regen_value(100, updated_at, "day", 450, 2500, "05:00")
         # Should have crossed at least 1 day boundary
         assert val >= 550  # 100 + 1 * 450
 
@@ -309,7 +309,7 @@ class TestComputeRealtimeValue:
         with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val, ts = _compute_realtime_value(1256, updated_at, "day", 450, 2500, "05:00")
+            val, ts = _compute_regen_value(1256, updated_at, "day", 450, 2500, "05:00")
         assert val == 1706
         assert ts == "2026-08-09T05:09:00"
 
@@ -317,26 +317,26 @@ class TestComputeRealtimeValue:
         """回复封顶"""
         now = datetime.now()
         updated_at = (now - timedelta(minutes=6000)).isoformat(timespec="seconds")
-        val, _ = _compute_realtime_value(2400, updated_at, "minute", 0.125, 2500)
+        val, _ = _compute_regen_value(2400, updated_at, "minute", 0.125, 2500)
         assert val == 2500
 
     def test_no_updated_at(self):
         """无 updated_at 返回原始值"""
-        val, ts = _compute_realtime_value(100, "", "minute", 0.125, 2500)
+        val, ts = _compute_regen_value(100, "", "minute", 0.125, 2500)
         assert val == 100
         assert ts == ""
 
     def test_negative_elapsed(self):
         """未来时间戳不回复"""
         future = (datetime.now() + timedelta(hours=1)).isoformat(timespec="seconds")
-        val, ts = _compute_realtime_value(100, future, "minute", 0.125, 2500)
+        val, ts = _compute_regen_value(100, future, "minute", 0.125, 2500)
         assert val == 100
 
     def test_minute_alignment(self):
         """整分钟对齐：秒数误差不累积"""
         now = datetime.now()
         updated_at = (now - timedelta(minutes=5, seconds=20)).isoformat(timespec="seconds")
-        val, new_ts = _compute_realtime_value(100, updated_at, "minute", 1.0, None)
+        val, new_ts = _compute_regen_value(100, updated_at, "minute", 1.0, None)
         # 5 整分钟 * 1.0 = 5
         assert val == 105.0
 
@@ -349,7 +349,7 @@ class TestComputeRealtimeValue:
         with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val, new_ts = _compute_realtime_value(
+            val, new_ts = _compute_regen_value(
                 100.5, updated_at, "minute", 0.125, 600
             )
 
@@ -368,17 +368,17 @@ class TestComputeRealtimeValue:
         with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = first_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val1, ts1 = _compute_realtime_value(
+            val1, ts1 = _compute_regen_value(
                 100.5, updated_at, "minute", 0.125, 600
             )
 
         with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = second_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            stepped_val, stepped_ts = _compute_realtime_value(
+            stepped_val, stepped_ts = _compute_regen_value(
                 val1, ts1, "minute", 0.125, 600
             )
-            single_val, single_ts = _compute_realtime_value(
+            single_val, single_ts = _compute_regen_value(
                 100.5, updated_at, "minute", 0.125, 600
             )
 
@@ -394,7 +394,7 @@ class TestComputeRealtimeValue:
         with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val, new_ts = _compute_realtime_value(
+            val, new_ts = _compute_regen_value(
                 100.5, updated_at, "minute", 0.125, 600
             )
 
@@ -408,30 +408,30 @@ class TestComputeRealtimeValue:
 class TestProfileEntry:
     def test_read_empty(self):
         data = {}
-        assert read_profile_entry(data, "daily", "k") == {}
+        assert read_profile_entry(data, "quota", "k") == {}
 
     def test_read_existing(self):
-        data = {"profile": {"daily": {"k": {"value": 100, "updated_at": "2026-08-08T10:00:00"}}}}
-        entry = read_profile_entry(data, "daily", "k")
+        data = {"profile": {"quota": {"k": {"value": 100, "updated_at": "2026-08-08T10:00:00"}}}}
+        entry = read_profile_entry(data, "quota", "k")
         assert entry["value"] == 100
 
     def test_write_new(self):
         data = {}
-        write_profile_entry(data, "daily", "k", 100)
-        assert data["profile"]["daily"]["k"]["value"] == 100
-        assert "updated_at" in data["profile"]["daily"]["k"]
+        write_profile_entry(data, "quota", "k", 100)
+        assert data["profile"]["quota"]["k"]["value"] == 100
+        assert "updated_at" in data["profile"]["quota"]["k"]
 
     def test_write_overwrites(self):
-        data = {"profile": {"daily": {"k": {"value": 100}}}}
-        write_profile_entry(data, "daily", "k", 200)
-        assert data["profile"]["daily"]["k"]["value"] == 200
+        data = {"profile": {"quota": {"k": {"value": 100}}}}
+        write_profile_entry(data, "quota", "k", 200)
+        assert data["profile"]["quota"]["k"]["value"] == 200
 
     def test_read_different_models(self):
         data = {
             "profile": {
-                "daily": {"k": {"value": 1}},
-                "realtime": {"k": {"value": 2}},
+                "quota": {"k": {"value": 1}},
+                "regen": {"k": {"value": 2}},
             }
         }
-        assert read_profile_entry(data, "daily", "k")["value"] == 1
-        assert read_profile_entry(data, "realtime", "k")["value"] == 2
+        assert read_profile_entry(data, "quota", "k")["value"] == 1
+        assert read_profile_entry(data, "regen", "k")["value"] == 2

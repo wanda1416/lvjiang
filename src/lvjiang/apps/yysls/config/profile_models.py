@@ -1,9 +1,9 @@
 """玩家数据模型定义
 
 三种游戏数据模型的数据类：
-- daily: 周期任务/限额，周期结束自动清零，可同步到 resource
-- realtime: 实时状态，按规则回复，有上限
-- resource: 资源计数，纯数字，无颜色告警
+- quota: 配额（周期任务/限额），周期结束自动清零，可同步到 stock
+- regen: 再生（恢复状态），按规则回复，有上限
+- stock: 存量（资源计数），纯数字，无颜色告警
 
 定义与存储完全镜像：profile.yaml 按模型归档，user.json 按模型分节点。
 """
@@ -17,16 +17,16 @@ from typing import Any
 VALID_PERIODS = ("day", "week", "month", "season", "half_season")
 
 # 模型类型常量
-MODEL_DAILY = "daily"
-MODEL_REALTIME = "realtime"
-MODEL_RESOURCE = "resource"
+MODEL_QUOTA = "quota"
+MODEL_REGEN = "regen"
+MODEL_STOCK = "stock"
 
-ALL_MODELS = (MODEL_DAILY, MODEL_REALTIME, MODEL_RESOURCE)
+ALL_MODELS = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK)
 
 MODEL_LABELS = {
-    MODEL_DAILY: "日常",
-    MODEL_REALTIME: "实时",
-    MODEL_RESOURCE: "资源",
+    MODEL_QUOTA: "配额",
+    MODEL_REGEN: "再生",
+    MODEL_STOCK: "存量",
 }
 
 
@@ -72,11 +72,11 @@ class KeyDef:
 
 
 @dataclass
-class DailyKeyDef(KeyDef):
-    """日常数据模型 — 周期任务/限额
+class QuotaKeyDef(KeyDef):
+    """配额数据模型 — 周期任务/限额
 
     周期结束自动清零，无累积概念。
-    可通过 sync_to 单向同步到 Resource 模型（仅 steps 动作触发）。
+    可通过 sync_to 单向同步到 Stock 模型（仅 steps 动作触发）。
 
     reset_day:
         week 周期: 1=周一 ... 7=周日（0 或未设置 → 默认周一）
@@ -86,8 +86,8 @@ class DailyKeyDef(KeyDef):
         例如 [100, 500] 表示右键菜单显示 +100 和 +500。
         例如 [-1] 表示只显示 -1。
     sync_to:
-        同步目标 Resource key。当通过 steps 修改 Daily 值时，
-        同步 delta 到该 Resource key 的值。手动编辑不触发同步。
+        同步目标 Stock key。当通过 steps 修改 Quota 值时，
+        同步 delta 到该 Stock key 的值。手动编辑不触发同步。
     increment_only:
         单向增加模式。勾选后右键菜单只显示「增加...」，不提供减少功能。
     """
@@ -102,7 +102,7 @@ class DailyKeyDef(KeyDef):
     increment_only: bool = False
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DailyKeyDef:
+    def from_dict(cls, data: dict[str, Any]) -> QuotaKeyDef:
         steps_raw = data.get("steps", [])
         if isinstance(steps_raw, list):
             steps = [int(s) for s in steps_raw]
@@ -125,8 +125,8 @@ class DailyKeyDef(KeyDef):
 
 
 @dataclass
-class RealtimeKeyDef(KeyDef):
-    """实时数据模型 — 实时状态
+class RegenKeyDef(KeyDef):
+    """再生数据模型 — 恢复状态
 
     按回复周期和回复数值计算回复，有上限。
     regen_period: 回复周期单位 ("minute" | "hour" | "day" | "week")
@@ -145,7 +145,7 @@ class RealtimeKeyDef(KeyDef):
     steps: list[int] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> RealtimeKeyDef:
+    def from_dict(cls, data: dict[str, Any]) -> RegenKeyDef:
         steps_raw = data.get("steps", [])
         if isinstance(steps_raw, list):
             steps = [int(s) for s in steps_raw]
@@ -167,8 +167,8 @@ class RealtimeKeyDef(KeyDef):
 
 
 @dataclass
-class ResourceKeyDef(KeyDef):
-    """资源数据模型 — 资源计数
+class StockKeyDef(KeyDef):
+    """存量数据模型 — 资源计数
 
     纯计数器，可设上限（软/硬）。
     soft=True 时上限为软上限（仅提醒），soft=False 时为硬上限。
@@ -178,7 +178,7 @@ class ResourceKeyDef(KeyDef):
     soft: bool = False
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ResourceKeyDef:
+    def from_dict(cls, data: dict[str, Any]) -> StockKeyDef:
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
@@ -192,9 +192,9 @@ class ResourceKeyDef(KeyDef):
 # ─── 模型类型 -> 数据类映射 ─────────────────────────────────
 
 MODEL_CLASSES: dict[str, type[KeyDef]] = {
-    MODEL_DAILY: DailyKeyDef,
-    MODEL_REALTIME: RealtimeKeyDef,
-    MODEL_RESOURCE: ResourceKeyDef,
+    MODEL_QUOTA: QuotaKeyDef,
+    MODEL_REGEN: RegenKeyDef,
+    MODEL_STOCK: StockKeyDef,
 }
 
 

@@ -1,8 +1,8 @@
 """玩家数据模型后台计算引擎
 
 低频后台线程，每 60 秒 tick 一次，负责：
-1. 周期检查与重置（daily 的 period 到期清零）
-2. 实时计算（realtime 按 regen_period + regen_value 回复，封顶 cap）
+1. 周期检查与重置（quota 的 period 到期清零）
+2. 再生计算（regen 按 regen_period + regen_value 回复，封顶 cap）
 
 Signals:
     alert_triggered(key, label, message): 提醒触发
@@ -22,7 +22,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from lvjiang.core.config import SessionManager
 from lvjiang.core.user_config import UserConfigManager
 
-from ..config.profile_models import RealtimeKeyDef
+from ..config.profile_models import RegenKeyDef
 from ..config.profile_store import (
     get_alert_history,
     is_alert_marked,
@@ -162,7 +162,7 @@ def _should_reset(updated_at_str: str, boundary: datetime) -> bool:
 # ─── 实时计算 ────────────────────────────────────────────────
 
 
-def _compute_realtime_value(
+def _compute_regen_value(
     stored_value: int | float,
     updated_at_str: str,
     regen_period: str,
@@ -190,7 +190,7 @@ def _compute_realtime_value(
     stored_ts = datetime.fromisoformat(updated_at_str)
 
     if regen_period == "day":
-        days = _count_daily_regens(stored_ts, now, reset_time)
+        days = _count_quota_regens(stored_ts, now, reset_time)
         if days <= 0:
             return float(stored_value), updated_at_str
         computed = stored_value + days * regen_value
@@ -240,15 +240,15 @@ def _compute_realtime_value(
     return computed, new_ts_str
 
 
-def compute_realtime_entry(entry: dict, key_def: RealtimeKeyDef) -> tuple[float, str]:
-    """按 RealtimeKeyDef 计算一个 profile entry 的当前值。
+def compute_regen_entry(entry: dict, key_def: RegenKeyDef) -> tuple[float, str]:
+    """按 RegenKeyDef 计算一个 profile entry 的当前值。
 
     entry["value"] 允许带小数；对 minute/hour 来说，小数用于表达已经累计、
     但总览按整数展示的进度。
     """
     stored_value = entry.get("value", 0) or 0
     updated_at_str = entry.get("updated_at", "")
-    return _compute_realtime_value(
+    return _compute_regen_value(
         stored_value,
         updated_at_str,
         key_def.regen_period,
@@ -259,7 +259,7 @@ def compute_realtime_entry(entry: dict, key_def: RealtimeKeyDef) -> tuple[float,
     )
 
 
-def _count_daily_regens(
+def _count_quota_regens(
     prev_time: datetime, now: datetime, reset_time: str
 ) -> int:
     """计算两个时间点之间经过了多少个 reset_time 重置边界
@@ -448,10 +448,10 @@ class ProfileEngine(QThread):
         now = datetime.now()
         modified = False
 
-        # ── Step 1: 周期检查与重置（daily）──
-        daily_keys = config.get_keys_by_model("daily")
-        for kd in daily_keys:
-            entry = profile_data.get("daily", {}).get(kd.key, {})
+        # ── Step 1: 周期检查与重置（quota）──
+        quota_keys = config.get_keys_by_model("quota")
+        for kd in quota_keys:
+            entry = profile_data.get("quota", {}).get(kd.key, {})
             updated_at_str = entry.get("updated_at", "")
 
             boundary = _get_period_boundary(
@@ -463,32 +463,32 @@ class ProfileEngine(QThread):
             # 周期已过期，尝试重置到 DB
             try:
                 db_upsert(
-                    user_name, "daily", kd.key, 0,
-                    change_type="tick", detail="周期重置",
+                    user_name, "quota", kd.key, 0,
+                    change_type="tick", detail="reset:0",
                 )
-                logger.debug(f"[ProfileEngine] {user_name} daily.{kd.key} 周期重置")
+                logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
                 modified = True
             except sqlite3.OperationalError:
                 logger.warning(
-                    f"{user_name} daily.{kd.key} 写入冲突，放弃本轮"
+                    f"{user_name} quota.{kd.key} 写入冲突，放弃本轮"
                 )
 
-        # ── Step 2: 实时计算（realtime）──
-        realtime_keys = config.get_keys_by_model("realtime")
-        for kd in realtime_keys:
-            if not isinstance(kd, RealtimeKeyDef):
+        # ── Step 2: 再生计算（regen）──
+        regen_keys = config.get_keys_by_model("regen")
+        for kd in regen_keys:
+            if not isinstance(kd, RegenKeyDef):
                 continue
-            entry = profile_data.get("realtime", {}).get(kd.key, {})
+            entry = profile_data.get("regen", {}).get(kd.key, {})
             stored_value = entry.get("value", 0)
             updated_at_str = entry.get("updated_at", "")
 
-            computed, new_ts = compute_realtime_entry(entry, kd)
+            computed, new_ts = compute_regen_entry(entry, kd)
 
             if computed != stored_value or new_ts != updated_at_str:
                 delta = computed - (stored_value or 0)
                 try:
                     db_upsert(
-                        user_name, "realtime", kd.key, computed,
+                        user_name, "regen", kd.key, computed,
                         updated_at=new_ts,
                         change_type="tick",
                         detail=f"regen:{delta:+.4f}",
@@ -496,7 +496,7 @@ class ProfileEngine(QThread):
                     modified = True
                 except sqlite3.OperationalError:
                     logger.warning(
-                        f"{user_name} realtime.{kd.key} 写入冲突，放弃本轮"
+                        f"{user_name} regen.{kd.key} 写入冲突，放弃本轮"
                     )
 
             # 检查 alert_above（用最新计算值，不论是否写入成功）

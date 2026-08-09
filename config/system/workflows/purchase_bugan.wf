@@ -1,0 +1,90 @@
+#% name: 自动购买不肝
+
+# 自动购买不肝商店商品
+#
+# 流程结构：
+#   1. 导航：首页 → 菜单 → 不肝 → 切换到不肝商店视图
+#   2. 战斗养成（默认类目）：依次处理两个商品面板（各 2 行 × 4 列），
+#      整面板 OCR 扫描 → 逐格判断是否命中购买关键词 → 命中则购买
+#      商品1 处理完后，商品2 上滑 2 行再处理
+#   3. 营生（cat_4）：只购买 shangpin_1 的 (1,1)
+#   4. 类目列表上拖 1 单位 → 赛季（仍在 cat_4）：shangpin_1 全部 2×4 格各购买一次
+#   5. 外观（cat_5）：只购买 shangpin_1 的 (1,1) 和 (2,3)
+#   6. 完成后返回主页
+#
+# 购买动作统一为：点击格子 → 全部添加 → 购买
+
+# ─── 配置：战斗养成要购买的商品类目（新增类目直接在此追加） ────
+eval $buy_keywords = ["心法", "武学", "奇术", "生活", "宝钱", "短陌钱"]
+
+# ─── 导航：从首页到不肝商店视图 ─────────────────────────
+click [game_main_page].[menu] after wait @page_refresh_wait
+click [game_menu_page].[bugan] after wait @page_refresh_wait
+click [bugan_detail].[shop] after wait @page_refresh_wait
+
+# ─── 战斗养成：依次购买两个商品面板 ─────────────────────
+call buy_panel("shangpin_1", $buy_keywords)
+drag [bugan_detail].[shangpin_2] up 2 after wait @step_interval
+call buy_panel("shangpin_2", $buy_keywords)
+
+# ─── 营生：只买第一格 ──────────────────────────────────
+click [bugan_detail].[cat_4] after wait @page_refresh_wait
+call buy_cell(1, 1)
+
+# ─── 赛季：类目列表上拖后，shangpin_1 全部格子买一遍 ───
+drag [bugan_detail].[liebiao] up 1 after wait @step_interval
+click [bugan_detail].[cat_4] after wait @page_refresh_wait
+call buy_all_cells()
+
+# ─── 外观：只买 (1,1) 与 (2,3) ─────────────────────────
+click [bugan_detail].[cat_5] after wait @page_refresh_wait
+call buy_cell(1, 1)
+call buy_cell(2, 3)
+
+# ─── 返回主页 ──────────────────────────────────────────
+click [bugan_detail].[back] after wait @step_interval
+click [game_menu_page].[back] after wait @step_interval
+log "不肝商店购买流程结束。"
+
+# ─── 关键词命中判断 ────────────────────────────────────
+# 返回文本中命中的第一个关键词，未命中返回 ""
+def match_keyword($text, $keywords)
+    for kw in $keywords
+        if $text contains $kw
+            return $kw
+        end
+    end
+    return ""
+end
+
+# ─── 购买单个格子：点击格子 → 全部添加 → 购买 ─────────
+def buy_cell($r, $c)
+    click [bugan_detail].[shangpin_1][$r][$c] after wait @step_interval
+    click [bugan_detail].[add_all] after wait @step_interval
+    click [bugan_detail].[purchase] after wait @step_interval
+end
+
+# ─── shangpin_1 全部格子（2×4）各购买一次 ──────────────
+def buy_all_cells()
+    for r in [1, 2]
+        for c in [1, 2, 3, 4]
+            call buy_cell($r, $c)
+        end
+    end
+end
+
+# ─── 按关键词购买单个商品面板 ──────────────────────────
+# 整面板 OCR 后逐格判断，命中目标类目则购买
+def buy_panel($panel_key, $keywords)
+    scan [bugan_detail].$panel_key as $grid
+    for r in [1, 2]
+        for c in [1, 2, 3, 4]
+            eval $cell = $grid.$r.$c
+            call $hit = match_keyword($cell, $keywords)
+            if $hit
+                log concat("命中商品 [", $panel_key, "] 行", $r, "列", $c, " (", $hit, "): ", $cell)
+                call buy_cell($r, $c)
+            end
+        end
+    end
+end

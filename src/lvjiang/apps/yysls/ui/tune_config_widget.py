@@ -20,6 +20,8 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QVBoxLayout,
     QWidget,
 )
@@ -143,11 +145,20 @@ class TuningConfigWidget(QWidget):
                 content_layout = QVBoxLayout(content)
                 content_layout.setContentsMargins(0, 0, 0, 0)
                 for name, summary in options.items():
+                    row = QHBoxLayout()
                     cb = QCheckBox(f"{name}（{summary}）")
                     cb.setChecked(True)  # 缺省 = 全部玩法
                     cb.stateChanged.connect(
                         lambda _state: self.config_changed.emit())
-                    content_layout.addWidget(cb)
+                    row.addWidget(cb)
+                    # 绑定开关只读标签
+                    ps = rule.playstyles.get(name)
+                    if ps and ps.switch:
+                        switch_label = QLabel(f"开关: {ps.switch}")
+                        switch_label.setStyleSheet("color: gray;")
+                        row.addWidget(switch_label)
+                    row.addStretch()
+                    content_layout.addLayout(row)
                     widgets["playstyles"][name] = cb
                 content.setVisible(False)  # 随规则勾选状态联动
                 grp_layout.addWidget(content)

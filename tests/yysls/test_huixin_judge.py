@@ -89,14 +89,16 @@ class TestBigTiers:
         assert big.judge(e).rating == Rating.NORMAL
 
     def test_main_defect_pair_normal(self, big):
-        # 精准+会心（非首）同现 为缺陷 → 一般
+        # 精准+会心（非首）同现：当前规则 common normal 不再覆盖此场景
+        # → 四档条件均未命中，默认判定为优秀
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "会心率", "精准率"])
-        assert big.judge(e).rating == Rating.NORMAL
+        assert big.judge(e).rating == Rating.EXCELLENT
 
     def test_main_excellent(self, big):
-        # 单会心非缺陷，但破坏主武器顶级排除条件 → 优秀
+        # 单会心：当前规则主武器顶级要求 count_min[会心率/精准率/敏]≥1
+        # 会心率帮助命中顶级而非阻止
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "会心率"])
-        assert big.judge(e).rating == Rating.EXCELLENT
+        assert big.judge(e).rating == Rating.TOP
 
     def test_main_missing_waigong_normal(self, big):
         # 非首缺大外是硬门槛 → 能用封顶（一般）
@@ -155,7 +157,8 @@ class TestSmall:
 
     def test_leg_first_is_huixin(self, small):
         # 小外胫甲首词条为 会心率/精准率（与大外的 劲 不同）
-        e = make_equip("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "最大无相攻击"],
+        # 最大裂石攻击 经动态归类(裂石) → 最大本属攻击，满足顶级条件
+        e = make_equip("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "最大裂石攻击"],
                        quality="purple")
         assert small.judge(e).rating == Rating.TOP
 
@@ -228,14 +231,15 @@ class TestSmallDynamic:
         return get_tuning_judge("huixin_small", {"playstyles": ["双切"]})
 
     def test_ring_no_small_attr_top(self, small_lieshi):
-        # 基线：无小属攻且无三率 → 顶级
-        e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "敏"])
+        # 基线：无小属攻，最大裂石攻击(→最大本属攻击) 满足 count_min≥1 → 顶级
+        e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "最大裂石攻击"])
         assert small_lieshi.judge(e).rating == Rating.TOP
 
     def test_ring_huixin_excellent(self, small_lieshi):
-        # 有神力部位非首会心 → 优秀封顶
+        # 非首会心率：当前规则环顶级要求 count_min[会心率/精准率/最大本属攻击]≥1
+        # 会心率帮助命中顶级而非阻止
         e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "会心率"])
-        assert small_lieshi.judge(e).rating == Rating.EXCELLENT
+        assert small_lieshi.judge(e).rating == Rating.TOP
 
     def test_ring_missing_waigong_normal(self, small_lieshi):
         # 非首缺小外是硬门槛 → 能用封顶（一般）

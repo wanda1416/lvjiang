@@ -71,14 +71,14 @@ class TestSaveRoundtrip:
         result = _save({
             "selected_slots": ["ring", "head", "sub_weapon"],  # 禁用项应被丢弃
             "rules": {"huiyi_general": {"enabled": True}},
-            "switches": {"keep_pvp": True},
+            "switches": {"keep_danti": True, "keep_wanjia": True},
         })
         assert result["ok"] is True
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))["wf_configs"]["auto_tuning"]
         assert saved["selected_slots"] == ["ring", "head"]
         assert saved["rules"]["huiyi_general"]["enabled"] is True
-        assert saved["switches"] == {"keep_pvp": True}
+        assert saved["switches"] == {"keep_danti": True, "keep_wanjia": True}
         assert "skip_tuning" not in saved
 
         view = json.loads(get_tuning_config())
@@ -93,7 +93,8 @@ class TestSaveRoundtrip:
         assert not slots["main_weapon"]["checked"]
         assert slots["sub_weapon"]["locked"] and not slots["sub_weapon"]["checked"]
         switches = {s["key"]: s for s in view["switches"]}
-        assert switches["keep_pvp"]["checked"] is True
+        assert switches["keep_danti"]["checked"] is True
+        assert switches["keep_wanjia"]["checked"] is True
 
     def test_skip_tuning_preserved(self, session_path):
         # skip_tuning 不进设备端 UI，保存不得覆盖已有值

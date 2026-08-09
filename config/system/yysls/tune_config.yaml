@@ -21,5 +21,7 @@ quality_thresholds:
   - gold
   - purple
 switches:
-  keep_pvp:
-    name: 保留PVP装备
+  keep_danti:
+    name: 保留单体奇术增
+  keep_wanjia:
+    name: 保留对玩家增效

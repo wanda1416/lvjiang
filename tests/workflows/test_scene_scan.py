@@ -121,12 +121,12 @@ def test_ref_line_no_matches_source():
 
 # ─── 与旧 required_scenes 等价性验证 ──────────────────────
 
-def test_activity_jianghu_matches_legacy_required_scenes():
-    """activity_jianghu.wf 搜集结果应与原手写 required_scenes 一致
+def test_daily_jianghu_matches_legacy_required_scenes():
+    """daily_jianghu.wf 搜集结果应与原手写 required_scenes 一致
 
     waiguan_qingjing 为情境动作落地后新增的依赖。
     """
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "activity_jianghu.wf"
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
     program = parse_file(wf)
     scenes = collect_scene_keys(program.body, program.procs)
     assert scenes == {

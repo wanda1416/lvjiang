@@ -163,6 +163,7 @@ class Collect:
 @dataclass(frozen=True)
 class Log:
     message: Any    # Literal
+    level: str = "info"  # debug / info / warn / error
     line_no: int = 0
 
 

@@ -529,10 +529,17 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_collect(node)
             case Log():
                 if isinstance(node.message, FuncCall):
-                    logger.info(str(self._call_func(node.message)))
+                    msg = str(self._call_func(node.message))
                 else:
                     val = self._resolve(node.message)
-                    logger.info("null" if val is None else val)
+                    msg = "null" if val is None else val
+                _log_func = {
+                    "debug": logger.debug,
+                    "info": logger.info,
+                    "warn": logger.warning,
+                    "error": logger.error,
+                }.get(node.level, logger.info)
+                _log_func(msg)
             case Screenshot():
                 self._exec_screenshot()
             case If():

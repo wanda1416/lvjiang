@@ -61,13 +61,17 @@ packaging\package.bat
 
 打包产物：
 - `dist/lvjiang/lvjiang.exe` — 可执行文件
-- `dist/lvjiang-win64.zip` — 发布压缩包
+- `dist/lvjiang-win64.zip` — 发布压缩包（便携版）
+- `dist/lvjiang-win64-setup.exe` — Windows 安装包（推荐）
 
 打包脚本会自动：
 1. 从 `pyproject.toml` 读取版本号注入到 `src/lvjiang/_version.py`
 2. 调用 PyInstaller 构建
 3. 复制配置、ADB、scrcpy 等运行时依赖
 4. 压缩为 zip
+5. 调用 Inno Setup 生成安装包（需安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）
+
+> **注意：** 如果未安装 Inno Setup，脚本会跳过安装包构建，仅生成 zip。
 
 ### 第五步：提交
 
@@ -110,6 +114,7 @@ git push
 - [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
 - [ ] `packaging/package.bat` 打包成功
 - [ ] `dist/lvjiang-win64.zip` 已生成
+- [ ] `dist/lvjiang-win64-setup.exe` 已生成
 - [ ] `src/lvjiang/_version.py` 版本号已注入（打包脚本自动完成）
 - [ ] `uv.lock` 变更已纳入提交（如有）
 - [ ] 所有变更已提交并推送

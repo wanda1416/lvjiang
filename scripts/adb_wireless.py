@@ -10,8 +10,15 @@
     python scripts/adb_wireless.py 5555     # 指定端口
 """
 
+import os
 import sys
 import time
+
+# src-layout：仓库根不是可导入路径，需要把 src/ 加入 sys.path
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_src = os.path.join(_root, "src")
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
 from lvjiang.core.android.device import list_adb_devices
 from lvjiang.core.android.wireless import (

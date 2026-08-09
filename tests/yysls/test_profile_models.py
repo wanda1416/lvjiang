@@ -15,8 +15,10 @@ from lvjiang.apps.yysls.config.profile_models import (
     KeyDef,
     QuotaKeyDef,
     RegenKeyDef,
+    StepDef,
     StockKeyDef,
     parse_key_def,
+    parse_steps,
 )
 
 # ─── KeyDef 基类 ─────────────────────────────────────────────
@@ -28,16 +30,20 @@ class TestKeyDef:
         assert kd.key == ""
         assert kd.label == ""
         assert kd.description == ""
+        assert kd.sources == []
 
     def test_from_dict(self):
         kd = KeyDef.from_dict({
             "key": "test_key",
             "label": "测试",
             "description": "描述",
+            "sources": ["打本", " 商店 ", ""],
         })
         assert kd.key == "test_key"
         assert kd.label == "测试"
         assert kd.description == "描述"
+        # 词表去空白、过滤空项
+        assert kd.sources == ["打本", "商店"]
 
     def test_from_dict_missing_fields(self):
         kd = KeyDef.from_dict({})
@@ -93,8 +99,24 @@ class TestQuotaKeyDef:
             "steps": [100, 500],
             "sync_to": "zhige_balance",
         })
-        assert kd.steps == [100, 500]
+        assert kd.steps == [StepDef(100), StepDef(500)]
         assert kd.sync_to == "zhige_balance"
+
+    def test_from_dict_steps_dict_format_with_source(self):
+        """新格式 dict 条目携带来源"""
+        kd = QuotaKeyDef.from_dict({
+            "key": "tili_qu", "label": "体力", "cap": 100,
+            "steps": [
+                {"value": -900, "source": "打本消耗"},
+                -1100,
+            ],
+            "sync_to": "res",
+            "sync_source": "打本掉落",
+            "sources": ["打本", "商店"],
+        })
+        assert kd.steps == [StepDef(-900, "打本消耗"), StepDef(-1100)]
+        assert kd.sync_source == "打本掉落"
+        assert kd.sources == ["打本", "商店"]
 
     def test_from_dict_steps_non_list(self):
         """steps 非 list 时应默认为空列表"""
@@ -110,11 +132,23 @@ class TestQuotaKeyDef:
     def test_to_dict_with_steps_and_sync(self):
         kd = QuotaKeyDef(
             key="k", label="l", cap=100,
-            steps=[1, 10], sync_to="res",
+            steps=[StepDef(1), StepDef(10)], sync_to="res",
         )
         d = kd.to_dict()
+        # 无 source 的 StepDef 序列化退回纯 int
         assert d["steps"] == [1, 10]
         assert d["sync_to"] == "res"
+
+    def test_to_dict_steps_with_source(self):
+        """有 source 的 StepDef 序列化为 dict"""
+        kd = QuotaKeyDef(
+            key="k", label="l",
+            steps=[StepDef(-900, "打本消耗"), StepDef(-1100)],
+            sync_source="同步来源",
+        )
+        d = kd.to_dict()
+        assert d["steps"] == [{"value": -900, "source": "打本消耗"}, -1100]
+        assert d["sync_source"] == "同步来源"
 
     def test_to_dict_default_steps_not_output(self):
         """steps=[] 是默认值，不输出"""
@@ -122,6 +156,8 @@ class TestQuotaKeyDef:
         d = kd.to_dict()
         assert "steps" not in d
         assert "sync_to" not in d
+        assert "sync_source" not in d
+        assert "sources" not in d
 
 
 # ─── RegenKeyDef ──────────────────────────────────────────
@@ -203,6 +239,32 @@ class TestParseKeyDef:
 
 
 # ─── 常量 ────────────────────────────────────────────────────
+
+
+class TestStepDef:
+    def test_from_raw_int(self):
+        s = StepDef.from_raw(100)
+        assert s.value == 100
+        assert s.source == ""
+
+    def test_from_raw_dict(self):
+        s = StepDef.from_raw({"value": -900, "source": " 打本消耗 "})
+        assert s.value == -900
+        assert s.source == "打本消耗"
+
+    def test_to_dict_plain(self):
+        assert StepDef(10).to_dict() == 10
+
+    def test_to_dict_with_source(self):
+        assert StepDef(-900, "打本").to_dict() == {"value": -900, "source": "打本"}
+
+    def test_parse_steps_mixed(self):
+        steps = parse_steps([1, {"value": 2, "source": "商店"}])
+        assert steps == [StepDef(1), StepDef(2, "商店")]
+
+    def test_parse_steps_non_list(self):
+        assert parse_steps("invalid") == []
+        assert parse_steps(None) == []
 
 
 class TestConstants:

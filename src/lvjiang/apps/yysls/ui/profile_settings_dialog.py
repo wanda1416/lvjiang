@@ -37,11 +37,53 @@ from ..config.profile_models import (
     KeyDef,
     QuotaKeyDef,
     RegenKeyDef,
+    StepDef,
     StockKeyDef,
 )
 
 # 模型 TAB 顺序
 _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN]
+
+
+def _format_steps(steps: list[StepDef]) -> str:
+    """steps 编辑框文本：有来源的条目显示 value:source"""
+    return ",".join(f"{s.value}:{s.source}" if s.source else str(s.value) for s in steps)
+
+
+def _parse_steps_text(raw: str) -> tuple[list[StepDef] | None, str]:
+    """解析 steps 编辑框文本，如 '-900:打本消耗,-1100'
+
+    返回 (steps, error_msg)；格式错误时 steps 为 None。
+    """
+    steps: list[StepDef] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            val_text, _, src_text = part.partition(":")
+            val_text = val_text.strip()
+            src_text = src_text.strip()
+        else:
+            val_text, src_text = part, ""
+        try:
+            value = int(val_text)
+        except ValueError:
+            return None, f"增减幅度格式错误: '{part}'，应为整数或 整数:来源"
+        steps.append(StepDef(value=value, source=src_text))
+    return steps, ""
+
+
+def _parse_sources_text(raw: str) -> list[str]:
+    """解析来源词表编辑框文本（逗号分隔，去空去重保序）"""
+    seen: set[str] = set()
+    result: list[str] = []
+    for part in raw.split(","):
+        s = part.strip()
+        if s and s not in seen:
+            seen.add(s)
+            result.append(s)
+    return result
 
 # QTableWidgetItem.UserRole key：在表格首列存储完整 KeyDef 对象
 _ROLE_KEYDEF = Qt.ItemDataRole.UserRole
@@ -242,9 +284,13 @@ class ProfileDefinitionDialog(QDialog):
             if kd.increment_only:
                 parts.append("单向增加")
             if kd.steps:
-                parts.append(f"幅度:{kd.steps}")
+                parts.append(f"幅度:{_format_steps(kd.steps)}")
             if kd.sync_to:
                 parts.append(f"同步:{kd.sync_to}")
+            if kd.sync_source:
+                parts.append(f"同步来源:{kd.sync_source}")
+            if kd.sources:
+                parts.append(f"来源词表:{','.join(kd.sources)}")
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
@@ -261,7 +307,9 @@ class ProfileDefinitionDialog(QDialog):
             if kd.show_cap:
                 parts.append("展示上限")
             if kd.steps:
-                parts.append(f"幅度:{kd.steps}")
+                parts.append(f"幅度:{_format_steps(kd.steps)}")
+            if kd.sources:
+                parts.append(f"来源词表:{','.join(kd.sources)}")
             if kd.alert_above:
                 parts.append(f"提醒:>={kd.alert_above}")
             return ", ".join(parts)
@@ -274,7 +322,9 @@ class ProfileDefinitionDialog(QDialog):
             if kd.show_cap:
                 parts.append("展示上限")
             if kd.steps:
-                parts.append(f"幅度:{kd.steps}")
+                parts.append(f"幅度:{_format_steps(kd.steps)}")
+            if kd.sources:
+                parts.append(f"来源词表:{','.join(kd.sources)}")
             if kd.description:
                 parts.append(kd.description)
             return ", ".join(parts)
@@ -368,6 +418,12 @@ class ProfileDefinitionDialog(QDialog):
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
 
+        # 来源词表（三种模型通用）
+        sources_input = QLineEdit(",".join(existing.sources) if existing else "")
+        sources_input.setPlaceholderText("逗号分隔，如: 打本,商店,任务")
+        layout.addRow("来源词表:", sources_input)
+        widgets["sources"] = sources_input
+
         if model_type == MODEL_QUOTA:
             kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
             period_combo = QComboBox()
@@ -436,13 +492,13 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow(increment_check)
             widgets["increment_only"] = increment_check
 
-            # 自定义增减幅度
-            steps_input = QLineEdit(",".join(str(s) for s in kd.steps) if kd.steps else "")
-            steps_input.setPlaceholderText("如: 1,10,100 或 -1")
+            # 自定义增减幅度（支持 value:来源）
+            steps_input = QLineEdit(_format_steps(kd.steps))
+            steps_input.setPlaceholderText("如: -900:打本消耗,-1100 或 1,10:商店")
             layout.addRow("增减幅度:", steps_input)
             widgets["steps"] = steps_input
 
-            # 同步目标 Resource
+            # 同步目标 Resource，同行附触发器来源输入框
             sync_combo = QComboBox()
             sync_combo.addItem("（不同步）", "")
             # 加载所有 Stock key 作为同步目标
@@ -453,8 +509,16 @@ class ProfileDefinitionDialog(QDialog):
             idx = sync_combo.findData(kd.sync_to)
             if idx >= 0:
                 sync_combo.setCurrentIndex(idx)
-            layout.addRow("同步到资源:", sync_combo)
+
+            sync_source_input = QLineEdit(kd.sync_source)
+            sync_source_input.setPlaceholderText("同步触发来源，如: 打本掉落")
+
+            sync_row = QHBoxLayout()
+            sync_row.addWidget(sync_combo, 1)
+            sync_row.addWidget(sync_source_input, 1)
+            layout.addRow("同步到资源:", sync_row)
             widgets["sync_to"] = sync_combo
+            widgets["sync_source"] = sync_source_input
 
         elif model_type == MODEL_REGEN:
             rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
@@ -526,9 +590,9 @@ class ProfileDefinitionDialog(QDialog):
             regen_period_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             _update_reset_time_visibility()
 
-            # 自定义增减幅度
-            steps_input = QLineEdit(",".join(str(s) for s in rt_kd.steps) if rt_kd.steps else "")
-            steps_input.setPlaceholderText("如: 1,10,100 或 -1")
+            # 自定义增减幅度（支持 value:来源）
+            steps_input = QLineEdit(_format_steps(rt_kd.steps))
+            steps_input.setPlaceholderText("如: 1:任务奖励,10 或 -1")
             layout.addRow("增减幅度:", steps_input)
             widgets["steps"] = steps_input
 
@@ -556,9 +620,9 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow(show_cap_check)
             widgets["show_cap"] = show_cap_check
 
-            # 自定义增减幅度
-            steps_input = QLineEdit(",".join(str(s) for s in res_kd.steps) if res_kd.steps else "")
-            steps_input.setPlaceholderText("如: 1,10,100 或 -1")
+            # 自定义增减幅度（支持 value:来源）
+            steps_input = QLineEdit(_format_steps(res_kd.steps))
+            steps_input.setPlaceholderText("如: 1:兑换,10 或 -1")
             layout.addRow("增减幅度:", steps_input)
             widgets["steps"] = steps_input
 
@@ -605,51 +669,44 @@ class ProfileDefinitionDialog(QDialog):
                 error_label.setText(f"Key '{key}' 已存在")
                 return
 
+            # 来源词表
+            sources_list = _parse_sources_text(widgets["sources"].text())
+
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
                 cap_val = widgets["cap"].value()
-                # 解析 steps
-                steps_raw = widgets["steps"].text().strip()
-                steps_list: list[int] = []
-                if steps_raw:
-                    for part in steps_raw.split(","):
-                        part = part.strip()
-                        if part:
-                            try:
-                                steps_list.append(int(part))
-                            except ValueError:
-                                error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
-                                return
-                # 解析 sync_to
+                # 解析 steps（支持 value:来源）
+                steps_list, steps_err = _parse_steps_text(widgets["steps"].text().strip())
+                if steps_list is None:
+                    error_label.setText(steps_err)
+                    return
+                # 解析 sync_to 与同步触发来源
                 sync_to_val = widgets["sync_to"].currentData() or ""
+                sync_source_val = widgets["sync_source"].text().strip()
                 kd = QuotaKeyDef(
                     key=key, label=label,
+                    sources=sources_list,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),
                     steps=steps_list,
                     sync_to=sync_to_val,
+                    sync_source=sync_source_val,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
                     increment_only=widgets["increment_only"].isChecked(),
                 )
             elif model_type == MODEL_REGEN:
                 alert_val = widgets["alert_above"].value()
-                # 解析 steps
-                steps_raw = widgets["steps"].text().strip()
-                steps_list: list[int] = []
-                if steps_raw:
-                    for part in steps_raw.split(","):
-                        part = part.strip()
-                        if part:
-                            try:
-                                steps_list.append(int(part))
-                            except ValueError:
-                                error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
-                                return
+                # 解析 steps（支持 value:来源）
+                steps_list, steps_err = _parse_steps_text(widgets["steps"].text().strip())
+                if steps_list is None:
+                    error_label.setText(steps_err)
+                    return
                 kd = RegenKeyDef(
                     key=key, label=label,
+                    sources=sources_list,
                     cap=widgets["cap"].value(),
                     show_cap=widgets["show_cap"].isChecked(),
                     regen_period=widgets["regen_period"].currentData(),
@@ -661,27 +718,21 @@ class ProfileDefinitionDialog(QDialog):
                 )
             elif model_type == MODEL_STOCK:
                 cap_val = widgets["cap"].value()
-                # 解析 steps
-                steps_raw = widgets["steps"].text().strip()
-                steps_list: list[int] = []
-                if steps_raw:
-                    for part in steps_raw.split(","):
-                        part = part.strip()
-                        if part:
-                            try:
-                                steps_list.append(int(part))
-                            except ValueError:
-                                error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
-                                return
+                # 解析 steps（支持 value:来源）
+                steps_list, steps_err = _parse_steps_text(widgets["steps"].text().strip())
+                if steps_list is None:
+                    error_label.setText(steps_err)
+                    return
                 kd = StockKeyDef(
                     key=key, label=label,
+                    sources=sources_list,
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),
                     steps=steps_list,
                 )
             else:
-                kd = KeyDef(key=key, label=label)
+                kd = KeyDef(key=key, label=label, sources=sources_list)
 
             result_kd[0] = kd
             dialog.accept()

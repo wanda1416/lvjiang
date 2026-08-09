@@ -25,6 +25,7 @@ from .profile_models import (
     KeyDef,
     QuotaKeyDef,
     RegenKeyDef,
+    StepDef,
     StockKeyDef,
 )
 from .profile_store import (
@@ -66,6 +67,7 @@ __all__ = [
     "KeyDef",
     "QuotaKeyDef",
     "RegenKeyDef",
+    "StepDef",
     "StockKeyDef",
     "ProfileSchema",
     "get_profile_config",

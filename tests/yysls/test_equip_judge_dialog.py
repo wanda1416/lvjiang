@@ -161,7 +161,7 @@ class TestTuningConfigWidget:
         result = w.get_config()
         assert result["huiyi_general"]["enabled"]
         # 缺 playstyles 键 = 全选
-        assert result["huiyi_general"]["playstyles"] == ["会意"]
+        assert result["huiyi_general"]["playstyles"] == ["无名", "火九"]
         assert result["huixin_big"]["playstyles"] == ["双切"]
         assert not result["huixin_small"]["enabled"]
 
@@ -184,17 +184,20 @@ class TestTuningConfigWidget:
         fired = []
         w.config_changed.connect(lambda: fired.append(1))
         w.set_config({"huiyi_general": {"enabled": True}})
-        w.set_switches({"keep_pvp": True})
+        w.set_switches({"keep_danti": True})
         assert not fired
 
     def test_switches_roundtrip(self, qtbot):
         # 全局开关独立于规则配置读写（注册表驱动）
         w = TuningConfigWidget()
         qtbot.addWidget(w)
-        assert w.get_switches() == {"keep_pvp": False}
-        w.set_switches({"keep_pvp": True})
-        assert w.get_switches() == {"keep_pvp": True}
-        assert "keep_pvp" not in w.get_config()["huiyi_general"]
+        switches = w.get_switches()
+        assert switches.get("keep_danti") is False
+        assert switches.get("keep_wanjia") is False
+        w.set_switches({"keep_danti": True, "keep_wanjia": True})
+        assert w.get_switches()["keep_danti"] is True
+        assert w.get_switches()["keep_wanjia"] is True
+        assert "keep_danti" not in w.get_config()["huiyi_general"]
 
     def test_group_titles_and_checkboxes(self, qtbot):
         # 分组标题 = 规则名；玩法复选框文本含主副武器摘要

@@ -210,13 +210,13 @@ class TestConfigTabs:
 
     def test_more_page_loads_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "wf_configs": {"auto_tuning": {"switches": {"keep_pvp": True}, "skip_tuning": True}},
+            "wf_configs": {"auto_tuning": {"switches": {"keep_danti": True}, "skip_tuning": True}},
         }), encoding="utf-8")
         import lvjiang.core.config.session as store_mod
         store_mod.reset_session_store()
 
         tab = _make_tab(qtbot, host)
-        assert tab._get_tuning_switches().get("keep_pvp") is True
+        assert tab._get_tuning_switches().get("keep_danti") is True
         assert tab._get_tuning_skip_tuning() is True
 
     def test_more_page_change_persists(self, qtbot, host, session_path):

@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.apps.yysls.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuneConfigManager,
     TuningGroupManager,
@@ -65,8 +66,9 @@ class TestDialog:
         qtbot.addWidget(dialog)
         # 左侧导航：基础规则 + 扫描处理 + 材料处理 + 结束处理 + 分割线 + 流派规则 + 各规则
         # StackedWidget 不含分割线（行 0-3 = 栈页 0-3，行 ≥5 = 栈页 - 1）
-        assert dialog._nav.count() == len(ALL_KEYS) + 6
-        assert dialog._stack.count() == len(ALL_KEYS) + 5
+        n_rules = len(get_tuning_rules())
+        assert dialog._nav.count() == n_rules + 6
+        assert dialog._stack.count() == n_rules + 5
         assert dialog._nav.item(0).text() == "基础规则"
         assert dialog._nav.item(1).text() == "扫描处理"
         assert dialog._nav.item(2).text() == "材料处理"

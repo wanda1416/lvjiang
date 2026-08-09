@@ -1,0 +1,86 @@
+key: huiyi_modao
+name: 威威大王(beta)
+order: 100
+transmute_priority:
+- 最大外功攻击
+- 劲
+- 势
+- 会心率
+- 敏
+- 最大无相攻击
+- 最大裂石攻击
+affix_pool:
+- 对首领单位增伤
+- 全武学增效
+- 最大外功攻击
+- 劲
+- 势
+- 会心率
+- 精准率
+- 最小外功攻击
+- 敏
+- 最大无相攻击
+- 最大裂石攻击
+patterns:
+  主武器:
+    first:
+    - 最大外功攻击
+    top_conditions:
+    - contains_all:
+      - 最大外功攻击
+      - 劲
+  副武器:
+    first:
+    - 最大外功攻击
+    top_conditions:
+    - contains_all:
+      - 最大外功攻击
+      - 劲
+  环:
+    first:
+    - 最大外功攻击
+    top_conditions:
+    - contains_all:
+      - 最大外功攻击
+      - 劲
+  冠胄:
+    first:
+    - 会心率
+    - 精准率
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 最大外功攻击
+  胫甲:
+    first:
+    - 劲
+    top_conditions:
+    - contains_all:
+      - 最大外功攻击
+      - 劲
+default_rating: excellent
+playstyles:
+  威威:
+    main:
+      weapon: 陌刀
+      damage: 陌刀武学增伤
+    sub:
+      weapon: 枪
+      damage: null
+    attr: 裂石
+common_conditions:
+  normal_conditions:
+  - - count_min:
+        symbols:
+        - 最大裂石攻击
+        - 最大无相攻击
+        min: 1
+    - count_min:
+        symbols:
+        - 会心率
+        - 精准率
+        min: 1
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0

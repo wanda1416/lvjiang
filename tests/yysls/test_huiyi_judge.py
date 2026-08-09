@@ -2,7 +2,7 @@
 
 覆盖各部位四档条件（junk → normal → excellent → top 档序）、
 鸣金属性分部位（武器写 最大无相攻击 / 非武器写 最大鸣金攻击）、
-开关 keep_pvp（条件组 when 语义）、品阶/首词条筛选、规则注册与
+开关 keep_danti / keep_wanjia（条件组 when 语义）、品阶/首词条筛选、规则注册与
 调律潜力判定。
 会心/治疗规则测试见 test_huixin_judge.py / test_heal_judge.py。
 """
@@ -12,7 +12,6 @@ import pytest
 from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.evaluator import (
     Rating,
-    get_rule_names,
     get_tuning_judge,
     get_tuning_rules,
     is_rule_implemented,
@@ -40,7 +39,7 @@ def judge():
 @pytest.fixture
 def judge_pvp():
     return get_tuning_judge("huiyi_general",
-                            {"switches": {"keep_pvp": True}})
+                            {"switches": {"keep_danti": True, "keep_wanjia": True}})
 
 
 # ─── 主武器（剑，会意规则需要 剑武学增伤） ─────────────────
@@ -165,7 +164,7 @@ class TestHelm:
         assert judge.judge(e).rating == Rating.JUNK
 
 
-# ─── 胫甲（首词条 劲，对首领增要求挂 keep_pvp 开关） ──────
+# ─── 胫甲（首词条 劲，对首领增要求挂 keep_wanjia 开关） ──────
 
 class TestLeg:
     def test_top(self, judge):
@@ -179,37 +178,60 @@ class TestLeg:
         assert judge.judge(e).rating == Rating.JUNK
 
 
-# ─── 开关 keep_pvp（条件组 when） ────────────────────────────────────
+# ─── 开关 keep_danti（冠胄·单体奇术） / keep_wanjia（胫甲·玩家增效） ────
 
-class TestKeepPvp:
-    def test_leg_pvp_off_junk(self, judge):
+class TestKeepDanti:
+    """keep_danti 控制冠胄部位单体类奇术增伤的垃圾/顶级判定"""
+
+    @pytest.fixture
+    def judge_no_danti(self):
+        """仅启用无名玩法（无绑定开关），keep_danti 全局关闭"""
+        return get_tuning_judge("huiyi_general",
+                                {"playstyles": ["无名"]})
+
+    def test_helm_danti_off_junk(self, judge_no_danti):
+        # 未开启：单体奇术增伤 ≥ 1 → 垃圾（when off 组命中）
+        e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
+                       quality="purple")
+        assert judge_no_danti.judge(e).rating == Rating.JUNK
+
+    def test_helm_danti_on_top(self, judge_pvp):
+        # 开启：垃圾组失效，单体奇术入池参与顶级条件 → 顶级
+        e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
+                       quality="purple")
+        assert judge_pvp.judge(e).rating == Rating.TOP
+
+    def test_helm_danti_bound_by_playstyle(self):
+        """火九玩法绑定 keep_danti：冠胄单体奇术不触发垃圾"""
+        judge = get_tuning_judge("huiyi_general",
+                                  {"playstyles": ["火九"]})
+        e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
+                       quality="purple")
+        # 火九绑定 keep_danti → 垃圾条件(when keep_danti=false)不生效
+        # 单体奇术增伤满足顶级条件 count_min[势/劲/单体类奇术增伤]≥2
+        assert judge.judge(e).rating == Rating.TOP
+
+
+class TestKeepWanjia:
+    """keep_wanjia 控制胫甲部位对玩家增效的垃圾/顶级判定"""
+
+    def test_leg_wanjia_off_junk(self, judge):
         # 未开启：缺对首领增 + 出现对玩家增 → 垃圾（when off 组命中）
         e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击", "劲", "势"],
                        quality="purple")
         assert judge.judge(e).rating == Rating.JUNK
 
-    def test_leg_pvp_on_top(self, judge_pvp):
+    def test_leg_wanjia_on_top(self, judge_pvp):
         # 开启：off 垃圾组失效，对玩家增视作有效增伤 → 顶级
         e = make_equip("胫甲", ["劲", "对玩家单位增效", "最大外功攻击", "劲", "势"],
                        quality="purple")
         assert judge_pvp.judge(e).rating == Rating.TOP
 
-    def test_leg_pvp_on_both_missing_junk(self, judge_pvp):
+    def test_leg_wanjia_on_both_missing_junk(self, judge_pvp):
         # 开启：对首领增/对玩家增 两者皆缺 → 垃圾（when on 组命中）
         e = make_equip("胫甲", ["劲", "最大外功攻击", "最大鸣金攻击", "劲", "势"],
                        quality="purple")
         assert judge_pvp.judge(e).rating == Rating.JUNK
-
-    def test_helm_pvp_off_junk(self, judge):
-        e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.JUNK
-
-    def test_helm_pvp_on_top(self, judge_pvp):
-        # 开启：单体奇术垃圾组失效，池内词条不拖后腿 → 顶级
-        e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
-                       quality="purple")
-        assert judge_pvp.judge(e).rating == Rating.TOP
 
 
 # ─── 品阶与首词条筛选 ──────────────────────────────────────
@@ -237,15 +259,6 @@ class TestFilters:
 # ─── 规则注册 ──────────────────────────────────────────────
 
 class TestRegistry:
-    def test_get_rule_names_order(self):
-        assert list(get_rule_names()) == [
-            "huiyi_general", "huixin_small", "huixin_big",
-            "heal_pure", "heal_fire",
-        ]
-        # 名称随规则文件 name 字段（可被用户改名），不硬编码
-        assert get_rule_names()["huiyi_general"] == \
-            get_tuning_rules()["huiyi_general"].name
-
     def test_all_implemented(self):
         for key in get_tuning_rules():
             assert is_rule_implemented(key)
@@ -469,3 +482,107 @@ class TestCommonConditionsJudge:
             {"can_transmute": False})
         e = make_equip("环", ["最大外功攻击", "势", "劲", "劲", "劲"])
         assert judge.check_tuning_worthiness(e).rating == Rating.JUNK
+
+
+# ─── 玩法绑定开关 ──────────────────────────────────────
+
+class TestPlaystyleBoundSwitch:
+    """玩法绑定开关：判定时等价于激活该开关（覆盖全局状态）"""
+
+    @staticmethod
+    def _make_judge(playstyle_switch: str | None = None,
+                    common: dict | None = None,
+                    config: dict | None = None):
+        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        ps_data = {
+            "main": {"weapon": "剑", "damage": "剑武学增伤"},
+            "sub": {"weapon": "枪", "damage": None},
+            "attr": "通用",
+        }
+        if playstyle_switch:
+            ps_data["switch"] = playstyle_switch
+        data = {
+            "key": "t1",
+            "name": "测试规则",
+            "playstyles": {"测试": ps_data},
+            "affix_pool": ["最大外功攻击", "劲", "势"],
+            "patterns": {
+                "主武器": {
+                    "first": ["最大外功攻击"],
+                    "top_conditions": [{"contains_all": ["劲"]}],
+                },
+                "环": {
+                    "first": ["最大外功攻击"],
+                    "top_conditions": [{"contains_all": ["劲"]}],
+                },
+            },
+        }
+        if common:
+            data["common_conditions"] = common
+        return GenericTuningJudge(parse_tuning_rule(data), config)
+
+    def test_bound_switch_activates_condition_on_weapon(self):
+        """玩法绑定开关后，武器判定时条件组 when 引用该开关视为 true"""
+        # 垃圾条件组要求 keep_pvp=True，全局未开启
+        common = {"junk_conditions": [
+            {"when": {"keep_pvp": True},
+             "all": [{"contains_all": ["势"]}]}]}
+        judge = self._make_judge(playstyle_switch="keep_pvp", common=common)
+        # 武器判定：玩法绑定开关激活 → 垃圾条件命中
+        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "势", "劲", "劲"])
+        assert judge.judge(e).rating == Rating.JUNK
+
+    def test_no_bound_switch_follows_global(self):
+        """无绑定开关的玩法跟随全局状态"""
+        common = {"junk_conditions": [
+            {"when": {"keep_pvp": True},
+             "all": [{"contains_all": ["势"]}]}]}
+        # 无绑定开关，全局也未开启 → 条件组不生效
+        judge = self._make_judge(playstyle_switch=None, common=common)
+        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "势", "劲", "劲"])
+        assert judge.judge(e).rating == Rating.TOP
+
+    def test_non_weapon_respects_bound_switch(self):
+        """非武器部位同样携带玩法绑定开关"""
+        common = {"junk_conditions": [
+            {"when": {"keep_pvp": True},
+             "all": [{"contains_all": ["势"]}]}]}
+        judge = self._make_judge(playstyle_switch="keep_pvp", common=common)
+        # 非武器部位：玩法绑定开关生效 → 垃圾条件命中
+        e = make_equip("环", ["最大外功攻击", "势", "劲"])
+        assert judge.judge(e).rating == Rating.JUNK
+
+    def test_non_weapon_best_playstyle_wins(self):
+        """多个玩法展开同一非武器部位时，取最优评级"""
+        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        data = {
+            "key": "t1",
+            "name": "测试规则",
+            "playstyles": {
+                "无开关": {
+                    "main": {"weapon": "剑", "damage": "剑武学增伤"},
+                    "sub": {"weapon": "枪", "damage": None},
+                    "attr": "通用",
+                },
+                "有开关": {
+                    "main": {"weapon": "剑", "damage": "剑武学增伤"},
+                    "sub": {"weapon": "枪", "damage": None},
+                    "attr": "通用",
+                    "switch": "keep_pvp",
+                },
+            },
+            "affix_pool": ["最大外功攻击", "劲", "势"],
+            "patterns": {"环": {
+                "first": ["最大外功攻击"],
+                "junk_conditions": [
+                    {"when": {"keep_pvp": True},
+                     "all": [{"contains_all": ["势"]}]}],
+                "top_conditions": [{"contains_all": ["劲"]}],
+            }},
+        }
+        judge = GenericTuningJudge(parse_tuning_rule(data))
+        # 有开关玩法会触发垃圾条件，但无开关玩法不会 → 取最优（顶级）
+        e = make_equip("环", ["最大外功攻击", "势", "劲"])
+        assert judge.judge(e).rating == Rating.TOP

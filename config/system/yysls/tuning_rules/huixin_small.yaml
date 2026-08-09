@@ -23,14 +23,6 @@ playstyles:
       weapon: 横刀
       damage: null
     attr: 裂石
-  威威:
-    main:
-      weapon: 陌刀
-      damage: 陌刀武学增伤
-    sub:
-      weapon: 枪
-      damage: null
-    attr: 裂石
   破竹鸢:
     main:
       weapon: 手甲
@@ -45,7 +37,7 @@ playstyles:
       damage: 双刀武学增伤
     sub:
       weapon: 绳镖
-      damage: null
+      damage: 绳镖武学增伤
     attr: 破竹
   尘尘:
     main:
@@ -55,15 +47,7 @@ playstyles:
       weapon: 绳镖
       damage: null
     attr: 破竹
-  玉玉:
-    main:
-      weapon: 伞
-      damage: 伞武学增效
-    sub:
-      weapon: 扇
-      damage: null
-    attr: 牵丝
-  翊翊:
+  翊翊(不推荐):
     main:
       weapon: 舞绫鼓
       damage: 舞绫鼓武学增伤
@@ -104,9 +88,6 @@ common_conditions:
       - 最小本属攻击
       - 最小外属攻击
       min: 1
-  - contains_all:
-    - 会心率
-    - 精准率
   - count_max:
       symbols:
       - 最小外功攻击
@@ -116,27 +97,18 @@ patterns:
     first:
     - 最小外功攻击
     top_conditions:
-    - - contains_all:
-        - 最小外功攻击
-      - count_max:
-          symbols:
-          - 最小无相攻击
-          - 精准率
-          - 会心率
-          max: 0
+    - contains_all:
+      - 最小外功攻击
+      - 敏
+      - 最大无相攻击
   副武器:
     first:
     - 最小外功攻击
     top_conditions:
-    - - contains_all:
-        - 最小外功攻击
-        - 敏
-        - 最大无相攻击
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          min: 1
+    - contains_all:
+      - 最小外功攻击
+      - 敏
+      - 最大无相攻击
   环:
     first:
     - 最小外功攻击
@@ -148,19 +120,20 @@ patterns:
     top_conditions:
     - - contains_all:
         - 最小外功攻击
-      - count_max:
+        - 敏
+      - count_min:
           symbols:
-          - 最小本属攻击
           - 会心率
           - 精准率
-          max: 0
+          - 最大本属攻击
+          min: 1
   冠胄:
     first:
     - 会心率
     - 精准率
     junk_conditions:
     - when:
-        keep_pvp: false
+        keep_danti: false
       all:
       - count_min:
           symbols:
@@ -169,15 +142,13 @@ patterns:
     top_conditions:
     - - contains_all:
         - 最小外功攻击
+        - 敏
+        - 最大本属攻击
       - count_min:
           symbols:
-          - 敏
-          - 最大无相攻击
+          - 会心率
+          - 精准率
           min: 1
-      - count_max:
-          symbols:
-          - 最小本属攻击
-          max: 0
       - count_max:
           symbols:
           - 精准率
@@ -189,21 +160,21 @@ patterns:
     - 精准率
     junk_conditions:
     - when:
-        keep_pvp: false
+        keep_wanjia: false
       all:
       - count_max:
           symbols:
           - 对首领单位增伤
           max: 0
     - when:
-        keep_pvp: false
+        keep_wanjia: false
       all:
       - count_min:
           symbols:
           - 对玩家单位增效
           min: 1
     - when:
-        keep_pvp: true
+        keep_wanjia: true
       all:
       - count_max:
           symbols:
@@ -211,14 +182,7 @@ patterns:
           - 对玩家单位增效
           max: 0
     top_conditions:
-    - - contains_all:
-        - 最小外功攻击
-      - count_max:
-          symbols:
-          - 最小本属攻击
-          max: 0
-      - count_max:
-          symbols:
-          - 会心率
-          - 精准率
-          max: 0
+    - contains_all:
+      - 最小外功攻击
+      - 敏
+      - 最大本属攻击

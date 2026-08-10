@@ -514,7 +514,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # 右侧 Tab（与左侧结构一致，直接添加 QTabWidget）
         self.tabs = QTabWidget()
         self._build_right_tabs()
-        splitter.addWidget(self.tabs)
+
+        # 右侧面板：Tab + 告警区域
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+        right_layout.addWidget(self.tabs, stretch=1)
+
+        # 告警面板（在 Tab 下方）
+        from .alert_panel import AlertPanel
+        self._alert_panel = AlertPanel()
+        right_layout.addWidget(self._alert_panel)
+
+        splitter.addWidget(right_panel)
 
         # 初始比例：左 1/3、右 2/3
         splitter.setStretchFactor(0, 1)
@@ -644,6 +657,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def session_manager(self) -> "SessionManager":
         """会话数据管理器（只读）"""
         return self._session_manager
+
+    @property
+    def alert_panel(self):
+        """告警面板（供插件推送告警）"""
+        return self._alert_panel
 
     def active_user_name(self) -> str:
         """当前激活用户名（无用户时返回空串）"""

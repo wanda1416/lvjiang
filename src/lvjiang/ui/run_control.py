@@ -115,6 +115,15 @@ class _UIHelper(QObject):
             self._active_dialog = dlg
             ok = dlg.exec()
             return dlg.textValue() if ok else None
+        if action == "notify":
+            # DSL notify: 写入告警面板（弹窗已在 builtin 层完成）
+            message = kwargs.get("message", "")
+            now = datetime.now()
+            alert_id = f"dsl:notify:{now.strftime('%Y%m%d%H%M%S%f')}"
+            # push_alert 内部调用 add_alert（含去重），同时更新 UI
+            if self._window and getattr(self._window, 'alert_panel', None) is not None:
+                self._window.alert_panel.push_alert(alert_id, message, now.isoformat())
+            return None
         logger.warning(f"未知 UI 交互类型: {action}")
         return None
 
@@ -273,6 +282,19 @@ class RunControlMixin:
         # 通知插件页面（如装备状态）刷新
         self.user_changed.emit(self._user_manager.get_active_user_name() or "")
 
+    def navigate_user(self, delta: int) -> None:
+        """按 delta 偏移切换当前用户（-1 上一个 / +1 下一个）。
+
+        边界夹止：到达列表首尾时不再移动。
+        通过修改 user_combo.currentIndex 触发 _on_user_changed 完整链路。
+        """
+        count = self.user_combo.count()
+        if count < 2:
+            return
+        new_idx = max(0, min(count - 1, self.user_combo.currentIndex() + delta))
+        if new_idx != self.user_combo.currentIndex():
+            self.user_combo.setCurrentIndex(new_idx)
+
     # ─── 布局选择器 ────────────────────────────────────────
 
     def _refresh_layout_combo(self):
@@ -327,12 +349,12 @@ class RunControlMixin:
         return self._stop_requested
 
     def _create_ui_callback(self):
-        """创建线程安全的 UI 交互回调（confirm/pause/input）
+        """创建线程安全的 UI 交互回调（confirm/pause/input/notify）
 
         _UIHelper 常驻主线程，工作流线程发信号请求弹窗，
         用 threading.Event 等待结果，避免 QEventLoop 的
-        "结果先于 exec() 到达"竞态。notify 不经回调（内置函数
-        直接用 Win32 后台线程弹出）。
+        "结果先于 exec() 到达"竞态。notify 同时走弹窗
+        （native_notify）和告警面板（_ui_callback → alert_panel）双通道。
         """
         import threading
 

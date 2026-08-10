@@ -56,18 +56,25 @@ def _pause(_engine=None, message: str = "", *args) -> str:
 
 
 @builtin_func("notify")
-def _notify(message: str = "", *args) -> str:
-    """非阻塞通知（5 秒后自动关闭）
+def _notify(_engine=None, message: str = "", *args) -> str:
+    """非阻塞通知（5 秒后自动关闭）+ 写入告警面板
 
-    Windows 在后台守护线程调用 Win32 MessageBoxTimeoutW，超时自动关闭；
-    macOS 走系统通知中心（display notification，天然非阻塞）。
+    双重通知：
+    1. Windows 在后台守护线程调用 Win32 MessageBoxTimeoutW，超时自动关闭；
+       macOS 走系统通知中心（display notification，天然非阻塞）。
+    2. 同时写入 session.json 的 alert_info，在 UI 告警面板展示。
+
     工作流线程立即返回，不被阻塞。
 
     .wf 用法:
         eval notify("步骤完成")
     """
     text = _build_text(message, args)
+    # 1. 弹窗通知（5 秒自动关闭）
     native_notify(text)
+    # 2. 写入告警面板（持久化到 session.json）
+    if _engine is not None and getattr(_engine, '_ui_callback', None) is not None:
+        _engine._ui_callback("notify", message=text)
     return ""
 
 

@@ -1147,7 +1147,7 @@ class ProfileOverviewTab(QWidget):
             source=quota_kd.sync_source or source,
         )
         logger.debug(
-            f"[ProfileTab] {user_name} quota.{quota_kd.key} 同步 {delta:+d} 到 "
+            f"[ProfileTab] {user_name} quota.{quota_kd.key} 同步 {delta:+g} 到 "
             f"stock.{quota_kd.sync_to} = {new_stock}"
         )
 

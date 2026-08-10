@@ -516,11 +516,13 @@ class ProfileEngine(QThread):
             # 检查 alert_above（用最新计算值，不论是否写入成功）
             if kd.alert_above is not None and computed >= kd.alert_above:
                 if _check_and_mark_alert(user_name, kd.key, "above", "current"):
-                    self.alert_triggered.emit(
-                        kd.key,
-                        kd.label,
-                        f"{kd.label} 已达 {int(computed)}，超过阈值 {kd.alert_above}",
-                    )
+                    message = f"{user_name} {kd.label} 已达 {int(computed)}，超过阈值 {kd.alert_above}"
+                    alert_id = f"yysls:{user_name}:{kd.key}"
+                    # 引擎直接持久化告警，不依赖 UI 信号链路
+                    from lvjiang.core.config.session import add_alert
+                    add_alert(alert_id, message, datetime.now().isoformat())
+                    # 信号仅用于通知 UI 刷新
+                    self.alert_triggered.emit(kd.key, kd.label, message)
 
         # ── 通知 UI 刷新 ──
         if modified:

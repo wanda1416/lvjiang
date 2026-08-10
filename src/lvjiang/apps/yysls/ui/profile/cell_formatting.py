@@ -16,6 +16,8 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import QTableWidgetItem
 
 from ...config.profile_models import (
+    DIR_BOTH,
+    DIRECTION_LABELS,
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
@@ -23,6 +25,8 @@ from ...config.profile_models import (
     QuotaKeyDef,
     RegenKeyDef,
     StockKeyDef,
+    format_sync_label,
+    parse_sync_key,
 )
 from ...profile.profile_engine import compute_regen_entry
 
@@ -185,22 +189,33 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
     return str(value), ""
 
 
-def is_stock_at_hard_cap(stock_key: str, data: dict) -> bool:
-    """检查指定 stock key 是否已达到硬上限（非 soft）"""
+def is_sync_target_at_hard_cap(sync_key: str, data: dict) -> bool:
+    """检查同步目标（`model_type:key` 命名空间）是否已达硬上限
+
+    Quota/Stock：cap 非空且非 soft；Regen：cap 非空。
+    命名空间缺失或与 KeyDef 实际模型不符时返回 False。
+    """
     from ...config import get_profile_config
 
-    entry = data.get(MODEL_STOCK, {}).get(stock_key, {})
+    model_type, key = parse_sync_key(sync_key)
+    if not model_type:
+        return False
+    entry = data.get(model_type, {}).get(key, {})
     if not entry:
         return False
     value = entry.get("value", 0) or 0
-    # 从配置中查找该 stock key 的 cap 和 soft
     config = get_profile_config()
-    kd = config.get_key(stock_key)
-    if not isinstance(kd, StockKeyDef) or kd.cap is None:
+    kd = config.get_key(key, model_type=model_type)
+    if kd is None:
         return False
-    if kd.soft:
+    if config.get_model_type(key) != model_type:
         return False
-    return value >= kd.cap
+    cap = getattr(kd, "cap", None)
+    if cap is None:
+        return False
+    if getattr(kd, "soft", False):
+        return False
+    return value >= cap
 
 
 def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
@@ -248,7 +263,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         if kd.cap is not None:
             lines.append(f"上限: {kd.cap}")
 
-    # 配额模型显示周期、上限、同步信息
+    # 配额模型显示周期、上限
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
         period_labels = {
             "week": "每周", "month": "每月", "season": "每赛季",
@@ -264,10 +279,13 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                 days = remaining.days
                 hours = remaining.seconds // 3600
                 lines.append(f"距重置: {days}天 {hours}小时")
-        if kd.sync_to:
-            from ...config import get_profile_config
-            sync_kd = get_profile_config().get_key(kd.sync_to)
-            sync_label = sync_kd.label if sync_kd else kd.sync_to
-            lines.append(f"同步到: {sync_label}")
+
+    # 同步目标（所有模型通用）
+    if kd.sync_targets:
+        lines.append("同步到:")
+        for t in kd.sync_targets:
+            label = format_sync_label(t.key)
+            suffix = f" [{DIRECTION_LABELS[t.direction]}]" if t.direction != DIR_BOTH else ""
+            lines.append(f"  • {label} (x{t.ratio:g}){suffix}")
 
     return "\n".join(lines) if len(lines) > 1 else ""

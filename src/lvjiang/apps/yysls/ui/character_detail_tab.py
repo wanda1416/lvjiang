@@ -10,12 +10,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# 统一的刷新按钮样式
-_REFRESH_BTN_STYLE = (
-    "QPushButton { background-color: #607D8B; color: white; font-size: 12px; "
-    "padding: 4px; border-radius: 3px; }"
-    "QPushButton:hover { background-color: #78909C; }"
-)
+from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
+from .profile.tab import add_user_nav_buttons
 
 
 class CharacterDetailTab(QWidget):
@@ -38,6 +34,7 @@ class CharacterDetailTab(QWidget):
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)
         btn_row.addWidget(btn_refresh)
+        add_user_nav_buttons(btn_row, self._host)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 

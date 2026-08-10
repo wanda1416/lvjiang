@@ -175,3 +175,105 @@ class TestDefaultPath:
         store = SessionStore()
         store.set_node("k", 1)
         assert (tmp_path / "s.json").exists()
+
+
+class TestAlertStorage:
+    """告警存储接口测试"""
+
+    def test_get_alerts_empty(self, store):
+        """无告警时返回空列表"""
+        from lvjiang.core.config.session import get_alerts, reset_session_store
+        reset_session_store()
+        # 使用测试 store
+        import lvjiang.core.config.session as session_mod
+        session_mod._store = store
+        assert get_alerts() == []
+
+    def test_add_and_get_alerts(self, store):
+        """添加告警后可读取"""
+        from lvjiang.core.config.session import (
+            add_alert,
+            get_alerts,
+            reset_session_store,
+        )
+        reset_session_store()
+        import lvjiang.core.config.session as session_mod
+        session_mod._store = store
+
+        add_alert("test:1", "测试告警", "2026-08-11T12:00:00")
+        alerts = get_alerts()
+        assert len(alerts) == 1
+        assert alerts[0]["id"] == "test:1"
+        assert alerts[0]["message"] == "测试告警"
+        assert alerts[0]["timestamp"] == "2026-08-11T12:00:00"
+
+    def test_add_alert_dedup(self, store):
+        """同 ID 告警不重复添加"""
+        from lvjiang.core.config.session import (
+            add_alert,
+            get_alerts,
+            reset_session_store,
+        )
+        reset_session_store()
+        import lvjiang.core.config.session as session_mod
+        session_mod._store = store
+
+        assert add_alert("test:1", "第一次", "2026-08-11T12:00:00") is True
+        assert add_alert("test:1", "第二次", "2026-08-11T12:01:00") is False
+        alerts = get_alerts()
+        assert len(alerts) == 1
+        assert alerts[0]["message"] == "第一次"  # 保留第一次
+
+    def test_add_alert_lifo_order(self, store):
+        """新告警插入栈顶（列表头部）"""
+        from lvjiang.core.config.session import (
+            add_alert,
+            get_alerts,
+            reset_session_store,
+        )
+        reset_session_store()
+        import lvjiang.core.config.session as session_mod
+        session_mod._store = store
+
+        add_alert("test:1", "第一条", "2026-08-11T12:00:00")
+        add_alert("test:2", "第二条", "2026-08-11T12:01:00")
+        alerts = get_alerts()
+        assert len(alerts) == 2
+        assert alerts[0]["id"] == "test:2"  # 最新的在前
+        assert alerts[1]["id"] == "test:1"
+
+    def test_dismiss_alert(self, store):
+        """移除指定 ID 的告警"""
+        from lvjiang.core.config.session import (
+            add_alert,
+            dismiss_alert,
+            get_alerts,
+            reset_session_store,
+        )
+        reset_session_store()
+        import lvjiang.core.config.session as session_mod
+        session_mod._store = store
+
+        add_alert("test:1", "第一条", "2026-08-11T12:00:00")
+        add_alert("test:2", "第二条", "2026-08-11T12:01:00")
+        dismiss_alert("test:1")
+        alerts = get_alerts()
+        assert len(alerts) == 1
+        assert alerts[0]["id"] == "test:2"
+
+    def test_dismiss_nonexistent_alert(self, store):
+        """移除不存在的告警静默成功"""
+        from lvjiang.core.config.session import (
+            add_alert,
+            dismiss_alert,
+            get_alerts,
+            reset_session_store,
+        )
+        reset_session_store()
+        import lvjiang.core.config.session as session_mod
+        session_mod._store = store
+
+        add_alert("test:1", "第一条", "2026-08-11T12:00:00")
+        dismiss_alert("nonexistent")
+        alerts = get_alerts()
+        assert len(alerts) == 1

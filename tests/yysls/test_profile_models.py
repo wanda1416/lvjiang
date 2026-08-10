@@ -495,10 +495,12 @@ class TestKeyDefSyncTargets:
         assert kd.uses == ["强化"]
 
     def test_regen_from_dict_roundtrip(self):
-        """Regen to_dict → from_dict 往返不丢 sync_targets"""
+        """Regen to_dict → from_dict 往返不丢 sync_targets/uses"""
         kd = RegenKeyDef(
             key="tili", label="体力",
             sync_targets=[SyncTargetDef(key="stock:bugan")],
+            uses=["打本消耗"],
         )
         restored = RegenKeyDef.from_dict(kd.to_dict())
         assert restored.sync_targets == kd.sync_targets
+        assert restored.uses == kd.uses

@@ -26,13 +26,13 @@ def _build_character_detail_tab(host):
 
 
 def _build_profile_overview_tab(host):
-    from .ui.profile_tab import ProfileOverviewTab
+    from .ui.profile import ProfileOverviewTab
     _ensure_engine_started(host)
     return ProfileOverviewTab(host)
 
 
 def _build_profile_tab(host):
-    from .ui.profile_tab import ProfileTab
+    from .ui.profile import ProfileTab
     _ensure_engine_started(host)
     return ProfileTab(host)
 

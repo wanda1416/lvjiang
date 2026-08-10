@@ -1,7 +1,6 @@
-"""燕云「档案总览」与「其他信息」Tab
+"""档案总览 Tab
 
-档案总览：宽表展示所有角色的概要信息，交互式列头配置
-其他信息：展示当前用户的详细信息（按模型类型分区）
+ProfileOverviewTab: 宽表展示所有角色的概要信息，交互式列头配置。
 
 数据来源：user.json 的 profile 节点
     profile:
@@ -15,29 +14,15 @@
 
 from __future__ import annotations
 
-import calendar
-from datetime import datetime, timedelta
-
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
-from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QDoubleSpinBox,
-    QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
-    QLabel,
-    QMenu,
     QMessageBox,
     QPushButton,
-    QScrollArea,
-    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -48,7 +33,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.config import get_session_store
 from lvjiang.core.user_config import UserConfigManager
 
-from ..config.profile_models import (
+from ...config.profile_models import (
     MODEL_LABELS,
     MODEL_QUOTA,
     MODEL_REGEN,
@@ -59,26 +44,27 @@ from ..config.profile_models import (
     StepDef,
     StockKeyDef,
 )
-from ..config.profile_store import (
+from ...config.profile_store import (
     get_active_group,
     get_groups,
     migrate_from_legacy,
     save_groups,
     set_active_group,
 )
-from ..config.user_profile import (
+from ...config.user_profile import (
     get_profile_config,
     save_profile_config,
 )
-from ..profile.profile_db import db_get_history, db_read_all, db_upsert
-from ..profile.profile_engine import compute_regen_entry
-
-# 统一的刷新按钮样式
-_REFRESH_BTN_STYLE = (
-    "QPushButton { background-color: #607D8B; color: white; font-size: 12px; "
-    "padding: 4px; border-radius: 3px; }"
-    "QPushButton:hover { background-color: #78909C; }"
+from ...profile.profile_db import db_read_all, db_upsert
+from ...profile.profile_engine import compute_regen_entry
+from .cell_formatting import (
+    apply_cell_style,
+    format_cell_tooltip,
+    format_profile_cell,
+    is_stock_at_hard_cap,
 )
+from .dialogs import HistoryDialog, ask_value_dialog
+from .tab import REFRESH_BTN_STYLE
 
 # 列宽配置仍在 ui_state 下
 _COLUMN_WIDTHS_KEY = "profile_overview_column_widths"
@@ -106,86 +92,8 @@ def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> Q
     return timer
 
 
-def _quota_period_days(period: str, now: datetime | None = None) -> int:
-    """配额周期对应的总天数（用于过半判断）
-
-    month 分支使用当前月的实际天数，避免短月份 / 闰月的半程阈值偏差。
-    """
-    if period == "week":
-        return 7
-    if period == "month":
-        if now is None:
-            now = datetime.now()
-        return calendar.monthrange(now.year, now.month)[1]
-    return 0
-
-
-def _parse_reset_time(reset_time: str) -> tuple[int, int]:
-    """解析 'HH:MM' 重置时刻；格式错误时回退 05:00"""
-    try:
-        parts = reset_time.split(":")
-        return int(parts[0]), int(parts[1])
-    except (ValueError, IndexError, AttributeError):
-        return 5, 0
-
-
-def _quota_reset_remaining(
-    kd: "QuotaKeyDef", now: datetime | None = None,
-) -> timedelta | None:
-    """计算配额距离下一次重置的剩余时间
-
-    week: 按 reset_day (1=周一...7=周日，0=周一) + reset_time 计算
-    month: 按 reset_day (1-31，0=1 号，超出当月天数时取最后一天) + reset_time 计算
-    其他周期或配置缺失时返回 None。
-    """
-    if now is None:
-        now = datetime.now()
-    reset_h, reset_m = _parse_reset_time(kd.reset_time)
-
-    if kd.period == "week":
-        reset_weekday = (kd.reset_day - 1) if kd.reset_day else 0  # 0=Monday
-        current_weekday = now.weekday()
-        days_ahead = reset_weekday - current_weekday
-
-        reset_today = datetime(
-            now.year, now.month, now.day, reset_h, reset_m,
-        )
-        if days_ahead == 0 and now >= reset_today:
-            days_ahead = 7
-        elif days_ahead < 0:
-            days_ahead += 7
-
-        if days_ahead == 0:
-            target = reset_today
-        else:
-            target = datetime(
-                now.year, now.month, now.day, reset_h, reset_m,
-            ) + timedelta(days=days_ahead)
-        return target - now
-
-    if kd.period == "month":
-        reset_day = kd.reset_day if kd.reset_day else 1
-        year, month = now.year, now.month
-        last_day = calendar.monthrange(year, month)[1]
-        actual_day = min(reset_day, last_day)
-
-        reset_today = datetime(year, month, actual_day, reset_h, reset_m)
-        if now < reset_today:
-            return reset_today - now
-
-        # 已过本月重置时刻 → 跳到下月
-        if month == 12:
-            next_year, next_month = year + 1, 1
-        else:
-            next_year, next_month = year, month + 1
-        next_last_day = calendar.monthrange(next_year, next_month)[1]
-        next_actual_day = min(reset_day, next_last_day)
-        target = datetime(
-            next_year, next_month, next_actual_day, reset_h, reset_m,
-        )
-        return target - now
-
-    return None
+# 哨兵值：表示解析失败
+_PARSE_ERROR = object()
 
 
 # ─── 档案总览 Tab ────────────────────────────────────────────
@@ -210,7 +118,7 @@ class ProfileOverviewTab(QWidget):
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新总览 UI。"""
         try:
-            from ..profile.profile_engine import get_or_create_engine
+            from ...profile.profile_engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
             engine.data_updated.connect(lambda _user_name: self._schedule_refresh())
         except Exception as e:
@@ -231,7 +139,7 @@ class ProfileOverviewTab(QWidget):
         btn_refresh = QPushButton("刷新")
         btn_refresh.setFixedWidth(60)
         btn_refresh.setToolTip("重新读取角色数据")
-        btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
+        btn_refresh.setStyleSheet(REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self.refresh)
         toolbar.addWidget(btn_refresh)
 
@@ -350,7 +258,9 @@ class ProfileOverviewTab(QWidget):
 
     def _refresh_group(self, group_name: str, table: QTableWidget):
         """刷新指定分组的表格数据"""
-        from ..config import get_profile_config
+        from PyQt6.QtGui import QFont
+
+        from ...config import get_profile_config
 
         config = get_profile_config()
         groups = get_groups()
@@ -407,14 +317,14 @@ class ProfileOverviewTab(QWidget):
                     model_type == MODEL_QUOTA
                     and isinstance(kd, QuotaKeyDef)
                     and kd.sync_to
-                    and self._is_stock_at_hard_cap(kd.sync_to, data)
+                    and is_stock_at_hard_cap(kd.sync_to, data)
                 )
 
                 if sync_capped:
                     display_text = "—"
                     style = ""
                 else:
-                    display_text, style = self._format_profile_cell(kd, model_type, data)
+                    display_text, style = format_profile_cell(kd, model_type, data)
 
                 item = QTableWidgetItem(display_text)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -423,9 +333,9 @@ class ProfileOverviewTab(QWidget):
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     item.setToolTip(f"{kd.label} 的同步目标 {kd.sync_to} 已达上限")
                 else:
-                    self._apply_cell_style(item, style)
+                    apply_cell_style(item, style)
                     # 设置悬停提示，显示元信息
-                    tooltip = self._format_cell_tooltip(kd, model_type, data)
+                    tooltip = format_cell_tooltip(kd, model_type, data)
                     if tooltip:
                         item.setToolTip(tooltip)
 
@@ -439,161 +349,7 @@ class ProfileOverviewTab(QWidget):
         self._loading = False
         self._restore_column_widths(group_name, table)
 
-    def _format_profile_cell(self, kd: KeyDef, model_type: str, data: dict) -> tuple[str, str]:
-        """根据模型类型格式化 profile 值用于总览显示
-
-        返回 (display_text, style)，style 为 "" | "red_bold" | "orange_bold" | "green_bold"
-        """
-        entry = data.get(model_type, {}).get(kd.key, {})
-        if not entry:
-            return "", ""
-
-        value = entry.get("value")
-        if value is None:
-            return "", ""
-
-        if model_type == MODEL_QUOTA:
-            if not isinstance(kd, QuotaKeyDef):
-                return str(int(value)), ""
-
-            # 已达上限 → 绿色（优先级最高）
-            if kd.cap is not None and value >= kd.cap:
-                text = f"{int(value)}/{kd.cap}" if kd.show_cap else str(int(value))
-                return text, "green_bold"
-
-            # 周/月级别：按周期进度着色（未达上限才会走到这里）
-            style = ""
-            if kd.period in ("week", "month") and kd.cap is not None:
-                now = datetime.now()
-                remaining = _quota_reset_remaining(kd, now)
-                if remaining is not None:
-                    if remaining <= timedelta(hours=48):
-                        # 剩余 ≤ 48 小时且未达上限 → 红色
-                        style = "red_bold"
-                    elif remaining <= timedelta(days=_quota_period_days(kd.period, now) / 2):
-                        # 周期过半且未达一半 → 橙色
-                        if value < kd.cap / 2:
-                            style = "orange_bold"
-
-            text = f"{int(value)}/{kd.cap}" if kd.show_cap else str(int(value))
-            return text, style
-
-        if model_type == MODEL_REGEN:
-            if isinstance(kd, RegenKeyDef):
-                # 再生计算当前值；小数部分表示未展示的恢复进度。
-                computed, _ = compute_regen_entry(entry, kd)
-                int_value = int(computed)
-                style = ""
-                if kd.cap is not None and computed >= kd.cap:
-                    style = "red_bold"
-                elif kd.alert_above is not None and computed >= kd.alert_above:
-                    style = "orange_bold"
-                if kd.show_cap and kd.cap:
-                    return f"{int_value}/{kd.cap}", style
-                return str(int_value), style
-            return str(int(value)), ""
-
-        if model_type == MODEL_STOCK:
-            if isinstance(kd, StockKeyDef) and kd.cap is not None:
-                if kd.show_cap and kd.cap:
-                    if value >= kd.cap:
-                        style = "red_bold" if not kd.soft else "orange_bold"
-                        return f"{int(value)}/{kd.cap}", style
-                    return f"{int(value)}/{kd.cap}", ""
-                # 不展示上限但达到上限时
-                if value >= kd.cap:
-                    style = "red_bold" if not kd.soft else "orange_bold"
-                    return str(int(value)), style
-            # 存量模型无上限时纯数字
-            return str(int(value)), ""
-
-        return str(value), ""
-
-    @staticmethod
-    def _is_stock_at_hard_cap(stock_key: str, data: dict) -> bool:
-        """检查指定 stock key 是否已达到硬上限（非 soft）"""
-        entry = data.get(MODEL_STOCK, {}).get(stock_key, {})
-        if not entry:
-            return False
-        value = entry.get("value", 0) or 0
-        # 从配置中查找该 stock key 的 cap 和 soft
-        from ..config import get_profile_config
-        config = get_profile_config()
-        kd = config.get_key(stock_key)
-        if not isinstance(kd, StockKeyDef) or kd.cap is None:
-            return False
-        if kd.soft:
-            return False
-        return value >= kd.cap
-
-    @staticmethod
-    def _apply_cell_style(item: QTableWidgetItem, style: str) -> None:
-        """应用单元格样式: '' | 'red_bold' | 'orange_bold' | 'green_bold'"""
-        if style == "red_bold":
-            font = QFont(item.font())
-            font.setBold(True)
-            item.setFont(font)
-            item.setForeground(Qt.GlobalColor.red)
-        elif style == "orange_bold":
-            font = QFont(item.font())
-            font.setBold(True)
-            item.setFont(font)
-            item.setForeground(QColor(255, 165, 0))  # 橙色
-        elif style == "green_bold":
-            font = QFont(item.font())
-            font.setBold(True)
-            item.setFont(font)
-            item.setForeground(QColor(34, 139, 34))  # 森林绿
-
-    def _format_cell_tooltip(self, kd: KeyDef, model_type: str, data: dict) -> str:
-        """生成单元格悬停提示，显示元信息（更新时间等）"""
-        entry = data.get(model_type, {}).get(kd.key, {})
-        if not entry:
-            return ""
-
-        lines = [f"【{kd.label}】"]
-
-        # 更新时间
-        updated_at = entry.get("updated_at")
-        if updated_at:
-            lines.append(f"更新时间: {updated_at}")
-
-        # 再生模型显示额外信息
-        if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-            computed, new_ts = compute_regen_entry(entry, kd)
-            period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
-            period_label = period_labels.get(kd.regen_period, kd.regen_period)
-            lines.append(f"回复周期: 每{period_label}")
-            lines.append(f"每次回复: {kd.regen_value}")
-            lines.append(f"精确值: {computed:.4f}".rstrip("0").rstrip("."))
-            if new_ts and new_ts != updated_at:
-                lines.append(f"已计入至: {new_ts}")
-            if kd.cap is not None:
-                lines.append(f"上限: {kd.cap}")
-
-        # 配额模型显示周期、上限、同步信息
-        if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
-            period_labels = {
-                "week": "每周", "month": "每月", "season": "每赛季",
-                "half_season": "每半赛季", "day": "每日",
-            }
-            period_label = period_labels.get(kd.period, kd.period)
-            if kd.cap is not None:
-                lines.append(f"{period_label}上限: {kd.cap}")
-            # 周/月：附加距下次重置的剩余时间
-            if kd.period in ("week", "month"):
-                remaining = _quota_reset_remaining(kd)
-                if remaining is not None:
-                    days = remaining.days
-                    hours = remaining.seconds // 3600
-                    lines.append(f"距重置: {days}天 {hours}小时")
-            if kd.sync_to:
-                from ..config import get_profile_config
-                sync_kd = get_profile_config().get_key(kd.sync_to)
-                sync_label = sync_kd.label if sync_kd else kd.sync_to
-                lines.append(f"同步到: {sync_label}")
-
-        return "\n".join(lines) if len(lines) > 1 else ""
+    # ─── 列管理 ──────────────────────────────────────────────
 
     def _on_columns_reordered(self, group_name: str, table: QTableWidget):
         """拖拽列头后持久化新顺序"""
@@ -733,7 +489,9 @@ class ProfileOverviewTab(QWidget):
         if logical_index == 0:
             return
 
-        from ..config import get_profile_config
+        from PyQt6.QtWidgets import QDialog
+
+        from ...config import get_profile_config
         config = get_profile_config()
         all_keys = config.get_all_keys()
 
@@ -746,8 +504,6 @@ class ProfileOverviewTab(QWidget):
         groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
         current_key = column_keys[data_index] if data_index < len(column_keys) else ""
-
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
         dialog = QDialog(self)
         dialog.setWindowTitle("选择字段")
@@ -785,7 +541,9 @@ class ProfileOverviewTab(QWidget):
 
     def _add_column(self, group_name: str, after_index: int):
         """在指定分组的指定列后新增一列"""
-        from ..config import get_profile_config
+        from PyQt6.QtWidgets import QDialog
+
+        from ...config import get_profile_config
         config = get_profile_config()
 
         # 过滤掉该分组已有的 key
@@ -797,8 +555,6 @@ class ProfileOverviewTab(QWidget):
         if not all_keys:
             QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
-
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
         dialog = QDialog(self)
         dialog.setWindowTitle("选择字段")
@@ -870,12 +626,14 @@ class ProfileOverviewTab(QWidget):
         save_groups(groups)
         self._refresh_group(group_name, self._tables[group_name])
 
+    # ─── 单元格事件与编辑 ──────────────────────────────────────
+
     def _on_cell_double_clicked(self, row: int, col: int, group_name: str):
         """单元格双击：对有 cap 的列，剥离 /cap 后缀再进入编辑"""
         if self._loading:
             return
 
-        from ..config import get_profile_config
+        from ...config import get_profile_config
         config = get_profile_config()
         groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
@@ -919,7 +677,7 @@ class ProfileOverviewTab(QWidget):
         if not table:
             return
 
-        from ..config import get_profile_config
+        from ...config import get_profile_config
         config = get_profile_config()
 
         groups = get_groups()
@@ -941,13 +699,13 @@ class ProfileOverviewTab(QWidget):
         user_name = name_item.text()
 
         raw_value = item.text()
-        parsed_value = self._parse_value(raw_value, model_type, kd)
+        parsed_value = _parse_value(raw_value, model_type, kd)
         if parsed_value is _PARSE_ERROR:
             self._loading = True
             user_data = self._load_user_data(user_name)
-            text, style = self._format_profile_cell(kd, model_type, user_data)
+            text, style = format_profile_cell(kd, model_type, user_data)
             item.setText(text)
-            self._apply_cell_style(item, style)
+            apply_cell_style(item, style)
             self._loading = False
             return
 
@@ -970,67 +728,10 @@ class ProfileOverviewTab(QWidget):
             is_action=True, source=cell_source,
         )
 
-    @staticmethod
-    def _parse_value(raw: str, model_type: str, kd: KeyDef):
-        """解析用户输入值，返回解析后的值或 _PARSE_ERROR"""
-        if model_type == MODEL_QUOTA:
-            # quota 可以是 int 或 bool（如 shop_of_week）
-            if isinstance(kd, QuotaKeyDef) and kd.cap is not None:
-                try:
-                    return int(raw) if raw else 0
-                except ValueError:
-                    QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
-                    return _PARSE_ERROR
-            # 无 cap 的 quota 可能是 bool
-            upper = raw.upper()
-            if upper in ("Y", "TRUE", "1", "是", "YES"):
-                return True
-            if upper in ("", "N", "FALSE", "0", "否", "NO"):
-                return False
-            try:
-                return int(raw)
-            except ValueError:
-                return raw
-
-        if model_type == MODEL_REGEN:
-            try:
-                return float(raw) if raw else 0.0
-            except ValueError:
-                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
-                return _PARSE_ERROR
-
-        if model_type == MODEL_STOCK:
-            try:
-                return int(raw) if raw else 0
-            except ValueError:
-                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
-                return _PARSE_ERROR
-
-        return raw
-
-    def _write_profile_entry(
-        self,
-        user_name: str,
-        model_type: str,
-        key: str,
-        value,
-        change_type: str = "override",
-        detail: str = "",
-        source: str = "",
-    ):
-        """将值写入 profile DB（带变更历史记录）"""
-        try:
-            db_upsert(
-                user_name, model_type, key, value,
-                change_type=change_type, detail=detail, source=source,
-            )
-            logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
-        except Exception as e:
-            logger.error(f"回写失败: {e}")
-            QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
-
     def _on_cell_context_menu(self, pos, group_name: str, table: QTableWidget):
         """右键菜单：快速增减数值"""
+        from PyQt6.QtWidgets import QMenu
+
         item = table.itemAt(pos)
         if not item:
             return
@@ -1038,7 +739,7 @@ class ProfileOverviewTab(QWidget):
         row = item.row()
         col = item.column()
 
-        from ..config import get_profile_config
+        from ...config import get_profile_config
         config = get_profile_config()
 
         groups = get_groups()
@@ -1159,6 +860,29 @@ class ProfileOverviewTab(QWidget):
         if viewport:
             menu.exec(viewport.mapToGlobal(pos))
 
+    # ─── 数据写入与增减 ──────────────────────────────────────
+
+    def _write_profile_entry(
+        self,
+        user_name: str,
+        model_type: str,
+        key: str,
+        value,
+        change_type: str = "override",
+        detail: str = "",
+        source: str = "",
+    ):
+        """将值写入 profile DB（带变更历史记录）"""
+        try:
+            db_upsert(
+                user_name, model_type, key, value,
+                change_type=change_type, detail=detail, source=source,
+            )
+            logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
+        except Exception as e:
+            logger.error(f"回写失败: {e}")
+            QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
+
     def _adjust_value(
         self,
         user_name: str,
@@ -1259,76 +983,6 @@ class ProfileOverviewTab(QWidget):
             f"stock.{quota_kd.sync_to} = {new_stock}"
         )
 
-    def _ask_value_dialog(
-        self,
-        title: str,
-        hint: str,
-        prompt: str,
-        is_float: bool,
-        min_val: int,
-        sources: list[str],
-        initial_value: float = 0,
-        sync_checkbox: bool = False,
-        sync_default: bool = True,
-    ) -> tuple[float | int, str, bool, bool]:
-        """数值输入 + 来源下拉（可输入新来源）的通用对话框
-
-        sync_checkbox: 是否展示「同步变更依赖方」复选框
-        sync_default:  复选框的默认勾选状态
-
-        Returns: (value, source, sync_checked, ok)
-            sync_checked 仅在 sync_checkbox=True 时有意义，否则始终为 True。
-        """
-        dialog = QDialog(self)
-        dialog.setWindowTitle(title)
-        dialog.setMinimumWidth(320)
-        layout = QFormLayout(dialog)
-
-        hint_label = QLabel(hint)
-        layout.addRow(hint_label)
-
-        spin: QSpinBox | QDoubleSpinBox
-        if is_float:
-            ds = QDoubleSpinBox()
-            ds.setRange(min_val, 999999)
-            ds.setDecimals(4)
-            ds.setValue(initial_value)
-            spin = ds
-        else:
-            si = QSpinBox()
-            si.setRange(min_val, 999999)
-            si.setValue(int(initial_value))
-            spin = si
-        layout.addRow(prompt, spin)
-
-        combo = QComboBox()
-        combo.setEditable(True)
-        combo.addItems(sources)
-        combo.setPlaceholderText("选择或输入新来源")
-        layout.addRow("来源:", combo)
-
-        sync_check: QCheckBox | None = None
-        if sync_checkbox:
-            sync_check = QCheckBox("同步变更依赖方")
-            sync_check.setChecked(sync_default)
-            sync_check.setToolTip(
-                "勾选：按 action 语义处理，触发配额→资源的同步（如配置了 sync_to）。\n"
-                "取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
-            )
-            layout.addRow(sync_check)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addRow(buttons)
-
-        if dialog.exec():
-            sync_checked = sync_check.isChecked() if sync_check is not None else True
-            return spin.value(), combo.currentText().strip(), sync_checked, True
-        return 0, "", sync_default, False
-
     def _register_new_source(self, kd: KeyDef, source: str) -> None:
         """新来源自动追加到该 key 的来源词表并持久化到 profile.yaml
 
@@ -1377,7 +1031,8 @@ class ProfileOverviewTab(QWidget):
             current_text = str(int(current_value))
             is_float = False
 
-        value, source, _sync, ok = self._ask_value_dialog(
+        value, source, _sync, ok = ask_value_dialog(
+            self,
             title=f"自定义增减 - {kd.label}",
             hint=f"当前值: {current_text}",
             prompt=prompt,
@@ -1433,7 +1088,8 @@ class ProfileOverviewTab(QWidget):
             current_text = str(int(current_value))
             is_float = False
 
-        value, source, sync_checked, ok = self._ask_value_dialog(
+        value, source, sync_checked, ok = ask_value_dialog(
+            self,
             title=f"覆写 - {kd.label}",
             hint=f"当前值: {current_text}",
             prompt="新值:",
@@ -1465,62 +1121,10 @@ class ProfileOverviewTab(QWidget):
         self, user_name: str, model_type: str, key: str, key_label: str,
     ) -> None:
         """打开历史记录查看器，展示指定 key 的最近变更记录"""
-        history = db_get_history(user_name, type_=model_type, key=key, limit=50)
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"{key_label} — {user_name} 变更记录")
-        dialog.resize(820, 420)
-
-        layout = QVBoxLayout(dialog)
-
-        table = QTableWidget()
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(["时间", "类型", "旧值", "新值", "来源", "详情"])
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        vh = table.verticalHeader()
-        if vh is not None:
-            vh.setVisible(False)
-
-        header = table.horizontalHeader()
-        if header is not None:
-            # 时间列：固定 140px（够放 "MM-DD HH:MM:SS"）
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-            table.setColumnWidth(0, 140)
-            # 窄字段列（类型/旧值/新值/来源）：固定宽，不挤占详情列空间
-            for col, w in ((1, 60), (2, 70), (3, 70), (4, 100)):
-                header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
-                table.setColumnWidth(col, w)
-            # 详情列：stretch 占满剩余空间
-            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-
-        _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}
-
-        table.setRowCount(len(history))
-        for row, rec in enumerate(history):
-            # 格式化时间
-            raw_ts = rec.get("ts", "")
-            try:
-                formatted_ts = datetime.fromisoformat(raw_ts).strftime("%m-%d %H:%M:%S")
-            except (ValueError, TypeError):
-                formatted_ts = raw_ts
-
-            ct = rec.get("change_type", "")
-            old_val = rec.get("old_value")
-            new_val = rec.get("new_value")
-            old_str = str(int(old_val)) if old_val is not None and old_val == int(old_val) else str(old_val) if old_val is not None else "—"
-            new_str = str(int(new_val)) if new_val is not None and new_val == int(new_val) else str(new_val) if new_val is not None else "—"
-
-            table.setItem(row, 0, QTableWidgetItem(formatted_ts))
-            table.setItem(row, 1, QTableWidgetItem(_TYPE_LABEL.get(ct, ct)))
-            table.setItem(row, 2, QTableWidgetItem(old_str))
-            table.setItem(row, 3, QTableWidgetItem(new_str))
-            table.setItem(row, 4, QTableWidgetItem(rec.get("source", "")))
-            table.setItem(row, 5, QTableWidgetItem(rec.get("detail", "")))
-
-        layout.addWidget(table)
+        dialog = HistoryDialog(user_name, model_type, key, key_label, self)
         dialog.exec()
+
+    # ─── 用户数据加载 ──────────────────────────────────────
 
     def _load_all_users(self) -> dict[str, dict]:
         """加载所有用户 profile 数据（从 DB 读取）"""
@@ -1548,10 +1152,10 @@ class ProfileOverviewTab(QWidget):
 
     def _open_metadata_dialog(self):
         """打开数据模型定义对话框"""
-        from .profile_settings_dialog import ProfileDefinitionDialog
+        from ...config import reload_profile_config
+        from .dialogs import ProfileDefinitionDialog
         dialog = ProfileDefinitionDialog(self)
         if dialog.exec():
-            from ..config import reload_profile_config
             reload_profile_config()
             self._build_groups()
 
@@ -1663,204 +1267,42 @@ class ProfileOverviewTab(QWidget):
             set_active_group(self._tab_widget.tabText(index))
 
 
-# 哨兵值：表示解析失败
-_PARSE_ERROR = object()
+# ─── 值解析（模块级） ────────────────────────────────────────────
 
 
-# ─── 角色状态 Tab ────────────────────────────────────────────
-
-
-class ProfileTab(QWidget):
-    """其他信息 Tab - 展示当前用户的详细信息（按模型类型分区）"""
-
-    def __init__(self, host, parent=None):
-        super().__init__(parent)
-        self._host = host
-        self._detail_page: _DetailPage | None = None
-        self._pending_detail_refresh = False
-        self._detail_refresh_timer = _make_debounce_timer(
-            self, self._refresh_pending_detail
-        )
-        self._setup_ui()
-        self._refresh_current_user()
-        host.user_changed.connect(lambda _name: self._refresh_current_user())
-        self._connect_profile_engine()
-
-    def _connect_profile_engine(self) -> None:
-        """让后台 profile 更新能刷新当前用户详情。"""
+def _parse_value(raw: str, model_type: str, kd: KeyDef):
+    """解析用户输入值，返回解析后的值或 _PARSE_ERROR"""
+    if model_type == MODEL_QUOTA:
+        # quota 可以是 int 或 bool（如 shop_of_week）
+        if isinstance(kd, QuotaKeyDef) and kd.cap is not None:
+            try:
+                return int(raw) if raw else 0
+            except ValueError:
+                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                return _PARSE_ERROR
+        # 无 cap 的 quota 可能是 bool
+        upper = raw.upper()
+        if upper in ("Y", "TRUE", "1", "是", "YES"):
+            return True
+        if upper in ("", "N", "FALSE", "0", "否", "NO"):
+            return False
         try:
-            from ..profile.profile_engine import get_or_create_engine
-            engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
-            engine.data_updated.connect(self._on_profile_data_updated)
-        except Exception as e:
-            logger.debug(f"ProfileTab 连接 ProfileEngine 失败: {e}")
+            return int(raw)
+        except ValueError:
+            return raw
 
-    def _on_profile_data_updated(self, user_name: str) -> None:
-        if user_name == self._host.active_user_name():
-            self._pending_detail_refresh = True
-            if not self._detail_refresh_timer.isActive():
-                self._detail_refresh_timer.start()
-
-    def _refresh_pending_detail(self) -> None:
-        if self._pending_detail_refresh and self._detail_page is not None:
-            self._detail_page.refresh()
-        self._pending_detail_refresh = False
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-
-        # 刷新按钮
-        btn_row = QHBoxLayout()
-        btn_refresh = QPushButton("刷新")
-        btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip("重新读取角色数据")
-        btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
-        btn_refresh.clicked.connect(self._refresh_current_user)
-        btn_row.addWidget(btn_refresh)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-
-        # 详情容器
-        self._detail_container = QVBoxLayout()
-        layout.addLayout(self._detail_container, stretch=1)
-
-    def _refresh_current_user(self):
-        """根据当前用户重建详情页"""
-        while self._detail_container.count() > 0:
-            item = self._detail_container.takeAt(0)
-            w = item.widget()
-            if w:
-                w.setParent(None)
-
-        user_name = self._host.active_user_name()
-        if not user_name:
-            placeholder = QLabel("请先选择用户")
-            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setStyleSheet("color: #999; font-size: 14px; padding: 40px;")
-            self._detail_container.addWidget(placeholder)
-            return
-
-        self._detail_page = _DetailPage(user_name)
-        self._detail_container.addWidget(self._detail_page)
-
-
-# ─── 角色详情页 ──────────────────────────────────────────────
-
-
-class _DetailPage(QWidget):
-    """角色详情页 - 按模型类型分区展示单个角色的完整信息"""
-
-    def __init__(self, user_name: str, parent=None):
-        super().__init__(parent)
-        self._user_name = user_name
-        self._value_labels: dict[str, QLabel] = {}
-        self._setup_ui()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        self._container = QWidget()
-        self._form_layout = QVBoxLayout(self._container)
-        self._form_layout.setSpacing(8)
-        scroll.setWidget(self._container)
-        layout.addWidget(scroll)
-
-        self._build_form()
-        self.refresh()
-
-    def _build_form(self):
-        """按模型类型并列三列展示"""
-        from ..config import get_profile_config
-
-        config = get_profile_config()
-
-        row = QHBoxLayout()
-        row.setSpacing(12)
-
-        _GROUP_STYLE = """
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 4px;
-            }
-        """
-
-        for model_type in (MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN):
-            keys = config.get_keys_by_model(model_type)
-            model_label = MODEL_LABELS.get(model_type, model_type)
-            box = QGroupBox(model_label)
-            box.setStyleSheet(_GROUP_STYLE)
-
-            form = QFormLayout(box)
-            form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-
-            for kd in keys:
-                label = QLabel("")
-                label.setStyleSheet("color: #333333;")
-                form.addRow(f"{kd.label}:", label)
-                self._value_labels[kd.key] = label
-
-            row.addWidget(box, stretch=1)
-
-        self._form_layout.addLayout(row)
-        self._form_layout.addStretch()
-
-    def refresh(self):
-        """从 profile DB 加载数据并刷新"""
+    if model_type == MODEL_REGEN:
         try:
-            data = db_read_all(self._user_name)
-        except Exception as e:
-            logger.warning(f"加载用户 {self._user_name} profile 失败: {e}")
-            return
+            return float(raw) if raw else 0.0
+        except ValueError:
+            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
+            return _PARSE_ERROR
 
-        from ..config import get_profile_config
-        config = get_profile_config()
+    if model_type == MODEL_STOCK:
+        try:
+            return int(raw) if raw else 0
+        except ValueError:
+            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+            return _PARSE_ERROR
 
-        for key, label in self._value_labels.items():
-            model_type = config.get_model_type(key) or ""
-            kd = config.get_key(key)
-            if not kd:
-                label.setText("")
-                continue
-
-            text = self._format_detail_value(kd, model_type, data)
-            label.setText(text)
-
-    def _format_detail_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
-        """格式化详情页的值显示（纯数值，取整）"""
-        entry = data.get(model_type, {}).get(kd.key, {})
-        if not entry:
-            return ""
-
-        value = entry.get("value")
-        if value is None:
-            return ""
-
-        if model_type == MODEL_QUOTA:
-            if isinstance(value, bool):
-                return "已完成" if value else "未完成"
-            return str(int(value))
-
-        if model_type == MODEL_REGEN:
-            if isinstance(kd, RegenKeyDef):
-                computed, _ = compute_regen_entry(entry, kd)
-                return str(int(computed))
-            return str(int(value))
-
-        if model_type == MODEL_STOCK:
-            return str(int(value))
-
-        return str(int(value))
+    return raw

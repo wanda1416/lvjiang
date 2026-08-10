@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..config.profile_models import (
+from ...config.profile_models import (
     MODEL_LABELS,
     MODEL_QUOTA,
     MODEL_REGEN,
@@ -252,7 +252,7 @@ class ProfileDefinitionDialog(QDialog):
 
     def _load_data(self):
         """从 ProfileSchema 加载并填充表格"""
-        from ..config import get_profile_config
+        from ...config import get_profile_config
         config = get_profile_config()
 
         for model_type in _MODEL_ORDER:
@@ -502,7 +502,7 @@ class ProfileDefinitionDialog(QDialog):
             sync_combo = QComboBox()
             sync_combo.addItem("（不同步）", "")
             # 加载所有 Stock key 作为同步目标
-            from ..config import get_profile_config
+            from ...config import get_profile_config
             res_keys = get_profile_config().get_keys_by_model(MODEL_STOCK)
             for rk in res_keys:
                 sync_combo.addItem(f"{rk.label} ({rk.key})", rk.key)
@@ -747,7 +747,7 @@ class ProfileDefinitionDialog(QDialog):
 
     def _on_save(self):
         """保存所有模型类型的 key 定义到 profile.yaml"""
-        from ..config.user_profile import ProfileSchema, save_profile_config
+        from ...config.user_profile import ProfileSchema, save_profile_config
 
         keys_by_model: dict[str, list[KeyDef]] = {}
 

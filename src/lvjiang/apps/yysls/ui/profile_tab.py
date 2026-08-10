@@ -15,7 +15,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import calendar
+from datetime import datetime, timedelta
 
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
@@ -103,6 +104,89 @@ def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> Q
     timer.setInterval(interval_ms)
     timer.timeout.connect(callback)
     return timer
+
+
+def _quota_period_days(period: str, now: datetime | None = None) -> int:
+    """配额周期对应的总天数（用于过半判断）
+
+    month 分支使用当前月的实际天数，避免短月份 / 闰月的半程阈值偏差。
+    """
+    if period == "week":
+        return 7
+    if period == "month":
+        if now is None:
+            now = datetime.now()
+        return calendar.monthrange(now.year, now.month)[1]
+    return 0
+
+
+def _parse_reset_time(reset_time: str) -> tuple[int, int]:
+    """解析 'HH:MM' 重置时刻；格式错误时回退 05:00"""
+    try:
+        parts = reset_time.split(":")
+        return int(parts[0]), int(parts[1])
+    except (ValueError, IndexError, AttributeError):
+        return 5, 0
+
+
+def _quota_reset_remaining(
+    kd: "QuotaKeyDef", now: datetime | None = None,
+) -> timedelta | None:
+    """计算配额距离下一次重置的剩余时间
+
+    week: 按 reset_day (1=周一...7=周日，0=周一) + reset_time 计算
+    month: 按 reset_day (1-31，0=1 号，超出当月天数时取最后一天) + reset_time 计算
+    其他周期或配置缺失时返回 None。
+    """
+    if now is None:
+        now = datetime.now()
+    reset_h, reset_m = _parse_reset_time(kd.reset_time)
+
+    if kd.period == "week":
+        reset_weekday = (kd.reset_day - 1) if kd.reset_day else 0  # 0=Monday
+        current_weekday = now.weekday()
+        days_ahead = reset_weekday - current_weekday
+
+        reset_today = datetime(
+            now.year, now.month, now.day, reset_h, reset_m,
+        )
+        if days_ahead == 0 and now >= reset_today:
+            days_ahead = 7
+        elif days_ahead < 0:
+            days_ahead += 7
+
+        if days_ahead == 0:
+            target = reset_today
+        else:
+            target = datetime(
+                now.year, now.month, now.day, reset_h, reset_m,
+            ) + timedelta(days=days_ahead)
+        return target - now
+
+    if kd.period == "month":
+        reset_day = kd.reset_day if kd.reset_day else 1
+        year, month = now.year, now.month
+        last_day = calendar.monthrange(year, month)[1]
+        actual_day = min(reset_day, last_day)
+
+        reset_today = datetime(year, month, actual_day, reset_h, reset_m)
+        if now < reset_today:
+            return reset_today - now
+
+        # 已过本月重置时刻 → 跳到下月
+        if month == 12:
+            next_year, next_month = year + 1, 1
+        else:
+            next_year, next_month = year, month + 1
+        next_last_day = calendar.monthrange(next_year, next_month)[1]
+        next_actual_day = min(reset_day, next_last_day)
+        target = datetime(
+            next_year, next_month, next_actual_day, reset_h, reset_m,
+        )
+        return target - now
+
+    return None
+
 
 # ─── 档案总览 Tab ────────────────────────────────────────────
 
@@ -369,13 +453,30 @@ class ProfileOverviewTab(QWidget):
             return "", ""
 
         if model_type == MODEL_QUOTA:
-            if isinstance(kd, QuotaKeyDef) and kd.show_cap and kd.cap:
-                style = "green_bold" if value >= kd.cap else ""
-                return f"{int(value)}/{kd.cap}", style
-            # 即使不展示上限，达标时也显示绿色
-            if isinstance(kd, QuotaKeyDef) and kd.cap is not None and value >= kd.cap:
-                return str(int(value)), "green_bold"
-            return str(int(value)), ""
+            if not isinstance(kd, QuotaKeyDef):
+                return str(int(value)), ""
+
+            # 已达上限 → 绿色（优先级最高）
+            if kd.cap is not None and value >= kd.cap:
+                text = f"{int(value)}/{kd.cap}" if kd.show_cap else str(int(value))
+                return text, "green_bold"
+
+            # 周/月级别：按周期进度着色（未达上限才会走到这里）
+            style = ""
+            if kd.period in ("week", "month") and kd.cap is not None:
+                now = datetime.now()
+                remaining = _quota_reset_remaining(kd, now)
+                if remaining is not None:
+                    if remaining <= timedelta(hours=48):
+                        # 剩余 ≤ 48 小时且未达上限 → 红色
+                        style = "red_bold"
+                    elif remaining <= timedelta(days=_quota_period_days(kd.period, now) / 2):
+                        # 周期过半且未达一半 → 橙色
+                        if value < kd.cap / 2:
+                            style = "orange_bold"
+
+            text = f"{int(value)}/{kd.cap}" if kd.show_cap else str(int(value))
+            return text, style
 
         if model_type == MODEL_REGEN:
             if isinstance(kd, RegenKeyDef):
@@ -479,6 +580,13 @@ class ProfileOverviewTab(QWidget):
             period_label = period_labels.get(kd.period, kd.period)
             if kd.cap is not None:
                 lines.append(f"{period_label}上限: {kd.cap}")
+            # 周/月：附加距下次重置的剩余时间
+            if kd.period in ("week", "month"):
+                remaining = _quota_reset_remaining(kd)
+                if remaining is not None:
+                    days = remaining.days
+                    hours = remaining.seconds // 3600
+                    lines.append(f"距重置: {days}天 {hours}小时")
             if kd.sync_to:
                 from ..config import get_profile_config
                 sync_kd = get_profile_config().get_key(kd.sync_to)

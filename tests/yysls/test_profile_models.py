@@ -38,6 +38,7 @@ class TestKeyDef:
         assert kd.label == ""
         assert kd.description == ""
         assert kd.sources == []
+        assert kd.uses == []
 
     def test_from_dict(self):
         kd = KeyDef.from_dict({
@@ -45,12 +46,14 @@ class TestKeyDef:
             "label": "测试",
             "description": "描述",
             "sources": ["打本", " 商店 ", ""],
+            "uses": ["兑换", " 强化 ", ""],
         })
         assert kd.key == "test_key"
         assert kd.label == "测试"
         assert kd.description == "描述"
         # 词表去空白、过滤空项
         assert kd.sources == ["打本", "商店"]
+        assert kd.uses == ["兑换", "强化"]
 
     def test_from_dict_missing_fields(self):
         kd = KeyDef.from_dict({})
@@ -120,10 +123,12 @@ class TestQuotaKeyDef:
             ],
             "sync_targets": [{"key": "stock:res", "ratio": 1.0, "source": "打本掉落"}],
             "sources": ["打本", "商店"],
+            "uses": ["打本消耗"],
         })
         assert kd.steps == [StepDef(-900, "打本消耗"), StepDef(-1100)]
         assert kd.sync_targets[0].source == "打本掉落"
         assert kd.sources == ["打本", "商店"]
+        assert kd.uses == ["打本消耗"]
 
     def test_from_dict_steps_non_list(self):
         """steps 非 list 时应默认为空列表"""
@@ -165,6 +170,13 @@ class TestQuotaKeyDef:
         assert "steps" not in d
         assert "sync_targets" not in d
         assert "sources" not in d
+        assert "uses" not in d
+
+    def test_to_dict_with_uses(self):
+        """非空 uses 正常序列化"""
+        kd = QuotaKeyDef(key="k", label="l", uses=["兑换", "强化"])
+        d = kd.to_dict()
+        assert d["uses"] == ["兑换", "强化"]
 
 
 # ─── RegenKeyDef ──────────────────────────────────────────
@@ -460,23 +472,27 @@ class TestKeyDefSyncTargets:
         assert "sync_targets" not in d
 
     def test_regen_from_dict_parses_sync_targets(self):
-        """Regen 模型 from_dict 必须解析 sync_targets（回归）"""
+        """Regen 模型 from_dict 必须解析 sync_targets/uses（回归）"""
         kd = RegenKeyDef.from_dict({
             "key": "tili", "label": "体力",
             "sync_targets": [{"key": "stock:bugan", "ratio": 0.5}],
+            "uses": ["打本消耗"],
         })
         assert len(kd.sync_targets) == 1
         assert kd.sync_targets[0].key == "stock:bugan"
         assert kd.sync_targets[0].ratio == 0.5
+        assert kd.uses == ["打本消耗"]
 
     def test_stock_from_dict_parses_sync_targets(self):
-        """Stock 模型 from_dict 必须解析 sync_targets（回归）"""
+        """Stock 模型 from_dict 必须解析 sync_targets/uses（回归）"""
         kd = StockKeyDef.from_dict({
             "key": "bugan", "label": "不肝",
             "sync_targets": [{"key": "quota:dihua"}],
+            "uses": ["强化"],
         })
         assert len(kd.sync_targets) == 1
         assert kd.sync_targets[0].key == "quota:dihua"
+        assert kd.uses == ["强化"]
 
     def test_regen_from_dict_roundtrip(self):
         """Regen to_dict → from_dict 往返不丢 sync_targets"""

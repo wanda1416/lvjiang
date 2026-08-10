@@ -1036,22 +1036,22 @@ class ProfileOverviewTab(QWidget):
 
         return new_value, new_value - current_value
 
-    def _register_new_source(self, kd: KeyDef, source: str) -> None:
-        """新来源自动追加到该 key 的来源词表并持久化到 profile.yaml
+    def _register_new_source(self, kd: KeyDef, source: str, vocab: list[str]) -> None:
+        """新词条自动追加到对应词表（来源/用途）并持久化到 profile.yaml
 
         保存与内存修改原子化：save 失败时回滚内存词表，避免"会话内可见、重启后丢失"。
         """
-        if not source or source in kd.sources:
+        if not source or source in vocab:
             return
-        kd.sources.append(source)
+        vocab.append(source)
         try:
             save_profile_config(get_profile_config())
         except Exception as e:
             try:
-                kd.sources.remove(source)
+                vocab.remove(source)
             except ValueError:
                 pass
-            logger.warning(f"持久化新来源 '{source}' 失败: {e}")
+            logger.warning(f"持久化新词条 '{source}' 失败: {e}")
 
     def _adjust_value_custom(
         self,
@@ -1062,20 +1062,27 @@ class ProfileOverviewTab(QWidget):
         current_value,
         direction: int = 0,
     ):
-        """自定义增减数值（带来源选择）
+        """自定义增减数值（带来源/用途选择）
 
-        direction: 1=增加，-1=减少，0=双向（输入正负值）
+        direction: 1=增加（展示来源词表），-1=减少（展示用途词表），
+            0=双向（两类叠加，来源在上）。
         """
-        # 根据 direction 设置输入范围和提示
+        # 根据 direction 选择词表与标签
         if direction > 0:
             min_val = 0
             prompt = "增加量:"
+            vocab = kd.sources
+            vocab_label = "来源"
         elif direction < 0:
             min_val = 0
             prompt = "减少量:"
+            vocab = kd.uses
+            vocab_label = "用途"
         else:
             min_val = -999999
             prompt = "增减量（正增负减）:"
+            vocab = kd.sources + [u for u in kd.uses if u not in kd.sources]
+            vocab_label = "来源"
 
         if model_type == MODEL_REGEN:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
@@ -1091,7 +1098,8 @@ class ProfileOverviewTab(QWidget):
             prompt=prompt,
             is_float=is_float,
             min_val=min_val,
-            sources=kd.sources,
+            sources=vocab,
+            source_label=vocab_label,
         )
         if not ok:
             return
@@ -1113,7 +1121,11 @@ class ProfileOverviewTab(QWidget):
             )
             return
 
-        self._register_new_source(kd, source)
+        # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途
+        if delta > 0:
+            self._register_new_source(kd, source, kd.sources)
+        elif delta < 0:
+            self._register_new_source(kd, source, kd.uses)
 
         # 自定义增减属于 action，触发 sync_targets 同步
         self._adjust_value(
@@ -1148,7 +1160,7 @@ class ProfileOverviewTab(QWidget):
             prompt="新值:",
             is_float=is_float,
             min_val=0,
-            sources=kd.sources,
+            sources=kd.sources + [u for u in kd.uses if u not in kd.sources],
             initial_value=current_value,
             sync_checkbox=True,
             sync_default=True,
@@ -1161,7 +1173,11 @@ class ProfileOverviewTab(QWidget):
         if delta == 0:
             return
 
-        self._register_new_source(kd, source)
+        # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途
+        if delta > 0:
+            self._register_new_source(kd, source, kd.sources)
+        elif delta < 0:
+            self._register_new_source(kd, source, kd.uses)
 
         # sync_checked=True: 走 action 路径（触发 sync_targets 同步）
         # sync_checked=False: 纯覆写语义（change_type="override"，不触发同步）

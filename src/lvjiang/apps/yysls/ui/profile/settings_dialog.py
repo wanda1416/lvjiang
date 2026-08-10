@@ -80,7 +80,7 @@ def _parse_steps_text(raw: str) -> tuple[list[StepDef] | None, str]:
 
 
 def _parse_sources_text(raw: str) -> list[str]:
-    """解析来源词表编辑框文本（逗号分隔，去空去重保序）"""
+    """解析来源/用途词表编辑框文本（逗号分隔，去空去重保序）"""
     seen: set[str] = set()
     result: list[str] = []
     for part in raw.split(","):
@@ -443,7 +443,9 @@ class ProfileDefinitionDialog(QDialog):
             if sync_summary:
                 parts.append(sync_summary)
             if kd.sources:
-                parts.append(f"来源词表:{','.join(kd.sources)}")
+                parts.append(f"来源:{','.join(kd.sources)}")
+            if kd.uses:
+                parts.append(f"用途:{','.join(kd.uses)}")
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
@@ -465,7 +467,9 @@ class ProfileDefinitionDialog(QDialog):
             if sync_summary:
                 parts.append(sync_summary)
             if kd.sources:
-                parts.append(f"来源词表:{','.join(kd.sources)}")
+                parts.append(f"来源:{','.join(kd.sources)}")
+            if kd.uses:
+                parts.append(f"用途:{','.join(kd.uses)}")
             if kd.alert_above:
                 parts.append(f"提醒:>={kd.alert_above}")
             return ", ".join(parts)
@@ -483,7 +487,9 @@ class ProfileDefinitionDialog(QDialog):
             if sync_summary:
                 parts.append(sync_summary)
             if kd.sources:
-                parts.append(f"来源词表:{','.join(kd.sources)}")
+                parts.append(f"来源:{','.join(kd.sources)}")
+            if kd.uses:
+                parts.append(f"用途:{','.join(kd.uses)}")
             if kd.description:
                 parts.append(kd.description)
             return ", ".join(parts)
@@ -577,11 +583,16 @@ class ProfileDefinitionDialog(QDialog):
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
 
-        # 来源词表（三种模型通用）
+        # 来源/用途词表（三种模型通用）：来源对应增加，用途对应减少
         sources_input = QLineEdit(",".join(existing.sources) if existing else "")
-        sources_input.setPlaceholderText("逗号分隔，如: 打本,商店,任务")
-        layout.addRow("来源词表:", sources_input)
+        sources_input.setPlaceholderText("逗号分隔，增加时供下拉选择，如: 打本,商店,任务")
+        layout.addRow("来源:", sources_input)
         widgets["sources"] = sources_input
+
+        uses_input = QLineEdit(",".join(existing.uses) if existing else "")
+        uses_input.setPlaceholderText("逗号分隔，减少时供下拉选择，如: 兑换,强化,出售")
+        layout.addRow("用途:", uses_input)
+        widgets["uses"] = uses_input
 
         if model_type == MODEL_QUOTA:
             kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
@@ -814,8 +825,9 @@ class ProfileDefinitionDialog(QDialog):
                 error_label.setText(f"Key '{key}' 已存在")
                 return
 
-            # 来源词表
+            # 来源/用途词表
             sources_list = _parse_sources_text(widgets["sources"].text())
+            uses_list = _parse_sources_text(widgets["uses"].text())
 
             # 收集同步目标（三种模型通用）
             sync_targets_list = widgets["sync_targets"].get_sync_targets()
@@ -837,6 +849,7 @@ class ProfileDefinitionDialog(QDialog):
                 kd = QuotaKeyDef(
                     key=key, label=label,
                     sources=sources_list,
+                    uses=uses_list,
                     sync_targets=sync_targets_list,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
@@ -857,6 +870,7 @@ class ProfileDefinitionDialog(QDialog):
                 kd = RegenKeyDef(
                     key=key, label=label,
                     sources=sources_list,
+                    uses=uses_list,
                     sync_targets=sync_targets_list,
                     cap=widgets["cap"].value(),
                     show_cap=widgets["show_cap"].isChecked(),
@@ -877,6 +891,7 @@ class ProfileDefinitionDialog(QDialog):
                 kd = StockKeyDef(
                     key=key, label=label,
                     sources=sources_list,
+                    uses=uses_list,
                     sync_targets=sync_targets_list,
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),
@@ -884,7 +899,7 @@ class ProfileDefinitionDialog(QDialog):
                     steps=steps_list,
                 )
             else:
-                kd = KeyDef(key=key, label=label, sources=sources_list)
+                kd = KeyDef(key=key, label=label, sources=sources_list, uses=uses_list)
 
             result_kd[0] = kd
             dialog.accept()

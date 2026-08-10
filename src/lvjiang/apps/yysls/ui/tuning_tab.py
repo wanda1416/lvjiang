@@ -375,7 +375,6 @@ class TuningTab(QWidget):
                 judge_rule_keys=list(enabled),
                 base_group=base_group,
                 skip_tuning=skip_tuning,
-                doc_username=host.active_user_name(),
                 skip_start=skip_start,
                 target_cell=target_cell,
             )

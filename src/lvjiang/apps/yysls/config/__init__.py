@@ -37,7 +37,6 @@ from .profile_store import (
     get_alert_history,
     get_groups,
     mark_alert,
-    migrate_from_legacy,
     save_groups,
     set_active_group,
     set_alert_history,
@@ -89,5 +88,4 @@ __all__ = [
     "get_alert_history",
     "set_alert_history",
     "mark_alert",
-    "migrate_from_legacy",
 ]

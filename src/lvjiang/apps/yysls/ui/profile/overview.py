@@ -48,7 +48,6 @@ from ...config.profile_models import (
 from ...config.profile_store import (
     get_active_group,
     get_groups,
-    migrate_from_legacy,
     save_groups,
     set_active_group,
 )
@@ -112,7 +111,6 @@ class ProfileOverviewTab(QWidget):
         self._restoring_widths = False
         self._reordering = False
         self._refresh_timer = _make_debounce_timer(self, self.refresh)
-        migrate_from_legacy()
         self._setup_ui()
         self._connect_profile_engine()
 

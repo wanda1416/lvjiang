@@ -1,9 +1,11 @@
 """玩家数据模型定义
 
 三种游戏数据模型的数据类：
-- quota: 配额（周期任务/限额），周期结束自动清零，可同步到 stock
+- quota: 配额（周期任务/限额），周期结束自动清零
 - regen: 再生（恢复状态），按规则回复，有上限
 - stock: 存量（资源计数），纯数字，无颜色告警
+
+任意模型的 key 可通过 sync_targets 配置触发器同步（跨模型、多目标、倍率、方向限定）。
 
 定义与存储完全镜像：profile.yaml 按模型归档，user.json 按模型分节点。
 """
@@ -26,11 +28,105 @@ ALL_MODELS = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK)
 MODEL_LABELS = {
     MODEL_QUOTA: "配额",
     MODEL_REGEN: "再生",
-    MODEL_STOCK: "存量",
+    MODEL_STOCK: "库存",
 }
+
+# 同步方向限定
+DIR_BOTH = "both"  # 全向：任意变动触发
+DIR_POS = "pos"    # 正向：仅数值增加触发
+DIR_NEG = "neg"    # 负向：仅数值减少触发
+VALID_DIRECTIONS = (DIR_BOTH, DIR_POS, DIR_NEG)
+DIRECTION_LABELS = {DIR_BOTH: "全向", DIR_POS: "正向", DIR_NEG: "负向"}
 
 
 # ─── 数据类 ────────────────────────────────────────────────
+
+
+@dataclass
+class SyncTargetDef:
+    """同步目标定义
+
+    key 采用 `model_type:key` 命名空间（如 `stock:bugan`），跨模型无歧义。
+    ratio 允许负数 / 小数：-1 表示反向同步，0.5 表示减半，0 表示禁用该目标。
+    direction 方向限定：both=全向（任意变动触发），pos=正向（仅增加触发），
+    neg=负向（仅减少触发）。
+    source 可选：覆盖默认来源描述（未填时沿用触发 action 的 source）。
+    """
+
+    key: str = ""
+    ratio: float = 1.0
+    direction: str = DIR_BOTH
+    source: str = ""
+
+    @classmethod
+    def from_raw(cls, raw) -> "SyncTargetDef":
+        if isinstance(raw, cls):
+            return raw
+        if isinstance(raw, dict):
+            direction = str(raw.get("direction", DIR_BOTH)).strip()
+            if direction not in VALID_DIRECTIONS:
+                raise ValueError(f"无效的同步方向: {direction!r}，应为 {VALID_DIRECTIONS}")
+            return cls(
+                key=str(raw.get("key", "")).strip(),
+                ratio=float(raw.get("ratio", 1.0)),
+                direction=direction,
+                source=str(raw.get("source", "")).strip(),
+            )
+        # 兼容裸字符串（隐式 1:1 倍率）
+        return cls(key=str(raw).strip())
+
+    def to_dict(self) -> dict[str, Any]:
+        """序列化：仅输出非默认字段"""
+        result: dict[str, Any] = {"key": self.key}
+        if self.ratio != 1.0:
+            result["ratio"] = self.ratio
+        if self.direction != DIR_BOTH:
+            result["direction"] = self.direction
+        if self.source:
+            result["source"] = self.source
+        return result
+
+
+def parse_sync_targets(raw) -> list[SyncTargetDef]:
+    """解析 sync_targets 配置（dict / str / SyncTargetDef 混用列表）"""
+    if not isinstance(raw, list):
+        return []
+    return [SyncTargetDef.from_raw(s) for s in raw if s]
+
+
+def parse_sync_key(raw: str) -> tuple[str, str]:
+    """解析命名空间 key
+
+    'stock:bugan' → ('stock', 'bugan')
+    裸 'bugan'   → ('', 'bugan')（隐式模型，由调用方按上下文推断）
+    """
+    raw = (raw or "").strip()
+    if ":" in raw:
+        ns, _, key = raw.partition(":")
+        return ns.strip(), key.strip()
+    return "", raw
+
+
+def format_sync_label(sync_key: str) -> str:
+    """将命名空间 key 渲染为人话标签（UI 用，中文冒号）
+
+    'stock:bugan' → '库存：不肝'
+    'quota:dihua' → '配额：地花'
+    解析失败降级到原始 ID。
+    """
+    model_type, key = parse_sync_key(sync_key)
+    # 延迟导入避免循环：profile_config 依赖 profile_models
+    try:
+        from . import get_profile_config
+        kd = get_profile_config().get_key(key, model_type=model_type or None)
+    except Exception:
+        kd = None
+    if kd is None:
+        return sync_key
+    model_label = MODEL_LABELS.get(model_type, model_type or "")
+    if model_label:
+        return f"{model_label}：{kd.label}"
+    return kd.label
 
 
 @dataclass
@@ -74,6 +170,8 @@ class KeyDef:
     不含 model 字段 — 模型类型由 profile.yaml 的父节点决定。
     show_cap: 是否在总览中展示上限（value/cap），默认否。
     sources: 来源词表，增减操作时供下拉选择。
+    sync_targets: 触发器同步目标列表，任意模型类型的 action 动作都会触发；
+        每个目标独立倍率（允许负数 / 小数），key 采用 `model_type:key` 命名空间。
     """
 
     key: str = ""
@@ -81,6 +179,7 @@ class KeyDef:
     description: str = ""
     show_cap: bool = False
     sources: list[str] = field(default_factory=list)
+    sync_targets: list[SyncTargetDef] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KeyDef:
@@ -90,6 +189,7 @@ class KeyDef:
             description=data.get("description", ""),
             show_cap=data.get("show_cap", False),
             sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
+            sync_targets=parse_sync_targets(data.get("sync_targets", [])),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -104,8 +204,9 @@ class KeyDef:
             elif f.default_factory is not MISSING:
                 if val == f.default_factory():
                     continue
-            if f.name == "steps":
-                result[f.name] = [s.to_dict() for s in val]
+            # 子 dataclass 列表（StepDef / SyncTargetDef）统一序列化
+            if isinstance(val, list) and val and hasattr(val[0], "to_dict"):
+                result[f.name] = [v.to_dict() for v in val]
             else:
                 result[f.name] = val
         return result
@@ -116,7 +217,7 @@ class QuotaKeyDef(KeyDef):
     """配额数据模型 — 周期任务/限额
 
     周期结束自动清零，无累积概念。
-    可通过 sync_to 单向同步到 Stock 模型（仅 steps 动作触发）。
+    通过 sync_targets（继承自 KeyDef）配置触发器同步，任意 action 动作都会触发。
 
     reset_day:
         week 周期: 1=周一 ... 7=周日（0 或未设置 → 默认周一）
@@ -125,12 +226,6 @@ class QuotaKeyDef(KeyDef):
         自定义增减幅度，正值=增加，负值=减少，每条可携带来源描述。
         例如 [{value: 100, source: 商店}] 右键菜单显示「商店(+100)」。
         纯 int 条目兼容旧格式，菜单标签退回 ±N。
-    sync_to:
-        同步目标 Stock key。当通过 steps 修改 Quota 值时，
-        同步 delta 到该 Stock key 的值。手动编辑不触发同步。
-    sync_source:
-        同步触发器的来源描述：Quota 变化自动同步到 Stock 时，
-        Stock 历史记录自动携带该 source。
     increment_only:
         单向增加模式。勾选后右键菜单只显示「增加...」，不提供减少功能。
     """
@@ -139,26 +234,24 @@ class QuotaKeyDef(KeyDef):
     cap: int | None = None
     soft: bool = False
     steps: list[StepDef] = field(default_factory=list)
-    sync_to: str = ""
-    sync_source: str = ""
     reset_time: str = "05:00"
     reset_day: int = 0
     increment_only: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> QuotaKeyDef:
+        base = KeyDef.from_dict(data)
         return cls(
-            key=data.get("key", ""),
-            label=data.get("label", ""),
-            description=data.get("description", ""),
-            show_cap=data.get("show_cap", False),
-            sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
+            key=base.key,
+            label=base.label,
+            description=base.description,
+            show_cap=base.show_cap,
+            sources=base.sources,
+            sync_targets=base.sync_targets,
             period=data.get("period", "week"),
             cap=data.get("cap"),
             soft=data.get("soft", False),
             steps=parse_steps(data.get("steps", [])),
-            sync_to=data.get("sync_to", ""),
-            sync_source=str(data.get("sync_source", "")).strip(),
             reset_time=data.get("reset_time", "05:00"),
             reset_day=data.get("reset_day", 0),
             increment_only=data.get("increment_only", False),
@@ -187,12 +280,14 @@ class RegenKeyDef(KeyDef):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RegenKeyDef:
+        base = KeyDef.from_dict(data)
         return cls(
-            key=data.get("key", ""),
-            label=data.get("label", ""),
-            description=data.get("description", ""),
-            show_cap=data.get("show_cap", False),
-            sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
+            key=base.key,
+            label=base.label,
+            description=base.description,
+            show_cap=base.show_cap,
+            sources=base.sources,
+            sync_targets=base.sync_targets,
             cap=data.get("cap"),
             regen_period=data.get("regen_period", "minute"),
             regen_value=data.get("regen_value", 0.0),
@@ -218,12 +313,14 @@ class StockKeyDef(KeyDef):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StockKeyDef:
+        base = KeyDef.from_dict(data)
         return cls(
-            key=data.get("key", ""),
-            label=data.get("label", ""),
-            description=data.get("description", ""),
-            show_cap=data.get("show_cap", False),
-            sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
+            key=base.key,
+            label=base.label,
+            description=base.description,
+            show_cap=base.show_cap,
+            sources=base.sources,
+            sync_targets=base.sync_targets,
             cap=data.get("cap"),
             soft=data.get("soft", False),
             steps=parse_steps(data.get("steps", [])),

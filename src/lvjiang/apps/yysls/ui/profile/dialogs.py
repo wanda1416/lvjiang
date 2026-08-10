@@ -160,7 +160,7 @@ def ask_value_dialog(
         sync_check = QCheckBox("同步变更依赖方")
         sync_check.setChecked(sync_default)
         sync_check.setToolTip(
-            "勾选：按 action 语义处理，触发配额→资源的同步（如配置了 sync_to）。\n"
+            "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n"
             "取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
         )
         layout.addRow(sync_check)

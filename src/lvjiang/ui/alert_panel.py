@@ -123,3 +123,12 @@ class AlertPanel(QWidget):
     def dismiss_current(self) -> None:
         """手动关闭当前告警（供外部调用）"""
         self._on_close_clicked()
+
+    def refresh(self) -> None:
+        """从 session.json 重新加载告警并刷新显示（供信号触发）"""
+        alerts = get_alerts()
+        if alerts:
+            self._display_alert(alerts[0])
+        else:
+            self._current_alert_id = None
+            self.setVisible(False)

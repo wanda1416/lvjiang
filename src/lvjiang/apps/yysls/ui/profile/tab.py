@@ -68,13 +68,18 @@ def add_user_nav_buttons(btn_row: QHBoxLayout, host) -> None:
     btn_next.clicked.connect(lambda: host.navigate_user(1))
     btn_row.addWidget(btn_next)
 
-    def _update_enabled(idx: int) -> None:
+    def _update_enabled(*_args) -> None:
+        idx = host.user_combo.currentIndex()
         count = host.user_combo.count()
         btn_prev.setEnabled(idx > 0)
         btn_next.setEnabled(idx < count - 1)
 
     host.user_combo.currentIndexChanged.connect(_update_enabled)
-    _update_enabled(host.user_combo.currentIndex())
+    # user_changed 信号覆盖 blockSignals 期间的用户切换（如批量执行器）
+    host.user_changed.connect(lambda _n: _update_enabled())
+    # 延迟到事件循环再执行初始状态检查，确保 _refresh_user_combo 已完成
+    from PyQt6.QtCore import QTimer
+    QTimer.singleShot(0, _update_enabled)
 
 
 # ─── 其他信息 Tab ────────────────────────────────────────────
@@ -123,10 +128,12 @@ class ProfileTab(QWidget):
                 self._detail_refresh_timer.start()
 
     def _on_alert_triggered(self, key: str, label: str, message: str) -> None:
-        """处理 ProfileEngine 的告警信号，推送到公共告警面板"""
-        from datetime import datetime
-        alert_id = f"yysls:{key}"
-        self._host.alert_panel.push_alert(alert_id, message, datetime.now().isoformat())
+        """处理 ProfileEngine 的告警信号，刷新公共告警面板
+
+        持久化已由引擎侧 add_alert 完成，这里仅通知面板刷新显示。
+        """
+        if getattr(self._host, 'alert_panel', None) is not None:
+            self._host.alert_panel.refresh()
 
     def _refresh_pending_detail(self) -> None:
         if self._pending_detail_refresh and self._detail_page is not None:

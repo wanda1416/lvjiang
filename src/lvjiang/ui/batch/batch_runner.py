@@ -27,7 +27,6 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from ...core.batch_config import BatchConfigItem
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
-from ...core.user_config import UserConfigManager
 from ...workflows.engine import WorkflowEngine
 
 # 进度状态常量
@@ -70,12 +69,10 @@ class BatchWorker(QThread):
     Signals:
         progress(entry_label, script_id, status): 进度更新
         log(str): 日志行（由 host 转发到日志面板）
-        user_changed(str): 用户切换通知（由 host 转发到主页面）
         finished_all(dict): 全部结束，携带汇总
     """
     progress = pyqtSignal(str, str, str)
     log = pyqtSignal(str)
-    user_changed = pyqtSignal(str)
     finished_all = pyqtSignal(dict)
 
     def __init__(
@@ -84,7 +81,6 @@ class BatchWorker(QThread):
         scripts: list[BatchScript],
         config: BatchConfigItem,
         ctx: BatchContext,
-        user_manager: UserConfigManager,
         session_manager: SessionManager,
         stop_check: Callable[[], bool],
         parent=None,
@@ -94,7 +90,6 @@ class BatchWorker(QThread):
         self._scripts = scripts
         self._config = config
         self._ctx = ctx
-        self._user_manager = user_manager
         self._session_manager = session_manager
         self._stop_check = stop_check
         self._stopped = False
@@ -134,12 +129,11 @@ class BatchWorker(QThread):
             else:
                 entry_result["switch"] = ST_SKIPPED
 
-            # 2. 工具侧 session 切换（user 是角色名，从 row_data 获取）
-            role = self._get_role_from_row(row_data)
-            if role:
-                self._user_manager.set_active_user(role)
-                self.user_changed.emit(role)  # 通知主页面更新当前用户
-                session = self._session_manager.load(role)
+            # 2. 批量层显式传递用户：按行加载该用户 session，
+            #    不触碰全局 active user，与 UI 下拉框彻底无关
+            username = self._get_username_from_row(row_data)
+            if username:
+                session = self._session_manager.load(username)
             else:
                 session = {}
 
@@ -153,12 +147,12 @@ class BatchWorker(QThread):
                 self.progress.emit(label, script.id, ST_RUNNING)
                 self.log.emit(f"[批量] {label} → {script.name} ...")
                 try:
-                    result = self._run_script(script, session)
+                    result = self._run_script(script, session, username)
                     entry_result["scripts"][script.id] = ST_SUCCESS
                     self.progress.emit(label, script.id, ST_SUCCESS)
                     self.log.emit(f"[批量] {label} → {script.name} 完成")
                     any_success = True
-                    self._save_result(role or "unknown", script, result)
+                    self._save_result(username or "unknown", script, result)
                 except Exception as e:
                     tb = traceback.format_exc()
                     logger.error(f"批量执行 {label}/{script.name} 异常:\n{tb}")
@@ -167,8 +161,8 @@ class BatchWorker(QThread):
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
 
             # 4. session 落盘
-            if any_success and role:
-                self._session_manager.save(role, session)
+            if any_success and username:
+                self._session_manager.save(username, session)
 
             prev_row = row_data
 
@@ -209,10 +203,11 @@ class BatchWorker(QThread):
                 parts.append(str(val))
         return " / ".join(parts) if parts else f"(行 {row_idx})"
 
-    def _get_role_from_row(self, row_data: dict) -> str | None:
-        """根据配置的 user_column 获取用户名（用于 session 切换）
+    def _get_username_from_row(self, row_data: dict) -> str | None:
+        """获取该行的用户名（yysls 中为游戏角色名 role）
 
-        如果未配置 user_column，返回 None（不切换用户）
+        根据配置的 user_column 获取用户名（用于 session 绑定）
+        如果未配置 user_column，返回 None（不绑定用户）
         """
         if not self._config.user_column:
             return None
@@ -270,13 +265,18 @@ class BatchWorker(QThread):
             self.log.emit(f"[批量] 切换异常: {e}")
             return False
 
-    def _run_script(self, script: BatchScript, session: dict) -> dict:
+    def _run_script(self, script: BatchScript, session: dict, username: str | None) -> dict:
         """执行单个脚本，返回 collect 结果
 
         参数从 wf_configs 按 script.id 加载，批量层不传递参数。
+        用户信息由批量层显式传递（username）：引擎绑定 run_username 与
+        save_fn，全程不读全局 active user。
         """
         engine = self._create_engine()
         engine.session = session
+        engine.run_username = username or ""
+        if username:
+            engine._save_callback = self._session_manager.save_fn(username, session)
 
         # 参数由执行时从 wf_configs 加载，而非批量层传递
         from ...core.config.wf_configs import get_wf_config

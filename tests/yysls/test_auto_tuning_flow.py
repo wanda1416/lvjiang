@@ -1599,7 +1599,7 @@ class TestTuningDocIntegration:
             lambda equip_data, *a, **k: dict(
                 _WORTHY if equip_data.name == "好剑" else _JUNK))
         wf = FakeWF()
-        wf.ctx.doc_username = "小明"
+        wf._engine.run_username = "小明"
         wf.ctx.doc_dir = tmp_path
         wf._ocr_map[TUNE_SCENE] = {
             "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",

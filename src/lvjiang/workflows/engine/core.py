@@ -116,6 +116,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # session / context（公开属性，UI 层注入）
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
+        # 本次运行归属的用户名（启动时由 UI 层/批量层快照注入）。
+        # 整个运行生命周期只依赖此绑定值，绝不再重读全局 active user，
+        # 保证运行期间 UI 切换用户不影响数据落盘归属。
+        self.run_username: str = ""
         self._save_callback: Callable | None = None
         # UI 交互回调（UI 层注入，解决工作流线程不能直接弹对话框的问题）
         # 签名: (action, **kwargs) → result

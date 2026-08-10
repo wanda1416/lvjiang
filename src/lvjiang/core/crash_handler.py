@@ -18,6 +18,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from ..constants import PROJECT_ROOT
+
 # faulthandler 预建的文件句柄与路径（atexit 清理空文件用）
 _fault_file = None
 _fault_path: Path | None = None
@@ -29,7 +31,7 @@ _windows_handler_keepalive = None
 
 def _crash_log_dir() -> Path:
     """崩溃日志目录"""
-    d = Path("logs/crashes")
+    d = PROJECT_ROOT / "logs" / "crashes"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

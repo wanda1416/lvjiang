@@ -19,6 +19,8 @@ import argparse
 import logging
 import sys
 
+from lvjiang.constants import PROJECT_ROOT
+
 
 def _configure_dpi() -> None:
     """Windows 下锁定 DPI 感知为 Per-Monitor v2，避免截图坐标偏移。
@@ -53,7 +55,7 @@ def _configure_logging() -> None:
         level="DEBUG",
     )
     logger.add(
-        "logs/lvjiang_{time:YYYY-MM-DD}.log",
+        str(PROJECT_ROOT / "logs" / "lvjiang_{time:YYYY-MM-DD}.log"),
         rotation="1 day",
         retention="7 days",
         encoding="utf-8",

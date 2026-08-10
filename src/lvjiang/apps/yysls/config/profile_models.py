@@ -169,7 +169,8 @@ class KeyDef:
 
     不含 model 字段 — 模型类型由 profile.yaml 的父节点决定。
     show_cap: 是否在总览中展示上限（value/cap），默认否。
-    sources: 来源词表，增减操作时供下拉选择。
+    sources: 来源词表，增加操作时供下拉选择。
+    uses: 用途词表，减少操作时供下拉选择。
     sync_targets: 触发器同步目标列表，任意模型类型的 action 动作都会触发；
         每个目标独立倍率（允许负数 / 小数），key 采用 `model_type:key` 命名空间。
     """
@@ -179,6 +180,7 @@ class KeyDef:
     description: str = ""
     show_cap: bool = False
     sources: list[str] = field(default_factory=list)
+    uses: list[str] = field(default_factory=list)
     sync_targets: list[SyncTargetDef] = field(default_factory=list)
 
     @classmethod
@@ -189,6 +191,7 @@ class KeyDef:
             description=data.get("description", ""),
             show_cap=data.get("show_cap", False),
             sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
+            uses=[str(s).strip() for s in data.get("uses", []) if str(s).strip()],
             sync_targets=parse_sync_targets(data.get("sync_targets", [])),
         )
 
@@ -247,6 +250,7 @@ class QuotaKeyDef(KeyDef):
             description=base.description,
             show_cap=base.show_cap,
             sources=base.sources,
+            uses=base.uses,
             sync_targets=base.sync_targets,
             period=data.get("period", "week"),
             cap=data.get("cap"),
@@ -287,6 +291,7 @@ class RegenKeyDef(KeyDef):
             description=base.description,
             show_cap=base.show_cap,
             sources=base.sources,
+            uses=base.uses,
             sync_targets=base.sync_targets,
             cap=data.get("cap"),
             regen_period=data.get("regen_period", "minute"),
@@ -320,6 +325,7 @@ class StockKeyDef(KeyDef):
             description=base.description,
             show_cap=base.show_cap,
             sources=base.sources,
+            uses=base.uses,
             sync_targets=base.sync_targets,
             cap=data.get("cap"),
             soft=data.get("soft", False),

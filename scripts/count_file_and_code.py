@@ -1,26 +1,30 @@
 import os, pathlib
 
 exts = ['.py', '.md']
-skip = {'__pycache__', '.idea', '.qoder', '.agents', 'node_modules', '.venv', 'logs', '.tooling', 'android', 'tests'}
+targets = ['src', 'docs']
+skip = {'__pycache__', '.idea', '.qoder', '.agents', 'node_modules', '.venv', 'logs', '.tooling', 'android', 'tests', 'dist'}
 results = {e: {'files': 0, 'lines': 0, 'chars': 0} for e in exts}
 details = {e: [] for e in exts}
 
-for root, dirs, files in os.walk('.'):
-    if any(s in root for s in skip):
+for base in targets:
+    if not os.path.isdir(base):
         continue
-    for f in files:
-        p = pathlib.Path(root) / f
-        if p.suffix in exts:
-            try:
-                content = p.read_text(encoding='utf-8', errors='ignore')
-            except Exception:
-                continue
-            lines = len(content.splitlines())
-            chars = len(content)
-            results[p.suffix]['files'] += 1
-            results[p.suffix]['lines'] += lines
-            results[p.suffix]['chars'] += chars
-            details[p.suffix].append((str(p), lines, chars))
+    for root, dirs, files in os.walk(base):
+        if any(s in root for s in skip):
+            continue
+        for f in files:
+            p = pathlib.Path(root) / f
+            if p.suffix in exts:
+                try:
+                    content = p.read_text(encoding='utf-8', errors='ignore')
+                except Exception:
+                    continue
+                lines = len(content.splitlines())
+                chars = len(content)
+                results[p.suffix]['files'] += 1
+                results[p.suffix]['lines'] += lines
+                results[p.suffix]['chars'] += chars
+                details[p.suffix].append((str(p), lines, chars))
 
 for e in exts:
     print(f"\n{'='*60}")

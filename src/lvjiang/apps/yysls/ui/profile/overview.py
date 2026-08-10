@@ -725,8 +725,11 @@ class ProfileOverviewTab(QWidget):
         if delta == 0:
             return
 
-        # Cell 编辑路径默认取 kd.sources 的第一个来源（为空则写空）
-        cell_source = kd.sources[0] if kd.sources else ""
+        # Cell 编辑路径根据变动方向选择对应词表（增加→来源，减少→用途）
+        if delta > 0:
+            cell_source = kd.sources[0] if kd.sources else ""
+        else:
+            cell_source = kd.uses[0] if kd.uses else ""
 
         self._adjust_value(
             user_name, model_type, key_str, kd, current_value, delta,
@@ -1164,6 +1167,7 @@ class ProfileOverviewTab(QWidget):
             initial_value=current_value,
             sync_checkbox=True,
             sync_default=True,
+            source_label="来源/用途",
         )
         if not ok:
             return

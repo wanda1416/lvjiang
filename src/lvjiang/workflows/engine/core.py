@@ -9,6 +9,7 @@ from typing import Callable
 import cv2
 from loguru import logger
 
+from ...constants import PROJECT_ROOT
 from ...core.capture_base import CaptureBackend
 from ...core.config import DelayParam, InputSimConfig
 from ...core.config.resolver import get_resolver
@@ -590,7 +591,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         filename = f"image_{timestamp}.png"
 
         # 保存目录
-        out_dir = Path("logs/image")
+        out_dir = PROJECT_ROOT / "logs" / "image"
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / filename
 

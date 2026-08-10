@@ -25,6 +25,8 @@ import cv2
 import numpy as np
 from loguru import logger
 
+from ..constants import PROJECT_ROOT
+
 
 @dataclass(frozen=True)
 class SlotAxis:
@@ -368,7 +370,7 @@ def _save_debug_image(image: np.ndarray, tag: str) -> Path | None:
     返回保存路径；保存失败返回 None（仅 log，不抛异常）。
     """
     try:
-        out_dir = Path("logs/image")
+        out_dir = PROJECT_ROOT / "logs" / "image"
         out_dir.mkdir(parents=True, exist_ok=True)
         ts = time.strftime("%Y%m%d_%H%M%S")
         out_path = out_dir / f"{ts}_{tag}.png"

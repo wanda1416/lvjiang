@@ -82,6 +82,75 @@ class TestCRUD:
         assert db.get_entry("user1", "quota", "k1")["value"] == 10
         assert db.get_entry("user2", "quota", "k1")["value"] == 99
 
+    def test_update_if_current_success(self, db: ProfileDB):
+        db.upsert("user1", "regen", "xinli", 100, updated_at="2026-08-11T10:00:00")
+        updated = db.update_if_current(
+            "user1", "regen", "xinli",
+            expected_value=100,
+            expected_updated_at="2026-08-11T10:00:00",
+            new_value=101,
+            new_updated_at="2026-08-11T10:08:00",
+            change_type="tick",
+            detail="regen:+1.0000",
+        )
+
+        assert updated is True
+        entry = db.get_entry("user1", "regen", "xinli")
+        assert entry["value"] == 101
+        assert entry["updated_at"] == "2026-08-11T10:08:00"
+        history = db.get_history("user1")
+        assert len(history) == 1
+        assert history[0]["old_value"] == 100
+        assert history[0]["new_value"] == 101
+
+    def test_update_if_current_value_mismatch_fails(self, db: ProfileDB):
+        db.upsert("user1", "regen", "xinli", 100, updated_at="2026-08-11T10:00:00")
+        updated = db.update_if_current(
+            "user1", "regen", "xinli",
+            expected_value=99,
+            expected_updated_at="2026-08-11T10:00:00",
+            new_value=101,
+            new_updated_at="2026-08-11T10:08:00",
+            change_type="tick",
+            detail="regen:+1.0000",
+        )
+
+        assert updated is False
+        entry = db.get_entry("user1", "regen", "xinli")
+        assert entry["value"] == 100
+        assert entry["updated_at"] == "2026-08-11T10:00:00"
+        assert db.get_history("user1") == []
+
+    def test_update_if_current_updated_at_mismatch_fails(self, db: ProfileDB):
+        db.upsert("user1", "regen", "xinli", 100, updated_at="2026-08-11T10:01:00")
+        updated = db.update_if_current(
+            "user1", "regen", "xinli",
+            expected_value=100,
+            expected_updated_at="2026-08-11T10:00:00",
+            new_value=101,
+            new_updated_at="2026-08-11T10:08:00",
+            change_type="tick",
+            detail="regen:+1.0000",
+        )
+
+        assert updated is False
+        entry = db.get_entry("user1", "regen", "xinli")
+        assert entry["value"] == 100
+        assert entry["updated_at"] == "2026-08-11T10:01:00"
+        assert db.get_history("user1") == []
+
+    def test_update_if_current_missing_entry_fails(self, db: ProfileDB):
+        updated = db.update_if_current(
+            "user1", "regen", "xinli",
+            expected_value=100,
+            expected_updated_at="2026-08-11T10:00:00",
+            new_value=101,
+            new_updated_at="2026-08-11T10:08:00",
+        )
+
+        assert updated is False
+        assert db.get_entry("user1", "regen", "xinli") == {}
+
 
 # ─── Schema 版本管理 ──────────────────────────────────────────
 
@@ -290,3 +359,27 @@ class TestConcurrentUpsert:
         # 由于并发，某些 tick 可能读到与写入相同的值 → history 行数 ≤ 20
         history = db.get_history("u", limit=100)
         assert len(history) > 0
+
+    def test_concurrent_cas_allows_only_one_tick_from_same_snapshot(self, db: ProfileDB):
+        """多个 tick 基于同一快照写入时，只允许一个 CAS 成功。"""
+        db.upsert("u", "regen", "xinli", 100, updated_at="2026-08-11T10:00:00")
+
+        def tick(_i: int) -> bool:
+            return db.update_if_current(
+                "u", "regen", "xinli",
+                expected_value=100,
+                expected_updated_at="2026-08-11T10:00:00",
+                new_value=101,
+                new_updated_at="2026-08-11T10:08:00",
+                change_type="tick",
+                detail="regen:+1.0000",
+            )
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            results = list(executor.map(tick, range(8)))
+
+        assert results.count(True) == 1
+        assert db.get_entry("u", "regen", "xinli")["value"] == 101
+        history = db.get_history("u", limit=100)
+        assert len(history) == 1
+        assert history[0]["detail"] == "regen:+1.0000"

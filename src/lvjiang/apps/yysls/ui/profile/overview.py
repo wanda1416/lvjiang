@@ -18,6 +18,7 @@ from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import (
     QComboBox,
+    QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -55,7 +56,7 @@ from ...config.user_profile import (
     get_profile_config,
     save_profile_config,
 )
-from ...profile.profile_db import db_read_all, db_upsert
+from ...profile.profile_db import db_read_all, db_update_if_current, db_upsert
 from ...profile.profile_engine import compute_regen_entry
 from .cell_formatting import (
     apply_cell_style,
@@ -110,7 +111,7 @@ class ProfileOverviewTab(QWidget):
         self._editing_cap_cell = False
         self._restoring_widths = False
         self._reordering = False
-        self._refresh_timer = _make_debounce_timer(self, self.refresh)
+        self._refresh_timer = _make_debounce_timer(self, self._refresh_when_idle)
         self._setup_ui()
         self._connect_profile_engine()
 
@@ -127,6 +128,20 @@ class ProfileOverviewTab(QWidget):
         """合并后台批量更新，避免每个用户更新都刷新整张总览表。"""
         if not self._refresh_timer.isActive():
             self._refresh_timer.start()
+
+    def _is_editing_cell(self) -> bool:
+        """判断总览表是否有正在编辑的单元格。"""
+        return any(
+            table.state() == QAbstractItemView.State.EditingState
+            for table in self._tables.values()
+        )
+
+    def _refresh_when_idle(self) -> None:
+        """后台刷新只在单元格未编辑时执行，避免重建表格打断编辑。"""
+        if self._is_editing_cell():
+            self._refresh_timer.start()
+            return
+        self.refresh()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -731,7 +746,7 @@ class ProfileOverviewTab(QWidget):
 
         self._adjust_value(
             user_name, model_type, key_str, kd, current_value, delta,
-            is_action=True, source=cell_source,
+            is_action=True, source=cell_source, expected_entry=dict(entry),
         )
 
     def _on_cell_context_menu(self, pos, group_name: str, table: QTableWidget):
@@ -774,6 +789,7 @@ class ProfileOverviewTab(QWidget):
             current_value = 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value, _ = compute_regen_entry(entry, kd)
+        expected_entry = dict(entry)
 
         # 构建菜单
         menu = QMenu(self)
@@ -805,7 +821,7 @@ class ProfileOverviewTab(QWidget):
                     action.triggered.connect(
                         lambda checked, s=step: self._adjust_value(
                             user_name, model_type, key_str, kd, current_value, s.value,
-                            is_action=True, source=s.source,
+                            is_action=True, source=s.source, expected_entry=expected_entry,
                         )
                     )
             menu.addSeparator()
@@ -814,7 +830,8 @@ class ProfileOverviewTab(QWidget):
             if action_inc:
                 action_inc.triggered.connect(
                     lambda: self._adjust_value_custom(
-                        user_name, model_type, key_str, kd, current_value, direction=1
+                        user_name, model_type, key_str, kd, current_value, direction=1,
+                        expected_entry=expected_entry,
                     )
                 )
             # 单向增加模式下不提供减少
@@ -823,7 +840,8 @@ class ProfileOverviewTab(QWidget):
                 if action_dec:
                     action_dec.triggered.connect(
                         lambda: self._adjust_value_custom(
-                            user_name, model_type, key_str, kd, current_value, direction=-1
+                            user_name, model_type, key_str, kd, current_value, direction=-1,
+                            expected_entry=expected_entry,
                         )
                     )
         else:
@@ -832,7 +850,8 @@ class ProfileOverviewTab(QWidget):
             if action_inc:
                 action_inc.triggered.connect(
                     lambda: self._adjust_value_custom(
-                        user_name, model_type, key_str, kd, current_value, direction=1
+                        user_name, model_type, key_str, kd, current_value, direction=1,
+                        expected_entry=expected_entry,
                     )
                 )
             # 单向增加模式下不提供减少
@@ -841,7 +860,8 @@ class ProfileOverviewTab(QWidget):
                 if action_dec:
                     action_dec.triggered.connect(
                         lambda: self._adjust_value_custom(
-                            user_name, model_type, key_str, kd, current_value, direction=-1
+                            user_name, model_type, key_str, kd, current_value, direction=-1,
+                            expected_entry=expected_entry,
                         )
                     )
 
@@ -899,6 +919,8 @@ class ProfileOverviewTab(QWidget):
         delta: int | float,
         is_action: bool = True,
         source: str = "",
+        expected_entry: dict | None = None,
+        use_cas: bool = True,
     ):
         """增减数值并写回
 
@@ -945,12 +967,40 @@ class ProfileOverviewTab(QWidget):
         else:
             detail = f"override:{new_value}"
 
-        self._write_profile_entry(
-            user_name, model_type, key, new_value,
-            change_type="action" if is_action else "override",
-            detail=detail,
-            source=source,
-        )
+        if model_type == MODEL_REGEN and is_action and use_cas and expected_entry is not None:
+            try:
+                updated = db_update_if_current(
+                    user_name, model_type, key,
+                    expected_value=expected_entry.get("value", 0) or 0,
+                    expected_updated_at=expected_entry.get("updated_at", ""),
+                    new_value=new_value,
+                    change_type="action",
+                    detail=detail,
+                    source=source,
+                )
+            except Exception as e:
+                logger.error(f"CAS 回写失败: {e}")
+                QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
+                return
+            if not updated:
+                logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
+                QMessageBox.warning(
+                    self, "写入冲突",
+                    "该数值已被其他进程更新，本次增减未写入。请刷新后重试。",
+                )
+                current_group = self._get_current_group_name()
+                table = self._tables.get(current_group)
+                if table:
+                    self._refresh_group(current_group, table)
+                return
+            logger.debug(f"已 CAS 回写 {user_name}.profile.{model_type}.{key} = {new_value}")
+        else:
+            self._write_profile_entry(
+                user_name, model_type, key, new_value,
+                change_type="action" if is_action else "override",
+                detail=detail,
+                source=source,
+            )
 
         # 触发器同步（仅 action 动作触发）
         if is_action and kd.sync_targets:
@@ -1062,6 +1112,7 @@ class ProfileOverviewTab(QWidget):
         kd,
         current_value,
         direction: int = 0,
+        expected_entry: dict | None = None,
     ):
         """自定义增减数值（带来源/用途选择）
 
@@ -1131,7 +1182,7 @@ class ProfileOverviewTab(QWidget):
         # 自定义增减属于 action，触发 sync_targets 同步
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
-            is_action=True, source=source,
+            is_action=True, source=source, expected_entry=expected_entry,
         )
 
     def _override_value_custom(
@@ -1185,7 +1236,7 @@ class ProfileOverviewTab(QWidget):
         # sync_checked=False: 纯覆写语义（change_type="override"，不触发同步）
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
-            is_action=sync_checked, source=source,
+            is_action=sync_checked, source=source, use_cas=False,
         )
 
     def _show_history_dialog(

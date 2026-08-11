@@ -2,7 +2,7 @@
 
 低频后台线程，每 60 秒 tick 一次，负责：
 1. 周期检查与重置（quota 的 period 到期清零）
-2. 再生计算（regen 按 regen_period + regen_value 回复，封顶 cap）
+2. 再生计算（regen 显式区分实时恢复与准点恢复，封顶 cap）
 
 Signals:
     alert_triggered(key, label, message): 提醒触发
@@ -34,6 +34,7 @@ from ..config.user_profile import (
     get_profile_config,
 )
 from .profile_db import db_read_all, db_update_if_current, db_upsert
+from .regen_math import compute_regen_entry
 
 # ─── 周期边界计算 ────────────────────────────────────────────
 
@@ -239,25 +240,6 @@ def _compute_regen_value(
     new_ts_str = new_ts.isoformat(timespec="seconds")
 
     return computed, new_ts_str
-
-
-def compute_regen_entry(entry: dict, key_def: RegenKeyDef) -> tuple[float, str]:
-    """按 RegenKeyDef 计算一个 profile entry 的当前值。
-
-    entry["value"] 允许带小数；对 minute/hour 来说，小数用于表达已经累计、
-    但总览按整数展示的进度。
-    """
-    stored_value = entry.get("value", 0) or 0
-    updated_at_str = entry.get("updated_at", "")
-    return _compute_regen_value(
-        stored_value,
-        updated_at_str,
-        key_def.regen_period,
-        key_def.regen_value,
-        key_def.cap,
-        key_def.reset_time,
-        key_def.reset_day,
-    )
 
 
 def _count_quota_regens(
@@ -483,22 +465,19 @@ class ProfileEngine(QThread):
             stored_value = entry.get("value", 0)
             updated_at_str = entry.get("updated_at", "")
 
-            computed, new_ts = compute_regen_entry(entry, kd)
+            regen_result = compute_regen_entry(entry, kd)
+            computed = regen_result.value
 
-            # 分钟/小时级再生值由 UI 基于 value + updated_at 实时计算展示。
-            # tick 不推进这些 entry，也不触发 UI 刷新，避免心力这类分钟级字段
-            # 频繁落盘或打断表格编辑。
-            persist_tick = kd.regen_period not in ("minute", "hour")
-
-            # 日/周级再生仍需要持久化周期边界，避免每日/每周回复遗漏。
-            if persist_tick and int(computed) != int(stored_value):
+            # realtime 由 UI 基于 value + updated_at 实时计算展示，tick 不落库；
+            # boundary 经过准点边界后持久化，避免日/周等回复遗漏。
+            if regen_result.persisted and int(computed) != int(stored_value):
                 delta = computed - (stored_value or 0)
                 updated = db_update_if_current(
                     user_name, "regen", kd.key,
                     expected_value=stored_value or 0,
                     expected_updated_at=updated_at_str,
                     new_value=computed,
-                    new_updated_at=new_ts,
+                    new_updated_at=regen_result.updated_at,
                     change_type="tick",
                     detail=f"regen:{delta:+.4f}",
                 )

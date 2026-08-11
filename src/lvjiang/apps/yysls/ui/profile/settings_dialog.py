@@ -65,13 +65,16 @@ def _format_cap(kd: KeyDef) -> str:
 
 
 def _format_period(kd: KeyDef) -> str:
-    """周期列显示（Quota 用 period，Regen 用 regen_period）"""
+    """周期列显示（Quota 用 period，Regen 按恢复类型显示）"""
     if isinstance(kd, QuotaKeyDef):
         period_labels = {"day": "每天", "week": "每周", "month": "每月", "season": "赛季", "half_season": "半赛季"}
         return period_labels.get(kd.period, kd.period)
     if isinstance(kd, RegenKeyDef):
         regen_labels = {"minute": "分钟", "hour": "小时", "day": "每天", "week": "每周"}
-        return regen_labels.get(kd.regen_period, kd.regen_period)
+        if kd.regen_type == "realtime":
+            unit = regen_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
+            return f"实时/{unit}"
+        return f"准点/{regen_labels.get(kd.regen_period, kd.regen_period)}"
     return ""
 
 
@@ -512,12 +515,16 @@ class ProfileDefinitionDialog(QDialog):
         if isinstance(kd, RegenKeyDef):
             parts = []
             period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
-            period_text = period_labels.get(kd.regen_period, kd.regen_period)
-            parts.append(f"回复:{kd.regen_value}/{period_text}")
-            if kd.regen_period == "week" and kd.reset_day:
+            if kd.regen_type == "realtime":
+                unit_text = period_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
+                parts.append(f"实时:{kd.regen_rate_value}/{unit_text}")
+            else:
+                period_text = period_labels.get(kd.regen_period, kd.regen_period)
+                parts.append(f"准点:{kd.regen_amount}/{period_text}")
+            if kd.regen_type == "boundary" and kd.regen_period == "week" and kd.reset_day:
                 if 1 <= kd.reset_day <= 7:
                     parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
-            if kd.regen_period in ("day", "week"):
+            if kd.regen_type == "boundary" and kd.regen_period in ("day", "week"):
                 parts.append(f"重置:{kd.reset_time}")
             if kd.show_cap:
                 parts.append("展示上限")
@@ -719,6 +726,15 @@ class ProfileDefinitionDialog(QDialog):
         elif model_type == MODEL_REGEN:
             rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
 
+            regen_type_combo = QComboBox()
+            regen_type_combo.addItem("实时恢复", "realtime")
+            regen_type_combo.addItem("准点恢复", "boundary")
+            idx = regen_type_combo.findData(rt_kd.regen_type)
+            if idx >= 0:
+                regen_type_combo.setCurrentIndex(idx)
+            layout.addRow("恢复类型:", regen_type_combo)
+            widgets["regen_type"] = regen_type_combo
+
             regen_period_combo = QComboBox()
             regen_period_combo.addItem("分钟", "minute")
             regen_period_combo.addItem("小时", "hour")
@@ -727,16 +743,35 @@ class ProfileDefinitionDialog(QDialog):
             idx = regen_period_combo.findData(rt_kd.regen_period)
             if idx >= 0:
                 regen_period_combo.setCurrentIndex(idx)
-            layout.addRow("回复周期:", regen_period_combo)
+            layout.addRow("准点周期:", regen_period_combo)
             widgets["regen_period"] = regen_period_combo
 
-            regen_value_spin = QDoubleSpinBox()
-            regen_value_spin.setRange(0, 99999)
-            regen_value_spin.setDecimals(4)
-            regen_value_spin.setSingleStep(0.1)
-            regen_value_spin.setValue(rt_kd.regen_value)
-            layout.addRow("回复数值:", regen_value_spin)
-            widgets["regen_value"] = regen_value_spin
+            regen_rate_unit_combo = QComboBox()
+            regen_rate_unit_combo.addItem("分钟", "minute")
+            regen_rate_unit_combo.addItem("小时", "hour")
+            regen_rate_unit_combo.addItem("天", "day")
+            regen_rate_unit_combo.addItem("周", "week")
+            idx = regen_rate_unit_combo.findData(rt_kd.regen_rate_unit)
+            if idx >= 0:
+                regen_rate_unit_combo.setCurrentIndex(idx)
+            layout.addRow("速率单位:", regen_rate_unit_combo)
+            widgets["regen_rate_unit"] = regen_rate_unit_combo
+
+            regen_rate_spin = QDoubleSpinBox()
+            regen_rate_spin.setRange(0, 99999)
+            regen_rate_spin.setDecimals(4)
+            regen_rate_spin.setSingleStep(0.1)
+            regen_rate_spin.setValue(rt_kd.regen_rate_value)
+            layout.addRow("速率数值:", regen_rate_spin)
+            widgets["regen_rate_value"] = regen_rate_spin
+
+            regen_amount_spin = QDoubleSpinBox()
+            regen_amount_spin.setRange(0, 99999)
+            regen_amount_spin.setDecimals(4)
+            regen_amount_spin.setSingleStep(1)
+            regen_amount_spin.setValue(rt_kd.regen_amount)
+            layout.addRow("每次恢复:", regen_amount_spin)
+            widgets["regen_amount"] = regen_amount_spin
 
             reset_input = QLineEdit(rt_kd.reset_time)
             reset_input.setFixedWidth(80)
@@ -767,19 +802,30 @@ class ProfileDefinitionDialog(QDialog):
             widgets["alert_red"] = red_spin
 
             def _update_reset_time_visibility():
+                regen_type = regen_type_combo.currentData()
                 period = regen_period_combo.currentData()
+                is_realtime = regen_type == "realtime"
                 is_day_or_week = period in ("day", "week")
                 is_week = period == "week"
-                reset_input.setVisible(is_day_or_week)
-                reset_day_spin.setVisible(is_week)
-                reset_day_label.setVisible(is_week)
+                regen_period_combo.setVisible(not is_realtime)
+                regen_amount_spin.setVisible(not is_realtime)
+                regen_rate_unit_combo.setVisible(is_realtime)
+                regen_rate_spin.setVisible(is_realtime)
+                for field in (regen_period_combo, regen_amount_spin, regen_rate_unit_combo, regen_rate_spin):
+                    label_widget = reset_input.parent().layout().labelForField(field)
+                    if label_widget:
+                        label_widget.setVisible(field.isVisible())
+                reset_input.setVisible((not is_realtime) and is_day_or_week)
+                reset_day_spin.setVisible((not is_realtime) and is_week)
+                reset_day_label.setVisible((not is_realtime) and is_week)
                 # 更新标签
                 label_widget = reset_input.parent().layout().labelForField(reset_input)
                 if label_widget:
-                    label_widget.setVisible(is_day_or_week)
+                    label_widget.setVisible((not is_realtime) and is_day_or_week)
                 if is_week:
                     reset_day_label.setText("重置日(周几):")
             regen_period_combo.currentIndexChanged.connect(_update_reset_time_visibility)
+            regen_type_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             _update_reset_time_visibility()
 
             # 自定义增减幅度（支持 value:来源）
@@ -904,8 +950,11 @@ class ProfileDefinitionDialog(QDialog):
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
+                    regen_type=widgets["regen_type"].currentData(),
+                    regen_rate_value=widgets["regen_rate_value"].value(),
+                    regen_rate_unit=widgets["regen_rate_unit"].currentData(),
+                    regen_amount=widgets["regen_amount"].value(),
                     regen_period=widgets["regen_period"].currentData(),
-                    regen_value=widgets["regen_value"].value(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
                     alert_orange=orange_val if orange_val > 0 else None,

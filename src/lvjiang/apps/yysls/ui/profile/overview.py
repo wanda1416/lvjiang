@@ -15,7 +15,7 @@ ProfileOverviewTab: 宽表展示所有角色的概要信息，交互式列头配
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
@@ -60,7 +60,12 @@ from ...config.user_profile import (
     save_profile_config,
 )
 from ...profile.profile_db import db_read_all, db_update_if_current, db_upsert
-from ...profile.profile_engine import compute_regen_entry
+from ...profile.regen_math import (
+    compute_realtime_value,
+    compute_regen_entry,
+    is_realtime_regen,
+    normalize_realtime_write,
+)
 from .cell_formatting import (
     apply_cell_style,
     format_cell_tooltip,
@@ -101,48 +106,21 @@ _PARSE_ERROR = object()
 
 
 def _is_continuous_regen(kd) -> bool:
-    return (
-        isinstance(kd, RegenKeyDef)
-        and kd.regen_period in ("minute", "hour")
-        and kd.regen_value > 0
-    )
+    return isinstance(kd, RegenKeyDef) and is_realtime_regen(kd)
 
 
 def _normalize_continuous_regen_write(kd: RegenKeyDef, raw_value: float) -> tuple[float, str]:
-    """将分钟/小时级 regen 的小数进度折算到 updated_at，DB value 只存整数。"""
-    now = datetime.now()
-    value = max(0.0, float(raw_value))
-    stored_value = math.floor(value)
-    fraction = value - stored_value
-    base_seconds = 60 if kd.regen_period == "minute" else 3600
-    rollback_seconds = (fraction * base_seconds) / kd.regen_value
-    updated_at = (now - timedelta(seconds=rollback_seconds)).isoformat(timespec="seconds")
-    return float(stored_value), updated_at
+    return normalize_realtime_write(kd, max(0.0, float(raw_value)))
 
 
 def _compute_continuous_regen_value(entry: dict, kd: RegenKeyDef) -> float:
-    """按秒计算分钟/小时级 regen 当前值；只用于 UI 手动写入语义。"""
-    stored_value = entry.get("value", 0) or 0
-    updated_at = entry.get("updated_at", "")
-    if not updated_at:
-        return float(stored_value)
-    try:
-        stored_ts = datetime.fromisoformat(updated_at)
-    except (ValueError, TypeError):
-        return float(stored_value)
-    base_seconds = 60 if kd.regen_period == "minute" else 3600
-    elapsed_seconds = max((datetime.now() - stored_ts).total_seconds(), 0)
-    current_value = float(stored_value) + (elapsed_seconds / base_seconds) * kd.regen_value
-    if kd.cap is not None:
-        current_value = min(current_value, kd.cap)
-    return current_value
+    return compute_realtime_value(entry.get("value", 0) or 0, entry.get("updated_at", ""), kd)
 
 
 def _current_regen_value(entry: dict, kd: RegenKeyDef) -> float:
     if _is_continuous_regen(kd):
         return _compute_continuous_regen_value(entry, kd)
-    current_value, _ = compute_regen_entry(entry, kd)
-    return current_value
+    return compute_regen_entry(entry, kd).value
 
 
 # ─── 档案总览 Tab ────────────────────────────────────────────

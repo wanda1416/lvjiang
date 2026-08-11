@@ -125,6 +125,11 @@ class FakeWF(AutoTuningWorkflow):
     def wait_delay(self, name: str):
         pass
 
+    def wait_stable(self, timeout: float | str = 8.0, threshold: float = 0.02,
+                    interval: float = 0.3, stable_duration: float = 0.5,
+                    least: float = 0.5):
+        pass
+
     def wait_seconds(self, seconds: float):
         pass
 

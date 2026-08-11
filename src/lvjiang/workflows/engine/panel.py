@@ -212,29 +212,48 @@ class _PanelMixin:
         logger.info(f"scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _recognize_panel_cell(self, node: Recognize):
-        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...] [where ...]
+        """recognize [scene].[panel][row][col] as [rich] $var [by ...] [on group ...] [where ...]
 
-        [row][col] 是 key 过滤，结果为该格材料类型名（str）。
+        [row][col] 是 key 过滤，结果为该格材料类型名（str）或富 dict（rich 模式）。
         """
         ref: PanelRef = node.scene
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         slot_img, slot_key, _, _ = self._crop_slot_image(ref)
         if slot_img is None:
-            self.variables[var_name] = ""
+            self.variables[var_name] = {} if node.rich else ""
             return
         group = self._resolve(node.group) if node.group is not None else None
         min_conf = self._resolve_min_confidence(node.where)
+        recognizer = self._ensure_workflow().material_recognizer
         if node.by is not None:
+            # by 优先：rich 不影响短路匹配语义
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
+            info = recognizer.recognize(slot_img, group=group)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
                 matched = self._match_text(info.type, target_value, by_clause.match_mode)
                 self.variables[var_name] = info.type if matched else ""
+        elif node.rich:
+            # rich 模式：返回富 dict
+            info = recognizer.recognize(slot_img, group=group)
+            if min_conf is not None and info.confidence < min_conf:
+                self.variables[var_name] = {}
+            elif not info.type:
+                self.variables[var_name] = {}
+            else:
+                base = recognizer.build_rich_base(info, group=group)
+                if node.with_func is not None:
+                    from .. import builtins
+                    func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
+                    transform = builtins.get_function(func_name)
+                    if transform is None:
+                        raise ValueError(f"未知内置函数: {func_name}")
+                    base = transform(base)
+                self.variables[var_name] = base
         else:
-            info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
+            info = recognizer.recognize(slot_img, group=group)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
@@ -297,26 +316,41 @@ class _PanelMixin:
         self.variables[var_name] = result
         logger.info(f"scan panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
-    def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None, min_confidence: float | None = None):
-        """recognize [scene].[panel] as $var [on group ...] [where ...] — 整面板逐格材料识别
+    def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None, min_confidence: float | None = None, rich: bool = False, with_func=None):
+        """recognize [scene].[panel] as [rich] $var [on group ...] [where ...] [with ...] — 整面板逐格材料识别
 
-        结果结构与 _scan_panel_whole 一致：$var.[行].[列] 取材料类型名。
+        结果结构与 _scan_panel_whole 一致：$var.[行].[列] 取材料类型名或富 dict（rich 模式）。
         """
         panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
         if panel_img is None:
             self.variables[var_name] = {}
             return
         recognizer = self._ensure_workflow().material_recognizer
-        result: dict[str, dict[str, str]] = {}
+        # 解析 with 转换函数
+        transform = None
+        if rich and with_func is not None:
+            from .. import builtins
+            func_name = with_func.value if hasattr(with_func, 'value') else str(with_func)
+            transform = builtins.get_function(func_name)
+            if transform is None:
+                raise ValueError(f"未知内置函数: {func_name}")
+        result: dict[str, dict[str, str | dict]] = {}
         for r, c, slot_img in self._iter_slot_images(panel_img, cal):
-            mat_type = ""
-            if slot_img is not None:
+            if slot_img is None:
+                cell_value: str | dict = {} if rich else ""
+            else:
                 info = recognizer.recognize(slot_img, group=group)
                 if min_confidence is not None and info.confidence < min_confidence:
-                    mat_type = ""
+                    cell_value = {} if rich else ""
+                elif rich:
+                    if info.type:
+                        base = recognizer.build_rich_base(info, group=group)
+                        cell_value = transform(base) if transform is not None else base
+                    else:
+                        cell_value = {}
                 else:
-                    mat_type = info.type
-            result.setdefault(str(r + 1), {})[str(c + 1)] = mat_type
+                    cell_value = info.type
+            result.setdefault(str(r + 1), {})[str(c + 1)] = cell_value
         self.variables[var_name] = result
         logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 

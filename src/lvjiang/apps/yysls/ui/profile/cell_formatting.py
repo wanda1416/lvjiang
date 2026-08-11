@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import calendar
+import math
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import Qt
@@ -255,10 +256,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
 
     lines = [f"【{kd.label}】"]
 
-    # 更新时间
     updated_at = entry.get("updated_at")
-    if updated_at:
-        lines.append(f"更新时间: {updated_at}")
 
     # 再生模型显示额外信息
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
@@ -266,15 +264,49 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         stored_value = entry.get("value", 0) or 0
         period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
         period_label = period_labels.get(kd.regen_period, kd.regen_period)
-        lines.append(f"展示值: {int(computed)}")
-        lines.append(f"精确值: {_format_number(computed)}")
-        lines.append(f"存储值: {_format_number(stored_value)}")
-        lines.append(f"回复周期: 每{period_label}")
-        lines.append(f"每次回复: {kd.regen_value}")
-        if new_ts and new_ts != updated_at:
-            lines.append(f"计算至: {new_ts}")
-        if kd.cap is not None:
-            lines.append(f"上限: {kd.cap}")
+
+        if kd.regen_period in ("minute", "hour") and kd.regen_value > 0:
+            if updated_at:
+                lines.append(f"更新时间: {updated_at}")
+            lines.append(f"回复周期: 每{period_label}")
+            lines.append(f"每次回复: {kd.regen_value}")
+            base_seconds = 60 if kd.regen_period == "minute" else 3600
+            if updated_at:
+                try:
+                    stored_ts = datetime.fromisoformat(updated_at)
+                    elapsed_seconds = (datetime.now() - stored_ts).total_seconds()
+                    elapsed_seconds = max(elapsed_seconds, 0)
+                    current_value = stored_value + (elapsed_seconds / base_seconds) * kd.regen_value
+                    if kd.cap is not None and current_value >= kd.cap:
+                        lines.append("下一点恢复: 已达上限")
+                    else:
+                        points_needed = math.floor(current_value) + 1 - current_value
+                        time_to_next = (points_needed / kd.regen_value) * base_seconds
+                        minutes = int(time_to_next // 60)
+                        seconds = int(time_to_next % 60)
+                        lines.append(f"下一点恢复: {minutes}分{seconds:02d}秒")
+                except (ValueError, TypeError):
+                    pass
+            else:
+                time_to_next = base_seconds / kd.regen_value
+                minutes = int(time_to_next // 60)
+                seconds = int(time_to_next % 60)
+                lines.append(f"下一点恢复: {minutes}分{seconds:02d}秒")
+            lines.append(f"存储值: {_format_number(stored_value)}")
+            if kd.cap is not None:
+                lines.append(f"上限: {kd.cap}")
+        else:
+            if updated_at:
+                lines.append(f"更新时间: {updated_at}")
+            lines.append(f"回复周期: 每{period_label}")
+            lines.append(f"每次回复: {kd.regen_value}")
+            if new_ts and new_ts != updated_at:
+                lines.append(f"计算至: {new_ts}")
+            if kd.cap is not None:
+                lines.append(f"上限: {kd.cap}")
+
+    if model_type != MODEL_REGEN and updated_at:
+        lines.append(f"更新时间: {updated_at}")
 
     # 配额模型显示周期、上限
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):

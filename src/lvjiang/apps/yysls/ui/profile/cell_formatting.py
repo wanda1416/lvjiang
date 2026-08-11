@@ -42,6 +42,24 @@ def _format_number(value) -> str:
         return str(value)
 
 
+def _continuous_regen_current_value(entry: dict, kd: RegenKeyDef) -> float:
+    """分钟/小时级 regen 用秒级 elapsed 计算当前值。"""
+    stored_value = entry.get("value", 0) or 0
+    updated_at = entry.get("updated_at", "")
+    if not updated_at or kd.regen_value <= 0:
+        return float(stored_value)
+    try:
+        stored_ts = datetime.fromisoformat(updated_at)
+    except (TypeError, ValueError):
+        return float(stored_value)
+    base_seconds = 60 if kd.regen_period == "minute" else 3600
+    elapsed_seconds = max((datetime.now() - stored_ts).total_seconds(), 0)
+    value = float(stored_value) + (elapsed_seconds / base_seconds) * kd.regen_value
+    if kd.cap is not None:
+        value = min(value, kd.cap)
+    return value
+
+
 def quota_period_days(period: str, now: datetime | None = None) -> int:
     """配额周期对应的总天数（用于过半判断）
 
@@ -168,8 +186,10 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
 
     if model_type == MODEL_REGEN:
         if isinstance(kd, RegenKeyDef):
-            # 再生计算当前值；小数部分表示未展示的恢复进度。
-            computed, _ = compute_regen_entry(entry, kd)
+            if kd.regen_period in ("minute", "hour") and kd.regen_value > 0:
+                computed = _continuous_regen_current_value(entry, kd)
+            else:
+                computed, _ = compute_regen_entry(entry, kd)
             int_value = int(computed)
             style = ""
             if kd.cap is not None and computed >= kd.cap:
@@ -257,6 +277,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
     lines = [f"【{kd.label}】"]
 
     updated_at = entry.get("updated_at")
+    updated_time = entry.get("updated_time")
 
     # 再生模型显示额外信息
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
@@ -268,6 +289,8 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         if kd.regen_period in ("minute", "hour") and kd.regen_value > 0:
             if updated_at:
                 lines.append(f"更新时间: {updated_at}")
+            if updated_time:
+                lines.append(f"写入时间: {updated_time}")
             lines.append(f"回复周期: 每{period_label}")
             lines.append(f"每次回复: {kd.regen_value}")
             base_seconds = 60 if kd.regen_period == "minute" else 3600
@@ -276,7 +299,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                     stored_ts = datetime.fromisoformat(updated_at)
                     elapsed_seconds = (datetime.now() - stored_ts).total_seconds()
                     elapsed_seconds = max(elapsed_seconds, 0)
-                    current_value = stored_value + (elapsed_seconds / base_seconds) * kd.regen_value
+                    current_value = _continuous_regen_current_value(entry, kd)
                     if kd.cap is not None and current_value >= kd.cap:
                         lines.append("下一点恢复: 已达上限")
                     else:
@@ -298,6 +321,8 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         else:
             if updated_at:
                 lines.append(f"更新时间: {updated_at}")
+            if updated_time:
+                lines.append(f"写入时间: {updated_time}")
             lines.append(f"回复周期: 每{period_label}")
             lines.append(f"每次回复: {kd.regen_value}")
             if new_ts and new_ts != updated_at:
@@ -307,6 +332,8 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
 
     if model_type != MODEL_REGEN and updated_at:
         lines.append(f"更新时间: {updated_at}")
+    if model_type != MODEL_REGEN and updated_time:
+        lines.append(f"写入时间: {updated_time}")
 
     # 配额模型显示周期、上限
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):

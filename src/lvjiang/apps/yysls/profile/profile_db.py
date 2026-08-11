@@ -36,6 +36,7 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             key        TEXT NOT NULL,
             value      REAL NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL DEFAULT '',
+            updated_time TEXT NOT NULL DEFAULT '',
             PRIMARY KEY (username, type, key)
         );
         CREATE TABLE profile_history (
@@ -66,10 +67,32 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """entries 新增 updated_time 列：记录 SQL 实际写入时间（幂等）。"""
+    cols = [
+        row[1]
+        for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
+    ]
+    if "updated_time" not in cols:
+        try:
+            conn.execute(
+                "ALTER TABLE profile_entries ADD COLUMN updated_time TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                raise
+    now_ts = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        "UPDATE profile_entries SET updated_time=? WHERE updated_time=''",
+        (now_ts,),
+    )
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
     (2, "history add source column", _migrate_v2),
+    (3, "entries add updated_time column", _migrate_v3),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -132,7 +155,7 @@ class ProfileDB:
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT value, updated_at FROM profile_entries "
+                "SELECT value, updated_at, updated_time FROM profile_entries "
                 "WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
@@ -141,7 +164,7 @@ class ProfileDB:
 
         if row is None:
             return {}
-        return {"value": row[0], "updated_at": row[1]}
+        return {"value": row[0], "updated_at": row[1], "updated_time": row[2]}
 
     def get_all(self, username: str) -> dict[str, dict[str, dict]]:
         """读取用户全部 profile
@@ -152,7 +175,7 @@ class ProfileDB:
         conn = self._connect()
         try:
             rows = conn.execute(
-                "SELECT type, key, value, updated_at FROM profile_entries "
+                "SELECT type, key, value, updated_at, updated_time FROM profile_entries "
                 "WHERE username=?",
                 (username,),
             ).fetchall()
@@ -160,9 +183,13 @@ class ProfileDB:
             conn.close()
 
         result: dict[str, dict[str, dict]] = {}
-        for type_, key, value, updated_at in rows:
+        for type_, key, value, updated_at, updated_time in rows:
             model_data = result.setdefault(type_, {})
-            model_data[key] = {"value": value, "updated_at": updated_at}
+            model_data[key] = {
+                "value": value,
+                "updated_at": updated_at,
+                "updated_time": updated_time,
+            }
         return result
 
     # ─── 写入 ───
@@ -184,7 +211,8 @@ class ProfileDB:
         source: 变更来源描述，随 history 一并记录。
         锁冲突抛 sqlite3.OperationalError。
         """
-        ts = updated_at or datetime.now().isoformat(timespec="seconds")
+        write_ts = datetime.now().isoformat(timespec="seconds")
+        ts = updated_at or write_ts
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
@@ -199,8 +227,9 @@ class ProfileDB:
             # upsert entry
             conn.execute(
                 "INSERT OR REPLACE INTO profile_entries "
-                "(username, type, key, value, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (username, type_, key, float(value), ts),
+                "(username, type, key, value, updated_at, updated_time) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (username, type_, key, float(value), ts, write_ts),
             )
 
             # history 记录
@@ -214,13 +243,12 @@ class ProfileDB:
                     should_record = True
 
                 if should_record:
-                    now_ts = datetime.now().isoformat(timespec="seconds")
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
                         "change_type, detail, source) "
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (now_ts, username, type_, key, old_value, float(value),
+                        (write_ts, username, type_, key, old_value, float(value),
                          change_type, detail, source),
                     )
 
@@ -242,7 +270,8 @@ class ProfileDB:
             for entry in entries:
                 source = entry[6] if len(entry) > 6 else ""
                 type_, key, value, updated_at, change_type, detail = entry[:6]
-                ts = updated_at or datetime.now().isoformat(timespec="seconds")
+                write_ts = datetime.now().isoformat(timespec="seconds")
+                ts = updated_at or write_ts
 
                 old_row = conn.execute(
                     "SELECT value FROM profile_entries "
@@ -253,8 +282,9 @@ class ProfileDB:
 
                 conn.execute(
                     "INSERT OR REPLACE INTO profile_entries "
-                    "(username, type, key, value, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    (username, type_, key, float(value), ts),
+                    "(username, type, key, value, updated_at, updated_time) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (username, type_, key, float(value), ts, write_ts),
                 )
 
                 if change_type is not None:
@@ -265,12 +295,11 @@ class ProfileDB:
                         should_record = True
 
                     if should_record:
-                        now_ts = datetime.now().isoformat(timespec="seconds")
                         conn.execute(
                             "INSERT INTO profile_history "
                             "(ts, username, type, key, old_value, new_value, "
                             "change_type, detail, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (now_ts, username, type_, key, old_value, float(value),
+                            (write_ts, username, type_, key, old_value, float(value),
                              change_type, detail, source),
                         )
 
@@ -299,16 +328,17 @@ class ProfileDB:
         """
         old_value = float(expected_value)
         value = float(new_value)
-        ts = new_updated_at or datetime.now().isoformat(timespec="seconds")
+        write_ts = datetime.now().isoformat(timespec="seconds")
+        ts = new_updated_at or write_ts
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
                 "UPDATE profile_entries "
-                "SET value=?, updated_at=? "
+                "SET value=?, updated_at=?, updated_time=? "
                 "WHERE username=? AND type=? AND key=? "
                 "AND value=? AND updated_at=?",
-                (value, ts, username, type_, key, old_value, expected_updated_at),
+                (value, ts, write_ts, username, type_, key, old_value, expected_updated_at),
             )
             if cursor.rowcount != 1:
                 conn.rollback()
@@ -322,13 +352,12 @@ class ProfileDB:
                     should_record = True
 
                 if should_record:
-                    now_ts = datetime.now().isoformat(timespec="seconds")
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
                         "change_type, detail, source) "
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (now_ts, username, type_, key, old_value, value,
+                        (write_ts, username, type_, key, old_value, value,
                          change_type, detail, source),
                     )
 

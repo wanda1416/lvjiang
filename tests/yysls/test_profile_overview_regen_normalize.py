@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from lvjiang.apps.yysls.config.profile_models import MODEL_REGEN, RegenKeyDef
-from lvjiang.apps.yysls.ui.profile.cell_formatting import format_cell_tooltip
+from lvjiang.apps.yysls.ui.profile.cell_formatting import (
+    format_cell_tooltip,
+    format_profile_cell,
+)
 from lvjiang.apps.yysls.ui.profile.overview import (
     _compute_continuous_regen_value,
     _normalize_continuous_regen_write,
@@ -60,6 +63,7 @@ def test_continuous_regen_tooltip_keeps_base_metadata():
             "xinli": {
                 "value": 100,
                 "updated_at": updated_at,
+                "updated_time": datetime.now().isoformat(timespec="seconds"),
             }
         }
     }
@@ -67,6 +71,7 @@ def test_continuous_regen_tooltip_keeps_base_metadata():
     tooltip = format_cell_tooltip(kd, MODEL_REGEN, data)
 
     assert "更新时间:" in tooltip
+    assert "写入时间:" in tooltip
     assert "回复周期: 每分钟" in tooltip
     assert "每次回复: 0.125" in tooltip
     assert "下一点恢复:" in tooltip
@@ -74,3 +79,26 @@ def test_continuous_regen_tooltip_keeps_base_metadata():
     assert "上限: 600" in tooltip
     assert "精确值:" not in tooltip
     assert "展示值:" not in tooltip
+
+
+def test_continuous_regen_cell_display_uses_second_level_progress():
+    kd = RegenKeyDef(
+        key="xinli",
+        label="心力",
+        regen_period="minute",
+        regen_value=0.13,
+    )
+    data = {
+        MODEL_REGEN: {
+            "xinli": {
+                "value": 100,
+                "updated_at": (
+                    datetime.now() - timedelta(minutes=7, seconds=42)
+                ).isoformat(timespec="seconds"),
+            }
+        }
+    }
+
+    text, _style = format_profile_cell(kd, MODEL_REGEN, data)
+
+    assert text == "101"

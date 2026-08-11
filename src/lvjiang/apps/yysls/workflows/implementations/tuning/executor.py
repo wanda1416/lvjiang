@@ -69,9 +69,10 @@ class TuningExecutor:
             infos = self._validate_tuning_materials(infos)
             self._material_cache = infos
             self._food_count_overrides = {}  # 清空覆盖，使用 OCR 原始值
-            # 日志：记录缓存的材料数量
-            counts = {getattr(i, "type", ""): self._get_count(i)
-                      for i in (infos or {}).values() if getattr(i, "type", "")}
+            # 日志：记录缓存的材料数量（同名材料去重，保留最高置信度）
+            deduped = self._dedup_by_confidence(infos)
+            counts = {label: self._get_count(info)
+                      for label, info in deduped.items()}
             logger.debug(f"材料缓存已刷新: {counts}")
         else:
             self._material_cache = None
@@ -87,6 +88,35 @@ class TuningExecutor:
         if food_type in self._food_count_overrides:
             return self._food_count_overrides[food_type]
         return info.count
+
+    def _dedup_by_confidence(self, infos: dict | None) -> dict[str, object]:
+        """同名材料去重：保留置信度最高的槽
+
+        材料区可能将同一材料误识别到多个槽（如第6列真槽 + 第7列幽灵槽），
+        返回 {type: info} 字典，同名时保留 confidence 最高者；
+        置信度相同时，优先保留 count 有效的槽（防止幽灵槽覆盖真槽）。
+        """
+        result: dict[str, object] = {}
+        for info in (infos or {}).values():
+            label = getattr(info, "type", "")
+            if not label:
+                continue
+            existing = result.get(label)
+            if existing is None:
+                result[label] = info
+            else:
+                old_conf = getattr(existing, "confidence", 0) or 0
+                new_conf = getattr(info, "confidence", 0) or 0
+                # 置信度更高 → 替换
+                # 置信度相同 → 保留 count 有效的（防止幽灵槽覆盖真槽）
+                if new_conf > old_conf:
+                    result[label] = info
+                elif new_conf == old_conf:
+                    old_count = getattr(existing, "count", None)
+                    new_count = getattr(info, "count", None)
+                    if old_count is None and new_count is not None:
+                        result[label] = info
+        return result
 
     def decrement_food(self, food: str):
         """调律后扣减本轮使用的狗粮数量（缓存内 -1）
@@ -223,16 +253,12 @@ class TuningExecutor:
             return FoodDecision("none", "", "未配置狗粮规则 → 不添加")
         cap_pct = (equip_data.affixes[0].cap_pct
                    if equip_data.affixes else None)
+        # 同名材料去重：保留最高置信度的槽
+        deduped = self._dedup_by_confidence(infos)
         stocks: dict[str, int | None] = {}
-        for info in (infos or {}).values():
-            label = getattr(info, "type", "") or ""
-            if not label:
-                continue
+        for label, info in deduped.items():
             # 数量 None = 该材料是装备而非狗粮，视为已耗尽（count=0）
             count = self._get_count(info) if self._get_count(info) is not None else 0
-            # 低置信度误匹配的同名幽灵槽（数量 0）不得覆盖真槽
-            if label in stocks and (stocks[label] or 0) > 0:
-                continue
             stocks[label] = count
         decision = settings.decide_food(
             int(cap_pct) if cap_pct is not None else None, expect_rating, equip_data.quality, stocks)
@@ -258,16 +284,19 @@ class TuningExecutor:
         """
         if not settings.stone_check_enabled or self._stone_check_waived:
             return True
-        stone = next((i for i in (infos or {}).values()
-                      if getattr(i, "type", "") == STONE_LABEL), None)
+        # 同名材料去重：保留最高置信度的槽
+        deduped = self._dedup_by_confidence(infos)
+        stone = deduped.get(STONE_LABEL)
         if stone is None:
             stock = 0  # 材料区无大律准石，视为已耗尽
         else:
-            stock = stone.count
-            if stock is None:
+            raw_count = self._get_count(stone)
+            if raw_count is None:
                 # 数量识别失败 = 该材料是装备而非调律石，视为已耗尽
                 logger.warning("大律准石数量识别失败（实为装备），视为材料不足")
                 stock = 0
+            else:
+                stock = raw_count
         if stock >= settings.stone_min_count:
             logger.debug(
                 f"大律准石库存 {stock} >= 基准 {settings.stone_min_count}")

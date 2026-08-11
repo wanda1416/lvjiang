@@ -33,6 +33,14 @@ from ...profile.profile_engine import compute_regen_entry
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
 
 
+def _format_number(value) -> str:
+    """格式化 tooltip 中的数值，保留必要小数。"""
+    try:
+        return f"{float(value):.4f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def quota_period_days(period: str, now: datetime | None = None) -> int:
     """配额周期对应的总天数（用于过半判断）
 
@@ -255,13 +263,16 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
     # 再生模型显示额外信息
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
         computed, new_ts = compute_regen_entry(entry, kd)
+        stored_value = entry.get("value", 0) or 0
         period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
         period_label = period_labels.get(kd.regen_period, kd.regen_period)
+        lines.append(f"展示值: {int(computed)}")
+        lines.append(f"精确值: {_format_number(computed)}")
+        lines.append(f"存储值: {_format_number(stored_value)}")
         lines.append(f"回复周期: 每{period_label}")
         lines.append(f"每次回复: {kd.regen_value}")
-        lines.append(f"精确值: {computed:.4f}".rstrip("0").rstrip("."))
         if new_ts and new_ts != updated_at:
-            lines.append(f"已计入至: {new_ts}")
+            lines.append(f"计算至: {new_ts}")
         if kd.cap is not None:
             lines.append(f"上限: {kd.cap}")
 

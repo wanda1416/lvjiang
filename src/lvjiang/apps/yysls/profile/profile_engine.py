@@ -485,8 +485,13 @@ class ProfileEngine(QThread):
 
             computed, new_ts = compute_regen_entry(entry, kd)
 
-            # 仅当整数部分变化时才写入，小数进度通过 updated_at 不变隐式累计
-            if int(computed) != int(stored_value):
+            # 分钟/小时级再生值由 UI 基于 value + updated_at 实时计算展示。
+            # tick 不推进这些 entry，也不触发 UI 刷新，避免心力这类分钟级字段
+            # 频繁落盘或打断表格编辑。
+            persist_tick = kd.regen_period not in ("minute", "hour")
+
+            # 日/周级再生仍需要持久化周期边界，避免每日/每周回复遗漏。
+            if persist_tick and int(computed) != int(stored_value):
                 delta = computed - (stored_value or 0)
                 updated = db_update_if_current(
                     user_name, "regen", kd.key,

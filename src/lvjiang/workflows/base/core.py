@@ -78,6 +78,10 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         """重置运行时状态（在 run 开始前调用）"""
         self.output = {}
         self.variables = {}
+        # 刷新共享材料识别器的参考库，确保图库管理中的新增/修改/删除分组
+        # 在下次工作流运行时生效（场景编辑器按钮每次 new 识别器不受此影响）
+        if BaseWorkflow._shared_material_recognizer is not None:
+            BaseWorkflow._shared_material_recognizer.reference_db.load()
 
     @property
     def is_stopped(self) -> bool:

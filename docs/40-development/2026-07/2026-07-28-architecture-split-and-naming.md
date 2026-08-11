@@ -78,7 +78,7 @@ engine/
 
 ### 4.1 背景
 
-工作流中的等待/延迟参数（`step_interval`、`scroll_settle_wait` 等）原本
+工作流中的等待/延迟参数（`step_interval`、`scroll_settle` 等）原本
 与引擎字段混在同一命名空间，导致：
 
 - 引擎字段（如 `max_retries`）与命名等待（如 `step_interval`）难以区分；

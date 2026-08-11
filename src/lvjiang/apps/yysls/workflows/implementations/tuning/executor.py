@@ -67,7 +67,7 @@ class TuningExecutor:
         can_add = "添加" in add_scan.get("auto_add", "")
         if "添加" in add_scan.get("auto_add_2", ""):
             wf.click_region(wf.TUNE_SCENE, "expand")
-            wf.wait_delay("page_refresh_wait")
+            wf.wait_delay("page_refresh")
             can_add = True
         if not can_add:
             logger.info("未找到「添加」入口，视为无法继续调律")
@@ -122,7 +122,7 @@ class TuningExecutor:
             return None
         wf.click_region(wf.TUNE_SCENE, "tune_btn")
         wf.wait_delay("step_interval")
-        wf.wait_delay("page_refresh_wait")  # 调律结果出现（after_tune_wait 已废弃）
+        wf.wait_delay("page_refresh")  # 调律结果出现（after_tune_wait 已废弃）
 
         result = wf.ocr_scene(wf.RESULT_SCENE, ["tune_affix", "tune_tip"])
         logger.info(f"调律结果: {result}")
@@ -133,7 +133,7 @@ class TuningExecutor:
         # 再弹一个无边框弹窗（同样 tune_tip「点击空白区域关闭」）。若不补关，
         # 它会挡住「一键添加」等后续点击，导致误判无法继续调律。
         if food:
-            wf.wait_delay("page_refresh_wait")
+            wf.wait_delay("page_refresh")
             bonus = wf.ocr_scene(wf.RESULT_SCENE, ["tune_tip"])
             if bonus.get("tune_tip"):
                 logger.info(f"检测到狗粮返还弹窗: {bonus}，补点一次关闭")
@@ -271,7 +271,7 @@ class TuningExecutor:
         btn = ""
         for attempt in range(2):
             if attempt:
-                wf.wait_delay("page_refresh_wait")
+                wf.wait_delay("page_refresh")
             btn = wf.ocr_scene(wf.TUNE_SCENE, ["tune_btn"]).get(
                 "tune_btn", "") or ""
             if "调律" in btn:

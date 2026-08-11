@@ -22,6 +22,7 @@ layout_scenes:
   - school_main
   - waiguan_yigui
   - waiguan_qingjing
+  - baiye_main
   group_5:
   - activity_main
   - activity_jianghu

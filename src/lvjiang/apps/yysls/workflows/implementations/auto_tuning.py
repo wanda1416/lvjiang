@@ -287,7 +287,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """
         self.recorder.on_slot_enter(slot)
         self.click_region(self.GRID_SCENE, slot)
-        self.wait_delay("page_refresh_wait")  # 背包浏览页 → 装备详情页
+        self.wait_delay("page_refresh")  # 背包浏览页 → 装备详情页
 
     def _process_slot_group(self, slot: str, detail_scene: str):
         self._process_slot_group_enter(slot)
@@ -306,7 +306,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             if self.is_stopped:
                 break
             self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "up", hold=0.3)
-            self.wait_delay("scroll_settle_wait")
+            self.wait_delay("scroll_settle")
         self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
 
     def _process_single_target(self, detail_scene: str, row: int, col: int) -> None:
@@ -330,7 +330,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         默认第 1 列（行指纹/滚动校验链路）；列遍历时传入 col 读非首列。"""
         self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
-        self.wait_delay("page_refresh_wait")
+        self.wait_delay("page_refresh")
         fields = self.SCAN_FIELDS + (["base_attr_2"]
                                      if detail_scene == self.ARMOR_DETAIL else [])
         raw = self.ocr_scene(detail_scene, fields)
@@ -544,7 +544,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.info(f"  [{name}] 值得调律，但跳过实际调律（测试开关）")
             self.recorder.doc_note("值得调律，但测试开关已启用，跳过实际调律")
             self.click_region(self.TUNE_SCENE, "back")
-            self.wait_delay("page_refresh_wait")  # 调律页 → 背包详情页
+            self.wait_delay("page_refresh")  # 调律页 → 背包详情页
             self.click_region(self.EQUIP_DETAIL, "more_func")
             self.wait_delay("step_interval")
             self.recorder.commit_report("skip_tuning")
@@ -586,7 +586,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         while not self.is_stopped and not skip_tune_loop:
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
-            self.wait_delay("page_refresh_wait")
+            self.wait_delay("page_refresh")
             result = self.executor.tune_once(
                 equip_data, self.recorder.expect_rating,
                 self.recorder.tune_full_recycle_mode)
@@ -630,7 +630,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 因进调律前点过「更多」弹出子菜单，back 回来后弹窗仍在，
         # 再点一次「更多」more_func 使其收起，保持背包页干净以继续遍历。
         self.click_region(self.TUNE_SCENE, "back")
-        self.wait_delay("page_refresh_wait")  # 调律页 → 背包详情页（页面切换）
+        self.wait_delay("page_refresh")  # 调律页 → 背包详情页（页面切换）
         self.click_region(self.EQUIP_DETAIL, "more_func")
         self.wait_delay("step_interval")
 

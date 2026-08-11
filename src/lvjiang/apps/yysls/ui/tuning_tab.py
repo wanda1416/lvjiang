@@ -56,7 +56,7 @@ class TuningTab(QWidget):
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
-        # 顶部固定「开始调律」按钮（第一行）+ 下方配置三页 Tab（规则 | 部位 | 更多）
+        # 顶部固定「开始调律」按钮（第一行）+ 下方配置三页 Tab（规则 | 部位 | 更多）+ 底部状态栏
         tab_layout = QVBoxLayout(self)
         tab_layout.setContentsMargins(8, 8, 8, 8)
         tab_layout.setSpacing(8)
@@ -73,6 +73,13 @@ class TuningTab(QWidget):
         config_tabs.addTab(self._build_slots_page(), "部位")
         config_tabs.addTab(self._build_more_page(), "更多")
         tab_layout.addWidget(config_tabs)
+
+        # 底部状态栏（显示启动失败原因）
+        self._status_label = QLabel("")
+        self._status_label.setStyleSheet("color: #d32f2f; padding: 4px; font-size: 12px;")
+        self._status_label.setWordWrap(True)
+        self._status_label.hide()
+        tab_layout.addWidget(self._status_label)
 
     def _wrap_scroll(self, panel: QWidget) -> QScrollArea:
         """页面统一包可滚动容器（禁水平滚动，最小宽避免内容被裁切）"""
@@ -298,13 +305,26 @@ class TuningTab(QWidget):
             return
         self._start_tuning()
 
+    def _show_status_error(self, message: str):
+        """在底部状态栏显示错误信息"""
+        self._status_label.setText(message)
+        self._status_label.show()
+
+    def _clear_status(self):
+        """清除底部状态栏"""
+        self._status_label.hide()
+        self._status_label.setText("")
+
     def _start_tuning(self):
         """从统一存储读取调律配置，校验后启动 auto_tuning 工作流"""
         host = self._host
+        self._clear_status()
 
         # 图库空间预检（UI 即时反馈，与工作流 run() 预检同契约）
         if self._missing_tuning_output_fields():
-            host.append_log("[错误] 当前图库空间缺少 levels/counts 输出字段，无法启动自动调律")
+            msg = "当前图库空间缺少 levels/counts 输出字段，无法启动自动调律"
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
             return
 
         # ── 从统一存储读取配置 ──
@@ -313,7 +333,9 @@ class TuningTab(QWidget):
 
         selected_slots = tc.get("selected_slots") or []
         if not selected_slots:
-            host.append_log("[错误] 请至少选择一个调律部位")
+            msg = "请至少选择一个调律部位"
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
             return
 
         # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
@@ -326,7 +348,9 @@ class TuningTab(QWidget):
         rules_cfg = tc.get("rules", {})
         enabled = {k: cfg for k, cfg in rules_cfg.items() if cfg.get("enabled")}
         if not enabled:
-            host.append_log("[错误] 请至少选择一个调律规则")
+            msg = "请至少选择一个调律规则"
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
             return
         rule_judges = []
         rule_map = get_tuning_rules()
@@ -339,12 +363,16 @@ class TuningTab(QWidget):
             rule = rule_map[rule_key]
             wr_cfg = cfg.get("playstyles")
             if rule.playstyles and wr_cfg is not None and not wr_cfg:
-                host.append_log(f"[错误] 规则「{rule.name}」需至少勾选一个玩法")
+                msg = f"规则「{rule.name}」需至少勾选一个玩法"
+                host.append_log(f"[错误] {msg}")
+                self._show_status_error(msg)
                 return
             rule_judges.append(
                 get_tuning_judge(rule_key, {**cfg, "switches": switches}))
         if not rule_judges:
-            host.append_log("[错误] 选中的规则均未实现判定逻辑")
+            msg = "选中的规则均未实现判定逻辑"
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
             return
 
         flow_name = "自动调律"
@@ -354,7 +382,9 @@ class TuningTab(QWidget):
         group_key = tc.get("base_group", "")
         base_group = get_tuning_group(group_key) if group_key else None
         if base_group is None:
-            host.append_log(f"[错误] 基础规则组 '{group_key}' 不存在，拒绝启动")
+            msg = f"基础规则组 '{group_key}' 不存在，拒绝启动"
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
             return
 
         # 运行时瞬态字段（启动时从 UI 即时读取，保存时也会持久化）

@@ -139,6 +139,7 @@ def ask_value_dialog(
     layout.addRow(hint_label)
 
     value_input = QLineEdit()
+    validator: QDoubleValidator | QIntValidator
     if is_float:
         validator = QDoubleValidator(float(min_val), 999999.0, 4, value_input)
         value_input.setValidator(validator)

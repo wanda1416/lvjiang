@@ -154,14 +154,15 @@ class _ActionMixin:
         """
         import cv2
 
-        deadline = time.monotonic() + max(0.0, timeout)
-        least_until = time.monotonic() + max(0.0, least)
+        start_time = time.monotonic()
+        deadline = start_time + max(0.0, timeout)
+        least_until = start_time + max(0.0, least)
         prev = None
         stable_since = None
 
         while time.monotonic() < deadline:
             if self._stop_check():
-                logger.info("wait stable: 收到停止请求，提前结束")
+                logger.debug("wait stable: 收到停止请求，提前结束")
                 return
 
             img = self._capture.capture()
@@ -177,7 +178,8 @@ class _ActionMixin:
                         stable_since = time.monotonic()
                         logger.debug(f"wait stable: 差异 {diff:.4f} < {threshold}，开始计时")
                     elif time.monotonic() - stable_since >= stable_duration:
-                        logger.info(f"wait stable: 画面已稳定 {stable_duration}s (差异 {diff:.4f})")
+                        elapsed = time.monotonic() - start_time
+                        logger.debug(f"wait stable: 画面已稳定 {elapsed:.1f}s (差异 {diff:.4f})")
                         return
                 else:
                     if stable_since is not None:
@@ -188,6 +190,7 @@ class _ActionMixin:
             remaining = deadline - time.monotonic()
             time.sleep(min(interval, max(0.0, remaining)))
 
+        elapsed = time.monotonic() - start_time
         logger.warning(
-            f"wait stable: 画面在 {timeout}s 内未稳定（差异阈值 {threshold}），继续执行"
+            f"wait stable: 画面在 {elapsed:.1f}s 内未稳定（差异阈值 {threshold}），继续执行"
         )

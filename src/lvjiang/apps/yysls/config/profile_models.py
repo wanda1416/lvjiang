@@ -270,16 +270,21 @@ class QuotaKeyDef(KeyDef):
 class RegenKeyDef(KeyDef):
     """再生数据模型 — 恢复状态
 
-    按回复周期和回复数值计算回复，有上限。
-    regen_period: 回复周期单位 ("minute" | "hour" | "day" | "week")
-    regen_value: 每个周期的回复量（允许小数）
-    reset_time: day/week 周期使用，指定重置时刻
-    reset_day: week 周期使用，1=周一 ... 7=周日（0=默认周一）
+    regen_type:
+        realtime = 按速率连续恢复，period 只是速率单位；
+        boundary = 经过准点边界才恢复。
+    regen_rate_value / regen_rate_unit: realtime 使用，每个单位时间恢复多少点。
+    regen_amount / regen_period: boundary 使用，每个边界恢复多少点。
+    reset_time: boundary 的 day/week 周期使用，指定重置时刻。
+    reset_day: boundary 的 week 周期使用，1=周一 ... 7=周日（0=默认周一）。
     steps: 自定义增减幅度，正值=增加，负值=减少，可携带来源描述。
     """
 
-    regen_period: str = "minute"
-    regen_value: float = 0.0
+    regen_type: str = "realtime"
+    regen_rate_value: float = 0.0
+    regen_rate_unit: str = "minute"
+    regen_amount: float = 0.0
+    regen_period: str = "day"
     reset_time: str = "05:00"
     reset_day: int = 0
     alert_orange: int | None = None  # 橙色告警阈值（低）
@@ -299,8 +304,11 @@ class RegenKeyDef(KeyDef):
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
-            regen_period=data.get("regen_period", "minute"),
-            regen_value=data.get("regen_value", 0.0),
+            regen_type=data.get("regen_type", "realtime"),
+            regen_rate_value=data.get("regen_rate_value", 0.0),
+            regen_rate_unit=data.get("regen_rate_unit", "minute"),
+            regen_amount=data.get("regen_amount", 0.0),
+            regen_period=data.get("regen_period", "day"),
             reset_time=data.get("reset_time", "05:00"),
             reset_day=data.get("reset_day", 0),
             alert_orange=data.get("alert_orange"),

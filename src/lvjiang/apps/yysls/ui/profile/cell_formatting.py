@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import calendar
-import math
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import Qt
@@ -29,7 +28,13 @@ from ...config.profile_models import (
     format_sync_label,
     parse_sync_key,
 )
-from ...profile.profile_engine import compute_regen_entry
+from ...profile.regen_math import (
+    compute_regen_entry,
+    format_seconds,
+    is_realtime_regen,
+    next_boundary_after,
+    next_realtime_point_seconds,
+)
 
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
 
@@ -40,24 +45,6 @@ def _format_number(value) -> str:
         return f"{float(value):.4f}".rstrip("0").rstrip(".")
     except (TypeError, ValueError):
         return str(value)
-
-
-def _continuous_regen_current_value(entry: dict, kd: RegenKeyDef) -> float:
-    """分钟/小时级 regen 用秒级 elapsed 计算当前值。"""
-    stored_value = entry.get("value", 0) or 0
-    updated_at = entry.get("updated_at", "")
-    if not updated_at or kd.regen_value <= 0:
-        return float(stored_value)
-    try:
-        stored_ts = datetime.fromisoformat(updated_at)
-    except (TypeError, ValueError):
-        return float(stored_value)
-    base_seconds = 60 if kd.regen_period == "minute" else 3600
-    elapsed_seconds = max((datetime.now() - stored_ts).total_seconds(), 0)
-    value = float(stored_value) + (elapsed_seconds / base_seconds) * kd.regen_value
-    if kd.cap is not None:
-        value = min(value, kd.cap)
-    return value
 
 
 def quota_period_days(period: str, now: datetime | None = None) -> int:
@@ -186,10 +173,7 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
 
     if model_type == MODEL_REGEN:
         if isinstance(kd, RegenKeyDef):
-            if kd.regen_period in ("minute", "hour") and kd.regen_value > 0:
-                computed = _continuous_regen_current_value(entry, kd)
-            else:
-                computed, _ = compute_regen_entry(entry, kd)
+            computed = compute_regen_entry(entry, kd).value
             int_value = int(computed)
             style = ""
             if kd.cap is not None and computed >= kd.cap:
@@ -281,40 +265,23 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
 
     # 再生模型显示额外信息
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-        computed, new_ts = compute_regen_entry(entry, kd)
+        result = compute_regen_entry(entry, kd)
         stored_value = entry.get("value", 0) or 0
         period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
+        rate_label = period_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
         period_label = period_labels.get(kd.regen_period, kd.regen_period)
 
-        if kd.regen_period in ("minute", "hour") and kd.regen_value > 0:
+        if is_realtime_regen(kd):
             if updated_at:
                 lines.append(f"更新时间: {updated_at}")
             if updated_time:
                 lines.append(f"写入时间: {updated_time}")
-            lines.append(f"回复周期: 每{period_label}")
-            lines.append(f"每次回复: {kd.regen_value}")
-            base_seconds = 60 if kd.regen_period == "minute" else 3600
-            if updated_at:
-                try:
-                    stored_ts = datetime.fromisoformat(updated_at)
-                    elapsed_seconds = (datetime.now() - stored_ts).total_seconds()
-                    elapsed_seconds = max(elapsed_seconds, 0)
-                    current_value = _continuous_regen_current_value(entry, kd)
-                    if kd.cap is not None and current_value >= kd.cap:
-                        lines.append("下一点恢复: 已达上限")
-                    else:
-                        points_needed = math.floor(current_value) + 1 - current_value
-                        time_to_next = (points_needed / kd.regen_value) * base_seconds
-                        minutes = int(time_to_next // 60)
-                        seconds = int(time_to_next % 60)
-                        lines.append(f"下一点恢复: {minutes}分{seconds:02d}秒")
-                except (ValueError, TypeError):
-                    pass
-            else:
-                time_to_next = base_seconds / kd.regen_value
-                minutes = int(time_to_next // 60)
-                seconds = int(time_to_next % 60)
-                lines.append(f"下一点恢复: {minutes}分{seconds:02d}秒")
+            lines.append("恢复类型: 实时恢复")
+            lines.append(f"恢复速率: {kd.regen_rate_value}/{rate_label}")
+            seconds = next_realtime_point_seconds(entry, kd)
+            lines.append(
+                "下一点恢复: 已达上限" if seconds is None else f"下一点恢复: {format_seconds(seconds)}"
+            )
             lines.append(f"存储值: {_format_number(stored_value)}")
             if kd.cap is not None:
                 lines.append(f"上限: {kd.cap}")
@@ -323,10 +290,16 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                 lines.append(f"更新时间: {updated_at}")
             if updated_time:
                 lines.append(f"写入时间: {updated_time}")
-            lines.append(f"回复周期: 每{period_label}")
-            lines.append(f"每次回复: {kd.regen_value}")
-            if new_ts and new_ts != updated_at:
-                lines.append(f"计算至: {new_ts}")
+            lines.append("恢复类型: 准点恢复")
+            lines.append(f"恢复周期: 每{period_label}")
+            lines.append(f"每次恢复: {kd.regen_amount}")
+            try:
+                next_ts = next_boundary_after(datetime.now(), kd)
+                lines.append(f"下次恢复: {next_ts.isoformat(timespec='seconds')}")
+            except (ValueError, TypeError):
+                pass
+            if result.updated_at and result.updated_at != updated_at:
+                lines.append(f"计算至: {result.updated_at}")
             if kd.cap is not None:
                 lines.append(f"上限: {kd.cap}")
 

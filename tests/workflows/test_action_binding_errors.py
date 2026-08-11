@@ -161,11 +161,11 @@ def test_drag_arrow_absolute_target_works():
 
 def test_wait_delay_unknown_name_raises():
     actor = _Actor(_FakeLayout())
-    with pytest.raises(ValueError, match="page_refresh_wait"):
-        actor.wait_delay("page_refresh_wait")
+    with pytest.raises(ValueError, match="page_refresh"):
+        actor.wait_delay("page_refresh")
 
 
 def test_wait_delay_defined_name_works():
     actor = _Actor(_FakeLayout(),
-                   delay_params={"page_refresh_wait": DelayParam(range=(0.0, 0.0))})
-    actor.wait_delay("page_refresh_wait")  # _stop_check 恒 True，立即返回
+                   delay_params={"page_refresh": DelayParam(range=(0.0, 0.0))})
+    actor.wait_delay("page_refresh")  # _stop_check 恒 True，立即返回

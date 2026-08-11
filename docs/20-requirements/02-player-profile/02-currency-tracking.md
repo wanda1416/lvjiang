@@ -187,10 +187,10 @@ call $ok = nav_main_to_equip()
 if $ok < 0
     return -1
 click "more_func"
-wait "page_refresh_wait"
+wait "page_refresh"
 # 找到货币按钮（需要确认具体位置）
 click "sub_func_3"  # 待确认
-wait "page_refresh_wait"
+wait "page_refresh"
 return 0
 ```
 

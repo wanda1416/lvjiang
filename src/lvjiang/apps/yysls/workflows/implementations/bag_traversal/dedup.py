@@ -74,7 +74,7 @@ class DedupTraversal(BagTraversal):
                 break
             logger.info(f"═══ 滚动 #{rounds} ═══")
             wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
-            wf.wait_delay("scroll_settle_wait")
+            wf.wait_delay("scroll_settle")
             alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
             assert alignment_raw is not None, "对齐失败：alignment 为 None"
             alignment: GridAlignment = alignment_raw

@@ -187,10 +187,10 @@ input_simulation:
   region_jitter_ratio: 0.25         # 区域中心抖动比例
 
 delay_params:
-  page_refresh_wait:
+  page_refresh:
     label: 页面刷新等待
     range: [2.0, 3.0]
-  scroll_settle_wait:
+  scroll_settle:
     label: 滚动惯性等待
     range: [3.0, 4.0]
 ```

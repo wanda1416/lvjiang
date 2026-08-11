@@ -6,12 +6,12 @@ meta_schema:
   filterable: true
   type: number
   sort_by: desc
-- key: levels
-  name: 等级区域
+- key: level_text
+  name: 等级文本区域
   scope: output
   crop: [0.0, 0.0, 1.0, 0.5]
-- key: counts
-  name: 数量区域
+- key: count_text
+  name: 数量文本区域
   scope: output
   crop: [0.0, 0.5, 1.0, 0.5]
 references:

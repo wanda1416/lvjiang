@@ -68,9 +68,9 @@ def _make_recognizer(tmp_path, meta_schema) -> MaterialRecognizer:
 
 _OUTPUT_SCHEMA = [
     {"key": "level", "name": "等级", "scope": "input"},
-    {"key": "levels", "name": "等级区域", "scope": "output",
+    {"key": "level_text", "name": "等级文本区域", "scope": "output",
      "crop": [0.0, 0.0, 1.0, 0.25]},
-    {"key": "counts", "name": "数量区域", "scope": "output",
+    {"key": "count_text", "name": "数量文本区域", "scope": "output",
      "crop": [0.0, 0.25, 1.0, 0.75]},
 ]
 
@@ -86,9 +86,9 @@ class TestRecognizeOutputFields:
         result = recognizer.recognize(_slot_img())
 
         assert result.type == "彩狗粮"
-        # 40x40 图：levels 高 10，counts 高 30
-        assert result.ocr_texts["levels"] == "10x40"
-        assert result.ocr_texts["counts"] == "30x40"
+        # 40x40 图：level_text 高 10，count_text 高 30
+        assert result.ocr_texts["level_text"] == "10x40"
+        assert result.ocr_texts["count_text"] == "30x40"
         assert result.level_text == "10x40"
         assert result.count_text == "30x40"
 
@@ -103,10 +103,10 @@ class TestRecognizeOutputFields:
 
         result = recognizer.recognize(_slot_img())
 
-        assert set(result.ocr_texts) == {"levels", "counts"}
+        assert set(result.ocr_texts) == {"level_text", "count_text"}
         # 上下各半：40x40 图各高 20
-        assert result.ocr_texts["levels"] == "20x40"
-        assert result.ocr_texts["counts"] == "20x40"
+        assert result.ocr_texts["level_text"] == "20x40"
+        assert result.ocr_texts["count_text"] == "20x40"
 
     def test_empty_slot_returns_empty(self, tmp_path):
         """空槽：无 ocr_texts"""
@@ -131,7 +131,7 @@ class TestRecognizeTopN:
         results = recognizer.recognize_top_n(_slot_img(), n=2)
 
         assert [r.level_text for r in results] == ["110阶", "105阶"]
-        # counts 两条共享同一次 OCR 结果
+        # count_text 两条共享同一次 OCR 结果
         assert results[0].count_text == results[1].count_text == "30x40"
 
     def test_top_n_without_meta_level(self, tmp_path):
@@ -151,58 +151,58 @@ class TestMaterialInfoParsing:
 
     def test_count_and_devoted_parsing(self):
         info = MaterialInfo(type="彩狗粮",
-                            ocr_texts={"counts": "0/691"})
+                            ocr_texts={"count_text": "0/691"})
         assert info.count == 691
         assert info.devoted == 0
 
     def test_count_without_slash(self):
         info = MaterialInfo(type="彩狗粮",
-                            ocr_texts={"counts": "691"})
+                            ocr_texts={"count_text": "691"})
         assert info.count == 691
         assert info.devoted is None
 
-    def test_level_parsing(self):
+    def test_real_level_parsing(self):
         info = MaterialInfo(type="彩狗粮",
-                            ocr_texts={"levels": "110阶"})
-        assert info.level == 110
+                            ocr_texts={"level_text": "110阶"})
+        assert info.real_level == 110
 
     def test_missing_texts(self):
         info = MaterialInfo(type="")
         assert info.level_text == ""
         assert info.count_text == ""
-        assert info.level is None
+        assert info.real_level is None
         assert info.count is None
         assert info.devoted is None
 
     def test_count_with_wan(self):
         """支持 '1.5万'、'12万' 等中文数字格式"""
         info = MaterialInfo(type="彩狗粮",
-                            ocr_texts={"counts": "1.5万"})
+                            ocr_texts={"count_text": "1.5万"})
         assert info.count == 15000
 
         info2 = MaterialInfo(type="彩狗粮",
-                             ocr_texts={"counts": "12万"})
+                             ocr_texts={"count_text": "12万"})
         assert info2.count == 120000
 
     def test_count_with_slash_and_wan(self):
         """'0/1.5万' 格式：投入 0，持有 15000"""
         info = MaterialInfo(type="彩狗粮",
-                            ocr_texts={"counts": "0/1.5万"})
+                            ocr_texts={"count_text": "0/1.5万"})
         assert info.count == 15000
         assert info.devoted == 0
 
-    def test_level_with_wan(self):
+    def test_real_level_with_wan(self):
         """等级也可能出现 '万' 格式（虽然罕见）"""
         info = MaterialInfo(type="彩狗粮",
-                            ocr_texts={"levels": "1.5万"})
-        assert info.level == 15000
+                            ocr_texts={"level_text": "1.5万"})
+        assert info.real_level == 15000
 
 
 class TestTuningPrecheck:
-    """调律启动预检：当前图库空间必须含 levels/counts 输出字段"""
+    """调律启动预检：当前图库空间必须含 level_text/count_text 输出字段"""
 
     def test_contract_keys(self):
-        assert REQUIRED_OUTPUT_FIELDS == ("levels", "counts")
+        assert REQUIRED_OUTPUT_FIELDS == ("level_text", "count_text")
 
     def test_full_schema_satisfies_contract(self, tmp_path):
         db = _make_db(tmp_path, _OUTPUT_SCHEMA)
@@ -212,25 +212,25 @@ class TestTuningPrecheck:
     def test_missing_both(self, tmp_path):
         db = _make_db(tmp_path, [{"key": "level", "name": "等级", "scope": "input"}])
         db.load()
-        assert get_missing_output_fields(db) == ["levels", "counts"]
+        assert get_missing_output_fields(db) == ["level_text", "count_text"]
 
     def test_missing_one(self, tmp_path):
         schema = [
-            {"key": "levels", "name": "等级区域", "scope": "output",
+            {"key": "level_text", "name": "等级文本区域", "scope": "output",
              "crop": [0.0, 0.0, 1.0, 0.25]},
         ]
         db = _make_db(tmp_path, schema)
         db.load()
-        assert get_missing_output_fields(db) == ["counts"]
+        assert get_missing_output_fields(db) == ["count_text"]
 
     def test_invalid_crop_not_counted(self, tmp_path):
         """output 字段 crop 非法时不算有效输出字段"""
         schema = [
-            {"key": "levels", "name": "等级区域", "scope": "output",
+            {"key": "level_text", "name": "等级文本区域", "scope": "output",
              "crop": [2.0, 0.0, 1.0, 0.25]},
-            {"key": "counts", "name": "数量区域", "scope": "output",
+            {"key": "count_text", "name": "数量文本区域", "scope": "output",
              "crop": [0.0, 0.25, 1.0, 0.75]},
         ]
         db = _make_db(tmp_path, schema)
         db.load()
-        assert get_missing_output_fields(db) == ["levels"]
+        assert get_missing_output_fields(db) == ["level_text"]

@@ -210,9 +210,12 @@ class RecognitionOpsMixin:
                     value = info.meta.get(f.key)
                     if value is not None:
                         parts.append(f"{f.key}={value}")
-                # 输出元数据 OCR 原始文本（如 levels=110阶 counts=0/691）
+                # 输出元数据 OCR 原始文本（如 level_text=110阶 count_text=0/691）
                 for key, text in info.ocr_texts.items():
                     parts.append(f"{key}={text or '(无)'}")
+                # 解析属性
+                if info.real_level is not None:
+                    parts.append(f"real_level={info.real_level}")
                 parts.append(f"[{info.confidence:.0%}]")
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: {' '.join(parts)}"
             self._result_text.append(line)

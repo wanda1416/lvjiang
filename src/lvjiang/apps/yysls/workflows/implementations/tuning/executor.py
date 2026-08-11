@@ -30,6 +30,7 @@ class TuningExecutor:
     - abort_reason: tune_once 返回 None 时的原因文案
     - round_food / round_food_reason: 本轮狗粮决策结果
     - materials_exhausted: 大律准石低于基准，全部退出
+    - _material_cache: 材料区 OCR 缓存（进入调律页/重置后刷新）
     """
 
     def __init__(self, wf: AutoTuningWorkflow):
@@ -37,15 +38,70 @@ class TuningExecutor:
         self.abort_reason = ""
         self.round_food = ""
         self.round_food_reason = ""
+        self.round_food_refunded = False  # 本轮狗粮是否被概率返还
         self.materials_exhausted = False
         self._stone_check_waived = False
         self._tune_ready_waived = False
+        self._material_cache: dict | None = None
+        self._food_count_overrides: dict[str, int] = {}  # 狗粮数量覆盖（MaterialInfo.count 只读）
 
     def reset_state(self):
         """每次 run 开始时重置运行期状态"""
         self.materials_exhausted = False
         self._stone_check_waived = False
         self._tune_ready_waived = False
+        self._material_cache = None
+        self._food_count_overrides = {}
+
+    def cache_materials(self):
+        """进入调律页或重置后调用：OCR 材料区一次并缓存
+
+        缓存大律准石、小律准石和三种狗粮的数值，后续调律轮次
+        直接使用缓存，避免每轮重复 OCR。狗粮每轮 -1 由
+        decrement_food() 维护；重置或退出调律页后需重新调用本方法刷新。
+        """
+        wf = self._wf
+        settings = wf.base_group.materials
+        if settings.stone_check_enabled or settings.food_rules:
+            infos = wf.recognize_materials_info_panel(
+                wf.TUNE_SCENE, wf.MATERIAL_PANEL,
+                group=wf.MATERIAL_GROUP)
+            infos = self._validate_tuning_materials(infos)
+            self._material_cache = infos
+            self._food_count_overrides = {}  # 清空覆盖，使用 OCR 原始值
+            # 日志：记录缓存的材料数量
+            counts = {getattr(i, "type", ""): self._get_count(i)
+                      for i in (infos or {}).values() if getattr(i, "type", "")}
+            logger.debug(f"材料缓存已刷新: {counts}")
+        else:
+            self._material_cache = None
+            self._food_count_overrides = {}
+
+    def invalidate_cache(self):
+        """退出调律页时清空缓存"""
+        self._material_cache = None
+
+    def _get_count(self, info) -> int | None:
+        """获取材料数量：优先查覆盖字典，否则用 info.count（只读属性）"""
+        food_type = getattr(info, "type", "")
+        if food_type in self._food_count_overrides:
+            return self._food_count_overrides[food_type]
+        return info.count
+
+    def decrement_food(self, food: str):
+        """调律后扣减本轮使用的狗粮数量（缓存内 -1）
+
+        Args:
+            food: 本轮使用的狗粮类型名（如「彩狗粮」「金狗粮」），空串不操作
+        """
+        if not food or not self._material_cache:
+            return
+        for info in self._material_cache.values():
+            if getattr(info, "type", "") == food and info.count is not None:
+                current = self._food_count_overrides.get(food, info.count)
+                self._food_count_overrides[food] = max(0, current - 1)
+                logger.debug(f"狗粮扣减: {food} → {self._food_count_overrides[food]}")
+                return
 
     def tune_once(self, equip_data: EquipmentData,
                   expect_rating: str | None,
@@ -63,6 +119,7 @@ class TuningExecutor:
         self.abort_reason = ""
         self.round_food = ""
         self.round_food_reason = ""
+        self.round_food_refunded = False  # 重置返还标记
         add_scan = wf.ocr_scene(wf.TUNE_SCENE, ["auto_add", "auto_add_2"])
         can_add = "添加" in add_scan.get("auto_add", "")
         if "添加" in add_scan.get("auto_add_2", ""):
@@ -74,15 +131,11 @@ class TuningExecutor:
             self.abort_reason = "未找到「添加」入口"
             return None
 
-        # 一次材料区识别：大律准石检查 + 逐轮狗粮决策共用
+        # 使用缓存的材料数据：大律准石检查 + 逐轮狗粮决策共用
+        # 缓存由 cache_materials() 在进入调律页/重置后刷新，
+        # 每轮调律后由 decrement_food() 扣减狗粮数量
         settings = self._wf.base_group.materials
-        infos = None
-        if settings.stone_check_enabled or settings.food_rules:
-            infos = wf.recognize_materials_info_panel(
-                wf.TUNE_SCENE, wf.MATERIAL_PANEL,
-                group=wf.MATERIAL_GROUP)
-            # 调律流程特有校验：投入必须为 0（材料通过点击/一键添加投入）
-            infos = self._validate_tuning_materials(infos)
+        infos = self._material_cache
         if not self._check_stone_stock(settings, infos):
             return None
 
@@ -139,6 +192,7 @@ class TuningExecutor:
                 logger.info(f"检测到狗粮返还弹窗: {bonus}，补点一次关闭")
                 wf.click_region(wf.RESULT_SCENE, "close_btn")
                 wf.wait_delay("step_interval")
+                self.round_food_refunded = True  # 标记返还，调用方据此恢复缓存
         return result
 
     def _validate_tuning_materials(self, infos: dict | None) -> dict | None:
@@ -175,7 +229,7 @@ class TuningExecutor:
             if not label:
                 continue
             # 数量 None = 该材料是装备而非狗粮，视为已耗尽（count=0）
-            count = info.count if info.count is not None else 0
+            count = self._get_count(info) if self._get_count(info) is not None else 0
             # 低置信度误匹配的同名幽灵槽（数量 0）不得覆盖真槽
             if label in stocks and (stocks[label] or 0) > 0:
                 continue

@@ -313,8 +313,9 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
     assert reports[0]["rounds"] == 3
-    # 每轮：共用一次材料识别 + 点狗粮槽位
-    assert wf.material_info_calls == 3
+    # 材料识别只在进入调律页时调用一次（缓存优化）
+    assert wf.material_info_calls == 1
+    # 每轮：点狗粮槽位（缓存扣减，不重 OCR）
     assert wf.clicks.count((TUNE_SCENE, "materials", 1, 3)) == 3
 
 

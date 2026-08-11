@@ -356,6 +356,8 @@ class SceneOpsMixin:
         registry = get_registry()
         try:
             registry.delete_group(group_key)
+            self._rebuild_group_tabs()
+            self._status_bar.showMessage(f"已删除分组: {group_name} ({group_key})")
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))  # type: ignore[arg-type]
 

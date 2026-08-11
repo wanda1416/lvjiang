@@ -188,7 +188,8 @@ class TestRegenKeyDef:
         assert kd.cap is None
         assert kd.regen_period == "minute"
         assert kd.regen_value == 0.0
-        assert kd.alert_above is None
+        assert kd.alert_orange is None
+        assert kd.alert_red is None
 
     def test_from_dict(self):
         kd = RegenKeyDef.from_dict({
@@ -197,12 +198,14 @@ class TestRegenKeyDef:
             "cap": 2500,
             "regen_period": "day",
             "regen_value": 450,
-            "alert_above": 2150,
+            "alert_orange": 2000,
+            "alert_red": 2300,
         })
         assert kd.cap == 2500
         assert kd.regen_period == "day"
         assert kd.regen_value == 450
-        assert kd.alert_above == 2150
+        assert kd.alert_orange == 2000
+        assert kd.alert_red == 2300
 
     def test_to_dict(self):
         kd = RegenKeyDef(key="tili", label="体力", cap=2500, regen_period="day", regen_value=450)
@@ -210,6 +213,14 @@ class TestRegenKeyDef:
         assert d["cap"] == 2500
         assert d["regen_period"] == "day"
         assert d["regen_value"] == 450
+        # 默认值不输出
+        assert "alert_orange" not in d
+        assert "alert_red" not in d
+        # 非默认值应输出
+        kd3 = RegenKeyDef(key="tili", label="体力", alert_orange=2000, alert_red=2300)
+        d3 = kd3.to_dict()
+        assert d3["alert_orange"] == 2000
+        assert d3["alert_red"] == 2300
         # regen_period="minute" 是默认值，不输出
         kd2 = RegenKeyDef(key="xinli", label="心力", regen_value=0.125)
         d2 = kd2.to_dict()

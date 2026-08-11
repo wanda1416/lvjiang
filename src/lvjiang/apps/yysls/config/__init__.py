@@ -40,6 +40,7 @@ from .profile_store import (
     save_groups,
     set_active_group,
     set_alert_history,
+    unmark_alert,
 )
 from .user_profile import (
     ProfileSchema,
@@ -88,4 +89,5 @@ __all__ = [
     "get_alert_history",
     "set_alert_history",
     "mark_alert",
+    "unmark_alert",
 ]

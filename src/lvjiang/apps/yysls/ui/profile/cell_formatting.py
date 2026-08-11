@@ -165,7 +165,9 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
             style = ""
             if kd.cap is not None and computed >= kd.cap:
                 style = "red_bold"
-            elif kd.alert_above is not None and computed >= kd.alert_above:
+            elif kd.alert_red is not None and computed >= kd.alert_red:
+                style = "red_bold"
+            elif kd.alert_orange is not None and computed >= kd.alert_orange:
                 style = "orange_bold"
             if kd.show_cap and kd.cap:
                 return f"{int_value}/{kd.cap}", style

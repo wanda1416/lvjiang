@@ -12,7 +12,10 @@
 | [03-2-basic-commands.md](03-2-basic-commands.md) | 基础指令：collect、eval、call、log |
 | [04-data-flow.md](04-data-flow.md) | 感知指令：scan、recognize、find、where |
 | [05-control-flow.md](05-control-flow.md) | 控制流指令（if/for/loop/while/continue/try-catch/break/return/goto）、条件表达式 |
-| [06-functions.md](06-functions.md) | 内置函数全集：基础运算、字典/列表、字符串、装备处理、用户交互（confirm/pause/notify/input） |
+| [06-functions.md](06-functions.md) | 内置函数总览与速查表 |
+| [06-1-basic-functions.md](06-1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
+| [06-2-system-interaction.md](06-2-system-interaction.md) | 系统与交互函数：用户交互、系统函数、玩家档案 |
+| [06-3-game-functions.md](06-3-game-functions.md) | 游戏相关函数：装备处理、背包遍历、综合示例 |
 | [07-subworkflows.md](07-subworkflows.md) | 模块化（import/def/call）、变量隔离、工作流参数声明 |
 | [08-examples.md](08-examples.md) | 完整示例：装备分析、调律决策树、批量调律、异常重试与用户介入 |
 | [09-data-channels.md](09-data-channels.md) | 数据通道：session/context/variables/output 的生命周期与隔离性 |

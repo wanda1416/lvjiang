@@ -187,6 +187,16 @@ wait stable <timeout> least <value>                                        # 自
 wait stable <timeout> threshold <v> interval <v> duration <v> least <v>    # 任意组合
 ```
 
+**参数值形式**：
+
+所有参数（timeout / threshold / interval / duration / least）均支持三种形式：
+
+| 形式 | 示例 | 说明 |
+|------|------|------|
+| 字面量数字 | `wait stable 5` | 直接指定秒数 |
+| `@命名延迟` | `wait stable @page_load` | 从延迟配置中读取（取范围中值） |
+| `$变量引用` | `wait stable $my_timeout` | 运行时从变量读取 |
+
 **参数**：
 
 | 参数 | 默认值 | 说明 |
@@ -218,7 +228,7 @@ click [activity_jianghu].[btn] after wait stable 8 least 0.5
 - `least` 期间只截图建立基准，不进行稳定判定。防止点击后转场动画尚未开始，画面恰好「没变」就被误判为稳定
 - 等待期间持续检查停止标志，F10 / 停止按钮可立即中断
 - 可作为 click/drag 的后缀等待子句：`click ... after wait stable <timeout> ...`，与普通 wait 子句展开规则一致（around 前后各执行一次）
-- 所有参数均为字面量数值，不支持变量引用
+- 所有参数支持字面量数字、`@命名延迟`、`$变量引用` 三种形式
 - `threshold`、`interval`、`duration` 和 `least` 可以任意顺序书写
 
 ## 五、align — 面板自对齐

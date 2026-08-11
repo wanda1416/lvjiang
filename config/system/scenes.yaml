@@ -2,9 +2,9 @@ layout_scenes:
   group_1:
   - game_main_page
   - game_menu_page
+  - game_login_page
   - general_control
   - general_action
-  - game_login_page
   group_2:
   - equip_detail
   - equip_weapon_detail

@@ -504,6 +504,39 @@ class CanvasPoiMixin:
             self.update()
         return False
 
+    def _collect_point_snap_targets(self, exclude_idx: int) -> tuple[list[float], list[float]]:
+        """收集其他点的吸附参考线（归一化）
+        返回 (xs, ys)：xs 为竖线 x 值，ys 为横线 y 值（仅中心点）
+        """
+        xs: list[float] = []
+        ys: list[float] = []
+        for i, p in enumerate(self._points):
+            if i == exclude_idx:
+                continue
+            xs.append(p.cx_ratio)
+            ys.append(p.cy_ratio)
+        return xs, ys
+
+    def _apply_point_move_snap(self, p) -> None:
+        """移动点时向其他点的中心吸附对齐"""
+        xs, ys = self._collect_point_snap_targets(self._selected_point_idx)
+        thx = self._snap_threshold_x()
+        thy = self._snap_threshold_y()
+        self._snap_lines_x = []
+        self._snap_lines_y = []
+
+        # x 方向：找最近的吸附目标
+        best_x = self._nearest(p.cx_ratio, xs, thx)
+        if best_x is not None:
+            p.cx_ratio = max(0.0, min(1.0, best_x))
+            self._snap_lines_x.append(best_x)
+
+        # y 方向
+        best_y = self._nearest(p.cy_ratio, ys, thy)
+        if best_y is not None:
+            p.cy_ratio = max(0.0, min(1.0, best_y))
+            self._snap_lines_y.append(best_y)
+
     def _poi_handle_move(self, event) -> bool:
         pos = event.position()
 
@@ -511,6 +544,12 @@ class CanvasPoiMixin:
             cx, cy = self._widget_to_canvas_norm(pos)
             p = self._points[self._selected_point_idx]
             p.cx_ratio, p.cy_ratio = cx, cy
+            # Shift 按下时禁用吸附
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                self._snap_lines_x = []
+                self._snap_lines_y = []
+            else:
+                self._apply_point_move_snap(p)
             self._poi_drag_moved = True
             self.update()
             return True
@@ -557,6 +596,9 @@ class CanvasPoiMixin:
             self._poi_drag = PoiDrag.NONE
             self._poi_drag_orig = None
             self._poi_drag_moved = False
+            # 清除吸附参考线
+            self._snap_lines_x = []
+            self._snap_lines_y = []
             # 纯点击（未拖动）不算数据变更
             if moved:
                 self._notify_poi_changed()

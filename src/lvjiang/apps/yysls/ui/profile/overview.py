@@ -515,10 +515,9 @@ class ProfileOverviewTab(QWidget):
         logical_index = h_header.logicalIndexAt(pos)
         menu = QMenu(self)
 
-        # 第 0 列是角色名，不支持新增/删除
         if logical_index == 0:
             menu.addAction("角色名列（不可删除）")
-            menu.setEnabled(False)
+            menu.addAction("右侧新增列", lambda: self._add_column(group_name, 0))
         else:
             # 数据列索引需要减 1（跳过角色名列）
             data_index = logical_index - 1

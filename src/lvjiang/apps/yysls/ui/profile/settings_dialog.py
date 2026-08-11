@@ -55,6 +55,26 @@ def _format_steps(steps: list[StepDef]) -> str:
     return ",".join(f"{s.value}:{s.source}" if s.source else str(s.value) for s in steps)
 
 
+def _format_cap(kd: KeyDef) -> str:
+    """上限列显示：硬上限 [x]，软上限 (x)，无上限空"""
+    if kd.cap is None:
+        return ""
+    if kd.soft:
+        return f"({kd.cap})"
+    return f"[{kd.cap}]"
+
+
+def _format_period(kd: KeyDef) -> str:
+    """周期列显示（Quota 用 period，Regen 用 regen_period）"""
+    if isinstance(kd, QuotaKeyDef):
+        period_labels = {"day": "每天", "week": "每周", "month": "每月", "season": "赛季", "half_season": "半赛季"}
+        return period_labels.get(kd.period, kd.period)
+    if isinstance(kd, RegenKeyDef):
+        regen_labels = {"minute": "分钟", "hour": "小时", "day": "每天", "week": "每周"}
+        return regen_labels.get(kd.regen_period, kd.regen_period)
+    return ""
+
+
 def _parse_steps_text(raw: str) -> tuple[list[StepDef] | None, str]:
     """解析 steps 编辑框文本，如 '-900:打本消耗,-1100'
 
@@ -293,22 +313,49 @@ class _ModelTab(QWidget):
 
         layout.addLayout(toolbar)
 
-        # key 表格
+        # key 表格 — 根据模型类型决定列结构
+        # Quota: Key | 标签 | 上限 | 周期 | 来源 | 详情摘要
+        # Regen: Key | 标签 | 上限 | 周期 | 用途 | 详情摘要
+        # Stock: Key | 标签 | 上限 | 来源 | 用途 | 详情摘要
         self._table = QTableWidget()
-        self._table.setColumnCount(3)
-        self._table.setHorizontalHeaderLabels(["Key", "标签", "详情摘要"])
+        if self._model_type == MODEL_QUOTA:
+            self._table.setColumnCount(6)
+            self._table.setHorizontalHeaderLabels(["Key", "标签", "上限", "周期", "来源", "详情摘要"])
+        elif self._model_type == MODEL_REGEN:
+            self._table.setColumnCount(6)
+            self._table.setHorizontalHeaderLabels(["Key", "标签", "上限", "周期", "用途", "详情摘要"])
+        else:
+            self._table.setColumnCount(6)
+            self._table.setHorizontalHeaderLabels(["Key", "标签", "上限", "来源", "用途", "详情摘要"])
         self._table.verticalHeader().setVisible(False)
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.doubleClicked.connect(self._edit_key)
 
+        # 表头加粗
+        header_font = self._table.horizontalHeader().font()
+        header_font.setBold(True)
+        self._table.horizontalHeader().setFont(header_font)
+
         header = self._table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self._table.setColumnWidth(0, 160)
-        self._table.setColumnWidth(1, 100)
+        # Key/标签/上限: 自适应
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        if self._model_type == MODEL_STOCK:
+            # 来源/用途: 固定, 详情摘要: 拉伸
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+            self._table.setColumnWidth(3, 150)
+            self._table.setColumnWidth(4, 150)
+        else:
+            # Quota/Regen: 周期: 自适应, 来源或用途: 固定, 详情摘要: 拉伸
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+            self._table.setColumnWidth(4, 150)
 
         layout.addWidget(self._table)
 
@@ -414,25 +461,42 @@ class ProfileDefinitionDialog(QDialog):
             keys = config.get_keys_by_model(model_type)
             tab.table.setRowCount(len(keys))
             for row, kd in enumerate(keys):
-                key_item = QTableWidgetItem(kd.key)
-                key_item.setData(_ROLE_KEYDEF, kd)
-                tab.table.setItem(row, 0, key_item)
-                tab.table.setItem(row, 1, QTableWidgetItem(kd.label))
-                tab.table.setItem(row, 2, QTableWidgetItem(self._summarize(kd)))
+                self._populate_row(tab, row, kd)
+
+    @staticmethod
+    def _populate_row(tab: _ModelTab, row: int, kd: KeyDef) -> None:
+        """填充一行数据到表格"""
+        key_item = QTableWidgetItem(kd.key)
+        key_item.setData(_ROLE_KEYDEF, kd)
+        tab.table.setItem(row, 0, key_item)
+        tab.table.setItem(row, 1, QTableWidgetItem(kd.label))
+        tab.table.setItem(row, 2, QTableWidgetItem(_format_cap(kd)))
+        if tab.model_type == MODEL_QUOTA:
+            # Key | 标签 | 上限 | 周期 | 来源 | 详情摘要
+            tab.table.setItem(row, 3, QTableWidgetItem(_format_period(kd)))
+            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.sources)))
+            tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
+        elif tab.model_type == MODEL_REGEN:
+            # Key | 标签 | 上限 | 周期 | 用途 | 详情摘要
+            tab.table.setItem(row, 3, QTableWidgetItem(_format_period(kd)))
+            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.uses)))
+            tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
+        else:
+            # Key | 标签 | 上限 | 来源 | 用途 | 详情摘要
+            tab.table.setItem(row, 3, QTableWidgetItem(",".join(kd.sources)))
+            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.uses)))
+            tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
 
     @staticmethod
     def _summarize(kd: KeyDef) -> str:
-        """生成 key 的详情摘要"""
+        """生成 key 的详情摘要（已移除上限/周期/来源/用途，这些已独立成列）"""
         if isinstance(kd, QuotaKeyDef):
-            parts = [f"周期:{kd.period}"]
+            parts = []
             if kd.reset_day and kd.period in ("week", "month"):
                 if kd.period == "week" and 1 <= kd.reset_day <= 7:
                     parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
                 elif kd.period == "month" and 1 <= kd.reset_day <= 31:
                     parts.append(f"重置日:{kd.reset_day}号")
-            if kd.cap is not None:
-                cap_type = "软" if kd.soft else "硬"
-                parts.append(f"{cap_type}上限:{kd.cap}")
             if kd.show_cap:
                 parts.append("展示上限")
             if kd.increment_only:
@@ -442,15 +506,11 @@ class ProfileDefinitionDialog(QDialog):
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
-            if kd.sources:
-                parts.append(f"来源:{','.join(kd.sources)}")
-            if kd.uses:
-                parts.append(f"用途:{','.join(kd.uses)}")
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
         if isinstance(kd, RegenKeyDef):
-            parts = [f"上限:{kd.cap}"]
+            parts = []
             period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
             period_text = period_labels.get(kd.regen_period, kd.regen_period)
             parts.append(f"回复:{kd.regen_value}/{period_text}")
@@ -466,10 +526,6 @@ class ProfileDefinitionDialog(QDialog):
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
-            if kd.sources:
-                parts.append(f"来源:{','.join(kd.sources)}")
-            if kd.uses:
-                parts.append(f"用途:{','.join(kd.uses)}")
             if kd.alert_orange:
                 parts.append(f"橙警:>={kd.alert_orange}")
             if kd.alert_red:
@@ -478,9 +534,6 @@ class ProfileDefinitionDialog(QDialog):
 
         if isinstance(kd, StockKeyDef):
             parts = []
-            if kd.cap is not None:
-                cap_type = "软" if kd.soft else "硬"
-                parts.append(f"{cap_type}上限:{kd.cap}")
             if kd.show_cap:
                 parts.append("展示上限")
             if kd.steps:
@@ -488,10 +541,6 @@ class ProfileDefinitionDialog(QDialog):
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
-            if kd.sources:
-                parts.append(f"来源:{','.join(kd.sources)}")
-            if kd.uses:
-                parts.append(f"用途:{','.join(kd.uses)}")
             if kd.description:
                 parts.append(kd.description)
             return ", ".join(parts)
@@ -509,11 +558,7 @@ class ProfileDefinitionDialog(QDialog):
         tab = self._tabs[model_type]
         row = tab.table.rowCount()
         tab.table.setRowCount(row + 1)
-        key_item = QTableWidgetItem(kd.key)
-        key_item.setData(_ROLE_KEYDEF, kd)
-        tab.table.setItem(row, 0, key_item)
-        tab.table.setItem(row, 1, QTableWidgetItem(kd.label))
-        tab.table.setItem(row, 2, QTableWidgetItem(self._summarize(kd)))
+        self._populate_row(tab, row, kd)
 
     def _edit_key(self, model_type: str, row: int):
         """编辑 key"""
@@ -530,11 +575,7 @@ class ProfileDefinitionDialog(QDialog):
         if kd is None:
             return
 
-        key_item = QTableWidgetItem(kd.key)
-        key_item.setData(_ROLE_KEYDEF, kd)
-        tab.table.setItem(row, 0, key_item)
-        tab.table.setItem(row, 1, QTableWidgetItem(kd.label))
-        tab.table.setItem(row, 2, QTableWidgetItem(self._summarize(kd)))
+        self._populate_row(tab, row, kd)
 
     def _delete_key(self, model_type: str, row: int):
         """删除 key"""
@@ -585,6 +626,32 @@ class ProfileDefinitionDialog(QDialog):
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
 
+        # 上限/软上限/展示上限（三种模型通用）
+        existing_cap = existing.cap if existing else None
+        existing_soft = existing.soft if existing else False
+        existing_show_cap = existing.show_cap if existing else False
+
+        cap_spin = QSpinBox()
+        cap_spin.setRange(0, 999999)
+        cap_spin.setSpecialValueText("无上限")
+        cap_spin.setValue(existing_cap or 0)
+
+        soft_check = QCheckBox("软上限")
+        soft_check.setChecked(existing_soft)
+
+        cap_row = QHBoxLayout()
+        cap_row.addWidget(cap_spin)
+        cap_row.addWidget(soft_check)
+        cap_row.addStretch()
+        layout.addRow("上限:", cap_row)
+        widgets["cap"] = cap_spin
+        widgets["soft"] = soft_check
+
+        show_cap_check = QCheckBox("展示上限")
+        show_cap_check.setChecked(existing_show_cap)
+        layout.addRow(show_cap_check)
+        widgets["show_cap"] = show_cap_check
+
         # 来源/用途词表（三种模型通用）：来源对应增加，用途对应减少
         sources_input = QLineEdit(",".join(existing.sources) if existing else "")
         sources_input.setPlaceholderText("逗号分隔，增加时供下拉选择，如: 打本,商店,任务")
@@ -606,27 +673,6 @@ class ProfileDefinitionDialog(QDialog):
                 period_combo.setCurrentIndex(idx)
             layout.addRow("周期:", period_combo)
             widgets["period"] = period_combo
-
-            cap_spin = QSpinBox()
-            cap_spin.setRange(0, 999999)
-            cap_spin.setSpecialValueText("无上限")
-            cap_spin.setValue(kd.cap or 0)
-
-            soft_check = QCheckBox("软上限")
-            soft_check.setChecked(kd.soft)
-
-            cap_row = QHBoxLayout()
-            cap_row.addWidget(cap_spin)
-            cap_row.addWidget(soft_check)
-            cap_row.addStretch()
-            layout.addRow("上限:", cap_row)
-            widgets["cap"] = cap_spin
-            widgets["soft"] = soft_check
-
-            show_cap_check = QCheckBox("展示上限")
-            show_cap_check.setChecked(kd.show_cap)
-            layout.addRow(show_cap_check)
-            widgets["show_cap"] = show_cap_check
 
             reset_input = QLineEdit(kd.reset_time)
             reset_input.setFixedWidth(80)
@@ -672,17 +718,6 @@ class ProfileDefinitionDialog(QDialog):
 
         elif model_type == MODEL_REGEN:
             rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
-
-            cap_spin = QSpinBox()
-            cap_spin.setRange(0, 999999)
-            cap_spin.setValue(rt_kd.cap or 0)
-            layout.addRow("上限:", cap_spin)
-            widgets["cap"] = cap_spin
-
-            show_cap_check = QCheckBox("展示上限")
-            show_cap_check.setChecked(rt_kd.show_cap)
-            layout.addRow(show_cap_check)
-            widgets["show_cap"] = show_cap_check
 
             regen_period_combo = QComboBox()
             regen_period_combo.addItem("分钟", "minute")
@@ -756,27 +791,6 @@ class ProfileDefinitionDialog(QDialog):
         elif model_type == MODEL_STOCK:
             res_kd = existing if isinstance(existing, StockKeyDef) else StockKeyDef()
 
-            cap_spin = QSpinBox()
-            cap_spin.setRange(0, 999999)
-            cap_spin.setSpecialValueText("无上限")
-            cap_spin.setValue(res_kd.cap or 0)
-
-            soft_check = QCheckBox("软上限")
-            soft_check.setChecked(res_kd.soft)
-
-            cap_row = QHBoxLayout()
-            cap_row.addWidget(cap_spin)
-            cap_row.addWidget(soft_check)
-            cap_row.addStretch()
-            layout.addRow("上限:", cap_row)
-            widgets["cap"] = cap_spin
-            widgets["soft"] = soft_check
-
-            show_cap_check = QCheckBox("展示上限")
-            show_cap_check.setChecked(res_kd.show_cap)
-            layout.addRow(show_cap_check)
-            widgets["show_cap"] = show_cap_check
-
             # 自定义增减幅度（支持 value:来源）
             steps_input = QLineEdit(_format_steps(res_kd.steps))
             steps_input.setPlaceholderText("如: 1:兑换,10 或 -1")
@@ -847,9 +861,14 @@ class ProfileDefinitionDialog(QDialog):
                 error_label.setText("同步目标不能指向自身")
                 return
 
+            # 通用上限字段（三种模型通用）
+            cap_val = widgets["cap"].value()
+            cap_final = cap_val if cap_val > 0 else None
+            soft_final = widgets["soft"].isChecked()
+            show_cap_final = widgets["show_cap"].isChecked()
+
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
-                cap_val = widgets["cap"].value()
                 # 解析 steps（支持 value:来源）
                 steps_list, steps_err = _parse_steps_text(widgets["steps"].text().strip())
                 if steps_list is None:
@@ -861,9 +880,9 @@ class ProfileDefinitionDialog(QDialog):
                     uses=uses_list,
                     sync_targets=sync_targets_list,
                     period=widgets["period"].currentData(),
-                    cap=cap_val if cap_val > 0 else None,
-                    soft=widgets["soft"].isChecked(),
-                    show_cap=widgets["show_cap"].isChecked(),
+                    cap=cap_final,
+                    soft=soft_final,
+                    show_cap=show_cap_final,
                     steps=steps_list,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
@@ -882,8 +901,9 @@ class ProfileDefinitionDialog(QDialog):
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
-                    cap=widgets["cap"].value(),
-                    show_cap=widgets["show_cap"].isChecked(),
+                    cap=cap_final,
+                    soft=soft_final,
+                    show_cap=show_cap_final,
                     regen_period=widgets["regen_period"].currentData(),
                     regen_value=widgets["regen_value"].value(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
@@ -893,7 +913,6 @@ class ProfileDefinitionDialog(QDialog):
                     steps=steps_list,
                 )
             elif model_type == MODEL_STOCK:
-                cap_val = widgets["cap"].value()
                 # 解析 steps（支持 value:来源）
                 steps_list, steps_err = _parse_steps_text(widgets["steps"].text().strip())
                 if steps_list is None:
@@ -904,9 +923,9 @@ class ProfileDefinitionDialog(QDialog):
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
-                    cap=cap_val if cap_val > 0 else None,
-                    soft=widgets["soft"].isChecked(),
-                    show_cap=widgets["show_cap"].isChecked(),
+                    cap=cap_final,
+                    soft=soft_final,
+                    show_cap=show_cap_final,
                     steps=steps_list,
                 )
             else:

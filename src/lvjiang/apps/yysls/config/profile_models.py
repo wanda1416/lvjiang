@@ -168,6 +168,8 @@ class KeyDef:
     """所有模型共有的基础字段
 
     不含 model 字段 — 模型类型由 profile.yaml 的父节点决定。
+    cap: 上限值，None 表示无上限。
+    soft: True 表示软上限（仅提醒），False 表示硬上限（强制截断）。
     show_cap: 是否在总览中展示上限（value/cap），默认否。
     sources: 来源词表，增加操作时供下拉选择。
     uses: 用途词表，减少操作时供下拉选择。
@@ -178,6 +180,8 @@ class KeyDef:
     key: str = ""
     label: str = ""
     description: str = ""
+    cap: int | None = None
+    soft: bool = False
     show_cap: bool = False
     sources: list[str] = field(default_factory=list)
     uses: list[str] = field(default_factory=list)
@@ -189,6 +193,8 @@ class KeyDef:
             key=data.get("key", ""),
             label=data.get("label", ""),
             description=data.get("description", ""),
+            cap=data.get("cap"),
+            soft=data.get("soft", False),
             show_cap=data.get("show_cap", False),
             sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
             uses=[str(s).strip() for s in data.get("uses", []) if str(s).strip()],
@@ -234,8 +240,6 @@ class QuotaKeyDef(KeyDef):
     """
 
     period: str = "week"
-    cap: int | None = None
-    soft: bool = False
     steps: list[StepDef] = field(default_factory=list)
     reset_time: str = "05:00"
     reset_day: int = 0
@@ -248,13 +252,13 @@ class QuotaKeyDef(KeyDef):
             key=base.key,
             label=base.label,
             description=base.description,
+            cap=base.cap,
+            soft=base.soft,
             show_cap=base.show_cap,
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
             period=data.get("period", "week"),
-            cap=data.get("cap"),
-            soft=data.get("soft", False),
             steps=parse_steps(data.get("steps", [])),
             reset_time=data.get("reset_time", "05:00"),
             reset_day=data.get("reset_day", 0),
@@ -274,7 +278,6 @@ class RegenKeyDef(KeyDef):
     steps: 自定义增减幅度，正值=增加，负值=减少，可携带来源描述。
     """
 
-    cap: int | None = None
     regen_period: str = "minute"
     regen_value: float = 0.0
     reset_time: str = "05:00"
@@ -290,11 +293,12 @@ class RegenKeyDef(KeyDef):
             key=base.key,
             label=base.label,
             description=base.description,
+            cap=base.cap,
+            soft=base.soft,
             show_cap=base.show_cap,
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
-            cap=data.get("cap"),
             regen_period=data.get("regen_period", "minute"),
             regen_value=data.get("regen_value", 0.0),
             reset_time=data.get("reset_time", "05:00"),
@@ -314,8 +318,6 @@ class StockKeyDef(KeyDef):
     steps: 自定义增减幅度，正值=增加，负值=减少，可携带来源描述。
     """
 
-    cap: int | None = None
-    soft: bool = False
     steps: list[StepDef] = field(default_factory=list)
 
     @classmethod
@@ -325,12 +327,12 @@ class StockKeyDef(KeyDef):
             key=base.key,
             label=base.label,
             description=base.description,
+            cap=base.cap,
+            soft=base.soft,
             show_cap=base.show_cap,
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
-            cap=data.get("cap"),
-            soft=data.get("soft", False),
             steps=parse_steps(data.get("steps", [])),
         )
 

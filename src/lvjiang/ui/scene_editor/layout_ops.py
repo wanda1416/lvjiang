@@ -186,8 +186,9 @@ class LayoutOpsMixin:
             return
         name = self._current_layout.name
         # 画布配置从当前激活 Tab 获取（用户编辑的是当前 Tab 的画布）
-        current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
-        self._current_layout.set_canvas(current_tab.get_canvas_config())
+        current_tab = self._current_scene_tab() or next(iter(self._tabs.values()), None)
+        if current_tab is not None:
+            self._current_layout.set_canvas(current_tab.get_canvas_config())
         # 从所有 Tab 收集数据到 Layout 对象（内存操作，始终全量）
         for scene_key, tab in self._tabs.items():
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
@@ -196,7 +197,9 @@ class LayoutOpsMixin:
             self._current_layout.set_scene_panels(scene_key, tab.get_panels())
         # 增量写盘：只写变更的场景文件
         changed = set(self._dirty_scenes) if self._dirty_scenes else None
-        self._manager.save_layout(self._current_layout, changed_scenes=changed)
+        if not self._manager.save_layout(self._current_layout, changed_scenes=changed):
+            self._status_bar.showMessage(f"保存布局「{name}」失败，请检查日志")
+            return
         self._update_ui_state()
         total_r = sum(len(tab.get_regions()) for tab in self._tabs.values())
         total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
@@ -283,8 +286,12 @@ class LayoutOpsMixin:
 
         if inherit:
             # 创建别名布局
-            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
-            canvas = current_tab.get_canvas_config()
+            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()), None)
+            canvas = (
+                current_tab.get_canvas_config()
+                if current_tab is not None
+                else self._current_layout.get_canvas()
+            )
             extends_name = self._current_layout.name
             # 如果当前是别名，继承目标必须是根布局
             if self._manager.is_alias_layout(extends_name):
@@ -309,8 +316,12 @@ class LayoutOpsMixin:
         else:
             # 正常另存为：独立副本
             temp = Layout(name="")
-            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
-            temp.set_canvas(current_tab.get_canvas_config())
+            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()), None)
+            temp.set_canvas(
+                current_tab.get_canvas_config()
+                if current_tab is not None
+                else self._current_layout.get_canvas()
+            )
             for scene_key, tab in self._tabs.items():
                 temp.set_scene_regions(scene_key, tab.get_regions())
                 temp.set_scene_points(scene_key, tab.get_points())
@@ -318,7 +329,9 @@ class LayoutOpsMixin:
                 temp.set_scene_panels(scene_key, tab.get_panels())
 
             temp.name = name
-            self._manager.save_layout(temp)
+            if not self._manager.save_layout(temp):
+                QMessageBox.warning(self, "另存为失败", "布局写入失败，请检查日志。")
+                return
             copy_screenshots(self._current_layout.name, name)
             self._current_layout = temp
             self._refresh_combo()

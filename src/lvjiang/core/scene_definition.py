@@ -5,6 +5,7 @@
 """
 
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
@@ -21,6 +22,15 @@ from .scene_definition_models import (
     SceneDef,
     ViewDef,
 )
+
+_VALID_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _validate_key_and_name(key: str, name: str, kind: str) -> None:
+    if not _VALID_KEY_RE.fullmatch(key):
+        raise ValueError(f"{kind} key 必须以小写字母开头，仅含小写字母/数字/下划线")
+    if not name.strip():
+        raise ValueError(f"{kind}名称不能为空")
 
 
 class SceneRegistry:
@@ -222,6 +232,7 @@ class SceneRegistry:
 
     def create_group(self, key: str, name: str):
         """创建新分组"""
+        _validate_key_and_name(key, name, "分组")
         if key in self._groups:
             raise ValueError(f"分组 key 已存在: {key}")
         self._groups[key] = name
@@ -233,6 +244,8 @@ class SceneRegistry:
         """重命名分组（key 不可变）"""
         if key not in self._groups:
             raise ValueError(f"分组不存在: {key}")
+        if not new_name.strip():
+            raise ValueError("分组名称不能为空")
         self._groups[key] = new_name
         logger.info(f"已重命名分组: {key} -> {new_name}")
 
@@ -244,6 +257,7 @@ class SceneRegistry:
         """
         if old_key not in self._groups:
             raise ValueError(f"分组不存在: {old_key}")
+        _validate_key_and_name(new_key, new_name, "分组")
         if new_key != old_key and new_key in self._groups:
             raise ValueError(f"分组 key 已存在: {new_key}")
         # 更新 _group_scenes
@@ -261,6 +275,8 @@ class SceneRegistry:
         """删除空分组（非空抛异常）"""
         if key not in self._groups:
             raise ValueError(f"分组不存在: {key}")
+        if len(self._groups) <= 1:
+            raise ValueError("至少需要保留一个场景分组")
         scenes = self._group_scenes.get(key, [])
         if scenes:
             raise ValueError(f"分组非空，无法删除: {key}（包含 {len(scenes)} 个场景）")
@@ -307,6 +323,7 @@ class SceneRegistry:
 
     def create_scene(self, key: str, name: str, group_key: str | None = None) -> SceneDef:
         """创建新场景 YAML 文件并注册，可选指定分组"""
+        _validate_key_and_name(key, name, "场景")
         if key in self._scenes:
             raise ValueError(f"场景 key 已存在: {key}")
         scene = SceneDef(key=key, name=name)
@@ -337,11 +354,20 @@ class SceneRegistry:
         """重命名场景（修改 YAML 的 key/name，必要时重命名文件）"""
         if key not in self._scenes:
             raise ValueError(f"场景不存在: {key}")
+        _validate_key_and_name(new_key, new_name, "场景")
         if new_key != key and new_key in self._scenes:
             raise ValueError(f"场景 key 已存在: {new_key}")
         scene = self._scenes[key]
+        old_name = scene.name
         scene.key = new_key
         scene.name = new_name
+        try:
+            # 先写新文件，成功后再删除旧文件，避免写入失败时丢失原定义。
+            self._save_scene_yaml(scene)
+        except Exception:
+            scene.key = key
+            scene.name = old_name
+            raise
         # 如果 key 变了，需要删旧建新
         if new_key != key:
             self._resolver.delete_entity(f"scenes/{key}.yaml")
@@ -355,7 +381,6 @@ class SceneRegistry:
                 scenes_list = self._group_scenes[group]
                 gidx = scenes_list.index(key)
                 scenes_list[gidx] = new_key
-        self._save_scene_yaml(scene)
         logger.info(f"已重命名场景: {key} -> {new_key}")
 
     def reorder_scenes(self, new_order: list[str]):

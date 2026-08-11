@@ -135,8 +135,12 @@ def rename_scene_screenshots(old_key: str, new_key: str):
     for layout_dir in screenshots_base.iterdir():
         if not layout_dir.is_dir():
             continue
-        # 匹配 {old_key}.png 和 {old_key}__*.png
-        for png in layout_dir.glob(f"{old_key}*.png"):
+        # 只匹配 {old_key}.png 和 {old_key}__*.png，不能误伤同前缀场景。
+        candidates = [layout_dir / f"{old_key}.png"]
+        candidates.extend(layout_dir.glob(f"{old_key}__*.png"))
+        for png in candidates:
+            if not png.is_file():
+                continue
             suffix = png.stem[len(old_key):]  # 空或 "__view_key"
             new_name = f"{new_key}{suffix}.png"
             png.rename(layout_dir / new_name)
@@ -153,8 +157,8 @@ def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str):
     old_path = resolver.resolve_read(old_rel)
     if old_path and old_path.exists():
         content = old_path.read_text(encoding="utf-8")
-        resolver.delete_entity(old_rel)
         resolver.write_entity(new_rel, content)
+        resolver.delete_entity(old_rel)
         logger.info(f"布局场景文件已重命名: {old_key}.json -> {new_key}.json ({layout_name})")
 
 
@@ -166,6 +170,24 @@ def rename_scene_across_all_layouts(old_key: str, new_key: str):
     for layout_name in manager.list_layouts():
         rename_layout_scene_key(layout_name, old_key, new_key)
     rename_scene_screenshots(old_key, new_key)
+
+
+def delete_scene_across_all_layouts(scene_key: str):
+    """彻底删除所有布局中的场景 JSON 及该场景的全部视图截图。"""
+    resolver = get_resolver()
+    manager = LayoutConfigManager()
+    for layout_name in manager.list_layouts():
+        resolver.delete_entity(_scene_rel(layout_name, scene_key))
+    if SCREENSHOTS_DIR.exists():
+        for layout_dir in SCREENSHOTS_DIR.iterdir():
+            if not layout_dir.is_dir():
+                continue
+            candidates = [layout_dir / f"{scene_key}.png"]
+            candidates.extend(layout_dir.glob(f"{scene_key}__*.png"))
+            for path in candidates:
+                if path.is_file():
+                    path.unlink()
+                    logger.info(f"场景截图已删除: {path}")
 
 
 def rename_item_key_across_all_layouts(scene_key: str, kind: str, old_key: str, new_key: str):
@@ -569,7 +591,7 @@ class LayoutConfigManager:
             logger.info(f"布局已加载: {name}")
         return layout
 
-    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None):
+    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None) -> bool:
         """保存布局
 
         Args:
@@ -590,7 +612,7 @@ class LayoutConfigManager:
         resolved = _resolve_layout_entry(layouts_doc, layout.name)
         if resolved is None:
             logger.error(f"布局 [{layout.name}] 的 extends 条目非法，拒绝保存")
-            return
+            return False
         _, scene_dir_name = resolved
 
         # 2. 更新 layouts.yaml 中的条目（别名布局保留 extends）
@@ -628,6 +650,7 @@ class LayoutConfigManager:
             )
         mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else "全量"
         logger.info(f"布局已保存: {layout.name} ({mode})")
+        return True
 
     def delete_layout(self, name: str) -> bool:
         resolver = get_resolver()

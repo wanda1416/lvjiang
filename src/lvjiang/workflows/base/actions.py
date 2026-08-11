@@ -135,7 +135,7 @@ class _ActionMixin:
             remaining = deadline - time.monotonic()
             time.sleep(min(0.05, max(0.0, remaining)))
 
-    def wait_stable(self, timeout: float, threshold: float = 0.02,
+    def wait_stable(self, timeout: float | str, threshold: float = 0.02,
                     interval: float = 0.3, stable_duration: float = 0.5,
                     least: float = 0.5):
         """等待画面稳定（连续截图对比）
@@ -147,6 +147,9 @@ class _ActionMixin:
         执行（游戏画面常有持续动画，永远达不到阈值是常态，不应终止流程）。
         实际书写时建议把 timeout 设得宽裕些，至少不会比固定等待差。
 
+        timeout 可以是数值（秒）或命名延迟参数名（如 "page_refresh"），
+        命名参数从 delay_params 配置取范围中值。
+
         least 参数：点击后至少等待这么久再开始稳定检测。
         防止转场动画未开始就被误判为「画面已稳定」。
 
@@ -154,8 +157,20 @@ class _ActionMixin:
         """
         import cv2
 
+        # 命名延迟参数：取范围中值
+        if isinstance(timeout, str):
+            delay_param = self._delay_params.get(timeout)
+            if delay_param is None:
+                raise ValueError(
+                    f"wait stable: 等待参数 @{timeout} 未定义"
+                )
+            lo, hi = delay_param.range
+            timeout_val = (lo + hi) / 2.0
+        else:
+            timeout_val = float(timeout)
+
         start_time = time.monotonic()
-        deadline = start_time + max(0.0, timeout)
+        deadline = start_time + max(0.0, timeout_val)
         least_until = start_time + max(0.0, least)
         prev = None
         stable_since = None

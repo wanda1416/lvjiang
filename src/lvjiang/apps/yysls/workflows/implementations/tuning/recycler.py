@@ -92,7 +92,7 @@ class TuningRecycler:
             return False
         logger.info(f"  执行重置调律（剩余次数 OCR: {remaining}）：{why}")
         wf.click_region(wf.TUNE_SCENE, "reset_tune")
-        wf.wait_delay("page_refresh")  # 重置确认弹窗
+        wf.wait_stable("page_refresh")  # 重置确认弹窗
         # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
         check_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_check"]).get(
             "reset_check", "") or ""
@@ -128,7 +128,7 @@ class TuningRecycler:
         # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
         wf.wait_seconds(random.uniform(6.0, 7.0))
         wf.click_region(wf.TUNE_SCENE, "reset_confirm_2")
-        wf.wait_delay("page_refresh")  # 重置结果弹窗出现
+        wf.wait_stable("page_refresh")  # 重置结果弹窗出现
         wf.click_region(wf.TUNE_SCENE, "close_btn")  # 关闭 → 回到调律进度页
         wf.wait_delay("step_interval")
         return True
@@ -163,7 +163,7 @@ class TuningRecycler:
         stage_label = BEHAVIOR_STAGE_LABELS.get(stage, stage)
         logger.info(f"  [{stage_label}] 回收 {label}：{reason}")
         wf.click_region(wf.EQUIP_DETAIL, "more_func")
-        wf.wait_delay("page_refresh")  # 详情页 → 「更多」弹窗展开
+        wf.wait_stable("page_refresh")  # 详情页 → 「更多」弹窗展开
         key = wf.ocr_scene_by(
             wf.EQUIP_DETAIL,
             ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
@@ -174,7 +174,7 @@ class TuningRecycler:
             wf.wait_delay("step_interval")
             return RecycleOutcome.UNAVAILABLE
         wf.click_region(wf.EQUIP_DETAIL, key)
-        wf.wait_delay("page_refresh")  # 回收确认弹窗
+        wf.wait_stable("page_refresh")  # 回收确认弹窗
         # 装备锁定检测：确认弹窗内应含「确认」，否则装备被锁定
         confirm_text = wf.ocr_scene(wf.EQUIP_DETAIL,
                                     ["recycle_confirm"]).get(
@@ -187,7 +187,7 @@ class TuningRecycler:
             wf.wait_delay("step_interval")
             return RecycleOutcome.LOCKED
         wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
-        wf.wait_delay("page_refresh")  # 回收完成，背包刷新补位
+        wf.wait_stable("page_refresh")  # 回收完成，背包刷新补位
         if report is not None:
             report["recycled"] = True
             report["recycle_reason"] = reason

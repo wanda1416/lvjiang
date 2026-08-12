@@ -392,7 +392,11 @@ def _parse_food_rule(raw, where: str) -> FoodRule:
         raise RuleValidationError(
             f"{where}.on_insufficient 非法: {action!r}"
             f"（须为 {list(INSUFFICIENT_ACTIONS)}）")
-    return FoodRule(pct=pct, min_expect=expect, min_quality=quality,
+    enabled = raw.get("enabled", defaults.enabled)
+    if not isinstance(enabled, bool):
+        raise RuleValidationError(f"{where}.enabled 必须是 bool")
+    return FoodRule(enabled=enabled, pct=pct, min_expect=expect,
+                    min_quality=quality,
                     food=food, on_insufficient=action)
 
 
@@ -459,11 +463,16 @@ def _parse_behavior_rule(raw, where: str,
     first_affix_only 仅扫描处置表可声明"""
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
-    parts = list(raw.get("parts") or [])
+    raw_parts = raw.get("parts") or []
+    # 支持特殊值 "全部" 展开为所有部位
+    if raw_parts == ["全部"]:
+        parts = list(QUALITY_PARTS)
+    else:
+        parts = list(raw_parts)
     bad = [p for p in parts if p not in QUALITY_PARTS]
     if bad:
         raise RuleValidationError(
-            f"{where}.parts: 未知部位 {bad}（须为 {list(QUALITY_PARTS)}）")
+            f"{where}.parts: 未知部位 {bad}（须为 {list(QUALITY_PARTS)} 或 '全部'）")
     max_quality = raw.get("max_quality", "gold")
     if max_quality not in _VALID_RULE_QUALITIES:
         raise RuleValidationError(
@@ -480,7 +489,11 @@ def _parse_behavior_rule(raw, where: str,
     if action not in allowed_actions:
         raise RuleValidationError(
             f"{where}.action 非法: {action!r}（须为 {list(allowed_actions)}）")
-    return BehaviorRule(parts=parts, max_quality=max_quality,
+    defaults = BehaviorRule()
+    enabled = raw.get("enabled", defaults.enabled)
+    if not isinstance(enabled, bool):
+        raise RuleValidationError(f"{where}.enabled 必须是 bool")
+    return BehaviorRule(enabled=enabled, parts=parts, max_quality=max_quality,
                         pct_op=pct_op, pct=pct, ratings=ratings,
                         judge_scope=scope, judge_rules=keys,
                         first_affix_only=first_affix, action=action)

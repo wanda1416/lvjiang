@@ -22,6 +22,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     FoodRule,
     MaterialSettings,
     RuleValidationError,
+    ScanBehavior,
     TuneBehavior,
     TuningGroupManager,
     TuningRuleManager,
@@ -808,7 +809,7 @@ class TestBehaviorSettings:
         data["tune"] = {
             "enabled": True,
             "rules": [
-                {"max_rating": "junk", "judge_scope": "all",
+                {"enabled": False, "max_rating": "junk", "judge_scope": "all",
                  "action": "recycle"},
                 {"max_pct": 30, "action": "reset"},
                 {"max_rating": "normal", "action": "skip"},
@@ -831,6 +832,7 @@ class TestBehaviorSettings:
             "all", "incoming", "incoming", "incoming"]
         assert [r.action for r in g.tune.rules] == [
             "recycle", "reset", "skip", "continue"]
+        assert [r.enabled for r in g.tune.rules] == [False, True, True, True]
         assert g.tune.max_resets == 2
         assert g.tune.reset_exhausted_action == "recycle"
 
@@ -948,6 +950,13 @@ class TestBehaviorSettings:
         disabled = parse_tuning_group(data).scan
         assert disabled.decide("武器", "gold", 20, junk)[0] == "skip"
 
+    def test_disabled_behavior_rule_is_skipped(self):
+        scan = ScanBehavior(enabled=True, rules=[
+            BehaviorRule(enabled=False, action="recycle"),
+            BehaviorRule(action="skip"),
+        ])
+        assert scan.decide("武器", "gold", 50, _rating("junk"))[0] == "skip"
+
     def test_rule_judge_semantics_lazy(self):
         # 评级按各规则自身判定语义懒取：不限评级的规则不取评级；
         # 同一装备不同语义可得不同评级（传入判垃圾、自选判顶级）
@@ -1042,7 +1051,7 @@ class TestBehaviorSettings:
 
     def test_tune_decide_defaults_and_full(self):
         # 无命中默认：未满 = 继续调律；词条满 = 结束保留；
-        # full=True 时 continue 规则跳过匹配（不可达）
+        # full=True 时 continue 规则转为 skip，并终止后续规则判定
         junk, normal, top = (_rating("junk"), _rating("normal"),
                              _rating("top"))
         data = _valid_group()
@@ -1058,6 +1067,11 @@ class TestBehaviorSettings:
         assert tune.decide("武器", "gold", 95, normal,
                            False)[0] == "continue"
         assert tune.decide("武器", "gold", 95, normal, True)[0] == "skip"
+        guarded = TuneBehavior(enabled=True, rules=[
+            BehaviorRule(ratings=["top"], action="continue"),
+            BehaviorRule(action="recycle"),
+        ])
+        assert guarded.decide("武器", "gold", 95, top, True)[0] == "skip"
         # 全部不命中 → 默认：未满继续、满跳过该装备
         assert tune.decide("武器", "gold", 95, top, False)[0] == "continue"
         assert tune.decide("武器", "gold", 95, top, True)[0] == "skip"
@@ -1072,6 +1086,15 @@ class TestDecideFood:
     """decide_food 新语义：三条件顺序匹配 + 持有量判定 + 不足策略"""
 
     STOCKS = {"彩狗粮": 5, "金狗粮": 3, "紫狗粮": 0}
+
+    def test_disabled_food_rule_is_skipped(self):
+        rules = [
+            FoodRule(enabled=False, food="彩狗粮"),
+            FoodRule(food="金狗粮"),
+        ]
+        decision = MaterialSettings(food_rules=rules).decide_food(
+            100, "top", "gold", self.STOCKS)
+        assert decision.food == "金狗粮"
     # 测试用狗粮规则（与 default.yaml 中的示例一致，但非“默认”）
     _RULES = [
         FoodRule(pct=98, min_expect="top", food="彩狗粮"),

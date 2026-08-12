@@ -58,6 +58,8 @@ class TuningProgressDialog:
     关闭窗口 = 隐藏（不销毁），可通过“打开进度”按钮重新显示。
     """
 
+    MAX_AFFIX = 5  # 装备最大词条数（固定占位，避免布局抖动）
+
     def __init__(self, hub: TuningProgressHub):
         self._hub = hub
         self._build_ui()
@@ -65,6 +67,23 @@ class TuningProgressDialog:
         # 内部计数
         self._equipment_count = 0
         self._round_count = 0
+
+    @staticmethod
+    def _format_affix_lines(affixes: list[dict], count: int | None = None) -> str:
+        """格式化词条列表为固定 MAX_AFFIX 行的文本（空位灰色占位）"""
+        total = TuningProgressDialog.MAX_AFFIX
+        n = count if count is not None else len(affixes)
+        lines = []
+        for i in range(total):
+            if i < len(affixes):
+                a = affixes[i]
+                cap = a.get("cap_pct")
+                cap_text = f" ({cap}%)" if cap is not None else ""
+                lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
+            else:
+                lines.append("  • —")
+        header = f"当前词条（{n}/{total}）："
+        return header + "\n" + "\n".join(lines)
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
@@ -265,18 +284,10 @@ class TuningProgressDialog:
             quality, quality)
         self._equip_info_label.setText(
             f"等级 {level} | {quality_cn} | 词条 {len(info.get('affixes', []))}/5")
-        # 当前词条
+        # 当前词条（固定 5 行占位，避免布局抖动）
         affixes = info.get("affixes", [])
-        if affixes:
-            lines = []
-            for a in affixes:
-                cap = a.get("cap_pct")
-                cap_text = f" ({cap}%)" if cap is not None else ""
-                lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
-            self._affix_current_label.setText(
-                f"当前词条（{len(affixes)}/5）：\n" + "\n".join(lines))
-        else:
-            self._affix_current_label.setText("当前词条：无（首词条待调）")
+        self._affix_current_label.setText(
+            self._format_affix_lines(affixes, len(affixes)))
         # 目标词条
         target = info.get("target_affixes", [])
         if target:
@@ -307,17 +318,11 @@ class TuningProgressDialog:
         self._round_count += 1
         round_no = info.get("round_no", self._round_count)
         self._round_label.setText(f"轮次：{round_no}")
-        # 更新当前词条
+        # 更新当前词条（固定 5 行占位）
         affixes = info.get("current_affixes", [])
         affix_count = info.get("affix_count", len(affixes))
-        if affixes:
-            lines = []
-            for a in affixes:
-                cap = a.get("cap_pct")
-                cap_text = f" ({cap}%)" if cap is not None else ""
-                lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
-            self._affix_current_label.setText(
-                f"当前词条（{affix_count}/5）：\n" + "\n".join(lines))
+        self._affix_current_label.setText(
+            self._format_affix_lines(affixes, affix_count))
         # 本轮结果
         new_affix = info.get("new_affix")
         food = info.get("food_used", "")
@@ -335,7 +340,8 @@ class TuningProgressDialog:
         # 狗粮策略说明
         if food_reason:
             self._last_result_label.setText(
-                f"{result_text}\n<span style='color:#888'>{food_reason}</span>")
+                f"{result_text}<br>"
+                f"<span style='color:#888'>{food_reason}</span>")
         # 材料库存快照
         stock = info.get("material_stock", {})
         if stock:
@@ -354,16 +360,11 @@ class TuningProgressDialog:
             f"<b>{name}</b> → "
             f"<span style='{rating_style}'>{rating_cn}</span> "
             f"({rounds}轮, {status_text})")
-        # 更新目标词条最终状态
+        # 更新最终词条（固定 5 行占位）
         final_affixes = info.get("final_affixes", [])
-        if final_affixes:
-            lines = []
-            for a in final_affixes:
-                cap = a.get("cap_pct")
-                cap_text = f" ({cap}%)" if cap is not None else ""
-                lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
-            self._affix_current_label.setText(
-                f"最终词条（{len(final_affixes)}/5）：\n" + "\n".join(lines))
+        self._affix_current_label.setText(
+            self._format_affix_lines(final_affixes, len(final_affixes))
+            .replace("当前词条", "最终词条", 1))
 
     def _on_scan_decision(self, info: dict):
         """显示扫描处理决策（评级未达门槛 / 词条已满时的处置结果）"""

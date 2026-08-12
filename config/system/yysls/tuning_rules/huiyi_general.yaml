@@ -1,6 +1,5 @@
 key: huiyi_general
 name: 通用会意
-order: 10
 default_rating: excellent
 quality_thresholds:
   环:

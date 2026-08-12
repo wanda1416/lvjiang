@@ -745,9 +745,13 @@ class _BehaviorPageBase(QWidget):
         judge: _JudgeScopeCell = table.cellWidget(row, self._ci["judge"])
         action: QComboBox = table.cellWidget(row, self._ci["action"])
         seq = table.cellWidget(row, _SEQ_COL)
+        selected_parts = parts.selected()
+        # 全选时折叠为简写，保持 YAML 紧凑
+        if set(selected_parts) == set(QUALITY_PARTS):
+            selected_parts = ["全部"]
         rule = {
             "enabled": bool(seq.property("rule_enabled")),
-            "parts": parts.selected(),
+            "parts": selected_parts,
             "max_quality": quals.currentData(),
             "pct_op": pct.op(),
             "pct": pct.value(),

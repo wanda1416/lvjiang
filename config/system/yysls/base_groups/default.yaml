@@ -38,7 +38,9 @@ scan:
   entry_min_rating: top
   max_consecutive_recycles: 50
   rules:
-  - parts: [全部]
+  - enabled: true
+    parts:
+    - 全部
     max_quality: gold_only
     pct_op: le
     pct: 98
@@ -48,7 +50,9 @@ scan:
     judge_rules: []
     action: tune_full_recycle
     first_affix_only: true
-  - parts: [武器]
+  - enabled: true
+    parts:
+    - 武器
     max_quality: purple_only
     pct_op: ge
     pct: 90
@@ -59,7 +63,9 @@ scan:
     judge_rules: []
     action: skip
     first_affix_only: true
-  - parts: [全部]
+  - enabled: true
+    parts:
+    - 全部
     max_quality: purple
     pct_op: ge
     pct: 0
@@ -70,7 +76,9 @@ scan:
     judge_rules: []
     action: skip
     first_affix_only: false
-  - parts: [全部]
+  - enabled: true
+    parts:
+    - 全部
     max_quality: purple
     pct_op: le
     pct: 100
@@ -84,18 +92,19 @@ tune:
   enabled: true
   rules:
   - enabled: true
-    parts: [全部]
+    parts:
+    - 全部
     max_quality: gold
     pct_op: le
     pct: 100
     ratings:
     - top
-    - excellent
     judge_scope: all
     judge_rules: []
     action: continue
   - enabled: true
-    parts: [全部]
+    parts:
+    - 全部
     max_quality: gold_only
     pct_op: ge
     pct: 92
@@ -105,7 +114,8 @@ tune:
     judge_rules: []
     action: reset
   - enabled: true
-    parts: [全部]
+    parts:
+    - 全部
     max_quality: purple
     pct_op: le
     pct: 92
@@ -115,7 +125,8 @@ tune:
     judge_rules: []
     action: recycle
   - enabled: true
-    parts: [全部]
+    parts:
+    - 全部
     max_quality: gold
     pct_op: le
     pct: 100

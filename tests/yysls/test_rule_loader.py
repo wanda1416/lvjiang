@@ -98,10 +98,14 @@ class TestBuiltinRules:
         # 规则数量随文件增加，不硬编码列表
         assert len(list(mgr.get_rules())) >= 5
 
-    def test_order_ascending(self):
+    def test_order_matches_tune_config(self):
+        """规则顺序与 tune_config.yaml tuning_rules 声明顺序一致"""
         rules = get_tuning_rules()
-        orders = [r.order for r in rules.values()]
-        assert orders == sorted(orders)
+        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+        tuning_rules = get_tune_config().tuning_rules
+        declared = [k for k in tuning_rules if k in rules]
+        undeclared = sorted(k for k in rules if k not in tuning_rules)
+        assert list(rules.keys()) == declared + undeclared
 
     def test_required_fields_present(self):
         for rule in get_tuning_rules().values():

@@ -1,7 +1,7 @@
 """批量配置对话框 — 管理多个命名配置
 
 工具菜单「批量配置」打开此对话框。
-每个配置包含：名字 + 用户自定义列的 table + 三个 wf 槽位。
+每个配置包含：名字 + 用户自定义列的 table + 生命周期 wf 槽位。
 支持：新建配置 / 删除配置 / 切换配置 / 自定义列名 / 编辑行数据。
 """
 
@@ -134,18 +134,21 @@ class BatchConfigDialog(QDialog):
 
         layout.addLayout(table_btn_row)
 
-        # ── wf 槽位 ──
+        # ── 生命周期 wf 槽位 ──
         wf_form = QFormLayout()
         wf_form.setContentsMargins(0, 4, 0, 0)
 
-        self._wf_preprocess = self._create_wf_selector()
-        wf_form.addRow("预处理 wf：", self._wf_preprocess)
+        self._wf_batch_setup = self._create_wf_selector()
+        wf_form.addRow("批次初始化 wf：", self._wf_batch_setup)
 
-        self._wf_switch = self._create_wf_selector()
-        wf_form.addRow("切换 wf：", self._wf_switch)
+        self._wf_prepare_item = self._create_wf_selector()
+        wf_form.addRow("条目准备 wf：", self._wf_prepare_item)
 
-        self._wf_postprocess = self._create_wf_selector()
-        wf_form.addRow("后处理 wf：", self._wf_postprocess)
+        self._wf_finish_item = self._create_wf_selector()
+        wf_form.addRow("条目收尾 wf：", self._wf_finish_item)
+
+        self._wf_batch_teardown = self._create_wf_selector()
+        wf_form.addRow("批次收尾 wf：", self._wf_batch_teardown)
 
         layout.addLayout(wf_form)
 
@@ -253,9 +256,10 @@ class BatchConfigDialog(QDialog):
                 self._table.setItem(row_idx, col_idx, QTableWidgetItem(val))
 
         # wf 槽位
-        self._set_wf_text(self._wf_preprocess, item.workflows.preprocess)
-        self._set_wf_text(self._wf_switch, item.workflows.switch)
-        self._set_wf_text(self._wf_postprocess, item.workflows.postprocess)
+        self._set_wf_text(self._wf_batch_setup, item.workflows.batch_setup)
+        self._set_wf_text(self._wf_prepare_item, item.workflows.prepare_item)
+        self._set_wf_text(self._wf_finish_item, item.workflows.finish_item)
+        self._set_wf_text(self._wf_batch_teardown, item.workflows.batch_teardown)
 
     def _clear_editor(self):
         """清空编辑区"""
@@ -264,9 +268,10 @@ class BatchConfigDialog(QDialog):
         self._user_column_input.clear()
         self._table.setRowCount(0)
         self._table.setColumnCount(0)
-        self._set_wf_text(self._wf_preprocess, "")
-        self._set_wf_text(self._wf_switch, "")
-        self._set_wf_text(self._wf_postprocess, "")
+        self._set_wf_text(self._wf_batch_setup, "")
+        self._set_wf_text(self._wf_prepare_item, "")
+        self._set_wf_text(self._wf_finish_item, "")
+        self._set_wf_text(self._wf_batch_teardown, "")
 
     def _on_config_selected(self, index: int):
         """配置下拉框切换"""
@@ -423,7 +428,8 @@ class BatchConfigDialog(QDialog):
         item.rows = self._read_table_rows()
         item.user_column = self._user_column_input.text().strip()
         item.workflows = BatchWorkflows(
-            preprocess=self._get_wf_text(self._wf_preprocess),
-            switch=self._get_wf_text(self._wf_switch),
-            postprocess=self._get_wf_text(self._wf_postprocess),
+            batch_setup=self._get_wf_text(self._wf_batch_setup),
+            prepare_item=self._get_wf_text(self._wf_prepare_item),
+            finish_item=self._get_wf_text(self._wf_finish_item),
+            batch_teardown=self._get_wf_text(self._wf_batch_teardown),
         )

@@ -1,0 +1,31 @@
+# 批量生命周期：每个启用条目执行一次。
+# 输入由 Runner 注入；返回统一的 {status, message, state}。
+# 根据 batch_state 中已确认的游戏状态，以最小操作达到目标账号/角色。
+
+import "_exit_to_login.wf"
+import "_switch_account.wf"
+import "_select_role.wf"
+
+# 上一条成功进入主页后，先回到角色/账号入口。
+if $batch_state.page_state == 2
+    call _exit_to_login()
+    eval $batch_state.page_state = 1
+    eval $batch_state.role = ""
+end
+
+log "目标账号：" + $account
+
+if $batch_state.account is_empty
+    log "状态未知，完整登录: " + $role
+    call $result = _switch_account($tail, $role_index, $account, $role, $batch_state)
+else
+    if $batch_state.account equals $account
+        log "同账号，直接切换角色: " + $role
+        call $result = _select_role($role_index, $role, $batch_state)
+    else
+        log "不同账号，重新登录: " + $role
+        call $result = _switch_account($tail, $role_index, $account, $role, $batch_state)
+    end
+end
+
+return $result

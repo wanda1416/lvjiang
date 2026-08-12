@@ -15,6 +15,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuneConfigManager,
     TuningGroupManager,
     TuningRuleManager,
+    get_tuning_rule_manager,
 )
 from lvjiang.apps.yysls.ui.tune_settings import TuningRulesDialog
 from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
@@ -66,7 +67,8 @@ class TestDialog:
         qtbot.addWidget(dialog)
         # 左侧导航：基础规则 + 扫描处理 + 材料处理 + 结束处理 + 分割线 + 流派规则 + 各规则
         # StackedWidget 不含分割线（行 0-3 = 栈页 0-3，行 ≥5 = 栈页 - 1）
-        n_rules = len(get_tuning_rules())
+        # 对话框加载全部规则（含禁用），与 get_tuning_rules()（仅启用）不同
+        n_rules = len(get_tuning_rule_manager().get_all_rule_keys_and_names())
         assert dialog._nav.count() == n_rules + 6
         assert dialog._stack.count() == n_rules + 5
         assert dialog._nav.item(0).text() == "基础规则"
@@ -77,8 +79,8 @@ class TestDialog:
         assert not dialog._nav.item(4).flags()
         assert dialog._nav.item(5).text() == "流派规则"
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
-        first_rule = next(iter(
-            TuningRuleManager(rules_dir=RULES_DIR).get_rules().values()))
+        # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
+        first_rule = next(iter(get_tuning_rules().values()))
         assert dialog._nav.item(6).text() == first_rule.name
         # 导航切换驱动右侧内容区（跳过分割线偏移）
         dialog._nav.setCurrentRow(3)

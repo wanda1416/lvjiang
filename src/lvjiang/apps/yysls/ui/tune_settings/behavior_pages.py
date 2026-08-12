@@ -484,6 +484,10 @@ class _BehaviorPageBase(QWidget):
                 self._ci["first_affix"],
                 QHeaderView.ResizeMode.ResizeToContents)
         self._table.verticalHeader().setVisible(False)
+        self._table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(
+            self._on_rule_context_menu)
         self._table.setMinimumHeight(140)
         layout.addWidget(self._table)
 
@@ -551,6 +555,7 @@ class _BehaviorPageBase(QWidget):
         # 序号列（只读标签）
         seq_label = QLabel(str(row + 1))
         seq_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        seq_label.setProperty("rule_enabled", rule.enabled)
         table.setCellWidget(row, _SEQ_COL, seq_label)
 
         parts = _MultiSelect([(p, p) for p in QUALITY_PARTS], self._apply)
@@ -605,6 +610,31 @@ class _BehaviorPageBase(QWidget):
         action.setCurrentIndex(max(action.findData(rule.action), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
         table.setCellWidget(row, self._ci["action"], action)
+        self._set_row_enabled(row, rule.enabled)
+
+    def _on_rule_context_menu(self, pos) -> None:
+        index = self._table.indexAt(pos)
+        if not index.isValid() or index.column() != _SEQ_COL:
+            return
+        row = index.row()
+        seq = self._table.cellWidget(row, _SEQ_COL)
+        enabled = bool(seq.property("rule_enabled"))
+        menu = QMenu(self._table)
+        action = menu.addAction("禁用" if enabled else "启用")
+        if menu.exec(self._table.viewport().mapToGlobal(pos)) is action:
+            self._set_row_enabled(row, not enabled)
+            self._apply()
+
+    def _set_row_enabled(self, row: int, enabled: bool) -> None:
+        seq = self._table.cellWidget(row, _SEQ_COL)
+        if seq is not None:
+            seq.setProperty("rule_enabled", enabled)
+            seq.setStyleSheet("" if enabled else "color: gray;")
+            seq.setToolTip("右键禁用" if enabled else "规则已禁用；右键启用")
+        for col in range(1, self._table.columnCount()):
+            widget = self._table.cellWidget(row, col)
+            if widget is not None:
+                widget.setEnabled(enabled)
 
     # ── 行增删 ──
 
@@ -687,6 +717,7 @@ class _BehaviorPageBase(QWidget):
         judge.set_value(values["judge_scope"], values["judge_rules"])
         action: QComboBox = table.cellWidget(row, self._ci["action"])
         action.setCurrentIndex(max(action.findData(values["action"]), 0))
+        self._set_row_enabled(row, values.get("enabled", True))
 
     # ── 回填 ──
 
@@ -713,7 +744,9 @@ class _BehaviorPageBase(QWidget):
         ratings = table.cellWidget(row, self._ci["ratings"])
         judge: _JudgeScopeCell = table.cellWidget(row, self._ci["judge"])
         action: QComboBox = table.cellWidget(row, self._ci["action"])
+        seq = table.cellWidget(row, _SEQ_COL)
         rule = {
+            "enabled": bool(seq.property("rule_enabled")),
             "parts": parts.selected(),
             "max_quality": quals.currentData(),
             "pct_op": pct.op(),

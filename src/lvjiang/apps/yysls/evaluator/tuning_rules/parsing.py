@@ -788,4 +788,25 @@ def parse_tune_config(data: dict) -> TuneConfig:
         base_rules=base_rules,
         quality_thresholds=quality_thresholds,
         switches=switches,
+        tuning_rules=_parse_tuning_rules(data.get("tuning_rules") or {}),
     )
+
+
+def _parse_tuning_rules(raw) -> dict[str, bool]:
+    """解析 tuning_rules 段：有序 dict，key → 是否启用"""
+    if not isinstance(raw, dict):
+        raise RuleValidationError("tuning_rules 必须是 dict")
+    result: dict[str, bool] = {}
+    for k, v in raw.items():
+        k = str(k).strip()
+        if not _KEY_RE.match(k):
+            raise RuleValidationError(
+                f"tuning_rules: 规则 key 非法: {k!r}")
+        if not isinstance(v, bool):
+            raise RuleValidationError(
+                f"tuning_rules.{k} 必须是 bool（true/false）")
+        if k in result:
+            raise RuleValidationError(
+                f"tuning_rules: 规则 key 重复: {k}")
+        result[k] = v
+    return result

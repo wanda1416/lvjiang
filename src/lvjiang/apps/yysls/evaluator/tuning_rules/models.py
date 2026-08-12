@@ -276,9 +276,14 @@ class CommonConditions:
 
 @dataclass
 class TuningRule:
-    """单条调律规则（一个 YAML 文件，对应 UI 一个 Tab）"""
+    """单条调律规则（一个 YAML 文件，对应 UI 一个 Tab）
+
+    order 字段已废弃：规则顺序由 tune_config.yaml 的 tuning_rules 段控制。
+    保留字段仅为向后兼容，不再参与排序。
+    """
     key: str
     name: str
+    # 已废弃：规则顺序现由 tune_config.tuning_rules 控制，此字段不再使用
     order: int = 100
     playstyles: dict[str, Playstyle] = field(default_factory=dict)
     transmute_priority: list[str] = field(default_factory=list)
@@ -753,10 +758,13 @@ class TuneConfig:
     base_rules: 基础规则组 key 列表，顺序即 UI 展示顺序。
     quality_thresholds: 品阶门槛，部位 → 允许品阶列表。
     switches: 开关注册表，key → 显示名。
+    tuning_rules: 流派规则启用状态与顺序，key → 是否启用；
+        dict 插入序即规则展示/判定顺序（替代原 TuningRule.order）。
     """
     base_rules: list[str] = field(default_factory=list)
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
+    tuning_rules: dict[str, bool] = field(default_factory=dict)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

@@ -1,6 +1,14 @@
 base_rules:
 - default
 - aggressive
+tuning_rules:
+  huiyi_general: true
+  huixin_small: true
+  huixin_big: true
+  heal_pure: true
+  heal_fire: true
+  huixin_yuyu: true
+  huixin_modao: true
 quality_thresholds:
   武器:
   - gold

@@ -124,7 +124,22 @@ if $slot
 end
 ```
 
-支持的返回值类型：数字、字符串、布尔值、null、变量、算术表达式、列表、字典。详见 [05-control-flow.md](05-control-flow.md#八return--结束工作流或返回子过程)。
+支持的返回值类型：数字、字符串、布尔值、null、变量、算术表达式、列表、**字典**。详见 [05-control-flow.md](05-control-flow.md#八return--结束工作流或返回子过程)。
+
+**返回字典用于结构化数据传递**：子过程可通过 `return {"field": value}` 返回字典，调用方通过字段访问（`.`）提取多个结果字段。这比用多个全局变量传递更清晰、更模块化：
+
+```
+# 子过程返回字典，一次性传递多个结果
+def scan_equip_info()
+    scan [equip].[name_area] as $name by exact
+    scan [equip].[score_area] as $score by exact
+    return {"name": $name, "score": $score}
+end
+
+# 调用方通过字段访问提取各字段
+call $info = scan_equip_info()
+log concat("装备: ", $info.name, " 分数: ", $info.score)
+```
 
 ### 异常返回值约定
 

@@ -15,6 +15,7 @@
   - [continue — 跳过当前迭代](#continue--跳过当前迭代)
 - [七、try / catch — 异常处理](#七try--catch--异常处理)
 - [八、return — 结束工作流或返回子过程](#八return--结束工作流或返回子过程)
+  - [返回字典/列表：结构化数据传递](#返回字典列表结构化数据传递)
 - [九、label / goto — 标签跳转](#九label--goto--标签跳转)
 - [十、条件表达式](#十条件表达式)
   - [10.1 基础条件](#101-基础条件)
@@ -270,7 +271,7 @@ end
 
 ### 返回值
 
-在 `def` 定义的子过程中，`return` 可携带一个值返回给调用方。返回值支持所有字面量类型、变量引用和算术表达式：
+在 `def` 定义的子过程中，`return` 可携带一个值返回给调用方。返回值支持**所有字面量类型**（包括字典和列表）、变量引用和算术表达式：
 
 ```
 def get_count()
@@ -304,7 +305,43 @@ end
 | 变量 | `return $result` |
 | 算术表达式 | `return $x + 1` |
 | 列表 | `return [1, 2, 3]` |
-| 字典 | `return {"key": "value"}` |
+| **字典** | `return {"key": "value"}` |
+
+#### 返回字典/列表：结构化数据传递
+
+`return` 可直接返回字典或列表，调用方通过字段访问（`.`）或索引（`[]`）使用返回的结构化数据。这是子过程向调用方传递多字段结果的标准方式：
+
+```
+# 子过程返回字典，包含多个状态字段
+def check_login_status()
+    scan [login_page].[status_area] as $text by contains "在线"
+    if $text
+        return {"logged_in": true, "page_state": 2}
+    end
+    return {"logged_in": false, "page_state": 1}
+end
+
+# 调用方接收字典后，通过字段访问使用
+call $status = check_login_status()
+if $status.logged_in
+    log "已登录"
+end
+if $status.page_state == 2
+    call _exit_to_login()
+end
+```
+
+字典内可嵌套变量引用，运行时自动求值：
+
+```
+def build_result($name, $score)
+    return {"name": $name, "score": $score, "passed": $score >= 60}
+end
+
+call $r = build_result("张三", 85)
+# $r == {"name": "张三", "score": 85, "passed": true}
+log concat($r.name, " 得分: ", $r.score)
+```
 
 调用方通过 `call $var = proc()` 语法接收返回值，详见 [07-subworkflows.md](07-subworkflows.md#四call--执行调用)。
 

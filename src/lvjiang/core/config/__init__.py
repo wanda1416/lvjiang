@@ -37,10 +37,14 @@ from .resolver import (
 from .session import (
     SessionStore,
     get_session_store,
+    load_equip_display,
     load_material_grid,
     load_settings,
+    load_ui_page_state,
+    save_equip_display,
     save_material_grid,
     save_settings,
+    update_ui_page_state,
 )
 from .users import SessionManager
 from .wf_configs import (
@@ -61,6 +65,8 @@ __all__ = [
     "merge_doc",
     "SessionStore",
     "get_session_store",
+    "load_ui_page_state",
+    "update_ui_page_state",
     "SessionManager",
     "load_yaml",
     "save_yaml",
@@ -77,6 +83,8 @@ __all__ = [
     "save_settings",
     "load_material_grid",
     "save_material_grid",
+    "load_equip_display",
+    "save_equip_display",
     "load_user_config",
     # 工作流配置统一存储
     "get_wf_config",

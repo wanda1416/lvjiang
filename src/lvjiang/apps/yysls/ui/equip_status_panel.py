@@ -42,10 +42,15 @@ _SLOT_LAYOUT = [
 class _EquipCard(QFrame):
     """单件装备卡片"""
 
-    def __init__(self, slot_name: str, part_label: str, parent=None):
+    def __init__(self, slot_name: str, part_label: str, display_params: dict | None = None, parent=None):
         super().__init__(parent)
         self._slot_name = slot_name
         self._part_label = part_label
+        dp = display_params or {}
+        self._name_fs = dp.get("name_font_size", 13)
+        self._level_fs = dp.get("level_font_size", 12)
+        self._affix_fs = dp.get("affix_font_size", 11)
+
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet("""
             _EquipCard {
@@ -55,7 +60,7 @@ class _EquipCard(QFrame):
                 padding: 6px;
             }
         """)
-        self.setMinimumHeight(160)
+        self.setFixedHeight(dp.get("card_min_height", 160))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
@@ -63,12 +68,12 @@ class _EquipCard(QFrame):
 
         # 第一行：部位 · 装备名（未装备时仅显示槽位名）
         self.lbl_slot = QLabel(slot_name)
-        self.lbl_slot.setStyleSheet("font-weight: bold; font-size: 13px; color: #333333;")
+        self.lbl_slot.setStyleSheet(f"font-weight: bold; font-size: {self._name_fs}px; color: #333333;")
         layout.addWidget(self.lbl_slot)
 
         # 第二行：等级 + 承音标记
         self.lbl_info = QLabel("—")
-        self.lbl_info.setStyleSheet("font-size: 12px; color: #666666;")
+        self.lbl_info.setStyleSheet(f"font-size: {self._level_fs}px; color: #666666;")
         layout.addWidget(self.lbl_info)
 
         # 分割线
@@ -90,9 +95,9 @@ class _EquipCard(QFrame):
     def set_empty(self):
         """显示为空槽位"""
         self.lbl_slot.setText(self._slot_name)
-        self.lbl_slot.setStyleSheet("font-weight: bold; font-size: 13px; color: #333333;")
+        self.lbl_slot.setStyleSheet(f"font-weight: bold; font-size: {self._name_fs}px; color: #333333;")
         self.lbl_info.setText(tr("未装备"))
-        self.lbl_info.setStyleSheet("font-size: 12px; color: #999999;")
+        self.lbl_info.setStyleSheet(f"font-size: {self._level_fs}px; color: #999999;")
         self._clear_affixes()
 
     def _clear_affixes(self):
@@ -118,7 +123,7 @@ class _EquipCard(QFrame):
         # 第一行：部位 · 装备名（武器不区分主副），按品质着色
         name = equip_data.get("name", tr("未知"))
         self.lbl_slot.setText(f"{self._part_label} · {name}")
-        self.lbl_slot.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {color};")
+        self.lbl_slot.setStyleSheet(f"font-weight: bold; font-size: {self._name_fs}px; color: {color};")
 
         # 第二行：等级 + 承音标记
         level = equip_data.get("level", "?")
@@ -126,7 +131,7 @@ class _EquipCard(QFrame):
         chengyin_tag = "  [" + tr("承音") + "]" if is_chengyin else ""
 
         self.lbl_info.setText(f"Lv{level}{chengyin_tag}")
-        self.lbl_info.setStyleSheet("font-size: 12px; color: #666666;")
+        self.lbl_info.setStyleSheet(f"font-size: {self._level_fs}px; color: #666666;")
 
         # 词条列表
         self._clear_affixes()
@@ -175,18 +180,18 @@ class _EquipCard(QFrame):
             row.setSpacing(4)
 
             lbl_name = QLabel(f"{affix_name}{transfer_mark}")
-            lbl_name.setStyleSheet("font-size: 11px; color: #555555;")
+            lbl_name.setStyleSheet(f"font-size: {self._affix_fs}px; color: #555555;")
             row.addWidget(lbl_name, stretch=1)
 
             lbl_val = QLabel(val_str)
-            lbl_val.setStyleSheet(f"font-size: 11px; color: {val_color}; font-weight: bold;")
+            lbl_val.setStyleSheet(f"font-size: {self._affix_fs}px; color: {val_color}; font-weight: bold;")
             row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
 
             self.affix_layout.addLayout(row)
 
         if not has_affix:
             lbl = QLabel(tr("无词条"))
-            lbl.setStyleSheet("font-size: 11px; color: #999999;")
+            lbl.setStyleSheet(f"font-size: {self._affix_fs}px; color: #999999;")
             self.affix_layout.addWidget(lbl)
 
         # 定音词条：与普通词条间用虚线分隔
@@ -203,13 +208,13 @@ class _EquipCard(QFrame):
             row.setSpacing(4)
 
             lbl_name = QLabel(dingyin["name"])
-            lbl_name.setStyleSheet("font-size: 11px; color: #555555;")
+            lbl_name.setStyleSheet(f"font-size: {self._affix_fs}px; color: #555555;")
             row.addWidget(lbl_name, stretch=1)
 
             dy_value = dingyin.get("value", "")
             dy_val_str = f"{dy_value}%" if isinstance(dy_value, (int, float)) else str(dy_value)
             lbl_val = QLabel(dy_val_str)
-            lbl_val.setStyleSheet("font-size: 11px; color: #333333; font-weight: bold;")
+            lbl_val.setStyleSheet(f"font-size: {self._affix_fs}px; color: #333333; font-weight: bold;")
             row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
 
             self.affix_layout.addLayout(row)
@@ -218,8 +223,9 @@ class _EquipCard(QFrame):
 class EquipStatusPanel(QWidget):
     """装备状态面板（2行×4列）"""
 
-    def __init__(self, parent=None):
+    def __init__(self, display_params: dict | None = None, parent=None):
         super().__init__(parent)
+        self._display_params = display_params or {}
         self._cards: dict[str, _EquipCard] = {}
         self._setup_ui()
 
@@ -229,7 +235,7 @@ class EquipStatusPanel(QWidget):
 
         # 滚动区域
         scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
+        scroll.setWidgetResizable(False)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         container = QWidget()
@@ -237,15 +243,30 @@ class EquipStatusPanel(QWidget):
         grid.setSpacing(8)
 
         for row, col, slot_key, display_name, part_label in _SLOT_LAYOUT:
-            card = _EquipCard(display_name, part_label)
+            card = _EquipCard(display_name, part_label, self._display_params)
             grid.addWidget(card, row, col)
             self._cards[slot_key] = card
 
         scroll.setWidget(container)
+        scroll.viewport().resizeEvent = lambda e: container.setMinimumWidth(e.size().width())
         layout.addWidget(scroll)
+
+    def set_display_params(self, params: dict):
+        """更新展示参数并刷新所有卡片样式"""
+        self._display_params = params
+        for card in self._cards.values():
+            dp = params
+            card._name_fs = dp.get("name_font_size", 13)
+            card._level_fs = dp.get("level_font_size", 12)
+            card._affix_fs = dp.get("affix_font_size", 11)
+            card.setFixedHeight(dp.get("card_min_height", 160))
+        # 触发重新渲染：如果有当前数据则刷新
+        if hasattr(self, '_last_equipped'):
+            self.refresh(self._last_equipped)
 
     def refresh(self, equipped_data: dict):
         """根据 equipped 字典刷新面板"""
+        self._last_equipped = equipped_data
         for _row, _col, slot_key, _display_name, _part_label in _SLOT_LAYOUT:
             card = self._cards[slot_key]
             equip = equipped_data.get(slot_key)

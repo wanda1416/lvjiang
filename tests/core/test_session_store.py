@@ -13,7 +13,11 @@ import threading
 
 import pytest
 
-from lvjiang.core.config import SessionStore
+from lvjiang.core.config import (
+    SessionStore,
+    load_ui_page_state,
+    update_ui_page_state,
+)
 
 
 @pytest.fixture
@@ -175,6 +179,58 @@ class TestDefaultPath:
         store = SessionStore()
         store.set_node("k", 1)
         assert (tmp_path / "s.json").exists()
+
+
+class TestUIPageState:
+    """页面级 UI 状态必须嵌套合并，禁止页签保存覆盖窗口尺寸。"""
+
+    @pytest.fixture(autouse=True)
+    def isolated_global_store(self, tmp_path, monkeypatch):
+        from lvjiang import constants
+        from lvjiang.core.config.session import reset_session_store
+
+        monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
+        reset_session_store()
+        yield
+        reset_session_store()
+
+    def test_page_patch_preserves_existing_fields(self):
+        update_ui_page_state("main_page", {
+            "window_size": [1280, 800],
+            "splitter_sizes": [400, 880],
+        })
+        update_ui_page_state("main_page", {
+            "left_tab_index": 1,
+            "right_tab_index": 2,
+        })
+        assert load_ui_page_state("main_page") == {
+            "window_size": [1280, 800],
+            "splitter_sizes": [400, 880],
+            "left_tab_index": 1,
+            "right_tab_index": 2,
+        }
+
+    def test_page_patch_preserves_other_pages(self):
+        update_ui_page_state("scene_editor", {"size": [900, 700]})
+        update_ui_page_state("main_page", {"window_size": [1200, 800]})
+        assert load_ui_page_state("scene_editor") == {"size": [900, 700]}
+
+    def test_invalid_page_node_is_rebuilt_without_damaging_siblings(self):
+        from lvjiang.core.config import get_session_store
+
+        get_session_store().set_node("ui_state", {
+            "main_page": "bad",
+            "scene_editor": {"size": [800, 600]},
+        })
+        update_ui_page_state("main_page", {"left_tab_index": 1})
+        assert load_ui_page_state("main_page") == {"left_tab_index": 1}
+        assert load_ui_page_state("scene_editor") == {"size": [800, 600]}
+
+    def test_invalid_arguments_rejected(self):
+        with pytest.raises(ValueError):
+            update_ui_page_state("", {"x": 1})
+        with pytest.raises(TypeError):
+            update_ui_page_state("main_page", [])  # type: ignore[arg-type]
 
 
 class TestAlertStorage:

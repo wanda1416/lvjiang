@@ -951,13 +951,15 @@ class ProfileOverviewTab(QWidget):
         menu = QMenu(self)
         menu.setTitle(f"{kd.label} ({user_name})")
 
-        # 获取该字段的自定义 steps（Quota 和 Regen 模型支持）
+        # 获取该字段的自定义 steps（Quota、Regen 和 Stock 模型支持）
         kd_steps: list[int] = []
         kd_increment_only = False
         if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
             kd_steps = kd.steps
             kd_increment_only = kd.increment_only
         elif model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+            kd_steps = kd.steps
+        elif model_type == MODEL_STOCK and isinstance(kd, StockKeyDef):
             kd_steps = kd.steps
 
         if kd_steps:

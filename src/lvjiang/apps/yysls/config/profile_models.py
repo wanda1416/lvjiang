@@ -172,13 +172,20 @@ class StockKeyDef(KeyDef):
 
     纯计数器，可设上限（软/硬）。
     soft=True 时上限为软上限（仅提醒），soft=False 时为硬上限。
+    steps: 自定义增减幅度，正值=增加，负值=减少。
     """
 
     cap: int | None = None
     soft: bool = False
+    steps: list[int] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StockKeyDef:
+        steps_raw = data.get("steps", [])
+        if isinstance(steps_raw, list):
+            steps = [int(s) for s in steps_raw]
+        else:
+            steps = []
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
@@ -186,6 +193,7 @@ class StockKeyDef(KeyDef):
             show_cap=data.get("show_cap", False),
             cap=data.get("cap"),
             soft=data.get("soft", False),
+            steps=steps,
         )
 
 

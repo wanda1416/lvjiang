@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
     QDialog,
     QFileDialog,
     QGroupBox,
@@ -124,6 +125,17 @@ class OCRDialog(QDialog):
 
         btn_row.addStretch()
         right_layout.addLayout(btn_row)
+
+        # 分组选择下拉框
+        group_row = QHBoxLayout()
+        group_row.addWidget(QLabel("匹配分组:"))
+        self._group_combo = QComboBox()
+        self._group_combo.addItem("- 全部 -", None)
+        self._group_combo.setMinimumWidth(120)
+        self._load_groups()
+        group_row.addWidget(self._group_combo)
+        group_row.addStretch()
+        right_layout.addLayout(group_row)
 
         # 识别结果
         right_layout.addWidget(QLabel("识别结果（已应用清洗规则）："))
@@ -262,6 +274,18 @@ class OCRDialog(QDialog):
         for i, (pattern, replacement) in enumerate(patterns.items()):
             self._pattern_table.setItem(i, 0, QTableWidgetItem(pattern))
             self._pattern_table.setItem(i, 1, QTableWidgetItem(replacement))
+
+    def _load_groups(self):
+        """从参考图库加载分组列表到下拉框"""
+        try:
+            from lvjiang.core.reference_db import ReferenceDatabase
+            db = ReferenceDatabase()
+            db.load()
+            groups = db.get_groups()
+            for group in sorted(groups):
+                self._group_combo.addItem(group, group)
+        except Exception as e:
+            logger.warning(f"加载分组列表失败: {e}")
 
     # ─── 清洗规则操作 ────────────────────────────────────────
 
@@ -532,7 +556,7 @@ class OCRDialog(QDialog):
             self._status_label.setText("识别失败")
 
     def _on_recognize_material(self):
-        """执行材料识别（类型 + 等级 + 数量）"""
+        """执行材料识别（类型 + 等级 + 数量），输出最相似的 5 个结果"""
         image, error_msg = self._get_recognition_image()
         if image is None:
             self._status_label.setText(error_msg or "获取图像失败")
@@ -549,26 +573,39 @@ class OCRDialog(QDialog):
 
             ocr = OCREngine()
             recognizer = MaterialRecognizer(ocr)
-            result = recognizer.recognize(image)
+            # 获取选中的分组（None 表示全部）
+            group = self._group_combo.currentData()
+            results = recognizer.recognize_top_n(image, n=5, group=group)
 
             self._result_text.clear()
-            if not result.type:
+            if not results:
                 self._result_text.append("未识别到材料（空槽或无匹配）")
-                self._result_text.append(f"  置信度: {result.confidence:.3f}")
             else:
-                self._result_text.append(f"类型: {result.type}")
-                self._result_text.append(f"等级: {result.level if result.level is not None else '无'}")
-                count_str = str(result.count) if result.count is not None else '?'
-                owned_str = str(result.owned) if result.owned is not None else '?'
-                self._result_text.append(f"数量: {count_str}/{owned_str} (投入/持有)")
-                self._result_text.append(f"匹配置信度: {result.confidence:.3f}")
+                for i, result in enumerate(results, 1):
+                    if i > 1:
+                        self._result_text.append("")  # 结果之间空行
+                    if not result.type:
+                        self._result_text.append(f"[{i}] 空槽  (置信度: {result.confidence:.3f})")
+                    else:
+                        # 第一行显示 名称_等级（有等级时）
+                        display_name = result.type
+                        if result.level_text:
+                            display_name = f"{result.type}_{result.level_text}"
+                        self._result_text.append(f"[{i}] {display_name}")
+                        self._result_text.append(f"  等级文本: {result.level_text or '(无)'}")
+                        self._result_text.append(f"  数量文本: {result.count_text or '(无)'}")
+                        self._result_text.append(f"  等级: {result.level if result.level is not None else '无'}")
+                        self._result_text.append(f"  数量: {result.count if result.count is not None else '无'}")
+                        self._result_text.append(f"  投入: {result.devoted if result.devoted is not None else '无'}")
+                        self._result_text.append(f"  匹配置信度: {result.confidence:.3f}")
 
+            best_type = results[0].type if results else ""
             self._status_label.setText(
-                f"材料识别完成: {result.type or '(空)'}"
+                f"材料识别完成: {best_type or '(空)'}"
             )
             logger.info(
-                f"材料识别: type={result.type} level={result.level} "
-                f"count={result.count} conf={result.confidence:.3f}"
+                f"材料识别 top {len(results)}: "
+                + ", ".join(f"{r.type}({r.confidence:.3f})" for r in results)
             )
         except Exception as e:
             logger.error(f"材料识别失败: {e}")

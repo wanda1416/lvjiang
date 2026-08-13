@@ -4,15 +4,18 @@
 仿照调律 Tab 结构：顶部开始/停止按钮 + 三页子 Tab。
 - 进度：执行进度表
 - 脚本：勾选要执行的脚本
-- 配置：勾选要执行的条目（用户/角色）
+- 配置：选择配置 + 勾选要执行的行
 """
 
 from __future__ import annotations
+
+import json
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -26,8 +29,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.batch_config import (
-    BatchEntry,
+from ...constants import SESSION_CONFIG_DIR, SESSION_PATH
+from ...core.batch_config import (
+    BatchConfigItem,
     load_batch_config,
     save_batch_config,
 )
@@ -60,6 +64,36 @@ _STYLE_BTN_NOT_READY = (
 )
 
 
+# ─── enabled 用户态（session.json）──────────────────────────
+
+
+def _load_enabled_rows() -> dict[str, list[bool]]:
+    """从 session.json 读取各配置的 enabled 状态"""
+    if not SESSION_PATH.exists():
+        return {}
+    try:
+        data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+        return data.get("batch", {}).get("enabled_rows", {})
+    except Exception:
+        return {}
+
+
+def _save_enabled_rows(enabled_rows: dict[str, list[bool]]) -> None:
+    """保存 enabled 状态到 session.json（read-modify-write）"""
+    data: dict = {}
+    if SESSION_PATH.exists():
+        try:
+            data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    data.setdefault("batch", {})["enabled_rows"] = enabled_rows
+    SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    SESSION_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 class BatchTab(QWidget):
     """批量执行页面
 
@@ -77,6 +111,7 @@ class BatchTab(QWidget):
         host.automation_state_changed.connect(self._on_automation_state)
 
         self._refresh_script_list()
+        self._refresh_config_combo()
         self._refresh_entry_list()
 
     # ─── UI 构建 ─────────────────────────────────────────
@@ -136,42 +171,90 @@ class BatchTab(QWidget):
         return scroll
 
     def _build_config_page(self) -> QWidget:
-        """配置页：勾选要执行的条目（用户/角色）"""
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
+        """配置页：选择配置 + 勾选要执行的行"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        # 标题行
-        header = QHBoxLayout()
-        header.addWidget(QLabel("<b>选择要执行的条目：</b>"))
-        header.addStretch()
+        # 配置选择行
+        config_row = QHBoxLayout()
+        config_row.addWidget(QLabel("当前配置："))
+        self._config_combo = QComboBox()
+        self._config_combo.setMinimumWidth(150)
+        self._config_combo.currentIndexChanged.connect(self._on_config_changed)
+        config_row.addWidget(self._config_combo, stretch=1)
+        layout.addLayout(config_row)
+
+        # 全选/全不选行
+        select_row = QHBoxLayout()
+        select_row.addWidget(QLabel("<b>选择要执行的行：</b>"))
+        select_row.addStretch()
         btn_all = QPushButton("全选")
         btn_all.setFixedWidth(60)
         btn_all.clicked.connect(lambda: self._set_all_entries_checked(True))
-        header.addWidget(btn_all)
+        select_row.addWidget(btn_all)
         btn_none = QPushButton("全不选")
         btn_none.setFixedWidth(60)
         btn_none.clicked.connect(lambda: self._set_all_entries_checked(False))
-        header.addWidget(btn_none)
-        layout.addLayout(header)
+        select_row.addWidget(btn_none)
+        layout.addLayout(select_row)
 
-        # 条目勾选列表
-        self._entry_checkboxes: list[tuple[QCheckBox, int]] = []  # (checkbox, entry_index)
+        # 行勾选列表（放在 scroll 中）
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._entry_checkboxes: list[tuple[QCheckBox, int]] = []  # (checkbox, row_index)
         self._entry_container = QVBoxLayout()
-        layout.addLayout(self._entry_container)
-        layout.addStretch()
+        scroll_layout.addLayout(self._entry_container)
+        scroll_layout.addStretch()
 
-        scroll.setWidget(widget)
-        return scroll
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll, stretch=1)
 
-    # ─── 条目列表 ─────────────────────────────────────────
+        return widget
+
+    # ─── 配置选择 ─────────────────────────────────────────
+
+    def _refresh_config_combo(self):
+        """刷新配置下拉框"""
+        cfg = load_batch_config()
+        self._config_combo.blockSignals(True)
+        self._config_combo.clear()
+        for name in cfg.configs:
+            self._config_combo.addItem(name)
+        # 选中 active_config
+        if cfg.active_config and cfg.active_config in cfg.configs:
+            idx = self._config_combo.findText(cfg.active_config)
+            if idx >= 0:
+                self._config_combo.setCurrentIndex(idx)
+        self._config_combo.blockSignals(False)
+
+    def _on_config_changed(self, index: int):
+        """配置下拉框切换 → 刷新行列表 + 保存 active_config"""
+        if index < 0:
+            return
+        name = self._config_combo.itemText(index)
+        cfg = load_batch_config()
+        cfg.active_config = name
+        save_batch_config(cfg)
+        self._refresh_entry_list()
+
+    def _current_config_name(self) -> str:
+        """获取当前选中的配置名"""
+        idx = self._config_combo.currentIndex()
+        if idx < 0:
+            return ""
+        return self._config_combo.itemText(idx)
+
+    # ─── 行列表 ──────────────────────────────────────────
 
     def _refresh_entry_list(self):
-        """刷新配置页的条目勾选列表"""
+        """刷新配置页的行勾选列表"""
         # 清空旧控件
         while self._entry_container.count():
             item = self._entry_container.takeAt(0)
@@ -180,43 +263,80 @@ class BatchTab(QWidget):
         self._entry_checkboxes.clear()
 
         cfg = load_batch_config()
-        if not cfg.entries:
-            lbl = QLabel("暂无条目，请通过 工具 → 批量配置 添加")
+        config = cfg.get_active()
+        if not config or not config.rows:
+            lbl = QLabel("暂无数据，请通过 工具 → 批量配置 添加")
             lbl.setStyleSheet("color: #999;")
             self._entry_container.addWidget(lbl)
             return
 
-        for i, entry in enumerate(cfg.entries):
-            cb = QCheckBox(f"{entry.account} / {entry.role}（角色{entry.role_index}）")
-            cb.setChecked(entry.enabled)
+        # 加载 enabled 状态
+        enabled_rows = _load_enabled_rows()
+        config_enabled = enabled_rows.get(config.name, [True] * len(config.rows))
+
+        for i, row_data in enumerate(config.rows):
+            label = self._format_row_label(config, row_data)
+            cb = QCheckBox(label)
+            checked = config_enabled[i] if i < len(config_enabled) else True
+            cb.setChecked(checked)
             cb.stateChanged.connect(self._on_entry_check_changed)
             self._entry_container.addWidget(cb)
             self._entry_checkboxes.append((cb, i))
 
+    def _format_row_label(self, config: BatchConfigItem, row_data: dict) -> str:
+        """格式化行显示标签"""
+        parts = []
+        for col in config.columns:
+            val = row_data.get(col, "")
+            if val:
+                parts.append(str(val))
+        return " / ".join(parts) if parts else "(空行)"
+
     def _on_entry_check_changed(self):
-        """条目勾选变更 → 保存到 batch_config"""
-        cfg = load_batch_config()
+        """行勾选变更 → 保存到 session.json（用户态）"""
+        config_name = self._current_config_name()
+        if not config_name:
+            return
+
+        enabled_rows = _load_enabled_rows()
+        config = load_batch_config().get_active()
+        if not config:
+            return
+
+        enabled_list = [False] * len(config.rows)
         for cb, idx in self._entry_checkboxes:
-            if 0 <= idx < len(cfg.entries):
-                cfg.entries[idx].enabled = cb.isChecked()
-        save_batch_config(cfg)
+            if 0 <= idx < len(enabled_list):
+                enabled_list[idx] = cb.isChecked()
+        enabled_rows[config_name] = enabled_list
+        _save_enabled_rows(enabled_rows)
 
     def _set_all_entries_checked(self, checked: bool):
-        """全选/全不选条目"""
+        """全选/全不选行"""
         for cb, _ in self._entry_checkboxes:
             cb.setChecked(checked)
         self._on_entry_check_changed()
 
-    def _get_enabled_entries(self) -> list[BatchEntry]:
-        """获取已启用的条目列表"""
+    def _get_enabled_rows(self) -> list[tuple[int, dict]]:
+        """获取已启用的行列表：[(index, row_data), ...]"""
         cfg = load_batch_config()
-        return [e for e in cfg.entries if e.enabled]
+        config = cfg.get_active()
+        if not config:
+            return []
+
+        enabled_rows = _load_enabled_rows()
+        config_enabled = enabled_rows.get(config.name, [True] * len(config.rows))
+
+        result = []
+        for i, row_data in enumerate(config.rows):
+            if i < len(config_enabled) and config_enabled[i]:
+                result.append((i, row_data))
+        return result
 
     # ─── 脚本列表 ─────────────────────────────────────────
 
     def _refresh_script_list(self, checked_ids: set[str] | None = None):
         """刷新脚本勾选列表（数据源与日常下拉一致）"""
-        from ..workflows.discovery import list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts
 
         if checked_ids is None:
             cfg = load_batch_config()
@@ -282,11 +402,11 @@ class BatchTab(QWidget):
         self._start_batch()
 
     def _start_batch(self):
-        entries = self._get_enabled_entries()
+        enabled_rows = self._get_enabled_rows()
         scripts = self._checked_scripts()
 
-        if not entries:
-            self._host.append_log("[批量] 暂无启用的条目，请到「配置」页勾选")
+        if not enabled_rows:
+            self._host.append_log("[批量] 暂无启用的行，请到「配置」页勾选")
             return
         if not scripts:
             self._host.append_log("[批量] 请至少勾选一个脚本")
@@ -298,19 +418,21 @@ class BatchTab(QWidget):
         save_batch_config(cfg)
 
         # 构建进度表
-        self._build_progress_table(entries, scripts)
+        config = cfg.get_active()
+        self._build_progress_table(enabled_rows, config, scripts)
         self._set_config_enabled(False)
 
-        ok = self._host.run_batch(entries, scripts)
+        ok = self._host.run_batch(enabled_rows, scripts)
         if not ok:
             self._set_config_enabled(True)
 
-    def _build_progress_table(self, entries: list[BatchEntry],
+    def _build_progress_table(self, enabled_rows: list[tuple[int, dict]],
+                              config: BatchConfigItem | None,
                               scripts: list[BatchScript]):
-        """初始化进度表：条目×脚本 全量行"""
+        """初始化进度表：行×脚本 全量行"""
         self._progress_table.setRowCount(0)
-        for entry in entries:
-            label = f"{entry.account}/{entry.role}"
+        for _idx, row_data in enabled_rows:
+            label = self._format_row_label(config, row_data) if config else str(row_data)
             for script in scripts:
                 row = self._progress_table.rowCount()
                 self._progress_table.insertRow(row)
@@ -351,7 +473,8 @@ class BatchTab(QWidget):
         self._refresh_run_button("ready")
 
     def refresh_config(self):
-        """外部配置变更后调用，刷新脚本 + 条目列表"""
+        """外部配置变更后调用，刷新配置 + 脚本 + 行列表"""
+        self._refresh_config_combo()
         self._refresh_script_list()
         self._refresh_entry_list()
 
@@ -380,5 +503,6 @@ class BatchTab(QWidget):
     def _set_config_enabled(self, enabled: bool):
         """运行期间锁定脚本页和配置页"""
         self._script_list.setEnabled(enabled)
+        self._config_combo.setEnabled(enabled)
         for cb, _ in self._entry_checkboxes:
             cb.setEnabled(enabled)

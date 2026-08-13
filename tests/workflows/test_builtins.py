@@ -22,7 +22,7 @@ class TestRegistry:
         registered = set(list_functions())
         expected = {
             "add", "sub", "mul", "div", "mod", "min", "max", "abs",
-            "concat", "range", "count_key", "contains", "find_key", "append",
+            "concat", "range", "count_nonempty", "contains", "find_key", "append",
         }
         assert expected <= registered
 
@@ -102,16 +102,16 @@ class TestRange:
             _fn("range")(1, 2, 3)
 
 
-class TestCountKey:
+class TestCountNonempty:
     def test_dict_counts_non_empty_values(self):
-        assert _fn("count_key")({"a": "x", "b": "", "c": "  ", "d": "y"}) == 2
+        assert _fn("count_nonempty")({"a": "x", "b": "", "c": "  ", "d": "y"}) == 2
 
     def test_list_counts_elements(self):
-        assert _fn("count_key")([1, 2, 3]) == 3
+        assert _fn("count_nonempty")([1, 2, 3]) == 3
 
     def test_other_types_return_zero(self):
-        assert _fn("count_key")("text") == 0
-        assert _fn("count_key")(None) == 0
+        assert _fn("count_nonempty")("text") == 0
+        assert _fn("count_nonempty")(None) == 0
 
 
 class TestContains:

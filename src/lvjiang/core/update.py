@@ -73,6 +73,10 @@ def is_newer_version(latest: str, current: str) -> bool:
 
 
 # ─── 跳过版本管理（存储于 session.json 的 server_config 节点）────────────
+#
+# ⚠️ 警告：禁止添加旧配置迁移逻辑
+# 本模块已从 config/local/update.json 迁移到 session.json。
+# 禁止添加读取旧文件的兼容代码。旧配置直接丢弃，不兼容。
 
 
 def get_skip_version() -> str:

@@ -93,7 +93,8 @@ def list_exposed_scripts() -> list[dict]:
     桌面下拉与设备端悬浮面板共用本函数，避免两处各写一份暴露逻辑。
 
     Returns:
-        脚本配置列表，shape 同 ``discover_scripts()``，name 已套用 overrides。
+        脚本配置列表，shape 同 ``discover_scripts()``，name 已套用 overrides，
+        额外含 ``scope`` 字段（"daily" 或 "dedicated"，默认 "daily"）。
     """
     discovered = {cfg["id"]: cfg for cfg in discover_scripts()}
     exposed, overrides = _load_exposure()
@@ -104,5 +105,6 @@ def list_exposed_scripts() -> list[dict]:
         ov = overrides.get(sid) or {}
         if ov.get("name"):
             cfg["name"] = ov["name"]
+        cfg["scope"] = ov.get("scope", "daily")
         result.append(cfg)
     return result

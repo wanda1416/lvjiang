@@ -842,13 +842,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._save_daily_config()
 
     def _save_displayed_params(self):
-        """将当前参数面板的值写入 _displayed_script_id 对应的配置项"""
+        """将当前参数面板的值写入 _displayed_script_id 对应的配置项
+
+        仅对 scope=daily 的脚本生效；专用脚本的参数由专属页面管理，
+        日常页禁止读写。
+        """
         sid = getattr(self, '_displayed_script_id', None)
         if not sid or not self._param_panel or not self._param_panel.isVisible():
             return
         # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
         target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
         if not target_cfg:
+            return
+        # ⚠️ 专用脚本的参数由专属页面管理，日常页禁止读写
+        if target_cfg.get("scope", "daily") != "daily":
             return
         if not target_cfg.get("parameters"):
             return
@@ -873,7 +880,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         update_wf_config(sid, params)
 
     def _save_daily_config(self):
-        """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘"""
+        """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘
+
+        ⚠️ 警告：禁止在此处添加遍历清理其他工作流 wf_configs 的逻辑。
+        各工作流的配置由其专属页面自行管理，日常页只负责自己的 workflow_id。
+        擅自清理不归自己管理的配置会破坏其他工作流的数据完整性。
+        """
         from ..core.config import get_session_store
 
         flow_cfg = self._get_selected_flow_config()
@@ -897,8 +909,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             daily = {}
         workflow_id = daily.get("workflow_id")
 
-        # 从统一存储读取各脚本参数；无参数脚本的 wf_configs 可能由专属页面管理
+        # 从统一存储读取各脚本参数；仅对 scope=daily 的脚本生效
+        # 专用脚本的参数由专属页面管理，日常页禁止读写
         for cfg in self._workflow_configs:
+            if cfg.get("scope", "daily") != "daily":
+                continue
             if not cfg.get("parameters"):
                 continue
             saved = get_wf_config(cfg["id"])
@@ -919,9 +934,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._rebuild_param_panel()
 
     def _rebuild_param_panel(self):
+        """重建参数面板
+
+        仅对 scope=daily 的脚本绘制参数面板；专用脚本不画面板，
+        其参数由专属配置页面管理。
+        """
         while self._param_layout.rowCount() > 0:
             self._param_layout.removeRow(0)
         flow_cfg = self._get_selected_flow_config()
+        # ⚠️ 专用脚本不画参数面板
+        if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
+            self._param_panel.setVisible(False)
+            return
         params = flow_cfg.get("parameters", []) if flow_cfg else []
         if not params:
             self._param_panel.setVisible(False)

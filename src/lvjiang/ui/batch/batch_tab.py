@@ -363,21 +363,21 @@ class BatchTab(QWidget):
         return ids
 
     def _checked_scripts(self) -> list[BatchScript]:
-        """获取勾选的脚本 BatchScript 列表（参数从统一存储读取）"""
-        from ...core.config.wf_configs import get_wf_config
+        """获取勾选的脚本 BatchScript 列表
+
+        ⚠️ 不读取参数：脚本参数由批量执行引擎在执行时从 wf_configs 加载。
+        """
         scripts: list[BatchScript] = []
         for i in range(self._script_list.count()):
             item = self._script_list.item(i)
             if item is None or item.checkState() != Qt.CheckState.Checked:
                 continue
             cfg = item.data(Qt.ItemDataRole.UserRole)
-            wf_params = get_wf_config(cfg["id"])
             scripts.append(BatchScript(
                 id=cfg["id"],
                 name=cfg["name"],
                 wf_file=cfg.get("wf_file", ""),
                 class_name=cfg.get("class", ""),
-                params=wf_params or None,
             ))
         return scripts
 

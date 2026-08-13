@@ -3,19 +3,22 @@
 # 从装备详情页进入调律页面
 # 前置：在装备详情页（equip_detail）
 # 后置（成功）：在调律详情页（equip_tune_detail）
-# 后置（失败）：仍在装备详情页
-# 输出：成功时 context.status = "ok"，失败时无输出
+# 后置（失败）：仍在装备详情页，弹窗已收起
 
 def nav_equip_to_tune()
-    click [equip_detail].[more_func] after wait step_interval
+    # 展开「更多」弹窗
+    click [equip_detail].[more_func] after wait page_refresh_wait
 
+    # 在次功能按钮中寻找「调律」
     scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+
     if not $tune_key
         log "未找到调律按钮"
+        # 再次点击 more_func 收起弹窗，保持页面干净
+        click [equip_detail].[more_func] after wait step_interval
         return -1
     end
 
-    click [equip_detail].$tune_key after wait step_interval
-
-    eval context.status = "ok"
+    # 点击调律按钮，进入调律页
+    click [equip_detail].$tune_key after wait page_refresh_wait
 end

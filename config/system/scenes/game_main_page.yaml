@@ -13,7 +13,7 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-- key: activity
+- key: huodong
   name: 活动
   type: func
   is_text: true
@@ -28,32 +28,32 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-- key: battle_pass
+- key: zhanling
   name: 战令
   type: func
   is_text: true
   is_clickable: true
-- key: harmony
+- key: heming
   name: 和鸣
   type: func
   is_text: true
   is_clickable: true
-- key: map
+- key: ditu
   name: 地图
   type: func
   is_text: false
   is_clickable: true
-- key: team
+- key: zudui
   name: 组队
   type: func
   is_text: false
   is_clickable: true
-- key: summon_horse
+- key: huanma
   name: 唤马
   type: func
   is_text: false
   is_clickable: true
-- key: listen_wind
+- key: tingfeng
   name: 听风辩位
   type: func
   is_text: false
@@ -63,12 +63,12 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: greet
+- key: dongzuo
   name: 动作
   type: func
   is_text: false
   is_clickable: true
-- key: chat
+- key: liaotian
   name: 聊天
   type: func
   is_text: false

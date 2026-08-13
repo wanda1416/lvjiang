@@ -170,7 +170,7 @@ def action_qingjing($label)
    click [activity_jianghu].[goto] after wait step_interval
    click [activity_jianghu].[confirm] after wait step_interval
    click [activity_jianghu].[expand_up] after wait step_interval
-   click [activity_jianghu].[goto_edit_qingjing] after wait step_interval
+   click [activity_jianghu].[goto_qingjing] after wait step_interval
 
    click [waiguan_qingjing].[save] after wait step_interval
    # 保存后可能弹出二次确认，识别到取消按钮才点一次

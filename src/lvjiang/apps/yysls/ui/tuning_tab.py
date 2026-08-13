@@ -73,6 +73,7 @@ class TuningTab(QWidget):
         progress_row = QHBoxLayout()
         progress_row.setContentsMargins(0, 0, 0, 0)
         self._cb_auto_progress = QCheckBox("自动打开调律进度")
+        self._cb_auto_progress.toggled.connect(lambda: self._save_tuning_config())
         progress_row.addWidget(self._cb_auto_progress)
         progress_row.addStretch()
         self._btn_toggle_progress = QPushButton("打开进度")
@@ -507,6 +508,10 @@ class TuningTab(QWidget):
         self._select_base_group_radio(self._base_group_key)
         self._tuning_globals.set_switches(tc.get("switches", {}))
         self._tuning_globals.set_skip_tuning(bool(tc.get("skip_tuning", False)))
+        # 自动打开进度对话框
+        self._cb_auto_progress.blockSignals(True)
+        self._cb_auto_progress.setChecked(bool(tc.get("auto_open_progress", False)))
+        self._cb_auto_progress.blockSignals(False)
         # 初始跳过 / 指定调律
         for key, cb, sp_row, sp_col in (
             ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
@@ -543,6 +548,7 @@ class TuningTab(QWidget):
             "skip_tuning": self._get_tuning_skip_tuning(),
             "skip_start": skip_start,
             "target_cell": target_cell,
+            "auto_open_progress": self._cb_auto_progress.isChecked(),
         })
 
     def _set_all_tuning_checks(self, checked: bool):

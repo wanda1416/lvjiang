@@ -1831,6 +1831,7 @@ class TestRunWithTargetCell:
         wf.run_ctx = TuningRunContext(
             selected_slots=["main_weapon", "ring"],
             target_cell=(2, 3),
+            base_group=TuningGroup(),
         )
         wf._read_row_result = ("目标剑", "fp_x", _equip(3))
         wf.run()
@@ -1849,6 +1850,7 @@ class TestRunWithSkipStart:
         wf.run_ctx = TuningRunContext(
             selected_slots=["main_weapon", "head"],
             skip_start=(4, 1),
+            base_group=TuningGroup(),
         )
         wf.run()
         # 第一个部位：先滚动再遍历

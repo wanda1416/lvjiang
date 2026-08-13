@@ -73,7 +73,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._restore_window_size()
 
     def _restore_window_size(self):
-        """从 session.json 恢复窗口大小 + 分割器尺寸"""
+        """从 session.json 恢复窗口位置 + 大小 + 分割器尺寸"""
         import json
 
         from ....constants import SESSION_PATH
@@ -84,6 +84,11 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
         except Exception:
             return
+        # 窗口位置
+        pos = state.get("scene_editor_pos")
+        if isinstance(pos, list) and len(pos) == 2:
+            self.move(int(pos[0]), int(pos[1]))
+        # 窗口大小
         size = state.get("scene_editor_size")
         if isinstance(size, list) and len(size) == 2:
             self.resize(int(size[0]), int(size[1]))
@@ -99,7 +104,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._pending_tab_split = state.get("scene_editor_tab_split")
 
     def _save_window_size(self):
-        """保存窗口大小 + 分割器尺寸到 session.json"""
+        """保存窗口位置 + 大小 + 分割器尺寸到 session.json"""
         import json
 
         from ....constants import SESSION_CONFIG_DIR, SESSION_PATH
@@ -110,6 +115,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             except Exception:
                 pass
         ui = data.setdefault("ui_state", {})
+        ui["scene_editor_pos"] = [self.x(), self.y()]
         ui["scene_editor_size"] = [self.width(), self.height()]
         ui["scene_editor_vsplit"] = self._splitter.sizes()
         ui["scene_editor_hsplit"] = self._bottom_splitter.sizes()

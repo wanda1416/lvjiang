@@ -98,8 +98,19 @@ class ConfigResolver:
     ):
         self._system_dir = Path(system_dir) if system_dir else None
         self._local_dir = Path(local_dir) if local_dir else None
-        self._dev_mode = dev_mode
+        self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
         self._listeners: list[Callable[[str], None]] = []
+
+    @staticmethod
+    def _compute_dev_mode() -> bool:
+        """计算开发模式：环境变量强制 > .git 探测"""
+        env = os.environ.get("LVJIANG_DEV_MODE", "").strip().lower()
+        if env in ("1", "true", "yes"):
+            return True
+        if env in ("0", "false", "no"):
+            return False
+        from .. import constants
+        return (constants.PROJECT_ROOT / ".git").exists()
 
     # ─── 层根目录与模式 ─────────────────────────────────
 
@@ -120,18 +131,9 @@ class ConfigResolver:
     def is_dev_mode(self) -> bool:
         """开发模式（写 system）or 用户模式（写 local）
 
-        LVJIANG_DEV_MODE=1/0 强制覆盖；否则以 PROJECT_ROOT/.git 是否存在判定
-        （仓库检出 → 开发模式；打包/安卓 → 用户模式）。
+        构造时已计算并缓存，此处直接返回。
         """
-        if self._dev_mode is not None:
-            return self._dev_mode
-        env = os.environ.get("LVJIANG_DEV_MODE", "").strip().lower()
-        if env in ("1", "true", "yes"):
-            return True
-        if env in ("0", "false", "no"):
-            return False
-        from .. import constants
-        return (constants.PROJECT_ROOT / ".git").exists()
+        return self._dev_mode
 
     def write_dir(self, rel_dir: str = "") -> Path:
         """当前模式的可写目录（确保存在），编辑器默认目录等场景用"""

@@ -197,13 +197,18 @@ class RunControlMixin:
         panel = self._param_panel
         if panel is None:
             return params
-        from PyQt6.QtWidgets import QComboBox, QSpinBox
+        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox
         for param_def in flow_cfg.get("parameters", []):
             name = param_def["name"]
             # 先找 QSpinBox
             widget = panel.findChild(QSpinBox, name)
             if widget is not None:
                 params[name] = str(widget.value())
+                continue
+            # 再找 QCheckBox（bool 参数，传 True/False）
+            widget = panel.findChild(QCheckBox, name)
+            if widget is not None:
+                params[name] = widget.isChecked()
                 continue
             # 再找 QComboBox
             widget = panel.findChild(QComboBox, name)

@@ -3,7 +3,7 @@
 此前 tuning_tab 的 configure 回调直接往工作流实例上塞下划线属性
 （_selected_slots/_skip_tuning/...），读取端只能 getattr 防御，契约
 不在类型系统里，重命名即静默失效。收口为 dataclass 后，注入端
-（tuning_tab/测试）与读取端（auto_tuning/single_tuning）共享同一份
+（tuning_tab/测试）与读取端（auto_tuning）共享同一份
 字段定义，类型检查与 IDE 重命名均可覆盖。
 """
 

@@ -14,3 +14,4 @@
 | [06-functions.md](06-functions.md) | 内置函数全集：基础运算、字典/列表、字符串、装备处理、用户交互（confirm/pause/notify/input） |
 | [07-subworkflows.md](07-subworkflows.md) | 模块化（import/def/call）、变量隔离、工作流参数声明 |
 | [08-examples.md](08-examples.md) | 完整示例：装备分析、调律决策树、批量调律、异常重试与用户介入 |
+| [09-data-channels.md](09-data-channels.md) | 数据通道：session/context/variables/output 的生命周期与隔离性 |

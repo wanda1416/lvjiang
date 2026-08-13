@@ -36,7 +36,7 @@ eval $targets = ["合影", "换装", "情境", "东方", "醉意", "双人"]
 scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
 if not $at_haoling
    log "未识别到号令标题，视为当前在游戏首页，先导航至江湖号令页"
-   call back_to_menpai()
+   call back_to_haoling()
    scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
    if not $at_haoling
       log "导航后仍未进入江湖号令页，终止流程"
@@ -47,25 +47,25 @@ end
 for idx in ["1", "2", "3", "4", "5", "6"]
 
    # 动态构造本组的 label / btn region 名
-   eval $label = concat("label_", $idx)
-   eval $btn = concat("btn_", $idx)
+   eval $label = "label_" + $idx
+   eval $btn = "btn_" + $idx
 
    # 先识别当前任务是否已是目标任务
    scan [activity_jianghu].$label as $hit by contains_any $targets
    if $hit
-      log concat("任务 ", $idx, " 已是目标任务")
+      log "任务 " + $idx + " 已是目标任务"
    else
       # 不断刷新直到命中目标任务
       loop $max_refresh
          click [activity_jianghu].$btn after wait step_interval
          scan [activity_jianghu].$label as $hit by contains_any $targets
          if $hit
-            log concat("任务 ", $idx, " 刷新命中目标任务")
+            log "任务 " + $idx + " 刷新命中目标任务"
             break
          end
       end
       if not $hit
-         log concat("任务 ", $idx, " 达到刷新上限仍未命中，跳过")
+         log "任务 " + $idx + " 达到刷新上限仍未命中，跳过"
       end
    end
 
@@ -73,7 +73,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
    if $hit
       scan [activity_jianghu].$label as $text_result
       eval $task_text = $text_result.$label
-      log concat("任务 ", $idx, " 命中：", $task_text)
+      log "任务 " + $idx + " 命中：" + $task_text
 
       if $task_text contains "换装"
          call action_huanzhuang($label)
@@ -120,7 +120,7 @@ end
 # 需多点一次返回先关闭弹窗，收尾才能顺利退回游戏首页
 def claim_reward($label, $idx)
    click [activity_jianghu].$label after wait step_interval
-   log concat("任务 ", $idx, " 奖励已领取")
+   log "任务 " + $idx + " 奖励已领取"
    if $idx equals "6"
       click [activity_jianghu].[back] after wait step_interval
       log "末个任务领奖弹出奖励窗口，多点一次返回关闭"
@@ -158,7 +158,7 @@ def action_heying($label, $idx)
    if $idx equals "6" and not $claim_reward
       log "末个任务合影完成且无需领奖，留在桌面"
    else
-      call back_to_menpai()
+      call back_to_haoling()
    end
 end
 
@@ -228,7 +228,7 @@ def action_dongfang($label, $idx)
    if $idx equals "6" and not $claim_reward
       log "末个任务看报完成且无需领奖，留在桌面"
    else
-      call back_to_menpai()
+      call back_to_haoling()
    end
 end
 
@@ -244,7 +244,7 @@ end
 
 # 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
 # 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
-def back_to_menpai()
+def back_to_haoling()
    click [game_main_page].[menu] after wait step_interval
 
    # 在菜单区域搜索「门派」，可能需要下滑翻页
@@ -264,17 +264,13 @@ def back_to_menpai()
    end
    click $found after wait (2, 3)
 
-   call back_to_haoling()
-end
-
-def back_to_haoling()
    # 门派页三种形态：
    # # 有门派（基底，入口文字「江湖号令」）
    # # 无门无派（no_school 视图，入口换成 haoling_2）
    # # 问津（wenjin 视图，入口换成 haoling_3）
    scan [school_main].[haoling_1, haoling_2, haoling_3] as $haoling_key by contains "号令"
    if $haoling_key
-      log concat("识别到号令，正常进入，区域：", $haoling_key)
+      log "识别到号令，正常进入，区域：" + $haoling_key
       click [school_main].$haoling_key after wait step_interval
       return 0
    end

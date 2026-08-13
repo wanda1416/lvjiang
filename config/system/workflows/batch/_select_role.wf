@@ -1,7 +1,7 @@
 # 公共子过程：选角色 + 进入游戏
 
 def _select_role($role_index)
-    log concat("当前下标", $role_index)
+    log "当前下标" + $role_index
 
     click [game_login_page].[switch_role]
     wait (1, 2)

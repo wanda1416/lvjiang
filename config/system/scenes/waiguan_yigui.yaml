@@ -21,3 +21,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: yigui
+  name: 衣柜
+  type: func
+  is_text: true
+  is_clickable: true

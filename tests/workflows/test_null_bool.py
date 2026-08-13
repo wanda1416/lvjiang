@@ -2,32 +2,8 @@
 
 归档自 P2 开发期冒烟测试（scripts/_phase5_smoke.py）。
 """
-from unittest.mock import MagicMock
-
-from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import parse_text
-
-
-def make_engine() -> WorkflowEngine:
-    """创建最小化引擎实例"""
-    capture = MagicMock()
-    capture.get_capture_size.return_value = (1920, 1080)
-    layout = MagicMock()
-    layout.get_canvas.return_value = MagicMock(
-        x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
-    return WorkflowEngine(
-        capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout, delay_config=MagicMock(),
-    )
-
-
-def run(code: str, initial: dict | None = None) -> dict:
-    """执行 DSL 片段并返回变量表"""
-    eng = make_engine()
-    eng.variables = dict(initial or {})
-    eng._exec_body(parse_text(code).body)
-    return eng.variables
-
+from tests.workflows.conftest import make_engine, run
 
 IF_ELSE_TPL = '''%s
 if %s

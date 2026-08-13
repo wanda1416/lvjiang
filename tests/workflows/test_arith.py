@@ -4,12 +4,10 @@
 改写为标准 pytest 断言以纳入回归基线。
 """
 
-from unittest.mock import MagicMock
-
 import pytest
 
-from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import parse_text
+from tests.workflows.conftest import make_engine
 
 # ─── 语法解析 ──────────────────────────────────────────────
 
@@ -34,18 +32,6 @@ class TestArithParse:
 
 
 # ─── 引擎求值 ──────────────────────────────────────────────
-
-def make_engine() -> WorkflowEngine:
-    """创建一个最小化的引擎实例用于求值测试"""
-    capture = MagicMock()
-    capture.get_capture_size.return_value = (1920, 1080)
-    layout = MagicMock()
-    layout.get_canvas.return_value = MagicMock(
-        x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
-    return WorkflowEngine(
-        capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout, delay_config=MagicMock(),
-    )
 
 
 class TestArithEval:

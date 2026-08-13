@@ -33,6 +33,10 @@ STATE_STOPPED = "stopped"
 #: 日志环形缓冲容量。悬浮面板只显示最后几行，留 200 行够回溯一段流程。
 _LOG_CAPACITY = 200
 
+#: 冒烟自检任务 id（config/system/workflows/device_smoke_test.wf）。它不在日常
+#: 暴露列表里，但设备端自检链路 smoke.py 要靠它出现在清单中，故 list_tasks 单独补入。
+_SMOKE_TASK_ID = "device_smoke_test"
+
 
 class _TaskState:
     """任务运行状态的唯一持有者
@@ -163,7 +167,16 @@ def list_tasks() -> str:
         JSON 文本 ``{"ok": bool, "tasks": [{"id","name","source"}], "error": str}``
     """
     try:
-        from ...workflows.discovery import discover_scripts
+        from ...workflows.discovery import discover_scripts, list_exposed_scripts
+
+        # 日常清单只给 workflows.yaml 暴露的脚本（含中文显示名），与桌面下拉一致；
+        # 冒烟自检任务不暴露，但自检链路要用，未暴露时从全集里补一条到末尾。
+        items = list_exposed_scripts()
+        if not any(item["id"] == _SMOKE_TASK_ID for item in items):
+            for cfg in discover_scripts():
+                if cfg["id"] == _SMOKE_TASK_ID:
+                    items = [*items, cfg]
+                    break
 
         tasks = [
             {
@@ -171,7 +184,7 @@ def list_tasks() -> str:
                 "name": item["name"],
                 "source": "class" if item.get("class") else "wf",
             }
-            for item in discover_scripts()
+            for item in items
         ]
         return json.dumps({"ok": True, "tasks": tasks, "error": ""}, ensure_ascii=False)
     except Exception as e:
@@ -321,7 +334,8 @@ def _build_source(task: dict, engine):
             ocr=engine._ocr,
             input_ctrl=engine._input,
             layout=engine._layout,
-            delay_config=engine._delay,
+            input_sim=engine._input_sim,
+            delay_params=engine._delay_params,
             window_left=engine._window_left,
             window_top=engine._window_top,
             stop_check=_STATE.should_stop,

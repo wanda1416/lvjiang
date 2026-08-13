@@ -3,8 +3,8 @@
 全部在 tmp_path 上构造隔离实例，不触碰真实 config 目录。
 """
 
-import yaml
 import pytest
+import yaml
 
 from lvjiang.core.config_resolver import (
     ConfigResolver,

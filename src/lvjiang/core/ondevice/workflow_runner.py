@@ -19,7 +19,7 @@ from typing import Callable
 
 from loguru import logger
 
-from ...config import DelayConfig
+from ...config import load_user_config
 from ...core.capture_base import CaptureBackend
 from ...core.config_resolver import get_resolver
 from ...core.input_base import InputBackend
@@ -35,9 +35,9 @@ def _create_capture() -> CaptureBackend:
     return A11yCapture()
 
 
-def _create_input() -> InputBackend:
+def _create_input(input_sim=None) -> InputBackend:
     """创建设备端输入后端"""
-    return A11yInput()
+    return A11yInput(input_sim=input_sim)
 
 
 def _create_ocr() -> OCREngine:
@@ -88,30 +88,32 @@ def _load_layout(name: str) -> Layout:
 
 def create_engine(
     layout_name: str | None = None,
-    delay_config: DelayConfig | None = None,
     stop_check: Callable[[], bool] | None = None,
 ) -> WorkflowEngine:
     """创建设备端工作流引擎
 
     Args:
         layout_name: 布局文件名（不含 .json），None 则用 session 活动布局/首个布局
-        delay_config: 延迟配置，None 则用默认值
         stop_check: 停止判据，引擎每条语句前轮询一次；None 表示不可停止
 
     Returns:
         装配好的 WorkflowEngine 实例
     """
     capture = _create_capture()
-    input_ctrl = _create_input()
     ocr = _create_ocr()
     layout = _load_layout(layout_name or _default_layout_name())
+
+    # 输入模拟/延迟参数从 app.yaml（system ← local）加载，设备端与 PC 端同源
+    user_config = load_user_config()
+    input_ctrl = _create_input(user_config.input_sim)
 
     engine = WorkflowEngine(
         capture=capture,
         ocr=ocr,
         input_ctrl=input_ctrl,
         layout=layout,
-        delay_config=delay_config or DelayConfig(),
+        input_sim=user_config.input_sim,
+        delay_params=user_config.delay_params,
         window_left=0,
         window_top=0,
         stop_check=stop_check,

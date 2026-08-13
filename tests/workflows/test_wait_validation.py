@@ -1,30 +1,15 @@
 """wf 加载期命名等待参数静态校验测试
 
 _execute_dsl 在解析与 import 展开后、执行前遍历全部语句体，
-wait 引用的命名等待参数（DelayConfig.custom）不存在时
+wait 引用的命名等待参数（delay_params）不存在时
 直接抛 WorkflowUserError，不进入执行阶段。
 """
 
-from unittest.mock import MagicMock
-
 import pytest
 
-from lvjiang.config import DelayConfig
-from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
-
-
-def make_engine(custom: dict | None = None) -> WorkflowEngine:
-    """创建最小化引擎实例，custom 为命名等待参数定义"""
-    capture = MagicMock()
-    capture.get_capture_size.return_value = (1920, 1080)
-    layout = MagicMock()
-    layout.get_canvas.return_value = MagicMock(
-        x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
-    return WorkflowEngine(
-        capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout,
-        delay_config=DelayConfig(custom=custom or {}),
-    )
+from lvjiang.config import DelayParam
+from lvjiang.workflows.engine import WorkflowUserError
+from tests.workflows.conftest import make_engine
 
 
 def write_wf(tmp_path, text: str):
@@ -44,7 +29,7 @@ class TestNamedWaitValidation:
     def test_defined_wait_passes(self, tmp_path):
         """已定义的命名等待正常执行"""
         wf = write_wf(tmp_path, 'wait step_interval\n')
-        engine = make_engine({"step_interval": {"range": [0.0, 0.0]}})
+        engine = make_engine(delay_params={"step_interval": DelayParam(range=(0.0, 0.0))})
         engine.execute(wf)  # 不抛异常
 
     def test_numeric_and_range_wait_not_affected(self, tmp_path):

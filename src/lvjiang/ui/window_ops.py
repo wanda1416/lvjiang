@@ -205,7 +205,7 @@ class WindowOpsMixin:
             return
 
         # 创建输入控制器（adb shell input）
-        self._input = create_input_backend(device=device, delay_config=self._user_config.input_delay)
+        self._input = create_input_backend(device=device, input_sim=self._user_config.input_sim)
 
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
         self._scrcpy_streaming = False
@@ -342,12 +342,12 @@ class WindowOpsMixin:
             if self.chk_bg_mode.isChecked():
                 from ..core.desktop import PostMessageInput
                 self._input = PostMessageInput(
-                    delay_config=self._user_config.input_delay,
+                    input_sim=self._user_config.input_sim,
                     hwnd=w["hwnd"],
                 )
             else:
                 from ..core.desktop import SendInputInput
-                self._input = SendInputInput(delay_config=self._user_config.input_delay)
+                self._input = SendInputInput(input_sim=self._user_config.input_sim)
                 self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
 
     def _on_bg_mode_changed(self, state):
@@ -358,13 +358,13 @@ class WindowOpsMixin:
         if bool(state):
             from ..core.desktop import PostMessageInput
             self._input = PostMessageInput(
-                delay_config=self._user_config.input_delay,
+                input_sim=self._user_config.input_sim,
                 hwnd=hwnd,
             )
             self.log_text.append("[模式] 已切换到后台模式（PostMessage，不移动光标）")
         else:
             from ..core.desktop import SendInputInput
-            self._input = SendInputInput(delay_config=self._user_config.input_delay)
+            self._input = SendInputInput(input_sim=self._user_config.input_sim)
             self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
 
     def _on_capture_method_changed(self, state):

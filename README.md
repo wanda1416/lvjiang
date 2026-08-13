@@ -196,6 +196,7 @@ pytest tests/workflows/test_parser.py
 
 | 目录 | 内容 |
 |------|------|
+| [`docs/user-guide.md`](docs/user-guide.md) | 用户指南：连接手机、配置与运行自动调律 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
 | [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型 |

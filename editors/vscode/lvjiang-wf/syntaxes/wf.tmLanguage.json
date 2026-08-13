@@ -110,7 +110,7 @@
     },
     "keywords-wait-stable": {
       "name": "keyword.other.wait-stable.wf",
-      "match": "\\b(stable|threshold|interval|duration)\\b"
+      "match": "\\b(stable|threshold|interval|duration|least)\\b"
     },
     "keywords-match": {
       "name": "keyword.operator.match.wf",

@@ -179,11 +179,12 @@ wait (1, 2)                 # 随机等待 1~2 秒
 **语法**：
 
 ```
-wait stable <timeout>                                            # 基本形式
-wait stable <timeout> threshold <value>                          # 自定义差异阈值
-wait stable <timeout> interval <value>                           # 自定义截图间隔
-wait stable <timeout> duration <value>                           # 自定义稳定持续时长
-wait stable <timeout> threshold <v> interval <v> duration <v>    # 任意组合
+wait stable <timeout>                                                      # 基本形式
+wait stable <timeout> threshold <value>                                    # 自定义差异阈值
+wait stable <timeout> interval <value>                                     # 自定义截图间隔
+wait stable <timeout> duration <value>                                     # 自定义稳定持续时长
+wait stable <timeout> least <value>                                        # 自定义最低等待时间
+wait stable <timeout> threshold <v> interval <v> duration <v> least <v>    # 任意组合
 ```
 
 **参数**：
@@ -194,6 +195,7 @@ wait stable <timeout> threshold <v> interval <v> duration <v>    # 任意组合
 | `threshold` | 0.02 | 像素差异率阈值（0~1），低于此值认为「画面没变」 |
 | `interval` | 0.3 | 截图对比间隔秒数 |
 | `duration` | 0.5 | 画面需持续稳定的时长（秒），连续差异低于阈值达到此时长后返回 |
+| `least` | 0.5 | 最低等待秒数，点击后至少等这么久再开始检测稳定，防止转场动画未开始就被误判为「画面已稳定」 |
 
 **示例**：
 
@@ -202,16 +204,18 @@ wait stable 5                    # 等待画面稳定，最多 5 秒
 wait stable 3 threshold 0.01     # 严格模式，差异 < 1% 视为稳定
 wait stable 10 interval 0.5      # 每 0.5 秒检测一次，最多等 10 秒
 wait stable 5 duration 1.0       # 画面需连续稳定 1 秒才算完成
-wait stable 10 threshold 0.03 interval 0.5 duration 1.0  # 完整参数
+wait stable 5 least 1.0          # 点击后至少等 1 秒再开始检测（慢加载页面）
+wait stable 10 threshold 0.03 interval 0.5 duration 1.0 least 0.3  # 完整参数
 ```
 
 **说明**：
 
 - 工作原理：每 `interval` 秒截图一次，与上一帧计算像素差异率（`cv2.absdiff.mean() / 255`），连续差异低于 `threshold` 的时长达到 `duration` 后返回
+- `least` 期间只截图建立基准，不进行稳定判定。防止点击后转场动画尚未开始，画面恰好「没变」就被误判为稳定
 - 超时未稳定时抛出 `WorkflowUserError` 终止工作流
 - 等待期间持续检查停止标志，F10 / 停止按钮可立即中断
 - 所有参数均为字面量数值，不支持变量引用
-- `threshold`、`interval` 和 `duration` 可以任意顺序书写
+- `threshold`、`interval`、`duration` 和 `least` 可以任意顺序书写
 
 ## 五、align — 面板自对齐
 

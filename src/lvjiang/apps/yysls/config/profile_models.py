@@ -4,7 +4,7 @@
 - daily: 周期任务/限额，周期结束自动清零
 - realtime: 实时状态，按规则回复，有上限
 - resource: 资源计数，纯数字
-- activity: 活动进度，周期限额 + 账号总上限
+- activity: 活动进度，与 daily 结构一致，周期结束自动清零
 
 定义与存储完全镜像：profile.yaml 按模型归档，user.json 按模型分节点。
 """
@@ -45,7 +45,6 @@ class KeyDef:
 
     key: str = ""
     label: str = ""
-    source: str = ""
     description: str = ""
 
     @classmethod
@@ -53,7 +52,6 @@ class KeyDef:
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
-            source=data.get("source", ""),
             description=data.get("description", ""),
         )
 
@@ -73,22 +71,27 @@ class DailyKeyDef(KeyDef):
     """日常数据模型 — 周期任务/限额
 
     周期结束自动清零，无累积概念。
+
+    reset_day:
+        week 周期: 1=周一 ... 7=周日（0 或未设置 → 默认周一）
+        month 周期: 1-31 表示每月第几天（0 或未设置 → 默认 1 号）
     """
 
     period: str = "week"
     cap: int | None = None
     reset_time: str = "05:00"
+    reset_day: int = 0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DailyKeyDef:
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
-            source=data.get("source", ""),
             description=data.get("description", ""),
             period=data.get("period", "week"),
             cap=data.get("cap"),
             reset_time=data.get("reset_time", "05:00"),
+            reset_day=data.get("reset_day", 0),
         )
 
 
@@ -110,7 +113,6 @@ class RealtimeKeyDef(KeyDef):
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
-            source=data.get("source", ""),
             description=data.get("description", ""),
             cap=data.get("cap"),
             regen_rate=data.get("regen_rate", 0.0),
@@ -132,7 +134,6 @@ class ResourceKeyDef(KeyDef):
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
-            source=data.get("source", ""),
             description=data.get("description", ""),
         )
 
@@ -141,30 +142,29 @@ class ResourceKeyDef(KeyDef):
 class ActivityKeyDef(KeyDef):
     """活动数据模型 — 活动进度
 
-    周期限额 + 账号总上限。value 是当期原始值，total 是历史累积。
-    周期重置时 total += value，然后 value = 0。
+    与 DailyKeyDef 结构一致：周期结束自动清零。
+    value 是当期原始值，user.json 中的 total 记录历史累积（引擎自动累加，无上限）。
+
+    reset_day:
+        week 周期: 1=周一 ... 7=周日（0 或未设置 → 默认周一）
+        month 周期: 1-31 表示每月第几天（0 或未设置 → 默认 1 号）
     """
 
     period: str = "week"
-    period_cap: int = 0
-    lifetime_cap: int = 0
+    cap: int | None = None
     reset_time: str = "05:00"
-    alert_near_period_cap: float | None = None
-    alert_near_lifetime_cap: float | None = None
+    reset_day: int = 0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ActivityKeyDef:
         return cls(
             key=data.get("key", ""),
             label=data.get("label", ""),
-            source=data.get("source", ""),
             description=data.get("description", ""),
             period=data.get("period", "week"),
-            period_cap=data.get("period_cap", 0),
-            lifetime_cap=data.get("lifetime_cap", 0),
+            cap=data.get("cap"),
             reset_time=data.get("reset_time", "05:00"),
-            alert_near_period_cap=data.get("alert_near_period_cap"),
-            alert_near_lifetime_cap=data.get("alert_near_lifetime_cap"),
+            reset_day=data.get("reset_day", 0),
         )
 
 

@@ -139,6 +139,12 @@ class Log:
 
 
 @dataclass(frozen=True)
+class Screenshot:
+    """截取当前画面并保存到 logs/image/"""
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class If:
     condition: Any  # 表达式节点
     then_body: list = field(default_factory=list)

@@ -53,6 +53,7 @@ from .ast_nodes import (
     Scan,
     # 表达式节点
     SceneRef,
+    Screenshot,
     Try,
     UntilLoop,
     VarRef,
@@ -64,7 +65,7 @@ from .parser import parse_file, parse_text
 __all__ = [
     "parse_file", "parse_text",
     "Program",
-    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log", "Find",
+    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log", "Screenshot", "Find",
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",

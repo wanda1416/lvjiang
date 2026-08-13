@@ -1,7 +1,7 @@
 """批量执行编排器
 
-通用批处理执行器：遍历启用的行，根据配置调用预处理/切换/后处理 wf。
-每个 wf 接收 (batch_table, batch_index, batch_row) 变量。
+通用批处理执行器：按批次/条目生命周期调用 wf。
+控制层只解释标准结果 status/message/state，不理解 state 内的业务字段。
 
 线程模型：单个 BatchWorker(QThread) 串行执行，与主窗口
 “同一时刻仅一个自动化”约束一致。
@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import traceback
 from dataclasses import dataclass
@@ -36,6 +37,14 @@ ST_RUNNING = "运行中"
 ST_SUCCESS = "成功"
 ST_FAILED = "失败"
 ST_SKIPPED = "跳过"
+
+RESULT_SUCCESS = "success"
+RESULT_SKIPPED = "skipped"
+RESULT_FAILED = "failed"
+RESULT_STOPPED = "stopped"
+_RESULT_STATUSES = {
+    RESULT_SUCCESS, RESULT_SKIPPED, RESULT_FAILED, RESULT_STOPPED,
+}
 
 
 @dataclass
@@ -62,6 +71,14 @@ class BatchContext:
     delay_params: dict | None = None
     window_left: int = 0
     window_top: int = 0
+
+
+@dataclass(frozen=True)
+class BatchStageResult:
+    """生命周期 wf 的通用返回结果。state 内容对控制层完全透明。"""
+    status: str = RESULT_SUCCESS
+    message: str = ""
+    state: dict | None = None
 
 
 class BatchWorker(QThread):
@@ -98,7 +115,9 @@ class BatchWorker(QThread):
     # ─── 主循环 ─────────────────────────────────────────
 
     def run(self):
-        summary: dict = {"entries": {}, "stopped": False}
+        summary: dict = {
+            "entries": {}, "stopped": False, "lifecycle": {},
+        }
         total = len(self._enabled_rows)
         self.log.emit(f"[批量] 开始：{total} 行 × "
                       f"{len(self._scripts)} 脚本")
@@ -113,9 +132,34 @@ class BatchWorker(QThread):
         )
         report.start_batch()
 
-        prev_row: dict | None = None
+        batch_state: dict = {}
+        setup = self._run_stage(
+            "batch_setup", self._config.workflows.batch_setup,
+            -1, -1, {}, batch_state,
+        )
+        batch_state = setup.state if setup.state is not None else batch_state
+        summary["lifecycle"]["batch_setup"] = setup.status
+        can_run = setup.status == RESULT_SUCCESS
+        if not can_run:
+            self._stopped = setup.status == RESULT_STOPPED
+            self.log.emit(self._stage_message("批次初始化", setup))
+            for run_idx, (_row_idx, row_data) in enumerate(self._enabled_rows):
+                label = self._format_label(row_data, run_idx)
+                username = self._get_username_from_row(row_data) or ""
+                summary["entries"][label] = {
+                    "prepare": ST_SKIPPED,
+                    "finish": ST_SKIPPED,
+                    "scripts": {s.id: ST_SKIPPED for s in self._scripts},
+                }
+                report.start_entry(label, username)
+                report.record_prepare(ST_SKIPPED)
+                report.end_entry()
+                for script in self._scripts:
+                    self.progress.emit(label, script.id, ST_SKIPPED)
 
         for run_idx, (row_idx, row_data) in enumerate(self._enabled_rows):
+            if not can_run:
+                break
             if self._stop_check():
                 self._stopped = True
                 break
@@ -123,29 +167,35 @@ class BatchWorker(QThread):
             label = self._format_label(row_data, run_idx)
             username = self._get_username_from_row(row_data) or ""
             self.log.emit(f"[批量] ── [{run_idx + 1}/{total}] {label} ──")
-            entry_result: dict = {"switch": ST_SKIPPED, "scripts": {}}
+            entry_result: dict = {
+                "prepare": ST_SKIPPED,
+                "finish": ST_SKIPPED,
+                "scripts": {},
+            }
             summary["entries"][label] = entry_result
 
             report.start_entry(label, username)
 
-            # 1. 调用预处理/切换 wf
-            wf_path = self._choose_switch_wf(row_idx, row_data, prev_row)
-            if wf_path:
-                ok = self._run_switch_wf(wf_path, run_idx, row_data)
-                if not ok:
-                    entry_result["switch"] = ST_FAILED
-                    report.record_switch(ST_FAILED)
-                    report.end_entry()
-                    for s in self._scripts:
-                        entry_result["scripts"][s.id] = ST_SKIPPED
-                        self.progress.emit(label, s.id, ST_SKIPPED)
-                    self.log.emit(f"[批量] {label} 切换失败，跳过该行")
-                    continue
-                entry_result["switch"] = ST_SUCCESS
-                report.record_switch(ST_SUCCESS)
-            else:
-                entry_result["switch"] = ST_SKIPPED
-                report.record_switch(ST_SKIPPED)
+            # 1. 每条统一调用 prepare_item；如何达到目标状态完全由 wf 决定。
+            prepared = self._run_stage(
+                "prepare_item", self._config.workflows.prepare_item,
+                run_idx, row_idx, row_data, batch_state,
+            )
+            batch_state = (prepared.state if prepared.state is not None
+                           else batch_state)
+            prepare_ui_status = self._result_to_ui_status(prepared.status)
+            entry_result["prepare"] = prepare_ui_status
+            report.record_prepare(prepare_ui_status)
+            if prepared.status != RESULT_SUCCESS:
+                report.end_entry()
+                for s in self._scripts:
+                    entry_result["scripts"][s.id] = ST_SKIPPED
+                    self.progress.emit(label, s.id, ST_SKIPPED)
+                self.log.emit(self._stage_message(label, prepared))
+                if prepared.status == RESULT_STOPPED:
+                    self._stopped = True
+                    break
+                continue
 
             # 2. 批量层显式传递用户：按行加载该用户 session，
             #    不触碰全局 active user，与 UI 下拉框彻底无关
@@ -188,8 +238,29 @@ class BatchWorker(QThread):
             if self._stopped:
                 report.finish_pending()
 
+            # 5. 条目收尾收到通用执行摘要，wf 可据此维护私有状态。
+            item_summary = {
+                "prepare": prepared.status,
+                "scripts": {
+                    script_id: self._ui_status_to_result(status)
+                    for script_id, status in entry_result["scripts"].items()
+                },
+            }
+            finished = self._run_stage(
+                "finish_item", self._config.workflows.finish_item,
+                run_idx, row_idx, row_data, batch_state, item_summary,
+            )
+            batch_state = (finished.state if finished.state is not None
+                           else batch_state)
+            finish_ui_status = self._result_to_ui_status(finished.status)
+            entry_result["finish"] = finish_ui_status
+            report.record_finish(finish_ui_status)
+            if finished.status != RESULT_SUCCESS:
+                self.log.emit(self._stage_message(f"{label} 条目收尾", finished))
+            if finished.status == RESULT_STOPPED:
+                self._stopped = True
+
             report.end_entry()
-            prev_row = row_data
 
             if self._stopped:
                 break
@@ -198,11 +269,17 @@ class BatchWorker(QThread):
         tag = "（用户中断）" if self._stopped else ""
         self.log.emit(f"[批量] 全部结束{tag}")
 
-        # 5. 调用后处理 wf（如果定义）
-        postprocess_wf = self._config.workflows.postprocess
-        if postprocess_wf:
-            self.log.emit(f"[批量] 执行后处理: {postprocess_wf}")
-            self._run_switch_wf(postprocess_wf, -1, {})
+        # setup 成功才说明批次现场已经建立，此时才允许执行 teardown。
+        # setup 非 success 时直接终止，不启动任何后续生命周期阶段。
+        if can_run:
+            teardown = self._run_stage(
+                "batch_teardown", self._config.workflows.batch_teardown,
+                -1, -1, {}, batch_state,
+                {"stopped": self._stopped, "entries": summary["entries"]},
+            )
+            summary["lifecycle"]["batch_teardown"] = teardown.status
+            if teardown.status != RESULT_SUCCESS:
+                self.log.emit(self._stage_message("批次收尾", teardown))
 
         # 6. 生成报告
         report.end_batch(stopped=self._stopped)
@@ -216,18 +293,61 @@ class BatchWorker(QThread):
 
         self.finished_all.emit(summary)
 
-    # ─── 切换逻辑 ───────────────────────────────────────
+    # ─── 生命周期协议 ────────────────────────────────────
 
-    def _choose_switch_wf(self, row_idx: int, row_data: dict,
-                          prev_row: dict | None) -> str | None:
-        """选择调用哪个 wf
+    @staticmethod
+    def _normalize_stage_result(value, current_state: dict) -> BatchStageResult:
+        """校验 wf 返回协议；不解析 state 内任何业务字段。"""
+        if value is None:
+            return BatchStageResult(state=current_state)
+        if not isinstance(value, dict):
+            return BatchStageResult(
+                status=RESULT_FAILED,
+                message="生命周期 wf 必须返回 dict 或 null",
+                state=current_state,
+            )
+        status = value.get("status", RESULT_SUCCESS)
+        message = value.get("message", "")
+        state = value.get("state", current_state)
+        if status not in _RESULT_STATUSES:
+            return BatchStageResult(
+                status=RESULT_FAILED,
+                message=f"生命周期 wf 返回了未知 status: {status!r}",
+                state=current_state,
+            )
+        if not isinstance(message, str):
+            message = str(message)
+        if not isinstance(state, dict):
+            return BatchStageResult(
+                status=RESULT_FAILED,
+                message="生命周期 wf 的 state 必须是 dict",
+                state=current_state,
+            )
+        return BatchStageResult(status=status, message=message, state=state)
 
-        - 首行 → preprocess wf
-        - 后续行 → switch wf
-        """
-        if prev_row is None:
-            return self._config.workflows.preprocess or None
-        return self._config.workflows.switch or None
+    @staticmethod
+    def _result_to_ui_status(status: str) -> str:
+        return {
+            RESULT_SUCCESS: ST_SUCCESS,
+            RESULT_SKIPPED: ST_SKIPPED,
+            RESULT_FAILED: ST_FAILED,
+            RESULT_STOPPED: ST_SKIPPED,
+        }.get(status, ST_FAILED)
+
+    @staticmethod
+    def _ui_status_to_result(status: str) -> str:
+        return {
+            ST_SUCCESS: RESULT_SUCCESS,
+            ST_FAILED: RESULT_FAILED,
+            ST_SKIPPED: RESULT_SKIPPED,
+            ST_PENDING: "pending",
+            ST_RUNNING: "running",
+        }.get(status, RESULT_FAILED)
+
+    @staticmethod
+    def _stage_message(label: str, result: BatchStageResult) -> str:
+        text = result.message or result.status
+        return f"[批量] {label}: {text}"
 
     def _format_label(self, row_data: dict, row_idx: int = -1) -> str:
         """格式化行显示标签"""
@@ -268,25 +388,42 @@ class BatchWorker(QThread):
             stop_check=self._stop_check,
         )
 
-    def _run_switch_wf(self, wf_name: str, run_idx: int, row_data: dict) -> bool:
-        """执行切换工作流（预处理/切换/后处理）
-
-        传递变量：batch_table (启用行列表), batch_index (启用行索引), batch_row, 以及行数据的各列
-        """
+    def _run_stage(
+        self,
+        phase: str,
+        wf_name: str,
+        run_idx: int,
+        source_idx: int,
+        row_data: dict,
+        batch_state: dict,
+        item_result: dict | None = None,
+    ) -> BatchStageResult:
+        """执行一个生命周期 wf，并统一校验其返回协议。"""
+        if not wf_name:
+            return BatchStageResult(state=batch_state)
         wf_path = get_resolver().resolve_read(f"workflows/{wf_name}")
         if wf_path is None:
-            self.log.emit(f"[批量] 工作流不存在: {wf_name}")
-            return False
+            return BatchStageResult(
+                status=RESULT_FAILED,
+                message=f"工作流不存在: {wf_name}",
+                state=batch_state,
+            )
 
         engine = self._create_engine()
         engine.session = {}
 
-        # 构建变量：batch_table 为启用行列表（不含禁用行）
+        # 每阶段获得独立工作副本；只有返回协议中的 state 会被调用方提交。
+        # 控制层不读取 state 内部的任何业务字段。
+        working_state = copy.deepcopy(batch_state)
         enabled_rows_list = [row for _, row in self._enabled_rows]
         variables: dict = {
+            "batch_phase": phase,
             "batch_table": enabled_rows_list,
             "batch_index": run_idx,
+            "batch_source_index": source_idx,
             "batch_row": row_data,
+            "batch_state": working_state,
+            "batch_item_result": item_result or {},
         }
         # 展开行数据各列
         for k, v in row_data.items():
@@ -294,11 +431,16 @@ class BatchWorker(QThread):
 
         try:
             engine.execute(wf_path, initial_variables=variables)
-            return True
+            return self._normalize_stage_result(engine.return_value, batch_state)
         except Exception as e:
-            logger.error(f"切换失败 ({self._format_label(row_data, run_idx)}): {e}")
-            self.log.emit(f"[批量] 切换异常: {e}")
-            return False
+            logger.error(
+                f"批量阶段失败 ({phase}, "
+                f"{self._format_label(row_data, run_idx)}): {e}")
+            return BatchStageResult(
+                status=RESULT_FAILED,
+                message=f"工作流异常: {e}",
+                state=batch_state,
+            )
 
     def _run_script(self, script: BatchScript, session: dict, username: str | None) -> dict:
         """执行单个脚本，返回 collect 结果

@@ -4,8 +4,8 @@
 
 数据模型：
 - BatchConfig: 顶层容器，持有多个命名配置 + 当前选中配置名
-- BatchConfigItem: 单个命名配置 = 名字 + 列定义 + 行数据 + 三个 wf 槽位
-- BatchWorkflows: 预处理 / 切换 / 后处理 三个 wf 路径
+- BatchConfigItem: 单个命名配置 = 名字 + 列定义 + 行数据 + 生命周期 wf
+- BatchWorkflows: 批次初始化 / 条目准备 / 条目收尾 / 批次收尾
 
 enabled 状态不在本模块管理，而是存入 session.json 的用户态
 （由 batch_tab 读写），因为它是重度变化的用户态参数。
@@ -20,24 +20,27 @@ from loguru import logger
 
 @dataclass
 class BatchWorkflows:
-    """三个 wf 槽位"""
-    preprocess: str = ""   # 预处理 wf（首次登录 / 账号变化时调用）
-    switch: str = ""       # 切换 wf（同账号切换角色时调用）
-    postprocess: str = ""  # 后处理 wf（可选，当前未使用）
+    """批量任务生命周期 wf 槽位。"""
+    batch_setup: str = ""
+    prepare_item: str = ""
+    finish_item: str = ""
+    batch_teardown: str = ""
 
     def to_dict(self) -> dict:
         return {
-            "preprocess": self.preprocess,
-            "switch": self.switch,
-            "postprocess": self.postprocess,
+            "batch_setup": self.batch_setup,
+            "prepare_item": self.prepare_item,
+            "finish_item": self.finish_item,
+            "batch_teardown": self.batch_teardown,
         }
 
     @staticmethod
     def from_dict(d: dict) -> "BatchWorkflows":
         return BatchWorkflows(
-            preprocess=d.get("preprocess", ""),
-            switch=d.get("switch", ""),
-            postprocess=d.get("postprocess", ""),
+            batch_setup=d.get("batch_setup", ""),
+            prepare_item=d.get("prepare_item", ""),
+            finish_item=d.get("finish_item", ""),
+            batch_teardown=d.get("batch_teardown", ""),
         )
 
 
@@ -47,7 +50,7 @@ class BatchConfigItem:
 
     columns: 列名列表（用户自定义，如 ["account", "phone_tail", "role", "role_index"]）
     rows: 行数据列表，每行是 {col_name: value_str} 字典
-    workflows: 三个 wf 槽位
+    workflows: 批量任务生命周期 wf 槽位
     user_column: 指定哪一列的值作为用户名（用于 session 切换）
     """
     name: str = ""

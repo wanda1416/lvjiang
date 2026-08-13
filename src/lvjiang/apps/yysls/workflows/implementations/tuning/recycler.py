@@ -65,7 +65,7 @@ class TuningRecycler:
         if resets_used >= 1:
             # 重置后进入冷却期，本次工作内不可再重置该件
             logger.info("  本件已重置过一次，冷却期内不再重置")
-            return False
+            return "本件已重置过一次，冷却期内不再重置"
         if resets_used >= cfg.max_resets:
             logger.info(f"  重置次数已达上限（{cfg.max_resets}），不再重置")
             return False

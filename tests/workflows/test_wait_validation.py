@@ -21,14 +21,14 @@ def write_wf(tmp_path, text: str):
 class TestNamedWaitValidation:
     def test_undefined_wait_raises_before_execution(self, tmp_path):
         """顶层 wait 引用未定义参数：加载即报错，log 不会执行"""
-        wf = write_wf(tmp_path, 'log "start"\nwait no_such_wait\n')
+        wf = write_wf(tmp_path, 'log "start"\nwait @no_such_wait\n')
         engine = make_engine()
         with pytest.raises(WorkflowUserError, match="no_such_wait"):
             engine.execute(wf)
 
     def test_defined_wait_passes(self, tmp_path):
         """已定义的命名等待正常执行"""
-        wf = write_wf(tmp_path, 'wait step_interval\n')
+        wf = write_wf(tmp_path, 'wait @step_interval\n')
         engine = make_engine(delay_params={"step_interval": DelayParam(range=(0.0, 0.0))})
         engine.execute(wf)  # 不抛异常
 
@@ -42,10 +42,10 @@ class TestNamedWaitValidation:
         """loop / def 过程体内的未定义引用同样在加载期检出"""
         wf = write_wf(tmp_path, (
             'def p()\n'
-            '    wait proc_wait\n'
+            '    wait @proc_wait\n'
             'end\n'
             'loop 2\n'
-            '    wait loop_wait\n'
+            '    wait @loop_wait\n'
             'end\n'
             'call p()\n'
         ))
@@ -57,7 +57,7 @@ class TestNamedWaitValidation:
 
     def test_wait_clause_desugared_and_validated(self, tmp_path):
         """click ... after wait <name> 语法糖展开后同样校验"""
-        wf = write_wf(tmp_path, 'click (0.5, 0.5) after wait clause_wait\n')
+        wf = write_wf(tmp_path, 'click (0.5, 0.5) after wait @clause_wait\n')
         engine = make_engine()
         with pytest.raises(WorkflowUserError, match="clause_wait"):
             engine.execute(wf)

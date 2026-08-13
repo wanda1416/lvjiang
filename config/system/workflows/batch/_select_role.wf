@@ -45,5 +45,5 @@ def _select_role($role_index)
     eval pause("无法确认已登录至主页，请手动检查后点击确定")
 
     @all_done
-    wait step_interval
+    wait @step_interval
 end

@@ -7,9 +7,10 @@
 - [一、click — 点击](#一click--点击)
 - [二、drag — 拖拽](#二drag--拖拽)
 - [三、wait — 等待](#三wait--等待)
-- [四、align — 面板自对齐](#四align--面板自对齐)
-- [五、screenshot — 截图](#五screenshot--截图)
-- [六、失败语义](#六失败语义)
+- [四、wait stable — 等待画面稳定](#四wait-stable--等待画面稳定)
+- [五、align — 面板自对齐](#五align--面板自对齐)
+- [六、screenshot — 截图](#六screenshot--截图)
+- [七、失败语义](#七失败语义)
 
 ## 一、click — 点击
 
@@ -54,7 +55,7 @@ click [general_action].[actions]              # 点击面板中心（用于点�
 - `[scene].$var`：Area 名在运行时由变量值决定。引擎会先从 `_coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 Area
 - `click (rx, ry)`：**画布归一化坐标模式**。`rx`/`ry ∈ [0,1]`，表示画布内容区域内相对位置。回放时按「窗口偏移 + 画布原点 + 比例 × 画布尺寸」动态反算屏幕坐标，窗口缩放/移动后仍准确。这是录制功能（F8）生成的坐标字面量，可直接剪切复用，与 `scene.area` 引用形式混用
 - `[]` 和 `""` 在非赋值语境等价，都表示静态常量
-- `[scene].[panel][r][c]`：**Panel 三级索引模式**。`r`/`c` 从 1 开始计数。首次执行时自动触发图像自对齐（`align`），缓存格子中心坐标；后续点击直接查缓存。详见 [align](#四align--面板自对齐)
+- `[scene].[panel][r][c]`：**Panel 三级索引模式**。`r`/`c` 从 1 开始计数。首次执行时自动触发图像自对齐（`align`），缓存格子中心坐标；后续点击直接查缓存。详见 [align](#五align--面板自对齐)
 - `[scene].[panel]`：**Panel 中心点击模式**。点击面板中心点，用于点击空白处或重置面板状态
 - `click $var`：**find 结果点击模式**。`$var` 是 `find` 指令产出的 `FoundRegion` 变量，点击其文字中心坐标。变量未定义或不是 find 结果时报错。详见 [04-data-flow.md — find](04-data-flow.md#三find--文字定位)
 
@@ -149,7 +150,7 @@ drag [scene].[point_a] [scene].[point_b]        # 两点之间拖拽
 **语法**：
 
 ```
-wait <delay_name>       # 命名延迟（从延迟配置中读取）
+wait @<delay_name>      # 命名延迟（从延迟配置中读取，@ 前缀必须）
 wait <秒数>             # 固定等待
 wait $var               # 动态等待（变量值为秒数）
 wait (min, max)         # 随机范围等待（在 min~max 秒之间随机取值）
@@ -158,7 +159,7 @@ wait (min, max)         # 随机范围等待（在 min~max 秒之间随机取值
 **示例**：
 
 ```
-wait page_refresh_wait      # 命名延迟（从配置读取）
+wait @page_refresh_wait     # 命名延迟（从配置读取）
 wait 1.5                    # 固定等待 1.5 秒
 wait $interval              # 动态等待，$interval 的值是秒数
 wait (1, 2)                 # 随机等待 1~2 秒
@@ -168,9 +169,51 @@ wait (1, 2)                 # 随机等待 1~2 秒
 
 - `$var` 的值可以是数字（固定等待）或元组 `(min, max)`（随机范围等待）
 - 配合 `eval $var = (min, max)` 或 `default $var = (min, max)` 赋值后使用
-- `wait <delay_name>` 引用的命名延迟必须已在「配置管理 → 等待参数」中定义，否则报错终止（详见[失败语义](#五失败语义)）
+- `wait @<delay_name>` 引用的命名延迟必须已在「配置管理 → 等待参数」中定义，否则报错终止（详见[失败语义](#六失败语义)）
+- 命名延迟必须使用 `@` 前缀，裸标识符（如 `wait page_refresh_wait`）是语法错误
 
-## 四、align — 面板自对齐
+## 四、wait stable — 等待画面稳定
+
+连续截图对比，当画面在指定时长内没有明显变化时，认为「加载完成 / 动画结束」，继续执行下一步。适用于加载时间不确定的场景，替代固定延迟等待。
+
+**语法**：
+
+```
+wait stable <timeout>                                            # 基本形式
+wait stable <timeout> threshold <value>                          # 自定义差异阈值
+wait stable <timeout> interval <value>                           # 自定义截图间隔
+wait stable <timeout> duration <value>                           # 自定义稳定持续时长
+wait stable <timeout> threshold <v> interval <v> duration <v>    # 任意组合
+```
+
+**参数**：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `timeout` | （必填） | 最大等待秒数，超时未稳定则报错终止 |
+| `threshold` | 0.02 | 像素差异率阈值（0~1），低于此值认为「画面没变」 |
+| `interval` | 0.3 | 截图对比间隔秒数 |
+| `duration` | 0.5 | 画面需持续稳定的时长（秒），连续差异低于阈值达到此时长后返回 |
+
+**示例**：
+
+```
+wait stable 5                    # 等待画面稳定，最多 5 秒
+wait stable 3 threshold 0.01     # 严格模式，差异 < 1% 视为稳定
+wait stable 10 interval 0.5      # 每 0.5 秒检测一次，最多等 10 秒
+wait stable 5 duration 1.0       # 画面需连续稳定 1 秒才算完成
+wait stable 10 threshold 0.03 interval 0.5 duration 1.0  # 完整参数
+```
+
+**说明**：
+
+- 工作原理：每 `interval` 秒截图一次，与上一帧计算像素差异率（`cv2.absdiff.mean() / 255`），连续差异低于 `threshold` 的时长达到 `duration` 后返回
+- 超时未稳定时抛出 `WorkflowUserError` 终止工作流
+- 等待期间持续检查停止标志，F10 / 停止按钮可立即中断
+- 所有参数均为字面量数值，不支持变量引用
+- `threshold`、`interval` 和 `duration` 可以任意顺序书写
+
+## 五、align — 面板自对齐
 
 对 Panel 进行图像自对齐，计算实际网格间距并缓存格子中心坐标。
 
@@ -200,7 +243,7 @@ click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 - 对齐算法基于方差分析，自动检测网格间距
 - 详见 [02-concepts.md — 自对齐机制](02-concepts.md#自对齐机制)
 
-## 五、screenshot — 截图
+## 六、screenshot — 截图
 
 截取当前画面并保存到 `logs/image/` 目录，用于调试和记录。
 
@@ -226,7 +269,7 @@ click [equip_detail].[confirm]
 - 日志输出保存的文件名，便于事后查找
 - 截图失败时仅记录警告，不中断执行
 
-## 六、失败语义
+## 七、失败语义
 
 交互指令的失败按原因分两类，不再混作一谈：
 
@@ -240,7 +283,7 @@ click [equip_detail].[confirm]
 | `$var` 未定义或取到空值 | `click $scene.$area` / `drag $scene.$arrow` |
 | Panel 未在布局中定义 | `click` / `drag` / `align` |
 | Panel 行列索引不是数值、拖拽距离不是数值 | `click` / `drag` |
-| `wait <delay_name>` 的命名延迟未定义 | `wait` |
+| `wait @<delay_name>` 的命名延迟未定义 | `wait` |
 | 拿不到截屏尺寸（截屏后端不可用） | 任何需要换算坐标的指令 |
 
 **运行时状态 → 记日志后跳过**（不是配置问题，脚本本来就要靠它判断边界）：

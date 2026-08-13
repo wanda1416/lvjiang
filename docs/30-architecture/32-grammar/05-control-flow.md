@@ -97,7 +97,7 @@ end
 # 固定次数
 loop 3
     click [equip_tune_detail].[retry]
-    wait step_interval
+    wait @step_interval
 end
 
 # 变量引用（运行时从变量取值）

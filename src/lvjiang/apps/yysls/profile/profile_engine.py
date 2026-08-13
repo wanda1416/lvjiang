@@ -484,7 +484,8 @@ class ProfileEngine(QThread):
 
             computed, new_ts = compute_regen_entry(entry, kd)
 
-            if computed != stored_value or new_ts != updated_at_str:
+            # 仅当整数部分变化时才写入，小数进度通过 updated_at 不变隐式累计
+            if int(computed) != int(stored_value):
                 delta = computed - (stored_value or 0)
                 try:
                     db_upsert(

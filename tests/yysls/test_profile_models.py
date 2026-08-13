@@ -7,6 +7,9 @@ import pytest
 
 from lvjiang.apps.yysls.config.profile_models import (
     ALL_MODELS,
+    DIR_BOTH,
+    DIR_NEG,
+    DIR_POS,
     MODEL_CLASSES,
     MODEL_QUOTA,
     MODEL_REGEN,
@@ -17,8 +20,12 @@ from lvjiang.apps.yysls.config.profile_models import (
     RegenKeyDef,
     StepDef,
     StockKeyDef,
+    SyncTargetDef,
+    format_sync_label,
     parse_key_def,
     parse_steps,
+    parse_sync_key,
+    parse_sync_targets,
 )
 
 # ─── KeyDef 基类 ─────────────────────────────────────────────
@@ -67,7 +74,7 @@ class TestQuotaKeyDef:
         assert kd.period == "week"
         assert kd.cap is None
         assert kd.steps == []
-        assert kd.sync_to == ""
+        assert kd.sync_targets == []
         assert kd.reset_time == "05:00"
 
     def test_from_dict(self):
@@ -88,7 +95,7 @@ class TestQuotaKeyDef:
         assert kd.period == "week"
         assert kd.cap is None
         assert kd.steps == []
-        assert kd.sync_to == ""
+        assert kd.sync_targets == []
         assert kd.reset_time == "05:00"
 
     def test_from_dict_with_steps_and_sync(self):
@@ -97,10 +104,11 @@ class TestQuotaKeyDef:
             "label": "止戈",
             "cap": 4200,
             "steps": [100, 500],
-            "sync_to": "zhige_balance",
+            "sync_targets": [{"key": "stock:zhige_balance", "ratio": 1.0}],
         })
         assert kd.steps == [StepDef(100), StepDef(500)]
-        assert kd.sync_to == "zhige_balance"
+        assert len(kd.sync_targets) == 1
+        assert kd.sync_targets[0].key == "stock:zhige_balance"
 
     def test_from_dict_steps_dict_format_with_source(self):
         """新格式 dict 条目携带来源"""
@@ -110,12 +118,11 @@ class TestQuotaKeyDef:
                 {"value": -900, "source": "打本消耗"},
                 -1100,
             ],
-            "sync_to": "res",
-            "sync_source": "打本掉落",
+            "sync_targets": [{"key": "stock:res", "ratio": 1.0, "source": "打本掉落"}],
             "sources": ["打本", "商店"],
         })
         assert kd.steps == [StepDef(-900, "打本消耗"), StepDef(-1100)]
-        assert kd.sync_source == "打本掉落"
+        assert kd.sync_targets[0].source == "打本掉落"
         assert kd.sources == ["打本", "商店"]
 
     def test_from_dict_steps_non_list(self):
@@ -132,31 +139,31 @@ class TestQuotaKeyDef:
     def test_to_dict_with_steps_and_sync(self):
         kd = QuotaKeyDef(
             key="k", label="l", cap=100,
-            steps=[StepDef(1), StepDef(10)], sync_to="res",
+            steps=[StepDef(1), StepDef(10)],
+            sync_targets=[SyncTargetDef(key="stock:res")],
         )
         d = kd.to_dict()
         # 无 source 的 StepDef 序列化退回纯 int
         assert d["steps"] == [1, 10]
-        assert d["sync_to"] == "res"
+        assert d["sync_targets"] == [{"key": "stock:res"}]
 
     def test_to_dict_steps_with_source(self):
         """有 source 的 StepDef 序列化为 dict"""
         kd = QuotaKeyDef(
             key="k", label="l",
             steps=[StepDef(-900, "打本消耗"), StepDef(-1100)],
-            sync_source="同步来源",
+            sync_targets=[SyncTargetDef(key="stock:res", source="同步来源")],
         )
         d = kd.to_dict()
         assert d["steps"] == [{"value": -900, "source": "打本消耗"}, -1100]
-        assert d["sync_source"] == "同步来源"
+        assert d["sync_targets"] == [{"key": "stock:res", "source": "同步来源"}]
 
     def test_to_dict_default_steps_not_output(self):
         """steps=[] 是默认值，不输出"""
         kd = QuotaKeyDef(key="k", label="l")
         d = kd.to_dict()
         assert "steps" not in d
-        assert "sync_to" not in d
-        assert "sync_source" not in d
+        assert "sync_targets" not in d
         assert "sources" not in d
 
 
@@ -285,3 +292,197 @@ class TestConstants:
         assert "month" in VALID_PERIODS
         assert "season" in VALID_PERIODS
         assert "half_season" in VALID_PERIODS
+
+
+# ─── SyncTargetDef ───────────────────────────────────────────
+
+
+class TestSyncTargetDef:
+    def test_from_raw_dict(self):
+        t = SyncTargetDef.from_raw({"key": "stock:bugan", "ratio": 2.0, "source": "打本"})
+        assert t.key == "stock:bugan"
+        assert t.ratio == 2.0
+        assert t.source == "打本"
+
+    def test_from_raw_str(self):
+        t = SyncTargetDef.from_raw("stock:bugan")
+        assert t.key == "stock:bugan"
+        assert t.ratio == 1.0
+        assert t.source == ""
+
+    def test_from_raw_instance(self):
+        orig = SyncTargetDef(key="stock:x", ratio=0.5)
+        t = SyncTargetDef.from_raw(orig)
+        assert t is orig
+
+    def test_to_dict_minimal(self):
+        t = SyncTargetDef(key="stock:bugan")
+        assert t.to_dict() == {"key": "stock:bugan"}
+
+    def test_to_dict_with_ratio(self):
+        t = SyncTargetDef(key="stock:bugan", ratio=2.0)
+        d = t.to_dict()
+        assert d == {"key": "stock:bugan", "ratio": 2.0}
+
+    def test_to_dict_with_source(self):
+        t = SyncTargetDef(key="stock:bugan", ratio=1.0, source="打本")
+        d = t.to_dict()
+        assert d == {"key": "stock:bugan", "source": "打本"}
+
+    def test_roundtrip(self):
+        orig = SyncTargetDef(key="stock:bugan", ratio=-1.0, source="副本")
+        d = orig.to_dict()
+        restored = SyncTargetDef.from_raw(d)
+        assert restored.key == orig.key
+        assert restored.ratio == orig.ratio
+        assert restored.source == orig.source
+
+    def test_from_raw_direction(self):
+        t = SyncTargetDef.from_raw({"key": "stock:x", "direction": "neg"})
+        assert t.direction == DIR_NEG
+
+    def test_from_raw_direction_default_both(self):
+        t = SyncTargetDef.from_raw({"key": "stock:x"})
+        assert t.direction == DIR_BOTH
+
+    def test_from_raw_direction_invalid_raises(self):
+        with pytest.raises(ValueError, match="无效的同步方向"):
+            SyncTargetDef.from_raw({"key": "stock:x", "direction": "sideways"})
+
+    def test_to_dict_direction_non_default(self):
+        t = SyncTargetDef(key="stock:x", direction=DIR_POS)
+        assert t.to_dict() == {"key": "stock:x", "direction": "pos"}
+
+    def test_to_dict_direction_both_omitted(self):
+        t = SyncTargetDef(key="stock:x", direction=DIR_BOTH)
+        assert "direction" not in t.to_dict()
+
+    def test_roundtrip_with_direction(self):
+        orig = SyncTargetDef(key="stock:x", ratio=-1.0, direction=DIR_NEG, source="兑换")
+        restored = SyncTargetDef.from_raw(orig.to_dict())
+        assert restored == orig
+
+
+# ─── parse_sync_key ─────────────────────────────────────────
+
+
+class TestParseSyncKey:
+    def test_namespaced(self):
+        assert parse_sync_key("stock:bugan") == ("stock", "bugan")
+
+    def test_bare_key(self):
+        assert parse_sync_key("bugan") == ("", "bugan")
+
+    def test_empty(self):
+        assert parse_sync_key("") == ("", "")
+
+    def test_none(self):
+        assert parse_sync_key(None) == ("", "")
+
+    def test_whitespace(self):
+        assert parse_sync_key("  stock : bugan  ") == ("stock", "bugan")
+
+
+# ─── parse_sync_targets ─────────────────────────────────────
+
+
+class TestParseSyncTargets:
+    def test_list_of_dicts(self):
+        targets = parse_sync_targets([
+            {"key": "stock:a", "ratio": 1.0},
+            {"key": "stock:b", "ratio": -1.0},
+        ])
+        assert len(targets) == 2
+        assert targets[0].key == "stock:a"
+        assert targets[1].ratio == -1.0
+
+    def test_list_of_strings(self):
+        targets = parse_sync_targets(["stock:a", "stock:b"])
+        assert len(targets) == 2
+        assert targets[0].key == "stock:a"
+
+    def test_non_list(self):
+        assert parse_sync_targets("invalid") == []
+        assert parse_sync_targets(None) == []
+
+    def test_filters_empty(self):
+        targets = parse_sync_targets([None, "", {"key": "stock:a"}])
+        assert len(targets) == 1
+
+
+# ─── format_sync_label ──────────────────────────────────────
+
+
+class TestFormatSyncLabel:
+    def test_unknown_key_returns_raw(self):
+        """解析失败降级到原始值"""
+        assert format_sync_label("nonexistent_xyz:key_abc") == "nonexistent_xyz:key_abc"
+
+    def test_unknown_bare_key_returns_raw(self):
+        """裸 key 不存在时降级到原始值"""
+        assert format_sync_label("totally_nonexistent_key_xyz") == "totally_nonexistent_key_xyz"
+
+    def test_positive_rendering(self, monkeypatch):
+        """正向渲染：命名空间 key → '模型标签：字段标签'（中文冒号）"""
+        from lvjiang.apps.yysls.config.user_profile import ProfileSchema
+
+        schema = ProfileSchema(keys_by_model={
+            MODEL_QUOTA: [],
+            MODEL_REGEN: [],
+            MODEL_STOCK: [StockKeyDef(key="bugan", label="不肝")],
+        })
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.config.get_profile_config",
+            lambda: schema,
+        )
+        assert format_sync_label("stock:bugan") == "库存：不肝"
+
+
+# ─── KeyDef sync_targets ───────────────────────────────────
+
+
+class TestKeyDefSyncTargets:
+    def test_no_sync(self):
+        kd = KeyDef.from_dict({"key": "k", "label": "l"})
+        assert kd.sync_targets == []
+
+    def test_to_dict_sync_targets(self):
+        kd = KeyDef(
+            key="k", label="l",
+            sync_targets=[SyncTargetDef(key="stock:bugan")],
+        )
+        d = kd.to_dict()
+        assert d["sync_targets"] == [{"key": "stock:bugan"}]
+
+    def test_to_dict_empty_sync_targets_not_output(self):
+        kd = KeyDef(key="k", label="l")
+        d = kd.to_dict()
+        assert "sync_targets" not in d
+
+    def test_regen_from_dict_parses_sync_targets(self):
+        """Regen 模型 from_dict 必须解析 sync_targets（回归）"""
+        kd = RegenKeyDef.from_dict({
+            "key": "tili", "label": "体力",
+            "sync_targets": [{"key": "stock:bugan", "ratio": 0.5}],
+        })
+        assert len(kd.sync_targets) == 1
+        assert kd.sync_targets[0].key == "stock:bugan"
+        assert kd.sync_targets[0].ratio == 0.5
+
+    def test_stock_from_dict_parses_sync_targets(self):
+        """Stock 模型 from_dict 必须解析 sync_targets（回归）"""
+        kd = StockKeyDef.from_dict({
+            "key": "bugan", "label": "不肝",
+            "sync_targets": [{"key": "quota:dihua"}],
+        })
+        assert len(kd.sync_targets) == 1
+        assert kd.sync_targets[0].key == "quota:dihua"
+
+    def test_regen_from_dict_roundtrip(self):
+        """Regen to_dict → from_dict 往返不丢 sync_targets"""
+        kd = RegenKeyDef(
+            key="tili", label="体力",
+            sync_targets=[SyncTargetDef(key="stock:bugan")],
+        )
+        restored = RegenKeyDef.from_dict(kd.to_dict())
+        assert restored.sync_targets == kd.sync_targets

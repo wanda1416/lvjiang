@@ -30,6 +30,9 @@ from PyQt6.QtWidgets import (
 )
 
 from ...config.profile_models import (
+    ALL_MODELS,
+    DIR_BOTH,
+    DIRECTION_LABELS,
     MODEL_LABELS,
     MODEL_QUOTA,
     MODEL_REGEN,
@@ -39,6 +42,8 @@ from ...config.profile_models import (
     RegenKeyDef,
     StepDef,
     StockKeyDef,
+    SyncTargetDef,
+    format_sync_label,
 )
 
 # 模型 TAB 顺序
@@ -84,6 +89,155 @@ def _parse_sources_text(raw: str) -> list[str]:
             seen.add(s)
             result.append(s)
     return result
+
+
+def _format_sync_summary(kd: KeyDef) -> str | None:
+    """sync_targets 摘要片段（三种模型通用），无同步目标时返回 None"""
+    if not kd.sync_targets:
+        return None
+    sync_parts = []
+    for t in kd.sync_targets:
+        label_text = format_sync_label(t.key)
+        ratio_text = f"x{t.ratio:g}" if t.ratio != 1.0 else ""
+        dir_text = f"[{DIRECTION_LABELS[t.direction]}]" if t.direction != DIR_BOTH else ""
+        sync_parts.append(f"{label_text}{ratio_text}{dir_text}")
+    return f"同步:{','.join(sync_parts)}"
+
+class _SyncTargetsWidget(QWidget):
+    """同步目标动态列表编辑器
+
+    每行一个 SyncTargetDef：目标 key 下拉框 + 倍率 spinbox + 来源输入 + 删除按钮。
+    exclude_key_input: 指向正在编辑的 key 输入框，下拉框排除自身，防止自环。
+    """
+
+    def __init__(self, exclude_key_input: QLineEdit | None = None, parent=None):
+        super().__init__(parent)
+        self._exclude_key_input = exclude_key_input
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self._table = QTableWidget()
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels(["目标", "倍率", "方向", "来源", ""])
+        v_header = self._table.verticalHeader()
+        if v_header is not None:
+            v_header.setVisible(False)
+        self._table.setAlternatingRowColors(True)
+
+        header = self._table.horizontalHeader()
+        assert header is not None
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(1, 120)
+        self._table.setColumnWidth(2, 90)
+        self._table.setColumnWidth(3, 120)
+        self._table.setColumnWidth(4, 30)
+
+        layout.addWidget(self._table)
+
+        btn_add = QPushButton("+ 添加同步目标")
+        btn_add.setFixedWidth(120)
+        btn_add.clicked.connect(lambda: self.add_row())
+        layout.addWidget(btn_add)
+
+    def add_row(
+        self,
+        target: SyncTargetDef | None = None,
+    ) -> None:
+        """添加一行同步目标"""
+        row = self._table.rowCount()
+        self._table.setRowCount(row + 1)
+
+        # 目标 key 下拉框（所有模型类型的 key）
+        from ...config import get_profile_config
+        config = get_profile_config()
+
+        combo = QComboBox()
+        combo.addItem("（请选择）", "")
+        exclude = (
+            self._exclude_key_input.text().strip()
+            if self._exclude_key_input else ""
+        )
+        for mt in ALL_MODELS:
+            model_label = MODEL_LABELS.get(mt, mt)
+            for kd in config.get_keys_by_model(mt):
+                if kd.key == exclude:
+                    continue  # 排除自身，防止自环
+                sync_key = f"{mt}:{kd.key}"
+                combo.addItem(f"{model_label}：{kd.label}", sync_key)
+
+        if target:
+            idx = combo.findData(target.key)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        self._table.setCellWidget(row, 0, combo)
+
+        # 倍率
+        ratio_spin = QDoubleSpinBox()
+        ratio_spin.setRange(-999.0, 999.0)
+        ratio_spin.setDecimals(2)
+        ratio_spin.setSingleStep(0.5)
+        ratio_spin.setValue(target.ratio if target else 1.0)
+        self._table.setCellWidget(row, 1, ratio_spin)
+
+        # 方向限定
+        direction_combo = QComboBox()
+        for val, text in DIRECTION_LABELS.items():
+            direction_combo.addItem(text, val)
+        dir_idx = direction_combo.findData(target.direction if target else DIR_BOTH)
+        if dir_idx >= 0:
+            direction_combo.setCurrentIndex(dir_idx)
+        self._table.setCellWidget(row, 2, direction_combo)
+
+        # 来源（可选）
+        source_input = QLineEdit(target.source if target else "")
+        source_input.setPlaceholderText("可选")
+        self._table.setCellWidget(row, 3, source_input)
+
+        # 删除按钮（点击时按 widget 反查行号，避免删行后行号错位）
+        btn_remove = QPushButton("×")
+        btn_remove.setFixedWidth(30)
+        btn_remove.clicked.connect(
+            lambda _checked, b=btn_remove: self._remove_row(self._row_of_widget(b))
+        )
+        self._table.setCellWidget(row, 4, btn_remove)
+
+    def _row_of_widget(self, widget: QWidget) -> int:
+        """反查指定 cell widget 所在行（QTableWidget.row 只接受 QTableWidgetItem）"""
+        for r in range(self._table.rowCount()):
+            if self._table.cellWidget(r, 4) is widget:
+                return r
+        return -1
+
+    def _remove_row(self, row: int) -> None:
+        if row >= 0:
+            self._table.removeRow(row)
+
+    def get_sync_targets(self) -> list[SyncTargetDef]:
+        """收集所有有效的同步目标"""
+        targets: list[SyncTargetDef] = []
+        for row in range(self._table.rowCount()):
+            combo = self._table.cellWidget(row, 0)
+            if not isinstance(combo, QComboBox):
+                continue
+            key = combo.currentData()
+            if not key:
+                continue
+            ratio_spin = self._table.cellWidget(row, 1)
+            direction_combo = self._table.cellWidget(row, 2)
+            source_input = self._table.cellWidget(row, 3)
+            ratio = ratio_spin.value() if isinstance(ratio_spin, QDoubleSpinBox) else 1.0
+            direction = (
+                direction_combo.currentData()
+                if isinstance(direction_combo, QComboBox) else DIR_BOTH
+            )
+            source = source_input.text().strip() if isinstance(source_input, QLineEdit) else ""
+            targets.append(SyncTargetDef(key=key, ratio=ratio, direction=direction, source=source))
+        return targets
+
 
 # QTableWidgetItem.UserRole key：在表格首列存储完整 KeyDef 对象
 _ROLE_KEYDEF = Qt.ItemDataRole.UserRole
@@ -285,10 +439,9 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append("单向增加")
             if kd.steps:
                 parts.append(f"幅度:{_format_steps(kd.steps)}")
-            if kd.sync_to:
-                parts.append(f"同步:{kd.sync_to}")
-            if kd.sync_source:
-                parts.append(f"同步来源:{kd.sync_source}")
+            sync_summary = _format_sync_summary(kd)
+            if sync_summary:
+                parts.append(sync_summary)
             if kd.sources:
                 parts.append(f"来源词表:{','.join(kd.sources)}")
             parts.append(f"重置:{kd.reset_time}")
@@ -308,6 +461,9 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append("展示上限")
             if kd.steps:
                 parts.append(f"幅度:{_format_steps(kd.steps)}")
+            sync_summary = _format_sync_summary(kd)
+            if sync_summary:
+                parts.append(sync_summary)
             if kd.sources:
                 parts.append(f"来源词表:{','.join(kd.sources)}")
             if kd.alert_above:
@@ -323,6 +479,9 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append("展示上限")
             if kd.steps:
                 parts.append(f"幅度:{_format_steps(kd.steps)}")
+            sync_summary = _format_sync_summary(kd)
+            if sync_summary:
+                parts.append(sync_summary)
             if kd.sources:
                 parts.append(f"来源词表:{','.join(kd.sources)}")
             if kd.description:
@@ -402,7 +561,7 @@ class ProfileDefinitionDialog(QDialog):
         dialog = QDialog(self)
         title = "编辑" if existing else "新增"
         dialog.setWindowTitle(f"{title} Key ({MODEL_LABELS[model_type]})")
-        dialog.setMinimumWidth(400)
+        dialog.setMinimumWidth(620)
 
         layout = QFormLayout(dialog)
 
@@ -497,28 +656,6 @@ class ProfileDefinitionDialog(QDialog):
             steps_input.setPlaceholderText("如: -900:打本消耗,-1100 或 1,10:商店")
             layout.addRow("增减幅度:", steps_input)
             widgets["steps"] = steps_input
-
-            # 同步目标 Resource，同行附触发器来源输入框
-            sync_combo = QComboBox()
-            sync_combo.addItem("（不同步）", "")
-            # 加载所有 Stock key 作为同步目标
-            from ...config import get_profile_config
-            res_keys = get_profile_config().get_keys_by_model(MODEL_STOCK)
-            for rk in res_keys:
-                sync_combo.addItem(f"{rk.label} ({rk.key})", rk.key)
-            idx = sync_combo.findData(kd.sync_to)
-            if idx >= 0:
-                sync_combo.setCurrentIndex(idx)
-
-            sync_source_input = QLineEdit(kd.sync_source)
-            sync_source_input.setPlaceholderText("同步触发来源，如: 打本掉落")
-
-            sync_row = QHBoxLayout()
-            sync_row.addWidget(sync_combo, 1)
-            sync_row.addWidget(sync_source_input, 1)
-            layout.addRow("同步到资源:", sync_row)
-            widgets["sync_to"] = sync_combo
-            widgets["sync_source"] = sync_source_input
 
         elif model_type == MODEL_REGEN:
             rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
@@ -626,6 +763,14 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("增减幅度:", steps_input)
             widgets["steps"] = steps_input
 
+        # 同步目标动态列表（三种模型通用，下拉排除自身）
+        sync_targets_widget = _SyncTargetsWidget(exclude_key_input=key_input)
+        if existing and existing.sync_targets:
+            for t in existing.sync_targets:
+                sync_targets_widget.add_row(t)
+        layout.addRow("同步目标:", sync_targets_widget)
+        widgets["sync_targets"] = sync_targets_widget
+
         # 按钮行
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -672,6 +817,15 @@ class ProfileDefinitionDialog(QDialog):
             # 来源词表
             sources_list = _parse_sources_text(widgets["sources"].text())
 
+            # 收集同步目标（三种模型通用）
+            sync_targets_list = widgets["sync_targets"].get_sync_targets()
+
+            # 禁止同步目标指向自身（兼容：行已存在时 key 被改名的情况）
+            self_sync_key = f"{model_type}:{key}"
+            if any(t.key == self_sync_key for t in sync_targets_list):
+                error_label.setText("同步目标不能指向自身")
+                return
+
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
                 cap_val = widgets["cap"].value()
@@ -680,19 +834,15 @@ class ProfileDefinitionDialog(QDialog):
                 if steps_list is None:
                     error_label.setText(steps_err)
                     return
-                # 解析 sync_to 与同步触发来源
-                sync_to_val = widgets["sync_to"].currentData() or ""
-                sync_source_val = widgets["sync_source"].text().strip()
                 kd = QuotaKeyDef(
                     key=key, label=label,
                     sources=sources_list,
+                    sync_targets=sync_targets_list,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),
                     steps=steps_list,
-                    sync_to=sync_to_val,
-                    sync_source=sync_source_val,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
                     increment_only=widgets["increment_only"].isChecked(),
@@ -707,6 +857,7 @@ class ProfileDefinitionDialog(QDialog):
                 kd = RegenKeyDef(
                     key=key, label=label,
                     sources=sources_list,
+                    sync_targets=sync_targets_list,
                     cap=widgets["cap"].value(),
                     show_cap=widgets["show_cap"].isChecked(),
                     regen_period=widgets["regen_period"].currentData(),
@@ -726,6 +877,7 @@ class ProfileDefinitionDialog(QDialog):
                 kd = StockKeyDef(
                     key=key, label=label,
                     sources=sources_list,
+                    sync_targets=sync_targets_list,
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),

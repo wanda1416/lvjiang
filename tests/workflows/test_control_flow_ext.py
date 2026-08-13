@@ -330,3 +330,80 @@ call $r = outer()
 '''
         v = run(code)
         assert v["r"] == "from_inner"
+
+
+class TestCallOutputBinding:
+    """call proc() as $output 语法：获取子过程的 output dict"""
+
+    def test_call_with_output_binding(self):
+        """call proc() as $output 获取子过程的 collect 结果"""
+        code = '''def produce()
+    collect 42 as "value"
+    collect "hello" as "msg"
+end
+call produce() as $out
+'''
+        v = run(code)
+        assert v["out"]["value"] == 42.0
+        assert v["out"]["msg"] == "hello"
+
+    def test_call_with_both_return_and_output(self):
+        """call $result = proc() as $output 同时获取返回值和 output"""
+        code = '''def produce()
+    collect "data" as "info"
+    return -1
+end
+call $r = produce() as $out
+'''
+        v = run(code)
+        assert v["r"] == -1.0
+        assert v["out"]["info"] == "data"
+
+    def test_output_isolation(self):
+        """子过程的 output 不影响调用方"""
+        code = '''def child()
+    collect "child_data" as "key"
+end
+collect "parent_data" as "key"
+call child()
+'''
+        eng = make_engine()
+        eng.variables = {}
+        program = parse_text(code)
+        eng._procs = dict(program.procs)
+        eng._exec_body(program.body)
+        # 调用方的 output 保持不变
+        assert eng.output["key"] == "parent_data"
+
+    def test_output_discarded_without_as(self):
+        """不使用 as $output 时，子过程的 output 被丢弃"""
+        code = '''def produce()
+    collect "data" as "key"
+end
+call produce()
+'''
+        eng = make_engine()
+        eng.variables = {}
+        program = parse_text(code)
+        eng._procs = dict(program.procs)
+        eng._exec_body(program.body)
+        # 调用方的 output 为空（子过程的 output 被丢弃）
+        assert "key" not in eng.output
+
+    def test_nested_call_output(self):
+        """嵌套调用时 output 正确隔离"""
+        code = '''def inner()
+    collect "inner" as "source"
+end
+def outer()
+    collect "outer" as "source"
+    call inner() as $inner_out
+    return $inner_out
+end
+call $result = outer() as $outer_out
+'''
+        v = run(code)
+        # outer 的 return 值是 inner 的 output
+        assert v["result"]["source"] == "inner"
+        # 调用方获取的是 outer 的 output
+        assert v["outer_out"]["source"] == "outer"

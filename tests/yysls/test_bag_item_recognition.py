@@ -75,6 +75,13 @@ EXPECTED_RESULTS = {
 # Panel key
 BAG_PANEL_KEY = "bag_grid"
 
+# 每个格子的匹配分组（默认"调律材料"，个别格子属于其他分组）
+SLOT_GROUPS = {
+    (2, 2): "装备培养",  # 溯玉
+    (2, 4): "装备培养",  # 振玉
+}
+DEFAULT_GROUP = "调律材料"
+
 
 # ─── Fixture ──────────────────────────────────────────────
 
@@ -185,8 +192,9 @@ class TestBagItemRecognition:
         # 裁剪格子
         slot_img = crop_bag_cell(screenshot, cell_bounds)
 
-        # 识别
-        result = recognizer.recognize(slot_img)
+        # 识别（按格子限定匹配分组，避免跨组误匹配）
+        group = SLOT_GROUPS.get((row, col), DEFAULT_GROUP)
+        result = recognizer.recognize(slot_img, group=group)
 
         # 获取期望结果
         expected_name, expected_level = EXPECTED_RESULTS[(row, col)]
@@ -238,7 +246,8 @@ class TestBagItemRecognitionSummary:
                 continue
             cell_bounds = cells[cell_idx]
             slot_img = crop_bag_cell(screenshot, cell_bounds)
-            result = recognizer.recognize(slot_img)
+            group = SLOT_GROUPS.get((row, col), DEFAULT_GROUP)
+            result = recognizer.recognize(slot_img, group=group)
 
             name_ok = result.type == expected_name
             level_ok = (expected_level is None) or (result.real_level == expected_level)

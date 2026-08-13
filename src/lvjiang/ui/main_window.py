@@ -890,7 +890,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     # ─── 快捷键 + 关闭 ───────────────────────────────────────
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: QKeyEvent):  # type: ignore[override]
         if event.key() == Qt.Key.Key_F9:
             self._on_f9_start()
         elif event.key() == Qt.Key.Key_F10:

@@ -61,7 +61,7 @@ class CaptureOpsMixin:
         """构建预览区右侧采集控制面板（状态区/录制组/截屏/处置组）"""
         self._screen_recorder = None
         self._rec_state = "idle"
-        self._rec_timer = QTimer(self)
+        self._rec_timer = QTimer(self)  # type: ignore[arg-type]
         self._rec_timer.setInterval(500)
         self._rec_timer.timeout.connect(self._refresh_rec_time)
 

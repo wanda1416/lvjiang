@@ -175,8 +175,10 @@ class OCRDialog(QDialog):
 
         self._repl_table = QTableWidget(0, 2)
         self._repl_table.setHorizontalHeaderLabels(["原始文本", "替换为"])
-        self._repl_table.horizontalHeader().setStretchLastSection(True)
-        self._repl_table.horizontalHeader().setSectionResizeMode(
+        header = self._repl_table.horizontalHeader()
+        assert header is not None
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(
             0, QHeaderView.ResizeMode.Stretch
         )
         self._repl_table.cellChanged.connect(self._on_repl_cell_changed)
@@ -202,8 +204,10 @@ class OCRDialog(QDialog):
 
         self._pattern_table = QTableWidget(0, 2)
         self._pattern_table.setHorizontalHeaderLabels(["正则表达式", "替换为"])
-        self._pattern_table.horizontalHeader().setStretchLastSection(True)
-        self._pattern_table.horizontalHeader().setSectionResizeMode(
+        header = self._pattern_table.horizontalHeader()
+        assert header is not None
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(
             0, QHeaderView.ResizeMode.Stretch
         )
         self._pattern_table.cellChanged.connect(self._on_pattern_cell_changed)

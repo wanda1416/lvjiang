@@ -63,6 +63,7 @@ class PoiPanelMixin:
         self._point_list.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
         # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._point_list.horizontalHeader()
+        assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
@@ -72,7 +73,9 @@ class PoiPanelMixin:
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         strip_focus_rect(self._point_list)
-        self._point_list.verticalHeader().setVisible(False)
+        vheader = self._point_list.verticalHeader()
+        assert vheader is not None
+        vheader.setVisible(False)
         self._point_list.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_point_selection(row))
         self._point_list.cellDoubleClicked.connect(self._on_edit_point_from_table)
         self._point_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -102,13 +105,17 @@ class PoiPanelMixin:
         self._arrow_list = QTableWidget()
         self._arrow_list.setColumnCount(2)
         self._arrow_list.setHorizontalHeaderLabels(["Key", "方向"])
-        self._arrow_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self._arrow_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header = self._arrow_list.horizontalHeader()
+        assert header is not None
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self._arrow_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._arrow_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._arrow_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         strip_focus_rect(self._arrow_list)
-        self._arrow_list.verticalHeader().setVisible(False)
+        vheader = self._arrow_list.verticalHeader()
+        assert vheader is not None
+        vheader.setVisible(False)
         self._arrow_list.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_arrow_selection(row))
         self._arrow_list.cellDoubleClicked.connect(self._on_edit_arrow_from_table)
         self._arrow_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -436,7 +443,7 @@ class PoiPanelMixin:
 
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
         """
-        dialog = QDialog(self)
+        dialog = QDialog(self)  # type: ignore[arg-type]
         dialog.setWindowTitle("新建坐标" if point_def is None else "编辑坐标")
         form = QFormLayout(dialog)
 

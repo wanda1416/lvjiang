@@ -385,7 +385,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         h, w = rgb.shape[:2]
         self._img_w = w
         self._img_h = h
-        qimg = QImage(rgb.data, w, h, w * 3, QImage.Format.Format_RGB888).copy()
+        qimg = QImage(bytes(rgb.data), w, h, w * 3, QImage.Format.Format_RGB888).copy()
         self._pixmap = QPixmap.fromImage(qimg)
         self._original_image = image  # 保存原始 numpy 数组，供 OCR 使用
         self._zoom = 1.0  # 新图片时重置缩放
@@ -417,7 +417,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     # ─── 绘制 ────────────────────────────────────────────
 
-    def paintEvent(self, event: QPaintEvent):
+    def paintEvent(self, event: QPaintEvent):  # type: ignore[override]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 

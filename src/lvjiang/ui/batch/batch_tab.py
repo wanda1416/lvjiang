@@ -130,13 +130,17 @@ class BatchTab(QWidget):
 
         self._progress_table = QTableWidget(0, 3)
         self._progress_table.setHorizontalHeaderLabels(["条目", "脚本", "状态"])
-        self._progress_table.horizontalHeader().setStretchLastSection(True)
+        hheader = self._progress_table.horizontalHeader()
+        assert hheader is not None
+        hheader.setStretchLastSection(True)
         self._progress_table.setColumnWidth(0, 100)
         self._progress_table.setColumnWidth(1, 110)
         self._progress_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers
         )
-        self._progress_table.verticalHeader().setVisible(False)
+        vheader = self._progress_table.verticalHeader()
+        assert vheader is not None
+        vheader.setVisible(False)
         layout.addWidget(self._progress_table, stretch=1)
         return widget
 
@@ -352,7 +356,7 @@ class BatchTab(QWidget):
         ids: list[str] = []
         for i in range(self._script_list.count()):
             item = self._script_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
                 cfg = item.data(Qt.ItemDataRole.UserRole)
                 if cfg:
                     ids.append(cfg["id"])
@@ -363,7 +367,7 @@ class BatchTab(QWidget):
         scripts: list[BatchScript] = []
         for i in range(self._script_list.count()):
             item = self._script_list.item(i)
-            if item.checkState() != Qt.CheckState.Checked:
+            if item is None or item.checkState() != Qt.CheckState.Checked:
                 continue
             cfg = item.data(Qt.ItemDataRole.UserRole)
             scripts.append(BatchScript(
@@ -436,7 +440,10 @@ class BatchTab(QWidget):
         """更新进度表中匹配行的状态（由 host 调用）"""
         script_name = script_id
         for i in range(self._script_list.count()):
-            cfg = self._script_list.item(i).data(Qt.ItemDataRole.UserRole)
+            it = self._script_list.item(i)
+            if it is None:
+                continue
+            cfg = it.data(Qt.ItemDataRole.UserRole)
             if cfg and cfg["id"] == script_id:
                 script_name = cfg["name"]
                 break

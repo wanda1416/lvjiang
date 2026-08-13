@@ -22,7 +22,7 @@ class WheelGuard(QObject):
     定制控件类）；滚轮事件交回父级滚动区域，页面滚动不受影响。
     """
 
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
         if (event.type() == QEvent.Type.Wheel
                 and isinstance(obj, (QComboBox, QAbstractSpinBox))):
             # 克隆后沿父链上抛至被接收：页面照常滚动，控件值不变
@@ -80,9 +80,10 @@ class TrimmedLogEdit(QTextEdit):
         self._max_lines = max_lines
         self.setReadOnly(True)
 
-    def append(self, text: str):
+    def append(self, text: str):  # type: ignore[override]
         super().append(text)
         doc = self.document()
+        assert doc is not None
         if doc.blockCount() > self._max_lines:
             cursor = self.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.Start)

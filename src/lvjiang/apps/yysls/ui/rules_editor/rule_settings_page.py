@@ -172,8 +172,12 @@ class RuleSettingsPage(QWidget):
     @staticmethod
     def _fix_table_height(table: QTableWidget, rows: int):
         """表格默认展示区固定为 rows 行高（超出行数走滚动条）"""
-        header_h = table.horizontalHeader().sizeHint().height()
-        row_h = table.verticalHeader().defaultSectionSize()
+        hheader = table.horizontalHeader()
+        assert hheader is not None
+        header_h = hheader.sizeHint().height()
+        vheader = table.verticalHeader()
+        assert vheader is not None
+        row_h = vheader.defaultSectionSize()
         table.setFixedHeight(
             header_h + row_h * rows + 2 * table.frameWidth())
 

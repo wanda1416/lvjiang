@@ -9,6 +9,7 @@ from loguru import logger
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal.base import (
     BagTraversal,
 )
+from lvjiang.workflows.align import GridAlignment
 
 if TYPE_CHECKING:  # pragma: no cover - 仅类型标注，防循环导入
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
@@ -179,7 +180,9 @@ class PositionalTraversal(BagTraversal):
         # 大幅步进（1 行）
         wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
         wf.wait_delay("scroll_settle_wait")
-        alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+        alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+        assert alignment_raw is not None, "对齐失败：alignment 为 None"
+        alignment: GridAlignment = alignment_raw
 
         # 对比现场：三向校验的候选指纹（next 在前沿处不存在）
         next_fp = (fps[first_real_row + 1]
@@ -225,7 +228,9 @@ class PositionalTraversal(BagTraversal):
                     return ScrollState.BOTTOM, alignment.n_rows
                 wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", distance=0.25)
                 wf.wait_delay("scroll_settle_wait")
-                alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+                alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+                assert alignment_raw is not None, "补滚后对齐失败"
+                alignment = alignment_raw
             elif (first_real_row + 1 < len(fps)
                     and nfp == fps[first_real_row + 1]):
                 # 边界守卫：前沿处（first_real_row 为最后一个已知行）无 next
@@ -285,7 +290,9 @@ class PositionalTraversal(BagTraversal):
                     wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up",
                                  distance=0.25)
                     wf.wait_delay("scroll_settle_wait")
-                    alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+                    alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
+                    assert alignment_raw is not None, "漂移补滚后对齐失败"
+                    alignment = alignment_raw
                     continue
                 # 反查无果（前沿无候选/第二行为空/两行都漂移）→ 指纹检测
                 # 的目的只是确认滚动了一行，既然读到了装备就假定步进成立，

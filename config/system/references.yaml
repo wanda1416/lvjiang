@@ -562,4 +562,52 @@ references:
     group: 增益道具
   source: clipboard
   notes: ''
+- file: 货币资产/BF46CE97.png
+  label: 不肝
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/BD1F0404.png
+  label: 长鸣珠
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/182424D9.png
+  label: 宝钱
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/52DCBF30.png
+  label: 长鸣玉
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/3337014D.png
+  label: 宋元通宝
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/73B15299.png
+  label: 河西通宝
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/1410245B.png
+  label: 周元通宝
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
+- file: 货币资产/265F68CE.png
+  label: 不见山墨筹
+  meta:
+    group: 货币资产
+  source: clipboard
+  notes: ''
 match_threshold: 0.35

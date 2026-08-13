@@ -756,6 +756,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 # 重置成功，更新装备状态
                 equip_data.affixes = base_affixes[:1]
                 equip_data.extra_data["affix_count"] = 1
+                # 重置后刷新预期评级（首词条不变，但词条数变化可能影响判定）
+                _, self._expect_rating = self.judge.refresh_expectation(equip_data)
                 return "continue", why, resets_used, 1
             # skip 或 recycle → 直接返回
             return action, why, resets_used, affix_count

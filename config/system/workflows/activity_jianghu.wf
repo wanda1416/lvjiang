@@ -28,8 +28,6 @@
 default $max_refresh = 50
 default $claim_reward = false
 
-$step_interval = (1, 2)
-
 # 目标任务关键词列表
 eval $targets = ["合影", "换装", "情境", "东方", "醉意", "双人"]
 
@@ -59,7 +57,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
    else
       # 不断刷新直到命中目标任务
       loop $max_refresh
-         click [activity_jianghu].$btn after wait $step_interval
+         click [activity_jianghu].$btn after wait step_interval
          scan [activity_jianghu].$label as $hit by contains_any $targets
          if $hit
             log concat("任务 ", $idx, " 刷新命中目标任务")
@@ -110,9 +108,9 @@ log "六个任务刷新处理完成"
 scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
 if $at_haoling
    log "仍在江湖号令页，退回游戏首页"
-   click [activity_jianghu].[back] after wait $step_interval
-   click [school_main].[back] after wait $step_interval
-   click [game_menu_page].[back] after wait $step_interval
+   click [activity_jianghu].[back] after wait step_interval
+   click [school_main].[back] after wait step_interval
+   click [game_menu_page].[back] after wait step_interval
 end
 
 # 领取奖励：动作完成后再次点击任务标签领取
@@ -121,10 +119,10 @@ end
 # 领奖后会弹出一个奖励窗口：末个任务领完即进入收尾，
 # 需多点一次返回先关闭弹窗，收尾才能顺利退回游戏首页
 def claim_reward($label, $idx)
-   click [activity_jianghu].$label after wait $step_interval
+   click [activity_jianghu].$label after wait step_interval
    log concat("任务 ", $idx, " 奖励已领取")
    if $idx equals "6"
-      click [activity_jianghu].[back] after wait $step_interval
+      click [activity_jianghu].[back] after wait step_interval
       log "末个任务领奖弹出奖励窗口，多点一次返回关闭"
    end
 end
@@ -135,26 +133,26 @@ end
 
 # 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
 def action_huanzhuang($label)
-   click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[goto] after wait $step_interval
-   click [waiguan_yigui].[chuanda] after wait $step_interval
-   click [waiguan_yigui].[fangan_1] after wait $step_interval
-   click [waiguan_yigui].[taoyong] after wait $step_interval
-   click [waiguan_yigui].[back_1] after wait $step_interval
-   click [waiguan_yigui].[back_1] after wait $step_interval
-   click [waiguan_yigui].[back_1] after wait $step_interval
+   click [activity_jianghu].$label after wait step_interval
+   click [activity_jianghu].[goto] after wait step_interval
+   click [waiguan_yigui].[chuanda] after wait step_interval
+   click [waiguan_yigui].[fangan_1] after wait step_interval
+   click [waiguan_yigui].[taoyong] after wait step_interval
+   click [waiguan_yigui].[back_1] after wait step_interval
+   click [waiguan_yigui].[back_1] after wait step_interval
+   click [waiguan_yigui].[back_1] after wait step_interval
 end
 
 # 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
 # 退出拍照会落到游戏首页（桌面），拍照结束后主动返回号令页；
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_heying($label, $idx)
-   click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[goto] after wait $step_interval
-   click [general_action].[camera_shot] after wait $step_interval
-   click [general_action].[back] after wait $step_interval
-   click [general_action].[back] after wait $step_interval
-   click [general_action].[back_confirm] after wait $step_interval
+   click [activity_jianghu].$label after wait step_interval
+   click [activity_jianghu].[goto] after wait step_interval
+   click [general_action].[camera_shot] after wait step_interval
+   click [general_action].[back] after wait step_interval
+   click [general_action].[back] after wait step_interval
+   click [general_action].[back_confirm] after wait step_interval
 
    # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward
@@ -168,25 +166,25 @@ end
 # → 情境编辑视图（保存 → 取消按钮出现则点一次 → 等 6s）
 # → 情境基底返回退回号令页 → 号令页连点两次返回回到号令主页面
 def action_qingjing($label)
-   click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[goto] after wait $step_interval
-   click [activity_jianghu].[confirm] after wait $step_interval
-   click [activity_jianghu].[expand_up] after wait $step_interval
-   click [activity_jianghu].[goto_edit_qingjing] after wait $step_interval
+   click [activity_jianghu].$label after wait step_interval
+   click [activity_jianghu].[goto] after wait step_interval
+   click [activity_jianghu].[confirm] after wait step_interval
+   click [activity_jianghu].[expand_up] after wait step_interval
+   click [activity_jianghu].[goto_edit_qingjing] after wait step_interval
 
-   click [waiguan_qingjing].[save] after wait $step_interval
+   click [waiguan_qingjing].[save] after wait step_interval
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
    scan [waiguan_qingjing].[cancel] as $has_cancel by contains "取消"
    if $has_cancel
       log "情境保存弹出取消按钮，点击一次"
-      click [waiguan_qingjing].[cancel] after wait $step_interval
+      click [waiguan_qingjing].[cancel] after wait step_interval
    end
    # 保存生效需时间，固定等 6 秒再退出
    wait 8
 
-   click [waiguan_qingjing].[back] after wait $step_interval
-   click [activity_jianghu].[back] after wait $step_interval
-   click [activity_jianghu].[back] after wait $step_interval
+   click [waiguan_qingjing].[back] after wait step_interval
+   click [activity_jianghu].[back] after wait step_interval
+   click [activity_jianghu].[back] after wait step_interval
 end
 
 # 东方第一枝（看报）：点击任务 → 前往 → 立刻进入表情动作视图
@@ -194,8 +192,8 @@ end
 # → 点第一个选择 → 连点两次返回回到游戏首页（桌面），看报结束后主动返回号令页；
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_dongfang($label, $idx)
-   click [activity_jianghu].$label after wait $step_interval
-   click [activity_jianghu].[goto] after wait $step_interval
+   click [activity_jianghu].$label after wait step_interval
+   click [activity_jianghu].[goto] after wait step_interval
 
    # 整面板扫描动作列表，定位「看报」所在行列
    scan [general_action].[actions] as $acts
@@ -217,12 +215,12 @@ def action_dongfang($label, $idx)
       eval $fc = 3
    end
 
-   click [general_action].[actions][$fr][$fc] after wait $step_interval
+   click [general_action].[actions][$fr][$fc] after wait step_interval
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
-   click [general_action].[choose_1] after wait $step_interval
-   click [general_action].[back] after wait $step_interval
-   click [general_action].[back] after wait $step_interval
+   click [general_action].[choose_1] after wait step_interval
+   click [general_action].[back] after wait step_interval
+   click [general_action].[back] after wait step_interval
 
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward
@@ -245,12 +243,12 @@ end
 # 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
 # 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
 def back_to_menpai()
-   click [game_main_page].[menu] after wait $step_interval
+   click [game_main_page].[menu] after wait step_interval
 
    # 在菜单区域搜索「门派」，可能需要下滑翻页
    find [game_menu_page].[menu] as $found by contains "门派"
    if not $found
-      drag [general_control].[menu_up] after wait $step_interval
+      drag [general_control].[menu_up] after wait step_interval
       find [game_menu_page].[menu] as $found by contains "门派"
    end
    if not $found
@@ -262,7 +260,7 @@ def back_to_menpai()
       log "仍未找到门派，无法前往江湖号令页"
       return -1
    end
-   click $found after wait $step_interval
+   click $found after wait step_interval
 
    call back_to_haoling()
 end
@@ -273,15 +271,15 @@ def back_to_haoling()
    # / 问津（wenjin 视图，入口换成 haoling_3）
    scan [school_main].[haoling] as $haoling_key by contains "江湖号令"
    if $haoling_key
-      click [school_main].$haoling_key after wait $step_interval
+      click [school_main].$haoling_key after wait step_interval
    else
       scan [school_main].[haoling_2] as $haoling_key by contains "号令"
       if $haoling_key
          log "未读到江湖号令，按无门无派处理，改点号令入口"
-         click [school_main].$haoling_key after wait $step_interval
+         click [school_main].$haoling_key after wait step_interval
       else
          log "haoling 与 haoling_2 均未识别，按问津视图改点 haoling_3"
-         click [school_main].[haoling_3] after wait $step_interval
+         click [school_main].[haoling_3] after wait step_interval
       end
    end
 end
@@ -298,5 +296,5 @@ def back_to_haoling_1()
       log "仍未找到江湖号令入口"
       return -1
    end
-   click $found after wait $step_interval
+   click $found after wait step_interval
 end

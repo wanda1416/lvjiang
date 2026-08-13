@@ -1,0 +1,19 @@
+# 主页 → 退出 → 回到登录页
+#
+# 流程：主页点菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
+# 无参数，无返回值。
+
+# 1. 主页 → 菜单
+click [game_main_page].[menu]
+wait (1, 2)
+
+# 2. 菜单 → 退出
+click [game_menu_page].[exit]
+wait (1, 2)
+
+# 3. 二次确认：在 check_right 区域找「登录」按钮
+find [game_main_page].[check_right] as $confirm by contains "登录"
+if $confirm
+    click $confirm
+end
+wait (2, 3)

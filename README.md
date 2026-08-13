@@ -9,7 +9,7 @@
 <p align="left">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue">
   <img alt="GUI" src="https://img.shields.io/badge/GUI-PyQt6-41CD52">
-  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D6">
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6">
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
@@ -76,20 +76,34 @@ lvjiang/
 │   └── apps/                  # 插件注册表
 │       ├── base.py            # AppHooks 数据类
 │       └── yysls/             # 燕云十六声插件
+│           ├── core/          # 材料识别等核心逻辑
 │           ├── equip_parser/  # 装备词条解析
 │           ├── evaluator/     # 评分与规则引擎
 │           ├── workflows/     # 燕云专属工作流与内置函数
-│           └── ui/            # 燕云专属 UI Tab
+│           ├── ui/            # 燕云专属 UI Tab
+│           ├── game_config.py # 游戏规则配置
+│           └── plugin_session.py # 插件会话管理
 ├── android/                   # 安卓独立执行端（Kotlin + Chaquopy 宿主工程）
 ├── config/
-│   ├── system/                # 随版本发布的场景 / 工作流 / 规则配置
-│   └── local/                 # 运行时生成的本地数据（已 .gitignore）
+│   ├── system/                # 随版本发布的配置
+│   │   ├── layouts/           # 布局定义（按名称分目录）
+│   │   ├── scenes/            # 场景定义 YAML
+│   │   ├── workflows/         # 工作流脚本（.wf）
+│   │   ├── references/        # 参考图库
+│   │   ├── app.yaml           # 应用配置
+│   │   ├── layouts.yaml       # 布局索引
+│   │   ├── scenes.yaml        # 场景索引
+│   │   ├── workflows.yaml     # 工作流索引
+│   │   └── references.yaml    # 参考图索引
+│   ├── local/                 # 用户覆盖配置（已 .gitignore）
+│   └── session/               # 运行时会话数据
 ├── data/                      # 材料模板图、scrcpy-server 等资源
 ├── docs/                      # 分层文档（用户指南 / 游戏机制 / 需求 / 架构 / 开发日志 / 进度追踪）
 ├── packaging/                 # PyInstaller 打包配置与脚本
 ├── scripts/                   # 辅助脚本与手动测试
 ├── tests/                     # pytest 测试（按 src 三层结构分包）
 ├── dev.bat                    # Windows 快捷启动脚本
+├── dev.sh                     # macOS 快捷启动脚本
 └── pyproject.toml             # 项目元数据与依赖
 ```
 
@@ -97,7 +111,7 @@ lvjiang/
 
 ## 🔧 环境要求
 
-- **操作系统**：Windows（桌面投屏模式依赖 Win32 API）
+- **操作系统**：Windows（桌面投屏模式依赖 Win32 API）或 macOS 11+（ADB 模式）
 - **Python**：3.10 及以上
 - **游戏侧**：手机端《燕云十六声》，并满足以下任一连接方式：
   - **投屏模式**：PC 端存在可截屏、且支持鼠标点击转发到手机的投屏窗口（以 vivo 自带投屏为参考，不绑定特定品牌）
@@ -120,7 +134,7 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-核心依赖：`PyQt6`、`mss`、`pynput`、`rapidocr-onnxruntime`、`onnxruntime`、`PyYAML`、`pydantic`、`loguru`、`av`（scrcpy 模式的 H.264 解码）。
+核心依赖：`PyQt6`、`mss`、`pynput`、`rapidocr-onnxruntime`、`onnxruntime`、`PyYAML`、`lark`（DSL 解析器）、`loguru`、`av`（scrcpy 模式的 H.264 解码）。
 
 ---
 

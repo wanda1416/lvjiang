@@ -1,11 +1,7 @@
-"""批量执行 Tab —— 多用户 × 多脚本顺序执行
+"""批量执行 Tab — 脚本勾选 + 触发 + 进度
 
-通用层页面（非插件），挂载于主窗口左侧 Tab「日常」之后。
-每个用户轮次：游戏内账号切换（_switch_account.wf）→ 工具侧
-session 切换 → 顺序执行所选脚本。
-
-与宿主交互：run_batch() 启动、request_stop() 停止、
-automation_state_changed 信号刷新按钮状态。
+挂载于主窗口左侧 Tab「批量」。
+条目配置由工具菜单「批量配置」对话框管理，本 Tab 只负责触发与进度展示。
 """
 
 from __future__ import annotations
@@ -13,7 +9,6 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -25,6 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..core.batch_config import BatchConfig, BatchEntry, load_batch_config, save_batch_config
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
@@ -32,7 +28,6 @@ from .batch_runner import (
     ST_SKIPPED,
     ST_SUCCESS,
     BatchScript,
-    BatchUser,
 )
 
 # 状态 → 表格背景色
@@ -70,10 +65,9 @@ class BatchTab(QWidget):
 
         # 宿主状态信号
         host.automation_state_changed.connect(self._on_automation_state)
-        host.user_changed.connect(lambda _: self._refresh_user_list())
 
-        self._refresh_user_list()
         self._refresh_script_list()
+        self._refresh_entry_summary()
 
     # ─── UI 构建 ─────────────────────────────────────────
 
@@ -82,34 +76,17 @@ class BatchTab(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        # ── 用户列表 ──
-        layout.addWidget(self._section_label("执行用户（勾选 & 排序）"))
-
-        self._user_list = QListWidget()
-        self._user_list.setMinimumHeight(90)
-        layout.addWidget(self._user_list)
-
-        btn_row = QHBoxLayout()
-        self._btn_up = QPushButton("↑ 上移")
-        self._btn_up.clicked.connect(lambda: self._move_item(-1))
-        btn_row.addWidget(self._btn_up)
-        self._btn_down = QPushButton("↓ 下移")
-        self._btn_down.clicked.connect(lambda: self._move_item(1))
-        btn_row.addWidget(self._btn_down)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
+        # ── 条目概览 ──
+        self._lbl_summary = QLabel()
+        self._lbl_summary.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
+        layout.addWidget(self._lbl_summary)
 
         # ── 脚本列表 ──
         layout.addWidget(self._section_label("执行脚本（勾选）"))
 
         self._script_list = QListWidget()
-        self._script_list.setMinimumHeight(90)
+        self._script_list.setMaximumHeight(140)
         layout.addWidget(self._script_list)
-
-        # ── 选项 ──
-        self._chk_skip_first = QCheckBox("首个用户跳过切换（已登录）")
-        self._chk_skip_first.setChecked(True)
-        layout.addWidget(self._chk_skip_first)
 
         # ── 执行按钮 ──
         self._btn_run = QPushButton("开始批量执行 (F9)")
@@ -121,12 +98,13 @@ class BatchTab(QWidget):
         layout.addWidget(self._section_label("执行进度"))
 
         self._progress_table = QTableWidget(0, 3)
-        self._progress_table.setHorizontalHeaderLabels(["用户", "脚本", "状态"])
+        self._progress_table.setHorizontalHeaderLabels(["条目", "脚本", "状态"])
         self._progress_table.horizontalHeader().setStretchLastSection(True)
-        self._progress_table.setColumnWidth(0, 90)
+        self._progress_table.setColumnWidth(0, 100)
         self._progress_table.setColumnWidth(1, 110)
         self._progress_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers)
+            QTableWidget.EditTrigger.NoEditTriggers
+        )
         self._progress_table.verticalHeader().setVisible(False)
         layout.addWidget(self._progress_table, stretch=1)
 
@@ -136,42 +114,29 @@ class BatchTab(QWidget):
         label.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
         return label
 
-    # ─── 列表刷新 ─────────────────────────────────────────
+    # ─── 条目概览 ─────────────────────────────────────────
 
-    def _refresh_user_list(self):
-        """刷新用户勾选列表（保留当前勾选与顺序）"""
-        # 记住旧顺序与勾选
-        old_order: list[tuple[str, bool]] = []
-        for i in range(self._user_list.count()):
-            item = self._user_list.item(i)
-            old_order.append((item.data(Qt.ItemDataRole.UserRole),
-                              item.checkState() == Qt.CheckState.Checked))
-        old_map = dict(old_order)
+    def _refresh_entry_summary(self):
+        """刷新条目概览（从 batch_config 读取）"""
+        cfg = load_batch_config()
+        n = len(cfg.entries)
+        if n == 0:
+            self._lbl_summary.setText("暂无执行条目（工具 → 批量配置）")
+        else:
+            accounts = sorted(set(e.account for e in cfg.entries))
+            self._lbl_summary.setText(
+                f"已配置 {n} 个条目（{len(accounts)} 个账号）— 工具 → 批量配置"
+            )
 
-        self._user_list.blockSignals(True)
-        self._user_list.clear()
-        um = self._host._user_manager
-        # 按旧顺序排前，新用户追加
-        names = [n for n, _ in old_order if um.get_user(n)]
-        names += [n for n in um.list_users() if n not in old_map]
-        for name in names:
-            user = um.get_user(name)
-            suffix = ""
-            if user and (user.game_account or user.game_character):
-                suffix = f"（{user.game_account or '?'} / " \
-                         f"{user.game_character or '?'}）"
-            item = QListWidgetItem(f"{name}{suffix}")
-            item.setData(Qt.ItemDataRole.UserRole, name)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            checked = old_map.get(name, False)
-            item.setCheckState(
-                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
-            self._user_list.addItem(item)
-        self._user_list.blockSignals(False)
+    # ─── 脚本列表 ─────────────────────────────────────────
 
-    def _refresh_script_list(self):
+    def _refresh_script_list(self, checked_ids: set[str] | None = None):
         """刷新脚本勾选列表（数据源与日常下拉一致）"""
         from ..workflows.discovery import list_exposed_scripts
+
+        if checked_ids is None:
+            cfg = load_batch_config()
+            checked_ids = set(cfg.script_ids)
 
         self._script_list.blockSignals(True)
         self._script_list.clear()
@@ -183,45 +148,27 @@ class BatchTab(QWidget):
             item = QListWidgetItem(cfg["name"])
             item.setData(Qt.ItemDataRole.UserRole, cfg)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Unchecked)
+            checked = cfg["id"] in checked_ids
+            item.setCheckState(
+                Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+            )
             self._script_list.addItem(item)
         self._script_list.blockSignals(False)
 
-    # ─── 列表操作 ─────────────────────────────────────────
-
-    def _move_item(self, delta: int):
-        """上移/下移当前选中项"""
-        row = self._user_list.currentRow()
-        if row < 0:
-            return
-        new_row = row + delta
-        if new_row < 0 or new_row >= self._user_list.count():
-            return
-        item = self._user_list.takeItem(row)
-        self._user_list.insertItem(new_row, item)
-        self._user_list.setCurrentRow(new_row)
-
-    def _checked_users(self) -> list[BatchUser]:
-        """勾选的用户（按列表顺序）"""
-        um = self._host._user_manager
-        users = []
-        for i in range(self._user_list.count()):
-            item = self._user_list.item(i)
-            if item.checkState() != Qt.CheckState.Checked:
-                continue
-            name = item.data(Qt.ItemDataRole.UserRole)
-            user = um.get_user(name)
-            if user:
-                users.append(BatchUser(
-                    name=user.name,
-                    game_account=user.game_account,
-                    game_character=user.game_character,
-                ))
-        return users
+    def _checked_script_ids(self) -> list[str]:
+        """获取勾选的脚本 ID 列表"""
+        ids: list[str] = []
+        for i in range(self._script_list.count()):
+            item = self._script_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                cfg = item.data(Qt.ItemDataRole.UserRole)
+                if cfg:
+                    ids.append(cfg["id"])
+        return ids
 
     def _checked_scripts(self) -> list[BatchScript]:
-        """勾选的脚本（按列表顺序）"""
-        scripts = []
+        """获取勾选的脚本 BatchScript 列表"""
+        scripts: list[BatchScript] = []
         for i in range(self._script_list.count()):
             item = self._script_list.item(i)
             if item.checkState() != Qt.CheckState.Checked:
@@ -251,45 +198,48 @@ class BatchTab(QWidget):
         self._start_batch()
 
     def _start_batch(self):
-        users = self._checked_users()
+        cfg = load_batch_config()
+        entries = cfg.entries
         scripts = self._checked_scripts()
-        if not users:
-            self._host.append_log("[批量] 请至少勾选一个用户")
+
+        if not entries:
+            self._host.append_log("[批量] 暂无执行条目，请先通过 工具 → 批量配置 添加")
             return
         if not scripts:
             self._host.append_log("[批量] 请至少勾选一个脚本")
             return
 
+        # 保存脚本勾选到 batch_config
+        cfg.script_ids = self._checked_script_ids()
+        save_batch_config(cfg)
+
         # 构建进度表
-        self._build_progress_table(users, scripts)
+        self._build_progress_table(entries, scripts)
         self._set_config_enabled(False)
 
-        ok = self._host.run_batch(
-            users, scripts,
-            skip_first_switch=self._chk_skip_first.isChecked(),
-        )
+        ok = self._host.run_batch(entries, scripts)
         if not ok:
             self._set_config_enabled(True)
 
-    def _build_progress_table(self, users: list[BatchUser],
+    def _build_progress_table(self, entries: list[BatchEntry],
                               scripts: list[BatchScript]):
-        """初始化进度表：用户×脚本 全量行"""
+        """初始化进度表：条目×脚本 全量行"""
         self._progress_table.setRowCount(0)
-        for user in users:
+        for entry in entries:
+            label = f"{entry.account}/{entry.role}"
             for script in scripts:
                 row = self._progress_table.rowCount()
                 self._progress_table.insertRow(row)
                 self._progress_table.setItem(
-                    row, 0, QTableWidgetItem(user.name))
+                    row, 0, QTableWidgetItem(label))
                 self._progress_table.setItem(
                     row, 1, QTableWidgetItem(script.name))
                 status_item = QTableWidgetItem(ST_PENDING)
                 status_item.setBackground(_STATUS_COLORS[ST_PENDING])
                 self._progress_table.setItem(row, 2, status_item)
 
-    def _update_progress(self, username: str, script_id: str, status: str):
-        """更新进度表中匹配行的状态"""
-        # 找脚本显示名
+    def update_progress(self, entry_label: str, script_id: str, status: str):
+        """更新进度表中匹配行的状态（由 host 调用）"""
         script_name = script_id
         for i in range(self._script_list.count()):
             cfg = self._script_list.item(i).data(Qt.ItemDataRole.UserRole)
@@ -300,7 +250,7 @@ class BatchTab(QWidget):
         for row in range(self._progress_table.rowCount()):
             u_item = self._progress_table.item(row, 0)
             s_item = self._progress_table.item(row, 1)
-            if u_item and u_item.text() == username and \
+            if u_item and u_item.text() == entry_label and \
                s_item and s_item.text() == script_name:
                 status_item = QTableWidgetItem(status)
                 color = _STATUS_COLORS.get(status)
@@ -310,13 +260,16 @@ class BatchTab(QWidget):
                 self._progress_table.scrollToItem(status_item)
                 break
 
-    def _on_batch_finished(self, summary: dict):
-        """批量全部结束（主线程）"""
+    def on_batch_finished(self, summary: dict):
+        """批量全部结束（由 host 调用）"""
         self._running = False
         self._set_config_enabled(True)
         self._refresh_run_button("ready")
-        # 刷新用户列表（批量过程中 active_user 可能已变化）
-        self._refresh_user_list()
+
+    def refresh_config(self):
+        """外部配置变更后调用，刷新条目概览 + 脚本勾选"""
+        self._refresh_entry_summary()
+        self._refresh_script_list()
 
     # ─── 状态联动 ─────────────────────────────────────────
 
@@ -342,8 +295,4 @@ class BatchTab(QWidget):
 
     def _set_config_enabled(self, enabled: bool):
         """运行期间锁定配置区域"""
-        self._user_list.setEnabled(enabled)
         self._script_list.setEnabled(enabled)
-        self._btn_up.setEnabled(enabled)
-        self._btn_down.setEnabled(enabled)
-        self._chk_skip_first.setEnabled(enabled)

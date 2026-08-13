@@ -5,9 +5,11 @@ views:
   name: 基底
 - key: users
   name: 切换用户
+- key: login_in
+  name: 已登录
 regions:
 - key: more_user
-  name: 选择用户
+  name: 更多用户
   type: func
   is_text: false
   is_clickable: true
@@ -56,6 +58,18 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: close_btn_1
+  name: 关闭按钮
+  type: func
+  is_text: true
+  is_clickable: true
+  view: login_in
+- key: loading
+  name: 加载中
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: login_in
 points:
 - key: point_1
   name: 点1
@@ -75,8 +89,10 @@ panels:
   cols: 1
   rows: 4
   min_visible: 0.95
+  calibration: even
 - key: user_list
   name: 用户列表
   cols: 1
   rows: 3
   min_visible: 0.95
+  calibration: even

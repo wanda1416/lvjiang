@@ -219,6 +219,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         script_config.triggered.connect(self._open_script_config)
         tools_menu.addAction(script_config)
 
+        batch_settings = QAction("批量配置", self)
+        batch_settings.triggered.connect(self._open_batch_config)
+        tools_menu.addAction(batch_settings)
+
         # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
         registry = get_registry()
         for builder in registry.get("menu_builders", []):
@@ -476,6 +480,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         daily_scroll.setWidget(daily_panel)
         self._left_tabs.addTab(daily_scroll, "日常")
 
+        # ── Tab 2: 批量 ──
+        from .batch_tab import BatchTab
+        self._batch_tab = BatchTab(host=self)
+        self._left_tabs.addTab(self._batch_tab, "批量")
+
         # ── 插件注入的左侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self._left_tabs, "left_tab_builders")
 
@@ -514,6 +523,77 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def append_log(self, text: str):
         """向运行日志面板追加一行消息"""
         self.log_text.append(text)
+
+    # ─── 批处理执行 ───────────────────────────────────────
+
+    def run_batch(self, entries, scripts) -> bool:
+        """启动批量执行，返回是否成功"""
+        if not self._backend_ready():
+            if self._backend == "adb":
+                self.log_text.append("[错误] 请先连接设备")
+            else:
+                self.log_text.append("[错误] 请先定位窗口")
+            return False
+
+        if not self._begin_automation("批量执行"):
+            return False
+
+        layout_name = self._layout_manager.get_active_layout_name()
+        layout = self._layout_manager.load_layout(layout_name)
+        if not layout:
+            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            self._end_automation("批量执行")
+            return False
+
+        if self._backend == "adb":
+            window_left, window_top = 0, 0
+        else:
+            if self._input.background_mode and self._target_window:
+                self._input.target_hwnd = self._target_window["hwnd"]
+            window_left = self._target_window["left"]
+            window_top = self._target_window["top"]
+
+        from .batch_runner import BatchContext, BatchWorker
+
+        ctx = BatchContext(
+            capture=self._capture,
+            ocr=self._ocr,
+            input_ctrl=self._input,
+            layout=layout,
+            input_sim=self._user_config.input_sim,
+            delay_params=self._user_config.delay_params,
+            window_left=window_left,
+            window_top=window_top,
+        )
+
+        worker = BatchWorker(
+            entries=entries,
+            scripts=scripts,
+            ctx=ctx,
+            user_manager=self._user_manager,
+            session_manager=self._session_manager,
+            stop_check=self._is_stopped,
+        )
+
+        # 信号连接：进度 → batch_tab，日志 → log_text
+        worker.progress.connect(self._batch_tab.update_progress)
+        worker.log.connect(self.log_text.append)
+        worker.finished_all.connect(self._batch_tab.on_batch_finished)
+        worker.finished_all.connect(
+            lambda _: self._end_automation("批量执行")
+        )
+
+        self._current_worker = worker
+        worker.start()
+        return True
+
+    def _open_batch_config(self):
+        """工具菜单 → 批量配置：打开配置对话框"""
+        from .batch_config_dialog import BatchConfigDialog
+        dlg = BatchConfigDialog(self)
+        if dlg.exec():
+            # 保存后刷新批量 Tab 的条目概览和脚本勾选
+            self._batch_tab.refresh_config()
 
     # ─── UI 状态持久化（session.json ui_state 节点）────────
 

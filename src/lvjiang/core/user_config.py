@@ -17,21 +17,13 @@ SESSION_FILE = SESSION_PATH
 
 @dataclass
 class User:
-    """用户数据
-
-    game_account / game_character 用于批量执行时的游戏内账号切换：
-    切换工作流在账号/角色选择界面按此名字做 OCR 匹配定位。
-    """
+    """用户数据 — 核心标识，仅用于产出归档与 session 隔离。"""
     name: str
-    game_account: str = ""    # 游戏账号选择界面的账号名（OCR 匹配目标）
-    game_character: str = ""  # 角色选择界面的角色名
     created_at: str = ""      # ISO 格式时间戳
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
-            "game_account": self.game_account,
-            "game_character": self.game_character,
             "created_at": self.created_at,
         }
 
@@ -39,8 +31,6 @@ class User:
     def from_dict(d: dict) -> "User":
         return User(
             name=d.get("name", ""),
-            game_account=d.get("game_account", ""),
-            game_character=d.get("game_character", ""),
             created_at=d.get("created_at", ""),
         )
 
@@ -127,15 +117,12 @@ class UserConfigManager:
         return True
 
     def update_user(self, name: str, **fields) -> bool:
-        """更新用户字段（game_account / game_character），返回是否成功"""
+        """更新用户字段，返回是否成功"""
         user = self._users.get(name)
         if user is None:
             return False
-        for key, value in fields.items():
-            if key in ("game_account", "game_character"):
-                setattr(user, key, str(value).strip())
-        self._save()
-        return True
+        # 当前 User 无可更新字段，保留扩展点
+        return False
 
     def delete_user(self, name: str) -> bool:
         """删除用户，返回是否成功"""

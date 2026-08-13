@@ -468,6 +468,11 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
                 )
             painter.restore()
 
+        # 单区域编辑模式下隐藏 points/arrows/panels，聚焦当前 region
+        if self._field_selected:
+            painter.end()
+            return
+
         # 绘制 point / arrow（在 region 之上）
         self._draw_arrows(painter)
         self._draw_points(painter)

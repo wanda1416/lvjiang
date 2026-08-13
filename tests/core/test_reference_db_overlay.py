@@ -259,3 +259,68 @@ class TestDevModeWrites:
         assert not (system_dir / entry.file).exists()
         sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
         assert sys_doc["references"] == []
+
+
+# ─── meta_schema 输入/输出场景 ────────────────────────
+
+class TestMetaSchemaScope:
+    def test_parse_scope_and_crop(self, layers):
+        _, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
+            {"key": "level", "name": "等级", "scope": "input"},
+            {"key": "levels", "name": "等级区域", "scope": "output",
+             "crop": [0.0, 0.0, 1.0, 0.5]},
+        ]})
+        db = _make_db(layers, dev_mode=False)
+        schema = db.get_meta_schema()
+        assert schema[0].scope == "input"
+        assert schema[0].crop is None
+        assert schema[1].scope == "output"
+        assert schema[1].crop == [0.0, 0.0, 1.0, 0.5]
+
+    def test_missing_or_invalid_scope_defaults_to_input(self, layers):
+        _, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
+            {"key": "a", "name": "A"},
+            {"key": "b", "name": "B", "scope": "bogus"},
+        ]})
+        db = _make_db(layers, dev_mode=False)
+        assert [f.scope for f in db.get_meta_schema()] == ["input", "input"]
+
+    def test_invalid_crop_becomes_none(self, layers):
+        _, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
+            {"key": "r1", "name": "R1", "scope": "output", "crop": [0.0, 0.0, 1.5, 0.5]},
+            {"key": "r2", "name": "R2", "scope": "output", "crop": [0.0, 0.0, 1.0]},
+            {"key": "r3", "name": "R3", "scope": "output", "crop": "abc"},
+        ]})
+        db = _make_db(layers, dev_mode=False)
+        assert all(f.crop is None for f in db.get_meta_schema())
+
+    def test_get_output_fields_filters_valid(self, layers):
+        _, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
+            {"key": "level", "name": "等级", "scope": "input"},
+            {"key": "levels", "name": "等级区域", "scope": "output",
+             "crop": [0.0, 0.0, 1.0, 0.5]},
+            {"key": "bad", "name": "非法", "scope": "output", "crop": [2.0, 0, 1, 1]},
+            {"key": "counts", "name": "数量区域", "scope": "output",
+             "crop": [0.0, 0.5, 1.0, 0.5]},
+        ]})
+        db = _make_db(layers, dev_mode=False)
+        assert [f.key for f in db.get_output_fields()] == ["levels", "counts"]
+
+    def test_save_omits_none_crop(self, layers):
+        _, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        db = _make_db(layers, dev_mode=True)
+        db.set_meta_schema([
+            MetaFieldDef(key="level", name="等级", scope="input"),
+            MetaFieldDef(key="levels", name="等级区域", scope="output",
+                         crop=[0.0, 0.0, 1.0, 0.5]),
+        ])
+        sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
+        fields = {f["key"]: f for f in sys_doc["meta_schema"]}
+        assert "crop" not in fields["level"]           # input 字段不写 crop
+        assert fields["level"]["scope"] == "input"
+        assert fields["levels"]["crop"] == [0.0, 0.0, 1.0, 0.5]

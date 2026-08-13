@@ -2,9 +2,18 @@ version: 1
 meta_schema:
 - key: level
   name: 等级
+  scope: input
   filterable: true
   type: number
   sort_by: desc
+- key: levels
+  name: 等级区域
+  scope: output
+  crop: [0.0, 0.0, 1.0, 0.5]
+- key: counts
+  name: 数量区域
+  scope: output
+  crop: [0.0, 0.5, 1.0, 0.5]
 references:
 - file: 装备培养/475BF859.png
   label: 装备碎片

@@ -371,11 +371,11 @@ class ProfileDefinitionDialog(QDialog):
             widgets["reset_time"] = reset_input
 
         elif model_type == MODEL_REALTIME:
-            kd = existing if isinstance(existing, RealtimeKeyDef) else RealtimeKeyDef()
+            rt_kd = existing if isinstance(existing, RealtimeKeyDef) else RealtimeKeyDef()
 
             cap_spin = QSpinBox()
             cap_spin.setRange(0, 999999)
-            cap_spin.setValue(kd.cap)
+            cap_spin.setValue(rt_kd.cap or 0)
             layout.addRow("上限:", cap_spin)
             widgets["cap"] = cap_spin
 
@@ -383,18 +383,18 @@ class ProfileDefinitionDialog(QDialog):
             regen_spin.setRange(0, 999)
             regen_spin.setDecimals(4)
             regen_spin.setSingleStep(0.01)
-            regen_spin.setValue(kd.regen_rate)
+            regen_spin.setValue(rt_kd.regen_rate)
             regen_spin.setSuffix(" /min")
             layout.addRow("回复速率:", regen_spin)
             widgets["regen_rate"] = regen_spin
 
             daily_spin = QSpinBox()
             daily_spin.setRange(0, 99999)
-            daily_spin.setValue(kd.regen_daily)
+            daily_spin.setValue(rt_kd.regen_daily)
             layout.addRow("每日补充:", daily_spin)
             widgets["regen_daily"] = daily_spin
 
-            reset_input = QLineEdit(kd.reset_time)
+            reset_input = QLineEdit(rt_kd.reset_time)
             reset_input.setFixedWidth(80)
             layout.addRow("重置时刻:", reset_input)
             widgets["reset_time"] = reset_input
@@ -402,7 +402,7 @@ class ProfileDefinitionDialog(QDialog):
             alert_spin = QSpinBox()
             alert_spin.setRange(0, 999999)
             alert_spin.setSpecialValueText("不提醒")
-            alert_spin.setValue(kd.alert_above or 0)
+            alert_spin.setValue(rt_kd.alert_above or 0)
             layout.addRow("提醒阈值:", alert_spin)
             widgets["alert_above"] = alert_spin
 
@@ -410,12 +410,12 @@ class ProfileDefinitionDialog(QDialog):
             pass  # 只有 source，已在通用字段中
 
         elif model_type == MODEL_ACTIVITY:
-            kd = existing if isinstance(existing, ActivityKeyDef) else ActivityKeyDef()
+            act_kd = existing if isinstance(existing, ActivityKeyDef) else ActivityKeyDef()
 
             period_combo = QComboBox()
             for val, text in _PERIOD_OPTIONS:
                 period_combo.addItem(text, val)
-            idx = period_combo.findData(kd.period)
+            idx = period_combo.findData(act_kd.period)
             if idx >= 0:
                 period_combo.setCurrentIndex(idx)
             layout.addRow("周期:", period_combo)
@@ -423,17 +423,17 @@ class ProfileDefinitionDialog(QDialog):
 
             period_cap_spin = QSpinBox()
             period_cap_spin.setRange(0, 999999)
-            period_cap_spin.setValue(kd.period_cap)
+            period_cap_spin.setValue(act_kd.period_cap)
             layout.addRow("周期限额:", period_cap_spin)
             widgets["period_cap"] = period_cap_spin
 
             lifetime_spin = QSpinBox()
             lifetime_spin.setRange(0, 9999999)
-            lifetime_spin.setValue(kd.lifetime_cap)
+            lifetime_spin.setValue(act_kd.lifetime_cap)
             layout.addRow("总上限:", lifetime_spin)
             widgets["lifetime_cap"] = lifetime_spin
 
-            reset_input = QLineEdit(kd.reset_time)
+            reset_input = QLineEdit(act_kd.reset_time)
             reset_input.setFixedWidth(80)
             layout.addRow("重置时刻:", reset_input)
             widgets["reset_time"] = reset_input
@@ -442,7 +442,7 @@ class ProfileDefinitionDialog(QDialog):
             alert_period_spin.setRange(0.0, 1.0)
             alert_period_spin.setDecimals(2)
             alert_period_spin.setSingleStep(0.05)
-            alert_period_spin.setValue(kd.alert_near_period_cap if kd.alert_near_period_cap is not None else 0.0)
+            alert_period_spin.setValue(act_kd.alert_near_period_cap if act_kd.alert_near_period_cap is not None else 0.0)
             alert_period_spin.setSpecialValueText("不提醒")
             layout.addRow("接近周限比例:", alert_period_spin)
             widgets["alert_near_period_cap"] = alert_period_spin
@@ -451,7 +451,7 @@ class ProfileDefinitionDialog(QDialog):
             alert_lifetime_spin.setRange(0.0, 1.0)
             alert_lifetime_spin.setDecimals(2)
             alert_lifetime_spin.setSingleStep(0.05)
-            alert_lifetime_spin.setValue(kd.alert_near_lifetime_cap if kd.alert_near_lifetime_cap is not None else 0.0)
+            alert_lifetime_spin.setValue(act_kd.alert_near_lifetime_cap if act_kd.alert_near_lifetime_cap is not None else 0.0)
             alert_lifetime_spin.setSpecialValueText("不提醒")
             layout.addRow("接近总限比例:", alert_lifetime_spin)
             widgets["alert_near_lifetime_cap"] = alert_lifetime_spin

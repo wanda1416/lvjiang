@@ -14,6 +14,7 @@ from loguru import logger
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 from lvjiang.apps.yysls.evaluator import (
     get_rule_names,
+    judge_equipment_actual,
     judge_equipment_potential,
     summarize_potential,
 )
@@ -142,10 +143,19 @@ class TuningJudge:
 
         行为表评级另经评级提供者按各规则判定语义懒取。
 
-        Returns: (传入规则判定结果, 期望评级 key)。
+        Returns: (传入规则判定结果, 最大预期评级 key)。
         """
         results = self.judge_by_scope(equip_data, "incoming", [])
         _, logs = summarize_potential(results)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         return results, self.expect_key(results)
+
+    def compute_actual_rating(self, equip_data: EquipmentData) -> str | None:
+        """计算装备实际评级（不模拟空槽填充/转律）
+
+        仅在词条满 5 条后调用才有意义。供进度对话框实时显示。
+        """
+        actual_results = judge_equipment_actual(
+            equip_data, self._ctx.judge_configs, self._ctx.judge_rule_keys)
+        return self.expect_key(actual_results)

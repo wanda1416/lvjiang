@@ -13,8 +13,8 @@ from .tuning_rules import TuningRule, get_tuning_rule_manager
 __all__ = [
     "get_tuning_rules", "get_rule_names",
     "is_rule_implemented", "get_tuning_judge",
-    "judge_equipment_potential", "judge_tuning_worthiness",
-    "summarize_potential",
+    "judge_equipment_potential", "judge_equipment_actual",
+    "judge_tuning_worthiness", "summarize_potential",
 ]
 
 
@@ -80,6 +80,44 @@ def judge_equipment_potential(
         judge = GenericTuningJudge(rule, (configs or {}).get(key))
         try:
             res = judge.check_tuning_worthiness(equip)
+        except NotImplementedError:
+            continue
+        results[key] = {
+            "name": rule.name,
+            "rating": res.rating.value,
+            "skipped": res.skipped,
+            "not_applicable": res.not_applicable,
+            "reasons": res.reasons,
+        }
+    return results
+
+
+def judge_equipment_actual(
+    equip, configs: dict[str, dict] | None = None,
+    rule_keys: list[str] | None = None,
+) -> dict[str, dict]:
+    """遍历全部调律规则做实际评级判定（不模拟空槽填充/转律）
+
+    与 judge_equipment_potential 对称，但调用 judge()（partial=False），
+    按装备当前词条状态直接定级，返回各规则结构化实际评级。
+    供进度对话框实时更新显示使用。
+
+    Args:
+        equip: EquipmentData
+        configs: 规则 key → 配置 dict（缺省用默认配置）
+        rule_keys: 仅参与判定的规则 key 列表（None → 全部规则）
+
+    Returns:
+        规则 key → {"name", "rating", "skipped", "not_applicable",
+        "reasons"}（同 judge_equipment_potential 结构）
+    """
+    results: dict[str, dict] = {}
+    for key, rule in get_tuning_rules().items():
+        if rule_keys is not None and key not in rule_keys:
+            continue
+        judge = GenericTuningJudge(rule, (configs or {}).get(key))
+        try:
+            res = judge.judge(equip)
         except NotImplementedError:
             continue
         results[key] = {

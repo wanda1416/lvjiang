@@ -1,4 +1,12 @@
 <resources>
     <!-- 深浅色自适应；引导页自带大标题，系统 ActionBar 只会叠在上面重复一遍应用名 —— 去掉 -->
     <style name="Theme.Lvjiang" parent="Theme.AppCompat.DayNight.NoActionBar" />
+
+    <!-- 透明悬浮层：配置页从悬浮面板打开时叠在游戏画面上，游戏窗口保持
+         可见、进程留在 visible 层不被 LMK 回收（全屏不透明 Activity 会把
+         游戏挤到后台，11GB 设备上游戏秒被杀）。80% 黑底保证表单可读。 -->
+    <style name="Theme.Lvjiang.Translucent">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">#CC000000</item>
+    </style>
 </resources>

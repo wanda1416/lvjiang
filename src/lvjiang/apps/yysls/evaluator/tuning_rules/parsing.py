@@ -17,7 +17,6 @@ from .models import (
     PART_KEYS,
     PCT_OPS,
     QUALITY_PARTS,
-    QUALITY_RANK,
     RATING_KEYS,
     STONE_ACTIONS,
     TIER_KEYS,
@@ -50,8 +49,10 @@ _LEGACY_KEYS = ("variants", "sub_schools", "weapons", "own_attr",
 
 _VALID_QUALITIES = ("gold", "purple", "blue")
 
-# 行为规则的品阶条件额外支持 gold_only（仅金装精确匹配）
-_VALID_RULE_QUALITIES = ("gold", "gold_only", "purple", "blue")
+# 行为规则的品阶条件额外支持 gold_only（仅金装精确匹配）与
+# purple_only（仅紫装精确匹配）
+_VALID_RULE_QUALITIES = ("gold", "gold_only", "purple_only", "purple",
+                         "blue")
 
 
 def _parse_quality_thresholds(raw, where: str,
@@ -366,10 +367,10 @@ def _parse_food_rule(raw, where: str) -> FoodRule:
             f"{where}.min_expect 非法: {expect!r}"
             f"（须为 {list(FOOD_EXPECT_KEYS)}）")
     quality = str(raw.get("min_quality", defaults.min_quality))
-    if quality not in QUALITY_RANK:
+    if quality not in _VALID_QUALITIES:
         raise RuleValidationError(
             f"{where}.min_quality 非法: {quality!r}"
-            f"（须为 {list(QUALITY_RANK)}）")
+            f"（须为 {list(_VALID_QUALITIES)}）")
     food = str(raw.get("food") or "")
     if food and food not in FOOD_LABELS:
         raise RuleValidationError(
@@ -458,8 +459,8 @@ def _parse_behavior_rule(raw, where: str,
             f"{where}.max_quality 非法: {max_quality!r}（须为 "
             f"{list(_VALID_RULE_QUALITIES)}）")
     pct_op, pct = _parse_rule_pct(raw, where)
-    ratings = _parse_rule_ratings(raw, where)
     scope, keys = _parse_judge(raw, where)
+    ratings = _parse_rule_ratings(raw, where, scope)
     first_affix = bool(raw.get("first_affix_only", False))
     if first_affix and not allow_first_affix:
         raise RuleValidationError(
@@ -494,13 +495,20 @@ def _parse_rule_pct(raw: dict, where: str) -> tuple[str, int]:
     return pct_op, pct
 
 
-def _parse_rule_ratings(raw: dict, where: str) -> list[str]:
-    """评级条件解析：ratings 档位集合（自由多选，空/全选 = 不限）
+def _parse_rule_ratings(raw: dict, where: str, scope: str) -> list[str]:
+    """结果条件解析，语义随 judge_scope 分流：
 
+    评级语义：ratings 档位集合（自由多选，空/全选 = 不限）；
     全选归一化为空（不限 = 不取评级，未知评级也命中）；去重
     并按 RATING_KEYS 声明序归一。兼容历史字段 max_rating（≤
     语义）：top → 不限，其余 → 该档及以下的档位集合。
+    自选词条语义（affix）：ratings 存词条名集合，按
+    rule_affix_candidates 词表校验，去重按词表序归一；必须非空
+    （空 = 永不命中的僵尸规则，直接报错）；不做全选归一
+    （全选词条 = 全词条命中，语义不同于不限）。
     """
+    if scope == "affix":
+        return _parse_rule_affix_ratings(raw, where)
     raw_ratings = raw.get("ratings")
     if raw_ratings is not None:
         if not isinstance(raw_ratings, list):
@@ -523,8 +531,25 @@ def _parse_rule_ratings(raw: dict, where: str) -> list[str]:
     return list(RATING_KEYS[:cut + 1])
 
 
+def _parse_rule_affix_ratings(raw: dict, where: str) -> list[str]:
+    """自选词条语义的词条集解析：按 rule_affix_candidates 词表
+    校验（未知词条报错），去重并按词表声明序归一；必须非空
+    （空 = 永不命中的僵尸规则，直接报错）；不做全选归一
+    （全选词条 = 全词条命中，语义不同于不限）。"""
+    raw_ratings = raw.get("ratings")
+    if not isinstance(raw_ratings, list) or not raw_ratings:
+        raise RuleValidationError(
+            f"{where}.ratings: 自选词条语义须至少勾选一个词条")
+    vocab = rule_affix_candidates()
+    bad = [r for r in raw_ratings if r not in vocab]
+    if bad:
+        raise RuleValidationError(
+            f"{where}.ratings 非法: {bad}（须为词条词表内词条名）")
+    return [name for name in vocab if name in raw_ratings]
+
+
 def _parse_judge(raw: dict, where: str) -> tuple[str, list[str]]:
-    """判定语义解析（逐规则声明）：judge_scope 三选一 + judge_rules
+    """判定语义解析（逐规则声明）：judge_scope 四选一 + judge_rules
     key 列表
 
     judge_rules 仅 scope=custom 时允许非空（key 格式校验；是否

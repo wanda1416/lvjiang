@@ -846,6 +846,21 @@ class TestBehaviorSettings:
                               "ratings": ["good"]}]}},      # 评级档位非法
         {"scan": {"rules": [{"action": "recycle",
                               "ratings": "junk"}]}},        # ratings 须为 list
+        {"scan": {"rules": [{"action": "recycle",
+                              "judge_scope": "affix"}]}},
+        # ↑ 自选词条 ratings 禁止为空
+        {"scan": {"rules": [{"action": "recycle",
+                              "judge_scope": "affix",
+                              "ratings": []}]}},          # 空 list 同报错
+        {"scan": {"rules": [{"action": "recycle",
+                              "judge_scope": "affix",
+                              "ratings": ["不存在的词条"]}]}},
+        # ↑ 词条须在词表内
+        {"scan": {"rules": [{"action": "recycle",
+                              "judge_scope": "affix",
+                              "ratings": ["最大外功攻击"],
+                              "judge_rules": ["huiyi_general"]}]}},
+        # ↑ affix 不可声明自选规则
         {"tune": {"max_resets": 4}},                     # 超游戏硬限
         {"tune": {"max_resets": "3"}},                   # 字符串伪整数
         {"tune": {"reset_exhausted_action": "reset"}},   # 转处置非法
@@ -902,6 +917,73 @@ class TestBehaviorSettings:
         calls.clear()
         top_of = _rating("top")
         assert scan.decide("武器", "gold", 90, top_of)[0] == "skip"
+
+    def test_purple_only_quality(self):
+        # purple_only 为精确档：仅紫色命中，金/蓝不命中
+        data = _valid_base()
+        data["behavior"] = {"scan": {"enabled": True, "rules": [
+            {"max_quality": "purple_only", "action": "recycle"},
+        ]}}
+        scan = parse_tuning_base(data).behavior.scan
+        junk = _rating("junk")
+        assert scan.decide("武器", "purple", 50, junk)[0] == "recycle"
+        assert scan.decide("武器", "gold", 50, junk)[0] == "skip"
+        assert scan.decide("武器", "blue", 50, junk)[0] == "skip"
+
+    def test_affix_scope_parsed_and_decide(self):
+        # 自选词条语义：ratings 存词条名（去重），不跑潜力判定，
+        # 按装备词条名匹配；pct/品阶条件仍参与 AND
+        calls: list[str] = []
+
+        def rating_of(scope, keys, _fao=False):
+            calls.append(scope)
+            return "junk"
+
+        data = _valid_base()
+        data["behavior"] = {"scan": {"enabled": True, "rules": [
+            {"parts": ["武器"], "max_quality": "purple_only",
+             "judge_scope": "affix",
+             "ratings": ["最大鸣金攻击", "最大外功攻击",
+                         "最大鸣金攻击"],
+             "pct_op": "ge", "pct": 90, "action": "skip"},
+            {"action": "recycle"},
+        ]}}
+        scan = parse_tuning_base(data).behavior.scan
+        # 去重后剩两项（词表序归一）
+        assert len(scan.rules[0].ratings) == 2
+        assert set(scan.rules[0].ratings) == {
+            "最大鸣金攻击", "最大外功攻击"}
+        # 紫武器含目标词条 + 首词条 ≥90 → 命中跳过（不回收）
+        assert scan.decide("武器", "purple", 95, rating_of,
+                           ["最大鸣金攻击",
+                            "最小外功攻击"])[0] == "skip"
+        assert calls == []  # affix 语义不跑潜力判定
+        # 首词条 pct 不足 → 落回收
+        assert scan.decide("武器", "purple", 80, rating_of,
+                           ["最大鸣金攻击"])[0] == "recycle"
+        # 金装超出 purple_only → 落回收
+        assert scan.decide("武器", "gold", 95, rating_of,
+                           ["最大鸣金攻击"])[0] == "recycle"
+        # 装备无目标词条 → 落回收
+        assert scan.decide("武器", "purple", 95, rating_of,
+                           ["最小外功攻击"])[0] == "recycle"
+
+    def test_affix_scope_first_affix_only(self):
+        # 勾选仅首词条时只判定 affixes[0]：目标词非首不命中
+        data = _valid_base()
+        data["behavior"] = {"scan": {"enabled": True, "rules": [
+            {"judge_scope": "affix", "ratings": ["最大外功攻击"],
+             "first_affix_only": True, "action": "skip"},
+            {"action": "recycle"},
+        ]}}
+        scan = parse_tuning_base(data).behavior.scan
+        junk = _rating("junk")
+        assert scan.decide("武器", "purple", 50, junk,
+                           ["最大外功攻击",
+                            "最小外功攻击"])[0] == "skip"
+        assert scan.decide("武器", "purple", 50, junk,
+                           ["最小外功攻击",
+                            "最大外功攻击"])[0] == "recycle"
 
     def test_tune_decide_defaults_and_full(self):
         # 无命中默认：未满 = 继续调律；词条满 = 结束保留；

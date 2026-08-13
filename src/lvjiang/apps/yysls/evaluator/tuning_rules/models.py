@@ -342,10 +342,14 @@ RATING_RANK = {"junk": 0, "normal": 1, "excellent": 2, "top": 3}
 FOOD_EXPECT_KEYS = ("top", "excellent", "normal")
 # 品阶序与展示名（狗粮规则「品阶 ≥」比较；蓝=不限）
 # 行为规则品阶条件：gold=不限（≤金色即全部），gold_only=仅金装，
-# purple=紫装及以下（≤紫色），blue=蓝装及以下（≤蓝色）
-QUALITY_RANK = {"blue": 0, "purple": 1, "gold": 2, "gold_only": 3}
+# purple_only=仅紫装（精确），purple=紫装及以下（≤紫色），
+# blue=蓝装及以下（≤蓝色）
+QUALITY_RANK = {"blue": 0, "purple": 1, "gold": 2,
+                "gold_only": 3, "purple_only": 4}
 QUALITY_LABELS = {"gold": "金色", "purple": "紫色", "blue": "蓝色",
-                  "gold_only": "仅金色"}
+                  "gold_only": "仅金色", "purple_only": "仅紫色"}
+# 狗粮规则品阶标签（仅含阈值语义的品阶，不含精确匹配品阶）
+_FOOD_QUALITY_LABELS = {"gold": "金色", "purple": "紫色", "blue": "蓝色"}
 # 材料不足时的行为：continue=继续调律（不添加狗粮），skip=跳过该装备
 INSUFFICIENT_ACTIONS = ("continue", "skip")
 INSUFFICIENT_LABELS = {"continue": "继续调律", "skip": "跳过该装备"}
@@ -377,7 +381,7 @@ class FoodRule:
         """条件摘要文本（日志与说明文档）"""
         return (f"首词条≥{self.pct}% 且 期望≥"
                 f"{RATING_LABELS.get(self.min_expect, self.min_expect)} 且 "
-                f"品阶≥{QUALITY_LABELS.get(self.min_quality, self.min_quality)}")
+                f"品阶≥{_FOOD_QUALITY_LABELS.get(self.min_quality, self.min_quality)}")
 
 
 @dataclass
@@ -483,10 +487,11 @@ BEHAVIOR_ACTION_TOOLTIPS = {
     "skip": "跳过该装备：结束保留在背包",
     "tune_full_recycle": "调满后回收：金装专用，跳过狗粮与规则判定，调满5词条后回收",
 }
-# 判定规则语义：预期评级识别用哪个流派规则集
-JUDGE_SCOPES = ("incoming", "all", "custom")
+# 判定语义：预期评级识别用哪个流派规则集；affix=自选词条
+#（不跑潜力判定，判定结果列存词条名，按装备词条名匹配）
+JUDGE_SCOPES = ("incoming", "all", "custom", "affix")
 JUDGE_SCOPE_LABELS = {"incoming": "传入规则", "all": "全部规则",
-                      "custom": "自选规则"}
+                      "custom": "自选规则", "affix": "自选词条"}
 # 首词条初始数值比较方向（le=≤，ge=≥）
 PCT_OPS = ("le", "ge")
 PCT_OP_LABELS = {"le": "≤", "ge": "≥"}
@@ -501,21 +506,24 @@ class BehaviorRule:
     四条件全部满足时命中：
     - parts: 部位集合（QUALITY_PARTS 子集，空 = 不限）；
     - max_quality: 品阶条件（gold = 不限，gold_only = 仅金装，
-      purple/blue = ≤ 该档）；
+      purple_only = 仅紫装（精确），purple/blue = ≤ 该档）；
     - pct_op/pct: 首词条初始数值 cap_pct 比较条件（方向可选：
       le=≤、ge=≥；le 且 pct=100 / ge 且 pct=0 均为不限；
       非不限时识别失败视为不达标）；
-    - ratings: 预期评级档位集合（RATING_KEYS 子集，自由多选；
-      空 = 不限，不取评级；非空时预期评级属于集合内才命中，
-      按本规则声明的判定语义 judge_scope/judge_rules 取各适用
-      规则最高档；无任何适用规则 = 无调律价值，由评级提供者
-      兜底为垃圾档）。
+    - ratings: 结果条件集合，语义随 judge_scope 分流：
+      评级语义（incoming/all/custom）下为预期评级档位集合
+      （RATING_KEYS 子集，自由多选；空 = 不限，不取评级；非空时
+      预期评级属于集合内才命中，按本规则声明的判定语义
+      judge_scope/judge_rules 取各适用规则最高档；无任何适用
+      规则 = 无调律价值，由评级提供者兜底为垃圾档）；
+      自选词条语义（affix）下为词条名集合（解析层保证非空），
+      不跑潜力判定，装备任一条题名属于集合即命中。
     判定语义逐规则声明：incoming=传入规则 / all=全部规则 /
-    custom=自选 judge_rules（仅 custom 可声明）。
-    first_affix_only（仅扫描处置表可声明）：本条规则取评级时
+    custom=自选 judge_rules（仅 custom 可声明）/ affix=自选词条。
+    first_affix_only（仅扫描处置表可声明）：评级语义下取评级时
     只注入首词条（忽略已有其他词条，其余槽视作空槽由潜力
     判定自由填充），避免回收掉非首词条已成垃圾但可重置
-    调律的装备。
+    调律的装备；自选词条语义下只判定装备的首词条。
     """
     parts: list[str] = field(default_factory=list)
     max_quality: str = "gold"
@@ -534,20 +542,27 @@ class BehaviorRule:
                 else self.pct <= 0)
 
     def matches(self, part: str | None, quality: str | None,
-                cap_pct: float | None, rating: str | None) -> bool:
+                cap_pct: float | None, rating: str | None,
+                affix_names: list[str] | None = None) -> bool:
         """四条件 AND 判定（未知部位/品阶/评级仅命中不限条件）
 
         品阶条件：gold=不限（全部匹配），gold_only=仅金装，
-        purple=紫装及以下（≤紫色），blue=蓝装及以下（≤蓝色）。
+        purple_only=仅紫装（精确），purple=紫装及以下（≤紫色），
+        blue=蓝装及以下（≤蓝色）。
         首词条条件：pct_op 方向比较（非不限时识别失败不命中）。
-        评级条件：ratings 空=不限，非空时评级属于集合才命中
+        结果条件按 judge_scope 分流：affix=装备任一条题名属于
+        ratings（first_affix_only 时只判定首词条，ratings 空不命中）；
+        评级语义 ratings 空=不限，非空时评级属于集合才命中
         （未知评级不命中）。
         """
         if self.parts and (part or "") not in self.parts:
             return False
-        # 品阶匹配：gold=不限，gold_only=仅金装，其余 ≤ 语义
+        # 品阶匹配：gold=不限，gold_only/purple_only=精确，其余 ≤ 语义
         if self.max_quality == "gold_only":
             if (quality or "") != "gold":
+                return False
+        elif self.max_quality == "purple_only":
+            if (quality or "") != "purple":
                 return False
         elif self.max_quality != "gold":
             rank = QUALITY_RANK.get(quality or "", -1)
@@ -561,6 +576,15 @@ class BehaviorRule:
                     return False
             elif cap_pct > self.pct:
                 return False
+        if self.judge_scope == "affix":
+            # 自选词条：ratings 存词条名（解析层保证非空），
+            # 装备任一条名属于集合即命中；仅首词条时只看首条
+            if not self.ratings:
+                return False
+            names = affix_names or []
+            if self.first_affix_only:
+                names = names[:1]
+            return any(n in self.ratings for n in names)
         if self.ratings and (rating or "") not in self.ratings:
             return False
         return True
@@ -572,20 +596,27 @@ class BehaviorRule:
             quals = "不限品阶"
         elif self.max_quality == "gold_only":
             quals = "仅金装"
+        elif self.max_quality == "purple_only":
+            quals = "仅紫色"
         else:
             quals = f"品阶≤{QUALITY_LABELS.get(self.max_quality, self.max_quality)}"
         pct = ("首词条不限" if self.pct_unlimited
                else f"首词条{PCT_OP_LABELS.get(self.pct_op, self.pct_op)}"
                     f"{self.pct}%")
-        if self.ratings:
+        if self.judge_scope == "affix":
+            # 自选词条：ratings 存词条名，无词条时不命中
+            names = "/".join(self.ratings) if self.ratings else "未选词条"
+            extra = "，仅首词条" if self.first_affix_only else ""
+            result = f"词条∈{{{names}}}（自选词条{extra}）"
+        elif self.ratings:
             scope = JUDGE_SCOPE_LABELS.get(self.judge_scope, self.judge_scope)
             names = "/".join(RATING_LABELS.get(r, r)
                              for r in RATING_KEYS if r in self.ratings)
             extra = "，仅首词条" if self.first_affix_only else ""
-            ratings = f"评级∈{{{names}}}（按{scope}{extra}）"
+            result = f"评级∈{{{names}}}（按{scope}{extra}）"
         else:
-            ratings = "不限评级"
-        return f"{parts} 且 {quals} 且 {pct} 且 {ratings}"
+            result = "不限评级"
+        return f"{parts} 且 {quals} 且 {pct} 且 {result}"
 
 
 # 评级提供者：(判定语义, 自选规则 key 集, 仅注入首词条) →
@@ -598,16 +629,18 @@ RatingProvider = Callable[[str, list[str], bool], str | None]
 def _first_hit(rules: list[BehaviorRule], part: str | None,
                quality: str | None, cap_pct: float | None,
                rating_of: RatingProvider,
+               affix_names: list[str] | None = None,
                skip: Callable[[BehaviorRule], bool] | None = None,
                ) -> tuple[int, BehaviorRule] | None:
-    """有序规则表首条命中（评级按各规则自身判定语义懒取）"""
+    """有序规则表首条命中（评级按各规则自身判定语义懒取；
+    自选词条语义不跑潜力判定，按 affix_names 词条名匹配）"""
     for idx, rule in enumerate(rules, start=1):
         if skip and skip(rule):
             continue
         rating = (rating_of(rule.judge_scope, rule.judge_rules,
                             rule.first_affix_only)
-                  if rule.ratings else None)
-        if rule.matches(part, quality, cap_pct, rating):
+                  if rule.ratings and rule.judge_scope != "affix" else None)
+        if rule.matches(part, quality, cap_pct, rating, affix_names):
             return idx, rule
     return None
 
@@ -627,11 +660,14 @@ class ScanBehavior:
 
     def decide(self, part: str | None, quality: str | None,
                cap_pct: float | None,
-               rating_of: RatingProvider) -> tuple[str, str]:
+               rating_of: RatingProvider,
+               affix_names: list[str] | None = None,
+               ) -> tuple[str, str]:
         """返回 (动作, 决策说明)；未启用/无命中时为 ("skip", 说明)"""
         if not self.enabled:
             return "skip", "扫描处置未启用 → 跳过该装备"
-        hit = _first_hit(self.rules, part, quality, cap_pct, rating_of)
+        hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
+                         affix_names)
         if hit:
             idx, rule = hit
             label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
@@ -659,7 +695,8 @@ class TuneBehavior:
 
     def decide(self, part: str | None, quality: str | None,
                cap_pct: float | None, rating_of: RatingProvider,
-               full: bool) -> tuple[str, str]:
+               full: bool,
+               affix_names: list[str] | None = None) -> tuple[str, str]:
         """返回 (动作, 决策说明)；无命中默认未满=continue、满=skip"""
         default = (("skip", "词条已满，无行为规则命中 → 跳过该装备")
                    if full else ("continue", "无行为规则命中 → 继续调律"))
@@ -667,6 +704,7 @@ class TuneBehavior:
             return default
         # 词条已满不可再调，continue 动作自动转为 skip
         hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
+                         affix_names,
                          skip=(lambda r: full and r.action == "continue"))
         if hit:
             idx, rule = hit

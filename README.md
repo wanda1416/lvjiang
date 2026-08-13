@@ -22,7 +22,7 @@
 - **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放。
 - **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。
 - **装备评分规则**：可配置的词条上限（cap）、品阶推断、流派权重，支持鸣金 / 通用等评估器。
-- **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/30-architecture/35-workflows/02-auto-tuning.md)）。
+- **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/20-requirements/01-auto-tuning.md)）。
 - **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
 - **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
 - **安卓独立执行端（开发中）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [安卓迁移进度](docs/todo-android.md)）。
@@ -163,7 +163,7 @@ python -m lvjiang -reg yysls
 4. **选择部位与模式**：勾选需要处理的调律部位（武器类 / 防具类），选择批量筛选或精调。
 5. **开始执行**：实时查看画面预览、识别叠加与运行日志。
 
-> 详细业务流程见 [当前装备分析](docs/30-architecture/35-workflows/01-current-equip-analysis.md) 与 [自动调律流程](docs/30-architecture/35-workflows/02-auto-tuning.md)。
+> 详细业务流程见 [当前装备分析](docs/30-architecture/35-workflows/01-current-equip-analysis.md) 与 [自动调律流程](docs/20-requirements/01-auto-tuning.md)。
 
 ---
 

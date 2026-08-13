@@ -29,6 +29,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .....i18n import tr
+
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config.yaml"
 
@@ -57,7 +59,7 @@ class SchoolPanel(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("流派类型"))
+        left_layout.addWidget(QLabel(tr("流派类型")))
 
         self._school_list = QListWidget()
         self._school_list.currentRowChanged.connect(self._on_school_changed)
@@ -65,10 +67,10 @@ class SchoolPanel(QWidget):
         left_layout.addWidget(self._school_list)
 
         btn_layout = QHBoxLayout()
-        self._btn_add = QPushButton("添加")
+        self._btn_add = QPushButton(tr("添加"))
         self._btn_add.clicked.connect(self._on_add_school)
         btn_layout.addWidget(self._btn_add)
-        self._btn_del = QPushButton("删除")
+        self._btn_del = QPushButton(tr("删除"))
         self._btn_del.clicked.connect(self._on_del_school)
         btn_layout.addWidget(self._btn_del)
         left_layout.addLayout(btn_layout)
@@ -80,16 +82,14 @@ class SchoolPanel(QWidget):
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        hint = QLabel(
-            "武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。"
-        )
+        hint = QLabel(tr("武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。"))
         hint.setStyleSheet("color: #888;")
         right_layout.addWidget(hint)
 
         # 第一行：属性（标签后留两字宽，使下拉框与下方主/副武器列对齐）
         row_attr = QHBoxLayout()
         row_attr.setSpacing(28)  # 属性(2字) + 2字间距 = 主武器(3字) + 1字间距
-        row_attr.addWidget(QLabel("属性"))
+        row_attr.addWidget(QLabel(tr("属性")))
         self._combo_attr = QComboBox()
         self._combo_attr.setFixedWidth(100)
         row_attr.addWidget(self._combo_attr)
@@ -101,13 +101,13 @@ class SchoolPanel(QWidget):
         self._combo_main_weapon = QComboBox()
         self._combo_main_weapon.setFixedWidth(100)
         self._edit_main_martial = QLineEdit()
-        self._edit_main_martial.setPlaceholderText("武学名称")
+        self._edit_main_martial.setPlaceholderText(tr("武学名称"))
         self._edit_main_martial.setMaxLength(6)
         self._edit_main_martial.setFixedWidth(100)
         self._combo_sub_weapon = QComboBox()
         self._combo_sub_weapon.setFixedWidth(100)
         self._edit_sub_martial = QLineEdit()
-        self._edit_sub_martial.setPlaceholderText("武学名称")
+        self._edit_sub_martial.setPlaceholderText(tr("武学名称"))
         self._edit_sub_martial.setMaxLength(6)
         self._edit_sub_martial.setFixedWidth(100)
 
@@ -122,10 +122,10 @@ class SchoolPanel(QWidget):
         grid = QGridLayout()
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        grid.addLayout(_pair("主武器", self._combo_main_weapon), 0, 0)
-        grid.addLayout(_pair("主武学", self._edit_main_martial), 0, 1)
-        grid.addLayout(_pair("副武器", self._combo_sub_weapon), 1, 0)
-        grid.addLayout(_pair("副武学", self._edit_sub_martial), 1, 1)
+        grid.addLayout(_pair(tr("主武器"), self._combo_main_weapon), 0, 0)
+        grid.addLayout(_pair(tr("主武学"), self._edit_main_martial), 0, 1)
+        grid.addLayout(_pair(tr("副武器"), self._combo_sub_weapon), 1, 0)
+        grid.addLayout(_pair(tr("副武学"), self._edit_sub_martial), 1, 1)
         right_layout.addLayout(grid)
 
         right_layout.addStretch()
@@ -248,7 +248,7 @@ class SchoolPanel(QWidget):
         if new_name == old_name:
             return
         if not new_name or new_name in self._schools():
-            QMessageBox.warning(self, "无法重命名", "流派名不能为空或与已有流派重名。")
+            QMessageBox.warning(self, tr("无法重命名"), tr("流派名不能为空或与已有流派重名。"))
             self._refresh_list(select=old_name)
             return
         schools = {
@@ -260,14 +260,14 @@ class SchoolPanel(QWidget):
         self._refresh_list(select=new_name)
 
     def _on_add_school(self):
-        name, ok = QInputDialog.getText(self, "添加流派", "流派名称：")
+        name, ok = QInputDialog.getText(self, tr("添加流派"), tr("流派名称："))
         if not ok:
             return
         name = name.strip()
         if not name:
             return
         if name in self._schools():
-            QMessageBox.warning(self, "无法添加", f"流派「{name}」已存在。")
+            QMessageBox.warning(self, tr("无法添加"), tr("流派「{name}」已存在。").format(name=name))
             return
         self._data.setdefault("schools", {})[name] = {}
         self._save_data()
@@ -277,7 +277,7 @@ class SchoolPanel(QWidget):
         name = self._current_school()
         if name is None:
             return
-        ret = QMessageBox.question(self, "确认删除", f"确定删除流派「{name}」？")
+        ret = QMessageBox.question(self, tr("确认删除"), tr("确定删除流派「{name}」？").format(name=name))
         if ret != QMessageBox.StandardButton.Yes:
             return
         self._data.get("schools", {}).pop(name, None)

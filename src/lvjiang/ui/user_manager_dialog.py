@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.user_config import UserConfigManager
+from ..i18n import tr
 
 # ─── 样式常量 ────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ class UserManagerDialog(QDialog):
 
     def __init__(self, user_manager: UserConfigManager, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("用户管理")
+        self.setWindowTitle(tr("用户管理"))
         self.setMinimumSize(720, 480)
         self.resize(760, 520)
 
@@ -144,7 +145,7 @@ class UserManagerDialog(QDialog):
         # ─── 底部按钮行 ───
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()
-        btn_close = QPushButton("关闭")
+        btn_close = QPushButton(tr("关闭"))
         btn_close.setStyleSheet(_STYLE_BTN_GHOST)
         btn_close.clicked.connect(self.accept)
         bottom_row.addWidget(btn_close)
@@ -162,12 +163,12 @@ class UserManagerDialog(QDialog):
         toolbar = QHBoxLayout()
         toolbar.setSpacing(8)
 
-        self._btn_new = QPushButton("＋ 新建用户")
+        self._btn_new = QPushButton(tr("＋ 新建用户"))
         self._btn_new.setStyleSheet(_STYLE_BTN_PRIMARY)
         self._btn_new.clicked.connect(self._on_create_user)
         toolbar.addWidget(self._btn_new)
 
-        self._btn_delete = QPushButton("删除")
+        self._btn_delete = QPushButton(tr("删除"))
         self._btn_delete.setStyleSheet(_STYLE_BTN_DANGER)
         self._btn_delete.setEnabled(False)
         self._btn_delete.clicked.connect(self._on_delete_user)
@@ -218,7 +219,7 @@ class UserManagerDialog(QDialog):
         self._lbl_title.setFont(title_font)
         header_layout.addWidget(self._lbl_title)
 
-        self._badge_active = QLabel("当前用户")
+        self._badge_active = QLabel(tr("当前用户"))
         self._badge_active.setStyleSheet(_STYLE_BADGE_ACTIVE)
         self._badge_active.setVisible(False)
         header_layout.addWidget(self._badge_active)
@@ -235,17 +236,17 @@ class UserManagerDialog(QDialog):
         info_layout.setContentsMargins(20, 16, 20, 16)
         info_layout.setSpacing(10)
 
-        info_layout.addWidget(self._section_title("基本信息"))
+        info_layout.addWidget(self._section_title(tr("基本信息")))
 
         form = QFormLayout()
         form.setHorizontalSpacing(24)
         form.setVerticalSpacing(10)
 
         self._lbl_name = QLabel("-")
-        form.addRow(self._field_label("用户名"), self._lbl_name)
+        form.addRow(self._field_label(tr("用户名")), self._lbl_name)
 
         self._lbl_created = QLabel("-")
-        form.addRow(self._field_label("创建时间"), self._lbl_created)
+        form.addRow(self._field_label(tr("创建时间")), self._lbl_created)
 
         info_layout.addLayout(form)
         layout.addWidget(info_card)
@@ -258,9 +259,9 @@ class UserManagerDialog(QDialog):
         stats_layout.setContentsMargins(20, 16, 20, 16)
         stats_layout.setSpacing(10)
 
-        stats_layout.addWidget(self._section_title("数据统计"))
+        stats_layout.addWidget(self._section_title(tr("数据统计")))
 
-        self._lbl_stats = QLabel("装备数据展示功能开发中...")
+        self._lbl_stats = QLabel(tr("装备数据展示功能开发中..."))
         self._lbl_stats.setStyleSheet("color: #999; font-style: italic;")
         stats_layout.addWidget(self._lbl_stats)
 
@@ -312,7 +313,7 @@ class UserManagerDialog(QDialog):
                 font = item.font()
                 font.setBold(True)
                 item.setFont(font)
-                item.setToolTip("当前用户")
+                item.setToolTip(tr("当前用户"))
             if name == select_name:
                 select_row = row
             self._user_list.addItem(item)
@@ -376,7 +377,7 @@ class UserManagerDialog(QDialog):
     def _on_create_user(self):
         """新建用户"""
         name, ok = QInputDialog.getText(
-            self, "新建用户", "请输入用户名：",
+            self, tr("新建用户"), tr("请输入用户名："),
         )
         if not ok or not name:
             return
@@ -388,7 +389,7 @@ class UserManagerDialog(QDialog):
             self._refresh_user_list(select_name=name)
             logger.info(f"用户已创建: {name}")
         else:
-            QMessageBox.warning(self, "失败", "用户名已存在或为空")
+            QMessageBox.warning(self, tr("失败"), tr("用户名已存在或为空"))
 
     def _on_delete_user(self):
         """删除用户"""
@@ -397,8 +398,8 @@ class UserManagerDialog(QDialog):
             return
 
         reply = QMessageBox.question(
-            self, "确认删除",
-            f"确定要删除用户「{name}」吗？\n该用户的所有数据将被清除，此操作不可恢复。",
+            self, tr("确认删除"),
+            tr("确定要删除用户「{name}」吗？\n该用户的所有数据将被清除，此操作不可恢复。").format(name=name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -408,5 +409,5 @@ class UserManagerDialog(QDialog):
             self._refresh_user_list(select_name="")
             logger.info(f"用户已删除: {name}")
         else:
-            QMessageBox.warning(self, "失败", "无法删除该用户")
+            QMessageBox.warning(self, tr("失败"), tr("无法删除该用户"))
 

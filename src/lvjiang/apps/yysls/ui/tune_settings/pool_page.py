@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .....i18n import tr
+
 from .affix_picker import AffixSelectSortDialog
 
 
@@ -61,7 +63,7 @@ class _AffixListBox(QWidget):
         layout.addWidget(self._list, 1)
 
         btn_col = QVBoxLayout()
-        btn_edit = QPushButton("编辑")
+        btn_edit = QPushButton(tr("编辑"))
         btn_edit.clicked.connect(self._edit)
         btn_col.addWidget(btn_edit)
         btn_col.addStretch()
@@ -85,7 +87,7 @@ class _AffixListBox(QWidget):
 
     def _edit(self):
         dlg = AffixSelectSortDialog(self._candidates, self.get_names(),
-                                    f"选择{self._title}词条", self)
+                                    tr("选择{title}词条").format(title=self._title), self)
         if dlg.exec():
             # 对话框内已完成选择与拖拽排序，直接采用其返回顺序写回
             self._list.clear()
@@ -110,23 +112,23 @@ class PoolPage(QWidget):
         layout = QVBoxLayout(self)
 
         # ── 转律词条库 ──
-        prio_box = QGroupBox("转律词条库（全局，优先级从高到低）")
+        prio_box = QGroupBox(tr("转律词条库（全局，优先级从高到低）"))
         prio_layout = QVBoxLayout(prio_box)
         self._prio_list = _AffixListBox(
-            self._candidates, self._apply, "转律词条库", rows=7)
+            self._candidates, self._apply, tr("转律词条库"), rows=7)
         prio_layout.addWidget(self._prio_list)
         layout.addWidget(prio_box)
 
         # ── 可用词条库（填满剩余高度）──
-        pool_box = QGroupBox("可用词条库（全局，各部位词条混放）")
+        pool_box = QGroupBox(tr("可用词条库（全局，各部位词条混放）"))
         pool_layout = QVBoxLayout(pool_box)
         self._pool_list = _AffixListBox(
-            self._candidates, self._apply, "可用词条库", rows=7, fill=True)
+            self._candidates, self._apply, tr("可用词条库"), rows=7, fill=True)
         pool_layout.addWidget(self._pool_list, 1)
         note = QLabel(
-            "可用词条库为全局价值序（越靠前越优先保留与填充）；"
-            "武学增伤不在此填写——玩法指定武器的武学增伤自动视为"
-            "最高优先级，未指定时按垃圾词条处理。")
+            tr("可用词条库为全局价值序（越靠前越优先保留与填充）；"
+               "武学增伤不在此填写——玩法指定武器的武学增伤自动视为"
+               "最高优先级，未指定时按垃圾词条处理。"))
         note.setWordWrap(True)
         note.setStyleSheet("color: gray; font-size: 12px;")
         pool_layout.addWidget(note)

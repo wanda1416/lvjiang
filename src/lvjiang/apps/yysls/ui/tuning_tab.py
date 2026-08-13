@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ....i18n import tr
 from ..tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 from .tune_config_widget import TuningConfigWidget, TuningGlobalsWidget
 
@@ -62,7 +63,7 @@ class TuningTab(QWidget):
         tab_layout.setContentsMargins(8, 8, 8, 8)
         tab_layout.setSpacing(8)
 
-        self.btn_run_tuning = QPushButton("开始调律 (F9)")
+        self.btn_run_tuning = QPushButton(tr("开始调律 (F9)"))
         self.btn_run_tuning.clicked.connect(self.f9_run)
         self.btn_run_tuning.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
@@ -72,20 +73,20 @@ class TuningTab(QWidget):
         # 进度对话框控制行：复选框 + 按钮
         progress_row = QHBoxLayout()
         progress_row.setContentsMargins(0, 0, 0, 0)
-        self._cb_auto_progress = QCheckBox("自动打开调律进度")
+        self._cb_auto_progress = QCheckBox(tr("自动打开调律进度"))
         self._cb_auto_progress.toggled.connect(lambda: self._save_tuning_config())
         progress_row.addWidget(self._cb_auto_progress)
         progress_row.addStretch()
-        self._btn_toggle_progress = QPushButton("打开进度")
+        self._btn_toggle_progress = QPushButton(tr("打开进度"))
         self._btn_toggle_progress.setFixedWidth(80)
         self._btn_toggle_progress.clicked.connect(self._toggle_progress_dialog)
         progress_row.addWidget(self._btn_toggle_progress)
         tab_layout.addLayout(progress_row)
 
         config_tabs = QTabWidget()
-        config_tabs.addTab(self._build_rules_page(), "规则")
-        config_tabs.addTab(self._build_slots_page(), "部位")
-        config_tabs.addTab(self._build_more_page(), "更多")
+        config_tabs.addTab(self._build_rules_page(), tr("规则"))
+        config_tabs.addTab(self._build_slots_page(), tr("部位"))
+        config_tabs.addTab(self._build_more_page(), tr("更多"))
         tab_layout.addWidget(config_tabs)
 
         # 底部状态栏（显示启动失败原因）
@@ -113,7 +114,7 @@ class TuningTab(QWidget):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.addWidget(QLabel("<b>基础规则（单选）：</b>"))
+        layout.addWidget(QLabel("<b>" + tr("基础规则（单选）：") + "</b>"))
         self._base_group_key = ""
         self._button_group: QButtonGroup | None = None
         self._group_container = QWidget()
@@ -122,7 +123,7 @@ class TuningTab(QWidget):
         self._group_layout.setSpacing(2)
         self._refresh_base_group_radios()
         layout.addWidget(self._group_container)
-        layout.addWidget(QLabel("<b>流派规则（可多选）：</b>"))
+        layout.addWidget(QLabel("<b>" + tr("流派规则（可多选）：") + "</b>"))
         self._tuning_config = TuningConfigWidget(show_globals=False)
         self._tuning_config.config_changed.connect(self._save_tuning_config)
         layout.addWidget(self._tuning_config)
@@ -145,7 +146,7 @@ class TuningTab(QWidget):
         self._button_group = QButtonGroup(self)
         for key, group in groups.items():
             rb = QRadioButton(group.name)
-            rb.setToolTip("F6 调律配置可新增/编辑规则组")
+            rb.setToolTip(tr("F6 调律配置可新增/编辑规则组"))
             rb.setChecked(key == self._base_group_key)
             rb.toggled.connect(
                 lambda checked, k=key: self._on_base_group_toggled(k, checked))
@@ -181,13 +182,13 @@ class TuningTab(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         slots_header = QHBoxLayout()
-        slots_header.addWidget(QLabel("<b>选择调律部位：</b>"))
+        slots_header.addWidget(QLabel("<b>" + tr("选择调律部位：") + "</b>"))
         slots_header.addStretch()
-        btn_select_all = QPushButton("全选")
+        btn_select_all = QPushButton(tr("全选"))
         btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
         btn_select_all.setFixedWidth(70)
         slots_header.addWidget(btn_select_all)
-        btn_deselect_all = QPushButton("取消全选")
+        btn_deselect_all = QPushButton(tr("取消全选"))
         btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
         btn_deselect_all.setFixedWidth(70)
         slots_header.addWidget(btn_deselect_all)
@@ -215,13 +216,13 @@ class TuningTab(QWidget):
 
         # ── 初始跳过 / 指定调律（互斥）────────────────────
         skip_group = QHBoxLayout()
-        self._cb_skip = QCheckBox("初始跳过")
+        self._cb_skip = QCheckBox(tr("初始跳过"))
         self._sp_skip_row = QSpinBox()
         self._sp_skip_row.setRange(1, 99)
-        self._sp_skip_row.setPrefix("行 ")
+        self._sp_skip_row.setPrefix(tr("行 "))
         self._sp_skip_col = QSpinBox()
         self._sp_skip_col.setRange(1, 6)
-        self._sp_skip_col.setPrefix("列 ")
+        self._sp_skip_col.setPrefix(tr("列 "))
         skip_group.addWidget(self._cb_skip)
         skip_group.addWidget(self._sp_skip_row)
         skip_group.addWidget(self._sp_skip_col)
@@ -229,13 +230,13 @@ class TuningTab(QWidget):
         layout.addLayout(skip_group)
 
         target_group = QHBoxLayout()
-        self._cb_target = QCheckBox("指定调律")
+        self._cb_target = QCheckBox(tr("指定调律"))
         self._sp_target_row = QSpinBox()
         self._sp_target_row.setRange(1, 99)
-        self._sp_target_row.setPrefix("行 ")
+        self._sp_target_row.setPrefix(tr("行 "))
         self._sp_target_col = QSpinBox()
         self._sp_target_col.setRange(1, 6)
-        self._sp_target_col.setPrefix("列 ")
+        self._sp_target_col.setPrefix(tr("列 "))
         target_group.addWidget(self._cb_target)
         target_group.addWidget(self._sp_target_row)
         target_group.addWidget(self._sp_target_col)
@@ -265,7 +266,7 @@ class TuningTab(QWidget):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.addWidget(QLabel("<b>全局开关与测试选项：</b>"))
+        layout.addWidget(QLabel("<b>" + tr("全局开关与测试选项：") + "</b>"))
         self._tuning_globals = TuningGlobalsWidget()
         self._tuning_globals.config_changed.connect(self._save_tuning_config)
         layout.addWidget(self._tuning_globals)
@@ -276,17 +277,17 @@ class TuningTab(QWidget):
 
     def _on_automation_state(self, state: str):
         if state == "running":
-            self.btn_run_tuning.setText("停止 (F10)")
+            self.btn_run_tuning.setText(tr("停止 (F10)"))
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         elif state == "not_ready":
-            self.btn_run_tuning.setText("未就绪")
+            self.btn_run_tuning.setText(tr("未就绪"))
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         else:
-            self.btn_run_tuning.setText("开始调律 (F9)")
+            self.btn_run_tuning.setText(tr("开始调律 (F9)"))
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
@@ -298,7 +299,7 @@ class TuningTab(QWidget):
                     dlg.mark_done()
                 # 同步按钮文本（用户可能通过 X 按钮关闭了对话框）
                 if dlg is not None and not dlg.is_visible():
-                    self._btn_toggle_progress.setText("打开进度")
+                    self._btn_toggle_progress.setText(tr("打开进度"))
 
     # ─── 配置变更监听 ────────────────────────────────────────
 
@@ -345,7 +346,7 @@ class TuningTab(QWidget):
 
         # 图库空间预检（UI 即时反馈，与工作流 run() 预检同契约）
         if self._missing_tuning_output_fields():
-            msg = "当前图库空间缺少 levels/counts 输出字段，无法启动自动调律"
+            msg = tr("当前图库空间缺少 levels/counts 输出字段，无法启动自动调律")
             host.append_log(f"[错误] {msg}")
             self._show_status_error(msg)
             return
@@ -356,7 +357,7 @@ class TuningTab(QWidget):
 
         selected_slots = tc.get("selected_slots") or []
         if not selected_slots:
-            msg = "请至少选择一个调律部位"
+            msg = tr("请至少选择一个调律部位")
             host.append_log(f"[错误] {msg}")
             self._show_status_error(msg)
             return
@@ -371,7 +372,7 @@ class TuningTab(QWidget):
         rules_cfg = tc.get("rules", {})
         enabled = {k: cfg for k, cfg in rules_cfg.items() if cfg.get("enabled")}
         if not enabled:
-            msg = "请至少选择一个调律规则"
+            msg = tr("请至少选择一个调律规则")
             host.append_log(f"[错误] {msg}")
             self._show_status_error(msg)
             return
@@ -386,26 +387,26 @@ class TuningTab(QWidget):
             rule = rule_map[rule_key]
             wr_cfg = cfg.get("playstyles")
             if rule.playstyles and wr_cfg is not None and not wr_cfg:
-                msg = f"规则「{rule.name}」需至少勾选一个玩法"
+                msg = f"{tr('规则「{name}」需至少勾选一个玩法')}".format(name=rule.name)
                 host.append_log(f"[错误] {msg}")
                 self._show_status_error(msg)
                 return
             rule_judges.append(
                 get_tuning_judge(rule_key, {**cfg, "switches": switches}))
         if not rule_judges:
-            msg = "选中的规则均未实现判定逻辑"
+            msg = tr("选中的规则均未实现判定逻辑")
             host.append_log(f"[错误] {msg}")
             self._show_status_error(msg)
             return
 
-        flow_name = "自动调律"
+        flow_name = tr("自动调律")
 
         # 基础规则组（启动时快照注入）
         from ..evaluator.tuning_rules import get_tuning_group
         group_key = tc.get("base_group", "")
         base_group = get_tuning_group(group_key) if group_key else None
         if base_group is None:
-            msg = f"基础规则组 '{group_key}' 不存在，拒绝启动"
+            msg = tr("基础规则组 '{key}' 不存在，拒绝启动").format(key=group_key)
             host.append_log(f"[错误] {msg}")
             self._show_status_error(msg)
             return
@@ -462,10 +463,10 @@ class TuningTab(QWidget):
             return  # hub 尚未创建，无法操作
         if dlg.is_visible():
             dlg.hide()
-            self._btn_toggle_progress.setText("打开进度")
+            self._btn_toggle_progress.setText(tr("打开进度"))
         else:
             dlg.show()
-            self._btn_toggle_progress.setText("隐藏进度")
+            self._btn_toggle_progress.setText(tr("隐藏进度"))
 
     def _ensure_progress_dialog(self, *, auto_show: bool):
         """懒创建或复用进度对话框，连接到当前 engine 的 hub"""
@@ -487,7 +488,7 @@ class TuningTab(QWidget):
 
         if auto_show:
             dlg.show()
-            self._btn_toggle_progress.setText("隐藏进度")
+            self._btn_toggle_progress.setText(tr("隐藏进度"))
         return dlg
 
     # ─── 调律配置持久化（wf_configs["auto_tuning"]）──────────

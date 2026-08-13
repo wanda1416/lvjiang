@@ -40,6 +40,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 )
 from lvjiang.apps.yysls.evaluator.tuning_rules.models import FOOD_LABELS
 
+from ....i18n import tr
 from .game_settings.level_combo import LevelCombo
 from .tune_config_widget import TuningConfigWidget
 
@@ -144,10 +145,10 @@ class EquipAffixEditor(QWidget):
         self.part_combo = QComboBox()
         self.part_combo.addItems(PART_ITEMS)
         self.part_combo.currentIndexChanged.connect(self._on_part_changed)
-        form.addRow("部位：", self.part_combo)
+        form.addRow(tr("部位："), self.part_combo)
 
         # 二级选择：部位为「武器」时显示，选具体武器
-        self._weapon_label = QLabel("武器：")
+        self._weapon_label = QLabel(tr("武器："))
         self.weapon_combo = QComboBox()
         self.weapon_combo.addItems(WEAPON_TYPES)
         self.weapon_combo.currentIndexChanged.connect(
@@ -155,13 +156,13 @@ class EquipAffixEditor(QWidget):
         form.addRow(self._weapon_label, self.weapon_combo)
 
         self.quality_combo = QComboBox()
-        self.quality_combo.addItem("金色", "gold")
-        self.quality_combo.addItem("紫色", "purple")
-        form.addRow("品阶：", self.quality_combo)
+        self.quality_combo.addItem(tr("金色"), "gold")
+        self.quality_combo.addItem(tr("紫色"), "purple")
+        form.addRow(tr("品阶："), self.quality_combo)
 
         # 等级选择（从等级配置中选择）
         self._level_combo = LevelCombo(allow_empty=False)
-        form.addRow("等级：", self._level_combo)
+        form.addRow(tr("等级："), self._level_combo)
 
         # 词条 1-5 行：下拉 + 数值 + 待调出复选框（仅词条 2-5）
         self._affix_combos: list[QComboBox] = []
@@ -181,11 +182,11 @@ class EquipAffixEditor(QWidget):
             row_layout.addWidget(spin)
             # 词条 2-5 添加"待调出"复选框
             if i > 0:
-                chk = QCheckBox("待调出")
-                chk.setToolTip("勾选表示该词条是调律过程中调出的，非扫描时已有")
+                chk = QCheckBox(tr("待调出"))
+                chk.setToolTip(tr("勾选表示该词条是调律过程中调出的，非扫描时已有"))
                 row_layout.addWidget(chk)
                 self._tune_checkboxes.append(chk)
-            form.addRow(f"词条{i + 1}：", row)
+            form.addRow(tr("词条{i}：").format(i=i + 1), row)
             self._affix_combos.append(combo)
             self._affix_spins.append(spin)
 
@@ -342,15 +343,15 @@ class EquipJudgeTestDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle("装备调律验证")
+        self.setWindowTitle(tr("装备调律验证"))
         self.resize(860, 620)
         layout = QHBoxLayout(self)
 
         # ── 左：流派配置（读 session 初值，不回写）──
         left = QVBoxLayout()
-        left.addWidget(QLabel("<b>流派配置（仅本次测试，不保存）：</b>"))
+        left.addWidget(QLabel("<b>" + tr("流派配置（仅本次测试，不保存）：") + "</b>"))
         # 可转律开关：取消后潜力判定放弃转律模拟（仅按空槽评估）
-        self._chk_transmute = QCheckBox("可转律（取消后不做转律模拟）")
+        self._chk_transmute = QCheckBox(tr("可转律（取消后不做转律模拟）"))
         self._chk_transmute.setChecked(True)
         left.addWidget(self._chk_transmute)
         self._tuning_config = TuningConfigWidget()
@@ -365,14 +366,14 @@ class EquipJudgeTestDialog(QDialog):
 
         # ── 右：装备编辑 + 判定 ──
         right = QVBoxLayout()
-        right.addWidget(QLabel("<b>构造装备：</b>"))
+        right.addWidget(QLabel("<b>" + tr("构造装备：") + "</b>"))
         self.editor = EquipAffixEditor()
         right.addWidget(self.editor)
         btn_row = QHBoxLayout()
-        self.btn_judge = QPushButton("判定")
+        self.btn_judge = QPushButton(tr("判定"))
         self.btn_judge.clicked.connect(self._on_judge)
         btn_row.addWidget(self.btn_judge)
-        self.btn_simulate = QPushButton("模拟调律")
+        self.btn_simulate = QPushButton(tr("模拟调律"))
         self.btn_simulate.clicked.connect(self._on_simulate)
         btn_row.addWidget(self.btn_simulate)
         right.addLayout(btn_row)
@@ -397,24 +398,24 @@ class EquipJudgeTestDialog(QDialog):
             if cfg.get("enabled")
         }
         if not configs:
-            self.result_text.setPlainText("请先在左侧启用至少一个调律规则")
+            self.result_text.setPlainText(tr("请先在左侧启用至少一个调律规则"))
             return
         equip = self.editor.get_equipment()
         if equip is None:
-            self.result_text.setPlainText("请至少选择首词条")
+            self.result_text.setPlainText(tr("请至少选择首词条"))
             return
 
         worth, logs = judge_tuning_worthiness(
             equip, configs, rule_keys=list(configs))
         lines = [
-            "【调律潜力】" + ("值得调律" if worth else "不值得调律"),
+            tr("【调律潜力】") + (tr("值得调律") if worth else tr("不值得调律")),
             *logs,
         ]
 
         # 词条满 5 条：追加各启用且已实现流派的完整定级
         if len(equip.affixes) == _AFFIX_ROWS:
             lines.append("")
-            lines.append("【完整定级】")
+            lines.append(tr("【完整定级】"))
             for key, cfg in configs.items():
                 if not is_rule_implemented(key):
                     continue
@@ -442,17 +443,17 @@ class EquipJudgeTestDialog(QDialog):
             if cfg.get("enabled")
         }
         if not configs:
-            self.result_text.setPlainText("请先在左侧启用至少一个调律规则")
+            self.result_text.setPlainText(tr("请先在左侧启用至少一个调律规则"))
             return
 
         scanned = self.editor.get_scanned_affixes()
         tune_affixes = self.editor.get_tune_affixes()
         if not scanned:
-            self.result_text.setPlainText("请至少选择首词条")
+            self.result_text.setPlainText(tr("请至少选择首词条"))
             return
         if not tune_affixes:
             self.result_text.setPlainText(
-                "请勾选至少一个「待调出」词条进行模拟")
+                tr("请勾选至少一个「待调出」词条进行模拟"))
             return
 
         # 加载基础规则组
@@ -460,7 +461,7 @@ class EquipJudgeTestDialog(QDialog):
         group_key = get_wf_config("auto_tuning").get("base_group", "default")
         group = get_tuning_group(group_key)
         if group is None:
-            self.result_text.setPlainText(f"基础规则组 {group_key!r} 不存在")
+            self.result_text.setPlainText(tr("基础规则组 {key} 不存在").format(key=repr(group_key)))
             return
 
         mgr = get_game_config()

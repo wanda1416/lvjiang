@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.config.resolver import get_resolver
+from ..i18n import tr
 
 _STYLE_IDLE = (
     "background-color: #607D8B; color: white; font-weight: bold; padding: 8px;"
@@ -41,7 +42,7 @@ class ScriptRecordDialog(QDialog):
         self._main = main_window
         self._recorder = None
         self._preserved = False   # 已保存/复制过（防误关丢失）
-        self.setWindowTitle("脚本录制")
+        self.setWindowTitle(tr("脚本录制"))
         self.setMinimumSize(560, 520)
         self._setup_ui()
         self.line_captured.connect(self._append_line)
@@ -53,23 +54,23 @@ class ScriptRecordDialog(QDialog):
         layout = QVBoxLayout(self)
 
         btn_row = QHBoxLayout()
-        self.btn_record = QPushButton("● 录制脚本 (F8)")
+        self.btn_record = QPushButton(tr("● 录制脚本 (F8)"))
         self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.clicked.connect(self.toggle_recording)
         btn_row.addWidget(self.btn_record)
         btn_row.addStretch()
-        self.btn_save = QPushButton("保存")
+        self.btn_save = QPushButton(tr("保存"))
         self.btn_save.clicked.connect(self._on_save)
         btn_row.addWidget(self.btn_save)
-        self.btn_copy = QPushButton("复制")
+        self.btn_copy = QPushButton(tr("复制"))
         self.btn_copy.clicked.connect(self._on_copy)
         btn_row.addWidget(self.btn_copy)
-        self.btn_clear = QPushButton("清除")
+        self.btn_clear = QPushButton(tr("清除"))
         self.btn_clear.clicked.connect(self._on_clear)
         btn_row.addWidget(self.btn_clear)
         layout.addLayout(btn_row)
 
-        self.lbl_status = QLabel("待机 | 点击「录制脚本」或按 F8 开始")
+        self.lbl_status = QLabel(tr("待机 | 点击「录制脚本」或按 F8 开始"))
         self.lbl_status.setStyleSheet("color: #888;")
         layout.addWidget(self.lbl_status)
 
@@ -77,7 +78,7 @@ class ScriptRecordDialog(QDialog):
         self.text_edit.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;")
         self.text_edit.setPlaceholderText(
-            "录制生成的 DSL 语句将实时显示在这里（画布归一化坐标，可直接保存为 .wf）")
+            tr("录制生成的 DSL 语句将实时显示在这里（画布归一化坐标，可直接保存为 .wf）"))
         self.text_edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.text_edit)
 
@@ -97,19 +98,19 @@ class ScriptRecordDialog(QDialog):
     def _start_recording(self):
         main = self._main
         if main._running:
-            self.lbl_status.setText("工作流运行中，无法录制")
+            self.lbl_status.setText(tr("工作流运行中，无法录制"))
             return
         if main._backend == "adb":
-            self.lbl_status.setText("ADB 模式暂不支持录制")
+            self.lbl_status.setText(tr("ADB 模式暂不支持录制"))
             return
         w = main._target_window
         if not w:
-            self.lbl_status.setText("请先在主窗口扫描并定位窗口")
+            self.lbl_status.setText(tr("请先在主窗口扫描并定位窗口"))
             return
         layout_name = main._layout_manager.get_active_layout_name()
         layout = main._layout_manager.load_layout(layout_name)
         if not layout:
-            self.lbl_status.setText(f"无法加载布局: {layout_name}")
+            self.lbl_status.setText(tr("无法加载布局: {layout_name}").format(layout_name=layout_name))
             return
         if main._capture is None:
             from ..core.desktop import DesktopCapture
@@ -126,10 +127,10 @@ class ScriptRecordDialog(QDialog):
             self._recorder.start()
         except Exception as e:
             self._recorder = None
-            self.lbl_status.setText(f"启动失败: {e}")
+            self.lbl_status.setText(tr("启动失败: {e}").format(e=e))
             logger.error(f"录制启动失败: {e}")
             return
-        self.lbl_status.setText("录制中…在游戏窗口内点击/拖拽，F8 或点击停止")
+        self.lbl_status.setText(tr("录制中…在游戏窗口内点击/拖拽，F8 或点击停止"))
         self._refresh_buttons()
 
     def _stop_recording(self):
@@ -140,9 +141,9 @@ class ScriptRecordDialog(QDialog):
             if dsl.strip():
                 # 全文兜底刷新，防实时追加漏行
                 self.text_edit.setPlainText(dsl)
-                self.lbl_status.setText("录制结束，可编辑后保存为 .wf")
+                self.lbl_status.setText(tr("录制结束，可编辑后保存为 .wf"))
             else:
-                self.lbl_status.setText("录制结束，未捕获到有效操作")
+                self.lbl_status.setText(tr("录制结束，未捕获到有效操作"))
         self._refresh_buttons()
 
     def _append_line(self, line: str):
@@ -155,10 +156,10 @@ class ScriptRecordDialog(QDialog):
         recording = self.is_recording
         has_text = bool(self.text_edit.toPlainText().strip())
         if recording:
-            self.btn_record.setText("■ 停止录制 (F8)")
+            self.btn_record.setText(tr("■ 停止录制 (F8)"))
             self.btn_record.setStyleSheet(_STYLE_RECORDING)
         else:
-            self.btn_record.setText("● 录制脚本 (F8)")
+            self.btn_record.setText(tr("● 录制脚本 (F8)"))
             self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.setEnabled(not self._main._running)
         for btn in (self.btn_save, self.btn_copy, self.btn_clear):
@@ -176,8 +177,8 @@ class ScriptRecordDialog(QDialog):
         """保存当前文本为 .wf 文件（默认目录为当前模式的可写 workflows 目录）"""
         default_path = str(get_resolver().write_dir("workflows") / "recorded.wf")
         path, _ = QFileDialog.getSaveFileName(
-            self, "保存为工作流文件", default_path,
-            "工作流文件 (*.wf);;所有文件 (*)")
+            self, tr("保存为工作流文件"), default_path,
+            tr("工作流文件 (*.wf);;所有文件 (*)"))
         if not path:
             return
         try:
@@ -188,19 +189,19 @@ class ScriptRecordDialog(QDialog):
             self.lbl_status.setText(f"已保存: {path}")
         except Exception as e:
             logger.error(f"保存录制 DSL 失败: {e}")
-            QMessageBox.warning(self, "保存失败", str(e))
+            QMessageBox.warning(self, tr("保存失败"), str(e))
 
     def _on_copy(self):
         """复制当前文本到系统剪贴板"""
         QApplication.clipboard().setText(self.text_edit.toPlainText())
         self._preserved = True
-        self.lbl_status.setText("已复制到剪贴板")
+        self.lbl_status.setText(tr("已复制到剪贴板"))
 
     def _on_clear(self):
         """清除文本区（非空时先确认）"""
         if self.text_edit.toPlainText().strip():
             reply = QMessageBox.question(
-                self, "清除", "确定清除已录制的 DSL 内容吗？",
+                self, tr("清除"), tr("确定清除已录制的 DSL 内容吗？"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -208,7 +209,7 @@ class ScriptRecordDialog(QDialog):
                 return
         self.text_edit.clear()
         self._preserved = False
-        self.lbl_status.setText("已清除")
+        self.lbl_status.setText(tr("已清除"))
 
     # ─── 关闭保护 ─────────────────────────────────────────
 
@@ -217,8 +218,8 @@ class ScriptRecordDialog(QDialog):
         if self._preserved or not self.text_edit.toPlainText().strip():
             return True
         reply = QMessageBox.question(
-            self, "未保存",
-            "录制内容尚未保存或复制到剪贴板，确定要关闭吗？",
+            self, tr("未保存"),
+            tr("录制内容尚未保存或复制到剪贴板，确定要关闭吗？"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

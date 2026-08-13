@@ -26,6 +26,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ....i18n import tr
+
 
 class TuningGlobalsWidget(QWidget):
     """调律全局区控件（跳过实际调律 mock + 全部注册开关）
@@ -41,7 +43,7 @@ class TuningGlobalsWidget(QWidget):
         self._layout.setContentsMargins(0, 0, 0, 0)
 
         # ── 跳过实际调律（临时测试开关，仅模拟进出调律页）──
-        self._skip_tuning_cb = QCheckBox("跳过实际调律（仅进出调律页，测试滚动用）")
+        self._skip_tuning_cb = QCheckBox(tr("跳过实际调律（仅进出调律页，测试滚动用）"))
         self._skip_tuning_cb.stateChanged.connect(
             lambda _state: self.config_changed.emit())
         self._layout.addWidget(self._skip_tuning_cb)
@@ -54,7 +56,7 @@ class TuningGlobalsWidget(QWidget):
         """按当前 get_tune_config().switches 构建开关复选框"""
         from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
         for switch_key, switch_name in get_tune_config().switches.items():
-            cb = QCheckBox(f"{switch_name}（全局）")
+            cb = QCheckBox(f"{switch_name}" + tr("（全局）"))
             cb.stateChanged.connect(
                 lambda _state: self.config_changed.emit())
             self._layout.addWidget(cb)
@@ -73,7 +75,7 @@ class TuningGlobalsWidget(QWidget):
         # 添加新增的开关
         for key, name in current.items():
             if key not in self._switch_cbs:
-                cb = QCheckBox(f"{name}（全局）")
+                cb = QCheckBox(f"{name}" + tr("（全局）"))
                 cb.stateChanged.connect(
                     lambda _state: self.config_changed.emit())
                 self._layout.addWidget(cb)
@@ -129,7 +131,7 @@ class TuningConfigWidget(QWidget):
         #   "playstyles": {名字: QCheckBox}}
         self._rule_widgets: dict[str, dict] = {}
         for key, rule in get_tuning_rules().items():
-            title = rule.name if rule.implemented else f"{rule.name}（未实现）"
+            title = rule.name if rule.implemented else f"{rule.name}" + tr("（未实现）")
             grp = QGroupBox(title)
             grp.setCheckable(True)
             grp.setChecked(False)
@@ -154,7 +156,7 @@ class TuningConfigWidget(QWidget):
                     # 绑定开关只读标签
                     ps = rule.playstyles.get(name)
                     if ps and ps.switch:
-                        switch_label = QLabel(f"开关: {ps.switch}")
+                        switch_label = QLabel(tr("开关: ") + ps.switch)
                         switch_label.setStyleSheet("color: gray;")
                         row.addWidget(switch_label)
                     row.addStretch()

@@ -1,0 +1,788 @@
+meta:
+  language: en_US
+  display_name: "English"
+  version: "0.2.5"
+
+# ── Main Window ──
+main_window:
+  title: "LvJiang - Universal Visual RPA Engine"
+  menu_general: "General"
+  menu_settings: "Settings"
+  menu_user_mgmt: "User Management"
+  menu_scene_editor: "Scene Editor"
+  menu_reference_mgr: "Reference Manager"
+  menu_tools: "Tools"
+  menu_ocr: "Image Recognition"
+  menu_script_record: "Script Recording"
+  menu_script_config: "Script Config"
+  menu_batch_config: "Batch Config"
+  menu_help: "Help"
+  menu_check_update: "Check for Updates"
+  menu_docs: "Documentation"
+  menu_feedback: "Feedback"
+  menu_about: "About"
+  label_current_user: "Current User"
+  label_current_layout: "Current Layout"
+  btn_scan_window: "Scan Windows"
+  btn_scan_device: "Scan Devices"
+  btn_locate: "Locate"
+  btn_show_preview: "Show Preview"
+  btn_hide_preview: "Hide Preview"
+  chk_bg_mode: "Background Mode"
+  chk_scrcpy: "Streaming Capture"
+  tab_daily: "Daily"
+  tab_batch: "Batch"
+  tab_log: "Run Log"
+  btn_start: "Start (F9)"
+  btn_stop: "Stop"
+  group_script: "Script"
+  btn_load: "Load"
+  group_params: "Parameters"
+  label_log_level: "Log Level"
+  status_ready: "Ready | F9 Start | F10 Stop | F8 Record"
+  label_no_window: "No window selected"
+  label_preview_placeholder: "Locate window to capture"
+  status_window_located: "Window located"
+  status_device_connected: "Device connected"
+  confirm_exit_title: "Confirm Exit"
+  confirm_exit_message: "A workflow is currently running. Closing will terminate it.\nAre you sure you want to exit?"
+  status_workflow_done: "Workflow completed"
+  status_workflow_stopped: "Workflow stopped"
+  status_workflow_error: "Execution error"
+  workflow_running: "Workflow Running"
+
+# ── Settings Dialog ──
+settings_dialog:
+  title: "Settings"
+  tab_basic: "Basic"
+  tab_input: "Input Simulation"
+  tab_wait: "Wait Parameters"
+  btn_save: "Save"
+  btn_close: "Close"
+  language_label: "Interface Language"
+  adb_capture_label: "ADB Capture Mode:"
+  adb_capture_scrcpy: "Streaming (scrcpy)"
+  adb_capture_screencap: "Static (screencap)"
+  input_mode_label: "Window Input Mode:"
+  input_postmessage: "Background (PostMessage)"
+  input_sendinput: "Foreground (SendInput)"
+  window_title_label: "Default Window Title:"
+  window_title_placeholder: "Empty = no auto-locate"
+  status_saved: "Settings saved"
+
+# ── About Dialog ──
+about_dialog:
+  title: "About LvJiang"
+  app_name: "LvJiang"
+  version_prefix: "Version"
+  app_desc: "Universal Visual RPA Engine"
+  btn_check_update: "Check for Updates"
+  checking: "Checking..."
+  check_failed: "Update check failed"
+
+# ── User Manager ──
+user_manager:
+  title: "User Management"
+  btn_close: "Close"
+  btn_new_user: "+ New User"
+  btn_delete: "Delete"
+  label_current_user: "Current User"
+  section_basic: "Basic Info"
+  label_username: "Username"
+  label_created_at: "Created"
+  section_stats: "Statistics"
+  equip_data_wip: "Equipment data display is under development..."
+  new_user_title: "New User"
+  input_username_prompt: "Enter username:"
+  user_created: "User created: {name}"
+  failure: "Failed"
+  username_exists: "Username already exists or is empty"
+  confirm_delete_title: "Confirm Delete"
+  confirm_delete_message: "Delete user \"{name}\"?\nAll data will be cleared. This cannot be undone."
+  user_deleted: "User deleted: {name}"
+  cannot_delete: "Cannot delete this user"
+
+# ── Script Record ──
+script_record:
+  title: "Script Recording"
+  btn_record: "● Record Script (F8)"
+  btn_save: "Save"
+  btn_copy: "Copy"
+  btn_clear: "Clear"
+  status_idle: "Idle | Click \"Record Script\" or press F8"
+  btn_stop_record: "■ Stop Recording (F8)"
+  save_workflow_title: "Save as Workflow File"
+  save_workflow_filter: "Workflow Files (*.wf);;All Files (*)"
+  err_workflow_running: "Cannot record while workflow is running"
+  err_adb_not_supported: "ADB mode does not support recording yet"
+  err_no_window: "Please locate a window in the main window first"
+  err_layout_not_found: "Failed to load layout: {layout_name}"
+  err_start_failed: "Start failed: {e}"
+  err_record_failed: "Recording start failed: {e}"
+  status_recording: "Recording... Click/drag in game window, F8 or click to stop"
+  status_done: "Recording done. Edit and save as .wf"
+  status_done_empty: "Recording ended, no valid actions captured"
+  status_copied: "Copied to clipboard"
+  status_cleared: "Cleared"
+  unsaved_title: "Unsaved"
+  unsaved_message: "Recording has not been saved or copied. Close anyway?"
+
+# ── Script Config ──
+script_config:
+  tab_daily: "Daily"
+  tab_dedicated: "Dedicated"
+  title: "Script Config"
+  col_exposed: "Exposed"
+  col_display_name: "Display Name"
+  col_nature: "Type"
+  col_source: "Source"
+  col_params: "Params"
+  btn_move_up: "Move Up"
+  btn_move_down: "Move Down"
+  btn_save: "Save"
+  btn_cancel: "Cancel"
+  save_failed: "Save failed"
+
+# ── Update Dialog ──
+update_dialog:
+  title: "New Version Available"
+  btn_download: "Download"
+  chk_skip: "Don't ask again for this version"
+  btn_continue: "Continue"
+
+# ── OCR Dialog ──
+ocr_dialog:
+  title: "Image Recognition"
+  tab_ocr: "Image Recognition"
+  tab_cleaning_rules: "Cleaning Rules"
+  btn_upload: "Upload Image"
+  btn_refresh: "Refresh Capture"
+  tooltip_refresh: "Get latest capture from device"
+  btn_clear_canvas: "Clear Canvas"
+  btn_clear_selection: "Clear Selection"
+  tooltip_clear_selection: "Clear red selection box"
+  btn_ocr_text: "Text Recognition (F5)"
+  btn_ocr_material: "Material Recognition (F6)"
+  label_match_group: "Match Group:"
+  label_all_groups: "- All -"
+  label_ocr_result: "Recognition Results (with cleaning rules applied):"
+  status_ready: "Ready"
+  cleaning_rules_hint: "General cleaning rules: All OCR text goes through these rules.\nChanges take effect immediately, no restart needed."
+  group_text_replace: "Text Replacement (exact match)"
+  col_original: "Original Text"
+  col_replacement: "Replace With"
+  btn_add_replacement: "+ Add Replacement"
+  btn_delete_selected: "- Delete Selected"
+  group_regex_replace: "Regex Replacement"
+  col_regex: "Regex Pattern"
+  btn_add_regex: "+ Add Regex Rule"
+  group_test: "Test Cleaning"
+  placeholder_test_input: "Enter test text..."
+  placeholder_test_output: "Cleaning result..."
+  btn_test: "Test"
+  status_rules_saved: "Rules saved"
+  no_clipboard_image: "No image in clipboard"
+  cannot_read_clipboard: "Cannot read clipboard image"
+  select_image_title: "Select Image"
+  image_file_filter: "Image Files (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)"
+  status_refreshing: "Refreshing capture..."
+  status_refresh_failed: "Refresh capture failed"
+  status_ocr_text: "Recognizing text..."
+  no_text_found: "No text recognized"
+  status_ocr_material: "Recognizing materials..."
+  no_material_found: "No material recognized (empty slot or no match)"
+  ocr_failed: "Recognition failed"
+  selection_cleared: "Selection cleared"
+  no_image: "No image"
+  selection_empty: "Selection area is empty"
+  capture_failed: "Failed to capture image"
+  screenshot_failed: "Screenshot failed"
+
+# ── Capture Ops ──
+capture_ops:
+  status_idle: "Idle"
+  btn_record: "● Record"
+  btn_pause: "⏸ Pause"
+  btn_screenshot: "Screenshot"
+  btn_save: "Save"
+  btn_discard: "Discard"
+  err_streaming_only: "Recording requires streaming capture mode"
+  status_recording: "Recording"
+  btn_stop: "■ Stop"
+  status_paused: "Paused"
+  btn_resume: "▶ Resume"
+  status_pending_save: "Pending save"
+
+# ── Run Control ──
+run_control:
+  btn_start: "Start"
+  btn_stop: "Stop"
+  status_done: "Execution completed"
+  status_stopped: "Execution stopped"
+  status_error: "Execution error"
+  err_no_workflow: "Please select a workflow"
+  workflow_confirm: "Workflow Confirmation"
+  workflow_pause: "Workflow Paused"
+  workflow_input: "Workflow Input"
+  btn_continue_tuning: "Continue Tuning"
+  btn_skip_current: "Skip Current Equipment"
+  btn_end_tuning: "End This Tuning Session"
+  btn_stop_f10: "Stop (F10)"
+  label_not_connected: "Not Connected"
+  label_not_located: "Not Located"
+
+# ── Window Ops ──
+window_ops:
+  no_window_found: "No window found"
+  window_located: "Window located"
+  window_closed: "Window closed"
+  devices_found: "Found {count} device(s)"
+  no_device_found: "No device found"
+  no_adb_device_title: "No ADB Device Found"
+  no_adb_device_msg: "No USB-connected ADB device found.\n\nScan LAN and try wireless connection?\n(Device must have wireless debugging enabled)"
+  btn_scan: "Scan"
+  btn_cancel: "Cancel"
+  btn_scanning: "Scanning..."
+  btn_connect: "Connect"
+  btn_locate: "Locate"
+  btn_disconnect: "Disconnect"
+  btn_scan_device: "Scan Device"
+  status_scanning_window: "Scanning windows..."
+  status_scanning_device: "Scanning devices..."
+  status_connecting: "Connecting to device..."
+  status_scan_cancelled: "Scan cancelled"
+  status_scan_failed: "Scan failed | See logs"
+  status_connect_failed: "Connection failed | See logs"
+  status_disconnected: "Device disconnected"
+  disconnected: "Disconnected"
+  status_window_unlocated: "Window location cleared"
+  label_not_located: "No window located"
+  label_not_connected: "No device connected"
+  label_select_window: "Please select a target window..."
+  label_select_device: "Please select a device and click connect..."
+  status_window_scanned: "Windows scanned | Select target and click Locate"
+  status_device_scanned: "Devices scanned | Select device and click Connect"
+  status_no_device_hint: "No device found | Try LAN scan"
+  status_no_wireless_hint: "No device found | Check wireless debugging"
+  wireless_no_device_title: "No Device Found"
+  wireless_no_device_msg: "No connectable ADB device found on LAN.\n\nPlease ensure:\n1. Device and PC are on the same LAN\n2. Wireless debugging is enabled (Developer Options)"
+  status_scanning_lan: "Scanning LAN..."
+  btn_scan_lan: "Scan LAN..."
+  preview_stopped: "Preview stopped"
+  ocr_canvas_placeholder: "Ctrl+V to paste screenshot, or click \"Upload Image\""
+
+# ── Alert Panel ──
+alert_panel:
+  dismiss: "Dismiss"
+
+
+# ── YYSLS Plugin ──
+yysls:
+  # ── 通用 ──
+  其他装备: Other Equipment
+  其他装备展示开发中: Other equipment display under development…
+  刷新装备数据: Refresh Equipment Data
+  开关: "Switch: "
+  当前装备: Current Equipment
+  承音: Chengyin
+  无词条: No Affixes
+  未装备: Not Equipped
+  跳过实际调律_仅进出调律页_测试滚动用: Skip actual tuning (enter/exit tuning page only, for scroll testing)
+  全局: (Global)
+  未实现: (Not implemented)
+  # ── 调律 Tab ──
+  F6_调律配置可新增_编辑规则组: "F6: Tuning Config to add/edit rule groups"
+  停止_F10: Stop (F10)
+  全局开关与测试选项: "Global Switches & Test Options:"
+  列: Col
+  初始跳过: Initial Skip
+  取消全选: Deselect All
+  基础规则组_{key}_不存在_拒绝启动: Base rule group '{key}' does not exist, refusing to start
+  基础规则_单选: "Base Rule (single select):"
+  开始调律_F9: Start Tuning (F9)
+  当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: Current gallery space missing levels/counts output field, cannot start auto tuning
+  打开进度: Open Progress
+  指定调律: Specify Tuning
+  更多: More
+  未就绪: Not Ready
+  流派规则_可多选: "Playstyle Rules (multi-select):"
+  自动打开调律进度: Auto Open Tuning Progress
+  自动调律: Auto Tuning
+  行: Line 
+  规则: Rule
+  请至少选择一个调律规则: Please select at least one tuning rule
+  请至少选择一个调律部位: Please select at least one tuning slot
+  选中的规则均未实现判定逻辑: Selected rules have no judgment logic implemented
+  选择调律部位: "Select tuning slot:"
+  隐藏进度: Hide Progress
+  # ── 调律进度 ──
+  保留: Keep
+  关闭: Close
+  准备中: Preparing...
+  回收: Recycle
+  完成: Done
+  已保留: Kept
+  已回收: Recycled
+  强制调律: Force Tune
+  当前词条: Current Affixes
+  "{prefix}（{n}/{total}）：": "{prefix} ({n}/{total}):"
+  "正在处理：{name}（{idx}/{total}）": "Processing: {name} ({idx}/{total})"
+  周一: Monday
+  周二: Tuesday
+  周三: Wednesday
+  周四: Thursday
+  周五: Friday
+  周六: Saturday
+  周日: Sunday
+  顶级: Top
+  优秀: Excellent
+  能用: Usable
+  垃圾: Junk
+  当前词条_1: "Current Affixes: -"
+  扫描处理_{name}: "Scan Result: {name} → "
+  批次进度: Batch Progress
+  最终词条: Final Affixes
+  材料: "Materials:"
+  正在处理_{name}: "Processing: {name}"
+  目标词条: "Target Affixes: -"
+  目标: Target
+  目标_1: "Target: -"
+  等待中: Waiting...
+  等级_{level}_{quality}_词条_{count}_5: Lv {level} | {quality} | Affix {count}/5
+  蓝色: Blue
+  词条进度: Affix Progress
+  调律状态: Tuning Status
+  调律结束{suffix}_{total}_件装备_{rounds}_轮调律: "Tuning Ended{suffix}: {total} equipment, {rounds} rounds"
+  调律进度: Tuning Progress
+  调满后回收: Recycle When Full
+  轮次_0: "Round: 0"
+  轮次_{n}: "Round: {n}"
+  预期评级: "Expected Rating: -"
+  已中断: (Interrupted)
+  # ── 装备判定 ──
+  完整定级: "[Full Rating]"
+  调律潜力: "[Tuning Potential]"
+  不值得调律: Not Worth Tuning
+  值得调律: Worth Tuning
+  判定: Judge
+  勾选表示该词条是调律过程中调出的_非扫描时已有: Check to indicate this affix was tuned out, not already present at scan
+  可转律_取消后不做转律模拟: Can Transform (cancel to skip transform simulation)
+  品阶: "Quality:"
+  基础规则组_{key}_不存在: Base rule group {key} does not exist
+  待调出: To Tune Out
+  构造装备: "Build Equipment:"
+  模拟调律: Simulate Tuning
+  武器: "Weapon:"
+  流派配置_仅本次测试_不保存: "Playstyle Config (this test only, not saved):"
+  等级: "Level:"
+  紫色: Purple
+  装备调律验证: Equipment Tuning Validation
+  词条{i}: "Affix {i}:"
+  请先在左侧启用至少一个调律规则: Please enable at least one tuning rule on the left
+  请勾选至少一个_待调出_词条进行模拟: Please check at least one 'to tune out' affix to simulate
+  请至少选择首词条: Please select at least the first affix
+  部位: Slot
+  金色: Gold
+  # ── 角色详情 ──
+  刷新: Refresh
+  刷新角色详情: Refresh Character Details
+  角色详情功能开发中: Character details under development…
+  # ── 菜单 ──
+  燕云: Yan Yun
+  调律配置: Tuning Config
+  # ── 游戏设置 ──
+  词组: + Phrase
+  词组_1: "- Phrase"
+  上移: Move Up
+  下移: Move Down
+  不分组: No Group
+  主武器: Main Weapon
+  主武学: Main Martial
+  全选: Select All
+  分组: Group
+  分组_{name}_已存在: Group '{name}' already exists
+  分组名称: "Group Name:"
+  删除: Delete
+  删除选中: Delete Selected
+  副武器: Off Weapon
+  副武学: Off Martial
+  勾选该词条可出现的装备部位_全选_全部: Check equipment slots where this affix can appear (Select All = All)
+  反选: Invert
+  定音词组: Dingyin Phrase
+  将选中赛季上移一行: Move selected season up one row
+  将选中赛季下移一行: Move selected season down one row
+  将选中配置上移一行: Move selected config up one row
+  将选中配置下移一行: Move selected config down one row
+  属性: Attribute
+  提示: Notice
+  新增武器重启后方可参与识别_被流派配置引用的武器不可删除: New weapons participate in recognition only after restart; weapons referenced by playstyle config cannot be deleted
+  无法删除: Cannot Delete
+  无法添加: Cannot Add
+  无法重命名: Cannot Rename
+  普通词组: Normal Phrase
+  最大值: Max Value
+  最小值: Min Value
+  武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: Weapon candidates come from weapon types in Equipment Config. Martial Enhancement moved to weapon types in Equipment Config.
+  武器名称: "Weapon Name:"
+  武器类型: Weapon Type
+  武器类型_{name}_已存在: Weapon type '{name}' already exists.
+  武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Weapon type '{name}' is referenced by playstyle {users}, please unbind in playstyle config first.
+  武学名称: Martial Name
+  武学增效: Martial Enhancement
+  流派_{name}_已存在: Playstyle '{name}' already exists.
+  流派名不能为空或与已有流派重名: Playstyle name cannot be empty or duplicate.
+  流派名称: "Playstyle Name:"
+  流派类型: Playstyle Type
+  流派配置: Playstyle Config
+  添加: Add
+  添加分组: Add Group
+  添加武器类型: Add Weapon Type
+  添加流派: Add Playstyle
+  添加等级: Add Level
+  添加词组: Add Phrase
+  添加赛季: Add Season
+  添加配置: Add Config
+  游戏配置: Game Config
+  确定删除武器类型_{name}: Delete weapon type '{name}'?
+  确定删除流派_{name}: Delete playstyle '{name}'?
+  确定要删除等级_{level}_吗: Delete level {level}?
+  确定要删除词组_{name}_吗: Delete phrase '{name}'?
+  确认删除: Confirm Delete
+  等级配置: Level Config
+  装备类型: Equipment Type
+  装备配置: Equipment Config
+  词条分组: Affix Group
+  词组_{name}_已存在: Phrase '{name}' already exists
+  词组分类: Phrase Category
+  词组单位: Phrase Unit
+  词组名称: "Phrase Name:"
+  词组类型: Phrase Type
+  词组配置: Phrase Config
+  请先选择要删除的等级: Please select a level to delete first
+  赛季配置: Season Config
+  选择词条部位: Select Affix Slot
+  重命名分组: Rename Group
+  重命名词组: Rename Phrase
+  重复: Duplicate
+  无等级配置: (No level config)
+  # ── 调律配置 ──
+  全部: "- All -"
+  key_须为小写英文标识_字母开头_可含数字_下划线: Key must be lowercase (starts with letter, may contain digits/underscore)
+  不足时: When Insufficient
+  主增伤词条: Main Damage Affix
+  低于该等级的装备直接跳过_不进入任何判定: Equipment below this level is skipped, no judgment entered
+  保存失败_{e}: "Save failed: {e}"
+  停用后不进调律的装备一律保留_调律门槛仍生效: When disabled, equipment not entering tuning is kept (tuning threshold still applies)
+  停用后按无命中默认行为执行: When disabled, execute with no-hit default behavior
+  全部_1: All
+  全部未命中时取_默认判定_部位页可按部位设置: "When all miss, use 'Default Judgment': slot page can set per slot,"
+  关闭时生效: Takes effect when enabled
+  切换后扫描处理_材料处理_结束处理页同步对准该组: After switching, Scan/Material/End Processing pages sync to this group,
+  删除基础规则组: Delete base rule group
+  删除本组: Delete This Group
+  删除本规则: Delete This Rule
+  删除规则: Delete Rule
+  删除选中行: Delete Selected Row
+  删除选中规则: Delete Selected Rule
+  删除选中规则组_至少保留一个: Delete selected rule group (keep at least one)
+  判定条件: Judgment Conditions
+  判定顺序_垃圾_一般_优秀_顶级_命中即定档: "Judgment order: Junk → Normal → Excellent → Top, first hit sets tier"
+  副增伤词条: Sub Damage Affix
+  勾选装备词条名_至少一项: "Check equipment affix names (at least one):"
+  单件重置次数上限: Per-item Max Reset Count
+  双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: Double-click 'Rule Description' column to edit; select a row to copy/delete the rule group
+  发现同时配置_动态属攻和真实属攻_建议修正: Dynamic attr and real attr configured simultaneously, recommend correction
+  可用词条库: Available Affix Pool
+  可用词条库为全局价值序_越靠前越优先保留与填充: Available Affix Pool is global value order (earlier = higher priority);
+  可用词条库_全局_各部位词条混放: Available Affix Pool (global, mixed slots)
+  右键禁用: Right-click to disable
+  名字: Name
+  名称: Name
+  含首词条: Contains First Affix
+  启用: Enable
+  启用初始判定: Enable Initial Judgment
+  启用处置表: Enable Disposal Table
+  启用检查: Enable Check
+  启用行为表: Enable Behavior Table
+  启用该规则: Enable this rule
+  命中条件_预期评级属于勾选档位_全选_不限: "Hit condition: expected rating in checked tiers (Select All = no limit,"
+  命中条件_首词条初始数值按方向比较该值: "Hit condition: first affix initial value compared by direction;"
+  品阶门槛: Quality Threshold
+  品阶门槛_覆盖: Quality Threshold (override)
+  四档_垃圾_一般_优秀_顶级: "Four tiers: Junk / Normal / Excellent / Top"
+  回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0: "Recycle retry cap: max re-read count after recycle, must be > 0"
+  固定标准部位_勾选有调律价值的品阶: Fixed standard slots; check quality tiers with tuning value;
+  基础规则: Base Rule
+  复制基础规则组: Copy base rule group
+  复制选中: Copy Selected
+  复制选中规则组为独立副本: Copy selected rule group as independent copy
+  大律准石数量检查: Check major tuning stone count
+  如_aggressive_小写字母_数字_下划线: e.g. aggressive (lowercase/digits/underscore)
+  如_my_rule_小写字母_数字_下划线: e.g. my_rule (lowercase/digits/underscore)
+  如_治疗_纯奶: e.g. Heal-Pure Healer
+  如_激进回收: e.g. Aggressive Recycle
+  对装备进行第一次调律前执行一次结束处理: Execute end processing once before first tuning of equipment,
+  将选中规则上移一行: Move selected rule up one row
+  将选中规则下移一行: Move selected rule down one row
+  已保存并生效_{now}: Saved and active ({now})
+  已切换到基础规则组_{name}: Switched to base rule group '{name}'
+  已删除基础规则组_{name}: Deleted base rule group '{name}'
+  已删除规则_{key}: Deleted rule {key}
+  已启用: Enabled
+  已复制为基础规则组_{name}: Copied as base rule group '{name}'
+  已新增基础规则组_{name}: Added new base rule group '{name}'
+  已新增规则_{name}: Added new rule '{name}'
+  已是最后一条规则_无法下移: Already the last rule, cannot move down
+  已是第一条规则_无法上移: Already the first rule, cannot move up
+  已禁用: Disabled
+  已选词条_可拖拽调整顺序: Selected affixes (drag to reorder)
+  开关_key: Switch key
+  开关_key_显示名_规则条件组_when_引用的: Switch key → display name; referenced by rule condition group when
+  开关前提: "Switch precondition:"
+  开关设定: Switch Settings
+  开启时生效: Takes effect when enabled
+  当前规则: Current Rule
+  当前规则_1: "Current Rule:"
+  扫描处理: Scan Processing
+  数量基准: Quantity Baseline
+  新增基础规则组: New base rule group
+  新增规则组: New Rule Group
+  新增调律规则: New Tuning Rule
+  最大连续回收次数: Max Consecutive Recycles
+  本条规则的判定方式_传入规则_运行期勾选的规则_全部规则: "This rule's judgment method: passed rules = runtime checked rules; all rules;"
+  机制说明_不可配置: Mechanism description, not configurable
+  材料处理: Material Processing
+  条件: Condition
+  条件组_组内全部满足方命中: Condition group (all in group must be met)
+  标识_key_须为小写字母开头的英文_数字_下划线: Identifier key must start with lowercase letter, then letters/digits/underscores
+  标识_key: "Identifier key:"
+  校验失败_未保存_{err}: "Validation failed (not saved): {err}"
+  次数用尽后: When Count Exhausted
+  每档由若干条件组定义_组间_OR_组内_AND: "Each tier defined by condition groups: OR between groups, AND within group,"
+  每轮调律开始前的行为点: "Behavior point before each tuning round):"
+  每轮调律结束后的行为点_按预期评级决策: "Behavior point after each tuning round): decide by expected rating"
+  每轮调律自上而下匹配_首条命中即生效: Each tuning round matches top-down, first hit takes effect;
+  流派规则: Playstyle Rules
+  添加条件: Add Condition
+  添加条件组: Add Condition Group
+  添加行: Add Row
+  添加规则: Add Rule
+  狗粮添加规则: Fodder Add Rules
+  玩法设定: Playstyle Settings
+  确定删除规则组_{name}_该操作不可恢复: Delete rule group '{name}'? This cannot be undone.
+  确定删除调律规则_{name}_规则文件将被删除_不可恢复: Delete tuning rule '{name}'? The file will be deleted permanently.
+  禁用: Disable
+  移除选中: Remove Selected
+  等级门槛: Level Threshold
+  等级门槛_调律门槛_扫描_材料_结束处理: Level threshold + tuning threshold + scan/material/end processing,
+  绑定开关: Binding Switch
+  结束处理: End Processing
+  自选判定规则: Custom Judgment Rules
+  自选词条: Custom Affixes
+  至少保留一个规则组: Keep at least one rule group
+  装备评级: Equipment Rating
+  规则变更即校验_校验通过自动保存并生效: Rule changes validated; auto-saved on pass
+  规则名称不能为空: Rule name cannot be empty
+  规则名称: "Rule Name:"
+  规则命中重置但次数已用尽_按钮文本读不到数字: Rule hit reset but count exhausted (button text cannot read number)
+  规则已禁用_右键启用: Rule disabled; right-click to enable
+  规则组名: Rule Group Name
+  规则组名称不能为空: Rule group name cannot be empty
+  规则组名称: "Rule Group Name:"
+  规则说明: Rule Description
+  规则说明已保存_{key}: Rule description saved ({key})
+  设置启用状态失败_{e}: "Failed to set enable state: {e}"
+  询问是否继续_弹窗确认_继续则本次运行不再检查: "Ask to continue: popup confirm, continue skips further checks this run"
+  请先在列表中选中要删除的规则组: Please select a rule group to delete in the list first
+  请先在列表中选中要复制的规则组: Please select a rule group to copy in the list first
+  请先选中要删除的规则行: Please select a rule row to delete first
+  调律前识别材料区数量: Identify material area count before tuning,
+  调律门槛: Tuning Threshold
+  转律词条库: Transform Affix Pool
+  转律词条库_全局_优先级从高到低: Transform Affix Pool (global, priority high to low)
+  进调律前的行为点_未达调律门槛的装备: "Before tuning behavior): Equipment below tuning threshold"
+  选择{title}词条: Select {title} affix
+  选择条件词条: Select condition affix
+  选择词条: Select Affix
+  选择首词条候选: Select first affix candidates
+  通用判定_这里的条件对所有部位都生效: "Common judgment: conditions here apply to all slots"
+  部位: Slot
+  重命名: Rename
+  重命名失败_{e}: "Rename failed: {e}"
+  重命名规则: Rename Rule
+  重命名规则_key: Rename rule key
+  预期评级_该档即进入调律_固定用传入规则判定: Enter tuning when expected rating >= this tier (uses passed rules)
+  预期评级识别使用勾选的流派规则: "Expected rating uses checked playstyle rules:"
+  首词条: First Affix
+  首词条初始数值比较方向: First affix initial value comparison direction
+  默认判定: Default Judgment
+  默认判定_1: "Default Judgment:"
+  仅列出的部位覆盖全局默认_未列部位沿用基础配置: (Only listed slots override global defaults)
+  双击左侧导航中的规则名可修改: (Double-click rule name in left nav to rename)
+  无_恒生效: (None, always active)
+  点击选择词条: (Click to select affix)
+  点击选择首词条: (Click to select first affix)
+  跟随规则设置: (Follow rule settings)
+  须大于_0: (Must be > 0)
+  新增规则: ＋ New Rule
+  # ── 用户总览 ──
+  Key_{key}_已在该分组中显示: Key '{key}' already shown in group
+  "{label}_必须是数字": "{label} must be a number"
+  "{label}_必须是整数": "{label} must be an integer"
+  保存失败: Save Failed
+  写入冲突: Write conflict
+  减少: Decrease...
+  减少后数值不能小于_0_当前值_{cur}_输入_{inp}: "Value after decrease cannot be less than 0 (current: {cur}, input: {inp})"
+  减少量: "Decrease Amount:"
+  分组名不能为空: Group name cannot be empty
+  删除分组: Delete Group
+  取消: Cancel
+  同步写入失败: Sync write failed
+  增减量_正增负减: "Change amount (+/-):"
+  增加: Increase...
+  增加量: "Increase Amount:"
+  定义数据模型_key: Define data model keys
+  当前值_{val}: "Current Value: {val}"
+  数值无效: Invalid value
+  数据模型: Data Model
+  新值: New Value
+  新名称: "New Name:"
+  新建分组: New Group
+  来源_用途: Source/Usage
+  查看历史记录: View History
+  没有可用的数据模型_key_请先在数据模型定义中添加: No data model keys available, please add in model definition first
+  用途: "Usage:"
+  确定: OK
+  确定要删除分组_{name}_吗: Delete group '{name}'?
+  自定义增减_{label}: Custom change - {label}
+  至少保留一个分组: Keep at least one group
+  覆写_{label}: Override - {label}
+  覆写: Override...
+  该数值已被其他进程更新_本次增减未写入_请刷新后重试: Value was updated by another process, change not written. Please refresh and retry.
+  选择字段: Select Field
+  重新读取角色数据: Reload character data
+  错误: Error
+  请选择: (Please select)
+  # ── 用户对话框 ──
+  "{field}不能大于_999999": "{field} cannot exceed 999999"
+  "{field}不能小于_{min}": "{field} cannot be less than {min}"
+  "{field}必须是有效数字": "{field} must be a valid number"
+  变更记录: Change Log
+  同步变更依赖方: Sync change dependents
+  新值: New Value
+  旧值: Old Value
+  时间: Time
+  来源: "Source:"
+  类型: Type
+  详情: Details
+  请输入{field}: Please enter {field}
+  请输入数值: Please enter a value
+  输入错误: Input Error
+  选择或输入新{label}: Select or enter new {label}
+  # ── 用户 Tab ──
+  上一个用户: Previous User
+  下一个用户: Next User
+  已完成: Completed
+  未完成: Incomplete
+  请先选择用户: Please select a user first
+  # ── 用户设置 ──
+  Key_{key}_已存在: Key '{key}' already exists
+  Key_只能包含字母_数字和下划线: Key can only contain letters, digits and underscores
+  "{title}_Key_{model}": "{title} Key ({model})"
+  上移: Move Up
+  上限: Cap
+  上限_1: "Cap:"
+  下移: Move Down
+  不提醒: No Alert
+  中文_如_袅袅_本周: Chinese, e.g. Niaoniao (this week)
+  倍率: Ratio
+  准点_{unit}: Boundary/{unit}
+  准点_{val}_{period}: "Boundary:{val}/{period}"
+  准点周期: "Boundary Period:"
+  准点恢复: Boundary Recovery
+  分钟: Minute
+  半赛季: Half Season
+  单向增加: Increase Only
+  可选: Optional
+  同步_{sync}: "Sync:{sync}"
+  同步目标: "Sync Targets:"
+  同步目标不能指向自身: Sync target cannot point to itself
+  周: Week
+  周期: Period
+  周期_1: "Period:"
+  增减幅度: "Step Values:"
+  增减幅度格式错误_{part}_应为整数或_整数_来源: "Step format error: '{part}', expected integer or int:source"
+  天: Day
+  如_900_打本消耗_1100_或_1_10_商店: "e.g.: -900:dungeon,-1100 or 1,10:shop"
+  如_1_任务奖励_10_或_1: "e.g.: 1:quest reward,10 or -1"
+  如_1_兑换_10_或_1: "e.g.: 1:exchange,10 or -1"
+  定义三种数据模型的_key_双击行可编辑: Define keys for three data models. Double-click to edit.
+  实时_{unit}: Realtime/{unit}
+  实时_{val}_{unit}: "Realtime:{val}/{unit}"
+  实时恢复: Realtime Recovery
+  小时: Hour
+  展示上限: Show Cap
+  支持小数: Decimal Support
+  幅度_{steps}: "Steps:{steps}"
+  恢复类型: "Recovery Type:"
+  新增: New
+  方向: Direction
+  无上限: No Cap
+  来源: "Source:"
+  标签: Label
+  标签_1: "Label:"
+  橙色阈值: "Orange Threshold:"
+  橙警_{val}: "Orange:>={val}"
+  每周: Weekly
+  每天: Daily
+  每月: Monthly
+  每次恢复: "Per Recovery:"
+  添加同步目标: Add Sync Target
+  玩家数据模型定义: Player Data Model Definition
+  用途: "Usage:"
+  目标: Target
+  确定要删除_key_{key}_吗: Delete key '{key}'?
+  红色阈值: "Red Threshold:"
+  红警_{val}: "Red:>={val}"
+  编辑: Edit
+  英文_如: "English, e.g. "
+  详情摘要: Summary
+  请输入_Key: Please enter Key
+  请输入标签: Please enter label
+  赛季: Season
+  软上限: Soft Cap
+  逗号分隔_减少时供下拉选择_如_兑换_强化_出售: "Comma-separated, dropdown source for decreases, e.g.: Exchange,Enhance,Sell"
+  逗号分隔_增加时供下拉选择_如_打本_商店_任务: "Comma-separated, dropdown source for increases, e.g.: Dungeon,Shop,Quest"
+  速率单位: "Rate Unit:"
+  速率数值: "Rate Value:"
+  重置_{time}: "Reset:{time}"
+  重置日_几号: "Reset Day (date):"
+  重置日_周几: "Reset Day (weekday):"
+  重置日_{day}: "Reset day:{day}"
+  重置日_{day}号: "Reset day:{day}"
+  重置时刻: "Reset Time:"
+  默认: Default
+
+# ── Messages ──
+messages:
+  err_layout_not_found: "Failed to load layout: {name}"
+  err_panel_not_defined: "Panel {scene}.{panel} not defined in layout, please bind it in Scene Editor"
+  err_no_capture_source: "No capture source, please locate window first"
+  update_available: "New version v{latest} available.\nCurrent: v{current}\n\nDownload now?"
+  update_latest_title: "Up to Date"
+  update_latest_message: "Version v{current} is the latest"
+
+# ── Config Display Names ──
+config:
+  wf_equip_analysis: "Equipment Analysis"
+  wf_purchase_xinfa: "Auto Purchase Xinfa"
+  wf_purchase_bugan: "Auto Purchase Bugan"
+  wf_daily_jianghu: "Daily Jianghu Order"
+  wf_daily_checkin: "Daily Check-in"
+  layout_default: "Default Layout"
+  layout_phone: "Phone Layout"
+  delay_step_wait: "Step Interval"
+  delay_click_interval: "Click Interval"
+  delay_page_refresh: "Page Refresh Wait"
+  delay_scroll_settle: "Scroll Settle Wait"
+

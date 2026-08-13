@@ -6,10 +6,12 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QAction
 
+from ....i18n import tr
+
 
 def build_menu(host, menubar) -> None:
     """在通用菜单栏上追加「燕云」菜单（host 作为对话框 parent）"""
-    menu = menubar.addMenu("燕云")
+    menu = menubar.addMenu(tr("燕云"))
 
     def _open_game_config():
         from .game_settings import GameConfigDialog
@@ -22,8 +24,8 @@ def build_menu(host, menubar) -> None:
         dialog.exec()
 
     for label, handler, shortcut in [
-        ("游戏配置", _open_game_config, "F5"),
-        ("调律配置", _open_tuning_rules, "F6"),
+        (tr("游戏配置"), _open_game_config, "F5"),
+        (tr("调律配置"), _open_tuning_rules, "F6"),
     ]:
         action = QAction(label, host)
         action.setShortcut(shortcut)

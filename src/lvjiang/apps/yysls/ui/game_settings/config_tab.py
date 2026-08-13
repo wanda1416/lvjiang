@@ -10,6 +10,7 @@
 
 from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
+from .....i18n import tr
 from .affix_caps_panel import AffixCapsPanel
 from .base_attr_panel import BaseAttrPanel
 from .level_config_panel import LevelConfigPanel
@@ -33,23 +34,23 @@ class GameConfigTab(QWidget):
 
         # 词组配置面板（最基础，不依赖任何 tab）
         self._affix_panel = AffixCapsPanel()
-        self._tabs.addTab(self._affix_panel, "词组配置")
+        self._tabs.addTab(self._affix_panel, tr("词组配置"))
 
         # 装备配置面板（基础属性 + 武器类型）
         self._base_panel = BaseAttrPanel()
-        self._tabs.addTab(self._base_panel, "装备配置")
+        self._tabs.addTab(self._base_panel, tr("装备配置"))
 
         # 流派配置面板
         self._school_panel = SchoolPanel()
-        self._tabs.addTab(self._school_panel, "流派配置")
+        self._tabs.addTab(self._school_panel, tr("流派配置"))
 
         # 等级配置面板（按等级区分重置支持与材料要求）
         self._level_panel = LevelConfigPanel()
-        self._tabs.addTab(self._level_panel, "等级配置")
+        self._tabs.addTab(self._level_panel, tr("等级配置"))
 
         # 赛季配置面板（管理游戏赛季时间与装备等级）
         self._season_panel = SeasonConfigPanel()
-        self._tabs.addTab(self._season_panel, "赛季配置")
+        self._tabs.addTab(self._season_panel, tr("赛季配置"))
 
         # 等级配置保存后，刷新其他面板中的 LevelCombo
         self._level_panel.level_configs_saved.connect(self._refresh_level_combos)

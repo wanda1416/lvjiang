@@ -14,6 +14,8 @@ from typing import Callable
 
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from .....i18n import tr
+
 from .condition_editor import ConditionGroupsEditor
 from .part_pattern_page import TierTabsWidget
 
@@ -34,7 +36,7 @@ class CommonJudgePage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
-            "<b>判定条件</b>（通用判定：这里的条件对所有部位都生效）"))
+            "<b>" + tr("判定条件") + "</b>（" + tr("通用判定：这里的条件对所有部位都生效") + "）"))
 
         # 判定条件 Tab（全部 + 四档，顺序 junk → … → top）
         self._tier_tabs = TierTabsWidget(self._candidates)

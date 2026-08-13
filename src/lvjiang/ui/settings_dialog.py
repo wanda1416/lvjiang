@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.config import load_user_config, save_app_config, save_settings
+from ..i18n import tr
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -50,7 +51,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("配置管理")
+        self.setWindowTitle(tr("配置管理"))
         self.setMinimumSize(720, 480)
         self.resize(760, 520)
         self._config = load_user_config()
@@ -63,20 +64,20 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         tabs = QTabWidget()
-        tabs.addTab(self._build_basic_tab(), "基础配置")
-        tabs.addTab(self._build_input_tab(), "输入模拟")
-        tabs.addTab(self._build_wait_tab(), "等待参数")
+        tabs.addTab(self._build_basic_tab(), tr("基础配置"))
+        tabs.addTab(self._build_input_tab(), tr("输入模拟"))
+        tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         layout.addWidget(tabs)
 
         # ── 底部按钮：保存（左）与关闭（右）隔开，语义不同 ──
         # 保存默认置灰，参数发生变更后启用；保存后不关闭对话框，可继续修改
         btn_row = QHBoxLayout()
-        self._save_btn = QPushButton("保存")
+        self._save_btn = QPushButton(tr("保存"))
         self._save_btn.setEnabled(False)
         self._save_btn.clicked.connect(self._on_save)
         btn_row.addWidget(self._save_btn)
         btn_row.addStretch()
-        close_btn = QPushButton("关闭")
+        close_btn = QPushButton(tr("关闭"))
         close_btn.clicked.connect(self.accept)
         btn_row.addWidget(close_btn)
         layout.addLayout(btn_row)
@@ -89,6 +90,7 @@ class SettingsDialog(QDialog):
 
     def _connect_dirty_signals(self):
         """UI 构建完成后统一连接变更信号（避免初始赋值触发）"""
+        self._lang_combo.currentIndexChanged.connect(self._mark_dirty)
         self._capture_combo.currentIndexChanged.connect(self._mark_dirty)
         self._input_combo.currentIndexChanged.connect(self._mark_dirty)
         self._title_edit.textChanged.connect(self._mark_dirty)
@@ -113,21 +115,33 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         form = QFormLayout(tab)
 
+        # ── 语言选择 ──
+        from ..i18n import available_languages, current_language
+        self._lang_combo = QComboBox()
+        languages = available_languages()
+        for lang in languages:
+            self._lang_combo.addItem(f"{lang['name']} ({lang['code']})", lang["code"])
+        current = current_language()
+        idx = self._lang_combo.findData(current)
+        if idx >= 0:
+            self._lang_combo.setCurrentIndex(idx)
+        form.addRow(tr("界面语言") + ":", self._lang_combo)
+
         self._capture_combo = QComboBox()
-        self._capture_combo.addItem("视频流截图 (scrcpy)", True)
-        self._capture_combo.addItem("静态截图 (screencap)", False)
+        self._capture_combo.addItem(tr("视频流截图 (scrcpy)"), True)
+        self._capture_combo.addItem(tr("静态截图 (screencap)"), False)
         self._capture_combo.setCurrentIndex(0 if self._config.adb_capture_streaming else 1)
-        form.addRow("ADB 截图方式:", self._capture_combo)
+        form.addRow(tr("ADB 截图方式:"), self._capture_combo)
 
         self._input_combo = QComboBox()
-        self._input_combo.addItem("后台输入 (PostMessage)", True)
-        self._input_combo.addItem("光标输入 (SendInput)", False)
+        self._input_combo.addItem(tr("后台输入 (PostMessage)"), True)
+        self._input_combo.addItem(tr("光标输入 (SendInput)"), False)
         self._input_combo.setCurrentIndex(0 if self._config.desktop_background_input else 1)
-        form.addRow("窗口输入模式:", self._input_combo)
+        form.addRow(tr("窗口输入模式:"), self._input_combo)
 
         self._title_edit = QLineEdit(self._config.desktop_window_title)
-        self._title_edit.setPlaceholderText("空串不自动定位窗口")
-        form.addRow("默认窗口标题:", self._title_edit)
+        self._title_edit.setPlaceholderText(tr("空串不自动定位窗口"))
+        form.addRow(tr("默认窗口标题:"), self._title_edit)
 
         return tab
 
@@ -330,11 +344,16 @@ class SettingsDialog(QDialog):
         delay_params = self._collect_custom()
         if delay_params is None:
             return
-        save_settings({
+        settings = {
             "adb_capture_streaming": self._capture_combo.currentData(),
             "desktop_background_input": self._input_combo.currentData(),
             "desktop_window_title": self._title_edit.text().strip(),
-        })
+        }
+        # 保存语言设置（需重启生效）
+        lang = self._lang_combo.currentData()
+        if lang:
+            settings["language"] = lang
+        save_settings(settings)
         input_sim: dict = {}
         for name, *_ in _RANGE_FIELDS:
             lo_spin, hi_spin = self._range_spins[name]

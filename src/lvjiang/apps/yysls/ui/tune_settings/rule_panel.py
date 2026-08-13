@@ -30,6 +30,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     rule_affix_candidates,
     specific_attr_names,
 )
+from .....i18n import tr
 
 from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
@@ -46,7 +47,7 @@ _NAV_ITEMS: list[tuple[str, str | None]] = [
     ("环 · 佩", "环"),
     ("冠胄 · 胸甲", "冠胄"),
     ("胫甲 · 腕甲", "胫甲"),
-]
+]  # runtime tr()
 
 # 分割线插入位置：「词条库设置」之下（全局区 / 判定区语义分隔）
 _SEP_ROW = 2
@@ -126,7 +127,7 @@ class RulePanel(QWidget):
         # ── 左侧导航 ──
         self._nav = QListWidget()
         for row, (title, _) in enumerate(_NAV_ITEMS):
-            self._nav.addItem(title)
+            self._nav.addItem(tr(title))
             if row == _SEP_ROW - 1:
                 add_nav_separator(self._nav)
         self._nav.setFixedWidth(140)
@@ -187,27 +188,27 @@ class RulePanel(QWidget):
         self._judge_candidates[:] = list(self._data.get("affix_pool") or [])
         err = self._manager.validate(self._data)
         if err:
-            self._status_cb(f"校验失败（未保存）：{err}", True)
+            self._status_cb(tr("校验失败（未保存）：{err}").format(err=err), True)
             return
         try:
             self._manager.save_rule(self._key, self._data)
         except Exception as e:  # noqa: BLE001
             logger.exception(f"调律规则 {self._key} 保存失败")
-            self._status_cb(f"保存失败：{e}", True)
+            self._status_cb(tr("保存失败：{e}").format(e=e), True)
             return
         now = datetime.now().strftime("%H:%M:%S")
         warn = self._soft_pool_warning()
         if warn:
-            self._status_cb(f"已保存并生效（{now}）；{warn}", "warn")
+            self._status_cb(tr("已保存并生效（{now}）").format(now=now) + "；" + warn, "warn")
         else:
-            self._status_cb(f"已保存并生效（{now}）", False)
+            self._status_cb(tr("已保存并生效（{now}）").format(now=now), False)
 
     def _soft_pool_warning(self) -> str | None:
         """软校验（不阻止保存）：可用词条库同时含动态属攻与
         真实属攻（非无相）时提醒统一风格，避免名实混用"""
         pool = set(self._data.get("affix_pool") or [])
         if pool & set(DYNAMIC_AFFIXES) and pool & set(specific_attr_names()):
-            return "发现同时配置 动态属攻和真实属攻，建议修正"
+            return tr("发现同时配置 动态属攻和真实属攻，建议修正")
         return None
 
     def _request_delete(self):
@@ -220,7 +221,7 @@ class RulePanel(QWidget):
         try:
             self._manager.rename_rule(old_key, new_key)
         except Exception as e:  # noqa: BLE001
-            self._status_cb(f"重命名失败：{e}", True)
+            self._status_cb(tr("重命名失败：{e}").format(e=e), True)
             raise
         self._key = new_key
         # 对话框在创建面板时注入 _dialog_rename_cb，用于更新 Tab 文本
@@ -242,8 +243,8 @@ class RulePanel(QWidget):
         try:
             self._manager.set_rule_enabled(self._key, enabled)
             now = datetime.now().strftime("%H:%M:%S")
-            status = "已启用" if enabled else "已禁用"
+            status = tr("已启用") if enabled else tr("已禁用")
             self._status_cb(f"{status}（{now}）", False)
         except Exception as e:  # noqa: BLE001
-            self._status_cb(f"设置启用状态失败：{e}", True)
+            self._status_cb(tr("设置启用状态失败：{e}").format(e=e), True)
 

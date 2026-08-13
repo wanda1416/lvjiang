@@ -38,6 +38,7 @@ from ..core.config import load_user_config
 from ..core.config.users import SessionManager
 from ..core.layout_manager import LayoutConfigManager
 from ..core.user_config import UserConfigManager
+from ..i18n import tr
 from .capture_ops import CaptureOpsMixin
 from .overlay import BorderOverlay
 from .run_control import RunControlMixin
@@ -204,43 +205,43 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """)
 
         # ── 通用 ──
-        settings_menu = menubar.addMenu("通用")
+        settings_menu = menubar.addMenu(tr("通用"))
 
-        settings_mgmt = QAction("配置管理", self)
+        settings_mgmt = QAction(tr("配置管理"), self)
         settings_mgmt.triggered.connect(self._open_settings_manager)
         settings_menu.addAction(settings_mgmt)
 
-        user_mgmt = QAction("用户管理", self)
+        user_mgmt = QAction(tr("用户管理"), self)
         user_mgmt.setShortcut("F2")
         user_mgmt.triggered.connect(self._open_user_manager)
         settings_menu.addAction(user_mgmt)
 
-        scene_editor = QAction("场景管理", self)
+        scene_editor = QAction(tr("场景管理"), self)
         scene_editor.setShortcut("F3")
         scene_editor.triggered.connect(self._open_scene_editor)
         settings_menu.addAction(scene_editor)
 
-        reference_mgr = QAction("图库管理", self)
+        reference_mgr = QAction(tr("图库管理"), self)
         reference_mgr.setShortcut("F4")
         reference_mgr.triggered.connect(self._open_reference_manager)
         settings_menu.addAction(reference_mgr)
 
         # ── 工具 ──
-        tools_menu = menubar.addMenu("工具")
+        tools_menu = menubar.addMenu(tr("工具"))
 
-        ocr_action = QAction("图像识别", self)
+        ocr_action = QAction(tr("图像识别"), self)
         ocr_action.triggered.connect(self._open_ocr_dialog)
         tools_menu.addAction(ocr_action)
 
-        script_record = QAction("脚本录制", self)
+        script_record = QAction(tr("脚本录制"), self)
         script_record.triggered.connect(self._open_script_record)
         tools_menu.addAction(script_record)
 
-        script_config = QAction("脚本配置", self)
+        script_config = QAction(tr("脚本配置"), self)
         script_config.triggered.connect(self._open_script_config)
         tools_menu.addAction(script_config)
 
-        batch_settings = QAction("批量配置", self)
+        batch_settings = QAction(tr("批量配置"), self)
         batch_settings.triggered.connect(self._open_batch_config)
         tools_menu.addAction(batch_settings)
 
@@ -253,23 +254,23 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 logger.exception("menu builder 执行失败")
 
         # ── 帮助 ──
-        help_menu = menubar.addMenu("帮助")
+        help_menu = menubar.addMenu(tr("帮助"))
 
-        check_update = QAction("检查更新", self)
+        check_update = QAction(tr("检查更新"), self)
         check_update.triggered.connect(self._check_update)
         help_menu.addAction(check_update)
 
-        docs = QAction("文档", self)
+        docs = QAction(tr("文档"), self)
         docs.triggered.connect(self._open_docs)
         help_menu.addAction(docs)
 
-        feedback = QAction("反馈", self)
+        feedback = QAction(tr("反馈"), self)
         feedback.triggered.connect(self._open_feedback)
         help_menu.addAction(feedback)
 
         help_menu.addSeparator()
 
-        about = QAction("关于", self)
+        about = QAction(tr("关于"), self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
 
@@ -323,7 +324,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             from ..workflows.base import BaseWorkflow
             if BaseWorkflow._shared_material_recognizer is not None:
                 BaseWorkflow._shared_material_recognizer.reload()
-                self.statusBar().showMessage("图库已刷新", 3000)
+                self.statusBar().showMessage(tr("图库已刷新"), 3000)
 
     def _show_about(self):
         from .about_dialog import AboutDialog
@@ -346,10 +347,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             if is_newer_version(latest_version, current_version):
                 result = QMessageBox.information(
                     self,
-                    "发现新版本",
-                    f"发现新版本 v{latest_version}\n"
-                    f"当前版本: v{current_version}\n\n"
-                    "是否前往下载？",
+                    tr("发现新版本"),
+                    tr("发现新版本 v{latest}\n当前版本: v{current}\n\n是否前往下载？").format(
+                        latest=latest_version, current=current_version),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
                 if result == QMessageBox.StandardButton.Yes:
@@ -357,12 +357,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             else:
                 QMessageBox.information(
                     self,
-                    "已是最新版本",
-                    f"当前版本 v{current_version} 已是最新版本",
+                    tr("已是最新版本"),
+                    tr("当前版本 v{current} 已是最新版本").format(current=current_version),
                 )
 
         def on_error(error_msg: str):
-            QMessageBox.warning(self, "检查更新失败", error_msg)
+            QMessageBox.warning(self, tr("检查更新失败"), error_msg)
 
         checker.finished.connect(on_finished)
         checker.error.connect(on_error)
@@ -397,11 +397,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if dialog.exec():
             # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
             self._user_config = load_user_config()
-            self.statusBar().showMessage("配置已保存", 3000)
+            self.statusBar().showMessage(tr("配置已保存"), 3000)
 
     def _on_toggle_preview(self, checked: bool):
         self.preview_container.setVisible(not checked)
-        self.btn_hide_window.setText("显示预览" if checked else "隐藏预览")
+        self.btn_hide_window.setText(tr("显示预览") if checked else tr("隐藏预览"))
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
@@ -412,13 +412,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         # === 顶部：用户 + 布局 ===
         top_row = QHBoxLayout()
-        top_row.addWidget(QLabel("当前用户"))
+        top_row.addWidget(QLabel(tr("当前用户")))
         self.user_combo = QComboBox()
         self.user_combo.setMinimumWidth(150)
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         top_row.addWidget(self.user_combo)
         top_row.addSpacing(20)
-        top_row.addWidget(QLabel("当前布局"))
+        top_row.addWidget(QLabel(tr("当前布局")))
         self.layout_combo = QComboBox()
         self.layout_combo.setMinimumWidth(150)
         self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
@@ -432,7 +432,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         window_main_layout = QVBoxLayout(window_group)
 
         row1 = QHBoxLayout()
-        self.btn_scan_window = QPushButton("扫描窗口")
+        self.btn_scan_window = QPushButton(tr("扫描窗口"))
         self.btn_scan_window.setFixedWidth(90)
         self.btn_scan_window.clicked.connect(self._on_scan_window)
         from ..core.platforms import DESKTOP_BACKEND_AVAILABLE
@@ -441,7 +441,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             self.btn_scan_window.setVisible(False)
         row1.addWidget(self.btn_scan_window)
 
-        self.btn_scan_device = QPushButton("扫描设备")
+        self.btn_scan_device = QPushButton(tr("扫描设备"))
         self.btn_scan_device.setFixedWidth(90)
         self.btn_scan_device.clicked.connect(self._on_scan_devices)
         row1.addWidget(self.btn_scan_device)
@@ -451,13 +451,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.window_combo.currentIndexChanged.connect(self._on_window_selected)
         row1.addWidget(self.window_combo)
 
-        self.btn_locate = QPushButton("定位")
+        self.btn_locate = QPushButton(tr("定位"))
         self.btn_locate.setFixedWidth(70)
         self.btn_locate.setEnabled(False)
         self.btn_locate.clicked.connect(self._on_locate_window)
         row1.addWidget(self.btn_locate)
 
-        self.btn_hide_window = QPushButton("显示预览")
+        self.btn_hide_window = QPushButton(tr("显示预览"))
         self.btn_hide_window.setFixedWidth(80)
         self.btn_hide_window.setCheckable(True)
         self.btn_hide_window.setChecked(True)
@@ -466,17 +466,17 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         window_main_layout.addLayout(row1)
 
         row2 = QHBoxLayout()
-        self.lbl_window_info = QLabel("未选择窗口")
+        self.lbl_window_info = QLabel(tr("未选择窗口"))
         self.lbl_window_info.setStyleSheet("color: gray;")
         row2.addWidget(self.lbl_window_info)
         row2.addStretch()
 
-        self.chk_bg_mode = QCheckBox("后台模式")
+        self.chk_bg_mode = QCheckBox(tr("后台模式"))
         self.chk_bg_mode.setVisible(False)
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
         row2.addWidget(self.chk_bg_mode)
 
-        self.chk_scrcpy = QCheckBox("流式截图")
+        self.chk_scrcpy = QCheckBox(tr("流式截图"))
         self.chk_scrcpy.setVisible(False)
         self.chk_scrcpy.stateChanged.connect(self._on_capture_method_changed)
         row2.addWidget(self.chk_scrcpy)
@@ -492,7 +492,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         preview_layout.setContentsMargins(0, 0, 0, 0)
         preview_layout.setSpacing(6)
 
-        self.preview_label = QLabel("定位窗口后自动截屏")
+        self.preview_label = QLabel(tr("定位窗口后自动截屏"))
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setStyleSheet("background-color: #2b2b2b; color: #888; font-size: 14px;")
         preview_layout.addWidget(self.preview_label, stretch=1)
@@ -537,7 +537,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
-        self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 脚本录制")
+        self.statusBar().showMessage(tr("就绪 | F9 开始 | F10 停止 | F8 脚本录制"))
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._migrate_ui_state()
@@ -556,20 +556,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         daily_layout.setSpacing(8)
 
         # 开始/停止按钮（第一行）
-        self.btn_run_workflow = QPushButton("开始执行 (F9)")
+        self.btn_run_workflow = QPushButton(tr("开始执行 (F9)"))
         self.btn_run_workflow.clicked.connect(self._on_run_workflow)
         self.btn_run_workflow.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
         )
         daily_layout.addWidget(self.btn_run_workflow)
 
-        wf_group = QGroupBox("脚本")
+        wf_group = QGroupBox(tr("脚本"))
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.setMinimumWidth(150)
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
         wf_layout.addWidget(self.workflow_combo, stretch=1)
-        self.btn_load_workflow = QPushButton("加载")
+        self.btn_load_workflow = QPushButton(tr("加载"))
         self.btn_load_workflow.setFixedWidth(64)
         self.btn_load_workflow.clicked.connect(self._on_load_workflow)
         self.btn_load_workflow.setStyleSheet(
@@ -578,19 +578,19 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         wf_layout.addWidget(self.btn_load_workflow)
         daily_layout.addWidget(wf_group)
 
-        self._param_panel = QGroupBox("参数设置")
+        self._param_panel = QGroupBox(tr("参数设置"))
         self._param_layout = QFormLayout(self._param_panel)
         self._param_panel.setVisible(False)
         daily_layout.addWidget(self._param_panel)
 
         daily_layout.addStretch()
         daily_scroll.setWidget(daily_panel)
-        self._left_tabs.addTab(daily_scroll, "日常")
+        self._left_tabs.addTab(daily_scroll, tr("日常"))
 
         # ── Tab 2: 批量 ──
         from .batch import BatchTab
         self._batch_tab = BatchTab(host=self)
-        self._left_tabs.addTab(self._batch_tab, "批量")
+        self._left_tabs.addTab(self._batch_tab, tr("批量"))
 
         # ── 插件注入的左侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self._left_tabs, "left_tab_builders")
@@ -617,7 +617,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         filter_bar = QHBoxLayout()
         filter_bar.setContentsMargins(4, 0, 4, 2)
         filter_bar.addStretch()
-        filter_bar.addWidget(QLabel("日志级别"))
+        filter_bar.addWidget(QLabel(tr("日志级别")))
         self._log_level_combo = QComboBox()
         self._log_level_combo.addItem("INFO", 20)
         self._log_level_combo.addItem("DEBUG", 10)
@@ -626,7 +626,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         filter_bar.addWidget(self._log_level_combo)
         log_layout.addLayout(filter_bar)
 
-        self.tabs.addTab(log_container, "运行日志")
+        self.tabs.addTab(log_container, tr("运行日志"))
 
         # ── 插件注入的右侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self.tabs, "right_tab_builders")
@@ -638,7 +638,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """消费注册表中的插件 Tab builder；单个失败只记日志不中断。"""
         for label, builder in get_registry().get(registry_key, []):
             try:
-                tab_widget.addTab(builder(self), label)
+                tab_widget.addTab(builder(self), tr(label))
             except Exception:  # noqa: BLE001
                 logger.exception(f"插件 Tab「{label}」构建失败")
 
@@ -1061,8 +1061,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def closeEvent(self, event):
         if self._running:
             reply = QMessageBox.question(
-                self, "工作流运行中",
-                "当前有工作流正在运行，关闭程序将终止工作流。\n确定要退出吗？",
+                self, tr("工作流运行中"),
+                tr("当前有工作流正在运行，关闭程序将终止工作流。\n确定要退出吗？"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )

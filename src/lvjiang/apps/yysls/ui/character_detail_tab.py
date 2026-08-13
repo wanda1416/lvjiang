@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 
 from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from .profile.tab import add_user_nav_buttons
+from ....i18n import tr
 
 
 class CharacterDetailTab(QWidget):
@@ -28,9 +29,9 @@ class CharacterDetailTab(QWidget):
 
         # 刷新按钮
         btn_row = QHBoxLayout()
-        btn_refresh = QPushButton("刷新")
+        btn_refresh = QPushButton(tr("刷新"))
         btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip("刷新角色详情")
+        btn_refresh.setToolTip(tr("刷新角色详情"))
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)
         btn_row.addWidget(btn_refresh)
@@ -39,7 +40,7 @@ class CharacterDetailTab(QWidget):
         layout.addLayout(btn_row)
 
         # 占位提示
-        placeholder = QLabel("角色详情功能开发中…")
+        placeholder = QLabel(tr("角色详情功能开发中…"))
         placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder.setStyleSheet("color: #999; font-size: 14px; padding: 40px;")
         layout.addWidget(placeholder, stretch=1)

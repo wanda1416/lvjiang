@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.ocr_cleaner import OCRCleaner
+from ..i18n import tr
 from .ocr_canvas import OCRBox, OCRCanvas
 
 
@@ -41,7 +42,7 @@ class OCRDialog(QDialog):
             refresh_callback: 刷新截图回调，返回 (image, error_msg)
         """
         super().__init__(parent)
-        self.setWindowTitle("图像识别")
+        self.setWindowTitle(tr("图像识别"))
         self.setMinimumSize(1000, 700)
         self._refresh_callback = refresh_callback
         self._setup_ui()
@@ -55,11 +56,11 @@ class OCRDialog(QDialog):
 
         # Tab 1: 图像识别
         self._ocr_tab = self._create_ocr_tab()
-        self._tabs.addTab(self._ocr_tab, "图像识别")
+        self._tabs.addTab(self._ocr_tab, tr("图像识别"))
 
         # Tab 2: 清洗规则
         self._rules_tab = self._create_rules_tab()
-        self._tabs.addTab(self._rules_tab, "清洗规则")
+        self._tabs.addTab(self._rules_tab, tr("清洗规则"))
 
     # ─── Tab 1: 图像识别 ────────────────────────────────────
 
@@ -78,21 +79,21 @@ class OCRDialog(QDialog):
         # 画布上方按钮栏
         canvas_btn_row = QHBoxLayout()
 
-        self._btn_upload = QPushButton("上传图片")
+        self._btn_upload = QPushButton(tr("上传图片"))
         self._btn_upload.clicked.connect(self._on_upload)
         canvas_btn_row.addWidget(self._btn_upload)
 
-        self._btn_refresh = QPushButton("刷新截图")
-        self._btn_refresh.setToolTip("从设备获取最新截图")
+        self._btn_refresh = QPushButton(tr("刷新截图"))
+        self._btn_refresh.setToolTip(tr("从设备获取最新截图"))
         self._btn_refresh.clicked.connect(self._on_refresh)
         canvas_btn_row.addWidget(self._btn_refresh)
 
-        self._btn_clear_canvas = QPushButton("清空画布")
+        self._btn_clear_canvas = QPushButton(tr("清空画布"))
         self._btn_clear_canvas.clicked.connect(self._on_clear)
         canvas_btn_row.addWidget(self._btn_clear_canvas)
 
-        self._btn_clear_selection = QPushButton("清除选择")
-        self._btn_clear_selection.setToolTip("清除红色选框")
+        self._btn_clear_selection = QPushButton(tr("清除选择"))
+        self._btn_clear_selection.setToolTip(tr("清除红色选框"))
         self._btn_clear_selection.clicked.connect(self._on_clear_selection)
         canvas_btn_row.addWidget(self._btn_clear_selection)
 
@@ -113,12 +114,12 @@ class OCRDialog(QDialog):
         # 识别按钮栏
         btn_row = QHBoxLayout()
 
-        self._btn_ocr = QPushButton("识别文字 (F5)")
+        self._btn_ocr = QPushButton(tr("识别文字 (F5)"))
         self._btn_ocr.setEnabled(False)
         self._btn_ocr.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_ocr)
 
-        self._btn_material = QPushButton("识别材料 (F6)")
+        self._btn_material = QPushButton(tr("识别材料 (F6)"))
         self._btn_material.setEnabled(False)
         self._btn_material.clicked.connect(self._on_recognize_material)
         btn_row.addWidget(self._btn_material)
@@ -128,9 +129,9 @@ class OCRDialog(QDialog):
 
         # 分组选择下拉框
         group_row = QHBoxLayout()
-        group_row.addWidget(QLabel("匹配分组:"))
+        group_row.addWidget(QLabel(tr("匹配分组:")))
         self._group_combo = QComboBox()
-        self._group_combo.addItem("- 全部 -", None)
+        self._group_combo.addItem(tr("- 全部 -"), None)
         self._group_combo.setMinimumWidth(120)
         self._load_groups()
         group_row.addWidget(self._group_combo)
@@ -138,7 +139,7 @@ class OCRDialog(QDialog):
         right_layout.addLayout(group_row)
 
         # 识别结果
-        right_layout.addWidget(QLabel("识别结果（已应用清洗规则）："))
+        right_layout.addWidget(QLabel(tr("识别结果（已应用清洗规则）：")))
         self._result_text = QTextEdit()
         self._result_text.setReadOnly(True)
         self._result_text.setStyleSheet(
@@ -152,7 +153,7 @@ class OCRDialog(QDialog):
         layout.addWidget(splitter, stretch=1)  # splitter 占满剩余空间
 
         # 状态栏
-        self._status_label = QLabel("就绪")
+        self._status_label = QLabel(tr("就绪"))
         self._status_label.setStyleSheet("color: gray;")
         layout.addWidget(self._status_label)
 
@@ -165,16 +166,16 @@ class OCRDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         layout.addWidget(QLabel(
-            "通用清洗规则：所有 OCR 识别出的文字都会经过这些规则处理。\n"
-            "规则修改后立即生效，无需重启。"
+            tr("通用清洗规则：所有 OCR 识别出的文字都会经过这些规则处理。\n"
+               "规则修改后立即生效，无需重启。")
         ))
 
         # ── 文本替换规则 ──
-        repl_group = QGroupBox("文本替换（精确匹配）")
+        repl_group = QGroupBox(tr("文本替换（精确匹配）"))
         repl_layout = QVBoxLayout(repl_group)
 
         self._repl_table = QTableWidget(0, 2)
-        self._repl_table.setHorizontalHeaderLabels(["原始文本", "替换为"])
+        self._repl_table.setHorizontalHeaderLabels([tr("原始文本"), tr("替换为")])
         header = self._repl_table.horizontalHeader()
         assert header is not None
         header.setStretchLastSection(True)
@@ -185,11 +186,11 @@ class OCRDialog(QDialog):
         repl_layout.addWidget(self._repl_table)
 
         repl_btn_row = QHBoxLayout()
-        self._btn_add_repl = QPushButton("+ 添加替换规则")
+        self._btn_add_repl = QPushButton(tr("+ 添加替换规则"))
         self._btn_add_repl.clicked.connect(self._on_add_replacement)
         repl_btn_row.addWidget(self._btn_add_repl)
 
-        self._btn_del_repl = QPushButton("- 删除选中")
+        self._btn_del_repl = QPushButton(tr("- 删除选中"))
         self._btn_del_repl.clicked.connect(self._on_delete_replacement)
         repl_btn_row.addWidget(self._btn_del_repl)
 
@@ -199,11 +200,11 @@ class OCRDialog(QDialog):
         layout.addWidget(repl_group)
 
         # ── 正则替换规则 ──
-        pattern_group = QGroupBox("正则替换")
+        pattern_group = QGroupBox(tr("正则替换"))
         pattern_layout = QVBoxLayout(pattern_group)
 
         self._pattern_table = QTableWidget(0, 2)
-        self._pattern_table.setHorizontalHeaderLabels(["正则表达式", "替换为"])
+        self._pattern_table.setHorizontalHeaderLabels([tr("正则表达式"), tr("替换为")])
         header = self._pattern_table.horizontalHeader()
         assert header is not None
         header.setStretchLastSection(True)
@@ -214,11 +215,11 @@ class OCRDialog(QDialog):
         pattern_layout.addWidget(self._pattern_table)
 
         pattern_btn_row = QHBoxLayout()
-        self._btn_add_pattern = QPushButton("+ 添加正则规则")
+        self._btn_add_pattern = QPushButton(tr("+ 添加正则规则"))
         self._btn_add_pattern.clicked.connect(self._on_add_pattern)
         pattern_btn_row.addWidget(self._btn_add_pattern)
 
-        self._btn_del_pattern = QPushButton("- 删除选中")
+        self._btn_del_pattern = QPushButton(tr("- 删除选中"))
         self._btn_del_pattern.clicked.connect(self._on_delete_pattern)
         pattern_btn_row.addWidget(self._btn_del_pattern)
 
@@ -228,18 +229,18 @@ class OCRDialog(QDialog):
         layout.addWidget(pattern_group)
 
         # ── 测试区 ──
-        test_group = QGroupBox("测试清洗效果")
+        test_group = QGroupBox(tr("测试清洗效果"))
         test_layout = QVBoxLayout(test_group)
 
         test_input_row = QHBoxLayout()
         self._test_input = QTextEdit()
-        self._test_input.setPlaceholderText("输入测试文本...")
+        self._test_input.setPlaceholderText(tr("输入测试文本..."))
         self._test_input.setMaximumHeight(60)
         test_input_row.addWidget(self._test_input)
 
         self._test_output = QTextEdit()
         self._test_output.setReadOnly(True)
-        self._test_output.setPlaceholderText("清洗结果...")
+        self._test_output.setPlaceholderText(tr("清洗结果..."))
         self._test_output.setMaximumHeight(60)
         self._test_output.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
@@ -248,7 +249,7 @@ class OCRDialog(QDialog):
         test_layout.addLayout(test_input_row)
 
         test_btn_row = QHBoxLayout()
-        self._btn_test = QPushButton("测试")
+        self._btn_test = QPushButton(tr("测试"))
         self._btn_test.clicked.connect(self._on_test_clean)
         test_btn_row.addWidget(self._btn_test)
         test_btn_row.addStretch()
@@ -328,7 +329,7 @@ class OCRDialog(QDialog):
                 new_patterns[key] = val
         # 批量写入，只保存一次
         cleaner.set_patterns(new_patterns)
-        self._status_label.setText("规则已保存")
+        self._status_label.setText(tr("规则已保存"))
 
     def _on_add_replacement(self):
         """添加文本替换规则：插入空行供编辑"""
@@ -406,11 +407,11 @@ class OCRDialog(QDialog):
             url = mime.urls()[0]
             qimg = QImage(url.toLocalFile())
         else:
-            self._status_label.setText("剪贴板中没有图片")
+            self._status_label.setText(tr("剪贴板中没有图片"))
             return
 
         if qimg.isNull():
-            self._status_label.setText("无法读取剪贴板图片")
+            self._status_label.setText(tr("无法读取剪贴板图片"))
             return
 
         # QImage -> numpy BGR
@@ -426,8 +427,8 @@ class OCRDialog(QDialog):
     def _on_upload(self):
         """从文件对话框加载图片"""
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择图片", "",
-            "图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*)",
+            self, tr("选择图片"), "",
+            tr("图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*)"),
         )
         if not path:
             return
@@ -468,7 +469,7 @@ class OCRDialog(QDialog):
             self._status_label.setText("刷新截图不可用：未连接设备或未传入回调")
             return
 
-        self._status_label.setText("正在刷新截图...")
+        self._status_label.setText(tr("正在刷新截图..."))
         QApplication.processEvents()
 
         try:
@@ -480,7 +481,7 @@ class OCRDialog(QDialog):
 
         new_image, error_msg = result if isinstance(result, tuple) else (result, None)
         if new_image is None:
-            self._status_label.setText(error_msg or "刷新截图失败")
+            self._status_label.setText(error_msg or tr("刷新截图失败"))
             return
 
         # 直接使用 numpy 数组设置画布
@@ -497,7 +498,7 @@ class OCRDialog(QDialog):
         """
         bgr = self._canvas.get_image()
         if bgr is None:
-            return None, "无图片"
+            return None, tr("无图片")
 
         # 检查是否有选框
         sel = self._canvas.get_selection_pixels()
@@ -506,7 +507,7 @@ class OCRDialog(QDialog):
             # 裁剪选框区域
             crop = bgr[y1:y2, x1:x2].copy()
             if crop.size == 0:
-                return None, "选框区域为空"
+                return None, tr("选框区域为空")
             return crop, None
 
         return bgr, None
@@ -515,10 +516,10 @@ class OCRDialog(QDialog):
         """执行 OCR 文字识别（输出已由引擎层清洗）"""
         image, error_msg = self._get_recognition_image()
         if image is None:
-            self._status_label.setText(error_msg or "获取图像失败")
+            self._status_label.setText(error_msg or tr("获取图像失败"))
             return
 
-        self._status_label.setText("正在识别文字...")
+        self._status_label.setText(tr("正在识别文字..."))
         QApplication.processEvents()
 
         try:
@@ -528,7 +529,7 @@ class OCRDialog(QDialog):
 
             self._result_text.clear()
             if not results:
-                self._result_text.append("未识别到文字")
+                self._result_text.append(tr("未识别到文字"))
                 self._canvas.set_ocr_boxes([])
             else:
                 # 构建画布标注（如果有选框，需要加上偏移）
@@ -557,16 +558,16 @@ class OCRDialog(QDialog):
         except Exception as e:
             logger.error(f"OCR 识别失败: {e}")
             self._result_text.setText(f"识别失败: {e}")
-            self._status_label.setText("识别失败")
+            self._status_label.setText(tr("识别失败"))
 
     def _on_recognize_material(self):
         """执行材料识别（类型 + 等级 + 数量），输出最相似的 5 个结果"""
         image, error_msg = self._get_recognition_image()
         if image is None:
-            self._status_label.setText(error_msg or "获取图像失败")
+            self._status_label.setText(error_msg or tr("获取图像失败"))
             return
 
-        self._status_label.setText("正在识别材料...")
+        self._status_label.setText(tr("正在识别材料..."))
         QApplication.processEvents()
 
         try:
@@ -588,7 +589,7 @@ class OCRDialog(QDialog):
 
             self._result_text.clear()
             if not results:
-                self._result_text.append("未识别到材料（空槽或无匹配）")
+                self._result_text.append(tr("未识别到材料（空槽或无匹配）"))
             else:
                 for i, result in enumerate(results, 1):
                     if i > 1:
@@ -619,7 +620,7 @@ class OCRDialog(QDialog):
         except Exception as e:
             logger.error(f"材料识别失败: {e}")
             self._result_text.setText(f"识别失败: {e}")
-            self._status_label.setText("识别失败")
+            self._status_label.setText(tr("识别失败"))
 
     def _on_clear(self):
         """清空图片和结果"""
@@ -627,9 +628,9 @@ class OCRDialog(QDialog):
         self._result_text.clear()
         self._btn_ocr.setEnabled(False)
         self._btn_material.setEnabled(False)
-        self._status_label.setText("就绪")
+        self._status_label.setText(tr("就绪"))
 
     def _on_clear_selection(self):
         """清除选框"""
         self._canvas.clear_selection()
-        self._status_label.setText("已清除选框")
+        self._status_label.setText(tr("已清除选框"))

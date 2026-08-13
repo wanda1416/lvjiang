@@ -71,6 +71,7 @@ from .cell_formatting import (
 )
 from .dialogs import HistoryDialog, ask_value_dialog
 from .tab import REFRESH_BTN_STYLE
+from .....i18n import tr
 
 # 列宽配置仍在 ui_state 下
 _COLUMN_WIDTHS_KEY = "profile_overview_column_widths"
@@ -163,24 +164,24 @@ class ProfileOverviewTab(QWidget):
         # ── 工具栏：刷新 + 分组管理 ──
         toolbar = QHBoxLayout()
 
-        btn_refresh = QPushButton("刷新")
+        btn_refresh = QPushButton(tr("刷新"))
         btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip("重新读取角色数据")
+        btn_refresh.setToolTip(tr("重新读取角色数据"))
         btn_refresh.setStyleSheet(REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self.refresh)
         toolbar.addWidget(btn_refresh)
 
-        btn_add_group = QPushButton("新建分组")
+        btn_add_group = QPushButton(tr("新建分组"))
         btn_add_group.setFixedWidth(70)
         btn_add_group.clicked.connect(self._add_group)
         toolbar.addWidget(btn_add_group)
 
-        btn_rename_group = QPushButton("重命名分组")
+        btn_rename_group = QPushButton(tr("重命名分组"))
         btn_rename_group.setFixedWidth(80)
         btn_rename_group.clicked.connect(self._rename_group)
         toolbar.addWidget(btn_rename_group)
 
-        btn_remove_group = QPushButton("删除分组")
+        btn_remove_group = QPushButton(tr("删除分组"))
         btn_remove_group.setFixedWidth(70)
         btn_remove_group.clicked.connect(self._remove_group)
         toolbar.addWidget(btn_remove_group)
@@ -197,9 +198,9 @@ class ProfileOverviewTab(QWidget):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
-        btn_settings = QPushButton("数据模型")
+        btn_settings = QPushButton(tr("数据模型"))
         btn_settings.setFixedWidth(70)
-        btn_settings.setToolTip("定义数据模型 key")
+        btn_settings.setToolTip(tr("定义数据模型 key"))
         btn_settings.clicked.connect(self._open_metadata_dialog)
         btn_row.addWidget(btn_settings)
 
@@ -526,7 +527,7 @@ class ProfileOverviewTab(QWidget):
         all_keys = config.get_all_keys()
 
         if not all_keys:
-            QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
+            QMessageBox.information(self, tr("提示"), tr("没有可用的数据模型 key，请先在数据模型定义中添加"))
             return
 
         # 数据列索引需要减 1（跳过角色名列）
@@ -536,12 +537,12 @@ class ProfileOverviewTab(QWidget):
         current_key = column_keys[data_index] if data_index < len(column_keys) else ""
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("选择字段")
+        dialog.setWindowTitle(tr("选择字段"))
         dialog.setMinimumWidth(250)
         layout = QVBoxLayout(dialog)
 
         combo = QComboBox()
-        combo.addItem("（请选择）", "")
+        combo.addItem(tr("（请选择）"), "")
         for kd in all_keys:
             model_type = config.get_model_type(kd.key) or ""
             model_label = MODEL_LABELS.get(model_type, model_type)
@@ -556,10 +557,10 @@ class ProfileOverviewTab(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        btn_ok = QPushButton("确定")
+        btn_ok = QPushButton(tr("确定"))
         btn_ok.clicked.connect(dialog.accept)
         btn_row.addWidget(btn_ok)
-        btn_cancel = QPushButton("取消")
+        btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
         layout.addLayout(btn_row)
@@ -583,11 +584,11 @@ class ProfileOverviewTab(QWidget):
         all_keys = [kd for kd in config.get_all_keys() if kd.key not in used_keys]
 
         if not all_keys:
-            QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
+            QMessageBox.information(self, tr("提示"), tr("没有可用的数据模型 key，请先在数据模型定义中添加"))
             return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("选择字段")
+        dialog.setWindowTitle(tr("选择字段"))
         dialog.setMinimumWidth(250)
         layout = QVBoxLayout(dialog)
 
@@ -600,10 +601,10 @@ class ProfileOverviewTab(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        btn_ok = QPushButton("确定")
+        btn_ok = QPushButton(tr("确定"))
         btn_ok.clicked.connect(dialog.accept)
         btn_row.addWidget(btn_ok)
-        btn_cancel = QPushButton("取消")
+        btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
         layout.addLayout(btn_row)
@@ -615,7 +616,7 @@ class ProfileOverviewTab(QWidget):
                 group_data = groups.get(group_name, {"columns": []})
                 column_keys = group_data.get("columns", [])
                 if selected_key in column_keys:
-                    QMessageBox.warning(self, "重复", f"Key '{selected_key}' 已在该分组中显示")
+                    QMessageBox.warning(self, tr("重复"), tr("Key '{key}' 已在该分组中显示").format(key=selected_key))
                     return
                 insert_idx = max(0, min(after_index + 1, len(column_keys)))
                 column_keys.insert(insert_idx, selected_key)
@@ -647,7 +648,7 @@ class ProfileOverviewTab(QWidget):
             return
 
         if field_key in column_keys and column_keys.index(field_key) != logical_index:
-            QMessageBox.warning(self, "重复", f"Key '{field_key}' 已在该分组中显示")
+            QMessageBox.warning(self, tr("重复"), tr("Key '{key}' 已在该分组中显示").format(key=field_key))
             return
 
         column_keys[logical_index] = field_key
@@ -845,7 +846,7 @@ class ProfileOverviewTab(QWidget):
                     )
             menu.addSeparator()
             # 始终提供自定义输入入口
-            action_inc = menu.addAction("增加...")
+            action_inc = menu.addAction(tr("增加..."))
             if action_inc:
                 action_inc.triggered.connect(
                     lambda: self._adjust_value_custom(
@@ -855,7 +856,7 @@ class ProfileOverviewTab(QWidget):
                 )
             # 单向增加模式下不提供减少
             if not kd_increment_only:
-                action_dec = menu.addAction("减少...")
+                action_dec = menu.addAction(tr("减少..."))
                 if action_dec:
                     action_dec.triggered.connect(
                         lambda: self._adjust_value_custom(
@@ -865,7 +866,7 @@ class ProfileOverviewTab(QWidget):
                     )
         else:
             # 无自定义 steps：只提供自定义输入
-            action_inc = menu.addAction("增加...")
+            action_inc = menu.addAction(tr("增加..."))
             if action_inc:
                 action_inc.triggered.connect(
                     lambda: self._adjust_value_custom(
@@ -875,7 +876,7 @@ class ProfileOverviewTab(QWidget):
                 )
             # 单向增加模式下不提供减少
             if not kd_increment_only:
-                action_dec = menu.addAction("减少...")
+                action_dec = menu.addAction(tr("减少..."))
                 if action_dec:
                     action_dec.triggered.connect(
                         lambda: self._adjust_value_custom(
@@ -885,7 +886,7 @@ class ProfileOverviewTab(QWidget):
                     )
 
         # 覆写：直接设定值，不走 sync
-        action_override = menu.addAction("覆写...")
+        action_override = menu.addAction(tr("覆写..."))
         if action_override:
             action_override.triggered.connect(
                 lambda: self._override_value_custom(
@@ -895,7 +896,7 @@ class ProfileOverviewTab(QWidget):
 
         # 历史记录
         menu.addSeparator()
-        action_history = menu.addAction("查看历史记录")
+        action_history = menu.addAction(tr("查看历史记录"))
         if action_history:
             action_history.triggered.connect(
                 lambda: self._show_history_dialog(user_name, model_type, key_str, kd.label)
@@ -943,8 +944,8 @@ class ProfileOverviewTab(QWidget):
         except ProfileWriteConflict:
             logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
             QMessageBox.warning(
-                self, "写入冲突",
-                "该数值已被其他进程更新，本次增减未写入。请刷新后重试。",
+                self, tr("写入冲突"),
+                tr("该数值已被其他进程更新，本次增减未写入。请刷新后重试。"),
             )
             current_group = self._get_current_group_name()
             table = self._tables.get(current_group)
@@ -953,7 +954,7 @@ class ProfileOverviewTab(QWidget):
             return
         except Exception as e:
             logger.error(f"回写失败: {e}")
-            QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
+            QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=e))
             return
 
         # 刷新表格
@@ -997,19 +998,19 @@ class ProfileOverviewTab(QWidget):
         # 根据 direction 选择词表与标签
         if direction > 0:
             min_val = 0
-            prompt = "增加量:"
+            prompt = tr("增加量:")
             vocab = kd.sources
-            vocab_label = "来源"
+            vocab_label = tr("来源")
         elif direction < 0:
             min_val = 0
-            prompt = "减少量:"
+            prompt = tr("减少量:")
             vocab = kd.uses
-            vocab_label = "用途"
+            vocab_label = tr("用途")
         else:
             min_val = -999999
-            prompt = "增减量（正增负减）:"
+            prompt = tr("增减量（正增负减）:")
             vocab = kd.sources + [u for u in kd.uses if u not in kd.sources]
-            vocab_label = "来源"
+            vocab_label = tr("来源")
 
         if kd.decimal:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
@@ -1020,8 +1021,8 @@ class ProfileOverviewTab(QWidget):
 
         value, source, _sync, ok = ask_value_dialog(
             self,
-            title=f"自定义增减 - {kd.label}",
-            hint=f"当前值: {current_text}",
+            title=tr("自定义增减 - {label}").format(label=kd.label),
+            hint=tr("当前值: {val}").format(val=current_text),
             prompt=prompt,
             is_float=is_float,
             min_val=min_val,
@@ -1043,8 +1044,8 @@ class ProfileOverviewTab(QWidget):
         new_value = current_value + delta
         if new_value < 0:
             QMessageBox.warning(
-                None, "数值无效",
-                f"减少后数值不能小于 0（当前值: {int(current_value)}，输入: {int(abs(delta))}）"
+                None, tr("数值无效"),
+                tr("减少后数值不能小于 0（当前值: {cur}，输入: {inp}）").format(cur=int(current_value), inp=int(abs(delta)))
             )
             return
 
@@ -1082,16 +1083,16 @@ class ProfileOverviewTab(QWidget):
 
         value, source, sync_checked, ok = ask_value_dialog(
             self,
-            title=f"覆写 - {kd.label}",
-            hint=f"当前值: {current_text}",
-            prompt="新值:",
+            title=tr("覆写 - {label}").format(label=kd.label),
+            hint=tr("当前值: {val}").format(val=current_text),
+            prompt=tr("新值:"),
             is_float=is_float,
             min_val=0,
             sources=kd.sources + [u for u in kd.uses if u not in kd.sources],
             initial_value=current_value,
             sync_checkbox=True,
             sync_default=True,
-            source_label="来源/用途",
+            source_label=tr("来源/用途"),
         )
         if not ok:
             return
@@ -1175,15 +1176,15 @@ class ProfileOverviewTab(QWidget):
     def _add_group(self):
         """新建分组"""
         groups = get_groups()
-        name, ok = QInputDialog.getText(self, "新建分组", "分组名称:")
+        name, ok = QInputDialog.getText(self, tr("新建分组"), tr("分组名称:"))
         if not ok:
             return
         name = name.strip()
         if not name:
-            QMessageBox.warning(self, "错误", "分组名不能为空")
+            QMessageBox.warning(self, tr("错误"), tr("分组名不能为空"))
             return
         if name in groups:
-            QMessageBox.warning(self, "错误", f"分组 '{name}' 已存在")
+            QMessageBox.warning(self, tr("错误"), tr("分组 '{name}' 已存在").format(name=name))
             return
 
         groups[name] = {"columns": []}
@@ -1201,18 +1202,18 @@ class ProfileOverviewTab(QWidget):
             return
 
         new_name, ok = QInputDialog.getText(
-            self, "重命名分组", "新名称:", text=old_name
+            self, tr("重命名分组"), tr("新名称:"), text=old_name
         )
         if not ok:
             return
         new_name = new_name.strip()
         if not new_name:
-            QMessageBox.warning(self, "错误", "分组名不能为空")
+            QMessageBox.warning(self, tr("错误"), tr("分组名不能为空"))
             return
         if new_name == old_name:
             return
         if new_name in groups:
-            QMessageBox.warning(self, "错误", f"分组 '{new_name}' 已存在")
+            QMessageBox.warning(self, tr("错误"), tr("分组 '{name}' 已存在").format(name=new_name))
             return
 
         # 保持插入顺序：用新 key 替换旧 key
@@ -1243,12 +1244,12 @@ class ProfileOverviewTab(QWidget):
             return
 
         if len(groups) <= 1:
-            QMessageBox.warning(self, "错误", "至少保留一个分组")
+            QMessageBox.warning(self, tr("错误"), tr("至少保留一个分组"))
             return
 
         reply = QMessageBox.question(
-            self, "确认删除",
-            f"确定要删除分组 '{group_name}' 吗？",
+            self, tr("确认删除"),
+            tr("确定要删除分组 '{name}' 吗？").format(name=group_name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -1290,7 +1291,7 @@ def _parse_value(raw: str, model_type: str, kd: KeyDef):
             try:
                 return int(raw) if raw else 0
             except ValueError:
-                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                QMessageBox.warning(None, tr("输入错误"), tr("{label} 必须是整数").format(label=kd.label))
                 return _PARSE_ERROR
         # 无 cap 的 quota 可能是 bool
         upper = raw.upper()
@@ -1307,14 +1308,14 @@ def _parse_value(raw: str, model_type: str, kd: KeyDef):
         try:
             return int(raw) if raw else 0
         except ValueError:
-            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+            QMessageBox.warning(None, tr("输入错误"), tr("{label} 必须是整数").format(label=kd.label))
             return _PARSE_ERROR
 
     if model_type == MODEL_STOCK:
         try:
             return int(raw) if raw else 0
         except ValueError:
-            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+            QMessageBox.warning(None, tr("输入错误"), tr("{label} 必须是整数").format(label=kd.label))
             return _PARSE_ERROR
 
     return raw

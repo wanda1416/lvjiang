@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, WUXUE_CATEGORY
+from .....i18n import tr
 
 from .level_combo import LevelCombo
 
@@ -78,8 +79,8 @@ class _RangeCell(QWidget):
             sb.setRange(0, 999999)
             sb.setSpecialValueText(" ")  # 空串会退回显示 0，用空格实现空白
             sb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._min.setToolTip("最小值")
-        self._max.setToolTip("最大值")
+        self._min.setToolTip(tr("最小值"))
+        self._max.setToolTip(tr("最大值"))
 
         layout.addWidget(self._min, 1)
         layout.addWidget(QLabel("~"))
@@ -134,7 +135,7 @@ class BaseAttrPanel(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("装备类型"))
+        left_layout.addWidget(QLabel(tr("装备类型")))
 
         self._part_list = QListWidget()
         for part in BASE_ATTR_PARTS:
@@ -183,15 +184,15 @@ class BaseAttrPanel(QWidget):
         weapon_layout.setContentsMargins(8, 4, 8, 4)
 
         weapon_header = QHBoxLayout()
-        weapon_header.addWidget(QLabel("武器类型"))
-        hint = QLabel("新增武器重启后方可参与识别；被流派配置引用的武器不可删除")
+        weapon_header.addWidget(QLabel(tr("武器类型")))
+        hint = QLabel(tr("新增武器重启后方可参与识别；被流派配置引用的武器不可删除"))
         hint.setStyleSheet("color: #888;")
         weapon_header.addWidget(hint)
         weapon_header.addStretch()
-        self._btn_add_weapon = QPushButton("添加")
+        self._btn_add_weapon = QPushButton(tr("添加"))
         self._btn_add_weapon.clicked.connect(self._on_add_weapon)
         weapon_header.addWidget(self._btn_add_weapon)
-        self._btn_del_weapon = QPushButton("删除")
+        self._btn_del_weapon = QPushButton(tr("删除"))
         self._btn_del_weapon.clicked.connect(self._on_del_weapon)
         weapon_header.addWidget(self._btn_del_weapon)
         weapon_layout.addLayout(weapon_header)
@@ -204,7 +205,7 @@ class BaseAttrPanel(QWidget):
         # 武学增效编辑区（选中武器后展示）
         wuxue_layout = QHBoxLayout()
         wuxue_layout.setContentsMargins(0, 4, 0, 0)
-        wuxue_layout.addWidget(QLabel("武学增效"))
+        wuxue_layout.addWidget(QLabel(tr("武学增效")))
         self._combo_wuxue_affix = QComboBox()
         self._combo_wuxue_affix.currentTextChanged.connect(self._on_wuxue_affix_changed)
         wuxue_layout.addWidget(self._combo_wuxue_affix, 1)
@@ -234,7 +235,7 @@ class BaseAttrPanel(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self._btn_add_level = QPushButton("添加等级")
+        self._btn_add_level = QPushButton(tr("添加等级"))
         self._btn_add_level.clicked.connect(self._add_level)
         btn_layout.addWidget(self._btn_add_level)
 
@@ -389,7 +390,7 @@ class BaseAttrPanel(QWidget):
 
     def _on_add_weapon(self):
         """添加新武器类型"""
-        name, ok = QInputDialog.getText(self, "添加武器类型", "武器名称：")
+        name, ok = QInputDialog.getText(self, tr("添加武器类型"), tr("武器名称："))
         if not ok:
             return
         name = name.strip()
@@ -397,7 +398,7 @@ class BaseAttrPanel(QWidget):
             return
         types = self._weapon_types()
         if name in types:
-            QMessageBox.warning(self, "无法添加", f"武器类型「{name}」已存在。")
+            QMessageBox.warning(self, tr("无法添加"), tr("武器类型「{name}」已存在。").format(name=name))
             return
         raw = self._weapon_types_raw()
         raw.append({"name": name})
@@ -415,12 +416,12 @@ class BaseAttrPanel(QWidget):
         users = self._schools_using_weapon(name)
         if users:
             QMessageBox.warning(
-                self, "无法删除",
-                f"武器类型「{name}」正被流派 {'、'.join(users)} 引用，"
-                "请先在流派配置中解除绑定。",
+                self, tr("无法删除"),
+                tr("武器类型「{name}」正被流派 {users} 引用，请先在流派配置中解除绑定。").format(
+                    name=name, users='、'.join(users)),
             )
             return
-        ret = QMessageBox.question(self, "确认删除", f"确定删除武器类型「{name}」？")
+        ret = QMessageBox.question(self, tr("确认删除"), tr("确定删除武器类型「{name}」？").format(name=name))
         if ret != QMessageBox.StandardButton.Yes:
             return
         raw = [t for t in self._weapon_types_raw() if t.get("name") != name]

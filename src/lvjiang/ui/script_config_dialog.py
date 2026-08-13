@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.config.resolver import get_resolver
+from ..i18n import tr
 from ..workflows.discovery import discover_scripts
 
 
@@ -54,7 +55,7 @@ class ScriptConfigDialog(QDialog):
     def __init__(self, main_window):
         super().__init__(main_window)
         self._main = main_window
-        self.setWindowTitle("脚本配置")
+        self.setWindowTitle(tr("脚本配置"))
         self.setMinimumSize(640, 480)
         # id -> 发现层原始显示名（用于判断是否需要写 overrides）
         self._base_names: dict[str, str] = {}
@@ -66,9 +67,9 @@ class ScriptConfigDialog(QDialog):
         layout = QVBoxLayout(self)
 
         hint = QLabel(
-            "勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数："
-            "日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。"
-            "用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。"
+            tr("勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数："
+               "日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。"
+               "用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。")
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #666;")
@@ -76,7 +77,7 @@ class ScriptConfigDialog(QDialog):
 
         self._table = QTableWidget(0, 6)
         self._table.setHorizontalHeaderLabels(
-            ["暴露", "显示名", "脚本性质", "来源", "id", "参数数"])
+            [tr("暴露"), tr("显示名"), tr("脚本性质"), tr("来源"), "id", tr("参数数")])
         self._table.verticalHeader().setVisible(False)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -87,9 +88,9 @@ class ScriptConfigDialog(QDialog):
 
         # 顺序调整按钮
         order_bar = QHBoxLayout()
-        self._btn_up = QPushButton("上移")
+        self._btn_up = QPushButton(tr("上移"))
         self._btn_up.clicked.connect(lambda: self._move_row(-1))
-        self._btn_down = QPushButton("下移")
+        self._btn_down = QPushButton(tr("下移"))
         self._btn_down.clicked.connect(lambda: self._move_row(1))
         order_bar.addWidget(self._btn_up)
         order_bar.addWidget(self._btn_down)
@@ -99,11 +100,11 @@ class ScriptConfigDialog(QDialog):
         # 底部保存/取消
         btn_bar = QHBoxLayout()
         btn_bar.addStretch()
-        btn_save = QPushButton("保存")
+        btn_save = QPushButton(tr("保存"))
         btn_save.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 6px 16px;")
         btn_save.clicked.connect(self._on_save)
-        btn_cancel = QPushButton("取消")
+        btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(self.reject)
         btn_bar.addWidget(btn_save)
         btn_bar.addWidget(btn_cancel)
@@ -146,7 +147,7 @@ class ScriptConfigDialog(QDialog):
         # 脚本性质：下拉框（日常 / 专用）
         scope_combo = QComboBox()
         for key, label in self.SCOPE_LABELS.items():
-            scope_combo.addItem(label, key)
+            scope_combo.addItem(tr(label), key)
         scope_combo.setCurrentIndex(max(scope_combo.findData(scope), 0))
         self._table.setCellWidget(row, self.COL_SCOPE, scope_combo)
 
@@ -229,7 +230,7 @@ class ScriptConfigDialog(QDialog):
             get_resolver().save_merged(
                 "workflows.yaml", {"exposed": exposed, "overrides": overrides})
         except OSError as e:
-            QMessageBox.warning(self, "保存失败", f"写入 workflows.yaml 失败：{e}")
+            QMessageBox.warning(self, tr("保存失败"), f"写入 workflows.yaml 失败：{e}")
             return
         logger.info(f"脚本暴露配置已保存：exposed={exposed}, overrides={overrides}")
         self.accept()

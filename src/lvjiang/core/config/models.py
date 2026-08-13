@@ -83,7 +83,8 @@ class UserConfig:
     输入模拟 input_sim + 延迟参数 delay_params 来自 config/**/app.yaml
     （system 出厂默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
-    adb_capture_streaming: bool = True     # ADB 模式是否启用 scrcpy 视频流截图（false 则用 screencap）
+    language: str = "zh_CN"                  # 界面语言（zh_CN / en_US / auto）
+    adb_capture_streaming: bool = True     # ADB 模式是否使用 scrcpy 视频流截图（false 则用 screencap）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
     material_grid: MaterialGridConfig = field(default_factory=MaterialGridConfig)

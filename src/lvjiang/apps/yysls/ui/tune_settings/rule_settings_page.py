@@ -47,6 +47,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     get_tune_config,
     standard_playstyle_attrs,
 )
+from .....i18n import tr
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -63,7 +64,7 @@ _PLAYSTYLE_TIPS = (
     "增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n"
     "属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n"
     "绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n"
-    "武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。")
+    "武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。")  # runtime tr()
 
 
 class RuleSettingsPage(QWidget):
@@ -104,7 +105,7 @@ class RuleSettingsPage(QWidget):
         layout = QVBoxLayout(self)
 
         # ── 启用该规则（顶部第一行）──
-        self._enable_cb = QCheckBox("启用该规则")
+        self._enable_cb = QCheckBox(tr("启用该规则"))
         self._enable_cb.setChecked(True)  # 默认勾选
         self._enable_cb.stateChanged.connect(self._on_enable_cb_changed)
         self._enable_cb.setStyleSheet("font-weight: bold;")
@@ -115,26 +116,26 @@ class RuleSettingsPage(QWidget):
         key_row = QHBoxLayout()
         self._key_label = QLabel()
         key_row.addWidget(self._key_label)
-        btn_rename_key = QPushButton("重命名")
+        btn_rename_key = QPushButton(tr("重命名"))
         btn_rename_key.clicked.connect(self._rename_key)
         key_row.addWidget(btn_rename_key)
         key_row.addStretch()
         # 删除入口收在首行最右，避免与表格编辑区混排误触
-        btn_delete = QPushButton("删除本规则")
+        btn_delete = QPushButton(tr("删除本规则"))
         btn_delete.setStyleSheet("color: #c62828;")
         btn_delete.clicked.connect(self._confirm_delete)
         key_row.addWidget(btn_delete)
-        form.addRow("标识 key：", key_row)
+        form.addRow(tr("标识 key："), key_row)
 
         # 名称只读展示（修改走对话框左侧导航双击）
         name_row = QHBoxLayout()
         self._name_label = QLabel()
         name_row.addWidget(self._name_label)
-        hint = QLabel("（双击左侧导航中的规则名可修改）")
+        hint = QLabel(tr("（双击左侧导航中的规则名可修改）"))
         hint.setStyleSheet("color: #888;")
         name_row.addWidget(hint)
         name_row.addStretch()
-        form.addRow("规则名称：", name_row)
+        form.addRow(tr("规则名称："), name_row)
 
         # 默认判定：四档条件全不命中时的兜底档位
         self._default_rating_combo = QComboBox()
@@ -143,12 +144,12 @@ class RuleSettingsPage(QWidget):
                 RATING_LABELS[rating_key], rating_key)
         self._default_rating_combo.currentIndexChanged.connect(
             self._apply_default_rating)
-        form.addRow("默认判定：", self._default_rating_combo)
+        form.addRow(tr("默认判定："), self._default_rating_combo)
         layout.addLayout(form)
 
         # ── playstyles 玩法设定（说明收入「?」按钮，点击展示）──
         title_row = QHBoxLayout()
-        title_row.addWidget(QLabel("<b>玩法设定</b>"))
+        title_row.addWidget(QLabel("<b>" + tr("玩法设定") + "</b>"))
         self._playstyle_tips_btn = QToolButton()
         self._playstyle_tips_btn.setText("?")
         self._playstyle_tips_btn.clicked.connect(self._show_playstyle_tips)
@@ -157,8 +158,8 @@ class RuleSettingsPage(QWidget):
         layout.addLayout(title_row)
         self._playstyle_table = QTableWidget(0, 7)
         self._playstyle_table.setHorizontalHeaderLabels(
-            ["名字", "主武器", "主增伤词条", "副武器", "副增伤词条", "属性",
-             "绑定开关"])
+            [tr("名字"), tr("主武器"), tr("主增伤词条"), tr("副武器"), tr("副增伤词条"), tr("属性"),
+             tr("绑定开关")])
         # 增伤词条列比武器列更宽；不拉伸末列，列宽固定、列表偏左，
         # 未占满 dialog 时右侧留白（避免末列被拉升占满全宽）
         for col, width in enumerate((80, 90, 150, 90, 150, 90, 120)):
@@ -171,15 +172,15 @@ class RuleSettingsPage(QWidget):
 
         # ── 品阶门槛覆盖（只列出需覆盖全局默认的部位）──
         q_title = QHBoxLayout()
-        q_title.addWidget(QLabel("<b>品阶门槛（覆盖）</b>"))
-        q_hint = QLabel("（仅列出的部位覆盖全局默认，未列部位沿用基础配置）")
+        q_title.addWidget(QLabel("<b>" + tr("品阶门槛（覆盖）") + "</b>"))
+        q_hint = QLabel(tr("（仅列出的部位覆盖全局默认，未列部位沿用基础配置）"))
         q_hint.setStyleSheet("color: #888;")
         q_title.addWidget(q_hint)
         q_title.addStretch()
         layout.addLayout(q_title)
         self._quality_table = QTableWidget(0, 4)
         self._quality_table.setHorizontalHeaderLabels(
-            ["部位", "gold", "purple", "blue"])
+            [tr("部位"), "gold", "purple", "blue"])
         for col, width in enumerate((120, 70, 70, 70)):
             self._quality_table.setColumnWidth(col, width)
         self._fix_table_height(self._quality_table, 3)
@@ -201,10 +202,10 @@ class RuleSettingsPage(QWidget):
 
     def _table_buttons(self, table: QTableWidget, apply) -> QHBoxLayout:
         row = QHBoxLayout()
-        btn_add = QPushButton("添加行")
+        btn_add = QPushButton(tr("添加行"))
         btn_add.clicked.connect(
             lambda: self._insert_playstyle_row(table.rowCount()))
-        btn_del = QPushButton("删除选中行")
+        btn_del = QPushButton(tr("删除选中行"))
 
         def _delete():
             r = table.currentRow()
@@ -222,11 +223,11 @@ class RuleSettingsPage(QWidget):
 
     def _quality_table_buttons(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        btn_add = QPushButton("添加行")
+        btn_add = QPushButton(tr("添加行"))
         btn_add.clicked.connect(
             lambda: (self._insert_quality_row(self._quality_table.rowCount()),
                      self._apply_quality()))
-        btn_del = QPushButton("删除选中行")
+        btn_del = QPushButton(tr("删除选中行"))
 
         def _delete():
             r = self._quality_table.currentRow()
@@ -425,15 +426,15 @@ class RuleSettingsPage(QWidget):
     def _show_playstyle_tips(self):
         btn = self._playstyle_tips_btn
         QToolTip.showText(
-            btn.mapToGlobal(btn.rect().bottomRight()), _PLAYSTYLE_TIPS, btn)
+            btn.mapToGlobal(btn.rect().bottomRight()), tr(_PLAYSTYLE_TIPS), btn)
 
     def _rename_key(self):
         old_key = str(self._data.get("key", ""))
         new_key, ok = QInputDialog.getText(
-            self, "重命名规则 key",
-            "重命名会修改规则 id（YAML 文件名），\n"
-            "可能影响直接引用该 key 的代码/工作流配置，请确认。\n\n"
-            "新 key（小写字母开头的英文/数字/下划线）：",
+            self, tr("重命名规则 key"),
+            tr("重命名会修改规则 id（YAML 文件名），\n"
+               "可能影响直接引用该 key 的代码/工作流配置，请确认。\n\n"
+               "新 key（小写字母开头的英文/数字/下划线）："),
             text=old_key)
         if not ok:
             return
@@ -442,8 +443,8 @@ class RuleSettingsPage(QWidget):
             return
         if not _KEY_RE.match(new_key):
             QMessageBox.warning(
-                self, "重命名规则 key",
-                "标识 key 须为小写字母开头的英文/数字/下划线")
+                self, tr("重命名规则 key"),
+                tr("标识 key 须为小写字母开头的英文/数字/下划线"))
             return
         # 重命名文件并通知面板/对话框更新导航（失败已由状态栏提示）
         if self._on_rename is not None:
@@ -503,7 +504,7 @@ class RuleSettingsPage(QWidget):
             return
         name = str(self._data.get("name") or self._data.get("key") or "")
         ret = QMessageBox.question(
-            self, "删除规则",
-            f"确定删除调律规则「{name}」？规则文件将被删除，不可恢复。")
+            self, tr("删除规则"),
+            tr("确定删除调律规则「{name}」？规则文件将被删除，不可恢复。").format(name=name))
         if ret == QMessageBox.StandardButton.Yes:
             self._on_delete()

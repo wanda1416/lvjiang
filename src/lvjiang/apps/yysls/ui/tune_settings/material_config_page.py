@@ -46,6 +46,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuningGroup,
     TuningGroupManager,
 )
+from .....i18n import tr
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）
 _NO_FOOD = "- 不添加 -"
@@ -54,7 +55,7 @@ _QUALITY_KEYS = ("blue", "purple", "gold")
 
 # 规则表列定义（第一列为序号）
 _SEQ_COL = 0
-_COLS = ("#", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")
+_COLS = ("#", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")  # runtime tr()
 
 
 class MaterialConfigPage(QWidget):
@@ -104,30 +105,30 @@ class MaterialConfigPage(QWidget):
 
         # 页面标题
         layout.addWidget(QLabel(
-            "<b>材料处理</b>（每轮调律开始前的行为点）："
-            "律准石数量检查、狗粮检查与添加"))
+            "<b>" + tr("材料处理") + "</b>（" + tr("每轮调律开始前的行为点）："
+            "律准石数量检查、狗粮检查与添加") + "）"))
         half_line = self.fontMetrics().height() // 2
         layout.addSpacing(half_line)
 
         # 大律准石数量检查
         layout.addWidget(QLabel(
-            "<b>大律准石数量检查</b>（调律前识别材料区数量，"
-            "低于基准判材料不足，按不足处理执行）"))
+            "<b>" + tr("大律准石数量检查") + "</b>（" + tr("调律前识别材料区数量，"
+            "低于基准判材料不足，按不足处理执行") + "）"))
         stone_row = QHBoxLayout()
-        self._stone_cb = QCheckBox("启用检查")
+        self._stone_cb = QCheckBox(tr("启用检查"))
         self._stone_cb.stateChanged.connect(lambda _s: self._apply())
         stone_row.addWidget(self._stone_cb)
-        stone_row.addWidget(QLabel("数量基准"))
+        stone_row.addWidget(QLabel(tr("数量基准")))
         self._stone_min = QSpinBox()
         self._stone_min.setRange(1, 99999)
         self._stone_min.valueChanged.connect(lambda _v: self._apply())
         stone_row.addWidget(self._stone_min)
-        stone_row.addWidget(QLabel("不足时"))
+        stone_row.addWidget(QLabel(tr("不足时")))
         self._stone_action = QComboBox()
         for key, label in STONE_ACTION_LABELS.items():
             self._stone_action.addItem(label, key)
         self._stone_action.setToolTip(
-            "询问是否继续：弹窗确认，继续则本次运行不再检查")
+            tr("询问是否继续：弹窗确认，继续则本次运行不再检查"))
         self._stone_action.currentIndexChanged.connect(
             lambda _i: self._apply())
         stone_row.addWidget(self._stone_action)
@@ -137,10 +138,10 @@ class MaterialConfigPage(QWidget):
         # 狗粮添加规则（标题顶部留半个字高度）
         layout.addSpacing(half_line)
         layout.addWidget(QLabel(
-            "<b>狗粮添加规则</b>（每轮调律自上而下匹配，首条命中即生效；"
-            "全部不命中则不添加）"))
+            "<b>" + tr("狗粮添加规则") + "</b>（" + tr("每轮调律自上而下匹配，首条命中即生效；"
+            "全部不命中则不添加") + "）"))
         self._table = QTableWidget(0, len(_COLS))
-        self._table.setHorizontalHeaderLabels(list(_COLS))
+        self._table.setHorizontalHeaderLabels([tr(c) for c in _COLS])
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
         # 序号列固定宽度，隐藏原生行号
@@ -155,20 +156,20 @@ class MaterialConfigPage(QWidget):
         layout.addWidget(self._table)
 
         btn_row = QHBoxLayout()
-        add_btn = QPushButton("添加规则")
+        add_btn = QPushButton(tr("添加规则"))
         add_btn.clicked.connect(self._on_add_rule)
         btn_row.addWidget(add_btn)
-        del_btn = QPushButton("删除选中规则")
+        del_btn = QPushButton(tr("删除选中规则"))
         del_btn.clicked.connect(self._on_del_rule)
         btn_row.addWidget(del_btn)
         btn_row.addSpacing(8)
-        self._up_btn = QPushButton("▲ 上移")
-        self._up_btn.setToolTip("将选中规则上移一行")
+        self._up_btn = QPushButton(tr("▲ 上移"))
+        self._up_btn.setToolTip(tr("将选中规则上移一行"))
         self._up_btn.clicked.connect(self._on_move_up)
         self._up_btn.setEnabled(False)
         btn_row.addWidget(self._up_btn)
-        self._down_btn = QPushButton("▼ 下移")
-        self._down_btn.setToolTip("将选中规则下移一行")
+        self._down_btn = QPushButton(tr("▼ 下移"))
+        self._down_btn.setToolTip(tr("将选中规则下移一行"))
         self._down_btn.clicked.connect(self._on_move_down)
         self._down_btn.setEnabled(False)
         btn_row.addWidget(self._down_btn)
@@ -236,7 +237,7 @@ class MaterialConfigPage(QWidget):
         seq = self._table.cellWidget(row, _SEQ_COL)
         enabled = bool(seq.property("rule_enabled"))
         menu = QMenu(self._table)
-        action = menu.addAction("禁用" if enabled else "启用")
+        action = menu.addAction(tr("禁用") if enabled else tr("启用"))
         if menu.exec(self._table.viewport().mapToGlobal(pos)) is action:
             self._set_row_enabled(row, not enabled)
             self._apply()
@@ -246,7 +247,7 @@ class MaterialConfigPage(QWidget):
         if seq is not None:
             seq.setProperty("rule_enabled", enabled)
             seq.setStyleSheet("" if enabled else "color: gray;")
-            seq.setToolTip("右键禁用" if enabled else "规则已禁用；右键启用")
+            seq.setToolTip(tr("右键禁用") if enabled else tr("规则已禁用；右键启用"))
         for col in range(1, self._table.columnCount()):
             widget = self._table.cellWidget(row, col)
             if widget is not None:
@@ -278,7 +279,7 @@ class MaterialConfigPage(QWidget):
     def _on_del_rule(self):
         row = self._table.currentRow()
         if row < 0:
-            self._status_cb("请先选中要删除的规则行", True)
+            self._status_cb(tr("请先选中要删除的规则行"), True)
             return
         self._table.removeRow(row)
         self._refresh_seq_numbers()
@@ -288,7 +289,7 @@ class MaterialConfigPage(QWidget):
     def _on_move_up(self):
         row = self._table.currentRow()
         if row <= 0:
-            self._status_cb("已是第一条规则，无法上移", True)
+            self._status_cb(tr("已是第一条规则，无法上移"), True)
             return
         self._swap_rows(row, row - 1)
         self._table.selectRow(row - 1)
@@ -298,7 +299,7 @@ class MaterialConfigPage(QWidget):
     def _on_move_down(self):
         row = self._table.currentRow()
         if row < 0 or row >= self._table.rowCount() - 1:
-            self._status_cb("已是最后一条规则，无法下移", True)
+            self._status_cb(tr("已是最后一条规则，无法下移"), True)
             return
         self._swap_rows(row, row + 1)
         self._table.selectRow(row + 1)
@@ -383,13 +384,13 @@ class MaterialConfigPage(QWidget):
         data = self._build()
         err = self._manager.validate(data)
         if err:
-            self._status_cb(f"校验失败（未保存）：{err}", True)
+            self._status_cb(tr("校验失败（未保存）：{err}").format(err=err), True)
             return
         try:
             self._manager.save_group(self._group_key, data)
         except Exception as e:  # noqa: BLE001
             logger.exception("材料配置保存失败")
-            self._status_cb(f"保存失败：{e}", True)
+            self._status_cb(tr("保存失败：{e}").format(e=e), True)
             return
         now = datetime.now().strftime("%H:%M:%S")
-        self._status_cb(f"已保存并生效（{now}）", False)
+        self._status_cb(tr("已保存并生效（{now}）").format(now=now), False)

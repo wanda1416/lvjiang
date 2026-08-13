@@ -14,6 +14,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QComboBox, QWidget
 
 from lvjiang.apps.yysls.config import get_game_config
+from .....i18n import tr
 
 
 class LevelCombo(QComboBox):
@@ -46,7 +47,7 @@ class LevelCombo(QComboBox):
         levels = sorted([c.level for c in configs], reverse=True)
         if not levels:
             # 无等级配置时显示占位提示
-            self.addItem("（无等级配置）", None)
+            self.addItem(tr("（无等级配置）"), None)
             self.setEnabled(False)
         else:
             self.setEnabled(True)

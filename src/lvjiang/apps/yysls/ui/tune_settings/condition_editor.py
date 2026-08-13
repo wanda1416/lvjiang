@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .....i18n import tr
+
 from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）
@@ -36,7 +38,7 @@ _KIND_NAMES = {
     "not_together": "没有全部出现",
     "count_max": "计数小于等于",
     "count_min": "计数大于等于",
-}
+}  # runtime tr()
 
 
 class _ConditionRow(QWidget):
@@ -54,11 +56,11 @@ class _ConditionRow(QWidget):
 
         self.kind_combo = QComboBox()
         for kind in kinds:
-            self.kind_combo.addItem(_KIND_NAMES[kind], kind)
+            self.kind_combo.addItem(tr(_KIND_NAMES[kind]), kind)
         self.kind_combo.currentIndexChanged.connect(self._on_kind_changed)
         layout.addWidget(self.kind_combo)
 
-        self.symbols_btn = QPushButton("（点击选择词条）")
+        self.symbols_btn = QPushButton(tr("（点击选择词条）"))
         self.symbols_btn.clicked.connect(self._pick_symbols)
         layout.addWidget(self.symbols_btn, 1)
 
@@ -67,11 +69,11 @@ class _ConditionRow(QWidget):
         self.count_spin.valueChanged.connect(self.changed)
         layout.addWidget(self.count_spin)
 
-        self.first_check = QCheckBox("含首词条")
+        self.first_check = QCheckBox(tr("含首词条"))
         self.first_check.stateChanged.connect(self.changed)
         layout.addWidget(self.first_check)
 
-        btn_del = QPushButton("删除")
+        btn_del = QPushButton(tr("删除"))
         btn_del.setFixedWidth(50)
         btn_del.clicked.connect(lambda: self.remove_requested.emit(self))
         layout.addWidget(btn_del)
@@ -136,7 +138,7 @@ class _ConditionRow(QWidget):
 
     def _pick_symbols(self):
         dlg = AffixSelectSortDialog(self._candidates, self._symbols,
-                                    "选择条件词条", self, flat=True)
+                                    tr("选择条件词条"), self, flat=True)
         if dlg.exec():
             self._symbols = dlg.selected()
             self._update_symbols_text()
@@ -144,7 +146,7 @@ class _ConditionRow(QWidget):
 
     def _update_symbols_text(self):
         self.symbols_btn.setText(
-            "/".join(self._symbols) if self._symbols else "（点击选择词条）")
+            "/".join(self._symbols) if self._symbols else tr("（点击选择词条）"))
 
 
 class ConditionEditor(QWidget):
@@ -153,7 +155,7 @@ class ConditionEditor(QWidget):
     changed = pyqtSignal()
 
     def __init__(self, candidates: list[str],
-                 label: str | None = "条件列表（全部满足方成立）：",
+                 label: str | None = None,
                  parent=None):
         super().__init__(parent)
         self._candidates = candidates
@@ -169,7 +171,7 @@ class ConditionEditor(QWidget):
         self._rows_layout.setSpacing(2)
         layout.addLayout(self._rows_layout)
 
-        btn_add = QPushButton("+ 添加条件")
+        btn_add = QPushButton("+ " + tr("添加条件"))
         btn_add.clicked.connect(self._add_row_clicked)
         layout.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -218,21 +220,21 @@ class _ConditionGroupBox(QGroupBox):
 
     def __init__(self, candidates: list[str], switch_keys: list[str],
                  parent=None):
-        super().__init__("条件组（组内全部满足方命中）", parent)
+        super().__init__(tr("条件组（组内全部满足方命中）"), parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
         # 开关前提：绑定开关 key + 期望值，不绑定 = 恒生效
         when_row = QHBoxLayout()
-        when_row.addWidget(QLabel("开关前提："))
+        when_row.addWidget(QLabel(tr("开关前提：")))
         self.when_combo = QComboBox()
-        self.when_combo.addItem("（无，恒生效）", "")
+        self.when_combo.addItem(tr("（无，恒生效）"), "")
         for key in switch_keys:
             self.when_combo.addItem(key, key)
         self.when_combo.currentIndexChanged.connect(self._on_when_changed)
         when_row.addWidget(self.when_combo)
         self.expect_combo = QComboBox()
-        self.expect_combo.addItem("开启时生效", True)
-        self.expect_combo.addItem("关闭时生效", False)
+        self.expect_combo.addItem(tr("开启时生效"), True)
+        self.expect_combo.addItem(tr("关闭时生效"), False)
         self.expect_combo.currentIndexChanged.connect(
             lambda _i: self.changed.emit())
         self.expect_combo.setVisible(False)
@@ -242,7 +244,7 @@ class _ConditionGroupBox(QGroupBox):
         self.editor = ConditionEditor(candidates, label=None)
         self.editor.changed.connect(self.changed)
         layout.addWidget(self.editor)
-        btn_del = QPushButton("删除本组")
+        btn_del = QPushButton(tr("删除本组"))
         btn_del.setFixedWidth(70)
         btn_del.clicked.connect(lambda: self.remove_requested.emit(self))
         layout.addWidget(btn_del, alignment=Qt.AlignmentFlag.AlignRight)
@@ -304,7 +306,7 @@ class ConditionGroupsEditor(QWidget):
         self._groups_layout.setSpacing(4)
         layout.addLayout(self._groups_layout)
 
-        btn_add = QPushButton("+ 添加条件组")
+        btn_add = QPushButton("+ " + tr("添加条件组"))
         btn_add.clicked.connect(self._add_group_clicked)
         layout.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
 

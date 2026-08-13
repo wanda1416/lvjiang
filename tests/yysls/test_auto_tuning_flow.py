@@ -676,10 +676,11 @@ def test_below_min_level_skips(monkeypatch):
     from lvjiang.apps.yysls.evaluator.tuning_rules import ScanBehavior
     base = TuningGroup(scan=ScanBehavior(min_level=120))
     wf = _wf_with(base)
-    fp = wf._process_equipment_once("低级剑", _equip(2, name="低级剑"),
-                                    WEAPON_DETAIL)
+    fp, outcome = wf._process_equipment_once(
+        "低级剑", _equip(2, name="低级剑"), WEAPON_DETAIL)
 
     assert fp   # 保留装备，返回指纹
+    assert outcome is None
     assert not wf.output.get("tuning_reports")   # 不进调律
     assert not wf.scan_reject_calls   # 不走扫描处置
     assert not wf.full_calls   # 不走已满处理
@@ -691,9 +692,10 @@ def test_quality_unrecognized_skips(monkeypatch):
     wf = FakeWF()
     equip = _equip(2, name="异常剑")
     equip["quality"] = None   # 模拟品阶识别失败
-    fp = wf._process_equipment_once("异常剑", equip, WEAPON_DETAIL)
+    fp, outcome = wf._process_equipment_once("异常剑", equip, WEAPON_DETAIL)
 
     assert fp   # 保留装备，返回指纹
+    assert outcome is None
     assert not wf.output.get("tuning_reports")
     assert not wf.scan_reject_calls
     assert not wf.full_calls
@@ -708,9 +710,10 @@ def test_min_level_default_100_passes(monkeypatch):
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
                                "tune_btn": "调律", "tune_affix": "",
                                "tune_tip": ""}
-    fp = wf._process_equipment_once("满级剑", _equip(2), WEAPON_DETAIL)
+    fp, outcome = wf._process_equipment_once("满级剑", _equip(2), WEAPON_DETAIL)
 
     assert fp   # 正常处理，未被等级门槛拦截
+    assert outcome is None
     assert wf.output.get("tuning_reports")   # 进了调律
 
 
@@ -1191,7 +1194,7 @@ def test_full_equipment_recycled(monkeypatch):
 
 def test_recycle_locked_equipment(monkeypatch):
     """装备锁定检测：回收确认弹窗无「确认」字样 = 装备被锁定，
-    收起弹窗返回 False，不卡死"""
+    收起弹窗返回 RecycleOutcome.LOCKED，不卡死"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
     base = _behavior_base(scan=ScanBehavior(enabled=True,
@@ -1209,6 +1212,68 @@ def test_recycle_locked_equipment(monkeypatch):
     # 关键：不应点击 recycle_confirm（因为检测到锁定）
     assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
     # 不应收集回收记录
+    assert not wf.output.get("recycled_items")
+
+
+def test_recycle_locked_equipment_not_retried(monkeypatch):
+    """同一轮再次读到已锁定装备时直接跳过，不重复打开回收链"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    base = _behavior_base(scan=ScanBehavior(enabled=True,
+                                            rules=_RECYCLE_ALL))
+    wf = _wf_with(base)
+    wf._ocr_map[EQUIP_DETAIL] = {"recycle_confirm": "装备已锁定"}
+    equip = _equip(2, name="锁定剑")
+
+    fp1 = wf._process_equipment("锁定剑", equip, WEAPON_DETAIL, row=1, col=2)
+    clicks_after_first = list(wf.clicks)
+    fp2 = wf._process_equipment("锁定剑", equip, WEAPON_DETAIL, row=1, col=2)
+
+    assert fp2 == fp1
+    assert wf.clicks == clicks_after_first
+    assert wf.clicks.count((EQUIP_DETAIL, "sub_func_1")) == 1
+    assert not wf.output.get("recycled_items")
+
+
+def test_recycle_unavailable_not_blocked(monkeypatch):
+    """回收入口缺失不阻断（只记锁定）：重扫到允许再次尝试"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    base = _behavior_base(scan=ScanBehavior(enabled=True,
+                                            rules=_RECYCLE_ALL))
+    wf = _wf_with(base)
+    wf._nav_tune_ok = False
+    equip = _equip(2, name="无回收入口剑")
+
+    fp1 = wf._process_equipment("无回收入口剑", equip, WEAPON_DETAIL,
+                                row=1, col=2)
+    fp2 = wf._process_equipment("无回收入口剑", equip, WEAPON_DETAIL,
+                                row=1, col=2)
+
+    assert fp2 == fp1
+    # 两次扫描各完整尝试一次：展开「更多」+ 未找到后收起，共 4 次点击
+    assert (EQUIP_DETAIL, "sub_func_1") not in wf.clicks
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 4
+    assert not wf.output.get("recycled_items")
+
+
+def test_locked_block_is_fingerprint_scoped(monkeypatch):
+    """阻断按指纹生效：同指纹装备（锁态必然一致）重读直接跳过"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    base = _behavior_base(scan=ScanBehavior(enabled=True,
+                                            rules=_RECYCLE_ALL))
+    wf = _wf_with(base)
+    wf._ocr_map[EQUIP_DETAIL] = {"recycle_confirm": "装备已锁定"}
+    equip = _equip(2, name="同款锁定剑")
+
+    wf._process_equipment("同款锁定剑A", equip, WEAPON_DETAIL, row=1, col=2)
+    clicks_after_first = list(wf.clicks)
+    wf._process_equipment("同款锁定剑B", equip, WEAPON_DETAIL, row=1, col=3)
+
+    # 同指纹锁定态必然一致：第二件不再打开回收链
+    assert wf.clicks == clicks_after_first
+    assert wf.clicks.count((EQUIP_DETAIL, "sub_func_1")) == 1
     assert not wf.output.get("recycled_items")
 
 
@@ -1246,10 +1311,10 @@ def test_reset_remaining_parses():
 def test_recycle_refill_reprocesses_slot():
     """回收后有格位信息 → 重读同格续处理补位装备"""
     wf = FakeWF()
-    outcomes = [("", True), ("fp_b", False)]
+    outcomes = [("", auto_tuning.RecycleOutcome.RECYCLED), ("fp_b", None)]
     names: list[str] = []
     wf._process_equipment_once = \
-        lambda name, equip, scene: (names.append(name), outcomes.pop(0))[1]
+        lambda name, equip, scene, **k: (names.append(name), outcomes.pop(0))[1]
     wf._read_row = lambda scene, row, col=1: ("补位剑", "FB", {"n": 1})
     fp = wf._process_equipment("原剑", {"n": 0}, WEAPON_DETAIL, row=2)
 
@@ -1260,7 +1325,8 @@ def test_recycle_refill_reprocesses_slot():
 def test_recycle_refill_empty_slot_ends():
     """回收后重读同格为空 → 背包尽头，返回空指纹"""
     wf = FakeWF()
-    wf._process_equipment_once = lambda *a: ("", True)
+    wf._process_equipment_once = \
+        lambda *a, **k: ("", auto_tuning.RecycleOutcome.RECYCLED)
     wf._read_row = lambda scene, row, col=1: ("", "", {})
     assert wf._process_equipment("原剑", {"n": 0}, WEAPON_DETAIL,
                                  row=1) == ""
@@ -1269,7 +1335,8 @@ def test_recycle_refill_empty_slot_ends():
 def test_recycle_without_row_returns_empty():
     """无格位信息（row=None）→ 回收后无法回读，返回空指纹"""
     wf = FakeWF()
-    wf._process_equipment_once = lambda *a: ("", True)
+    wf._process_equipment_once = \
+        lambda *a, **k: ("", auto_tuning.RecycleOutcome.RECYCLED)
     assert wf._process_equipment("原剑", {"n": 0}, WEAPON_DETAIL) == ""
 
 

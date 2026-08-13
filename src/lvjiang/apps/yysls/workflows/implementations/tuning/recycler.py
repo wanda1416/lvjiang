@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import random
 import re
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -19,6 +20,22 @@ if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
     )
+
+
+class RecycleOutcome(Enum):
+    """当前装备回收动作对背包格位产生的结果。"""
+
+    RECYCLED = "recycled"       # 装备已移除，当前格由补位装备/空位占据
+    LOCKED = "locked"           # 装备锁定无法回收，当前格仍是原装备
+    UNAVAILABLE = "unavailable" # 未找到回收入口，当前格仍是原装备
+
+    @property
+    def slot_changed(self) -> bool:
+        return self is RecycleOutcome.RECYCLED
+
+    @property
+    def retry_blocked(self) -> bool:
+        return self in (RecycleOutcome.LOCKED, RecycleOutcome.UNAVAILABLE)
 
 
 class TuningRecycler:
@@ -133,13 +150,13 @@ class TuningRecycler:
 
     def recycle_current(self, equip_data: EquipmentData, detail_scene: str,
                         stage: str, reason: str,
-                        report: dict | None = None) -> bool:
+                        report: dict | None = None) -> RecycleOutcome:
         """回收当前详情页选中的装备：更多 → 子菜单「回收」→ 确认弹窗
 
         进入时背包详情页无弹窗；未找到回收按钮时收起弹窗返回
-        False（装备保留原地）。成功后背包刷新、后续装备前移补位。
+        UNAVAILABLE（装备保留原地）。成功后背包刷新、后续装备前移补位。
         装备锁定检测：确认弹窗内无「确认」字样 = 装备被锁定，
-        收起弹窗返回 False。
+        收起弹窗返回 LOCKED。
         """
         wf = self._wf
         label = equip_data.name or equip_data.type
@@ -155,7 +172,7 @@ class TuningRecycler:
             logger.warning("未找到回收按钮，装备保留")
             wf.click_region(wf.EQUIP_DETAIL, "more_func")
             wf.wait_delay("step_interval")
-            return False
+            return RecycleOutcome.UNAVAILABLE
         wf.click_region(wf.EQUIP_DETAIL, key)
         wf.wait_delay("page_refresh_wait")  # 回收确认弹窗
         # 装备锁定检测：确认弹窗内应含「确认」，否则装备被锁定
@@ -168,7 +185,7 @@ class TuningRecycler:
                            f"装备被锁定，保留")
             wf.click_region(wf.EQUIP_DETAIL, "more_func")
             wf.wait_delay("step_interval")
-            return False
+            return RecycleOutcome.LOCKED
         wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
         wf.wait_delay("page_refresh_wait")  # 回收完成，背包刷新补位
         if report is not None:
@@ -180,4 +197,4 @@ class TuningRecycler:
             "stage": stage, "reason": reason,
         })
         logger.info(f"  [{stage_label}] {label} 已回收")
-        return True
+        return RecycleOutcome.RECYCLED

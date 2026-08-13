@@ -49,7 +49,8 @@ class _EntryRecord:
     label: str
     username: str
     status: str = ""
-    switch_status: str = ""
+    prepare_status: str = ""
+    finish_status: str = ""
     scripts: list[_ScriptRecord] = field(default_factory=list)
     duration: float = 0.0
     _start: float = 0.0
@@ -70,7 +71,7 @@ class BatchReport:
         report.start_batch()
         for ...:
             report.start_entry(label, username)
-            report.record_switch(status)
+            report.record_prepare(status)
             for script in scripts:
                 report.start_script(script)
                 ... execute ...
@@ -84,7 +85,7 @@ class BatchReport:
         self,
         config_name: str,
         scripts: list[tuple[str, str]],   # [(id, name), ...]
-        workflows: dict[str, str],         # {preprocess, switch, postprocess}
+        workflows: dict[str, str],         # 生命周期 wf
         user_column: str = "",
         total_rows: int = 0,
     ):
@@ -112,9 +113,13 @@ class BatchReport:
         self._entries.append(entry)
         self._current_entry = entry
 
-    def record_switch(self, status: str) -> None:
+    def record_prepare(self, status: str) -> None:
         if self._current_entry:
-            self._current_entry.switch_status = status
+            self._current_entry.prepare_status = status
+
+    def record_finish(self, status: str) -> None:
+        if self._current_entry:
+            self._current_entry.finish_status = status
 
     def start_script(self, script_id: str, script_name: str) -> None:
         rec = _ScriptRecord(script_id=script_id, script_name=script_name)
@@ -185,7 +190,8 @@ class BatchReport:
 
         # 工作流槽位
         wf_parts = []
-        for key in ("preprocess", "switch", "postprocess"):
+        for key in ("batch_setup", "prepare_item", "finish_item",
+                    "batch_teardown"):
             val = self._workflows.get(key, "")
             if val:
                 wf_parts.append(f"{key}={val}")
@@ -201,9 +207,10 @@ class BatchReport:
                 lines.append(f"- 用户：{entry.username}")
             lines.append(f"- 耗时：{_fmt_duration(entry.duration)}")
 
-            # 切换
-            if entry.switch_status:
-                lines.append(f"- 切换：{entry.switch_status}")
+            if entry.prepare_status:
+                lines.append(f"- 条目准备：{entry.prepare_status}")
+            if entry.finish_status:
+                lines.append(f"- 条目收尾：{entry.finish_status}")
 
             # 各脚本
             for sr in entry.scripts:
@@ -224,18 +231,20 @@ class BatchReport:
         total_entries = len(self._entries)
         entry_success = sum(
             1 for e in self._entries
-            if e.switch_status != "失败" and e.scripts
+            if e.prepare_status != "失败" and e.finish_status != "失败"
+            and e.scripts
             and all(s.status == "成功" for s in e.scripts)
         )
-        entry_switch_fail = sum(
-            1 for e in self._entries if e.switch_status == "失败")
-        entry_partial = total_entries - entry_success - entry_switch_fail
+        entry_lifecycle_fail = sum(
+            1 for e in self._entries
+            if e.prepare_status == "失败" or e.finish_status == "失败")
+        entry_partial = total_entries - entry_success - entry_lifecycle_fail
         lines.append(f"- 行执行总计：{total_entries} 行")
         lines.append(f"  - 全部成功：{entry_success}")
         if entry_partial:
             lines.append(f"  - 部分失败：{entry_partial}")
-        if entry_switch_fail:
-            lines.append(f"  - 切换失败：{entry_switch_fail}")
+        if entry_lifecycle_fail:
+            lines.append(f"  - 生命周期失败：{entry_lifecycle_fail}")
         lines.append("")
 
         # 脚本级统计

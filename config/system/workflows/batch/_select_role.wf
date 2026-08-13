@@ -1,10 +1,20 @@
 # 公共子过程：选角色 + 进入游戏
 
-def _select_role($role_index)
+def _select_role($role_index, $role, $batch_state)
     log "当前下标" + $role_index
 
     click [game_login_page].[switch_role]
-    wait (1, 2)
+    wait @page_refresh
+
+    # 检查角色是否已在线（confirm 区域包含「其他角色」）
+    scan [general_control].[confirm] as $online by contains "其他角色"
+    if $online
+        log "角色在线，不可登录，跳过"
+        click [general_control].[cancel] after wait @page_refresh
+        eval $batch_state.page_state = 1
+        eval $batch_state.role = ""
+        return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+    end
 
     # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）
     click [game_login_page].[role_list][$role_index][1]
@@ -45,5 +55,8 @@ def _select_role($role_index)
     eval pause("无法确认已登录至主页，请手动检查后点击确定")
 
     @all_done
+    eval $batch_state.page_state = 2
+    eval $batch_state.role = $role
     wait @step_interval
+    return {"status": "success", "message": "", "state": $batch_state}
 end

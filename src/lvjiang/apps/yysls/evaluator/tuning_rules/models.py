@@ -472,10 +472,11 @@ BEHAVIOR_ACTION_LABELS = {
     "recycle": "回收装备",
     "skip": "跳过该装备",
     "tune_full_recycle": "调满后回收",  # 金装专用：调满5词条后回收
+    "tune_this": "强制调律",  # 扫描处理专用：无视门槛强制进入调律页
 }
 # 各行为点允许的动作（材料处理由 MaterialSettings 承担，不入表）
 BEHAVIOR_STAGE_ACTIONS = {
-    "scan": ("recycle", "skip", "tune_full_recycle"),
+    "scan": ("recycle", "skip", "tune_full_recycle", "tune_this"),
     "tune": ("continue", "reset", "recycle", "skip"),
 }
 BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "结束处理"}
@@ -486,6 +487,7 @@ BEHAVIOR_ACTION_TOOLTIPS = {
     "recycle": "回收装备：分解为材料",
     "skip": "跳过该装备：结束保留在背包",
     "tune_full_recycle": "调满后回收：金装专用，跳过狗粮与规则判定，调满5词条后回收",
+    "tune_this": "强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）",
 }
 # 判定语义：预期评级识别用哪个流派规则集；affix=自选词条
 #（不跑潜力判定，判定结果列存词条名，按装备词条名匹配）
@@ -692,6 +694,7 @@ class TuneBehavior:
     rules: list[BehaviorRule] = field(default_factory=list)
     max_resets: int = MAX_TUNE_RESETS
     reset_exhausted_action: str = "skip"
+    initial_check: bool = False
 
     def decide(self, part: str | None, quality: str | None,
                cap_pct: float | None, rating_of: RatingProvider,

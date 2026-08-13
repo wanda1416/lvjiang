@@ -15,6 +15,7 @@ _aliases 支持两种形态：list（不分组）或 dict（分组：组名 → 
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,6 +34,25 @@ WUXUE_CATEGORY = "指定武学增效"
 
 # 词条归属分类（固定 6 类，与词组正交；定音词条不参与归属）
 AFFIX_CATEGORY_NAMES = ("外功类", "属攻类", "三率类", "增效类", "武器类", "生存类")
+
+
+# ─── 等级配置数据结构 ──────────────────────────────────────
+
+@dataclass
+class LevelConfig:
+    """单等级配置条目
+
+    level: 装备等级（必填）
+    allow_reset: 该等级是否支持重置调律（可选，None 表示未设置）
+    min_material_count: 该等级要求的最低材料数量（可选，None 表示未设置）
+    judge_resistance: 判定抗性百分比（可选，>= 0）
+    buff_resistance: 增益抗性百分比（可选，>= 0）
+    """
+    level: int = 0
+    allow_reset: bool | None = None
+    min_material_count: int | None = None
+    judge_resistance: int | None = None
+    buff_resistance: int | None = None
 
 
 # ─── 品阶推断数据结构 ──────────────────────────────────────
@@ -122,6 +142,7 @@ class GameConfigManager:
     def __init__(self, path: str | Path | None = None):
         # path 非空（测试/孤立文件）时直读；否则经 resolver 读合并视图
         self._path = Path(path) if path is not None else None
+        self._raw: dict = {}
 
         # 品阶推断：key → level → LevelRule
         self._base_rules: dict[str, dict[int, LevelRule]] = {}
@@ -147,6 +168,8 @@ class GameConfigManager:
         self._weapon_wuxue_affixes: dict[str, str] = {}
         # 流派配置：流派名 → {main: {武器: 词条}, sub: [武器]}（顶层 schools）
         self._schools: dict[str, dict] = {}
+        # 等级配置：等级 → LevelConfig（顶层 level_configs）
+        self._level_configs: list[LevelConfig] = []
 
         self._load()
 
@@ -157,6 +180,7 @@ class GameConfigManager:
         else:
             from lvjiang.core.config.resolver import get_resolver
             data = get_resolver().load_merged("yysls/attributes.yaml")
+        self._raw = data
 
         # 重置全部规则（_load 会在 UI 保存后重复调用，避免残留旧映射）
         self._base_rules.clear()
@@ -171,6 +195,7 @@ class GameConfigManager:
         self._weapon_types.clear()
         self._weapon_wuxue_affixes.clear()
         self._schools.clear()
+        self._level_configs.clear()
 
         # ── weapon_types（支持 dict 列表格式：[{name, wuxue_affix}, ...]）──
         raw_weapon_types = data.get("weapon_types") or []
@@ -280,6 +305,26 @@ class GameConfigManager:
                     self._affix_caps[category][level] = {
                         "cap": entry,
                     }
+
+        # ── level_configs（顶层等级配置）──
+        raw_levels = data.get("level_configs") or []
+        seen_levels: set[int] = set()
+        for item in raw_levels:
+            if not isinstance(item, dict):
+                continue
+            level = item.get("level")
+            if not isinstance(level, int) or level in seen_levels:
+                continue
+            seen_levels.add(level)
+            self._level_configs.append(LevelConfig(
+                level=level,
+                allow_reset=item.get("allow_reset"),
+                min_material_count=item.get("min_material_count"),
+                judge_resistance=item.get("judge_resistance"),
+                buff_resistance=item.get("buff_resistance"),
+            ))
+        # 按等级排序
+        self._level_configs.sort(key=lambda c: c.level)
 
     # ── 词条映射 ────────────────────────────────────────────
 
@@ -402,6 +447,41 @@ class GameConfigManager:
     def get_schools(self) -> dict[str, dict]:
         """流派配置（顶层 schools：流派名 → {main: {武器: 词条}, sub: [武器]}）"""
         return dict(self._schools)
+
+    # ── 等级配置 ────────────────────────────────────────────
+
+    def get_level_configs(self) -> list[LevelConfig]:
+        """等级配置列表（按等级排序的副本）"""
+        return list(self._level_configs)
+
+    def level_config_for(self, level: int) -> LevelConfig | None:
+        """按等级查找配置条目（精确匹配），未找到返回 None"""
+        for cfg in self._level_configs:
+            if cfg.level == level:
+                return cfg
+        return None
+
+    # ── 原始数据访问与保存（UI 编辑用） ────────────────────────
+
+    def get_raw(self) -> dict:
+        """返回原始 YAML 数据的深拷贝（UI 编辑用）"""
+        return copy.deepcopy(self._raw)
+
+    def save(self, data: dict) -> None:
+        """校验并写盘，然后 reload"""
+        # 简单校验：确保是 dict 且有 level_configs
+        if not isinstance(data, dict):
+            raise ValueError("数据必须是 dict")
+        # 写盘
+        if self._path is not None:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        else:
+            from lvjiang.core.config.resolver import get_resolver
+            get_resolver().save_merged("yysls/attributes.yaml", data)
+        # 重新加载
+        self._load()
 
     # ── 品阶推断 ────────────────────────────────────────────
 

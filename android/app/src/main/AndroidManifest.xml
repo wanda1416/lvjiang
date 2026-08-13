@@ -27,10 +27,12 @@
             </intent-filter>
         </activity>
 
-        <!-- 调律参数配置页：主页功能区与悬浮面板都能进 -->
+        <!-- 调律参数配置页：主页功能区与悬浮面板都能进。
+             透明主题：叠在游戏画面上，游戏不被挤到后台（防 LMK 击杀） -->
         <activity
             android:name=".TuningConfigActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:theme="@style/Theme.Lvjiang.Translucent" />
 
         <!-- 悬浮图标前台服务 -->
         <service

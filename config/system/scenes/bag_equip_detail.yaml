@@ -1,5 +1,10 @@
 key: bag_equip_detail
 name: 装备
+views:
+- key: base
+  name: 基底
+- key: kuaijie
+  name: 快捷道具
 regions:
 - key: back
   name: 返回

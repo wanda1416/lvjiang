@@ -1,5 +1,7 @@
 """场景管理混入类 - 分组/场景 CRUD、右键菜单、Tab 排序"""
 
+import re
+
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -13,6 +15,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 
+from ....core.layout_manager import rename_scene_across_all_layouts
 from ....core.scene_registry import (
     get_group_name,
     get_registry,
@@ -20,6 +23,9 @@ from ....core.scene_registry import (
     reload_scene_registry,
 )
 from .scene_tab import SceneTab
+
+# key 格式校验：小写字母开头，仅含小写字母/数字/下划线
+_RE_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 class SceneOpsMixin:
@@ -265,33 +271,62 @@ class SceneOpsMixin:
         self._status_bar.showMessage(f"已创建分组: {name}")
 
     def _do_rename_group(self, group_key: str):
-        """重命名分组（key 不可变）"""
+        """重命名分组（支持修改 key 和名称）"""
         old_name = get_group_name(group_key)
         dialog = QDialog(self)
         dialog.setWindowTitle("重命名分组")
         form = QFormLayout(dialog)
-        key_label = QLineEdit(group_key)
-        key_label.setReadOnly(True)
-        form.addRow("分组 Key:", key_label)
+        key_edit = QLineEdit(group_key)
+        form.addRow("分组 Key:", key_edit)
         name_edit = QLineEdit(old_name)
         form.addRow("分组名称:", name_edit)
+        error_label = QLabel("")
+        error_label.setStyleSheet("color: red;")
+        error_label.hide()
+        form.addRow(error_label)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         form.addRow(buttons)
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        registry = get_registry()
+        existing_keys = {gk for gk, _ in registry.get_groups()}
+
         def _validate():
-            ok_btn.setEnabled(bool(name_edit.text().strip()))
+            k = key_edit.text().strip()
+            n = name_edit.text().strip()
+            if not n:
+                error_label.hide()
+                ok_btn.setEnabled(False)
+                return
+            if not _RE_KEY.match(k):
+                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
+                error_label.show()
+                ok_btn.setEnabled(False)
+                return
+            if k != group_key and k in existing_keys:
+                error_label.setText(f"key 已存在: {k}")
+                error_label.show()
+                ok_btn.setEnabled(False)
+                return
+            error_label.hide()
+            ok_btn.setEnabled(True)
+
+        key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
         _validate()
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        new_key = key_edit.text().strip()
         new_name = name_edit.text().strip()
-        registry = get_registry()
+        key_changed = new_key != group_key
         try:
-            registry.rename_group(group_key, new_name)
+            if key_changed:
+                registry.rename_group_key(group_key, new_key, new_name)
+            else:
+                registry.rename_group(group_key, new_name)
         except ValueError as e:
             QMessageBox.warning(self, "重命名失败", str(e))
             return
@@ -299,7 +334,10 @@ class SceneOpsMixin:
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
-        self._status_bar.showMessage(f"已重命名分组: {new_name}")
+        msg = f"已重命名分组: {new_name}"
+        if key_changed:
+            msg += f" (key: {group_key} → {new_key})"
+        self._status_bar.showMessage(msg)
 
     def _do_delete_group(self, group_key: str):
         """删除空分组"""
@@ -425,42 +463,79 @@ class SceneOpsMixin:
         self._status_bar.showMessage(f"已移动场景「{scene_name}」到分组「{target_name}」")
 
     def _do_rename_scene(self, scene_key: str):
-        """重命名场景（只允许修改名称，key 不可变）"""
+        """重命名场景（支持修改 key 和名称）"""
         old_name = get_scene_name(scene_key)
         dialog = QDialog(self)
         dialog.setWindowTitle("重命名场景")
         form = QFormLayout(dialog)
-        key_label = QLineEdit(scene_key)
-        key_label.setReadOnly(True)
-        form.addRow("场景 Key:", key_label)
+        key_edit = QLineEdit(scene_key)
+        form.addRow("场景 Key:", key_edit)
         name_edit = QLineEdit(old_name)
         form.addRow("场景名称:", name_edit)
+        error_label = QLabel("")
+        error_label.setStyleSheet("color: red;")
+        error_label.hide()
+        form.addRow(error_label)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         form.addRow(buttons)
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        registry = get_registry()
+        existing_keys = set(registry.all_scene_keys())
+
         def _validate():
-            ok_btn.setEnabled(bool(name_edit.text().strip()))
+            k = key_edit.text().strip()
+            n = name_edit.text().strip()
+            if not n:
+                error_label.hide()
+                ok_btn.setEnabled(False)
+                return
+            if not _RE_KEY.match(k):
+                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
+                error_label.show()
+                ok_btn.setEnabled(False)
+                return
+            if k != scene_key and k in existing_keys:
+                error_label.setText(f"key 已存在: {k}")
+                error_label.show()
+                ok_btn.setEnabled(False)
+                return
+            error_label.hide()
+            ok_btn.setEnabled(True)
+
+        key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
         _validate()
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        new_key = key_edit.text().strip()
         new_name = name_edit.text().strip()
-        registry = get_registry()
+        key_changed = new_key != scene_key
         try:
-            registry.rename_scene(scene_key, scene_key, new_name)
+            registry.rename_scene(scene_key, new_key, new_name)
         except ValueError as e:
             QMessageBox.warning(self, "重命名失败", str(e))
             return
         registry.save_group_config()
+        # 同步布局和截图文件
+        if key_changed:
+            rename_scene_across_all_layouts(scene_key, new_key)
+            # 重新加载当前布局以刷新 scene key 映射
+            if self._current_layout:
+                reloaded = self._manager.load_layout(self._current_layout.name)
+                if reloaded:
+                    self._current_layout = reloaded
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
-        self._select_scene(scene_key)
-        self._status_bar.showMessage(f"已重命名场景: {new_name}")
+        self._select_scene(new_key)
+        msg = f"已重命名场景: {new_name}"
+        if key_changed:
+            msg += f" (key: {scene_key} → {new_key})"
+        self._status_bar.showMessage(msg)
 
     def _do_delete_scene(self, scene_key: str):
         """删除场景（二次确认）"""

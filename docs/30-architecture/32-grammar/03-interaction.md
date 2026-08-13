@@ -44,7 +44,7 @@ click [bag_equip_detail].[bag_grid][1][1]     # 点击第 1 行第 1 列的格�
 click [scene].[panel][$row][$col]             # 动态行列（变量指定）
 
 # 点击 Panel 中心
-click [action_control].[actions]              # 点击面板中心（用于点击空白处）
+click [general_action].[actions]              # 点击面板中心（用于点击空白处）
 ```
 
 **说明**：
@@ -108,7 +108,7 @@ drag [bag_equip_detail].[bag_grid][1][1] up $n  # 上翻 $n 行（动态）
 drag [bag_equip_detail].[bag_grid][1][1] right 2 # 右翻 2 列
 
 # Panel/Region 中心拖拽
-drag [action_control].[actions] down            # 从面板中心下翻
+drag [general_action].[actions] down            # 从面板中心下翻
 drag [scene].[scroll_area] up 2                 # 从区域中心上翻 2 次
 
 # 点对拖拽

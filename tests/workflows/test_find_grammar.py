@@ -25,10 +25,10 @@ class TestFindGrammar:
 
     def test_with_search_area(self):
         """find [scene].[area] as $var by contains "文字" — 指定区域搜索"""
-        prog = parse_text('find [action_control].[btn_area] as $btn by contains "确认"\n')
+        prog = parse_text('find [general_action].[btn_area] as $btn by contains "确认"\n')
         node = prog.body[0]
         assert isinstance(node, Find)
-        assert node.search_scene == "action_control"
+        assert node.search_scene == "general_action"
         assert node.search_region == "btn_area"
         assert node.var_name == "btn"
         assert node.by.match_mode == "contains"

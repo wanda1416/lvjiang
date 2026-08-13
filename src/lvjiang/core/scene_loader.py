@@ -323,6 +323,27 @@ class SceneRegistry:
         self._groups[key] = new_name
         logger.info(f"已重命名分组: {key} -> {new_name}")
 
+    def rename_group_key(self, old_key: str, new_key: str, new_name: str):
+        """重命名分组 key（修改 scenes.yaml 中的 group_key）
+
+        同时更新内存中的 _groups / _group_order / _group_scenes。
+        调用方需随后调用 save_group_config() 持久化。
+        """
+        if old_key not in self._groups:
+            raise ValueError(f"分组不存在: {old_key}")
+        if new_key != old_key and new_key in self._groups:
+            raise ValueError(f"分组 key 已存在: {new_key}")
+        # 更新 _group_scenes
+        scenes = self._group_scenes.pop(old_key, [])
+        self._group_scenes[new_key] = scenes
+        # 更新 _groups
+        self._groups.pop(old_key)
+        self._groups[new_key] = new_name
+        # 更新 _group_order
+        idx = self._group_order.index(old_key)
+        self._group_order[idx] = new_key
+        logger.info(f"已重命名分组 key: {old_key} -> {new_key} ({new_name})")
+
     def delete_group(self, key: str):
         """删除空分组（非空抛异常）"""
         if key not in self._groups:
@@ -415,6 +436,12 @@ class SceneRegistry:
             self._scenes[new_key] = scene
             idx = self._order.index(key)
             self._order[idx] = new_key
+            # 同步更新分组中的场景 key
+            group = self.get_scene_group(key)
+            if group:
+                scenes_list = self._group_scenes[group]
+                gidx = scenes_list.index(key)
+                scenes_list[gidx] = new_key
         self._save_scene_yaml(scene)
         logger.info(f"已重命名场景: {key} -> {new_key}")
 

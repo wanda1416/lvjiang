@@ -67,7 +67,7 @@ end
 **结果结构**：行列嵌套 dict，key 为 1-based 数字字符串，用 `$var.[行].[列]` 取值：
 
 ```
-scan [action_control].[actions] as $bags   # actions 是 6×2 panel
+scan [general_action].[actions] as $bags   # actions 是 6×2 panel
 collect $bags                              # {"1": {"1": "抱拳", "2": "作揖", ...}, "2": {...}}
 
 log $bags.[1].[2]                          # 1 行 2 列的文本（静态数字 key）
@@ -79,7 +79,7 @@ for r in [1...2]                           # 动态遍历：$r/$c 是 int，自�
 end
 
 if $bags.[1].[2] contains "背包"           # 命中后可直接点对应格
-    click [action_control].[actions][1][2]
+    click [general_action].[actions][1][2]
 end
 ```
 
@@ -215,7 +215,7 @@ if $found
 end
 
 # 在指定区域内搜索
-find [action_control].[btn_area] as $btn by contains "确认"
+find [general_action].[btn_area] as $btn by contains "确认"
 if $btn
     click $btn
 end

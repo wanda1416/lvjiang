@@ -95,7 +95,7 @@ class _PanelMixin:
     def _crop_slot_image(self, ref: PanelRef) -> "tuple[np.ndarray | None, str, int, int]":
         """裁剪 panel cell 图像，返回 (slot_img, slot_key, row_idx, col_idx)
 
-        slot_key 格式: "r{row}c{col}"（1-based），用于结果字典的 key。
+        slot_key 格式: "r{row}c{col}"（1-based），仅用于日志定位。
         """
         scene_key = ref.scene
         panel_key = ref.panel
@@ -148,7 +148,11 @@ class _PanelMixin:
         return slot_img, slot_key, row_idx, col_idx
 
     def _scan_panel_cell(self, node: Scan):
-        """scan [scene].[panel][row][col] as $var [by ...]"""
+        """scan [scene].[panel][row][col] as $var [by ...]
+
+        [row][col] 是对整面板结果的 key 过滤，结果为该格文本（str），
+        与整面板 $var.[行].[列] 取值格式一致。
+        """
         ref: PanelRef = node.scene
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         slot_img, slot_key, _, _ = self._crop_slot_image(ref)
@@ -166,11 +170,14 @@ class _PanelMixin:
         else:
             ocr_results = self._ocr.recognize(slot_img)
             text = " ".join(r.text for r in ocr_results).strip()
-            self.variables[var_name] = {slot_key: text} if text else {slot_key: ""}
+            self.variables[var_name] = text
         logger.info(f"scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _recognize_panel_cell(self, node: Recognize):
-        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...]"""
+        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...]
+
+        [row][col] 是 key 过滤，结果为该格材料类型名（str）。
+        """
         ref: PanelRef = node.scene
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         slot_img, slot_key, _, _ = self._crop_slot_image(ref)
@@ -186,8 +193,81 @@ class _PanelMixin:
             self.variables[var_name] = info.type if matched else ""
         else:
             info = self._ensure_workflow().material_recognizer.recognize(slot_img, group=group)
-            self.variables[var_name] = {slot_key: info.type}
+            self.variables[var_name] = info.type
         logger.info(f"recognize panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
+
+    def _aligned_panel_image(self, scene_key: str, panel_key: str):
+        """自动 align 并截取 panel 全图，返回 (panel_img, cal)；失败 (None, None)"""
+        cache_key = (scene_key, panel_key)
+        if cache_key not in self._panel_alignments:
+            self._exec_align(Align(scene=scene_key, panel=panel_key))
+        cal = self._panel_alignments.get(cache_key)
+        if cal is None:
+            logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
+            return None, None
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if panel_obj is None:
+            raise WorkflowUserError(
+                f"布局中未定义 panel {scene_key}.{panel_key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
+        panel_img = self._capture_panel_image(panel_obj)
+        if panel_img is None:
+            logger.error(f"无法截取 panel {scene_key}.{panel_key}")
+            return None, None
+        return panel_img, cal
+
+    def _iter_slot_images(self, panel_img, cal):
+        """按对齐结果逐格裁剪 panel 图像，yield (row_idx, col_idx, slot_img|None)"""
+        ph, pw = panel_img.shape[:2]
+        for r in range(cal.n_rows):
+            for c in range(cal.n_cols):
+                x1_r, y1_r, x2_r, y2_r = cal.slot_bounds(r, c)
+                x1 = max(0, int(x1_r * pw))
+                y1 = max(0, int(y1_r * ph))
+                x2 = min(pw, int(x2_r * pw))
+                y2 = min(ph, int(y2_r * ph))
+                slot_img = panel_img[y1:y2, x1:x2]
+                yield r, c, (slot_img if slot_img.size else None)
+
+    def _scan_panel_whole(self, scene_key: str, panel_key: str, var_name: str):
+        """scan [scene].[panel] as $var — 整面板逐格 OCR
+
+        结果为行列嵌套 dict（key 为 1-based 字符串）：$var.[1].[2] 取 1 行 2 列文本。
+        整面板只截一次图，所有格从同一帧裁剪，避免逐格重截的耗时与画面漂移。
+        """
+        panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
+        if panel_img is None:
+            self.variables[var_name] = {}
+            return
+        result: dict[str, dict[str, str]] = {}
+        for r, c, slot_img in self._iter_slot_images(panel_img, cal):
+            text = ""
+            if slot_img is not None:
+                ocr_results = self._ocr.recognize(slot_img)
+                text = " ".join(t.text for t in ocr_results).strip()
+            result.setdefault(str(r + 1), {})[str(c + 1)] = text
+        self.variables[var_name] = result
+        logger.info(f"scan panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
+
+    def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None):
+        """recognize [scene].[panel] as $var [on group ...] — 整面板逐格材料识别
+
+        结果结构与 _scan_panel_whole 一致：$var.[行].[列] 取材料类型名。
+        """
+        panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
+        if panel_img is None:
+            self.variables[var_name] = {}
+            return
+        recognizer = self._ensure_workflow().material_recognizer
+        result: dict[str, dict[str, str]] = {}
+        for r, c, slot_img in self._iter_slot_images(panel_img, cal):
+            mat_type = ""
+            if slot_img is not None:
+                mat_type = recognizer.recognize(slot_img, group=group).type
+            result.setdefault(str(r + 1), {})[str(c + 1)] = mat_type
+        self.variables[var_name] = result
+        logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
     def _match_text(self, text: str, target: str, mode: str) -> bool:
         """文本匹配（用于 by 子句短路识别）"""

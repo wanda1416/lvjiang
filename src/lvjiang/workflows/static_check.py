@@ -66,6 +66,9 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
             ok = ref.key in bound["arrow"]
         elif ref.kind == "panel":
             ok = ref.key in bound["panel"]
+        elif ref.kind == "scan":
+            # 单 key scan/recognize：区域或面板任一绑定即可（运行时据此分派）
+            ok = ref.key in bound["region"] or ref.key in bound["panel"]
         else:
             ok = ref.key in bound["region"]
         if not ok:

@@ -3,6 +3,7 @@
 ## 目录
 
 - [一、scan — OCR 扫描](#一scan--ocr-扫描)
+  - [整面板扫描](#整面板扫描)
   - [by 子句（短路识别）](#by-子句短路识别)
 - [二、recognize — 图像识别](#二recognize--图像识别)
 - [三、collect — 收集输出](#三collect--收集输出)
@@ -53,6 +54,42 @@ end
 - 扫描结果 `$var` 为字典，key 为 Area 名，value 为 OCR 识别文本
 - 引擎自动将 Region 坐标元数据存入内部 `_coord_meta`，供后续 `click [scene].$key` 解析坐标
 - 场景名支持 `[]`、`""`、`$var` 三种形式，语义等价
+
+### 整面板扫描
+
+`scan [scene].[key]` 的 key 命中场景的 **panel**（而非 region）时，自动分派为
+整面板逐格 OCR：自动 align 对齐后只截一次图，所有格从同一帧裁剪识别。
+
+**结果结构**：行列嵌套 dict，key 为 1-based 数字字符串，用 `$var.[行].[列]` 取值：
+
+```
+scan [action_control].[actions] as $bags   # actions 是 6×2 panel
+collect $bags                              # {"1": {"1": "抱拳", "2": "作揖", ...}, "2": {...}}
+
+log $bags.[1].[2]                          # 1 行 2 列的文本（静态数字 key）
+
+for r in [1...2]                           # 动态遍历：$r/$c 是 int，自动归一化命中 "1" 字符串 key
+    for c in [1...6]
+        log $bags.$r.$c
+    end
+end
+
+if $bags.[1].[2] contains "背包"           # 命中后可直接点对应格
+    click [action_control].[actions][1][2]
+end
+```
+
+**说明**：
+
+- 行列数取自对齐结果（实际检测到的网格），而非配置的 rows/cols
+- 空格 value 为空字符串 `""`
+- region 与 panel 同名时 region 优先（保持既有语义）
+- `[scene].[panel][行][列]` 单格形式是对整面板结果的 **key 过滤**，
+  结果为该格文本（str），与 `$var.[行].[列]` 取值格式一致
+- 整面板扫描**不支持 by 子句**（嵌套 dict 与短路返回字段名语义不兼容），
+  需要短路匹配时用 `[scene].[panel][行][列]` 单格形式
+- `recognize [scene].[panel名]` 同样支持整面板分派，结果结构一致，value 为材料类型名；
+  单格 `recognize [scene].[panel][行][列]` 结果为该格材料类型名（str）
 
 ### by 子句（短路识别）
 
@@ -140,6 +177,7 @@ recognize [equip_tune_detail].[
 
 - 识别结果 `$var` 为字典，key 为 Area 名，value 为材料类型名
 - 与 `scan` 一样，引擎自动将 slot Region 坐标元数据存入 `_coord_meta`
+- 与 `scan` 一样，单一 key 命中 panel 时分派为整面板逐格识别（见[整面板扫描](#整面板扫描)）
 - **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str）
 - **on group 子句**：限定材料识别的分组范围，仅在指定分组的参考材料中匹配。支持字符串常量和变量引用
 

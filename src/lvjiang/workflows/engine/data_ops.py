@@ -40,6 +40,26 @@ class _DataOpsMixin:
             return [str(k) for k in region_key]
         return [str(region_key)]
 
+    def _whole_panel_key(self, scene: str, field_keys, by, verb: str) -> str | None:
+        """单一 key 且指向 panel（而非 region）时返回 panel key，否则 None
+
+        region 与 panel 同名时 region 优先（保持既有语义）。
+        整面板结果是行列嵌套 dict，与 by 短路返回字段名的语义不兼容，直接拦住。
+        """
+        if not field_keys or len(field_keys) != 1:
+            return None
+        key = str(field_keys[0])
+        if any(r.key == key for r in self._layout.get_scene_regions(scene)):
+            return None
+        if self._find_panel_in_layout(scene, key) is None:
+            return None
+        if by is not None:
+            raise WorkflowUserError(
+                f"整面板 {verb} [{scene}].[{key}] 不支持 by 子句，"
+                f"请用 [{scene}].[{key}][行][列] 单格形式"
+            )
+        return key
+
     def _exec_scan(self, node: Scan):
         # PanelRef: panel cell 级 OCR
         if isinstance(node.scene, PanelRef):
@@ -58,6 +78,12 @@ class _DataOpsMixin:
             # 动态 region：[scene].$var → 解析变量值
             field_keys = self._dynamic_field_keys(node.region_var)
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+
+        # 单一 key 指向 panel → 整面板逐格 OCR（$var.[行].[列] 取值）
+        panel_key = self._whole_panel_key(scene, field_keys, node.by, "scan")
+        if panel_key is not None:
+            self._scan_panel_whole(scene, panel_key, var_name)
+            return
 
         if node.by is not None:
             # ── by 子句：短路 OCR，返回字段名 str ──
@@ -98,6 +124,12 @@ class _DataOpsMixin:
         group = None
         if node.group is not None:
             group = self._resolve(node.group)
+
+        # 单一 key 指向 panel → 整面板逐格材料识别（$var.[行].[列] 取值）
+        panel_key = self._whole_panel_key(scene, field_keys, node.by, "recognize")
+        if panel_key is not None:
+            self._recognize_panel_whole(scene, panel_key, var_name, group=group)
+            return
 
         if node.by is not None:
             # ── by 子句：短路参考图匹配，返回 slot 名 str ──

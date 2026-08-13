@@ -11,6 +11,8 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal.base import (
 )
 from lvjiang.workflows.align import GridAlignment
 
+from ......i18n import tr
+
 if TYPE_CHECKING:  # pragma: no cover - 仅类型标注，防循环导入
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
@@ -181,12 +183,12 @@ class PositionalTraversal(BagTraversal):
         wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
         wf.wait_stable("scroll_settle")  # 滚动后面板稳定
         alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
-        assert alignment_raw is not None, "对齐失败：alignment 为 None"
+        assert alignment_raw is not None, tr("对齐失败：alignment 为 None")
         alignment: GridAlignment = alignment_raw
 
         # 对比现场：三向校验的候选指纹（next 在前沿处不存在）
         next_fp = (fps[first_real_row + 1]
-                   if first_real_row + 1 < len(fps) else "无")
+                   if first_real_row + 1 < len(fps) else tr("无"))
         logger.info(
             f"  滚动校验: first_real_row={first_real_row} len(fps)={len(fps)} "
             f"窗口行数={alignment.n_rows} 候选 prev={fps[first_real_row - 1]} "
@@ -229,7 +231,7 @@ class PositionalTraversal(BagTraversal):
                 wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", distance=0.25)
                 wf.wait_stable("scroll_settle")  # 补滚后稳定
                 alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
-                assert alignment_raw is not None, "补滚后对齐失败"
+                assert alignment_raw is not None, tr("补滚后对齐失败")
                 alignment = alignment_raw
             elif (first_real_row + 1 < len(fps)
                     and nfp == fps[first_real_row + 1]):
@@ -291,7 +293,7 @@ class PositionalTraversal(BagTraversal):
                                  distance=0.25)
                     wf.wait_stable("scroll_settle")  # 漂移补滚后稳定
                     alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
-                    assert alignment_raw is not None, "漂移补滚后对齐失败"
+                    assert alignment_raw is not None, tr("漂移补滚后对齐失败")
                     alignment = alignment_raw
                     continue
                 # 反查无果（前沿无候选/第二行为空/两行都漂移）→ 指纹检测

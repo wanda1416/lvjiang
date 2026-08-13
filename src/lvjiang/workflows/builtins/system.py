@@ -3,6 +3,7 @@
 from loguru import logger
 
 from ...core.platforms import native_confirm, native_notify, native_pause
+from ...i18n import tr
 from ._registry import builtin_func
 
 
@@ -46,7 +47,7 @@ def _pause(_engine=None, message: str = "", *args) -> str:
         eval pause("请手动处理异常，完成后点击确定")
         eval pause()    # 无消息暂停
     """
-    text = _build_text(message or "工作流已暂停，点击确定继续", args)
+    text = _build_text(message or tr("工作流已暂停，点击确定继续"), args)
     if _engine is not None and getattr(_engine, '_ui_callback', None) is not None:
         _engine._ui_callback("pause", message=text)
         return ""

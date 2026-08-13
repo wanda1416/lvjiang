@@ -17,6 +17,7 @@ from datetime import datetime
 
 from loguru import logger
 
+from ....i18n import tr
 from ..config.profile_models import (
     MODEL_QUOTA,
     MODEL_REGEN,
@@ -146,7 +147,7 @@ def profile_action(
     model_type: str | None = None,
     delta: float | None = None,
     set_value: float | None = None,
-    source: str = "DSL 写入",
+    source: str = tr("DSL 写入"),
     current_value: float | None = None,
     expected_entry: dict | None = None,
     is_action: bool = True,

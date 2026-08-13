@@ -27,6 +27,7 @@ from ...core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
+from ...i18n import tr
 from ..widgets import strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
@@ -44,8 +45,8 @@ class PanelEditorMixin:
         _btn_del_panel, _refresh_lists(), on_item_migrated
     """
 
-    _CALIBRATION_LABELS = {"auto": "自动模式", "even": "等分网格", "image": "图像检测"}
-    _SCROLL_LABELS = {"vertical": "纵向滚动", "horizontal": "横向滚动", "both": "双向滚动", "none": "固定网格"}
+    _CALIBRATION_LABELS = {"auto": tr("自动模式"), "even": tr("等分网格"), "image": tr("图像检测")}
+    _SCROLL_LABELS = {"vertical": tr("纵向滚动"), "horizontal": tr("横向滚动"), "both": tr("双向滚动"), "none": tr("固定网格")}
 
     # ─── 面板构建 ────────────────────────────────────────
 
@@ -56,7 +57,7 @@ class PanelEditorMixin:
         self._panel_table = QTableWidget()
         self._panel_table.setColumnCount(7)
         self._panel_table.setHorizontalHeaderLabels(
-            ["名称", "Key", "行数", "列数", "比例", "校准模式", "滚动方向"]
+            [tr("名称"), "Key", tr("行数"), tr("列数"), tr("比例"), tr("校准模式"), tr("滚动方向")]
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
@@ -91,18 +92,18 @@ class PanelEditorMixin:
         layout.addWidget(self._panel_table)
 
         btn_row = QHBoxLayout()
-        self._btn_new_panel = QPushButton("+ 创建面板")
-        self._btn_new_panel.setToolTip("在场景 YAML 中新增 Panel 定义（声明式网格）")
+        self._btn_new_panel = QPushButton(tr("+ 创建面板"))
+        self._btn_new_panel.setToolTip(tr("在场景 YAML 中新增 Panel 定义（声明式网格）"))
         self._btn_new_panel.clicked.connect(self._on_new_panel_def)
         btn_row.addWidget(self._btn_new_panel)
-        self._btn_del_panel = QPushButton("删除面板")
-        self._btn_del_panel.setToolTip("从场景 YAML 中删除 Panel 定义")
+        self._btn_del_panel = QPushButton(tr("删除面板"))
+        self._btn_del_panel.setToolTip(tr("从场景 YAML 中删除 Panel 定义"))
         self._btn_del_panel.clicked.connect(self._on_delete_panel_def)
         self._btn_del_panel.setEnabled(False)
         btn_row.addWidget(self._btn_del_panel)
-        self._btn_bind_panel = QPushButton("绑定面板")
+        self._btn_bind_panel = QPushButton(tr("绑定面板"))
         self._btn_bind_panel.setToolTip(
-            "在画布上框选一个矩形区域，绑定到选中的 Panel 定义"
+            tr("在画布上框选一个矩形区域，绑定到选中的 Panel 定义")
         )
         self._btn_bind_panel.clicked.connect(self._on_bind_panel)
         btn_row.addWidget(self._btn_bind_panel)
@@ -198,7 +199,7 @@ class PanelEditorMixin:
             try:
                 registry.add_panel_to_scene(target_scene, new_def)
             except ValueError as e:
-                QMessageBox.warning(self, "迁移失败", str(e))
+                QMessageBox.warning(self, tr("迁移失败"), str(e))
                 return
             registry.remove_panel_from_scene(self._scene_key, old_key)
             sync_scene_cache(self._scene_key)
@@ -244,7 +245,7 @@ class PanelEditorMixin:
                     self._canvas.set_panels(panels)
                     self._canvas._notify_panel_changed()
         except ValueError as e:
-            QMessageBox.warning(self, "更新失败", str(e))
+            QMessageBox.warning(self, tr("更新失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -275,7 +276,7 @@ class PanelEditorMixin:
         try:
             registry.add_panel_to_scene(self._scene_key, panel_def)
         except ValueError as e:
-            QMessageBox.warning(self, "创建失败", str(e))
+            QMessageBox.warning(self, tr("创建失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -295,7 +296,7 @@ class PanelEditorMixin:
             return
         reply = QMessageBox.question(
             self,
-            "确认删除",
+            tr("确认删除"),
             f"确定要从场景定义中删除面板「{panel_def.name}」({panel_def.key}) 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -304,7 +305,7 @@ class PanelEditorMixin:
         try:
             registry.remove_panel_from_scene(self._scene_key, panel_def.key)
         except ValueError as e:
-            QMessageBox.warning(self, "删除失败", str(e))
+            QMessageBox.warning(self, tr("删除失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -315,22 +316,22 @@ class PanelEditorMixin:
         scene = registry.get_scene(self._scene_key)
         if not scene or not scene.panels:
             QMessageBox.information(
-                self, "无可用面板", "该场景尚未定义任何 Panel，请先创建面板定义。"
+                self, tr("无可用面板"), tr("该场景尚未定义任何 Panel，请先创建面板定义。")
             )
             return
         bound_keys = {p.key for p in self._canvas.get_panels()}
         available = [p for p in scene.panels if p.key not in bound_keys]
         if not available:
             QMessageBox.information(
-                self, "无可用面板", "该场景所有 Panel 定义都已绑定。"
+                self, tr("无可用面板"), tr("该场景所有 Panel 定义都已绑定。")
             )
             return
         # 弹出选择对话框
         items = [f"{p.name} ({p.key})" for p in available]
         from PyQt6.QtWidgets import QInputDialog
         dlg = QInputDialog(self)
-        dlg.setWindowTitle("绑定面板")
-        dlg.setLabelText("选择要绑定的 Panel：")
+        dlg.setWindowTitle(tr("绑定面板"))
+        dlg.setLabelText(tr("选择要绑定的 Panel："))
         dlg.setComboBoxItems(items)
         if not dlg.exec() or not dlg.textValue():
             return
@@ -349,31 +350,31 @@ class PanelEditorMixin:
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
         """
         dialog = QDialog(self)  # type: ignore[arg-type]
-        dialog.setWindowTitle("新建面板" if panel_def is None else "编辑面板")
+        dialog.setWindowTitle(tr("新建面板") if panel_def is None else tr("编辑面板"))
         form = QFormLayout(dialog)
 
         key_edit = QLineEdit()
-        key_edit.setPlaceholderText("英文，如 bag_grid")
+        key_edit.setPlaceholderText(tr("英文，如 bag_grid"))
         if panel_def:
             key_edit.setText(panel_def.key)
             # 允许编辑 key，但需要校验唯一性
         form.addRow("Key:", key_edit)
 
         name_edit = QLineEdit()
-        name_edit.setPlaceholderText("中文名称，如 背包网格")
+        name_edit.setPlaceholderText(tr("中文名称，如 背包网格"))
         if panel_def:
             name_edit.setText(panel_def.name)
-        form.addRow("名称:", name_edit)
+        form.addRow(tr("名称:"), name_edit)
 
         cols_spin = QSpinBox()
         cols_spin.setRange(1, 20)
         cols_spin.setValue(panel_def.cols if panel_def else 6)
-        form.addRow("列数:", cols_spin)
+        form.addRow(tr("列数:"), cols_spin)
 
         rows_spin = QSpinBox()
         rows_spin.setRange(1, 20)
         rows_spin.setValue(panel_def.rows if panel_def else 3)
-        form.addRow("行数:", rows_spin)
+        form.addRow(tr("行数:"), rows_spin)
 
         vis_spin = QDoubleSpinBox()
         vis_spin.setRange(0.50, 1.00)
@@ -385,13 +386,13 @@ class PanelEditorMixin:
             "0.95 = 基本完整才计入；调低（如 0.55）可减少少检一行，\n"
             "但必须 > 0.5，否则行中心可能落在面板外导致点击脱靶"
         )
-        form.addRow("行最小可见比例:", vis_spin)
+        form.addRow(tr("行最小可见比例:"), vis_spin)
 
         # 校准模式下拉
         calibration_combo = QComboBox()
-        calibration_combo.addItem("自动模式", "auto")
-        calibration_combo.addItem("等分网格", "even")
-        calibration_combo.addItem("图像检测", "image")
+        calibration_combo.addItem(tr("自动模式"), "auto")
+        calibration_combo.addItem(tr("等分网格"), "even")
+        calibration_combo.addItem(tr("图像检测"), "image")
         calibration_combo.setToolTip(
             "自动模式: 先图像检测，失败降级为等分\n"
             "等分网格: 跳过图像检测，直接按行列数等分\n"
@@ -401,14 +402,14 @@ class PanelEditorMixin:
             idx = calibration_combo.findData(panel_def.calibration)
             if idx >= 0:
                 calibration_combo.setCurrentIndex(idx)
-        form.addRow("校准模式:", calibration_combo)
+        form.addRow(tr("校准模式:"), calibration_combo)
 
         # 滚动方向下拉
         scroll_combo = QComboBox()
-        scroll_combo.addItem("纵向滚动", "vertical")
-        scroll_combo.addItem("横向滚动", "horizontal")
-        scroll_combo.addItem("双向滚动", "both")
-        scroll_combo.addItem("固定网格", "none")
+        scroll_combo.addItem(tr("纵向滚动"), "vertical")
+        scroll_combo.addItem(tr("横向滚动"), "horizontal")
+        scroll_combo.addItem(tr("双向滚动"), "both")
+        scroll_combo.addItem(tr("固定网格"), "none")
         scroll_combo.setToolTip(
             "纵向滚动: rows 允许 expected-1\n"
             "横向滚动: cols 允许 expected-1\n"
@@ -420,7 +421,7 @@ class PanelEditorMixin:
             idx = scroll_combo.findData(panel_def.scroll_direction)
             if idx >= 0:
                 scroll_combo.setCurrentIndex(idx)
-        form.addRow("滚动方向:", scroll_combo)
+        form.addRow(tr("滚动方向:"), scroll_combo)
 
         # 实时校验 scroll_direction 与 rows/cols 的约束
         scroll_error_label = QLabel()
@@ -433,11 +434,11 @@ class PanelEditorMixin:
             cols = cols_spin.value()
             direction = scroll_combo.currentData()
             if rows == 1 and direction in ("vertical", "both"):
-                scroll_error_label.setText("rows=1 时滚动方向不能为纵向")
+                scroll_error_label.setText(tr("rows=1 时滚动方向不能为纵向"))
                 scroll_error_label.show()
                 return False
             if cols == 1 and direction in ("horizontal", "both"):
-                scroll_error_label.setText("cols=1 时滚动方向不能为横向")
+                scroll_error_label.setText(tr("cols=1 时滚动方向不能为横向"))
                 scroll_error_label.show()
                 return False
             scroll_error_label.hide()

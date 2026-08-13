@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from ...core.layout_manager import rename_view_screenshots
 from ...core.scene_definition import BASE_VIEW_KEY
 from ...core.scene_registry import get_registry, sync_scene_cache
+from ...i18n import tr
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -34,7 +35,7 @@ class ViewManagerDialog(QDialog):
         super().__init__(parent)
         self._scene_key = scene_key
         self._registry = get_registry()
-        self.setWindowTitle("管理视图")
+        self.setWindowTitle(tr("管理视图"))
         self.setMinimumWidth(360)
 
         layout = QVBoxLayout(self)
@@ -49,36 +50,36 @@ class ViewManagerDialog(QDialog):
         layout.addWidget(self._list)
 
         btn_row = QHBoxLayout()
-        self._btn_add = QPushButton("新增视图")
+        self._btn_add = QPushButton(tr("新增视图"))
         self._btn_add.clicked.connect(self._on_add)
         btn_row.addWidget(self._btn_add)
-        self._btn_rename = QPushButton("重命名")
+        self._btn_rename = QPushButton(tr("重命名"))
         self._btn_rename.clicked.connect(self._on_rename)
         btn_row.addWidget(self._btn_rename)
-        self._btn_delete = QPushButton("删除视图")
+        self._btn_delete = QPushButton(tr("删除视图"))
         self._btn_delete.clicked.connect(self._on_delete)
         btn_row.addWidget(self._btn_delete)
         btn_row.addStretch()
         # 上移/下移按钮
         self._btn_up = QPushButton("↑")
         self._btn_up.setFixedWidth(32)
-        self._btn_up.setToolTip("上移视图")
+        self._btn_up.setToolTip(tr("上移视图"))
         self._btn_up.clicked.connect(lambda: self._on_move(-1))
         btn_row.addWidget(self._btn_up)
         self._btn_down = QPushButton("↓")
         self._btn_down.setFixedWidth(32)
-        self._btn_down.setToolTip("下移视图")
+        self._btn_down.setToolTip(tr("下移视图"))
         self._btn_down.clicked.connect(lambda: self._on_move(1))
         btn_row.addWidget(self._btn_down)
         layout.addLayout(btn_row)
 
         bottom_row = QHBoxLayout()
-        self._btn_disable = QPushButton("取消多视图")
-        self._btn_disable.setToolTip("仅剩基底视图时可用，取消后所有定义归为无视图区分")
+        self._btn_disable = QPushButton(tr("取消多视图"))
+        self._btn_disable.setToolTip(tr("仅剩基底视图时可用，取消后所有定义归为无视图区分"))
         self._btn_disable.clicked.connect(self._on_disable)
         bottom_row.addWidget(self._btn_disable)
         bottom_row.addStretch()
-        btn_close = QPushButton("关闭")
+        btn_close = QPushButton(tr("关闭"))
         btn_close.clicked.connect(self.accept)
         bottom_row.addWidget(btn_close)
         layout.addLayout(bottom_row)
@@ -92,7 +93,7 @@ class ViewManagerDialog(QDialog):
         self._list.clear()
         views = self._registry.get_scene_views(self._scene_key)
         if not views:
-            item = QListWidgetItem("（未开启多视图，点「新增视图」自动开启）")
+            item = QListWidgetItem(tr("（未开启多视图，点「新增视图」自动开启）"))
             item.setForeground(Qt.GlobalColor.gray)
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             self._list.addItem(item)
@@ -115,18 +116,18 @@ class ViewManagerDialog(QDialog):
     def _on_add(self):
         """新增视图：单对话框同时输入 key 与名称，实时校验"""
         dialog = QDialog(self)
-        dialog.setWindowTitle("新增视图")
+        dialog.setWindowTitle(tr("新增视图"))
         form = QFormLayout(dialog)
         key_edit = QLineEdit()
-        key_edit.setPlaceholderText("小写字母开头，仅含小写字母/数字/下划线")
-        form.addRow("视图 Key:", key_edit)
+        key_edit.setPlaceholderText(tr("小写字母开头，仅含小写字母/数字/下划线"))
+        form.addRow(tr("视图 Key:"), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()
-        name_edit.setPlaceholderText("留空则与 key 相同")
-        form.addRow("视图名称:", name_edit)
+        name_edit.setPlaceholderText(tr("留空则与 key 相同"))
+        form.addRow(tr("视图名称:"), name_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -146,7 +147,7 @@ class ViewManagerDialog(QDialog):
                 return
             if not _RE_VIEW_KEY.match(k):
                 ok_btn.setEnabled(False)
-                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
+                error_label.setText(tr("key 必须以小写字母开头，仅含小写字母/数字/下划线"))
                 error_label.show()
                 return
             if k == BASE_VIEW_KEY:
@@ -174,7 +175,7 @@ class ViewManagerDialog(QDialog):
         try:
             self._registry.add_scene_view(self._scene_key, key, name)
         except ValueError as e:
-            QMessageBox.warning(self, "新增失败", str(e))
+            QMessageBox.warning(self, tr("新增失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._changed = True
@@ -191,18 +192,18 @@ class ViewManagerDialog(QDialog):
             return
         # 构建重命名对话框
         dialog = QDialog(self)
-        dialog.setWindowTitle("重命名视图")
+        dialog.setWindowTitle(tr("重命名视图"))
         form = QFormLayout(dialog)
         key_edit = QLineEdit(old_key)
-        key_edit.setPlaceholderText("小写字母开头，仅含小写字母/数字/下划线")
-        form.addRow("视图 Key:", key_edit)
+        key_edit.setPlaceholderText(tr("小写字母开头，仅含小写字母/数字/下划线"))
+        form.addRow(tr("视图 Key:"), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit(old_view.name)
-        name_edit.setPlaceholderText("留空则与 key 相同")
-        form.addRow("视图名称:", name_edit)
+        name_edit.setPlaceholderText(tr("留空则与 key 相同"))
+        form.addRow(tr("视图名称:"), name_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -220,7 +221,7 @@ class ViewManagerDialog(QDialog):
                 return
             if not _RE_VIEW_KEY.match(k):
                 ok_btn.setEnabled(False)
-                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
+                error_label.setText(tr("key 必须以小写字母开头，仅含小写字母/数字/下划线"))
                 error_label.show()
                 return
             if k in existing:
@@ -243,7 +244,7 @@ class ViewManagerDialog(QDialog):
         try:
             self._registry.rename_scene_view_key(self._scene_key, old_key, new_key, new_name)
         except ValueError as e:
-            QMessageBox.warning(self, "重命名失败", str(e))
+            QMessageBox.warning(self, tr("重命名失败"), str(e))
             return
         # key 变更时同步重命名截图文件
         if key_changed:
@@ -259,7 +260,7 @@ class ViewManagerDialog(QDialog):
         try:
             self._registry.delete_scene_view(self._scene_key, key)
         except ValueError as e:
-            QMessageBox.warning(self, "删除失败", str(e))
+            QMessageBox.warning(self, tr("删除失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._changed = True
@@ -269,7 +270,7 @@ class ViewManagerDialog(QDialog):
         try:
             self._registry.disable_scene_views(self._scene_key)
         except ValueError as e:
-            QMessageBox.warning(self, "无法取消", str(e))
+            QMessageBox.warning(self, tr("无法取消"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._changed = True
@@ -295,7 +296,7 @@ class ViewManagerDialog(QDialog):
         try:
             self._registry.move_scene_view(self._scene_key, key, direction)
         except ValueError as e:
-            QMessageBox.warning(self, "移动失败", str(e))
+            QMessageBox.warning(self, tr("移动失败"), str(e))
             return
         self._changed = True
         self._refresh()

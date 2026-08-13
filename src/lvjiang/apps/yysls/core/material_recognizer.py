@@ -23,6 +23,8 @@ from lvjiang.core.ocr import OCREngine
 from lvjiang.core.recognizers.reference_matcher import ReferenceMatcher
 from lvjiang.core.reference_db import ReferenceDatabase
 
+from ....i18n import tr
+
 # yysls 调律输出字段契约：自动调律启动前必须存在的 output 字段 key
 # （业务层对核心层 meta_schema 的合法要求，非侵入）
 REQUIRED_OUTPUT_FIELDS = ("level_text", "count_text")
@@ -43,7 +45,7 @@ def _parse_number(text: str) -> int | None:
     if not text:
         return None
     multiplier = 1
-    if text.endswith("万"):
+    if text.endswith(tr("万")):
         text = text[:-1]
         multiplier = 10000
     try:

@@ -29,6 +29,7 @@ from ...core.scene_registry import (
     get_registry,
     get_scene_name,
 )
+from ...i18n import tr
 from .layout_ops import LayoutOpsMixin
 from .recognition_ops import RecognitionOpsMixin
 from .scene_ops import SceneOpsMixin
@@ -46,7 +47,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("场景管理")
+        self.setWindowTitle(tr("场景管理"))
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(
@@ -139,57 +140,57 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         # ─── 顶部布局栏 ───
         top_bar = QHBoxLayout()
 
-        top_bar.addWidget(QLabel("当前布局"))
+        top_bar.addWidget(QLabel(tr("当前布局")))
         self._layout_combo = QComboBox()
         self._layout_combo.setMinimumWidth(140)
         self._layout_combo.currentIndexChanged.connect(self._on_combo_changed)
         top_bar.addWidget(self._layout_combo)
 
-        self._btn_save = QPushButton("保存")
+        self._btn_save = QPushButton(tr("保存"))
         self._btn_save.clicked.connect(self._on_save_layout)
         top_bar.addWidget(self._btn_save)
 
-        self._btn_new = QPushButton("新建")
+        self._btn_new = QPushButton(tr("新建"))
         self._btn_new.clicked.connect(self._on_new_layout)
         top_bar.addWidget(self._btn_new)
 
-        self._btn_save_as = QPushButton("另存为")
+        self._btn_save_as = QPushButton(tr("另存为"))
         self._btn_save_as.clicked.connect(self._on_save_as_layout)
         top_bar.addWidget(self._btn_save_as)
 
-        self._btn_delete = QPushButton("删除")
+        self._btn_delete = QPushButton(tr("删除"))
         self._btn_delete.clicked.connect(self._on_delete_layout)
         top_bar.addWidget(self._btn_delete)
 
-        self._btn_refresh = QPushButton("刷新截图")
+        self._btn_refresh = QPushButton(tr("刷新截图"))
         self._btn_refresh.clicked.connect(self._on_refresh_image)
         top_bar.addWidget(self._btn_refresh)
 
         top_bar.addSpacing(20)
 
-        self._btn_canvas_mode = QPushButton("编辑画布")
+        self._btn_canvas_mode = QPushButton(tr("编辑画布"))
         self._btn_canvas_mode.setCheckable(True)
         self._btn_canvas_mode.clicked.connect(self._on_toggle_canvas_mode)
-        self._btn_canvas_mode.setToolTip("切换画布编辑模式，调整画布范围以排除窗口边框")
+        self._btn_canvas_mode.setToolTip(tr("切换画布编辑模式，调整画布范围以排除窗口边框"))
         top_bar.addWidget(self._btn_canvas_mode)
 
         top_bar.addSpacing(20)
 
-        self._btn_new_group = QPushButton("创建分组")
-        self._btn_new_group.setToolTip("新建场景分组")
+        self._btn_new_group = QPushButton(tr("创建分组"))
+        self._btn_new_group.setToolTip(tr("新建场景分组"))
         self._btn_new_group.clicked.connect(self._on_new_group)
         top_bar.addWidget(self._btn_new_group)
 
         top_bar.addSpacing(20)
 
-        self._btn_new_scene = QPushButton("创建场景")
-        self._btn_new_scene.setToolTip("在当前分组下新建场景")
+        self._btn_new_scene = QPushButton(tr("创建场景"))
+        self._btn_new_scene.setToolTip(tr("在当前分组下新建场景"))
         self._btn_new_scene.clicked.connect(self._on_new_scene)
         top_bar.addWidget(self._btn_new_scene)
 
         top_bar.addStretch()
 
-        self._dirty_label = QLabel("● 有改动")
+        self._dirty_label = QLabel(tr("● 有改动"))
         self._dirty_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
         self._dirty_label.setVisible(False)
         top_bar.addWidget(self._dirty_label)
@@ -209,7 +210,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._info_label = QLabel()
         self._info_label.setTextFormat(Qt.TextFormat.RichText)
         self._info_label.setStyleSheet("font-size: 12px; padding: 2px 2px 4px 2px;")
-        self._info_label.setText('<span style="color:#888;">截图：—  画布：—</span>')
+        self._info_label.setText(tr('<span style="color:#888;">截图：—  画布：—</span>'))
         second_line.addWidget(self._info_label)
         second_line.addStretch()
 
@@ -237,21 +238,21 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         ocr_layout.setContentsMargins(0, 0, 0, 0)
 
         btn_row = QHBoxLayout()
-        self._btn_recognize = QPushButton("识别全部字段")
+        self._btn_recognize = QPushButton(tr("识别全部字段"))
         self._btn_recognize.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_recognize)
-        self._btn_recognize_mat = QPushButton("识别全部材料")
+        self._btn_recognize_mat = QPushButton(tr("识别全部材料"))
         self._btn_recognize_mat.clicked.connect(self._on_recognize_materials)
         btn_row.addWidget(self._btn_recognize_mat)
         # 材料分组筛选下拉
         self._combo_mat_group = QComboBox()
-        self._combo_mat_group.addItem("全部", None)
+        self._combo_mat_group.addItem(tr("全部"), None)
         self._refresh_mat_group_combo()
-        self._combo_mat_group.setToolTip("限定材料识别的分组范围")
+        self._combo_mat_group.setToolTip(tr("限定材料识别的分组范围"))
         btn_row.addWidget(self._combo_mat_group)
         from PyQt6.QtWidgets import QCheckBox
-        self._chk_live_image = QCheckBox("使用实时图像")
-        self._chk_live_image.setToolTip("勾选后直接从设备实时截屏进行识别，不保存到场景文件")
+        self._chk_live_image = QCheckBox(tr("使用实时图像"))
+        self._chk_live_image.setToolTip(tr("勾选后直接从设备实时截屏进行识别，不保存到场景文件"))
         btn_row.addWidget(self._chk_live_image)
         btn_row.addStretch()
         ocr_layout.addLayout(btn_row)
@@ -262,7 +263,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._result_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
         )
-        self._result_text.setPlaceholderText("点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果")
+        self._result_text.setPlaceholderText(tr("点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果"))
         ocr_layout.addWidget(self._result_text)
 
         self._bottom_splitter.addWidget(ocr_panel)
@@ -273,18 +274,18 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         script_layout.setContentsMargins(0, 0, 0, 0)
 
         script_btn_row = QHBoxLayout()
-        self._btn_run_script = QPushButton("运行脚本")
+        self._btn_run_script = QPushButton(tr("运行脚本"))
         self._btn_run_script.clicked.connect(self._on_script_test)
         script_btn_row.addWidget(self._btn_run_script)
         # 当前用户下拉列表（仅影响脚本测试执行，不切换主页面用户）
-        script_btn_row.addWidget(QLabel("当前用户:"))
+        script_btn_row.addWidget(QLabel(tr("当前用户:")))
         self._script_user_combo = QComboBox()
-        self._script_user_combo.setToolTip("脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。")
+        self._script_user_combo.setToolTip(tr("脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。"))
         script_btn_row.addWidget(self._script_user_combo)
-        self._btn_load_script = QPushButton("加载文件")
+        self._btn_load_script = QPushButton(tr("加载文件"))
         self._btn_load_script.clicked.connect(self._on_load_script_file)
         script_btn_row.addWidget(self._btn_load_script)
-        self._btn_save_script = QPushButton("保存文件")
+        self._btn_save_script = QPushButton(tr("保存文件"))
         self._btn_save_script.clicked.connect(self._on_save_script_file)
         script_btn_row.addWidget(self._btn_save_script)
         # 当前场景 key 按钮
@@ -295,7 +296,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         script_layout.addLayout(script_btn_row)
 
         self._script_text = QTextEdit()
-        self._script_text.setPlaceholderText("输入 DSL 脚本内容...")
+        self._script_text.setPlaceholderText(tr("输入 DSL 脚本内容..."))
         self._script_text.setAcceptRichText(False)
         self._script_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
@@ -316,7 +317,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
         # ─── 状态栏 ───
         self._status_bar = QStatusBar()
-        self._status_bar.showMessage("请先新建或加载布局")
+        self._status_bar.showMessage(tr("请先新建或加载布局"))
         layout.addWidget(self._status_bar)
 
     # ─── Tab 操作 ────────────────────────────────────────
@@ -450,10 +451,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
     def _on_refresh_image(self):
         """刷新当前场景的截图（调用外部回调获取新截图，保存到磁盘）"""
         if self._refresh_callback is None:
-            self._status_bar.showMessage("无截图源，请先在主窗口定位窗口")
+            self._status_bar.showMessage(tr("无截图源，请先在主窗口定位窗口"))
             return
         if self._current_layout is None:
-            self._status_bar.showMessage("没有已加载的布局")
+            self._status_bar.showMessage(tr("没有已加载的布局"))
             return
         result = self._refresh_callback()
         new_image, error_msg = result if isinstance(result, tuple) else (result, None)
@@ -471,7 +472,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             self._status_bar.showMessage(f"已保存「{scene_name}」场景截图")
             self._update_info_label()
         else:
-            self._status_bar.showMessage(error_msg or "刷新截图失败")
+            self._status_bar.showMessage(error_msg or tr("刷新截图失败"))
 
     def _refresh_mat_group_combo(self):
         """刷新材料分组下拉：保留当前选中（如有），重新加载图库分组"""
@@ -480,7 +481,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         current_data = self._combo_mat_group.currentData()
         self._combo_mat_group.blockSignals(True)
         self._combo_mat_group.clear()
-        self._combo_mat_group.addItem("全部", None)
+        self._combo_mat_group.addItem(tr("全部"), None)
         try:
             groups = ReferenceDatabase().get_groups()
         except Exception:
@@ -503,11 +504,11 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 tab.set_canvas_mode()
             else:
                 tab.set_region_mode()
-        self._btn_canvas_mode.setText("退出画布编辑" if checked else "编辑画布")
+        self._btn_canvas_mode.setText(tr("退出画布编辑") if checked else tr("编辑画布"))
         if checked:
-            self._status_bar.showMessage("画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框")
+            self._status_bar.showMessage(tr("画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框"))
         else:
-            self._status_bar.showMessage("已退出画布编辑模式")
+            self._status_bar.showMessage(tr("已退出画布编辑模式"))
 
     def _on_any_canvas_changed(self):
         """任一 Tab 的画布被修改时，以当前正在编辑的 Tab 为源，同步到其他所有 Tab
@@ -590,7 +591,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         QDialog.closeEvent 会调用 reject()，且当 reject 后对话框仍可见时
         会 ignore 关闭事件，因此只需覆盖 reject 即可同时拦截 X 与 Esc。
         """
-        if not self._confirm_discard_changes("关闭场景编辑器"):
+        if not self._confirm_discard_changes(tr("关闭场景编辑器")):
             return
         super().reject()
 
@@ -603,7 +604,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         tab = self._current_scene_tab()
         if tab is None or tab.canvas.image_size[0] <= 0:
             self._info_label.setText(
-                '<span style="color:#888;">截图：—　　画布：—</span>'
+                tr('<span style="color:#888;">截图：—　　画布：—</span>')
             )
             return
         img_w, img_h = tab.canvas.image_size

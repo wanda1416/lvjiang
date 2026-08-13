@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from ..i18n import tr
 from .config.resolver import get_resolver
 from .scene_definition_models import (
     BASE_VIEW_KEY,
@@ -103,12 +104,12 @@ class SceneRegistry:
         """从单个 YAML 文件加载场景定义"""
         data = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
-            raise ValueError("YAML 顶层必须是字典")
+            raise ValueError(tr("YAML 顶层必须是字典"))
 
         key = data.get("key")
         name = data.get("name")
         if not key or not name:
-            raise ValueError("场景必须包含 key 和 name")
+            raise ValueError(tr("场景必须包含 key 和 name"))
 
         views = []
         for vd in data.get("views", []):
@@ -232,7 +233,7 @@ class SceneRegistry:
 
     def create_group(self, key: str, name: str):
         """创建新分组"""
-        _validate_key_and_name(key, name, "分组")
+        _validate_key_and_name(key, name, tr("分组"))
         if key in self._groups:
             raise ValueError(f"分组 key 已存在: {key}")
         self._groups[key] = name
@@ -245,7 +246,7 @@ class SceneRegistry:
         if key not in self._groups:
             raise ValueError(f"分组不存在: {key}")
         if not new_name.strip():
-            raise ValueError("分组名称不能为空")
+            raise ValueError(tr("分组名称不能为空"))
         self._groups[key] = new_name
         logger.info(f"已重命名分组: {key} -> {new_name}")
 
@@ -257,7 +258,7 @@ class SceneRegistry:
         """
         if old_key not in self._groups:
             raise ValueError(f"分组不存在: {old_key}")
-        _validate_key_and_name(new_key, new_name, "分组")
+        _validate_key_and_name(new_key, new_name, tr("分组"))
         if new_key != old_key and new_key in self._groups:
             raise ValueError(f"分组 key 已存在: {new_key}")
         # 更新 _group_scenes
@@ -276,7 +277,7 @@ class SceneRegistry:
         if key not in self._groups:
             raise ValueError(f"分组不存在: {key}")
         if len(self._groups) <= 1:
-            raise ValueError("至少需要保留一个场景分组")
+            raise ValueError(tr("至少需要保留一个场景分组"))
         scenes = self._group_scenes.get(key, [])
         if scenes:
             raise ValueError(f"分组非空，无法删除: {key}（包含 {len(scenes)} 个场景）")
@@ -323,7 +324,7 @@ class SceneRegistry:
 
     def create_scene(self, key: str, name: str, group_key: str | None = None) -> SceneDef:
         """创建新场景 YAML 文件并注册，可选指定分组"""
-        _validate_key_and_name(key, name, "场景")
+        _validate_key_and_name(key, name, tr("场景"))
         if key in self._scenes:
             raise ValueError(f"场景 key 已存在: {key}")
         scene = SceneDef(key=key, name=name)
@@ -354,7 +355,7 @@ class SceneRegistry:
         """重命名场景（修改 YAML 的 key/name，必要时重命名文件）"""
         if key not in self._scenes:
             raise ValueError(f"场景不存在: {key}")
-        _validate_key_and_name(new_key, new_name, "场景")
+        _validate_key_and_name(new_key, new_name, tr("场景"))
         if new_key != key and new_key in self._scenes:
             raise ValueError(f"场景 key 已存在: {new_key}")
         scene = self._scenes[key]
@@ -499,7 +500,7 @@ class SceneRegistry:
         """删除空视图（视图下仍有定义时抛异常，基底视图不可删）"""
         scene = self._require_scene(scene_key)
         if view_key == BASE_VIEW_KEY:
-            raise ValueError("基底视图不可删除，如需取消分层请取消多视图")
+            raise ValueError(tr("基底视图不可删除，如需取消分层请取消多视图"))
         if not any(v.key == view_key for v in scene.views):
             raise ValueError(f"视图不存在: {view_key}")
         used = [

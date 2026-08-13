@@ -46,64 +46,64 @@ from .tune_config_widget import TuningConfigWidget
 
 # 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
 # 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
-PART_WEAPON = "武器"
-PART_ITEMS: list[str] = [PART_WEAPON, "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲"]
+PART_WEAPON = tr("武器")
+PART_ITEMS: list[str] = [PART_WEAPON, tr("环"), tr("佩"), tr("冠胄"), tr("胸甲"), tr("胫甲"), tr("腕甲")]
 
 # 调律词条池（词条 2-5，全部位可出，attributes.yaml 标准字段名）
 _COMMON_AFFIXES: list[str] = [
-    "最大外功攻击", "最小外功攻击",
-    "劲", "势", "敏", "体", "御",
-    "会意率", "会心率", "精准率",
+    tr("最大外功攻击"), tr("最小外功攻击"),
+    tr("劲"), tr("势"), tr("敏"), tr("体"), tr("御"),
+    tr("会意率"), tr("会心率"), tr("精准率"),
     *[f"{prefix}{attr}攻击"
-      for attr in ("无相", "裂石", "牵丝", "破竹", "鸣金")
-      for prefix in ("最大", "最小")],
+      for attr in (tr("无相"), tr("裂石"), tr("牵丝"), tr("破竹"), tr("鸣金"))
+      for prefix in (tr("最大"), tr("最小"))],
 ]
 
 # 初始词条池（词条 1，按部位区分，源：01-equipment-system.md 三.1）
 _INITIAL_WEAPON: list[str] = [
-    "最大外功攻击", "最小外功攻击",
-    "最大无相攻击", "最小无相攻击", "敏", "势",
+    tr("最大外功攻击"), tr("最小外功攻击"),
+    tr("最大无相攻击"), tr("最小无相攻击"), tr("敏"), tr("势"),
 ]
-_INITIAL_JEWELRY: list[str] = ["最大外功攻击", "最小外功攻击"]
+_INITIAL_JEWELRY: list[str] = [tr("最大外功攻击"), tr("最小外功攻击")]
 _INITIAL_HEAD_CHEST: list[str] = [
-    "会心率", "会意率", "精准率", "气血最大值", "外功防御",
+    tr("会心率"), tr("会意率"), tr("精准率"), tr("气血最大值"), tr("外功防御"),
 ]
 _INITIAL_LEG_WRIST: list[str] = [
-    "会心率", "会意率", "劲", "精准率", "体", "御",
-    "气血最大值", "外功防御",
+    tr("会心率"), tr("会意率"), tr("劲"), tr("精准率"), tr("体"), tr("御"),
+    tr("气血最大值"), tr("外功防御"),
 ]
 _INITIAL_AFFIXES: dict[str, list[str]] = {
     **{w: _INITIAL_WEAPON for w in WEAPON_TYPES},
-    "环": _INITIAL_JEWELRY, "佩": _INITIAL_JEWELRY,
-    "冠胄": _INITIAL_HEAD_CHEST, "胸甲": _INITIAL_HEAD_CHEST,
-    "胫甲": _INITIAL_LEG_WRIST, "腕甲": _INITIAL_LEG_WRIST,
+    tr("环"): _INITIAL_JEWELRY, tr("佩"): _INITIAL_JEWELRY,
+    tr("冠胄"): _INITIAL_HEAD_CHEST, tr("胸甲"): _INITIAL_HEAD_CHEST,
+    tr("胫甲"): _INITIAL_LEG_WRIST, tr("腕甲"): _INITIAL_LEG_WRIST,
 }
 
 # 武器 → 专属武学增伤/增效词条
 _WEAPON_WUXUE: dict[str, list[str]] = {
-    "陌刀": ["陌刀武学增伤"],
-    "舞绫鼓": ["舞绫鼓武学增伤"],
-    "双刀": ["双刀武学增伤"],
-    "绳镖": ["绳镖武学增伤"],
-    "横刀": ["横刀武学增伤"],
-    "手甲": ["手甲武学增伤"],
-    "剑": ["剑武学增伤"],
-    "枪": ["枪武学增伤"],
-    "扇": ["扇武学增伤", "扇武学增效"],
-    "伞": ["伞武学增伤"],
+    tr("陌刀"): [tr("陌刀武学增伤")],
+    tr("舞绫鼓"): [tr("舞绫鼓武学增伤")],
+    tr("双刀"): [tr("双刀武学增伤")],
+    tr("绳镖"): [tr("绳镖武学增伤")],
+    tr("横刀"): [tr("横刀武学增伤")],
+    tr("手甲"): [tr("手甲武学增伤")],
+    tr("剑"): [tr("剑武学增伤")],
+    tr("枪"): [tr("枪武学增伤")],
+    tr("扇"): [tr("扇武学增伤"), tr("扇武学增效")],
+    tr("伞"): [tr("伞武学增伤")],
 }
 
 # 非武器部位 → 专属神力词条
 _PART_EXTRA: dict[str, list[str]] = {
-    "环": ["全武学增效"],
-    "佩": ["全武学增效"],
-    "冠胄": ["单体类奇术增伤"],
-    "胸甲": ["单体类奇术增伤"],
-    "胫甲": ["对首领单位增伤", "对玩家单位增效"],
-    "腕甲": ["对首领单位增伤", "对玩家单位增效"],
+    tr("环"): [tr("全武学增效")],
+    tr("佩"): [tr("全武学增效")],
+    tr("冠胄"): [tr("单体类奇术增伤")],
+    tr("胸甲"): [tr("单体类奇术增伤")],
+    tr("胫甲"): [tr("对首领单位增伤"), tr("对玩家单位增效")],
+    tr("腕甲"): [tr("对首领单位增伤"), tr("对玩家单位增效")],
 }
 
-_NONE_ITEM = "（未选）"
+_NONE_ITEM = tr("（未选）")
 _AFFIX_ROWS = 5
 
 # 模拟模式虚拟库存（假定材料充足，不统计消耗）
@@ -286,7 +286,7 @@ class EquipAffixEditor(QWidget):
             return None
         return EquipmentData(
             type=self.current_type(),
-            name="测试装备",
+            name=tr("测试装备"),
             level=self._level_combo.get_level() or 0,
             quality=self.quality_combo.currentData(),
             affixes=affixes,
@@ -422,9 +422,9 @@ class EquipJudgeTestDialog(QDialog):
                 judge = get_tuning_judge(key, cfg)
                 res = judge.judge(equip)
                 if res.not_applicable:
-                    tag = "不适用"
+                    tag = tr("不适用")
                 elif res.skipped:
-                    tag = "跳过"
+                    tag = tr("跳过")
                 else:
                     tag = res.rating.value
                 lines.append(
@@ -471,7 +471,7 @@ class EquipJudgeTestDialog(QDialog):
         # 构造初始装备（仅扫描已有词条）
         equip = EquipmentData(
             type=self.editor.current_type(),
-            name="测试装备",
+            name=tr("测试装备"),
             level=level or 0,
             quality=quality,
             affixes=list(scanned),
@@ -536,7 +536,7 @@ class EquipJudgeTestDialog(QDialog):
                   >= RATING_RANK.get(entry, 0))
 
         if not passes:
-            log.append("未达门槛 → 扫描处理")
+            log.append(tr("未达门槛 → 扫描处理"))
             if group.scan.enabled:
                 action, why = group.scan.decide(
                     equip_part, equip_quality, float(cap_pct)
@@ -553,12 +553,12 @@ class EquipJudgeTestDialog(QDialog):
                     self.result_text.setPlainText("\n".join(log))
                     return
             else:
-                log.append("  扫描处理未启用 → 跳过")
+                log.append(tr("  扫描处理未启用 → 跳过"))
                 self.result_text.setPlainText("\n".join(log))
                 return
 
         # 值得调律 → 模拟调律循环
-        log.append("── 调律开始 ──")
+        log.append(tr("── 调律开始 ──"))
         affix_count = len(equip.affixes)
         full_recycle = False
 
@@ -568,7 +568,7 @@ class EquipJudgeTestDialog(QDialog):
             food = group.materials.decide_food(
                 cap_pct, expect_key, equip_quality, _DUMMY_STOCKS)
             food_tag = (food.food if food.action == "feed"
-                        else "无" if food.action == "none"
+                        else tr("无") if food.action == "none"
                         else food.action)
             log.append(
                 f"R{rnd} +{new_affix.name} 狗粮:{food_tag}"
@@ -592,7 +592,7 @@ class EquipJudgeTestDialog(QDialog):
                     rating_of, full, [a.name for a in equip.affixes])
             else:
                 action = "skip" if full else "continue"
-                why = "结束处理未启用"
+                why = tr("结束处理未启用")
 
             if action == "continue":
                 if full:
@@ -615,7 +615,7 @@ class EquipJudgeTestDialog(QDialog):
                 log.append(f"  {why} → 未知动作 {action!r}")
 
         if not full_recycle and affix_count < _AFFIX_ROWS and not log[-1].endswith(
-                ("保留", "重置", "回收", "跳过")):
+                (tr("保留"), tr("重置"), tr("回收"), tr("跳过"))):
             log.append(f"── 调律结束（{affix_count}/{_AFFIX_ROWS}）──")
 
         self.result_text.setPlainText("\n".join(log))

@@ -786,3 +786,829 @@ config:
   delay_page_refresh: "Page Refresh Wait"
   delay_scroll_settle: "Scroll Settle Wait"
 
+# ── UI Auto-wrapped Strings (P0) ──
+ui_auto:
+  k000: "  No image imported"
+  k001: "(Optional)"
+  k002: "(Unnamed)"
+  k003: "(Empty)"
+  k004: "+ Group"
+  k005: "+ Create Region"
+  k006: "+ Create Point"
+  k007: "+ Create Panel"
+  k008: "+ Add Affix Name"
+  k009: "- Group"
+  k010: "- Ungrouped -"
+  k011: "- Unnamed -"
+  k012: "0 = No restriction on first affix"
+  k013: "<b>Select scripts to execute:</b>"
+  k014: "<b>Select lines to execute:</b>"
+  k015: "<span style=\"color:#888;\">Screenshot: —  Canvas: —</span>"
+  k016: "<span style=\"color:#888;\">Screenshot: —　　Canvas: —</span>"
+  k017: "[Scan] Scanning LAN ADB devices..."
+  k018: "[Disconnected] Window positioning cleared"
+  k019: "Scroll direction cannot be horizontal when cols=1"
+  k020: "Key must start with a lowercase letter, containing only lowercase letters/digits/underscores"
+  k021: "Key must start with a lowercase letter, containing only lowercase letters/digits/underscores."
+  k022: "Duplicate key"
+  k023: "Scroll direction cannot be vertical when rows=1"
+  k024: "↑ Move Up"
+  k025: "↓ Move Down"
+  k026: "● Modified"
+  k027: "First half season end date"
+  k028: "Move View Up"
+  k029: "Move View Down"
+  k030: "Chinese Name"
+  k031: "Chinese name, e.g. Bag Grid"
+  k032: "Which field to bind for this region?"
+  k033: "Only available with base view remaining; canceling merges all definitions into no-view distinction"
+  k034: "Delete Panel definition from scene YAML"
+  k035: "Delete coordinate point definition from scene YAML (meta data)"
+  k036: "Use Live Image"
+  k037: "Save File"
+  k038: "Metadata field definitions saved"
+  k039: "First select a placed coordinate point, then drag to create a direction arrow"
+  k040: "Deselect All"
+  k041: "Delete All"
+  k042: "Built-in fields cannot be deleted"
+  k043: "Built-in field, cannot be edited or deleted"
+  k044: "Conflict"
+  k045: "Group Key:"
+  k046: "Group:"
+  k047: "Group is not empty, cannot delete"
+  k048: "Split"
+  k049: "Split Result"
+  k050: "Switch log level: DEBUG shows more detailed debug info"
+  k051: "Toggle canvas edit mode, adjust canvas range to exclude window borders"
+  k052: "Col:"
+  k053: "Column names (comma-separated):"
+  k054: "Columns"
+  k055: "Create Group"
+  k056: "Create Scene"
+  k057: "Create Point"
+  k058: "Creation Failed"
+  k059: "Create Direction"
+  k060: "Delete Region"
+  k061: "Delete Scene"
+  k062: "Delete Point"
+  k063: "Delete Failed"
+  k064: "Delete Current Column"
+  k065: "Delete Direction"
+  k066: "Delete Level"
+  k067: "Delete Row"
+  k068: "Delete View"
+  k069: "Delete Panel"
+  k070: "Judgment resistance percentage (optional, >= 0)"
+  k071: "Alias layout creation failed, please check logs."
+  k072: "Alias layouts cannot be saved-as. Please use the original layout or create a new one."
+  k073: "Refresh screenshot unavailable: device not connected or callback not provided"
+  k074: "Load File"
+  k075: "When checked, capture directly from device for recognition without saving to scene file"
+  k076: "Match Threshold"
+  k077: "Region List"
+  k078: "Range value (min~max)"
+  k079: "Cell Size"
+  k080: "Single Value"
+  k081: "Single View"
+  k082: "Original affix name:"
+  k083: "Parameter key"
+  k084: "Parameter exceeds image size"
+  k085: "Reference Image Info"
+  k086: "Bidirectional Scroll"
+  k087: "Cancel Multi-View"
+  k088: "Save As"
+  k089: "Save As Failed"
+  k090: "Clickable"
+  k091: "Filterable"
+  k092: "Add Column on Right"
+  k093: "Name:"
+  k094: "Invalid Name"
+  k095: "Contains Text"
+  k096: "Name Direction"
+  k097: "Invalid Name"
+  k098: "Fixed Grid"
+  k099: "Image Detection"
+  k100: "Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter"
+  k101: "Gallery Space:"
+  k102: "Add Panel definition to scene YAML (declarative grid)"
+  k103: "Add coordinate point definition to scene YAML (meta data)"
+  k104: "Create scene under current group"
+  k105: "Place a coordinate point on canvas (bound to YAML definition)"
+  k106: "Select a rectangular area on canvas, bound to selected Panel definition"
+  k107: "Scene Key:"
+  k108: "Scene:"
+  k109: "Scene Name:"
+  k110: "Coordinate List"
+  k111: "Base attributes: Not declared (configured via _attr in YAML)"
+  k112: "Bonus resistance percentage (optional, >= 0)"
+  k113: "Note:"
+  k114: "Copy DSL Reference"
+  k115: "Copy as New Row"
+  k116: "Copy Coordinates"
+  k117: "e.g. my_wait"
+  k118: "e.g. Huangzhong Changming"
+  k119: "Field Identifier (key)"
+  k120: "W:"
+  k121: "Import Image"
+  k122: "Starts with lowercase letter, containing only lowercase letters/digits/underscores"
+  k123: "Not yet split"
+  k124: "Attribute Follow"
+  k125: "Saved"
+  k126: "Filled fields will be applied to all selected items"
+  k127: "Exited canvas edit mode"
+  k128: "Layout write failed, please check logs."
+  k129: "Layout name cannot start with space or dot"
+  k130: "Apply to All"
+  k131: "Apply Settings"
+  k132: "When enabled, allows decimal input; UI uses DoubleValidator"
+  k133: "Enable multi-view, add/rename/delete views"
+  k134: "Start Batch Execution (F9)"
+  k135: "Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5"
+  k136: "Current User:"
+  k137: "Current season equipment level (select from level config)"
+  k138: "Current Config:"
+  k139: "Screenshot"
+  k140: "Screenshot unavailable, please position window or connect device in main window first"
+  k141: "Screenshot Failed"
+  k142: "Execute Split"
+  k143: "Batch Group:"
+  k144: "Batch Management"
+  k145: "Batch Settings"
+  k146: "Sort"
+  k147: "Submit to Gallery"
+  k148: "Values reuse target slot, table is read-only"
+  k149: "Which coordinate point to bind for new point? (reuse source radius):"
+  k150: "Add Reference Image"
+  k151: "Add Failed"
+  k152: "Add Field"
+  k153: "Add View"
+  k154: "New"
+  k155: "New Region"
+  k156: "New Scene"
+  k157: "New Scene Group"
+  k158: "New Point"
+  k159: "Create Failed"
+  k160: "New Space"
+  k161: "New Panel"
+  k162: "Direction List"
+  k163: "No Available Points"
+  k164: "No Available Panels"
+  k165: "Cannot Cancel"
+  k166: "Cannot Capture Screenshot"
+  k167: "Cannot Follow"
+  k168: "Yes"
+  k169: "Display Name"
+  k170: "No data yet, please add via Tools → Batch Config"
+  k171: "Change Group"
+  k172: "Update Failed"
+  k173: "Unsaved Changes"
+  k174: "Not Filled"
+  k175: "No Area Selected"
+  k176: "Unknown"
+  k177: "Not Selected"
+  k178: "Calibration Mode"
+  k179: "Validation Failed"
+  k180: "Horizontal Scroll"
+  k181: "Ratio"
+  k182: "No target slot to follow."
+  k183: "Measure Height"
+  k184: "Browse..."
+  k185: "Add Parameter"
+  k186: "Add Affix Name"
+  k187: "Clear Grid"
+  k188: "Scroll Direction"
+  k189: "Active Space"
+  k190: "Click 'Recognize All Fields' to view OCR results, click 'Recognize All Materials' to view material recognition results"
+  k191: "Click to insert current scene key at script editor cursor"
+  k192: "Generate Grid"
+  k193: "Username column:"
+  k194: "Canvas edit mode: drag/resize yellow canvas frame to exclude window borders"
+  k195: "Leave empty to keep unchanged"
+  k196: "Leave empty to same as key"
+  k197: "Confirm Overwrite"
+  k198: "Confirm Follow"
+  k199: "Move Failed"
+  k200: "Equal Grid"
+  k201: "Wait Range (sec)"
+  k202: "Level"
+  k203: "Manage Views"
+  k204: "Type:"
+  k205: "Paste (Ctrl+V)"
+  k206: "Vertical Scroll"
+  k207: "Bind Point"
+  k208: "Bind Panel"
+  k209: "Inherit Failed"
+  k210: "Edit Region"
+  k211: "Edit Point"
+  k212: "Edit Canvas"
+  k213: "Edit Panel"
+  k214: "Grid Parameters"
+  k215: "Grid line interval in pixels, for filtering black borders"
+  k216: "User for script test execution, defaults to current user on main page. Switching does not affect main page."
+  k217: "Auto Mode"
+  k218: "At least one scene group must be retained"
+  k219: "English, e.g. bag_grid"
+  k220: "English, e.g. my_group"
+  k221: "English, e.g. my_point"
+  k222: "English, e.g. my_region"
+  k223: "English, e.g. my_scene"
+  k224: "Row:"
+  k225: "Rows"
+  k226: "Crop Area (x, y, w, h)"
+  k227: "Equipment level (1-999, no duplicates, required)"
+  k228: "View"
+  k229: "View Key:"
+  k230: "View Name:"
+  k231: "Character name column (cannot be deleted)"
+  k232: "Recognize All Fields"
+  k233: "Recognize All Materials"
+  k234: "Affix name (original affix → current category)"
+  k235: "No Panel defined for this scene, please create a panel definition first."
+  k236: "All Panel definitions for this scene are already bound."
+  k237: "All YAML coordinate points for this scene have been placed."
+  k238: "All YAML coordinate points for this scene have been placed, cannot copy new points."
+  k239: "This point is referenced by a direction, please delete the associated direction first."
+  k240: "Whether this level allows tuning reset (optional)"
+  k241: "Minimum material count required for this level (optional)"
+  k242: "Please select a placed coordinate point on canvas or in the list first, then create direction."
+  k243: "Please import an image first"
+  k244: "Please select an area first"
+  k245: "Please click '+ Group' to create a group first"
+  k246: "Please select a point first"
+  k247: "Please select an affix category first"
+  k248: "Please select at least one reference image"
+  k249: "Please enter a layout name"
+  k250: "Season name (e.g. Huangzhong Changming, Jiazhong Bingzuo)"
+  k251: "Season start date"
+  k252: "Season end date"
+  k253: "Season number (1, 2, 3..., for sorting, no duplicates)"
+  k254: "Enter DSL script content..."
+  k255: "Enter metadata (for filter management)"
+  k256: "Enter current scene"
+  k257: "Enter direction key (starts with lowercase letter, may contain digits/underscores):"
+  k258: "Output metadata (OCR by region during recognition)"
+  k259: "Migration Failed"
+  k260: "Run Script"
+  k261: "Progress"
+  k262: "Exit Batch"
+  k263: "Exit Canvas Edit"
+  k264: "Select wf file..."
+  k265: "Select coordinate point to place:"
+  k266: "Select Panel to bind:"
+  k267: "Config"
+  k268: "Config:"
+  k269: "Rename Scene"
+  k270: "Rename Failed"
+  k271: "Rename View"
+  k272: "Interval:"
+  k273: "Limit group scope for material recognition"
+  k274: "Panel List"
+  k275: "H:"
+  k276: "(No affix name, click '+ Add Affix Name' to add)"
+  k277: "Based on PyQt6 · RapidOCR · OpenCV"
+  k278: "This project is for learning and communication purposes only"
+  k279: "[Loaded] Workflow loaded: "
+  k280: "Built-in class: "
+  k281: "Current version: "
+  k282: " ...+"
+  k283: "round(s)"
+  k284: "Timed"
+  k285: "Action"
+  k286: "Name = Tuning Tab checkbox item;\nLeave damage affix empty / select '- No Damage -' = no damage boost needed on that side;\nAttribute = gameplay element school (non-weapon slots use element→no-equal equivalence);\nBind switch = this gameplay judgment equals activating that switch (overrides global state);\nWeapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon."
+
+# ── P1 Error Messages (auto-wrapped) ──
+p1_errors:
+  k287: "DesktopCapture 已停止"
+  k288: "YAML top level must be a dict"
+  k289: "[扫描] 局域网内未发现可连接的 ADB 设备"
+  k290: "base_rules 必须是 list"
+  k291: "common_conditions 必须是 dict"
+  k292: "config 中缺少 model_path"
+  k293: "initial_variables 必须是 JSON 对象"
+  k294: "payload 必须是 JSON 对象"
+  k295: "playstyles: 名字不能为空"
+  k296: "profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式"
+  k297: "pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when"
+  k298: "pynput 未安装，无法录制"
+  k299: "scenes.yaml 必须至少包含一个场景分组，请检查配置"
+  k300: "scrcpy 流式"
+  k301: "switches 必须是 dict"
+  k302: "tune_config 顶层必须是 dict"
+  k303: "tuning_rules 必须是 dict"
+  k304: "关闭程序"
+  k305: "分组名称不能为空"
+  k306: "Scene"
+  k307: "Scene must contain key and name"
+  k308: "基底视图不可删除，如需取消分层请取消多视图"
+  k309: "基础规则组顶层必须是 dict"
+  k310: "数据必须是 dict"
+  k311: "无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）"
+  k312: "无法获取版本信息"
+  k313: "无赛季配置，无法计算赛季周期边界"
+  k314: "未配置基础规则组，请在调律页选择基础规则组"
+  k315: "未配置调律规则，请在调律页选择至少一个规则"
+  k316: "未配置调律部位，请在调律页选择至少一个部位"
+  k317: "没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空"
+  k318: "没有启用任何调律规则，请在调律页勾选至少一个规则"
+  k319: "缺少必填字段 key/name"
+  k320: "规则 key 须为小写字母开头的英文/数字/下划线"
+  k321: "规则可引用词表为空（attributes.yaml 异常）"
+  k322: "规则文件顶层必须是 dict"
+  k323: "规则组 key 须为小写字母开头的英文/数字/下划线"
+  k324: "规则组 name 不能为空"
+  k325: "调律部位配置无效，请在调律页重新选择部位"
+  k326: "颜色特征识别器尚未实现"
+  k327: "（空）"
+  k328: "(Must be ['recycle', 'skip'])"
+  k329: "(Must be alphanumeric starting with lowercase letter, underscores allowed)"
+p2_other:
+  k330: '   - 词条未记录'
+  k331: '  扫描处理未启用 → 跳过'
+  k332: '## 汇总'
+  k333: '## 运行结束'
+  k334: '### 成品清单（一般及以上）'
+  k335: '(\d+)\s*阶'
+  k336: '(无)'
+  k337: '(未识别到)'
+  k338: '- 不添加 -'
+  k339: '- 不限 -'
+  k340: '- 无需增伤 -'
+  k341: 'DSL 写入'
+  k342: '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启'
+  k343: '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）'
+  k344: '[录屏] 仅流式截图模式支持录屏'
+  k345: '[录屏] 保存失败（详见日志）'
+  k346: '[录屏] 启动失败（详见日志）'
+  k347: '[录屏] 已放弃本次录制，文件已删除'
+  k348: '[录屏] 无法获取画面尺寸'
+  k349: '[截屏] PNG 编码失败'
+  k350: '[截屏] 截屏失败：无可用画面'
+  k351: '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止'
+  k352: '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律'
+  k353: '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」'
+  k354: '[提示] 当前没有正在运行的自动化'
+  k355: '[提示] 未发现 USB 连接的 ADB 设备'
+  k356: '[提示] 请先停止当前任务，再重新扫描窗口'
+  k357: '[提示] 请先停止当前任务，再重新扫描设备'
+  k358: '[操作] 已停止'
+  k359: '[操作] 收到停止请求'
+  k360: '[模式] 已切换到前台模式（SendInput，移动光标）'
+  k361: '[模式] 已切换到后台模式（PostMessage，不移动光标）'
+  k362: '[状态] 重新扫描窗口，旧定位已失效'
+  k363: '[错误] 暂无配置，请先通过 工具 → 批量配置 添加'
+  k364: '[错误] 未找到可见窗口'
+  k365: '[错误] 请先定位窗口'
+  k366: '[错误] 请先连接设备'
+  k367: '[错误] 请选择一个工作流'
+  k368: '\[转[1\]]?'
+  k369: '^(.+?)武学增[伤效]'
+  k370: '── 调律开始 ──'
+  k371: '一般'
+  k372: '一键添加律准石'
+  k373: '万'
+  k374: '三率'
+  k375: '三率类'
+  k376: '下一点恢复: 已达上限'
+  k377: '不适用'
+  k378: '不限品阶'
+  k379: '不限评级'
+  k380: '不限部位'
+  k381: '专用'
+  k382: '主武器'
+  k383: '云珑'
+  k384: '仅紫色'
+  k385: '仅金色'
+  k386: '仅金装'
+  k387: '仅首词条'
+  k388: '优秀'
+  k389: '会心'
+  k390: '会心率'
+  k391: '会意'
+  k392: '会意率'
+  k393: '伞'
+  k394: '伞武学增伤'
+  k395: '传入规则'
+  k396: '体'
+  k397: '佩'
+  k398: '保留'
+  k399: '停止中... | 等待当前步骤结束'
+  k400: '全向'
+  k401: '全武学增效'
+  k402: '全部'
+  k403: '全部同时出现'
+  k404: '全部规则'
+  k405: '全部规则（默认配置）'
+  k406: '全量'
+  k407: '其他信息'
+  k408: '再生'
+  k409: '冠'
+  k410: '冠胄'
+  k411: '冠胄 · 胸甲'
+  k412: '分钟'
+  k413: '切换截图方式'
+  k414: '判定抗性(%)'
+  k415: '判定结果'
+  k416: '判定语义'
+  k417: '剑'
+  k418: '剑武学增伤'
+  k419: '副武器'
+  k420: '加载工作流文件'
+  k421: '动作'
+  k422: '动态类'
+  k423: '劲'
+  k424: '势'
+  k425: '区域'
+  k426: '区域/坐标点/面板'
+  k427: '区域/面板'
+  k428: '区域中心偏移比例:'
+  k429: '区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）'
+  k430: '半赛季'
+  k431: '单体类奇术增伤'
+  k432: '原始词条名称:'
+  k433: '双刀'
+  k434: '双刀武学增伤'
+  k435: '可重置'
+  k436: '同步到:'
+  k437: '否'
+  k438: '周'
+  k439: '周一'
+  k440: '周三'
+  k441: '周二'
+  k442: '周五'
+  k443: '周六'
+  k444: '周四'
+  k445: '品阶'
+  k446: '品阶 ≥'
+  k447: '品阶未知'
+  k448: '品阶未识别，跳过品阶筛选'
+  k449: '商'
+  k450: '回收'
+  k451: '回收装备'
+  k452: '图像检测'
+  k453: '场景未绑定任何坐标'
+  k454: '坐标点'
+  k455: '坐标随机偏移(px):'
+  k456: '垃圾'
+  k457: '基底'
+  k458: '基础规则'
+  k459: '增效类'
+  k460: '外功增益'
+  k461: '外功类'
+  k462: '外功防御'
+  k463: '大外攻'
+  k464: '大律准石'
+  k465: '天'
+  k466: '失败'
+  k467: '套装'
+  k468: '定时'
+  k469: '实时截屏失败'
+  k470: '宫'
+  k471: '对玩家单位增效'
+  k472: '对首领单位增伤'
+  k473: '对齐失败：alignment 为 None'
+  k474: '小时'
+  k475: '属性攻击'
+  k476: '属攻增益'
+  k477: '属攻类'
+  k478: '工作流已暂停，点击确定继续'
+  k479: '工作流文件 (*.wf);;所有文件 (*)'
+  k480: '工作流暂停'
+  k481: '工作流确认'
+  k482: '工作流通知'
+  k483: '已是最后一条赛季，无法下移'
+  k484: '已是最后一条配置，无法下移'
+  k485: '已是第一条赛季，无法上移'
+  k486: '已是第一条配置，无法上移'
+  k487: '库存'
+  k488: '开始日期'
+  k489: '强制调律'
+  k490: '强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）'
+  k491: '当前场景无截图'
+  k492: '当前场景无截图，请先刷新截图'
+  k493: '当前场景没有 slot 类型的区域'
+  k494: '彩狗粮'
+  k495: '待执行'
+  k496: '律匠 - 通用视觉 RPA 引擎'
+  k497: '御'
+  k498: '徵'
+  k499: '恢复类型: 准点恢复'
+  k500: '恢复类型: 实时恢复'
+  k501: '成功'
+  k502: '截图失败'
+  k503: '扇'
+  k504: '扇武学增伤'
+  k505: '扇武学增效'
+  k506: '手甲'
+  k507: '手甲武学增伤'
+  k508: '扫描处置未启用 → 跳过该装备'
+  k509: '批次初始化'
+  k510: '批次收尾'
+  k511: '批量执行'
+  k512: '承音'
+  k513: '持有'
+  k514: '持有\s*(\d+)'
+  k515: '指定技能增效'
+  k516: '指定武学增效'
+  k517: '操作'
+  k518: '支持重置'
+  k519: '敏'
+  k520: '断连'
+  k521: '方向'
+  k522: '方向/区域'
+  k523: '无'
+  k524: '无处置规则命中 → 跳过该装备'
+  k525: '无已实现规则可判定该装备，结束调律'
+  k526: '无截图
+请连接投屏后点击「刷新截图」'
+  k527: '无截图源，请先在主窗口定位窗口'
+  k528: '无有效结论'
+  k529: '无法获取设备分辨率'
+  k530: '无狗粮规则命中 → 不添加'
+  k531: '无相'
+  k532: '无行为规则命中 → 继续调律'
+  k533: '无词条数据'
+  k534: '日常'
+  k535: '是'
+  k536: '最低材料数量'
+  k537: '最大'
+  k538: '最大外功攻击'
+  k539: '最大外属攻击'
+  k540: '最大无相攻击'
+  k541: '最大本属攻击'
+  k542: '最小'
+  k543: '最小外功攻击'
+  k544: '最小外属攻击'
+  k545: '最小无相攻击'
+  k546: '最小本属攻击'
+  k547: '期望 ≥'
+  k548: '未定位窗口 | 未找到可见窗口'
+  k549: '未定位窗口 | 请先扫描窗口并点击定位'
+  k550: '未归类'
+  k551: '未知'
+  k552: '未知类型'
+  k553: '未知装备'
+  k554: '未知词条'
+  k555: '未达门槛 → 扫描处理'
+  k556: '未连接设备 | 请先扫描并连接设备'
+  k557: '未选词条'
+  k558: '未配置狗粮规则 → 不添加'
+  k559: '本次无一般及以上成品。'
+  k560: '来源'
+  k561: '枪'
+  k562: '枪武学增伤'
+  k563: '横刀'
+  k564: '横刀武学增伤'
+  k565: '正向'
+  k566: '正在校准面板网格...'
+  k567: '正在识别...'
+  k568: '正在识别材料...'
+  k569: '正常完成'
+  k570: '武器'
+  k571: '武器类'
+  k572: '武学增效'
+  k573: '每半赛季'
+  k574: '每周'
+  k575: '每天'
+  k576: '每日'
+  k577: '每月'
+  k578: '每次点击前的随机等待，模拟人类反应时间'
+  k579: '每次点击后的随机等待'
+  k580: '每赛季'
+  k581: '每轮添加'
+  k582: '气血最大值'
+  k583: '没有全部出现'
+  k584: '没有已定义的区域'
+  k585: '没有已定义的面板'
+  k586: '注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）'
+  k587: '测试装备'
+  k588: '添加'
+  k589: '漂移补滚后对齐失败'
+  k590: '点击前延迟(秒)'
+  k591: '点击后延迟(秒)'
+  k592: '点击坐标附加 ±N 像素的随机偏移'
+  k593: '牵丝'
+  k594: '环'
+  k595: '环 · 佩'
+  k596: '生命周期 wf 必须返回 dict 或 null'
+  k597: '生命周期 wf 的 state 必须是 dict'
+  k598: '生存类'
+  k599: '用户中断（F10）'
+  k600: '用户总览'
+  k601: '破竹'
+  k602: '确认'
+  k603: '空'
+  k604: '空数据'
+  k605: '符合以下规则，开始调律：'
+  k606: '等分降级'
+  k607: '等级'
+  k608: '简体中文'
+  k609: '精准率'
+  k610: '紫狗粮'
+  k611: '紫色'
+  k612: '紫装'
+  k613: '紫装及以下'
+  k614: '终点'
+  k615: '结束全部调律'
+  k616: '结束处理未启用'
+  k617: '结束日期'
+  k618: '继续调律'
+  k619: '继续调律或跳过'
+  k620: '绳镖'
+  k621: '绳镖武学增伤'
+  k622: '羽'
+  k623: '胄'
+  k624: '胫'
+  k625: '胫甲'
+  k626: '胫甲 · 腕甲'
+  k627: '胸'
+  k628: '胸甲'
+  k629: '能用'
+  k630: '腕'
+  k631: '腕甲'
+  k632: '自动化运行中 | F10 停止'
+  k633: '自选规则'
+  k634: '自选词条'
+  k635: '舞绫鼓'
+  k636: '舞绫鼓武学增伤'
+  k637: '获取图像失败'
+  k638: '蓝色'
+  k639: '蓝装'
+  k640: '蓝装及以下'
+  k641: '补滚后对齐失败'
+  k642: '裂石'
+  k643: '装备数据'
+  k644: '装备重置冷却期，跳过该装备'
+  k645: '覆写'
+  k646: '规则设置'
+  k647: '角'
+  k648: '角色名'
+  k649: '角色详情'
+  k650: '计数大于等于'
+  k651: '计数小于等于'
+  k652: '词条已满，无行为规则命中 → 跳过该装备'
+  k653: '词条库设置'
+  k654: '询问是否继续'
+  k655: '请先在主窗口定位窗口'
+  k656: '请先在主窗口连接设备'
+  k657: '请先选中要删除的赛季行'
+  k658: '请先选中要删除的配置行'
+  k659: '请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定'
+  k660: '调律'
+  k661: '调满后回收'
+  k662: '调满后回收模式，跳过狗粮添加'
+  k663: '调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收'
+  k664: '负向'
+  k665: '赛季'
+  k666: '赛季名称'
+  k667: '赛季编号'
+  k668: '赛季编号不可重复'
+  k669: '起点'
+  k670: '跳过'
+  k671: '跳过该装备'
+  k672: '辟邪'
+  k673: '运行中'
+  k674: '通用'
+  k675: '通用判定'
+  k676: '通用视觉 RPA 引擎（支持插件扩展）'
+  k677: '部位'
+  k678: '配额'
+  k679: '重命名词条名'
+  k680: '重置'
+  k681: '重置材料信息识别失败，跳过该装备'
+  k682: '重置装备'
+  k683: '金狗粮'
+  k684: '金色'
+  k685: '金装'
+  k686: '防具类'
+  k687: '陌刀'
+  k688: '陌刀武学增伤'
+  k689: '面板'
+  k690: '面板/区域'
+  k691: '顶级'
+  k692: '首词条 %'
+  k693: '首词条 ≥ %'
+  k694: '首词条不限'
+  k695: '首领增伤'
+  k696: '鸣金'
+  k697: '默认'
+  k698: '默认用户'
+  k699: '鼠标/触控移动到目标位置的耗时'
+  k700: '鼠标移动时长(秒)'
+  k701: '（无）'
+  k702: '（未选）'
+  k703: '（正常完成）'
+  k704: '（用户中断）'
+  k705: '（用户中断，部分结果）'
+  k706: '，仅首词条'
+  k707: '，请选择 保存 或 放弃'
+p3_other:
+  k708: '(空行)'
+  k709: '[批量] 暂无启用的行，请到「配置」页勾选'
+  k710: '[批量] 请至少勾选一个脚本'
+  k711: '[错误] 无主窗口，无法获取运行环境'
+  k712: '[错误] 没有已加载的布局'
+  k713: '[错误] 脚本内容为空'
+  k714: '[错误] 请先在主窗口定位游戏窗口'
+  k715: '[错误] 请先在主窗口连接 ADB 设备'
+  k716: '任务被停止'
+  k717: '保存脚本文件'
+  k718: '值得调律，但测试开关已启用，跳过实际调律'
+  k719: '元数据定义'
+  k720: '全部'
+  k721: '关闭场景编辑器'
+  k722: '分组'
+  k723: '分组 Key:'
+  k724: '列数:'
+  k725: '初始判定'
+  k726: '刷新截图失败'
+  k727: '升序'
+  k728: '双向滚动'
+  k729: '名称'
+  k730: '回收装备：分解为材料'
+  k731: '固定网格'
+  k732: '图像检测'
+  k733: '图库管理'
+  k734: '图片文件 (*.png *.jpg *.bmp *.webp)'
+  k735: '场景'
+  k736: '处置未启用，保留'
+  k737: '备注'
+  k738: '工作流文件 (*.wf)'
+  k739: '工作流文件 (*.wf);;所有文件 (*)'
+  k740: '已有任务在运行，请先停止'
+  k741: '已符合规则但未找到调律入口，跳过本件'
+  k742: '已请求停止'
+  k743: '已请求停止，等当前步骤结束'
+  k744: '当前没有运行中的任务'
+  k745: '当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）'
+  k746: '截图失败'
+  k747: '执行中'
+  k748: '扫描处理'
+  k749: '批次初始化 wf：'
+  k750: '批次收尾 wf：'
+  k751: '数字'
+  k752: '文本'
+  k753: '新建分组'
+  k754: '新建图库空间'
+  k755: '新建场景'
+  k756: '新建布局'
+  k757: '新建配置'
+  k758: '无截图源，请先在主窗口定位窗口'
+  k759: '无法继续调律'
+  k760: '无障碍服务未连接，请先在设置里开启'
+  k761: '未找到「添加」入口'
+  k762: '本件已重置过一次，冷却期内不再重置'
+  k763: '条目'
+  k764: '条目准备 wf：'
+  k765: '条目收尾 wf：'
+  k766: '校准模式:'
+  k767: '横向滚动'
+  k768: '橙色'
+  k769: '正在初始化引擎'
+  k770: '正在启动'
+  k771: '没有已加载的布局'
+  k772: '滚动方向:'
+  k773: '激活布局不可删除'
+  k774: '燕云十六声'
+  k775: '状态'
+  k776: '用户中断（F10）'
+  k777: '移动场景'
+  k778: '空间名:'
+  k779: '等分网格'
+  k780: '简体中文'
+  k781: '红色'
+  k782: '纵向滚动'
+  k783: '结束处理'
+  k784: '结果集：'
+  k785: '结果集：(空)'
+  k786: '继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则'
+  k787: '脚本'
+  k788: '脚本内容为空，无法保存'
+  k789: '脚本测试失败'
+  k790: '脚本测试完成'
+  k791: '脚本测试运行中...'
+  k792: '自动模式'
+  k793: '自动调律'
+  k794: '行数:'
+  k795: '行最小可见比例:'
+  k796: '视图:'
+  k797: '请先新建或加载布局'
+  k798: '请至少选择一个调律规则'
+  k799: '请至少选择一个调律部位'
+  k800: '请输入布局名称：'
+  k801: '调律材料'
+  k802: '调律结束'
+  k803: '调满后回收模式：词条已满，执行回收'
+  k804: '跳过该装备：结束保留在背包'
+  k805: '输入新的方向 key（小写字母开头）：'
+  k806: '返回值：(无)'
+  k807: '选择参考图片'
+  k808: '选择工作流文件'
+  k809: '选择脚本文件'
+  k810: '配置名称：'
+  k811: '重命名分组'
+  k812: '重命名场景'
+  k813: '重命名方向'
+  k814: '重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）'
+  k815: '降序'
+  k816: '（内置）'
+  k817: '（未开启多视图，点「新增视图」自动开启）'

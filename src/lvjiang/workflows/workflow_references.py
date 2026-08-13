@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from ..i18n import tr
 from .grammar.ast_nodes import (
     Align,
     Click,
@@ -34,14 +35,14 @@ from .grammar.ast_nodes import (
 
 # 引用类别 → 需要在布局中查找的对象类型说明（错误提示用）
 KIND_LABELS = {
-    "click_target": "区域/坐标点/面板",
-    "drag_target": "方向/区域",
-    "drag_grid_target": "面板/区域",
-    "arrow": "方向",
-    "panel": "面板",
-    "region": "区域",
-    "scan": "区域/面板",
-    "point": "坐标点",
+    "click_target": tr("区域/坐标点/面板"),
+    "drag_target": tr("方向/区域"),
+    "drag_grid_target": tr("面板/区域"),
+    "arrow": tr("方向"),
+    "panel": tr("面板"),
+    "region": tr("区域"),
+    "scan": tr("区域/面板"),
+    "point": tr("坐标点"),
 }
 
 

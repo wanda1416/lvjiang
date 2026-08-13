@@ -4,6 +4,7 @@ import numpy as np
 from loguru import logger
 
 from ...core.layout_models import CanvasConfig, FoundRegion, Region
+from ...i18n import tr
 
 
 class _RecognitionMixin:
@@ -277,7 +278,7 @@ class _RecognitionMixin:
             infos[(row, col)] = info
 
         summary = {f"({r},{c})": (f"{i.type}×{i.count}" if i.count is not None else i.type)
-                   if i.type else "空"
+                   if i.type else tr("空")
                    for (r, c), i in infos.items()}
         logger.info(f"材料识别 panel [{scene_key}/{panel_key}]: => {summary}")
         return infos

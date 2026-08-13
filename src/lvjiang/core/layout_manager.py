@@ -17,6 +17,7 @@ import numpy as np
 from loguru import logger
 
 from ..constants import SESSION_CONFIG_DIR
+from ..i18n import tr
 from .config.resolver import get_resolver
 from .config.session import get_session_store
 from .layout_models import CanvasConfig, Layout
@@ -648,7 +649,7 @@ class LayoutConfigManager:
                 _scene_rel(scene_dir_name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),
             )
-        mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else "全量"
+        mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else tr("全量")
         logger.info(f"布局已保存: {layout.name} ({mode})")
         return True
 

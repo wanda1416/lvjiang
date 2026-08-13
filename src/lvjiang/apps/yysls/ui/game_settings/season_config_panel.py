@@ -48,7 +48,7 @@ _START_DATE_COL = 3
 _END_DATE_COL = 4
 _FIRST_HALF_COL = 5
 _EQUIP_LEVEL_COL = 6
-_COLS = ("#", "赛季编号", "赛季名称", "开始日期", "结束日期", "上半赛季结束", "装备等级")  # runtime tr()
+_COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("结束日期"), "上半赛季结束", "装备等级")  # runtime tr()
 
 
 class SeasonConfigPanel(QWidget):
@@ -142,15 +142,15 @@ class SeasonConfigPanel(QWidget):
         # 赛季编号（必填）
         number_spin = QSpinBox()
         number_spin.setRange(1, 999)
-        number_spin.setToolTip("赛季编号（1, 2, 3...，用于排序，不可重复）")
+        number_spin.setToolTip(tr("赛季编号（1, 2, 3...，用于排序，不可重复）"))
         number_spin.setValue(cfg.season_number if cfg.season_number > 0 else 1)
         number_spin.valueChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _NUMBER_COL, number_spin)
 
         # 赛季名称（必填）
         name_edit = QLineEdit()
-        name_edit.setPlaceholderText("如：黄钟长鸣")
-        name_edit.setToolTip("赛季名称（如：黄钟长鸣、夹钟并作）")
+        name_edit.setPlaceholderText(tr("如：黄钟长鸣"))
+        name_edit.setToolTip(tr("赛季名称（如：黄钟长鸣、夹钟并作）"))
         name_edit.setText(cfg.name)
         name_edit.editingFinished.connect(self._apply)
         self._table.setCellWidget(row, _NAME_COL, name_edit)
@@ -159,7 +159,7 @@ class SeasonConfigPanel(QWidget):
         start_date_edit = QDateEdit()
         start_date_edit.setCalendarPopup(True)
         start_date_edit.setDisplayFormat("yyyy-MM-dd")
-        start_date_edit.setToolTip("赛季开始日期")
+        start_date_edit.setToolTip(tr("赛季开始日期"))
         if cfg.start_date:
             start_date_edit.setDate(QDate(cfg.start_date.year, cfg.start_date.month, cfg.start_date.day))
         else:
@@ -171,7 +171,7 @@ class SeasonConfigPanel(QWidget):
         end_date_edit = QDateEdit()
         end_date_edit.setCalendarPopup(True)
         end_date_edit.setDisplayFormat("yyyy-MM-dd")
-        end_date_edit.setToolTip("赛季结束日期")
+        end_date_edit.setToolTip(tr("赛季结束日期"))
         if cfg.end_date:
             end_date_edit.setDate(QDate(cfg.end_date.year, cfg.end_date.month, cfg.end_date.day))
         else:
@@ -183,7 +183,7 @@ class SeasonConfigPanel(QWidget):
         first_half_edit = QDateEdit()
         first_half_edit.setCalendarPopup(True)
         first_half_edit.setDisplayFormat("yyyy-MM-dd")
-        first_half_edit.setToolTip("上半赛季结束日期")
+        first_half_edit.setToolTip(tr("上半赛季结束日期"))
         if cfg.first_half_end_date:
             first_half_edit.setDate(QDate(cfg.first_half_end_date.year, cfg.first_half_end_date.month, cfg.first_half_end_date.day))
         else:
@@ -193,7 +193,7 @@ class SeasonConfigPanel(QWidget):
 
         # 装备等级（下拉选择）
         level_combo = LevelCombo(allow_empty=True)
-        level_combo.setToolTip("当前赛季装备等级（从等级配置中选择）")
+        level_combo.setToolTip(tr("当前赛季装备等级（从等级配置中选择）"))
         level_combo.set_level(cfg.equip_level)
         level_combo.currentIndexChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _EQUIP_LEVEL_COL, level_combo)
@@ -217,7 +217,7 @@ class SeasonConfigPanel(QWidget):
     def _on_del_row(self):
         row = self._table.currentRow()
         if row < 0:
-            self._set_status("请先选中要删除的赛季行", True)
+            self._set_status(tr("请先选中要删除的赛季行"), True)
             return
         self._table.removeRow(row)
         self._refresh_seq_numbers()
@@ -227,7 +227,7 @@ class SeasonConfigPanel(QWidget):
     def _on_move_up(self):
         row = self._table.currentRow()
         if row <= 0:
-            self._set_status("已是第一条赛季，无法上移", True)
+            self._set_status(tr("已是第一条赛季，无法上移"), True)
             return
         self._swap_rows(row, row - 1)
         self._table.selectRow(row - 1)
@@ -238,7 +238,7 @@ class SeasonConfigPanel(QWidget):
     def _on_move_down(self):
         row = self._table.currentRow()
         if row < 0 or row >= self._table.rowCount() - 1:
-            self._set_status("已是最后一条赛季，无法下移", True)
+            self._set_status(tr("已是最后一条赛季，无法下移"), True)
             return
         self._swap_rows(row, row + 1)
         self._table.selectRow(row + 1)
@@ -339,7 +339,7 @@ class SeasonConfigPanel(QWidget):
             spin: QSpinBox = self._table.cellWidget(row, _NUMBER_COL)
             numbers.append(spin.value())
         if len(numbers) != len(set(numbers)):
-            return "赛季编号不可重复"
+            return tr("赛季编号不可重复")
 
         # 检查赛季名称是否为空
         for row in range(self._table.rowCount()):

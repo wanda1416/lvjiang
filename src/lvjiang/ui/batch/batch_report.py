@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ...constants import PROJECT_ROOT
+from ...i18n import tr
 
 # 报告输出目录
 BATCH_REPORT_DIR = PROJECT_ROOT / "logs" / "batch"
@@ -141,7 +142,7 @@ class BatchReport:
     def finish_pending(self) -> None:
         """中断时关闭尚未结束的脚本记录"""
         if self._current_script:
-            self._current_script.finish("跳过")
+            self._current_script.finish(tr("跳过"))
             self._current_script = None
 
     def end_batch(self, stopped: bool = False) -> None:
@@ -176,7 +177,7 @@ class BatchReport:
         lines.append(f"- 启动时间：{st:%H:%M:%S}")
         if self._end_time:
             lines.append(f"- 结束时间：{self._end_time:%H:%M:%S}"
-                         f"{'（用户中断）' if self._stopped else '（正常完成）'}")
+                         f"{tr('（用户中断）') if self._stopped else tr('（正常完成）')}")
             total_sec = (self._end_time - st).total_seconds()
             lines.append(f"- 总耗时：{_fmt_duration(total_sec)}")
         lines.append(f"- 计划行数：{self._total_rows}")
@@ -186,7 +187,7 @@ class BatchReport:
 
         # 脚本列表
         script_names = "、".join(name for _, name in self._scripts)
-        lines.append(f"- 执行脚本：{script_names or '（无）'}")
+        lines.append(f"- 执行脚本：{script_names or tr('（无）')}")
 
         # 工作流槽位
         wf_parts = []
@@ -214,7 +215,7 @@ class BatchReport:
 
             # 各脚本
             for sr in entry.scripts:
-                status_icon = {"成功": "✓", "失败": "✗", "跳过": "⊘"}.get(
+                status_icon = {tr("成功"): "✓", tr("失败"): "✗", tr("跳过"): "⊘"}.get(
                     sr.status, "?")
                 line = f"- {sr.script_name}：{status_icon} {sr.status}"
                 line += f"（{_fmt_duration(sr.duration)}）"
@@ -224,20 +225,20 @@ class BatchReport:
             lines.append("")
 
         # ── 汇总 ──
-        lines.append("## 汇总")
+        lines.append(tr("## 汇总"))
         lines.append("")
 
         # 行级统计
         total_entries = len(self._entries)
         entry_success = sum(
             1 for e in self._entries
-            if e.prepare_status != "失败" and e.finish_status != "失败"
+            if e.prepare_status != tr("失败") and e.finish_status != "失败"
             and e.scripts
-            and all(s.status == "成功" for s in e.scripts)
+            and all(s.status == tr("成功") for s in e.scripts)
         )
         entry_lifecycle_fail = sum(
             1 for e in self._entries
-            if e.prepare_status == "失败" or e.finish_status == "失败")
+            if e.prepare_status == tr("失败") or e.finish_status == "失败")
         entry_partial = total_entries - entry_success - entry_lifecycle_fail
         lines.append(f"- 行执行总计：{total_entries} 行")
         lines.append(f"  - 全部成功：{entry_success}")
@@ -250,11 +251,11 @@ class BatchReport:
         # 脚本级统计
         total_scripts = sum(len(e.scripts) for e in self._entries)
         success_count = sum(
-            1 for e in self._entries for s in e.scripts if s.status == "成功")
+            1 for e in self._entries for s in e.scripts if s.status == tr("成功"))
         fail_count = sum(
-            1 for e in self._entries for s in e.scripts if s.status == "失败")
+            1 for e in self._entries for s in e.scripts if s.status == tr("失败"))
         skip_count = sum(
-            1 for e in self._entries for s in e.scripts if s.status == "跳过")
+            1 for e in self._entries for s in e.scripts if s.status == tr("跳过"))
         lines.append(f"- 脚本执行总计：{total_scripts} 次")
         lines.append(f"  - 成功：{success_count}")
         if fail_count:

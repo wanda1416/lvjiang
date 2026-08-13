@@ -11,6 +11,7 @@ com.lvjiang.app.OnnxBridge（onnxruntime-android）承担。本模块负责两�
 
 import numpy as np
 
+from ...i18n import tr
 from .rapidocr_adapter import patch_all
 
 
@@ -24,7 +25,7 @@ class JavaInferSession:
     def __init__(self, config):
         model_path = config.get("model_path")
         if not model_path:
-            raise ValueError("config 中缺少 model_path")
+            raise ValueError(tr("config 中缺少 model_path"))
 
         # 延迟导入：只有在 Chaquopy 环境里才存在 com.lvjiang.app，
         # 这样本模块在 PC 上也能被导入（便于静态检查与单测）。

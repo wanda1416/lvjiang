@@ -74,7 +74,7 @@ class _DeviceWorker(QObject):
         device = AdbDevice(serial=self._serial)
         w, h = device.get_resolution()
         if w <= 0 or h <= 0:
-            self.error.emit("无法获取设备分辨率")
+            self.error.emit(tr("无法获取设备分辨率"))
             return
 
         capture = create_capture_backend(device=device, method=self._capture_method)
@@ -202,10 +202,10 @@ class WindowOpsMixin:
         from ..core.platforms import DESKTOP_BACKEND_AVAILABLE
         if not DESKTOP_BACKEND_AVAILABLE:
             # 按钮在非 Windows 已隐藏，此处为防御：投屏模式依赖 Win32 API
-            self.log_text.append("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」")
+            self.log_text.append(tr("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」"))
             return
         if self._running:
-            self.log_text.append("[提示] 请先停止当前任务，再重新扫描窗口")
+            self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描窗口"))
             return
 
         # 切到 windows 模式：清理可能存在的 ADB 资源，恢复 Windows 输入控制器
@@ -236,15 +236,15 @@ class WindowOpsMixin:
         self.statusBar().showMessage(tr("正在扫描窗口..."))
         self._refresh_run_button()
         if had_target:
-            self.log_text.append("[状态] 重新扫描窗口，旧定位已失效")
+            self.log_text.append(tr("[状态] 重新扫描窗口，旧定位已失效"))
 
         from ..core.desktop import list_visible_windows
         self._scanned_windows = list_visible_windows()
         self.window_combo.clear()
 
         if not self._scanned_windows:
-            self.log_text.append("[错误] 未找到可见窗口")
-            self.statusBar().showMessage("未定位窗口 | 未找到可见窗口")
+            self.log_text.append(tr("[错误] 未找到可见窗口"))
+            self.statusBar().showMessage(tr("未定位窗口 | 未找到可见窗口"))
             return
 
         for w in self._scanned_windows:
@@ -279,7 +279,7 @@ class WindowOpsMixin:
     def _on_scan_devices(self):
         """扫描已连接（device 状态）的设备，填充下拉框（切换到 ADB 设备模式）"""
         if self._running:
-            self.log_text.append("[提示] 请先停止当前任务，再重新扫描设备")
+            self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描设备"))
             return
 
         # 切到 adb 模式：清理旧 ADB 资源与 Windows 定位状态
@@ -333,7 +333,7 @@ class WindowOpsMixin:
         self.window_combo.clear()
 
         if not devices:
-            self.log_text.append("[提示] 未发现 USB 连接的 ADB 设备")
+            self.log_text.append(tr("[提示] 未发现 USB 连接的 ADB 设备"))
             self.statusBar().showMessage(tr("未发现设备 | 可尝试局域网扫描"))
             # 弹出对话框询问是否扫描局域网
             self._ask_wireless_scan()
@@ -384,7 +384,7 @@ class WindowOpsMixin:
         self.btn_scan_device.setEnabled(False)
         self.btn_scan_device.setText(tr("扫描局域网..."))
         self.statusBar().showMessage(tr("正在扫描局域网..."))
-        self.log_text.append("[扫描] 正在扫描局域网 ADB 设备...")
+        self.log_text.append(tr("[扫描] 正在扫描局域网 ADB 设备..."))
 
         self._wait_device_thread()
         self._device_thread = QThread()
@@ -427,7 +427,7 @@ class WindowOpsMixin:
                 pass  # 对话框已被销毁
 
         if not devices:
-            self.log_text.append("[扫描] 局域网内未发现可连接的 ADB 设备")
+            self.log_text.append(tr("[扫描] 局域网内未发现可连接的 ADB 设备"))
             self.statusBar().showMessage(tr("未发现设备 | 请确认设备已开启无线调试"))
             QMessageBox.warning(
                 self,  # type: ignore[arg-type]  # mixin: self is QWidget
@@ -556,7 +556,7 @@ class WindowOpsMixin:
         """清理 ADB 后端资源，用于重连或退出（仅清理资源，不改 UI）"""
         # 录屏进行中/待保存时先自动转正保存，再停止截图后端
         if self._screen_recorder is not None:
-            self._abort_screen_record("断连")
+            self._abort_screen_record(tr("断连"))
         self._device_ready = False
         self._scrcpy_streaming = False
         self._stop_capture_backend()
@@ -608,7 +608,7 @@ class WindowOpsMixin:
             self.lbl_window_info.setText(tr("未定位窗口"))
             self.lbl_window_info.setStyleSheet("color: gray;")
             self.statusBar().showMessage(tr("已取消窗口定位"))
-            self.log_text.append("[断连] 窗口定位已清除")
+            self.log_text.append(tr("[断连] 窗口定位已清除"))
         self._refresh_run_button()
 
     def _device_combo_current_serial(self) -> str:
@@ -668,7 +668,7 @@ class WindowOpsMixin:
             else:
                 from ..core.desktop import SendInputInput
                 self._input = SendInputInput(input_sim=self._user_config.input_sim)
-                self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
+                self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
 
     def _on_bg_mode_changed(self, state):
         """后台模式开关切换：在 PostMessageInput / SendInputInput 之间替换整个 _input 实例"""
@@ -681,11 +681,11 @@ class WindowOpsMixin:
                 input_sim=self._user_config.input_sim,
                 hwnd=hwnd,
             )
-            self.log_text.append("[模式] 已切换到后台模式（PostMessage，不移动光标）")
+            self.log_text.append(tr("[模式] 已切换到后台模式（PostMessage，不移动光标）"))
         else:
             from ..core.desktop import SendInputInput
             self._input = SendInputInput(input_sim=self._user_config.input_sim)
-            self.log_text.append("[模式] 已切换到前台模式（SendInput，移动光标）")
+            self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
 
     def _on_capture_method_changed(self, state):
         """截图方式开关切换：在 screencap / scrcpy 之间重建截图后端"""
@@ -693,7 +693,7 @@ class WindowOpsMixin:
 
         # 录屏依赖流式推帧，切换前自动转正保存
         if self._screen_recorder is not None:
-            self._abort_screen_record("切换截图方式")
+            self._abort_screen_record(tr("切换截图方式"))
 
         if not self._device:
             # 未连接设备时仅更新内存配置
@@ -719,7 +719,7 @@ class WindowOpsMixin:
                     old_capture.stop()
                 except Exception:
                     pass
-            mode_label = "scrcpy 流式" if method == "scrcpy" else "screencap"
+            mode_label = tr("scrcpy 流式") if method == "scrcpy" else "screencap"
             self.log_text.append(f"[模式] 已切换到 {mode_label} 截图")
             if not self._scrcpy_streaming:
                 self._capture_preview()
@@ -790,14 +790,14 @@ class WindowOpsMixin:
         """
         if self._backend == "adb":
             if not self._device_ready or self._capture is None:
-                return None, "请先在主窗口连接设备"
+                return None, tr("请先在主窗口连接设备")
             img = self._capture.capture()
             if img is not None:
                 self._last_capture = img
                 return img, None
-            return None, "截图失败"
+            return None, tr("截图失败")
         if not self._target_window:
-            return None, "请先在主窗口定位窗口"
+            return None, tr("请先在主窗口定位窗口")
         try:
             from ..core.desktop import DesktopCapture
             if self._capture is None:
@@ -810,7 +810,7 @@ class WindowOpsMixin:
             if img is not None:
                 self._last_capture = img
                 return img, None
-            return None, "截图失败"
+            return None, tr("截图失败")
         except Exception as e:
             logger.error(f"刷新截图失败: {e}")
             return None, f"截图失败: {e}"

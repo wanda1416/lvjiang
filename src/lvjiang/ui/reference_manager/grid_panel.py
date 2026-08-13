@@ -19,6 +19,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.reference_db import MetaFieldDef
 
+from ...i18n import tr
+
 
 class CellEditor(QWidget):
     """单个切割 cell 的编辑组件：缩略图 + 名称 + 分组 + 动态 meta 字段"""
@@ -47,13 +49,13 @@ class CellEditor(QWidget):
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(4)
 
-        info_layout.addWidget(QLabel("名称:"), 0, 0)
+        info_layout.addWidget(QLabel(tr("名称:")), 0, 0)
         self.label_edit = QComboBox()
         self.label_edit.setEditable(True)
         self.label_edit.setMinimumWidth(100)
         info_layout.addWidget(self.label_edit, 0, 1)
 
-        self._group_label = QLabel("分组:")
+        self._group_label = QLabel(tr("分组:"))
         info_layout.addWidget(self._group_label, 1, 0)
         self.group_edit = QComboBox()
         self.group_edit.setEditable(True)
@@ -175,42 +177,42 @@ class GridPanel(QWidget):
         main_layout = QVBoxLayout(self)
 
         # ── 第一组：网格参数 ──
-        grid_group = QGroupBox("网格参数")
+        grid_group = QGroupBox(tr("网格参数"))
         grid_layout = QVBoxLayout(grid_group)
 
         row_layout = QHBoxLayout()
-        row_layout.addWidget(QLabel("行:"))
+        row_layout.addWidget(QLabel(tr("行:")))
         self._rows_spin = QSpinBox()
         self._rows_spin.setRange(1, 20)
         self._rows_spin.setValue(self._default_rows)
         row_layout.addWidget(self._rows_spin)
-        row_layout.addWidget(QLabel("列:"))
+        row_layout.addWidget(QLabel(tr("列:")))
         self._cols_spin = QSpinBox()
         self._cols_spin.setRange(1, 20)
         self._cols_spin.setValue(self._default_cols)
         row_layout.addWidget(self._cols_spin)
-        row_layout.addWidget(QLabel("间隔:"))
+        row_layout.addWidget(QLabel(tr("间隔:")))
         self._gap_spin = QSpinBox()
         self._gap_spin.setRange(0, 50)
         self._gap_spin.setValue(self._default_gap)
-        self._gap_spin.setToolTip("网格线间隔像素，用于过滤黑边")
+        self._gap_spin.setToolTip(tr("网格线间隔像素，用于过滤黑边"))
         row_layout.addWidget(self._gap_spin)
         row_layout.addStretch()
         grid_layout.addLayout(row_layout)
         main_layout.addWidget(grid_group)
 
         # ── 第二组：单cell尺寸 + 生成网格 ──
-        cell_group = QGroupBox("单cell尺寸")
+        cell_group = QGroupBox(tr("单cell尺寸"))
         cell_layout = QVBoxLayout(cell_group)
 
         size_layout = QHBoxLayout()
-        size_layout.addWidget(QLabel("高:"))
+        size_layout.addWidget(QLabel(tr("高:")))
         self._height_spin = QSpinBox()
         self._height_spin.setRange(10, 500)
         self._height_spin.setValue(self._default_height)
         self._height_spin.setSuffix(" px")
         size_layout.addWidget(self._height_spin)
-        size_layout.addWidget(QLabel("宽:"))
+        size_layout.addWidget(QLabel(tr("宽:")))
         self._width_spin = QSpinBox()
         self._width_spin.setRange(10, 500)
         self._width_spin.setValue(self._default_width)
@@ -219,8 +221,8 @@ class GridPanel(QWidget):
         size_layout.addStretch()
         cell_layout.addLayout(size_layout)
 
-        self._generate_btn = QPushButton("生成网格")
-        self._clear_grid_btn = QPushButton("清除网格")
+        self._generate_btn = QPushButton(tr("生成网格"))
+        self._clear_grid_btn = QPushButton(tr("清除网格"))
         gen_layout = QHBoxLayout()
         gen_layout.addWidget(self._generate_btn)
         gen_layout.addWidget(self._clear_grid_btn)
@@ -228,18 +230,18 @@ class GridPanel(QWidget):
         main_layout.addWidget(cell_group)
 
         # ── 第三组：执行切割 ──
-        execute_group = QGroupBox("切割")
+        execute_group = QGroupBox(tr("切割"))
         execute_layout = QVBoxLayout(execute_group)
-        self._execute_btn = QPushButton("执行切割")
+        self._execute_btn = QPushButton(tr("执行切割"))
         self._execute_btn.setEnabled(False)
         execute_layout.addWidget(self._execute_btn)
         main_layout.addWidget(execute_group)
 
         # ── 切割结果编辑区 ──
-        result_group = QGroupBox("切割结果")
+        result_group = QGroupBox(tr("切割结果"))
         result_layout = QVBoxLayout(result_group)
 
-        self._result_info = QLabel("尚未切割")
+        self._result_info = QLabel(tr("尚未切割"))
         result_layout.addWidget(self._result_info)
 
         # 可滚动的 cell 编辑列表
@@ -256,17 +258,17 @@ class GridPanel(QWidget):
 
         # 批量设置 + 提交
         batch_layout = QHBoxLayout()
-        batch_layout.addWidget(QLabel("批量分组:"))
+        batch_layout.addWidget(QLabel(tr("批量分组:")))
         self._batch_group = QComboBox()
         self._batch_group.setEditable(True)
         self._batch_group.setMinimumWidth(100)
         batch_layout.addWidget(self._batch_group)
-        self._apply_group_btn = QPushButton("应用到全部")
+        self._apply_group_btn = QPushButton(tr("应用到全部"))
         batch_layout.addWidget(self._apply_group_btn)
         batch_layout.addStretch()
         result_layout.addLayout(batch_layout)
 
-        self._submit_btn = QPushButton("提交到图库")
+        self._submit_btn = QPushButton(tr("提交到图库"))
         self._submit_btn.setEnabled(False)
         result_layout.addWidget(self._submit_btn)
 

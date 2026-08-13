@@ -39,7 +39,7 @@ _RESET_COL = 2
 _MATERIAL_COL = 3
 _JUDGE_RES_COL = 4
 _BUFF_RES_COL = 5
-_COLS = ("#", "等级", "支持重置", "最低材料数量", "判定抗性(%)", "增益抗性(%)")  # runtime tr()
+_COLS = ("#", tr("等级"), tr("支持重置"), tr("最低材料数量"), tr("判定抗性(%)"), "增益抗性(%)")  # runtime tr()
 
 
 class LevelConfigPanel(QWidget):
@@ -136,14 +136,14 @@ class LevelConfigPanel(QWidget):
         level_spin = QSpinBox()
         level_spin.setRange(0, 999)
         level_spin.setSpecialValueText("")
-        level_spin.setToolTip("装备等级（1-999，不可重复，必填）")
+        level_spin.setToolTip(tr("装备等级（1-999，不可重复，必填）"))
         level_spin.setValue(cfg.level)
         level_spin.valueChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _LEVEL_COL, level_spin)
 
         # 支持重置（可选，默认未勾选 = None）
         reset_cb = QCheckBox()
-        reset_cb.setToolTip("该等级是否允许重置调律（可选）")
+        reset_cb.setToolTip(tr("该等级是否允许重置调律（可选）"))
         reset_cb.setTristate(False)
         if cfg.allow_reset is not None:
             reset_cb.setChecked(cfg.allow_reset)
@@ -160,7 +160,7 @@ class LevelConfigPanel(QWidget):
         material_spin = QSpinBox()
         material_spin.setRange(0, 99999)
         material_spin.setSpecialValueText("")
-        material_spin.setToolTip("该等级要求的最低材料数量（可选）")
+        material_spin.setToolTip(tr("该等级要求的最低材料数量（可选）"))
         if cfg.min_material_count is not None:
             material_spin.setValue(cfg.min_material_count)
         material_spin.valueChanged.connect(lambda _v: self._apply())
@@ -170,7 +170,7 @@ class LevelConfigPanel(QWidget):
         judge_spin = QSpinBox()
         judge_spin.setRange(0, 99999)
         judge_spin.setSpecialValueText("")
-        judge_spin.setToolTip("判定抗性百分比（可选，>= 0）")
+        judge_spin.setToolTip(tr("判定抗性百分比（可选，>= 0）"))
         if cfg.judge_resistance is not None:
             judge_spin.setValue(cfg.judge_resistance)
         judge_spin.valueChanged.connect(lambda _v: self._apply())
@@ -180,7 +180,7 @@ class LevelConfigPanel(QWidget):
         buff_spin = QSpinBox()
         buff_spin.setRange(0, 99999)
         buff_spin.setSpecialValueText("")
-        buff_spin.setToolTip("增益抗性百分比（可选，>= 0）")
+        buff_spin.setToolTip(tr("增益抗性百分比（可选，>= 0）"))
         if cfg.buff_resistance is not None:
             buff_spin.setValue(cfg.buff_resistance)
         buff_spin.valueChanged.connect(lambda _v: self._apply())
@@ -198,7 +198,7 @@ class LevelConfigPanel(QWidget):
     def _on_del_row(self):
         row = self._table.currentRow()
         if row < 0:
-            self._set_status("请先选中要删除的配置行", True)
+            self._set_status(tr("请先选中要删除的配置行"), True)
             return
         self._table.removeRow(row)
         self._refresh_seq_numbers()
@@ -208,7 +208,7 @@ class LevelConfigPanel(QWidget):
     def _on_move_up(self):
         row = self._table.currentRow()
         if row <= 0:
-            self._set_status("已是第一条配置，无法上移", True)
+            self._set_status(tr("已是第一条配置，无法上移"), True)
             return
         self._swap_rows(row, row - 1)
         self._table.selectRow(row - 1)
@@ -219,7 +219,7 @@ class LevelConfigPanel(QWidget):
     def _on_move_down(self):
         row = self._table.currentRow()
         if row < 0 or row >= self._table.rowCount() - 1:
-            self._set_status("已是最后一条配置，无法下移", True)
+            self._set_status(tr("已是最后一条配置，无法下移"), True)
             return
         self._swap_rows(row, row + 1)
         self._table.selectRow(row + 1)

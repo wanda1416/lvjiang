@@ -57,7 +57,7 @@ _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _QUALITIES = ("gold", "purple", "blue")
 
 # 增伤列留空项的展示文案（仅显示层，收集时仍写入空 = null）
-_NO_DAMAGE_LABEL = "- 无需增伤 -"
+_NO_DAMAGE_LABEL = tr("- 无需增伤 -")
 
 # 玩法设定表说明（「?」按钮点击展示，不用悬停 tooltip）
 _PLAYSTYLE_TIPS = (

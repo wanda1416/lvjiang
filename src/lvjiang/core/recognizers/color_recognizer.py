@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from ...i18n import tr
 from ._registry import register_recognizer
 
 
@@ -24,4 +25,4 @@ class ColorRecognizer:
         pass
 
     def recognize(self, image: np.ndarray, **kwargs: Any) -> Any:
-        raise NotImplementedError("颜色特征识别器尚未实现")
+        raise NotImplementedError(tr("颜色特征识别器尚未实现"))

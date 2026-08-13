@@ -10,6 +10,8 @@ import time
 
 from loguru import logger
 
+from ..i18n import tr
+
 try:
     from pynput import mouse as pynput_mouse
 except Exception:  # pragma: no cover - 环境缺失 pynput 时降级
@@ -51,7 +53,7 @@ class MacroRecorder:
     def start(self):
         """开始录制（启动 pynput 监听线程）"""
         if pynput_mouse is None:
-            raise RuntimeError("pynput 未安装，无法录制")
+            raise RuntimeError(tr("pynput 未安装，无法录制"))
         if self._recording:
             return
         self._lines = []

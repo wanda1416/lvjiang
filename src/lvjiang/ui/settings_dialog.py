@@ -32,9 +32,9 @@ from ..i18n import tr
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
 _RANGE_FIELDS = [
-    ("before_click_wait", "点击前延迟(秒)", "每次点击前的随机等待，模拟人类反应时间"),
-    ("after_click_wait", "点击后延迟(秒)", "每次点击后的随机等待"),
-    ("mouse_move_duration", "鼠标移动时长(秒)", "鼠标/触控移动到目标位置的耗时"),
+    ("before_click_wait", tr("点击前延迟(秒)"), tr("每次点击前的随机等待，模拟人类反应时间")),
+    ("after_click_wait", tr("点击后延迟(秒)"), tr("每次点击后的随机等待")),
+    ("mouse_move_duration", tr("鼠标移动时长(秒)"), tr("鼠标/触控移动到目标位置的耗时")),
 ]
 
 # 等待参数不可占用的保留 key（InputSimConfig 引擎级固定字段）
@@ -160,8 +160,8 @@ class SettingsDialog(QDialog):
         self._offset_spin.setRange(0, 50)
         self._offset_spin.setValue(sim.click_random_offset)
         self._offset_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow("坐标随机偏移(px):", self._spin_with_tip(
-            self._offset_spin, "点击坐标附加 ±N 像素的随机偏移"))
+        form.addRow(tr("坐标随机偏移(px):"), self._spin_with_tip(
+            self._offset_spin, tr("点击坐标附加 ±N 像素的随机偏移")))
 
         self._jitter_spin = QDoubleSpinBox()
         self._jitter_spin.setRange(0.0, 0.49)
@@ -169,9 +169,9 @@ class SettingsDialog(QDialog):
         self._jitter_spin.setDecimals(2)
         self._jitter_spin.setValue(sim.region_jitter_ratio)
         self._jitter_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow("区域中心偏移比例:", self._spin_with_tip(
+        form.addRow(tr("区域中心偏移比例:"), self._spin_with_tip(
             self._jitter_spin,
-            "区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）"))
+            tr("区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）")))
 
         return tab
 
@@ -190,16 +190,16 @@ class SettingsDialog(QDialog):
         self._custom_grid = QGridLayout()
         self._custom_grid.setColumnStretch(0, 3)
         self._custom_grid.setColumnStretch(1, 3)
-        self._custom_grid.addWidget(QLabel("参数 key"), 0, 0)
-        self._custom_grid.addWidget(QLabel("名称"), 0, 1)
-        self._custom_grid.addWidget(QLabel("等待范围(秒)"), 0, 2, 1, 3)
+        self._custom_grid.addWidget(QLabel(tr("参数 key")), 0, 0)
+        self._custom_grid.addWidget(QLabel(tr("名称")), 0, 1)
+        self._custom_grid.addWidget(QLabel(tr("等待范围(秒)")), 0, 2, 1, 3)
         vbox.addLayout(self._custom_grid)
 
         for key, item in self._config.delay_params.items():
             self._add_custom_row(key, item.label, *item.range, saved=True)  # type: ignore[misc]
 
         add_row = QHBoxLayout()
-        add_btn = QPushButton("添加参数")
+        add_btn = QPushButton(tr("添加参数"))
         add_btn.clicked.connect(self._on_add_custom_row)
         add_row.addWidget(add_btn)
         add_row.addStretch()
@@ -271,18 +271,18 @@ class SettingsDialog(QDialog):
         saved: 是否来自已保存的配置（删除时需二次确认）
         """
         key_edit = QLineEdit(key)
-        key_edit.setPlaceholderText("如 my_wait")
+        key_edit.setPlaceholderText(tr("如 my_wait"))
         key_edit.setMinimumWidth(100)
 
         label_edit = QLineEdit(label)
-        label_edit.setPlaceholderText("显示名称")
+        label_edit.setPlaceholderText(tr("显示名称"))
         label_edit.setMinimumWidth(100)
 
         lo_spin, hi_spin = self._make_range_spins(lo, hi)
 
         entry = {"key": key_edit, "label": label_edit, "lo": lo_spin, "hi": hi_spin,
                  "saved": saved}
-        del_btn = QPushButton("删除")
+        del_btn = QPushButton(tr("删除"))
         del_btn.clicked.connect(lambda: self._remove_custom_row(entry))
 
         widgets = [key_edit, label_edit, lo_spin, QLabel("~"), hi_spin, del_btn]
@@ -297,9 +297,9 @@ class SettingsDialog(QDialog):
     def _remove_custom_row(self, entry: dict):
         """删除一行等待参数；已保存的行需二次确认"""
         if entry["saved"]:
-            key = entry["key"].text().strip() or "(未命名)"
+            key = entry["key"].text().strip() or tr("(未命名)")
             reply = QMessageBox.question(
-                self, "确认删除",
+                self, tr("确认删除"),
                 f"确定删除等待参数「{key}」吗？\n"
                 f"引用该参数的工作流将在加载时报错。",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -322,14 +322,14 @@ class SettingsDialog(QDialog):
             if not key:
                 continue  # 空行忽略
             if not key.isidentifier():
-                QMessageBox.warning(self, "配置管理",
+                QMessageBox.warning(self, tr("配置管理"),
                                     f"参数 key「{key}」无效：只能由字母/数字/下划线组成且不以数字开头")
                 return None
             if key in _RESERVED_KEYS:
-                QMessageBox.warning(self, "配置管理", f"参数 key「{key}」与引擎参数冲突")
+                QMessageBox.warning(self, tr("配置管理"), f"参数 key「{key}」与引擎参数冲突")
                 return None
             if key in custom:
-                QMessageBox.warning(self, "配置管理", f"参数 key「{key}」重复")
+                QMessageBox.warning(self, tr("配置管理"), f"参数 key「{key}」重复")
                 return None
             lo, hi = entry["lo"].value(), entry["hi"].value()
             if hi < lo:

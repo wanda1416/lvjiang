@@ -30,6 +30,7 @@ from ...core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
+from ...i18n import tr
 from ..widgets import strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
@@ -65,7 +66,7 @@ class PoiPanelMixin:
         layout = QVBoxLayout(panel)
         self._point_list = QTableWidget()
         self._point_list.setColumnCount(5)
-        self._point_list.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
+        self._point_list.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击")])
         # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._point_list.horizontalHeader()
         assert header is not None
@@ -88,16 +89,16 @@ class PoiPanelMixin:
         layout.addWidget(self._point_list)
 
         btn_row = QHBoxLayout()
-        self._btn_new_point_def = QPushButton("+ 创建坐标")
-        self._btn_new_point_def.setToolTip("在场景 YAML 中新增坐标点定义（meta 数据）")
+        self._btn_new_point_def = QPushButton(tr("+ 创建坐标"))
+        self._btn_new_point_def.setToolTip(tr("在场景 YAML 中新增坐标点定义（meta 数据）"))
         self._btn_new_point_def.clicked.connect(self._on_new_point_def)
         btn_row.addWidget(self._btn_new_point_def)
-        self._btn_del_point = QPushButton("删除坐标")
-        self._btn_del_point.setToolTip("从场景 YAML 中删除坐标点定义（meta 数据）")
+        self._btn_del_point = QPushButton(tr("删除坐标"))
+        self._btn_del_point.setToolTip(tr("从场景 YAML 中删除坐标点定义（meta 数据）"))
         self._btn_del_point.clicked.connect(self._on_delete_point_def)
         btn_row.addWidget(self._btn_del_point)
-        self._btn_bind_point = QPushButton("绑定坐标")
-        self._btn_bind_point.setToolTip("在画布上放置一个坐标点（绑定到 YAML 定义）")
+        self._btn_bind_point = QPushButton(tr("绑定坐标"))
+        self._btn_bind_point.setToolTip(tr("在画布上放置一个坐标点（绑定到 YAML 定义）"))
         self._btn_bind_point.clicked.connect(self._on_new_point)
         btn_row.addWidget(self._btn_bind_point)
         btn_row.addStretch()
@@ -109,7 +110,7 @@ class PoiPanelMixin:
         layout = QVBoxLayout(panel)
         self._arrow_list = QTableWidget()
         self._arrow_list.setColumnCount(2)
-        self._arrow_list.setHorizontalHeaderLabels(["Key", "方向"])
+        self._arrow_list.setHorizontalHeaderLabels(["Key", tr("方向")])
         header = self._arrow_list.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -128,11 +129,11 @@ class PoiPanelMixin:
         layout.addWidget(self._arrow_list)
 
         btn_row = QHBoxLayout()
-        self._btn_new_arrow = QPushButton("创建方向")
-        self._btn_new_arrow.setToolTip("先选中一个已放置的坐标点，再从它拉出一条方向箭头")
+        self._btn_new_arrow = QPushButton(tr("创建方向"))
+        self._btn_new_arrow.setToolTip(tr("先选中一个已放置的坐标点，再从它拉出一条方向箭头"))
         self._btn_new_arrow.clicked.connect(self._on_new_arrow)
         btn_row.addWidget(self._btn_new_arrow)
-        self._btn_del_arrow = QPushButton("删除方向")
+        self._btn_del_arrow = QPushButton(tr("删除方向"))
         self._btn_del_arrow.clicked.connect(self._on_delete_arrow)
         btn_row.addWidget(self._btn_del_arrow)
         btn_row.addStretch()
@@ -228,13 +229,13 @@ class PoiPanelMixin:
         placed = {p.key for p in self._canvas.get_points()}
         available = [(k, n) for k, n in pairs if k not in placed]
         if not available:
-            QMessageBox.information(self, "无可用坐标",
-                                    "该场景所有 YAML 坐标点都已放置。")
+            QMessageBox.information(self, tr("无可用坐标"),
+                                    tr("该场景所有 YAML 坐标点都已放置。"))
             return
         items = [f"{n} ({k})" for k, n in available]
         dlg = QInputDialog(self)
-        dlg.setWindowTitle("创建坐标")
-        dlg.setLabelText("选择要放置的坐标点：")
+        dlg.setWindowTitle(tr("创建坐标"))
+        dlg.setLabelText(tr("选择要放置的坐标点："))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(_LIGHT_DIALOG_QSS)
         if not dlg.exec() or not dlg.textValue():
@@ -248,8 +249,8 @@ class PoiPanelMixin:
         key = self._canvas.selected_point_key()
         if key is None:
             QMessageBox.information(
-                self, "请先选中坐标",
-                "请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。",
+                self, tr("请先选中坐标"),
+                tr("请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。"),
             )
             return
         self._canvas.begin_draw_arrow(key)
@@ -264,7 +265,7 @@ class PoiPanelMixin:
             return
         key = key_item.text()
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, tr("确认删除"),
             f"确定要从场景定义中删除坐标点「{key}」吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -274,7 +275,7 @@ class PoiPanelMixin:
         try:
             registry.remove_point_from_scene(self._scene_key, key)
         except ValueError as e:
-            QMessageBox.warning(self, "删除失败", str(e))
+            QMessageBox.warning(self, tr("删除失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -289,7 +290,7 @@ class PoiPanelMixin:
         try:
             registry.add_point_to_scene(self._scene_key, point_def)
         except ValueError as e:
-            QMessageBox.warning(self, "创建失败", str(e))
+            QMessageBox.warning(self, tr("创建失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -341,7 +342,7 @@ class PoiPanelMixin:
                     # key 不变：只更新其他属性
                     registry.update_point_in_scene(self._scene_key, old_key, new_def)
             except ValueError as e:
-                QMessageBox.warning(self, "更新失败", str(e))
+                QMessageBox.warning(self, tr("更新失败"), str(e))
                 return
             sync_scene_cache(self._scene_key)
             self._refresh_lists()
@@ -352,7 +353,7 @@ class PoiPanelMixin:
         try:
             registry.add_point_to_scene(target_scene, new_def)
         except ValueError as e:
-            QMessageBox.warning(self, "迁移失败", str(e))
+            QMessageBox.warning(self, tr("迁移失败"), str(e))
             return
         registry.remove_point_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
@@ -409,7 +410,7 @@ class PoiPanelMixin:
         existing = {a.key for a in self._canvas.get_arrows()} - {old}
         while True:
             new, ok = QInputDialog.getText(
-                self, "重命名方向", "输入新的方向 key（小写字母开头）：", text=old,
+                self, tr("重命名方向"), tr("输入新的方向 key（小写字母开头）："), text=old,
             )
             if not ok:
                 return
@@ -417,11 +418,11 @@ class PoiPanelMixin:
             if new == old:
                 return
             if not _RE_ARROW_KEY.match(new):
-                QMessageBox.warning(self, "命名非法",
-                                    "key 必须以小写字母开头，仅含小写字母/数字/下划线。")
+                QMessageBox.warning(self, tr("命名非法"),
+                                    tr("key 必须以小写字母开头，仅含小写字母/数字/下划线。"))
                 continue
             if new in existing:
-                QMessageBox.warning(self, "key 重复", f"方向 key「{new}」已存在。")
+                QMessageBox.warning(self, tr("key 重复"), f"方向 key「{new}」已存在。")
                 continue
             self._canvas.rename_arrow_by_key(old, new)
             return
@@ -449,34 +450,34 @@ class PoiPanelMixin:
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
         """
         dialog = QDialog(self)  # type: ignore[arg-type]
-        dialog.setWindowTitle("新建坐标" if point_def is None else "编辑坐标")
+        dialog.setWindowTitle(tr("新建坐标") if point_def is None else tr("编辑坐标"))
         form = QFormLayout(dialog)
 
         key_edit = QLineEdit()
-        key_edit.setPlaceholderText("英文，如 my_point")
+        key_edit.setPlaceholderText(tr("英文，如 my_point"))
         if point_def:
             key_edit.setText(point_def.key)
             # 允许编辑 key，但需要校验唯一性
         form.addRow("Key:", key_edit)
 
         name_edit = QLineEdit()
-        name_edit.setPlaceholderText("中文名称")
+        name_edit.setPlaceholderText(tr("中文名称"))
         if point_def:
             name_edit.setText(point_def.name)
-        form.addRow("名称:", name_edit)
+        form.addRow(tr("名称:"), name_edit)
 
         type_combo = QComboBox()
         type_combo.addItems(sorted(VALID_REGION_TYPES))
         if point_def:
             type_combo.setCurrentText(point_def.type)
-        form.addRow("类型:", type_combo)
+        form.addRow(tr("类型:"), type_combo)
 
-        is_text_check = QCheckBox("含文本")
+        is_text_check = QCheckBox(tr("含文本"))
         if point_def:
             is_text_check.setChecked(point_def.is_text)
         form.addRow(is_text_check)
 
-        is_clickable_check = QCheckBox("可点击")
+        is_clickable_check = QCheckBox(tr("可点击"))
         if point_def:
             is_clickable_check.setChecked(point_def.is_clickable)
         else:

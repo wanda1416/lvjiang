@@ -33,10 +33,10 @@ from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）
 _KIND_NAMES = {
-    "contains_all": "全部同时出现",
-    "not_together": "没有全部出现",
-    "count_max": "计数小于等于",
-    "count_min": "计数大于等于",
+    "contains_all": tr("全部同时出现"),
+    "not_together": tr("没有全部出现"),
+    "count_max": tr("计数小于等于"),
+    "count_min": tr("计数大于等于"),
 }  # runtime tr()
 
 

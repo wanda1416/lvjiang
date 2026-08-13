@@ -7,6 +7,7 @@
 
 from loguru import logger
 
+from ..i18n import tr
 from .config.resolver import get_resolver
 from .scene_definition import SceneRegistry
 from .scene_definition_models import (
@@ -111,7 +112,7 @@ _rebuild_scene_globals()
 
 # 启动校验：至少存在一个分组
 if not _registry.get_groups():
-    raise RuntimeError("scenes.yaml 必须至少包含一个场景分组，请检查配置")
+    raise RuntimeError(tr("scenes.yaml 必须至少包含一个场景分组，请检查配置"))
 
 
 def get_registry() -> SceneRegistry:

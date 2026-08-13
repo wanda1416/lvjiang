@@ -5,6 +5,8 @@ from datetime import datetime
 
 from loguru import logger
 
+from ..i18n import tr
+
 # ─── 数据类 ──────────────────────────────────────────────
 
 @dataclass
@@ -66,7 +68,7 @@ class UserConfigManager:
     def _create_default_user(self):
         """创建默认用户"""
         default = User(
-            name="默认用户",
+            name=tr("默认用户"),
             created_at=datetime.now().isoformat(),
         )
         self._users[default.name] = default

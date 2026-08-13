@@ -17,6 +17,7 @@ import mss.tools
 import numpy as np
 from loguru import logger
 
+from ...i18n import tr
 from ..capture_base import CaptureBackend
 
 
@@ -70,7 +71,7 @@ class DesktopCapture(CaptureBackend):
     def _sct(self):
         """主线程 mss 实例（惰性创建，仅用于 list_monitors / get_capture_size）"""
         if self._closed:
-            raise RuntimeError("DesktopCapture 已停止")
+            raise RuntimeError(tr("DesktopCapture 已停止"))
         if self._main_sct is None:
             self._main_sct = mss.mss()
         return self._main_sct

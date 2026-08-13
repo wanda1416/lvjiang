@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from ...i18n import tr
 from ..align import GridAlignment, _make_even_alignment, detect_grid
 
 if TYPE_CHECKING:
@@ -126,7 +127,7 @@ class _PanelMixin:
             logger.error(f"align: panel {scene_key}.{panel_key} 未检测到 slot")
             return None
         self._panel_alignments[(scene_key, panel_key)] = alignment
-        mode = "等分降级" if (fallback and alignment.row_span == 0.0) else "图像检测"
+        mode = tr("等分降级") if (fallback and alignment.row_span == 0.0) else tr("图像检测")
         logger.info(
             f"align: {scene_key}.{panel_key} 已对齐（{mode}），"
             f"检测到 {alignment.n_rows}×{alignment.n_cols} = {alignment.total_slots} 个 slot 中心"

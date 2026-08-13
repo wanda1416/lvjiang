@@ -10,6 +10,8 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal.base import (
 )
 from lvjiang.workflows.align import GridAlignment
 
+from ......i18n import tr
+
 if TYPE_CHECKING:  # pragma: no cover - 仅类型标注，防循环导入
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
@@ -76,7 +78,7 @@ class DedupTraversal(BagTraversal):
             wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
             wf.wait_stable("scroll_settle")  # 滚动后面板稳定
             alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
-            assert alignment_raw is not None, "对齐失败：alignment 为 None"
+            assert alignment_raw is not None, tr("对齐失败：alignment 为 None")
             alignment: GridAlignment = alignment_raw
             recent, new_count, hit_empty = self._scan_window(
                 wf, detail_scene, alignment.n_rows, cols, recent)

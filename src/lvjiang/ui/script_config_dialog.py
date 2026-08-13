@@ -50,7 +50,7 @@ class ScriptConfigDialog(QDialog):
     COL_PARAMS = 5
 
     # 脚本性质选项
-    SCOPE_LABELS = {"daily": "日常", "dedicated": "专用"}
+    SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
 
     def __init__(self, main_window):
         super().__init__(main_window)

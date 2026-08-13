@@ -15,8 +15,10 @@ import re
 
 from loguru import logger
 
+from ....i18n import tr
+
 # 定音词条所在的全部类别（增益类 + 指定技能增效）
-_DINGYIN_CATEGORIES = ("外功增益", "属攻增益", "指定技能增效")
+_DINGYIN_CATEGORIES = (tr("外功增益"), tr("属攻增益"), tr("指定技能增效"))
 
 
 class DingyinParser:

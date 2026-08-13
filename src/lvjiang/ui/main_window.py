@@ -51,7 +51,7 @@ class _LogBridge(QObject):
     append_log = pyqtSignal(str)
 
 
-DEFAULT_TITLE = "律匠 - 通用视觉 RPA 引擎"
+DEFAULT_TITLE = tr("律匠 - 通用视觉 RPA 引擎")
 
 
 def _get_title_with_version() -> str:
@@ -621,7 +621,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._log_level_combo = QComboBox()
         self._log_level_combo.addItem("INFO", 20)
         self._log_level_combo.addItem("DEBUG", 10)
-        self._log_level_combo.setToolTip("切换日志显示级别：DEBUG 会显示更详细的调试信息")
+        self._log_level_combo.setToolTip(tr("切换日志显示级别：DEBUG 会显示更详细的调试信息"))
         self._log_level_combo.currentIndexChanged.connect(self._on_log_level_changed)
         filter_bar.addWidget(self._log_level_combo)
         log_layout.addLayout(filter_bar)
@@ -707,19 +707,19 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """
         if not self._backend_ready():
             if self._backend == "adb":
-                self._log_append("[错误] 请先连接设备")
+                self._log_append(tr("[错误] 请先连接设备"))
             else:
-                self._log_append("[错误] 请先定位窗口")
+                self._log_append(tr("[错误] 请先定位窗口"))
             return False
 
-        if not self._begin_automation("批量执行"):
+        if not self._begin_automation(tr("批量执行")):
             return False
 
         layout_name = self._layout_manager.get_active_layout_name()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
             self._log_append(f"[错误] 无法加载布局: {layout_name}")
-            self._end_automation("批量执行")
+            self._end_automation(tr("批量执行"))
             return False
 
         if self._backend == "adb":
@@ -748,8 +748,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         cfg = load_batch_config()
         config = cfg.get_active()
         if not config:
-            self._log_append("[错误] 暂无配置，请先通过 工具 → 批量配置 添加")
-            self._end_automation("批量执行")
+            self._log_append(tr("[错误] 暂无配置，请先通过 工具 → 批量配置 添加"))
+            self._end_automation(tr("批量执行"))
             return False
 
         worker = BatchWorker(
@@ -767,7 +767,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         worker.log.connect(self._log_append)
         worker.finished_all.connect(self._batch_tab.on_batch_finished)
         worker.finished_all.connect(
-            lambda _: self._end_automation("批量执行")
+            lambda _: self._end_automation(tr("批量执行"))
         )
 
         self._current_worker = worker  # type: ignore[assignment]
@@ -1091,7 +1091,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             except Exception as e:
                 logger.warning(f"插件清理回调失败: {e}")
         # 录屏进行中/待保存时自动转正保存，不丢数据
-        self._abort_screen_record("关闭程序")
+        self._abort_screen_record(tr("关闭程序"))
         if self._backend == "adb":
             self._teardown_adb_backend()
         else:

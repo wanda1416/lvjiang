@@ -36,10 +36,10 @@ _QUALITY_COLORS = {
 
 # 评级 key → 中文 + 颜色（运行时通过 tr() 翻译）
 _RATING_STYLE = {
-    "top": ("顶级", "#FF6F00; font-weight: bold"),
-    "excellent": ("优秀", "#388E3C"),
-    "normal": ("能用", "#757575"),
-    "junk": ("垃圾", "#D32F2F"),
+    "top": (tr("顶级"), "#FF6F00; font-weight: bold"),
+    "excellent": (tr("优秀"), "#388E3C"),
+    "normal": (tr("能用"), "#757575"),
+    "junk": (tr("垃圾"), "#D32F2F"),
 }
 
 
@@ -279,7 +279,7 @@ class TuningProgressDialog:
         self._equipment_count += 1
         self._round_count = 0
         # 装备名称 + 品阶颜色
-        name = info.get("name") or info.get("type") or "未知"
+        name = info.get("name") or info.get("type") or tr("未知")
         quality = info.get("quality", "")
         color = _QUALITY_COLORS.get(quality, "#333")
         self._equip_name_label.setText(

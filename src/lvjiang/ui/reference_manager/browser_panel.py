@@ -23,6 +23,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
 
+from ...i18n import tr
+
 THUMB_SIZE = 96  # 图库缩略图尺寸
 _CHECK_SIZE = 20  # 批量模式复选框尺寸
 
@@ -145,15 +147,15 @@ class BrowserPanel(QWidget):
 
         # ── 过滤栏 ──
         filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("分组:"))
+        filter_layout.addWidget(QLabel(tr("分组:")))
         self._group_filter = QComboBox()
-        self._group_filter.addItem("全部", "")
+        self._group_filter.addItem(tr("全部"), "")
         self._group_filter.setMinimumWidth(120)
         filter_layout.addWidget(self._group_filter)
 
-        filter_layout.addWidget(QLabel("名称:"))
+        filter_layout.addWidget(QLabel(tr("名称:")))
         self._label_filter = QComboBox()
-        self._label_filter.addItem("全部", "")
+        self._label_filter.addItem(tr("全部"), "")
         self._label_filter.setMinimumWidth(120)
         filter_layout.addWidget(self._label_filter)
 
@@ -161,10 +163,10 @@ class BrowserPanel(QWidget):
         self._meta_filter_layout = QHBoxLayout()
         filter_layout.addLayout(self._meta_filter_layout)
 
-        self._refresh_btn = QPushButton("刷新")
+        self._refresh_btn = QPushButton(tr("刷新"))
         filter_layout.addWidget(self._refresh_btn)
 
-        self._batch_btn = QPushButton("批量管理")
+        self._batch_btn = QPushButton(tr("批量管理"))
         self._batch_btn.setCheckable(True)
         filter_layout.addWidget(self._batch_btn)
 
@@ -199,11 +201,11 @@ class BrowserPanel(QWidget):
         batch_layout = QHBoxLayout(self._batch_toolbar)
         batch_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._select_all_btn = QPushButton("全选")
+        self._select_all_btn = QPushButton(tr("全选"))
         batch_layout.addWidget(self._select_all_btn)
-        self._deselect_all_btn = QPushButton("全不选")
+        self._deselect_all_btn = QPushButton(tr("全不选"))
         batch_layout.addWidget(self._deselect_all_btn)
-        self._invert_sel_btn = QPushButton("反选")
+        self._invert_sel_btn = QPushButton(tr("反选"))
         batch_layout.addWidget(self._invert_sel_btn)
         batch_layout.addStretch()
 
@@ -218,21 +220,21 @@ class BrowserPanel(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
 
         # 单个编辑区
-        edit_group = QGroupBox("参考图信息")
+        edit_group = QGroupBox(tr("参考图信息"))
         edit_layout = QVBoxLayout(edit_group)
 
-        self._file_label = QLabel("未选择")
+        self._file_label = QLabel(tr("未选择"))
         self._file_label.setStyleSheet("color: gray;")
         edit_layout.addWidget(self._file_label)
 
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("名称:"))
+        row1.addWidget(QLabel(tr("名称:")))
         self._label_edit = QLineEdit()
         row1.addWidget(self._label_edit)
         edit_layout.addLayout(row1)
 
         row_group = QHBoxLayout()
-        row_group.addWidget(QLabel("分组:"))
+        row_group.addWidget(QLabel(tr("分组:")))
         self._group_edit = QComboBox()
         self._group_edit.setEditable(True)
         row_group.addWidget(self._group_edit, 1)  # stretch=1 让它填充剩余空间
@@ -244,16 +246,16 @@ class BrowserPanel(QWidget):
         edit_layout.addLayout(self._meta_edit_layout)
 
         row_notes = QHBoxLayout()
-        row_notes.addWidget(QLabel("备注:"))
+        row_notes.addWidget(QLabel(tr("备注:")))
         self._notes_edit = QLineEdit()
         row_notes.addWidget(self._notes_edit)
         edit_layout.addLayout(row_notes)
 
         btn_layout = QHBoxLayout()
-        self._save_btn = QPushButton("保存")
+        self._save_btn = QPushButton(tr("保存"))
         self._save_btn.setEnabled(False)
         btn_layout.addWidget(self._save_btn)
-        self._delete_btn = QPushButton("删除")
+        self._delete_btn = QPushButton(tr("删除"))
         self._delete_btn.setEnabled(False)
         btn_layout.addWidget(self._delete_btn)
         btn_layout.addStretch()
@@ -262,22 +264,22 @@ class BrowserPanel(QWidget):
         right_layout.addWidget(edit_group)
 
         # 批量编辑区（默认隐藏）
-        self._batch_group = QGroupBox("批量设置")
+        self._batch_group = QGroupBox(tr("批量设置"))
         batch_edit_layout = QVBoxLayout(self._batch_group)
 
-        batch_hint = QLabel("已填写的字段将应用到所有选中项")
+        batch_hint = QLabel(tr("已填写的字段将应用到所有选中项"))
         batch_hint.setStyleSheet("color: gray; font-size: 11px;")
         batch_edit_layout.addWidget(batch_hint)
 
         brow1 = QHBoxLayout()
-        brow1.addWidget(QLabel("名称:"))
+        brow1.addWidget(QLabel(tr("名称:")))
         self._batch_label_edit = QLineEdit()
-        self._batch_label_edit.setPlaceholderText("留空则不修改")
+        self._batch_label_edit.setPlaceholderText(tr("留空则不修改"))
         brow1.addWidget(self._batch_label_edit)
         batch_edit_layout.addLayout(brow1)
 
         brow_group = QHBoxLayout()
-        brow_group.addWidget(QLabel("分组:"))
+        brow_group.addWidget(QLabel(tr("分组:")))
         self._batch_group_edit = QComboBox()
         self._batch_group_edit.setEditable(True)
         brow_group.addWidget(self._batch_group_edit, 1)
@@ -288,11 +290,11 @@ class BrowserPanel(QWidget):
         self._batch_meta_layout.setContentsMargins(0, 0, 0, 0)
         batch_edit_layout.addLayout(self._batch_meta_layout)
 
-        self._batch_apply_btn = QPushButton("应用设置")
+        self._batch_apply_btn = QPushButton(tr("应用设置"))
         self._batch_apply_btn.setEnabled(False)
         batch_edit_layout.addWidget(self._batch_apply_btn)
 
-        self._batch_delete_btn = QPushButton("全部删除")
+        self._batch_delete_btn = QPushButton(tr("全部删除"))
         self._batch_delete_btn.setEnabled(False)
         self._batch_delete_btn.setStyleSheet("color: #d32f2f;")
         batch_edit_layout.addWidget(self._batch_delete_btn)
@@ -365,7 +367,7 @@ class BrowserPanel(QWidget):
             brow = QHBoxLayout()
             brow.addWidget(QLabel(f"{field.name}:"))
             bedit = QLineEdit()
-            bedit.setPlaceholderText("留空则不修改")
+            bedit.setPlaceholderText(tr("留空则不修改"))
             brow.addWidget(bedit)
             self._batch_meta_layout.addLayout(brow)
             self._batch_meta_edits[field.key] = bedit
@@ -391,8 +393,8 @@ class BrowserPanel(QWidget):
             cur = combo.currentData()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem("全部", None)
-            combo.addItem("未填写", _UNSET)
+            combo.addItem(tr("全部"), None)
+            combo.addItem(tr("未填写"), _UNSET)
             for v in self._db.get_meta_options(field):
                 combo.addItem(v, v)
             idx = combo.findData(cur)
@@ -409,7 +411,7 @@ class BrowserPanel(QWidget):
         cur = self._group_filter.currentData()
         self._group_filter.blockSignals(True)
         self._group_filter.clear()
-        self._group_filter.addItem("全部", "")
+        self._group_filter.addItem(tr("全部"), "")
         for g in groups:
             self._group_filter.addItem(g, g)
         idx = self._group_filter.findData(cur)
@@ -538,8 +540,8 @@ class BrowserPanel(QWidget):
 
         self._group_filter.blockSignals(True)
         self._group_filter.clear()
-        self._group_filter.addItem("全部", "")
-        self._group_filter.addItem("- 未分组 -", "ungrouped")
+        self._group_filter.addItem(tr("全部"), "")
+        self._group_filter.addItem(tr("- 未分组 -"), "ungrouped")
         for g in self._db.get_groups():
             self._group_filter.addItem(g, g)
         idx = self._group_filter.findData(cur_group)
@@ -549,8 +551,8 @@ class BrowserPanel(QWidget):
 
         self._label_filter.blockSignals(True)
         self._label_filter.clear()
-        self._label_filter.addItem("全部", "")
-        self._label_filter.addItem("- 未命名 -", "unnamed")
+        self._label_filter.addItem(tr("全部"), "")
+        self._label_filter.addItem(tr("- 未命名 -"), "unnamed")
         for t in self._db.get_labels():
             self._label_filter.addItem(t, t)
         idx = self._label_filter.findData(cur_label)
@@ -628,7 +630,7 @@ class BrowserPanel(QWidget):
         self._batch_mode_ref[0] = checked
         if checked:
             self._checked_items.clear()
-            self._batch_btn.setText("退出批量")
+            self._batch_btn.setText(tr("退出批量"))
             self._batch_btn.setStyleSheet(
                 "QPushButton { background-color: #1976d2; color: white; }"
                 "QPushButton:hover { background-color: #1565c0; }"
@@ -637,7 +639,7 @@ class BrowserPanel(QWidget):
             self._update_batch_buttons()
         else:
             self._checked_items.clear()
-            self._batch_btn.setText("批量管理")
+            self._batch_btn.setText(tr("批量管理"))
             self._batch_btn.setStyleSheet("")  # 恢复默认样式
             self._list.clearSelection()
             self._update_batch_buttons()
@@ -706,7 +708,7 @@ class BrowserPanel(QWidget):
         self._db.remove_entry(filename)
         self._save_btn.setEnabled(False)
         self._delete_btn.setEnabled(False)
-        self._file_label.setText("未选择")
+        self._file_label.setText(tr("未选择"))
         self.data_changed.emit()  # 通知数据变动
         self.refresh()
 
@@ -776,7 +778,7 @@ class BrowserPanel(QWidget):
         from PyQt6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
             self,
-            "确认删除",
+            tr("确认删除"),
             f"确定要删除已勾选的 {len(checked)} 个参考图吗？\n此操作不可撤销。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,

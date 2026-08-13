@@ -28,14 +28,14 @@ _QUALITY_COLORS = {
 # part_label 为已装备时第一行展示的部位名（武器不区分主副）
 _SLOT_LAYOUT = [
     # (row, col, slot_key, display_name, part_label)
-    (0, 0, "main_weapon", "主武器", "武器"),
-    (0, 1, "sub_weapon", "副武器", "武器"),
-    (0, 2, "head", "冠胄", "冠胄"),
-    (0, 3, "chest", "胸甲", "胸甲"),
-    (1, 0, "ring", "环", "环"),
-    (1, 1, "pendant", "佩", "佩"),
-    (1, 2, "leg", "胫甲", "胫甲"),
-    (1, 3, "wrist", "腕甲", "腕甲"),
+    (0, 0, "main_weapon", tr("主武器"), tr("武器")),
+    (0, 1, "sub_weapon", tr("副武器"), tr("武器")),
+    (0, 2, "head", tr("冠胄"), "冠胄"),
+    (0, 3, "chest", tr("胸甲"), "胸甲"),
+    (1, 0, "ring", tr("环"), "环"),
+    (1, 1, "pendant", tr("佩"), "佩"),
+    (1, 2, "leg", tr("胫甲"), "胫甲"),
+    (1, 3, "wrist", tr("腕甲"), "腕甲"),
 ]
 
 
@@ -116,7 +116,7 @@ class _EquipCard(QFrame):
         color = _QUALITY_COLORS.get(quality, "#888888")
 
         # 第一行：部位 · 装备名（武器不区分主副），按品质着色
-        name = equip_data.get("name", "未知")
+        name = equip_data.get("name", tr("未知"))
         self.lbl_slot.setText(f"{self._part_label} · {name}")
         self.lbl_slot.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {color};")
 

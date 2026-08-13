@@ -9,6 +9,7 @@ from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QInputDialog, QMenu
 
 from ...core.layout_models import CanvasConfig, Panel, Region
+from ...i18n import tr
 from .canvas_coords import CanvasCoordMixin
 
 # ─── 枚举定义 ────────────────────────────────────────────
@@ -762,7 +763,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         logger.debug(f"区域选择: current_regions={self._current_regions}, available={available}")
 
         if not available:
-            msg = "当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）"
+            msg = tr("当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）")
             logger.warning(msg)
             self._notify_status(msg)
             self._regions.pop(region_idx)
@@ -773,8 +774,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
         items = [f"{name} ({key})" for key, name in available]
         dlg = QInputDialog(self.window())
-        dlg.setWindowTitle("选择字段")
-        dlg.setLabelText("为该区域绑定哪个字段？")
+        dlg.setWindowTitle(tr("选择字段"))
+        dlg.setLabelText(tr("为该区域绑定哪个字段？"))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(
             "QInputDialog { background-color: #f0f0f0; }"
@@ -808,8 +809,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction("复制")
-        delete_action = menu.addAction("删除")
+        copy_action = menu.addAction(tr("复制"))
+        delete_action = menu.addAction(tr("删除"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
         if action == copy_action:
             self._copy_selected_region()
@@ -847,8 +848,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction("复制 DSL 引用")
-        delete_action = menu.addAction("删除面板")
+        copy_action = menu.addAction(tr("复制 DSL 引用"))
+        delete_action = menu.addAction(tr("删除面板"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
         if action == copy_action:
             self._copy_panel_key()

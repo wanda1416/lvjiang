@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import QWidget
 
 from ...core.layout_models import CanvasConfig, Panel, Region
 from ...core.scene_registry import get_region_name
+from ...i18n import tr
 from .canvas_interaction import HANDLE_SIZE, CanvasInteractionMixin, EditMode, HandlePos
 from .canvas_poi import CanvasPoiMixin
 
@@ -518,7 +519,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         font = QFont("Microsoft YaHei", 12)
         painter.setFont(font)
         painter.setPen(QColor(150, 150, 150))
-        text = "无截图\n请连接投屏后点击「刷新截图」"
+        text = tr("无截图\n请连接投屏后点击「刷新截图」")
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, text)
         painter.restore()
 

@@ -26,6 +26,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, validate_crop
 
+from ...i18n import tr
+
 # 内置固定字段（只读展示，不可编辑/删除）
 # (显示名, key, filterable, type, sort_by)
 _BUILTIN_ROWS = [
@@ -83,13 +85,13 @@ class MetaSchemaPanel(QWidget):
 
         # 匹配度阈值配置（写入 references.yaml 的 match_threshold，随模式路由）
         threshold_row = QHBoxLayout()
-        threshold_row.addWidget(QLabel("匹配度阈值"))
+        threshold_row.addWidget(QLabel(tr("匹配度阈值")))
         self._threshold_spin = QDoubleSpinBox()
         self._threshold_spin.setRange(0.0, 1.0)
         self._threshold_spin.setSingleStep(0.01)
         self._threshold_spin.setDecimals(2)
         self._threshold_spin.setToolTip(
-            "图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格"
+            tr("图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格")
         )
         threshold_row.addWidget(self._threshold_spin)
         threshold_row.addStretch()
@@ -105,17 +107,17 @@ class MetaSchemaPanel(QWidget):
 
         # 工具栏（新增/删除作用于当前聚焦的表格）
         toolbar = QHBoxLayout()
-        self._add_btn = QPushButton("新增字段")
+        self._add_btn = QPushButton(tr("新增字段"))
         self._add_btn.clicked.connect(self._on_add_field)
         toolbar.addWidget(self._add_btn)
 
-        self._delete_btn = QPushButton("删除选中")
+        self._delete_btn = QPushButton(tr("删除选中"))
         self._delete_btn.clicked.connect(self._on_delete_field)
         toolbar.addWidget(self._delete_btn)
 
         toolbar.addStretch()
 
-        self._save_btn = QPushButton("保存")
+        self._save_btn = QPushButton(tr("保存"))
         self._save_btn.setStyleSheet(
             "QPushButton { background-color: #1976d2; color: white; }"
             "QPushButton:hover { background-color: #1565c0; }"
@@ -125,10 +127,10 @@ class MetaSchemaPanel(QWidget):
         layout.addLayout(toolbar)
 
         # ── 输入元数据表 ──
-        layout.addWidget(QLabel("输入元数据（用于筛选管理）"))
+        layout.addWidget(QLabel(tr("输入元数据（用于筛选管理）")))
         self._input_table = QTableWidget(0, 5)
         self._input_table.setHorizontalHeaderLabels(
-            ["显示名", "字段标识 (key)", "类型", "排序", "可筛选"]
+            [tr("显示名"), tr("字段标识 (key)"), tr("类型"), tr("排序"), tr("可筛选")]
         )
         header = self._input_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -140,10 +142,10 @@ class MetaSchemaPanel(QWidget):
         layout.addWidget(self._input_table)
 
         # ── 输出元数据表 ──
-        layout.addWidget(QLabel("输出元数据（识别时按区域 OCR）"))
+        layout.addWidget(QLabel(tr("输出元数据（识别时按区域 OCR）")))
         self._output_table = QTableWidget(0, 3)
         self._output_table.setHorizontalHeaderLabels(
-            ["显示名", "字段标识 (key)", "裁剪区域 (x, y, w, h)"]
+            [tr("显示名"), tr("字段标识 (key)"), tr("裁剪区域 (x, y, w, h)")]
         )
         out_header = self._output_table.horizontalHeader()
         out_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -186,7 +188,7 @@ class MetaSchemaPanel(QWidget):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 item.setForeground(Qt.GlobalColor.gray)
             name_item.setText(name)
-            name_item.setToolTip("内置字段，不可编辑或删除")
+            name_item.setToolTip(tr("内置字段，不可编辑或删除"))
         # 用 UserRole 标记是否内置
         name_item.setData(Qt.ItemDataRole.UserRole, builtin)
         self._input_table.setItem(row, 0, name_item)
@@ -229,7 +231,7 @@ class MetaSchemaPanel(QWidget):
         self._output_table.setItem(row, 0, QTableWidgetItem(name))
         self._output_table.setItem(row, 1, QTableWidgetItem(key))
         crop_item = QTableWidgetItem(crop_text)
-        crop_item.setToolTip("归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5")
+        crop_item.setToolTip(tr("归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5"))
         self._output_table.setItem(row, 2, crop_item)
 
     def _is_builtin_row(self, row: int) -> bool:
@@ -277,7 +279,7 @@ class MetaSchemaPanel(QWidget):
         if row < 0:
             return
         if table is self._input_table and self._is_builtin_row(row):
-            QMessageBox.information(self, "提示", "内置字段不可删除")
+            QMessageBox.information(self, tr("提示"), tr("内置字段不可删除"))
             return
         table.removeRow(row)
 
@@ -311,7 +313,7 @@ class MetaSchemaPanel(QWidget):
                    if self._input_table.item(row, 1) else "").strip()
             error = _check_key(name, key, f"输入元数据第 {row + 1} 行")
             if error:
-                QMessageBox.warning(self, "校验失败", error)
+                QMessageBox.warning(self, tr("校验失败"), error)
                 return None
             seen_keys.add(key)
             check = self._input_row_checkbox(row)
@@ -333,12 +335,12 @@ class MetaSchemaPanel(QWidget):
                          if self._output_table.item(row, 2) else "").strip()
             error = _check_key(name, key, f"输出元数据第 {row + 1} 行")
             if error:
-                QMessageBox.warning(self, "校验失败", error)
+                QMessageBox.warning(self, tr("校验失败"), error)
                 return None
             crop = parse_crop(crop_text)
             if crop is None:
                 QMessageBox.warning(
-                    self, "校验失败",
+                    self, tr("校验失败"),
                     f"输出字段 “{key}” 的裁剪区域非法：需 4 个 0~1 数值 "
                     f"(x, y, w, h)，且 x+w≤1、y+h≤1"
                 )
@@ -356,4 +358,4 @@ class MetaSchemaPanel(QWidget):
         self._db.set_match_threshold(self._threshold_spin.value())
         self._db.set_meta_schema(schema)
         self.schema_changed.emit()
-        QMessageBox.information(self, "已保存", "元数据字段定义已保存")
+        QMessageBox.information(self, tr("已保存"), tr("元数据字段定义已保存"))

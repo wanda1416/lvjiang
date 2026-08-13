@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from .....i18n import tr
 from .models import (
     BEHAVIOR_STAGE_ACTIONS,
     COND_KINDS,
@@ -211,7 +212,7 @@ def _parse_common(raw, vocab: set[str]) -> CommonConditions:
     if raw is None:
         return CommonConditions()
     if not isinstance(raw, dict):
-        raise RuleValidationError("common_conditions 必须是 dict")
+        raise RuleValidationError(tr("common_conditions 必须是 dict"))
     unknown = set(raw) - set(TIER_KEYS)
     if unknown:
         raise RuleValidationError(
@@ -264,11 +265,11 @@ def parse_tuning_rule(data: dict,
     传入时校验全部条件组 when 引用；None 跳过（单测/离线解析）。
     """
     if not isinstance(data, dict):
-        raise RuleValidationError("规则文件顶层必须是 dict")
+        raise RuleValidationError(tr("规则文件顶层必须是 dict"))
     key = data.get("key")
     name = data.get("name")
     if not key or not name:
-        raise RuleValidationError("缺少必填字段 key/name")
+        raise RuleValidationError(tr("缺少必填字段 key/name"))
     legacy = [k for k in _LEGACY_KEYS if k in data]
     if legacy:
         raise RuleValidationError(
@@ -283,14 +284,14 @@ def parse_tuning_rule(data: dict,
 
     vocab = set(rule_affix_candidates())
     if not vocab:
-        raise RuleValidationError("规则可引用词表为空（attributes.yaml 异常）")
+        raise RuleValidationError(tr("规则可引用词表为空（attributes.yaml 异常）"))
     attr_vocab = set(standard_playstyle_attrs())
 
     playstyles: dict[str, Playstyle] = {}
     for w_name, w_raw in (data.get("playstyles") or {}).items():
         w_name = str(w_name).strip()
         if not w_name:
-            raise RuleValidationError("playstyles: 名字不能为空")
+            raise RuleValidationError(tr("playstyles: 名字不能为空"))
         if w_name in playstyles:
             raise RuleValidationError(
                 f"playstyles: 名字重复: {w_name}")
@@ -309,7 +310,7 @@ def parse_tuning_rule(data: dict,
             elif not _KEY_RE.match(ps_switch):
                 raise RuleValidationError(
                     f"playstyles.{w_name}.switch: 开关 key 非法: {ps_switch!r}"
-                    "（须为小写字母开头的英文/数字/下划线）")
+                    + tr("（须为小写字母开头的英文/数字/下划线）"))
         playstyles[w_name] = Playstyle(
             name=w_name,
             main=_parse_weapon_side(
@@ -465,7 +466,7 @@ def _parse_behavior_rule(raw, where: str,
         raise RuleValidationError(f"{where} 必须是 dict")
     raw_parts = raw.get("parts") or []
     # 支持特殊值 "全部" 展开为所有部位
-    if raw_parts == ["全部"]:
+    if raw_parts == [tr("全部")]:
         parts = list(QUALITY_PARTS)
     else:
         parts = list(raw_parts)
@@ -593,7 +594,7 @@ def _parse_judge(raw: dict, where: str) -> tuple[str, list[str]]:
             if not _KEY_RE.match(k):
                 raise RuleValidationError(
                     f"{where}.judge_rules: 规则 key 非法: {k!r}"
-                    "（须为小写字母开头的英文/数字/下划线）")
+                    + tr("（须为小写字母开头的英文/数字/下划线）"))
             keys.append(k)
     else:
         raise RuleValidationError(f"{where}.judge_rules 必须是 list")
@@ -688,7 +689,7 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
     if exhausted not in ("recycle", "skip"):
         raise RuleValidationError(
             f"{where}.reset_exhausted_action 非法: {exhausted!r}"
-            "（须为 ['recycle', 'skip']）")
+            + tr("（须为 ['recycle', 'skip']）"))
     return TuneBehavior(
         enabled=bool(raw.get("enabled", False)),
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
@@ -703,7 +704,7 @@ def parse_tuning_group(data: dict) -> TuningGroup:
     """原始 base_groups/*.yaml dict → TuningGroup（校验失败抛
     RuleValidationError）"""
     if not isinstance(data, dict):
-        raise RuleValidationError("基础规则组顶层必须是 dict")
+        raise RuleValidationError(tr("基础规则组顶层必须是 dict"))
 
     # ── key（小写英文标识，作文件名）──
     key = str(data.get("key") or "").strip()
@@ -714,7 +715,7 @@ def parse_tuning_group(data: dict) -> TuningGroup:
     # ── name ──
     name = str(data.get("name") or "").strip()
     if not name:
-        raise RuleValidationError("规则组 name 不能为空")
+        raise RuleValidationError(tr("规则组 name 不能为空"))
 
     return TuningGroup(
         key=key,
@@ -732,10 +733,10 @@ def parse_tune_config(data: dict) -> TuneConfig:
     承载：base_rules（基础规则组声明）+ quality_thresholds + switches。
     """
     if not isinstance(data, dict):
-        raise RuleValidationError("tune_config 顶层必须是 dict")
+        raise RuleValidationError(tr("tune_config 顶层必须是 dict"))
     if "pvp" in data:
         raise RuleValidationError(
-            "pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when")
+            tr("pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when"))
     if "recycle" in data:
         raise RuleValidationError(
             "recycle 段已废弃，请改用 behavior 行为配置"
@@ -749,7 +750,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
     # ── base_rules（基础规则组声明）──
     raw_base_rules = data.get("base_rules") or []
     if not isinstance(raw_base_rules, list):
-        raise RuleValidationError("base_rules 必须是 list")
+        raise RuleValidationError(tr("base_rules 必须是 list"))
     base_rules: list[str] = []
     for item in raw_base_rules:
         key = str(item).strip()
@@ -769,7 +770,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
     # ── switches（开关注册表：key → {name}）──
     raw_switches = data.get("switches") or {}
     if not isinstance(raw_switches, dict):
-        raise RuleValidationError("switches 必须是 dict")
+        raise RuleValidationError(tr("switches 必须是 dict"))
     switches: dict[str, str] = {}
     for k, spec in raw_switches.items():
         k = str(k).strip()
@@ -795,7 +796,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
 def _parse_tuning_rules(raw) -> dict[str, bool]:
     """解析 tuning_rules 段：有序 dict，key → 是否启用"""
     if not isinstance(raw, dict):
-        raise RuleValidationError("tuning_rules 必须是 dict")
+        raise RuleValidationError(tr("tuning_rules 必须是 dict"))
     result: dict[str, bool] = {}
     for k, v in raw.items():
         k = str(k).strip()

@@ -38,10 +38,10 @@ from .condition_editor import ConditionGroupsEditor
 
 # 四档条件：(YAML 键, Tab 标题)，判定顺序即列表顺序
 _TIERS: list[tuple[str, str]] = [
-    ("junk_conditions", "垃圾"),
-    ("normal_conditions", "一般"),
-    ("excellent_conditions", "优秀"),
-    ("top_conditions", "顶级"),
+    ("junk_conditions", tr("垃圾")),
+    ("normal_conditions", tr("一般")),
+    ("excellent_conditions", tr("优秀")),
+    ("top_conditions", tr("顶级")),
 ]  # runtime tr()
 
 # 档位标头配色（浅色背景可见，与品质/词条分级配色一致）

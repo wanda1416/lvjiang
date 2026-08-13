@@ -8,6 +8,8 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+from .....i18n import tr
+
 
 def _get_username(_engine) -> str:
     """从引擎获取当前用户名"""
@@ -61,7 +63,7 @@ def _profile_set(_engine, key: str, value, *args) -> float:
 
     from ...profile.profile_ops import profile_action
     username = _get_username(_engine)
-    return profile_action(username, key, set_value=value_num, source="DSL 写入")
+    return profile_action(username, key, set_value=value_num, source=tr("DSL 写入"))
 
 
 @builtin_func("profile_inc")
@@ -92,7 +94,7 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
 
     from ...profile.profile_ops import profile_action
     username = _get_username(_engine)
-    return profile_action(username, key, delta=delta_num, source="DSL 写入")
+    return profile_action(username, key, delta=delta_num, source=tr("DSL 写入"))
 
 
 @builtin_func("profile_model")

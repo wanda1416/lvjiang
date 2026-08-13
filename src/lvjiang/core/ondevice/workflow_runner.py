@@ -25,6 +25,7 @@ from ...core.config.session import get_session_store
 from ...core.input_base import InputBackend
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
+from ...i18n import tr
 from ...workflows.engine import WorkflowEngine
 from .capture import A11yCapture
 from .input import A11yInput
@@ -60,7 +61,7 @@ def _default_layout_name() -> str:
     names = sorted(merged.get("layouts", {}).keys())
     if names:
         return names[0]
-    raise RuntimeError("没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空")
+    raise RuntimeError(tr("没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空"))
 
 
 def _load_layout(name: str) -> Layout:

@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
+from ..i18n import tr
+
 if TYPE_CHECKING:
     from pynput.keyboard import GlobalHotKeys
 
@@ -104,14 +106,14 @@ def native_confirm(text: str) -> bool:
     """平台原生确认弹窗（是/否），返回 bool"""
     if IS_WINDOWS:
         import ctypes
-        result = ctypes.windll.user32.MessageBoxW(0, text, "工作流确认", 4 | 32)
+        result = ctypes.windll.user32.MessageBoxW(0, text, tr("工作流确认"), 4 | 32)
         return result == 6
     if IS_MACOS:
         out = _osascript(
             f'display dialog {_osa_quote(text)} with title "工作流确认" '
             'buttons {"否", "是"} default button "是"'
         )
-        return out.endswith("是")
+        return out.endswith(tr("是"))
     logger.warning(f"confirm(): 当前平台无原生弹窗回退，默认返回 false: {text}")
     return False
 
@@ -120,7 +122,7 @@ def native_pause(text: str) -> None:
     """平台原生阻塞弹窗（确定后返回）"""
     if IS_WINDOWS:
         import ctypes
-        ctypes.windll.user32.MessageBoxW(0, text, "工作流暂停", 0x40)
+        ctypes.windll.user32.MessageBoxW(0, text, tr("工作流暂停"), 0x40)
         return
     if IS_MACOS:
         _osascript(
@@ -151,7 +153,7 @@ def native_notify(text: str) -> None:
             # MessageBoxTimeoutW(hwnd, text, caption, type, wLanguageId, dwMilliseconds)
             # 未文档化但自 Win2000 起稳定导出；wLanguageId=0 表示默认语言
             ctypes.windll.user32.MessageBoxTimeoutW(
-                0, text, "工作流通知", 0x40, 0, 5000
+                0, text, tr("工作流通知"), 0x40, 0, 5000
             )
         except Exception as e:
             logger.warning(f"notify 弹窗失败: {e}")

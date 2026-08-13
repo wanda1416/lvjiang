@@ -16,6 +16,7 @@ from PyQt6.QtGui import QBrush, QColor, QCursor, QFont, QPainter, QPen, QPolygon
 from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 
 from ...core.layout_models import Arrow, Point
+from ...i18n import tr
 
 # ─── 常量 ────────────────────────────────────────────────
 
@@ -252,8 +253,8 @@ class CanvasPoiMixin:
     def delete_point_by_key(self, key: str) -> bool:
         """删除 point；被 arrow 引用时拒绝并返回 False"""
         if self._point_referenced_by_arrow(key):
-            QMessageBox.warning(self.window(), "无法删除",
-                                "该坐标被方向引用，请先删除关联的方向。")
+            QMessageBox.warning(self.window(), tr("无法删除"),
+                                tr("该坐标被方向引用，请先删除关联的方向。"))
             return False
         self._points = [p for p in self._points if p.key != key]
         self._selected_point_idx = -1
@@ -294,8 +295,8 @@ class CanvasPoiMixin:
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction("复制")
-        del_action = menu.addAction("删除")
+        copy_action = menu.addAction(tr("复制"))
+        del_action = menu.addAction(tr("删除"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
         if action == copy_action:
             self._copy_selected_point()
@@ -311,13 +312,13 @@ class CanvasPoiMixin:
         placed = {p.key for p in self._points}
         available = [(k, n) for k, n in self._current_points if k not in placed]
         if not available:
-            QMessageBox.information(self.window(), "无可用坐标",
-                                    "该场景所有 YAML 坐标点都已放置，无法再复制新坐标。")
+            QMessageBox.information(self.window(), tr("无可用坐标"),
+                                    tr("该场景所有 YAML 坐标点都已放置，无法再复制新坐标。"))
             return
         items = [f"{n} ({k})" for k, n in available]
         dlg = QInputDialog(self.window())
-        dlg.setWindowTitle("复制坐标")
-        dlg.setLabelText("新坐标绑定哪个坐标点？（沿用源半径）：")
+        dlg.setWindowTitle(tr("复制坐标"))
+        dlg.setLabelText(tr("新坐标绑定哪个坐标点？（沿用源半径）："))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(
             "QInputDialog { background-color: #f0f0f0; }"
@@ -643,8 +644,8 @@ class CanvasPoiMixin:
         existing = {a.key for a in self._arrows}
         while True:
             dlg = QInputDialog(self.window())
-            dlg.setWindowTitle("命名方向")
-            dlg.setLabelText("输入方向 key（小写字母开头，可含数字/下划线）：")
+            dlg.setWindowTitle(tr("命名方向"))
+            dlg.setLabelText(tr("输入方向 key（小写字母开头，可含数字/下划线）："))
             dlg.setTextValue("")
             dlg.setStyleSheet(
                 "QInputDialog { background-color: #f0f0f0; }"
@@ -657,11 +658,11 @@ class CanvasPoiMixin:
                 return ""
             key = dlg.textValue().strip()
             if not _RE_ARROW_KEY.match(key):
-                QMessageBox.warning(self.window(), "命名非法",
-                                    "key 必须以小写字母开头，仅含小写字母/数字/下划线。")
+                QMessageBox.warning(self.window(), tr("命名非法"),
+                                    tr("key 必须以小写字母开头，仅含小写字母/数字/下划线。"))
                 continue
             if key in existing:
-                QMessageBox.warning(self.window(), "key 重复",
+                QMessageBox.warning(self.window(), tr("key 重复"),
                                     f"方向 key「{key}」已存在，请换一个。")
                 continue
             return key

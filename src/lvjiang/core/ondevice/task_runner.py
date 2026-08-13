@@ -23,6 +23,8 @@ import traceback
 from collections import deque
 from typing import Any
 
+from ...i18n import tr
+
 #: 状态机取值。running 之外都是终态，可直接再起下一个任务。
 STATE_IDLE = "idle"
 STATE_RUNNING = "running"
@@ -222,7 +224,7 @@ def start_task(task_id: str, initial_variables: str = "") -> str:
     try:
         variables = json.loads(initial_variables) if initial_variables else None
         if variables is not None and not isinstance(variables, dict):
-            raise ValueError("initial_variables 必须是 JSON 对象")
+            raise ValueError(tr("initial_variables 必须是 JSON 对象"))
     except Exception as e:
         return json.dumps(
             {"ok": False, "message": f"初始变量解析失败: {e}"}, ensure_ascii=False
@@ -286,7 +288,7 @@ def _resolve_task(task_id: str) -> dict:
     for item in discover_scripts():
         if item["id"] == task_id:
             return item
-    available = ", ".join(item["id"] for item in discover_scripts()) or "（空）"
+    available = ", ".join(item["id"] for item in discover_scripts()) or tr("（空）")
     raise ValueError(f"未找到任务 {task_id!r}，可选：{available}")
 
 

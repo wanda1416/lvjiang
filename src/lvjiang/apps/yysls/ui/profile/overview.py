@@ -218,7 +218,7 @@ class ProfileOverviewTab(QWidget):
 
         groups = get_groups()
         if not groups:
-            groups = {"默认": {"columns": []}}
+            groups = {tr("默认"): {"columns": []}}
             save_groups(groups)
 
         active_group = get_active_group()
@@ -307,7 +307,7 @@ class ProfileOverviewTab(QWidget):
 
         # 第一列是角色名，后面是数据列
         col_count = len(key_defs) + 1
-        headers = ["角色名"] + [kd.label for kd in key_defs]
+        headers = [tr("角色名")] + [kd.label for kd in key_defs]
 
         users_data = self._load_all_users()
 
@@ -504,13 +504,13 @@ class ProfileOverviewTab(QWidget):
         menu = QMenu(self)
 
         if logical_index == 0:
-            menu.addAction("角色名列（不可删除）")
-            menu.addAction("右侧新增列", lambda: self._add_column(group_name, 0))
+            menu.addAction(tr("角色名列（不可删除）"))
+            menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, 0))
         else:
             # 数据列索引需要减 1（跳过角色名列）
             data_index = logical_index - 1
-            menu.addAction("右侧新增列", lambda: self._add_column(group_name, data_index))
-            menu.addAction("删除当前列", lambda: self._remove_column(group_name, data_index))
+            menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, data_index))
+            menu.addAction(tr("删除当前列"), lambda: self._remove_column(group_name, data_index))
 
         menu.exec(h_header.mapToGlobal(pos))
 
@@ -1282,7 +1282,7 @@ def _parse_value(raw: str, model_type: str, kd: KeyDef):
         try:
             return float(raw) if raw else 0.0
         except ValueError:
-            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
+            QMessageBox.warning(None, tr("输入错误"), f"{kd.label} 必须是数字")
             return _PARSE_ERROR
 
     if model_type == MODEL_QUOTA:
@@ -1295,9 +1295,9 @@ def _parse_value(raw: str, model_type: str, kd: KeyDef):
                 return _PARSE_ERROR
         # 无 cap 的 quota 可能是 bool
         upper = raw.upper()
-        if upper in ("Y", "TRUE", "1", "是", "YES"):
+        if upper in ("Y", "TRUE", "1", tr("是"), "YES"):
             return True
-        if upper in ("", "N", "FALSE", "0", "否", "NO"):
+        if upper in ("", "N", "FALSE", "0", tr("否"), "NO"):
             return False
         try:
             return int(raw)

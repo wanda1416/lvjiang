@@ -42,6 +42,7 @@ from __future__ import annotations
 
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 
+from ....i18n import tr
 from .base import JudgeResult, Rating, TuningJudge, part_label
 from .tuning_rules import (
     DYNAMIC_AFFIXES,
@@ -64,7 +65,7 @@ _RATING_BY_KEY = {"junk": Rating.JUNK, "normal": Rating.NORMAL,
                   "excellent": Rating.EXCELLENT, "top": Rating.TOP}
 
 # 武器部位 key（不做属攻→动态词条归类）
-_WEAPON_PARTS = ("主武器", "副武器")
+_WEAPON_PARTS = (tr("主武器"), tr("副武器"))
 
 
 def _group_text(group: ConditionGroup) -> str:
@@ -108,7 +109,7 @@ class GenericTuningJudge(TuningJudge):
         # 品阶筛选（quality 未识别时跳过此步继续判定）
         pre_reasons: list[str] = []
         if equip.quality is None:
-            pre_reasons.append("品阶未识别，跳过品阶筛选")
+            pre_reasons.append(tr("品阶未识别，跳过品阶筛选"))
         elif not get_tune_config().quality_ok(
                 equip.part, equip.quality, self.rule.quality_thresholds):
             result.skipped = True
@@ -117,7 +118,7 @@ class GenericTuningJudge(TuningJudge):
 
         if not equip.affixes:
             result.skipped = True
-            result.reasons.append("无词条数据")
+            result.reasons.append(tr("无词条数据"))
             return result
 
         n_free = (5 - len(equip.affixes)) if partial else 0
@@ -272,7 +273,7 @@ class GenericTuningJudge(TuningJudge):
             # 动态词条不在游戏配置部位表中（缺省会误判全部位），
             # 仅非武器部位可作填充/转入候选
             if name in DYNAMIC_AFFIXES:
-                return part != "武器"
+                return part != tr("武器")
             return part in gc.get_affix_parts(name)
 
         def ids(name: str) -> set[str]:
@@ -373,21 +374,21 @@ class GenericTuningJudge(TuningJudge):
               玩法绑定开关 key 或 None), ...]
         """
         combos: list[tuple[str, str, str | None, str, str | None]] = []
-        if equip.part == "武器":
+        if equip.part == tr("武器"):
             weapon = equip.weapon or ""
             for name in self._enabled_playstyles():
                 ps = self.rule.playstyles[name]
                 if weapon == ps.main.weapon:
                     combos.append(
-                        (f"{name} 主武器", "主武器", ps.main.damage,
+                        (f"{name} 主武器", tr("主武器"), ps.main.damage,
                          ps.attr, ps.switch))
                 if weapon == ps.sub.weapon:
                     combos.append(
-                        (f"{name} 副武器", "副武器", ps.sub.damage,
+                        (f"{name} 副武器", tr("副武器"), ps.sub.damage,
                          ps.attr, ps.switch))
         else:
             part = PART_ALIAS.get(equip.part, equip.part)
-            if part in ("环", "冠胄", "胫甲"):
+            if part in (tr("环"), tr("冠胄"), tr("胫甲")):
                 for name in self._enabled_playstyles():
                     ps = self.rule.playstyles[name]
                     combos.append(

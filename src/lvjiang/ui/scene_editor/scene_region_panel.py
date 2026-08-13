@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 from ...core.layout_manager import rename_item_key_across_all_layouts
 from ...core.scene_definition import VALID_REGION_TYPES, RegionDef
 from ...core.scene_registry import get_registry, is_view_visible, sync_scene_cache
+from ...i18n import tr
 from ..widgets import strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
@@ -46,7 +47,7 @@ class RegionPanelMixin:
         layout = QVBoxLayout(panel)
         self._region_table = QTableWidget()
         self._region_table.setColumnCount(5)
-        self._region_table.setHorizontalHeaderLabels(["名称", "Key", "类型", "含文本", "可点击"])
+        self._region_table.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击")])
         # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._region_table.horizontalHeader()
         assert header is not None
@@ -69,10 +70,10 @@ class RegionPanelMixin:
         layout.addWidget(self._region_table)
 
         btn_row = QHBoxLayout()
-        self._btn_new_region = QPushButton("+ 创建区域")
+        self._btn_new_region = QPushButton(tr("+ 创建区域"))
         self._btn_new_region.clicked.connect(self._on_new_region)
         btn_row.addWidget(self._btn_new_region)
-        self._btn_del_region = QPushButton("删除区域")
+        self._btn_del_region = QPushButton(tr("删除区域"))
         self._btn_del_region.clicked.connect(self._on_delete_region)
         self._btn_del_region.setEnabled(False)
         btn_row.addWidget(self._btn_del_region)
@@ -175,7 +176,7 @@ class RegionPanelMixin:
                     # key 不变：只更新其他属性
                     registry.update_region_in_scene(self._scene_key, old_key, new_def)
             except ValueError as e:
-                QMessageBox.warning(self, "更新失败", str(e))
+                QMessageBox.warning(self, tr("更新失败"), str(e))
                 return
             sync_scene_cache(self._scene_key)
             self._refresh_lists()
@@ -186,7 +187,7 @@ class RegionPanelMixin:
         try:
             registry.add_region_to_scene(target_scene, new_def)
         except ValueError as e:
-            QMessageBox.warning(self, "迁移失败", str(e))
+            QMessageBox.warning(self, tr("迁移失败"), str(e))
             return
         registry.remove_region_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
@@ -222,7 +223,7 @@ class RegionPanelMixin:
         try:
             registry.add_region_to_scene(self._scene_key, region_def)
         except ValueError as e:
-            QMessageBox.warning(self, "创建失败", str(e))
+            QMessageBox.warning(self, tr("创建失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -241,7 +242,7 @@ class RegionPanelMixin:
         if region_def is None:
             return
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, tr("确认删除"),
             f"确定要从场景定义中删除区域「{region_def.name}」({region_def.key}) 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -250,7 +251,7 @@ class RegionPanelMixin:
         try:
             registry.remove_region_from_scene(self._scene_key, region_def.key)
         except ValueError as e:
-            QMessageBox.warning(self, "删除失败", str(e))
+            QMessageBox.warning(self, tr("删除失败"), str(e))
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
@@ -263,11 +264,11 @@ class RegionPanelMixin:
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
         """
         dialog = QDialog(self)  # type: ignore[arg-type]
-        dialog.setWindowTitle("新建区域" if region_def is None else "编辑区域")
+        dialog.setWindowTitle(tr("新建区域") if region_def is None else tr("编辑区域"))
         form = QFormLayout(dialog)
 
         key_edit = QLineEdit()
-        key_edit.setPlaceholderText("英文，如 my_region")
+        key_edit.setPlaceholderText(tr("英文，如 my_region"))
         if region_def:
             key_edit.setText(region_def.key)
             # 允许编辑 key，但需要校验唯一性
@@ -278,25 +279,25 @@ class RegionPanelMixin:
         form.addRow("", error_label)
 
         name_edit = QLineEdit()
-        name_edit.setPlaceholderText("中文名称")
+        name_edit.setPlaceholderText(tr("中文名称"))
         if region_def:
             name_edit.setText(region_def.name)
-        form.addRow("名称:", name_edit)
+        form.addRow(tr("名称:"), name_edit)
 
         type_combo = QComboBox()
         type_combo.addItems(sorted(VALID_REGION_TYPES))
         if region_def:
             type_combo.setCurrentText(region_def.type)
-        form.addRow("类型:", type_combo)
+        form.addRow(tr("类型:"), type_combo)
 
-        is_text_check = QCheckBox("含文本")
+        is_text_check = QCheckBox(tr("含文本"))
         if region_def:
             is_text_check.setChecked(region_def.is_text)
         else:
             is_text_check.setChecked(True)
         form.addRow(is_text_check)
 
-        is_clickable_check = QCheckBox("可点击")
+        is_clickable_check = QCheckBox(tr("可点击"))
         if region_def:
             is_clickable_check.setChecked(region_def.is_clickable)
         form.addRow(is_clickable_check)

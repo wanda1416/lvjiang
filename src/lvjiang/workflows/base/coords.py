@@ -8,6 +8,7 @@ import math
 import random
 
 from ...core.layout_models import Point, Region
+from ...i18n import tr
 
 
 class _CoordMixin:
@@ -17,7 +18,7 @@ class _CoordMixin:
         """取截屏尺寸，拿不到就抛错"""
         size = self._capture.get_capture_size()
         if size == (0, 0):
-            raise ValueError("无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）")
+            raise ValueError(tr("无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）"))
         return size
 
     def _region_to_screen(self, region: Region, jitter: bool = True) -> tuple[int, int]:

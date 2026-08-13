@@ -8,6 +8,8 @@ UI 新增武器后需重启方可参与识别）。
 
 import re
 
+from ....i18n import tr
+
 # ─── 部位分类（旧，仅 parser 内部用于 base_attr 分派） ────
 
 WEAPON_SLOTS = {"main_weapon", "sub_weapon"}
@@ -86,8 +88,8 @@ WEAPON_TYPES, AFFIX_NAMES, PERCENT_AFFIXES = _load_config()
 # ─── 装备类型分类（type-based，替代 slot-based） ────────────
 
 WEAPON_TYPES_SET: set[str] = set(WEAPON_TYPES)
-JEWELRY_TYPES_SET: set[str] = {"环", "佩"}
-ARMOR_TYPES_SET: set[str] = {"冠胄", "胸甲", "胫甲", "腕甲"}
+JEWELRY_TYPES_SET: set[str] = {tr("环"), tr("佩")}
+ARMOR_TYPES_SET: set[str] = {tr("冠胄"), tr("胸甲"), tr("胫甲"), tr("腕甲")}
 
 
 def infer_category(equip_type: str | None) -> str:
@@ -113,7 +115,7 @@ def infer_part(equip_type: str | None) -> str:
     Returns: "武器" / "环" / "佩" / "冠胄" / "胸甲" / "胫甲" / "腕甲" / "unknown"
     """
     if equip_type in WEAPON_TYPES_SET:
-        return "武器"
+        return tr("武器")
     if equip_type in JEWELRY_TYPES_SET or equip_type in ARMOR_TYPES_SET:
         return equip_type
     return "unknown"
@@ -125,6 +127,6 @@ def infer_part(equip_type: str | None) -> str:
 # AFFIX_NAMES / PERCENT_AFFIXES 已在上方 _load_config() 中赋值
 
 # 武学增伤/增效需要动态匹配（如 "剑武学增伤"、"扇武学增效"），单独处理
-WUXUE_PATTERN = re.compile(r"^(.+?)武学增[伤效]")
+WUXUE_PATTERN = re.compile(tr(r"^(.+?)武学增[伤效]"))
 
 # 带 % 的词条（_unit='%' 且非定音池，已在 _load_config() 中赋值）

@@ -43,10 +43,10 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 from .....i18n import tr
 
 # 候选无归属时归入的兜底桶名
-_UNCATEGORIZED = "未归类"
+_UNCATEGORIZED = tr("未归类")
 
 # 动态类展示位置锚点：插在该分类之后
-_DYNAMIC_ANCHOR = "属攻类"
+_DYNAMIC_ANCHOR = tr("属攻类")
 
 # 右列复选网格列数
 _COLS = 3

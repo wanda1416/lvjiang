@@ -50,13 +50,13 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 from .....i18n import tr
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）
-_NO_FOOD = "- 不添加 -"
+_NO_FOOD = tr("- 不添加 -")
 # 品阶下拉候选（按品阶从低到高，blue=不限）
 _QUALITY_KEYS = ("blue", "purple", "gold")
 
 # 规则表列定义（第一列为序号）
 _SEQ_COL = 0
-_COLS = ("#", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")  # runtime tr()
+_COLS = ("#", tr("首词条 ≥ %"), tr("期望 ≥"), tr("品阶 ≥"), tr("每轮添加"), "材料不足时")  # runtime tr()
 
 
 class MaterialConfigPage(QWidget):
@@ -195,7 +195,7 @@ class MaterialConfigPage(QWidget):
         pct = QSpinBox()
         pct.setRange(0, 100)
         pct.setSuffix(" %")
-        pct.setToolTip("0 = 不限首词条")
+        pct.setToolTip(tr("0 = 不限首词条"))
         pct.setValue(rule.pct)
         pct.valueChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, 1, pct)

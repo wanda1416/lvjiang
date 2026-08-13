@@ -1,4 +1,4 @@
-"""自动调律工作流 — 端到端流水线
+"""自动调律工作流 — 端到端流水线（编排层）
 
 状态机三行为点（tuning_base.behavior + materials）驱动流程决策，
 流派规则仅作装备预期识别（输入装备 → 输出预期评级上限）：
@@ -11,37 +11,38 @@
   同一路径（tune_full_recycle 视为直接回收）。
 回收后背包补位，由 _process_equipment 就地重读同格续处理。
 
-实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含于本类。
+调律功能按职责拆分为 tuning 包下四个独立类（组合引用）：
+- TuningJudge: 判定与评级（纯逻辑）
+- TuningExecutor: 调律执行（材料检查、狗粮决策、单轮调律）
+- TuningNavigator: 导航（页面跳转、词条收集）
+- TuningRecycler: 重置与回收
 
 背包滚动遍历抽象为策略类（bag_traversal：dedup 滑动窗口去重 /
 positional 位置对齐三向校验），_traverse_bag 按配置调度，默认 dedup。
 """
 
-import random
-import re
-from dataclasses import replace
-
 from loguru import logger
 
-from lvjiang.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
+from lvjiang.apps.yysls.equip_parser import EquipmentData
 from lvjiang.apps.yysls.evaluator import (
     get_rule_names,
     judge_equipment_potential,
     summarize_potential,
 )
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
-    BEHAVIOR_STAGE_LABELS,
     RATING_LABELS,
     RATING_RANK,
-    STONE_LABEL,
-    FoodDecision,
-    MaterialSettings,
-    RatingProvider,
     get_tuning_base,
 )
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
+)
+from lvjiang.apps.yysls.workflows.implementations.tuning import (
+    TuningExecutor,
+    TuningJudge,
+    TuningNavigator,
+    TuningRecycler,
 )
 from lvjiang.apps.yysls.workflows.run_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
@@ -58,6 +59,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     # 细粒度配置仍只在桌面调律 Tab 经 run_ctx 注入。
     DISPLAY_NAME = "自动调律"
 
+    # ─── 共享常量 ──────────────────────────────────────────
+
     WEAPON_SLOTS = ["main_weapon", "sub_weapon", "ring", "pendant"]
     ARMOR_SLOTS = ["head", "chest", "leg", "wrist"]
     WEAPON_DETAIL = "equip_weapon_detail"
@@ -72,7 +75,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     GRID_SCENE = "bag_equip_detail"
     GRID_PANEL = "bag_grid"
 
-    # 调律执行相关场景/材料
     TUNE_SCENE = "equip_tune_detail"
     # 调律结果弹窗已并入调律页（result 视图），运行时同场景寻址
     RESULT_SCENE = "equip_tune_detail"
@@ -80,37 +82,64 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     MATERIAL_GROUP = "调律材料"
     MAX_AFFIX = 5
 
+    # ─── 编排层状态 ────────────────────────────────────────
+
     # 调律说明文档（叙事输出，与技术日志分离）：run() 内创建，
     # 创建失败/未走 run() 时保持 None，各插桩点均先判空
     _doc: TuningDocWriter | None = None
     _doc_seq = 0                # 说明文档中的装备序号
-    _tune_abort_reason = ""     # _tune_once 返回 None 时的原因文案
-    _materials_exhausted = False  # 大律准石低于基准，全部退出
-    _stone_check_waived = False   # 询问后用户确认继续，本次运行不再检查
-    _tune_ready_waived = False    # 按钮未就绪询问后确认继续，本次运行不再询问
-    _expect_rating: str | None = None  # 当前装备期望评级 key（适用规则最高档）
-    _round_food = ""            # 本轮实际添加的狗粮 label（空=不添加）
-    _round_food_reason = ""     # 本轮狗粮决策说明（供说明文档/日志）
     _equipment_recycled = False  # 最近一次 _process_equipment 是否触发了回收
     _tune_full_recycle_mode = False  # 调满后回收模式（跳过狗粮与规则判定，调满后回收）
+    _expect_rating: str | None = None  # 当前装备期望评级 key（适用规则最高档）
+
+    # ─── 功能组件（懒初始化）──────────────────────────────
+
+    _judge: TuningJudge | None = None
+    _executor: TuningExecutor | None = None
+    _navigator: TuningNavigator | None = None
+    _recycler: TuningRecycler | None = None
+
+    @property
+    def judge(self) -> TuningJudge:
+        if self._judge is None:
+            self._judge = TuningJudge(self.ctx)
+        return self._judge
+
+    @property
+    def executor(self) -> TuningExecutor:
+        if self._executor is None:
+            self._executor = TuningExecutor(self)
+        return self._executor
+
+    @property
+    def navigator(self) -> TuningNavigator:
+        if self._navigator is None:
+            self._navigator = TuningNavigator(self)
+        return self._navigator
+
+    @property
+    def recycler(self) -> TuningRecycler:
+        if self._recycler is None:
+            self._recycler = TuningRecycler(self)
+        return self._recycler
+
+    # ─── 生命周期 ─────────────────────────────────────────
 
     @property
     def is_stopped(self) -> bool:
         """停止请求或材料耗尽（大律准石低于基准）都视为停止，
         背包遍历与部位循环全部收束，复用 F10 中断的退出路径"""
-        return self._materials_exhausted or super().is_stopped
+        return self.executor.materials_exhausted or super().is_stopped
 
     def run(self) -> dict:
-        self._materials_exhausted = False
-        self._stone_check_waived = False
-        self._tune_ready_waived = False
+        self.executor.reset_state()
         self._ensure_judge_config()
 
         selected = self._resolve_selected_slots()
 
         self._open_doc(selected)
         try:
-            self._navigate_to_equip()
+            self.navigator.navigate_to_equip()
 
             first_slot = True
             for slot in selected:
@@ -144,7 +173,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 if "stop_reason" not in self.output:
                     self.output["stop_reason"] = "用户中断（F10）"
             else:
-                self._navigate_back()
+                self.navigator.navigate_back()
                 logger.info("自动调律完成")
         finally:
             self._close_doc()
@@ -241,30 +270,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             })
         return items
 
-    # ─── 导航 ──────────────────────────────────────────────
-
-    def _navigate_to_equip(self):
-        result = self.ocr_scene("game_menu_page", ["wulinlu"])
-        if result.get("wulinlu") != "武林录":
-            self.click_region("game_main_page", "menu")
-            self.wait_delay("page_refresh_wait")  # 主界面 → 菜单页
-        else:
-            logger.info("当前在菜单页")
-
-        self.click_region("game_menu_page", "bag")
-        self.wait_delay("page_refresh_wait")  # 菜单页 → 背包页
-
-        bag_scan = self.ocr_scene("bag_equip_detail", ["sub_equip"])
-        if "装备" not in bag_scan.get("sub_equip", ""):
-            self.click_region("bag_equip_detail", "training")
-            self.wait_delay("page_refresh_wait")  # 背包页 → 调律训练页
-
-    def _navigate_back(self):
-        self.click_region("bag_equip_detail", "back")
-        self.wait_delay("page_refresh_wait")  # 背包详情页 → 菜单页
-        self.click_region("game_menu_page", "back")
-        self.wait_delay("page_refresh_wait")  # 菜单页 → 主界面
-
     # ─── 部位处理 ──────────────────────────────────────────
 
     def _process_slot_group_enter(self, slot: str):
@@ -307,15 +312,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self._process_equipment(name, equip, detail_scene, row=1, col=col)
 
     # ─── 背包遍历（滚动策略实现见 bag_traversal）──────────────
-
-    @staticmethod
-    def _equip_label(equip: dict) -> str:
-        """日志用装备标识：name|type（缺失部分省略，全空返回'空'）"""
-        if not isinstance(equip, dict) or not equip:
-            return "空"
-        label = "|".join(
-            str(p) for p in (equip.get("name"), equip.get("type")) if p)
-        return label or "空"
 
     def _read_row(self, detail_scene: str, row: int,
                   col: int = 1) -> tuple[str, str, dict]:
@@ -390,7 +386,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             key = DEFAULT_TRAVERSAL
         logger.info(f"背包遍历策略: {key}")
         TRAVERSALS[key]().traverse(self, detail_scene)
-
 
     # ─── 单件装备处理（潜力判定 + 实际调律 + 回报）────────
 
@@ -479,7 +474,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         #    走 scan 行为点决定回收/保留）；未处理过，不收集 report
         if affix_count >= self.MAX_AFFIX:
             logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
-            judgement = self._final_judge(equip_data)
+            judgement = self.judge.final_judge(equip_data)
             report["status"] = "already_full"
             report["final_judgement"] = judgement
             if self._on_scan_reject(equip_data, judgement, detail_scene,
@@ -494,7 +489,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         potential = judge_equipment_potential(
             equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
         _, logs = summarize_potential(potential)
-        expect = self._expect_key(potential)
+        expect = self.judge.expect_key(potential)
         self._expect_rating = expect
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
@@ -520,7 +515,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._doc_seq += 1
             self._doc.start_equipment(self._doc_seq, equip)
             self._doc.worthiness_matched(potential)
-        if not self._nav_to_tune(detail_scene):
+        if not self.navigator.nav_to_tune(detail_scene):
             logger.info(f"  [{name}] 未找到调律入口，跳过")
             report["status"] = "no_tune_entry"
             if self._doc:
@@ -556,9 +551,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
             self.wait_delay("page_refresh_wait")
-            result = self._tune_once(equip_data)
+            result = self.executor.tune_once(
+                equip_data, self._expect_rating, self._tune_full_recycle_mode)
             if result is None:
-                stop_reason = self._tune_abort_reason or "无法继续调律"
+                stop_reason = self.executor.abort_reason or "无法继续调律"
                 report["stop_reason"] = stop_reason
                 if self._doc:
                     self._doc.note(f"{stop_reason}，结束调律")
@@ -567,14 +563,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             affix_count += 1
             # 每轮结果挂在本件 report 下，与装备一一对应
             report.setdefault("tune_results", []).append(result)
-            new_affix = self._collect_new_affix(
+            new_affix = self.navigator.collect_new_affix(
                 equip_data, result.get("tune_affix", "")) \
                 or result.get("tune_affix", "")
             if self._doc:
-                if self._round_food_reason != last_food_reason:
-                    self._doc.food_strategy(self._round_food_reason)
-                    last_food_reason = self._round_food_reason
-                self._doc.tune_round(rounds, self._round_food, new_affix)
+                if self.executor.round_food_reason != last_food_reason:
+                    self._doc.food_strategy(self.executor.round_food_reason)
+                    last_food_reason = self.executor.round_food_reason
+                self._doc.tune_round(rounds, self.executor.round_food,
+                                     new_affix)
             # 结束处理（tune 行为点）：传入规则口径刷新预期评级
             # （供狗粮决策与说明文档）→ 行为表决策，评级按各规则
             # 自身判定语义懒取；词条满为边界条件（continue 不可达）
@@ -596,9 +593,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     if self._doc:
                         self._doc.round_decision(why)
                     continue
-            incoming = self._refresh_expectation(equip_data)
-            part, quality, cap_pct = self._recycle_inputs(equip_data)
-            rating_of = self._rating_provider(equip_data, incoming)
+            incoming, self._expect_rating = self.judge.refresh_expectation(
+                equip_data)
+            part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
+            rating_of = self.judge.rating_provider(equip_data, incoming)
             action, why = tune_cfg.decide(part, quality, cap_pct, rating_of,
                                           full)
             logger.info(f"  [结束处理] {why}")
@@ -607,7 +605,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     self._doc.round_decision(why)
                 continue
             if action == "reset":
-                result = self._try_reset_tune(tune_cfg, resets_used, why)
+                result = self.recycler.try_reset_tune(
+                    tune_cfg, resets_used, why)
                 if result is True:
                     resets_used += 1
                     report["resets"] = resets_used
@@ -646,7 +645,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.click_region(detail_scene, "more_func")
         self.wait_delay("step_interval")
 
-        judgement = self._final_judge(equip_data)
+        judgement = self.judge.final_judge(equip_data)
         report["status"] = "tuned"
         report["rounds"] = rounds
         report["final_affix_count"] = affix_count
@@ -663,7 +662,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 命中回收的装备在回到背包页后执行（阻断时不回收）
         recycled = False
         if tune_recycle_reason and not self.is_stopped:
-            recycled = self._recycle_current(
+            recycled = self.recycler.recycle_current(
                 equip_data, detail_scene, "tune", tune_recycle_reason,
                 report)
         self.output.setdefault("tuning_reports", []).append(report)
@@ -696,15 +695,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if detail_scene is None or not cfg.enabled:
             logger.info(f"  [扫描处理] {label} 不进调律（处置未启用，保留）")
             return False
-        part, quality, cap_pct = self._recycle_inputs(equip_data)
+        part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
         action, why = cfg.decide(part, quality, cap_pct,
-                                 self._rating_provider(equip_data, potential))
+                                 self.judge.rating_provider(equip_data,
+                                                            potential))
         if action == "tune_full_recycle":
             if already_full:
-                # 已满装备无需再调，“调满后回收”意图等价于直接回收
+                # 已满装备无需再调，"调满后回收"意图等价于直接回收
                 logger.info(f"  [扫描处理] {label} {why}（已满，直接回收）")
-                return self._recycle_current(equip_data, detail_scene,
-                                             "scan", why)
+                return self.recycler.recycle_current(equip_data, detail_scene,
+                                                     "scan", why)
             # 未满：设置标记，继续走调律流程
             logger.info(f"  [扫描处理] {label} {why}（调满后回收模式）")
             self._tune_full_recycle_mode = True
@@ -712,184 +712,47 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if action != "recycle":
             logger.info(f"  [扫描处理] {label} {why}")
             return False
-        return self._recycle_current(equip_data, detail_scene, "scan", why)
+        return self.recycler.recycle_current(equip_data, detail_scene,
+                                             "scan", why)
 
-    def _judge_by_scope(self, equip_data: EquipmentData, scope: str,
-                        keys: list[str]) -> dict:
-        """按判定语义跑潜力判定（行为点的预期评级识别入口）
-
-        incoming=运行期传入配置；all=全部规则默认配置；custom=
-        自选 key 集 + 默认配置（已删除的 key 运行期过滤；全部无效
-        时回落全部规则，宁多保留不误收）。
-        """
-        if scope == "incoming":
-            return judge_equipment_potential(
-                equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
-        use_keys = None
-        if scope == "custom" and keys:
-            known = set(get_rule_names())
-            use_keys = [k for k in keys if k in known]
-            unknown = [k for k in keys if k not in known]
-            if unknown:
-                logger.warning(f"判定声明的规则不存在: {unknown}，已忽略")
-            if not use_keys:
-                logger.warning("判定声明的规则全部无效，按全部规则判定")
-                use_keys = None
-        return judge_equipment_potential(equip_data, None, use_keys)
-
-    def _rating_provider(self, equip_data: EquipmentData,
-                         incoming: dict | None = None) -> RatingProvider:
-        """构造行为表的评级提供者（同一装备当前词条状态内缓存）
-
-        各规则按自身判定语义懒算评级（缓存键 (scope, keys,
-        仅首词条)）；incoming 为已有的传入规则判定结果，作种子
-        避免重复跑（基于全词条，仅首词条时不可复用）。
-        first_affix_only 时只注入首词条（其余槽视作空槽由潜力
-        判定自由填充），避免回收掉非首词条已成垃圾但可重置
-        调律的装备。无任何适用规则（部位/品阶不在任何判定
-        范围）= 无调律价值，按业务约定兜底为垃圾档。
-        """
-        cache: dict[tuple, str] = {}
-        if incoming is not None:
-            cache[("incoming", (), False)] = (
-                self._expect_key(incoming) or "junk")
-        label = equip_data.name or equip_data.type
-
-        def rating_of(scope: str, keys: list[str],
-                      first_affix_only: bool = False) -> str:
-            # 单词条装备无需构造副本，归一到全词条缓存键
-            fao = first_affix_only and len(equip_data.affixes) > 1
-            ck = (scope, tuple(keys), fao)
-            if ck not in cache:
-                target = equip_data
-                if fao:
-                    target = replace(
-                        equip_data, affixes=equip_data.affixes[:1],
-                        extra_data={**equip_data.extra_data,
-                                    "affix_count": 1})
-                    logger.info(
-                        f"  [行为评级] {label} 仅按首词条判定评级"
-                        f"（忽略其他 {len(equip_data.affixes) - 1} 条）")
-                results = self._judge_by_scope(target, scope, keys)
-                cache[ck] = self._expect_key(results) or "junk"
-            return cache[ck]
-
-        return rating_of
-
-    def _on_materials_insufficient(self, stock: int, baseline: int):
-        """大律准石低于基准的后处理挂载点（预留：补货/兑换）。
-        当前仅记录不动作；不足处理（跳过/结束/询问）由
-        _check_stone_stock 按配置执行。"""
-        logger.info(f"  [材料不足] 大律准石 {stock}/基准 {baseline}"
-                    f"（补货/兑换后处理待实现，仅记录）")
-
+    # ─── 工具方法（bag_traversal 经 wf 调用）──────────────
 
     @staticmethod
-    def _recycle_inputs(equip_data: EquipmentData,
-                        ) -> tuple[str, str | None, float | None]:
-        """行为规则匹配输入：(部位, 品阶, 首词条初始数值 cap_pct)
+    def _make_fingerprint(equip: dict) -> str:
+        """生成装备指纹，空装备返回空串。
 
-        首词条 cap_pct 不因调律改变，各行为点可用同一输入。
+        空装备判定：type/name/level 全为空或 None。
         """
-        cap_pct = (equip_data.affixes[0].cap_pct
-                   if equip_data.affixes else None)
-        return equip_data.part, equip_data.quality, cap_pct
+        if not isinstance(equip, dict) or not equip:
+            return ""
+        # 检查是否有有效装备数据（type/level 至少有一个非空）
+        equip_type = equip.get("type") or ""
+        equip_name = equip.get("name") or ""
+        equip_level = equip.get("level") or ""
+        if not equip_type and not equip_name and not equip_level:
+            return ""  # 空装备 → 空指纹
+        import hashlib
+        parts = [
+            str(equip_type),
+            str(equip_level),
+            str(equip.get("quality", "") or ""),
+            str(equip.get("chengyin", "") or ""),
+        ]
+        for i in range(1, 6):
+            affix = equip.get(f"affix_{i}")
+            if isinstance(affix, dict) and affix.get("name"):
+                parts.append(f"{affix['name']}:{affix.get('value', '')}")
+        raw = "+".join(parts)
+        return hashlib.md5(raw.encode()).hexdigest()[:8]
 
-    def _reset_remaining(self) -> int:
-        """OCR 调律页「重置调律」按钮文本，解析剩余次数
-
-        按钮文本携带次数（如「重置调律(3)」）；兼容 x/y 样式取 x
-        （剩余/总数），无斜杠取首个数字；读不到任何数字 =
-        次数已用尽（返回 0）。
-        """
-        raw = self.ocr_scene(self.TUNE_SCENE, ["reset_tune"]).get(
-            "reset_tune", "") or ""
-        m = re.search(r"(\d+)\s*[/／]\s*\d+", raw)
-        if m:
-            return int(m.group(1))
-        m = re.search(r"\d+", raw)
-        return int(m.group()) if m else 0
-
-    def _try_reset_tune(self, cfg, resets_used: int, why: str):
-        """在调律页执行一次重置调律（点按钮 + 冷却检查 + 确认 + 二次确认 + 关闭）
-
-        重置清空首词条以外的全部词条；重置后有冷却期不可连重
-        → 本件硬限只重置一次。次数门槛：本地计数达配置上限即止；
-        按钮文本剩余次数另作硬门（读不到数字 = 用尽，不重置）。
-        点击重置按钮后 OCR check_1 区域，无「可调律重置」字样 =
-        装备在冷却期，点返回回到调律页并降级为跳过。
-
-        Returns: True=成功；False=正常拒绝（走 reset_exhausted）；
-                 str=冷却期拒绝（强制跳过，原因字符串）。
-        """
-        if resets_used >= 1:
-            # 重置后进入冷却期，本次工作内不可再重置该件
-            logger.info("  本件已重置过一次，冷却期内不再重置")
-            return False
-        if resets_used >= cfg.max_resets:
-            logger.info(f"  重置次数已达上限（{cfg.max_resets}），不再重置")
-            return False
-        remaining = self._reset_remaining()
-        if remaining <= 0:
-            logger.info("  重置调律按钮无剩余次数，不再重置")
-            return False
-        logger.info(f"  执行重置调律（剩余次数 OCR: {remaining}）：{why}")
-        self.click_region(self.TUNE_SCENE, "reset_tune")
-        self.wait_delay("page_refresh_wait")  # 重置确认弹窗
-        # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
-        check_text = self.ocr_scene(self.TUNE_SCENE, ["check_1"]).get(
-            "check_1", "") or ""
-        if "可调律重置" not in check_text:
-            logger.info(f"  冷却期检查未通过（check_1={check_text!r}），"
-                        "装备在冷却期，降级跳过")
-            self.click_region(self.TUNE_SCENE, "back")  # 关闭弹窗回调律页
-            self.wait_delay("step_interval")
-            return "装备重置冷却期，跳过该装备"
-        self.click_region(self.TUNE_SCENE, "reset_confirm")
-        # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
-        self.wait_seconds(random.uniform(6.0, 7.0))
-        self.click_region(self.TUNE_SCENE, "reset_confirm_2")
-        self.wait_delay("page_refresh_wait")  # 重置结果弹窗出现
-        self.click_region(self.TUNE_SCENE, "close_btn")  # 关闭 → 回到调律进度页
-        self.wait_delay("step_interval")
-        return True
-
-    def _recycle_current(self, equip_data: EquipmentData, detail_scene: str,
-                         stage: str, reason: str,
-                         report: dict | None = None) -> bool:
-        """回收当前详情页选中的装备：更多 → 子菜单「回收」→ 确认弹窗
-
-        进入时背包详情页无弹窗；未找到回收按钮时收起弹窗返回
-        False（装备保留原地）。成功后背包刷新、后续装备前移补位。
-        """
-        label = equip_data.name or equip_data.type
-        stage_label = BEHAVIOR_STAGE_LABELS.get(stage, stage)
-        logger.info(f"  [{stage_label}] 回收 {label}：{reason}")
-        self.click_region(detail_scene, "more_func")
-        self.wait_delay("page_refresh_wait")  # 详情页 → 「更多」弹窗展开
-        key = self.ocr_scene_by(
-            detail_scene,
-            ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
-            "回收", "contains")
-        if not key:
-            logger.warning("未找到回收按钮，装备保留")
-            self.click_region(detail_scene, "more_func")
-            self.wait_delay("step_interval")
-            return False
-        self.click_region(detail_scene, key)
-        self.wait_delay("page_refresh_wait")  # 回收确认弹窗
-        self.click_region(detail_scene, "recycle_confirm")
-        self.wait_delay("page_refresh_wait")  # 回收完成，背包刷新补位
-        if report is not None:
-            report["recycled"] = True
-            report["recycle_reason"] = reason
-        self.output.setdefault("recycled_items", []).append({
-            "name": equip_data.name, "type": equip_data.type,
-            "quality": equip_data.quality,
-            "stage": stage, "reason": reason,
-        })
-        logger.info(f"  [{stage_label}] {label} 已回收")
-        return True
+    @staticmethod
+    def _equip_label(equip: dict) -> str:
+        """日志用装备标识：name|type（缺失部分省略，全空返回'空'）"""
+        if not isinstance(equip, dict) or not equip:
+            return "空"
+        label = "|".join(
+            str(p) for p in (equip.get("name"), equip.get("type")) if p)
+        return label or "空"
 
     # ─── 判定配置兜底 ──────────────────────────────────────
 
@@ -941,334 +804,3 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if not selected:
             selected = self.WEAPON_SLOTS + self.ARMOR_SLOTS
         return selected
-
-    # ─── 调律执行 ──
-
-    @staticmethod
-    def _expect_key(results: dict) -> str | None:
-        """从潜力判定结果提取装备期望评级 key（适用规则最高档）
-
-        跳过/不适用的规则不参与；无任何适用规则时返回 None
-        （狗粮规则的期望条件永不命中）。
-        """
-        label_to_key = {v: k for k, v in RATING_LABELS.items()}
-        best: str | None = None
-        for r in (results or {}).values():
-            if r.get("skipped") or r.get("not_applicable"):
-                continue
-            key = label_to_key.get(r.get("rating", ""))
-            if key and (best is None or RATING_RANK[key] > RATING_RANK[best]):
-                best = key
-        return best
-
-    def _decide_food_round(self, equip_data: EquipmentData,
-                           settings: MaterialSettings,
-                           infos: dict | None) -> FoodDecision:
-        """逐轮狗粮决策：按材料设置规则表（首词条/期望/品阶三条件）
-        与本轮材料区持有量决策（与石头检查共用同一次识别）"""
-        if not settings.food_rules:
-            return FoodDecision("none", "", "未配置狗粮规则 → 不添加")
-        cap_pct = (equip_data.affixes[0].cap_pct
-                   if equip_data.affixes else None)
-        stocks: dict[str, int | None] = {}
-        for info in (infos or {}).values():
-            label = getattr(info, "type", "") or ""
-            if not label:
-                continue
-            # 低置信度误匹配的同名幽灵槽（数量 None）不得覆盖真槽
-            if label in stocks and stocks[label] is not None:
-                continue
-            stocks[label] = (info.owned if info.owned is not None
-                             else info.count)
-        decision = settings.decide_food(
-            cap_pct, self._expect_rating, equip_data.quality, stocks)
-        log = logger.warning if decision.action == "skip" else logger.info
-        log(f"狗粮策略: {decision.reason}")
-        return decision
-
-    def _check_stone_stock(self, settings: MaterialSettings,
-                           infos: dict | None) -> bool:
-        """大律准石数量检查（材料设置可开关，默认关闭）
-
-        基于调律页材料区识别结果（infos，与逐轮狗粮决策共用同一次
-        识别），取大律准石持有量（x/y 优先取 y，无斜杠取显示数字）；
-        低于基准判材料不足，按配置的不足处理执行：skip=跳过该装备
-        （继续遍历）；ask=confirm 弹窗询问，确认继续则本次运行不再
-        检查，拒绝同 abort；abort=置 _materials_exhausted 使 is_stopped
-        恒真，全部退出。材料区找不到大律准石视为已耗尽；数量 OCR
-        失败时警告放行（识别波动不误杀整次运行）。
-
-        Returns:
-            True=可继续调律；False=材料不足，本件终止（是否全退
-            由 _materials_exhausted 决定）
-        """
-        if not settings.stone_check_enabled or self._stone_check_waived:
-            return True
-        stone = next((i for i in (infos or {}).values()
-                      if getattr(i, "type", "") == STONE_LABEL), None)
-        if stone is None:
-            stock = 0  # 材料区无大律准石，视为已耗尽
-        else:
-            stock = stone.owned if stone.owned is not None else stone.count
-            if stock is None:
-                logger.warning("大律准石数量识别失败，本轮跳过数量检查")
-                return True
-        if stock >= settings.stone_min_count:
-            logger.debug(
-                f"大律准石库存 {stock} >= 基准 {settings.stone_min_count}")
-            return True
-        reason = (f"大律准石 {stock} < 基准 "
-                  f"{settings.stone_min_count}，材料不足")
-        action = settings.stone_insufficient_action
-        if action == "ask" and self._confirm_continue(
-                f"{reason}，是否继续调律？"):
-            logger.warning(f"{reason}，用户确认继续，本次运行不再检查")
-            self._stone_check_waived = True
-            return True
-        if action == "skip":
-            logger.warning(f"{reason}，跳过该装备")
-            self._tune_abort_reason = f"{reason}，跳过该装备"
-            self._on_materials_insufficient(stock, settings.stone_min_count)
-            return False
-        # abort / ask 拒绝 → 全部退出
-        logger.warning(f"{reason}，终止全部调律")
-        self._tune_abort_reason = reason
-        self._materials_exhausted = True
-        self.output["stop_reason"] = reason
-        self._on_materials_insufficient(stock, settings.stone_min_count)
-        return False
-
-    def _confirm_continue(self, message: str) -> bool:
-        """走 DSL confirm 内置函数弹窗询问用户
-
-        有 engine 引用时经 engine._ui_callback 调度到 Qt 主线程，
-        无则回退平台原生弹窗（confirm 内置函数自行处理）。
-        """
-        return bool(self.call_function("confirm", [message],
-                                       engine=self._engine))
-
-    def _ensure_tune_ready(self, settings: MaterialSettings) -> bool:
-        """一键添加后确认「调律」按钮已就绪（文字含「调律」）
-
-        添加失败时按钮文字不变——多半是材料不足（一键添加无可用
-        材料），盲点「调律」只会空转。未就绪先等一拍重扫一次（防 UI
-        刷新慢 / OCR 波动误杀），仍未就绪走材料不足处理：本件必然
-        结束（按钮点不动），是否全退按石头检查的不足处理决定；
-        未启用检查时也要兜底，按 skip 语义只跳过本件。ask 确认继续
-        后本次运行不再重复询问（后续未就绪直接按跳过处理）。
-
-        Returns:
-            True=按钮就绪可点击；False=本件终止（是否全退由
-            _materials_exhausted 决定），原因已存 _tune_abort_reason
-        """
-        btn = ""
-        for attempt in range(2):
-            if attempt:
-                self.wait_delay("page_refresh_wait")
-            btn = self.ocr_scene(self.TUNE_SCENE, ["tune_btn"]).get(
-                "tune_btn", "") or ""
-            if "调律" in btn:
-                return True
-        reason = (f"一键添加后「调律」按钮未就绪"
-                  f"（OCR: {btn or '空'}），疑似材料不足")
-        action = (settings.stone_insufficient_action
-                  if settings.stone_check_enabled else "skip")
-        if action == "ask":
-            if self._tune_ready_waived:
-                action = "skip"
-            elif self._confirm_continue(
-                    f"{reason}，是否跳过本件继续处理后续装备？"):
-                self._tune_ready_waived = True
-                action = "skip"
-            else:
-                action = "abort"
-        if action == "skip":
-            logger.warning(f"{reason}，结束本件调律")
-            self._tune_abort_reason = f"{reason}，结束本件调律"
-            return False
-        # abort / ask 拒绝 → 全部退出
-        logger.warning(f"{reason}，终止全部调律")
-        self._tune_abort_reason = reason
-        self._materials_exhausted = True
-        self.output["stop_reason"] = reason
-        return False
-
-    def _refresh_expectation(self, equip_data: EquipmentData) -> dict:
-        """按传入规则刷新装备预期评级（每轮调律结束后取值）
-
-        同步写入 _expect_rating（供狗粮决策与说明文档）；行为表
-        评级另经评级提供者按各规则判定语义懒取。
-
-        Returns: 传入规则判定结果（供评级提供者作 incoming 种子）。
-        """
-        results = self._judge_by_scope(equip_data, "incoming", [])
-        _, logs = summarize_potential(results)
-        for line in logs:
-            logger.info(f"  潜力判定 | {line}")
-        self._expect_rating = self._expect_key(results)
-        return results
-
-    def _collect_new_affix(self, equip_data: EquipmentData, text: str) -> str:
-        """把调律结果的新词条补充进装备数据，供下一轮判定使用
-
-        Returns:
-            新词条展示文本（供说明文档）；无法解析时原样返回 OCR
-            文本并标注未能解析。
-        """
-        affix = get_equipment_parser().parse_affix_text(text, equip_data.level)
-        if affix is None:
-            logger.warning(f"调律结果词条无法解析: {text!r}，该槽位按未知处理")
-            return f"{text}（未能解析）"
-        equip_data.affixes.append(affix)
-        equip_data.extra_data["affix_count"] = len(equip_data.affixes)
-        pct = f"（{affix.cap_pct}%）" if affix.cap_pct is not None else ""
-        desc = f"{affix.name} {affix.value}{affix.unit or ''}{pct}"
-        logger.info(f"新词条: {desc}")
-        return desc
-
-    def _final_judge(self, equip_data: EquipmentData) -> dict:
-        """终局判定：含转律模拟的各规则评级上限，返回结构化结果供 report/hook 消费"""
-        results = judge_equipment_potential(
-            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
-        for r in results.values():
-            tag = ("不适用" if r["not_applicable"]
-                   else "跳过" if r["skipped"] else r["rating"])
-            logger.info(
-                f"  终局判定 | {r['name']}: {tag}（{'；'.join(r['reasons'])}）")
-        return results
-
-    def _nav_to_tune(self, detail_scene: str) -> bool:
-        """从装备详情页进入调律页，失败时停留在详情页并返回 False"""
-        self.click_region(detail_scene, "more_func")
-        self.wait_delay("page_refresh_wait")  # 详情页 → 「更多」弹窗展开
-        tune_key = self.ocr_scene_by(
-            detail_scene,
-            ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
-            "调律", "contains")
-        if not tune_key:
-            logger.info("未找到调律按钮")
-            # 「更多」弹窗已开，再点一次 more_func 使其收起，保持背包页干净
-            self.click_region(detail_scene, "more_func")
-            self.wait_delay("step_interval")
-            return False
-        self.click_region(detail_scene, tune_key)
-        self.wait_delay("page_refresh_wait")  # 详情页 → 调律页（页面切换）
-        return True
-
-    def _tune_once(self, equip_data: EquipmentData) -> dict | None:
-        """执行一轮调律：展开材料区→逐轮狗粮决策→一键添加→调律→收结果。
-
-        石头检查与狗粮决策共用同一次材料区识别；决策结果存入
-        _round_food/_round_food_reason 供调用方写说明文档。
-        返回调律结果 OCR dict（由调用方挂进本件 report 的 tune_results）；
-        返回 None 表示应终止循环（无添加入口/材料不足/规则判跳过装备，
-        原因文案存入 _tune_abort_reason 供说明文档）。
-        添加过狗粮时，关闭结果弹窗后还会补扫一次狗粮返还弹窗并补关。
-        """
-        self._tune_abort_reason = ""
-        self._round_food = ""
-        self._round_food_reason = ""
-        add_scan = self.ocr_scene(self.TUNE_SCENE, ["auto_add", "auto_add_2"])
-        can_add = "添加" in add_scan.get("auto_add", "")
-        if "添加" in add_scan.get("auto_add_2", ""):
-            self.click_region(self.TUNE_SCENE, "expand")
-            self.wait_delay("page_refresh_wait")
-            can_add = True
-        if not can_add:
-            logger.info("未找到「添加」入口，视为无法继续调律")
-            self._tune_abort_reason = "未找到「添加」入口"
-            return None
-
-        # 一次材料区识别：大律准石检查 + 逐轮狗粮决策共用
-        settings = get_tuning_base().materials
-        infos = None
-        if settings.stone_check_enabled or settings.food_rules:
-            infos = self.recognize_materials_info(
-                self.TUNE_SCENE, self.MATERIAL_SLOTS,
-                group=self.MATERIAL_GROUP)
-        if not self._check_stone_stock(settings, infos):
-            return None
-
-        # 调满后回收模式：跳过狗粮决策
-        food = ""
-        if self._tune_full_recycle_mode:
-            self._round_food = ""
-            self._round_food_reason = "调满后回收模式，跳过狗粮添加"
-            logger.info(f"狗粮策略: {self._round_food_reason}")
-        else:
-            decision = self._decide_food_round(equip_data, settings, infos)
-            self._round_food_reason = decision.reason
-            if decision.action == "skip":
-                self._tune_abort_reason = decision.reason
-                return None
-            food = decision.food if decision.action == "feed" else ""
-            self._round_food = food
-        if food:
-            # 同名幽灵槽防护：只认数量有效的槽位
-            slot = next(
-                (s for s, i in (infos or {}).items()
-                 if getattr(i, "type", "") == food
-                 and (getattr(i, "owned", None) is not None
-                      or getattr(i, "count", None) is not None)), None)
-            if not slot:
-                logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
-                self._tune_abort_reason = f"{food} 材料槽位定位失败"
-                return None
-            self.click_region(self.TUNE_SCENE, slot)
-            self.wait_delay("step_interval")
-
-        self.click_region(self.TUNE_SCENE, "auto_add")
-        self.wait_delay("step_interval")
-        # 添加后确认按钮真的变成了「调律」，未就绪走材料不足处理
-        if not self._ensure_tune_ready(settings):
-            return None
-        self.click_region(self.TUNE_SCENE, "tune_btn")
-        self.wait_delay("step_interval")
-        self.wait_delay("page_refresh_wait")  # 调律结果出现（after_tune_wait 已废弃）
-
-        result = self.ocr_scene(self.RESULT_SCENE, ["tune_affix", "tune_tip"])
-        logger.info(f"调律结果: {result}")
-        self.click_region(self.RESULT_SCENE, "close_btn")
-        self.wait_delay("step_interval")
-
-        # 狗粮返还机制：添加过狗粮的轮次，关闭结果弹窗后可能命中概率返还，
-        # 再弹一个无边框弹窗（同样 tune_tip「点击空白区域关闭」）。若不补关，
-        # 它会挡住「一键添加」等后续点击，导致误判无法继续调律。
-        if food:
-            self.wait_delay("page_refresh_wait")
-            bonus = self.ocr_scene(self.RESULT_SCENE, ["tune_tip"])
-            if bonus.get("tune_tip"):
-                logger.info(f"检测到狗粮返还弹窗: {bonus}，补点一次关闭")
-                self.click_region(self.RESULT_SCENE, "close_btn")
-                self.wait_delay("step_interval")
-        return result
-
-    # ─── 工具方法 ──────────────────────────────────────────
-
-    @staticmethod
-    def _make_fingerprint(equip: dict) -> str:
-        """生成装备指纹，空装备返回空串。
-
-        空装备判定：type/name/level 全为空或 None。
-        """
-        if not isinstance(equip, dict) or not equip:
-            return ""
-        # 检查是否有有效装备数据（type/level 至少有一个非空）
-        equip_type = equip.get("type") or ""
-        equip_name = equip.get("name") or ""
-        equip_level = equip.get("level") or ""
-        if not equip_type and not equip_name and not equip_level:
-            return ""  # 空装备 → 空指纹
-        import hashlib
-        parts = [
-            str(equip_type),
-            str(equip_level),
-            str(equip.get("quality", "") or ""),
-            str(equip.get("chengyin", "") or ""),
-        ]
-        for i in range(1, 6):
-            affix = equip.get(f"affix_{i}")
-            if isinstance(affix, dict) and affix.get("name"):
-                parts.append(f"{affix['name']}:{affix.get('value', '')}")
-        raw = "+".join(parts)
-        return hashlib.md5(raw.encode()).hexdigest()[:8]

@@ -27,6 +27,7 @@ from ..ast_nodes import (
     NotEqual,
     NumericEqual,
     Or,
+    Screenshot,
     VarRef,
 )
 
@@ -148,6 +149,10 @@ class _ExprMixin:
     def log_arg(self, items):
         """log_arg: 透传任何表达式"""
         return items[0]
+
+    def screenshot_stmt(self, items):
+        """screenshot: 截取当前画面并保存"""
+        return Screenshot(line_no=self._line(items))
 
     def eval_assign_func(self, items):
         """eval $var = func($arg...)"""

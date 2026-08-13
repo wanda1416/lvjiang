@@ -40,13 +40,13 @@ _STATUS_COLORS = {
 }
 
 _STYLE_BTN_RUN = (
-    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;"
+    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
 )
 _STYLE_BTN_STOP = (
-    "background-color: #f44336; color: white; font-weight: bold; padding: 8px;"
+    "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
 )
 _STYLE_BTN_NOT_READY = (
-    "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px;"
+    "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
 )
 
 
@@ -76,6 +76,12 @@ class BatchTab(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
+        # ── 执行按钮（第一行）──
+        self._btn_run = QPushButton("开始批量执行 (F9)")
+        self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
+        self._btn_run.clicked.connect(self._on_run_clicked)
+        layout.addWidget(self._btn_run)
+
         # ── 条目概览 ──
         self._lbl_summary = QLabel()
         self._lbl_summary.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
@@ -87,12 +93,6 @@ class BatchTab(QWidget):
         self._script_list = QListWidget()
         self._script_list.setMaximumHeight(140)
         layout.addWidget(self._script_list)
-
-        # ── 执行按钮 ──
-        self._btn_run = QPushButton("开始批量执行 (F9)")
-        self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
-        self._btn_run.clicked.connect(self._on_run_clicked)
-        layout.addWidget(self._btn_run)
 
         # ── 进度表 ──
         layout.addWidget(self._section_label("执行进度"))

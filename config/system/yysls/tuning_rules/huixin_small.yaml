@@ -104,29 +104,25 @@ common_conditions:
       - 最小本属攻击
       - 最小外属攻击
       min: 1
-  - count_max:
-      symbols:
-      - 最小外功攻击
-      max: 0
+  - contains_all:
+    - 会心率
+    - 精准率
 patterns:
   主武器:
     first:
     - 最小外功攻击
     top_conditions:
-    - count_max:
-        symbols:
-        - 最小无相攻击
-        - 精准率
-        - 会心率
-        max: 0
+    - - contains_all:
+        - 最小外功攻击
+      - count_max:
+          symbols:
+          - 最小无相攻击
+          - 精准率
+          - 会心率
+          max: 0
   副武器:
     first:
     - 最小外功攻击
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 敏
-        max: 0
     top_conditions:
     - - contains_all:
         - 最小外功攻击
@@ -146,11 +142,14 @@ patterns:
         - 全武学增效
         max: 0
     top_conditions:
-    - count_max:
-        symbols:
-        - 最小本属攻击
-        - 精准率
-        max: 0
+    - - contains_all:
+        - 最小外功攻击
+      - count_max:
+          symbols:
+          - 最小本属攻击
+          - 会心率
+          - 精准率
+          max: 0
   冠胄:
     first:
     - 会心率
@@ -163,14 +162,15 @@ patterns:
           symbols:
           - 单体类奇术增伤
           min: 1
-    normal_conditions:
-    - count_max:
-        symbols:
-        - 敏
-        - 最大本属攻击
-        max: 0
     top_conditions:
-    - - count_max:
+    - - contains_all:
+        - 最小外功攻击
+      - count_min:
+          symbols:
+          - 敏
+          - 最大无相攻击
+          min: 1
+      - count_max:
           symbols:
           - 最小本属攻击
           max: 0
@@ -207,7 +207,9 @@ patterns:
           - 对玩家单位增效
           max: 0
     top_conditions:
-    - - count_max:
+    - - contains_all:
+        - 最小外功攻击
+      - count_max:
           symbols:
           - 最小本属攻击
           max: 0

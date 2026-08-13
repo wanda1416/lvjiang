@@ -116,7 +116,7 @@ regions:
 panels:
 - key: materials
   name: 材料格
-  cols: 7
+  cols: 6
   rows: 1
   min_visible: 0.95
   calibration: even

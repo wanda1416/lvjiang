@@ -1,0 +1,62 @@
+{
+  "name": "lvjiang-wf",
+  "displayName": "LvJiang Workflow DSL",
+  "description": "Syntax highlighting and diagnostics for .wf workflow files",
+  "version": "0.1.0",
+  "publisher": "lvjiang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:wf"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "wf",
+        "aliases": [
+          "Workflow DSL",
+          "wf"
+        ],
+        "extensions": [
+          ".wf"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "wf",
+        "scopeName": "source.wf",
+        "path": "./syntaxes/wf.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "LvJiang Workflow DSL",
+      "properties": {
+        "lvjiangWf.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python interpreter path with lvjiang installed"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -89,6 +89,34 @@ class TestWaitStableExecution:
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.05,
                        stable_duration=0.1, least=0.5)
 
+    def test_crop_box_region_stable(self):
+        """crop_box 限定区域：只对比指定区域，背景变化不影响稳定判定"""
+        # 构造 100x100 帧，左半背景变化、右半区域稳定
+        frames = []
+        for i in range(25):
+            f = _frame(100)  # 全灰
+            # 左半背景随机变化（模拟游戏动画）
+            f[:, :50] = (i * 37) % 256
+            # 右半区域始终相同
+            f[:, 50:] = 200
+            frames.append(f)
+        wf = _workflow_with_capture(_SeqCapture(frames))
+        # 只对比右半区域 [x=50, y=0, w=50, h=100]，应快速稳定
+        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.05,
+                       stable_duration=0.1, least=0.05,
+                       crop_box={"x": 50, "y": 0, "w": 50, "h": 100})
+
+    def test_crop_box_none_falls_back_to_full(self):
+        """crop_box=None 时回退到全画面检测（向后兼容）"""
+        frames = [
+            _frame(100),
+            _frame(200),
+            *[_frame(200) for _ in range(20)],
+        ]
+        wf = _workflow_with_capture(_SeqCapture(frames))
+        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.05,
+                       stable_duration=0.1, crop_box=None)
+
 
 class TestWaitStableDSL:
     """端到端：DSL wait stable 语句通过引擎执行"""

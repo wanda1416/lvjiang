@@ -30,6 +30,7 @@ from .grammar.ast_nodes import (
     SceneRef,
     Try,
     UntilLoop,
+    WaitStable,
     WhileLoop,
 )
 
@@ -43,6 +44,7 @@ KIND_LABELS = {
     "region": tr("区域"),
     "scan": tr("区域/面板"),
     "point": tr("坐标点"),
+    "stable_area": tr("区域"),
 }
 
 
@@ -130,6 +132,10 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
     elif isinstance(stmt, (Align, PanelGridDrag)):
         # scene / panel 均为裸字符串
         _add(acc, stmt.scene, stmt.panel, "panel", line)
+    elif isinstance(stmt, WaitStable):
+        # wait stable on [scene].[region] — 校验区域绑定
+        if stmt.area is not None and isinstance(stmt.area, SceneRef):
+            _add(acc, stmt.area.scene, stmt.area.region, "stable_area", line)
 
     # 嵌套体递归
     if isinstance(stmt, If):

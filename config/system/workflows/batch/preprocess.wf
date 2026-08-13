@@ -3,5 +3,7 @@
 
 import "_switch_account.wf"
 
+log concat("当前账号：", $account)
+
 # 选账号 + 登录 + 选角色
 call _switch_account($tail, $role_index)

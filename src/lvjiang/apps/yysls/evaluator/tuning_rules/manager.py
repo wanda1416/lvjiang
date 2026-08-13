@@ -34,8 +34,8 @@ class TuningRuleManager:
     """调律规则管理器
 
     加载目录下全部 YAML，校验失败的文件记录错误并跳过；
-    提供按 order 排序的规则注册表、原始数据访问（UI 编辑用）、
-    创建/删除与保存 + reload。
+    提供按 tuning_rules 顺序排列（仅含启用规则）的规则注册表、
+    原始数据访问（UI 编辑用）、创建/删除与保存 + reload。
     """
 
     def __init__(self, rules_dir: str | Path | None = None):
@@ -57,13 +57,23 @@ class TuningRuleManager:
         return f"{self._rel_dir}/{filename}" if self._rel_dir else filename
 
     def reload(self) -> None:
-        """重新加载全部规则文件（含 when 开关引用校验）"""
+        """重新加载全部规则文件（含 when 开关引用校验）
+
+        规则顺序与启用状态由 tune_config.yaml 的 tuning_rules 段控制：
+        - 启用状态：tuning_rules[key]=false 的规则不进入注册表
+        - 顺序：tuning_rules 的 dict 插入序即规则顺序（替代原 order 字段）
+        - 未在 tuning_rules 中声明的规则追加到末尾（兼容新建规则）
+        """
         self._rules.clear()
         self._raw.clear()
         self._files.clear()
         self._errors.clear()
         switch_keys = self._switch_keys()
-        loaded: list[TuningRule] = []
+        # 读取 tuning_rules 顺序与启用状态（从本管理器 resolver 读取）
+        tuning_rules = self._load_tuning_rules()
+        enabled_keys = {k for k, v in tuning_rules.items() if v}
+        ordered_keys = [k for k in tuning_rules if k in enabled_keys]
+        loaded: dict[str, TuningRule] = {}
         for name in self._resolver.enumerate_entities(self._rel_dir, "*.yaml"):
             path = self._resolver.resolve_read(self._rel(name))
             if path is None:
@@ -79,11 +89,46 @@ class TuningRuleManager:
             if rule.key in self._files:
                 logger.error(f"调律规则 {name} key 重复: {rule.key}")
                 continue
-            loaded.append(rule)
+            # 过滤禁用规则
+            if tuning_rules and rule.key not in enabled_keys:
+                continue
+            loaded[rule.key] = rule
             self._raw[rule.key] = data
             self._files[rule.key] = name
-        for rule in sorted(loaded, key=lambda r: (r.order, r.key)):
-            self._rules[rule.key] = rule
+        # 按 tuning_rules 顺序排列，未声明的追加到末尾
+        for key in ordered_keys:
+            if key in loaded:
+                self._rules[key] = loaded[key]
+        for key in sorted(loaded.keys()):
+            if key not in self._rules:
+                self._rules[key] = loaded[key]
+
+    def _load_tuning_rules(self) -> dict[str, bool]:
+        """从本管理器 resolver 读取 tune_config.yaml 的 tuning_rules 段"""
+        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
+        if path is None:
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            raw = data.get("tuning_rules") or {}
+            if not isinstance(raw, dict):
+                return {}
+            result: dict[str, bool] = {}
+            for k, v in raw.items():
+                k = str(k).strip()
+                if not _KEY_RE.match(k):
+                    logger.warning(f"tuning_rules: 跳过非法 key {k!r}")
+                    continue
+                if not isinstance(v, bool):
+                    logger.warning(
+                        f"tuning_rules.{k} 非 bool（{v!r}），跳过")
+                    continue
+                result[k] = v
+            return result
+        except Exception as e:
+            logger.error(f"tune_config.yaml tuning_rules 读取失败: {e}")
+            return {}
 
     @staticmethod
     def _switch_keys() -> set[str] | None:
@@ -97,7 +142,7 @@ class TuningRuleManager:
     # ── 查询 ──
 
     def get_rules(self) -> dict[str, TuningRule]:
-        """key → TuningRule（按 order 排序）"""
+        """key → TuningRule（按 tuning_rules 顺序；仅含启用规则）"""
         return dict(self._rules)
 
     def get_rule(self, key: str) -> TuningRule | None:
@@ -135,6 +180,8 @@ class TuningRuleManager:
     def create_rule(self, key: str, name: str) -> None:
         """新建规则（最小骨架 YAML），key 作为文件名
 
+        新建规则默认启用，追加到 tuning_rules 末尾。
+
         Raises:
             RuleValidationError: key 非法 / 已存在 / 名称为空
         """
@@ -151,7 +198,6 @@ class TuningRuleManager:
         data = {
             "key": key,
             "name": name,
-            "order": 100,
             "playstyles": {},
             "transmute_priority": [],
             "affix_pool": [],
@@ -163,10 +209,12 @@ class TuningRuleManager:
             self._rel(f"{key}.yaml"),
             yaml.dump(data, allow_unicode=True, sort_keys=False),
         )
+        # 追加到 tuning_rules（默认启用）
+        self._append_tuning_rule(key)
         self.reload()
 
     def delete_rule(self, key: str) -> None:
-        """删除规则文件并 reload
+        """删除规则文件并从 tuning_rules 移除，然后 reload
 
         Raises:
             RuleValidationError: key 未注册
@@ -175,6 +223,7 @@ class TuningRuleManager:
         if filename is None:
             raise RuleValidationError(f"规则不存在: {key}")
         self._resolver.delete_entity(self._rel(filename))
+        self._remove_tuning_rule(key)
         self.reload()
 
     def rename_rule(self, old_key: str, new_key: str) -> None:
@@ -205,7 +254,104 @@ class TuningRuleManager:
             yaml.dump(data, allow_unicode=True, sort_keys=False),
         )
         self._resolver.delete_entity(self._rel(self._files[old_key]))
+        self._rename_tuning_rule(old_key, new_key)
         self.reload()
+
+    def set_rule_enabled(self, key: str, enabled: bool) -> None:
+        """设置规则启用状态并更新 tune_config.yaml"""
+        # 检查磁盘文件是否存在（禁用规则不在 _files 中，需直接查磁盘）
+        if (key not in self._files
+                and self._resolver.resolve_read(
+                    self._rel(f"{key}.yaml")) is None):
+            raise RuleValidationError(f"规则不存在: {key}")
+        self._set_tuning_rule_enabled(key, enabled)
+        self.reload()
+
+    # ── tuning_rules 持久化辅助 ──
+
+    def _read_tune_config_raw(self) -> dict:
+        """读取 tune_config.yaml 原始 dict"""
+        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
+        if path is None:
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.error(f"tune_config.yaml 读取失败: {e}")
+            return {}
+
+    def _write_tune_config_raw(self, data: dict) -> None:
+        """写回 tune_config.yaml 并通知 TuneConfigManager 刷新"""
+        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
+        if path is None:
+            logger.error("tune_config.yaml 不存在，无法写入")
+            return
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        # 通知 TuneConfigManager 单例刷新，避免缓存过期
+        if _tune_config_manager is not None:
+            _tune_config_manager.reload()
+
+    def _append_tuning_rule(self, key: str) -> None:
+        """追加规则到 tuning_rules（默认启用）"""
+        data = self._read_tune_config_raw()
+        tuning_rules = data.get("tuning_rules") or {}
+        if key not in tuning_rules:
+            tuning_rules[key] = True
+            data["tuning_rules"] = tuning_rules
+            self._write_tune_config_raw(data)
+
+    def _remove_tuning_rule(self, key: str) -> None:
+        """从 tuning_rules 移除规则"""
+        data = self._read_tune_config_raw()
+        tuning_rules = data.get("tuning_rules") or {}
+        if key in tuning_rules:
+            del tuning_rules[key]
+            data["tuning_rules"] = tuning_rules
+            self._write_tune_config_raw(data)
+
+    def _rename_tuning_rule(self, old_key: str, new_key: str) -> None:
+        """在 tuning_rules 中重命名规则（保持原位置）"""
+        data = self._read_tune_config_raw()
+        tuning_rules = data.get("tuning_rules") or {}
+        if old_key in tuning_rules:
+            # 保持插入序：重建 dict
+            new_rules: dict[str, bool] = {}
+            for k, v in tuning_rules.items():
+                if k == old_key:
+                    new_rules[new_key] = v
+                else:
+                    new_rules[k] = v
+            data["tuning_rules"] = new_rules
+            self._write_tune_config_raw(data)
+
+    def _set_tuning_rule_enabled(self, key: str, enabled: bool) -> None:
+        """设置 tuning_rules 中规则的启用状态（key 不存在则追加）"""
+        data = self._read_tune_config_raw()
+        tuning_rules = data.get("tuning_rules") or {}
+        tuning_rules[key] = enabled
+        data["tuning_rules"] = tuning_rules
+        self._write_tune_config_raw(data)
+
+
+    def get_all_rule_keys_and_names(self) -> list[tuple[str, str]]:
+        """全部规则 key + 名称（含禁用），供对话框导航使用"""
+        result: list[tuple[str, str]] = []
+        for name in self._resolver.enumerate_entities(self._rel_dir, "*.yaml"):
+            path = self._resolver.resolve_read(self._rel(name))
+            if path is None:
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                key = str(data.get("key", "")).strip()
+                rule_name = str(data.get("name", "")).strip()
+                if key:
+                    result.append((key, rule_name or key))
+            except Exception:
+                continue
+        return result
 
 
 # ─── 全局单例 ──────────────────────────────────────────────

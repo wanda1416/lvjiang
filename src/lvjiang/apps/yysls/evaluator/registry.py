@@ -20,13 +20,13 @@ __all__ = [
 # ─── 调律规则注册表（每次查询管理器，保证 reload 后不过期） ───
 
 def get_tuning_rules() -> dict[str, TuningRule]:
-    """key → TuningRule（按规则 order 排序；UI 据其元数据属性
-    playstyle_options 生成玩法勾选控件）"""
+    """key → TuningRule（按 tuning_rules 声明顺序；仅含启用规则；
+    UI 据其元数据属性 playstyle_options 生成玩法勾选控件）"""
     return get_tuning_rule_manager().get_rules()
 
 
 def get_rule_names() -> dict[str, str]:
-    """key → 显示名（供 UI 使用，保持规则 order 顺序）"""
+    """key → 显示名（供 UI 使用，按 tuning_rules 声明顺序）"""
     return {key: rule.name for key, rule in get_tuning_rules().items()}
 
 

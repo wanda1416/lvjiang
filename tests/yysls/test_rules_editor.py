@@ -87,10 +87,11 @@ class TestBehaviorPages:
         scan = tmp_base_manager.get().behavior.scan
         assert page._entry_combo.currentData() == scan.entry_min_rating
 
-        page._entry_combo.setCurrentIndex(page._entry_combo.findData("top"))
+        # 变更到不同于默认值的选项（默认配置为 top，故切换到 excellent）
+        page._entry_combo.setCurrentIndex(page._entry_combo.findData("excellent"))
         assert statuses and not statuses[-1][1], statuses[-1][0]
         after = tmp_base_manager.get().behavior.scan
-        assert after.entry_min_rating == "top"
+        assert after.entry_min_rating == "excellent"
         # 处置表其他字段不受影响
         assert after.enabled == scan.enabled
         assert after.rules == scan.rules

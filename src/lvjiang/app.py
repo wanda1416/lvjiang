@@ -133,6 +133,7 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     install_wheel_guard(_app)
 
     _window = MainWindow()
+    _window.setUpdatesEnabled(True)   # 构造期重绘已关闭，show 前恢复
     _window.show()
 
     # 启动后延迟检查更新（不阻塞主窗口显示）

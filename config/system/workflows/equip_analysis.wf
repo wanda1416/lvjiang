@@ -36,10 +36,7 @@ for slot in ["head", "chest", "leg", "wrist"]
 end
 
 # 结束后一次性写入 session
-eval session.equipped = $equipped
-
-# 输出装备数据（供调用方 read 取用）
-collect $equipped
+session.equipped = $equipped
 
 # 返回主界面
 call nav_back_to_main()

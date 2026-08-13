@@ -75,12 +75,8 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
     def _restore_window_size(self):
         """从 session.json 恢复窗口位置 + 大小 + 分割器尺寸"""
-        from ...core.config import get_session_store
-        state = get_session_store().get_node("ui_state", {})
-        if not isinstance(state, dict):
-            logger.debug("场景编辑器恢复：ui_state 非 dict")
-            return
-        se = state.get("scene_editor", {})
+        from ...core.config import load_ui_page_state
+        se = load_ui_page_state("scene_editor")
         if not isinstance(se, dict):
             logger.debug("场景编辑器恢复：scene_editor 子节点非 dict")
             return
@@ -111,7 +107,6 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
     def _save_window_size(self):
         """保存窗口位置 + 大小 + 分割器尺寸到 session.json（写入 ui_state.scene_editor）"""
-        from ...core.config import get_session_store
         se = {
             "pos": [self.x(), self.y()],
             "size": [self.width(), self.height()],
@@ -124,7 +119,8 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             break
         logger.debug(f"场景编辑器保存：scene_editor = {se}")
         try:
-            get_session_store().update_node("ui_state", {"scene_editor": se})
+            from ...core.config import update_ui_page_state
+            update_ui_page_state("scene_editor", se)
         except Exception as e:
             logger.warning(f"保存场景编辑器窗口大小失败: {e}")
 

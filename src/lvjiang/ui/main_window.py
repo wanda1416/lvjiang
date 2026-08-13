@@ -42,7 +42,7 @@ from ..i18n import tr
 from .capture_ops import CaptureOpsMixin
 from .overlay import BorderOverlay
 from .run_control import RunControlMixin
-from .widgets import TrimmedLogEdit
+from .widgets import FlowLayout, TrimmedLogEdit
 from .window_ops import WindowOpsMixin
 
 
@@ -63,6 +63,25 @@ def _get_title_with_version() -> str:
     except Exception:
         pass
     return DEFAULT_TITLE
+
+
+class _FlowContainer(QWidget):
+    """FlowLayout 容器，正确传递 heightForWidth 给外层 QFormLayout。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._flow = None
+
+    def set_flow_layout(self, flow: FlowLayout):
+        self._flow = flow
+
+    def hasHeightForWidth(self):
+        return self._flow is not None and self._flow.hasHeightForWidth()
+
+    def heightForWidth(self, width: int) -> int:
+        if self._flow is not None:
+            return self._flow.heightForWidth(width)
+        return super().heightForWidth(width)
 
 
 class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
@@ -86,6 +105,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
+        # 构造期间禁止重绘，防止 adjustSize / resize 等操作
+        # 在 show() 之前触发 DWM 短暂渲染出一帧小窗口
+        self.setUpdatesEnabled(False)
         registry = get_registry()
 
         # 标题
@@ -827,13 +849,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _restore_ui_state(self):
         """启动时恢复窗口大小、左右分栏比例和当前 Tab 页签"""
-        from ..core.config import get_session_store
-        state = get_session_store().get_node("ui_state", {})
-        if not isinstance(state, dict):
-            return
-        page = state.get("main_page", {})
-        if not isinstance(page, dict):
-            return
+        from ..core.config import load_ui_page_state
+        page = load_ui_page_state("main_page")
         size = page.get("window_size")
         if isinstance(size, list) and len(size) == 2:
             self.resize(int(size[0]), int(size[1]))
@@ -849,29 +866,25 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             self.tabs.setCurrentIndex(right_idx)
 
     def _save_ui_state(self):
-        """退出时写入 ui_state.main_page（浅合并，各页面写各自子节点互不干扰）"""
-        from ..core.config import get_session_store
+        """退出时安全合并 ui_state.main_page。"""
+        from ..core.config import update_ui_page_state
         try:
-            get_session_store().update_node("ui_state", {
-                "main_page": {
-                    "window_size": [self.width(), self.height()],
-                    "splitter_sizes": self._main_splitter.sizes(),
-                    "left_tab_index": self._left_tabs.currentIndex(),
-                    "right_tab_index": self.tabs.currentIndex(),
-                },
+            update_ui_page_state("main_page", {
+                "window_size": [self.width(), self.height()],
+                "splitter_sizes": self._main_splitter.sizes(),
+                "left_tab_index": self._left_tabs.currentIndex(),
+                "right_tab_index": self.tabs.currentIndex(),
             })
         except Exception as e:
             logger.warning(f"保存 UI 状态失败: {e}")
 
     def _save_tab_indices(self):
         """Tab 切换时保存当前左右页签索引"""
-        from ..core.config import get_session_store
+        from ..core.config import update_ui_page_state
         try:
-            get_session_store().update_node("ui_state", {
-                "main_page": {
-                    "left_tab_index": self._left_tabs.currentIndex(),
-                    "right_tab_index": self.tabs.currentIndex(),
-                },
+            update_ui_page_state("main_page", {
+                "left_tab_index": self._left_tabs.currentIndex(),
+                "right_tab_index": self.tabs.currentIndex(),
             })
         except Exception as e:
             logger.warning(f"保存 Tab 页签失败: {e}")
@@ -920,9 +933,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if not target_cfg.get("parameters"):
             return
         params = {}
-        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox
+        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox, QWidget
         for param_def in target_cfg.get("parameters", []):
             name = param_def["name"]
+            # checkgroup：从容器内收集各复选框状态为 dict
+            if param_def.get("type") == "checkgroup":
+                container = self._param_panel.findChild(QWidget, name)
+                if container is not None:
+                    group = {}
+                    for chk in container.findChildren(QCheckBox):
+                        group[chk.objectName()] = chk.isChecked()
+                    params[name] = group
+                continue
             widget = self._param_panel.findChild(QSpinBox, name)
             if widget is not None:
                 params[name] = str(widget.value())
@@ -1032,6 +1054,29 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 else:
                     chk.setChecked(bool(default))
                 self._param_layout.addRow(label + ":", chk)
+            elif param_type == "checkgroup":
+                # 分组复选框：值为 dict {key: bool}，使用 FlowLayout 自动换行
+                container = _FlowContainer()
+                container.setObjectName(name)
+                flow = FlowLayout(container, spacing=6)
+                flow.setContentsMargins(0, 0, 0, 0)
+                container.set_flow_layout(flow)
+                if isinstance(default, dict):
+                    saved_dict = default
+                else:
+                    saved_dict = {}
+                for opt in options:
+                    if isinstance(opt, dict):
+                        opt_key = opt["value"]
+                        opt_label = opt.get("label", opt_key)
+                    else:
+                        opt_key = str(opt)
+                        opt_label = str(opt)
+                    chk = QCheckBox(opt_label)
+                    chk.setObjectName(opt_key)
+                    chk.setChecked(bool(saved_dict.get(opt_key, True)))
+                    flow.addWidget(chk)
+                self._param_layout.addRow(label + ":", container)
             else:
                 combo = QComboBox()
                 combo.setObjectName(name)

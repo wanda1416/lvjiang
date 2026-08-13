@@ -9,6 +9,10 @@
 
 节点语义：session.json 顶层 key 即节点（ui_state / daily / settings /
 active_layout / active_space 等），各调用方只操作自己的节点。
+
+ui_state 的页面子节点禁止直接通过 update_node 嵌套写入；该方法只做
+顶层浅合并，会整体覆盖同名页面。页面状态统一使用
+load_ui_page_state / update_ui_page_state。
 """
 from __future__ import annotations
 
@@ -163,6 +167,40 @@ def reset_session_store() -> None:
     _store = None
 
 
+# ─── UI 页面状态安全入口 ──────────────────────────────────
+
+def load_ui_page_state(page_key: str) -> dict[str, Any]:
+    """读取 ``ui_state.<page_key>``，非法或缺失时返回空字典。"""
+    state = get_session_store().get_node("ui_state", {})
+    if not isinstance(state, dict):
+        return {}
+    page = state.get(page_key)
+    return page if isinstance(page, dict) else {}
+
+
+def update_ui_page_state(page_key: str, patch: dict[str, Any]) -> dict:
+    """原子浅合并 ``ui_state.<page_key>``，保留该页面其他字段。
+
+    这是页面级 UI 状态的唯一写入口。不得写成
+    ``update_node("ui_state", {page_key: patch})``，后者会整体替换页面，
+    例如保存页签索引时删除窗口大小。
+    """
+    if not isinstance(page_key, str) or not page_key:
+        raise ValueError("page_key 必须是非空字符串")
+    if not isinstance(patch, dict):
+        raise TypeError("patch 必须是 dict")
+
+    def _merge(old):
+        state = dict(old) if isinstance(old, dict) else {}
+        page = state.get(page_key)
+        page = dict(page) if isinstance(page, dict) else {}
+        page.update(patch)
+        state[page_key] = page
+        return state
+
+    return get_session_store().mutate_node("ui_state", _merge)
+
+
 # ─── 便捷函数：settings / material_grid ────────────────────
 
 def load_settings() -> dict[str, Any]:
@@ -191,6 +229,34 @@ def save_material_grid(grid: dict[str, Any]) -> None:
     """保存材料网格参数到 session.json 的 settings.material_grid 节点（保留其他 settings 字段）"""
     existing = load_settings()
     existing["material_grid"] = grid
+    get_session_store().set_node("settings", existing)
+
+
+# ─── 便捷函数：equip_display 装备展示参数 ────────────────────
+
+_EQUIP_DISPLAY_DEFAULTS: dict[str, Any] = {
+    "name_font_size": 13,
+    "level_font_size": 12,
+    "affix_font_size": 11,
+    "card_min_height": 180,
+    "grid_columns": 4,
+}
+
+
+def load_equip_display() -> dict[str, Any]:
+    """读取 session.json 的 settings.equip_display 节点，缺失字段用默认值补齐"""
+    value = load_settings().get("equip_display")
+    if not isinstance(value, dict):
+        return dict(_EQUIP_DISPLAY_DEFAULTS)
+    merged = dict(_EQUIP_DISPLAY_DEFAULTS)
+    merged.update(value)
+    return merged
+
+
+def save_equip_display(params: dict[str, Any]) -> None:
+    """保存装备展示参数到 session.json 的 settings.equip_display 节点"""
+    existing = load_settings()
+    existing["equip_display"] = params
     get_session_store().set_node("settings", existing)
 
 

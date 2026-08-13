@@ -65,11 +65,8 @@ class ReferenceManagerDialog(QDialog):
 
     def _restore_window_size(self):
         """从 session.json 恢复窗口大小"""
-        from lvjiang.core.config import get_session_store
-        state = get_session_store().get_node("ui_state", {})
-        if not isinstance(state, dict):
-            return
-        rm = state.get("reference_manager", {})
+        from lvjiang.core.config import load_ui_page_state
+        rm = load_ui_page_state("reference_manager")
         if not isinstance(rm, dict):
             return
         size = rm.get("size")
@@ -78,10 +75,10 @@ class ReferenceManagerDialog(QDialog):
 
     def _save_window_size(self):
         """保存窗口大小到 session.json（写入 ui_state.reference_manager）"""
-        from lvjiang.core.config import get_session_store
         try:
-            get_session_store().update_node(
-                "ui_state", {"reference_manager": {"size": [self.width(), self.height()]}})
+            from lvjiang.core.config import update_ui_page_state
+            update_ui_page_state(
+                "reference_manager", {"size": [self.width(), self.height()]})
         except Exception as e:
             logger.warning(f"保存图库管理器窗口大小失败: {e}")
 

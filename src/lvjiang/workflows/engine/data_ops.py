@@ -347,20 +347,24 @@ class _DataOpsMixin:
         return self._ensure_workflow().call_function(node.func_name, resolved_args, engine=self)
 
     def _exec_call_proc(self, node: CallProc):
-        """call proc_name($arg1, "arg2", ...) 或 call $result = proc_name(...) — 调用子过程
+        """call proc_name($arg1, "arg2", ...) [as $output] — 调用子过程
 
         变量隔离：save/restore caller variables。
+        output 隔离：save/restore caller output，子过程的 collect 写入隔离的 output。
         session/context/_coord_meta 共享引用，不隔离。
         return 在过程中 = 退出过程（捕获 _ReturnSignal）。
         若指定 result_var，则将返回值绑定到该变量。
+        若指定 output_var，则将子过程的 output dict 绑定到该变量。
         """
         proc_def = self._procs.get(node.name)
         if proc_def is None:
             logger.error(f"call: 未定义的过程 {node.name}")
             return
         logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
-        # 1. 保存当前变量快照
+        # 1. 保存当前变量和 output 快照
         saved_vars = dict(self.variables)
+        saved_output = dict(self.output)
+        self.output = {}  # 子过程从空 output 开始
         return_value = None
         try:
             # 2. 绑定参数
@@ -373,11 +377,16 @@ class _DataOpsMixin:
             except _ReturnSignal as e:
                 return_value = e.value  # 捕获返回值
         finally:
-            # 4. 恢复变量（session/context 自然保留修改）
+            # 4. 捕获子过程的 output，然后恢复调用方的变量和 output
+            callee_output = dict(self.output)
             self.variables = saved_vars
+            self.output = saved_output
         # 5. 绑定返回值到调用方变量
         if node.result_var is not None:
             self.variables[node.result_var] = return_value
+        # 6. 绑定子过程 output 到调用方变量
+        if node.output_var is not None:
+            self.variables[node.output_var] = callee_output
 
     def _exec_find(self, node: Find):
         """find [scene].[area] as $var by ... — 在指定区域或全画布 OCR 搜索目标文字

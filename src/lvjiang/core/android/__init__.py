@@ -12,7 +12,7 @@
 - create_capture_backend(device, method)：创建截图后端（screencap 或 scrcpy）
 """
 
-from ...config import InputSimConfig
+from ...core.config import InputSimConfig
 from ..capture_base import CaptureBackend
 from ..input_base import InputBackend
 from .adb_capture import AdbCapture

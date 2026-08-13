@@ -7,7 +7,7 @@ wait 引用的命名等待参数（delay_params）不存在时
 
 import pytest
 
-from lvjiang.config import DelayParam
+from lvjiang.core.config import DelayParam
 from lvjiang.workflows.engine import WorkflowUserError
 from tests.workflows.conftest import make_engine
 

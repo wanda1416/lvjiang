@@ -41,7 +41,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
     TuningNavigator,
 )
 from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
-from lvjiang.config import load_user_config
+from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_name
 from lvjiang.workflows.engine import WorkflowEngine
 

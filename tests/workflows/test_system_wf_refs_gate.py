@@ -11,7 +11,7 @@ config/local 影子文件影响，CI 与开发机结论一致。
 
 import pytest
 
-from lvjiang.config import load_user_config
+from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine
 

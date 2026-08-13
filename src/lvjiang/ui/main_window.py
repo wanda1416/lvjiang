@@ -36,7 +36,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps import get_registry
 
-from ..config import load_user_config
+from ..core.config import load_user_config
 from ..core.config.users import SessionManager
 from ..core.layout_manager import LayoutConfigManager
 from ..core.user_config import UserConfigManager

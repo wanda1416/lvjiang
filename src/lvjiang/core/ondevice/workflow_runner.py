@@ -18,8 +18,8 @@ from typing import Callable
 
 from loguru import logger
 
-from ...config import load_user_config
 from ...core.capture_base import CaptureBackend
+from ...core.config import load_user_config
 from ...core.config.resolver import get_resolver
 from ...core.config.session import get_session_store
 from ...core.input_base import InputBackend

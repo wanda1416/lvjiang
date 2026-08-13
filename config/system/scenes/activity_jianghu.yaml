@@ -88,7 +88,7 @@ regions:
   is_text: false
   is_clickable: true
   view: qingjing
-- key: goto_edit_qingjing
+- key: goto_qingjing
   name: 前往编辑情境
   type: attr
   is_text: true

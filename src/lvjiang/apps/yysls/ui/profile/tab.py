@@ -29,6 +29,7 @@ from ...config.profile_models import (
 )
 from ...profile.profile_db import db_read_all
 from ...profile.regen_math import compute_regen_entry
+from .....i18n import tr
 
 # 统一的刷新按钮样式（overview.py 与 tab.py 共用）
 REFRESH_BTN_STYLE = (
@@ -56,14 +57,14 @@ def add_user_nav_buttons(btn_row: QHBoxLayout, host) -> None:
     btn_row.addSpacing(6)
     btn_prev = QPushButton("◀")
     btn_prev.setFixedWidth(28)
-    btn_prev.setToolTip("上一个用户")
+    btn_prev.setToolTip(tr("上一个用户"))
     btn_prev.setStyleSheet(NAV_BTN_STYLE)
     btn_prev.clicked.connect(lambda: host.navigate_user(-1))
     btn_row.addWidget(btn_prev)
 
     btn_next = QPushButton("▶")
     btn_next.setFixedWidth(28)
-    btn_next.setToolTip("下一个用户")
+    btn_next.setToolTip(tr("下一个用户"))
     btn_next.setStyleSheet(NAV_BTN_STYLE)
     btn_next.clicked.connect(lambda: host.navigate_user(1))
     btn_row.addWidget(btn_next)
@@ -146,9 +147,9 @@ class ProfileTab(QWidget):
 
         # 刷新按钮
         btn_row = QHBoxLayout()
-        btn_refresh = QPushButton("刷新")
+        btn_refresh = QPushButton(tr("刷新"))
         btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip("重新读取角色数据")
+        btn_refresh.setToolTip(tr("重新读取角色数据"))
         btn_refresh.setStyleSheet(REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._refresh_current_user)
         btn_row.addWidget(btn_refresh)
@@ -170,7 +171,7 @@ class ProfileTab(QWidget):
 
         user_name = self._host.active_user_name()
         if not user_name:
-            placeholder = QLabel("请先选择用户")
+            placeholder = QLabel(tr("请先选择用户"))
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setStyleSheet("color: #999; font-size: 14px; padding: 40px;")
             self._detail_container.addWidget(placeholder)
@@ -287,7 +288,7 @@ def _format_detail_value(kd: KeyDef, model_type: str, data: dict) -> str:
 
     if model_type == MODEL_QUOTA:
         if isinstance(value, bool):
-            return "已完成" if value else "未完成"
+            return tr("已完成") if value else tr("未完成")
         return str(int(value))
 
     if model_type == MODEL_REGEN:

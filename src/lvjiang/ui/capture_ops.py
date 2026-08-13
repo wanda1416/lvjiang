@@ -19,6 +19,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from ..constants import PICTURE_DIR, VIDEO_DIR
+from ..i18n import tr
 
 
 def _cap_btn_style(bg: str) -> str:
@@ -83,18 +84,18 @@ class CaptureOpsMixin:
         )
         status_row.addWidget(self.lbl_rec_time)
         status_row.addStretch()
-        self.lbl_rec_state = QLabel("待机")
+        self.lbl_rec_state = QLabel(tr("待机"))
         self.lbl_rec_state.setStyleSheet("color: #888; font-size: 11px;")
         status_row.addWidget(self.lbl_rec_state)
         lay.addLayout(status_row)
 
         # 录制控制组（注意：btn_record/btn_pause 已被宏录制等占用，这里用独立命名）
-        self.btn_rec_screen = QPushButton("● 录屏")
+        self.btn_rec_screen = QPushButton(tr("● 录屏"))
         self.btn_rec_screen.setStyleSheet(_STYLE_RECORD_IDLE)
         self.btn_rec_screen.clicked.connect(self._on_toggle_record)
         lay.addWidget(self.btn_rec_screen)
 
-        self.btn_rec_pause = QPushButton("⏸ 暂停")
+        self.btn_rec_pause = QPushButton(tr("⏸ 暂停"))
         self.btn_rec_pause.setStyleSheet(_STYLE_PAUSE)
         self.btn_rec_pause.clicked.connect(self._on_pause_record)
         lay.addWidget(self.btn_rec_pause)
@@ -102,7 +103,7 @@ class CaptureOpsMixin:
         lay.addWidget(_cap_divider())
 
         # 截屏（独立于录屏状态机，点击立即保存）
-        self.btn_snap = QPushButton("截屏")
+        self.btn_snap = QPushButton(tr("截屏"))
         self.btn_snap.setStyleSheet(_STYLE_SNAP)
         self.btn_snap.clicked.connect(self._on_snap)
         lay.addWidget(self.btn_snap)
@@ -112,11 +113,11 @@ class CaptureOpsMixin:
         # 处置组：保存 | 放弃（仅待保存状态可用）
         disposal_row = QHBoxLayout()
         disposal_row.setSpacing(6)
-        self.btn_save_rec = QPushButton("保存")
+        self.btn_save_rec = QPushButton(tr("保存"))
         self.btn_save_rec.setStyleSheet(_STYLE_SAVE)
         self.btn_save_rec.clicked.connect(self._on_save_recording)
         disposal_row.addWidget(self.btn_save_rec)
-        self.btn_discard_rec = QPushButton("放弃")
+        self.btn_discard_rec = QPushButton(tr("放弃"))
         self.btn_discard_rec.setStyleSheet(_STYLE_DISCARD)
         self.btn_discard_rec.clicked.connect(self._on_discard_recording)
         disposal_row.addWidget(self.btn_discard_rec)
@@ -139,42 +140,42 @@ class CaptureOpsMixin:
 
         if state == "idle":
             self.lbl_rec_dot.setStyleSheet("color: #666; font-size: 14px;")
-            self.lbl_rec_state.setText("待机")
-            self.btn_rec_screen.setText("● 录屏")
+            self.lbl_rec_state.setText(tr("待机"))
+            self.btn_rec_screen.setText(tr("● 录屏"))
             self.btn_rec_screen.setStyleSheet(_STYLE_RECORD_IDLE)
             self.btn_rec_screen.setEnabled(connected and streaming)
-            self.btn_rec_screen.setToolTip("" if streaming else "仅流式截图模式支持录屏")
-            self.btn_rec_pause.setText("⏸ 暂停")
+            self.btn_rec_screen.setToolTip("" if streaming else tr("仅流式截图模式支持录屏"))
+            self.btn_rec_pause.setText(tr("⏸ 暂停"))
             self.btn_rec_pause.setEnabled(False)
             self.btn_save_rec.setEnabled(False)
             self.btn_discard_rec.setEnabled(False)
         elif state == "recording":
             self.lbl_rec_dot.setStyleSheet("color: #f44336; font-size: 14px;")
-            self.lbl_rec_state.setText("录制中")
-            self.btn_rec_screen.setText("■ 停止")
+            self.lbl_rec_state.setText(tr("录制中"))
+            self.btn_rec_screen.setText(tr("■ 停止"))
             self.btn_rec_screen.setStyleSheet(_STYLE_RECORD_STOP)
             self.btn_rec_screen.setEnabled(True)
-            self.btn_rec_pause.setText("⏸ 暂停")
+            self.btn_rec_pause.setText(tr("⏸ 暂停"))
             self.btn_rec_pause.setEnabled(True)
             self.btn_save_rec.setEnabled(False)
             self.btn_discard_rec.setEnabled(False)
         elif state == "paused":
             self.lbl_rec_dot.setStyleSheet("color: #FFA726; font-size: 14px;")
-            self.lbl_rec_state.setText("已暂停")
-            self.btn_rec_screen.setText("■ 停止")
+            self.lbl_rec_state.setText(tr("已暂停"))
+            self.btn_rec_screen.setText(tr("■ 停止"))
             self.btn_rec_screen.setStyleSheet(_STYLE_RECORD_STOP)
             self.btn_rec_screen.setEnabled(True)
-            self.btn_rec_pause.setText("▶ 继续")
+            self.btn_rec_pause.setText(tr("▶ 继续"))
             self.btn_rec_pause.setEnabled(True)
             self.btn_save_rec.setEnabled(False)
             self.btn_discard_rec.setEnabled(False)
         elif state == "pending":
             self.lbl_rec_dot.setStyleSheet("color: #FFD54F; font-size: 14px;")
-            self.lbl_rec_state.setText("待保存")
-            self.btn_rec_screen.setText("● 录屏")
+            self.lbl_rec_state.setText(tr("待保存"))
+            self.btn_rec_screen.setText(tr("● 录屏"))
             self.btn_rec_screen.setStyleSheet(_STYLE_RECORD_IDLE)
             self.btn_rec_screen.setEnabled(False)
-            self.btn_rec_pause.setText("⏸ 暂停")
+            self.btn_rec_pause.setText(tr("⏸ 暂停"))
             self.btn_rec_pause.setEnabled(False)
             self.btn_save_rec.setEnabled(True)
             self.btn_discard_rec.setEnabled(True)

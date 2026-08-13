@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ....i18n import tr
+
 # 品质颜色映射（适配浅色背景）
 _QUALITY_COLORS = {
     "gold": "#B8860B",   # 暗金
@@ -89,7 +91,7 @@ class _EquipCard(QFrame):
         """显示为空槽位"""
         self.lbl_slot.setText(self._slot_name)
         self.lbl_slot.setStyleSheet("font-weight: bold; font-size: 13px; color: #333333;")
-        self.lbl_info.setText("未装备")
+        self.lbl_info.setText(tr("未装备"))
         self.lbl_info.setStyleSheet("font-size: 12px; color: #999999;")
         self._clear_affixes()
 
@@ -121,7 +123,7 @@ class _EquipCard(QFrame):
         # 第二行：等级 + 承音标记
         level = equip_data.get("level", "?")
         is_chengyin = equip_data.get("is_chengyin", False)
-        chengyin_tag = "  [承音]" if is_chengyin else ""
+        chengyin_tag = "  [" + tr("承音") + "]" if is_chengyin else ""
 
         self.lbl_info.setText(f"Lv{level}{chengyin_tag}")
         self.lbl_info.setStyleSheet("font-size: 12px; color: #666666;")
@@ -183,7 +185,7 @@ class _EquipCard(QFrame):
             self.affix_layout.addLayout(row)
 
         if not has_affix:
-            lbl = QLabel("无词条")
+            lbl = QLabel(tr("无词条"))
             lbl.setStyleSheet("font-size: 11px; color: #999999;")
             self.affix_layout.addWidget(lbl)
 

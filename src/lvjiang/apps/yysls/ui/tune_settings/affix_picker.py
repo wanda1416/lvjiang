@@ -39,6 +39,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     DYNAMIC_AFFIXES,
     DYNAMIC_CATEGORY,
 )
+from .....i18n import tr
 
 # 候选无归属时归入的兜底桶名
 _UNCATEGORIZED = "未归类"
@@ -75,10 +76,10 @@ class AffixSelectSortDialog(QDialog):
     flat=True 时下区按归类顺序平铺）"""
 
     def __init__(self, candidates: list[str], selected: list[str],
-                 title: str = "选择词条", parent=None, *,
+                 title: str | None = None, parent=None, *,
                  flat: bool = False):
         super().__init__(parent)
-        self.setWindowTitle(title)
+        self.setWindowTitle(title or tr("选择词条"))
         self.setMinimumSize(560, 560)
         self._candidates = list(candidates)
         # 词条名 → 复选框（构建右列时按分类填充，故用单一映射便于同步）
@@ -96,9 +97,9 @@ class AffixSelectSortDialog(QDialog):
         top_layout = QVBoxLayout(top_widget)
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_header = QHBoxLayout()
-        top_header.addWidget(QLabel("已选词条（可拖拽调整顺序）"))
+        top_header.addWidget(QLabel(tr("已选词条（可拖拽调整顺序）")))
         top_header.addStretch()
-        btn_remove = QPushButton("移除选中")
+        btn_remove = QPushButton(tr("移除选中"))
         btn_remove.clicked.connect(self._remove_selected)
         top_header.addWidget(btn_remove)
         top_layout.addLayout(top_header)

@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ....i18n import tr
 from .tuning_progress_hub import TuningProgressHub
 
 # 品阶 key → 颜色
@@ -33,7 +34,7 @@ _QUALITY_COLORS = {
     "blue": "#2196F3",
 }
 
-# 评级 key → 中文 + 颜色
+# 评级 key → 中文 + 颜色（运行时通过 tr() 翻译）
 _RATING_STYLE = {
     "top": ("顶级", "#FF6F00; font-weight: bold"),
     "excellent": ("优秀", "#388E3C"),
@@ -69,8 +70,12 @@ class TuningProgressDialog:
         self._round_count = 0
 
     @staticmethod
-    def _format_affix_lines(affixes: list[dict], count: int | None = None) -> str:
-        """格式化词条列表为固定 MAX_AFFIX 行的文本（空位灰色占位）"""
+    def _format_affix_lines(affixes: list[dict], count: int | None = None,
+                            header_label: str | None = None) -> str:
+        """格式化词条列表为固定 MAX_AFFIX 行的文本（空位灰色占位）
+
+        header_label: 显示在词条列表前的标题（已翻译文本），默认 tr("当前词条")
+        """
         total = TuningProgressDialog.MAX_AFFIX
         n = count if count is not None else len(affixes)
         lines = []
@@ -82,14 +87,15 @@ class TuningProgressDialog:
                 lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
             else:
                 lines.append("  • —")
-        header = f"当前词条（{n}/{total}）："
+        prefix = header_label if header_label is not None else tr("当前词条")
+        header = tr("{prefix}（{n}/{total}）：").format(prefix=prefix, n=n, total=total)
         return header + "\n" + "\n".join(lines)
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
         self._dialog = _HideOnCloseDialog(None)  # 独立窗口，关闭=隐藏
-        self._dialog.setWindowTitle("调律进度")
+        self._dialog.setWindowTitle(tr("调律进度"))
         self._dialog.setMinimumWidth(420)
         self._dialog.setModal(False)
         self._dialog.setWindowFlag(Qt.WindowType.Window, True)
@@ -99,9 +105,9 @@ class TuningProgressDialog:
         layout.setSpacing(8)
 
         # ── 批次进度条 ──
-        batch_group = QGroupBox("批次进度")
+        batch_group = QGroupBox(tr("批次进度"))
         batch_layout = QVBoxLayout(batch_group)
-        self._batch_label = QLabel("准备中...")
+        self._batch_label = QLabel(tr("准备中..."))
         self._batch_label.setStyleSheet("font-size: 12px;")
         batch_layout.addWidget(self._batch_label)
         self._batch_progress = QProgressBar()
@@ -110,9 +116,9 @@ class TuningProgressDialog:
         layout.addWidget(batch_group)
 
         # ── 当前装备 ──
-        equip_group = QGroupBox("当前装备")
+        equip_group = QGroupBox(tr("当前装备"))
         equip_layout = QVBoxLayout(equip_group)
-        self._equip_name_label = QLabel("等待中...")
+        self._equip_name_label = QLabel(tr("等待中..."))
         self._equip_name_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         equip_layout.addWidget(self._equip_name_label)
         self._equip_info_label = QLabel("")
@@ -128,9 +134,9 @@ class TuningProgressDialog:
         layout.addWidget(equip_group)
 
         # ── 词条进度 ──
-        affix_group = QGroupBox("词条进度")
+        affix_group = QGroupBox(tr("词条进度"))
         affix_layout = QVBoxLayout(affix_group)
-        self._affix_current_label = QLabel("当前词条：-")
+        self._affix_current_label = QLabel(tr("当前词条：-"))
         self._affix_current_label.setStyleSheet("font-size: 12px;")
         self._affix_current_label.setWordWrap(True)
         affix_layout.addWidget(self._affix_current_label)
@@ -141,19 +147,19 @@ class TuningProgressDialog:
         line.setFrameShadow(QFrame.Shadow.Sunken)
         affix_layout.addWidget(line)
 
-        self._target_label = QLabel("目标词条：-")
+        self._target_label = QLabel(tr("目标词条：-"))
         self._target_label.setStyleSheet("font-size: 12px;")
         self._target_label.setWordWrap(True)
         affix_layout.addWidget(self._target_label)
         layout.addWidget(affix_group)
 
         # ── 调律状态 ──
-        status_group = QGroupBox("调律状态")
+        status_group = QGroupBox(tr("调律状态"))
         status_layout = QVBoxLayout(status_group)
-        self._round_label = QLabel("轮次：0")
+        self._round_label = QLabel(tr("轮次：0"))
         self._round_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._round_label)
-        self._expect_label = QLabel("预期评级：-")
+        self._expect_label = QLabel(tr("预期评级：-"))
         self._expect_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._expect_label)
         self._last_result_label = QLabel("")
@@ -180,7 +186,7 @@ class TuningProgressDialog:
         # ── 关闭按钮 ──
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self._close_btn = QPushButton("关闭")
+        self._close_btn = QPushButton(tr("关闭"))
         self._close_btn.setEnabled(False)
         self._close_btn.clicked.connect(self._on_close_clicked)
         self._close_btn.setFixedWidth(80)
@@ -237,25 +243,25 @@ class TuningProgressDialog:
         """重置 UI 到初始状态（新工作流启动时调用）"""
         self._equipment_count = 0
         self._round_count = 0
-        self._batch_label.setText("准备中...")
+        self._batch_label.setText(tr("准备中..."))
         self._batch_progress.setValue(0)
-        self._equip_name_label.setText("等待中...")
+        self._equip_name_label.setText(tr("等待中..."))
         self._equip_info_label.setText("")
-        self._affix_current_label.setText("当前词条：-")
-        self._target_label.setText("目标词条：-")
-        self._round_label.setText("轮次：0")
-        self._expect_label.setText("预期评级：-")
+        self._affix_current_label.setText(tr("当前词条：-"))
+        self._target_label.setText(tr("目标词条：-"))
+        self._round_label.setText(tr("轮次：0"))
+        self._expect_label.setText(tr("预期评级：-"))
         self._last_result_label.setText("")
         self._status_msg_label.setVisible(False)
         self._scan_decision_label.setVisible(False)
         self._material_label.setVisible(False)
         self._close_btn.setEnabled(False)
-        self._close_btn.setText("关闭")
+        self._close_btn.setText(tr("关闭"))
 
     def mark_done(self):
         """工作流结束回调：启用关闭按钮"""
         self._close_btn.setEnabled(True)
-        self._close_btn.setText("完成")
+        self._close_btn.setText(tr("完成"))
 
     def _on_close_clicked(self):
         """关闭按钮：隐藏窗口而非销毁"""
@@ -267,7 +273,7 @@ class TuningProgressDialog:
         self._status_msg_label.setVisible(True)
 
     def _on_slot_entered(self, slot_key: str, slot_name: str):
-        self._batch_label.setText(f"正在处理：{slot_name}")
+        self._batch_label.setText(tr("正在处理：{name}").format(name=slot_name))
 
     def _on_equipment_started(self, info: dict):
         self._equipment_count += 1
@@ -280,10 +286,11 @@ class TuningProgressDialog:
             f"<span style='color:{color}'>{name}</span>")
         # 基础信息
         level = info.get("level", 0)
-        quality_cn = {"gold": "金色", "purple": "紫色", "blue": "蓝色"}.get(
+        quality_cn = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}.get(
             quality, quality)
         self._equip_info_label.setText(
-            f"等级 {level} | {quality_cn} | 词条 {len(info.get('affixes', []))}/5")
+            tr("等级 {level} | {quality} | 词条 {count}/5").format(
+                level=level, quality=quality_cn, count=len(info.get('affixes', []))))
         # 当前词条（固定 5 行占位，避免布局抖动）
         affixes = info.get("affixes", [])
         self._affix_current_label.setText(
@@ -301,15 +308,15 @@ class TuningProgressDialog:
                     parts.append(f"○{t}")
             remaining = len(target) - 12
             suffix = f" 等+{remaining}" if remaining > 0 else ""
-            self._target_label.setText("目标：" + "、".join(parts) + suffix)
+            self._target_label.setText(tr("目标：") + "、".join(parts) + suffix)
         else:
-            self._target_label.setText("目标：-")
+            self._target_label.setText(tr("目标：-"))
         # 预期评级
         expect = info.get("expect_rating", "")
         rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
         self._expect_label.setText(
-            f"预期评级：<span style='{rating_style}'>{rating_cn}</span>")
-        self._round_label.setText("轮次：0")
+            f"{tr('预期评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+        self._round_label.setText(tr("轮次：0"))
         self._last_result_label.setText("")
         self._scan_decision_label.setVisible(False)
         self._material_label.setVisible(False)
@@ -317,7 +324,7 @@ class TuningProgressDialog:
     def _on_tune_round_completed(self, info: dict):
         self._round_count += 1
         round_no = info.get("round_no", self._round_count)
-        self._round_label.setText(f"轮次：{round_no}")
+        self._round_label.setText(tr("轮次：{n}").format(n=round_no))
         # 更新当前词条（固定 5 行占位）
         affixes = info.get("current_affixes", [])
         affix_count = info.get("affix_count", len(affixes))
@@ -346,7 +353,7 @@ class TuningProgressDialog:
         stock = info.get("material_stock", {})
         if stock:
             parts = [f"{k}×{v}" for k, v in stock.items()]
-            self._material_label.setText("材料：" + "、".join(parts))
+            self._material_label.setText(tr("材料：") + "、".join(parts))
             self._material_label.setVisible(True)
 
     def _on_equipment_finished(self, info: dict):
@@ -355,16 +362,16 @@ class TuningProgressDialog:
         rounds = info.get("rounds", 0)
         status = info.get("status", "done")
         rating_cn, rating_style = _RATING_STYLE.get(rating, (rating, "#333"))
-        status_text = "已回收" if status == "recycled" else "已保留"
+        status_text = tr("已回收") if status == "recycled" else tr("已保留")
         self._last_result_label.setText(
             f"<b>{name}</b> → "
-            f"<span style='{rating_style}'>{rating_cn}</span> "
+            f"<span style='{rating_style}'>{tr(rating_cn)}</span> "
             f"({rounds}轮, {status_text})")
         # 更新最终词条（固定 5 行占位）
         final_affixes = info.get("final_affixes", [])
         self._affix_current_label.setText(
-            self._format_affix_lines(final_affixes, len(final_affixes))
-            .replace("当前词条", "最终词条", 1))
+            self._format_affix_lines(final_affixes, len(final_affixes),
+                                     header_label=tr("最终词条")))
 
     def _on_scan_decision(self, info: dict):
         """显示扫描处理决策（评级未达门槛 / 词条已满时的处置结果）"""
@@ -372,14 +379,14 @@ class TuningProgressDialog:
         action = info.get("action", "")
         reason = info.get("reason", "")
         action_labels = {
-            "recycled": "回收",
-            "kept": "保留",
-            "force_tune": "强制调律",
-            "tune_full_recycle": "调满后回收",
+            "recycled": tr("回收"),
+            "kept": tr("保留"),
+            "force_tune": tr("强制调律"),
+            "tune_full_recycle": tr("调满后回收"),
         }
         action_cn = action_labels.get(action, action)
         self._scan_decision_label.setText(
-            f"扫描处理：{name} → <b>{action_cn}</b>\n{reason}")
+            tr("扫描处理：{name} → ").format(name=name) + f"<b>{action_cn}</b>\n{reason}")
         self._scan_decision_label.setVisible(True)
 
     def _on_batch_progress(self, info: dict):
@@ -388,7 +395,9 @@ class TuningProgressDialog:
         total = info.get("total_slots", 0)
         from lvjiang.apps.yysls.ui.tuning_progress_hub import SLOT_NAMES
         slot_cn = SLOT_NAMES.get(slot_key, slot_key)
-        self._batch_label.setText(f"正在处理：{slot_cn}（{slot_idx}/{total}）")
+        self._batch_label.setText(
+            tr("正在处理：{name}（{idx}/{total}）").format(
+                name=slot_cn, idx=slot_idx, total=total))
         self._batch_progress.setMaximum(total)
         self._batch_progress.setValue(slot_idx)
 
@@ -396,9 +405,10 @@ class TuningProgressDialog:
         total = info.get("total_equipment", 0)
         rounds = info.get("total_rounds", 0)
         interrupted = info.get("interrupted", False)
-        suffix = "（已中断）" if interrupted else ""
+        suffix = tr("（已中断）") if interrupted else ""
         self._batch_label.setText(
-            f"调律结束{suffix}：{total} 件装备，{rounds} 轮调律")
+            tr("调律结束{suffix}：{total} 件装备，{rounds} 轮调律").format(
+                suffix=suffix, total=total, rounds=rounds))
         self._batch_progress.setValue(self._batch_progress.maximum())
         self._close_btn.setEnabled(True)
-        self._close_btn.setText("关闭")
+        self._close_btn.setText(tr("关闭"))

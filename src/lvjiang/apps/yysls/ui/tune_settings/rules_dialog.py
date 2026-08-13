@@ -43,6 +43,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     get_tuning_rule_manager,
 )
 from lvjiang.core.config.wf_configs import get_wf_config
+from .....i18n import tr
 
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
@@ -59,15 +60,15 @@ class _NewRuleDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("新增调律规则")
+        self.setWindowTitle(tr("新增调律规则"))
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self._key_edit = QLineEdit()
-        self._key_edit.setPlaceholderText("如 my_rule（小写字母/数字/下划线）")
-        form.addRow("标识 key：", self._key_edit)
+        self._key_edit.setPlaceholderText(tr("如 my_rule（小写字母/数字/下划线）"))
+        form.addRow(tr("标识 key："), self._key_edit)
         self._name_edit = QLineEdit()
-        self._name_edit.setPlaceholderText("如 治疗-纯奶")
-        form.addRow("规则名称：", self._name_edit)
+        self._name_edit.setPlaceholderText(tr("如 治疗-纯奶"))
+        form.addRow(tr("规则名称："), self._name_edit)
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(
@@ -81,11 +82,11 @@ class _NewRuleDialog(QDialog):
         key, name = self.rule_key(), self.rule_name()
         if not _KEY_RE.match(key):
             QMessageBox.warning(
-                self, "新增调律规则",
-                "key 须为小写英文标识（字母开头，可含数字/下划线）")
+                self, tr("新增调律规则"),
+                tr("key 须为小写英文标识（字母开头，可含数字/下划线）"))
             return
         if not name:
-            QMessageBox.warning(self, "新增调律规则", "规则名称不能为空")
+            QMessageBox.warning(self, tr("新增调律规则"), tr("规则名称不能为空"))
             return
         self.accept()
 
@@ -101,7 +102,7 @@ class TuningRulesDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("调律配置")
+        self.setWindowTitle(tr("调律配置"))
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(
@@ -132,11 +133,11 @@ class TuningRulesDialog(QDialog):
         self._nav.currentRowChanged.connect(self._on_nav_changed)
         self._nav.itemDoubleClicked.connect(self._on_nav_double_clicked)
         left.addWidget(self._nav, 1)
-        btn_new = QPushButton("＋ 新增规则")
+        btn_new = QPushButton(tr("＋ 新增规则"))
         btn_new.setAutoDefault(False)
         btn_new.clicked.connect(self._create_rule)
         left.addWidget(btn_new)
-        btn_judge_test = QPushButton("装备调律验证")
+        btn_judge_test = QPushButton(tr("装备调律验证"))
         btn_judge_test.setAutoDefault(False)
         btn_judge_test.clicked.connect(self._open_judge_test)
         left.addWidget(btn_judge_test)
@@ -147,18 +148,18 @@ class TuningRulesDialog(QDialog):
         body.addWidget(self._stack, 1)
         layout.addLayout(body, 1)
 
-        self._status_label = QLabel("规则变更即校验，校验通过自动保存并生效")
+        self._status_label = QLabel(tr("规则变更即校验，校验通过自动保存并生效"))
         layout.addWidget(self._status_label)
 
         # 一级节点：基础规则 → 扫描处理 → 材料处理 → 结束处理 →
         # 分割线 → 流派规则 → 各规则（导航含分割线：行 0-3 = 栈页 0-3，
         # 行 ≥5 = 栈页 - 1）
-        self._nav.addItem("基础规则")
-        self._nav.addItem("扫描处理")
-        self._nav.addItem("材料处理")
-        self._nav.addItem("结束处理")
+        self._nav.addItem(tr("基础规则"))
+        self._nav.addItem(tr("扫描处理"))
+        self._nav.addItem(tr("材料处理"))
+        self._nav.addItem(tr("结束处理"))
         add_nav_separator(self._nav)
-        self._nav.addItem("流派规则")
+        self._nav.addItem(tr("流派规则"))
         self._base_page = BaseRuleGroupPage(
             self._group_manager, group_key, self._set_status)
         self._stack.addWidget(self._base_page)
@@ -258,7 +259,7 @@ class TuningRulesDialog(QDialog):
         layout = page.layout()
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(QLabel("当前规则："))
+        row.addWidget(QLabel(tr("当前规则：")))
         combo = QComboBox()
         combo.currentIndexChanged.connect(
             lambda idx: self._on_group_dropdown_changed(idx, combo))
@@ -305,7 +306,7 @@ class TuningRulesDialog(QDialog):
             return
         old_name = panel.rule_name
         new_name, ok = QInputDialog.getText(
-            self, "重命名规则", "规则名称：", text=old_name)
+            self, tr("重命名规则"), tr("规则名称："), text=old_name)
         if not ok:
             return
         new_name = new_name.strip()
@@ -322,17 +323,17 @@ class TuningRulesDialog(QDialog):
         try:
             self._manager.create_rule(key, name)
         except RuleValidationError as e:
-            QMessageBox.warning(self, "新增调律规则", str(e))
+            QMessageBox.warning(self, tr("新增调律规则"), str(e))
             return
         self._add_rule_page(key, name)
         self._nav.setCurrentRow(self._nav.count() - 1)
-        self._set_status(f"已新增规则「{name}」", False)
+        self._set_status(tr("已新增规则「{name}」").format(name=name), False)
 
     def _delete_rule(self, key: str):
         try:
             self._manager.delete_rule(key)
         except RuleValidationError as e:
-            QMessageBox.warning(self, "删除规则", str(e))
+            QMessageBox.warning(self, tr("删除规则"), str(e))
             return
         for i in range(5, self._stack.count()):
             panel = self._stack.widget(i)
@@ -342,7 +343,7 @@ class TuningRulesDialog(QDialog):
                 self._nav.takeItem(i + 1)  # 导航含分割线，行号 +1
                 break
         self._nav.setCurrentRow(0)
-        self._set_status(f"已删除规则 {key}", False)
+        self._set_status(tr("已删除规则 {key}").format(key=key), False)
 
     def _rename_rule(self, old_key: str, new_key: str, new_name: str):
         """更新对应导航项的标题文本（由 panel 在 key/name 变更时回调）"""

@@ -8,6 +8,8 @@ from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 
+from ..i18n import tr
+
 
 class _DeviceWorker(QObject):
     """后台线程：扫描或连接 ADB 设备（互斥，不会同时运行）"""
@@ -97,16 +99,16 @@ class _WirelessScanDialog(QObject):
             QVBoxLayout,
         )
         self._dialog = QDialog(parent)
-        self._dialog.setWindowTitle("未发现 ADB 设备")
+        self._dialog.setWindowTitle(tr("未发现 ADB 设备"))
         self._dialog.setMinimumWidth(400)
 
         layout = QVBoxLayout(self._dialog)
 
         # 提示文字
         self._msg_label = QLabel(
-            "未发现 USB 连接的 ADB 设备。\n\n"
-            "是否扫描局域网并尝试无线连接？\n"
-            "（设备需已开启无线调试）"
+            tr("未发现 USB 连接的 ADB 设备。\n\n"
+               "是否扫描局域网并尝试无线连接？\n"
+               "（设备需已开启无线调试）")
         )
         layout.addWidget(self._msg_label)
 
@@ -123,8 +125,8 @@ class _WirelessScanDialog(QObject):
 
         # 按钮
         btn_layout = QHBoxLayout()
-        self._scan_btn = QPushButton("扫描")
-        self._cancel_btn = QPushButton("取消")
+        self._scan_btn = QPushButton(tr("扫描"))
+        self._cancel_btn = QPushButton(tr("取消"))
         btn_layout.addStretch()
         btn_layout.addWidget(self._scan_btn)
         btn_layout.addWidget(self._cancel_btn)
@@ -140,7 +142,7 @@ class _WirelessScanDialog(QObject):
     def _on_scan_clicked(self):
         """点击扫描按钮"""
         self._scan_btn.setEnabled(False)
-        self._scan_btn.setText("扫描中...")
+        self._scan_btn.setText(tr("扫描中..."))
         self._cancel_btn.setEnabled(False)
         self._progress_bar.setVisible(True)
         self._status_label.setVisible(True)
@@ -189,9 +191,9 @@ class WindowOpsMixin:
         两个扫描按钮始终保留，用户点哪个即切到哪个模式。
         """
         if mode == "adb":
-            self.btn_locate.setText("连接")
+            self.btn_locate.setText(tr("连接"))
         else:
-            self.btn_locate.setText("定位")
+            self.btn_locate.setText(tr("定位"))
 
     # ─── 窗口扫描 ──────────────────────────────────────────
 
@@ -229,9 +231,9 @@ class WindowOpsMixin:
         self._target_window = None
         self._overlay.hide_border()
         self.btn_locate.setEnabled(False)
-        self.lbl_window_info.setText("未定位窗口")
+        self.lbl_window_info.setText(tr("未定位窗口"))
         self.lbl_window_info.setStyleSheet("color: gray;")
-        self.statusBar().showMessage("正在扫描窗口...")
+        self.statusBar().showMessage(tr("正在扫描窗口..."))
         self._refresh_run_button()
         if had_target:
             self.log_text.append("[状态] 重新扫描窗口，旧定位已失效")
@@ -264,9 +266,9 @@ class WindowOpsMixin:
         else:
             self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
         self.btn_locate.setEnabled(True)
-        self.lbl_window_info.setText("请下拉选择目标窗口...")
+        self.lbl_window_info.setText(tr("请下拉选择目标窗口..."))
         self.lbl_window_info.setStyleSheet("color: orange;")
-        self.statusBar().showMessage("已扫描窗口 | 请下拉选择目标窗口并点击定位")
+        self.statusBar().showMessage(tr("已扫描窗口 | 请下拉选择目标窗口并点击定位"))
 
     def _on_window_selected(self, index):
         """下拉框选择了某项时，启用定位按钮"""
@@ -305,10 +307,10 @@ class WindowOpsMixin:
         self._device_ready = False
         self.btn_locate.setEnabled(False)
         self.btn_scan_device.setEnabled(False)
-        self.btn_scan_device.setText("扫描中...")
-        self.lbl_window_info.setText("未连接设备")
+        self.btn_scan_device.setText(tr("扫描中..."))
+        self.lbl_window_info.setText(tr("未连接设备"))
         self.lbl_window_info.setStyleSheet("color: gray;")
-        self.statusBar().showMessage("正在扫描设备...")
+        self.statusBar().showMessage(tr("正在扫描设备..."))
         self._refresh_run_button()
 
         # 异步扫描
@@ -326,13 +328,13 @@ class WindowOpsMixin:
     def _on_scan_devices_done(self, devices: list):
         """扫描完成回调（主线程）"""
         self.btn_scan_device.setEnabled(True)
-        self.btn_scan_device.setText("扫描设备")
+        self.btn_scan_device.setText(tr("扫描设备"))
         self._scanned_windows = devices
         self.window_combo.clear()
 
         if not devices:
             self.log_text.append("[提示] 未发现 USB 连接的 ADB 设备")
-            self.statusBar().showMessage("未发现设备 | 可尝试局域网扫描")
+            self.statusBar().showMessage(tr("未发现设备 | 可尝试局域网扫描"))
             # 弹出对话框询问是否扫描局域网
             self._ask_wireless_scan()
             return
@@ -341,10 +343,10 @@ class WindowOpsMixin:
             label = d["serial"] + (f"  ({d['model']})" if d["model"] else "")
             self.window_combo.addItem(label, d)
         self.btn_locate.setEnabled(True)
-        self.lbl_window_info.setText("请下拉选择设备并点击连接...")
+        self.lbl_window_info.setText(tr("请下拉选择设备并点击连接..."))
         self.lbl_window_info.setStyleSheet("color: orange;")
         self.log_text.append(f"[扫描] 找到 {len(devices)} 台设备，请选择并点击连接")
-        self.statusBar().showMessage("已扫描设备 | 请选择设备并点击连接")
+        self.statusBar().showMessage(tr("已扫描设备 | 请选择设备并点击连接"))
 
     def _ask_wireless_scan(self):
         """询问用户是否扫描局域网 ADB 设备"""
@@ -360,8 +362,8 @@ class WindowOpsMixin:
             # 用户取消 — 停止后台线程，防止过期回调更新 UI
             self._cancel_wireless_scan()
             self.btn_scan_device.setEnabled(True)
-            self.btn_scan_device.setText("扫描设备")
-            self.statusBar().showMessage("已取消扫描")
+            self.btn_scan_device.setText(tr("扫描设备"))
+            self.statusBar().showMessage(tr("已取消扫描"))
 
     def _cancel_wireless_scan(self):
         """取消无线扫描并等待线程结束"""
@@ -380,8 +382,8 @@ class WindowOpsMixin:
     def _start_wireless_scan(self):
         """启动局域网 ADB 扫描（异步）"""
         self.btn_scan_device.setEnabled(False)
-        self.btn_scan_device.setText("扫描局域网...")
-        self.statusBar().showMessage("正在扫描局域网...")
+        self.btn_scan_device.setText(tr("扫描局域网..."))
+        self.statusBar().showMessage(tr("正在扫描局域网..."))
         self.log_text.append("[扫描] 正在扫描局域网 ADB 设备...")
 
         self._wait_device_thread()
@@ -414,7 +416,7 @@ class WindowOpsMixin:
 
         from PyQt6.QtWidgets import QMessageBox
         self.btn_scan_device.setEnabled(True)
-        self.btn_scan_device.setText("扫描设备")
+        self.btn_scan_device.setText(tr("扫描设备"))
         self.window_combo.clear()
 
         # 关闭对话框（可能已关闭）
@@ -426,14 +428,14 @@ class WindowOpsMixin:
 
         if not devices:
             self.log_text.append("[扫描] 局域网内未发现可连接的 ADB 设备")
-            self.statusBar().showMessage("未发现设备 | 请确认设备已开启无线调试")
+            self.statusBar().showMessage(tr("未发现设备 | 请确认设备已开启无线调试"))
             QMessageBox.warning(
                 self,  # type: ignore[arg-type]  # mixin: self is QWidget
-                "未发现设备",
-                "局域网内未发现可连接的 ADB 设备。\n\n"
-                "请确认：\n"
-                "1. 设备与电脑在同一局域网\n"
-                "2. 设备已开启无线调试（开发者选项）",
+                tr("未发现设备"),
+                tr("局域网内未发现可连接的 ADB 设备。\n\n"
+                   "请确认：\n"
+                   "1. 设备与电脑在同一局域网\n"
+                   "2. 设备已开启无线调试（开发者选项）"),
             )
             return
 
@@ -450,7 +452,7 @@ class WindowOpsMixin:
     def _on_wireless_scan_error(self, error_msg: str):
         """局域网扫描失败回调（主线程）"""
         self.btn_scan_device.setEnabled(True)
-        self.btn_scan_device.setText("扫描设备")
+        self.btn_scan_device.setText(tr("扫描设备"))
         # 关闭对话框（可能已关闭）
         if hasattr(self, "_wireless_dialog") and self._wireless_dialog:
             try:
@@ -459,15 +461,15 @@ class WindowOpsMixin:
                 pass  # 对话框已被销毁
         logger.error(f"局域网扫描失败: {error_msg}")
         self.log_text.append(f"[错误] 局域网扫描失败: {error_msg}")
-        self.statusBar().showMessage("扫描失败 | 详见日志")
+        self.statusBar().showMessage(tr("扫描失败 | 详见日志"))
 
     def _on_scan_devices_error(self, error_msg: str):
         """扫描失败回调（主线程）"""
         self.btn_scan_device.setEnabled(True)
-        self.btn_scan_device.setText("扫描设备")
+        self.btn_scan_device.setText(tr("扫描设备"))
         logger.error(f"扫描设备失败: {error_msg}")
         self.log_text.append(f"[错误] 扫描设备失败: {error_msg}")
-        self.statusBar().showMessage("扫描失败 | 详见日志")
+        self.statusBar().showMessage(tr("扫描失败 | 详见日志"))
 
     def _on_connect_device(self):
         """ADB 模式：异步连接选中设备（adb shell input + adb screencap/scrcpy）"""
@@ -480,8 +482,8 @@ class WindowOpsMixin:
 
         # UI 进入连接中状态
         self.btn_locate.setEnabled(False)
-        self.btn_locate.setText("连接中...")
-        self.statusBar().showMessage("正在连接设备...")
+        self.btn_locate.setText(tr("连接中..."))
+        self.statusBar().showMessage(tr("正在连接设备..."))
 
         capture_method = "scrcpy" if self._user_config.adb_capture_streaming else "screencap"
 
@@ -523,7 +525,7 @@ class WindowOpsMixin:
         self.lbl_window_info.setStyleSheet("color: green;")
         self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
         self.statusBar().showMessage(f"已连接设备 {combo_data['serial']} | F9 开始 | F10 停止")
-        self.btn_locate.setText("断连")
+        self.btn_locate.setText(tr("断连"))
         self.btn_locate.setEnabled(True)
         self._set_connected_ui(True)
         self._refresh_run_button()
@@ -535,8 +537,8 @@ class WindowOpsMixin:
         """连接失败回调（主线程）"""
         logger.error(f"连接设备失败: {error_msg}")
         self.log_text.append(f"[错误] 连接设备失败: {error_msg}")
-        self.statusBar().showMessage("连接失败 | 详见日志")
-        self.btn_locate.setText("连接")
+        self.statusBar().showMessage(tr("连接失败 | 详见日志"))
+        self.btn_locate.setText(tr("连接"))
         self.btn_locate.setEnabled(True)
 
     def _stop_capture_backend(self):
@@ -590,11 +592,11 @@ class WindowOpsMixin:
             serial = self._device_combo_current_serial()
             self._teardown_adb_backend()
             self._set_connected_ui(False)
-            self.btn_locate.setText("连接")
-            self.lbl_window_info.setText("已断开连接")
+            self.btn_locate.setText(tr("连接"))
+            self.lbl_window_info.setText(tr("已断开连接"))
             self.lbl_window_info.setStyleSheet("color: gray;")
-            self.preview_label.setText("预览已停止")
-            self.statusBar().showMessage("已断开设备连接")
+            self.preview_label.setText(tr("预览已停止"))
+            self.statusBar().showMessage(tr("已断开设备连接"))
             self.log_text.append(f"[断连] 设备已断开: {serial}")
         else:
             # Windows 模式：清除定位状态，但保留窗口选择
@@ -602,10 +604,10 @@ class WindowOpsMixin:
             self._overlay.hide_border()
             self._stop_capture_backend()
             self._set_connected_ui(False)
-            self.btn_locate.setText("定位")
-            self.lbl_window_info.setText("未定位窗口")
+            self.btn_locate.setText(tr("定位"))
+            self.lbl_window_info.setText(tr("未定位窗口"))
             self.lbl_window_info.setStyleSheet("color: gray;")
-            self.statusBar().showMessage("已取消窗口定位")
+            self.statusBar().showMessage(tr("已取消窗口定位"))
             self.log_text.append("[断连] 窗口定位已清除")
         self._refresh_run_button()
 
@@ -651,7 +653,7 @@ class WindowOpsMixin:
         self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
         self._overlay.set_color("red")
         self._set_connected_ui(True)
-        self.btn_locate.setText("断连")
+        self.btn_locate.setText(tr("断连"))
         self._refresh_run_button()
         self._capture_preview()
 
@@ -742,7 +744,7 @@ class WindowOpsMixin:
         img = self._grab_capture_image()
         if img is None:
             if self.preview_label.isVisible():
-                self.preview_label.setText("截屏失败")
+                self.preview_label.setText(tr("截屏失败"))
             return
         self._last_capture = img
         try:

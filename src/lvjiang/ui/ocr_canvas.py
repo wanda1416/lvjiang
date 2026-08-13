@@ -24,6 +24,8 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
+from ..i18n import tr
+
 
 @dataclass
 class OCRBox:
@@ -102,7 +104,7 @@ class OCRCanvas(QWidget):
         self._drag_orig: QRectF | None = None  # 归一化坐标
 
         # 提示文字
-        self._placeholder = "Ctrl+V 粘贴截图，或点击「上传图片」加载文件"
+        self._placeholder = tr("Ctrl+V 粘贴截图，或点击「上传图片」加载文件")
 
     # ─── 公开接口 ────────────────────────────────────────
 
@@ -136,7 +138,7 @@ class OCRCanvas(QWidget):
         self._original_image = None
         self._ocr_boxes.clear()
         self._selection = None
-        self._placeholder = "Ctrl+V 粘贴截图，或点击「上传图片」加载文件"
+        self._placeholder = tr("Ctrl+V 粘贴截图，或点击「上传图片」加载文件")
         self.update()
 
     def clear_selection(self):

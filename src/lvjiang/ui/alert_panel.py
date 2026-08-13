@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..core.config.session import dismiss_alert, get_alerts
+from ..i18n import tr
 
 
 class AlertPanel(QWidget):
@@ -74,7 +75,7 @@ class AlertPanel(QWidget):
 
         self._close_btn = QPushButton("×")
         self._close_btn.setFixedSize(24, 24)
-        self._close_btn.setToolTip("关闭此告警")
+        self._close_btn.setToolTip(tr("关闭此告警"))
         self._close_btn.clicked.connect(self._on_close_clicked)
         content_row.addWidget(self._close_btn)
 

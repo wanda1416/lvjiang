@@ -41,6 +41,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RuleValidationError,
     TuningGroupManager,
 )
+from .....i18n import tr
 
 # 规则组 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -56,11 +57,11 @@ class _NewGroupDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self._key_edit = QLineEdit()
-        self._key_edit.setPlaceholderText("如 aggressive（小写字母/数字/下划线）")
-        form.addRow("标识 key：", self._key_edit)
+        self._key_edit.setPlaceholderText(tr("如 aggressive（小写字母/数字/下划线）"))
+        form.addRow(tr("标识 key："), self._key_edit)
         self._name_edit = QLineEdit()
-        self._name_edit.setPlaceholderText("如 激进回收")
-        form.addRow("规则组名称：", self._name_edit)
+        self._name_edit.setPlaceholderText(tr("如 激进回收"))
+        form.addRow(tr("规则组名称："), self._name_edit)
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(
@@ -75,10 +76,10 @@ class _NewGroupDialog(QDialog):
         if not _KEY_RE.match(key):
             QMessageBox.warning(
                 self, self._title,
-                "key 须为小写英文标识（字母开头，可含数字/下划线）")
+                tr("key 须为小写英文标识（字母开头，可含数字/下划线）"))
             return
         if not name:
-            QMessageBox.warning(self, self._title, "规则组名称不能为空")
+            QMessageBox.warning(self, self._title, tr("规则组名称不能为空"))
             return
         self.accept()
 
@@ -129,16 +130,16 @@ class BaseRuleGroupPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
-            "<b>基础规则</b>（等级门槛 + 调律门槛 + 扫描/材料/结束处理，"
-            "一组一套可切换；流派规则全局不受影响）"))
+            "<b>" + tr("基础规则") + "</b>（" + tr("等级门槛 + 调律门槛 + 扫描/材料/结束处理，"
+            "一组一套可切换；流派规则全局不受影响") + "）"))
 
         # 当前规则（切换即激活）
         combo_row = QHBoxLayout()
-        combo_row.addWidget(QLabel("<b>当前规则</b>"))
+        combo_row.addWidget(QLabel("<b>" + tr("当前规则") + "</b>"))
         self._combo = QComboBox()
         self._combo.setToolTip(
-            "切换后扫描处理/材料处理/结束处理页同步对准该组，"
-            "调律任务启动时以此为准")
+            tr("切换后扫描处理/材料处理/结束处理页同步对准该组，"
+               "调律任务启动时以此为准"))
         self._combo.currentIndexChanged.connect(self._on_combo_changed)
         combo_row.addWidget(self._combo)
         combo_row.addStretch()
@@ -147,7 +148,7 @@ class BaseRuleGroupPage(QWidget):
         # 规则组列表（规则组名 / 等级门槛 / 调律门槛 / 规则说明）
         self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels(
-            ["规则组名", "等级门槛", "调律门槛", "规则说明"])
+            [tr("规则组名"), tr("等级门槛"), tr("调律门槛"), tr("规则说明")])
         for col, width in enumerate((220, 100, 120, 300)):
             self._table.setColumnWidth(col, width)
         self._table.setEditTriggers(
@@ -158,19 +159,19 @@ class BaseRuleGroupPage(QWidget):
             QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(
             QTableWidget.SelectionMode.SingleSelection)
-        self._table.setToolTip("双击「规则说明」列可编辑，选中一行后可复制/删除该规则组")
+        self._table.setToolTip(tr("双击「规则说明」列可编辑，选中一行后可复制/删除该规则组"))
         layout.addWidget(self._table)
 
         btn_row = QHBoxLayout()
-        add_btn = QPushButton("新增规则组")
+        add_btn = QPushButton(tr("新增规则组"))
         add_btn.clicked.connect(self._on_add)
         btn_row.addWidget(add_btn)
-        copy_btn = QPushButton("复制选中")
-        copy_btn.setToolTip("复制选中规则组为独立副本")
+        copy_btn = QPushButton(tr("复制选中"))
+        copy_btn.setToolTip(tr("复制选中规则组为独立副本"))
         copy_btn.clicked.connect(self._on_copy)
         btn_row.addWidget(copy_btn)
-        del_btn = QPushButton("删除选中")
-        del_btn.setToolTip("删除选中规则组（至少保留一个）")
+        del_btn = QPushButton(tr("删除选中"))
+        del_btn.setToolTip(tr("删除选中规则组（至少保留一个）"))
         del_btn.clicked.connect(self._on_delete)
         btn_row.addWidget(del_btn)
         btn_row.addStretch()
@@ -233,15 +234,15 @@ class BaseRuleGroupPage(QWidget):
         raw["description"] = new_desc
         err = self._manager.validate(raw)
         if err:
-            self._status_cb(f"校验失败（未保存）：{err}", True)
+            self._status_cb(tr("校验失败（未保存）：{err}").format(err=err), True)
             return
         try:
             self._manager.save_group(key, raw)
         except Exception as e:  # noqa: BLE001
             logger.exception("规则说明保存失败")
-            self._status_cb(f"保存失败：{e}", True)
+            self._status_cb(tr("保存失败：{e}").format(e=e), True)
             return
-        self._set_saved_status(f"规则说明已保存（{key}）")
+        self._set_saved_status(tr("规则说明已保存（{key}）").format(key=key))
 
     # ── 规则组切换 ──
 
@@ -264,60 +265,60 @@ class BaseRuleGroupPage(QWidget):
             self._switch_cb(key)
         group = self._manager.get_group(key)
         name = group.name if group else key
-        self._status_cb(f"已切换到基础规则组「{name}」", False)
+        self._status_cb(tr("已切换到基础规则组「{name}」").format(name=name), False)
 
     # ── CRUD ──
 
     def _on_add(self):
-        dlg = _NewGroupDialog("新增基础规则组", self)
+        dlg = _NewGroupDialog(tr("新增基础规则组"), self)
         if not dlg.exec():
             return
         key, name = dlg.group_key(), dlg.group_name()
         try:
             self._manager.create_group(key, name)
         except RuleValidationError as e:
-            QMessageBox.warning(self, "新增基础规则组", str(e))
+            QMessageBox.warning(self, tr("新增基础规则组"), str(e))
             return
         self._switch_to(key)
-        self._set_saved_status(f"已新增基础规则组「{name}」")
+        self._set_saved_status(tr("已新增基础规则组「{name}」").format(name=name))
 
     def _on_copy(self):
         src_key = self._selected_key()
         if src_key is None:
-            self._status_cb("请先在列表中选中要复制的规则组", True)
+            self._status_cb(tr("请先在列表中选中要复制的规则组"), True)
             return
-        dlg = _NewGroupDialog("复制基础规则组", self)
+        dlg = _NewGroupDialog(tr("复制基础规则组"), self)
         if not dlg.exec():
             return
         key, name = dlg.group_key(), dlg.group_name()
         try:
             self._manager.copy_group(src_key, key, name)
         except RuleValidationError as e:
-            QMessageBox.warning(self, "复制基础规则组", str(e))
+            QMessageBox.warning(self, tr("复制基础规则组"), str(e))
             return
         self._switch_to(key)
-        self._set_saved_status(f"已复制为基础规则组「{name}」")
+        self._set_saved_status(tr("已复制为基础规则组「{name}」").format(name=name))
 
     def _on_delete(self):
         key = self._selected_key()
         if key is None:
-            self._status_cb("请先在列表中选中要删除的规则组", True)
+            self._status_cb(tr("请先在列表中选中要删除的规则组"), True)
             return
         groups = self._manager.get_groups()
         if len(groups) <= 1:
-            self._status_cb("至少保留一个规则组", True)
+            self._status_cb(tr("至少保留一个规则组"), True)
             return
         group = self._manager.get_group(key)
         name = group.name if group else key
         if QMessageBox.question(
-                self, "删除基础规则组",
-                f"确定删除规则组「{name}」？该操作不可恢复。") \
+                self, tr("删除基础规则组"),
+                tr("确定删除规则组「{name}」？该操作不可恢复。").format(name=name)) \
                 != QMessageBox.StandardButton.Yes:
             return
         try:
             self._manager.delete_group(key)
         except RuleValidationError as e:
-            QMessageBox.warning(self, "删除基础规则组", str(e))
+            QMessageBox.warning(self, tr("删除基础规则组"), str(e))
             return
         if self._group_key == key:
             groups = self._manager.get_groups()
@@ -328,7 +329,7 @@ class BaseRuleGroupPage(QWidget):
         self._refresh()
         self._load()
         self._loading = False
-        self._set_saved_status(f"已删除基础规则组「{name}」")
+        self._set_saved_status(tr("已删除基础规则组「{name}」").format(name=name))
 
     def _selected_key(self) -> str | None:
         row = self._table.currentRow()
@@ -364,17 +365,17 @@ class BaseRuleGroupPage(QWidget):
         data = self._build()
         err = self._manager.validate(data)
         if err:
-            self._status_cb(f"校验失败（未保存）：{err}", True)
+            self._status_cb(tr("校验失败（未保存）：{err}").format(err=err), True)
             return
         try:
             self._manager.save_group(self._group_key, data)
         except Exception as e:  # noqa: BLE001
             logger.exception("基础规则组保存失败")
-            self._status_cb(f"保存失败：{e}", True)
+            self._status_cb(tr("保存失败：{e}").format(e=e), True)
             return
         self._refresh()
         self._set_saved_status()
 
     def _set_saved_status(self, text: str | None = None):
         now = datetime.now().strftime("%H:%M:%S")
-        self._status_cb(text or f"已保存并生效（{now}）", False)
+        self._status_cb(text or tr("已保存并生效（{now}）").format(now=now), False)

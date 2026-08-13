@@ -10,6 +10,7 @@ from loguru import logger
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from ..core.config.resolver import get_resolver
+from ..i18n import tr
 from ..workflows.engine import WorkflowEngine
 
 
@@ -73,7 +74,7 @@ class _UIHelper(QObject):
         from PyQt6.QtWidgets import QInputDialog, QMessageBox
         if action == "confirm":
             box = QMessageBox(
-                QMessageBox.Icon.Question, "工作流确认",
+                QMessageBox.Icon.Question, tr("工作流确认"),
                 kwargs.get("message", ""),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 self._window,
@@ -84,11 +85,11 @@ class _UIHelper(QObject):
             # 三选项确认对话框（用于材料不足等场景）
             box = QMessageBox(self._window)
             box.setIcon(QMessageBox.Icon.Question)
-            box.setWindowTitle("工作流确认")
+            box.setWindowTitle(tr("工作流确认"))
             box.setText(kwargs.get("message", ""))
-            btn_continue = box.addButton("继续调律", QMessageBox.ButtonRole.AcceptRole)
-            btn_skip = box.addButton("跳过当前装备", QMessageBox.ButtonRole.DestructiveRole)
-            btn_end = box.addButton("结束本次调律", QMessageBox.ButtonRole.RejectRole)  # noqa: F841
+            btn_continue = box.addButton(tr("继续调律"), QMessageBox.ButtonRole.AcceptRole)
+            btn_skip = box.addButton(tr("跳过当前装备"), QMessageBox.ButtonRole.DestructiveRole)
+            btn_end = box.addButton(tr("结束本次调律"), QMessageBox.ButtonRole.RejectRole)  # noqa: F841
             box.setDefaultButton(btn_continue)
             self._active_dialog = box
             box.exec()
@@ -101,7 +102,7 @@ class _UIHelper(QObject):
                 return "end"
         if action == "pause":
             box = QMessageBox(
-                QMessageBox.Icon.Information, "工作流暂停",
+                QMessageBox.Icon.Information, tr("工作流暂停"),
                 kwargs.get("message", ""),
                 QMessageBox.StandardButton.Ok, self._window,
             )
@@ -110,7 +111,7 @@ class _UIHelper(QObject):
             return None
         if action == "input":
             dlg = QInputDialog(self._window)
-            dlg.setWindowTitle("工作流输入")
+            dlg.setWindowTitle(tr("工作流输入"))
             dlg.setLabelText(kwargs.get("prompt", ""))
             self._active_dialog = dlg
             ok = dlg.exec()
@@ -603,20 +604,20 @@ class RunControlMixin:
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         if self._running:
             state = "running"
-            self.btn_run_workflow.setText("停止 (F10)")
+            self.btn_run_workflow.setText(tr("停止 (F10)"))
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         elif not self._backend_ready():
             state = "not_ready"
-            label = "未连接" if self._backend == "adb" else "未定位"
+            label = tr("未连接") if self._backend == "adb" else tr("未定位")
             self.btn_run_workflow.setText(label)
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         else:
             state = "ready"
-            self.btn_run_workflow.setText("开始执行 (F9)")
+            self.btn_run_workflow.setText(tr("开始执行 (F9)"))
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )

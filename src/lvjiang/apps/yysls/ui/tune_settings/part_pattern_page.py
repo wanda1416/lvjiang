@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import RATING_KEYS, RATING_LABELS
+from .....i18n import tr
 
 from .affix_picker import AffixSelectSortDialog
 from .condition_editor import ConditionGroupsEditor
@@ -41,7 +42,7 @@ _TIERS: list[tuple[str, str]] = [
     ("normal_conditions", "一般"),
     ("excellent_conditions", "优秀"),
     ("top_conditions", "顶级"),
-]
+]  # runtime tr()
 
 # 档位标头配色（浅色背景可见，与品质/词条分级配色一致）
 _TIER_COLORS = {
@@ -65,9 +66,9 @@ class TierTabsWidget(QWidget):
 
         self._bar = QTabBar()
         self._bar.setExpanding(False)
-        self._bar.addTab("全部")
+        self._bar.addTab(tr("全部"))
         for _tier_key, tier_name in _TIERS:
-            self._bar.addTab(tier_name)
+            self._bar.addTab(tr(tier_name))
         layout.addWidget(self._bar)
 
         body = QFrame()
@@ -77,7 +78,7 @@ class TierTabsWidget(QWidget):
         self.editors: dict[str, ConditionGroupsEditor] = {}
         self._sections: list[tuple[QLabel, ConditionGroupsEditor]] = []
         for tier_key, tier_name in _TIERS:
-            header = QLabel(f"■ {tier_name}条件")
+            header = QLabel(f"■ {tr(tier_name)}" + tr("条件"))
             header.setStyleSheet(
                 f"font-weight: bold; color: {_TIER_COLORS[tier_key]};")
             editor = ConditionGroupsEditor(candidates)
@@ -102,7 +103,7 @@ _FIRST_TIPS = (
     "首词条：装备第 1 条词条须在候选之内（任一符合即可），\n"
     "不符合 → 本部位跳过判定。\n"
     "首词条为空 = 本部位不定义模式，不参与判定。"
-)
+)  # runtime tr()
 
 
 class PartPatternPage(QWidget):
@@ -124,27 +125,27 @@ class PartPatternPage(QWidget):
 
         # ① 首词条：提示 icon 点开说明，词条按钮点击进入编辑
         first_row = QHBoxLayout()
-        first_row.addWidget(QLabel("<b>首词条</b>"))
+        first_row.addWidget(QLabel("<b>" + tr("首词条") + "</b>"))
         tips_btn = QToolButton()
         tips_btn.setText("ⓘ")
         tips_btn.setAutoRaise(True)
-        tips_btn.setToolTip(_FIRST_TIPS)
+        tips_btn.setToolTip(tr(_FIRST_TIPS))
         tips_btn.clicked.connect(
-            lambda: QToolTip.showText(QCursor.pos(), _FIRST_TIPS))
+            lambda: QToolTip.showText(QCursor.pos(), tr(_FIRST_TIPS)))
         first_row.addWidget(tips_btn)
         first_row.addStretch()
         layout.addLayout(first_row)
 
         self._first: list[str] = []
-        self._first_btn = QPushButton("（点击选择首词条）")
+        self._first_btn = QPushButton(tr("（点击选择首词条）"))
         self._first_btn.clicked.connect(self._pick_first)
         layout.addWidget(self._first_btn)
 
         # ② 默认判定：全档不命中时的兜底档位（空 = 跟随规则设置页）
         rating_row = QHBoxLayout()
-        rating_row.addWidget(QLabel("<b>默认判定</b>"))
+        rating_row.addWidget(QLabel("<b>" + tr("默认判定") + "</b>"))
         self._rating_combo = QComboBox()
-        self._rating_combo.addItem("（跟随规则设置）", "")
+        self._rating_combo.addItem(tr("（跟随规则设置）"), "")
         for rating_key in RATING_KEYS:
             self._rating_combo.addItem(RATING_LABELS[rating_key], rating_key)
         self._rating_combo.currentIndexChanged.connect(
@@ -154,7 +155,7 @@ class PartPatternPage(QWidget):
         layout.addLayout(rating_row)
 
         # ③ 判定条件 Tab（全部 + 四档，顺序 junk → … → top）
-        layout.addWidget(QLabel("<b>判定条件</b>"))
+        layout.addWidget(QLabel("<b>" + tr("判定条件") + "</b>"))
         self._tier_tabs = TierTabsWidget(self._candidates)
         self._tier_editors = self._tier_tabs.editors
         for editor in self._tier_editors.values():
@@ -208,7 +209,7 @@ class PartPatternPage(QWidget):
 
     def _pick_first(self):
         dlg = AffixSelectSortDialog(self._candidates, self._first,
-                                    "选择首词条候选", self, flat=True)
+                                    tr("选择首词条候选"), self, flat=True)
         if dlg.exec():
             self._first = dlg.selected()
             self._update_first_text()
@@ -216,7 +217,7 @@ class PartPatternPage(QWidget):
 
     def _update_first_text(self):
         self._first_btn.setText(
-            "/".join(self._first) if self._first else "（点击选择首词条）")
+            "/".join(self._first) if self._first else tr("（点击选择首词条）"))
 
     # ── 其他 ──
 

@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .....i18n import tr
 from ...config.profile_models import (
     ALL_MODELS,
     DIR_BOTH,
@@ -67,14 +68,14 @@ def _format_cap(kd: KeyDef) -> str:
 def _format_period(kd: KeyDef) -> str:
     """周期列显示（Quota 用 period，Regen 按恢复类型显示）"""
     if isinstance(kd, QuotaKeyDef):
-        period_labels = {"day": "每天", "week": "每周", "month": "每月", "season": "赛季", "half_season": "半赛季"}
+        period_labels = {"day": tr("每天"), "week": tr("每周"), "month": tr("每月"), "season": tr("赛季"), "half_season": tr("半赛季")}
         return period_labels.get(kd.period, kd.period)
     if isinstance(kd, RegenKeyDef):
-        regen_labels = {"minute": "分钟", "hour": "小时", "day": "每天", "week": "每周"}
+        regen_labels = {"minute": tr("分钟"), "hour": tr("小时"), "day": tr("每天"), "week": tr("每周")}
         if kd.regen_type == "realtime":
             unit = regen_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
-            return f"实时/{unit}"
-        return f"准点/{regen_labels.get(kd.regen_period, kd.regen_period)}"
+            return tr("实时/{unit}").format(unit=unit)
+        return tr("准点/{unit}").format(unit=regen_labels.get(kd.regen_period, kd.regen_period))
     return ""
 
 
@@ -97,7 +98,7 @@ def _parse_steps_text(raw: str) -> tuple[list[StepDef] | None, str]:
         try:
             value = int(val_text)
         except ValueError:
-            return None, f"增减幅度格式错误: '{part}'，应为整数或 整数:来源"
+            return None, tr("增减幅度格式错误: '{part}'，应为整数或 整数:来源").format(part=part)
         steps.append(StepDef(value=value, source=src_text))
     return steps, ""
 
@@ -124,7 +125,7 @@ def _format_sync_summary(kd: KeyDef) -> str | None:
         ratio_text = f"x{t.ratio:g}" if t.ratio != 1.0 else ""
         dir_text = f"[{DIRECTION_LABELS[t.direction]}]" if t.direction != DIR_BOTH else ""
         sync_parts.append(f"{label_text}{ratio_text}{dir_text}")
-    return f"同步:{','.join(sync_parts)}"
+    return tr("同步:{sync}").format(sync=','.join(sync_parts))
 
 class _SyncTargetsWidget(QWidget):
     """同步目标动态列表编辑器
@@ -141,7 +142,7 @@ class _SyncTargetsWidget(QWidget):
 
         self._table = QTableWidget()
         self._table.setColumnCount(5)
-        self._table.setHorizontalHeaderLabels(["目标", "倍率", "方向", "来源", ""])
+        self._table.setHorizontalHeaderLabels([tr("目标"), tr("倍率"), tr("方向"), tr("来源"), ""])
         v_header = self._table.verticalHeader()
         if v_header is not None:
             v_header.setVisible(False)
@@ -161,7 +162,7 @@ class _SyncTargetsWidget(QWidget):
 
         layout.addWidget(self._table)
 
-        btn_add = QPushButton("+ 添加同步目标")
+        btn_add = QPushButton("+ " + tr("添加同步目标"))
         btn_add.setFixedWidth(120)
         btn_add.clicked.connect(lambda: self.add_row())
         layout.addWidget(btn_add)
@@ -179,7 +180,7 @@ class _SyncTargetsWidget(QWidget):
         config = get_profile_config()
 
         combo = QComboBox()
-        combo.addItem("（请选择）", "")
+        combo.addItem(tr("（请选择）"), "")
         exclude = (
             self._exclude_key_input.text().strip()
             if self._exclude_key_input else ""
@@ -217,7 +218,7 @@ class _SyncTargetsWidget(QWidget):
 
         # 来源（可选）
         source_input = QLineEdit(target.source if target else "")
-        source_input.setPlaceholderText("可选")
+        source_input.setPlaceholderText(tr("可选"))
         self._table.setCellWidget(row, 3, source_input)
 
         # 删除按钮（点击时按 widget 反查行号，避免删行后行号错位）
@@ -267,7 +268,7 @@ _ROLE_KEYDEF = Qt.ItemDataRole.UserRole
 
 # 周期选项
 _PERIOD_OPTIONS = [
-    ("day", "每天"),
+    ("day", "每天"),  # runtime tr()
     ("week", "每周"),
     ("month", "每月"),
     ("season", "赛季"),
@@ -275,7 +276,7 @@ _PERIOD_OPTIONS = [
 ]
 
 # 周几选项（isoweekday: 1=周一 ... 7=周日）
-_WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+_WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]  # runtime tr()
 
 
 class _ModelTab(QWidget):
@@ -294,22 +295,22 @@ class _ModelTab(QWidget):
         toolbar = QHBoxLayout()
         toolbar.addStretch()
 
-        btn_add = QPushButton("+ 新增")
+        btn_add = QPushButton("+ " + tr("新增"))
         btn_add.setFixedWidth(70)
         btn_add.clicked.connect(self._add_key)
         toolbar.addWidget(btn_add)
 
-        btn_del = QPushButton("- 删除")
+        btn_del = QPushButton("- " + tr("删除"))
         btn_del.setFixedWidth(70)
         btn_del.clicked.connect(self._delete_key)
         toolbar.addWidget(btn_del)
 
-        btn_up = QPushButton("↑ 上移")
+        btn_up = QPushButton("↑ " + tr("上移"))
         btn_up.setFixedWidth(70)
         btn_up.clicked.connect(self._move_up)
         toolbar.addWidget(btn_up)
 
-        btn_down = QPushButton("↓ 下移")
+        btn_down = QPushButton("↓ " + tr("下移"))
         btn_down.setFixedWidth(70)
         btn_down.clicked.connect(self._move_down)
         toolbar.addWidget(btn_down)
@@ -323,13 +324,13 @@ class _ModelTab(QWidget):
         self._table = QTableWidget()
         if self._model_type == MODEL_QUOTA:
             self._table.setColumnCount(6)
-            self._table.setHorizontalHeaderLabels(["Key", "标签", "上限", "周期", "来源", "详情摘要"])
+            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("周期"), tr("来源"), tr("详情摘要")])
         elif self._model_type == MODEL_REGEN:
             self._table.setColumnCount(6)
-            self._table.setHorizontalHeaderLabels(["Key", "标签", "上限", "周期", "用途", "详情摘要"])
+            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("周期"), tr("用途"), tr("详情摘要")])
         else:
             self._table.setColumnCount(6)
-            self._table.setHorizontalHeaderLabels(["Key", "标签", "上限", "来源", "用途", "详情摘要"])
+            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("来源"), tr("用途"), tr("详情摘要")])
         self._table.verticalHeader().setVisible(False)
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -417,7 +418,7 @@ class ProfileDefinitionDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("玩家数据模型定义")
+        self.setWindowTitle(tr("玩家数据模型定义"))
         self.setMinimumSize(800, 550)
         self._setup_ui()
         self._load_data()
@@ -425,7 +426,7 @@ class ProfileDefinitionDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        info = QLabel("定义三种数据模型的 key。双击行可编辑。")
+        info = QLabel(tr("定义三种数据模型的 key。双击行可编辑。"))
         info.setStyleSheet("color: #666666; margin-bottom: 10px;")
         layout.addWidget(info)
 
@@ -442,12 +443,12 @@ class ProfileDefinitionDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
-        btn_ok = QPushButton("确定")
+        btn_ok = QPushButton(tr("确定"))
         btn_ok.setFixedWidth(80)
         btn_ok.clicked.connect(self._on_save)
         btn_row.addWidget(btn_ok)
 
-        btn_cancel = QPushButton("取消")
+        btn_cancel = QPushButton(tr("取消"))
         btn_cancel.setFixedWidth(80)
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
@@ -497,60 +498,60 @@ class ProfileDefinitionDialog(QDialog):
             parts = []
             if kd.reset_day and kd.period in ("week", "month"):
                 if kd.period == "week" and 1 <= kd.reset_day <= 7:
-                    parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
+                    parts.append(tr("重置日:{day}").format(day=tr(_WEEKDAY_NAMES[kd.reset_day - 1])))
                 elif kd.period == "month" and 1 <= kd.reset_day <= 31:
-                    parts.append(f"重置日:{kd.reset_day}号")
+                    parts.append(tr("重置日:{day}号").format(day=kd.reset_day))
             if kd.show_cap:
-                parts.append("展示上限")
+                parts.append(tr("展示上限"))
             if kd.decimal:
-                parts.append("支持小数")
+                parts.append(tr("支持小数"))
             if kd.increment_only:
-                parts.append("单向增加")
+                parts.append(tr("单向增加"))
             if kd.steps:
-                parts.append(f"幅度:{_format_steps(kd.steps)}")
+                parts.append(tr("幅度:{steps}").format(steps=_format_steps(kd.steps)))
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
-            parts.append(f"重置:{kd.reset_time}")
+            parts.append(tr("重置:{time}").format(time=kd.reset_time))
             return ", ".join(parts)
 
         if isinstance(kd, RegenKeyDef):
             parts = []
-            period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
+            period_labels = {"minute": tr("分钟"), "hour": tr("小时"), "day": tr("天"), "week": tr("周")}
             if kd.regen_type == "realtime":
                 unit_text = period_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
-                parts.append(f"实时:{kd.regen_rate_value}/{unit_text}")
+                parts.append(tr("实时:{val}/{unit}").format(val=kd.regen_rate_value, unit=unit_text))
             else:
                 period_text = period_labels.get(kd.regen_period, kd.regen_period)
-                parts.append(f"准点:{kd.regen_amount}/{period_text}")
+                parts.append(tr("准点:{val}/{period}").format(val=kd.regen_amount, period=period_text))
             if kd.regen_type == "boundary" and kd.regen_period == "week" and kd.reset_day:
                 if 1 <= kd.reset_day <= 7:
-                    parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
+                    parts.append(tr("重置日:{day}").format(day=tr(_WEEKDAY_NAMES[kd.reset_day - 1])))
             if kd.regen_type == "boundary" and kd.regen_period in ("day", "week"):
-                parts.append(f"重置:{kd.reset_time}")
+                parts.append(tr("重置:{time}").format(time=kd.reset_time))
             if kd.show_cap:
-                parts.append("展示上限")
+                parts.append(tr("展示上限"))
             if kd.decimal:
-                parts.append("支持小数")
+                parts.append(tr("支持小数"))
             if kd.steps:
-                parts.append(f"幅度:{_format_steps(kd.steps)}")
+                parts.append(tr("幅度:{steps}").format(steps=_format_steps(kd.steps)))
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
             if kd.alert_orange:
-                parts.append(f"橙警:>={kd.alert_orange}")
+                parts.append(tr("橙警:>={val}").format(val=kd.alert_orange))
             if kd.alert_red:
-                parts.append(f"红警:>={kd.alert_red}")
+                parts.append(tr("红警:>={val}").format(val=kd.alert_red))
             return ", ".join(parts)
 
         if isinstance(kd, StockKeyDef):
             parts = []
             if kd.show_cap:
-                parts.append("展示上限")
+                parts.append(tr("展示上限"))
             if kd.decimal:
-                parts.append("支持小数")
+                parts.append(tr("支持小数"))
             if kd.steps:
-                parts.append(f"幅度:{_format_steps(kd.steps)}")
+                parts.append(tr("幅度:{steps}").format(steps=_format_steps(kd.steps)))
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
@@ -598,8 +599,8 @@ class ProfileDefinitionDialog(QDialog):
             return
 
         reply = QMessageBox.question(
-            self, "确认删除",
-            f"确定要删除 key '{key_item.text()}' 吗？",
+            self, tr("确认删除"),
+            tr("确定要删除 key '{key}' 吗？").format(key=key_item.text()),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -621,20 +622,20 @@ class ProfileDefinitionDialog(QDialog):
     def _open_edit_dialog(self, model_type: str, existing: KeyDef | None) -> KeyDef | None:
         """打开 key 编辑对话框，返回新的 KeyDef 或 None"""
         dialog = QDialog(self)
-        title = "编辑" if existing else "新增"
-        dialog.setWindowTitle(f"{title} Key ({MODEL_LABELS[model_type]})")
+        title = tr("编辑") if existing else tr("新增")
+        dialog.setWindowTitle(tr("{title} Key ({model})").format(title=title, model=MODEL_LABELS[model_type]))
         dialog.setMinimumWidth(620)
 
         layout = QFormLayout(dialog)
 
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
-        key_input.setPlaceholderText("英文，如 ")
+        key_input.setPlaceholderText(tr("英文，如 "))
         layout.addRow("Key:", key_input)
 
         label_input = QLineEdit(existing.label if existing else "")
-        label_input.setPlaceholderText("中文，如 袅袅(本周)")
-        layout.addRow("标签:", label_input)
+        label_input.setPlaceholderText(tr("中文，如 袅袅(本周)"))
+        layout.addRow(tr("标签:"), label_input)
 
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
@@ -647,21 +648,21 @@ class ProfileDefinitionDialog(QDialog):
 
         cap_spin = QSpinBox()
         cap_spin.setRange(0, 999999)
-        cap_spin.setSpecialValueText("无上限")
+        cap_spin.setSpecialValueText(tr("无上限"))
         cap_spin.setValue(existing_cap or 0)
 
-        soft_check = QCheckBox("软上限")
+        soft_check = QCheckBox(tr("软上限"))
         soft_check.setChecked(existing_soft)
 
         cap_row = QHBoxLayout()
         cap_row.addWidget(cap_spin)
         cap_row.addWidget(soft_check)
         cap_row.addStretch()
-        layout.addRow("上限:", cap_row)
+        layout.addRow(tr("上限:"), cap_row)
         widgets["cap"] = cap_spin
         widgets["soft"] = soft_check
 
-        show_cap_check = QCheckBox("展示上限")
+        show_cap_check = QCheckBox(tr("展示上限"))
         show_cap_check.setChecked(existing_show_cap)
 
         decimal_check = QCheckBox("支持小数")
@@ -678,34 +679,34 @@ class ProfileDefinitionDialog(QDialog):
 
         # 来源/用途词表（三种模型通用）：来源对应增加，用途对应减少
         sources_input = QLineEdit(",".join(existing.sources) if existing else "")
-        sources_input.setPlaceholderText("逗号分隔，增加时供下拉选择，如: 打本,商店,任务")
-        layout.addRow("来源:", sources_input)
+        sources_input.setPlaceholderText(tr("逗号分隔，增加时供下拉选择，如: 打本,商店,任务"))
+        layout.addRow(tr("来源:"), sources_input)
         widgets["sources"] = sources_input
 
         uses_input = QLineEdit(",".join(existing.uses) if existing else "")
-        uses_input.setPlaceholderText("逗号分隔，减少时供下拉选择，如: 兑换,强化,出售")
-        layout.addRow("用途:", uses_input)
+        uses_input.setPlaceholderText(tr("逗号分隔，减少时供下拉选择，如: 兑换,强化,出售"))
+        layout.addRow(tr("用途:"), uses_input)
         widgets["uses"] = uses_input
 
         if model_type == MODEL_QUOTA:
             kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
             period_combo = QComboBox()
             for val, text in _PERIOD_OPTIONS:
-                period_combo.addItem(text, val)
+                period_combo.addItem(tr(text), val)
             idx = period_combo.findData(kd.period)
             if idx >= 0:
                 period_combo.setCurrentIndex(idx)
-            layout.addRow("周期:", period_combo)
+            layout.addRow(tr("周期:"), period_combo)
             widgets["period"] = period_combo
 
             reset_input = QLineEdit(kd.reset_time)
             reset_input.setFixedWidth(80)
-            layout.addRow("重置时刻:", reset_input)
+            layout.addRow(tr("重置时刻:"), reset_input)
             widgets["reset_time"] = reset_input
 
             reset_day_spin = QSpinBox()
             reset_day_spin.setRange(0, 31)
-            reset_day_spin.setSpecialValueText("默认")
+            reset_day_spin.setSpecialValueText(tr("默认"))
             reset_day_spin.setValue(kd.reset_day)
             reset_day_label = QLabel()
             widgets["reset_day"] = reset_day_spin
@@ -721,57 +722,57 @@ class ProfileDefinitionDialog(QDialog):
                 reset_day_label.setVisible(visible)
                 if is_week:
                     reset_day_spin.setRange(0, 7)
-                    reset_day_label.setText("重置日(周几):")
+                    reset_day_label.setText(tr("重置日(周几):"))
                 elif is_month:
                     reset_day_spin.setRange(0, 31)
-                    reset_day_label.setText("重置日(几号):")
+                    reset_day_label.setText(tr("重置日(几号):"))
             period_combo.currentIndexChanged.connect(_update_reset_day_visibility)
             _update_reset_day_visibility()
 
             # 单向增加复选框
-            increment_check = QCheckBox("单向增加")
+            increment_check = QCheckBox(tr("单向增加"))
             increment_check.setChecked(kd.increment_only)
             layout.addRow(increment_check)
             widgets["increment_only"] = increment_check
 
             # 自定义增减幅度（支持 value:来源）
             steps_input = QLineEdit(_format_steps(kd.steps))
-            steps_input.setPlaceholderText("如: -900:打本消耗,-1100 或 1,10:商店")
-            layout.addRow("增减幅度:", steps_input)
+            steps_input.setPlaceholderText(tr("如: -900:打本消耗,-1100 或 1,10:商店"))
+            layout.addRow(tr("增减幅度:"), steps_input)
             widgets["steps"] = steps_input
 
         elif model_type == MODEL_REGEN:
             rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
 
             regen_type_combo = QComboBox()
-            regen_type_combo.addItem("实时恢复", "realtime")
-            regen_type_combo.addItem("准点恢复", "boundary")
+            regen_type_combo.addItem(tr("实时恢复"), "realtime")
+            regen_type_combo.addItem(tr("准点恢复"), "boundary")
             idx = regen_type_combo.findData(rt_kd.regen_type)
             if idx >= 0:
                 regen_type_combo.setCurrentIndex(idx)
-            layout.addRow("恢复类型:", regen_type_combo)
+            layout.addRow(tr("恢复类型:"), regen_type_combo)
             widgets["regen_type"] = regen_type_combo
 
             regen_period_combo = QComboBox()
-            regen_period_combo.addItem("分钟", "minute")
-            regen_period_combo.addItem("小时", "hour")
-            regen_period_combo.addItem("天", "day")
-            regen_period_combo.addItem("周", "week")
+            regen_period_combo.addItem(tr("分钟"), "minute")
+            regen_period_combo.addItem(tr("小时"), "hour")
+            regen_period_combo.addItem(tr("天"), "day")
+            regen_period_combo.addItem(tr("周"), "week")
             idx = regen_period_combo.findData(rt_kd.regen_period)
             if idx >= 0:
                 regen_period_combo.setCurrentIndex(idx)
-            layout.addRow("准点周期:", regen_period_combo)
+            layout.addRow(tr("准点周期:"), regen_period_combo)
             widgets["regen_period"] = regen_period_combo
 
             regen_rate_unit_combo = QComboBox()
-            regen_rate_unit_combo.addItem("分钟", "minute")
-            regen_rate_unit_combo.addItem("小时", "hour")
-            regen_rate_unit_combo.addItem("天", "day")
-            regen_rate_unit_combo.addItem("周", "week")
+            regen_rate_unit_combo.addItem(tr("分钟"), "minute")
+            regen_rate_unit_combo.addItem(tr("小时"), "hour")
+            regen_rate_unit_combo.addItem(tr("天"), "day")
+            regen_rate_unit_combo.addItem(tr("周"), "week")
             idx = regen_rate_unit_combo.findData(rt_kd.regen_rate_unit)
             if idx >= 0:
                 regen_rate_unit_combo.setCurrentIndex(idx)
-            layout.addRow("速率单位:", regen_rate_unit_combo)
+            layout.addRow(tr("速率单位:"), regen_rate_unit_combo)
             widgets["regen_rate_unit"] = regen_rate_unit_combo
 
             regen_rate_spin = QDoubleSpinBox()
@@ -779,7 +780,7 @@ class ProfileDefinitionDialog(QDialog):
             regen_rate_spin.setDecimals(4)
             regen_rate_spin.setSingleStep(0.1)
             regen_rate_spin.setValue(rt_kd.regen_rate_value)
-            layout.addRow("速率数值:", regen_rate_spin)
+            layout.addRow(tr("速率数值:"), regen_rate_spin)
             widgets["regen_rate_value"] = regen_rate_spin
 
             regen_amount_spin = QDoubleSpinBox()
@@ -787,17 +788,17 @@ class ProfileDefinitionDialog(QDialog):
             regen_amount_spin.setDecimals(4)
             regen_amount_spin.setSingleStep(1)
             regen_amount_spin.setValue(rt_kd.regen_amount)
-            layout.addRow("每次恢复:", regen_amount_spin)
+            layout.addRow(tr("每次恢复:"), regen_amount_spin)
             widgets["regen_amount"] = regen_amount_spin
 
             reset_input = QLineEdit(rt_kd.reset_time)
             reset_input.setFixedWidth(80)
-            layout.addRow("重置时刻:", reset_input)
+            layout.addRow(tr("重置时刻:"), reset_input)
             widgets["reset_time"] = reset_input
 
             reset_day_spin = QSpinBox()
             reset_day_spin.setRange(0, 7)
-            reset_day_spin.setSpecialValueText("默认")
+            reset_day_spin.setSpecialValueText(tr("默认"))
             reset_day_spin.setValue(rt_kd.reset_day)
             reset_day_label = QLabel()
             widgets["reset_day"] = reset_day_spin
@@ -806,16 +807,16 @@ class ProfileDefinitionDialog(QDialog):
 
             orange_spin = QSpinBox()
             orange_spin.setRange(0, 999999)
-            orange_spin.setSpecialValueText("不提醒")
+            orange_spin.setSpecialValueText(tr("不提醒"))
             orange_spin.setValue(rt_kd.alert_orange or 0)
-            layout.addRow("橙色阈值:", orange_spin)
+            layout.addRow(tr("橙色阈值:"), orange_spin)
             widgets["alert_orange"] = orange_spin
 
             red_spin = QSpinBox()
             red_spin.setRange(0, 999999)
-            red_spin.setSpecialValueText("不提醒")
+            red_spin.setSpecialValueText(tr("不提醒"))
             red_spin.setValue(rt_kd.alert_red or 0)
-            layout.addRow("红色阈值:", red_spin)
+            layout.addRow(tr("红色阈值:"), red_spin)
             widgets["alert_red"] = red_spin
 
             def _update_reset_time_visibility():
@@ -840,15 +841,15 @@ class ProfileDefinitionDialog(QDialog):
                 if label_widget:
                     label_widget.setVisible((not is_realtime) and is_day_or_week)
                 if is_week:
-                    reset_day_label.setText("重置日(周几):")
+                    reset_day_label.setText(tr("重置日(周几):"))
             regen_period_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             regen_type_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             _update_reset_time_visibility()
 
             # 自定义增减幅度（支持 value:来源）
             steps_input = QLineEdit(_format_steps(rt_kd.steps))
-            steps_input.setPlaceholderText("如: 1:任务奖励,10 或 -1")
-            layout.addRow("增减幅度:", steps_input)
+            steps_input.setPlaceholderText(tr("如: 1:任务奖励,10 或 -1"))
+            layout.addRow(tr("增减幅度:"), steps_input)
             widgets["steps"] = steps_input
 
         elif model_type == MODEL_STOCK:
@@ -856,8 +857,8 @@ class ProfileDefinitionDialog(QDialog):
 
             # 自定义增减幅度（支持 value:来源）
             steps_input = QLineEdit(_format_steps(res_kd.steps))
-            steps_input.setPlaceholderText("如: 1:兑换,10 或 -1")
-            layout.addRow("增减幅度:", steps_input)
+            steps_input.setPlaceholderText(tr("如: 1:兑换,10 或 -1"))
+            layout.addRow(tr("增减幅度:"), steps_input)
             widgets["steps"] = steps_input
 
         # 同步目标动态列表（三种模型通用，下拉排除自身）
@@ -865,15 +866,15 @@ class ProfileDefinitionDialog(QDialog):
         if existing and existing.sync_targets:
             for t in existing.sync_targets:
                 sync_targets_widget.add_row(t)
-        layout.addRow("同步目标:", sync_targets_widget)
+        layout.addRow(tr("同步目标:"), sync_targets_widget)
         widgets["sync_targets"] = sync_targets_widget
 
         # 按钮行
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        btn_ok = QPushButton("确定")
+        btn_ok = QPushButton(tr("确定"))
         btn_row.addWidget(btn_ok)
-        btn_cancel = QPushButton("取消")
+        btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
         layout.addRow(btn_row)
@@ -890,13 +891,13 @@ class ProfileDefinitionDialog(QDialog):
             label = label_input.text().strip()
 
             if not key:
-                error_label.setText("请输入 Key")
+                error_label.setText(tr("请输入 Key"))
                 return
             if not key.replace("_", "").isalnum():
-                error_label.setText("Key 只能包含字母、数字和下划线")
+                error_label.setText(tr("Key 只能包含字母、数字和下划线"))
                 return
             if not label:
-                error_label.setText("请输入标签")
+                error_label.setText(tr("请输入标签"))
                 return
 
             # 检查 key 唯一性（排除自身）
@@ -908,7 +909,7 @@ class ProfileDefinitionDialog(QDialog):
                     if item and item.text() != (existing.key if existing else ""):
                         all_keys.add(item.text())
             if key in all_keys:
-                error_label.setText(f"Key '{key}' 已存在")
+                error_label.setText(tr("Key '{key}' 已存在").format(key=key))
                 return
 
             # 来源/用途词表
@@ -921,7 +922,7 @@ class ProfileDefinitionDialog(QDialog):
             # 禁止同步目标指向自身（兼容：行已存在时 key 被改名的情况）
             self_sync_key = f"{model_type}:{key}"
             if any(t.key == self_sync_key for t in sync_targets_list):
-                error_label.setText("同步目标不能指向自身")
+                error_label.setText(tr("同步目标不能指向自身"))
                 return
 
             # 通用上限字段（三种模型通用）
@@ -1040,4 +1041,4 @@ class ProfileDefinitionDialog(QDialog):
             self.accept()
         except Exception as e:
             logger.error(f"保存失败: {e}")
-            QMessageBox.warning(self, "保存失败", f"保存 profile.yaml 失败:\n{e}")
+            QMessageBox.warning(self, tr("保存失败"), tr("保存 profile.yaml 失败:\n{e}").format(e=e))

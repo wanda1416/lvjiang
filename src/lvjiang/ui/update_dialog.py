@@ -12,6 +12,7 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
 
 from ..core.update import get_version, set_skip_version
+from ..i18n import tr
 
 
 class UpdateDialog(QDialog):
@@ -29,7 +30,7 @@ class UpdateDialog(QDialog):
         self._setup_ui()
 
     def _setup_ui(self):
-        self.setWindowTitle("发现新版本")
+        self.setWindowTitle(tr("发现新版本"))
         self.setFixedSize(380, 200)
 
         layout = QVBoxLayout(self)
@@ -53,7 +54,7 @@ class UpdateDialog(QDialog):
         btn_layout.setSpacing(8)
 
         # 前往下载
-        self._download_btn = QPushButton("前往下载")
+        self._download_btn = QPushButton(tr("前往下载"))
         self._download_btn.setStyleSheet(
             "QPushButton { background-color: #4CAF50; color: white; "
             "padding: 8px 16px; font-weight: bold; }"
@@ -62,12 +63,12 @@ class UpdateDialog(QDialog):
         btn_layout.addWidget(self._download_btn)
 
         # 此版本不再询问
-        self._skip_btn = QPushButton("此版本不再询问")
+        self._skip_btn = QPushButton(tr("此版本不再询问"))
         self._skip_btn.clicked.connect(self._on_skip)
         btn_layout.addWidget(self._skip_btn)
 
         # 继续使用
-        self._close_btn = QPushButton("继续使用")
+        self._close_btn = QPushButton(tr("继续使用"))
         self._close_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self._close_btn)
 

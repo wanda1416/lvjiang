@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import SeasonConfig, get_game_config
+from .....i18n import tr
 
 from .level_combo import LevelCombo
 
@@ -47,7 +48,7 @@ _START_DATE_COL = 3
 _END_DATE_COL = 4
 _FIRST_HALF_COL = 5
 _EQUIP_LEVEL_COL = 6
-_COLS = ("#", "赛季编号", "赛季名称", "开始日期", "结束日期", "上半赛季结束", "装备等级")
+_COLS = ("#", "赛季编号", "赛季名称", "开始日期", "结束日期", "上半赛季结束", "装备等级")  # runtime tr()
 
 
 class SeasonConfigPanel(QWidget):
@@ -73,7 +74,7 @@ class SeasonConfigPanel(QWidget):
 
         # 表格
         self._table = QTableWidget(0, len(_COLS))
-        self._table.setHorizontalHeaderLabels(list(_COLS))
+        self._table.setHorizontalHeaderLabels([tr(c) for c in _COLS])
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
         # 序号列固定宽度
@@ -90,20 +91,20 @@ class SeasonConfigPanel(QWidget):
 
         # 底部按钮
         btn_row = QHBoxLayout()
-        add_btn = QPushButton("添加赛季")
+        add_btn = QPushButton(tr("添加赛季"))
         add_btn.clicked.connect(self._on_add_row)
         btn_row.addWidget(add_btn)
-        del_btn = QPushButton("删除选中")
+        del_btn = QPushButton(tr("删除选中"))
         del_btn.clicked.connect(self._on_del_row)
         btn_row.addWidget(del_btn)
         btn_row.addSpacing(8)
-        self._up_btn = QPushButton("▲ 上移")
-        self._up_btn.setToolTip("将选中赛季上移一行")
+        self._up_btn = QPushButton(tr("▲ 上移"))
+        self._up_btn.setToolTip(tr("将选中赛季上移一行"))
         self._up_btn.clicked.connect(self._on_move_up)
         self._up_btn.setEnabled(False)
         btn_row.addWidget(self._up_btn)
-        self._down_btn = QPushButton("▼ 下移")
-        self._down_btn.setToolTip("将选中赛季下移一行")
+        self._down_btn = QPushButton(tr("▼ 下移"))
+        self._down_btn.setToolTip(tr("将选中赛季下移一行"))
         self._down_btn.clicked.connect(self._on_move_down)
         self._down_btn.setEnabled(False)
         btn_row.addWidget(self._down_btn)

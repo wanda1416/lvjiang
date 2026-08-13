@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import LevelConfig, get_game_config
+from .....i18n import tr
 
 # 列定义
 _SEQ_COL = 0
@@ -37,7 +38,7 @@ _RESET_COL = 2
 _MATERIAL_COL = 3
 _JUDGE_RES_COL = 4
 _BUFF_RES_COL = 5
-_COLS = ("#", "等级", "支持重置", "最低材料数量", "判定抗性(%)", "增益抗性(%)")
+_COLS = ("#", "等级", "支持重置", "最低材料数量", "判定抗性(%)", "增益抗性(%)")  # runtime tr()
 
 
 class LevelConfigPanel(QWidget):
@@ -66,7 +67,7 @@ class LevelConfigPanel(QWidget):
 
         # 表格
         self._table = QTableWidget(0, len(_COLS))
-        self._table.setHorizontalHeaderLabels(list(_COLS))
+        self._table.setHorizontalHeaderLabels([tr(c) for c in _COLS])
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
         # 序号列固定宽度
@@ -82,20 +83,20 @@ class LevelConfigPanel(QWidget):
 
         # 底部按钮
         btn_row = QHBoxLayout()
-        add_btn = QPushButton("添加配置")
+        add_btn = QPushButton(tr("添加配置"))
         add_btn.clicked.connect(self._on_add_row)
         btn_row.addWidget(add_btn)
-        del_btn = QPushButton("删除选中")
+        del_btn = QPushButton(tr("删除选中"))
         del_btn.clicked.connect(self._on_del_row)
         btn_row.addWidget(del_btn)
         btn_row.addSpacing(8)
-        self._up_btn = QPushButton("▲ 上移")
-        self._up_btn.setToolTip("将选中配置上移一行")
+        self._up_btn = QPushButton(tr("▲ 上移"))
+        self._up_btn.setToolTip(tr("将选中配置上移一行"))
         self._up_btn.clicked.connect(self._on_move_up)
         self._up_btn.setEnabled(False)
         btn_row.addWidget(self._up_btn)
-        self._down_btn = QPushButton("▼ 下移")
-        self._down_btn.setToolTip("将选中配置下移一行")
+        self._down_btn = QPushButton(tr("▼ 下移"))
+        self._down_btn.setToolTip(tr("将选中配置下移一行"))
         self._down_btn.clicked.connect(self._on_move_down)
         self._down_btn.setEnabled(False)
         btn_row.addWidget(self._down_btn)

@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 from .equip_status_panel import EquipStatusPanel
 from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from .profile.tab import add_user_nav_buttons
+from ....i18n import tr
 
 
 class _OtherEquipPage(QWidget):
@@ -23,7 +24,7 @@ class _OtherEquipPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        placeholder = QLabel("其他装备展示开发中…")
+        placeholder = QLabel(tr("其他装备展示开发中…"))
         placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder.setStyleSheet("color: #999; font-size: 14px; padding: 40px;")
         layout.addWidget(placeholder, stretch=1)
@@ -44,9 +45,9 @@ class EquipStatusTab(QWidget):
 
         # 刷新按钮
         btn_row = QHBoxLayout()
-        btn_refresh = QPushButton("刷新")
+        btn_refresh = QPushButton(tr("刷新"))
         btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip("刷新装备数据")
+        btn_refresh.setToolTip(tr("刷新装备数据"))
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)
         btn_row.addWidget(btn_refresh)
@@ -60,11 +61,11 @@ class EquipStatusTab(QWidget):
 
         # 当前装备 —— 复用 EquipStatusPanel
         self._current_equip_panel = EquipStatusPanel()
-        self._sub_tabs.addTab(self._current_equip_panel, "当前装备")
+        self._sub_tabs.addTab(self._current_equip_panel, tr("当前装备"))
 
         # 其他装备 —— 暂时留空
         self._other_equip_page = _OtherEquipPage()
-        self._sub_tabs.addTab(self._other_equip_page, "其他装备")
+        self._sub_tabs.addTab(self._other_equip_page, tr("其他装备"))
 
         # 订阅宿主用户切换
         self._host.user_changed.connect(lambda _name: self._refresh_current())

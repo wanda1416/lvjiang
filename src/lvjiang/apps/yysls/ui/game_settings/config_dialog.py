@@ -6,6 +6,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
+from .....i18n import tr
 from .config_tab import GameConfigTab
 
 
@@ -14,7 +15,7 @@ class GameConfigDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("游戏配置")
+        self.setWindowTitle(tr("游戏配置"))
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
         self.setWindowFlags(

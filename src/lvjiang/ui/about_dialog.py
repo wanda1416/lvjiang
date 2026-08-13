@@ -25,6 +25,7 @@ from ..core.update import (
     get_version,
     is_newer_version,
 )
+from ..i18n import tr
 
 # 导出供外部使用
 __all__ = ["AboutDialog", "GITHUB_REPO"]
@@ -35,7 +36,7 @@ class AboutDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("关于律匠")
+        self.setWindowTitle(tr("关于律匠"))
         self.setFixedSize(400, 320)
         self._update_checker = None
         self._setup_ui()
@@ -46,11 +47,11 @@ class AboutDialog(QDialog):
 
         # ─── 标题与版本 ───
         version = get_version()
-        title_label = QLabel("<h2>律匠</h2>")
+        title_label = QLabel(f"<h2>{tr('律匠')}</h2>")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
-        version_label = QLabel(f"版本 {version}")
+        version_label = QLabel(f"{tr('版本')} {version}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_label.setStyleSheet("color: gray; font-size: 12px;")
         layout.addWidget(version_label)
@@ -58,7 +59,7 @@ class AboutDialog(QDialog):
         # ─── 功能简介 ───
         desc_label = QLabel(
             "<p style='text-align: center;'>"
-            "通用视觉 RPA 引擎<br>"
+            f"{tr('通用视觉 RPA 引擎')}<br>"
             "<small>窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行</small>"
             "</p>"
         )
@@ -83,7 +84,7 @@ class AboutDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self._check_update_btn = QPushButton("检查更新")
+        self._check_update_btn = QPushButton(tr("检查更新"))
         self._check_update_btn.clicked.connect(self._check_update)
         btn_layout.addWidget(self._check_update_btn)
 
@@ -109,7 +110,7 @@ class AboutDialog(QDialog):
     def _check_update(self):
         """检查 GitHub Release 更新"""
         self._check_update_btn.setEnabled(False)
-        self._check_update_btn.setText("检查中...")
+        self._check_update_btn.setText(tr("检查中..."))
 
         self._update_checker = UpdateChecker()
         self._update_checker.finished.connect(self._on_update_available)
@@ -119,17 +120,16 @@ class AboutDialog(QDialog):
     def _on_update_available(self, latest_version: str, download_url: str):
         """发现新版本"""
         self._check_update_btn.setEnabled(True)
-        self._check_update_btn.setText("检查更新")
+        self._check_update_btn.setText(tr("检查更新"))
 
         current_version = get_version()
 
         if is_newer_version(latest_version, current_version):
             result = QMessageBox.information(
                 self,
-                "发现新版本",
-                f"发现新版本 v{latest_version}\n"
-                f"当前版本: v{current_version}\n\n"
-                "是否前往下载？",
+                tr("发现新版本"),
+                tr("发现新版本 v{latest}\n当前版本: v{current}\n\n是否前往下载？").format(
+                    latest=latest_version, current=current_version),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if result == QMessageBox.StandardButton.Yes:
@@ -137,15 +137,15 @@ class AboutDialog(QDialog):
         else:
             QMessageBox.information(
                 self,
-                "已是最新版本",
-                f"当前版本 v{current_version} 已是最新版本",
+                tr("已是最新版本"),
+                tr("当前版本 v{current} 已是最新版本").format(current=current_version),
             )
 
     def _on_update_error(self, error_msg: str):
         """检查更新失败"""
         self._check_update_btn.setEnabled(True)
-        self._check_update_btn.setText("检查更新")
-        QMessageBox.warning(self, "检查更新失败", error_msg)
+        self._check_update_btn.setText(tr("检查更新"))
+        QMessageBox.warning(self, tr("检查更新失败"), error_msg)
 
     def _open_github(self):
         """打开 GitHub 仓库页面"""

@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...profile.profile_db import db_get_history
+from .....i18n import tr
 
 # ProfileDefinitionDialog 位于 settings_dialog.py，此处 re-export 便于统一导入。
 from .settings_dialog import ProfileDefinitionDialog  # noqa: F401
@@ -39,11 +40,11 @@ __all__ = ["HistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
 class HistoryDialog(QDialog):
     """查看指定 key 的变更记录（最近 50 条）"""
 
-    _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}
+    _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}  # runtime tr()
 
     def __init__(self, user_name: str, model_type: str, key: str, key_label: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"{key_label} — {user_name} 变更记录")
+        self.setWindowTitle(f"{key_label} — {user_name} " + tr("变更记录"))
         self.resize(820, 420)
         self._setup_ui(user_name, model_type, key)
 
@@ -54,7 +55,8 @@ class HistoryDialog(QDialog):
 
         table = QTableWidget()
         table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(["时间", "类型", "旧值", "新值", "来源", "详情"])
+        table.setHorizontalHeaderLabels([
+                    tr("时间"), tr("类型"), tr("旧值"), tr("新值"), tr("来源"), tr("详情")])
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
@@ -96,7 +98,7 @@ class HistoryDialog(QDialog):
             )
 
             table.setItem(row, 0, QTableWidgetItem(formatted_ts))
-            table.setItem(row, 1, QTableWidgetItem(self._TYPE_LABEL.get(ct, ct)))
+            table.setItem(row, 1, QTableWidgetItem(tr(self._TYPE_LABEL.get(ct, ct))))
             table.setItem(row, 2, QTableWidgetItem(old_str))
             table.setItem(row, 3, QTableWidgetItem(new_str))
             table.setItem(row, 4, QTableWidgetItem(rec.get("source", "")))
@@ -149,18 +151,18 @@ def ask_value_dialog(
 
     if initial_value is not None:
         value_input.setText(str(initial_value) if is_float else str(int(initial_value)))
-    value_input.setPlaceholderText("请输入数值")
+    value_input.setPlaceholderText(tr("请输入数值"))
     layout.addRow(prompt, value_input)
 
     combo = QComboBox()
     combo.setEditable(True)
     combo.addItems(sources)
-    combo.setPlaceholderText(f"选择或输入新{source_label}")
+    combo.setPlaceholderText(tr("选择或输入新{label}").format(label=source_label))
     layout.addRow(f"{source_label}:", combo)
 
     sync_check: QCheckBox | None = None
     if sync_checkbox:
-        sync_check = QCheckBox("同步变更依赖方")
+        sync_check = QCheckBox(tr("同步变更依赖方"))
         sync_check.setChecked(sync_default)
         sync_check.setToolTip(
             "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n"
@@ -179,21 +181,21 @@ def ask_value_dialog(
     def on_accept() -> None:
         text = value_input.text().strip()
         if not text:
-            QMessageBox.warning(dialog, "输入错误", f"请输入{prompt.rstrip(':：')}")
+            QMessageBox.warning(dialog, tr("输入错误"), tr("请输入{field}").format(field=prompt.rstrip(':：')))
             value_input.setFocus()
             return
         try:
             value = float(text) if is_float else int(text)
         except ValueError:
-            QMessageBox.warning(dialog, "输入错误", f"{prompt.rstrip(':：')}必须是有效数字")
+            QMessageBox.warning(dialog, tr("输入错误"), tr("{field}必须是有效数字").format(field=prompt.rstrip(':：')))
             value_input.setFocus()
             return
         if value < min_val:
-            QMessageBox.warning(dialog, "输入错误", f"{prompt.rstrip(':：')}不能小于 {min_val}")
+            QMessageBox.warning(dialog, tr("输入错误"), tr("{field}不能小于 {min}").format(field=prompt.rstrip(':：'), min=min_val))
             value_input.setFocus()
             return
         if value > 999999:
-            QMessageBox.warning(dialog, "输入错误", f"{prompt.rstrip(':：')}不能大于 999999")
+            QMessageBox.warning(dialog, tr("输入错误"), tr("{field}不能大于 999999").format(field=prompt.rstrip(':：')))
             value_input.setFocus()
             return
         parsed_value[0] = value

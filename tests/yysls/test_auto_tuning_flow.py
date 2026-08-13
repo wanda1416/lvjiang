@@ -129,7 +129,7 @@ class FakeWF(AutoTuningWorkflow):
     def click_region(self, scene_key, field_key, jitter: bool = True):
         self.clicks.append((scene_key, field_key))
 
-    def ocr_scene(self, scene_key, field_keys=None):
+    def ocr_scene(self, scene_key, field_keys=None, min_confidence=None):
         data = dict(self._ocr_map.get(scene_key, {}))
         # 默认值：回收确认弹窗包含「确认」（除非测试显式覆盖为锁定场景）
         if scene_key == EQUIP_DETAIL and "recycle_confirm" not in data:
@@ -138,11 +138,11 @@ class FakeWF(AutoTuningWorkflow):
             return {k: v for k, v in data.items() if k in field_keys}
         return data
 
-    def ocr_scene_by(self, scene_key, field_keys, target_value, mode):
+    def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
         return "sub_func_1" if self._nav_tune_ok else ""
 
     def recognize_materials_by(self, scene_key, field_keys, target_value,
-                               mode, group=None):
+                               mode, group=None, min_confidence=None):
         return self._material_result.get(target_value, "")
 
     def recognize_materials_info(self, scene_key, slot_keys=None, group=None):

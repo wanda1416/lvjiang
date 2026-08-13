@@ -20,6 +20,7 @@ from ..ast_nodes import (
     SceneRef,
     VarRef,
     Wait,
+    WhereClause,
 )
 
 
@@ -235,12 +236,13 @@ class _StmtMixin:
     # ─── find 指令 ─────────────────────────────────────────
 
     def find_stmt_area(self, items):
-        """find [scene].[area] as $var by ... — 指定区域搜索"""
+        """find [scene].[area] as $var by ... [where ...] — 指定区域搜索"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
         var_ref = items[1]       # var_ref → VarRef
         var_name = var_ref.name
         by_clause = items[2]     # ByClause（必填）
+        where_clause = items[3] if len(items) > 3 else None  # WhereClause | None
         # 解析搜索区域（与 scan 一致）
         search_region = None
         if len(scene_target) > 1 and scene_target[1] is not None:
@@ -254,17 +256,20 @@ class _StmtMixin:
         return Find(
             var_name=var_name, by=by_clause,
             search_scene=scene_name, search_region=search_region,
+            where=where_clause,
             line_no=self._line(items),
         )
 
     def find_stmt_full(self, items):
-        """find as $var by ... — 全画布搜索"""
+        """find as $var by ... [where ...] — 全画布搜索"""
         var_ref = items[0]       # var_ref → VarRef
         var_name = var_ref.name
         by_clause = items[1]     # ByClause（必填）
+        where_clause = items[2] if len(items) > 2 else None  # WhereClause | None
         return Find(
             var_name=var_name, by=by_clause,
             search_scene=None, search_region=None,
+            where=where_clause,
             line_no=self._line(items),
         )
 
@@ -343,22 +348,34 @@ class _StmtMixin:
                 fields = second  # field_list → list[Literal]
             elif isinstance(second, VarRef):
                 region_var = second  # 动态 region
-        by_clause = items[2] if len(items) > 2 else None  # ByClause | None
-        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, line_no=self._line(items))
+        by_clause = None
+        where_clause = None
+        for item in items[2:]:
+            if isinstance(item, ByClause):
+                by_clause = item
+            elif isinstance(item, WhereClause):
+                where_clause = item
+        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, line_no=self._line(items))
 
     def scan_panel_stmt(self, items):
-        """scan [scene].[panel][row][col] as $var [by ...]"""
+        """scan [scene].[panel][row][col] as $var [by ...] [where ...]"""
         scene_val = self._resolve_const_or_var(items[0])
         panel_val = self._resolve_const_or_var(items[1])
         row = items[2]
         col = items[3]
         target = items[4]  # var_ref → VarRef
-        by_clause = items[5] if len(items) > 5 else None
+        by_clause = None
+        where_clause = None
+        for item in items[5:]:
+            if isinstance(item, ByClause):
+                by_clause = item
+            elif isinstance(item, WhereClause):
+                where_clause = item
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
-        return Scan(scene=panel_ref, target=target, by=by_clause, line_no=self._line(items))
+        return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, line_no=self._line(items))
 
     def recognize_stmt(self, items):
-        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...]"""
+        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] [where ...]"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
         scene = SceneRef(scene=scene_name)
@@ -373,16 +390,19 @@ class _StmtMixin:
                 region_var = second  # 动态 region
         by_clause = None
         group_clause = None
-        # 解析可选的 by_clause 和 group_clause
+        where_clause = None
+        # 解析可选的 by_clause、group_clause 和 where_clause
         for item in items[2:]:
             if isinstance(item, ByClause):
                 by_clause = item
             elif isinstance(item, (Literal, VarRef)):
                 group_clause = item  # group 子句返回的是 Literal 或 VarRef
-        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, line_no=self._line(items))
+            elif isinstance(item, WhereClause):
+                where_clause = item
+        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, line_no=self._line(items))
 
     def recognize_panel_stmt(self, items):
-        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...]"""
+        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...] [where ...]"""
         scene_val = self._resolve_const_or_var(items[0])
         panel_val = self._resolve_const_or_var(items[1])
         row = items[2]
@@ -390,10 +410,13 @@ class _StmtMixin:
         target = items[4]  # var_ref → VarRef
         by_clause = None
         group_clause = None
+        where_clause = None
         for item in items[5:]:
             if isinstance(item, ByClause):
                 by_clause = item
             elif isinstance(item, (Literal, VarRef)):
                 group_clause = item
+            elif isinstance(item, WhereClause):
+                where_clause = item
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
-        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, line_no=self._line(items))
+        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, line_no=self._line(items))

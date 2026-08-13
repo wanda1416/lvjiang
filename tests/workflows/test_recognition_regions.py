@@ -44,7 +44,7 @@ class _FakeOCR:
         self.calls.append(idx)
         return [_FakeOCRResult(self.texts.get(idx, ""))]
 
-    def ocr_scene_regions(self, img, canvas, regions, scene_key):
+    def ocr_scene_regions(self, img, canvas, regions, scene_key, min_confidence=None):
         return {r.key: self.texts.get(i, "") for i, r in enumerate(regions)}
 
 

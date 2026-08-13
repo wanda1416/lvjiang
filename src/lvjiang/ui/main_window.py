@@ -533,7 +533,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """退出时统一写入 ui_state（保留 session.json 其他字段）"""
         import json
 
-        from ..constants import LOCAL_CONFIG_DIR, SESSION_PATH
+        from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
         data = {}
         if SESSION_PATH.exists():
             try:
@@ -545,7 +545,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             "splitter_sizes": self._main_splitter.sizes(),
         }
         try:
-            LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             SESSION_PATH.write_text(
                 json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
             )

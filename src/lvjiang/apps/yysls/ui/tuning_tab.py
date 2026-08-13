@@ -1,7 +1,9 @@
 """燕云「调律」Tab —— 通过 AppHooks 注入通用 MainWindow 的插件页面。
 
 职责：
-- 流派配置 / 部位选择 UI 与插件会话持久化
+- 调律配置三页 Tab（规则 | 部位 | 更多）与插件会话持久化：
+  规则 = 调律规则与玩法；部位 = 调律部位选择；
+  更多 = 跳过实际调律 mock + 全部注册开关
 - 「开始调律」按钮三态（运行中 / 未就绪 / 就绪），订阅宿主 automation_state_changed
 - ``f9_run()``：F9 快捷键与按钮共用的启停入口，
   收集配置并通过宿主 ``run_workflow_implementation`` 启动 auto_tuning
@@ -16,11 +18,12 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from .tuning_config_widget import TuningConfigWidget
+from .tuning_config_widget import TuningConfigWidget, TuningGlobalsWidget
 
 
 def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
@@ -46,7 +49,7 @@ class TuningTab(QWidget):
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
-        # 顶部固定「开始调律」按钮 + 下方可滚动配置区（滚动时按钮始终可见）
+        # 顶部固定「开始调律」按钮 + 下方配置三页 Tab（规则 | 部位 | 更多）
         tab_layout = QVBoxLayout(self)
         tab_layout.setContentsMargins(4, 4, 4, 4)
 
@@ -57,20 +60,41 @@ class TuningTab(QWidget):
         )
         tab_layout.addWidget(self.btn_run_tuning)
 
-        tuning_scroll = QScrollArea()
-        tuning_scroll.setWidgetResizable(True)
-        tuning_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        tuning_panel = QWidget()
-        tuning_layout = QVBoxLayout(tuning_panel)
-        tuning_layout.setContentsMargins(4, 4, 4, 4)
+        config_tabs = QTabWidget()
+        config_tabs.addTab(self._build_rules_page(), "规则")
+        config_tabs.addTab(self._build_slots_page(), "部位")
+        config_tabs.addTab(self._build_more_page(), "更多")
+        tab_layout.addWidget(config_tabs)
 
-        # ── 流派配置（公共控件，变更即持久化）──
-        tuning_layout.addWidget(QLabel("<b>流派配置（可多选）：</b>"))
-        self._tuning_config = TuningConfigWidget()
+    def _wrap_scroll(self, panel: QWidget) -> QScrollArea:
+        """页面统一包可滚动容器（禁水平滚动，最小宽避免内容被裁切）"""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(panel)
+        scrollbar_w = scroll.verticalScrollBar().sizeHint().width()
+        scroll.setMinimumWidth(
+            panel.minimumSizeHint().width() + scrollbar_w + 8)
+        return scroll
+
+    def _build_rules_page(self) -> QWidget:
+        """「规则」页：调律规则与玩法（公共控件，变更即持久化）"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.addWidget(QLabel("<b>流派配置（可多选）：</b>"))
+        self._tuning_config = TuningConfigWidget(show_globals=False)
         self._tuning_config.config_changed.connect(self._save_tuning_config)
-        tuning_layout.addWidget(self._tuning_config)
+        layout.addWidget(self._tuning_config)
+        layout.addStretch()
+        return self._wrap_scroll(panel)
 
-        # ── 部位选择（标题行内嵌全选/取消全选，仅作用于部位复选框）──
+    def _build_slots_page(self) -> QWidget:
+        """「部位」页：调律部位选择（标题行内嵌全选/取消全选）"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+
         slots_header = QHBoxLayout()
         slots_header.addWidget(QLabel("<b>选择调律部位：</b>"))
         slots_header.addStretch()
@@ -82,7 +106,7 @@ class TuningTab(QWidget):
         btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
         btn_deselect_all.setFixedWidth(70)
         slots_header.addWidget(btn_deselect_all)
-        tuning_layout.addLayout(slots_header)
+        layout.addLayout(slots_header)
         self._tuning_checkboxes: list[QCheckBox] = []
 
         slots_row = QHBoxLayout()
@@ -107,16 +131,21 @@ class TuningTab(QWidget):
                 grp_layout.addWidget(cb)
                 self._tuning_checkboxes.append(cb)
             slots_row.addWidget(grp)
-        tuning_layout.addLayout(slots_row)
+        layout.addLayout(slots_row)
+        layout.addStretch()
+        return self._wrap_scroll(panel)
 
-        tuning_layout.addStretch()
-        tuning_scroll.setWidget(tuning_panel)
-        # 宽度自适应：滚动区最小宽 = 内容最小宽 + 垂直滚动条，
-        # 避免左侧分栏默认宽度下内容被裁切（水平滚动条已禁用）
-        scrollbar_w = tuning_scroll.verticalScrollBar().sizeHint().width()
-        tuning_scroll.setMinimumWidth(
-            tuning_panel.minimumSizeHint().width() + scrollbar_w + 8)
-        tab_layout.addWidget(tuning_scroll)
+    def _build_more_page(self) -> QWidget:
+        """「更多」页：跳过实际调律 mock + 全部注册开关"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.addWidget(QLabel("<b>全局开关与测试选项：</b>"))
+        self._tuning_globals = TuningGlobalsWidget()
+        self._tuning_globals.config_changed.connect(self._save_tuning_config)
+        layout.addWidget(self._tuning_globals)
+        layout.addStretch()
+        return self._wrap_scroll(panel)
 
     # ─── 按钮状态（订阅宿主 automation_state_changed）──────────
 
@@ -216,7 +245,7 @@ class TuningTab(QWidget):
         host.run_workflow_implementation(
             "auto_tuning", flow_name, configure)
 
-    # ─── 调律配置持久化（插件会话 config/local/yysls/session.json）──
+    # ─── 调律配置持久化（插件会话 config/session/yysls/session.json）──
 
     def _load_tuning_config(self):
         from ..plugin_session import get_plugin_session
@@ -235,8 +264,8 @@ class TuningTab(QWidget):
             cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
             cb.blockSignals(False)
         self._tuning_config.set_config(rules_cfg)
-        self._tuning_config.set_switches(tuning.get("switches") or {})
-        self._tuning_config.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
+        self._tuning_globals.set_switches(tuning.get("switches") or {})
+        self._tuning_globals.set_skip_tuning(bool(tuning.get("skip_tuning", False)))
 
     def _save_tuning_config(self):
         from ..plugin_session import get_plugin_session
@@ -261,9 +290,9 @@ class TuningTab(QWidget):
         return self._tuning_config.get_config()
 
     def _get_tuning_switches(self) -> dict[str, bool]:
-        """全局开关状态（公共控件顶部动态复选框）"""
-        return self._tuning_config.get_switches()
+        """全局开关状态（「更多」页动态复选框）"""
+        return self._tuning_globals.get_switches()
 
     def _get_tuning_skip_tuning(self) -> bool:
-        """全局「跳过实际调律」开关（临时测试用，与 switches 同级）"""
-        return self._tuning_config.get_skip_tuning()
+        """全局「跳过实际调律」开关（临时测试用，「更多」页）"""
+        return self._tuning_globals.get_skip_tuning()

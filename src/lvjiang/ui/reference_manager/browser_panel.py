@@ -580,7 +580,7 @@ class BrowserPanel(QWidget):
         """加载参考图并生成缩略图"""
         import cv2
         from PIL import Image
-        path = self._db.dir / filename
+        path = self._db.image_path(filename)
         try:
             img_rgb = np.array(Image.open(path))
             bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)

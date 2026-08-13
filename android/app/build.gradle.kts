@@ -143,23 +143,17 @@ dependencies {
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }
 
-// 系统配置（场景/工作流 YAML）随 APK 分发：从仓库 config/system 同步进 assets，
-// App 启动时解压到 filesDir/lvjiang/config/system（见 App.kt）。
+// 系统配置（场景/工作流 YAML + 布局 + 参照图）随 APK 分发：从仓库 config/system
+// 同步进 assets，App 启动时解压到 filesDir/lvjiang/config/system（见 App.kt）。
 // 用 Sync 任务而非手拷一份：仓库里只有 config/system 一个数据源，不会两处失同步。
 val syncSystemConfig = tasks.register<Sync>("syncSystemConfig") {
     from(rootProject.file("../config/system"))
+    exclude("workflows/_*.wf")  // 编辑器临时/草稿脚本不进 APK
     into(layout.buildDirectory.dir("generated/lvjiang_assets/config/system"))
-}
-// 布局文件（手机直控.json）随 APK 分发：从仓库 config/local/layouts 同步进 assets，
-// App 启动时解压到 filesDir/lvjiang/config/local/layouts。
-val syncLayoutConfig = tasks.register<Sync>("syncLayoutConfig") {
-    from(rootProject.file("../config/local/layouts"))
-    include("手机直控.json")
-    into(layout.buildDirectory.dir("generated/lvjiang_assets/config/local/layouts"))
 }
 android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/lvjiang_assets"))
 // 把 sync 任务挂到 preBuild 上：AGP 8 + Gradle 8.10 的 strict task validation 会抓
 // generateReleaseLintVitalReportModel 等任务对 assets 目录的隐式依赖，只挂 generate*Assets
 // 不够（lint 任务不走这条命名规则）。preBuild 是构建生命周期的最早任务，所有下游都会
 // 等它完成，依赖关系因此显式化。
-tasks.named("preBuild") { dependsOn(syncSystemConfig, syncLayoutConfig) }
+tasks.named("preBuild") { dependsOn(syncSystemConfig) }

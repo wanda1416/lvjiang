@@ -1,5 +1,6 @@
 """WorkflowEngine 主类：生命周期、执行入口与语句分发"""
 
+import posixpath
 import traceback
 from pathlib import Path
 from typing import Callable
@@ -8,6 +9,7 @@ from loguru import logger
 
 from ...config import DelayConfig
 from ...core.capture_base import CaptureBackend
+from ...core.config_resolver import get_resolver
 from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout
@@ -94,6 +96,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self.output: dict = {}
         self._coord_meta: dict[str, dict] = {}
         self._base_dir: Path | None = None
+        # 当前 wf 相对 workflows 根的目录（跨层 import 解析用），None=根外文件
+        self._wf_rel_dir: str | None = None
         # panel 对齐缓存：(scene_key, panel_key) → GridAlignment
         self._panel_alignments: dict[tuple[str, str], GridAlignment] = {}
         # 过程定义索引：{name: ProcDef}，由 _execute_dsl 填充
@@ -164,6 +168,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._ensure_workflow()
         resolved = Path(wf_path).resolve()
         self._base_dir = resolved.parent
+        self._wf_rel_dir = self._workflows_rel_dir(resolved)
         program = parse_file(resolved)
 
         # 解析 import 链（含循环检测），收集所有 def 到 self._procs
@@ -200,15 +205,43 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         logger.info(f"=== DSL 工作流完成，收集到 {len(self.output)} 项数据 ===")
         return self.output
 
+    @staticmethod
+    def _workflows_rel_dir(path: Path) -> str | None:
+        """计算 wf 文件所在目录相对 workflows 根的 posix 路径
+
+        命中 system/local 任一层的 workflows 目录时返回相对目录
+        （顶层为 ""），否则 None（编辑器临时文件、外部绝对路径执行）。
+        """
+        resolver = get_resolver()
+        for root in (resolver.system_dir, resolver.local_dir):
+            try:
+                rel = path.resolve().relative_to((root / "workflows").resolve())
+            except (ValueError, OSError):
+                continue
+            return rel.parent.as_posix() if rel.parent != Path(".") else ""
+        return None
+
     def _resolve_imports(self, program, import_stack: set):
         """递归解析 import 链，收集所有 def 到 self._procs
 
+        相对路径先按「当前 wf 相对 workflows 根的目录 + import 路径」
+        经 resolver 跨层解析（local 影子优先），未命中回退 _base_dir 拼接。
         import_stack: 当前 import 链中的文件路径集合，用于循环检测。
         """
         for imp in program.imports:
             imp_path = Path(imp.path)
-            if not imp_path.is_absolute() and self._base_dir:
-                imp_path = self._base_dir / imp_path
+            if not imp_path.is_absolute():
+                resolved_cross = None
+                if self._wf_rel_dir is not None:
+                    rel = posixpath.normpath(posixpath.join(
+                        self._wf_rel_dir, Path(imp.path).as_posix()))
+                    if not rel.startswith(".."):
+                        resolved_cross = get_resolver().resolve_read(
+                            f"workflows/{rel}")
+                if resolved_cross is not None:
+                    imp_path = resolved_cross
+                elif self._base_dir:
+                    imp_path = self._base_dir / imp_path
             imp_resolved = str(imp_path.resolve())
 
             # 循环检测
@@ -220,11 +253,14 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             imp_program = parse_file(imp_path)
             new_stack = import_stack | {imp_resolved}
 
-            # 递归解析子文件的 import（临时切换 base_dir）
+            # 递归解析子文件的 import（临时切换 base_dir 与相对目录）
             old_base = self._base_dir
+            old_rel = self._wf_rel_dir
             self._base_dir = imp_path.parent
+            self._wf_rel_dir = self._workflows_rel_dir(imp_path)
             self._resolve_imports(imp_program, new_stack)
             self._base_dir = old_base
+            self._wf_rel_dir = old_rel
 
             # 收集子文件的 def（平铺到当前命名空间）
             for name, proc_def in imp_program.procs.items():

@@ -5,11 +5,10 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 from loguru import logger
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from ..constants import SYSTEM_CONFIG_DIR, SYSTEM_WORKFLOWS_DIR
+from ..core.config_resolver import get_resolver
 from ..workflows.engine import WorkflowEngine
 
 
@@ -163,15 +162,14 @@ class RunControlMixin:
         logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
 
     def _load_script_exposure(self) -> tuple[list, dict]:
-        """读取 workflows.yaml 的 exposed 列表与 overrides 映射。"""
-        yaml_path = SYSTEM_CONFIG_DIR / "workflows.yaml"
-        if not yaml_path.exists():
-            logger.warning(f"脚本暴露配置文件不存在: {yaml_path}")
-            return [], {}
+        """读取 workflows.yaml（合并视图）的 exposed 列表与 overrides 映射。"""
         try:
-            data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+            data = get_resolver().load_merged("workflows.yaml")
         except Exception as e:
             logger.error(f"加载脚本暴露配置失败: {e}")
+            return [], {}
+        if not data:
+            logger.warning("脚本暴露配置 workflows.yaml 为空或不存在")
             return [], {}
         exposed = data.get("exposed") or []
         overrides = data.get("overrides") or {}
@@ -186,7 +184,7 @@ class RunControlMixin:
 
         from ..workflows.metadata import build_flow_config
         path, _ = QFileDialog.getOpenFileName(
-            self, "加载工作流文件", str(SYSTEM_WORKFLOWS_DIR),
+            self, "加载工作流文件", str(get_resolver().write_dir("workflows")),
             "工作流文件 (*.wf);;所有文件 (*)",
         )
         if not path:
@@ -467,7 +465,11 @@ class RunControlMixin:
             wf_file = flow_cfg["wf_file"]
             wf_path = Path(wf_file)
             if not wf_path.is_absolute():
-                wf_path = SYSTEM_WORKFLOWS_DIR / wf_file
+                resolved = get_resolver().resolve_read(f"workflows/{wf_file}")
+                if resolved is None:
+                    logger.error(f"工作流文件不存在: {wf_file}")
+                    return
+                wf_path = resolved
             self._start_workflow(flow_id, flow_name,
                                  lambda: engine.execute(wf_path, initial_variables=flow_params))
 

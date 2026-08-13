@@ -5,6 +5,8 @@ views:
   name: 基底
 - key: result
   name: 调律结果
+- key: reset_tune
+  name: 重置调律
 regions:
 - key: back
   name: 返回
@@ -114,3 +116,15 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: reset_confirm
+  name: 确认重置
+  type: func
+  is_text: true
+  is_clickable: true
+  view: reset_tune
+- key: reset_confirm_2
+  name: 二次确认
+  type: func
+  is_text: true
+  is_clickable: true
+  view: reset_tune

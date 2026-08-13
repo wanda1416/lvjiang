@@ -120,10 +120,8 @@ class GameConfigManager:
     """
 
     def __init__(self, path: str | Path | None = None):
-        if path is None:
-            from lvjiang.constants import PROJECT_ROOT
-            path = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"
-        self._path = Path(path)
+        # path 非空（测试/孤立文件）时直读；否则经 resolver 读合并视图
+        self._path = Path(path) if path is not None else None
 
         # 品阶推断：key → level → LevelRule
         self._base_rules: dict[str, dict[int, LevelRule]] = {}
@@ -153,8 +151,12 @@ class GameConfigManager:
         self._load()
 
     def _load(self):
-        with open(self._path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        if self._path is not None:
+            with open(self._path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        else:
+            from lvjiang.core.config_resolver import get_resolver
+            data = get_resolver().load_merged("yysls/attributes.yaml")
 
         # 重置全部规则（_load 会在 UI 保存后重复调用，避免残留旧映射）
         self._base_rules.clear()

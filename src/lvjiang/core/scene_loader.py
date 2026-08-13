@@ -6,6 +6,8 @@ from pathlib import Path
 import yaml
 from loguru import logger
 
+from .config_resolver import get_resolver
+
 # 合法的 region type 枚举
 VALID_REGION_TYPES = {"attr", "slot", "func"}
 
@@ -115,38 +117,33 @@ class SceneRegistry:
 
     def __init__(
         self,
-        scenes_dir: Path,
+        resolver=None,
         scene_order: list[str] | None = None,
         group_config: dict[str, list[str]] | None = None,
         group_names: dict[str, str] | None = None,
     ):
-        self._scenes_dir = scenes_dir
+        self._resolver = resolver or get_resolver()
         self._scenes: dict[str, SceneDef] = {}
         self._order: list[str] = []
         # 分组数据
         self._groups: dict[str, str] = {}            # group_key -> group_name
         self._group_order: list[str] = []            # 分组顺序
         self._group_scenes: dict[str, list[str]] = {}  # group_key -> [scene_key, ...]
-        self._load_all(scenes_dir, scene_order, group_config, group_names)
+        self._load_all(scene_order, group_config, group_names)
 
     def _load_all(
         self,
-        scenes_dir: Path,
         scene_order: list[str] | None,
         group_config: dict[str, list[str]] | None = None,
         group_names: dict[str, str] | None = None,
     ):
         """加载场景：按 scene_order 指定的顺序，未指定的按文件名追加"""
-        if not scenes_dir.exists():
-            logger.warning(f"场景配置目录不存在: {scenes_dir}")
-            return
-
-        # 先扫描全部 YAML 文件，建立 key -> path 映射
-        file_map: dict[str, Path] = {}
-        for yaml_file in scenes_dir.glob("*.yaml"):
+        for name in self._resolver.enumerate_entities("scenes", "*.yaml"):
+            yaml_file = self._resolver.resolve_read(f"scenes/{name}")
+            if yaml_file is None:
+                continue
             try:
                 scene = self._load_scene(yaml_file)
-                file_map[scene.key] = yaml_file
                 self._scenes[scene.key] = scene
                 logger.debug(f"已加载场景: {scene.key}（{len(scene.regions)} 个区域）")
             except Exception as e:
@@ -344,24 +341,16 @@ class SceneRegistry:
             if k not in self._group_order:
                 self._group_order.append(k)
 
-    def save_group_config(self, scenes_config_path: Path):
-        """将分组配置写入 scenes.yaml"""
-        data = {}
-        if scenes_config_path.exists():
-            try:
-                data = yaml.safe_load(scenes_config_path.read_text(encoding="utf-8")) or {}
-            except Exception:
-                pass
+    def save_group_config(self):
+        """将分组配置写入 scenes.yaml（聚合键值文件，经 resolver 读合并视图、按模式写回）"""
+        data = self._resolver.load_merged("scenes.yaml")
         # 构建分组结构
         layout_scenes = {}
         for gk in self._group_order:
             layout_scenes[gk] = self._group_scenes.get(gk, [])
         data["layout_scenes"] = layout_scenes
         data["group_names"] = dict(self._groups)
-        scenes_config_path.write_text(
-            yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
-            encoding="utf-8",
-        )
+        self._resolver.save_merged("scenes.yaml", data)
         logger.info(f"已保存分组配置: {self._group_order}")
 
     # ─── 场景 CRUD ──────────────────────────────────────────
@@ -371,8 +360,7 @@ class SceneRegistry:
         if key in self._scenes:
             raise ValueError(f"场景 key 已存在: {key}")
         scene = SceneDef(key=key, name=name)
-        yaml_path = self._scenes_dir / f"{key}.yaml"
-        self._save_scene_yaml(yaml_path, scene)
+        self._save_scene_yaml(scene)
         self._scenes[key] = scene
         self._order.append(key)
         # 添加到指定分组（或第一个分组）
@@ -386,9 +374,7 @@ class SceneRegistry:
         """删除场景 YAML 文件并从注册表移除"""
         if key not in self._scenes:
             raise ValueError(f"场景不存在: {key}")
-        yaml_path = self._scenes_dir / f"{key}.yaml"
-        if yaml_path.exists():
-            yaml_path.unlink()
+        self._resolver.delete_entity(f"scenes/{key}.yaml")
         del self._scenes[key]
         self._order.remove(key)
         # 从分组中移除
@@ -406,17 +392,14 @@ class SceneRegistry:
         scene = self._scenes[key]
         scene.key = new_key
         scene.name = new_name
-        # 如果 key 变了，需要重命名文件
+        # 如果 key 变了，需要删旧建新
         if new_key != key:
-            old_path = self._scenes_dir / f"{key}.yaml"
-            new_path = self._scenes_dir / f"{new_key}.yaml"
-            if old_path.exists():
-                old_path.rename(new_path)
+            self._resolver.delete_entity(f"scenes/{key}.yaml")
             del self._scenes[key]
             self._scenes[new_key] = scene
             idx = self._order.index(key)
             self._order[idx] = new_key
-        self._save_scene_yaml(self._scenes_dir / f"{new_key}.yaml", scene)
+        self._save_scene_yaml(scene)
         logger.info(f"已重命名场景: {key} -> {new_key}")
 
     def reorder_scenes(self, new_order: list[str]):
@@ -427,7 +410,7 @@ class SceneRegistry:
             if k not in self._order:
                 self._order.append(k)
 
-    def save_scene_order(self, order: list[str], scenes_config_path: Path):
+    def save_scene_order(self, order: list[str]):
         """将场景顺序写入 scenes.yaml（保持分组结构）"""
         self.reorder_scenes(order)
         # 同步更新各分组内的场景顺序
@@ -436,7 +419,7 @@ class SceneRegistry:
             # 按 order 中的顺序重新排列该分组的场景
             new_list = [k for k in order if k in group_scene_list]
             self._group_scenes[gk] = new_list
-        self.save_group_config(scenes_config_path)
+        self.save_group_config()
 
     # ─── 视图管理 ─────────────────────────────────────────────
 
@@ -451,7 +434,7 @@ class SceneRegistry:
         if scene.views:
             return list(scene.views)
         scene.views = [ViewDef(key=BASE_VIEW_KEY, name=BASE_VIEW_NAME)]
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 已开启多视图")
         return list(scene.views)
 
@@ -463,7 +446,7 @@ class SceneRegistry:
         scene.views = []
         for item in (*scene.regions, *scene.points, *scene.panels):
             item.view = ""
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 已取消多视图")
 
     def add_scene_view(self, scene_key: str, view_key: str, view_name: str) -> ViewDef:
@@ -477,7 +460,7 @@ class SceneRegistry:
             raise ValueError(f"视图 key 已存在: {view_key}")
         view = ViewDef(key=view_key, name=view_name)
         scene.views.append(view)
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 新增视图: {view_key} ({view_name})")
         return view
 
@@ -488,7 +471,7 @@ class SceneRegistry:
         if view is None:
             raise ValueError(f"视图不存在: {view_key}")
         view.name = new_name
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 视图重命名: {view_key} -> {new_name}")
 
     def delete_scene_view(self, scene_key: str, view_key: str):
@@ -505,7 +488,7 @@ class SceneRegistry:
         if used:
             raise ValueError(f"视图非空，无法删除: {view_key}（包含 {len(used)} 个定义）")
         scene.views = [v for v in scene.views if v.key != view_key]
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 已删除视图: {view_key}")
 
     def _require_scene(self, scene_key: str) -> SceneDef:
@@ -523,7 +506,7 @@ class SceneRegistry:
             raise ValueError(f"场景不存在: {scene_key}")
         self._check_key_unique(scene, region_def.key)
         scene.regions.append(region_def)
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def remove_region_from_scene(self, scene_key: str, region_key: str):
         """从场景 YAML 移除 region 定义"""
@@ -531,7 +514,7 @@ class SceneRegistry:
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
         scene.regions = [r for r in scene.regions if r.key != region_key]
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def update_region_in_scene(self, scene_key: str, old_key: str, region_def: RegionDef):
         """更新场景中的 region 定义"""
@@ -544,7 +527,7 @@ class SceneRegistry:
                 break
         else:
             raise ValueError(f"区域不存在: {old_key}")
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def add_point_to_scene(self, scene_key: str, point_def: PointDef):
         """向场景 YAML 追加 point 定义"""
@@ -553,7 +536,7 @@ class SceneRegistry:
             raise ValueError(f"场景不存在: {scene_key}")
         self._check_key_unique(scene, point_def.key)
         scene.points.append(point_def)
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def remove_point_from_scene(self, scene_key: str, point_key: str):
         """从场景 YAML 移除 point 定义"""
@@ -561,7 +544,7 @@ class SceneRegistry:
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
         scene.points = [p for p in scene.points if p.key != point_key]
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def update_point_in_scene(self, scene_key: str, old_key: str, point_def: PointDef):
         """更新场景中的 point 定义"""
@@ -574,7 +557,7 @@ class SceneRegistry:
                 break
         else:
             raise ValueError(f"坐标点不存在: {old_key}")
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def add_panel_to_scene(self, scene_key: str, panel_def: PanelDef):
         """向场景 YAML 追加 panel 定义"""
@@ -583,7 +566,7 @@ class SceneRegistry:
             raise ValueError(f"场景不存在: {scene_key}")
         self._check_key_unique(scene, panel_def.key)
         scene.panels.append(panel_def)
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def remove_panel_from_scene(self, scene_key: str, panel_key: str):
         """从场景 YAML 移除 panel 定义"""
@@ -591,7 +574,7 @@ class SceneRegistry:
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
         scene.panels = [p for p in scene.panels if p.key != panel_key]
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     def update_panel_in_scene(self, scene_key: str, old_key: str, panel_def: PanelDef):
         """更新场景中的 panel 定义"""
@@ -604,7 +587,7 @@ class SceneRegistry:
                 break
         else:
             raise ValueError(f"面板不存在: {old_key}")
-        self._save_scene_yaml(self._scenes_dir / f"{scene_key}.yaml", scene)
+        self._save_scene_yaml(scene)
 
     # ─── 内部方法 ─────────────────────────────────────────────
 
@@ -618,8 +601,8 @@ class SceneRegistry:
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
 
-    def _save_scene_yaml(self, path: Path, scene: SceneDef):
-        """将场景定义写入 YAML 文件"""
+    def _save_scene_yaml(self, scene: SceneDef):
+        """将场景定义经 resolver 写入 YAML（开发→system/scenes，用户→local/scenes）"""
         data = {"key": scene.key, "name": scene.name}
         if scene.views:
             data["views"] = [v.to_dict() for v in scene.views]
@@ -659,7 +642,7 @@ class SceneRegistry:
                 }
                 for p in scene.panels
             ]
-        path.write_text(
+        self._resolver.write_entity(
+            f"scenes/{scene.key}.yaml",
             yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
-            encoding="utf-8",
         )

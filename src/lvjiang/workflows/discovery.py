@@ -2,8 +2,9 @@
 
 统一从两个来源自动发现「脚本」（对外称谓，内部仍为 workflow/wf）：
 
-1. **.wf 来源**：``SYSTEM_WORKFLOWS_DIR`` 顶层 ``*.wf`` 文件，跳过 ``_`` 前缀
-   （如 ``_editor_run.wf`` / ``_recorded.wf``）与 ``subcall/`` / ``testwf/`` 等子目录。
+1. **.wf 来源**：workflows 目录顶层 ``*.wf`` 文件（system ∪ local 合并视图），
+   跳过 ``_`` 前缀（如 ``_editor_run.wf`` / ``_recorded.wf``）与 ``subcall/`` /
+   ``testwf/`` 等子目录。
    name/parameters 取自文件顶部的 ``#%`` front-matter，id = 文件名 stem。
 2. **class 来源**：``implementations.list_workflows()`` 中已注册的内置类实现，
    name/parameters 取自类属性 ``DISPLAY_NAME`` / ``PARAMETERS``，id = 注册名。
@@ -16,18 +17,18 @@ from __future__ import annotations
 
 from loguru import logger
 
-from ..constants import SYSTEM_WORKFLOWS_DIR
+from ..core.config_resolver import get_resolver
 from . import implementations
 from .metadata import parse_metadata_file
 
 
 def _discover_wf_scripts() -> dict[str, dict]:
-    """扫描 workflows/ 顶层 .wf，返回 {id: config}。"""
+    """扫描 workflows/ 顶层 .wf（system ∪ local），返回 {id: config}。"""
     result: dict[str, dict] = {}
-    if not SYSTEM_WORKFLOWS_DIR.exists():
-        return result
-    for p in sorted(SYSTEM_WORKFLOWS_DIR.glob("*.wf")):
-        if p.name.startswith("_"):
+    resolver = get_resolver()
+    for name in resolver.enumerate_entities("workflows", "*.wf"):
+        p = resolver.resolve_read(f"workflows/{name}")
+        if p is None:
             continue
         meta = parse_metadata_file(p)
         result[p.stem] = {

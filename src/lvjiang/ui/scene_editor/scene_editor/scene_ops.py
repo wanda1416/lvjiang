@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 
-from ....constants import SCENES_CONFIG_PATH
 from ....core.scene_registry import (
     get_group_name,
     get_registry,
@@ -190,7 +189,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "创建失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -259,7 +258,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "创建失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -296,7 +295,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "重命名失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -318,7 +317,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -360,7 +359,7 @@ class SceneOpsMixin:
                     break
         registry = get_registry()
         registry.reorder_groups(new_order)
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         logger.info(f"分组顺序已更新: {new_order}")
 
@@ -416,7 +415,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "移动失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -456,7 +455,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "重命名失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -484,7 +483,7 @@ class SceneOpsMixin:
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))
             return
-        registry.save_group_config(SCENES_CONFIG_PATH)
+        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()
@@ -512,6 +511,6 @@ class SceneOpsMixin:
                 all_order.extend(new_order)
             else:
                 all_order.extend(registry.get_group_scenes(gk))
-        registry.save_scene_order(all_order, SCENES_CONFIG_PATH)
+        registry.save_scene_order(all_order)
         reload_scene_registry()
         logger.info(f"分组 {group_key} 场景顺序已更新: {new_order}")

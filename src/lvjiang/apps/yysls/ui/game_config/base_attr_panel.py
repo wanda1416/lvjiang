@@ -13,9 +13,6 @@
 自动保存，覆盖已有数值时确认。
 """
 
-from pathlib import Path
-
-import yaml
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -39,8 +36,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.game_config import BASE_ATTR_PARTS, WUXUE_CATEGORY
 
-# 配置文件路径
-_ATTRS_PATH = Path("config/system/yysls/attributes.yaml")
+# 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
+_ATTRS_REL = "yysls/attributes.yaml"
 
 # 部位显示名称（顺序由 BASE_ATTR_PARTS 决定）
 _PART_NAMES = {
@@ -246,16 +243,14 @@ class BaseAttrPanel(QWidget):
 
     def _load_data(self):
         """从 YAML 加载数据"""
-        if not _ATTRS_PATH.exists():
-            logger.warning(f"配置文件不存在: {_ATTRS_PATH}")
+        from lvjiang.core.config_resolver import get_resolver
+        try:
+            self._data = get_resolver().load_merged(_ATTRS_REL)
+        except Exception as e:
+            logger.error(f"加载配置失败: {e}")
             self._data = {"base_attrs": {}, "affix_caps": {}}
-        else:
-            try:
-                with open(_ATTRS_PATH, "r", encoding="utf-8") as f:
-                    self._data = yaml.safe_load(f) or {}
-            except Exception as e:
-                logger.error(f"加载配置失败: {e}")
-                self._data = {"base_attrs": {}, "affix_caps": {}}
+        if not self._data:
+            self._data = {"base_attrs": {}, "affix_caps": {}}
 
         if self._part_list.count() > 0:
             self._part_list.setCurrentRow(0)
@@ -762,10 +757,10 @@ class BaseAttrPanel(QWidget):
 
     def _save_data(self):
         """保存数据到 YAML"""
+        from lvjiang.core.config_resolver import get_resolver
         try:
-            with open(_ATTRS_PATH, "w", encoding="utf-8") as f:
-                yaml.dump(self._data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-            logger.debug(f"配置已保存: {_ATTRS_PATH}")
+            get_resolver().save_merged(_ATTRS_REL, self._data)
+            logger.debug(f"配置已保存: {_ATTRS_REL}")
             # 刷新 GameConfigManager 单例
             from lvjiang.apps.yysls.game_config import get_game_config
             manager = get_game_config()

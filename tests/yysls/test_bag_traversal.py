@@ -40,6 +40,7 @@ class DedupFakeWF(AutoTuningWorkflow):
         self.windows = windows          # 每轮窗口各行首列指纹
         self.n_rows_map: dict[int, int] = {}   # 轮次(=drags) -> n_rows
         self.tune_map: dict[str, str] = {}     # 指纹 -> 调律后指纹
+        self.recycle_fps: set[str] = set()     # 回收后格位已空的指纹
         self.processed: list[str] = []
         self.drags = 0
 
@@ -68,9 +69,12 @@ class DedupFakeWF(AutoTuningWorkflow):
         fp = win[row - 1] if row <= len(win) else ""
         return (fp or "空", fp, {"fp": fp} if fp else {})
 
-    def _process_equipment(self, name, equip, detail_scene):
+    def _process_equipment(self, name, equip, detail_scene,
+                           row=None, col=1):
         fp = equip["fp"]
         self.processed.append(fp)
+        if fp in self.recycle_fps:
+            return ""   # 回收后该格已空（无装备补位）
         new_fp = self.tune_map.get(fp)
         if not new_fp:
             return fp
@@ -146,6 +150,15 @@ def test_tuned_fp_reread_dedups_next_round():
     DedupTraversal().traverse(wf, WEAPON_DETAIL)
     assert wf.processed == ["A", "B", "C", "D"]
     assert "C2" not in wf.processed
+
+
+def test_recycled_empty_slot_ends_traversal():
+    """回收后格位已空（无补位）→ 视为背包尽头，立即结束不再拖拽"""
+    wf = DedupFakeWF([["A", "B", "C"]])
+    wf.recycle_fps = {"B"}
+    DedupTraversal().traverse(wf, WEAPON_DETAIL)
+    assert wf.processed == ["A", "B"]
+    assert wf.drags == 0
 
 
 def test_max_rounds_fuse():

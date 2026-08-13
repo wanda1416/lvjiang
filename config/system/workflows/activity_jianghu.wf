@@ -268,35 +268,26 @@ def back_to_menpai()
 end
 
 def back_to_haoling()
-   # 门派页三种形态：有门派（基底，入口文字「江湖号令」）
-   # / 无门无派（no_school 视图，入口换成 haoling_2）
-   # / 问津（wenjin 视图，入口换成 haoling_3）
-   scan [school_main].[haoling] as $haoling_key by contains "号令"
+   # 门派页三种形态：
+   # # 有门派（基底，入口文字「江湖号令」）
+   # # 无门无派（no_school 视图，入口换成 haoling_2）
+   # # 问津（wenjin 视图，入口换成 haoling_3）
+   scan [school_main].[haoling_1, haoling_2, haoling_3] as $haoling_key by contains "号令"
    if $haoling_key
+      log concat("识别到号令，正常进入，区域：", $haoling_key)
       click [school_main].$haoling_key after wait step_interval
-   else
-      scan [school_main].[haoling_2] as $haoling_key by contains "号令"
-      if $haoling_key
-         log "未读到江湖号令，按无门无派处理，改点号令入口"
-         click [school_main].$haoling_key after wait step_interval
-      else
-         log "haoling 与 haoling_2 均未识别，按问津视图改点 haoling_3"
-         click [school_main].[haoling_3] after wait step_interval
-      end
+      return 0
    end
-end
 
-def back_to_haoling_1()
+   # 三种都识别不到，干脆全图扫
    # 门派页三种形态均含「号令」文字，find 统一搜索
-   find [school_main].[haoling] as $found by contains "号令"
-   if not $found
+   find as $haoling_key by contains "号令"
+   if $haoling_key
+      screenshot
+      log "全图扫识别到江湖号令，已截图，建议检查问题"
+      click $haoling_key after wait step_interval
+   else
       log "找不到江湖号令，请手动定位后继续"
-      eval pause("找不到「江湖号令」，请手动定位到入口后点击确定")
-      find [school_main].[haoling] as $found by contains "号令"
+      eval pause("找不到「江湖号令」，请手动定位到号令页后点击确定")
    end
-   if not $found
-      log "仍未找到江湖号令入口"
-      return -1
-   end
-   click $found after wait step_interval
 end

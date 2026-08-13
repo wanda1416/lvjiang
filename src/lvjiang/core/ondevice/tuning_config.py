@@ -22,7 +22,7 @@ def get_tuning_config() -> str:
             {"ok": bool,
              "base_groups": [{"key", "name", "checked"}],
              "rules": [{"key", "name", "enabled",
-                        "playstyles": [{"name", "summary", "checked"}]}],
+                        "playstyles": [{"name", "summary", "checked", "switch"}]}],
              "slot_groups": [{"name",
                               "slots": [{"key", "label", "checked", "locked"}]}],
              "switches": [{"key", "name", "checked"}],
@@ -68,7 +68,8 @@ def get_tuning_config() -> str:
                 "enabled": bool(cfg.get("enabled", False)),
                 "playstyles": [
                     {"name": name, "summary": summary,
-                     "checked": selected is None or name in selected}
+                     "checked": selected is None or name in selected,
+                     "switch": rule.playstyles[name].switch}
                     for name, summary in rule.playstyle_options.items()
                 ],
             })

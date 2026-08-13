@@ -7,7 +7,7 @@ materials:
     min_count: 80
     insufficient_action: ask
   food_rules:
-  - pct: 98
+  - pct: 96
     min_expect: top
     min_quality: gold
     food: 彩狗粮
@@ -115,7 +115,7 @@ tune:
     - 腕甲
     max_quality: gold_only
     pct_op: ge
-    pct: 90
+    pct: 80
     ratings:
     - normal
     - junk

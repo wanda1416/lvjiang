@@ -1,6 +1,6 @@
-# Dev Log: 2026-07-14 装备模型去 slot 依赖全链路重构
+# Dev Log: 2026-07-16 装备模型去 slot 依赖全链路重构
 
-> 日期：2026-07-14
+> 日期：2026-07-16（对应提交 `42f8294`；文件名原误标为 07-14，已修正）
 > 涉及模块：`lvjiang/equip_parser/`、`lvjiang/evaluator/`、`lvjiang/workflows/builtins.py`、`config/system/rules/鸣金虹.yaml`、`config/system/workflows/single_tuning.wf`、`tests/`
 > 关键词：去 slot 化、type-based、infer_category、EquipmentData、equipment_parser、DSL 条件分支
 

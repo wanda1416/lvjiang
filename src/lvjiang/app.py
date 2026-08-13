@@ -26,6 +26,14 @@ def _wait_for_threads(timeout: float = 5.0) -> None:
     后台线程（如 PyAV 解码线程）在访问 C 扩展对象，会导致段错误。
     此函数在 aboutToQuit 时调用，确保线程先于 Qt 清理退出。
     """
+    # 先停掉 loguru 异步写入线程（enqueue=True 创建的后台线程），
+    # 否则该线程会一直阻塞等待队列刷完，导致退出挂起。
+    try:
+        from loguru import logger as _loguru
+        _loguru.remove()
+    except Exception:
+        pass
+
     main_thread = threading.current_thread()
     pending = [
         t for t in threading.enumerate()

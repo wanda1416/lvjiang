@@ -19,7 +19,12 @@ import numpy as np
 import pytest
 
 from lvjiang.core.scene_registry import CanvasConfig, Layout, Panel
-from lvjiang.workflows.align import _binary_axis, _even_axis, _make_even_alignment, detect_grid
+from lvjiang.workflows.align import (
+    _binary_axis,
+    _even_axis,
+    _make_even_alignment,
+    detect_grid,
+)
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar.ast_nodes import Align
 
@@ -693,8 +698,8 @@ class TestDetectGridScrollDirection:
         # 构造一个列数少的图像（模拟横向滚动异常）
         img = load_test_image("image1.png")
         # 假设检测到 5 列（expected=6），vertical 模式不允许 cols-1
-        result = detect_grid(img, expected_rows=5, expected_cols=5,
-                             scroll_direction="vertical", fallback=True)
+        detect_grid(img, expected_rows=5, expected_cols=5,
+                    scroll_direction="vertical", fallback=True)
         # 如果列数不匹配，应降级
         # 注意：实际测试取决于图片内容，这里主要验证逻辑路径
 

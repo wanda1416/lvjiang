@@ -347,11 +347,12 @@ class _DataOpsMixin:
         return self._ensure_workflow().call_function(node.func_name, resolved_args, engine=self)
 
     def _exec_call_proc(self, node: CallProc):
-        """call proc_name($arg1, "arg2", ...) — 调用子过程
+        """call proc_name($arg1, "arg2", ...) 或 call $result = proc_name(...) — 调用子过程
 
         变量隔离：save/restore caller variables。
         session/context/_coord_meta 共享引用，不隔离。
         return 在过程中 = 退出过程（捕获 _ReturnSignal）。
+        若指定 result_var，则将返回值绑定到该变量。
         """
         proc_def = self._procs.get(node.name)
         if proc_def is None:
@@ -360,6 +361,7 @@ class _DataOpsMixin:
         logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
         # 1. 保存当前变量快照
         saved_vars = dict(self.variables)
+        return_value = None
         try:
             # 2. 绑定参数
             for i, param_name in enumerate(proc_def.params):
@@ -368,11 +370,14 @@ class _DataOpsMixin:
             # 3. 执行过程体（return = 退出过程）
             try:
                 self._exec_body(proc_def.body)
-            except _ReturnSignal:
-                pass  # 正常退出过程
+            except _ReturnSignal as e:
+                return_value = e.value  # 捕获返回值
         finally:
             # 4. 恢复变量（session/context 自然保留修改）
             self.variables = saved_vars
+        # 5. 绑定返回值到调用方变量
+        if node.result_var is not None:
+            self.variables[node.result_var] = return_value
 
     def _exec_find(self, node: Find):
         """find [scene].[area] as $var by ... — 在指定区域或全画布 OCR 搜索目标文字

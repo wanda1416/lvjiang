@@ -443,7 +443,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             case Continue():
                 raise _ContinueSignal()
             case Return():
-                raise _ReturnSignal()
+                value = self._resolve(node.value) if node.value is not None else None
+                raise _ReturnSignal(value)
             case Label():
                 pass  # 标签无操作
             case Goto():

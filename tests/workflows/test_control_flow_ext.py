@@ -177,3 +177,156 @@ eval $x = $x + 10
 '''
         v = run(code, {"x": 0.0})
         assert v["x"] == 11.0
+
+
+# ─── call $var = proc() 返回值绑定 ─────────────────────────
+
+class TestCallReturnValue:
+    """call $var = proc() 语法：捕获过程返回值"""
+
+    def test_parse_call_assign(self):
+        """解析 call $result = proc() 语法"""
+        from lvjiang.workflows.grammar.ast_nodes import CallProc
+        prog = parse_text('def get_value()\n    return 42\nend\ncall $result = get_value()\n')
+        # def 进入 procs，body 只有 call 语句
+        call_stmt = prog.body[0]
+        assert isinstance(call_stmt, CallProc)
+        assert call_stmt.name == "get_value"
+        assert call_stmt.result_var == "result"
+
+    def test_exec_return_value(self):
+        """return 42 返回值被 call $var = proc() 捕获"""
+        code = '''def get_value()
+    return 42
+end
+call $result = get_value()
+'''
+        v = run(code)
+        assert v["result"] == 42.0
+
+    def test_exec_return_string(self):
+        """return "hello" 返回字符串"""
+        code = '''def greet()
+    return "hello"
+end
+call $msg = greet()
+'''
+        v = run(code)
+        assert v["msg"] == "hello"
+
+    def test_exec_return_variable(self):
+        """return $x 返回变量值"""
+        code = '''def compute($x)
+    eval $y = $x * 2
+    return $y
+end
+call $result = compute(21)
+'''
+        v = run(code)
+        assert v["result"] == 42.0
+
+    def test_exec_return_none(self):
+        """无 return 值时返回 None"""
+        code = '''def no_return()
+    eval $x = 1
+end
+call $result = no_return()
+'''
+        v = run(code)
+        assert v["result"] is None
+
+    def test_exec_early_return(self):
+        """提前 return 也能返回值"""
+        code = '''def early($flag)
+    if $flag
+        return "early"
+    end
+    return "late"
+end
+call $r1 = early(1)
+call $r2 = early(0)
+'''
+        v = run(code)
+        assert v["r1"] == "early"
+        assert v["r2"] == "late"
+
+    def test_call_without_result_var(self):
+        """不绑定返回值时也正常工作"""
+        code = '''def do_something()
+    return 42
+end
+call do_something()
+'''
+        v = run(code)
+        # 不绑定返回值，不应有异常
+        assert "result" not in v
+
+    def test_return_bool(self):
+        """return true / false 返回布尔值"""
+        code = '''def check($x)
+    if $x
+        return true
+    end
+    return false
+end
+call $r1 = check(1)
+call $r2 = check(0)
+'''
+        v = run(code)
+        assert v["r1"] is True
+        assert v["r2"] is False
+
+    def test_return_null(self):
+        """return null 返回 None"""
+        code = '''def give_null()
+    return null
+end
+call $r = give_null()
+'''
+        v = run(code)
+        assert v["r"] is None
+
+    def test_return_list(self):
+        """return [1, 2, 3] 返回列表"""
+        code = '''def get_list()
+    return [1, 2, 3]
+end
+call $r = get_list()
+'''
+        v = run(code)
+        assert v["r"] == [1.0, 2.0, 3.0]
+
+    def test_return_dict(self):
+        """return {"key": "value"} 返回字典"""
+        code = '''def get_dict()
+    return {"name": "test", "val": 42}
+end
+call $r = get_dict()
+'''
+        v = run(code)
+        assert v["r"]["name"] == "test"
+        assert v["r"]["val"] == 42.0
+
+    def test_return_arith_expr(self):
+        """return $x + 1 返回算术表达式结果"""
+        code = '''def add_one($x)
+    return $x + 1
+end
+call $r = add_one(41)
+'''
+        v = run(code)
+        assert v["r"] == 42.0
+
+    def test_nested_call_return(self):
+        """嵌套调用：outer 调用 inner 并返回其值"""
+        code = '''def inner()
+    return "from_inner"
+end
+def outer()
+    call $v = inner()
+    return $v
+end
+call $r = outer()
+'''
+        v = run(code)
+        assert v["r"] == "from_inner"

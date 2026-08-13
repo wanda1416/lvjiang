@@ -82,8 +82,12 @@ class TestBehaviorPages:
         # 回填与真实配置一致
         assert page._enabled_cb.isChecked() == scan.enabled
         assert page._entry_combo.currentData() == scan.entry_min_rating
-        assert page._judge.scope() == scan.judge_scope
         assert page._table.rowCount() == len(scan.rules)
+        # 判定语义已下沉为表格列（第 4 列），逐行回填
+        for i, rule in enumerate(scan.rules):
+            judge = page._table.cellWidget(i, 4)
+            assert judge.scope() == rule.judge_scope
+            assert judge.rules() == rule.judge_rules
 
         # 变更进入门槛 → 校验通过自动保存并生效
         page._entry_combo.setCurrentIndex(page._entry_combo.findData("top"))

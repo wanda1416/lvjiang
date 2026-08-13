@@ -454,17 +454,20 @@ def _parse_behavior_rule(raw, where: str,
         raise RuleValidationError(
             f"{where}.max_rating 非法: {max_rating!r}（须为 "
             f"{list(RATING_KEYS)}）")
+    scope, keys = _parse_judge(raw, where)
     action = str(raw.get("action") or "")
     if action not in allowed_actions:
         raise RuleValidationError(
             f"{where}.action 非法: {action!r}（须为 {list(allowed_actions)}）")
     return BehaviorRule(parts=parts, max_quality=max_quality,
                         max_pct=max_pct, max_rating=max_rating,
+                        judge_scope=scope, judge_rules=keys,
                         action=action)
 
 
 def _parse_judge(raw: dict, where: str) -> tuple[str, list[str]]:
-    """判定语义解析：judge_scope 三选一 + judge_rules key 列表
+    """判定语义解析（逐规则声明）：judge_scope 三选一 + judge_rules
+    key 列表
 
     judge_rules 仅 scope=custom 时允许非空（key 格式校验；是否
     真实存在由运行期过滤兜底，避免规则删除后配置加载即崩）。
@@ -507,37 +510,44 @@ def _parse_behavior_rules(raw, where: str, stage: str) -> list[BehaviorRule]:
     ]
 
 
+def _reject_stage_judge(raw: dict, where: str) -> None:
+    """段级判定语义已下沉到逐条规则，残留即报错（不做迁移兼容）"""
+    for key in ("judge_scope", "judge_rules"):
+        if key in raw:
+            raise RuleValidationError(
+                f"{where}.{key} 已废弃，判定语义改为逐条规则声明"
+                f"（{where}.rules[].{key}）")
+
+
 def _parse_scan(raw, where: str) -> ScanBehavior:
-    """扫描处理解析：{enabled, entry_min_rating, judge_scope,
-    judge_rules, rules}；缺省段取 ScanBehavior 默认值"""
+    """扫描处理解析：{enabled, entry_min_rating, rules}；
+    缺省段取 ScanBehavior 默认值"""
     if raw is None:
         return ScanBehavior()
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
+    _reject_stage_judge(raw, where)
     entry = raw.get("entry_min_rating", "excellent")
     if entry not in RATING_KEYS:
         raise RuleValidationError(
             f"{where}.entry_min_rating 非法: {entry!r}（须为 "
             f"{list(RATING_KEYS)}）")
-    scope, keys = _parse_judge(raw, where)
     return ScanBehavior(
         enabled=bool(raw.get("enabled", True)),
         entry_min_rating=entry,
-        judge_scope=scope,
-        judge_rules=keys,
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
                                     "scan"),
     )
 
 
 def _parse_tune(raw, where: str) -> TuneBehavior:
-    """结束处理解析：{enabled, judge_scope, judge_rules, rules,
-    max_resets, reset_exhausted_action}；缺省段取 TuneBehavior 默认值"""
+    """结束处理解析：{enabled, rules, max_resets,
+    reset_exhausted_action}；缺省段取 TuneBehavior 默认值"""
     if raw is None:
         return TuneBehavior()
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
-    scope, keys = _parse_judge(raw, where)
+    _reject_stage_judge(raw, where)
     max_resets = raw.get("max_resets", MAX_TUNE_RESETS)
     if isinstance(max_resets, bool) or not isinstance(max_resets, int):
         raise RuleValidationError(f"{where}.max_resets 必须是整数")
@@ -552,8 +562,6 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
             "（须为 ['recycle', 'ignore']）")
     return TuneBehavior(
         enabled=bool(raw.get("enabled", False)),
-        judge_scope=scope,
-        judge_rules=keys,
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
                                     "tune"),
         max_resets=max_resets,

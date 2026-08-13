@@ -30,6 +30,7 @@ from lvjiang.workflows.grammar import (
     Loop,
     Not,
     NumericEqual,
+    PanelRef,
     ProcDef,
     Program,
     Recognize,
@@ -616,6 +617,144 @@ def test_recognize_dynamic_scene():
     assert isinstance(n.scene.scene, VarRef)
     assert n.scene.scene.name == "scene"
     print("  recognize $scene.[field] as $var: OK")
+
+
+def test_recognize_rich():
+    """测试 recognize as rich 语法"""
+    print("\n=== 测试 recognize as rich ===")
+
+    # region 模式 + rich
+    program = parse_text("recognize [material_grid].[f1, f2] as rich $mats")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is True
+    assert isinstance(n.target, VarRef)
+    assert n.target.name == "mats"
+    print("  recognize [s].[f1,f2] as rich $var: OK")
+
+    # 普通模式：rich=False
+    program = parse_text("recognize [material_grid] as $mats")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is False
+    print("  recognize [s] as $var (plain): OK")
+
+    # panel cell 模式 + rich
+    program = parse_text("recognize [s].[panel][1][2] as rich $cell")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is True
+    assert isinstance(n.scene, PanelRef)
+    assert n.target.name == "cell"
+    print("  recognize [s].[panel][1][2] as rich $var: OK")
+
+    # panel cell 模式无 rich
+    program = parse_text("recognize [s].[panel][1][2] as $cell")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is False
+    print("  recognize [s].[panel][1][2] as $var (plain): OK")
+
+    # rich + by 子句（语法允许，运行时 by 优先）
+    program = parse_text('recognize [s].[f1] as rich $m by equals "text"')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is True
+    assert n.by is not None
+    print("  recognize [s].[f1] as rich $var by equals ...: OK")
+
+    # rich + on group + where 子句
+    program = parse_text('recognize [s] as rich $m on group "grp" where confidence >= 0.8')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is True
+    assert n.group is not None
+    assert n.where is not None
+    print("  recognize [s] as rich $var on group ... where ...: OK")
+
+    # 大小写不敏感
+    program = parse_text("recognize [s] as RICH $m")
+    n = program.body[0]
+    assert n.rich is True
+    print("  recognize [s] as RICH $var (case insensitive): OK")
+
+
+def test_recognize_rich_no_regression():
+    """回归测试：rich 关键字不影响其他标识符和字符串常量语法"""
+    # "rich" 作为字段名
+    program = parse_text("recognize [s].[rich] as $var")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is False
+    assert n.fields[0].value == "rich"
+
+    # 字符串常量 panel 语法（无 rich）
+    program = parse_text('recognize "sc"."pn"[1][2] as $cell')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert isinstance(n.scene, PanelRef)
+    assert n.scene.scene == "sc"
+    assert n.scene.panel == "pn"
+    assert n.rich is False
+
+    # 字符串常量 panel 语法（有 rich）
+    program = parse_text('recognize "sc"."pn"[1][2] as rich $cell')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert isinstance(n.scene, PanelRef)
+    assert n.scene.scene == "sc"
+    assert n.scene.panel == "pn"
+    assert n.rich is True
+
+
+def test_recognize_with_clause():
+    """测试 recognize as rich with func_name 语法"""
+    # region 模式 + rich + with
+    program = parse_text("recognize [s].[f1] as rich $mats with yysls_rich_parse")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is True
+    assert n.with_func is not None
+    assert isinstance(n.with_func, Literal)
+    assert n.with_func.value == "yysls_rich_parse"
+
+    # 无 with 时 with_func 为 None
+    program = parse_text("recognize [s].[f1] as rich $mats")
+    n = program.body[0]
+    assert n.with_func is None
+
+    # panel cell + rich + with
+    program = parse_text("recognize [s].[p][1][2] as rich $cell with yysls_rich_parse")
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.rich is True
+    assert isinstance(n.scene, PanelRef)
+    assert n.with_func is not None
+    assert isinstance(n.with_func, Literal)
+    assert n.with_func.value == "yysls_rich_parse"
+
+    # rich + with + by + group + where 全组合（with 在末尾）
+    program = parse_text(
+        'recognize [s].[f1] as rich $m by equals "x" on group "g" where confidence >= 0.5 with my_func'
+    )
+    n = program.body[0]
+    assert n.rich is True
+    assert n.with_func is not None
+    assert n.with_func.value == "my_func"
+    assert n.by is not None
+    assert n.group is not None
+    assert n.where is not None
+
+    # 字符串常量 panel + rich + with
+    program = parse_text('recognize "sc"."pn"[1][2] as rich $cell with yysls_rich_parse')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert isinstance(n.scene, PanelRef)
+    assert n.scene.scene == "sc"
+    assert n.scene.panel == "pn"
+    assert n.rich is True
+    assert n.with_func is not None
+    assert n.with_func.value == "yysls_rich_parse"
 
 
 # ─── collect 测试 ───────────────────────────────────────────

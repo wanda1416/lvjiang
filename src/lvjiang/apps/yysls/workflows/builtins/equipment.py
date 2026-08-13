@@ -5,6 +5,35 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+# ─── 材料富解析 ───────────────────────────────────────────
+
+@builtin_func("yysls_rich_parse")
+def _yysls_rich_parse(base: dict) -> dict:
+    """yysls rich 模式：从 level_text/count_text 解析 real_level / count / devoted
+
+    解析完成后删除原始 level_text / count_text，保持 dict 扁平干净。
+    """
+    from ...core.material_recognizer import _parse_number
+    level_text = base.pop("level_text", "")
+    count_text = base.pop("count_text", "")
+    real_level = _parse_number(level_text)
+    if real_level is not None:
+        base["real_level"] = real_level
+    if "/" in count_text:
+        parts = count_text.split("/")
+        devoted = _parse_number(parts[0])
+        count = _parse_number(parts[-1]) if parts else None
+        if devoted is not None:
+            base["devoted"] = devoted
+        if count is not None:
+            base["count"] = count
+    else:
+        count = _parse_number(count_text)
+        if count is not None:
+            base["count"] = count
+    return base
+
+
 # ─── 装备解析 ───────────────────────────────────────────
 
 @builtin_func("to_equipment")

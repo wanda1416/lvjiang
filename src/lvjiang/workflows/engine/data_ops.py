@@ -129,7 +129,14 @@ class _DataOpsMixin:
             self._coord_meta[var_name] = {r.key: r for r in regions}
 
     def _exec_recognize(self, node: Recognize):
-        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] [where ...] — 图像识别场景中的材料"""
+        """recognize [scene].[f1, f2, ...] as [rich] $var [by ...] [group ...] [where ...] [with ...] — 图像识别场景中的材料"""
+        # with 子句必须配合 as rich 使用
+        if node.with_func is not None and not node.rich:
+            var_desc = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+            raise WorkflowUserError(
+                f"'with' 子句必须与 'as rich' 搭配使用，"
+                f"请改为 'as rich ${var_desc} with ...'"
+            )
         # PanelRef: panel cell 级材料识别
         if isinstance(node.scene, PanelRef):
             self._recognize_panel_cell(node)
@@ -158,14 +165,14 @@ class _DataOpsMixin:
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "recognize")
         if panel_key is not None:
             if node.by is not None:
-                # 整面板 + by：返回首个命中的行列 {row, col}
+                # 整面板 + by：返回首个命中的行列 {row, col}（by 优先，rich 不影响）
                 self._recognize_panel_by(scene, panel_key, var_name, node.by, group=group, min_confidence=min_conf)
             else:
-                self._recognize_panel_whole(scene, panel_key, var_name, group=group, min_confidence=min_conf)
+                self._recognize_panel_whole(scene, panel_key, var_name, group=group, min_confidence=min_conf, rich=node.rich, with_func=node.with_func)
             return
 
         if node.by is not None:
-            # ── by 子句：短路参考图匹配，返回 slot 名 str ──
+            # ── by 子句：短路参考图匹配，返回 slot 名 str（by 优先，rich 不影响）──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             result = self._ensure_workflow().recognize_materials_by(
@@ -173,6 +180,14 @@ class _DataOpsMixin:
                 group=group, min_confidence=min_conf,
             )
             self.variables[var_name] = result  # str（命中 slot 名或 ""）
+        elif node.rich:
+            # ── rich 模式：返回包含输入/输出元数据和插件解析字段的富 dict ──
+            result, region_map = self._ensure_workflow().recognize_materials_rich(
+                scene, field_keys, group=group, min_confidence=min_conf,
+                with_func=node.with_func,
+            )
+            self.variables[var_name] = result           # {slot_key: enriched_dict}
+            self._coord_meta[var_name] = region_map     # {slot_key: Region}
         else:
             result, region_map = self._ensure_workflow().recognize_materials(
                 scene, field_keys, group=group, min_confidence=min_conf,

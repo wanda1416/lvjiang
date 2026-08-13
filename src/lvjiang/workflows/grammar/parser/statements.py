@@ -443,13 +443,17 @@ class _StmtMixin:
         return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, line_no=self._line(items))
 
     def recognize_stmt(self, items):
-        """recognize [scene].[f1, f2, ...] as $var [by ...] [group ...] [where ...]"""
+        """recognize [scene].[f1, f2, ...] as [rich] $var [by ...] [group ...] [where ...] [with ...]"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
         scene = SceneRef(scene=scene_name)
         fields = None
         region_var = None
-        target = items[1]  # var_ref → VarRef (as 子句)
+        # 检测 as rich：RICH_KEYWORD Token 出现在 items 中
+        rich = any(isinstance(it, Token) and it.type == "RICH_KEYWORD" for it in items)
+        # 仅过滤 RICH_KEYWORD Token，保留 const_or_var 可能产生的 STRING Token
+        non_token = [it for it in items if not (isinstance(it, Token) and it.type == "RICH_KEYWORD")]
+        target = non_token[1]  # var_ref → VarRef (as 子句)
         if len(scene_target) > 1 and scene_target[1] is not None:
             second = scene_target[1]
             if isinstance(second, list):
@@ -459,32 +463,46 @@ class _StmtMixin:
         by_clause = None
         group_clause = None
         where_clause = None
-        # 解析可选的 by_clause、group_clause 和 where_clause
-        for item in items[2:]:
+        with_func = None
+        # 解析可选的 by_clause、group_clause、where_clause 和 with_clause
+        for item in non_token[2:]:
             if isinstance(item, ByClause):
                 by_clause = item
             elif isinstance(item, (Literal, VarRef)):
                 group_clause = item  # group 子句返回的是 Literal 或 VarRef
             elif isinstance(item, WhereClause):
                 where_clause = item
-        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, line_no=self._line(items))
+            elif isinstance(item, tuple) and item[0] == "__with_func__":
+                with_func = Literal(value=item[1])
+        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, line_no=self._line(items))
 
     def recognize_panel_stmt(self, items):
-        """recognize [scene].[panel][row][col] as $var [by ...] [on group ...] [where ...]"""
-        scene_val = self._resolve_const_or_var(items[0])
-        panel_val = self._resolve_const_or_var(items[1])
-        row = items[2]
-        col = items[3]
-        target = items[4]  # var_ref → VarRef
+        """recognize [scene].[panel][row][col] as [rich] $var [by ...] [on group ...] [where ...] [with ...]"""
+        # 检测 as rich：RICH_KEYWORD Token 出现在 items 中
+        rich = any(isinstance(it, Token) and it.type == "RICH_KEYWORD" for it in items)
+        # 仅过滤 RICH_KEYWORD Token，保留 const_or_var 可能产生的 STRING Token
+        non_token = [it for it in items if not (isinstance(it, Token) and it.type == "RICH_KEYWORD")]
+        scene_val = self._resolve_const_or_var(non_token[0])
+        panel_val = self._resolve_const_or_var(non_token[1])
+        row = non_token[2]
+        col = non_token[3]
+        target = non_token[4]  # var_ref → VarRef
         by_clause = None
         group_clause = None
         where_clause = None
-        for item in items[5:]:
+        with_func = None
+        for item in non_token[5:]:
             if isinstance(item, ByClause):
                 by_clause = item
             elif isinstance(item, (Literal, VarRef)):
                 group_clause = item
             elif isinstance(item, WhereClause):
                 where_clause = item
+            elif isinstance(item, tuple) and item[0] == "__with_func__":
+                with_func = Literal(value=item[1])
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
-        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, line_no=self._line(items))
+        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, line_no=self._line(items))
+
+    def with_clause(self, items):
+        """with <func_name> — 指定 rich 模式的 dict->dict 转换函数"""
+        return ("__with_func__", str(items[0]))

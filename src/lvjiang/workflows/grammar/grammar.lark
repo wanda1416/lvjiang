@@ -143,8 +143,11 @@ scan_stmt: "scan"i scene_target "as"i var_ref by_clause? where_clause? _NL
 // recognize 支持两种目标：
 //   1. [scene].[region] — 场景区域材料识别
 //   2. [scene].[panel][row][col] — panel cell 级材料识别
-recognize_stmt: "recognize"i scene_target "as"i var_ref by_clause? group_clause? where_clause? _NL
-              | "recognize"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? group_clause? where_clause? _NL -> recognize_panel_stmt
+// rich 关键字：as rich $var 返回包含输入/输出元数据的富 dict
+// with 子句：as rich $var with func_name — 指定 dict->dict 转换函数
+RICH_KEYWORD: "rich"i
+recognize_stmt: "recognize"i scene_target "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL
+              | "recognize"i const_or_var "." const_or_var panel_index panel_index "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL -> recognize_panel_stmt
 
 // by 子句：短路识别模式
 // 有 by 时返回首个命中的字段名（str），无 by 时返回完整 dict
@@ -162,6 +165,9 @@ group_clause: "on"i "group"i (STRING | var_ref)
 // where 子句：识别结果过滤条件（纯过滤，不改变返回语义）
 // 当前仅支持 confidence >= threshold
 where_clause: "where"i "confidence"i ">=" (number | var_ref)
+
+// with 子句：指定 rich 模式的 dict->dict 转换函数（任意满足 dict->dict 的内置函数）
+with_clause: "with"i NAME
 
 // 场景目标：支持静态/动态场景名 + 静态/动态字段
 // 场景名：[scene] / "scene" / $var

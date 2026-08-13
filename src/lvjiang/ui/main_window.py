@@ -55,6 +55,17 @@ class _LogBridge(QObject):
 DEFAULT_TITLE = "律匠 - 通用视觉 RPA 引擎"
 
 
+def _get_title_with_version() -> str:
+    """获取带版本号的窗口标题"""
+    try:
+        from .._version import __version__
+        if __version__ and __version__ != "0.0.0.dev0":
+            return f"{DEFAULT_TITLE} v{__version__}"
+    except Exception:
+        pass
+    return DEFAULT_TITLE
+
+
 class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     """通用主窗口。
 
@@ -80,7 +91,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         registry = get_registry()
 
         # 标题
-        title = registry.get("window_title") or DEFAULT_TITLE
+        title = registry.get("window_title") or _get_title_with_version()
         self.setWindowTitle(title)
         self.setMinimumSize(1000, 700)
 

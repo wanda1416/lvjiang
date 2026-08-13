@@ -582,9 +582,33 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _build_right_tabs(self):
         """构建右侧 Tab（通用：运行日志），再追加插件注入的 Tab。"""
+        self._log_buffer: list[tuple[int, str]] = []  # (level, text)
+        self._log_min_level = 20  # INFO=20, DEBUG=10
+
+        # 日志面板容器：日志文本 + 底部级别过滤栏
+        log_container = QWidget()
+        log_layout = QVBoxLayout(log_container)
+        log_layout.setContentsMargins(0, 0, 0, 0)
+        log_layout.setSpacing(2)
+
         self.log_text = TrimmedLogEdit()
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
-        self.tabs.addTab(self.log_text, "运行日志")
+        log_layout.addWidget(self.log_text, 1)
+
+        # 底部级别过滤栏
+        filter_bar = QHBoxLayout()
+        filter_bar.setContentsMargins(4, 0, 4, 2)
+        filter_bar.addStretch()
+        filter_bar.addWidget(QLabel("日志级别"))
+        self._log_level_combo = QComboBox()
+        self._log_level_combo.addItem("INFO", 20)
+        self._log_level_combo.addItem("DEBUG", 10)
+        self._log_level_combo.setToolTip("切换日志显示级别：DEBUG 会显示更详细的调试信息")
+        self._log_level_combo.currentIndexChanged.connect(self._on_log_level_changed)
+        filter_bar.addWidget(self._log_level_combo)
+        log_layout.addLayout(filter_bar)
+
+        self.tabs.addTab(log_container, "运行日志")
 
         # ── 插件注入的右侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self.tabs, "right_tab_builders")
@@ -614,7 +638,25 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def append_log(self, text: str):
         """向运行日志面板追加一行消息"""
-        self.log_text.append(text)
+        self._log_append(text)
+
+    def _log_append(self, text: str):
+        """带级别检测的日志追加：缓冲全部，按当前级别过滤显示"""
+        import logging
+        # 支持两种格式：[DEBUG] 前缀 或 loguru 格式 "| DEBUG"
+        is_debug = text.startswith("[DEBUG]") or "| DEBUG" in text[:30]
+        level = logging.DEBUG if is_debug else logging.INFO
+        self._log_buffer.append((level, text))
+        if level >= self._log_min_level:
+            self.log_text.append(text)
+
+    def _on_log_level_changed(self):
+        """日志级别切换：更新阈值，重建显示"""
+        self._log_min_level = self._log_level_combo.currentData()
+        self.log_text.clear()
+        for level, text in self._log_buffer:
+            if level >= self._log_min_level:
+                self.log_text.append(text)
 
     # ─── 批处理执行 ───────────────────────────────────────
 
@@ -625,9 +667,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """
         if not self._backend_ready():
             if self._backend == "adb":
-                self.log_text.append("[错误] 请先连接设备")
+                self._log_append("[错误] 请先连接设备")
             else:
-                self.log_text.append("[错误] 请先定位窗口")
+                self._log_append("[错误] 请先定位窗口")
             return False
 
         if not self._begin_automation("批量执行"):
@@ -636,7 +678,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         layout_name = self._layout_manager.get_active_layout_name()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
-            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            self._log_append(f"[错误] 无法加载布局: {layout_name}")
             self._end_automation("批量执行")
             return False
 
@@ -666,7 +708,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         cfg = load_batch_config()
         config = cfg.get_active()
         if not config:
-            self.log_text.append("[错误] 暂无配置，请先通过 工具 → 批量配置 添加")
+            self._log_append("[错误] 暂无配置，请先通过 工具 → 批量配置 添加")
             self._end_automation("批量执行")
             return False
 
@@ -682,7 +724,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         # 信号连接：进度 → batch_tab，日志 → log_text，用户切换 → 刷新用户下拉
         worker.progress.connect(self._batch_tab.update_progress)
-        worker.log.connect(self.log_text.append)
+        worker.log.connect(self._log_append)
         worker.user_changed.connect(lambda _: self._refresh_user_combo())
         worker.finished_all.connect(self._batch_tab.on_batch_finished)
         worker.finished_all.connect(
@@ -729,7 +771,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _setup_log_redirect(self):
         self._log_bridge = _LogBridge(self)
-        self._log_bridge.append_log.connect(self.log_text.append)
+        self._log_bridge.append_log.connect(self._log_append)
 
         class QtSink:
             def __init__(self, bridge):
@@ -738,7 +780,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 self._bridge.append_log.emit(message.strip())
 
         sink = QtSink(self._log_bridge)
-        logger.add(sink, level="INFO", format="{time:HH:mm:ss} | {level:<7} | {message}")
+        logger.add(sink, level="DEBUG", format="{time:HH:mm:ss} | {level:<7} | {message}")
 
     # ─── 日常页配置持久化（session.json daily 节点）───────
 

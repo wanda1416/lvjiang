@@ -68,7 +68,7 @@
 ## 较早完成（2026-07-26 ~ 07-30）
 
 - **调律规则开关化重构**（07-29 `6db9b32`）：`keep_pvp` 专用语义废弃，
-  改为通用开关机制（tuning_base.yaml `switches` 注册表 + 条件组 `when`
+  改为通用开关机制（tune_config.yaml `switches` 注册表 + 条件组 `when`
   前提）；评级四档定名 垃圾/一般/优秀/顶级（`Rating.USABLE`→`NORMAL`）；
   条件原语收敛为 4 个（contains_all/not_together/count_max/count_min，
   均支持 include_first）；规则级/部位级 `default_rating` 兜底。

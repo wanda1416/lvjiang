@@ -10,7 +10,7 @@ ConditionGroupsEditor：条件组列表（组间 OR、组内 AND，组可绑定
 带 when 时产出 {when: {开关key: bool}, all: [...]}
 （与 parsing._parse_condition_groups 三种形态对应）。
 候选词条为标准词条全集，由构造方注入；开关候选来自
- tuning_base 开关注册表。
+ tune_config 开关注册表。
 """
 
 from __future__ import annotations

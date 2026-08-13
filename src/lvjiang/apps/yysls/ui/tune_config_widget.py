@@ -2,7 +2,7 @@
 
 调律 Tab 与「装备调律验证」面板共用的调律规则配置 UI：
 - TuningGlobalsWidget：全局区（跳过实际调律 mock + 按开关注册表
-  tuning_base.yaml switches 段动态渲染的全局开关复选框）
+  tune_config.yaml switches 段动态渲染的全局开关复选框）
 - TuningConfigWidget：每规则一个可勾选分组框（勾选标题 = 启用规则），
   组内按规则声明（playstyle_options）生成玩法复选框（名字 + 主副武器摘要）；
   show_globals=True（默认）时顶部内嵌全局区并委托其读写接口，
@@ -44,7 +44,7 @@ class TuningGlobalsWidget(QWidget):
             lambda _state: self.config_changed.emit())
         self._layout.addWidget(self._skip_tuning_cb)
 
-        # ── 全局开关（按 tuning_base.yaml 开关注册表动态渲染）──
+        # ── 全局开关（按 tune_config.yaml 开关注册表动态渲染）──
         self._switch_cbs: dict[str, QCheckBox] = {}
         self._build_switches()
 

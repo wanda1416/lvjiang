@@ -177,7 +177,7 @@ def _equip(affix_count: int, quality: str = "gold", cap_pct: int = 50,
 
 
 def _wf_with(base: TuningGroup) -> FakeWF:
-    """注入基础规则组的 FakeWF（替代旧 get_tuning_base 模块级补丁）"""
+    """注入基础规则组的 FakeWF（替代旧模块级补丁）"""
     wf = FakeWF()
     wf.run_ctx.base_group = base
     return wf

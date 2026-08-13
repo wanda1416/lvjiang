@@ -9,6 +9,7 @@
 也可用于将 USB 设备切换为无线连接（enable_tcpip）。
 """
 
+import os
 import re
 import shutil
 import socket
@@ -30,7 +31,6 @@ def resolve_adb() -> str:
     found = shutil.which("adb")
     if found:
         return found
-    import os
 
     from ...constants import PROJECT_ROOT
     bundled = PROJECT_ROOT / "data" / "adb" / ("adb.exe" if os.name == "nt" else "adb")
@@ -51,15 +51,74 @@ def run_adb(adb: str, *args: str, timeout: float = 10) -> str:
     return r.stdout.strip()
 
 
+def _is_private_ip(ip: str) -> bool:
+    """判断是否为 RFC1918 私有地址（排除 VPN/代理虚拟网段）"""
+    parts = ip.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        a, b = int(parts[0]), int(parts[1])
+    except ValueError:
+        return False
+    # 10.0.0.0/8
+    if a == 10:
+        return True
+    # 172.16.0.0/12
+    if a == 172 and 16 <= b <= 31:
+        return True
+    # 192.168.0.0/16
+    if a == 192 and b == 168:
+        return True
+    return False
+
+
+def _enumerate_local_ips() -> list[str]:
+    """枚举本机所有 IPv4 地址（纯标准库，兼容 Windows/macOS/Linux）"""
+    ips: list[str] = []
+    # 方式一：socket.getaddrinfo（轻量，覆盖多数场景）
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = str(info[4][0])
+            if ip not in ips:
+                ips.append(ip)
+    except Exception:
+        pass
+    # 方式二：Windows 下解析 ipconfig 输出（覆盖 VPN/多网卡场景）
+    if os.name == "nt":
+        try:
+            out = subprocess.run(
+                ["ipconfig"], capture_output=True, text=True,
+                timeout=5, **SUBPROCESS_NO_WINDOW,
+            ).stdout
+            for m in re.finditer(r"IPv4.*?:\s*(\d+\.\d+\.\d+\.\d+)", out):
+                ip = m.group(1)
+                if ip not in ips:
+                    ips.append(ip)
+        except Exception:
+            pass
+    return ips
+
+
 def get_local_subnet() -> str | None:
-    """获取本机局域网子网前缀（如 '192.168.1.'）"""
+    """获取本机局域网子网前缀（如 '192.168.1.'）
+
+    遍历本机所有 IPv4 地址，选择 RFC1918 私有地址段，
+    避免 VPN/代理软件（198.18.x.x 等虚拟网段）干扰。
+    兜底使用 socket.connect 技巧。
+    """
+    for ip in _enumerate_local_ips():
+        if _is_private_ip(ip):
+            parts = ip.split(".")
+            return ".".join(parts[:3]) + "."
+
+    # 兜底：socket 技巧（可能被 VPN 干扰）
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
         s.close()
-        parts = local_ip.split(".")
-        if len(parts) == 4:
+        if _is_private_ip(local_ip):
+            parts = local_ip.split(".")
             return ".".join(parts[:3]) + "."
     except Exception:
         pass

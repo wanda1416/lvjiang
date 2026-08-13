@@ -1250,11 +1250,14 @@ class ProfileOverviewTab(QWidget):
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
+        vh = table.verticalHeader()
+        if vh is not None:
+            vh.setVisible(False)
 
         header = table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        if header is not None:
+            header.setStretchLastSection(True)
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
 
         _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}
 

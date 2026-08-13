@@ -1,21 +1,12 @@
-# 脚本暴露配置
-#
-# 脚本本体（.wf 文件 + 内置类实现）由发现层自动扫描（见 src/lvjiang/workflows/discovery.py）：
-#   - config/system/workflows/ 顶层 *.wf（跳过 _ 前缀与子目录），name/参数取自 #% front-matter
-#   - 已注册内置类实现，name/参数取自类属性 DISPLAY_NAME / PARAMETERS
-# 本文件只负责「暴露」：决定日常页下拉展示哪些脚本、顺序、以及可选的显示名覆盖。
-# 可在「工具 → 脚本配置」中可视化编辑本文件。
-#
-# 语义：exposed 缺失/为空 → 展示全部已发现脚本；否则仅展示且按其顺序。
-
-exposed:            # 日常下拉展示的脚本 id，按此顺序
-  - equip_analysis
-  - auto_tuning
-  - auto_purchase_xinde
-  - activity_jianghu
-  - mengzhuzhengfeng
-
-overrides:          # 可选：覆盖发现层得到的显示名
-  equip_analysis: { name: 当前装备分析 }
-  auto_purchase_xinde: { name: 自动购买心法 }
-  activity_jianghu: { name: 江湖号令 }
+exposed:
+- equip_analysis
+- auto_purchase_xinde
+- activity_jianghu
+- mengzhuzhengfeng
+overrides:
+  equip_analysis:
+    name: 当前装备分析
+  auto_purchase_xinde:
+    name: 循环购买心法
+  activity_jianghu:
+    name: 每日江湖号令

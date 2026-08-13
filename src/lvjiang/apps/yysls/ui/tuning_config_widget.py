@@ -35,24 +35,47 @@ class TuningGlobalsWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
 
         # ── 跳过实际调律（临时测试开关，仅模拟进出调律页）──
         self._skip_tuning_cb = QCheckBox("跳过实际调律（仅进出调律页，测试滚动用）")
         self._skip_tuning_cb.stateChanged.connect(
             lambda _state: self.config_changed.emit())
-        layout.addWidget(self._skip_tuning_cb)
+        self._layout.addWidget(self._skip_tuning_cb)
 
         # ── 全局开关（按 tuning_base.yaml 开关注册表动态渲染）──
-        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
         self._switch_cbs: dict[str, QCheckBox] = {}
+        self._build_switches()
+
+    def _build_switches(self):
+        """按当前 get_tuning_base().switches 构建开关复选框"""
+        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
         for switch_key, switch_name in get_tuning_base().switches.items():
             cb = QCheckBox(f"{switch_name}（全局）")
             cb.stateChanged.connect(
                 lambda _state: self.config_changed.emit())
-            layout.addWidget(cb)
+            self._layout.addWidget(cb)
             self._switch_cbs[switch_key] = cb
+
+    def refresh_switches(self):
+        """重新读取开关注册表，增量更新复选框（保留已有值）"""
+        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
+        current = get_tuning_base().switches
+        # 移除已不存在的开关
+        removed = [k for k in self._switch_cbs if k not in current]
+        for k in removed:
+            cb = self._switch_cbs.pop(k)
+            cb.setParent(None)
+            cb.deleteLater()
+        # 添加新增的开关
+        for key, name in current.items():
+            if key not in self._switch_cbs:
+                cb = QCheckBox(f"{name}（全局）")
+                cb.stateChanged.connect(
+                    lambda _state: self.config_changed.emit())
+                self._layout.addWidget(cb)
+                self._switch_cbs[key] = cb
 
     def get_switches(self) -> dict[str, bool]:
         """全局开关状态：{开关 key: 是否开启}"""

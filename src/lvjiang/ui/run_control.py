@@ -145,10 +145,16 @@ class RunControlMixin:
             logger.error(f"发现脚本失败: {e}")
             return
 
-        # 填充下拉列表
+        # 填充下拉列表（block 信号，避免 addItem 逐条触发 _on_workflow_combo_changed）
+        self.workflow_combo.blockSignals(True)
         self.workflow_combo.clear()
         for cfg in self._workflow_configs:
             self.workflow_combo.addItem(cfg["name"], cfg["id"])
+        self.workflow_combo.blockSignals(False)
+
+        # 初始化当前面板显示的脚本追踪（供日常配置持久化使用）
+        first_cfg = self._workflow_configs[0] if self._workflow_configs else None
+        self._displayed_script_id = first_cfg["id"] if first_cfg else None
 
         logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
 
@@ -421,6 +427,11 @@ class RunControlMixin:
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
         flow_params = self._collect_flow_params()
+        # 执行前持久化当前参数，确保下次启动恢复最新值
+        if hasattr(self, '_save_displayed_params'):
+            self._save_displayed_params()
+        if hasattr(self, '_save_daily_config'):
+            self._save_daily_config()
 
         self.log_text.append(f"[开始] {flow_name} 流程...")
         if flow_params:

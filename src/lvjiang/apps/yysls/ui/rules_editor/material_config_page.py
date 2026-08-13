@@ -1,6 +1,6 @@
-"""材料配置页（全局 tuning_base.yaml 的 materials 段）
+"""调律配置对话框 —— 材料处理页（全局 tuning_base.yaml 的 materials 段）
 
-编辑材料设置（materials）：
+状态机行为点「材料处理」（每轮调律开始前的行为）：
 - 大律准石数量检查：开关 + 数量基准（低于基准判材料不足，全部退出）；
 - 狗粮添加规则：有序规则表（可自由增删行），每条规则 = 三条件
   （首词条百分比 / 装备期望 / 装备品阶）+ 动作（添加狗粮或不添加）
@@ -67,7 +67,10 @@ class MaterialConfigPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # 大律准石数量检查
+        # 页面说明 + 大律准石数量检查
+        layout.addWidget(QLabel(
+            "<b>材料处理</b>（每轮调律开始前的行为点）："
+            "律准石数量检查、狗粮检查与添加"))
         layout.addWidget(QLabel(
             "<b>大律准石数量检查</b>（调律前识别材料区数量，"
             "低于基准判材料不足，全部退出）"))

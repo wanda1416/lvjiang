@@ -1,8 +1,10 @@
 """装备调律配置对话框
 
-左侧一级导航（基础配置 + 材料配置 + 各规则）+ 右侧内容区（QStackedWidget）：
+左侧一级导航（基础配置 + 状态机三行为点 + 各规则）+ 右侧内容区（QStackedWidget）：
 - 基础配置：品阶门槛与开关设定（BaseConfigPage）；
-- 材料配置：大律准石数量检查与狗粮添加规则（MaterialConfigPage）；
+- 扫描处理：进调律前的进入门槛与处置表（ScanBehaviorPage）；
+- 材料处理：每轮调律开始前的律准石检查与狗粮规则（MaterialConfigPage）；
+- 结束处理：每轮调律结束后的行为表与重置设置（TuneBehaviorPage）；
 - 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
   双击规则导航项弹窗修改规则名称（配置页项不可改名）。
 左侧导航下方为「＋ 新增规则 / 装备调律验证」入口。
@@ -34,6 +36,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 )
 
 from .base_config_page import BaseConfigPage
+from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
 from .rule_panel import RulePanel, add_nav_separator
 
@@ -129,14 +132,21 @@ class TuningRulesDialog(QDialog):
         self._status_label = QLabel("规则变更即校验，校验通过自动保存并生效")
         layout.addWidget(self._status_label)
 
-        # 一级节点：基础配置 → 材料配置 → 分割线 → 各规则
-        # （导航含分割线：行 0/1 = 栈页 0/1，行 ≥3 = 栈页 - 1）
+        # 一级节点：基础配置 → 扫描处理 → 材料处理 → 结束处理 →
+        # 分割线 → 各规则（导航含分割线：行 0-3 = 栈页 0-3，
+        # 行 ≥5 = 栈页 - 1）
         self._nav.addItem("基础配置")
-        self._nav.addItem("材料配置")
+        self._nav.addItem("扫描处理")
+        self._nav.addItem("材料处理")
+        self._nav.addItem("结束处理")
         add_nav_separator(self._nav)
         self._stack.addWidget(BaseConfigPage(
             self._base_manager, self._set_status))
+        self._stack.addWidget(ScanBehaviorPage(
+            self._base_manager, self._set_status))
         self._stack.addWidget(MaterialConfigPage(
+            self._base_manager, self._set_status))
+        self._stack.addWidget(TuneBehaviorPage(
             self._base_manager, self._set_status))
         for key, rule in self._manager.get_rules().items():
             self._add_rule_page(key, rule.name)
@@ -156,12 +166,12 @@ class TuningRulesDialog(QDialog):
         item = self._nav.item(row)
         if row < 0 or item is None or not item.flags():
             return  # 分割线项不响应
-        self._stack.setCurrentIndex(row if row <= 1 else row - 1)
+        self._stack.setCurrentIndex(row if row <= 3 else row - 1)
 
     def _on_nav_double_clicked(self, item):
         """双击规则导航项 → 弹窗修改规则名称（配置页不可改名）"""
         row = self._nav.row(item)
-        if row < 3:  # 基础配置、材料配置与分割线
+        if row < 5:  # 四张配置页与分割线
             return
         panel = self._stack.widget(row - 1)
         if not isinstance(panel, RulePanel):
@@ -197,7 +207,7 @@ class TuningRulesDialog(QDialog):
         except RuleValidationError as e:
             QMessageBox.warning(self, "删除规则", str(e))
             return
-        for i in range(2, self._stack.count()):
+        for i in range(4, self._stack.count()):
             panel = self._stack.widget(i)
             if isinstance(panel, RulePanel) and panel.rule_key == key:
                 self._stack.removeWidget(panel)
@@ -209,7 +219,7 @@ class TuningRulesDialog(QDialog):
 
     def _rename_rule(self, old_key: str, new_key: str, new_name: str):
         """更新对应导航项的标题文本（由 panel 在 key/name 变更时回调）"""
-        for i in range(2, self._stack.count()):
+        for i in range(4, self._stack.count()):
             panel = self._stack.widget(i)
             if isinstance(panel, RulePanel) and panel.rule_key == new_key:
                 self._nav.item(i + 1).setText(new_name)  # 含分割线偏移

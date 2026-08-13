@@ -843,6 +843,19 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # skip 或 recycle → 直接返回
             return action, why, resets_used, affix_count
 
+        if action == "tune_full_recycle":
+            # 结束处理命中后进入与扫描处理相同的直通模式：后续轮次
+            # 不再做规则判定/狗粮决策，调满后回到背包执行回收。
+            self.recorder.tune_full_recycle_mode = True
+            self._emit_progress("scan_decision", {
+                "name": equip_data.name or equip_data.type,
+                "action": "tune_full_recycle",
+                "reason": f"{why}（调满后回收模式）",
+            })
+            if full:
+                return "recycle", f"{why}（词条已满，执行回收）", resets_used, affix_count
+            return "continue", f"{why}（进入调满后回收模式）", resets_used, affix_count
+
         # recycle 或 skip → 直接返回
         return action, why, resets_used, affix_count
 

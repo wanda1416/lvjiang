@@ -22,10 +22,10 @@ from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
 from .profile_models import (
     ALL_MODELS,
     MODEL_LABELS,
-    DailyKeyDef,
     KeyDef,
-    RealtimeKeyDef,
-    ResourceKeyDef,
+    QuotaKeyDef,
+    RegenKeyDef,
+    StockKeyDef,
 )
 from .profile_store import (
     get_active_group,
@@ -64,9 +64,9 @@ __all__ = [
     "ALL_MODELS",
     "MODEL_LABELS",
     "KeyDef",
-    "DailyKeyDef",
-    "RealtimeKeyDef",
-    "ResourceKeyDef",
+    "QuotaKeyDef",
+    "RegenKeyDef",
+    "StockKeyDef",
     "ProfileSchema",
     "get_profile_config",
     "reload_profile_config",

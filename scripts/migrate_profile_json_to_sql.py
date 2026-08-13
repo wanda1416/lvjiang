@@ -27,6 +27,13 @@ if str(_project_root / "src") not in sys.path:
 from lvjiang.apps.yysls.profile.profile_db import ProfileDB  # noqa: E402
 from lvjiang.constants import SESSION_CONFIG_DIR, USERS_DIR  # noqa: E402
 
+# 旧 JSON 中的 model type → 新 DB 中的 model type
+_TYPE_RENAME = {
+    "daily": "quota",
+    "realtime": "regen",
+    "resource": "stock",
+}
+
 
 def migrate(users_dir: Path | None = None, db_path: Path | None = None) -> int:
     """执行 JSON → SQLite 迁移，返回导入的 entry 数量"""
@@ -56,6 +63,8 @@ def migrate(users_dir: Path | None = None, db_path: Path | None = None) -> int:
         for type_, keys in profile.items():
             if not isinstance(keys, dict):
                 continue
+            # 映射旧类型名到新类型名
+            db_type = _TYPE_RENAME.get(type_, type_)
             for key, entry in keys.items():
                 if not isinstance(entry, dict):
                     continue
@@ -72,7 +81,7 @@ def migrate(users_dir: Path | None = None, db_path: Path | None = None) -> int:
                     conn.execute(
                         "INSERT OR IGNORE INTO profile_entries "
                         "(username, type, key, value, updated_at) VALUES (?, ?, ?, ?, ?)",
-                        (username, type_, key, float(value), updated_at),
+                        (username, db_type, key, float(value), updated_at),
                     )
                     conn.commit()
                 finally:

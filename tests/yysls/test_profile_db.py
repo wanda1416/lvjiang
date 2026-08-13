@@ -33,54 +33,54 @@ def db(tmp_path: Path) -> ProfileDB:
 
 class TestCRUD:
     def test_upsert_and_get(self, db: ProfileDB):
-        db.upsert("user1", "daily", "k1", 42)
-        entry = db.get_entry("user1", "daily", "k1")
+        db.upsert("user1", "quota", "k1", 42)
+        entry = db.get_entry("user1", "quota", "k1")
         assert entry["value"] == 42
         assert entry["updated_at"] != ""
 
     def test_get_nonexistent_returns_empty(self, db: ProfileDB):
-        assert db.get_entry("nobody", "daily", "k1") == {}
+        assert db.get_entry("nobody", "quota", "k1") == {}
 
     def test_get_all(self, db: ProfileDB):
-        db.upsert("user1", "daily", "k1", 10)
-        db.upsert("user1", "daily", "k2", 20)
-        db.upsert("user1", "realtime", "tili", 2500)
+        db.upsert("user1", "quota", "k1", 10)
+        db.upsert("user1", "quota", "k2", 20)
+        db.upsert("user1", "regen", "tili", 2500)
 
         all_data = db.get_all("user1")
-        assert all_data["daily"]["k1"]["value"] == 10
-        assert all_data["daily"]["k2"]["value"] == 20
-        assert all_data["realtime"]["tili"]["value"] == 2500
+        assert all_data["quota"]["k1"]["value"] == 10
+        assert all_data["quota"]["k2"]["value"] == 20
+        assert all_data["regen"]["tili"]["value"] == 2500
 
     def test_get_all_empty_user(self, db: ProfileDB):
         assert db.get_all("nobody") == {}
 
     def test_upsert_replaces(self, db: ProfileDB):
-        db.upsert("user1", "daily", "k1", 10)
-        db.upsert("user1", "daily", "k1", 20)
-        assert db.get_entry("user1", "daily", "k1")["value"] == 20
+        db.upsert("user1", "quota", "k1", 10)
+        db.upsert("user1", "quota", "k1", 20)
+        assert db.get_entry("user1", "quota", "k1")["value"] == 20
 
     def test_upsert_custom_updated_at(self, db: ProfileDB):
-        db.upsert("user1", "daily", "k1", 10, updated_at="2026-01-01T00:00:00")
-        entry = db.get_entry("user1", "daily", "k1")
+        db.upsert("user1", "quota", "k1", 10, updated_at="2026-01-01T00:00:00")
+        entry = db.get_entry("user1", "quota", "k1")
         assert entry["updated_at"] == "2026-01-01T00:00:00"
 
     def test_upsert_many(self, db: ProfileDB):
         entries = [
-            ("daily", "k1", 10, "2026-08-01T10:00:00", None, ""),
-            ("daily", "k2", 20, "2026-08-01T10:00:00", None, ""),
-            ("realtime", "tili", 2500, "2026-08-09T05:00:00", None, ""),
+            ("quota", "k1", 10, "2026-08-01T10:00:00", None, ""),
+            ("quota", "k2", 20, "2026-08-01T10:00:00", None, ""),
+            ("regen", "tili", 2500, "2026-08-09T05:00:00", None, ""),
         ]
         db.upsert_many("user1", entries)
 
         all_data = db.get_all("user1")
-        assert len(all_data["daily"]) == 2
-        assert all_data["realtime"]["tili"]["value"] == 2500
+        assert len(all_data["quota"]) == 2
+        assert all_data["regen"]["tili"]["value"] == 2500
 
     def test_different_users_isolated(self, db: ProfileDB):
-        db.upsert("user1", "daily", "k1", 10)
-        db.upsert("user2", "daily", "k1", 99)
-        assert db.get_entry("user1", "daily", "k1")["value"] == 10
-        assert db.get_entry("user2", "daily", "k1")["value"] == 99
+        db.upsert("user1", "quota", "k1", 10)
+        db.upsert("user2", "quota", "k1", 99)
+        assert db.get_entry("user1", "quota", "k1")["value"] == 10
+        assert db.get_entry("user2", "quota", "k1")["value"] == 99
 
 
 # ─── Schema 版本管理 ──────────────────────────────────────────
@@ -121,10 +121,10 @@ class TestSchemaMigration:
         db_path = tmp_path / "test.db"
 
         db1 = ProfileDB(db_path)
-        db1.upsert("u", "daily", "k", 10)
+        db1.upsert("u", "quota", "k", 10)
 
         db2 = ProfileDB(db_path)
-        assert db2.get_entry("u", "daily", "k")["value"] == 10
+        assert db2.get_entry("u", "quota", "k")["value"] == 10
 
 
 # ─── 变更历史 ─────────────────────────────────────────────────
@@ -133,45 +133,45 @@ class TestSchemaMigration:
 class TestHistory:
     def test_action_always_records(self, db: ProfileDB):
         """action 类型：即使值不变也记录"""
-        db.upsert("u", "daily", "k", 10, change_type="action", detail="+10")
-        db.upsert("u", "daily", "k", 10, change_type="action", detail="+0")
+        db.upsert("u", "quota", "k", 10, change_type="action", detail="+10")
+        db.upsert("u", "quota", "k", 10, change_type="action", detail="+0")
 
         history = db.get_history("u")
         assert len(history) == 2
         assert history[0]["change_type"] == "action"
         assert history[0]["detail"] == "+0"
 
-    def test_manual_always_records(self, db: ProfileDB):
-        """manual 类型：即使值不变也记录"""
-        db.upsert("u", "daily", "k", 10, change_type="manual", detail="覆盖")
-        db.upsert("u", "daily", "k", 10, change_type="manual", detail="覆盖")
+    def test_override_always_records(self, db: ProfileDB):
+        """override 类型：即使值不变也记录"""
+        db.upsert("u", "quota", "k", 10, change_type="override", detail="override:10")
+        db.upsert("u", "quota", "k", 10, change_type="override", detail="override:10")
 
         history = db.get_history("u")
         assert len(history) == 2
 
     def test_tick_records_only_on_change(self, db: ProfileDB):
         """tick 类型：值不变时不记录"""
-        db.upsert("u", "daily", "k", 10, change_type="tick", detail="周期重置")
+        db.upsert("u", "quota", "k", 10, change_type="tick", detail="reset:0")
         # 再次写入相同值 → 不记录
-        db.upsert("u", "daily", "k", 10, change_type="tick", detail="regen:+0.0")
+        db.upsert("u", "quota", "k", 10, change_type="tick", detail="regen:+0.0")
         # 写入不同值 → 记录
-        db.upsert("u", "daily", "k", 20, change_type="tick", detail="regen:+10.0")
+        db.upsert("u", "quota", "k", 20, change_type="tick", detail="regen:+10.0")
 
         history = db.get_history("u")
         assert len(history) == 2
         assert history[0]["detail"] == "regen:+10.0"
-        assert history[1]["detail"] == "周期重置"
+        assert history[1]["detail"] == "reset:0"
 
     def test_no_change_type_no_history(self, db: ProfileDB):
         """change_type=None 时不记录 history"""
-        db.upsert("u", "daily", "k", 10)
-        db.upsert("u", "daily", "k", 20)
+        db.upsert("u", "quota", "k", 10)
+        db.upsert("u", "quota", "k", 20)
         assert db.get_history("u") == []
 
     def test_history_old_value(self, db: ProfileDB):
         """history 中 old_value 正确记录"""
-        db.upsert("u", "daily", "k", 10, change_type="action", detail="+10")
-        db.upsert("u", "daily", "k", 20, change_type="action", detail="+10")
+        db.upsert("u", "quota", "k", 10, change_type="action", detail="+10")
+        db.upsert("u", "quota", "k", 20, change_type="action", detail="+10")
 
         history = db.get_history("u")
         # 按 id 倒序：最新在前
@@ -181,16 +181,16 @@ class TestHistory:
         assert history[1]["new_value"] == 10
 
     def test_history_filter_by_type(self, db: ProfileDB):
-        db.upsert("u", "daily", "k1", 10, change_type="action", detail="")
-        db.upsert("u", "realtime", "tili", 2500, change_type="tick", detail="regen")
+        db.upsert("u", "quota", "k1", 10, change_type="action", detail="")
+        db.upsert("u", "regen", "tili", 2500, change_type="tick", detail="regen")
 
-        daily_history = db.get_history("u", type_="daily")
+        daily_history = db.get_history("u", type_="quota")
         assert len(daily_history) == 1
-        assert daily_history[0]["type"] == "daily"
+        assert daily_history[0]["type"] == "quota"
 
     def test_history_filter_by_key(self, db: ProfileDB):
-        db.upsert("u", "daily", "k1", 10, change_type="action", detail="")
-        db.upsert("u", "daily", "k2", 20, change_type="action", detail="")
+        db.upsert("u", "quota", "k1", 10, change_type="action", detail="")
+        db.upsert("u", "quota", "k2", 20, change_type="action", detail="")
 
         k1_history = db.get_history("u", key="k1")
         assert len(k1_history) == 1
@@ -198,7 +198,7 @@ class TestHistory:
 
     def test_history_limit(self, db: ProfileDB):
         for i in range(20):
-            db.upsert("u", "daily", "k", i, change_type="tick", detail=f"v{i}")
+            db.upsert("u", "quota", "k", i, change_type="tick", detail=f"v{i}")
 
         limited = db.get_history("u", limit=5)
         assert len(limited) == 5
@@ -220,14 +220,14 @@ class TestCleanupHistory:
                 "INSERT INTO profile_history "
                 "(ts, username, type, key, old_value, new_value, change_type, detail) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (old_ts, "u", "daily", "k", None, 10, "tick", "old"),
+                (old_ts, "u", "quota", "k", None, 10, "tick", "old"),
             )
             conn.commit()
         finally:
             conn.close()
 
         # 再插入一条新记录
-        db.upsert("u", "daily", "k", 20, change_type="tick", detail="new")
+        db.upsert("u", "quota", "k", 20, change_type="tick", detail="new")
 
         assert len(db.get_history("u")) == 2
         deleted = db.cleanup_history(days=1)
@@ -244,13 +244,13 @@ class TestConcurrentUpsert:
     def test_concurrent_upsert_no_data_loss(self, db: ProfileDB):
         """并发写入同一 key 时不丢数据"""
         def increment(i: int):
-            db.upsert("u", "daily", "counter", i, change_type="tick", detail=f"v{i}")
+            db.upsert("u", "quota", "counter", i, change_type="tick", detail=f"v{i}")
 
         with ThreadPoolExecutor(max_workers=4) as executor:
             list(executor.map(increment, range(20)))
 
         # 最终值一定是 0-19 中的某一个（取决于执行顺序）
-        entry = db.get_entry("u", "daily", "counter")
+        entry = db.get_entry("u", "quota", "counter")
         assert entry["value"] in range(20)
 
         # history 行数 = 20（action/manual 每次记录，tick 每次值变化记录）

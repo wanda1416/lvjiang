@@ -1,6 +1,6 @@
 """玩家数据模型定义对话框
 
-编辑 profile.yaml，按三种数据模型（日常/资源/实时）分区管理 key 定义。
+编辑 profile.yaml，按三种数据模型（配额/存量/再生）分区管理 key 定义。
 每个模型 Tab 内展示该类型的 key 列表，支持新增/删除/上移/下移。
 新增/编辑通过弹出对话框完成，表单根据模型类型动态切换。
 """
@@ -30,18 +30,18 @@ from PyQt6.QtWidgets import (
 )
 
 from ..config.profile_models import (
-    MODEL_DAILY,
     MODEL_LABELS,
-    MODEL_REALTIME,
-    MODEL_RESOURCE,
-    DailyKeyDef,
+    MODEL_QUOTA,
+    MODEL_REGEN,
+    MODEL_STOCK,
     KeyDef,
-    RealtimeKeyDef,
-    ResourceKeyDef,
+    QuotaKeyDef,
+    RegenKeyDef,
+    StockKeyDef,
 )
 
 # 模型 TAB 顺序
-_MODEL_ORDER = [MODEL_DAILY, MODEL_RESOURCE, MODEL_REALTIME]
+_MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN]
 
 # QTableWidgetItem.UserRole key：在表格首列存储完整 KeyDef 对象
 _ROLE_KEYDEF = Qt.ItemDataRole.UserRole
@@ -227,7 +227,7 @@ class ProfileDefinitionDialog(QDialog):
     @staticmethod
     def _summarize(kd: KeyDef) -> str:
         """生成 key 的详情摘要"""
-        if isinstance(kd, DailyKeyDef):
+        if isinstance(kd, QuotaKeyDef):
             parts = [f"周期:{kd.period}"]
             if kd.reset_day and kd.period in ("week", "month"):
                 if kd.period == "week" and 1 <= kd.reset_day <= 7:
@@ -248,7 +248,7 @@ class ProfileDefinitionDialog(QDialog):
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
-        if isinstance(kd, RealtimeKeyDef):
+        if isinstance(kd, RegenKeyDef):
             parts = [f"上限:{kd.cap}"]
             period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
             period_text = period_labels.get(kd.regen_period, kd.regen_period)
@@ -266,7 +266,7 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append(f"提醒:>{kd.alert_above}")
             return ", ".join(parts)
 
-        if isinstance(kd, ResourceKeyDef):
+        if isinstance(kd, StockKeyDef):
             parts = []
             if kd.cap is not None:
                 cap_type = "软" if kd.soft else "硬"
@@ -366,8 +366,8 @@ class ProfileDefinitionDialog(QDialog):
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
 
-        if model_type == MODEL_DAILY:
-            kd = existing if isinstance(existing, DailyKeyDef) else DailyKeyDef()
+        if model_type == MODEL_QUOTA:
+            kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
             period_combo = QComboBox()
             for val, text in _PERIOD_OPTIONS:
                 period_combo.addItem(text, val)
@@ -443,9 +443,9 @@ class ProfileDefinitionDialog(QDialog):
             # 同步目标 Resource
             sync_combo = QComboBox()
             sync_combo.addItem("（不同步）", "")
-            # 加载所有 Resource key 作为同步目标
+            # 加载所有 Stock key 作为同步目标
             from ..config import get_profile_config
-            res_keys = get_profile_config().get_keys_by_model(MODEL_RESOURCE)
+            res_keys = get_profile_config().get_keys_by_model(MODEL_STOCK)
             for rk in res_keys:
                 sync_combo.addItem(f"{rk.label} ({rk.key})", rk.key)
             idx = sync_combo.findData(kd.sync_to)
@@ -454,8 +454,8 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("同步到资源:", sync_combo)
             widgets["sync_to"] = sync_combo
 
-        elif model_type == MODEL_REALTIME:
-            rt_kd = existing if isinstance(existing, RealtimeKeyDef) else RealtimeKeyDef()
+        elif model_type == MODEL_REGEN:
+            rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
 
             cap_spin = QSpinBox()
             cap_spin.setRange(0, 999999)
@@ -530,8 +530,8 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("增减幅度:", steps_input)
             widgets["steps"] = steps_input
 
-        elif model_type == MODEL_RESOURCE:
-            res_kd = existing if isinstance(existing, ResourceKeyDef) else ResourceKeyDef()
+        elif model_type == MODEL_STOCK:
+            res_kd = existing if isinstance(existing, StockKeyDef) else StockKeyDef()
 
             cap_spin = QSpinBox()
             cap_spin.setRange(0, 999999)
@@ -598,7 +598,7 @@ class ProfileDefinitionDialog(QDialog):
                 return
 
             # 构造 KeyDef
-            if model_type == MODEL_DAILY:
+            if model_type == MODEL_QUOTA:
                 cap_val = widgets["cap"].value()
                 # 解析 steps
                 steps_raw = widgets["steps"].text().strip()
@@ -614,7 +614,7 @@ class ProfileDefinitionDialog(QDialog):
                                 return
                 # 解析 sync_to
                 sync_to_val = widgets["sync_to"].currentData() or ""
-                kd = DailyKeyDef(
+                kd = QuotaKeyDef(
                     key=key, label=label,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
@@ -626,7 +626,7 @@ class ProfileDefinitionDialog(QDialog):
                     reset_day=widgets["reset_day"].value(),
                     increment_only=widgets["increment_only"].isChecked(),
                 )
-            elif model_type == MODEL_REALTIME:
+            elif model_type == MODEL_REGEN:
                 alert_val = widgets["alert_above"].value()
                 # 解析 steps
                 steps_raw = widgets["steps"].text().strip()
@@ -640,7 +640,7 @@ class ProfileDefinitionDialog(QDialog):
                             except ValueError:
                                 error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
                                 return
-                kd = RealtimeKeyDef(
+                kd = RegenKeyDef(
                     key=key, label=label,
                     cap=widgets["cap"].value(),
                     show_cap=widgets["show_cap"].isChecked(),
@@ -651,9 +651,9 @@ class ProfileDefinitionDialog(QDialog):
                     alert_above=alert_val if alert_val > 0 else None,
                     steps=steps_list,
                 )
-            elif model_type == MODEL_RESOURCE:
+            elif model_type == MODEL_STOCK:
                 cap_val = widgets["cap"].value()
-                kd = ResourceKeyDef(
+                kd = StockKeyDef(
                     key=key, label=label,
                     cap=cap_val if cap_val > 0 else None,
                     soft=widgets["soft"].isChecked(),

@@ -5,11 +5,6 @@ meta_schema:
   filterable: true
   type: number
   sort_by: desc
-- key: count
-  name: 数量
-  filterable: false
-  type: number
-  sort_by: asc
 references:
 - file: 装备培养/475BF859.png
   label: 装备碎片
@@ -555,3 +550,16 @@ references:
     group: 普通道具
   source: clipboard
   notes: ''
+- file: 增益道具/4210FD59.png
+  label: 忘川渡
+  meta:
+    group: 增益道具
+  source: clipboard
+  notes: ''
+- file: 增益道具/060E5C98.png
+  label: 黄泉酿
+  meta:
+    group: 增益道具
+  source: clipboard
+  notes: ''
+match_threshold: 0.35

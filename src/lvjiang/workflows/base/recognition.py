@@ -136,7 +136,7 @@ class _RecognitionMixin:
                 result[region.key] = info.type  # 空槽 info.type == ""
             logger.debug(
                 f"参考图匹配 [{scene_key}].[{region.key}]: "
-                f"label={info.type!r} level={info.level} count={info.count}"
+                f"label={info.type!r} real_level={info.real_level} count={info.count}"
             )
 
         fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]

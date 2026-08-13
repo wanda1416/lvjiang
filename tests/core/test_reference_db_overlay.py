@@ -280,7 +280,7 @@ class TestMetaSchemaScope:
         _, system_yaml, _, _ = layers
         _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
             {"key": "level", "name": "等级", "scope": "input"},
-            {"key": "levels", "name": "等级区域", "scope": "output",
+            {"key": "level_text", "name": "等级文本区域", "scope": "output",
              "crop": [0.0, 0.0, 1.0, 0.5]},
         ]})
         db = _make_db(layers, dev_mode=False)
@@ -313,14 +313,14 @@ class TestMetaSchemaScope:
         _, system_yaml, _, _ = layers
         _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
             {"key": "level", "name": "等级", "scope": "input"},
-            {"key": "levels", "name": "等级区域", "scope": "output",
+            {"key": "level_text", "name": "等级文本区域", "scope": "output",
              "crop": [0.0, 0.0, 1.0, 0.5]},
             {"key": "bad", "name": "非法", "scope": "output", "crop": [2.0, 0, 1, 1]},
-            {"key": "counts", "name": "数量区域", "scope": "output",
+            {"key": "count_text", "name": "数量文本区域", "scope": "output",
              "crop": [0.0, 0.5, 1.0, 0.5]},
         ]})
         db = _make_db(layers, dev_mode=False)
-        assert [f.key for f in db.get_output_fields()] == ["levels", "counts"]
+        assert [f.key for f in db.get_output_fields()] == ["level_text", "count_text"]
 
     def test_save_omits_none_crop(self, layers):
         _, system_yaml, _, _ = layers
@@ -328,14 +328,14 @@ class TestMetaSchemaScope:
         db = _make_db(layers, dev_mode=True)
         db.set_meta_schema([
             MetaFieldDef(key="level", name="等级", scope="input"),
-            MetaFieldDef(key="levels", name="等级区域", scope="output",
+            MetaFieldDef(key="level_text", name="等级文本区域", scope="output",
                          crop=[0.0, 0.0, 1.0, 0.5]),
         ])
         sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
         fields = {f["key"]: f for f in sys_doc["meta_schema"]}
         assert "crop" not in fields["level"]           # input 字段不写 crop
         assert fields["level"]["scope"] == "input"
-        assert fields["levels"]["crop"] == [0.0, 0.0, 1.0, 0.5]
+        assert fields["level_text"]["crop"] == [0.0, 0.0, 1.0, 0.5]
 
 
 # ─── 图库空间 ────────────────────────────────────────

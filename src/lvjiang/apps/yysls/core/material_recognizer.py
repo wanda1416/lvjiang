@@ -25,7 +25,7 @@ from lvjiang.core.reference_db import ReferenceDatabase
 
 # yysls 调律输出字段契约：自动调律启动前必须存在的 output 字段 key
 # （业务层对核心层 meta_schema 的合法要求，非侵入）
-REQUIRED_OUTPUT_FIELDS = ("levels", "counts")
+REQUIRED_OUTPUT_FIELDS = ("level_text", "count_text")
 
 
 def get_missing_output_fields(db: ReferenceDatabase) -> list[str]:
@@ -60,16 +60,18 @@ class MaterialInfo:
     通用字段：
         type: 材料类型（如 "定音石"），空槽为 ""
         ocr_texts: 输出元数据 OCR 原始文本（输出字段 key -> 文本，
-            如 {"levels": "110阶", "counts": "0/691"}）
+            如 {"level_text": "110阶", "count_text": "0/691"}）
         confidence: 类型匹配置信度 0~1
         meta: 匹配参考条目的元数据（输入字段 key -> 值，如 {"level": 110}）
 
-    便捷属性（按 yysls 配置契约 key 读取 ocr_texts）：
-        level_text: levels 的 OCR 文本（如 "110阶"）
-        count_text: counts 的 OCR 文本（如 "0/691" 或 "691"）
+    便捷属性（读取 ocr_texts 原始文本）：
+        level_text: 等级区域的 OCR 文本（如 "110阶"）
+        count_text: 数量区域的 OCR 文本（如 "0/691" 或 "691"）
 
-    解析属性（从 text 解析）：
-        level: 从 level_text 提取的第一个数字
+    解析属性（从文本解析）：
+        real_level: 从 level_text 解析的实际等级（OCR 读出的真实等级，
+            可能与参考图库标注的 level 不同——不同等级材料外观相似时
+            参考图匹配可能出错，OCR 读出的 real_level 更可靠）
         count: 用户拥有的数量（核心语义）— 有 "/" 时取后者，无 "/" 时取整个数字
         devoted: 投入数量（仅调律流程关注）— 有 "/" 时取前者，无 "/" 时为 None
     """
@@ -82,17 +84,22 @@ class MaterialInfo:
 
     @property
     def level_text(self) -> str:
-        return self.ocr_texts.get("levels", "")
+        return self.ocr_texts.get("level_text", "")
 
     @property
     def count_text(self) -> str:
-        return self.ocr_texts.get("counts", "")
+        return self.ocr_texts.get("count_text", "")
 
     # ── 解析属性 ─────────────────────────────────────────────
 
     @property
-    def level(self) -> int | None:
-        """从 level_text 提取数字（支持 '110'、'1.5万' 等）"""
+    def real_level(self) -> int | None:
+        """从 level_text 解析的实际等级（OCR 读出的真实等级）
+
+        支持 '110'、'110阶'、'1.5万' 等格式。
+        注意：参考图库标注的 meta['level'] 可能因外观相似而匹配错误，
+        real_level 是 OCR 从画面直接读出的等级，更可靠。
+        """
         return _parse_number(self.level_text)
 
     @property
@@ -129,10 +136,10 @@ class MaterialRecognizer:
         recognizer = MaterialRecognizer(ocr_engine)
         result = recognizer.recognize(slot_img)
         # result.type -> "定音石"
-        # result.ocr_texts -> {"levels": "110阶", "counts": "0/691"}
+        # result.ocr_texts -> {"level_text": "110阶", "count_text": "0/691"}
         # result.level_text -> "110阶"
         # result.count_text -> "0/691"
-        # result.level -> 110   (从 level_text 解析)
+        # result.real_level -> 110   (从 level_text 解析的实际等级)
         # result.count -> 691   (用户拥有的数量，核心语义)
         # result.devoted -> 0   (投入，仅调律流程关注)
     """
@@ -238,7 +245,7 @@ class MaterialRecognizer:
             # 从参考条目元数据获取原始等级（区分同名不同等级）
             ref_level = match_result.meta.get("level")
             if ref_level is not None:
-                texts["levels"] = f"{ref_level}阶"
+                texts["level_text"] = f"{ref_level}阶"
 
             results.append(MaterialInfo(
                 type=match_result.label,
@@ -270,13 +277,13 @@ class MaterialRecognizer:
         """按 schema 输出字段的 crop 区域逐个 OCR，返回 {key: 文本}
 
         schema 无输出字段时回退硬编码上下半区，产出 key 仍为
-        levels / counts（兼容旧配置）。
+        level_text / count_text（兼容旧配置）。
         """
         output_fields = self._db.get_output_fields()
         if not output_fields:
             return {
-                "levels": self._ocr_region(slot_img, self.LEVEL_REGION),
-                "counts": self._ocr_region(slot_img, self.COUNT_REGION),
+                "level_text": self._ocr_region(slot_img, self.LEVEL_REGION),
+                "count_text": self._ocr_region(slot_img, self.COUNT_REGION),
             }
         return {
             f.key: self._ocr_region(slot_img, tuple(f.crop))  # type: ignore[arg-type]

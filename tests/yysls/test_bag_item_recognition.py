@@ -200,9 +200,9 @@ class TestBagItemRecognition:
 
         # 验证等级（None 表示无等级标识，允许识别为 None）
         if expected_level is not None:
-            assert result.level == expected_level, (
+            assert result.real_level == expected_level, (
                 f"背包格{row}_{col}: 等级不匹配 "
-                f"(期望={expected_level}, 实际={result.level})"
+                f"(期望={expected_level}, 实际={result.real_level})"
             )
         # 如果期望为 None，实际可以是 None 或任何值（不强制验证）
 
@@ -241,7 +241,7 @@ class TestBagItemRecognitionSummary:
             result = recognizer.recognize(slot_img)
 
             name_ok = result.type == expected_name
-            level_ok = (expected_level is None) or (result.level == expected_level)
+            level_ok = (expected_level is None) or (result.real_level == expected_level)
 
             if name_ok:
                 correct_name += 1
@@ -250,7 +250,7 @@ class TestBagItemRecognitionSummary:
             if not (name_ok and level_ok):
                 errors.append(
                     f"背包格{row}_{col}: 期望={expected_name} {expected_level}级, "
-                    f"实际={result.type} {result.level}级 (conf={result.confidence:.2f})"
+                    f"实际={result.type} {result.real_level}级 (conf={result.confidence:.2f})"
                 )
 
         name_accuracy = correct_name / total * 100

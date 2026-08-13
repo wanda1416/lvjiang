@@ -340,7 +340,11 @@ class BrowserPanel(QWidget):
         return "" if value is None else str(value)
 
     def rebuild_meta_fields(self):
-        """按 meta_schema 重建筛选/编辑/批量的动态 meta 控件"""
+        """按 meta_schema 重建筛选/编辑/批量的动态 meta 控件
+
+        仅展示 input 字段（排除 output 字段）：output 字段是从图中识别读取的，
+        不是用户可编辑的元信息。
+        """
         self._clear_layout(self._meta_filter_layout)
         self._clear_layout(self._meta_edit_layout)
         self._clear_layout(self._batch_meta_layout)
@@ -348,7 +352,7 @@ class BrowserPanel(QWidget):
         self._meta_edits.clear()
         self._batch_meta_edits.clear()
 
-        for field in self._db.get_meta_schema():
+        for field in self._db.get_custom_input_fields():
             # 编辑区输入
             row = QHBoxLayout()
             row.addWidget(QLabel(f"{field.name}:"))

@@ -1,11 +1,12 @@
 """基础配置页（全局 tuning_base.yaml）
 
-编辑品阶门槛（quality_thresholds）与开关注册表（switches）。
-沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
-通过才写盘并 reload，失败时状态栏红字提示。
+编辑等级门槛（min_level）、品阶门槛（quality_thresholds）与开关注册表
+（switches）。沿用「变更即校验即保存」模式：控件变更即重建 raw dict →
+校验 → 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、只替换本页负责的段，
 与材料配置页（materials 段）互不覆盖。
 
+- 等级门槛：低于该等级的装备不允许进入调律，直接跳过；
 - 品阶门槛表：固定 7 个标准部位（QUALITY_PARTS，锁死不可增删）×
   gold/purple/blue 勾选；规则级可在规则设置页按部位覆盖；
 - 开关设定表：开关 key → 显示名；规则条件组 when 引用的开关
@@ -25,6 +26,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -57,6 +59,18 @@ class BaseConfigPage(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
+
+        # 等级门槛（最顶部）
+        level_row = QHBoxLayout()
+        level_row.addWidget(QLabel("<b>等级门槛</b>"))
+        self._min_level_spin = QSpinBox()
+        self._min_level_spin.setRange(1, 999)
+        self._min_level_spin.setValue(100)
+        self._min_level_spin.valueChanged.connect(lambda _v: self._apply())
+        level_row.addWidget(self._min_level_spin)
+        level_row.addWidget(QLabel("级（低于该等级的装备直接跳过，不走调律和回收）"))
+        level_row.addStretch()
+        layout.addLayout(level_row)
 
         # 品阶门槛（固定 7 个标准部位，锁死不可增删）
         layout.addWidget(QLabel(
@@ -143,6 +157,11 @@ class BaseConfigPage(QWidget):
 
     def _load(self):
         d = self._data
+        # 等级门槛
+        self._min_level_spin.blockSignals(True)
+        self._min_level_spin.setValue(d.get("min_level", 100))
+        self._min_level_spin.blockSignals(False)
+        # 品阶门槛
         q = d.get("quality_thresholds") or {}
         self._q_table.blockSignals(True)
         self._q_table.setRowCount(0)
@@ -194,6 +213,7 @@ class BaseConfigPage(QWidget):
         # 以最新 raw 为底只替换本页负责的段，保留材料配置页负责的
         # materials 段等其他内容
         data = self._manager.get_raw()
+        data["min_level"] = self._min_level_spin.value()
         data["quality_thresholds"] = quality
         data["switches"] = switches
         return data

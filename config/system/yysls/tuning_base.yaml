@@ -1,3 +1,4 @@
+min_level: 100
 quality_thresholds:
   武器:
   - gold
@@ -22,8 +23,9 @@ switches:
     name: 保留PVP装备
 materials:
   stone_check:
-    enabled: false
+    enabled: true
     min_count: 80
+    insufficient_action: ask
   food_rules:
   - pct: 98
     min_expect: top
@@ -53,7 +55,7 @@ materials:
 behavior:
   scan:
     enabled: true
-    entry_min_rating: normal
+    entry_min_rating: excellent
     rules:
     - parts:
       - 武器
@@ -66,11 +68,11 @@ behavior:
       max_quality: purple
       max_pct: 100
       max_rating: junk
-      judge_scope: all
+      judge_scope: incoming
       judge_rules: []
       action: recycle
   tune:
-    enabled: false
+    enabled: true
     rules:
     - parts:
       - 武器

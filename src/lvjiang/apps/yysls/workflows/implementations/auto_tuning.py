@@ -7,8 +7,8 @@
 - 材料处理（materials）：每轮调律开始前的律准石检查与狗粮决策；
 - 结束处理（behavior.tune）：每轮调律结束后按预期评级决策
   继续调律/重置调律/回收/结束保留，词条满为边界条件（continue
-  不可选，无命中默认结束保留）；背包读到已满装备同口径
-  （_on_full_equipment，reset 不支持）。
+  不可选，无命中默认结束保留）；背包读到已满装备走扫描处理
+  同一路径（tune_full_recycle 视为直接回收）。
 回收后背包补位，由 _process_equipment 就地重读同格续处理。
 
 实际调律执行逻辑（狗粮策略、进调律页、单轮调律、终局判定）自包含移植自
@@ -424,15 +424,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "affix_count": affix_count,
         }
 
-        # A. 词条已满 → 终局判定 + 结束处理（full=True，仅回收/保留）；
-        #    未处理过，不收集 report
+        # A. 词条已满 → 终局判定 + 扫描处理（已满不进调律，
+        #    走 scan 行为点决定回收/保留）；未处理过，不收集 report
         if affix_count >= self.MAX_AFFIX:
             logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
             judgement = self._final_judge(equip_data)
             report["status"] = "already_full"
             report["final_judgement"] = judgement
-            if self._on_full_equipment(equip_data, judgement, report,
-                                       detail_scene):
+            if self._on_scan_reject(equip_data, judgement, detail_scene,
+                                    already_full=True):
                 return "", True
             return self._make_fingerprint(equip_data.to_dict()), False
 
@@ -556,7 +556,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     self._doc.round_decision(why)
                 continue
             if action == "reset":
-                if self._try_reset_tune(tune_cfg, resets_used, why):
+                result = self._try_reset_tune(tune_cfg, resets_used, why)
+                if result is True:
                     resets_used += 1
                     report["resets"] = resets_used
                     # 重置清空首词条以外全部词条 → 只剩首词条
@@ -567,11 +568,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                         self._doc.note(
                             f"重置调律（第 {resets_used} 次）：{why}")
                     continue
-                # 重置次数已用尽（本地上限或按钮无次数）→ 按配置转处置
-                action = tune_cfg.reset_exhausted_action
-                if action == "recycle":
-                    why = f"重置次数已用尽转回收（{why}）"
-                    logger.info(f"  [结束处理] {why}")
+                if isinstance(result, str):
+                    # 冷却期拒绝 → 强制跳过（不走 reset_exhausted_action）
+                    action = "skip"
+                    why = result
+                else:
+                    # 重置次数已用尽（本地上限或按钮无次数）→ 按配置转处置
+                    action = tune_cfg.reset_exhausted_action
+                    if action == "recycle":
+                        why = f"重置次数已用尽转回收（{why}）"
+                        logger.info(f"  [结束处理] {why}")
             # 回收延到 back 回背包页后执行；skip = 结束保留
             if action == "recycle":
                 tune_recycle_reason = why
@@ -617,8 +623,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     # ─── 行为处置（按 tuning_base.behavior 行为点配置驱动）──────
 
     def _on_scan_reject(self, equip_data: EquipmentData, potential: dict,
-                        detail_scene: str | None = None) -> bool:
-        """未达进入门槛装备的扫描处置（scan 行为点）。
+                        detail_scene: str | None = None,
+                        already_full: bool = False) -> bool:
+        """扫描阶段处置（scan 行为点）。
+
+        两种入口：
+        1. 未满装备预期评级未达进入门槛 → 按处置表决定回收/保留；
+        2. 已满装备（already_full=True）→ 同走处置表，其中
+           tune_full_recycle 视为直接回收（已满无需再调）。
 
         处置表评级按各规则自身判定语义懒取（incoming 复用进入
         决策的判定结果，all/custom 按需另跑潜力判定并缓存；
@@ -637,7 +649,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         action, why = cfg.decide(part, quality, cap_pct,
                                  self._rating_provider(equip_data, potential))
         if action == "tune_full_recycle":
-            # 调满后回收模式：设置标记，继续走调律流程
+            if already_full:
+                # 已满装备无需再调，“调满后回收”意图等价于直接回收
+                logger.info(f"  [扫描处理] {label} {why}（已满，直接回收）")
+                return self._recycle_current(equip_data, detail_scene,
+                                             "scan", why)
+            # 未满：设置标记，继续走调律流程
             logger.info(f"  [扫描处理] {label} {why}（调满后回收模式）")
             self._tune_full_recycle_mode = True
             return False
@@ -715,37 +732,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         logger.info(f"  [材料不足] 大律准石 {stock}/基准 {baseline}"
                     f"（补货/兑换后处理待实现，仅记录）")
 
-    def _on_full_equipment(self, equip_data: EquipmentData,
-                           judgement: dict, report: dict,
-                           detail_scene: str | None = None) -> bool:
-        """背包读到词条已满装备的结束处理（tune 行为点，full=True）。
-
-        仅执行 recycle/ignore；重置需要基线词条快照（已满装备无
-        快照，重置后需重读整页词条，本期不支持），reset 规则跳过
-        并告警；优秀→转律、顶级→装上等后处理仍待实现。
-
-        Returns: True=已回收。
-        """
-        label = equip_data.name or equip_data.type
-        cfg = get_tuning_base().behavior.tune
-        if detail_scene is None or not cfg.enabled:
-            return False
-        if self.is_stopped:
-            return False  # 材料不足/用户中断属阻断，不处置
-        if any(r.action == "reset" for r in cfg.rules):
-            logger.warning("已满装备不支持重置调律（无基线词条快照），"
-                           "reset 规则跳过")
-        cfg = replace(cfg, rules=[r for r in cfg.rules
-                                  if r.action != "reset"])
-        part, quality, cap_pct = self._recycle_inputs(equip_data)
-        action, why = cfg.decide(part, quality, cap_pct,
-                                 self._rating_provider(equip_data, judgement),
-                                 full=True)
-        if action != "recycle":
-            logger.info(f"  [结束处理] {label} {why}")
-            return False
-        return self._recycle_current(equip_data, detail_scene, "tune", why,
-                                     report)
 
     @staticmethod
     def _recycle_inputs(equip_data: EquipmentData,
@@ -773,13 +759,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         m = re.search(r"\d+", raw)
         return int(m.group()) if m else 0
 
-    def _try_reset_tune(self, cfg, resets_used: int, why: str) -> bool:
-        """在调律页执行一次重置调律（点按钮 + 确认 + 二次确认）
+    def _try_reset_tune(self, cfg, resets_used: int, why: str):
+        """在调律页执行一次重置调律（点按钮 + 冷却检查 + 确认 + 二次确认 + 关闭）
 
         重置清空首词条以外的全部词条；重置后有冷却期不可连重
-        （暂不做冷却判断）→ 本件硬限只重置一次。次数门槛：
-        本地计数达配置上限即止；按钮文本剩余次数另作硬门
-        （读不到数字 = 用尽，不重置）。成功后调律页保持打开。
+        → 本件硬限只重置一次。次数门槛：本地计数达配置上限即止；
+        按钮文本剩余次数另作硬门（读不到数字 = 用尽，不重置）。
+        点击重置按钮后 OCR check_1 区域，无「可调律重置」字样 =
+        装备在冷却期，点返回回到调律页并降级为跳过。
+
+        Returns: True=成功；False=正常拒绝（走 reset_exhausted）；
+                 str=冷却期拒绝（强制跳过，原因字符串）。
         """
         if resets_used >= 1:
             # 重置后进入冷却期，本次工作内不可再重置该件
@@ -795,11 +785,22 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         logger.info(f"  执行重置调律（剩余次数 OCR: {remaining}）：{why}")
         self.click_region(self.TUNE_SCENE, "reset_tune")
         self.wait_delay("page_refresh_wait")  # 重置确认弹窗
+        # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
+        check_text = self.ocr_scene(self.TUNE_SCENE, ["check_1"]).get(
+            "check_1", "") or ""
+        if "可调律重置" not in check_text:
+            logger.info(f"  冷却期检查未通过（check_1={check_text!r}），"
+                        "装备在冷却期，降级跳过")
+            self.click_region(self.TUNE_SCENE, "back")  # 关闭弹窗回调律页
+            self.wait_delay("step_interval")
+            return "装备重置冷却期，跳过该装备"
         self.click_region(self.TUNE_SCENE, "reset_confirm")
         # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
         self.wait_seconds(random.uniform(6.0, 7.0))
         self.click_region(self.TUNE_SCENE, "reset_confirm_2")
-        self.wait_delay("page_refresh_wait")  # 词条重置，调律页刷新
+        self.wait_delay("page_refresh_wait")  # 重置结果弹窗出现
+        self.click_region(self.TUNE_SCENE, "close_btn")  # 关闭 → 回到调律进度页
+        self.wait_delay("step_interval")
         return True
 
     def _recycle_current(self, equip_data: EquipmentData, detail_scene: str,

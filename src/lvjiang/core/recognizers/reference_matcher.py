@@ -14,7 +14,11 @@ import numpy as np
 from loguru import logger
 from PIL import Image
 
-from lvjiang.core.reference_db import ReferenceDatabase, ReferenceEntry
+from lvjiang.core.reference_db import (
+    DEFAULT_MATCH_THRESHOLD,
+    ReferenceDatabase,
+    ReferenceEntry,
+)
 
 
 @dataclass
@@ -40,21 +44,22 @@ class ReferenceMatcher:
         # result.confidence -> 0.85
     """
 
-    # ORB 特征匹配最低置信度
-    DEFAULT_THRESHOLD = 0.05
+    # ORB 特征匹配最低置信度（兼容别名，实际默认值读图库配置）
+    DEFAULT_THRESHOLD = DEFAULT_MATCH_THRESHOLD
     # ORB 特征点数量
     NFEATURES = 300
 
     def __init__(
         self,
         db: ReferenceDatabase,
-        threshold: float = DEFAULT_THRESHOLD,
+        threshold: float | None = None,
         target_size: tuple[int, int] | None = None,
     ):
         """
         Args:
             db: 参考图库数据库
-            threshold: 匹配置信度阈值
+            threshold: 匹配置信度阈值；None 则动态取图库配置
+                （references.yaml 的 match_threshold，local 覆盖 system）
             target_size: 统一缩放尺寸 (w, h)，None 则自动取第一张参考图尺寸
         """
         self._db = db
@@ -71,6 +76,13 @@ class ReferenceMatcher:
     @property
     def database(self) -> ReferenceDatabase:
         return self._db
+
+    @property
+    def threshold(self) -> float:
+        """生效阈值：显式传入 > 图库配置（含默认值）"""
+        if self._threshold is not None:
+            return self._threshold
+        return self._db.get_match_threshold()
 
     # ─── 加载与预计算 ─────────────────────────────────────
 
@@ -92,7 +104,7 @@ class ReferenceMatcher:
         # 确定目标尺寸
         if self._target_size is None:
             for entry in entries:
-                path = self._db.dir / entry.file
+                path = self._db.image_path(entry.file)
                 if path.exists():
                     try:
                         img = self._load_image(path)
@@ -108,7 +120,7 @@ class ReferenceMatcher:
 
         loaded_count = 0
         for entry in entries:
-            path = self._db.dir / entry.file
+            path = self._db.image_path(entry.file)
             if not path.exists():
                 logger.warning(f"参考图不存在，跳过: {entry.file}")
                 continue
@@ -216,7 +228,7 @@ class ReferenceMatcher:
                 best_score = score
                 best_entry = entry
 
-        if best_score < self._threshold or best_entry is None:
+        if best_score < self.threshold or best_entry is None:
             logger.debug(f"匹配置信度过低: {best_score:.3f}")
             return MatchResult(entry=None, label="", confidence=best_score, meta={})
 

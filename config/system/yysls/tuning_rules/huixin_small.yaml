@@ -1,6 +1,5 @@
 key: huixin_small
 name: 会心小外
-order: 20
 default_rating: excellent
 quality_thresholds:
   佩:

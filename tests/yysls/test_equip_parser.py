@@ -131,10 +131,15 @@ class TestParseSingleAffix:
         "[转]会心率 5.6%",
         "［转］会心率 5.6%",
         "[转1会心率 5.6%",   # 87cb2b3：OCR 将 ] 误识别为 1
+        "【转劲62.8",         # OCR 漏识别闭合括号
     ])
     def test_transfer_mark_variants(self, parser, text):
         affix = parser._parse_single_affix(text)
-        assert affix.name == "会心率"
+        if "劲" in text:
+            # 劲词条（转劲 = 转律后的劲属性）
+            assert affix.name == "劲"
+        else:
+            assert affix.name == "会心率"
         assert affix.is_transferred
 
     def test_wuxue_dynamic_affix(self, parser):

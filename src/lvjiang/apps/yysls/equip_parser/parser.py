@@ -393,6 +393,10 @@ class EquipmentParser:
         # OCR 常将 ］/] 误识别为 1，兼容 ［转1 / [转1 等变体
         is_transferred = bool(re.search(r"[［【\[]转[］\]】1]", text))
         text = re.sub(r"[［【\[]转[］\]】1]", "", text)
+        # OCR 容错：【转 无闭合括号（漏识别）
+        if not is_transferred and text.startswith(("【转", "［转", "[转")):
+            is_transferred = True
+            text = re.sub(r"^[［【\[]转", "", text)
 
         # ── 2. 过滤套装信息 ──
         if "套装" in text:

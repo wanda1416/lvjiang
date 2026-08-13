@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31（Phase 4 进行中：首启引导流程完成，e2e 回归补上两处 R8 反射面破口）
+> 最后更新：2026-07-31（Phase 4 进行中：正式签名完成，只剩真实业务工作流上机）
 
 ---
 
@@ -12,7 +12,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导完成；剩真实业务上机 + 正式签名 |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名完成；剩真实业务上机 |
 
 ---
 
@@ -174,9 +174,14 @@
     文件存在则签 release，不存在则走 debug 签名兜底（`assembleRelease` 始终能跑）
   - `.gitignore` 新增 `android/keystore.properties` / `*.jks` / `*.keystore`，
     避免密钥材料入库
-  - 用户侧待办：`keytool -genkeypair -v -keystore lvjiang.jks -keyalg RSA \
-    -keysize 2048 -validity 10000 -alias lvjiang`，再把路径与密码写入
-    `android/keystore.properties`（待补 `android/README-signing.md` 说明文档）
+  - 用户侧待办：已完成（见下条）
+- [x] **正式签名**（2026-07-31）
+  - `android/lvjiang.jks` 已生成（RSA 2048，有效期 10000 天，别名 lvjiang，
+    随机 24 位密码写入 `keystore.properties`，两者均在 .gitignore）
+  - `android/README-signing.md`：重建命令、备份提醒、签名变更需卸载重装
+  - apksigner 验证通过：Signer CN=lvjiang（不再是 debug 兜底）
+  - ⚠ 设备上现装的是 debug 签名的 release 包，下次装正式签名包必须先卸载
+    （会丢无障碍授权，需重新手动开），宜合并到下次上机验证时一起做
 - [x] **release 包实机复验**（2026-07-31）
   - 新增 `SelfTestProvider.kt`：release 包不可调试，`run-as` 读报告直接拒绝
     （"package not debuggable"），改走 ContentProvider 只读通道：
@@ -241,6 +246,6 @@
 
 ## 下一步操作（按顺序）
 
-1. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
-2. **正式签名**：生成 keystore + 写 `android/README-signing.md` 说明文档
+1. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）；
+   上机时顺带：卸载重装正式签名包 + 重开无障碍
 

@@ -41,6 +41,11 @@ def test_default_attach_to_window_returns_false():
     assert fake.attach_to_window("some_window") is False
 
 
+def test_default_stop_is_noop():
+    fake = _FakeCapture()
+    fake.stop()
+
+
 def test_default_capture_to_file_returns_false_when_capture_fails():
     # capture 返回 None → capture_to_file 返回 False
     fake = _FakeCapture(frame=None)
@@ -55,10 +60,8 @@ def test_desktop_capture_factory():
     assert isinstance(backend, DesktopCapture)
     assert isinstance(backend, CaptureBackend)
     # 清理工作线程
-    try:
-        backend._worker.join(timeout=0.1)
-    except Exception:
-        pass
+    backend.stop()
+    assert not backend._worker.is_alive()
 
 
 # ─── ADB 工厂 ────────────────────────────────────────────────

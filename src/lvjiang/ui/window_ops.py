@@ -230,6 +230,17 @@ class WindowOpsMixin:
         if not self._scrcpy_streaming:
             self._capture_preview()
 
+    def _stop_capture_backend(self):
+        """停止并丢弃当前截图后端（桌面/ADB/scrcpy 共用）。"""
+        if self._capture is None:
+            return
+        try:
+            self._capture.stop()
+        except Exception as e:
+            logger.debug(f"截图后端停止失败: {e}")
+        finally:
+            self._capture = None
+
     def _teardown_adb_backend(self):
         """清理 ADB 后端资源，用于重连或退出（仅清理资源，不改 UI）"""
         # 录屏进行中/待保存时先自动转正保存，再停止截图后端
@@ -237,12 +248,7 @@ class WindowOpsMixin:
             self._abort_screen_record("断连")
         self._device_ready = False
         self._scrcpy_streaming = False
-        if self._capture is not None:
-            try:
-                self._capture.stop()
-            except Exception:
-                pass
-            self._capture = None
+        self._stop_capture_backend()
         self._input = None
         self._device = None
 
@@ -283,6 +289,7 @@ class WindowOpsMixin:
             # Windows 模式：清除定位状态，但保留窗口选择
             self._target_window = None
             self._overlay.hide_border()
+            self._stop_capture_backend()
             self._set_connected_ui(False)
             self.btn_locate.setText("定位")
             self.lbl_window_info.setText("未定位窗口")

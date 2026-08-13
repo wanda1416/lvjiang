@@ -3,15 +3,15 @@
 从 config/session/profile.yaml 加载按模型归档的 key 定义。
 profile.yaml 结构：
 
-    daily:
+    quota:
       - key: niaoniao_of_week
         label: 袅袅(本周)
         period: week
         ...
-    realtime:
+    regen:
       - key: tili
         ...
-    resource:
+    stock:
       ...
 
 此模块仅负责定义加载，不负责运行时数据存储（运行时数据在 user.json 的 profile 节点）。
@@ -80,7 +80,7 @@ class ProfileSchema:
     按模型类型归档存储 key 定义，同时提供扁平视图和按模型查询。
     """
 
-    # 按模型类型归档：{"daily": [DailyKeyDef, ...], "realtime": [...], ...}
+    # 按模型类型归档：{"quota": [QuotaKeyDef, ...], "regen": [...], ...}
     keys_by_model: dict[str, list[KeyDef]] = field(default_factory=dict)
 
     # 内部缓存

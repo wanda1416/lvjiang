@@ -191,7 +191,7 @@ class ProfileDB:
             # history 记录
             if change_type is not None:
                 should_record = False
-                if change_type in ("action", "manual"):
+                if change_type in ("action", "override"):
                     # 用户主动操作始终记录
                     should_record = True
                 elif old_value != float(value):
@@ -241,7 +241,7 @@ class ProfileDB:
 
                 if change_type is not None:
                     should_record = False
-                    if change_type in ("action", "manual"):
+                    if change_type in ("action", "override"):
                         should_record = True
                     elif old_value != float(value):
                         should_record = True

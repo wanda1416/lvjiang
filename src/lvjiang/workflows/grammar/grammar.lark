@@ -20,6 +20,7 @@ start: (_NL | statement)*
           | implicit_eval_stmt
           | default_stmt
           | align_stmt
+          | find_stmt
           | import_stmt
           | def_stmt
           | call_proc_stmt
@@ -41,26 +42,38 @@ start: (_NL | statement)*
 // 语法：align [scene].[panel]
 align_stmt: "align"i bracket_expr "." bracket_expr _NL
 
-// click 支持三种目标：
+// find：在指定区域或全画布 OCR 搜索目标文字，产出可点击的 FoundRegion 变量
+// 与 scan/recognize 共享 scene_target + by_clause 语法
+// 两种形式：
+//   find [scene].[area] as $var by contains "文字"  — 指定区域搜索
+//   find as $var by contains "文字"                 — 全画布搜索
+find_stmt: "find"i scene_target "as"i var_ref by_clause _NL -> find_stmt_area
+         | "find"i "as"i var_ref by_clause _NL              -> find_stmt_full
+
+// click 支持四种目标：
 //   1. [scene].[panel][row][col] — panel 三级索引（点击格子中心）
 //   2. [scene].[region] / $var.[region] / ... — scene.area 引用
-//   3. (rx, ry) — 画布归一化坐标点
+//   3. $var — 裸变量引用（find 指令产出的 FoundRegion，直接点击文字位置）
+//   4. (rx, ry) — 画布归一化坐标点
 //
 // 注意：panel 与 scene.area 都以 [x].[y] 开头，必须用同一规则避免歧义。
 // transformer 根据 row/col 是否存在分派为 SceneRef 或 PanelRef。
 click_stmt: "click"i click_target wait_clause? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var                          -> click_scene_target
-            | coord_point                                             -> click_coord_target
+            | var_ref                                                  -> click_var_target
+            | coord_point                                              -> click_coord_target
 
-// drag 支持四种目标：
+// drag 支持五种目标：
 //   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽
 //   2. [scene].[panel] up|down|left|right [n]  — panel grid 级拖拽（中心起拖）
-//   3. scene.arrow — scene.arrow 引用
-//   4. (rx1, ry1) (rx2, ry2) — 两坐标点
+//   3. [scene].[point_1] [scene].[point_2]      — 两个命名点之间拖拽
+//   4. scene.arrow — scene.arrow 引用
+//   5. (rx1, ry1) (rx2, ry2) — 两坐标点
 drag_stmt: "drag"i drag_target drag_duration? drag_hold? wait_clause? _NL
 drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
            | const_or_var "." const_or_var drag_direction                       -> drag_grid_target
+           | const_or_var "." const_or_var const_or_var "." const_or_var        -> drag_point_pair_target
            | const_or_var "." const_or_var                                      -> drag_scene_target
            | coord_point coord_point                                            -> drag_coord_target
 

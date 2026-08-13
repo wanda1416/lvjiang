@@ -319,6 +319,25 @@ class CanvasConfig:
 
 
 @dataclass
+class FoundRegion:
+    """find 指令产出的文字区域（画布归一化坐标）
+
+    与 Region 不同：key 为动态生成的标识（或空字符串），
+    坐标来自 OCR 识别到的文字 bbox，而非预定义的场景布局。
+    可直接用于 click / drag 的目标。
+    """
+    x_ratio: float
+    y_ratio: float
+    w_ratio: float
+    h_ratio: float
+    text: str = ""  # 匹配到的文字内容（供调试日志使用）
+
+    def center_ratios(self) -> tuple[float, float]:
+        """区域中心的画布归一化坐标"""
+        return self.x_ratio + self.w_ratio / 2, self.y_ratio + self.h_ratio / 2
+
+
+@dataclass
 class Region:
     """单个区域实例（归一化坐标）
 
@@ -408,6 +427,18 @@ class Panel:
     span（间距）由校准算法自动检测，无需手动指定。
     min_visible 控制行计入有效的最小可见比例（0.5-1.0，默认 0.95）：
     调低可减少滚动半截行导致的少检一行，但必须 > 0.5 保证行中心可点击。
+
+    calibration 校准模式：
+    - "image"：仅图像检测，失败返回 None（当前默认行为）
+    - "even"：跳过图像检测，直接按 rows/cols 等分 panel 区域
+    - "auto"：先尝试图像检测，失败时降级为等分（默认值）
+
+    scroll_direction 滚动方向：
+    - "vertical"：纵向滚动（默认），rows 允许 expected-1
+    - "horizontal"：横向滚动，cols 允许 expected-1
+    - "both"：双向滚动，rows/cols 都允许 expected-1
+    - "none"：固定网格，rows/cols 必须精确匹配
+    约束：rows=1 时禁止 vertical/both，cols=1 时禁止 horizontal/both
     """
     key: str
     x_ratio: float
@@ -417,6 +448,25 @@ class Panel:
     cols: int = 6
     rows: int = 3
     min_visible: float = 0.95
+    calibration: str = "auto"  # "image" | "even" | "auto"
+    scroll_direction: str = "vertical"  # "vertical" | "horizontal" | "both" | "none"
+
+    _VALID_SCROLL_DIRECTIONS = ("vertical", "horizontal", "both", "none")
+
+    def __post_init__(self):
+        if self.scroll_direction not in self._VALID_SCROLL_DIRECTIONS:
+            raise ValueError(
+                f"scroll_direction 必须为 {self._VALID_SCROLL_DIRECTIONS} 之一，"
+                f"got {self.scroll_direction!r}"
+            )
+        if self.rows == 1 and self.scroll_direction in ("vertical", "both"):
+            raise ValueError(
+                f"rows=1 时 scroll_direction 不能为 {self.scroll_direction!r}（无内容可纵向滚动）"
+            )
+        if self.cols == 1 and self.scroll_direction in ("horizontal", "both"):
+            raise ValueError(
+                f"cols=1 时 scroll_direction 不能为 {self.scroll_direction!r}（无内容可横向滚动）"
+            )
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -432,6 +482,8 @@ class Panel:
             cols=int(d.get("cols", 6)),
             rows=int(d.get("rows", 3)),
             min_visible=float(d.get("min_visible", 0.95)),
+            calibration=str(d.get("calibration", "auto")),
+            scroll_direction=str(d.get("scroll_direction", "vertical")),
         )
 
 

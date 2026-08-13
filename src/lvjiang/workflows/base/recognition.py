@@ -3,7 +3,7 @@
 import numpy as np
 from loguru import logger
 
-from ...core.scene_registry import CanvasConfig, Region
+from ...core.scene_registry import CanvasConfig, FoundRegion, Region
 
 
 class _RecognitionMixin:
@@ -334,4 +334,98 @@ class _RecognitionMixin:
                 return region.key
 
         logger.info(f"by 材料识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
+        return ""
+
+    # ─── find 指令：文字搜索 ─────────────────────────────────
+
+    def find_text_in_region(
+        self,
+        target_value,
+        mode: str,
+        search_region: Region | None = None,
+    ) -> FoundRegion | str:
+        """在指定区域或全画布搜索目标文字，返回文字的画布归一化坐标区域
+
+        Args:
+            target_value: 搜索目标（str 或 list，由 mode 决定）
+            mode: equals | contains | equals_any | contains_any
+            search_region: 搜索区域（None 表示搜索全画布）
+
+        Returns:
+            命中: FoundRegion（画布归一化坐标）
+            未命中: 空字符串 ""
+        """
+        self._validate_by_target(target_value, mode)
+
+        img = self._capture.capture()
+        if img is None:
+            logger.error("find: 截图失败")
+            return ""
+
+        canvas = self._layout.get_canvas()
+        h, w = img.shape[:2]
+
+        # 计算搜索区域的像素坐标与画布偏移
+        canvas_px_x = canvas.x_ratio * w
+        canvas_px_y = canvas.y_ratio * h
+        canvas_px_w = canvas.w_ratio * w
+        canvas_px_h = canvas.h_ratio * h
+
+        if search_region is not None:
+            # 指定区域：裁剪后 OCR
+            crop_x1 = int(canvas_px_x + search_region.x_ratio * canvas_px_w)
+            crop_y1 = int(canvas_px_y + search_region.y_ratio * canvas_px_h)
+            crop_x2 = int(canvas_px_x + (search_region.x_ratio + search_region.w_ratio) * canvas_px_w)
+            crop_y2 = int(canvas_px_y + (search_region.y_ratio + search_region.h_ratio) * canvas_px_h)
+            crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
+            if crop.size == 0:
+                logger.warning("find: 搜索区域裁剪为空")
+                return ""
+        else:
+            # 全画布搜索
+            crop_x1, crop_y1 = int(canvas_px_x), int(canvas_px_y)
+            crop_x2, crop_y2 = int(canvas_px_x + canvas_px_w), int(canvas_px_y + canvas_px_h)
+            crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
+
+        ocr_results = self._ocr.recognize(crop)
+        if not ocr_results:
+            logger.debug("find: OCR 无结果")
+            return ""
+
+        # 遍历 OCR 结果，找第一个匹配的文字
+        for ocr_result in ocr_results:
+            text = ocr_result.text
+            if self._match_text(text, target_value, mode):
+                # 将 OCR bbox（裁剪图内像素坐标）转为画布归一化坐标
+                # bbox 是四角坐标 [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+                xs = [p[0] for p in ocr_result.bbox]
+                ys = [p[1] for p in ocr_result.bbox]
+                min_x, max_x = min(xs), max(xs)
+                min_y, max_y = min(ys), max(ys)
+
+                # 裁剪图内像素 → 全图像素 → 画布归一化
+                full_x1 = crop_x1 + min_x
+                full_y1 = crop_y1 + min_y
+                full_x2 = crop_x1 + max_x
+                full_y2 = crop_y1 + max_y
+
+                ratio_x1 = (full_x1 - canvas_px_x) / canvas_px_w
+                ratio_y1 = (full_y1 - canvas_px_y) / canvas_px_h
+                ratio_x2 = (full_x2 - canvas_px_x) / canvas_px_w
+                ratio_y2 = (full_y2 - canvas_px_y) / canvas_px_h
+
+                found = FoundRegion(
+                    x_ratio=ratio_x1,
+                    y_ratio=ratio_y1,
+                    w_ratio=ratio_x2 - ratio_x1,
+                    h_ratio=ratio_y2 - ratio_y1,
+                    text=text,
+                )
+                logger.info(
+                    f"find 命中: text={text!r} mode={mode} "
+                    f"region=({ratio_x1:.3f},{ratio_y1:.3f},{ratio_x2 - ratio_x1:.3f},{ratio_y2 - ratio_y1:.3f})"
+                )
+                return found
+
+        logger.debug(f"find 未命中: target={target_value!r} mode={mode}")
         return ""

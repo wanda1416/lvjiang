@@ -115,39 +115,6 @@ if $at_haoling
    click [game_menu_page].[back] after wait $step_interval
 end
 
-# 首页 → 江湖号令页：菜单 → 上滑翻页（最多两次）识别门派 → 门派首页 → 江湖号令
-def back_to_haoling()
-   click [game_main_page].[menu] after wait $step_interval
-   loop 2
-      drag [general_control].[menu_up] after wait $step_interval
-      scan [game_menu_page].[menpai] as $menpai_key by contains "门派"
-      if $menpai_key
-         break
-      end
-   end
-   if not $menpai_key
-      log "菜单上滑两次仍未识别到门派，无法返回江湖号令页"
-      return
-   end
-   click [game_menu_page].$menpai_key after wait $step_interval
-   # 门派页三种形态：有门派（基底，入口文字「江湖号令」）
-   # / 无门无派（no_school 视图，入口换成 haoling_2）
-   # / 问津（wenjin 视图，入口换成 haoling_3）
-   scan [ui_school_main].[haoling] as $haoling_key by contains "江湖号令"
-   if $haoling_key
-      click [ui_school_main].$haoling_key after wait $step_interval
-   else
-      scan [ui_school_main].[haoling_2] as $haoling_key by contains "号令"
-      if $haoling_key
-         log "未读到江湖号令，按无门无派处理，改点号令入口"
-         click [ui_school_main].$haoling_key after wait $step_interval
-      else
-         log "haoling 与 haoling_2 均未识别，按问津视图改点 haoling_3"
-         click [ui_school_main].[haoling_3] after wait $step_interval
-      end
-   end
-end
-
 # 领取奖励：动作完成后再次点击任务标签领取
 # 调用时必定已在号令页（状态由各动作保证：非末个任务动作结束后
 # 主动返回；末个任务需领奖时动作内也已返回），无需再扫描定位。
@@ -273,4 +240,72 @@ end
 # 双人：动作暂未实现
 def action_shuangren($label)
    log "双人动作暂未实现"
+end
+
+# 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
+# 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
+def back_to_haoling_1()
+   click [game_main_page].[menu] after wait $step_interval
+
+   # 在菜单区域搜索「门派」，可能需要下滑翻页
+   find [game_menu_page].[menu] as $found by contains "门派"
+   if not $found
+      drag [general_control].[menu_up] after wait $step_interval
+      find [game_menu_page].[menu] as $found by contains "门派"
+   end
+   if not $found
+      log "找不到门派，请手动定位后继续"
+      eval pause("找不到「门派」，请手动定位到门派入口后点击确定")
+      find [game_menu_page].[menu] as $found by contains "门派"
+   end
+   if not $found
+      log "仍未找到门派，无法前往江湖号令页"
+      return
+   end
+   click $found after wait $step_interval
+
+   # 门派页三种形态均含「号令」文字，find 统一搜索
+   find [ui_school_main].[haoling] as $found by contains "号令"
+   if not $found
+      log "找不到江湖号令，请手动定位后继续"
+      eval pause("找不到「江湖号令」，请手动定位到入口后点击确定")
+      find [ui_school_main].[haoling] as $found by contains "号令"
+   end
+   if not $found
+      log "仍未找到江湖号令入口"
+      return
+   end
+   click $found after wait $step_interval
+end
+
+def back_to_haoling()
+   click [game_main_page].[menu] after wait $step_interval
+   loop 2
+      drag [general_control].[menu_up] after wait $step_interval
+      scan [game_menu_page].[menpai] as $menpai_key by contains "门派"
+      if $menpai_key
+         break
+      end
+   end
+   if not $menpai_key
+      log "菜单上滑两次仍未识别到门派，无法返回江湖号令页"
+      return
+   end
+   click [game_menu_page].$menpai_key after wait $step_interval
+   # 门派页三种形态：有门派（基底，入口文字「江湖号令」）
+   # / 无门无派（no_school 视图，入口换成 haoling_2）
+   # / 问津（wenjin 视图，入口换成 haoling_3）
+   scan [ui_school_main].[haoling] as $haoling_key by contains "江湖号令"
+   if $haoling_key
+      click [ui_school_main].$haoling_key after wait $step_interval
+   else
+      scan [ui_school_main].[haoling_2] as $haoling_key by contains "号令"
+      if $haoling_key
+         log "未读到江湖号令，按无门无派处理，改点号令入口"
+         click [ui_school_main].$haoling_key after wait $step_interval
+      else
+         log "haoling 与 haoling_2 均未识别，按问津视图改点 haoling_3"
+         click [ui_school_main].[haoling_3] after wait $step_interval
+      end
+   end
 end

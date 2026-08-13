@@ -59,7 +59,9 @@
       "h_ratio": 0.3186822608543458,
       "cols": 6,
       "rows": 2,
-      "min_visible": 0.95
+      "min_visible": 0.95,
+      "calibration": "auto",
+      "scroll_direction": "vertical"
     },
     {
       "key": "types",
@@ -69,7 +71,9 @@
       "h_ratio": 0.06687440502189657,
       "cols": 4,
       "rows": 1,
-      "min_visible": 0.95
+      "min_visible": 0.95,
+      "calibration": "auto",
+      "scroll_direction": "horizontal"
     }
   ]
 }

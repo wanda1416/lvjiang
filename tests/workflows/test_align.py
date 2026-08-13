@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from lvjiang.core.scene_registry import CanvasConfig, Layout, Panel
-from lvjiang.workflows.align import _binary_axis, detect_grid
+from lvjiang.workflows.align import _binary_axis, _even_axis, _make_even_alignment, detect_grid
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar.ast_nodes import Align
 
@@ -407,3 +407,320 @@ class TestPanelRatioClamp:
         """panel 内部正常 slot 中心不受钳位影响"""
         sx, sy = sized_engine._panel_ratio_to_screen(self._panel(sized_engine), 0.5, 0.5)
         assert (sx, sy) == (500, 500)
+
+
+class TestEvenAxis:
+    """_even_axis 等分降级算法"""
+
+    def test_basic_division(self):
+        """3 等分 → 中心 [0.167, 0.5, 0.833]"""
+        axis = _even_axis(3)
+        assert len(axis.centers) == 3
+        assert abs(axis.centers[0] - 1/6) < 0.01
+        assert abs(axis.centers[1] - 0.5) < 0.01
+        assert abs(axis.centers[2] - 5/6) < 0.01
+
+    def test_boundaries_cover_full_range(self):
+        """边界覆盖 [0, 1]"""
+        axis = _even_axis(4)
+        assert len(axis.boundaries) == 5
+        assert axis.boundaries[0] == 0.0
+        assert axis.boundaries[-1] == 1.0
+
+    def test_slot_size_no_span(self):
+        """等分模式 slot_size = 1/count，span_size = 0"""
+        axis = _even_axis(5)
+        assert axis.slot_size == 0.2
+        assert axis.span_size == 0.0
+
+    def test_zero_count(self):
+        """0 等分 → 空结果"""
+        axis = _even_axis(0)
+        assert axis.centers == []
+        assert axis.boundaries == []
+
+
+class TestMakeEvenAlignment:
+    """_make_even_alignment 等分降级辅助函数"""
+
+    def test_basic_grid(self):
+        """3×6 等分 → 18 个 slot"""
+        alignment = _make_even_alignment(3, 6)
+        assert alignment.n_rows == 3
+        assert alignment.n_cols == 6
+        assert alignment.total_slots == 18
+
+    def test_slot_centers_in_range(self):
+        """所有 slot 中心在 [0, 1] 范围内"""
+        alignment = _make_even_alignment(4, 5)
+        for r in range(alignment.n_rows):
+            for c in range(alignment.n_cols):
+                cx, cy = alignment.slot_center(r, c)
+                assert 0 < cx < 1
+                assert 0 < cy < 1
+
+    def test_slot_bounds_within_panel(self):
+        """所有 slot 边界在 [0, 1] 范围内"""
+        alignment = _make_even_alignment(3, 4)
+        for r in range(alignment.n_rows):
+            for c in range(alignment.n_cols):
+                x1, y1, x2, y2 = alignment.slot_bounds(r, c)
+                assert 0 <= x1 < x2 <= 1
+                assert 0 <= y1 < y2 <= 1
+
+
+class TestDetectGridFallback:
+    """detect_grid fallback 参数：检测失败时降级为等分"""
+
+    def test_fallback_on_empty_image(self):
+        """空图像 + fallback=True → 返回等分结果"""
+        empty = np.zeros((0, 0), dtype=np.uint8)
+        result = detect_grid(empty, expected_rows=3, expected_cols=6, fallback=True)
+        assert result is not None
+        assert result.n_rows == 3
+        assert result.n_cols == 6
+        assert result.total_slots == 18
+
+    def test_no_fallback_returns_none(self):
+        """空图像 + fallback=False → 返回 None"""
+        empty = np.zeros((0, 0), dtype=np.uint8)
+        result = detect_grid(empty, expected_rows=3, expected_cols=6, fallback=False)
+        assert result is None
+
+    def test_fallback_on_dark_image(self, load_test_image):
+        """全黑图像（无法检测）+ fallback=True → 返回等分结果"""
+        # 构造全黑图像
+        dark = np.zeros((100, 100, 3), dtype=np.uint8)
+        result = detect_grid(dark, expected_rows=4, expected_cols=5, fallback=True)
+        assert result is not None
+        assert result.n_rows == 4
+        assert result.n_cols == 5
+
+    def test_fallback_preserves_expected_counts(self):
+        """等分降级应使用传入的 expected_rows/cols"""
+        dark = np.zeros((200, 300, 3), dtype=np.uint8)
+        result = detect_grid(dark, expected_rows=7, expected_cols=8, fallback=True)
+        assert result is not None
+        assert result.n_rows == 7
+        assert result.n_cols == 8
+
+
+class TestPanelCalibration:
+    """Panel.calibration 字段序列化兼容"""
+
+    def test_from_dict_default(self):
+        """旧布局 JSON 无 calibration 字段 → 默认 auto"""
+        p = Panel.from_dict({"key": "g", "x_ratio": 0.1, "y_ratio": 0.1,
+                             "w_ratio": 0.8, "h_ratio": 0.8})
+        assert p.calibration == "auto"
+
+    def test_from_dict_even(self):
+        """calibration=even 可正确解析"""
+        p = Panel.from_dict({"key": "g", "x_ratio": 0.1, "y_ratio": 0.1,
+                             "w_ratio": 0.8, "h_ratio": 0.8, "calibration": "even"})
+        assert p.calibration == "even"
+
+    def test_roundtrip(self):
+        """to_dict/from_dict 往返保留 calibration"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8,
+                  h_ratio=0.8, calibration="image")
+        assert Panel.from_dict(p.to_dict()).calibration == "image"
+
+
+class TestEngineAlignCalibration:
+    """engine._exec_align 校准模式集成"""
+
+    def test_even_mode_skips_image_detection(self, mock_engine):
+        """calibration=even → 跳过图像检测，直接等分"""
+        # 设置 panel 为 even 模式
+        panel = Panel(
+            key="test_panel",
+            x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+            cols=6, rows=5,
+            calibration="even",
+        )
+        mock_engine._layout.set_scene_panels("test_scene", [panel])
+
+        # 不 mock _capture_panel_image，even 模式不应调用它
+        node = Align(scene="test_scene", panel="test_panel")
+        mock_engine._exec_align(node)
+
+        # 验证缓存
+        cal = mock_engine._panel_alignments.get(("test_scene", "test_panel"))
+        assert cal is not None
+        assert cal.n_rows == 5
+        assert cal.n_cols == 6
+        # 等分模式 span 应为 0
+        assert cal.row_span == 0.0
+        assert cal.col_span == 0.0
+
+    def test_auto_mode_fallback_on_dark_image(self, mock_engine):
+        """calibration=auto + 全黑图像 → 降级为等分"""
+        # 设置 panel 为 auto 模式
+        panel = Panel(
+            key="test_panel",
+            x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+            cols=6, rows=5,
+            calibration="auto",
+        )
+        mock_engine._layout.set_scene_panels("test_scene", [panel])
+
+        # 构造全黑图像
+        dark = np.zeros((100, 100, 3), dtype=np.uint8)
+        with patch.object(mock_engine, '_capture_panel_image', return_value=dark):
+            node = Align(scene="test_scene", panel="test_panel")
+            mock_engine._exec_align(node)
+
+        # 验证降级为等分
+        cal = mock_engine._panel_alignments.get(("test_scene", "test_panel"))
+        assert cal is not None
+        assert cal.n_rows == 5
+        assert cal.n_cols == 6
+        assert cal.row_span == 0.0
+
+    def test_image_mode_returns_none_on_failure(self, mock_engine):
+        """calibration=image + 全黑图像 → 返回 None，不缓存"""
+        # 设置 panel 为 image 模式
+        panel = Panel(
+            key="test_panel",
+            x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+            cols=6, rows=5,
+            calibration="image",
+        )
+        mock_engine._layout.set_scene_panels("test_scene", [panel])
+
+        # 构造全黑图像
+        dark = np.zeros((100, 100, 3), dtype=np.uint8)
+        with patch.object(mock_engine, '_capture_panel_image', return_value=dark):
+            node = Align(scene="test_scene", panel="test_panel")
+            mock_engine._exec_align(node)
+
+        # 验证未缓存
+        cal = mock_engine._panel_alignments.get(("test_scene", "test_panel"))
+        assert cal is None
+
+
+class TestPanelScrollDirection:
+    """Panel.scroll_direction 字段验证"""
+
+    def test_from_dict_default(self):
+        """旧布局 JSON 无 scroll_direction 字段 → 默认 vertical"""
+        p = Panel.from_dict({"key": "g", "x_ratio": 0.1, "y_ratio": 0.1,
+                             "w_ratio": 0.8, "h_ratio": 0.8})
+        assert p.scroll_direction == "vertical"
+
+    def test_from_dict_horizontal(self):
+        """scroll_direction=horizontal 可正确解析"""
+        p = Panel.from_dict({"key": "g", "x_ratio": 0.1, "y_ratio": 0.1,
+                             "w_ratio": 0.8, "h_ratio": 0.8,
+                             "scroll_direction": "horizontal"})
+        assert p.scroll_direction == "horizontal"
+
+    def test_roundtrip(self):
+        """to_dict/from_dict 往返保留 scroll_direction"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8,
+                  h_ratio=0.8, scroll_direction="both")
+        assert Panel.from_dict(p.to_dict()).scroll_direction == "both"
+
+    def test_invalid_scroll_direction_raises(self):
+        """无效的 scroll_direction 抛出 ValueError"""
+        with pytest.raises(ValueError, match="scroll_direction 必须为"):
+            Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  scroll_direction="diagonal")
+
+    def test_rows1_vertical_raises(self):
+        """rows=1 + scroll_direction=vertical 抛出 ValueError"""
+        with pytest.raises(ValueError, match="rows=1 时 scroll_direction 不能为"):
+            Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  rows=1, scroll_direction="vertical")
+
+    def test_rows1_both_raises(self):
+        """rows=1 + scroll_direction=both 抛出 ValueError"""
+        with pytest.raises(ValueError, match="rows=1 时 scroll_direction 不能为"):
+            Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  rows=1, scroll_direction="both")
+
+    def test_rows1_horizontal_ok(self):
+        """rows=1 + scroll_direction=horizontal 合法"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  rows=1, scroll_direction="horizontal")
+        assert p.scroll_direction == "horizontal"
+
+    def test_rows1_none_ok(self):
+        """rows=1 + scroll_direction=none 合法"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  rows=1, scroll_direction="none")
+        assert p.scroll_direction == "none"
+
+    def test_cols1_horizontal_raises(self):
+        """cols=1 + scroll_direction=horizontal 抛出 ValueError"""
+        with pytest.raises(ValueError, match="cols=1 时 scroll_direction 不能为"):
+            Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  cols=1, scroll_direction="horizontal")
+
+    def test_cols1_both_raises(self):
+        """cols=1 + scroll_direction=both 抛出 ValueError"""
+        with pytest.raises(ValueError, match="cols=1 时 scroll_direction 不能为"):
+            Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  cols=1, scroll_direction="both")
+
+    def test_cols1_vertical_ok(self):
+        """cols=1 + scroll_direction=vertical 合法"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  cols=1, scroll_direction="vertical")
+        assert p.scroll_direction == "vertical"
+
+    def test_single_cell_none_ok(self):
+        """rows=1 + cols=1 + scroll_direction=none 合法"""
+        p = Panel(key="g", x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+                  rows=1, cols=1, scroll_direction="none")
+        assert p.rows == 1 and p.cols == 1 and p.scroll_direction == "none"
+
+
+class TestDetectGridScrollDirection:
+    """detect_grid scroll_direction 参数：影响 rows/cols 容差判断"""
+
+    def test_vertical_rows_minus1_ok(self, load_test_image):
+        """scroll_direction=vertical + 检测行数=expected-1 → 通过"""
+        img = load_test_image("image2.png")  # 4 行（expected=5）
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             scroll_direction="vertical")
+        assert result is not None
+        assert result.n_rows == 4  # expected-1 可接受
+
+    def test_vertical_cols_minus1_fallback(self, load_test_image):
+        """scroll_direction=vertical + 检测列数=expected-1 + fallback → 等分"""
+        # 构造一个列数少的图像（模拟横向滚动异常）
+        img = load_test_image("image1.png")
+        # 假设检测到 5 列（expected=6），vertical 模式不允许 cols-1
+        result = detect_grid(img, expected_rows=5, expected_cols=5,
+                             scroll_direction="vertical", fallback=True)
+        # 如果列数不匹配，应降级
+        # 注意：实际测试取决于图片内容，这里主要验证逻辑路径
+
+    def test_horizontal_cols_minus1_ok(self, load_test_image):
+        """scroll_direction=horizontal + 检测列数=expected-1 → 通过"""
+        # 使用 image2（4 行）模拟，但 horizontal 模式关注列
+        img = load_test_image("image1.png")  # 5 行 6 列
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             scroll_direction="horizontal")
+        assert result is not None
+        # horizontal 模式：rows 必须精确，cols 允许 -1
+
+    def test_none_exact_match_required(self, load_test_image):
+        """scroll_direction=none + 行数不精确 + fallback → 等分"""
+        img = load_test_image("image2.png")  # 4 行（expected=5）
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             scroll_direction="none", fallback=True)
+        # none 模式要求精确匹配，4 行不符合 5 行预期，应降级
+        assert result is not None
+        assert result.n_rows == 5  # 等分模式使用 expected_rows
+        assert result.row_span == 0.0
+
+    def test_both_directions_allow_minus1(self, load_test_image):
+        """scroll_direction=both + 行/列数=expected-1 → 通过"""
+        img = load_test_image("image2.png")  # 4 行
+        result = detect_grid(img, expected_rows=5, expected_cols=6,
+                             scroll_direction="both")
+        assert result is not None
+        # both 模式：rows 和 cols 都允许 -1

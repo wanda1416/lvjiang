@@ -195,6 +195,63 @@ def test_drag_const_or_var():
     print("  drag [scene].[arrow] 0.5 hold 0.2: OK")
 
 
+def test_drag_point_pair():
+    """drag [scene].[point_1] [scene].[point_2] — 两个命名点之间拖拽"""
+    print("\n=== 测试 drag 点对模式 ===")
+
+    # 静态场景名 + 静态点名
+    program = parse_text("drag [game_login_page].[point_1] [game_login_page].[point_2]")
+    n = program.body[0]
+    assert isinstance(n, Drag)
+    assert n.from_scene_ref is not None
+    assert n.to_scene_ref is not None
+    assert n.from_scene_ref.scene == "game_login_page"
+    assert n.from_scene_ref.region == "point_1"
+    assert n.to_scene_ref.scene == "game_login_page"
+    assert n.to_scene_ref.region == "point_2"
+    print("  drag [scene].[p1] [scene].[p2]: OK")
+
+    # 跨场景点对
+    program = parse_text("drag [scene_a].[pt1] [scene_b].[pt2]")
+    n = program.body[0]
+    assert isinstance(n, Drag)
+    assert n.from_scene_ref.scene == "scene_a"
+    assert n.from_scene_ref.region == "pt1"
+    assert n.to_scene_ref.scene == "scene_b"
+    assert n.to_scene_ref.region == "pt2"
+    print("  drag 跨场景点对: OK")
+
+    # 动态变量场景名和点名
+    program = parse_text("drag $scene.$from_pt $scene.$to_pt")
+    n = program.body[0]
+    assert isinstance(n, Drag)
+    assert isinstance(n.from_scene_ref.scene, VarRef)
+    assert n.from_scene_ref.scene.name == "scene"
+    assert isinstance(n.from_scene_ref.region, VarRef)
+    assert n.from_scene_ref.region.name == "from_pt"
+    assert isinstance(n.to_scene_ref.scene, VarRef)
+    assert isinstance(n.to_scene_ref.region, VarRef)
+    print("  drag $scene.$from_pt $scene.$to_pt: OK")
+
+    # 带 duration 和 hold
+    program = parse_text("drag [s].[p1] [s].[p2] 0.5 hold 0.2")
+    n = program.body[0]
+    assert isinstance(n, Drag)
+    assert n.from_scene_ref is not None
+    assert n.to_scene_ref is not None
+    assert isinstance(n.duration, Literal)
+    assert n.duration.value == 0.5
+    assert n.hold == 0.2
+    print("  drag 点对带 duration + hold: OK")
+
+    # 带 wait 子句
+    program = parse_text("drag [s].[p1] [s].[p2] after wait step_interval")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Drag)
+    assert isinstance(program.body[1], Wait)
+    print("  drag 点对带 after wait: OK")
+
+
 # ─── wait 指令测试 ──────────────────────────────────────────
 
 def test_wait():

@@ -19,7 +19,7 @@ loop while 1 == 1
     if not $btn
        log "找不到自选散本，结束"
        call go_back()
-       return
+       return -1
     end
 
     click [training_xinfa].$btn after wait step_interval
@@ -31,7 +31,7 @@ loop while 1 == 1
     if not $confirm
        log "书票数量不足，结束"
        call go_back()
-       return
+       return -1
     end
 
     click [training_xinfa].[add_max] after wait step_interval

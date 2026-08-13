@@ -21,8 +21,11 @@ from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -33,6 +36,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -51,6 +55,7 @@ from ..config.profile_models import (
     KeyDef,
     QuotaKeyDef,
     RegenKeyDef,
+    StepDef,
     StockKeyDef,
 )
 from ..config.profile_store import (
@@ -59,6 +64,10 @@ from ..config.profile_store import (
     migrate_from_legacy,
     save_groups,
     set_active_group,
+)
+from ..config.user_profile import (
+    get_profile_config,
+    save_profile_config,
 )
 from ..profile.profile_db import db_get_history, db_read_all, db_upsert
 from ..profile.profile_engine import compute_regen_entry
@@ -845,9 +854,12 @@ class ProfileOverviewTab(QWidget):
         if delta == 0:
             return
 
+        # Cell 编辑路径默认取 kd.sources 的第一个来源（为空则写空）
+        cell_source = kd.sources[0] if kd.sources else ""
+
         self._adjust_value(
             user_name, model_type, key_str, kd, current_value, delta,
-            is_action=True,
+            is_action=True, source=cell_source,
         )
 
     @staticmethod
@@ -896,12 +908,13 @@ class ProfileOverviewTab(QWidget):
         value,
         change_type: str = "override",
         detail: str = "",
+        source: str = "",
     ):
         """将值写入 profile DB（带变更历史记录）"""
         try:
             db_upsert(
                 user_name, model_type, key, value,
-                change_type=change_type, detail=detail,
+                change_type=change_type, detail=detail, source=source,
             )
             logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
         except Exception as e:
@@ -952,7 +965,7 @@ class ProfileOverviewTab(QWidget):
         menu.setTitle(f"{kd.label} ({user_name})")
 
         # 获取该字段的自定义 steps（Quota、Regen 和 Stock 模型支持）
-        kd_steps: list[int] = []
+        kd_steps: list[StepDef] = []
         kd_increment_only = False
         if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
             kd_steps = kd.steps
@@ -963,20 +976,21 @@ class ProfileOverviewTab(QWidget):
             kd_steps = kd.steps
 
         if kd_steps:
-            # 有自定义 steps：只展示用户定义的幅度
+            # 有自定义 steps：只展示用户定义的幅度，标签优先显示来源
             for step in kd_steps:
-                if step > 0:
-                    label = f"+{step}"
-                elif step < 0:
-                    label = str(step)
+                if step.value > 0:
+                    val_label = f"+{step.value}"
+                elif step.value < 0:
+                    val_label = str(step.value)
                 else:
                     continue
+                label = f"{step.source}({val_label})" if step.source else val_label
                 action = menu.addAction(label)
                 if action:
                     action.triggered.connect(
                         lambda checked, s=step: self._adjust_value(
-                            user_name, model_type, key_str, kd, current_value, s,
-                            is_action=True,
+                            user_name, model_type, key_str, kd, current_value, s.value,
+                            is_action=True, source=s.source,
                         )
                     )
             menu.addSeparator()
@@ -1046,11 +1060,13 @@ class ProfileOverviewTab(QWidget):
         current_value,
         delta: int | float,
         is_action: bool = True,
+        source: str = "",
     ):
         """增减数值并写回
 
         is_action: True 表示通过 steps 按钮触发（会触发 Daily->Resource 同步），
                      False 表示手动编辑（不触发同步）。
+        source: 变更来源描述，随 history 一并记录。
         """
         new_value = current_value + delta
 
@@ -1081,6 +1097,10 @@ class ProfileOverviewTab(QWidget):
         if new_value == current_value:
             return
 
+        # 计算 clamp 后的真实 delta（与 DB 实际写入的变化量一致），
+        # 用于 Quota->Stock 同步，避免同步量超过实际变化量导致数据漂移。
+        actual_delta = new_value - current_value
+
         # 确定 detail 信息
         if is_action:
             detail = f"delta:{delta:+g}"
@@ -1091,6 +1111,7 @@ class ProfileOverviewTab(QWidget):
             user_name, model_type, key, new_value,
             change_type="action" if is_action else "override",
             detail=detail,
+            source=source,
         )
 
         # Quota -> Stock 单向同步（仅 steps 动作触发）
@@ -1100,7 +1121,7 @@ class ProfileOverviewTab(QWidget):
             and isinstance(kd, QuotaKeyDef)
             and kd.sync_to
         ):
-            self._sync_to_stock(user_name, kd, delta)
+            self._sync_to_stock(user_name, kd, actual_delta, source)
 
         # 刷新表格
         current_group = self._get_current_group_name()
@@ -1108,8 +1129,14 @@ class ProfileOverviewTab(QWidget):
         if table:
             self._refresh_group(current_group, table)
 
-    def _sync_to_stock(self, user_name: str, quota_kd: QuotaKeyDef, delta: int | float) -> None:
-        """将 Quota 的变更同步到关联的 Stock"""
+    def _sync_to_stock(
+        self, user_name: str, quota_kd: QuotaKeyDef, delta: int | float, source: str = "",
+    ) -> None:
+        """将 Quota 的变更同步到关联的 Stock
+
+        source 优先级（语义：sync_source 为触发器来源，未填写时复用本次 action 来源）：
+            quota_kd.sync_source  >  本次 action 的 source
+        """
         stock_data = db_read_all(user_name).get(MODEL_STOCK, {})
         stock_entry = stock_data.get(quota_kd.sync_to, {})
         current_stock = stock_entry.get("value", 0) or 0
@@ -1117,11 +1144,99 @@ class ProfileOverviewTab(QWidget):
         self._write_profile_entry(
             user_name, MODEL_STOCK, quota_kd.sync_to, new_stock,
             change_type="action", detail=f"sync_from:{quota_kd.key}",
+            source=quota_kd.sync_source or source,
         )
         logger.debug(
             f"[ProfileTab] {user_name} quota.{quota_kd.key} 同步 {delta:+d} 到 "
             f"stock.{quota_kd.sync_to} = {new_stock}"
         )
+
+    def _ask_value_dialog(
+        self,
+        title: str,
+        hint: str,
+        prompt: str,
+        is_float: bool,
+        min_val: int,
+        sources: list[str],
+        initial_value: float = 0,
+        sync_checkbox: bool = False,
+        sync_default: bool = True,
+    ) -> tuple[float | int, str, bool, bool]:
+        """数值输入 + 来源下拉（可输入新来源）的通用对话框
+
+        sync_checkbox: 是否展示「同步变更依赖方」复选框
+        sync_default:  复选框的默认勾选状态
+
+        Returns: (value, source, sync_checked, ok)
+            sync_checked 仅在 sync_checkbox=True 时有意义，否则始终为 True。
+        """
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setMinimumWidth(320)
+        layout = QFormLayout(dialog)
+
+        hint_label = QLabel(hint)
+        layout.addRow(hint_label)
+
+        spin: QSpinBox | QDoubleSpinBox
+        if is_float:
+            ds = QDoubleSpinBox()
+            ds.setRange(min_val, 999999)
+            ds.setDecimals(4)
+            ds.setValue(initial_value)
+            spin = ds
+        else:
+            si = QSpinBox()
+            si.setRange(min_val, 999999)
+            si.setValue(int(initial_value))
+            spin = si
+        layout.addRow(prompt, spin)
+
+        combo = QComboBox()
+        combo.setEditable(True)
+        combo.addItems(sources)
+        combo.setPlaceholderText("选择或输入新来源")
+        layout.addRow("来源:", combo)
+
+        sync_check: QCheckBox | None = None
+        if sync_checkbox:
+            sync_check = QCheckBox("同步变更依赖方")
+            sync_check.setChecked(sync_default)
+            sync_check.setToolTip(
+                "勾选：按 action 语义处理，触发配额→资源的同步（如配置了 sync_to）。\n"
+                "取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
+            )
+            layout.addRow(sync_check)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addRow(buttons)
+
+        if dialog.exec():
+            sync_checked = sync_check.isChecked() if sync_check is not None else True
+            return spin.value(), combo.currentText().strip(), sync_checked, True
+        return 0, "", sync_default, False
+
+    def _register_new_source(self, kd: KeyDef, source: str) -> None:
+        """新来源自动追加到该 key 的来源词表并持久化到 profile.yaml
+
+        保存与内存修改原子化：save 失败时回滚内存词表，避免"会话内可见、重启后丢失"。
+        """
+        if not source or source in kd.sources:
+            return
+        kd.sources.append(source)
+        try:
+            save_profile_config(get_profile_config())
+        except Exception as e:
+            try:
+                kd.sources.remove(source)
+            except ValueError:
+                pass
+            logger.warning(f"持久化新来源 '{source}' 失败: {e}")
 
     def _adjust_value_custom(
         self,
@@ -1132,46 +1247,40 @@ class ProfileOverviewTab(QWidget):
         current_value,
         direction: int = 0,
     ):
-        """自定义增减数值
+        """自定义增减数值（带来源选择）
 
         direction: 1=增加，-1=减少，0=双向（输入正负值）
         """
-        from PyQt6.QtWidgets import QInputDialog
-
         # 根据 direction 设置输入范围和提示
         if direction > 0:
             min_val = 0
-            prompt = "输入增加量:"
+            prompt = "增加量:"
         elif direction < 0:
             min_val = 0
-            prompt = "输入减少量:"
+            prompt = "减少量:"
         else:
             min_val = -999999
-            prompt = "输入增减量（正数增加，负数减少）:"
+            prompt = "增减量（正增负减）:"
 
         if model_type == MODEL_REGEN:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
-            delta, ok = QInputDialog.getDouble(
-                self,
-                f"自定义增减 - {kd.label}",
-                f"当前值: {current_text}\n{prompt}",
-                0,
-                min_val,
-                999999,
-                4,
-            )
+            is_float = True
         else:
-            delta, ok = QInputDialog.getInt(
-                self,
-                f"自定义增减 - {kd.label}",
-                f"当前值: {int(current_value)}\n{prompt}",
-                0,
-                min_val,
-                999999,
-                1,
-            )
+            current_text = str(int(current_value))
+            is_float = False
+
+        value, source, _sync, ok = self._ask_value_dialog(
+            title=f"自定义增减 - {kd.label}",
+            hint=f"当前值: {current_text}",
+            prompt=prompt,
+            is_float=is_float,
+            min_val=min_val,
+            sources=kd.sources,
+        )
         if not ok:
             return
+
+        delta = float(value) if is_float else int(value)
 
         # 根据 direction 调整 delta 符号
         if direction > 0:
@@ -1188,8 +1297,13 @@ class ProfileOverviewTab(QWidget):
             )
             return
 
+        self._register_new_source(kd, source)
+
         # 自定义增减属于 action，触发 Quota->Stock 同步
-        self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=True)
+        self._adjust_value(
+            user_name, model_type, key, kd, current_value, delta,
+            is_action=True, source=source,
+        )
 
     def _override_value_custom(
         self,
@@ -1199,38 +1313,45 @@ class ProfileOverviewTab(QWidget):
         kd,
         current_value,
     ):
-        """覆写：直接设定绝对值，不触发 Quota->Stock 同步"""
-        from PyQt6.QtWidgets import QInputDialog
+        """覆写（编辑语义）：输入目标值，计算 delta 走 CAS 写入。
 
+        默认勾选「同步变更依赖方」→ 走 action 路径（触发 Quota->Stock 同步）。
+        取消勾选 → 退回旧覆写语义（仅写本 key，不触发 sync_to）。
+        """
         if model_type == MODEL_REGEN:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
-            new_value, ok = QInputDialog.getDouble(
-                self,
-                f"覆写 - {kd.label}",
-                f"当前值: {current_text}\n输入新值:",
-                current_value,
-                0,
-                999999,
-                4,
-            )
+            is_float = True
         else:
-            new_value, ok = QInputDialog.getInt(
-                self,
-                f"覆写 - {kd.label}",
-                f"当前值: {int(current_value)}\n输入新值:",
-                int(current_value),
-                0,
-                999999,
-            )
+            current_text = str(int(current_value))
+            is_float = False
+
+        value, source, sync_checked, ok = self._ask_value_dialog(
+            title=f"覆写 - {kd.label}",
+            hint=f"当前值: {current_text}",
+            prompt="新值:",
+            is_float=is_float,
+            min_val=0,
+            sources=kd.sources,
+            initial_value=current_value,
+            sync_checkbox=True,
+            sync_default=True,
+        )
         if not ok:
             return
 
+        new_value = value
         delta = new_value - current_value
         if delta == 0:
             return
 
-        # is_action=False → change_type="override"，不触发 sync
-        self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=False)
+        self._register_new_source(kd, source)
+
+        # sync_checked=True: 走 action 路径（触发 Quota->Stock 同步）
+        # sync_checked=False: 旧覆写语义（change_type="override"，不触发 sync）
+        self._adjust_value(
+            user_name, model_type, key, kd, current_value, delta,
+            is_action=sync_checked, source=source,
+        )
 
     def _show_history_dialog(
         self, user_name: str, model_type: str, key: str, key_label: str,
@@ -1240,13 +1361,13 @@ class ProfileOverviewTab(QWidget):
 
         dialog = QDialog(self)
         dialog.setWindowTitle(f"{key_label} — {user_name} 变更记录")
-        dialog.resize(620, 420)
+        dialog.resize(820, 420)
 
         layout = QVBoxLayout(dialog)
 
         table = QTableWidget()
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(["时间", "类型", "旧值", "新值", "详情"])
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels(["时间", "类型", "旧值", "新值", "来源", "详情"])
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
@@ -1256,8 +1377,15 @@ class ProfileOverviewTab(QWidget):
 
         header = table.horizontalHeader()
         if header is not None:
-            header.setStretchLastSection(True)
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            # 时间列：固定 140px（够放 "MM-DD HH:MM:SS"）
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            table.setColumnWidth(0, 140)
+            # 窄字段列（类型/旧值/新值/来源）：固定宽，不挤占详情列空间
+            for col, w in ((1, 60), (2, 70), (3, 70), (4, 100)):
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+                table.setColumnWidth(col, w)
+            # 详情列：stretch 占满剩余空间
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
 
         _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}
 
@@ -1280,7 +1408,8 @@ class ProfileOverviewTab(QWidget):
             table.setItem(row, 1, QTableWidgetItem(_TYPE_LABEL.get(ct, ct)))
             table.setItem(row, 2, QTableWidgetItem(old_str))
             table.setItem(row, 3, QTableWidgetItem(new_str))
-            table.setItem(row, 4, QTableWidgetItem(rec.get("detail", "")))
+            table.setItem(row, 4, QTableWidgetItem(rec.get("source", "")))
+            table.setItem(row, 5, QTableWidgetItem(rec.get("detail", "")))
 
         layout.addWidget(table)
         dialog.exec()

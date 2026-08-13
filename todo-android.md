@@ -1,6 +1,8 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31（配置架构重构完成：input_delay 拆 input_sim + delay_params，app.yaml 走 system/local 分层）
+> 最后更新：2026-07-31（六主题变更已提交并推送至 `20acde0`；装备分析上机前依赖面预检全绿，坐标绑定风险已排除）
+>
+> 上一次：配置架构重构完成（input_delay 拆 input_sim + delay_params，app.yaml 走 system/local 分层）
 
 ---
 
@@ -12,7 +14,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名 + 江湖号令实机跑通 + 悬浮面板打磨；剩其余业务流上机 |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导 + 正式签名 + 江湖号令实机跑通 + 悬浮面板打磨；剩其余业务流上机（上机前预检已就位，下一个跑 `equip_analysis`） |
 
 ---
 
@@ -50,7 +52,7 @@
 
 **Shizuku 保留为可选高级通道**（`screencap -p` 不受截图节流限制），两者接口形状一致，上层可按可用性择一。
 
-### 代码已就位（未提交）
+### 代码已就位（已随检查点 2 `926d55e` 提交）
 
 | 文件 | 职责 |
 |---|---|
@@ -269,7 +271,20 @@
     `wf` 变 `class`、`to_equipment` 已注册、`PyQt6 not in sys.modules`；
     ruff + pytest（exit 0）全绿
 
-### 本轮改动文件（未提交）
+### 本轮改动文件（已提交并推送）
+
+按主题拆成 6 个提交，`master` 与 `origin/master` 已同步（最新 `20acde0`）：
+
+| 提交 | 主题 |
+|---|---|
+| `54fb43e` `feat(tuning_rules)` | 仅首词条逐规则化 + 首词条方向比较 + 潜力日志改进 |
+| `ceb447f` `feat(rules_editor)` | 调律门槛迁基础配置页 + 行为页仅首词条列 + 布局优化 |
+| `9ecb626` `fix(ondevice)` | 设备端插件加载缺失修复 + 自动调律暴露 |
+| `6e1fe9c` `chore(android)` | versionCode 9→10 + todo 记录插件加载修复 |
+| `f2c28bb` `chore(rules-data)` | 会心大小号玩法与首词条数据更新 |
+| `20acde0` `fix(app)` | 退出时先停 loguru 异步写入线程，避免退出挂起 |
+
+涉及文件：
 
 | 文件 | 改动 |
 |---|---|
@@ -293,6 +308,54 @@
 | `.tooling/run_selftest.py --no-install` | 同一 APK 连跑多个 target，避免反复装包 |
 | `.tooling/run_selftest.py --release` | 用 release APK 装包跑自检，验证 R8 没砍反射 |
 | `android/app/proguard-rules.pro` | R8 keep 规则：Chaquopy 反射访问面 + 服务构造器 + AIDL + ONNX |
+| `scripts/manual-tests/preflight_device_workflows.py` | 上机前预检（DSL 侧）：走设备端真实发现路径 + session 活动布局，只解析不执行 |
+| `scripts/manual-tests/preflight_class_refs.py` | 上机前预检（类实现侧）：AST 抽 Python 字面量坐标调用比对布局 |
+| `tests/workflows/test_system_wf_refs_gate.py` (13 用例) | **CI 门禁**：系统布局 × 全部系统 .wf 的引用绑定，漏绑当场红 |
+| `WorkflowEngine.validate_only()` | 只解析 + 两道静态校验的正式 API，判据与真执行共用 `_load_and_validate` |
+
+### 上机前依赖面预检（2026-07-31，装备分析上机前置）
+
+江湖号令上机前是靠「依赖面核查全绿」才敢点第一下的。装备分析按同一标准补了两条
+校验路径，都在 PC 上跑、零点击 —— 实机失败的代价是游戏已经被点到别处去了。
+
+- **DSL 侧**：`preflight_device_workflows.py` 按设备端同一条路径（`ensure_loaded` →
+  `_default_layout_name` → `_load_layout`）装配引擎，再调 `WorkflowEngine.validate_only()`。
+  实测 6 项中 4 个 DSL 脚本（`equip_analysis` / `auto_purchase_xinde` /
+  `activity_jianghu` / `mengzhuzhengfeng`）**全部通过，失败 0 项**
+- **类实现侧**：静态引用收集器只认 DSL 语法，`auto_tuning` / `single_tuning` 在 Python
+  里用 `self.click_region("场景", "key")` 引坐标，是校验盲区。`preflight_class_refs.py`
+  用 AST 抽出调用点（`self.CONST` 形式经类属性求值）再比对布局：`auto_tuning`
+  21 组 + `single_tuning` 17 组去重引用，**缺失 0 处**
+
+「只校验」已从短路私有 `_exec_body` 的 hack 沉成正式 API：`WorkflowEngine.validate_only()`
+与 `_execute_dsl` 共用 `_load_and_validate`（解析 + import 链 + 两道校验），因此不会
+出现「预检放过、上机仍炸」的判据偏差。
+
+**已进 CI 门禁**：`tests/workflows/test_system_wf_refs_gate.py` 对「系统布局 × 全部系统
+.wf」参数化跑 `validate_only`（12 个 .wf × 1 个布局 + 1 项清单非空断言）。固定只读
+`config/system` 层：随 APK 分发到设备端的就是这一层，且不受本机 `config/local` 影子
+文件影响。`_` 前缀的编辑器临时脚本（`_editor_run.wf` / `_recorded.wf` / `_testwf/`）
+不入门禁 —— 它们随上一次编辑器操作变化，不是分发物。门禁有效性已反向验证：
+拿空布局跑 `equip_analysis.wf` 报「12 处引用在当前布局中找不到」，不是空跑通过。
+
+逐场景复核关键 key 的结果：
+
+| 场景 | 绑定量 | 复核结果 |
+|---|---|---|
+| `equip_weapon_detail` | 16 区域 | `more_func` ✅，`SCAN_FIELDS` 8 字段全绑 |
+| `equip_armor_detail` | 17 区域 | 同上 |
+| `equip_tune_detail` | 23 区域 | `back` / `reset_tune` / `reset_confirm` / `reset_confirm_2` ✅ |
+| `bag_equip_detail` | 36 区域 + panel `bag_grid` | `back` ✅，8 个部位 key 全绑 |
+
+**共同盲区**：场景参数非字面量时两条路径都只校验到场景一级 —— 即 DSL 的
+`click [bag_equip_detail].$slot` 与类实现的 `click_region(GRID_SCENE, slot)`（slot 是
+循环变量）。`equip_analysis` 用到的 8 个部位 key 已逐个查过绑定，这条路是干净的。
+（曾据此误判 `more_func` 缺失 —— 它在 `equip_weapon_detail` / `equip_armor_detail` 上，
+而 `auto_tuning` 是对动态变量 `detail_scene` 点它，AST 整条跳过。报「缺失」前必须先
+确认引用的真实场景。）
+
+顺带查实：布局已从 `config/local/layouts/` 迁到 `config/system/layouts/`（单份
+`默认布局.json`），随 `syncSystemConfig` 分发，`syncLayoutConfig` 任务已并入，分发链自洽。
 
 ### 实机验证踩到的坑
 
@@ -323,26 +386,47 @@
 
 ## 下一步操作（按顺序）
 
-1. **本轮改动提交**（等用户明确指示）：配置架构重构 + 暴露层 + 悬浮面板 UI + versionCode，
-   涉及 config.py / config/system/app.yaml / engine / mixins / input backends / 调用点 /
-   settings_dialog / discovery.py / task_runner.py / run_control.py / FloatService.kt /
-   build.gradle.kts / 10 个测试文件
-2. **其余业务工作流上机**（需游戏环境）：
-   - 装备分析（`equip_analysis`）：读装备详情 + OCR 词条，属识别类，风险低，宜先跑
-   - 自动调律（`auto_tuning`）：已按内置默认配置暴露（全部 8 部位 + 全部规则默认
-     判定），含滚动校验 + 状态机，链路最长，实机可能踩背包滚动、详情刷新延迟等
-     既有坑，需重点观察；`single_tuning` 修了插件加载后才第一次真正可运行
-   - 盟主争锋（`mengzhuzhengfeng`）、自动购买心法（`auto_purchase_xinde`）：
-     纯点击/识别类，可仿江湖号令快速验证
-3. **桌面下拉回归确认**：暴露层重构 + 新增 `auto_tuning` 后，桌面 `run_control`
-   下拉会多出一项「自动调律」。注意这是与调律 Tab **并列的第二个入口**，且该路径
-   不注入 run_ctx（跑的是全默认配置）——exposed 是双端共用的，若不希望桌面出现
-   这个入口，需把暴露层拆成双端各一份
-4. **调律参数 UI（后置）**：待自动调律实机跑通后再做。两条路线：
+1. **`equip_analysis` 实机验证**（需游戏环境，用户侧操作）：读装备详情 + OCR 词条，
+   属识别类，风险低，宜先跑。坐标绑定风险已由上机前预检排除，剩下的只有运行期问题：
+   - `to_equipment` 是插件 builtin，靠 `9ecb626` 的 `ensure_loaded()` 修复才在设备端可用，
+     这次是它的**首次真实验证**
+   - OCR 词条识别在手机分辨率下的准确率未验过，看 `collect session.equipped` 的输出对不对
+   - 建议先只跑这一个，不要与调律链路混在一起
+2. **桌面下拉回归确认**（阻塞项，等用户表态）：已查实事实如下，差异不会报错，纯属误导：
+   - `run_control._load_workflow_configs` 直接拿 `list_exposed_scripts()` 填下拉，所以
+     桌面**必然**多出一项「自动调律」，与调律 Tab 并列成第二个入口
+   - 调律 Tab 是在 `configure` 回调里注入 `TuningRunContext`（部位/规则配置/开关/
+     `doc_username`）；下拉这条路不走 `configure`，`run_ctx` 为 None → `self.ctx` 惰性
+     建全默认实例，即全部 8 部位 + 回退插件 session 的规则判定，且 `doc_username=""`
+     （调律说明文档缺操作用户名）
+   - `TuningRunContext` 每个字段都有兜底，所以不会崩 —— 问题是用户分不清两个入口的区别
+   - exposed 是双端共用的，若不希望桌面出现这个入口，需把暴露层拆成双端各一份
+3. **调律参数 UI（后置）**：待自动调律实机跑通后再做。两条路线：
    - 扩 `PARAMETERS` schema 加 `multiselect`/`bool`，双端按元数据动态渲染表单（桌面
      `main_window._rebuild_param_panel` 已是这个模式）；配套需 `list_tasks()` 带出
      `parameters`（当前丢了）、`PyBridge.startTask` 加参数（当前硬传 `""`）、
      `auto_tuning.run()` 从 `get_variable` 组装 `TuningRunContext`
    - Android 原生调律配置页写设备端 `config/session/yysls/session.json`，
      走 `_ensure_judge_config` 已有的 session 回退路径（可持久化，但要重造规则表编辑器）
+
+### 待 ① 跑通后才推进的其余上机项
+
+- **自动调律（`auto_tuning`）**：已按内置默认配置暴露（全部 8 部位 + 全部规则默认
+  判定），含滚动校验 + 状态机，链路最长，实机可能踩背包滚动、详情刷新延迟等
+  既有坑，需重点观察；`single_tuning` 修了插件加载后才第一次真正可运行
+- **盟主争锋（`mengzhuzhengfeng`）、自动购买心法（`auto_purchase_xinde`）**：
+  纯点击/识别类，可仿江湖号令快速验证；预检已全绿
+
+### 遗留待决（与 Phase 4 上机不相干）
+
+- `.git-mypy-base/` worktree 是做 mypy 基线对比时建的，待清：
+  `git worktree remove --force .git-mypy-base`
+- **CI 的 mypy 门禁在远端已经是红的**：裸 `python -m mypy` 报 2 个错，在 `origin/master`
+  与当前 HEAD 都存在，是既有存量、非新引入。注意给 mypy 传路径参数会**覆盖**
+  `[tool.mypy] files` 清单（`mypy src/lvjiang` 报 145 错，不是门禁基线）
+- 工作区未提交批次：Windows PyInstaller 打包（`constants.py` 的 `sys.frozen` 分支 +
+  `packaging/launcher.py` + `lvjiang.spec` + `package.bat`，另有 `core/android/device.py` /
+  `scrcpy_capture.py` / `platforms.py`）+ 预检设施（两个 `scripts/manual-tests/preflight_*.py`
+  + `engine/core.py` 的 `validate_only` 抽取 + `test_system_wf_refs_gate.py`）。其中
+  `.package_build.log` 是构建日志，`.gitignore` 未覆盖，不应进版本库
 

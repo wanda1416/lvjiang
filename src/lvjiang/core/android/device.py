@@ -6,7 +6,7 @@ import subprocess
 
 from loguru import logger
 
-from ..platforms import adb_path_candidates
+from ..platforms import SUBPROCESS_NO_WINDOW, adb_path_candidates
 
 
 def _resolve_adb_path() -> str:
@@ -31,7 +31,7 @@ def list_adb_devices(adb_path: str | None = None) -> list[dict]:
     try:
         out = subprocess.run(
             [adb, "devices", "-l"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
         ).stdout
     except Exception as e:
         logger.error(f"adb devices 执行失败: {e}")
@@ -84,7 +84,7 @@ class AdbDevice:
         """执行 adb shell 命令，返回 stdout 文本"""
         r = subprocess.run(
             [*self._base(), "shell", *args],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, timeout=timeout, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.debug(f"adb shell {args} 返回码 {r.returncode}: {r.stderr.strip()}")
@@ -94,7 +94,7 @@ class AdbDevice:
         """执行 adb 命令返回原始字节流（如 exec-out screencap）"""
         r = subprocess.run(
             [*self._base(), *args],
-            capture_output=True, timeout=timeout,
+            capture_output=True, timeout=timeout, **SUBPROCESS_NO_WINDOW,
         )
         return r.stdout
 
@@ -102,7 +102,7 @@ class AdbDevice:
         """建立端口转发 local -> remote，成功返回 True"""
         r = subprocess.run(
             [*self._base(), "forward", local, remote],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.error(f"adb forward {local} {remote} 失败: {r.stderr.strip()}")
@@ -114,7 +114,7 @@ class AdbDevice:
         try:
             subprocess.run(
                 [*self._base(), "forward", "--remove", local],
-                capture_output=True, timeout=10,
+                capture_output=True, timeout=10, **SUBPROCESS_NO_WINDOW,
             )
         except Exception:
             pass
@@ -123,7 +123,7 @@ class AdbDevice:
         """推送文件到设备，成功返回 True"""
         r = subprocess.run(
             [*self._base(), "push", local_path, remote_path],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=60, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.error(f"adb push {local_path} 失败: {r.stderr.strip()}")
@@ -135,6 +135,7 @@ class AdbDevice:
         return subprocess.Popen(
             [*self._base(), "shell", *args],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            **SUBPROCESS_NO_WINDOW,
         )
 
     # ─── 设备属性（带缓存）─────────────────────────────────

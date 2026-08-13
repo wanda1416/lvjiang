@@ -11,6 +11,7 @@ import threading
 import time
 from typing import Any
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
 from .ui.main_window import MainWindow
@@ -75,6 +76,9 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     window = MainWindow(hooks_list=hooks_list)
     window.show()
+
+    # 启动后延迟检查更新（不阻塞主窗口显示）
+    QTimer.singleShot(1000, window.check_update_on_startup)
 
     # 退出前等待后台线程，避免 PyQt6/SIP 清理时的 native crash
     app.aboutToQuit.connect(_wait_for_threads)

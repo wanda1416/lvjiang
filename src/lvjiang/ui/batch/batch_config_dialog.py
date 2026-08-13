@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
 )
 
 from ...constants import SYSTEM_WORKFLOWS_DIR
-
 from ...core.batch_config import (
     BatchConfigItem,
     BatchWorkflows,
@@ -169,12 +168,12 @@ class BatchConfigDialog(QDialog):
         line_edit = QLineEdit()
         line_edit.setPlaceholderText("选择 wf 文件...")
         row.addWidget(line_edit, stretch=1)
-        
+
         btn = QPushButton("浏览...")
         btn.setFixedWidth(70)
         btn.clicked.connect(lambda: self._browse_wf(line_edit))
         row.addWidget(btn)
-        
+
         # 把 line_edit 附加到 row 上，方便后续访问
         row._line_edit = line_edit  # type: ignore
         return row
@@ -323,7 +322,7 @@ class BatchConfigDialog(QDialog):
         new_columns = self._parse_columns()
         if not new_columns:
             return
-        
+
         # 直接设置新列名，保留现有数据
         self._table.setColumnCount(len(new_columns))
         self._table.setHorizontalHeaderLabels(new_columns)

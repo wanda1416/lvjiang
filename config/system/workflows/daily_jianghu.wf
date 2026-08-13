@@ -188,8 +188,20 @@ def action_qingjing($label)
       log "情境保存弹出取消按钮，点击一次"
       click [waiguan_qingjing].[cancel] after wait @step_interval
    end
-   # 保存生效需时间，最多等 10 秒再退出
-   wait stable 10
+   # 轮询检查 save 区域是否出现「保存」，最多等待 10 次
+   eval $save_i = 0
+   eval $save_found = ""
+   loop while $save_i < 10
+      eval $save_i = $save_i + 1
+      wait @step_interval
+      scan [waiguan_qingjing].[save] as $save_found by contains "保存"
+      if $save_found
+         break
+      end
+   end
+   if not $save_found
+      eval pause("保存情境失败，请手动处理")
+   end
 
    click [waiguan_qingjing].[back] after wait stable @page_refresh least 0.5
    click [activity_jianghu].[back] after wait @step_interval

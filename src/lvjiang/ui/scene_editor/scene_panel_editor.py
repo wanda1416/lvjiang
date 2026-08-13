@@ -44,6 +44,9 @@ class PanelEditorMixin:
         _btn_del_panel, _refresh_lists(), on_item_migrated
     """
 
+    _CALIBRATION_LABELS = {"auto": "自动模式", "even": "等分网格", "image": "图像检测"}
+    _SCROLL_LABELS = {"vertical": "纵向滚动", "horizontal": "横向滚动", "both": "双向滚动", "none": "固定网格"}
+
     # ─── 面板构建 ────────────────────────────────────────
 
     def _build_panel_panel(self) -> QWidget:
@@ -148,11 +151,11 @@ class PanelEditorMixin:
             vis_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._panel_table.setItem(row, 4, vis_item)
             # 校准模式
-            cal_item = QTableWidgetItem(panel_def.calibration)
+            cal_item = QTableWidgetItem(self._CALIBRATION_LABELS.get(panel_def.calibration, panel_def.calibration))
             cal_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._panel_table.setItem(row, 5, cal_item)
             # 滚动方向
-            sd_item = QTableWidgetItem(panel_def.scroll_direction)
+            sd_item = QTableWidgetItem(self._SCROLL_LABELS.get(panel_def.scroll_direction, panel_def.scroll_direction))
             sd_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._panel_table.setItem(row, 6, sd_item)
         self._panel_table.blockSignals(False)
@@ -386,30 +389,35 @@ class PanelEditorMixin:
 
         # 校准模式下拉
         calibration_combo = QComboBox()
-        calibration_combo.addItems(["auto", "even", "image"])
+        calibration_combo.addItem("自动模式", "auto")
+        calibration_combo.addItem("等分网格", "even")
+        calibration_combo.addItem("图像检测", "image")
         calibration_combo.setToolTip(
-            "auto: 先图像检测，失败降级为等分\n"
-            "even: 跳过图像检测，直接按行列数等分\n"
-            "image: 仅图像检测，失败返回 None"
+            "自动模式: 先图像检测，失败降级为等分\n"
+            "等分网格: 跳过图像检测，直接按行列数等分\n"
+            "图像检测: 仅图像检测，失败返回 None"
         )
         if panel_def:
-            idx = calibration_combo.findText(panel_def.calibration)
+            idx = calibration_combo.findData(panel_def.calibration)
             if idx >= 0:
                 calibration_combo.setCurrentIndex(idx)
         form.addRow("校准模式:", calibration_combo)
 
         # 滚动方向下拉
         scroll_combo = QComboBox()
-        scroll_combo.addItems(["vertical", "horizontal", "both", "none"])
+        scroll_combo.addItem("纵向滚动", "vertical")
+        scroll_combo.addItem("横向滚动", "horizontal")
+        scroll_combo.addItem("双向滚动", "both")
+        scroll_combo.addItem("固定网格", "none")
         scroll_combo.setToolTip(
-            "vertical: 纵向滚动，rows 允许 expected-1\n"
-            "horizontal: 横向滚动，cols 允许 expected-1\n"
-            "both: 双向滚动，rows/cols 都允许 expected-1\n"
-            "none: 固定网格，rows/cols 必须精确匹配\n\n"
-            "约束：rows=1 时禁止 vertical/both，cols=1 时禁止 horizontal/both"
+            "纵向滚动: rows 允许 expected-1\n"
+            "横向滚动: cols 允许 expected-1\n"
+            "双向滚动: rows/cols 都允许 expected-1\n"
+            "固定网格: rows/cols 必须精确匹配\n\n"
+            "约束：rows=1 时禁止纵向/双向，cols=1 时禁止横向/双向"
         )
         if panel_def:
-            idx = scroll_combo.findText(panel_def.scroll_direction)
+            idx = scroll_combo.findData(panel_def.scroll_direction)
             if idx >= 0:
                 scroll_combo.setCurrentIndex(idx)
         form.addRow("滚动方向:", scroll_combo)
@@ -423,7 +431,7 @@ class PanelEditorMixin:
         def _validate_scroll():
             rows = rows_spin.value()
             cols = cols_spin.value()
-            direction = scroll_combo.currentText()
+            direction = scroll_combo.currentData()
             if rows == 1 and direction in ("vertical", "both"):
                 scroll_error_label.setText("rows=1 时滚动方向不能为纵向")
                 scroll_error_label.show()
@@ -503,6 +511,6 @@ class PanelEditorMixin:
             rows=rows_spin.value(),
             min_visible=round(vis_spin.value(), 2),
             view=combo_view_value(view_combo, self._current_view),
-            calibration=calibration_combo.currentText(),
-            scroll_direction=scroll_combo.currentText(),
+            calibration=calibration_combo.currentData(),
+            scroll_direction=scroll_combo.currentData(),
         ), target_scene

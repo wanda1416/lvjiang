@@ -51,6 +51,12 @@ regions:
   is_text: true
   is_clickable: true
   view: kanbao
+- key: action_type
+  name: 动作分类
+  type: func
+  is_text: true
+  is_clickable: true
+  view: biaoqing
 panels:
 - key: actions
   name: 动作列表
@@ -58,9 +64,5 @@ panels:
   rows: 2
   min_visible: 0.95
   view: biaoqing
-- key: types
-  name: 分类
-  cols: 4
-  rows: 1
-  min_visible: 0.95
-  view: biaoqing
+  calibration: even
+  scroll_direction: none

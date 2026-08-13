@@ -48,20 +48,27 @@
       "y_ratio": 0.5087940943211016,
       "w_ratio": 0.12858019016335076,
       "h_ratio": 0.057146751183711486
+    },
+    {
+      "key": "action_type",
+      "x_ratio": 0.6609233956340311,
+      "y_ratio": 0.53343828379682,
+      "w_ratio": 0.2640270832971452,
+      "h_ratio": 0.07073483619071863
     }
   ],
   "panels": [
     {
       "key": "actions",
-      "x_ratio": 0.6304994285976462,
-      "y_ratio": 0.6043623299658764,
-      "w_ratio": 0.3229679921025459,
+      "x_ratio": 0.6307383218497946,
+      "y_ratio": 0.6061865441623739,
+      "w_ratio": 0.3209700351609178,
       "h_ratio": 0.3186822608543458,
       "cols": 6,
       "rows": 2,
       "min_visible": 0.95,
-      "calibration": "auto",
-      "scroll_direction": "vertical"
+      "calibration": "even",
+      "scroll_direction": "none"
     },
     {
       "key": "types",

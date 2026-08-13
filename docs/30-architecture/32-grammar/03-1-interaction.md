@@ -159,7 +159,7 @@ wait (min, max)         # 随机范围等待（在 min~max 秒之间随机取值
 **示例**：
 
 ```
-wait @page_refresh_wait     # 命名延迟（从配置读取）
+wait @page_refresh     # 命名延迟（从配置读取）
 wait 1.5                    # 固定等待 1.5 秒
 wait $interval              # 动态等待，$interval 的值是秒数
 wait (1, 2)                 # 随机等待 1~2 秒
@@ -170,7 +170,7 @@ wait (1, 2)                 # 随机等待 1~2 秒
 - `$var` 的值可以是数字（固定等待）或元组 `(min, max)`（随机范围等待）
 - 配合 `eval $var = (min, max)` 或 `default $var = (min, max)` 赋值后使用
 - `wait @<delay_name>` 引用的命名延迟必须已在「配置管理 → 等待参数」中定义，否则报错终止（详见[失败语义](#六失败语义)）
-- 命名延迟必须使用 `@` 前缀，裸标识符（如 `wait page_refresh_wait`）是语法错误
+- 命名延迟必须使用 `@` 前缀，裸标识符（如 `wait page_refresh`）是语法错误
 
 ## 四、wait stable — 等待画面稳定
 

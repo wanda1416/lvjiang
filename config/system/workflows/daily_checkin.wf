@@ -11,8 +11,8 @@
 # 各活动过程后置：退回菜单页（找不到活动时原地不动）
 
 # ─── 从游戏首页进入活动页面 ─────────────────────────────
-click [game_main_page].[menu] after wait @page_refresh_wait
-click [game_menu_page].[huodong] after wait @page_refresh_wait
+click [game_main_page].[menu] after wait @page_refresh
+click [game_menu_page].[huodong] after wait @page_refresh
 
 # ─── 各活动签到 ──────────────────────────────────────
 call checkin_zhaoxi()
@@ -44,12 +44,12 @@ def checkin_zhaoxi()
       return -1
    end
 
-   click $found after wait @page_refresh_wait
+   click $found after wait @page_refresh
 
    scan [activity_main].[qiandao] as $sign by contains "签到"
    if $sign
       log "检测到签到按钮，点击签到领奖。"
-      click [activity_main].[qiandao] after wait @page_refresh_wait
+      click [activity_main].[qiandao] after wait @page_refresh
       log "签到完成！"
 
       # 签到后：两次 back 退回菜单页

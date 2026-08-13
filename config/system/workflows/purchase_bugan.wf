@@ -18,9 +18,9 @@
 eval $buy_keywords = ["心法", "武学", "奇术", "生活", "宝钱", "短陌钱"]
 
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
-click [game_main_page].[menu] after wait @page_refresh_wait
-click [game_menu_page].[bugan] after wait @page_refresh_wait
-click [bugan_detail].[shop] after wait @page_refresh_wait
+click [game_main_page].[menu] after wait @page_refresh
+click [game_menu_page].[bugan] after wait @page_refresh
+click [bugan_detail].[shop] after wait @page_refresh
 
 # ─── 战斗养成：依次购买两个商品面板 ─────────────────────
 call buy_panel("shangpin_1", $buy_keywords)
@@ -28,16 +28,16 @@ drag [bugan_detail].[shangpin_2] up 2 after wait @step_interval
 call buy_panel("shangpin_2", $buy_keywords)
 
 # ─── 营生：只买第一格 ──────────────────────────────────
-click [bugan_detail].[cat_4] after wait @page_refresh_wait
+click [bugan_detail].[cat_4] after wait @page_refresh
 call buy_cell(1, 1)
 
 # ─── 赛季：类目列表上拖后，shangpin_1 全部格子买一遍 ───
 drag [bugan_detail].[liebiao] up 1 after wait @step_interval
-click [bugan_detail].[cat_4] after wait @page_refresh_wait
+click [bugan_detail].[cat_4] after wait @page_refresh
 call buy_all_cells()
 
 # ─── 外观：只买 (1,1) 与 (2,3) ─────────────────────────
-click [bugan_detail].[cat_5] after wait @page_refresh_wait
+click [bugan_detail].[cat_5] after wait @page_refresh
 call buy_cell(1, 1)
 call buy_cell(2, 3)
 

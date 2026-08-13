@@ -1,26 +1,33 @@
-# 应用运行参数（出厂默认，随版本分发）
-# system 提供全量默认；用户在配置管理里的改动以键级 diff 写入 config/local/app.yaml。
-# 读取恒为 system ← local 合并视图（见 core.config_resolver）。
-
-# 输入模拟：引擎级点击/移动/抖动参数，InputBackend 各子类与坐标钳位使用
 input_simulation:
-  before_click_wait: [0.1, 0.3]     # 点击前随机延迟范围（秒）
-  after_click_wait: [0.1, 0.3]      # 点击后随机延迟范围（秒）
-  mouse_move_duration: [0.5, 0.7]   # 鼠标/触摸移动时长范围（秒）
-  click_random_offset: 5            # 坐标随机偏移像素
-  region_jitter_ratio: 0.25         # 区域中心抖动比例，必须 [0, 0.5)
-
-# 延迟参数：命名等待，工作流通过 wait <key>（DSL）/ wait_delay(key)（代码）按 key 引用
+  before_click_wait:
+  - 0.1
+  - 0.3
+  after_click_wait:
+  - 0.1
+  - 0.3
+  mouse_move_duration:
+  - 0.5
+  - 0.7
+  click_random_offset: 5
+  region_jitter_ratio: 0.25
 delay_params:
   step_interval:
     label: 步骤间等待
-    range: [1.0, 1.2]
+    range:
+    - 1.0
+    - 1.2
   click_interval:
     label: 连续点击间隔
-    range: [1.0, 1.2]
-  page_refresh_wait:
+    range:
+    - 1.0
+    - 1.2
+  page_refresh:
     label: 页面刷新等待
-    range: [2.0, 3.0]
-  scroll_settle_wait:
+    range:
+    - 2.0
+    - 3.0
+  scroll_settle:
     label: 滚动惯性等待
-    range: [3.0, 4.0]
+    range:
+    - 3.0
+    - 4.0

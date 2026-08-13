@@ -19,19 +19,19 @@ def nav_main_to_equip()
     scan [game_menu_page].[wulinlu] as $result
     if not $result.[wulinlu] equals "武林录"
         # 不在菜单页，从主界面进入菜单
-        click [game_main_page].[menu] after wait @page_refresh_wait
+        click [game_main_page].[menu] after wait @page_refresh
     else
         log "当前已在菜单页"
     end
 
     # 菜单页 → 背包页
-    click [game_menu_page].[baoguo] after wait @page_refresh_wait
+    click [game_menu_page].[baoguo] after wait @page_refresh
 
     # 检查是否在装备页（可能开包裹后在道具页等其他页面）
     scan [bag_equip_detail].[sub_equip] as $bag_scan
     if not $bag_scan.sub_equip contains "装备"
         # 不在装备页，点击培养切换
-        click [bag_equip_detail].[peiyang] after wait @page_refresh_wait
+        click [bag_equip_detail].[peiyang] after wait @page_refresh
     end
 end
 
@@ -44,11 +44,11 @@ end
 
 def nav_back_to_main()
     # 关闭详情弹窗 → 背包页
-    click [bag_equip_detail].[back] after wait @page_refresh_wait
+    click [bag_equip_detail].[back] after wait @page_refresh
     # 背包页 → 菜单页
-    click [bag_equip_detail].[back] after wait @page_refresh_wait
+    click [bag_equip_detail].[back] after wait @page_refresh
     # 菜单页 → 主界面
-    click [game_menu_page].[back] after wait @page_refresh_wait
+    click [game_menu_page].[back] after wait @page_refresh
 end
 
 # ─── nav_equip_to_tune ────────────────────────────────────
@@ -59,7 +59,7 @@ end
 
 def nav_equip_to_tune()
     # 展开「更多」弹窗
-    click [equip_detail].[more_func] after wait @page_refresh_wait
+    click [equip_detail].[more_func] after wait @page_refresh
 
     # 在次功能按钮中寻找「调律」
     scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
@@ -72,5 +72,5 @@ def nav_equip_to_tune()
     end
 
     # 点击调律按钮，进入调律页
-    click [equip_detail].$tune_key after wait @page_refresh_wait
+    click [equip_detail].$tune_key after wait @page_refresh
 end

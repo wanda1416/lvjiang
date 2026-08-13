@@ -1,5 +1,7 @@
 """数据指令 Mixin：scan / recognize / collect / eval / call proc"""
 
+from typing import Any
+
 from loguru import logger
 
 from ..grammar import (
@@ -25,6 +27,20 @@ from .signals import WorkflowUserError, _ReturnSignal
 
 class _DataOpsMixin:
     """数据指令执行：OCR/识别取数、collect 输出、eval 赋值、过程调用"""
+
+    def _resolve_literal(self, value) -> Any:
+        """递归解析 literal 内的 VarRef/FieldAccess（用于 default 的 dict/list）
+
+        dict/list 的 value 可能包含 VarRef 或 FieldAccess，需要递归解析。
+        其他类型（str/int/float/bool/None）直接返回。
+        """
+        if isinstance(value, dict):
+            return {k: self._resolve_literal(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._resolve_literal(item) for item in value]
+        if isinstance(value, (VarRef, FieldAccess)):
+            return self._resolve(value)
+        return value
 
     def _dynamic_field_keys(self, region_var) -> list[str]:
         """[scene].$var 动态区域 → 字段 key 列表
@@ -224,7 +240,8 @@ class _DataOpsMixin:
         # 默认值赋值：default $var = value — 仅当变量未从外部传入时才赋值
         if node.func_name == "__default__":
             if node.target is not None and node.target not in self.variables:
-                default_val = node.func_args[0].value
+                lit_value = node.func_args[0].value
+                default_val = self._resolve_literal(lit_value)  # 递归解析 dict/list 内变量
                 self.variables[node.target] = default_val
                 logger.debug(f"default: {node.target} = {default_val!r}")
             return
@@ -361,16 +378,18 @@ class _DataOpsMixin:
             logger.error(f"call: 未定义的过程 {node.name}")
             return
         logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
-        # 1. 保存当前变量和 output 快照
+        # 1. 保存当前变量和 output 快照，进入干净作用域
         saved_vars = dict(self.variables)
         saved_output = dict(self.output)
-        self.output = {}  # 子过程从空 output 开始
+        self.variables = {}  # 子过程从干净变量表开始（作用域隔离）
+        self.output = {}  # type: ignore[var-annotated]  # 子过程从空 output 开始
         return_value = None
         try:
-            # 2. 绑定参数
+            # 2. 绑定参数（只绑定声明的参数）
             for i, param_name in enumerate(proc_def.params):
                 if i < len(node.args):
                     self.variables[param_name] = self._resolve(node.args[i])
+                # 未传参数保持未定义状态（访问时返回 null）
             # 3. 执行过程体（return = 退出过程）
             try:
                 self._exec_body(proc_def.body)

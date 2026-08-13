@@ -378,6 +378,7 @@ class FoodRule:
     on_insufficient：命中但持有量不足（读不到即没有）时，
     continue=继续调律（不添加狗粮），skip=跳过该装备。
     """
+    enabled: bool = True
     pct: int = 0
     min_expect: str = "normal"
     min_quality: str = "blue"
@@ -433,6 +434,8 @@ class MaterialSettings:
         expect_rank = RATING_RANK.get(expect or "", -1)
         quality_rank = QUALITY_RANK.get(quality or "", -1)
         for idx, rule in enumerate(self.food_rules, start=1):
+            if not rule.enabled:
+                continue
             if rule.pct > 0 and (cap_pct is None or cap_pct < rule.pct):
                 continue
             if expect_rank < RATING_RANK.get(rule.min_expect, 99):
@@ -457,16 +460,16 @@ class MaterialSettings:
 # ─── 行为配置（状态机三行为点：扫描处理 / 材料处理 / 结束处理）──
 
 # 行为动作（结束处理 tune 的四个动作）：
-# - continue: 继续调律（词条满时自动结束，无需单独配置）
+# - continue: 继续调律或跳过（未满继续，词条满后结束保留）
 # - reset: 重置装备（清空首词条以外全部词条后继续，冷却期限制每件限一次）
 # - recycle: 回收装备
 # - skip: 跳过该装备（结束保留在背包）
-# - tune_full_recycle: 调满后回收（金装专用，仅扫描处理可用）
+# - tune_full_recycle: 调满后回收（命中后直通调满并回收）
 # 扫描处理 scan 有 recycle / skip / tune_full_recycle 三个动作
 # 行为动作（结束处理 tune 的四个动作 + 扫描处理新增的调满后回收）
 BEHAVIOR_ACTIONS = ("continue", "reset", "recycle", "skip", "tune_full_recycle")
 BEHAVIOR_ACTION_LABELS = {
-    "continue": "继续调律",   # 词条满时自动结束
+    "continue": "继续调律或跳过",   # 词条满时结束保留
     "reset": "重置装备",
     "recycle": "回收装备",
     "skip": "跳过该装备",
@@ -476,16 +479,16 @@ BEHAVIOR_ACTION_LABELS = {
 # 各行为点允许的动作（材料处理由 MaterialSettings 承担，不入表）
 BEHAVIOR_STAGE_ACTIONS = {
     "scan": ("recycle", "skip", "tune_full_recycle", "tune_this"),
-    "tune": ("continue", "reset", "recycle", "skip"),
+    "tune": ("continue", "reset", "recycle", "skip", "tune_full_recycle"),
 }
 BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "结束处理"}
 # 动作说明（供 UI tooltip 显示）
 BEHAVIOR_ACTION_TOOLTIPS = {
-    "continue": "继续调律：词条满时自动结束",
+    "continue": "继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则",
     "reset": "重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）",
     "recycle": "回收装备：分解为材料",
     "skip": "跳过该装备：结束保留在背包",
-    "tune_full_recycle": "调满后回收：金装专用，跳过狗粮与规则判定，调满5词条后回收",
+    "tune_full_recycle": "调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收",
     "tune_this": "强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）",
 }
 # 判定语义：预期评级识别用哪个流派规则集；affix=自选词条
@@ -526,6 +529,7 @@ class BehaviorRule:
     判定自由填充），避免回收掉非首词条已成垃圾但可重置
     调律的装备；自选词条语义下只判定装备的首词条。
     """
+    enabled: bool = True
     parts: list[str] = field(default_factory=list)
     max_quality: str = "gold"
     pct_op: str = "le"
@@ -636,6 +640,8 @@ def _first_hit(rules: list[BehaviorRule], part: str | None,
     """有序规则表首条命中（评级按各规则自身判定语义懒取；
     自选词条语义不跑潜力判定，按 affix_names 词条名匹配）"""
     for idx, rule in enumerate(rules, start=1):
+        if not rule.enabled:
+            continue
         if skip and skip(rule):
             continue
         rating = (rating_of(rule.judge_scope, rule.judge_rules,
@@ -686,7 +692,8 @@ class TuneBehavior:
     """结束处理（每轮调律结束后的行为点）
 
     每轮 decide 时评级按各规则自身判定语义懒取；词条满为边界
-    条件：full=True 时 continue 动作自动转为 skip（不可再调）。
+    条件：full=True 时 continue 动作自动转为 skip，并以该规则
+    作为最终命中结果，不再继续匹配后续规则。
     无命中默认：未满=继续调律、满=跳过该装备；未启用同默认。
     max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
     硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
@@ -708,10 +715,10 @@ class TuneBehavior:
                    if full else ("continue", "无行为规则命中 → 继续调律"))
         if not self.enabled:
             return default
-        # 词条已满不可再调，continue 动作自动转为 skip
+        # continue 规则即使词条已满也必须命中，并在下方转为 skip，
+        # 从而终止后续规则判定并保留装备。
         hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
-                         affix_names,
-                         skip=(lambda r: full and r.action == "continue"))
+                         affix_names)
         if hit:
             idx, rule = hit
             # continue 动作在词条满时自动转为 skip

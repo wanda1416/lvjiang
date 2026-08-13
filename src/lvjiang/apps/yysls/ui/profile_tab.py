@@ -308,14 +308,34 @@ class ProfileOverviewTab(QWidget):
             table.setItem(row, 0, name_item)
             for col, kd in enumerate(key_defs):
                 model_type = config.get_model_type(kd.key) or ""
-                display_text, style = self._format_profile_cell(kd, model_type, data)
+
+                # 检查 Quota→Stock sync 目标是否已达硬上限
+                sync_capped = (
+                    model_type == MODEL_QUOTA
+                    and isinstance(kd, QuotaKeyDef)
+                    and kd.sync_to
+                    and self._is_stock_at_hard_cap(kd.sync_to, data)
+                )
+
+                if sync_capped:
+                    display_text = "—"
+                    style = ""
+                else:
+                    display_text, style = self._format_profile_cell(kd, model_type, data)
+
                 item = QTableWidgetItem(display_text)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._apply_cell_style(item, style)
-                # 设置悬停提示，显示元信息
-                tooltip = self._format_cell_tooltip(kd, model_type, data)
-                if tooltip:
-                    item.setToolTip(tooltip)
+
+                if sync_capped:
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    item.setToolTip(f"{kd.label} 的同步目标 {kd.sync_to} 已达上限")
+                else:
+                    self._apply_cell_style(item, style)
+                    # 设置悬停提示，显示元信息
+                    tooltip = self._format_cell_tooltip(kd, model_type, data)
+                    if tooltip:
+                        item.setToolTip(tooltip)
+
                 table.setItem(row, col + 1, item)
 
         header = table.horizontalHeader()
@@ -378,6 +398,23 @@ class ProfileOverviewTab(QWidget):
             return str(int(value)), ""
 
         return str(value), ""
+
+    @staticmethod
+    def _is_stock_at_hard_cap(stock_key: str, data: dict) -> bool:
+        """检查指定 stock key 是否已达到硬上限（非 soft）"""
+        entry = data.get(MODEL_STOCK, {}).get(stock_key, {})
+        if not entry:
+            return False
+        value = entry.get("value", 0) or 0
+        # 从配置中查找该 stock key 的 cap 和 soft
+        from ..config import get_profile_config
+        config = get_profile_config()
+        kd = config.get_key(stock_key)
+        if not isinstance(kd, StockKeyDef) or kd.cap is None:
+            return False
+        if kd.soft:
+            return False
+        return value >= kd.cap
 
     @staticmethod
     def _apply_cell_style(item: QTableWidgetItem, style: str) -> None:
@@ -1038,6 +1075,10 @@ class ProfileOverviewTab(QWidget):
             if cap is not None and not soft:
                 new_value = min(new_value, cap)
 
+        # clamp 后值未变 → 不产生任何写入
+        if new_value == current_value:
+            return
+
         # 确定 detail 信息
         if is_action:
             detail = f"delta:{delta:+g}"
@@ -1492,32 +1533,34 @@ class _DetailPage(QWidget):
         self.refresh()
 
     def _build_form(self):
-        """按模型类型分区构建表单"""
+        """按模型类型并列三列展示"""
         from ..config import get_profile_config
 
         config = get_profile_config()
 
-        for model_type in (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK):
-            keys = config.get_keys_by_model(model_type)
-            if not keys:
-                continue
+        row = QHBoxLayout()
+        row.setSpacing(12)
 
+        _GROUP_STYLE = """
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                margin-top: 8px;
+                padding-top: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 4px;
+            }
+        """
+
+        for model_type in (MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN):
+            keys = config.get_keys_by_model(model_type)
             model_label = MODEL_LABELS.get(model_type, model_type)
             box = QGroupBox(model_label)
-            box.setStyleSheet("""
-                QGroupBox {
-                    font-weight: bold;
-                    border: 1px solid #cccccc;
-                    border-radius: 4px;
-                    margin-top: 8px;
-                    padding-top: 12px;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 4px;
-                }
-            """)
+            box.setStyleSheet(_GROUP_STYLE)
 
             form = QFormLayout(box)
             form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
@@ -1528,8 +1571,9 @@ class _DetailPage(QWidget):
                 form.addRow(f"{kd.label}:", label)
                 self._value_labels[kd.key] = label
 
-            self._form_layout.addWidget(box)
+            row.addWidget(box, stretch=1)
 
+        self._form_layout.addLayout(row)
         self._form_layout.addStretch()
 
     def refresh(self):
@@ -1554,7 +1598,7 @@ class _DetailPage(QWidget):
             label.setText(text)
 
     def _format_detail_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
-        """格式化详情页的值显示"""
+        """格式化详情页的值显示（纯数值，取整）"""
         entry = data.get(model_type, {}).get(kd.key, {})
         if not entry:
             return ""
@@ -1564,24 +1608,17 @@ class _DetailPage(QWidget):
             return ""
 
         if model_type == MODEL_QUOTA:
-            if isinstance(kd, QuotaKeyDef) and kd.cap:
-                return f"{value} / {kd.cap}  (周期: {kd.period})"
             if isinstance(value, bool):
                 return "已完成" if value else "未完成"
-            return str(value)
+            return str(int(value))
 
         if model_type == MODEL_REGEN:
             if isinstance(kd, RegenKeyDef):
                 computed, _ = compute_regen_entry(entry, kd)
-                int_value = int(computed)
-                period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
-                period_text = period_labels.get(kd.regen_period, kd.regen_period)
-                cap_text = f" / {kd.cap}" if kd.cap else ""
-                exact = f"{computed:.4f}".rstrip("0").rstrip(".")
-                return f"{int_value}{cap_text}  (精确: {exact}, 回复: {kd.regen_value}/{period_text})"
+                return str(int(computed))
             return str(int(value))
 
         if model_type == MODEL_STOCK:
-            return str(value)
+            return str(int(value))
 
-        return str(value)
+        return str(int(value))

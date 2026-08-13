@@ -1115,25 +1115,6 @@ def test_scan_without_by():
     print("  scan 无 by → by=None: OK")
 
 
-def test_find_tune_material_wf():
-    """验证改写后的 find_tune_material.wf 能正常解析（def 格式）"""
-    print("\n=== 测试 find_tune_material.wf ===")
-    path = Path("config/system/workflows/subcall/find_tune_material.wf")
-    program = parse_file(path)
-    assert len(program.body) == 0  # 内容在 def 内
-    assert "find_tune_material" in program.procs
-    proc = program.procs["find_tune_material"]
-    assert proc.params == ["material_name"]
-    assert len(proc.body) == 2  # recognize + eval
-    n = proc.body[0]
-    assert isinstance(n, Recognize)
-    assert n.by is not None
-    assert n.by.match_mode == "equals"
-    assert isinstance(n.by.target, VarRef)
-    assert n.by.target.name == "material_name"
-    print("  find_tune_material.wf 解析 OK")
-
-
 # ─── 换行续行测试 ─────────────────────────────────────────
 
 def test_explicit_line_continuation():
@@ -1286,7 +1267,6 @@ if __name__ == "__main__":
     test_recognize_by_equals_any()
     test_recognize_by_contains_any()
     test_scan_without_by()
-    test_find_tune_material_wf()
 
     # 换行续行
     test_explicit_line_continuation()

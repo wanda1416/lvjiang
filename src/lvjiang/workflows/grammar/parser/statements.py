@@ -346,8 +346,11 @@ class _StmtMixin:
         return items[0]
 
     def wait_stable_ref(self, items):
-        """stable <timeout> [threshold <v>] [interval <v>] [duration <v>] [least <v>] → WaitStable"""
-        timeout = float(items[0])  # number 已转为 float
+        """stable <timeout> [threshold <v>] [interval <v>] [duration <v>] [least <v>] → WaitStable
+
+        参数支持三种形式：number(float) / delay_ref(NAME Token) / var_ref(VarRef)
+        """
+        timeout = self._to_ws_param(items[0])
         threshold = 0.02
         interval = 0.3
         stable_duration = 0.5
@@ -362,6 +365,16 @@ class _StmtMixin:
                           interval=interval, stable_duration=stable_duration,
                           least=least, line_no=self._line(items))
 
+    def _to_ws_param(self, item):
+        """将 wait stable 参数项转为 Literal / VarRef / float"""
+        if isinstance(item, VarRef):
+            return item
+        if isinstance(item, Token):
+            # NAME Token（来自 delay_ref）→ Literal
+            return Literal(value=str(item))
+        # number 已转为 float
+        return float(item)
+
     def wait_stable_opts(self, items):
         """收集 threshold/interval/duration 选项为 dict"""
         result = {}
@@ -375,16 +388,16 @@ class _StmtMixin:
         return items[0]
 
     def wait_stable_threshold(self, items):
-        return {"threshold": float(items[0])}
+        return {"threshold": self._to_ws_param(items[0])}
 
     def wait_stable_interval(self, items):
-        return {"interval": float(items[0])}
+        return {"interval": self._to_ws_param(items[0])}
 
     def wait_stable_duration(self, items):
-        return {"stable_duration": float(items[0])}
+        return {"stable_duration": self._to_ws_param(items[0])}
 
     def wait_stable_least(self, items):
-        return {"least": float(items[0])}
+        return {"least": self._to_ws_param(items[0])}
 
     def range_literal(self, items):
         """(min, max) → (float, float) 范围元组，用于 eval 赋值"""

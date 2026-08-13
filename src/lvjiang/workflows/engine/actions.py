@@ -412,14 +412,58 @@ class _ActionsMixin:
 
     def _exec_wait_stable(self, node: WaitStable):
         """等待画面稳定：连续截图对比，差异低于阈值持续 stable_duration 秒后继续；
-        超时仅记警告不中断流程"""
+        超时仅记警告不中断流程
+
+        参数支持三种形式：float / Literal(@delay / 数值) / VarRef($var)
+        """
+        timeout = self._resolve_ws_param(node.timeout, "timeout")
+        threshold = self._resolve_ws_param(node.threshold, "threshold")
+        interval = self._resolve_ws_param(node.interval, "interval")
+        stable_duration = self._resolve_ws_param(node.stable_duration, "duration")
+        least = self._resolve_ws_param(node.least, "least")
         self._ensure_workflow().wait_stable(
-            timeout=node.timeout,
-            threshold=node.threshold,
-            interval=node.interval,
-            stable_duration=node.stable_duration,
-            least=node.least,
+            timeout=timeout,
+            threshold=threshold,
+            interval=interval,
+            stable_duration=stable_duration,
+            least=least,
         )
+
+    def _resolve_ws_param(self, param, name: str) -> float:
+        """解析 wait stable 参数：float / Literal / VarRef → float
+
+        - float: 直接返回
+        - Literal(数值): 直接返回
+        - Literal(字符串): 命名延迟，取范围中值
+        - VarRef: 从变量表查找，必须为数值
+        """
+        if isinstance(param, (int, float)):
+            return float(param)
+        if isinstance(param, Literal):
+            val = param.value
+            if isinstance(val, (int, float)):
+                return float(val)
+            # 命名延迟：取范围中值
+            delay_param = self._delay_params.get(str(val))
+            if delay_param is None:
+                raise WorkflowUserError(
+                    f"wait stable {name}: 等待参数 @{val} 未定义"
+                )
+            lo, hi = delay_param.range
+            return (lo + hi) / 2.0
+        if isinstance(param, VarRef):
+            val = self.variables.get(param.name)
+            if val is None:
+                raise WorkflowUserError(
+                    f"wait stable {name}: 变量 ${param.name} 未定义"
+                )
+            if not isinstance(val, (int, float)):
+                raise WorkflowUserError(
+                    f"wait stable {name}: ${param.name} 不是数值类型: {val}"
+                )
+            return float(val)
+        # fallback: 尝试直接转换
+        return float(param)
 
     def _found_region_to_screen(self, found_region, jitter: bool = True) -> tuple[int, int]:
         """FoundRegion → 屏幕坐标（取区域中心，可选抖动）"""

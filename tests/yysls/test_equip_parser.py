@@ -11,11 +11,23 @@
 import pytest
 
 from lvjiang.apps.yysls.equip_parser.parser import EquipmentParser
+from lvjiang.core.ocr_cleaner import OCRCleaner
 
 
 @pytest.fixture(scope="module")
 def parser():
     return EquipmentParser()
+
+
+@pytest.fixture(autouse=True)
+def reset_cleaner():
+    """每个测试前重置单例，确保加载最新配置"""
+    OCRCleaner.reset_instance()
+
+
+def clean(text: str) -> str:
+    """模拟 OCR 引擎清洗"""
+    return OCRCleaner().clean(text)
 
 
 # ─── equip_type 解析 ──────────────────────────────────────
@@ -129,12 +141,12 @@ class TestParseSingleAffix:
 
     @pytest.mark.parametrize("text", [
         "[转]会心率 5.6%",
-        "［转］会心率 5.6%",
+        "[转]会心率 5.6%",   # 全角括号清洗后
         "[转1会心率 5.6%",   # 87cb2b3：OCR 将 ] 误识别为 1
-        "【转劲62.8",         # OCR 漏识别闭合括号
+        "[转劲62.8",         # OCR 漏识别闭合括号
     ])
     def test_transfer_mark_variants(self, parser, text):
-        affix = parser._parse_single_affix(text)
+        affix = parser._parse_single_affix(clean(text))
         if "劲" in text:
             # 劲词条（转劲 = 转律后的劲属性）
             assert affix.name == "劲"
@@ -148,12 +160,13 @@ class TestParseSingleAffix:
         assert affix.value == 8.2
 
     def test_ocr_correction_jingzhun(self, parser):
-        # 猜准率 → 精准率
-        affix = parser._parse_single_affix("猜准率 10.8%")
+        # 猜准率 → 精准率（由 OCR 引擎清洗）
+        affix = parser._parse_single_affix(clean("猜准率 10.8%"))
         assert affix.name == "精准率"
 
     def test_noise_char_jian_removed(self, parser):
-        affix = parser._parse_single_affix("荐会心率 5%")
+        # 荐 噪声由 OCR 引擎删除
+        affix = parser._parse_single_affix(clean("荐会心率 5%"))
         assert affix.name == "会心率"
 
     def test_suit_info_filtered(self, parser):

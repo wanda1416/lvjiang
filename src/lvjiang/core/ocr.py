@@ -1,10 +1,14 @@
-"""OCR 引擎封装 - RapidOCR (ONNX Runtime) 封装，懒加载"""
+"""OCR 引擎封装 - RapidOCR (ONNX Runtime) 封装，懒加载
+
+所有 OCR 输出均经过通用清洗规则处理（config/system/ocr_rules.yaml）。
+"""
 
 from dataclasses import dataclass
 
 import numpy as np
 from loguru import logger
 
+from .ocr_cleaner import OCRCleaner
 from .scene_registry import CanvasConfig, Region, get_region_defs
 
 
@@ -74,15 +78,20 @@ class OCREngine:
     @staticmethod
     def _parse_result(result) -> list[OCRResult]:
         """将 RapidOCR 原始结果解析为 OCRResult 列表
+
         RapidOCR 返回: list of [bbox, text, confidence]
         bbox: [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+
+        所有文本均经过通用清洗规则处理。
         """
         if not result:
             return []
+        cleaner = OCRCleaner()
         parsed = []
         for bbox_raw, text, conf in result:
             bbox = [(int(p[0]), int(p[1])) for p in bbox_raw]
-            parsed.append(OCRResult(text=text, confidence=float(conf), bbox=bbox))
+            cleaned_text = cleaner.clean(text)
+            parsed.append(OCRResult(text=cleaned_text, confidence=float(conf), bbox=bbox))
         return parsed
 
     def ocr_scene_regions(

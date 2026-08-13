@@ -84,7 +84,7 @@ behavior:
       - 腕甲
       max_quality: purple
       pct_op: ge
-      pct: 80
+      pct: 0
       ratings:
       - top
       - excellent

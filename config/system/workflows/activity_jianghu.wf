@@ -203,10 +203,12 @@ def action_dongfang($label, $idx)
          if $acts.$r.$c contains "看报"
             eval $fr = $r
             eval $fc = $c
+            goto found_kanbao
          end
       end
    end
 
+   @found_kanbao
    if $fr is_empty
       # 扫描读不到时回退默认位置：看报固定在 1 行 3 列
       log "动作列表未识别到「看报」，按默认位置 [1][3] 处理"

@@ -10,6 +10,7 @@ from __future__ import annotations
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
@@ -236,13 +237,18 @@ class ProfileDefinitionDialog(QDialog):
                     parts.append(f"重置日:{kd.reset_day}号")
             if kd.cap is not None:
                 parts.append(f"上限:{kd.cap}")
+            if kd.show_cap:
+                parts.append("展示上限")
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
         if isinstance(kd, RealtimeKeyDef):
-            parts = [f"上限:{kd.cap}", f"回复:{kd.regen_rate}/min"]
-            if kd.regen_daily:
-                parts.append(f"日补:{kd.regen_daily}")
+            parts = [f"上限:{kd.cap}"]
+            period_labels = {"minute": "分钟", "hour": "小时", "day": "天"}
+            period_text = period_labels.get(kd.regen_period, kd.regen_period)
+            parts.append(f"回复:{kd.regen_value}/{period_text}")
+            if kd.show_cap:
+                parts.append("展示上限")
             if kd.alert_above:
                 parts.append(f"提醒:>{kd.alert_above}")
             return ", ".join(parts)
@@ -259,6 +265,8 @@ class ProfileDefinitionDialog(QDialog):
                     parts.append(f"重置日:{kd.reset_day}号")
             if kd.cap is not None:
                 parts.append(f"上限:{kd.cap}")
+            if kd.show_cap:
+                parts.append("展示上限")
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
@@ -369,6 +377,11 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("上限:", cap_spin)
             widgets["cap"] = cap_spin
 
+            show_cap_check = QCheckBox("展示上限")
+            show_cap_check.setChecked(kd.show_cap)
+            layout.addRow(show_cap_check)
+            widgets["show_cap"] = show_cap_check
+
             reset_input = QLineEdit(kd.reset_time)
             reset_input.setFixedWidth(80)
             layout.addRow("重置时刻:", reset_input)
@@ -408,20 +421,28 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("上限:", cap_spin)
             widgets["cap"] = cap_spin
 
-            regen_spin = QDoubleSpinBox()
-            regen_spin.setRange(0, 999)
-            regen_spin.setDecimals(4)
-            regen_spin.setSingleStep(0.01)
-            regen_spin.setValue(rt_kd.regen_rate)
-            regen_spin.setSuffix(" /min")
-            layout.addRow("回复速率:", regen_spin)
-            widgets["regen_rate"] = regen_spin
+            show_cap_check = QCheckBox("展示上限")
+            show_cap_check.setChecked(rt_kd.show_cap)
+            layout.addRow(show_cap_check)
+            widgets["show_cap"] = show_cap_check
 
-            daily_spin = QSpinBox()
-            daily_spin.setRange(0, 99999)
-            daily_spin.setValue(rt_kd.regen_daily)
-            layout.addRow("每日补充:", daily_spin)
-            widgets["regen_daily"] = daily_spin
+            regen_period_combo = QComboBox()
+            regen_period_combo.addItem("分钟", "minute")
+            regen_period_combo.addItem("小时", "hour")
+            regen_period_combo.addItem("天", "day")
+            idx = regen_period_combo.findData(rt_kd.regen_period)
+            if idx >= 0:
+                regen_period_combo.setCurrentIndex(idx)
+            layout.addRow("回复周期:", regen_period_combo)
+            widgets["regen_period"] = regen_period_combo
+
+            regen_value_spin = QDoubleSpinBox()
+            regen_value_spin.setRange(0, 99999)
+            regen_value_spin.setDecimals(4)
+            regen_value_spin.setSingleStep(0.1)
+            regen_value_spin.setValue(rt_kd.regen_value)
+            layout.addRow("回复数值:", regen_value_spin)
+            widgets["regen_value"] = regen_value_spin
 
             reset_input = QLineEdit(rt_kd.reset_time)
             reset_input.setFixedWidth(80)
@@ -434,6 +455,16 @@ class ProfileDefinitionDialog(QDialog):
             alert_spin.setValue(rt_kd.alert_above or 0)
             layout.addRow("提醒阈值:", alert_spin)
             widgets["alert_above"] = alert_spin
+
+            def _update_reset_time_visibility():
+                is_day = regen_period_combo.currentData() == "day"
+                reset_input.setVisible(is_day)
+                # 更新标签
+                label_widget = reset_input.parent().layout().labelForField(reset_input)
+                if label_widget:
+                    label_widget.setVisible(is_day)
+            regen_period_combo.currentIndexChanged.connect(_update_reset_time_visibility)
+            _update_reset_time_visibility()
 
         elif model_type == MODEL_RESOURCE:
             pass  # Resource 无模型专属字段
@@ -456,6 +487,11 @@ class ProfileDefinitionDialog(QDialog):
             cap_spin.setValue(act_kd.cap or 0)
             layout.addRow("上限:", cap_spin)
             widgets["cap"] = cap_spin
+
+            show_cap_check = QCheckBox("展示上限")
+            show_cap_check.setChecked(act_kd.show_cap)
+            layout.addRow(show_cap_check)
+            widgets["show_cap"] = show_cap_check
 
             reset_input = QLineEdit(act_kd.reset_time)
             reset_input.setFixedWidth(80)
@@ -537,6 +573,7 @@ class ProfileDefinitionDialog(QDialog):
                     key=key, label=label,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
+                    show_cap=widgets["show_cap"].isChecked(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
                 )
@@ -545,8 +582,9 @@ class ProfileDefinitionDialog(QDialog):
                 kd = RealtimeKeyDef(
                     key=key, label=label,
                     cap=widgets["cap"].value(),
-                    regen_rate=widgets["regen_rate"].value(),
-                    regen_daily=widgets["regen_daily"].value(),
+                    show_cap=widgets["show_cap"].isChecked(),
+                    regen_period=widgets["regen_period"].currentData(),
+                    regen_value=widgets["regen_value"].value(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     alert_above=alert_val if alert_val > 0 else None,
                 )
@@ -558,6 +596,7 @@ class ProfileDefinitionDialog(QDialog):
                     key=key, label=label,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
+                    show_cap=widgets["show_cap"].isChecked(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
                 )

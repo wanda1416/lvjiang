@@ -54,7 +54,7 @@ class SessionManager:
                 json.dumps(session, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            logger.info(f"已保存 session: {username}")
+            logger.debug(f"已保存 session: {username}")
         except Exception as e:
             logger.error(f"保存 session 失败: {e}")
 

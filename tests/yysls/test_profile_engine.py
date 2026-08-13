@@ -261,36 +261,61 @@ class TestCountDailyRegens:
 
 class TestComputeRealtimeValue:
     def test_no_regen(self):
-        """regen_rate=0 不回复"""
-        result = _compute_realtime_value(100, "2026-08-08T10:00:00", 0.0, 2500)
-        assert result == 100
+        """regen_value=0 不回复"""
+        val, ts = _compute_realtime_value(100, "2026-08-08T10:00:00", "minute", 0.0, 2500)
+        assert val == 100
+        assert ts == "2026-08-08T10:00:00"
 
-    def test_regen_within_cap(self):
-        """回复未封顶"""
+    def test_minute_regen(self):
+        """分钟回复：60 分钟 * 0.125 = 7.5"""
         now = datetime.now()
         updated_at = (now - timedelta(minutes=60)).isoformat(timespec="seconds")
-        # 60 分钟 * 0.125/min = 7.5
-        result = _compute_realtime_value(100, updated_at, 0.125, 2500)
-        assert result == 107  # int(100 + 7.5) = 107
+        val, new_ts = _compute_realtime_value(100, updated_at, "minute", 0.125, 2500)
+        assert val == 107.5  # 100 + 60 * 0.125
+
+    def test_hour_regen(self):
+        """小时回复：2 小时 * 10 = 20"""
+        now = datetime.now()
+        updated_at = (now - timedelta(minutes=150)).isoformat(timespec="seconds")
+        val, new_ts = _compute_realtime_value(100, updated_at, "hour", 10, 2500)
+        # 150 分钟 = 2 整小时
+        assert val == 120  # 100 + 2 * 10
+
+    def test_day_regen(self):
+        """天回复：跨越 05:00 边界 * 450"""
+        now = datetime.now()
+        yesterday_3am = (now - timedelta(days=1)).replace(hour=3, minute=0, second=0)
+        updated_at = yesterday_3am.isoformat(timespec="seconds")
+        val, ts = _compute_realtime_value(100, updated_at, "day", 450, 2500, "05:00")
+        # Should have crossed at least 1 day boundary
+        assert val >= 550  # 100 + 1 * 450
 
     def test_regen_capped(self):
         """回复封顶"""
         now = datetime.now()
         updated_at = (now - timedelta(minutes=6000)).isoformat(timespec="seconds")
-        # 大量时间后应封顶
-        result = _compute_realtime_value(2400, updated_at, 0.125, 2500)
-        assert result == 2500
+        val, _ = _compute_realtime_value(2400, updated_at, "minute", 0.125, 2500)
+        assert val == 2500
 
     def test_no_updated_at(self):
         """无 updated_at 返回原始值"""
-        result = _compute_realtime_value(100, "", 0.125, 2500)
-        assert result == 100
+        val, ts = _compute_realtime_value(100, "", "minute", 0.125, 2500)
+        assert val == 100
+        assert ts == ""
 
     def test_negative_elapsed(self):
         """未来时间戳不回复"""
         future = (datetime.now() + timedelta(hours=1)).isoformat(timespec="seconds")
-        result = _compute_realtime_value(100, future, 0.125, 2500)
-        assert result == 100
+        val, ts = _compute_realtime_value(100, future, "minute", 0.125, 2500)
+        assert val == 100
+
+    def test_minute_alignment(self):
+        """整分钟对齐：秒数误差不累积"""
+        now = datetime.now()
+        updated_at = (now - timedelta(minutes=5, seconds=20)).isoformat(timespec="seconds")
+        val, new_ts = _compute_realtime_value(100, updated_at, "minute", 1.0, None)
+        # 5 整分钟 * 1.0 = 5
+        assert val == 105.0
 
 
 # ─── profile 节点读写 ────────────────────────────────────────

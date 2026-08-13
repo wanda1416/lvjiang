@@ -97,8 +97,8 @@ class TestRealtimeKeyDef:
     def test_defaults(self):
         kd = RealtimeKeyDef()
         assert kd.cap is None
-        assert kd.regen_rate == 0.0
-        assert kd.regen_daily == 0
+        assert kd.regen_period == "minute"
+        assert kd.regen_value == 0.0
         assert kd.alert_above is None
 
     def test_from_dict(self):
@@ -106,22 +106,25 @@ class TestRealtimeKeyDef:
             "key": "tili",
             "label": "体力",
             "cap": 2500,
-            "regen_rate": 0.125,
-            "regen_daily": 450,
+            "regen_period": "day",
+            "regen_value": 450,
             "alert_above": 2150,
         })
         assert kd.cap == 2500
-        assert kd.regen_rate == 0.125
-        assert kd.regen_daily == 450
+        assert kd.regen_period == "day"
+        assert kd.regen_value == 450
         assert kd.alert_above == 2150
 
     def test_to_dict(self):
-        kd = RealtimeKeyDef(key="tili", label="体力", cap=2500, regen_rate=0.125)
+        kd = RealtimeKeyDef(key="tili", label="体力", cap=2500, regen_period="day", regen_value=450)
         d = kd.to_dict()
         assert d["cap"] == 2500
-        assert d["regen_rate"] == 0.125
-        # regen_daily=0 是默认值，不输出
-        assert "regen_daily" not in d
+        assert d["regen_period"] == "day"
+        assert d["regen_value"] == 450
+        # regen_period="minute" 是默认值，不输出
+        kd2 = RealtimeKeyDef(key="xinli", label="心力", regen_value=0.125)
+        d2 = kd2.to_dict()
+        assert "regen_period" not in d2
 
 
 # ─── ResourceKeyDef ──────────────────────────────────────────

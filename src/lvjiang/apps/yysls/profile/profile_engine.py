@@ -2,7 +2,7 @@
 
 低频后台线程，每 60 秒 tick 一次，负责：
 1. 周期检查与重置（daily / activity 的 period 到期清零）
-2. 实时计算（realtime 按 regen_rate 回复，封顶 cap）
+2. 实时计算（realtime 按 regen_period + regen_value 回复，封顶 cap）
 
 Signals:
     alert_triggered(key, label, message): 提醒触发
@@ -19,21 +19,21 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from lvjiang.constants import USERS_DIR
-from lvjiang.core.config import SessionManager, get_session_store
+from lvjiang.core.config import SessionManager
 from lvjiang.core.user_config import UserConfigManager
 
-from ..config.profile_models import (
-    RealtimeKeyDef,
+from ..config.profile_models import RealtimeKeyDef
+from ..config.profile_store import (
+    get_alert_history,
+    is_alert_marked,
+    mark_alert,
+    set_alert_history,
 )
 from ..config.user_profile import (
     get_profile_config,
     read_profile_entry,
     write_profile_entry,
 )
-
-# 提醒去重在 session.json 中的节点路径
-_ALERT_HISTORY_KEY = "profile_alert_history"
-
 
 # ─── 周期边界计算 ────────────────────────────────────────────
 
@@ -166,22 +166,68 @@ def _should_reset(updated_at_str: str, boundary: datetime) -> bool:
 def _compute_realtime_value(
     stored_value: int | float,
     updated_at_str: str,
-    regen_rate: float,
+    regen_period: str,
+    regen_value: float,
     cap: int | None,
-) -> int:
-    """根据回复速率计算当前实时值"""
-    if regen_rate <= 0 or not updated_at_str:
-        return int(stored_value)
+    reset_time: str = "05:00",
+) -> tuple[float, str]:
+    """根据回复周期和回复数值计算当前实时值
 
-    updated_at = datetime.fromisoformat(updated_at_str)  # 格式错误直接抛异常
-    elapsed_minutes = (datetime.now() - updated_at).total_seconds() / 60.0
+    返回 (computed_value, new_updated_at)。
+    - minute/hour: 按整分钟/整小时计算，小数部分不累计
+    - day: 按每日重置边界计算
+    """
+    now = datetime.now()
+
+    if regen_value <= 0 or not updated_at_str:
+        return float(stored_value), updated_at_str
+
+    if regen_period not in ("minute", "hour", "day"):
+        logger.error(f"非法 regen_period={regen_period!r}，不计算回复")
+        return float(stored_value), updated_at_str
+
+    stored_ts = datetime.fromisoformat(updated_at_str)
+
+    if regen_period == "day":
+        days = _count_daily_regens(stored_ts, now, reset_time)
+        if days <= 0:
+            return float(stored_value), updated_at_str
+        computed = stored_value + days * regen_value
+        if cap is not None:
+            computed = min(computed, cap)
+        # 推进时间戳到 now，避免下次 tick 重复计入已计算的边界
+        return computed, now.isoformat(timespec="seconds")
+
+    # minute / hour
+    elapsed_seconds = (now - stored_ts).total_seconds()
+    if elapsed_seconds <= 0:
+        return float(stored_value), updated_at_str
+
+    elapsed_minutes = int(elapsed_seconds // 60)
     if elapsed_minutes <= 0:
-        return int(stored_value)
+        return float(stored_value), updated_at_str
 
-    computed = stored_value + elapsed_minutes * regen_rate
-    if cap is not None:
-        return int(min(computed, cap))
-    return int(computed)
+    if regen_period == "hour":
+        periods = elapsed_minutes // 60
+    else:  # minute
+        periods = elapsed_minutes
+
+    if periods <= 0:
+        return float(stored_value), updated_at_str
+
+    computed = stored_value + periods * regen_value
+    if cap is not None and computed >= cap:
+        # 触顶：直接推进到 now，避免下次 tick 重复计算
+        return float(cap), now.isoformat(timespec="seconds")
+
+    # 未触顶：仅推进已计入的整周期，避免秒数误差累积
+    if regen_period == "hour":
+        new_ts = stored_ts + timedelta(hours=periods)
+    else:
+        new_ts = stored_ts + timedelta(minutes=periods)
+    new_ts_str = new_ts.isoformat(timespec="seconds")
+
+    return computed, new_ts_str
 
 
 def _count_daily_regens(
@@ -222,25 +268,18 @@ def _check_and_mark_alert(
 
     返回 True 表示首次触发（需要发送），False 表示已提醒过。
     """
-    store = get_session_store()
-    history = store.get_node(_ALERT_HISTORY_KEY, {})
-    if not isinstance(history, dict):
-        history = {}
-
     alert_key = f"{user_name}:{key}:{alert_type}:{period_key}"
-    if alert_key in history:
+    if is_alert_marked(alert_key):
         return False
 
-    history[alert_key] = datetime.now().isoformat(timespec="seconds")
-    store.set_node(_ALERT_HISTORY_KEY, history)
+    mark_alert(alert_key, datetime.now().isoformat(timespec="seconds"))
     return True
 
 
 def _clean_old_alerts(current_keys: set[str]) -> None:
     """清理已不存在的 key 的提醒记录"""
-    store = get_session_store()
-    history = store.get_node(_ALERT_HISTORY_KEY, {})
-    if not isinstance(history, dict) or not history:
+    history = get_alert_history()
+    if not history:
         return
 
     cleaned = {
@@ -248,7 +287,7 @@ def _clean_old_alerts(current_keys: set[str]) -> None:
         if k.split(":")[1] in current_keys
     }
     if len(cleaned) != len(history):
-        store.set_node(_ALERT_HISTORY_KEY, cleaned)
+        set_alert_history(cleaned)
 
 
 # ─── ProfileEngine ───────────────────────────────────────────
@@ -372,24 +411,16 @@ class ProfileEngine(QThread):
             stored_value = entry.get("value", 0)
             updated_at_str = entry.get("updated_at", "")
 
-            computed = _compute_realtime_value(
-                stored_value, updated_at_str, kd.regen_rate, kd.cap
+            computed, new_ts = _compute_realtime_value(
+                stored_value, updated_at_str,
+                kd.regen_period, kd.regen_value, kd.cap,
+                kd.reset_time,
             )
 
-            # 每日补充：计算经过了多少个 reset_time 边界，每次加 regen_daily
-            if kd.regen_daily > 0 and updated_at_str:
-                try:
-                    prev_time = datetime.fromisoformat(updated_at_str)
-                    days_crossed = _count_daily_regens(prev_time, now, kd.reset_time)
-                    if days_crossed > 0:
-                        computed += kd.regen_daily * days_crossed
-                        if kd.cap is not None:
-                            computed = min(computed, kd.cap)
-                except ValueError:
-                    pass  # 时间戳格式错误，跳过每日补充
-
-            if computed != stored_value:
-                write_profile_entry(data, "realtime", kd.key, computed)
+            if computed != stored_value or new_ts != updated_at_str:
+                write_profile_entry(
+                    data, "realtime", kd.key, computed, updated_at=new_ts
+                )
                 modified = True
 
             # 检查 alert_above
@@ -398,7 +429,7 @@ class ProfileEngine(QThread):
                     self.alert_triggered.emit(
                         kd.key,
                         kd.label,
-                        f"{kd.label} 已达 {computed}，超过阈值 {kd.alert_above}",
+                        f"{kd.label} 已达 {int(computed)}，超过阈值 {kd.alert_above}",
                     )
 
         # ── 写入变更 ──

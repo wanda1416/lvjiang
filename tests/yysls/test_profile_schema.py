@@ -121,7 +121,7 @@ class TestLoadConfig:
                 {"key": "niaoniao", "label": "袅袅", "period": "week"},
             ],
             "realtime": [
-                {"key": "tili", "label": "体力", "cap": 2500, "regen_rate": 0.125},
+                {"key": "tili", "label": "体力", "cap": 2500, "regen_period": "day", "regen_value": 450},
             ],
         })
         schema = _load_config()

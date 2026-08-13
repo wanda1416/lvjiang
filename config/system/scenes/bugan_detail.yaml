@@ -51,6 +51,16 @@ regions:
   is_text: true
   is_clickable: false
   view: shangdian
+- key: bugan_jindu
+  name: 不肝进度
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: bugan_view
+  name: 查看不肝
+  type: func
+  is_text: false
+  is_clickable: true
 panels:
 - key: shangpin_1
   name: 商品列表1

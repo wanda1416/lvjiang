@@ -3,13 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from lvjiang.apps.yysls.config.profile_models import MODEL_REGEN, RegenKeyDef
-from lvjiang.apps.yysls.ui.profile.cell_formatting import (
-    format_cell_tooltip,
-    format_profile_cell,
-)
 from lvjiang.apps.yysls.profile.regen_math import (
     compute_realtime_value,
     normalize_realtime_write,
+)
+from lvjiang.apps.yysls.ui.profile.cell_formatting import (
+    format_cell_tooltip,
+    format_profile_cell,
 )
 
 

@@ -5,8 +5,6 @@
 from __future__ import annotations
 
 import pytest
-import yaml
-
 
 # ── fixture：每个测试前后重置 i18n 全局状态 ──
 
@@ -144,7 +142,7 @@ class TestInitI18n:
         assert tr("任意文本") == "任意文本"
 
     def test_current_language(self):
-        from lvjiang.i18n import init_i18n, current_language
+        from lvjiang.i18n import current_language, init_i18n
         init_i18n("en_US")
         assert current_language() == "en_US"
         init_i18n("zh_CN")

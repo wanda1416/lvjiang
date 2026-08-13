@@ -19,6 +19,21 @@ def _concat(*args) -> str:
     return "".join("" if arg is None else str(arg) for arg in args)
 
 
+@builtin_func("split")
+def _split(s: str, delimiter: str) -> list:
+    """按分隔符拆分字符串，返回列表
+
+    返回的列表可用 $var[0] / $var[1] 访问各段。
+
+    .wf 用法:
+        eval $parts = split("20223/23028", "/")
+        # $parts = ["20223", "23028"]
+        eval $current = $parts[0]
+        eval $total = $parts[1]
+    """
+    return str(s).split(str(delimiter))
+
+
 # ─── 范围 ───────────────────────────────────────────────
 
 @builtin_func("range")

@@ -38,14 +38,7 @@ scan:
   entry_min_rating: excellent
   max_consecutive_recycles: 50
   rules:
-  - parts:
-    - 武器
-    - 环
-    - 佩
-    - 冠胄
-    - 胸甲
-    - 胫甲
-    - 腕甲
+  - parts: [全部]
     max_quality: gold_only
     pct_op: le
     pct: 100
@@ -55,8 +48,7 @@ scan:
     judge_rules: []
     action: tune_full_recycle
     first_affix_only: true
-  - parts:
-    - 武器
+  - parts: [武器]
     max_quality: purple_only
     pct_op: ge
     pct: 90
@@ -66,14 +58,7 @@ scan:
     judge_rules: []
     action: skip
     first_affix_only: true
-  - parts:
-    - 武器
-    - 环
-    - 佩
-    - 冠胄
-    - 胸甲
-    - 胫甲
-    - 腕甲
+  - parts: [全部]
     max_quality: purple
     pct_op: ge
     pct: 0
@@ -84,14 +69,7 @@ scan:
     judge_rules: []
     action: skip
     first_affix_only: false
-  - parts:
-    - 武器
-    - 环
-    - 佩
-    - 冠胄
-    - 胸甲
-    - 胫甲
-    - 腕甲
+  - parts: [全部]
     max_quality: purple
     pct_op: le
     pct: 100
@@ -105,14 +83,19 @@ scan:
 tune:
   enabled: true
   rules:
-  - parts:
-    - 武器
-    - 环
-    - 佩
-    - 冠胄
-    - 胸甲
-    - 胫甲
-    - 腕甲
+  - enabled: true
+    parts: [全部]
+    max_quality: gold
+    pct_op: le
+    pct: 100
+    ratings:
+    - top
+    - excellent
+    judge_scope: all
+    judge_rules: []
+    action: continue
+  - enabled: true
+    parts: [全部]
     max_quality: gold_only
     pct_op: ge
     pct: 80
@@ -122,14 +105,8 @@ tune:
     judge_scope: incoming
     judge_rules: []
     action: reset
-  - parts:
-    - 武器
-    - 环
-    - 佩
-    - 冠胄
-    - 胸甲
-    - 胫甲
-    - 腕甲
+  - enabled: true
+    parts: [全部]
     max_quality: purple
     pct_op: le
     pct: 100
@@ -139,14 +116,8 @@ tune:
     judge_scope: incoming
     judge_rules: []
     action: recycle
-  - parts:
-    - 武器
-    - 环
-    - 佩
-    - 冠胄
-    - 胸甲
-    - 胫甲
-    - 腕甲
+  - enabled: true
+    parts: [全部]
     max_quality: gold
     pct_op: le
     pct: 100

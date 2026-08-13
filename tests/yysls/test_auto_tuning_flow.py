@@ -338,7 +338,7 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._material_infos = {
         "material_1": _Stone(type="紫狗粮"),                     # 前置幽灵槽
-        "material_2": _Stone(type="紫狗粮", count=0, owned=103),  # 真槽
+        "material_2": _Stone(type="紫狗粮", count=103, devoted=0),  # 真槽
         "material_6": _Stone(type="紫狗粮"),                     # 后置幽灵槽
     }
     wf._process_equipment("紫胸甲", _equip(2, quality="purple", cap_pct=95),
@@ -347,7 +347,7 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
     assert reports[0]["rounds"] == 3
-    # 库存取真槽 owned=103 → 每轮都喂；点击落在真槽而非幽灵槽
+    # 库存取真槽 count=103 → 每轮都喂；点击落在真槽而非幽灵槽
     assert wf.clicks.count((TUNE_SCENE, "material_2")) == 3
     assert (TUNE_SCENE, "material_1") not in wf.clicks
 
@@ -355,12 +355,12 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
 # ─── 大律准石数量检查 ─────────────────────────
 
 class _Stone:
-    """MaterialInfo 最小替身（只需 type/count/owned 三字段）"""
+    """MaterialInfo 最小替身（只需 type/count/devoted 字段）"""
 
-    def __init__(self, type="大律准石", count=None, owned=None):
+    def __init__(self, type="大律准石", count=None, devoted=None):
         self.type = type
         self.count = count
-        self.owned = owned
+        self.devoted = devoted
 
 
 @pytest.fixture
@@ -391,10 +391,10 @@ def test_stone_check_enough_passes():
     assert not wf.executor.materials_exhausted
 
 
-def test_stone_check_owned_priority():
-    """x/y 样式 owned 优先：count=7 但 owned=117 ≥ 100 → 放行"""
+def test_stone_check_count_as_stock():
+    """count 即持有量：count=117 ≥ 100 → 放行"""
     wf = FakeWF()
-    infos = {"material_2": _Stone(count=7, owned=117)}
+    infos = {"material_2": _Stone(count=117, devoted=7)}
     assert wf.executor._check_stone_stock(_STONE_ON, infos) is True
     assert not wf.executor.materials_exhausted
 
@@ -402,7 +402,7 @@ def test_stone_check_owned_priority():
 def test_stone_check_ocr_fail_passes():
     """找到大律准石但数量 OCR 失败 → 警告放行不误杀"""
     wf = FakeWF()
-    infos = {"material_2": _Stone(count=None, owned=None)}
+    infos = {"material_2": _Stone(count=None, devoted=None)}
     assert wf.executor._check_stone_stock(_STONE_ON, infos) is True
     assert not wf.executor.materials_exhausted
 

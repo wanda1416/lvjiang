@@ -16,7 +16,7 @@ android {
         targetSdk = 35
         // versionCode 同时是配置解压的 stamp（见 App.kt）：改了 config/system 或布局文件
         // 就要 +1，否则升级后仍走「同版本跳过」分支，设备上还是旧配置。
-        versionCode = 10
+        versionCode = 11
         versionName = "0.1.0"
         // 设备为 arm64（vivo V2415A），Chaquopy 按 ABI 打包 Python 运行时
         ndk { abiFilters += listOf("arm64-v8a") }

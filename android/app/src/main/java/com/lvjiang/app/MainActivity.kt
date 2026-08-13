@@ -14,19 +14,22 @@ import com.chaquo.python.Python
 import java.util.concurrent.Executors
 
 /**
- * MainActivity — 首次启动引导与开发者自检页。
+ * MainActivity — 主页：权限状态卡 + 功能区 + 开发者自检。
  *
- * 引导区（普通用户可见面）：权限清单 + 一颗主按钮，按钮永远指向下一件
+ * 权限状态卡（普通用户可见面）：权限清单 + 一颗主按钮，按钮永远指向下一件
  * 要做的事（无障碍 → 悬浮窗 → 启动悬浮图标），每步附一行操作提示。
  * 通知权限不单独设步：不是硬门槛（缺了只是前台通知不显示），在启动
  * 悬浮图标时顺带申请一次。
+ *
+ * 功能区：调律参数配置入口（TuningConfigActivity，不依赖任何权限）+
+ * 悬浮图标启停合一按钮（文案随 FloatService.isRunning 切换）。
  *
  * 高级面板（默认折叠）：Phase 0 以来的开发者自检按钮全部在这里。
  *
  * 另外接受一个由 adb 触发的自检入口，用于不依赖手点按钮的验证：
  *   adb shell am start -n com.lvjiang.app/.MainActivity --es selftest ocr
- * 自检模式下隐藏引导区、展开高级面板：布局回到与实机验证过的旧版一致，
- * e2e 闭环的 OCR 目标（「自检：点击回显」按钮与状态行）不受引导文案干扰。
+ * 自检模式下隐藏权限卡与功能区、展开高级面板：布局回到与实机验证过的
+ * 旧版一致，e2e 闭环的 OCR 目标（「自检：点击回显」按钮与状态行）不受干扰。
  */
 class MainActivity : AppCompatActivity() {
 
@@ -41,6 +44,12 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.advanced_toggle).setOnClickListener { toggleAdvanced() }
         findViewById<Button>(R.id.btn_next).setOnClickListener { onNextStep() }
+
+        // 功能区：配置页不依赖任何权限，随时可进；悬浮启停合一按钮
+        findViewById<Button>(R.id.btn_tuning_config).setOnClickListener {
+            startActivity(Intent(this, TuningConfigActivity::class.java))
+        }
+        findViewById<Button>(R.id.btn_float_toggle).setOnClickListener { onFloatToggle() }
 
         findViewById<Button>(R.id.btn_overlay).setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
@@ -86,18 +95,6 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btn_notification).setOnClickListener {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
-        }
-
-        findViewById<Button>(R.id.btn_start_float).setOnClickListener {
-            if (!Settings.canDrawOverlays(this)) {
-                toast("请先授予悬浮窗权限")
-                return@setOnClickListener
-            }
-            startForegroundService(Intent(this, FloatService::class.java))
-        }
-
-        findViewById<Button>(R.id.btn_stop_float).setOnClickListener {
-            stopService(Intent(this, FloatService::class.java))
         }
 
         findViewById<Button>(R.id.btn_test_shell).setOnClickListener {
@@ -176,6 +173,27 @@ class MainActivity : AppCompatActivity() {
                 hint.text = getString(R.string.guide_hint_float)
             }
         }
+
+        // 悬浮启停合一按钮：文案随运行状态切换
+        findViewById<Button>(R.id.btn_float_toggle).text = getString(
+            if (FloatService.isRunning) R.string.btn_stop_float
+            else R.string.btn_start_float
+        )
+    }
+
+    /** 功能区悬浮图标启停：未运行时启动（需悬浮窗权限），运行中停止 */
+    private fun onFloatToggle() {
+        if (FloatService.isRunning) {
+            stopService(Intent(this, FloatService::class.java))
+        } else {
+            if (!Settings.canDrawOverlays(this)) {
+                toast("请先授予悬浮窗权限")
+                return
+            }
+            startForegroundService(Intent(this, FloatService::class.java))
+        }
+        // isRunning 要等服务生命周期回调跑完才翻转，稍等一拍再刷新
+        statusText.postDelayed({ refreshGuide() }, 500)
     }
 
     private fun onNextStep() {
@@ -219,12 +237,11 @@ class MainActivity : AppCompatActivity() {
             getString(if (expanded) R.string.advanced_collapsed else R.string.advanced_expanded)
     }
 
-    /** 自检模式：隐藏引导区、展开高级面板，让布局回到实机验证过的旧版形态 */
+    /** 自检模式：隐藏权限卡与功能区、展开高级面板，让布局回到实机验证过的旧版形态 */
     private fun enterSelfTestLayout() {
-        for (id in intArrayOf(
-            R.id.guide_title, R.id.guide_subtitle, R.id.check_a11y,
-            R.id.check_overlay, R.id.check_notification, R.id.btn_next, R.id.guide_hint,
-        )) findViewById<View>(id).visibility = View.GONE
+        for (id in intArrayOf(R.id.guide_card, R.id.features_section)) {
+            findViewById<View>(id).visibility = View.GONE
+        }
         findViewById<View>(R.id.advanced_panel).visibility = View.VISIBLE
         findViewById<TextView>(R.id.advanced_toggle).text =
             getString(R.string.advanced_expanded)

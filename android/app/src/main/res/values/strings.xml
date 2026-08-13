@@ -18,6 +18,13 @@
     <string name="advanced_collapsed">▸ 高级（开发者自检）</string>
     <string name="advanced_expanded">▾ 高级（开发者自检）</string>
 
+    <!-- 主页功能区与调律参数配置页 -->
+    <string name="section_features">功能</string>
+    <string name="btn_tuning_config">调律参数配置</string>
+    <string name="tuning_config_title">调律参数配置</string>
+    <string name="tuning_config_loading">加载配置…</string>
+    <string name="tuning_config_save">保存</string>
+
     <string name="btn_overlay">1. 授予悬浮窗权限</string>
     <string name="btn_a11y">2. 开启无障碍服务（必需）</string>
     <string name="btn_shizuku">3. 授予 Shizuku 权限（可选）</string>

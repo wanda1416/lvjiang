@@ -97,6 +97,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 执行状态
         self.variables: dict = {}
         self.output: dict = {}
+        self.return_value = None  # 顶层 return 值（供场景编辑器显示）
         self._coord_meta: dict[str, dict] = {}
         self._base_dir: Path | None = None
         # 当前 wf 相对 workflows 根的目录（跨层 import 解析用），None=根外文件
@@ -219,7 +220,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         except _GotoSignal as sig:
             logger.error(f"goto 目标标签不存在: {sig.target}")
             return self.output
-        except _ReturnSignal:
+        except _ReturnSignal as sig:
+            self.return_value = sig.value  # 捕获顶层 return 值
             logger.info(f"=== DSL 工作流正常返回，收集到 {len(self.output)} 项数据 ===")
             return self.output
         except _BreakSignal:

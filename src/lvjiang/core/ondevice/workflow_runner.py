@@ -48,7 +48,7 @@ def _create_ocr() -> OCREngine:
 
 
 def _default_layout_name() -> str:
-    """默认布局名：session 的 active_layout → 枚举到的第一个布局
+    """默认布局名：session 的 active_layout → layouts.yaml 名册第一个
 
     Raises:
         RuntimeError: 无任何可用布局时
@@ -62,28 +62,28 @@ def _default_layout_name() -> str:
                 return name
         except Exception as e:  # noqa: BLE001 session 损坏不应阻断回退枚举
             logger.warning(f"读取 session.json 失败: {e}")
-    names = get_resolver().enumerate_entities("layouts", "*.json")
+    merged = get_resolver().load_merged("layouts.yaml")
+    names = sorted(merged.get("layouts", {}).keys())
     if names:
-        return Path(names[0]).stem
-    raise RuntimeError("没有可用布局：session 未指定 active_layout 且 layouts/ 下无 *.json")
+        return names[0]
+    raise RuntimeError("没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空")
 
 
 def _load_layout(name: str) -> Layout:
-    """从 JSON 文件加载布局（local 影子优先 → system）
+    """加载布局（目录化结构：layouts.yaml + layouts/{name}/{scene}.json）
 
     Args:
-        name: 布局文件名（不含 .json 后缀）
+        name: 布局名称
 
     Returns:
         Layout 实例
     """
-    layout_path = get_resolver().resolve_read(f"layouts/{name}.json")
-    if layout_path is None:
-        logger.warning(f"布局文件不存在: {name}，使用空布局")
+    from ..layout_manager import load_layout_by_name
+    layout = load_layout_by_name(name)
+    if layout is None:
+        logger.warning(f"布局不存在: {name}，使用空布局")
         return Layout(name=name)
-
-    data = json.loads(layout_path.read_text(encoding="utf-8"))
-    return Layout.from_dict(name, data)
+    return layout
 
 
 def create_engine(
@@ -93,7 +93,7 @@ def create_engine(
     """创建设备端工作流引擎
 
     Args:
-        layout_name: 布局文件名（不含 .json），None 则用 session 活动布局/首个布局
+        layout_name: 布局名称，None 则用 session 活动布局/名册首个布局
         stop_check: 停止判据，引擎每条语句前轮询一次；None 表示不可停止
 
     Returns:
@@ -136,7 +136,7 @@ def run_workflow(
 
     Args:
         wf_name: 工作流文件名（如 "equip_analysis.wf"）或完整路径
-        layout_name: 布局文件名（不含 .json），None 则用 session 活动布局/首个布局
+        layout_name: 布局名称，None 则用 session 活动布局/名册首个布局
         initial_variables: 初始变量
 
     Returns:

@@ -149,15 +149,21 @@ class _ExprMixin:
         return self._unquote(str(item))  # 静态 alias
 
     def log_stmt(self, items):
-        arg = items[0]
+        # 可选的 LOG_LEVEL 终端
+        level = "info"
+        arg_idx = 0
+        if len(items) == 2:
+            level = str(items[0]).lower()
+            arg_idx = 1
+        arg = items[arg_idx]
         # log 参数可以是：字符串常量、函数调用、变量引用、字段访问
         if isinstance(arg, FuncCall):
-            return Log(message=arg, line_no=self._line(items))
+            return Log(message=arg, level=level, line_no=self._line(items))
         if isinstance(arg, VarRef):
-            return Log(message=arg, line_no=self._line(items))
+            return Log(message=arg, level=level, line_no=self._line(items))
         if isinstance(arg, FieldAccess):
-            return Log(message=arg, line_no=self._line(items))
-        return Log(message=self._ensure_literal(arg), line_no=self._line(items))
+            return Log(message=arg, level=level, line_no=self._line(items))
+        return Log(message=self._ensure_literal(arg), level=level, line_no=self._line(items))
 
     def log_arg(self, items):
         """log_arg: 透传任何表达式"""

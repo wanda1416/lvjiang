@@ -178,7 +178,11 @@ collect_stmt: "collect"i collect_source collect_as_clause? _NL
 // collect as 支持字符串常量或变量
 collect_as_clause: "as"i (STRING | var_ref)
 
-log_stmt: "log"i log_arg _NL
+// log 支持可选级别：log [debug|info|warn|error] "message"
+// 默认 info
+log_stmt: "log"i LOG_LEVEL? log_arg _NL
+
+LOG_LEVEL: /debug/i | /info/i | /warn/i | /error/i
 
 // log 参数：任何能求值为字符串的表达式（支持 + 拼接）
 ?log_arg: arith_expr | func_call | var_ref | field_access

@@ -152,14 +152,21 @@ def back_to_haoling()
       return
    end
    click [game_menu_page].$menpai_key after wait $step_interval
-   # 门派页两种形态：有门派（基底，入口文字「江湖号令」）
+   # 门派页三种形态：有门派（基底，入口文字「江湖号令」）
    # / 无门无派（no_school 视图，入口换成 haoling_2）
+   # / 问津（wenjin 视图，入口换成 haoling_3）
    scan [ui_school_main].[haoling] as $haoling_key by contains "江湖号令"
    if $haoling_key
       click [ui_school_main].$haoling_key after wait $step_interval
    else
-      log "未读到江湖号令，按无门无派处理，改点号令入口"
-      click [ui_school_main].[haoling_2] after wait $step_interval
+      scan [ui_school_main].[haoling_2] as $haoling_key by contains "号令"
+      if $haoling_key
+         log "未读到江湖号令，按无门无派处理，改点号令入口"
+         click [ui_school_main].$haoling_key after wait $step_interval
+      else
+         log "haoling 与 haoling_2 均未识别，按问津视图改点 haoling_3"
+         click [ui_school_main].[haoling_3] after wait $step_interval
+      end
    end
 end
 

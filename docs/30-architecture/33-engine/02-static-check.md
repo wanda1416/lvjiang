@@ -11,7 +11,7 @@
 
 | 检查 | 实现 | 依据 |
 |------|------|------|
-| 命名等待参数已定义 | `_validate_named_waits` | `DelayConfig.custom`（配置管理 → 等待参数） |
+| 命名等待参数已定义 | `_validate_named_waits` | `delay_params`（配置管理 → 等待参数，app.yaml delay_params 节） |
 | 引用的坐标已绑定 | `_validate_refs_bound` | 当前激活布局的 regions / points / arrows / panels |
 
 第二项按引用**类别**分别查表，与运行时的查找路径一一对应：

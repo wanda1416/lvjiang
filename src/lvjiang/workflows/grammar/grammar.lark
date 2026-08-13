@@ -333,12 +333,14 @@ catch_clause: "catch"i var_ref? _NL (_NL | statement)*
 field_access: field_access "." NAME -> field_chain
             | field_access "." var_ref -> field_var_chain
             | field_access "[" var_ref "]" -> field_index_chain
+            | field_access "[" INT "]" -> field_bracket_chain
             | field_access "." STRING -> field_str_chain
             | field_access "." "[" NAME "]" -> field_bracket_chain
             | field_access "." "[" INT "]" -> field_bracket_chain
             | var_ref "." NAME -> field_base
             | var_ref "." var_ref -> field_var_base
             | var_ref "[" var_ref "]" -> field_index_base
+            | var_ref "[" INT "]" -> field_bracket_base
             | var_ref "." STRING -> field_str_base
             | var_ref "." "[" NAME "]" -> field_bracket_base
             | var_ref "." "[" INT "]" -> field_bracket_base

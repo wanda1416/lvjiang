@@ -20,6 +20,27 @@ eval $buy_keywords = ["心法", "武学", "奇术", "生活", "宝钱", "短陌�
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
 click [game_main_page].[menu] after wait @page_refresh
 click [game_menu_page].[bugan] after wait @page_refresh
+
+# ─── 获取本周不肝进度 ──────────────────────────────────
+click [bugan_detail].[bugan_view] after wait @step_interval
+scan [bugan_detail].[bugan_jindu] as $jindu_str
+eval $parts = split($jindu_str.bugan_jindu, "/")
+eval $current = $parts[0]
+eval $total = $parts[1]
+
+# 校验进度值
+if $current < 0
+    log concat("不肝进度异常：当前值 ", $current, " 小于 0")
+else
+    if $current > $total
+        log concat("不肝进度解析错误：", $current, " > ", $total)
+    else
+        eval profile_set("bugan_of_week", $current)
+        log concat("本周不肝进度: ", $current, "/", $total)
+    end
+end
+
+
 click [bugan_detail].[shop] after wait @page_refresh
 
 # ─── 战斗养成：依次购买两个商品面板 ─────────────────────

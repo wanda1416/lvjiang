@@ -757,15 +757,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             scripts=scripts,
             config=config,
             ctx=ctx,
-            user_manager=self._user_manager,
             session_manager=self._session_manager,
             stop_check=self._is_stopped,
         )
 
-        # 信号连接：进度 → batch_tab，日志 → log_text，用户切换 → 刷新用户下拉
+        # 信号连接：进度 → batch_tab，日志 → log_text
+        # （批量层显式传递用户，不再联动主页面用户下拉）
         worker.progress.connect(self._batch_tab.update_progress)
         worker.log.connect(self._log_append)
-        worker.user_changed.connect(lambda _: self._refresh_user_combo())
         worker.finished_all.connect(self._batch_tab.on_batch_finished)
         worker.finished_all.connect(
             lambda _: self._end_automation("批量执行")

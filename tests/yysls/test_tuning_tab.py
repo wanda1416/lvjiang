@@ -189,7 +189,6 @@ class TestF9Run:
         assert wf.run_ctx.selected_slots == tab._get_tuning_selected_slots()
         assert wf.run_ctx.rule_judges
         assert wf.run_ctx.judge_rule_keys
-        assert wf.run_ctx.doc_username == "测试用户"
         assert any(m.startswith("[开始] 自动调律") for m in host.logs)
 
 

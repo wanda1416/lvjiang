@@ -236,10 +236,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _open_doc(self, slots: list[str]):
         """创建本次运行的说明文档并写文档头；失败只警告不中断流程。
 
-        操作用户名由 run_control 注入 ctx.doc_username；输出目录可用
+        操作用户名取引擎启动时绑定的 run_username；输出目录可用
         ctx.doc_dir 覆盖（供测试），缺省 logs/tuning/。
         """
-        username = self.ctx.doc_username or "default"
+        username = (self.engine.run_username if self.engine else "") or "default"
         try:
             doc = TuningDocWriter(username, self.ctx.doc_dir)
         except OSError as e:

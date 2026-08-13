@@ -273,10 +273,8 @@ class RunControlMixin:
         name = self.user_combo.currentText()
         old_name = self._user_manager.get_active_user_name()
         if name and name != old_name:
-            # 切换前：如果有正在运行的工作流，先保存旧用户的 session
-            if self._current_engine is not None and self._running:
-                self._session_manager.save(old_name, self._current_engine.session)
-                logger.info(f"用户切换前已保存 session: {old_name}")
+            # 切换只影响 UI 展示；正在运行的任务已在启动时绑定用户名，
+            # 其 session 落盘归属不受此处切换影响
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
         # 通知插件页面（如装备状态）刷新
@@ -461,9 +459,10 @@ class RunControlMixin:
             window_top=window_top,
             stop_check=self._is_stopped,
         )
-        # session/context 初始化
+        # session/context 初始化：启动时快照当前用户，全程只依赖此绑定值
         username = self._user_manager.get_active_user_name()
         engine.session = self._session_manager.load(username)
+        engine.run_username = username
         # context 由 execute() 自动初始化为空 dict
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
         engine._ui_callback = self._create_ui_callback()
@@ -563,12 +562,10 @@ class RunControlMixin:
         self._end_automation(flow_name)
 
     def _auto_save_session(self):
-        """正常结束时自动保存 session"""
+        """正常结束时自动保存 session（存入启动时绑定的用户名）"""
         engine = self._current_engine
-        if engine is not None:
-            username = self._user_manager.get_active_user_name()
-            if username:
-                self._session_manager.save(username, engine.session)
+        if engine is not None and engine.run_username:
+            self._session_manager.save(engine.run_username, engine.session)
 
     def _save_workflow_result(self, flow_id: str, result, interrupted: bool = False):
         """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json
@@ -584,7 +581,9 @@ class RunControlMixin:
         serializable = _to_serializable(result)
 
         from ..constants import OUTPUT_DIR
-        username = self._user_manager.get_active_user_name() or "default"
+        # 输出目录归属启动时绑定的用户名，不受运行期间 UI 切换影响
+        engine = self._current_engine
+        username = (engine.run_username if engine is not None else "") or "default"
         user_output_dir = OUTPUT_DIR / username
         user_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -705,6 +704,7 @@ class RunControlMixin:
         )
         username = self._user_manager.get_active_user_name()
         engine.session = self._session_manager.load(username)
+        engine.run_username = username
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
         engine._ui_callback = self._create_ui_callback()
         self._current_engine = engine  # type: ignore[assignment]

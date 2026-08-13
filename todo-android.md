@@ -485,8 +485,7 @@ $adb = ".tooling\android-sdk\platform-tools\adb.exe"
 
 - ~~仓库分叉~~ ✅ 已解决：master 与 origin/master 已同步（含调律 UI `5d51117` +
   用户指南 `efaa41e` + 透明主题 `92fcb8e`）
-- `.git-mypy-base/` worktree （detached HEAD `33c1baf`）**仍在**，是做 mypy 基线对比时建的，待清：
-  `git worktree remove --force .git-mypy-base`
+- ~~`.git-mypy-base/` worktree~~ ✅ 已清（`git worktree remove --force`，mypy 基线对比早做完，遗留物）
 - **CI 的 mypy 门禁在远端已经是红的**：裸 `python -m mypy` 报 2 个错（`engine/core.py:347`
   的 `workflow._engine = self`、`ondevice/workflow_runner.py:151`），是既有存量、非新引入。
   注意给 mypy 传路径参数会**覆盖** `[tool.mypy] files` 清单；同理 ruff 门禁范围只是

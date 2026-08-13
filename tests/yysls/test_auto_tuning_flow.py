@@ -94,15 +94,13 @@ class FakeWF(AutoTuningWorkflow):
         # 循环词条计数由 _process_equipment 本地维护，测试无需真实解析
         pass
 
-    def _on_scan_reject(self, equip_data, potential, detail_scene=None):
+    def _on_scan_reject(self, equip_data, potential, detail_scene=None,
+                        already_full=False):
         self.scan_reject_calls.append(equip_data)
-        return super()._on_scan_reject(equip_data, potential, detail_scene)
-
-    def _on_full_equipment(self, equip_data, judgement, report,
-                           detail_scene=None):
-        self.full_calls.append((equip_data, judgement, report))
-        return super()._on_full_equipment(equip_data, judgement, report,
-                                          detail_scene)
+        if already_full:
+            self.full_calls.append((equip_data, potential))
+        return super()._on_scan_reject(equip_data, potential, detail_scene,
+                                       already_full=already_full)
 
 
 def _equip(affix_count: int, quality: str = "gold", cap_pct: int = 50,
@@ -126,23 +124,21 @@ def patch_worth(monkeypatch):
 
 
 def test_already_full(monkeypatch):
-    """词条满 → 不进调律，调 _on_full_equipment，未处理过不收集 report"""
+    """词条满 → 不进调律，走扫描处理，未处理过不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: {"s": {"name": "x", "rating": "顶级",
                                                "skipped": False,
                                                "not_applicable": False,
                                                "reasons": []}})
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: TuningBase())
     wf = FakeWF()
     wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
 
     assert not wf.output.get("tuning_reports")
     assert len(wf.full_calls) == 1
-    # 钩子仍能拿到完整 report（含终局判定）
-    assert wf.full_calls[0][2]["status"] == "already_full"
-    assert wf.full_calls[0][2]["final_judgement"]
-    # 未进入调律导航；tune 行为表默认关 → 保留不回收
+    assert len(wf.scan_reject_calls) == 1  # 已满装备走扫描处理路径
+    # 未进入调律导航；scan 处置表默认无规则 → 保留不回收
     assert (WEAPON_DETAIL, "more_func") not in wf.clicks
-    assert not wf.scan_reject_calls
     assert "recycled_items" not in wf.output
 
 
@@ -567,6 +563,7 @@ def test_skip_tuning_full_affix_not_entered(monkeypatch):
     """开关开启但词条已满 → 仍走 already_full，不进调律页也不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: {})
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: TuningBase())
     wf = FakeWF()
     wf.ctx.skip_tuning = True
     wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
@@ -892,7 +889,8 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
-                               "tune_tip": "", "reset_tune": "重置调律(3)"}
+                               "tune_tip": "", "reset_tune": "重置调律(3)",
+                               "check_1": "可调律重置"}
     fp = wf._process_equipment("可救剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -906,6 +904,7 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
     assert (TUNE_SCENE, "reset_tune") in wf.clicks
     assert (TUNE_SCENE, "reset_confirm") in wf.clicks
     assert (TUNE_SCENE, "reset_confirm_2") in wf.clicks
+    assert (TUNE_SCENE, "close_btn") in wf.clicks  # 关闭重置结果弹窗
     assert "recycled_items" not in wf.output
 
 
@@ -954,7 +953,8 @@ def test_tune_reset_local_cap(monkeypatch):
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
-                               "tune_tip": "", "reset_tune": "重置调律 3/3"}
+                               "tune_tip": "", "reset_tune": "重置调律 3/3",
+                               "check_1": "可调律重置"}
     wf._process_equipment("重置一次剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -962,6 +962,39 @@ def test_tune_reset_local_cap(monkeypatch):
     assert reports[0]["resets"] == 1
     assert reports[0]["rounds"] == 2      # 重置一轮 + 冷却硬限后结束一轮
     assert wf.clicks.count((TUNE_SCENE, "reset_confirm")) == 1
+    assert "recycled_items" not in wf.output
+
+
+def test_tune_reset_cooldown_check_fails(monkeypatch):
+    """冷却期检查：check_1 无「可调律重置」→ 点返回回调律页，强制跳过装备"""
+    calls = {"n": 0}
+
+    def judge(*a, **k):
+        calls["n"] += 1
+        return dict(_WORTHY) if calls["n"] == 1 else dict(_JUNK)
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
+    base = _behavior_base(tune=TuneBehavior(
+        enabled=True,
+        rules=[BehaviorRule(ratings=["junk"], action="reset")],
+        reset_exhausted_action="recycle"))  # 回收配置不应生效
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
+                               "tune_affix": "最大外功攻击 100",
+                               "tune_tip": "", "reset_tune": "重置调律(3)",
+                               "check_1": "冷却中"}  # 无「可调律重置」
+    fp = wf._process_equipment("冷却剑", _equip(2, quality="gold",
+                                             cap_pct=50), WEAPON_DETAIL)
+
+    assert fp  # 指纹正常返回（未回收）
+    reports = wf.output["tuning_reports"]
+    assert "resets" not in reports[0]  # 未执行重置
+    assert "冷却期" in reports[0]["stop_reason"]
+    # 点了 reset_tune 后检查失败 → 点 back 回调律页，未点 reset_confirm
+    assert (TUNE_SCENE, "reset_tune") in wf.clicks
+    assert (TUNE_SCENE, "back") in wf.clicks
+    assert (TUNE_SCENE, "reset_confirm") not in wf.clicks
+    # 强制跳过，不走 reset_exhausted_action=recycle
     assert "recycled_items" not in wf.output
 
 
@@ -995,22 +1028,20 @@ def test_tune_reset_exhausted_recycles(monkeypatch):
 
 
 def test_full_equipment_recycled(monkeypatch):
-    """背包已满装备（case A）：reset 规则跳过，recycle 命中即回收"""
+    """背包已满装备：走扫描处理，recycle 规则命中即回收"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
-    base = _behavior_base(tune=TuneBehavior(
-        enabled=True, rules=[BehaviorRule(action="reset"),
-                             BehaviorRule(action="recycle")]))
+    base = _behavior_base(scan=ScanBehavior(
+        enabled=True, rules=[BehaviorRule(action="recycle")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     wf = FakeWF()
     fp = wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
 
     assert fp == ""
     assert len(wf.full_calls) == 1
-    # reset 无基线快照被跳过，recycle 规则命中
     assert (WEAPON_DETAIL, "recycle_confirm") in wf.clicks
     items = wf.output["recycled_items"]
-    assert len(items) == 1 and items[0]["stage"] == "tune"
+    assert len(items) == 1 and items[0]["stage"] == "scan"
     assert not wf.output.get("tuning_reports")
 
 

@@ -21,15 +21,6 @@ _APP_REGISTRY: dict[str, str] = {
 }
 
 
-def register_app(name: str, module_path: str) -> None:
-    """程序化登记一个插件（供测试 / 动态扩展使用）。"""
-    _APP_REGISTRY[name] = module_path
-
-
-def list_apps() -> list[str]:
-    """返回所有已登记的插件名。"""
-    return list(_APP_REGISTRY.keys())
-
 
 def load_app(name: str) -> AppHooks:
     """加载指定插件并返回其 ``AppHooks``。

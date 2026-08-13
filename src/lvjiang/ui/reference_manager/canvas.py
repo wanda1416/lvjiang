@@ -129,10 +129,6 @@ class ReferenceCanvas(QWidget):
         """获取原始 numpy 图片"""
         return self._original_image
 
-    @property
-    def has_image(self) -> bool:
-        return self._pixmap is not None
-
     # ─── 网格区域 ─────────────────────────────────────────
 
     def set_grid_rect(self, rect: QRectF | None):

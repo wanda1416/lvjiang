@@ -104,11 +104,6 @@ class SceneDef:
     panels: list[PanelDef] = field(default_factory=list)
     views: list[ViewDef] = field(default_factory=list)
 
-    @property
-    def multi_view(self) -> bool:
-        """是否已开启多视图"""
-        return bool(self.views)
-
 
 class SceneRegistry:
     """

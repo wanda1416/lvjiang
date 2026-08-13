@@ -25,7 +25,6 @@ from .scene_registry import (
     get_panel_defs,
     get_point_defs,
     get_region_defs,
-    get_scene_name,
 )
 
 # ─── 路径常量 ────────────────────────────────────────────
@@ -687,26 +686,6 @@ class LayoutConfigManager:
             logger.info(f"跨场景迁移 {kind}「{key}」: {source} -> {target}, 更新布局: {changed}")
         return changed
 
-    def check_scenes_valid(self, name: str, scene_keys: list[str]) -> list[str]:
-        """检查指定场景是否已绑定坐标，返回缺失场景的名称列表
-
-        区域/坐标点/方向/面板任一非空即视为已绑定——有些场景（如通用控制）
-        本身只定义坐标点与方向，不含任何区域。
-        """
-        layout = self.load_layout(name)
-        if not layout:
-            return [get_scene_name(k) for k in scene_keys]
-        missing = []
-        for scene_key in scene_keys:
-            bound = (
-                layout.get_scene_regions(scene_key)
-                or layout.get_scene_points(scene_key)
-                or layout.get_scene_arrows(scene_key)
-                or layout.get_scene_panels(scene_key)
-            )
-            if not bound:
-                missing.append(get_scene_name(scene_key))
-        return missing
 
     # ─── 激活布局 ────────────────────────────────────────
 
@@ -725,9 +704,4 @@ class LayoutConfigManager:
         self._config["active_layout"] = name
         self._save_config()
 
-    def get_active_layout(self) -> "Layout | None":
-        name = self.get_active_layout_name()
-        if not name:
-            return None
-        return self.load_layout(name)
 

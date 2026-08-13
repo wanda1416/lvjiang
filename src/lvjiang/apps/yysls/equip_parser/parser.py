@@ -123,24 +123,6 @@ class EquipmentParser:
                     f"equip_type OCR 缺失，由基础属性值 {value} 反查回填部位 {inferred}")
         return quality
 
-    def parse_slot(self, slot_key: str, raw: dict) -> EquipmentData:
-        """向后兼容别名，新代码请用 parse()"""
-        return self.parse(raw)
-
-    def parse_all(self, raw_data: dict) -> dict[str, EquipmentData]:
-        """解析所有部位
-
-        Args:
-            raw_data: 完整 OCR 数据 {key: {field: text, ...}, ...}
-
-        Returns:
-            {key: EquipmentData, ...}
-        """
-        return {
-            key: self.parse(raw)
-            for key, raw in raw_data.items()
-        }
-
     # ─── equip_type 解析 ──────────────────────────────────
 
     def _parse_equip_type(self, raw: str) -> tuple[str | None, str | None]:

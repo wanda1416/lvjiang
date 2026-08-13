@@ -28,6 +28,7 @@ from ...core.batch_config import BatchConfigItem
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
 from ...workflows.engine import WorkflowEngine
+from .batch_report import BatchReport
 
 # 进度状态常量
 ST_PENDING = "待执行"
@@ -102,6 +103,16 @@ class BatchWorker(QThread):
         self.log.emit(f"[批量] 开始：{total} 行 × "
                       f"{len(self._scripts)} 脚本")
 
+        # 初始化报告
+        report = BatchReport(
+            config_name=self._config.name,
+            scripts=[(s.id, s.name) for s in self._scripts],
+            workflows=self._config.workflows.to_dict(),
+            user_column=self._config.user_column,
+            total_rows=total,
+        )
+        report.start_batch()
+
         prev_row: dict | None = None
 
         for run_idx, (row_idx, row_data) in enumerate(self._enabled_rows):
@@ -110,9 +121,12 @@ class BatchWorker(QThread):
                 break
 
             label = self._format_label(row_data, run_idx)
+            username = self._get_username_from_row(row_data) or ""
             self.log.emit(f"[批量] ── [{run_idx + 1}/{total}] {label} ──")
             entry_result: dict = {"switch": ST_SKIPPED, "scripts": {}}
             summary["entries"][label] = entry_result
+
+            report.start_entry(label, username)
 
             # 1. 调用预处理/切换 wf
             wf_path = self._choose_switch_wf(row_idx, row_data, prev_row)
@@ -120,18 +134,21 @@ class BatchWorker(QThread):
                 ok = self._run_switch_wf(wf_path, run_idx, row_data)
                 if not ok:
                     entry_result["switch"] = ST_FAILED
+                    report.record_switch(ST_FAILED)
+                    report.end_entry()
                     for s in self._scripts:
                         entry_result["scripts"][s.id] = ST_SKIPPED
                         self.progress.emit(label, s.id, ST_SKIPPED)
                     self.log.emit(f"[批量] {label} 切换失败，跳过该行")
                     continue
                 entry_result["switch"] = ST_SUCCESS
+                report.record_switch(ST_SUCCESS)
             else:
                 entry_result["switch"] = ST_SKIPPED
+                report.record_switch(ST_SKIPPED)
 
             # 2. 批量层显式传递用户：按行加载该用户 session，
             #    不触碰全局 active user，与 UI 下拉框彻底无关
-            username = self._get_username_from_row(row_data)
             if username:
                 session = self._session_manager.load(username)
             else:
@@ -146,11 +163,13 @@ class BatchWorker(QThread):
 
                 self.progress.emit(label, script.id, ST_RUNNING)
                 self.log.emit(f"[批量] {label} → {script.name} ...")
+                report.start_script(script.id, script.name)
                 try:
                     result = self._run_script(script, session, username)
                     entry_result["scripts"][script.id] = ST_SUCCESS
                     self.progress.emit(label, script.id, ST_SUCCESS)
                     self.log.emit(f"[批量] {label} → {script.name} 完成")
+                    report.end_script(ST_SUCCESS, result)
                     any_success = True
                     self._save_result(username or "unknown", script, result)
                 except Exception as e:
@@ -159,11 +178,17 @@ class BatchWorker(QThread):
                     entry_result["scripts"][script.id] = ST_FAILED
                     self.progress.emit(label, script.id, ST_FAILED)
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
+                    report.end_script(ST_FAILED)
 
             # 4. session 落盘
             if any_success and username:
                 self._session_manager.save(username, session)
 
+            # 用户中断时，关闭尚未结束的脚本记录
+            if self._stopped:
+                report.finish_pending()
+
+            report.end_entry()
             prev_row = row_data
 
             if self._stopped:
@@ -178,6 +203,16 @@ class BatchWorker(QThread):
         if postprocess_wf:
             self.log.emit(f"[批量] 执行后处理: {postprocess_wf}")
             self._run_switch_wf(postprocess_wf, -1, {})
+
+        # 6. 生成报告
+        report.end_batch(stopped=self._stopped)
+        try:
+            report_path = report.write()
+            if report_path:
+                self.log.emit(f"[批量] 报告已保存: {report_path}")
+        except Exception as e:
+            logger.error(f"批量报告写入失败: {e}")
+            self.log.emit(f"[批量] 报告写入失败（不影响执行结果）: {e}")
 
         self.finished_all.emit(summary)
 

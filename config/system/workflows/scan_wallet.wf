@@ -22,7 +22,7 @@
 # 流程结构：
 #   1. 从主页进入菜单 → 包裹 → 装备页 → 钱袋
 #   2. 扫描区域货币面板（money_1, 1×4），累计求和后写入 profile 通宝(万)
-#   3. 扫描其他货币面板（money_2, 3×6），遍历查找么玉、宝钱、长鸣玉并写入 profile
+#   3. 扫描其他货币面板（money_2, 3×6），按目标货币反向遍历取最高置信度写入 profile
 #   4. 返回主界面
 #
 # 参数：
@@ -37,6 +37,10 @@
 #   bugan    — 么玉数量（个）
 #   baoqian  — 宝钱数量 / 10000（万为单位）
 #   changmingyu — 长鸣玉数量（个）
+#
+# 选取策略：
+#   同一货币可能在多个格子出现（如么玉在 row1 和 row2 都识别到），
+#   取置信度最高的结果写入，避免低置信度覆盖高置信度。
 
 default $tol_tongbao = 0
 default $tol_bugan = 0
@@ -81,27 +85,24 @@ eval $tongbao_wan = $tongbao_total / 10000
 call safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)")
 
 # ─── 扫描其他货币（money_2, 3×6） ────────────────────────
-# 遍历 18 个格子，查找么玉、宝钱、长鸣玉
-recognize [bag_wallet_detail].[money_2] as rich $money2 on group "货币资产" with yysls_rich_parse
+# where confidence >= 0.6 过滤掉低置信度噪声
+recognize [bag_wallet_detail].[money_2] as rich $money2 on group "货币资产" where confidence >= 0.6 with yysls_rich_parse
 
-for r in range(1, 3)
-    for c in range(1, 6)
-        eval $cell = $money2.$r.$c
-        eval $label = $cell.label
-        eval $count = $cell.count
-        if $label
-            if $label equals "么玉"
-                call safe_set("bugan", $count, $tol_bugan, "么玉")
-            end
-            if $label equals "宝钱"
-                eval $baoqian_wan = $count / 10000
-                call safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)")
-            end
-            if $label equals "长鸣玉"
-                call safe_set("changmingyu", $count, $tol_changmingyu, "长鸣玉")
-            end
-        end
-    end
+# 按目标货币反向遍历取最高置信度
+call $bugan_val = scan_get($money2, "么玉")
+if $bugan_val > 0
+    call safe_set("bugan", $bugan_val, $tol_bugan, "么玉")
+end
+
+call $baoqian_val = scan_get($money2, "宝钱")
+if $baoqian_val > 0
+    eval $baoqian_wan = $baoqian_val / 10000
+    call safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)")
+end
+
+call $changmingyu_val = scan_get($money2, "长鸣玉")
+if $changmingyu_val > 0
+    call safe_set("changmingyu", $changmingyu_val, $tol_changmingyu, "长鸣玉")
 end
 
 log "钱袋货币扫描完成"
@@ -111,6 +112,27 @@ log "钱袋货币扫描完成"
 click [bag_equip_detail].[back] after wait @step_interval
 # 菜单页 → 主界面
 click [game_menu_page].[back] after wait @page_refresh
+
+# ─── 最高置信度取值子过程 ────────────────────────────────
+# 遍历面板 3×6 所有格子，返回目标货币在最高置信度下的数量
+def scan_get($data, $target)
+    eval $best_val = 0
+    eval $best_conf = -1
+    for r in range(1, 3)
+        for c in range(1, 6)
+            eval $cell = $data.$r.$c
+            eval $label = $cell.label
+            if $label equals $target
+                eval $conf = $cell.confidence
+                if $conf > $best_conf
+                    eval $best_val = $cell.count
+                    eval $best_conf = $conf
+                end
+            end
+        end
+    end
+    return $best_val
+end
 
 # ─── 容差写入子过程 ────────────────────────────────────
 # 校验新值与旧值差值是否在容差范围内，通过则写入，否则跳过

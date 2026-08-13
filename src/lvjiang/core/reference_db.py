@@ -7,16 +7,21 @@
 - 名册：config/system/references.yaml（spaces 列表）
         + config/local/references.yaml（仅本地新建的空间）
 - 作者层：config/system/references/{space}.yaml
-          + config/system/references/{space}/{group}/*.png
+          + config/system/references/{space}/{bucket}/*.png
 - 用户层：config/local/references/{space}.yaml（条目级 diff：references + deleted）
-          + config/local/references/{space}/{group}/*.png
+          + config/local/references/{space}/{bucket}/*.png
 - 激活空间：config/session/session.json 的 active_space 字段（纯运行态）
+
+桶（bucket）：每个空间的桶目录由代码扫描空间目录下的全部二级子目录自动发现。
+文件随机分配到某个桶，YAML 中 file 字段只存文件名（不含桶路径）。
+用户可自由移动文件到任意桶，代码均能感知。
 
 读取恒为合并视图：system 条目（deleted 剔除、同 file 被 local 条目替换）
 + local 独有条目；meta_schema 用户层存在即整列表替换。
 写入按模式路由（开发→system，用户→local），与 ConfigResolver 同一套模式判定。
 """
 
+import random
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -89,7 +94,7 @@ class ReferenceEntry:
     """单条参考图记录
 
     Attributes:
-        file: 图片相对路径（如 "调律材料/001.png"）
+        file: 图片文件名（如 "A1B2C3D4.png"，不含桶目录路径）
         label: 主标识（如 "定音石"、"Boss图标"）
         meta: 任意元数据（如 {"level": 100, "group": "调律材料"}）
         source: 来源截图名（可选）
@@ -105,12 +110,24 @@ class ReferenceEntry:
 
     @property
     def group(self) -> str:
-        """元数据中的分组字段"""
+        """元数据中的分组字段（逗号分隔的多组字符串）"""
         return self.meta.get("group", "")
 
     @group.setter
     def group(self, value: str):
         self.meta["group"] = value
+
+    @property
+    def groups(self) -> list[str]:
+        """元数据中的分组列表（支持逗号分隔多组）"""
+        raw = self.meta.get("group", "")
+        if not raw:
+            return []
+        return [g.strip() for g in str(raw).split(",") if g.strip()]
+
+    @groups.setter
+    def groups(self, value: list[str]):
+        self.meta["group"] = ",".join(g.strip() for g in value if g.strip())
 
     @property
     def level(self) -> int | None:
@@ -170,6 +187,7 @@ class ReferenceDatabase:
         # 合并视图（查询方法统一消费）
         self._entries: list[ReferenceEntry] = []
         self._meta_schema: list[MetaFieldDef] = []
+        self._buckets: list[str] = []  # 目录扫描发现的桶
         self.load()  # 构造时立即加载
 
     # ─── 属性 ────────────────────────────────────────────
@@ -230,12 +248,34 @@ class ReferenceDatabase:
             return self._dev_mode
         return get_resolver().is_dev_mode()
 
-    def image_path(self, rel_path: str) -> Path:
-        """解析图片绝对路径：local 层优先 → system 层"""
-        local = self.local_dir / rel_path
-        if local.exists():
-            return local
-        return self.system_dir / rel_path
+    def image_path(self, filename: str) -> Path:
+        """解析图片绝对路径：遍历全部桶目录查找文件
+
+        Args:
+            filename: 文件名（不含桶路径，如 'A1B2C3D4.png'）
+
+        Returns:
+            文件绝对路径（local 层优先 → system 层），不存在时返回 system 层路径
+        """
+        # 先在 local 层的全部桶中查找
+        for bucket in self._buckets:
+            local = self.local_dir / bucket / filename
+            if local.exists():
+                return local
+        # 再在 system 层的全部桶中查找
+        for bucket in self._buckets:
+            system = self.system_dir / bucket / filename
+            if system.exists():
+                return system
+        # 未找到时返回 system 层第一个桶的路径（保持向后兼容）
+        if self._buckets:
+            return self.system_dir / self._buckets[0] / filename
+        return self.system_dir / filename
+
+    @property
+    def buckets(self) -> list[str]:
+        """当前空间的桶列表（目录扫描发现）"""
+        return list(self._buckets)
 
     @property
     def entries(self) -> list[ReferenceEntry]:
@@ -445,6 +485,8 @@ class ReferenceDatabase:
         self._meta_schema = (self._local_schema
                              if self._local_schema is not None
                              else self._system_schema)
+        # 桶：目录扫描发现（local 层 + system 层合并去重）
+        self._buckets = self._discover_buckets()
 
     @staticmethod
     def _seed_schema() -> list[MetaFieldDef]:
@@ -459,6 +501,21 @@ class ReferenceDatabase:
         except (TypeError, ValueError):
             return None
         return value if 0.0 <= value <= 1.0 else None
+
+    def _discover_buckets(self) -> list[str]:
+        """扫描 local 层 + system 层目录，发现全部二级子目录作为桶"""
+        buckets: list[str] = []
+        # 先扫描 local 层
+        if self.local_dir.exists():
+            for d in self.local_dir.iterdir():
+                if d.is_dir() and not d.name.startswith('.') and d.name not in buckets:
+                    buckets.append(d.name)
+        # 再扫描 system 层
+        if self.system_dir.exists():
+            for d in self.system_dir.iterdir():
+                if d.is_dir() and not d.name.startswith('.') and d.name not in buckets:
+                    buckets.append(d.name)
+        return sorted(buckets)
 
     def _parse_schema(self, raw) -> list[MetaFieldDef]:
         """解析 meta_schema 列表，缺失或为空时种子化"""
@@ -567,20 +624,19 @@ class ReferenceDatabase:
         notes: str = "",
         image_data: "np.ndarray | None" = None,
     ) -> ReferenceEntry:
-        """新增参考图条目（开发→system 层，用户→local 层，图片与条目同层）
+        """新增参考图条目（开发→system 层，用户→local 层，图片随机分配到桶）
 
         Args:
             label: 主标识（如 "定音石"）
-            meta: 元数据字典（如 {"level": 100, "group": "调律材料"}）
+            meta: 元数据字典（如 {"level": 100, "group": "调律材料,装备培养"}）
             source: 来源截图名
             notes: 备注
-            image_data: 如果提供，自动保存为 PNG 文件
+            image_data: 如果提供，自动保存为 PNG 文件（随机分配到注册桶）
 
         Returns:
             新建的 ReferenceEntry
         """
-        group = (meta or {}).get("group", "")
-        filename = self.next_filename(group)
+        filename = self.next_filename()
         entry = ReferenceEntry(
             file=filename,
             label=label,
@@ -589,7 +645,7 @@ class ReferenceDatabase:
             notes=notes,
         )
 
-        # 保存图片文件（与条目同层）
+        # 保存图片文件（随机分配到桶）
         if image_data is not None:
             layer_dir = self.system_dir if self._is_dev() else self.local_dir
             self._save_image(layer_dir, filename, image_data)
@@ -604,11 +660,11 @@ class ReferenceDatabase:
     def update_entry(self, filename: str, **kwargs) -> bool:
         """修改条目元数据
 
-        group 变更时只搬当前可写层实际存在的图片（搬动成功才改 file 路径）；
+        group 变更不再移动文件（文件与分组解耦，用户可自由移动文件到任意桶）。
         用户模式改 system 条目时复制进 local 做影子（file 不变，图片不动）。
 
         Args:
-            filename: 目标文件路径（相对路径）
+            filename: 目标文件名（不含桶路径）
             **kwargs: 要修改的字段（label, meta, source, notes）
 
         Returns:
@@ -622,28 +678,18 @@ class ReferenceDatabase:
 
         if local_entry is not None:
             entry = local_entry
-            layer_dir = self.local_dir
         elif self._is_dev():
             entry = system_entry
-            layer_dir = self.system_dir
         else:
             # 用户模式改 system 条目 → 复制进 local 做影子
             entry = ReferenceEntry(**asdict(system_entry))
             self._local_entries.append(entry)
-            layer_dir = None  # 图片在 system 层，不动
 
-        old_group = entry.group
         if "meta" in kwargs:
             entry.meta.update(kwargs.pop("meta"))
         for key, value in kwargs.items():
             if hasattr(entry, key) and key != "meta":
                 setattr(entry, key, value)
-
-        new_group = entry.group
-        if new_group != old_group and layer_dir is not None:
-            if self._move_image(layer_dir, entry.file, new_group):
-                old_name = Path(entry.file).name
-                entry.file = f"{new_group}/{old_name}" if new_group else old_name
 
         self.save()
         self._rebuild_merged()
@@ -706,7 +752,7 @@ class ReferenceDatabase:
         if label_filter:
             result = [e for e in result if e.label == label_filter]
         if group_filter:
-            result = [e for e in result if e.group == group_filter]
+            result = [e for e in result if group_filter in e.groups]
         if level_filter is not None:
             result = [e for e in result if e.level == level_filter]
         if meta_filters:
@@ -721,19 +767,22 @@ class ReferenceDatabase:
 
 
     def get_all_labels_by_group(self) -> dict[str, list[str]]:
-        """返回所有分组 -> 标识列表的映射"""
+        """返回所有分组 -> 标识列表的映射，支持逗号分隔的多组"""
         result: dict[str, set[str]] = {}
         for e in self._entries:
-            if e.group and e.label:
-                if e.group not in result:
-                    result[e.group] = set()
-                result[e.group].add(e.label)
+            if e.label:
+                for group in e.groups:
+                    if group not in result:
+                        result[group] = set()
+                    result[group].add(e.label)
         return {g: sorted(labels) for g, labels in result.items()}
 
     def get_groups(self) -> list[str]:
-        """返回所有去重分组列表（排序）"""
-        groups = sorted({e.group for e in self._entries if e.group})
-        return groups
+        """返回所有去重分组列表（排序），支持逗号分隔的多组"""
+        all_groups: set[str] = set()
+        for e in self._entries:
+            all_groups.update(e.groups)
+        return sorted(all_groups)
 
 
     # ─── meta_schema 与通用 meta 查询 ──────────────────────
@@ -821,21 +870,33 @@ class ReferenceDatabase:
                 return e
         return None
 
-    def next_filename(self, group: str = "") -> str:
-        """返回新的文件路径（如 '调律材料/A1B2C3D4.png'）
+    def next_filename(self) -> str:
+        """返回新的文件名（如 'A1B2C3D4.png'）
 
         使用 UUID 前 8 位（大写字母）作为文件名，防止重复。
+        不含桶路径，桶由 _save_image 随机分配。
         """
-        name = f"{uuid.uuid4().hex[:8].upper()}.png"
-        return f"{group}/{name}" if group else name
+        return f"{uuid.uuid4().hex[:8].upper()}.png"
 
     # ─── 内部方法 ─────────────────────────────────────────
 
-    def _save_image(self, layer_dir: Path, rel_path: str, image_data: "np.ndarray"):
-        """保存 numpy 图像到指定层目录（按相对路径，支持中文路径）"""
+    def _save_image(self, layer_dir: Path, filename: str, image_data: "np.ndarray"):
+        """保存 numpy 图像到指定层的随机桶目录
+
+        Args:
+            layer_dir: 层目录（system_dir 或 local_dir）
+            filename: 文件名（不含桶路径）
+            image_data: numpy 图像数据
+        """
         import cv2
-        file_path = layer_dir / rel_path
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        # 随机选择一个桶
+        if self._buckets:
+            bucket = random.choice(self._buckets)
+            bucket_dir = layer_dir / bucket
+        else:
+            bucket_dir = layer_dir
+        bucket_dir.mkdir(parents=True, exist_ok=True)
+        file_path = bucket_dir / filename
         # cv2.imwrite 不支持中文路径，用 imencode + 文件写入
         success, buf = cv2.imencode('.png', image_data)
         if success:
@@ -844,30 +905,24 @@ class ReferenceDatabase:
         else:
             logger.error(f"图片编码失败: {file_path}")
 
-    @staticmethod
-    def _delete_image(layer_dir: Path, rel_path: str):
-        """删除指定层的图片文件（不存在则静默跳过）"""
-        file_path = layer_dir / rel_path
-        if file_path.exists():
-            file_path.unlink()
-            logger.debug(f"删除参考图文件: {file_path}")
+    def _delete_image(self, layer_dir: Path, filename: str):
+        """删除指定层的图片文件（遍历全部桶查找，不存在则静默跳过）
 
-    def _move_image(self, layer_dir: Path, rel_path: str, new_group: str) -> bool:
-        """在指定层内移动图片到新分组目录
-
-        Returns:
-            是否实际发生移动（图片不在该层时返回 False，调用方据此决定是否改 file 路径）
+        Args:
+            layer_dir: 层目录（system_dir 或 local_dir）
+            filename: 文件名（不含桶路径）
         """
-        old_path = layer_dir / rel_path
-        if not old_path.exists():
-            return False
-
-        name = old_path.name
-        new_dir = layer_dir / new_group if new_group else layer_dir
-        new_dir.mkdir(parents=True, exist_ok=True)
-        new_path = new_dir / name
-
-        old_path.rename(new_path)
-        logger.debug(f"移动参考图: {old_path} -> {new_path}")
-        return True
+        # 遍历全部桶查找文件
+        for bucket in self._buckets:
+            file_path = layer_dir / bucket / filename
+            if file_path.exists():
+                file_path.unlink()
+                logger.debug(f"删除参考图文件: {file_path}")
+                return
+        # 桶列表为空时直接在层目录查找
+        if not self._buckets:
+            file_path = layer_dir / filename
+            if file_path.exists():
+                file_path.unlink()
+                logger.debug(f"删除参考图文件: {file_path}")
 

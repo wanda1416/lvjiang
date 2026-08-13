@@ -54,24 +54,59 @@ def _make_db(layers, dev_mode: bool) -> ReferenceDatabase:
     )
 
 
+# ─── 桶发现 ──────────────────────────────────────────────
+
+class TestBucketDiscovery:
+    def test_discovers_all_subdirs_from_both_layers(self, layers):
+        """扫描 local + system 层全部子目录，合并去重"""
+        system_dir, system_yaml, local_dir, local_yaml = layers
+        (system_dir / "bucket_a").mkdir(parents=True)
+        (system_dir / "bucket_b").mkdir(parents=True)
+        (local_dir / "bucket_b").mkdir(parents=True)  # 重复
+        (local_dir / "bucket_c").mkdir(parents=True)
+        (system_dir / ".hidden").mkdir(parents=True)  # 应被排除
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
+        db = _make_db(layers, dev_mode=False)
+        assert db.buckets == ["bucket_a", "bucket_b", "bucket_c"]
+
+    def test_empty_when_no_subdirs(self, layers):
+        """无子目录时 buckets 为空列表"""
+        system_dir, system_yaml, local_dir, local_yaml = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
+        db = _make_db(layers, dev_mode=False)
+        assert db.buckets == []
+
+    def test_sorted_order(self, layers):
+        """桶列表按字母排序"""
+        system_dir, system_yaml, _, _ = layers
+        (system_dir / "z_bucket").mkdir(parents=True)
+        (system_dir / "a_bucket").mkdir(parents=True)
+        (system_dir / "m_bucket").mkdir(parents=True)
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        db = _make_db(layers, dev_mode=False)
+        assert db.buckets == ["a_bucket", "m_bucket", "z_bucket"]
+
+
 # ─── 合并视图 ────────────────────────────────────────────
 
 class TestMergedView:
     def test_union_of_layers(self, layers):
         _, system_yaml, _, local_yaml = layers
         _write_yaml(system_yaml, {"version": 1, "references": [
-            _entry("g/A.png", "甲"), _entry("g/B.png", "乙")]})
+            _entry("A.png", "甲"), _entry("B.png", "乙")]})
         _write_yaml(local_yaml, {"version": 1, "references": [
-            _entry("g/C.png", "丙")], "deleted": []})
+            _entry("C.png", "丙")], "deleted": []})
         db = _make_db(layers, dev_mode=False)
-        assert [e.file for e in db.entries] == ["g/A.png", "g/B.png", "g/C.png"]
+        assert [e.file for e in db.entries] == ["A.png", "B.png", "C.png"]
 
     def test_local_entry_replaces_same_file(self, layers):
         _, system_yaml, _, local_yaml = layers
         _write_yaml(system_yaml, {"version": 1, "references": [
-            _entry("g/A.png", "旧名", level=1)]})
+            _entry("A.png", "旧名", level=1)]})
         _write_yaml(local_yaml, {"version": 1, "references": [
-            _entry("g/A.png", "新名", level=99)], "deleted": []})
+            _entry("A.png", "新名", level=99)], "deleted": []})
         db = _make_db(layers, dev_mode=False)
         assert len(db.entries) == 1
         assert db.entries[0].label == "新名"
@@ -80,11 +115,11 @@ class TestMergedView:
     def test_deleted_removes_system_entry(self, layers):
         _, system_yaml, _, local_yaml = layers
         _write_yaml(system_yaml, {"version": 1, "references": [
-            _entry("g/A.png", "甲"), _entry("g/B.png", "乙")]})
+            _entry("A.png", "甲"), _entry("B.png", "乙")]})
         _write_yaml(local_yaml, {"version": 1, "references": [],
-                                 "deleted": ["g/A.png"]})
+                                 "deleted": ["A.png"]})
         db = _make_db(layers, dev_mode=False)
-        assert [e.file for e in db.entries] == ["g/B.png"]
+        assert [e.file for e in db.entries] == ["B.png"]
 
     def test_local_schema_replaces_whole_list(self, layers):
         _, system_yaml, _, local_yaml = layers
@@ -108,18 +143,24 @@ class TestMergedView:
 
 class TestImagePath:
     def test_local_wins_when_exists(self, layers):
-        system_dir, _, local_dir, _ = layers
-        (system_dir / "g").mkdir(parents=True)
-        (system_dir / "g" / "A.png").write_bytes(b"sys")
-        (local_dir / "g").mkdir(parents=True)
-        (local_dir / "g" / "A.png").write_bytes(b"loc")
+        system_dir, system_yaml, local_dir, local_yaml = layers
+        # 创建桶目录（桶由目录扫描发现）
+        (system_dir / "bucket_00").mkdir(parents=True)
+        (system_dir / "bucket_00" / "A.png").write_bytes(b"sys")
+        (local_dir / "bucket_00").mkdir(parents=True)
+        (local_dir / "bucket_00" / "A.png").write_bytes(b"loc")
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
         db = _make_db(layers, dev_mode=False)
-        assert db.image_path("g/A.png") == local_dir / "g" / "A.png"
+        assert db.image_path("A.png") == local_dir / "bucket_00" / "A.png"
 
     def test_falls_back_to_system(self, layers):
-        system_dir, _, _, _ = layers
+        system_dir, system_yaml, _, _ = layers
+        (system_dir / "bucket_00").mkdir(parents=True)
+        _write_yaml(system_yaml, {"version": 1, "references": []})
         db = _make_db(layers, dev_mode=False)
-        assert db.image_path("g/A.png") == system_dir / "g" / "A.png"
+        # 文件不存在时返回 system 层第一个桶的路径
+        assert db.image_path("A.png") == system_dir / "bucket_00" / "A.png"
 
 
 # ─── 用户模式写路由 ──────────────────────────────────────
@@ -140,49 +181,49 @@ class TestUserModeWrites:
 
     def test_remove_system_entry_appends_deleted(self, layers):
         system_dir, system_yaml, _, local_yaml = layers
-        (system_dir / "g").mkdir(parents=True)
-        (system_dir / "g" / "A.png").write_bytes(b"sys")
+        (system_dir / "bucket_00").mkdir(parents=True)
+        (system_dir / "bucket_00" / "A.png").write_bytes(b"sys")
         _write_yaml(system_yaml, {"version": 1, "references": [
-            _entry("g/A.png", "甲")]})
+            _entry("A.png", "甲")]})
         db = _make_db(layers, dev_mode=False)
-        assert db.remove_entry("g/A.png") is True
+        assert db.remove_entry("A.png") is True
         # system 图片与 yaml 均不动
-        assert (system_dir / "g" / "A.png").exists()
+        assert (system_dir / "bucket_00" / "A.png").exists()
         assert yaml.safe_load(system_yaml.read_text(
             encoding="utf-8"))["references"]
         overlay = yaml.safe_load(local_yaml.read_text(encoding="utf-8"))
-        assert overlay["deleted"] == ["g/A.png"]
+        assert overlay["deleted"] == ["A.png"]
         assert db.entries == []
 
     def test_remove_local_only_entry_deletes_file(self, layers):
         _, system_yaml, local_dir, local_yaml = layers
         _write_yaml(system_yaml, {"version": 1, "references": []})
-        (local_dir / "g").mkdir(parents=True)
-        (local_dir / "g" / "B.png").write_bytes(b"loc")
+        (local_dir / "bucket_00").mkdir(parents=True)
+        (local_dir / "bucket_00" / "B.png").write_bytes(b"loc")
         _write_yaml(local_yaml, {"version": 1, "references": [
-            _entry("g/B.png", "乙")], "deleted": []})
+            _entry("B.png", "乙")], "deleted": []})
         db = _make_db(layers, dev_mode=False)
-        assert db.remove_entry("g/B.png") is True
-        assert not (local_dir / "g" / "B.png").exists()
+        assert db.remove_entry("B.png") is True
+        assert not (local_dir / "bucket_00" / "B.png").exists()
         # overlay 无内容 → 覆盖文件被删
         assert not local_yaml.exists()
 
     def test_update_system_entry_copies_to_local_shadow(self, layers):
         system_dir, system_yaml, _, local_yaml = layers
-        (system_dir / "g").mkdir(parents=True)
-        (system_dir / "g" / "A.png").write_bytes(b"sys")
+        (system_dir / "bucket_00").mkdir(parents=True)
+        (system_dir / "bucket_00" / "A.png").write_bytes(b"sys")
         _write_yaml(system_yaml, {"version": 1, "references": [
-            _entry("g/A.png", "旧名")]})
+            _entry("A.png", "旧名")]})
         db = _make_db(layers, dev_mode=False)
-        assert db.update_entry("g/A.png", label="新名") is True
+        assert db.update_entry("A.png", label="新名") is True
         overlay = yaml.safe_load(local_yaml.read_text(encoding="utf-8"))
-        assert overlay["references"][0]["file"] == "g/A.png"  # file 不变
+        assert overlay["references"][0]["file"] == "A.png"  # file 不变
         assert overlay["references"][0]["label"] == "新名"
         # system yaml 原条目不动
         sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
         assert sys_doc["references"][0]["label"] == "旧名"
         # 合并视图取影子
-        assert db.get_entry("g/A.png").label == "新名"
+        assert db.get_entry("A.png").label == "新名"
 
     def test_set_meta_schema_writes_local(self, layers):
         _, system_yaml, _, local_yaml = layers
@@ -452,18 +493,23 @@ class TestReferenceSpaces:
     def test_image_path_resolves_within_active_space(self, space_env):
         """图片路径按激活空间解析，local 优先"""
         _write_roster(space_env["system_roster"], [DEFAULT_SPACE, "空间A"])
-        (space_env["system_ref"] / "空间A" / "g").mkdir(parents=True)
-        (space_env["system_ref"] / "空间A" / "g" / "X.png").write_bytes(b"sys")
-        (space_env["local_ref"] / "空间A" / "g").mkdir(parents=True)
-        (space_env["local_ref"] / "空间A" / "g" / "X.png").write_bytes(b"loc")
+        # 创建桶目录（桶由目录扫描发现）
+        (space_env["system_ref"] / "空间A" / "bucket_00").mkdir(parents=True)
+        (space_env["system_ref"] / "空间A" / "bucket_00" / "X.png").write_bytes(b"sys")
+        (space_env["local_ref"] / "空间A" / "bucket_00").mkdir(parents=True)
+        (space_env["local_ref"] / "空间A" / "bucket_00" / "X.png").write_bytes(b"loc")
+        system_yaml = space_env["system_ref"] / "空间A.yaml"
+        local_yaml = space_env["local_ref"] / "空间A.yaml"
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
         db = ReferenceDatabase(dev_mode=False)
         db.set_active_space("空间A")
         db.load()
-        assert db.image_path("g/X.png") == (
-            space_env["local_ref"] / "空间A" / "g" / "X.png")
+        assert db.image_path("X.png") == (
+            space_env["local_ref"] / "空间A" / "bucket_00" / "X.png")
         # local 缺失时回退 system
-        assert db.image_path("g/Y.png") == (
-            space_env["system_ref"] / "空间A" / "g" / "Y.png")
+        assert db.image_path("Y.png") == (
+            space_env["system_ref"] / "空间A" / "bucket_00" / "Y.png")
 
     def test_create_space_user_mode(self, space_env):
         """用户模式新建空间：yaml 落 local 层并注册 local 名册"""

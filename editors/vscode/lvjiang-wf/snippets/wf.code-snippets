@@ -92,6 +92,13 @@
     ],
     "description": "等待画面稳定"
   },
+  "after_wait_stable": {
+    "prefix": "afterstable",
+    "body": [
+      "after wait stable ${1:timeout}"
+    ],
+    "description": "click/drag 后缀子句：操作后等待画面稳定"
+  },
   "import": {
     "prefix": "import",
     "body": [

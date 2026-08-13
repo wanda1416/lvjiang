@@ -58,7 +58,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
    else
       # 不断刷新直到命中目标任务
       loop $max_refresh
-         click [activity_jianghu].$btn after wait @page_refresh_wait
+         click [activity_jianghu].$btn after wait stable 8 least 0.3
          scan [activity_jianghu].$label as $hit by contains_any $targets
          if $hit
             log "任务 " + $idx + " 刷新命中目标任务"
@@ -135,12 +135,12 @@ end
 # 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
 def action_huanzhuang($label)
    click [activity_jianghu].$label after wait @step_interval
-   click [activity_jianghu].[goto] after wait @page_refresh_wait
+   click [activity_jianghu].[goto] after wait stable 8 least 0.5
    click [waiguan_yigui].[chuanda] after wait @step_interval
    click [waiguan_yigui].[fangan_1] after wait @step_interval
    click [waiguan_yigui].[taoyong] after wait @step_interval
    click [waiguan_yigui].[back] after wait @step_interval
-   click [waiguan_yigui].[back] after wait @page_refresh_wait
+   click [waiguan_yigui].[back] after wait stable 8 least 0.5
    click [activity_jianghu].[back] after wait @step_interval
 end
 
@@ -149,7 +149,7 @@ end
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_heying($label, $idx)
    click [activity_jianghu].$label after wait @step_interval
-   click [activity_jianghu].[goto] after wait @page_refresh_wait
+   click [activity_jianghu].[goto] after wait stable 8 least 0.5
    click [general_action].[camera_shot] after wait @step_interval
    click [general_action].[back] after wait @step_interval
    click [general_action].[back] after wait @step_interval
@@ -171,14 +171,14 @@ def action_qingjing($label)
    click [activity_jianghu].[goto] after wait @step_interval
    click [activity_jianghu].[confirm] after wait @step_interval
    click [activity_jianghu].[expand_up] after wait @step_interval
-   click [activity_jianghu].[goto_qingjing] after wait @page_refresh_wait
+   click [activity_jianghu].[goto_qingjing] after wait stable 8 least 0.5
 
    # 检查是否在衣柜页面（识别到"穿搭"），如果是则导航回情境页面
    scan [waiguan_yigui].[chuanda] as $in_yigui by contains "穿搭"
    if $in_yigui
       log "检测到在衣柜页面，导航回情境编辑页面"
       click [waiguan_qingjing].[qingjing] after wait @step_interval
-      click [waiguan_qingjing].[goto_editing] after wait @page_refresh_wait
+      click [waiguan_qingjing].[goto_editing] after wait stable 8 least 0.5
    end
 
    click [waiguan_qingjing].[save] after wait @step_interval
@@ -191,7 +191,7 @@ def action_qingjing($label)
    # 保存生效需时间，固定等 8 秒再退出
    wait 8
 
-   click [waiguan_qingjing].[back] after wait @page_refresh_wait
+   click [waiguan_qingjing].[back] after wait stable 8 least 0.5
    click [activity_jianghu].[back] after wait @step_interval
    click [activity_jianghu].[back] after wait @step_interval
 end
@@ -229,8 +229,8 @@ def action_dongfang($label, $idx)
    click [general_action].[actions][$fr][$fc] after wait @step_interval
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
-   click [general_action].[choose_1] after wait @page_refresh_wait
-   click [general_action].[back] after wait @page_refresh_wait
+   click [general_action].[choose_1] after wait stable 8 least 0.5
+   click [general_action].[back] after wait stable 8 least 0.5
 
    # 投票后可能弹出确认弹窗，识别到“确认”则点击“取消”关闭
    scan [general_control].[confirm] as $has_confirm by contains "确认"
@@ -288,7 +288,7 @@ def back_to_haoling()
    scan [school_main].[haoling_1, haoling_2, haoling_3] as $haoling_key by contains "号令"
    if $haoling_key
       log "识别到号令，正常进入，区域：" + $haoling_key
-      click [school_main].$haoling_key after wait @page_refresh_wait
+      click [school_main].$haoling_key after wait stable 8 least 0.5
       return 0
    end
 

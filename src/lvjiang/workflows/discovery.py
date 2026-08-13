@@ -9,7 +9,7 @@
 2. **class 来源**：``implementations.list_workflows()`` 中已注册的内置类实现，
    name/parameters 取自类属性 ``DISPLAY_NAME`` / ``PARAMETERS``，id = 注册名。
 
-同 id 时 class 覆盖 .wf（如 ``single_tuning`` 同时存在 .wf 与类实现，以类为准）。
+同 id 时 class 覆盖 .wf。
 每项统一 shape：``{id, name, wf_file|class, parameters}``，不再含 ``required_scenes``
 （场景校验改由 engine 执行时按 AST 静态搜集）。
 """

@@ -170,7 +170,7 @@ def list_tasks() -> str:
         from ...workflows.discovery import list_exposed_scripts
         from .plugins import ensure_loaded
 
-        # 插件必须先加载：class 来源的脚本（auto_tuning / single_tuning）依赖
+        # 插件必须先加载：class 来源的脚本（auto_tuning 等）依赖
         # 工作流注册表，未加载会退化成同名旧 .wf（见 plugins 模块说明）。
         ensure_loaded()
 

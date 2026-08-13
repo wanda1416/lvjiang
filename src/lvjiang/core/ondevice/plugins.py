@@ -6,7 +6,7 @@ Chaquopy 直接调 ``task_runner`` / ``workflow_runner``，没有命令行，若
 
 1. **类实现退化成同名 .wf**：``discover_scripts()`` 的 class 来源取自
    ``implementations.list_workflows()``（由插件注册），注册表为空时
-   ``auto_tuning`` / ``single_tuning`` 会解析成 ``config/system/workflows/``
+   ``auto_tuning`` 会解析成 ``config/system/workflows/``
    下的同名旧 DSL 文件，与类实现行为不同。
 2. **燕云内置函数缺失**：``to_equipment`` 等由 ``builtin_modules`` 导入时经
    ``@builtin_func`` 注册，未加载则 DSL 调用直接报未知函数。

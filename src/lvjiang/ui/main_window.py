@@ -585,6 +585,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 spin.setRange(param_def.get("min", 1), param_def.get("max", 9999))
                 spin.setValue(int(default) if default is not None else 1)
                 self._param_layout.addRow(label + ":", spin)
+            elif param_type == "bool":
+                chk = QCheckBox()
+                chk.setObjectName(name)
+                if isinstance(default, str):
+                    chk.setChecked(default.lower() in ("true", "1", "yes", "on"))
+                else:
+                    chk.setChecked(bool(default))
+                self._param_layout.addRow(label + ":", chk)
             else:
                 combo = QComboBox()
                 combo.setObjectName(name)

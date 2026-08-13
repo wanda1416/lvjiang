@@ -229,7 +229,7 @@ def _parse_pattern(raw: dict, vocab: set[str], where: str) -> PartPattern:
     if "usable_conditions" in raw:
         raise RuleValidationError(
             f"{where}: usable_conditions 已废弃，请改用 normal_conditions")
-    first = _check_names(raw.get("first"), vocab, f"{where}.first")
+    first = _check_names(raw.get("first") or [], vocab, f"{where}.first")
     if not first:
         raise RuleValidationError(f"{where}: first 不能为空")
     # 部位级默认判定覆盖（可选，缺省跟随规则级）
@@ -310,8 +310,8 @@ def parse_tuning_rule(data: dict,
         )
 
     # ── 词条库与模式（顶层，允许为空 = 新建骨架） ──
-    affix_pool = _check_names(data.get("affix_pool"), vocab, "affix_pool")
-    priority = _check_names(data.get("transmute_priority"), vocab,
+    affix_pool = _check_names(data.get("affix_pool") or [], vocab, "affix_pool")
+    priority = _check_names(data.get("transmute_priority") or [], vocab,
                             "transmute_priority")
 
     patterns: dict[str, PartPattern] = {}

@@ -89,8 +89,8 @@ class TuningDocWriter:
         name = equip.get("name") or "未知装备"
         etype = equip.get("type") or "未知类型"
         level = equip.get("level")
-        quality = _QUALITY_NAMES.get(
-            equip.get("quality"), equip.get("quality") or "品阶未知")
+        quality_raw = equip.get("quality")
+        quality = _QUALITY_NAMES.get(quality_raw, quality_raw or "品阶未知") if quality_raw is not None else "品阶未知"
         level_txt = f"{level}级 " if level else ""
         self._write()
         self._write(f"## {seq}. {name} · {etype}（{level_txt}{quality}）")
@@ -99,6 +99,7 @@ class TuningDocWriter:
         affixes = [a for a in affixes if isinstance(a, dict) and a.get("name")]
         self._write(f"进入调律时词条（{len(affixes)}/5）：")
         for a in affixes:
+            assert isinstance(a, dict)
             self._write(f"- {format_affix(a)}")
 
     def worthiness_matched(self, results: dict[str, dict]):
@@ -179,8 +180,8 @@ class TuningDocWriter:
             name = it.get("name") or "未知装备"
             etype = it.get("type") or "未知类型"
             level = it.get("level")
-            quality = _QUALITY_NAMES.get(
-                it.get("quality"), it.get("quality") or "品阶未知")
+            quality_raw = it.get("quality")
+            quality = _QUALITY_NAMES.get(quality_raw, quality_raw or "品阶未知") if quality_raw is not None else "品阶未知"
             level_txt = f"{level}级 " if level else ""
             rating = it.get("rating_text") or "无有效结论"
             self._write(f"{i}. {name} · {etype}（{level_txt}{quality}）"

@@ -147,7 +147,8 @@ class CanvasPoiMixin:
         if self._visible_keys is None:
             return list(arrows), []
         visible_pt_keys = {p.key for p in self._points}
-        visible, hidden = [], []
+        visible: list[Point] = []
+        hidden: list[Point] = []
         for a in arrows:
             (visible if a.from_key in visible_pt_keys else hidden).append(a)
         return visible, hidden
@@ -287,7 +288,7 @@ class CanvasPoiMixin:
         self._selected_arrow_idx = -1
         self.update()
 
-        menu = QMenu(self)
+        menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: #f0f0f0; padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
@@ -425,7 +426,7 @@ class CanvasPoiMixin:
     def _nearest_point_for_snap(self, pos: QPointF, exclude_key: str) -> int:
         """找距 pos 最近且在吸附阈值内的 point（排除 exclude_key），-1 无"""
         best_idx = -1
-        best_d = ARROW_SNAP_PIXELS
+        best_d = float(ARROW_SNAP_PIXELS)
         for i, p in enumerate(self._points):
             if p.key == exclude_key:
                 continue

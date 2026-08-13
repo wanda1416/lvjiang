@@ -303,6 +303,7 @@ class OCRCanvas(QWidget):
 
     def _draw_selection(self, painter: QPainter):
         """绘制选框（红色边框 + 8 个手柄）"""
+        assert self._selection is not None
         widget_rect = self._norm_to_widget_rect(self._selection)
 
         # 半透明红色填充
@@ -413,11 +414,13 @@ class OCRCanvas(QWidget):
             if mode == _DragMode.MOVING:
                 self._drag_mode = _DragMode.MOVING
                 self._drag_start = pos
+                assert self._selection is not None
                 self._drag_orig = QRectF(self._selection)
             elif mode == _DragMode.RESIZING:
                 self._drag_mode = _DragMode.RESIZING
                 self._drag_handle = handle
                 self._drag_start = pos
+                assert self._selection is not None
                 self._drag_orig = QRectF(self._selection)
             else:
                 # 空白区域：开始绘制新选框

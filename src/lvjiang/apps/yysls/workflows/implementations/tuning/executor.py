@@ -170,7 +170,7 @@ class TuningExecutor:
             return FoodDecision("none", "", "未配置狗粮规则 → 不添加")
         cap_pct = (equip_data.affixes[0].cap_pct
                    if equip_data.affixes else None)
-        stocks: dict[str, int] = {}
+        stocks: dict[str, int | None] = {}
         for info in (infos or {}).values():
             label = getattr(info, "type", "") or ""
             if not label:
@@ -178,11 +178,11 @@ class TuningExecutor:
             # 数量 None = 该材料是装备而非狗粮，视为已耗尽（count=0）
             count = info.count if info.count is not None else 0
             # 低置信度误匹配的同名幽灵槽（数量 0）不得覆盖真槽
-            if label in stocks and stocks[label] > 0:
+            if label in stocks and (stocks[label] or 0) > 0:
                 continue
             stocks[label] = count
         decision = settings.decide_food(
-            cap_pct, expect_rating, equip_data.quality, stocks)
+            int(cap_pct) if cap_pct is not None else None, expect_rating, equip_data.quality, stocks)
         log = logger.warning if decision.action == "skip" else logger.info
         log(f"狗粮策略: {decision.reason}")
         return decision

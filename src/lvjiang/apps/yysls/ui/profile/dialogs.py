@@ -10,16 +10,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFormLayout,
     QHeaderView,
     QLabel,
-    QSpinBox,
+    QLineEdit,
+    QMessageBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -115,7 +116,7 @@ def ask_value_dialog(
     is_float: bool,
     min_val: int,
     sources: list[str],
-    initial_value: float = 0,
+    initial_value: float | None = None,
     sync_checkbox: bool = False,
     sync_default: bool = True,
     source_label: str = "来源",
@@ -137,19 +138,18 @@ def ask_value_dialog(
     hint_label = QLabel(hint)
     layout.addRow(hint_label)
 
-    spin: QSpinBox | QDoubleSpinBox
+    value_input = QLineEdit()
     if is_float:
-        ds = QDoubleSpinBox()
-        ds.setRange(min_val, 999999)
-        ds.setDecimals(4)
-        ds.setValue(initial_value)
-        spin = ds
+        validator = QDoubleValidator(float(min_val), 999999.0, 4, value_input)
+        value_input.setValidator(validator)
     else:
-        si = QSpinBox()
-        si.setRange(min_val, 999999)
-        si.setValue(int(initial_value))
-        spin = si
-    layout.addRow(prompt, spin)
+        validator = QIntValidator(min_val, 999999, value_input)
+        value_input.setValidator(validator)
+
+    if initial_value is not None:
+        value_input.setText(str(initial_value) if is_float else str(int(initial_value)))
+    value_input.setPlaceholderText("请输入数值")
+    layout.addRow(prompt, value_input)
 
     combo = QComboBox()
     combo.setEditable(True)
@@ -170,11 +170,37 @@ def ask_value_dialog(
     buttons = QDialogButtonBox(
         QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
     )
-    buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addRow(buttons)
 
+    parsed_value: list[float | int] = [0.0 if is_float else 0]
+
+    def on_accept() -> None:
+        text = value_input.text().strip()
+        if not text:
+            QMessageBox.warning(dialog, "输入错误", f"请输入{prompt.rstrip(':：')}")
+            value_input.setFocus()
+            return
+        try:
+            value = float(text) if is_float else int(text)
+        except ValueError:
+            QMessageBox.warning(dialog, "输入错误", f"{prompt.rstrip(':：')}必须是有效数字")
+            value_input.setFocus()
+            return
+        if value < min_val:
+            QMessageBox.warning(dialog, "输入错误", f"{prompt.rstrip(':：')}不能小于 {min_val}")
+            value_input.setFocus()
+            return
+        if value > 999999:
+            QMessageBox.warning(dialog, "输入错误", f"{prompt.rstrip(':：')}不能大于 999999")
+            value_input.setFocus()
+            return
+        parsed_value[0] = value
+        dialog.accept()
+
+    buttons.accepted.connect(on_accept)
+
     if dialog.exec():
         sync_checked = sync_check.isChecked() if sync_check is not None else True
-        return spin.value(), combo.currentText().strip(), sync_checked, True
+        return parsed_value[0], combo.currentText().strip(), sync_checked, True
     return 0, "", sync_default, False

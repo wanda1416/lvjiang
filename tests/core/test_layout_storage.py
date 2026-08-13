@@ -47,8 +47,8 @@ def env(tmp_path, monkeypatch):
     import lvjiang.constants as constants
     import lvjiang.core.config.resolver as cr
 
-    monkeypatch.setattr(constants, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
+    monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
     monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

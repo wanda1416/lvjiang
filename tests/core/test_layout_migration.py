@@ -92,8 +92,9 @@ class TestMigrateAcrossLayouts:
     def manager(self, tmp_path, monkeypatch):
         """resolver 三层根指向 tmp_path 的独立管理器（开发模式写 system）"""
         import lvjiang.constants as constants
-        monkeypatch.setattr(constants, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-        monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", tmp_path / "local")
+        import lvjiang.core.config.resolver as cr
+        monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
+        monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
         monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

@@ -30,12 +30,12 @@ ATTRS_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"
 @pytest.fixture
 def tmp_attrs(tmp_path, monkeypatch):
     """真实 attributes.yaml 的 tmp 副本（resolver 根指向 tmp，开发模式直写 system）"""
-    import lvjiang.constants as constants
+    import lvjiang.core.config.resolver as cr
     dst = tmp_path / "system" / "yysls" / "attributes.yaml"
     dst.parent.mkdir(parents=True)
     shutil.copy(ATTRS_FILE, dst)
-    monkeypatch.setattr(constants, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr(constants, "LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
+    monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
     return dst
 

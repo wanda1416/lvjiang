@@ -726,6 +726,7 @@ class TuningGroup:
     """
     key: str = "default"
     name: str = "基础规则"
+    description: str = ""
     materials: MaterialSettings = field(default_factory=MaterialSettings)
     scan: ScanBehavior = field(default_factory=ScanBehavior)
     tune: TuneBehavior = field(default_factory=TuneBehavior)

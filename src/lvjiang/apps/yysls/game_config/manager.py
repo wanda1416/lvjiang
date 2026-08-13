@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -24,7 +25,21 @@ from .constants import (
     POOL_NORMAL,
     WUXUE_CATEGORY,
 )
-from .models import AttrRange, LevelConfig, LevelRule
+from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
+
+
+def _parse_date(value) -> date | None:
+    """解析日期值：支持 date 对象、ISO 格式字符串（YYYY-MM-DD），无效返回 None"""
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
 
 
 class GameConfigManager:
@@ -67,6 +82,8 @@ class GameConfigManager:
         self._schools: dict[str, dict] = {}
         # 等级配置：等级 → LevelConfig（顶层 level_configs）
         self._level_configs: list[LevelConfig] = []
+        # 赛季配置：赛季编号 → SeasonConfig（顶层 season_configs）
+        self._season_configs: list[SeasonConfig] = []
 
         self._load()
 
@@ -93,6 +110,7 @@ class GameConfigManager:
         self._weapon_wuxue_affixes.clear()
         self._schools.clear()
         self._level_configs.clear()
+        self._season_configs.clear()
 
         # ── weapon_types（支持 dict 列表格式：[{name, wuxue_affix}, ...]）──
         raw_weapon_types = data.get("weapon_types") or []
@@ -222,6 +240,27 @@ class GameConfigManager:
             ))
         # 按等级排序
         self._level_configs.sort(key=lambda c: c.level)
+
+        # ── season_configs（顶层赛季配置）──
+        raw_seasons = data.get("season_configs") or []
+        seen_seasons: set[int] = set()
+        for item in raw_seasons:
+            if not isinstance(item, dict):
+                continue
+            season_number = item.get("season_number")
+            if not isinstance(season_number, int) or season_number in seen_seasons:
+                continue
+            seen_seasons.add(season_number)
+            self._season_configs.append(SeasonConfig(
+                season_number=season_number,
+                name=item.get("name", ""),
+                start_date=_parse_date(item.get("start_date")),
+                end_date=_parse_date(item.get("end_date")),
+                first_half_end_date=_parse_date(item.get("first_half_end_date")),
+                equip_level=item.get("equip_level"),
+            ))
+        # 按赛季编号排序
+        self._season_configs.sort(key=lambda c: c.season_number)
 
     # ── 词条映射 ────────────────────────────────────────────
 
@@ -356,6 +395,31 @@ class GameConfigManager:
         for cfg in self._level_configs:
             if cfg.level == level:
                 return cfg
+        return None
+
+    # ── 赛季配置 ────────────────────────────────────────────
+
+    def get_season_configs(self) -> list[SeasonConfig]:
+        """赛季配置列表（按赛季编号排序的副本）"""
+        return list(self._season_configs)
+
+    def season_config_for(self, season_number: int) -> SeasonConfig | None:
+        """按赛季编号查找配置条目（精确匹配），未找到返回 None"""
+        for cfg in self._season_configs:
+            if cfg.season_number == season_number:
+                return cfg
+        return None
+
+    def current_season(self) -> SeasonConfig | None:
+        """获取当前赛季（根据当前日期在 start_date 和 end_date 之间判断）
+
+        无匹配返回 None。
+        """
+        today = date.today()
+        for cfg in self._season_configs:
+            if cfg.start_date and cfg.end_date:
+                if cfg.start_date <= today <= cfg.end_date:
+                    return cfg
         return None
 
     # ── 原始数据访问与保存（UI 编辑用） ────────────────────────

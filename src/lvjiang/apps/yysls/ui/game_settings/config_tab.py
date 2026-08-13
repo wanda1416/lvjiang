@@ -1,10 +1,11 @@
 """游戏配置 - 主容器
 
-包含四个 Tab 页：
+包含五个 Tab 页：
 - 词组配置（最基础的配置，不依赖任何 tab）
 - 装备配置（基础属性规则 + 武器类型注册）
 - 流派配置
 - 等级配置（按等级区分重置支持与材料要求）
+- 赛季配置（管理游戏赛季时间与装备等级）
 """
 
 from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
@@ -13,6 +14,7 @@ from .affix_caps_panel import AffixCapsPanel
 from .base_attr_panel import BaseAttrPanel
 from .level_config_panel import LevelConfigPanel
 from .school_panel import SchoolPanel
+from .season_config_panel import SeasonConfigPanel
 
 
 class GameConfigTab(QWidget):
@@ -44,5 +46,9 @@ class GameConfigTab(QWidget):
         # 等级配置面板（按等级区分重置支持与材料要求）
         self._level_panel = LevelConfigPanel()
         self._tabs.addTab(self._level_panel, "等级配置")
+
+        # 赛季配置面板（管理游戏赛季时间与装备等级）
+        self._season_panel = SeasonConfigPanel()
+        self._tabs.addTab(self._season_panel, "赛季配置")
 
         layout.addWidget(self._tabs)

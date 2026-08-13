@@ -1,5 +1,6 @@
 key: default
 name: 默认规则
+description: 均衡策略，兼顾材料消耗与装备质量，适合日常使用
 materials:
   stone_check:
     enabled: true

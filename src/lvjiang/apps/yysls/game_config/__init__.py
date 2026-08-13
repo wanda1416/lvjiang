@@ -22,7 +22,7 @@ from .constants import (
     WUXUE_CATEGORY,
 )
 from .manager import GameConfigManager, get_game_config
-from .models import AttrRange, LevelConfig, LevelRule
+from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
 
 __all__ = [
     "AFFIX_CATEGORY_NAMES",
@@ -34,6 +34,7 @@ __all__ = [
     "LevelRule",
     "POOL_DINGYIN",
     "POOL_NORMAL",
+    "SeasonConfig",
     "WUXUE_CATEGORY",
     "get_game_config",
 ]

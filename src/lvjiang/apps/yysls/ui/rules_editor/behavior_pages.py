@@ -10,10 +10,13 @@
   边界条件：继续调律不可达，无命中默认结束保留；未满默认
   继续调律）；另有单件重置次数上限 + 次数用尽转处置动作。
 每条规则 = 部位多选（至少勾一项，全选展示 - 全部 -）
-+ 品阶/首词条初始数值/判定评级三个有序 ≤ 门槛（单选，
-取最高档 = 不限）+ 判定语义（预期评级识别用哪个流派规则集：
-传入规则/全部规则/自选规则，自选经弹窗勾选）+ 动作（候选按
-行为点白名单锁定）。
++ 品阶（扫描处理：不限/金装/紫装及以下/蓝装及以下；结束
+处理：≤ 门槛）+ 首词条初始数值（≥/≤ 方向可选 + 数值，
+≤ 100 / ≥ 0 = 不限）+ 判定评级多选
+（四档自由勾选，全选 = 不限）+ 仅首词条（仅扫描处理，
+取评级时只注入首词条）+ 判定语义（预期评级识别用
+哪个流派规则集：传入规则/全部规则/自选规则，自选经弹窗
+勾选）+ 动作（候选按行为点白名单锁定）。
 沿用「变更即校验即保存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、各自只替换 behavior.scan /
@@ -26,6 +29,7 @@ from datetime import datetime
 from typing import Callable
 
 from loguru import logger
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -47,10 +51,13 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps.yysls.evaluator import get_rule_names
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     BEHAVIOR_ACTION_LABELS,
+    BEHAVIOR_ACTION_TOOLTIPS,
     BEHAVIOR_STAGE_ACTIONS,
     JUDGE_SCOPE_LABELS,
     JUDGE_SCOPES,
     MAX_TUNE_RESETS,
+    PCT_OP_LABELS,
+    PCT_OPS,
     QUALITY_LABELS,
     QUALITY_PARTS,
     RATING_KEYS,
@@ -60,15 +67,31 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
 )
 
 # 品阶 ≤ 门槛候选（从高到低，最高档 = 不限）
+# 扫描处理用 SCAN_QUALITY_KEYS（含金装专用），结束处理用 QUALITY_KEYS
 _QUALITY_KEYS = ("gold", "purple", "blue")
+_SCAN_QUALITY_KEYS = ("gold", "gold_only", "purple", "blue")
+_SCAN_QUALITY_LABELS = {
+    "gold": "- 不限 -",
+    "gold_only": "金装",
+    "purple": "紫装及以下",
+    "blue": "蓝装及以下",
+}
 
-# 规则表列定义
-_COLS = ("部位", "品阶 ≤", "首词条 ≤ %", "评级 ≤", "判定语义", "动作")
+# 规则表列定义（第一列为排序按钮；扫描处理在评级后多一列
+# 「仅首词条」，列索引经 self._ci 按列 key 取）
+_SORT_COL = 0
+_BASE_COL_KEYS = ("sort", "parts", "quality", "pct", "ratings",
+                  "judge", "action")
+_COL_TITLES = {
+    "sort": "", "parts": "部位", "quality": "品阶 ≤",
+    "pct": "首词条 %", "ratings": "评级", "first_affix": "仅首词条",
+    "judge": "判定语义", "action": "动作",
+}
 
-# tune 行为点的 ignore 语义是「结束保留」，动作文案按行为点区分
+# 各行为点的动作标签（统一使用 BEHAVIOR_ACTION_LABELS）
 _STAGE_ACTION_LABELS = {
     "scan": BEHAVIOR_ACTION_LABELS,
-    "tune": {**BEHAVIOR_ACTION_LABELS, "ignore": "结束保留"},
+    "tune": BEHAVIOR_ACTION_LABELS,
 }
 
 
@@ -133,6 +156,54 @@ class _MultiSelect(QPushButton):
             self.setText("- 全部 -")
         else:
             self.setText("/".join(labels))
+
+
+class _PctCell(QWidget):
+    """规则行「首词条」单元格：比较方向（≥/≤）下拉 + 数值
+
+    不限语义跟随方向：≤ 100 / ≥ 0 均为不限；非不限时
+    识别失败视为不达标。
+    """
+
+    def __init__(self, op: str, value: int,
+                 changed: Callable[[], None], parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setSpacing(2)
+        self._op = QComboBox()
+        for key in PCT_OPS:
+            self._op.addItem(PCT_OP_LABELS.get(key, key), key)
+        # 符号列需容纳「符号 + 下拉箭头」，过窄会被箭头挤掉
+        self._op.setMinimumWidth(52)
+        self._op.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._op.setToolTip("首词条初始数值比较方向")
+        layout.addWidget(self._op)
+        self._spin = QSpinBox()
+        self._spin.setRange(0, 100)
+        self._spin.setSuffix(" %")
+        self._spin.setToolTip(
+            "命中条件：首词条初始数值按方向比较该值；"
+            "≤ 100 / ≥ 0 = 不限（识别失败视为不达标）")
+        layout.addWidget(self._spin, stretch=1)
+        self.set_value(op, value)
+        self._op.currentIndexChanged.connect(lambda _i: changed())
+        self._spin.valueChanged.connect(lambda _v: changed())
+
+    def op(self) -> str:
+        return self._op.currentData()
+
+    def value(self) -> int:
+        return self._spin.value()
+
+    def set_value(self, op: str, value: int):
+        self._op.blockSignals(True)
+        self._op.setCurrentIndex(max(self._op.findData(op), 0))
+        self._op.blockSignals(False)
+        self._spin.blockSignals(True)
+        self._spin.setValue(value)
+        self._spin.blockSignals(False)
 
 
 class _JudgeRulesDialog(QDialog):
@@ -261,11 +332,30 @@ class _BehaviorPageBase(QWidget):
 
         self._init_head(layout)
 
-        self._table = QTableWidget(0, len(_COLS))
-        self._table.setHorizontalHeaderLabels(list(_COLS))
+        # 扫描处理：品阶列标题为「品阶」（含金装专用），且多
+        # 「仅首词条」列；结束处理为「品阶 ≤」标准列
+        keys = list(_BASE_COL_KEYS)
+        titles = dict(_COL_TITLES)
+        if self.STAGE == "scan":
+            titles["quality"] = "品阶"  # 扫描处理品阶列不用 ≤ 语义
+            keys.insert(keys.index("judge"), "first_affix")
+        self._ci = {k: i for i, k in enumerate(keys)}
+        self._table = QTableWidget(0, len(keys))
+        self._table.setHorizontalHeaderLabels([titles[k] for k in keys])
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
-        self._table.verticalHeader().setVisible(True)
+        # 排序列固定宽度，首词条列（符号 + 数值）与仅首词条列
+        # 按内容自适应，隐藏序号列
+        self._table.horizontalHeader().setSectionResizeMode(
+            _SORT_COL, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(_SORT_COL, 28)
+        self._table.horizontalHeader().setSectionResizeMode(
+            self._ci["pct"], QHeaderView.ResizeMode.ResizeToContents)
+        if "first_affix" in self._ci:
+            self._table.horizontalHeader().setSectionResizeMode(
+                self._ci["first_affix"],
+                QHeaderView.ResizeMode.ResizeToContents)
+        self._table.verticalHeader().setVisible(False)
         self._table.setMinimumHeight(140)
         layout.addWidget(self._table)
 
@@ -289,47 +379,81 @@ class _BehaviorPageBase(QWidget):
         row = table.rowCount()
         table.insertRow(row)
 
+        # 排序按钮列（上三角 + 下三角）
+        sort_widget = QWidget()
+        sort_layout = QVBoxLayout(sort_widget)
+        sort_layout.setContentsMargins(2, 2, 2, 2)
+        sort_layout.setSpacing(1)
+        up_btn = QPushButton("▲")
+        up_btn.setFixedSize(22, 16)
+        up_btn.setToolTip("上移")
+        up_btn.clicked.connect(lambda: self._on_move_up(row))
+        sort_layout.addWidget(up_btn)
+        down_btn = QPushButton("▼")
+        down_btn.setFixedSize(22, 16)
+        down_btn.setToolTip("下移")
+        down_btn.clicked.connect(lambda: self._on_move_down(row))
+        sort_layout.addWidget(down_btn)
+        sort_layout.addStretch()
+        sort_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        table.setCellWidget(row, _SORT_COL, sort_widget)
+
         parts = _MultiSelect([(p, p) for p in QUALITY_PARTS], self._apply)
         parts.set_selected(rule.parts)
-        table.setCellWidget(row, 0, parts)
+        table.setCellWidget(row, self._ci["parts"], parts)
 
-        # 品阶/评级是有序量表 → ≤ 门槛单选，最高档即不限
+        # 品阶/评级是有序量表 → 门槛单选
+        # 扫描处理：不限 / 金装 / 紫装及以下 / 蓝装及以下
+        # 结束处理：- 不限 - / ≤ 紫色 / ≤ 蓝色
         quals = QComboBox()
-        for q in _QUALITY_KEYS:
-            label = QUALITY_LABELS.get(q, q)
-            quals.addItem("- 不限 -" if q == "gold" else f"≤ {label}", q)
+        if self.STAGE == "scan":
+            for q in _SCAN_QUALITY_KEYS:
+                quals.addItem(_SCAN_QUALITY_LABELS.get(q, q), q)
+        else:
+            for q in _QUALITY_KEYS:
+                label = QUALITY_LABELS.get(q, q)
+                quals.addItem("- 不限 -" if q == "gold" else f"≤ {label}", q)
         quals.setCurrentIndex(max(quals.findData(rule.max_quality), 0))
         quals.currentIndexChanged.connect(lambda _i: self._apply())
-        table.setCellWidget(row, 1, quals)
+        table.setCellWidget(row, self._ci["quality"], quals)
 
-        pct = QSpinBox()
-        pct.setRange(0, 100)
-        pct.setSuffix(" %")
-        pct.setToolTip("命中条件：首词条初始数值 ≤ 该值；"
-                       "100 = 不限（识别失败视为不达标）")
-        pct.setValue(rule.max_pct)
-        pct.valueChanged.connect(lambda _v: self._apply())
-        table.setCellWidget(row, 2, pct)
+        pct_widget = _PctCell(rule.pct_op, rule.pct, self._apply)
+        table.setCellWidget(row, self._ci["pct"], pct_widget)
 
-        ratings = QComboBox()
-        for r in reversed(RATING_KEYS):
-            label = RATING_LABELS.get(r, r)
-            ratings.addItem("- 不限 -" if r == "top" else f"≤ {label}", r)
-        ratings.setCurrentIndex(max(ratings.findData(rule.max_rating), 0))
-        ratings.currentIndexChanged.connect(lambda _i: self._apply())
-        table.setCellWidget(row, 3, ratings)
+        ratings = _MultiSelect(
+            [(r, RATING_LABELS.get(r, r)) for r in reversed(RATING_KEYS)],
+            self._apply)
+        ratings.setToolTip(
+            "命中条件：预期评级属于勾选档位（全选 = 不限，"
+            "不取评级）")
+        ratings.set_selected(rule.ratings)
+        table.setCellWidget(row, self._ci["ratings"], ratings)
+
+        if "first_affix" in self._ci:
+            fao = QCheckBox()
+            fao.setChecked(rule.first_affix_only)
+            fao.setToolTip(
+                "本条规则取评级时只注入首词条，忽略已有的其他词条\n"
+                "（其余槽视作空槽由潜力判定自由填充）；避免回收掉\n"
+                "非首词条已成垃圾但可重置调律的装备")
+            fao.stateChanged.connect(lambda _s: self._apply())
+            table.setCellWidget(row, self._ci["first_affix"], fao)
 
         judge = _JudgeScopeCell(self._apply)
         judge.set_value(rule.judge_scope, rule.judge_rules)
-        table.setCellWidget(row, 4, judge)
+        table.setCellWidget(row, self._ci["judge"], judge)
 
         action = QComboBox()
         labels = _STAGE_ACTION_LABELS[self.STAGE]
         for key in BEHAVIOR_STAGE_ACTIONS[self.STAGE]:
             action.addItem(labels.get(key, key), key)
+            # 设置每项的 tooltip
+            idx = action.count() - 1
+            action.setItemData(idx, BEHAVIOR_ACTION_TOOLTIPS.get(key, ""),
+                               Qt.ItemDataRole.ToolTipRole)
         action.setCurrentIndex(max(action.findData(rule.action), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
-        table.setCellWidget(row, 5, action)
+        table.setCellWidget(row, self._ci["action"], action)
 
     # ── 行增删 ──
 
@@ -346,6 +470,48 @@ class _BehaviorPageBase(QWidget):
             return
         self._table.removeRow(row)
         self._apply()
+
+    def _on_move_up(self, row: int):
+        if row <= 0:
+            self._status_cb("已是第一条规则，无法上移", True)
+            return
+        self._swap_rows(row, row - 1)
+        self._table.selectRow(row - 1)
+        self._apply()
+
+    def _on_move_down(self, row: int):
+        if row < 0 or row >= self._table.rowCount() - 1:
+            self._status_cb("已是最后一条规则，无法下移", True)
+            return
+        self._swap_rows(row, row + 1)
+        self._table.selectRow(row + 1)
+        self._apply()
+
+    def _swap_rows(self, row_a: int, row_b: int) -> None:
+        """交换两行的规则数据（含所有控件值）"""
+        values_a = self._row_rule(row_a)
+        values_b = self._row_rule(row_b)
+        self._set_row_values(row_a, values_b)
+        self._set_row_values(row_b, values_a)
+
+    def _set_row_values(self, row: int, values: dict) -> None:
+        """将 raw dict 写回指定行的控件"""
+        table = self._table
+        parts: _MultiSelect = table.cellWidget(row, self._ci["parts"])
+        parts.set_selected(values["parts"])
+        quals: QComboBox = table.cellWidget(row, self._ci["quality"])
+        quals.setCurrentIndex(max(quals.findData(values["max_quality"]), 0))
+        pct: _PctCell = table.cellWidget(row, self._ci["pct"])
+        pct.set_value(values["pct_op"], values["pct"])
+        ratings: _MultiSelect = table.cellWidget(row, self._ci["ratings"])
+        ratings.set_selected(values["ratings"])
+        if "first_affix" in self._ci:
+            fao: QCheckBox = table.cellWidget(row, self._ci["first_affix"])
+            fao.setChecked(values.get("first_affix_only", False))
+        judge: _JudgeScopeCell = table.cellWidget(row, self._ci["judge"])
+        judge.set_value(values["judge_scope"], values["judge_rules"])
+        action: QComboBox = table.cellWidget(row, self._ci["action"])
+        action.setCurrentIndex(max(action.findData(values["action"]), 0))
 
     # ── 回填 ──
 
@@ -366,21 +532,26 @@ class _BehaviorPageBase(QWidget):
     def _row_rule(self, row: int) -> dict:
         """收集一行的规则控件值为 raw dict"""
         table = self._table
-        parts: _MultiSelect = table.cellWidget(row, 0)
-        quals: QComboBox = table.cellWidget(row, 1)
-        pct: QSpinBox = table.cellWidget(row, 2)
-        ratings: QComboBox = table.cellWidget(row, 3)
-        judge: _JudgeScopeCell = table.cellWidget(row, 4)
-        action: QComboBox = table.cellWidget(row, 5)
-        return {
+        parts: _MultiSelect = table.cellWidget(row, self._ci["parts"])
+        quals: QComboBox = table.cellWidget(row, self._ci["quality"])
+        pct: _PctCell = table.cellWidget(row, self._ci["pct"])
+        ratings: _MultiSelect = table.cellWidget(row, self._ci["ratings"])
+        judge: _JudgeScopeCell = table.cellWidget(row, self._ci["judge"])
+        action: QComboBox = table.cellWidget(row, self._ci["action"])
+        rule = {
             "parts": parts.selected(),
             "max_quality": quals.currentData(),
-            "max_pct": pct.value(),
-            "max_rating": ratings.currentData(),
+            "pct_op": pct.op(),
+            "pct": pct.value(),
+            "ratings": ratings.selected(),
             "judge_scope": judge.scope(),
             "judge_rules": judge.rules(),
             "action": action.currentData(),
         }
+        if "first_affix" in self._ci:
+            fao: QCheckBox = table.cellWidget(row, self._ci["first_affix"])
+            rule["first_affix_only"] = fao.isChecked()
+        return rule
 
     def _rules_raw(self) -> list[dict]:
         return [self._row_rule(row)
@@ -422,31 +593,16 @@ class ScanBehaviorPage(_BehaviorPageBase):
 
     def _init_head(self, layout: QVBoxLayout):
         layout.addWidget(QLabel(
-            "<b>扫描处理</b>（进调律前的行为点）：传入规则预期评级 ≥ "
-            "进入门槛 → 进入调律；未达门槛的装备按下表处置"
-            "（首条命中；无命中 = 保留）"))
+            "<b>扫描处理</b>（进调律前的行为点）：未达调律门槛的装备"
+            "按下表处置，自上而下首条命中即生效并阻断后续规则；"
+            "无命中 = 保留"))
 
-        # 第一行：进入门槛（独立于处置表，停用处置表仍生效）
-        entry_row = QHBoxLayout()
-        entry_row.addWidget(QLabel("进入门槛"))
-        self._entry_combo = QComboBox()
-        for r in reversed(RATING_KEYS):
-            label = RATING_LABELS.get(r, r)
-            self._entry_combo.addItem(f"预期 ≥ {label} 进入调律", r)
-        self._entry_combo.setToolTip(
-            "传入规则（运行期勾选）预期评级达到该档才进入调律")
-        self._entry_combo.currentIndexChanged.connect(
-            lambda _i: self._apply())
-        entry_row.addWidget(self._entry_combo)
-        entry_row.addStretch()
-        layout.addLayout(entry_row)
-
-        # 处置表区：与门槛行拉开距离，启用开关紧贴规则表
+        # 处置表区：启用开关紧贴规则表
         layout.addSpacing(self.fontMetrics().height())
         head = QHBoxLayout()
         self._enabled_cb = QCheckBox("启用处置表")
         self._enabled_cb.setToolTip(
-            "停用后不进调律的装备一律保留（进入门槛仍生效）")
+            "停用后不进调律的装备一律保留（调律门槛仍生效）")
         self._enabled_cb.stateChanged.connect(lambda _s: self._apply())
         head.addWidget(self._enabled_cb)
         head.addStretch()
@@ -454,13 +610,14 @@ class ScanBehaviorPage(_BehaviorPageBase):
 
     def _load_stage(self, stage) -> None:
         self._enabled_cb.setChecked(stage.enabled)
-        idx = self._entry_combo.findData(stage.entry_min_rating)
-        self._entry_combo.setCurrentIndex(max(idx, 0))
 
     def _stage_raw(self) -> dict:
+        # 调律门槛已移至基础配置页，整段重建时透传最新值避免丢失
+        scan = ((self._manager.get_raw().get("behavior") or {})
+                .get("scan") or {})
         return {
             "enabled": self._enabled_cb.isChecked(),
-            "entry_min_rating": self._entry_combo.currentData(),
+            "entry_min_rating": scan.get("entry_min_rating", "excellent"),
             "rules": self._rules_raw(),
         }
 
@@ -492,7 +649,7 @@ class TuneBehaviorPage(_BehaviorPageBase):
         head.addWidget(QLabel("次数用尽后"))
         self._exhausted_combo = QComboBox()
         labels = _STAGE_ACTION_LABELS["tune"]
-        for act in ("recycle", "ignore"):
+        for act in ("recycle", "skip"):
             self._exhausted_combo.addItem(labels.get(act, act), act)
         self._exhausted_combo.setToolTip(
             "规则命中重置但次数已用尽（按钮文本读不到数字）"

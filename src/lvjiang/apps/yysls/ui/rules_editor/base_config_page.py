@@ -1,12 +1,16 @@
 """基础配置页（全局 tuning_base.yaml）
 
-编辑等级门槛（min_level）、品阶门槛（quality_thresholds）与开关注册表
+编辑等级门槛（min_level）、调律门槛（behavior.scan.
+entry_min_rating）、品阶门槛（quality_thresholds）与开关注册表
 （switches）。沿用「变更即校验即保存」模式：控件变更即重建 raw dict →
 校验 → 通过才写盘并 reload，失败时状态栏红字提示。
-`_build()` 以管理器最新 raw 为底、只替换本页负责的段，
-与材料配置页（materials 段）互不覆盖。
+`_build()` 以管理器最新 raw 为底、只替换本页负责的段/键，
+与材料配置页（materials 段）、行为处理页（behavior 段其余键）
+互不覆盖。
 
 - 等级门槛：低于该等级的装备不允许进入调律，直接跳过；
+- 调律门槛：传入规则预期评级达到该档才进入调律（数据仍存
+  behavior.scan 段，未达门槛的装备按扫描处理页处置表处置）；
 - 品阶门槛表：固定 7 个标准部位（QUALITY_PARTS，锁死不可增删）×
   gold/purple/blue 勾选；规则级可在规则设置页按部位覆盖；
 - 开关设定表：开关 key → 显示名；规则条件组 when 引用的开关
@@ -23,6 +27,7 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -35,6 +40,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     QUALITY_PARTS,
+    RATING_KEYS,
+    RATING_LABELS,
     TuningBaseManager,
 )
 
@@ -71,6 +78,22 @@ class BaseConfigPage(QWidget):
         level_row.addWidget(QLabel("级（低于该等级的装备直接跳过，不走调律和回收）"))
         level_row.addStretch()
         layout.addLayout(level_row)
+
+        # 调律门槛（数据存 behavior.scan.entry_min_rating）
+        entry_row = QHBoxLayout()
+        entry_row.addWidget(QLabel("<b>调律门槛</b>"))
+        self._entry_combo = QComboBox()
+        for r in reversed(RATING_KEYS):
+            label = RATING_LABELS.get(r, r)
+            self._entry_combo.addItem(f"预期 ≥ {label} 进入调律", r)
+        self._entry_combo.setToolTip(
+            "传入规则（运行期勾选）预期评级达到该档才进入调律")
+        self._entry_combo.currentIndexChanged.connect(
+            lambda _i: self._apply())
+        entry_row.addWidget(self._entry_combo)
+        entry_row.addWidget(QLabel("（未达门槛的装备按扫描处理页处置表处置）"))
+        entry_row.addStretch()
+        layout.addLayout(entry_row)
 
         # 品阶门槛（固定 7 个标准部位，锁死不可增删）
         layout.addWidget(QLabel(
@@ -161,6 +184,13 @@ class BaseConfigPage(QWidget):
         self._min_level_spin.blockSignals(True)
         self._min_level_spin.setValue(d.get("min_level", 100))
         self._min_level_spin.blockSignals(False)
+        # 调律门槛（behavior.scan 段）
+        scan = (d.get("behavior") or {}).get("scan") or {}
+        entry = scan.get("entry_min_rating", "excellent")
+        self._entry_combo.blockSignals(True)
+        idx = self._entry_combo.findData(entry)
+        self._entry_combo.setCurrentIndex(max(idx, 0))
+        self._entry_combo.blockSignals(False)
         # 品阶门槛
         q = d.get("quality_thresholds") or {}
         self._q_table.blockSignals(True)
@@ -216,6 +246,9 @@ class BaseConfigPage(QWidget):
         data["min_level"] = self._min_level_spin.value()
         data["quality_thresholds"] = quality
         data["switches"] = switches
+        # 调律门槛写回 behavior.scan 段（仅改该键，不动处置表）
+        scan = data.setdefault("behavior", {}).setdefault("scan", {})
+        scan["entry_min_rating"] = self._entry_combo.currentData()
         return data
 
     def _apply(self):

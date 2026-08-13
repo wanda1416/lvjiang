@@ -135,6 +135,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def run(self) -> dict:
         self.executor.reset_state()
         self._ensure_judge_config()
+        # 加载导航所需的 DSL subcall 文件（每次运行都重新加载，保证修改立即生效）
+        self.navigator.load_dependencies()
 
         selected = self._resolve_selected_slots()
 
@@ -517,7 +519,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._doc_seq += 1
             self._doc.start_equipment(self._doc_seq, equip)
             self._doc.worthiness_matched(potential)
-        if not self.navigator.nav_to_tune(detail_scene):
+        if not self.navigator.nav_to_tune():
             logger.info(f"  [{name}] 未找到调律入口，跳过")
             report["status"] = "no_tune_entry"
             if self._doc:

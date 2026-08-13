@@ -9,6 +9,8 @@ already_full / 未达进入门槛 / no_tune_entry / tuned（含材料不足提�
 由注入 behavior 配置的 TuningBase 驱动，钩子委派真实实现。
 """
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from lvjiang.apps.yysls.equip_parser import EquipmentData
@@ -39,6 +41,9 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
     TuningNavigator,
 )
 from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
+from lvjiang.config import load_user_config
+from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.workflows.engine import WorkflowEngine
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
 EQUIP_DETAIL = AutoTuningWorkflow.EQUIP_DETAIL
@@ -52,6 +57,42 @@ _WORTHY = {"s": {"name": "血河", "rating": "顶级", "skipped": False,
 _JUNK = {"s": {"name": "血河", "rating": "垃圾", "skipped": False,
                "not_applicable": False, "reasons": ["词条不符"]}}
 
+# ─── subcall 桥：FakeWF 接线引擎 ─────────────────────────
+# 导航改走 DSL subcall 后，FakeWF 需要一个真引擎：真布局 + 真等待
+# 参数供 load_subcalls 静态校验，运行时 DSL 动作经
+# engine._workflow = wf 委派到 FakeWF 覆写的原语。
+
+_LAYOUT_CACHE = None
+_DELAY_CACHE = None
+
+
+def _system_layout():
+    global _LAYOUT_CACHE
+    if _LAYOUT_CACHE is None:
+        _LAYOUT_CACHE = load_layout_by_name("默认布局")
+    assert _LAYOUT_CACHE is not None, "默认布局加载失败"
+    return _LAYOUT_CACHE
+
+
+def _delay_params():
+    global _DELAY_CACHE
+    if _DELAY_CACHE is None:
+        _DELAY_CACHE = load_user_config().delay_params
+    return _DELAY_CACHE
+
+
+def _make_subcall_engine(wf) -> WorkflowEngine:
+    """装配最小引擎：后端全 mock，DSL 动作委派到 wf 的覆写原语"""
+    capture = MagicMock()
+    capture.get_capture_size.return_value = (1920, 1080)
+    engine = WorkflowEngine(
+        capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
+        layout=_system_layout(), input_sim=MagicMock(),
+        delay_params=_delay_params(),
+    )
+    engine._workflow = wf
+    return engine
+
 
 class FakeWF(AutoTuningWorkflow):
     """不走 BaseWorkflow.__init__ 的测试替身，记录调用并脚本化识别响应"""
@@ -60,6 +101,11 @@ class FakeWF(AutoTuningWorkflow):
         self.output = {}
         self.run_ctx = TuningRunContext(judge_configs={}, judge_rule_keys=[])
         self._stopped = False
+        # subcall 桥：真布局供 click_any 解析区域，引擎执行 DSL 导航
+        self._layout = _system_layout()
+        self._engine = _make_subcall_engine(self)
+        # 显式加载导航 subcall（生产路径在 run() 中加载，测试路径在此加载）
+        self.navigator.load_dependencies()
         self.clicks: list[tuple[str, str]] = []
         self.scan_reject_calls: list = []
         self.full_calls: list = []

@@ -88,6 +88,7 @@ class AndroidStreamCapture(CaptureBackend):
         self._decoder = None  # av.CodecContext
         self._latest_frame: np.ndarray | None = None
         self._frame_lock = threading.Lock()
+        self._decoder_lock = threading.Lock()  # 保护 decoder.parse/decode 的线程安全
         self._on_frame_callback = None
         self._running = False
         self._decode_thread: threading.Thread | None = None
@@ -173,7 +174,8 @@ class AndroidStreamCapture(CaptureBackend):
                 return False
 
             # 6. 启动解码线程
-            self._decoder = av.CodecContext.create("h264", "r")
+            with self._decoder_lock:
+                self._decoder = av.CodecContext.create("h264", "r")
             self._decode_thread = threading.Thread(
                 target=self._decode_loop, daemon=True, name="android-stream-decode"
             )
@@ -244,7 +246,8 @@ class AndroidStreamCapture(CaptureBackend):
         )
 
         if not decode_thread_stuck:
-            self._decoder = None
+            with self._decoder_lock:
+                self._decoder = None
         logger.debug("[AndroidStream] 已停止")
 
     # ─── 截图接口（继承 CaptureBackend）────────────────────
@@ -491,15 +494,21 @@ class AndroidStreamCapture(CaptureBackend):
                 h264_data = buf[12:12 + payload_size]
                 buf = buf[12 + payload_size:]  # 移除已处理的 packet
 
-                # 解码 H.264 帧
+                # 解码 H.264 帧（加锁保护 decoder 并发访问）
                 try:
-                    packets = self._decoder.parse(h264_data)
+                    with self._decoder_lock:
+                        if self._decoder is None:
+                            break
+                        packets = self._decoder.parse(h264_data)
                 except Exception:
                     continue
 
                 for pkt in packets:
                     try:
-                        frames = self._decoder.decode(pkt)
+                        with self._decoder_lock:
+                            if self._decoder is None:
+                                break
+                            frames = self._decoder.decode(pkt)
                     except Exception:
                         continue
                     for frame in frames:
@@ -525,21 +534,31 @@ class AndroidStreamCapture(CaptureBackend):
                 buf = buf[-65536:]
 
         # flush decoder 仅在正常退出时执行（非停止信号触发），避免退出时阻塞
-        if self._running and self._decoder:
-            try:
-                for frame in self._decoder.decode():
-                    bgr = self._frame_to_bgr(frame)
-                    with self._frame_lock:
-                        self._latest_frame = bgr
-            except Exception:
-                pass
+        if self._running:
+            with self._decoder_lock:
+                if self._decoder is None:
+                    return
+                try:
+                    for frame in self._decoder.decode():
+                        bgr = self._frame_to_bgr(frame)
+                        with self._frame_lock:
+                            self._latest_frame = bgr
+                except Exception:
+                    pass
 
     @staticmethod
     def _frame_to_bgr(frame) -> np.ndarray:
-        """将 PyAV VideoFrame 转换为 BGR numpy 数组"""
+        """将 PyAV VideoFrame 转换为 BGR numpy 数组
+
+        注意：reformat / to_ndarray 期间必须保持 frame 引用，
+        防止底层 AVFrame 被提前释放导致 numpy 数组指向已释放内存（use-after-free）。
+        """
         if frame.format.name != "bgr24":
             frame = frame.reformat(format="bgr24")
-        return frame.to_ndarray()
+        arr = frame.to_ndarray()
+        # 显式保持 frame 生命周期至 ndarray 拷贝完成
+        _ = frame
+        return arr
 
     # ─── 内部：forward 清理 ───────────────────────────────
 

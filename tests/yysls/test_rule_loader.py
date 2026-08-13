@@ -722,7 +722,7 @@ class TestMaterialSettings:
 
 def _rating(value: str | None):
     """固定评级提供者（忽略判定语义）"""
-    return lambda _scope, _keys: value
+    return lambda _scope, _keys, _fao=False: value
 
 
 class TestBehaviorSettings:
@@ -734,7 +734,7 @@ class TestBehaviorSettings:
         assert b.scan.entry_min_rating == "excellent"
         assert b.tune.enabled is False and b.tune.rules == []
         assert b.tune.max_resets == MAX_TUNE_RESETS
-        assert b.tune.reset_exhausted_action == "ignore"
+        assert b.tune.reset_exhausted_action == "skip"
 
     def test_full_section_parsed(self):
         data = _valid_base()
@@ -747,6 +747,7 @@ class TestBehaviorSettings:
                      "max_pct": 100, "max_rating": "junk",
                      "judge_scope": "custom",
                      "judge_rules": ["huiyi_general", "heal_pure"],
+                     "first_affix_only": True,
                      "action": "recycle"},
                 ],
             },
@@ -756,7 +757,7 @@ class TestBehaviorSettings:
                     {"max_rating": "junk", "judge_scope": "all",
                      "action": "recycle"},
                     {"max_pct": 30, "action": "reset"},
-                    {"max_rating": "normal", "action": "ignore"},
+                    {"max_rating": "normal", "action": "skip"},
                     {"action": "continue"},
                 ],
                 "max_resets": 2,
@@ -767,16 +768,16 @@ class TestBehaviorSettings:
         assert b.scan.enabled is True
         assert b.scan.entry_min_rating == "top"
         assert b.scan.rules == [BehaviorRule(
-            parts=["武器"], max_quality="blue", max_rating="junk",
+            parts=["武器"], max_quality="blue", ratings=["junk"],
             judge_scope="custom",
             judge_rules=["huiyi_general", "heal_pure"],
-            action="recycle")]
+            first_affix_only=True, action="recycle")]
         assert b.tune.enabled is True
         # 判定语义逐规则声明，缺省 incoming
         assert [r.judge_scope for r in b.tune.rules] == [
             "all", "incoming", "incoming", "incoming"]
         assert [r.action for r in b.tune.rules] == [
-            "recycle", "reset", "ignore", "continue"]
+            "recycle", "reset", "skip", "continue"]
         assert b.tune.max_resets == 2
         assert b.tune.reset_exhausted_action == "recycle"
 
@@ -801,14 +802,18 @@ class TestBehaviorSettings:
         {"scan": "yes"},                                 # 行为点须为 dict
         {"scan": {"entry_min_rating": "good"}},          # 门槛档位非法
         {"scan": {"judge_scope": "incoming"}},           # 段级语义已废弃
+        {"scan": {"first_affix_only": True}},            # 段级仅首词条已废弃
         {"tune": {"judge_rules": []}},                   # 段级自选已废弃
+        {"tune": {"rules": [{"action": "skip",
+                              "first_affix_only": True}]}},
+        # ↑ 仅首词条仅扫描处置表可声明
         {"scan": {"rules": [{"action": "recycle",
                               "judge_scope": "mixed"}]}},  # 判定语义非法
         {"scan": {"rules": [{"action": "recycle",
                               "judge_scope": "incoming",
                               "judge_rules": ["huiyi_general"]}]}},
         # ↑ 非 custom 带自选
-        {"tune": {"rules": [{"action": "ignore",
+        {"tune": {"rules": [{"action": "skip",
                               "judge_scope": "all",
                               "judge_rules": ["huiyi_general"]}]}},
         # ↑ 非 custom 带自选
@@ -832,7 +837,15 @@ class TestBehaviorSettings:
         {"scan": {"rules": [{"action": "recycle",
                               "max_pct": True}]}},         # bool 伪装 int
         {"scan": {"rules": [{"action": "recycle",
-                              "max_rating": "good"}]}},    # 评级非法
+                              "pct_op": "gt"}]}},           # 比较方向非法
+        {"scan": {"rules": [{"action": "recycle",
+                              "pct": 101}]}},               # pct 超出上界
+        {"scan": {"rules": [{"action": "recycle",
+                              "max_rating": "good"}]}},    # 评级非法（历史字段）
+        {"scan": {"rules": [{"action": "recycle",
+                              "ratings": ["good"]}]}},      # 评级档位非法
+        {"scan": {"rules": [{"action": "recycle",
+                              "ratings": "junk"}]}},        # ratings 须为 list
         {"tune": {"max_resets": 4}},                     # 超游戏硬限
         {"tune": {"max_resets": "3"}},                   # 字符串伪整数
         {"tune": {"reset_exhausted_action": "reset"}},   # 转处置非法
@@ -844,33 +857,33 @@ class TestBehaviorSettings:
             parse_tuning_base(data)
 
     def test_scan_decide_first_hit(self):
-        # 处置表自上而下首条命中；未启用/无命中 → ignore 保留
+        # 处置表自上而下首条命中；未启用/无命中 → skip 跳过
         junk = _rating("junk")
         data = _valid_base()
         data["behavior"] = {"scan": {"enabled": True, "rules": [
             {"max_pct": 30, "action": "recycle"},
-            {"max_quality": "purple", "action": "ignore"},
+            {"max_quality": "purple", "action": "skip"},
         ]}}
         scan = parse_tuning_base(data).behavior.scan
         # 首条命中即生效：cap 20 ≤ 30 → 回收（不再看后续）
         assert scan.decide("武器", "gold", 20, junk)[0] == "recycle"
-        # 首条不中、次条 ≤紫色 命中（蓝色 ≤ 紫色）→ 忽略保留
-        assert scan.decide("武器", "blue", 50, junk)[0] == "ignore"
-        # 金色超出 ≤紫色 → 全部不命中 = 默认保留
-        assert scan.decide("武器", "gold", 50, junk)[0] == "ignore"
+        # 首条不中、次条 ≤紫色 命中（蓝色 ≤ 紫色）→ 跳过该装备
+        assert scan.decide("武器", "blue", 50, junk)[0] == "skip"
+        # 金色超出 ≤紫色 → 全部不命中 = 默认跳过
+        assert scan.decide("武器", "gold", 50, junk)[0] == "skip"
         # max_pct 限制下 cap_pct 识别失败视为不达标（保守不回收）
-        assert scan.decide("武器", "gold", None, junk)[0] == "ignore"
-        # 未启用 → 一律保留
+        assert scan.decide("武器", "gold", None, junk)[0] == "skip"
+        # 未启用 → 一律跳过
         data["behavior"]["scan"]["enabled"] = False
         disabled = parse_tuning_base(data).behavior.scan
-        assert disabled.decide("武器", "gold", 20, junk)[0] == "ignore"
+        assert disabled.decide("武器", "gold", 20, junk)[0] == "skip"
 
     def test_rule_judge_semantics_lazy(self):
         # 评级按各规则自身判定语义懒取：不限评级的规则不取评级；
         # 同一装备不同语义可得不同评级（传入判垃圾、自选判顶级）
         calls: list[tuple[str, list[str]]] = []
 
-        def rating_of(scope, keys):
+        def rating_of(scope, keys, _fao=False):
             calls.append((scope, keys))
             return "top" if scope == "custom" else "junk"
 
@@ -879,7 +892,7 @@ class TestBehaviorSettings:
             {"max_rating": "junk", "judge_scope": "custom",
              "judge_rules": ["huiyi_general"], "action": "recycle"},
             {"max_rating": "junk", "action": "recycle"},
-            {"action": "ignore"},
+            {"action": "skip"},
         ]}}
         scan = parse_tuning_base(data).behavior.scan
         # 规则1 自选判顶级不命中；规则2 传入判垃圾命中 → 回收
@@ -888,7 +901,7 @@ class TestBehaviorSettings:
         # 不限评级的规则不取评级（前两条部位不限仍需取）
         calls.clear()
         top_of = _rating("top")
-        assert scan.decide("武器", "gold", 90, top_of)[0] == "ignore"
+        assert scan.decide("武器", "gold", 90, top_of)[0] == "skip"
 
     def test_tune_decide_defaults_and_full(self):
         # 无命中默认：未满 = 继续调律；词条满 = 结束保留；
@@ -904,18 +917,18 @@ class TestBehaviorSettings:
         # 首条命中 → 回收（满/未满一致）
         assert tune.decide("武器", "gold", 95, junk, False)[0] == "recycle"
         assert tune.decide("武器", "gold", 95, junk, True)[0] == "recycle"
-        # 次条 continue：未满命中生效；词条满跳过 → 默认结束保留
+        # 次条 continue：未满命中生效；词条满跳过 → 默认跳过该装备
         assert tune.decide("武器", "gold", 95, normal,
                            False)[0] == "continue"
-        assert tune.decide("武器", "gold", 95, normal, True)[0] == "ignore"
-        # 全部不命中 → 默认：未满继续、满结束保留
+        assert tune.decide("武器", "gold", 95, normal, True)[0] == "skip"
+        # 全部不命中 → 默认：未满继续、满跳过该装备
         assert tune.decide("武器", "gold", 95, top, False)[0] == "continue"
-        assert tune.decide("武器", "gold", 95, top, True)[0] == "ignore"
+        assert tune.decide("武器", "gold", 95, top, True)[0] == "skip"
         # 未启用 → 同默认
         assert BehaviorSettings().tune.decide(
             "武器", "gold", 95, junk, False)[0] == "continue"
         assert BehaviorSettings().tune.decide(
-            "武器", "gold", 95, junk, True)[0] == "ignore"
+            "武器", "gold", 95, junk, True)[0] == "skip"
 
 
 class TestDecideFood:

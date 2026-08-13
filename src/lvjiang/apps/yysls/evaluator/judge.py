@@ -293,8 +293,11 @@ class GenericTuningJudge(TuningJudge):
             slots -= 1
 
         def label(base: str) -> str:
-            return (f"填充 {'、'.join(fill_log)} 后{base}"
-                    if fill_log else base)
+            # 首词条排在最前，位置即语义
+            head = f"当前 {'、'.join([first_token, *tokens])} 词条"
+            if fill_log:
+                head += f"，填充 {'、'.join(fill_log)} 词条"
+            return f"{head}：{base}"
 
         # 不转律基线
         rating, why = self._grade(pattern, damage, first_token, filled, equiv)

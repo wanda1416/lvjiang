@@ -1,11 +1,7 @@
 """批量执行编排器
 
-多条目顺序执行：每条 (账号, 角色) 轮次先通过 DSL 工作流完成
-游戏内登录（选账号 → 选角色 → 进入游戏），再顺序执行所选脚本，
-最后退出回登录页。
-
-同账号多角色优化：连续条目属同一账号时跳过选账号步骤，
-直接选角色进入游戏。
+通用批处理执行器：遍历启用的行，根据配置调用预处理/切换/后处理 wf。
+每个 wf 接收 (batch_table, batch_index, batch_row) 变量。
 
 线程模型：单个 BatchWorker(QThread) 串行执行，与主窗口
 "同一时刻仅一个自动化" 约束一致。
@@ -23,16 +19,11 @@ from typing import Callable
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..core.batch_config import BatchEntry
-from ..core.config_resolver import get_resolver
-from ..core.session_manager import SessionManager
-from ..core.user_config import UserConfigManager
-from ..workflows.engine import WorkflowEngine
-
-# DSL 工作流文件名（batch 子目录）
-SWITCH_ACCOUNT_WF = "batch/_switch_account.wf"
-SELECT_ROLE_WF = "batch/_select_role.wf"
-EXIT_TO_LOGIN_WF = "batch/_exit_to_login.wf"
+from ...core.batch_config import BatchConfigItem
+from ...core.config_resolver import get_resolver
+from ...core.session_manager import SessionManager
+from ...core.user_config import UserConfigManager
+from ...workflows.engine import WorkflowEngine
 
 # 进度状态常量
 ST_PENDING = "待执行"
@@ -71,16 +62,19 @@ class BatchWorker(QThread):
     Signals:
         progress(entry_label, script_id, status): 进度更新
         log(str): 日志行（由 host 转发到日志面板）
+        user_changed(str): 用户切换通知（由 host 转发到主页面）
         finished_all(dict): 全部结束，携带汇总
     """
     progress = pyqtSignal(str, str, str)
     log = pyqtSignal(str)
+    user_changed = pyqtSignal(str)
     finished_all = pyqtSignal(dict)
 
     def __init__(
         self,
-        entries: list[BatchEntry],
+        enabled_rows: list[tuple[int, dict]],
         scripts: list[BatchScript],
+        config: BatchConfigItem,
         ctx: BatchContext,
         user_manager: UserConfigManager,
         session_manager: SessionManager,
@@ -88,8 +82,9 @@ class BatchWorker(QThread):
         parent=None,
     ):
         super().__init__(parent)
-        self._entries = entries
+        self._enabled_rows = enabled_rows  # [(index, row_data), ...]
         self._scripts = scripts
+        self._config = config
         self._ctx = ctx
         self._user_manager = user_manager
         self._session_manager = session_manager
@@ -100,38 +95,45 @@ class BatchWorker(QThread):
 
     def run(self):
         summary: dict = {"entries": {}, "stopped": False}
-        self.log.emit(f"[批量] 开始：{len(self._entries)} 条目 × "
+        total = len(self._enabled_rows)
+        self.log.emit(f"[批量] 开始：{total} 行 × "
                       f"{len(self._scripts)} 脚本")
 
-        current_account = ""
+        prev_row: dict | None = None
 
-        for i, entry in enumerate(self._entries):
+        for run_idx, (row_idx, row_data) in enumerate(self._enabled_rows):
             if self._stop_check():
                 self._stopped = True
                 break
 
-            label = f"{entry.account}/{entry.role}"
-            self.log.emit(f"[批量] ── [{i + 1}/{len(self._entries)}] {label} ──")
+            label = self._format_label(row_data, run_idx)
+            self.log.emit(f"[批量] ── [{run_idx + 1}/{total}] {label} ──")
             entry_result: dict = {"switch": ST_SKIPPED, "scripts": {}}
             summary["entries"][label] = entry_result
 
-            # 1. 游戏内登录（同账号跳过选账号）
-            need_full_switch = (entry.account != current_account)
-            ok = self._run_login(entry, need_full_switch)
-            if not ok:
-                entry_result["switch"] = ST_FAILED
-                for s in self._scripts:
-                    entry_result["scripts"][s.id] = ST_SKIPPED
-                    self.progress.emit(label, s.id, ST_SKIPPED)
-                self.log.emit(f"[批量] {label} 登录失败，跳过该条目")
-                continue
+            # 1. 调用预处理/切换 wf
+            wf_path = self._choose_switch_wf(row_idx, row_data, prev_row)
+            if wf_path:
+                ok = self._run_switch_wf(wf_path, run_idx, row_data)
+                if not ok:
+                    entry_result["switch"] = ST_FAILED
+                    for s in self._scripts:
+                        entry_result["scripts"][s.id] = ST_SKIPPED
+                        self.progress.emit(label, s.id, ST_SKIPPED)
+                    self.log.emit(f"[批量] {label} 切换失败，跳过该行")
+                    continue
+                entry_result["switch"] = ST_SUCCESS
+            else:
+                entry_result["switch"] = ST_SKIPPED
 
-            entry_result["switch"] = ST_SUCCESS
-            current_account = entry.account
-
-            # 2. 工具侧 session 切换（user 是角色名，不是账号）
-            self._user_manager.set_active_user(entry.role)
-            session = self._session_manager.load(entry.role)
+            # 2. 工具侧 session 切换（user 是角色名，从 row_data 获取）
+            role = self._get_role_from_row(row_data)
+            if role:
+                self._user_manager.set_active_user(role)
+                self.user_changed.emit(role)  # 通知主页面更新当前用户
+                session = self._session_manager.load(role)
+            else:
+                session = {}
 
             # 3. 顺序执行脚本
             any_success = False
@@ -148,7 +150,7 @@ class BatchWorker(QThread):
                     self.progress.emit(label, script.id, ST_SUCCESS)
                     self.log.emit(f"[批量] {label} → {script.name} 完成")
                     any_success = True
-                    self._save_result(entry.account, entry.role, script, result)
+                    self._save_result(role or "unknown", script, result)
                 except Exception as e:
                     tb = traceback.format_exc()
                     logger.error(f"批量执行 {label}/{script.name} 异常:\n{tb}")
@@ -157,14 +159,10 @@ class BatchWorker(QThread):
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
 
             # 4. session 落盘
-            if any_success:
-                self._session_manager.save(entry.role, session)
+            if any_success and role:
+                self._session_manager.save(role, session)
 
-            # 5. 退出回登录页（最后一个条目也退出，方便下次从头开始）
-            if not self._stop_check():
-                exit_ok = self._run_exit_to_login()
-                if not exit_ok:
-                    self.log.emit(f"[批量] {label} 退出回登录页失败，请手动处理")
+            prev_row = row_data
 
             if self._stopped:
                 break
@@ -172,7 +170,48 @@ class BatchWorker(QThread):
         summary["stopped"] = self._stopped
         tag = "（用户中断）" if self._stopped else ""
         self.log.emit(f"[批量] 全部结束{tag}")
+        
+        # 5. 调用后处理 wf（如果定义）
+        postprocess_wf = self._config.workflows.postprocess
+        if postprocess_wf:
+            self.log.emit(f"[批量] 执行后处理: {postprocess_wf}")
+            self._run_switch_wf(postprocess_wf, -1, {})
+        
         self.finished_all.emit(summary)
+
+    # ─── 切换逻辑 ───────────────────────────────────────
+
+    def _choose_switch_wf(self, row_idx: int, row_data: dict,
+                          prev_row: dict | None) -> str | None:
+        """选择调用哪个 wf
+
+        - 首行 → preprocess wf
+        - 后续行 → switch wf
+        """
+        if prev_row is None:
+            return self._config.workflows.preprocess or None
+        return self._config.workflows.switch or None
+
+    def _format_label(self, row_data: dict, row_idx: int = -1) -> str:
+        """格式化行显示标签"""
+        parts = []
+        for col in self._config.columns:
+            val = row_data.get(col, "")
+            if val:
+                parts.append(str(val))
+        return " / ".join(parts) if parts else f"(行 {row_idx})"
+
+    def _get_role_from_row(self, row_data: dict) -> str | None:
+        """根据配置的 user_column 获取用户名（用于 session 切换）
+        
+        如果未配置 user_column，返回 None（不切换用户）
+        """
+        if not self._config.user_column:
+            return None
+        if self._config.user_column not in row_data:
+            logger.warning(f"用户名列 {self._config.user_column!r} 不存在于行数据中")
+            return None
+        return row_data[self._config.user_column]
 
     # ─── 内部方法 ───────────────────────────────────────
 
@@ -191,13 +230,11 @@ class BatchWorker(QThread):
             stop_check=self._stop_check,
         )
 
-    def _run_login(self, entry: BatchEntry, full_switch: bool) -> bool:
-        """执行登录工作流
+    def _run_switch_wf(self, wf_name: str, run_idx: int, row_data: dict) -> bool:
+        """执行切换工作流（预处理/切换/后处理）
 
-        full_switch=True  → _switch_account.wf（选账号 + 登录 + 选角色 + 进入游戏）
-        full_switch=False → _select_role.wf（仅选角色 + 进入游戏，同账号优化）
+        传递变量：batch_table (启用行列表), batch_index (启用行索引), batch_row, 以及行数据的各列
         """
-        wf_name = SWITCH_ACCOUNT_WF if full_switch else SELECT_ROLE_WF
         wf_path = get_resolver().resolve_read(f"workflows/{wf_name}")
         if wf_path is None:
             self.log.emit(f"[批量] 工作流不存在: {wf_name}")
@@ -205,33 +242,24 @@ class BatchWorker(QThread):
 
         engine = self._create_engine()
         engine.session = {}
-        variables: dict = {"role_idx": entry.role_index}
-        if full_switch:
-            variables["target_phone_tail"] = entry.phone_tail
+
+        # 构建变量：batch_table 为启用行列表（不含禁用行）
+        enabled_rows_list = [row for _, row in self._enabled_rows]
+        variables: dict = {
+            "batch_table": enabled_rows_list,
+            "batch_index": run_idx,
+            "batch_row": row_data,
+        }
+        # 展开行数据各列
+        for k, v in row_data.items():
+            variables[k] = v
 
         try:
             engine.execute(wf_path, initial_variables=variables)
             return True
         except Exception as e:
-            logger.error(f"登录失败 ({entry.account}/{entry.role}): {e}")
-            self.log.emit(f"[批量] 登录异常: {e}")
-            return False
-
-    def _run_exit_to_login(self) -> bool:
-        """执行退出工作流（主页 → 菜单 → 退出 → 确认 → 登录页）"""
-        wf_path = get_resolver().resolve_read(f"workflows/{EXIT_TO_LOGIN_WF}")
-        if wf_path is None:
-            self.log.emit(f"[批量] 退出工作流不存在: {EXIT_TO_LOGIN_WF}")
-            return False
-
-        engine = self._create_engine()
-        engine.session = {}
-        try:
-            engine.execute(wf_path)
-            return True
-        except Exception as e:
-            logger.error(f"退出回登录页失败: {e}")
-            self.log.emit(f"[批量] 退出异常: {e}")
+            logger.error(f"切换失败 ({self._format_label(row_data, run_idx)}): {e}")
+            self.log.emit(f"[批量] 切换异常: {e}")
             return False
 
     def _run_script(self, script: BatchScript, session: dict) -> dict:
@@ -241,7 +269,7 @@ class BatchWorker(QThread):
         params = script.params or {}
 
         if script.class_name:
-            from ..workflows.implementations import get_workflow_class
+            from ...workflows.implementations import get_workflow_class
             ctx = self._ctx
             wf_class = get_workflow_class(script.class_name)
             wf_instance = wf_class(
@@ -267,11 +295,11 @@ class BatchWorker(QThread):
         return engine.execute(wf_path, initial_variables=params)
 
     @staticmethod
-    def _save_result(account: str, role: str, script: BatchScript, result: dict):
+    def _save_result(role: str, script: BatchScript, result: dict):
         """结果落盘 output/{role}/{script_id}_{timestamp}.json"""
         if not isinstance(result, (dict, list)) or not result:
             return
-        from ..constants import OUTPUT_DIR
+        from ...constants import OUTPUT_DIR
 
         def _ser(obj):
             if isinstance(obj, list):

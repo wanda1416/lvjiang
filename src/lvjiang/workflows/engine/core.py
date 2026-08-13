@@ -107,7 +107,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._wf_rel_dir: str | None = None
         # panel 对齐缓存：(scene_key, panel_key) → GridAlignment
         self._panel_alignments: dict[tuple[str, str], GridAlignment] = {}
-        # 过程定义索引：{name: ProcDef}，由 _execute_dsl 填充
+        # 过程定义索引：{name: ProcDef}，由 _execute_dsl / load_subcalls 填充
         self._procs: dict[str, ProcDef] = {}
         # 过程来源索引：{name: 所在 .wf 文件}，静态检查报错定位用
         self._proc_sources: dict[str, str] = {}
@@ -126,7 +126,12 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._workflow: BaseWorkflow | None = None
 
     def _ensure_workflow(self) -> BaseWorkflow:
-        """懒创建 BaseWorkflow 作为游戏操作委托"""
+        """懒创建 BaseWorkflow 作为游戏操作委托
+
+        注意：Python 工作流执行期间（_execute_python_workflow），self._workflow
+        会被临时设置为注入的工作流实例（如 AutoTuningWorkflow），使 DSL 子过程
+        的游戏操作原语委派到该工作流。执行结束后在 finally 中重置为 None。
+        """
         if self._workflow is None:
             self._workflow = BaseWorkflow(
                 capture=self._capture,
@@ -209,6 +214,67 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 静态校验：脚本引用的场景 / 区域 / 方向 / 面板必须已在当前布局绑定坐标
         self._validate_refs_bound(program)
         return program
+
+    # ─── Python 桥：subcall 加载与调用 ────────────────────────
+
+    def load_subcalls(self, wf_path: str | Path) -> None:
+        """加载 .wf 文件的 def 定义为可调用过程（不执行顶层语句）
+
+        供 Python 工作流经 call_subcall 复用 DSL 子过程，避免同一导航/
+        操作序列在 Python 与 DSL 两处重复维护。
+
+        每次调用都重新解析文件，确保修改立即生效。后加载的同名过程覆盖
+        先加载的。相对路径以 workflows 根为基准经 resolver 解析（local
+        影子层优先）；import 链递归加载；与 _execute_dsl 同样跑两道静态
+        校验（命名等待 / 布局引用）。
+
+        注意：后续 execute(.wf) 会重置 _procs，已加载的 subcall 过程将失效。
+        若需 DSL 执行期间保留 subcall，请在 execute 之后重新 load_subcalls。
+        """
+        path = Path(wf_path)
+        if not path.is_absolute():
+            found = get_resolver().resolve_read(f"workflows/{path.as_posix()}")
+            if found is None:
+                raise WorkflowUserError(
+                    f"load_subcalls: 找不到子过程文件 workflows/{path.as_posix()}")
+            path = Path(found)
+        resolved = path.resolve()
+        key = str(resolved)
+
+        program = parse_file(resolved)
+        # 递归解析 import 链（临时切换 base_dir，与 _load_and_validate 同语义）
+        old_base, old_rel = self._base_dir, self._wf_rel_dir
+        self._base_dir = resolved.parent
+        self._wf_rel_dir = self._workflows_rel_dir(resolved)
+        try:
+            self._resolve_imports(program, {key})
+        finally:
+            self._base_dir, self._wf_rel_dir = old_base, old_rel
+        for name, proc_def in program.procs.items():
+            self._procs[name] = proc_def
+            self._proc_sources[name] = program.source
+
+        # 校验本次文件定义的所有过程（含覆盖的），确保修改后的静态校验仍然生效
+        loaded_proc_names = set(program.procs.keys())
+        loaded_bodies = [program.procs[n].body for n in loaded_proc_names]
+        self._validate_named_waits_scoped(program.body, loaded_bodies)
+        self._validate_refs_bound_scoped(program.body, loaded_proc_names, program.source)
+        logger.debug(f"load_subcalls: {key} → 注册 {len(program.procs)} 个过程")
+
+    def call_subcall(self, name: str, args: list | None = None):
+        """调用已加载的 DSL 子过程，返回其 return 值（变量/output 隔离）
+
+        与 DSL 内 call 语句同语义：子过程从干净变量表开始，结束恢复
+        调用方快照；return 值直接返回给 Python 调用方（约定 return < 0
+        表示错误）。未加载的过程直接报错，不走静默降级。
+        """
+        proc_def = self._procs.get(name)
+        if proc_def is None:
+            raise ValueError(
+                f"call_subcall: 过程 {name} 未加载，请先 load_subcalls 对应 .wf 文件")
+        logger.debug(f"--- call_subcall {name}({len(args or [])} args) ---")
+        return_value, _callee_output = self._run_proc(proc_def, list(args or []))
+        return return_value
 
     def _execute_dsl(self, wf_path: Path) -> dict:
         """加载并执行 .wf 文件"""
@@ -344,6 +410,33 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                     self._collect_missing_waits(node.body, missing)
                     self._collect_missing_waits(node.catch_body, missing)
 
+    def _validate_named_waits_scoped(self, top_body: list, proc_bodies: list):
+        """限定范围的命名等待校验：仅检查指定的语句体列表
+
+        供 load_subcalls 使用，避免重复校验已加载过程。
+        """
+        missing: dict[str, int] = {}
+        for body in [top_body, *proc_bodies]:
+            self._collect_missing_waits(body, missing)
+        if missing:
+            detail = "、".join(f"{name}(行 {line})" for name, line in missing.items())
+            raise WorkflowUserError(
+                f"wait 引用了未定义的等待参数: {detail}，请先在配置管理→等待参数中定义")
+
+    def _validate_refs_bound_scoped(self, top_body: list, proc_names: set, source: str):
+        """限定范围的布局引用校验：仅检查顶层语句与指定过程
+
+        供 load_subcalls 使用，避免重复校验已加载过程。
+        """
+        # 构造仅包含指定过程的子集用于 collect_refs
+        scoped_procs = {n: self._procs[n] for n in proc_names if n in self._procs}
+        scoped_sources = {n: self._proc_sources.get(n, source) for n in proc_names}
+        refs = collect_refs(top_body, scoped_procs,
+                           proc_sources=scoped_sources, source=source)
+        problems = check_refs(refs, self._layout)
+        if problems:
+            raise WorkflowUserError(format_problems(problems))
+
     def _execute_python_workflow(self, workflow: BaseWorkflow) -> dict:
         """执行 Python 工作流实例"""
         workflow.reset_state()
@@ -351,12 +444,18 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 注入引擎引用，使工作流内调用的 UI 交互内置函数
         # （confirm/pause/input）能经 _ui_callback 走 Qt 主线程桥
         workflow._engine = self
+        # 工作流实例直接作为游戏操作委托：期间经 call_subcall 执行的
+        # DSL 子过程与工作流本体共用同一套原语（延迟参数/测试替身一致）
+        self._workflow = workflow
         logger.info(f"=== Python 工作流开始: {workflow.__class__.__name__} ===")
         try:
             result = workflow.run()
         except Exception as e:
             logger.error(f"Python 工作流异常: {e}\n{traceback.format_exc()}")
             result = workflow.output
+        finally:
+            # 清理：避免引擎复用时泄漏过期工作流引用
+            self._workflow = None
         logger.info(f"=== Python 工作流完成，收集到 {len(result)} 项数据 ===")
         return result
 

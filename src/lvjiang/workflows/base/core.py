@@ -33,6 +33,11 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
     # 函数的 UI 交互 confirm/pause/input 走 Qt 主线程桥）
     _engine: Optional["WorkflowEngine"] = None
 
+    @property
+    def engine(self) -> Optional["WorkflowEngine"]:
+        """获取执行引擎引用（供 subcall 桥等需要访问引擎的场景使用）"""
+        return self._engine
+
     def __init__(
         self,
         capture: CaptureBackend,

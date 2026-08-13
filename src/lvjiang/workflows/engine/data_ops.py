@@ -384,33 +384,42 @@ class _DataOpsMixin:
             if i < len(node.args):
                 resolved_args.append(self._resolve(node.args[i]))
             # 未传参数保持未定义状态（访问时返回 null）
-        # 2. 保存当前变量和 output 快照，进入干净作用域
+        # 2. 执行过程体（变量/output 隔离）
+        return_value, callee_output = self._run_proc(proc_def, resolved_args)
+        # 3. 绑定返回值到调用方变量
+        if node.result_var is not None:
+            self.variables[node.result_var] = return_value
+        # 4. 绑定子过程 output 到调用方变量
+        if node.output_var is not None:
+            self.variables[node.output_var] = callee_output
+
+    def _run_proc(self, proc_def, resolved_args: list):
+        """执行过程体并返回 (return_value, callee_output)，变量/output 隔离
+
+        call 语句与 call_subcall（Python 桥）共用的过程执行核心：
+        子过程从干净变量表与空 output 开始，结束后恢复调用方快照。
+        """
         saved_vars = dict(self.variables)
         saved_output = dict(self.output)
         self.variables = {}  # 子过程从干净变量表开始（作用域隔离）
         self.output = {}  # type: ignore[var-annotated]  # 子过程从空 output 开始
         return_value = None
         try:
-            # 3. 绑定参数（使用预解析的值）
+            # 绑定参数（使用预解析的值）
             for i, param_name in enumerate(proc_def.params):
                 if i < len(resolved_args):
                     self.variables[param_name] = resolved_args[i]
-            # 4. 执行过程体（return = 退出过程）
+            # 执行过程体（return = 退出过程）
             try:
                 self._exec_body(proc_def.body)
             except _ReturnSignal as e:
                 return_value = e.value  # 捕获返回值
         finally:
-            # 5. 捕获子过程的 output，然后恢复调用方的变量和 output
+            # 捕获子过程的 output，然后恢复调用方的变量和 output
             callee_output = dict(self.output)
             self.variables = saved_vars
             self.output = saved_output
-        # 6. 绑定返回值到调用方变量
-        if node.result_var is not None:
-            self.variables[node.result_var] = return_value
-        # 7. 绑定子过程 output 到调用方变量
-        if node.output_var is not None:
-            self.variables[node.output_var] = callee_output
+        return return_value, callee_output
 
     def _exec_find(self, node: Find):
         """find [scene].[area] as $var by ... — 在指定区域或全画布 OCR 搜索目标文字

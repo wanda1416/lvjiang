@@ -1,6 +1,9 @@
 """参考图管理对话框 - 新增参考图与参考图管理两个独立 Tab"""
 
+import json
+
 import numpy as np
+from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import (
@@ -53,6 +56,43 @@ class ReferenceManagerDialog(QDialog):
         self._source_name = ""
         self._data_changed = False  # 跟踪是否有数据变动
         self._init_ui()
+        self._restore_window_size()
+
+    def _restore_window_size(self):
+        """从 session.json 恢复窗口大小"""
+        from lvjiang.constants import SESSION_PATH
+        if not SESSION_PATH.exists():
+            return
+        try:
+            state = json.loads(
+                SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
+        except Exception:
+            return
+        size = state.get("reference_manager_size")
+        if isinstance(size, list) and len(size) == 2:
+            self.resize(int(size[0]), int(size[1]))
+
+    def _save_window_size(self):
+        """保存窗口大小到 session.json"""
+        from lvjiang.constants import SESSION_CONFIG_DIR, SESSION_PATH
+        data = {}
+        if SESSION_PATH.exists():
+            try:
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        data.setdefault("ui_state", {})["reference_manager_size"] = [self.width(), self.height()]
+        try:
+            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SESSION_PATH.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存参考图管理器窗口大小失败: {e}")
+
+    def closeEvent(self, event):
+        self._save_window_size()
+        super().closeEvent(event)
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)

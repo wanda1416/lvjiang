@@ -278,6 +278,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                     key=p.key, x_ratio=p.x_ratio, y_ratio=p.y_ratio,
                     w_ratio=p.w_ratio, h_ratio=p.h_ratio,
                     cols=p.cols, rows=p.rows, min_visible=p.min_visible,
+                    scroll_direction=p.scroll_direction,
                 )
                 # 仅选中，数据未变 → 不能标记 dirty
                 self._notify_selection_changed()

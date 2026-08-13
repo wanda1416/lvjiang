@@ -1,4 +1,4 @@
-key: action_control
+key: general_action
 name: 动作
 views:
 - key: base

@@ -70,6 +70,45 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._setup_ui()
         self._auto_load_script()
         self._auto_load_active()
+        self._restore_window_size()
+
+    def _restore_window_size(self):
+        """从 session.json 恢复窗口大小"""
+        import json
+        from ....constants import SESSION_PATH
+        if not SESSION_PATH.exists():
+            return
+        try:
+            state = json.loads(
+                SESSION_PATH.read_text(encoding="utf-8")).get("ui_state", {})
+        except Exception:
+            return
+        size = state.get("scene_editor_size")
+        if isinstance(size, list) and len(size) == 2:
+            self.resize(int(size[0]), int(size[1]))
+
+    def _save_window_size(self):
+        """保存窗口大小到 session.json"""
+        import json
+        from ....constants import SESSION_CONFIG_DIR, SESSION_PATH
+        data = {}
+        if SESSION_PATH.exists():
+            try:
+                data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        data.setdefault("ui_state", {})["scene_editor_size"] = [self.width(), self.height()]
+        try:
+            SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SESSION_PATH.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存场景编辑器窗口大小失败: {e}")
+
+    def closeEvent(self, event):
+        self._save_window_size()
+        super().closeEvent(event)
 
     # ─── UI 构建 ───────────────────────────────────────────
 

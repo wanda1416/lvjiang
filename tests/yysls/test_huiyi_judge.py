@@ -60,6 +60,11 @@ class TestJian:
         e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会意率", "最大无相攻击"])
         assert judge.judge(e).rating == Rating.EXCELLENT
 
+    def test_normal_missing_waigong(self, judge):
+        # 非首缺大外是硬门槛 → 能用封顶（一般）
+        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "劲", "势", "会意率"])
+        assert judge.judge(e).rating == Rating.NORMAL
+
     def test_normal_defect_huixin(self, judge):
         # 会心率 为会意流缺陷词条 → 一般
         e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会心率"])
@@ -95,9 +100,14 @@ class TestQiang:
         assert judge.judge(e).rating == Rating.EXCELLENT
 
     def test_normal_missing_jin_shi(self, judge):
-        # 缺劲/势/大外不算缺陷 → 优秀
+        # 缺劲/势不算缺陷 → 优秀（非首大外在位）
         e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "会意率", "最大无相攻击", "最大无相攻击"])
         assert judge.judge(e).rating == Rating.EXCELLENT
+
+    def test_normal_missing_waigong(self, judge):
+        # 非首缺大外是硬门槛 → 能用封顶（一般）
+        e = make_equip("枪", ["最大外功攻击", "劲", "势", "会意率", "最大无相攻击"])
+        assert judge.judge(e).rating == Rating.NORMAL
 
     def test_normal_defect_huixin(self, judge):
         # 精准率 为会意流缺陷词条 → 一般

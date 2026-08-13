@@ -22,7 +22,6 @@ from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
 from .profile_models import (
     ALL_MODELS,
     MODEL_LABELS,
-    ActivityKeyDef,
     DailyKeyDef,
     KeyDef,
     RealtimeKeyDef,
@@ -68,7 +67,6 @@ __all__ = [
     "DailyKeyDef",
     "RealtimeKeyDef",
     "ResourceKeyDef",
-    "ActivityKeyDef",
     "ProfileSchema",
     "get_profile_config",
     "reload_profile_config",

@@ -168,7 +168,7 @@ class ReferenceDatabase:
         # 合并视图（查询方法统一消费）
         self._entries: list[ReferenceEntry] = []
         self._meta_schema: list[MetaFieldDef] = []
-        self._loaded = False
+        self.load()  # 构造时立即加载
 
     # ─── 属性 ────────────────────────────────────────────
 
@@ -241,7 +241,6 @@ class ReferenceDatabase:
 
     @property
     def entries(self) -> list[ReferenceEntry]:
-        self._ensure_loaded()
         return list(self._entries)
 
     # ─── 图库空间 ────────────────────────────────────
@@ -295,12 +294,10 @@ class ReferenceDatabase:
 
     def get_spaces(self) -> list[str]:
         """空间列表（system 名册 ∪ local 名册，保序去重；名册全空回退 DEFAULT_SPACE）"""
-        self._ensure_loaded()
         return list(self._spaces)
 
     def get_active_space(self) -> str:
         """当前激活的图库空间名"""
-        self._ensure_loaded()
         return self._space
 
     def set_active_space(self, name: str) -> bool:
@@ -309,15 +306,13 @@ class ReferenceDatabase:
         切换成功后自动 load() 重载新空间，避免旧空间内存态
         被后续 save() 写进新空间 yaml。
         """
-        self._ensure_loaded()
         name = str(name or "").strip()
         if name not in self._spaces:
             logger.warning(f"图库空间不存在，无法切换: {name!r}")
             return False
         self._write_session_active_space(name)
         self._space = name
-        self._loaded = False
-        self.load()
+        self.load()  # 重载新空间
         logger.info(f"图库空间已切换: {name}")
         return True
 
@@ -326,7 +321,6 @@ class ReferenceDatabase:
 
         空间 yaml 按模式写入可写层（dev→system，user→local）。
         """
-        self._ensure_loaded()
         name = str(name or "").strip()
         if not name:
             logger.warning("图库空间名不能为空")
@@ -384,10 +378,6 @@ class ReferenceDatabase:
 
     # ─── 加载 / 保存 ─────────────────────────────────────
 
-    def _ensure_loaded(self):
-        if not self._loaded:
-            self.load()
-
     @staticmethod
     def _parse_entries(raw_list) -> list[ReferenceEntry]:
         entries = []
@@ -437,7 +427,6 @@ class ReferenceDatabase:
             self._local_threshold = self._parse_threshold(overlay.get("match_threshold"))
 
         self._rebuild_merged()
-        self._loaded = True
         logger.info(
             f"参考图库加载完成（空间={self._space}）: 合并 {len(self._entries)} 条"
             f"（system {len(self._system_entries)} / local {len(self._local_entries)}"
@@ -521,7 +510,6 @@ class ReferenceDatabase:
 
     def save(self):
         """按模式落盘：开发→system 全量；用户→local 条目级 diff（空则删覆盖文件）"""
-        self._ensure_loaded()
         if self._is_dev():
             data = {
                 "version": 1,
@@ -593,7 +581,6 @@ class ReferenceDatabase:
         Returns:
             新建的 ReferenceEntry
         """
-        self._ensure_loaded()
         group = (meta or {}).get("group", "")
         filename = self.next_filename(group)
         entry = ReferenceEntry(
@@ -629,7 +616,6 @@ class ReferenceDatabase:
         Returns:
             是否找到并修改
         """
-        self._ensure_loaded()
         local_entry = self._find(self._local_entries, filename)
         system_entry = self._find(self._system_entries, filename)
         if local_entry is None and system_entry is None:
@@ -679,7 +665,6 @@ class ReferenceDatabase:
         Returns:
             是否找到并删除
         """
-        self._ensure_loaded()
         local_entry = self._find(self._local_entries, filename)
         system_entry = self._find(self._system_entries, filename)
         if local_entry is None and system_entry is None:
@@ -719,7 +704,6 @@ class ReferenceDatabase:
             level_filter: 按等级过滤（兼容保留），None 返回全部
             meta_filters: 按任意 meta key 文本相等过滤（{key: 文本值}）
         """
-        self._ensure_loaded()
         result = list(self._entries)
         if label_filter:
             result = [e for e in result if e.label == label_filter]
@@ -734,19 +718,16 @@ class ReferenceDatabase:
 
     def get_labels(self) -> list[str]:
         """返回所有去重标识列表（排序）"""
-        self._ensure_loaded()
         labels = sorted({e.label for e in self._entries if e.label})
         return labels
 
     def get_labels_by_group(self, group: str) -> list[str]:
         """返回指定分组下的去重标识列表（排序）"""
-        self._ensure_loaded()
         labels = sorted({e.label for e in self._entries if e.label and e.group == group})
         return labels
 
     def get_all_labels_by_group(self) -> dict[str, list[str]]:
         """返回所有分组 -> 标识列表的映射"""
-        self._ensure_loaded()
         result: dict[str, set[str]] = {}
         for e in self._entries:
             if e.group and e.label:
@@ -757,13 +738,11 @@ class ReferenceDatabase:
 
     def get_groups(self) -> list[str]:
         """返回所有去重分组列表（排序）"""
-        self._ensure_loaded()
         groups = sorted({e.group for e in self._entries if e.group})
         return groups
 
     def get_levels(self) -> list[int]:
         """返回所有去重等级列表（升序）"""
-        self._ensure_loaded()
         levels = sorted({e.level for e in self._entries if e.level is not None})
         return levels
 
@@ -771,12 +750,10 @@ class ReferenceDatabase:
 
     def get_meta_schema(self) -> list[MetaFieldDef]:
         """返回 meta 字段定义列表"""
-        self._ensure_loaded()
         return list(self._meta_schema)
 
     def set_meta_schema(self, schema: list[MetaFieldDef]):
         """设置并持久化 meta 字段定义（用户模式整列表替换进 local）"""
-        self._ensure_loaded()
         if self._is_dev():
             self._system_schema = list(schema)
         else:
@@ -787,13 +764,11 @@ class ReferenceDatabase:
 
     def get_output_fields(self) -> list[MetaFieldDef]:
         """返回输出元数据字段（scope=output 且 crop 有效），按定义顺序"""
-        self._ensure_loaded()
         return [f for f in self._meta_schema
                 if f.scope == "output" and f.crop is not None]
 
     def get_custom_input_fields(self) -> list[MetaFieldDef]:
         """返回非预制的输入元数据字段（排除 label/group/notes）"""
-        self._ensure_loaded()
         return [f for f in self._meta_schema
                 if f.scope == "input" and f.key not in _PREDEFINED_INPUT_KEYS]
 
@@ -801,7 +776,6 @@ class ReferenceDatabase:
 
     def get_match_threshold(self) -> float:
         """返回匹配度阈值：local 覆盖 → system → 默认值"""
-        self._ensure_loaded()
         if self._local_threshold is not None:
             return self._local_threshold
         if self._system_threshold is not None:
@@ -811,7 +785,6 @@ class ReferenceDatabase:
     def set_match_threshold(self, value: float):
         """设置并持久化匹配度阈值（开发→system；用户→local 覆盖，
         回设为 system 有效值时清除覆盖）"""
-        self._ensure_loaded()
         value = round(float(value), 4)
         if self._is_dev():
             self._system_threshold = value
@@ -831,7 +804,6 @@ class ReferenceDatabase:
 
     def get_meta_values(self, key: str) -> list[str]:
         """返回某 meta key 的去重文本值列表（升序）"""
-        self._ensure_loaded()
         values = {self._meta_text(e, key) for e in self._entries}
         values.discard("")
         return sorted(values)
@@ -842,7 +814,6 @@ class ReferenceDatabase:
         - type="number"：按数值排序，数字优先于非数字文本，空值不在列表中
         - type="text"：按字典序升序
         """
-        self._ensure_loaded()
         raw = {self._meta_text(e, field.key) for e in self._entries}
         raw.discard("")
         values = list(raw)
@@ -859,12 +830,10 @@ class ReferenceDatabase:
 
     def get_by_label(self, label: str) -> list[ReferenceEntry]:
         """返回某标识下所有条目（含 file、meta）"""
-        self._ensure_loaded()
         return [e for e in self._entries if e.label == label]
 
     def get_entry(self, filename: str) -> ReferenceEntry | None:
         """按文件路径查找条目"""
-        self._ensure_loaded()
         for e in self._entries:
             if e.file == filename:
                 return e

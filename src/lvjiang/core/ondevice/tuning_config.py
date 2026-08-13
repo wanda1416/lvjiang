@@ -35,14 +35,13 @@ def get_tuning_config() -> str:
 
         from ...apps.yysls.evaluator import get_tuning_rules
         from ...apps.yysls.evaluator.tuning_rules import get_tuning_base
-        from ...apps.yysls.plugin_session import get_plugin_session
-        from ...apps.yysls.slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+        from ...apps.yysls.tune_config import TuneConfig
+        from ...apps.yysls.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 
-        tuning = get_plugin_session().get_section("tuning")
+        tc = TuneConfig.load()
 
         # 规则：无保存值时缺省与桌面一致（仅 huiyi_general 启用，玩法全勾）
-        raw = tuning.get("rules")
-        saved_rules: dict = raw if isinstance(raw, dict) else {
+        saved_rules: dict = tc.rules or {
             "huiyi_general": {"enabled": True}}
         rules = []
         for key, rule in get_tuning_rules().items():
@@ -59,7 +58,7 @@ def get_tuning_config() -> str:
                 ],
             })
 
-        selected_slots = tuning.get("selected_slots") or list(DEFAULT_SLOTS)
+        selected_slots = tc.selected_slots or list(DEFAULT_SLOTS)
         slot_groups = [
             {
                 "name": group_name,
@@ -74,7 +73,7 @@ def get_tuning_config() -> str:
             for group_name, slots in SLOT_GROUPS
         ]
 
-        saved_switches = tuning.get("switches") or {}
+        saved_switches = tc.switches
         switches = [
             {"key": key, "name": name,
              "checked": bool(saved_switches.get(key, False))}
@@ -114,8 +113,8 @@ def save_tuning_config(payload: str) -> str:
         ensure_loaded()
 
         from ...apps.yysls.evaluator import get_tuning_rules
-        from ...apps.yysls.plugin_session import get_plugin_session
-        from ...apps.yysls.slots import LOCKED_SLOTS, SLOT_LABELS
+        from ...apps.yysls.tune_config import TuneConfig
+        from ...apps.yysls.tune_slots import LOCKED_SLOTS, SLOT_LABELS
 
         data = json.loads(payload)
         if not isinstance(data, dict):
@@ -168,15 +167,17 @@ def save_tuning_config(payload: str) -> str:
         raw_switches = raw_switches if isinstance(raw_switches, dict) else {}
         switches = {str(k): bool(v) for k, v in raw_switches.items()}
 
-        session = get_plugin_session()
         # skip_tuning 不进设备端 UI，保留会话原值（缺省 False）
-        skip_tuning = bool(session.get_section("tuning").get("skip_tuning", False))
-        session.set_section("tuning", {
-            "selected_slots": selected_slots,
-            "rules": rules_cfg,
-            "switches": switches,
-            "skip_tuning": skip_tuning,
-        })
+        old = TuneConfig.load()
+        TuneConfig(
+            selected_slots=selected_slots,
+            rules=rules_cfg,
+            switches=switches,
+            skip_tuning=old.skip_tuning,
+            skip_start=old.skip_start,
+            target_cell=old.target_cell,
+            scroll_strategy=old.scroll_strategy,
+        ).save()
         return json.dumps({"ok": True, "message": "已保存"}, ensure_ascii=False)
     except Exception as e:
         return json.dumps(

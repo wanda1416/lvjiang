@@ -12,12 +12,12 @@ def build_menu(host, menubar) -> None:
     menu = menubar.addMenu("燕云")
 
     def _open_game_config():
-        from .game_config import GameConfigDialog
+        from .game_settings import GameConfigDialog
         dialog = GameConfigDialog(parent=host)
         dialog.exec()
 
     def _open_tuning_rules():
-        from .tune_config import TuningRulesDialog
+        from .tune_settings import TuningRulesDialog
         dialog = TuningRulesDialog(parent=host)
         dialog.exec()
 

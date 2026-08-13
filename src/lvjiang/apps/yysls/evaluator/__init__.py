@@ -5,7 +5,6 @@
 """
 
 from .base import JudgeResult, Rating, TuningJudge
-from .judge import GenericTuningJudge
 from .registry import (
     get_rule_names,
     get_tuning_judge,
@@ -15,6 +14,7 @@ from .registry import (
     judge_tuning_worthiness,
     summarize_potential,
 )
+from .rule_judge import GenericTuningJudge
 from .tuning_rules import (
     TuningRule,
     TuningRuleManager,

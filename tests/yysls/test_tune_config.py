@@ -14,15 +14,15 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuningRuleManager,
 )
 from lvjiang.apps.yysls.game_config import get_game_config
-from lvjiang.apps.yysls.ui.tune_config import TuningRulesDialog
-from lvjiang.apps.yysls.ui.tune_config.base_config_page import (
+from lvjiang.apps.yysls.ui.tune_settings import TuningRulesDialog
+from lvjiang.apps.yysls.ui.tune_settings.base_config_page import (
     BaseConfigPage,
 )
-from lvjiang.apps.yysls.ui.tune_config.behavior_pages import (
+from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
     ScanBehaviorPage,
     TuneBehaviorPage,
 )
-from lvjiang.apps.yysls.ui.tune_config.rule_panel import RulePanel
+from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
@@ -350,7 +350,7 @@ class TestSettingsPageBasics:
 
     def test_rename_key_via_button(self, qtbot, tmp_manager, monkeypatch):
         # 「重命名」按钮弹窗确认后：文件改名、新 key 生效、展示同步
-        from lvjiang.apps.yysls.ui.tune_config import rule_settings_page
+        from lvjiang.apps.yysls.ui.tune_settings import rule_settings_page
         monkeypatch.setattr(
             rule_settings_page.QInputDialog, "getText",
             staticmethod(lambda *a, **k: ("heal_pure2", True)))
@@ -364,7 +364,7 @@ class TestSettingsPageBasics:
         assert tmp_manager.get_rule("heal_pure") is None
 
     def test_rename_key_cancel_noop(self, qtbot, tmp_manager, monkeypatch):
-        from lvjiang.apps.yysls.ui.tune_config import rule_settings_page
+        from lvjiang.apps.yysls.ui.tune_settings import rule_settings_page
         monkeypatch.setattr(
             rule_settings_page.QInputDialog, "getText",
             staticmethod(lambda *a, **k: ("whatever", False)))

@@ -11,7 +11,7 @@ from loguru import logger
 
 from ...config import DelayParam, InputSimConfig
 from ...core.capture_base import CaptureBackend
-from ...core.config_resolver import get_resolver
+from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
 from ...core.scene_registry import Layout

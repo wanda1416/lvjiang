@@ -3,7 +3,7 @@
 from loguru import logger
 from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
 
-from ....core.config_resolver import get_resolver
+from ....core.config.resolver import get_resolver
 
 
 def _format_value(value) -> str:

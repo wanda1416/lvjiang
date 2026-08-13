@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 
 from loguru import logger
 
-from .config_resolver import get_resolver
+from .config.resolver import get_resolver
 from .scene_loader import (
     BASE_VIEW_KEY,
     PanelDef,

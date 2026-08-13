@@ -1,17 +1,9 @@
 """用户配置管理 - 多用户支持"""
 
-import json
 from dataclasses import dataclass
 from datetime import datetime
 
 from loguru import logger
-
-from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
-
-# ─── 路径常量 ────────────────────────────────────────────
-
-SESSION_FILE = SESSION_PATH
-
 
 # ─── 数据类 ──────────────────────────────────────────────
 
@@ -41,46 +33,35 @@ class UserConfigManager:
     """用户管理：增删查改 + 当前用户切换"""
 
     def __init__(self):
-        SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         self._users: dict[str, User] = {}
         self._active_user: str = ""
         self._load()
 
     def _load(self):
-        """从 session.json 加载用户相关字段"""
-        if SESSION_FILE.exists():
-            try:
-                data = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
-                for u_data in data.get("users", []):
+        """从 session.json 加载用户相关字段（经 SessionStore 统一入口）"""
+        from .config.session import get_session_store
+        store = get_session_store()
+        users_raw = store.get_node("users", [])
+        if isinstance(users_raw, list):
+            for u_data in users_raw:
+                if isinstance(u_data, dict):
                     user = User.from_dict(u_data)
                     self._users[user.name] = user
-                self._active_user = data.get("active_user", "")
-                if self._active_user and self._active_user not in self._users:
-                    self._active_user = ""
-            except Exception as e:
-                logger.error(f"加载 session.json 用户数据失败: {e}")
-                self._users = {}
-                self._active_user = ""
+        active = store.get_node("active_user", "")
+        self._active_user = active if isinstance(active, str) else ""
+        if self._active_user and self._active_user not in self._users:
+            self._active_user = ""
 
         # 如果没有用户，创建默认用户
         if not self._users:
             self._create_default_user()
 
     def _save(self):
-        """保存用户字段到 session.json（保留其他字段）"""
-        data = {}
-        if SESSION_FILE.exists():
-            try:
-                data = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        data["users"] = [u.to_dict() for u in self._users.values()]
-        data["active_user"] = self._active_user
-        SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        SESSION_FILE.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        """保存用户字段到 session.json（经 SessionStore，不影响其他节点）"""
+        from .config.session import get_session_store
+        store = get_session_store()
+        store.set_node("users", [u.to_dict() for u in self._users.values()])
+        store.set_node("active_user", self._active_user)
 
     def _create_default_user(self):
         """创建默认用户"""

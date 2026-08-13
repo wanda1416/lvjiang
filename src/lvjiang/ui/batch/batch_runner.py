@@ -20,8 +20,8 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ...core.batch_config import BatchConfigItem
-from ...core.config_resolver import get_resolver
-from ...core.session_manager import SessionManager
+from ...core.config.resolver import get_resolver
+from ...core.config.users import SessionManager
 from ...core.user_config import UserConfigManager
 from ...workflows.engine import WorkflowEngine
 

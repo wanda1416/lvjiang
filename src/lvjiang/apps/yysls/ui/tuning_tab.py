@@ -48,7 +48,7 @@ class TuningTab(QWidget):
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
         # 基础配置变更时刷新「更多」页开关（新增/删除开关即时生效）
-        from ....core.config_resolver import get_resolver
+        from ....core.config.resolver import get_resolver
         get_resolver().add_change_listener(self._on_base_config_changed)
 
     # ─── UI 构建 ─────────────────────────────────────────────

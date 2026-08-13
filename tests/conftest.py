@@ -24,3 +24,16 @@ def _no_native_dialogs(monkeypatch):
         monkeypatch.setattr(f"{mod}.native_confirm", _banned)
         monkeypatch.setattr(f"{mod}.native_pause", _banned)
         monkeypatch.setattr(f"{mod}.native_notify", lambda *a, **k: None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_session_store():
+    """每个用例前重置 SessionStore 单例
+
+    单例内存态懒加载后常驻；用例里 monkeypatch constants.SESSION_PATH
+    指向 tmp 目录时，旧内存态会造成跨用例串扰。生产环境不受影响。
+    """
+    from lvjiang.core.config.session import reset_session_store
+    reset_session_store()
+    yield
+    reset_session_store()

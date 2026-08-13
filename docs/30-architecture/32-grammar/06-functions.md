@@ -143,7 +143,8 @@ eval $r = mod($index, 3)                 # 取模（判断是否行首等）
 eval $clamped = min($val, 100)           # 限制上限
 eval $lowest = min($a, $b, $c)           # 多参最小值
 eval $at_least = max($val, 1)            # 限制下限
-eval $diff = abs($a - $b)                # 绝对值（支持运算符）
+eval $diff = sub($a, $b)
+eval $abs_diff = abs($diff)              # 绝对值（需先计算差值）
 ```
 
 > **运算符 vs 函数**：`$a + $b` 和 `add($a, $b)` 完全等价，均为 number（float）语义。简单四则运算推荐用运算符，需要取模/最值/绝对值时用函数。DSL 层暂无取整函数，需要向下取整时可用 `sub($x, mod($x, 1))` 组合实现。
@@ -183,8 +184,8 @@ end
 - **其他**：返回 0
 
 ```
-eval n = count_key($result)
-eval n = count_key($list)
+eval $n = count_key($result)
+eval $n = count_key($list)
 ```
 
 ### contains — 文本包含检查
@@ -471,7 +472,8 @@ loop while $attempt < $max_retry
         eval $success = true
         break
     catch $err
-        eval $need_help = confirm(concat("第 ", $attempt, " 次失败: ", $err, "\n是否重试？"))
+        eval $msg = concat("第 ", $attempt, " 次失败: ", $err, "\n是否重试？")
+        eval $need_help = confirm($msg)
         if not $need_help
             break
         end
@@ -479,7 +481,8 @@ loop while $attempt < $max_retry
 end
 
 if not $success
-    eval pause("自动流程失败，请手动完成后点击确定")
+    eval $pause_msg = "自动流程失败，请手动完成后点击确定"
+    eval pause($pause_msg)
 end
 ```
 

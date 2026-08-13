@@ -47,7 +47,7 @@ from lvjiang.workflows.grammar import (
 def test_existing_wf_files():
     """验证现有 .wf 文件能正常解析"""
     print("=== 验证现有 .wf 文件 ===")
-    for wf in ["equip_analysis", "activity_jianghu"]:
+    for wf in ["equip_analysis", "daily_jianghu"]:
         path = Path(f"config/system/workflows/{wf}.wf")
         program = parse_file(path)
         print(f"  {path}: {len(program.body)} 条指令 OK")

@@ -7,7 +7,7 @@
 
 import pytest
 
-from lvjiang.config import CustomDelay, DelayConfig
+from lvjiang.config import DelayParam, InputSimConfig
 from lvjiang.core.scene_registry import Arrow, CanvasConfig, Point, Region
 from lvjiang.workflows.base.actions import _ActionMixin
 from lvjiang.workflows.base.coords import _CoordMixin
@@ -57,11 +57,12 @@ class _FakeInput:
 class _Actor(_ActionMixin, _CoordMixin):
     """把操作与坐标换算两个 Mixin 拼成可独立实例化的最小对象"""
 
-    def __init__(self, layout, capture_size=(1000, 500), custom=None):
+    def __init__(self, layout, capture_size=(1000, 500), delay_params=None, input_sim=None):
         self._layout = layout
         self._capture = _FakeCapture(capture_size)
         self._input = _FakeInput()
-        self._delay = DelayConfig(custom=custom or {})
+        self._delay_params = delay_params or {}
+        self._input_sim = input_sim or InputSimConfig()
         self._window_left = 0
         self._window_top = 0
 
@@ -162,5 +163,5 @@ def test_wait_delay_unknown_name_raises():
 
 def test_wait_delay_defined_name_works():
     actor = _Actor(_FakeLayout(),
-                   custom={"page_refresh_wait": CustomDelay(range=(0.0, 0.0))})
+                   delay_params={"page_refresh_wait": DelayParam(range=(0.0, 0.0))})
     actor.wait_delay("page_refresh_wait")  # _stop_check 恒 True，立即返回

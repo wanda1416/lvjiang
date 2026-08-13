@@ -34,7 +34,7 @@ class _CoordMixin:
         cy = canvas_y + (region.y_ratio + region.h_ratio / 2) * canvas_h
 
         if jitter:
-            jitter_ratio = self._delay.region_jitter_ratio
+            jitter_ratio = self._input_sim.region_jitter_ratio
             region_w = region.w_ratio * canvas_w
             region_h = region.h_ratio * canvas_h
             cx += region_w * random.uniform(-jitter_ratio, jitter_ratio)

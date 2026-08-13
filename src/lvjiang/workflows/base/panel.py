@@ -64,7 +64,7 @@ class _PanelMixin:
         ph = panel_obj.h_ratio * canvas_h
         sx = px + cx * pw
         sy = py + cy * ph
-        margin = self._delay.click_random_offset + 2
+        margin = self._input_sim.click_random_offset + 2
         csx = max(px + margin, min(sx, px + pw - margin))
         csy = max(py + margin, min(sy, py + ph - margin))
         if (csx, csy) != (sx, sy):

@@ -11,7 +11,7 @@
 
 from abc import ABC, abstractmethod
 
-from ..config import DelayConfig
+from ..config import InputSimConfig
 
 
 class InputBackend(ABC):
@@ -25,14 +25,14 @@ class InputBackend(ABC):
     - background_mode: bool（ADB 恒 True）
     - target_hwnd: int | None（ADB 恒 None）
 
-    延迟/抖动参数（由 DelayConfig 注入，所有子类共享）：
+    延迟/抖动参数（由 InputSimConfig 注入，所有子类共享）：
     - before_click_wait / after_click_wait：点击前后延迟范围
     - mouse_move_duration：鼠标/触摸移动时长范围
     - click_random_offset：坐标随机偏移像素
     - region_jitter_ratio：区域中心抖动比例
     """
 
-    # ─── 延迟/抖动参数（子类 __init__ 由 DelayConfig 注入）──────────
+    # ─── 延迟/抖动参数（子类 __init__ 由 InputSimConfig 注入）──────────
     before_click_wait: tuple[float, float]
     after_click_wait: tuple[float, float]
     mouse_move_duration: tuple[float, float]
@@ -66,12 +66,12 @@ class InputBackend(ABC):
         """
 
     @staticmethod
-    def _inject_delay_config(instance, delay_config: DelayConfig | None):
-        """工具方法：将 DelayConfig 的延迟参数注入到子类实例
+    def _inject_input_sim(instance, input_sim: InputSimConfig | None):
+        """工具方法：将 InputSimConfig 的输入模拟参数注入到子类实例
 
         子类 __init__ 可调用此方法统一注入，避免重复代码。
         """
-        cfg = delay_config or DelayConfig()
+        cfg = input_sim or InputSimConfig()
         instance.before_click_wait = cfg.before_click_wait
         instance.after_click_wait = cfg.after_click_wait
         instance.mouse_move_duration = cfg.mouse_move_duration

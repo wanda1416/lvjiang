@@ -9,7 +9,7 @@ import time
 
 from loguru import logger
 
-from ...config import DelayConfig
+from ...config import InputSimConfig
 from ..input_base import InputBackend
 from .win32_util import (
     postmessage_click,
@@ -21,8 +21,8 @@ from .win32_util import (
 class PostMessageInput(InputBackend):
     """基于 PostMessage 的输入后端（后台模式，不移动光标）"""
 
-    def __init__(self, delay_config: DelayConfig | None = None, hwnd: int | None = None):
-        self._inject_delay_config(self, delay_config)
+    def __init__(self, input_sim: InputSimConfig | None = None, hwnd: int | None = None):
+        self._inject_input_sim(self, input_sim)
         # 兼容属性：PostMessage 恒为后台模式
         self.background_mode = True
         self.target_hwnd = hwnd

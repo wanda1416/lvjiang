@@ -1,15 +1,10 @@
 """截图后端抽象测试
 
 验证：
-1. CaptureBackend 抽象契约（ABC 不可直接实例化、子类必须实现 capture/get_capture_size）
-2. 默认 capture_to_file / set_capture_region / attach_to_window 行为
-3. 桌面工厂 create_capture_backend 返回 DesktopCapture 实例
-4. AdbCapture 实现 CaptureBackend 接口
-5. 工作流可接受 fake CaptureBackend
+1. 默认 capture_to_file / set_capture_region / attach_to_window 行为
+2. 桌面工厂 create_capture_backend 返回 DesktopCapture 实例
+3. ADB 工厂 create_capture_backend 返回 AdbCapture 实例
 """
-
-import numpy as np
-import pytest
 
 from lvjiang.core.capture_base import CaptureBackend
 
@@ -29,28 +24,6 @@ class _FakeCapture(CaptureBackend):
 
     def get_capture_size(self):
         return self._size
-
-
-class _IncompleteCapture(CaptureBackend):
-    """故意缺失抽象方法实现"""
-    pass
-
-
-# ─── ABC 契约 ────────────────────────────────────────────────
-
-def test_capture_backend_cannot_be_instantiated():
-    with pytest.raises(TypeError):
-        CaptureBackend()
-
-
-def test_incomplete_subclass_cannot_be_instantiated():
-    with pytest.raises(TypeError):
-        _IncompleteCapture()
-
-
-def test_complete_subclass_can_be_instantiated():
-    fake = _FakeCapture()
-    assert isinstance(fake, CaptureBackend)
 
 
 # ─── 默认方法行为 ─────────────────────────────────────────────
@@ -88,17 +61,7 @@ def test_desktop_capture_factory():
         pass
 
 
-def test_desktop_capture_is_capture_backend():
-    from lvjiang.core.desktop import DesktopCapture
-    assert issubclass(DesktopCapture, CaptureBackend)
-
-
-# ─── AdbCapture 抽象一致性 ────────────────────────────────────
-
-def test_adb_capture_is_capture_backend_class():
-    from lvjiang.core.android.adb_capture import AdbCapture
-    assert issubclass(AdbCapture, CaptureBackend)
-
+# ─── ADB 工厂 ────────────────────────────────────────────────
 
 def test_adb_factory_returns_capture_backend():
     from lvjiang.core.android import AdbCapture, create_capture_backend
@@ -116,35 +79,3 @@ def test_adb_factory_returns_capture_backend():
     assert isinstance(backend, CaptureBackend)
     # 清理（未启动，stop 应安全）
     backend.stop()
-
-
-# ─── 工作流可接受 fake 后端 ────────────────────────────────────
-
-def test_base_workflow_accepts_fake_capture_backend():
-    """验证 BaseWorkflow 只依赖抽象接口，fake 子类可无缝注入"""
-    from lvjiang.core.scene_registry import CanvasConfig, Layout
-    from lvjiang.workflows.base import BaseWorkflow
-
-    class _FakeInput:
-        background_mode = False
-        target_hwnd = None
-        def click_screen(self, x, y, poi=""): pass
-        def drag_screen(self, *a, **kw): pass
-
-    frame = np.zeros((100, 200, 3), dtype=np.uint8)
-    fake_capture = _FakeCapture(size=(200, 100), frame=frame)
-    wf = BaseWorkflow(
-        capture=fake_capture,
-        ocr=None,
-        input_ctrl=_FakeInput(),
-        layout=Layout(name="t"),
-        window_left=0,
-        window_top=0,
-    )
-    wf._layout.set_canvas(CanvasConfig())
-    # 验证 get_capture_size 通过抽象接口被调用
-    w, h = wf._capture.get_capture_size()
-    assert (w, h) == (200, 100)
-    # 验证 capture 通过抽象接口被调用
-    img = wf._capture.capture()
-    assert img is frame

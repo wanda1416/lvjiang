@@ -130,29 +130,19 @@ class RunControlMixin:
         """发现全部脚本，按 workflows.yaml 的 exposed/overrides 过滤排序后填充下拉。
 
         脚本本体（.wf + 内置类）由发现层自动扫描；workflows.yaml 只决定日常页
-        暴露哪些脚本、顺序、以及可选的显示名覆盖。
+        暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
+        悬浮面板共用 ``list_exposed_scripts()``。
         """
-        from ..workflows.discovery import discover_scripts
+        from ..workflows.discovery import list_exposed_scripts
 
         self._workflow_configs: list[dict] = []
         self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
 
         try:
-            discovered = {cfg["id"]: cfg for cfg in discover_scripts()}
+            self._workflow_configs = list_exposed_scripts()
         except Exception as e:
             logger.error(f"发现脚本失败: {e}")
             return
-
-        exposed, overrides = self._load_script_exposure()
-        # exposed 缺失/为空 → 展示全部；否则仅展示且按其顺序
-        order = [i for i in exposed if i in discovered] if exposed else sorted(discovered)
-
-        for sid in order:
-            cfg = dict(discovered[sid])
-            ov = overrides.get(sid) or {}
-            if ov.get("name"):
-                cfg["name"] = ov["name"]
-            self._workflow_configs.append(cfg)
 
         # 填充下拉列表
         self.workflow_combo.clear()
@@ -160,20 +150,6 @@ class RunControlMixin:
             self.workflow_combo.addItem(cfg["name"], cfg["id"])
 
         logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
-
-    def _load_script_exposure(self) -> tuple[list, dict]:
-        """读取 workflows.yaml（合并视图）的 exposed 列表与 overrides 映射。"""
-        try:
-            data = get_resolver().load_merged("workflows.yaml")
-        except Exception as e:
-            logger.error(f"加载脚本暴露配置失败: {e}")
-            return [], {}
-        if not data:
-            logger.warning("脚本暴露配置 workflows.yaml 为空或不存在")
-            return [], {}
-        exposed = data.get("exposed") or []
-        overrides = data.get("overrides") or {}
-        return exposed, overrides
 
     def _on_load_workflow(self):
         """加载任意 .wf 文件为临时工作流项（非常驻，打开新文件会覆盖）
@@ -424,7 +400,8 @@ class RunControlMixin:
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
-            delay_config=self._user_config.input_delay,
+            input_sim=self._user_config.input_sim,
+            delay_params=self._user_config.delay_params,
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,
@@ -453,7 +430,8 @@ class RunControlMixin:
                 ocr=self._ocr,
                 input_ctrl=self._input,
                 layout=layout,
-                delay_config=self._user_config.input_delay,
+                input_sim=self._user_config.input_sim,
+                delay_params=self._user_config.delay_params,
                 window_left=window_left,
                 window_top=window_top,
                 stop_check=self._is_stopped,
@@ -649,7 +627,8 @@ class RunControlMixin:
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
-            delay_config=self._user_config.input_delay,
+            input_sim=self._user_config.input_sim,
+            delay_params=self._user_config.delay_params,
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,
@@ -668,7 +647,8 @@ class RunControlMixin:
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
-            delay_config=self._user_config.input_delay,
+            input_sim=self._user_config.input_sim,
+            delay_params=self._user_config.delay_params,
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,

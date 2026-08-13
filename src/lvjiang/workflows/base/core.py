@@ -2,7 +2,7 @@
 
 from typing import Callable, Optional
 
-from ...config import DelayConfig
+from ...config import DelayParam, InputSimConfig
 from ...core.capture_base import CaptureBackend
 from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
@@ -26,13 +26,18 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
     # 类级别共享：MaterialRecognizer 跨所有实例复用，避免重复加载参考图
     _shared_material_recognizer = None
 
+    # 执行引擎引用（engine._execute_python_workflow 注入，供内置
+    # 函数的 UI 交互 confirm/pause/input 走 Qt 主线程桥）
+    _engine = None
+
     def __init__(
         self,
         capture: CaptureBackend,
         ocr: OCREngine,
         input_ctrl: InputBackend,
         layout: Layout,
-        delay_config: DelayConfig | None = None,
+        input_sim: InputSimConfig | None = None,
+        delay_params: dict[str, DelayParam] | None = None,
         window_left: int = 0,
         window_top: int = 0,
         stop_check: Optional[Callable[[], bool]] = None,
@@ -41,7 +46,8 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         self._ocr = ocr
         self._input = input_ctrl
         self._layout = layout
-        self._delay = delay_config or DelayConfig()
+        self._input_sim = input_sim or InputSimConfig()
+        self._delay_params = delay_params or {}
         self._window_left = window_left
         self._window_top = window_top
         self._stop_check = stop_check or (lambda: False)

@@ -15,6 +15,11 @@ build/
 *.swp
 *.swo
 
+# Tool caches (mypy baseline worktree etc.)
+.git-mypy-base/
+.mypy_cache/
+.ruff_cache/
+
 # Logs
 logs/
 
@@ -43,3 +48,6 @@ android/keystore.properties
 *.keystore
 android/**/build/
 android/**/.cxx/
+
+# Kotlin build cache
+android/.kotlin/

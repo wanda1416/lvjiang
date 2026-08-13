@@ -7,7 +7,7 @@ quality_thresholds:
   - gold
   - purple
 playstyles:
-  会意:
+  无名:
     main:
       weapon: 剑
       damage: 剑武学增伤
@@ -15,6 +15,15 @@ playstyles:
       weapon: 枪
       damage: null
     attr: 鸣金
+  火九:
+    main:
+      weapon: 剑
+      damage: 剑武学增伤
+    sub:
+      weapon: 枪
+      damage: null
+    attr: 鸣金
+    switch: keep_danti
 transmute_priority:
 - 最大外功攻击
 - 势
@@ -63,7 +72,7 @@ patterns:
     - 会意率
     junk_conditions:
     - when:
-        keep_pvp: false
+        keep_danti: false
       all:
       - count_min:
           symbols:
@@ -76,7 +85,22 @@ patterns:
           symbols:
           - 劲
           - 势
-          min: 1
+          min: 2
+      - count_max:
+          symbols:
+          - 最大鸣金攻击
+          max: 0
+    - when:
+        keep_danti: true
+      all:
+      - contains_all:
+        - 最大外功攻击
+      - count_min:
+          symbols:
+          - 势
+          - 劲
+          - 单体类奇术增伤
+          min: 2
       - count_max:
           symbols:
           - 最大鸣金攻击
@@ -86,21 +110,21 @@ patterns:
     - 劲
     junk_conditions:
     - when:
-        keep_pvp: false
+        keep_wanjia: false
       all:
       - count_max:
           symbols:
           - 对首领单位增伤
           max: 0
     - when:
-        keep_pvp: false
+        keep_wanjia: false
       all:
       - count_min:
           symbols:
           - 对玩家单位增效
           min: 1
     - when:
-        keep_pvp: true
+        keep_wanjia: true
       all:
       - count_max:
           symbols:

@@ -18,7 +18,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from pynput.keyboard import GlobalHotKeys
 
-    from ..config import InputSimConfig
+    from ..core.config import InputSimConfig
     from .input_base import InputBackend
 
 IS_WINDOWS = sys.platform == "win32"

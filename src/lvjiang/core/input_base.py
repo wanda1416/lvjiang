@@ -11,7 +11,7 @@
 
 from abc import ABC, abstractmethod
 
-from ..config import InputSimConfig
+from ..core.config import InputSimConfig
 
 
 class InputBackend(ABC):

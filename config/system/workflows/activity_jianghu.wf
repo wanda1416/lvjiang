@@ -29,7 +29,7 @@ default $max_refresh = 50
 default $claim_reward = false
 
 # 目标任务关键词列表
-eval $targets = ["合影", "换装", "情境", "东方", "醉意", "双人"]
+eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉樟林"]
 
 # 起始定位：用户可能在江湖号令活动页点 F9，也可能停在游戏首页
 # 读不到「号令」标题即视为在首页，先导航进活动页
@@ -90,8 +90,8 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       if $task_text contains "醉意"
          call action_zuiyi($label)
       end
-      if $task_text contains "双人"
-         call action_shuangren($label)
+      if $task_text contains "觉樟林"
+         call action_juezhanglin($label)
       end
 
       # 领取奖励（勾选时）：动作完成后、切到下一个 label 前再点一次任务标签
@@ -237,9 +237,9 @@ def action_zuiyi($label)
    log "醉意动作暂未实现"
 end
 
-# 双人：动作暂未实现
-def action_shuangren($label)
-   log "双人动作暂未实现"
+# 觉樟林：动作暂未实现
+def action_juezhanglin($label)
+   log "觉樟林动作暂未实现"
 end
 
 # 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令

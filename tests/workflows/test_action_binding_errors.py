@@ -7,7 +7,7 @@
 
 import pytest
 
-from lvjiang.config import DelayParam, InputSimConfig
+from lvjiang.core.config import DelayParam, InputSimConfig
 from lvjiang.core.scene_registry import Arrow, CanvasConfig, Point, Region
 from lvjiang.workflows.base.actions import _ActionMixin
 from lvjiang.workflows.base.coords import _CoordMixin

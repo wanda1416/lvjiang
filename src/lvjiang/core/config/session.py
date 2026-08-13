@@ -151,3 +151,27 @@ def reset_session_store() -> None:
     """丢弃模块级单例（测试用：monkeypatch SESSION_PATH 后避免内存态跨用例残留）"""
     global _store
     _store = None
+
+
+# ─── 便捷函数：settings / material_grid ────────────────────
+
+def load_settings() -> dict[str, Any]:
+    """读取 session.json 的 settings 节点"""
+    value = get_session_store().get_node("settings")
+    return value if isinstance(value, dict) else {}
+
+
+def save_settings(settings: dict[str, Any]) -> None:
+    """保存配置到 session.json 的 settings 节点"""
+    get_session_store().set_node("settings", settings)
+
+
+def load_material_grid() -> dict[str, Any]:
+    """读取 session.json 的 material_grid 节点"""
+    value = get_session_store().get_node("material_grid")
+    return value if isinstance(value, dict) else {}
+
+
+def save_material_grid(grid: dict[str, Any]) -> None:
+    """保存材料网格参数到 session.json 的 material_grid 节点"""
+    get_session_store().set_node("material_grid", grid)

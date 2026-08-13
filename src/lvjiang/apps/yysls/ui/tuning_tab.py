@@ -54,14 +54,15 @@ class TuningTab(QWidget):
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
-        # 顶部固定「开始调律」按钮 + 下方配置三页 Tab（规则 | 部位 | 更多）
+        # 顶部固定「开始调律」按钮（第一行）+ 下方配置三页 Tab（规则 | 部位 | 更多）
         tab_layout = QVBoxLayout(self)
-        tab_layout.setContentsMargins(4, 4, 4, 4)
+        tab_layout.setContentsMargins(8, 8, 8, 8)
+        tab_layout.setSpacing(8)
 
         self.btn_run_tuning = QPushButton("开始调律 (F9)")
         self.btn_run_tuning.clicked.connect(self.f9_run)
         self.btn_run_tuning.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
         )
         tab_layout.addWidget(self.btn_run_tuning)
 
@@ -198,17 +199,17 @@ class TuningTab(QWidget):
         if state == "running":
             self.btn_run_tuning.setText("停止 (F10)")
             self.btn_run_tuning.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         elif state == "not_ready":
             self.btn_run_tuning.setText("未就绪")
             self.btn_run_tuning.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 10px; font-size: 14px;"
+                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
         else:
             self.btn_run_tuning.setText("开始调律 (F9)")
             self.btn_run_tuning.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; font-size: 14px;"
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
 
     # ─── 配置变更监听 ────────────────────────────────────────

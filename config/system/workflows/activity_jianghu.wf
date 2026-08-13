@@ -286,8 +286,6 @@ def back_to_haoling()
    end
 end
 
-# 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
-# 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
 def back_to_haoling_1()
    # 门派页三种形态均含「号令」文字，find 统一搜索
    find [ui_school_main].[haoling] as $found by contains "号令"

@@ -12,18 +12,20 @@ def select_role_and_enter($role_idx)
 
     # 进入游戏
     click [game_login_page].[enter]
-    wait (3, 5)
+    wait 5
 
-    # 等待主页（检测菜单标识，最多 60 秒）
-    loop 15
-        scan [game_main_page].[menu] as $menu by contains "菜单"
-        if $menu
-            goto done
+    # 等待加载完成：检测 loading 区域的「加载」文字
+    # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
+    loop 10
+        scan [game_login_page].[loading] as $load_text by contains "加载"
+        if $load_text
+            wait 5
+        else
+            goto loading_done
         end
-        wait 4
     end
-    eval pause("等待进入游戏超时，请手动确认后点击确定")
+    eval pause("等待加载超时，请手动确认后点击确定")
 
-    @done
-    wait (1, 2)
+    @loading_done
+    wait 5
 end

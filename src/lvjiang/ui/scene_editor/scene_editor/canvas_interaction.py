@@ -262,6 +262,32 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.update()
             return
 
+        # 单区域编辑模式下跳过 panel/POI 命中测试，直接聚焦 region
+        if self._field_selected and self._selected_idx >= 0:
+            # 右侧字段列表选中：单区域编辑模式
+            r = self._regions[self._selected_idx]
+            handle = self._hit_handle(r, pos)
+            if handle is not None:
+                self._drag_mode = DragMode.RESIZING
+                self._drag_handle = handle
+                self._drag_start = pos
+                self._drag_orig = Region(**r.to_dict())
+                self.update()
+                return
+            rect = self._region_rect_widget(r)
+            if rect.contains(pos):
+                self._drag_mode = DragMode.MOVING
+                self._drag_start = pos
+                self._drag_orig = Region(**r.to_dict())
+                self.update()
+                return
+            # 点击空白：退出单区域模式，回到全局模式
+            self._field_selected = False
+            self._selected_idx = -1
+            self._notify_selection_changed()
+            self.update()
+            # 继续往下走，进入全局模式逻辑
+
         # ── Panel 移动/缩放介入 ──
         if self._edit_mode == EditMode.REGION and self._panels:
             p_idx, p_handle = self._hit_panel_test(pos)
@@ -320,30 +346,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
 
         # ── 区域编辑模式（原有逻辑） ──
-
-        if self._field_selected and self._selected_idx >= 0:
-            # 右侧字段列表选中：单区域编辑模式
-            r = self._regions[self._selected_idx]
-            handle = self._hit_handle(r, pos)
-            if handle is not None:
-                self._drag_mode = DragMode.RESIZING
-                self._drag_handle = handle
-                self._drag_start = pos
-                self._drag_orig = Region(**r.to_dict())
-                self.update()
-                return
-            rect = self._region_rect_widget(r)
-            if rect.contains(pos):
-                self._drag_mode = DragMode.MOVING
-                self._drag_start = pos
-                self._drag_orig = Region(**r.to_dict())
-                self.update()
-                return
-            # 点击空白：退出单区域模式，回到全局模式
-            self._field_selected = False
-            self._selected_idx = -1
-            self.update()
-            # 继续往下走，进入全局模式逻辑
 
         # 全局调整模式：可以选中/移动/缩放已有区域，或创建新区域
         idx, handle = self._hit_test(pos)

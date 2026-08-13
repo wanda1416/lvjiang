@@ -76,13 +76,13 @@ _QUALITY_LABELS = {
     "blue": "蓝装及以下",
 }
 
-# 规则表列定义（第一列为排序按钮；扫描处理在判定结果后多一列
+# 规则表列定义（第一列为序号；扫描处理在判定结果后多一列
 # 「仅首词条」，列索引经 self._ci 按列 key 取）
-_SORT_COL = 0
-_BASE_COL_KEYS = ("sort", "parts", "quality", "judge", "ratings",
+_SEQ_COL = 0
+_BASE_COL_KEYS = ("seq", "parts", "quality", "judge", "ratings",
                   "pct", "action")
 _COL_TITLES = {
-    "sort": "", "parts": "部位", "quality": "品阶",
+    "seq": "#", "parts": "部位", "quality": "品阶",
     "judge": "判定语义", "ratings": "判定结果", "first_affix": "仅首词条",
     "pct": "首词条 %", "action": "动作",
 }
@@ -445,11 +445,11 @@ class _BehaviorPageBase(QWidget):
         self._table.setHorizontalHeaderLabels([titles[k] for k in keys])
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
-        # 排序列固定宽度，首词条列（符号 + 数值）与仅首词条列
-        # 按内容自适应，隐藏序号列
+        # 序号列固定宽度，首词条列（符号 + 数值）与仅首词条列
+        # 按内容自适应，隐藏原生行号
         self._table.horizontalHeader().setSectionResizeMode(
-            _SORT_COL, QHeaderView.ResizeMode.Fixed)
-        self._table.setColumnWidth(_SORT_COL, 28)
+            _SEQ_COL, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(_SEQ_COL, 32)
         self._table.horizontalHeader().setSectionResizeMode(
             self._ci["pct"], QHeaderView.ResizeMode.ResizeToContents)
         if "first_affix" in self._ci:
@@ -467,9 +467,23 @@ class _BehaviorPageBase(QWidget):
         del_btn = QPushButton("删除选中规则")
         del_btn.clicked.connect(lambda _c: self._on_del_rule())
         btn_row.addWidget(del_btn)
+        btn_row.addSpacing(8)
+        self._up_btn = QPushButton("▲ 上移")
+        self._up_btn.setToolTip("将选中规则上移一行")
+        self._up_btn.clicked.connect(lambda _c: self._on_move_up())
+        self._up_btn.setEnabled(False)
+        btn_row.addWidget(self._up_btn)
+        self._down_btn = QPushButton("▼ 下移")
+        self._down_btn.setToolTip("将选中规则下移一行")
+        self._down_btn.clicked.connect(lambda _c: self._on_move_down())
+        self._down_btn.setEnabled(False)
+        btn_row.addWidget(self._down_btn)
         btn_row.addStretch()
         layout.addLayout(btn_row)
         layout.addStretch()
+
+        # 表格选中变化时更新移动按钮状态
+        self._table.itemSelectionChanged.connect(self._update_move_buttons)
 
     def _init_head(self, layout: QVBoxLayout):
         raise NotImplementedError
@@ -507,24 +521,10 @@ class _BehaviorPageBase(QWidget):
         row = table.rowCount()
         table.insertRow(row)
 
-        # 排序按钮列（上三角 + 下三角）
-        sort_widget = QWidget()
-        sort_layout = QVBoxLayout(sort_widget)
-        sort_layout.setContentsMargins(2, 2, 2, 2)
-        sort_layout.setSpacing(1)
-        up_btn = QPushButton("▲")
-        up_btn.setFixedSize(22, 16)
-        up_btn.setToolTip("上移")
-        up_btn.clicked.connect(lambda: self._on_move_up(row))
-        sort_layout.addWidget(up_btn)
-        down_btn = QPushButton("▼")
-        down_btn.setFixedSize(22, 16)
-        down_btn.setToolTip("下移")
-        down_btn.clicked.connect(lambda: self._on_move_down(row))
-        sort_layout.addWidget(down_btn)
-        sort_layout.addStretch()
-        sort_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        table.setCellWidget(row, _SORT_COL, sort_widget)
+        # 序号列（只读标签）
+        seq_label = QLabel(str(row + 1))
+        seq_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        table.setCellWidget(row, _SEQ_COL, seq_label)
 
         parts = _MultiSelect([(p, p) for p in QUALITY_PARTS], self._apply)
         parts.set_selected(rule.parts)
@@ -585,6 +585,7 @@ class _BehaviorPageBase(QWidget):
         self._loading = True
         self._make_row_widgets(BehaviorRule())
         self._loading = False
+        self._update_move_buttons()
         self._apply()
 
     def _on_del_rule(self):
@@ -593,23 +594,45 @@ class _BehaviorPageBase(QWidget):
             self._status_cb("请先选中要删除的规则行", True)
             return
         self._table.removeRow(row)
+        self._refresh_seq_numbers()
+        self._update_move_buttons()
         self._apply()
 
-    def _on_move_up(self, row: int):
+    def _on_move_up(self):
+        row = self._table.currentRow()
         if row <= 0:
             self._status_cb("已是第一条规则，无法上移", True)
             return
         self._swap_rows(row, row - 1)
         self._table.selectRow(row - 1)
+        self._refresh_seq_numbers()
         self._apply()
 
-    def _on_move_down(self, row: int):
+    def _on_move_down(self):
+        row = self._table.currentRow()
         if row < 0 or row >= self._table.rowCount() - 1:
             self._status_cb("已是最后一条规则，无法下移", True)
             return
         self._swap_rows(row, row + 1)
         self._table.selectRow(row + 1)
+        self._refresh_seq_numbers()
         self._apply()
+
+    def _refresh_seq_numbers(self) -> None:
+        """刷新序号列，保持与行序一致"""
+        for r in range(self._table.rowCount()):
+            w = self._table.cellWidget(r, _SEQ_COL)
+            if isinstance(w, QLabel):
+                w.setText(str(r + 1))
+
+    def _update_move_buttons(self) -> None:
+        """根据当前选中行更新移动按钮的启用状态"""
+        row = self._table.currentRow()
+        has_selection = row >= 0
+        # 上移：有选中且不是第一行
+        self._up_btn.setEnabled(has_selection and row > 0)
+        # 下移：有选中且不是最后一行
+        self._down_btn.setEnabled(has_selection and row < self._table.rowCount() - 1)
 
     def _swap_rows(self, row_a: int, row_b: int) -> None:
         """交换两行的规则数据（含所有控件值）"""
@@ -785,11 +808,26 @@ class TuneBehaviorPage(_BehaviorPageBase):
         head.addStretch()
         layout.addLayout(head)
 
+        # 初始判定复选框
+        init_row = QHBoxLayout()
+        self._initial_check_cb = QCheckBox("启用初始判定")
+        self._initial_check_cb.setToolTip(
+            "勾选后，对每件装备进行第一次调律前会先执行一次结束处理判定。\n"
+            "用于支持本身已经是废品的装备先重置，再开始正常调律。")
+        self._initial_check_cb.stateChanged.connect(lambda _s: self._apply())
+        init_row.addWidget(self._initial_check_cb)
+        init_row.addWidget(QLabel(
+            "<font color='gray'>对装备进行第一次调律前执行一次结束处理，"
+            "用于支持装备直接重置</font>"))
+        init_row.addStretch()
+        layout.addLayout(init_row)
+
     def _load_stage(self, stage) -> None:
         self._enabled_cb.setChecked(stage.enabled)
         self._resets_spin.setValue(stage.max_resets)
         idx = self._exhausted_combo.findData(stage.reset_exhausted_action)
         self._exhausted_combo.setCurrentIndex(max(idx, 0))
+        self._initial_check_cb.setChecked(stage.initial_check)
 
     def _stage_raw(self) -> dict:
         return {
@@ -797,4 +835,5 @@ class TuneBehaviorPage(_BehaviorPageBase):
             "rules": self._rules_raw(),
             "max_resets": self._resets_spin.value(),
             "reset_exhausted_action": self._exhausted_combo.currentData(),
+            "initial_check": self._initial_check_cb.isChecked(),
         }

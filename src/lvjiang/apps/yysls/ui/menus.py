@@ -17,7 +17,7 @@ def build_menu(host, menubar) -> None:
         dialog.exec()
 
     def _open_tuning_rules():
-        from .rules_editor import TuningRulesDialog
+        from .tune_config import TuningRulesDialog
         dialog = TuningRulesDialog(parent=host)
         dialog.exec()
 

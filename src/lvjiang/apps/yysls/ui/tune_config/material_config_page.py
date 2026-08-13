@@ -48,9 +48,9 @@ _NO_FOOD = "- 不添加 -"
 # 品阶下拉候选（按品阶从低到高，blue=不限）
 _QUALITY_KEYS = ("blue", "purple", "gold")
 
-# 规则表列定义（第一列为排序按钮）
-_SORT_COL = 0
-_COLS = ("", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")
+# 规则表列定义（第一列为序号）
+_SEQ_COL = 0
+_COLS = ("#", "首词条 ≥ %", "期望 ≥", "品阶 ≥", "每轮添加", "材料不足时")
 
 
 class MaterialConfigPage(QWidget):
@@ -108,10 +108,10 @@ class MaterialConfigPage(QWidget):
         self._table.setHorizontalHeaderLabels(list(_COLS))
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
-        # 排序列固定宽度，隐藏序号列
+        # 序号列固定宽度，隐藏原生行号
         self._table.horizontalHeader().setSectionResizeMode(
-            _SORT_COL, QHeaderView.ResizeMode.Fixed)
-        self._table.setColumnWidth(_SORT_COL, 28)
+            _SEQ_COL, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(_SEQ_COL, 32)
         self._table.verticalHeader().setVisible(False)
         layout.addWidget(self._table)
 
@@ -122,33 +122,33 @@ class MaterialConfigPage(QWidget):
         del_btn = QPushButton("删除选中规则")
         del_btn.clicked.connect(self._on_del_rule)
         btn_row.addWidget(del_btn)
+        btn_row.addSpacing(8)
+        self._up_btn = QPushButton("▲ 上移")
+        self._up_btn.setToolTip("将选中规则上移一行")
+        self._up_btn.clicked.connect(self._on_move_up)
+        self._up_btn.setEnabled(False)
+        btn_row.addWidget(self._up_btn)
+        self._down_btn = QPushButton("▼ 下移")
+        self._down_btn.setToolTip("将选中规则下移一行")
+        self._down_btn.clicked.connect(self._on_move_down)
+        self._down_btn.setEnabled(False)
+        btn_row.addWidget(self._down_btn)
         btn_row.addStretch()
         layout.addLayout(btn_row)
         layout.addStretch()
+
+        # 表格选中变化时更新移动按钮状态
+        self._table.itemSelectionChanged.connect(self._update_move_buttons)
 
     def _make_row_widgets(self, rule: FoodRule) -> None:
         """在表尾新增一行并填充该规则的编辑控件"""
         row = self._table.rowCount()
         self._table.insertRow(row)
 
-        # 排序按钮列（上三角 + 下三角）
-        sort_widget = QWidget()
-        sort_layout = QVBoxLayout(sort_widget)
-        sort_layout.setContentsMargins(2, 2, 2, 2)
-        sort_layout.setSpacing(1)
-        up_btn = QPushButton("▲")
-        up_btn.setFixedSize(22, 16)
-        up_btn.setToolTip("上移")
-        up_btn.clicked.connect(lambda: self._on_move_up(row))
-        sort_layout.addWidget(up_btn)
-        down_btn = QPushButton("▼")
-        down_btn.setFixedSize(22, 16)
-        down_btn.setToolTip("下移")
-        down_btn.clicked.connect(lambda: self._on_move_down(row))
-        sort_layout.addWidget(down_btn)
-        sort_layout.addStretch()
-        sort_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        self._table.setCellWidget(row, _SORT_COL, sort_widget)
+        # 序号列（只读标签）
+        seq_label = QLabel(str(row + 1))
+        seq_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table.setCellWidget(row, _SEQ_COL, seq_label)
 
         pct = QSpinBox()
         pct.setRange(0, 100)
@@ -207,6 +207,7 @@ class MaterialConfigPage(QWidget):
         self._loading = True
         self._make_row_widgets(FoodRule())
         self._loading = False
+        self._update_move_buttons()
         self._apply()
 
     def _on_del_rule(self):
@@ -215,23 +216,45 @@ class MaterialConfigPage(QWidget):
             self._status_cb("请先选中要删除的规则行", True)
             return
         self._table.removeRow(row)
+        self._refresh_seq_numbers()
+        self._update_move_buttons()
         self._apply()
 
-    def _on_move_up(self, row: int):
+    def _on_move_up(self):
+        row = self._table.currentRow()
         if row <= 0:
             self._status_cb("已是第一条规则，无法上移", True)
             return
         self._swap_rows(row, row - 1)
         self._table.selectRow(row - 1)
+        self._refresh_seq_numbers()
         self._apply()
 
-    def _on_move_down(self, row: int):
+    def _on_move_down(self):
+        row = self._table.currentRow()
         if row < 0 or row >= self._table.rowCount() - 1:
             self._status_cb("已是最后一条规则，无法下移", True)
             return
         self._swap_rows(row, row + 1)
         self._table.selectRow(row + 1)
+        self._refresh_seq_numbers()
         self._apply()
+
+    def _refresh_seq_numbers(self) -> None:
+        """刷新序号列，保持与行序一致"""
+        for r in range(self._table.rowCount()):
+            w = self._table.cellWidget(r, _SEQ_COL)
+            if isinstance(w, QLabel):
+                w.setText(str(r + 1))
+
+    def _update_move_buttons(self) -> None:
+        """根据当前选中行更新移动按钮的启用状态"""
+        row = self._table.currentRow()
+        has_selection = row >= 0
+        # 上移：有选中且不是第一行
+        self._up_btn.setEnabled(has_selection and row > 0)
+        # 下移：有选中且不是最后一行
+        self._down_btn.setEnabled(has_selection and row < self._table.rowCount() - 1)
 
     def _swap_rows(self, row_a: int, row_b: int) -> None:
         """交换两行的规则数据（含所有控件值）"""

@@ -1,4 +1,6 @@
-# DSL 感知与数据指令
+# DSL 感知指令
+
+> 基础指令（collect/eval/call/log）见 [03-2-basic-commands.md](03-2-basic-commands.md)。
 
 ## 目录
 
@@ -12,10 +14,7 @@
   - [返回值语义](#返回值语义-2)
   - [搜索区域](#搜索区域)
   - [by 子句](#by-子句-2)
-- [四、collect — 收集输出](#四collect--收集输出)
-- [五、eval — 赋值](#五eval--赋值)
-- [六、call — 调用子工作流](#六call--调用子工作流)
-- [七、log — 日志输出](#七log--日志输出)
+- [四、where 子句 — 置信度过滤](#四where-子句--置信度过滤)
 
 ## 一、scan — OCR 扫描
 
@@ -35,6 +34,10 @@ scan scene_name.[a1, a2, ...] as $var by equals "文本"
 scan scene_name.[a1, a2, ...] as $var by contains "文本"
 scan scene_name.[a1, a2, ...] as $var by equals_any $list
 scan scene_name.[a1, a2, ...] as $var by contains_any $list
+
+# 带 where 子句（置信度过滤）
+scan scene_name.[a1, a2, ...] as $var where confidence >= 0.8
+scan scene_name.[a1, a2, ...] as $var by contains "文本" where confidence >= 0.7
 ```
 
 **示例**：
@@ -163,6 +166,9 @@ recognize scene_name.[a1, a2] as $var by contains "文本"
 # 带 on group 子句（限定材料分组范围）
 recognize scene_name.[a1, a2] as $var on group "分组名"
 recognize scene_name.[a1, a2] as $var by equals $name on group "分组名"
+
+# 带 where 子句（置信度过滤）
+recognize scene_name.[a1, a2] as $var where confidence >= 0.85
 ```
 
 ### 返回值语义
@@ -238,6 +244,9 @@ find [scene].[area] as $var by contains "文字"
 # 顺序匹配（支持列表）
 find as $var by contains_any $list
 find [scene].[area] as $var by equals_any $list
+
+# 带 where 子句（置信度过滤）
+find as $var by contains "文字" where confidence >= 0.8
 ```
 
 ### 返回值语义
@@ -319,120 +328,42 @@ end
 
 `contains_any` / `equals_any` 支持**顺序匹配**：按列表顺序逐个尝试，返回第一个命中的文字位置。
 
-## 四、collect — 收集输出
+## 四、where 子句 — 置信度过滤
 
-将值存入工作流的输出字典。
+`where` 子句附加在 `scan` / `recognize` / `find` 末尾，过滤低置信度的识别结果。
+
+**语义**：纯过滤 —— 不改变返回值类型，仅丢弃置信度低于阈值的结果。与 `by` 子句正交，可同时使用。
 
 **语法**：
 
 ```
-collect $var                      # 以变量名为 key 存入
-collect $var as "label"           # 以静态 label 为 key 存入
-collect $var as $alias            # 以动态 alias 值为 key 存入
-collect session.field             # 以字段名为 key 存入
-collect 0 as $exit_code           # 字面量数字存入
-collect "ok" as $result           # 字面量字符串存入
+where confidence >= <threshold>
 ```
+
+`<threshold>` 支持：
+- 数字常量：`0.8`、`0.95`
+- 变量引用：`$threshold`（运行时解析）
 
 **示例**：
 
 ```
-collect $main_weapon              # output["main_weapon"] = $main_weapon
-collect $result as "status"       # output["status"] = $result
+# 过滤低置信度 OCR 结果
+scan [equip_detail].[affix_1, affix_2] as $result where confidence >= 0.8
 
-# 字面量
-collect 0 as $exit_code           # output["exit_code"] = 0.0
-collect "ok" as $result           # output["result"] = "ok"
+# 与 by 子句组合使用
+scan [equip_detail].[f1, f2, f3] as $key by contains "调律" where confidence >= 0.7
 
-# 动态 alias
-eval $key_name = "weapon_data"
-collect $result as $key_name      # output["weapon_data"] = $result
+# 变量阈值
+eval $min_conf = 0.85
+recognize [material_grid] as $mats where confidence >= $min_conf
+
+# find 同样支持
+find as $found by contains "确认" where confidence >= 0.9
 ```
 
 **说明**：
 
-- 不带 `as`：将源值以变量名/字段名为 key 存入输出字典（name reification）
-- 带 `as "label"`：以静态字符串为 key 存入
-- 带 `as $alias`：以 `$alias` 的运行时值为 key 存入
-- 字面量源必须带 `as` 子句，否则默认 key 为 `"value"`
-
-## 五、eval — 赋值
-
-调用内置函数、字面量赋值、字典字段赋值。
-
-**语法**：
-
-```
-eval $var = func(args...)         # 函数调用并赋值
-eval $var = "字符串"              # 字面量赋值
-eval $var = 123                   # 数字赋值
-eval $var = {}                    # 初始化空字典
-eval $var = {"k": "v"}              # 字典字面量（支持嵌套）
-eval $var = ["a", "b"]           # 列表赋值
-eval $var.field = value           # 字典字段赋值（单层）
-eval $var.f1.f2 = value           # 字典链式字段赋值（自动创建中间层）
-eval $var.$key = value            # 动态字段名赋值
-eval func(args...)                # 调用函数，丢弃返回值
-```
-
-> 算术表达式（`+` `-` `*` `/`）和隐式 eval 的详细说明见 [01-basics.md](01-basics.md#四表达式)。
-
-### 字典字面量
-
-eval 赋值右侧支持字典字面量初始化，key 限定为字符串，value 支持多种类型：
-
-```
-eval $d = {}                                  # 空字典
-eval $d = {"a": "b", "c": "d"}              # 字符串值
-eval $d = {"count": 3, "name": $user}       # 数字值 + 变量引用
-eval $d = {"nested": {"k": "v"}}            # 嵌套字典
-eval $d = {"list": [1, 2, $var]}            # 列表值
-```
-
-列表字面量同样支持嵌套字典：
-
-```
-eval $list = [{"k": "v"}, {"k2": "v2"}]     # 列表含字典元素
-```
-
-内置函数全集见 [06-functions.md](06-functions.md)。
-
-## 六、call — 调用子过程
-
-调用同文件内 `def` 定义的子过程，或 `import` 引入的外部子过程。
-
-**语法**：
-
-```
-call proc_name()                                  # 简单调用
-call proc_name($arg1, $arg2)                      # 传入参数
-call $result = proc_name()                        # 获取返回值
-call proc_name() as $output                       # 获取 output dict
-call $result = proc_name() as $output             # 同时获取返回值与 output
-```
-
-详细说明见 [07-subworkflows.md](07-subworkflows.md)。
-
-## 七、log — 日志输出
-
-输出一条日志消息。参数可以是任何能求值为字符串的表达式。
-
-**语法**：
-
-```
-log "消息文本"                    # 输出固定文本
-log $var                          # 输出变量值
-log $dict.field                   # 输出字段值
-log func(args...)                 # 输出函数返回值（如 concat 拼接）
-```
-
-**示例**：
-
-```
-log "开始执行调律流程"
-log $current_slot
-log $result.status
-log concat("当前槽位：", $slot)
-```
-
-控制流与条件表达式详见 [05-control-flow.md](05-control-flow.md)。
+- 过滤条件为 `confidence >= threshold`（大于等于）
+- 无 `where` 时不过滤任何结果（保持向后兼容）
+- `by` 子句改变返回语义（dict → str），`where` 仅过滤，两者独立
+- 阈值应在 `[0.0, 1.0]` 范围内，超出范围会输出警告

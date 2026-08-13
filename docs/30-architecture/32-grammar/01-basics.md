@@ -264,6 +264,7 @@ end
 - 优先级：`*` `/` 高于 `+` `-`，支持 `()` 改变优先级
 - 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
 - 运算两侧可以是数字、变量引用、字段访问、函数调用
+- **字符串拼接**：`+` 两侧含非数值字符串时自动拼接（如 `"hello" + " world"`）；数值字符串（如 `"1.0"`）仍走算术加法
 
 ### 函数调用
 
@@ -283,6 +284,7 @@ end
 **后续阅读**：
 
 - 场景、布局与 Panel 概念 → [02-concepts.md](02-concepts.md)
-- 交互指令（click/drag/wait/align） → [03-interaction.md](03-interaction.md)
-- 数据指令（scan/recognize/collect/eval/log） → [04-data-flow.md](04-data-flow.md)
+- 交互指令（click/drag/wait/align） → [03-1-interaction.md](03-1-interaction.md)
+- 基础指令（collect/eval/call/log） → [03-2-basic-commands.md](03-2-basic-commands.md)
+- 感知指令（scan/recognize/find/where） → [04-data-flow.md](04-data-flow.md)
 - 控制流与条件表达式 → [05-control-flow.md](05-control-flow.md)

@@ -6,31 +6,29 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 - [一、速查表](#一速查表)
   - [基础运算（8）](#基础运算8)
-  - [通用工具（6）](#通用工具6)
-  - [字典/列表操作（7）](#字典列表操作7)
-  - [字符串处理（8）](#字符串处理8)
+  - [字典/列表操作（12）](#字典列表操作12)
+  - [字符串处理（9）](#字符串处理9)
   - [装备处理（6）](#装备处理6)
   - [背包遍历（3）](#背包遍历3)
   - [系统与用户交互（7）](#系统与用户交互7)
 - [二、基础运算](#二基础运算)
   - [算术运算符（推荐）](#算术运算符推荐)
   - [运算函数](#运算函数)
-- [三、通用工具](#三通用工具)
-- [四、字典/列表与字符串函数](#四字典列表与字符串函数)
+- [三、字典/列表与字符串函数](#三字典列表与字符串函数)
   - [字典/列表操作](#字典列表操作)
   - [字符串处理](#字符串处理)
   - [类型不匹配时的行为](#类型不匹配时的行为)
-- [五、装备处理](#五装备处理)
-- [六、背包遍历](#六背包遍历)
-- [七、用户交互函数](#七用户交互函数)
-- [八、系统函数](#八系统函数)
-- [九、综合示例](#九综合示例)
+- [四、装备处理](#四装备处理)
+- [五、背包遍历](#五背包遍历)
+- [六、用户交互函数](#六用户交互函数)
+- [七、系统函数](#七系统函数)
+- [八、综合示例](#八综合示例)
 
 ---
 
 ## 一、速查表
 
-共 45 个内置函数，按功能分为 7 类：
+共 45 个内置函数，按功能分为 6 类：
 
 ### 基础运算（8）
 
@@ -45,18 +43,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `max` | `(a, b, ...) -> number` | 取最大值（支持两个以上参数） |
 | `abs` | `(a) -> number` | 取绝对值 |
 
-### 通用工具（6）
-
-| 函数 | 签名 | 说明 |
-|---|---|---|
-| `concat` | `(*args) -> str` | 拼接所有参数为字符串 |
-| `range` | `(end) / (start, end) -> list` | 生成闭区间整数列表 |
-| `count_key` | `(dict/list) -> int` | dict 统计非空字段数，list 统计元素数 |
-| `contains` | `(dict, str) -> bool` | 检查字典中是否有任意 value 包含指定文本 |
-| `find_key` | `(dict, str) -> str` | 查找 value 包含指定文本的 key，找不到返回 `""` |
-| `append` | `(list, val) / (dict, key, val) -> ""` | 向列表追加或向字典写入（副作用操作） |
-
-### 字典/列表操作（7）
+### 字典/列表操作（12）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -67,11 +54,17 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `del_key` | `(dict, str) -> ""` | 删除字典指定 key（不存在不报错），副作用 |
 | `remove` | `(list, val) -> ""` | 删除列表中首个匹配元素，副作用 |
 | `slice` | `(list, start, end) -> list` | 列表切片（闭区间，与 range 一致） |
+| `range` | `(end) / (start, end) -> list` | 生成闭区间整数列表 |
+| `count_nonempty` | `(dict/list) -> int` | dict 统计非空字段数，list 统计元素数 |
+| `contains` | `(dict, str) -> bool` | 检查字典中是否有任意 value 包含指定文本 |
+| `find_key` | `(dict, str) -> str` | 查找 value 包含指定文本的 key，找不到返回 `""` |
+| `append` | `(list, val) / (dict, key, val) -> ""` | 向列表追加或向字典写入（副作用操作） |
 
-### 字符串处理（8）
+### 字符串处理（9）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
+| `concat` | `(*args) -> str` | 拼接所有参数为字符串 |
 | `substr` | `(str, start, end?) -> str` | 子串，start/end 为索引（闭区间），end 缺省到末尾，支持负数索引 |
 | `split` | `(str, sep) -> list` | 按分隔符拆分，返回列表 |
 | `replace` | `(str, old, new) -> str` | 替换所有匹配 |
@@ -104,7 +97,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `confirm` | `(str) -> bool` | 弹出确认对话框（是/否），详见[七、用户交互函数](#七用户交互函数) |
+| `confirm` | `(str) -> bool` | 弹出确认对话框（是/否），详见[六、用户交互函数](#六用户交互函数) |
 | `pause` | `(str?) -> ""` | 暂停执行直到用户点击确定 |
 | `notify` | `(str) -> ""` | 非阻塞通知（5 秒自动关闭） |
 | `input` | `(str) -> str \| null` | 弹出输入对话框，取消返回 null |
@@ -151,77 +144,7 @@ eval $abs_diff = abs($diff)              # 绝对值（需先计算差值）
 
 ---
 
-## 三、通用工具
-
-### concat — 字符串拼接
-
-将多个参数依次拼接为字符串，非字符串参数自动转 `str()`。
-
-```
-log concat("当前数据: ", $dict.key)
-eval $msg = concat("结果: ", $var, " 完成")
-```
-
-### range — 生成整数列表
-
-生成闭区间整数列表，常用于 `for` 循环迭代。
-
-```
-eval $list = range(1, 100)     # [1, 2, ..., 100]
-for i in range(1, 5)           # 迭代 1, 2, 3, 4, 5
-    ...
-end
-```
-
-- `range(end)` → `[1, 2, ..., end]`
-- `range(start, end)` → `[start, start+1, ..., end]`
-
-### count_key — 统计数量
-
-根据输入类型不同：
-- **dict**：统计非空字段数量（值为空或空白字符串的字段不计）
-- **list**：统计元素数量
-- **其他**：返回 0
-
-```
-eval $n = count_key($result)
-eval $n = count_key($list)
-```
-
-### contains — 文本包含检查
-
-检查字典中是否有任意 string 类型的 value 包含指定文本。
-
-```
-if contains($scan, "调律")
-    log "找到调律相关字段"
-end
-```
-
-### find_key — 按键查找
-
-在字典的 values 中查找包含目标文本的项，返回其 key 名。找不到返回空字符串 `""`，配合 `if` 判断使用。
-
-```
-scan [scene].[f1, f2, f3] as $scan
-eval $key = find_key($scan, "调律")
-if $key
-    click [scene].$key
-end
-```
-
-### append — 追加元素
-
-向列表追加元素，或向字典写入键值对。返回空字符串（副作用操作）。
-
-```
-eval append($candidates, $equip_data)           # 列表追加
-eval append($fingerprints, $slot, $fp)          # 字典写入
-```
-
----
-
-## 四、字典/列表与字符串函数
+## 三、字典/列表与字符串函数
 
 ### 字典/列表操作
 
@@ -244,11 +167,72 @@ eval del_key($data, "obsolete")
 eval $part = slice($items, 0, 4)
 ```
 
-> **与 count_key 的区别**：`len($dict)` 返回**全部** key 数（含空值字段），`count_key($dict)` 统计**非空**字段。两者共存，不替换。
+> **与 count_nonempty 的区别**：`len($dict)` 返回**全部** key 数（含空值字段），`count_nonempty($dict)` 统计**非空**字段。两者共存，不替换。
+
+#### range — 生成整数列表
+
+生成闭区间整数列表，常用于 `for` 循环迭代。
+
+```
+eval $list = range(1, 100)     # [1, 2, ..., 100]
+for i in range(1, 5)           # 迭代 1, 2, 3, 4, 5
+    ...
+end
+```
+
+- `range(end)` → `[1, 2, ..., end]`
+- `range(start, end)` → `[start, start+1, ..., end]`
+
+#### count_nonempty — 统计非空项数量
+
+根据输入类型不同：
+- **dict**：统计非空字段数量（值为空或空白字符串的字段不计）
+- **list**：统计元素数量
+- **其他**：返回 0
+
+```
+eval $n = count_nonempty($result)
+eval $n = count_nonempty($list)
+```
+
+#### contains — 文本包含检查
+
+检查字典中是否有任意 string 类型的 value 包含指定文本。
+
+```
+if contains($scan, "调律")
+    log "找到调律相关字段"
+end
+```
+
+#### find_key — 按键查找
+
+在字典的 values 中查找包含目标文本的项，返回其 key 名。找不到返回空字符串 `""`，配合 `if` 判断使用。
+
+```
+scan [scene].[f1, f2, f3] as $scan
+eval $key = find_key($scan, "调律")
+if $key
+    click [scene].$key
+end
+```
+
+#### append — 追加元素
+
+向列表追加元素，或向字典写入键值对。返回空字符串（副作用操作）。
+
+```
+eval append($candidates, $equip_data)           # 列表追加
+eval append($fingerprints, $slot, $fp)          # 字典写入
+```
 
 ### 字符串处理
 
 ```
+# 字符串拼接
+log concat("当前数据: ", $dict.key)
+eval $msg = concat("结果: ", $var, " 完成")
+
 # 子串
 eval $name = substr($full_name, 0, 2)
 
@@ -269,6 +253,20 @@ eval $tag = upper($category)
 # 字符串转数字
 eval $price = to_num($price_str)
 ```
+
+#### concat — 字符串拼接
+
+将多个参数依次拼接为字符串，非字符串参数自动转 `str()`。
+
+**替代语法**：可使用 `+` 运算符拼接字符串，当任一操作数为非数值字符串时自动走拼接：
+
+```
+eval $msg = "hello" + " world"          # "hello world"
+eval $msg = $name + "!"                  # 变量 + 字面量
+eval $msg = "count: " + $n               # 数字自动转字符串
+```
+
+> **注意**：数值字符串（如 `"1.0"`）走算术加法而非拼接。如需强制拼接，使用 `concat()`。
 
 **注意事项**：
 
@@ -291,7 +289,7 @@ eval $price = to_num($price_str)
 
 ---
 
-## 五、装备处理
+## 四、装备处理
 
 ### to_equipment — 装备解析
 
@@ -359,7 +357,7 @@ end
 
 ---
 
-## 六、背包遍历
+## 五、背包遍历
 
 用于 grid 滚动遍历场景的指纹管理三件套，配合 `check_scroll` → 处理 → `notify_scroll` → `scroll_advance` 流程使用。
 
@@ -392,7 +390,7 @@ eval scroll_advance()
 
 ---
 
-## 七、用户交互函数
+## 六、用户交互函数
 
 运行中与用户交互的内置函数。`confirm`/`pause`/`input` 通过 Qt 主线程回调机制实现，可在工作流子线程中安全调用；`notify` 使用 Win32 超时 API，不阻塞工作流。
 
@@ -488,7 +486,7 @@ end
 
 ---
 
-## 八、系统函数
+## 七、系统函数
 
 ### save — 手动保存 session
 
@@ -509,7 +507,7 @@ eval $cols = panel_cols("bag_equip_detail", "bag_grid")
 
 ---
 
-## 九、综合示例
+## 八、综合示例
 
 ### 装备扫描 → 解析 → 评估 → 收集
 
@@ -527,7 +525,7 @@ end
 
 # 评估
 eval $result = evaluate($equip)
-eval $total = count_key($result)
+eval $total = count_nonempty($result)
 log concat("评级: ", $result.rating, " 详情数: ", $total)
 ```
 
@@ -535,7 +533,7 @@ log concat("评级: ", $result.rating, " 详情数: ", $total)
 
 ```
 eval $summary = {}
-eval $summary.total_affixes = count_key($scan_result)
+eval $summary.total_affixes = count_nonempty($scan_result)
 eval $summary.status = "done"
 collect $summary
 ```

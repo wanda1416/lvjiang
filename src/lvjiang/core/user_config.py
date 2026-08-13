@@ -97,13 +97,6 @@ class UserConfigManager:
         logger.info(f"用户已创建: {name}")
         return True
 
-    def update_user(self, name: str, **fields) -> bool:
-        """更新用户字段，返回是否成功"""
-        user = self._users.get(name)
-        if user is None:
-            return False
-        # 当前 User 无可更新字段，保留扩展点
-        return False
 
     def delete_user(self, name: str) -> bool:
         """删除用户，返回是否成功"""
@@ -139,9 +132,6 @@ class UserConfigManager:
         """获取当前激活用户名"""
         return self._active_user
 
-    def get_active_user(self) -> User | None:
-        """获取当前激活用户对象"""
-        return self._users.get(self._active_user)
 
     def set_active_user(self, name: str) -> bool:
         """切换激活用户"""

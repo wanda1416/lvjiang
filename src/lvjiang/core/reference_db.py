@@ -222,10 +222,6 @@ class ReferenceDatabase:
         from lvjiang import constants
         return constants.SESSION_PATH
 
-    @property
-    def yaml_path(self) -> Path:
-        """当前模式的写入目标 yaml（日志/展示用）"""
-        return self.system_yaml_path if self._is_dev() else self.local_yaml_path
 
     def _is_dev(self) -> bool:
         if self._dev_mode is not None:
@@ -721,10 +717,6 @@ class ReferenceDatabase:
         labels = sorted({e.label for e in self._entries if e.label})
         return labels
 
-    def get_labels_by_group(self, group: str) -> list[str]:
-        """返回指定分组下的去重标识列表（排序）"""
-        labels = sorted({e.label for e in self._entries if e.label and e.group == group})
-        return labels
 
     def get_all_labels_by_group(self) -> dict[str, list[str]]:
         """返回所有分组 -> 标识列表的映射"""
@@ -741,10 +733,6 @@ class ReferenceDatabase:
         groups = sorted({e.group for e in self._entries if e.group})
         return groups
 
-    def get_levels(self) -> list[int]:
-        """返回所有去重等级列表（升序）"""
-        levels = sorted({e.level for e in self._entries if e.level is not None})
-        return levels
 
     # ─── meta_schema 与通用 meta 查询 ──────────────────────
 
@@ -802,11 +790,6 @@ class ReferenceDatabase:
         value = entry.meta.get(key)
         return "" if value is None else str(value)
 
-    def get_meta_values(self, key: str) -> list[str]:
-        """返回某 meta key 的去重文本值列表（升序）"""
-        values = {self._meta_text(e, key) for e in self._entries}
-        values.discard("")
-        return sorted(values)
 
     def get_meta_options(self, field: MetaFieldDef) -> list[str]:
         """返回某 meta 字段的去重值列表，按 type/sort_by 排序
@@ -828,9 +811,6 @@ class ReferenceDatabase:
             values.sort(reverse=(field.sort_by == "desc"))
         return values
 
-    def get_by_label(self, label: str) -> list[ReferenceEntry]:
-        """返回某标识下所有条目（含 file、meta）"""
-        return [e for e in self._entries if e.label == label]
 
     def get_entry(self, filename: str) -> ReferenceEntry | None:
         """按文件路径查找条目"""

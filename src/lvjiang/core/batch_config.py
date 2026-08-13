@@ -147,8 +147,3 @@ def save_batch_config(cfg: BatchConfig) -> None:
     get_session_store().mutate_node("batch", _merge)
     total_rows = sum(len(c.rows) for c in cfg.configs.values())
     logger.info(f"批处理配置已保存: {len(cfg.configs)} 个配置, {total_rows} 行数据")
-
-
-def get_active_config() -> BatchConfigItem | None:
-    """获取当前选中的配置"""
-    return load_batch_config().get_active()

@@ -74,7 +74,7 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 全局屏蔽下拉框/数字输入框的滚轮改值（防滑动页面时误改）
     install_wheel_guard(app)
 
-    window = MainWindow(hooks_list=hooks_list)
+    window = MainWindow()
     window.show()
 
     # 启动后延迟检查更新（不阻塞主窗口显示）

@@ -84,13 +84,23 @@ class TestBigWeaponRules:
 
 class TestBigTiers:
     def test_main_normal_before_top(self, big):
-        # 缺 最大外功攻击 命中一般条件；一般先于顶级判定
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "劲", "劲", "敏"])
+        # 势 为缺陷词条命中一般条件；一般先于顶级判定
+        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "势"])
+        assert big.judge(e).rating == Rating.NORMAL
+
+    def test_main_defect_pair_normal(self, big):
+        # 精准+会心（非首）同现 为缺陷 → 一般
+        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "会心率", "精准率"])
         assert big.judge(e).rating == Rating.NORMAL
 
     def test_main_excellent(self, big):
-        # 势 破坏顶级排除条件 → 优秀
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "势"])
+        # 单会心非缺陷，但破坏主武器顶级排除条件 → 优秀
+        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "会心率"])
+        assert big.judge(e).rating == Rating.EXCELLENT
+
+    def test_main_missing_core_excellent(self, big):
+        # 缺非首大外不算缺陷（可调出）→ 优秀
+        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "劲", "劲", "敏"])
         assert big.judge(e).rating == Rating.EXCELLENT
 
     def test_ring_missing_quanwuxue_junk(self, big):
@@ -218,9 +228,14 @@ class TestSmallDynamic:
         return get_tuning_judge("huixin_small", {"playstyles": ["双切"]})
 
     def test_ring_no_small_attr_top(self, small_lieshi):
-        # 基线：无任何小属攻 → 顶级
-        e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "会心率"])
+        # 基线：无小属攻且无三率 → 顶级
+        e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "敏"])
         assert small_lieshi.judge(e).rating == Rating.TOP
+
+    def test_ring_huixin_excellent(self, small_lieshi):
+        # 有神力部位非首会心 → 优秀封顶
+        e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "会心率"])
+        assert small_lieshi.judge(e).rating == Rating.EXCELLENT
 
     def test_ring_one_foreign_small_attr_normal(self, small_lieshi):
         # 1 条 最小破竹攻击（→最小外属攻击）→ 一般

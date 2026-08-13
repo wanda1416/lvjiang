@@ -61,7 +61,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._tabs: dict[str, SceneTab] = {}          # scene_key -> SceneTab
         self._group_tabs: dict[str, QTabWidget] = {}  # group_key -> QTabWidget
         self._current_layout: Layout | None = None
-        self._dirty = False
+        self._dirty_scenes: set[str] = set()  # 当前布局中已变更的场景 key 集合
         # 截图懒加载：(layout_name, scene_key, view) -> ndarray|None 缓存；
         # _loaded_scenes 记录当前布局下已上屏底图的场景，布局切换时重置
         self._img_cache: dict[tuple[str, str, str], object] = {}
@@ -255,10 +255,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_arrows(arrows)
             tab.set_panels(panels)
             tab.set_canvas_config(canvas)
-            tab.canvas.on_region_changed = self._on_any_region_changed
+            tab.canvas.on_region_changed = lambda sk=scene_key: self._on_scene_data_changed(sk)
             tab.canvas.on_canvas_changed = self._on_any_canvas_changed
-            tab.canvas.on_poi_changed = self._on_any_poi_changed
-            tab.canvas.on_panel_changed = self._on_any_panel_changed
+            tab.canvas.on_poi_changed = lambda sk=scene_key: self._on_scene_data_changed(sk)
+            tab.canvas.on_panel_changed = lambda sk=scene_key: self._on_scene_data_changed(sk)
             tab.canvas.on_status_message = lambda msg: self._status_bar.showMessage(msg, 5000)
             tab.on_view_changed = self._on_tab_view_changed
         self._set_dirty(False)
@@ -418,31 +418,66 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._set_dirty(True)
         self._update_info_label()
 
-    def _on_any_region_changed(self):
-        """任一 Tab 的区域被修改时，标记 dirty + 刷新当前 Tab 的字段列表"""
-        self._set_dirty(True)
+    def _on_scene_data_changed(self, scene_key: str):
+        """任一场景 Tab 的数据被修改时，标记该场景 dirty + 刷新当前 Tab 的列表"""
+        self._mark_scene_dirty(scene_key)
         current = self._current_scene_tab()
-        if current and hasattr(current, '_refresh_region_list'):
-            current._refresh_region_list()
+        if current and current.scene_key == scene_key:
+            if hasattr(current, '_refresh_region_list'):
+                current._refresh_region_list()
+            if hasattr(current, '_on_poi_changed'):
+                current._on_poi_changed()
+            if hasattr(current, '_on_panel_changed'):
+                current._on_panel_changed()
 
-    def _on_any_poi_changed(self):
-        """任一 Tab 的 point/arrow 被修改时，标记 dirty + 刷新当前 Tab 的坐标/方向列表"""
-        self._set_dirty(True)
-        current = self._current_scene_tab()
-        if current and hasattr(current, '_on_poi_changed'):
-            current._on_poi_changed()
+    def _on_any_canvas_changed(self):
+        """画布配置变化（所有 Tab 共享），标记所有场景 dirty"""
+        for sk in self._tabs:
+            self._mark_scene_dirty(sk)
 
-    def _on_any_panel_changed(self):
-        """任一 Tab 的 panel 被修改时，标记 dirty + 刷新当前 Tab 的面板列表"""
-        self._set_dirty(True)
-        current = self._current_scene_tab()
-        if current and hasattr(current, '_on_panel_changed'):
-            current._on_panel_changed()
+    def _mark_scene_dirty(self, scene_key: str):
+        """标记指定场景为已变更，更新 Tab 标题绿点 + 全局 dirty 指示"""
+        if scene_key in self._dirty_scenes:
+            return
+        self._dirty_scenes.add(scene_key)
+        self._dirty_label.setVisible(True)
+        self._update_scene_tab_title(scene_key, dirty=True)
+
+    def _mark_all_scenes_clean(self):
+        """清除所有场景的变更标记"""
+        for sk in self._dirty_scenes:
+            self._update_scene_tab_title(sk, dirty=False)
+        self._dirty_scenes.clear()
+        self._dirty_label.setVisible(False)
 
     def _set_dirty(self, dirty: bool):
-        """设置/清除修改状态指示"""
-        self._dirty = dirty
-        self._dirty_label.setVisible(dirty)
+        """兼容层：True = 标记所有场景 dirty，False = 清除全部 dirty"""
+        if dirty:
+            for sk in self._tabs:
+                self._mark_scene_dirty(sk)
+        else:
+            self._mark_all_scenes_clean()
+
+    def _update_scene_tab_title(self, scene_key: str, dirty: bool):
+        """更新场景 Tab 标题：dirty 时追加绿点指示"""
+        for group_key, tab_widget in self._group_tabs.items():
+            for i in range(tab_widget.count()):
+                w = tab_widget.widget(i)
+                if isinstance(w, SceneTab) and w.scene_key == scene_key:
+                    base_name = get_scene_name(scene_key)
+                    tab_widget.setTabText(i, f"{base_name} ●" if dirty else base_name)
+                    if dirty:
+                        tab_widget.tabBar().setTabTextColor(i, Qt.GlobalColor.green)
+                    else:
+                        tab_widget.tabBar().setTabTextColor(i, Qt.GlobalColor.black)
+                    return
+
+    def _get_dirty_scene_names(self) -> str:
+        """获取变更场景的可读名称列表（用于提示文案）"""
+        if not self._dirty_scenes:
+            return ""
+        names = [get_scene_name(sk) for sk in sorted(self._dirty_scenes)]
+        return "、".join(names)
 
     def reject(self):
         """关闭对话框（X 按钮 / Esc）前检查未保存修改

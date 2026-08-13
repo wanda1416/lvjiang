@@ -337,7 +337,15 @@ class LayoutConfigManager:
             logger.info(f"布局已加载: {name}")
         return layout
 
-    def save_layout(self, layout: Layout):
+    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None):
+        """保存布局
+
+        Args:
+            layout: 布局对象
+            changed_scenes: 需要写盘的场景 key 集合。
+                None = 全量写盘（新建布局、另存为等场景）；
+                set = 增量写盘，只写指定场景的 JSON 文件。
+        """
         resolver = get_resolver()
 
         # 1. 更新 layouts.yaml 中的 canvas 条目
@@ -346,8 +354,9 @@ class LayoutConfigManager:
         layouts_doc[layout.name] = {"canvas": layout.canvas.to_dict()}
         resolver.save_merged(_LAYOUTS_YAML_REL, merged)
 
-        # 2. 逐场景写 JSON 文件
-        scene_keys = set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels)
+        # 2. 写场景 JSON 文件（增量或全量）
+        all_scene_keys = set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels)
+        scene_keys = all_scene_keys if changed_scenes is None else (changed_scenes & all_scene_keys)
         for sk in scene_keys:
             entry: dict = {}
             regions = layout.scenes.get(sk) or []
@@ -365,7 +374,8 @@ class LayoutConfigManager:
                 _scene_rel(layout.name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),
             )
-        logger.info(f"布局已保存: {layout.name}")
+        mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else "全量"
+        logger.info(f"布局已保存: {layout.name} ({mode})")
 
     def delete_layout(self, name: str) -> bool:
         resolver = get_resolver()

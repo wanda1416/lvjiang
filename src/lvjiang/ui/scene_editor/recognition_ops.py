@@ -12,7 +12,7 @@ class RecognitionOpsMixin:
     依赖主类提供:
         _tabs, _result_text, _status_bar,
         _current_scene_key (property), _current_scene_tab(),
-        _chk_live_image, _refresh_callback
+        _chk_live_image, _combo_mat_group, _refresh_callback
     """
 
     def _is_panel_tab_active(self, current_tab) -> bool:
@@ -142,6 +142,12 @@ class RecognitionOpsMixin:
 
     # ─── 材料识别 ────────────────────────────────────────
 
+    def _get_mat_group(self) -> str | None:
+        """从材料分组下拉框获取选中的分组，None 表示全部"""
+        if hasattr(self, '_combo_mat_group'):
+            return self._combo_mat_group.currentData()
+        return None
+
     def _on_recognize_materials(self):
         """对当前 Tab 场景的区域或面板做材料识别（根据激活的列表自动分发）"""
         current_tab = self._tabs.get(self._current_scene_key)
@@ -193,13 +199,14 @@ class RecognitionOpsMixin:
 
         # 展示结果
         self._result_text.clear()
+        group = self._get_mat_group()
         for region in slot_regions:
             x1 = int(canvas_x + region.x_ratio * canvas_w)
             y1 = int(canvas_y + region.y_ratio * canvas_h)
             x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
             y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
             crop = image[y1:y2, x1:x2]
-            info = recognizer.recognize(crop)
+            info = recognizer.recognize(crop, group=group)
 
             if not info.type:
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: (空槽)"
@@ -254,6 +261,7 @@ class RecognitionOpsMixin:
 
         self._result_text.clear()
         total_cells = 0
+        group = self._get_mat_group()
         for panel in panels:
             # 校准网格，获取每个 cell 的位置
             cells = ocr_engine.calibrate_panel_cells(image, canvas_config, panel)
@@ -264,7 +272,7 @@ class RecognitionOpsMixin:
             self._result_text.append(f"[{panel.key}] {panel.rows}×{panel.cols} = {len(cells)} 个 cell")
             for i, (x1, y1, x2, y2) in enumerate(cells):
                 crop = image[y1:y2, x1:x2]
-                info = recognizer.recognize(crop)
+                info = recognizer.recognize(crop, group=group)
                 row = i // panel.cols + 1
                 col = i % panel.cols + 1
 

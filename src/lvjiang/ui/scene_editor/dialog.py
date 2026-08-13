@@ -243,6 +243,12 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._btn_recognize_mat = QPushButton("识别全部材料")
         self._btn_recognize_mat.clicked.connect(self._on_recognize_materials)
         btn_row.addWidget(self._btn_recognize_mat)
+        # 材料分组筛选下拉
+        self._combo_mat_group = QComboBox()
+        self._combo_mat_group.addItem("全部", None)
+        self._refresh_mat_group_combo()
+        self._combo_mat_group.setToolTip("限定材料识别的分组范围")
+        btn_row.addWidget(self._combo_mat_group)
         from PyQt6.QtWidgets import QCheckBox
         self._chk_live_image = QCheckBox("使用实时图像")
         self._chk_live_image.setToolTip("勾选后直接从设备实时截屏进行识别，不保存到场景文件")
@@ -466,6 +472,27 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             self._update_info_label()
         else:
             self._status_bar.showMessage(error_msg or "刷新截图失败")
+
+    def _refresh_mat_group_combo(self):
+        """刷新材料分组下拉：保留当前选中（如有），重新加载图库分组"""
+        from lvjiang.core.reference_db import ReferenceDatabase
+
+        current_data = self._combo_mat_group.currentData()
+        self._combo_mat_group.blockSignals(True)
+        self._combo_mat_group.clear()
+        self._combo_mat_group.addItem("全部", None)
+        try:
+            groups = ReferenceDatabase().get_groups()
+        except Exception:
+            groups = []
+        for g in groups:
+            self._combo_mat_group.addItem(g, g)
+        # 恢复之前的选中
+        if current_data is not None:
+            idx = self._combo_mat_group.findData(current_data)
+            if idx >= 0:
+                self._combo_mat_group.setCurrentIndex(idx)
+        self._combo_mat_group.blockSignals(False)
 
     # ─── 画布模式切换 ───────────────────────────────────
 

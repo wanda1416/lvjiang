@@ -496,7 +496,8 @@ class TestDetectGridFallback:
         """全黑图像（无法检测）+ fallback=True → 返回等分结果"""
         # 构造全黑图像
         dark = np.zeros((100, 100, 3), dtype=np.uint8)
-        result = detect_grid(dark, expected_rows=4, expected_cols=5, fallback=True)
+        with patch("lvjiang.workflows.align.cv2.imwrite"):
+            result = detect_grid(dark, expected_rows=4, expected_cols=5, fallback=True)
         assert result is not None
         assert result.n_rows == 4
         assert result.n_cols == 5
@@ -504,7 +505,8 @@ class TestDetectGridFallback:
     def test_fallback_preserves_expected_counts(self):
         """等分降级应使用传入的 expected_rows/cols"""
         dark = np.zeros((200, 300, 3), dtype=np.uint8)
-        result = detect_grid(dark, expected_rows=7, expected_cols=8, fallback=True)
+        with patch("lvjiang.workflows.align.cv2.imwrite"):
+            result = detect_grid(dark, expected_rows=7, expected_cols=8, fallback=True)
         assert result is not None
         assert result.n_rows == 7
         assert result.n_cols == 8
@@ -698,8 +700,9 @@ class TestDetectGridScrollDirection:
         # 构造一个列数少的图像（模拟横向滚动异常）
         img = load_test_image("image1.png")
         # 假设检测到 5 列（expected=6），vertical 模式不允许 cols-1
-        detect_grid(img, expected_rows=5, expected_cols=5,
-                    scroll_direction="vertical", fallback=True)
+        with patch("lvjiang.workflows.align.cv2.imwrite"):
+            detect_grid(img, expected_rows=5, expected_cols=5,
+                        scroll_direction="vertical", fallback=True)
         # 如果列数不匹配，应降级
         # 注意：实际测试取决于图片内容，这里主要验证逻辑路径
 
@@ -715,8 +718,9 @@ class TestDetectGridScrollDirection:
     def test_none_exact_match_required(self, load_test_image):
         """scroll_direction=none + 行数不精确 + fallback → 等分"""
         img = load_test_image("image2.png")  # 4 行（expected=5）
-        result = detect_grid(img, expected_rows=5, expected_cols=6,
-                             scroll_direction="none", fallback=True)
+        with patch("lvjiang.workflows.align.cv2.imwrite"):
+            result = detect_grid(img, expected_rows=5, expected_cols=6,
+                                 scroll_direction="none", fallback=True)
         # none 模式要求精确匹配，4 行不符合 5 行预期，应降级
         assert result is not None
         assert result.n_rows == 5  # 等分模式使用 expected_rows

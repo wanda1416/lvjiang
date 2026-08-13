@@ -8,7 +8,8 @@ import "_select_role.wf"
 # 1. 退出到登录页
 call _exit_to_login()
 
-# 2. 比对当前行与上一行的 account
+# 2. 比对当前行与上一行的 account（游戏账号）
+# 同账号 → 只需选角色；不同账号 → 需要切换账号重新登录
 # batch_table 和 batch_index 由 Runner 注入
 eval $prev_index = $batch_index - 1
 eval $prev_account = ""
@@ -19,12 +20,12 @@ if $prev_index >= 0
 end
 
 # 3. 根据比对结果决定流程
-if $prev_account == $tail
+if $prev_account == $account
     # 同账号：直接选角色
-    log concat("同账号切换，直接选角色: ", $tail)
+    log concat("同账号切换，直接选角色: ", $account)
     call _select_role($role_index)
 else
     # 不同账号：选账号 + 登录 + 选角色
-    log concat("不同账号切换，重新登录: ", $tail)
+    log concat("不同账号切换，重新登录: ", $account)
     call _switch_account($tail, $role_index)
 end

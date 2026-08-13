@@ -125,12 +125,14 @@ class RecognitionOpsMixin:
                 self._result_text.append(f"[{panel.key}] 校准失败，跳过")
                 continue
 
-            self._result_text.append(f"[{panel.key}] {len(cells)} 个 cell")
+            self._result_text.append(f"[{panel.key}] {panel.rows}×{panel.cols} = {len(cells)} 个 cell")
             for i, (x1, y1, x2, y2) in enumerate(cells):
                 crop = image[y1:y2, x1:x2]
                 text = engine.ocr_single(crop)
+                row = i // panel.cols + 1
+                col = i % panel.cols + 1
                 if text:
-                    self._result_text.append(f"  cell[{i}]: {text}")
+                    self._result_text.append(f"  cell[{row}][{col}]: {text}")
                     total_cells += 1
 
         self._status_bar.showMessage(f"面板识别完成，共 {total_cells} 个 cell")
@@ -246,20 +248,22 @@ class RecognitionOpsMixin:
                 self._result_text.append(f"[{panel.key}] 校准失败，跳过")
                 continue
 
-            self._result_text.append(f"[{panel.key}] {len(cells)} 个 cell")
+            self._result_text.append(f"[{panel.key}] {panel.rows}×{panel.cols} = {len(cells)} 个 cell")
             for i, (x1, y1, x2, y2) in enumerate(cells):
                 crop = image[y1:y2, x1:x2]
                 info = recognizer.recognize(crop)
+                row = i // panel.cols + 1
+                col = i % panel.cols + 1
 
                 if not info.type:
-                    self._result_text.append(f"  cell[{i}]: (空)")
+                    self._result_text.append(f"  cell[{row}][{col}]: (空)")
                 else:
                     parts = [info.type]
                     if info.level is not None:
                         parts.append(f"{info.level}级")
                     if info.count is not None:
                         parts.append(f"×{info.count}")
-                    self._result_text.append(f"  cell[{i}]: {' '.join(parts)}")
+                    self._result_text.append(f"  cell[{row}][{col}]: {' '.join(parts)}")
                 total_cells += 1
 
         self._status_bar.showMessage(f"面板材料识别完成，共 {total_cells} 个 cell")

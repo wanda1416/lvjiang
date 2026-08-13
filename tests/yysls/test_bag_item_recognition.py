@@ -72,12 +72,8 @@ EXPECTED_RESULTS = {
     (5, 6): ("金狗粮", 61),
 }
 
-# 背包格子区域 key 映射：(row, col) -> region_key
-BAG_REGION_KEYS = {
-    (row, col): f"bag_{row}_{col}"
-    for row in range(1, 6)
-    for col in range(1, 7)
-}
+# Panel key
+BAG_PANEL_KEY = "bag_grid"
 
 
 # ─── Fixture ──────────────────────────────────────────────
@@ -129,6 +125,18 @@ def crop_bag_slot(img: np.ndarray, region: Region) -> np.ndarray:
     return crop
 
 
+def crop_bag_cell(img: np.ndarray, cell_bounds: tuple[int, int, int, int]) -> np.ndarray:
+    """从截图中裁剪 panel grid 的单个 cell
+
+    cell_bounds: (x1, y1, x2, y2) 像素坐标
+    """
+    x1, y1, x2, y2 = cell_bounds
+    crop = img[y1:y2, x1:x2]
+    if crop.size == 0:
+        raise ValueError(f"裁剪为空: bounds={cell_bounds}")
+    return crop
+
+
 # ─── 测试用例 ──────────────────────────────────────────────
 
 class TestBagItemRecognition:
@@ -139,14 +147,13 @@ class TestBagItemRecognition:
         assert screenshot is not None
         assert screenshot.shape[0] > 0 and screenshot.shape[1] > 0
 
-    def test_layout_has_bag_regions(self, layout):
-        """布局包含 30 个背包格子区域"""
-        regions = layout.get_scene_regions("bag_item_detail")
-        assert len(regions) >= 30, f"区域数量不足: {len(regions)}"
-        # 检查所有 bag_X_Y 区域是否存在
-        region_keys = {r.key for r in regions}
-        for (_row, _col), key in BAG_REGION_KEYS.items():
-            assert key in region_keys, f"缺少区域: {key}"
+    def test_layout_has_bag_panel(self, layout):
+        """布局包含背包网格 panel"""
+        panels = layout.get_scene_panels("bag_item_detail")
+        assert len(panels) >= 1, f"Panel 数量不足: {len(panels)}"
+        # 检查 bag_grid panel 是否存在
+        panel_keys = {p.key for p in panels}
+        assert BAG_PANEL_KEY in panel_keys, f"缺少 panel: {BAG_PANEL_KEY}"
 
     @pytest.mark.parametrize("row,col", [
         (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6),
@@ -157,14 +164,26 @@ class TestBagItemRecognition:
     ])
     def test_bag_slot_recognition(self, screenshot, layout, recognizer, row, col):
         """单个背包格子识别：验证材料名称和等级"""
-        # 获取区域
-        region_key = BAG_REGION_KEYS[(row, col)]
-        regions = layout.get_scene_regions("bag_item_detail")
-        region = next((r for r in regions if r.key == region_key), None)
-        assert region is not None, f"区域不存在: {region_key}"
+        from lvjiang.core.ocr import OCREngine
+
+        # 获取 panel
+        panels = layout.get_scene_panels("bag_item_detail")
+        panel = next((p for p in panels if p.key == BAG_PANEL_KEY), None)
+        assert panel is not None, f"Panel 不存在: {BAG_PANEL_KEY}"
+
+        # 使用 OCREngine 校准 panel
+        ocr = OCREngine()
+        canvas = layout.get_canvas()
+        cells = ocr.calibrate_panel_cells(screenshot, canvas, panel)
+        assert cells, "Panel 校准失败，无有效 cell"
+
+        # 获取 cell 像素坐标 (row, col 是 1-based，cells 按 row-major 顺序)
+        cell_idx = (row - 1) * panel.cols + (col - 1)
+        assert cell_idx < len(cells), f"Cell 索引越界: {cell_idx} >= {len(cells)}"
+        cell_bounds = cells[cell_idx]
 
         # 裁剪格子
-        slot_img = crop_bag_slot(screenshot, region)
+        slot_img = crop_bag_cell(screenshot, cell_bounds)
 
         # 识别
         result = recognizer.recognize(slot_img)
@@ -193,8 +212,18 @@ class TestBagItemRecognitionSummary:
 
     def test_recognition_accuracy_summary(self, screenshot, layout, recognizer):
         """输出识别准确率汇总（用于调试和回归分析）"""
-        regions = layout.get_scene_regions("bag_item_detail")
-        region_map = {r.key: r for r in regions}
+        from lvjiang.core.ocr import OCREngine
+
+        # 获取 panel
+        panels = layout.get_scene_panels("bag_item_detail")
+        panel = next((p for p in panels if p.key == BAG_PANEL_KEY), None)
+        assert panel is not None, f"Panel 不存在: {BAG_PANEL_KEY}"
+
+        # 使用 OCREngine 校准 panel
+        ocr = OCREngine()
+        canvas = layout.get_canvas()
+        cells = ocr.calibrate_panel_cells(screenshot, canvas, panel)
+        assert cells, "Panel 校准失败，无有效 cell"
 
         correct_name = 0
         correct_level = 0
@@ -202,13 +231,13 @@ class TestBagItemRecognitionSummary:
         errors = []
 
         for (row, col), (expected_name, expected_level) in EXPECTED_RESULTS.items():
-            region_key = BAG_REGION_KEYS[(row, col)]
-            region = region_map.get(region_key)
-            if region is None:
-                errors.append(f"背包格{row}_{col}: 区域不存在")
+            # 获取 cell 像素坐标 (row, col 是 1-based，cells 按 row-major 顺序)
+            cell_idx = (row - 1) * panel.cols + (col - 1)
+            if cell_idx >= len(cells):
+                errors.append(f"背包格{row}_{col}: Cell 索引越界")
                 continue
-
-            slot_img = crop_bag_slot(screenshot, region)
+            cell_bounds = cells[cell_idx]
+            slot_img = crop_bag_cell(screenshot, cell_bounds)
             result = recognizer.recognize(slot_img)
 
             name_ok = result.type == expected_name

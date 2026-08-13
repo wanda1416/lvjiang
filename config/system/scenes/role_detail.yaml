@@ -1,2 +1,23 @@
 key: role_detail
 name: 角色
+regions:
+- key: shuxing
+  name: 属性
+  type: attr
+  is_text: true
+  is_clickable: true
+- key: tizhi
+  name: 体质
+  type: attr
+  is_text: true
+  is_clickable: true
+- key: mingyu
+  name: 名誉
+  type: attr
+  is_text: true
+  is_clickable: true
+- key: shuxing_detail
+  name: 属性详情
+  type: attr
+  is_text: true
+  is_clickable: false

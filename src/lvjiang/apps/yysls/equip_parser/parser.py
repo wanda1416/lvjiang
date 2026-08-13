@@ -7,6 +7,7 @@ import re
 
 from loguru import logger
 
+from ....i18n import tr
 from .constants import (
     AFFIX_NAMES,
     PERCENT_AFFIXES,
@@ -23,9 +24,9 @@ class EquipmentParser:
 
     # 部位单字 → 类型（类型段单字足以说明部位，容忍 OCR 错字）
     _PART_CHAR_TO_TYPE = {
-        "冠": "冠胄", "胄": "冠胄",
-        "胸": "胸甲", "胫": "胫甲", "腕": "腕甲",
-        "环": "环", "佩": "佩",
+        tr("冠"): tr("冠胄"), tr("胄"): "冠胄",
+        tr("胸"): tr("胸甲"), tr("胫"): tr("胫甲"), tr("腕"): tr("腕甲"),
+        tr("环"): "环", tr("佩"): "佩",
     }
 
     def __init__(self):
@@ -171,19 +172,19 @@ class EquipmentParser:
         - 名称含"胫" → 胫甲
         - 名称含"腕" → 腕甲
         """
-        if "云珑" in name:
-            return "环"
-        if "辟邪" in name:
-            return "佩"
+        if tr("云珑") in name:
+            return tr("环")
+        if tr("辟邪") in name:
+            return tr("佩")
         # 防具类型推断（按名称中的关键字）
-        if "冠" in name:
-            return "冠胄"
-        if "胸" in name:
-            return "胸甲"
-        if "胫" in name:
-            return "胫甲"
-        if "腕" in name:
-            return "腕甲"
+        if tr("冠") in name:
+            return tr("冠胄")
+        if tr("胸") in name:
+            return tr("胸甲")
+        if tr("胫") in name:
+            return tr("胫甲")
+        if tr("腕") in name:
+            return tr("腕甲")
         return None
 
     def _extract_weapon_type(self, text: str) -> str | None:
@@ -195,7 +196,7 @@ class EquipmentParser:
         "一杆"    → None（脏数据）
         """
         # 武器格式：武器·XX
-        if "武器" in text:
+        if tr("武器") in text:
             for wt in WEAPON_TYPES:
                 if wt in text:
                     return wt
@@ -221,9 +222,9 @@ class EquipmentParser:
             (level, is_chengyin)
         """
         raw = raw.strip()
-        is_chengyin = "承音" in raw
+        is_chengyin = tr("承音") in raw
 
-        m = re.search(r"(\d+)\s*阶", raw)
+        m = re.search(tr(r"(\d+)\s*阶"), raw)
         level = int(m.group(1)) if m else None
 
         return level, is_chengyin
@@ -253,7 +254,7 @@ class EquipmentParser:
 
         # 尝试单值格式（名称 + 单个数字）
         # 已知属性名前缀
-        for attr_name in ["气血最大值", "外功防御", "最大外功攻击", "最小外功攻击"]:
+        for attr_name in [tr("气血最大值"), tr("外功防御"), tr("最大外功攻击"), tr("最小外功攻击")]:
             if raw.startswith(attr_name):
                 remainder = raw[len(attr_name):]
                 nums = re.findall(r"\d+", remainder)
@@ -266,7 +267,7 @@ class EquipmentParser:
         if nums:
             # 尝试提取名称（去掉数字和常见噪声字符）
             name_match = re.match(r"^([^\d]+)", raw)
-            name = name_match.group(1).strip() if name_match else "未知"
+            name = name_match.group(1).strip() if name_match else tr("未知")
             return EquipAttr(name=name, value=int(nums[-1]))
 
         logger.warning(f"base_attr 无法解析: {raw!r}")
@@ -316,7 +317,7 @@ class EquipmentParser:
         AFFIX_KEYS = [
             "affix_gong", "affix_shang", "affix_jue", "affix_zhi", "affix_yu"
         ]
-        KEY_NAMES = ["宫", "商", "角", "徵", "羽"]
+        KEY_NAMES = [tr("宫"), tr("商"), tr("角"), tr("徵"), tr("羽")]
 
         affixes: list[Affix] = []
         warnings: list[str] = []
@@ -344,7 +345,7 @@ class EquipmentParser:
             if affix is None:
                 warnings.append(f"词条{cn_name}({key}) 无法解析: {text!r}")
                 # 套装信息等非词条内容，跳过但不中断
-                if "套装" in text:
+                if tr("套装") in text:
                     continue
                 break
             affixes.append(affix)
@@ -371,11 +372,11 @@ class EquipmentParser:
 
         # ── 1. 转律标记检测与移除 ──
         # 符号已统一为英文括号，匹配 [转1] / [转] / [转1 / [转 等变体
-        is_transferred = bool(re.search(r"\[转[1\]]?", text))
-        text = re.sub(r"\[转[1\]]?", "", text)
+        is_transferred = bool(re.search(tr(r"\[转[1\]]?"), text))
+        text = re.sub(tr(r"\[转[1\]]?"), "", text)
 
         # ── 2. 过滤套装信息 ──
-        if "套装" in text:
+        if tr("套装") in text:
             return None
 
         # ── 3. 匹配已知词条名称 ──

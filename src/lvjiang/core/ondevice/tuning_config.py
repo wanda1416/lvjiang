@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 
+from ...i18n import tr
+
 
 def get_tuning_config() -> str:
     """可配置项 + 当前保存值合并视图
@@ -140,7 +142,7 @@ def save_tuning_config(payload: str) -> str:
 
         data = json.loads(payload)
         if not isinstance(data, dict):
-            raise ValueError("payload 必须是 JSON 对象")
+            raise ValueError(tr("payload 必须是 JSON 对象"))
 
         # 部位：只认已知且未禁用的 key，保持常量声明顺序
         raw_slots = set(data.get("selected_slots") or [])
@@ -205,7 +207,7 @@ def save_tuning_config(payload: str) -> str:
             "switches": switches,
             "base_group": base_group,
         })
-        return json.dumps({"ok": True, "message": "已保存"}, ensure_ascii=False)
+        return json.dumps({"ok": True, "message": tr("已保存")}, ensure_ascii=False)
     except Exception as e:
         return json.dumps(
             {"ok": False, "message": f"{type(e).__name__}: {e}"},

@@ -442,7 +442,7 @@ class TuningTab(QWidget):
             if on_names:
                 rule_names_text += f"（开关：{'、'.join(on_names)}）"
             if skip_tuning:
-                host.append_log("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律")
+                host.append_log(tr("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律"))
             host.append_log(
                 f"[开始] {flow_name} 流程，基础规则: {base_group.name}，"
                 f"规则: {rule_names_text}，部位: {selected_slots}")

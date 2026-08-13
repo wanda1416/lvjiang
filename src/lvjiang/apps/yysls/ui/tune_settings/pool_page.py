@@ -51,7 +51,7 @@ class _AffixListBox(QWidget):
         # 展示高度按行数折算（fill 时为最小值，否则固定，超出滚动）；
         # 用临时项测真实行高（fontMetrics 估算偏小，会导致实际
         # 可见行数不足 rows）
-        self._list.addItem("测高")
+        self._list.addItem(tr("测高"))
         row_h = self._list.sizeHintForRow(0)
         self._list.takeItem(0)
         height = rows * row_h + 2 * self._list.frameWidth()

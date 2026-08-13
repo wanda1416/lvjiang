@@ -35,7 +35,7 @@ from .....i18n import tr
 _ATTRS_REL = "yysls/game_config.yaml"
 
 # 流派属性候选
-_SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
+_SCHOOL_ATTRS = [tr("鸣金"), tr("裂石"), tr("破竹"), tr("牵丝")]
 
 
 class SchoolPanel(QWidget):

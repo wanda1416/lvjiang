@@ -14,6 +14,7 @@ from pathlib import Path
 
 import yaml
 
+from ....i18n import tr
 from .constants import (
     _CHENGYIN_RATIO,
     _KEY_TO_TYPE,
@@ -432,7 +433,7 @@ class GameConfigManager:
         """校验并写盘，然后 reload"""
         # 简单校验：确保是 dict 且有 level_configs
         if not isinstance(data, dict):
-            raise ValueError("数据必须是 dict")
+            raise ValueError(tr("数据必须是 dict"))
         # 写盘
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)

@@ -27,20 +27,22 @@ from loguru import logger
 from lvjiang.core.config import load_yaml, save_yaml
 from lvjiang.core.config.resolver import get_resolver
 
+from ..i18n import tr
+
 if TYPE_CHECKING:
     import numpy as np
 
 
 # meta_schema 缺失时的种子字段（兼容现有数据：等级作为默认可筛选 meta 字段）
 _SEED_META_SCHEMA = [
-    {"key": "level", "name": "等级", "filterable": True, "type": "number", "sort_by": "asc"},
+    {"key": "level", "name": tr("等级"), "filterable": True, "type": "number", "sort_by": "asc"},
 ]
 
 # 预制输入字段 key（图库内部使用，不参与业务展示）
 _PREDEFINED_INPUT_KEYS = frozenset({"label", "group", "notes"})
 
 # 默认图库空间名（名册缺失时的回退空间）
-DEFAULT_SPACE = "默认"
+DEFAULT_SPACE = tr("默认")
 
 
 def validate_crop(values: list[float]) -> list[float] | None:

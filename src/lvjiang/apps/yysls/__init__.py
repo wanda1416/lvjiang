@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from ..._version import __version__
+from ...i18n import tr
 from ..base import AppHooks
 
 
@@ -56,16 +57,16 @@ def _build_menu(host, menubar):
 
 
 hooks = AppHooks(
-    name="燕云十六声",
+    name=tr("燕云十六声"),
     window_title=f"律匠 - 燕云十六声装备调律工具 v{__version__}",
 
     # 注入通用 MainWindow 的 Tab / 菜单
-    left_tab_builders=[("调律", _build_tuning_tab)],
+    left_tab_builders=[(tr("调律"), _build_tuning_tab)],
     right_tab_builders=[
-        ("用户总览", _build_profile_overview_tab),
-        ("角色详情", _build_character_detail_tab),
-        ("装备数据", _build_equip_status_tab),
-        ("其他信息", _build_profile_tab),
+        (tr("用户总览"), _build_profile_overview_tab),
+        (tr("角色详情"), _build_character_detail_tab),
+        (tr("装备数据"), _build_equip_status_tab),
+        (tr("其他信息"), _build_profile_tab),
     ],
     menu_builders=[_build_menu],
 

@@ -9,6 +9,8 @@
 
 from dataclasses import dataclass, field
 
+from ..i18n import tr
+
 # 合法的 region type 枚举
 VALID_REGION_TYPES = {"attr", "slot", "func"}
 
@@ -16,7 +18,7 @@ VALID_REGION_TYPES = {"attr", "slot", "func"}
 # 等同（不叠加到其他视图），仅承接存量定义且不可删除
 # （定义的 view 字段为空等价于归属基底视图）
 BASE_VIEW_KEY = "base"
-BASE_VIEW_NAME = "基底"
+BASE_VIEW_NAME = tr("基底")
 
 
 @dataclass

@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..i18n import tr
 from .workflow_references import KIND_LABELS, RefUse
 
 
@@ -60,7 +61,7 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
     for ref in refs:
         bound = cache.setdefault(ref.scene, _bound_keys(layout, ref.scene))
         if not any(bound.values()):
-            problems.append(RefProblem(ref, "场景未绑定任何坐标"))
+            problems.append(RefProblem(ref, tr("场景未绑定任何坐标")))
             continue
         if ref.key is None:
             continue
@@ -106,5 +107,5 @@ def format_problems(problems: list[RefProblem]) -> str:
     for p in problems:
         key = f".[{p.ref.key}]" if p.ref.key else ""
         lines.append(f"  {_where(p.ref)}  [{p.ref.scene}]{key} — {p.reason}")
-    lines.append("请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定")
+    lines.append(tr("请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定"))
     return "\n".join(lines)

@@ -74,11 +74,11 @@ from .....i18n import tr
 # 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）
 _QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
 _QUALITY_LABELS = {
-    "gold": "- 不限 -",
-    "gold_only": "金装",
-    "purple_only": "紫色",
-    "purple": "紫装及以下",
-    "blue": "蓝装及以下",
+    "gold": tr("- 不限 -"),
+    "gold_only": tr("金装"),
+    "purple_only": tr("紫色"),
+    "purple": tr("紫装及以下"),
+    "blue": tr("蓝装及以下"),
 }
 
 # 规则表列定义（第一列为序号；扫描处理在判定结果后多一列
@@ -87,9 +87,9 @@ _SEQ_COL = 0
 _BASE_COL_KEYS = ("seq", "parts", "quality", "judge", "ratings",
                   "pct", "action")
 _COL_TITLES = {
-    "seq": "#", "parts": "部位", "quality": "品阶",
-    "judge": "判定语义", "ratings": "判定结果", "first_affix": "仅首词条",
-    "pct": "首词条 %", "action": "动作",
+    "seq": "#", "parts": tr("部位"), "quality": tr("品阶"),
+    "judge": tr("判定语义"), "ratings": tr("判定结果"), "first_affix": tr("仅首词条"),
+    "pct": tr("首词条 %"), "action": tr("动作"),
 }  # runtime tr()
 
 # 各行为点的动作标签（统一使用 BEHAVIOR_ACTION_LABELS）
@@ -750,7 +750,7 @@ class _BehaviorPageBase(QWidget):
         selected_parts = parts.selected()
         # 全选时折叠为简写，保持 YAML 紧凑
         if set(selected_parts) == set(QUALITY_PARTS):
-            selected_parts = ["全部"]
+            selected_parts = [tr("全部")]
         rule = {
             "enabled": bool(seq.property("rule_enabled")),
             "parts": selected_parts,

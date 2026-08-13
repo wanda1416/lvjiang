@@ -58,6 +58,8 @@ from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
 from lvjiang.workflows.base import BaseWorkflow
 
+from .....i18n import tr
+
 
 class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     """自动调律工作流"""
@@ -1048,7 +1050,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         from lvjiang.core.config.wf_configs import get_wf_config
         group_key = get_wf_config("auto_tuning").get("base_group", "")
         if not group_key:
-            raise ValueError("未配置基础规则组，请在调律页选择基础规则组")
+            raise ValueError(tr("未配置基础规则组，请在调律页选择基础规则组"))
         from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_group
         group = get_tuning_group(group_key)
         if group is None:
@@ -1069,13 +1071,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         tc = get_wf_config("auto_tuning")
         rules = tc.get("rules", {})
         if not rules:
-            raise ValueError("未配置调律规则，请在调律页选择至少一个规则")
+            raise ValueError(tr("未配置调律规则，请在调律页选择至少一个规则"))
         switches = tc.get("switches", {})
         enabled = {k: {**cfg, "switches": switches}
                    for k, cfg in rules.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
         if not enabled:
-            raise ValueError("没有启用任何调律规则，请在调律页勾选至少一个规则")
+            raise ValueError(tr("没有启用任何调律规则，请在调律页勾选至少一个规则"))
         ctx.judge_rule_keys = list(enabled)
         ctx.judge_configs = enabled
 
@@ -1088,9 +1090,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             from lvjiang.core.config.wf_configs import get_wf_config
             raw = get_wf_config("auto_tuning").get("selected_slots")
             if not isinstance(raw, list) or not raw:
-                raise ValueError("未配置调律部位，请在调律页选择至少一个部位")
+                raise ValueError(tr("未配置调律部位，请在调律页选择至少一个部位"))
             valid = set(self.WEAPON_SLOTS) | set(self.ARMOR_SLOTS)
             selected = [s for s in raw if s in valid]
         if not selected:
-            raise ValueError("调律部位配置无效，请在调律页重新选择部位")
+            raise ValueError(tr("调律部位配置无效，请在调律页重新选择部位"))
         return selected

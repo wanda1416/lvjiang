@@ -237,19 +237,19 @@ class AffixCapsPanel(QWidget):
 
         # 标题行
         alias_title_row = QHBoxLayout()
-        alias_title_row.addWidget(QLabel("词条名称（原始词条名 → 当前类别）"))
+        alias_title_row.addWidget(QLabel(tr("词条名称（原始词条名 → 当前类别）")))
         alias_title_row.addStretch()
-        self._btn_add_group = QPushButton("+ 分组")
+        self._btn_add_group = QPushButton(tr("+ 分组"))
         self._btn_add_group.setFixedWidth(60)
         self._btn_add_group.clicked.connect(self._add_group)
         self._btn_add_group.setVisible(False)
         alias_title_row.addWidget(self._btn_add_group)
-        self._btn_del_group = QPushButton("- 分组")
+        self._btn_del_group = QPushButton(tr("- 分组"))
         self._btn_del_group.setFixedWidth(60)
         self._btn_del_group.clicked.connect(self._del_group)
         self._btn_del_group.setVisible(False)
         alias_title_row.addWidget(self._btn_del_group)
-        self._btn_add_alias = QPushButton("+ 词条名")
+        self._btn_add_alias = QPushButton(tr("+ 词条名"))
         self._btn_add_alias.setFixedWidth(70)
         self._btn_add_alias.clicked.connect(self._add_alias)
         alias_title_row.addWidget(self._btn_add_alias)
@@ -272,7 +272,7 @@ class AffixCapsPanel(QWidget):
 
         self._table = QTableWidget()
         self._table.setColumnCount(3)
-        self._table.setHorizontalHeaderLabels(["等级", "上限", "承音"])
+        self._table.setHorizontalHeaderLabels([tr("等级"), tr("上限"), tr("承音")])
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._table.cellChanged.connect(self._on_cell_changed)
         right_layout.addWidget(self._table)
@@ -281,11 +281,11 @@ class AffixCapsPanel(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self._btn_add_level = QPushButton("添加等级")
+        self._btn_add_level = QPushButton(tr("添加等级"))
         self._btn_add_level.clicked.connect(self._add_level)
         btn_layout.addWidget(self._btn_add_level)
 
-        self._btn_del_level = QPushButton("删除等级")
+        self._btn_del_level = QPushButton(tr("删除等级"))
         self._btn_del_level.clicked.connect(self._del_level)
         btn_layout.addWidget(self._btn_del_level)
 
@@ -678,7 +678,7 @@ class AffixCapsPanel(QWidget):
             # 开启分组：已有词条名归入默认组
             if not isinstance(raw, dict):
                 aliases = raw if isinstance(raw, list) else []
-                category_data["_aliases"] = {"默认": aliases} if aliases else {}
+                category_data["_aliases"] = {tr("默认"): aliases} if aliases else {}
             category_data["_group"] = True
         else:
             # 关闭分组：拍平所有组内词条名
@@ -753,7 +753,7 @@ class AffixCapsPanel(QWidget):
         group_name = self._alias_group_tabs.tabText(index)
         count = len(self._get_alias_groups().get(group_name, []))
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, tr("确认删除"),
             f"确定要删除分组 '{group_name}'（含 {count} 个词条名）吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -825,7 +825,7 @@ class AffixCapsPanel(QWidget):
 
         # 无词条名时显示提示
         if not aliases:
-            hint = QLabel("（无词条名，点击 '+ 词条名' 添加）")
+            hint = QLabel(tr("（无词条名，点击 '+ 词条名' 添加）"))
             hint.setStyleSheet("color: #888; font-size: 12px;")
             self._alias_tags_layout.addWidget(hint)
 
@@ -847,7 +847,7 @@ class AffixCapsPanel(QWidget):
             for alias in names:
                 rows.addWidget(self._create_alias_row(alias))
             if not names:
-                hint = QLabel("（无词条名，点击 '+ 词条名' 添加）")
+                hint = QLabel(tr("（无词条名，点击 '+ 词条名' 添加）"))
                 hint.setStyleSheet("color: #888; font-size: 12px;")
                 rows.addWidget(hint)
             rows.addStretch()
@@ -940,7 +940,7 @@ class AffixCapsPanel(QWidget):
     def _format_parts(parts: list[str]) -> str:
         """部位按钮文本：全选展示「全部」，否则 / 拼接（如 环/佩）"""
         if len(parts) >= len(EQUIP_PART_NAMES):
-            return "全部"
+            return tr("全部")
         return "/".join(parts)
 
     def _pick_affix_parts(self, alias: str, btn: QPushButton):
@@ -951,7 +951,7 @@ class AffixCapsPanel(QWidget):
         parts = dlg.selected()
         if not parts or len(parts) >= len(EQUIP_PART_NAMES):
             self._drop_affix_parts(alias)
-            btn.setText("全部")
+            btn.setText(tr("全部"))
         else:
             self._data.setdefault("affix_parts", {})[alias] = parts
             btn.setText(self._format_parts(parts))
@@ -979,7 +979,7 @@ class AffixCapsPanel(QWidget):
 
     def _rename_alias(self, alias: str):
         """双击词条名标签重命名（原位替换，兼容分组/不分组形态）"""
-        name, ok = QInputDialog.getText(self, "重命名词条名", "原始词条名称:", text=alias)
+        name, ok = QInputDialog.getText(self, tr("重命名词条名"), tr("原始词条名称:"), text=alias)
         if not ok or not name:
             return
         name = name.strip()
@@ -988,10 +988,10 @@ class AffixCapsPanel(QWidget):
 
         # 重复 / 跨类别冲突检查
         if name in self._get_aliases():
-            QMessageBox.warning(self, "重复", f"词条名 '{name}' 已存在")
+            QMessageBox.warning(self, tr("重复"), f"词条名 '{name}' 已存在")
             return
         if name in self._get_all_aliases():
-            QMessageBox.warning(self, "冲突", f"词条名 '{name}' 已被其他类别使用")
+            QMessageBox.warning(self, tr("冲突"), f"词条名 '{name}' 已被其他类别使用")
             return
 
         affix_caps = self._data.get("affix_caps", {})
@@ -1020,10 +1020,10 @@ class AffixCapsPanel(QWidget):
     def _add_alias(self):
         """添加新词条名（分组模式下加入当前选中组）"""
         if not self._current_affix:
-            QMessageBox.information(self, "提示", "请先选择词条类别")
+            QMessageBox.information(self, tr("提示"), tr("请先选择词条类别"))
             return
 
-        name, ok = QInputDialog.getText(self, "添加词条名", "原始词条名称:")
+        name, ok = QInputDialog.getText(self, tr("添加词条名"), tr("原始词条名称:"))
         if not ok or not name:
             return
 
@@ -1034,13 +1034,13 @@ class AffixCapsPanel(QWidget):
         # 检查是否已存在
         aliases = self._get_aliases()
         if name in aliases:
-            QMessageBox.warning(self, "重复", f"词条名 '{name}' 已存在")
+            QMessageBox.warning(self, tr("重复"), f"词条名 '{name}' 已存在")
             return
 
         # 检查是否已被其他类别占用
         all_aliases = self._get_all_aliases()
         if name in all_aliases:
-            QMessageBox.warning(self, "冲突", f"词条名 '{name}' 已被其他类别使用")
+            QMessageBox.warning(self, tr("冲突"), f"词条名 '{name}' 已被其他类别使用")
             return
 
         # 添加到数据
@@ -1049,7 +1049,7 @@ class AffixCapsPanel(QWidget):
         if self._is_grouped():
             index = self._alias_group_tabs.currentIndex()
             if index < 0:
-                QMessageBox.information(self, "提示", "请先点击 '+ 分组' 创建分组")
+                QMessageBox.information(self, tr("提示"), tr("请先点击 '+ 分组' 创建分组"))
                 return
             group_name = self._alias_group_tabs.tabText(index)
             category_data["_aliases"].setdefault(group_name, []).append(name)
@@ -1064,7 +1064,7 @@ class AffixCapsPanel(QWidget):
     def _remove_alias(self, alias: str):
         """移除词条名（分组模式下自动定位所在组）"""
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, tr("确认删除"),
             f"确定要移除词条名 '{alias}' 吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )

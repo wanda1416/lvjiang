@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import QTableWidgetItem
 
+from .....i18n import tr
 from ...config.profile_models import (
     DIR_BOTH,
     DIRECTION_LABELS,
@@ -267,7 +268,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
         result = compute_regen_entry(entry, kd)
         stored_value = entry.get("value", 0) or 0
-        period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
+        period_labels = {"minute": tr("分钟"), "hour": tr("小时"), "day": tr("天"), "week": tr("周")}
         rate_label = period_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
         period_label = period_labels.get(kd.regen_period, kd.regen_period)
 
@@ -276,11 +277,11 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                 lines.append(f"更新时间: {updated_at}")
             if updated_time:
                 lines.append(f"写入时间: {updated_time}")
-            lines.append("恢复类型: 实时恢复")
+            lines.append(tr("恢复类型: 实时恢复"))
             lines.append(f"恢复速率: {kd.regen_rate_value}/{rate_label}")
             seconds = next_realtime_point_seconds(entry, kd)
             lines.append(
-                "下一点恢复: 已达上限" if seconds is None else f"下一点恢复: {format_seconds(seconds)}"
+                tr("下一点恢复: 已达上限") if seconds is None else f"下一点恢复: {format_seconds(seconds)}"
             )
             lines.append(f"存储值: {_format_number(stored_value)}")
             if kd.cap is not None:
@@ -290,7 +291,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                 lines.append(f"更新时间: {updated_at}")
             if updated_time:
                 lines.append(f"写入时间: {updated_time}")
-            lines.append("恢复类型: 准点恢复")
+            lines.append(tr("恢复类型: 准点恢复"))
             lines.append(f"恢复周期: 每{period_label}")
             lines.append(f"每次恢复: {kd.regen_amount}")
             try:
@@ -311,8 +312,8 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
     # 配额模型显示周期、上限
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
         period_labels = {
-            "week": "每周", "month": "每月", "season": "每赛季",
-            "half_season": "每半赛季", "day": "每日",
+            "week": tr("每周"), "month": tr("每月"), "season": tr("每赛季"),
+            "half_season": tr("每半赛季"), "day": tr("每日"),
         }
         period_label = period_labels.get(kd.period, kd.period)
         if kd.cap is not None:
@@ -336,7 +337,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
 
     # 同步目标（所有模型通用）
     if kd.sync_targets:
-        lines.append("同步到:")
+        lines.append(tr("同步到:"))
         for t in kd.sync_targets:
             label = format_sync_label(t.key)
             suffix = f" [{DIRECTION_LABELS[t.direction]}]" if t.direction != DIR_BOTH else ""

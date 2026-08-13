@@ -15,6 +15,7 @@ import time
 
 import numpy as np
 
+from ...i18n import tr
 from ..capture_base import CaptureBackend
 from . import a11y, shell
 
@@ -65,7 +66,7 @@ class A11yCapture(CaptureBackend):
         """
         for attempt in range(1, self._MAX_ATTEMPTS + 1):
             if not a11y.is_ready():
-                print("[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启")
+                print(tr("[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启"))
                 return None
 
             try:
@@ -114,7 +115,7 @@ class ShellCapture(CaptureBackend):
             return None
 
         if not png:
-            print("[ShellCapture] screencap 返回空数据（Shizuku 未授权？）")
+            print(tr("[ShellCapture] screencap 返回空数据（Shizuku 未授权？）"))
             return None
         # 通道未就绪时 ShellBridge 会回一段 [stderr]... 文本而不是 PNG，
         # 直接送进 imdecode 只会得到一个含义不明的 None

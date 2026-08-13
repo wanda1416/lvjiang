@@ -44,20 +44,20 @@ _ATTRS_REL = "yysls/game_config.yaml"
 
 # 部位显示名称（顺序由 BASE_ATTR_PARTS 决定）
 _PART_NAMES = {
-    "weapon": "武器",
-    "ring": "环",
-    "pendant": "佩",
-    "head": "冠胄",
-    "chest": "胸甲",
-    "leg": "胫甲",
-    "wrist": "腕甲",
+    "weapon": tr("武器"),
+    "ring": tr("环"),
+    "pendant": tr("佩"),
+    "head": tr("冠胄"),
+    "chest": tr("胸甲"),
+    "leg": tr("胫甲"),
+    "wrist": tr("腕甲"),
 }
 
 # 品阶显示名称
 _QUALITY_NAMES = {
-    "gold": "金装",
-    "purple": "紫装",
-    "blue": "蓝装",
+    "gold": tr("金装"),
+    "purple": tr("紫装"),
+    "blue": tr("蓝装"),
 }
 
 
@@ -157,7 +157,7 @@ class BaseAttrPanel(QWidget):
         )
         follow_layout = QHBoxLayout(follow_frame)
         follow_layout.setContentsMargins(8, 4, 8, 4)
-        self._check_follow = QCheckBox("属性跟随")
+        self._check_follow = QCheckBox(tr("属性跟随"))
         self._check_follow.toggled.connect(self._on_follow_toggled)
         follow_layout.addWidget(self._check_follow)
 
@@ -450,9 +450,9 @@ class BaseAttrPanel(QWidget):
             return
         attr_name = self._part_data(part).get("_attr")
         if not attr_name:
-            self._attr_label.setText("基础属性：未声明（YAML 中通过 _attr 配置）")
+            self._attr_label.setText(tr("基础属性：未声明（YAML 中通过 _attr 配置）"))
             return
-        kind = "区间值（最小~最大）" if self._is_range_part() else "单值"
+        kind = tr("区间值（最小~最大）") if self._is_range_part() else tr("单值")
         self._attr_label.setText(f"基础属性：{attr_name}（{kind}）")
 
     # ── 属性跟随 ──────────────────────────────────────────────
@@ -493,7 +493,7 @@ class BaseAttrPanel(QWidget):
         self._check_follow.setChecked(following)
         self._combo_follow.setEnabled(following)
         if following:
-            self._follow_hint.setText("数值复用目标部位，表格只读")
+            self._follow_hint.setText(tr("数值复用目标部位，表格只读"))
         else:
             followers = self._followers_of(self._current_part)
             if followers:
@@ -516,7 +516,7 @@ class BaseAttrPanel(QWidget):
             if followers:
                 names = "、".join(_PART_NAMES.get(p, p) for p in followers)
                 QMessageBox.warning(
-                    self, "无法跟随",
+                    self, tr("无法跟随"),
                     f"「{_PART_NAMES.get(part, part)}」正被 {names} 跟随，不能再跟随其他部位。",
                 )
                 self._revert_follow_check(False)
@@ -524,7 +524,7 @@ class BaseAttrPanel(QWidget):
 
             candidates = self._follow_candidates()
             if not candidates:
-                QMessageBox.warning(self, "无法跟随", "没有可跟随的目标部位。")
+                QMessageBox.warning(self, tr("无法跟随"), tr("没有可跟随的目标部位。"))
                 self._revert_follow_check(False)
                 return
 
@@ -535,7 +535,7 @@ class BaseAttrPanel(QWidget):
             }
             if own_levels:
                 ret = QMessageBox.question(
-                    self, "确认跟随",
+                    self, tr("确认跟随"),
                     f"「{_PART_NAMES.get(part, part)}」已配置等级数值，"
                     "启用跟随将清除自身数值，是否继续？",
                 )
@@ -608,7 +608,7 @@ class BaseAttrPanel(QWidget):
 
         # 列：等级 + 各品阶
         qualities = ["gold", "purple", "blue"]
-        columns = ["等级"] + [_QUALITY_NAMES.get(q, q) for q in qualities]
+        columns = [tr("等级")] + [_QUALITY_NAMES.get(q, q) for q in qualities]
 
         self._table.setColumnCount(len(columns))
         self._table.setHorizontalHeaderLabels(columns)
@@ -677,7 +677,7 @@ class BaseAttrPanel(QWidget):
         # 首次添加时初始化列
         if self._table.columnCount() == 0:
             qualities = ["gold", "purple", "blue"]
-            columns = ["等级"] + [_QUALITY_NAMES.get(q, q) for q in qualities]
+            columns = [tr("等级")] + [_QUALITY_NAMES.get(q, q) for q in qualities]
             self._table.setColumnCount(len(columns))
             self._table.setHorizontalHeaderLabels(columns)
 

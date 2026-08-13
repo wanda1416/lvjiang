@@ -16,6 +16,8 @@ from loguru import logger
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 from lvjiang.apps.yysls.evaluator.tuning_rules import BEHAVIOR_STAGE_LABELS
 
+from ......i18n import tr
+
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
@@ -96,12 +98,12 @@ class TuningRecycler:
         # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
         check_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_check"]).get(
             "reset_check", "") or ""
-        if "可重置" not in check_text:
+        if tr("可重置") not in check_text:
             logger.info(f"  冷却期检查未通过（reset_check={check_text!r}），"
                         "装备在冷却期，降级跳过")
             wf.click_region(wf.TUNE_SCENE, "back")  # 关闭弹窗回调律页
             wf.wait_delay("step_interval")
-            return "装备重置冷却期，跳过该装备"
+            return tr("装备重置冷却期，跳过该装备")
         # 材料检查：读取 reset_info 解析「持有 N」格式
         if min_material_count is not None:
             reset_info_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_info"]).get(
@@ -114,7 +116,7 @@ class TuningRecycler:
                     f"（reset_info={reset_info_text!r}），视为异常，跳过")
                 wf.click_region(wf.TUNE_SCENE, "back")  # 关闭弹窗回调律页
                 wf.wait_delay("step_interval")
-                return "重置材料信息识别失败，跳过该装备"
+                return tr("重置材料信息识别失败，跳过该装备")
             if material_count < min_material_count:
                 # 材料不足
                 logger.info(
@@ -139,10 +141,10 @@ class TuningRecycler:
         期望格式：「持有 N」，N 为数字。
         返回数字；未识别到「持有」返回 None。
         """
-        if "持有" not in text:
+        if tr("持有") not in text:
             return None
         # 匹配「持有」后的数字
-        m = re.search(r"持有\s*(\d+)", text)
+        m = re.search(tr(r"持有\s*(\d+)"), text)
         if m:
             return int(m.group(1))
         # 有「持有」但没解析到数字，返回 0
@@ -167,7 +169,7 @@ class TuningRecycler:
         key = wf.ocr_scene_by(
             wf.EQUIP_DETAIL,
             ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
-            "回收", "contains")
+            tr("回收"), "contains")
         if not key:
             logger.warning("未找到回收按钮，装备保留")
             wf.click_region(wf.EQUIP_DETAIL, "more_func")
@@ -179,7 +181,7 @@ class TuningRecycler:
         confirm_text = wf.ocr_scene(wf.EQUIP_DETAIL,
                                     ["recycle_confirm"]).get(
             "recycle_confirm", "") or ""
-        if "确认" not in confirm_text:
+        if tr("确认") not in confirm_text:
             logger.warning(f"  回收确认弹窗未识别到「确认」"
                            f"（recycle_confirm={confirm_text!r}），"
                            f"装备被锁定，保留")

@@ -28,6 +28,7 @@ from loguru import logger
 from lvjiang.constants import SESSION_CONFIG_DIR
 from lvjiang.core.config import load_yaml, save_yaml
 
+from ....i18n import tr
 from .profile_models import (
     ALL_MODELS,
     KeyDef,
@@ -150,7 +151,7 @@ def _load_config() -> ProfileSchema:
 
     # 检测旧格式
     if "fields" in data or "groups" in data:
-        raise ValueError("profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式")
+        raise ValueError(tr("profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式"))
 
     # 新格式：按模型类型加载
     keys_by_model: dict[str, list[KeyDef]] = {}

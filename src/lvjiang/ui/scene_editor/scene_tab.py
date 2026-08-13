@@ -26,6 +26,7 @@ from ...core.scene_registry import (
     get_scene_views,
     get_view_visible_keys,
 )
+from ...i18n import tr
 from .canvas import EditMode, RegionCanvas
 from .scene_panel_editor import PanelEditorMixin
 from .scene_poi_panel import PoiPanelMixin
@@ -65,10 +66,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
 
         # 右侧四 Tab
         self._right_tabs = QTabWidget()
-        self._right_tabs.addTab(self._build_region_panel(), "区域列表")
-        self._right_tabs.addTab(self._build_point_panel(), "坐标列表")
-        self._right_tabs.addTab(self._build_arrow_panel(), "方向列表")
-        self._right_tabs.addTab(self._build_panel_panel(), "面板列表")
+        self._right_tabs.addTab(self._build_region_panel(), tr("区域列表"))
+        self._right_tabs.addTab(self._build_point_panel(), tr("坐标列表"))
+        self._right_tabs.addTab(self._build_arrow_panel(), tr("方向列表"))
+        self._right_tabs.addTab(self._build_panel_panel(), tr("面板列表"))
         self._splitter.addWidget(self._right_tabs)
         self._splitter.setSizes([650, 250])
 
@@ -91,13 +92,13 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     def _build_canvas_toolbar(self) -> QHBoxLayout:
         """画布顶部工具栏：视图选择器 + 管理入口"""
         bar = QHBoxLayout()
-        bar.addWidget(QLabel("视图"))
+        bar.addWidget(QLabel(tr("视图")))
         self._view_combo = QComboBox()
         self._view_combo.setMinimumWidth(120)
         self._view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
         bar.addWidget(self._view_combo)
-        self._btn_manage_views = QPushButton("管理视图")
-        self._btn_manage_views.setToolTip("开启多视图、新增/重命名/删除视图")
+        self._btn_manage_views = QPushButton(tr("管理视图"))
+        self._btn_manage_views.setToolTip(tr("开启多视图、新增/重命名/删除视图"))
         self._btn_manage_views.clicked.connect(self._on_manage_views)
         bar.addWidget(self._btn_manage_views)
         bar.addStretch()
@@ -117,11 +118,11 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         combo.clear()
         views = get_scene_views(self._scene_key)
         if not views:
-            combo.addItem("单视图", userData="")
+            combo.addItem(tr("单视图"), userData="")
             combo.setEnabled(False)
         else:
             combo.setEnabled(True)
-            combo.addItem("全部", userData="")
+            combo.addItem(tr("全部"), userData="")
             for v in views:
                 combo.addItem(v.name, userData=v.key)
             # 尽量保持当前选中视图

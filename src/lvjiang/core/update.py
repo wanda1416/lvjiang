@@ -14,6 +14,8 @@ from urllib.request import Request, urlopen
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from ..i18n import tr
+
 # GitHub 仓库信息
 GITHUB_REPO = "wanda1416/lvjiang"
 GITHUB_RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
@@ -136,7 +138,7 @@ class UpdateChecker(QThread):
             if latest_version:
                 self.finished.emit(latest_version, download_url)
             else:
-                self.error.emit("无法获取版本信息")
+                self.error.emit(tr("无法获取版本信息"))
         except Exception as e:
             logger.exception("检查更新失败")
             self.error.emit(f"检查更新失败: {e}")

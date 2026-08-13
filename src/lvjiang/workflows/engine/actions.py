@@ -9,6 +9,7 @@
 
 from loguru import logger
 
+from ...i18n import tr
 from ..grammar import (
     Click,
     CoordPoint,
@@ -125,8 +126,8 @@ class _ActionsMixin:
             return
         if node.from_scene_ref is not None and node.to_scene_ref is not None:
             # 点对模式：drag [scene1].[point1] [scene2].[point2]
-            x1, y1 = self._resolve_point_ref_to_screen(node.from_scene_ref, "起点")
-            x2, y2 = self._resolve_point_ref_to_screen(node.to_scene_ref, "终点")
+            x1, y1 = self._resolve_point_ref_to_screen(node.from_scene_ref, tr("起点"))
+            x2, y2 = self._resolve_point_ref_to_screen(node.to_scene_ref, tr("终点"))
             duration = self._resolve_duration(node.duration) if node.duration else None
             self._input.drag_screen(
                 x1, y1, x2, y2,

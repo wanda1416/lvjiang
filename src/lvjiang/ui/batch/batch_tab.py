@@ -33,6 +33,7 @@ from ...core.batch_config import (
     save_batch_config,
 )
 from ...core.config.session import get_session_store
+from ...i18n import tr
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
@@ -110,16 +111,16 @@ class BatchTab(QWidget):
         layout.setSpacing(8)
 
         # ── 执行按钮（第一行）──
-        self._btn_run = QPushButton("开始批量执行 (F9)")
+        self._btn_run = QPushButton(tr("开始批量执行 (F9)"))
         self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         self._btn_run.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._btn_run)
 
         # ── 三页子 Tab ──
         self._sub_tabs = QTabWidget()
-        self._sub_tabs.addTab(self._build_progress_page(), "进度")
-        self._sub_tabs.addTab(self._build_script_page(), "脚本")
-        self._sub_tabs.addTab(self._build_config_page(), "配置")
+        self._sub_tabs.addTab(self._build_progress_page(), tr("进度"))
+        self._sub_tabs.addTab(self._build_script_page(), tr("脚本"))
+        self._sub_tabs.addTab(self._build_config_page(), tr("配置"))
         layout.addWidget(self._sub_tabs)
 
     def _build_progress_page(self) -> QWidget:
@@ -129,7 +130,7 @@ class BatchTab(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         self._progress_table = QTableWidget(0, 3)
-        self._progress_table.setHorizontalHeaderLabels(["条目", "脚本", "状态"])
+        self._progress_table.setHorizontalHeaderLabels([tr("条目"), tr("脚本"), tr("状态")])
         hheader = self._progress_table.horizontalHeader()
         assert hheader is not None
         hheader.setStretchLastSection(True)
@@ -154,7 +155,7 @@ class BatchTab(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        layout.addWidget(QLabel("<b>勾选要执行的脚本：</b>"))
+        layout.addWidget(QLabel(tr("<b>勾选要执行的脚本：</b>")))
         self._script_list = QListWidget()
         layout.addWidget(self._script_list)
         layout.addStretch()
@@ -170,7 +171,7 @@ class BatchTab(QWidget):
 
         # 配置选择行
         config_row = QHBoxLayout()
-        config_row.addWidget(QLabel("当前配置："))
+        config_row.addWidget(QLabel(tr("当前配置：")))
         self._config_combo = QComboBox()
         self._config_combo.setMinimumWidth(150)
         self._config_combo.currentIndexChanged.connect(self._on_config_changed)
@@ -179,13 +180,13 @@ class BatchTab(QWidget):
 
         # 全选/全不选行
         select_row = QHBoxLayout()
-        select_row.addWidget(QLabel("<b>选择要执行的行：</b>"))
+        select_row.addWidget(QLabel(tr("<b>选择要执行的行：</b>")))
         select_row.addStretch()
-        btn_all = QPushButton("全选")
+        btn_all = QPushButton(tr("全选"))
         btn_all.setFixedWidth(60)
         btn_all.clicked.connect(lambda: self._set_all_entries_checked(True))
         select_row.addWidget(btn_all)
-        btn_none = QPushButton("全不选")
+        btn_none = QPushButton(tr("全不选"))
         btn_none.setFixedWidth(60)
         btn_none.clicked.connect(lambda: self._set_all_entries_checked(False))
         select_row.addWidget(btn_none)
@@ -257,7 +258,7 @@ class BatchTab(QWidget):
         cfg = load_batch_config()
         config = cfg.get_active()
         if not config or not config.rows:
-            lbl = QLabel("暂无数据，请通过 工具 → 批量配置 添加")
+            lbl = QLabel(tr("暂无数据，请通过 工具 → 批量配置 添加"))
             lbl.setStyleSheet("color: #999;")
             self._entry_container.addWidget(lbl)
             return
@@ -282,7 +283,7 @@ class BatchTab(QWidget):
             val = row_data.get(col, "")
             if val:
                 parts.append(str(val))
-        return " / ".join(parts) if parts else "(空行)"
+        return " / ".join(parts) if parts else tr("(空行)")
 
     def _on_entry_check_changed(self):
         """行勾选变更 → 保存到 session.json（用户态）"""
@@ -401,10 +402,10 @@ class BatchTab(QWidget):
         scripts = self._checked_scripts()
 
         if not enabled_rows:
-            self._host.append_log("[批量] 暂无启用的行，请到「配置」页勾选")
+            self._host.append_log(tr("[批量] 暂无启用的行，请到「配置」页勾选"))
             return
         if not scripts:
-            self._host.append_log("[批量] 请至少勾选一个脚本")
+            self._host.append_log(tr("[批量] 请至少勾选一个脚本"))
             return
 
         # 保存脚本勾选到 batch_config
@@ -489,13 +490,13 @@ class BatchTab(QWidget):
 
     def _refresh_run_button(self, state: str):
         if state == "running":
-            self._btn_run.setText("停止 (F10)")
+            self._btn_run.setText(tr("停止 (F10)"))
             self._btn_run.setStyleSheet(_STYLE_BTN_STOP)
         elif state == "not_ready":
-            self._btn_run.setText("未连接")
+            self._btn_run.setText(tr("未连接"))
             self._btn_run.setStyleSheet(_STYLE_BTN_NOT_READY)
         else:
-            self._btn_run.setText("开始批量执行 (F9)")
+            self._btn_run.setText(tr("开始批量执行 (F9)"))
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
 
     def _set_config_enabled(self, enabled: bool):

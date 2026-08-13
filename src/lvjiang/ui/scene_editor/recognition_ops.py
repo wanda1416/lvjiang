@@ -4,6 +4,7 @@ from loguru import logger
 from PyQt6.QtWidgets import QApplication
 
 from ...core.scene_registry import get_region_defs, get_region_name, get_scene_name
+from ...i18n import tr
 
 
 class RecognitionOpsMixin:
@@ -33,19 +34,19 @@ class RecognitionOpsMixin:
         if use_live:
             # 实时截屏模式：从设备获取最新截图，不保存到场景
             if not hasattr(self, '_refresh_callback') or self._refresh_callback is None:
-                return None, "无截图源，请先在主窗口定位窗口"
+                return None, tr("无截图源，请先在主窗口定位窗口")
             result = self._refresh_callback()
             new_image, error_msg = result if isinstance(result, tuple) else (result, None)
             if new_image is None:
-                return None, error_msg or "实时截屏失败"
+                return None, error_msg or tr("实时截屏失败")
             return new_image, None
         else:
             # 缓存截图模式：使用当前场景的截图
             if current_tab.canvas.pixmap is None:
-                return None, "当前场景无截图，请先刷新截图"
+                return None, tr("当前场景无截图，请先刷新截图")
             image = current_tab.canvas.get_image()
             if image is None:
-                return None, "当前场景无截图"
+                return None, tr("当前场景无截图")
             return image, None
 
     # ─── OCR 文字识别 ────────────────────────────────────
@@ -66,16 +67,16 @@ class RecognitionOpsMixin:
         """区域 OCR 文字识别"""
         regions = current_tab.get_visible_regions()
         if not regions:
-            self._status_bar.showMessage("没有已定义的区域")
+            self._status_bar.showMessage(tr("没有已定义的区域"))
             return
 
         # 获取识别用图（实时截屏或缓存截图）
         image, error_msg = self._get_recognition_image(current_tab)
         if image is None:
-            self._status_bar.showMessage(error_msg or "获取图像失败")
+            self._status_bar.showMessage(error_msg or tr("获取图像失败"))
             return
 
-        self._status_bar.showMessage("正在识别...")
+        self._status_bar.showMessage(tr("正在识别..."))
         QApplication.processEvents()
 
         from ...core.ocr import OCREngine
@@ -91,7 +92,7 @@ class RecognitionOpsMixin:
                 continue
             text = results[region.key]
             name = get_region_name(current_tab.scene_key, region.key)
-            self._result_text.append(f"{name}: {text or '(未识别到)'}")
+            self._result_text.append(f"{name}: {text or tr('(未识别到)')}")
 
         self._status_bar.showMessage(f"识别完成，共 {len(results)} 个字段")
         logger.info(
@@ -102,16 +103,16 @@ class RecognitionOpsMixin:
         """面板 OCR 文字识别（逐 cell 识别）"""
         panels = current_tab.get_visible_panels()
         if not panels:
-            self._status_bar.showMessage("没有已定义的面板")
+            self._status_bar.showMessage(tr("没有已定义的面板"))
             return
 
         # 获取识别用图
         image, error_msg = self._get_recognition_image(current_tab)
         if image is None:
-            self._status_bar.showMessage(error_msg or "获取图像失败")
+            self._status_bar.showMessage(error_msg or tr("获取图像失败"))
             return
 
-        self._status_bar.showMessage("正在校准面板网格...")
+        self._status_bar.showMessage(tr("正在校准面板网格..."))
         QApplication.processEvents()
 
         from ...core.ocr import OCREngine
@@ -164,23 +165,23 @@ class RecognitionOpsMixin:
         """区域材料识别（type==slot 的区域）"""
         regions = current_tab.get_visible_regions()
         if not regions:
-            self._status_bar.showMessage("没有已定义的区域")
+            self._status_bar.showMessage(tr("没有已定义的区域"))
             return
 
         # 筛选 slot 类型区域
         slot_keys = {r.key for r in get_region_defs(current_tab.scene_key) if r.type == "slot"}
         slot_regions = [r for r in regions if r.key in slot_keys]
         if not slot_regions:
-            self._status_bar.showMessage("当前场景没有 slot 类型的区域")
+            self._status_bar.showMessage(tr("当前场景没有 slot 类型的区域"))
             return
 
         # 获取识别用图（实时截屏或缓存截图）
         image, error_msg = self._get_recognition_image(current_tab)
         if image is None:
-            self._status_bar.showMessage(error_msg or "获取图像失败")
+            self._status_bar.showMessage(error_msg or tr("获取图像失败"))
             return
 
-        self._status_bar.showMessage("正在识别材料...")
+        self._status_bar.showMessage(tr("正在识别材料..."))
         QApplication.processEvents()
 
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
@@ -219,7 +220,7 @@ class RecognitionOpsMixin:
                         parts.append(f"{f.key}={value}")
                 # 输出元数据 OCR 原始文本（如 level_text=110阶 count_text=0/691）
                 for key, text in info.ocr_texts.items():
-                    parts.append(f"{key}={text or '(无)'}")
+                    parts.append(f"{key}={text or tr('(无)')}")
                 # 解析属性
                 if info.real_level is not None:
                     parts.append(f"real_level={info.real_level}")
@@ -237,16 +238,16 @@ class RecognitionOpsMixin:
         """面板材料识别（逐 cell 识别）"""
         panels = current_tab.get_visible_panels()
         if not panels:
-            self._status_bar.showMessage("没有已定义的面板")
+            self._status_bar.showMessage(tr("没有已定义的面板"))
             return
 
         # 获取识别用图
         image, error_msg = self._get_recognition_image(current_tab)
         if image is None:
-            self._status_bar.showMessage(error_msg or "获取图像失败")
+            self._status_bar.showMessage(error_msg or tr("获取图像失败"))
             return
 
-        self._status_bar.showMessage("正在校准面板网格...")
+        self._status_bar.showMessage(tr("正在校准面板网格..."))
         QApplication.processEvents()
 
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
@@ -287,7 +288,7 @@ class RecognitionOpsMixin:
                             parts.append(f"{f.key}={value}")
                     # 输出元数据 OCR 原始文本
                     for key, text in info.ocr_texts.items():
-                        parts.append(f"{key}={text or '(无)'}")
+                        parts.append(f"{key}={text or tr('(无)')}")
                     self._result_text.append(f"  cell[{row}][{col}]: {' '.join(parts)}")
                 total_cells += 1
 

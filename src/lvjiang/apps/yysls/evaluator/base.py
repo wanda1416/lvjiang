@@ -10,19 +10,21 @@ from enum import Enum
 
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 
+from ....i18n import tr
+
 # ─── 评级枚举 ──────────────────────────────────────────────
 
 class Rating(Enum):
     """装备评级（穷举匹配制四档）"""
-    TOP = "顶级"
-    EXCELLENT = "优秀"
-    NORMAL = "一般"
-    JUNK = "垃圾"
+    TOP = tr("顶级")
+    EXCELLENT = tr("优秀")
+    NORMAL = tr("一般")
+    JUNK = tr("垃圾")
 
 
 def part_label(equip: EquipmentData) -> str:
     """部位/武器描述文案（部位为武器时给出具体武器类型）"""
-    if equip.part == "武器":
+    if equip.part == tr("武器"):
         return f"武器 {equip.weapon}"
     return f"部位 {equip.type}"
 

@@ -466,7 +466,7 @@ class OCRDialog(QDialog):
     def _on_refresh(self):
         """从设备获取最新截图"""
         if self._refresh_callback is None:
-            self._status_label.setText("刷新截图不可用：未连接设备或未传入回调")
+            self._status_label.setText(tr("刷新截图不可用：未连接设备或未传入回调"))
             return
 
         self._status_label.setText(tr("正在刷新截图..."))
@@ -606,12 +606,12 @@ class OCRDialog(QDialog):
                         # 输出元数据 OCR 结果（按 schema 输出字段展示名）
                         for key, text in result.ocr_texts.items():
                             name = output_names.get(key, key)
-                            self._result_text.append(f"  {name}: {text or '(无)'}")
+                            self._result_text.append(f"  {name}: {text or tr('(无)')}")
                         self._result_text.append(f"  匹配置信度: {result.confidence:.3f}")
 
             best_type = results[0].type if results else ""
             self._status_label.setText(
-                f"材料识别完成: {best_type or '(空)'}"
+                f"材料识别完成: {best_type or tr('(空)')}"
             )
             logger.info(
                 f"材料识别 top {len(results)}: "

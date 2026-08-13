@@ -28,15 +28,16 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from ...core.batch_config import BatchConfigItem
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
+from ...i18n import tr
 from ...workflows.engine import WorkflowEngine
 from .batch_report import BatchReport
 
 # 进度状态常量
-ST_PENDING = "待执行"
-ST_RUNNING = "运行中"
-ST_SUCCESS = "成功"
-ST_FAILED = "失败"
-ST_SKIPPED = "跳过"
+ST_PENDING = tr("待执行")
+ST_RUNNING = tr("运行中")
+ST_SUCCESS = tr("成功")
+ST_FAILED = tr("失败")
+ST_SKIPPED = tr("跳过")
 
 RESULT_SUCCESS = "success"
 RESULT_SKIPPED = "skipped"
@@ -142,7 +143,7 @@ class BatchWorker(QThread):
         can_run = setup.status == RESULT_SUCCESS
         if not can_run:
             self._stopped = setup.status == RESULT_STOPPED
-            self.log.emit(self._stage_message("批次初始化", setup))
+            self.log.emit(self._stage_message(tr("批次初始化"), setup))
             for run_idx, (_row_idx, row_data) in enumerate(self._enabled_rows):
                 label = self._format_label(row_data, run_idx)
                 username = self._get_username_from_row(row_data) or ""
@@ -266,7 +267,7 @@ class BatchWorker(QThread):
                 break
 
         summary["stopped"] = self._stopped
-        tag = "（用户中断）" if self._stopped else ""
+        tag = tr("（用户中断）") if self._stopped else ""
         self.log.emit(f"[批量] 全部结束{tag}")
 
         # setup 成功才说明批次现场已经建立，此时才允许执行 teardown。
@@ -279,7 +280,7 @@ class BatchWorker(QThread):
             )
             summary["lifecycle"]["batch_teardown"] = teardown.status
             if teardown.status != RESULT_SUCCESS:
-                self.log.emit(self._stage_message("批次收尾", teardown))
+                self.log.emit(self._stage_message(tr("批次收尾"), teardown))
 
         # 6. 生成报告
         report.end_batch(stopped=self._stopped)
@@ -303,7 +304,7 @@ class BatchWorker(QThread):
         if not isinstance(value, dict):
             return BatchStageResult(
                 status=RESULT_FAILED,
-                message="生命周期 wf 必须返回 dict 或 null",
+                message=tr("生命周期 wf 必须返回 dict 或 null"),
                 state=current_state,
             )
         status = value.get("status", RESULT_SUCCESS)
@@ -320,7 +321,7 @@ class BatchWorker(QThread):
         if not isinstance(state, dict):
             return BatchStageResult(
                 status=RESULT_FAILED,
-                message="生命周期 wf 的 state 必须是 dict",
+                message=tr("生命周期 wf 的 state 必须是 dict"),
                 state=current_state,
             )
         return BatchStageResult(status=status, message=message, state=state)

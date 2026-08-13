@@ -23,6 +23,8 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RatingProvider,
 )
 
+from ......i18n import tr
+
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 
@@ -55,8 +57,8 @@ class TuningJudge:
         results = judge_equipment_potential(
             equip_data, self._ctx.judge_configs, self._ctx.judge_rule_keys)
         for r in results.values():
-            tag = ("不适用" if r["not_applicable"]
-                   else "跳过" if r["skipped"] else r["rating"])
+            tag = (tr("不适用") if r["not_applicable"]
+                   else tr("跳过") if r["skipped"] else r["rating"])
             logger.info(
                 f"  终局判定 | {r['name']}: {tag}（{'；'.join(r['reasons'])}）")
         return results

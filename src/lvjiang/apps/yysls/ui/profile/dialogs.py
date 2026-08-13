@@ -40,7 +40,7 @@ __all__ = ["HistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
 class HistoryDialog(QDialog):
     """查看指定 key 的变更记录（最近 50 条）"""
 
-    _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}  # runtime tr()
+    _TYPE_LABEL = {"tick": tr("定时"), "action": tr("操作"), "override": tr("覆写")}  # runtime tr()
 
     def __init__(self, user_name: str, model_type: str, key: str, key_label: str, parent=None):
         super().__init__(parent)
@@ -121,7 +121,7 @@ def ask_value_dialog(
     initial_value: float | None = None,
     sync_checkbox: bool = False,
     sync_default: bool = True,
-    source_label: str = "来源",
+    source_label: str = tr("来源"),
 ) -> tuple[float | int, str, bool, bool]:
     """数值输入 + 来源/用途下拉（可输入新词条）的通用对话框
 

@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.layout_manager import copy_screenshots, delete_screenshots
 from ...core.layout_models import Layout
+from ...i18n import tr
 
 
 class LayoutOpsMixin:
@@ -34,15 +35,15 @@ class LayoutOpsMixin:
         for ch in invalid_chars:
             if ch in name:
                 QMessageBox.warning(
-                    self, "名称不合法",  # type: ignore[arg-type]
+                    self, tr("名称不合法"),  # type: ignore[arg-type]
                     f"布局名称不能包含字符: {ch}\n"
                     f"禁用字符: \\ / : * ? \" < > |",
                 )
                 return False
         if name.startswith(' ') or name.startswith('.'):
             QMessageBox.warning(
-                self, "名称不合法",  # type: ignore[arg-type]
-                "布局名称不能以空格或点开头",
+                self, tr("名称不合法"),  # type: ignore[arg-type]
+                tr("布局名称不能以空格或点开头"),
             )
             return False
         return True
@@ -100,7 +101,7 @@ class LayoutOpsMixin:
         if dirty_names:
             msg += f"\n\n当前有如下场景发生变更：{dirty_names}"
         reply = QMessageBox.question(
-            self, "未保存的修改", msg,  # type: ignore[arg-type]
+            self, tr("未保存的修改"), msg,  # type: ignore[arg-type]
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel,
@@ -152,9 +153,9 @@ class LayoutOpsMixin:
 
     def _on_new_layout(self):
         """新建空布局并切换到画布（不自动激活），先检查未保存修改"""
-        if not self._confirm_discard_changes("新建布局"):
+        if not self._confirm_discard_changes(tr("新建布局")):
             return
-        name, ok = QInputDialog.getText(self, "新建布局", "请输入布局名称：")
+        name, ok = QInputDialog.getText(self, tr("新建布局"), tr("请输入布局名称："))
         if not ok or not name:
             return
         name = name.strip()
@@ -166,7 +167,7 @@ class LayoutOpsMixin:
         try:
             layout = self._manager.new_layout(name)
         except ValueError as e:
-            QMessageBox.warning(self, "新建失败", str(e))
+            QMessageBox.warning(self, tr("新建失败"), str(e))
             return
         if prev_active and prev_active != name:
             self._manager.set_active_layout(prev_active)
@@ -182,7 +183,7 @@ class LayoutOpsMixin:
     def _on_save_layout(self):
         """从所有 Tab 收集数据，增量写入变更的场景文件"""
         if self._current_layout is None:
-            self._status_bar.showMessage("没有已加载的布局")
+            self._status_bar.showMessage(tr("没有已加载的布局"))
             return
         name = self._current_layout.name
         # 画布配置从当前激活 Tab 获取（用户编辑的是当前 Tab 的画布）
@@ -205,7 +206,7 @@ class LayoutOpsMixin:
         total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
         total_a = sum(len(tab.get_arrows()) for tab in self._tabs.values())
         total_pn = sum(len(tab.get_panels()) for tab in self._tabs.values())
-        saved_info = f"{len(changed)} 个场景" if changed else "全部"
+        saved_info = f"{len(changed)} 个场景" if changed else tr("全部")
         self._status_bar.showMessage(
             f"已保存布局「{name}」（{saved_info}），"
             f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
@@ -219,23 +220,23 @@ class LayoutOpsMixin:
     def _on_save_as_layout(self):
         """另存为：输入新名称，可选继承当前布局（创建别名）"""
         if self._current_layout is None:
-            self._status_bar.showMessage("没有已加载的布局")
+            self._status_bar.showMessage(tr("没有已加载的布局"))
             return
         # 别名布局禁止另存为
         if self._manager.is_alias_layout(self._current_layout.name):
             QMessageBox.warning(
-                self, "另存为失败",
-                "别名布局禁止另存为，请使用原布局另存或者新建布局。",
+                self, tr("另存为失败"),
+                tr("别名布局禁止另存为，请使用原布局另存或者新建布局。"),
             )
             return
 
         # 自定义对话框：名称 + 继承复选框
         dialog = QDialog(self)
-        dialog.setWindowTitle("另存为")
+        dialog.setWindowTitle(tr("另存为"))
         layout = QVBoxLayout(dialog)
 
         name_input = QLineEdit()
-        name_input.setPlaceholderText("请输入布局名称")
+        name_input.setPlaceholderText(tr("请输入布局名称"))
         layout.addWidget(name_input)
 
         inherit_checkbox = QCheckBox(f"继承自当前布局「{self._current_layout.name}」")
@@ -246,8 +247,8 @@ class LayoutOpsMixin:
         layout.addWidget(inherit_checkbox)
 
         button_layout = QHBoxLayout()
-        ok_button = QPushButton("确定")
-        cancel_button = QPushButton("取消")
+        ok_button = QPushButton(tr("确定"))
+        cancel_button = QPushButton(tr("取消"))
         button_layout.addWidget(ok_button)
         button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
@@ -271,13 +272,13 @@ class LayoutOpsMixin:
             # 别名布局不可被另存为覆盖（会把场景写入根布局目录，破坏继承语义）
             if self._manager.is_alias_layout(name):
                 QMessageBox.warning(
-                    self, "另存为失败",
+                    self, tr("另存为失败"),
                     f"布局「{name}」是别名布局（继承自根布局），不可被另存为覆盖。\n"
                     f"请使用其他名称。",
                 )
                 return
             reply = QMessageBox.question(
-                self, "确认覆盖",
+                self, tr("确认覆盖"),
                 f"布局「{name}」已存在，是否覆盖？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
@@ -296,14 +297,14 @@ class LayoutOpsMixin:
             # 如果当前是别名，继承目标必须是根布局
             if self._manager.is_alias_layout(extends_name):
                 QMessageBox.warning(
-                    self, "继承失败",
+                    self, tr("继承失败"),
                     f"当前布局「{extends_name}」是别名布局，不能作为继承目标。\n"
                     f"请切换到根布局后再试。",
                 )
                 return
             new_layout = self._manager.create_alias_layout(name, extends_name, canvas)
             if new_layout is None:
-                QMessageBox.warning(self, "创建失败", "别名布局创建失败，请检查日志。")
+                QMessageBox.warning(self, tr("创建失败"), tr("别名布局创建失败，请检查日志。"))
                 return
             self._current_layout = new_layout
             self._refresh_combo()
@@ -330,7 +331,7 @@ class LayoutOpsMixin:
 
             temp.name = name
             if not self._manager.save_layout(temp):
-                QMessageBox.warning(self, "另存为失败", "布局写入失败，请检查日志。")
+                QMessageBox.warning(self, tr("另存为失败"), tr("布局写入失败，请检查日志。"))
                 return
             copy_screenshots(self._current_layout.name, name)
             self._current_layout = temp
@@ -351,10 +352,10 @@ class LayoutOpsMixin:
         active = self._manager.get_active_layout_name()
         name = self._current_layout.name
         if name == active:
-            self._status_bar.showMessage("激活布局不可删除")
+            self._status_bar.showMessage(tr("激活布局不可删除"))
             return
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, tr("确认删除"),
             f"确定要删除布局「{name}」吗？此操作不可恢复。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )

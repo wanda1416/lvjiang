@@ -22,6 +22,7 @@ from lvjiang.core.config import SessionManager
 from lvjiang.core.config.session import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
+from ....i18n import tr
 from ..config.profile_models import RegenKeyDef
 from ..config.profile_store import (
     get_alert_history,
@@ -118,7 +119,7 @@ def _get_season_boundary(
     game_config = get_game_config()
     seasons = game_config.get_season_configs()
     if not seasons:
-        raise ValueError("无赛季配置，无法计算赛季周期边界")
+        raise ValueError(tr("无赛季配置，无法计算赛季周期边界"))
 
     today = now.date()
     # 找到当前所在的赛季
@@ -497,7 +498,7 @@ class ProfileEngine(QThread):
                 if computed >= threshold:
                     # 值满足阈值：如果未标记则触发告警
                     if not is_alert_marked(alert_key):
-                        level_label = "橙色" if level == "orange" else "红色"
+                        level_label = tr("橙色") if level == "orange" else tr("红色")
                         message = f"{user_name} {kd.label} [{level_label}] 已达 {int(computed)}，超过阈值 {threshold}"
                         # 先持久化告警，再标记去重（避免 add_alert 失败时去重标记已写入但告警未持久化）
                         add_alert(alert_id, message, datetime.now().isoformat())

@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.reference_db import ReferenceDatabase
 
+from ...i18n import tr
 from .browser_panel import BrowserPanel
 from .canvas import ReferenceCanvas
 from .grid_panel import GridPanel
@@ -41,7 +42,7 @@ class ReferenceManagerDialog(QDialog):
 
     def __init__(self, parent=None, screenshot_callback: Callable | None = None):
         super().__init__(parent)
-        self.setWindowTitle("图库管理")
+        self.setWindowTitle(tr("图库管理"))
         self.resize(1200, 800)
         # 启用最小化/最大化按钮
         self.setWindowFlags(
@@ -93,16 +94,16 @@ class ReferenceManagerDialog(QDialog):
 
         # ── 图库空间切换栏（图库内部概念，外部消费方无感）──
         space_bar = QHBoxLayout()
-        space_bar.addWidget(QLabel("图库空间:"))
+        space_bar.addWidget(QLabel(tr("图库空间:")))
         self._space_combo = QComboBox()
         self._space_combo.addItems(self._db.get_spaces())
         self._space_combo.setCurrentText(self._db.get_active_space())
         self._space_combo.currentTextChanged.connect(self._on_space_changed)
         space_bar.addWidget(self._space_combo)
-        btn_new_space = QPushButton("新建空间")
+        btn_new_space = QPushButton(tr("新建空间"))
         btn_new_space.clicked.connect(self._on_new_space)
         space_bar.addWidget(btn_new_space)
-        btn_activate_space = QPushButton("激活空间")
+        btn_activate_space = QPushButton(tr("激活空间"))
         btn_activate_space.clicked.connect(self._on_activate_space)
         space_bar.addWidget(btn_activate_space)
         space_bar.addStretch()
@@ -115,19 +116,19 @@ class ReferenceManagerDialog(QDialog):
 
         # Tab 1: 新增参考图（完整编辑工作流）
         self._add_tab = self._build_add_tab()
-        self._tabs.addTab(self._add_tab, "新增参考图")
+        self._tabs.addTab(self._add_tab, tr("新增参考图"))
 
         # Tab 2: 图库管理（浏览与编辑已有参考图）
         self._browser = BrowserPanel(self._db)
         self._browser.set_known_groups(self._db.get_groups())
         self._browser.refresh()
         self._browser.data_changed.connect(self._on_data_changed)
-        self._tabs.addTab(self._browser, "图库管理")
+        self._tabs.addTab(self._browser, tr("图库管理"))
 
         # Tab 3: 元数据定义（定义名称/分组之外的 meta 字段）
         self._meta_panel = MetaSchemaPanel(self._db)
         self._meta_panel.schema_changed.connect(self._on_schema_changed)
-        self._tabs.addTab(self._meta_panel, "元数据定义")
+        self._tabs.addTab(self._meta_panel, tr("元数据定义"))
 
         main_layout.addWidget(self._tabs)
 
@@ -155,12 +156,12 @@ class ReferenceManagerDialog(QDialog):
 
     def _on_new_space(self):
         """新建空间：创建空空间 + 激活 + 刷新下拉与面板"""
-        name, ok = QInputDialog.getText(self, "新建图库空间", "空间名:")
+        name, ok = QInputDialog.getText(self, tr("新建图库空间"), tr("空间名:"))
         if not ok or not str(name).strip():
             return
         name = str(name).strip()
         if not self._db.create_space(name):
-            QMessageBox.warning(self, "新建空间", f"无法创建空间「{name}」（可能已存在或名册未迁移）")
+            QMessageBox.warning(self, tr("新建空间"), f"无法创建空间「{name}」（可能已存在或名册未迁移）")
             return
         self._db.set_active_space(name)
         self._space_combo.blockSignals(True)
@@ -195,34 +196,34 @@ class ReferenceManagerDialog(QDialog):
 
         # 顶部工具栏
         toolbar = QToolBar()
-        self._import_btn = QPushButton("导入图片")
+        self._import_btn = QPushButton(tr("导入图片"))
         self._import_btn.clicked.connect(self._on_import)
         toolbar.addWidget(self._import_btn)
 
-        self._paste_btn = QPushButton("粘贴 (Ctrl+V)")
+        self._paste_btn = QPushButton(tr("粘贴 (Ctrl+V)"))
         self._paste_btn.clicked.connect(self._on_paste)
         toolbar.addWidget(self._paste_btn)
 
-        self._screenshot_btn = QPushButton("截图")
+        self._screenshot_btn = QPushButton(tr("截图"))
         self._screenshot_btn.clicked.connect(self._on_screenshot)
         toolbar.addWidget(self._screenshot_btn)
 
-        self._clear_btn = QPushButton("清空画布")
+        self._clear_btn = QPushButton(tr("清空画布"))
         self._clear_btn.clicked.connect(self._on_clear)
         toolbar.addWidget(self._clear_btn)
 
         toolbar.addSeparator()
 
-        self._select_all_btn = QPushButton("全选")
+        self._select_all_btn = QPushButton(tr("全选"))
         self._select_all_btn.setEnabled(False)
         toolbar.addWidget(self._select_all_btn)
 
-        self._deselect_all_btn = QPushButton("全不选")
+        self._deselect_all_btn = QPushButton(tr("全不选"))
         self._deselect_all_btn.setEnabled(False)
         toolbar.addWidget(self._deselect_all_btn)
 
         toolbar.addSeparator()
-        self._source_label = QLabel("  未导入图片")
+        self._source_label = QLabel(tr("  未导入图片"))
         toolbar.addWidget(self._source_label)
 
         layout.addWidget(toolbar)
@@ -237,7 +238,7 @@ class ReferenceManagerDialog(QDialog):
         canvas_layout.setSpacing(2)
 
         # 信息栏：显示区域规格和 cell 规格
-        self._info_label = QLabel("未框选区域")
+        self._info_label = QLabel(tr("未框选区域"))
         self._info_label.setStyleSheet("color: #888; font-size: 11px;")
         self._info_label.setMaximumHeight(20)
         canvas_layout.addWidget(self._info_label)
@@ -286,8 +287,8 @@ class ReferenceManagerDialog(QDialog):
 
     def _on_import(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择参考图片", "",
-            "图片文件 (*.png *.jpg *.bmp *.webp)"
+            self, tr("选择参考图片"), "",
+            tr("图片文件 (*.png *.jpg *.bmp *.webp)")
         )
         if not path:
             return
@@ -299,7 +300,7 @@ class ReferenceManagerDialog(QDialog):
             img_rgb = np.array(Image.open(path))
             img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
         except Exception as e:
-            QMessageBox.warning(self, "错误", f"无法读取图片:\n{path}\n{e}")
+            QMessageBox.warning(self, tr("错误"), f"无法读取图片:\n{path}\n{e}")
             return
 
         self._source_name = path.split("/")[-1].split("\\")[-1]
@@ -311,7 +312,7 @@ class ReferenceManagerDialog(QDialog):
         clipboard = QApplication.clipboard()
         image = clipboard.image()
         if image.isNull():
-            QMessageBox.information(self, "提示", "剪贴板中没有图片")
+            QMessageBox.information(self, tr("提示"), tr("剪贴板中没有图片"))
             return
 
         # QImage → numpy BGR
@@ -330,19 +331,19 @@ class ReferenceManagerDialog(QDialog):
     def _on_screenshot(self):
         """通过回调截取当前窗口/设备截图，加载到画布"""
         if self._screenshot_callback is None:
-            QMessageBox.information(self, "提示", "截图功能不可用，请先在主窗口定位窗口或连接设备")
+            QMessageBox.information(self, tr("提示"), tr("截图功能不可用，请先在主窗口定位窗口或连接设备"))
             return
 
         try:
             result = self._screenshot_callback()
         except Exception as e:
             logger.error(f"截图回调异常: {e}")
-            QMessageBox.warning(self, "截图失败", f"截图过程出错: {e}")
+            QMessageBox.warning(self, tr("截图失败"), f"截图过程出错: {e}")
             return
 
         new_image, error_msg = result if isinstance(result, tuple) else (result, None)
         if new_image is None:
-            QMessageBox.warning(self, "截图失败", error_msg or "无法获取截图")
+            QMessageBox.warning(self, tr("截图失败"), error_msg or tr("无法获取截图"))
             return
 
         self._source_name = "screenshot"
@@ -359,7 +360,7 @@ class ReferenceManagerDialog(QDialog):
         if self._source_name:
             self._source_label.setText(f"  来源: {self._source_name}")
         else:
-            self._source_label.setText("  未导入图片")
+            self._source_label.setText(tr("  未导入图片"))
 
     # ── 画布事件 ──
 
@@ -392,7 +393,7 @@ class ReferenceManagerDialog(QDialog):
         """根据单cell尺寸生成网格区域"""
         img_size = self._canvas.image_size
         if img_size is None:
-            QMessageBox.warning(self, "提示", "请先导入图片")
+            QMessageBox.warning(self, tr("提示"), tr("请先导入图片"))
             return
 
         img_w, img_h = img_size
@@ -403,7 +404,7 @@ class ReferenceManagerDialog(QDialog):
         # 检查是否超出图片范围
         if total_w > img_w or total_h > img_h:
             QMessageBox.warning(
-                self, "参数超出图片大小",
+                self, tr("参数超出图片大小"),
                 f"生成的网格尺寸 {total_w}×{total_h} 超出图片尺寸 {img_w}×{img_h}"
             )
             return
@@ -430,7 +431,7 @@ class ReferenceManagerDialog(QDialog):
         """更新信息栏显示"""
         region_px = self._canvas.get_region_pixels()
         if region_px is None:
-            self._info_label.setText("未框选区域")
+            self._info_label.setText(tr("未框选区域"))
             return
 
         x1, y1, x2, y2 = region_px
@@ -456,7 +457,7 @@ class ReferenceManagerDialog(QDialog):
         """执行切割：从画布获取已选 cell 图像，传递给编辑面板"""
         # 检查是否有选中的单元格
         if not self._canvas.has_selection():
-            QMessageBox.warning(self, "提示", "请至少选择一个参考图")
+            QMessageBox.warning(self, tr("提示"), tr("请至少选择一个参考图"))
             return
 
         rows = self._grid_panel.rows
@@ -469,12 +470,12 @@ class ReferenceManagerDialog(QDialog):
 
         cells_coords = self._canvas.get_grid_cells(gap=gap)
         if not cells_coords:
-            QMessageBox.warning(self, "提示", "请先框选区域")
+            QMessageBox.warning(self, tr("提示"), tr("请先框选区域"))
             return
 
         image = self._canvas.get_image()
         if image is None:
-            QMessageBox.warning(self, "提示", "请先导入图片")
+            QMessageBox.warning(self, tr("提示"), tr("请先导入图片"))
             return
 
         # 只裁剪已选中的 cell

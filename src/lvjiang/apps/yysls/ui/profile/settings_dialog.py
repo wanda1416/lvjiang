@@ -268,15 +268,15 @@ _ROLE_KEYDEF = Qt.ItemDataRole.UserRole
 
 # 周期选项
 _PERIOD_OPTIONS = [
-    ("day", "每天"),  # runtime tr()
-    ("week", "每周"),
-    ("month", "每月"),
-    ("season", "赛季"),
-    ("half_season", "半赛季"),
+    ("day", tr("每天")),  # runtime tr()
+    ("week", tr("每周")),
+    ("month", tr("每月")),
+    ("season", tr("赛季")),
+    ("half_season", tr("半赛季")),
 ]
 
 # 周几选项（isoweekday: 1=周一 ... 7=周日）
-_WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]  # runtime tr()
+_WEEKDAY_NAMES = [tr("周一"), tr("周二"), tr("周三"), tr("周四"), tr("周五"), tr("周六"), "周日"]  # runtime tr()
 
 
 class _ModelTab(QWidget):
@@ -665,9 +665,9 @@ class ProfileDefinitionDialog(QDialog):
         show_cap_check = QCheckBox(tr("展示上限"))
         show_cap_check.setChecked(existing_show_cap)
 
-        decimal_check = QCheckBox("支持小数")
+        decimal_check = QCheckBox(tr("支持小数"))
         decimal_check.setChecked(existing_decimal)
-        decimal_check.setToolTip("开启后允许输入小数，UI 使用 DoubleValidator")
+        decimal_check.setToolTip(tr("开启后允许输入小数，UI 使用 DoubleValidator"))
 
         cap_opts_row = QHBoxLayout()
         cap_opts_row.addWidget(show_cap_check)

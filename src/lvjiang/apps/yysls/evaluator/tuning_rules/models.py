@@ -36,21 +36,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .....i18n import tr
+
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
 # 属性攻击词组类别（玩法属性候选 + 属攻→无相等价的数据源）
-ATTR_ATTACK_CATEGORY = "属性攻击"
+ATTR_ATTACK_CATEGORY = tr("属性攻击")
 # 通用属性（其属攻即无相攻击，混搭流玩法不做动态归类）
-GENERIC_ATTR = "通用"
+GENERIC_ATTR = tr("通用")
 
 # 动态词条（规则层词汇，非 attributes.yaml 真实词条）：判定时按
 # 玩法属性把装备上的具体属攻归类为 本属（=该属性）/外属（=其余
 # 属性，多对一），大/小对齐词组内声明序（最大↔大、最小↔小）
-DYNAMIC_AFFIXES = ("最大本属攻击", "最小本属攻击",
-                   "最大外属攻击", "最小外属攻击")
+DYNAMIC_AFFIXES = (tr("最大本属攻击"), tr("最小本属攻击"),
+                   tr("最大外属攻击"), tr("最小外属攻击"))
 # 动态词条在规则编辑器中的归属分类名（与属攻类并列，不入
 # game_config 归属体系）
-DYNAMIC_CATEGORY = "动态类"
+DYNAMIC_CATEGORY = tr("动态类")
 
 # 条件原语类型
 COND_KINDS = {"contains_all", "not_together", "count_max", "count_min"}
@@ -61,17 +63,17 @@ RATING_KEYS = ("junk", "normal", "excellent", "top")
 TIER_KEYS = ("junk_conditions", "normal_conditions",
              "excellent_conditions", "top_conditions")
 # 评级档位显示名
-RATING_LABELS = {"junk": "垃圾", "normal": "一般",
-                 "excellent": "优秀", "top": "顶级"}
+RATING_LABELS = {"junk": tr("垃圾"), "normal": tr("一般"),
+                 "excellent": tr("优秀"), "top": tr("顶级")}
 
 # 部位归并：佩→环、胸甲→冠胄、腕甲→胫甲
-PART_ALIAS = {"佩": "环", "胸甲": "冠胄", "腕甲": "胫甲"}
+PART_ALIAS = {tr("佩"): tr("环"), tr("胸甲"): tr("冠胄"), tr("腕甲"): tr("胫甲")}
 
 # 模式部位 key 全集
-PART_KEYS = ("主武器", "副武器", "环", "冠胄", "胫甲")
+PART_KEYS = (tr("主武器"), tr("副武器"), tr("环"), tr("冠胄"), tr("胫甲"))
 
 # 品阶门槛部位全集（固定 7 项，与 equip_parser.infer_part 输出对齐）
-QUALITY_PARTS = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
+QUALITY_PARTS = (tr("武器"), tr("环"), tr("佩"), tr("冠胄"), tr("胸甲"), tr("胫甲"), tr("腕甲"))
 
 
 def standard_affix_names() -> list[str]:
@@ -345,8 +347,8 @@ class TuningRule:
 
 # 大律准石（数量检查目标）与狗粮材料 label（须与 references.yaml
 # 调律材料组的参考图 label 严格一致，材料识别按 label 精确匹配）
-STONE_LABEL = "大律准石"
-FOOD_LABELS = ("金狗粮", "紫狗粮", "彩狗粮")
+STONE_LABEL = tr("大律准石")
+FOOD_LABELS = (tr("金狗粮"), tr("紫狗粮"), tr("彩狗粮"))
 # 评级档位序（狗粮规则「期望 ≥」比较）
 RATING_RANK = {"junk": 0, "normal": 1, "excellent": 2, "top": 3}
 # 狗粮规则可选的期望档位（能进调律的装备至少优秀，
@@ -358,18 +360,18 @@ FOOD_EXPECT_KEYS = ("top", "excellent", "normal")
 # blue=蓝装及以下（≤蓝色）
 QUALITY_RANK = {"blue": 0, "purple": 1, "gold": 2,
                 "gold_only": 3, "purple_only": 4}
-QUALITY_LABELS = {"gold": "金色", "purple": "紫色", "blue": "蓝色",
-                  "gold_only": "仅金色", "purple_only": "仅紫色"}
+QUALITY_LABELS = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色"),
+                  "gold_only": tr("仅金色"), "purple_only": tr("仅紫色")}
 # 狗粮规则品阶标签（仅含阈值语义的品阶，不含精确匹配品阶）
-_FOOD_QUALITY_LABELS = {"gold": "金色", "purple": "紫色", "blue": "蓝色"}
+_FOOD_QUALITY_LABELS = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}
 # 材料不足时的行为：continue=继续调律（不添加狗粮），skip=跳过该装备
 INSUFFICIENT_ACTIONS = ("continue", "skip")
-INSUFFICIENT_LABELS = {"continue": "继续调律", "skip": "跳过该装备"}
+INSUFFICIENT_LABELS = {"continue": tr("继续调律"), "skip": tr("跳过该装备")}
 # 大律准石不足时的处理：skip=跳过该装备（继续遍历），abort=结束
 # 全部调律，ask=confirm 弹窗询问（确认继续后本次运行不再检查）
 STONE_ACTIONS = ("skip", "abort", "ask")
-STONE_ACTION_LABELS = {"skip": "跳过该装备", "abort": "结束全部调律",
-                       "ask": "询问是否继续"}
+STONE_ACTION_LABELS = {"skip": tr("跳过该装备"), "abort": tr("结束全部调律"),
+                       "ask": tr("询问是否继续")}
 
 
 @dataclass
@@ -459,7 +461,7 @@ class MaterialSettings:
                 continue  # 继续走后续规则
             return FoodDecision(
                 "feed", rule.food, f"{desc} → 本轮添加 {rule.food}")
-        return FoodDecision("none", "", "无狗粮规则命中 → 不添加")
+        return FoodDecision("none", "", tr("无狗粮规则命中 → 不添加"))
 
 
 # ─── 行为配置（状态机三行为点：扫描处理 / 材料处理 / 结束处理）──
@@ -474,12 +476,12 @@ class MaterialSettings:
 # 行为动作（结束处理 tune 的四个动作 + 扫描处理新增的调满后回收）
 BEHAVIOR_ACTIONS = ("continue", "reset", "recycle", "skip", "tune_full_recycle")
 BEHAVIOR_ACTION_LABELS = {
-    "continue": "继续调律或跳过",   # 词条满时结束保留
-    "reset": "重置装备",
-    "recycle": "回收装备",
-    "skip": "跳过该装备",
-    "tune_full_recycle": "调满后回收",  # 金装专用：调满5词条后回收
-    "tune_this": "强制调律",  # 扫描处理专用：无视门槛强制进入调律页
+    "continue": tr("继续调律或跳过"),   # 词条满时结束保留
+    "reset": tr("重置装备"),
+    "recycle": tr("回收装备"),
+    "skip": tr("跳过该装备"),
+    "tune_full_recycle": tr("调满后回收"),  # 金装专用：调满5词条后回收
+    "tune_this": tr("强制调律"),  # 扫描处理专用：无视门槛强制进入调律页
 }
 # 各行为点允许的动作（材料处理由 MaterialSettings 承担，不入表）
 BEHAVIOR_STAGE_ACTIONS = {
@@ -493,14 +495,14 @@ BEHAVIOR_ACTION_TOOLTIPS = {
     "reset": "重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）",
     "recycle": "回收装备：分解为材料",
     "skip": "跳过该装备：结束保留在背包",
-    "tune_full_recycle": "调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收",
-    "tune_this": "强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）",
+    "tune_full_recycle": tr("调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收"),
+    "tune_this": tr("强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）"),
 }
 # 判定语义：预期评级识别用哪个流派规则集；affix=自选词条
 #（不跑潜力判定，判定结果列存词条名，按装备词条名匹配）
 JUDGE_SCOPES = ("incoming", "all", "custom", "affix")
-JUDGE_SCOPE_LABELS = {"incoming": "传入规则", "all": "全部规则",
-                      "custom": "自选规则", "affix": "自选词条"}
+JUDGE_SCOPE_LABELS = {"incoming": tr("传入规则"), "all": tr("全部规则"),
+                      "custom": tr("自选规则"), "affix": tr("自选词条")}
 # 首词条初始数值比较方向（le=≤，ge=≥）
 PCT_OPS = ("le", "ge")
 PCT_OP_LABELS = {"le": "≤", "ge": "≥"}
@@ -601,31 +603,31 @@ class BehaviorRule:
 
     def summary(self) -> str:
         """条件摘要文本（日志与说明文档）"""
-        parts = "/".join(self.parts) if self.parts else "不限部位"
+        parts = "/".join(self.parts) if self.parts else tr("不限部位")
         if self.max_quality == "gold":
-            quals = "不限品阶"
+            quals = tr("不限品阶")
         elif self.max_quality == "gold_only":
-            quals = "仅金装"
+            quals = tr("仅金装")
         elif self.max_quality == "purple_only":
-            quals = "仅紫色"
+            quals = tr("仅紫色")
         else:
             quals = f"品阶≤{QUALITY_LABELS.get(self.max_quality, self.max_quality)}"
-        pct = ("首词条不限" if self.pct_unlimited
+        pct = (tr("首词条不限") if self.pct_unlimited
                else f"首词条{PCT_OP_LABELS.get(self.pct_op, self.pct_op)}"
                     f"{self.pct}%")
         if self.judge_scope == "affix":
             # 自选词条：ratings 存词条名，无词条时不命中
-            names = "/".join(self.ratings) if self.ratings else "未选词条"
-            extra = "，仅首词条" if self.first_affix_only else ""
+            names = "/".join(self.ratings) if self.ratings else tr("未选词条")
+            extra = tr("，仅首词条") if self.first_affix_only else ""
             result = f"词条∈{{{names}}}（自选词条{extra}）"
         elif self.ratings:
             scope = JUDGE_SCOPE_LABELS.get(self.judge_scope, self.judge_scope)
             names = "/".join(RATING_LABELS.get(r, r)
                              for r in RATING_KEYS if r in self.ratings)
-            extra = "，仅首词条" if self.first_affix_only else ""
+            extra = tr("，仅首词条") if self.first_affix_only else ""
             result = f"评级∈{{{names}}}（按{scope}{extra}）"
         else:
-            result = "不限评级"
+            result = tr("不限评级")
         return f"{parts} 且 {quals} 且 {pct} 且 {result}"
 
 
@@ -681,7 +683,7 @@ class ScanBehavior:
                ) -> tuple[str, str]:
         """返回 (动作, 决策说明)；未启用/无命中时为 ("skip", 说明)"""
         if not self.enabled:
-            return "skip", "扫描处置未启用 → 跳过该装备"
+            return "skip", tr("扫描处置未启用 → 跳过该装备")
         hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
                          affix_names)
         if hit:
@@ -689,7 +691,7 @@ class ScanBehavior:
             label = BEHAVIOR_ACTION_LABELS.get(rule.action, rule.action)
             return rule.action, (
                 f"规则{idx}（{rule.summary()}）命中 → {label}")
-        return "skip", "无处置规则命中 → 跳过该装备"
+        return "skip", tr("无处置规则命中 → 跳过该装备")
 
 
 @dataclass
@@ -716,8 +718,8 @@ class TuneBehavior:
                full: bool,
                affix_names: list[str] | None = None) -> tuple[str, str]:
         """返回 (动作, 决策说明)；无命中默认未满=continue、满=skip"""
-        default = (("skip", "词条已满，无行为规则命中 → 跳过该装备")
-                   if full else ("continue", "无行为规则命中 → 继续调律"))
+        default = (("skip", tr("词条已满，无行为规则命中 → 跳过该装备"))
+                   if full else ("continue", tr("无行为规则命中 → 继续调律")))
         if not self.enabled:
             return default
         # continue 规则即使词条已满也必须命中，并在下方转为 skip，
@@ -744,7 +746,7 @@ class TuningGroup:
     启动时经 TuningRunContext 注入工作流。
     """
     key: str = "default"
-    name: str = "基础规则"
+    name: str = tr("基础规则")
     description: str = ""
     materials: MaterialSettings = field(default_factory=MaterialSettings)
     scan: ScanBehavior = field(default_factory=ScanBehavior)

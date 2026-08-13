@@ -32,6 +32,7 @@ from ...core.batch_config import (
     load_batch_config,
     save_batch_config,
 )
+from ...i18n import tr
 
 
 class BatchConfigDialog(QDialog):
@@ -39,7 +40,7 @@ class BatchConfigDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("批量配置")
+        self.setWindowTitle(tr("批量配置"))
         self.setMinimumSize(600, 500)
         self._cfg = load_batch_config()
         self._current_name: str = ""  # 当前编辑的配置名
@@ -55,18 +56,18 @@ class BatchConfigDialog(QDialog):
 
         # ── 配置选择行 ──
         config_row = QHBoxLayout()
-        config_row.addWidget(QLabel("配置："))
+        config_row.addWidget(QLabel(tr("配置：")))
         self._config_combo = QComboBox()
         self._config_combo.setMinimumWidth(150)
         self._config_combo.currentIndexChanged.connect(self._on_config_selected)
         config_row.addWidget(self._config_combo, stretch=1)
 
-        self._btn_new = QPushButton("新建")
+        self._btn_new = QPushButton(tr("新建"))
         self._btn_new.setFixedWidth(60)
         self._btn_new.clicked.connect(self._on_new_config)
         config_row.addWidget(self._btn_new)
 
-        self._btn_delete = QPushButton("删除")
+        self._btn_delete = QPushButton(tr("删除"))
         self._btn_delete.setFixedWidth(60)
         self._btn_delete.clicked.connect(self._on_delete_config)
         config_row.addWidget(self._btn_delete)
@@ -75,7 +76,7 @@ class BatchConfigDialog(QDialog):
 
         # ── 列定义行 ──
         col_row = QHBoxLayout()
-        col_row.addWidget(QLabel("列名（逗号分隔）："))
+        col_row.addWidget(QLabel(tr("列名（逗号分隔）：")))
         self._columns_input = QLineEdit()
         self._columns_input.setPlaceholderText("col1, col2, col3, ...")
         self._columns_input.editingFinished.connect(self._on_columns_changed)
@@ -84,9 +85,9 @@ class BatchConfigDialog(QDialog):
 
         # ── 用户名列 ──
         user_col_row = QHBoxLayout()
-        user_col_row.addWidget(QLabel("用户名列："))
+        user_col_row.addWidget(QLabel(tr("用户名列：")))
         self._user_column_input = QLineEdit()
-        self._user_column_input.setPlaceholderText("(可选)")
+        self._user_column_input.setPlaceholderText(tr("(可选)"))
         self._user_column_input.setFixedWidth(120)
         user_col_row.addWidget(self._user_column_input)
         user_col_row.addStretch()
@@ -112,22 +113,22 @@ class BatchConfigDialog(QDialog):
 
         # ── 表格操作行 ──
         table_btn_row = QHBoxLayout()
-        self._btn_add_row = QPushButton("添加行")
+        self._btn_add_row = QPushButton(tr("添加行"))
         self._btn_add_row.clicked.connect(self._on_add_row)
         table_btn_row.addWidget(self._btn_add_row)
 
-        self._btn_del_row = QPushButton("删除行")
+        self._btn_del_row = QPushButton(tr("删除行"))
         self._btn_del_row.clicked.connect(self._on_delete_row)
         table_btn_row.addWidget(self._btn_del_row)
 
         table_btn_row.addStretch()
 
-        self._btn_up = QPushButton("↑ 上移")
+        self._btn_up = QPushButton(tr("↑ 上移"))
         self._btn_up.setFixedWidth(72)
         self._btn_up.clicked.connect(lambda: self._move_row(-1))
         table_btn_row.addWidget(self._btn_up)
 
-        self._btn_down = QPushButton("↓ 下移")
+        self._btn_down = QPushButton(tr("↓ 下移"))
         self._btn_down.setFixedWidth(72)
         self._btn_down.clicked.connect(lambda: self._move_row(1))
         table_btn_row.addWidget(self._btn_down)
@@ -139,27 +140,27 @@ class BatchConfigDialog(QDialog):
         wf_form.setContentsMargins(0, 4, 0, 0)
 
         self._wf_batch_setup = self._create_wf_selector()
-        wf_form.addRow("批次初始化 wf：", self._wf_batch_setup)
+        wf_form.addRow(tr("批次初始化 wf："), self._wf_batch_setup)
 
         self._wf_prepare_item = self._create_wf_selector()
-        wf_form.addRow("条目准备 wf：", self._wf_prepare_item)
+        wf_form.addRow(tr("条目准备 wf："), self._wf_prepare_item)
 
         self._wf_finish_item = self._create_wf_selector()
-        wf_form.addRow("条目收尾 wf：", self._wf_finish_item)
+        wf_form.addRow(tr("条目收尾 wf："), self._wf_finish_item)
 
         self._wf_batch_teardown = self._create_wf_selector()
-        wf_form.addRow("批次收尾 wf：", self._wf_batch_teardown)
+        wf_form.addRow(tr("批次收尾 wf："), self._wf_batch_teardown)
 
         layout.addLayout(wf_form)
 
         # ── 底部按钮 ──
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()
-        btn_save = QPushButton("保存")
+        btn_save = QPushButton(tr("保存"))
         btn_save.setDefault(True)
         btn_save.clicked.connect(self._on_save)
         bottom_row.addWidget(btn_save)
-        btn_cancel = QPushButton("取消")
+        btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(self.reject)
         bottom_row.addWidget(btn_cancel)
         layout.addLayout(bottom_row)
@@ -168,10 +169,10 @@ class BatchConfigDialog(QDialog):
         """创建 wf 文件选择器（输入框 + 浏览按钮）"""
         row = QHBoxLayout()
         line_edit = QLineEdit()
-        line_edit.setPlaceholderText("选择 wf 文件...")
+        line_edit.setPlaceholderText(tr("选择 wf 文件..."))
         row.addWidget(line_edit, stretch=1)
 
-        btn = QPushButton("浏览...")
+        btn = QPushButton(tr("浏览..."))
         btn.setFixedWidth(70)
         btn.clicked.connect(lambda: self._browse_wf(line_edit))
         row.addWidget(btn)
@@ -186,8 +187,8 @@ class BatchConfigDialog(QDialog):
         workflows_dir = get_resolver().system_dir / "workflows"
         start_dir = str(workflows_dir) if workflows_dir.exists() else ""
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择工作流文件", start_dir,
-            "工作流文件 (*.wf);;所有文件 (*)"
+            self, tr("选择工作流文件"), start_dir,
+            tr("工作流文件 (*.wf);;所有文件 (*)")
         )
         if path:
             # 转换为相对于 workflows 目录的路径
@@ -283,13 +284,13 @@ class BatchConfigDialog(QDialog):
     def _on_new_config(self):
         """新建配置"""
         from PyQt6.QtWidgets import QInputDialog
-        name, ok = QInputDialog.getText(self, "新建配置", "配置名称：")
+        name, ok = QInputDialog.getText(self, tr("新建配置"), tr("配置名称："))
         if not ok or not name.strip():
             return
         name = name.strip()
         if name in self._cfg.configs:
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "重复", f"配置 {name!r} 已存在")
+            QMessageBox.warning(self, tr("重复"), f"配置 {name!r} 已存在")
             return
 
         item = BatchConfigItem(
@@ -309,7 +310,7 @@ class BatchConfigDialog(QDialog):
             return
         from PyQt6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
-            self, "确认删除",
+            self, tr("确认删除"),
             f"确定删除配置 {self._current_name!r}？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -376,7 +377,7 @@ class BatchConfigDialog(QDialog):
         if row < 0:
             return
         ctx_menu = QMenu(self._table)
-        copy_action = QAction("复制为新行", self)
+        copy_action = QAction(tr("复制为新行"), self)
         copy_action.triggered.connect(lambda: self._copy_row(row))
         ctx_menu.addAction(copy_action)
         ctx_menu.exec(self._table.viewport().mapToGlobal(pos))

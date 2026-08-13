@@ -5,6 +5,7 @@
 规则变更（含 UI「装备调律配置」编辑保存）后 reload 即生效。
 """
 
+from ....i18n import tr
 from .base import Rating, TuningJudge
 from .rule_judge import GenericTuningJudge
 from .tuning_rules import TuningRule, get_tuning_rule_manager
@@ -108,14 +109,14 @@ def summarize_potential(results: dict[str, dict]) -> tuple[bool, list[str]]:
             logs.append(f"{r['name']}: 不适用（{detail}）")
             continue
         conclusive = True
-        tag = "跳过" if r["skipped"] else r["rating"]
+        tag = tr("跳过") if r["skipped"] else r["rating"]
         logs.append(f"{r['name']}: {tag}（{detail}）")
         if not r["skipped"] and r["rating"] in (Rating.TOP.value,
                                                Rating.EXCELLENT.value):
             worth = True
     if not conclusive:
         worth = False
-        logs.append("无已实现规则可判定该装备，结束调律")
+        logs.append(tr("无已实现规则可判定该装备，结束调律"))
     return worth, logs
 
 

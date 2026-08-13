@@ -10,6 +10,7 @@ from loguru import logger
 
 from lvjiang.core.config.resolver import ConfigResolver, get_resolver
 
+from .....i18n import tr
 from .models import (
     RuleValidationError,
     TuneConfig,
@@ -189,9 +190,9 @@ class TuningRuleManager:
         name = name.strip()
         if not _KEY_RE.match(key):
             raise RuleValidationError(
-                "规则 key 须为小写字母开头的英文/数字/下划线")
+                tr("规则 key 须为小写字母开头的英文/数字/下划线"))
         if not name:
-            raise RuleValidationError("规则名称不能为空")
+            raise RuleValidationError(tr("规则名称不能为空"))
         if key in self._files or self._resolver.resolve_read(
                 self._rel(f"{key}.yaml")) is not None:
             raise RuleValidationError(f"规则 key 已存在: {key}")
@@ -238,7 +239,7 @@ class TuningRuleManager:
             raise RuleValidationError(f"规则不存在: {old_key}")
         if not _KEY_RE.match(new_key):
             raise RuleValidationError(
-                "规则 key 须为小写字母开头的英文/数字/下划线")
+                tr("规则 key 须为小写字母开头的英文/数字/下划线"))
         if new_key != old_key and (
                 new_key in self._files
                 or self._resolver.resolve_read(
@@ -502,9 +503,9 @@ class TuningGroupManager:
         name = name.strip()
         if not _KEY_RE.match(key):
             raise RuleValidationError(
-                "规则组 key 须为小写字母开头的英文/数字/下划线")
+                tr("规则组 key 须为小写字母开头的英文/数字/下划线"))
         if not name:
-            raise RuleValidationError("规则组名称不能为空")
+            raise RuleValidationError(tr("规则组名称不能为空"))
         if key in self._files or self._resolver.resolve_read(
                 self._rel(f"{key}.yaml")) is not None:
             raise RuleValidationError(f"规则组 key 已存在: {key}")
@@ -538,9 +539,9 @@ class TuningGroupManager:
             raise RuleValidationError(f"规则组不存在: {src_key}")
         if not _KEY_RE.match(new_key):
             raise RuleValidationError(
-                "规则组 key 须为小写字母开头的英文/数字/下划线")
+                tr("规则组 key 须为小写字母开头的英文/数字/下划线"))
         if not new_name:
-            raise RuleValidationError("规则组名称不能为空")
+            raise RuleValidationError(tr("规则组名称不能为空"))
         if new_key in self._files or self._resolver.resolve_read(
                 self._rel(f"{new_key}.yaml")) is not None:
             raise RuleValidationError(f"规则组 key 已存在: {new_key}")
@@ -567,7 +568,7 @@ class TuningGroupManager:
         if filename is None:
             raise RuleValidationError(f"规则组不存在: {key}")
         if len(self._files) <= 1:
-            raise RuleValidationError("至少保留一个规则组")
+            raise RuleValidationError(tr("至少保留一个规则组"))
         self._resolver.delete_entity(self._rel(filename))
         # 从 base_rules 移除
         new_order = [k for k in self._order if k != key]

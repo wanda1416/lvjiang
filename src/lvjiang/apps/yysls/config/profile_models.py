@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Any
 
+from ....i18n import tr
+
 # 合法周期值
 VALID_PERIODS = ("day", "week", "month", "season", "half_season")
 
@@ -26,9 +28,9 @@ MODEL_STOCK = "stock"
 ALL_MODELS = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK)
 
 MODEL_LABELS = {
-    MODEL_QUOTA: "配额",
-    MODEL_REGEN: "再生",
-    MODEL_STOCK: "库存",
+    MODEL_QUOTA: tr("配额"),
+    MODEL_REGEN: tr("再生"),
+    MODEL_STOCK: tr("库存"),
 }
 
 # 同步方向限定
@@ -36,7 +38,7 @@ DIR_BOTH = "both"  # 全向：任意变动触发
 DIR_POS = "pos"    # 正向：仅数值增加触发
 DIR_NEG = "neg"    # 负向：仅数值减少触发
 VALID_DIRECTIONS = (DIR_BOTH, DIR_POS, DIR_NEG)
-DIRECTION_LABELS = {DIR_BOTH: "全向", DIR_POS: "正向", DIR_NEG: "负向"}
+DIRECTION_LABELS = {DIR_BOTH: tr("全向"), DIR_POS: tr("正向"), DIR_NEG: tr("负向")}
 
 
 # ─── 数据类 ────────────────────────────────────────────────

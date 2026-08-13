@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QComboBox, QFormLayout
 
 from ...core.scene_definition import BASE_VIEW_KEY
 from ...core.scene_registry import get_registry, get_scene_views
+from ...i18n import tr
 
 
 def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:
@@ -17,7 +18,7 @@ def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:
         combo.addItem(f"{scene.name} ({key})", userData=key)
         if key == current_scene_key:
             combo.setCurrentIndex(combo.count() - 1)
-    form.addRow("场景:", combo)
+    form.addRow(tr("场景:"), combo)
     return combo
 
 
@@ -31,7 +32,7 @@ def add_view_combo_row(
     """
     combo = QComboBox()
     _populate_view_combo(combo, scene_key, selected_view)
-    form.addRow("视图:", combo)
+    form.addRow(tr("视图:"), combo)
     return combo
 
 
@@ -41,7 +42,7 @@ def _populate_view_combo(combo: QComboBox, scene_key: str, selected_view: str):
     combo.clear()
     views = get_scene_views(scene_key)
     if not views:
-        combo.addItem("单视图", userData="")
+        combo.addItem(tr("单视图"), userData="")
         combo.setEnabled(False)
     else:
         combo.setEnabled(True)

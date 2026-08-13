@@ -17,6 +17,8 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     MaterialSettings,
 )
 
+from ......i18n import tr
+
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
@@ -167,8 +169,8 @@ class TuningExecutor:
         self.round_food_reason = ""
         self.round_food_refunded = False  # 重置返还标记
         add_scan = wf.ocr_scene(wf.TUNE_SCENE, ["auto_add", "auto_add_2"])
-        can_add = "添加" in add_scan.get("auto_add", "")
-        if "添加" in add_scan.get("auto_add_2", ""):
+        can_add = tr("添加") in add_scan.get("auto_add", "")
+        if tr("添加") in add_scan.get("auto_add_2", ""):
             wf.click_region(wf.TUNE_SCENE, "expand")
             wf.wait_stable("page_refresh")  # 展开添加面板
             can_add = True
@@ -189,7 +191,7 @@ class TuningExecutor:
         food = ""
         if full_recycle_mode:
             self.round_food = ""
-            self.round_food_reason = "调满后回收模式，跳过狗粮添加"
+            self.round_food_reason = tr("调满后回收模式，跳过狗粮添加")
             logger.info(f"狗粮策略: {self.round_food_reason}")
         else:
             decision = self._decide_food_round(
@@ -266,7 +268,7 @@ class TuningExecutor:
         """逐轮狗粮决策：按材料设置规则表（首词条/期望/品阶三条件）
         与本轮材料区持有量决策（与石头检查共用同一次识别）"""
         if not settings.food_rules:
-            return FoodDecision("none", "", "未配置狗粮规则 → 不添加")
+            return FoodDecision("none", "", tr("未配置狗粮规则 → 不添加"))
         cap_pct = (equip_data.affixes[0].cap_pct
                    if equip_data.affixes else None)
         # 同名材料去重：保留最高置信度的槽
@@ -373,10 +375,10 @@ class TuningExecutor:
                 wf.wait_stable("page_refresh")  # 重试时等按钮就绪
             btn = wf.ocr_scene(wf.TUNE_SCENE, ["tune_btn"]).get(
                 "tune_btn", "") or ""
-            if "调律" in btn:
+            if tr("调律") in btn:
                 return True
         reason = (f"一键添加后「调律」按钮未就绪"
-                  f"（OCR: {btn or '空'}），疑似材料不足")
+                  f"（OCR: {btn or tr('空')}），疑似材料不足")
         action = (settings.stone_insufficient_action
                   if settings.stone_check_enabled else "skip")
         if action == "ask":

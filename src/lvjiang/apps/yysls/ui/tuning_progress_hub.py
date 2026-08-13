@@ -13,11 +13,13 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from ....i18n import tr
+
 # 部位 key → 中文名（工作流与对话框共享，避免各自维护）
 SLOT_NAMES: dict[str, str] = {
-    "main_weapon": "主武器", "sub_weapon": "副武器",
-    "ring": "环", "pendant": "佩",
-    "head": "冠胄", "chest": "胸甲", "leg": "胫甲", "wrist": "腕甲",
+    "main_weapon": tr("主武器"), "sub_weapon": tr("副武器"),
+    "ring": tr("环"), "pendant": tr("佩"),
+    "head": tr("冠胄"), "chest": tr("胸甲"), "leg": tr("胫甲"), "wrist": tr("腕甲"),
 }
 
 

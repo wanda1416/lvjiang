@@ -21,6 +21,8 @@ import sys
 
 from lvjiang.constants import PROJECT_ROOT
 
+from .i18n import tr
+
 
 def _configure_dpi() -> None:
     """Windows 下锁定 DPI 感知为 Per-Monitor v2，避免截图坐标偏移。
@@ -72,7 +74,7 @@ def _configure_logging() -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="lvjiang",
-        description="通用视觉 RPA 引擎（支持插件扩展）",
+        description=tr("通用视觉 RPA 引擎（支持插件扩展）"),
     )
     parser.add_argument(
         "-reg",
@@ -80,7 +82,7 @@ def _parse_args() -> argparse.Namespace:
         action="append",
         dest="apps",
         metavar="APP",
-        help="注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）",
+        help=tr("注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）"),
     )
     return parser.parse_args()
 

@@ -197,8 +197,8 @@ class RunControlMixin:
 
         from ..workflows.metadata import build_flow_config
         path, _ = QFileDialog.getOpenFileName(
-            self, "加载工作流文件", str(get_resolver().write_dir("workflows")),
-            "工作流文件 (*.wf);;所有文件 (*)",
+            self, tr("加载工作流文件"), str(get_resolver().write_dir("workflows")),
+            tr("工作流文件 (*.wf);;所有文件 (*)"),
         )
         if not path:
             return
@@ -322,8 +322,8 @@ class RunControlMixin:
     def _begin_automation(self, name: str) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
-            self.log_text.append("[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止")
-            self.statusBar().showMessage("自动化运行中 | F10 停止")
+            self.log_text.append(tr("[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止"))
+            self.statusBar().showMessage(tr("自动化运行中 | F10 停止"))
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False
         self._running = True
@@ -372,24 +372,24 @@ class RunControlMixin:
 
     def _request_stop(self):
         """统一停止入口（F10 / 停止按钮）。只设标志，不立即改 running。"""
-        self.log_text.append("[操作] 收到停止请求")
+        self.log_text.append(tr("[操作] 收到停止请求"))
         logger.info("收到停止请求")
         if not self._running:
-            self.log_text.append("[提示] 当前没有正在运行的自动化")
+            self.log_text.append(tr("[提示] 当前没有正在运行的自动化"))
             return
         self._stop_requested = True
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
         helper = self._ui_helper
         if helper is not None:
             helper.close_active_dialog()
-        self.statusBar().showMessage("停止中... | 等待当前步骤结束")
+        self.statusBar().showMessage(tr("停止中... | 等待当前步骤结束"))
         # 占位主流程（_on_start）没有工作流线程，直接复位
         if self._current_worker is None:
             self._running = False
             self._stop_requested = False
             self._refresh_run_button()
             self._overlay.set_color("red")
-            self.log_text.append("[操作] 已停止")
+            self.log_text.append(tr("[操作] 已停止"))
 
     # ─── 后端就绪判定 ──────────────────────────────────
 
@@ -410,16 +410,16 @@ class RunControlMixin:
 
         if not self._backend_ready():
             if self._backend == "adb":
-                self.log_text.append("[错误] 请先连接设备")
-                self.statusBar().showMessage("未连接设备 | 请先扫描并连接设备")
+                self.log_text.append(tr("[错误] 请先连接设备"))
+                self.statusBar().showMessage(tr("未连接设备 | 请先扫描并连接设备"))
             else:
-                self.log_text.append("[错误] 请先定位窗口")
-                self.statusBar().showMessage("未定位窗口 | 请先扫描窗口并点击定位")
+                self.log_text.append(tr("[错误] 请先定位窗口"))
+                self.statusBar().showMessage(tr("未定位窗口 | 请先扫描窗口并点击定位"))
             return
 
         flow_cfg = self._get_selected_flow_config()
         if flow_cfg is None:
-            self.log_text.append("[错误] 请选择一个工作流")
+            self.log_text.append(tr("[错误] 请选择一个工作流"))
             return
 
         flow_name = flow_cfg["name"]
@@ -555,7 +555,7 @@ class RunControlMixin:
             self._save_workflow_result(flow_id, result, interrupted=interrupted)
             # 通用控制台输出
             serializable = _to_serializable(result)
-            tag = "（用户中断，部分结果）" if interrupted else ""
+            tag = tr("（用户中断，部分结果）") if interrupted else ""
             logger.info(f"工作流 {flow_id} 结果{tag}: {json.dumps(serializable, ensure_ascii=False, indent=2)}")
             if not interrupted:
                 self.log_text.append(f"[完成] {flow_name} 结果已保存")
@@ -668,9 +668,9 @@ class RunControlMixin:
 
         if not self._backend_ready():
             if self._backend == "adb":
-                self.log_text.append("[错误] 请先连接设备")
+                self.log_text.append(tr("[错误] 请先连接设备"))
             else:
-                self.log_text.append("[错误] 请先定位窗口")
+                self.log_text.append(tr("[错误] 请先定位窗口"))
             return
 
         if not self._begin_automation(flow_name):

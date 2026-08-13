@@ -5,6 +5,8 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+from .....i18n import tr
+
 # ─── 材料富解析 ───────────────────────────────────────────
 
 @builtin_func("yysls_rich_parse")
@@ -151,9 +153,9 @@ def _chengyin_cap(affix_name: str, level, *args) -> float:
 # 高价值词条关键词（用于 is_good_equip 判定）
 # TODO: 从调律规则配置中读取，当前为硬编码
 _HIGH_VALUE_KEYWORDS = [
-    "大外攻", "会心", "会意", "三率",
-    "劲", "敏", "势",
-    "武学增效", "首领增伤",
+    tr("大外攻"), tr("会心"), tr("会意"), tr("三率"),
+    tr("劲"), tr("敏"), tr("势"),
+    tr("武学增效"), tr("首领增伤"),
 ]
 
 
@@ -207,7 +209,7 @@ def _evaluate(equip_data: dict, *args) -> dict:
         end
     """
     if not isinstance(equip_data, dict) or not equip_data:
-        return {"rating": "垃圾", "skipped": True, "reasons": ["空数据"]}
+        return {"rating": tr("垃圾"), "skipped": True, "reasons": [tr("空数据")]}
 
     from ...equip_parser.models import EquipmentData
     from ...evaluator import get_tuning_judge

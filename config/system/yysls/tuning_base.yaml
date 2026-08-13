@@ -25,7 +25,7 @@ materials:
   stone_check:
     enabled: true
     min_count: 80
-    insufficient_action: ask
+    insufficient_action: skip
   food_rules:
   - pct: 98
     min_expect: top
@@ -42,7 +42,7 @@ materials:
     min_quality: gold
     food: ''
     on_insufficient: continue
-  - pct: 92
+  - pct: 90
     min_expect: top
     min_quality: purple
     food: 金狗粮
@@ -65,12 +65,50 @@ behavior:
       - 胸甲
       - 胫甲
       - 腕甲
+      max_quality: gold_only
+      pct_op: le
+      pct: 98
+      ratings:
+      - junk
+      judge_scope: all
+      judge_rules: []
+      action: tune_full_recycle
+      first_affix_only: true
+    - parts:
+      - 武器
+      - 环
+      - 佩
+      - 冠胄
+      - 胸甲
+      - 胫甲
+      - 腕甲
       max_quality: purple
-      max_pct: 100
-      max_rating: junk
+      pct_op: ge
+      pct: 80
+      ratings:
+      - top
+      - excellent
+      judge_scope: all
+      judge_rules: []
+      action: skip
+      first_affix_only: false
+    - parts:
+      - 武器
+      - 环
+      - 佩
+      - 冠胄
+      - 胸甲
+      - 胫甲
+      - 腕甲
+      max_quality: purple
+      pct_op: le
+      pct: 100
+      ratings:
+      - junk
       judge_scope: incoming
       judge_rules: []
       action: recycle
+      first_affix_only: false
   tune:
     enabled: true
     rules:
@@ -83,10 +121,28 @@ behavior:
       - 胫甲
       - 腕甲
       max_quality: purple
-      max_pct: 100
-      max_rating: junk
+      pct_op: le
+      pct: 100
+      ratings:
+      - junk
       judge_scope: incoming
       judge_rules: []
       action: recycle
+    - parts:
+      - 武器
+      - 环
+      - 佩
+      - 冠胄
+      - 胸甲
+      - 胫甲
+      - 腕甲
+      max_quality: gold
+      pct_op: le
+      pct: 100
+      ratings:
+      - junk
+      judge_scope: incoming
+      judge_rules: []
+      action: skip
     max_resets: 3
     reset_exhausted_action: recycle

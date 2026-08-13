@@ -278,6 +278,65 @@ class ProfileDB:
         finally:
             conn.close()
 
+    def update_if_current(
+        self,
+        username: str,
+        type_: str,
+        key: str,
+        *,
+        expected_value: float | int,
+        expected_updated_at: str,
+        new_value: float | int,
+        new_updated_at: str | None = None,
+        change_type: str | None = None,
+        detail: str = "",
+        source: str = "",
+    ) -> bool:
+        """CAS 更新单条 entry。
+
+        仅当当前 value 与 updated_at 均仍等于调用方读到的快照时才写入。
+        返回 True 表示更新成功；False 表示状态已被其他进程修改，本轮调用方应放弃。
+        """
+        old_value = float(expected_value)
+        value = float(new_value)
+        ts = new_updated_at or datetime.now().isoformat(timespec="seconds")
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.execute(
+                "UPDATE profile_entries "
+                "SET value=?, updated_at=? "
+                "WHERE username=? AND type=? AND key=? "
+                "AND value=? AND updated_at=?",
+                (value, ts, username, type_, key, old_value, expected_updated_at),
+            )
+            if cursor.rowcount != 1:
+                conn.rollback()
+                return False
+
+            if change_type is not None:
+                should_record = False
+                if change_type in ("action", "override"):
+                    should_record = True
+                elif old_value != value:
+                    should_record = True
+
+                if should_record:
+                    now_ts = datetime.now().isoformat(timespec="seconds")
+                    conn.execute(
+                        "INSERT INTO profile_history "
+                        "(ts, username, type, key, old_value, new_value, "
+                        "change_type, detail, source) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (now_ts, username, type_, key, old_value, value,
+                         change_type, detail, source),
+                    )
+
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
     # ─── History 查询 ───
 
     def get_history(
@@ -384,6 +443,33 @@ def db_upsert(
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:
     get_profile_db().upsert_many(username, entries)
+
+
+def db_update_if_current(
+    username: str,
+    type_: str,
+    key: str,
+    *,
+    expected_value: float | int,
+    expected_updated_at: str,
+    new_value: float | int,
+    new_updated_at: str | None = None,
+    change_type: str | None = None,
+    detail: str = "",
+    source: str = "",
+) -> bool:
+    return get_profile_db().update_if_current(
+        username,
+        type_,
+        key,
+        expected_value=expected_value,
+        expected_updated_at=expected_updated_at,
+        new_value=new_value,
+        new_updated_at=new_updated_at,
+        change_type=change_type,
+        detail=detail,
+        source=source,
+    )
 
 
 def db_get_history(

@@ -12,7 +12,6 @@ Signals:
 from __future__ import annotations
 
 import calendar
-import sqlite3
 import time
 from datetime import datetime, timedelta
 
@@ -32,7 +31,7 @@ from ..config.profile_store import (
 from ..config.user_profile import (
     get_profile_config,
 )
-from .profile_db import db_read_all, db_upsert
+from .profile_db import db_read_all, db_update_if_current, db_upsert
 
 # ─── 周期边界计算 ────────────────────────────────────────────
 
@@ -438,8 +437,8 @@ class ProfileEngine(QThread):
     def _tick_user(self, user_name: str, config) -> None:
         """处理单个用户的一次 tick
 
-        从 DB 读取 profile 数据，逐条计算并 upsert。
-        锁冲突时放弃单条 entry，下轮重试。
+        从 DB 读取 profile 数据，逐条计算并 CAS 更新。
+        CAS 失败表示其他进程已经更新，本轮放弃该 entry，下轮重试。
         """
         profile_data = db_read_all(user_name)
         if not profile_data:
@@ -452,6 +451,14 @@ class ProfileEngine(QThread):
         quota_keys = config.get_keys_by_model("quota")
         for kd in quota_keys:
             entry = profile_data.get("quota", {}).get(kd.key, {})
+            if not entry:
+                # 首次初始化：entry 不存在，直接 upsert 创建
+                db_upsert(user_name, "quota", kd.key, 0,
+                          change_type="tick", detail="reset:0")
+                logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 首次初始化")
+                modified = True
+                continue
+            stored_value = entry.get("value", 0) or 0
             updated_at_str = entry.get("updated_at", "")
 
             boundary = _get_period_boundary(
@@ -460,18 +467,20 @@ class ProfileEngine(QThread):
             if not _should_reset(updated_at_str, boundary):
                 continue
 
-            # 周期已过期，尝试重置到 DB
-            try:
-                db_upsert(
-                    user_name, "quota", kd.key, 0,
-                    change_type="tick", detail="reset:0",
-                )
+            # 周期已过期，CAS 重置到 DB
+            updated = db_update_if_current(
+                user_name, "quota", kd.key,
+                expected_value=stored_value,
+                expected_updated_at=updated_at_str,
+                new_value=0,
+                change_type="tick",
+                detail="reset:0",
+            )
+            if updated:
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
                 modified = True
-            except sqlite3.OperationalError:
-                logger.warning(
-                    f"{user_name} quota.{kd.key} 写入冲突，放弃本轮"
-                )
+            else:
+                logger.warning(f"{user_name} quota.{kd.key} CAS 失败，放弃本轮")
 
         # ── Step 2: 再生计算（regen）──
         regen_keys = config.get_keys_by_model("regen")
@@ -479,6 +488,9 @@ class ProfileEngine(QThread):
             if not isinstance(kd, RegenKeyDef):
                 continue
             entry = profile_data.get("regen", {}).get(kd.key, {})
+            if not entry:
+                # 首次：以 0 值、空时间戳构造虚拟 entry，走正常计算路径
+                entry = {"value": 0, "updated_at": ""}
             stored_value = entry.get("value", 0)
             updated_at_str = entry.get("updated_at", "")
 
@@ -487,18 +499,19 @@ class ProfileEngine(QThread):
             # 仅当整数部分变化时才写入，小数进度通过 updated_at 不变隐式累计
             if int(computed) != int(stored_value):
                 delta = computed - (stored_value or 0)
-                try:
-                    db_upsert(
-                        user_name, "regen", kd.key, computed,
-                        updated_at=new_ts,
-                        change_type="tick",
-                        detail=f"regen:{delta:+.4f}",
-                    )
+                updated = db_update_if_current(
+                    user_name, "regen", kd.key,
+                    expected_value=stored_value or 0,
+                    expected_updated_at=updated_at_str,
+                    new_value=computed,
+                    new_updated_at=new_ts,
+                    change_type="tick",
+                    detail=f"regen:{delta:+.4f}",
+                )
+                if updated:
                     modified = True
-                except sqlite3.OperationalError:
-                    logger.warning(
-                        f"{user_name} regen.{kd.key} 写入冲突，放弃本轮"
-                    )
+                else:
+                    logger.warning(f"{user_name} regen.{kd.key} CAS 失败，放弃本轮")
 
             # 检查 alert_above（用最新计算值，不论是否写入成功）
             if kd.alert_above is not None and computed >= kd.alert_above:

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from ..align import _make_even_alignment, detect_grid
+from ..align import GridAlignment, _make_even_alignment, detect_grid
 
 if TYPE_CHECKING:
     import numpy as np
@@ -92,6 +92,7 @@ class _PanelMixin:
         calibration = getattr(panel_obj, "calibration", "auto")
 
         # even 模式：跳过图像检测，直接等分
+        alignment: GridAlignment | None
         if calibration == "even":
             alignment = _make_even_alignment(panel_obj.rows, panel_obj.cols)
             self._panel_alignments[(scene_key, panel_key)] = alignment

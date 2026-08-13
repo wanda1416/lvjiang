@@ -697,7 +697,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             lambda _: self._end_automation("批量执行")
         )
 
-        self._current_worker = worker
+        self._current_worker = worker  # type: ignore[assignment]
         worker.start()
         return True
 

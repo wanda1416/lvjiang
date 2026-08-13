@@ -2,18 +2,18 @@
 
 识别策略：
 - 类型识别：使用通用 ReferenceMatcher（ORB 特征匹配）
-- 等级识别：OCR 裁剪上半部分（游戏专属）
-- 数量识别：OCR 裁剪下半部分（游戏专属）
+- 输出元数据 OCR：按 references.yaml meta_schema 中 scope=output 字段的
+  crop 区域裁剪 OCR（schema 未配置时回退硬编码上下半区）
 - 空槽检测：图像方差判断（游戏专属）
 
-通用识别只产出 level_text / count_text 原始文本。
+通用识别只产出 ocr_texts 原始文本（输出字段 key -> 文本）。
 投入/持有的语义解析由调用方（如调律流程）按需处理。
 
 参考库数据源：ReferenceDatabase（references.yaml）。
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
@@ -24,15 +24,36 @@ from lvjiang.core.recognizers.reference_matcher import ReferenceMatcher
 from lvjiang.core.reference_db import ReferenceDatabase
 
 
+def _parse_number(text: str) -> int | None:
+    """解析数字文本，支持 '123'、'1.5万'、'12万' 等格式（yysls 游戏专属）"""
+    text = text.strip()
+    if not text:
+        return None
+    multiplier = 1
+    if text.endswith("万"):
+        text = text[:-1]
+        multiplier = 10000
+    try:
+        return int(float(text) * multiplier)
+    except ValueError:
+        nums = re.findall(r"\d+", text)
+        return int(nums[0]) * multiplier if nums else None
+
+
 @dataclass
 class MaterialInfo:
     """单个材料槽识别结果（游戏专属）
 
     通用字段：
         type: 材料类型（如 "定音石"），空槽为 ""
-        level_text: 上半部分 OCR 原始文本（如 "110阶"）
-        count_text: 下半部分 OCR 原始文本（如 "0/691" 或 "691"）
+        ocr_texts: 输出元数据 OCR 原始文本（输出字段 key -> 文本，
+            如 {"levels": "110阶", "counts": "0/691"}）
         confidence: 类型匹配置信度 0~1
+        meta: 匹配参考条目的元数据（输入字段 key -> 值，如 {"level": 110}）
+
+    便捷属性（按 yysls 配置契约 key 读取 ocr_texts）：
+        level_text: levels 的 OCR 文本（如 "110阶"）
+        count_text: counts 的 OCR 文本（如 "0/691" 或 "691"）
 
     解析属性（从 text 解析）：
         level: 从 level_text 提取的第一个数字
@@ -40,28 +61,37 @@ class MaterialInfo:
         devoted: 投入数量（仅调律流程关注）— 有 "/" 时取前者，无 "/" 时为 None
     """
     type: str
-    level_text: str = ""
-    count_text: str = ""
+    ocr_texts: dict[str, str] = field(default_factory=dict)
     confidence: float = 0.0
+    meta: dict = field(default_factory=dict)
+
+    # ── 便捷属性（读取 ocr_texts）──────────────────────
+
+    @property
+    def level_text(self) -> str:
+        return self.ocr_texts.get("levels", "")
+
+    @property
+    def count_text(self) -> str:
+        return self.ocr_texts.get("counts", "")
 
     # ── 解析属性 ─────────────────────────────────────────────
 
     @property
     def level(self) -> int | None:
-        """从 level_text 提取第一个数字"""
-        nums = re.findall(r"\d+", self.level_text)
-        return int(nums[0]) if nums else None
+        """从 level_text 提取数字（支持 '110'、'1.5万' 等）"""
+        return _parse_number(self.level_text)
 
     @property
     def count(self) -> int | None:
         """用户拥有的数量（核心语义）
 
-        "0/691" → 691, "691" → 691, "" → None
+        "0/691" → 691, "691" → 691, "1.5万" → 15000, "" → None
         """
-        nums = re.findall(r"\d+", self.count_text)
         if "/" in self.count_text:
-            return int(nums[1]) if len(nums) >= 2 else None
-        return int(nums[0]) if nums else None
+            parts = self.count_text.split("/")
+            return _parse_number(parts[-1]) if parts else None
+        return _parse_number(self.count_text)
 
     @property
     def devoted(self) -> int | None:
@@ -71,20 +101,22 @@ class MaterialInfo:
         """
         if "/" not in self.count_text:
             return None
-        nums = re.findall(r"\d+", self.count_text)
-        return int(nums[0]) if nums else None
+        parts = self.count_text.split("/")
+        return _parse_number(parts[0]) if parts else None
 
 
 class MaterialRecognizer:
     """材料槽内容识别器（游戏专属）
 
     使用通用 ReferenceMatcher 做类型识别，
-    OCR 分上下两半：上半识别等级文本，下半识别数量文本。
+    按 schema 输出元数据的 crop 区域 OCR 产出原始文本（schema 无输出字段
+    时回退硬编码上下半区）。
 
     用法：
         recognizer = MaterialRecognizer(ocr_engine)
         result = recognizer.recognize(slot_img)
         # result.type -> "定音石"
+        # result.ocr_texts -> {"levels": "110阶", "counts": "0/691"}
         # result.level_text -> "110阶"
         # result.count_text -> "0/691"
         # result.level -> 110   (从 level_text 解析)
@@ -92,10 +124,10 @@ class MaterialRecognizer:
         # result.devoted -> 0   (投入，仅调律流程关注)
     """
 
-    # ── 子区域比例配置（游戏专属）──────────────────────────────
-    # 等级文字区域（上半部分）
+    # ── 子区域回退配置（schema 无输出字段时使用）──────────────────────────────
+    # 等级文字区域（上半部分，schema 无输出字段时回退使用）
     LEVEL_REGION = (0.0, 0.0, 1.0, 0.50)
-    # 数量文字区域（下半部分）
+    # 数量文字区域（下半部分，schema 无输出字段时回退使用）
     COUNT_REGION = (0.0, 0.50, 1.0, 0.50)
     # 空槽判定：像素方差阈值
     EMPTY_VARIANCE_THRESHOLD = 50.0
@@ -133,11 +165,11 @@ class MaterialRecognizer:
             group: 限定匹配范围到指定分组，None 表示匹配所有分组
 
         Returns:
-            MaterialInfo（通用字段：type, level_text, count_text, confidence）
+            MaterialInfo（通用字段：type, ocr_texts, confidence）
         """
         # 1. 空槽检测
         if self._is_empty(slot_img):
-            return MaterialInfo(type="", level_text="", count_text="", confidence=1.0)
+            return MaterialInfo(type="", confidence=1.0)
 
         # 2. 类型识别（通用 ReferenceMatcher）
         match_result = self._matcher.match(slot_img, group=group)
@@ -145,19 +177,16 @@ class MaterialRecognizer:
         confidence = match_result.confidence
 
         if not mat_type:
-            return MaterialInfo(type="", level_text="", count_text="", confidence=confidence)
+            return MaterialInfo(type="", confidence=confidence)
 
-        # 3. 等级 OCR（上半部分）
-        level_text = self._ocr_level(slot_img)
-
-        # 4. 数量 OCR（下半部分）
-        count_text = self._ocr_count(slot_img)
+        # 3. 输出元数据 OCR（按 schema 输出字段的 crop 区域）
+        ocr_texts = self._ocr_output_fields(slot_img)
 
         return MaterialInfo(
             type=mat_type,
-            level_text=level_text,
-            count_text=count_text,
+            ocr_texts=ocr_texts,
             confidence=confidence,
+            meta=match_result.meta,
         )
 
     def recognize_top_n(
@@ -178,7 +207,7 @@ class MaterialRecognizer:
         """
         # 1. 空槽检测
         if self._is_empty(slot_img):
-            return [MaterialInfo(type="", level_text="", count_text="", confidence=1.0)]
+            return [MaterialInfo(type="", confidence=1.0)]
 
         # 2. 类型识别（通用 ReferenceMatcher top N）
         match_results = self._matcher.match_top_n(slot_img, n=n, group=group)
@@ -186,24 +215,23 @@ class MaterialRecognizer:
         if not match_results:
             return []
 
-        # 3. 数量 OCR（下半部分）— 只识别一次
-        count_text = self._ocr_count(slot_img)
+        # 3. 输出元数据 OCR — 只识别一次
+        ocr_texts = self._ocr_output_fields(slot_img)
 
-        # 4. 为每个匹配结果构建 MaterialInfo，使用参考条目自身的等级
+        # 4. 为每个匹配结果构建 MaterialInfo，等级用参考条目自身的标记
         results = []
         for match_result in match_results:
-            # 从参考条目元数据获取原始等级
+            texts = dict(ocr_texts)
+            # 从参考条目元数据获取原始等级（区分同名不同等级）
             ref_level = match_result.meta.get("level")
             if ref_level is not None:
-                level_text = f"{ref_level}阶"
-            else:
-                level_text = ""  # 无等级信息
+                texts["levels"] = f"{ref_level}阶"
 
             results.append(MaterialInfo(
                 type=match_result.label,
-                level_text=level_text,
-                count_text=count_text,
+                ocr_texts=texts,
                 confidence=match_result.confidence,
+                meta=match_result.meta,
             ))
 
         return results
@@ -240,37 +268,32 @@ class MaterialRecognizer:
             return True
         return False
 
-    # ─── 等级 OCR（上半部分）───────────────────────────────────
+    # ─── 输出元数据 OCR ─────────────────────────────────────
 
-    def _ocr_level(self, slot_img: np.ndarray) -> str:
-        """OCR 识别上半部分等级文本"""
-        h, w = slot_img.shape[:2]
-        x1 = int(self.LEVEL_REGION[0] * w)
-        y1 = int(self.LEVEL_REGION[1] * h)
-        x2 = int((self.LEVEL_REGION[0] + self.LEVEL_REGION[2]) * w)
-        y2 = int((self.LEVEL_REGION[1] + self.LEVEL_REGION[3]) * h)
+    def _ocr_output_fields(self, slot_img: np.ndarray) -> dict[str, str]:
+        """按 schema 输出字段的 crop 区域逐个 OCR，返回 {key: 文本}
 
-        crop = slot_img[y1:y2, x1:x2]
-        if crop.size == 0:
-            return ""
-
-        text = self._ocr_single(crop)
-        if text:
-            logger.debug(f"等级 OCR: {text!r}")
-        return text.strip()
-
-    # ─── 数量 OCR（下半部分）───────────────────────────────────
-
-    def _ocr_count(self, slot_img: np.ndarray) -> str:
-        """OCR 识别下半部分数量文本
-
-        返回原始文本（如 "0/691" 或 "691"），由调用方按需解析。
+        schema 无输出字段时回退硬编码上下半区，产出 key 仍为
+        levels / counts（兼容旧配置）。
         """
+        output_fields = self._db.get_output_fields()
+        if not output_fields:
+            return {
+                "levels": self._ocr_region(slot_img, self.LEVEL_REGION),
+                "counts": self._ocr_region(slot_img, self.COUNT_REGION),
+            }
+        return {
+            f.key: self._ocr_region(slot_img, tuple(f.crop))  # type: ignore[arg-type]
+            for f in output_fields
+        }
+
+    def _ocr_region(self, slot_img: np.ndarray, region: tuple) -> str:
+        """OCR 识别指定归一化区域 (x, y, w, h) 的文本"""
         h, w = slot_img.shape[:2]
-        x1 = int(self.COUNT_REGION[0] * w)
-        y1 = int(self.COUNT_REGION[1] * h)
-        x2 = int((self.COUNT_REGION[0] + self.COUNT_REGION[2]) * w)
-        y2 = int((self.COUNT_REGION[1] + self.COUNT_REGION[3]) * h)
+        x1 = int(region[0] * w)
+        y1 = int(region[1] * h)
+        x2 = int((region[0] + region[2]) * w)
+        y2 = int((region[1] + region[3]) * h)
 
         crop = slot_img[y1:y2, x1:x2]
         if crop.size == 0:
@@ -278,7 +301,7 @@ class MaterialRecognizer:
 
         text = self._ocr_single(crop)
         if text:
-            logger.debug(f"数量 OCR: {text!r}")
+            logger.debug(f"输出区域 OCR {region}: {text!r}")
         return text.strip()
 
     # ─── OCR 辅助 ──────────────────────────────────────────

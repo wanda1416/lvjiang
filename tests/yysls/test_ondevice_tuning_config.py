@@ -9,9 +9,7 @@ import json
 
 import pytest
 
-import lvjiang.apps.yysls.session as ps_module
 import lvjiang.core.ondevice.plugins as plugins_module
-from lvjiang.apps.yysls.session import PluginSession
 from lvjiang.core.ondevice.tuning_config import (
     get_tuning_config,
     save_tuning_config,
@@ -20,12 +18,13 @@ from lvjiang.core.ondevice.tuning_config import (
 
 @pytest.fixture
 def session_path(tmp_path, monkeypatch):
-    """插件 session 单例 → tmp_path 隔离实例；ensure_loaded → 空操作"""
-    import lvjiang.apps.yysls.tune_config as tc_module
+    """core SessionStore → tmp_path 隔离实例；ensure_loaded → 空操作"""
+    import lvjiang.constants as constants_mod
+    import lvjiang.core.config.session as store_mod
     path = tmp_path / "session.json"
-    monkeypatch.setattr(ps_module, "_session", PluginSession(path))
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
+    store_mod.reset_session_store()
     monkeypatch.setattr(plugins_module, "ensure_loaded", lambda: None)
-    monkeypatch.setattr(tc_module, "_instance", None)
     return path
 
 
@@ -76,7 +75,7 @@ class TestSaveRoundtrip:
         })
         assert result["ok"] is True
 
-        saved = json.loads(session_path.read_text(encoding="utf-8"))["yysls"]["tuning"]
+        saved = json.loads(session_path.read_text(encoding="utf-8"))["wf_configs"]["auto_tuning"]
         assert saved["selected_slots"] == ["ring", "head"]
         assert saved["rules"]["huiyi_general"]["enabled"] is True
         assert saved["switches"] == {"keep_pvp": True}
@@ -99,14 +98,15 @@ class TestSaveRoundtrip:
     def test_skip_tuning_preserved(self, session_path):
         # skip_tuning 不进设备端 UI，保存不得覆盖已有值
         session_path.write_text(json.dumps({
-            "yysls": {"tuning": {"skip_tuning": True}},
+            "wf_configs": {"auto_tuning": {"skip_tuning": True}},
         }), encoding="utf-8")
-        ps_module._session = PluginSession(session_path)  # 重新加载文件内容
+        import lvjiang.core.config.session as store_mod
+        store_mod.reset_session_store()  # 重新加载文件内容
 
         result = _save({
             "selected_slots": ["ring"],
             "rules": {"huiyi_general": {"enabled": True}},
         })
         assert result["ok"] is True
-        saved = json.loads(session_path.read_text(encoding="utf-8"))["yysls"]["tuning"]
+        saved = json.loads(session_path.read_text(encoding="utf-8"))["wf_configs"]["auto_tuning"]
         assert saved["skip_tuning"] is True

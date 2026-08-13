@@ -295,10 +295,10 @@ class EquipJudgeTestDialog(QDialog):
 
     @staticmethod
     def _load_session_tuning() -> tuple[dict, dict]:
-        """读取调律 Tab 已保存的规则配置与全局开关作为初值（插件会话）"""
-        from ..tune_config import TuneConfig
-        tc = TuneConfig.load()
-        return tc.rules, tc.switches
+        """读取调律 Tab 已保存的规则配置与全局开关作为初值（统一存储）"""
+        from ....core.config.wf_configs import get_wf_config
+        tc = get_wf_config("auto_tuning")
+        return tc.get("rules", {}), tc.get("switches", {})
 
     def _on_judge(self):
         switches = self._tuning_config.get_switches()

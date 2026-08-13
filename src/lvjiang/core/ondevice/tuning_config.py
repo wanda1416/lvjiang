@@ -2,10 +2,9 @@
 
 Kotlin 侧不写死任何规则/玩法/部位清单：get_tuning_config() 把可配置项
 （规则注册表 + 开关注册表 + 部位常量）与当前保存值合并后一次性返回，
-Activity 只负责按 JSON 渲染表单；save_tuning_config() 校验后写入插件
-会话（config/session/yysls/session.json）tuning 节 —— 与桌面调律 Tab
-同一落点，auto_tuning._ensure_judge_config() 的会话回退路径直接消费，
-工作流零改动。
+Activity 只负责按 JSON 渲染表单；save_tuning_config() 校验后写入统一存储
+wf_configs["auto_tuning"] —— 与桌面调律 Tab 同一落点，
+auto_tuning._ensure_judge_config() 的回退路径直接消费，工作流零改动。
 
 与 task_runner 相同的跨语言约定：对外函数返回 JSON 文本、自己吞异常。
 """
@@ -39,13 +38,13 @@ def get_tuning_config() -> str:
             get_tune_config,
             get_tuning_group_manager,
         )
-        from ...apps.yysls.tune_config import TuneConfig
         from ...apps.yysls.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+        from ...core.config.wf_configs import get_wf_config
 
-        tc = TuneConfig.load()
+        tc = get_wf_config("auto_tuning")
 
         # 基础规则组：单选，无持久值时取第一个可用
-        group_key = tc.base_group
+        group_key = tc.get("base_group", "")
         groups = get_tuning_group_manager().get_groups()
         if group_key not in groups:
             group_key = next(iter(groups), "")
@@ -55,7 +54,7 @@ def get_tuning_config() -> str:
         ]
 
         # 规则：无保存值时缺省与桌面一致（仅 huiyi_general 启用，玩法全勾）
-        saved_rules: dict = tc.rules or {
+        saved_rules: dict = tc.get("rules") or {
             "huiyi_general": {"enabled": True}}
         rules = []
         for key, rule in get_tuning_rules().items():
@@ -72,7 +71,7 @@ def get_tuning_config() -> str:
                 ],
             })
 
-        selected_slots = tc.selected_slots or list(DEFAULT_SLOTS)
+        selected_slots = tc.get("selected_slots") or list(DEFAULT_SLOTS)
         slot_groups = [
             {
                 "name": group_name,
@@ -87,7 +86,7 @@ def get_tuning_config() -> str:
             for group_name, slots in SLOT_GROUPS
         ]
 
-        saved_switches = tc.switches
+        saved_switches = tc.get("switches", {})
         switches = [
             {"key": key, "name": name,
              "checked": bool(saved_switches.get(key, False))}
@@ -133,8 +132,8 @@ def save_tuning_config(payload: str) -> str:
         from ...apps.yysls.evaluator.tuning_rules import (
             get_tuning_group_manager,
         )
-        from ...apps.yysls.tune_config import TuneConfig
         from ...apps.yysls.tune_slots import LOCKED_SLOTS, SLOT_LABELS
+        from ...core.config.wf_configs import get_wf_config, set_wf_config
 
         data = json.loads(payload)
         if not isinstance(data, dict):
@@ -187,26 +186,26 @@ def save_tuning_config(payload: str) -> str:
         raw_switches = raw_switches if isinstance(raw_switches, dict) else {}
         switches = {str(k): bool(v) for k, v in raw_switches.items()}
 
-        # skip_tuning 不进设备端 UI，保留会话原值（缺省 False）
-        old = TuneConfig.load()
+        # skip_tuning 不进设备端 UI，保留统一存储原值（缺省 False）
+        old = get_wf_config("auto_tuning")
 
-        # 基础规则组：按注册表校验，非法/缺省回退会话原值
+        # 基础规则组：按注册表校验，非法/缺省回退原值
         raw_group = data.get("base_group")
         group_keys = get_tuning_group_manager().get_groups()
         if isinstance(raw_group, str) and raw_group in group_keys:
             base_group = raw_group
         else:
-            base_group = old.base_group
-        TuneConfig(
-            selected_slots=selected_slots,
-            rules=rules_cfg,
-            switches=switches,
-            base_group=base_group,
-            skip_tuning=old.skip_tuning,
-            skip_start=old.skip_start,
-            target_cell=old.target_cell,
-            scroll_strategy=old.scroll_strategy,
-        ).save()
+            base_group = old.get("base_group", "")
+        set_wf_config("auto_tuning", {
+            "selected_slots": selected_slots,
+            "rules": rules_cfg,
+            "switches": switches,
+            "base_group": base_group,
+            "skip_tuning": old.get("skip_tuning", False),
+            "skip_start": old.get("skip_start"),
+            "target_cell": old.get("target_cell"),
+            "scroll_strategy": old.get("scroll_strategy", ""),
+        })
         return json.dumps({"ok": True, "message": "已保存"}, ensure_ascii=False)
     except Exception as e:
         return json.dumps(

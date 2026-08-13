@@ -38,7 +38,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     get_tuning_group_manager,
     get_tuning_rule_manager,
 )
-from lvjiang.apps.yysls.tune_config import get_tune_config
+from lvjiang.core.config.wf_configs import get_wf_config
 
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
@@ -113,7 +113,7 @@ class TuningRulesDialog(QDialog):
         self._config_manager = get_tune_config_manager()
         self._group_manager = get_tuning_group_manager()
         # 初始规则组：session 持久值，组不存在取第一个可用
-        group_key = get_tune_config().base_group
+        group_key = get_wf_config("auto_tuning").get("base_group", "")
         if self._group_manager.get_group(group_key) is None:
             groups = self._group_manager.get_groups()
             group_key = next(iter(groups), "")

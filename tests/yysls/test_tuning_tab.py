@@ -12,8 +12,6 @@ import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QTabWidget
 
-import lvjiang.apps.yysls.session as ps_module
-from lvjiang.apps.yysls.session import PluginSession
 from lvjiang.apps.yysls.ui.tuning_tab import TuningTab
 
 
@@ -49,11 +47,12 @@ class _FakeHost(QObject):
 
 @pytest.fixture
 def session_path(tmp_path, monkeypatch):
-    """把插件 session 单例替换为 tmp_path 下的隔离实例"""
-    import lvjiang.apps.yysls.tune_config as tc_module
+    """把 core SessionStore 替换为 tmp_path 下的隔离实例（wf_configs 读写落 tmp）"""
+    import lvjiang.constants as constants_mod
+    import lvjiang.core.config.session as store_mod
     path = tmp_path / "session.json"
-    monkeypatch.setattr(ps_module, "_session", PluginSession(path))
-    monkeypatch.setattr(tc_module, "_instance", None)
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
+    store_mod.reset_session_store()
     return path
 
 
@@ -73,9 +72,10 @@ def _make_tab(qtbot, host):
 class TestSessionRoundtrip:
     def test_load_selected_slots_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "yysls": {"tuning": {"selected_slots": ["ring", "head"]}},
+            "wf_configs": {"auto_tuning": {"selected_slots": ["ring", "head"]}},
         }), encoding="utf-8")
-        ps_module._session = PluginSession(session_path)  # 重新加载文件内容
+        import lvjiang.core.config.session as store_mod
+        store_mod.reset_session_store()  # 重新加载文件内容
 
         tab = _make_tab(qtbot, host)
         assert tab._get_tuning_selected_slots() == ["ring", "head"]
@@ -92,13 +92,14 @@ class TestSessionRoundtrip:
         cb.setChecked(False)  # stateChanged → _save_tuning_config 落盘
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
-        assert "ring" not in saved["yysls"]["tuning"]["selected_slots"]
+        assert "ring" not in saved["wf_configs"]["auto_tuning"]["selected_slots"]
 
     def test_sub_weapon_stays_disabled(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "yysls": {"tuning": {"selected_slots": ["sub_weapon", "ring"]}},
+            "wf_configs": {"auto_tuning": {"selected_slots": ["sub_weapon", "ring"]}},
         }), encoding="utf-8")
-        ps_module._session = PluginSession(session_path)
+        import lvjiang.core.config.session as store_mod
+        store_mod.reset_session_store()
 
         tab = _make_tab(qtbot, host)
         sub = next(c for c in tab._tuning_checkboxes if c.objectName() == "sub_weapon")
@@ -152,13 +153,27 @@ class TestF9Run:
 
     def test_no_rules_enabled_logs_error(self, qtbot, host, session_path):
         tab = _make_tab(qtbot, host)
-        tab._get_tuning_rule_config = lambda: {"huiyi_general": {"enabled": False}}
+        # 直接写 wf_configs：有部位但所有规则禁用
+        from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
+        tc = get_wf_config("auto_tuning")
+        tc["selected_slots"] = ["ring", "head"]
+        tc["rules"] = {"huiyi_general": {"enabled": False}}
+        set_wf_config("auto_tuning", tc)
         tab.f9_run()
         assert any("请至少选择一个调律规则" in m for m in host.logs)
         assert host.run_calls == []
 
     def test_starts_via_host_with_configure(self, qtbot, host, session_path):
         tab = _make_tab(qtbot, host)
+        # 通过 UI 设置部位（触发 _save_tuning_config 写入 wf_configs）
+        for cb in tab._tuning_checkboxes:
+            cb.setChecked(cb.objectName() in ("ring", "head"))
+        # 确保规则启用 + 基础规则组存在
+        from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
+        tc = get_wf_config("auto_tuning")
+        tc["rules"] = {"huiyi_general": {"enabled": True}}
+        tc["base_group"] = "default"
+        set_wf_config("auto_tuning", tc)
         tab.f9_run()
 
         assert len(host.run_calls) == 1
@@ -195,9 +210,10 @@ class TestConfigTabs:
 
     def test_more_page_loads_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "yysls": {"tuning": {"switches": {"keep_pvp": True}, "skip_tuning": True}},
+            "wf_configs": {"auto_tuning": {"switches": {"keep_pvp": True}, "skip_tuning": True}},
         }), encoding="utf-8")
-        ps_module._session = PluginSession(session_path)
+        import lvjiang.core.config.session as store_mod
+        store_mod.reset_session_store()
 
         tab = _make_tab(qtbot, host)
         assert tab._get_tuning_switches().get("keep_pvp") is True
@@ -208,7 +224,7 @@ class TestConfigTabs:
         tab._tuning_globals._skip_tuning_cb.setChecked(True)  # 变更即落盘
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
-        assert saved["yysls"]["tuning"]["skip_tuning"] is True
+        assert saved["wf_configs"]["auto_tuning"]["skip_tuning"] is True
 
 
 # ─── 初始跳过 / 指定调律（互斥 + 持久化 + 注入）───────────
@@ -247,14 +263,15 @@ class TestSkipTarget:
         tab._sp_skip_col.setValue(3)
 
         saved = json.loads(session_path.read_text(encoding="utf-8"))
-        assert saved["yysls"]["tuning"]["skip_start"] == [5, 3]
-        assert saved["yysls"]["tuning"]["target_cell"] is None
+        assert saved["wf_configs"]["auto_tuning"]["skip_start"] == [5, 3]
+        assert saved["wf_configs"]["auto_tuning"]["target_cell"] is None
 
     def test_load_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
-            "yysls": {"tuning": {"target_cell": [7, 2]}},
+            "wf_configs": {"auto_tuning": {"target_cell": [7, 2]}},
         }), encoding="utf-8")
-        ps_module._session = PluginSession(session_path)
+        import lvjiang.core.config.session as store_mod
+        store_mod.reset_session_store()
 
         tab = _make_tab(qtbot, host)
         assert tab._cb_target.isChecked()

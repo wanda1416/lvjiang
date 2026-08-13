@@ -41,6 +41,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
 from lvjiang.apps.yysls.workflows.run_context import TuningRunContext
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
+EQUIP_DETAIL = AutoTuningWorkflow.EQUIP_DETAIL
 # 调律页与调律结果弹窗已合并为同一场景（结果在 result 视图），
 # 故 _ocr_map 里两者字段共用一个场景条目
 TUNE_SCENE = AutoTuningWorkflow.TUNE_SCENE
@@ -154,7 +155,7 @@ def test_already_full(monkeypatch):
     assert len(wf.full_calls) == 1
     assert len(wf.scan_reject_calls) == 1  # 已满装备走扫描处理路径
     # 未进入调律导航；scan 处置表默认无规则 → 保留不回收
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks
     assert "recycled_items" not in wf.output
 
 
@@ -172,7 +173,7 @@ def test_below_entry_not_tuned(monkeypatch):
     assert len(wf.scan_reject_calls) == 1
     assert not wf.full_calls
     # 处置表无规则（默认）→ 保留，不碰回收链
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks
 
 
 def test_no_tune_entry(patch_worth):
@@ -186,7 +187,7 @@ def test_no_tune_entry(patch_worth):
     assert not wf.full_calls
     assert (TUNE_SCENE, "back") not in wf.clicks
     # 「更多」弹窗已开却无调律按钮：再点一次收起 → more_func 共 2 次
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
 
 
 def test_worth_tuned_to_full(patch_worth, monkeypatch):
@@ -210,7 +211,7 @@ def test_worth_tuned_to_full(patch_worth, monkeypatch):
     assert reports[0]["final_affix_count"] == 5
     assert (TUNE_SCENE, "back") in wf.clicks   # 单次 back 返回背包页
     # back 回背包后再点一次「更多」收起弹窗 → more_func 共 2 次（展开 + 收起）
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
     # 词条满 → 结束处理默认「跳过该装备」，不回收
     assert "跳过该装备" in reports[0]["stop_reason"]
     assert "recycled_items" not in wf.output
@@ -236,7 +237,7 @@ def test_food_skip_rule_stops_equipment(patch_worth, monkeypatch):
     assert reports[0]["rounds"] == 0
     assert "跳过" in reports[0]["stop_reason"]
     assert (TUNE_SCENE, "back") in wf.clicks
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
     assert not wf.full_calls
     assert not wf.executor.materials_exhausted   # 只跳过该装备，遍历继续
 
@@ -576,9 +577,9 @@ def test_skip_tuning_switch(patch_worth):
     assert not wf.scan_reject_calls
     assert not wf.full_calls
     # 真实进出调律页：展开「更多」+ 调律入口 + back + 收起「更多」
-    assert (WEAPON_DETAIL, "sub_func_1") in wf.clicks
+    assert (EQUIP_DETAIL, "sub_func_1") in wf.clicks
     assert (TUNE_SCENE, "back") in wf.clicks
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
     # 未执行任何调律
     assert "tune_results" not in reports[0]
     assert "tune_results" not in wf.output
@@ -596,7 +597,7 @@ def test_skip_tuning_full_affix_not_entered(monkeypatch):
 
     assert not wf.output.get("tuning_reports")
     assert len(wf.full_calls) == 1
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks
     assert (TUNE_SCENE, "back") not in wf.clicks
 
 
@@ -613,7 +614,7 @@ def test_skip_tuning_junk_not_entered(monkeypatch):
 
     assert not wf.output.get("tuning_reports")
     assert len(wf.scan_reject_calls) == 1
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks
     assert (TUNE_SCENE, "back") not in wf.clicks
 
 
@@ -628,7 +629,7 @@ def test_skip_tuning_no_entry(patch_worth):
     assert not wf.scan_reject_calls
     assert (TUNE_SCENE, "back") not in wf.clicks
     # _nav_to_tune 失败分支自行收起弹窗 → more_func 共 2 次
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
 
 
 # ─── 等级门槛 + 品阶异常前置拦截 ───────────────────
@@ -647,7 +648,7 @@ def test_below_min_level_skips(monkeypatch):
     assert not wf.output.get("tuning_reports")   # 不进调律
     assert not wf.scan_reject_calls   # 不走扫描处置
     assert not wf.full_calls   # 不走已满处理
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks   # 不触发回收
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks   # 不触发回收
 
 
 def test_quality_unrecognized_skips(monkeypatch):
@@ -661,7 +662,7 @@ def test_quality_unrecognized_skips(monkeypatch):
     assert not wf.output.get("tuning_reports")
     assert not wf.scan_reject_calls
     assert not wf.full_calls
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks
 
 
 def test_min_level_default_100_passes(monkeypatch):
@@ -709,9 +710,9 @@ def test_scan_recycles_junk(monkeypatch):
     assert fp == ""   # row=None → 空指纹由上层按空 slot 处理
     assert len(wf.scan_reject_calls) == 1
     # 回收链：展开「更多」→ 子菜单「回收」→ 确认弹窗
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 1
-    assert (WEAPON_DETAIL, "sub_func_1") in wf.clicks
-    assert (WEAPON_DETAIL, "recycle_confirm") in wf.clicks
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 1
+    assert (EQUIP_DETAIL, "sub_func_1") in wf.clicks
+    assert (EQUIP_DETAIL, "recycle_confirm") in wf.clicks
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
     assert not wf.output.get("tuning_reports")
@@ -778,7 +779,7 @@ def test_scan_recycles_when_no_applicable_rule(monkeypatch):
                                WEAPON_DETAIL)
 
     assert fp == ""
-    assert (WEAPON_DETAIL, "recycle_confirm") in wf.clicks
+    assert (EQUIP_DETAIL, "recycle_confirm") in wf.clicks
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
 
@@ -806,7 +807,7 @@ def test_scan_custom_scope_protects(monkeypatch):
 
     assert fp   # 保留，正常返回指纹
     assert "recycled_items" not in wf.output
-    assert (WEAPON_DETAIL, "recycle_confirm") not in wf.clicks
+    assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
 
 
 def test_scan_rule_not_matched_keeps(monkeypatch):
@@ -823,7 +824,7 @@ def test_scan_rule_not_matched_keeps(monkeypatch):
 
     assert fp
     assert "recycled_items" not in wf.output
-    assert (WEAPON_DETAIL, "more_func") not in wf.clicks
+    assert (EQUIP_DETAIL, "more_func") not in wf.clicks
 
 
 def test_scan_no_recycle_button_keeps(monkeypatch):
@@ -841,7 +842,7 @@ def test_scan_no_recycle_button_keeps(monkeypatch):
     assert fp
     assert "recycled_items" not in wf.output
     # 展开 + 收起共 2 次「更多」
-    assert wf.clicks.count((WEAPON_DETAIL, "more_func")) == 2
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
 
 
 def test_judge_by_scope_filter(monkeypatch):
@@ -892,7 +893,7 @@ def test_tune_recycles_after_hit(monkeypatch):
     assert len(items) == 1 and items[0]["stage"] == "tune"
     # 回收发生在 back 回背包页之后
     assert (wf.clicks.index((TUNE_SCENE, "back"))
-            < wf.clicks.index((WEAPON_DETAIL, "recycle_confirm")))
+            < wf.clicks.index((EQUIP_DETAIL, "recycle_confirm")))
 
 
 def test_tune_skip_ends_keeps(monkeypatch):
@@ -1094,7 +1095,7 @@ def test_full_equipment_recycled(monkeypatch):
 
     assert fp == ""
     assert len(wf.full_calls) == 1
-    assert (WEAPON_DETAIL, "recycle_confirm") in wf.clicks
+    assert (EQUIP_DETAIL, "recycle_confirm") in wf.clicks
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
     assert not wf.output.get("tuning_reports")

@@ -1,21 +1,21 @@
 #% name: 导航至调律页
 
 # 从装备详情页进入调律页面
-# 前置：在装备详情页（equip_weapon_detail）
+# 前置：在装备详情页（equip_detail）
 # 后置（成功）：在调律详情页（equip_tune_detail）
 # 后置（失败）：仍在装备详情页
 # 输出：成功时 context.status = "ok"，失败时无输出
 
 def nav_equip_to_tune()
-    click [equip_weapon_detail].[more_func] after wait step_interval
+    click [equip_detail].[more_func] after wait step_interval
 
-    scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+    scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
     if not $tune_key
         log "未找到调律按钮"
         return
     end
 
-    click [equip_weapon_detail].$tune_key after wait step_interval
+    click [equip_detail].$tune_key after wait step_interval
 
     eval context.status = "ok"
 end

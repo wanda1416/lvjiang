@@ -3,7 +3,7 @@
 启动时发现有新版本时弹出，提供三个选项：
 - 前往下载：打开 GitHub Releases 页面
 - 此版本不再询问：跳过该版本，直到有更新版本发布
-- 退出：关闭程序
+- 继续使用：关闭对话框，继续使用当前版本
 """
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ class UpdateDialog(QDialog):
     # 返回值常量
     ACTION_DOWNLOAD = "download"
     ACTION_SKIP = "skip"
-    ACTION_EXIT = "exit"
 
     def __init__(self, latest_version: str, download_url: str, parent=None):
         super().__init__(parent)
@@ -67,10 +66,10 @@ class UpdateDialog(QDialog):
         self._skip_btn.clicked.connect(self._on_skip)
         btn_layout.addWidget(self._skip_btn)
 
-        # 退出
-        self._exit_btn = QPushButton("退出")
-        self._exit_btn.clicked.connect(self._on_exit)
-        btn_layout.addWidget(self._exit_btn)
+        # 继续使用
+        self._close_btn = QPushButton("继续使用")
+        self._close_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(self._close_btn)
 
         layout.addLayout(btn_layout)
 
@@ -84,11 +83,6 @@ class UpdateDialog(QDialog):
         """此版本不再询问"""
         set_skip_version(self._latest_version)
         self._action = self.ACTION_SKIP
-        self.accept()
-
-    def _on_exit(self):
-        """退出程序"""
-        self._action = self.ACTION_EXIT
         self.accept()
 
     @property

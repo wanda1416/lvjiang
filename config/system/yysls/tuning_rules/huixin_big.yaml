@@ -35,10 +35,34 @@ playstyles:
       weapon: 绳镖
       damage: null
     attr: 破竹
-  走地玉:
+  双刀:
+    main:
+      weapon: 双刀
+      damage: 双刀武学增伤
+    sub:
+      weapon: 绳镖
+      damage: null
+    attr: 破竹
+  尘尘:
     main:
       weapon: 伞
       damage: 伞武学增效
+    sub:
+      weapon: 绳镖
+      damage: null
+    attr: 破竹
+  玉玉:
+    main:
+      weapon: 伞
+      damage: 伞武学增效
+    sub:
+      weapon: 扇
+      damage: null
+    attr: 牵丝
+  翊翊:
+    main:
+      weapon: 舞绫鼓
+      damage: 舞绫鼓武学增伤
     sub:
       weapon: 扇
       damage: null

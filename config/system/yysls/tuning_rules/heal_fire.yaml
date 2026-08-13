@@ -124,6 +124,7 @@ patterns:
   冠胄:
     first:
     - 会心率
+    - 精准率
     junk_conditions:
     - count_max:
         symbols:

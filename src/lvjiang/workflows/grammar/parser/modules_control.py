@@ -70,6 +70,21 @@ class _ModuleControlMixin:
                 args.append(item)
         return CallProc(name=name, args=args, line_no=self._line(items))
 
+    def call_proc_assign_stmt(self, items):
+        """call $result = proc_name($arg1, "arg2", ...) — 调用过程并绑定返回值"""
+        # 语法: "call" "$" NAME "=" NAME "(" [call_arg_list] ")"
+        # items: [result_var_name, proc_name, ...args]
+        result_var = str(items[0])
+        proc_name = str(items[1])
+        args = []
+        for item in items[2:]:
+            if isinstance(item, list):
+                args = item  # call_arg_list 返回 list
+                break
+            elif item is not None and not isinstance(item, Token):
+                args.append(item)
+        return CallProc(name=proc_name, args=args, result_var=result_var, line_no=self._line(items))
+
     def call_arg_list(self, items):
         """参数列表 → list"""
         return list(items)
@@ -195,7 +210,17 @@ class _ModuleControlMixin:
         return Continue(line_no=self._line(items))
 
     def return_stmt(self, items):
-        return Return(line_no=self._line(items))
+        """return [value] — 返回值可选"""
+        if not items:
+            value = None
+        else:
+            item = items[0]
+            # STRING token 需要解包为 Literal
+            if isinstance(item, Token) and item.type == 'STRING':
+                value = Literal(value=self._unquote(str(item)))
+            else:
+                value = item
+        return Return(value=value, line_no=self._line(items))
 
     def label_stmt(self, items):
         return Label(name=str(items[0]), line_no=self._line(items))

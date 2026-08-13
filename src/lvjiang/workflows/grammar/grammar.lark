@@ -205,6 +205,7 @@ def_param: "$" NAME
 
 // call proc：调用过程（本地定义或 import 引入）
 call_proc_stmt: "call"i NAME "(" [call_arg_list] ")" _NL
+              | "call"i "$" NAME "=" NAME "(" [call_arg_list] ")" _NL  -> call_proc_assign_stmt
 call_arg_list: call_arg ("," call_arg)*
 ?call_arg: STRING -> call_arg_str
          | number -> call_arg_num
@@ -238,7 +239,7 @@ break_stmt: "break"i _NL
 
 continue_stmt: "continue"i _NL
 
-return_stmt: "return"i _NL
+return_stmt: "return"i [literal | arith_expr] _NL
 
 label_stmt: "@" NAME _NL
 

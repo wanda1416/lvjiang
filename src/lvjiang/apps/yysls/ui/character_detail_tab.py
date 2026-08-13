@@ -30,15 +30,15 @@ class CharacterDetailTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # 刷新按钮（右上角）
+        # 刷新按钮
         btn_row = QHBoxLayout()
-        btn_row.addStretch()
         btn_refresh = QPushButton("刷新")
         btn_refresh.setFixedWidth(60)
         btn_refresh.setToolTip("刷新角色详情")
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)
         btn_row.addWidget(btn_refresh)
+        btn_row.addStretch()
         layout.addLayout(btn_row)
 
         # 占位提示

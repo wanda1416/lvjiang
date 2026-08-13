@@ -133,6 +133,22 @@ class TuningExecutor:
                 logger.debug(f"狗粮扣减: {food} → {self._food_count_overrides[food]}")
                 return
 
+    def get_material_stock(self) -> dict[str, int]:
+        """当前材料库存快照（供进度对话框显示）
+
+        返回 {材料名: 数量} 字典，同名材料去重后取当前有效数量。
+        无缓存时返回空字典。
+        """
+        if not self._material_cache:
+            return {}
+        deduped = self._dedup_by_confidence(self._material_cache)
+        result: dict[str, int] = {}
+        for label, info in deduped.items():
+            count = self._get_count(info)
+            if count is not None:
+                result[label] = count
+        return result
+
     def tune_once(self, equip_data: EquipmentData,
                   expect_rating: str | None,
                   full_recycle_mode: bool = False) -> dict | None:
@@ -392,8 +408,16 @@ class TuningExecutor:
 
         经 engine._ui_callback 调度到 Qt 主线程弹三按钮对话框，
         无回调时回退为拒绝（按 end 处理）。
+        同时经 _progress_hub 向进度对话框推送状态消息。
         """
         wf = self._wf
+        # 向进度对话框推送状态
+        try:
+            hub = getattr(wf.engine, '_progress_hub', None) if wf.engine else None
+            if hub is not None:
+                hub.status_message.emit(message)
+        except Exception:
+            pass
         if wf.engine is None or wf.engine._ui_callback is None:
             logger.warning("无 UI 回调，材料不足对话框无法弹出，按结束处理")
             return "end"

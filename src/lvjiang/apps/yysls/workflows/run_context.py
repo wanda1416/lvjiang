@@ -30,6 +30,8 @@ class TuningRunContext:
     doc_username: str = ""                    # 调律说明文档（logs/tuning/）的操作用户名
     doc_dir: Path | None = None               # 说明文档输出目录覆盖（供测试）
     scroll_strategy: str = ""                 # 背包遍历策略 key（空=读 session/默认）
+    skip_start: tuple[int, int] | None = None    # 初始跳过 (row, col)；None=不跳过
+    target_cell: tuple[int, int] | None = None   # 指定调律 (row, col)；None=不指定
 
 
 class TuningContextMixin:

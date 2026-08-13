@@ -113,13 +113,32 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         try:
             self._navigate_to_equip()
 
+            first_slot = True
             for slot in selected:
                 if self.is_stopped:
                     break
-                if slot in self.WEAPON_SLOTS:
-                    self._process_slot_group(slot, self.WEAPON_DETAIL)
-                elif slot in self.ARMOR_SLOTS:
-                    self._process_slot_group(slot, self.ARMOR_DETAIL)
+                detail = (self.WEAPON_DETAIL if slot in self.WEAPON_SLOTS
+                          else self.ARMOR_DETAIL if slot in self.ARMOR_SLOTS
+                          else None)
+                if detail is None:
+                    continue
+
+                if first_slot and self.ctx.target_cell:
+                    # 指定调律：只处理这一件即收工
+                    self._process_slot_group_enter(slot)
+                    r, c = self.ctx.target_cell
+                    self._process_single_target(detail, r, c)
+                    break
+
+                if first_slot and self.ctx.skip_start:
+                    # 初始跳过：先滚到指定行，再正常遍历
+                    self._process_slot_group_enter(slot)
+                    self._scroll_to_row(self.ctx.skip_start[0])
+                    self._traverse_bag(detail)
+                else:
+                    self._process_slot_group(slot, detail)
+
+                first_slot = False
 
             if self.is_stopped:
                 logger.info("自动调律被中断（F10/材料耗尽），保留当前页面")
@@ -249,11 +268,44 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     # ─── 部位处理 ──────────────────────────────────────────
 
-    def _process_slot_group(self, slot: str, detail_scene: str):
+    def _process_slot_group_enter(self, slot: str):
+        """点击部位标签进入背包网格页"""
         logger.info(f"── 处理部位: {slot} ──")
         self.click_region(self.GRID_SCENE, slot)
         self.wait_delay("page_refresh_wait")  # 背包浏览页 → 装备详情页
+
+    def _process_slot_group(self, slot: str, detail_scene: str):
+        self._process_slot_group_enter(slot)
         self._traverse_bag(detail_scene)
+
+    def _scroll_to_row(self, target_row: int) -> None:
+        """滚动背包网格使 target_row 出现在可见区第一行
+
+        每次 drag_grid("up") 步进一行。target_row <= 1 时无操作。
+        """
+        if target_row <= 1:
+            return
+        drags = target_row - 1
+        logger.info(f"滚动定位: 目标行={target_row}, 需拖拽{drags}次")
+        for _i in range(drags):
+            if self.is_stopped:
+                break
+            self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "up", hold=0.3)
+            self.wait_delay("scroll_settle_wait")
+        self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
+
+    def _process_single_target(self, detail_scene: str, row: int, col: int) -> None:
+        """指定调律：定位到 (row, col)，只处理这一件，含完整处理链"""
+        self._scroll_to_row(row)
+        if self.is_stopped:
+            return
+        # 滚动后目标行在可见区第 1 行
+        name, fp, equip = self._read_row(detail_scene, 1, col)
+        if not fp:
+            logger.warning(f"指定调律: 目标格 ({row},{col}) 为空，无装备可处理")
+            return
+        logger.info(f"指定调律: 定位到 ({row},{col})，装备={name or fp}")
+        self._process_equipment(name, equip, detail_scene, row=1, col=col)
 
     # ─── 背包遍历（滚动策略实现见 bag_traversal）──────────────
 

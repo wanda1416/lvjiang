@@ -139,6 +139,7 @@ class ProfileOverviewTab(QWidget):
         self._loading = False
         self._editing_cap_cell = False
         self._restoring_widths = False
+        self._reordering = False
         _migrate_old_columns()
         self._setup_ui()
 
@@ -346,23 +347,29 @@ class ProfileOverviewTab(QWidget):
 
     def _on_columns_reordered(self, group_name: str, table: QTableWidget):
         """拖拽列头后持久化新顺序"""
-        h_header = table.horizontalHeader()
-        assert h_header is not None
-        groups = _get_groups()
-        group_data = groups.get(group_name, {"columns": []})
-        column_keys = group_data.get("columns", [])
-        # 跳过第 0 列（角色名），从第 1 列开始读取新的视觉顺序
-        new_order = []
-        for visual_idx in range(1, h_header.count()):
-            logical_idx = h_header.logicalIndex(visual_idx)
-            if 0 <= logical_idx - 1 < len(column_keys):
-                new_order.append(column_keys[logical_idx - 1])
+        if self._reordering or self._loading:
+            return
+        self._reordering = True
+        try:
+            h_header = table.horizontalHeader()
+            assert h_header is not None
+            groups = _get_groups()
+            group_data = groups.get(group_name, {"columns": []})
+            column_keys = group_data.get("columns", [])
+            # 跳过第 0 列（角色名），从第 1 列开始读取新的视觉顺序
+            new_order = []
+            for visual_idx in range(1, h_header.count()):
+                logical_idx = h_header.logicalIndex(visual_idx)
+                if 0 <= logical_idx - 1 < len(column_keys):
+                    new_order.append(column_keys[logical_idx - 1])
 
-        if column_keys != new_order:
-            group_data["columns"] = new_order
-            groups[group_name] = group_data
-            _save_groups(groups)
-            self._refresh_group(group_name, table)
+            if column_keys != new_order:
+                group_data["columns"] = new_order
+                groups[group_name] = group_data
+                _save_groups(groups)
+                self._refresh_group(group_name, table)
+        finally:
+            self._reordering = False
 
     def _on_column_resized(self, group_name: str, table: QTableWidget):
         """列宽拖拽调整后持久化"""

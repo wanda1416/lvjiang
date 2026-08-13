@@ -118,11 +118,13 @@ def ask_value_dialog(
     initial_value: float = 0,
     sync_checkbox: bool = False,
     sync_default: bool = True,
+    source_label: str = "来源",
 ) -> tuple[float | int, str, bool, bool]:
-    """数值输入 + 来源下拉（可输入新来源）的通用对话框
+    """数值输入 + 来源/用途下拉（可输入新词条）的通用对话框
 
     sync_checkbox: 是否展示「同步变更依赖方」复选框
     sync_default:  复选框的默认勾选状态
+    source_label:  下拉行标签（增加用「来源」，减少用「用途」）
 
     Returns: (value, source, sync_checked, ok)
         sync_checked 仅在 sync_checkbox=True 时有意义，否则始终为 True。
@@ -152,8 +154,8 @@ def ask_value_dialog(
     combo = QComboBox()
     combo.setEditable(True)
     combo.addItems(sources)
-    combo.setPlaceholderText("选择或输入新来源")
-    layout.addRow("来源:", combo)
+    combo.setPlaceholderText(f"选择或输入新{source_label}")
+    layout.addRow(f"{source_label}:", combo)
 
     sync_check: QCheckBox | None = None
     if sync_checkbox:

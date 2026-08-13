@@ -15,7 +15,10 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 
-from ...core.layout_manager import rename_scene_across_all_layouts
+from ...core.layout_manager import (
+    delete_scene_across_all_layouts,
+    rename_scene_across_all_layouts,
+)
 from ...core.scene_registry import (
     get_group_name,
     get_registry,
@@ -137,6 +140,10 @@ class SceneOpsMixin:
 
     # ─── 场景 CRUD ────────────────────────────────────────
 
+    def _confirm_structure_change(self, action: str) -> bool:
+        """重建场景 Tab 前处理未保存的布局编辑。"""
+        return self._confirm_discard_changes(action)
+
     def _on_new_scene(self):
         """新建场景：弹窗输入 key 和 name，创建到当前分组"""
         current_group = self._current_group_key()
@@ -168,9 +175,9 @@ class SceneOpsMixin:
                 ok_btn.setEnabled(False)
                 error_label.hide()
                 return
-            if not k.replace("_", "").isalnum():
+            if not _RE_KEY.fullmatch(k):
                 ok_btn.setEnabled(False)
-                error_label.setText("Key 仅允许英文/数字/下划线")
+                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
                 error_label.show()
                 return
             if registry.get_scene(k) is not None:
@@ -194,6 +201,8 @@ class SceneOpsMixin:
             return
         key = key_edit.text().strip()
         name = name_edit.text().strip()
+        if not self._confirm_structure_change("新建场景"):
+            return
         registry = get_registry()
         try:
             registry.create_scene(key, name, group_key=current_group)
@@ -238,12 +247,12 @@ class SceneOpsMixin:
                 ok_btn.setEnabled(False)
                 error_label.hide()
                 return
-            if not k.replace("_", "").isalnum():
+            if not _RE_KEY.fullmatch(k):
                 ok_btn.setEnabled(False)
-                error_label.setText("Key 仅允许英文/数字/下划线")
+                error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
                 error_label.show()
                 return
-            if k in registry.get_groups():
+            if k in {gk for gk, _ in registry.get_groups()}:
                 ok_btn.setEnabled(False)
                 error_label.setText(f"分组 Key 已存在: {k}")
                 error_label.show()
@@ -263,6 +272,8 @@ class SceneOpsMixin:
             return
         key = key_edit.text().strip()
         name = name_edit.text().strip()
+        if not self._confirm_structure_change("新建分组"):
+            return
         registry = get_registry()
         try:
             registry.create_group(key, name)
@@ -303,7 +314,7 @@ class SceneOpsMixin:
                 error_label.hide()
                 ok_btn.setEnabled(False)
                 return
-            if not _RE_KEY.match(k):
+            if not _RE_KEY.fullmatch(k):
                 error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
                 error_label.show()
                 ok_btn.setEnabled(False)
@@ -325,6 +336,8 @@ class SceneOpsMixin:
             return
         new_key = key_edit.text().strip()
         new_name = name_edit.text().strip()
+        if not self._confirm_structure_change("重命名分组"):
+            return
         key_changed = new_key != group_key
         try:
             if key_changed:
@@ -353,10 +366,25 @@ class SceneOpsMixin:
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+        if not self._confirm_structure_change("删除分组"):
+            return
         registry = get_registry()
         try:
             registry.delete_group(group_key)
+            registry.save_group_config()
+            reload_scene_registry()
             self._rebuild_group_tabs()
+            # 重建会销毁并重新创建全部 SceneTab。必须重新下发布局数据并
+            # 清空截图懒加载状态，否则新 Tab 会被旧的 _loaded_scenes
+            # 误判为已经加载过截图。
+            self._apply_layout_to_tabs()
+            # 选中第一个分组第一个场景，触发截图加载
+            registry = get_registry()
+            for first_group_key, _ in registry.get_groups():
+                first_scenes = registry.get_group_scenes(first_group_key)
+                if first_scenes:
+                    self._select_scene(first_scenes[0])
+                    break
             self._status_bar.showMessage(f"已删除分组: {group_name} ({group_key})")
         except ValueError as e:
             QMessageBox.warning(self, "删除失败", str(e))  # type: ignore[arg-type]
@@ -376,7 +404,10 @@ class SceneOpsMixin:
         rename_action = menu.addAction("重命名分组")
         delete_action = menu.addAction("删除分组")
         # 非空分组不允许删除
-        if get_registry().get_group_scenes(group_key):
+        if len(groups) <= 1:
+            delete_action.setEnabled(False)
+            delete_action.setToolTip("至少需要保留一个场景分组")
+        elif get_registry().get_group_scenes(group_key):
             delete_action.setEnabled(False)
             delete_action.setToolTip("分组非空，无法删除")
         action = menu.exec(self._group_tab_widget.mapToGlobal(pos))
@@ -447,11 +478,19 @@ class SceneOpsMixin:
 
     def _do_move_scene_group(self, scene_key: str, target_group: str):
         """移动场景到其他分组"""
+        if not self._confirm_structure_change("移动场景"):
+            return
         registry = get_registry()
         try:
             registry.move_scene_to_group(scene_key, target_group)
         except ValueError as e:
             QMessageBox.warning(self, "移动失败", str(e))  # type: ignore[arg-type]
+            return
+        registry.save_group_config()
+        reload_scene_registry()
+        self._rebuild_group_tabs()
+        self._apply_layout_to_tabs()
+        self._select_scene(scene_key)
         target_name = get_group_name(target_group)
         scene_name = get_scene_name(scene_key)
         self._status_bar.showMessage(f"已移动场景「{scene_name}」到分组「{target_name}」")
@@ -485,7 +524,7 @@ class SceneOpsMixin:
                 error_label.hide()
                 ok_btn.setEnabled(False)
                 return
-            if not _RE_KEY.match(k):
+            if not _RE_KEY.fullmatch(k):
                 error_label.setText("key 必须以小写字母开头，仅含小写字母/数字/下划线")
                 error_label.show()
                 ok_btn.setEnabled(False)
@@ -507,6 +546,8 @@ class SceneOpsMixin:
             return
         new_key = key_edit.text().strip()
         new_name = name_edit.text().strip()
+        if not self._confirm_structure_change("重命名场景"):
+            return
         key_changed = new_key != scene_key
         try:
             registry.rename_scene(scene_key, new_key, new_name)
@@ -537,10 +578,12 @@ class SceneOpsMixin:
         reply = QMessageBox.question(
             self, "确认删除",  # type: ignore[arg-type]
             f"确定要删除场景「{scene_name}」({scene_key}) 吗？\n"
-            f"这将删除场景定义文件，但不会影响布局数据。",
+            f"这将同时删除场景定义、所有布局标注和截图，且不可恢复。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
+            return
+        if not self._confirm_structure_change("删除场景"):
             return
         registry = get_registry()
         # 删除前记录同分组相邻场景，供删除后定位
@@ -553,6 +596,7 @@ class SceneOpsMixin:
             QMessageBox.warning(self, "删除失败", str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
+        delete_scene_across_all_layouts(scene_key)
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()

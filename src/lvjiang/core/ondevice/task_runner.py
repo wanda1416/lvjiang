@@ -168,6 +168,11 @@ def list_tasks() -> str:
     """
     try:
         from ...workflows.discovery import discover_scripts, list_exposed_scripts
+        from .plugins import ensure_loaded
+
+        # 插件必须先加载：class 来源的脚本（auto_tuning / single_tuning）依赖
+        # 工作流注册表，未加载会退化成同名旧 .wf（见 plugins 模块说明）。
+        ensure_loaded()
 
         # 日常清单只给 workflows.yaml 暴露的脚本（含中文显示名），与桌面下拉一致；
         # 冒烟自检任务不暴露，但自检链路要用，未暴露时从全集里补一条到末尾。
@@ -282,6 +287,9 @@ def is_running() -> bool:
 def _resolve_task(task_id: str) -> dict:
     """按 id 找到任务配置，找不到就抛出带可选项的异常"""
     from ...workflows.discovery import discover_scripts
+    from .plugins import ensure_loaded
+
+    ensure_loaded()  # 同 list_tasks：class 型脚本要靠插件注册表才解析成类实现
 
     for item in discover_scripts():
         if item["id"] == task_id:

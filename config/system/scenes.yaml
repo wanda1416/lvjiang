@@ -22,8 +22,9 @@ layout_scenes:
   - waiguan_yigui
   - waiguan_qingjing
   group_5:
-  - activity_mengzhu
+  - activity_main
   - activity_jianghu
+  - activity_mengzhu
 group_names:
   group_1: 通用
   group_2: 培养

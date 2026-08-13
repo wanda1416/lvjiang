@@ -19,13 +19,31 @@ def _select_role($role_index)
     loop 10
         scan [game_login_page].[loading] as $load_text by contains "加载"
         if $load_text
-            wait 5
+            wait 3
         else
             goto loading_done
         end
     end
-    eval pause("等待加载超时，请手动确认后点击确定")
+    eval pause("等待加载超时，请手动检查后点击确定")
 
     @loading_done
     wait 5
+
+    # 等待主页加载完成：检测菜单、活动、武林录任一文字
+    # 能读到 → 登录完成；否则关闭活动弹窗
+    eval $main_items = ["菜单", "活动", "武林录"]
+    loop 8
+        scan [game_main_page].[menu, huodong, wulinlu] as $found by contains_any $main_items
+        if $found
+            log "主页加载完成，检测到：" + $found
+            goto all_done
+        end
+        # 未检测到，关闭活动弹窗
+        click [game_login_page].[close_btn]
+        wait 2
+    end
+    eval pause("无法确认已登录至主页，请手动检查后点击确定")
+
+    @all_done
+    wait step_interval
 end

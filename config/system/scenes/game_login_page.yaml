@@ -9,6 +9,8 @@ views:
   name: 切换角色
 - key: loading
   name: 登录画面
+- key: start
+  name: 启动日常
 regions:
 - key: more_user
   name: 更多用户
@@ -61,12 +63,12 @@ regions:
   is_text: true
   is_clickable: true
   view: roles
-- key: close_btn_1
+- key: close_btn
   name: 关闭按钮
   type: func
   is_text: true
   is_clickable: true
-  view: loading
+  view: start
 - key: loading
   name: 加载中
   type: attr

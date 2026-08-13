@@ -1,6 +1,6 @@
 """玩家数据模型定义对话框
 
-编辑 profile.yaml，按四种数据模型（日常/实时/资源/活动）分区管理 key 定义。
+编辑 profile.yaml，按三种数据模型（日常/资源/实时）分区管理 key 定义。
 每个模型 Tab 内展示该类型的 key 列表，支持新增/删除/上移/下移。
 新增/编辑通过弹出对话框完成，表单根据模型类型动态切换。
 """
@@ -30,12 +30,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ..config.profile_models import (
-    MODEL_ACTIVITY,
     MODEL_DAILY,
     MODEL_LABELS,
     MODEL_REALTIME,
     MODEL_RESOURCE,
-    ActivityKeyDef,
     DailyKeyDef,
     KeyDef,
     RealtimeKeyDef,
@@ -43,7 +41,7 @@ from ..config.profile_models import (
 )
 
 # 模型 TAB 顺序
-_MODEL_ORDER = [MODEL_DAILY, MODEL_REALTIME, MODEL_RESOURCE, MODEL_ACTIVITY]
+_MODEL_ORDER = [MODEL_DAILY, MODEL_RESOURCE, MODEL_REALTIME]
 
 # QTableWidgetItem.UserRole key：在表格首列存储完整 KeyDef 对象
 _ROLE_KEYDEF = Qt.ItemDataRole.UserRole
@@ -111,9 +109,10 @@ class _ModelTab(QWidget):
 
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self._table.setColumnWidth(0, 160)
+        self._table.setColumnWidth(1, 100)
 
         layout.addWidget(self._table)
 
@@ -180,7 +179,7 @@ class ProfileDefinitionDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        info = QLabel("定义四种数据模型的 key。双击行可编辑。")
+        info = QLabel("定义三种数据模型的 key。双击行可编辑。")
         info.setStyleSheet("color: #666666; margin-bottom: 10px;")
         layout.addWidget(info)
 
@@ -236,39 +235,47 @@ class ProfileDefinitionDialog(QDialog):
                 elif kd.period == "month" and 1 <= kd.reset_day <= 31:
                     parts.append(f"重置日:{kd.reset_day}号")
             if kd.cap is not None:
-                parts.append(f"上限:{kd.cap}")
+                cap_type = "软" if kd.soft else "硬"
+                parts.append(f"{cap_type}上限:{kd.cap}")
             if kd.show_cap:
                 parts.append("展示上限")
+            if kd.increment_only:
+                parts.append("单向增加")
+            if kd.steps:
+                parts.append(f"幅度:{kd.steps}")
+            if kd.sync_to:
+                parts.append(f"同步:{kd.sync_to}")
             parts.append(f"重置:{kd.reset_time}")
             return ", ".join(parts)
 
         if isinstance(kd, RealtimeKeyDef):
             parts = [f"上限:{kd.cap}"]
-            period_labels = {"minute": "分钟", "hour": "小时", "day": "天"}
+            period_labels = {"minute": "分钟", "hour": "小时", "day": "天", "week": "周"}
             period_text = period_labels.get(kd.regen_period, kd.regen_period)
             parts.append(f"回复:{kd.regen_value}/{period_text}")
+            if kd.regen_period == "week" and kd.reset_day:
+                if 1 <= kd.reset_day <= 7:
+                    parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
+            if kd.regen_period in ("day", "week"):
+                parts.append(f"重置:{kd.reset_time}")
             if kd.show_cap:
                 parts.append("展示上限")
+            if kd.steps:
+                parts.append(f"幅度:{kd.steps}")
             if kd.alert_above:
                 parts.append(f"提醒:>{kd.alert_above}")
             return ", ".join(parts)
 
         if isinstance(kd, ResourceKeyDef):
-            return kd.description or kd.key or ""
-
-        if isinstance(kd, ActivityKeyDef):
-            parts = [f"周期:{kd.period}"]
-            if kd.reset_day and kd.period in ("week", "month"):
-                if kd.period == "week" and 1 <= kd.reset_day <= 7:
-                    parts.append(f"重置日:{_WEEKDAY_NAMES[kd.reset_day - 1]}")
-                elif kd.period == "month" and 1 <= kd.reset_day <= 31:
-                    parts.append(f"重置日:{kd.reset_day}号")
+            parts = []
             if kd.cap is not None:
-                parts.append(f"上限:{kd.cap}")
+                cap_type = "软" if kd.soft else "硬"
+                parts.append(f"{cap_type}上限:{kd.cap}")
             if kd.show_cap:
                 parts.append("展示上限")
-            parts.append(f"重置:{kd.reset_time}")
-            return ", ".join(parts)
+            if kd.description:
+                parts.append(kd.description)
+            return ", ".join(parts) if parts else (kd.description or kd.key or "")
 
         return ""
 
@@ -374,8 +381,17 @@ class ProfileDefinitionDialog(QDialog):
             cap_spin.setRange(0, 999999)
             cap_spin.setSpecialValueText("无上限")
             cap_spin.setValue(kd.cap or 0)
-            layout.addRow("上限:", cap_spin)
+
+            soft_check = QCheckBox("软上限")
+            soft_check.setChecked(kd.soft)
+
+            cap_row = QHBoxLayout()
+            cap_row.addWidget(cap_spin)
+            cap_row.addWidget(soft_check)
+            cap_row.addStretch()
+            layout.addRow("上限:", cap_row)
             widgets["cap"] = cap_spin
+            widgets["soft"] = soft_check
 
             show_cap_check = QCheckBox("展示上限")
             show_cap_check.setChecked(kd.show_cap)
@@ -412,6 +428,32 @@ class ProfileDefinitionDialog(QDialog):
             period_combo.currentIndexChanged.connect(_update_reset_day_visibility)
             _update_reset_day_visibility()
 
+            # 单向增加复选框
+            increment_check = QCheckBox("单向增加")
+            increment_check.setChecked(kd.increment_only)
+            layout.addRow(increment_check)
+            widgets["increment_only"] = increment_check
+
+            # 自定义增减幅度
+            steps_input = QLineEdit(",".join(str(s) for s in kd.steps) if kd.steps else "")
+            steps_input.setPlaceholderText("如: 1,10,100 或 -1")
+            layout.addRow("增减幅度:", steps_input)
+            widgets["steps"] = steps_input
+
+            # 同步目标 Resource
+            sync_combo = QComboBox()
+            sync_combo.addItem("（不同步）", "")
+            # 加载所有 Resource key 作为同步目标
+            from ..config import get_profile_config
+            res_keys = get_profile_config().get_keys_by_model(MODEL_RESOURCE)
+            for rk in res_keys:
+                sync_combo.addItem(f"{rk.label} ({rk.key})", rk.key)
+            idx = sync_combo.findData(kd.sync_to)
+            if idx >= 0:
+                sync_combo.setCurrentIndex(idx)
+            layout.addRow("同步到资源:", sync_combo)
+            widgets["sync_to"] = sync_combo
+
         elif model_type == MODEL_REALTIME:
             rt_kd = existing if isinstance(existing, RealtimeKeyDef) else RealtimeKeyDef()
 
@@ -430,6 +472,7 @@ class ProfileDefinitionDialog(QDialog):
             regen_period_combo.addItem("分钟", "minute")
             regen_period_combo.addItem("小时", "hour")
             regen_period_combo.addItem("天", "day")
+            regen_period_combo.addItem("周", "week")
             idx = regen_period_combo.findData(rt_kd.regen_period)
             if idx >= 0:
                 regen_period_combo.setCurrentIndex(idx)
@@ -449,6 +492,15 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow("重置时刻:", reset_input)
             widgets["reset_time"] = reset_input
 
+            reset_day_spin = QSpinBox()
+            reset_day_spin.setRange(0, 7)
+            reset_day_spin.setSpecialValueText("默认")
+            reset_day_spin.setValue(rt_kd.reset_day)
+            reset_day_label = QLabel()
+            widgets["reset_day"] = reset_day_spin
+            widgets["reset_day_label"] = reset_day_label
+            layout.addRow(reset_day_label, reset_day_spin)
+
             alert_spin = QSpinBox()
             alert_spin.setRange(0, 999999)
             alert_spin.setSpecialValueText("不提醒")
@@ -457,71 +509,50 @@ class ProfileDefinitionDialog(QDialog):
             widgets["alert_above"] = alert_spin
 
             def _update_reset_time_visibility():
-                is_day = regen_period_combo.currentData() == "day"
-                reset_input.setVisible(is_day)
+                period = regen_period_combo.currentData()
+                is_day_or_week = period in ("day", "week")
+                is_week = period == "week"
+                reset_input.setVisible(is_day_or_week)
+                reset_day_spin.setVisible(is_week)
+                reset_day_label.setVisible(is_week)
                 # 更新标签
                 label_widget = reset_input.parent().layout().labelForField(reset_input)
                 if label_widget:
-                    label_widget.setVisible(is_day)
+                    label_widget.setVisible(is_day_or_week)
+                if is_week:
+                    reset_day_label.setText("重置日(周几):")
             regen_period_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             _update_reset_time_visibility()
 
+            # 自定义增减幅度
+            steps_input = QLineEdit(",".join(str(s) for s in rt_kd.steps) if rt_kd.steps else "")
+            steps_input.setPlaceholderText("如: 1,10,100 或 -1")
+            layout.addRow("增减幅度:", steps_input)
+            widgets["steps"] = steps_input
+
         elif model_type == MODEL_RESOURCE:
-            pass  # Resource 无模型专属字段
-
-        elif model_type == MODEL_ACTIVITY:
-            act_kd = existing if isinstance(existing, ActivityKeyDef) else ActivityKeyDef()
-
-            period_combo = QComboBox()
-            for val, text in _PERIOD_OPTIONS:
-                period_combo.addItem(text, val)
-            idx = period_combo.findData(act_kd.period)
-            if idx >= 0:
-                period_combo.setCurrentIndex(idx)
-            layout.addRow("周期:", period_combo)
-            widgets["period"] = period_combo
+            res_kd = existing if isinstance(existing, ResourceKeyDef) else ResourceKeyDef()
 
             cap_spin = QSpinBox()
             cap_spin.setRange(0, 999999)
             cap_spin.setSpecialValueText("无上限")
-            cap_spin.setValue(act_kd.cap or 0)
-            layout.addRow("上限:", cap_spin)
+            cap_spin.setValue(res_kd.cap or 0)
+
+            soft_check = QCheckBox("软上限")
+            soft_check.setChecked(res_kd.soft)
+
+            cap_row = QHBoxLayout()
+            cap_row.addWidget(cap_spin)
+            cap_row.addWidget(soft_check)
+            cap_row.addStretch()
+            layout.addRow("上限:", cap_row)
             widgets["cap"] = cap_spin
+            widgets["soft"] = soft_check
 
             show_cap_check = QCheckBox("展示上限")
-            show_cap_check.setChecked(act_kd.show_cap)
+            show_cap_check.setChecked(res_kd.show_cap)
             layout.addRow(show_cap_check)
             widgets["show_cap"] = show_cap_check
-
-            reset_input = QLineEdit(act_kd.reset_time)
-            reset_input.setFixedWidth(80)
-            layout.addRow("重置时刻:", reset_input)
-            widgets["reset_time"] = reset_input
-
-            reset_day_spin = QSpinBox()
-            reset_day_spin.setRange(0, 31)
-            reset_day_spin.setSpecialValueText("默认")
-            reset_day_spin.setValue(act_kd.reset_day)
-            reset_day_label = QLabel()
-            widgets["reset_day"] = reset_day_spin
-            widgets["reset_day_label"] = reset_day_label
-            layout.addRow(reset_day_label, reset_day_spin)
-
-            def _update_act_reset_day_visibility():
-                p = period_combo.currentData()
-                is_week = p == "week"
-                is_month = p == "month"
-                visible = is_week or is_month
-                reset_day_spin.setVisible(visible)
-                reset_day_label.setVisible(visible)
-                if is_week:
-                    reset_day_spin.setRange(0, 7)
-                    reset_day_label.setText("重置日(周几):")
-                elif is_month:
-                    reset_day_spin.setRange(0, 31)
-                    reset_day_label.setText("重置日(几号):")
-            period_combo.currentIndexChanged.connect(_update_act_reset_day_visibility)
-            _update_act_reset_day_visibility()
 
         # 按钮行
         btn_row = QHBoxLayout()
@@ -569,16 +600,46 @@ class ProfileDefinitionDialog(QDialog):
             # 构造 KeyDef
             if model_type == MODEL_DAILY:
                 cap_val = widgets["cap"].value()
+                # 解析 steps
+                steps_raw = widgets["steps"].text().strip()
+                steps_list: list[int] = []
+                if steps_raw:
+                    for part in steps_raw.split(","):
+                        part = part.strip()
+                        if part:
+                            try:
+                                steps_list.append(int(part))
+                            except ValueError:
+                                error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
+                                return
+                # 解析 sync_to
+                sync_to_val = widgets["sync_to"].currentData() or ""
                 kd = DailyKeyDef(
                     key=key, label=label,
                     period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
+                    soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),
+                    steps=steps_list,
+                    sync_to=sync_to_val,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
+                    increment_only=widgets["increment_only"].isChecked(),
                 )
             elif model_type == MODEL_REALTIME:
                 alert_val = widgets["alert_above"].value()
+                # 解析 steps
+                steps_raw = widgets["steps"].text().strip()
+                steps_list: list[int] = []
+                if steps_raw:
+                    for part in steps_raw.split(","):
+                        part = part.strip()
+                        if part:
+                            try:
+                                steps_list.append(int(part))
+                            except ValueError:
+                                error_label.setText(f"增减幅度格式错误: '{part}'，请输入整数")
+                                return
                 kd = RealtimeKeyDef(
                     key=key, label=label,
                     cap=widgets["cap"].value(),
@@ -586,19 +647,17 @@ class ProfileDefinitionDialog(QDialog):
                     regen_period=widgets["regen_period"].currentData(),
                     regen_value=widgets["regen_value"].value(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
+                    reset_day=widgets["reset_day"].value(),
                     alert_above=alert_val if alert_val > 0 else None,
+                    steps=steps_list,
                 )
             elif model_type == MODEL_RESOURCE:
-                kd = ResourceKeyDef(key=key, label=label)
-            elif model_type == MODEL_ACTIVITY:
                 cap_val = widgets["cap"].value()
-                kd = ActivityKeyDef(
+                kd = ResourceKeyDef(
                     key=key, label=label,
-                    period=widgets["period"].currentData(),
                     cap=cap_val if cap_val > 0 else None,
+                    soft=widgets["soft"].isChecked(),
                     show_cap=widgets["show_cap"].isChecked(),
-                    reset_time=widgets["reset_time"].text().strip() or "05:00",
-                    reset_day=widgets["reset_day"].value(),
                 )
             else:
                 kd = KeyDef(key=key, label=label)

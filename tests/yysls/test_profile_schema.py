@@ -7,7 +7,6 @@ import pytest
 import yaml
 
 from lvjiang.apps.yysls.config.profile_models import (
-    ActivityKeyDef,
     DailyKeyDef,
     RealtimeKeyDef,
     ResourceKeyDef,
@@ -197,16 +196,14 @@ class TestSaveConfig:
             "daily": [DailyKeyDef(key="d1", label="D1", period="week")],
             "realtime": [RealtimeKeyDef(key="r1", label="R1", cap=100)],
             "resource": [ResourceKeyDef(key="res1", label="Res1")],
-            "activity": [ActivityKeyDef(key="a1", label="A1", cap=2000)],
         })
         save_profile_config(schema)
         reloaded = _load_config()
 
-        assert len(reloaded.get_all_keys()) == 4
+        assert len(reloaded.get_all_keys()) == 3
         assert isinstance(reloaded.get_key("d1"), DailyKeyDef)
         assert isinstance(reloaded.get_key("r1"), RealtimeKeyDef)
         assert isinstance(reloaded.get_key("res1"), ResourceKeyDef)
-        assert isinstance(reloaded.get_key("a1"), ActivityKeyDef)
 
 
 # ─── 单例 ────────────────────────────────────────────────────

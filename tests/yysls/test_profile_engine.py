@@ -212,11 +212,17 @@ class TestCountDailyRegens:
         now = datetime(2026, 8, 8, 10, 0)
         assert _count_daily_regens(prev, now, "05:00") == 0
 
+    def test_same_day_cross_reset(self):
+        """同一天 05:00 前 → 05:00 后，应计入今天重置点"""
+        prev = datetime(2026, 8, 8, 4, 40)
+        now = datetime(2026, 8, 8, 5, 9)
+        assert _count_daily_regens(prev, now, "05:00") == 1
+
     def test_cross_one_reset(self):
-        """昨天 03:00 → 今天 10:00，经过今天 05:00 → 1"""
+        """昨天 03:00 → 今天 10:00，经过昨天和今天两个 05:00 → 2"""
         prev = datetime(2026, 8, 7, 3, 0)
         now = datetime(2026, 8, 8, 10, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 1
+        assert _count_daily_regens(prev, now, "05:00") == 2
 
     def test_cross_two_resets(self):
         """前天 20:00 → 今天 10:00，经过昨天和今天两个 05:00 → 2"""
@@ -244,16 +250,16 @@ class TestCountDailyRegens:
 
     def test_now_before_today_reset(self):
         """now 在今天 05:00 之前，今天重置尚未到达，不应计入"""
-        # 前天 03:00 → 今天 03:00，只经过昨天 05:00 一个边界
+        # 前天 03:00 → 今天 03:00，经过前天和昨天两个 05:00 边界
         prev = datetime(2026, 8, 6, 3, 0)
         now = datetime(2026, 8, 8, 3, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 1
+        assert _count_daily_regens(prev, now, "05:00") == 2
 
     def test_now_before_today_reset_one_day(self):
-        """昨天 03:00 → 今天 03:00，今天 05:00 还没到 → 0"""
+        """昨天 03:00 → 今天 03:00，今天 05:00 还没到，但昨天 05:00 已过 → 1"""
         prev = datetime(2026, 8, 7, 3, 0)
         now = datetime(2026, 8, 8, 3, 0)
-        assert _count_daily_regens(prev, now, "05:00") == 0
+        assert _count_daily_regens(prev, now, "05:00") == 1
 
 
 # ─── _compute_realtime_value ─────────────────────────────────
@@ -295,6 +301,18 @@ class TestComputeRealtimeValue:
         # Should have crossed at least 1 day boundary
         assert val >= 550  # 100 + 1 * 450
 
+    def test_day_regen_same_day_cross_reset(self):
+        """体力：04:40 → 05:09 应跨过 05:00 并增加 450"""
+        from unittest.mock import patch
+        fixed_now = datetime(2026, 8, 9, 5, 9, 0)
+        updated_at = datetime(2026, 8, 9, 4, 40, 6).isoformat(timespec="seconds")
+        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            mock_dt.fromisoformat = datetime.fromisoformat
+            val, ts = _compute_realtime_value(1256, updated_at, "day", 450, 2500, "05:00")
+        assert val == 1706
+        assert ts == "2026-08-09T05:09:00"
+
     def test_regen_capped(self):
         """回复封顶"""
         now = datetime.now()
@@ -322,6 +340,67 @@ class TestComputeRealtimeValue:
         # 5 整分钟 * 1.0 = 5
         assert val == 105.0
 
+    def test_fractional_progress_is_preserved(self):
+        """小数表示已累计进度：100.5 再过 4 分钟变 101.0"""
+        from unittest.mock import patch
+
+        fixed_now = datetime(2026, 8, 9, 10, 4, 0)
+        updated_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
+        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            mock_dt.fromisoformat = datetime.fromisoformat
+            val, new_ts = _compute_realtime_value(
+                100.5, updated_at, "minute", 0.125, 600
+            )
+
+        assert val == 101.0
+        assert new_ts == "2026-08-09T10:04:00"
+
+    def test_fractional_progress_multi_tick_matches_single_tick(self):
+        """多轮 tick 与一次性长时间 tick 的结果一致，不累计截断误差"""
+        from unittest.mock import patch
+
+        start = datetime(2026, 8, 9, 10, 0, 0)
+        first_now = datetime(2026, 8, 9, 10, 3, 30)
+        second_now = datetime(2026, 8, 9, 10, 8, 0)
+        updated_at = start.isoformat(timespec="seconds")
+
+        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+            mock_dt.now.return_value = first_now
+            mock_dt.fromisoformat = datetime.fromisoformat
+            val1, ts1 = _compute_realtime_value(
+                100.5, updated_at, "minute", 0.125, 600
+            )
+
+        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+            mock_dt.now.return_value = second_now
+            mock_dt.fromisoformat = datetime.fromisoformat
+            stepped_val, stepped_ts = _compute_realtime_value(
+                val1, ts1, "minute", 0.125, 600
+            )
+            single_val, single_ts = _compute_realtime_value(
+                100.5, updated_at, "minute", 0.125, 600
+            )
+
+        assert stepped_val == single_val == 101.5
+        assert stepped_ts == single_ts == "2026-08-09T10:08:00"
+
+    def test_sub_minute_progress_does_not_advance_timestamp(self):
+        """未满一个 minute 周期时，不推进 updated_at，剩余秒数保留在时间差里"""
+        from unittest.mock import patch
+
+        fixed_now = datetime(2026, 8, 9, 10, 0, 59)
+        updated_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
+        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            mock_dt.fromisoformat = datetime.fromisoformat
+            val, new_ts = _compute_realtime_value(
+                100.5, updated_at, "minute", 0.125, 600
+            )
+
+        assert val == 100.5
+        assert new_ts == updated_at
+
 
 # ─── profile 节点读写 ────────────────────────────────────────
 
@@ -344,8 +423,8 @@ class TestProfileEntry:
 
     def test_write_with_total(self):
         data = {}
-        write_profile_entry(data, "activity", "k", 500, total=2000)
-        entry = data["profile"]["activity"]["k"]
+        write_profile_entry(data, "resource", "k", 500, total=2000)
+        entry = data["profile"]["resource"]["k"]
         assert entry["value"] == 500
         assert entry["total"] == 2000
 

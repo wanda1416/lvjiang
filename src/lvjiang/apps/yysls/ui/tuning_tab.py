@@ -1,7 +1,7 @@
 """燕云「调律」Tab —— 通过 AppHooks 注入通用 MainWindow 的插件页面。
 
 职责：
-- 调律配置三页 Tab（规则 | 部位 | 更多）与插件会话持久化：
+- 调律配置三页 Tab（规则 | 部位 | 更多）与 wf_configs 统一存储持久化：
   规则 = 调律规则与玩法；部位 = 调律部位选择；
   更多 = 跳过实际调律 mock + 全部注册开关
 - 「开始调律」按钮三态（运行中 / 未就绪 / 就绪），订阅宿主 automation_state_changed
@@ -276,7 +276,7 @@ class TuningTab(QWidget):
         """配置变更监听回调：tune_config/规则组变化时刷新对应控件"""
         if rel_path == "yysls/tune_config.yaml":
             self._tuning_globals.refresh_switches()
-        elif rel_path.startswith("yysls/tuning_groups/"):
+        elif rel_path.startswith("yysls/base_groups/"):
             self._refresh_base_group_radios()
 
     # ─── 启停入口（F9 快捷键 / 按钮点击共用）───────────────────
@@ -393,7 +393,7 @@ class TuningTab(QWidget):
         host.run_workflow_implementation(
             "auto_tuning", flow_name, configure)
 
-    # ─── 调律配置持久化（插件会话 config/session/yysls/session.json）──
+    # ─── 调律配置持久化（wf_configs["auto_tuning"]）──────────
 
     def _load_tuning_config(self):
         from ....core.config.wf_configs import get_wf_config
@@ -432,16 +432,14 @@ class TuningTab(QWidget):
         self._on_skip_target_toggled()
 
     def _save_tuning_config(self):
-        from ....core.config.wf_configs import get_wf_config, set_wf_config
+        from ....core.config.wf_configs import update_wf_config
         skip_start = None
         if self._cb_skip.isChecked():
             skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]
         target_cell = None
         if self._cb_target.isChecked():
             target_cell = [self._sp_target_row.value(), self._sp_target_col.value()]
-        # 保留设备端写入的非 UI 字段（如 scroll_strategy）
-        old = get_wf_config("auto_tuning")
-        set_wf_config("auto_tuning", {
+        update_wf_config("auto_tuning", {
             "selected_slots": self._get_tuning_selected_slots(),
             "rules": self._get_tuning_rule_config(),
             "switches": self._get_tuning_switches(),
@@ -449,7 +447,6 @@ class TuningTab(QWidget):
             "skip_tuning": self._get_tuning_skip_tuning(),
             "skip_start": skip_start,
             "target_cell": target_cell,
-            "scroll_strategy": old.get("scroll_strategy", ""),
         })
 
     def _set_all_tuning_checks(self, checked: bool):

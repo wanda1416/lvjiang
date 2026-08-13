@@ -320,7 +320,7 @@ class SchoolPanel(QWidget):
         try:
             get_resolver().save_merged(_ATTRS_REL, self._data)
             logger.debug(f"配置已保存: {_ATTRS_REL}")
-            from lvjiang.apps.yysls.game_config import get_game_config
+            from lvjiang.apps.yysls.config import get_game_config
             get_game_config()._load()
         except Exception as e:
             logger.error(f"保存失败: {e}")

@@ -305,7 +305,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             self._load_workflow_configs()
 
     def _open_scene_editor(self):
-        from .scene_editor.scene_editor import SceneEditorDialog
+        from .scene_editor import SceneEditorDialog
         dialog = SceneEditorDialog(
             layout_manager=self._layout_manager,
             refresh_callback=self._refresh_capture,
@@ -526,6 +526,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.statusBar().showMessage("就绪 | F9 开始 | F10 停止 | F8 脚本录制")
         self.adjustSize()
         self.setMinimumHeight(self.height())
+        self._migrate_ui_state()
         self._restore_ui_state()
         self._setup_log_redirect()
 
@@ -743,7 +744,48 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             # 保存后刷新批量 Tab 的条目概览和脚本勾选
             self._batch_tab.refresh_config()
 
-    # ─── UI 状态持久化（session.json ui_state 节点）────────
+    # ─── UI 状态持久化（session.json ui_state 节点，按页面归档）────────
+
+    @staticmethod
+    def _migrate_ui_state():
+        """一次性迁移：旧扁平 ui_state → 按页面归档嵌套结构"""
+        from ..core.config import get_session_store
+        store = get_session_store()
+        state = store.get_node("ui_state", {})
+        if not isinstance(state, dict) or "main_page" in state:
+            return  # 已是新格式或为空
+
+        migrated = False
+
+        # main_page
+        old_main_keys = {"window_size", "splitter_sizes"}
+        if any(k in state for k in old_main_keys):
+            page = {}
+            for k in old_main_keys:
+                if k in state:
+                    page[k] = state.pop(k)
+            state["main_page"] = page
+            migrated = True
+
+        # scene_editor
+        se_prefix = "scene_editor_"
+        se_keys = [k for k in state if k.startswith(se_prefix)]
+        if se_keys:
+            se = state.get("scene_editor", {})
+            for k in se_keys:
+                se[k[len(se_prefix):]] = state.pop(k)
+            state["scene_editor"] = se
+            migrated = True
+
+        # reference_manager
+        if "reference_manager_size" in state:
+            rm = state.get("reference_manager", {})
+            rm["size"] = state.pop("reference_manager_size")
+            state["reference_manager"] = rm
+            migrated = True
+
+        if migrated:
+            store.set_node("ui_state", state)
 
     def _restore_ui_state(self):
         """启动时恢复窗口大小与左右分栏比例，免去每次手动拉伸"""
@@ -751,20 +793,25 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         state = get_session_store().get_node("ui_state", {})
         if not isinstance(state, dict):
             return
-        size = state.get("window_size")
+        page = state.get("main_page", {})
+        if not isinstance(page, dict):
+            return
+        size = page.get("window_size")
         if isinstance(size, list) and len(size) == 2:
             self.resize(int(size[0]), int(size[1]))
-        sizes = state.get("splitter_sizes")
+        sizes = page.get("splitter_sizes")
         if isinstance(sizes, list) and len(sizes) == 2 and all(s > 0 for s in sizes):
             self._main_splitter.setSizes([int(s) for s in sizes])
 
     def _save_ui_state(self):
-        """退出时统一写入 ui_state（浅合并，保留其他组件的 ui_state 如 scene_editor_*）"""
+        """退出时写入 ui_state.main_page（浅合并，各页面写各自子节点互不干扰）"""
         from ..core.config import get_session_store
         try:
             get_session_store().update_node("ui_state", {
-                "window_size": [self.width(), self.height()],
-                "splitter_sizes": self._main_splitter.sizes(),
+                "main_page": {
+                    "window_size": [self.width(), self.height()],
+                    "splitter_sizes": self._main_splitter.sizes(),
+                },
             })
         except Exception as e:
             logger.warning(f"保存 UI 状态失败: {e}")
@@ -803,6 +850,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
         if not target_cfg:
             return
+        if not target_cfg.get("parameters"):
+            return
         params = {}
         from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox
         for param_def in target_cfg.get("parameters", []):
@@ -820,23 +869,16 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 data = widget.currentData()
                 params[name] = data if data is not None else widget.currentText()
         target_cfg["_saved_params"] = params
+        from ..core.config.wf_configs import update_wf_config
+        update_wf_config(sid, params)
 
     def _save_daily_config(self):
-        """保存日常页脚本选择与参数：workflow_id 存 daily 节点，参数存 wf_configs"""
+        """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘"""
         from ..core.config import get_session_store
-        from ..core.config.wf_configs import delete_wf_config, set_wf_config
 
         flow_cfg = self._get_selected_flow_config()
         if not flow_cfg:
             return
-
-        # 各脚本参数写入统一存储；参数清空的脚本删除对应条目
-        for cfg in self._workflow_configs:
-            saved = cfg.get("_saved_params")
-            if saved:
-                set_wf_config(cfg["id"], saved)
-            else:
-                delete_wf_config(cfg["id"])
 
         # workflow_id 仍存 daily 节点（UI 状态，非工作流配置）
         try:
@@ -855,8 +897,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             daily = {}
         workflow_id = daily.get("workflow_id")
 
-        # 从统一存储读取各脚本参数
+        # 从统一存储读取各脚本参数；无参数脚本的 wf_configs 可能由专属页面管理
         for cfg in self._workflow_configs:
+            if not cfg.get("parameters"):
+                continue
             saved = get_wf_config(cfg["id"])
             if saved:
                 cfg["_saved_params"] = saved

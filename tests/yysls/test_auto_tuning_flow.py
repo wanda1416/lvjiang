@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lvjiang.apps.yysls.config import LevelConfig
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     BehaviorRule,
@@ -23,7 +24,6 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuneBehavior,
     TuningGroup,
 )
-from lvjiang.apps.yysls.game_config import LevelConfig
 from lvjiang.apps.yysls.workflows.implementations import auto_tuning
 from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
     AutoTuningWorkflow,
@@ -1718,10 +1718,11 @@ class TestResolveSelectedSlots:
         session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring", "head"]}})
         assert self._device_wf()._resolve_selected_slots() == ["ring", "head"]
 
-    def test_empty_session_falls_back_to_all(self, session):
+    def test_empty_session_raises(self, session):
+        """未配置调律部位时抛异常，不默认全部部位"""
         wf = self._device_wf()
-        assert wf._resolve_selected_slots() == (
-            wf.WEAPON_SLOTS + wf.ARMOR_SLOTS)
+        with pytest.raises(ValueError, match="未配置调律部位"):
+            wf._resolve_selected_slots()
 
     def test_injected_ctx_ignores_session(self, session):
         session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring"]}})
@@ -1860,9 +1861,18 @@ class TestRunWithSkipStart:
 # ─── 基础规则组回退链 ──────────────────────────────
 
 class TestBaseGroupFallback:
-    """回退链：ctx 注入优先，未注入则用空 TuningGroup()，不回退读盘"""
+    """回退链：ctx 注入优先，未注入则读 wf_configs，读不到抛异常"""
 
-    def test_ctx_injection_used_directly(self):
+    @pytest.fixture
+    def session(self, tmp_path, monkeypatch):
+        import lvjiang.constants as constants_mod
+        import lvjiang.core.config.session as store_mod
+        path = tmp_path / "session.json"
+        monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
+        store_mod.reset_session_store()
+        return store_mod.get_session_store()
+
+    def test_ctx_injection_used_directly(self, session):
         # ctx.base_group 已注入时直接使用
         custom = TuningGroup(key="custom", name="自定义")
         wf = FakeWF()
@@ -1870,21 +1880,24 @@ class TestBaseGroupFallback:
         result = wf._ensure_base_group()
         assert result is custom
 
-    def test_no_injection_falls_back_to_empty(self):
-        # ctx.base_group 未注入时用空 TuningGroup()，不读盘
+    def test_no_config_raises(self, session):
+        """未配置基础规则组时抛异常，不默认空 TuningGroup"""
         wf = FakeWF()
         wf.run_ctx.base_group = None
-        result = wf._ensure_base_group()
-        assert result.key == "default"  # TuningGroup() 缺省 key
-        assert result.materials.food_rules == []
-        assert result.scan.rules == []
-        assert result.tune.rules == []
+        with pytest.raises(ValueError, match="未配置基础规则组"):
+            wf._ensure_base_group()
 
-    def test_empty_group_is_cached(self):
-        # 空 TuningGroup() 创建后缓存在 ctx
+    def test_reads_wf_configs_and_caches(self, session, monkeypatch):
+        """回退读 wf_configs 并缓存在 ctx"""
+        group = TuningGroup(key="test_grp", name="测试组")
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.evaluator.tuning_rules.get_tuning_group",
+            lambda key: group if key == "test_grp" else None)
+        session.set_node("wf_configs", {"auto_tuning": {"base_group": "test_grp"}})
         wf = FakeWF()
         wf.run_ctx.base_group = None
         result1 = wf._ensure_base_group()
         result2 = wf._ensure_base_group()
+        assert result1 is group
         assert result1 is result2
         assert wf.run_ctx.base_group is result1

@@ -12,7 +12,7 @@ import yaml
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox
 
-from lvjiang.apps.yysls.game_config import EQUIP_PART_NAMES
+from lvjiang.apps.yysls.config import EQUIP_PART_NAMES
 from lvjiang.apps.yysls.ui.game_settings import (
     GameConfigDialog,
     affix_caps_panel,

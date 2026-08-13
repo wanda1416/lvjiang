@@ -246,7 +246,7 @@ class GenericTuningJudge(TuningJudge):
         优先级词条，替换后再定级，与不转律基线取评级较高者。填充
         与转律后均复用 _grade（与完整定级同一套条件求值）。
         """
-        from ..game_config import get_game_config
+        from ..config import get_game_config
         gc = get_game_config()
         part = result.equipment.part
 

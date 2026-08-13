@@ -131,7 +131,7 @@ class TestAffixCap:
             "get_affix_caps": lambda self, level, name: {"cap": 150.0, "chengyin": 141.0},
         })()
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.game_config.get_game_config",
+            "lvjiang.apps.yysls.config.get_game_config",
             lambda: mock_config,
         )
         result = _fn("affix_cap")("外攻攻击", 40)
@@ -143,7 +143,7 @@ class TestAffixCap:
             "get_affix_caps": lambda self, level, name: None,
         })()
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.game_config.get_game_config",
+            "lvjiang.apps.yysls.config.get_game_config",
             lambda: mock_config,
         )
         assert _fn("affix_cap")("不存在的词条", 40) == 0
@@ -156,7 +156,7 @@ class TestChengyinCap:
             "get_affix_caps": lambda self, level, name: {"cap": 150.0, "chengyin": 141.0},
         })()
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.game_config.get_game_config",
+            "lvjiang.apps.yysls.config.get_game_config",
             lambda: mock_config,
         )
         result = _fn("chengyin_cap")("外攻攻击", 40)

@@ -1,6 +1,6 @@
 """玩家信息元数据配置加载
 
-从 config/session/profiles.yaml 加载字段定义和分组信息。
+从 config/session/profile.yaml 加载字段定义和分组信息。
 此模块仅负责定义 user.json 的字段 schema，不负责展示控制。
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from lvjiang.constants import SESSION_CONFIG_DIR
 from lvjiang.core.config import load_yaml
 
 # 配置文件路径（用户级数据，位于 session 目录）
-_PROFILES_PATH = SESSION_CONFIG_DIR / "profiles.yaml"
+_PROFILE_PATH = SESSION_CONFIG_DIR / "profile.yaml"
 
 # 全局单例
 _config: ProfileConfig | None = None
@@ -88,7 +88,7 @@ class ProfileConfig:
 
 
 def _create_default_config():
-    """创建默认的 profiles.yaml（首次运行时）"""
+    """创建默认的 profile.yaml（首次运行时）"""
     from lvjiang.core.config import save_yaml
 
     default_data = {
@@ -98,23 +98,32 @@ def _create_default_config():
         },
     }
     try:
-        _PROFILES_PATH.parent.mkdir(parents=True, exist_ok=True)
-        save_yaml(_PROFILES_PATH, default_data)
-        logger.info(f"已创建默认 profiles.yaml: {_PROFILES_PATH}")
+        _PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        save_yaml(_PROFILE_PATH, default_data)
+        logger.info(f"已创建默认 profile.yaml: {_PROFILE_PATH}")
     except Exception as e:
-        logger.error(f"创建默认 profiles.yaml 失败: {e}")
+        logger.error(f"创建默认 profile.yaml 失败: {e}")
 
 
 def _load_config() -> ProfileConfig:
     """从 YAML 加载配置，文件不存在时创建默认配置"""
-    if not _PROFILES_PATH.exists():
-        logger.info(f"profiles.yaml 不存在，创建默认配置: {_PROFILES_PATH}")
+    # 一次性迁移：旧 profiles.yaml → 新 profile.yaml
+    _legacy = SESSION_CONFIG_DIR / "profiles.yaml"
+    if not _PROFILE_PATH.exists() and _legacy.exists():
+        try:
+            _legacy.rename(_PROFILE_PATH)
+            logger.info(f"已迁移旧配置: {_legacy} → {_PROFILE_PATH}")
+        except OSError as e:
+            logger.warning(f"迁移旧配置失败: {e}")
+
+    if not _PROFILE_PATH.exists():
+        logger.info(f"profile.yaml 不存在，创建默认配置: {_PROFILE_PATH}")
         _create_default_config()
 
     try:
-        data = load_yaml(_PROFILES_PATH)
+        data = load_yaml(_PROFILE_PATH)
     except Exception as e:
-        logger.error(f"加载 profiles.yaml 失败: {e}")
+        logger.error(f"加载 profile.yaml 失败: {e}")
         return ProfileConfig()
 
     # 解析字段

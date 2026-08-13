@@ -34,11 +34,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     DYNAMIC_AFFIXES,
     DYNAMIC_CATEGORY,
 )
-from lvjiang.apps.yysls.game_config import get_game_config
 
 # 候选无归属时归入的兜底桶名
 _UNCATEGORIZED = "未归类"

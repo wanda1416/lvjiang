@@ -1,4 +1,4 @@
-"""参考图管理对话框 - 新增参考图与参考图管理两个独立 Tab"""
+"""图库管理对话框 - 新增参考图与图库管理两个独立 Tab"""
 
 from typing import Callable
 
@@ -31,17 +31,17 @@ from .meta_schema_panel import MetaSchemaPanel
 
 
 class ReferenceManagerDialog(QDialog):
-    """参考图管理对话框
+    """图库管理对话框
 
     三个顶级 Tab，完全独立的工作流：
       - 新增参考图：导入截图 → 网格切割 → 编辑 cell 信息 → 提交到图库
-      - 参考图管理：按分组浏览、搜索、编辑已有参考图
+      - 图库管理：按分组浏览、搜索、编辑已有参考图
       - 元数据定义：定义名称/分组之外的 meta 字段
     """
 
     def __init__(self, parent=None, screenshot_callback: Callable | None = None):
         super().__init__(parent)
-        self.setWindowTitle("参考图管理")
+        self.setWindowTitle("图库管理")
         self.resize(1200, 800)
         # 启用最小化/最大化按钮
         self.setWindowFlags(
@@ -68,18 +68,21 @@ class ReferenceManagerDialog(QDialog):
         state = get_session_store().get_node("ui_state", {})
         if not isinstance(state, dict):
             return
-        size = state.get("reference_manager_size")
+        rm = state.get("reference_manager", {})
+        if not isinstance(rm, dict):
+            return
+        size = rm.get("size")
         if isinstance(size, list) and len(size) == 2:
             self.resize(int(size[0]), int(size[1]))
 
     def _save_window_size(self):
-        """保存窗口大小到 session.json（浅合并 ui_state）"""
+        """保存窗口大小到 session.json（写入 ui_state.reference_manager）"""
         from lvjiang.core.config import get_session_store
         try:
             get_session_store().update_node(
-                "ui_state", {"reference_manager_size": [self.width(), self.height()]})
+                "ui_state", {"reference_manager": {"size": [self.width(), self.height()]}})
         except Exception as e:
-            logger.warning(f"保存参考图管理器窗口大小失败: {e}")
+            logger.warning(f"保存图库管理器窗口大小失败: {e}")
 
     def closeEvent(self, event):
         self._save_window_size()
@@ -114,12 +117,12 @@ class ReferenceManagerDialog(QDialog):
         self._add_tab = self._build_add_tab()
         self._tabs.addTab(self._add_tab, "新增参考图")
 
-        # Tab 2: 参考图管理（浏览与编辑已有参考图）
+        # Tab 2: 图库管理（浏览与编辑已有参考图）
         self._browser = BrowserPanel(self._db)
         self._browser.set_known_groups(self._db.get_groups())
         self._browser.refresh()
         self._browser.data_changed.connect(self._on_data_changed)
-        self._tabs.addTab(self._browser, "参考图管理")
+        self._tabs.addTab(self._browser, "图库管理")
 
         # Tab 3: 元数据定义（定义名称/分组之外的 meta 字段）
         self._meta_panel = MetaSchemaPanel(self._db)
@@ -345,7 +348,7 @@ class ReferenceManagerDialog(QDialog):
         self._source_name = "screenshot"
         self._canvas.set_image(new_image)
         self._update_source_label()
-        logger.info(f"参考图管理：截图载入画布 {new_image.shape[1]}x{new_image.shape[0]}")
+        logger.info(f"图库管理：截图载入画布 {new_image.shape[1]}x{new_image.shape[0]}")
 
     def _on_clear(self):
         self._canvas.clear_image()
@@ -509,18 +512,18 @@ class ReferenceManagerDialog(QDialog):
 
         if count > 0:
             self._data_changed = True  # 标记数据已变动
-            # 刷新分组列表（新增参考图面板 + 参考图管理面板）
+            # 刷新分组列表（新增参考图面板 + 图库管理面板）
             groups = self._db.get_groups()
             labels_by_group = self._db.get_all_labels_by_group()
             self._grid_panel.set_known_groups(groups, labels_by_group)
             self._browser.set_known_groups(groups)
             # 刷新图库面板
             self._browser.refresh()
-            # 切换到参考图管理 tab 查看结果
+            # 切换到图库管理 tab 查看结果
             self._tabs.setCurrentIndex(1)
 
     def _on_data_changed(self):
-        """参考图管理面板数据变动时标记"""
+        """图库管理面板数据变动时标记"""
         self._data_changed = True
 
     def _on_schema_changed(self):

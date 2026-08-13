@@ -3,7 +3,7 @@
 from loguru import logger
 from PyQt6.QtWidgets import QApplication
 
-from ....core.scene_registry import get_region_defs, get_region_name, get_scene_name
+from ...core.scene_registry import get_region_defs, get_region_name, get_scene_name
 
 
 class RecognitionOpsMixin:
@@ -78,7 +78,7 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage("正在识别...")
         QApplication.processEvents()
 
-        from ....core.ocr import OCREngine
+        from ...core.ocr import OCREngine
         engine = OCREngine()
         canvas = current_tab.get_canvas_config()
 
@@ -114,7 +114,7 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage("正在校准面板网格...")
         QApplication.processEvents()
 
-        from ....core.ocr import OCREngine
+        from ...core.ocr import OCREngine
         engine = OCREngine()
         canvas_config = current_tab.get_canvas_config()
 
@@ -179,7 +179,7 @@ class RecognitionOpsMixin:
 
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
 
-        from ....core.ocr import OCREngine
+        from ...core.ocr import OCREngine
         ocr_engine = OCREngine()
         recognizer = MaterialRecognizer(ocr_engine)
         # 非预制输入字段（用于展示匹配条目的元数据）
@@ -241,7 +241,7 @@ class RecognitionOpsMixin:
 
         from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
 
-        from ....core.ocr import OCREngine
+        from ...core.ocr import OCREngine
 
         ocr_engine = OCREngine()
         recognizer = MaterialRecognizer(ocr_engine)

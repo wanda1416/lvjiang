@@ -17,9 +17,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ....core.layout_manager import rename_view_screenshots
-from ....core.scene_definition import BASE_VIEW_KEY
-from ....core.scene_registry import get_registry, sync_scene_cache
+from ...core.layout_manager import rename_view_screenshots
+from ...core.scene_definition import BASE_VIEW_KEY
+from ...core.scene_registry import get_registry, sync_scene_cache
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 

@@ -397,7 +397,8 @@ class WindowOpsMixin:
             self.log_text.append("[扫描] 局域网内未发现可连接的 ADB 设备")
             self.statusBar().showMessage("未发现设备 | 请确认设备已开启无线调试")
             QMessageBox.warning(
-                self, "未发现设备",
+                self,  # type: ignore[arg-type]  # mixin: self is QWidget
+                "未发现设备",
                 "局域网内未发现可连接的 ADB 设备。\n\n"
                 "请确认：\n"
                 "1. 设备与电脑在同一局域网\n"

@@ -645,7 +645,7 @@ class TestTuneConfig:
 
     @pytest.mark.parametrize("legacy", ["min_level", "materials", "behavior"])
     def test_legacy_sections_rejected(self, legacy):
-        # 0.1 预览版硬拒绝：旧段已迁移至 tuning_groups/*.yaml
+        # 0.1 预览版硬拒绝：旧段已迁移至 base_groups/*.yaml
         data = _valid_config()
         data[legacy] = {}
         with pytest.raises(RuleValidationError, match="迁移"):
@@ -1163,9 +1163,9 @@ class TestTuningGroupManagerCRUD:
 
     @pytest.fixture
     def mgr(self, tmp_path):
-        """复制内置 tuning_groups/ 和 tune_config.yaml 到 tmp，构造独立管理器"""
+        """复制内置 base_groups/ 和 tune_config.yaml 到 tmp，构造独立管理器"""
         import shutil
-        src = Path(__file__).parents[2] / "config" / "system" / "yysls" / "tuning_groups"
+        src = Path(__file__).parents[2] / "config" / "system" / "yysls" / "base_groups"
         for f in src.glob("*.yaml"):
             shutil.copy(f, tmp_path)
         # 同时复制 tune_config.yaml（base_rules 声明来源）

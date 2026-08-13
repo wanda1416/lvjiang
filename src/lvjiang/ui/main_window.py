@@ -233,6 +233,21 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         # ── 帮助 ──
         help_menu = menubar.addMenu("帮助")
+
+        check_update = QAction("检查更新", self)
+        check_update.triggered.connect(self._check_update)
+        help_menu.addAction(check_update)
+
+        docs = QAction("文档", self)
+        docs.triggered.connect(self._open_docs)
+        help_menu.addAction(docs)
+
+        feedback = QAction("反馈", self)
+        feedback.triggered.connect(self._open_feedback)
+        help_menu.addAction(feedback)
+
+        help_menu.addSeparator()
+
         about = QAction("关于", self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
@@ -293,6 +308,64 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         from .about_dialog import AboutDialog
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def _check_update(self):
+        """直接检查更新（复用 AboutDialog 的更新检查逻辑）"""
+        from .about_dialog import GITHUB_REPO, _UpdateChecker, _get_version
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtWidgets import QMessageBox
+
+        checker = _UpdateChecker(self)
+
+        def on_finished(latest_version: str, download_url: str):
+            current_version = _get_version()
+            try:
+                current_parts = [int(x) for x in current_version.split(".")]
+                latest_parts = [int(x) for x in latest_version.split(".")]
+                is_newer = latest_parts > current_parts
+            except (ValueError, AttributeError):
+                is_newer = latest_version != current_version
+
+            if is_newer:
+                result = QMessageBox.information(
+                    self,
+                    "发现新版本",
+                    f"发现新版本 v{latest_version}\n"
+                    f"当前版本: v{current_version}\n\n"
+                    "是否前往下载？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if result == QMessageBox.StandardButton.Yes:
+                    QDesktopServices.openUrl(QUrl(download_url))
+            else:
+                QMessageBox.information(
+                    self,
+                    "已是最新版本",
+                    f"当前版本 v{current_version} 已是最新版本",
+                )
+
+        def on_error(error_msg: str):
+            QMessageBox.warning(self, "检查更新失败", error_msg)
+
+        checker.finished.connect(on_finished)
+        checker.error.connect(on_error)
+        checker.start()
+        self._update_checker = checker  # 防止被 GC
+
+    def _open_docs(self):
+        """打开 GitHub 文档"""
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+        from .about_dialog import GITHUB_REPO
+        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/user-guide.md"))
+
+    def _open_feedback(self):
+        """打开 GitHub Issue 反馈页面"""
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+        from .about_dialog import GITHUB_REPO
+        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/issues"))
 
     def _open_user_manager(self):
         from .user_manager_dialog import UserManagerDialog

@@ -227,7 +227,7 @@
     左半屏则面板贴右侧、右半屏贴左侧，纵向与图标顶端对齐并按屏高 clamp 防越界
 - [x] **悬浮清单接暴露层**（2026-07-31）
   - 病灶：设备端 `task_runner.list_tasks()` 直接用发现层全集，绕过了 `workflows.yaml`
-    的 exposed/overrides——冒出 `auto_purchase_xinde` 等原始 id、还混进 `auto_tuning`/
+    的 exposed/overrides——冒出 `auto_purchase_xinfa` 等原始 id、还混进 `auto_tuning`/
     `device_smoke_test` 等不该给日常用户看的脚本
   - 修复：把桌面 `run_control` 的暴露逻辑抽成 `discovery.list_exposed_scripts()`，
     桌面下拉与设备端悬浮面板共用同一套（避免两处各写一份）；`list_tasks()` 改用它，
@@ -339,7 +339,7 @@
 
 - **DSL 侧**：`preflight_device_workflows.py` 按设备端同一条路径（`ensure_loaded` →
   `_default_layout_name` → `_load_layout`）装配引擎，再调 `WorkflowEngine.validate_only()`。
-  实测 6 项中 4 个 DSL 脚本（`equip_analysis` / `auto_purchase_xinde` /
+  实测 6 项中 4 个 DSL 脚本（`equip_analysis` / `auto_purchase_xinfa` /
   `activity_jianghu` / `mengzhuzhengfeng`）**全部通过，失败 0 项**
 - **类实现侧**：静态引用收集器只认 DSL 语法，`auto_tuning` / `single_tuning` 在 Python
   里用 `self.click_region("场景", "key")` 引坐标，是校验盲区。`preflight_class_refs.py`
@@ -495,7 +495,7 @@ $adb = ".tooling\android-sdk\platform-tools\adb.exe"
 - **自动调律（`auto_tuning`）**：已按内置默认配置暴露（全部 8 部位 + 全部规则默认
   判定），含滚动校验 + 状态机，链路最长，实机可能踩背包滚动、详情刷新延迟等
   既有坑，需重点观察；`single_tuning` 修了插件加载后才第一次真正可运行
-- **盟主争锋（`mengzhuzhengfeng`）、自动购买心法（`auto_purchase_xinde`）**：
+- **盟主争锋（`mengzhuzhengfeng`）、自动购买心法（`auto_purchase_xinfa`）**：
   纯点击/识别类，可仿江湖号令快速验证；预检已全绿
 
 ### 遗留待决（与 Phase 4 上机不相干）

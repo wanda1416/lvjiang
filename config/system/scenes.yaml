@@ -9,15 +9,15 @@ layout_scenes:
   - equip_weapon_detail
   - equip_armor_detail
   - equip_tune_detail
-  - training_xinde
+  - training_xinfa
   group_3:
   - bag_equip_detail
   - bag_item_detail
   - bag_wallet_detail
   group_6:
-  - ui_school_main
-  - ui_waiguan_yigui
-  - ui_waiguan_qingjing
+  - school_main
+  - waiguan_yigui
+  - waiguan_qingjing
   group_5:
   - activity_mengzhu
   - activity_jianghu

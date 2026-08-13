@@ -54,6 +54,7 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
     - drag_grid_target 查 panel+region（drag 的 PanelGridDrag 分支）
     - arrow 查 arrows、panel 查 panels、region 查 regions、point 查 points
     - scan 查 region+panel（单 key scan/recognize）
+    - stable_area 查 region（wait stable on 区域限定）
     key 为 None 的引用（动态 $var、整场景识别）只能校验到场景一级。
     """
     problems: list[RefProblem] = []

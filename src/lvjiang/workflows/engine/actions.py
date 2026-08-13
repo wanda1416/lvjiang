@@ -416,18 +416,21 @@ class _ActionsMixin:
         超时仅记警告不中断流程
 
         参数支持三种形式：float / Literal(@delay / 数值) / VarRef($var)
+        支持 on [scene].[region] 区域限定，只对指定区域做 diff 对比。
         """
         timeout = self._resolve_ws_param(node.timeout, "timeout")
         threshold = self._resolve_ws_param(node.threshold, "threshold")
         interval = self._resolve_ws_param(node.interval, "interval")
         stable_duration = self._resolve_ws_param(node.stable_duration, "duration")
         least = self._resolve_ws_param(node.least, "least")
+        crop_box = self._resolve_area_crop(node.area)
         self._ensure_workflow().wait_stable(
             timeout=timeout,
             threshold=threshold,
             interval=interval,
             stable_duration=stable_duration,
             least=least,
+            crop_box=crop_box,
         )
 
     def _resolve_ws_param(self, param, name: str) -> float:
@@ -465,6 +468,57 @@ class _ActionsMixin:
             return float(val)
         # fallback: 尝试直接转换
         return float(param)
+
+    def _resolve_area_crop(self, area) -> dict | None:
+        """将 area (SceneRef) 解析为像素裁剪框 {'x', 'y', 'w', 'h'}
+
+        用于 wait stable on [scene].[region] 的区域限定。
+        返回 None 表示全画面检测（area 为 None 时）。
+        scene 和 region 均支持 $var 动态引用。
+        """
+        if area is None:
+            return None
+        if isinstance(area, SceneRef):
+            # 解析 scene（支持 VarRef）
+            if isinstance(area.scene, VarRef):
+                scene = self.variables.get(area.scene.name)
+                if scene is None:
+                    raise WorkflowUserError(
+                        f"wait stable on: 变量 ${area.scene.name} 未定义"
+                    )
+                scene = str(scene)
+            else:
+                scene = str(area.scene)
+
+            # 解析 region（支持 VarRef）
+            region_key = area.region
+            if isinstance(region_key, VarRef):
+                region_key = self.variables.get(region_key.name)
+                if region_key is None:
+                    raise WorkflowUserError(
+                        f"wait stable on: 变量 ${area.region.name} 未定义"
+                    )
+            region_key = str(region_key)
+
+            regions = self._layout.get_scene_regions(scene)
+            region_obj = next((r for r in regions if r.key == region_key), None)
+            if region_obj is None:
+                raise WorkflowUserError(
+                    f"wait stable on [{scene}].[{region_key}]: 区域未绑定"
+                )
+            x_r, y_r, w_r, h_r = (
+                region_obj.x_ratio, region_obj.y_ratio,
+                region_obj.w_ratio, region_obj.h_ratio,
+            )
+            # 归一化坐标 → 像素（相对于截图，不含窗口偏移）
+            w, h = self._capture.get_capture_size()
+            canvas = self._layout.get_canvas()
+            px = int((canvas.x_ratio + x_r * canvas.w_ratio) * w)
+            py = int((canvas.y_ratio + y_r * canvas.h_ratio) * h)
+            pw = max(1, int(w_r * canvas.w_ratio * w))
+            ph = max(1, int(h_r * canvas.h_ratio * h))
+            return {"x": px, "y": py, "w": pw, "h": ph}
+        raise WorkflowUserError(f"wait stable on: 不支持的区域类型: {type(area)}")
 
     def _found_region_to_screen(self, found_region, jitter: bool = True) -> tuple[int, int]:
         """FoundRegion → 屏幕坐标（取区域中心，可选抖动）"""

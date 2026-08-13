@@ -364,6 +364,51 @@ def test_wait_stable_reversed_opts():
     assert n.least == 0.3
 
 
+def test_wait_stable_on_region():
+    """wait stable 5 on [scene].[region] — 区域限定"""
+    program = parse_text("wait stable 5 on [equip_page].[bag_area]")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 5.0
+    assert isinstance(n.area, SceneRef)
+    assert n.area.scene == "equip_page"
+    assert n.area.region == "bag_area"
+
+
+def test_wait_stable_on_with_opts():
+    """wait stable 5 on [scene].[region] threshold 0.05 — 区域 + 选项"""
+    program = parse_text("wait stable 5 on [equip_page].[bag_area] threshold 0.05 interval 0.2")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.timeout == 5.0
+    assert n.threshold == 0.05
+    assert n.interval == 0.2
+    assert isinstance(n.area, SceneRef)
+    assert n.area.scene == "equip_page"
+    assert n.area.region == "bag_area"
+
+
+def test_wait_stable_no_area_default():
+    """wait stable 5 — area 默认为 None（全画面）"""
+    program = parse_text("wait stable 5")
+    n = program.body[0]
+    assert isinstance(n, WaitStable)
+    assert n.area is None
+
+
+def test_click_after_wait_stable_on_region():
+    """click [x].[y] after wait stable 5 on [scene].[region] — wait_clause 组合语法"""
+    program = parse_text("click [main].[btn] after wait stable 5 on [equip_page].[bag_area]")
+    # click after wait stable 展开为 [Click, WaitStable]
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Click)
+    ws = program.body[1]
+    assert isinstance(ws, WaitStable)
+    assert isinstance(ws.area, SceneRef)
+    assert ws.area.scene == "equip_page"
+    assert ws.area.region == "bag_area"
+
+
 # ─── click/drag wait 语法糖测试 ─────────────────────────────
 
 def test_click_after_wait():

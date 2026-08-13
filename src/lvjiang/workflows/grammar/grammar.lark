@@ -107,10 +107,12 @@ drag_hold: "hold"i number
 wait_stmt: "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range) _NL
 
 // wait stable：等待画面稳定（连续截图对比，差异低于阈值持续 stable_duration 秒）
-// 语法：wait stable <timeout> [threshold <value>] [interval <value>] [duration <value>] [least <value>]
+// 语法：wait stable <timeout> [on [scene].[region]] [threshold <value>] [interval <value>] [duration <value>] [least <value>]
 // 参数支持数值、命名延迟(@)、变量($)
+// on 子句：限定稳定检测区域（半屏 UI + 半屏动画场景下，只对指定区域做 diff）
 wait_stable_stmt: "wait"i wait_stable_ref _NL
-wait_stable_ref: "stable"i (delay_ref | var_ref | number) wait_stable_opts?
+wait_stable_ref: "stable"i (delay_ref | var_ref | number) wait_stable_on? wait_stable_opts?
+wait_stable_on: "on"i const_or_var "." const_or_var
 wait_stable_opts: wait_stable_opt+
 wait_stable_opt: wait_stable_threshold
                | wait_stable_interval

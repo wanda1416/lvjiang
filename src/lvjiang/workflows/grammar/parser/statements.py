@@ -346,7 +346,7 @@ class _StmtMixin:
         return items[0]
 
     def wait_stable_ref(self, items):
-        """stable <timeout> [threshold <v>] [interval <v>] [duration <v>] [least <v>] → WaitStable
+        """stable <timeout> [on [scene].[region]] [threshold <v>] [interval <v>] [duration <v>] [least <v>] → WaitStable
 
         参数支持三种形式：number(float) / delay_ref(NAME Token) / var_ref(VarRef)
         """
@@ -355,15 +355,24 @@ class _StmtMixin:
         interval = 0.3
         stable_duration = 0.5
         least = 0.5
-        if len(items) > 1 and isinstance(items[1], dict):
-            opts = items[1]
-            threshold = opts.get("threshold", threshold)
-            interval = opts.get("interval", interval)
-            stable_duration = opts.get("stable_duration", stable_duration)
-            least = opts.get("least", least)
+        area = None
+        for item in items[1:]:
+            if isinstance(item, SceneRef):
+                area = item
+            elif isinstance(item, dict):
+                threshold = item.get("threshold", threshold)
+                interval = item.get("interval", interval)
+                stable_duration = item.get("stable_duration", stable_duration)
+                least = item.get("least", least)
         return WaitStable(timeout=timeout, threshold=threshold,
                           interval=interval, stable_duration=stable_duration,
-                          least=least, line_no=self._line(items))
+                          least=least, area=area, line_no=self._line(items))
+
+    def wait_stable_on(self, items):
+        """on [scene].[region] → SceneRef（区域限定子句）"""
+        scene_val = self._resolve_const_or_var(items[0])
+        region_val = self._resolve_const_or_var(items[1])
+        return SceneRef(scene=scene_val, region=region_val)
 
     def _to_ws_param(self, item):
         """将 wait stable 参数项转为 Literal / VarRef / float"""

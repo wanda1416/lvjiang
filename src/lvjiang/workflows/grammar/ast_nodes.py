@@ -77,12 +77,16 @@ class WaitStable:
     - float: 直接数值
     - Literal: 命名延迟引用（@delay_name），运行时从延迟参数表查找
     - VarRef: 变量引用（$var），运行时从变量表查找
+
+    area: 限定检测区域（SceneRef），为 None 时检测全画面。
+    用于半屏 UI + 半屏动画场景，只对指定区域做 diff 对比。
     """
     timeout: Any            # 最大等待秒数（总超时）
     threshold: Any = 0.02   # 像素差异率阈值
     interval: Any = 0.3     # 截图对比间隔秒数
     stable_duration: Any = 0.5  # 画面需持续稳定的时长（秒）
     least: Any = 0.5        # 最低等待秒数（点击后至少等这么久再开始检测稳定）
+    area: Any = None        # 区域限定：SceneRef（[scene].[region]）或 None（全画面）
     line_no: int = 0
 
 

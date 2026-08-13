@@ -137,11 +137,15 @@ class _ActionMixin:
 
     def wait_stable(self, timeout: float | str, threshold: float = 0.02,
                     interval: float = 0.3, stable_duration: float = 0.5,
-                    least: float = 0.5):
+                    least: float = 0.5, crop_box: dict | None = None):
         """等待画面稳定（连续截图对比）
 
         每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
         视为「画面没变」。连续稳定时长达到 stable_duration 秒后返回。
+
+        crop_box: 像素裁剪框 {'x', 'y', 'w', 'h'}，只对指定区域做 diff 对比。
+        用于半屏 UI + 半屏动画场景，避免游戏画面动画干扰稳定检测。
+        为 None 时检测全画面（向后兼容）。
 
         timeout 是等待预算而非硬性断言：预算内未稳定时记录警告并继续
         执行（游戏画面常有持续动画，永远达不到阈值是常态，不应终止流程）。
@@ -184,6 +188,18 @@ class _ActionMixin:
             if img is None:
                 time.sleep(interval)
                 continue
+
+            # 区域限定：裁剪到指定区域后再做 diff 对比
+            if crop_box is not None:
+                x, y, w, h = crop_box["x"], crop_box["y"], crop_box["w"], crop_box["h"]
+                ih, iw = img.shape[:2]
+                x1, y1 = max(0, min(x, iw)), max(0, min(y, ih))
+                x2, y2 = max(0, min(x + w, iw)), max(0, min(y + h, ih))
+                if x2 <= x1 or y2 <= y1:
+                    # 裁剪区域无效，回退到全画面
+                    pass
+                else:
+                    img = img[y1:y2, x1:x2]
 
             # least 期间：只截图建立基准，不判断稳定
             if prev is not None and time.monotonic() >= least_until:

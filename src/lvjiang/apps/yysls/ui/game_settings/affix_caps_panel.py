@@ -40,6 +40,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.game_config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
+from .level_combo import LevelCombo
+
 
 def _selectAll(checks: list) -> None:
     for cb in checks:
@@ -371,9 +373,11 @@ class AffixCapsPanel(QWidget):
             # 计算承音值（94%）
             chengyin = round(cap * _CHENGYIN_RATIO, 2)
 
-            # 等级（可编辑）
-            level_item = QTableWidgetItem(str(level))
-            self._table.setItem(row, 0, level_item)
+            # 等级（下拉选择）
+            level_combo = LevelCombo(allow_empty=False)
+            level_combo.set_level(int(level) if str(level).isdigit() else None)
+            level_combo.currentIndexChanged.connect(lambda _v, r=row: self._on_cell_changed(r, 0))
+            self._table.setCellWidget(row, 0, level_combo)
 
             # 上限（可编辑）
             cap_item = QTableWidgetItem(str(cap))
@@ -497,14 +501,24 @@ class AffixCapsPanel(QWidget):
         if not self._current_affix:
             return
 
-        # 直接插入空行
+        # 插入空行，等级列用下拉选择
         row = self._table.rowCount()
         self._table.insertRow(row)
 
-        # 所有列留空，让用户填写
-        for col in range(self._table.columnCount()):
-            item = QTableWidgetItem("")
-            self._table.setItem(row, col, item)
+        # 等级列用下拉选择（允许空，用户可选择）
+        level_combo = LevelCombo(allow_empty=True)
+        level_combo.currentIndexChanged.connect(lambda _v, r=row: self._on_cell_changed(r, 0))
+        self._table.setCellWidget(row, 0, level_combo)
+
+        # 上限列留空
+        cap_item = QTableWidgetItem("")
+        self._table.setItem(row, 1, cap_item)
+
+        # 承音列留空（只读）
+        chengyin_item = QTableWidgetItem("")
+        chengyin_item.setFlags(chengyin_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        chengyin_item.setForeground(Qt.GlobalColor.gray)
+        self._table.setItem(row, 2, chengyin_item)
 
     def _del_level(self):
         """删除当前选中的等级"""
@@ -513,19 +527,13 @@ class AffixCapsPanel(QWidget):
             QMessageBox.information(self, "提示", "请先选择要删除的等级")
             return
 
-        level_item = self._table.item(row, 0)
-        if not level_item:
+        level_combo = self._table.cellWidget(row, 0)
+        if not isinstance(level_combo, LevelCombo):
             return
 
-        level_text = level_item.text().strip()
-        if not level_text:
+        level = level_combo.get_level()
+        if level is None:
             # 空行直接删除
-            self._table.removeRow(row)
-            return
-
-        try:
-            level = int(level_text)
-        except ValueError:
             self._table.removeRow(row)
             return
 
@@ -561,19 +569,22 @@ class AffixCapsPanel(QWidget):
         level_caps.update(internal)
 
         for row in range(self._table.rowCount()):
-            level_item = self._table.item(row, 0)
+            level_combo = self._table.cellWidget(row, 0)
             cap_item = self._table.item(row, 1)
 
-            if not level_item or not cap_item:
+            if not isinstance(level_combo, LevelCombo) or not cap_item:
                 continue
 
-            level_text = level_item.text().strip()
-            if not level_text:
-                continue  # 跳过空行
+            level = level_combo.get_level()
+            if level is None:
+                continue  # 跳过未选择等级的行
+
+            cap_text = cap_item.text().strip()
+            if not cap_text:
+                continue
 
             try:
-                level = int(level_text)
-                cap = float(cap_item.text())
+                cap = float(cap_text)
                 # 如果是整数，存 int
                 if cap == int(cap):
                     cap = int(cap)
@@ -1093,3 +1104,10 @@ class AffixCapsPanel(QWidget):
                 for alias in raw:
                     result[alias] = category
         return result
+
+    def refresh_level_combos(self):
+        """刷新表格中的等级下拉列表（等级配置变更后调用）"""
+        for row in range(self._table.rowCount()):
+            combo = self._table.cellWidget(row, 0)
+            if isinstance(combo, LevelCombo):
+                combo.refresh()

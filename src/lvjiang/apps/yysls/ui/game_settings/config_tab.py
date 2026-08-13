@@ -51,4 +51,13 @@ class GameConfigTab(QWidget):
         self._season_panel = SeasonConfigPanel()
         self._tabs.addTab(self._season_panel, "赛季配置")
 
+        # 等级配置保存后，刷新其他面板中的 LevelCombo
+        self._level_panel.level_configs_saved.connect(self._refresh_level_combos)
+
         layout.addWidget(self._tabs)
+
+    def _refresh_level_combos(self):
+        """刷新所有面板中的 LevelCombo（等级配置变更后调用）"""
+        self._affix_panel.refresh_level_combos()
+        self._base_panel.refresh_level_combos()
+        self._season_panel.refresh_level_combos()

@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMenu,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -138,6 +139,10 @@ class MaterialConfigPage(QWidget):
             _SEQ_COL, QHeaderView.ResizeMode.Fixed)
         self._table.setColumnWidth(_SEQ_COL, 32)
         self._table.verticalHeader().setVisible(False)
+        self._table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(
+            self._on_rule_context_menu)
         layout.addWidget(self._table)
 
         btn_row = QHBoxLayout()
@@ -173,6 +178,7 @@ class MaterialConfigPage(QWidget):
         # 序号列（只读标签）
         seq_label = QLabel(str(row + 1))
         seq_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        seq_label.setProperty("rule_enabled", rule.enabled)
         self._table.setCellWidget(row, _SEQ_COL, seq_label)
 
         pct = QSpinBox()
@@ -211,6 +217,31 @@ class MaterialConfigPage(QWidget):
         action.setCurrentIndex(max(action.findData(rule.on_insufficient), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
         self._table.setCellWidget(row, 5, action)
+        self._set_row_enabled(row, rule.enabled)
+
+    def _on_rule_context_menu(self, pos) -> None:
+        index = self._table.indexAt(pos)
+        if not index.isValid() or index.column() != _SEQ_COL:
+            return
+        row = index.row()
+        seq = self._table.cellWidget(row, _SEQ_COL)
+        enabled = bool(seq.property("rule_enabled"))
+        menu = QMenu(self._table)
+        action = menu.addAction("禁用" if enabled else "启用")
+        if menu.exec(self._table.viewport().mapToGlobal(pos)) is action:
+            self._set_row_enabled(row, not enabled)
+            self._apply()
+
+    def _set_row_enabled(self, row: int, enabled: bool) -> None:
+        seq = self._table.cellWidget(row, _SEQ_COL)
+        if seq is not None:
+            seq.setProperty("rule_enabled", enabled)
+            seq.setStyleSheet("" if enabled else "color: gray;")
+            seq.setToolTip("右键禁用" if enabled else "规则已禁用；右键启用")
+        for col in range(1, self._table.columnCount()):
+            widget = self._table.cellWidget(row, col)
+            if widget is not None:
+                widget.setEnabled(enabled)
 
     # ── 回填 ──
 
@@ -300,6 +331,7 @@ class MaterialConfigPage(QWidget):
         food.setCurrentIndex(max(food.findData(values["food"]), 0))
         action: QComboBox = self._table.cellWidget(row, 5)
         action.setCurrentIndex(max(action.findData(values["on_insufficient"]), 0))
+        self._set_row_enabled(row, values.get("enabled", True))
 
     # ── 收集 → 校验 → 写盘 → reload ──
 
@@ -310,7 +342,9 @@ class MaterialConfigPage(QWidget):
         quality: QComboBox = self._table.cellWidget(row, 3)
         food: QComboBox = self._table.cellWidget(row, 4)
         action: QComboBox = self._table.cellWidget(row, 5)
+        seq = self._table.cellWidget(row, _SEQ_COL)
         return {
+            "enabled": bool(seq.property("rule_enabled")),
             "pct": pct.value(),
             "min_expect": expect.currentData(),
             "min_quality": quality.currentData(),

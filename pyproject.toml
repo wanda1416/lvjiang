@@ -27,6 +27,7 @@ dev = [
     "pytest-qt>=4.0",
     "ruff>=0.6",
     "mypy>=1.10",
+    "pygls>=1.3,<2.0",  # Language Server for VS Code extension (2.x API changed)
 ]
 
 # src-layout：`src/` 只是源根，不是包；可导入的包是 src/lvjiang/。

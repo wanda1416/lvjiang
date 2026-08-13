@@ -67,6 +67,7 @@ class FloatService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         startForeground(NOTIFICATION_ID, buildNotification("悬浮控制运行中"))
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         addFloatIcon()
@@ -75,6 +76,7 @@ class FloatService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         ui.removeCallbacks(poller)
         closePanel()
         floatView?.let { runCatching { windowManager.removeView(it) } }
@@ -412,6 +414,12 @@ class FloatService : Service() {
         (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        /** 悬浮图标是否在运行：引导页据此决定主按钮是「启动」还是「就绪」。
+         *  服务与 Activity 同进程，静态标志足够，不值得上 dumpsys/绑定查询 */
+        @Volatile
+        var isRunning = false
+            private set
+
         private const val TAG = "FloatService"
         private const val NOTIFICATION_ID = 1
         private const val ICON_SIZE_PX = 140

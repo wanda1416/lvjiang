@@ -1,6 +1,6 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-07-31（Phase 4 进行中：release 包实机复验通过，R8 未破坏 Chaquopy 反射面）
+> 最后更新：2026-07-31（Phase 4 进行中：首启引导流程完成，e2e 回归补上两处 R8 反射面破口）
 
 ---
 
@@ -12,7 +12,7 @@
 | Phase 1：三通道 PoC（截图/OCR/点击） | ✅ 完成 | e2e 自检 7 步全绿，检查点 2 已提交（`926d55e`） |
 | Phase 2：核心逻辑移植与配置分层 | ✅ 完成 | pydantic 剥离 + 基类继承 + 系统配置 APK 分发 + 布局分发（`1c0b754`） |
 | Phase 3：工作流引擎设备端跑通 | ✅ 完成 | DSL 引擎实机执行验证通过（`a3052ec` + `9aa140a`） |
-| Phase 4：打包发布与稳定性 | 🚧 进行中 | R8 + 签名基础设施已就位；release 实机复验 + 引导流程待做 |
+| Phase 4：打包发布与稳定性 | 🚧 进行中 | release 复验 + 首启引导完成；剩真实业务上机 + 正式签名 |
 
 ---
 
@@ -184,7 +184,22 @@
     openFile 里校验调用方必须是 shell/root uid；`run_selftest.py` 自动降级
   - `task` 自检 5 步全绿：任务清单 7 项 → start_task ok → 0.7s 跑完
     device_smoke_test → 终态 done → 互斥校验通过，R8 没砍 Chaquopy 反射面
-- [ ] 用户引导流程（首次启动 → 开无障碍 → 悬浮窗权限 → 开始使用）
+- [x] **用户引导流程**（2026-07-31）
+  - `activity_main.xml` 重构：引导区（权限清单 ✅/⬜ + 一颗主按钮 + 每步提示行）
+    在上，Phase 0 以来的开发者自检按钮全部收进默认折叠的「高级」面板
+  - `MainActivity` 引导状态机：主按钮永远指向第一个未完成项
+    （无障碍 → 悬浮窗 → 启动悬浮图标 → 就绪）；通知权限不单独设步，
+    启动悬浮图标时顺带申请；`FloatService.isRunning` 静态标志供引导页判断
+  - 自检模式（`--es selftest`）隐藏引导区、展开高级面板：布局回到实机
+    验证过的旧版形态，e2e 的 OCR 目标不受引导文案干扰
+  - 主题换 `DayNight.NoActionBar` + `fitsSystemWindows`：targetSdk 35 强制
+    edge-to-edge，原先内容顶进状态栏、系统 ActionBar 叠在自带大标题上
+  - 实机验证：三项权限全绿时主按钮一点即启动悬浮图标并翻成「运行中」；
+    e2e 回归三通道闭环全部通过（OCR 12 框 → 命中目标 → 点击落地）
+  - **e2e 回归抓到两处 R8 反射面破口**（之前 task 目标没走到这两条路径）：
+    `OnnxOutput` 字段被砍（`'q' object has no attribute 'data'`）、`ShellBridge`
+    类名被混淆（`No module named 'com'`），proguard-rules.pro 已补 keep 并复验
+- [x] versionCode 4 已上机（config 变更随之重新解压）
 
 ### 本轮新增验证设施
 
@@ -214,12 +229,18 @@
   AM 只报「delivered to top-most instance」但 onCreate/onNewIntent 都不走
   （standard launchMode 无 SINGLE_TOP flag）。先 BACK 销毁实例再 start 即可，
   不必 force-stop（那会连无障碍服务一起杀掉）。
+- **R8 反射面要 keep 到「返回类的字段」粒度**：keep 了 OnnxBridge 的方法不等于
+  keep 它返回的 OnnxOutput；Python 侧 `from com.lvjiang.app import X` 的每个 X
+  及其返回类型都必须整类 keep（含 `<fields>`）。task 目标跑绿不代表反射面
+  完整，e2e 这种走全链路的目标才是 release 复验的有效判据。
+- **覆盖安装（`pm install -r`）不撤销无障碍授权**：2026-07-31 实测两次覆盖安装
+  后无障碍/悬浮窗/通知全部保留，且未弹确认框；之前「重装撤销授权」的记录
+  针对的是卸载重装场景。悬浮服务会被杀掉，需重新点「启动悬浮图标」。
 
 ---
 
 ## 下一步操作（按顺序）
 
-1. **首次启动引导流程**（权限一步步过：无障碍 → 悬浮窗 → 主界面）
-2. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
-3. **正式签名**：生成 keystore + 写 `android/README-signing.md` 说明文档
+1. **真实业务工作流上机**（自动调律 / 装备分析，需游戏环境）
+2. **正式签名**：生成 keystore + 写 `android/README-signing.md` 说明文档
 

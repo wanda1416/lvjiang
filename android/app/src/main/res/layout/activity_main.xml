@@ -1,13 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="24dp">
+
+        <!-- ── 首次启动引导区：一行一个权限，主按钮永远指向下一件要做的事 ── -->
+
+        <TextView
+            android:id="@+id/guide_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/guide_title"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/guide_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/guide_subtitle"
+            android:textSize="14sp"
+            android:paddingBottom="16dp" />
+
+        <TextView
+            android:id="@+id/check_a11y"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:paddingBottom="6dp" />
+
+        <TextView
+            android:id="@+id/check_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:paddingBottom="6dp" />
+
+        <TextView
+            android:id="@+id/check_notification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:paddingBottom="16dp" />
+
+        <Button
+            android:id="@+id/btn_next"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/guide_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp" />
+
+        <!-- ── 状态行：自检报告回填 + 点击回显目标，e2e 闭环靠 OCR 读这里 ── -->
 
         <TextView
             android:id="@+id/status_text"
@@ -17,61 +74,81 @@
             android:textSize="15sp"
             android:paddingBottom="16dp" />
 
-        <Button
-            android:id="@+id/btn_overlay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_overlay" />
+        <!-- ── 高级面板：开发者自检按钮，默认折叠；adb 触发自检时自动展开 ── -->
 
-        <Button
-            android:id="@+id/btn_a11y"
+        <TextView
+            android:id="@+id/advanced_toggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/btn_a11y" />
+            android:text="@string/advanced_collapsed"
+            android:textSize="15sp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
 
-        <Button
-            android:id="@+id/btn_shizuku"
+        <LinearLayout
+            android:id="@+id/advanced_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/btn_shizuku" />
+            android:orientation="vertical"
+            android:visibility="gone">
 
-        <Button
-            android:id="@+id/btn_notification"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_notification" />
+            <Button
+                android:id="@+id/btn_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_overlay" />
 
-        <Button
-            android:id="@+id/btn_start_float"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_start_float" />
+            <Button
+                android:id="@+id/btn_a11y"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_a11y" />
 
-        <Button
-            android:id="@+id/btn_stop_float"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_stop_float" />
+            <Button
+                android:id="@+id/btn_shizuku"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_shizuku" />
 
-        <Button
-            android:id="@+id/btn_test_shell"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_test_shell" />
+            <Button
+                android:id="@+id/btn_notification"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_notification" />
 
-        <Button
-            android:id="@+id/btn_test_python"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_test_python" />
+            <Button
+                android:id="@+id/btn_start_float"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_start_float" />
 
-        <!-- 三通道闭环自检的被点目标：点中后上方状态行会出现「已生效」，
-             而这三个字在点击前的界面上不存在，因此 OCR 自己就能判定点击是否真的落地 -->
-        <Button
-            android:id="@+id/btn_test_click"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_test_click" />
+            <Button
+                android:id="@+id/btn_stop_float"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_stop_float" />
+
+            <Button
+                android:id="@+id/btn_test_shell"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_test_shell" />
+
+            <Button
+                android:id="@+id/btn_test_python"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_test_python" />
+
+            <!-- 三通道闭环自检的被点目标：点中后上方状态行会出现「已生效」，
+                 而这三个字在点击前的界面上不存在，因此 OCR 自己就能判定点击是否真的落地 -->
+            <Button
+                android:id="@+id/btn_test_click"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_test_click" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>

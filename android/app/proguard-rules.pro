@@ -6,17 +6,28 @@
 -keepclassmembers class com.lvjiang.app.A11yBridge {
     public static final com.lvjiang.app.A11yBridge INSTANCE;
 }
--keepclassmembers class com.lvjiang.app.OnnxBridge {
-    public static final com.lvjiang.app.OnnxBridge INSTANCE;
+-keepclassmembers class com.lvjiang.app.ShellBridge {
+    public static final com.lvjiang.app.ShellBridge INSTANCE;
 }
 
 # A11yBridge 的公开方法（Python 侧调用 .takeScreenshot / .dispatchClick 等）
 -keep class com.lvjiang.app.A11yBridge {
     public *;
 }
-# OnnxBridge 的公开方法（Python 侧调用 .runSession）
+# ShellBridge：shell.py 反射导入（from com.lvjiang.app import ShellBridge）。
+# 类名被 R8 混淆后 Chaquopy 直接报 No module named 'com'（e2e 实机踩到）
+-keep class com.lvjiang.app.ShellBridge {
+    public *;
+}
+# OnnxBridge 的公开方法（Python 侧调用 .run / .metadata / .close）
 -keep class com.lvjiang.app.OnnxBridge {
     public *;
+}
+# OnnxOutput：run() 的返回类，Python 侧读 .data / .shape 字段。
+# 只 keep 方法不 keep 字段时 R8 会把它砍成 'q' object has no attribute 'data'（e2e 实机踩到）
+-keep class com.lvjiang.app.OnnxOutput {
+    public *;
+    <fields>;
 }
 
 # PyBridge：Kotlin 调 Python 的入口，Chaquopy 反射找 com.chaquo.python.Python.start

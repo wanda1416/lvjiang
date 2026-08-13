@@ -62,9 +62,9 @@ select = ["E", "F", "W", "B", "I"]
 # E501：存量长行较多，避免一次性全仓重排；新代码自觉控制行宽
 ignore = ["E501"]
 
-# mypy 先覆盖非 UI 纯逻辑区（workflows + core），UI 层后续再收编
+# mypy 覆盖全部 src 代码
 [tool.mypy]
-files = ["src/lvjiang/workflows", "src/lvjiang/core"]
+files = ["src"]
 ignore_missing_imports = true
 # attr-defined/has-type：Mixin 拆分架构下宿主属性在组装类才存在，
 # 单文件视角必然报未定义，属架构噪音；待 Protocol 声明宿主接口后再启用

@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.config import get_session_store
 from lvjiang.core.user_config import UserConfigManager
 
+from .....i18n import tr
 from ...config.profile_models import (
     MODEL_LABELS,
     MODEL_QUOTA,
@@ -71,7 +72,6 @@ from .cell_formatting import (
 )
 from .dialogs import HistoryDialog, ask_value_dialog
 from .tab import REFRESH_BTN_STYLE
-from .....i18n import tr
 
 # 列宽配置仍在 ui_state 下
 _COLUMN_WIDTHS_KEY = "profile_overview_column_widths"

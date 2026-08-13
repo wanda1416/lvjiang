@@ -14,6 +14,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QComboBox, QWidget
 
 from lvjiang.apps.yysls.config import get_game_config
+
 from .....i18n import tr
 
 

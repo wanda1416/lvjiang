@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-
 from .affix_picker import AffixSelectSortDialog
 
 

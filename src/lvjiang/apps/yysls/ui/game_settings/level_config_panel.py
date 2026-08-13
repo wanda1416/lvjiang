@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import LevelConfig, get_game_config
+
 from .....i18n import tr
 
 # 列定义

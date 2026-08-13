@@ -35,8 +35,8 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, WUXUE_CATEGORY
-from .....i18n import tr
 
+from .....i18n import tr
 from .level_combo import LevelCombo
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）

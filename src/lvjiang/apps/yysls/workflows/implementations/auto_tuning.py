@@ -189,7 +189,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def run(self) -> dict:
         # 兜底创建进度信号桥（tuning_tab 启动时已在 configure 中创建，
         # 此处覆盖日常启动 / 批量运行等未经 tuning_tab 的场景）
-        if not hasattr(self.engine, '_progress_hub') or self.engine._progress_hub is None:
+        if self.engine is not None and (
+            not hasattr(self.engine, '_progress_hub') or self.engine._progress_hub is None
+        ):
             from lvjiang.apps.yysls.ui.tuning_progress_hub import TuningProgressHub
             self.engine._progress_hub = TuningProgressHub()
         # 预检：当前图库空间必须满足调律输出字段契约（levels/counts）

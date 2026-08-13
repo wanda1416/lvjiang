@@ -39,8 +39,8 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
-from .....i18n import tr
 
+from .....i18n import tr
 from .level_combo import LevelCombo
 
 

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .....i18n import tr
 from ...config.profile_models import (
     MODEL_LABELS,
     MODEL_QUOTA,
@@ -29,7 +30,6 @@ from ...config.profile_models import (
 )
 from ...profile.profile_db import db_read_all
 from ...profile.regen_math import compute_regen_entry
-from .....i18n import tr
 
 # 统一的刷新按钮样式（overview.py 与 tab.py 共用）
 REFRESH_BTN_STYLE = (

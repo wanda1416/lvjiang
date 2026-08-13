@@ -68,6 +68,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     rule_affix_candidates,
 )
 from lvjiang.apps.yysls.ui.game_settings.level_combo import LevelCombo
+
 from .....i18n import tr
 
 # 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）

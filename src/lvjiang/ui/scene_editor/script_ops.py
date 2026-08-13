@@ -96,9 +96,9 @@ class ScriptOpsMixin:
 
     # ─── 脚本执行 ────────────────────────────────────────
 
-    def showEvent(self, event: QShowEvent):
+    def showEvent(self, event: QShowEvent | None):  # type: ignore[misc]
         """对话框首次显示时填充用户下拉列表"""
-        super().showEvent(event)
+        super().showEvent(event)  # type: ignore[misc]
         main_win = self.parent()
         if main_win is not None and hasattr(main_win, '_user_manager'):
             self._refresh_script_user_combo(main_win)

@@ -29,7 +29,6 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-
 from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）

@@ -15,7 +15,6 @@ from typing import Callable
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from .....i18n import tr
-
 from .condition_editor import ConditionGroupsEditor
 from .part_pattern_page import TierTabsWidget
 

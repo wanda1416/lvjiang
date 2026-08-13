@@ -44,6 +44,8 @@ class FloatService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var floatView: ImageView? = null
+    /** 悬浮图标的布局参数（拖动时就地更新 x/y），面板开展时据此贴近图标 */
+    private var floatParams: WindowManager.LayoutParams? = null
     private var panelView: View? = null
     private var statusLine: TextView? = null
     private var logLine: TextView? = null
@@ -142,6 +144,7 @@ class FloatService : Service() {
 
         windowManager.addView(icon, params)
         floatView = icon
+        floatParams = params
     }
 
     private fun tintIcon(state: String) {
@@ -184,7 +187,7 @@ class FloatService : Service() {
 
         val status = TextView(this).apply {
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             text = "读取状态…"
         }
         root.addView(status)
@@ -192,9 +195,9 @@ class FloatService : Service() {
 
         val log = TextView(this).apply {
             setTextColor(0xFFAAAAAA.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
             maxLines = LOG_TAIL_LINES
-            setPadding(0, dp(4), 0, dp(6))
+            setPadding(0, dp(3), 0, dp(4))
         }
         root.addView(log)
         logLine = log
@@ -209,7 +212,7 @@ class FloatService : Service() {
             ScrollView(this).apply {
                 addView(actions)
                 layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(260),
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(170),
                 )
             }
         )
@@ -217,8 +220,9 @@ class FloatService : Service() {
 
         root.addView(smallButton("收起") { closePanel() })
 
+        val panelW = dp(220)
         val params = WindowManager.LayoutParams(
-            dp(240), WindowManager.LayoutParams.WRAP_CONTENT,
+            panelW, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             // 不要 FLAG_NOT_TOUCHABLE：面板里的按钮要能点。
             // 也不加 FLAG_NOT_FOCUSABLE 之外的输入相关 flag，避免抢走游戏的触摸。
@@ -226,8 +230,7 @@ class FloatService : Service() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dp(16)
-            y = dp(120)
+            anchorPanelToIcon(this, panelW)
         }
 
         windowManager.addView(root, params)
@@ -238,21 +241,51 @@ class FloatService : Service() {
         refreshStatus()
     }
 
+    /**
+     * 把面板放到悬浮图标旁边（gravity 均为 TOP|START，故 x/y 直接用图标坐标系）。
+     *
+     * 横向：图标在左半屏→面板贴在图标右侧；在右半屏→贴左侧，避免越界。
+     * 纵向：与图标顶端对齐向下展开；靠底时上提（面板高度 WRAP_CONTENT，用估计上限做 clamp）。
+     * 拿不到图标参数时退回原来的固定位置。
+     */
+    private fun anchorPanelToIcon(params: WindowManager.LayoutParams, panelW: Int) {
+        val icon = floatParams
+        if (icon == null) {
+            params.x = dp(16)
+            params.y = dp(120)
+            return
+        }
+        val metrics = resources.displayMetrics
+        val screenW = metrics.widthPixels
+        val screenH = metrics.heightPixels
+        val gap = dp(4)
+        val panelHApprox = dp(300)  // status + 日志 + 170dp 滚动区 + 收起按钮，估个上限用于 clamp
+
+        val toRight = icon.x + ICON_SIZE_PX / 2 < screenW / 2
+        val rawX = if (toRight) icon.x + ICON_SIZE_PX + gap else icon.x - panelW - gap
+        params.x = rawX.coerceIn(gap, maxOf(gap, screenW - panelW - gap))
+        params.y = icon.y.coerceIn(gap, maxOf(gap, screenH - panelHApprox))
+    }
+
     /** 面板里所有按钮长一个样，抽出来省掉 5 处重复 */
     private fun smallButton(label: String, onClick: () -> Unit): Button =
         Button(this).apply {
             text = label
             isAllCaps = false
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            minimumHeight = dp(38)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            // Button 默认内边距很占高度，显式压到最小才能真正把行高砍下来；
+            // minimumHeight 也一并调小，让行高由文字本身决定。
+            minimumHeight = dp(15)
+            minHeight = dp(15)
+            setPadding(dp(12), dp(2), dp(12), dp(2))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
                 setColor(0xFF3A3A3A.toInt())
             }
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(6) }
+            ).apply { topMargin = dp(3) }
             setOnClickListener { onClick() }
         }
 
@@ -320,7 +353,7 @@ class FloatService : Service() {
 
         val loading = TextView(this).apply {
             setTextColor(0xFFAAAAAA.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             text = "加载任务清单…"
         }
         area.addView(loading)
@@ -333,7 +366,7 @@ class FloatService : Service() {
                 if (!result.optBoolean("ok", false) || tasks == null || tasks.length() == 0) {
                     area.addView(TextView(this).apply {
                         setTextColor(0xFFFF8A80.toInt())
-                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                         text = result.optString("error").ifEmpty { "没有可执行任务" }
                     })
                     return@post
@@ -361,7 +394,16 @@ class FloatService : Service() {
             val ok = r.optBoolean("ok", false)
             toast(r.optString("message", if (ok) "已启动：$taskName" else "启动失败"))
             report("task start $taskId -> ok=$ok ${r.optString("message")}")
-            ui.post { refreshStatus() }
+            ui.post {
+                // 启动成功就收回面板，只留一个圆点（图标颜色反映运行中），不遮挡游戏。
+                // 面板关了也要继续轮询：refreshStatus 会给图标上色、转到运行态时启动 poller，
+                // 这样任务跑完/失败时图标能变蓝/变红。lastState 置为非运行态以确保检测到状态跳变。
+                if (ok) {
+                    closePanel()
+                    lastState = STATE_IDLE
+                }
+                refreshStatus()
+            }
         }
     }
 

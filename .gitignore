@@ -23,14 +23,16 @@ build/
 # Logs
 logs/
 
-# Local data (user overlay / session runtime)
-/config/local/
-/config/session/
+# local config (user overlay / session runtime)
+/config/local*
+/config/session*
+/config/system/workflows/_*
+
+# local data
 /data/local
 /data/video
 /data/picture
 /data/temp*
-/config/system/workflows/_*
 
 # OS
 Thumbs.db

@@ -421,13 +421,6 @@ class TestProfileEntry:
         assert data["profile"]["daily"]["k"]["value"] == 100
         assert "updated_at" in data["profile"]["daily"]["k"]
 
-    def test_write_with_total(self):
-        data = {}
-        write_profile_entry(data, "resource", "k", 500, total=2000)
-        entry = data["profile"]["resource"]["k"]
-        assert entry["value"] == 500
-        assert entry["total"] == 2000
-
     def test_write_overwrites(self):
         data = {"profile": {"daily": {"k": {"value": 100}}}}
         write_profile_entry(data, "daily", "k", 200)

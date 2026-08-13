@@ -21,6 +21,7 @@ class BatchEntry:
     phone_tail: str     # 手机尾号（OCR 匹配目标，如 "1234"）
     role: str           # 角色名（显示用）
     role_index: int     # 角色下标 1-4（role_list panel 行号）
+    enabled: bool = True  # 是否启用（配置页勾选）
 
     def to_dict(self) -> dict:
         return {
@@ -28,6 +29,7 @@ class BatchEntry:
             "phone_tail": self.phone_tail,
             "role": self.role,
             "role_index": self.role_index,
+            "enabled": self.enabled,
         }
 
     @staticmethod
@@ -37,6 +39,7 @@ class BatchEntry:
             phone_tail=d.get("phone_tail", ""),
             role=d.get("role", ""),
             role_index=int(d.get("role_index", 1)),
+            enabled=d.get("enabled", True),
         )
 
 

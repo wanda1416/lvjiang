@@ -21,7 +21,6 @@ from .models import (
     STONE_ACTIONS,
     TIER_KEYS,
     BehaviorRule,
-    BehaviorSettings,
     CommonConditions,
     Condition,
     ConditionGroup,
@@ -32,7 +31,8 @@ from .models import (
     RuleValidationError,
     ScanBehavior,
     TuneBehavior,
-    TuningBase,
+    TuneConfig,
+    TuningGroup,
     TuningRule,
     WeaponSide,
     rule_affix_candidates,
@@ -604,8 +604,8 @@ def _reject_stage_judge(raw: dict, where: str) -> None:
 
 
 def _parse_scan(raw, where: str) -> ScanBehavior:
-    """扫描处理解析：{enabled, entry_min_rating, rules}；缺省段取
-    ScanBehavior 默认值"""
+    """扫描处理解析：{enabled, min_level, entry_min_rating, rules}；
+    缺省段取 ScanBehavior 默认值"""
     if raw is None:
         return ScanBehavior()
     if not isinstance(raw, dict):
@@ -615,6 +615,13 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
         raise RuleValidationError(
             f"{where}.first_affix_only 已废弃，改为逐条规则声明"
             f"（{where}.rules[].first_affix_only）")
+    # ── min_level（等级门槛，缺省 100）──
+    min_level = raw.get("min_level", ScanBehavior.min_level)
+    if isinstance(min_level, bool) or not isinstance(min_level, int):
+        raise RuleValidationError(f"{where}.min_level 必须是整数")
+    if not (1 <= min_level <= 999):
+        raise RuleValidationError(
+            f"{where}.min_level 超出范围 [1, 999]: {min_level}")
     entry = raw.get("entry_min_rating", "excellent")
     if entry not in RATING_KEYS:
         raise RuleValidationError(
@@ -622,6 +629,7 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
             f"{list(RATING_KEYS)}）")
     return ScanBehavior(
         enabled=bool(raw.get("enabled", True)),
+        min_level=min_level,
         entry_min_rating=entry,
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
                                     "scan"),
@@ -658,22 +666,39 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
     )
 
 
-def _parse_behavior(raw, where: str = "behavior") -> BehaviorSettings:
-    """行为配置解析：缺省段取 BehaviorSettings 默认值"""
-    if raw is None:
-        return BehaviorSettings()
-    if not isinstance(raw, dict):
-        raise RuleValidationError(f"{where} 必须是 dict")
-    return BehaviorSettings(
-        scan=_parse_scan(raw.get("scan"), f"{where}.scan"),
-        tune=_parse_tune(raw.get("tune"), f"{where}.tune"),
+def parse_tuning_group(data: dict) -> TuningGroup:
+    """原始 tuning_groups/*.yaml dict → TuningGroup（校验失败抛
+    RuleValidationError）"""
+    if not isinstance(data, dict):
+        raise RuleValidationError("基础规则组顶层必须是 dict")
+
+    # ── key（小写英文标识，作文件名）──
+    key = str(data.get("key") or "").strip()
+    if not _KEY_RE.match(key):
+        raise RuleValidationError(
+            f"规则组 key 非法: {key!r}（须为小写字母开头的英文/数字/下划线）")
+
+    # ── name ──
+    name = str(data.get("name") or "").strip()
+    if not name:
+        raise RuleValidationError("规则组 name 不能为空")
+
+    return TuningGroup(
+        key=key,
+        name=name,
+        materials=_parse_materials(data.get("materials")),
+        scan=_parse_scan(data.get("scan"), "scan"),
+        tune=_parse_tune(data.get("tune"), "tune"),
     )
 
 
-def parse_tuning_base(data: dict) -> TuningBase:
-    """原始 tuning_base.yaml dict → TuningBase（校验失败抛 RuleValidationError）"""
+def parse_tune_config(data: dict) -> TuneConfig:
+    """原始 tune_config.yaml dict → TuneConfig（校验失败抛 RuleValidationError）
+
+    承载：base_rules（基础规则组声明）+ quality_thresholds + switches。
+    """
     if not isinstance(data, dict):
-        raise RuleValidationError("tuning_base 顶层必须是 dict")
+        raise RuleValidationError("tune_config 顶层必须是 dict")
     if "pvp" in data:
         raise RuleValidationError(
             "pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when")
@@ -681,14 +706,26 @@ def parse_tuning_base(data: dict) -> TuningBase:
         raise RuleValidationError(
             "recycle 段已废弃，请改用 behavior 行为配置"
             "（behavior.scan / behavior.tune）")
+    for legacy in ("min_level", "materials", "behavior"):
+        if legacy in data:
+            raise RuleValidationError(
+                f"{legacy} 段已迁移至基础规则组"
+                f"（tuning_groups/*.yaml），请从 tune_config.yaml 移除")
 
-    # ── min_level（等级门槛，缺省 100）──
-    min_level = data.get("min_level", TuningBase.min_level)
-    if isinstance(min_level, bool) or not isinstance(min_level, int):
-        raise RuleValidationError("min_level 必须是整数")
-    if not (1 <= min_level <= 999):
-        raise RuleValidationError(
-            f"min_level 超出范围 [1, 999]: {min_level}")
+    # ── base_rules（基础规则组声明）──
+    raw_base_rules = data.get("base_rules") or []
+    if not isinstance(raw_base_rules, list):
+        raise RuleValidationError("base_rules 必须是 list")
+    base_rules: list[str] = []
+    for item in raw_base_rules:
+        key = str(item).strip()
+        if not _KEY_RE.match(key):
+            raise RuleValidationError(
+                f"base_rules: 规则组 key 非法: {key!r}")
+        if key in base_rules:
+            raise RuleValidationError(
+                f"base_rules: 规则组 key 重复: {key}")
+        base_rules.append(key)
 
     # ── quality_thresholds（固定 7 个标准部位，须列全）──
     quality_thresholds = _parse_quality_thresholds(
@@ -713,10 +750,8 @@ def parse_tuning_base(data: dict) -> TuningBase:
             raise RuleValidationError(f"switches.{k}.name 不能为空")
         switches[k] = sw_name
 
-    return TuningBase(
-        min_level=min_level,
+    return TuneConfig(
+        base_rules=base_rules,
         quality_thresholds=quality_thresholds,
         switches=switches,
-        materials=_parse_materials(data.get("materials")),
-        behavior=_parse_behavior(data.get("behavior")),
     )

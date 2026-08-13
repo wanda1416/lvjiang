@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 )
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
-_ATTRS_REL = "yysls/attributes.yaml"
+_ATTRS_REL = "yysls/game_config.yaml"
 
 # 流派属性候选
 _SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]

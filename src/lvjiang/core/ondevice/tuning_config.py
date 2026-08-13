@@ -21,6 +21,7 @@ def get_tuning_config() -> str:
         JSON 文本::
 
             {"ok": bool,
+             "base_groups": [{"key", "name", "checked"}],
              "rules": [{"key", "name", "enabled",
                         "playstyles": [{"name", "summary", "checked"}]}],
              "slot_groups": [{"name",
@@ -34,11 +35,24 @@ def get_tuning_config() -> str:
         ensure_loaded()  # 规则注册表在 yysls 插件内，未加载时枚举为空
 
         from ...apps.yysls.evaluator import get_tuning_rules
-        from ...apps.yysls.evaluator.tuning_rules import get_tuning_base
+        from ...apps.yysls.evaluator.tuning_rules import (
+            get_tune_config,
+            get_tuning_group_manager,
+        )
         from ...apps.yysls.tune_config import TuneConfig
         from ...apps.yysls.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 
         tc = TuneConfig.load()
+
+        # 基础规则组：单选，无持久值时取第一个可用
+        group_key = tc.base_group
+        groups = get_tuning_group_manager().get_groups()
+        if group_key not in groups:
+            group_key = next(iter(groups), "")
+        base_groups = [
+            {"key": key, "name": group.name, "checked": key == group_key}
+            for key, group in get_tuning_group_manager().get_groups().items()
+        ]
 
         # 规则：无保存值时缺省与桌面一致（仅 huiyi_general 启用，玩法全勾）
         saved_rules: dict = tc.rules or {
@@ -77,17 +91,19 @@ def get_tuning_config() -> str:
         switches = [
             {"key": key, "name": name,
              "checked": bool(saved_switches.get(key, False))}
-            for key, name in get_tuning_base().switches.items()
+            for key, name in get_tune_config().switches.items()
         ]
 
         return json.dumps(
-            {"ok": True, "rules": rules, "slot_groups": slot_groups,
+            {"ok": True, "base_groups": base_groups, "rules": rules,
+             "slot_groups": slot_groups,
              "switches": switches, "error": ""},
             ensure_ascii=False,
         )
     except Exception as e:
         return json.dumps(
-            {"ok": False, "rules": [], "slot_groups": [], "switches": [],
+            {"ok": False, "base_groups": [], "rules": [], "slot_groups": [],
+             "switches": [],
              "error": f"{type(e).__name__}: {e}"},
             ensure_ascii=False,
         )
@@ -99,7 +115,8 @@ def save_tuning_config(payload: str) -> str:
     Args:
         payload: JSON 对象文本::
 
-            {"selected_slots": [部位 key],
+            {"base_group": 规则组 key（可缺省）,
+             "selected_slots": [部位 key],
              "rules": {规则 key: {"enabled": bool, "playstyles": [玩法名]}},
              "switches": {开关 key: bool}}
 
@@ -113,6 +130,9 @@ def save_tuning_config(payload: str) -> str:
         ensure_loaded()
 
         from ...apps.yysls.evaluator import get_tuning_rules
+        from ...apps.yysls.evaluator.tuning_rules import (
+            get_tuning_group_manager,
+        )
         from ...apps.yysls.tune_config import TuneConfig
         from ...apps.yysls.tune_slots import LOCKED_SLOTS, SLOT_LABELS
 
@@ -169,10 +189,19 @@ def save_tuning_config(payload: str) -> str:
 
         # skip_tuning 不进设备端 UI，保留会话原值（缺省 False）
         old = TuneConfig.load()
+
+        # 基础规则组：按注册表校验，非法/缺省回退会话原值
+        raw_group = data.get("base_group")
+        group_keys = get_tuning_group_manager().get_groups()
+        if isinstance(raw_group, str) and raw_group in group_keys:
+            base_group = raw_group
+        else:
+            base_group = old.base_group
         TuneConfig(
             selected_slots=selected_slots,
             rules=rules_cfg,
             switches=switches,
+            base_group=base_group,
             skip_tuning=old.skip_tuning,
             skip_start=old.skip_start,
             target_cell=old.target_cell,

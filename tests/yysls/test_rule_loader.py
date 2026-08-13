@@ -19,16 +19,18 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     MAX_TUNE_RESETS,
     QUALITY_PARTS,
     BehaviorRule,
-    BehaviorSettings,
     FoodRule,
     MaterialSettings,
     RuleValidationError,
+    TuneBehavior,
+    TuningGroupManager,
     TuningRuleManager,
-    default_food_rules,
     dynamic_affix_map,
-    get_tuning_base,
+    get_tune_config,
+    get_tuning_group,
     get_tuning_rule_manager,
-    parse_tuning_base,
+    parse_tune_config,
+    parse_tuning_group,
     parse_tuning_rule,
     rule_affix_candidates,
     specific_attr_names,
@@ -72,6 +74,18 @@ def write_rule(tmp_path: Path, data: dict, name: str = "t1.yaml") -> Path:
     with open(path, "w", encoding="utf-8") as f:
         yaml.dump(data, f, allow_unicode=True, sort_keys=False)
     return path
+
+
+def _valid_group() -> dict:
+    """构造一份最小合法基础规则组 dict（测试按需覆盖字段制造非法样本）"""
+    return {
+        "key": "t1",
+        "name": "测试规则组",
+        "min_level": 100,
+        "materials": {},
+        "scan": {},
+        "tune": {},
+    }
 
 
 # ─── 内置规则加载 ──────────────────────────────────────────
@@ -128,7 +142,7 @@ class TestBuiltinRules:
 
     def test_when_references_registered_switches(self):
         # 内置规则条件组 when 引用的开关全部已在注册表登记
-        registered = set(get_tuning_base().switches)
+        registered = set(get_tune_config().switches)
         for key, rule in get_tuning_rules().items():
             assert rule.referenced_switches() <= registered, key
 
@@ -559,72 +573,83 @@ class TestDynamicAffixMap:
 
 # ─── 基础配置 tuning_base ─────────────────────────
 
-def _valid_base() -> dict:
+def _valid_config() -> dict:
     thresholds = {p: ["gold"] for p in QUALITY_PARTS}
     thresholds["冠胄"] = ["gold", "purple"]
     return {
+        "base_rules": ["default"],
         "quality_thresholds": thresholds,
         "switches": {"keep_pvp": {"name": "保留PVP装备"}},
     }
 
 
-class TestTuningBase:
-    def test_builtin_base_loaded(self):
-        base = get_tuning_base()
+class TestTuneConfig:
+    def test_builtin_config_loaded(self):
+        config = get_tune_config()
+        # base_rules 非空
+        assert "default" in config.base_rules
         # 品阶门槛锁死为固定 7 个标准部位
-        assert list(base.quality_thresholds) == list(QUALITY_PARTS)
+        assert list(config.quality_thresholds) == list(QUALITY_PARTS)
         # 开关注册表含 keep_pvp（保留PVP装备）
-        assert base.switches.get("keep_pvp")
+        assert config.switches.get("keep_pvp")
 
     def test_quality_ok_by_part(self):
-        base = parse_tuning_base(_valid_base())
-        assert base.quality_ok("冠胄", "purple") is True
-        assert base.quality_ok("冠胄", "blue") is False
-        assert base.quality_ok("武器", "gold") is True
-        assert base.quality_ok("武器", "purple") is False
+        config = parse_tune_config(_valid_config())
+        assert config.quality_ok("冠胄", "purple") is True
+        assert config.quality_ok("冠胄", "blue") is False
+        assert config.quality_ok("武器", "gold") is True
+        assert config.quality_ok("武器", "purple") is False
 
     def test_quality_ok_rule_overrides(self):
         # 规则级覆盖：列出的部位优先，未列部位沿用全局
-        base = parse_tuning_base(_valid_base())
+        config = parse_tune_config(_valid_config())
         overrides = {"佩": ["gold", "purple"]}
-        assert base.quality_ok("佩", "purple", overrides) is True
-        assert base.quality_ok("佩", "purple") is False
-        assert base.quality_ok("环", "gold", overrides) is True
-        assert base.quality_ok("环", "purple", overrides) is False
+        assert config.quality_ok("佩", "purple", overrides) is True
+        assert config.quality_ok("佩", "purple") is False
+        assert config.quality_ok("环", "gold", overrides) is True
+        assert config.quality_ok("环", "purple", overrides) is False
 
     def test_switches_parsed(self):
-        base = parse_tuning_base(_valid_base())
-        assert base.switches == {"keep_pvp": "保留PVP装备"}
+        config = parse_tune_config(_valid_config())
+        assert config.switches == {"keep_pvp": "保留PVP装备"}
 
     def test_switches_optional(self):
-        data = _valid_base()
+        data = _valid_config()
         data.pop("switches")
-        assert parse_tuning_base(data).switches == {}
+        assert parse_tune_config(data).switches == {}
 
     def test_missing_part_rejected(self):
-        data = _valid_base()
+        data = _valid_config()
         data["quality_thresholds"].pop("佩")
         with pytest.raises(RuleValidationError):
-            parse_tuning_base(data)
+            parse_tune_config(data)
 
     def test_unknown_part_rejected(self):
-        data = _valid_base()
+        data = _valid_config()
         data["quality_thresholds"]["default"] = ["gold"]
         with pytest.raises(RuleValidationError):
-            parse_tuning_base(data)
+            parse_tune_config(data)
 
     def test_bad_quality_rejected(self):
-        data = _valid_base()
+        data = _valid_config()
         data["quality_thresholds"]["武器"] = ["legendary"]
         with pytest.raises(RuleValidationError):
-            parse_tuning_base(data)
+            parse_tune_config(data)
 
     def test_pvp_section_rejected(self):
         # 旧版 pvp 段已废弃，出现即报错提示新写法
-        data = _valid_base()
+        data = _valid_config()
         data["pvp"] = {"names": ["单体类奇术增伤"]}
         with pytest.raises(RuleValidationError, match="switches"):
-            parse_tuning_base(data)
+            parse_tune_config(data)
+
+    @pytest.mark.parametrize("legacy", ["min_level", "materials", "behavior"])
+    def test_legacy_sections_rejected(self, legacy):
+        # 0.1 预览版硬拒绝：旧段已迁移至 tuning_groups/*.yaml
+        data = _valid_config()
+        data[legacy] = {}
+        with pytest.raises(RuleValidationError, match="迁移"):
+            parse_tune_config(data)
 
     @pytest.mark.parametrize("switches", [
         {"BadKey": {"name": "非法大写"}},
@@ -633,25 +658,25 @@ class TestTuningBase:
         {"keep_pvp": "保留PVP装备"},      # spec 必须是 dict
     ])
     def test_bad_switches_rejected(self, switches):
-        data = _valid_base()
+        data = _valid_config()
         data["switches"] = switches
         with pytest.raises(RuleValidationError):
-            parse_tuning_base(data)
+            parse_tune_config(data)
 
 
 # ─── 材料设置 materials ─────────────────────────
 
 class TestMaterialSettings:
     def test_defaults_when_section_missing(self):
-        # materials 段缺省 → 全部默认值（默认两条狗粮规则）
-        m = parse_tuning_base(_valid_base()).materials
+        # materials 段缺省 → 全部空默认值（无狗粮规则）
+        m = parse_tuning_group(_valid_group()).materials
         assert m.stone_check_enabled is False
         assert m.stone_min_count == 100
         assert m.stone_insufficient_action == "abort"
-        assert m.food_rules == default_food_rules()
+        assert m.food_rules == []
 
     def test_full_section_parsed(self):
-        data = _valid_base()
+        data = _valid_group()
         data["materials"] = {
             "stone_check": {"enabled": True, "min_count": 500,
                             "insufficient_action": "ask"},
@@ -663,7 +688,7 @@ class TestMaterialSettings:
                 {"food": ""},                     # 终止规则：命中即不添加
             ],
         }
-        m = parse_tuning_base(data).materials
+        m = parse_tuning_group(data).materials
         assert m.stone_check_enabled is True
         assert m.stone_min_count == 500
         assert m.stone_insufficient_action == "ask"
@@ -677,20 +702,20 @@ class TestMaterialSettings:
 
     def test_empty_rules_legal(self):
         # 空列表合法 = 从不添加狗粮
-        data = _valid_base()
+        data = _valid_group()
         data["materials"] = {"food_rules": []}
-        assert parse_tuning_base(data).materials.food_rules == []
+        assert parse_tuning_group(data).materials.food_rules == []
 
     def test_legacy_food_strategy_rejected(self):
         # 旧 food_strategy 段已废弃，出现即报错提示新写法
-        data = _valid_base()
+        data = _valid_group()
         data["materials"] = {"food_strategy": {"high_pct": 90}}
         with pytest.raises(RuleValidationError, match="已废弃"):
-            parse_tuning_base(data)
+            parse_tuning_group(data)
 
-    def test_builtin_base_materials_loaded(self):
-        # 内置 tuning_base.yaml 的 materials 段可正常解析
-        m = get_tuning_base().materials
+    def test_builtin_group_materials_loaded(self):
+        # 内置 default.yaml 的 materials 段可正常解析
+        m = get_tuning_group("default").materials
         assert isinstance(m, MaterialSettings)
         assert all(isinstance(r, FoodRule) for r in m.food_rules)
 
@@ -712,10 +737,10 @@ class TestMaterialSettings:
         {"food_rules": [{"on_insufficient": "abort"}]},  # 行为非法
     ])
     def test_bad_materials_rejected(self, materials):
-        data = _valid_base()
+        data = _valid_group()
         data["materials"] = materials
         with pytest.raises(RuleValidationError):
-            parse_tuning_base(data)
+            parse_tuning_group(data)
 
 
 # ─── 行为配置 behavior ─────────────────────
@@ -727,159 +752,159 @@ def _rating(value: str | None):
 
 class TestBehaviorSettings:
     def test_defaults_when_section_missing(self):
-        # behavior 段缺省 → scan 默认启用（门槛 excellent），
+        # scan/tune 段缺省 → scan 默认启用（门槛 excellent），
         # tune 默认关，max_resets 取游戏硬限
-        b = parse_tuning_base(_valid_base()).behavior
-        assert b.scan.enabled is True and b.scan.rules == []
-        assert b.scan.entry_min_rating == "excellent"
-        assert b.tune.enabled is False and b.tune.rules == []
-        assert b.tune.max_resets == MAX_TUNE_RESETS
-        assert b.tune.reset_exhausted_action == "skip"
+        g = parse_tuning_group(_valid_group())
+        assert g.scan.enabled is True and g.scan.rules == []
+        assert g.scan.entry_min_rating == "excellent"
+        assert g.tune.enabled is False and g.tune.rules == []
+        assert g.tune.max_resets == MAX_TUNE_RESETS
+        assert g.tune.reset_exhausted_action == "skip"
 
     def test_full_section_parsed(self):
-        data = _valid_base()
-        data["behavior"] = {
-            "scan": {
-                "enabled": True,
-                "entry_min_rating": "top",
-                "rules": [
-                    {"parts": ["武器"], "max_quality": "blue",
-                     "max_pct": 100, "max_rating": "junk",
-                     "judge_scope": "custom",
-                     "judge_rules": ["huiyi_general", "heal_pure"],
-                     "first_affix_only": True,
-                     "action": "recycle"},
-                ],
-            },
-            "tune": {
-                "enabled": True,
-                "rules": [
-                    {"max_rating": "junk", "judge_scope": "all",
-                     "action": "recycle"},
-                    {"max_pct": 30, "action": "reset"},
-                    {"max_rating": "normal", "action": "skip"},
-                    {"action": "continue"},
-                ],
-                "max_resets": 2,
-                "reset_exhausted_action": "recycle",
-            },
+        data = _valid_group()
+        data["scan"] = {
+            "enabled": True,
+            "entry_min_rating": "top",
+            "rules": [
+                {"parts": ["武器"], "max_quality": "blue",
+                 "max_pct": 100, "max_rating": "junk",
+                 "judge_scope": "custom",
+                 "judge_rules": ["huiyi_general", "heal_pure"],
+                 "first_affix_only": True,
+                 "action": "recycle"},
+            ],
         }
-        b = parse_tuning_base(data).behavior
-        assert b.scan.enabled is True
-        assert b.scan.entry_min_rating == "top"
-        assert b.scan.rules == [BehaviorRule(
+        data["tune"] = {
+            "enabled": True,
+            "rules": [
+                {"max_rating": "junk", "judge_scope": "all",
+                 "action": "recycle"},
+                {"max_pct": 30, "action": "reset"},
+                {"max_rating": "normal", "action": "skip"},
+                {"action": "continue"},
+            ],
+            "max_resets": 2,
+            "reset_exhausted_action": "recycle",
+        }
+        g = parse_tuning_group(data)
+        assert g.scan.enabled is True
+        assert g.scan.entry_min_rating == "top"
+        assert g.scan.rules == [BehaviorRule(
             parts=["武器"], max_quality="blue", ratings=["junk"],
             judge_scope="custom",
             judge_rules=["huiyi_general", "heal_pure"],
             first_affix_only=True, action="recycle")]
-        assert b.tune.enabled is True
+        assert g.tune.enabled is True
         # 判定语义逐规则声明，缺省 incoming
-        assert [r.judge_scope for r in b.tune.rules] == [
+        assert [r.judge_scope for r in g.tune.rules] == [
             "all", "incoming", "incoming", "incoming"]
-        assert [r.action for r in b.tune.rules] == [
+        assert [r.action for r in g.tune.rules] == [
             "recycle", "reset", "skip", "continue"]
-        assert b.tune.max_resets == 2
-        assert b.tune.reset_exhausted_action == "recycle"
+        assert g.tune.max_resets == 2
+        assert g.tune.reset_exhausted_action == "recycle"
 
     def test_stage_missing_defaults(self):
         # 只声明 tune → scan 取默认（启用/excellent）
-        data = _valid_base()
-        data["behavior"] = {"tune": {"enabled": True}}
-        b = parse_tuning_base(data).behavior
-        assert b.tune.enabled is True and b.tune.rules == []
-        assert b.scan.enabled is True
-        assert b.scan.entry_min_rating == "excellent"
+        data = _valid_group()
+        data["tune"] = {"enabled": True}
+        g = parse_tuning_group(data)
+        assert g.tune.enabled is True and g.tune.rules == []
+        assert g.scan.enabled is True
+        assert g.scan.entry_min_rating == "excellent"
 
     def test_legacy_recycle_rejected(self):
         # 旧 recycle 段已废弃，出现即报错提示新写法
-        data = _valid_base()
+        data = _valid_config()
         data["recycle"] = {"scan": {"enabled": True}}
         with pytest.raises(RuleValidationError, match="behavior"):
-            parse_tuning_base(data)
+            parse_tune_config(data)
 
-    @pytest.mark.parametrize("behavior", [
+    @pytest.mark.parametrize("scan", [
         ["not", "a", "dict"],                            # 段须为 dict
-        {"scan": "yes"},                                 # 行为点须为 dict
-        {"scan": {"entry_min_rating": "good"}},          # 门槛档位非法
-        {"scan": {"judge_scope": "incoming"}},           # 段级语义已废弃
-        {"scan": {"first_affix_only": True}},            # 段级仅首词条已废弃
-        {"tune": {"judge_rules": []}},                   # 段级自选已废弃
-        {"tune": {"rules": [{"action": "skip",
-                              "first_affix_only": True}]}},
-        # ↑ 仅首词条仅扫描处置表可声明
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "mixed"}]}},  # 判定语义非法
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "incoming",
-                              "judge_rules": ["huiyi_general"]}]}},
-        # ↑ 非 custom 带自选
-        {"tune": {"rules": [{"action": "skip",
-                              "judge_scope": "all",
-                              "judge_rules": ["huiyi_general"]}]}},
-        # ↑ 非 custom 带自选
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "custom",
-                              "judge_rules": "huiyi"}]}},  # 须为 list
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "custom",
-                              "judge_rules": ["BadKey"]}]}},  # key 格式非法
-        {"scan": {"rules": {"action": "recycle"}}},      # rules 须为 list
-        {"scan": {"rules": ["回收"]}},                   # 元素须为 dict
-        {"scan": {"rules": [{}]}},                       # action 必填
-        {"scan": {"rules": [{"action": "continue"}]}},   # scan 无 continue
-        {"scan": {"rules": [{"action": "reset"}]}},      # scan 无 reset
-        {"scan": {"rules": [{"action": "recycle",
-                              "parts": ["魅力"]}]}},     # 未知部位
-        {"scan": {"rules": [{"action": "recycle",
-                              "max_quality": "green"}]}},  # 品阶非法
-        {"scan": {"rules": [{"action": "recycle",
-                              "max_pct": 101}]}},          # 超出上界
-        {"scan": {"rules": [{"action": "recycle",
-                              "max_pct": True}]}},         # bool 伪装 int
-        {"scan": {"rules": [{"action": "recycle",
-                              "pct_op": "gt"}]}},           # 比较方向非法
-        {"scan": {"rules": [{"action": "recycle",
-                              "pct": 101}]}},               # pct 超出上界
-        {"scan": {"rules": [{"action": "recycle",
-                              "max_rating": "good"}]}},    # 评级非法（历史字段）
-        {"scan": {"rules": [{"action": "recycle",
-                              "ratings": ["good"]}]}},      # 评级档位非法
-        {"scan": {"rules": [{"action": "recycle",
-                              "ratings": "junk"}]}},        # ratings 须为 list
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "affix"}]}},
-        # ↑ 自选词条 ratings 禁止为空
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "affix",
-                              "ratings": []}]}},          # 空 list 同报错
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "affix",
-                              "ratings": ["不存在的词条"]}]}},
-        # ↑ 词条须在词表内
-        {"scan": {"rules": [{"action": "recycle",
-                              "judge_scope": "affix",
-                              "ratings": ["最大外功攻击"],
-                              "judge_rules": ["huiyi_general"]}]}},
-        # ↑ affix 不可声明自选规则
-        {"tune": {"max_resets": 4}},                     # 超游戏硬限
-        {"tune": {"max_resets": "3"}},                   # 字符串伪整数
-        {"tune": {"reset_exhausted_action": "reset"}},   # 转处置非法
+        {"entry_min_rating": "good"},                    # 门槛档位非法
+        {"judge_scope": "incoming"},                     # 段级语义已废弃
+        {"first_affix_only": True},                      # 段级仅首词条已废弃
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "mixed"}]},         # 判定语义非法
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "incoming",
+                      "judge_rules": ["huiyi_general"]}]},  # 非 custom 带自选
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "custom",
+                      "judge_rules": "huiyi"}]},         # 须为 list
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "custom",
+                      "judge_rules": ["BadKey"]}]},      # key 格式非法
+        {"rules": {"action": "recycle"}},                # rules 须为 list
+        {"rules": ["回收"]},                             # 元素须为 dict
+        {"rules": [{}]},                                 # action 必填
+        {"rules": [{"action": "continue"}]},             # scan 无 continue
+        {"rules": [{"action": "reset"}]},                # scan 无 reset
+        {"rules": [{"action": "recycle",
+                      "parts": ["魅力"]}]},              # 未知部位
+        {"rules": [{"action": "recycle",
+                      "max_quality": "green"}]},         # 品阶非法
+        {"rules": [{"action": "recycle",
+                      "max_pct": 101}]},                 # 超出上界
+        {"rules": [{"action": "recycle",
+                      "max_pct": True}]},                # bool 伪装 int
+        {"rules": [{"action": "recycle",
+                      "pct_op": "gt"}]},                 # 比较方向非法
+        {"rules": [{"action": "recycle",
+                      "pct": 101}]},                     # pct 超出上界
+        {"rules": [{"action": "recycle",
+                      "max_rating": "good"}]},           # 评级非法（历史字段）
+        {"rules": [{"action": "recycle",
+                      "ratings": ["good"]}]},            # 评级档位非法
+        {"rules": [{"action": "recycle",
+                      "ratings": "junk"}]},              # ratings 须为 list
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "affix"}]},         # 自选词条 ratings 禁止为空
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "affix",
+                      "ratings": []}]},                  # 空 list 同报错
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "affix",
+                      "ratings": ["不存在的词条"]}]},    # 词条须在词表内
+        {"rules": [{"action": "recycle",
+                      "judge_scope": "affix",
+                      "ratings": ["最大外功攻击"],
+                      "judge_rules": ["huiyi_general"]}]},  # affix 不可声明自选规则
     ])
-    def test_bad_behavior_rejected(self, behavior):
-        data = _valid_base()
-        data["behavior"] = behavior
+    def test_bad_scan_rejected(self, scan):
+        data = _valid_group()
+        data["scan"] = scan
         with pytest.raises(RuleValidationError):
-            parse_tuning_base(data)
+            parse_tuning_group(data)
+
+    @pytest.mark.parametrize("tune", [
+        ["not", "a", "dict"],                            # 段须为 dict
+        {"judge_rules": []},                             # 段级自选已废弃
+        {"rules": [{"action": "skip",
+                      "first_affix_only": True}]},       # 仅首词条仅扫描处置表可声明
+        {"rules": [{"action": "skip",
+                      "judge_scope": "all",
+                      "judge_rules": ["huiyi_general"]}]},  # 非 custom 带自选
+        {"max_resets": 4},                               # 超游戏硬限
+        {"max_resets": "3"},                             # 字符串伪整数
+        {"reset_exhausted_action": "reset"},             # 转处置非法
+    ])
+    def test_bad_tune_rejected(self, tune):
+        data = _valid_group()
+        data["tune"] = tune
+        with pytest.raises(RuleValidationError):
+            parse_tuning_group(data)
 
     def test_scan_decide_first_hit(self):
         # 处置表自上而下首条命中；未启用/无命中 → skip 跳过
         junk = _rating("junk")
-        data = _valid_base()
-        data["behavior"] = {"scan": {"enabled": True, "rules": [
+        data = _valid_group()
+        data["scan"] = {"enabled": True, "rules": [
             {"max_pct": 30, "action": "recycle"},
             {"max_quality": "purple", "action": "skip"},
-        ]}}
-        scan = parse_tuning_base(data).behavior.scan
+        ]}
+        scan = parse_tuning_group(data).scan
         # 首条命中即生效：cap 20 ≤ 30 → 回收（不再看后续）
         assert scan.decide("武器", "gold", 20, junk)[0] == "recycle"
         # 首条不中、次条 ≤紫色 命中（蓝色 ≤ 紫色）→ 跳过该装备
@@ -889,8 +914,8 @@ class TestBehaviorSettings:
         # max_pct 限制下 cap_pct 识别失败视为不达标（保守不回收）
         assert scan.decide("武器", "gold", None, junk)[0] == "skip"
         # 未启用 → 一律跳过
-        data["behavior"]["scan"]["enabled"] = False
-        disabled = parse_tuning_base(data).behavior.scan
+        data["scan"]["enabled"] = False
+        disabled = parse_tuning_group(data).scan
         assert disabled.decide("武器", "gold", 20, junk)[0] == "skip"
 
     def test_rule_judge_semantics_lazy(self):
@@ -902,14 +927,14 @@ class TestBehaviorSettings:
             calls.append((scope, keys))
             return "top" if scope == "custom" else "junk"
 
-        data = _valid_base()
-        data["behavior"] = {"scan": {"enabled": True, "rules": [
+        data = _valid_group()
+        data["scan"] = {"enabled": True, "rules": [
             {"max_rating": "junk", "judge_scope": "custom",
              "judge_rules": ["huiyi_general"], "action": "recycle"},
             {"max_rating": "junk", "action": "recycle"},
             {"action": "skip"},
-        ]}}
-        scan = parse_tuning_base(data).behavior.scan
+        ]}
+        scan = parse_tuning_group(data).scan
         # 规则1 自选判顶级不命中；规则2 传入判垃圾命中 → 回收
         assert scan.decide("武器", "gold", 90, rating_of)[0] == "recycle"
         assert calls == [("custom", ["huiyi_general"]), ("incoming", [])]
@@ -920,11 +945,11 @@ class TestBehaviorSettings:
 
     def test_purple_only_quality(self):
         # purple_only 为精确档：仅紫色命中，金/蓝不命中
-        data = _valid_base()
-        data["behavior"] = {"scan": {"enabled": True, "rules": [
+        data = _valid_group()
+        data["scan"] = {"enabled": True, "rules": [
             {"max_quality": "purple_only", "action": "recycle"},
-        ]}}
-        scan = parse_tuning_base(data).behavior.scan
+        ]}
+        scan = parse_tuning_group(data).scan
         junk = _rating("junk")
         assert scan.decide("武器", "purple", 50, junk)[0] == "recycle"
         assert scan.decide("武器", "gold", 50, junk)[0] == "skip"
@@ -939,16 +964,16 @@ class TestBehaviorSettings:
             calls.append(scope)
             return "junk"
 
-        data = _valid_base()
-        data["behavior"] = {"scan": {"enabled": True, "rules": [
+        data = _valid_group()
+        data["scan"] = {"enabled": True, "rules": [
             {"parts": ["武器"], "max_quality": "purple_only",
              "judge_scope": "affix",
              "ratings": ["最大鸣金攻击", "最大外功攻击",
                          "最大鸣金攻击"],
              "pct_op": "ge", "pct": 90, "action": "skip"},
             {"action": "recycle"},
-        ]}}
-        scan = parse_tuning_base(data).behavior.scan
+        ]}
+        scan = parse_tuning_group(data).scan
         # 去重后剩两项（词表序归一）
         assert len(scan.rules[0].ratings) == 2
         assert set(scan.rules[0].ratings) == {
@@ -970,13 +995,13 @@ class TestBehaviorSettings:
 
     def test_affix_scope_first_affix_only(self):
         # 勾选仅首词条时只判定 affixes[0]：目标词非首不命中
-        data = _valid_base()
-        data["behavior"] = {"scan": {"enabled": True, "rules": [
+        data = _valid_group()
+        data["scan"] = {"enabled": True, "rules": [
             {"judge_scope": "affix", "ratings": ["最大外功攻击"],
              "first_affix_only": True, "action": "skip"},
             {"action": "recycle"},
-        ]}}
-        scan = parse_tuning_base(data).behavior.scan
+        ]}
+        scan = parse_tuning_group(data).scan
         junk = _rating("junk")
         assert scan.decide("武器", "purple", 50, junk,
                            ["最大外功攻击",
@@ -990,12 +1015,12 @@ class TestBehaviorSettings:
         # full=True 时 continue 规则跳过匹配（不可达）
         junk, normal, top = (_rating("junk"), _rating("normal"),
                              _rating("top"))
-        data = _valid_base()
-        data["behavior"] = {"tune": {"enabled": True, "rules": [
+        data = _valid_group()
+        data["tune"] = {"enabled": True, "rules": [
             {"max_rating": "junk", "action": "recycle"},
             {"max_rating": "normal", "action": "continue"},
-        ]}}
-        tune = parse_tuning_base(data).behavior.tune
+        ]}
+        tune = parse_tuning_group(data).tune
         # 首条命中 → 回收（满/未满一致）
         assert tune.decide("武器", "gold", 95, junk, False)[0] == "recycle"
         assert tune.decide("武器", "gold", 95, junk, True)[0] == "recycle"
@@ -1007,9 +1032,9 @@ class TestBehaviorSettings:
         assert tune.decide("武器", "gold", 95, top, False)[0] == "continue"
         assert tune.decide("武器", "gold", 95, top, True)[0] == "skip"
         # 未启用 → 同默认
-        assert BehaviorSettings().tune.decide(
+        assert TuneBehavior().decide(
             "武器", "gold", 95, junk, False)[0] == "continue"
-        assert BehaviorSettings().tune.decide(
+        assert TuneBehavior().decide(
             "武器", "gold", 95, junk, True)[0] == "skip"
 
 
@@ -1017,20 +1042,28 @@ class TestDecideFood:
     """decide_food 新语义：三条件顺序匹配 + 持有量判定 + 不足策略"""
 
     STOCKS = {"彩狗粮": 5, "金狗粮": 3, "紫狗粮": 0}
+    # 测试用狗粮规则（与 default.yaml 中的示例一致，但非“默认”）
+    _RULES = [
+        FoodRule(pct=98, min_expect="top", food="彩狗粮"),
+        FoodRule(pct=90, min_expect="excellent", food="金狗粮"),
+    ]
 
     def test_first_rule_hit(self):
-        # 默认规则1：首词条≥98 且期望≥顶级 → 彩狗粮
-        d = MaterialSettings().decide_food(98, "top", "gold", self.STOCKS)
+        # 规则1：首词条≥98 且期望≥顶级 → 彩狗粮
+        m = MaterialSettings(food_rules=self._RULES)
+        d = m.decide_food(98, "top", "gold", self.STOCKS)
         assert (d.action, d.food) == ("feed", "彩狗粮")
 
     def test_second_rule_hit(self):
         # 规则1 不命中（cap 92 < 98）→ 顺序落到规则2 金狗粮
-        d = MaterialSettings().decide_food(
+        m = MaterialSettings(food_rules=self._RULES)
+        d = m.decide_food(
             92, "excellent", "purple", self.STOCKS)
         assert (d.action, d.food) == ("feed", "金狗粮")
 
     def test_no_rule_hit(self):
-        d = MaterialSettings().decide_food(50, "top", "gold", self.STOCKS)
+        m = MaterialSettings(food_rules=self._RULES)
+        d = m.decide_food(50, "top", "gold", self.STOCKS)
         assert (d.action, d.food) == ("none", "")
 
     def test_pct_zero_unlimited(self):
@@ -1041,12 +1074,14 @@ class TestDecideFood:
 
     def test_cap_pct_none_fails_positive_pct(self):
         # pct>0 时 cap_pct 识别失败视为不达标
-        d = MaterialSettings().decide_food(None, "top", "gold", self.STOCKS)
+        m = MaterialSettings(food_rules=self._RULES)
+        d = m.decide_food(None, "top", "gold", self.STOCKS)
         assert d.action == "none"
 
     def test_expect_none_never_hits(self):
         # 无任何适用规则（expect=None）→ 期望条件永不命中
-        d = MaterialSettings().decide_food(98, None, "gold", self.STOCKS)
+        m = MaterialSettings(food_rules=self._RULES)
+        d = m.decide_food(98, None, "gold", self.STOCKS)
         assert d.action == "none"
 
     def test_quality_terminator_ordering(self):
@@ -1119,3 +1154,92 @@ class TestRuleQualityThresholds:
             "环": ["gold", "purple"]}
         assert rules["huixin_small"].quality_thresholds == {
             "佩": ["gold", "purple"]}
+
+
+# ─── TuningGroupManager CRUD ─────────────────────
+
+class TestTuningGroupManagerCRUD:
+    """规则组 CRUD：新建空白 / 复制副本 / 删除（default 禁删）"""
+
+    @pytest.fixture
+    def mgr(self, tmp_path):
+        """复制内置 tuning_groups/ 和 tune_config.yaml 到 tmp，构造独立管理器"""
+        import shutil
+        src = Path(__file__).parents[2] / "config" / "system" / "yysls" / "tuning_groups"
+        for f in src.glob("*.yaml"):
+            shutil.copy(f, tmp_path)
+        # 同时复制 tune_config.yaml（base_rules 声明来源）
+        # resolver 在测试模式下会查找 yysls/tune_config.yaml
+        config_src = Path(__file__).parents[2] / "config" / "system" / "yysls" / "tune_config.yaml"
+        yysls_dir = tmp_path / "yysls"
+        yysls_dir.mkdir(exist_ok=True)
+        shutil.copy(config_src, yysls_dir / "tune_config.yaml")
+        return TuningGroupManager(groups_dir=tmp_path)
+
+    def test_create_group_is_empty(self, mgr):
+        # 新建组应全空（仅含 key/name），不带任何默认规则/材料
+        mgr.create_group("test_empty", "测试空白")
+        g = mgr.get_group("test_empty")
+        assert g.key == "test_empty"
+        assert g.name == "测试空白"
+        assert g.scan.min_level == 100  # ScanBehavior 缺省值
+        # 所有规则表应为空
+        assert g.materials.food_rules == []
+        assert g.scan.rules == []
+        assert g.tune.rules == []
+
+    def test_create_group_bad_key_rejected(self, mgr):
+        with pytest.raises(RuleValidationError):
+            mgr.create_group("BadKey", "非法大写")
+        with pytest.raises(RuleValidationError):
+            mgr.create_group("1abc", "数字开头")
+
+    def test_create_group_duplicate_key_rejected(self, mgr):
+        with pytest.raises(RuleValidationError, match="已存在"):
+            mgr.create_group("default", "重复")
+
+    def test_create_group_empty_name_rejected(self, mgr):
+        with pytest.raises(RuleValidationError, match="名称"):
+            mgr.create_group("new_key", "")
+
+    def test_copy_group_is_independent(self, mgr):
+        # 复制组应是源组的独立副本
+        mgr.copy_group("default", "default_copy", "默认副本")
+        src = mgr.get_group("default")
+        cp = mgr.get_group("default_copy")
+        assert cp.name == "默认副本"
+        assert cp.scan.min_level == src.scan.min_level
+        assert cp.scan.rules == src.scan.rules
+        # 修改副本不影响源组
+        raw = mgr.get_raw("default_copy")
+        raw["scan"]["min_level"] = 50
+        mgr.save_group("default_copy", raw)
+        assert mgr.get_group("default").scan.min_level != 50
+
+    def test_copy_group_missing_src_rejected(self, mgr):
+        with pytest.raises(RuleValidationError, match="不存在"):
+            mgr.copy_group("nonexistent", "new", "新组")
+
+    def test_delete_last_group_rejected(self, mgr):
+        # 仅剩一个规则组时不可删除
+        # 先删除其他组，直到只剩 default
+        for key in list(mgr.get_groups()):
+            if key != "default":
+                mgr.delete_group(key)
+        assert len(mgr.get_groups()) == 1
+        with pytest.raises(RuleValidationError, match="至少"):
+            mgr.delete_group("default")
+
+    def test_delete_any_group_when_others_exist(self, mgr):
+        # 有多个组时，任何组（包括 default）都可删除
+        mgr.create_group("temp", "临时")
+        assert "default" in mgr.get_groups()
+        assert "temp" in mgr.get_groups()
+        # 删除 default 也是允许的
+        mgr.delete_group("default")
+        assert "default" not in mgr.get_groups()
+        assert "temp" in mgr.get_groups()
+
+    def test_delete_group_nonexistent_rejected(self, mgr):
+        with pytest.raises(RuleValidationError, match="不存在"):
+            mgr.delete_group("nonexistent")

@@ -45,7 +45,14 @@
           "description": "Python interpreter path with lvjiang installed"
         }
       }
-    }
+    },
+    "snippets": [
+      {
+        "language": "wf",
+        "scopeName": "source.wf",
+        "path": "./snippets/wf.code-snippets"
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExtensionContext, workspace } from 'vscode';
+import { ExtensionContext, workspace, window } from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -16,23 +16,36 @@ let client: LanguageClient;
 function resolvePythonPath(): string {
   // 1. Explicit extension setting
   const configured = workspace.getConfiguration('lvjiangWf').get<string>('pythonPath');
-  if (configured) return configured;
+  if (configured) {
+    window.showInformationMessage(`LvJiang WF: Using configured Python path: ${configured}`);
+    return configured;
+  }
 
   // 2. VS Code Python extension setting
   const vscodePython = workspace.getConfiguration('python').get<string>('defaultInterpreterPath');
-  if (vscodePython && vscodePython !== 'python') return vscodePython;
+  if (vscodePython && vscodePython !== 'python') {
+    window.showInformationMessage(`LvJiang WF: Using VS Code Python path: ${vscodePython}`);
+    return vscodePython;
+  }
 
   // 3. Auto-detect .venv in workspace folders
   const folders = workspace.workspaceFolders;
   if (folders) {
     for (const folder of folders) {
       const winVenv = path.join(folder.uri.fsPath, '.venv', 'Scripts', 'python.exe');
-      if (fs.existsSync(winVenv)) return winVenv;
+      if (fs.existsSync(winVenv)) {
+        window.showInformationMessage(`LvJiang WF: Auto-detected .venv at: ${winVenv}`);
+        return winVenv;
+      }
       const unixVenv = path.join(folder.uri.fsPath, '.venv', 'bin', 'python');
-      if (fs.existsSync(unixVenv)) return unixVenv;
+      if (fs.existsSync(unixVenv)) {
+        window.showInformationMessage(`LvJiang WF: Auto-detected .venv at: ${unixVenv}`);
+        return unixVenv;
+      }
     }
   }
 
+  window.showWarningMessage(`LvJiang WF: No .venv found, using system python. Folders: ${folders?.map(f => f.uri.fsPath).join(', ') || 'none'}`);
   return 'python';
 }
 

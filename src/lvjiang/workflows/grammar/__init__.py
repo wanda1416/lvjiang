@@ -21,6 +21,7 @@ from .ast_nodes import (
     Eval,
     EvalFieldChainAssign,
     FieldAccess,
+    Find,
     For,
     ForRange,
     FuncCall,
@@ -63,7 +64,7 @@ from .parser import parse_file, parse_text
 __all__ = [
     "parse_file", "parse_text",
     "Program",
-    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log",
+    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log", "Find",
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",

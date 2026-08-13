@@ -47,9 +47,13 @@ def _check_arrow_ends(layout, scene: str, arrow_key: str, points: set[str]) -> s
 def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
     """逐条比对引用与布局绑定，返回全部问题（按传入顺序）
 
-    kind 决定查哪类对象：click 查 region+point（click_any 的查找顺序）、
-    arrow 查 arrows、panel 查 panels、region 查 regions。key 为 None 的
-    引用（动态 $var、整场景识别）只能校验到场景一级。
+    kind 决定查哪类对象：
+    - click_target 查 region+point+panel（click_any 的查找顺序）
+    - drag_target 查 arrow+region（drag 的 SceneRef 分支）
+    - drag_grid_target 查 panel+region（drag 的 PanelGridDrag 分支）
+    - arrow 查 arrows、panel 查 panels、region 查 regions、point 查 points
+    - scan 查 region+panel（单 key scan/recognize）
+    key 为 None 的引用（动态 $var、整场景识别）只能校验到场景一级。
     """
     problems: list[RefProblem] = []
     cache: dict[str, dict[str, set[str]]] = {}
@@ -60,8 +64,12 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
             continue
         if ref.key is None:
             continue
-        if ref.kind == "click":
-            ok = ref.key in bound["region"] or ref.key in bound["point"]
+        if ref.kind == "click_target":
+            ok = ref.key in bound["region"] or ref.key in bound["point"] or ref.key in bound["panel"]
+        elif ref.kind == "drag_target":
+            ok = ref.key in bound["arrow"] or ref.key in bound["region"]
+        elif ref.kind == "drag_grid_target":
+            ok = ref.key in bound["panel"] or ref.key in bound["region"]
         elif ref.kind == "arrow":
             ok = ref.key in bound["arrow"]
         elif ref.kind == "panel":
@@ -69,13 +77,16 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
         elif ref.kind == "scan":
             # 单 key scan/recognize：区域或面板任一绑定即可（运行时据此分派）
             ok = ref.key in bound["region"] or ref.key in bound["panel"]
+        elif ref.kind == "point":
+            ok = ref.key in bound["point"]
         else:
             ok = ref.key in bound["region"]
         if not ok:
             label = KIND_LABELS.get(ref.kind, ref.kind)
             problems.append(RefProblem(ref, f"{label}未绑定"))
             continue
-        if ref.kind == "arrow":
+        # 检查 arrow 端点
+        if ref.kind in ("arrow", "drag_target") and ref.key in bound["arrow"]:
             reason = _check_arrow_ends(layout, ref.scene, ref.key, bound["point"])
             if reason:
                 problems.append(RefProblem(ref, reason))

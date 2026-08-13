@@ -6,10 +6,14 @@
   - [整面板扫描](#整面板扫描)
   - [by 子句（短路识别）](#by-子句短路识别)
 - [二、recognize — 图像识别](#二recognize--图像识别)
-- [三、collect — 收集输出](#三collect--收集输出)
-- [四、eval — 赋值](#四eval--赋值)
-- [五、call — 调用子工作流](#五call--调用子工作流)
-- [六、log — 日志输出](#六log--日志输出)
+- [三、find — 文字定位](#三find--文字定位)
+  - [搜索区域](#搜索区域)
+  - [by 子句](#by-子句)
+  - [结果与点击](#结果与点击)
+- [四、collect — 收集输出](#四collect--收集输出)
+- [五、eval — 赋值](#五eval--赋值)
+- [六、call — 调用子工作流](#六call--调用子工作流)
+- [七、log — 日志输出](#七log--日志输出)
 
 ## 一、scan — OCR 扫描
 
@@ -181,7 +185,103 @@ recognize [equip_tune_detail].[
 - **by 子句**：与 `scan` 的 `by` 子句完全一致，返回首个命中的字段名（str）
 - **on group 子句**：限定材料识别的分组范围，仅在指定分组的参考材料中匹配。支持字符串常量和变量引用
 
-## 三、collect — 收集输出
+## 三、find — 文字定位
+
+在屏幕上搜索特定文字，找到后返回该文字所在区域的坐标，供后续 `click` 直接点击。
+
+**语义**：`find` 对当前屏幕截图执行 OCR，搜索目标文字，将匹配区域的画布归一化坐标存入变量。与 `scan`/`recognize` 共享 `scene_target` + `by_clause` 语法体系。
+
+**语法**：
+
+```
+# 全画布搜索
+find as $var by contains "文字"
+
+# 指定区域搜索
+find [scene].[area] as $var by contains "文字"
+
+# 顺序匹配（支持列表）
+find as $var by contains_any $list
+find [scene].[area] as $var by equals_any $list
+```
+
+**示例**：
+
+```
+# 全画布搜索，找到后直接点击
+find as $found by contains "调律"
+if $found
+    click $found
+end
+
+# 在指定区域内搜索
+find [action_control].[btn_area] as $btn by contains "确认"
+if $btn
+    click $btn
+end
+
+# 动态场景和区域
+find $scene.$region as $close by contains "关闭"
+
+# 顺序匹配：在多个目标中找第一个命中的
+eval $buttons = ["确认", "确定", "OK"]
+find as $btn by contains_any $buttons
+if $btn
+    click $btn
+end
+```
+
+### 搜索区域
+
+| 形式 | 语法 | 说明 |
+|---|---|---|
+| 全画布 | `find as $var by ...` | 在整个屏幕截图中搜索 |
+| 指定区域 | `find [scene].[area] as $var by ...` | 仅在布局定义的区域内搜索 |
+| 动态区域 | `find $scene.$region as $var by ...` | 场景和区域由变量指定 |
+
+指定区域搜索时，`[scene].[area]` 必须在当前布局中绑定坐标，否则报错。
+
+### by 子句
+
+`find` 的 `by` 子句与 `scan`/`recognize` 完全一致，**必填**，指定匹配模式和搜索目标：
+
+| 模式 | 说明 | target 类型 |
+|---|---|---|
+| `equals "文字"` | OCR 文本完全等于目标 | 字符串 |
+| `contains "文字"` | OCR 文本包含目标子串 | 字符串 |
+| `equals_any $list` | OCR 文本等于列表中任一项 | 列表变量 |
+| `contains_any $list` | OCR 文本包含列表中任一项 | 列表变量 |
+
+`contains_any` / `equals_any` 支持**顺序匹配**：按列表顺序逐个尝试，返回第一个命中的文字位置。
+
+### 结果与点击
+
+`find` 的结果变量是 `FoundRegion` 类型，存储文字区域的画布归一化坐标。可以直接用于 `click`：
+
+```
+find as $found by contains "调律"
+click $found                   # 直接点击找到的文字位置
+```
+
+**结果变量行为**：
+
+| 情况 | 变量值 | 条件判断 |
+|---|---|---|
+| 找到文字 | `FoundRegion` 对象 | truthy |
+| 未找到 | 空字符串 `""` | falsy |
+
+因此可以直接用 `if $found` 判断是否找到。
+
+**与 scan 的关系**：
+
+| 特性 | `find` | `scan` |
+|---|---|---|
+| 语法风格 | 共享 `scene_target` + `by_clause` | 相同 |
+| 返回类型 | `FoundRegion` 或 `""` | `dict` 或 `str`（by 子句） |
+| 适用场景 | 文字定位 + 点击 | 批量区域 OCR |
+| 可直接点击 | `click $found` | `click [scene].$key` |
+
+## 四、collect — 收集输出
 
 将值存入工作流的输出字典。
 
@@ -218,7 +318,7 @@ collect $result as $key_name      # output["weapon_data"] = $result
 - 带 `as $alias`：以 `$alias` 的运行时值为 key 存入
 - 字面量源必须带 `as` 子句，否则默认 key 为 `"value"`
 
-## 四、eval — 赋值
+## 五、eval — 赋值
 
 调用内置函数、字面量赋值、字典字段赋值。
 
@@ -259,7 +359,7 @@ eval $list = [{"k": "v"}, {"k2": "v2"}]     # 列表含字典元素
 
 内置函数全集见 [06-functions.md](06-functions.md)。
 
-## 五、call — 调用子工作流
+## 六、call — 调用子工作流
 
 调用另一个 `.wf` 文件作为子工作流，支持传入参数和提取返回值。
 
@@ -274,7 +374,7 @@ call "sub.wf" with $x as "arg1" read "key" as $var  # 传参 + 提取
 
 详细说明见 [07-subworkflows.md](07-subworkflows.md)。
 
-## 六、log — 日志输出
+## 七、log — 日志输出
 
 输出一条日志消息。参数可以是任何能求值为字符串的表达式。
 

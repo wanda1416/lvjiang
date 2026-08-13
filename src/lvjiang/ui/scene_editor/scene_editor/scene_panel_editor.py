@@ -2,12 +2,14 @@
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -43,19 +45,20 @@ class PanelEditorMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._panel_table = QTableWidget()
-        self._panel_table.setColumnCount(5)
+        self._panel_table.setColumnCount(7)
         self._panel_table.setHorizontalHeaderLabels(
-            ["名称", "Key", "行数", "列数", "行可见比例"]
+            ["名称", "Key", "行数", "列数", "行可见比例", "校准模式", "滚动方向"]
         )
-        # 列宽：名称/Key 自适应内容，行数/列数/可见比例固定窄宽
+        # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 50)
-        header.resizeSection(3, 50)
-        header.resizeSection(4, 80)
+        for col in (2, 3, 4, 5, 6):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(2, 50)   # 行数
+        header.resizeSection(3, 50)   # 列数
+        header.resizeSection(4, 80)   # 行可见比例
+        header.resizeSection(5, 70)   # 校准模式
+        header.resizeSection(6, 80)   # 滚动方向
         self._panel_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
@@ -135,6 +138,14 @@ class PanelEditorMixin:
             vis_item = QTableWidgetItem(f"{panel_def.min_visible:.2f}")
             vis_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._panel_table.setItem(row, 4, vis_item)
+            # 校准模式
+            cal_item = QTableWidgetItem(panel_def.calibration)
+            cal_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._panel_table.setItem(row, 5, cal_item)
+            # 滚动方向
+            sd_item = QTableWidgetItem(panel_def.scroll_direction)
+            sd_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._panel_table.setItem(row, 6, sd_item)
         self._panel_table.blockSignals(False)
 
     # ─── 事件处理 ────────────────────────────────────────
@@ -185,7 +196,7 @@ class PanelEditorMixin:
         except ValueError as e:
             QMessageBox.warning(self, "更新失败", str(e))
             return
-        # 同步网格参数到已绑定的布局 Panel（几何不变，仅 cols/rows/min_visible），
+        # 同步网格参数到已绑定的布局 Panel（几何不变，仅 cols/rows/min_visible/calibration/scroll_direction），
         # 否则弹窗改动只写入场景 YAML，运行时读的布局 Panel 不会生效
         panels = self._canvas.get_panels()
         changed = False
@@ -193,6 +204,8 @@ class PanelEditorMixin:
             if p.key == old_def.key:
                 p.cols, p.rows = new_def.cols, new_def.rows
                 p.min_visible = new_def.min_visible
+                p.calibration = new_def.calibration
+                p.scroll_direction = new_def.scroll_direction
                 changed = True
         if changed:
             self._canvas.set_panels(panels)
@@ -339,6 +352,62 @@ class PanelEditorMixin:
         )
         form.addRow("行最小可见比例:", vis_spin)
 
+        # 校准模式下拉
+        calibration_combo = QComboBox()
+        calibration_combo.addItems(["auto", "even", "image"])
+        calibration_combo.setToolTip(
+            "auto: 先图像检测，失败降级为等分\n"
+            "even: 跳过图像检测，直接按行列数等分\n"
+            "image: 仅图像检测，失败返回 None"
+        )
+        if panel_def:
+            idx = calibration_combo.findText(panel_def.calibration)
+            if idx >= 0:
+                calibration_combo.setCurrentIndex(idx)
+        form.addRow("校准模式:", calibration_combo)
+
+        # 滚动方向下拉
+        scroll_combo = QComboBox()
+        scroll_combo.addItems(["vertical", "horizontal", "both", "none"])
+        scroll_combo.setToolTip(
+            "vertical: 纵向滚动，rows 允许 expected-1\n"
+            "horizontal: 横向滚动，cols 允许 expected-1\n"
+            "both: 双向滚动，rows/cols 都允许 expected-1\n"
+            "none: 固定网格，rows/cols 必须精确匹配\n\n"
+            "约束：rows=1 时禁止 vertical/both，cols=1 时禁止 horizontal/both"
+        )
+        if panel_def:
+            idx = scroll_combo.findText(panel_def.scroll_direction)
+            if idx >= 0:
+                scroll_combo.setCurrentIndex(idx)
+        form.addRow("滚动方向:", scroll_combo)
+
+        # 实时校验 scroll_direction 与 rows/cols 的约束
+        scroll_error_label = QLabel()
+        scroll_error_label.setStyleSheet("color: #c62828;")
+        scroll_error_label.hide()
+        form.addRow("", scroll_error_label)
+
+        def _validate_scroll():
+            rows = rows_spin.value()
+            cols = cols_spin.value()
+            direction = scroll_combo.currentText()
+            if rows == 1 and direction in ("vertical", "both"):
+                scroll_error_label.setText("rows=1 时滚动方向不能为纵向")
+                scroll_error_label.show()
+                return False
+            if cols == 1 and direction in ("horizontal", "both"):
+                scroll_error_label.setText("cols=1 时滚动方向不能为横向")
+                scroll_error_label.show()
+                return False
+            scroll_error_label.hide()
+            return True
+
+        rows_spin.valueChanged.connect(_validate_scroll)
+        cols_spin.valueChanged.connect(_validate_scroll)
+        scroll_combo.currentTextChanged.connect(_validate_scroll)
+        _validate_scroll()
+
         # 仅编辑模式可选择归属场景（跨场景迁移）
         scene_combo = None
         if panel_def is not None:
@@ -362,6 +431,7 @@ class PanelEditorMixin:
         def _validate():
             ok_btn.setEnabled(
                 bool(key_edit.text().strip() and name_edit.text().strip())
+                and _validate_scroll()
             )
 
         key_edit.textChanged.connect(_validate)
@@ -384,4 +454,6 @@ class PanelEditorMixin:
             rows=rows_spin.value(),
             min_visible=round(vis_spin.value(), 2),
             view=combo_view_value(view_combo, self._current_view),
+            calibration=calibration_combo.currentText(),
+            scroll_direction=scroll_combo.currentText(),
         ), target_scene

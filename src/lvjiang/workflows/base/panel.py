@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from ..align import detect_grid
+from ..align import _make_even_alignment, detect_grid
 
 if TYPE_CHECKING:
     import numpy as np
@@ -77,6 +77,11 @@ class _PanelMixin:
         panel 没在布局里定义是配置错误，直接抛错；截图失败 / 未检测到
         slot 属于运行时情况（列表为空、页面未加载完），继续返回 None
         交由调用方判断。
+
+        校准模式由 panel.calibration 控制：
+        - "even"：跳过图像检测，直接按 rows/cols 等分
+        - "image"：仅图像检测，失败返回 None
+        - "auto"（默认）：先图像检测，失败降级为等分
         """
         panel_obj = self._find_panel(scene_key, panel_key)
         if panel_obj is None:
@@ -84,17 +89,47 @@ class _PanelMixin:
                 f"align: 布局中未定义 panel {scene_key}.{panel_key}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
+        calibration = getattr(panel_obj, "calibration", "auto")
+
+        # even 模式：跳过图像检测，直接等分
+        if calibration == "even":
+            alignment = _make_even_alignment(panel_obj.rows, panel_obj.cols)
+            self._panel_alignments[(scene_key, panel_key)] = alignment
+            logger.info(
+                f"align: {scene_key}.{panel_key} 等分模式，"
+                f"{alignment.n_rows}×{alignment.n_cols} = {alignment.total_slots} 个 slot"
+            )
+            return alignment
+
+        # image / auto 模式：先尝试图像检测
         panel_img = self._capture_panel_image(panel_obj)
         if panel_img is None:
             logger.error(f"align: 无法截取 panel {scene_key}.{panel_key}")
+            if calibration == "auto":
+                alignment = _make_even_alignment(panel_obj.rows, panel_obj.cols)
+                self._panel_alignments[(scene_key, panel_key)] = alignment
+                logger.warning(f"align: {scene_key}.{panel_key} 截图失败，降级为等分模式")
+                return alignment
             return None
-        alignment = detect_grid(panel_img, expected_rows=panel_obj.rows, expected_cols=panel_obj.cols,
-                                min_visible=getattr(panel_obj, "min_visible", 0.95))
+
+        fallback = (calibration == "auto")
+        alignment = detect_grid(
+            panel_img,
+            expected_rows=panel_obj.rows,
+            expected_cols=panel_obj.cols,
+            min_visible=getattr(panel_obj, "min_visible", 0.95),
+            fallback=fallback,
+            scroll_direction=getattr(panel_obj, "scroll_direction", "vertical"),
+        )
         if alignment is None:
             logger.error(f"align: panel {scene_key}.{panel_key} 未检测到 slot")
             return None
         self._panel_alignments[(scene_key, panel_key)] = alignment
-        logger.info(f"align: {scene_key}.{panel_key} 已对齐，检测到 {alignment.total_slots} 个 slot 中心")
+        mode = "等分降级" if (fallback and alignment.row_span == 0.0) else "图像检测"
+        logger.info(
+            f"align: {scene_key}.{panel_key} 已对齐（{mode}），"
+            f"检测到 {alignment.n_rows}×{alignment.n_cols} = {alignment.total_slots} 个 slot 中心"
+        )
         return alignment
 
     def _ensure_aligned(self, scene_key: str, panel_key: str) -> "GridAlignment | None":

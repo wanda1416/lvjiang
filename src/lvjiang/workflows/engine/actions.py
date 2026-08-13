@@ -23,6 +23,16 @@ from ..grammar import (
 from ..grammar.ast_nodes import Align
 from .signals import WorkflowUserError
 
+# FoundRegion 延迟导入，避免循环依赖
+_FoundRegion = None
+
+def _get_found_region_cls():
+    global _FoundRegion
+    if _FoundRegion is None:
+        from ...core.scene_registry import FoundRegion
+        _FoundRegion = FoundRegion
+    return _FoundRegion
+
 
 class _ActionsMixin:
     """基础指令执行：_exec_click / _exec_drag / _exec_wait
@@ -61,6 +71,12 @@ class _ActionsMixin:
                 region_val = self.variables.get(region.name)
                 if region_val is None:
                     raise WorkflowUserError(f"变量 ${region.name} 未定义，无法点击")
+                # 检查是否为 find 指令产出的 FoundRegion
+                FoundRegionCls = _get_found_region_cls()
+                if isinstance(region_val, FoundRegionCls):
+                    x, y = self._found_region_to_screen(region_val)
+                    self._input.click_screen(x, y, f"find({region_val.text!r})")
+                    return
                 # 尝试从 coord_meta 查找该 key 对应的 Region
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
@@ -71,12 +87,29 @@ class _ActionsMixin:
                 self._ensure_workflow().click_any(str(scene), str(region_val))
             else:
                 self._ensure_workflow().click_any(str(scene), region)
+        elif isinstance(node.target, VarRef):
+            # 裸变量引用：find 指令产出的 FoundRegion，直接点击文字位置
+            region_val = self.variables.get(node.target.name)
+            if region_val is None:
+                raise WorkflowUserError(
+                    f"变量 ${node.target.name} 未定义，无法点击"
+                )
+            FoundRegionCls = _get_found_region_cls()
+            if isinstance(region_val, FoundRegionCls):
+                x, y = self._found_region_to_screen(region_val)
+                self._input.click_screen(x, y, f"find({region_val.text!r})")
+                return
+            raise WorkflowUserError(
+                f"click ${node.target.name}: 变量值不是 find 产出的区域 "
+                f"(类型: {type(region_val).__name__})"
+            )
         else:
             raise WorkflowUserError(f"click: 未知目标类型 {type(node.target).__name__}")
 
     def _exec_drag(self, node: Drag):
-        """drag scene.arrow / scene.panel[row][col] — scene 和 arrow 都可以是常量或变量。
+        """drag scene.arrow / scene.panel[row][col] / scene.point1 scene.point2 — 多种拖拽模式。
         若为坐标模式（from_point/to_point），则两端点按画布归一化坐标反算。
+        若为点对模式（from_scene_ref/to_scene_ref），则查找两个命名点的屏幕坐标。
         若为 panel 模式，则查校准缓存获取格子中心坐标。
         """
         if isinstance(node.from_point, CoordPoint) and isinstance(node.to_point, CoordPoint):
@@ -89,21 +122,78 @@ class _ActionsMixin:
                 duration=duration, hold=node.hold,
             )
             return
+        if node.from_scene_ref is not None and node.to_scene_ref is not None:
+            # 点对模式：drag [scene1].[point1] [scene2].[point2]
+            x1, y1 = self._resolve_point_ref_to_screen(node.from_scene_ref, "起点")
+            x2, y2 = self._resolve_point_ref_to_screen(node.to_scene_ref, "终点")
+            duration = self._resolve_duration(node.duration) if node.duration else None
+            self._input.drag_screen(
+                x1, y1, x2, y2,
+                f"point({node.from_scene_ref.scene}.{node.from_scene_ref.region})->({node.to_scene_ref.scene}.{node.to_scene_ref.region})",
+                duration=duration, hold=node.hold,
+            )
+            return
         if isinstance(node.scene, PanelGridDrag):
-            # grid 级拖拽：起点为 panel 中心，距离按整行/列高度
+            # grid 级拖拽：起点为 panel/region 中心，距离按整行/列高度
             grid = node.scene
+            # 先尝试作为 panel 查找
             panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
+            is_region = False
             if panel_obj is None:
-                raise WorkflowUserError(
-                    f"drag grid: 布局中未定义 panel {grid.scene}.{grid.panel}"
+                # 未找到 panel，尝试作为 region 查找
+                regions = self._layout.get_scene_regions(grid.scene)
+                region_obj = next((r for r in regions if r.key == grid.panel), None)
+                if region_obj is None:
+                    raise WorkflowUserError(
+                        f"drag grid: 布局中未定义 panel/region {grid.scene}.{grid.panel}"
+                    )
+                is_region = True
+                # region 中心在截图中的归一化坐标
+                cx = region_obj.x_ratio + region_obj.w_ratio / 2
+                cy = region_obj.y_ratio + region_obj.h_ratio / 2
+                w, h = self._capture.get_capture_size()
+                canvas = self._layout.get_canvas()
+                x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
+                y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
+                # region 拖拽：使用 region 高度/宽度作为步长
+                direction = grid.direction
+                distance = grid.distance
+                if isinstance(distance, VarRef):
+                    distance = self.variables.get(distance.name, 1.0)
+                try:
+                    distance = float(distance)
+                except (TypeError, ValueError):
+                    raise WorkflowUserError(f"drag grid: 距离无效: {distance}") from None
+                dx, dy = 0, 0
+                if direction in ("up", "down"):
+                    dy = int(region_obj.h_ratio * canvas.h_ratio * h * distance)
+                    if direction == "up":
+                        dy = -dy
+                    if abs(dy) < 10:
+                        dy = 10 if dy >= 0 else -10
+                else:
+                    dx = int(region_obj.w_ratio * canvas.w_ratio * w * distance)
+                    if direction == "left":
+                        dx = -dx
+                    if abs(dx) < 10:
+                        dx = 10 if dx >= 0 else -10
+                x2, y2 = x + dx, y + dy
+                duration = self._resolve_duration(node.duration) if node.duration else None
+                self._input.drag_screen(
+                    x, y, x2, y2,
+                    f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
+                    duration=duration, hold=node.hold,
                 )
-            # panel 中心在截图中的归一化坐标
-            cx = panel_obj.x_ratio + panel_obj.w_ratio / 2
-            cy = panel_obj.y_ratio + panel_obj.h_ratio / 2
-            w, h = self._capture.get_capture_size()
-            canvas = self._layout.get_canvas()
-            x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
-            y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
+                logger.debug(f"drag grid: region {grid.scene}.{grid.panel} {direction} {distance}")
+                return
+            else:
+                # panel 中心在截图中的归一化坐标
+                cx = panel_obj.x_ratio + panel_obj.w_ratio / 2
+                cy = panel_obj.y_ratio + panel_obj.h_ratio / 2
+                w, h = self._capture.get_capture_size()
+                canvas = self._layout.get_canvas()
+                x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
+                y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
             # 解析 distance（支持 int、float、VarRef）
             distance = grid.distance
             if isinstance(distance, VarRef):
@@ -232,17 +322,53 @@ class _ActionsMixin:
             else:
                 scene = node.scene.scene
 
-            # 解析 arrow（可能是 str 或 VarRef）
-            arrow = node.scene.region
-            if isinstance(arrow, VarRef):
-                arrow_val = self.variables.get(arrow.name)
-                if arrow_val is None:
-                    raise WorkflowUserError(f"变量 ${arrow.name} 未定义，无法拖拽")
-                arrow = arrow_val
+            # 解析 key（可能是 str 或 VarRef）
+            key = node.scene.region
+            if isinstance(key, VarRef):
+                key_val = self.variables.get(key.name)
+                if key_val is None:
+                    raise WorkflowUserError(f"变量 ${key.name} 未定义，无法拖拽")
+                key = key_val
 
             duration = self._resolve_duration(node.duration) if node.duration else None
             hold = node.hold
-            self._ensure_workflow().drag_arrow(str(scene), str(arrow), duration=duration, hold=hold)
+
+            # 先尝试作为 arrow 查找
+            arrows = self._layout.get_scene_arrows(str(scene))
+            arrow = next((a for a in arrows if a.key == str(key)), None)
+            if arrow is not None:
+                self._ensure_workflow().drag_arrow(str(scene), str(key), duration=duration, hold=hold)
+                return
+
+            # 未找到 arrow，尝试作为 region 查找
+            regions = self._layout.get_scene_regions(str(scene))
+            region = next((r for r in regions if r.key == str(key)), None)
+            if region is not None:
+                # region 中心作为起点，默认向上拖拽（用于滚动）
+                cx = region.x_ratio + region.w_ratio / 2
+                cy = region.y_ratio + region.h_ratio / 2
+                w, h = self._capture.get_capture_size()
+                canvas = self._layout.get_canvas()
+                x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
+                y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
+                # 默认向上拖拽一个 region 高度
+                dy = int(region.h_ratio * canvas.h_ratio * h)
+                if abs(dy) < 10:
+                    dy = 10
+                x2 = x
+                y2 = y - dy
+                self._input.drag_screen(
+                    x, y, x2, y2,
+                    f"region({scene}.{key}) up",
+                    duration=duration, hold=hold,
+                )
+                logger.debug(f"drag region: {scene}.{key} up (default)")
+                return
+
+            raise WorkflowUserError(
+                f"drag: 场景 [{scene}] 的 arrow/region 未绑定: {key}，"
+                f"请在场景布局编辑器中绑定后重试"
+            )
         else:
             raise WorkflowUserError(f"drag: 未知目标类型 {type(node.scene).__name__}")
 
@@ -281,3 +407,62 @@ class _ActionsMixin:
                 self._ensure_workflow().wait_delay(str(val))
         else:
             self._ensure_workflow().wait_delay(str(delay))
+
+    def _found_region_to_screen(self, found_region, jitter: bool = True) -> tuple[int, int]:
+        """FoundRegion → 屏幕坐标（取区域中心，可选抖动）"""
+        import random
+        w, h = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
+
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+
+        cx = canvas_x + (found_region.x_ratio + found_region.w_ratio / 2) * canvas_w
+        cy = canvas_y + (found_region.y_ratio + found_region.h_ratio / 2) * canvas_h
+
+        if jitter:
+            jitter_ratio = self._input_sim.region_jitter_ratio
+            region_w = found_region.w_ratio * canvas_w
+            region_h = found_region.h_ratio * canvas_h
+            cx += region_w * random.uniform(-jitter_ratio, jitter_ratio)
+            cy += region_h * random.uniform(-jitter_ratio, jitter_ratio)
+
+        return int(self._window_left + cx), int(self._window_top + cy)
+
+    def _resolve_point_ref_to_screen(self, scene_ref: SceneRef, label: str = "") -> tuple[int, int]:
+        """SceneRef(scene=场景名, region=点名) → 屏幕坐标
+
+        用于 drag 点对模式：查找布局中定义的 Point 并转换为屏幕坐标。
+        """
+        # 解析场景名（支持 VarRef）
+        if isinstance(scene_ref.scene, VarRef):
+            scene = self.variables.get(scene_ref.scene.name)
+            if scene is None:
+                raise WorkflowUserError(
+                    f"drag {label}: 变量 ${scene_ref.scene.name} 未定义"
+                )
+        else:
+            scene = str(scene_ref.scene)
+
+        # 解析点名（支持 VarRef）
+        if isinstance(scene_ref.region, VarRef):
+            point_key = self.variables.get(scene_ref.region.name)
+            if point_key is None:
+                raise WorkflowUserError(
+                    f"drag {label}: 变量 ${scene_ref.region.name} 未定义"
+                )
+        else:
+            point_key = str(scene_ref.region)
+
+        # 从布局中查找 Point
+        points = self._layout.get_scene_points(str(scene))
+        point = next((p for p in points if p.key == str(point_key)), None)
+        if point is None:
+            raise WorkflowUserError(
+                f"drag {label}: 场景 [{scene}] 的坐标点未绑定: {point_key}"
+            )
+
+        # Point → 屏幕坐标（带半径内随机偏移）
+        return self._ensure_workflow()._point_to_screen(point)

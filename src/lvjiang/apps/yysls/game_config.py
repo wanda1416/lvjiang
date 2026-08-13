@@ -155,7 +155,7 @@ class GameConfigManager:
             with open(self._path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         else:
-            from lvjiang.core.config_resolver import get_resolver
+            from lvjiang.core.config.resolver import get_resolver
             data = get_resolver().load_merged("yysls/attributes.yaml")
 
         # 重置全部规则（_load 会在 UI 保存后重复调用，避免残留旧映射）

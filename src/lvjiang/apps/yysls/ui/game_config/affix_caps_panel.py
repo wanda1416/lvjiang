@@ -283,7 +283,7 @@ class AffixCapsPanel(QWidget):
 
     def _load_data(self):
         """从 YAML 加载数据"""
-        from lvjiang.core.config_resolver import get_resolver
+        from lvjiang.core.config.resolver import get_resolver
         try:
             self._data = get_resolver().load_merged(_ATTRS_REL)
         except Exception as e:
@@ -573,7 +573,7 @@ class AffixCapsPanel(QWidget):
 
     def _save_data(self):
         """保存数据到 YAML"""
-        from lvjiang.core.config_resolver import get_resolver
+        from lvjiang.core.config.resolver import get_resolver
         try:
             get_resolver().save_merged(_ATTRS_REL, self._data)
             logger.debug(f"配置已保存: {_ATTRS_REL}")

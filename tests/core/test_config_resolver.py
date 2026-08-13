@@ -6,7 +6,7 @@
 import pytest
 import yaml
 
-from lvjiang.core.config_resolver import (
+from lvjiang.core.config.resolver import (
     ConfigResolver,
     compute_diff,
     merge_doc,

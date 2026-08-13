@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 from loguru import logger
 
-from lvjiang.core.config_resolver import ConfigResolver, get_resolver
+from lvjiang.core.config.resolver import ConfigResolver, get_resolver
 
 from .models import RuleValidationError, TuningBase, TuningRule
 from .parsing import _KEY_RE, parse_tuning_base, parse_tuning_rule

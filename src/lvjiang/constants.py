@@ -37,14 +37,8 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 
 # 系统配置（出厂默认，随版本发布，进 git）
 SYSTEM_CONFIG_DIR = CONFIG_DIR / "system"
-SYSTEM_SCENES_DIR = SYSTEM_CONFIG_DIR / "scenes"
 SYSTEM_WORKFLOWS_DIR = SYSTEM_CONFIG_DIR / "workflows"
 SYSTEM_LAYOUTS_DIR = SYSTEM_CONFIG_DIR / "layouts"
-SYSTEM_REFERENCES_DIR = SYSTEM_CONFIG_DIR / "references"
-SCENES_CONFIG_PATH = SYSTEM_CONFIG_DIR / "scenes.yaml"
-WORKFLOWS_CONFIG_PATH = SYSTEM_CONFIG_DIR / "workflows.yaml"
-REFERENCES_CONFIG_PATH = SYSTEM_CONFIG_DIR / "references.yaml"
-LAYOUTS_CONFIG_PATH = SYSTEM_CONFIG_DIR / "layouts.yaml"
 
 # 用户覆盖层（影子文件 + 键级 diff + 墓碑，目录镜像 system，.gitignore）
 LOCAL_CONFIG_DIR = CONFIG_DIR / "local"

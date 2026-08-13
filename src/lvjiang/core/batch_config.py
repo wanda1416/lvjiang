@@ -11,12 +11,9 @@ enabled 状态不在本模块管理，而是存入 session.json 的用户态
 （由 batch_tab 读写），因为它是重度变化的用户态参数。
 """
 
-import json
 from dataclasses import dataclass, field
 
 from loguru import logger
-
-from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
 
 # ─── 数据类 ──────────────────────────────────────────────
 
@@ -129,34 +126,25 @@ class BatchConfig:
 
 def load_batch_config() -> BatchConfig:
     """从 session.json 读取批处理配置"""
-    if not SESSION_PATH.exists():
+    from .config.session import get_session_store
+    node = get_session_store().get_node("batch", {})
+    if not isinstance(node, dict):
         return BatchConfig()
-    try:
-        data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-        return BatchConfig.from_dict(data.get("batch", {}))
-    except Exception as e:
-        logger.error(f"加载批处理配置失败: {e}")
-        return BatchConfig()
+    return BatchConfig.from_dict(node)
 
 
 def save_batch_config(cfg: BatchConfig) -> None:
-    """保存批处理配置到 session.json（read-modify-write）"""
-    data: dict = {}
-    if SESSION_PATH.exists():
-        try:
-            data = json.loads(SESSION_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    # 保留 enabled_rows（用户态，由 batch_tab 管理）
-    enabled_rows = data.get("batch", {}).get("enabled_rows")
-    data["batch"] = cfg.to_dict()
-    if enabled_rows is not None:
-        data["batch"]["enabled_rows"] = enabled_rows
-    SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    SESSION_PATH.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    """保存批处理配置到 session.json 的 batch 节点（保留 enabled_rows 用户态）"""
+    from .config.session import get_session_store
+
+    def _merge(old):
+        # 保留 enabled_rows（用户态，由 batch_tab 管理）
+        new = cfg.to_dict()
+        if isinstance(old, dict) and old.get("enabled_rows") is not None:
+            new["enabled_rows"] = old["enabled_rows"]
+        return new
+
+    get_session_store().mutate_node("batch", _merge)
     total_rows = sum(len(c.rows) for c in cfg.configs.values())
     logger.info(f"批处理配置已保存: {len(cfg.configs)} 个配置, {total_rows} 行数据")
 

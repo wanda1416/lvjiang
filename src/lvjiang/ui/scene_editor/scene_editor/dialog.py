@@ -24,8 +24,8 @@ from ....core.layout_manager import (
     migrate_layout_item,
     save_scene_screenshot,
 )
+from ....core.layout_models import Layout
 from ....core.scene_registry import (
-    Layout,
     get_registry,
     get_scene_name,
 )

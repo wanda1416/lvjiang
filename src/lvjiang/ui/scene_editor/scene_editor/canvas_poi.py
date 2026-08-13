@@ -15,7 +15,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QCursor, QFont, QPainter, QPen, QPolygonF
 from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 
-from ....core.scene_registry import Arrow, Point
+from ....core.layout_models import Arrow, Point
 
 # ─── 常量 ────────────────────────────────────────────────
 

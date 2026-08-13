@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ....core.layout_manager import rename_item_key_across_all_layouts
-from ....core.scene_loader import VALID_REGION_TYPES, PointDef
+from ....core.scene_definition import VALID_REGION_TYPES, PointDef
 from ....core.scene_registry import (
     get_point_def,
     get_registry,

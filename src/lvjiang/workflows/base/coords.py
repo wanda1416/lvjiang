@@ -7,7 +7,7 @@
 import math
 import random
 
-from ...core.scene_registry import Point, Region
+from ...core.layout_models import Point, Region
 
 
 class _CoordMixin:

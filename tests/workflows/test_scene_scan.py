@@ -13,7 +13,7 @@ import pytest
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
-from lvjiang.workflows.scene_scan import collect_refs, collect_scene_keys
+from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
 
 # ─── 搜集单元测试 ─────────────────────────────────────────
 

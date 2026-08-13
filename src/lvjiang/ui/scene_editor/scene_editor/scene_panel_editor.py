@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ....core.layout_manager import rename_item_key_across_all_layouts
-from ....core.scene_loader import PanelDef
+from ....core.scene_definition import PanelDef
 from ....core.scene_registry import (
     get_registry,
     is_view_visible,

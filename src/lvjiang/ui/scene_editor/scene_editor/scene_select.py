@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import QComboBox, QFormLayout
 
-from ....core.scene_loader import BASE_VIEW_KEY
+from ....core.scene_definition import BASE_VIEW_KEY
 from ....core.scene_registry import get_registry, get_scene_views
 
 

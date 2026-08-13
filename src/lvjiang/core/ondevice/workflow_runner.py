@@ -23,8 +23,8 @@ from ...core.config import load_user_config
 from ...core.config.resolver import get_resolver
 from ...core.config.session import get_session_store
 from ...core.input_base import InputBackend
+from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
-from ...core.scene_registry import Layout
 from ...workflows.engine import WorkflowEngine
 from .capture import A11yCapture
 from .input import A11yInput

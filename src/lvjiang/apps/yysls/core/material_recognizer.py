@@ -23,6 +23,16 @@ from lvjiang.core.ocr import OCREngine
 from lvjiang.core.recognizers.reference_matcher import ReferenceMatcher
 from lvjiang.core.reference_db import ReferenceDatabase
 
+# yysls 调律输出字段契约：自动调律启动前必须存在的 output 字段 key
+# （业务层对核心层 meta_schema 的合法要求，非侵入）
+REQUIRED_OUTPUT_FIELDS = ("levels", "counts")
+
+
+def get_missing_output_fields(db: ReferenceDatabase) -> list[str]:
+    """返回当前图库空间缺失的必需输出字段 key（空列表 = 满足启动条件）"""
+    existing = {f.key for f in db.get_output_fields()}
+    return [k for k in REQUIRED_OUTPUT_FIELDS if k not in existing]
+
 
 def _parse_number(text: str) -> int | None:
     """解析数字文本，支持 '123'、'1.5万'、'12万' 等格式（yysls 游戏专属）"""

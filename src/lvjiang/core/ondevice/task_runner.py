@@ -321,6 +321,12 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
             _STATE.finish(STATE_STOPPED, f"已停止：{name}", dict(result or {}))
             return
 
+        # 工作流预检失败返回 {"error": ...}：拒绝启动，按失败收场
+        if isinstance(result, dict) and result.get("error"):
+            _STATE.log(f"启动被拒绝：{result['error']}")
+            _STATE.finish(STATE_FAILED, f"启动被拒绝：{result['error']}")
+            return
+
         collected = len(result or {})
         _STATE.log(f"任务完成，收集 {collected} 项")
         _STATE.finish(STATE_DONE, f"已完成：{name}", dict(result or {}))

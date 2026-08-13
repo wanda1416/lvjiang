@@ -23,6 +23,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuneBehavior,
     TuningBase,
 )
+from lvjiang.apps.yysls.game_config import LevelConfig
 from lvjiang.apps.yysls.workflows.implementations import auto_tuning
 from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
     AutoTuningWorkflow,
@@ -745,6 +746,16 @@ def _behavior_base(scan=None, tune=None) -> TuningBase:
                                   tune=tune or TuneBehavior()))
 
 
+def _mock_game_config(level_configs=None):
+    """创建带等级配置的 GameConfigManager mock"""
+    mock_mgr = MagicMock()
+    configs = level_configs or []
+    mock_mgr.get_level_configs.return_value = configs
+    mock_mgr.level_config_for = lambda level: next(
+        (c for c in configs if c.level == level), None)
+    return mock_mgr
+
+
 _RECYCLE_ALL = [BehaviorRule(action="recycle")]   # 无条件 → 全部回收
 
 
@@ -1044,17 +1055,21 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
         return dict(_JUNK) if calls["n"] == 2 else dict(_WORTHY)
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    base = _behavior_base(tune=TuneBehavior(
-        enabled=True,
-        rules=[BehaviorRule(ratings=["junk"], action="reset")],
-        max_resets=3))
+    base = _behavior_base(
+        tune=TuneBehavior(
+            enabled=True,
+            rules=[BehaviorRule(ratings=["junk"], action="reset")],
+            max_resets=3))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(auto_tuning, "get_game_config",
+                        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律(3)",
-                               "check_1": "当前装备剩余可重置次数：3"}
+                               "reset_check": "当前装备剩余可重置次数：3",
+                               "reset_info": "持有 100"}
     fp = wf._process_equipment("可救剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1081,11 +1096,14 @@ def test_tune_reset_blocked_ocr_zero(monkeypatch):
         return dict(_WORTHY) if calls["n"] == 1 else dict(_JUNK)
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    base = _behavior_base(tune=TuneBehavior(
-        enabled=True,
-        rules=[BehaviorRule(ratings=["junk"], action="reset")]))
+    base = _behavior_base(
+        tune=TuneBehavior(
+            enabled=True,
+            rules=[BehaviorRule(ratings=["junk"], action="reset")]))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(auto_tuning, "get_game_config",
+                        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
@@ -1112,17 +1130,21 @@ def test_tune_reset_local_cap(monkeypatch):
         return dict(_WORTHY) if calls["n"] == 1 else dict(_JUNK)
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    base = _behavior_base(tune=TuneBehavior(
-        enabled=True,
-        rules=[BehaviorRule(ratings=["junk"], action="reset")],
-        max_resets=3))
+    base = _behavior_base(
+        tune=TuneBehavior(
+            enabled=True,
+            rules=[BehaviorRule(ratings=["junk"], action="reset")],
+            max_resets=3))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(auto_tuning, "get_game_config",
+                        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律 3/3",
-                               "check_1": "当前装备剩余可重置次数：3"}
+                               "reset_check": "当前装备剩余可重置次数：3",
+                               "reset_info": "持有 100"}
     wf._process_equipment("重置一次剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1134,7 +1156,7 @@ def test_tune_reset_local_cap(monkeypatch):
 
 
 def test_tune_reset_cooldown_check_fails(monkeypatch):
-    """冷却期检查：check_1 无「可调律重置」→ 点返回回调律页，强制跳过装备"""
+    """冷却期检查：reset_check 无「可调律重置」→ 点返回回调律页，强制跳过装备"""
     calls = {"n": 0}
 
     def judge(*a, **k):
@@ -1142,17 +1164,20 @@ def test_tune_reset_cooldown_check_fails(monkeypatch):
         return dict(_WORTHY) if calls["n"] == 1 else dict(_JUNK)
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    base = _behavior_base(tune=TuneBehavior(
-        enabled=True,
-        rules=[BehaviorRule(ratings=["junk"], action="reset")],
-        reset_exhausted_action="recycle"))  # 回收配置不应生效
+    base = _behavior_base(
+        tune=TuneBehavior(
+            enabled=True,
+            rules=[BehaviorRule(ratings=["junk"], action="reset")],
+            reset_exhausted_action="recycle"))  # 回收配置不应生效
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(auto_tuning, "get_game_config",
+                        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律(3)",
-                               "check_1": "冷却中"}  # 无「可调律重置」
+                               "reset_check": "冷却中"}  # 无「可调律重置」
     fp = wf._process_equipment("冷却剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1177,12 +1202,15 @@ def test_tune_reset_exhausted_recycles(monkeypatch):
         return dict(_WORTHY) if calls["n"] == 1 else dict(_JUNK)
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential", judge)
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
-    base = _behavior_base(tune=TuneBehavior(
-        enabled=True,
-        rules=[BehaviorRule(ratings=["junk"], action="reset")],
-        reset_exhausted_action="recycle"))
+    base = _behavior_base(
+        tune=TuneBehavior(
+            enabled=True,
+            rules=[BehaviorRule(ratings=["junk"], action="reset")],
+            reset_exhausted_action="recycle"))
     monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
     monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(auto_tuning, "get_game_config",
+                        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",

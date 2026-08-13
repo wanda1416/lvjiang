@@ -1,8 +1,17 @@
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0.."
 rem 一键打包：PyInstaller onedir → dist\lvjiang\（绿色免安装目录）+ zip
 rem 产物布局与资源收集说明见 packaging\lvjiang.spec / packaging\launcher.py
 rem 支持从项目根目录调用：packaging\package.bat
+
+rem ─── 版本注入 ───
+rem 从 pyproject.toml 读取版本号，写入 _version.py
+python packaging\inject_version.py
+if errorlevel 1 (
+    echo [package] 版本注入失败
+    exit /b 1
+)
 
 if exist dist\lvjiang rmdir /s /q dist\lvjiang
 

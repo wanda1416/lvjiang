@@ -13,12 +13,12 @@
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 datas, binaries, hiddenimports = collect_all("rapidocr_onnxruntime")
-datas += [("src/lvjiang/workflows/grammar", "lvjiang/workflows/grammar")]
+datas += [("../src/lvjiang/workflows/grammar", "lvjiang/workflows/grammar")]
 hiddenimports += collect_submodules("lvjiang")
 
 a = Analysis(
-    ["packaging/launcher.py"],
-    pathex=["src"],
+    ["launcher.py"],
+    pathex=["../src"],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

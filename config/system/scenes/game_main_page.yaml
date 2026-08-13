@@ -6,7 +6,7 @@ views:
 - key: jiugongge
   name: 九宫格
 - key: more
-  name: 更多
+  name: 检查区
 regions:
 - key: menu
   name: 菜单
@@ -139,6 +139,11 @@ regions:
   is_text: true
   is_clickable: false
   view: more
+- key: xianshi
+  name: 限时
+  type: func
+  is_text: true
+  is_clickable: true
 points:
 - key: origin
   name: 起点

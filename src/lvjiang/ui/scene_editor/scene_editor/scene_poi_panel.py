@@ -31,7 +31,12 @@ from ....core.scene_registry import (
     sync_scene_cache,
 )
 from ...widgets import strip_focus_rect
-from .scene_select import add_scene_combo_row, add_view_combo_row, combo_view_value
+from .scene_select import (
+    add_scene_combo_row,
+    add_view_combo_row,
+    combo_view_value,
+    connect_scene_view_sync,
+)
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -488,6 +493,10 @@ class PoiPanelMixin:
             form, self._scene_key,
             point_def.view if point_def else self._current_view,
         )
+
+        # 场景切换时同步更新视图下拉框
+        if scene_combo is not None:
+            connect_scene_view_sync(scene_combo, view_combo)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel

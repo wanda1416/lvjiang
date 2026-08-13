@@ -55,7 +55,7 @@ materials:
 behavior:
   scan:
     enabled: true
-    entry_min_rating: excellent
+    entry_min_rating: top
     rules:
     - parts:
       - 武器
@@ -150,7 +150,7 @@ behavior:
       - 腕甲
       max_quality: purple
       pct_op: le
-      pct: 100
+      pct: 92
       ratings:
       - junk
       judge_scope: incoming
@@ -168,6 +168,7 @@ behavior:
       pct_op: le
       pct: 100
       ratings:
+      - excellent
       - normal
       - junk
       judge_scope: incoming

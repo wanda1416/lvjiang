@@ -8,8 +8,11 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QFileDialog,
+    QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -99,6 +102,20 @@ class ReferenceManagerDialog(QDialog):
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
 
+        # ── 图库空间切换栏（图库内部概念，外部消费方无感）──
+        space_bar = QHBoxLayout()
+        space_bar.addWidget(QLabel("图库空间:"))
+        self._space_combo = QComboBox()
+        self._space_combo.addItems(self._db.get_spaces())
+        self._space_combo.setCurrentText(self._db.get_active_space())
+        self._space_combo.currentTextChanged.connect(self._on_space_changed)
+        space_bar.addWidget(self._space_combo)
+        btn_new_space = QPushButton("新建空间")
+        btn_new_space.clicked.connect(self._on_new_space)
+        space_bar.addWidget(btn_new_space)
+        space_bar.addStretch()
+        main_layout.addLayout(space_bar)
+
         # ── 顶级 Tab ──
         self._tabs = QTabWidget()
 
@@ -119,6 +136,51 @@ class ReferenceManagerDialog(QDialog):
         self._tabs.addTab(self._meta_panel, "元数据定义")
 
         main_layout.addWidget(self._tabs)
+
+    # ── 图库空间切换 ──
+
+    def _on_space_changed(self, name: str):
+        """下拉切换空间：持久化 + 重载 + 刷新面板"""
+        if not name or name == self._db.get_active_space():
+            return
+        if not self._db.set_active_space(name):
+            self._space_combo.blockSignals(True)
+            self._space_combo.setCurrentText(self._db.get_active_space())
+            self._space_combo.blockSignals(False)
+            return
+        self._refresh_panels()
+
+    def _on_new_space(self):
+        """新建空间：创建空空间 + 激活 + 刷新下拉与面板"""
+        name, ok = QInputDialog.getText(self, "新建图库空间", "空间名:")
+        if not ok or not str(name).strip():
+            return
+        name = str(name).strip()
+        if not self._db.create_space(name):
+            QMessageBox.warning(self, "新建空间", f"无法创建空间「{name}」（可能已存在或名册未迁移）")
+            return
+        self._db.set_active_space(name)
+        self._space_combo.blockSignals(True)
+        self._space_combo.clear()
+        self._space_combo.addItems(self._db.get_spaces())
+        self._space_combo.setCurrentText(name)
+        self._space_combo.blockSignals(False)
+        self._refresh_panels()
+
+    def _refresh_panels(self):
+        """空间切换后刷新依赖 db 的面板
+
+        不同空间可有不同 meta_schema：除列表/网格外，动态 meta 控件
+        （browser 筛选/编辑字段、grid cell 编辑器）也必须按新空间 schema 重建，
+        否则旧 schema 的 key 会被写进新空间。
+        """
+        groups = self._db.get_groups()
+        self._browser.set_known_groups(groups)
+        self._browser.rebuild_meta_fields()
+        self._browser.refresh()
+        self._meta_panel.reload()
+        self._grid_panel.set_known_groups(groups, self._db.get_all_labels_by_group())
+        self._grid_panel.set_meta_fields(self._db.get_meta_schema())
 
     # ── Tab 1: 新增参考图 ──
 

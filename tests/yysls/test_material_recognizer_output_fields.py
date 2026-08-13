@@ -12,11 +12,13 @@ import numpy as np
 import yaml
 
 from lvjiang.apps.yysls.core.material_recognizer import (
+    REQUIRED_OUTPUT_FIELDS,
     MaterialInfo,
     MaterialRecognizer,
+    get_missing_output_fields,
 )
 from lvjiang.core.recognizers.reference_matcher import MatchResult
-from lvjiang.core.reference_db import ReferenceDatabase
+from lvjiang.core.reference_db import DEFAULT_SPACE, ReferenceDatabase
 
 
 def _write_yaml(path, doc):
@@ -28,12 +30,18 @@ def _make_db(tmp_path, meta_schema) -> ReferenceDatabase:
     system_yaml = tmp_path / "system" / "references.yaml"
     _write_yaml(system_yaml, {"version": 1, "references": [],
                               "meta_schema": meta_schema})
+    # 名册同步隔离到 tmp_path（避免读真实 config）
+    spaces_yaml = tmp_path / "system" / "spaces.yaml"
+    _write_yaml(spaces_yaml, {"version": 1, "spaces": [DEFAULT_SPACE]})
     return ReferenceDatabase(
         system_dir=tmp_path / "system" / "references",
         system_yaml=system_yaml,
         local_dir=tmp_path / "local" / "references",
         local_yaml=tmp_path / "local" / "references.yaml",
         dev_mode=False,
+        system_spaces_yaml=spaces_yaml,
+        local_spaces_yaml=tmp_path / "local" / "spaces.yaml",
+        session_path=tmp_path / "session.json",
     )
 
 
@@ -188,3 +196,41 @@ class TestMaterialInfoParsing:
         info = MaterialInfo(type="彩狗粮",
                             ocr_texts={"levels": "1.5万"})
         assert info.level == 15000
+
+
+class TestTuningPrecheck:
+    """调律启动预检：当前图库空间必须含 levels/counts 输出字段"""
+
+    def test_contract_keys(self):
+        assert REQUIRED_OUTPUT_FIELDS == ("levels", "counts")
+
+    def test_full_schema_satisfies_contract(self, tmp_path):
+        db = _make_db(tmp_path, _OUTPUT_SCHEMA)
+        db.load()
+        assert get_missing_output_fields(db) == []
+
+    def test_missing_both(self, tmp_path):
+        db = _make_db(tmp_path, [{"key": "level", "name": "等级", "scope": "input"}])
+        db.load()
+        assert get_missing_output_fields(db) == ["levels", "counts"]
+
+    def test_missing_one(self, tmp_path):
+        schema = [
+            {"key": "levels", "name": "等级区域", "scope": "output",
+             "crop": [0.0, 0.0, 1.0, 0.25]},
+        ]
+        db = _make_db(tmp_path, schema)
+        db.load()
+        assert get_missing_output_fields(db) == ["counts"]
+
+    def test_invalid_crop_not_counted(self, tmp_path):
+        """output 字段 crop 非法时不算有效输出字段"""
+        schema = [
+            {"key": "levels", "name": "等级区域", "scope": "output",
+             "crop": [2.0, 0.0, 1.0, 0.25]},
+            {"key": "counts", "name": "数量区域", "scope": "output",
+             "crop": [0.0, 0.25, 1.0, 0.75]},
+        ]
+        db = _make_db(tmp_path, schema)
+        db.load()
+        assert get_missing_output_fields(db) == ["levels"]

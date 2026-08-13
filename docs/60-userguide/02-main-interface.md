@@ -82,4 +82,4 @@
 
 ---
 
-上一步：[← 快速开始](01-quick-start.md) | 下一步：[3. 通用配置 →](03-config.md)
+上一步：[← 快速开始](01-quick-start.md) | 下一步：[3. 通用配置 →](03-base-config.md)

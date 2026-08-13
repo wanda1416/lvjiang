@@ -102,7 +102,7 @@ DSL 支持 6 种值类型，变量的实际类型由赋值来源决定（动态�
 | `equals` 比较 | 两侧 null 相等 | `null equals null` → true |
 | 字符串字段访问 | 转为空字符串 | 字段链中 null → "" |
 | `log` | 显示 "null" | `log $null_var` → 输出 "null" |
-| `collect` | 收集 null 值 | `collect $null_var` → output 含 null |
+| `collect` | 未定义变量被跳过 | `collect $undefined` → output 不含该 key |
 
 ### bool 语义
 
@@ -203,7 +203,7 @@ $list[0]                 # 静态索引（数字）
 | eval 字面量 | `eval $var = "str"` / `eval $var = 42` | 字面量赋值 |
 | eval 函数 | `eval $var = func(args...)` | 函数返回值赋值 |
 | eval 算术 | `eval $var = $a + $b * 2` | 算术表达式赋值 |
-| eval 字典 | `eval $var = {"k": v}` | 字典赋值 |
+| eval 字典 | `eval $var = {"k": "v"}` | 字典赋值 |
 | eval 列表 | `eval $var = ["a", "b"]` | 列表赋值 |
 | eval 范围 | `eval $var = (1, 2)` | 范围元组赋值 |
 | default | `default $var = <literal>` | 仅当变量未从外部传入时赋值 |

@@ -37,6 +37,45 @@ REFRESH_BTN_STYLE = (
     "QPushButton:hover { background-color: #78909C; }"
 )
 
+# 用户导航按钮样式（上一个 / 下一个）
+NAV_BTN_STYLE = (
+    "QPushButton { background-color: #546E7A; color: white; font-size: 12px; "
+    "padding: 2px 6px; border-radius: 3px; }"
+    "QPushButton:hover { background-color: #78909C; }"
+    "QPushButton:disabled { background-color: #B0BEC5; }"
+)
+
+
+def add_user_nav_buttons(btn_row: QHBoxLayout, host) -> None:
+    """在工具栏的刷新按钮后追加「上一个 / 下一个」用户导航按钮。
+
+    按钮通过 host.navigate_user(delta) 切换当前用户，
+    由 user_changed 信号统一刷新所有订阅方。
+    到达列表首尾时按钮自动禁用（:disabled 样式生效）。
+    """
+    btn_row.addSpacing(6)
+    btn_prev = QPushButton("◀")
+    btn_prev.setFixedWidth(28)
+    btn_prev.setToolTip("上一个用户")
+    btn_prev.setStyleSheet(NAV_BTN_STYLE)
+    btn_prev.clicked.connect(lambda: host.navigate_user(-1))
+    btn_row.addWidget(btn_prev)
+
+    btn_next = QPushButton("▶")
+    btn_next.setFixedWidth(28)
+    btn_next.setToolTip("下一个用户")
+    btn_next.setStyleSheet(NAV_BTN_STYLE)
+    btn_next.clicked.connect(lambda: host.navigate_user(1))
+    btn_row.addWidget(btn_next)
+
+    def _update_enabled(idx: int) -> None:
+        count = host.user_combo.count()
+        btn_prev.setEnabled(idx > 0)
+        btn_next.setEnabled(idx < count - 1)
+
+    host.user_combo.currentIndexChanged.connect(_update_enabled)
+    _update_enabled(host.user_combo.currentIndex())
+
 
 # ─── 其他信息 Tab ────────────────────────────────────────────
 
@@ -73,6 +112,7 @@ class ProfileTab(QWidget):
             from ...profile.profile_engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
             engine.data_updated.connect(self._on_profile_data_updated)
+            engine.alert_triggered.connect(self._on_alert_triggered)
         except Exception as e:
             logger.debug(f"ProfileTab 连接 ProfileEngine 失败: {e}")
 
@@ -81,6 +121,12 @@ class ProfileTab(QWidget):
             self._pending_detail_refresh = True
             if not self._detail_refresh_timer.isActive():
                 self._detail_refresh_timer.start()
+
+    def _on_alert_triggered(self, key: str, label: str, message: str) -> None:
+        """处理 ProfileEngine 的告警信号，推送到公共告警面板"""
+        from datetime import datetime
+        alert_id = f"yysls:{key}"
+        self._host.alert_panel.push_alert(alert_id, message, datetime.now().isoformat())
 
     def _refresh_pending_detail(self) -> None:
         if self._pending_detail_refresh and self._detail_page is not None:
@@ -99,6 +145,7 @@ class ProfileTab(QWidget):
         btn_refresh.setStyleSheet(REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._refresh_current_user)
         btn_row.addWidget(btn_refresh)
+        add_user_nav_buttons(btn_row, self._host)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 

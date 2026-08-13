@@ -279,7 +279,8 @@ class RegenKeyDef(KeyDef):
     regen_value: float = 0.0
     reset_time: str = "05:00"
     reset_day: int = 0
-    alert_above: int | None = None
+    alert_orange: int | None = None  # 橙色告警阈值（低）
+    alert_red: int | None = None     # 红色告警阈值（高）
     steps: list[StepDef] = field(default_factory=list)
 
     @classmethod
@@ -298,7 +299,8 @@ class RegenKeyDef(KeyDef):
             regen_value=data.get("regen_value", 0.0),
             reset_time=data.get("reset_time", "05:00"),
             reset_day=data.get("reset_day", 0),
-            alert_above=data.get("alert_above"),
+            alert_orange=data.get("alert_orange"),
+            alert_red=data.get("alert_red"),
             steps=parse_steps(data.get("steps", [])),
         )
 

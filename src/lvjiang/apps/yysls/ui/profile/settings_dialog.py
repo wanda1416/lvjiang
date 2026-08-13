@@ -470,8 +470,10 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append(f"来源:{','.join(kd.sources)}")
             if kd.uses:
                 parts.append(f"用途:{','.join(kd.uses)}")
-            if kd.alert_above:
-                parts.append(f"提醒:>={kd.alert_above}")
+            if kd.alert_orange:
+                parts.append(f"橙警:>={kd.alert_orange}")
+            if kd.alert_red:
+                parts.append(f"红警:>={kd.alert_red}")
             return ", ".join(parts)
 
         if isinstance(kd, StockKeyDef):
@@ -715,12 +717,19 @@ class ProfileDefinitionDialog(QDialog):
             widgets["reset_day_label"] = reset_day_label
             layout.addRow(reset_day_label, reset_day_spin)
 
-            alert_spin = QSpinBox()
-            alert_spin.setRange(0, 999999)
-            alert_spin.setSpecialValueText("不提醒")
-            alert_spin.setValue(rt_kd.alert_above or 0)
-            layout.addRow("提醒阈值:", alert_spin)
-            widgets["alert_above"] = alert_spin
+            orange_spin = QSpinBox()
+            orange_spin.setRange(0, 999999)
+            orange_spin.setSpecialValueText("不提醒")
+            orange_spin.setValue(rt_kd.alert_orange or 0)
+            layout.addRow("橙色阈值:", orange_spin)
+            widgets["alert_orange"] = orange_spin
+
+            red_spin = QSpinBox()
+            red_spin.setRange(0, 999999)
+            red_spin.setSpecialValueText("不提醒")
+            red_spin.setValue(rt_kd.alert_red or 0)
+            layout.addRow("红色阈值:", red_spin)
+            widgets["alert_red"] = red_spin
 
             def _update_reset_time_visibility():
                 period = regen_period_combo.currentData()
@@ -861,7 +870,8 @@ class ProfileDefinitionDialog(QDialog):
                     increment_only=widgets["increment_only"].isChecked(),
                 )
             elif model_type == MODEL_REGEN:
-                alert_val = widgets["alert_above"].value()
+                orange_val = widgets["alert_orange"].value()
+                red_val = widgets["alert_red"].value()
                 # 解析 steps（支持 value:来源）
                 steps_list, steps_err = _parse_steps_text(widgets["steps"].text().strip())
                 if steps_list is None:
@@ -878,7 +888,8 @@ class ProfileDefinitionDialog(QDialog):
                     regen_value=widgets["regen_value"].value(),
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
-                    alert_above=alert_val if alert_val > 0 else None,
+                    alert_orange=orange_val if orange_val > 0 else None,
+                    alert_red=red_val if red_val > 0 else None,
                     steps=steps_list,
                 )
             elif model_type == MODEL_STOCK:

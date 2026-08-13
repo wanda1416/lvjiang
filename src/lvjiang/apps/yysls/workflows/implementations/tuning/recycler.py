@@ -43,19 +43,25 @@ class TuningRecycler:
         m = re.search(r"\d+", raw)
         return int(m.group()) if m else 0
 
-    def try_reset_tune(self, cfg, resets_used: int, why: str):
-        """在调律页执行一次重置调律（点按钮 + 冷却检查 + 确认 + 二次确认 + 关闭）
+    def try_reset_tune(self, cfg, resets_used: int, why: str,
+                       min_material_count: int | None = None):
+        """在调律页执行一次重置调律（点按钮 + 冷却检查 + 材料检查 + 确认 + 二次确认 + 关闭）
 
         重置清空首词条以外的全部词条；重置后有冷却期不可连重
         → 本件硬限只重置一次。次数门槛：本地计数达配置上限即止；
         按钮文本剩余次数另作硬门（读不到数字 = 用尽，不重置）。
-        点击重置按钮后 OCR check_1 区域，无「可调律重置」字样 =
-        装备在冷却期，点返回回到调律页并降级为跳过。
+        点击重置按钮后：
+        - OCR reset_check 区域，无「可调律重置」字样 = 装备在冷却期，降级跳过；
+        - OCR reset_info 区域，解析「持有 N」格式获取材料数量，
+          与等级配置的 min_material_count 比较，不足则跳过。
 
         Returns: True=成功；False=正常拒绝（走 reset_exhausted）；
-                 str=冷却期拒绝（强制跳过，原因字符串）。
+                 str=冷却期/材料不足拒绝（强制跳过，原因字符串）。
         """
         wf = self._wf
+        logger.debug(
+            f"  [try_reset_tune] min_material_count={min_material_count}, "
+            f"resets_used={resets_used}")
         if resets_used >= 1:
             # 重置后进入冷却期，本次工作内不可再重置该件
             logger.info("  本件已重置过一次，冷却期内不再重置")
@@ -71,14 +77,36 @@ class TuningRecycler:
         wf.click_region(wf.TUNE_SCENE, "reset_tune")
         wf.wait_delay("page_refresh_wait")  # 重置确认弹窗
         # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
-        check_text = wf.ocr_scene(wf.TUNE_SCENE, ["check_1"]).get(
-            "check_1", "") or ""
+        check_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_check"]).get(
+            "reset_check", "") or ""
         if "可重置" not in check_text:
-            logger.info(f"  冷却期检查未通过（check_1={check_text!r}），"
+            logger.info(f"  冷却期检查未通过（reset_check={check_text!r}），"
                         "装备在冷却期，降级跳过")
             wf.click_region(wf.TUNE_SCENE, "back")  # 关闭弹窗回调律页
             wf.wait_delay("step_interval")
             return "装备重置冷却期，跳过该装备"
+        # 材料检查：读取 reset_info 解析「持有 N」格式
+        if min_material_count is not None:
+            reset_info_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_info"]).get(
+                "reset_info", "") or ""
+            material_count = self._parse_material_count(reset_info_text)
+            if material_count is None:
+                # 未识别到「持有」关键字 → 异常
+                logger.error(
+                    f"  reset_info 未识别到「持有」关键字"
+                    f"（reset_info={reset_info_text!r}），视为异常，跳过")
+                wf.click_region(wf.TUNE_SCENE, "back")  # 关闭弹窗回调律页
+                wf.wait_delay("step_interval")
+                return "重置材料信息识别失败，跳过该装备"
+            if material_count < min_material_count:
+                # 材料不足
+                logger.info(
+                    f"  重置材料不足（持有 {material_count} < "
+                    f"要求 {min_material_count}），跳过该装备")
+                wf.click_region(wf.TUNE_SCENE, "back")  # 关闭弹窗回调律页
+                wf.wait_delay("step_interval")
+                return f"重置材料不足（持有 {material_count} < 要求 {min_material_count}），跳过该装备"
+            logger.info(f"  重置材料检查通过（持有 {material_count} >= 要求 {min_material_count}）")
         wf.click_region(wf.TUNE_SCENE, "reset_confirm")
         # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
         wf.wait_seconds(random.uniform(6.0, 7.0))
@@ -87,6 +115,21 @@ class TuningRecycler:
         wf.click_region(wf.TUNE_SCENE, "close_btn")  # 关闭 → 回到调律进度页
         wf.wait_delay("step_interval")
         return True
+
+    def _parse_material_count(self, text: str) -> int | None:
+        """解析 reset_info 文本中的材料数量
+
+        期望格式：「持有 N」，N 为数字。
+        返回数字；未识别到「持有」返回 None。
+        """
+        if "持有" not in text:
+            return None
+        # 匹配「持有」后的数字
+        m = re.search(r"持有\s*(\d+)", text)
+        if m:
+            return int(m.group(1))
+        # 有「持有」但没解析到数字，返回 0
+        return 0
 
     def recycle_current(self, equip_data: EquipmentData, detail_scene: str,
                         stage: str, reason: str,

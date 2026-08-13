@@ -83,4 +83,12 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 退出前等待后台线程，避免 PyQt6/SIP 清理时的 native crash
     app.aboutToQuit.connect(_wait_for_threads)
 
-    return app.exec()
+    ret = app.exec()
+
+    # 显式清理 Qt 对象，避免 Python 解释器关闭阶段 SIP 析构时
+    # 访问已释放内存导致 EXC_BAD_ACCESS（macOS 上尤为常见）
+    window.close()
+    del window
+    del app
+
+    return ret

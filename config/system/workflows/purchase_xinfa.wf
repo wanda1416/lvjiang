@@ -12,17 +12,24 @@ def go_back()
     click [game_menu_page].[back] after wait page_refresh_wait
 end
 
+# 循环购买心法
 loop while 1 == 1
-    # ─── 主逻辑 ──────────────────────────────────────────────
+    # 检查有没有找到自选标记
     wait step_interval
-    scan [training_xinfa].[sanben_1,sanben_2,sanben_3,sanben_4,sanben_5] as $btn by contains "自选"
-    if not $btn
+    scan [training_xinfa].[sanben_1,sanben_2,sanben_3,sanben_4,sanben_5] as $zixuan by contains "自选"
+    if not $zixuan
        log "找不到自选散本，结束"
        call go_back()
        return -1
     end
 
-    click [training_xinfa].$btn after wait step_interval
+    # 先走一遍回收，避免书票不足，心法过多
+    click [training_xinfa].[count] after wait step_interval
+    click [training_xinfa].[recycle_entry] after wait step_interval
+    click [training_xinfa].[recycle] after wait step_interval
+    click [training_xinfa].[confirm] after wait page_refresh_wait
+
+    click [training_xinfa].$zixuan after wait step_interval
     click [training_xinfa].[add_all] after wait step_interval
     click [training_xinfa].[purchase] after wait page_refresh_wait
 
@@ -38,9 +45,4 @@ loop while 1 == 1
     click [training_xinfa].[confirm] after wait page_refresh_wait
 
     click [training_xinfa].[blank] after wait step_interval
-
-    click [training_xinfa].[count] after wait step_interval
-    click [training_xinfa].[recycle_entry] after wait step_interval
-    click [training_xinfa].[recycle] after wait page_refresh_wait
-    click [training_xinfa].[confirm] after wait page_refresh_wait
 end

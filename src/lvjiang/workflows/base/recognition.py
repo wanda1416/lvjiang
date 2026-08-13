@@ -143,6 +143,89 @@ class _RecognitionMixin:
         logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
+    def recognize_materials_rich(
+        self,
+        scene_key: str,
+        slot_keys: list[str] | None = None,
+        group: str | None = None,
+        min_confidence: float | None = None,
+        with_func=None,
+    ) -> tuple[dict[str, dict], dict]:
+        """rich 模式材料识别：返回包含输入/输出元数据的富 dict
+
+        与 recognize_materials 相同的截图+裁切逻辑，
+        区别：构建 base dict（type/confidence/meta/ocr_texts），
+        若指定 with_func 则调用内置函数进行 dict->dict 转换。
+
+        Returns:
+            (result, region_map)
+            result: {slot_key: enriched_dict, ...}  空槽为 {}
+            region_map: {slot_key: Region, ...}  供 coord_meta 存储
+        """
+        from .. import builtins
+
+        # 解析 with 转换函数
+        transform = None
+        if with_func is not None:
+            func_name = with_func.value if hasattr(with_func, 'value') else str(with_func)
+            transform = builtins.get_function(func_name)
+            if transform is None:
+                raise ValueError(f"未知内置函数: {func_name}")
+
+        img = self._capture.capture()
+        if img is None:
+            logger.error("截图失败")
+            return {}, {}
+
+        canvas = self._layout.get_canvas()
+        regions = self._layout.get_scene_regions(scene_key)
+        if slot_keys:
+            regions = self._require_regions(scene_key, slot_keys, regions)
+        elif not regions:
+            logger.warning(f"场景 {scene_key} 没有定义区域")
+            return {}, {}
+
+        region_map = {r.key: r for r in regions}
+        recognizer = self.material_recognizer
+
+        result: dict[str, dict] = {}
+        h, w = img.shape[:2]
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+
+        for region in regions:
+            x1 = int(canvas_x + region.x_ratio * canvas_w)
+            y1 = int(canvas_y + region.y_ratio * canvas_h)
+            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
+            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
+            slot_img = img[y1:y2, x1:x2]
+
+            if slot_img.size == 0:
+                logger.warning(f"slot {region.key} 裁切为空，跳过")
+                result[region.key] = {}
+                continue
+
+            info = recognizer.recognize(slot_img, group=group)
+            if min_confidence is not None and info.confidence < min_confidence:
+                result[region.key] = {}
+            elif not info.type:
+                result[region.key] = {}  # 空槽
+            else:
+                base = recognizer.build_rich_base(info, group=group)
+                if transform is not None:
+                    base = transform(base)
+                result[region.key] = base
+            logger.debug(
+                f"rich 匹配 [{scene_key}].[{region.key}]: "
+                f"label={info.type!r}"
+            )
+
+        fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
+        logger.info(f"rich 匹配 [{scene_key}]:{fields_display} => {result}")
+        return result, region_map
+
     def recognize_materials_info_panel(
         self,
         scene_key: str,

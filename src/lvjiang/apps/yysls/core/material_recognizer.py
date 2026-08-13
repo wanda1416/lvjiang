@@ -256,6 +256,37 @@ class MaterialRecognizer:
 
         return results
 
+    # ─── 富 dict 序列化（插件扩展钩子）────────────────────────
+
+    @staticmethod
+    def build_rich_base(info: MaterialInfo, group: str | None = None) -> dict:
+        """构建 rich 模式 base dict（扁平结构）
+
+        字段：label / group / confidence / level_text / count_text
+        np.float32 → Python float 确保 JSON 可序列化。
+        workflows 层和 enrich_info 共用此方法，消除重复。
+        """
+        return {
+            "label": info.type,
+            "group": group or "",
+            "confidence": float(info.confidence),
+            "level_text": info.ocr_texts.get("level_text", ""),
+            "count_text": info.ocr_texts.get("count_text", ""),
+        }
+
+    def enrich_info(self, info: MaterialInfo, group: str | None = None) -> dict:
+        """将 MaterialInfo 转为富 dict，含插件专属解析字段。
+
+        核心提供扁平 base 字段（label/group/confidence/level_text/count_text），
+        通过内置函数 yysls_rich_parse 追加游戏专属的解析字段。
+
+        DSL ``recognize ... as rich $var`` 使用此方法构建返回值。
+        """
+        from lvjiang.workflows import builtins
+        base = self.build_rich_base(info, group=group)
+        parser = builtins.get_function("yysls_rich_parse")
+        return parser(base) if parser else base
+
     # ─── 空槽检测（游戏专属）───────────────────────────────────
 
     def _is_empty(self, img: np.ndarray) -> bool:

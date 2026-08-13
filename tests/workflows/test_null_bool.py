@@ -63,6 +63,31 @@ class TestConditions:
         v = run(IF_ELSE_TPL % ('eval $x = null\neval $y = null', '$x equals $y'))
         assert v["r"] == 1.0
 
+    def test_field_access_truthy(self):
+        """if $dict.field → 存在且非空为 True"""
+        v = run(IF_ELSE_TPL % ('', '$d.a'), {"d": {"a": "hello"}})
+        assert v["r"] == 1.0
+
+    def test_field_access_falsy_missing_key(self):
+        """if $dict.missing → key 不存在为 False"""
+        v = run(IF_ELSE_TPL % ('', '$d.missing'), {"d": {"a": 1}})
+        assert v["r"] == 0.0
+
+    def test_field_access_falsy_empty_string(self):
+        """if $dict.field → 值为空字符串为 False"""
+        v = run(IF_ELSE_TPL % ('', '$d.a'), {"d": {"a": ""}})
+        assert v["r"] == 0.0
+
+    def test_field_access_bracket_truthy(self):
+        """if $dict.[key] → 数字索引 truthy 检查"""
+        v = run(IF_ELSE_TPL % ('', '$d.[1].[1]'), {"d": {"1": {"1": "宋元通宝"}}})
+        assert v["r"] == 1.0
+
+    def test_field_access_bracket_falsy_empty(self):
+        """if $dict.[key] → 空 dict 为 False"""
+        v = run(IF_ELSE_TPL % ('', '$d.[1].[5]'), {"d": {"1": {}}})
+        assert v["r"] == 0.0
+
 
 # ─── null 语义统一 ────────────────────────────────────────
 

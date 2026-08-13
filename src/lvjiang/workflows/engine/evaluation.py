@@ -98,6 +98,10 @@ class _EvalMixin:
                 # 条件中的 $var → truthy 检查
                 val = self.variables.get(node.name)
                 return bool(val)
+            case FieldAccess():
+                # 条件中的 $var.field / $var.[key] → truthy 检查
+                val = self._eval_field_raw(node)
+                return bool(val)
             case _:
                 logger.error(f"未知条件节点: {type(node).__name__}")
                 return False
@@ -408,5 +412,7 @@ class _EvalMixin:
                 return f"({_EvalMixin._cond_desc(node.left)} or {_EvalMixin._cond_desc(node.right)})"
             case VarRef():
                 return f"[{node.name}]"
+            case FieldAccess():
+                return f"[{_EvalMixin._field_path(node)}]"
             case _:
                 return str(type(node).__name__)

@@ -173,12 +173,14 @@ recognize scene_name.[a1, a2] as $var where confidence >= 0.85
 
 ### 返回值语义
 
-`recognize` 的返回值与 `scan` 完全对称，区别仅在于 value 是**材料类型名**而非 OCR 文本：
+`recognize` 的返回值与 `scan` 完全对称，区别仅在于 value 是**材料类型名**而非 OCR 文本。
+`as rich` 和 `by` 是两个正交的返回值修饰符：**`rich` 是升级**（str → 富 dict），**`by` 是降级**（dict → str/位置）。同时指定时 `by` 优先。
 
-| 目标 | 无 by | 有 by |
-|---|---|---|
-| **Region**（一个或多个） | `dict` — `{slot_key: material_type}` | `str` — 首个命中的 slot_key，未命中为 `""` |
-| **Panel 整面板** | `dict` — `{行: {列: material_type}}` 行列嵌套 | `dict` — `{"row": 行号, "col": 列号}`，未命中为 `{}` |
+| 目标 | 默认（plain） | `as rich`（升级） | `by`（降级） |
+|---|---|---|---|
+| **Region** | `dict` — `{slot_key: material_type}` | `dict` — `{slot_key: enriched_dict}` | `str` — 首个命中的 slot_key，未命中为 `""` |
+| **Panel 整面板** | `dict` — `{行: {列: material_type}}` | `dict` — `{行: {列: enriched_dict}}` | `dict` — `{"row": 行号, "col": 列号}`，未命中为 `{}` |
+| **Panel 单格** | `str` — 材料类型名 | `dict` — enriched_dict | `str` — 匹配结果 |
 
 **Region 无 by**（最常见）：
 
@@ -225,6 +227,73 @@ recognize [bag_item_detail].[bag_grid] as $pos by equals "金狗粮" on group "�
 - 空格 value 为空字符串 `""`
 - region 与 panel 同名时 region 优先
 - **on group 子句**：限定材料识别的分组范围，仅在指定分组的参考材料中匹配。支持字符串常量和变量引用
+
+### as rich — 富返回值
+
+`recognize` 默认只返回材料类型名（str）。加上 `as rich` 修饰符后，每个 slot 返回包含输入/输出元数据的富 dict。**`rich` 是对默认返回值的升级**：从纯 str 升级为结构化 dict。
+
+**语法**：
+
+```
+recognize scene_name.[a1, a2] as rich $var           # region 模式（仅 base 字段）
+recognize scene_name.[panel] as rich $var             # panel 整面板
+recognize scene_name.[panel][1][2] as rich $var       # panel 单格
+
+# 指定转换函数（base dict → 函数处理 → 最终 dict）
+recognize scene_name.[a1, a2] as rich $var with yysls_rich_parse
+```
+
+`rich` 是 `as` 和 `$var` 之间的可选关键字，大小写不敏感。`with` 子句放在语句末尾（在 `by`/`group`/`where` 之后），指定任意满足 `dict -> dict` 的内置函数名。
+
+**返回值结构**：
+
+无 `with` 子句时，返回扁平 base 字段：
+
+```
+$mats = {
+    "slot_1": {
+        "label": "宋元通宝",          # 材料类型
+        "group": "货币资产",            # 分组名（无则空字符串）
+        "confidence": 0.95,            # 匹配置信度（Python float）
+        "level_text": "110阶",          # OCR 原始文本
+        "count_text": "0/691"           # OCR 原始文本
+    },
+    "slot_2": { ... }
+}
+```
+
+指定 `with` 子句后，base dict 经内置函数转换。`yysls_rich_parse` 会解析数值字段并删除原始 OCR 文本：
+
+```
+recognize [material_grid].[f1, f2] as rich $mats with yysls_rich_parse
+# $mats["slot_1"] = {
+#     "label": "宋元通宝",
+#     "group": "货币资产",
+#     "confidence": 0.95,
+#     "real_level": 110,       # yysls_rich_parse 解析
+#     "count": 691,            # yysls_rich_parse 解析
+#     "devoted": 0             # yysls_rich_parse 解析
+# }
+```
+
+**`with` 子句语义**：`with <func_name>` 中的 `func_name` 可以是任何满足 `dict -> dict` 的内置函数（通过 `@builtin_func` 注册）。core 构建 base dict 后调用该函数，函数返回最终 dict。无 `with` 时 `$var = base_dict`（仅标准字段）。
+
+**插件扩展**：游戏插件通过 `@builtin_func("func_name")` 提供转换函数，DSL 中用 `with func_name` 显式指定。`MaterialRecognizer.enrich_info()` 保留向后兼容，内部同样走内置函数。
+
+### rich 升级与 by 降级
+
+`rich` 和 `by` 是两个正交的返回值修饰符，方向相反：
+
+- **`rich` 是升级**：将默认的 str 返回值升级为包含完整元数据的富 dict，便于下游做精细判断（如按等级、数量过滤）
+- **`by` 是降级**：将默认的 dict 返回值降级为单个 str（slot key）或位置 dict，用于短路匹配场景
+- **`by` 优先于 `rich`**：同时指定时，`by` 的降级语义生效，`rich` 被忽略
+
+| 组合 | Region 返回值 | Panel 整面板返回值 | Panel 单格返回值 |
+|---|---|---|---|
+| plain | `{slot_key: str}` | `{行: {列: str}}` | `str` |
+| `as rich` | `{slot_key: dict}` | `{行: {列: dict}}` | `dict` |
+| `by ...` | `str` | `{row, col}` | `str` |
+| `as rich by ...` | `str`（by 优先） | `{row, col}`（by 优先） | `str`（by 优先） |
 
 ## 三、find — 文字定位
 

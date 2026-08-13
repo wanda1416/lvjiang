@@ -34,7 +34,7 @@ class SessionManager:
         if path.exists():
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                logger.info(f"已加载 session: {username} ({len(data)} 个字段)")
+                logger.debug(f"已加载 session: {username} ({len(data)} 个字段)")
                 return data
             except Exception as e:
                 logger.error(f"加载 session 失败: {e}")

@@ -364,7 +364,7 @@ class TestFillSimulation:
 class TestPatternDefaultRating:
     @staticmethod
     def _make_judge(pattern_default: str | None):
-        from lvjiang.apps.yysls.evaluator.judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
         from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",
@@ -410,7 +410,7 @@ class TestPatternDefaultRating:
 class TestCommonConditionsJudge:
     @staticmethod
     def _make_judge(common: dict | None, config: dict | None = None):
-        from lvjiang.apps.yysls.evaluator.judge import GenericTuningJudge
+        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
         from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",

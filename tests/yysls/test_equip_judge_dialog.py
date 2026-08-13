@@ -14,7 +14,7 @@ from lvjiang.apps.yysls.ui.equip_judge_dialog import (
     PART_WEAPON,
     EquipAffixEditor,
 )
-from lvjiang.apps.yysls.ui.tuning_config_widget import TuningConfigWidget
+from lvjiang.apps.yysls.ui.tune_config_widget import TuningConfigWidget
 
 
 def _combo_items(combo) -> list[str]:

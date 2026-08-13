@@ -45,6 +45,6 @@ hooks = AppHooks(
     # 燕云专属内置函数模块（导入即触发 @builtin_func 注册）
     builtin_modules=[
         "lvjiang.apps.yysls.workflows.builtins.equipment",
-        "lvjiang.apps.yysls.workflows.builtins.bag_traversal",
+        "lvjiang.apps.yysls.workflows.builtins.bag_funcs",
     ],
 )

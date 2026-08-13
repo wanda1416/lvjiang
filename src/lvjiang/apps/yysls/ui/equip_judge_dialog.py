@@ -33,7 +33,7 @@ from lvjiang.apps.yysls.evaluator import (
 )
 from lvjiang.apps.yysls.game_config import get_game_config
 
-from .tuning_config_widget import TuningConfigWidget
+from .tune_config_widget import TuningConfigWidget
 
 # 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
 # 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
@@ -296,14 +296,9 @@ class EquipJudgeTestDialog(QDialog):
     @staticmethod
     def _load_session_tuning() -> tuple[dict, dict]:
         """读取调律 Tab 已保存的规则配置与全局开关作为初值（插件会话）"""
-        from ..plugin_session import get_plugin_session
-        section = get_plugin_session().get_section("tuning")
-        switches = {str(k): bool(v)
-                    for k, v in (section.get("switches") or {}).items()}
-        raw = section.get("rules")
-        if isinstance(raw, dict):
-            return raw, switches
-        return {}, switches
+        from ..tune_config import TuneConfig
+        tc = TuneConfig.load()
+        return tc.rules, tc.switches
 
     def _on_judge(self):
         switches = self._tuning_config.get_switches()

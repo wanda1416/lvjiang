@@ -13,15 +13,15 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox
 
 from lvjiang.apps.yysls.game_config import EQUIP_PART_NAMES
-from lvjiang.apps.yysls.ui.game_config import (
+from lvjiang.apps.yysls.ui.game_settings import (
     GameConfigDialog,
     affix_caps_panel,
     base_attr_panel,
     school_panel,
 )
-from lvjiang.apps.yysls.ui.game_config.affix_caps_panel import AffixCapsPanel
-from lvjiang.apps.yysls.ui.game_config.base_attr_panel import BaseAttrPanel
-from lvjiang.apps.yysls.ui.game_config.school_panel import SchoolPanel
+from lvjiang.apps.yysls.ui.game_settings.affix_caps_panel import AffixCapsPanel
+from lvjiang.apps.yysls.ui.game_settings.base_attr_panel import BaseAttrPanel
+from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 ATTRS_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "attributes.yaml"

@@ -6,7 +6,7 @@
 import pytest
 
 # 导入以注册内置函数
-import lvjiang.apps.yysls.workflows.builtins.bag_traversal  # noqa: F401
+import lvjiang.apps.yysls.workflows.builtins.bag_funcs  # noqa: F401
 from lvjiang.workflows.builtins import get_function
 
 

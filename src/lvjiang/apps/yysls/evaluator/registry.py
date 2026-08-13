@@ -6,7 +6,7 @@
 """
 
 from .base import Rating, TuningJudge
-from .judge import GenericTuningJudge
+from .rule_judge import GenericTuningJudge
 from .tuning_rules import TuningRule, get_tuning_rule_manager
 
 __all__ = [

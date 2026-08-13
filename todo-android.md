@@ -463,13 +463,25 @@ $adb = ".tooling\android-sdk\platform-tools\adb.exe"
      （调律说明文档缺操作用户名）
    - `TuningRunContext` 每个字段都有兜底，所以不会崩 —— 问题是用户分不清两个入口的区别
    - exposed 是双端共用的，若不希望桌面出现这个入口，需把暴露层拆成双端各一份
-3. **调律参数 UI（后置）**：待自动调律实机跑通后再做。两条路线：
-   - 扩 `PARAMETERS` schema 加 `multiselect`/`bool`，双端按元数据动态渲染表单（桌面
-     `main_window._rebuild_param_panel` 已是这个模式）；配套需 `list_tasks()` 带出
-     `parameters`（当前丢了）、`PyBridge.startTask` 加参数（当前硬传 `""`）、
-     `auto_tuning.run()` 从 `get_variable` 组装 `TuningRunContext`
-   - Android 原生调律配置页写设备端 `config/session/yysls/session.json`，
-     走 `_ensure_judge_config` 已有的 session 回退路径（可持久化，但要重造规则表编辑器）
+3. **调律参数 UI**（✅ 代码已实现，待上机验证，versionCode 10→11）：两条路线中选定
+   **路线 B**（原生配置页写插件 session）—— 理由：路线 A（扩 `PARAMETERS`
+   schema）改动横跨五层且悬浮小面板放不下多规则多玩法的复杂表单；路线 B
+   写 `config/session/yysls/session.json` tuning 节，`_ensure_judge_config` 已有
+   回退路径直接消费，工作流零改动。本次改动清单：
+   - Python：新增 `core/ondevice/tuning_config.py`（`get_tuning_config` /
+     `save_tuning_config`，JSON 文本约定同 task_runner；校验与桌面
+     `_start_tuning` 一致：部位非空 / 启用规则非空 / 启用规则玩法非空；
+     `skip_tuning` 不进 UI，保存时保留原值）；部位常量抽到
+     `apps/yysls/slots.py`（无 PyQt 依赖，桌面 tuning_tab 同步改引用）
+   - Kotlin：`TuningConfigActivity`（全屏单列三区块：规则卡片 Switch+玩法复选 /
+     武器防具两组 8 部位复选 sub_weapon 置灰 / 开关注册表动态渲染，条目全部
+     代码生成不写死清单）；`PyBridge` 加 `getTuningConfig`/`saveTuningConfig`；
+     MainActivity 主页化（权限状态卡 + 功能区：配置入口 + 悬浮启停合一按钮，
+     自检模式改为整卡隐藏）；悬浮面板空闲态追加「调律配置」入口
+     （FLAG_ACTIVITY_NEW_TASK）
+   - 上机验证项：主页进配置页 → 改动保存 → 读设备端 session.json 确认 tuning
+     节格式与桌面一致 → 悬浮面板入口可达 → 自检模式（`--es selftest`）布局
+     仍与旧版一致（e2e OCR 闭环不受新区块干扰）
 
 ### 待 ① 跑通后才推进的其余上机项
 

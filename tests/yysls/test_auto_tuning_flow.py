@@ -1434,3 +1434,45 @@ class TestTuningDocIntegration:
         wf._open_doc(["main_weapon"])
         assert wf._doc is None
         wf._close_doc()   # 幂等，不抛
+
+
+class TestResolveSelectedSlots:
+    """调律部位解析：设备端（ctx 未注入）回退读插件会话
+
+    设备端经 task_runner 启动 auto_tuning 时 run_ctx 为默认实例
+    （selected_slots=None）；部位必须从插件会话 tuning.selected_slots
+    回退读取，否则配置页保存的部位不生效（恒按全部 8 部位）。
+    """
+
+    @pytest.fixture
+    def session(self, tmp_path, monkeypatch):
+        import lvjiang.apps.yysls.plugin_session as ps_module
+        from lvjiang.apps.yysls.plugin_session import PluginSession
+        sess = PluginSession(tmp_path / "session.json")
+        monkeypatch.setattr(ps_module, "_session", sess)
+        return sess
+
+    def _device_wf(self):
+        wf = FakeWF()
+        wf.run_ctx = TuningRunContext()  # selected_slots=None，模拟设备端未注入
+        return wf
+
+    def test_device_reads_session(self, session):
+        session.set_section("tuning", {"selected_slots": ["ring", "head"]})
+        assert self._device_wf()._resolve_selected_slots() == ["ring", "head"]
+
+    def test_empty_session_falls_back_to_all(self, session):
+        wf = self._device_wf()
+        assert wf._resolve_selected_slots() == (
+            wf.WEAPON_SLOTS + wf.ARMOR_SLOTS)
+
+    def test_injected_ctx_ignores_session(self, session):
+        session.set_section("tuning", {"selected_slots": ["ring"]})
+        wf = self._device_wf()
+        wf.run_ctx = TuningRunContext(selected_slots=["main_weapon"])  # UI 已注入
+        assert wf._resolve_selected_slots() == ["main_weapon"]
+
+    def test_unknown_slot_keys_dropped(self, session):
+        session.set_section("tuning",
+                            {"selected_slots": ["ring", "bogus"]})
+        assert self._device_wf()._resolve_selected_slots() == ["ring"]

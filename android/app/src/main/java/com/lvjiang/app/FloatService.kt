@@ -369,6 +369,8 @@ class FloatService : Service() {
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                         text = result.optString("error").ifEmpty { "没有可执行任务" }
                     })
+                    // 配置页不依赖任务清单，清单拉不到时也给入口
+                    area.addView(smallButton("调律配置") { openTuningConfig() })
                     return@post
                 }
                 for (i in 0 until tasks.length()) {
@@ -377,8 +379,20 @@ class FloatService : Service() {
                     val name = item.optString("name").ifEmpty { id }
                     area.addView(smallButton(name) { launchTask(id, name) })
                 }
+                area.addView(smallButton("调律配置") { openTuningConfig() })
             }
         }
+    }
+
+    /** 打开调律参数配置页：先收面板再跳，配置页是全屏 Activity 不需要悬浮层 */
+    private fun openTuningConfig() {
+        closePanel()
+        runCatching {
+            startActivity(
+                Intent(this, TuningConfigActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onFailure { Log.w(TAG, "打开调律配置页失败", it) }
     }
 
     private fun launchTask(taskId: String, taskName: String) {

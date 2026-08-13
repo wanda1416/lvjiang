@@ -27,6 +27,11 @@
             </intent-filter>
         </activity>
 
+        <!-- 调律参数配置页：主页功能区与悬浮面板都能进 -->
+        <activity
+            android:name=".TuningConfigActivity"
+            android:exported="false" />
+
         <!-- 悬浮图标前台服务 -->
         <service
             android:name=".FloatService"

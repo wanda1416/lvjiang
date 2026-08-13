@@ -192,3 +192,39 @@ def save_material_grid(grid: dict[str, Any]) -> None:
     existing = load_settings()
     existing["material_grid"] = grid
     get_session_store().set_node("settings", existing)
+
+
+# ─── 便捷函数：alert_info 告警存储 ────────────────────────────
+
+
+def get_alerts() -> list[dict[str, Any]]:
+    """读取 session.json 的 alert_info 节点（告警列表，最新在前）"""
+    value = get_session_store().get_node("alert_info")
+    return value if isinstance(value, list) else []
+
+
+def add_alert(alert_id: str, message: str, timestamp: str) -> bool:
+    """追加告警到栈顶（列表头部），最新优先展示。返回 True 表示新增成功，False 表示已存在"""
+    added = False
+
+    def _mutate(current):
+        nonlocal added
+        alerts = current if isinstance(current, list) else []
+        # 去重：同 ID 告警不重复添加
+        for alert in alerts:
+            if alert.get("id") == alert_id:
+                return alerts
+        new_alert = {"id": alert_id, "message": message, "timestamp": timestamp}
+        added = True
+        return ([new_alert] + alerts)[:200]  # 插入到头部，截断防无限膨胀
+
+    get_session_store().mutate_node("alert_info", _mutate)
+    return added
+
+
+def dismiss_alert(alert_id: str) -> None:
+    """移除指定 ID 的告警"""
+    def _mutate(current):
+        alerts = current if isinstance(current, list) else []
+        return [a for a in alerts if a.get("id") != alert_id]
+    get_session_store().mutate_node("alert_info", _mutate)

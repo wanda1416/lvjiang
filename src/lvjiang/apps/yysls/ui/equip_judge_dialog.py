@@ -30,8 +30,15 @@ from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.evaluator import (
     get_tuning_judge,
     is_rule_implemented,
+    judge_equipment_potential,
     judge_tuning_worthiness,
 )
+from lvjiang.apps.yysls.evaluator.tuning_rules import (
+    RATING_LABELS,
+    RATING_RANK,
+    get_tuning_group,
+)
+from lvjiang.apps.yysls.evaluator.tuning_rules.models import FOOD_LABELS
 
 from .game_settings.level_combo import LevelCombo
 from .tune_config_widget import TuningConfigWidget
@@ -98,6 +105,22 @@ _PART_EXTRA: dict[str, list[str]] = {
 _NONE_ITEM = "（未选）"
 _AFFIX_ROWS = 5
 
+# 模拟模式虚拟库存（假定材料充足，不统计消耗）
+_DUMMY_STOCKS: dict[str, int] = {label: 999 for label in FOOD_LABELS}
+
+
+def _best_rating_key(pot: dict[str, dict],
+                     label_to_key: dict[str, str]) -> str | None:
+    """从潜力判定结果提取最高评级 key（跳过/不适用规则不参与）"""
+    best: str | None = None
+    for r in pot.values():
+        if r.get("skipped") or r.get("not_applicable"):
+            continue
+        k = label_to_key.get(r.get("rating", ""))
+        if k and (best is None or RATING_RANK[k] > RATING_RANK[best]):
+            best = k
+    return best
+
 
 class EquipAffixEditor(QWidget):
     """手工装备编辑器：部位（+武器二级选择）+ 品阶 + 词条 1-5
@@ -140,9 +163,10 @@ class EquipAffixEditor(QWidget):
         self._level_combo = LevelCombo(allow_empty=False)
         form.addRow("等级：", self._level_combo)
 
-        # 词条 1-5 行：下拉 + 数值
+        # 词条 1-5 行：下拉 + 数值 + 待调出复选框（仅词条 2-5）
         self._affix_combos: list[QComboBox] = []
         self._affix_spins: list[QDoubleSpinBox] = []
+        self._tune_checkboxes: list[QCheckBox] = []  # 仅词条 2-5，长度 4
         for i in range(_AFFIX_ROWS):
             row = QWidget()
             row_layout = QHBoxLayout(row)
@@ -155,6 +179,12 @@ class EquipAffixEditor(QWidget):
             spin.setDecimals(2)
             row_layout.addWidget(combo, stretch=1)
             row_layout.addWidget(spin)
+            # 词条 2-5 添加"待调出"复选框
+            if i > 0:
+                chk = QCheckBox("待调出")
+                chk.setToolTip("勾选表示该词条是调律过程中调出的，非扫描时已有")
+                row_layout.addWidget(chk)
+                self._tune_checkboxes.append(chk)
             form.addRow(f"词条{i + 1}：", row)
             self._affix_combos.append(combo)
             self._affix_spins.append(spin)
@@ -201,6 +231,8 @@ class EquipAffixEditor(QWidget):
             combo.addItem(_NONE_ITEM)
             combo.addItems(initial if i == 0 else tuning)
             spin.setValue(0)
+        for chk in self._tune_checkboxes:
+            chk.setChecked(False)
         self._updating = False
 
     def _refresh_dedup(self):
@@ -259,6 +291,51 @@ class EquipAffixEditor(QWidget):
             affixes=affixes,
         )
 
+    def get_scanned_affixes(self) -> list[Affix]:
+        """获取扫描时已有的词条（未勾选"待调出"的词条）"""
+        mgr = get_game_config()
+        affixes: list[Affix] = []
+        # 词条 1 始终是扫描时已有
+        combo = self._affix_combos[0]
+        spin = self._affix_spins[0]
+        name = combo.currentText()
+        if name != _NONE_ITEM:
+            level = self._level_combo.get_level()
+            caps = mgr.get_affix_caps(level, name) if level else None
+            unit = caps["unit"] or None if caps else None
+            affixes.append(Affix(name=name, value=spin.value(), unit=unit))
+        # 词条 2-5：未勾选"待调出"的
+        for combo, spin, chk in zip(
+                self._affix_combos[1:], self._affix_spins[1:],
+                self._tune_checkboxes, strict=False):
+            if chk.isChecked():
+                continue  # 勾选"待调出"的不算扫描时已有
+            name = combo.currentText()
+            if name == _NONE_ITEM:
+                continue
+            level = self._level_combo.get_level()
+            caps = mgr.get_affix_caps(level, name) if level else None
+            unit = caps["unit"] or None if caps else None
+            affixes.append(Affix(name=name, value=spin.value(), unit=unit))
+        return affixes
+
+    def get_tune_affixes(self) -> list[Affix]:
+        """获取待调出的词条（勾选"待调出"的词条，按顺序）"""
+        mgr = get_game_config()
+        affixes: list[Affix] = []
+        for combo, spin, chk in zip(self._affix_combos[1:], self._affix_spins[1:],
+                                     self._tune_checkboxes, strict=False):
+            if not chk.isChecked():
+                continue
+            name = combo.currentText()
+            if name == _NONE_ITEM:
+                continue
+            level = self._level_combo.get_level()
+            caps = mgr.get_affix_caps(level, name) if level else None
+            unit = caps["unit"] or None if caps else None
+            affixes.append(Affix(name=name, value=spin.value(), unit=unit))
+        return affixes
+
 
 class EquipJudgeTestDialog(QDialog):
     """装备识别测试面板（左：流派配置；右：装备编辑 + 判定输出）"""
@@ -291,9 +368,14 @@ class EquipJudgeTestDialog(QDialog):
         right.addWidget(QLabel("<b>构造装备：</b>"))
         self.editor = EquipAffixEditor()
         right.addWidget(self.editor)
+        btn_row = QHBoxLayout()
         self.btn_judge = QPushButton("判定")
         self.btn_judge.clicked.connect(self._on_judge)
-        right.addWidget(self.btn_judge)
+        btn_row.addWidget(self.btn_judge)
+        self.btn_simulate = QPushButton("模拟调律")
+        self.btn_simulate.clicked.connect(self._on_simulate)
+        btn_row.addWidget(self.btn_simulate)
+        right.addLayout(btn_row)
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)
         right.addWidget(self.result_text, stretch=1)
@@ -347,3 +429,192 @@ class EquipJudgeTestDialog(QDialog):
                 lines.append(
                     f"{judge.rule_name}: {tag}（{'；'.join(res.reasons)}）")
         self.result_text.setPlainText("\n".join(lines))
+
+    # ─── 模拟调律 ────────────────────────────────────────────
+
+    def _on_simulate(self):
+        """模拟完整单件调律流程，输出紧凑日志"""
+        switches = self._tuning_config.get_switches()
+        can_transmute = self._chk_transmute.isChecked()
+        configs = {
+            k: {**cfg, "switches": switches, "can_transmute": can_transmute}
+            for k, cfg in self._tuning_config.get_config().items()
+            if cfg.get("enabled")
+        }
+        if not configs:
+            self.result_text.setPlainText("请先在左侧启用至少一个调律规则")
+            return
+
+        scanned = self.editor.get_scanned_affixes()
+        tune_affixes = self.editor.get_tune_affixes()
+        if not scanned:
+            self.result_text.setPlainText("请至少选择首词条")
+            return
+        if not tune_affixes:
+            self.result_text.setPlainText(
+                "请勾选至少一个「待调出」词条进行模拟")
+            return
+
+        # 加载基础规则组
+        from ....core.config.wf_configs import get_wf_config
+        group_key = get_wf_config("auto_tuning").get("base_group", "default")
+        group = get_tuning_group(group_key)
+        if group is None:
+            self.result_text.setPlainText(f"基础规则组 {group_key!r} 不存在")
+            return
+
+        mgr = get_game_config()
+        level = self.editor._level_combo.get_level()
+        quality = self.editor.quality_combo.currentData()
+
+        # 构造初始装备（仅扫描已有词条）
+        equip = EquipmentData(
+            type=self.editor.current_type(),
+            name="测试装备",
+            level=level or 0,
+            quality=quality,
+            affixes=list(scanned),
+        )
+        equip_name = equip.name or equip.type
+        equip_part = equip.part
+        equip_quality = equip.quality
+
+        # 首词条 cap_pct = 承音值 / 等级最大值 × 100
+        first = equip.affixes[0]
+        first_caps = mgr.get_affix_caps(level, first.name) if level else None
+        cap_pct = int(first.value / first_caps["cap"] * 100) \
+            if first_caps and first_caps.get("cap") else None
+
+        log: list[str] = []
+        log.append(f"══ {equip_name} {equip_part} {equip_quality} "
+                   f"首词条{first.name} {cap_pct}% ══")
+        log.append(f"扫描词条: {', '.join(a.name for a in scanned)}")
+        log.append(f"待调出: {', '.join(a.name for a in tune_affixes)}")
+        log.append(f"规则组: {group.name}")
+
+        # 等级门槛
+        if level and level < group.scan.min_level:
+            log.append(f"等级{level} < 门槛{group.scan.min_level} → 跳过")
+            self.result_text.setPlainText("\n".join(log))
+            return
+
+        # 评级提供者（行为规则用）
+        rule_keys = list(configs.keys())
+
+        def rating_of(scope: str, keys: list[str],
+                      fao: bool = False) -> str:
+            target = equip
+            if fao and len(equip.affixes) > 1:
+                target = EquipmentData(
+                    type=equip.type, name=equip.name,
+                    level=equip.level, quality=equip.quality,
+                    affixes=equip.affixes[:1],
+                    extra_data={**equip.extra_data, "affix_count": 1})
+            results = judge_equipment_potential(target, configs, rule_keys)
+            best: str | None = None
+            for r in results.values():
+                if r.get("skipped") or r.get("not_applicable"):
+                    continue
+                k = label_to_key.get(r.get("rating", ""))
+                if k and (best is None or RATING_RANK[k] > RATING_RANK[best]):
+                    best = k
+            return best or "junk"
+
+        # 初始评级
+        label_to_key = {v: k for k, v in RATING_LABELS.items()}
+        pot = judge_equipment_potential(equip, configs, rule_keys)
+        expect_key = _best_rating_key(pot, label_to_key)
+        expect_label = RATING_LABELS.get(expect_key, expect_key or "?")
+        entry = group.scan.entry_min_rating
+        entry_label = RATING_LABELS.get(entry, entry)
+        log.append(f"初始评级: {expect_label}（门槛≥{entry_label}）")
+
+        # 门槛检查
+        passes = (expect_key is not None
+                  and RATING_RANK.get(expect_key, -1)
+                  >= RATING_RANK.get(entry, 0))
+
+        if not passes:
+            log.append("未达门槛 → 扫描处理")
+            if group.scan.enabled:
+                action, why = group.scan.decide(
+                    equip_part, equip_quality, float(cap_pct)
+                    if cap_pct is not None else None,
+                    rating_of, [a.name for a in equip.affixes])
+                if action == "tune_full_recycle":
+                    log.append(f"  {why} → 调满后回收")
+                    self.result_text.setPlainText("\n".join(log))
+                    return
+                if action == "tune_this":
+                    log.append(f"  {why} → 强制调律")
+                else:
+                    log.append(f"  {why}")
+                    self.result_text.setPlainText("\n".join(log))
+                    return
+            else:
+                log.append("  扫描处理未启用 → 跳过")
+                self.result_text.setPlainText("\n".join(log))
+                return
+
+        # 值得调律 → 模拟调律循环
+        log.append("── 调律开始 ──")
+        affix_count = len(equip.affixes)
+        full_recycle = False
+
+        for i, new_affix in enumerate(tune_affixes):
+            rnd = i + 1
+            # 狗粮决策（只取决于首词条 pct + 当前期望评级 + 品阶）
+            food = group.materials.decide_food(
+                cap_pct, expect_key, equip_quality, _DUMMY_STOCKS)
+            food_tag = (food.food if food.action == "feed"
+                        else "无" if food.action == "none"
+                        else food.action)
+            log.append(
+                f"R{rnd} +{new_affix.name} 狗粮:{food_tag}"
+                f" 评:{expect_label}")
+
+            # 添加词条
+            equip.affixes.append(new_affix)
+            affix_count += 1
+            full = affix_count >= _AFFIX_ROWS
+
+            # 重新评级
+            pot = judge_equipment_potential(equip, configs, rule_keys)
+            expect_key = _best_rating_key(pot, label_to_key)
+            expect_label = RATING_LABELS.get(expect_key, expect_key or "?")
+
+            # 结束处理
+            if group.tune.enabled:
+                action, why = group.tune.decide(
+                    equip_part, equip_quality,
+                    float(cap_pct) if cap_pct is not None else None,
+                    rating_of, full, [a.name for a in equip.affixes])
+            else:
+                action = "skip" if full else "continue"
+                why = "结束处理未启用"
+
+            if action == "continue":
+                if full:
+                    log.append(f"  {why} → 词条满，保留")
+                    break
+            elif action == "reset":
+                log.append(f"  {why} → 重置")
+                break
+            elif action == "recycle":
+                log.append(f"  {why} → 回收")
+                break
+            elif action == "skip":
+                log.append(f"  {why} → 跳过")
+                break
+            elif action == "tune_full_recycle":
+                log.append(f"  {why} → 调满后回收")
+                full_recycle = True
+                break
+            else:
+                log.append(f"  {why} → 未知动作 {action!r}")
+
+        if not full_recycle and affix_count < _AFFIX_ROWS and not log[-1].endswith(
+                ("保留", "重置", "回收", "跳过")):
+            log.append(f"── 调律结束（{affix_count}/{_AFFIX_ROWS}）──")
+
+        self.result_text.setPlainText("\n".join(log))

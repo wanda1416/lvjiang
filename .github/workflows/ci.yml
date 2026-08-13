@@ -8,7 +8,8 @@ on:
 jobs:
   test:
     # Windows 视觉自动化工具，与目标平台保持一致；Qt offscreen 开箱即用
-    runs-on: windows-latest
+    # windows-latest 已升至 Server 2025，ONNX Runtime 不支持；锁定 2022
+    runs-on: windows-2022
     env:
       QT_QPA_PLATFORM: offscreen
       PYTHONIOENCODING: utf-8  # runner 默认 GBK 代码页，避免中文日志 UnicodeEncodeError

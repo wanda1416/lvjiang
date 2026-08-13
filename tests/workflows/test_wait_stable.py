@@ -2,14 +2,12 @@
 
 验证画面稳定检测逻辑：
 - 画面从变化到稳定时正常返回
-- 超时未稳定时抛出 WorkflowUserError / TimeoutError
+- 超时未稳定时记警告并继续（不抛异常）
 - 停止检查生效
 """
 
 import numpy as np
-import pytest
 
-from lvjiang.workflows.engine import WorkflowUserError
 from tests.workflows.conftest import make_engine
 
 
@@ -53,12 +51,12 @@ class TestWaitStableExecution:
         # timeout=5s 总超时，stable_duration=0.1s 需连续稳定 0.1s
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.05, stable_duration=0.1)
 
-    def test_timeout_raises(self):
-        """画面持续变化，超时抛出 TimeoutError"""
+    def test_timeout_continues_without_raising(self):
+        """画面持续变化，超时后记警告并继续（不抛异常）"""
         frames = [_frame(i * 10) for i in range(50)]
         wf = _workflow_with_capture(_SeqCapture(frames))
-        with pytest.raises(TimeoutError, match="未稳定"):
-            wf.wait_stable(timeout=0.3, threshold=0.02, interval=0.05, stable_duration=0.1)
+        # 新语义：timeout 是预算而非断言，耗尽后正常返回
+        wf.wait_stable(timeout=0.3, threshold=0.02, interval=0.05, stable_duration=0.1)
 
     def test_stop_check_exits_early(self):
         """停止标志置位时立即返回"""
@@ -104,8 +102,8 @@ class TestWaitStableDSL:
         # 正常执行不报"未定义等待参数"
         eng.execute(wf)
 
-    def test_timeout_via_engine(self, tmp_path):
-        """通过引擎执行 wait stable，超时转 WorkflowUserError"""
+    def test_timeout_via_engine_continues(self, tmp_path):
+        """通过引擎执行 wait stable，超时仅记警告，后续语句继续执行"""
         frames = [_frame(i * 10) for i in range(100)]
         cap = _SeqCapture(frames)
         eng = make_engine()
@@ -113,6 +111,10 @@ class TestWaitStableDSL:
         eng._workflow = None
 
         wf = tmp_path / "t.wf"
-        wf.write_text("wait stable 0.3 interval 0.05 duration 0.1\n", encoding="utf-8")
-        with pytest.raises(WorkflowUserError, match="未稳定"):
-            eng.execute(wf)
+        wf.write_text(
+            "wait stable 0.3 interval 0.05 duration 0.1\n"
+            "log \"timeout 后仍继续执行\"\n",
+            encoding="utf-8",
+        )
+        # 不抛异常，流程正常走完
+        eng.execute(wf)

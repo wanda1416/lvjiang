@@ -142,9 +142,12 @@ class _ActionMixin:
 
         每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
         视为「画面没变」。连续稳定时长达到 stable_duration 秒后返回。
-        总超时 timeout 秒内未稳定则抛出 TimeoutError。
 
-        least 参数：点击后至少等待这么入再开始稳定检测。
+        timeout 是等待预算而非硬性断言：预算内未稳定时记录警告并继续
+        执行（游戏画面常有持续动画，永远达不到阈值是常态，不应终止流程）。
+        实际书写时建议把 timeout 设得宽裕些，至少不会比固定等待差。
+
+        least 参数：点击后至少等待这么久再开始稳定检测。
         防止转场动画未开始就被误判为「画面已稳定」。
 
         与 wait_seconds 相同，期间持续检查停止标志。
@@ -185,6 +188,6 @@ class _ActionMixin:
             remaining = deadline - time.monotonic()
             time.sleep(min(interval, max(0.0, remaining)))
 
-        raise TimeoutError(
-            f"wait stable: 画面在 {timeout}s 内未稳定（差异阈值 {threshold}）"
+        logger.warning(
+            f"wait stable: 画面在 {timeout}s 内未稳定（差异阈值 {threshold}），继续执行"
         )

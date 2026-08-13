@@ -414,6 +414,46 @@ def test_click_no_wait():
     assert isinstance(program.body[0], Click)
 
 
+def test_click_after_wait_stable():
+    """click ... after wait stable -> [Click, WaitStable]"""
+    program = parse_text("click [scene].[region] after wait stable 8 least 1.0")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Click)
+    assert isinstance(program.body[1], WaitStable)
+    assert program.body[1].timeout == 8.0
+    assert program.body[1].least == 1.0
+
+
+def test_click_before_wait_stable():
+    """click ... before wait stable -> [WaitStable, Click]"""
+    program = parse_text("click [scene].[region] before wait stable 5")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], WaitStable)
+    assert isinstance(program.body[1], Click)
+    assert program.body[0].timeout == 5.0
+
+
+def test_click_around_wait_stable():
+    """click ... around wait stable -> [WaitStable, Click, WaitStable]"""
+    program = parse_text("click [scene].[region] around wait stable 5 threshold 0.03")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], WaitStable)
+    assert isinstance(program.body[1], Click)
+    assert isinstance(program.body[2], WaitStable)
+    # 同一参数：前后 WaitStable 相同
+    assert program.body[0] == program.body[2]
+    assert program.body[0].threshold == 0.03
+
+
+def test_drag_after_wait_stable():
+    """drag ... after wait stable -> [Drag, WaitStable]"""
+    program = parse_text("drag [scene].[panel] up 2 after wait stable 6")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Drag)
+    assert isinstance(program.body[1], WaitStable)
+    assert program.body[1].timeout == 6.0
+
+
 def test_drag_after_wait():
     """drag ... after wait -> [Drag, Wait]"""
     program = parse_text("drag [scene].[panel] up 2 after wait @step_interval")

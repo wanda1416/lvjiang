@@ -1,8 +1,11 @@
 # 安卓独立执行端迁移 — 进度与下一步
 
-> 最后更新：2026-08-01（调律参数 UI 上机首验：v11 已装、配置页可用；修了两个 bug——
-> 部位不生效（selected_slots 缺会话回退）+ 开配置页游戏被 LMK 杀（改透明悬浮层主题）。
+> 最后更新：2026-08-01（废弃三个旧 .wf：single_tuning/auto_tuning 调律逻辑已集成进
+> 类实现，device_smoke_test 内联进 smoke.py；发现层不再残留同名旧 DSL 退化路径。
 > 待最终验证：透明配置页下游戏存活 + 只调勾选部位 + equip_analysis 首跑）
+>
+> 上一次：调律参数 UI 上机首验：v11 已装、配置页可用；修了两个 bug——
+> 部位不生效（selected_slots 缺会话回退）+ 开配置页游戏被 LMK 杀（改透明悬浮层主题）
 >
 > 上一次：调律参数 UI 路线 B 实现（`5d51117`）+ 用户指南（`efaa41e`）+ 透明主题（`92fcb8e`），master 与 origin 已同步
 
@@ -272,6 +275,20 @@
   - 验证：`list_tasks()` 裸进程实测 `single_tuning`/`auto_tuning` 的 source 由
     `wf` 变 `class`、`to_equipment` 已注册、`PyQt6 not in sys.modules`；
     ruff + pytest（exit 0）全绿
+
+- [x] **废弃三个旧工作流脚本**（2026-08-01）
+  - 删除 `config/system/workflows/` 下的 `single_tuning.wf` / `auto_tuning.wf` /
+    `device_smoke_test.wf`。调律逻辑已集成进类实现（`implementations/single_tuning.py`、
+    `auto_tuning.py`），此前发现层「class 覆盖 .wf」只是把同名旧 DSL 当插件加载失败时
+    的退化兜底——删除后这条退化路径（上文 versionCode 9→10 修的 bug）从根上消失
+  - `device_smoke_test.wf` 是自检夹具（非调律逻辑），内联进 `smoke.py` 的
+    `SMOKE_WF_DSL` 常量：`run` 自检经 `write_smoke_wf()` 落临时 .wf 执行；`task` 自检
+    由 `task_runner._resolve_task` 内置合成空壳配置、`_build_source` 落临时文件，
+    冒烟任务不再出现在 `list_tasks()` 清单里（自检链路不依赖发现层）
+  - 改动面：`smoke.py`（内联 DSL + 两条链路）、`task_runner.py`（删清单注入 +
+    `_resolve_task`/`_build_source` 内联分支）、`test_task_runner.py`（冒烟用例去文件依赖）
+  - `subcall/` 下子流程 .wf 保留（仍被其余业务工作流引用）；`workflows.yaml` 的
+    exposed 无需改（single_tuning/auto_tuning 由 class 实现继续提供）
 
 ### 本轮改动文件（已提交并推送）
 

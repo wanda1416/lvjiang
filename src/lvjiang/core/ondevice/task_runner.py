@@ -33,8 +33,8 @@ STATE_STOPPED = "stopped"
 #: 日志环形缓冲容量。悬浮面板只显示最后几行，留 200 行够回溯一段流程。
 _LOG_CAPACITY = 200
 
-#: 冒烟自检任务 id（config/system/workflows/device_smoke_test.wf）。它不在日常
-#: 暴露列表里，但设备端自检链路 smoke.py 要靠它出现在清单中，故 list_tasks 单独补入。
+#: 冒烟自检任务 id。源码内联于 smoke.SMOKE_WF_DSL（不再是分发 .wf），
+#: 不出现在日常清单里，由 _resolve_task 内置合成、_build_source 落临时文件执行。
 _SMOKE_TASK_ID = "device_smoke_test"
 
 
@@ -167,21 +167,16 @@ def list_tasks() -> str:
         JSON 文本 ``{"ok": bool, "tasks": [{"id","name","source"}], "error": str}``
     """
     try:
-        from ...workflows.discovery import discover_scripts, list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts
         from .plugins import ensure_loaded
 
         # 插件必须先加载：class 来源的脚本（auto_tuning / single_tuning）依赖
         # 工作流注册表，未加载会退化成同名旧 .wf（见 plugins 模块说明）。
         ensure_loaded()
 
-        # 日常清单只给 workflows.yaml 暴露的脚本（含中文显示名），与桌面下拉一致；
-        # 冒烟自检任务不暴露，但自检链路要用，未暴露时从全集里补一条到末尾。
+        # 日常清单只给 workflows.yaml 暴露的脚本（含中文显示名），与桌面下拉一致。
+        # 冒烟自检任务源码已内联，不再出现在清单里，由 _resolve_task 内置合成。
         items = list_exposed_scripts()
-        if not any(item["id"] == _SMOKE_TASK_ID for item in items):
-            for cfg in discover_scripts():
-                if cfg["id"] == _SMOKE_TASK_ID:
-                    items = [*items, cfg]
-                    break
 
         tasks = [
             {
@@ -289,6 +284,16 @@ def _resolve_task(task_id: str) -> dict:
     from ...workflows.discovery import discover_scripts
     from .plugins import ensure_loaded
 
+    # 冒烟任务源码内联，不走发现层，直接合成一条空壳配置（_build_source 靠 id 识别）
+    if task_id == _SMOKE_TASK_ID:
+        return {
+            "id": _SMOKE_TASK_ID,
+            "name": "设备端冒烟测试",
+            "wf_file": "",
+            "class": "",
+            "parameters": [],
+        }
+
     ensure_loaded()  # 同 list_tasks：class 型脚本要靠插件注册表才解析成类实现
 
     for item in discover_scripts():
@@ -348,6 +353,12 @@ def _build_source(task: dict, engine):
             window_top=engine._window_top,
             stop_check=_STATE.should_stop,
         )
+
+    # 冒烟任务：源码内联于 smoke.SMOKE_WF_DSL，落成临时 .wf 给引擎执行
+    if task.get("id") == _SMOKE_TASK_ID and not task.get("wf_file"):
+        from .smoke import write_smoke_wf
+
+        return write_smoke_wf()
 
     from ..config_resolver import get_resolver
 

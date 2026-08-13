@@ -189,9 +189,74 @@ def find_material()
 end
 ```
 
-## 七、注意事项
+## 七、Profile — 玩家档案（只读数据源）
+
+除上述四条通道外，DSL 还可通过内置函数访问 **ProfileDB**（玩家档案数据库），获取角色级的持久化数据。ProfileDB 按三模型组织：
+
+| 模型 | 语义 | 典型 key |
+|------|------|----------|
+| **quota** | 周期配额（跨周期重置） | `niaoniao_of_week`、`bugan_of_week` |
+| **regen** | 再生值（按时间恢复） | `tili`（体力）、`xinli`（心力） |
+| **stock** | 资源存量（只增只减） | `niaoniao`、`tongbao`、`baoqian` |
+
+### regen 模型两种类型
+
+regen 模型区分两种刷新机制，DSL 函数自动处理：
+
+| 类型 | 语义 | 示例 | 存储方式 |
+|------|------|------|----------|
+| **boundary**（准点刷新） | 经过时间边界时跳变 +N | 体力每日 05:00 +450 | `{value, updated_at}` |
+| **realtime**（实时刷新） | 按速率连续恢复 | 心力每分钟 +1 | `{value, anchor_time}` |
+
+`profile_get` / `profile_inc` 对 realtime 类型的 key 会自动计算当前实时值（含未落库的累积恢复量），无需手动处理。
+
+### DSL 函数
+
+| 函数 | 签名 | 说明 |
+|------|------|------|
+| `profile_get` | `(key) -> float \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值 |
+| `profile_set` | `(key, value) -> float` | 写入 profile 值；realtime regen 自动规范化时间锚点 |
+| `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值 |
+| `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` |
+| `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
+
+### DSL 用法
+
+```dsl
+# 读取配额剩余
+eval $remain = profile_get("niaoniao_of_week")
+if $remain != null
+    log concat("袅袅剩余: ", $remain)
+end
+
+# 消耗体力（realtime regen，自动处理时间锚点）
+eval $tili = profile_inc("tili", -900)
+log concat("体力剩余: ", $tili)
+
+# 查询模型类型
+eval $model = profile_model("tili")
+# $model = "regen"
+
+# 批量获取
+eval $all = profile_all()
+eval $quota_data = $all.quota
+eval $regen_data = $all.regen
+```
+
+### 与 session 的区别
+
+| | session | profile |
+|---|---|---|
+| **数据来源** | 工作流运行时写入 | 用户手动 / UI 同步 / 引擎 tick |
+| **存储位置** | `users/{username}.json` | `profile.db`（SQLite） |
+| **访问方式** | `session.key` 直接访问 | `profile_get("key")` 函数调用 |
+| **自动计算** | 无 | regen key 自动计算实时值 |
+| **典型用途** | 工作流内部状态 | 角色级游戏数据（配额、体力、库存） |
+
+## 八、注意事项
 
 1. **session 写入时机**：`eval session.key = value` 只修改内存，需要显式 `save()` 或等待正常结束才落盘
 2. **context 非隔离**：子过程对 `context` 的修改会立即影响调用方，注意命名冲突
 3. **variables 隔离**：子过程无法直接修改调用方的局部变量，需要通过 `return` 或 `context` 传递
 4. **output 隔离**：子过程的 `collect` 不会污染调用方的 `output`，需要通过 `as $output` 显式获取
+5. **profile 只读数据源**：profile 函数访问独立数据库，不影响 session/context/variables/output 四通道

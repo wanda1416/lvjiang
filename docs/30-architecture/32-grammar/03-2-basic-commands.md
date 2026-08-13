@@ -105,16 +105,32 @@ call $result = proc_name() as $output             # 同时获取返回值与 out
 
 ## 四、log — 日志输出
 
-输出一条日志消息。参数可以是任何能求值为字符串的表达式。
+输出一条日志消息。参数可以是任何能求值为字符串的表达式。支持可选日志级别。
 
 **语法**：
 
 ```
-log "消息文本"                    # 输出固定文本
+log "消息文本"                    # 输出固定文本（默认 info 级别）
 log $var                          # 输出变量值
 log $dict.field                   # 输出字段值
 log func(args...)                 # 输出函数返回值（如 concat 拼接）
+
+# 指定日志级别
+log debug "调试信息"
+log warn "警告信息"
+log error "错误信息"
 ```
+
+**日志级别**：
+
+| 级别 | 说明 |
+|------|------|
+| `debug` | 调试信息，仅在 debug 日志级别时输出 |
+| `info` | 默认级别，常规信息 |
+| `warn` | 警告信息 |
+| `error` | 错误信息 |
+
+级别关键字不区分大小写，写在 `log` 和消息之间。省略时默认为 `info`。
 
 **示例**：
 
@@ -123,6 +139,8 @@ log "开始执行调律流程"
 log $current_slot
 log $result.status
 log concat("当前槽位：", $slot)
+log warn "装备评分低于阈值，跳过"
+log error concat("调律失败: ", $err)
 ```
 
 控制流与条件表达式详见 [05-control-flow.md](05-control-flow.md)。

@@ -10,6 +10,7 @@ from .registry import (
     get_tuning_judge,
     get_tuning_rules,
     is_rule_implemented,
+    judge_equipment_actual,
     judge_equipment_potential,
     judge_tuning_worthiness,
     summarize_potential,
@@ -34,6 +35,7 @@ __all__ = [
     "get_tuning_judge",
     "is_rule_implemented",
     "judge_equipment_potential",
+    "judge_equipment_actual",
     "judge_tuning_worthiness",
     "summarize_potential",
 ]

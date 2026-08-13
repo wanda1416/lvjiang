@@ -148,11 +148,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             pass  # 进度信号失败不应影响工作流执行
 
     def _emit_equip_finish(self, name, equip_data, rounds=0,
-                           affix_count=0, status="skipped"):
+                           affix_count=0, status="skipped",
+                           final_rating=""):
         """发送装备处理结束信号（供 early-return 路径补发）"""
         self._emit_progress("equipment_finished", {
             "name": name,
-            "final_rating": "",
+            "final_rating": final_rating,
             "rounds": rounds,
             "affix_count": affix_count,
             "final_affixes": [a.to_dict() for a in equip_data.affixes],
@@ -549,12 +550,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.report_set("final_judgement", judgement)
             outcome = self._on_scan_reject(
                 equip_data, judgement, detail_scene, already_full=True)
+            # 词条已满，计算实际评级用于进度显示
+            actual_rating = self.judge.compute_actual_rating(equip_data) or ""
             if outcome is RecycleOutcome.RECYCLED:
                 self._emit_equip_finish(name, equip_data, affix_count=affix_count,
-                                        status="recycled")
+                                        status="recycled",
+                                        final_rating=actual_rating)
                 self.recorder.discard_report()
                 return "", outcome
-            self._emit_equip_finish(name, equip_data, affix_count=affix_count)
+            self._emit_equip_finish(name, equip_data, affix_count=affix_count,
+                                    final_rating=actual_rating)
             self.recorder.discard_report()
             return self._make_fingerprint(equip_data.to_dict()), outcome
 
@@ -671,6 +676,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         rounds = 0
         stop_reason = stop_reason or ""
         last_food_reason = ""
+        last_actual: str | None = None  # 缓存最后一轮的实际评级
         while not self.is_stopped and not skip_tune_loop:
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
@@ -695,7 +701,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 last_food_reason = self.executor.round_food_reason
             self.recorder.doc_tune_round(rounds, self.executor.round_food,
                                          new_affix)
-            # 进度信号：单轮调律完成
+            # 刷新评级（每轮调律后词条变化，更新最大预期）
+            incoming, new_expect = \
+                self.judge.refresh_expectation(equip_data)
+            self.recorder.expect_rating = new_expect
+            # 实际评级仅在词条满 5 条后才有意义
+            if affix_count >= self.MAX_AFFIX:
+                last_actual = self.judge.compute_actual_rating(equip_data)
+                actual_for_signal = last_actual
+            else:
+                actual_for_signal = None
+            # 进度信号：单轮调律完成（含更新后的评级）
             self._emit_progress("tune_round_completed", {
                 "round_no": rounds,
                 "new_affix": new_affix,
@@ -704,6 +720,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "material_stock": self.executor.get_material_stock(),
                 "current_affixes": [a.to_dict() for a in equip_data.affixes],
                 "affix_count": affix_count,
+                "expect_rating": new_expect,
+                "actual_rating": actual_for_signal,
             })
             # 扣减本轮狗粮缓存：返还时不消耗（不变），否则 -1
             if not self.executor.round_food_refunded:
@@ -711,7 +729,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # 结束处理（tune 行为点）：调用公共结束处理逻辑
             action, why, resets_used, affix_count = self._execute_end_processing(
                 tune_cfg, equip_data, affix_count, resets_used, base_affixes,
-                is_initial_check=False)
+                is_initial_check=False,
+                pre_incoming=incoming, pre_expect=new_expect)
             if action == "continue":
                 # 放行或重置成功，继续调律循环
                 if resets_used > 0:
@@ -760,9 +779,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.output.setdefault("tuning_reports", []).extend(
             self.recorder.collect_reports()[-1:])
         # 进度信号：装备处理结束
+        # 实际评级仅在词条满 5 条后才有意义（复用循环中缓存的结果，避免重复计算）
+        if affix_count >= self.MAX_AFFIX and last_actual is not None:
+            actual_rating = last_actual or ""
+        elif affix_count >= self.MAX_AFFIX:
+            # 兆底：循环未执行但词条已满（路径 A 已单独处理，此处保险）
+            actual_rating = self.judge.compute_actual_rating(equip_data) or ""
+        else:
+            actual_rating = ""
         self._emit_progress("equipment_finished", {
             "name": name,
-            "final_rating": (judgement or {}).get("rating", ""),
+            "final_rating": actual_rating,
             "rounds": rounds,
             "affix_count": affix_count,
             "final_affixes": [a.to_dict() for a in equip_data.affixes],
@@ -777,7 +804,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _execute_end_processing(
         self, tune_cfg, equip_data: EquipmentData, affix_count: int,
         resets_used: int, base_affixes: list, potential: dict | None = None,
-        is_initial_check: bool = False
+        is_initial_check: bool = False,
+        pre_incoming: dict | None = None,
+        pre_expect: str | None = None,
     ) -> tuple[str, str, int, int]:
         """执行结束处理逻辑（初始判定或每轮结束后调用）
 
@@ -816,6 +845,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 刷新预期评级（结束处理时更新，初始判定时使用传入的 potential）
         if is_initial_check:
             incoming = potential
+        elif pre_incoming is not None:
+            # 使用调用方预计算的结果（避免 tune_round_completed 信号前已跑过的判定重复执行）
+            incoming = pre_incoming
+            self.recorder.expect_rating = pre_expect
         else:
             incoming, self.recorder.expect_rating = \
                 self.judge.refresh_expectation(equip_data)

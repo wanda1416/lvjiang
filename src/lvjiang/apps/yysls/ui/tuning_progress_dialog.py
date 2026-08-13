@@ -4,7 +4,7 @@
 - 当前装备信息（名称、类型、等级、品阶）
 - 当前词条列表（按 cap_pct 着色）
 - 目标词条清单（已出 / 未出）
-- 预期评级 + 当前轮次
+- 最大预期评级 + 实际评级 + 当前轮次
 - 批次进度（部位 X / Y）
 - 最近调律结果
 
@@ -159,9 +159,12 @@ class TuningProgressDialog:
         self._round_label = QLabel(tr("轮次：0"))
         self._round_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._round_label)
-        self._expect_label = QLabel(tr("预期评级：-"))
+        self._expect_label = QLabel(tr("最大预期：-"))
         self._expect_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._expect_label)
+        self._actual_label = QLabel(tr("实际评级：-"))
+        self._actual_label.setStyleSheet("font-size: 12px;")
+        status_layout.addWidget(self._actual_label)
         self._last_result_label = QLabel("")
         self._last_result_label.setStyleSheet(
             "font-size: 11px; color: #555; padding: 2px;")
@@ -250,7 +253,8 @@ class TuningProgressDialog:
         self._affix_current_label.setText(tr("当前词条：-"))
         self._target_label.setText(tr("目标词条：-"))
         self._round_label.setText(tr("轮次：0"))
-        self._expect_label.setText(tr("预期评级：-"))
+        self._expect_label.setText(tr("最大预期：-"))
+        self._actual_label.setText(tr("实际评级：-"))
         self._last_result_label.setText("")
         self._status_msg_label.setVisible(False)
         self._scan_decision_label.setVisible(False)
@@ -311,11 +315,13 @@ class TuningProgressDialog:
             self._target_label.setText(tr("目标：") + "、".join(parts) + suffix)
         else:
             self._target_label.setText(tr("目标：-"))
-        # 预期评级
+        # 最大预期评级（装备开始时设定，不再变化）
         expect = info.get("expect_rating", "")
         rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
         self._expect_label.setText(
-            f"{tr('预期评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+            f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+        # 实际评级初始化（每轮调律后更新）
+        self._actual_label.setText(tr("实际评级：-"))
         self._round_label.setText(tr("轮次：0"))
         self._last_result_label.setText("")
         self._scan_decision_label.setVisible(False)
@@ -355,6 +361,20 @@ class TuningProgressDialog:
             parts = [f"{k}×{v}" for k, v in stock.items()]
             self._material_label.setText(tr("材料：") + "、".join(parts))
             self._material_label.setVisible(True)
+        # 更新评级（每轮调律后词条变化，刷新最大预期）
+        expect = info.get("expect_rating")
+        if expect:
+            rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
+            self._expect_label.setText(
+                f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+        # 实际评级仅在词条满 5 条后才有值，否则重置为“-”
+        actual = info.get("actual_rating")
+        if actual:
+            rating_cn, rating_style = _RATING_STYLE.get(actual, (actual, "#333"))
+            self._actual_label.setText(
+                f"{tr('实际评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+        else:
+            self._actual_label.setText(tr("实际评级：-"))
 
     def _on_equipment_finished(self, info: dict):
         name = info.get("name", "")
@@ -367,6 +387,12 @@ class TuningProgressDialog:
             f"<b>{name}</b> → "
             f"<span style='{rating_style}'>{tr(rating_cn)}</span> "
             f"({rounds}轮, {status_text})")
+        # 更新实际评级（仅在词条满 5 条时 final_rating 有值）
+        if rating:
+            self._actual_label.setText(
+                f"{tr('实际评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+        else:
+            self._actual_label.setText(tr("实际评级：-"))
         # 更新最终词条（固定 5 行占位）
         final_affixes = info.get("final_affixes", [])
         self._affix_current_label.setText(

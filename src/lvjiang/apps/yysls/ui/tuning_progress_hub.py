@@ -40,11 +40,15 @@ class TuningProgressHub(QObject):
     equipment_started = pyqtSignal(object)
     # dict: {name, type, level, quality, affixes: list[dict],
     #        expect_rating, target_affixes: list[str]}
+    # expect_rating: 最大预期评级（partial=True 判定，装备开始时设定不变）
 
     # ─── 单轮调律结果 ────────────────────────────────────
     tune_round_completed = pyqtSignal(object)
     # dict: {round_no, new_affix: dict|None, food_used, food_reason,
-    #        material_stock: dict, current_affixes: list[dict], affix_count}
+    #        material_stock: dict, current_affixes: list[dict], affix_count,
+    #        expect_rating, actual_rating}
+    # expect_rating: 本轮调律后刷新的最大预期评级
+    # actual_rating: 实际评级（仅词条满 5 条时有值，否则为 None）
 
     # ─── 扫描处理决策（评级未达门槛 / 词条已满）──────────
     scan_decision = pyqtSignal(object)
@@ -55,6 +59,7 @@ class TuningProgressHub(QObject):
     equipment_finished = pyqtSignal(object)
     # dict: {name, final_rating, rounds, affix_count,
     #        final_affixes: list[dict], status}
+    # final_rating: 实际评级（仅词条满 5 条时有值，否则为空串）
 
     # ─── 批次进度 ────────────────────────────────────────
     batch_progress = pyqtSignal(object)

@@ -54,9 +54,22 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    """history 新增 source 列：记录变更来源（幂等，列已存在时跳过）"""
+    cols = [
+        row[1]
+        for row in conn.execute("PRAGMA table_info(profile_history)").fetchall()
+    ]
+    if "source" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_history ADD COLUMN source TEXT DEFAULT ''"
+        )
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
+    (2, "history add source column", _migrate_v2),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -163,10 +176,12 @@ class ProfileDB:
         updated_at: str | None = None,
         change_type: str | None = None,
         detail: str = "",
+        source: str = "",
     ) -> None:
         """INSERT OR REPLACE 单条 entry
 
         change_type 非 None 时记录 history（内部对比 old/new 值，无变化跳过）。
+        source: 变更来源描述，随 history 一并记录。
         锁冲突抛 sqlite3.OperationalError。
         """
         ts = updated_at or datetime.now().isoformat(timespec="seconds")
@@ -202,10 +217,11 @@ class ProfileDB:
                     now_ts = datetime.now().isoformat(timespec="seconds")
                     conn.execute(
                         "INSERT INTO profile_history "
-                        "(ts, username, type, key, old_value, new_value, change_type, detail) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "(ts, username, type, key, old_value, new_value, "
+                        "change_type, detail, source) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (now_ts, username, type_, key, old_value, float(value),
-                         change_type, detail),
+                         change_type, detail, source),
                     )
 
             conn.commit()
@@ -217,13 +233,15 @@ class ProfileDB:
     ) -> None:
         """批量 upsert（事务包裹），用于 tick 写入
 
-        entries 元素: (type_, key, value, updated_at, change_type, detail)
+        entries 元素: (type_, key, value, updated_at, change_type, detail[, source])
         """
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
 
-            for type_, key, value, updated_at, change_type, detail in entries:
+            for entry in entries:
+                source = entry[6] if len(entry) > 6 else ""
+                type_, key, value, updated_at, change_type, detail = entry[:6]
                 ts = updated_at or datetime.now().isoformat(timespec="seconds")
 
                 old_row = conn.execute(
@@ -251,9 +269,9 @@ class ProfileDB:
                         conn.execute(
                             "INSERT INTO profile_history "
                             "(ts, username, type, key, old_value, new_value, "
-                            "change_type, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            "change_type, detail, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (now_ts, username, type_, key, old_value, float(value),
-                             change_type, detail),
+                             change_type, detail, source),
                         )
 
             conn.commit()
@@ -287,7 +305,7 @@ class ProfileDB:
         try:
             rows = conn.execute(
                 f"SELECT id, ts, username, type, key, old_value, new_value, "
-                f"change_type, detail FROM profile_history "
+                f"change_type, detail, source FROM profile_history "
                 f"WHERE {where} ORDER BY id DESC LIMIT ?",
                 params,
             ).fetchall()
@@ -299,7 +317,7 @@ class ProfileDB:
                 "id": r[0], "ts": r[1], "username": r[2],
                 "type": r[3], "key": r[4],
                 "old_value": r[5], "new_value": r[6],
-                "change_type": r[7], "detail": r[8],
+                "change_type": r[7], "detail": r[8], "source": r[9],
             }
             for r in rows
         ]
@@ -359,8 +377,9 @@ def db_upsert(
     updated_at: str | None = None,
     change_type: str | None = None,
     detail: str = "",
+    source: str = "",
 ) -> None:
-    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, detail)
+    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, detail, source)
 
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:

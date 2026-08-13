@@ -126,6 +126,23 @@ class TestSchemaMigration:
         db2 = ProfileDB(db_path)
         assert db2.get_entry("u", "quota", "k")["value"] == 10
 
+    def test_migrate_v2_idempotent(self, tmp_path: Path):
+        """v2 迁移列已存在时应幂等跳过（不报 duplicate column name）"""
+        db_path = tmp_path / "test.db"
+        db1 = ProfileDB(db_path)  # 正常走 v1+v2
+        # 强制把版本号回退到 1，模拟旧版代码升级场景
+        conn = db1._connect()
+        try:
+            conn.execute("DELETE FROM schema_version")
+            conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+            conn.commit()
+        finally:
+            conn.close()
+        # 再次打开应重跑 v2 且因 source 列已存在而跳过，不抛 duplicate column name
+        db2 = ProfileDB(db_path)
+        db2.upsert("u", "quota", "k", 10, change_type="action", detail="+10", source="打本")
+        assert db2.get_history("u")[0]["source"] == "打本"
+
 
 # ─── 变更历史 ─────────────────────────────────────────────────
 
@@ -140,6 +157,22 @@ class TestHistory:
         assert len(history) == 2
         assert history[0]["change_type"] == "action"
         assert history[0]["detail"] == "+0"
+
+    def test_source_recorded_in_history(self, db: ProfileDB):
+        """upsert 传入的 source 应随 history 落盘并可读回"""
+        db.upsert("u", "quota", "k", 10, change_type="action", detail="+10", source="打本")
+        db.upsert("u", "quota", "k", 20, change_type="action", detail="+10", source="商店")
+
+        history = db.get_history("u")
+        assert len(history) == 2
+        assert history[0]["source"] == "商店"   # 最新在前
+        assert history[1]["source"] == "打本"
+
+    def test_source_default_empty(self, db: ProfileDB):
+        """未传 source 时，history 返回空字符串而非 None"""
+        db.upsert("u", "quota", "k", 10, change_type="action", detail="+10")
+        history = db.get_history("u")
+        assert history[0]["source"] == ""
 
     def test_override_always_records(self, db: ProfileDB):
         """override 类型：即使值不变也记录"""

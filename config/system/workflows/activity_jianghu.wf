@@ -29,7 +29,7 @@ default $max_refresh = 50
 default $claim_reward = false
 
 # 目标任务关键词列表
-eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉樟林"]
+eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉障林"]
 
 # 起始定位：用户可能在江湖号令活动页点 F9，也可能停在游戏首页
 # 读不到「号令」标题即视为在首页，先导航进活动页
@@ -37,6 +37,7 @@ scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
 if not $at_haoling
    log "未识别到号令标题，视为当前在游戏首页，先导航至江湖号令页"
    call back_to_haoling()
+
    scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
    if not $at_haoling
       log "导航后仍未进入江湖号令页，终止流程"
@@ -57,7 +58,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
    else
       # 不断刷新直到命中目标任务
       loop $max_refresh
-         click [activity_jianghu].$btn after wait step_interval
+         click [activity_jianghu].$btn after wait page_refresh_wait
          scan [activity_jianghu].$label as $hit by contains_any $targets
          if $hit
             log "任务 " + $idx + " 刷新命中目标任务"
@@ -90,7 +91,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       if $task_text contains "醉意"
          call action_zuiyi($label)
       end
-      if $task_text contains "觉樟林"
+      if $task_text contains "觉障林"
          call action_juezhanglin($label)
       end
 
@@ -134,13 +135,13 @@ end
 # 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
 def action_huanzhuang($label)
    click [activity_jianghu].$label after wait step_interval
-   click [activity_jianghu].[goto] after wait step_interval
+   click [activity_jianghu].[goto] after wait page_refresh_wait
    click [waiguan_yigui].[chuanda] after wait step_interval
    click [waiguan_yigui].[fangan_1] after wait step_interval
    click [waiguan_yigui].[taoyong] after wait step_interval
-   click [waiguan_yigui].[back_1] after wait step_interval
-   click [waiguan_yigui].[back_1] after wait step_interval
-   click [waiguan_yigui].[back_1] after wait step_interval
+   click [waiguan_yigui].[back] after wait step_interval
+   click [waiguan_yigui].[back] after wait page_refresh_wait
+   click [activity_jianghu].[back] after wait step_interval
 end
 
 # 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
@@ -148,7 +149,7 @@ end
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_heying($label, $idx)
    click [activity_jianghu].$label after wait step_interval
-   click [activity_jianghu].[goto] after wait step_interval
+   click [activity_jianghu].[goto] after wait page_refresh_wait
    click [general_action].[camera_shot] after wait step_interval
    click [general_action].[back] after wait step_interval
    click [general_action].[back] after wait step_interval
@@ -170,7 +171,7 @@ def action_qingjing($label)
    click [activity_jianghu].[goto] after wait step_interval
    click [activity_jianghu].[confirm] after wait step_interval
    click [activity_jianghu].[expand_up] after wait step_interval
-   click [activity_jianghu].[goto_qingjing] after wait step_interval
+   click [activity_jianghu].[goto_qingjing] after wait page_refresh_wait
 
    click [waiguan_qingjing].[save] after wait step_interval
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
@@ -179,10 +180,10 @@ def action_qingjing($label)
       log "情境保存弹出取消按钮，点击一次"
       click [waiguan_qingjing].[cancel] after wait step_interval
    end
-   # 保存生效需时间，固定等 6 秒再退出
+   # 保存生效需时间，固定等 8 秒再退出
    wait 8
 
-   click [waiguan_qingjing].[back] after wait step_interval
+   click [waiguan_qingjing].[back] after wait page_refresh_wait
    click [activity_jianghu].[back] after wait step_interval
    click [activity_jianghu].[back] after wait step_interval
 end
@@ -237,9 +238,9 @@ def action_zuiyi($label)
    log "醉意动作暂未实现"
 end
 
-# 觉樟林：动作暂未实现
+# 觉障林：动作暂未实现
 def action_juezhanglin($label)
-   log "觉樟林动作暂未实现"
+   log "觉障林动作暂未实现"
 end
 
 # 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
@@ -271,7 +272,7 @@ def back_to_haoling()
    scan [school_main].[haoling_1, haoling_2, haoling_3] as $haoling_key by contains "号令"
    if $haoling_key
       log "识别到号令，正常进入，区域：" + $haoling_key
-      click [school_main].$haoling_key after wait step_interval
+      click [school_main].$haoling_key after wait page_refresh_wait
       return 0
    end
 

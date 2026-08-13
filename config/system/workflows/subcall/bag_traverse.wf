@@ -37,14 +37,14 @@ def bag_traverse()
     # 到底检测 1：grid[1][1] 为空 → 绝对到底
     if $check_fp is_empty
         log "该部位遍历结束（到底：空）"
-        return
+        return -1
     end
 
     # 到底检测 2：grid[1][1] == fp_r1 → 内容未移动 → 到底
     # 选定装备后 grid 无空行，内容撑满时 drag 完全无效
     if $check_fp equals $fp_r1
         log "该部位遍历结束（到底：未移动）"
-        return
+        return -1
     end
 
     # 滚动校验：处理过头情况（fp_r1 和空值已在上方处理）
@@ -64,12 +64,12 @@ def bag_traverse()
             eval $check_fp = make_fingerprint($check_equip)
             if $check_fp is_empty
                 log "该部位遍历结束（回调到底）"
-                return
+                return -1
             end
             goto verify_loop
         end
         log "滚动校验失败"
-        return
+        return -1
     end
 
     # ── 确保 row 3 可见（处理部分滚动 0.8 行）──
@@ -89,7 +89,7 @@ def bag_traverse()
             goto nudge_loop
         end
         log "该部位遍历结束（补滚后 row 3 仍无内容）"
-        return
+        return -1
     end
 
     # 滑动更新：fps[0]=fps[1], fps[1]=旧 fps[2]

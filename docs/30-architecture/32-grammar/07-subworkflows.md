@@ -126,6 +126,31 @@ end
 
 支持的返回值类型：数字、字符串、布尔值、null、变量、算术表达式、列表、字典。详见 [05-control-flow.md](05-control-flow.md#八return--结束工作流或返回子过程)。
 
+### 异常返回值约定
+
+子过程使用负数（推荐 `-1`）表示异常或失败返回，调用方可通过检查返回值判断是否成功：
+
+```
+def find_target($name)
+    scan [scene].[areas] as $found by contains $name
+    if not $found
+        log concat("未找到: ", $name)
+        return -1
+    end
+    return $found
+end
+
+call $result = find_target("目标")
+if $result < 0
+    log "查找失败，执行备用逻辑"
+end
+```
+
+**约定**：
+- `return -1`（或任意 `< 0` 的数值）：异常/失败返回
+- `return 0` 或正数：正常返回（也可用于传递状态码）
+- `return null`：无返回值或空结果（语义上不同于错误）
+
 不绑定返回值时，`call proc()` 正常工作，返回值被丢弃：
 
 ```

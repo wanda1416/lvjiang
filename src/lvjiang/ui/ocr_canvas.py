@@ -112,7 +112,7 @@ class OCRCanvas(QWidget):
         h, w = rgb.shape[:2]
         self._img_w = w
         self._img_h = h
-        qimg = QImage(rgb.data, w, h, w * 3, QImage.Format.Format_RGB888).copy()
+        qimg = QImage(bytes(rgb.data), w, h, w * 3, QImage.Format.Format_RGB888).copy()
         self._pixmap = QPixmap.fromImage(qimg)
         self._original_image = image  # 保存原始 numpy 数组，供 OCR 使用
         self._zoom = 1.0
@@ -230,7 +230,7 @@ class OCRCanvas(QWidget):
 
     # ─── 绘制 ────────────────────────────────────────────
 
-    def paintEvent(self, event: QPaintEvent):
+    def paintEvent(self, event: QPaintEvent):  # type: ignore[override]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -370,7 +370,7 @@ class OCRCanvas(QWidget):
 
     # ─── 交互：缩放/平移/选框 ────────────────────────────
 
-    def wheelEvent(self, event: QWheelEvent):
+    def wheelEvent(self, event: QWheelEvent):  # type: ignore[override]
         if self._pixmap is None:
             return
         pos = event.position()
@@ -392,7 +392,7 @@ class OCRCanvas(QWidget):
         self._display_rect.translate(pos.x() - new_wx, pos.y() - new_wy)
         self.update()
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event: QMouseEvent):  # type: ignore[override]
         if self._pixmap is None:
             return
 
@@ -427,7 +427,7 @@ class OCRCanvas(QWidget):
                 self._selection = QRectF(norm.x(), norm.y(), 0, 0)
                 self._drag_orig = QRectF(self._selection)
 
-    def mouseMoveEvent(self, event: QMouseEvent):
+    def mouseMoveEvent(self, event: QMouseEvent):  # type: ignore[override]
         pos = event.position()
 
         # 平移
@@ -481,7 +481,7 @@ class OCRCanvas(QWidget):
                 else:
                     self.setCursor(Qt.CursorShape.ArrowCursor)
 
-    def mouseReleaseEvent(self, event: QMouseEvent):
+    def mouseReleaseEvent(self, event: QMouseEvent):  # type: ignore[override]
         # 平移结束
         if event.button() == Qt.MouseButton.RightButton:
             self._panning = False

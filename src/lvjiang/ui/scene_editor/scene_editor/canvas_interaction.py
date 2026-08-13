@@ -604,7 +604,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         """根据手柄位置调整矩形大小"""
         nx, ny = self._widget_to_norm(pos)
         r = self._regions[self._selected_idx]
+        assert r is not None
         o = self._drag_orig
+        assert o is not None
         h = self._drag_handle
 
         x1, y1 = o.x_ratio, o.y_ratio
@@ -661,6 +663,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         """根据手柄位置调整画布框大小"""
         nx, ny = self._widget_to_norm(pos)
         o = self._canvas_drag_orig
+        assert o is not None
         h = self._canvas_drag_handle
 
         x1, y1 = o.x_ratio, o.y_ratio

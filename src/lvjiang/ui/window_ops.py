@@ -438,7 +438,7 @@ class WindowOpsMixin:
             h, w_img = img.shape[:2]
             rgb = np.ascontiguousarray(img[:, :, ::-1])
             fmt = QImage.Format.Format_RGB888
-            qimg = QImage(rgb.data, w_img, h, w_img * 3, fmt).copy()
+            qimg = QImage(bytes(rgb.data), w_img, h, w_img * 3, fmt).copy()
             pixmap = QPixmap.fromImage(qimg)
             scaled = pixmap.scaled(
                 self.preview_label.size(),
@@ -550,7 +550,7 @@ class WindowOpsMixin:
             h, w_img = bgr.shape[:2]
             rgb = np.ascontiguousarray(bgr[:, :, ::-1])
             fmt = QImage.Format.Format_RGB888
-            qimg = QImage(rgb.data, w_img, h, w_img * 3, fmt).copy()
+            qimg = QImage(bytes(rgb.data), w_img, h, w_img * 3, fmt).copy()
             pixmap = QPixmap.fromImage(qimg)
             scaled = pixmap.scaled(
                 self.preview_label.size(),

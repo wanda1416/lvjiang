@@ -98,7 +98,7 @@ class CellEditor(QWidget):
         new_w, new_h = int(w * scale), int(h * scale)
         resized = cv2.resize(rgb, (new_w, new_h))
         # 必须 copy()，否则 numpy 数据会被垃圾回收
-        return QImage(resized.copy().data, new_w, new_h, new_w * 3, QImage.Format.Format_RGB888)
+        return QImage(bytes(resized.copy().data), new_w, new_h, new_w * 3, QImage.Format.Format_RGB888)
 
     @property
     def index(self) -> int:

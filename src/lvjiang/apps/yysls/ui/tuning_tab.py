@@ -78,7 +78,9 @@ class TuningTab(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(panel)
-        scrollbar_w = scroll.verticalScrollBar().sizeHint().width()
+        vscrollbar = scroll.verticalScrollBar()
+        assert vscrollbar is not None
+        scrollbar_w = vscrollbar.sizeHint().width()
         scroll.setMinimumWidth(
             panel.minimumSizeHint().width() + scrollbar_w + 8)
         return scroll

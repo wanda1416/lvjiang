@@ -14,7 +14,7 @@
   - [break — 跳出循环](#break--跳出循环)
   - [continue — 跳过当前迭代](#continue--跳过当前迭代)
 - [七、try / catch — 异常处理](#七try--catch--异常处理)
-- [八、return — 结束工作流](#八return--结束工作流)
+- [八、return — 结束工作流或返回子过程](#八return--结束工作流或返回子过程)
 - [九、label / goto — 标签跳转](#九label--goto--标签跳转)
 - [十、条件表达式](#十条件表达式)
   - [10.1 基础条件](#101-基础条件)
@@ -33,7 +33,7 @@
 | break | `break` | 跳出最内层 for/loop |
 | continue | `continue` | 跳过当前迭代，进入下一轮 |
 | try/catch | `try ... catch [$err] ... end` | 异常捕获与兜底 |
-| return | `return` | 提前结束当前工作流 |
+| return | `return` 或 `return <value>` | 结束当前工作流或子过程，可携带返回值 |
 | label | `@label_name` | 标签，goto 的目标 |
 | goto | `goto label_name` | 同文件内无条件跳转 |
 
@@ -244,9 +244,9 @@ loop 10
 end
 ```
 
-## 八、return — 结束工作流
+## 八、return — 结束工作流或返回子过程
 
-提前结束当前工作流的执行。若当前是子工作流，则返回到调用方：
+`return` 用于提前结束当前工作流或子过程的执行：
 
 ```
 if not $gold_pos
@@ -254,6 +254,46 @@ if not $gold_pos
     return
 end
 ```
+
+### 返回值
+
+在 `def` 定义的子过程中，`return` 可携带一个值返回给调用方。返回值支持所有字面量类型、变量引用和算术表达式：
+
+```
+def get_count()
+    return 42
+end
+
+def get_status($ok)
+    if $ok
+        return "success"
+    end
+    return "failed"
+end
+
+def compute($x)
+    return $x * 2 + 1
+end
+
+def get_config()
+    return {"mode": "auto", "retry": 3}
+end
+```
+
+支持的返回值类型：
+
+| 类型 | 示例 |
+|------|------|
+| 数字 | `return 42`、`return 3.14` |
+| 字符串 | `return "hello"` |
+| 布尔值 | `return true`、`return false` |
+| null | `return null` |
+| 变量 | `return $result` |
+| 算术表达式 | `return $x + 1` |
+| 列表 | `return [1, 2, 3]` |
+| 字典 | `return {"key": "value"}` |
+
+调用方通过 `call $var = proc()` 语法接收返回值，详见 [07-subworkflows.md](07-subworkflows.md#四call--执行调用)。
 
 ## 九、label / goto — 标签跳转
 

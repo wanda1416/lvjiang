@@ -24,6 +24,7 @@ DSL 通过三个正交指令实现代码复用和模块化：
 | `import "file.wf"` | 引入定义 | 解析目标文件的 `def` 块，注册到当前命名空间 |
 | `def name($p)` ... `end` | 定义过程 | 在当前文件内定义可复用过程 |
 | `call name($args)` | 执行调用 | 调用本地或导入的过程 |
+| `call $var = name($args)` | 返回值绑定 | 调用过程并接收返回值 |
 
 **命名空间**：平铺。`import "a.wf"` 后，a.wf 中的 `def foo()` 直接以 `call foo()` 调用。名字冲突时后 import 覆盖先 import。
 
@@ -60,7 +61,7 @@ end
 - 过程定义在文件顶层（不在其他 def 体内）
 - 参数列表可选：`def navigate()` 无参数也合法
 - 参数以 `$` 前缀声明，调用时按位置绑定
-- 过程体内可使用 `return` 退出过程（不退出整个工作流）
+- 过程体内可使用 `return` 退出过程，或 `return <value>` 返回值给调用方
 - 过程体内可使用 `goto` 跳转到同过程内的标签
 
 ## 四、call — 执行调用
@@ -91,24 +92,47 @@ call my_proc($x)
 # 但 context 的修改会保留
 ```
 
-### 返回值传递
+### 返回值绑定
 
-过程间通过 `context` 传递返回值（因为 context 是共享引用）：
+使用 `call $var = proc()` 语法接收子过程的返回值：
+
+```
+def get_count()
+    return 42
+end
+
+call $n = get_count()
+# $n == 42
+```
+
+子过程内通过 `return <value>` 返回值，调用方通过 `$var` 接收：
 
 ```
 # 被调用方
 def find_material($name)
-    recognize [equip_tune_detail].[material_1] as $found
-    eval context.slot_name = $found
+    recognize [equip_tune_detail].[material_1, material_2, material_3] as $found by contains $name
+    if $found
+        return $found
+    end
+    return null
 end
 
 # 调用方
-call find_material("紫色狗粮")
-eval $slot = context.slot_name
+call $slot = find_material("紫色狗粮")
 if $slot
     click [equip_tune_detail].$slot
 end
 ```
+
+支持的返回值类型：数字、字符串、布尔值、null、变量、算术表达式、列表、字典。详见 [05-control-flow.md](05-control-flow.md#八return--结束工作流或返回子过程)。
+
+不绑定返回值时，`call proc()` 正常工作，返回值被丢弃：
+
+```
+call do_something()  # 不关心返回值
+```
+
+> **与旧版 context 传递的区别**：旧版通过 `context.slot = $value` 共享引用传递返回值，需要调用方额外读取 `context`。新版 `call $var = proc()` 直接绑定到局部变量，语义更清晰。旧方式仍然可用，特别是在需要传递多个返回值时。
 
 ## 五、完整示例
 
@@ -129,16 +153,14 @@ wait step_interval
 scan [equip_weapon_detail] as $scan_result
 
 # 导航到调律页（带返回值检测）
-call nav_equip_to_tune()
-eval $tune_status = context.status
+call $tune_status = nav_equip_to_tune()
 if not $tune_status
     log "未进入调律页面"
     return
 end
 
 # 查找材料
-call find_tune_material($target_material)
-eval $slot = context.slot_name
+call $slot = find_tune_material($target_material)
 if $slot
     click [equip_tune_detail].$slot
 end
@@ -154,12 +176,12 @@ def nav_equip_to_tune()
     scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
     if not $tune_key
         log "未找到调律按钮"
-        return
+        return false
     end
 
     click [equip_weapon_detail].$tune_key
     wait step_interval
-    eval context.status = "ok"
+    return true
 end
 ```
 

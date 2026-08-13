@@ -120,7 +120,14 @@ class TestLoadConfig:
                 {"key": "niaoniao", "label": "袅袅", "period": "week"},
             ],
             "regen": [
-                {"key": "tili", "label": "体力", "cap": 2500, "regen_period": "day", "regen_value": 450},
+                {
+                    "key": "tili",
+                    "label": "体力",
+                    "cap": 2500,
+                    "regen_type": "boundary",
+                    "regen_amount": 450,
+                    "regen_period": "day",
+                },
             ],
         })
         schema = _load_config()

@@ -31,8 +31,10 @@ def _profile_get(_engine, key: str, *args) -> float | None:
         logger.warning("profile_get: key 为空")
         return None
 
+    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
     from ...config.user_profile import get_profile_config
     from ...profile.profile_db import db_read_entry
+    from ...profile.regen_math import compute_regen_entry
 
     username = _get_username(_engine)
     config = get_profile_config()
@@ -48,6 +50,9 @@ def _profile_get(_engine, key: str, *args) -> float | None:
         logger.debug(f"profile_get: {key} 无数据")
         return None
 
+    kd = config.get_key(key)
+    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+        return compute_regen_entry(entry, kd).value
     return entry.get("value")
 
 
@@ -66,8 +71,10 @@ def _profile_set(_engine, key: str, value, *args) -> float:
         logger.warning("profile_set: key 为空")
         return 0
 
+    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
     from ...config.user_profile import get_profile_config
     from ...profile.profile_db import db_upsert
+    from ...profile.regen_math import is_realtime_regen, normalize_realtime_write
 
     username = _get_username(_engine)
     config = get_profile_config()
@@ -83,7 +90,14 @@ def _profile_set(_engine, key: str, value, *args) -> float:
         logger.warning(f"profile_set: value 无法转为数字: {value!r}")
         return 0
 
-    db_upsert(username, model_type, key, value_num,
+    kd = config.get_key(key)
+    updated_at = None
+    write_value = value_num
+    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and is_realtime_regen(kd):
+        write_value, updated_at = normalize_realtime_write(kd, value_num)
+
+    db_upsert(username, model_type, key, write_value,
+              updated_at=updated_at,
               change_type="action", source="dsl")
     logger.debug(f"profile_set: {key} = {value_num} ({model_type})")
     return value_num
@@ -109,8 +123,14 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
         logger.warning("profile_inc: key 为空")
         return 0
 
+    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
     from ...config.user_profile import get_profile_config
     from ...profile.profile_db import db_read_entry, db_upsert
+    from ...profile.regen_math import (
+        compute_regen_entry,
+        is_realtime_regen,
+        normalize_realtime_write,
+    )
 
     username = _get_username(_engine)
     config = get_profile_config()
@@ -128,10 +148,19 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
 
     # 读取当前值
     entry = db_read_entry(username, model_type, key)
-    current = entry.get("value", 0) if entry else 0
+    kd = config.get_key(key)
+    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and entry:
+        current = compute_regen_entry(entry, kd).value
+    else:
+        current = entry.get("value", 0) if entry else 0
 
     new_value = current + delta_num
-    db_upsert(username, model_type, key, new_value,
+    updated_at = None
+    write_value = new_value
+    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and is_realtime_regen(kd):
+        write_value, updated_at = normalize_realtime_write(kd, new_value)
+    db_upsert(username, model_type, key, write_value,
+              updated_at=updated_at,
               change_type="action", source="dsl",
               detail=f"inc {delta_num}")
     logger.debug(f"profile_inc: {key} {current} + {delta_num} = {new_value} ({model_type})")
@@ -163,13 +192,25 @@ def _profile_all(_engine, *args) -> dict:
     """获取当前用户的全部 profile 数据
 
     返回 {model_type: {key: {value, updated_at}}} 结构的字典。
+    regen 条目的 value 会按当前时间计算，与 profile_get 保持一致。
 
     .wf 用法:
         eval $all = profile_all()
         eval $quota = $all.quota
         collect $all as "profile"
     """
+    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
+    from ...config.user_profile import get_profile_config
     from ...profile.profile_db import db_read_all
+    from ...profile.regen_math import compute_regen_entry
 
     username = _get_username(_engine)
-    return db_read_all(username)
+    data = db_read_all(username)
+    config = get_profile_config()
+    for kd in config.get_keys_by_model(MODEL_REGEN):
+        if not isinstance(kd, RegenKeyDef):
+            continue
+        entry = data.get(MODEL_REGEN, {}).get(kd.key)
+        if entry:
+            entry["value"] = compute_regen_entry(entry, kd).value
+    return data

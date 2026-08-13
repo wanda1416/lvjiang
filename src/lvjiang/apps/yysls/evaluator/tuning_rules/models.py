@@ -230,11 +230,14 @@ class Playstyle:
 
     attr 为属性攻击词组组名（通用/鸣金/牵丝/裂石/破竹），判定非武器
     部位时装备具体属攻按该属性额外获得动态词条身份（见 dynamic_affix_map）。
+    switch 为可选绑定开关 key：该玩法参与判定时等价于激活该开关
+    （视为 true），使条件组 when 可按玩法区分行为；None = 不绑定。
     """
     name: str
     main: WeaponSide
     sub: WeaponSide
     attr: str = GENERIC_ATTR
+    switch: str | None = None
 
     def summary(self) -> str:
         """UI 摘要文案"""
@@ -293,12 +296,16 @@ class TuningRule:
         return set(self.affix_pool)
 
     def referenced_switches(self) -> set[str]:
-        """全部条件组 when 引用的开关 key 集合（含通用判定）"""
+        """全部条件组 when 引用的开关 key 集合（含通用判定 + 玩法绑定）"""
         keys: set[str] = set()
         for holder in (self.common, *self.patterns.values()):
             for tier_key in TIER_KEYS:
                 for group in getattr(holder, tier_key):
                     keys.update(group.when)
+        # 玩法绑定开关
+        for ps in self.playstyles.values():
+            if ps.switch:
+                keys.add(ps.switch)
         return keys
 
     def referenced_affixes(self) -> set[str]:

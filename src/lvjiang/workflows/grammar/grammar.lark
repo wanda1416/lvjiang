@@ -48,8 +48,8 @@ align_stmt: "align"i bracket_expr "." bracket_expr _NL
 // 两种形式：
 //   find [scene].[area] as $var by contains "文字"  — 指定区域搜索
 //   find as $var by contains "文字"                 — 全画布搜索
-find_stmt: "find"i scene_target "as"i var_ref by_clause _NL -> find_stmt_area
-         | "find"i "as"i var_ref by_clause _NL              -> find_stmt_full
+find_stmt: "find"i scene_target "as"i var_ref by_clause where_clause? _NL -> find_stmt_area
+         | "find"i "as"i var_ref by_clause where_clause? _NL              -> find_stmt_full
 
 // click 支持四种目标：
 //   1. [scene].[panel][row][col] — panel 三级索引（点击格子中心）
@@ -118,14 +118,14 @@ wait_range: "(" number "," number ")"
 // scan 支持两种目标：
 //   1. [scene].[region] — 场景区域 OCR
 //   2. [scene].[panel][row][col] — panel cell 级 OCR
-scan_stmt: "scan"i scene_target "as"i var_ref by_clause? _NL
-         | "scan"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? _NL -> scan_panel_stmt
+scan_stmt: "scan"i scene_target "as"i var_ref by_clause? where_clause? _NL
+         | "scan"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? where_clause? _NL -> scan_panel_stmt
 
 // recognize 支持两种目标：
 //   1. [scene].[region] — 场景区域材料识别
 //   2. [scene].[panel][row][col] — panel cell 级材料识别
-recognize_stmt: "recognize"i scene_target "as"i var_ref by_clause? group_clause? _NL
-              | "recognize"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? group_clause? _NL -> recognize_panel_stmt
+recognize_stmt: "recognize"i scene_target "as"i var_ref by_clause? group_clause? where_clause? _NL
+              | "recognize"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? group_clause? where_clause? _NL -> recognize_panel_stmt
 
 // by 子句：短路识别模式
 // 有 by 时返回首个命中的字段名（str），无 by 时返回完整 dict
@@ -139,6 +139,10 @@ match_mode: "equals_any"i -> match_equals_any
 
 // group 子句：限定材料识别的分组范围
 group_clause: "on"i "group"i (STRING | var_ref)
+
+// where 子句：识别结果过滤条件（纯过滤，不改变返回语义）
+// 当前仅支持 confidence >= threshold
+where_clause: "where"i "confidence"i ">=" (number | var_ref)
 
 // 场景目标：支持静态/动态场景名 + 静态/动态字段
 // 场景名：[scene] / "scene" / $var
@@ -158,8 +162,8 @@ collect_as_clause: "as"i (STRING | var_ref)
 
 log_stmt: "log"i log_arg _NL
 
-// log 参数：任何能求值为字符串的表达式
-?log_arg: STRING | func_call | var_ref | field_access
+// log 参数：任何能求值为字符串的表达式（支持 + 拼接）
+?log_arg: arith_expr | func_call | var_ref | field_access
 
 // screenshot：截取当前画面并保存到 logs/image/
 // 语法：screenshot
@@ -330,6 +334,7 @@ keyword_ref: "session" -> session_ref
      | factor
 
 ?factor: number
+       | STRING -> string_atom
        | var_ref
        | field_access
        | func_call

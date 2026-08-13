@@ -31,8 +31,8 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import RATING_KEYS, RATING_LABELS
-from .....i18n import tr
 
+from .....i18n import tr
 from .affix_picker import AffixSelectSortDialog
 from .condition_editor import ConditionGroupsEditor
 

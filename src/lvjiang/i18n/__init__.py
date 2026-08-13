@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -114,7 +113,7 @@ def _load_translation_file(language: str) -> dict[str, str]:
 
     # 加载中文基准文件，用于建立 原文 → 译文 映射
     zh_file = _i18n_dir / "zh_CN.yaml"
-    zh_data = {}
+    zh_data: dict = {}
     if zh_file.exists() and language != "zh_CN":
         try:
             with open(zh_file, "r", encoding="utf-8") as f:
@@ -122,7 +121,7 @@ def _load_translation_file(language: str) -> dict[str, str]:
         except Exception:
             pass
 
-    result = {}
+    result: dict[str, str] = {}
     _build_translation_map(zh_data, data, result)
     return result
 

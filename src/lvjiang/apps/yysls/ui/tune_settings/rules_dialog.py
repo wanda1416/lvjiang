@@ -43,8 +43,8 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     get_tuning_rule_manager,
 )
 from lvjiang.core.config.wf_configs import get_wf_config
-from .....i18n import tr
 
+from .....i18n import tr
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
@@ -257,6 +257,8 @@ class TuningRulesDialog(QDialog):
     def _insert_group_dropdown(self, page: QWidget):
         """在行为页布局顶部插入「当前规则」下拉"""
         layout = page.layout()
+        if layout is None:
+            return
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(QLabel(tr("当前规则：")))

@@ -47,6 +47,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     get_tune_config,
     standard_playstyle_attrs,
 )
+
 from .....i18n import tr
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）

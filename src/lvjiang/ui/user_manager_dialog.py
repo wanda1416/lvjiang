@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.user_config import UserConfigManager
+
 from ..i18n import tr
 
 # ─── 样式常量 ────────────────────────────────────────────

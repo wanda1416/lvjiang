@@ -30,8 +30,8 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import SeasonConfig, get_game_config
-from .....i18n import tr
 
+from .....i18n import tr
 from .level_combo import LevelCombo
 
 

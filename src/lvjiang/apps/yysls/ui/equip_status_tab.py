@@ -12,10 +12,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ....i18n import tr
 from .equip_status_panel import EquipStatusPanel
 from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from .profile.tab import add_user_nav_buttons
-from ....i18n import tr
 
 
 class _OtherEquipPage(QWidget):

@@ -30,8 +30,8 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     rule_affix_candidates,
     specific_attr_names,
 )
-from .....i18n import tr
 
+from .....i18n import tr
 from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
 from .pool_page import PoolPage

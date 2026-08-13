@@ -39,6 +39,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     DYNAMIC_AFFIXES,
     DYNAMIC_CATEGORY,
 )
+
 from .....i18n import tr
 
 # 候选无归属时归入的兜底桶名

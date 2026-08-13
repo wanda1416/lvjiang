@@ -35,6 +35,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     QUALITY_PARTS,
     TuneConfigManager,
 )
+
 from .....i18n import tr
 
 _QUALITIES = ("gold", "purple", "blue")

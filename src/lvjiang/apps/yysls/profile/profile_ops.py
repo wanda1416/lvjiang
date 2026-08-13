@@ -32,7 +32,6 @@ from .regen_math import (
     normalize_realtime_write,
 )
 
-
 # ─── 内部工具函数 ─────────────────────────────────────────────
 
 
@@ -215,16 +214,18 @@ def profile_action(
     custom_updated_at = None
     write_value = new_value  # 默认：语义值 = 入库值
     if model_type == MODEL_REGEN and kd and _is_continuous_regen(kd):
+        assert isinstance(kd, RegenKeyDef)  # mypy narrowing
         progress_value = new_value if regen_progress_source == "target" else current_value
         write_value, custom_updated_at = _normalize_continuous_regen_write(
             kd, progress_value
         )
         new_value = float(math.floor(new_value))
-        if getattr(kd, "cap", None) is not None and new_value >= kd.cap:
-            new_value = float(kd.cap)
-            semantic_new_value = float(kd.cap)
+        cap = kd.cap
+        if cap is not None and new_value >= cap:
+            new_value = float(cap)
+            semantic_new_value = float(cap)
             actual_delta = _normalize_float_noise(semantic_new_value - current_value)
-            write_value = float(kd.cap)
+            write_value = float(cap)
             custom_updated_at = datetime.now().isoformat(timespec="seconds")
         elif regen_progress_source == "current":
             write_value = new_value
@@ -263,7 +264,7 @@ def profile_action(
     )
 
     # ── 8. 触发器同步 ──
-    if is_action and kd.sync_targets:
+    if is_action and kd and kd.sync_targets:
         from .sync_engine import fire_sync_targets
         fire_sync_targets(
             write_fn=sync_write_adapter,
@@ -308,12 +309,14 @@ def sync_write_adapter(
 
     custom_updated_at = None
     if model_type == MODEL_REGEN and kd and _is_continuous_regen(kd):
+        assert isinstance(kd, RegenKeyDef)  # mypy narrowing
         progress_value = semantic_new_value  # 保留 floor 前的小数进度，用于回拨 updated_at
         new_value = float(math.floor(semantic_new_value))
         _, custom_updated_at = _normalize_continuous_regen_write(kd, progress_value)
-        if getattr(kd, "cap", None) is not None and new_value >= kd.cap:
-            new_value = float(kd.cap)
-            semantic_new_value = float(kd.cap)
+        cap = kd.cap
+        if cap is not None and new_value >= cap:
+            new_value = float(cap)
+            semantic_new_value = float(cap)
             actual_delta = _normalize_float_noise(semantic_new_value - current_value)
             custom_updated_at = datetime.now().isoformat(timespec="seconds")
 

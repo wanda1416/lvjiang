@@ -14,11 +14,14 @@ ProfileOverviewTab: 宽表展示所有角色的概要信息，交互式列头配
 
 from __future__ import annotations
 
+import math
+from datetime import datetime, timedelta
+
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import (
-    QComboBox,
     QAbstractItemView,
+    QComboBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -95,6 +98,51 @@ def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> Q
 
 # 哨兵值：表示解析失败
 _PARSE_ERROR = object()
+
+
+def _is_continuous_regen(kd) -> bool:
+    return (
+        isinstance(kd, RegenKeyDef)
+        and kd.regen_period in ("minute", "hour")
+        and kd.regen_value > 0
+    )
+
+
+def _normalize_continuous_regen_write(kd: RegenKeyDef, raw_value: float) -> tuple[float, str]:
+    """将分钟/小时级 regen 的小数进度折算到 updated_at，DB value 只存整数。"""
+    now = datetime.now()
+    value = max(0.0, float(raw_value))
+    stored_value = math.floor(value)
+    fraction = value - stored_value
+    base_seconds = 60 if kd.regen_period == "minute" else 3600
+    rollback_seconds = (fraction * base_seconds) / kd.regen_value
+    updated_at = (now - timedelta(seconds=rollback_seconds)).isoformat(timespec="seconds")
+    return float(stored_value), updated_at
+
+
+def _compute_continuous_regen_value(entry: dict, kd: RegenKeyDef) -> float:
+    """按秒计算分钟/小时级 regen 当前值；只用于 UI 手动写入语义。"""
+    stored_value = entry.get("value", 0) or 0
+    updated_at = entry.get("updated_at", "")
+    if not updated_at:
+        return float(stored_value)
+    try:
+        stored_ts = datetime.fromisoformat(updated_at)
+    except (ValueError, TypeError):
+        return float(stored_value)
+    base_seconds = 60 if kd.regen_period == "minute" else 3600
+    elapsed_seconds = max((datetime.now() - stored_ts).total_seconds(), 0)
+    current_value = float(stored_value) + (elapsed_seconds / base_seconds) * kd.regen_value
+    if kd.cap is not None:
+        current_value = min(current_value, kd.cap)
+    return current_value
+
+
+def _current_regen_value(entry: dict, kd: RegenKeyDef) -> float:
+    if _is_continuous_regen(kd):
+        return _compute_continuous_regen_value(entry, kd)
+    current_value, _ = compute_regen_entry(entry, kd)
+    return current_value
 
 
 # ─── 档案总览 Tab ────────────────────────────────────────────
@@ -732,10 +780,15 @@ class ProfileOverviewTab(QWidget):
         entry = profile_data.get(model_type, {}).get(key_str, {})
         current_value = entry.get("value", 0) or 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-            current_value, _ = compute_regen_entry(entry, kd)
+            current_value = _current_regen_value(entry, kd)
 
         delta = parsed_value - current_value
-        if delta == 0:
+        force_target_write = (
+            model_type == MODEL_REGEN
+            and _is_continuous_regen(kd)
+            and abs(parsed_value - math.floor(parsed_value)) > 1e-9
+        )
+        if delta == 0 and not force_target_write:
             return
 
         # Cell 编辑路径根据变动方向选择对应词表（增加→来源，减少→用途）
@@ -747,6 +800,8 @@ class ProfileOverviewTab(QWidget):
         self._adjust_value(
             user_name, model_type, key_str, kd, current_value, delta,
             is_action=True, source=cell_source, expected_entry=dict(entry),
+            regen_progress_source="target",
+            force_write=force_target_write,
         )
 
     def _on_cell_context_menu(self, pos, group_name: str, table: QTableWidget):
@@ -788,7 +843,7 @@ class ProfileOverviewTab(QWidget):
         if current_value is None:
             current_value = 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-            current_value, _ = compute_regen_entry(entry, kd)
+            current_value = _current_regen_value(entry, kd)
         expected_entry = dict(entry)
 
         # 构建菜单
@@ -897,11 +952,13 @@ class ProfileOverviewTab(QWidget):
         change_type: str = "override",
         detail: str = "",
         source: str = "",
+        updated_at: str | None = None,
     ):
         """将值写入 profile DB（带变更历史记录）"""
         try:
             db_upsert(
                 user_name, model_type, key, value,
+                updated_at=updated_at,
                 change_type=change_type, detail=detail, source=source,
             )
             logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
@@ -921,6 +978,8 @@ class ProfileOverviewTab(QWidget):
         source: str = "",
         expected_entry: dict | None = None,
         use_cas: bool = True,
+        regen_progress_source: str = "current",
+        force_write: bool = False,
     ):
         """增减数值并写回
 
@@ -954,7 +1013,7 @@ class ProfileOverviewTab(QWidget):
                 new_value = min(new_value, cap)
 
         # clamp 后值未变 → 不产生任何写入
-        if new_value == current_value:
+        if new_value == current_value and not force_write:
             return
 
         # 计算 clamp 后的真实 delta（与 DB 实际写入的变化量一致），
@@ -967,6 +1026,20 @@ class ProfileOverviewTab(QWidget):
         else:
             detail = f"override:{new_value}"
 
+        # 分钟/小时级 regen 特殊处理：小数只作为恢复进度语法，入库值保持整数。
+        custom_updated_at = None
+        if model_type == MODEL_REGEN and _is_continuous_regen(kd):
+            progress_value = new_value if regen_progress_source == "target" else current_value
+            stored_value, custom_updated_at = _normalize_continuous_regen_write(
+                kd, progress_value
+            )
+            new_value = float(math.floor(new_value))
+            if getattr(kd, "cap", None) is not None and new_value >= kd.cap:
+                new_value = float(kd.cap)
+                custom_updated_at = datetime.now().isoformat(timespec="seconds")
+            else:
+                new_value = stored_value if regen_progress_source == "target" else new_value
+
         if model_type == MODEL_REGEN and is_action and use_cas and expected_entry is not None:
             try:
                 updated = db_update_if_current(
@@ -974,6 +1047,7 @@ class ProfileOverviewTab(QWidget):
                     expected_value=expected_entry.get("value", 0) or 0,
                     expected_updated_at=expected_entry.get("updated_at", ""),
                     new_value=new_value,
+                    new_updated_at=custom_updated_at,
                     change_type="action",
                     detail=detail,
                     source=source,
@@ -1000,6 +1074,7 @@ class ProfileOverviewTab(QWidget):
                 change_type="action" if is_action else "override",
                 detail=detail,
                 source=source,
+                updated_at=custom_updated_at,
             )
 
         # 触发器同步（仅 action 动作触发）
@@ -1045,7 +1120,7 @@ class ProfileOverviewTab(QWidget):
         entry = profile_data.get(model_type, {}).get(key, {})
         current_value = entry.get("value", 0) or 0
         if model_type == MODEL_REGEN and kd and isinstance(kd, RegenKeyDef):
-            current_value, _ = compute_regen_entry(entry, kd)
+            current_value = _current_regen_value(entry, kd)
 
         new_value = current_value + delta
 
@@ -1075,9 +1150,19 @@ class ProfileOverviewTab(QWidget):
         if new_value == current_value:
             return current_value, 0
 
+        custom_updated_at = None
+        if model_type == MODEL_REGEN and kd and _is_continuous_regen(kd):
+            progress_value = current_value
+            new_value = float(math.floor(new_value))
+            _, custom_updated_at = _normalize_continuous_regen_write(kd, progress_value)
+            if getattr(kd, "cap", None) is not None and new_value >= kd.cap:
+                new_value = float(kd.cap)
+                custom_updated_at = datetime.now().isoformat(timespec="seconds")
+
         try:
             db_upsert(
                 user_name, model_type, key, new_value,
+                updated_at=custom_updated_at,
                 change_type=change_type, detail=detail, source=source,
             )
         except Exception as e:
@@ -1223,7 +1308,12 @@ class ProfileOverviewTab(QWidget):
 
         new_value = value
         delta = new_value - current_value
-        if delta == 0:
+        force_target_write = (
+            model_type == MODEL_REGEN
+            and _is_continuous_regen(kd)
+            and abs(new_value - math.floor(new_value)) > 1e-9
+        )
+        if delta == 0 and not force_target_write:
             return
 
         # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途
@@ -1237,6 +1327,8 @@ class ProfileOverviewTab(QWidget):
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
             is_action=sync_checked, source=source, use_cas=False,
+            regen_progress_source="target",
+            force_write=force_target_write,
         )
 
     def _show_history_dialog(

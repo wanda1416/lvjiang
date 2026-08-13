@@ -41,6 +41,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_RANK,
     get_tune_config,
 )
+from lvjiang.apps.yysls.ui.tuning_progress_hub import SLOT_NAMES
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -92,6 +93,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     MATERIAL_GROUP = "调律材料"
     MAX_AFFIX = 5
 
+    # 部位 key → 中文名（与 hub 共享，避免重复定义）
+    _SLOT_NAMES = SLOT_NAMES
+
     # ─── 编排层状态 ────────────────────────────────────────
 
     # 调律功能组件（懒初始化）──────────────────────────────
@@ -132,6 +136,27 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._recorder = TuningRecorder()
         return self._recorder
 
+    def _emit_progress(self, signal_name: str, *args):
+        """经 engine 向 UI 发送进度信号；异常时静默跳过（测试/设备端兼容）"""
+        try:
+            hub = getattr(self.engine, '_progress_hub', None) if self.engine else None
+            if hub is not None:
+                getattr(hub, signal_name).emit(*args)
+        except Exception:
+            pass  # 进度信号失败不应影响工作流执行
+
+    def _emit_equip_finish(self, name, equip_data, rounds=0,
+                           affix_count=0, status="skipped"):
+        """发送装备处理结束信号（供 early-return 路径补发）"""
+        self._emit_progress("equipment_finished", {
+            "name": name,
+            "final_rating": "",
+            "rounds": rounds,
+            "affix_count": affix_count,
+            "final_affixes": [a.to_dict() for a in equip_data.affixes],
+            "status": status,
+        })
+
     def _recycle_current(self, equip_data: EquipmentData, detail_scene: str,
                          stage: str, reason: str,
                          report: dict | None = None) -> RecycleOutcome:
@@ -162,12 +187,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         return get_missing_output_fields(db)
 
     def run(self) -> dict:
+        # 兜底创建进度信号桥（tuning_tab 启动时已在 configure 中创建，
+        # 此处覆盖日常启动 / 批量运行等未经 tuning_tab 的场景）
+        if not hasattr(self.engine, '_progress_hub') or self.engine._progress_hub is None:
+            from lvjiang.apps.yysls.ui.tuning_progress_hub import TuningProgressHub
+            self.engine._progress_hub = TuningProgressHub()
         # 预检：当前图库空间必须满足调律输出字段契约（levels/counts）
         missing = self._missing_output_fields()
         if missing:
             msg = (f"当前图库空间缺少输出字段 {'、'.join(missing)}，"
                    f"无法启动自动调律（请在图库元数据定义中补充）")
             logger.error(msg)
+            self._emit_progress("tuning_finished", {
+                "total_equipment": 0, "total_rounds": 0, "interrupted": False,
+            })
             return {"error": msg}
 
         try:
@@ -181,6 +214,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         except ValueError as e:
             msg = str(e)
             logger.error(msg)
+            self._emit_progress("tuning_finished", {
+                "total_equipment": 0, "total_rounds": 0, "interrupted": False,
+            })
             return {"error": msg}
         logger.info(f"基础规则组: {group.name}")
 
@@ -189,6 +225,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.navigator.navigate_to_equip()
 
             first_slot = True
+            _batch_total_slots = len(selected)
+            _slot_idx = 0
             for slot in selected:
                 if self.is_stopped:
                     break
@@ -198,6 +236,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 if detail is None:
                     continue
 
+                _slot_idx += 1
+                self._emit_progress("batch_progress", {
+                    "current_slot": slot,
+                    "slot_index": _slot_idx,
+                    "total_slots": _batch_total_slots,
+                })
                 if first_slot and self.ctx.target_cell:
                     # 指定调律：只处理这一件即收工
                     self._process_slot_group_enter(slot)
@@ -219,6 +263,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             user_interrupt = (hasattr(self, '_stop_check')
                              and callable(self._stop_check)
                              and self._stop_check())
+            # 进度信号：整体完成
+            self._emit_progress("tuning_finished", {
+                "total_equipment": _slot_idx,
+                "total_rounds": sum(
+                    int(r.get("rounds") or 0)
+                    for r in self.recorder.collect_reports()
+                    if r.get("status") == "tuned"),
+                "interrupted": user_interrupt,
+            })
             if user_interrupt:
                 # 用户按 F10 中断：保留当前页面，方便查看停在哪里
                 logger.info("自动调律被用户中断（F10），保留当前页面")
@@ -290,6 +343,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         阻断指纹对新部位无效，必须清空。
         """
         self.recorder.on_slot_enter(slot)
+        self._emit_progress(
+            "slot_entered", slot,
+            self._SLOT_NAMES.get(slot, slot))
         self.click_region(self.GRID_SCENE, slot)
         self.wait_stable("page_refresh")  # 背包浏览页 → 装备详情页
 
@@ -490,8 +546,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             outcome = self._on_scan_reject(
                 equip_data, judgement, detail_scene, already_full=True)
             if outcome is RecycleOutcome.RECYCLED:
+                self._emit_equip_finish(name, equip_data, affix_count=affix_count,
+                                        status="recycled")
                 self.recorder.discard_report()
                 return "", outcome
+            self._emit_equip_finish(name, equip_data, affix_count=affix_count)
             self.recorder.discard_report()
             return self._make_fingerprint(equip_data.to_dict()), outcome
 
@@ -507,6 +566,19 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         self.recorder.report_set("worthiness", logs)
+        # 进度信号：装备开始处理（含目标词条）
+        _target_names: set[str] = set()
+        for _cfg in (self.ctx.judge_configs or {}).values():
+            _target_names.update(_cfg.get("affix_pool") or [])
+        self._emit_progress("equipment_started", {
+            "name": name,
+            "type": equip.get("type", ""),
+            "level": equip.get("level", 0),
+            "quality": equip.get("quality", ""),
+            "affixes": [a.to_dict() for a in equip_data.affixes],
+            "expect_rating": expect,
+            "target_affixes": sorted(_target_names),
+        })
         # 重置调满后回收模式标记与强制调律标记（每件装备重新判断）
         self.recorder.tune_full_recycle_mode = False
         self.recorder.force_tune_mode = False
@@ -519,6 +591,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             outcome = self._on_scan_reject(equip_data, potential,
                                             detail_scene)
             if outcome is RecycleOutcome.RECYCLED:
+                self._emit_equip_finish(name, equip_data, affix_count=affix_count,
+                                        status="recycled")
                 self.recorder.discard_report()
                 return "", outcome
             # 调满后回收模式：继续走调律流程
@@ -527,6 +601,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             elif self.recorder.force_tune_mode:
                 logger.info(f"  [{name}] 扫描处理强制调律，进入调律页")
             else:
+                self._emit_equip_finish(name, equip_data, affix_count=affix_count)
                 self.recorder.discard_report()
                 return self._make_fingerprint(equip_data.to_dict()), outcome
 
@@ -539,6 +614,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.commit_report("no_tune_entry")
             self.output.setdefault("tuning_reports", []).extend(
                 self.recorder.collect_reports()[-1:])
+            self._emit_equip_finish(name, equip_data, affix_count=affix_count)
             return self._make_fingerprint(equip_data.to_dict()), None
 
         # 临时测试开关：只有词条未满、判定值得调律且找到入口的装备
@@ -554,6 +630,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.commit_report("skip_tuning")
             self.output.setdefault("tuning_reports", []).extend(
                 self.recorder.collect_reports()[-1:])
+            self._emit_equip_finish(name, equip_data, affix_count=affix_count)
             return self._make_fingerprint(equip_data.to_dict()), None
 
         # 进入调律页成功，缓存材料区 OCR（后续轮次复用，避免每轮 OCR）
@@ -614,6 +691,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 last_food_reason = self.executor.round_food_reason
             self.recorder.doc_tune_round(rounds, self.executor.round_food,
                                          new_affix)
+            # 进度信号：单轮调律完成
+            self._emit_progress("tune_round_completed", {
+                "round_no": rounds,
+                "new_affix": new_affix,
+                "food_used": self.executor.round_food,
+                "food_reason": self.executor.round_food_reason,
+                "material_stock": self.executor.get_material_stock(),
+                "current_affixes": [a.to_dict() for a in equip_data.affixes],
+                "affix_count": affix_count,
+            })
             # 扣减本轮狗粮缓存：返还时不消耗（不变），否则 -1
             if not self.executor.round_food_refunded:
                 self.executor.decrement_food(self.executor.round_food)
@@ -668,6 +755,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.recorder.commit_report("tuned")
         self.output.setdefault("tuning_reports", []).extend(
             self.recorder.collect_reports()[-1:])
+        # 进度信号：装备处理结束
+        self._emit_progress("equipment_finished", {
+            "name": name,
+            "final_rating": (judgement or {}).get("rating", ""),
+            "rounds": rounds,
+            "affix_count": affix_count,
+            "final_affixes": [a.to_dict() for a in equip_data.affixes],
+            "status": "recycled" if outcome is RecycleOutcome.RECYCLED else "done",
+        })
         if outcome is RecycleOutcome.RECYCLED:
             return "", outcome
         return self._make_fingerprint(equip_data.to_dict()), outcome
@@ -834,6 +930,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         cfg = self.base_group.scan
         if detail_scene is None or not cfg.enabled:
             logger.info(f"  [扫描处理] {label} 不进调律（处置未启用，保留）")
+            self._emit_progress("scan_decision", {
+                "name": label, "action": "kept", "reason": "处置未启用，保留"})
             return None
         part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
         action, why = cfg.decide(part, quality, cap_pct,
@@ -844,21 +942,34 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             if already_full:
                 # 已满装备无需再调，“调满后回收”意图等价于直接回收
                 logger.info(f"  [扫描处理] {label} {why}（已满，直接回收）")
+                self._emit_progress("scan_decision", {
+                    "name": label, "action": "recycled",
+                    "reason": f"{why}（已满，直接回收）"})
                 return self._recycle_current(
                     equip_data, detail_scene, "scan", why)
             # 未满：设置标记，继续走调律流程
             logger.info(f"  [扫描处理] {label} {why}（调满后回收模式）")
             self.recorder.tune_full_recycle_mode = True
+            self._emit_progress("scan_decision", {
+                "name": label, "action": "tune_full_recycle",
+                "reason": f"{why}（调满后回收模式）"})
             return None
         if action == "tune_this":
             # 强制调律：无视进入门槛，强制进入调律页
             # 配合结束处理「启用初始判定」实现调废装备重置复用
             logger.info(f"  [扫描处理] {label} {why}（强制调律模式）")
             self.recorder.force_tune_mode = True
+            self._emit_progress("scan_decision", {
+                "name": label, "action": "force_tune",
+                "reason": f"{why}（强制调律）"})
             return None
         if action != "recycle":
             logger.info(f"  [扫描处理] {label} {why}")
+            self._emit_progress("scan_decision", {
+                "name": label, "action": "kept", "reason": why})
             return None
+        self._emit_progress("scan_decision", {
+            "name": label, "action": "recycled", "reason": why})
         return self._recycle_current(equip_data, detail_scene,
                                      "scan", why)
 

@@ -311,10 +311,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _check_update(self):
         """直接检查更新（复用 AboutDialog 的更新检查逻辑）"""
-        from .about_dialog import GITHUB_REPO, _UpdateChecker, _get_version
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtWidgets import QMessageBox
+
+        from .about_dialog import _get_version, _UpdateChecker
 
         checker = _UpdateChecker(self)
 
@@ -357,6 +358,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """打开 GitHub 文档"""
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
+
         from .about_dialog import GITHUB_REPO
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/user-guide.md"))
 
@@ -364,6 +366,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """打开 GitHub Issue 反馈页面"""
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
+
         from .about_dialog import GITHUB_REPO
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/issues"))
 

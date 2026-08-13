@@ -75,6 +75,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
     def _restore_window_size(self):
         """从 session.json 恢复窗口大小"""
         import json
+
         from ....constants import SESSION_PATH
         if not SESSION_PATH.exists():
             return
@@ -90,6 +91,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
     def _save_window_size(self):
         """保存窗口大小到 session.json"""
         import json
+
         from ....constants import SESSION_CONFIG_DIR, SESSION_PATH
         data = {}
         if SESSION_PATH.exists():
@@ -500,7 +502,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
     def _update_scene_tab_title(self, scene_key: str, dirty: bool):
         """更新场景 Tab 标题：dirty 时追加绿点指示"""
-        for group_key, tab_widget in self._group_tabs.items():
+        for _group_key, tab_widget in self._group_tabs.items():
             for i in range(tab_widget.count()):
                 w = tab_widget.widget(i)
                 if isinstance(w, SceneTab) and w.scene_key == scene_key:

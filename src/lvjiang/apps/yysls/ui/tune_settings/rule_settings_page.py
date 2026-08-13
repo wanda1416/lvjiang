@@ -12,7 +12,7 @@ key 与名称均为只读文本展示：key 重命名走展示区后的「重命
 属性列候选 = 属性攻击词组组名（通用/鸣金/牵丝/裂石/破竹）。
 增伤词条列候选随同侧武器收窄：武器已绑定武学增效词条
 （weapon_types.wuxue_affix）时仅保留留空 + 该绑定词条。
-另含品阶门槛覆盖表：按部位覆盖全局 tuning_base 默认，
+另含品阶门槛覆盖表：按部位覆盖全局 tune_config 默认，
 未列部位沿用基础配置（如 小外流佩/会意环 金紫皆可）。
 """
 
@@ -50,7 +50,7 @@ from lvjiang.apps.yysls.game_config import get_game_config
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
-# 品阶枚举（与 tuning_base 一致）
+# 品阶枚举（与 tune_config 一致）
 _QUALITIES = ("gold", "purple", "blue")
 
 # 增伤列留空项的展示文案（仅显示层，收集时仍写入空 = null）

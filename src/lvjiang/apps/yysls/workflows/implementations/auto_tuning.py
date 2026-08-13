@@ -791,7 +791,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.info(f"  [{prefix}] {why}")
         return action, why, resets_used
 
-    # ─── 行为处置（按 tuning_base.behavior 行为点配置驱动）──────
+    # ─── 行为处置（按 tune_config.behavior 行为点配置驱动）──────
 
     def _on_scan_reject(self, equip_data: EquipmentData, potential: dict,
                         detail_scene: str | None = None,

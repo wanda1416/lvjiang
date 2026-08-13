@@ -31,7 +31,7 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
 泛化）均可命中；武器部位保持字面匹配不做归类（无相词条为
 字面语义，仅武器掉落）；attr=通用（混搭流）不做任何归类。
 
-品阶门槛与开关注册表从 tuning_base.yaml 读取：
+品阶门槛与开关注册表从 tune_config.yaml 读取：
 - 品阶门槛按标准部位（武器/环/佩/防具四件）配置，规则级
   quality_thresholds 可按部位覆盖全局默认；
 - 开关状态由调用方经 config["switches"] 注入，仅影响带 when 前提

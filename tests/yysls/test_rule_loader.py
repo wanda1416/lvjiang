@@ -3,7 +3,7 @@
 覆盖 TuningRuleManager 的加载/排序/校验拒绝/保存与 get_raw 深拷贝、
 create_rule/delete_rule、playstyles 节（含 attr）、4 条件原语与
 条件组三种形态（单键 dict / list=AND / when+all 开关组）解析、
-default_rating、tuning_base 开关注册表（switches），以及规则内
+default_rating、tune_config 开关注册表（switches），以及规则内
 词条名与规则可引用词表（rule_affix_candidates：标准词条全集
 + 四个动态词条）的一致性守护。
 """
@@ -571,7 +571,7 @@ class TestDynamicAffixMap:
         assert "裂石" in attrs and "鸣金" in attrs and "牵丝" in attrs
 
 
-# ─── 基础配置 tuning_base ─────────────────────────
+# ─── 基础配置 tune_config ─────────────────────────
 
 def _valid_config() -> dict:
     thresholds = {p: ["gold"] for p in QUALITY_PARTS}

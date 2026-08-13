@@ -131,6 +131,9 @@ class FakeWF(AutoTuningWorkflow):
 
     def ocr_scene(self, scene_key, field_keys=None):
         data = dict(self._ocr_map.get(scene_key, {}))
+        # 默认值：回收确认弹窗包含「确认」（除非测试显式覆盖为锁定场景）
+        if scene_key == EQUIP_DETAIL and "recycle_confirm" not in data:
+            data["recycle_confirm"] = "确认"
         if field_keys:
             return {k: v for k, v in data.items() if k in field_keys}
         return data
@@ -856,6 +859,71 @@ def test_scan_custom_scope_protects(monkeypatch):
     assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
 
 
+# 自选词条语义：紫武器带金色数值珍贵词条（首词条≥90%）→
+# 命中跳过不回收；兜底回收规则排后验证不命中分支
+_AFFIX_SKIP_RULE = BehaviorRule(
+    parts=["武器"], max_quality="purple_only", judge_scope="affix",
+    ratings=["最大外功攻击"], pct_op="ge", pct=90, action="skip")
+
+
+def test_scan_affix_scope_protects_purple_weapon(monkeypatch):
+    """紫武器含目标词条 + 首词条 ≥90% → 命中跳过（不回收）"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    base = _behavior_base(scan=ScanBehavior(
+        enabled=True, rules=[_AFFIX_SKIP_RULE] + _RECYCLE_ALL))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    fp = wf._process_equipment("紫武好词条", _equip(
+        2, quality="purple", cap_pct=95), WEAPON_DETAIL)
+
+    assert fp   # 保留，正常返回指纹
+    assert "recycled_items" not in wf.output
+    assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
+
+
+def test_scan_affix_scope_pct_insufficient_recycles(monkeypatch):
+    """对照：首词条 80% < 90% 门槛 → 不命中，落兜底回收"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    base = _behavior_base(scan=ScanBehavior(
+        enabled=True, rules=[_AFFIX_SKIP_RULE] + _RECYCLE_ALL))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    fp = wf._process_equipment("紫武低分", _equip(
+        2, quality="purple", cap_pct=80), WEAPON_DETAIL)
+
+    assert fp == ""
+    items = wf.output["recycled_items"]
+    assert len(items) == 1 and items[0]["stage"] == "scan"
+
+
+def test_scan_affix_scope_first_affix_only(monkeypatch):
+    """勾选仅首词条：目标词条在非首位置 → 不命中，落兜底回收"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    rule = BehaviorRule(
+        parts=["武器"], max_quality="purple_only", judge_scope="affix",
+        ratings=["最大外功攻击"], pct_op="ge", pct=90,
+        first_affix_only=True, action="skip")
+    base = _behavior_base(scan=ScanBehavior(
+        enabled=True, rules=[rule] + _RECYCLE_ALL))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    # 目标词条在第二位（首词条为杂词，cap 95 满足 pct 条件）
+    d = _equip(2, quality="purple", cap_pct=95)
+    d["affix_1"], d["affix_2"] = d["affix_2"], d["affix_1"]
+    d["affix_1"]["cap_pct"] = 95
+    fp = wf._process_equipment("紫武非首", d, WEAPON_DETAIL)
+
+    assert fp == ""
+    items = wf.output["recycled_items"]
+    assert len(items) == 1 and items[0]["stage"] == "scan"
+
+
 def test_scan_rule_not_matched_keeps(monkeypatch):
     """扫描启用但规则不命中（cap 50 > max_pct 30）→ 忽略保留"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
@@ -1145,6 +1213,31 @@ def test_full_equipment_recycled(monkeypatch):
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
     assert not wf.output.get("tuning_reports")
+
+
+def test_recycle_locked_equipment(monkeypatch):
+    """装备锁定检测：回收确认弹窗无「确认」字样 = 装备被锁定，
+    收起弹窗返回 False，不卡死"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_JUNK))
+    base = _behavior_base(scan=ScanBehavior(enabled=True,
+                                            rules=_RECYCLE_ALL))
+    monkeypatch.setattr(auto_tuning, "get_tuning_base", lambda: base)
+    monkeypatch.setattr(tuning_executor, "get_tuning_base", lambda: base)
+    wf = FakeWF()
+    # 模拟装备锁定：回收确认弹窗内无「确认」字样
+    wf._ocr_map[EQUIP_DETAIL] = {"recycle_confirm": "装备已锁定"}
+    fp = wf._process_equipment("锁定剑", _equip(2), WEAPON_DETAIL)
+
+    # 装备被锁定，应返回指纹（保留），不收集 recycled_items
+    assert fp  # 非空指纹（装备保留原地）
+    # 回收链应停在确认检测：展开「更多」→ 子菜单「回收」，但不应点击确认
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) >= 1
+    assert (EQUIP_DETAIL, "sub_func_1") in wf.clicks
+    # 关键：不应点击 recycle_confirm（因为检测到锁定）
+    assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
+    # 不应收集回收记录
+    assert not wf.output.get("recycled_items")
 
 
 def test_materials_block_no_behavior(monkeypatch):

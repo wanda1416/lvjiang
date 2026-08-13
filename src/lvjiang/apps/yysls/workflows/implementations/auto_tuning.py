@@ -602,7 +602,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
             rating_of = self.judge.rating_provider(equip_data, incoming)
             action, why = tune_cfg.decide(part, quality, cap_pct, rating_of,
-                                          full)
+                                          full,
+                                          [a.name
+                                           for a in equip_data.affixes])
             logger.info(f"  [结束处理] {why}")
             if action == "continue":
                 if self._doc:
@@ -702,7 +704,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         part, quality, cap_pct = self.judge.recycle_inputs(equip_data)
         action, why = cfg.decide(part, quality, cap_pct,
                                  self.judge.rating_provider(equip_data,
-                                                            potential))
+                                                            potential),
+                                 [a.name for a in equip_data.affixes])
         if action == "tune_full_recycle":
             if already_full:
                 # 已满装备无需再调，"调满后回收"意图等价于直接回收

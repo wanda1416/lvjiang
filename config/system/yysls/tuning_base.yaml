@@ -23,7 +23,7 @@ switches:
 materials:
   stone_check:
     enabled: false
-    min_count: 100
+    min_count: 80
   food_rules:
   - pct: 98
     min_expect: top
@@ -50,3 +50,41 @@ materials:
     min_quality: purple
     food: 紫狗粮
     on_insufficient: continue
+behavior:
+  scan:
+    enabled: true
+    entry_min_rating: normal
+    judge_scope: incoming
+    judge_rules: []
+    rules:
+    - parts:
+      - 武器
+      - 环
+      - 佩
+      - 冠胄
+      - 胸甲
+      - 胫甲
+      - 腕甲
+      max_quality: purple
+      max_pct: 100
+      max_rating: junk
+      action: recycle
+  tune:
+    enabled: true
+    judge_scope: incoming
+    judge_rules: []
+    rules:
+    - parts:
+      - 武器
+      - 环
+      - 佩
+      - 冠胄
+      - 胸甲
+      - 胫甲
+      - 腕甲
+      max_quality: purple
+      max_pct: 100
+      max_rating: junk
+      action: recycle
+    max_resets: 3
+    reset_exhausted_action: recycle

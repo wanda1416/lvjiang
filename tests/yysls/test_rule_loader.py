@@ -16,7 +16,10 @@ import yaml
 from lvjiang.apps.yysls.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     DYNAMIC_AFFIXES,
+    MAX_TUNE_RESETS,
     QUALITY_PARTS,
+    BehaviorRule,
+    BehaviorSettings,
     FoodRule,
     MaterialSettings,
     RuleValidationError,
@@ -708,6 +711,164 @@ class TestMaterialSettings:
         data["materials"] = materials
         with pytest.raises(RuleValidationError):
             parse_tuning_base(data)
+
+
+# ─── 行为配置 behavior ─────────────────────
+
+class TestBehaviorSettings:
+    def test_defaults_when_section_missing(self):
+        # behavior 段缺省 → scan 默认启用（门槛 excellent/传入规则），
+        # tune 默认关，max_resets 取游戏硬限
+        b = parse_tuning_base(_valid_base()).behavior
+        assert b.scan.enabled is True and b.scan.rules == []
+        assert b.scan.entry_min_rating == "excellent"
+        assert b.scan.judge_scope == "incoming"
+        assert b.scan.judge_rules == []
+        assert b.tune.enabled is False and b.tune.rules == []
+        assert b.tune.judge_scope == "incoming"
+        assert b.tune.max_resets == MAX_TUNE_RESETS
+        assert b.tune.reset_exhausted_action == "ignore"
+
+    def test_full_section_parsed(self):
+        data = _valid_base()
+        data["behavior"] = {
+            "scan": {
+                "enabled": True,
+                "entry_min_rating": "top",
+                "judge_scope": "custom",
+                "judge_rules": ["huiyi_general", "heal_pure"],
+                "rules": [
+                    {"parts": ["武器"], "max_quality": "blue",
+                     "max_pct": 100, "max_rating": "junk",
+                     "action": "recycle"},
+                ],
+            },
+            "tune": {
+                "enabled": True,
+                "judge_scope": "all",
+                "rules": [
+                    {"max_rating": "junk", "action": "recycle"},
+                    {"max_pct": 30, "action": "reset"},
+                    {"max_rating": "normal", "action": "ignore"},
+                    {"action": "continue"},
+                ],
+                "max_resets": 2,
+                "reset_exhausted_action": "recycle",
+            },
+        }
+        b = parse_tuning_base(data).behavior
+        assert b.scan.enabled is True
+        assert b.scan.entry_min_rating == "top"
+        assert b.scan.judge_scope == "custom"
+        assert b.scan.judge_rules == ["huiyi_general", "heal_pure"]
+        assert b.scan.rules == [BehaviorRule(
+            parts=["武器"], max_quality="blue", max_rating="junk",
+            action="recycle")]
+        assert b.tune.enabled is True
+        assert b.tune.judge_scope == "all" and b.tune.judge_rules == []
+        assert [r.action for r in b.tune.rules] == [
+            "recycle", "reset", "ignore", "continue"]
+        assert b.tune.max_resets == 2
+        assert b.tune.reset_exhausted_action == "recycle"
+
+    def test_stage_missing_defaults(self):
+        # 只声明 tune → scan 取默认（启用/excellent/incoming）
+        data = _valid_base()
+        data["behavior"] = {"tune": {"enabled": True}}
+        b = parse_tuning_base(data).behavior
+        assert b.tune.enabled is True and b.tune.rules == []
+        assert b.scan.enabled is True
+        assert b.scan.entry_min_rating == "excellent"
+
+    def test_legacy_recycle_rejected(self):
+        # 旧 recycle 段已废弃，出现即报错提示新写法
+        data = _valid_base()
+        data["recycle"] = {"scan": {"enabled": True}}
+        with pytest.raises(RuleValidationError, match="behavior"):
+            parse_tuning_base(data)
+
+    @pytest.mark.parametrize("behavior", [
+        ["not", "a", "dict"],                            # 段须为 dict
+        {"scan": "yes"},                                 # 行为点须为 dict
+        {"scan": {"entry_min_rating": "good"}},          # 门槛档位非法
+        {"scan": {"judge_scope": "mixed"}},              # 判定语义非法
+        {"scan": {"judge_scope": "incoming",
+                  "judge_rules": ["huiyi_general"]}},    # 非 custom 带自选
+        {"tune": {"judge_scope": "all",
+                  "judge_rules": ["huiyi_general"]}},    # 非 custom 带自选
+        {"scan": {"judge_scope": "custom",
+                  "judge_rules": "huiyi"}},              # 须为 list
+        {"scan": {"judge_scope": "custom",
+                  "judge_rules": ["BadKey"]}},           # key 格式非法
+        {"scan": {"rules": {"action": "recycle"}}},      # rules 须为 list
+        {"scan": {"rules": ["回收"]}},                   # 元素须为 dict
+        {"scan": {"rules": [{}]}},                       # action 必填
+        {"scan": {"rules": [{"action": "continue"}]}},   # scan 无 continue
+        {"scan": {"rules": [{"action": "reset"}]}},      # scan 无 reset
+        {"scan": {"rules": [{"action": "recycle",
+                              "parts": ["魅力"]}]}},     # 未知部位
+        {"scan": {"rules": [{"action": "recycle",
+                              "max_quality": "green"}]}},  # 品阶非法
+        {"scan": {"rules": [{"action": "recycle",
+                              "max_pct": 101}]}},          # 超出上界
+        {"scan": {"rules": [{"action": "recycle",
+                              "max_pct": True}]}},         # bool 伪装 int
+        {"scan": {"rules": [{"action": "recycle",
+                              "max_rating": "good"}]}},    # 评级非法
+        {"tune": {"max_resets": 4}},                     # 超游戏硬限
+        {"tune": {"max_resets": "3"}},                   # 字符串伪整数
+        {"tune": {"reset_exhausted_action": "reset"}},   # 转处置非法
+    ])
+    def test_bad_behavior_rejected(self, behavior):
+        data = _valid_base()
+        data["behavior"] = behavior
+        with pytest.raises(RuleValidationError):
+            parse_tuning_base(data)
+
+    def test_scan_decide_first_hit(self):
+        # 处置表自上而下首条命中；未启用/无命中 → ignore 保留
+        data = _valid_base()
+        data["behavior"] = {"scan": {"enabled": True, "rules": [
+            {"max_pct": 30, "action": "recycle"},
+            {"max_quality": "purple", "action": "ignore"},
+        ]}}
+        scan = parse_tuning_base(data).behavior.scan
+        # 首条命中即生效：cap 20 ≤ 30 → 回收（不再看后续）
+        assert scan.decide("武器", "gold", 20, "junk")[0] == "recycle"
+        # 首条不中、次条 ≤紫色 命中（蓝色 ≤ 紫色）→ 忽略保留
+        assert scan.decide("武器", "blue", 50, "junk")[0] == "ignore"
+        # 金色超出 ≤紫色 → 全部不命中 = 默认保留
+        assert scan.decide("武器", "gold", 50, "junk")[0] == "ignore"
+        # max_pct 限制下 cap_pct 识别失败视为不达标（保守不回收）
+        assert scan.decide("武器", "gold", None, "junk")[0] == "ignore"
+        # 未启用 → 一律保留
+        data["behavior"]["scan"]["enabled"] = False
+        disabled = parse_tuning_base(data).behavior.scan
+        assert disabled.decide("武器", "gold", 20, "junk")[0] == "ignore"
+
+    def test_tune_decide_defaults_and_full(self):
+        # 无命中默认：未满 = 继续调律；词条满 = 结束保留；
+        # full=True 时 continue 规则跳过匹配（不可达）
+        data = _valid_base()
+        data["behavior"] = {"tune": {"enabled": True, "rules": [
+            {"max_rating": "junk", "action": "recycle"},
+            {"max_rating": "normal", "action": "continue"},
+        ]}}
+        tune = parse_tuning_base(data).behavior.tune
+        # 首条命中 → 回收（满/未满一致）
+        assert tune.decide("武器", "gold", 95, "junk", False)[0] == "recycle"
+        assert tune.decide("武器", "gold", 95, "junk", True)[0] == "recycle"
+        # 次条 continue：未满命中生效；词条满跳过 → 默认结束保留
+        assert tune.decide("武器", "gold", 95, "normal", False)[0] == "continue"
+        assert tune.decide("武器", "gold", 95, "normal", True)[0] == "ignore"
+        # 全部不命中 → 默认：未满继续、满结束保留
+        assert tune.decide("武器", "gold", 95, "top", False)[0] == "continue"
+        assert tune.decide("武器", "gold", 95, "top", True)[0] == "ignore"
+        # 未启用 → 同默认
+        assert BehaviorSettings().tune.decide(
+            "武器", "gold", 95, "junk", False)[0] == "continue"
+        assert BehaviorSettings().tune.decide(
+            "武器", "gold", 95, "junk", True)[0] == "ignore"
 
 
 class TestDecideFood:

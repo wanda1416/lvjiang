@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from .models import (
+    BEHAVIOR_STAGE_ACTIONS,
     COND_KINDS,
     DYNAMIC_AFFIXES,
     FOOD_EXPECT_KEYS,
@@ -17,7 +18,7 @@ from .models import (
     QUALITY_PARTS,
     QUALITY_RANK,
     RATING_KEYS,
-    BEHAVIOR_STAGE_ACTIONS,
+    STONE_ACTIONS,
     TIER_KEYS,
     BehaviorRule,
     BehaviorSettings,
@@ -406,6 +407,12 @@ def _parse_materials(raw, where: str = "materials") -> MaterialSettings:
     min_count = _int_field(
         stone.get("min_count", defaults.stone_min_count),
         "stone_check.min_count", 1, 99999)
+    insufficient = stone.get("insufficient_action",
+                             defaults.stone_insufficient_action)
+    if insufficient not in STONE_ACTIONS:
+        raise RuleValidationError(
+            f"{where}.stone_check.insufficient_action 非法: "
+            f"{insufficient!r}（须为 {list(STONE_ACTIONS)}）")
 
     if "food_strategy" in raw:
         raise RuleValidationError(
@@ -424,6 +431,7 @@ def _parse_materials(raw, where: str = "materials") -> MaterialSettings:
     return MaterialSettings(
         stone_check_enabled=enabled,
         stone_min_count=min_count,
+        stone_insufficient_action=insufficient,
         food_rules=food_rules,
     )
 
@@ -593,6 +601,14 @@ def parse_tuning_base(data: dict) -> TuningBase:
             "recycle 段已废弃，请改用 behavior 行为配置"
             "（behavior.scan / behavior.tune）")
 
+    # ── min_level（等级门槛，缺省 100）──
+    min_level = data.get("min_level", TuningBase.min_level)
+    if isinstance(min_level, bool) or not isinstance(min_level, int):
+        raise RuleValidationError("min_level 必须是整数")
+    if not (1 <= min_level <= 999):
+        raise RuleValidationError(
+            f"min_level 超出范围 [1, 999]: {min_level}")
+
     # ── quality_thresholds（固定 7 个标准部位，须列全）──
     quality_thresholds = _parse_quality_thresholds(
         data.get("quality_thresholds") or {}, "quality_thresholds",
@@ -617,6 +633,7 @@ def parse_tuning_base(data: dict) -> TuningBase:
         switches[k] = sw_name
 
     return TuningBase(
+        min_level=min_level,
         quality_thresholds=quality_thresholds,
         switches=switches,
         materials=_parse_materials(data.get("materials")),

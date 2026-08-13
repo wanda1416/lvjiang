@@ -300,6 +300,54 @@ class _PanelMixin:
         self.variables[var_name] = result
         logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
+    def _scan_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None):
+        """scan [scene].[panel] as $var by ... — 整面板 OCR + by 短路匹配
+
+        返回首个命中的行列位置 {"row": 行号, "col": 列号}，未命中返回空 dict {}。
+        行列号为 1-based 整数。
+        """
+        panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
+        if panel_img is None:
+            self.variables[var_name] = {}
+            return
+        target_value = self._resolve(by_clause.target)
+        match_mode = by_clause.match_mode
+        for r, c, slot_img in self._iter_slot_images(panel_img, cal):
+            text = ""
+            if slot_img is not None:
+                ocr_results = self._ocr.recognize(slot_img)
+                text = " ".join(t.text for t in ocr_results).strip()
+            if self._match_text(text, target_value, match_mode):
+                self.variables[var_name] = {"row": r + 1, "col": c + 1}
+                logger.info(f"scan panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {text!r}")
+                return
+        self.variables[var_name] = {}
+        logger.info(f"scan panel by [{scene_key}.{panel_key}] no match")
+
+    def _recognize_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None):
+        """recognize [scene].[panel] as $var by ... [on group ...] — 整面板材料识别 + by 短路匹配
+
+        返回首个命中的行列位置 {"row": 行号, "col": 列号}，未命中返回空 dict {}。
+        行列号为 1-based 整数。
+        """
+        panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
+        if panel_img is None:
+            self.variables[var_name] = {}
+            return
+        recognizer = self._ensure_workflow().material_recognizer
+        target_value = self._resolve(by_clause.target)
+        match_mode = by_clause.match_mode
+        for r, c, slot_img in self._iter_slot_images(panel_img, cal):
+            mat_type = ""
+            if slot_img is not None:
+                mat_type = recognizer.recognize(slot_img, group=group).type
+            if self._match_text(mat_type, target_value, match_mode):
+                self.variables[var_name] = {"row": r + 1, "col": c + 1}
+                logger.info(f"recognize panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {mat_type!r}")
+                return
+        self.variables[var_name] = {}
+        logger.info(f"recognize panel by [{scene_key}.{panel_key}] no match")
+
     def _match_text(self, text: str, target: str, mode: str) -> bool:
         """文本匹配（用于 by 子句短路识别）"""
         if mode == "equals":

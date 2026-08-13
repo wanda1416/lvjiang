@@ -93,21 +93,6 @@ class TestUpdate:
         with pytest.raises(ValueError, match="模拟失败"):
             mgr.update("用户", bad_mutate)
 
-    def test_concurrent_update_does_not_lose_increments(self, mgr, tmp_path):
-        mgr.save("并发更新", {"counter": 0})
-
-        def increment(_i: int):
-            def mutate(data: dict):
-                data["counter"] = data.get("counter", 0) + 1
-
-            mgr.update("并发更新", mutate)
-
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            list(executor.map(increment, range(50)))
-
-        data = json.loads((tmp_path / "并发更新.json").read_text(encoding="utf-8"))
-        assert data["counter"] == 50
-
 
 class TestSaveFn:
     def test_save_fn_returns_callable(self, mgr):

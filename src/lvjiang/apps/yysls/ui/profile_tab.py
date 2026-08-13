@@ -258,7 +258,11 @@ class ProfileOverviewTab(QWidget):
 
         self._loading = True
         # 先清空表格内容，再设置新的行列数
+        # 列数不变时 setColumnCount 不会重置列的视觉顺序，拖拽列头后
+        # visual != logical 会残留；先置 0 再重建，确保 visual == logical
+        # == 持久化顺序，否则重建的表头会与拖拽位移叠加导致列错位
         table.setRowCount(0)
+        table.setColumnCount(0)
         table.setColumnCount(col_count)
         table.setHorizontalHeaderLabels(headers)
         table.setRowCount(len(users_data))
@@ -273,6 +277,10 @@ class ProfileOverviewTab(QWidget):
                 item = QTableWidgetItem(display_text)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._apply_cell_style(item, style)
+                # 设置悬停提示，显示元信息
+                tooltip = self._format_cell_tooltip(kd, model_type, data)
+                if tooltip:
+                    item.setToolTip(tooltip)
                 table.setItem(row, col + 1, item)
 
         header = table.horizontalHeader()
@@ -345,6 +353,46 @@ class ProfileOverviewTab(QWidget):
             item.setFont(font)
             item.setForeground(QColor(255, 165, 0))  # 橙色
 
+    def _format_cell_tooltip(self, kd: KeyDef, model_type: str, data: dict) -> str:
+        """生成单元格悬停提示，显示元信息（更新时间等）"""
+        entry = read_profile_entry(data, model_type, kd.key)
+        if not entry:
+            return ""
+
+        lines = [f"【{kd.label}】"]
+
+        # 更新时间
+        updated_at = entry.get("updated_at")
+        if updated_at:
+            lines.append(f"更新时间: {updated_at}")
+
+        # 实时模型显示额外信息
+        if model_type == MODEL_REALTIME and isinstance(kd, RealtimeKeyDef):
+            period_labels = {"minute": "分钟", "hour": "小时", "day": "天"}
+            period_label = period_labels.get(kd.regen_period, kd.regen_period)
+            lines.append(f"回复周期: 每{period_label}")
+            lines.append(f"每次回复: {kd.regen_value}")
+            if kd.cap is not None:
+                lines.append(f"上限: {kd.cap}")
+
+        # 日常模型显示周期和上限
+        if model_type == MODEL_DAILY and isinstance(kd, DailyKeyDef):
+            period_labels = {
+                "week": "每周", "month": "每月", "season": "每赛季",
+                "half_season": "每半赛季", "day": "每日",
+            }
+            period_label = period_labels.get(kd.period, kd.period)
+            if kd.cap is not None:
+                lines.append(f"{period_label}上限: {kd.cap}")
+
+        # 活动模型显示总数
+        if model_type == MODEL_ACTIVITY:
+            total = entry.get("total")
+            if total is not None:
+                lines.append(f"总计: {total}")
+
+        return "\n".join(lines) if len(lines) > 1 else ""
+
     def _on_columns_reordered(self, group_name: str, table: QTableWidget):
         """拖拽列头后持久化新顺序"""
         if self._reordering or self._loading:
@@ -394,10 +442,14 @@ class ProfileOverviewTab(QWidget):
                     self._restoring_widths = True
                     other_header.resizeSection(0, name_col_width)
                     self._restoring_widths = False
-                    # 同步更新持久化的列宽
+                    # 同步更新持久化的列宽，如果没有记录则创建
                     other_widths = all_widths.get(other_group)
-                    if other_widths and len(other_widths) == other_header.count():
-                        other_widths[0] = name_col_width
+                    col_count = other_header.count()
+                    if not other_widths or len(other_widths) != col_count:
+                        # 创建默认列宽记录
+                        other_widths = [other_header.sectionSize(i) for i in range(col_count)]
+                        all_widths[other_group] = other_widths
+                    other_widths[0] = name_col_width
 
         _save_column_widths(all_widths)
 
@@ -429,13 +481,24 @@ class ProfileOverviewTab(QWidget):
         logical_index = h_header.logicalIndexAt(pos)
         menu = QMenu(self)
 
-        menu.addAction("右侧新增列", lambda: self._add_column(group_name, logical_index))
-        menu.addAction("删除当前列", lambda: self._remove_column(group_name, logical_index))
+        # 第 0 列是角色名，不支持新增/删除
+        if logical_index == 0:
+            menu.addAction("角色名列（不可删除）")
+            menu.setEnabled(False)
+        else:
+            # 数据列索引需要减 1（跳过角色名列）
+            data_index = logical_index - 1
+            menu.addAction("右侧新增列", lambda: self._add_column(group_name, data_index))
+            menu.addAction("删除当前列", lambda: self._remove_column(group_name, data_index))
 
         menu.exec(h_header.mapToGlobal(pos))
 
     def _on_header_double_clicked(self, logical_index: int, group_name: str):
         """表头双击：选择字段"""
+        # 第 0 列是角色名，不可编辑
+        if logical_index == 0:
+            return
+
         from ..config import get_profile_config
         config = get_profile_config()
         all_keys = config.get_all_keys()
@@ -444,9 +507,11 @@ class ProfileOverviewTab(QWidget):
             QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
 
+        # 数据列索引需要减 1（跳过角色名列）
+        data_index = logical_index - 1
         groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
-        current_key = column_keys[logical_index] if logical_index < len(column_keys) else ""
+        current_key = column_keys[data_index] if data_index < len(column_keys) else ""
 
         from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
@@ -482,7 +547,7 @@ class ProfileOverviewTab(QWidget):
         if dialog.exec():
             selected_key = combo.currentData()
             if selected_key:
-                self._set_column_field(group_name, logical_index, selected_key)
+                self._set_column_field(group_name, data_index, selected_key)
 
     def _add_column(self, group_name: str, after_index: int):
         """在指定分组的指定列后新增一列"""

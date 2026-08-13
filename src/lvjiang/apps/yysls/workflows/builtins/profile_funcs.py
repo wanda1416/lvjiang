@@ -18,8 +18,9 @@ def _get_username(_engine) -> str:
 def _profile_get(_engine, key: str, *args) -> float | None:
     """读取 profile 属性值（自动识别模型类型）
 
-    根据 key 在 profile.yaml 中的定义，自动确定所属模型（quota/regen/stock），
-    从 ProfileDB 读取当前值。key 不存在返回 None。
+    走共享读取管线 profile_ops.profile_read()，与 UI 读取路径一致：
+    自动识别模型类型 → 读 entry → regen 实时计算。
+    key 不存在返回 None。
 
     .wf 用法:
         eval $value = profile_get("niaoniao_of_week")
@@ -31,37 +32,18 @@ def _profile_get(_engine, key: str, *args) -> float | None:
         logger.warning("profile_get: key 为空")
         return None
 
-    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
-    from ...config.user_profile import get_profile_config
-    from ...profile.profile_db import db_read_entry
-    from ...profile.regen_math import compute_regen_entry
-
+    from ...profile.profile_ops import profile_read
     username = _get_username(_engine)
-    config = get_profile_config()
-
-    # 自动识别模型类型
-    model_type = config.get_model_type(key)
-    if model_type is None:
-        logger.warning(f"profile_get: key '{key}' 未在 profile.yaml 中定义")
-        return None
-
-    entry = db_read_entry(username, model_type, key)
-    if not entry:
-        logger.debug(f"profile_get: {key} 无数据")
-        return None
-
-    kd = config.get_key(key)
-    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-        return compute_regen_entry(entry, kd).value
-    return entry.get("value")
+    return profile_read(username, key)
 
 
 @builtin_func("profile_set")
 def _profile_set(_engine, key: str, value, *args) -> float:
     """写入 profile 属性值（自动识别模型类型）
 
-    将指定 key 的值设为 value，自动记录变更历史（change_type="action"）。
-    key 不存在时记录警告并返回 0。
+    走共享写入管线 profile_action()，与 UI 增减完全一致：
+    clamp → delta → detail → db_upsert → sync_targets。
+    source 固定为 "DSL 写入"。
 
     .wf 用法:
         eval profile_set("niaoniao_of_week", 10)
@@ -71,45 +53,24 @@ def _profile_set(_engine, key: str, value, *args) -> float:
         logger.warning("profile_set: key 为空")
         return 0
 
-    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
-    from ...config.user_profile import get_profile_config
-    from ...profile.profile_db import db_upsert
-    from ...profile.regen_math import is_realtime_regen, normalize_realtime_write
-
-    username = _get_username(_engine)
-    config = get_profile_config()
-
-    model_type = config.get_model_type(key)
-    if model_type is None:
-        logger.warning(f"profile_set: key '{key}' 未在 profile.yaml 中定义")
-        return 0
-
     try:
         value_num = float(value)
     except (TypeError, ValueError):
         logger.warning(f"profile_set: value 无法转为数字: {value!r}")
         return 0
 
-    kd = config.get_key(key)
-    updated_at = None
-    write_value = value_num
-    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and is_realtime_regen(kd):
-        write_value, updated_at = normalize_realtime_write(kd, value_num)
-
-    db_upsert(username, model_type, key, write_value,
-              updated_at=updated_at,
-              change_type="action", source="dsl")
-    logger.debug(f"profile_set: {key} = {value_num} ({model_type})")
-    return value_num
+    from ...profile.profile_ops import profile_action
+    username = _get_username(_engine)
+    return profile_action(username, key, set_value=value_num, source="DSL 写入")
 
 
 @builtin_func("profile_inc")
 def _profile_inc(_engine, key: str, delta=1, *args) -> float:
     """增减 profile 属性值（自动识别模型类型）
 
-    在当前值基础上增加 delta（负数表示减少）。
-    key 不存在或无当前值时，视为从 0 开始增减。
-    返回增减后的新值。
+    走共享写入管线 profile_action()，与 UI 增减完全一致：
+    clamp → delta → detail → db_upsert → sync_targets。
+    source 固定为 "DSL 写入"。
 
     .wf 用法:
         # 完成任务，配额 -1
@@ -123,48 +84,15 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
         logger.warning("profile_inc: key 为空")
         return 0
 
-    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
-    from ...config.user_profile import get_profile_config
-    from ...profile.profile_db import db_read_entry, db_upsert
-    from ...profile.regen_math import (
-        compute_regen_entry,
-        is_realtime_regen,
-        normalize_realtime_write,
-    )
-
-    username = _get_username(_engine)
-    config = get_profile_config()
-
-    model_type = config.get_model_type(key)
-    if model_type is None:
-        logger.warning(f"profile_inc: key '{key}' 未在 profile.yaml 中定义")
-        return 0
-
     try:
         delta_num = float(delta)
     except (TypeError, ValueError):
         logger.warning(f"profile_inc: delta 无法转为数字: {delta!r}")
         return 0
 
-    # 读取当前值
-    entry = db_read_entry(username, model_type, key)
-    kd = config.get_key(key)
-    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and entry:
-        current = compute_regen_entry(entry, kd).value
-    else:
-        current = entry.get("value", 0) if entry else 0
-
-    new_value = current + delta_num
-    updated_at = None
-    write_value = new_value
-    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and is_realtime_regen(kd):
-        write_value, updated_at = normalize_realtime_write(kd, new_value)
-    db_upsert(username, model_type, key, write_value,
-              updated_at=updated_at,
-              change_type="action", source="dsl",
-              detail=f"inc {delta_num}")
-    logger.debug(f"profile_inc: {key} {current} + {delta_num} = {new_value} ({model_type})")
-    return new_value
+    from ...profile.profile_ops import profile_action
+    username = _get_username(_engine)
+    return profile_action(username, key, delta=delta_num, source="DSL 写入")
 
 
 @builtin_func("profile_model")
@@ -191,26 +119,16 @@ def _profile_model(_engine, key: str, *args) -> str:
 def _profile_all(_engine, *args) -> dict:
     """获取当前用户的全部 profile 数据
 
+    走共享读取管线 profile_ops.profile_read_all()，与 UI 读取路径一致：
+    读全部 entry → regen 条目按当前时间计算。
+
     返回 {model_type: {key: {value, updated_at}}} 结构的字典。
-    regen 条目的 value 会按当前时间计算，与 profile_get 保持一致。
 
     .wf 用法:
         eval $all = profile_all()
         eval $quota = $all.quota
         collect $all as "profile"
     """
-    from ...config.profile_models import MODEL_REGEN, RegenKeyDef
-    from ...config.user_profile import get_profile_config
-    from ...profile.profile_db import db_read_all
-    from ...profile.regen_math import compute_regen_entry
-
+    from ...profile.profile_ops import profile_read_all
     username = _get_username(_engine)
-    data = db_read_all(username)
-    config = get_profile_config()
-    for kd in config.get_keys_by_model(MODEL_REGEN):
-        if not isinstance(kd, RegenKeyDef):
-            continue
-        entry = data.get(MODEL_REGEN, {}).get(kd.key)
-        if entry:
-            entry["value"] = compute_regen_entry(entry, kd).value
-    return data
+    return profile_read_all(username)

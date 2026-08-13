@@ -1,5 +1,11 @@
 key: bag_wallet_detail
 name: 钱袋
+regions:
+- key: back
+  name: 返回
+  type: func
+  is_text: false
+  is_clickable: true
 panels:
 - key: money_1
   name: 区域货币
@@ -11,6 +17,6 @@ panels:
 - key: money_2
   name: 其他货币
   cols: 6
-  rows: 4
+  rows: 3
   min_visible: 0.8
   calibration: even

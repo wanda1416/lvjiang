@@ -7,9 +7,9 @@ from lvjiang.apps.yysls.ui.profile.cell_formatting import (
     format_cell_tooltip,
     format_profile_cell,
 )
-from lvjiang.apps.yysls.ui.profile.overview import (
-    _compute_continuous_regen_value,
-    _normalize_continuous_regen_write,
+from lvjiang.apps.yysls.profile.regen_math import (
+    compute_realtime_value,
+    normalize_realtime_write,
 )
 
 
@@ -23,7 +23,7 @@ def test_continuous_regen_fraction_is_stored_as_time_progress():
     )
 
     before = datetime.now()
-    stored_value, updated_at = _normalize_continuous_regen_write(kd, 120.111)
+    stored_value, updated_at = normalize_realtime_write(kd, 120.111)
     after = datetime.now()
 
     assert stored_value == 120
@@ -46,7 +46,7 @@ def test_continuous_regen_current_value_uses_second_level_progress():
         "updated_at": (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds"),
     }
 
-    current = _compute_continuous_regen_value(entry, kd)
+    current = compute_realtime_value(entry["value"], entry["updated_at"], kd)
 
     assert 100.49 <= current <= 100.51
 

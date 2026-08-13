@@ -14,13 +14,7 @@ from typing import Callable
 
 from loguru import logger
 
-from ..config.profile_models import (
-    DIR_NEG,
-    DIR_POS,
-    MODEL_REGEN,
-    KeyDef,
-    parse_sync_key,
-)
+from ..config.profile_models import DIR_NEG, DIR_POS, KeyDef, parse_sync_key
 from ..config.user_profile import get_profile_config
 
 # write_fn 签名：(user_name, model_type, key, delta, change_type, detail, source)
@@ -89,7 +83,7 @@ def fire_sync_targets(
             continue
 
         # 倍率计算；取整后为 0 跳过无意义写入
-        scaled_delta = _apply_ratio(delta, target.ratio, target_model)
+        scaled_delta = _apply_ratio(delta, target.ratio, target_model, target_kd)
         if scaled_delta == 0:
             continue
 
@@ -125,9 +119,9 @@ def fire_sync_targets(
 
 
 def _apply_ratio(
-    delta: int | float, ratio: float, target_model: str,
+    delta: int | float, ratio: float, target_model: str, target_kd: KeyDef | None = None,
 ) -> int | float:
-    """按目标模型类型决定返回类型：int 模型 round()，float 模型直接乘"""
-    if target_model == MODEL_REGEN:
+    """按目标字段配置决定返回类型：decimal 保留小数，其余 round。"""
+    if getattr(target_kd, "decimal", False):
         return delta * ratio
     return round(delta * ratio)

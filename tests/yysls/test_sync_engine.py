@@ -70,14 +70,41 @@ class TestApplyRatio:
         assert _apply_ratio(100, 0.33, MODEL_QUOTA) == 33
         assert _apply_ratio(100, -1.0, MODEL_STOCK) == -100
 
-    def test_regen_model_float(self):
+    def test_regen_model_rounds_without_decimal(self):
         result = _apply_ratio(100, 0.5, MODEL_REGEN)
-        assert result == 50.0
+        assert result == 50
+        assert isinstance(result, int)
+
+    def test_decimal_regen_keeps_float(self):
+        result = _apply_ratio(
+            100,
+            0.25,
+            MODEL_REGEN,
+            RegenKeyDef(
+                key="xinli",
+                label="心力",
+                decimal=True,
+                regen_type="realtime",
+                regen_rate_value=0.125,
+                regen_rate_unit="minute",
+            ),
+        )
+        assert result == 25.0
+        assert isinstance(result, float)
+
+    def test_decimal_stock_keeps_float(self):
+        result = _apply_ratio(
+            10,
+            0.25,
+            MODEL_STOCK,
+            StockKeyDef(key="tongbao", label="通宝", decimal=True),
+        )
+        assert result == 2.5
         assert isinstance(result, float)
 
     def test_ratio_zero(self):
         assert _apply_ratio(100, 0.0, MODEL_STOCK) == 0
-        assert _apply_ratio(100, 0.0, MODEL_REGEN) == 0.0
+        assert _apply_ratio(100, 0.0, MODEL_REGEN) == 0
 
 
 # ─── fire_sync_targets ───────────────────────────────────

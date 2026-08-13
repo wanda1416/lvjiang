@@ -171,6 +171,7 @@ class KeyDef:
     cap: 上限值，None 表示无上限。
     soft: True 表示软上限（仅提醒），False 表示硬上限（强制截断）。
     show_cap: 是否在总览中展示上限（value/cap），默认否。
+    decimal: 是否支持小数输入，默认否。UI 层据此选择 IntValidator 或 DoubleValidator。
     sources: 来源词表，增加操作时供下拉选择。
     uses: 用途词表，减少操作时供下拉选择。
     sync_targets: 触发器同步目标列表，任意模型类型的 action 动作都会触发；
@@ -183,6 +184,7 @@ class KeyDef:
     cap: int | None = None
     soft: bool = False
     show_cap: bool = False
+    decimal: bool = False
     sources: list[str] = field(default_factory=list)
     uses: list[str] = field(default_factory=list)
     sync_targets: list[SyncTargetDef] = field(default_factory=list)
@@ -196,6 +198,7 @@ class KeyDef:
             cap=data.get("cap"),
             soft=data.get("soft", False),
             show_cap=data.get("show_cap", False),
+            decimal=data.get("decimal", False),
             sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
             uses=[str(s).strip() for s in data.get("uses", []) if str(s).strip()],
             sync_targets=parse_sync_targets(data.get("sync_targets", [])),
@@ -255,6 +258,7 @@ class QuotaKeyDef(KeyDef):
             cap=base.cap,
             soft=base.soft,
             show_cap=base.show_cap,
+            decimal=base.decimal,
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
@@ -301,6 +305,7 @@ class RegenKeyDef(KeyDef):
             cap=base.cap,
             soft=base.soft,
             show_cap=base.show_cap,
+            decimal=base.decimal,
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
@@ -338,6 +343,7 @@ class StockKeyDef(KeyDef):
             cap=base.cap,
             soft=base.soft,
             show_cap=base.show_cap,
+            decimal=base.decimal,
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,

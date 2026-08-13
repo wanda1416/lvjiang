@@ -5,6 +5,7 @@ exposed:
 - daily_jianghu
 - daily_checkin
 - auto_tuning
+- scan_wallet
 overrides:
   equip_analysis:
     name: 当前装备分析
@@ -18,3 +19,5 @@ overrides:
     name: 每日自动签到
   auto_tuning:
     scope: dedicated
+  scan_wallet:
+    name: 扫描钱袋货币

@@ -4,6 +4,7 @@
 #%     label: 单任务最大刷新次数
 #%     type: number
 #%     default: 50
+#%     min: 1
 #%   - name: claim_reward
 #%     label: 领取奖励
 #%     type: bool

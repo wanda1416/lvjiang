@@ -502,6 +502,8 @@ class ProfileDefinitionDialog(QDialog):
                     parts.append(f"重置日:{kd.reset_day}号")
             if kd.show_cap:
                 parts.append("展示上限")
+            if kd.decimal:
+                parts.append("支持小数")
             if kd.increment_only:
                 parts.append("单向增加")
             if kd.steps:
@@ -528,6 +530,8 @@ class ProfileDefinitionDialog(QDialog):
                 parts.append(f"重置:{kd.reset_time}")
             if kd.show_cap:
                 parts.append("展示上限")
+            if kd.decimal:
+                parts.append("支持小数")
             if kd.steps:
                 parts.append(f"幅度:{_format_steps(kd.steps)}")
             sync_summary = _format_sync_summary(kd)
@@ -543,6 +547,8 @@ class ProfileDefinitionDialog(QDialog):
             parts = []
             if kd.show_cap:
                 parts.append("展示上限")
+            if kd.decimal:
+                parts.append("支持小数")
             if kd.steps:
                 parts.append(f"幅度:{_format_steps(kd.steps)}")
             sync_summary = _format_sync_summary(kd)
@@ -637,6 +643,7 @@ class ProfileDefinitionDialog(QDialog):
         existing_cap = existing.cap if existing else None
         existing_soft = existing.soft if existing else False
         existing_show_cap = existing.show_cap if existing else False
+        existing_decimal = existing.decimal if existing else False
 
         cap_spin = QSpinBox()
         cap_spin.setRange(0, 999999)
@@ -656,8 +663,18 @@ class ProfileDefinitionDialog(QDialog):
 
         show_cap_check = QCheckBox("展示上限")
         show_cap_check.setChecked(existing_show_cap)
-        layout.addRow(show_cap_check)
+
+        decimal_check = QCheckBox("支持小数")
+        decimal_check.setChecked(existing_decimal)
+        decimal_check.setToolTip("开启后允许输入小数，UI 使用 DoubleValidator")
+
+        cap_opts_row = QHBoxLayout()
+        cap_opts_row.addWidget(show_cap_check)
+        cap_opts_row.addWidget(decimal_check)
+        cap_opts_row.addStretch()
+        layout.addRow(cap_opts_row)
         widgets["show_cap"] = show_cap_check
+        widgets["decimal"] = decimal_check
 
         # 来源/用途词表（三种模型通用）：来源对应增加，用途对应减少
         sources_input = QLineEdit(",".join(existing.sources) if existing else "")
@@ -912,6 +929,7 @@ class ProfileDefinitionDialog(QDialog):
             cap_final = cap_val if cap_val > 0 else None
             soft_final = widgets["soft"].isChecked()
             show_cap_final = widgets["show_cap"].isChecked()
+            decimal_final = widgets["decimal"].isChecked()
 
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
@@ -929,6 +947,7 @@ class ProfileDefinitionDialog(QDialog):
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
+                    decimal=decimal_final,
                     steps=steps_list,
                     reset_time=widgets["reset_time"].text().strip() or "05:00",
                     reset_day=widgets["reset_day"].value(),
@@ -950,6 +969,7 @@ class ProfileDefinitionDialog(QDialog):
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
+                    decimal=decimal_final,
                     regen_type=widgets["regen_type"].currentData(),
                     regen_rate_value=widgets["regen_rate_value"].value(),
                     regen_rate_unit=widgets["regen_rate_unit"].currentData(),
@@ -975,6 +995,7 @@ class ProfileDefinitionDialog(QDialog):
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
+                    decimal=decimal_final,
                     steps=steps_list,
                 )
             else:

@@ -4,6 +4,7 @@
 #%     label: 执行局数
 #%     type: number
 #%     default: 10
+#%     min: 1
 
 # 盟主争锋自动化流程
 #

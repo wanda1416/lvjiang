@@ -15,7 +15,6 @@ ProfileOverviewTab: 宽表展示所有角色的概要信息，交互式列头配
 from __future__ import annotations
 
 import math
-from datetime import datetime
 
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
@@ -59,12 +58,10 @@ from ...config.user_profile import (
     get_profile_config,
     save_profile_config,
 )
-from ...profile.profile_db import db_read_all, db_update_if_current, db_upsert
+from ...profile.profile_db import db_read_all
 from ...profile.regen_math import (
-    compute_realtime_value,
     compute_regen_entry,
     is_realtime_regen,
-    normalize_realtime_write,
 )
 from .cell_formatting import (
     apply_cell_style,
@@ -109,17 +106,7 @@ def _is_continuous_regen(kd) -> bool:
     return isinstance(kd, RegenKeyDef) and is_realtime_regen(kd)
 
 
-def _normalize_continuous_regen_write(kd: RegenKeyDef, raw_value: float) -> tuple[float, str]:
-    return normalize_realtime_write(kd, max(0.0, float(raw_value)))
-
-
-def _compute_continuous_regen_value(entry: dict, kd: RegenKeyDef) -> float:
-    return compute_realtime_value(entry.get("value", 0) or 0, entry.get("updated_at", ""), kd)
-
-
 def _current_regen_value(entry: dict, kd: RegenKeyDef) -> float:
-    if _is_continuous_regen(kd):
-        return _compute_continuous_regen_value(entry, kd)
     return compute_regen_entry(entry, kd).value
 
 
@@ -920,29 +907,6 @@ class ProfileOverviewTab(QWidget):
 
     # ─── 数据写入与增减 ──────────────────────────────────────
 
-    def _write_profile_entry(
-        self,
-        user_name: str,
-        model_type: str,
-        key: str,
-        value,
-        change_type: str = "override",
-        detail: str = "",
-        source: str = "",
-        updated_at: str | None = None,
-    ):
-        """将值写入 profile DB（带变更历史记录）"""
-        try:
-            db_upsert(
-                user_name, model_type, key, value,
-                updated_at=updated_at,
-                change_type=change_type, detail=detail, source=source,
-            )
-            logger.debug(f"已回写 {user_name}.profile.{model_type}.{key} = {value}")
-        except Exception as e:
-            logger.error(f"回写失败: {e}")
-            QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
-
     def _adjust_value(
         self,
         user_name: str,
@@ -958,196 +922,45 @@ class ProfileOverviewTab(QWidget):
         regen_progress_source: str = "current",
         force_write: bool = False,
     ):
-        """增减数值并写回
+        """增减数值并写回。
 
-        is_action: True 表示通过 steps 按钮触发（会触发 sync_targets 同步），
-                     False 表示手动编辑（不触发同步）。
-        source: 变更来源描述，随 history 一并记录。
+        UI 只负责收集上下文、处理提示和刷新；写入语义统一委托 profile_ops.profile_action。
         """
-        new_value = current_value + delta
-
-        # 下限：0
-        new_value = max(0, new_value)
-
-        # 上限：硬上限才 clamp，软上限仅提醒
-        if model_type == MODEL_QUOTA:
-            cap = getattr(kd, "cap", None)
-            soft = getattr(kd, "soft", False)
-            if cap is not None and not soft:
-                new_value = min(new_value, cap)
-
-        if model_type == MODEL_REGEN:
-            cap = getattr(kd, "cap", None)
-            if cap is not None:
-                new_value = min(new_value, cap)
-            if abs(new_value - int(new_value)) < 1e-9:
-                new_value = float(int(new_value))
-
-        if model_type == MODEL_STOCK:
-            cap = getattr(kd, "cap", None)
-            soft = getattr(kd, "soft", False)
-            if cap is not None and not soft:
-                new_value = min(new_value, cap)
-
-        # clamp 后值未变 → 不产生任何写入
-        if new_value == current_value and not force_write:
+        from ...profile.profile_ops import ProfileWriteConflict, profile_action
+        try:
+            profile_action(
+                user_name, key,
+                model_type=model_type,
+                delta=delta,
+                source=source,
+                current_value=current_value,
+                expected_entry=expected_entry,
+                is_action=is_action,
+                use_cas=use_cas,
+                regen_progress_source=regen_progress_source,
+                force_write=force_write,
+            )
+        except ProfileWriteConflict:
+            logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
+            QMessageBox.warning(
+                self, "写入冲突",
+                "该数值已被其他进程更新，本次增减未写入。请刷新后重试。",
+            )
+            current_group = self._get_current_group_name()
+            table = self._tables.get(current_group)
+            if table:
+                self._refresh_group(current_group, table)
             return
-
-        # 计算 clamp 后的真实 delta（与 DB 实际写入的变化量一致），
-        # 用于 sync_targets 触发器同步，避免同步量超过实际变化量导致数据漂移。
-        actual_delta = new_value - current_value
-
-        # 确定 detail 信息（action 记录 clamp 后的实际增量，而非请求量）
-        if is_action:
-            detail = f"delta:{actual_delta:+g}"
-        else:
-            detail = f"override:{new_value}"
-
-        # 分钟/小时级 regen 特殊处理：小数只作为恢复进度语法，入库值保持整数。
-        custom_updated_at = None
-        if model_type == MODEL_REGEN and _is_continuous_regen(kd):
-            progress_value = new_value if regen_progress_source == "target" else current_value
-            stored_value, custom_updated_at = _normalize_continuous_regen_write(
-                kd, progress_value
-            )
-            new_value = float(math.floor(new_value))
-            if getattr(kd, "cap", None) is not None and new_value >= kd.cap:
-                new_value = float(kd.cap)
-                custom_updated_at = datetime.now().isoformat(timespec="seconds")
-            else:
-                new_value = stored_value if regen_progress_source == "target" else new_value
-
-        if model_type == MODEL_REGEN and is_action and use_cas and expected_entry is not None:
-            try:
-                updated = db_update_if_current(
-                    user_name, model_type, key,
-                    expected_value=expected_entry.get("value", 0) or 0,
-                    expected_updated_at=expected_entry.get("updated_at", ""),
-                    new_value=new_value,
-                    new_updated_at=custom_updated_at,
-                    change_type="action",
-                    detail=detail,
-                    source=source,
-                )
-            except Exception as e:
-                logger.error(f"CAS 回写失败: {e}")
-                QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
-                return
-            if not updated:
-                logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
-                QMessageBox.warning(
-                    self, "写入冲突",
-                    "该数值已被其他进程更新，本次增减未写入。请刷新后重试。",
-                )
-                current_group = self._get_current_group_name()
-                table = self._tables.get(current_group)
-                if table:
-                    self._refresh_group(current_group, table)
-                return
-            logger.debug(f"已 CAS 回写 {user_name}.profile.{model_type}.{key} = {new_value}")
-        else:
-            self._write_profile_entry(
-                user_name, model_type, key, new_value,
-                change_type="action" if is_action else "override",
-                detail=detail,
-                source=source,
-                updated_at=custom_updated_at,
-            )
-
-        # 触发器同步（仅 action 动作触发）
-        if is_action and kd.sync_targets:
-            from ...profile.sync_engine import fire_sync_targets
-            fire_sync_targets(
-                write_fn=self._sync_write_adapter,
-                user_name=user_name,
-                source_kd=kd,
-                delta=actual_delta,
-                source=source,
-            )
+        except Exception as e:
+            logger.error(f"回写失败: {e}")
+            QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
+            return
 
         # 刷新表格
         current_group = self._get_current_group_name()
         table = self._tables.get(current_group)
         if table:
             self._refresh_group(current_group, table)
-
-    def _sync_write_adapter(
-        self,
-        user_name: str,
-        model_type: str,
-        key: str,
-        *,
-        delta: int | float,
-        change_type: str = "action",
-        detail: str = "",
-        source: str = "",
-    ) -> tuple[int | float, int | float] | None:
-        """同步引擎的写入适配器：读取当前值 → 加 delta → clamp → 写入
-
-        返回 (new_value, applied_delta)；写入失败返回 None，
-        引擎据此中止该目标的下游递归。供 fire_sync_targets 注入使用，
-        不刷新表格（由调用方统一刷新）。
-        """
-        from ...config import get_profile_config
-        config = get_profile_config()
-        kd = config.get_key(key, model_type=model_type)
-
-        # 读取当前值
-        profile_data = db_read_all(user_name)
-        entry = profile_data.get(model_type, {}).get(key, {})
-        current_value = entry.get("value", 0) or 0
-        if model_type == MODEL_REGEN and kd and isinstance(kd, RegenKeyDef):
-            current_value = _current_regen_value(entry, kd)
-
-        new_value = current_value + delta
-
-        # 下限：0
-        new_value = max(0, new_value)
-
-        # 上限：按模型类型 clamp
-        if kd:
-            if model_type == MODEL_QUOTA:
-                cap = getattr(kd, "cap", None)
-                soft = getattr(kd, "soft", False)
-                if cap is not None and not soft:
-                    new_value = min(new_value, cap)
-            elif model_type == MODEL_REGEN:
-                cap = getattr(kd, "cap", None)
-                if cap is not None:
-                    new_value = min(new_value, cap)
-                if abs(new_value - int(new_value)) < 1e-9:
-                    new_value = float(int(new_value))
-            elif model_type == MODEL_STOCK:
-                cap = getattr(kd, "cap", None)
-                soft = getattr(kd, "soft", False)
-                if cap is not None and not soft:
-                    new_value = min(new_value, cap)
-
-        # clamp 后值未变 → 不产生写入
-        if new_value == current_value:
-            return current_value, 0
-
-        custom_updated_at = None
-        if model_type == MODEL_REGEN and kd and _is_continuous_regen(kd):
-            progress_value = current_value
-            new_value = float(math.floor(new_value))
-            _, custom_updated_at = _normalize_continuous_regen_write(kd, progress_value)
-            if getattr(kd, "cap", None) is not None and new_value >= kd.cap:
-                new_value = float(kd.cap)
-                custom_updated_at = datetime.now().isoformat(timespec="seconds")
-
-        try:
-            db_upsert(
-                user_name, model_type, key, new_value,
-                updated_at=custom_updated_at,
-                change_type=change_type, detail=detail, source=source,
-            )
-        except Exception as e:
-            logger.error(f"同步写入失败: {e}")
-            QMessageBox.warning(self, "同步写入失败", f"同步目标 {model_type}.{key} 回写失败:\n{e}")
-            return None
-
-        return new_value, new_value - current_value
 
     def _register_new_source(self, kd: KeyDef, source: str, vocab: list[str]) -> None:
         """新词条自动追加到对应词表（来源/用途）并持久化到 profile.yaml
@@ -1198,7 +1011,7 @@ class ProfileOverviewTab(QWidget):
             vocab = kd.sources + [u for u in kd.uses if u not in kd.sources]
             vocab_label = "来源"
 
-        if model_type == MODEL_REGEN:
+        if kd.decimal:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
             is_float = True
         else:
@@ -1260,7 +1073,7 @@ class ProfileOverviewTab(QWidget):
         默认勾选「同步变更依赖方」→ 走 action 路径（触发 sync_targets 同步）。
         取消勾选 → 纯覆写语义（仅写本 key，不触发任何同步）。
         """
-        if model_type == MODEL_REGEN:
+        if kd.decimal:
             current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
             is_float = True
         else:
@@ -1463,6 +1276,14 @@ class ProfileOverviewTab(QWidget):
 
 def _parse_value(raw: str, model_type: str, kd: KeyDef):
     """解析用户输入值，返回解析后的值或 _PARSE_ERROR"""
+    # decimal 类型的 key 统一走 float 解析
+    if kd.decimal:
+        try:
+            return float(raw) if raw else 0.0
+        except ValueError:
+            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
+            return _PARSE_ERROR
+
     if model_type == MODEL_QUOTA:
         # quota 可以是 int 或 bool（如 shop_of_week）
         if isinstance(kd, QuotaKeyDef) and kd.cap is not None:
@@ -1484,9 +1305,9 @@ def _parse_value(raw: str, model_type: str, kd: KeyDef):
 
     if model_type == MODEL_REGEN:
         try:
-            return float(raw) if raw else 0.0
+            return int(raw) if raw else 0
         except ValueError:
-            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
+            QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
             return _PARSE_ERROR
 
     if model_type == MODEL_STOCK:

@@ -18,6 +18,7 @@ single_tuning，single_tuning 保持不动。
 positional 位置对齐三向校验），_traverse_bag 按配置调度，默认 dedup。
 """
 
+import random
 import re
 from dataclasses import replace
 
@@ -493,10 +494,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.output.setdefault("tuning_reports", []).append(report)
             return self._make_fingerprint(equip_data.to_dict()), False
 
-        # 结束处理支撑：词条快照（重置后恢复）+ 本件重置计数
+        # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
         tune_cfg = get_tuning_base().behavior.tune
         base_affixes = list(equip_data.affixes)
-        base_count = affix_count
         resets_used = 0
         tune_recycle_reason = ""
 
@@ -561,9 +561,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 if self._try_reset_tune(tune_cfg, resets_used, why):
                     resets_used += 1
                     report["resets"] = resets_used
-                    equip_data.affixes = list(base_affixes)
-                    equip_data.extra_data["affix_count"] = len(base_affixes)
-                    affix_count = base_count
+                    # 重置清空首词条以外全部词条 → 只剩首词条
+                    equip_data.affixes = base_affixes[:1]
+                    equip_data.extra_data["affix_count"] = 1
+                    affix_count = 1
                     if self._doc:
                         self._doc.note(
                             f"重置调律（第 {resets_used} 次）：{why}")
@@ -777,10 +778,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _try_reset_tune(self, cfg, resets_used: int, why: str) -> bool:
         """在调律页执行一次重置调律（点按钮 + 确认 + 二次确认）
 
-        次数门槛：本地计数达配置上限即止；按钮文本剩余次数另作
-        硬门（读不到数字 = 用尽，不重置）。成功后词条已重置，
-        调律页保持打开。
+        重置清空首词条以外的全部词条；重置后有冷却期不可连重
+        （暂不做冷却判断）→ 本件硬限只重置一次。次数门槛：
+        本地计数达配置上限即止；按钮文本剩余次数另作硬门
+        （读不到数字 = 用尽，不重置）。成功后调律页保持打开。
         """
+        if resets_used >= 1:
+            # 重置后进入冷却期，本次工作内不可再重置该件
+            logger.info("  本件已重置过一次，冷却期内不再重置")
+            return False
         if resets_used >= cfg.max_resets:
             logger.info(f"  重置次数已达上限（{cfg.max_resets}），不再重置")
             return False
@@ -792,7 +798,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.click_region(self.TUNE_SCENE, "reset_tune")
         self.wait_delay("page_refresh_wait")  # 重置确认弹窗
         self.click_region(self.TUNE_SCENE, "reset_confirm")
-        self.wait_delay("page_refresh_wait")  # 二次确认弹窗
+        # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
+        self.wait_seconds(random.uniform(6.0, 7.0))
         self.click_region(self.TUNE_SCENE, "reset_confirm_2")
         self.wait_delay("page_refresh_wait")  # 词条重置，调律页刷新
         return True

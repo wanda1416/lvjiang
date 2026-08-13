@@ -74,7 +74,7 @@ class TestSaveRoundtrip:
         })
         assert result["ok"] is True
 
-        saved = json.loads(session_path.read_text(encoding="utf-8"))["tuning"]
+        saved = json.loads(session_path.read_text(encoding="utf-8"))["yysls"]["tuning"]
         assert saved["selected_slots"] == ["ring", "head"]
         assert saved["rules"]["huiyi_general"]["enabled"] is True
         assert saved["switches"] == {"keep_pvp": True}
@@ -97,7 +97,7 @@ class TestSaveRoundtrip:
     def test_skip_tuning_preserved(self, session_path):
         # skip_tuning 不进设备端 UI，保存不得覆盖已有值
         session_path.write_text(json.dumps({
-            "tuning": {"skip_tuning": True},
+            "yysls": {"tuning": {"skip_tuning": True}},
         }), encoding="utf-8")
         ps_module._session = PluginSession(session_path)  # 重新加载文件内容
 
@@ -106,5 +106,5 @@ class TestSaveRoundtrip:
             "rules": {"huiyi_general": {"enabled": True}},
         })
         assert result["ok"] is True
-        saved = json.loads(session_path.read_text(encoding="utf-8"))["tuning"]
+        saved = json.loads(session_path.read_text(encoding="utf-8"))["yysls"]["tuning"]
         assert saved["skip_tuning"] is True

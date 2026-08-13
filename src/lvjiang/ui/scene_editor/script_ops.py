@@ -1,6 +1,7 @@
 """脚本测试混入类 - DSL 脚本测试器"""
 
 from loguru import logger
+from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
 
 from ...core.config.resolver import get_resolver
@@ -95,6 +96,38 @@ class ScriptOpsMixin:
 
     # ─── 脚本执行 ────────────────────────────────────────
 
+    def showEvent(self, event: QShowEvent):
+        """对话框首次显示时填充用户下拉列表"""
+        super().showEvent(event)
+        main_win = self.parent()
+        if main_win is not None and hasattr(main_win, '_user_manager'):
+            self._refresh_script_user_combo(main_win)
+
+    def _refresh_script_user_combo(self, main_win):
+        """刷新脚本测试用户下拉列表
+
+        默认选中主页面当前用户；如果用户已手动选择其他用户，保持其选择。
+        不改变主页面的 active user。
+        """
+        if not hasattr(self, '_script_user_combo'):
+            return
+        users = main_win._user_manager.list_users()
+        active = main_win._user_manager.get_active_user_name()
+        current = self._script_user_combo.currentText()
+
+        self._script_user_combo.blockSignals(True)
+        self._script_user_combo.clear()
+        self._script_user_combo.addItems(users)
+
+        # 优先保持用户已选项；否则默认主页面 active user
+        if current and current in users:
+            idx = self._script_user_combo.findText(current)
+        else:
+            idx = self._script_user_combo.findText(active)
+        if idx >= 0:
+            self._script_user_combo.setCurrentIndex(idx)
+        self._script_user_combo.blockSignals(False)
+
     def _on_script_test(self):
         """执行脚本测试器中的 DSL 脚本，结果输出到左侧 _result_text"""
         script = self._script_text.toPlainText().strip()
@@ -127,6 +160,9 @@ class ScriptOpsMixin:
         self._result_text.clear()
         self._status_bar.showMessage("脚本测试运行中...")
 
+        # 刷新用户下拉列表（每次运行前刷新，确保包含最新用户）
+        self._refresh_script_user_combo(main_win)
+
         try:
             # 构建 WorkflowEngine
             from ...workflows.engine import WorkflowEngine
@@ -152,8 +188,13 @@ class ScriptOpsMixin:
                 stop_check=lambda: False,
             )
             # session/context 装配（与主入口一致）
-            username = main_win._user_manager.get_active_user_name()
+            # 使用下拉列表选中的用户，而非主页面的 active user
+            username = self._script_user_combo.currentText()
+            if not username:
+                # 回退：如果下拉列表为空，使用主页面用户
+                username = main_win._user_manager.get_active_user_name()
             engine.session = main_win._session_manager.load(username)
+            engine.run_username = username
             # context 由 execute() 自动初始化为空 dict
 
             # 写入临时 .wf 文件（按模式落可写层）

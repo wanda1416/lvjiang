@@ -27,7 +27,7 @@
 ```
 scan scene_name as $var                    # 扫描场景所有 Region
 scan scene_name.[a1, a2, ...] as $var      # 仅扫描指定 Area
-scan scene_name.$var as $result            # 动态 Area（变量指定单个 Area 名）
+scan scene_name.$area_key as $var            # 动态 Area（变量指定单个 Area 名）
 
 # 带 by 子句（短路识别，返回字段名）
 scan scene_name.[a1, a2, ...] as $var by equals "文本"
@@ -157,7 +157,7 @@ scan [scene].[field_1, field_2, field_3] as $found by contains_any $keywords
 ```
 recognize scene_name as $var                   # 识别场景所有 slot
 recognize scene_name.[a1, a2] as $var          # 仅识别指定 Area
-recognize scene_name.$var as $result           # 动态 Area
+recognize scene_name.$area_key as $var           # 动态 Area
 
 # 带 by 子句（短路识别）
 recognize scene_name.[a1, a2] as $var by equals "文本"

@@ -270,6 +270,11 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._btn_run_script = QPushButton("运行脚本")
         self._btn_run_script.clicked.connect(self._on_script_test)
         script_btn_row.addWidget(self._btn_run_script)
+        # 当前用户下拉列表（仅影响脚本测试执行，不切换主页面用户）
+        script_btn_row.addWidget(QLabel("当前用户:"))
+        self._script_user_combo = QComboBox()
+        self._script_user_combo.setToolTip("脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。")
+        script_btn_row.addWidget(self._script_user_combo)
         self._btn_load_script = QPushButton("加载文件")
         self._btn_load_script.clicked.connect(self._on_load_script_file)
         script_btn_row.addWidget(self._btn_load_script)

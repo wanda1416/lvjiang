@@ -1,0 +1,198 @@
+# DSL 基础函数
+
+基础运算、字典/列表操作、字符串处理等通用函数。
+
+> 总览与速查表见 [06-functions.md](06-functions.md)。
+
+## 目录
+
+- [一、基础运算](#一基础运算)
+  - [算术运算符（推荐）](#算术运算符推荐)
+  - [运算函数](#运算函数)
+- [二、字典/列表操作](#二字典列表操作)
+- [三、字符串处理](#三字符串处理)
+- [四、类型不匹配时的行为](#四类型不匹配时的行为)
+
+---
+
+## 一、基础运算
+
+### 算术运算符（推荐）
+
+eval 赋值右侧支持 `+` `-` `*` `/` 四则运算符，优先级 `*` `/` > `+` `-`，支持 `()` 改变优先级：
+
+```
+eval $x = $a + $b                   # 加法
+eval $x = $a - 1                    # 减法
+eval $x = $a * $b / 2              # 乘除混合
+eval $x = ($a + $b) * ($c - 1)     # 括号改变优先级
+```
+
+- 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
+- if 条件比较的两侧也支持算术表达式（见 [05-control-flow.md](05-control-flow.md)）
+
+### 运算函数
+
+运算函数统一 number（float）语义：参数宽容转 float，返回 float，类型不匹配时返回 0。适用于需要取模/最值/绝对值或函数式风格的场景：
+
+```
+eval $counter = add($counter, 1)          # 自增
+eval $remain = sub($total, $used)         # 相减
+eval $double = mul($val, 2)              # 翻倍
+eval $half = div($total, 2)              # 浮点除
+eval $r = mod($index, 3)                 # 取模（判断是否行首等）
+eval $clamped = min($val, 100)           # 限制上限
+eval $lowest = min($a, $b, $c)           # 多参最小值
+eval $at_least = max($val, 1)            # 限制下限
+eval $diff = sub($a, $b)
+eval $abs_diff = abs($diff)              # 绝对值（需先计算差值）
+```
+
+> **运算符 vs 函数**：`$a + $b` 和 `add($a, $b)` 完全等价，均为 number（float）语义。简单四则运算推荐用运算符，需要取模/最值/绝对值时用函数。DSL 层暂无取整函数，需要向下取整时可用 `sub($x, mod($x, 1))` 组合实现。
+
+---
+
+## 二、字典/列表操作
+
+```
+# 统计字典 key 数
+eval $n = len($config)
+
+# 遍历字典所有 key
+for k in keys($scores)
+    log concat(k, ": ", $scores.$k)
+end
+
+# 检查 key 存在
+eval $exists = has_key($data, "target")
+
+# 删除 key
+eval del_key($data, "obsolete")
+
+# 列表切片
+eval $part = slice($items, 0, 4)
+```
+
+> **与 count_nonempty 的区别**：`len($dict)` 返回**全部** key 数（含空值字段），`count_nonempty($dict)` 统计**非空**字段。两者共存，不替换。
+
+### range — 生成整数列表
+
+生成闭区间整数列表，常用于 `for` 循环迭代。
+
+```
+eval $list = range(1, 100)     # [1, 2, ..., 100]
+for i in range(1, 5)           # 迭代 1, 2, 3, 4, 5
+    ...
+end
+```
+
+- `range(end)` → `[1, 2, ..., end]`
+- `range(start, end)` → `[start, start+1, ..., end]`
+
+### count_nonempty — 统计非空项数量
+
+根据输入类型不同：
+- **dict**：统计非空字段数量（值为空或空白字符串的字段不计）
+- **list**：统计元素数量
+- **其他**：返回 0
+
+```
+eval $n = count_nonempty($result)
+eval $n = count_nonempty($list)
+```
+
+### contains — 文本包含检查
+
+检查字典中是否有任意 string 类型的 value 包含指定文本。
+
+```
+if contains($scan, "调律")
+    log "找到调律相关字段"
+end
+```
+
+### find_key — 按键查找
+
+在字典的 values 中查找包含目标文本的项，返回其 key 名。找不到返回空字符串 `""`，配合 `if` 判断使用。
+
+```
+scan [scene].[f1, f2, f3] as $scan
+eval $key = find_key($scan, "调律")
+if $key
+    click [scene].$key
+end
+```
+
+### append — 追加元素
+
+向列表追加元素，或向字典写入键值对。返回空字符串（副作用操作）。
+
+```
+eval append($candidates, $equip_data)           # 列表追加
+eval append($fingerprints, $slot, $fp)          # 字典写入
+```
+
+---
+
+## 三、字符串处理
+
+```
+# 字符串拼接
+log concat("当前数据: ", $dict.key)
+eval $msg = concat("结果: ", $var, " 完成")
+
+# 子串
+eval $name = substr($full_name, 0, 2)
+
+# 拆分 + 遍历
+for part in split($csv_line, ",")
+    log part
+end
+
+# 替换
+eval $clean = replace($raw, " ", "_")
+
+# 正则匹配
+eval $is_num = match($input, "^\d+$")
+
+# 大小写
+eval $tag = upper($category)
+
+# 字符串转数字
+eval $price = to_num($price_str)
+```
+
+### concat — 字符串拼接
+
+将多个参数依次拼接为字符串，非字符串参数自动转 `str()`。
+
+**替代语法**：可使用 `+` 运算符拼接字符串，当任一操作数为非数值字符串时自动走拼接：
+
+```
+eval $msg = "hello" + " world"          # "hello world"
+eval $msg = $name + "!"                  # 变量 + 字面量
+eval $msg = "count: " + $n               # 数字自动转字符串
+```
+
+> **注意**：数值字符串（如 `"1.0"`）走算术加法而非拼接。如需强制拼接，使用 `concat()`。
+
+**注意事项**：
+
+- DSL 字符串字面量**不做转义处理**，`"\d"` 就是两个字符 `\` 和 `d`，可直接用于正则。
+- `substr` 使用**闭区间** `[start, end]`，与 `slice` / `range` 一致。
+- `match` 使用 `re.search`（部分匹配），不是 `re.match`（全匹配）。
+- 非字符串参数会先 `str()` 转换，`null` 转为空字符串。
+
+---
+
+## 四、类型不匹配时的行为
+
+字典/列表与字符串函数对类型不匹配采用宽容策略：
+
+| 输入 | len | keys | has_key | substr | split |
+|---|---|---|---|---|---|
+| `dict` | key 数 | key 列表 | 正常 | str() 后截取 | str() 后拆分 |
+| `list` | 元素数 | `[]` | `False` | str() 后截取 | str() 后拆分 |
+| `str` | 字符数 | `[]` | `False` | 正常 | 正常 |
+| `int/float` | `0` | `[]` | `False` | str() 后截取 | str() 后拆分 |
+| `null` | `0` | `[]` | `False` | `""` | `[""]` |

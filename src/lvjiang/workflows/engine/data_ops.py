@@ -380,7 +380,7 @@ class _DataOpsMixin:
         logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
         # 1. 先在调用方作用域中解析参数值
         resolved_args = []
-        for i, param_name in enumerate(proc_def.params):
+        for i in range(len(proc_def.params)):
             if i < len(node.args):
                 resolved_args.append(self._resolve(node.args[i]))
             # 未传参数保持未定义状态（访问时返回 null）

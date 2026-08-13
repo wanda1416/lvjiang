@@ -1,0 +1,129 @@
+#% name: 扫描钱袋货币
+#% parameters:
+#%   - name: tol_tongbao
+#%     label: 通宝允许差值(万)
+#%     type: number
+#%     default: 0
+#%   - name: tol_bugan
+#%     label: 么玉允许差值
+#%     type: number
+#%     default: 0
+#%   - name: tol_baoqian
+#%     label: 宝钱允许差值(万)
+#%     type: number
+#%     default: 0
+#%   - name: tol_changmingyu
+#%     label: 长鸣玉允许差值
+#%     type: number
+#%     default: 0
+
+# 扫描钱袋货币工作流
+#
+# 流程结构：
+#   1. 从主页进入菜单 → 包裹 → 装备页 → 钱袋
+#   2. 扫描区域货币面板（money_1, 1×4），累计求和后写入 profile 通宝(万)
+#   3. 扫描其他货币面板（money_2, 3×6），遍历查找么玉、宝钱、长鸣玉并写入 profile
+#   4. 返回主界面
+#
+# 参数：
+#   tol_tongbao    — 通宝写入容差（万为单位），0 表示不限制
+#   tol_bugan      — 么玉写入容差（个），0 表示不限制
+#   tol_baoqian    — 宝钱写入容差（万为单位），0 表示不限制
+#   tol_changmingyu — 长鸣玉写入容差（个），0 表示不限制
+#   容差 >0 时，新值与旧值差的绝对值超过容差则视为识别异常，跳过写入
+#
+# Profile 写入：
+#   tongbao  — 区域货币总和 / 10000（万为单位）
+#   bugan    — 么玉数量（个）
+#   baoqian  — 宝钱数量 / 10000（万为单位）
+#   changmingyu — 长鸣玉数量（个）
+
+default $tol_tongbao = 0
+default $tol_bugan = 0
+default $tol_baoqian = 0
+default $tol_changmingyu = 0
+
+import "subcall/navigation.wf"
+
+# ─── 导航到钱袋页面 ──────────────────────────────────────
+# 主页 → 菜单
+click [game_main_page].[menu] after wait @page_refresh
+# 菜单 → 包裹
+click [game_menu_page].[baoguo] after wait @page_refresh
+
+# 确保在装备页（包裹可能默认打开道具页）
+scan [bag_equip_detail].[sub_equip] as $check
+if not $check.sub_equip contains "装备"
+    click [bag_equip_detail].[peiyang] after wait @page_refresh
+end
+
+# 装备页 → 钱袋
+click [bag_equip_detail].[qiandai] after wait @page_refresh
+
+# ─── 扫描区域货币（money_1, 1×4） ────────────────────────
+# 四种可能：宋元通宝、月华通宝、周元通宝、墨筹
+# recognize as rich 返回 {行: {列: {label, count, confidence, ...}}}
+recognize [bag_wallet_detail].[money_1] as rich $money1 on group "货币资产" with yysls_rich_parse
+
+eval $tongbao_total = 0
+for c in range(1, 4)
+    eval $cell = $money1."1".$c
+    eval $label = $cell.label
+    eval $count = $cell.count
+    if $label
+        eval $tongbao_total = $tongbao_total + $count
+        log concat("区域货币: ", $label, " = ", $count)
+    end
+end
+
+# 累计除以 10000 写入通宝(万)
+eval $tongbao_wan = $tongbao_total / 10000
+call safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)")
+
+# ─── 扫描其他货币（money_2, 3×6） ────────────────────────
+# 遍历 18 个格子，查找么玉、宝钱、长鸣玉
+recognize [bag_wallet_detail].[money_2] as rich $money2 on group "货币资产" with yysls_rich_parse
+
+for r in range(1, 3)
+    for c in range(1, 6)
+        eval $cell = $money2.$r.$c
+        eval $label = $cell.label
+        eval $count = $cell.count
+        if $label
+            if $label equals "么玉"
+                call safe_set("bugan", $count, $tol_bugan, "么玉")
+            end
+            if $label equals "宝钱"
+                eval $baoqian_wan = $count / 10000
+                call safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)")
+            end
+            if $label equals "长鸣玉"
+                call safe_set("changmingyu", $count, $tol_changmingyu, "长鸣玉")
+            end
+        end
+    end
+end
+
+log "钱袋货币扫描完成"
+
+# ─── 返回主界面 ──────────────────────────────────────────
+# 钱袋 → 菜单页
+click [bag_equip_detail].[back] after wait @step_interval
+# 菜单页 → 主界面
+click [game_menu_page].[back] after wait @page_refresh
+
+# ─── 容差写入子过程 ────────────────────────────────────
+# 校验新值与旧值差值是否在容差范围内，通过则写入，否则跳过
+def safe_set($key, $new_val, $tolerance, $label)
+    eval $old = profile_get($key)
+    if $tolerance > 0 and $old
+        eval $delta = $new_val - $old
+        eval $diff = abs($delta)
+        if $diff > $tolerance
+            log concat($label, " 差值 ", $diff, " 超过容差 ", $tolerance, "，跳过写入")
+            return
+        end
+    end
+    eval profile_set($key, $new_val)
+    log concat($label, ": ", $new_val)
+end

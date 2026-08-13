@@ -325,6 +325,15 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                 hours = remaining.seconds // 3600
                 lines.append(f"距重置: {days}天 {hours}小时")
 
+    # 精确值显示（decimal 类型且值含小数部分）
+    if kd.decimal:
+        if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+            exact = compute_regen_entry(entry, kd).value
+        else:
+            exact = entry.get("value", 0) or 0
+        if abs(exact - int(exact)) > 1e-9:
+            lines.append(f"精确值: {exact:.4f}".rstrip("0").rstrip("."))
+
     # 同步目标（所有模型通用）
     if kd.sync_targets:
         lines.append("同步到:")

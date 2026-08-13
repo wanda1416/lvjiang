@@ -28,8 +28,12 @@ def profile_func_env(tmp_path, monkeypatch):
                         "regen_type": "realtime",
                         "regen_rate_value": 0.125,
                         "regen_rate_unit": "minute",
+                        "sync_targets": [{"key": "stock:target_stock"}],
                     }
-                ]
+                ],
+                "stock": [
+                    {"key": "target_stock", "label": "同步目标"},
+                ],
             },
             allow_unicode=True,
         ),
@@ -79,3 +83,27 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     assert entry["value"] == 80
     assert datetime.now() - timedelta(minutes=4, seconds=1) <= stored_ts
     assert stored_ts <= datetime.now() - timedelta(minutes=3, seconds=59)
+
+
+def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func_env):
+    from lvjiang.apps.yysls.profile.profile_db import db_read_entry, db_upsert
+    from lvjiang.apps.yysls.profile.profile_ops import sync_write_adapter
+
+    updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
+    db_upsert(profile_func_env.username, "regen", "xinli", 100, updated_at=updated_at)
+    db_upsert(profile_func_env.username, "stock", "target_stock", 1000)
+
+    result = sync_write_adapter(
+        profile_func_env.username,
+        "regen",
+        "xinli",
+        delta=-20,
+        source="test",
+    )
+    target = db_read_entry(profile_func_env.username, "stock", "target_stock")
+
+    assert result is not None
+    new_value, applied_delta = result
+    assert new_value == pytest.approx(80.5, abs=0.02)
+    assert applied_delta == pytest.approx(-20, abs=0.02)
+    assert target["value"] == 1000

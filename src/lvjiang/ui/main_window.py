@@ -1021,7 +1021,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             if param_type == "number":
                 spin = QSpinBox()
                 spin.setObjectName(name)
-                spin.setRange(param_def.get("min", 1), param_def.get("max", 9999))
+                spin.setRange(param_def.get("min", 0), param_def.get("max", 999999))
                 spin.setValue(int(default) if default is not None else 1)
                 self._param_layout.addRow(label + ":", spin)
             elif param_type == "bool":

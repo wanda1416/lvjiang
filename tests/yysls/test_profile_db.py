@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -37,6 +38,7 @@ class TestCRUD:
         entry = db.get_entry("user1", "quota", "k1")
         assert entry["value"] == 42
         assert entry["updated_at"] != ""
+        assert entry["updated_time"] != ""
 
     def test_get_nonexistent_returns_empty(self, db: ProfileDB):
         assert db.get_entry("nobody", "quota", "k1") == {}
@@ -48,6 +50,7 @@ class TestCRUD:
 
         all_data = db.get_all("user1")
         assert all_data["quota"]["k1"]["value"] == 10
+        assert all_data["quota"]["k1"]["updated_time"] != ""
         assert all_data["quota"]["k2"]["value"] == 20
         assert all_data["regen"]["tili"]["value"] == 2500
 
@@ -63,6 +66,8 @@ class TestCRUD:
         db.upsert("user1", "quota", "k1", 10, updated_at="2026-01-01T00:00:00")
         entry = db.get_entry("user1", "quota", "k1")
         assert entry["updated_at"] == "2026-01-01T00:00:00"
+        assert entry["updated_time"] != "2026-01-01T00:00:00"
+        assert entry["updated_time"] != ""
 
     def test_upsert_many(self, db: ProfileDB):
         entries = [
@@ -98,6 +103,8 @@ class TestCRUD:
         entry = db.get_entry("user1", "regen", "xinli")
         assert entry["value"] == 101
         assert entry["updated_at"] == "2026-08-11T10:08:00"
+        assert entry["updated_time"] != "2026-08-11T10:08:00"
+        assert entry["updated_time"] != ""
         history = db.get_history("user1")
         assert len(history) == 1
         assert history[0]["old_value"] == 100
@@ -173,6 +180,19 @@ class TestSchemaMigration:
         assert "profile_history" in tables
         assert "schema_version" in tables
 
+    def test_entries_has_updated_time_column(self, db: ProfileDB):
+        """v3: profile_entries 增加实际落库时间 updated_time"""
+        conn = db._connect()
+        try:
+            cols = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
+            }
+        finally:
+            conn.close()
+
+        assert "updated_time" in cols
+
     def test_schema_version_is_current(self, db: ProfileDB):
         """迁移完成后版本号等于 CURRENT_VERSION"""
         conn = db._connect()
@@ -211,6 +231,92 @@ class TestSchemaMigration:
         db2 = ProfileDB(db_path)
         db2.upsert("u", "quota", "k", 10, change_type="action", detail="+10", source="打本")
         assert db2.get_history("u")[0]["source"] == "打本"
+
+    def test_migrate_v3_adds_updated_time_to_legacy_entries(self, tmp_path: Path):
+        """v2 旧库升级到 v3 时补 updated_time，且不覆盖业务 updated_at。"""
+        db_path = tmp_path / "legacy_v2.db"
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.executescript("""
+                CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+                INSERT INTO schema_version(version) VALUES (2);
+                CREATE TABLE profile_entries (
+                    username   TEXT NOT NULL,
+                    type       TEXT NOT NULL,
+                    key        TEXT NOT NULL,
+                    value      REAL NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (username, type, key)
+                );
+                CREATE TABLE profile_history (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts          TEXT    NOT NULL,
+                    username    TEXT    NOT NULL,
+                    type        TEXT    NOT NULL,
+                    key         TEXT    NOT NULL,
+                    old_value   REAL,
+                    new_value   REAL    NOT NULL,
+                    change_type TEXT    NOT NULL,
+                    detail      TEXT    DEFAULT '',
+                    source      TEXT    DEFAULT ''
+                );
+                INSERT INTO profile_entries
+                    (username, type, key, value, updated_at)
+                VALUES
+                    ('u', 'regen', 'xinli', 100, '2026-08-12T10:00:00');
+            """)
+            conn.commit()
+        finally:
+            conn.close()
+
+        db = ProfileDB(db_path)
+        entry = db.get_entry("u", "regen", "xinli")
+
+        assert entry["updated_at"] == "2026-08-12T10:00:00"
+        assert entry["updated_time"] != ""
+
+    def test_migrate_v3_idempotent_when_column_exists_but_version_old(self, tmp_path: Path):
+        """模拟并发迁移后半程：列已存在但版本号仍旧，不应 duplicate column。"""
+        db_path = tmp_path / "half_migrated_v3.db"
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.executescript("""
+                CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+                INSERT INTO schema_version(version) VALUES (2);
+                CREATE TABLE profile_entries (
+                    username   TEXT NOT NULL,
+                    type       TEXT NOT NULL,
+                    key        TEXT NOT NULL,
+                    value      REAL NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT '',
+                    updated_time TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (username, type, key)
+                );
+                CREATE TABLE profile_history (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts          TEXT    NOT NULL,
+                    username    TEXT    NOT NULL,
+                    type        TEXT    NOT NULL,
+                    key         TEXT    NOT NULL,
+                    old_value   REAL,
+                    new_value   REAL    NOT NULL,
+                    change_type TEXT    NOT NULL,
+                    detail      TEXT    DEFAULT '',
+                    source      TEXT    DEFAULT ''
+                );
+                INSERT INTO profile_entries
+                    (username, type, key, value, updated_at, updated_time)
+                VALUES
+                    ('u', 'regen', 'xinli', 100, '2026-08-12T10:00:00', '');
+            """)
+            conn.commit()
+        finally:
+            conn.close()
+
+        db = ProfileDB(db_path)
+        entry = db.get_entry("u", "regen", "xinli")
+
+        assert entry["updated_time"] != ""
 
 
 # ─── 变更历史 ─────────────────────────────────────────────────

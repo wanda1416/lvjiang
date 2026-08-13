@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 
 from loguru import logger
 
-from ..constants import SCENES_CONFIG_PATH, SYSTEM_SCENES_DIR
+from .config_resolver import get_resolver
 from .scene_loader import (
     BASE_VIEW_KEY,
     PanelDef,
@@ -16,14 +16,9 @@ from .scene_loader import (
 
 
 def _load_scene_order() -> list[str] | None:
-    """从 scenes.yaml 读取场景加载顺序"""
-    if not SCENES_CONFIG_PATH.exists():
-        return None
+    """从 scenes.yaml（合并视图）读取场景加载顺序"""
     try:
-        import yaml
-        data = yaml.safe_load(SCENES_CONFIG_PATH.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return None
+        data = get_resolver().load_merged("scenes.yaml")
         layout_scenes = data.get("layout_scenes")
         if isinstance(layout_scenes, dict):
             # 从分组结构中提取场景顺序
@@ -38,14 +33,9 @@ def _load_scene_order() -> list[str] | None:
 
 
 def _load_group_config() -> tuple[dict[str, list[str]] | None, dict[str, str] | None]:
-    """从 scenes.yaml 读取分组配置，返回 (group_config, group_names)"""
-    if not SCENES_CONFIG_PATH.exists():
-        return None, None
+    """从 scenes.yaml（合并视图）读取分组配置，返回 (group_config, group_names)"""
     try:
-        import yaml
-        data = yaml.safe_load(SCENES_CONFIG_PATH.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return None, None
+        data = get_resolver().load_merged("scenes.yaml")
         layout_scenes = data.get("layout_scenes")
         # 新格式：dict of groups
         if isinstance(layout_scenes, dict):
@@ -64,7 +54,6 @@ def _load_group_config() -> tuple[dict[str, list[str]] | None, dict[str, str] | 
 _scene_order = _load_scene_order()
 _group_config, _group_names = _load_group_config()
 _registry = SceneRegistry(
-    SYSTEM_SCENES_DIR,
     scene_order=_scene_order,
     group_config=_group_config,
     group_names=_group_names,
@@ -133,12 +122,20 @@ def reload_scene_registry():
     scene_order = _load_scene_order()
     group_config, group_names = _load_group_config()
     _registry = SceneRegistry(
-        SYSTEM_SCENES_DIR,
         scene_order=scene_order,
         group_config=group_config,
         group_names=group_names,
     )
     _rebuild_scene_globals()
+
+
+def _on_config_change(rel_path: str):
+    """配置写入后的失效通知：场景相关文件变更时重载注册表"""
+    if rel_path == "scenes.yaml" or rel_path.startswith("scenes/"):
+        reload_scene_registry()
+
+
+get_resolver().add_change_listener(_on_config_change)
 
 
 def sync_group_cache():

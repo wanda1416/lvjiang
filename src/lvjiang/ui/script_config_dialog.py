@@ -4,13 +4,13 @@
 
 脚本本体（.wf 文件 + 内置类实现）由发现层 ``discover_scripts()`` 自动扫描，
 本对话框只负责「暴露」：勾选是否在日常下拉展示、调整顺序、覆盖显示名。
-保存后写回 ``config/system/workflows.yaml`` 的 ``exposed`` + ``overrides``。
+保存后经 resolver 聚合接口写回 ``workflows.yaml`` 的 ``exposed`` + ``overrides``
+（开发→system 全量，用户→local 键级 diff）。
 
 参数本身不在此编辑（来自 .wf front-matter 或内置类属性，由源头维护）。
 """
 from __future__ import annotations
 
-import yaml
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -26,22 +26,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.constants import SYSTEM_CONFIG_DIR
-
+from ..core.config_resolver import get_resolver
 from ..workflows.discovery import discover_scripts
-
-_YAML_HEADER = """\
-# 脚本暴露配置
-#
-# 脚本本体（.wf 文件 + 内置类实现）由发现层自动扫描（见 src/lvjiang/workflows/discovery.py）：
-#   - config/system/workflows/ 顶层 *.wf（跳过 _ 前缀与子目录），name/参数取自 #% front-matter
-#   - 已注册内置类实现，name/参数取自类属性 DISPLAY_NAME / PARAMETERS
-# 本文件只负责「暴露」：决定日常页下拉展示哪些脚本、顺序、以及可选的显示名覆盖。
-# 可在「工具 → 脚本配置」中可视化编辑本文件。
-#
-# 语义：exposed 缺失/为空 → 展示全部已发现脚本；否则仅展示且按其顺序。
-
-"""
 
 
 class ScriptConfigDialog(QDialog):
@@ -176,15 +162,9 @@ class ScriptConfigDialog(QDialog):
             self._table.setItem(b, col, item_a)
 
     # ─── 读写 workflows.yaml ─────────────────────────────
-    def _yaml_path(self):
-        return SYSTEM_CONFIG_DIR / "workflows.yaml"
-
     def _read_yaml(self) -> tuple[list, dict]:
-        path = self._yaml_path()
-        if not path.exists():
-            return [], {}
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            data = get_resolver().load_merged("workflows.yaml")
         except Exception as e:
             logger.error(f"读取脚本暴露配置失败: {e}")
             return [], {}
@@ -203,18 +183,9 @@ class ScriptConfigDialog(QDialog):
             if display and display != base:
                 overrides[sid] = {"name": display}
 
-        text = _YAML_HEADER
-        text += yaml.safe_dump({"exposed": exposed}, allow_unicode=True,
-                               default_flow_style=False, sort_keys=False)
-        text += "\n"
-        if overrides:
-            text += yaml.safe_dump({"overrides": overrides}, allow_unicode=True,
-                                   default_flow_style=False, sort_keys=False)
-        else:
-            text += "overrides: {}\n"
-
         try:
-            self._yaml_path().write_text(text, encoding="utf-8")
+            get_resolver().save_merged(
+                "workflows.yaml", {"exposed": exposed, "overrides": overrides})
         except OSError as e:
             QMessageBox.warning(self, "保存失败", f"写入 workflows.yaml 失败：{e}")
             return

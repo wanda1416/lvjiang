@@ -1,11 +1,14 @@
 """调律规则配置公共控件
 
 调律 Tab 与「装备调律验证」面板共用的调律规则配置 UI：
-顶部按开关注册表（tuning_base.yaml switches 段）动态渲染的全局
-开关复选框 + 每规则一个可勾选分组框（勾选标题 = 启用规则），
-组内按规则声明（playstyle_options）生成玩法复选框（名字 + 主副武器摘要）。
+- TuningGlobalsWidget：全局区（跳过实际调律 mock + 按开关注册表
+  tuning_base.yaml switches 段动态渲染的全局开关复选框）
+- TuningConfigWidget：每规则一个可勾选分组框（勾选标题 = 启用规则），
+  组内按规则声明（playstyle_options）生成玩法复选框（名字 + 主副武器摘要）；
+  show_globals=True（默认）时顶部内嵌全局区并委托其读写接口，
+  调律 Tab 传 False 将全局区独立放到「更多」页。
 
-配置结构与插件会话（config/local/yysls/session.json）tuning 节点一致：
+配置结构与插件会话（config/session/yysls/session.json）tuning 节点一致：
 - rules: {规则 key: {"enabled": bool, "playstyles": [名字]}}
   （playstyles 缺省 = 该规则声明的全部玩法）
 - switches: {开关 key: bool}，由 get_switches/set_switches 单独读写
@@ -22,20 +25,24 @@ from PyQt6.QtWidgets import (
 )
 
 
-class TuningConfigWidget(QWidget):
-    """调律规则配置控件（可多选）
+class TuningGlobalsWidget(QWidget):
+    """调律全局区控件（跳过实际调律 mock + 全部注册开关）
 
-    - 未勾选规则时玩法复选框整体隐藏（折叠为仅标题行）；
-    - 任意控件变更发出 config_changed 信号。
+    任意控件变更发出 config_changed 信号。
     """
 
     config_changed = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        from lvjiang.apps.yysls.evaluator import get_tuning_rules
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+
+        # ── 跳过实际调律（临时测试开关，仅模拟进出调律页）──
+        self._skip_tuning_cb = QCheckBox("跳过实际调律（仅进出调律页，测试滚动用）")
+        self._skip_tuning_cb.stateChanged.connect(
+            lambda _state: self.config_changed.emit())
+        layout.addWidget(self._skip_tuning_cb)
 
         # ── 全局开关（按 tuning_base.yaml 开关注册表动态渲染）──
         from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
@@ -47,11 +54,51 @@ class TuningConfigWidget(QWidget):
             layout.addWidget(cb)
             self._switch_cbs[switch_key] = cb
 
-        # ── 全局：跳过实际调律（临时测试开关，仅模拟进出调律页）──
-        self._skip_tuning_cb = QCheckBox("跳过实际调律（仅进出调律页，测试滚动用）")
-        self._skip_tuning_cb.stateChanged.connect(
-            lambda _state: self.config_changed.emit())
-        layout.addWidget(self._skip_tuning_cb)
+    def get_switches(self) -> dict[str, bool]:
+        """全局开关状态：{开关 key: 是否开启}"""
+        return {key: cb.isChecked() for key, cb in self._switch_cbs.items()}
+
+    def set_switches(self, switches: dict[str, bool]):
+        """回填全局开关（不触发 config_changed；未配置的开关视为关闭）"""
+        switches = switches or {}
+        for key, cb in self._switch_cbs.items():
+            cb.blockSignals(True)
+            cb.setChecked(bool(switches.get(key, False)))
+            cb.blockSignals(False)
+
+    def get_skip_tuning(self) -> bool:
+        """全局「跳过实际调律」开关（临时测试用）"""
+        return self._skip_tuning_cb.isChecked()
+
+    def set_skip_tuning(self, value: bool):
+        """回填全局跳过调律开关（不触发 config_changed）"""
+        self._skip_tuning_cb.blockSignals(True)
+        self._skip_tuning_cb.setChecked(bool(value))
+        self._skip_tuning_cb.blockSignals(False)
+
+
+class TuningConfigWidget(QWidget):
+    """调律规则配置控件（可多选）
+
+    - 未勾选规则时玩法复选框整体隐藏（折叠为仅标题行）；
+    - 任意控件变更发出 config_changed 信号。
+    """
+
+    config_changed = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None,
+                 show_globals: bool = True):
+        super().__init__(parent)
+        from lvjiang.apps.yysls.evaluator import get_tuning_rules
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # ── 全局区（可选内嵌；调律 Tab 独立放「更多」页时传 False）──
+        self._globals: TuningGlobalsWidget | None = None
+        if show_globals:
+            self._globals = TuningGlobalsWidget()
+            self._globals.config_changed.connect(self.config_changed)
+            layout.addWidget(self._globals)
 
         # 规则 key → 控件集：{"group": QGroupBox, "content": QWidget|None,
         #   "playstyles": {名字: QCheckBox}}
@@ -130,24 +177,22 @@ class TuningConfigWidget(QWidget):
                 cb.setChecked(selected is None or name in selected)
                 cb.blockSignals(False)
 
+    # ─── 全局区委托（show_globals=False 时为空实现）─────────
+
     def get_switches(self) -> dict[str, bool]:
         """全局开关状态：{开关 key: 是否开启}"""
-        return {key: cb.isChecked() for key, cb in self._switch_cbs.items()}
+        return self._globals.get_switches() if self._globals else {}
 
     def set_switches(self, switches: dict[str, bool]):
         """回填全局开关（不触发 config_changed；未配置的开关视为关闭）"""
-        switches = switches or {}
-        for key, cb in self._switch_cbs.items():
-            cb.blockSignals(True)
-            cb.setChecked(bool(switches.get(key, False)))
-            cb.blockSignals(False)
+        if self._globals:
+            self._globals.set_switches(switches)
 
     def get_skip_tuning(self) -> bool:
         """全局「跳过实际调律」开关（临时测试用）"""
-        return self._skip_tuning_cb.isChecked()
+        return self._globals.get_skip_tuning() if self._globals else False
 
     def set_skip_tuning(self, value: bool):
         """回填全局跳过调律开关（不触发 config_changed）"""
-        self._skip_tuning_cb.blockSignals(True)
-        self._skip_tuning_cb.setChecked(bool(value))
-        self._skip_tuning_cb.blockSignals(False)
+        if self._globals:
+            self._globals.set_skip_tuning(value)

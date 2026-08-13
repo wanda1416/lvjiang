@@ -134,11 +134,17 @@ class PositionalTraversal(BagTraversal):
                 break
             fps.append(fp)
             logger.info(f"  新行{logical_row} grid[{win_row}][1] {name} fp={fp}")
-            new_fp = wf._process_equipment(name, equip, detail_scene)
-            # 调律会给该行首列装备加词条 → 指纹变化；用调律后指纹覆盖。
-            # 背包中该件位置不变，后续滚动再 OCR 到它时即可匹配上。
-            if new_fp and new_fp != fp:
-                logger.info(f"  行{logical_row} 调律后指纹更新: {fp} → {new_fp}")
+            new_fp = wf._process_equipment(name, equip, detail_scene,
+                                           row=win_row)
+            # 调律会给该行首列装备加词条 → 指纹变化；用处理后指纹覆盖。
+            # 回收后由 _process_equipment 就地续处理补位，new_fp 为最终
+            # 占位者指纹；空串表示该格已空（背包尽头）。
+            if not new_fp:
+                fps.pop()
+                logger.info(f"  行{logical_row} 回收后已空 → 到底")
+                break
+            if new_fp != fp:
+                logger.info(f"  行{logical_row} 处理后指纹更新: {fp} → {new_fp}")
                 fps[-1] = new_fp
             # ── 第 2..cols 列：遍历本行剩余列 ──
             wf._process_row_cols(detail_scene, win_row, logical_row, cols)

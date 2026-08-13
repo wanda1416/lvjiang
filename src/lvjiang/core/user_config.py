@@ -6,11 +6,11 @@ from datetime import datetime
 
 from loguru import logger
 
-from ..constants import LOCAL_CONFIG_DIR
+from ..constants import SESSION_CONFIG_DIR, SESSION_PATH
 
 # ─── 路径常量 ────────────────────────────────────────────
 
-SESSION_FILE = LOCAL_CONFIG_DIR / "session.json"
+SESSION_FILE = SESSION_PATH
 
 
 # ─── 数据类 ──────────────────────────────────────────────
@@ -41,7 +41,7 @@ class UserConfigManager:
     """用户管理：增删查改 + 当前用户切换"""
 
     def __init__(self):
-        LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         self._users: dict[str, User] = {}
         self._active_user: str = ""
         self._load()
@@ -76,7 +76,7 @@ class UserConfigManager:
                 pass
         data["users"] = [u.to_dict() for u in self._users.values()]
         data["active_user"] = self._active_user
-        LOCAL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         SESSION_FILE.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",

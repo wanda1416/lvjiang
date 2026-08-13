@@ -23,13 +23,13 @@ class EquipStatusTab(EquipStatusPanel):
         """从当前用户的本地配置加载已装备数据并刷新面板"""
         import json
 
-        from lvjiang.constants import LOCAL_CONFIG_DIR
+        from lvjiang.constants import USERS_DIR
 
         user_name = self._host.active_user_name()
         if not user_name:
             self.refresh({})
             return
-        user_file = LOCAL_CONFIG_DIR / "users" / f"{user_name}.json"
+        user_file = USERS_DIR / f"{user_name}.json"
         if not user_file.exists():
             self.refresh({})
             return

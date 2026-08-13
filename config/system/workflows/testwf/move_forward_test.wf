@@ -1,5 +1,0 @@
-# 向前移动测试
-# 拖拽方向键前进，按住2秒，等待2秒，重复一次
-
-drag [game_main_page].[forward] 0.2 hold 2 after wait 2
-drag [game_main_page].[forward] 0.2 hold 2

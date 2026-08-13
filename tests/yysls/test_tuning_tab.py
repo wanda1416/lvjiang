@@ -2,13 +2,15 @@
 
 假 host（QObject 带宿主信号/API 桩）+ 隔离的插件 session（tmp_path），
 覆盖：会话加载/保存、部位全选反选、按钮三态、f9_run 启停分发、
-未选部位/未选规则的报错路径、成功启动时的 configure 回调注入。
+未选部位/未选规则的报错路径、成功启动时的 configure 回调注入、
+配置三页 Tab（规则 | 部位 | 更多）结构与「更多」页读写。
 """
 
 import json
 
 import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtWidgets import QTabWidget
 
 import lvjiang.apps.yysls.plugin_session as ps_module
 from lvjiang.apps.yysls.plugin_session import PluginSession
@@ -172,3 +174,36 @@ class TestF9Run:
         assert wf.run_ctx.judge_rule_keys
         assert wf.run_ctx.doc_username == "测试用户"
         assert any(m.startswith("[开始] 自动调律") for m in host.logs)
+
+
+# ─── 配置三页 Tab（规则 | 部位 | 更多）───────────────────
+
+class TestConfigTabs:
+    def test_three_pages(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tabs = tab.findChild(QTabWidget)
+        assert tabs is not None
+        assert [tabs.tabText(i) for i in range(tabs.count())] == [
+            "规则", "部位", "更多"]
+
+    def test_rules_page_has_no_globals(self, qtbot, host, session_path):
+        # 「规则」页公共控件不内嵌全局区（开关/跳过调律已移「更多」页）
+        tab = _make_tab(qtbot, host)
+        assert tab._tuning_config._globals is None
+
+    def test_more_page_loads_from_session(self, qtbot, host, session_path):
+        session_path.write_text(json.dumps({
+            "tuning": {"switches": {"keep_pvp": True}, "skip_tuning": True},
+        }), encoding="utf-8")
+        ps_module._session = PluginSession(session_path)
+
+        tab = _make_tab(qtbot, host)
+        assert tab._get_tuning_switches().get("keep_pvp") is True
+        assert tab._get_tuning_skip_tuning() is True
+
+    def test_more_page_change_persists(self, qtbot, host, session_path):
+        tab = _make_tab(qtbot, host)
+        tab._tuning_globals._skip_tuning_cb.setChecked(True)  # 变更即落盘
+
+        saved = json.loads(session_path.read_text(encoding="utf-8"))
+        assert saved["tuning"]["skip_tuning"] is True

@@ -1,4 +1,4 @@
-"""燕云插件会话配置 —— config/local/yysls/session.json
+"""燕云插件会话配置 —— config/session/yysls/session.json
 
 插件专属的运行期配置（如调律配置）独立于主流程 session.json 维护，
 按节（顶层 dict key）读写，写入即落盘。
@@ -10,9 +10,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from lvjiang.constants import LOCAL_CONFIG_DIR
+from lvjiang.constants import SESSION_CONFIG_DIR
 
-YYSLS_LOCAL_DIR = LOCAL_CONFIG_DIR / "yysls"
+YYSLS_LOCAL_DIR = SESSION_CONFIG_DIR / "yysls"
 YYSLS_SESSION_PATH = YYSLS_LOCAL_DIR / "session.json"
 
 

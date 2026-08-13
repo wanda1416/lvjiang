@@ -284,7 +284,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _open_ocr_dialog(self):
         from .ocr_dialog import OCRDialog
-        dialog = OCRDialog(self)
+        dialog = OCRDialog(self, refresh_callback=self._refresh_capture)
         dialog.exec()
 
     def _open_script_record(self):
@@ -324,7 +324,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _open_reference_manager(self):
         from .reference_manager import ReferenceManagerDialog
-        dialog = ReferenceManagerDialog(parent=self)
+        dialog = ReferenceManagerDialog(parent=self, screenshot_callback=self._refresh_capture)
         dialog.exec()
         if dialog.data_changed:
             from ..workflows.base import BaseWorkflow

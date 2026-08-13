@@ -33,11 +33,16 @@ from .ocr_canvas import OCRBox, OCRCanvas
 class OCRDialog(QDialog):
     """图像识别对话框：图像识别 + 清洗规则管理"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, refresh_callback=None):
+        """
+        Args:
+            parent: 父窗口
+            refresh_callback: 刷新截图回调，返回 (image, error_msg)
+        """
         super().__init__(parent)
         self.setWindowTitle("图像识别")
         self.setMinimumSize(1000, 700)
-        self._current_pixmap = None
+        self._refresh_callback = refresh_callback
         self._setup_ui()
 
     def _setup_ui(self):
@@ -64,20 +69,48 @@ class OCRDialog(QDialog):
         # 左右分割：左侧画布，右侧结果文本
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # 左侧：画布（支持缩放/平移 + OCR 标注）
-        self._canvas = OCRCanvas()
-        splitter.addWidget(self._canvas)
+        # ─── 左侧：画布区域 ───
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 右侧：识别结果文本
+        # 画布上方按钮栏
+        canvas_btn_row = QHBoxLayout()
+
+        self._btn_upload = QPushButton("上传图片")
+        self._btn_upload.clicked.connect(self._on_upload)
+        canvas_btn_row.addWidget(self._btn_upload)
+
+        self._btn_refresh = QPushButton("刷新截图")
+        self._btn_refresh.setToolTip("从设备获取最新截图")
+        self._btn_refresh.clicked.connect(self._on_refresh)
+        canvas_btn_row.addWidget(self._btn_refresh)
+
+        self._btn_clear_canvas = QPushButton("清空画布")
+        self._btn_clear_canvas.clicked.connect(self._on_clear)
+        canvas_btn_row.addWidget(self._btn_clear_canvas)
+
+        self._btn_clear_selection = QPushButton("清除选择")
+        self._btn_clear_selection.setToolTip("清除红色选框")
+        self._btn_clear_selection.clicked.connect(self._on_clear_selection)
+        canvas_btn_row.addWidget(self._btn_clear_selection)
+
+        canvas_btn_row.addStretch()
+        left_layout.addLayout(canvas_btn_row)
+
+        # 画布
+        self._canvas = OCRCanvas()
+        left_layout.addWidget(self._canvas)
+
+        splitter.addWidget(left_panel)
+
+        # ─── 右侧：识别结果文本 ───
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 按钮栏
+        # 识别按钮栏
         btn_row = QHBoxLayout()
-        self._btn_upload = QPushButton("上传图片")
-        self._btn_upload.clicked.connect(self._on_upload)
-        btn_row.addWidget(self._btn_upload)
 
         self._btn_ocr = QPushButton("识别文字 (F5)")
         self._btn_ocr.setEnabled(False)
@@ -89,9 +122,7 @@ class OCRDialog(QDialog):
         self._btn_material.clicked.connect(self._on_recognize_material)
         btn_row.addWidget(self._btn_material)
 
-        self._btn_clear = QPushButton("清空")
-        self._btn_clear.clicked.connect(self._on_clear)
-        btn_row.addWidget(self._btn_clear)
+        btn_row.addStretch()
         right_layout.addLayout(btn_row)
 
         # 识别结果
@@ -354,12 +385,15 @@ class OCRDialog(QDialog):
             self._status_label.setText("无法读取剪贴板图片")
             return
 
-        pixmap = QPixmap.fromImage(qimg)
-        self._set_pixmap(pixmap)
-        self._status_label.setText(
-            f"已粘贴图片 ({pixmap.width()}x{pixmap.height()})，点击「识别」或按 F5"
-        )
-        logger.info(f"OCR 测试：粘贴图片 {pixmap.width()}x{pixmap.height()}")
+        # QImage -> numpy BGR
+        bgr = self._qimage_to_bgr(qimg)
+        if bgr is not None:
+            self._canvas.set_image(bgr)
+            h, w = bgr.shape[:2]
+            self._btn_ocr.setEnabled(True)
+            self._btn_material.setEnabled(True)
+            self._status_label.setText(f"已粘贴图片 ({w}x{h})，点击「识别」或按 F5")
+            logger.info(f"OCR 测试：粘贴图片 {w}x{h}")
 
     def _on_upload(self):
         """从文件对话框加载图片"""
@@ -373,43 +407,114 @@ class OCRDialog(QDialog):
         if pixmap.isNull():
             self._status_label.setText(f"无法读取图片: {path}")
             return
-        self._set_pixmap(pixmap)
-        w, h = pixmap.width(), pixmap.height()
-        self._status_label.setText(f"已加载图片 ({w}x{h})，点击「识别」或按 F5")
-        logger.info(f"OCR 测试：上传图片 {w}x{h} <- {path}")
+        # QPixmap -> numpy BGR
+        bgr = self._qpixmap_to_bgr(pixmap)
+        if bgr is not None:
+            self._canvas.set_image(bgr)
+            h, w = bgr.shape[:2]
+            self._btn_ocr.setEnabled(True)
+            self._btn_material.setEnabled(True)
+            self._status_label.setText(f"已加载图片 ({w}x{h})，点击「识别」或按 F5")
+            logger.info(f"OCR 测试：上传图片 {w}x{h} <- {path}")
 
-    def _set_pixmap(self, pixmap: QPixmap):
-        """设置当前图片并刷新显示"""
-        self._current_pixmap = pixmap
-        self._canvas.set_pixmap(pixmap)
+    @staticmethod
+    def _qimage_to_bgr(qimg: QImage) -> np.ndarray | None:
+        """QImage -> BGR numpy 数组"""
+        qimg = qimg.convertToFormat(QImage.Format.Format_RGB888)
+        w, h = qimg.width(), qimg.height()
+        bpl = qimg.bytesPerLine()
+        buf = qimg.constBits()
+        buf.setsize(qimg.sizeInBytes())
+        arr = np.frombuffer(buf, dtype=np.uint8).reshape(h, bpl)
+        rgb = arr[:, :w * 3].reshape(h, w, 3)
+        return rgb[:, :, ::-1].copy()
+
+    @staticmethod
+    def _qpixmap_to_bgr(pixmap: QPixmap) -> np.ndarray | None:
+        """QPixmap -> BGR numpy 数组"""
+        return OCRDialog._qimage_to_bgr(pixmap.toImage())
+
+    def _on_refresh(self):
+        """从设备获取最新截图"""
+        if self._refresh_callback is None:
+            self._status_label.setText("刷新截图不可用：未连接设备或未传入回调")
+            return
+
+        self._status_label.setText("正在刷新截图...")
+        QApplication.processEvents()
+
+        try:
+            result = self._refresh_callback()
+        except Exception as e:
+            logger.error(f"刷新截图回调异常: {e}")
+            self._status_label.setText(f"刷新截图失败: {e}")
+            return
+
+        new_image, error_msg = result if isinstance(result, tuple) else (result, None)
+        if new_image is None:
+            self._status_label.setText(error_msg or "刷新截图失败")
+            return
+
+        # 直接使用 numpy 数组设置画布
+        self._canvas.set_image(new_image)
+        h, w = new_image.shape[:2]
         self._btn_ocr.setEnabled(True)
         self._btn_material.setEnabled(True)
+        self._status_label.setText(f"已刷新截图 ({w}x{h})")
+        logger.info(f"OCR 测试：刷新截图 {w}x{h}")
+
+    def _get_recognition_image(self) -> tuple[np.ndarray | None, str | None]:
+        """获取识别用图，考虑选框裁剪
+        返回: (bgr_image, error_msg)
+        """
+        bgr = self._canvas.get_image()
+        if bgr is None:
+            return None, "无图片"
+
+        # 检查是否有选框
+        sel = self._canvas.get_selection_pixels()
+        if sel is not None:
+            x1, y1, x2, y2 = sel
+            # 裁剪选框区域
+            crop = bgr[y1:y2, x1:x2].copy()
+            if crop.size == 0:
+                return None, "选框区域为空"
+            return crop, None
+
+        return bgr, None
 
     def _on_recognize(self):
         """执行 OCR 文字识别（输出已由引擎层清洗）"""
-        if self._current_pixmap is None:
+        image, error_msg = self._get_recognition_image()
+        if image is None:
+            self._status_label.setText(error_msg or "获取图像失败")
             return
 
         self._status_label.setText("正在识别文字...")
         QApplication.processEvents()
 
-        bgr = self._pixmap_to_bgr(self._current_pixmap)
-
         try:
             from lvjiang.core.ocr import OCREngine
             engine = OCREngine()
-            results = engine.recognize(bgr)
+            results = engine.recognize(image)
 
             self._result_text.clear()
             if not results:
                 self._result_text.append("未识别到文字")
                 self._canvas.set_ocr_boxes([])
             else:
-                # 构建画布标注
+                # 构建画布标注（如果有选框，需要加上偏移）
+                sel = self._canvas.get_selection_pixels()
+                offset_x, offset_y = (sel[0], sel[1]) if sel else (0, 0)
+
                 boxes = []
                 for i, r in enumerate(results, 1):
+                    # 如果有选框，将坐标偏移回去
+                    bbox = r.bbox
+                    if sel is not None:
+                        bbox = [[x + offset_x, y + offset_y] for x, y in bbox]
                     boxes.append(OCRBox(
-                        text=r.text, confidence=r.confidence, bbox=r.bbox
+                        text=r.text, confidence=r.confidence, bbox=bbox
                     ))
                     self._result_text.append(
                         f"[{i}] {r.text}  (置信度: {r.confidence:.3f})"
@@ -428,13 +533,13 @@ class OCRDialog(QDialog):
 
     def _on_recognize_material(self):
         """执行材料识别（类型 + 等级 + 数量）"""
-        if self._current_pixmap is None:
+        image, error_msg = self._get_recognition_image()
+        if image is None:
+            self._status_label.setText(error_msg or "获取图像失败")
             return
 
         self._status_label.setText("正在识别材料...")
         QApplication.processEvents()
-
-        bgr = self._pixmap_to_bgr(self._current_pixmap)
 
         try:
             from lvjiang.apps.yysls.core.material_recognizer import (
@@ -444,7 +549,7 @@ class OCRDialog(QDialog):
 
             ocr = OCREngine()
             recognizer = MaterialRecognizer(ocr)
-            result = recognizer.recognize(bgr)
+            result = recognizer.recognize(image)
 
             self._result_text.clear()
             if not result.type:
@@ -470,24 +575,15 @@ class OCRDialog(QDialog):
             self._result_text.setText(f"识别失败: {e}")
             self._status_label.setText("识别失败")
 
-    @staticmethod
-    def _pixmap_to_bgr(pixmap: QPixmap) -> np.ndarray:
-        """QPixmap -> BGR numpy 数组"""
-        qimg = pixmap.toImage()
-        qimg = qimg.convertToFormat(QImage.Format.Format_RGB888)
-        w, h = qimg.width(), qimg.height()
-        bpl = qimg.bytesPerLine()
-        buf = qimg.constBits()
-        buf.setsize(qimg.sizeInBytes())
-        arr = np.frombuffer(buf, dtype=np.uint8).reshape(h, bpl)
-        bgr = arr[:, :w * 3].reshape(h, w, 3)[:, :, ::-1].copy()
-        return bgr
-
     def _on_clear(self):
         """清空图片和结果"""
-        self._current_pixmap = None
         self._canvas.clear()
         self._result_text.clear()
         self._btn_ocr.setEnabled(False)
         self._btn_material.setEnabled(False)
         self._status_label.setText("就绪")
+
+    def _on_clear_selection(self):
+        """清除选框"""
+        self._canvas.clear_selection()
+        self._status_label.setText("已清除选框")

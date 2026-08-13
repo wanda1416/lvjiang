@@ -937,7 +937,7 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律(3)",
-                               "check_1": "可调律重置"}
+                               "check_1": "当前装备剩余可重置次数：3"}
     fp = wf._process_equipment("可救剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -980,7 +980,7 @@ def test_tune_reset_blocked_ocr_zero(monkeypatch):
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
     assert reports[0]["rounds"] == 1
-    assert "resets" not in reports[0]
+    assert reports[0]["resets"] == 0
     assert "重置装备" in reports[0]["stop_reason"]   # 命中规则的决策说明
     assert (TUNE_SCENE, "reset_confirm") not in wf.clicks
     assert "recycled_items" not in wf.output
@@ -1005,7 +1005,7 @@ def test_tune_reset_local_cap(monkeypatch):
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律 3/3",
-                               "check_1": "可调律重置"}
+                               "check_1": "当前装备剩余可重置次数：3"}
     wf._process_equipment("重置一次剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1041,7 +1041,7 @@ def test_tune_reset_cooldown_check_fails(monkeypatch):
 
     assert fp  # 指纹正常返回（未回收）
     reports = wf.output["tuning_reports"]
-    assert "resets" not in reports[0]  # 未执行重置
+    assert reports[0]["resets"] == 0  # 未执行重置
     assert "冷却期" in reports[0]["stop_reason"]
     # 点了 reset_tune 后检查失败 → 点 back 回调律页，未点 reset_confirm
     assert (TUNE_SCENE, "reset_tune") in wf.clicks

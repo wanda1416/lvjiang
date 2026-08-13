@@ -431,9 +431,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 current._on_panel_changed()
 
     def _on_any_canvas_changed(self):
-        """画布配置变化（所有 Tab 共享），标记所有场景 dirty"""
+        """画布配置变化（所有 Tab 共享），标记所有场景 dirty + 刷新尺寸信息栏"""
         for sk in self._tabs:
             self._mark_scene_dirty(sk)
+        self._update_info_label()
 
     def _mark_scene_dirty(self, scene_key: str):
         """标记指定场景为已变更，更新 Tab 标题绿点 + 全局 dirty 指示"""

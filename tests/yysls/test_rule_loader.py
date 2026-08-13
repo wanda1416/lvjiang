@@ -647,12 +647,14 @@ class TestMaterialSettings:
         m = parse_tuning_base(_valid_base()).materials
         assert m.stone_check_enabled is False
         assert m.stone_min_count == 100
+        assert m.stone_insufficient_action == "abort"
         assert m.food_rules == default_food_rules()
 
     def test_full_section_parsed(self):
         data = _valid_base()
         data["materials"] = {
-            "stone_check": {"enabled": True, "min_count": 500},
+            "stone_check": {"enabled": True, "min_count": 500,
+                            "insufficient_action": "ask"},
             "food_rules": [
                 {"pct": 95, "min_expect": "top", "min_quality": "gold",
                  "food": "彩狗粮", "on_insufficient": "skip"},
@@ -664,6 +666,7 @@ class TestMaterialSettings:
         m = parse_tuning_base(data).materials
         assert m.stone_check_enabled is True
         assert m.stone_min_count == 500
+        assert m.stone_insufficient_action == "ask"
         assert m.food_rules == [
             FoodRule(pct=95, min_expect="top", min_quality="gold",
                      food="彩狗粮", on_insufficient="skip"),
@@ -697,6 +700,8 @@ class TestMaterialSettings:
         {"stone_check": {"min_count": 0}},             # 低于下界
         {"stone_check": {"min_count": "100"}},         # 字符串伪整数
         {"stone_check": {"min_count": True}},          # bool 伪装 int
+        {"stone_check": {"insufficient_action": "quit"}},  # 不足处理非法
+        {"stone_check": {"insufficient_action": "continue"}},  # 狗粮枚举不通用
         {"food_rules": {"pct": 90}},                    # 须为 list
         {"food_rules": ["金狗粮"]},                     # 元素须为 dict
         {"food_rules": [{"pct": 101}]},                 # 超出上界

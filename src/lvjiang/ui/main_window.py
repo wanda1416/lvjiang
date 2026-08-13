@@ -159,11 +159,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
             from .update_dialog import UpdateDialog
             dialog = UpdateDialog(latest_version, download_url, self)
-            dialog.exec()
-
-            if dialog.action == UpdateDialog.ACTION_EXIT:
-                from PyQt6.QtWidgets import QApplication
-                QApplication.quit()
+            dialog.exec()  # 用户选择“继续使用”时直接关闭对话框
 
         def on_error(_error_msg: str):
             pass  # 启动时检查失败静默忽略

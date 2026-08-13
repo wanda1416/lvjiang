@@ -780,44 +780,42 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         target_cfg["_saved_params"] = params
 
     def _save_daily_config(self):
-        """保存日常页脚本选择与参数到 session.json 的 daily 节点"""
+        """保存日常页脚本选择与参数：workflow_id 存 daily 节点，参数存 wf_configs"""
         from ..core.config import get_session_store
+        from ..core.config.wf_configs import delete_wf_config, set_wf_config
 
         flow_cfg = self._get_selected_flow_config()
         if not flow_cfg:
             return
 
-        # 汇总各脚本已保存的参数
-        params_map: dict[str, dict] = {}
+        # 各脚本参数写入统一存储；参数清空的脚本删除对应条目
         for cfg in self._workflow_configs:
             saved = cfg.get("_saved_params")
             if saved:
-                params_map[cfg["id"]] = saved
+                set_wf_config(cfg["id"], saved)
+            else:
+                delete_wf_config(cfg["id"])
 
-        daily = {
-            "workflow_id": flow_cfg["id"],
-            "params": params_map,
-        }
-
+        # workflow_id 仍存 daily 节点（UI 状态，非工作流配置）
         try:
-            get_session_store().set_node("daily", daily)
+            get_session_store().update_node("daily", {"workflow_id": flow_cfg["id"]})
         except Exception as e:
             logger.warning(f"保存日常配置失败: {e}")
 
     def _restore_daily_config(self):
         """启动时恢复日常页脚本选择与参数"""
         from ..core.config import get_session_store
+        from ..core.config.wf_configs import get_wf_config
 
         # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
         daily = get_session_store().get_node("daily", {})
         if not isinstance(daily, dict):
             daily = {}
         workflow_id = daily.get("workflow_id")
-        params_map = daily.get("params", {})
 
-        # 将保存的参数回写到 _workflow_configs 供 _rebuild_param_panel 使用
+        # 从统一存储读取各脚本参数
         for cfg in self._workflow_configs:
-            saved = params_map.get(cfg["id"])
+            saved = get_wf_config(cfg["id"])
             if saved:
                 cfg["_saved_params"] = saved
 

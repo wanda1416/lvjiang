@@ -184,19 +184,14 @@ class DispatchFakeWF(AutoTuningWorkflow):
 
 
 @pytest.fixture
-def stub_session(monkeypatch):
-    """隔离插件 session：默认 tuning 节为空 dict，可由测试改写"""
-    import lvjiang.apps.yysls.session as session_mod
-    import lvjiang.apps.yysls.tune_config as tc_module
-    section = {}
-
-    class _S:
-        def get_section(self, key):
-            return section
-
-    monkeypatch.setattr(session_mod, "get_plugin_session", lambda: _S())
-    monkeypatch.setattr(tc_module, "_instance", None)
-    return section
+def stub_session(monkeypatch, tmp_path):
+    """隔离 core SessionStore：wf_configs 默认为空，可由测试改写"""
+    import lvjiang.constants as constants_mod
+    import lvjiang.core.config.session as store_mod
+    path = tmp_path / "session.json"
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
+    store_mod.reset_session_store()
+    return store_mod.get_session_store()
 
 
 @pytest.fixture
@@ -232,8 +227,8 @@ def test_dispatch_injected_positional(stub_session, spy_traversals):
 
 
 def test_dispatch_session_config(stub_session, spy_traversals):
-    """无注入时从插件 session 的 tuning.scroll_strategy 读取"""
-    stub_session["scroll_strategy"] = "positional"
+    """无注入时从 wf_configs["auto_tuning"].scroll_strategy 读取"""
+    stub_session.set_node("wf_configs", {"auto_tuning": {"scroll_strategy": "positional"}})
     DispatchFakeWF()._traverse_bag(WEAPON_DETAIL)
     assert spy_traversals == ["positional"]
 

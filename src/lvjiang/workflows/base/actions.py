@@ -134,3 +134,51 @@ class _ActionMixin:
                 return
             remaining = deadline - time.monotonic()
             time.sleep(min(0.05, max(0.0, remaining)))
+
+    def wait_stable(self, timeout: float, threshold: float = 0.02,
+                    interval: float = 0.3, stable_duration: float = 0.5):
+        """等待画面稳定（连续截图对比）
+
+        每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
+        视为「画面没变」。连续稳定时长达到 stable_duration 秒后返回。
+        总超时 timeout 秒内未稳定则抛出 TimeoutError。
+
+        与 wait_seconds 相同，期间持续检查停止标志。
+        """
+        import cv2
+
+        deadline = time.monotonic() + max(0.0, timeout)
+        prev = None
+        stable_since = None
+
+        while time.monotonic() < deadline:
+            if self._stop_check():
+                logger.info("wait stable: 收到停止请求，提前结束")
+                return
+
+            img = self._capture.capture()
+            if img is None:
+                time.sleep(interval)
+                continue
+
+            if prev is not None:
+                diff = float(cv2.absdiff(prev, img).mean()) / 255.0
+                if diff < threshold:
+                    if stable_since is None:
+                        stable_since = time.monotonic()
+                        logger.debug(f"wait stable: 差异 {diff:.4f} < {threshold}，开始计时")
+                    elif time.monotonic() - stable_since >= stable_duration:
+                        logger.info(f"wait stable: 画面已稳定 {stable_duration}s (差异 {diff:.4f})")
+                        return
+                else:
+                    if stable_since is not None:
+                        logger.debug(f"wait stable: 差异 {diff:.4f} >= {threshold}，重置")
+                    stable_since = None
+
+            prev = img.copy()
+            remaining = deadline - time.monotonic()
+            time.sleep(min(interval, max(0.0, remaining)))
+
+        raise TimeoutError(
+            f"wait stable: 画面在 {timeout}s 内未稳定（差异阈值 {threshold}）"
+        )

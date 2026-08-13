@@ -11,6 +11,7 @@ start: (_NL | statement)*
 
 ?statement: click_stmt
           | drag_stmt
+          | wait_stable_stmt
           | wait_stmt
           | scan_stmt
           | recognize_stmt
@@ -103,14 +104,28 @@ drag_duration: number | bracket_list
 
 drag_hold: "hold"i number
 
-wait_stmt: "wait"i (NAME | number | bracket_expr | var_ref | wait_range) _NL
+wait_stmt: "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range) _NL
+
+// wait stable：等待画面稳定（连续截图对比，差异低于阈值持续 stable_duration 秒）
+// 语法：wait stable <timeout> [threshold <value>] [interval <value>] [stable <value>]
+wait_stable_stmt: "wait"i "stable"i number wait_stable_opts? _NL
+wait_stable_opts: wait_stable_opt+
+wait_stable_opt: wait_stable_threshold
+               | wait_stable_interval
+               | wait_stable_duration
+wait_stable_threshold: "threshold"i number
+wait_stable_interval: "interval"i number
+wait_stable_duration: "duration"i number
+
+// 命名延迟引用：@delay_name（从延迟参数配置中查找）
+delay_ref: "@" NAME
 
 // 后缀等待子句：用于 click/drag 的内联等待
 //   before wait xxx — 操作前等待
 //   after wait xxx  — 操作后等待
 //   around wait xxx  — 操作前后各等待一次（同一参数）
 // 参数形式与 wait_stmt 完全一致（命名延迟/数值/范围/变量）
-wait_clause: WAIT_TIMING "wait"i (NAME | number | bracket_expr | var_ref | wait_range)
+wait_clause: WAIT_TIMING "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range)
 WAIT_TIMING: /before/i | /after/i | /around/i
 
 wait_range: "(" number "," number ")"

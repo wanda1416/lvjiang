@@ -58,6 +58,7 @@ from .ast_nodes import (
     UntilLoop,
     VarRef,
     Wait,
+    WaitStable,
     WhereClause,
     WhileLoop,
 )
@@ -66,7 +67,7 @@ from .parser import parse_file, parse_text
 __all__ = [
     "parse_file", "parse_text",
     "Program",
-    "Click", "Drag", "Wait", "Scan", "Recognize", "Collect", "Log", "Screenshot", "Find",
+    "Click", "Drag", "Wait", "WaitStable", "Scan", "Recognize", "Collect", "Log", "Screenshot", "Find",
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",

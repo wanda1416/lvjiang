@@ -46,7 +46,7 @@ def _validator(layout_name: str) -> WorkflowEngine:
     """装配「只校验」的引擎：后端全为 None，validate_only 不触碰它们
 
     delay_params 必须取真实配置 —— 命名等待校验比对的就是它，传空会把
-    `wait step_interval` 全判成未定义。
+    `wait @step_interval` 全判成未定义。
     """
     from lvjiang.core.layout_manager import load_layout_by_name
     layout = load_layout_by_name(layout_name)

@@ -20,6 +20,7 @@ from ..ast_nodes import (
     SceneRef,
     VarRef,
     Wait,
+    WaitStable,
     WhereClause,
 )
 
@@ -330,6 +331,48 @@ class _StmtMixin:
     def wait_range(self, items):
         """(min, max) → (float, float) 随机范围元组"""
         return (float(items[0]), float(items[1]))
+
+    def delay_ref(self, items):
+        """@delay_name → NAME token（命名延迟引用）"""
+        return items[0]  # NAME Token，_build_wait_node 按 NAME 处理
+
+    # ─── wait stable ───────────────────────────────────────
+
+    def wait_stable_stmt(self, items):
+        """wait stable <timeout> [threshold <v>] [interval <v>] [duration <v>]"""
+        timeout = float(items[0])  # number 已转为 float
+        threshold = 0.02
+        interval = 0.3
+        stable_duration = 0.5
+        if len(items) > 1 and isinstance(items[1], dict):
+            opts = items[1]
+            threshold = opts.get("threshold", threshold)
+            interval = opts.get("interval", interval)
+            stable_duration = opts.get("stable_duration", stable_duration)
+        return WaitStable(timeout=timeout, threshold=threshold,
+                          interval=interval, stable_duration=stable_duration,
+                          line_no=self._line(items))
+
+    def wait_stable_opts(self, items):
+        """收集 threshold/interval/duration 选项为 dict"""
+        result = {}
+        for item in items:
+            if isinstance(item, dict):
+                result.update(item)
+        return result
+
+    def wait_stable_opt(self, items):
+        """单个选项，直接传递子节点返回的 dict"""
+        return items[0]
+
+    def wait_stable_threshold(self, items):
+        return {"threshold": float(items[0])}
+
+    def wait_stable_interval(self, items):
+        return {"interval": float(items[0])}
+
+    def wait_stable_duration(self, items):
+        return {"stable_duration": float(items[0])}
 
     def range_literal(self, items):
         """(min, max) → (float, float) 范围元组，用于 eval 赋值"""

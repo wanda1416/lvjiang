@@ -5,8 +5,13 @@
 ## 目录结构
 
 - `YYYY-MM/` — 按月分组的开发日志
-- `milestones/` — 里程碑总结
-- `experiments/` — 实验记录（含失败尝试）
+- `references/` — 拿来参考的开发信息（API 文档、技术调研等）
+
+## 参考信息
+
+| 文件 | 主题 |
+|------|------|
+| [references/game-api.md](references/game-api.md) | 燕云十六声官方 API 接口参考（装备/体力/心力/不肝数据） |
 
 ## 已有日志
 

@@ -19,6 +19,7 @@ from .adb_capture import AdbCapture
 from .device import AdbDevice, list_adb_devices
 from .input import AdbInput
 from .scrcpy_capture import AndroidStreamCapture
+from .wireless import scan_and_connect_wireless
 
 
 def create_input_backend(
@@ -61,4 +62,5 @@ __all__ = [
     "AndroidStreamCapture",
     "create_input_backend",
     "create_capture_backend",
+    "scan_and_connect_wireless",
 ]

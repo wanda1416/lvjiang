@@ -18,14 +18,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....core.layout_manager import (
+from ...core.layout_manager import (
     LayoutConfigManager,
     load_scene_screenshot,
     migrate_layout_item,
     save_scene_screenshot,
 )
-from ....core.layout_models import Layout
-from ....core.scene_registry import (
+from ...core.layout_models import Layout
+from ...core.scene_registry import (
     get_registry,
     get_scene_name,
 )
@@ -74,52 +74,56 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
     def _restore_window_size(self):
         """从 session.json 恢复窗口位置 + 大小 + 分割器尺寸"""
-        from ....core.config import get_session_store
+        from ...core.config import get_session_store
         state = get_session_store().get_node("ui_state", {})
         if not isinstance(state, dict):
             logger.debug("场景编辑器恢复：ui_state 非 dict")
             return
-        logger.debug(f"场景编辑器恢复：ui_state = {state}")
+        se = state.get("scene_editor", {})
+        if not isinstance(se, dict):
+            logger.debug("场景编辑器恢复：scene_editor 子节点非 dict")
+            return
+        logger.debug(f"场景编辑器恢复：scene_editor = {se}")
         # 窗口位置
-        pos = state.get("scene_editor_pos")
+        pos = se.get("pos")
         if isinstance(pos, list) and len(pos) == 2:
             logger.debug(f"场景编辑器恢复位置：{pos}")
             self.move(int(pos[0]), int(pos[1]))
         # 窗口大小
-        size = state.get("scene_editor_size")
+        size = se.get("size")
         if isinstance(size, list) and len(size) == 2:
             logger.debug(f"场景编辑器恢复大小：{size}")
             self.resize(int(size[0]), int(size[1]))
         # 垂直分割器（上 Tab + 下面板）
-        vs = state.get("scene_editor_vsplit")
+        vs = se.get("vsplit")
         if isinstance(vs, list) and len(vs) == 2 and all(s > 0 for s in vs):
             logger.debug(f"场景编辑器恢复垂直分割器：{vs}")
             self._splitter.setSizes([int(s) for s in vs])
         # 水平分割器（左 OCR + 右脚本）
-        hs = state.get("scene_editor_hsplit")
+        hs = se.get("hsplit")
         if isinstance(hs, list) and len(hs) == 2 and all(s > 0 for s in hs):
             logger.debug(f"场景编辑器恢复水平分割器：{hs}")
             self._bottom_splitter.setSizes([int(s) for s in hs])
         # Tab 内部分割器（画布 vs 右侧列表）—— 延迟到 Tab 创建后应用
-        self._pending_tab_split = state.get("scene_editor_tab_split")
+        self._pending_tab_split = se.get("tab_split")
         logger.debug(f"场景编辑器恢复 Tab 分割器（延迟）：{self._pending_tab_split}")
 
     def _save_window_size(self):
-        """保存窗口位置 + 大小 + 分割器尺寸到 session.json（浅合并 ui_state）"""
-        from ....core.config import get_session_store
-        patch = {
-            "scene_editor_pos": [self.x(), self.y()],
-            "scene_editor_size": [self.width(), self.height()],
-            "scene_editor_vsplit": self._splitter.sizes(),
-            "scene_editor_hsplit": self._bottom_splitter.sizes(),
+        """保存窗口位置 + 大小 + 分割器尺寸到 session.json（写入 ui_state.scene_editor）"""
+        from ...core.config import get_session_store
+        se = {
+            "pos": [self.x(), self.y()],
+            "size": [self.width(), self.height()],
+            "vsplit": self._splitter.sizes(),
+            "hsplit": self._bottom_splitter.sizes(),
         }
         # Tab 内部分割器（取第一个可用 Tab）
         for tab in self._tabs.values():
-            patch["scene_editor_tab_split"] = tab._splitter.sizes()
+            se["tab_split"] = tab._splitter.sizes()
             break
-        logger.debug(f"场景编辑器保存：ui_state = {patch}")
+        logger.debug(f"场景编辑器保存：scene_editor = {se}")
         try:
-            get_session_store().update_node("ui_state", patch)
+            get_session_store().update_node("ui_state", {"scene_editor": se})
         except Exception as e:
             logger.warning(f"保存场景编辑器窗口大小失败: {e}")
 

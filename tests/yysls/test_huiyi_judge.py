@@ -364,9 +364,11 @@ class TestFillSimulation:
 class TestPatternDefaultRating:
     @staticmethod
     def _make_judge(pattern_default: str | None):
+        from typing import Any
+
         from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
         from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
-        data = {
+        data: dict[str, Any] = {
             "key": "t1",
             "name": "测试规则",
             "playstyles": {"测试": {

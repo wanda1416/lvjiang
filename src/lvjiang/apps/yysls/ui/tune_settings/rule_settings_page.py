@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     GENERIC_ATTR,
     QUALITY_PARTS,
@@ -45,7 +46,6 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_LABELS,
     standard_playstyle_attrs,
 )
-from lvjiang.apps.yysls.game_config import get_game_config
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")

@@ -676,7 +676,7 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
 
 
 def parse_tuning_group(data: dict) -> TuningGroup:
-    """原始 tuning_groups/*.yaml dict → TuningGroup（校验失败抛
+    """原始 base_groups/*.yaml dict → TuningGroup（校验失败抛
     RuleValidationError）"""
     if not isinstance(data, dict):
         raise RuleValidationError("基础规则组顶层必须是 dict")
@@ -720,7 +720,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
         if legacy in data:
             raise RuleValidationError(
                 f"{legacy} 段已迁移至基础规则组"
-                f"（tuning_groups/*.yaml），请从 tune_config.yaml 移除")
+                f"（base_groups/*.yaml），请从 tune_config.yaml 移除")
 
     # ── base_rules（基础规则组声明）──
     raw_base_rules = data.get("base_rules") or []

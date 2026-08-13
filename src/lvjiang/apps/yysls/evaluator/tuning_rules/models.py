@@ -76,13 +76,13 @@ QUALITY_PARTS = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
 
 def standard_affix_names() -> list[str]:
     """标准词条全集（普通词组 _aliases 并集，按 YAML 声明序）"""
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     return get_game_config().get_normal_affix_names()
 
 
 def standard_playstyle_attrs() -> list[str]:
     """玩法属性候选（属性攻击词组的组名，通用置首）"""
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
     names = list(groups.keys())
     if GENERIC_ATTR in names:
@@ -96,7 +96,7 @@ def specific_attr_names() -> list[str]:
 
     即动态词条归类映射（dynamic_affix_map）的源词条全集。
     """
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
     return [s for name, names in groups.items()
             if name != GENERIC_ATTR for s in names]
@@ -109,7 +109,7 @@ def rule_affix_candidates() -> list[str]:
     动态词条插在无相词条之后（保持价值语境相邻；无相不在全集时
     追加末尾）。
     """
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     names = list(standard_affix_names())
     groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
     generic = groups.get(GENERIC_ATTR) or []
@@ -131,7 +131,7 @@ def dynamic_affix_map(attr: str) -> dict[str, str]:
     """
     if not attr or attr == GENERIC_ATTR:
         return {}
-    from ...game_config import get_game_config
+    from ...config import get_game_config
     groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
     if attr not in groups:
         return {}
@@ -718,7 +718,7 @@ class TuneBehavior:
 
 @dataclass
 class TuningGroup:
-    """基础规则组（tuning_groups/ 下一个 YAML 文件，可多套切换）
+    """基础规则组（base_groups/ 下一个 YAML 文件，可多套切换）
 
     承载单次调律运行的策略基线：材料设置 + 行为配置
     （扫描/结束处理）。激进/保守等账号策略差异体现在不同规则组，

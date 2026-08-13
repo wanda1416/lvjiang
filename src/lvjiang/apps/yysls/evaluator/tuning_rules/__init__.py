@@ -12,7 +12,7 @@
 manager（加载缓存 + 持久化 + 单例），外部一律经本 __init__ 导入。
 """
 
-from ...game_config import LevelConfig
+from ...config import LevelConfig
 from .manager import (
     TuneConfigManager,
     TuningGroupManager,

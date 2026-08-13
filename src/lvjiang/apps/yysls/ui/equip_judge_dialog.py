@@ -2,7 +2,7 @@
 
 装备调律配置对话框顶部按钮入口：纯手工构造装备验证判定器，
 改规则后可立即验证。
-左侧为调律规则配置（TuningConfigWidget，初值取自插件会话调律配置，
+左侧为调律规则配置（TuningConfigWidget，初值取自 wf_configs 调律配置，
 改动不回写 session）；右侧手选 部位 + 品阶 + 词条 1-5（数值默认
 承音 94%），点「判定」输出调律潜力结论，词条满 5 条时追加各启用
 规则的完整定级。词条名一律为 attributes.yaml 标准字段。
@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.evaluator import (
@@ -31,7 +32,6 @@ from lvjiang.apps.yysls.evaluator import (
     is_rule_implemented,
     judge_tuning_worthiness,
 )
-from lvjiang.apps.yysls.game_config import get_game_config
 
 from .game_settings.level_combo import LevelCombo
 from .tune_config_widget import TuningConfigWidget

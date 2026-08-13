@@ -9,7 +9,7 @@
 - PositionalTraversal（旧，positional.py）：位置对齐 + 三向指纹校验 +
   小步补滚/回滚纠偏，自 auto_tuning 原样迁入，逻辑保持不变，供回切。
 
-回切方式：config/session/yysls/session.json 的 tuning 节配
+回切方式：wf_configs["auto_tuning"] 的 scroll_strategy 配
 "scroll_strategy": "positional"（或给工作流注入 ctx.scroll_strategy）。
 """
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal.base import (

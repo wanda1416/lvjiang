@@ -23,6 +23,7 @@ positional 位置对齐三向校验），_traverse_bag 按配置调度，默认 
 
 from loguru import logger
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.equip_parser import EquipmentData
 from lvjiang.apps.yysls.evaluator import (
     judge_equipment_potential,
@@ -31,10 +32,8 @@ from lvjiang.apps.yysls.evaluator import (
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RATING_LABELS,
     RATING_RANK,
-    TuningGroup,
     get_tune_config,
 )
-from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -373,18 +372,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """按配置选择遍历策略并执行（策略实现见 bag_traversal）
 
         优先级：注入配置 ctx.scroll_strategy > 统一存储 wf_configs 的
-        scroll_strategy > 默认 DEFAULT_TRAVERSAL。
+        scroll_strategy；空串 = 默认策略；未知策略抛异常。
         """
         key = self.ctx.scroll_strategy or ""
         if not key:
-            try:
-                from lvjiang.core.config.wf_configs import get_wf_config
-                key = get_wf_config("auto_tuning").get("scroll_strategy", "")
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"读取遍历策略配置失败，用默认: {e}")
+            from lvjiang.core.config.wf_configs import get_wf_config
+            key = get_wf_config("auto_tuning").get("scroll_strategy", "")
         if key and key not in TRAVERSALS:
-            logger.warning(f"未知遍历策略 {key!r}，回落默认 {DEFAULT_TRAVERSAL}")
-        if key not in TRAVERSALS:
+            raise ValueError(f"未知遍历策略 '{key}'，请检查配置")
+        if not key:
             key = DEFAULT_TRAVERSAL
         logger.info(f"背包遍历策略: {key}")
         TRAVERSALS[key]().traverse(self, detail_scene)
@@ -896,13 +892,21 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _ensure_base_group(self):
         """保证 ctx.base_group 可用。
 
-        仅使用启动时注入的规则组；未注入则用空 TuningGroup()，
-        不回退读盘取任何预置规则组。
+        优先用启动时注入的规则组；未注入时回退读统一存储
+        wf_configs["auto_tuning"].base_group；读不到或无效则抛异常。
         """
         group = self.ctx.base_group
         if group is not None:
             return group
-        group = TuningGroup()
+        # 回退读统一存储的 base_group（日常 Tab 启动时 ctx 未注入）
+        from lvjiang.core.config.wf_configs import get_wf_config
+        group_key = get_wf_config("auto_tuning").get("base_group", "")
+        if not group_key:
+            raise ValueError("未配置基础规则组，请在调律页选择基础规则组")
+        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_group
+        group = get_tuning_group(group_key)
+        if group is None:
+            raise ValueError(f"基础规则组 '{group_key}' 不存在，请检查配置")
         self.ctx.base_group = group
         return group
 
@@ -910,45 +914,37 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """保证 ctx.judge_configs/judge_rule_keys 可用。
 
         优先用 run_control 注入的实时 UI 配置；未注入时回退读统一存储
-        wf_configs["auto_tuning"] 的 rules + switches，
-        无有效配置时回退 (None, None) 即全部规则默认配置。
+        wf_configs["auto_tuning"] 的 rules + switches；读不到则抛异常。
         """
         ctx = self.ctx
         if ctx.judge_configs is not None or ctx.judge_rule_keys is not None:
             return
-        try:
-            from lvjiang.core.config.wf_configs import get_wf_config
-            tc = get_wf_config("auto_tuning")
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"读取调律规则配置失败，按全部规则默认判定: {e}")
-            return
+        from lvjiang.core.config.wf_configs import get_wf_config
+        tc = get_wf_config("auto_tuning")
         rules = tc.get("rules", {})
         if not rules:
-            return
+            raise ValueError("未配置调律规则，请在调律页选择至少一个规则")
         switches = tc.get("switches", {})
         enabled = {k: {**cfg, "switches": switches}
                    for k, cfg in rules.items()
                    if isinstance(cfg, dict) and cfg.get("enabled")}
-        if enabled:
-            ctx.judge_rule_keys = list(enabled)
-            ctx.judge_configs = enabled
+        if not enabled:
+            raise ValueError("没有启用任何调律规则，请在调律页勾选至少一个规则")
+        ctx.judge_rule_keys = list(enabled)
+        ctx.judge_configs = enabled
 
     def _resolve_selected_slots(self) -> list[str]:
         """调律部位：优先 UI 注入的 ctx.selected_slots；设备端经 task_runner
         启动时 ctx 未注入（selected_slots=None），回退读统一存储
-        wf_configs["auto_tuning"].selected_slots；
-        仍无有效配置时按全部部位。"""
+        wf_configs["auto_tuning"].selected_slots；读不到则抛异常。"""
         selected = self.ctx.selected_slots
         if selected is None:
-            try:
-                from lvjiang.core.config.wf_configs import get_wf_config
-                raw = get_wf_config("auto_tuning").get("selected_slots")
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"读取调律部位配置失败，按全部部位: {e}")
-                raw = None
-            if isinstance(raw, list):
-                valid = set(self.WEAPON_SLOTS) | set(self.ARMOR_SLOTS)
-                selected = [s for s in raw if s in valid]
+            from lvjiang.core.config.wf_configs import get_wf_config
+            raw = get_wf_config("auto_tuning").get("selected_slots")
+            if not isinstance(raw, list) or not raw:
+                raise ValueError("未配置调律部位，请在调律页选择至少一个部位")
+            valid = set(self.WEAPON_SLOTS) | set(self.ARMOR_SLOTS)
+            selected = [s for s in raw if s in valid]
         if not selected:
-            selected = self.WEAPON_SLOTS + self.ARMOR_SLOTS
+            raise ValueError("调律部位配置无效，请在调律页重新选择部位")
         return selected

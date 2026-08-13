@@ -23,7 +23,7 @@ class DingyinParser:
     """定音词条解析器"""
 
     def __init__(self):
-        from ..game_config import get_game_config
+        from ..config import get_game_config
         self._attr_config = get_game_config()
 
     def parse(self, raw: str) -> dict | None:

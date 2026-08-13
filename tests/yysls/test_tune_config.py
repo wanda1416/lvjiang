@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     TuneConfigManager,
     TuningGroupManager,
     TuningRuleManager,
 )
-from lvjiang.apps.yysls.game_config import get_game_config
 from lvjiang.apps.yysls.ui.tune_settings import TuningRulesDialog
 from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
     ScanBehaviorPage,
@@ -24,7 +24,7 @@ from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
-GROUPS_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_groups"
+GROUPS_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "base_groups"
 BASE_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "tune_config.yaml"
 
 ALL_KEYS = ["huiyi_general", "huixin_small", "huixin_big",

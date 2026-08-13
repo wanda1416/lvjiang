@@ -869,9 +869,3 @@ class ReferenceDatabase:
         logger.debug(f"移动参考图: {old_path} -> {new_path}")
         return True
 
-
-# ─── 向后兼容别名（过渡期使用）────────────────────────────
-
-# 旧名称映射，方便逐步迁移
-MaterialEntry = ReferenceEntry
-MaterialDatabase = ReferenceDatabase

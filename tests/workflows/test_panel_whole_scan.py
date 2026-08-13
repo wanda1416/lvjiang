@@ -14,7 +14,7 @@ import numpy as np
 
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import Eval, FieldAccess, Literal, VarRef, parse_text
-from lvjiang.workflows.scene_scan import collect_refs
+from lvjiang.workflows.workflow_references import collect_refs
 
 DATA_DIR = Path(__file__).parent / "data"
 

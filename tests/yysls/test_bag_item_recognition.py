@@ -17,8 +17,8 @@ import numpy as np
 import pytest
 
 from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+from lvjiang.core.layout_models import Region
 from lvjiang.core.ocr import OCREngine
-from lvjiang.core.scene_registry import Region
 
 # CI 环境（GitHub Actions 等）可能不支持 ONNX Runtime，跳过整组测试
 pytestmark = pytest.mark.skipif(

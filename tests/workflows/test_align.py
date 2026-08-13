@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.core.scene_registry import CanvasConfig, Layout, Panel
+from lvjiang.core.layout_models import CanvasConfig, Layout, Panel
 from lvjiang.workflows.align import (
     _binary_axis,
     _even_axis,

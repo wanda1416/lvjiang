@@ -9,8 +9,9 @@ import numpy as np
 from loguru import logger
 
 from ..workflows.align import GridAlignment
+from .layout_models import CanvasConfig, Region
 from .ocr_cleaner import OCRCleaner
-from .scene_registry import CanvasConfig, Region, get_region_defs
+from .scene_registry import get_region_defs
 
 
 @dataclass

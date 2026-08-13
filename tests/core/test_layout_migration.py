@@ -9,7 +9,7 @@ import pytest
 
 from lvjiang.core import layout_manager
 from lvjiang.core.layout_manager import LayoutConfigManager, migrate_layout_item
-from lvjiang.core.scene_registry import Arrow, Layout, Panel, Point, Region
+from lvjiang.core.layout_models import Arrow, Layout, Panel, Point, Region
 
 
 def _make_layout(name: str = "test") -> Layout:

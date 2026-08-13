@@ -61,8 +61,8 @@ packaging\package.bat
 
 打包产物：
 - `dist/lvjiang/lvjiang.exe` — 可执行文件
-- `dist/lvjiang-win64.zip` — 发布压缩包（便携版）
-- `dist/lvjiang-win64-setup.exe` — Windows 安装包（推荐）
+- `dist/lvjiang-vX.Y.Z-win64.zip` — 发布压缩包（便携版）
+- `dist/lvjiang-vX.Y.Z-win64-setup.exe` — Windows 安装包（推荐）
 
 打包脚本会自动：
 1. 从 `pyproject.toml` 读取版本号注入到 `src/lvjiang/_version.py`
@@ -113,8 +113,8 @@ git push
 - [ ] `android/app/build.gradle.kts` versionCode 已递增（如有 config/布局变更）
 - [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
 - [ ] `packaging/package.bat` 打包成功
-- [ ] `dist/lvjiang-win64.zip` 已生成
-- [ ] `dist/lvjiang-win64-setup.exe` 已生成
+- [ ] `dist/lvjiang-vX.Y.Z-win64.zip` 已生成
+- [ ] `dist/lvjiang-vX.Y.Z-win64-setup.exe` 已生成
 - [ ] `src/lvjiang/_version.py` 版本号已注入（打包脚本自动完成）
 - [ ] `uv.lock` 变更已纳入提交（如有）
 - [ ] 所有变更已提交并推送

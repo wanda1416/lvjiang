@@ -27,6 +27,10 @@ from .profile_models import (
     RegenKeyDef,
     StepDef,
     StockKeyDef,
+    SyncTargetDef,
+    format_sync_label,
+    parse_sync_key,
+    parse_sync_targets,
 )
 from .profile_store import (
     get_active_group,
@@ -69,6 +73,10 @@ __all__ = [
     "RegenKeyDef",
     "StepDef",
     "StockKeyDef",
+    "SyncTargetDef",
+    "format_sync_label",
+    "parse_sync_key",
+    "parse_sync_targets",
     "ProfileSchema",
     "get_profile_config",
     "reload_profile_config",

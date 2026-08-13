@@ -102,9 +102,17 @@ class ProfileSchema:
                 self._keys_by_key[key_def.key] = key_def
                 self._model_of[key_def.key] = model_type
 
-    def get_key(self, key: str) -> KeyDef | None:
-        """按 key 获取定义"""
-        return self._keys_by_key.get(key)
+    def get_key(self, key: str, model_type: str | None = None) -> KeyDef | None:
+        """按 key 获取定义
+
+        model_type 可选：指定时校验 key 所属模型，不匹配返回 None。
+        """
+        kd = self._keys_by_key.get(key)
+        if kd is None:
+            return None
+        if model_type is not None and self._model_of.get(key) != model_type:
+            return None
+        return kd
 
     def get_all_keys(self) -> list[KeyDef]:
         """获取所有 key 定义（按定义顺序）"""

@@ -15,11 +15,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QComboBox,
+    QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -57,7 +60,7 @@ from ..config.profile_store import (
     save_groups,
     set_active_group,
 )
-from ..profile.profile_db import db_read_all, db_upsert
+from ..profile.profile_db import db_get_history, db_read_all, db_upsert
 from ..profile.profile_engine import compute_regen_entry
 
 # 统一的刷新按钮样式
@@ -794,44 +797,21 @@ class ProfileOverviewTab(QWidget):
             self._loading = False
             return
 
-        # 硬上限约束检查
-        if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
-            if kd.cap is not None and not kd.soft and parsed_value > kd.cap:
-                QMessageBox.warning(
-                    None, "超出上限",
-                    f"{kd.label} 硬上限为 {kd.cap}，无法设置为 {parsed_value}"
-                )
-                self._loading = True
-                user_data = self._load_user_data(user_name)
-                text, style = self._format_profile_cell(kd, model_type, user_data)
-                item.setText(text)
-                self._apply_cell_style(item, style)
-                self._loading = False
-                return
+        # 读取当前值，计算 delta，走 action 路径（触发 sync）
+        profile_data = db_read_all(user_name)
+        entry = profile_data.get(model_type, {}).get(key_str, {})
+        current_value = entry.get("value", 0) or 0
+        if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+            current_value, _ = compute_regen_entry(entry, kd)
 
-        if model_type == MODEL_STOCK and isinstance(kd, StockKeyDef):
-            if kd.cap is not None and not kd.soft and parsed_value > kd.cap:
-                QMessageBox.warning(
-                    None, "超出上限",
-                    f"{kd.label} 硬上限为 {kd.cap}，无法设置为 {parsed_value}"
-                )
-                self._loading = True
-                user_data = self._load_user_data(user_name)
-                text, style = self._format_profile_cell(kd, model_type, user_data)
-                item.setText(text)
-                self._apply_cell_style(item, style)
-                self._loading = False
-                return
+        delta = parsed_value - current_value
+        if delta == 0:
+            return
 
-        self._write_profile_entry(user_name, model_type, key_str, parsed_value,
-                                   change_type="override", detail=f"override:{parsed_value}")
-
-        self._loading = True
-        user_data = self._load_user_data(user_name)
-        text, style = self._format_profile_cell(kd, model_type, user_data)
-        item.setText(text)
-        self._apply_cell_style(item, style)
-        self._loading = False
+        self._adjust_value(
+            user_name, model_type, key_str, kd, current_value, delta,
+            is_action=True,
+        )
 
     @staticmethod
     def _parse_value(raw: str, model_type: str, kd: KeyDef):
@@ -997,6 +977,23 @@ class ProfileOverviewTab(QWidget):
                         )
                     )
 
+        # 覆写：直接设定值，不走 sync
+        action_override = menu.addAction("覆写...")
+        if action_override:
+            action_override.triggered.connect(
+                lambda: self._override_value_custom(
+                    user_name, model_type, key_str, kd, current_value
+                )
+            )
+
+        # 历史记录
+        menu.addSeparator()
+        action_history = menu.addAction("查看历史记录")
+        if action_history:
+            action_history.triggered.connect(
+                lambda: self._show_history_dialog(user_name, model_type, key_str, kd.label)
+            )
+
         viewport = table.viewport()
         if viewport:
             menu.exec(viewport.mapToGlobal(pos))
@@ -1150,6 +1147,97 @@ class ProfileOverviewTab(QWidget):
 
         # 自定义增减属于 action，触发 Quota->Stock 同步
         self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=True)
+
+    def _override_value_custom(
+        self,
+        user_name: str,
+        model_type: str,
+        key: str,
+        kd,
+        current_value,
+    ):
+        """覆写：直接设定绝对值，不触发 Quota->Stock 同步"""
+        from PyQt6.QtWidgets import QInputDialog
+
+        if model_type == MODEL_REGEN:
+            current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
+            new_value, ok = QInputDialog.getDouble(
+                self,
+                f"覆写 - {kd.label}",
+                f"当前值: {current_text}\n输入新值:",
+                current_value,
+                0,
+                999999,
+                4,
+            )
+        else:
+            new_value, ok = QInputDialog.getInt(
+                self,
+                f"覆写 - {kd.label}",
+                f"当前值: {int(current_value)}\n输入新值:",
+                int(current_value),
+                0,
+                999999,
+            )
+        if not ok:
+            return
+
+        delta = new_value - current_value
+        if delta == 0:
+            return
+
+        # is_action=False → change_type="override"，不触发 sync
+        self._adjust_value(user_name, model_type, key, kd, current_value, delta, is_action=False)
+
+    def _show_history_dialog(
+        self, user_name: str, model_type: str, key: str, key_label: str,
+    ) -> None:
+        """打开历史记录查看器，展示指定 key 的最近变更记录"""
+        history = db_get_history(user_name, type_=model_type, key=key, limit=50)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"{key_label} — {user_name} 变更记录")
+        dialog.resize(620, 420)
+
+        layout = QVBoxLayout(dialog)
+
+        table = QTableWidget()
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["时间", "类型", "旧值", "新值", "详情"])
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+
+        _TYPE_LABEL = {"tick": "定时", "action": "操作", "override": "覆写"}
+
+        table.setRowCount(len(history))
+        for row, rec in enumerate(history):
+            # 格式化时间
+            raw_ts = rec.get("ts", "")
+            try:
+                formatted_ts = datetime.fromisoformat(raw_ts).strftime("%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                formatted_ts = raw_ts
+
+            ct = rec.get("change_type", "")
+            old_val = rec.get("old_value")
+            new_val = rec.get("new_value")
+            old_str = str(int(old_val)) if old_val is not None and old_val == int(old_val) else str(old_val) if old_val is not None else "—"
+            new_str = str(int(new_val)) if new_val is not None and new_val == int(new_val) else str(new_val) if new_val is not None else "—"
+
+            table.setItem(row, 0, QTableWidgetItem(formatted_ts))
+            table.setItem(row, 1, QTableWidgetItem(_TYPE_LABEL.get(ct, ct)))
+            table.setItem(row, 2, QTableWidgetItem(old_str))
+            table.setItem(row, 3, QTableWidgetItem(new_str))
+            table.setItem(row, 4, QTableWidgetItem(rec.get("detail", "")))
+
+        layout.addWidget(table)
+        dialog.exec()
 
     def _load_all_users(self) -> dict[str, dict]:
         """加载所有用户 profile 数据（从 DB 读取）"""

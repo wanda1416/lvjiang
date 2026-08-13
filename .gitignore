@@ -29,6 +29,7 @@ logs/
 /data/local
 /data/video
 /data/picture
+/data/temp*
 /config/system/workflows/_*
 
 # OS

@@ -129,9 +129,9 @@ class BatchWorker(QThread):
             entry_result["switch"] = ST_SUCCESS
             current_account = entry.account
 
-            # 2. 工具侧 session 切换
-            self._user_manager.set_active_user(entry.account)
-            session = self._session_manager.load(entry.account)
+            # 2. 工具侧 session 切换（user 是角色名，不是账号）
+            self._user_manager.set_active_user(entry.role)
+            session = self._session_manager.load(entry.role)
 
             # 3. 顺序执行脚本
             any_success = False
@@ -158,7 +158,7 @@ class BatchWorker(QThread):
 
             # 4. session 落盘
             if any_success:
-                self._session_manager.save(entry.account, session)
+                self._session_manager.save(entry.role, session)
 
             # 5. 退出回登录页（最后一个条目也退出，方便下次从头开始）
             if not self._stop_check():
@@ -268,7 +268,7 @@ class BatchWorker(QThread):
 
     @staticmethod
     def _save_result(account: str, role: str, script: BatchScript, result: dict):
-        """结果落盘 output/{account}/{role}/{script_id}_{timestamp}.json"""
+        """结果落盘 output/{role}/{script_id}_{timestamp}.json"""
         if not isinstance(result, (dict, list)) or not result:
             return
         from ..constants import OUTPUT_DIR
@@ -282,7 +282,7 @@ class BatchWorker(QThread):
                 return obj.to_dict()
             return obj
 
-        user_dir = OUTPUT_DIR / account / role
+        user_dir = OUTPUT_DIR / role
         user_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = user_dir / f"{script.id}_{ts}.json"

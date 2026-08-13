@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.constants import SYSTEM_WORKFLOWS_DIR
+from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.scene_scan import collect_refs, collect_scene_keys
@@ -126,7 +126,7 @@ def test_activity_jianghu_matches_legacy_required_scenes():
 
     waiguan_qingjing 为情境动作落地后新增的依赖。
     """
-    wf = SYSTEM_WORKFLOWS_DIR / "activity_jianghu.wf"
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "activity_jianghu.wf"
     program = parse_file(wf)
     scenes = collect_scene_keys(program.body, program.procs)
     assert scenes == {

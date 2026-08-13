@@ -12,7 +12,7 @@ config/local 影子文件影响，CI 与开发机结论一致。
 import pytest
 
 from lvjiang.config import load_user_config
-from lvjiang.constants import SYSTEM_LAYOUTS_DIR, SYSTEM_WORKFLOWS_DIR
+from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine
 
 
@@ -22,20 +22,22 @@ def _system_wf_files() -> list:
     _editor_run.wf / _recorded.wf / _testwf/ 的内容随上一次编辑器操作变化，
     不是分发物，不作为门禁对象。
     """
+    workflows_dir = SYSTEM_CONFIG_DIR / "workflows"
     return sorted(
-        p for p in SYSTEM_WORKFLOWS_DIR.rglob("*.wf")
+        p for p in workflows_dir.rglob("*.wf")
         if not p.name.startswith("_")
         and not any(part.startswith("_") for part in p.relative_to(
-            SYSTEM_WORKFLOWS_DIR).parts[:-1])
+            workflows_dir).parts[:-1])
     )
 
 
 def _system_layouts() -> list[str]:
     """系统布局名册（目录化结构：layouts/{name}/ 目录）"""
-    if not SYSTEM_LAYOUTS_DIR.is_dir():
+    layouts_dir = SYSTEM_CONFIG_DIR / "layouts"
+    if not layouts_dir.is_dir():
         return []
     return sorted(
-        p.name for p in SYSTEM_LAYOUTS_DIR.iterdir()
+        p.name for p in layouts_dir.iterdir()
         if p.is_dir() and not p.name.startswith("_")
     )
 
@@ -68,7 +70,7 @@ def test_system_layouts_and_workflows_exist():
 @pytest.mark.parametrize("layout_name", _system_layouts())
 @pytest.mark.parametrize(
     "wf_path", _system_wf_files(),
-    ids=lambda p: p.relative_to(SYSTEM_WORKFLOWS_DIR).as_posix())
+    ids=lambda p: p.relative_to(SYSTEM_CONFIG_DIR / "workflows").as_posix())
 def test_wf_refs_all_bound(wf_path, layout_name):
     """每个系统 .wf 引用的场景/区域/坐标点/方向/面板都已在该布局绑定
 

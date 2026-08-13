@@ -30,6 +30,12 @@ from typing import Callable
 import yaml
 from loguru import logger
 
+from ... import constants
+
+# 层根目录：ConfigResolver 内部持有，外部经 ConfigResolver API 访问
+SYSTEM_CONFIG_DIR = constants.CONFIG_DIR / "system"
+LOCAL_CONFIG_DIR = constants.CONFIG_DIR / "local"
+
 # 聚合 diff 中的删除键标记
 DELETED_KEY = "__deleted__"
 # 墓碑文件后缀
@@ -109,7 +115,6 @@ class ConfigResolver:
             return True
         if env in ("0", "false", "no"):
             return False
-        from ... import constants
         return (constants.PROJECT_ROOT / ".git").exists()
 
     # ─── 层根目录与模式 ─────────────────────────────────
@@ -118,15 +123,13 @@ class ConfigResolver:
     def system_dir(self) -> Path:
         if self._system_dir is not None:
             return self._system_dir
-        from ... import constants
-        return constants.SYSTEM_CONFIG_DIR
+        return SYSTEM_CONFIG_DIR
 
     @property
     def local_dir(self) -> Path:
         if self._local_dir is not None:
             return self._local_dir
-        from ... import constants
-        return constants.LOCAL_CONFIG_DIR
+        return LOCAL_CONFIG_DIR
 
     def is_dev_mode(self) -> bool:
         """开发模式（写 system）or 用户模式（写 local）

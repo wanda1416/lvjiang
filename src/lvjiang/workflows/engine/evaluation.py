@@ -189,7 +189,14 @@ class _EvalMixin:
 
         # dict 按 key 取
         if isinstance(current, dict):
-            return current.get(key)  # 缺失 key → None（null）
+            if key in current:
+                return current[key]
+            # 数值 key 归一化：整面板扫描结果以 "1"/"2" 字符串为 key，
+            # 而 $var.$r 中 $r 来自 for 循环时是 int，转 str(int) 后再查一次
+            try:
+                return current.get(str(int(float(key))))
+            except (TypeError, ValueError):
+                return None  # 缺失 key → None（null）
         # list 按 index 取（key 需为整数）
         if isinstance(current, list):
             try:

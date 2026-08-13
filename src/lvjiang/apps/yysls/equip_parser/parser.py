@@ -73,10 +73,10 @@ class EquipmentParser:
         # 计算词条数值百分比（cap_pct）
         self._calc_affix_cap_pct(equip)
 
-        # 定音词条（委托 DingyinParser，按类别选择候选词条池）
+        # 定音词条（委托 DingyinParser，词条名全局唯一，不依赖部位）
         dingyin_text = raw.get("dingyin", "").strip()
         if dingyin_text:
-            result = self._dingyin_parser.parse(dingyin_text, category)
+            result = self._dingyin_parser.parse(dingyin_text)
             if result:
                 equip.dingyin = result
             else:

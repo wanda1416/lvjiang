@@ -65,6 +65,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     ARMOR_SLOTS = ["head", "chest", "leg", "wrist"]
     WEAPON_DETAIL = "equip_weapon_detail"
     ARMOR_DETAIL = "equip_armor_detail"
+    EQUIP_DETAIL = "equip_detail"  # 通用交互区域（more_func/sub_func_*/recycle_*）
 
     SCAN_FIELDS = [
         "equip_type", "equip_level", "base_attr",
@@ -532,7 +533,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self._doc.note("值得调律，但测试开关已启用，跳过实际调律")
             self.click_region(self.TUNE_SCENE, "back")
             self.wait_delay("page_refresh_wait")  # 调律页 → 背包详情页
-            self.click_region(detail_scene, "more_func")
+            self.click_region(self.EQUIP_DETAIL, "more_func")
             self.wait_delay("step_interval")
             report["status"] = "skip_tuning"
             self.output.setdefault("tuning_reports", []).append(report)
@@ -642,7 +643,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 再点一次「更多」more_func 使其收起，保持背包页干净以继续遍历。
         self.click_region(self.TUNE_SCENE, "back")
         self.wait_delay("page_refresh_wait")  # 调律页 → 背包详情页（页面切换）
-        self.click_region(detail_scene, "more_func")
+        self.click_region(self.EQUIP_DETAIL, "more_func")
         self.wait_delay("step_interval")
 
         judgement = self.judge.final_judge(equip_data)

@@ -100,20 +100,20 @@ class TuningRecycler:
         label = equip_data.name or equip_data.type
         stage_label = BEHAVIOR_STAGE_LABELS.get(stage, stage)
         logger.info(f"  [{stage_label}] 回收 {label}：{reason}")
-        wf.click_region(detail_scene, "more_func")
+        wf.click_region(wf.EQUIP_DETAIL, "more_func")
         wf.wait_delay("page_refresh_wait")  # 详情页 → 「更多」弹窗展开
         key = wf.ocr_scene_by(
-            detail_scene,
+            wf.EQUIP_DETAIL,
             ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
             "回收", "contains")
         if not key:
             logger.warning("未找到回收按钮，装备保留")
-            wf.click_region(detail_scene, "more_func")
+            wf.click_region(wf.EQUIP_DETAIL, "more_func")
             wf.wait_delay("step_interval")
             return False
-        wf.click_region(detail_scene, key)
+        wf.click_region(wf.EQUIP_DETAIL, key)
         wf.wait_delay("page_refresh_wait")  # 回收确认弹窗
-        wf.click_region(detail_scene, "recycle_confirm")
+        wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
         wf.wait_delay("page_refresh_wait")  # 回收完成，背包刷新补位
         if report is not None:
             report["recycled"] = True

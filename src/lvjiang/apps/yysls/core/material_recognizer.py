@@ -186,15 +186,19 @@ class MaterialRecognizer:
         if not match_results:
             return []
 
-        # 3. 等级 OCR（上半部分）— 只识别一次
-        level_text = self._ocr_level(slot_img)
-
-        # 4. 数量 OCR（下半部分）— 只识别一次
+        # 3. 数量 OCR（下半部分）— 只识别一次
         count_text = self._ocr_count(slot_img)
 
-        # 5. 为每个匹配结果构建 MaterialInfo
+        # 4. 为每个匹配结果构建 MaterialInfo，使用参考条目自身的等级
         results = []
         for match_result in match_results:
+            # 从参考条目元数据获取原始等级
+            ref_level = match_result.meta.get("level")
+            if ref_level is not None:
+                level_text = f"{ref_level}阶"
+            else:
+                level_text = ""  # 无等级信息
+
             results.append(MaterialInfo(
                 type=match_result.label,
                 level_text=level_text,

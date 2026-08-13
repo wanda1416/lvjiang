@@ -202,10 +202,7 @@ class RecognitionOpsMixin:
                 if info.level is not None:
                     parts.append(f"{info.level}级")
                 if info.count is not None:
-                    count_str = f"×{info.count}"
-                    if info.owned is not None:
-                        count_str += f"/{info.owned}"
-                    parts.append(count_str)
+                    parts.append(f"×{info.count}")
                 parts.append(f"[{info.confidence:.0%}]")
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: {' '.join(parts)}"
             self._result_text.append(line)
@@ -261,10 +258,7 @@ class RecognitionOpsMixin:
                     if info.level is not None:
                         parts.append(f"{info.level}级")
                     if info.count is not None:
-                        count_str = f"×{info.count}"
-                        if info.owned is not None:
-                            count_str += f"/{info.owned}"
-                        parts.append(count_str)
+                        parts.append(f"×{info.count}")
                     self._result_text.append(f"  cell[{i}]: {' '.join(parts)}")
                 total_cells += 1
 

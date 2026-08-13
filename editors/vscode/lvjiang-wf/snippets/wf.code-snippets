@@ -1,0 +1,88 @@
+{
+  "def": {
+    "prefix": "def",
+    "body": [
+      "def ${1:name}(${2:\\$params})",
+      "\t$0",
+      "end"
+    ],
+    "description": "定义一个过程"
+  },
+  "if": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition}",
+      "\t$0",
+      "end"
+    ],
+    "description": "条件语句"
+  },
+  "ifelse": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition}",
+      "\t$2",
+      "else",
+      "\t$0",
+      "end"
+    ],
+    "description": "条件语句（含 else 分支）"
+  },
+  "while": {
+    "prefix": "while",
+    "body": [
+      "loop while ${1:condition}",
+      "\t$0",
+      "end"
+    ],
+    "description": "条件循环"
+  },
+  "for": {
+    "prefix": "for",
+    "body": [
+      "for ${1:\\$item} in ${2:list}",
+      "\t$0",
+      "end"
+    ],
+    "description": "循环迭代"
+  },
+  "try": {
+    "prefix": "try",
+    "body": [
+      "try",
+      "\t$1",
+      "catch ${2:\\$error}",
+      "\t$0",
+      "end"
+    ],
+    "description": "异常处理"
+  },
+  "click": {
+    "prefix": "click",
+    "body": [
+      "click [${1:scene}].[${2:region}]"
+    ],
+    "description": "点击场景区域"
+  },
+  "scan": {
+    "prefix": "scan",
+    "body": [
+      "scan [${1:scene}].[${2:region}] as ${3:\\$result} by contains \"${4:text}\""
+    ],
+    "description": "OCR 扫描场景区域"
+  },
+  "wait": {
+    "prefix": "wait",
+    "body": [
+      "wait ${1:delay_name}"
+    ],
+    "description": "等待指定时间"
+  },
+  "import": {
+    "prefix": "import",
+    "body": [
+      "import \"${1:path/to/file.wf}\""
+    ],
+    "description": "导入外部工作流文件"
+  }
+}

@@ -427,10 +427,7 @@ class PanelEditorMixin:
             scroll_error_label.hide()
             return True
 
-        rows_spin.valueChanged.connect(_validate_scroll)
-        cols_spin.valueChanged.connect(_validate_scroll)
-        scroll_combo.currentTextChanged.connect(_validate_scroll)
-        _validate_scroll()
+        _validate_scroll()  # 初始校验
 
         # 仅编辑模式可选择归属场景（跨场景迁移）
         scene_combo = None
@@ -473,6 +470,9 @@ class PanelEditorMixin:
 
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
+        rows_spin.valueChanged.connect(_validate)
+        cols_spin.valueChanged.connect(_validate)
+        scroll_combo.currentTextChanged.connect(_validate)
         _validate()
 
         buttons.accepted.connect(dialog.accept)

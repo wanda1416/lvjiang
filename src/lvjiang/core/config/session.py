@@ -86,6 +86,7 @@ class SessionStore:
         """读顶层节点（返回深拷贝，调用方改不坏内部态）"""
         with self._lock:
             self._ensure_loaded()
+            assert self._data is not None
             value = self._data.get(key)
             return deepcopy(value) if value is not None else default
 
@@ -93,6 +94,7 @@ class SessionStore:
         """整节点替换并落盘"""
         with self._lock:
             self._ensure_loaded()
+            assert self._data is not None
             self._data[key] = value
             self._flush()
 
@@ -103,6 +105,7 @@ class SessionStore:
         """
         with self._lock:
             self._ensure_loaded()
+            assert self._data is not None
             node = self._data.get(key)
             node = node if isinstance(node, dict) else {}
             node.update(patch)
@@ -116,6 +119,7 @@ class SessionStore:
         """
         with self._lock:
             self._ensure_loaded()
+            assert self._data is not None
             new_value = fn(self._data.get(key))
             self._data[key] = new_value
             self._flush()
@@ -125,6 +129,7 @@ class SessionStore:
         """删除顶层节点并落盘（不存在时静默）"""
         with self._lock:
             self._ensure_loaded()
+            assert self._data is not None
             if key in self._data:
                 del self._data[key]
                 self._flush()

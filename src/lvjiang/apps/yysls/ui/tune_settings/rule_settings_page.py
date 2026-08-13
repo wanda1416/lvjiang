@@ -44,6 +44,7 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     QUALITY_PARTS,
     RATING_KEYS,
     RATING_LABELS,
+    get_tune_config,
     standard_playstyle_attrs,
 )
 
@@ -61,6 +62,7 @@ _PLAYSTYLE_TIPS = (
     "名字 = 调律 Tab 勾选项；\n"
     "增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n"
     "属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n"
+    "绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n"
     "武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。")
 
 
@@ -82,8 +84,14 @@ class RuleSettingsPage(QWidget):
         weapons = mgr.get_weapon_types()
         wuxue = mgr.get_wuxue_affix_names()
         attrs = standard_playstyle_attrs()
+        # 绑定开关候选来自开关注册表
+        try:
+            switch_keys = list(get_tune_config().switches)
+        except Exception:  # noqa: BLE001
+            switch_keys = []
         self._col_candidates: dict[int, list[str]] = {
-            1: weapons, 2: wuxue, 3: weapons, 4: wuxue, 5: attrs}
+            1: weapons, 2: wuxue, 3: weapons, 4: wuxue, 5: attrs,
+            6: switch_keys}
         # 武器 → 绑定武学增效词条（增伤列候选据此收窄）
         self._weapon_affixes = mgr.get_all_weapon_wuxue_affixes()
         self._init_ui()
@@ -138,12 +146,13 @@ class RuleSettingsPage(QWidget):
         title_row.addWidget(self._playstyle_tips_btn)
         title_row.addStretch()
         layout.addLayout(title_row)
-        self._playstyle_table = QTableWidget(0, 6)
+        self._playstyle_table = QTableWidget(0, 7)
         self._playstyle_table.setHorizontalHeaderLabels(
-            ["名字", "主武器", "主增伤词条", "副武器", "副增伤词条", "属性"])
+            ["名字", "主武器", "主增伤词条", "副武器", "副增伤词条", "属性",
+             "绑定开关"])
         # 增伤词条列比武器列更宽；不拉伸末列，列宽固定、列表偏左，
         # 未占满 dialog 时右侧留白（避免末列被拉升占满全宽）
-        for col, width in enumerate((100, 90, 200, 90, 200, 90)):
+        for col, width in enumerate((80, 90, 150, 90, 150, 90, 120)):
             self._playstyle_table.setColumnWidth(col, width)
         self._playstyle_table.cellChanged.connect(self._apply_playstyles)
         self._fix_table_height(self._playstyle_table, 10)
@@ -261,11 +270,11 @@ class RuleSettingsPage(QWidget):
 
     def _insert_playstyle_row(self, row: int,
                               values: tuple = (
-                                  "", "", "", "", "", GENERIC_ATTR)):
+                                  "", "", "", "", "", GENERIC_ATTR, "")):
         table = self._playstyle_table
         table.insertRow(row)
         table.setItem(row, 0, QTableWidgetItem(values[0]))
-        for col in range(1, 6):
+        for col in range(1, 7):
             # 增伤列（col 2/4）候选随同侧武器（col 1/3）绑定收窄
             candidates = (self._damage_candidates(values[col - 1])
                           if col in (2, 4) else None)
@@ -286,6 +295,8 @@ class RuleSettingsPage(QWidget):
         combo = QComboBox()
         if col in (2, 4):  # 增伤留空项以占位文案展示（收集时仍写入空）
             combo.addItem(_NO_DAMAGE_LABEL)
+        elif col == 6:  # 绑定开关列：留空 = 不绑定
+            combo.addItem("")
         elif col != 5:  # 属性列必选（默认通用），无留空项
             combo.addItem("")  # 留空 = 未配置
         if candidates is None:
@@ -293,7 +304,9 @@ class RuleSettingsPage(QWidget):
         combo.addItems(candidates)
         if value and value not in candidates:
             combo.addItem(value)
-        if col == 5:
+        if col == 6:
+            combo.setCurrentText(value or "")
+        elif col == 5:
             combo.setCurrentText(value or GENERIC_ATTR)
         elif col in (2, 4):
             combo.setCurrentText(value or _NO_DAMAGE_LABEL)
@@ -369,7 +382,8 @@ class RuleSettingsPage(QWidget):
                 str(main.get("damage") or ""),
                 str(sub.get("weapon") or ""),
                 str(sub.get("damage") or ""),
-                str(raw.get("attr") or GENERIC_ATTR)))
+                str(raw.get("attr") or GENERIC_ATTR),
+                str(raw.get("switch") or "")))
         self._playstyle_table.blockSignals(False)
 
         thresholds = d.get("quality_thresholds") or {}
@@ -445,6 +459,10 @@ class RuleSettingsPage(QWidget):
                 },
                 "attr": self._combo_text(i, 5) or GENERIC_ATTR,
             }
+            # 绑定开关（留空 = 不绑定，不写入字段）
+            sw = self._combo_text(i, 6)
+            if sw:
+                rules[name]["switch"] = sw
         if rules:
             self._data["playstyles"] = rules
         else:

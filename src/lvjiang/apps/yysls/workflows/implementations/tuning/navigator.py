@@ -20,9 +20,10 @@ if TYPE_CHECKING:
     )
 
 # 导航 subcall 文件（相对 workflows 根）与过程名
-_NAV_MAIN_TO_EQUIP = ("subcall/nav_main_to_equip.wf", "nav_main_to_equip")
-_NAV_EQUIP_TO_TUNE = ("subcall/nav_equip_to_tune.wf", "nav_equip_to_tune")
-_NAV_BACK_TO_MAIN = ("subcall/nav_back_to_main.wf", "nav_back_to_main")
+_NAV_FILE = "subcall/navigation.wf"
+_NAV_MAIN_TO_EQUIP = (_NAV_FILE, "nav_main_to_equip")
+_NAV_EQUIP_TO_TUNE = (_NAV_FILE, "nav_equip_to_tune")
+_NAV_BACK_TO_MAIN = (_NAV_FILE, "nav_back_to_main")
 
 
 class TuningNavigator:
@@ -42,8 +43,7 @@ class TuningNavigator:
             raise RuntimeError(
                 "TuningNavigator.load_dependencies: 未注入 WorkflowEngine，"
                 "无法加载导航 subcall")
-        for wf_file, _ in (_NAV_MAIN_TO_EQUIP, _NAV_EQUIP_TO_TUNE, _NAV_BACK_TO_MAIN):
-            engine.load_subcalls(wf_file)
+        engine.load_subcalls(_NAV_FILE)
 
     def _call_subcall(self, proc_name: str, args: list | None = None):
         """经引擎桥调用已加载的 DSL 子过程"""

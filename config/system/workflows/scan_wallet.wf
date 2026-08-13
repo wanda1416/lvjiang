@@ -107,6 +107,32 @@ end
 
 log "钱袋货币扫描完成"
 
+# ─── 点击么玉进入不肝页面，获取不肝进度 ──────────────────
+call $bugan_pos = find_cell($money2, "么玉")
+if $bugan_pos
+    eval $bugan_row = $bugan_pos.row
+    eval $bugan_col = $bugan_pos.col
+    click [bag_wallet_detail].[money_2][$bugan_row][$bugan_col] after wait @step_interval
+    
+    # 扫描不肝进度
+    scan [bag_wallet_detail].[bugan_jindu] as $jindu_str
+    eval $parts = split($jindu_str.bugan_jindu, "/")
+    eval $current = $parts[0]
+    eval $total = $parts[1]
+    
+    # 校验进度值
+    if $current < 0
+        log concat("不肝进度异常：当前值 ", $current, " 小于 0")
+    else
+        if $current > $total
+            log concat("不肝进度解析错误：", $current, " > ", $total)
+        else
+            eval profile_set("bugan_of_week", $current)
+            log concat("本周不肝进度: ", $current, "/", $total)
+        end
+    end
+end
+
 # ─── 返回主界面 ──────────────────────────────────────────
 # 钱袋 → 菜单页
 click [bag_equip_detail].[back] after wait @step_interval
@@ -132,6 +158,32 @@ def scan_get($data, $target)
         end
     end
     return $best_val
+end
+
+# ─── 查找目标位置子过程 ──────────────────────────────
+# 遍历面板 3×6 所有格子，返回目标货币最高置信度的行列位置
+def find_cell($data, $target)
+    eval $best_row = 0
+    eval $best_col = 0
+    eval $best_conf = -1
+    for r in range(1, 3)
+        for c in range(1, 6)
+            eval $cell = $data.$r.$c
+            eval $label = $cell.label
+            if $label equals $target
+                eval $conf = $cell.confidence
+                if $conf > $best_conf
+                    eval $best_row = $r
+                    eval $best_col = $c
+                    eval $best_conf = $conf
+                end
+            end
+        end
+    end
+    if $best_row > 0
+        return {"row": $best_row, "col": $best_col}
+    end
+    return {}
 end
 
 # ─── 容差写入子过程 ────────────────────────────────────

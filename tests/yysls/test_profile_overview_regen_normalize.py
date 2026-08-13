@@ -17,8 +17,9 @@ def test_continuous_regen_fraction_is_stored_as_time_progress():
     kd = RegenKeyDef(
         key="xinli",
         label="心力",
-        regen_period="minute",
-        regen_value=0.125,
+        regen_type="realtime",
+        regen_rate_value=0.125,
+        regen_rate_unit="minute",
     )
 
     before = datetime.now()
@@ -36,8 +37,9 @@ def test_continuous_regen_current_value_uses_second_level_progress():
     kd = RegenKeyDef(
         key="xinli",
         label="心力",
-        regen_period="minute",
-        regen_value=0.125,
+        regen_type="realtime",
+        regen_rate_value=0.125,
+        regen_rate_unit="minute",
     )
     entry = {
         "value": 100,
@@ -53,8 +55,9 @@ def test_continuous_regen_tooltip_keeps_base_metadata():
     kd = RegenKeyDef(
         key="xinli",
         label="心力",
-        regen_period="minute",
-        regen_value=0.125,
+        regen_type="realtime",
+        regen_rate_value=0.125,
+        regen_rate_unit="minute",
         cap=600,
     )
     updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
@@ -72,8 +75,8 @@ def test_continuous_regen_tooltip_keeps_base_metadata():
 
     assert "更新时间:" in tooltip
     assert "写入时间:" in tooltip
-    assert "回复周期: 每分钟" in tooltip
-    assert "每次回复: 0.125" in tooltip
+    assert "恢复类型: 实时恢复" in tooltip
+    assert "恢复速率: 0.125/分钟" in tooltip
     assert "下一点恢复:" in tooltip
     assert "存储值: 100" in tooltip
     assert "上限: 600" in tooltip
@@ -85,8 +88,9 @@ def test_continuous_regen_cell_display_uses_second_level_progress():
     kd = RegenKeyDef(
         key="xinli",
         label="心力",
-        regen_period="minute",
-        regen_value=0.13,
+        regen_type="realtime",
+        regen_rate_value=0.13,
+        regen_rate_unit="minute",
     )
     data = {
         MODEL_REGEN: {

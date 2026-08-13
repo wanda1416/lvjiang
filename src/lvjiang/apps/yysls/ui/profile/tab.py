@@ -28,7 +28,7 @@ from ...config.profile_models import (
     RegenKeyDef,
 )
 from ...profile.profile_db import db_read_all
-from ...profile.profile_engine import compute_regen_entry
+from ...profile.regen_math import compute_regen_entry
 
 # 统一的刷新按钮样式（overview.py 与 tab.py 共用）
 REFRESH_BTN_STYLE = (
@@ -292,8 +292,7 @@ def _format_detail_value(kd: KeyDef, model_type: str, data: dict) -> str:
 
     if model_type == MODEL_REGEN:
         if isinstance(kd, RegenKeyDef):
-            computed, _ = compute_regen_entry(entry, kd)
-            return str(int(computed))
+            return str(int(compute_regen_entry(entry, kd).value))
         return str(int(value))
 
     if model_type == MODEL_STOCK:

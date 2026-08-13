@@ -30,7 +30,7 @@
 - SQLite 持久化：`config/session/profile.db`（WAL 模式 + busy_timeout）
 - 变更历史：`profile_history` 表记录所有变更（action/manual/tick 三类）
 - 周期自动重置：quota 到期自动清零，支持 day/week/month/season/half_season
-- 再生自动计算：regen 按 regen_period + regen_value 回复，封顶 cap
+- 再生自动计算：regen 显式区分 realtime（按速率连续恢复）与 boundary（按准点边界恢复），封顶 cap
 - 超标预警：regen 达到 alert_above 阈值时触发提醒
 
 **配置层**
@@ -174,14 +174,17 @@ regen:
 - key: tili
   label: 体力
   cap: 2500
+  regen_type: boundary
+  regen_amount: 450.0
   regen_period: day
-  regen_value: 450.0
   alert_above: 2150
   steps: [-900, -1100, -2400]
 - key: xinli
   label: 心力
   cap: 600
-  regen_value: 0.125
+  regen_type: realtime
+  regen_rate_value: 0.125
+  regen_rate_unit: minute
   alert_above: 480
   steps: [-60, -180, -360, -480]
 

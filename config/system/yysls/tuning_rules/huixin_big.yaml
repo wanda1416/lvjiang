@@ -41,7 +41,7 @@ playstyles:
       damage: 双刀武学增伤
     sub:
       weapon: 绳镖
-      damage: null
+      damage: 绳镖武学增伤
     attr: 破竹
   尘尘:
     main:
@@ -51,14 +51,6 @@ playstyles:
       weapon: 绳镖
       damage: null
     attr: 破竹
-  玉玉:
-    main:
-      weapon: 伞
-      damage: 伞武学增效
-    sub:
-      weapon: 扇
-      damage: null
-    attr: 牵丝
   翊翊:
     main:
       weapon: 舞绫鼓
@@ -95,9 +87,6 @@ common_conditions:
       symbols:
       - 势
       min: 1
-  - contains_all:
-    - 会心率
-    - 精准率
   - count_max:
       symbols:
       - 最大外功攻击
@@ -109,14 +98,13 @@ patterns:
     top_conditions:
     - - contains_all:
         - 最大外功攻击
-      - count_max:
+        - 劲
+      - count_min:
           symbols:
-          - 最小外功攻击
-          - 最大无相攻击
           - 会心率
           - 精准率
-          - 势
-          max: 0
+          - 敏
+          min: 1
   副武器:
     first:
     - 最大外功攻击
@@ -124,12 +112,12 @@ patterns:
     - - contains_all:
         - 最大外功攻击
         - 劲
-      - count_max:
+      - count_min:
           symbols:
-          - 最小外功攻击
-          - 最大无相攻击
+          - 会心率
           - 精准率
-          max: 0
+          - 敏
+          min: 1
   环:
     first:
     - 最大外功攻击
@@ -141,21 +129,20 @@ patterns:
     top_conditions:
     - - contains_all:
         - 最大外功攻击
-      - count_max:
+        - 劲
+      - count_min:
           symbols:
-          - 最小外功攻击
-          - 最大本属攻击
           - 会心率
           - 精准率
-          - 势
-          max: 0
+          - 敏
+          min: 1
   冠胄:
     first:
     - 会心率
     - 精准率
     junk_conditions:
     - when:
-        keep_pvp: false
+        keep_danti: false
       all:
       - count_min:
           symbols:
@@ -165,12 +152,12 @@ patterns:
     - - contains_all:
         - 最大外功攻击
         - 劲
-      - count_max:
+      - count_min:
           symbols:
-          - 最小外功攻击
-          - 最大本属攻击
-          - 势
-          max: 0
+          - 会心率
+          - 精准率
+          - 敏
+          min: 2
       - count_max:
           symbols:
           - 精准率
@@ -181,21 +168,21 @@ patterns:
     - 劲
     junk_conditions:
     - when:
-        keep_pvp: false
+        keep_wanjia: false
       all:
       - count_max:
           symbols:
           - 对首领单位增伤
           max: 0
     - when:
-        keep_pvp: false
+        keep_wanjia: false
       all:
       - count_min:
           symbols:
           - 对玩家单位增效
           min: 1
     - when:
-        keep_pvp: true
+        keep_wanjia: true
       all:
       - count_max:
           symbols:
@@ -205,11 +192,10 @@ patterns:
     top_conditions:
     - - contains_all:
         - 最大外功攻击
-      - count_max:
+        - 劲
+      - count_min:
           symbols:
-          - 最小外功攻击
-          - 最大本属攻击
           - 会心率
           - 精准率
-          - 势
-          max: 0
+          - 敏
+          min: 1

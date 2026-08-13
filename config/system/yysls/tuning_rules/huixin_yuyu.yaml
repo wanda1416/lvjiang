@@ -1,0 +1,130 @@
+key: huixin_yuyu
+name: 玉玉大王(beta)
+order: 100
+transmute_priority:
+- 最大外功攻击
+- 劲
+- 会心率
+- 敏
+- 最小外功攻击
+- 最大无相攻击
+- 最大牵丝攻击
+affix_pool:
+- 对首领单位增伤
+- 全武学增效
+- 单体类奇术增伤
+- 最大外功攻击
+- 劲
+- 会心率
+- 敏
+- 精准率
+- 势
+- 最小外功攻击
+- 最大无相攻击
+- 最大牵丝攻击
+patterns:
+  胫甲:
+    first:
+    - 劲
+    junk_conditions:
+    - count_max:
+        symbols:
+        - 对首领单位增伤
+        max: 0
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 最大外功攻击
+  冠胄:
+    first:
+    - 精准率
+    - 会心率
+    junk_conditions:
+    - when:
+        keep_danti: false
+      all:
+      - count_min:
+          symbols:
+          - 单体类奇术增伤
+          min: 1
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 最大外功攻击
+    - when:
+        keep_danti: true
+      all:
+      - contains_all:
+        - 最大外功攻击
+      - count_min:
+          symbols:
+          - 劲
+          - 单体类奇术增伤
+          min: 1
+  环:
+    first:
+    - 最大外功攻击
+    junk_conditions:
+    - count_max:
+        symbols:
+        - 全武学增效
+        max: 0
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 最大外功攻击
+  副武器:
+    first:
+    - 最大外功攻击
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 最大外功攻击
+  主武器:
+    first:
+    - 最大外功攻击
+    top_conditions:
+    - contains_all:
+      - 劲
+      - 最大外功攻击
+default_rating: excellent
+common_conditions:
+  normal_conditions:
+  - - contains_all:
+      - 精准率
+      - 会心率
+    - count_min:
+        symbols:
+        - 势
+        - 最大牵丝攻击
+        - 最大无相攻击
+        min: 1
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0
+  excellent_conditions:
+  - count_min:
+      symbols:
+      - 势
+      - 最大牵丝攻击
+      - 最大无相攻击
+      min: 1
+playstyles:
+  走地玉:
+    main:
+      weapon: 伞
+      damage: 伞武学增效
+    sub:
+      weapon: 绳镖
+      damage: null
+    attr: 牵丝
+    switch: keep_danti
+  飞天玉:
+    main:
+      weapon: 伞
+      damage: 伞武学增效
+    sub:
+      weapon: 绳镖
+      damage: null
+    attr: 牵丝

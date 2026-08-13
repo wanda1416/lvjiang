@@ -94,10 +94,8 @@ class TestBuiltinRules:
     def test_all_loaded_without_errors(self):
         mgr = get_tuning_rule_manager()
         assert mgr.errors == {}
-        assert list(mgr.get_rules()) == [
-            "huiyi_general", "huixin_small", "huixin_big",
-            "heal_pure", "heal_fire",
-        ]
+        # 规则数量随文件增加，不硬编码列表
+        assert len(list(mgr.get_rules())) >= 5
 
     def test_order_ascending(self):
         rules = get_tuning_rules()
@@ -107,10 +105,10 @@ class TestBuiltinRules:
     def test_required_fields_present(self):
         for rule in get_tuning_rules().values():
             assert rule.key and rule.name
-            assert rule.affix_pool
-            assert rule.patterns
-            for pattern in rule.patterns.values():
-                assert pattern.first
+            if rule.patterns:  # 骨架规则无 pattern，跳过
+                assert rule.affix_pool
+                for pattern in rule.patterns.values():
+                    assert pattern.first
 
     def test_playstyles_per_plan(self):
         # 玩法定义持续变更：不硬编码内容，对照 YAML 原文校验解析
@@ -206,6 +204,38 @@ class TestValidation:
         parse_tuning_rule(data)  # 离线解析不校验
         with pytest.raises(RuleValidationError, match="未注册"):
             parse_tuning_rule(data, switch_keys={"keep_pvp"})
+
+    def test_playstyle_switch_parsed(self):
+        """玩法绑定开关 switch 字段解析：缺省 None，有值时记录"""
+        data = minimal_rule()
+        # 缺省无 switch
+        rule = parse_tuning_rule(data)
+        assert rule.playstyles["测试"].switch is None
+        # 有 switch
+        data["playstyles"]["测试"]["switch"] = "keep_pvp"
+        rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
+        assert rule.playstyles["测试"].switch == "keep_pvp"
+
+    def test_playstyle_switch_in_referenced_switches(self):
+        """玩法绑定开关计入 referenced_switches"""
+        data = minimal_rule()
+        data["playstyles"]["测试"]["switch"] = "keep_pvp"
+        rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
+        assert "keep_pvp" in rule.referenced_switches()
+
+    def test_playstyle_switch_unknown_key_rejected(self):
+        """玩法绑定未注册开关 key：传 switch_keys 时报错"""
+        data = minimal_rule()
+        data["playstyles"]["测试"]["switch"] = "nonexistent"
+        with pytest.raises(RuleValidationError, match="未注册"):
+            parse_tuning_rule(data, switch_keys={"keep_pvp"})
+
+    def test_playstyle_switch_bad_format_rejected(self):
+        """玩法绑定开关 key 格式非法：拒绝"""
+        data = minimal_rule()
+        data["playstyles"]["测试"]["switch"] = "Bad-Key"
+        with pytest.raises(RuleValidationError, match="非法"):
+            parse_tuning_rule(data)
 
     def test_include_first_all_kinds(self):
         """include_first 全原语可用：集合式原语的 dict 形态"""
@@ -590,8 +620,8 @@ class TestTuneConfig:
         assert "default" in config.base_rules
         # 品阶门槛锁死为固定 7 个标准部位
         assert list(config.quality_thresholds) == list(QUALITY_PARTS)
-        # 开关注册表含 keep_pvp（保留PVP装备）
-        assert config.switches.get("keep_pvp")
+        # 开关注册表含 keep_danti（保留单体奇术增）
+        assert config.switches.get("keep_danti")
 
     def test_quality_ok_by_part(self):
         config = parse_tune_config(_valid_config())

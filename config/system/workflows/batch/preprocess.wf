@@ -1,0 +1,7 @@
+# 批处理预处理：假定已在登录页，直接选账号+登录+选角色
+# 由 Runner 在首行调用，变量由 Runner 注入
+
+import "_switch_account.wf"
+
+# 选账号 + 登录 + 选角色
+call _switch_account($tail, $role_index)

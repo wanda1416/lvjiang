@@ -137,7 +137,10 @@ class RulePanel(QWidget):
         self._stack = QStackedWidget()
         self._settings_page = RuleSettingsPage(
             self._data, self._on_changed, on_delete=self._request_delete,
-            on_rename=self._rename_rule)
+            on_rename=self._rename_rule,
+            on_enable_changed=self._on_rule_enable_changed)
+        # 回填启用状态（从 tune_config.tuning_rules 读取）
+        self._settings_page.set_enabled(self._is_rule_enabled())
         self._stack.addWidget(self._wrap_scroll(self._settings_page))
         self._pool_page = PoolPage(self._candidates, self._on_changed)
         self._stack.addWidget(self._wrap_scroll(self._pool_page))
@@ -224,4 +227,23 @@ class RulePanel(QWidget):
         cb = self._dialog_rename_cb
         if cb is not None:
             cb(old_key, new_key, new_name)
+
+    def _is_rule_enabled(self) -> bool:
+        """从 tune_config.tuning_rules 读取当前规则启用状态"""
+        try:
+            from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+            tuning_rules = get_tune_config().tuning_rules
+            return tuning_rules.get(self._key, True)
+        except Exception:
+            return True
+
+    def _on_rule_enable_changed(self, enabled: bool):
+        """规则设置页启用复选框变更 → 更新 tune_config 并 reload"""
+        try:
+            self._manager.set_rule_enabled(self._key, enabled)
+            now = datetime.now().strftime("%H:%M:%S")
+            status = "已启用" if enabled else "已禁用"
+            self._status_cb(f"{status}（{now}）", False)
+        except Exception as e:  # noqa: BLE001
+            self._status_cb(f"设置启用状态失败：{e}", True)
 

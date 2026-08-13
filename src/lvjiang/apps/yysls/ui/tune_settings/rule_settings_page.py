@@ -72,12 +72,14 @@ class RuleSettingsPage(QWidget):
     def __init__(self, data: dict, on_changed: Callable[[], None],
                  on_delete: Callable[[], None] | None = None,
                  on_rename: Callable[[str, str, str], None] | None = None,
+                 on_enable_changed: Callable[[bool], None] | None = None,
                  parent=None):
         super().__init__(parent)
         self._data = data
         self._on_changed = on_changed
         self._on_delete = on_delete
         self._on_rename = on_rename
+        self._on_enable_changed = on_enable_changed
         self._loading = True
         # 武器/增伤词条候选来自游戏配置数据源（保存时已刷新单例）
         mgr = get_game_config()
@@ -100,6 +102,13 @@ class RuleSettingsPage(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
+
+        # ── 启用该规则（顶部第一行）──
+        self._enable_cb = QCheckBox("启用该规则")
+        self._enable_cb.setChecked(True)  # 默认勾选
+        self._enable_cb.stateChanged.connect(self._on_enable_cb_changed)
+        self._enable_cb.setStyleSheet("font-weight: bold;")
+        layout.addWidget(self._enable_cb)
 
         form = QFormLayout()
         # key 只读展示 + 「重命名」按钮（弹窗提醒 id 变更影响）
@@ -393,6 +402,19 @@ class RuleSettingsPage(QWidget):
                 self._insert_quality_row(
                     self._quality_table.rowCount(), part,
                     set(thresholds.get(part) or []))
+
+    def set_enabled(self, enabled: bool):
+        """回填启用状态（不触发回调）"""
+        self._enable_cb.blockSignals(True)
+        self._enable_cb.setChecked(enabled)
+        self._enable_cb.blockSignals(False)
+
+    def _on_enable_cb_changed(self, _state: int):
+        """启用复选框变更 → 回调通知管理器"""
+        if self._loading:
+            return
+        if self._on_enable_changed is not None:
+            self._on_enable_changed(self._enable_cb.isChecked())
 
     # ── 收集（写回共享 dict） ──
 

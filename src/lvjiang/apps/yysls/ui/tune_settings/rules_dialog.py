@@ -17,7 +17,9 @@
 import re
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QBrush
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -30,10 +32,12 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 from lvjiang.apps.yysls.evaluator.tuning_rules import (
     RuleValidationError,
+    get_tune_config,
     get_tune_config_manager,
     get_tuning_group_manager,
     get_tuning_rule_manager,
@@ -173,8 +177,26 @@ class TuningRulesDialog(QDialog):
         self._base_page.set_switch_callback(self._on_group_switched)
         # 扫描处理页保存后通知基础规则页刷新展示（门槛值同步）
         self._scan_page.set_save_callback(self._base_page.refresh)
+        # 三个行为页顶部插入「当前规则」下拉（快速切换基础规则组）
+        self._group_dropdowns: list[QComboBox] = []
+        self._syncing_group = False
+        for page in (self._scan_page, self._material_page, self._tune_page):
+            self._insert_group_dropdown(page)
+        self._sync_group_dropdowns(group_key)
         for key, rule in self._manager.get_rules().items():
             self._add_rule_page(key, rule.name)
+        # 加载全部规则（含禁用），禁用规则导航文字置灰
+        self._disabled_rule_keys: set[str] = set()
+        try:
+            tuning_rules = get_tune_config().tuning_rules
+            self._disabled_rule_keys = {
+                k for k, v in tuning_rules.items() if not v}
+        except Exception:
+            pass
+        for key, name in self._manager.get_all_rule_keys_and_names():
+            if key not in self._manager.get_rules():
+                panel = self._add_rule_page(key, name)
+                self._apply_disabled_nav_style(panel, True)
         self._nav.setCurrentRow(0)
 
     # ── 规则页增删 ──
@@ -185,7 +207,34 @@ class TuningRulesDialog(QDialog):
         panel._dialog_rename_cb = self._rename_rule  # type: ignore[assignment]
         self._stack.addWidget(panel)
         self._nav.addItem(name)
+        # 连接启用状态回调，更新导航灰色样式
+        settings_page = panel._settings_page
+        orig_cb = settings_page._on_enable_changed
+
+        def _on_enable(enabled: bool):
+            if orig_cb is not None:
+                orig_cb(enabled)
+            self._apply_disabled_nav_style(panel, not enabled)
+
+        settings_page._on_enable_changed = _on_enable  # type: ignore[assignment]
         return panel
+
+    def _apply_disabled_nav_style(self, panel: RulePanel, disabled: bool):
+        """更新规则导航项的灰色样式（禁用=灰色，启用=正常）"""
+        key = panel.rule_key
+        if disabled:
+            self._disabled_rule_keys.add(key)
+        else:
+            self._disabled_rule_keys.discard(key)
+        for i in range(6, self._nav.count()):
+            if (self._stack.widget(i - 1) is panel):
+                item = self._nav.item(i)
+                if disabled:
+                    item.setForeground(QBrush(Qt.GlobalColor.gray))
+                else:
+                    item.setData(
+                        Qt.ItemDataRole.ForegroundRole, None)
+                break
 
     def _on_nav_changed(self, row: int):
         item = self._nav.item(row)
@@ -195,9 +244,56 @@ class TuningRulesDialog(QDialog):
 
     def _on_group_switched(self, group_key: str):
         """基础规则组切换 → 三个行为页对准新组并重载"""
-        self._scan_page.set_group(group_key)
-        self._material_page.set_group(group_key)
-        self._tune_page.set_group(group_key)
+        self._syncing_group = True
+        try:
+            self._scan_page.set_group(group_key)
+            self._material_page.set_group(group_key)
+            self._tune_page.set_group(group_key)
+            self._sync_group_dropdowns(group_key)
+        finally:
+            self._syncing_group = False
+
+    def _insert_group_dropdown(self, page: QWidget):
+        """在行为页布局顶部插入「当前规则」下拉"""
+        layout = page.layout()
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(QLabel("当前规则："))
+        combo = QComboBox()
+        combo.currentIndexChanged.connect(
+            lambda idx: self._on_group_dropdown_changed(idx, combo))
+        row.addWidget(combo)
+        row.addStretch()
+        layout.insertLayout(0, row)
+        self._group_dropdowns.append(combo)
+
+    def _sync_group_dropdowns(self, group_key: str):
+        """同步所有下拉框选中状态（不触发信号）"""
+        for combo in self._group_dropdowns:
+            combo.blockSignals(True)
+            combo.clear()
+            for key, group in self._group_manager.get_groups().items():
+                combo.addItem(group.name, key)
+            idx = combo.findData(group_key)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
+
+    def _on_group_dropdown_changed(self, idx: int, combo: QComboBox):
+        """下拉变更 → 切换基础规则组"""
+        if self._syncing_group or idx < 0:
+            return
+        key = combo.currentData()
+        if key and key != self._base_page._group_key:
+            # 先同步基础规则页的 combo 到新 key，再触发切换
+            base_combo = self._base_page._combo
+            base_idx = base_combo.findData(key)
+            if base_idx >= 0:
+                base_combo.blockSignals(True)
+                base_combo.setCurrentIndex(base_idx)
+                base_combo.blockSignals(False)
+                # 委托基础规则页处理（持久化 + 刷新 + 回调行为页）
+                self._base_page._on_combo_changed(base_idx)
 
     def _on_nav_double_clicked(self, item):
         """双击规则导航项 → 弹窗修改规则名称（配置页不可改名）"""
@@ -253,7 +349,11 @@ class TuningRulesDialog(QDialog):
         for i in range(5, self._stack.count()):
             panel = self._stack.widget(i)
             if isinstance(panel, RulePanel) and panel.rule_key == new_key:
-                self._nav.item(i + 1).setText(new_name)  # 含分割线偏移
+                item = self._nav.item(i + 1)  # 含分割线偏移
+                item.setText(new_name)
+                # 重命名后保持禁用灰色样式
+                if new_key in self._disabled_rule_keys:
+                    item.setForeground(QBrush(Qt.GlobalColor.gray))
                 break
 
     # ── 其他 ──

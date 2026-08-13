@@ -98,6 +98,10 @@ common_conditions:
   - contains_all:
     - 会心率
     - 精准率
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0
 patterns:
   主武器:
     first:

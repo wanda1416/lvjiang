@@ -98,10 +98,10 @@ class TestBigTiers:
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "会心率"])
         assert big.judge(e).rating == Rating.EXCELLENT
 
-    def test_main_missing_core_excellent(self, big):
-        # 缺非首大外不算缺陷（可调出）→ 优秀
+    def test_main_missing_waigong_normal(self, big):
+        # 非首缺大外是硬门槛 → 能用封顶（一般）
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "劲", "劲", "敏"])
-        assert big.judge(e).rating == Rating.EXCELLENT
+        assert big.judge(e).rating == Rating.NORMAL
 
     def test_ring_missing_quanwuxue_junk(self, big):
         e = make_equip("环", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
@@ -236,6 +236,11 @@ class TestSmallDynamic:
         # 有神力部位非首会心 → 优秀封顶
         e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "敏", "会心率"])
         assert small_lieshi.judge(e).rating == Rating.EXCELLENT
+
+    def test_ring_missing_waigong_normal(self, small_lieshi):
+        # 非首缺小外是硬门槛 → 能用封顶（一般）
+        e = make_equip("环", ["最小外功攻击", "全武学增效", "敏", "敏", "敏"])
+        assert small_lieshi.judge(e).rating == Rating.NORMAL
 
     def test_ring_one_foreign_small_attr_normal(self, small_lieshi):
         # 1 条 最小破竹攻击（→最小外属攻击）→ 一般

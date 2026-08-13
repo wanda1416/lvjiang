@@ -1,0 +1,158 @@
+key: default
+name: 默认规则
+materials:
+  stone_check:
+    enabled: true
+    min_count: 80
+    insufficient_action: ask
+  food_rules:
+  - pct: 98
+    min_expect: top
+    min_quality: gold
+    food: 彩狗粮
+    on_insufficient: skip
+  - pct: 88
+    min_expect: excellent
+    min_quality: gold
+    food: 金狗粮
+    on_insufficient: skip
+  - pct: 0
+    min_expect: normal
+    min_quality: gold
+    food: ''
+    on_insufficient: continue
+  - pct: 90
+    min_expect: top
+    min_quality: purple
+    food: 金狗粮
+    on_insufficient: skip
+  - pct: 0
+    min_expect: excellent
+    min_quality: purple
+    food: 紫狗粮
+    on_insufficient: continue
+scan:
+  enabled: true
+  min_level: 100
+  entry_min_rating: top
+  rules:
+  - parts:
+    - 武器
+    - 环
+    - 佩
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
+    max_quality: gold_only
+    pct_op: le
+    pct: 98
+    ratings:
+    - junk
+    judge_scope: all
+    judge_rules: []
+    action: tune_full_recycle
+    first_affix_only: true
+  - parts:
+    - 武器
+    max_quality: purple_only
+    pct_op: ge
+    pct: 90
+    ratings:
+    - 最大外功攻击
+    - 最小外功攻击
+    judge_scope: affix
+    judge_rules: []
+    action: skip
+    first_affix_only: true
+  - parts:
+    - 武器
+    - 环
+    - 佩
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
+    max_quality: purple
+    pct_op: ge
+    pct: 0
+    ratings:
+    - top
+    - excellent
+    judge_scope: all
+    judge_rules: []
+    action: skip
+    first_affix_only: false
+  - parts:
+    - 武器
+    - 环
+    - 佩
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
+    max_quality: purple
+    pct_op: le
+    pct: 100
+    ratings:
+    - junk
+    judge_scope: incoming
+    judge_rules: []
+    action: recycle
+    first_affix_only: false
+tune:
+  enabled: true
+  rules:
+  - parts:
+    - 武器
+    - 环
+    - 佩
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
+    max_quality: gold_only
+    pct_op: ge
+    pct: 92
+    ratings:
+    - junk
+    judge_scope: incoming
+    judge_rules: []
+    action: reset
+  - parts:
+    - 武器
+    - 环
+    - 佩
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
+    max_quality: purple
+    pct_op: le
+    pct: 92
+    ratings:
+    - junk
+    judge_scope: incoming
+    judge_rules: []
+    action: recycle
+  - parts:
+    - 武器
+    - 环
+    - 佩
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
+    max_quality: gold
+    pct_op: le
+    pct: 100
+    ratings:
+    - excellent
+    - normal
+    - junk
+    judge_scope: incoming
+    judge_rules: []
+    action: skip
+  max_resets: 3
+  reset_exhausted_action: recycle
+  initial_check: false

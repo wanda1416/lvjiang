@@ -292,8 +292,8 @@ class ConditionGroupsEditor(QWidget):
         self._candidates = candidates
         # 开关候选来自注册表（加载失败时退化为无候选，仅影响新绑）
         try:
-            from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_base
-            self._switch_keys = list(get_tuning_base().switches)
+            from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+            self._switch_keys = list(get_tune_config().switches)
         except Exception:  # noqa: BLE001
             self._switch_keys = []
         self._groups: list[_ConditionGroupBox] = []

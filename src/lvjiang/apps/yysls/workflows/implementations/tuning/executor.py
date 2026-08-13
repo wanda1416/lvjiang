@@ -15,7 +15,6 @@ from lvjiang.apps.yysls.evaluator.tuning_rules import (
     STONE_LABEL,
     FoodDecision,
     MaterialSettings,
-    get_tuning_base,
 )
 
 if TYPE_CHECKING:
@@ -76,7 +75,7 @@ class TuningExecutor:
             return None
 
         # 一次材料区识别：大律准石检查 + 逐轮狗粮决策共用
-        settings = get_tuning_base().materials
+        settings = self._wf.base_group.materials
         infos = None
         if settings.stone_check_enabled or settings.food_rules:
             infos = wf.recognize_materials_info_panel(

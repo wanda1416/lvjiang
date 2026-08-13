@@ -81,5 +81,6 @@ hooks = AppHooks(
     builtin_modules=[
         "lvjiang.apps.yysls.workflows.builtins.equipment",
         "lvjiang.apps.yysls.workflows.builtins.bag_funcs",
+        "lvjiang.apps.yysls.workflows.builtins.profile_funcs",
     ],
 )

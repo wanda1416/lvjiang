@@ -4,6 +4,7 @@
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -55,6 +56,57 @@ class TestSave:
         mgr.save("中文用户", {"name": "测试中文"})
         content = (tmp_path / "中文用户.json").read_text(encoding="utf-8")
         assert "中文" in content  # ensure_ascii=False
+
+    def test_concurrent_save_keeps_valid_json(self, mgr, tmp_path):
+        """并发保存同一用户时，最终文件不能出现半截 JSON。"""
+        def save_one(i: int):
+            mgr.save("并发用户", {"current_user": "并发用户", "counter": i})
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(save_one, range(50)))
+
+        data = json.loads((tmp_path / "并发用户.json").read_text(encoding="utf-8"))
+        assert data["current_user"] == "并发用户"
+        assert isinstance(data["counter"], int)
+
+
+class TestUpdate:
+    def test_update_merges_with_latest_file(self, mgr, tmp_path):
+        mgr.save("用户", {"current_user": "用户", "a": 1})
+
+        def mutate(data: dict):
+            data["b"] = 2
+
+        result = mgr.update("用户", mutate)
+        assert result["a"] == 1
+        assert result["b"] == 2
+        saved = json.loads((tmp_path / "用户.json").read_text(encoding="utf-8"))
+        assert saved == result
+
+    def test_update_raises_on_mutator_error(self, mgr):
+        """mutator 抛异常时 update() 应向上传播，不吞掉"""
+        mgr.save("用户", {"current_user": "用户", "a": 1})
+
+        def bad_mutate(data: dict):
+            raise ValueError("模拟失败")
+
+        with pytest.raises(ValueError, match="模拟失败"):
+            mgr.update("用户", bad_mutate)
+
+    def test_concurrent_update_does_not_lose_increments(self, mgr, tmp_path):
+        mgr.save("并发更新", {"counter": 0})
+
+        def increment(_i: int):
+            def mutate(data: dict):
+                data["counter"] = data.get("counter", 0) + 1
+
+            mgr.update("并发更新", mutate)
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(increment, range(50)))
+
+        data = json.loads((tmp_path / "并发更新.json").read_text(encoding="utf-8"))
+        assert data["counter"] == 50
 
 
 class TestSaveFn:

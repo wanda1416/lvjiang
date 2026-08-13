@@ -378,7 +378,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         from PyQt6.QtGui import QDesktopServices
 
         from .about_dialog import GITHUB_REPO
-        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/user-guide.md"))
+        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
 
     def _open_feedback(self):
         """打开 GitHub Issue 反馈页面"""

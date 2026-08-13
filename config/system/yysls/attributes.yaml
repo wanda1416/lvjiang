@@ -585,3 +585,23 @@ affix_parts:
   - 武器
   扇武学增效:
   - 武器
+level_configs:
+- level: 91
+  allow_reset: false
+  judge_resistance: 45
+- level: 96
+  allow_reset: false
+  judge_resistance: 65
+- level: 100
+  allow_reset: true
+  min_material_count: 1
+  judge_resistance: 85
+- level: 105
+  allow_reset: true
+  min_material_count: 2
+  judge_resistance: 115
+- level: 110
+  allow_reset: true
+  min_material_count: 2
+  judge_resistance: 145
+  buff_resistance: 15

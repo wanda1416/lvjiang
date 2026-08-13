@@ -471,7 +471,7 @@ class TestReferenceSpaces:
         assert space_yaml.exists()
         doc = yaml.safe_load(space_yaml.read_text(encoding="utf-8"))
         assert doc["references"] == []
-        assert doc["meta_schema"]  # 种子 schema
+        assert doc["meta_schema"] == []  # 新建空间无预填字段，避免业务侵入
         local_roster = yaml.safe_load(
             space_env["local_roster"].read_text(encoding="utf-8"))
         assert local_roster["spaces"] == ["新空间"]

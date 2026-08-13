@@ -556,6 +556,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self.recorder.collect_reports()[-1:])
             return self._make_fingerprint(equip_data.to_dict()), None
 
+        # 进入调律页成功，缓存材料区 OCR（后续轮次复用，避免每轮 OCR）
+        self.executor.cache_materials()
+
         # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
         tune_cfg = self.base_group.tune
         base_affixes = list(equip_data.affixes)
@@ -611,6 +614,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 last_food_reason = self.executor.round_food_reason
             self.recorder.doc_tune_round(rounds, self.executor.round_food,
                                          new_affix)
+            # 扣减本轮狗粮缓存：返还时不消耗（不变），否则 -1
+            if not self.executor.round_food_refunded:
+                self.executor.decrement_food(self.executor.round_food)
             # 结束处理（tune 行为点）：调用公共结束处理逻辑
             action, why, resets_used, affix_count = self._execute_end_processing(
                 tune_cfg, equip_data, affix_count, resets_used, base_affixes,
@@ -633,6 +639,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 返回背包浏览页：调律页单次 back 即回到 bag_equip_detail（装备位置保持不变）。
         # 因进调律前点过「更多」弹出子菜单，back 回来后弹窗仍在，
         # 再点一次「更多」more_func 使其收起，保持背包页干净以继续遍历。
+        self.executor.invalidate_cache()  # 退出调律页，清空材料缓存
         self.click_region(self.TUNE_SCENE, "back")
         self.wait_stable("page_refresh")  # 调律页 → 背包详情页（页面切换）
         self.click_region(self.EQUIP_DETAIL, "more_func")
@@ -787,6 +794,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             tune_cfg, resets_used, why,
             min_material_count=level_cfg.min_material_count)
         if result is True:
+            # 重置成功，重新缓存材料区（重置后材料数量已变化）
+            self.executor.cache_materials()
             return "continue", why, resets_used + 1
         if isinstance(result, str):
             # 冷却期/材料不足拒绝 → 强制跳过（不走 reset_exhausted_action）

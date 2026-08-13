@@ -339,19 +339,21 @@ class _StmtMixin:
     # ─── wait stable ───────────────────────────────────────
 
     def wait_stable_stmt(self, items):
-        """wait stable <timeout> [threshold <v>] [interval <v>] [duration <v>]"""
+        """wait stable <timeout> [threshold <v>] [interval <v>] [duration <v>] [least <v>]"""
         timeout = float(items[0])  # number 已转为 float
         threshold = 0.02
         interval = 0.3
         stable_duration = 0.5
+        least = 0.5
         if len(items) > 1 and isinstance(items[1], dict):
             opts = items[1]
             threshold = opts.get("threshold", threshold)
             interval = opts.get("interval", interval)
             stable_duration = opts.get("stable_duration", stable_duration)
+            least = opts.get("least", least)
         return WaitStable(timeout=timeout, threshold=threshold,
                           interval=interval, stable_duration=stable_duration,
-                          line_no=self._line(items))
+                          least=least, line_no=self._line(items))
 
     def wait_stable_opts(self, items):
         """收集 threshold/interval/duration 选项为 dict"""
@@ -373,6 +375,9 @@ class _StmtMixin:
 
     def wait_stable_duration(self, items):
         return {"stable_duration": float(items[0])}
+
+    def wait_stable_least(self, items):
+        return {"least": float(items[0])}
 
     def range_literal(self, items):
         """(min, max) → (float, float) 范围元组，用于 eval 赋值"""

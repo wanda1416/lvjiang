@@ -415,6 +415,7 @@ class _ActionsMixin:
                 threshold=node.threshold,
                 interval=node.interval,
                 stable_duration=node.stable_duration,
+                least=node.least,
             )
         except TimeoutError as e:
             raise WorkflowUserError(str(e)) from None

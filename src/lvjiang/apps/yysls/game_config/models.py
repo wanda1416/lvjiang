@@ -1,11 +1,12 @@
 """游戏配置数据类
 
-等级配置、品阶推断规则等数据结构定义。
+等级配置、赛季配置、品阶推断规则等数据结构定义。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 # ─── 等级配置数据结构 ──────────────────────────────────────
 
@@ -24,6 +25,27 @@ class LevelConfig:
     min_material_count: int | None = None
     judge_resistance: int | None = None
     buff_resistance: int | None = None
+
+
+# ─── 赛季配置数据结构 ──────────────────────────────────────
+
+@dataclass
+class SeasonConfig:
+    """单赛季配置条目
+
+    season_number: 赛季编号（1, 2, 3...，用于排序）
+    name: 赛季名称（如"黄钟长鸣"、"夹钟并作"）
+    start_date: 赛季开始日期
+    end_date: 赛季结束日期
+    first_half_end_date: 上半赛季结束日期（每赛季 84 天，前 42 天为上半赛季）
+    equip_level: 当前赛季装备等级（如 90, 96, 100）
+    """
+    season_number: int = 0
+    name: str = ""
+    start_date: date | None = None
+    end_date: date | None = None
+    first_half_end_date: date | None = None
+    equip_level: int | None = None
 
 
 # ─── 品阶推断数据结构 ──────────────────────────────────────

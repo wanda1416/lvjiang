@@ -365,6 +365,7 @@ class TuningGroupManager:
         data = {
             "key": key,
             "name": name,
+            "description": "",
             "materials": {"food_rules": []},
             "scan": {"rules": []},
             "tune": {"rules": []},

@@ -1,5 +1,6 @@
 key: aggressive
 name: 激进规则
+description: 激进回收策略，降低门槛以最大化材料消耗速度
 materials:
   stone_check:
     enabled: true

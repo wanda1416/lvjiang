@@ -695,6 +695,7 @@ def parse_tuning_group(data: dict) -> TuningGroup:
     return TuningGroup(
         key=key,
         name=name,
+        description=str(data.get("description") or ""),
         materials=_parse_materials(data.get("materials")),
         scan=_parse_scan(data.get("scan"), "scan"),
         tune=_parse_tune(data.get("tune"), "tune"),

@@ -1,12 +1,11 @@
 """装备状态面板 - 展示用户当前穿戴的八件装备"""
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -217,8 +216,6 @@ class _EquipCard(QFrame):
 class EquipStatusPanel(QWidget):
     """装备状态面板（2行×4列）"""
 
-    refresh_requested = pyqtSignal()
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cards: dict[str, _EquipCard] = {}
@@ -227,27 +224,6 @@ class EquipStatusPanel(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
-
-        # 标题行：标题 + 刷新按钮
-        title_row = QHBoxLayout()
-
-        title = QLabel("当前装备")
-        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #333333;")
-        title_row.addWidget(title)
-
-        title_row.addStretch()
-
-        btn_refresh = QPushButton("刷新")
-        btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip("重新读取装备数据")
-        btn_refresh.setStyleSheet(
-            "QPushButton { background-color: #607D8B; color: white; font-size: 12px; padding: 4px; border-radius: 3px; }"
-            "QPushButton:hover { background-color: #78909C; }"
-        )
-        btn_refresh.clicked.connect(self.refresh_requested.emit)
-        title_row.addWidget(btn_refresh)
-
-        layout.addLayout(title_row)
 
         # 滚动区域
         scroll = QScrollArea()

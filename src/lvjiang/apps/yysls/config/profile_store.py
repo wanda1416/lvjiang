@@ -104,4 +104,17 @@ def is_alert_marked(alert_key: str) -> bool:
     return alert_key in get_alert_history()
 
 
+def unmark_alert(alert_key: str) -> None:
+    """移除一个提醒标记（条件不满足时调用，允许下次重新触发）"""
+    with _rw_lock:
+        data = _load()
+        history = data.get(_SUB_ALERT_HISTORY, {})
+        if not isinstance(history, dict):
+            return
+        if alert_key in history:
+            del history[alert_key]
+            data[_SUB_ALERT_HISTORY] = history
+            _save(data)
+
+
 

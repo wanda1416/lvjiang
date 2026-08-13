@@ -19,6 +19,7 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from lvjiang.core.config import SessionManager
+from lvjiang.core.config.session import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
 from ..config.profile_models import RegenKeyDef
@@ -27,6 +28,7 @@ from ..config.profile_store import (
     is_alert_marked,
     mark_alert,
     set_alert_history,
+    unmark_alert,
 )
 from ..config.user_profile import (
     get_profile_config,
@@ -334,30 +336,17 @@ def _count_weekly_regens(
 # ─── 提醒去重 ────────────────────────────────────────────────
 
 
-def _check_and_mark_alert(
-    user_name: str, key: str, alert_type: str, period_key: str
-) -> bool:
-    """检查提醒是否已发送过（同一 key + 同一阈值 + 同一周期只提醒一次）
-
-    返回 True 表示首次触发（需要发送），False 表示已提醒过。
-    """
-    alert_key = f"{user_name}:{key}:{alert_type}:{period_key}"
-    if is_alert_marked(alert_key):
-        return False
-
-    mark_alert(alert_key, datetime.now().isoformat(timespec="seconds"))
-    return True
-
-
 def _clean_old_alerts(current_keys: set[str]) -> None:
-    """清理已不存在的 key 的提醒记录"""
+    """清理已不存在的 key 的提醒记录，同时清除旧格式（alert_above 遗留）"""
     history = get_alert_history()
     if not history:
         return
 
     cleaned = {
         k: v for k, v in history.items()
-        if k.split(":")[1] in current_keys
+        # 丢弃旧格式 {user}:{key}:above:current
+        if not k.endswith(":above:current")
+        and k.split(":")[1] in current_keys
     }
     if len(cleaned) != len(history):
         set_alert_history(cleaned)
@@ -513,16 +502,29 @@ class ProfileEngine(QThread):
                 else:
                     logger.warning(f"{user_name} regen.{kd.key} CAS 失败，放弃本轮")
 
-            # 检查 alert_above（用最新计算值，不论是否写入成功）
-            if kd.alert_above is not None and computed >= kd.alert_above:
-                if _check_and_mark_alert(user_name, kd.key, "above", "current"):
-                    message = f"{user_name} {kd.label} 已达 {int(computed)}，超过阈值 {kd.alert_above}"
-                    alert_id = f"yysls:{user_name}:{kd.key}"
-                    # 引擎直接持久化告警，不依赖 UI 信号链路
-                    from lvjiang.core.config.session import add_alert
-                    add_alert(alert_id, message, datetime.now().isoformat())
-                    # 信号仅用于通知 UI 刷新
-                    self.alert_triggered.emit(kd.key, kd.label, message)
+            # 检查双阈值告警（用最新计算值，不论是否写入成功）
+            # 橙色和红色各自独立触发和清理
+            for level, threshold in [("orange", kd.alert_orange), ("red", kd.alert_red)]:
+                if threshold is None:
+                    continue
+                alert_key = f"{user_name}:{kd.key}:{level}:current"
+                alert_id = f"yysls:{user_name}:{kd.key}:{level}"
+
+                if computed >= threshold:
+                    # 值满足阈值：如果未标记则触发告警
+                    if not is_alert_marked(alert_key):
+                        level_label = "橙色" if level == "orange" else "红色"
+                        message = f"{user_name} {kd.label} [{level_label}] 已达 {int(computed)}，超过阈值 {threshold}"
+                        # 先持久化告警，再标记去重（避免 add_alert 失败时去重标记已写入但告警未持久化）
+                        add_alert(alert_id, message, datetime.now().isoformat())
+                        mark_alert(alert_key, datetime.now().isoformat(timespec="seconds"))
+                        # 信号仅用于通知 UI 刷新
+                        self.alert_triggered.emit(kd.key, kd.label, message)
+                else:
+                    # 值低于阈值：如果已标记则清除（允许下次重新触发）
+                    if is_alert_marked(alert_key):
+                        unmark_alert(alert_key)
+                        # 注意：不清理 alert_info，由用户手动关闭
 
         # ── 通知 UI 刷新 ──
         if modified:

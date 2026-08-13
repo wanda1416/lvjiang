@@ -179,7 +179,7 @@ class PositionalTraversal(BagTraversal):
 
         # 大幅步进（1 行）
         wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
-        wf.wait_delay("scroll_settle")
+        wf.wait_stable("scroll_settle")  # 滚动后面板稳定
         alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
         assert alignment_raw is not None, "对齐失败：alignment 为 None"
         alignment: GridAlignment = alignment_raw
@@ -227,7 +227,7 @@ class PositionalTraversal(BagTraversal):
                         f"nfp={nfp} first_real_row={first_real_row} fps={fps}")
                     return ScrollState.BOTTOM, alignment.n_rows
                 wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", distance=0.25)
-                wf.wait_delay("scroll_settle")
+                wf.wait_stable("scroll_settle")  # 补滚后稳定
                 alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
                 assert alignment_raw is not None, "补滚后对齐失败"
                 alignment = alignment_raw
@@ -247,7 +247,7 @@ class PositionalTraversal(BagTraversal):
                         f"nfp={nfp} first_real_row={first_real_row} fps={fps}"
                     )
                 wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "down", distance=0.25)
-                wf.wait_delay("scroll_settle")
+                wf.wait_stable("scroll_settle")  # 回滚后稳定
                 alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)  # type: ignore[assignment]
             else:
                 # nfp 与三候选都不匹配：滚动一行后首行必然是已见过的装备
@@ -289,7 +289,7 @@ class PositionalTraversal(BagTraversal):
                         return ScrollState.BOTTOM, alignment.n_rows
                     wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up",
                                  distance=0.25)
-                    wf.wait_delay("scroll_settle")
+                    wf.wait_stable("scroll_settle")  # 漂移补滚后稳定
                     alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
                     assert alignment_raw is not None, "漂移补滚后对齐失败"
                     alignment = alignment_raw

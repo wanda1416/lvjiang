@@ -43,12 +43,18 @@ class DedupFakeWF(AutoTuningWorkflow):
         self.recycle_fps: set[str] = set()     # 回收后格位已空的指纹
         self.processed: list[str] = []
         self.drags = 0
+        self._delay_params = {}  # wait_stable 命名参数查找用
 
     @property
     def is_stopped(self) -> bool:
         return False
 
     def wait_delay(self, name: str):
+        pass
+
+    def wait_stable(self, timeout: float | str = 8.0, threshold: float = 0.02,
+                    interval: float = 0.3, stable_duration: float = 0.5,
+                    least: float = 0.5):
         pass
 
     def _find_panel(self, scene_key, panel_key):

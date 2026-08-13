@@ -105,6 +105,7 @@ user_config:
 | 文档 | 内容 |
 |------|------|
 | [01-auto-tuning.md](01-auto-tuning.md) | 自动调律：背包遍历、调律决策编排 |
-| [03-wf-editor-plugin.md](03-wf-editor-plugin.md) | 工作流 DSL 编辑器插件：语法高亮、实时诊断、语义智能 |
 | [02-player-profile.md](02-player-profile.md) | 玩家档案系统：毕业率分析、货币追踪、心力体力管理 |
+| [03-wf-editor-plugin.md](03-wf-editor-plugin.md) | 工作流 DSL 编辑器插件：语法高亮、实时诊断、语义智能 |
+| [04-i18n.md](04-i18n.md) | 国际化支持框架：i18n 模块、翻译文件、UI 改造 |
 | [../10-game/README.md](../10-game/README.md) | 游戏机制介绍：装备系统、调律机制 |

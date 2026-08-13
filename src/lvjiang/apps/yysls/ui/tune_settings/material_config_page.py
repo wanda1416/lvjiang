@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMenu,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QVBoxLayout,
@@ -91,7 +92,15 @@ class MaterialConfigPage(QWidget):
     # ── UI 构建 ──
 
     def _init_ui(self):
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        outer.addWidget(scroll)
+        content = QWidget()
+        scroll.setWidget(content)
+        layout = QVBoxLayout(content)
 
         # 页面标题
         layout.addWidget(QLabel(

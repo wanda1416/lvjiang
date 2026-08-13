@@ -222,6 +222,10 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         """获取全部面板列表（含被视图过滤隐藏的）"""
         return [Panel(**p.to_dict()) for p in self._panels + self._hidden_panels]
 
+    def get_visible_panels(self) -> list[Panel]:
+        """获取当前视图下可见的面板列表（识别/OCR 只应作用于可见面板）"""
+        return [Panel(**p.to_dict()) for p in self._panels]
+
     def select_panel_by_key(self, key: str):
         """按 key 选中面板"""
         for i, p in enumerate(self._panels):

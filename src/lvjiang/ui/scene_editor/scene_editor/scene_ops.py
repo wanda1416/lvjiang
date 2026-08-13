@@ -76,6 +76,11 @@ class SceneOpsMixin:
             scene_name = get_scene_name(scene_key)
             tab = SceneTab(scene_key)
             tab.on_item_migrated = self._on_item_migrated
+            # 恢复 Tab 内部分割器尺寸（延迟应用）
+            if hasattr(self, '_pending_tab_split'):
+                ps = self._pending_tab_split
+                if isinstance(ps, list) and len(ps) == 2 and all(s > 0 for s in ps):
+                    tab._splitter.setSizes([int(s) for s in ps])
             self._tabs[scene_key] = tab
             idx = scene_tab_widget.addTab(tab, scene_name)
             scene_tab_widget.setTabToolTip(idx, scene_key)

@@ -155,7 +155,8 @@ class LayoutOpsMixin:
             self._status_bar.showMessage("没有已加载的布局")
             return
         name = self._current_layout.name
-        current_tab = next(iter(self._tabs.values()))
+        # 画布配置从当前激活 Tab 获取（用户编辑的是当前 Tab 的画布）
+        current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
         self._current_layout.set_canvas(current_tab.get_canvas_config())
         # 从所有 Tab 收集数据到 Layout 对象（内存操作，始终全量）
         for scene_key, tab in self._tabs.items():
@@ -188,7 +189,7 @@ class LayoutOpsMixin:
             self._status_bar.showMessage("没有已加载的布局")
             return
         temp = Layout(name="")
-        current_tab = next(iter(self._tabs.values()))
+        current_tab = self._current_scene_tab() or next(iter(self._tabs.values()))
         temp.set_canvas(current_tab.get_canvas_config())
         for scene_key, tab in self._tabs.items():
             temp.set_scene_regions(scene_key, tab.get_regions())

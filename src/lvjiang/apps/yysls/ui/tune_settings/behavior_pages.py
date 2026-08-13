@@ -793,6 +793,19 @@ class ScanBehaviorPage(_BehaviorPageBase):
         threshold_row.addWidget(self._entry_combo)
         threshold_row.addStretch()
         layout.addLayout(threshold_row)
+
+        # 最大连续回收次数
+        recycle_row = QHBoxLayout()
+        recycle_row.addWidget(QLabel("最大连续回收次数"))
+        self._max_recycle_spin = QSpinBox()
+        self._max_recycle_spin.setRange(1, 999)
+        self._max_recycle_spin.setToolTip(
+            "回收补位循环上限：回收后重读同格续处理的最大次数，必须大于 0")
+        self._max_recycle_spin.valueChanged.connect(lambda _v: self._apply())
+        recycle_row.addWidget(self._max_recycle_spin)
+        recycle_row.addWidget(QLabel("（须大于 0）"))
+        recycle_row.addStretch()
+        layout.addLayout(recycle_row)
         layout.addSpacing(half_line)
 
         # 处置表区：启用开关紧贴规则表
@@ -810,6 +823,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
         self._min_level_spin.setValue(stage.min_level)
         idx = self._entry_combo.findData(stage.entry_min_rating)
         self._entry_combo.setCurrentIndex(max(idx, 0))
+        self._max_recycle_spin.setValue(stage.max_consecutive_recycles)
         self._enabled_cb.setChecked(stage.enabled)
 
     def _stage_raw(self) -> dict:
@@ -817,6 +831,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
             "enabled": self._enabled_cb.isChecked(),
             "min_level": self._min_level_spin.value(),
             "entry_min_rating": self._entry_combo.currentData(),
+            "max_consecutive_recycles": self._max_recycle_spin.value(),
             "rules": self._rules_raw(),
         }
 

@@ -604,8 +604,8 @@ def _reject_stage_judge(raw: dict, where: str) -> None:
 
 
 def _parse_scan(raw, where: str) -> ScanBehavior:
-    """扫描处理解析：{enabled, min_level, entry_min_rating, rules}；
-    缺省段取 ScanBehavior 默认值"""
+    """扫描处理解析：{enabled, min_level, entry_min_rating,
+    max_consecutive_recycles, rules}；缺省段取 ScanBehavior 默认值"""
     if raw is None:
         return ScanBehavior()
     if not isinstance(raw, dict):
@@ -627,10 +627,19 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
         raise RuleValidationError(
             f"{where}.entry_min_rating 非法: {entry!r}（须为 "
             f"{list(RATING_KEYS)}）")
+    # ── max_consecutive_recycles（回收补位循环上限，缺省 50）──
+    mcr = raw.get("max_consecutive_recycles", 50)
+    if isinstance(mcr, bool) or not isinstance(mcr, int):
+        raise RuleValidationError(
+            f"{where}.max_consecutive_recycles 必须是整数")
+    if mcr <= 0:
+        raise RuleValidationError(
+            f"{where}.max_consecutive_recycles 必须大于 0: {mcr}")
     return ScanBehavior(
         enabled=bool(raw.get("enabled", True)),
         min_level=min_level,
         entry_min_rating=entry,
+        max_consecutive_recycles=mcr,
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
                                     "scan"),
     )

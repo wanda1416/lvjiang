@@ -42,7 +42,7 @@ if not $at_haoling
    scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
    if not $at_haoling
       log "导航后仍未进入江湖号令页，终止流程"
-      return
+      return -1
    end
 end
 

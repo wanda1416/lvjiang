@@ -401,12 +401,20 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 f"wait 引用了未定义的等待参数: {detail}，请先在配置管理→等待参数中定义")
 
     def _collect_missing_waits(self, stmts: list, missing: dict[str, int]):
-        """递归收集语句体中引用未定义命名等待的 Wait 节点"""
+        """递归收集语句体中引用未定义命名等待的 Wait / WaitStable 节点"""
         for node in stmts:
             match node:
                 case Wait(delay=Literal(value=str() as name)):
                     if name not in self._delay_params:
                         missing.setdefault(name, node.line_no)
+                case WaitStable():
+                    # wait stable 各参数也可能是 @命名延迟，需校验
+                    for field in (node.timeout, node.threshold, node.interval,
+                                  node.stable_duration, node.least):
+                        if (isinstance(field, Literal)
+                                and isinstance(field.value, str)
+                                and field.value not in self._delay_params):
+                            missing.setdefault(field.value, node.line_no)
                 case If():
                     self._collect_missing_waits(node.then_body, missing)
                     self._collect_missing_waits(node.else_body, missing)

@@ -384,7 +384,7 @@ class ReferenceManagerDialog(QDialog):
         self._update_info_label()
 
     def _on_grid_defaults_changed(self, grid: dict):
-        """五项网格参数手动改动后写入 session.json 的 material_grid 节点"""
+        """五项网格参数手动改动后写入 session.json 的 settings.material_grid 节点"""
         from lvjiang.core.config import save_material_grid
         save_material_grid(grid)
 

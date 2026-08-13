@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -27,6 +28,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -52,7 +54,15 @@ from ..config.profile_models import (
     KeyDef,
     RealtimeKeyDef,
 )
+from ..config.profile_store import (
+    get_active_group,
+    get_groups,
+    migrate_from_legacy,
+    save_groups,
+    set_active_group,
+)
 from ..config.user_profile import read_profile_entry
+from ..profile.profile_engine import _compute_realtime_value
 
 # 统一的刷新按钮样式
 _REFRESH_BTN_STYLE = (
@@ -61,33 +71,8 @@ _REFRESH_BTN_STYLE = (
     "QPushButton:hover { background-color: #78909C; }"
 )
 
-# 总览分组配置在 session.json 中的 key
-_GROUPS_KEY = "profile_overview_groups"
-_ACTIVE_GROUP_KEY = "profile_overview_active_group"
+# 列宽配置仍在 ui_state 下
 _COLUMN_WIDTHS_KEY = "profile_overview_column_widths"
-
-
-def _get_groups() -> dict:
-    """从 session.json 获取总览分组配置
-
-    返回 {group_name: {"columns": [key, ...]}, ...}
-    """
-    return get_session_store().get_node(_GROUPS_KEY, {})
-
-
-def _save_groups(groups: dict) -> None:
-    """保存总览分组配置到 session.json"""
-    get_session_store().set_node(_GROUPS_KEY, groups)
-
-
-def _get_active_group() -> str:
-    """获取当前活跃的分组名"""
-    return get_session_store().get_node(_ACTIVE_GROUP_KEY, "")
-
-
-def _set_active_group(name: str) -> None:
-    """保存当前活跃分组名"""
-    get_session_store().set_node(_ACTIVE_GROUP_KEY, name)
 
 
 def _get_column_widths() -> dict:
@@ -101,30 +86,6 @@ def _get_column_widths() -> dict:
 def _save_column_widths(widths: dict) -> None:
     """保存各分组列宽到 ui_state"""
     get_session_store().update_node("ui_state", {_COLUMN_WIDTHS_KEY: widths})
-
-
-def _migrate_old_columns() -> None:
-    """一次性迁移：将旧的 profile_overview_columns 扁平列表转为分组格式"""
-    store = get_session_store()
-    old_columns = store.get_node("profile_overview_columns", None)
-    groups = store.get_node(_GROUPS_KEY, None)
-
-    if groups:
-        # 已有新格式，清理旧 key
-        if old_columns is not None:
-            store.delete_node("profile_overview_columns")
-        return
-
-    # 无新格式，从旧格式迁移
-    if old_columns and isinstance(old_columns, list):
-        store.set_node(_GROUPS_KEY, {"默认": {"columns": old_columns}})
-        store.set_node(_ACTIVE_GROUP_KEY, "默认")
-    else:
-        store.set_node(_GROUPS_KEY, {"默认": {"columns": []}})
-        store.set_node(_ACTIVE_GROUP_KEY, "默认")
-
-    # 删除旧 key
-    store.delete_node("profile_overview_columns")
 
 # ─── 档案总览 Tab ────────────────────────────────────────────
 
@@ -140,7 +101,7 @@ class ProfileOverviewTab(QWidget):
         self._editing_cap_cell = False
         self._restoring_widths = False
         self._reordering = False
-        _migrate_old_columns()
+        migrate_from_legacy()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -202,12 +163,12 @@ class ProfileOverviewTab(QWidget):
         self._tab_widget.clear()
         self._tables.clear()
 
-        groups = _get_groups()
+        groups = get_groups()
         if not groups:
             groups = {"默认": {"columns": []}}
-            _save_groups(groups)
+            save_groups(groups)
 
-        active_group = _get_active_group()
+        active_group = get_active_group()
         active_idx = 0
 
         for idx, (group_name, _group_data) in enumerate(groups.items()):
@@ -220,7 +181,7 @@ class ProfileOverviewTab(QWidget):
         self._tab_widget.blockSignals(False)
         if self._tab_widget.count() > 0:
             self._tab_widget.setCurrentIndex(active_idx)
-            # _on_tab_changed 会自动调用 _set_active_group
+            # _on_tab_changed 会自动调用 set_active_group
 
     def _create_table_for_group(self, group_name: str) -> QTableWidget:
         """为指定分组创建并绑定一个 QTableWidget"""
@@ -232,6 +193,12 @@ class ProfileOverviewTab(QWidget):
         v_header.setDefaultSectionSize(24)
         v_header.setVisible(False)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+
+        # 右键菜单：快速增减数值
+        table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        table.customContextMenuRequested.connect(
+            lambda pos, gn=group_name, t=table: self._on_cell_context_menu(pos, gn, t)
+        )
 
         # 绑定信号（通过 lambda 携带 group_name）
         table.itemChanged.connect(lambda item, gn=group_name: self._on_item_changed(item, gn))
@@ -269,7 +236,7 @@ class ProfileOverviewTab(QWidget):
         from ..config import get_profile_config
 
         config = get_profile_config()
-        groups = _get_groups()
+        groups = get_groups()
         group_data = groups.get(group_name, {})
         column_keys = group_data.get("columns", [])
 
@@ -278,7 +245,7 @@ class ProfileOverviewTab(QWidget):
         if valid_keys != column_keys:
             group_data["columns"] = valid_keys
             groups[group_name] = group_data
-            _save_groups(groups)
+            save_groups(groups)
             column_keys = valid_keys
 
         key_defs = [kd for kd in (config.get_key(k) for k in column_keys) if kd is not None]
@@ -302,9 +269,10 @@ class ProfileOverviewTab(QWidget):
 
             for col, kd in enumerate(key_defs):
                 model_type = config.get_model_type(kd.key) or ""
-                value = self._format_profile_value(kd, model_type, data)
-                item = QTableWidgetItem(value)
+                display_text, style = self._format_profile_cell(kd, model_type, data)
+                item = QTableWidgetItem(display_text)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._apply_cell_style(item, style)
                 table.setItem(row, col + 1, item)
 
         header = table.horizontalHeader()
@@ -315,35 +283,67 @@ class ProfileOverviewTab(QWidget):
         self._loading = False
         self._restore_column_widths(group_name, table)
 
-    def _format_profile_value(self, kd: KeyDef, model_type: str, data: dict) -> str:
-        """根据模型类型格式化 profile 值用于总览显示"""
+    def _format_profile_cell(self, kd: KeyDef, model_type: str, data: dict) -> tuple[str, str]:
+        """根据模型类型格式化 profile 值用于总览显示
+
+        返回 (display_text, style)，style 为 "" | "red_bold" | "orange_bold"
+        """
         entry = read_profile_entry(data, model_type, kd.key)
         if not entry:
-            return ""
+            return "", ""
 
         value = entry.get("value")
         if value is None:
-            return ""
+            return "", ""
 
         if model_type == MODEL_DAILY:
-            if isinstance(kd, DailyKeyDef) and kd.cap:
-                return f"{value}/{kd.cap}"
-            return str(value)
+            if isinstance(kd, DailyKeyDef) and kd.show_cap and kd.cap:
+                return f"{int(value)}/{kd.cap}", ""
+            return str(int(value)), ""
 
         if model_type == MODEL_REALTIME:
-            if isinstance(kd, RealtimeKeyDef) and kd.cap:
-                return f"{value}/{kd.cap}"
-            return str(value)
+            if isinstance(kd, RealtimeKeyDef):
+                # 实时计算当前值
+                updated_at_str = entry.get("updated_at", "")
+                computed, _ = _compute_realtime_value(
+                    value, updated_at_str,
+                    kd.regen_period, kd.regen_value, kd.cap,
+                    kd.reset_time,
+                )
+                int_value = int(computed)
+                style = ""
+                if kd.cap is not None and computed >= kd.cap:
+                    style = "red_bold"
+                elif kd.alert_above is not None and computed >= kd.alert_above:
+                    style = "orange_bold"
+                if kd.show_cap and kd.cap:
+                    return f"{int_value}/{kd.cap}", style
+                return str(int_value), style
+            return str(int(value)), ""
 
         if model_type == MODEL_RESOURCE:
-            return str(value)
+            return str(int(value)), ""
 
         if model_type == MODEL_ACTIVITY:
-            if isinstance(kd, ActivityKeyDef) and kd.cap:
-                return f"{value}/{kd.cap}"
-            return str(value)
+            if isinstance(kd, ActivityKeyDef) and kd.show_cap and kd.cap:
+                return f"{int(value)}/{kd.cap}", ""
+            return str(int(value)), ""
 
-        return str(value)
+        return str(value), ""
+
+    @staticmethod
+    def _apply_cell_style(item: QTableWidgetItem, style: str) -> None:
+        """应用单元格样式: '' | 'red_bold' | 'orange_bold'"""
+        if style == "red_bold":
+            font = QFont(item.font())
+            font.setBold(True)
+            item.setFont(font)
+            item.setForeground(Qt.GlobalColor.red)
+        elif style == "orange_bold":
+            font = QFont(item.font())
+            font.setBold(True)
+            item.setFont(font)
+            item.setForeground(QColor(255, 165, 0))  # 橙色
 
     def _on_columns_reordered(self, group_name: str, table: QTableWidget):
         """拖拽列头后持久化新顺序"""
@@ -353,7 +353,7 @@ class ProfileOverviewTab(QWidget):
         try:
             h_header = table.horizontalHeader()
             assert h_header is not None
-            groups = _get_groups()
+            groups = get_groups()
             group_data = groups.get(group_name, {"columns": []})
             column_keys = group_data.get("columns", [])
             # 跳过第 0 列（角色名），从第 1 列开始读取新的视觉顺序
@@ -366,7 +366,7 @@ class ProfileOverviewTab(QWidget):
             if column_keys != new_order:
                 group_data["columns"] = new_order
                 groups[group_name] = group_data
-                _save_groups(groups)
+                save_groups(groups)
                 self._refresh_group(group_name, table)
         finally:
             self._reordering = False
@@ -430,7 +430,7 @@ class ProfileOverviewTab(QWidget):
             QMessageBox.information(self, "提示", "没有可用的数据模型 key，请先在数据模型定义中添加")
             return
 
-        groups = _get_groups()
+        groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
         current_key = column_keys[logical_index - 1] if logical_index - 1 < len(column_keys) else ""
 
@@ -476,7 +476,7 @@ class ProfileOverviewTab(QWidget):
         config = get_profile_config()
 
         # 过滤掉该分组已有的 key
-        groups = _get_groups()
+        groups = get_groups()
         group_data = groups.get(group_name, {"columns": []})
         used_keys = set(group_data.get("columns", []))
         all_keys = [kd for kd in config.get_all_keys() if kd.key not in used_keys]
@@ -512,7 +512,7 @@ class ProfileOverviewTab(QWidget):
         if dialog.exec():
             selected_key = combo.currentData()
             if selected_key:
-                groups = _get_groups()
+                groups = get_groups()
                 group_data = groups.get(group_name, {"columns": []})
                 column_keys = group_data.get("columns", [])
                 if selected_key in column_keys:
@@ -522,12 +522,12 @@ class ProfileOverviewTab(QWidget):
                 column_keys.insert(insert_idx, selected_key)
                 group_data["columns"] = column_keys
                 groups[group_name] = group_data
-                _save_groups(groups)
+                save_groups(groups)
                 self._refresh_group(group_name, self._tables[group_name])
 
     def _remove_column(self, group_name: str, logical_index: int):
         """从指定分组中删除指定列"""
-        groups = _get_groups()
+        groups = get_groups()
         group_data = groups.get(group_name, {"columns": []})
         column_keys = group_data.get("columns", [])
         col_idx = logical_index - 1
@@ -535,12 +535,12 @@ class ProfileOverviewTab(QWidget):
             del column_keys[col_idx]
             group_data["columns"] = column_keys
             groups[group_name] = group_data
-            _save_groups(groups)
+            save_groups(groups)
             self._refresh_group(group_name, self._tables[group_name])
 
     def _set_column_field(self, group_name: str, logical_index: int, field_key: str):
         """设置指定分组的指定列字段"""
-        groups = _get_groups()
+        groups = get_groups()
         group_data = groups.get(group_name, {"columns": []})
         column_keys = group_data.get("columns", [])
         col_idx = logical_index - 1
@@ -554,7 +554,7 @@ class ProfileOverviewTab(QWidget):
         column_keys[col_idx] = field_key
         group_data["columns"] = column_keys
         groups[group_name] = group_data
-        _save_groups(groups)
+        save_groups(groups)
         self._refresh_group(group_name, self._tables[group_name])
 
     def _on_cell_double_clicked(self, row: int, col: int, group_name: str):
@@ -564,7 +564,7 @@ class ProfileOverviewTab(QWidget):
 
         from ..config import get_profile_config
         config = get_profile_config()
-        groups = _get_groups()
+        groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
         field_idx = col - 1
         if field_idx >= len(column_keys):
@@ -610,7 +610,7 @@ class ProfileOverviewTab(QWidget):
         from ..config import get_profile_config
         config = get_profile_config()
 
-        groups = _get_groups()
+        groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
         field_idx = col - 1
         if field_idx >= len(column_keys):
@@ -637,7 +637,9 @@ class ProfileOverviewTab(QWidget):
         if parsed_value is _PARSE_ERROR:
             self._loading = True
             user_data = self._load_user_data(user_name)
-            item.setText(self._format_profile_value(kd, model_type, user_data))
+            text, style = self._format_profile_cell(kd, model_type, user_data)
+            item.setText(text)
+            self._apply_cell_style(item, style)
             self._loading = False
             return
 
@@ -645,7 +647,9 @@ class ProfileOverviewTab(QWidget):
 
         self._loading = True
         user_data = self._load_user_data(user_name)
-        item.setText(self._format_profile_value(kd, model_type, user_data))
+        text, style = self._format_profile_cell(kd, model_type, user_data)
+        item.setText(text)
+        self._apply_cell_style(item, style)
         self._loading = False
 
     @staticmethod
@@ -672,9 +676,9 @@ class ProfileOverviewTab(QWidget):
 
         if model_type == MODEL_REALTIME:
             try:
-                return int(raw) if raw else 0
+                return float(raw) if raw else 0.0
             except ValueError:
-                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是整数")
+                QMessageBox.warning(None, "输入错误", f"{kd.label} 必须是数字")
                 return _PARSE_ERROR
 
         if model_type == MODEL_RESOURCE:
@@ -705,6 +709,155 @@ class ProfileOverviewTab(QWidget):
         except Exception as e:
             logger.error(f"回写失败: {e}")
             QMessageBox.warning(self, "保存失败", f"回写用户数据失败:\n{e}")
+
+    def _on_cell_context_menu(self, pos, group_name: str, table: QTableWidget):
+        """右键菜单：快速增减数值"""
+        item = table.itemAt(pos)
+        if not item:
+            return
+
+        row = item.row()
+        col = item.column()
+        if col < 1:  # 角色名列不处理
+            return
+
+        from ..config import get_profile_config
+        config = get_profile_config()
+
+        groups = get_groups()
+        column_keys = groups.get(group_name, {}).get("columns", [])
+        field_idx = col - 1
+        if field_idx >= len(column_keys):
+            return
+
+        key_str = column_keys[field_idx]
+        kd = config.get_key(key_str)
+        if not kd:
+            return
+
+        model_type = config.get_model_type(key_str) or ""
+
+        # 资源模型不支持增减
+        if model_type == MODEL_RESOURCE:
+            return
+
+        name_item = table.item(row, 0)
+        if not name_item:
+            return
+        user_name = name_item.text()
+
+        # 获取当前值
+        user_data = self._load_user_data(user_name)
+        entry = user_data.get("profile", {}).get(model_type, {}).get(key_str, {})
+        current_value = entry.get("value", 0)
+        if current_value is None:
+            current_value = 0
+
+        # 构建菜单
+        menu = QMenu(self)
+        menu.setTitle(f"{kd.label} ({user_name})")
+
+        # 增减选项
+        steps = [1, 10, 100]
+        for step in steps:
+            # 增加
+            action_up = menu.addAction(f"+{step}")
+            if action_up:
+                action_up.triggered.connect(
+                    lambda checked, s=step: self._adjust_value(
+                        user_name, model_type, key_str, kd, current_value, s
+                    )
+                )
+
+        menu.addSeparator()
+
+        for step in steps:
+            # 减少
+            action_down = menu.addAction(f"-{step}")
+            if action_down:
+                action_down.triggered.connect(
+                    lambda checked, s=step: self._adjust_value(
+                        user_name, model_type, key_str, kd, current_value, -s
+                    )
+                )
+
+        # 自定义增减
+        menu.addSeparator()
+        action_custom = menu.addAction("自定义增减...")
+        if action_custom:
+            action_custom.triggered.connect(
+                lambda: self._adjust_value_custom(
+                    user_name, model_type, key_str, kd, current_value
+                )
+            )
+
+        viewport = table.viewport()
+        if viewport:
+            menu.exec(viewport.mapToGlobal(pos))
+
+    def _adjust_value(
+        self,
+        user_name: str,
+        model_type: str,
+        key: str,
+        kd,
+        current_value,
+        delta: int | float,
+    ):
+        """增减数值并写回"""
+        new_value = current_value + delta
+
+        # 下限：0
+        new_value = max(0, new_value)
+
+        # 上限：cap
+        cap = getattr(kd, "cap", None)
+        if cap is not None:
+            new_value = min(new_value, cap)
+
+        self._write_profile_entry(user_name, model_type, key, new_value)
+
+        # 刷新表格
+        current_group = self._get_current_group_name()
+        table = self._tables.get(current_group)
+        if table:
+            self._refresh_group(current_group, table)
+
+    def _adjust_value_custom(
+        self,
+        user_name: str,
+        model_type: str,
+        key: str,
+        kd,
+        current_value,
+    ):
+        """自定义增减数值"""
+        from PyQt6.QtWidgets import QInputDialog
+
+        if model_type == MODEL_REALTIME:
+            delta, ok = QInputDialog.getDouble(
+                self,
+                f"自定义增减 - {kd.label}",
+                f"当前值: {current_value}\n输入增减量（正数增加，负数减少）:",
+                0,
+                -999999,
+                999999,
+                4,
+            )
+        else:
+            delta, ok = QInputDialog.getInt(
+                self,
+                f"自定义增减 - {kd.label}",
+                f"当前值: {int(current_value)}\n输入增减量（正数增加，负数减少）:",
+                0,
+                -999999,
+                999999,
+                1,
+            )
+        if not ok:
+            return
+
+        self._adjust_value(user_name, model_type, key, kd, current_value, delta)
 
     def _load_all_users(self) -> dict[str, dict]:
         """加载所有用户数据（按用户管理定义的顺序）"""
@@ -760,7 +913,7 @@ class ProfileOverviewTab(QWidget):
 
     def _add_group(self):
         """新建分组"""
-        groups = _get_groups()
+        groups = get_groups()
         name, ok = QInputDialog.getText(self, "新建分组", "分组名称:")
         if not ok:
             return
@@ -773,13 +926,13 @@ class ProfileOverviewTab(QWidget):
             return
 
         groups[name] = {"columns": []}
-        _save_groups(groups)
-        _set_active_group(name)
+        save_groups(groups)
+        set_active_group(name)
         self._build_groups()
 
     def _rename_group(self):
         """重命名当前分组"""
-        groups = _get_groups()
+        groups = get_groups()
         if not groups:
             return
         old_name = self._get_current_group_name()
@@ -808,19 +961,19 @@ class ProfileOverviewTab(QWidget):
                 new_groups[new_name] = v
             else:
                 new_groups[k] = v
-        _save_groups(new_groups)
+        save_groups(new_groups)
         # 同步更新列宽字典的 key
         all_widths = _get_column_widths()
         if old_name in all_widths:
             all_widths[new_name] = all_widths.pop(old_name)
             _save_column_widths(all_widths)
-        if _get_active_group() == old_name:
-            _set_active_group(new_name)
+        if get_active_group() == old_name:
+            set_active_group(new_name)
         self._build_groups()
 
     def _remove_group(self):
         """删除当前分组"""
-        groups = _get_groups()
+        groups = get_groups()
         if not groups:
             return
 
@@ -843,18 +996,18 @@ class ProfileOverviewTab(QWidget):
         group_names = list(groups.keys())
         idx = group_names.index(group_name)
         del groups[group_name]
-        _save_groups(groups)
+        save_groups(groups)
 
         # 切换到相邻分组
         new_names = list(groups.keys())
         new_idx = min(idx, len(new_names) - 1)
-        _set_active_group(new_names[new_idx])
+        set_active_group(new_names[new_idx])
         self._build_groups()
 
     def _on_tab_changed(self, index: int):
         """Tab 切换时记录活跃分组"""
         if 0 <= index < self._tab_widget.count():
-            _set_active_group(self._tab_widget.tabText(index))
+            set_active_group(self._tab_widget.tabText(index))
 
 
 # 哨兵值：表示解析失败
@@ -1032,8 +1185,18 @@ class _DetailPage(QWidget):
 
         if model_type == MODEL_REALTIME:
             if isinstance(kd, RealtimeKeyDef):
-                return f"{value} / {kd.cap}  (回复: {kd.regen_rate}/min)"
-            return str(value)
+                updated_at_str = entry.get("updated_at", "")
+                computed, _ = _compute_realtime_value(
+                    value, updated_at_str,
+                    kd.regen_period, kd.regen_value, kd.cap,
+                    kd.reset_time,
+                )
+                int_value = int(computed)
+                period_labels = {"minute": "分钟", "hour": "小时", "day": "天"}
+                period_text = period_labels.get(kd.regen_period, kd.regen_period)
+                cap_text = f" / {kd.cap}" if kd.cap else ""
+                return f"{int_value}{cap_text}  (回复: {kd.regen_value}/{period_text})"
+            return str(int(value))
 
         if model_type == MODEL_RESOURCE:
             return str(value)

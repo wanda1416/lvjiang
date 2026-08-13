@@ -152,16 +152,23 @@ def load_settings() -> dict[str, Any]:
 
 
 def save_settings(settings: dict[str, Any]) -> None:
-    """保存配置到 session.json 的 settings 节点"""
-    get_session_store().set_node("settings", settings)
+    """保存配置到 session.json 的 settings 节点（保留 material_grid 子节点）"""
+    existing = load_settings()
+    material_grid = existing.get("material_grid")
+    merged = {**existing, **settings}
+    if material_grid is not None:
+        merged["material_grid"] = material_grid
+    get_session_store().set_node("settings", merged)
 
 
 def load_material_grid() -> dict[str, Any]:
-    """读取 session.json 的 material_grid 节点"""
-    value = get_session_store().get_node("material_grid")
+    """读取 session.json 的 settings.material_grid 节点"""
+    value = load_settings().get("material_grid")
     return value if isinstance(value, dict) else {}
 
 
 def save_material_grid(grid: dict[str, Any]) -> None:
-    """保存材料网格参数到 session.json 的 material_grid 节点"""
-    get_session_store().set_node("material_grid", grid)
+    """保存材料网格参数到 session.json 的 settings.material_grid 节点（保留其他 settings 字段）"""
+    existing = load_settings()
+    existing["material_grid"] = grid
+    get_session_store().set_node("settings", existing)

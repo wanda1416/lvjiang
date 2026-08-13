@@ -104,7 +104,7 @@ def save_yaml(path: Path, data: dict[str, Any]) -> None:
 
 
 def load_user_config() -> UserConfig:
-    """加载用户配置：session.json（settings/material_grid）+ app.yaml（输入模拟/延迟参数）"""
+    """加载用户配置：session.json（settings 及其 material_grid 子节点）+ app.yaml（输入模拟/延迟参数）"""
     data: dict[str, Any] = {}
 
     # session.json 节点

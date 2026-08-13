@@ -12,6 +12,7 @@ layout_scenes:
   - equip_tune_detail
   - training_main
   - training_xinfa
+  - role_detail
   group_3:
   - bag_equip_detail
   - bag_item_detail

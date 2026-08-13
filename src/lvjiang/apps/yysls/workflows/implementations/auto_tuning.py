@@ -191,13 +191,22 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
                 first_slot = False
 
-            if self.is_stopped:
-                logger.info("自动调律被中断（F10/材料耗尽），保留当前页面")
+            # 区分用户中断（F10）和材料耗尽：前者保留页面，后者返回主页
+            user_interrupt = (hasattr(self, '_stop_check')
+                             and callable(self._stop_check)
+                             and self._stop_check())
+            if user_interrupt:
+                # 用户按 F10 中断：保留当前页面，方便查看停在哪里
+                logger.info("自动调律被用户中断（F10），保留当前页面")
                 if "stop_reason" not in self.output:
                     self.output["stop_reason"] = "用户中断（F10）"
             else:
+                # 正常完成或材料耗尽：返回主页
                 self.navigator.navigate_back()
-                logger.info("自动调律完成")
+                if self.executor.materials_exhausted:
+                    logger.info("自动调律因材料耗尽而结束，已返回主页")
+                else:
+                    logger.info("自动调律完成，已返回主页")
         finally:
             self._close_doc()
         return self.output

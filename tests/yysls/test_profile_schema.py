@@ -197,7 +197,7 @@ class TestSaveConfig:
             "daily": [DailyKeyDef(key="d1", label="D1", period="week")],
             "realtime": [RealtimeKeyDef(key="r1", label="R1", cap=100)],
             "resource": [ResourceKeyDef(key="res1", label="Res1")],
-            "activity": [ActivityKeyDef(key="a1", label="A1", period_cap=1000)],
+            "activity": [ActivityKeyDef(key="a1", label="A1", cap=2000)],
         })
         save_profile_config(schema)
         reloaded = _load_config()

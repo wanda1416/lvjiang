@@ -27,12 +27,27 @@ def _build_character_detail_tab(host):
 
 def _build_profile_overview_tab(host):
     from .ui.profile_tab import ProfileOverviewTab
+    _ensure_engine_started(host)
     return ProfileOverviewTab(host)
 
 
 def _build_profile_tab(host):
     from .ui.profile_tab import ProfileTab
+    _ensure_engine_started(host)
     return ProfileTab(host)
+
+
+def _ensure_engine_started(host):
+    """确保 ProfileEngine 已启动（首次构建 profile Tab 时调用）"""
+    from .profile.profile_engine import get_or_create_engine, stop_engine
+    engine = get_or_create_engine(
+        user_manager=host.user_manager,
+        session_manager=host.session_manager,
+    )
+    if not engine.isRunning():
+        engine.start()
+        # 仅在首次启动时注册清理回调，避免重复注册
+        host.register_cleanup(stop_engine)
 
 
 def _build_menu(host, menubar):

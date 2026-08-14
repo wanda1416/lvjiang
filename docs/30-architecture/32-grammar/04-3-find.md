@@ -29,8 +29,8 @@ find [scene].[area] as $var by contains_any $list where confidence >= 0.7
 
 | 参数 | 支持形式 | 说明 |
 |------|---------|------|
-| scene | `[key]` / `"key"` / `$var` | 场景名（可选），限定搜索范围 |
-| area | `[key]` / `"key"` / `$var` | 区域名（可选），限定搜索范围 |
+| scene | `[key]` / `$var` | 场景名（可选），限定搜索范围 |
+| area | `[key]` / `$var` | 区域名（可选），限定搜索范围 |
 | `$var` | `$name` | 目标变量名，FoundRegion 或空字符串写入此变量 |
 
 > **与 scan/recognize 的区别**：find 不存 `_coord_meta`，返回的是独立的坐标对象 `FoundRegion`，用 `click $var` 直接点击。

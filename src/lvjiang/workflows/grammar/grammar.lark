@@ -95,9 +95,9 @@ panel_index: "[" INT "]" -> panel_index_int
 // 画布归一化坐标点：(rx, ry)，rx/ry ∈ [0,1]
 coord_point: "(" number "," number ")"
 
-// 常量或变量：scene/region/arrow 都支持三种形式
-?const_or_var: bracket_expr    // [name] — 括号常量
-            | STRING            // "name" — 字符串常量
+// 常量或变量：scene/region/arrow/panel 支持两种形式
+// [name] = 配置引用，$var = 变量引用。"" 不再允许用于引用位置
+?const_or_var: bracket_expr    // [name] — 括号常量（配置引用）
             | var_ref           // $var — 变量引用
 
 drag_duration: number | bracket_list
@@ -172,12 +172,12 @@ where_clause: "where"i "confidence"i ">=" (number | var_ref)
 with_clause: "with"i NAME
 
 // 场景目标：支持静态/动态场景名 + 静态/动态字段
-// 场景名：[scene] / "scene" / $var
+// 场景名：[scene] / $var（不再支持 "scene" 字符串形式）
 // 字段：.[field] / .$var / .[f1,f2] / 无字段
 scene_target: scene_name "." var_ref         -> scene_target_dyn
             | scene_name field_list?         -> scene_target_static
 
-?scene_name: bracket_expr | STRING | var_ref
+?scene_name: bracket_expr | var_ref
 
 collect_stmt: "collect"i collect_source collect_as_clause? _NL
 

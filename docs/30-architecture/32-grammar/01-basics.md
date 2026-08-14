@@ -135,23 +135,21 @@ DSL 有两套引用体系，语义完全不同：
 | `[name]` | 静态配置引用 | 引用场景名 / Area 名 / Action 名 | Scene YAML + Layout JSON |
 | `$name` | 运行时变量引用 | 引用工作流执行中的动态变量 | 运行时 `variables` 字典 |
 
-在非赋值语境中，`[]` 和 `""` 等价，都表示静态常量：`[scene]` = `"scene"`。
+`"text"` 始终表示字符串数据（用于 eval 赋值、log、by 匹配目标、函数参数等），不用于配置引用。
 
 > 场景、Area、Action、Panel 的完整概念说明见 [02-concepts.md](02-concepts.md)。
 
 ### 参数形式
 
-四大指令（`click`、`scan`、`recognize`、`drag`）的场景名和 Area/Action 名都支持三种形式：
+四大指令（`click`、`scan`、`recognize`、`drag`）的场景名和 Area/Action 名支持两种形式：
 
 ```
 # 场景名
-[scene]          # 括号常量
-"scene"          # 字符串常量（等价于 [scene]）
+[scene]          # 配置引用
 $var             # 变量引用（运行时解析）
 
 # Area / Action 名
-[area]           # 括号常量
-"area"           # 字符串常量
+[area]           # 配置引用
 $var             # 变量引用
 [f1, f2, ...]    # 多 Area 列表（仅 scan/recognize）
 

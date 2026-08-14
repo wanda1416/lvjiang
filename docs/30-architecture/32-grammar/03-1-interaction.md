@@ -21,7 +21,7 @@
 **语法**：
 
 ```
-click literal.literal          # literal 可以是 []、"" 或 $var
+click [name].[name]            # 配置引用（场景.区域）
 click [scene].[panel][r][c]    # Panel 三级索引（点击格子中心）
 click [scene].[panel]          # 点击 Panel 中心（无 row/col）
 click $var                     # 点击 find 指令产出的文字区域
@@ -34,7 +34,6 @@ click [scene].[region]         # 常量.常量
 click [scene].$var             # 常量.变量
 click $scene.[region]          # 变量.常量
 click $scene.$var              # 变量.变量
-click "scene"."region"         # 字符串常量（等价于 [scene].[region]）
 click (0.52, 0.38)             # 画布归一化坐标（录制产物）
 
 # 点击 find 指令找到的文字位置
@@ -54,8 +53,10 @@ click [general_action].[actions]              # 点击面板中心（用于点�
 - `[scene].[area]`：从场景配置中取出 Area 的中心坐标并点击（Region 优先，未命中回退 Point，再回退 Panel）
 - `[scene].$var`：Area 名在运行时由变量值决定。引擎会先从 `_coord_meta` 查找该 key 对应的 Region（由 scan/recognize 自动存入），找到则直接点击其屏幕坐标；找不到则回退到场景配置中查找同名 Area
 - `click (rx, ry)`：**画布归一化坐标模式**。`rx`/`ry ∈ [0,1]`，表示画布内容区域内相对位置。回放时按「窗口偏移 + 画布原点 + 比例 × 画布尺寸」动态反算屏幕坐标，窗口缩放/移动后仍准确。这是录制功能（F8）生成的坐标字面量，可直接剪切复用，与 `scene.area` 引用形式混用
-- `[]` 和 `""` 在非赋值语境等价，都表示静态常量
+- `[name]` 表示配置引用，`$var` 表示变量引用。`"text"` 始终表示字符串数据，不用于配置引用
 - `[scene].[panel][r][c]`：**Panel 三级索引模式**。`r`/`c` 从 1 开始计数。首次执行时自动触发图像自对齐（`align`），缓存格子中心坐标；后续点击直接查缓存。详见 [align](#五align--面板自对齐)
+
+> **重要区分**：`scene`/`panel` 是配置引用（用 `[name]` 或 `$var`），而 `row`/`col` 是面板索引（用 `[INT]` 或 `[$var]`）。row/col 不是 area 引用，不支持字符串，`["a"]` 语法不合法。正确示例：`[scene].$panel_ref[$row][5]`，错误示例：`[scene].$panel_ref["a"]["b"]`。
 - `[scene].[panel]`：**Panel 中心点击模式**。点击面板中心点，用于点击空白处或重置面板状态
 - `click $var`：**find 结果点击模式**。`$var` 是 `find` 指令产出的 `FoundRegion` 变量，点击其文字中心坐标。变量未定义或不是 find 结果时报错。详见 [04-3-find.md](04-3-find.md)
 
@@ -63,13 +64,13 @@ click [general_action].[actions]              # 点击面板中心（用于点�
 
 执行基于 Arrow 定义的拖拽动作，在 Panel/Region 内按方向翻页，或在两个 Point 之间拖拽。
 
-**语义**：`drag` 是 `drag_func(scene, action, ...)` 的语法糖。场景名和 Arrow 名都支持 `[]`/`""`/`$var` 三种形式。
+**语义**：`drag` 是 `drag_func(scene, action, ...)` 的语法糖。场景名和 Arrow 名支持 `[name]` / `$var` 两种形式。
 
 **语法**：
 
 ```
 # Arrow 拖拽（基于 Layout Action 定义）
-drag literal.literal                            # literal 可以是 []、"" 或 $var
+drag literal.literal                            # literal 可以是 [] 或 $var
 drag literal.literal 0.5                        # 指定时长 0.5s
 drag literal.literal [0.3, 0.8]                 # 随机时长范围 0.3~0.8s
 drag literal.literal 0.5 hold 0.2               # 拖拽后按住 0.2s

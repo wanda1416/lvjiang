@@ -58,7 +58,7 @@ def _build_menu(host, menubar):
 
 hooks = AppHooks(
     name=tr("燕云十六声"),
-    window_title=f"律匠 - 燕云十六声装备调律工具 v{__version__}",
+    window_title=tr("律匠 - 燕云十六声装备调律工具") + f" v{__version__}",
 
     # 注入通用 MainWindow 的 Tab / 菜单
     left_tab_builders=[(tr("调律"), _build_tuning_tab)],

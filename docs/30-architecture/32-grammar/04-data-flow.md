@@ -30,12 +30,11 @@
 recognize ... as rich $var [with <func>] [on group "<name>"]
 ```
 
-**场景引用**（scene / region / panel 均支持三种形式）：
+**场景引用**（scene / region / panel 均支持两种形式）：
 
 | 形式 | 示例 | 说明 |
 |------|------|------|
-| `[name]` | `[equip_detail]` | 常量 key |
-| `"name"` | `"equip_detail"` | 字符串常量 |
+| `[name]` | `[equip_detail]` | 配置引用 |
 | `$var` | `$scene_name` | 变量引用（运行时解析） |
 
 ## 返回值总对比表

@@ -95,6 +95,9 @@ _AFFIX_KEY_MAP: dict[str, str] = {
     "全武学增效": "WUXUE_DAMAGE",
     "对首领单位增伤": "BOSS_DAMAGE",
     "对玩家单位增效": "PLAYER_DAMAGE",
+    # 奇术增伤
+    "单体类奇术增伤": "SINGLEQS_DAMAGE",
+    "群体类奇术增伤": "GROUPQS_DAMAGE",
     # 武器增伤（含别名 → 网站 EXTERNAL_STAT_KEY_MAP 值）
     "陌刀武学增伤": "BIGBLADE_DAMAGE",
     "陌刀武学增效": "BIGBLADE_DAMAGE",
@@ -196,6 +199,9 @@ def _dingyin_to_stat(dingyin: dict | None) -> dict | None:
 def _convert_item(equip: dict, slot_type: str) -> dict | None:
     """将单件 session 装备数据转为 leoq7 ExternalItem 格式"""
     equip_type = equip.get("type")
+    # 当 equip.type 为空时，使用 slot_type 反推装备类型
+    if not equip_type:
+        equip_type = _SLOT_TYPE_TO_EQUIP_TYPE.get(slot_type)
     equipment_key = _map_equipment_key(equip_type)
     if equipment_key is None:
         return None
@@ -217,13 +223,16 @@ def _convert_item(equip: dict, slot_type: str) -> dict | None:
 
     pitch: list[dict] = []
     if dingyin_stat and _is_pitch_key(slot_type, dingyin_stat["key"]):
+        # dingyin 是合法定音 → 用作 pitch，affix_5 归入副词条
         pitch = [dingyin_stat]
-    elif affix_5_stat and _is_pitch_key(slot_type, affix_5_stat["key"]):
-        pitch = [affix_5_stat]
-    else:
-        # affix_5 不是合法定音 → 归入副词条
         if affix_5_stat:
             secondary.append(affix_5_stat)
+    elif affix_5_stat and _is_pitch_key(slot_type, affix_5_stat["key"]):
+        # affix_5 是合法定音 → 用作 pitch
+        pitch = [affix_5_stat]
+    elif affix_5_stat:
+        # affix_5 不是合法定音 → 归入副词条
+        secondary.append(affix_5_stat)
 
     # 副词条上限 4 条
     if len(secondary) > 4:
@@ -256,15 +265,15 @@ def _encode_transfer(json_bytes: bytes) -> str:
 
 # ── 公开 API ──────────────────────────────────────────
 
-# 已装备槽位 → slot_type
+# 已装备槽位 → slot_type（与网站 EXTERNAL_SLOT_TYPE_MAP 对齐）
 _EQUIPPED_SLOT_TYPE: dict[str, str] = {
     "main_weapon": "weapon",
     "sub_weapon": "weapon",
     "head": "head",
-    "chest": "chest",
+    "chest": "cloth",   # 网站用 cloth 表示胸甲
     "ring": "ring",
     "pendant": "pendant",
-    "leg": "leg",
+    "leg": "legs",      # 网站用 legs 表示胫甲
     "wrist": "wrist",
 }
 
@@ -272,10 +281,21 @@ _EQUIPPED_SLOT_TYPE: dict[str, str] = {
 _WEAPON_TYPES: frozenset[str] = frozenset(_EQUIPMENT_KEY_MAP.keys()) - frozenset({
     "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲",
 })
-# 背包防具 → slot_type
+# 背包防具 → slot_type（与网站 EXTERNAL_SLOT_TYPE_MAP 对齐）
 _SLOT_TYPE_MAP: dict[str, str] = {
     "环": "ring", "佩": "pendant", "冠胄": "head",
-    "胸甲": "chest", "胫甲": "leg", "腕甲": "wrist",
+    "胸甲": "cloth", "胫甲": "legs", "腕甲": "wrist",
+}
+
+# slot_type → 默认装备类型（当 equip.type 为空时的 fallback）
+_SLOT_TYPE_TO_EQUIP_TYPE: dict[str, str] = {
+    "weapon": "剑",  # 武器默认用剑（实际会根据 equipmentKey 确定）
+    "ring": "环",
+    "pendant": "佩",
+    "head": "冠胄",
+    "cloth": "胸甲",
+    "legs": "胫甲",
+    "wrist": "腕甲",
 }
 
 

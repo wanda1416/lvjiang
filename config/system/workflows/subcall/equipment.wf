@@ -1,0 +1,48 @@
+#% name: 装备公共子过程
+
+# 装备公共子过程库
+# 提供装备解析后的通用处理，供各工作流 import 后调用。
+#
+# 包含过程：
+#   fill_equipment_type($equip, $slot) — OCR type 缺失时按槽位补全
+
+# ─── fill_equipment_type ──────────────────────────────────
+# 当 OCR 未能识别装备类型时，根据已知的槽位/部位信息补全 type 字段。
+# 补全前记录 error 级别日志，便于排查 OCR 问题。
+#
+# Args:
+#   $equip — 装备字典（to_equipment 返回值，原地修改）
+#   $slot  — 槽位或部位名（main_weapon/ring/head/leg/weapon 等）
+
+def fill_equipment_type($equip, $slot)
+    if not $equip.type
+        log error "equip_type OCR 缺失, slot=" + $slot
+        if $slot equals "main_weapon"
+            eval $equip.type = "武器"
+        end
+        if $slot equals "sub_weapon"
+            eval $equip.type = "武器"
+        end
+        if $slot equals "weapon"
+            eval $equip.type = "武器"
+        end
+        if $slot equals "ring"
+            eval $equip.type = "环"
+        end
+        if $slot equals "pendant"
+            eval $equip.type = "佩"
+        end
+        if $slot equals "head"
+            eval $equip.type = "冠胄"
+        end
+        if $slot equals "chest"
+            eval $equip.type = "胸甲"
+        end
+        if $slot equals "leg"
+            eval $equip.type = "胫甲"
+        end
+        if $slot equals "wrist"
+            eval $equip.type = "腕甲"
+        end
+    end
+end

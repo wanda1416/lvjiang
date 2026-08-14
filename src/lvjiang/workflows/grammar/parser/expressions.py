@@ -590,7 +590,7 @@ class _ExprMixin:
         return VarRef(name=str(items[0]))
 
     def bracket_expr(self, items):
-        """[name] → str（场景名或区域名，由父节点组装为 SceneRef）"""
+        """[name] → str（场景名或实体名，由父节点组装为 EntityRef）"""
         return str(items[0])
 
     def bracket_list(self, items):

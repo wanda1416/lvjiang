@@ -13,6 +13,7 @@ from lvjiang.workflows.grammar import (
     Collect,
     Contains,
     Drag,
+    EntityRef,
     Equals,
     Eval,
     EvalFieldChainAssign,
@@ -35,7 +36,6 @@ from lvjiang.workflows.grammar import (
     Program,
     Recognize,
     Scan,
-    SceneRef,
     VarRef,
     Wait,
     WaitStable,
@@ -81,9 +81,9 @@ def test_click_scene_ref():
     assert len(program.body) == 1
     n = program.body[0]
     assert isinstance(n, Click)
-    assert isinstance(n.target, SceneRef)
+    assert isinstance(n.target, EntityRef)
     assert n.target.scene == "game_main_page"
-    assert n.target.region == "menu"
+    assert n.target.entity == "menu"
     print("  click [scene].[region]: OK")
 
 
@@ -95,10 +95,10 @@ def test_click_dynamic_region():
     assert len(program.body) == 1
     n = program.body[0]
     assert isinstance(n, Click)
-    assert isinstance(n.target, SceneRef)
+    assert isinstance(n.target, EntityRef)
     assert n.target.scene == "scene"
-    assert isinstance(n.target.region, VarRef)
-    assert n.target.region.name == "tune_pos"
+    assert isinstance(n.target.entity, VarRef)
+    assert n.target.entity.name == "tune_pos"
     print("  click [scene].$var: OK")
 
 
@@ -110,9 +110,9 @@ def test_click_const_or_var():
     program = parse_text("click [scene].[region]")
     n = program.body[0]
     assert isinstance(n, Click)
-    assert isinstance(n.target, SceneRef)
+    assert isinstance(n.target, EntityRef)
     assert n.target.scene == "scene"
-    assert n.target.region == "region"
+    assert n.target.entity == "region"
     print("  click [scene].[region]: OK")
 
     # click "scene"."region" — 字符串形式不再支持用于场景引用
@@ -120,30 +120,30 @@ def test_click_const_or_var():
     program = parse_text("click [scene].[region]")
     n = program.body[0]
     assert isinstance(n, Click)
-    assert isinstance(n.target, SceneRef)
+    assert isinstance(n.target, EntityRef)
     assert n.target.scene == "scene"
-    assert n.target.region == "region"
+    assert n.target.entity == "region"
     print('  click [scene].[region] (原 "scene"."region" 测试): OK')
 
     # click $scene.$region
     program = parse_text("click $scene.$region")
     n = program.body[0]
     assert isinstance(n, Click)
-    assert isinstance(n.target, SceneRef)
+    assert isinstance(n.target, EntityRef)
     assert isinstance(n.target.scene, VarRef)
     assert n.target.scene.name == "scene"
-    assert isinstance(n.target.region, VarRef)
-    assert n.target.region.name == "region"
+    assert isinstance(n.target.entity, VarRef)
+    assert n.target.entity.name == "region"
     print("  click $scene.$region: OK")
 
     # click [scene].$var
     program = parse_text("click [scene].$var")
     n = program.body[0]
     assert isinstance(n, Click)
-    assert isinstance(n.target, SceneRef)
+    assert isinstance(n.target, EntityRef)
     assert n.target.scene == "scene"
-    assert isinstance(n.target.region, VarRef)
-    assert n.target.region.name == "var"
+    assert isinstance(n.target.entity, VarRef)
+    assert n.target.entity.name == "var"
     print("  click [scene].$var: OK")
 
 
@@ -157,9 +157,9 @@ def test_drag_const_or_var():
     program = parse_text("drag [scene].[arrow]")
     n = program.body[0]
     assert isinstance(n, Drag)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert n.scene.scene == "scene"
-    assert n.scene.region == "arrow"
+    assert n.scene.entity == "arrow"
     print("  drag [scene].[arrow]: OK")
 
     # drag "scene"."arrow" — 字符串形式不再支持用于场景引用
@@ -167,20 +167,20 @@ def test_drag_const_or_var():
     program = parse_text("drag [scene].[arrow]")
     n = program.body[0]
     assert isinstance(n, Drag)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert n.scene.scene == "scene"
-    assert n.scene.region == "arrow"
+    assert n.scene.entity == "arrow"
     print('  drag [scene].[arrow] (原 "scene"."arrow" 测试): OK')
 
     # drag $scene.$arrow
     program = parse_text("drag $scene.$arrow")
     n = program.body[0]
     assert isinstance(n, Drag)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert isinstance(n.scene.scene, VarRef)
     assert n.scene.scene.name == "scene"
-    assert isinstance(n.scene.region, VarRef)
-    assert n.scene.region.name == "arrow"
+    assert isinstance(n.scene.entity, VarRef)
+    assert n.scene.entity.name == "arrow"
     print("  drag $scene.$arrow: OK")
 
     # drag with duration
@@ -210,9 +210,9 @@ def test_drag_point_pair():
     assert n.from_scene_ref is not None
     assert n.to_scene_ref is not None
     assert n.from_scene_ref.scene == "game_login_page"
-    assert n.from_scene_ref.region == "point_1"
+    assert n.from_scene_ref.entity == "point_1"
     assert n.to_scene_ref.scene == "game_login_page"
-    assert n.to_scene_ref.region == "point_2"
+    assert n.to_scene_ref.entity == "point_2"
     print("  drag [scene].[p1] [scene].[p2]: OK")
 
     # 跨场景点对
@@ -220,9 +220,9 @@ def test_drag_point_pair():
     n = program.body[0]
     assert isinstance(n, Drag)
     assert n.from_scene_ref.scene == "scene_a"
-    assert n.from_scene_ref.region == "pt1"
+    assert n.from_scene_ref.entity == "pt1"
     assert n.to_scene_ref.scene == "scene_b"
-    assert n.to_scene_ref.region == "pt2"
+    assert n.to_scene_ref.entity == "pt2"
     print("  drag 跨场景点对: OK")
 
     # 动态变量场景名和点名
@@ -231,10 +231,10 @@ def test_drag_point_pair():
     assert isinstance(n, Drag)
     assert isinstance(n.from_scene_ref.scene, VarRef)
     assert n.from_scene_ref.scene.name == "scene"
-    assert isinstance(n.from_scene_ref.region, VarRef)
-    assert n.from_scene_ref.region.name == "from_pt"
+    assert isinstance(n.from_scene_ref.entity, VarRef)
+    assert n.from_scene_ref.entity.name == "from_pt"
     assert isinstance(n.to_scene_ref.scene, VarRef)
-    assert isinstance(n.to_scene_ref.region, VarRef)
+    assert isinstance(n.to_scene_ref.entity, VarRef)
     print("  drag $scene.$from_pt $scene.$to_pt: OK")
 
     # 带 duration 和 hold
@@ -372,9 +372,9 @@ def test_wait_stable_on_region():
     n = program.body[0]
     assert isinstance(n, WaitStable)
     assert n.timeout == 5.0
-    assert isinstance(n.area, SceneRef)
+    assert isinstance(n.area, EntityRef)
     assert n.area.scene == "equip_page"
-    assert n.area.region == "bag_area"
+    assert n.area.entity == "bag_area"
 
 
 def test_wait_stable_on_with_opts():
@@ -385,9 +385,9 @@ def test_wait_stable_on_with_opts():
     assert n.timeout == 5.0
     assert n.threshold == 0.05
     assert n.interval == 0.2
-    assert isinstance(n.area, SceneRef)
+    assert isinstance(n.area, EntityRef)
     assert n.area.scene == "equip_page"
-    assert n.area.region == "bag_area"
+    assert n.area.entity == "bag_area"
 
 
 def test_wait_stable_no_area_default():
@@ -406,9 +406,9 @@ def test_click_after_wait_stable_on_region():
     assert isinstance(program.body[0], Click)
     ws = program.body[1]
     assert isinstance(ws, WaitStable)
-    assert isinstance(ws.area, SceneRef)
+    assert isinstance(ws.area, EntityRef)
     assert ws.area.scene == "equip_page"
-    assert ws.area.region == "bag_area"
+    assert ws.area.entity == "bag_area"
 
 
 # ─── click/drag wait 语法糖测试 ─────────────────────────────
@@ -618,7 +618,7 @@ def test_scan_dynamic_scene():
     program = parse_text("scan $scene.[field] as $result")
     n = program.body[0]
     assert isinstance(n, Scan)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert isinstance(n.scene.scene, VarRef)
     assert n.scene.scene.name == "scene"
     print("  scan $scene.[field] as $var: OK")
@@ -628,7 +628,7 @@ def test_scan_dynamic_scene():
     program = parse_text("scan [scene].[field] as $result")
     n = program.body[0]
     assert isinstance(n, Scan)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert n.scene.scene == "scene"
     print('  scan [scene].[field] as $var (原 "scene".[field] 测试): OK')
 
@@ -641,7 +641,7 @@ def test_recognize():
     assert len(program.body) == 1
     n = program.body[0]
     assert isinstance(n, Recognize)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert n.scene.scene == "material_grid"
     assert isinstance(n.target, VarRef)
     assert n.target.name == "mats"
@@ -661,7 +661,7 @@ def test_recognize_dynamic_scene():
     program = parse_text("recognize $scene.[field] as $result")
     n = program.body[0]
     assert isinstance(n, Recognize)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert isinstance(n.scene.scene, VarRef)
     assert n.scene.scene.name == "scene"
     print("  recognize $scene.[field] as $var: OK")
@@ -1332,7 +1332,7 @@ def test_scan_list_var():
     program = parse_text("scan [equip_weapon_detail].$fields as $result")
     n = program.body[0]
     assert isinstance(n, Scan)
-    assert isinstance(n.scene, SceneRef)
+    assert isinstance(n.scene, EntityRef)
     assert n.scene.scene == "equip_weapon_detail"
     assert n.region_var is not None
     assert isinstance(n.region_var, VarRef)

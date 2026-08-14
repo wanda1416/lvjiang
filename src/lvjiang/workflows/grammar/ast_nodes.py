@@ -6,11 +6,11 @@
 - 程序：Program
 - 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log / Align
          If / For / Loop / Break / Return / Label / Goto / Eval
-- 表达式：SceneRef / PanelRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
+- 表达式：EntityRef / PanelRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
 
 引用语义：
-- SceneRef → 静态配置引用（场景名/区域名），来自 yaml，语法 [scene].[region]
+- EntityRef → 静态配置引用（场景名/实体名），来自 yaml，语法 [scene].[entity]
 - PanelRef → panel 三级索引（场景名/panel名/行/列），语法 [scene].[panel][row][col]
 - VarRef   → 运行时变量引用，来自 variables dict，语法 $var
 """
@@ -32,20 +32,20 @@ class Program:
 
 @dataclass(frozen=True)
 class Click:
-    target: Any     # SceneRef（静态 [scene].[region]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
+    target: Any     # EntityRef（静态 [scene].[entity]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class Drag:
-    scene: Any      # SceneRef（静态 [scene].[region]）| PanelRef（panel 三级索引）| None（坐标/点对模式）
-    arrow: Any      # SceneRef | None（坐标/点对模式）
+    scene: Any      # EntityRef（静态 [scene].[entity]）| PanelRef（panel 三级索引）| None（坐标/点对模式）
+    arrow: Any      # EntityRef | None（坐标/点对模式）
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
     hold: float | None = None  # 到达目标后按住不放的时长（秒）
     from_point: Any = None  # CoordPoint | None（坐标模式起点）
     to_point: Any = None    # CoordPoint | None（坐标模式终点）
-    from_scene_ref: Any = None  # SceneRef | None（点对模式起点）
-    to_scene_ref: Any = None    # SceneRef | None（点对模式终点）
+    from_scene_ref: Any = None  # EntityRef | None（点对模式起点）
+    to_scene_ref: Any = None    # EntityRef | None（点对模式终点）
     direction: str | None = None   # "up" | "down" | "left" | "right" | None（panel 拖拽方向）
     distance: Any = 1.0            # 拖拽距离：float | VarRef（支持整数、浮点数如 0.5、变量引用）
     line_no: int = 0
@@ -78,7 +78,7 @@ class WaitStable:
     - Literal: 命名延迟引用（@delay_name），运行时从延迟参数表查找
     - VarRef: 变量引用（$var），运行时从变量表查找
 
-    area: 限定检测区域（SceneRef），为 None 时检测全画面。
+    area: 限定检测区域（EntityRef），为 None 时检测全画面。
     用于半屏 UI + 半屏动画场景，只对指定区域做 diff 对比。
     """
     timeout: Any            # 最大等待秒数（总超时）
@@ -86,13 +86,13 @@ class WaitStable:
     interval: Any = 0.3     # 截图对比间隔秒数
     stable_duration: Any = 0.5  # 画面需持续稳定的时长（秒）
     least: Any = 0.5        # 最低等待秒数（点击后至少等这么久再开始检测稳定）
-    area: Any = None        # 区域限定：SceneRef（[scene].[region]）或 None（全画面）
+    area: Any = None        # 区域限定：EntityRef（[scene].[entity]）或 None（全画面）
     line_no: int = 0
 
 
 @dataclass(frozen=True)
 class Scan:
-    scene: Any      # SceneRef（静态场景引用）| PanelRef（panel cell 级）
+    scene: Any      # EntityRef（静态场景引用）| PanelRef（panel cell 级）
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
@@ -103,7 +103,7 @@ class Scan:
 
 @dataclass(frozen=True)
 class Recognize:
-    scene: Any      # SceneRef（静态场景引用）| PanelRef（panel cell 级）
+    scene: Any      # EntityRef（静态场景引用）| PanelRef（panel cell 级）
     target: Any     # VarRef（$var，as 子句）
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
@@ -331,10 +331,13 @@ class CallProc:
 # ─── 表达式 ───────────────────────────────────────────────
 
 @dataclass(frozen=True)
-class SceneRef:
-    """静态配置引用：[scene] 或 [scene].[region]（region 支持 $var 动态引用）"""
+class EntityRef:
+    """静态配置引用：[scene] 或 [scene].[entity]（entity 支持 $var 动态引用）
+
+    entity 可以是 Area（Region/Point/Panel）或 Action（Arrow）。
+    """
     scene: str
-    region: str | None = None  # str | VarRef | None
+    entity: str | None = None  # str | VarRef | None
 
 
 @dataclass(frozen=True)

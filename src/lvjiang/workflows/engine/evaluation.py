@@ -27,6 +27,7 @@ from ..grammar import (
     Or,
     VarRef,
 )
+from ...core.coord_types import CoordRef, Offset, to_offset
 from .signals import WorkflowUserError
 
 # 数值相等容差：== / != 统一用容差比较，避免浮点误差（如 0.1+0.2 != 0.3）
@@ -266,24 +267,38 @@ class _EvalMixin:
         val = self._resolve(node)
         return self._to_number(val)
 
-    def _eval_arith(self, node: ArithOp) -> int | float | str:
+    def _eval_arith(self, node: ArithOp) -> int | float | str | CoordRef | Offset:
         """求值算术表达式节点
 
         保持 int/float 类型：int+int→int，int+float→float，除法始终为 float。
         null 操作数视为 0（int），除 0 返回 0.0。
         `+` 运算符：任一侧为 str 则走字符串拼接。
+        CoordRef/Offset 运算：委托 _eval_coord_arith。
         """
+        # 先解析两侧操作数（不做数值转换）
+        left_raw = self._resolve(node.left)
+        right_raw = self._resolve(node.right)
+
+        # tuple → Offset 隐式转换
+        if isinstance(left_raw, tuple) and len(left_raw) == 2:
+            left_raw = to_offset(left_raw)
+        if isinstance(right_raw, tuple) and len(right_raw) == 2:
+            right_raw = to_offset(right_raw)
+
+        # CoordRef / Offset 运算分支
+        if isinstance(left_raw, (CoordRef, Offset)) or isinstance(right_raw, (CoordRef, Offset)):
+            return self._eval_coord_arith(node.op, left_raw, right_raw)
+
         # `+` 运算符：任一侧为 str → 字符串拼接
         if node.op == "+":
-            left_raw = self._resolve(node.left)
-            right_raw = self._resolve(node.right)
             if isinstance(left_raw, str) or isinstance(right_raw, str):
                 left_str = left_raw if left_raw is not None else ""
                 right_str = right_raw if right_raw is not None else ""
                 return str(left_str) + str(right_str)
 
-        left = self._resolve_arith(node.left)
-        right = self._resolve_arith(node.right)
+        # 数值运算
+        left = self._to_number(left_raw)
+        right = self._to_number(right_raw)
         # null 操作数视为 0（int）
         if left is None:
             left = 0
@@ -301,6 +316,47 @@ class _EvalMixin:
             case _:
                 logger.warning(f"未知算术运算符: {node.op}")
                 return 0.0
+
+    def _eval_coord_arith(self, op: str, left, right) -> CoordRef | Offset:
+        """CoordRef / Offset 算术运算
+
+        合法运算：
+        - CoordRef + Offset → CoordRef（保持子类）
+        - CoordRef - Offset → CoordRef（保持子类）
+        - CoordRef - CoordRef → Offset（隐式降级）
+        - Offset + Offset → Offset
+        - Offset - Offset → Offset
+        - Offset * n / Offset / n → Offset
+        """
+        match op:
+            case "+":
+                if isinstance(left, CoordRef) and isinstance(right, Offset):
+                    return left + right
+                if isinstance(left, Offset) and isinstance(right, CoordRef):
+                    return right + left
+                if isinstance(left, Offset) and isinstance(right, Offset):
+                    return left + right
+            case "-":
+                if isinstance(left, CoordRef) and isinstance(right, Offset):
+                    return left - right
+                if isinstance(left, CoordRef) and isinstance(right, CoordRef):
+                    return left - right
+                if isinstance(left, Offset) and isinstance(right, Offset):
+                    return left - right
+            case "*":
+                if isinstance(left, Offset) and isinstance(right, (int, float)):
+                    return left * right
+                if isinstance(left, (int, float)) and isinstance(right, Offset):
+                    return right * left
+            case "/":
+                if isinstance(left, Offset) and isinstance(right, (int, float)):
+                    return left / right
+        left_desc = type(left).__name__ if left is not None else "null"
+        right_desc = type(right).__name__ if right is not None else "null"
+        raise WorkflowUserError(
+            f"坐标运算不合法: {left_desc} {op} {right_desc}。"
+            f"合法运算: CoordRef±Offset, CoordRef-CoordRef, Offset±Offset, Offset*数, Offset/数"
+        )
 
     def _resolve_param(self, node) -> str:
         """解析 click/scan 参数

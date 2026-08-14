@@ -81,6 +81,35 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 | `find` → `$var` = FoundRegion | `click $var` | 直接点击文字的屏幕坐标 |
 | Panel by → `$var` = `{row,col}` | `click [scene].[panel][$var.row][$var.col]` | 按行列位置点击对应格 |
 
+## 坐标运算
+
+CoordRef 类型支持向量运算，可用于计算相对位置。CoordRef 值通过变量持有，运算结果可赋给新变量：
+
+```
+# 计算两个区域的相对位移
+$a = [scene].[region_a]
+$b = [scene].[region_b]
+$offset = $b - $a                    # Offset
+
+# 平移坐标
+$target = $a + $offset               # CoordRef
+
+# 点击计算后的位置
+click $target
+```
+
+**合法运算**：
+- `CoordRef + Offset` → `CoordRef`（保持子类）
+- `CoordRef - Offset` → `CoordRef`（保持子类）
+- `CoordRef - CoordRef` → `Offset`（隐式降级为中心点）
+- `Offset ± Offset` → `Offset`
+- `Offset * n` / `Offset / n` → `Offset`
+- `tuple → Offset` — 隐式转换（`(dx, dy)` 可直接当位移用）
+
+**禁止运算**：`CoordRef * n` / `CoordRef / n`（位置乘以数字无意义，破坏向量运算法则）
+
+详见 [02-concepts.md — CoordRef 类型体系](02-concepts.md#三coordref-类型体系运行时坐标层)。
+
 ## 详细文档
 
 - [04-1-scan.md](04-1-scan.md) — scan 完整语法、返回值、修饰子句

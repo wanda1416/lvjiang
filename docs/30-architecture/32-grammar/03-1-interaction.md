@@ -1,6 +1,6 @@
 # DSL 交互指令
 
-> 操作对象（Area / Action / Panel）的概念说明见 [02-concepts.md](02-concepts.md)。
+> 操作对象（Entity / CoordRef / Panel）的概念说明见 [02-concepts.md](02-concepts.md)。
 
 ## 目录
 
@@ -14,9 +14,9 @@
 
 ## 一、click — 点击
 
-点击屏幕上的 Area（Region 或 Point）或 Panel 格子。
+点击屏幕上的 Area（Region 或 Point）或 Panel 格子，或 CoordRef 变量。
 
-**语义**：`click` 是 `click_func(scene, area)` 的语法糖，接收两个常量参数查坐标表。
+**语义**：`click` 将目标解析为 CoordRef，取其中心点（+ 抖动）后点击。
 
 **语法**：
 
@@ -24,7 +24,7 @@
 click [name].[name]            # 配置引用（场景.区域）
 click [scene].[panel][r][c]    # Panel 三级索引（点击格子中心）
 click [scene].[panel]          # 点击 Panel 中心（无 row/col）
-click $var                     # 点击 find 指令产出的文字区域
+click $var                     # 点击 CoordRef / find 产出的文字区域
 ```
 
 **示例**：
@@ -58,13 +58,19 @@ click [general_action].[actions]              # 点击面板中心（用于点�
 
 > **重要区分**：`scene`/`panel` 是配置引用（用 `[name]` 或 `$var`），而 `row`/`col` 是面板索引（用 `[INT]` 或 `[$var]`）。row/col 不是 area 引用，不支持字符串，`["a"]` 语法不合法。正确示例：`[scene].$panel_ref[$row][5]`，错误示例：`[scene].$panel_ref["a"]["b"]`。
 - `[scene].[panel]`：**Panel 中心点击模式**。点击面板中心点，用于点击空白处或重置面板状态
-- `click $var`：**find 结果点击模式**。`$var` 是 `find` 指令产出的 `FoundRegion` 变量，点击其文字中心坐标。变量未定义或不是 find 结果时报错。详见 [04-3-find.md](04-3-find.md)
+- `click $var`：**CoordRef / find 结果点击模式**。`$var` 可以是：
+  - `CoordRef` 类型（包括 `RectCoordRef` / `CircleCoordRef`）：点击其中心点（+ 抖动）
+  - `find` 指令产出的 `FoundRegion`：点击文字中心坐标
+  - 变量未定义或不是可点击类型时报错。详见 [04-3-find.md](04-3-find.md)
 
 ## 二、drag — 拖拽
 
-执行基于 Arrow 定义的拖拽动作，在 Panel/Region 内按方向翻页，或在两个 Point 之间拖拽。
+执行拖拽动作。支持 Arrow 拖拽、Panel/Region 翻页、Point 点对拖拽。
 
-**语义**：`drag` 是 `drag_func(scene, action, ...)` 的语法糖。场景名和 Arrow 名支持 `[name]` / `$var` 两种形式。
+**语义**：`drag` 将目标解析为 Entity：
+- **Arrow** → 直接执行其定义的拖拽（起点 → 终点）
+- **Region / Panel** → 隐式转为单向 Arrow（利用 w/h 计算终点）
+- **Point** → 不允许单独 drag（无 w/h 无法计算终点），必须使用两点模式
 
 **语法**：
 
@@ -141,8 +147,9 @@ drag [scene].[point_a] [scene].[point_b]        # 两点之间拖拽
 
 **查找顺序**：
 
-- `drag [scene].[key]`：先查 arrow，未命中再查 region
+- `drag [scene].[key]`：先查 arrow，未命中再查 region，最后查 point
 - `drag [scene].[key] direction`：先查 panel，未命中再查 region
+- `drag [scene].[point]`（单独）：**不允许**，Point 无 w/h 无法计算终点，请使用两点模式 `drag [scene].[point1] [scene].[point2]`
 
 ## 三、wait — 等待
 
@@ -297,7 +304,8 @@ click [equip_detail].[confirm]
 | 情况 | 报错时机 |
 |---|---|
 | Region / Point / Panel 在当前布局未绑定坐标 | `click` |
-| Arrow / Region 在当前布局未绑定坐标 | `drag` |
+| Arrow / Region / Point 在当前布局未绑定坐标 | `drag` |
+| Point 单独作为 drag 目标（无 w/h 无法计算终点） | `drag` |
 | Arrow 的起点或吸附态终点 Point 丢失 | `drag` |
 | `$var` 未定义或取到空值 | `click $scene.$area` / `drag $scene.$arrow` |
 | Panel 未在布局中定义 | `click` / `drag` / `align` |

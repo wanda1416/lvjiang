@@ -9,15 +9,16 @@
 
 from loguru import logger
 
+from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
 from ...i18n import tr
 from ..grammar import (
     Click,
     CoordPoint,
     Drag,
+    EntityRef,
     Literal,
     PanelGridDrag,
     PanelRef,
-    SceneRef,
     VarRef,
     Wait,
     WaitStable,
@@ -56,7 +57,7 @@ class _ActionsMixin:
             if x is not None and y is not None:
                 self._input.click_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])")
             return
-        if isinstance(node.target, SceneRef):
+        if isinstance(node.target, EntityRef):
             # 解析 scene（可能是 str 或 VarRef）
             if isinstance(node.target.scene, VarRef):
                 scene = self.variables.get(node.target.scene.name)
@@ -67,12 +68,12 @@ class _ActionsMixin:
             else:
                 scene = node.target.scene
 
-            # 解析 region（可能是 str 或 VarRef）
-            region = node.target.region
-            if isinstance(region, VarRef):
-                region_val = self.variables.get(region.name)
+            # 解析 entity（可能是 str 或 VarRef）
+            entity = node.target.entity
+            if isinstance(entity, VarRef):
+                region_val = self.variables.get(entity.name)
                 if region_val is None:
-                    raise WorkflowUserError(f"变量 ${region.name} 未定义，无法点击")
+                    raise WorkflowUserError(f"变量 ${entity.name} 未定义，无法点击")
                 # 检查是否为 find 指令产出的 FoundRegion
                 FoundRegionCls = _get_found_region_cls()
                 if isinstance(region_val, FoundRegionCls):
@@ -85,25 +86,31 @@ class _ActionsMixin:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
                     self._input.click_screen(x, y, f"{scene}/{region_val}")
                     return
-                # 回退：作为 region key 名查场景配置
+                # 回退：作为 entity key 名查场景配置
                 self._ensure_workflow().click_any(str(scene), str(region_val))
             else:
-                self._ensure_workflow().click_any(str(scene), region)
+                self._ensure_workflow().click_any(str(scene), entity)
         elif isinstance(node.target, VarRef):
-            # 裸变量引用：find 指令产出的 FoundRegion，直接点击文字位置
+            # 裸变量引用：可能是 CoordRef、find 产出的 FoundRegion
             region_val = self.variables.get(node.target.name)
             if region_val is None:
                 raise WorkflowUserError(
                     f"变量 ${node.target.name} 未定义，无法点击"
                 )
+            # CoordRef 变量：直接点击中心（+ 抖动）
+            if isinstance(region_val, CoordRef):
+                x, y = self._coord_ref_to_screen(region_val, jitter=True)
+                self._input.click_screen(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})")
+                return
             FoundRegionCls = _get_found_region_cls()
             if isinstance(region_val, FoundRegionCls):
                 x, y = self._found_region_to_screen(region_val)
                 self._input.click_screen(x, y, f"find({region_val.text!r})")
                 return
             raise WorkflowUserError(
-                f"click ${node.target.name}: 变量值不是 find 产出的区域 "
-                f"(类型: {type(region_val).__name__})"
+                f"click ${node.target.name}: 变量值不是可点击类型 "
+                f"(类型: {type(region_val).__name__})，"
+                f"仅支持 CoordRef / find 产出的 FoundRegion"
             )
         else:
             raise WorkflowUserError(f"click: 未知目标类型 {type(node.target).__name__}")
@@ -131,7 +138,7 @@ class _ActionsMixin:
             duration = self._resolve_duration(node.duration) if node.duration else None
             self._input.drag_screen(
                 x1, y1, x2, y2,
-                f"point({node.from_scene_ref.scene}.{node.from_scene_ref.region})->({node.to_scene_ref.scene}.{node.to_scene_ref.region})",
+                f"point({node.from_scene_ref.scene}.{node.from_scene_ref.entity})->({node.to_scene_ref.scene}.{node.to_scene_ref.entity})",
                 duration=duration, hold=node.hold,
             )
             return
@@ -251,7 +258,7 @@ class _ActionsMixin:
             x, y = self._panel_ref_to_screen(node.scene)
             if x is None or y is None:
                 return
-            # scene / panel 支持静态字符串或 $var（与 SceneRef 动态引用语义一致）
+            # scene / panel 支持静态字符串或 $var（与 EntityRef 动态引用语义一致）
             scene_key = self._resolve(node.scene.scene) if isinstance(node.scene.scene, VarRef) else node.scene.scene
             panel_key = self._resolve(node.scene.panel) if isinstance(node.scene.panel, VarRef) else node.scene.panel
             # panel drag：根据方向和距离计算拖拽终点
@@ -314,7 +321,7 @@ class _ActionsMixin:
             self._panel_alignments.pop((node.scene.scene, node.scene.panel), None)
             logger.debug(f"drag panel: 已失效对齐缓存: {node.scene.scene}.{node.scene.panel}")
             return
-        if isinstance(node.scene, SceneRef):
+        if isinstance(node.scene, EntityRef):
             # 解析 scene（可能是 str 或 VarRef）
             if isinstance(node.scene.scene, VarRef):
                 scene = self.variables.get(node.scene.scene.name)
@@ -326,7 +333,7 @@ class _ActionsMixin:
                 scene = node.scene.scene
 
             # 解析 key（可能是 str 或 VarRef）
-            key = node.scene.region
+            key = node.scene.entity
             if isinstance(key, VarRef):
                 key_val = self.variables.get(key.name)
                 if key_val is None:
@@ -347,7 +354,7 @@ class _ActionsMixin:
             regions = self._layout.get_scene_regions(str(scene))
             region = next((r for r in regions if r.key == str(key)), None)
             if region is not None:
-                # region 中心作为起点，默认向上拖拽（用于滚动）
+                # region 中心作为起点，利用 w/h 计算终点
                 cx = region.x_ratio + region.w_ratio / 2
                 cy = region.y_ratio + region.h_ratio / 2
                 w, h = self._capture.get_capture_size()
@@ -368,8 +375,17 @@ class _ActionsMixin:
                 logger.debug(f"drag region: {scene}.{key} up (default)")
                 return
 
+            # 尝试作为 point 查找 → 不允许单独 drag
+            points = self._layout.get_scene_points(str(scene))
+            point = next((p for p in points if p.key == str(key)), None)
+            if point is not None:
+                raise WorkflowUserError(
+                    f"drag [{scene}].[{key}]: Point 无法单独 drag（无 w/h 计算终点），"
+                    f"请使用两点模式 drag [{scene}].{key} [{scene}].<另一个点>"
+                )
+
             raise WorkflowUserError(
-                f"drag: 场景 [{scene}] 的 arrow/region 未绑定: {key}，"
+                f"drag: 场景 [{scene}] 的 arrow/region/point 未绑定: {key}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
         else:
@@ -470,15 +486,15 @@ class _ActionsMixin:
         return float(param)
 
     def _resolve_area_crop(self, area) -> dict | None:
-        """将 area (SceneRef) 解析为像素裁剪框 {'x', 'y', 'w', 'h'}
+        """将 area (EntityRef) 解析为像素裁剪框 {'x', 'y', 'w', 'h'}
 
-        用于 wait stable on [scene].[region] 的区域限定。
+        用于 wait stable on [scene].[entity] 的区域限定。
         返回 None 表示全画面检测（area 为 None 时）。
-        scene 和 region 均支持 $var 动态引用。
+        scene 和 entity 均支持 $var 动态引用。
         """
         if area is None:
             return None
-        if isinstance(area, SceneRef):
+        if isinstance(area, EntityRef):
             # 解析 scene（支持 VarRef）
             if isinstance(area.scene, VarRef):
                 scene = self.variables.get(area.scene.name)
@@ -490,21 +506,21 @@ class _ActionsMixin:
             else:
                 scene = str(area.scene)
 
-            # 解析 region（支持 VarRef）
-            region_key = area.region
-            if isinstance(region_key, VarRef):
-                region_key = self.variables.get(region_key.name)
-                if region_key is None:
+            # 解析 entity（支持 VarRef）
+            entity_key = area.entity
+            if isinstance(entity_key, VarRef):
+                entity_key = self.variables.get(entity_key.name)
+                if entity_key is None:
                     raise WorkflowUserError(
-                        f"wait stable on: 变量 ${area.region.name} 未定义"
+                        f"wait stable on: 变量 ${area.entity.name} 未定义"
                     )
-            region_key = str(region_key)
+            entity_key = str(entity_key)
 
             regions = self._layout.get_scene_regions(scene)
-            region_obj = next((r for r in regions if r.key == region_key), None)
+            region_obj = next((r for r in regions if r.key == entity_key), None)
             if region_obj is None:
                 raise WorkflowUserError(
-                    f"wait stable on [{scene}].[{region_key}]: 区域未绑定"
+                    f"wait stable on [{scene}].[{entity_key}]: 区域未绑定"
                 )
             x_r, y_r, w_r, h_r = (
                 region_obj.x_ratio, region_obj.y_ratio,
@@ -543,8 +559,8 @@ class _ActionsMixin:
 
         return int(self._window_left + cx), int(self._window_top + cy)
 
-    def _resolve_point_ref_to_screen(self, scene_ref: SceneRef, label: str = "") -> tuple[int, int]:
-        """SceneRef(scene=场景名, region=点名) → 屏幕坐标
+    def _resolve_point_ref_to_screen(self, scene_ref: EntityRef, label: str = "") -> tuple[int, int]:
+        """EntityRef(scene=场景名, entity=点名) → 屏幕坐标
 
         用于 drag 点对模式：查找布局中定义的 Point 并转换为屏幕坐标。
         """
@@ -559,14 +575,14 @@ class _ActionsMixin:
             scene = str(scene_ref.scene)
 
         # 解析点名（支持 VarRef）
-        if isinstance(scene_ref.region, VarRef):
-            point_key = self.variables.get(scene_ref.region.name)
+        if isinstance(scene_ref.entity, VarRef):
+            point_key = self.variables.get(scene_ref.entity.name)
             if point_key is None:
                 raise WorkflowUserError(
-                    f"drag {label}: 变量 ${scene_ref.region.name} 未定义"
+                    f"drag {label}: 变量 ${scene_ref.entity.name} 未定义"
                 )
         else:
-            point_key = str(scene_ref.region)
+            point_key = str(scene_ref.entity)
 
         # 从布局中查找 Point
         points = self._layout.get_scene_points(str(scene))
@@ -578,3 +594,43 @@ class _ActionsMixin:
 
         # Point → 屏幕坐标（带半径内随机偏移）
         return self._ensure_workflow()._point_to_screen(point)
+
+    def _coord_ref_to_screen(self, coord_ref: CoordRef, jitter: bool = True) -> tuple[int, int]:
+        """CoordRef → 屏幕绝对坐标（可选抖动）
+
+        RectCoordRef: 在 w/h 范围内抖动
+        CircleCoordRef: 在 r 范围内抖动
+        CoordRef (基类): 仅像素级抖动
+        """
+        import random
+        w, h = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
+
+        canvas_x = canvas.x_ratio * w
+        canvas_y = canvas.y_ratio * h
+        canvas_w = canvas.w_ratio * w
+        canvas_h = canvas.h_ratio * h
+
+        cx = canvas_x + coord_ref.cx * canvas_w
+        cy = canvas_y + coord_ref.cy * canvas_h
+
+        if jitter:
+            jitter_ratio = self._input_sim.region_jitter_ratio
+            if isinstance(coord_ref, RectCoordRef) and coord_ref.w > 0 and coord_ref.h > 0:
+                # RectCoordRef: 在 w/h 范围内抖动
+                region_w = coord_ref.w * canvas_w
+                region_h = coord_ref.h * canvas_h
+                cx += region_w * random.uniform(-jitter_ratio, jitter_ratio)
+                cy += region_h * random.uniform(-jitter_ratio, jitter_ratio)
+            elif isinstance(coord_ref, CircleCoordRef) and coord_ref.r > 0:
+                # CircleCoordRef: 在 r 范围内抖动
+                region_r = coord_ref.r * min(canvas_w, canvas_h)
+                cx += region_r * random.uniform(-jitter_ratio, jitter_ratio)
+                cy += region_r * random.uniform(-jitter_ratio, jitter_ratio)
+            else:
+                # 基类 CoordRef: 仅像素级随机偏移
+                pixel_jitter = self._input_sim.click_random_offset
+                cx += random.uniform(-pixel_jitter, pixel_jitter)
+                cy += random.uniform(-pixel_jitter, pixel_jitter)
+
+        return int(self._window_left + cx), int(self._window_top + cy)

@@ -16,6 +16,7 @@ from .grammar.ast_nodes import (
     Align,
     Click,
     Drag,
+    EntityRef,
     Find,
     For,
     ForRange,
@@ -27,7 +28,6 @@ from .grammar.ast_nodes import (
     ProcDef,
     Recognize,
     Scan,
-    SceneRef,
     Try,
     UntilLoop,
     WaitStable,
@@ -86,17 +86,17 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
 
     if isinstance(stmt, Click):
         target = stmt.target
-        if isinstance(target, SceneRef):
+        if isinstance(target, EntityRef):
             # click_any 先查 region 再查 point 再查 panel
-            _add(acc, target.scene, target.region, "click_target", line)
+            _add(acc, target.scene, target.entity, "click_target", line)
         elif isinstance(target, PanelRef):
             _add(acc, target.scene, target.panel, "panel", line)
     elif isinstance(stmt, Drag):
         # scene / arrow 对场景与 panel 目标是同一节点，去重后只留一条
         for ref in (stmt.scene, stmt.arrow):
-            if isinstance(ref, SceneRef):
+            if isinstance(ref, EntityRef):
                 # drag 的 key 查的是布局 arrows 或 regions
-                _add(acc, ref.scene, ref.region, "drag_target", line)
+                _add(acc, ref.scene, ref.entity, "drag_target", line)
             elif isinstance(ref, PanelRef):
                 _add(acc, ref.scene, ref.panel, "panel", line)
             elif isinstance(ref, PanelGridDrag):
@@ -104,13 +104,13 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
                 _add(acc, ref.scene, ref.panel, "drag_grid_target", line)
         # 点对模式：drag [scene1].[point1] [scene2].[point2]
         for ref in (stmt.from_scene_ref, stmt.to_scene_ref):
-            if isinstance(ref, SceneRef):
-                _add(acc, ref.scene, ref.region, "point", line)
+            if isinstance(ref, EntityRef):
+                _add(acc, ref.scene, ref.entity, "point", line)
     elif isinstance(stmt, (Scan, Recognize)):
         scene_ref = stmt.scene
         if isinstance(scene_ref, PanelRef):
             _add(acc, scene_ref.scene, scene_ref.panel, "panel", line)
-        elif isinstance(scene_ref, SceneRef):
+        elif isinstance(scene_ref, EntityRef):
             # fields 为识别的区域 key 列表；无 fields（或动态 region）时为整场景识别
             if stmt.fields:
                 # 单一 key 运行时可能分派为整面板识别，放宽为 区域/面板
@@ -133,9 +133,9 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
         # scene / panel 均为裸字符串
         _add(acc, stmt.scene, stmt.panel, "panel", line)
     elif isinstance(stmt, WaitStable):
-        # wait stable on [scene].[region] — 校验区域绑定
-        if stmt.area is not None and isinstance(stmt.area, SceneRef):
-            _add(acc, stmt.area.scene, stmt.area.region, "stable_area", line)
+        # wait stable on [scene].[entity] — 校验区域绑定
+        if stmt.area is not None and isinstance(stmt.area, EntityRef):
+            _add(acc, stmt.area.scene, stmt.area.entity, "stable_area", line)
 
     # 嵌套体递归
     if isinstance(stmt, If):

@@ -260,6 +260,31 @@ def save_equip_display(params: dict[str, Any]) -> None:
     get_session_store().set_node("settings", existing)
 
 
+# ─── 装备筛选配置 ────────────────────────────────────────────
+
+_EQUIP_FILTER_DEFAULTS: dict[str, str] = {
+    "level": "all",       # all | 110 | 105
+    "affix": "all",       # all | dingyin | full_tuning
+}
+
+
+def load_equip_filter() -> dict[str, str]:
+    """读取 session.json 的 settings.equip_filter 节点，缺失字段用默认值补齐"""
+    value = load_settings().get("equip_filter")
+    if not isinstance(value, dict):
+        return dict(_EQUIP_FILTER_DEFAULTS)
+    merged = dict(_EQUIP_FILTER_DEFAULTS)
+    merged.update(value)
+    return merged
+
+
+def save_equip_filter(filters: dict[str, str]) -> None:
+    """保存装备筛选配置到 session.json 的 settings.equip_filter 节点"""
+    existing = load_settings()
+    existing["equip_filter"] = filters
+    get_session_store().set_node("settings", existing)
+
+
 # ─── 便捷函数：alert_info 告警存储 ────────────────────────────
 
 

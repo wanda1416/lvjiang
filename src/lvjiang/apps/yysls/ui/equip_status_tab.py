@@ -8,6 +8,7 @@ from __future__ import annotations
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -501,6 +502,32 @@ class EquipStatusTab(QWidget):
         btn_row.addWidget(btn_refresh)
         add_user_nav_buttons(btn_row, self._host)
         btn_row.addStretch()
+
+        # ── 筛选下拉框 ──
+        lbl_level = QLabel(tr("等级"))
+        lbl_level.setStyleSheet("font-size: 12px; color: #555;")
+        btn_row.addWidget(lbl_level)
+        self._level_filter = QComboBox()
+        self._level_filter.addItem(tr("全部"), "all")
+        # 从游戏配置动态填充等级（降序）
+        from lvjiang.apps.yysls.config import get_game_config
+        for lvl in sorted([c.level for c in get_game_config().get_level_configs()], reverse=True):
+            self._level_filter.addItem(tr("≥{level}").format(level=lvl), str(lvl))
+        self._level_filter.setFixedWidth(70)
+        self._level_filter.currentIndexChanged.connect(self._on_filter_changed)
+        btn_row.addWidget(self._level_filter)
+
+        lbl_affix = QLabel(tr("词条"))
+        lbl_affix.setStyleSheet("font-size: 12px; color: #555;")
+        btn_row.addWidget(lbl_affix)
+        self._affix_filter = QComboBox()
+        self._affix_filter.addItem(tr("全部"), "all")
+        self._affix_filter.addItem(tr("定音"), "dingyin")
+        self._affix_filter.addItem(tr("满调律"), "full_tuning")
+        self._affix_filter.setFixedWidth(70)
+        self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
+        btn_row.addWidget(self._affix_filter)
+
         btn_export = QPushButton(tr("导出数据"))
         btn_export.setToolTip(tr("导出为 leoq7 格式"))
         btn_export.setFixedWidth(80)
@@ -559,6 +586,78 @@ class EquipStatusTab(QWidget):
         # 订阅用户切换
         self._host.user_changed.connect(lambda _name: self._refresh_all())
 
+        # 加载筛选配置
+        self._load_filter_settings()
+
+    # ── 筛选 ──
+
+    def _load_filter_settings(self):
+        """从 session 加载筛选配置并设置下拉框"""
+        from ....core.config import load_equip_filter
+        filters = load_equip_filter()
+        # 屏蔽信号，避免初始化时触发 _on_filter_changed
+        self._level_filter.blockSignals(True)
+        self._affix_filter.blockSignals(True)
+        try:
+            # 使用 findData 定位选项（显示文本与数据值分离）
+            level_idx = self._level_filter.findData(filters.get("level", "all"))
+            self._level_filter.setCurrentIndex(level_idx if level_idx >= 0 else 0)
+            affix_idx = self._affix_filter.findData(filters.get("affix", "all"))
+            self._affix_filter.setCurrentIndex(affix_idx if affix_idx >= 0 else 0)
+        finally:
+            self._level_filter.blockSignals(False)
+            self._affix_filter.blockSignals(False)
+
+    def _save_filter_settings(self):
+        """保存筛选配置到 session"""
+        from ....core.config import save_equip_filter
+        filters = {
+            "level": self._level_filter.currentData(),
+            "affix": self._affix_filter.currentData(),
+        }
+        save_equip_filter(filters)
+
+    def _on_filter_changed(self):
+        """筛选下拉框变化时触发"""
+        self._save_filter_settings()
+        self._rebuild_grid()
+
+    def _get_level_threshold(self) -> int:
+        """获取等级筛选阈值，0 表示不筛选"""
+        level_str = self._level_filter.currentData()
+        return int(level_str) if level_str != "all" else 0
+
+    def _get_affix_filter(self) -> str:
+        """获取词条筛选类型: all/dingyin/full_tuning"""
+        return self._affix_filter.currentData()
+
+    def _equip_passes_filter(self, equip: dict) -> bool:
+        """检查装备是否通过筛选条件"""
+        # 等级筛选
+        level_threshold = self._get_level_threshold()
+        if level_threshold > 0:
+            equip_level = equip.get("level", 0)
+            if isinstance(equip_level, str):
+                try:
+                    equip_level = int(equip_level)
+                except (ValueError, TypeError):
+                    equip_level = 0
+            if equip_level < level_threshold:
+                return False
+
+        # 词条筛选
+        affix_filter = self._get_affix_filter()
+        if affix_filter == "all":
+            return True
+        elif affix_filter == "dingyin":
+            # 有定音词条（包含满调律）
+            dingyin = equip.get("dingyin")
+            return bool(dingyin and dingyin.get("name"))
+        elif affix_filter == "full_tuning":
+            # 满调律：5 条非定音词条（affix_1 到 affix_5 都有）
+            return all(equip.get(f"affix_{i}", {}).get("name") for i in range(1, 6))
+        return True
+
     # ── 槽位点击 ──
 
     def _on_slot_clicked(self, slot_key: str):
@@ -605,6 +704,9 @@ class EquipStatusTab(QWidget):
                 continue
             part_label = _GROUP_PART_LABELS.get(group_key, group_key)
             for _fp, equip in items.items():
+                # 应用等级/词条筛选
+                if not self._equip_passes_filter(equip):
+                    continue
                 cards.append((equip, part_label))
 
         # 填充
@@ -682,7 +784,12 @@ class EquipStatusTab(QWidget):
 
             from ..leoq7_export import export_leoq7
             data = SessionManager().load(user_name)
-            text = export_leoq7(data, user_name)
+            text = export_leoq7(
+                data,
+                user_name,
+                level_threshold=self._get_level_threshold(),
+                affix_filter=self._get_affix_filter(),
+            )
         except Exception as e:
             logger.error(f"导出 leoq7 数据失败: {e}")
             QMessageBox.critical(self, tr("导出失败"), str(e))

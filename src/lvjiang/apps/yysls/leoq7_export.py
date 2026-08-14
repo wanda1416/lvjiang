@@ -299,7 +299,13 @@ _SLOT_TYPE_TO_EQUIP_TYPE: dict[str, str] = {
 }
 
 
-def export_leoq7(session_data: dict, role_name: str) -> str:
+def export_leoq7(
+    session_data: dict,
+    role_name: str,
+    *,
+    level_threshold: int = 0,
+    affix_filter: str = "all",
+) -> str:
     """将 session 数据导出为 leoq7 V2 传输文本。
 
     Parameters
@@ -308,6 +314,10 @@ def export_leoq7(session_data: dict, role_name: str) -> str:
         ``SessionManager().load(user_name)`` 返回的完整字典
     role_name:
         角色名（写入 payload 的 roleName 字段）
+    level_threshold:
+        等级筛选阈值（0 表示不筛选，背包物品适用）
+    affix_filter:
+        词条筛选类型："all" / "dingyin" / "full_tuning"（背包物品适用）
 
     Returns
     -------
@@ -316,7 +326,7 @@ def export_leoq7(session_data: dict, role_name: str) -> str:
     """
     items: list[dict] = []
 
-    # 已装备
+    # 已装备（不受筛选影响）
     for slot_key, equip in session_data.get("equipped", {}).items():
         slot_type = _EQUIPPED_SLOT_TYPE.get(slot_key)
         if not slot_type:
@@ -325,7 +335,7 @@ def export_leoq7(session_data: dict, role_name: str) -> str:
         if item:
             items.append(item)
 
-    # 背包
+    # 背包（应用筛选）
     for _group_key, group_items in session_data.get("bag_items", {}).items():
         if not isinstance(group_items, dict):
             continue
@@ -339,6 +349,24 @@ def export_leoq7(session_data: dict, role_name: str) -> str:
                 slot_type = _SLOT_TYPE_MAP[equip_type]
             else:
                 continue
+            # 等级筛选
+            if level_threshold > 0:
+                equip_level = equip.get("level", 0)
+                if isinstance(equip_level, str):
+                    try:
+                        equip_level = int(equip_level)
+                    except (ValueError, TypeError):
+                        equip_level = 0
+                if equip_level < level_threshold:
+                    continue
+            # 词条筛选
+            if affix_filter == "dingyin":
+                dingyin = equip.get("dingyin")
+                if not (dingyin and dingyin.get("name")):
+                    continue
+            elif affix_filter == "full_tuning":
+                if not all(equip.get(f"affix_{i}", {}).get("name") for i in range(1, 6)):
+                    continue
             item = _convert_item(equip, slot_type)
             if item:
                 items.append(item)

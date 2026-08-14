@@ -577,13 +577,13 @@ class _ExprMixin:
         return float(items[0])
 
     def number_int(self, items):
-        return float(int(items[0]))  # 统一为 float
+        return int(items[0])
 
     def number_neg_float(self, items):
         return -float(items[0])
 
     def number_neg_int(self, items):
-        return -float(int(items[0]))
+        return -int(items[0])
 
     # ─── 通用原子 ─────────────────────────────────────────
 

@@ -75,12 +75,13 @@ DSL 支持 6 种值类型，变量的实际类型由赋值来源决定（动态�
 |---|---|---|---|
 | `null` | `null` | `None` | `eval $x = null` |
 | `bool` | `true` / `false` | `True` / `False` | `eval $flag = true` |
-| `number` | `123` / `1.5` / `-3` | `float` | `eval $n = 42` |
+| `int` | `123` / `-3` | `int` | `eval $n = 42` |
+| `float` | `1.5` / `-3.14` | `float` | `eval $f = 1.5` |
 | `str` | `"hello"` | `str` | `eval $s = "hello"` |
 | `dict` | `{"k": "v"}` | `dict` | `eval $d = {"a": 1}` |
 | `list` | `[1, 2, 3]` | `list` | `eval $l = [1, "a", null]` |
 
-> 数字在内部统一为 `float`（即 Python 的 `float`），算术运算和比较均在此精度下进行。
+> 数字保持原始类型：整数字面量 `1` 为 int，小数字面量 `1.0` 为 float。算术运算保持类型传播（int+int→int，int+float→float）。
 
 ### null 语义
 
@@ -97,7 +98,7 @@ DSL 支持 6 种值类型，变量的实际类型由赋值来源决定（动态�
 |---|---|---|
 | 条件判断 | falsy | `if $null_var` → 不进入 |
 | `is_empty` | 视为空 | `$null_var is_empty` → true |
-| 算术运算 | 视为 0.0 | `null + 5` → 5.0 |
+| 算术运算 | 视为 0（int） | `null + 5` → 5 |
 | `concat` | 视为空字符串 | `concat("a", null, "b")` → "ab" |
 | `equals` 比较 | 两侧 null 相等 | `null equals null` → true |
 | 字符串字段访问 | 转为空字符串 | 字段链中 null → "" |
@@ -227,7 +228,8 @@ $var = "hello"               # 隐式 eval，效果完全相同
 | 来源 | 类型 | 示例 |
 |---|---|---|
 | `eval $var = "hello"` | `str` | 字符串 |
-| `eval $var = 42` | `number` | 数字（内部统一为 float） |
+| `eval $var = 42` | `int` | 整数 |
+| `eval $var = 1.5` | `float` | 浮点数 |
 | `eval $var = true` | `bool` | 布尔 |
 | `eval $var = null` | `null` | 空值 |
 | `eval $var = {}` / `{"k": v}` | `dict` | 字典 |
@@ -236,7 +238,7 @@ $var = "hello"               # 隐式 eval，效果完全相同
 | `scan ... as $var` | `dict` | OCR 结果字典 |
 | `scan ... as $var by ...` | `str` | 首个命中的 Area 名 |
 | `eval $var = $other` | 同 `$other` | 类型跟随源变量 |
-| `for x in [...]` | `str` | 迭代元素为字符串 |
+| `for x in [...]` | 原始类型 | 迭代元素保持原始类型（int/str 等） |
 
 ### 作用域与查找
 
@@ -264,7 +266,7 @@ end
 - 优先级：`*` `/` 高于 `+` `-`，支持 `()` 改变优先级
 - 除法为浮点除（`10 / 3 = 3.333...`），除零返回 `0`
 - 运算两侧可以是数字、变量引用、字段访问、函数调用
-- **字符串拼接**：`+` 两侧含非数值字符串时自动拼接（如 `"hello" + " world"`）；数值字符串（如 `"1.0"`）仍走算术加法
+- **字符串拼接**：`+` 任一侧为 str 时自动拼接（如 `"hello" + " world"`、`"item_" + $idx`）
 
 ### 函数调用
 

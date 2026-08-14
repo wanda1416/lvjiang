@@ -1,6 +1,6 @@
-"""leoq7 (yysls.leoq7.com) 装备数据导出。
+"""leoq7 (yysls.leoq7.com) 装备数据导出 — V2 外部传输格式。
 
-格式规范（来自 yysls-equip-exporter 参考项目）：
+目标网站：https://yysls.leoq7.com/
 
 Payload JSON::
 
@@ -11,16 +11,23 @@ Payload JSON::
       "items": [
         {
           "equipmentKey": "EQUIPMENT_WEAPON_SWORD",
+          "equipmentName": "踏雪含光",
           "type": "weapon",
-          "firstTuning":  [{"key": "...", "value": 0.0}],
-          "secondaryTuning": [{"key": "...", "value": 0.0}],
-          "pitch": [{"key": "...", "value": 0.0}],
+          "firstTuning":  [{"key": "MAX_EXTERNAL_ATTACK", "value": 114.1}],
+          "secondaryTuning": [{"key": "JIN", "value": 72.2}],
+          "pitch": [{"key": "EXTERNAL_PENETRATION", "value": 16.8}],
           "isChengyin": true
         }
       ]
     }
 
 编码：JSON → XOR 加密 → Base64 → 前缀 ``YYSLS_EQUIPMENT_EXPORT_V2\\n``
+
+XOR 公式（与网站 ``decodeExternalEquipmentExportV2`` 对齐）::
+
+    encrypted[i] = json_byte[i] ^ KEY[i % len(KEY)] ^ ((17*i + 29) % 251)
+
+KEY = ``b"yysls-equipment-transfer"``
 """
 from __future__ import annotations
 
@@ -33,9 +40,10 @@ _HEADER = "YYSLS_EQUIPMENT_EXPORT_V2"
 _TRANSFER_KEY = b"yysls-equipment-transfer"
 
 # ── 装备类型 → equipmentKey ──────────────────────────
+# 网站的 EXTERNAL_EQUIPMENT_KEY_SLOT_MAP / EXTERNAL_WEAPON_KEY_MAP
 
 _EQUIPMENT_KEY_MAP: dict[str, str] = {
-    # 武器
+    # 武器（10 种）
     "剑": "EQUIPMENT_WEAPON_SWORD",
     "枪": "EQUIPMENT_WEAPON_SPEAR",
     "伞": "EQUIPMENT_WEAPON_UMBRELLA",
@@ -46,7 +54,7 @@ _EQUIPMENT_KEY_MAP: dict[str, str] = {
     "横刀": "EQUIPMENT_WEAPON_HENGDAO",
     "手甲": "EQUIPMENT_WEAPON_FIST",
     "舞绫鼓": "EQUIPMENT_WEAPON_DRUM",
-    # 防具
+    # 防具（6 种）
     "环": "EQUIPMENT_RING",
     "佩": "EQUIPMENT_PENDANT",
     "冠胄": "EQUIPMENT_HEAD",
@@ -55,7 +63,8 @@ _EQUIPMENT_KEY_MAP: dict[str, str] = {
     "腕甲": "EQUIPMENT_HAND",
 }
 
-# ── 词条名 → external stat key ───────────────────────
+# ── 词条中文名 → external stat key ───────────────────
+# 网站的 EXTERNAL_STAT_KEY_MAP 的 key 集合
 
 _AFFIX_KEY_MAP: dict[str, str] = {
     # 攻击
@@ -86,11 +95,11 @@ _AFFIX_KEY_MAP: dict[str, str] = {
     "全武学增效": "WUXUE_DAMAGE",
     "对首领单位增伤": "BOSS_DAMAGE",
     "对玩家单位增效": "PLAYER_DAMAGE",
-    # 武器增伤（含别名）
+    # 武器增伤（含别名 → 网站 EXTERNAL_STAT_KEY_MAP 值）
     "陌刀武学增伤": "BIGBLADE_DAMAGE",
     "陌刀武学增效": "BIGBLADE_DAMAGE",
-    "横刀武学增伤": "横刀武学增效",
-    "横刀武学增效": "横刀武学增效",
+    "横刀武学增伤": "HENGDAO_DAMAGE",
+    "横刀武学增效": "HENGDAO_DAMAGE",
     "剑武学增伤": "SWORD_DAMAGE",
     "剑武学增效": "SWORD_DAMAGE",
     "枪武学增伤": "SPEAR_DAMAGE",
@@ -151,7 +160,7 @@ def _is_pitch_key(slot_type: str, key: str) -> bool:
 
 
 def _affix_to_stat(affix: dict | None) -> dict | None:
-    """将 bag_items 中的 affix 字典转为 {key, value}，无法映射则返回 None"""
+    """将 bag_items 中的 affix 字典转为 ``{key, value}``，无法映射则返回 None"""
     if not affix or not affix.get("name"):
         return None
     key = _map_affix_key(affix["name"])
@@ -164,7 +173,7 @@ def _affix_to_stat(affix: dict | None) -> dict | None:
 
 
 def _dingyin_to_stat(dingyin: dict | None) -> dict | None:
-    """将定音词条字典转为 {key, value}，无法映射则返回 None"""
+    """将定音词条字典转为 ``{key, value}``，无法映射则返回 None"""
     if not dingyin or not dingyin.get("name"):
         return None
     name = dingyin["name"]
@@ -183,7 +192,7 @@ def _dingyin_to_stat(dingyin: dict | None) -> dict | None:
 
 
 def _convert_item(equip: dict, slot_type: str) -> dict | None:
-    """将单件装备数据转为 leoq7 ExternalItem 格式"""
+    """将单件 session 装备数据转为 leoq7 ExternalItem 格式"""
     equip_type = equip.get("type")
     equipment_key = _map_equipment_key(equip_type)
     if equipment_key is None:
@@ -213,13 +222,12 @@ def _convert_item(equip: dict, slot_type: str) -> dict | None:
         # affix_5 不是合法定音 → 归入副词条
         if affix_5_stat:
             secondary.append(affix_5_stat)
-        # dingyin 存在但不是合法定音 → 丢弃
 
     # 副词条上限 4 条
     if len(secondary) > 4:
         secondary = secondary[:4]
 
-    return {
+    item: dict = {
         "equipmentKey": equipment_key,
         "type": slot_type,
         "firstTuning": first_tuning,
@@ -227,6 +235,11 @@ def _convert_item(equip: dict, slot_type: str) -> dict | None:
         "pitch": pitch,
         "isChengyin": bool(equip.get("is_chengyin", False)),
     }
+    # 可选字段：装备名称（网站的 convertExternalEquipmentItem 用它显示）
+    name = equip.get("name")
+    if name:
+        item["equipmentName"] = name
+    return item
 
 
 def _encode_transfer(json_bytes: bytes) -> str:
@@ -241,6 +254,29 @@ def _encode_transfer(json_bytes: bytes) -> str:
 
 # ── 公开 API ──────────────────────────────────────────
 
+# 已装备槽位 → slot_type
+_EQUIPPED_SLOT_TYPE: dict[str, str] = {
+    "main_weapon": "weapon",
+    "sub_weapon": "weapon",
+    "head": "head",
+    "chest": "chest",
+    "ring": "ring",
+    "pendant": "pendant",
+    "leg": "leg",
+    "wrist": "wrist",
+}
+
+# 背包武器类型集合（排除防具）
+_WEAPON_TYPES: frozenset[str] = frozenset(_EQUIPMENT_KEY_MAP.keys()) - frozenset({
+    "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲",
+})
+# 背包防具 → slot_type
+_SLOT_TYPE_MAP: dict[str, str] = {
+    "环": "ring", "佩": "pendant", "冠胄": "head",
+    "胸甲": "chest", "胫甲": "leg", "腕甲": "wrist",
+}
+
+
 def export_leoq7(session_data: dict, role_name: str) -> str:
     """将 session 数据导出为 leoq7 V2 传输文本。
 
@@ -254,21 +290,11 @@ def export_leoq7(session_data: dict, role_name: str) -> str:
     Returns
     -------
     str
-        可直接粘贴到 leoq7 网站的传输文本
+        可直接粘贴到 yysls.leoq7.com 的传输文本
     """
     items: list[dict] = []
 
     # 已装备
-    _EQUIPPED_SLOT_TYPE = {
-        "main_weapon": "weapon",
-        "sub_weapon": "weapon",
-        "head": "head",
-        "chest": "chest",
-        "ring": "ring",
-        "pendant": "pendant",
-        "leg": "leg",
-        "wrist": "wrist",
-    }
     for slot_key, equip in session_data.get("equipped", {}).items():
         slot_type = _EQUIPPED_SLOT_TYPE.get(slot_key)
         if not slot_type:
@@ -278,14 +304,6 @@ def export_leoq7(session_data: dict, role_name: str) -> str:
             items.append(item)
 
     # 背包
-    # 装备类型 → slot_type 映射（武器类统一为 weapon）
-    _WEAPON_TYPES = frozenset(_EQUIPMENT_KEY_MAP.keys()) - frozenset({
-        "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲",
-    })
-    _SLOT_TYPE_MAP = {
-        "环": "ring", "佩": "pendant", "冠胄": "head",
-        "胸甲": "chest", "胫甲": "leg", "腕甲": "wrist",
-    }
     for _group_key, group_items in session_data.get("bag_items", {}).items():
         if not isinstance(group_items, dict):
             continue

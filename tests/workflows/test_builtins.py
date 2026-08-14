@@ -68,11 +68,20 @@ class TestArithmetic:
         assert _fn(name)(7, 0) == 0
 
     @pytest.mark.parametrize("name", [
-        "add", "sub", "mul", "div", "mod", "min", "max",
+        "add", "sub", "mul", "div", "mod",
     ])
     def test_invalid_input_returns_zero(self, name):
         assert _fn(name)("abc", 1) == 0
         assert _fn(name)(None, 1) == 0
+
+    def test_min_max_skip_invalid(self):
+        """min/max 跳过无效值，仅全无效时返回 0"""
+        assert _fn("min")("abc", 1) == 1
+        assert _fn("max")("abc", 1) == 1
+        assert _fn("min")(None, 1) == 1
+        assert _fn("max")(None, 1) == 1
+        assert _fn("min")("abc", "def") == 0
+        assert _fn("max")("abc", "def") == 0
 
     def test_abs(self):
         assert _fn("abs")(-5) == 5

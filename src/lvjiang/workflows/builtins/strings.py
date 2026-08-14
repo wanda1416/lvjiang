@@ -4,6 +4,7 @@ import re
 
 from loguru import logger
 
+from ._coerce import to_number
 from ._registry import builtin_func
 
 # ─── 字符串 ─────────────────────────────────────────────
@@ -109,12 +110,10 @@ def _lower(s) -> str:
 
 
 @builtin_func("to_num")
-def _to_num(s) -> float:
-    """字符串转数字，失败返回 0.0
+def _to_num(s):
+    """字符串转数字，失败返回 0
 
-    与引擎 _to_number 行为一致（但返回 0.0 而不是 None）。
+    含小数点 → float，否则 → int。
     """
-    try:
-        return float(s)
-    except (TypeError, ValueError):
-        return 0.0
+    result = to_number(s)
+    return result if result is not None else 0

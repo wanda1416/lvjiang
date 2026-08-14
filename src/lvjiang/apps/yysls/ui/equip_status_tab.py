@@ -255,16 +255,25 @@ class _OtherEquipPage(QWidget):
 
         # 滚动网格
         scroll = QScrollArea()
-        scroll.setWidgetResizable(False)
+        scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
+        # wrapper 贴顶：grid 在上，stretch 占剩余空间
+        wrapper = QWidget()
+        wrapper_layout = QVBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+
         self._grid_container = QWidget()
+        # 限制 grid_container 垂直扩展，确保内容贴顶
+        self._grid_container.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._grid = QGridLayout(self._grid_container)
         self._grid.setSpacing(8)
-        scroll.setWidget(self._grid_container)
-        # 容器宽度跟随 viewport，高度保持自然尺寸（贴顶不居中）
-        scroll.viewport().resizeEvent = lambda e: self._grid_container.setMinimumWidth(e.size().width())
+        wrapper_layout.addWidget(self._grid_container)
+        wrapper_layout.addStretch()
+
+        scroll.setWidget(wrapper)
         layout.addWidget(scroll, stretch=1)
 
         # 默认选中「全部」

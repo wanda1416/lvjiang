@@ -101,13 +101,13 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
             eval $equip = to_equipment($raw)
             # OCR 完全失败（type 和 name 均为空）→ 跳过该格
             if not $equip.type and not $equip.name
-                log debug "  [" + $r + ",1] OCR 无效，跳过"
+                log "  [" + $r + ",1] OCR 无效，跳过"
                 eval $r = $r + 1
                 continue
             end
             eval $fp = make_fingerprint($equip)
             eval $signal = bag_cursor_visit($fp)
-            log debug "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
+            log "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
 
             if $signal equals "end"
                 log "  锚点已见过，结束当前窗口"
@@ -132,24 +132,21 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                         scan [equip_armor_detail] as $raw
                     end
                     eval $equip = to_equipment($raw)
-                    # OCR 完全失败 → 视为空白格，结束本行
+                    # OCR 完全失败 → 视为空白格，结束本行（继续下一行）
                     if not $equip.type and not $equip.name
                         log "    [" + $r + "," + $c + "] OCR 无效，结束本行"
-                        eval $signal = "end"
                         break
                     end
                     eval $fp = make_fingerprint($equip)
-                    log debug "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
+                    log "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
 
                     if not $fp
                         log "    指纹为空，空白格，结束本行"
-                        eval $signal = "end"
                         break
                     end
                     # 指纹已存在于本槽位 → 点击落到了空白格（详情页未刷新），结束本行
                     if $items.$fp
                         log "    指纹已存在，空白格残留数据，结束本行"
-                        eval $signal = "end"
                         break
                     end
                     if $equip.level < $min_level

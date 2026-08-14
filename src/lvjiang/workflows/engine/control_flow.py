@@ -46,8 +46,8 @@ class _ControlFlowMixin:
             if self._stop_check():
                 logger.info("工作流被用户停止")
                 return
-            # 设置循环变量
-            self.variables[node.var] = str(value)
+            # 设置循环变量（保持原始类型：int/float/str）
+            self.variables[node.var] = value
             try:
                 self._exec_body(node.body)
             except _BreakSignal:
@@ -75,7 +75,7 @@ class _ControlFlowMixin:
             if self._stop_check():
                 logger.info("工作流被用户停止")
                 return
-            self.variables[node.var] = str(value)
+            self.variables[node.var] = value  # int，保持原始类型
             try:
                 self._exec_body(node.body)
             except _BreakSignal:

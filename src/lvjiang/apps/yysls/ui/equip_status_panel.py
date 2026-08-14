@@ -235,10 +235,18 @@ class EquipStatusPanel(QWidget):
 
         # 滚动区域
         scroll = QScrollArea()
-        scroll.setWidgetResizable(False)
+        scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
+        # wrapper 贴顶：grid 在上，stretch 占剩余空间
+        wrapper = QWidget()
+        wrapper_layout = QVBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+
         container = QWidget()
+        # 限制 container 垂直扩展，确保内容贴顶
+        container.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         grid = QGridLayout(container)
         grid.setSpacing(8)
 
@@ -247,8 +255,9 @@ class EquipStatusPanel(QWidget):
             grid.addWidget(card, row, col)
             self._cards[slot_key] = card
 
-        scroll.setWidget(container)
-        scroll.viewport().resizeEvent = lambda e: container.setMinimumWidth(e.size().width())
+        wrapper_layout.addWidget(container)
+        wrapper_layout.addStretch()
+        scroll.setWidget(wrapper)
         layout.addWidget(scroll)
 
     def set_display_params(self, params: dict):

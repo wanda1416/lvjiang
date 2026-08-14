@@ -505,7 +505,7 @@ class ProfileOverviewTab(QWidget):
 
         if logical_index == 0:
             menu.addAction(tr("角色名列（不可删除）"))
-            menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, 0))
+            menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, -1))
         else:
             # 数据列索引需要减 1（跳过角色名列）
             data_index = logical_index - 1

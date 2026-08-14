@@ -66,6 +66,20 @@ click [equip_weapon_detail].[affix_1]     # 点击 Region 中心
 scan [equip_weapon_detail].[affix_1]      # 对 Region 执行 OCR
 ```
 
+**Panel — 可寻址 Area**：除普通 Area 外，Scene 还可声明 Panel（面板），它是一种特殊的 Area，作为**可寻址的容器**存在，支持通过 `[r][c]` 二维索引访问内部格子。Panel 在 Scene 层声明，详细概念见 [三、Panel](#三panel--可寻址容器)。
+
+```yaml
+# Scene 声明 Panel
+panels:
+  - key: bag_grid
+    rows: 3
+    cols: 6
+```
+
+```
+click [scene].[bag_grid][1][1]            # 点击 Panel 第 1 行第 1 列
+```
+
 ### Action — 行为实体
 
 Action（Arrow）是定义一次**拖拽交互**的行为实体，与 Area 完全正交。Action 纯 Layout 层定义，不在 Scene 层声明。

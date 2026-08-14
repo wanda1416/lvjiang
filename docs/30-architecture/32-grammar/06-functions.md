@@ -20,14 +20,14 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `add` | `(a, b) -> number` | 两数相加 |
-| `sub` | `(a, b) -> number` | 两数相减 |
-| `mul` | `(a, b) -> number` | 两数相乘 |
-| `div` | `(a, b) -> number` | 浮点除，除数为 0 返回 0 |
-| `mod` | `(a, b) -> number` | 取模，除数为 0 返回 0 |
-| `min` | `(a, b, ...) -> number` | 取最小值（支持两个以上参数） |
-| `max` | `(a, b, ...) -> number` | 取最大值（支持两个以上参数） |
-| `abs` | `(a) -> number` | 取绝对值 |
+| `add` | `(a, b) -> int \| float` | 两数相加，保持类型（int+int→int，int+float→float） |
+| `sub` | `(a, b) -> int \| float` | 两数相减，保持类型 |
+| `mul` | `(a, b) -> int \| float` | 两数相乘，保持类型 |
+| `div` | `(a, b) -> float` | 浮点除，除数为 0 返回 0.0 |
+| `mod` | `(a, b) -> int \| float` | 取模，除数为 0 返回 0 |
+| `min` | `(a, b, ...) -> int \| float` | 取最小值（支持两个以上参数），跳过无效值 |
+| `max` | `(a, b, ...) -> int \| float` | 取最大值（支持两个以上参数），跳过无效值 |
+| `abs` | `(a) -> int \| float` | 取绝对值，保持类型 |
 
 ### 字典/列表操作（12）
 
@@ -58,7 +58,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `trim` | `(str) -> str` | 去除两端空白 |
 | `upper` | `(str) -> str` | 转大写 |
 | `lower` | `(str) -> str` | 转小写 |
-| `to_num` | `(str) -> float` | 字符串转数字，失败返回 0 |
+| `to_num` | `(str) -> int \| float` | 字符串转数字，含小数点→float，否则→int，失败返回 0 |
 
 ### 装备处理（6）
 

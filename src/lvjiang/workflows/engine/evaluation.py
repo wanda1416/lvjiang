@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from ..builtins._coerce import to_number
 from ..grammar import (
     And,
     ArithOp,
@@ -107,12 +108,9 @@ class _EvalMixin:
                 return False
 
     @staticmethod
-    def _to_number(val: str):
-        """将字符串转为数值，失败时返回 None"""
-        try:
-            return float(val)
-        except (ValueError, TypeError):
-            return None
+    def _to_number(val):
+        """将值转为数值，失败时返回 None（委托公共实现）"""
+        return to_number(val)
 
     @staticmethod
     def _field_path(node) -> str:
@@ -195,12 +193,10 @@ class _EvalMixin:
         if isinstance(current, dict):
             if key in current:
                 return current[key]
-            # 数值 key 归一化：整面板扫描结果以 "1"/"2" 字符串为 key，
-            # 而 $var.$r 中 $r 来自 for 循环时是 int，转 str(int) 后再查一次
-            try:
-                return current.get(str(int(float(key))))
-            except (TypeError, ValueError):
-                return None  # 缺失 key → None（null）
+            # int/float key 隐式转 str 查找（匹配 scan 结果的 str key）
+            if isinstance(key, (int, float)):
+                return current.get(str(key))
+            return None
         # list 按 index 取（key 需为整数）
         if isinstance(current, list):
             try:
@@ -260,50 +256,39 @@ class _EvalMixin:
             case _:
                 return None
 
-    def _resolve_arith(self, node) -> float | None:
+    def _resolve_arith(self, node) -> int | float | None:
         """解析算术表达式右侧为数值（用于条件比较）
 
-        支持：float 字面量、VarRef、FieldAccess、ArithOp
+        支持：int/float 字面量、VarRef、FieldAccess、ArithOp
         """
         if isinstance(node, (int, float)):
-            return float(node)
+            return node
         val = self._resolve(node)
         return self._to_number(val)
 
-    def _eval_arith(self, node: ArithOp) -> float | str:
+    def _eval_arith(self, node: ArithOp) -> int | float | str:
         """求值算术表达式节点
 
-        递归求值 left/right，统一转 float 后执行运算。
-        null 操作数视为 0.0，除法为浮点除，除 0 返回 0。
-        `+` 运算符支持字符串拼接：仅当操作数含非数值字符串时执行拼接，
-        数值字符串（如 "1.0"）仍走算术加法。
+        保持 int/float 类型：int+int→int，int+float→float，除法始终为 float。
+        null 操作数视为 0（int），除 0 返回 0.0。
+        `+` 运算符：任一侧为 str 则走字符串拼接。
         """
-        # `+` 运算符：检查是否需要字符串拼接
+        # `+` 运算符：任一侧为 str → 字符串拼接
         if node.op == "+":
             left_raw = self._resolve(node.left)
             right_raw = self._resolve(node.right)
-            # 判断是否为字符串拼接场景：至少一个是字符串，且至少有一个不能转为数字
-            l_is_str = isinstance(left_raw, str)
-            r_is_str = isinstance(right_raw, str)
-            if l_is_str or r_is_str:
-                # 尝试将两个操作数转为数字（None 保留为 None，不特殊化为 0.0）
-                l_num = self._to_number(left_raw) if left_raw is not None else None
-                r_num = self._to_number(right_raw) if right_raw is not None else None
-                # 如果两个都能转为数字（非 None），走算术加法
-                if l_num is not None and r_num is not None:
-                    return l_num + r_num
-                # 否则走字符串拼接
+            if isinstance(left_raw, str) or isinstance(right_raw, str):
                 left_str = left_raw if left_raw is not None else ""
                 right_str = right_raw if right_raw is not None else ""
                 return str(left_str) + str(right_str)
 
         left = self._resolve_arith(node.left)
         right = self._resolve_arith(node.right)
-        # null 操作数视为 0.0
+        # null 操作数视为 0（int）
         if left is None:
-            left = 0.0
+            left = 0
         if right is None:
-            right = 0.0
+            right = 0
         match node.op:
             case "+":
                 return left + right

@@ -117,19 +117,25 @@ def test_whole_panel_scan_nested_result(tmp_path):
 
 
 def test_whole_panel_scan_bracket_and_dynamic_access(tmp_path):
-    """$bags.[1].[2] 静态数字 key 与 $bags.$r.$c 动态 int key 取同一格"""
+    """$bags.[1].[2] 静态 key 与 for 循环变量动态 key 取同一格"""
     wf = _write_wf(tmp_path, (
         'scan [s].[actions] as $bags\n'
         'eval $c12 = $bags.[1].[2]\n'
         'collect $c12\n'
-        'eval $r = 1\n'
-        'eval $c = 2\n'
-        'eval $dyn = $bags.$r.$c\n'
+        'eval $dyn = ""\n'
+        'for r in [1...2]\n'
+        '    for c in [1...2]\n'
+        '        if $r equals "1"\n'
+        '            if $c equals "2"\n'
+        '                eval $dyn = $bags.$r.$c\n'
+        '            end\n'
+        '        end\n'
+        '    end\n'
+        'end\n'
         'collect $dyn\n'
     ))
     output = _make_engine().execute(wf)
     assert output["c12"] == "t2"
-    # eval $r = 1 存的是 float 1.0，归一化为 "1" 后命中
     assert output["dyn"] == "t2"
 
 

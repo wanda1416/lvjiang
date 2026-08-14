@@ -50,7 +50,7 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
 
     kind 决定查哪类对象：
     - click_target 查 region+point+panel（click_any 的查找顺序）
-    - drag_target 查 arrow+region（drag 的 SceneRef 分支）
+    - drag_target 查 arrow+region（drag 的 EntityRef 分支）
     - drag_grid_target 查 panel+region（drag 的 PanelGridDrag 分支）
     - arrow 查 arrows、panel 查 panels、region 查 regions、point 查 points
     - scan 查 region+panel（单 key scan/recognize）

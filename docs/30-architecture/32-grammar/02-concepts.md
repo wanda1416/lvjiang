@@ -1,14 +1,18 @@
-# 场景、布局与 Panel
+# 实体与坐标体系
 
-DSL 指令操作的核心对象是**场景（Scene）**、**布局（Layout）**中定义的 **Area** 和 **Action**。理解这三个概念及其关系，是正确使用 DSL 的前提。
+DSL 指令操作的核心对象是**实体（Entity）**和**坐标（CoordRef）**。实体分为空间实体（Area）和行为实体（Action），坐标是 Area 在运行时的统一表示。理解这些概念及其关系，是正确使用 DSL 的前提。
 
 ## 目录
 
 - [一、场景（Scene）](#一场景scene)
-- [二、布局（Layout）](#二布局layout)
+- [二、布局（Layout）与实体层次](#二布局layout与实体层次)
+  - [实体层次](#实体层次)
   - [Area — 空间实体](#area--空间实体)
   - [Action — 行为实体](#action--行为实体)
-- [三、Panel — 可寻址容器](#三panel--可寻址容器)
+- [三、CoordRef 类型体系（运行时坐标层）](#三coordref-类型体系运行时坐标层)
+  - [运算规则](#运算规则)
+  - [坐标约定](#坐标约定)
+- [四、Panel — 可寻址容器](#四panel--可寻址容器)
   - [grid 型（已实现）](#grid-型已实现)
   - [regions 型（规划中）](#regions-型规划中)
   - [自对齐机制](#自对齐机制)
@@ -45,59 +49,82 @@ DSL 通过 `[scene_name]` 引用场景。场景名支持两种形式（见 [01-b
 $scene_name                 # 变量引用
 ```
 
-## 二、布局（Layout）
+## 二、布局（Layout）与实体层次
 
-布局定义 Area 和 Action 的**具体坐标**。每个场景通过 `required_layout` 关联一个 Layout JSON 文件（位于 `config/system/layouts/`），Layout 负责将场景中的抽象名称映射到屏幕上的实际坐标。
+布局定义实体的**具体坐标**。每个场景通过 `required_layout` 关联一个 Layout JSON 文件（位于 `config/system/layouts/`），Layout 负责将场景中的抽象名称映射到屏幕上的实际坐标。
 
-### Area — 空间实体
+### 实体层次
 
-Area 是有位置和形状的空间实体，DSL 的 `click`、`scan`、`recognize` 指令都操作 Area。
-
-| 类型 | 说明 | DSL 支持 |
-|---|---|---|
-| **Region** | 有面积的矩形区域（有宽高） | ✅ `click` / `scan` / `recognize` |
-| **Point** | 坐标点（无面积） | ✅ `click`（`scan` / `recognize` 当前仅支持 Region，未来可扩展） |
-
-DSL 通过 `[scene].[area]` 引用 Area：
+Layout 下所有元素统一继承 **Entity** 基类，分为两大分支：
 
 ```
-click [equip_weapon_detail].[affix_1]     # 点击 Region 中心
-scan [equip_weapon_detail].[affix_1]      # 对 Region 执行 OCR
+Entity（布局元素基类）
+├── Area（空间实体 —— 有位置、形状，可解析为 CoordRef）
+│   ├── Region  — 矩形区域
+│   ├── Panel   — 可寻址容器（本质也是矩形区域）
+│   └── Point   — 坐标点（带半径）
+└── Action（行为实体 —— 定义一次拖拽交互）
+    └── Arrow   — 从起点 Point 指向终点 Point 的方向
 ```
-
-**Panel — 可寻址 Area**：除普通 Area 外，Scene 还可声明 Panel（面板），它是一种特殊的 Area，作为**可寻址的容器**存在，支持通过 `[r][c]` 二维索引访问内部格子。Panel 在 Scene 层声明，详细概念见 [三、Panel](#三panel--可寻址容器)。
-
-```yaml
-# Scene 声明 Panel
-panels:
-  - key: bag_grid
-    rows: 3
-    cols: 6
-```
-
-```
-click [scene].[bag_grid][1][1]            # 点击 Panel 第 1 行第 1 列
-```
-
-### Action — 行为实体
-
-Action（Arrow）是定义一次**拖拽交互**的行为实体，与 Area 完全正交。Action 纯 Layout 层定义，不在 Scene 层声明。
 
 | | Area | Action |
 |---|------|--------|
 | 本质 | **空间实体**（有位置、形状） | **行为实体**（定义一次交互） |
 | 定义层 | Scene 层声明，Layout 层绑定坐标 | 纯 Layout 层定义 |
-| 操作指令 | `click` / `scan` / `recognize` | `drag` |
-| 互斥 | 不能 `drag` 一个 Area | 不能 `scan` / `click` 一个 Action |
+| 操作指令 | `click` / `scan` / `recognize` / `drag` | `drag` |
+| 运行时表示 | → CoordRef（可参与坐标运算） | → 直接执行拖拽 |
+| 约束 | Point 不能单独 `drag`（无 w/h，无法计算终点） | 不能 `scan` / `click` |
 
-DSL 通过 `[scene].[action]` 引用 Action：
+> **drag 对 Area 的隐式转换**：`drag` 操作 Region/Panel 时，引擎利用其 w/h 计算终点，将 Area 隐式转为单向 Arrow。这是语法糖，本质等价于定义一个从中心向某方向的 Arrow。
+
+DSL 通过 `[scene].[entity]` 引用 Entity：
 
 ```
-drag [scene].[arrow]                   # 执行 Arrow 定义的拖拽
-drag [scene].[arrow] 0.5 hold 0.2      # 指定时长 + 按住
+click [equip_weapon_detail].[affix_1]     # 点击 Area（Region）
+scan [equip_weapon_detail].[affix_1]      # 对 Area 执行 OCR
+drag [scene].[arrow]                      # 执行 Action（Arrow）定义的拖拽
+drag [scene].[region] up                  # 对 Area 隐式拖拽（向上翻页）
 ```
 
-## 三、Panel — 可寻址容器
+## 三、CoordRef 类型体系（运行时坐标层）
+
+Area 和 `find` 指令的产出在运行时统一解析为 **CoordRef** 类型体系，用于坐标运算和点击/拖拽：
+
+```
+CoordRef(cx, cy)              — 坐标点基类（中心点）
+├── RectCoordRef(cx, cy, w, h) — 矩形区域（Region / Panel / FoundRegion）
+├── CircleCoordRef(cx, cy, r)  — 圆形区域（Point）
+└── tuple (cx, cy)             — 原始坐标对，可隐式转 Offset
+
+Offset(dx, dy)                — 位移向量（独立类型，不属于 CoordRef）
+```
+
+> **tuple 的角色**：DSL 中 `(0.5, 0.3)` 这样的坐标对是原始 CoordRef，语义上是「位置」。当它参与 Offset 运算时（如 `CoordRef + tuple`），引擎自动将其转为 Offset。这保证了向量运算法则的一致性。
+
+### 运算规则
+
+| 运算 | 结果 | 说明 |
+|------|------|------|
+| CoordRef + Offset | CoordRef（保持子类） | 位置平移 |
+| CoordRef - Offset | CoordRef（保持子类） | 位置平移 |
+| CoordRef - CoordRef | Offset | 隐式降级为中心点 |
+| Offset + Offset | Offset | 向量叠加 |
+| Offset - Offset | Offset | 向量差 |
+| Offset * n | Offset | 向量缩放 |
+| Offset / n | Offset | 向量缩放 |
+| tuple → Offset | 隐式转换 | 原始可当位移 |
+
+**禁止的运算**：
+- `CoordRef * n` / `CoordRef / n` — 位置乘以数字无意义，破坏向量运算法则
+- 如需缩放，后续通过 `scale()` 函数提供
+
+### 坐标约定
+
+- **CoordRef 使用中心点**：`cx, cy` 命名
+- **Layout 层 Region 使用左上角**：`x_ratio, y_ratio` 是左上角
+- **转换时机**：`to_coord_ref()` 方法将左上角转为中心点：`cx = x + w/2`
+
+## 四、Panel — 可寻址容器
 
 Panel 是 Scene 层定义的一种特殊 Area，作为**可寻址的容器**存在。Panel 通过 `type` 字段区分内部结构：
 

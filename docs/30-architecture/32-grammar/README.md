@@ -111,7 +111,7 @@ click [scene].[region]                  # 点击区域中心
 click [scene].$var                      # 动态区域
 click [scene].[panel][r][c]             # Panel 格子中心
 click [scene].[panel]                   # Panel 中心
-click $var                              # find 结果的 FoundRegion
+click $var                              # CoordRef / find 结果
 click (rx, ry)                          # 画布归一化坐标
 click [scene].[region] after wait stable 5  # 点击后等待稳定
 ```
@@ -260,6 +260,7 @@ by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `cont
 |------|-----------|
 | scan/recognize 有 by → str | `click [scene].$var` |
 | find → FoundRegion | `click $var` |
+| CoordRef 变量 | `click $var` |
 | scan/recognize 无 by → dict | 不可直接 click |
 | panel by → {row, col} | `click [scene].[panel][$var.row][$var.col]` |
 

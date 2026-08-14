@@ -8,6 +8,7 @@ from ..ast_nodes import (
     Click,
     CoordPoint,
     Drag,
+    EntityRef,
     Find,
     Import,
     Literal,
@@ -17,7 +18,6 @@ from ..ast_nodes import (
     Program,
     Recognize,
     Scan,
-    SceneRef,
     VarRef,
     Wait,
     WaitStable,
@@ -94,7 +94,7 @@ class _StmtMixin:
         scene, coord = items  # 两个 const_or_var
         scene_val = self._resolve_const_or_var(scene)
         coord_val = self._resolve_const_or_var(coord)
-        return Click(target=SceneRef(scene=scene_val, region=coord_val), line_no=self._line(items))
+        return Click(target=EntityRef(scene=scene_val, entity=coord_val), line_no=self._line(items))
 
     def click_coord_target(self, items):
         """click (rx, ry) — 画布归一化坐标点"""
@@ -195,7 +195,7 @@ class _StmtMixin:
         """drag scene.arrow — scene 和 arrow 都可以是常量或变量"""
         scene_val = self._resolve_const_or_var(items[0])
         arrow_val = self._resolve_const_or_var(items[1])
-        scene_ref = SceneRef(scene=scene_val, region=arrow_val)
+        scene_ref = EntityRef(scene=scene_val, entity=arrow_val)
         return Drag(scene=scene_ref, arrow=scene_ref, line_no=self._line(items))
 
     def drag_point_pair_target(self, items):
@@ -204,8 +204,8 @@ class _StmtMixin:
         from_point = self._resolve_const_or_var(items[1])
         to_scene = self._resolve_const_or_var(items[2])
         to_point = self._resolve_const_or_var(items[3])
-        from_ref = SceneRef(scene=from_scene, region=from_point)
-        to_ref = SceneRef(scene=to_scene, region=to_point)
+        from_ref = EntityRef(scene=from_scene, entity=from_point)
+        to_ref = EntityRef(scene=to_scene, entity=to_point)
         return Drag(scene=None, arrow=None, from_scene_ref=from_ref, to_scene_ref=to_ref,
                     line_no=self._line(items))
 
@@ -355,7 +355,7 @@ class _StmtMixin:
         least = 0.5
         area = None
         for item in items[1:]:
-            if isinstance(item, SceneRef):
+            if isinstance(item, EntityRef):
                 area = item
             elif isinstance(item, dict):
                 threshold = item.get("threshold", threshold)
@@ -367,10 +367,10 @@ class _StmtMixin:
                           least=least, area=area, line_no=self._line(items))
 
     def wait_stable_on(self, items):
-        """on [scene].[region] → SceneRef（区域限定子句）"""
+        """on [scene].[entity] → EntityRef（区域限定子句）"""
         scene_val = self._resolve_const_or_var(items[0])
-        region_val = self._resolve_const_or_var(items[1])
-        return SceneRef(scene=scene_val, region=region_val)
+        entity_val = self._resolve_const_or_var(items[1])
+        return EntityRef(scene=scene_val, entity=entity_val)
 
     def _to_ws_param(self, item):
         """将 wait stable 参数项转为 Literal / VarRef / float"""
@@ -413,7 +413,7 @@ class _StmtMixin:
     def scan_stmt(self, items):
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
-        scene = SceneRef(scene=scene_name)
+        scene = EntityRef(scene=scene_name)
         fields = None
         region_var = None
         target = items[1]  # var_ref → VarRef (as 子句)
@@ -453,7 +453,7 @@ class _StmtMixin:
         """recognize [scene].[f1, f2, ...] as [rich] $var [by ...] [group ...] [where ...] [with ...]"""
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
-        scene = SceneRef(scene=scene_name)
+        scene = EntityRef(scene=scene_name)
         fields = None
         region_var = None
         # 检测 as rich：RICH_KEYWORD Token 出现在 items 中

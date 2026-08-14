@@ -86,7 +86,7 @@ class _PanelMixin:
 
         若缓存未命中，自动触发一次 align。
         """
-        # scene / panel 支持静态字符串或 $var（与 SceneRef 动态引用语义一致）
+        # scene / panel 支持静态字符串或 $var（与 EntityRef 动态引用语义一致）
         scene_key = self._resolve(ref.scene) if isinstance(ref.scene, VarRef) else ref.scene
         panel_key = self._resolve(ref.panel) if isinstance(ref.panel, VarRef) else ref.panel
         # 解析 row/col（支持 int 字面量或 $var）
@@ -130,7 +130,7 @@ class _PanelMixin:
 
         slot_key 格式: "r{row}c{col}"（1-based），仅用于日志定位。
         """
-        # scene / panel 支持静态字符串或 $var（与 SceneRef 动态引用语义一致）
+        # scene / panel 支持静态字符串或 $var（与 EntityRef 动态引用语义一致）
         scene_key = self._resolve(ref.scene) if isinstance(ref.scene, VarRef) else ref.scene
         panel_key = self._resolve(ref.panel) if isinstance(ref.panel, VarRef) else ref.panel
         row = self._resolve(ref.row) if isinstance(ref.row, VarRef) else ref.row

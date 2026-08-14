@@ -52,7 +52,7 @@ from .ast_nodes import (
     Return,
     Scan,
     # 表达式节点
-    SceneRef,
+    EntityRef,
     Screenshot,
     Try,
     UntilLoop,
@@ -71,7 +71,7 @@ __all__ = [
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",
-    "SceneRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause", "WhereClause",
+    "EntityRef", "PanelRef", "PanelGridDrag", "VarRef", "KeywordRef", "Literal", "FieldAccess", "CoordPoint", "ByClause", "WhereClause",
     "Contains", "Equals", "InList", "IsEmpty",
     "GreaterThan", "LessThan", "GreaterEqual", "LessEqual", "NotEqual", "NumericEqual",
     "Not", "And", "Or", "ArithOp",

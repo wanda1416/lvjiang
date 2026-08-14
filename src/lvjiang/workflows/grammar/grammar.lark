@@ -59,7 +59,7 @@ find_stmt: "find"i scene_target "as"i var_ref by_clause where_clause? _NL -> fin
 //   4. (rx, ry) — 画布归一化坐标点
 //
 // 注意：panel 与 scene.area 都以 [x].[y] 开头，必须用同一规则避免歧义。
-// transformer 根据 row/col 是否存在分派为 SceneRef 或 PanelRef。
+// transformer 根据 row/col 是否存在分派为 EntityRef 或 PanelRef。
 click_stmt: "click"i click_target wait_clause? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var                          -> click_scene_target

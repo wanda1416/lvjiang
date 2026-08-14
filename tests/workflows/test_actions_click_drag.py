@@ -2,7 +2,7 @@
 
 覆盖 _exec_click / _exec_drag 的多种目标模式：
 - CoordPoint 坐标点击
-- SceneRef + region 点击
+- EntityRef + entity 点击
 - CoordPoint 对拖拽
 """
 

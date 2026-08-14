@@ -9,6 +9,8 @@
 
 from dataclasses import asdict, dataclass, field
 
+from .coord_types import CircleCoordRef, CoordRef, RectCoordRef
+
 
 @dataclass
 class CanvasConfig:
@@ -49,6 +51,12 @@ class FoundRegion:
         """区域中心的画布归一化坐标"""
         return self.x_ratio + self.w_ratio / 2, self.y_ratio + self.h_ratio / 2
 
+    def to_coord_ref(self) -> RectCoordRef:
+        """转换为 RectCoordRef（左上角 → 中心点）"""
+        cx = self.x_ratio + self.w_ratio / 2
+        cy = self.y_ratio + self.h_ratio / 2
+        return RectCoordRef(cx=cx, cy=cy, w=self.w_ratio, h=self.h_ratio)
+
 
 @dataclass
 class Region:
@@ -64,6 +72,12 @@ class Region:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    def to_coord_ref(self) -> RectCoordRef:
+        """转换为 RectCoordRef（左上角 → 中心点）"""
+        cx = self.x_ratio + self.w_ratio / 2
+        cy = self.y_ratio + self.h_ratio / 2
+        return RectCoordRef(cx=cx, cy=cy, w=self.w_ratio, h=self.h_ratio)
 
     @staticmethod
     def from_dict(d: dict) -> "Region":
@@ -86,6 +100,10 @@ class Point:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    def to_coord_ref(self) -> CircleCoordRef:
+        """转换为 CircleCoordRef（已是中心点）"""
+        return CircleCoordRef(cx=self.cx_ratio, cy=self.cy_ratio, r=self.r_ratio)
 
     @staticmethod
     def from_dict(d: dict) -> "Point":
@@ -183,6 +201,12 @@ class Panel:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    def to_coord_ref(self) -> RectCoordRef:
+        """转换为 RectCoordRef（左上角 → 中心点）"""
+        cx = self.x_ratio + self.w_ratio / 2
+        cy = self.y_ratio + self.h_ratio / 2
+        return RectCoordRef(cx=cx, cy=cy, w=self.w_ratio, h=self.h_ratio)
 
     @staticmethod
     def from_dict(d: dict) -> "Panel":

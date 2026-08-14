@@ -9,6 +9,7 @@ from ..grammar import (
     ByClause,
     CallProc,
     Collect,
+    EntityRef,
     Eval,
     EvalFieldChainAssign,
     FieldAccess,
@@ -19,7 +20,6 @@ from ..grammar import (
     PanelRef,
     Recognize,
     Scan,
-    SceneRef,
     VarRef,
 )
 from .signals import WorkflowUserError, _ReturnSignal
@@ -86,7 +86,7 @@ class _DataOpsMixin:
             self._scan_panel_cell(node)
             return
         # 解析场景名（可能是 str 或 VarRef）
-        scene_ref = node.scene.scene if isinstance(node.scene, SceneRef) else node.scene
+        scene_ref = node.scene.scene if isinstance(node.scene, EntityRef) else node.scene
         if isinstance(scene_ref, VarRef):
             scene = self.variables.get(scene_ref.name, "")
         else:
@@ -142,7 +142,7 @@ class _DataOpsMixin:
             self._recognize_panel_cell(node)
             return
         # 解析场景名（可能是 str 或 VarRef）
-        scene_ref = node.scene.scene if isinstance(node.scene, SceneRef) else node.scene
+        scene_ref = node.scene.scene if isinstance(node.scene, EntityRef) else node.scene
         if isinstance(scene_ref, VarRef):
             scene = self.variables.get(scene_ref.name, "")
         else:

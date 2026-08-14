@@ -159,6 +159,8 @@ recognize [material_grid].[f1, f2] as rich $mats with yysls_rich_parse
 
 > `yysls_rich_parse` 会解析数值字段并**删除**原始 `level_text` / `count_text`。
 
+> 游戏插件通过 `@builtin_func("func_name")` 提供转换函数，DSL 中用 `with func_name` 显式指定。`MaterialRecognizer.enrich_info()` 保留向后兼容，内部同样走内置函数。
+
 ### rich 与 by 的优先级
 
 `rich` 和 `by` 是两个正交的修饰符，方向相反：
@@ -177,6 +179,8 @@ recognize [material_grid].[f1, f2] as rich $mats with yysls_rich_parse
 ## by 子句
 
 `by` 将返回值从 dict **降级**为 str（Region 模式）或位置 dict（Panel 模式）。
+
+> `by` 子句等价于 `recognize` + `find_key` 的组合，但只需一次截图，推荐使用。
 
 **语义**：一次截图 → 逐 slot 识别 → 首个命中即返回 slot key，不再遍历剩余 slot。
 
@@ -243,7 +247,7 @@ recognize [bag_item_detail].[bag_grid] as $pos by equals "金狗粮" on group $g
 
 ## 与 click 的配合
 
-recognize 执行后，引擎自动将 slot region 坐标元数据存入 `_coord_meta`，供后续 `click [scene].$key` 解析坐标。
+`recognize by` 返回的 str 即 slot key，可直接用于 `click [scene].$key`。引擎通过布局定义解析 region 坐标，无需额外操作。
 
 ```
 # 典型模式：recognize by 找到 slot → click 点击
@@ -260,5 +264,6 @@ end
 - **region 与 panel 同名时 region 优先**
 - **空格 value** 为空字符串 `""`
 - **行列数**取自对齐结果（实际检测到的网格），而非配置的 rows/cols
+- **单一 key 命中 panel** 时分派为整面板逐格识别（与 scan 行为一致）
 - **`with` 必须配合 `as rich`**：单独使用 `with` 而不写 `as rich` 会抛 `WorkflowUserError`
 - **共享识别器状态**：引擎使用类级别的共享 `MaterialRecognizer`，每次工作流启动时通过 `reset_state()` 刷新参考库

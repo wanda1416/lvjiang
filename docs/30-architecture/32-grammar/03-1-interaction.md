@@ -57,7 +57,7 @@ click [general_action].[actions]              # 点击面板中心（用于点�
 - `[]` 和 `""` 在非赋值语境等价，都表示静态常量
 - `[scene].[panel][r][c]`：**Panel 三级索引模式**。`r`/`c` 从 1 开始计数。首次执行时自动触发图像自对齐（`align`），缓存格子中心坐标；后续点击直接查缓存。详见 [align](#五align--面板自对齐)
 - `[scene].[panel]`：**Panel 中心点击模式**。点击面板中心点，用于点击空白处或重置面板状态
-- `click $var`：**find 结果点击模式**。`$var` 是 `find` 指令产出的 `FoundRegion` 变量，点击其文字中心坐标。变量未定义或不是 find 结果时报错。详见 [04-data-flow.md — find](04-data-flow.md#三find--文字定位)
+- `click $var`：**find 结果点击模式**。`$var` 是 `find` 指令产出的 `FoundRegion` 变量，点击其文字中心坐标。变量未定义或不是 find 结果时报错。详见 [04-3-find.md](04-3-find.md)
 
 ## 二、drag — 拖拽
 

@@ -19,7 +19,15 @@
 三条指令共享同一套场景引用和修饰子句体系：
 
 ```
+# Region 模式
 <指令> [scene].[region_list] as $var [by ...] [where ...]
+
+# Panel 模式（scan / recognize）
+<指令> [scene].[panel] as $var [by ...]
+<指令> [scene].[panel][row][col] as $var
+
+# recognize 特有
+recognize ... as rich $var [with <func>] [on group "<name>"]
 ```
 
 **场景引用**（scene / region / panel 均支持三种形式）：
@@ -36,6 +44,7 @@
 |------|------|------|-----------|----------|---------------|
 | **scan** | Region | `{key: 文本}` | — | `str`（命中 key） | — |
 | | Panel 整面板 | `{行: {列: 文本}}` | — | `{row, col}` | — |
+| | Panel 单格 | `str` | — | — | — |
 | **recognize** | Region | `{key: 材料名}` | `{key: 富dict}` | `str`（命中 key） | `str`（by 优先） |
 | | Panel 整面板 | `{行: {列: 材料名}}` | `{行: {列: 富dict}}` | `{row, col}` | `{row, col}`（by 优先） |
 | | Panel 单格 | `str` | `dict` | `str` | `str`（by 优先） |
@@ -50,7 +59,7 @@
 | `by <mode> <target>` | 短路匹配，返回命中 key 或坐标 | **降级**：dict → str/位置 | scan / recognize / find |
 | `as rich` | 返回含元数据的富 dict | **升级**：str → dict | 仅 recognize |
 | `with <func>` | 指定 rich dict 的转换函数 | 配合 rich 使用 | 仅 recognize |
-| `where confidence >= <n>` | 过滤低置信度结果 | **过滤**：不改变类型 | scan / recognize / find |
+| `where confidence >= <n>` | 过滤低置信度结果（阈值 `[0.0, 1.0]`，超出范围输出警告） | **过滤**：不改变类型 | scan / recognize / find |
 | `on group "<name>"` | 限定材料匹配分组 | **过滤**：缩小匹配范围 | 仅 recognize |
 
 **by 的四种匹配模式**（三条指令通用）：
@@ -67,10 +76,11 @@
 | 指令产出 | click 用法 | 说明 |
 |---------|-----------|------|
 | `scan` 无 by → `$var` = dict | 不可直接 click | dict 是 `{key: 文本}`，用于读取文字内容，不能传给 click |
-| `scan` 有 by → `$var` = str | `click [scene].$var` | str 即 region key，通过 `_coord_meta` 解析 region 中心 |
+| `scan` 有 by → `$var` = str | `click [scene].$var` | str 即 region key，引擎从布局解析 region 中心 |
 | `recognize` 无 by → `$var` = dict | 不可直接 click | 同上，dict 是 `{key: 材料名}` |
 | `recognize` 有 by → `$var` = str | `click [scene].$var` | 同上，str 即 slot key |
 | `find` → `$var` = FoundRegion | `click $var` | 直接点击文字的屏幕坐标 |
+| Panel by → `$var` = `{row,col}` | `click [scene].[panel][$var.row][$var.col]` | 按行列位置点击对应格 |
 
 ## 详细文档
 

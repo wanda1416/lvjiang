@@ -373,7 +373,7 @@ keyword_ref: "session" -> session_ref
        | func_call
        | "(" arith_expr ")"
 
-// 数值字面量：支持负数，统一为 number（float）
+// 数值字面量：支持负数，区分 int 和 float
 ?number: FLOAT -> number_float
        | INT -> number_int
        | "-" FLOAT -> number_neg_float

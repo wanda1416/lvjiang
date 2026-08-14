@@ -1,6 +1,6 @@
 # DSL 基础指令
 
-collect、eval、call、log 等通用基础指令。感知类指令（scan/recognize/find/where）见 [04-data-flow.md](04-data-flow.md)。
+collect、eval、call、log 等通用基础指令。感知类指令（scan/recognize/find/where）见 [04-data-flow.md](04-data-flow.md) 概览及 [04-1-scan.md](04-1-scan.md) / [04-2-recognize.md](04-2-recognize.md) / [04-3-find.md](04-3-find.md) 详细文档。
 
 ## 目录
 

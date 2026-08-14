@@ -148,7 +148,7 @@ scan [equip_detail].[f1, f2, f3] as $key by contains "调律" where confidence >
 
 ## 与 click 的配合
 
-scan 执行后，引擎自动将 region 坐标元数据存入内部 `_coord_meta`，供后续 `click [scene].$key` 解析坐标。
+`scan by` 返回的 str 即 region key，可直接用于 `click [scene].$key`。引擎通过布局定义解析 region 坐标，无需额外操作。
 
 ```
 # 典型模式：scan by 找到 key → click 点击
@@ -157,6 +157,8 @@ if $key
     click [equip_page].$key
 end
 ```
+
+> `by` 子句等价于 `scan` + `find_key` 的组合，但只需一次截图，推荐使用。
 
 ## 注意事项
 

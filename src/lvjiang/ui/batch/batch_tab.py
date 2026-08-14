@@ -118,9 +118,9 @@ class BatchTab(QWidget):
 
         # ── 三页子 Tab ──
         self._sub_tabs = QTabWidget()
-        self._sub_tabs.addTab(self._build_progress_page(), tr("进度"))
         self._sub_tabs.addTab(self._build_script_page(), tr("脚本"))
         self._sub_tabs.addTab(self._build_config_page(), tr("配置"))
+        self._sub_tabs.addTab(self._build_progress_page(), tr("进度"))
         layout.addWidget(self._sub_tabs)
 
     def _build_progress_page(self) -> QWidget:
@@ -428,7 +428,11 @@ class BatchTab(QWidget):
         """初始化进度表：行×脚本 全量行"""
         self._progress_table.setRowCount(0)
         for _idx, row_data in enabled_rows:
-            label = self._format_row_label(config, row_data) if config else str(row_data)
+            # 条目只显示 user_column 对应的值
+            if config and config.user_column:
+                label = row_data.get(config.user_column, "")
+            else:
+                label = self._format_row_label(config, row_data) if config else str(row_data)
             for script in scripts:
                 row = self._progress_table.rowCount()
                 self._progress_table.insertRow(row)

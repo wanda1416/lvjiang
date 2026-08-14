@@ -351,7 +351,12 @@ class BatchWorker(QThread):
         return f"[批量] {label}: {text}"
 
     def _format_label(self, row_data: dict, row_idx: int = -1) -> str:
-        """格式化行显示标签"""
+        """格式化行显示标签（优先使用 user_column）"""
+        if self._config.user_column:
+            val = row_data.get(self._config.user_column, "")
+            if val:
+                return str(val)
+        # fallback: 拼接所有列
         parts = []
         for col in self._config.columns:
             val = row_data.get(col, "")

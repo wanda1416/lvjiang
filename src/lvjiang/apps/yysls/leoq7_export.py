@@ -119,7 +119,8 @@ _AFFIX_KEY_MAP: dict[str, str] = {
     "舞绫鼓武学增伤": "DRUM_DAMAGE",
     "舞绫鼓武学增效": "DRUM_DAMAGE",
     "鼓武学增效": "DRUM_DAMAGE",
-    # 防御（网站会降级为无数值的生存类词条）
+    # 防御
+    "气血最大值": "MAX_HP",
     "体": "EXTERNAL_DEFENCE",
     "御": "EXTERNAL_DEFENCE",
     "外功防御": "EXTERNAL_DEFENCE",
@@ -143,11 +144,12 @@ def _map_affix_key(name: str) -> str | None:
     """词条中文名 → external stat key。
 
     先查精确映射；未命中时检查是否为技能增伤类定音词条
-    （名称含 ``·`` 且以「增伤」结尾）。
+    （名称以「增伤」结尾，不限是否含 ·）。
     """
     if name in _AFFIX_KEY_MAP:
         return _AFFIX_KEY_MAP[name]
-    if "·" in name and name.endswith("增伤"):
+    # 技能增伤类定音：名称以「增伤」结尾（含/不含 · 均匹配）
+    if name.endswith("增伤"):
         return "SKILL_DAMAGE"
     return None
 

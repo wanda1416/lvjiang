@@ -207,7 +207,7 @@ class _SlotCard(QFrame):
             self._apply_style(_SLOT_STYLE_EMPTY)
 
     def set_equip(self, equip_data: dict):
-        quality = equip_data.get("quality")
+        quality = equip_data.get("quality") or ""
         color = _QUALITY_COLORS.get(quality, "#888888")
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
 
@@ -346,7 +346,7 @@ class _CompactEquipCard(QFrame):
         layout.addStretch()
 
     def set_equip(self, equip_data: dict, part_label: str):
-        quality = equip_data.get("quality")
+        quality = equip_data.get("quality") or ""
         color = _QUALITY_COLORS.get(quality, "#888888")
         bg = _QUALITY_BG_COLORS.get(quality)
 

@@ -60,7 +60,7 @@ class AboutDialog(QDialog):
         desc_label = QLabel(
             "<p style='text-align: center;'>"
             f"{tr('通用视觉 RPA 引擎')}<br>"
-            "<small>窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行</small>"
+            f"<small>{tr('窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行')}</small>"
             "</p>"
         )
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -101,7 +101,7 @@ class AboutDialog(QDialog):
         copyright_label = QLabel(
             "<p style='text-align: center; color: gray; font-size: 10px;'>"
             "Copyright © 2024-2026 wanda1416<br>"
-            "本项目仅供学习交流使用"
+            f"{tr('本项目仅供学习交流使用')}"
             "</p>"
         )
         copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

@@ -38,11 +38,10 @@ scene:
       cols: 6
 ```
 
-DSL 通过 `[scene_name]` 引用场景。场景名支持三种形式（见 [01-basics.md](01-basics.md#二引用模型)）：
+DSL 通过 `[scene_name]` 引用场景。场景名支持两种形式（见 [01-basics.md](01-basics.md#二引用模型)）：
 
 ```
-[equip_weapon_detail]       # 括号常量
-"equip_weapon_detail"       # 字符串常量
+[equip_weapon_detail]       # 配置引用
 $scene_name                 # 变量引用
 ```
 
@@ -110,6 +109,8 @@ Panel 是 Scene 层定义的一种特殊 Area，作为**可寻址的容器**存�
 ### grid 型（已实现）
 
 当前所有 Panel 均为 `type=grid`（默认值，可省略），具有 `rows`/`cols` 属性，通过 `[r][c]` 二维索引寻址。`r`/`c` 从 1 开始计数。
+
+> **索引语法区分**：`[scene].[panel][row][col]` 中，`scene`/`panel` 是配置引用（`[name]` 或 `$var`），而 `row`/`col` 是面板索引（`[INT]` 或 `[$var]`）。row/col 不是 area 引用，不支持字符串，`["a"]` 语法不合法。正确示例：`[scene].$panel_ref[$row][5]`，错误示例：`[scene].$panel_ref["a"]["b"]`。
 
 ```yaml
 # Layout 定义

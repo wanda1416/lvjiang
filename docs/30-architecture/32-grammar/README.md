@@ -51,16 +51,18 @@ null                    # 空值
 ## 二、引用模型
 
 ```
-[name]                  # 静态配置引用（场景/Area/Action 名）
-" name"                 # 字符串常量（非赋值语境等价于 [name]）
+[name]                  # 配置引用（场景/Area/Action 名）
 $var                    # 运行时变量引用
 [scene].[area]          # 场景.区域
 [scene].$var            # 场景.动态区域
 $scene.[area]           # 动态场景.区域
 [f1, f2, f3]            # 多 Area 列表（scan/recognize 用）
+"text"                  # 字符串数据（用于 eval/log/by匹配/函数参数）
 ```
 
-> `[name]` 和 `"name"` 在非赋值语境等价。变量只是延迟求值的常量。
+> `[name]` 表示配置引用，`$var` 表示变量引用。`"text"` 始终表示字符串数据，不用于配置引用。变量只是延迟求值的常量。
+
+**Panel 索引区分**：`[scene].[panel][row][col]` 中，`scene`/`panel` 是配置引用（`[name]` 或 `$var`），而 `row`/`col` 是面板索引（`[INT]` 或 `[$var]`），不是 area 引用。row/col 不支持字符串，`["a"]` 语法不合法。
 
 ## 三、变量与表达式
 

@@ -112,11 +112,9 @@ class _ExprMixin:
         return (scene_name, var_ref)
 
     def _resolve_scene_name(self, item):
-        """解析场景名：bracket_expr→str, STRING→去引号str, var_ref→VarRef"""
+        """解析场景名：bracket_expr→str, var_ref→VarRef"""
         if isinstance(item, VarRef):
             return item  # 动态场景名
-        if isinstance(item, Token) and item.type == 'STRING':
-            return self._unquote(str(item))  # 字符串常量
         return str(item)  # bracket_expr
 
     def collect_stmt(self, items):

@@ -115,14 +115,15 @@ def test_click_const_or_var():
     assert n.target.region == "region"
     print("  click [scene].[region]: OK")
 
-    # click "scene"."region"
-    program = parse_text('click "scene"."region"')
+    # click "scene"."region" — 字符串形式不再支持用于场景引用
+    # 使用 [scene].[region] 形式
+    program = parse_text("click [scene].[region]")
     n = program.body[0]
     assert isinstance(n, Click)
     assert isinstance(n.target, SceneRef)
     assert n.target.scene == "scene"
     assert n.target.region == "region"
-    print('  click "scene"."region": OK')
+    print('  click [scene].[region] (原 "scene"."region" 测试): OK')
 
     # click $scene.$region
     program = parse_text("click $scene.$region")
@@ -161,14 +162,15 @@ def test_drag_const_or_var():
     assert n.scene.region == "arrow"
     print("  drag [scene].[arrow]: OK")
 
-    # drag "scene"."arrow"
-    program = parse_text('drag "scene"."arrow"')
+    # drag "scene"."arrow" — 字符串形式不再支持用于场景引用
+    # 使用 [scene].[arrow] 形式
+    program = parse_text("drag [scene].[arrow]")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert isinstance(n.scene, SceneRef)
     assert n.scene.scene == "scene"
     assert n.scene.region == "arrow"
-    print('  drag "scene"."arrow": OK')
+    print('  drag [scene].[arrow] (原 "scene"."arrow" 测试): OK')
 
     # drag $scene.$arrow
     program = parse_text("drag $scene.$arrow")
@@ -621,13 +623,14 @@ def test_scan_dynamic_scene():
     assert n.scene.scene.name == "scene"
     print("  scan $scene.[field] as $var: OK")
 
-    # scan "scene".[field] as $var
-    program = parse_text('scan "scene".[field] as $result')
+    # scan "scene".[field] — 字符串形式不再支持用于场景引用
+    # 使用 [scene].[field] 形式
+    program = parse_text("scan [scene].[field] as $result")
     n = program.body[0]
     assert isinstance(n, Scan)
     assert isinstance(n.scene, SceneRef)
     assert n.scene.scene == "scene"
-    print('  scan "scene".[field] as $var: OK')
+    print('  scan [scene].[field] as $var (原 "scene".[field] 测试): OK')
 
 
 def test_recognize():
@@ -733,8 +736,8 @@ def test_recognize_rich_no_regression():
     assert n.rich is False
     assert n.fields[0].value == "rich"
 
-    # 字符串常量 panel 语法（无 rich）
-    program = parse_text('recognize "sc"."pn"[1][2] as $cell')
+    # 字符串常量 panel 语法（无 rich）— 改用 [sc].[pn] 形式
+    program = parse_text('recognize [sc].[pn][1][2] as $cell')
     n = program.body[0]
     assert isinstance(n, Recognize)
     assert isinstance(n.scene, PanelRef)
@@ -742,8 +745,8 @@ def test_recognize_rich_no_regression():
     assert n.scene.panel == "pn"
     assert n.rich is False
 
-    # 字符串常量 panel 语法（有 rich）
-    program = parse_text('recognize "sc"."pn"[1][2] as rich $cell')
+    # 字符串常量 panel 语法（有 rich）— 改用 [sc].[pn] 形式
+    program = parse_text('recognize [sc].[pn][1][2] as rich $cell')
     n = program.body[0]
     assert isinstance(n, Recognize)
     assert isinstance(n.scene, PanelRef)
@@ -790,8 +793,8 @@ def test_recognize_with_clause():
     assert n.group is not None
     assert n.where is not None
 
-    # 字符串常量 panel + rich + with
-    program = parse_text('recognize "sc"."pn"[1][2] as rich $cell with yysls_rich_parse')
+    # panel + rich + with — 改用 [sc].[pn] 形式
+    program = parse_text('recognize [sc].[pn][1][2] as rich $cell with yysls_rich_parse')
     n = program.body[0]
     assert isinstance(n, Recognize)
     assert isinstance(n.scene, PanelRef)

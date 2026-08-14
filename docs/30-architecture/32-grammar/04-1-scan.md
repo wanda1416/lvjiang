@@ -31,12 +31,12 @@ scan [scene].[r1, r2] as $var by contains "文本" where confidence >= 0.7
 
 | 参数 | 支持形式 | 说明 |
 |------|---------|------|
-| scene | `[key]` / `"key"` / `$var` | 场景名，必须在当前布局中绑定坐标 |
-| region | `[key]` / `"key"` / `$var` | 区域名，必须在当前布局中绑定坐标 |
+| scene | `[key]` / `$var` | 场景名，必须在当前布局中绑定坐标 |
+| region | `[key]` / `$var` | 区域名，必须在当前布局中绑定坐标 |
 | panel | `[key]` | 面板名，引擎自动按对齐结果逐格识别 |
 | `$var` | `$name` | 目标变量名，结果写入此变量 |
 
-> scene 和 region 的三种形式语义等价。`$var` 形式运行时从变量表查找。
+> scene 和 region 支持 `[key]`（配置引用）和 `$var`（变量引用）两种形式。`"text"` 始终表示字符串数据，不用于配置引用。
 
 ## 返回值格式
 

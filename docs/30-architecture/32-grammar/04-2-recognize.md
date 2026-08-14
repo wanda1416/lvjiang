@@ -41,8 +41,8 @@ recognize [scene].[s1, s2] as rich $var with yysls_rich_parse where confidence >
 
 | 参数 | 支持形式 | 说明 |
 |------|---------|------|
-| scene | `[key]` / `"key"` / `$var` | 场景名，必须在当前布局中绑定坐标 |
-| region | `[key]` / `"key"` / `$var` | slot 区域名，必须在当前布局中绑定坐标 |
+| scene | `[key]` / `$var` | 场景名，必须在当前布局中绑定坐标 |
+| region | `[key]` / `$var` | slot 区域名，必须在当前布局中绑定坐标 |
 | panel | `[key]` | 面板名，引擎自动按对齐结果逐格识别 |
 | `$var` | `$name` | 目标变量名，结果写入此变量 |
 

@@ -76,6 +76,7 @@ about_dialog:
   app_name: "LvJiang"
   version_prefix: "Version"
   app_desc: "Universal Visual RPA Engine"
+  workflow_desc: "Window capture → Region annotation → OCR → Workflow execution"
   btn_check_update: "Check for Updates"
   checking: "Checking..."
   check_failed: "Update check failed"
@@ -786,7 +787,7 @@ config:
   delay_page_refresh: "Page Refresh Wait"
   delay_scroll_settle: "Scroll Settle Wait"
 
-# ── UI Auto-wrapped Strings (P0) ──
+# ── UI Auto-wrapped Strings ──
 ui_auto:
   k000: "  No image imported"
   k001: "(Optional)"
@@ -1076,8 +1077,8 @@ ui_auto:
   k285: "Action"
   k286: "Name = Tuning Tab checkbox item;\nLeave damage affix empty / select '- No Damage -' = no damage boost needed on that side;\nAttribute = gameplay element school (non-weapon slots use element→no-equal equivalence);\nBind switch = this gameplay judgment equals activating that switch (overrides global state);\nWeapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon."
 
-# ── P1 Error Messages (auto-wrapped) ──
-p1_errors:
+# ── Errors & Validation ──
+errors:
   k287: "DesktopCapture 已停止"
   k288: "YAML top level must be a dict"
   k289: "[扫描] 局域网内未发现可连接的 ADB 设备"
@@ -1121,7 +1122,8 @@ p1_errors:
   k327: "（空）"
   k328: "(Must be ['recycle', 'skip'])"
   k329: "(Must be alphanumeric starting with lowercase letter, underscores allowed)"
-p2_other:
+# ── Miscellaneous Strings ──
+misc:
   k330: '   - 词条未记录'
   k331: '  扫描处理未启用 → 跳过'
   k332: '## 汇总'
@@ -1501,7 +1503,7 @@ p2_other:
   k705: '（用户中断，部分结果）'
   k706: '，仅首词条'
   k707: '，请选择 保存 或 放弃'
-p3_other:
+
   k708: '(空行)'
   k709: '[批量] 暂无启用的行，请到「配置」页勾选'
   k710: '[批量] 请至少勾选一个脚本'
@@ -1610,5 +1612,6 @@ p3_other:
   k813: '重命名方向'
   k814: '重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）'
   k815: '降序'
-  k816: '（内置）'
-  k817: '（未开启多视图，点「新增视图」自动开启）'
+  k816: '(Built-in)'
+  k817: '(Multi-view not enabled, click "New View" to enable)'
+  k818: 'LvJiang - YYSLS Equipment Tuning Tool'

@@ -58,11 +58,9 @@ class _StmtMixin:
     # ─── 基础指令 ─────────────────────────────────────────
 
     def _resolve_const_or_var(self, item):
-        """解析 const_or_var：bracket_expr | STRING | var_ref"""
+        """解析 const_or_var：bracket_expr | var_ref"""
         if isinstance(item, VarRef):
             return item
-        elif isinstance(item, Token) and item.type == 'STRING':
-            return self._unquote(str(item))
         else:
             return str(item)
 

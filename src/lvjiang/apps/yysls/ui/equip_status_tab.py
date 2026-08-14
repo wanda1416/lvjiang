@@ -679,6 +679,7 @@ class EquipStatusTab(QWidget):
             return
         try:
             from lvjiang.core.config import SessionManager
+
             from ..leoq7_export import export_leoq7
             data = SessionManager().load(user_name)
             text = export_leoq7(data, user_name)

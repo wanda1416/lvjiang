@@ -81,8 +81,9 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
 
     assert returned == pytest.approx(80.5, abs=0.02)
     assert entry["value"] == 80
-    assert datetime.now() - timedelta(minutes=4, seconds=1) <= stored_ts
-    assert stored_ts <= datetime.now() - timedelta(minutes=3, seconds=59)
+    # 容差 2 秒：isoformat(timespec="seconds") 截断小数秒，CI 环境时序不稳定
+    assert datetime.now() - timedelta(minutes=4, seconds=2) <= stored_ts
+    assert stored_ts <= datetime.now() - timedelta(minutes=3, seconds=58)
 
 
 def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func_env):

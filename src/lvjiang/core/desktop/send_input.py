@@ -31,25 +31,27 @@ class SendInputInput(InputBackend):
 
     # ─── 点击 ─────────────────────────────────────────────────
 
-    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
+                     *, pre_delay=None, post_delay=None):
         """点击屏幕坐标（带鼠标移动时长 + 点击后延迟）"""
         self._move_to(screen_x, screen_y)
-        self._click(screen_x, screen_y, poi_name)
+        self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay, post_delay=post_delay)
 
     def _move_to(self, x: int, y: int):
         """移动鼠标到指定位置（时长随机化）"""
         duration = random.uniform(*self.mouse_move_duration)
         smooth_move_to(x, y, duration)
 
-    def _click(self, x: int, y: int, poi_name: str = ""):
+    def _click(self, x: int, y: int, poi_name: str = "",
+               *, pre_delay=None, post_delay=None):
         """点击指定坐标（加入随机偏移和延迟模拟人类）"""
         offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
         offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
         actual_x = x + offset_x
         actual_y = y + offset_y
 
-        pre_delay = random.uniform(*self.before_click_wait)
-        time.sleep(pre_delay)
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
 
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"点击 {label}: ({actual_x}, {actual_y}) [偏移: {offset_x:+d}, {offset_y:+d}]")
@@ -57,8 +59,8 @@ class SendInputInput(InputBackend):
         send_mouse_event(_MOUSEEVENTF_LEFTDOWN)
         send_mouse_event(_MOUSEEVENTF_LEFTUP)
 
-        post_delay = random.uniform(*self.after_click_wait)
-        time.sleep(post_delay)
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 
@@ -71,6 +73,7 @@ class SendInputInput(InputBackend):
         poi_name: str = "",
         duration: float | tuple[float, float] | None = None,
         hold: float | None = None,
+        *, pre_delay=None, post_delay=None,
     ):
         """从起点拖拽到终点（模拟人类操作）
 
@@ -79,8 +82,8 @@ class SendInputInput(InputBackend):
             hold: 到达目标后按住不放的时长（秒）。None 表示不按。
         """
         self._move_to(from_x, from_y)
-        pre_delay = random.uniform(*self.before_click_wait)
-        time.sleep(pre_delay)
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
         if duration is None:
             move_dur = random.uniform(*self.mouse_move_duration)
         elif isinstance(duration, tuple):
@@ -96,5 +99,5 @@ class SendInputInput(InputBackend):
             logger.debug(f"按住 {hold}s")
             time.sleep(float(hold))
         send_mouse_event(_MOUSEEVENTF_LEFTUP)
-        post_delay = random.uniform(*self.after_click_wait)
-        time.sleep(post_delay)
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))

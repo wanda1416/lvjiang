@@ -16,7 +16,7 @@ class _ActionMixin:
 
     # ─── 点击操作 ──────────────────────────────────────────
 
-    def click_region(self, scene_key: str, field_key: str, jitter: bool = True):
+    def click_region(self, scene_key: str, field_key: str, jitter: bool = True, **kw):
         """点击指定场景中指定区域的中心（带随机抖动）"""
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == field_key), None)
@@ -28,26 +28,26 @@ class _ActionMixin:
 
         screen_x, screen_y = self._region_to_screen(region, jitter)
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
-        self._input.click_screen(screen_x, screen_y, f"{scene_key}/{field_key}")
+        self._input.click_screen(screen_x, screen_y, f"{scene_key}/{field_key}", **kw)
 
-    def click_at(self, x: int, y: int):
+    def click_at(self, x: int, y: int, **kw):
         """点击屏幕绝对坐标"""
         logger.debug(f"点击坐标: ({x}, {y})")
-        self._input.click_screen(x, y, "dynamic")
+        self._input.click_screen(x, y, "dynamic", **kw)
 
     # ─── Point / Arrow 操作 ────────────────────────────────
 
-    def click_any(self, scene_key: str, key: str):
+    def click_any(self, scene_key: str, key: str, **kw):
         """点击 region / point / panel（自动识别，region → point → panel 顺序）"""
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == key), None)
         if region is not None:
-            self.click_region(scene_key, key)
+            self.click_region(scene_key, key, **kw)
             return
         points = self._layout.get_scene_points(scene_key)
         point = next((p for p in points if p.key == key), None)
         if point is not None:
-            self.click_point(scene_key, key)
+            self.click_point(scene_key, key, **kw)
             return
         # 尝试作为 panel 查找，点击面板中心
         panels = self._layout.get_scene_panels(scene_key)
@@ -58,14 +58,14 @@ class _ActionMixin:
             cy = panel.y_ratio + panel.h_ratio / 2
             screen_x, screen_y = self._ratio_to_screen(cx, cy)
             logger.debug(f"点击 panel 中心: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
-            self._input.click_screen(screen_x, screen_y, f"{scene_key}/{key}(panel)")
+            self._input.click_screen(screen_x, screen_y, f"{scene_key}/{key}(panel)", **kw)
             return
         raise ValueError(
             f"场景 {scene_key} 的 region / point / panel 未绑定坐标: {key}，"
             f"请在场景布局编辑器中绑定后重试"
         )
 
-    def click_point(self, scene_key: str, point_key: str):
+    def click_point(self, scene_key: str, point_key: str, **kw):
         """点击 point 中心（带半径内随机偏移）"""
         points = self._layout.get_scene_points(scene_key)
         point = next((p for p in points if p.key == point_key), None)
@@ -73,9 +73,9 @@ class _ActionMixin:
             raise ValueError(f"场景 {scene_key} 的坐标点未绑定: {point_key}")
         screen_x, screen_y = self._point_to_screen(point)
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
-        self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}")
+        self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}", **kw)
 
-    def drag_arrow(self, scene_key: str, arrow_key: str, duration: float | tuple[float, float] | None = None, hold: float | None = None):
+    def drag_arrow(self, scene_key: str, arrow_key: str, duration: float | tuple[float, float] | None = None, hold: float | None = None, **kw):
         """执行 arrow 定义的拖拽
 
         Args:
@@ -101,7 +101,7 @@ class _ActionMixin:
         fx, fy = self._point_to_screen(from_point)
         tx, ty = self._ratio_to_screen(to_cx, to_cy)
         logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})" + (f" hold {hold}s" if hold else ""))
-        self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration, hold=hold)
+        self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration, hold=hold, **kw)
 
     # ─── 等待 ──────────────────────────────────────────────
 

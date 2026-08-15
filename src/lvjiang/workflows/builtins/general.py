@@ -1,4 +1,4 @@
-"""内置函数 - 通用工具（字符串、字典、列表、范围）"""
+"""内置函数 - 通用工具（字符串、字典、列表、范围、时间）"""
 
 from loguru import logger
 
@@ -248,3 +248,51 @@ def _slice(obj, *args) -> list:
     except (TypeError, ValueError):
         return []
     return obj[start:end + 1]
+
+
+# ─── 时间 ──────────────────────────────────────────────────
+
+@builtin_func("clock")
+def _clock() -> float:
+    """获取当前 Unix 时间戳（秒精度 float）
+
+    .wf 用法:
+        eval $ts = clock()
+        eval $elapsed = clock() - $start_ts
+    """
+    import time
+    return time.time()
+
+
+@builtin_func("datetime")
+def _datetime(*args) -> str:
+    """时间格式化：支持当前时间或指定时间戳
+
+    - datetime() → 当前时间，默认格式 "YYYY-MM-DD HH:MM:SS"
+    - datetime("格式") → 当前时间，自定义 strftime 格式
+    - datetime($ts) → 指定时间戳，默认格式
+    - datetime($ts, "格式") → 指定时间戳，自定义格式
+
+    .wf 用法:
+        eval $start = clock()
+        # ... 执行操作 ...
+        eval $elapsed = clock() - $start
+        log concat("开始时间: ", datetime($start, "%H:%M:%S"))
+        log concat("当前时间: ", datetime())
+    """
+    from datetime import datetime
+    default_fmt = "%Y-%m-%d %H:%M:%S"
+
+    if not args:
+        # datetime() → 当前时间默认格式
+        return datetime.now().strftime(default_fmt)
+
+    first = args[0]
+    if isinstance(first, (int, float)):
+        # 第一个参数是时间戳
+        ts = float(first)
+        fmt = str(args[1]) if len(args) > 1 else default_fmt
+        return datetime.fromtimestamp(ts).strftime(fmt)
+    else:
+        # 第一个参数是格式字符串
+        return datetime.now().strftime(str(first))

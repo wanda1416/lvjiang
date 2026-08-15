@@ -29,7 +29,8 @@ class PostMessageInput(InputBackend):
 
     # ─── 点击 ─────────────────────────────────────────────────
 
-    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
+                     *, pre_delay=None, post_delay=None):
         """后台点击：PostMessage 向目标窗口发送鼠标事件，不移动光标"""
         if not self.target_hwnd:
             logger.error("PostMessage 模式未设置目标窗口句柄")
@@ -39,16 +40,16 @@ class PostMessageInput(InputBackend):
         offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
         sx, sy = screen_x + offset_x, screen_y + offset_y
 
-        pre_delay = random.uniform(*self.before_click_wait)
-        time.sleep(pre_delay)
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
 
         cx, cy = screen_to_client(self.target_hwnd, sx, sy)
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"[后台] 点击 {label}: 屏幕({sx},{sy}) -> 客户区({cx},{cy}) [偏移: {offset_x:+d}, {offset_y:+d}]")
         postmessage_click(self.target_hwnd, cx, cy)
 
-        post_delay = random.uniform(*self.after_click_wait)
-        time.sleep(post_delay)
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ class PostMessageInput(InputBackend):
         poi_name: str = "",
         duration: float | tuple[float, float] | None = None,
         hold: float | None = None,
+        *, pre_delay=None, post_delay=None,
     ):
         """后台拖拽：PostMessage 向目标窗口发送拖拽事件，不移动光标"""
         if not self.target_hwnd:
@@ -74,8 +76,8 @@ class PostMessageInput(InputBackend):
         else:
             move_dur = float(duration)
 
-        pre_delay = random.uniform(*self.before_click_wait)
-        time.sleep(pre_delay)
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
 
         fx, fy = screen_to_client(self.target_hwnd, from_x, from_y)
         tx, ty = screen_to_client(self.target_hwnd, to_x, to_y)
@@ -85,5 +87,5 @@ class PostMessageInput(InputBackend):
                      f"客户区: ({fx},{fy})->({tx},{ty}) [{move_dur:.2f}s]")
         postmessage_drag(self.target_hwnd, fx, fy, tx, ty, steps=steps)
 
-        post_delay = random.uniform(*self.after_click_wait)
-        time.sleep(post_delay)
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))

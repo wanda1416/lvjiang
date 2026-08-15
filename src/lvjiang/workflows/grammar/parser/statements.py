@@ -18,6 +18,7 @@ from ..ast_nodes import (
     Program,
     Recognize,
     Scan,
+    TupleLiteral,
     VarRef,
     Wait,
     WaitStable,
@@ -65,17 +66,37 @@ class _StmtMixin:
             return str(item)
 
     def click_stmt(self, items):
-        """click 目标 [before|after|around wait 参数] — 有 wait_clause 时展开为多条语句"""
+        """click 目标 [before|after|around wait 参数 ...] — 支持 before/after 任意组合
+
+        显式 wait_clause 时抑制 click 默认的 before/after_click_wait 延迟。
+        around 是语法糖，等价于同时指定 before 和 after（同一参数）。
+        """
         click_node = items[0]
-        if len(items) > 1 and isinstance(items[1], list) and len(items[1]) == 2 and isinstance(items[1][1], (Wait, WaitStable)):
-            timing, wait_node = items[1]
-            if timing == "before":
-                return [wait_node, click_node]
-            elif timing == "after":
-                return [click_node, wait_node]
-            else:  # "around" -> before + after 同一参数
-                return [wait_node, click_node, wait_node]
-        return click_node
+        # wait_clauses 返回一个列表，元素是每个 wait_clause 的 [timing, Wait] 对
+        wait_pairs = []
+        if len(items) > 1 and isinstance(items[1], list):
+            wait_pairs = [it for it in items[1] if isinstance(it, list) and len(it) == 2
+                          and isinstance(it[1], (Wait, WaitStable))]
+        if not wait_pairs:
+            return click_node
+
+        # 显式 wait_clause → 抑制默认延迟
+        click_node = Click(target=click_node.target, line_no=click_node.line_no,
+                          suppress_defaults=True)
+
+        # 展开 around 为 before + after
+        expanded = []
+        for timing, wait_node in wait_pairs:
+            if timing == "around":
+                expanded.append(("before", wait_node))
+                expanded.append(("after", wait_node))
+            else:
+                expanded.append((timing, wait_node))
+
+        # 按语义顺序组装：before 在 click 前，after 在 click 后
+        before_waits = [w for t, w in expanded if t == "before"]
+        after_waits = [w for t, w in expanded if t == "after"]
+        return before_waits + [click_node] + after_waits
 
     def click_panel_target(self, items):
         """click [scene].[panel][row][col] — panel 三级索引
@@ -111,24 +132,33 @@ class _StmtMixin:
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
 
     def drag_stmt(self, items):
-        """drag 目标 [duration] [hold] [before|after|around wait 参数] — 有 wait_clause 时展开为多条语句"""
-        # 检查末尾是否有 wait_clause 列表 [timing, Wait_node]
-        wait_timing = None
-        wait_node = None
-        if items and isinstance(items[-1], list) and len(items[-1]) == 2 and isinstance(items[-1][1], (Wait, WaitStable)):
-            wait_timing, wait_node = items[-1]
-            items = items[:-1]
+        """drag 目标 [duration] [hold] [before|after|around wait 参数 ...] — 支持 before/after 任意组合
 
-        drag_node = items[0]  # 已由 drag_*_target 构造为 Drag
+        显式 wait_clause 时抑制 drag 默认的 before/after_click_wait 延迟。
+        around 是语法糖，等价于同时指定 before 和 after（同一参数）。
+        """
+        # wait_clauses 结果是嵌套在 items 末尾的列表
+        wait_pairs = []
+        core_items = items
+        if len(items) > 1 and isinstance(items[-1], list):
+            # items[-1] 是 wait_clauses 的结果（一个列表，元素是 [timing, Wait]）
+            clauses_list = items[-1]
+            if clauses_list and isinstance(clauses_list[0], list) and len(clauses_list[0]) == 2 and isinstance(clauses_list[0][1], (Wait, WaitStable)):
+                wait_pairs = clauses_list
+                core_items = items[:-1]
+
+        drag_node = core_items[0]  # 已由 drag_*_target 构造为 Drag
         duration = None
         hold = None
-        for item in items[1:]:
+        for item in core_items[1:]:
             if isinstance(item, Literal):
                 duration = item
             elif isinstance(item, list):
                 duration = item
             elif isinstance(item, float):
                 hold = item
+        # 显式 wait_clause → 抑制默认延迟
+        suppress = len(wait_pairs) > 0
         result = Drag(
             scene=drag_node.scene, arrow=drag_node.arrow,
             duration=duration, hold=hold,
@@ -136,15 +166,23 @@ class _StmtMixin:
             from_scene_ref=drag_node.from_scene_ref, to_scene_ref=drag_node.to_scene_ref,
             direction=drag_node.direction, distance=drag_node.distance,
             line_no=drag_node.line_no,
+            suppress_defaults=suppress,
         )
-        if wait_node:
-            if wait_timing == "before":
-                return [wait_node, result]
-            elif wait_timing == "after":
-                return [result, wait_node]
-            else:  # "around"
-                return [wait_node, result, wait_node]
-        return result
+        if not wait_pairs:
+            return result
+
+        # 展开 around 为 before + after
+        expanded = []
+        for timing, wait_node in wait_pairs:
+            if timing == "around":
+                expanded.append(("before", wait_node))
+                expanded.append(("after", wait_node))
+            else:
+                expanded.append((timing, wait_node))
+
+        before_waits = [w for t, w in expanded if t == "before"]
+        after_waits = [w for t, w in expanded if t == "after"]
+        return before_waits + [result] + after_waits
 
     def drag_panel_target(self, items):
         """drag [scene].[panel][row][col] [up|down [n]] — panel 三级索引 + 可选方向距离"""
@@ -294,6 +332,10 @@ class _StmtMixin:
         arg = items[0]
         return self._build_wait_node(arg, items)
 
+    def wait_clauses(self, items):
+        """多个后缀等待子句的容器 — 直接透传列表，由 click_stmt/drag_stmt 拆解"""
+        return items
+
     def wait_clause(self, items):
         """后缀等待子句 — 返回 [timing_str, Wait_node]
 
@@ -310,9 +352,13 @@ class _StmtMixin:
 
     def _build_wait_node(self, arg, items):
         """构造 Wait 节点（复用 wait_stmt / wait_clause 的参数解析逻辑）"""
-        if isinstance(arg, tuple) and len(arg) == 2:
-            # wait_range → (min, max) 随机范围
+        if isinstance(arg, TupleLiteral):
+            # wait_range → TupleLiteral（支持混合数字和变量）
             return Wait(delay=arg, line_no=self._line(items))
+        if isinstance(arg, tuple) and len(arg) == 2:
+            # 向后兼容：旧式 Python tuple
+            return Wait(delay=TupleLiteral(elements=[Literal(value=float(arg[0])), Literal(value=float(arg[1]))]),
+                        line_no=self._line(items))
         if isinstance(arg, VarRef):
             # $var → 动态等待时间
             return Wait(delay=arg, line_no=self._line(items))
@@ -329,9 +375,25 @@ class _StmtMixin:
             return Wait(delay=Literal(value=arg), line_no=self._line(items))
         return Wait(delay=arg, line_no=self._line(items))
 
+    def _build_tuple_literal(self, items):
+        """将 tuple_elem 列表转为 TupleLiteral（元素已是 VarRef / Literal）"""
+        # tuple_elem 规则已保证元素为 VarRef | Literal，此处直接透传
+        return TupleLiteral(elements=list(items))
+
     def wait_range(self, items):
-        """(min, max) → (float, float) 随机范围元组"""
-        return (float(items[0]), float(items[1]))
+        """(min, max) → TupleLiteral，支持混合数字和变量"""
+        return self._build_tuple_literal(items)
+
+    def tuple_elem(self, items):
+        """元组元素：number | var_ref → 直接透传"""
+        item = items[0]
+        if isinstance(item, VarRef):
+            return item
+        if isinstance(item, (int, float)):
+            return Literal(value=float(item))
+        if isinstance(item, Token):
+            return Literal(value=float(item))
+        return item
 
     def delay_ref(self, items):
         """@delay_name → NAME token（命名延迟引用）"""
@@ -407,8 +469,8 @@ class _StmtMixin:
         return {"least": self._to_ws_param(items[0])}
 
     def range_literal(self, items):
-        """(min, max) → (float, float) 范围元组，用于 eval 赋值"""
-        return (float(items[0]), float(items[1]))
+        """(min, max) → TupleLiteral，支持混合数字和变量，用于 eval 赋值"""
+        return self._build_tuple_literal(items)
 
     def scan_stmt(self, items):
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)

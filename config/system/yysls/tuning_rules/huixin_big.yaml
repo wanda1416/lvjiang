@@ -26,7 +26,7 @@ playstyles:
       weapon: 枪
       damage: null
     attr: 裂石
-  破竹鸢:
+  鸢鸢:
     main:
       weapon: 手甲
       damage: 手甲武学增伤
@@ -58,6 +58,14 @@ playstyles:
       weapon: 扇
       damage: null
     attr: 牵丝
+  樽樽:
+    main:
+      weapon: 手甲
+      damage: 手甲武学增伤
+    sub:
+      weapon: 双刀
+      damage: 双刀武学增伤
+    attr: 破竹
 transmute_priority:
 - 最大外功攻击
 - 劲

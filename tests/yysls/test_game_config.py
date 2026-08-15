@@ -256,12 +256,18 @@ class TestWeaponTypesAndSchools:
 
     def test_get_schools_structure(self, mgr):
         schools = mgr.get_schools()
-        assert len(schools) == 10
+        assert len(schools) == 11
         assert "裂石·钧" in schools
         cfg = schools["裂石·钧"]
         assert cfg["attr"] == "裂石"
         assert cfg["main"] == {"weapon": "横刀", "martial_art": "斩雪刀法"}
         assert cfg["sub"] == {"weapon": "陌刀", "martial_art": "十方破阵"}
+        # 新增流派
+        assert "破竹·樽" in schools
+        cfg_zun = schools["破竹·樽"]
+        assert cfg_zun["attr"] == "破竹"
+        assert cfg_zun["main"] == {"weapon": "手甲", "martial_art": "悬身拳法"}
+        assert cfg_zun["sub"] == {"weapon": "双刀", "martial_art": "断水双诀"}
 
     def test_school_bindings_valid(self, mgr):
         # 属性合法；主/副武器须在注册表内

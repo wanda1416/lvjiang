@@ -5,6 +5,7 @@ exposed:
 - purchase_bugan
 - daily_jianghu
 - daily_checkin
+- daily_zhayu
 - scan_wallet
 - auto_tuning
 overrides:
@@ -20,6 +21,8 @@ overrides:
     name: 每日江湖号令
   daily_checkin:
     name: 每日自动签到
+  daily_zhayu:
+    name: 太极炸鱼
   scan_wallet:
     name: 扫描钱袋货币
   auto_tuning:

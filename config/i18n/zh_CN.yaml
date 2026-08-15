@@ -801,6 +801,7 @@ config:
   wf_purchase_bugan: "自动购买不肝"
   wf_daily_jianghu: "每日江湖号令"
   wf_daily_checkin: "每日自动签到"
+  wf_daily_zhayu: "太极炸鱼"
   layout_default: "默认布局"
   layout_phone: "手机布局"
   delay_step_wait: "步骤间等待"

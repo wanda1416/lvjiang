@@ -780,6 +780,7 @@ config:
   wf_purchase_bugan: "Auto Purchase Bugan"
   wf_daily_jianghu: "Daily Jianghu Order"
   wf_daily_checkin: "Daily Check-in"
+  wf_daily_zhayu: "Taiji Fish Bombing"
   layout_default: "Default Layout"
   layout_phone: "Phone Layout"
   delay_step_wait: "Step Interval"

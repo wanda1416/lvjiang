@@ -35,7 +35,7 @@ class BorderOverlay:
     def __init__(self):
         self._hwnd = None
         self._color = (255, 0, 0)
-        self._pen_width = 5
+        self._pen_width = 10
 
     @classmethod
     def _register_class(cls):

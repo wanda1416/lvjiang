@@ -7,7 +7,7 @@ Qt 自动经 QueuedConnection 投递到主线程槽函数，无需显式加锁�
 注入链路：
   tuning_tab.configure() → engine._progress_hub = hub
   auto_tuning → self.engine._progress_hub.emit(...)
-  TuningProgressDialog 连接 hub 信号 → 更新 UI
+  TuningProgressWidget 连接 hub 信号 → 更新 UI
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ class TuningProgressHub(QObject):
     """调律进度信号桥（worker 线程 → 主线程）
 
     所有信号从 worker 线程发射，经 Qt QueuedConnection 自动
-    投递到主线程的 TuningProgressDialog 槽函数。
+    投递到主线程的 TuningProgressWidget 槽函数。
     参数只用基础类型（str/int/bool）+ object（dict/list），
     确保跨线程元类型注册安全。
     """

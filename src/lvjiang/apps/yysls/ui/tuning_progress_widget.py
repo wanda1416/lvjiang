@@ -1,27 +1,22 @@
-"""调律进度对话框 —— 非模态浮动窗口，实时展示调律过程
+"""调律进度控件 —— 可嵌入 Tab 或 Dialog 的 QWidget
 
 连接 TuningProgressHub 信号，在调律工作流运行期间展示：
-- 当前装备信息（名称、类型、等级、品阶）
-- 当前词条列表（按 cap_pct 着色）
-- 目标词条清单（已出 / 未出）
-- 最大预期评级 + 实际评级 + 当前轮次
 - 批次进度（部位 X / Y）
-- 最近调律结果
+- 当前装备信息（名称、类型、等级、品阶）
+- 词条进度（当前 / 目标）
+- 调律状态（轮次、预期评级、实际评级、最近结果）
 
-工作流结束后自动标记完成，用户可手动关闭。
+hub 可在构造时为空，工作流启动后通过 reconnect() 绑定。
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog,
     QFrame,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QProgressBar,
-    QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from ....i18n import tr
@@ -34,7 +29,7 @@ _QUALITY_COLORS = {
     "blue": "#2196F3",
 }
 
-# 评级 key → 中文 + 颜色（运行时通过 tr() 翻译）
+# 评级 key → 中文 + 颜色
 _RATING_STYLE = {
     "top": (tr("顶级"), "#FF6F00; font-weight: bold"),
     "excellent": (tr("优秀"), "#388E3C"),
@@ -42,66 +37,26 @@ _RATING_STYLE = {
     "junk": (tr("垃圾"), "#D32F2F"),
 }
 
-
-class _HideOnCloseDialog(QDialog):
-    """关闭时隐藏而非销毁的 QDialog 子类"""
-
-    def closeEvent(self, event):
-        event.ignore()
-        self.hide()
+_MAX_AFFIX = 5  # 装备最大词条数（固定占位，避免布局抖动）
 
 
-class TuningProgressDialog:
-    """调律进度对话框（非模态，独立窗口）
+class TuningProgressWidget(QWidget):
+    """调律进度控件（可嵌入 Tab 页或 Dialog）"""
 
-    持有 QDialog 实例并连接 TuningProgressHub 信号。
-    工作流运行期间实时更新 UI，结束后标记完成。
-    关闭窗口 = 隐藏（不销毁），可通过“打开进度”按钮重新显示。
-    """
-
-    MAX_AFFIX = 5  # 装备最大词条数（固定占位，避免布局抖动）
-
-    def __init__(self, hub: TuningProgressHub):
+    def __init__(self, hub: TuningProgressHub | None = None, parent=None):
+        super().__init__(parent)
         self._hub = hub
-        self._build_ui()
-        self._connect_signals()
-        # 内部计数
         self._equipment_count = 0
         self._round_count = 0
-
-    @staticmethod
-    def _format_affix_lines(affixes: list[dict], count: int | None = None,
-                            header_label: str | None = None) -> str:
-        """格式化词条列表为固定 MAX_AFFIX 行的文本（空位灰色占位）
-
-        header_label: 显示在词条列表前的标题（已翻译文本），默认 tr("当前词条")
-        """
-        total = TuningProgressDialog.MAX_AFFIX
-        n = count if count is not None else len(affixes)
-        lines = []
-        for i in range(total):
-            if i < len(affixes):
-                a = affixes[i]
-                cap = a.get("cap_pct")
-                cap_text = f" ({cap}%)" if cap is not None else ""
-                lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
-            else:
-                lines.append("  • —")
-        prefix = header_label if header_label is not None else tr("当前词条")
-        header = tr("{prefix}（{n}/{total}）：").format(prefix=prefix, n=n, total=total)
-        return header + "\n" + "\n".join(lines)
+        self._build_ui()
+        if hub is not None:
+            self._connect_signals()
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
-        self._dialog = _HideOnCloseDialog(None)  # 独立窗口，关闭=隐藏
-        self._dialog.setWindowTitle(tr("调律进度"))
-        self._dialog.setMinimumWidth(420)
-        self._dialog.setModal(False)
-        self._dialog.setWindowFlag(Qt.WindowType.Window, True)
-
-        layout = QVBoxLayout(self._dialog)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
         # ── 批次进度条 ──
@@ -141,7 +96,6 @@ class TuningProgressDialog:
         self._affix_current_label.setWordWrap(True)
         affix_layout.addWidget(self._affix_current_label)
 
-        # 分隔线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
@@ -166,8 +120,7 @@ class TuningProgressDialog:
         self._actual_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._actual_label)
         self._last_result_label = QLabel("")
-        self._last_result_label.setStyleSheet(
-            "font-size: 11px; color: #555; padding: 2px;")
+        self._last_result_label.setStyleSheet("font-size: 11px; color: #555; padding: 2px;")
         self._last_result_label.setWordWrap(True)
         status_layout.addWidget(self._last_result_label)
         self._status_msg_label = QLabel("")
@@ -186,19 +139,13 @@ class TuningProgressDialog:
         status_layout.addWidget(self._status_msg_label)
         layout.addWidget(status_group)
 
-        # ── 关闭按钮 ──
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        self._close_btn = QPushButton(tr("关闭"))
-        self._close_btn.setEnabled(False)
-        self._close_btn.clicked.connect(self._on_close_clicked)
-        self._close_btn.setFixedWidth(80)
-        btn_layout.addWidget(self._close_btn)
-        layout.addLayout(btn_layout)
+        layout.addStretch()
 
     # ─── 信号连接 ─────────────────────────────────────────────
 
     def _connect_signals(self):
+        if self._hub is None:
+            return
         self._hub.slot_entered.connect(self._on_slot_entered)
         self._hub.equipment_started.connect(self._on_equipment_started)
         self._hub.tune_round_completed.connect(self._on_tune_round_completed)
@@ -208,26 +155,9 @@ class TuningProgressDialog:
         self._hub.status_message.connect(self._on_status_message)
         self._hub.scan_decision.connect(self._on_scan_decision)
 
-    # ─── 槽函数 ─────────────────────────────────────────────
-
-    # ─── 公共方法 ─────────────────────────────────────────
-
-    def show(self):
-        self._dialog.show()
-        self._dialog.raise_()
-
-    def hide(self):
-        self._dialog.hide()
-
-    def is_visible(self) -> bool:
-        return self._dialog.isVisible()
-
-    def close(self):
-        self._dialog.close()
-
-    def reconnect(self, hub: TuningProgressHub):
-        """切换到新 hub（每次启动工作流 hub 重建，对话框需重新连接）"""
-        # 断开旧连接
+    def _disconnect_signals(self):
+        if self._hub is None:
+            return
         try:
             self._hub.slot_entered.disconnect(self._on_slot_entered)
             self._hub.equipment_started.disconnect(self._on_equipment_started)
@@ -238,7 +168,13 @@ class TuningProgressDialog:
             self._hub.status_message.disconnect(self._on_status_message)
             self._hub.scan_decision.disconnect(self._on_scan_decision)
         except TypeError:
-            pass  # 部分信号可能未连接
+            pass
+
+    # ─── 公共方法 ─────────────────────────────────────────────
+
+    def reconnect(self, hub: TuningProgressHub):
+        """切换到新 hub（每次启动工作流 hub 重建）"""
+        self._disconnect_signals()
         self._hub = hub
         self._connect_signals()
 
@@ -259,20 +195,34 @@ class TuningProgressDialog:
         self._status_msg_label.setVisible(False)
         self._scan_decision_label.setVisible(False)
         self._material_label.setVisible(False)
-        self._close_btn.setEnabled(False)
-        self._close_btn.setText(tr("关闭"))
 
     def mark_done(self):
-        """工作流结束回调：启用关闭按钮"""
-        self._close_btn.setEnabled(True)
-        self._close_btn.setText(tr("完成"))
+        """工作流结束回调"""
+        pass  # Tab 模式无需按钮状态变更
 
-    def _on_close_clicked(self):
-        """关闭按钮：隐藏窗口而非销毁"""
-        self._dialog.hide()
+    # ─── 格式化 ───────────────────────────────────────────────
+
+    @staticmethod
+    def _format_affix_lines(affixes: list[dict], count: int | None = None,
+                            header_label: str | None = None) -> str:
+        total = _MAX_AFFIX
+        n = count if count is not None else len(affixes)
+        lines = []
+        for i in range(total):
+            if i < len(affixes):
+                a = affixes[i]
+                cap = a.get("cap_pct")
+                cap_text = f" ({cap}%)" if cap is not None else ""
+                lines.append(f"  • {a.get('name', '?')} {a.get('value', '')}{cap_text}")
+            else:
+                lines.append("  • —")
+        prefix = header_label if header_label is not None else tr("当前词条")
+        header = tr("{prefix}（{n}/{total}）：").format(prefix=prefix, n=n, total=total)
+        return header + "\n" + "\n".join(lines)
+
+    # ─── 槽函数 ───────────────────────────────────────────────
 
     def _on_status_message(self, message: str):
-        """显示工作流状态消息（如材料不足确认）"""
         self._status_msg_label.setText(message)
         self._status_msg_label.setVisible(True)
 
@@ -282,30 +232,25 @@ class TuningProgressDialog:
     def _on_equipment_started(self, info: dict):
         self._equipment_count += 1
         self._round_count = 0
-        # 装备名称 + 品阶颜色
         name = info.get("name") or info.get("type") or tr("未知")
         quality = info.get("quality", "")
         color = _QUALITY_COLORS.get(quality, "#333")
         self._equip_name_label.setText(
             f"<span style='color:{color}'>{name}</span>")
-        # 基础信息
         level = info.get("level", 0)
         quality_cn = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}.get(
             quality, quality)
         self._equip_info_label.setText(
             tr("等级 {level} | {quality} | 词条 {count}/5").format(
                 level=level, quality=quality_cn, count=len(info.get('affixes', []))))
-        # 当前词条（固定 5 行占位，避免布局抖动）
         affixes = info.get("affixes", [])
         self._affix_current_label.setText(
             self._format_affix_lines(affixes, len(affixes)))
-        # 目标词条
         target = info.get("target_affixes", [])
         if target:
-            # 标记已有的
             current_names = {a.get("name") for a in affixes}
             parts = []
-            for t in target[:12]:  # 限制显示数量
+            for t in target[:12]:
                 if t in current_names:
                     parts.append(f"✓{t}")
                 else:
@@ -315,12 +260,10 @@ class TuningProgressDialog:
             self._target_label.setText(tr("目标：") + "、".join(parts) + suffix)
         else:
             self._target_label.setText(tr("目标：-"))
-        # 最大预期评级（装备开始时设定，不再变化）
         expect = info.get("expect_rating", "")
         rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
         self._expect_label.setText(
             f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
-        # 实际评级初始化（每轮调律后更新）
         self._actual_label.setText(tr("实际评级：-"))
         self._round_label.setText(tr("轮次：0"))
         self._last_result_label.setText("")
@@ -331,12 +274,10 @@ class TuningProgressDialog:
         self._round_count += 1
         round_no = info.get("round_no", self._round_count)
         self._round_label.setText(tr("轮次：{n}").format(n=round_no))
-        # 更新当前词条（固定 5 行占位）
         affixes = info.get("current_affixes", [])
         affix_count = info.get("affix_count", len(affixes))
         self._affix_current_label.setText(
             self._format_affix_lines(affixes, affix_count))
-        # 本轮结果
         new_affix = info.get("new_affix")
         food = info.get("food_used", "")
         food_reason = info.get("food_reason", "")
@@ -350,24 +291,20 @@ class TuningProgressDialog:
         if food:
             result_text += f"（{food}）"
         self._last_result_label.setText(result_text)
-        # 狗粮策略说明
         if food_reason:
             self._last_result_label.setText(
                 f"{result_text}<br>"
                 f"<span style='color:#888'>{food_reason}</span>")
-        # 材料库存快照
         stock = info.get("material_stock", {})
         if stock:
             parts = [f"{k}×{v}" for k, v in stock.items()]
             self._material_label.setText(tr("材料：") + "、".join(parts))
             self._material_label.setVisible(True)
-        # 更新评级（每轮调律后词条变化，刷新最大预期）
         expect = info.get("expect_rating")
         if expect:
             rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
             self._expect_label.setText(
                 f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
-        # 实际评级仅在词条满 5 条后才有值，否则重置为“-”
         actual = info.get("actual_rating")
         if actual:
             rating_cn, rating_style = _RATING_STYLE.get(actual, (actual, "#333"))
@@ -387,20 +324,17 @@ class TuningProgressDialog:
             f"<b>{name}</b> → "
             f"<span style='{rating_style}'>{tr(rating_cn)}</span> "
             f"({rounds}轮, {status_text})")
-        # 更新实际评级（仅在词条满 5 条时 final_rating 有值）
         if rating:
             self._actual_label.setText(
                 f"{tr('实际评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         else:
             self._actual_label.setText(tr("实际评级：-"))
-        # 更新最终词条（固定 5 行占位）
         final_affixes = info.get("final_affixes", [])
         self._affix_current_label.setText(
             self._format_affix_lines(final_affixes, len(final_affixes),
                                      header_label=tr("最终词条")))
 
     def _on_scan_decision(self, info: dict):
-        """显示扫描处理决策（评级未达门槛 / 词条已满时的处置结果）"""
         name = info.get("name", "")
         action = info.get("action", "")
         reason = info.get("reason", "")
@@ -436,5 +370,3 @@ class TuningProgressDialog:
             tr("调律结束{suffix}：{total} 件装备，{rounds} 轮调律").format(
                 suffix=suffix, total=total, rounds=rounds))
         self._batch_progress.setValue(self._batch_progress.maximum())
-        self._close_btn.setEnabled(True)
-        self._close_btn.setText(tr("关闭"))

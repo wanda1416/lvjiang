@@ -23,8 +23,7 @@ from ..grammar import (
     Wait,
     WaitStable,
 )
-from ..grammar.ast_nodes import TupleLiteral
-from ..grammar.ast_nodes import Align
+from ..grammar.ast_nodes import Align, TupleLiteral
 from .signals import WorkflowUserError
 
 # FoundRegion 延迟导入，避免循环依赖

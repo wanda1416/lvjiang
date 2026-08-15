@@ -32,7 +32,7 @@ TEST_DIR = ROOT / "tests"
 MANUAL_MAP: dict[str, list[str]] = {
     "auto_tuning": ["test_auto_tuning_flow.py"],
     "tuning_progress_hub": ["test_tuning_tab.py"],
-    "tuning_progress_dialog": ["test_tuning_tab.py"],
+    "tuning_progress_widget": ["test_tuning_tab.py"],
     "cell_formatting": ["test_profile_db.py", "test_profile_overview_regen_normalize.py"],
 }
 

@@ -47,7 +47,6 @@ class TuningTab(QWidget):
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
-        self._tuning_progress_dialog = None  # 进度对话框（懒创建，复用）
         self._build_ui()
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
@@ -69,19 +68,6 @@ class TuningTab(QWidget):
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
         )
         tab_layout.addWidget(self.btn_run_tuning)
-
-        # 进度对话框控制行：复选框 + 按钮
-        progress_row = QHBoxLayout()
-        progress_row.setContentsMargins(0, 0, 0, 0)
-        self._cb_auto_progress = QCheckBox(tr("自动打开调律进度"))
-        self._cb_auto_progress.toggled.connect(lambda: self._save_tuning_config())
-        progress_row.addWidget(self._cb_auto_progress)
-        progress_row.addStretch()
-        self._btn_toggle_progress = QPushButton(tr("打开进度"))
-        self._btn_toggle_progress.setFixedWidth(80)
-        self._btn_toggle_progress.clicked.connect(self._toggle_progress_dialog)
-        progress_row.addWidget(self._btn_toggle_progress)
-        tab_layout.addLayout(progress_row)
 
         config_tabs = QTabWidget()
         config_tabs.addTab(self._build_rules_page(), tr("规则"))
@@ -291,15 +277,12 @@ class TuningTab(QWidget):
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
             )
-            # 工作流结束：仅调律工作流（有进度对话框或 hub）时通知标记完成
+            # 工作流结束：通知调律进度 Tab 标记完成
             engine = getattr(self._host, '_current_engine', None)
             if engine is not None and hasattr(engine, '_progress_hub'):
-                dlg = self._tuning_progress_dialog
-                if dlg is not None:
-                    dlg.mark_done()
-                # 同步按钮文本（用户可能通过 X 按钮关闭了对话框）
-                if dlg is not None and not dlg.is_visible():
-                    self._btn_toggle_progress.setText(tr("打开进度"))
+                widget = self._find_progress_widget()
+                if widget is not None:
+                    widget.mark_done()
 
     # ─── 配置变更监听 ────────────────────────────────────────
 
@@ -432,10 +415,15 @@ class TuningTab(QWidget):
                 skip_start=skip_start,
                 target_cell=target_cell,
             )
-            # 创建调律进度信号桥（对话框由 tuning_tab 管理，hub 归 auto_tuning 所有）
+            # 创建调律进度信号桥（右侧进度 Tab 由 _find_progress_widget 查找并连接）
             if engine is not None:
                 from .tuning_progress_hub import TuningProgressHub
                 engine._progress_hub = TuningProgressHub()
+                # 连接右侧调律进度 Tab
+                widget = self._find_progress_widget()
+                if widget is not None:
+                    widget.reconnect(engine._progress_hub)
+                    widget.reset_state()
 
             rule_names_text = "、".join(j.rule_name for j in rule_judges)
             on_names = _tuning_switch_names(switches)
@@ -449,47 +437,20 @@ class TuningTab(QWidget):
 
         host.run_workflow_implementation(
             "auto_tuning", flow_name, configure)
-
-        # 工作流已启动：若勾选“自动打开”则显示进度对话框
-        if self._cb_auto_progress.isChecked():
-            self._ensure_progress_dialog(auto_show=True)
-
-    # ─── 进度对话框管理 ────────────────────────────────
-
-    def _toggle_progress_dialog(self):
-        """“打开进度”按钮：显示/隐藏进度对话框"""
-        dlg = self._ensure_progress_dialog(auto_show=False)
-        if dlg is None:
-            return  # hub 尚未创建，无法操作
-        if dlg.is_visible():
-            dlg.hide()
-            self._btn_toggle_progress.setText(tr("打开进度"))
-        else:
-            dlg.show()
-            self._btn_toggle_progress.setText(tr("隐藏进度"))
-
-    def _ensure_progress_dialog(self, *, auto_show: bool):
-        """懒创建或复用进度对话框，连接到当前 engine 的 hub"""
-        engine = getattr(self._host, '_current_engine', None)
-        hub = getattr(engine, '_progress_hub', None) if engine else None
-        if hub is None:
-            # hub 尚未创建（不应发生，但兑底）
-            return self._tuning_progress_dialog
-
-        dlg = self._tuning_progress_dialog
-        if dlg is None:
-            from .tuning_progress_dialog import TuningProgressDialog
-            dlg = TuningProgressDialog(hub)
-            self._tuning_progress_dialog = dlg
-        else:
-            # 复用已有对话框，重新连接到新 hub
-            dlg.reconnect(hub)
-            dlg.reset_state()
-
-        if auto_show:
-            dlg.show()
-            self._btn_toggle_progress.setText(tr("隐藏进度"))
-        return dlg
+    
+    # ─── 进度控件查找 ────────────────────────────────
+    
+    def _find_progress_widget(self):
+        """在右侧 Tab 中查找 TuningProgressWidget"""
+        from .tuning_progress_widget import TuningProgressWidget
+        tabs = getattr(self._host, 'tabs', None)
+        if tabs is None:
+            return None
+        for i in range(tabs.count()):
+            w = tabs.widget(i)
+            if isinstance(w, TuningProgressWidget):
+                return w
+        return None
 
     # ─── 调律配置持久化（wf_configs["auto_tuning"]）──────────
 
@@ -509,10 +470,6 @@ class TuningTab(QWidget):
         self._select_base_group_radio(self._base_group_key)
         self._tuning_globals.set_switches(tc.get("switches", {}))
         self._tuning_globals.set_skip_tuning(bool(tc.get("skip_tuning", False)))
-        # 自动打开进度对话框
-        self._cb_auto_progress.blockSignals(True)
-        self._cb_auto_progress.setChecked(bool(tc.get("auto_open_progress", False)))
-        self._cb_auto_progress.blockSignals(False)
         # 初始跳过 / 指定调律
         for key, cb, sp_row, sp_col in (
             ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
@@ -549,7 +506,6 @@ class TuningTab(QWidget):
             "skip_tuning": self._get_tuning_skip_tuning(),
             "skip_start": skip_start,
             "target_cell": target_cell,
-            "auto_open_progress": self._cb_auto_progress.isChecked(),
         })
 
     def _set_all_tuning_checks(self, checked: bool):

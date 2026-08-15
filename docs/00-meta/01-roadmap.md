@@ -1,6 +1,6 @@
 # 律匠开发路线图 v3
 
-> 状态快照（2026-08-01 刷新）：Phase 0~9 已全部完成，并延伸出 Android
+> 状态快照（2026-08-15 刷新）：Phase 0~9 已全部完成，并延伸出 Android
 > 独立执行端、macOS 适配、打包分发与质量门禁。下文 Phase 0~8 为原始规划
 > 存档（实际交付已超出原计划，详见 docs/40-development/）。当前阶段与
 > 后续规划见文末「当前阶段」一节。
@@ -310,7 +310,7 @@ class InputController:
 - 统计报表（处理装备数量、保留/回收/精调汇总）
 - 配置编辑器（可视化修改流派规则、调律预算）
 
-## 当前阶段（2026-08-01 刷新）
+## 当前阶段（2026-08-15 刷新）
 
 已完成：Phase 0 → Phase 9 全部落地，并超额延伸。
 
@@ -322,7 +322,7 @@ class InputController:
 | Phase 3 UI 状态检测 | ✅ | 场景/视图模型 + 模板匹配 + OCR 关键词（置信度阈值 0.35） |
 | Phase 4 词条解析器 | ✅ | 装备解析（定音词条全量池匹配）+ 模糊匹配纠错 |
 | Phase 5 输入控制 | ✅ | SendInput / PostMessage（已弃 pyautogui）+ 随机延迟 + InputSimConfig |
-| Phase 6 工作流编排 | ✅ | DSL 工作流引擎（lark 解析 + 四大指令 + 子工作流 + validate_only 预检） |
+| Phase 6 工作流编排 | ✅ | DSL 工作流引擎（lark 解析 + 四大指令 + 子工作流 + validate_only 预检 + CoordRef 坐标体系 + Entity 层次） |
 | Phase 7 规则引擎配置化 | ✅ | 调律规则 YAML（开关机制 + 逐条处置规则 + 狗粮有序规则表 + 材料策略） |
 | Phase 8 GUI 完善 | ✅（部分持续） | 实时预览 + 日志面板 + 规则编辑器；统计报表面板仍为占位 |
 | Phase 9 游戏配置与规则重构 | ✅ | 游戏配置对话框 + 流派/玩法/调律规则三层术语统一 |
@@ -333,12 +333,13 @@ Phase 9 之后的延伸工作（07-26 ~ 08-01）：
 - **Android 独立执行端**：三通道 PoC 闭环、系统配置随 APK 分发、设备端工作流引擎、原生调律参数配置页、release 实机复验。
 - **打包分发**：PyInstaller onedir 一键打包 + 内置 adb，用户免装 platform-tools。
 - **平台适配**：抽离 core/platforms.py；macOS Phase 0（依赖验证 + 退出崩溃修复）。
-- **质量门禁**：ruff + mypy + GitHub Actions CI；pytest 1051 例全绿。
+- **质量门禁**：ruff + mypy + GitHub Actions CI；pytest 1654 例全绿。
+- **DSL CoordRef 坐标统一体系**：CoordRef/RectCoordRef/CircleCoordRef/Offset 类型层次 + 向量运算规则 + AST SceneRef→EntityRef 重命名 + click/drag 语义修正。
 - **配置架构**：ConfigResolver 双层（system/local）分离写合并读；布局目录化存储（layouts.yaml + layouts/{名}/{场景}.json）。
 
-后续规划（对应 TODO.md，按优先级）：
+后续规划（按优先级）：
 
 1. **装备分析流程（只扫不调）**：独立工作流，遍历背包 → OCR → 评级/潜力判定 → 输出结构化报告（值得调律/垃圾胚子/词条已满三类清单）。现有 equip_analysis.wf 仅扫 8 件穿戴装备，需扩展到背包批量。
 2. **转律 / 装上执行**：当前转律仅用于评级模拟（judge 预测潜力），无真实点击转律的工作流；毕业装备替换穿戴（装上）亦未做。这是「评级能力」与「执行能力」之间的断层。
 3. **统计报表面板**：user_manager_dialog 仅有「数据统计」占位卡片，面板本体未做；数据源可复用 auto_tuning 的 output["tuning_reports"]。
-4. **文档体系刷新**：本路线图与 docs/00-meta/README.md 的「你现在需要做的」一节均已过时，需对齐当前架构。
+4. **CoordRef 运算落地实际工作流**：当前 CoordRef 类型体系与运算规则已就位，但现有 .wf 脚本尚未使用坐标运算功能；待实际场景验证后补充示例工作流。

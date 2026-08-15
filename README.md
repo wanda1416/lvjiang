@@ -20,7 +20,7 @@
 - **双输入后端**：支持「桌面投屏窗口」（截图 + 后台 PostMessage / SendInput 点击）与「Android ADB」（screencap / scrcpy 视频流截图 + 触控注入）两种模式。
 - **视觉识别流水线**：`mss` / scrcpy 截图 → RapidOCR（ONNX）文字识别 → 装备词条结构化解析 → 品阶与数值评分。
 - **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放。
-- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。
+- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算。
 - **装备评分规则**：可配置的词条上限（cap）、品阶推断、流派权重，支持鸣金 / 通用等评估器。
 - **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/20-requirements/01-auto-tuning.md)）。
 - **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
@@ -66,7 +66,8 @@ lvjiang/
 │   ├── app.py                 # QApplication 入口
 │   ├── config.py              # 配置加载与校验
 │   ├── constants.py           # 路径与常量定义
-│   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局
+│   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局 / 坐标类型
+│   │   ├── coord_types.py     # CoordRef 坐标类型体系（CoordRef/RectCoordRef/CircleCoordRef/Offset）
 │   │   ├── desktop/           # 桌面投屏窗口后端
 │   │   ├── android/           # ADB / scrcpy 后端
 │   │   ├── ondevice/          # 设备端（Chaquopy）无障碍截图/输入与 OCR 适配

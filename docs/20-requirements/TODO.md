@@ -25,10 +25,22 @@
 
 - 主线功能全部就绪：自动调律端到端流水线（背包遍历 → 潜力判定 →
   实际调律 → 终局判定 → 调律说明文档）可用。
-- pytest **1120 例全绿**（2026-08-02 本地全量验证）。
+- DSL CoordRef 坐标统一体系已落地：CoordRef/RectCoordRef/CircleCoordRef/Offset
+  类型层次 + 向量运算 + EntityRef 重命名 + click/drag 语义修正。
+- pytest **1654 例全绿**（2026-08-15 本地全量验证）。
 - 全部改动已提交；是否推送以 /submit 指令为准。
 
 ---
+
+## 最近完成（2026-08-15）
+
+- **DSL CoordRef 坐标统一体系**：新建 coord_types.py（CoordRef/RectCoordRef/
+  CircleCoordRef/Offset 类型 + 向量运算规则）；AST SceneRef→EntityRef 全局重命名
+  （13 文件，字段 region→entity）；布局模型 to_coord_ref()（Region/Point/Panel/
+  FoundRegion 左上角→中心点）；引擎 _eval_arith 支持 CoordRef 运算 + tuple 隐式
+  转换；click/drag 解析更新（CoordRef 变量直接点击、Point 单独 drag 报错）；
+  文档梳理（02-concepts Entity 层次、03-1-interaction click/drag 语义、
+  04-data-flow 坐标运算示例）。
 
 ## 最近完成（2026-08-02）
 

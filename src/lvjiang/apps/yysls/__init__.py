@@ -38,6 +38,11 @@ def _build_profile_tab(host):
     return ProfileTab(host)
 
 
+def _build_tuning_progress_tab(host):
+    from .ui.tuning_progress_widget import TuningProgressWidget
+    return TuningProgressWidget()
+
+
 def _ensure_engine_started(host):
     """确保 ProfileEngine 已启动（首次构建 profile Tab 时调用）"""
     from .profile.profile_engine import get_or_create_engine, stop_engine
@@ -67,6 +72,7 @@ hooks = AppHooks(
         (tr("角色详情"), _build_character_detail_tab),
         (tr("装备数据"), _build_equip_status_tab),
         (tr("其他信息"), _build_profile_tab),
+        (tr("调律进度"), _build_tuning_progress_tab),
     ],
     menu_builders=[_build_menu],
 

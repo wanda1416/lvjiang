@@ -16,6 +16,8 @@
 - [二、系统函数](#二系统函数)
   - [save — 手动保存 session](#save--手动保存-session)
   - [panel_rows / panel_cols — Panel 尺寸查询](#panel_rows--panel_cols--panel-尺寸查询)
+  - [clock — Unix 时间戳](#clock--unix-时间戳)
+  - [datetime — 格式化时间](#datetime--格式化时间)
 - [三、玩家档案函数](#三玩家档案函数)
 
 ---
@@ -136,6 +138,44 @@ eval save()
 eval $rows = panel_rows("bag_equip_detail", "bag_grid")
 eval $cols = panel_cols("bag_equip_detail", "bag_grid")
 ```
+
+### clock — Unix 时间戳
+
+返回当前 Unix 时间戳（秒精度 float），可用于计时、超时判断。
+
+```
+eval $start = clock()
+# ... 执行某些操作 ...
+eval $elapsed = clock() - $start
+log concat("耗时: ", $elapsed, " 秒")
+```
+
+### datetime — 格式化时间
+
+返回时间的格式化字符串。支持当前时间或指定时间戳。
+
+```
+# 当前时间
+eval $time_str = datetime("%H:%M:%S")        # 当前时间
+eval $date = datetime("%Y-%m-%d")            # 当前日期
+eval $full = datetime()                       # 默认格式: "2026-08-15 14:30:45"
+
+# 指定时间戳（来自 clock()）
+eval $start = clock()
+# ... 执行某些操作 ...
+eval $elapsed = clock() - $start
+log concat("开始时间: ", datetime($start, "%H:%M:%S"))
+log concat("开始日期: ", datetime($start))     # 默认格式
+```
+
+| 调用 | 返回类型 | 说明 |
+|------|----------|------|
+| `datetime()` | `str` | 当前时间，默认格式 `"YYYY-MM-DD HH:MM:SS"` |
+| `datetime("格式")` | `str` | 当前时间，自定义 strftime 格式 |
+| `datetime($ts)` | `str` | 指定时间戳，默认格式 |
+| `datetime($ts, "格式")` | `str` | 指定时间戳，自定义格式 |
+
+常用 strftime 格式符：`%Y` 年、`%m` 月、`%d` 日、`%H` 时、`%M` 分、`%S` 秒。
 
 ---
 

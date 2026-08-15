@@ -43,7 +43,7 @@ true / false            # 布尔值
 null                    # 空值
 {"k": "v", "n": 3}     # 字典（key 限定 str）
 [1, "a", null]          # 列表
-(1, 2)                  # 范围元组（min, max）
+(1, 2)                  # 泛化元组（支持数字/变量混合）
 ```
 
 **续行**：行尾 `\` 显式续行；`{}`/`[]`/`()` 内部隐式续行。
@@ -74,7 +74,7 @@ eval $var = func(args)          # 函数返回值赋值
 eval $var = $a + $b * 2        # 算术表达式
 eval $var = {"k": "v"}          # 字典
 eval $var = ["a", "b"]          # 列表
-eval $var = (1, 2)              # 范围元组
+eval $var = (1, 2)              # 泛化元组
 default $var = 10               # 仅当未从外部传入时赋值
 
 # 字段访问
@@ -333,7 +333,7 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（50 个）
+## 十、内置函数（52 个）
 
 > 完整签名与说明见 [06-functions.md](06-functions.md)。
 
@@ -344,6 +344,7 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **字符串（9）** | `concat` `substr` `split` `replace` `match` `trim` `upper` `lower` `to_num` |
 | **装备（6）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` |
 | **背包（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
+| **时间（2）** | `clock` `datetime` |
 | **系统/交互（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
 | **玩家档案（5）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` |
 

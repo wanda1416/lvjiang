@@ -7,10 +7,9 @@
 - [一、click — 点击](#一click--点击)
 - [二、drag — 拖拽](#二drag--拖拽)
 - [三、wait — 等待](#三wait--等待)
-- [四、wait stable — 等待画面稳定](#四wait-stable--等待画面稳定)
-- [五、align — 面板自对齐](#五align--面板自对齐)
-- [六、screenshot — 截图](#六screenshot--截图)
-- [七、失败语义](#七失败语义)
+- [四、align — 面板自对齐](#四align--面板自对齐)
+- [五、screenshot — 截图](#五screenshot--截图)
+- [六、失败语义](#六失败语义)
 
 ## 一、click — 点击
 
@@ -62,6 +61,37 @@ click [general_action].[actions]              # 点击面板中心（用于点�
   - `CoordRef` 类型（包括 `RectCoordRef` / `CircleCoordRef`）：点击其中心点（+ 抖动）
   - `find` 指令产出的 `FoundRegion`：点击文字中心坐标
   - 变量未定义或不是可点击类型时报错。详见 [04-3-find.md](04-3-find.md)
+
+**隐藏延迟**：
+
+每次 `click` 底层执行时，会自动插入两段随机延迟（模拟人类操作节奏）：
+
+```
+[before_click_wait] → 点击 → [after_click_wait]
+```
+
+默认值（`app.yaml` 配置）：
+
+| 参数 | 默认范围 | 说明 |
+|------|----------|------|
+| `before_click_wait` | 0.05 ~ 0.2s | 点击前随机延迟 |
+| `after_click_wait` | 0.05 ~ 0.2s | 点击后随机延迟 |
+| `click_random_offset` | ±5px | 坐标随机偏移（模拟手指抖动） |
+| `region_jitter_ratio` | 0.25 | 区域中心抖动比例 |
+
+**默认延迟等价于 `around`**：如果不写任何后缀等待子句，每次 click 实际耗时 **100~400ms** 的隐藏等待。
+
+**显式 wait_clause 抑制默认延迟**：一旦指定了 `before`/`after`/`around` 任一子句，默认 `before_click_wait` 和 `after_click_wait` 全部废弃（置为 0）。例如：
+
+| 语法 | 执行时序 |
+|------|----------|
+| `click [s].[r]` | `[默认 before] → tap → [默认 after]` |
+| `click [s].[r] after wait 1.0` | `tap → wait 1.0`（无默认延迟） |
+| `click [s].[r] before wait 0.5` | `wait 0.5 → tap`（无默认延迟） |
+| `click [s].[r] around wait 0.3` | `wait 0.3 → tap → wait 0.3`（替换默认） |
+
+- 如果写 `click ... wait 1.0 click ...`（中间是独立 wait 语句而非后缀子句），两条 click 各自仍有默认延迟，wait 是额外叠加的
+- 详见 [3.3 后缀等待子句](#33-后缀等待子句-beforeafteraround)
 
 ## 二、drag — 拖拽
 
@@ -151,9 +181,24 @@ drag [scene].[point_a] [scene].[point_b]        # 两点之间拖拽
 - `drag [scene].[key] direction`：先查 panel，未命中再查 region
 - `drag [scene].[point]`（单独）：**不允许**，Point 无 w/h 无法计算终点，请使用两点模式 `drag [scene].[point1] [scene].[point2]`
 
+**隐藏延迟**：
+
+`drag` 与 `click` 类似，底层执行时也会插入 `before_click_wait` / `after_click_wait` 随机延迟。显式指定 `before`/`after`/`around` 子句时同样会抑制默认延迟（与 click 一致）。此外还有：
+
+| 参数 | 默认范围 | 说明 |
+|------|----------|------|
+| `mouse_move_duration` | 0.4 ~ 0.6s | 鼠标/手指移动到起点的时长 |
+| `duration`（拖拽时长） | 视模式而定 | Arrow/坐标模式默认 0.3~0.5s；Panel/Region 翻页默认 0.3~0.6s |
+
+`drag` 同样支持 `before`/`after`/`around` 后缀等待子句，详见 [3.3 后缀等待子句](#33-后缀等待子句-beforeafteraround)。
+
 ## 三、wait — 等待
 
-暂停执行指定时间。支持命名延迟、固定秒数、动态变量和随机范围四种形式。
+暂停执行。两种模式：**定时等待**（固定/随机时长）和**稳定等待**（画面不再变化时继续）。
+
+### 3.1 定时等待
+
+支持命名延迟、固定秒数、动态变量和随机范围四种形式。
 
 **语法**：
 
@@ -180,7 +225,18 @@ wait (1, 2)                 # 随机等待 1~2 秒
 - `wait @<delay_name>` 引用的命名延迟必须已在「配置管理 → 等待参数」中定义，否则报错终止（详见[失败语义](#六失败语义)）
 - 命名延迟必须使用 `@` 前缀，裸标识符（如 `wait page_refresh`）是语法错误
 
-## 四、wait stable — 等待画面稳定
+**语法形式对照**：
+
+| 语法 | 支持 | 说明 |
+|------|------|------|
+| `wait 1.5` | ✅ | 固定数值 |
+| `wait (1.0, 3.0)` | ✅ | 数值范围（字面量） |
+| `wait $var` | ✅ | 变量（值可以是 number 或 tuple） |
+| `wait ($a, $b)` | ✅ | 混合引用（变量 + 数字任意组合） |
+
+`wait ($a, $b)` 中每个元素可以是数字或变量引用，运行时解析后在 `lo~hi` 范围内随机取值。配合 `eval $var = ($a, $b)` 可将元组存入变量后 `wait $var` 使用。
+
+### 3.2 稳定等待（wait stable）
 
 连续截图对比，当画面在指定时长内没有明显变化时，认为「加载完成 / 动画结束」，继续执行下一步。适用于加载时间不确定的场景，替代固定延迟等待。
 
@@ -225,7 +281,7 @@ wait stable 5 duration 1.0       # 画面需连续稳定 1 秒才算完成
 wait stable 5 least 1.0          # 点击后至少等 1 秒再开始检测（慢加载页面）
 wait stable 10 threshold 0.03 interval 0.5 duration 1.0 least 0.3  # 完整参数
 
-# 也可作为 click/drag 的内联等待子句（before/after/around 均可）
+# 也可作为 click/drag 的后缀等待子句（before/after/around 均可）
 click [activity_jianghu].[btn] after wait stable 8 least 0.5
 ```
 
@@ -239,7 +295,42 @@ click [activity_jianghu].[btn] after wait stable 8 least 0.5
 - 所有参数支持字面量数字、`@命名延迟`、`$变量引用` 三种形式
 - `threshold`、`interval`、`duration` 和 `least` 可以任意顺序书写
 
-## 五、align — 面板自对齐
+### 3.3 后缀等待子句（before/after/around）
+
+`click` 和 `drag` 支持后缀等待子句，语法糖展开为多条语句。`wait` 的两种形式（定时/稳定）均可用于后缀子句。
+
+`before` 和 `after` 可以同时出现，顺序不限；`around` 是语法糖，等价于同时指定 `before` 和 `after`（同一参数）。
+
+```
+# 单独使用
+click [scene].[btn] after wait 1.0        # → click; wait 1.0
+click [scene].[btn] before wait 0.5       # → wait 0.5; click
+click [scene].[btn] around wait 0.3       # → wait 0.3; click; wait 0.3（等价于 before wait 0.3 after wait 0.3）
+
+# before + after 组合（顺序无关，语义始终：before 在操作前，after 在操作后）
+click [scene].[btn] before wait 0.5 after wait 1.0   # → wait 0.5; click; wait 1.0
+click [scene].[btn] after wait 1.0 before wait 0.5   # → wait 0.5; click; wait 1.0（同上）
+
+# 稳定等待组合
+click [scene].[btn] before wait stable 3 after wait stable 5  # → wait stable 3; click; wait stable 5
+click [scene].[btn] around wait stable 8 least 0.5  # → wait stable 8 least 0.5; click; wait stable 8 least 0.5
+
+# drag 同样支持
+drag [scene].[arrow] after wait 1.0       # → drag; wait 1.0
+drag [scene].[arrow] before wait 0.3 after wait 0.8  # → wait 0.3; drag; wait 0.8
+```
+
+**展开规则**：
+
+| 子句 | 展开顺序 |
+|------|----------|
+| `before wait X` | `Wait(X) → 操作` |
+| `after wait Y` | `操作 → Wait(Y)` |
+| `before wait X after wait Y` | `Wait(X) → 操作 → Wait(Y)` |
+| `after wait Y before wait X` | `Wait(X) → 操作 → Wait(Y)`（与上一行等价） |
+| `around wait Z` | `Wait(Z) → 操作 → Wait(Z)`（等价于 `before wait Z after wait Z`） |
+
+## 四、align — 面板自对齐
 
 对 Panel 进行图像自对齐，计算实际网格间距并缓存格子中心坐标。
 
@@ -269,7 +360,7 @@ click [bag_equip_detail].[bag_grid][2][3]     # 直接查缓存
 - 对齐算法基于方差分析，自动检测网格间距
 - 详见 [02-concepts.md — 自对齐机制](02-concepts.md#自对齐机制)
 
-## 六、screenshot — 截图
+## 五、screenshot — 截图
 
 截取当前画面并保存到 `logs/image/` 目录，用于调试和记录。
 
@@ -295,7 +386,7 @@ click [equip_detail].[confirm]
 - 日志输出保存的文件名，便于事后查找
 - 截图失败时仅记录警告，不中断执行
 
-## 七、失败语义
+## 六、失败语义
 
 交互指令的失败按原因分两类，不再混作一谈：
 

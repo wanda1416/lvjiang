@@ -309,7 +309,8 @@ class CanvasPoiMixin:
         if not (0 <= self._selected_point_idx < len(self._points)):
             return
         src = self._points[self._selected_point_idx]
-        placed = {p.key for p in self._points}
+        # 已放置集合必须含被视图过滤隐藏的实例，否则其他视图已绑定的点会被当成未绑定
+        placed = {p.key for p in self._points + self._hidden_points}
         available = [(k, n) for k, n in self._current_points if k not in placed]
         if not available:
             QMessageBox.information(self.window(), tr("无可用坐标"),
@@ -641,7 +642,8 @@ class CanvasPoiMixin:
 
     def _prompt_arrow_key(self) -> str:
         """弹框输入 arrow key，做 id 命名校验 + arrows 空间唯一校验"""
-        existing = {a.key for a in self._arrows}
+        # 已存在集合必须含被视图过滤隐藏的实例，否则其他视图已绑定的方向 key 会被当成可用
+        existing = {a.key for a in self._arrows + self._hidden_arrows}
         while True:
             dlg = QInputDialog(self.window())
             dlg.setWindowTitle(tr("命名方向"))

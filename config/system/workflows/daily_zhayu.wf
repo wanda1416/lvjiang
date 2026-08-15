@@ -1,0 +1,29 @@
+#% name: 太极炸鱼
+#% parameters:
+#%   - name: max_loops
+#%     label: 最大循环次数
+#%     type: number
+#%     default: 500
+#%     min: 1
+
+# 太极炸鱼流程
+#
+# 流程结构：
+#   1. 点击轻击 → 点击奇术，启动炸鱼
+#   2. 循环等待约 1 秒，共 20 轮
+#   3. 回到 zhayu 标签，最多循环 max_loops 次
+
+default $max_loops = 500
+eval $loop_count = 0
+
+@zhayu
+click [general_control].[qingji] after wait @step_interval
+click [general_control].[qishu]
+loop 20
+   wait (0.99,1.02)
+end
+eval $loop_count = $loop_count + 1
+if $loop_count < $max_loops
+   goto zhayu
+end
+log "太极炸鱼已完成 " + $loop_count + " 轮"

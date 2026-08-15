@@ -3,21 +3,23 @@ name: 控制
 views:
 - key: base
   name: 基底
-- key: con_or_can
-  name: 取消确认
+- key: confirm
+  name: 确认
+- key: fight
+  name: 战斗
 regions:
 - key: confirm
   name: 确认
   type: func
   is_text: true
   is_clickable: false
-  view: con_or_can
+  view: confirm
 - key: cancel
   name: 取消
   type: func
   is_text: true
   is_clickable: true
-  view: con_or_can
+  view: confirm
 points:
 - key: material_slot_1
   name: 材料格1
@@ -59,3 +61,51 @@ points:
   type: func
   is_text: false
   is_clickable: true
+- key: wuxueji
+  name: 武学技
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: teshuji
+  name: 特殊技
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: qishu
+  name: 奇术
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: xieshi
+  name: 卸势
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: xuli
+  name: 蓄力
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: qingji
+  name: 轻击
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: shanbi
+  name: 闪避
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: tiaoyue
+  name: 跳跃
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight

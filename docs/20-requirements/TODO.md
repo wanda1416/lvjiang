@@ -7,15 +7,14 @@
 
 ## 功能待办
 
-1. **装备分析流程（只扫不调）**：独立工作流，遍历背包 → OCR →
-   评级/潜力判定 → 输出结构化报告（值得调律/垃圾胚子/词条已满
-   三类清单），不做任何点击调律操作。供用户「先看看再动手」，
-   也是后续统计报表的数据源。
-2. **统计报表面板**：调律/分析结束后的数据汇总视图（处理装备数、
+1. **装备分析流程扩展（背包批量）**：现有 equip_analysis.wf 已实现
+   8 件穿戴装备扫描 + EquipStatusTab 展示；待扩展到背包批量遍历
+   （遍历背包 → OCR → 评级/潜力判定 → 输出结构化报告），供用户
+   「先看看再动手」，也是后续统计报表的数据源。
+2. **统计报表面板**：调律/分析结束后的独立数据汇总视图（处理装备数、
    评级分布、材料消耗、狗粮投入），与叙事型调律说明文档互补。
-   UI 目前仅 user_manager_dialog 有「数据统计」预留卡片（占位文案
-   "装备数据展示功能开发中..."），面板本体未做；数据源可复用
-   auto_tuning 的 output["tuning_reports"]。
+   当前数据源 `output["tuning_reports"]` 已产出，EquipStatusTab 已展示
+   装备数据；独立统计面板本体未做。
 3. **转律 / 装上执行**：当前转律仅用于评级模拟（judge 预测潜力），
    无真实点击转律的工作流；毕业装备替换穿戴（装上）亦未做。
 
@@ -25,22 +24,34 @@
 
 - 主线功能全部就绪：自动调律端到端流水线（背包遍历 → 潜力判定 →
   实际调律 → 终局判定 → 调律说明文档）可用。
-- DSL CoordRef 坐标统一体系已落地：CoordRef/RectCoordRef/CircleCoordRef/Offset
-  类型层次 + 向量运算 + EntityRef 重命名 + click/drag 语义修正。
+- DSL CoordRef 坐标统一体系已落地。
+- DSL click/drag 时序增强：suppress_defaults + before/after 组合 wait_clause +
+  泛化元组语法 + clock/datetime 内置函数。
+- i18n 国际化框架已落地：核心模块 + 翻译文件（zh_CN/en_US）+ 25+ 文件 tr() 改造。
 - pytest **1654 例全绿**（2026-08-15 本地全量验证）。
-- 全部改动已提交；是否推送以 /submit 指令为准。
 
 ---
+
+## 最近完成（2026-08-15 ~ 16）
+
+- **DSL click/drag 时序增强**：parser 支持 wait_clause（before/after/around）
+  任意组合；suppress_defaults 抑制引擎默认延迟；click_screen/drag_screen
+  扩展 pre_delay/post_delay 参数；全链路 **kw 透传。
+- **DSL 泛化元组语法**：wait_range/range_literal 支持数字/变量混合
+  （`($a, $b)`、`(1, $b)`）；TupleLiteral AST 节点 + __tuple__ 引擎处理；
+  _exec_wait 增加未定义变量错误保护。
+- **DSL clock/datetime 函数**：clock() 返回 Unix 时间戳；datetime() 支持
+  当前时间/自定义格式/时间戳格式化四种调用形式。
+- **i18n 国际化框架**：核心模块（i18n/__init__.py）+ 翻译文件
+  （zh_CN.yaml 1639 行、en_US.yaml 1618 行）+ 25+ 文件 tr() 改造 +
+  设置对话框语言选择 + 测试。
 
 ## 最近完成（2026-08-15）
 
 - **DSL CoordRef 坐标统一体系**：新建 coord_types.py（CoordRef/RectCoordRef/
   CircleCoordRef/Offset 类型 + 向量运算规则）；AST SceneRef→EntityRef 全局重命名
-  （13 文件，字段 region→entity）；布局模型 to_coord_ref()（Region/Point/Panel/
-  FoundRegion 左上角→中心点）；引擎 _eval_arith 支持 CoordRef 运算 + tuple 隐式
-  转换；click/drag 解析更新（CoordRef 变量直接点击、Point 单独 drag 报错）；
-  文档梳理（02-concepts Entity 层次、03-1-interaction click/drag 语义、
-  04-data-flow 坐标运算示例）。
+  （13 文件，字段 region→entity）；布局模型 to_coord_ref()；引擎 _eval_arith
+  支持 CoordRef 运算 + tuple 隐式转换；click/drag 解析更新。
 
 ## 最近完成（2026-08-02）
 
@@ -119,10 +130,7 @@
 4. **Qt 样式级联坑**：容器 QFrame 的 setStyleSheet 必须用 `QFrame#objectName` 选择器，
    否则级联到 QListWidget/QTableWidget（均继承 QFrame）抹掉其边框背景，看似"布局错乱"。
    排查布局问题先离屏 `widget.grab().save()` 截图确认实际渲染。
-5. 三面板（base_attr/affix_caps/school）各自模块级 `_ATTRS_PATH`（相对路径
-   `config/system/yysls/attributes.yaml`），全量加载→改动→yaml.dump 全量写盘
-   （allow_unicode、sort_keys=False）；UI 测试用 tmp 副本 + monkeypatch 三处 `_ATTRS_PATH`。
-6. school_panel 信号重入：`_refresh_list` 中 `clear()` 会嵌套触发 `_on_school_changed`，
+5. school_panel 信号重入：`_refresh_list` 中 `clear()` 会嵌套触发 `_on_school_changed`，
    后者用 `prev_loading` 保存/恢复 `_loading` 标志，改动时勿破坏此约定。
-7. 用户约定：开发期配置重构**不写迁移兼容代码**（旧 schema 直接废弃）。
-8. 提交推送遵循 /submit 一次性语义：完成后不自动 commit/push，等用户指令。
+6. 用户约定：开发期配置重构**不写迁移兼容代码**（旧 schema 直接废弃）。
+7. 提交推送遵循 /submit 一次性语义：完成后不自动 commit/push，等用户指令。

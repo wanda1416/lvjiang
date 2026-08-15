@@ -22,7 +22,7 @@ playstyles:
       weapon: 横刀
       damage: null
     attr: 裂石
-  破竹鸢:
+  鸢鸢:
     main:
       weapon: 手甲
       damage: 手甲武学增伤
@@ -54,6 +54,14 @@ playstyles:
       weapon: 扇
       damage: null
     attr: 牵丝
+  樽樽:
+    main:
+      weapon: 手甲
+      damage: 手甲武学增伤
+    sub:
+      weapon: 绳镖
+      damage: 绳镖武学增伤
+    attr: 破竹
 transmute_priority:
 - 最小外功攻击
 - 敏

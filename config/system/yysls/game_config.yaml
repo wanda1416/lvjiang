@@ -489,6 +489,14 @@ schools:
     sub:
       weapon: 绳镖
       martial_art: 千机索天
+  破竹·樽:
+    attr: 破竹
+    main:
+      weapon: 手甲
+      martial_art: 悬身拳法
+    sub:
+      weapon: 双刀
+      martial_art: 断水双诀
 affix_parts:
   最大无相攻击:
   - 武器

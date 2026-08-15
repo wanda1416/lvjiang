@@ -264,11 +264,21 @@ class _DataOpsMixin:
             return
 
         # 范围元组赋值：eval $var = (1, 2) 或 $var = (1, 2)
+        # 注：range_literal 现已改为返回 TupleLiteral，此路径从解析器侧已不可达，
+        # 保留作为防御性兼容，以防旧版本 AST 序列化数据流入
         if node.func_name == "__range__":
             if node.target is not None:
                 range_val = node.func_args[0].value  # (float, float)
                 self.variables[node.target] = range_val
                 logger.debug(f"eval: {node.target} = {range_val!r}")
+            return
+
+        # 泛化元组赋值：eval $var = ($a, $b) / eval $var = (1, $b)
+        if node.func_name == "__tuple__":
+            if node.target is not None:
+                tuple_val = tuple(self._resolve(elem) for elem in node.func_args)
+                self.variables[node.target] = tuple_val
+                logger.debug(f"eval: {node.target} = {tuple_val!r}")
             return
 
         # 默认值赋值：default $var = value — 仅当变量未从外部传入时才赋值

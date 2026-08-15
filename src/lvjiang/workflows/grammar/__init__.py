@@ -55,6 +55,7 @@ from .ast_nodes import (
     EntityRef,
     Screenshot,
     Try,
+    TupleLiteral,
     UntilLoop,
     VarRef,
     Wait,
@@ -75,4 +76,5 @@ __all__ = [
     "Contains", "Equals", "InList", "IsEmpty",
     "GreaterThan", "LessThan", "GreaterEqual", "LessEqual", "NotEqual", "NumericEqual",
     "Not", "And", "Or", "ArithOp",
+    "TupleLiteral",
 ]

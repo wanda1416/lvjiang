@@ -44,8 +44,15 @@ class InputBackend(ABC):
     target_hwnd: int | None
 
     @abstractmethod
-    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
-        """点击指定坐标（带随机偏移 + before/after 延迟）"""
+    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
+                     *, pre_delay: tuple[float, float] | None = None,
+                        post_delay: tuple[float, float] | None = None):
+        """点击指定坐标（带随机偏移 + before/after 延迟）
+
+        Args:
+            pre_delay: 点击前延迟范围。None=使用默认 before_click_wait，(0,0)=不延迟。
+            post_delay: 点击后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
+        """
 
     @abstractmethod
     def drag_screen(
@@ -57,12 +64,16 @@ class InputBackend(ABC):
         poi_name: str = "",
         duration: float | tuple[float, float] | None = None,
         hold: float | None = None,
+        *, pre_delay: tuple[float, float] | None = None,
+           post_delay: tuple[float, float] | None = None,
     ):
         """从起点拖拽到终点
 
         Args:
             duration: 移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认 mouse_move_duration。
             hold: 到达终点后按住不放的时长（秒）。None 表示不按。
+            pre_delay: 拖拽前延迟范围。None=使用默认 before_click_wait，(0,0)=不延迟。
+            post_delay: 拖拽后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
         """
 
     @staticmethod

@@ -42,16 +42,19 @@ class _GestureInput(InputBackend):
     def _swipe(self, x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> None:
         raise NotImplementedError
 
-    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
+                     *, pre_delay=None, post_delay=None):
         """点击设备坐标（带随机偏移 + before/after 延迟）"""
         sx = screen_x + random.randint(-self.click_random_offset, self.click_random_offset)
         sy = screen_y + random.randint(-self.click_random_offset, self.click_random_offset)
 
-        time.sleep(random.uniform(*self.before_click_wait))
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
         label = f"({poi_name})" if poi_name else ""
         print(f"[{self.name}] 点击 {label}: ({sx},{sy})")
         self._tap(sx, sy)
-        time.sleep(random.uniform(*self.after_click_wait))
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))
 
     def drag_screen(
         self,
@@ -62,6 +65,7 @@ class _GestureInput(InputBackend):
         poi_name: str = "",
         duration: float | tuple[float, float] | None = None,
         hold: float | None = None,
+        *, pre_delay=None, post_delay=None,
     ):
         """从起点拖拽到终点（随机化移动时长）
 
@@ -77,10 +81,12 @@ class _GestureInput(InputBackend):
 
         total_ms = int((move_dur + (float(hold) if hold and hold > 0 else 0.0)) * 1000)
 
-        time.sleep(random.uniform(*self.before_click_wait))
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
         print(f"[{self.name}] 拖拽 {poi_name}: ({from_x},{from_y})->({to_x},{to_y}) {total_ms}ms")
         self._swipe(from_x, from_y, to_x, to_y, total_ms)
-        time.sleep(random.uniform(*self.after_click_wait))
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))
 
 
 class A11yInput(_GestureInput):

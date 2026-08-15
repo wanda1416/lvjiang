@@ -29,6 +29,7 @@ from ..ast_nodes import (
     NumericEqual,
     Or,
     Screenshot,
+    TupleLiteral,
     VarRef,
     WhereClause,
 )
@@ -192,7 +193,10 @@ class _ExprMixin:
         # 列表快捷路径
         if isinstance(lit_value, list):
             return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
-        # 范围元组路径：(min, max)
+        # 元组路径：TupleLiteral（支持混合数字和变量）
+        if isinstance(lit_value, TupleLiteral):
+            return Eval(func_name="__tuple__", func_args=lit_value.elements, target=target_name, line_no=self._line(items))
+        # 向后兼容：旧式 Python tuple
         if isinstance(lit_value, tuple):
             return Eval(func_name="__range__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, Token):
@@ -258,6 +262,10 @@ class _ExprMixin:
             return Eval(func_name="__dict__", func_args=[lit_value], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, list):
             return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
+        # 元组路径：TupleLiteral（支持混合数字和变量）
+        if isinstance(lit_value, TupleLiteral):
+            return Eval(func_name="__tuple__", func_args=lit_value.elements, target=target_name, line_no=self._line(items))
+        # 向后兼容：旧式 Python tuple
         if isinstance(lit_value, tuple):
             return Eval(func_name="__range__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
         if isinstance(lit_value, Token):

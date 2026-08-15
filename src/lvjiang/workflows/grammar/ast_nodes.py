@@ -34,6 +34,7 @@ class Program:
 class Click:
     target: Any     # EntityRef（静态 [scene].[entity]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0
+    suppress_defaults: bool = False  # 显式 wait_clause 时抑制默认 before/after_click_wait
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class Drag:
     direction: str | None = None   # "up" | "down" | "left" | "right" | None（panel 拖拽方向）
     distance: Any = 1.0            # 拖拽距离：float | VarRef（支持整数、浮点数如 0.5、变量引用）
     line_no: int = 0
+    suppress_defaults: bool = False  # 显式 wait_clause 时抑制默认 before/after_click_wait
 
 
 @dataclass(frozen=True)
@@ -507,6 +509,16 @@ class Or:
     left: Any
     right: Any
     line_no: int = 0
+
+
+@dataclass(frozen=True)
+class TupleLiteral:
+    """元组字面量：(expr, expr)，元素可以是数字或变量引用
+
+    用于 wait ($a, $b) / eval $var = (1, $b) 等场景。
+    引擎求值时对每个元素调用 _resolve 获取运行时值。
+    """
+    elements: list  # list[Literal | VarRef]
 
 
 @dataclass(frozen=True)

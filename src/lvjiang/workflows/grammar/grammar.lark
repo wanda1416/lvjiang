@@ -60,7 +60,7 @@ find_stmt: "find"i scene_target "as"i var_ref by_clause where_clause? _NL -> fin
 //
 // 注意：panel 与 scene.area 都以 [x].[y] 开头，必须用同一规则避免歧义。
 // transformer 根据 row/col 是否存在分派为 EntityRef 或 PanelRef。
-click_stmt: "click"i click_target wait_clause? _NL
+click_stmt: "click"i click_target wait_clauses? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var                          -> click_scene_target
             | var_ref                                                  -> click_var_target
@@ -72,7 +72,7 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 //   3. [scene].[point_1] [scene].[point_2]      — 两个命名点之间拖拽
 //   4. scene.arrow — scene.arrow 引用
 //   5. (rx1, ry1) (rx2, ry2) — 两坐标点
-drag_stmt: "drag"i drag_target drag_duration? drag_hold? wait_clause? _NL
+drag_stmt: "drag"i drag_target drag_duration? drag_hold? wait_clauses? _NL
 drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
            | const_or_var "." const_or_var drag_direction                       -> drag_grid_target
            | const_or_var "." const_or_var const_or_var "." const_or_var        -> drag_point_pair_target
@@ -131,10 +131,15 @@ delay_ref: "@" NAME
 //   after wait xxx  — 操作后等待
 //   around wait xxx  — 操作前后各等待一次（同一参数）
 // 参数形式与 wait_stmt 完全一致（命名延迟/数值/范围/变量），另支持 wait stable
+wait_clauses: wait_clause+
+
 wait_clause: WAIT_TIMING "wait"i (wait_stable_ref | delay_ref | number | bracket_expr | var_ref | wait_range)
 WAIT_TIMING: /before/i | /after/i | /around/i
 
-wait_range: "(" number "," number ")"
+wait_range: "(" tuple_elem "," tuple_elem ")"
+
+// 元组元素：数字或变量引用（用于 wait ($a, $b) / eval $var = (1, $b) 等）
+tuple_elem: number | var_ref
 
 // scan 支持两种目标：
 //   1. [scene].[region] — 场景区域 OCR
@@ -390,8 +395,8 @@ keyword_ref: "session" -> session_ref
         | list_literal
         | range_literal
 
-// 范围字面量：(min, max) 用于 wait 随机等待
-range_literal: "(" number "," number ")"
+// 范围字面量：(min, max) 用于 wait 随机等待 / eval 元组赋值
+range_literal: "(" tuple_elem "," tuple_elem ")"
 
 // 列表字面量：["a", "b", 1, 2]，支持字符串、数字和变量引用
 list_literal: "[" [list_item ("," list_item)*] "]"

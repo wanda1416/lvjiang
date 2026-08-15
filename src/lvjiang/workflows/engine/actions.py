@@ -23,6 +23,7 @@ from ..grammar import (
     Wait,
     WaitStable,
 )
+from ..grammar.ast_nodes import TupleLiteral
 from ..grammar.ast_nodes import Align
 from .signals import WorkflowUserError
 
@@ -48,14 +49,19 @@ class _ActionsMixin:
         若 target 为 CoordPoint，则按画布归一化坐标反算后点击。
         若 target 为 PanelRef，则查 panel 校准缓存获取格子中心坐标。
         """
+        # suppress_defaults：显式 wait_clause 时抑制默认 before/after 延迟
+        kw = {}
+        if getattr(node, 'suppress_defaults', False):
+            kw["pre_delay"] = (0, 0)
+            kw["post_delay"] = (0, 0)
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
-            self._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
+            self._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})", **kw)
             return
         if isinstance(node.target, PanelRef):
             x, y = self._panel_ref_to_screen(node.target)
             if x is not None and y is not None:
-                self._input.click_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])")
+                self._input.click_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])", **kw)
             return
         if isinstance(node.target, EntityRef):
             # 解析 scene（可能是 str 或 VarRef）
@@ -78,18 +84,18 @@ class _ActionsMixin:
                 FoundRegionCls = _get_found_region_cls()
                 if isinstance(region_val, FoundRegionCls):
                     x, y = self._found_region_to_screen(region_val)
-                    self._input.click_screen(x, y, f"find({region_val.text!r})")
+                    self._input.click_screen(x, y, f"find({region_val.text!r})", **kw)
                     return
                 # 尝试从 coord_meta 查找该 key 对应的 Region
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
-                    self._input.click_screen(x, y, f"{scene}/{region_val}")
+                    self._input.click_screen(x, y, f"{scene}/{region_val}", **kw)
                     return
                 # 回退：作为 entity key 名查场景配置
-                self._ensure_workflow().click_any(str(scene), str(region_val))
+                self._ensure_workflow().click_any(str(scene), str(region_val), **kw)
             else:
-                self._ensure_workflow().click_any(str(scene), entity)
+                self._ensure_workflow().click_any(str(scene), entity, **kw)
         elif isinstance(node.target, VarRef):
             # 裸变量引用：可能是 CoordRef、find 产出的 FoundRegion
             region_val = self.variables.get(node.target.name)
@@ -100,12 +106,12 @@ class _ActionsMixin:
             # CoordRef 变量：直接点击中心（+ 抖动）
             if isinstance(region_val, CoordRef):
                 x, y = self._coord_ref_to_screen(region_val, jitter=True)
-                self._input.click_screen(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})")
+                self._input.click_screen(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})", **kw)
                 return
             FoundRegionCls = _get_found_region_cls()
             if isinstance(region_val, FoundRegionCls):
                 x, y = self._found_region_to_screen(region_val)
-                self._input.click_screen(x, y, f"find({region_val.text!r})")
+                self._input.click_screen(x, y, f"find({region_val.text!r})", **kw)
                 return
             raise WorkflowUserError(
                 f"click ${node.target.name}: 变量值不是可点击类型 "
@@ -121,6 +127,11 @@ class _ActionsMixin:
         若为点对模式（from_scene_ref/to_scene_ref），则查找两个命名点的屏幕坐标。
         若为 panel 模式，则查校准缓存获取格子中心坐标。
         """
+        # suppress_defaults：显式 wait_clause 时抑制默认 before/after 延迟
+        kw = {}
+        if getattr(node, 'suppress_defaults', False):
+            kw["pre_delay"] = (0, 0)
+            kw["post_delay"] = (0, 0)
         if isinstance(node.from_point, CoordPoint) and isinstance(node.to_point, CoordPoint):
             x1, y1 = self._coord_ratio_to_screen(node.from_point.rx, node.from_point.ry)
             x2, y2 = self._coord_ratio_to_screen(node.to_point.rx, node.to_point.ry)
@@ -128,7 +139,7 @@ class _ActionsMixin:
             self._input.drag_screen(
                 x1, y1, x2, y2,
                 f"coord({node.from_point.rx},{node.from_point.ry})->({node.to_point.rx},{node.to_point.ry})",
-                duration=duration, hold=node.hold,
+                duration=duration, hold=node.hold, **kw,
             )
             return
         if node.from_scene_ref is not None and node.to_scene_ref is not None:
@@ -139,7 +150,7 @@ class _ActionsMixin:
             self._input.drag_screen(
                 x1, y1, x2, y2,
                 f"point({node.from_scene_ref.scene}.{node.from_scene_ref.entity})->({node.to_scene_ref.scene}.{node.to_scene_ref.entity})",
-                duration=duration, hold=node.hold,
+                duration=duration, hold=node.hold, **kw,
             )
             return
         if isinstance(node.scene, PanelGridDrag):
@@ -189,7 +200,7 @@ class _ActionsMixin:
                 self._input.drag_screen(
                     x, y, x2, y2,
                     f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
-                    duration=duration, hold=node.hold,
+                    duration=duration, hold=node.hold, **kw,
                 )
                 logger.debug(f"drag grid: region {grid.scene}.{grid.panel} {direction} {distance}")
                 return
@@ -247,7 +258,7 @@ class _ActionsMixin:
             self._input.drag_screen(
                 x, y, x2, y2,
                 f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
-                duration=duration, hold=node.hold,
+                duration=duration, hold=node.hold, **kw,
             )
             # drag 后界面已滚动，失效对齐缓存（不立即刷新，避免截到滚动动画残影）
             # 下次访问时懒加载重新对齐（此时滚动动画已完成）
@@ -314,7 +325,7 @@ class _ActionsMixin:
             self._input.drag_screen(
                 x, y, x2, y2,
                 f"panel({node.scene.scene}.{node.scene.panel}[{node.scene.row}][{node.scene.col}]) {direction} {distance}",
-                duration=duration, hold=node.hold,
+                duration=duration, hold=node.hold, **kw,
             )
             # drag 后界面已滚动，失效对齐缓存（不立即刷新，避免截到滚动动画残影）
             # 下次访问时懒加载重新对齐（此时滚动动画已完成）
@@ -347,7 +358,7 @@ class _ActionsMixin:
             arrows = self._layout.get_scene_arrows(str(scene))
             arrow = next((a for a in arrows if a.key == str(key)), None)
             if arrow is not None:
-                self._ensure_workflow().drag_arrow(str(scene), str(key), duration=duration, hold=hold)
+                self._ensure_workflow().drag_arrow(str(scene), str(key), duration=duration, hold=hold, **kw)
                 return
 
             # 未找到 arrow，尝试作为 region 查找
@@ -370,7 +381,7 @@ class _ActionsMixin:
                 self._input.drag_screen(
                     x, y, x2, y2,
                     f"region({scene}.{key}) up",
-                    duration=duration, hold=hold,
+                    duration=duration, hold=hold, **kw,
                 )
                 logger.debug(f"drag region: {scene}.{key} up (default)")
                 return
@@ -393,8 +404,22 @@ class _ActionsMixin:
 
     def _exec_wait(self, node: Wait):
         delay = node.delay
-        if isinstance(delay, tuple) and len(delay) == 2:
-            # 随机范围等待：wait (min, max)
+        if isinstance(delay, TupleLiteral):
+            # 泛化元组等待：wait ($a, $b) / wait (1, $b) / wait ($a, 2)
+            import random
+            lo_raw = self._resolve(delay.elements[0])
+            hi_raw = self._resolve(delay.elements[1])
+            if not isinstance(lo_raw, (int, float)) or not isinstance(hi_raw, (int, float)):
+                raise WorkflowUserError(
+                    f"wait 元组元素必须是数值，实际得到: ({lo_raw!r}, {hi_raw!r})，"
+                    f"请检查变量是否已定义"
+                )
+            lo, hi = float(lo_raw), float(hi_raw)
+            seconds = random.uniform(lo, hi)
+            logger.debug(f"元组随机等待 ({lo}, {hi}) → {seconds:.2f}s")
+            self._ensure_workflow().wait_seconds(seconds)
+        elif isinstance(delay, tuple) and len(delay) == 2:
+            # 向后兼容：旧式 Python tuple
             import random
             lo, hi = float(delay[0]), float(delay[1])
             seconds = random.uniform(lo, hi)

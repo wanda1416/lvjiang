@@ -42,7 +42,8 @@ class AdbInput(InputBackend):
 
     # ─── 点击 ─────────────────────────────────────────────────
 
-    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+    def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
+                     *, pre_delay=None, post_delay=None):
         """点击设备坐标（带随机偏移 + before/after 延迟）"""
         offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
         offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
@@ -52,15 +53,15 @@ class AdbInput(InputBackend):
         # 截图坐标 → 设备坐标（处理横竖屏旋转）
         actual_x, actual_y = self._transform(sx, sy)
 
-        pre_delay = random.uniform(*self.before_click_wait)
-        time.sleep(pre_delay)
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
 
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"[ADB] 点击 {label}: 截图({sx},{sy}) → 设备({actual_x},{actual_y})")
         self._device.shell("input", "tap", str(actual_x), str(actual_y))
 
-        post_delay = random.uniform(*self.after_click_wait)
-        time.sleep(post_delay)
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ class AdbInput(InputBackend):
         poi_name: str = "",
         duration: float | tuple[float, float] | None = None,
         hold: float | None = None,
+        *, pre_delay=None, post_delay=None,
     ):
         """从起点拖拽到终点（adb shell input swipe，随机化移动时长）
 
@@ -93,8 +95,8 @@ class AdbInput(InputBackend):
         hold_dur = float(hold) if hold and hold > 0 else 0.0
         total_dur = move_dur + hold_dur
 
-        pre_delay = random.uniform(*self.before_click_wait)
-        time.sleep(pre_delay)
+        _pre = pre_delay if pre_delay is not None else self.before_click_wait
+        time.sleep(random.uniform(*_pre))
 
         duration_ms = int(total_dur * 1000)
         hold_info = f" + hold {hold}s（合并到 swipe 时长）" if hold_dur > 0 else ""
@@ -110,5 +112,5 @@ class AdbInput(InputBackend):
             str(fx), str(fy), str(tx), str(ty), str(duration_ms),
         )
 
-        post_delay = random.uniform(*self.after_click_wait)
-        time.sleep(post_delay)
+        _post = post_delay if post_delay is not None else self.after_click_wait
+        time.sleep(random.uniform(*_post))

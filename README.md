@@ -25,7 +25,7 @@
 - **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/20-requirements/01-auto-tuning.md)）。
 - **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
 - **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
-- **安卓独立执行端（开发中）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [安卓迁移进度](docs/todo-android.md)）。
+- **安卓独立执行端（实验性）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [安卓迁移进度](docs/20-requirements/todo-android.md)）。
 
 ---
 
@@ -141,7 +141,7 @@ pip install -e ".[dev]"
 
 ## ▶️ 使用
 
-> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/user-guide.md)——从连接手机、启动程序到运行自动调律的完整步骤。
+> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/60-userguide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
 
 ```powershell
 # 方式一：纯通用模式（场景编辑 + 识别测试）
@@ -220,7 +220,7 @@ pytest tests/workflows/test_parser.py
 
 | 目录 | 内容 |
 |------|------|
-| [`docs/user-guide.md`](docs/user-guide.md) | 用户指南：连接手机、配置与运行自动调律 |
+| [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接手机、配置与运行自动调律 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
 | [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型 |
@@ -236,7 +236,7 @@ pytest tests/workflows/test_parser.py
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（进行中）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)，安卓端迁移进度见 [todo-android](docs/todo-android.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（实验性）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)，安卓端迁移进度见 [todo-android](docs/20-requirements/todo-android.md)。
 
 ---
 

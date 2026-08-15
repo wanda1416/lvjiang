@@ -23,6 +23,7 @@ class TestRegistry:
         expected = {
             "add", "sub", "mul", "div", "mod", "min", "max", "abs",
             "concat", "range", "count_nonempty", "contains", "find_key", "append",
+            "clock", "datetime",
         }
         assert expected <= registered
 
@@ -170,3 +171,63 @@ class TestAppend:
         _fn("append")(lst)          # list 缺 value
         _fn("append")({}, "only")   # dict 缺 value
         assert lst == [1]
+
+
+# ─── 时间函数 ─────────────────────────────────────────────
+
+class TestClock:
+    def test_clock_returns_float(self):
+        """clock() 返回 Unix 时间戳（float）"""
+        ts = _fn("clock")()
+        assert isinstance(ts, float)
+        assert ts > 1_700_000_000  # 合理的时间戳范围
+
+    def test_clock_no_args(self):
+        """clock() 无参调用"""
+        ts = _fn("clock")()
+        assert isinstance(ts, float)
+
+
+class TestDatetime:
+    def test_datetime_default_format(self):
+        """datetime() 默认格式返回 YYYY-MM-DD HH:MM:SS"""
+        result = _fn("datetime")()
+        assert isinstance(result, str)
+        assert len(result) == 19  # "YYYY-MM-DD HH:MM:SS"
+
+    def test_datetime_custom_format(self):
+        """datetime("%Y") 返回年份字符串"""
+        year = _fn("datetime")("%Y")
+        assert isinstance(year, str)
+        assert len(year) == 4
+        assert year.isdigit()
+
+    def test_datetime_time_format(self):
+        """datetime("%H:%M:%S") 返回时间字符串"""
+        time_str = _fn("datetime")("%H:%M:%S")
+        assert isinstance(time_str, str)
+        parts = time_str.split(":")
+        assert len(parts) == 3
+
+    def test_datetime_with_timestamp(self):
+        """datetime($ts) 格式化指定时间戳"""
+        # 使用固定时间戳: 2026-01-15 10:30:45 UTC
+        ts = 1768470645.0
+        result = _fn("datetime")(ts)
+        assert isinstance(result, str)
+        assert len(result) == 19  # "YYYY-MM-DD HH:MM:SS"
+
+    def test_datetime_with_timestamp_and_format(self):
+        """datetime($ts, "%H:%M:%S") 格式化指定时间戳为时间"""
+        ts = 1768470645.0
+        time_str = _fn("datetime")(ts, "%H:%M:%S")
+        assert isinstance(time_str, str)
+        parts = time_str.split(":")
+        assert len(parts) == 3
+
+    def test_datetime_with_int_timestamp(self):
+        """datetime(int_ts) 支持整数时间戳"""
+        ts = 1768470645
+        result = _fn("datetime")(ts)
+        assert isinstance(result, str)
+        assert len(result) == 19

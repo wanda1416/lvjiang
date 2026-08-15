@@ -36,6 +36,7 @@ from lvjiang.workflows.grammar import (
     Program,
     Recognize,
     Scan,
+    TupleLiteral,
     VarRef,
     Wait,
     WaitStable,
@@ -286,12 +287,14 @@ def test_wait():
     assert n.delay.name == "interval"
     print("  wait $interval: OK")
 
-    # wait (min, max)
+    # wait (min, max) → TupleLiteral
     program = parse_text("wait (1, 2)")
     n = program.body[0]
     assert isinstance(n, Wait)
-    assert isinstance(n.delay, tuple)
-    assert n.delay == (1.0, 2.0)
+    assert isinstance(n.delay, TupleLiteral)
+    assert len(n.delay.elements) == 2
+    assert n.delay.elements[0].value == 1.0
+    assert n.delay.elements[1].value == 2.0
     print("  wait (1, 2): OK")
 
 
@@ -307,6 +310,67 @@ def test_bare_delay_in_clause_is_syntax_error():
     from lark.exceptions import UnexpectedCharacters
     with pytest.raises(UnexpectedCharacters):
         parse_text("click [s].[r] after wait step_interval")
+
+
+# ─── 泛化元组混合引用测试 ─────────────────────────────────
+
+def test_wait_tuple_mixed_var_var():
+    """wait ($lo, $hi) → TupleLiteral with VarRef + VarRef"""
+    program = parse_text("wait ($lo, $hi)")
+    n = program.body[0]
+    assert isinstance(n, Wait)
+    assert isinstance(n.delay, TupleLiteral)
+    assert isinstance(n.delay.elements[0], VarRef)
+    assert n.delay.elements[0].name == "lo"
+    assert isinstance(n.delay.elements[1], VarRef)
+    assert n.delay.elements[1].name == "hi"
+
+
+def test_wait_tuple_mixed_lit_var():
+    """wait (1, $hi) → TupleLiteral with Literal + VarRef"""
+    program = parse_text("wait (1, $hi)")
+    n = program.body[0]
+    assert isinstance(n, Wait)
+    assert isinstance(n.delay, TupleLiteral)
+    assert isinstance(n.delay.elements[0], Literal)
+    assert n.delay.elements[0].value == 1.0
+    assert isinstance(n.delay.elements[1], VarRef)
+    assert n.delay.elements[1].name == "hi"
+
+
+def test_wait_tuple_mixed_var_lit():
+    """wait ($lo, 2) → TupleLiteral with VarRef + Literal"""
+    program = parse_text("wait ($lo, 2)")
+    n = program.body[0]
+    assert isinstance(n, Wait)
+    assert isinstance(n.delay, TupleLiteral)
+    assert isinstance(n.delay.elements[0], VarRef)
+    assert n.delay.elements[0].name == "lo"
+    assert isinstance(n.delay.elements[1], Literal)
+    assert n.delay.elements[1].value == 2.0
+
+
+def test_eval_tuple_mixed():
+    """eval $var = ($a, $b) / eval $var = (1, $b) → Eval(__tuple__)"""
+    # eval $var = (1, $b)
+    program = parse_text("eval $v = (1, $b)")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__tuple__"
+    assert isinstance(n.func_args[0], Literal)
+    assert n.func_args[0].value == 1.0
+    assert isinstance(n.func_args[1], VarRef)
+    assert n.func_args[1].name == "b"
+
+    # eval $var = ($a, $b)
+    program = parse_text("eval $v = ($a, $b)")
+    n = program.body[0]
+    assert isinstance(n, Eval)
+    assert n.func_name == "__tuple__"
+    assert isinstance(n.func_args[0], VarRef)
+    assert n.func_args[0].name == "a"
+    assert isinstance(n.func_args[1], VarRef)
+    assert n.func_args[1].name == "b"
 
 
 # ─── wait stable 指令测试 ─────────────────────────────────
@@ -431,6 +495,8 @@ def test_click_before_wait():
     assert isinstance(program.body[1], Click)
     assert isinstance(program.body[0].delay, Literal)
     assert program.body[0].delay.value == 0.5
+    # 显式 wait_clause 应抑制默认延迟
+    assert program.body[1].suppress_defaults is True
 
 
 def test_click_around_wait():
@@ -442,7 +508,11 @@ def test_click_around_wait():
     assert isinstance(program.body[2], Wait)
     # 同一参数：前后 Wait 的 delay 相同
     assert program.body[0].delay == program.body[2].delay
-    assert program.body[0].delay == (0.3, 0.8)
+    assert isinstance(program.body[0].delay, TupleLiteral)
+    assert program.body[0].delay.elements[0].value == 0.3
+    assert program.body[0].delay.elements[1].value == 0.8
+    # 显式 wait_clause 应抑制默认延迟
+    assert program.body[1].suppress_defaults is True
 
 
 def test_click_after_wait_var():
@@ -453,6 +523,8 @@ def test_click_after_wait_var():
     assert isinstance(program.body[1], Wait)
     assert isinstance(program.body[1].delay, VarRef)
     assert program.body[1].delay.name == "myvar"
+    # 显式 wait_clause 应抑制默认延迟
+    assert program.body[0].suppress_defaults is True
 
 
 def test_click_no_wait():
@@ -543,6 +615,56 @@ def test_drag_no_wait():
     program = parse_text("drag [scene].[panel] up 2")
     assert len(program.body) == 1
     assert isinstance(program.body[0], Drag)
+
+
+# ─── before/after 组合语法测试 ────────────────────────────────
+
+def test_click_before_after_wait():
+    """click ... before wait X after wait Y → [Wait(X), Click, Wait(Y)]"""
+    program = parse_text("click [scene].[region] before wait 0.5 after wait 1.0")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Click)
+    assert isinstance(program.body[2], Wait)
+    assert program.body[0].delay.value == 0.5
+    assert program.body[2].delay.value == 1.0
+    # suppress_defaults 应被设置
+    assert program.body[1].suppress_defaults is True
+
+
+def test_click_after_before_wait():
+    """click ... after wait X before wait Y → [Wait(Y), Click, Wait(X)]（语义顺序：before 始终在前）"""
+    program = parse_text("click [scene].[region] after wait 1.0 before wait 0.5")
+    assert len(program.body) == 3
+    # 无论书写顺序，before 在 click 前，after 在 click 后
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Click)
+    assert isinstance(program.body[2], Wait)
+    assert program.body[0].delay.value == 0.5  # before
+    assert program.body[2].delay.value == 1.0  # after
+
+
+def test_click_before_after_wait_stable():
+    """click ... before wait stable 3 after wait stable 5 → [WaitStable(3), Click, WaitStable(5)]"""
+    program = parse_text("click [scene].[region] before wait stable 3 after wait stable 5")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], WaitStable)
+    assert isinstance(program.body[1], Click)
+    assert isinstance(program.body[2], WaitStable)
+    assert program.body[0].timeout == 3.0
+    assert program.body[2].timeout == 5.0
+
+
+def test_drag_before_after_wait():
+    """drag ... before wait X after wait Y → [Wait(X), Drag, Wait(Y)]"""
+    program = parse_text("drag [scene].[panel] up 2 before wait 0.3 after wait 0.8")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Drag)
+    assert isinstance(program.body[2], Wait)
+    assert program.body[0].delay.value == 0.3
+    assert program.body[2].delay.value == 0.8
+    assert program.body[1].suppress_defaults is True
 
 
 def test_click_wait_in_for_loop():

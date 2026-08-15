@@ -133,7 +133,7 @@ class FakeWF(AutoTuningWorkflow):
     def wait_seconds(self, seconds: float):
         pass
 
-    def click_region(self, scene_key, field_key, jitter: bool = True):
+    def click_region(self, scene_key, field_key, jitter: bool = True, **kw):
         self.clicks.append((scene_key, field_key))
 
     def ocr_scene(self, scene_key, field_keys=None, min_confidence=None):
@@ -156,7 +156,7 @@ class FakeWF(AutoTuningWorkflow):
         self.material_info_calls += 1
         return dict(self._material_infos)
 
-    def click_panel(self, scene_key, panel_key, row, col):
+    def click_panel(self, scene_key, panel_key, row, col, **kw):
         self.clicks.append((scene_key, panel_key, row, col))
 
     def _on_scan_reject(self, equip_data, potential, detail_scene=None,

@@ -437,9 +437,9 @@ class TuningTab(QWidget):
 
         host.run_workflow_implementation(
             "auto_tuning", flow_name, configure)
-    
+
     # ─── 进度控件查找 ────────────────────────────────
-    
+
     def _find_progress_widget(self):
         """在右侧 Tab 中查找 TuningProgressWidget"""
         from .tuning_progress_widget import TuningProgressWidget

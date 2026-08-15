@@ -117,7 +117,7 @@ class ScriptRecordDialog(QDialog):
             main._capture = DesktopCapture()
         main._capture.set_capture_region(
             w["left"], w["top"], w["width"], w["height"])
-        from ..macros import MacroRecorder
+        from .macros import MacroRecorder
         try:
             self._recorder = MacroRecorder(
                 target_window=w, capture=main._capture, layout=layout,

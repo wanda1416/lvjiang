@@ -9,7 +9,7 @@
 
 from dataclasses import asdict, dataclass, field
 
-from .coord_types import CircleCoordRef, CoordRef, RectCoordRef
+from .coord_types import CircleCoordRef, RectCoordRef
 
 
 @dataclass

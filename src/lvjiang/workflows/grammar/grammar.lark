@@ -371,6 +371,7 @@ keyword_ref: "session" -> session_ref
        | var_ref
        | field_access
        | func_call
+       | entity_ref        // [scene].[entity] → CoordRef
        | "(" arith_expr ")"
 
 // 数值字面量：支持负数，区分 int 和 float
@@ -420,6 +421,10 @@ dict_pair: STRING ":" dict_value
            | list_literal -> dict_val_list
 
 // ─── 通用原子 ─────────────────────────────────────────────
+
+// 实体引用（表达式上下文）：[scene].[entity] → EntityRef → CoordRef
+// 用于赋值（$a = [scene].[region]）和算术运算（$b - $a）
+entity_ref: bracket_expr "." bracket_expr
 
 var_ref: "$" NAME
 

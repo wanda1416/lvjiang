@@ -77,11 +77,15 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: main_area
+  name: 主功能区
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: detail
 panels:
 - key: bag_grid
   name: 背包
   cols: 6
   rows: 5
   min_visible: 0.85
-  calibration: auto
-  scroll_direction: vertical

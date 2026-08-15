@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from ...core.coord_types import CoordRef, Offset, to_offset
 from ..builtins._coerce import to_number
 from ..grammar import (
     And,
@@ -28,7 +29,6 @@ from ..grammar import (
     Or,
     VarRef,
 )
-from ...core.coord_types import CoordRef, Offset, to_offset
 from .signals import WorkflowUserError
 
 # 数值相等容差：== / != 统一用容差比较，避免浮点误差（如 0.1+0.2 != 0.3）

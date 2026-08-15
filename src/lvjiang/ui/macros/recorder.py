@@ -10,7 +10,7 @@ import time
 
 from loguru import logger
 
-from ..i18n import tr
+from ...i18n import tr
 
 try:
     from pynput import mouse as pynput_mouse
@@ -61,7 +61,7 @@ class MacroRecorder:
         self._last_action_time = None
         self._recording = True
         # 防护补丁：避免退出竞态下 pynput 钩子回调返回 None（幂等）
-        from ..core.pynput_patch import install as _install_pynput_patch
+        from ...core.pynput_patch import install as _install_pynput_patch
         _install_pynput_patch()
         self._listener = pynput_mouse.Listener(on_click=self._on_click)
         self._listener.start()

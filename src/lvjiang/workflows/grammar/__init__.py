@@ -17,6 +17,8 @@ from .ast_nodes import (
     Continue,
     CoordPoint,
     Drag,
+    # 表达式节点
+    EntityRef,
     Equals,
     Eval,
     EvalFieldChainAssign,
@@ -51,8 +53,6 @@ from .ast_nodes import (
     Recognize,
     Return,
     Scan,
-    # 表达式节点
-    EntityRef,
     Screenshot,
     Try,
     TupleLiteral,

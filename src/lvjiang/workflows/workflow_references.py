@@ -14,9 +14,12 @@ from dataclasses import dataclass, replace
 from ..i18n import tr
 from .grammar.ast_nodes import (
     Align,
+    ArithOp,
     Click,
     Drag,
     EntityRef,
+    Eval,
+    EvalFieldChainAssign,
     Find,
     For,
     ForRange,
@@ -45,6 +48,7 @@ KIND_LABELS = {
     "scan": tr("区域/面板"),
     "point": tr("坐标点"),
     "stable_area": tr("区域"),
+    "expr_ref": tr("区域/坐标点/面板"),
 }
 
 
@@ -78,6 +82,16 @@ def _add(acc: list[RefUse], scene, key, kind: str, line: int) -> None:
     """记一条引用；scene 为 $var 动态引用时静态无从校验，直接丢弃"""
     if isinstance(scene, str) and scene:
         acc.append(RefUse(scene, _static_key(key), kind, line))
+
+
+def _collect_from_expr(node, acc: list[RefUse], line: int) -> None:
+    """递归遍历表达式节点，收集其中的 EntityRef（用于赋值与算术上下文）"""
+    if isinstance(node, EntityRef):
+        _add(acc, node.scene, node.entity, "expr_ref", line)
+    elif isinstance(node, ArithOp):
+        _collect_from_expr(node.left, acc, line)
+        _collect_from_expr(node.right, acc, line)
+    # 其他节点类型（VarRef/Literal/FieldAccess/FuncCall）不含 EntityRef，无需递归
 
 
 def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
@@ -136,6 +150,14 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
         # wait stable on [scene].[entity] — 校验区域绑定
         if stmt.area is not None and isinstance(stmt.area, EntityRef):
             _add(acc, stmt.area.scene, stmt.area.entity, "stable_area", line)
+
+    # 表达式内 EntityRef 收集（$a = [scene].[region] 或 $diff = $b - $a 等）
+    if isinstance(stmt, Eval):
+        _collect_from_expr(getattr(stmt, 'value', None), acc, line)
+        for arg in getattr(stmt, 'func_args', []):
+            _collect_from_expr(arg, acc, line)
+    elif isinstance(stmt, EvalFieldChainAssign):
+        _collect_from_expr(getattr(stmt, 'value', None), acc, line)
 
     # 嵌套体递归
     if isinstance(stmt, If):

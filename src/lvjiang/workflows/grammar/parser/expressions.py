@@ -9,6 +9,7 @@ from ..ast_nodes import (
     ByClause,
     Collect,
     Contains,
+    EntityRef,
     Equals,
     Eval,
     EvalFieldChainAssign,
@@ -588,6 +589,10 @@ class _ExprMixin:
     def var_ref(self, items):
         """$name → VarRef"""
         return VarRef(name=str(items[0]))
+
+    def entity_ref(self, items):
+        """[scene].[entity] → EntityRef（表达式上下文，用于赋值与算术运算）"""
+        return EntityRef(scene=str(items[0]), entity=str(items[1]))
 
     def bracket_expr(self, items):
         """[name] → str（场景名或实体名，由父节点组装为 EntityRef）"""

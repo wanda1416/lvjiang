@@ -9,6 +9,7 @@ from ..grammar import (
     And,
     ArithOp,
     Contains,
+    EntityRef,
     Equals,
     FieldAccess,
     FuncCall,
@@ -225,6 +226,7 @@ class _EvalMixin:
         Literal → 直接返回值
         FieldAccess → 逐层遍历字典/列表
         ArithOp → 算术表达式求值
+        EntityRef → 布局查询返回 CoordRef
         int/float → 直接返回（来自 grammar number 规则）
         str/Token → 直接返回字符串（来自 grammar STRING）
         list 类型变量原样返回（支持 for 迭代）
@@ -246,6 +248,8 @@ class _EvalMixin:
                 return self._eval_arith(node)
             case FuncCall():
                 return self._call_func(node)
+            case EntityRef():
+                return self._resolve_entity_ref(node)
             case int() | float():
                 return node
             case str():
@@ -256,6 +260,36 @@ class _EvalMixin:
                 return [self._resolve(item) for item in node]
             case _:
                 return None
+
+    def _resolve_entity_ref(self, node: EntityRef) -> CoordRef:
+        """EntityRef → 布局查询 → CoordRef
+
+        [scene].[region] → RectCoordRef（region 中心 + w/h）
+        [scene].[point]  → CircleCoordRef（point 中心 + r）
+        [scene].[panel]  → RectCoordRef（panel 中心 + w/h）
+        """
+        scene = node.scene
+        entity = node.entity
+
+        # 查 region
+        for r in self._layout.get_scene_regions(scene):
+            if r.key == entity:
+                return r.to_coord_ref()
+
+        # 查 point
+        for p in self._layout.get_scene_points(scene):
+            if p.key == entity:
+                return p.to_coord_ref()
+
+        # 查 panel
+        for p in self._layout.get_scene_panels(scene):
+            if p.key == entity:
+                return p.to_coord_ref()
+
+        from .signals import WorkflowUserError
+        raise WorkflowUserError(
+            f"表达式引用 [{scene}].[{entity}] 未在布局中定义（region/point/panel 均未找到）"
+        )
 
     def _resolve_arith(self, node) -> int | float | None:
         """解析算术表达式右侧为数值（用于条件比较）
@@ -284,6 +318,13 @@ class _EvalMixin:
             left_raw = to_offset(left_raw)
         if isinstance(right_raw, tuple) and len(right_raw) == 2:
             right_raw = to_offset(right_raw)
+
+        # FoundRegion / Region / Point / Panel → CoordRef 隐式转换
+        # （find 产出的 FoundRegion、布局模型对象均可直接参与坐标运算）
+        if hasattr(left_raw, 'to_coord_ref') and not isinstance(left_raw, (CoordRef, Offset)):
+            left_raw = left_raw.to_coord_ref()
+        if hasattr(right_raw, 'to_coord_ref') and not isinstance(right_raw, (CoordRef, Offset)):
+            right_raw = right_raw.to_coord_ref()
 
         # CoordRef / Offset 运算分支
         if isinstance(left_raw, (CoordRef, Offset)) or isinstance(right_raw, (CoordRef, Offset)):

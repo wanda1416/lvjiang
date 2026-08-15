@@ -142,7 +142,7 @@ end
 **语法**：
 
 ```
-default $var = <literal>     # literal 可以是字符串、数字、范围元组等
+default $var = <literal>     # literal 可以是字符串、数字、泛化元组等
 ```
 
 **示例**：

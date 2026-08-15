@@ -63,7 +63,7 @@ eval $dict = {
 | 空值 | `null` | `eval $x = null` |
 | 字典 | `{"k": v, ...}` | `{}`, `{"a": "b", "count": 3, "ref": $var}` |
 | 列表 | `[item, ...]` | `["a", "b"]`, `[1, null, true]` |
-| 范围元组 | `(min, max)` | `(1, 2)`, `(0.5, 1.5)` |
+| 泛化元组 | `(min, max)` | `(1, 2)`, `(0.5, 1.5)`, `($a, $b)`, `(1, $b)` |
 
 字典 key 限定为字符串，value 支持字符串、数字、bool、null、变量引用、嵌套字典、列表。列表元素同理。
 
@@ -204,7 +204,7 @@ $list[0]                 # 静态索引（数字）
 | eval 算术 | `eval $var = $a + $b * 2` | 算术表达式赋值 |
 | eval 字典 | `eval $var = {"k": "v"}` | 字典赋值 |
 | eval 列表 | `eval $var = ["a", "b"]` | 列表赋值 |
-| eval 范围 | `eval $var = (1, 2)` | 范围元组赋值 |
+| eval 元组 | `eval $var = (1, 2)` | 泛化元组赋值（支持 `($a, $b)` 混合引用） |
 | default | `default $var = <literal>` | 仅当变量未从外部传入时赋值 |
 | scan | `scan scene as $var` | OCR 扫描结果存入 `$var`（dict） |
 | for 循环 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
@@ -232,7 +232,7 @@ $var = "hello"               # 隐式 eval，效果完全相同
 | `eval $var = null` | `null` | 空值 |
 | `eval $var = {}` / `{"k": v}` | `dict` | 字典 |
 | `eval $var = ["a"]` | `list` | 列表 |
-| `eval $var = (1, 2)` | `tuple` | 范围元组 |
+| `eval $var = (1, 2)` | `tuple` | 泛化元组（支持数字/变量混合：`($a, $b)`、`(1, $b)`） |
 | `scan ... as $var` | `dict` | OCR 结果字典 |
 | `scan ... as $var by ...` | `str` | 首个命中的 Area 名 |
 | `eval $var = $other` | 同 `$other` | 类型跟随源变量 |

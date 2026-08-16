@@ -7,7 +7,7 @@
 #   2. 战斗养成（默认类目）：依次处理两个商品面板（各 2 行 × 4 列），
 #      整面板 OCR 扫描 → 逐格判断是否命中购买关键词 → 命中则购买
 #      商品1 处理完后，商品2 上滑 2 行再处理
-#   3. 营生（cat_4）：只购买 shangpin_1 的 (1,1)
+#   3. 营生（cat_4）：扫描 (1,1) 确认含「营生」后才购买
 #   4. 类目列表上拖 1 单位 → 赛季（仍在 cat_4）：shangpin_1 全部 2×4 格各购买一次
 #   5. 外观（cat_5）：只购买 shangpin_1 的 (1,1) 和 (2,3)
 #   6. 完成后返回主页
@@ -48,9 +48,14 @@ call buy_panel("shangpin_1", $buy_keywords)
 drag [bugan_detail].[shangpin_2] up 2 after wait @step_interval
 call buy_panel("shangpin_2", $buy_keywords)
 
-# ─── 营生：只买第一格 ──────────────────────────────────
+# ─── 营生：只买第一格（先确认格子内容是营生） ────────────
 click [bugan_detail].[cat_4] after wait @page_refresh
-call buy_cell(1, 1)
+scan [bugan_detail].[shangpin_1][1][1] as $cat4_cell
+if $cat4_cell contains "营生"
+   call buy_cell(1, 1)
+else
+   log "营生 (1,1) 未命中，跳过购买"
+end
 
 # ─── 赛季：shangpin_1 全部格子买一遍 ───
 click [bugan_detail].[cat_5] after wait @page_refresh

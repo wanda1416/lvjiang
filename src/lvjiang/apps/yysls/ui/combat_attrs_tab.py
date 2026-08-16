@@ -116,6 +116,9 @@ class CombatAttrsTab(QWidget):
 
         layout.addWidget(select_group)
 
+        # ── 毕业率（独立区域，单列展示） ──
+        self._add_graduation_card(layout)
+
         # ── 属性展示区（主题一致的中性数据卡片） ──
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -154,6 +157,45 @@ class CombatAttrsTab(QWidget):
         self._host.equipment_changed.connect(self._refresh_display)
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
         self._host.user_changed.connect(lambda _name: self._load_data())
+
+    def _add_graduation_card(self, parent_layout: QVBoxLayout):
+        """毕业率展示卡片 — 当前配置下方、攻击属性上方"""
+        card = self._create_card(tr("毕业率"))
+        content = QWidget()
+        content_layout = QHBoxLayout(content)
+        content_layout.setContentsMargins(14, 2, 14, 14)
+        content_layout.setSpacing(20)
+
+        # DPS
+        dps_widget = QWidget()
+        dps_layout = QHBoxLayout(dps_widget)
+        dps_layout.setContentsMargins(0, 0, 0, 0)
+        dps_layout.setSpacing(8)
+        dps_name = QLabel(tr("DPS"))
+        dps_name.setStyleSheet(_NAME_STYLE)
+        self._dps_value = self._create_value_label()
+        self._dps_value.setText("--")
+        dps_layout.addWidget(dps_name)
+        dps_layout.addStretch()
+        dps_layout.addWidget(self._dps_value)
+        content_layout.addWidget(dps_widget)
+
+        # 毕业率
+        rate_widget = QWidget()
+        rate_layout = QHBoxLayout(rate_widget)
+        rate_layout.setContentsMargins(0, 0, 0, 0)
+        rate_layout.setSpacing(8)
+        rate_name = QLabel(tr("毕业率"))
+        rate_name.setStyleSheet(_NAME_STYLE)
+        self._graduation_value = self._create_value_label(yellow=True)
+        self._graduation_value.setText("--")
+        rate_layout.addWidget(rate_name)
+        rate_layout.addStretch()
+        rate_layout.addWidget(self._graduation_value)
+        content_layout.addWidget(rate_widget)
+
+        card.layout().addWidget(content)
+        parent_layout.addWidget(card)
 
     def _create_card(self, title: str) -> QFrame:
         """创建与应用主题一致的中性分组卡片。"""
@@ -563,6 +605,7 @@ class CombatAttrsTab(QWidget):
         self._refresh_attr_penetration(base_attrs, equip_attrs)
         self._refresh_attr_bonus(combat_attrs)
         self._refresh_extra_attrs(combat_attrs.extra_attrs)
+        self._refresh_graduation(combat_attrs)
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""
@@ -718,6 +761,38 @@ class CombatAttrsTab(QWidget):
 
         fill_slots(weapon_items, self._weapon_bonus_slots)
         fill_slots(skill_items, self._skill_bonus_slots)
+
+    def _refresh_graduation(self, combat_attrs: CombatAttributes) -> None:
+        """计算并刷新毕业率显示"""
+        from ..evaluator.graduation import get_graduation_calculator
+
+        school = self._get_current_school()
+        if not school:
+            self._dps_value.setText("--")
+            self._graduation_value.setText("--")
+            return
+
+        calc = get_graduation_calculator(school)
+        if calc is None:
+            self._dps_value.setText(tr("未实现"))
+            self._graduation_value.setText(tr("未实现"))
+            return
+
+        try:
+            result = calc.calculate(combat_attrs)
+            self._dps_value.setText(f"{result.dps:,.0f}")
+            self._graduation_value.setText(f"{result.graduation_rate * 100:.2f}%")
+            tooltip = (
+                f"{tr('总伤害')}: {result.total_damage:,.0f}\n"
+                f"{tr('基准DPS')}: {result.baseline_dps:,.2f}\n"
+                f"{tr('战斗时间')}: {result.combat_time}s"
+            )
+            self._dps_value.setToolTip(tooltip)
+            self._graduation_value.setToolTip(tooltip)
+        except Exception as e:
+            logger.error(f"毕业率计算失败: {e}")
+            self._dps_value.setText(tr("错误"))
+            self._graduation_value.setText(tr("错误"))
 
     def _compute_combat_attrs(self) -> CombatAttributes:
         """计算最终战斗属性 = 基础属性(玩法) + 装备基础攻击 + 装备词条 + 弓玦属性"""

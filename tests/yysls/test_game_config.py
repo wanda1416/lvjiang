@@ -67,7 +67,7 @@ class TestAliasGroups:
     def test_get_alias_groups_structure(self, mgr):
         groups = mgr.get_alias_groups("指定技能增效")
         # 十大流派各一组，每组至少 5 个词条名（牵丝·玉 7 条）
-        assert len(groups) == 10
+        assert len(groups) == 11
         assert all(len(names) >= 5 for names in groups.values())
         assert len(groups["牵丝·玉"]) == 7
         assert "鸣金·虹" in groups
@@ -81,7 +81,7 @@ class TestAliasGroups:
     def test_grouped_category_aliases_flattened(self, mgr):
         # get_aliases_for_category 拍平返回全部组内词条名（9 组 × 5 + 牵丝·玉 7）
         aliases = mgr.get_aliases_for_category("指定技能增效")
-        assert len(aliases) == 52
+        assert len(aliases) == 57
 
 
 # ─── 词条上限查询 ──────────────────────────────────────────
@@ -136,6 +136,25 @@ class TestAffixParts:
         # 非法部位名被过滤、非 list 形态被忽略 → 回退全部位
         assert mgr.get_affix_parts("非法部位词条") == list(EQUIP_PART_NAMES)
         assert mgr.get_affix_parts("非法形态词条") == list(EQUIP_PART_NAMES)
+
+
+class TestExternalAffixAliases:
+    def test_exact_alias_lookup(self, mgr):
+        assert mgr.get_affix_names_for_alias("拳甲增") == ["手甲武学增伤"]
+        assert mgr.get_affix_names_for_alias("首领增") == ["对首领单位增伤"]
+
+    def test_shared_alias_returns_all_exact_names(self, mgr):
+        names = mgr.get_affix_names_for_alias("蓄力技定音")
+        assert "无名剑法蓄力技增伤" in names
+        assert "无名枪法蓄力技增伤" in names
+        assert "天志垂象蓄力技增伤" in names
+
+    def test_no_fuzzy_fallback(self, mgr):
+        assert mgr.get_affix_names_for_alias("蓄力技") == []
+        assert mgr.get_affix_names_for_alias("不存在的增") == []
+
+    def test_reverse_lookup(self, mgr):
+        assert mgr.get_affix_aliases("剑武学增伤") == ["剑增"]
 
 
 # ─── 词库类型（普通 / 定音）──────────────────────────────
@@ -268,6 +287,10 @@ class TestWeaponTypesAndSchools:
         assert cfg_zun["attr"] == "破竹"
         assert cfg_zun["main"] == {"weapon": "手甲", "martial_art": "悬身拳法"}
         assert cfg_zun["sub"] == {"weapon": "双刀", "martial_art": "断水双诀"}
+
+    def test_graduation_schemes(self, mgr):
+        assert mgr.get_graduation_schemes("鸣金·虹") == ["基础方案"]
+        assert mgr.get_graduation_schemes("未注册流派") == []
 
     def test_school_bindings_valid(self, mgr):
         # 属性合法；主/副武器须在注册表内

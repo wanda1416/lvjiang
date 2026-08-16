@@ -1,13 +1,21 @@
 """燕云「战斗属性」Tab
 
 展示角色最终战斗属性（基础属性 + 装备 + 弓玦），支持：
-- 选择流派 / 玩法 / 弓玦
-- 创建玩法（弹出对话框输入面板属性，反推基础属性并保存）
+- 选择流派 / 基础属性 / 弓玦 / 方案
+- 创建基础属性（弹出对话框输入面板属性，反推基础属性并保存）
 """
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import QLocale, Qt
+from PyQt6.QtCore import (
+    QLocale,
+    QObject,
+    QRunnable,
+    Qt,
+    QThreadPool,
+    QTimer,
+    pyqtSignal,
+)
 from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -27,8 +35,13 @@ from PyQt6.QtWidgets import (
 )
 
 from ....i18n import tr
-from ..combat_attrs import (CombatAttributes, COMBAT_ATTR_FIELDS, format_value,
-                            compute_gongjue_attrs, PLAY_STYLE_FIELD_GROUPS)
+from ..combat_attrs import (
+    COMBAT_ATTR_FIELDS,
+    PLAY_STYLE_FIELD_GROUPS,
+    CombatAttributes,
+    compute_gongjue_attrs,
+    format_value,
+)
 from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from .profile.tab import add_user_nav_buttons
 
@@ -51,12 +64,61 @@ _YELLOW_VALUE_STYLE = (
 )
 
 
+class _GraduationSignals(QObject):
+    finished = pyqtSignal(int, str, str, str, object, object)
+
+
+class _GraduationTask(QRunnable):
+    """在线程池执行耗时公式，并携带请求快照返回结果。"""
+
+    def __init__(
+        self,
+        generation: int,
+        user_name: str,
+        school: str,
+        scheme: str,
+        attrs: CombatAttributes,
+    ) -> None:
+        super().__init__()
+        self.generation = generation
+        self.user_name = user_name
+        self.school = school
+        self.scheme = scheme
+        self.attrs = attrs
+        self.signals = _GraduationSignals()
+
+    def run(self) -> None:
+        try:
+            from ..evaluator.graduation import get_graduation_calculator
+
+            calculator = get_graduation_calculator(self.school, self.scheme)
+            result = calculator.calculate(self.attrs) if calculator else None
+            error = None
+        except Exception as exc:  # UI worker boundary
+            result = None
+            error = exc
+        self.signals.finished.emit(
+            self.generation,
+            self.user_name,
+            self.school,
+            self.scheme,
+            result,
+            error,
+        )
+
+
 class CombatAttrsTab(QWidget):
     """战斗属性 Tab"""
 
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
+        self._graduation_generation = 0
+        self._pending_graduation: tuple[int, str, str, str, CombatAttributes] | None = None
+        self._graduation_timer = QTimer(self)
+        self._graduation_timer.setSingleShot(True)
+        self._graduation_timer.setInterval(180)
+        self._graduation_timer.timeout.connect(self._start_graduation_task)
         self._setup_ui()
         self._load_data()
 
@@ -90,7 +152,7 @@ class CombatAttrsTab(QWidget):
         select_layout.addWidget(self._combo_school)
 
         select_layout.addSpacing(8)
-        select_layout.addWidget(QLabel(tr("玩法")))
+        select_layout.addWidget(QLabel(tr("基础属性")))
         self._combo_play_style = QComboBox()
         self._combo_play_style.setMinimumWidth(170)
         self._combo_play_style.setMinimumHeight(30)
@@ -108,8 +170,16 @@ class CombatAttrsTab(QWidget):
         self._combo_gongjue.currentTextChanged.connect(self._on_gongjue_changed)
         select_layout.addWidget(self._combo_gongjue)
 
+        select_layout.addSpacing(8)
+        select_layout.addWidget(QLabel(tr("方案")))
+        self._combo_scheme = QComboBox()
+        self._combo_scheme.setMinimumWidth(120)
+        self._combo_scheme.setMinimumHeight(30)
+        self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)
+        select_layout.addWidget(self._combo_scheme)
+
         select_layout.addStretch()
-        self._btn_create_play = QPushButton(tr("新建玩法…"))
+        self._btn_create_play = QPushButton(tr("新建基础属性…"))
         self._btn_create_play.setMinimumHeight(30)
         self._btn_create_play.clicked.connect(self._on_create_play_style)
         select_layout.addWidget(self._btn_create_play)
@@ -156,7 +226,7 @@ class CombatAttrsTab(QWidget):
         # 订阅装备变更信号（装备数据 Tab 中穿戴/卸下装备时触发）
         self._host.equipment_changed.connect(self._refresh_display)
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
-        self._host.user_changed.connect(lambda _name: self._load_data())
+        self._host.user_changed.connect(self._on_user_changed)
 
     def _add_graduation_card(self, parent_layout: QVBoxLayout):
         """毕业率展示卡片 — 当前配置下方、攻击属性上方"""
@@ -424,6 +494,7 @@ class CombatAttrsTab(QWidget):
         """加载数据并刷新显示"""
         self._refresh_schools()
         self._refresh_play_styles()
+        self._refresh_schemes()
         self._restore_selection()
         self._refresh_display()
 
@@ -440,13 +511,12 @@ class CombatAttrsTab(QWidget):
         self._combo_school.blockSignals(False)
 
     def _refresh_play_styles(self):
-        """刷新玩法下拉（根据当前选择的流派）"""
+        """刷新基础属性下拉（根据当前选择的流派）。"""
         from ..config import get_play_styles
 
         school = self._get_current_school()
         self._combo_play_style.blockSignals(True)
         self._combo_play_style.clear()
-        self._combo_play_style.addItem("")  # 空选项
 
         if school:
             play_styles = get_play_styles(school)
@@ -455,25 +525,52 @@ class CombatAttrsTab(QWidget):
 
         self._combo_play_style.blockSignals(False)
 
+    def _refresh_schemes(self):
+        """刷新当前流派的毕业率方案；有配置时默认选中第一项。"""
+        from ..config import get_game_config
+
+        school = self._get_current_school()
+        self._combo_scheme.blockSignals(True)
+        self._combo_scheme.clear()
+        if school:
+            for name in get_game_config().get_graduation_schemes(school):
+                self._combo_scheme.addItem(name)
+        self._combo_scheme.blockSignals(False)
+
     def _get_current_school(self) -> str | None:
         """获取当前选择的流派"""
         school = self._combo_school.currentText()
         return school if school else None
 
     def _on_school_changed(self, _school: str):
-        """流派切换 → 刷新玩法下拉"""
+        """流派切换 → 刷新基础属性和方案下拉。"""
         self._refresh_play_styles()
+        self._refresh_schemes()
         self._refresh_display()
         self._save_selection()
 
     def _on_play_style_changed(self, _name: str):
-        """玩法切换"""
+        """基础属性切换。"""
         self._refresh_display()
         self._save_selection()
 
     def _on_gongjue_changed(self, _gongjue: str):
         """弓玦切换"""
         self._refresh_display()
+        self._save_selection()
+
+    def _on_scheme_changed(self, _scheme: str):
+        """毕业率方案切换。"""
+        self._refresh_display()
+
+    def _on_user_changed(self, _name: str) -> None:
+        """切换用户时立即废弃尚未完成的毕业率请求。"""
+        self._graduation_generation += 1
+        self._graduation_timer.stop()
+        self._pending_graduation = None
+        self._dps_value.setText("--")
+        self._graduation_value.setText("--")
+        self._load_data()
         self._save_selection()
 
     def _get_current_gongjue(self) -> str:
@@ -498,6 +595,7 @@ class CombatAttrsTab(QWidget):
             "school": self._combo_school.currentText(),
             "play_style": self._combo_play_style.currentText(),
             "gongjue": self._get_current_gongjue(),
+            "scheme": self._combo_scheme.currentText(),
         }
 
         try:
@@ -531,6 +629,7 @@ class CombatAttrsTab(QWidget):
             school = selection.get("school", "")
             play_style = selection.get("play_style", "")
             gongjue = selection.get("gongjue", "")
+            scheme = selection.get("scheme", "")
 
             # 恢复流派
             if school:
@@ -538,8 +637,9 @@ class CombatAttrsTab(QWidget):
                 if idx >= 0:
                     self._combo_school.setCurrentIndex(idx)
                     self._refresh_play_styles()
+                    self._refresh_schemes()
 
-            # 恢复玩法
+            # 恢复基础属性
             if play_style:
                 idx = self._combo_play_style.findText(play_style)
                 if idx >= 0:
@@ -550,22 +650,48 @@ class CombatAttrsTab(QWidget):
                 idx = self._combo_gongjue.findData(gongjue)
                 if idx >= 0:
                     self._combo_gongjue.setCurrentIndex(idx)
+
+            # 恢复方案；不存在或失效时保留第一项
+            if scheme:
+                idx = self._combo_scheme.findText(scheme)
+                if idx >= 0:
+                    self._combo_scheme.setCurrentIndex(idx)
         except Exception as e:
             logger.debug(f"恢复战斗属性选择失败: {e}")
 
     # ── 属性展示 ──────────────────────────────────────────────
 
+    @staticmethod
+    def _current_resistances() -> tuple[float, float]:
+        """读取等级配置中最高等级的判定抗性与增益抗性。"""
+        from ..config import get_game_config
+
+        configs = get_game_config().get_level_configs()
+        if not configs:
+            return 0.0, 0.0
+        config = max(configs, key=lambda item: item.level)
+        return float(config.judge_resistance or 0), float(config.buff_resistance or 0)
+
     def _refresh_display(self):
         """刷新属性显示"""
-        from ..combat_attrs import apply_three_rate_resistance, apply_bonus_resistance, apply_penetration_resistance, has_resistance, is_three_rate_field, is_penetration_field, WUXIANG_TO_ATTR_PEN
-        
+        from ..combat_attrs import (
+            WUXIANG_TO_ATTR_PEN,
+            apply_bonus_resistance,
+            apply_penetration_resistance,
+            apply_three_rate_resistance,
+            has_resistance,
+            is_penetration_field,
+            is_three_rate_field,
+        )
+
         # 一次性计算所有中间结果，避免重复加载装备数据
         base_attrs = self._get_base_attrs()
         equip_base_attrs = self._compute_equip_base_attrs()
         equip_attrs = self._compute_equip_attrs()
         gongjue_attrs = self._compute_gongjue_attrs()
         combat_attrs = base_attrs + equip_base_attrs + equip_attrs + gongjue_attrs
-        
+        judge_resistance, buff_resistance = self._current_resistances()
+
         # 处理无相穿透转换：根据流派属性转换为对应的属攻穿透
         if equip_attrs.wuxiang_pen > 0:
             school = self._get_current_school()
@@ -585,27 +711,80 @@ class CombatAttrsTab(QWidget):
                 if has_resistance(field_name):
                     # 有抗性：显示 原始值(抗性值)
                     if is_three_rate_field(field_name):
-                        capped = apply_three_rate_resistance(field_name, value)
+                        capped = apply_three_rate_resistance(
+                            field_name, value, judge_resistance,
+                        )
                     elif is_penetration_field(field_name):
-                        # 穿透类：基础值(从玩法) + 装备定音 / 1.15
+                        # 穿透类：基础配置值 + 装备定音 / 1.15
                         base_val = getattr(base_attrs, field_name, 0.0)
                         equip_val = getattr(equip_attrs, field_name, 0.0)
-                        capped = apply_penetration_resistance(equip_val, base_val)
+                        capped = apply_penetration_resistance(
+                            equip_val, base_val, buff_resistance,
+                        )
                         # 显示：原始值(生效值)，其中原始值 = 基础 + 装备
                         original = base_val + equip_val
                         self._set_resistance_text(label, original, capped, unit)
                         continue
                     else:
                         # 增伤类：整个值 / 1.15
-                        capped = apply_bonus_resistance(value)
+                        capped = apply_bonus_resistance(
+                            value, resistance=buff_resistance,
+                        )
                     self._set_resistance_text(label, value, capped, unit)
                 else:
                     label.setText(format_value(value, unit))
 
-        self._refresh_attr_penetration(base_attrs, equip_attrs)
+        self._refresh_attr_penetration(base_attrs, equip_attrs, buff_resistance)
         self._refresh_attr_bonus(combat_attrs)
-        self._refresh_extra_attrs(combat_attrs.extra_attrs)
-        self._refresh_graduation(combat_attrs)
+        self._refresh_extra_attrs(combat_attrs.extra_attrs, buff_resistance)
+        graduation_attrs = CombatAttributes.from_dict(combat_attrs.to_dict())
+        for field_name in ("precision", "crit_rate", "intent_rate"):
+            setattr(
+                graduation_attrs,
+                field_name,
+                apply_three_rate_resistance(
+                    field_name, getattr(combat_attrs, field_name), judge_resistance,
+                ),
+            )
+        for field_name in (
+            "all_skill_bonus", "boss_bonus", "player_bonus",
+            "single_qs_bonus", "group_qs_bonus",
+        ):
+            setattr(
+                graduation_attrs,
+                field_name,
+                apply_bonus_resistance(
+                    getattr(combat_attrs, field_name),
+                    resistance=buff_resistance,
+                ),
+            )
+        school = self._get_current_school()
+        school_attr = None
+        if school:
+            from ..config import get_game_config
+            school_attr = get_game_config().get_school_attr(school)
+        target_pen = WUXIANG_TO_ATTR_PEN.get(school_attr or "")
+        for field_name in (
+            "outer_pen", "mingjin_pen", "lieshi_pen", "pozhua_pen", "qiansi_pen",
+        ):
+            equipment_value = getattr(equip_attrs, field_name)
+            if field_name == target_pen:
+                equipment_value += equip_attrs.wuxiang_pen
+            setattr(
+                graduation_attrs,
+                field_name,
+                apply_penetration_resistance(
+                    equipment_value,
+                    getattr(base_attrs, field_name),
+                    buff_resistance,
+                ),
+            )
+        graduation_attrs.extra_attrs = {
+            key: apply_bonus_resistance(value, resistance=buff_resistance)
+            if has_resistance(key) else value
+            for key, value in combat_attrs.extra_attrs.items()
+        }
+        self._schedule_graduation(graduation_attrs)
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""
@@ -655,11 +834,14 @@ class CombatAttrsTab(QWidget):
         self._attr_bonus_name.setToolTip(tooltip)
         self._attr_bonus_label.setToolTip(tooltip)
 
-    def _refresh_attr_penetration(self, base_attrs: CombatAttributes,
-                                  equip_attrs: CombatAttributes) -> None:
+    def _refresh_attr_penetration(
+        self,
+        base_attrs: CombatAttributes,
+        equip_attrs: CombatAttributes,
+        buff_resistance: float,
+    ) -> None:
         """显示当前流派属攻穿透，悬浮时展示完整四系明细。"""
-        from ..combat_attrs import (SCHOOL_ATTR_FIELD_MAP,
-                                    apply_penetration_resistance)
+        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP, apply_penetration_resistance
         from ..config import get_game_config
 
         attr_fields = (
@@ -684,7 +866,9 @@ class CombatAttrsTab(QWidget):
             if field == current_field:
                 equip_value += getattr(equip_attrs, "wuxiang_pen", 0.0)
             original = base_value + equip_value
-            effective = apply_penetration_resistance(equip_value, base_value)
+            effective = apply_penetration_resistance(
+                equip_value, base_value, buff_resistance,
+            )
             values[field] = (original, effective)
             details.append(
                 f"{name}穿透：{format_value(original, '')}"
@@ -724,7 +908,9 @@ class CombatAttrsTab(QWidget):
             f"{effective_text}</span>)"
         )
 
-    def _refresh_extra_attrs(self, extra_attrs: dict[str, float]):
+    def _refresh_extra_attrs(
+        self, extra_attrs: dict[str, float], buff_resistance: float,
+    ) -> None:
         """将动态增益填入武器和技能各自的两个固定槽位。"""
         from ..combat_attrs import apply_bonus_resistance, has_resistance
 
@@ -748,10 +934,14 @@ class CombatAttrsTab(QWidget):
             overflow_tip = "\n".join(
                 f"{key}：{format_value(value, '%')}" for key, value in overflow
             )
-            for (key, value), (widget, name_label, val_label) in zip(items, slots):
+            for (key, value), (widget, name_label, val_label) in zip(
+                items, slots, strict=False,
+            ):
                 name_label.setText(tr(key))
                 if has_resistance(key):
-                    capped = apply_bonus_resistance(value)
+                    capped = apply_bonus_resistance(
+                        value, resistance=buff_resistance,
+                    )
                     self._set_resistance_text(val_label, value, capped, "%")
                 else:
                     val_label.setText(format_value(value, "%"))
@@ -762,63 +952,104 @@ class CombatAttrsTab(QWidget):
         fill_slots(weapon_items, self._weapon_bonus_slots)
         fill_slots(skill_items, self._skill_bonus_slots)
 
-    def _refresh_graduation(self, combat_attrs: CombatAttributes) -> None:
-        """计算并刷新毕业率显示"""
-        from ..evaluator.graduation import get_graduation_calculator
-
+    def _schedule_graduation(self, combat_attrs: CombatAttributes) -> None:
+        """延迟提交毕业率计算；新请求会使旧结果自动失效。"""
+        self._graduation_generation += 1
+        generation = self._graduation_generation
+        self._graduation_timer.stop()
         school = self._get_current_school()
-        if not school:
+        scheme = self._combo_scheme.currentText()
+        user_name = self._host.active_user_name() or ""
+        self._dps_value.setToolTip("")
+        self._graduation_value.setToolTip("")
+        if not school or not scheme or not user_name:
+            self._pending_graduation = None
             self._dps_value.setText("--")
             self._graduation_value.setText("--")
             return
 
-        calc = get_graduation_calculator(school)
-        if calc is None:
+        attrs_snapshot = CombatAttributes.from_dict(combat_attrs.to_dict())
+        self._pending_graduation = (
+            generation, user_name, school, scheme, attrs_snapshot,
+        )
+        self._dps_value.setText("--")
+        self._graduation_value.setText("--")
+        self._graduation_timer.start()
+
+    def _start_graduation_task(self) -> None:
+        request = self._pending_graduation
+        if request is None:
+            return
+        generation, user_name, school, scheme, attrs = request
+        if generation != self._graduation_generation:
+            return
+        self._dps_value.setText(tr("计算中…"))
+        self._graduation_value.setText(tr("计算中…"))
+        task = _GraduationTask(generation, user_name, school, scheme, attrs)
+        task.signals.finished.connect(self._on_graduation_finished)
+        QThreadPool.globalInstance().start(task)
+
+    def _on_graduation_finished(
+        self,
+        generation: int,
+        user_name: str,
+        school: str,
+        scheme: str,
+        result,
+        error,
+    ) -> None:
+        """仅接收仍与当前用户和配置一致的后台计算结果。"""
+        if (
+            generation != self._graduation_generation
+            or user_name != (self._host.active_user_name() or "")
+            or school != self._get_current_school()
+            or scheme != self._combo_scheme.currentText()
+        ):
+            return
+        if error is not None:
+            logger.error(f"毕业率计算失败: {error}")
+            self._dps_value.setText(tr("错误"))
+            self._graduation_value.setText(tr("错误"))
+            return
+        if result is None:
             self._dps_value.setText(tr("未实现"))
             self._graduation_value.setText(tr("未实现"))
             return
-
-        try:
-            result = calc.calculate(combat_attrs)
-            self._dps_value.setText(f"{result.dps:,.0f}")
-            self._graduation_value.setText(f"{result.graduation_rate * 100:.2f}%")
-            tooltip = (
-                f"{tr('总伤害')}: {result.total_damage:,.0f}\n"
-                f"{tr('基准DPS')}: {result.baseline_dps:,.2f}\n"
-                f"{tr('战斗时间')}: {result.combat_time}s"
-            )
-            self._dps_value.setToolTip(tooltip)
-            self._graduation_value.setToolTip(tooltip)
-        except Exception as e:
-            logger.error(f"毕业率计算失败: {e}")
-            self._dps_value.setText(tr("错误"))
-            self._graduation_value.setText(tr("错误"))
+        self._dps_value.setText(f"{result.dps:,.0f}")
+        self._graduation_value.setText(f"{result.graduation_rate * 100:.2f}%")
+        tooltip = (
+            f"{tr('总伤害')}: {result.total_damage:,.0f}\n"
+            f"{tr('基准DPS')}: {result.baseline_dps:,.2f}\n"
+            f"{tr('战斗时间')}: {result.combat_time}s"
+        )
+        self._dps_value.setToolTip(tooltip)
+        self._graduation_value.setToolTip(tooltip)
 
     def _compute_combat_attrs(self) -> CombatAttributes:
-        """计算最终战斗属性 = 基础属性(玩法) + 装备基础攻击 + 装备词条 + 弓玦属性"""
+        """计算最终战斗属性 = 基础属性 + 装备基础攻击 + 装备词条 + 弓玦属性。"""
         base_attrs = self._get_base_attrs()
         equip_base_attrs = self._compute_equip_base_attrs()
         equip_attrs = self._compute_equip_attrs()
         gongjue_attrs = self._compute_gongjue_attrs()
         result = base_attrs + equip_base_attrs + equip_attrs + gongjue_attrs
-        
+
         # 处理无相穿透转换：根据流派属性转换为对应的属攻穿透
         if equip_attrs.wuxiang_pen > 0:
             school = self._get_current_school()
             if school:
-                from ..config import get_game_config
                 from ..combat_attrs import WUXIANG_TO_ATTR_PEN
+                from ..config import get_game_config
                 gc = get_game_config()
                 school_attr = gc.get_school_attr(school)
                 if school_attr and school_attr in WUXIANG_TO_ATTR_PEN:
                     target_field = WUXIANG_TO_ATTR_PEN[school_attr]
                     current = getattr(result, target_field, 0.0)
                     setattr(result, target_field, current + equip_attrs.wuxiang_pen)
-        
+
         return result
 
     def _get_base_attrs(self) -> CombatAttributes:
-        """获取当前玩法的基础属性"""
+        """获取当前选择的基础属性。"""
         play_style = self._combo_play_style.currentText()
         if not play_style:
             return CombatAttributes()
@@ -837,8 +1068,9 @@ class CombatAttrsTab(QWidget):
 
     def _compute_equip_attrs(self) -> CombatAttributes:
         """计算装备词条属性总和（含五维转换，不含装备基础攻击值）"""
-        from ..combat_attrs import aggregate_equipment_attrs
         from lvjiang.core.config import SessionManager
+
+        from ..combat_attrs import aggregate_equipment_attrs
 
         user_name = self._host.active_user_name()
         if not user_name:
@@ -857,9 +1089,10 @@ class CombatAttrsTab(QWidget):
 
         武器/环/佩 提供基础外功攻击，品阶不同数值不同。
         """
+        from lvjiang.core.config import SessionManager
+
         from ..combat_attrs import compute_equip_base_attrs
         from ..config import get_game_config
-        from lvjiang.core.config import SessionManager
 
         user_name = self._host.active_user_name()
         if not user_name:
@@ -895,10 +1128,10 @@ class CombatAttrsTab(QWidget):
             logger.error(f"计算弓玦属性失败: {e}")
             return CombatAttributes()
 
-    # ── 创建玩法（反推基础属性）────────────────────────────────
+    # ── 创建基础属性（反推并保存）──────────────────────────────
 
     def _on_create_play_style(self):
-        """创建玩法按钮 → 弹出对话框"""
+        """创建基础属性按钮 → 弹出对话框。"""
         school = self._get_current_school()
         if not school:
             QMessageBox.warning(self, tr("无法创建"), tr("请先选择一个流派"))
@@ -917,7 +1150,7 @@ class CombatAttrsTab(QWidget):
         name = dlg.get_play_style_name()
 
         if not name:
-            QMessageBox.warning(self, tr("无法保存"), tr("玩法名称不能为空"))
+            QMessageBox.warning(self, tr("无法保存"), tr("基础属性名称不能为空"))
             return
 
         # 检查重名
@@ -925,8 +1158,8 @@ class CombatAttrsTab(QWidget):
         existing = get_play_styles(school)
         if name in existing:
             ret = QMessageBox.question(
-                self, tr("玩法已存在"),
-                tr("玩法「{name}」已存在，是否覆盖？").format(name=name),
+                self, tr("基础属性已存在"),
+                tr("基础属性「{name}」已存在，是否覆盖？").format(name=name),
             )
             if ret != QMessageBox.StandardButton.Yes:
                 return
@@ -940,7 +1173,7 @@ class CombatAttrsTab(QWidget):
         equip_attrs = self._compute_equip_attrs()
         gongjue_attrs = self._compute_gongjue_attrs()
         base_attrs = panel_attrs - equip_base_attrs - equip_attrs - gongjue_attrs
-        
+
         # 穿透类特殊处理：用户填写的就是基础值，直接保存
         from ..combat_attrs import PENETRATION_FIELDS
         for pen_field in PENETRATION_FIELDS:
@@ -951,7 +1184,7 @@ class CombatAttrsTab(QWidget):
         self._save_play_style(school, name, base_attrs)
         QMessageBox.information(
             self, tr("保存成功"),
-            tr("玩法「{name}」已保存到流派「{school}」").format(name=name, school=school),
+            tr("基础属性「{name}」已保存到流派「{school}」").format(name=name, school=school),
         )
 
         # 刷新
@@ -959,9 +1192,9 @@ class CombatAttrsTab(QWidget):
         self._combo_play_style.setCurrentText(name)
 
     def _save_play_style(self, school: str, name: str, base_attrs: CombatAttributes):
-        """保存玩法到 session 配置（只保存 PLAY_STYLE_FIELD_GROUPS 中定义的字段）"""
-        from ..config import save_play_style, get_game_config
-        from ..combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
+        """保存基础属性到 session 配置（仅保存允许的字段）。"""
+        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP
+        from ..config import get_game_config, save_play_style
 
         # 解析占位符：根据流派属性获取实际字段名
         gc = get_game_config()
@@ -989,16 +1222,16 @@ class CombatAttrsTab(QWidget):
         try:
             save_play_style(school, name, play_style_data)
         except Exception as e:
-            logger.error(f"保存玩法失败: {e}")
+            logger.error(f"保存基础属性失败: {e}")
             raise
 
 
 class _CreatePlayStyleDialog(QDialog):
-    """创建玩法对话框 — 输入面板属性，反推基础属性"""
+    """创建基础属性对话框 — 输入面板属性，反推并保存基础值。"""
 
     def __init__(self, parent=None, school_attr: str | None = None):
         super().__init__(parent)
-        self.setWindowTitle(tr("创建玩法"))
+        self.setWindowTitle(tr("创建基础属性"))
         self.setMinimumWidth(720)
         self._school_attr = school_attr
         self._edits: dict[str, QLineEdit] = {}
@@ -1006,7 +1239,7 @@ class _CreatePlayStyleDialog(QDialog):
 
     def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
         """解析占位符字段，返回实际字段列表"""
-        from ..combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
+        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP
 
         if not self._school_attr or self._school_attr not in SCHOOL_ATTR_FIELD_MAP:
             # 无流派属性时，跳过属攻相关字段
@@ -1041,12 +1274,12 @@ class _CreatePlayStyleDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 14)
         layout.setSpacing(8)
 
-        title = QLabel(tr("创建玩法"))
+        title = QLabel(tr("创建基础属性"))
         title.setStyleSheet("font-size: 18px; font-weight: 600;")
         layout.addWidget(title)
 
         hint = QLabel(
-            tr("填写玩法本身提供的面板属性。装备专属属性无需填写；"
+            tr("填写这套基础配置对应的面板属性。装备专属属性无需填写；"
                "外功穿透和属攻穿透仅填写基础值，不包含装备定音。")
         )
         hint.setStyleSheet(
@@ -1104,11 +1337,11 @@ class _CreatePlayStyleDialog(QDialog):
         layout.addWidget(form_widget)
 
         name_row = QHBoxLayout()
-        name_label = QLabel(tr("玩法名称"))
+        name_label = QLabel(tr("基础属性名称"))
         name_label.setStyleSheet("font-size: 13px; font-weight: 600;")
         name_row.addWidget(name_label)
         self._edit_name = QLineEdit()
-        self._edit_name.setPlaceholderText(tr("输入玩法名称"))
+        self._edit_name.setPlaceholderText(tr("输入基础属性名称"))
         self._edit_name.setMaxLength(20)
         self._edit_name.setMinimumHeight(32)
         name_row.addWidget(self._edit_name)
@@ -1192,7 +1425,7 @@ class _CreatePlayStyleDialog(QDialog):
     def _on_save(self):
         """保存按钮"""
         if not self._edit_name.text().strip():
-            QMessageBox.warning(self, tr("名称为空"), tr("玩法名称不能为空"))
+            QMessageBox.warning(self, tr("名称为空"), tr("基础属性名称不能为空"))
             return
         self.accept()
 
@@ -1212,5 +1445,5 @@ class _CreatePlayStyleDialog(QDialog):
         return attrs
 
     def get_play_style_name(self) -> str:
-        """获取玩法名称"""
+        """获取基础属性配置名称。"""
         return self._edit_name.text().strip()

@@ -8,7 +8,6 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
@@ -28,7 +27,7 @@ class CharacterDetailTab(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         # 嵌入战斗属性 Tab
         self._combat_attrs_tab = CombatAttrsTab(self._host, self)
         layout.addWidget(self._combat_attrs_tab)

@@ -160,6 +160,38 @@ class TestAffixParts:
         parts = _load_yaml(tmp_attrs)["affix_parts"]
         assert parts.get("会心率X") == ["武器"] and "会心率" not in parts
 
+    def test_external_aliases_save_and_deduplicate(
+        self, qtbot, tmp_attrs, monkeypatch,
+    ):
+        panel = AffixCapsPanel()
+        qtbot.addWidget(panel)
+        button = affix_caps_panel.QPushButton(panel)
+        monkeypatch.setattr(
+            affix_caps_panel.QInputDialog, "getMultiLineText",
+            staticmethod(lambda *a, **k: ("剑增\n剑增\n主剑增", True)),
+        )
+        panel._edit_external_aliases("剑武学增伤", button)
+        aliases = _load_yaml(tmp_attrs)["affix_aliases"]["剑武学增伤"]
+        assert aliases == ["剑增", "主剑增"]
+
+    def test_rename_alias_migrates_external_aliases(
+        self, qtbot, tmp_attrs, monkeypatch,
+    ):
+        panel = AffixCapsPanel()
+        qtbot.addWidget(panel)
+        rows = [panel._affix_list.item(i).text()
+                for i in range(panel._affix_list.count())]
+        panel._affix_list.setCurrentRow(rows.index("会心率"))
+        panel._data.setdefault("affix_aliases", {})["会心率"] = ["暴击"]
+        monkeypatch.setattr(
+            affix_caps_panel.QInputDialog, "getText",
+            staticmethod(lambda *a, **k: ("会心率X", True)),
+        )
+        panel._rename_alias("会心率")
+        mapping = _load_yaml(tmp_attrs)["affix_aliases"]
+        assert mapping["会心率X"] == ["暴击"]
+        assert "会心率" not in mapping
+
 
 # ─── 流派配置行编辑往返 ────────────────────────────────────
 
@@ -181,6 +213,8 @@ class TestSchoolPanel:
         assert panel._edit_main_martial.text() == "斩雪刀法"
         assert panel._combo_sub_weapon.currentText() == "陌刀"
         assert panel._edit_sub_martial.text() == "十方破阵"
+        assert panel._scheme_list.count() == 1
+        assert panel._scheme_list.item(0).text() == "基础方案"
 
     def test_field_edit_saves(self, qtbot, tmp_attrs):
         panel = SchoolPanel()

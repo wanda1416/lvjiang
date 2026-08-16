@@ -75,6 +75,10 @@ class GameConfigManager:
         self._affix_to_category: dict[str, str] = {}
         # 词条部位：词条名 → [部位中文名]（顶层 affix_parts，缺省全部位）
         self._affix_parts: dict[str, list[str]] = {}
+        # 外部简称：简称 → [精准词条名]（顶层 affix_aliases）
+        self._external_alias_to_affixes: dict[str, list[str]] = {}
+        # 精准词条名 → [外部简称]
+        self._affix_external_aliases: dict[str, list[str]] = {}
         # 武器类型注册表（顶层 weapon_types）
         self._weapon_types: list[str] = []
         # 武器 → 武学增效词条映射（weapon_types 中每项的 wuxue_affix 字段）
@@ -107,6 +111,8 @@ class GameConfigManager:
         self._affix_categories.clear()
         self._affix_to_category.clear()
         self._affix_parts.clear()
+        self._external_alias_to_affixes.clear()
+        self._affix_external_aliases.clear()
         self._weapon_types.clear()
         self._weapon_wuxue_affixes.clear()
         self._schools.clear()
@@ -147,6 +153,21 @@ class GameConfigManager:
             valid = [p for p in parts if p in EQUIP_PART_NAMES]
             if valid:
                 self._affix_parts[str(name)] = valid
+
+        # ── affix_aliases（精准词条名→外部表格等系统使用的多个简称）──
+        raw_external_aliases = data.get("affix_aliases") or {}
+        for affix_name, aliases in raw_external_aliases.items():
+            if not isinstance(aliases, list):
+                continue
+            exact_name = str(affix_name)
+            cleaned = list(dict.fromkeys(
+                str(alias).strip() for alias in aliases if str(alias).strip()
+            ))
+            if not cleaned:
+                continue
+            self._affix_external_aliases[exact_name] = cleaned
+            for alias in cleaned:
+                self._external_alias_to_affixes.setdefault(alias, []).append(exact_name)
 
         # ── base_attrs ──
         # _follow: <目标部位> 声明该部位跟随目标部位的数值（单层解析）
@@ -299,6 +320,14 @@ class GameConfigManager:
         """词条可出现的装备部位（未配置 = 全部七个部位）"""
         return list(self._affix_parts.get(affix_name) or EQUIP_PART_NAMES)
 
+    def get_affix_aliases(self, affix_name: str) -> list[str]:
+        """返回精准词条配置的外部简称。"""
+        return list(self._affix_external_aliases.get(affix_name) or [])
+
+    def get_affix_names_for_alias(self, alias: str) -> list[str]:
+        """严格按外部简称返回精准词条名，不执行任何模糊匹配。"""
+        return list(self._external_alias_to_affixes.get(alias) or [])
+
     # ── 词库类型 ────────────────────────────────────────
 
     def get_affix_pool(self, affix_name: str) -> str:
@@ -419,6 +448,16 @@ class GameConfigManager:
         """获取流派的属性类型（鸣金/裂石/破竹/牵丝）"""
         cfg = self._schools.get(school, {})
         return cfg.get("attr") if cfg else None
+
+    def get_graduation_schemes(self, school: str) -> list[str]:
+        """获取流派已注册的毕业率方案，保持配置声明顺序。"""
+        cfg = self._schools.get(school, {})
+        schemes = cfg.get("schemes") if cfg else None
+        if not isinstance(schemes, list):
+            return []
+        return list(dict.fromkeys(
+            str(name).strip() for name in schemes if str(name).strip()
+        ))
 
     # ── 等级配置 ────────────────────────────────────────────
 

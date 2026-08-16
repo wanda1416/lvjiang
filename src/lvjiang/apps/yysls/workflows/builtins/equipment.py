@@ -42,12 +42,13 @@ def _yysls_rich_parse(base: dict) -> dict:
 def _to_equipment(raw_data: dict) -> dict:
     """解析装备 OCR 原始数据为标准装备字典
 
-    返回 EquipmentData.to_dict() 结果，支持 DSL 链式字段访问：
-    $weapon.affix_1.value / $weapon.base_attr.name 等。
+    返回 EquipmentData.to_dict() 结果，并自动计算 _fp 指纹字段，
+    支持 DSL 链式字段访问：$weapon.affix_1.value / $weapon._fp 等。
 
     .wf 用法:
         scan [equip_weapon_detail] as $result
         eval main_weapon = to_equipment($result)
+        log $main_weapon._fp
         collect $main_weapon
     """
     if not isinstance(raw_data, dict) or not raw_data:
@@ -55,10 +56,13 @@ def _to_equipment(raw_data: dict) -> dict:
         return {}
 
     from ...equip_parser import get_equipment_parser
+    from ...equip_parser.models import make_fingerprint
     parser = get_equipment_parser()
 
     try:
-        return parser.parse(raw_data).to_dict()
+        result = parser.parse(raw_data).to_dict()
+        result["_fp"] = make_fingerprint(result)
+        return result
     except Exception as e:
         logger.warning(f"to_equipment: 解析失败: {e}")
         return {}
@@ -70,29 +74,17 @@ def _to_equipment(raw_data: dict) -> dict:
 def _make_fingerprint(equip_data: dict, *args) -> str:
     """基于装备数据生成去重指纹（MD5 前 8 位 hex）
 
-    指纹由 type + level + quality + chengyin + 全部词条(name:value) 组成。
+    指纹由 type + level + quality + is_chengyin + 全部词条(name:value) 组成。
     空数据或空字典返回空字符串。
 
+    注意：to_equipment 已自动计算 _fp 字段，通常无需再调用此函数。
+    仅当需要对外部 dict 计算指纹时使用。
+
     .wf 用法:
-        eval $equip = to_equipment($scan)
         eval $fp = make_fingerprint($equip)
     """
-    if not isinstance(equip_data, dict) or not equip_data:
-        return ""
-    import hashlib
-    parts = [
-        str(equip_data.get("type", "") or ""),
-        str(equip_data.get("level", "") or ""),
-        str(equip_data.get("quality", "") or ""),
-        str(equip_data.get("chengyin", "") or ""),
-    ]
-    # 词条以 affix_1 ~ affix_5 形式存储在 dict 中
-    for i in range(1, 6):
-        affix = equip_data.get(f"affix_{i}")
-        if isinstance(affix, dict) and affix.get("name"):
-            parts.append(f"{affix['name']}:{affix.get('value', '')}")
-    raw = "+".join(parts)
-    return hashlib.md5(raw.encode()).hexdigest()[:8]
+    from ...equip_parser.models import make_fingerprint
+    return make_fingerprint(equip_data)
 
 
 # ─── 词条上限查询 ───────────────────────────────────────

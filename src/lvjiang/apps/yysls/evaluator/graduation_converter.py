@@ -245,7 +245,7 @@ def _compile_v2(
     compiler = ProgramCompiler(workbook_model, bindings)
     program = compiler.compile({
         name: OUTPUTS[name]
-        for name in ("combat_time", "total_damage", "dps", "graduation_rate")
+        for name in ("combat_time", "total_damage", "dps")
     })
     baseline_attrs = _baseline_attrs(workbook_model, affix_names)
     input_values = []
@@ -259,7 +259,7 @@ def _compile_v2(
     workbook_runtime = FormulaModel(workbook_model)
     reference = {
         name: float(workbook_runtime.value(OUTPUTS[name]))
-        for name in compiled_outputs
+        for name in ("combat_time", "total_damage", "dps", "graduation_rate")
     }
     for name, actual in reference.items():
         sheet, coordinate = OUTPUTS[name].split("!", 1)
@@ -276,6 +276,11 @@ def _compile_v2(
             raise FormulaError(
                 f"编译后的 {name}={actual} 与 Excel 公式结果 {expected} 不一致"
             )
+    if reference["graduation_rate"] <= 0:
+        raise FormulaError("Excel 的毕业率必须大于 0，无法提取 100% 基准 DPS")
+    graduation_baseline_dps = (
+        reference["dps"] / reference["graduation_rate"]
+    )
     return {
         "schema_version": 2,
         "school": school,
@@ -283,6 +288,7 @@ def _compile_v2(
         "baseline_attrs": baseline_attrs,
         "environment": environment,
         "reference": reference,
+        "graduation_baseline_dps": graduation_baseline_dps,
         "program": program,
     }
 
@@ -369,6 +375,10 @@ def validate_model(model: dict[str, Any]) -> dict[str, float]:
         for spec in model["program"]["inputs"]
     ]
     results = ProgramRuntime(model["program"], values).outputs()
+    baseline_dps = float(model["graduation_baseline_dps"])
+    if baseline_dps <= 0:
+        raise FormulaError("100%毕业率基准 DPS 必须大于 0")
+    results["graduation_rate"] = results["dps"] / baseline_dps
     for name, expected in model["reference"].items():
         if abs(results[name] - float(expected)) > max(1e-6, abs(float(expected)) * 1e-10):
             raise FormulaError(f"compiled {name} does not match its reference value")

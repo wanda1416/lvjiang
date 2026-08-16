@@ -56,7 +56,9 @@ class GenericCalculator(GraduationCalculator):
         self._data = self._load_data(school_name, scheme_name)
         if self._data.get("schema_version") != 2:
             raise ValueError(f"unsupported graduation model for {school_name}")
-        self._baseline = float(self._data["reference"]["dps"])
+        self._baseline = float(self._data["graduation_baseline_dps"])
+        if self._baseline <= 0:
+            raise ValueError("100%毕业率基准 DPS 必须大于 0")
         self._combat_time = float(self._data["environment"]["combat_time"])
 
     @staticmethod
@@ -80,10 +82,11 @@ class GenericCalculator(GraduationCalculator):
             for spec in self._data["program"]["inputs"]
         ]
         outputs = ProgramRuntime(self._data["program"], values).outputs()
+        graduation_rate = outputs["dps"] / self._baseline
         return GraduationResult(
             total_damage=outputs["total_damage"],
             dps=outputs["dps"],
-            graduation_rate=outputs["graduation_rate"],
+            graduation_rate=graduation_rate,
             baseline_dps=self._baseline,
             combat_time=outputs["combat_time"],
         )
@@ -120,6 +123,35 @@ def get_graduation_scheme_combat_attrs(
     if model.get("schema_version") != 2:
         raise ValueError("方案不是当前 v2 格式，请重新导入 Excel")
     return CombatAttributes.from_dict(model["baseline_attrs"])
+
+
+def get_graduation_scheme_metrics(
+    school_name: str, scheme_name: str,
+) -> tuple[float, float]:
+    """返回方案满值 ADPS 与可校正的 100% 毕业率基准 DPS。"""
+    model = GenericCalculator._load_data(school_name, scheme_name)
+    return (
+        float(model["reference"]["dps"]),
+        float(model["graduation_baseline_dps"]),
+    )
+
+
+def set_graduation_baseline_dps(
+    school_name: str, scheme_name: str, value: float,
+) -> None:
+    """原子更新方案的 100% 毕业率基准 DPS。"""
+    value = float(value)
+    if value <= 0:
+        raise ValueError("100%毕业率基准 DPS 必须大于 0")
+    model = dict(GenericCalculator._load_data(school_name, scheme_name))
+    if model.get("schema_version") != 2:
+        raise ValueError("方案不是当前 v2 格式，请重新导入 Excel")
+    model["graduation_baseline_dps"] = value
+    from .graduation_converter import scheme_path, write_model
+
+    destination = _DATA_DIR / scheme_path(school_name, scheme_name).name
+    write_model(destination, model)
+    invalidate_graduation_cache()
 
 
 def get_graduation_calculator(

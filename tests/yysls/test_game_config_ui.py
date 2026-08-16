@@ -246,8 +246,12 @@ class TestSchoolPanel:
         panel._on_scheme_selected(0)
         assert old_panel.parent() is None
         assert not old_panel.isVisible()
-        # 当前面板 + 末尾 stretch，不允许旧卡片残留在布局里。
-        assert panel._ps_scroll_layout.count() == 2
+        # 当前面板 + DPS 校正区 + 末尾 stretch，不允许旧卡片残留。
+        assert panel._ps_scroll_layout.count() == 3
+        assert panel._scheme_baseline_edit is not None
+        assert panel._scheme_baseline_edit.objectName() == (
+            "graduationBaselineDpsEdit"
+        )
 
     def test_external_navigation_selects_school_and_base_attr(
         self, qtbot, tmp_attrs, monkeypatch,

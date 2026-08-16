@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,8 @@ from lvjiang.apps.yysls.evaluator.graduation import (
     get_graduation_calculator,
     get_graduation_scheme_combat_attrs,
     get_graduation_scheme_inputs,
+    invalidate_graduation_cache,
+    set_graduation_baseline_dps,
 )
 from lvjiang.apps.yysls.evaluator.graduation_converter import convert_workbook
 from lvjiang.apps.yysls.evaluator.graduation_program import ProgramRuntime
@@ -70,6 +73,9 @@ def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
         for spec in model["program"]["inputs"]
     ]
     actual = ProgramRuntime(model["program"], values).outputs()
+    actual["graduation_rate"] = (
+        actual["dps"] / model["graduation_baseline_dps"]
+    )
     for name, expected in model["reference"].items():
         assert actual[name] == pytest.approx(expected, rel=1e-10, abs=1e-6)
     assert f"{actual['graduation_rate'] * 100:.2f}%" == "100.00%"
@@ -88,8 +94,32 @@ def test_runtime_uses_non_mingjin_element_inputs() -> None:
 def test_runtime_reports_workbook_baseline() -> None:
     calculator = get_graduation_calculator("裂石·威")
     assert calculator is not None
-    assert calculator.baseline_dps() == pytest.approx(141520.374878871)
+    assert calculator.baseline_dps() == pytest.approx(141520.37)
     assert calculator.combat_time() == pytest.approx(101.4)
+
+
+def test_editable_baseline_dps_recalibrates_graduation_rate(
+    tmp_path, monkeypatch,
+) -> None:
+    import lvjiang.apps.yysls.evaluator.graduation as graduation
+
+    source = DATA_DIR / "鸣金·虹_基础方案.json"
+    shutil.copy(source, tmp_path / source.name)
+    monkeypatch.setattr(graduation, "_DATA_DIR", tmp_path)
+    invalidate_graduation_cache()
+    try:
+        attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")
+        original = get_graduation_calculator("鸣金·虹", "基础方案")
+        assert original is not None
+        dps = original.calculate(attrs).dps
+        set_graduation_baseline_dps("鸣金·虹", "基础方案", dps * 2)
+        calibrated = get_graduation_calculator("鸣金·虹", "基础方案")
+        assert calibrated is not None
+        result = calibrated.calculate(attrs)
+        assert result.dps == pytest.approx(dps)
+        assert result.graduation_rate == pytest.approx(0.5)
+    finally:
+        invalidate_graduation_cache()
 
 
 @pytest.mark.parametrize("school", SCHOOLS)

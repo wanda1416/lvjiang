@@ -32,6 +32,12 @@ from .profile_models import (
     parse_sync_key,
     parse_sync_targets,
 )
+from .play_styles import (
+    delete_play_style,
+    get_play_styles,
+    rename_play_style,
+    save_play_style,
+)
 from .profile_store import (
     get_active_group,
     get_alert_history,
@@ -90,4 +96,9 @@ __all__ = [
     "set_alert_history",
     "mark_alert",
     "unmark_alert",
+    # 玩法配置存储
+    "get_play_styles",
+    "save_play_style",
+    "delete_play_style",
+    "rename_play_style",
 ]

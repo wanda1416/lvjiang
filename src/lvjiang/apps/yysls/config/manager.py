@@ -357,6 +357,36 @@ class GameConfigManager:
         """返回所有已配置的词条类别名"""
         return list(self._affix_caps.keys())
 
+    # ── 装备基础属性查询 ────────────────────────────────────────
+
+    def get_base_attr_values(
+        self, part: str, level: int, quality: str
+    ) -> tuple[int | None, int | None]:
+        """查询装备部位的基础属性值
+
+        Args:
+            part: 部位 key（weapon/ring/pendant/head/chest/leg/wrist）
+            level: 装备等级
+            quality: 品阶（gold/purple/blue）
+
+        Returns:
+            (min_val, max_val): 区间属性返回不同值，点值属性 min==max
+            未找到返回 (None, None)
+
+        用途：
+        - weapon: 返回外功攻击区间 (min_outer, max_outer)
+        - ring: 返回 (最小外功攻击, 最小外功攻击)
+        - pendant: 返回 (最大外功攻击, 最大外功攻击)
+        - head/chest/leg/wrist: 返回 (气血, 气血)
+        """
+        rule = self._base_rules.get(part, {}).get(level)
+        if rule is None:
+            return None, None
+        for r in rule.ranges:
+            if r.quality == quality:
+                return r.min_val, r.max_val
+        return None, None
+
     # ── 武器类型 / 流派配置 ────────────────────────
 
     def get_weapon_types(self) -> list[str]:
@@ -384,6 +414,11 @@ class GameConfigManager:
     def get_schools(self) -> dict[str, dict]:
         """流派配置（顶层 schools：流派名 → {main: {武器: 词条}, sub: [武器]}）"""
         return dict(self._schools)
+
+    def get_school_attr(self, school: str) -> str | None:
+        """获取流派的属性类型（鸣金/裂石/破竹/牵丝）"""
+        cfg = self._schools.get(school, {})
+        return cfg.get("attr") if cfg else None
 
     # ── 等级配置 ────────────────────────────────────────────
 

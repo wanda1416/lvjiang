@@ -1,0 +1,840 @@
+yysls:
+  其他装备: Other Equipment
+  其他装备展示开发中: Other equipment display under development…
+  刷新装备数据: Refresh Equipment Data
+  开关: 'Switch: '
+  当前装备: Current Equipment
+  承音: Chengyin
+  无词条: No Affixes
+  未装备: Not Equipped
+  跳过实际调律_仅进出调律页_测试滚动用: Skip actual tuning (enter/exit tuning page only, for scroll testing)
+  全局: (Global)
+  未实现: (Not implemented)
+  F6_调律配置可新增_编辑规则组: 'F6: Tuning Config to add/edit rule groups'
+  停止_F10: Stop (F10)
+  全局开关与测试选项: 'Global Switches & Test Options:'
+  列: Col
+  初始跳过: Initial Skip
+  取消全选: Deselect All
+  基础规则组_{key}_不存在_拒绝启动: Base rule group '{key}' does not exist, refusing to start
+  基础规则_单选: 'Base Rule (single select):'
+  开始调律_F9: Start Tuning (F9)
+  当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: Current gallery space missing levels/counts output field, cannot start auto tuning
+  打开进度: Open Progress
+  指定调律: Specify Tuning
+  更多: More
+  未就绪: Not Ready
+  流派规则_可多选: 'Playstyle Rules (multi-select):'
+  自动打开调律进度: Auto Open Tuning Progress
+  自动调律: Auto Tuning
+  行: Line
+  规则: Rule
+  请至少选择一个调律规则: Please select at least one tuning rule
+  请至少选择一个调律部位: Please select at least one tuning slot
+  选中的规则均未实现判定逻辑: Selected rules have no judgment logic implemented
+  选择调律部位: 'Select tuning slot:'
+  隐藏进度: Hide Progress
+  保留: Keep
+  关闭: Close
+  准备中: Preparing...
+  回收: Recycle
+  完成: Done
+  已保留: Kept
+  已回收: Recycled
+  强制调律: Force Tune
+  当前词条: Current Affixes
+  '{prefix}（{n}/{total}）：': '{prefix} ({n}/{total}):'
+  正在处理：{name}（{idx}/{total}）: 'Processing: {name} ({idx}/{total})'
+  周一: Monday
+  周二: Tuesday
+  周三: Wednesday
+  周四: Thursday
+  周五: Friday
+  周六: Saturday
+  周日: Sunday
+  顶级: Top
+  优秀: Excellent
+  能用: Usable
+  垃圾: Junk
+  当前词条_1: 'Current Affixes: -'
+  扫描处理_{name}: 'Scan Result: {name} → '
+  批次进度: Batch Progress
+  最终词条: Final Affixes
+  材料: 'Materials:'
+  正在处理_{name}: 'Processing: {name}'
+  目标词条: 'Target Affixes: -'
+  目标: Target
+  目标_1: 'Target: -'
+  等待中: Waiting...
+  等级_{level}_{quality}_词条_{count}_5: Lv {level} | {quality} | Affix {count}/5
+  蓝色: Blue
+  词条进度: Affix Progress
+  调律状态: Tuning Status
+  调律结束{suffix}_{total}_件装备_{rounds}_轮调律: 'Tuning Ended{suffix}: {total} equipment, {rounds} rounds'
+  调律进度: Tuning Progress
+  调满后回收: Recycle When Full
+  轮次_0: 'Round: 0'
+  轮次_{n}: 'Round: {n}'
+  预期评级: 'Expected Rating: -'
+  已中断: (Interrupted)
+  完整定级: '[Full Rating]'
+  调律潜力: '[Tuning Potential]'
+  不值得调律: Not Worth Tuning
+  值得调律: Worth Tuning
+  判定: Judge
+  勾选表示该词条是调律过程中调出的_非扫描时已有: Check to indicate this affix was tuned out, not already present at scan
+  可转律_取消后不做转律模拟: Can Transform (cancel to skip transform simulation)
+  品阶: 'Quality:'
+  基础规则组_{key}_不存在: Base rule group {key} does not exist
+  待调出: To Tune Out
+  构造装备: 'Build Equipment:'
+  模拟调律: Simulate Tuning
+  武器: 'Weapon:'
+  流派配置_仅本次测试_不保存: 'Playstyle Config (this test only, not saved):'
+  等级: 'Level:'
+  紫色: Purple
+  装备调律验证: Equipment Tuning Validation
+  词条{i}: 'Affix {i}:'
+  请先在左侧启用至少一个调律规则: Please enable at least one tuning rule on the left
+  请勾选至少一个_待调出_词条进行模拟: Please check at least one 'to tune out' affix to simulate
+  请至少选择首词条: Please select at least the first affix
+  部位: Slot
+  金色: Gold
+  刷新: Refresh
+  刷新角色详情: Refresh Character Details
+  角色详情功能开发中: Character details under development…
+  燕云: Yan Yun
+  调律配置: Tuning Config
+  词组: + Phrase
+  词组_1: '- Phrase'
+  上移: Move Up
+  下移: Move Down
+  不分组: No Group
+  主武器: Main Weapon
+  主武学: Main Martial
+  全选: Select All
+  分组: Group
+  分组_{name}_已存在: Group '{name}' already exists
+  分组名称: 'Group Name:'
+  删除: Delete
+  删除选中: Delete Selected
+  副武器: Off Weapon
+  副武学: Off Martial
+  勾选该词条可出现的装备部位_全选_全部: Check equipment slots where this affix can appear (Select All = All)
+  反选: Invert
+  定音词组: Dingyin Phrase
+  将选中赛季上移一行: Move selected season up one row
+  将选中赛季下移一行: Move selected season down one row
+  将选中配置上移一行: Move selected config up one row
+  将选中配置下移一行: Move selected config down one row
+  属性: Attribute
+  提示: Notice
+  新增武器重启后方可参与识别_被流派配置引用的武器不可删除: New weapons participate in recognition only after restart; weapons referenced by playstyle config cannot be deleted
+  无法删除: Cannot Delete
+  无法添加: Cannot Add
+  无法重命名: Cannot Rename
+  普通词组: Normal Phrase
+  最大值: Max Value
+  最小值: Min Value
+  武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: Weapon candidates come from weapon types in Equipment Config. Martial Enhancement moved to weapon types in Equipment Config.
+  武器名称: 'Weapon Name:'
+  武器类型: Weapon Type
+  武器类型_{name}_已存在: Weapon type '{name}' already exists.
+  武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Weapon type '{name}' is referenced by playstyle {users}, please unbind in playstyle config first.
+  武学名称: Martial Name
+  武学增效: Martial Enhancement
+  流派_{name}_已存在: Playstyle '{name}' already exists.
+  流派名不能为空或与已有流派重名: Playstyle name cannot be empty or duplicate.
+  流派名称: 'Playstyle Name:'
+  流派类型: Playstyle Type
+  流派配置: Playstyle Config
+  添加: Add
+  添加分组: Add Group
+  添加武器类型: Add Weapon Type
+  添加流派: Add Playstyle
+  添加等级: Add Level
+  添加词组: Add Phrase
+  添加赛季: Add Season
+  添加配置: Add Config
+  游戏配置: Game Config
+  确定删除武器类型_{name}: Delete weapon type '{name}'?
+  确定删除流派_{name}: Delete playstyle '{name}'?
+  确定要删除等级_{level}_吗: Delete level {level}?
+  确定要删除词组_{name}_吗: Delete phrase '{name}'?
+  确认删除: Confirm Delete
+  等级配置: Level Config
+  装备类型: Equipment Type
+  装备配置: Equipment Config
+  词条分组: Affix Group
+  词组_{name}_已存在: Phrase '{name}' already exists
+  词组分类: Phrase Category
+  词组单位: Phrase Unit
+  词组名称: 'Phrase Name:'
+  词组类型: Phrase Type
+  词组配置: Phrase Config
+  请先选择要删除的等级: Please select a level to delete first
+  赛季配置: Season Config
+  选择词条部位: Select Affix Slot
+  重命名分组: Rename Group
+  重命名词组: Rename Phrase
+  重复: Duplicate
+  无等级配置: (No level config)
+  全部: '- All -'
+  key_须为小写英文标识_字母开头_可含数字_下划线: Key must be lowercase (starts with letter, may contain digits/underscore)
+  不足时: When Insufficient
+  主增伤词条: Main Damage Affix
+  低于该等级的装备直接跳过_不进入任何判定: Equipment below this level is skipped, no judgment entered
+  保存失败_{e}: 'Save failed: {e}'
+  停用后不进调律的装备一律保留_调律门槛仍生效: When disabled, equipment not entering tuning is kept (tuning threshold still applies)
+  停用后按无命中默认行为执行: When disabled, execute with no-hit default behavior
+  全部_1: All
+  全部未命中时取_默认判定_部位页可按部位设置: 'When all miss, use ''Default Judgment'': slot page can set per slot,'
+  关闭时生效: Takes effect when enabled
+  切换后扫描处理_材料处理_结束处理页同步对准该组: After switching, Scan/Material/End Processing pages sync to this group,
+  删除基础规则组: Delete base rule group
+  删除本组: Delete This Group
+  删除本规则: Delete This Rule
+  删除规则: Delete Rule
+  删除选中行: Delete Selected Row
+  删除选中规则: Delete Selected Rule
+  删除选中规则组_至少保留一个: Delete selected rule group (keep at least one)
+  判定条件: Judgment Conditions
+  判定顺序_垃圾_一般_优秀_顶级_命中即定档: 'Judgment order: Junk → Normal → Excellent → Top, first hit sets tier'
+  副增伤词条: Sub Damage Affix
+  勾选装备词条名_至少一项: 'Check equipment affix names (at least one):'
+  单件重置次数上限: Per-item Max Reset Count
+  双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: Double-click 'Rule Description' column to edit; select a row to copy/delete the rule group
+  发现同时配置_动态属攻和真实属攻_建议修正: Dynamic attr and real attr configured simultaneously, recommend correction
+  可用词条库: Available Affix Pool
+  可用词条库为全局价值序_越靠前越优先保留与填充: Available Affix Pool is global value order (earlier = higher priority);
+  可用词条库_全局_各部位词条混放: Available Affix Pool (global, mixed slots)
+  右键禁用: Right-click to disable
+  名字: Name
+  名称: Name
+  含首词条: Contains First Affix
+  启用: Enable
+  启用初始判定: Enable Initial Judgment
+  启用处置表: Enable Disposal Table
+  启用检查: Enable Check
+  启用行为表: Enable Behavior Table
+  启用该规则: Enable this rule
+  命中条件_预期评级属于勾选档位_全选_不限: 'Hit condition: expected rating in checked tiers (Select All = no limit,'
+  命中条件_首词条初始数值按方向比较该值: 'Hit condition: first affix initial value compared by direction;'
+  品阶门槛: Quality Threshold
+  品阶门槛_覆盖: Quality Threshold (override)
+  四档_垃圾_一般_优秀_顶级: 'Four tiers: Junk / Normal / Excellent / Top'
+  回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0: 'Recycle retry cap: max re-read count after recycle, must be > 0'
+  固定标准部位_勾选有调律价值的品阶: Fixed standard slots; check quality tiers with tuning value;
+  基础规则: Base Rule
+  复制基础规则组: Copy base rule group
+  复制选中: Copy Selected
+  复制选中规则组为独立副本: Copy selected rule group as independent copy
+  大律准石数量检查: Check major tuning stone count
+  如_aggressive_小写字母_数字_下划线: e.g. aggressive (lowercase/digits/underscore)
+  如_my_rule_小写字母_数字_下划线: e.g. my_rule (lowercase/digits/underscore)
+  如_治疗_纯奶: e.g. Heal-Pure Healer
+  如_激进回收: e.g. Aggressive Recycle
+  对装备进行第一次调律前执行一次结束处理: Execute end processing once before first tuning of equipment,
+  将选中规则上移一行: Move selected rule up one row
+  将选中规则下移一行: Move selected rule down one row
+  已保存并生效_{now}: Saved and active ({now})
+  已切换到基础规则组_{name}: Switched to base rule group '{name}'
+  已删除基础规则组_{name}: Deleted base rule group '{name}'
+  已删除规则_{key}: Deleted rule {key}
+  已启用: Enabled
+  已复制为基础规则组_{name}: Copied as base rule group '{name}'
+  已新增基础规则组_{name}: Added new base rule group '{name}'
+  已新增规则_{name}: Added new rule '{name}'
+  已是最后一条规则_无法下移: Already the last rule, cannot move down
+  已是第一条规则_无法上移: Already the first rule, cannot move up
+  已禁用: Disabled
+  已选词条_可拖拽调整顺序: Selected affixes (drag to reorder)
+  开关_key: Switch key
+  开关_key_显示名_规则条件组_when_引用的: Switch key → display name; referenced by rule condition group when
+  开关前提: 'Switch precondition:'
+  开关设定: Switch Settings
+  开启时生效: Takes effect when enabled
+  当前规则: Current Rule
+  当前规则_1: 'Current Rule:'
+  扫描处理: Scan Processing
+  数量基准: Quantity Baseline
+  新增基础规则组: New base rule group
+  新增规则组: New Rule Group
+  新增调律规则: New Tuning Rule
+  最大连续回收次数: Max Consecutive Recycles
+  本条规则的判定方式_传入规则_运行期勾选的规则_全部规则: 'This rule''s judgment method: passed rules = runtime checked rules; all rules;'
+  机制说明_不可配置: Mechanism description, not configurable
+  材料处理: Material Processing
+  条件: Condition
+  条件组_组内全部满足方命中: Condition group (all in group must be met)
+  标识_key_须为小写字母开头的英文_数字_下划线: Identifier key must start with lowercase letter, then letters/digits/underscores
+  标识_key: 'Identifier key:'
+  校验失败_未保存_{err}: 'Validation failed (not saved): {err}'
+  次数用尽后: When Count Exhausted
+  每档由若干条件组定义_组间_OR_组内_AND: 'Each tier defined by condition groups: OR between groups, AND within group,'
+  每轮调律开始前的行为点: 'Behavior point before each tuning round):'
+  每轮调律结束后的行为点_按预期评级决策: 'Behavior point after each tuning round): decide by expected rating'
+  每轮调律自上而下匹配_首条命中即生效: Each tuning round matches top-down, first hit takes effect;
+  流派规则: Playstyle Rules
+  添加条件: Add Condition
+  添加条件组: Add Condition Group
+  添加行: Add Row
+  添加规则: Add Rule
+  狗粮添加规则: Fodder Add Rules
+  玩法设定: Playstyle Settings
+  确定删除规则组_{name}_该操作不可恢复: Delete rule group '{name}'? This cannot be undone.
+  确定删除调律规则_{name}_规则文件将被删除_不可恢复: Delete tuning rule '{name}'? The file will be deleted permanently.
+  禁用: Disable
+  移除选中: Remove Selected
+  等级门槛: Level Threshold
+  等级门槛_调律门槛_扫描_材料_结束处理: Level threshold + tuning threshold + scan/material/end processing,
+  绑定开关: Binding Switch
+  结束处理: End Processing
+  自选判定规则: Custom Judgment Rules
+  自选词条: Custom Affixes
+  至少保留一个规则组: Keep at least one rule group
+  装备评级: Equipment Rating
+  规则变更即校验_校验通过自动保存并生效: Rule changes validated; auto-saved on pass
+  规则名称不能为空: Rule name cannot be empty
+  规则名称: 'Rule Name:'
+  规则命中重置但次数已用尽_按钮文本读不到数字: Rule hit reset but count exhausted (button text cannot read number)
+  规则已禁用_右键启用: Rule disabled; right-click to enable
+  规则组名: Rule Group Name
+  规则组名称不能为空: Rule group name cannot be empty
+  规则组名称: 'Rule Group Name:'
+  规则说明: Rule Description
+  规则说明已保存_{key}: Rule description saved ({key})
+  设置启用状态失败_{e}: 'Failed to set enable state: {e}'
+  询问是否继续_弹窗确认_继续则本次运行不再检查: 'Ask to continue: popup confirm, continue skips further checks this run'
+  请先在列表中选中要删除的规则组: Please select a rule group to delete in the list first
+  请先在列表中选中要复制的规则组: Please select a rule group to copy in the list first
+  请先选中要删除的规则行: Please select a rule row to delete first
+  调律前识别材料区数量: Identify material area count before tuning,
+  调律门槛: Tuning Threshold
+  转律词条库: Transform Affix Pool
+  转律词条库_全局_优先级从高到低: Transform Affix Pool (global, priority high to low)
+  进调律前的行为点_未达调律门槛的装备: 'Before tuning behavior): Equipment below tuning threshold'
+  选择{title}词条: Select {title} affix
+  选择条件词条: Select condition affix
+  选择词条: Select Affix
+  选择首词条候选: Select first affix candidates
+  通用判定_这里的条件对所有部位都生效: 'Common judgment: conditions here apply to all slots'
+  重命名: Rename
+  重命名失败_{e}: 'Rename failed: {e}'
+  重命名规则: Rename Rule
+  重命名规则_key: Rename rule key
+  预期评级_该档即进入调律_固定用传入规则判定: Enter tuning when expected rating >= this tier (uses passed rules)
+  预期评级识别使用勾选的流派规则: 'Expected rating uses checked playstyle rules:'
+  首词条: First Affix
+  首词条初始数值比较方向: First affix initial value comparison direction
+  默认判定: Default Judgment
+  默认判定_1: 'Default Judgment:'
+  仅列出的部位覆盖全局默认_未列部位沿用基础配置: (Only listed slots override global defaults)
+  双击左侧导航中的规则名可修改: (Double-click rule name in left nav to rename)
+  无_恒生效: (None, always active)
+  点击选择词条: (Click to select affix)
+  点击选择首词条: (Click to select first affix)
+  跟随规则设置: (Follow rule settings)
+  须大于_0: (Must be > 0)
+  新增规则: ＋ New Rule
+  Key_{key}_已在该分组中显示: Key '{key}' already shown in group
+  '{label}_必须是数字': '{label} must be a number'
+  '{label}_必须是整数': '{label} must be an integer'
+  保存失败: Save Failed
+  写入冲突: Write conflict
+  减少: Decrease...
+  减少后数值不能小于_0_当前值_{cur}_输入_{inp}: 'Value after decrease cannot be less than 0 (current: {cur}, input: {inp})'
+  减少量: 'Decrease Amount:'
+  分组名不能为空: Group name cannot be empty
+  删除分组: Delete Group
+  取消: Cancel
+  同步写入失败: Sync write failed
+  增减量_正增负减: 'Change amount (+/-):'
+  增加: Increase...
+  增加量: 'Increase Amount:'
+  定义数据模型_key: Define data model keys
+  当前值_{val}: 'Current Value: {val}'
+  数值无效: Invalid value
+  数据模型: Data Model
+  新值: New Value
+  新名称: 'New Name:'
+  新建分组: New Group
+  来源_用途: Source/Usage
+  查看历史记录: View History
+  没有可用的数据模型_key_请先在数据模型定义中添加: No data model keys available, please add in model definition first
+  用途: 'Usage:'
+  确定: OK
+  确定要删除分组_{name}_吗: Delete group '{name}'?
+  自定义增减_{label}: Custom change - {label}
+  至少保留一个分组: Keep at least one group
+  覆写_{label}: Override - {label}
+  覆写: Override...
+  该数值已被其他进程更新_本次增减未写入_请刷新后重试: Value was updated by another process, change not written. Please refresh and retry.
+  选择字段: Select Field
+  重新读取角色数据: Reload character data
+  错误: Error
+  请选择: (Please select)
+  '{field}不能大于_999999': '{field} cannot exceed 999999'
+  '{field}不能小于_{min}': '{field} cannot be less than {min}'
+  '{field}必须是有效数字': '{field} must be a valid number'
+  变更记录: Change Log
+  同步变更依赖方: Sync change dependents
+  旧值: Old Value
+  时间: Time
+  来源: 'Source:'
+  类型: Type
+  详情: Details
+  请输入{field}: Please enter {field}
+  请输入数值: Please enter a value
+  输入错误: Input Error
+  选择或输入新{label}: Select or enter new {label}
+  上一个用户: Previous User
+  下一个用户: Next User
+  已完成: Completed
+  未完成: Incomplete
+  请先选择用户: Please select a user first
+  Key_{key}_已存在: Key '{key}' already exists
+  Key_只能包含字母_数字和下划线: Key can only contain letters, digits and underscores
+  '{title}_Key_{model}': '{title} Key ({model})'
+  上限: Cap
+  上限_1: 'Cap:'
+  不提醒: No Alert
+  中文_如_袅袅_本周: Chinese, e.g. Niaoniao (this week)
+  倍率: Ratio
+  准点_{unit}: Boundary/{unit}
+  准点_{val}_{period}: Boundary:{val}/{period}
+  准点周期: 'Boundary Period:'
+  准点恢复: Boundary Recovery
+  分钟: Minute
+  半赛季: Half Season
+  单向增加: Increase Only
+  可选: Optional
+  同步_{sync}: Sync:{sync}
+  同步目标: 'Sync Targets:'
+  同步目标不能指向自身: Sync target cannot point to itself
+  周: Week
+  周期: Period
+  周期_1: 'Period:'
+  增减幅度: 'Step Values:'
+  增减幅度格式错误_{part}_应为整数或_整数_来源: 'Step format error: ''{part}'', expected integer or int:source'
+  天: Day
+  如_900_打本消耗_1100_或_1_10_商店: 'e.g.: -900:dungeon,-1100 or 1,10:shop'
+  如_1_任务奖励_10_或_1: 'e.g.: 1:quest reward,10 or -1'
+  如_1_兑换_10_或_1: 'e.g.: 1:exchange,10 or -1'
+  定义三种数据模型的_key_双击行可编辑: Define keys for three data models. Double-click to edit.
+  实时_{unit}: Realtime/{unit}
+  实时_{val}_{unit}: Realtime:{val}/{unit}
+  实时恢复: Realtime Recovery
+  小时: Hour
+  展示上限: Show Cap
+  支持小数: Decimal Support
+  幅度_{steps}: Steps:{steps}
+  恢复类型: 'Recovery Type:'
+  新增: New
+  方向: Direction
+  无上限: No Cap
+  标签: Label
+  标签_1: 'Label:'
+  橙色阈值: 'Orange Threshold:'
+  橙警_{val}: Orange:>={val}
+  每周: Weekly
+  每天: Daily
+  每月: Monthly
+  每次恢复: 'Per Recovery:'
+  添加同步目标: Add Sync Target
+  玩家数据模型定义: Player Data Model Definition
+  确定要删除_key_{key}_吗: Delete key '{key}'?
+  红色阈值: 'Red Threshold:'
+  红警_{val}: Red:>={val}
+  编辑: Edit
+  英文_如: 'English, e.g. '
+  详情摘要: Summary
+  请输入_Key: Please enter Key
+  请输入标签: Please enter label
+  赛季: Season
+  软上限: Soft Cap
+  逗号分隔_减少时供下拉选择_如_兑换_强化_出售: 'Comma-separated, dropdown source for decreases, e.g.: Exchange,Enhance,Sell'
+  逗号分隔_增加时供下拉选择_如_打本_商店_任务: 'Comma-separated, dropdown source for increases, e.g.: Dungeon,Shop,Quest'
+  速率单位: 'Rate Unit:'
+  速率数值: 'Rate Value:'
+  重置_{time}: Reset:{time}
+  重置日_几号: 'Reset Day (date):'
+  重置日_周几: 'Reset Day (weekday):'
+  重置日_{day}: Reset day:{day}
+  重置日_{day}号: Reset day:{day}
+  重置时刻: 'Reset Time:'
+  默认: Default
+config:
+  wf_equip_analysis: Equipment Analysis
+  wf_purchase_xinfa: Auto Purchase Xinfa
+  wf_purchase_bugan: Auto Purchase Bugan
+  wf_daily_jianghu: Daily Jianghu Order
+  wf_daily_checkin: Daily Check-in
+  wf_daily_zhayu: Taiji Fish Bombing
+auto_strings:
+  + 分组: + Group
+  + 词条名: + Add Affix Name
+  '- 分组': '- Group'
+  0 = 不限首词条: 0 = No restriction on first affix
+  上半赛季结束日期: First half season end date
+  冲突: Conflict
+  删除当前列: Delete Current Column
+  删除等级: Delete Level
+  判定抗性百分比（可选，>= 0）: Judgment resistance percentage (optional, >= 0)
+  区间值（最小~最大）: Range value (min~max)
+  单值: Single Value
+  '原始词条名称:': '原始词条名称:'
+  右侧新增列: Add Column on Right
+  基础属性：未声明（YAML 中通过 _attr 配置）: 'Base attributes: Not declared (configured via _attr in YAML)'
+  增益抗性百分比（可选，>= 0）: Bonus resistance percentage (optional, >= 0)
+  如：黄钟长鸣: e.g. Huangzhong Changming
+  属性跟随: Attribute Follow
+  开启后允许输入小数，UI 使用 DoubleValidator: When enabled, allows decimal input; UI uses DoubleValidator
+  当前赛季装备等级（从等级配置中选择）: Current season equipment level (select from level config)
+  数值复用目标部位，表格只读: Values reuse target slot, table is read-only
+  无法跟随: Cannot Follow
+  未知: 未知
+  没有可跟随的目标部位。: No target slot to follow.
+  测高: Measure Height
+  添加词条名: Add Affix Name
+  确认跟随: Confirm Follow
+  装备等级（1-999，不可重复，必填）: Equipment level (1-999, no duplicates, required)
+  角色名列（不可删除）: Character name column (cannot be deleted)
+  词条名称（原始词条名 → 当前类别）: Affix name (original affix → current category)
+  该等级是否允许重置调律（可选）: Whether this level allows tuning reset (optional)
+  该等级要求的最低材料数量（可选）: Minimum material count required for this level (optional)
+  请先点击 '+ 分组' 创建分组: Please click '+ Group' to create a group first
+  请先选择词条类别: Please select an affix category first
+  赛季名称（如：黄钟长鸣、夹钟并作）: Season name (e.g. Huangzhong Changming, Jiazhong Bingzuo)
+  赛季开始日期: Season start date
+  赛季结束日期: Season end date
+  赛季编号（1, 2, 3...，用于排序，不可重复）: Season number (1, 2, 3..., for sorting, no duplicates)
+  （无词条名，点击 '+ 词条名' 添加）: (No affix name, click '+ Add Affix Name' to add)
+  ' 等+': ' ...+'
+  定时: 定时
+  操作: 操作
+  base_rules 必须是 list: base_rules 必须是 list
+  common_conditions 必须是 dict: common_conditions 必须是 dict
+  'playstyles: 名字不能为空': 'playstyles: 名字不能为空'
+  profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式
+  pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when: pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when
+  switches 必须是 dict: switches 必须是 dict
+  tune_config 顶层必须是 dict: tune_config 顶层必须是 dict
+  tuning_rules 必须是 dict: tuning_rules 必须是 dict
+  基础规则组顶层必须是 dict: 基础规则组顶层必须是 dict
+  数据必须是 dict: 数据必须是 dict
+  无赛季配置，无法计算赛季周期边界: 无赛季配置，无法计算赛季周期边界
+  未配置基础规则组，请在调律页选择基础规则组: 未配置基础规则组，请在调律页选择基础规则组
+  未配置调律规则，请在调律页选择至少一个规则: 未配置调律规则，请在调律页选择至少一个规则
+  未配置调律部位，请在调律页选择至少一个部位: 未配置调律部位，请在调律页选择至少一个部位
+  没有启用任何调律规则，请在调律页勾选至少一个规则: 没有启用任何调律规则，请在调律页勾选至少一个规则
+  缺少必填字段 key/name: 缺少必填字段 key/name
+  规则 key 须为小写字母开头的英文/数字/下划线: 规则 key 须为小写字母开头的英文/数字/下划线
+  规则可引用词表为空（attributes.yaml 异常）: 规则可引用词表为空（attributes.yaml 异常）
+  规则文件顶层必须是 dict: 规则文件顶层必须是 dict
+  规则组 key 须为小写字母开头的英文/数字/下划线: 规则组 key 须为小写字母开头的英文/数字/下划线
+  规则组 name 不能为空: 规则组 name 不能为空
+  调律部位配置无效，请在调律页重新选择部位: 调律部位配置无效，请在调律页重新选择部位
+  （须为 ['recycle', 'skip']）: (Must be ['recycle', 'skip'])
+  （须为小写字母开头的英文/数字/下划线）: (Must be alphanumeric starting with lowercase letter, underscores allowed)
+  '   - 词条未记录': '   - 词条未记录'
+  '  扫描处理未启用 → 跳过': '  扫描处理未启用 → 跳过'
+  '## 运行结束': '## 运行结束'
+  '### 成品清单（一般及以上）': '### 成品清单（一般及以上）'
+  (\d+)\s*阶: (\d+)\s*阶
+  '- 不添加 -': '- 不添加 -'
+  '- 不限 -': '- 不限 -'
+  '- 无需增伤 -': '- 无需增伤 -'
+  DSL 写入: DSL 写入
+  '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律': '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律'
+  \[转[1\]]?: \[转[1\]]?
+  ^(.+?)武学增[伤效]: ^(.+?)武学增[伤效]
+  ── 调律开始 ──: ── 调律开始 ──
+  一般: 一般
+  一键添加律准石: 一键添加律准石
+  万: 万
+  三率: 三率
+  三率类: 三率类
+  '下一点恢复: 已达上限': '下一点恢复: 已达上限'
+  不适用: 不适用
+  不限品阶: 不限品阶
+  不限评级: 不限评级
+  不限部位: 不限部位
+  主武器: 主武器
+  云珑: 云珑
+  仅紫色: 仅紫色
+  仅金色: 仅金色
+  仅金装: 仅金装
+  仅首词条: 仅首词条
+  优秀: 优秀
+  会心: 会心
+  会心率: 会心率
+  会意: 会意
+  会意率: 会意率
+  伞: 伞
+  伞武学增伤: 伞武学增伤
+  传入规则: 传入规则
+  体: 体
+  佩: 佩
+  保留: 保留
+  全向: 全向
+  全武学增效: 全武学增效
+  全部同时出现: 全部同时出现
+  全部规则: 全部规则
+  全部规则（默认配置）: 全部规则（默认配置）
+  其他信息: 其他信息
+  再生: 再生
+  冠: 冠
+  冠胄: 冠胄
+  冠胄 · 胸甲: 冠胄 · 胸甲
+  分钟: 分钟
+  判定抗性(%): 判定抗性(%)
+  判定结果: 判定结果
+  判定语义: 判定语义
+  剑: 剑
+  剑武学增伤: 剑武学增伤
+  副武器: 副武器
+  动作: 动作
+  动态类: 动态类
+  劲: 劲
+  势: 势
+  半赛季: 半赛季
+  单体类奇术增伤: 单体类奇术增伤
+  双刀: 双刀
+  双刀武学增伤: 双刀武学增伤
+  可重置: 可重置
+  '同步到:': '同步到:'
+  否: 否
+  周: 周
+  周一: 周一
+  周三: 周三
+  周二: 周二
+  周五: 周五
+  周六: 周六
+  周四: 周四
+  品阶: 品阶
+  品阶 ≥: 品阶 ≥
+  品阶未知: 品阶未知
+  品阶未识别，跳过品阶筛选: 品阶未识别，跳过品阶筛选
+  商: 商
+  回收: 回收
+  回收装备: 回收装备
+  垃圾: 垃圾
+  基础规则: 基础规则
+  增效类: 增效类
+  外功增益: 外功增益
+  外功类: 外功类
+  外功防御: 外功防御
+  大外攻: 大外攻
+  大律准石: 大律准石
+  天: 天
+  套装: 套装
+  宫: 宫
+  对玩家单位增效: 对玩家单位增效
+  对首领单位增伤: 对首领单位增伤
+  对齐失败：alignment 为 None: 对齐失败：alignment 为 None
+  小时: 小时
+  属性攻击: 属性攻击
+  属攻增益: 属攻增益
+  属攻类: 属攻类
+  已是最后一条赛季，无法下移: 已是最后一条赛季，无法下移
+  已是最后一条配置，无法下移: 已是最后一条配置，无法下移
+  已是第一条赛季，无法上移: 已是第一条赛季，无法上移
+  已是第一条配置，无法上移: 已是第一条配置，无法上移
+  库存: 库存
+  开始日期: 开始日期
+  强制调律: 强制调律
+  强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）: 强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）
+  彩狗粮: 彩狗粮
+  御: 御
+  徵: 徵
+  '恢复类型: 准点恢复': '恢复类型: 准点恢复'
+  '恢复类型: 实时恢复': '恢复类型: 实时恢复'
+  扇: 扇
+  扇武学增伤: 扇武学增伤
+  扇武学增效: 扇武学增效
+  手甲: 手甲
+  手甲武学增伤: 手甲武学增伤
+  扫描处置未启用 → 跳过该装备: 扫描处置未启用 → 跳过该装备
+  承音: 承音
+  持有: 持有
+  持有\s*(\d+): 持有\s*(\d+)
+  指定技能增效: 指定技能增效
+  指定武学增效: 指定武学增效
+  支持重置: 支持重置
+  敏: 敏
+  无: 无
+  无处置规则命中 → 跳过该装备: 无处置规则命中 → 跳过该装备
+  无已实现规则可判定该装备，结束调律: 无已实现规则可判定该装备，结束调律
+  无截图 请连接投屏后点击「刷新截图」: 无截图 请连接投屏后点击「刷新截图」
+  无有效结论: 无有效结论
+  无狗粮规则命中 → 不添加: 无狗粮规则命中 → 不添加
+  无相: 无相
+  无行为规则命中 → 继续调律: 无行为规则命中 → 继续调律
+  无词条数据: 无词条数据
+  最低材料数量: 最低材料数量
+  最大: 最大
+  最大外功攻击: 最大外功攻击
+  最大外属攻击: 最大外属攻击
+  最大无相攻击: 最大无相攻击
+  最大本属攻击: 最大本属攻击
+  最小: 最小
+  最小外功攻击: 最小外功攻击
+  最小外属攻击: 最小外属攻击
+  最小无相攻击: 最小无相攻击
+  最小本属攻击: 最小本属攻击
+  期望 ≥: 期望 ≥
+  未归类: 未归类
+  未知类型: 未知类型
+  未知装备: 未知装备
+  未知词条: 未知词条
+  未达门槛 → 扫描处理: 未达门槛 → 扫描处理
+  未选词条: 未选词条
+  未配置狗粮规则 → 不添加: 未配置狗粮规则 → 不添加
+  本次无一般及以上成品。: 本次无一般及以上成品。
+  来源: 来源
+  枪: 枪
+  枪武学增伤: 枪武学增伤
+  横刀: 横刀
+  横刀武学增伤: 横刀武学增伤
+  正向: 正向
+  正常完成: 正常完成
+  武器: 武器
+  武器类: 武器类
+  武学增效: 武学增效
+  每半赛季: 每半赛季
+  每周: 每周
+  每天: 每天
+  每日: 每日
+  每月: 每月
+  每赛季: 每赛季
+  每轮添加: 每轮添加
+  气血最大值: 气血最大值
+  没有全部出现: 没有全部出现
+  测试装备: 测试装备
+  添加: 添加
+  漂移补滚后对齐失败: 漂移补滚后对齐失败
+  牵丝: 牵丝
+  环: 环
+  环 · 佩: 环 · 佩
+  生存类: 生存类
+  用户中断（F10）: 用户中断（F10）
+  用户总览: 用户总览
+  破竹: 破竹
+  确认: 确认
+  空数据: 空数据
+  符合以下规则，开始调律：: 符合以下规则，开始调律：
+  精准率: 精准率
+  紫狗粮: 紫狗粮
+  紫色: 紫色
+  紫装: 紫装
+  紫装及以下: 紫装及以下
+  结束全部调律: 结束全部调律
+  结束处理未启用: 结束处理未启用
+  结束日期: 结束日期
+  继续调律: 继续调律
+  继续调律或跳过: 继续调律或跳过
+  绳镖: 绳镖
+  绳镖武学增伤: 绳镖武学增伤
+  羽: 羽
+  胄: 胄
+  胫: 胫
+  胫甲: 胫甲
+  胫甲 · 腕甲: 胫甲 · 腕甲
+  胸: 胸
+  胸甲: 胸甲
+  能用: 能用
+  腕: 腕
+  腕甲: 腕甲
+  自选规则: 自选规则
+  自选词条: 自选词条
+  舞绫鼓: 舞绫鼓
+  舞绫鼓武学增伤: 舞绫鼓武学增伤
+  蓝色: 蓝色
+  蓝装: 蓝装
+  蓝装及以下: 蓝装及以下
+  补滚后对齐失败: 补滚后对齐失败
+  裂石: 裂石
+  装备数据: 装备数据
+  装备重置冷却期，跳过该装备: 装备重置冷却期，跳过该装备
+  覆写: 覆写
+  规则设置: 规则设置
+  角: 角
+  角色名: 角色名
+  角色详情: 角色详情
+  计数大于等于: 计数大于等于
+  计数小于等于: 计数小于等于
+  词条已满，无行为规则命中 → 跳过该装备: 词条已满，无行为规则命中 → 跳过该装备
+  词条库设置: 词条库设置
+  询问是否继续: 询问是否继续
+  请先选中要删除的赛季行: 请先选中要删除的赛季行
+  请先选中要删除的配置行: 请先选中要删除的配置行
+  调律: 调律
+  调满后回收: 调满后回收
+  调满后回收模式，跳过狗粮添加: 调满后回收模式，跳过狗粮添加
+  调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收: 调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收
+  负向: 负向
+  赛季: 赛季
+  赛季名称: 赛季名称
+  赛季编号: 赛季编号
+  赛季编号不可重复: 赛季编号不可重复
+  跳过该装备: 跳过该装备
+  辟邪: 辟邪
+  通用: General
+  通用判定: 通用判定
+  部位: 部位
+  配额: 配额
+  重命名词条名: 重命名词条名
+  重置: 重置
+  重置材料信息识别失败，跳过该装备: 重置材料信息识别失败，跳过该装备
+  重置装备: 重置装备
+  金狗粮: 金狗粮
+  金色: 金色
+  金装: 金装
+  防具类: 防具类
+  陌刀: 陌刀
+  陌刀武学增伤: 陌刀武学增伤
+  顶级: 顶级
+  首词条 %: 首词条 %
+  首词条 ≥ %: 首词条 ≥ %
+  首词条不限: 首词条不限
+  首领增伤: 首领增伤
+  鸣金: 鸣金
+  （未选）: （未选）
+  ，仅首词条: ，仅首词条
+  任务被停止: 任务被停止
+  值得调律，但测试开关已启用，跳过实际调律: 值得调律，但测试开关已启用，跳过实际调律
+  初始判定: 初始判定
+  升序: 升序
+  回收装备：分解为材料: 回收装备：分解为材料
+  处置未启用，保留: 处置未启用，保留
+  备注: 备注
+  已有任务在运行，请先停止: 已有任务在运行，请先停止
+  已符合规则但未找到调律入口，跳过本件: 已符合规则但未找到调律入口，跳过本件
+  已请求停止: 已请求停止
+  已请求停止，等当前步骤结束: 已请求停止，等当前步骤结束
+  当前没有运行中的任务: 当前没有运行中的任务
+  执行中: 执行中
+  扫描处理: 扫描处理
+  无法继续调律: 无法继续调律
+  无障碍服务未连接，请先在设置里开启: 无障碍服务未连接，请先在设置里开启
+  未找到「添加」入口: 未找到「添加」入口
+  本件已重置过一次，冷却期内不再重置: 本件已重置过一次，冷却期内不再重置
+  橙色: 橙色
+  正在初始化引擎: 正在初始化引擎
+  正在启动: 正在启动
+  燕云十六声: 燕云十六声
+  红色: 红色
+  结束处理: 结束处理
+  继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则: 继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则
+  自动调律: 自动调律
+  请至少选择一个调律规则: 请至少选择一个调律规则
+  请至少选择一个调律部位: 请至少选择一个调律部位
+  调律材料: 调律材料
+  调律结束: 调律结束
+  调满后回收模式：词条已满，执行回收: 调满后回收模式：词条已满，执行回收
+  跳过该装备：结束保留在背包: 跳过该装备：结束保留在背包
+  重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）: 重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）
+  降序: 降序
+  （内置）: (Built-in)
+  律匠 - 燕云十六声装备调律工具: LvJiang - YYSLS Equipment Tuning Tool

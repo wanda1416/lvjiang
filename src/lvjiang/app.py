@@ -126,8 +126,16 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     _app = QApplication(sys.argv)
 
     # ── 初始化 i18n（在 QApplication 之后、MainWindow 之前）──
-    from .i18n import init_i18n
+    from .i18n import init_i18n, load_app_i18n
     init_i18n()
+
+    # 主体翻译加载完成后，加载已注册插件的专属翻译
+    for h in hooks_list:
+        if h.name:
+            try:
+                load_app_i18n(h.name)
+            except Exception:  # noqa: BLE001
+                pass
 
     # 全局屏蔽下拉框/数字输入框的滚轮改值（防滑动页面时误改）
     install_wheel_guard(_app)

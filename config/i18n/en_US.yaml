@@ -1,1618 +1,736 @@
 meta:
   language: en_US
-  display_name: "English"
-  version: "0.2.5"
-
-# ── Main Window ──
+  display_name: English
+  version: 0.2.5
 main_window:
-  title: "LvJiang - Universal Visual RPA Engine"
-  menu_general: "General"
-  menu_settings: "Settings"
-  menu_user_mgmt: "User Management"
-  menu_scene_editor: "Scene Editor"
-  menu_reference_mgr: "Reference Manager"
-  menu_tools: "Tools"
-  menu_ocr: "Image Recognition"
-  menu_script_record: "Script Recording"
-  menu_script_config: "Script Config"
-  menu_batch_config: "Batch Config"
-  menu_help: "Help"
-  menu_check_update: "Check for Updates"
-  menu_docs: "Documentation"
-  menu_feedback: "Feedback"
-  menu_about: "About"
-  label_current_user: "Current User"
-  label_current_layout: "Current Layout"
-  btn_scan_window: "Scan Windows"
-  btn_scan_device: "Scan Devices"
-  btn_locate: "Locate"
-  btn_show_preview: "Show Preview"
-  btn_hide_preview: "Hide Preview"
-  chk_bg_mode: "Background Mode"
-  chk_scrcpy: "Streaming Capture"
-  tab_daily: "Daily"
-  tab_batch: "Batch"
-  tab_log: "Run Log"
-  btn_start: "Start (F9)"
-  btn_stop: "Stop"
-  group_script: "Script"
-  btn_load: "Load"
-  group_params: "Parameters"
-  label_log_level: "Log Level"
-  status_ready: "Ready | F9 Start | F10 Stop | F8 Record"
-  label_no_window: "No window selected"
-  label_preview_placeholder: "Locate window to capture"
-  status_window_located: "Window located"
-  status_device_connected: "Device connected"
-  confirm_exit_title: "Confirm Exit"
-  confirm_exit_message: "A workflow is currently running. Closing will terminate it.\nAre you sure you want to exit?"
-  status_workflow_done: "Workflow completed"
-  status_workflow_stopped: "Workflow stopped"
-  status_workflow_error: "Execution error"
-  workflow_running: "Workflow Running"
+  title: LvJiang - Universal Visual RPA Engine
+  menu_general: General
+  menu_settings: Settings
+  menu_user_mgmt: User Management
+  menu_scene_editor: Scene Editor
+  menu_reference_mgr: Reference Manager
+  menu_tools: Tools
+  menu_ocr: Image Recognition
+  menu_script_record: Script Recording
+  menu_script_config: Script Config
+  menu_batch_config: Batch Config
+  menu_help: Help
+  menu_check_update: Check for Updates
+  menu_docs: Documentation
+  menu_feedback: Feedback
+  menu_about: About
+  label_current_user: Current User
+  label_current_layout: Current Layout
+  btn_scan_window: Scan Windows
+  btn_scan_device: Scan Devices
+  btn_locate: Locate
+  btn_show_preview: Show Preview
+  btn_hide_preview: Hide Preview
+  chk_bg_mode: Background Mode
+  chk_scrcpy: Streaming Capture
+  tab_daily: Daily
+  tab_batch: Batch
+  tab_log: Run Log
+  btn_start: Start (F9)
+  btn_stop: Stop
+  group_script: Script
+  btn_load: Load
+  group_params: Parameters
+  label_log_level: Log Level
+  status_ready: Ready | F9 Start | F10 Stop | F8 Record
+  label_no_window: No window selected
+  label_preview_placeholder: Locate window to capture
+  status_window_located: Window located
+  status_device_connected: Device connected
+  confirm_exit_title: Confirm Exit
+  confirm_exit_message: 'A workflow is currently running. Closing will terminate it.
 
-# ── Settings Dialog ──
+    Are you sure you want to exit?'
+  status_workflow_done: Workflow completed
+  status_workflow_stopped: Workflow stopped
+  status_workflow_error: Execution error
+  workflow_running: Workflow Running
 settings_dialog:
-  title: "Settings"
-  tab_basic: "Basic"
-  tab_input: "Input Simulation"
-  tab_wait: "Wait Parameters"
-  btn_save: "Save"
-  btn_close: "Close"
-  language_label: "Interface Language"
-  adb_capture_label: "ADB Capture Mode:"
-  adb_capture_scrcpy: "Streaming (scrcpy)"
-  adb_capture_screencap: "Static (screencap)"
-  input_mode_label: "Window Input Mode:"
-  input_postmessage: "Background (PostMessage)"
-  input_sendinput: "Foreground (SendInput)"
-  window_title_label: "Default Window Title:"
-  window_title_placeholder: "Empty = no auto-locate"
-  status_saved: "Settings saved"
-
-# ── About Dialog ──
+  title: Settings
+  tab_basic: Basic
+  tab_input: Input Simulation
+  tab_wait: Wait Parameters
+  btn_save: Save
+  btn_close: Close
+  language_label: Interface Language
+  adb_capture_label: 'ADB Capture Mode:'
+  adb_capture_scrcpy: Streaming (scrcpy)
+  adb_capture_screencap: Static (screencap)
+  input_mode_label: 'Window Input Mode:'
+  input_postmessage: Background (PostMessage)
+  input_sendinput: Foreground (SendInput)
+  window_title_label: 'Default Window Title:'
+  window_title_placeholder: Empty = no auto-locate
+  status_saved: Settings saved
 about_dialog:
-  title: "About LvJiang"
-  app_name: "LvJiang"
-  version_prefix: "Version"
-  app_desc: "Universal Visual RPA Engine"
-  workflow_desc: "Window capture → Region annotation → OCR → Workflow execution"
-  btn_check_update: "Check for Updates"
-  checking: "Checking..."
-  check_failed: "Update check failed"
-
-# ── User Manager ──
+  title: About LvJiang
+  app_name: LvJiang
+  version_prefix: Version
+  app_desc: Universal Visual RPA Engine
+  workflow_desc: Window capture → Region annotation → OCR → Workflow execution
+  btn_check_update: Check for Updates
+  checking: Checking...
+  check_failed: Update check failed
 user_manager:
-  title: "User Management"
-  btn_close: "Close"
-  btn_new_user: "+ New User"
-  btn_delete: "Delete"
-  label_current_user: "Current User"
-  section_basic: "Basic Info"
-  label_username: "Username"
-  label_created_at: "Created"
-  section_stats: "Statistics"
-  equip_data_wip: "Equipment data display is under development..."
-  new_user_title: "New User"
-  input_username_prompt: "Enter username:"
-  user_created: "User created: {name}"
-  failure: "Failed"
-  username_exists: "Username already exists or is empty"
-  confirm_delete_title: "Confirm Delete"
-  confirm_delete_message: "Delete user \"{name}\"?\nAll data will be cleared. This cannot be undone."
-  user_deleted: "User deleted: {name}"
-  cannot_delete: "Cannot delete this user"
+  title: User Management
+  btn_close: Close
+  btn_new_user: + New User
+  btn_delete: Delete
+  label_current_user: Current User
+  section_basic: Basic Info
+  label_username: Username
+  label_created_at: Created
+  section_stats: Statistics
+  equip_data_wip: Equipment data display is under development...
+  new_user_title: New User
+  input_username_prompt: 'Enter username:'
+  user_created: 'User created: {name}'
+  failure: Failed
+  username_exists: Username already exists or is empty
+  confirm_delete_title: Confirm Delete
+  confirm_delete_message: 'Delete user "{name}"?
 
-# ── Script Record ──
+    All data will be cleared. This cannot be undone.'
+  user_deleted: 'User deleted: {name}'
+  cannot_delete: Cannot delete this user
 script_record:
-  title: "Script Recording"
-  btn_record: "● Record Script (F8)"
-  btn_save: "Save"
-  btn_copy: "Copy"
-  btn_clear: "Clear"
-  status_idle: "Idle | Click \"Record Script\" or press F8"
-  btn_stop_record: "■ Stop Recording (F8)"
-  save_workflow_title: "Save as Workflow File"
-  save_workflow_filter: "Workflow Files (*.wf);;All Files (*)"
-  err_workflow_running: "Cannot record while workflow is running"
-  err_adb_not_supported: "ADB mode does not support recording yet"
-  err_no_window: "Please locate a window in the main window first"
-  err_layout_not_found: "Failed to load layout: {layout_name}"
-  err_start_failed: "Start failed: {e}"
-  err_record_failed: "Recording start failed: {e}"
-  status_recording: "Recording... Click/drag in game window, F8 or click to stop"
-  status_done: "Recording done. Edit and save as .wf"
-  status_done_empty: "Recording ended, no valid actions captured"
-  status_copied: "Copied to clipboard"
-  status_cleared: "Cleared"
-  unsaved_title: "Unsaved"
-  unsaved_message: "Recording has not been saved or copied. Close anyway?"
-
-# ── Script Config ──
+  title: Script Recording
+  btn_record: ● Record Script (F8)
+  btn_save: Save
+  btn_copy: Copy
+  btn_clear: Clear
+  status_idle: Idle | Click "Record Script" or press F8
+  btn_stop_record: ■ Stop Recording (F8)
+  save_workflow_title: Save as Workflow File
+  save_workflow_filter: Workflow Files (*.wf);;All Files (*)
+  err_workflow_running: Cannot record while workflow is running
+  err_adb_not_supported: ADB mode does not support recording yet
+  err_no_window: Please locate a window in the main window first
+  err_layout_not_found: 'Failed to load layout: {layout_name}'
+  err_start_failed: 'Start failed: {e}'
+  err_record_failed: 'Recording start failed: {e}'
+  status_recording: Recording... Click/drag in game window, F8 or click to stop
+  status_done: Recording done. Edit and save as .wf
+  status_done_empty: Recording ended, no valid actions captured
+  status_copied: Copied to clipboard
+  status_cleared: Cleared
+  unsaved_title: Unsaved
+  unsaved_message: Recording has not been saved or copied. Close anyway?
 script_config:
-  tab_daily: "Daily"
-  tab_dedicated: "Dedicated"
-  title: "Script Config"
-  col_exposed: "Exposed"
-  col_display_name: "Display Name"
-  col_nature: "Type"
-  col_source: "Source"
-  col_params: "Params"
-  btn_move_up: "Move Up"
-  btn_move_down: "Move Down"
-  btn_save: "Save"
-  btn_cancel: "Cancel"
-  save_failed: "Save failed"
-
-# ── Update Dialog ──
+  tab_daily: Daily
+  tab_dedicated: Dedicated
+  title: Script Config
+  col_exposed: Exposed
+  col_display_name: Display Name
+  col_nature: Type
+  col_source: Source
+  col_params: Params
+  btn_move_up: Move Up
+  btn_move_down: Move Down
+  btn_save: Save
+  btn_cancel: Cancel
+  save_failed: Save failed
 update_dialog:
-  title: "New Version Available"
-  btn_download: "Download"
-  chk_skip: "Don't ask again for this version"
-  btn_continue: "Continue"
-
-# ── OCR Dialog ──
+  title: New Version Available
+  btn_download: Download
+  chk_skip: Don't ask again for this version
+  btn_continue: Continue
 ocr_dialog:
-  title: "Image Recognition"
-  tab_ocr: "Image Recognition"
-  tab_cleaning_rules: "Cleaning Rules"
-  btn_upload: "Upload Image"
-  btn_refresh: "Refresh Capture"
-  tooltip_refresh: "Get latest capture from device"
-  btn_clear_canvas: "Clear Canvas"
-  btn_clear_selection: "Clear Selection"
-  tooltip_clear_selection: "Clear red selection box"
-  btn_ocr_text: "Text Recognition (F5)"
-  btn_ocr_material: "Material Recognition (F6)"
-  label_match_group: "Match Group:"
-  label_all_groups: "- All -"
-  label_ocr_result: "Recognition Results (with cleaning rules applied):"
-  status_ready: "Ready"
-  cleaning_rules_hint: "General cleaning rules: All OCR text goes through these rules.\nChanges take effect immediately, no restart needed."
-  group_text_replace: "Text Replacement (exact match)"
-  col_original: "Original Text"
-  col_replacement: "Replace With"
-  btn_add_replacement: "+ Add Replacement"
-  btn_delete_selected: "- Delete Selected"
-  group_regex_replace: "Regex Replacement"
-  col_regex: "Regex Pattern"
-  btn_add_regex: "+ Add Regex Rule"
-  group_test: "Test Cleaning"
-  placeholder_test_input: "Enter test text..."
-  placeholder_test_output: "Cleaning result..."
-  btn_test: "Test"
-  status_rules_saved: "Rules saved"
-  no_clipboard_image: "No image in clipboard"
-  cannot_read_clipboard: "Cannot read clipboard image"
-  select_image_title: "Select Image"
-  image_file_filter: "Image Files (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)"
-  status_refreshing: "Refreshing capture..."
-  status_refresh_failed: "Refresh capture failed"
-  status_ocr_text: "Recognizing text..."
-  no_text_found: "No text recognized"
-  status_ocr_material: "Recognizing materials..."
-  no_material_found: "No material recognized (empty slot or no match)"
-  ocr_failed: "Recognition failed"
-  selection_cleared: "Selection cleared"
-  no_image: "No image"
-  selection_empty: "Selection area is empty"
-  capture_failed: "Failed to capture image"
-  screenshot_failed: "Screenshot failed"
+  title: Image Recognition
+  tab_ocr: Image Recognition
+  tab_cleaning_rules: Cleaning Rules
+  btn_upload: Upload Image
+  btn_refresh: Refresh Capture
+  tooltip_refresh: Get latest capture from device
+  btn_clear_canvas: Clear Canvas
+  btn_clear_selection: Clear Selection
+  tooltip_clear_selection: Clear red selection box
+  btn_ocr_text: Text Recognition (F5)
+  btn_ocr_material: Material Recognition (F6)
+  label_match_group: 'Match Group:'
+  label_all_groups: '- All -'
+  label_ocr_result: 'Recognition Results (with cleaning rules applied):'
+  status_ready: Ready
+  cleaning_rules_hint: 'General cleaning rules: All OCR text goes through these rules.
 
-# ── Capture Ops ──
+    Changes take effect immediately, no restart needed.'
+  group_text_replace: Text Replacement (exact match)
+  col_original: Original Text
+  col_replacement: Replace With
+  btn_add_replacement: + Add Replacement
+  btn_delete_selected: '- Delete Selected'
+  group_regex_replace: Regex Replacement
+  col_regex: Regex Pattern
+  btn_add_regex: + Add Regex Rule
+  group_test: Test Cleaning
+  placeholder_test_input: Enter test text...
+  placeholder_test_output: Cleaning result...
+  btn_test: Test
+  status_rules_saved: Rules saved
+  no_clipboard_image: No image in clipboard
+  cannot_read_clipboard: Cannot read clipboard image
+  select_image_title: Select Image
+  image_file_filter: Image Files (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)
+  status_refreshing: Refreshing capture...
+  status_refresh_failed: Refresh capture failed
+  status_ocr_text: Recognizing text...
+  no_text_found: No text recognized
+  status_ocr_material: Recognizing materials...
+  no_material_found: No material recognized (empty slot or no match)
+  ocr_failed: Recognition failed
+  selection_cleared: Selection cleared
+  no_image: No image
+  selection_empty: Selection area is empty
+  capture_failed: Failed to capture image
+  screenshot_failed: Screenshot failed
 capture_ops:
-  status_idle: "Idle"
-  btn_record: "● Record"
-  btn_pause: "⏸ Pause"
-  btn_screenshot: "Screenshot"
-  btn_save: "Save"
-  btn_discard: "Discard"
-  err_streaming_only: "Recording requires streaming capture mode"
-  status_recording: "Recording"
-  btn_stop: "■ Stop"
-  status_paused: "Paused"
-  btn_resume: "▶ Resume"
-  status_pending_save: "Pending save"
-
-# ── Run Control ──
+  status_idle: Idle
+  btn_record: ● Record
+  btn_pause: ⏸ Pause
+  btn_screenshot: Screenshot
+  btn_save: Save
+  btn_discard: Discard
+  err_streaming_only: Recording requires streaming capture mode
+  status_recording: Recording
+  btn_stop: ■ Stop
+  status_paused: Paused
+  btn_resume: ▶ Resume
+  status_pending_save: Pending save
 run_control:
-  btn_start: "Start"
-  btn_stop: "Stop"
-  status_done: "Execution completed"
-  status_stopped: "Execution stopped"
-  status_error: "Execution error"
-  err_no_workflow: "Please select a workflow"
-  workflow_confirm: "Workflow Confirmation"
-  workflow_pause: "Workflow Paused"
-  workflow_input: "Workflow Input"
-  btn_continue_tuning: "Continue Tuning"
-  btn_skip_current: "Skip Current Equipment"
-  btn_end_tuning: "End This Tuning Session"
-  btn_stop_f10: "Stop (F10)"
-  label_not_connected: "Not Connected"
-  label_not_located: "Not Located"
-
-# ── Window Ops ──
+  btn_start: Start
+  btn_stop: Stop
+  status_done: Execution completed
+  status_stopped: Execution stopped
+  status_error: Execution error
+  err_no_workflow: Please select a workflow
+  workflow_confirm: Workflow Confirmation
+  workflow_pause: Workflow Paused
+  workflow_input: Workflow Input
+  btn_continue_tuning: Continue Tuning
+  btn_skip_current: Skip Current Equipment
+  btn_end_tuning: End This Tuning Session
+  btn_stop_f10: Stop (F10)
+  label_not_connected: Not Connected
+  label_not_located: Not Located
 window_ops:
-  no_window_found: "No window found"
-  window_located: "Window located"
-  window_closed: "Window closed"
-  devices_found: "Found {count} device(s)"
-  no_device_found: "No device found"
-  no_adb_device_title: "No ADB Device Found"
-  no_adb_device_msg: "No USB-connected ADB device found.\n\nScan LAN and try wireless connection?\n(Device must have wireless debugging enabled)"
-  btn_scan: "Scan"
-  btn_cancel: "Cancel"
-  btn_scanning: "Scanning..."
-  btn_connect: "Connect"
-  btn_locate: "Locate"
-  btn_disconnect: "Disconnect"
-  btn_scan_device: "Scan Device"
-  status_scanning_window: "Scanning windows..."
-  status_scanning_device: "Scanning devices..."
-  status_connecting: "Connecting to device..."
-  status_scan_cancelled: "Scan cancelled"
-  status_scan_failed: "Scan failed | See logs"
-  status_connect_failed: "Connection failed | See logs"
-  status_disconnected: "Device disconnected"
-  disconnected: "Disconnected"
-  status_window_unlocated: "Window location cleared"
-  label_not_located: "No window located"
-  label_not_connected: "No device connected"
-  label_select_window: "Please select a target window..."
-  label_select_device: "Please select a device and click connect..."
-  status_window_scanned: "Windows scanned | Select target and click Locate"
-  status_device_scanned: "Devices scanned | Select device and click Connect"
-  status_no_device_hint: "No device found | Try LAN scan"
-  status_no_wireless_hint: "No device found | Check wireless debugging"
-  wireless_no_device_title: "No Device Found"
-  wireless_no_device_msg: "No connectable ADB device found on LAN.\n\nPlease ensure:\n1. Device and PC are on the same LAN\n2. Wireless debugging is enabled (Developer Options)"
-  status_scanning_lan: "Scanning LAN..."
-  btn_scan_lan: "Scan LAN..."
-  preview_stopped: "Preview stopped"
-  ocr_canvas_placeholder: "Ctrl+V to paste screenshot, or click \"Upload Image\""
+  no_window_found: No window found
+  window_located: Window located
+  window_closed: Window closed
+  devices_found: Found {count} device(s)
+  no_device_found: No device found
+  no_adb_device_title: No ADB Device Found
+  no_adb_device_msg: 'No USB-connected ADB device found.
 
-# ── Alert Panel ──
+
+    Scan LAN and try wireless connection?
+
+    (Device must have wireless debugging enabled)'
+  btn_scan: Scan
+  btn_cancel: Cancel
+  btn_scanning: Scanning...
+  btn_connect: Connect
+  btn_locate: Locate
+  btn_disconnect: Disconnect
+  btn_scan_device: Scan Device
+  status_scanning_window: Scanning windows...
+  status_scanning_device: Scanning devices...
+  status_connecting: Connecting to device...
+  status_scan_cancelled: Scan cancelled
+  status_scan_failed: Scan failed | See logs
+  status_connect_failed: Connection failed | See logs
+  status_disconnected: Device disconnected
+  disconnected: Disconnected
+  status_window_unlocated: Window location cleared
+  label_not_located: No window located
+  label_not_connected: No device connected
+  label_select_window: Please select a target window...
+  label_select_device: Please select a device and click connect...
+  status_window_scanned: Windows scanned | Select target and click Locate
+  status_device_scanned: Devices scanned | Select device and click Connect
+  status_no_device_hint: No device found | Try LAN scan
+  status_no_wireless_hint: No device found | Check wireless debugging
+  wireless_no_device_title: No Device Found
+  wireless_no_device_msg: 'No connectable ADB device found on LAN.
+
+
+    Please ensure:
+
+    1. Device and PC are on the same LAN
+
+    2. Wireless debugging is enabled (Developer Options)'
+  status_scanning_lan: Scanning LAN...
+  btn_scan_lan: Scan LAN...
+  preview_stopped: Preview stopped
+  ocr_canvas_placeholder: Ctrl+V to paste screenshot, or click "Upload Image"
 alert_panel:
-  dismiss: "Dismiss"
-
-
-# ── YYSLS Plugin ──
-yysls:
-  # ── 通用 ──
-  其他装备: Other Equipment
-  其他装备展示开发中: Other equipment display under development…
-  刷新装备数据: Refresh Equipment Data
-  开关: "Switch: "
-  当前装备: Current Equipment
-  承音: Chengyin
-  无词条: No Affixes
-  未装备: Not Equipped
-  跳过实际调律_仅进出调律页_测试滚动用: Skip actual tuning (enter/exit tuning page only, for scroll testing)
-  全局: (Global)
-  未实现: (Not implemented)
-  # ── 调律 Tab ──
-  F6_调律配置可新增_编辑规则组: "F6: Tuning Config to add/edit rule groups"
-  停止_F10: Stop (F10)
-  全局开关与测试选项: "Global Switches & Test Options:"
-  列: Col
-  初始跳过: Initial Skip
-  取消全选: Deselect All
-  基础规则组_{key}_不存在_拒绝启动: Base rule group '{key}' does not exist, refusing to start
-  基础规则_单选: "Base Rule (single select):"
-  开始调律_F9: Start Tuning (F9)
-  当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: Current gallery space missing levels/counts output field, cannot start auto tuning
-  打开进度: Open Progress
-  指定调律: Specify Tuning
-  更多: More
-  未就绪: Not Ready
-  流派规则_可多选: "Playstyle Rules (multi-select):"
-  自动打开调律进度: Auto Open Tuning Progress
-  自动调律: Auto Tuning
-  行: Line 
-  规则: Rule
-  请至少选择一个调律规则: Please select at least one tuning rule
-  请至少选择一个调律部位: Please select at least one tuning slot
-  选中的规则均未实现判定逻辑: Selected rules have no judgment logic implemented
-  选择调律部位: "Select tuning slot:"
-  隐藏进度: Hide Progress
-  # ── 调律进度 ──
-  保留: Keep
-  关闭: Close
-  准备中: Preparing...
-  回收: Recycle
-  完成: Done
-  已保留: Kept
-  已回收: Recycled
-  强制调律: Force Tune
-  当前词条: Current Affixes
-  "{prefix}（{n}/{total}）：": "{prefix} ({n}/{total}):"
-  "正在处理：{name}（{idx}/{total}）": "Processing: {name} ({idx}/{total})"
-  周一: Monday
-  周二: Tuesday
-  周三: Wednesday
-  周四: Thursday
-  周五: Friday
-  周六: Saturday
-  周日: Sunday
-  顶级: Top
-  优秀: Excellent
-  能用: Usable
-  垃圾: Junk
-  当前词条_1: "Current Affixes: -"
-  扫描处理_{name}: "Scan Result: {name} → "
-  批次进度: Batch Progress
-  最终词条: Final Affixes
-  材料: "Materials:"
-  正在处理_{name}: "Processing: {name}"
-  目标词条: "Target Affixes: -"
-  目标: Target
-  目标_1: "Target: -"
-  等待中: Waiting...
-  等级_{level}_{quality}_词条_{count}_5: Lv {level} | {quality} | Affix {count}/5
-  蓝色: Blue
-  词条进度: Affix Progress
-  调律状态: Tuning Status
-  调律结束{suffix}_{total}_件装备_{rounds}_轮调律: "Tuning Ended{suffix}: {total} equipment, {rounds} rounds"
-  调律进度: Tuning Progress
-  调满后回收: Recycle When Full
-  轮次_0: "Round: 0"
-  轮次_{n}: "Round: {n}"
-  预期评级: "Expected Rating: -"
-  已中断: (Interrupted)
-  # ── 装备判定 ──
-  完整定级: "[Full Rating]"
-  调律潜力: "[Tuning Potential]"
-  不值得调律: Not Worth Tuning
-  值得调律: Worth Tuning
-  判定: Judge
-  勾选表示该词条是调律过程中调出的_非扫描时已有: Check to indicate this affix was tuned out, not already present at scan
-  可转律_取消后不做转律模拟: Can Transform (cancel to skip transform simulation)
-  品阶: "Quality:"
-  基础规则组_{key}_不存在: Base rule group {key} does not exist
-  待调出: To Tune Out
-  构造装备: "Build Equipment:"
-  模拟调律: Simulate Tuning
-  武器: "Weapon:"
-  流派配置_仅本次测试_不保存: "Playstyle Config (this test only, not saved):"
-  等级: "Level:"
-  紫色: Purple
-  装备调律验证: Equipment Tuning Validation
-  词条{i}: "Affix {i}:"
-  请先在左侧启用至少一个调律规则: Please enable at least one tuning rule on the left
-  请勾选至少一个_待调出_词条进行模拟: Please check at least one 'to tune out' affix to simulate
-  请至少选择首词条: Please select at least the first affix
-  部位: Slot
-  金色: Gold
-  # ── 角色详情 ──
-  刷新: Refresh
-  刷新角色详情: Refresh Character Details
-  角色详情功能开发中: Character details under development…
-  # ── 菜单 ──
-  燕云: Yan Yun
-  调律配置: Tuning Config
-  # ── 游戏设置 ──
-  词组: + Phrase
-  词组_1: "- Phrase"
-  上移: Move Up
-  下移: Move Down
-  不分组: No Group
-  主武器: Main Weapon
-  主武学: Main Martial
-  全选: Select All
-  分组: Group
-  分组_{name}_已存在: Group '{name}' already exists
-  分组名称: "Group Name:"
-  删除: Delete
-  删除选中: Delete Selected
-  副武器: Off Weapon
-  副武学: Off Martial
-  勾选该词条可出现的装备部位_全选_全部: Check equipment slots where this affix can appear (Select All = All)
-  反选: Invert
-  定音词组: Dingyin Phrase
-  将选中赛季上移一行: Move selected season up one row
-  将选中赛季下移一行: Move selected season down one row
-  将选中配置上移一行: Move selected config up one row
-  将选中配置下移一行: Move selected config down one row
-  属性: Attribute
-  提示: Notice
-  新增武器重启后方可参与识别_被流派配置引用的武器不可删除: New weapons participate in recognition only after restart; weapons referenced by playstyle config cannot be deleted
-  无法删除: Cannot Delete
-  无法添加: Cannot Add
-  无法重命名: Cannot Rename
-  普通词组: Normal Phrase
-  最大值: Max Value
-  最小值: Min Value
-  武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: Weapon candidates come from weapon types in Equipment Config. Martial Enhancement moved to weapon types in Equipment Config.
-  武器名称: "Weapon Name:"
-  武器类型: Weapon Type
-  武器类型_{name}_已存在: Weapon type '{name}' already exists.
-  武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Weapon type '{name}' is referenced by playstyle {users}, please unbind in playstyle config first.
-  武学名称: Martial Name
-  武学增效: Martial Enhancement
-  流派_{name}_已存在: Playstyle '{name}' already exists.
-  流派名不能为空或与已有流派重名: Playstyle name cannot be empty or duplicate.
-  流派名称: "Playstyle Name:"
-  流派类型: Playstyle Type
-  流派配置: Playstyle Config
-  添加: Add
-  添加分组: Add Group
-  添加武器类型: Add Weapon Type
-  添加流派: Add Playstyle
-  添加等级: Add Level
-  添加词组: Add Phrase
-  添加赛季: Add Season
-  添加配置: Add Config
-  游戏配置: Game Config
-  确定删除武器类型_{name}: Delete weapon type '{name}'?
-  确定删除流派_{name}: Delete playstyle '{name}'?
-  确定要删除等级_{level}_吗: Delete level {level}?
-  确定要删除词组_{name}_吗: Delete phrase '{name}'?
-  确认删除: Confirm Delete
-  等级配置: Level Config
-  装备类型: Equipment Type
-  装备配置: Equipment Config
-  词条分组: Affix Group
-  词组_{name}_已存在: Phrase '{name}' already exists
-  词组分类: Phrase Category
-  词组单位: Phrase Unit
-  词组名称: "Phrase Name:"
-  词组类型: Phrase Type
-  词组配置: Phrase Config
-  请先选择要删除的等级: Please select a level to delete first
-  赛季配置: Season Config
-  选择词条部位: Select Affix Slot
-  重命名分组: Rename Group
-  重命名词组: Rename Phrase
-  重复: Duplicate
-  无等级配置: (No level config)
-  # ── 调律配置 ──
-  全部: "- All -"
-  key_须为小写英文标识_字母开头_可含数字_下划线: Key must be lowercase (starts with letter, may contain digits/underscore)
-  不足时: When Insufficient
-  主增伤词条: Main Damage Affix
-  低于该等级的装备直接跳过_不进入任何判定: Equipment below this level is skipped, no judgment entered
-  保存失败_{e}: "Save failed: {e}"
-  停用后不进调律的装备一律保留_调律门槛仍生效: When disabled, equipment not entering tuning is kept (tuning threshold still applies)
-  停用后按无命中默认行为执行: When disabled, execute with no-hit default behavior
-  全部_1: All
-  全部未命中时取_默认判定_部位页可按部位设置: "When all miss, use 'Default Judgment': slot page can set per slot,"
-  关闭时生效: Takes effect when enabled
-  切换后扫描处理_材料处理_结束处理页同步对准该组: After switching, Scan/Material/End Processing pages sync to this group,
-  删除基础规则组: Delete base rule group
-  删除本组: Delete This Group
-  删除本规则: Delete This Rule
-  删除规则: Delete Rule
-  删除选中行: Delete Selected Row
-  删除选中规则: Delete Selected Rule
-  删除选中规则组_至少保留一个: Delete selected rule group (keep at least one)
-  判定条件: Judgment Conditions
-  判定顺序_垃圾_一般_优秀_顶级_命中即定档: "Judgment order: Junk → Normal → Excellent → Top, first hit sets tier"
-  副增伤词条: Sub Damage Affix
-  勾选装备词条名_至少一项: "Check equipment affix names (at least one):"
-  单件重置次数上限: Per-item Max Reset Count
-  双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: Double-click 'Rule Description' column to edit; select a row to copy/delete the rule group
-  发现同时配置_动态属攻和真实属攻_建议修正: Dynamic attr and real attr configured simultaneously, recommend correction
-  可用词条库: Available Affix Pool
-  可用词条库为全局价值序_越靠前越优先保留与填充: Available Affix Pool is global value order (earlier = higher priority);
-  可用词条库_全局_各部位词条混放: Available Affix Pool (global, mixed slots)
-  右键禁用: Right-click to disable
-  名字: Name
-  名称: Name
-  含首词条: Contains First Affix
-  启用: Enable
-  启用初始判定: Enable Initial Judgment
-  启用处置表: Enable Disposal Table
-  启用检查: Enable Check
-  启用行为表: Enable Behavior Table
-  启用该规则: Enable this rule
-  命中条件_预期评级属于勾选档位_全选_不限: "Hit condition: expected rating in checked tiers (Select All = no limit,"
-  命中条件_首词条初始数值按方向比较该值: "Hit condition: first affix initial value compared by direction;"
-  品阶门槛: Quality Threshold
-  品阶门槛_覆盖: Quality Threshold (override)
-  四档_垃圾_一般_优秀_顶级: "Four tiers: Junk / Normal / Excellent / Top"
-  回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0: "Recycle retry cap: max re-read count after recycle, must be > 0"
-  固定标准部位_勾选有调律价值的品阶: Fixed standard slots; check quality tiers with tuning value;
-  基础规则: Base Rule
-  复制基础规则组: Copy base rule group
-  复制选中: Copy Selected
-  复制选中规则组为独立副本: Copy selected rule group as independent copy
-  大律准石数量检查: Check major tuning stone count
-  如_aggressive_小写字母_数字_下划线: e.g. aggressive (lowercase/digits/underscore)
-  如_my_rule_小写字母_数字_下划线: e.g. my_rule (lowercase/digits/underscore)
-  如_治疗_纯奶: e.g. Heal-Pure Healer
-  如_激进回收: e.g. Aggressive Recycle
-  对装备进行第一次调律前执行一次结束处理: Execute end processing once before first tuning of equipment,
-  将选中规则上移一行: Move selected rule up one row
-  将选中规则下移一行: Move selected rule down one row
-  已保存并生效_{now}: Saved and active ({now})
-  已切换到基础规则组_{name}: Switched to base rule group '{name}'
-  已删除基础规则组_{name}: Deleted base rule group '{name}'
-  已删除规则_{key}: Deleted rule {key}
-  已启用: Enabled
-  已复制为基础规则组_{name}: Copied as base rule group '{name}'
-  已新增基础规则组_{name}: Added new base rule group '{name}'
-  已新增规则_{name}: Added new rule '{name}'
-  已是最后一条规则_无法下移: Already the last rule, cannot move down
-  已是第一条规则_无法上移: Already the first rule, cannot move up
-  已禁用: Disabled
-  已选词条_可拖拽调整顺序: Selected affixes (drag to reorder)
-  开关_key: Switch key
-  开关_key_显示名_规则条件组_when_引用的: Switch key → display name; referenced by rule condition group when
-  开关前提: "Switch precondition:"
-  开关设定: Switch Settings
-  开启时生效: Takes effect when enabled
-  当前规则: Current Rule
-  当前规则_1: "Current Rule:"
-  扫描处理: Scan Processing
-  数量基准: Quantity Baseline
-  新增基础规则组: New base rule group
-  新增规则组: New Rule Group
-  新增调律规则: New Tuning Rule
-  最大连续回收次数: Max Consecutive Recycles
-  本条规则的判定方式_传入规则_运行期勾选的规则_全部规则: "This rule's judgment method: passed rules = runtime checked rules; all rules;"
-  机制说明_不可配置: Mechanism description, not configurable
-  材料处理: Material Processing
-  条件: Condition
-  条件组_组内全部满足方命中: Condition group (all in group must be met)
-  标识_key_须为小写字母开头的英文_数字_下划线: Identifier key must start with lowercase letter, then letters/digits/underscores
-  标识_key: "Identifier key:"
-  校验失败_未保存_{err}: "Validation failed (not saved): {err}"
-  次数用尽后: When Count Exhausted
-  每档由若干条件组定义_组间_OR_组内_AND: "Each tier defined by condition groups: OR between groups, AND within group,"
-  每轮调律开始前的行为点: "Behavior point before each tuning round):"
-  每轮调律结束后的行为点_按预期评级决策: "Behavior point after each tuning round): decide by expected rating"
-  每轮调律自上而下匹配_首条命中即生效: Each tuning round matches top-down, first hit takes effect;
-  流派规则: Playstyle Rules
-  添加条件: Add Condition
-  添加条件组: Add Condition Group
-  添加行: Add Row
-  添加规则: Add Rule
-  狗粮添加规则: Fodder Add Rules
-  玩法设定: Playstyle Settings
-  确定删除规则组_{name}_该操作不可恢复: Delete rule group '{name}'? This cannot be undone.
-  确定删除调律规则_{name}_规则文件将被删除_不可恢复: Delete tuning rule '{name}'? The file will be deleted permanently.
-  禁用: Disable
-  移除选中: Remove Selected
-  等级门槛: Level Threshold
-  等级门槛_调律门槛_扫描_材料_结束处理: Level threshold + tuning threshold + scan/material/end processing,
-  绑定开关: Binding Switch
-  结束处理: End Processing
-  自选判定规则: Custom Judgment Rules
-  自选词条: Custom Affixes
-  至少保留一个规则组: Keep at least one rule group
-  装备评级: Equipment Rating
-  规则变更即校验_校验通过自动保存并生效: Rule changes validated; auto-saved on pass
-  规则名称不能为空: Rule name cannot be empty
-  规则名称: "Rule Name:"
-  规则命中重置但次数已用尽_按钮文本读不到数字: Rule hit reset but count exhausted (button text cannot read number)
-  规则已禁用_右键启用: Rule disabled; right-click to enable
-  规则组名: Rule Group Name
-  规则组名称不能为空: Rule group name cannot be empty
-  规则组名称: "Rule Group Name:"
-  规则说明: Rule Description
-  规则说明已保存_{key}: Rule description saved ({key})
-  设置启用状态失败_{e}: "Failed to set enable state: {e}"
-  询问是否继续_弹窗确认_继续则本次运行不再检查: "Ask to continue: popup confirm, continue skips further checks this run"
-  请先在列表中选中要删除的规则组: Please select a rule group to delete in the list first
-  请先在列表中选中要复制的规则组: Please select a rule group to copy in the list first
-  请先选中要删除的规则行: Please select a rule row to delete first
-  调律前识别材料区数量: Identify material area count before tuning,
-  调律门槛: Tuning Threshold
-  转律词条库: Transform Affix Pool
-  转律词条库_全局_优先级从高到低: Transform Affix Pool (global, priority high to low)
-  进调律前的行为点_未达调律门槛的装备: "Before tuning behavior): Equipment below tuning threshold"
-  选择{title}词条: Select {title} affix
-  选择条件词条: Select condition affix
-  选择词条: Select Affix
-  选择首词条候选: Select first affix candidates
-  通用判定_这里的条件对所有部位都生效: "Common judgment: conditions here apply to all slots"
-  部位: Slot
-  重命名: Rename
-  重命名失败_{e}: "Rename failed: {e}"
-  重命名规则: Rename Rule
-  重命名规则_key: Rename rule key
-  预期评级_该档即进入调律_固定用传入规则判定: Enter tuning when expected rating >= this tier (uses passed rules)
-  预期评级识别使用勾选的流派规则: "Expected rating uses checked playstyle rules:"
-  首词条: First Affix
-  首词条初始数值比较方向: First affix initial value comparison direction
-  默认判定: Default Judgment
-  默认判定_1: "Default Judgment:"
-  仅列出的部位覆盖全局默认_未列部位沿用基础配置: (Only listed slots override global defaults)
-  双击左侧导航中的规则名可修改: (Double-click rule name in left nav to rename)
-  无_恒生效: (None, always active)
-  点击选择词条: (Click to select affix)
-  点击选择首词条: (Click to select first affix)
-  跟随规则设置: (Follow rule settings)
-  须大于_0: (Must be > 0)
-  新增规则: ＋ New Rule
-  # ── 用户总览 ──
-  Key_{key}_已在该分组中显示: Key '{key}' already shown in group
-  "{label}_必须是数字": "{label} must be a number"
-  "{label}_必须是整数": "{label} must be an integer"
-  保存失败: Save Failed
-  写入冲突: Write conflict
-  减少: Decrease...
-  减少后数值不能小于_0_当前值_{cur}_输入_{inp}: "Value after decrease cannot be less than 0 (current: {cur}, input: {inp})"
-  减少量: "Decrease Amount:"
-  分组名不能为空: Group name cannot be empty
-  删除分组: Delete Group
-  取消: Cancel
-  同步写入失败: Sync write failed
-  增减量_正增负减: "Change amount (+/-):"
-  增加: Increase...
-  增加量: "Increase Amount:"
-  定义数据模型_key: Define data model keys
-  当前值_{val}: "Current Value: {val}"
-  数值无效: Invalid value
-  数据模型: Data Model
-  新值: New Value
-  新名称: "New Name:"
-  新建分组: New Group
-  来源_用途: Source/Usage
-  查看历史记录: View History
-  没有可用的数据模型_key_请先在数据模型定义中添加: No data model keys available, please add in model definition first
-  用途: "Usage:"
-  确定: OK
-  确定要删除分组_{name}_吗: Delete group '{name}'?
-  自定义增减_{label}: Custom change - {label}
-  至少保留一个分组: Keep at least one group
-  覆写_{label}: Override - {label}
-  覆写: Override...
-  该数值已被其他进程更新_本次增减未写入_请刷新后重试: Value was updated by another process, change not written. Please refresh and retry.
-  选择字段: Select Field
-  重新读取角色数据: Reload character data
-  错误: Error
-  请选择: (Please select)
-  # ── 用户对话框 ──
-  "{field}不能大于_999999": "{field} cannot exceed 999999"
-  "{field}不能小于_{min}": "{field} cannot be less than {min}"
-  "{field}必须是有效数字": "{field} must be a valid number"
-  变更记录: Change Log
-  同步变更依赖方: Sync change dependents
-  新值: New Value
-  旧值: Old Value
-  时间: Time
-  来源: "Source:"
-  类型: Type
-  详情: Details
-  请输入{field}: Please enter {field}
-  请输入数值: Please enter a value
-  输入错误: Input Error
-  选择或输入新{label}: Select or enter new {label}
-  # ── 用户 Tab ──
-  上一个用户: Previous User
-  下一个用户: Next User
-  已完成: Completed
-  未完成: Incomplete
-  请先选择用户: Please select a user first
-  # ── 用户设置 ──
-  Key_{key}_已存在: Key '{key}' already exists
-  Key_只能包含字母_数字和下划线: Key can only contain letters, digits and underscores
-  "{title}_Key_{model}": "{title} Key ({model})"
-  上移: Move Up
-  上限: Cap
-  上限_1: "Cap:"
-  下移: Move Down
-  不提醒: No Alert
-  中文_如_袅袅_本周: Chinese, e.g. Niaoniao (this week)
-  倍率: Ratio
-  准点_{unit}: Boundary/{unit}
-  准点_{val}_{period}: "Boundary:{val}/{period}"
-  准点周期: "Boundary Period:"
-  准点恢复: Boundary Recovery
-  分钟: Minute
-  半赛季: Half Season
-  单向增加: Increase Only
-  可选: Optional
-  同步_{sync}: "Sync:{sync}"
-  同步目标: "Sync Targets:"
-  同步目标不能指向自身: Sync target cannot point to itself
-  周: Week
-  周期: Period
-  周期_1: "Period:"
-  增减幅度: "Step Values:"
-  增减幅度格式错误_{part}_应为整数或_整数_来源: "Step format error: '{part}', expected integer or int:source"
-  天: Day
-  如_900_打本消耗_1100_或_1_10_商店: "e.g.: -900:dungeon,-1100 or 1,10:shop"
-  如_1_任务奖励_10_或_1: "e.g.: 1:quest reward,10 or -1"
-  如_1_兑换_10_或_1: "e.g.: 1:exchange,10 or -1"
-  定义三种数据模型的_key_双击行可编辑: Define keys for three data models. Double-click to edit.
-  实时_{unit}: Realtime/{unit}
-  实时_{val}_{unit}: "Realtime:{val}/{unit}"
-  实时恢复: Realtime Recovery
-  小时: Hour
-  展示上限: Show Cap
-  支持小数: Decimal Support
-  幅度_{steps}: "Steps:{steps}"
-  恢复类型: "Recovery Type:"
-  新增: New
-  方向: Direction
-  无上限: No Cap
-  来源: "Source:"
-  标签: Label
-  标签_1: "Label:"
-  橙色阈值: "Orange Threshold:"
-  橙警_{val}: "Orange:>={val}"
-  每周: Weekly
-  每天: Daily
-  每月: Monthly
-  每次恢复: "Per Recovery:"
-  添加同步目标: Add Sync Target
-  玩家数据模型定义: Player Data Model Definition
-  用途: "Usage:"
-  目标: Target
-  确定要删除_key_{key}_吗: Delete key '{key}'?
-  红色阈值: "Red Threshold:"
-  红警_{val}: "Red:>={val}"
-  编辑: Edit
-  英文_如: "English, e.g. "
-  详情摘要: Summary
-  请输入_Key: Please enter Key
-  请输入标签: Please enter label
-  赛季: Season
-  软上限: Soft Cap
-  逗号分隔_减少时供下拉选择_如_兑换_强化_出售: "Comma-separated, dropdown source for decreases, e.g.: Exchange,Enhance,Sell"
-  逗号分隔_增加时供下拉选择_如_打本_商店_任务: "Comma-separated, dropdown source for increases, e.g.: Dungeon,Shop,Quest"
-  速率单位: "Rate Unit:"
-  速率数值: "Rate Value:"
-  重置_{time}: "Reset:{time}"
-  重置日_几号: "Reset Day (date):"
-  重置日_周几: "Reset Day (weekday):"
-  重置日_{day}: "Reset day:{day}"
-  重置日_{day}号: "Reset day:{day}"
-  重置时刻: "Reset Time:"
-  默认: Default
-
-# ── Messages ──
+  dismiss: Dismiss
 messages:
-  err_layout_not_found: "Failed to load layout: {name}"
-  err_panel_not_defined: "Panel {scene}.{panel} not defined in layout, please bind it in Scene Editor"
-  err_no_capture_source: "No capture source, please locate window first"
-  update_available: "New version v{latest} available.\nCurrent: v{current}\n\nDownload now?"
-  update_latest_title: "Up to Date"
-  update_latest_message: "Version v{current} is the latest"
+  err_layout_not_found: 'Failed to load layout: {name}'
+  err_panel_not_defined: Panel {scene}.{panel} not defined in layout, please bind it in Scene Editor
+  err_no_capture_source: No capture source, please locate window first
+  update_available: 'New version v{latest} available.
 
-# ── Config Display Names ──
+    Current: v{current}
+
+
+    Download now?'
+  update_latest_title: Up to Date
+  update_latest_message: Version v{current} is the latest
 config:
-  wf_equip_analysis: "Equipment Analysis"
-  wf_purchase_xinfa: "Auto Purchase Xinfa"
-  wf_purchase_bugan: "Auto Purchase Bugan"
-  wf_daily_jianghu: "Daily Jianghu Order"
-  wf_daily_checkin: "Daily Check-in"
-  wf_daily_zhayu: "Taiji Fish Bombing"
-  layout_default: "Default Layout"
-  layout_phone: "Phone Layout"
-  delay_step_wait: "Step Interval"
-  delay_click_interval: "Click Interval"
-  delay_page_refresh: "Page Refresh Wait"
-  delay_scroll_settle: "Scroll Settle Wait"
+  layout_default: Default Layout
+  layout_phone: Phone Layout
+  delay_step_wait: Step Interval
+  delay_click_interval: Click Interval
+  delay_page_refresh: Page Refresh Wait
+  delay_scroll_settle: Scroll Settle Wait
+auto_strings:
+  '  未导入图片': '  No image imported'
+  (可选): (Optional)
+  (未命名): (Unnamed)
+  (空): (Empty)
+  + 创建区域: + Create Region
+  + 创建坐标: + Create Point
+  + 创建面板: + Create Panel
+  '- 未分组 -': '- Ungrouped -'
+  '- 未命名 -': '- Unnamed -'
+  <b>勾选要执行的脚本：</b>: <b>Select scripts to execute:</b>
+  <b>选择要执行的行：</b>: <b>Select lines to execute:</b>
+  <span style="color:#888;">截图：—  画布：—</span>: '<span style="color:#888;">Screenshot: —  Canvas: —</span>'
+  <span style="color:#888;">截图：—　　画布：—</span>: '<span style="color:#888;">Screenshot: —　　Canvas: —</span>'
+  '[扫描] 正在扫描局域网 ADB 设备...': '[Scan] Scanning LAN ADB devices...'
+  '[断连] 窗口定位已清除': '[Disconnected] Window positioning cleared'
+  cols=1 时滚动方向不能为横向: Scroll direction cannot be horizontal when cols=1
+  key 必须以小写字母开头，仅含小写字母/数字/下划线: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores
+  key 必须以小写字母开头，仅含小写字母/数字/下划线。: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores.
+  key 重复: Duplicate key
+  rows=1 时滚动方向不能为纵向: Scroll direction cannot be vertical when rows=1
+  ↑ 上移: ↑ Move Up
+  ↓ 下移: ↓ Move Down
+  ● 有改动: ● Modified
+  上移视图: Move View Up
+  下移视图: Move View Down
+  中文名称: Chinese Name
+  中文名称，如 背包网格: Chinese name, e.g. Bag Grid
+  为该区域绑定哪个字段？: Which field to bind for this region?
+  仅剩基底视图时可用，取消后所有定义归为无视图区分: Only available with base view remaining; canceling merges all definitions into no-view distinction
+  从场景 YAML 中删除 Panel 定义: Delete Panel definition from scene YAML
+  从场景 YAML 中删除坐标点定义（meta 数据）: Delete coordinate point definition from scene YAML (meta data)
+  使用实时图像: Use Live Image
+  保存文件: Save File
+  元数据字段定义已保存: Metadata field definitions saved
+  先选中一个已放置的坐标点，再从它拉出一条方向箭头: First select a placed coordinate point, then drag to create a direction arrow
+  全不选: Deselect All
+  全部删除: Delete All
+  内置字段不可删除: Built-in fields cannot be deleted
+  内置字段，不可编辑或删除: Built-in field, cannot be edited or deleted
+  '分组 Key:': '分组 Key:'
+  '分组:': 'Group:'
+  分组非空，无法删除: Group is not empty, cannot delete
+  切割: Split
+  切割结果: Split Result
+  切换日志显示级别：DEBUG 会显示更详细的调试信息: 'Switch log level: DEBUG shows more detailed debug info'
+  切换画布编辑模式，调整画布范围以排除窗口边框: Toggle canvas edit mode, adjust canvas range to exclude window borders
+  '列:': 'Col:'
+  列名（逗号分隔）：: 'Column names (comma-separated):'
+  列数: Columns
+  创建分组: Create Group
+  创建场景: Create Scene
+  创建坐标: Create Point
+  创建失败: Creation Failed
+  创建方向: Create Direction
+  删除区域: Delete Region
+  删除场景: Delete Scene
+  删除坐标: Delete Point
+  删除失败: Delete Failed
+  删除方向: Delete Direction
+  删除行: Delete Row
+  删除视图: Delete View
+  删除面板: Delete Panel
+  别名布局创建失败，请检查日志。: Alias layout creation failed, please check logs.
+  别名布局禁止另存为，请使用原布局另存或者新建布局。: Alias layouts cannot be saved-as. Please use the original layout or create a new one.
+  刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
+  加载文件: Load File
+  勾选后直接从设备实时截屏进行识别，不保存到场景文件: When checked, capture directly from device for recognition without saving to scene file
+  匹配度阈值: Match Threshold
+  区域列表: Region List
+  单cell尺寸: Cell Size
+  单视图: Single View
+  参数 key: Parameter key
+  参数超出图片大小: Parameter exceeds image size
+  参考图信息: Reference Image Info
+  双向滚动: 双向滚动
+  取消多视图: Cancel Multi-View
+  另存为: Save As
+  另存为失败: Save As Failed
+  可点击: Clickable
+  可筛选: Filterable
+  '名称:': 'Name:'
+  名称不合法: Invalid Name
+  含文本: Contains Text
+  命名方向: Name Direction
+  命名非法: Invalid Name
+  固定网格: 固定网格
+  图像检测: 图像检测
+  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
+  '图库空间:': 'Gallery Space:'
+  在场景 YAML 中新增 Panel 定义（声明式网格）: Add Panel definition to scene YAML (declarative grid)
+  在场景 YAML 中新增坐标点定义（meta 数据）: Add coordinate point definition to scene YAML (meta data)
+  在当前分组下新建场景: Create scene under current group
+  在画布上放置一个坐标点（绑定到 YAML 定义）: Place a coordinate point on canvas (bound to YAML definition)
+  在画布上框选一个矩形区域，绑定到选中的 Panel 定义: Select a rectangular area on canvas, bound to selected Panel definition
+  '场景 Key:': 'Scene Key:'
+  '场景:': 'Scene:'
+  '场景名称:': 'Scene Name:'
+  坐标列表: Coordinate List
+  '备注:': 'Note:'
+  复制 DSL 引用: Copy DSL Reference
+  复制为新行: Copy as New Row
+  复制坐标: Copy Coordinates
+  如 my_wait: e.g. my_wait
+  字段标识 (key): Field Identifier (key)
+  '宽:': 'W:'
+  导入图片: Import Image
+  小写字母开头，仅含小写字母/数字/下划线: Starts with lowercase letter, containing only lowercase letters/digits/underscores
+  尚未切割: Not yet split
+  已保存: Saved
+  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
+  已退出画布编辑模式: Exited canvas edit mode
+  布局写入失败，请检查日志。: Layout write failed, please check logs.
+  布局名称不能以空格或点开头: Layout name cannot start with space or dot
+  应用到全部: Apply to All
+  应用设置: Apply Settings
+  开启多视图、新增/重命名/删除视图: Enable multi-view, add/rename/delete views
+  开始批量执行 (F9): Start Batch Execution (F9)
+  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
+  '当前用户:': 'Current User:'
+  当前配置：: 'Current Config:'
+  截图: Screenshot
+  截图功能不可用，请先在主窗口定位窗口或连接设备: Screenshot unavailable, please position window or connect device in main window first
+  截图失败: 截图失败
+  执行切割: Execute Split
+  '批量分组:': 'Batch Group:'
+  批量管理: Batch Management
+  批量设置: Batch Settings
+  排序: Sort
+  提交到图库: Submit to Gallery
+  新坐标绑定哪个坐标点？（沿用源半径）：: 'Which coordinate point to bind for new point? (reuse source radius):'
+  新增参考图: Add Reference Image
+  新增失败: Add Failed
+  新增字段: Add Field
+  新增视图: Add View
+  新建: New
+  新建区域: New Region
+  新建场景: 新建场景
+  新建场景分组: New Scene Group
+  新建坐标: New Point
+  新建失败: Create Failed
+  新建空间: New Space
+  新建面板: New Panel
+  方向列表: Direction List
+  无可用坐标: No Available Points
+  无可用面板: No Available Panels
+  无法取消: Cannot Cancel
+  无法获取截图: Cannot Capture Screenshot
+  是: 是
+  显示名称: Display Name
+  暂无数据，请通过 工具 → 批量配置 添加: No data yet, please add via Tools → Batch Config
+  更改分组: Change Group
+  更新失败: Update Failed
+  未保存的修改: Unsaved Changes
+  未填写: Not Filled
+  未框选区域: No Area Selected
+  未选择: Not Selected
+  校准模式: Calibration Mode
+  校验失败: Validation Failed
+  横向滚动: 横向滚动
+  比例: Ratio
+  浏览...: Browse...
+  添加参数: Add Parameter
+  清除网格: Clear Grid
+  滚动方向: Scroll Direction
+  激活空间: Active Space
+  点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果: Click 'Recognize All Fields' to view OCR results, click 'Recognize All Materials' to view material recognition results
+  点击在脚本编辑器光标处插入当前场景 key: Click to insert current scene key at script editor cursor
+  生成网格: Generate Grid
+  用户名列：: 'Username column:'
+  画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Canvas edit mode: drag/resize yellow canvas frame to exclude window borders'
+  留空则不修改: Leave empty to keep unchanged
+  留空则与 key 相同: Leave empty to same as key
+  确认覆盖: Confirm Overwrite
+  移动失败: Move Failed
+  等分网格: 等分网格
+  等待范围(秒): Wait Range (sec)
+  等级: 等级
+  管理视图: Manage Views
+  '类型:': 'Type:'
+  粘贴 (Ctrl+V): Paste (Ctrl+V)
+  纵向滚动: 纵向滚动
+  绑定坐标: Bind Point
+  绑定面板: Bind Panel
+  继承失败: Inherit Failed
+  编辑区域: Edit Region
+  编辑坐标: Edit Point
+  编辑画布: Edit Canvas
+  编辑面板: Edit Panel
+  网格参数: Grid Parameters
+  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
+  脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。: User for script test execution, defaults to current user on main page. Switching does not affect main page.
+  自动模式: 自动模式
+  至少需要保留一个场景分组: At least one scene group must be retained
+  英文，如 bag_grid: English, e.g. bag_grid
+  英文，如 my_group: English, e.g. my_group
+  英文，如 my_point: English, e.g. my_point
+  英文，如 my_region: English, e.g. my_region
+  英文，如 my_scene: English, e.g. my_scene
+  '行:': 'Row:'
+  行数: Rows
+  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
+  视图: View
+  '视图 Key:': 'View Key:'
+  '视图名称:': 'View Name:'
+  识别全部字段: Recognize All Fields
+  识别全部材料: Recognize All Materials
+  该场景尚未定义任何 Panel，请先创建面板定义。: No Panel defined for this scene, please create a panel definition first.
+  该场景所有 Panel 定义都已绑定。: All Panel definitions for this scene are already bound.
+  该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
+  该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
+  该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
+  请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。: Please select a placed coordinate point on canvas or in the list first, then create direction.
+  请先导入图片: Please import an image first
+  请先框选区域: Please select an area first
+  请先选中坐标: Please select a point first
+  请至少选择一个参考图: Please select at least one reference image
+  请输入布局名称: Please enter a layout name
+  输入 DSL 脚本内容...: Enter DSL script content...
+  输入元数据（用于筛选管理）: Enter metadata (for filter management)
+  输入当前场景: Enter current scene
+  输入方向 key（小写字母开头，可含数字/下划线）：: 'Enter direction key (starts with lowercase letter, may contain digits/underscores):'
+  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
+  迁移失败: Migration Failed
+  运行脚本: Run Script
+  进度: Progress
+  退出批量: Exit Batch
+  退出画布编辑: Exit Canvas Edit
+  选择 wf 文件...: Select wf file...
+  选择要放置的坐标点：: 'Select coordinate point to place:'
+  选择要绑定的 Panel：: 'Select Panel to bind:'
+  配置: Config
+  配置：: 'Config:'
+  重命名场景: 重命名场景
+  重命名失败: Rename Failed
+  重命名视图: Rename View
+  '间隔:': 'Interval:'
+  限定材料识别的分组范围: Limit group scope for material recognition
+  面板列表: Panel List
+  '高:': 'H:'
+  基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
+  本项目仅供学习交流使用: This project is for learning and communication purposes only
+  '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
+  '内置类: ': 'Built-in class: '
+  '当前版本: ': 'Current version: '
+  轮: round(s)
+  ? '名字 = 调律 Tab 勾选项；
 
-# ── UI Auto-wrapped Strings ──
-ui_auto:
-  k000: "  No image imported"
-  k001: "(Optional)"
-  k002: "(Unnamed)"
-  k003: "(Empty)"
-  k004: "+ Group"
-  k005: "+ Create Region"
-  k006: "+ Create Point"
-  k007: "+ Create Panel"
-  k008: "+ Add Affix Name"
-  k009: "- Group"
-  k010: "- Ungrouped -"
-  k011: "- Unnamed -"
-  k012: "0 = No restriction on first affix"
-  k013: "<b>Select scripts to execute:</b>"
-  k014: "<b>Select lines to execute:</b>"
-  k015: "<span style=\"color:#888;\">Screenshot: —  Canvas: —</span>"
-  k016: "<span style=\"color:#888;\">Screenshot: —　　Canvas: —</span>"
-  k017: "[Scan] Scanning LAN ADB devices..."
-  k018: "[Disconnected] Window positioning cleared"
-  k019: "Scroll direction cannot be horizontal when cols=1"
-  k020: "Key must start with a lowercase letter, containing only lowercase letters/digits/underscores"
-  k021: "Key must start with a lowercase letter, containing only lowercase letters/digits/underscores."
-  k022: "Duplicate key"
-  k023: "Scroll direction cannot be vertical when rows=1"
-  k024: "↑ Move Up"
-  k025: "↓ Move Down"
-  k026: "● Modified"
-  k027: "First half season end date"
-  k028: "Move View Up"
-  k029: "Move View Down"
-  k030: "Chinese Name"
-  k031: "Chinese name, e.g. Bag Grid"
-  k032: "Which field to bind for this region?"
-  k033: "Only available with base view remaining; canceling merges all definitions into no-view distinction"
-  k034: "Delete Panel definition from scene YAML"
-  k035: "Delete coordinate point definition from scene YAML (meta data)"
-  k036: "Use Live Image"
-  k037: "Save File"
-  k038: "Metadata field definitions saved"
-  k039: "First select a placed coordinate point, then drag to create a direction arrow"
-  k040: "Deselect All"
-  k041: "Delete All"
-  k042: "Built-in fields cannot be deleted"
-  k043: "Built-in field, cannot be edited or deleted"
-  k044: "Conflict"
-  k045: "Group Key:"
-  k046: "Group:"
-  k047: "Group is not empty, cannot delete"
-  k048: "Split"
-  k049: "Split Result"
-  k050: "Switch log level: DEBUG shows more detailed debug info"
-  k051: "Toggle canvas edit mode, adjust canvas range to exclude window borders"
-  k052: "Col:"
-  k053: "Column names (comma-separated):"
-  k054: "Columns"
-  k055: "Create Group"
-  k056: "Create Scene"
-  k057: "Create Point"
-  k058: "Creation Failed"
-  k059: "Create Direction"
-  k060: "Delete Region"
-  k061: "Delete Scene"
-  k062: "Delete Point"
-  k063: "Delete Failed"
-  k064: "Delete Current Column"
-  k065: "Delete Direction"
-  k066: "Delete Level"
-  k067: "Delete Row"
-  k068: "Delete View"
-  k069: "Delete Panel"
-  k070: "Judgment resistance percentage (optional, >= 0)"
-  k071: "Alias layout creation failed, please check logs."
-  k072: "Alias layouts cannot be saved-as. Please use the original layout or create a new one."
-  k073: "Refresh screenshot unavailable: device not connected or callback not provided"
-  k074: "Load File"
-  k075: "When checked, capture directly from device for recognition without saving to scene file"
-  k076: "Match Threshold"
-  k077: "Region List"
-  k078: "Range value (min~max)"
-  k079: "Cell Size"
-  k080: "Single Value"
-  k081: "Single View"
-  k082: "Original affix name:"
-  k083: "Parameter key"
-  k084: "Parameter exceeds image size"
-  k085: "Reference Image Info"
-  k086: "Bidirectional Scroll"
-  k087: "Cancel Multi-View"
-  k088: "Save As"
-  k089: "Save As Failed"
-  k090: "Clickable"
-  k091: "Filterable"
-  k092: "Add Column on Right"
-  k093: "Name:"
-  k094: "Invalid Name"
-  k095: "Contains Text"
-  k096: "Name Direction"
-  k097: "Invalid Name"
-  k098: "Fixed Grid"
-  k099: "Image Detection"
-  k100: "Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter"
-  k101: "Gallery Space:"
-  k102: "Add Panel definition to scene YAML (declarative grid)"
-  k103: "Add coordinate point definition to scene YAML (meta data)"
-  k104: "Create scene under current group"
-  k105: "Place a coordinate point on canvas (bound to YAML definition)"
-  k106: "Select a rectangular area on canvas, bound to selected Panel definition"
-  k107: "Scene Key:"
-  k108: "Scene:"
-  k109: "Scene Name:"
-  k110: "Coordinate List"
-  k111: "Base attributes: Not declared (configured via _attr in YAML)"
-  k112: "Bonus resistance percentage (optional, >= 0)"
-  k113: "Note:"
-  k114: "Copy DSL Reference"
-  k115: "Copy as New Row"
-  k116: "Copy Coordinates"
-  k117: "e.g. my_wait"
-  k118: "e.g. Huangzhong Changming"
-  k119: "Field Identifier (key)"
-  k120: "W:"
-  k121: "Import Image"
-  k122: "Starts with lowercase letter, containing only lowercase letters/digits/underscores"
-  k123: "Not yet split"
-  k124: "Attribute Follow"
-  k125: "Saved"
-  k126: "Filled fields will be applied to all selected items"
-  k127: "Exited canvas edit mode"
-  k128: "Layout write failed, please check logs."
-  k129: "Layout name cannot start with space or dot"
-  k130: "Apply to All"
-  k131: "Apply Settings"
-  k132: "When enabled, allows decimal input; UI uses DoubleValidator"
-  k133: "Enable multi-view, add/rename/delete views"
-  k134: "Start Batch Execution (F9)"
-  k135: "Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5"
-  k136: "Current User:"
-  k137: "Current season equipment level (select from level config)"
-  k138: "Current Config:"
-  k139: "Screenshot"
-  k140: "Screenshot unavailable, please position window or connect device in main window first"
-  k141: "Screenshot Failed"
-  k142: "Execute Split"
-  k143: "Batch Group:"
-  k144: "Batch Management"
-  k145: "Batch Settings"
-  k146: "Sort"
-  k147: "Submit to Gallery"
-  k148: "Values reuse target slot, table is read-only"
-  k149: "Which coordinate point to bind for new point? (reuse source radius):"
-  k150: "Add Reference Image"
-  k151: "Add Failed"
-  k152: "Add Field"
-  k153: "Add View"
-  k154: "New"
-  k155: "New Region"
-  k156: "New Scene"
-  k157: "New Scene Group"
-  k158: "New Point"
-  k159: "Create Failed"
-  k160: "New Space"
-  k161: "New Panel"
-  k162: "Direction List"
-  k163: "No Available Points"
-  k164: "No Available Panels"
-  k165: "Cannot Cancel"
-  k166: "Cannot Capture Screenshot"
-  k167: "Cannot Follow"
-  k168: "Yes"
-  k169: "Display Name"
-  k170: "No data yet, please add via Tools → Batch Config"
-  k171: "Change Group"
-  k172: "Update Failed"
-  k173: "Unsaved Changes"
-  k174: "Not Filled"
-  k175: "No Area Selected"
-  k176: "Unknown"
-  k177: "Not Selected"
-  k178: "Calibration Mode"
-  k179: "Validation Failed"
-  k180: "Horizontal Scroll"
-  k181: "Ratio"
-  k182: "No target slot to follow."
-  k183: "Measure Height"
-  k184: "Browse..."
-  k185: "Add Parameter"
-  k186: "Add Affix Name"
-  k187: "Clear Grid"
-  k188: "Scroll Direction"
-  k189: "Active Space"
-  k190: "Click 'Recognize All Fields' to view OCR results, click 'Recognize All Materials' to view material recognition results"
-  k191: "Click to insert current scene key at script editor cursor"
-  k192: "Generate Grid"
-  k193: "Username column:"
-  k194: "Canvas edit mode: drag/resize yellow canvas frame to exclude window borders"
-  k195: "Leave empty to keep unchanged"
-  k196: "Leave empty to same as key"
-  k197: "Confirm Overwrite"
-  k198: "Confirm Follow"
-  k199: "Move Failed"
-  k200: "Equal Grid"
-  k201: "Wait Range (sec)"
-  k202: "Level"
-  k203: "Manage Views"
-  k204: "Type:"
-  k205: "Paste (Ctrl+V)"
-  k206: "Vertical Scroll"
-  k207: "Bind Point"
-  k208: "Bind Panel"
-  k209: "Inherit Failed"
-  k210: "Edit Region"
-  k211: "Edit Point"
-  k212: "Edit Canvas"
-  k213: "Edit Panel"
-  k214: "Grid Parameters"
-  k215: "Grid line interval in pixels, for filtering black borders"
-  k216: "User for script test execution, defaults to current user on main page. Switching does not affect main page."
-  k217: "Auto Mode"
-  k218: "At least one scene group must be retained"
-  k219: "English, e.g. bag_grid"
-  k220: "English, e.g. my_group"
-  k221: "English, e.g. my_point"
-  k222: "English, e.g. my_region"
-  k223: "English, e.g. my_scene"
-  k224: "Row:"
-  k225: "Rows"
-  k226: "Crop Area (x, y, w, h)"
-  k227: "Equipment level (1-999, no duplicates, required)"
-  k228: "View"
-  k229: "View Key:"
-  k230: "View Name:"
-  k231: "Character name column (cannot be deleted)"
-  k232: "Recognize All Fields"
-  k233: "Recognize All Materials"
-  k234: "Affix name (original affix → current category)"
-  k235: "No Panel defined for this scene, please create a panel definition first."
-  k236: "All Panel definitions for this scene are already bound."
-  k237: "All YAML coordinate points for this scene have been placed."
-  k238: "All YAML coordinate points for this scene have been placed, cannot copy new points."
-  k239: "This point is referenced by a direction, please delete the associated direction first."
-  k240: "Whether this level allows tuning reset (optional)"
-  k241: "Minimum material count required for this level (optional)"
-  k242: "Please select a placed coordinate point on canvas or in the list first, then create direction."
-  k243: "Please import an image first"
-  k244: "Please select an area first"
-  k245: "Please click '+ Group' to create a group first"
-  k246: "Please select a point first"
-  k247: "Please select an affix category first"
-  k248: "Please select at least one reference image"
-  k249: "Please enter a layout name"
-  k250: "Season name (e.g. Huangzhong Changming, Jiazhong Bingzuo)"
-  k251: "Season start date"
-  k252: "Season end date"
-  k253: "Season number (1, 2, 3..., for sorting, no duplicates)"
-  k254: "Enter DSL script content..."
-  k255: "Enter metadata (for filter management)"
-  k256: "Enter current scene"
-  k257: "Enter direction key (starts with lowercase letter, may contain digits/underscores):"
-  k258: "Output metadata (OCR by region during recognition)"
-  k259: "Migration Failed"
-  k260: "Run Script"
-  k261: "Progress"
-  k262: "Exit Batch"
-  k263: "Exit Canvas Edit"
-  k264: "Select wf file..."
-  k265: "Select coordinate point to place:"
-  k266: "Select Panel to bind:"
-  k267: "Config"
-  k268: "Config:"
-  k269: "Rename Scene"
-  k270: "Rename Failed"
-  k271: "Rename View"
-  k272: "Interval:"
-  k273: "Limit group scope for material recognition"
-  k274: "Panel List"
-  k275: "H:"
-  k276: "(No affix name, click '+ Add Affix Name' to add)"
-  k277: "Based on PyQt6 · RapidOCR · OpenCV"
-  k278: "This project is for learning and communication purposes only"
-  k279: "[Loaded] Workflow loaded: "
-  k280: "Built-in class: "
-  k281: "Current version: "
-  k282: " ...+"
-  k283: "round(s)"
-  k284: "Timed"
-  k285: "Action"
-  k286: "Name = Tuning Tab checkbox item;\nLeave damage affix empty / select '- No Damage -' = no damage boost needed on that side;\nAttribute = gameplay element school (non-weapon slots use element→no-equal equivalence);\nBind switch = this gameplay judgment equals activating that switch (overrides global state);\nWeapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon."
+    增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；
 
-# ── Errors & Validation ──
-errors:
-  k287: "DesktopCapture 已停止"
-  k288: "YAML top level must be a dict"
-  k289: "[扫描] 局域网内未发现可连接的 ADB 设备"
-  k290: "base_rules 必须是 list"
-  k291: "common_conditions 必须是 dict"
-  k292: "config 中缺少 model_path"
-  k293: "initial_variables 必须是 JSON 对象"
-  k294: "payload 必须是 JSON 对象"
-  k295: "playstyles: 名字不能为空"
-  k296: "profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式"
-  k297: "pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when"
-  k298: "pynput 未安装，无法录制"
-  k299: "scenes.yaml 必须至少包含一个场景分组，请检查配置"
-  k300: "scrcpy 流式"
-  k301: "switches 必须是 dict"
-  k302: "tune_config 顶层必须是 dict"
-  k303: "tuning_rules 必须是 dict"
-  k304: "关闭程序"
-  k305: "分组名称不能为空"
-  k306: "Scene"
-  k307: "Scene must contain key and name"
-  k308: "基底视图不可删除，如需取消分层请取消多视图"
-  k309: "基础规则组顶层必须是 dict"
-  k310: "数据必须是 dict"
-  k311: "无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）"
-  k312: "无法获取版本信息"
-  k313: "无赛季配置，无法计算赛季周期边界"
-  k314: "未配置基础规则组，请在调律页选择基础规则组"
-  k315: "未配置调律规则，请在调律页选择至少一个规则"
-  k316: "未配置调律部位，请在调律页选择至少一个部位"
-  k317: "没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空"
-  k318: "没有启用任何调律规则，请在调律页勾选至少一个规则"
-  k319: "缺少必填字段 key/name"
-  k320: "规则 key 须为小写字母开头的英文/数字/下划线"
-  k321: "规则可引用词表为空（attributes.yaml 异常）"
-  k322: "规则文件顶层必须是 dict"
-  k323: "规则组 key 须为小写字母开头的英文/数字/下划线"
-  k324: "规则组 name 不能为空"
-  k325: "调律部位配置无效，请在调律页重新选择部位"
-  k326: "颜色特征识别器尚未实现"
-  k327: "（空）"
-  k328: "(Must be ['recycle', 'skip'])"
-  k329: "(Must be alphanumeric starting with lowercase letter, underscores allowed)"
-# ── Miscellaneous Strings ──
-misc:
-  k330: '   - 词条未记录'
-  k331: '  扫描处理未启用 → 跳过'
-  k332: '## 汇总'
-  k333: '## 运行结束'
-  k334: '### 成品清单（一般及以上）'
-  k335: '(\d+)\s*阶'
-  k336: '(无)'
-  k337: '(未识别到)'
-  k338: '- 不添加 -'
-  k339: '- 不限 -'
-  k340: '- 无需增伤 -'
-  k341: 'DSL 写入'
-  k342: '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启'
-  k343: '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）'
-  k344: '[录屏] 仅流式截图模式支持录屏'
-  k345: '[录屏] 保存失败（详见日志）'
-  k346: '[录屏] 启动失败（详见日志）'
-  k347: '[录屏] 已放弃本次录制，文件已删除'
-  k348: '[录屏] 无法获取画面尺寸'
-  k349: '[截屏] PNG 编码失败'
-  k350: '[截屏] 截屏失败：无可用画面'
-  k351: '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止'
-  k352: '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律'
-  k353: '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」'
-  k354: '[提示] 当前没有正在运行的自动化'
-  k355: '[提示] 未发现 USB 连接的 ADB 设备'
-  k356: '[提示] 请先停止当前任务，再重新扫描窗口'
-  k357: '[提示] 请先停止当前任务，再重新扫描设备'
-  k358: '[操作] 已停止'
-  k359: '[操作] 收到停止请求'
-  k360: '[模式] 已切换到前台模式（SendInput，移动光标）'
-  k361: '[模式] 已切换到后台模式（PostMessage，不移动光标）'
-  k362: '[状态] 重新扫描窗口，旧定位已失效'
-  k363: '[错误] 暂无配置，请先通过 工具 → 批量配置 添加'
-  k364: '[错误] 未找到可见窗口'
-  k365: '[错误] 请先定位窗口'
-  k366: '[错误] 请先连接设备'
-  k367: '[错误] 请选择一个工作流'
-  k368: '\[转[1\]]?'
-  k369: '^(.+?)武学增[伤效]'
-  k370: '── 调律开始 ──'
-  k371: '一般'
-  k372: '一键添加律准石'
-  k373: '万'
-  k374: '三率'
-  k375: '三率类'
-  k376: '下一点恢复: 已达上限'
-  k377: '不适用'
-  k378: '不限品阶'
-  k379: '不限评级'
-  k380: '不限部位'
-  k381: '专用'
-  k382: '主武器'
-  k383: '云珑'
-  k384: '仅紫色'
-  k385: '仅金色'
-  k386: '仅金装'
-  k387: '仅首词条'
-  k388: '优秀'
-  k389: '会心'
-  k390: '会心率'
-  k391: '会意'
-  k392: '会意率'
-  k393: '伞'
-  k394: '伞武学增伤'
-  k395: '传入规则'
-  k396: '体'
-  k397: '佩'
-  k398: '保留'
-  k399: '停止中... | 等待当前步骤结束'
-  k400: '全向'
-  k401: '全武学增效'
-  k402: '全部'
-  k403: '全部同时出现'
-  k404: '全部规则'
-  k405: '全部规则（默认配置）'
-  k406: '全量'
-  k407: '其他信息'
-  k408: '再生'
-  k409: '冠'
-  k410: '冠胄'
-  k411: '冠胄 · 胸甲'
-  k412: '分钟'
-  k413: '切换截图方式'
-  k414: '判定抗性(%)'
-  k415: '判定结果'
-  k416: '判定语义'
-  k417: '剑'
-  k418: '剑武学增伤'
-  k419: '副武器'
-  k420: '加载工作流文件'
-  k421: '动作'
-  k422: '动态类'
-  k423: '劲'
-  k424: '势'
-  k425: '区域'
-  k426: '区域/坐标点/面板'
-  k427: '区域/面板'
-  k428: '区域中心偏移比例:'
-  k429: '区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）'
-  k430: '半赛季'
-  k431: '单体类奇术增伤'
-  k432: '原始词条名称:'
-  k433: '双刀'
-  k434: '双刀武学增伤'
-  k435: '可重置'
-  k436: '同步到:'
-  k437: '否'
-  k438: '周'
-  k439: '周一'
-  k440: '周三'
-  k441: '周二'
-  k442: '周五'
-  k443: '周六'
-  k444: '周四'
-  k445: '品阶'
-  k446: '品阶 ≥'
-  k447: '品阶未知'
-  k448: '品阶未识别，跳过品阶筛选'
-  k449: '商'
-  k450: '回收'
-  k451: '回收装备'
-  k452: '图像检测'
-  k453: '场景未绑定任何坐标'
-  k454: '坐标点'
-  k455: '坐标随机偏移(px):'
-  k456: '垃圾'
-  k457: '基底'
-  k458: '基础规则'
-  k459: '增效类'
-  k460: '外功增益'
-  k461: '外功类'
-  k462: '外功防御'
-  k463: '大外攻'
-  k464: '大律准石'
-  k465: '天'
-  k466: '失败'
-  k467: '套装'
-  k468: '定时'
-  k469: '实时截屏失败'
-  k470: '宫'
-  k471: '对玩家单位增效'
-  k472: '对首领单位增伤'
-  k473: '对齐失败：alignment 为 None'
-  k474: '小时'
-  k475: '属性攻击'
-  k476: '属攻增益'
-  k477: '属攻类'
-  k478: '工作流已暂停，点击确定继续'
-  k479: '工作流文件 (*.wf);;所有文件 (*)'
-  k480: '工作流暂停'
-  k481: '工作流确认'
-  k482: '工作流通知'
-  k483: '已是最后一条赛季，无法下移'
-  k484: '已是最后一条配置，无法下移'
-  k485: '已是第一条赛季，无法上移'
-  k486: '已是第一条配置，无法上移'
-  k487: '库存'
-  k488: '开始日期'
-  k489: '强制调律'
-  k490: '强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）'
-  k491: '当前场景无截图'
-  k492: '当前场景无截图，请先刷新截图'
-  k493: '当前场景没有 slot 类型的区域'
-  k494: '彩狗粮'
-  k495: '待执行'
-  k496: '律匠 - 通用视觉 RPA 引擎'
-  k497: '御'
-  k498: '徵'
-  k499: '恢复类型: 准点恢复'
-  k500: '恢复类型: 实时恢复'
-  k501: '成功'
-  k502: '截图失败'
-  k503: '扇'
-  k504: '扇武学增伤'
-  k505: '扇武学增效'
-  k506: '手甲'
-  k507: '手甲武学增伤'
-  k508: '扫描处置未启用 → 跳过该装备'
-  k509: '批次初始化'
-  k510: '批次收尾'
-  k511: '批量执行'
-  k512: '承音'
-  k513: '持有'
-  k514: '持有\s*(\d+)'
-  k515: '指定技能增效'
-  k516: '指定武学增效'
-  k517: '操作'
-  k518: '支持重置'
-  k519: '敏'
-  k520: '断连'
-  k521: '方向'
-  k522: '方向/区域'
-  k523: '无'
-  k524: '无处置规则命中 → 跳过该装备'
-  k525: '无已实现规则可判定该装备，结束调律'
-  k526: '无截图
-请连接投屏后点击「刷新截图」'
-  k527: '无截图源，请先在主窗口定位窗口'
-  k528: '无有效结论'
-  k529: '无法获取设备分辨率'
-  k530: '无狗粮规则命中 → 不添加'
-  k531: '无相'
-  k532: '无行为规则命中 → 继续调律'
-  k533: '无词条数据'
-  k534: '日常'
-  k535: '是'
-  k536: '最低材料数量'
-  k537: '最大'
-  k538: '最大外功攻击'
-  k539: '最大外属攻击'
-  k540: '最大无相攻击'
-  k541: '最大本属攻击'
-  k542: '最小'
-  k543: '最小外功攻击'
-  k544: '最小外属攻击'
-  k545: '最小无相攻击'
-  k546: '最小本属攻击'
-  k547: '期望 ≥'
-  k548: '未定位窗口 | 未找到可见窗口'
-  k549: '未定位窗口 | 请先扫描窗口并点击定位'
-  k550: '未归类'
-  k551: '未知'
-  k552: '未知类型'
-  k553: '未知装备'
-  k554: '未知词条'
-  k555: '未达门槛 → 扫描处理'
-  k556: '未连接设备 | 请先扫描并连接设备'
-  k557: '未选词条'
-  k558: '未配置狗粮规则 → 不添加'
-  k559: '本次无一般及以上成品。'
-  k560: '来源'
-  k561: '枪'
-  k562: '枪武学增伤'
-  k563: '横刀'
-  k564: '横刀武学增伤'
-  k565: '正向'
-  k566: '正在校准面板网格...'
-  k567: '正在识别...'
-  k568: '正在识别材料...'
-  k569: '正常完成'
-  k570: '武器'
-  k571: '武器类'
-  k572: '武学增效'
-  k573: '每半赛季'
-  k574: '每周'
-  k575: '每天'
-  k576: '每日'
-  k577: '每月'
-  k578: '每次点击前的随机等待，模拟人类反应时间'
-  k579: '每次点击后的随机等待'
-  k580: '每赛季'
-  k581: '每轮添加'
-  k582: '气血最大值'
-  k583: '没有全部出现'
-  k584: '没有已定义的区域'
-  k585: '没有已定义的面板'
-  k586: '注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）'
-  k587: '测试装备'
-  k588: '添加'
-  k589: '漂移补滚后对齐失败'
-  k590: '点击前延迟(秒)'
-  k591: '点击后延迟(秒)'
-  k592: '点击坐标附加 ±N 像素的随机偏移'
-  k593: '牵丝'
-  k594: '环'
-  k595: '环 · 佩'
-  k596: '生命周期 wf 必须返回 dict 或 null'
-  k597: '生命周期 wf 的 state 必须是 dict'
-  k598: '生存类'
-  k599: '用户中断（F10）'
-  k600: '用户总览'
-  k601: '破竹'
-  k602: '确认'
-  k603: '空'
-  k604: '空数据'
-  k605: '符合以下规则，开始调律：'
-  k606: '等分降级'
-  k607: '等级'
-  k608: '简体中文'
-  k609: '精准率'
-  k610: '紫狗粮'
-  k611: '紫色'
-  k612: '紫装'
-  k613: '紫装及以下'
-  k614: '终点'
-  k615: '结束全部调律'
-  k616: '结束处理未启用'
-  k617: '结束日期'
-  k618: '继续调律'
-  k619: '继续调律或跳过'
-  k620: '绳镖'
-  k621: '绳镖武学增伤'
-  k622: '羽'
-  k623: '胄'
-  k624: '胫'
-  k625: '胫甲'
-  k626: '胫甲 · 腕甲'
-  k627: '胸'
-  k628: '胸甲'
-  k629: '能用'
-  k630: '腕'
-  k631: '腕甲'
-  k632: '自动化运行中 | F10 停止'
-  k633: '自选规则'
-  k634: '自选词条'
-  k635: '舞绫鼓'
-  k636: '舞绫鼓武学增伤'
-  k637: '获取图像失败'
-  k638: '蓝色'
-  k639: '蓝装'
-  k640: '蓝装及以下'
-  k641: '补滚后对齐失败'
-  k642: '裂石'
-  k643: '装备数据'
-  k644: '装备重置冷却期，跳过该装备'
-  k645: '覆写'
-  k646: '规则设置'
-  k647: '角'
-  k648: '角色名'
-  k649: '角色详情'
-  k650: '计数大于等于'
-  k651: '计数小于等于'
-  k652: '词条已满，无行为规则命中 → 跳过该装备'
-  k653: '词条库设置'
-  k654: '询问是否继续'
-  k655: '请先在主窗口定位窗口'
-  k656: '请先在主窗口连接设备'
-  k657: '请先选中要删除的赛季行'
-  k658: '请先选中要删除的配置行'
-  k659: '请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定'
-  k660: '调律'
-  k661: '调满后回收'
-  k662: '调满后回收模式，跳过狗粮添加'
-  k663: '调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收'
-  k664: '负向'
-  k665: '赛季'
-  k666: '赛季名称'
-  k667: '赛季编号'
-  k668: '赛季编号不可重复'
-  k669: '起点'
-  k670: '跳过'
-  k671: '跳过该装备'
-  k672: '辟邪'
-  k673: '运行中'
-  k674: 'General'
-  k675: '通用判定'
-  k676: '通用视觉 RPA 引擎（支持插件扩展）'
-  k677: '部位'
-  k678: '配额'
-  k679: '重命名词条名'
-  k680: '重置'
-  k681: '重置材料信息识别失败，跳过该装备'
-  k682: '重置装备'
-  k683: '金狗粮'
-  k684: '金色'
-  k685: '金装'
-  k686: '防具类'
-  k687: '陌刀'
-  k688: '陌刀武学增伤'
-  k689: '面板'
-  k690: '面板/区域'
-  k691: '顶级'
-  k692: '首词条 %'
-  k693: '首词条 ≥ %'
-  k694: '首词条不限'
-  k695: '首领增伤'
-  k696: '鸣金'
-  k697: '默认'
-  k698: '默认用户'
-  k699: '鼠标/触控移动到目标位置的耗时'
-  k700: '鼠标移动时长(秒)'
-  k701: '（无）'
-  k702: '（未选）'
-  k703: '（正常完成）'
-  k704: '（用户中断）'
-  k705: '（用户中断，部分结果）'
-  k706: '，仅首词条'
-  k707: '，请选择 保存 或 放弃'
+    属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；
 
-  k708: '(空行)'
-  k709: '[批量] 暂无启用的行，请到「配置」页勾选'
-  k710: '[批量] 请至少勾选一个脚本'
-  k711: '[错误] 无主窗口，无法获取运行环境'
-  k712: '[错误] 没有已加载的布局'
-  k713: '[错误] 脚本内容为空'
-  k714: '[错误] 请先在主窗口定位游戏窗口'
-  k715: '[错误] 请先在主窗口连接 ADB 设备'
-  k716: '任务被停止'
-  k717: '保存脚本文件'
-  k718: '值得调律，但测试开关已启用，跳过实际调律'
-  k719: 'Metadata Definition'
-  k720: '全部'
-  k721: '关闭场景编辑器'
-  k722: '分组'
-  k723: '分组 Key:'
-  k724: '列数:'
-  k725: '初始判定'
-  k726: '刷新截图失败'
-  k727: '升序'
-  k728: '双向滚动'
-  k729: '名称'
-  k730: '回收装备：分解为材料'
-  k731: '固定网格'
-  k732: '图像检测'
-  k733: 'Reference Manager'
-  k734: '图片文件 (*.png *.jpg *.bmp *.webp)'
-  k735: '场景'
-  k736: '处置未启用，保留'
-  k737: '备注'
-  k738: '工作流文件 (*.wf)'
-  k739: '工作流文件 (*.wf);;所有文件 (*)'
-  k740: '已有任务在运行，请先停止'
-  k741: '已符合规则但未找到调律入口，跳过本件'
-  k742: '已请求停止'
-  k743: '已请求停止，等当前步骤结束'
-  k744: '当前没有运行中的任务'
-  k745: '当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）'
-  k746: '截图失败'
-  k747: '执行中'
-  k748: '扫描处理'
-  k749: '批次初始化 wf：'
-  k750: '批次收尾 wf：'
-  k751: '数字'
-  k752: '文本'
-  k753: '新建分组'
-  k754: '新建图库空间'
-  k755: '新建场景'
-  k756: '新建布局'
-  k757: '新建配置'
-  k758: '无截图源，请先在主窗口定位窗口'
-  k759: '无法继续调律'
-  k760: '无障碍服务未连接，请先在设置里开启'
-  k761: '未找到「添加」入口'
-  k762: '本件已重置过一次，冷却期内不再重置'
-  k763: '条目'
-  k764: '条目准备 wf：'
-  k765: '条目收尾 wf：'
-  k766: '校准模式:'
-  k767: '横向滚动'
-  k768: '橙色'
-  k769: '正在初始化引擎'
-  k770: '正在启动'
-  k771: '没有已加载的布局'
-  k772: '滚动方向:'
-  k773: '激活布局不可删除'
-  k774: '燕云十六声'
-  k775: '状态'
-  k776: '用户中断（F10）'
-  k777: '移动场景'
-  k778: '空间名:'
-  k779: '等分网格'
-  k780: '简体中文'
-  k781: '红色'
-  k782: '纵向滚动'
-  k783: '结束处理'
-  k784: '结果集：'
-  k785: '结果集：(空)'
-  k786: '继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则'
-  k787: '脚本'
-  k788: '脚本内容为空，无法保存'
-  k789: '脚本测试失败'
-  k790: '脚本测试完成'
-  k791: '脚本测试运行中...'
-  k792: '自动模式'
-  k793: '自动调律'
-  k794: '行数:'
-  k795: '行最小可见比例:'
-  k796: '视图:'
-  k797: '请先新建或加载布局'
-  k798: '请至少选择一个调律规则'
-  k799: '请至少选择一个调律部位'
-  k800: '请输入布局名称：'
-  k801: '调律材料'
-  k802: '调律结束'
-  k803: '调满后回收模式：词条已满，执行回收'
-  k804: '跳过该装备：结束保留在背包'
-  k805: '输入新的方向 key（小写字母开头）：'
-  k806: '返回值：(无)'
-  k807: '选择参考图片'
-  k808: '选择工作流文件'
-  k809: '选择脚本文件'
-  k810: '配置名称：'
-  k811: '重命名分组'
-  k812: '重命名场景'
-  k813: '重命名方向'
-  k814: '重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）'
-  k815: '降序'
-  k816: '(Built-in)'
-  k817: '(Multi-view not enabled, click "New View" to enable)'
-  k818: 'LvJiang - YYSLS Equipment Tuning Tool'
+    绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；
+
+    武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。'
+  : 'Name = Tuning Tab checkbox item;
+
+    Leave damage affix empty / select ''- No Damage -'' = no damage boost needed on that side;
+
+    Attribute = gameplay element school (non-weapon slots use element→no-equal equivalence);
+
+    Bind switch = this gameplay judgment equals activating that switch (overrides global state);
+
+    Weapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon.'
+  DesktopCapture 已停止: DesktopCapture 已停止
+  YAML 顶层必须是字典: YAML top level must be a dict
+  '[扫描] 局域网内未发现可连接的 ADB 设备': '[扫描] 局域网内未发现可连接的 ADB 设备'
+  config 中缺少 model_path: config 中缺少 model_path
+  initial_variables 必须是 JSON 对象: initial_variables 必须是 JSON 对象
+  payload 必须是 JSON 对象: payload 必须是 JSON 对象
+  pynput 未安装，无法录制: pynput 未安装，无法录制
+  scenes.yaml 必须至少包含一个场景分组，请检查配置: scenes.yaml 必须至少包含一个场景分组，请检查配置
+  scrcpy 流式: scrcpy 流式
+  关闭程序: 关闭程序
+  分组名称不能为空: 分组名称不能为空
+  场景: 场景
+  场景必须包含 key 和 name: Scene must contain key and name
+  基底视图不可删除，如需取消分层请取消多视图: 基底视图不可删除，如需取消分层请取消多视图
+  无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: 无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）
+  无法获取版本信息: 无法获取版本信息
+  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空
+  颜色特征识别器尚未实现: 颜色特征识别器尚未实现
+  （空）: （空）
+  '## 汇总': '## 汇总'
+  (无): (无)
+  (未识别到): (未识别到)
+  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启'
+  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）'
+  '[录屏] 仅流式截图模式支持录屏': '[录屏] 仅流式截图模式支持录屏'
+  '[录屏] 保存失败（详见日志）': '[录屏] 保存失败（详见日志）'
+  '[录屏] 启动失败（详见日志）': '[录屏] 启动失败（详见日志）'
+  '[录屏] 已放弃本次录制，文件已删除': '[录屏] 已放弃本次录制，文件已删除'
+  '[录屏] 无法获取画面尺寸': '[录屏] 无法获取画面尺寸'
+  '[截屏] PNG 编码失败': '[截屏] PNG 编码失败'
+  '[截屏] 截屏失败：无可用画面': '[截屏] 截屏失败：无可用画面'
+  '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止': '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止'
+  '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」'
+  '[提示] 当前没有正在运行的自动化': '[提示] 当前没有正在运行的自动化'
+  '[提示] 未发现 USB 连接的 ADB 设备': '[提示] 未发现 USB 连接的 ADB 设备'
+  '[提示] 请先停止当前任务，再重新扫描窗口': '[提示] 请先停止当前任务，再重新扫描窗口'
+  '[提示] 请先停止当前任务，再重新扫描设备': '[提示] 请先停止当前任务，再重新扫描设备'
+  '[操作] 已停止': '[操作] 已停止'
+  '[操作] 收到停止请求': '[操作] 收到停止请求'
+  '[模式] 已切换到前台模式（SendInput，移动光标）': '[模式] 已切换到前台模式（SendInput，移动光标）'
+  '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[模式] 已切换到后台模式（PostMessage，不移动光标）'
+  '[状态] 重新扫描窗口，旧定位已失效': '[状态] 重新扫描窗口，旧定位已失效'
+  '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[错误] 暂无配置，请先通过 工具 → 批量配置 添加'
+  '[错误] 未找到可见窗口': '[错误] 未找到可见窗口'
+  '[错误] 请先定位窗口': '[错误] 请先定位窗口'
+  '[错误] 请先连接设备': '[错误] 请先连接设备'
+  '[错误] 请选择一个工作流': '[错误] 请选择一个工作流'
+  专用: 专用
+  停止中... | 等待当前步骤结束: 停止中... | 等待当前步骤结束
+  全部: 全部
+  全量: 全量
+  切换截图方式: 切换截图方式
+  加载工作流文件: 加载工作流文件
+  区域: 区域
+  区域/坐标点/面板: 区域/坐标点/面板
+  区域/面板: 区域/面板
+  '区域中心偏移比例:': '区域中心偏移比例:'
+  区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）: 区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）
+  场景未绑定任何坐标: 场景未绑定任何坐标
+  坐标点: 坐标点
+  '坐标随机偏移(px):': '坐标随机偏移(px):'
+  基底: 基底
+  失败: 失败
+  实时截屏失败: 实时截屏失败
+  工作流已暂停，点击确定继续: 工作流已暂停，点击确定继续
+  工作流文件 (*.wf);;所有文件 (*): 工作流文件 (*.wf);;所有文件 (*)
+  工作流暂停: 工作流暂停
+  工作流确认: 工作流确认
+  工作流通知: 工作流通知
+  当前场景无截图: 当前场景无截图
+  当前场景无截图，请先刷新截图: 当前场景无截图，请先刷新截图
+  当前场景没有 slot 类型的区域: 当前场景没有 slot 类型的区域
+  待执行: 待执行
+  律匠 - 通用视觉 RPA 引擎: 律匠 - 通用视觉 RPA 引擎
+  成功: 成功
+  批次初始化: 批次初始化
+  批次收尾: 批次收尾
+  批量执行: 批量执行
+  断连: 断连
+  方向: 方向
+  方向/区域: 方向/区域
+  无截图源，请先在主窗口定位窗口: 无截图源，请先在主窗口定位窗口
+  无法获取设备分辨率: 无法获取设备分辨率
+  日常: 日常
+  未定位窗口 | 未找到可见窗口: 未定位窗口 | 未找到可见窗口
+  未定位窗口 | 请先扫描窗口并点击定位: 未定位窗口 | 请先扫描窗口并点击定位
+  未连接设备 | 请先扫描并连接设备: 未连接设备 | 请先扫描并连接设备
+  正在校准面板网格...: 正在校准面板网格...
+  正在识别...: 正在识别...
+  正在识别材料...: 正在识别材料...
+  每次点击前的随机等待，模拟人类反应时间: 每次点击前的随机等待，模拟人类反应时间
+  每次点击后的随机等待: 每次点击后的随机等待
+  没有已定义的区域: 没有已定义的区域
+  没有已定义的面板: 没有已定义的面板
+  注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）: 注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）
+  点击前延迟(秒): 点击前延迟(秒)
+  点击后延迟(秒): 点击后延迟(秒)
+  点击坐标附加 ±N 像素的随机偏移: 点击坐标附加 ±N 像素的随机偏移
+  生命周期 wf 必须返回 dict 或 null: 生命周期 wf 必须返回 dict 或 null
+  生命周期 wf 的 state 必须是 dict: 生命周期 wf 的 state 必须是 dict
+  空: 空
+  等分降级: 等分降级
+  简体中文: 简体中文
+  终点: 终点
+  自动化运行中 | F10 停止: 自动化运行中 | F10 停止
+  获取图像失败: 获取图像失败
+  请先在主窗口定位窗口: 请先在主窗口定位窗口
+  请先在主窗口连接设备: 请先在主窗口连接设备
+  请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: 请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定
+  起点: 起点
+  跳过: 跳过
+  运行中: 运行中
+  通用视觉 RPA 引擎（支持插件扩展）: 通用视觉 RPA 引擎（支持插件扩展）
+  面板: 面板
+  面板/区域: 面板/区域
+  默认: 默认
+  默认用户: 默认用户
+  鼠标/触控移动到目标位置的耗时: 鼠标/触控移动到目标位置的耗时
+  鼠标移动时长(秒): 鼠标移动时长(秒)
+  （无）: （无）
+  （正常完成）: （正常完成）
+  （用户中断）: （用户中断）
+  （用户中断，部分结果）: （用户中断，部分结果）
+  ，请选择 保存 或 放弃: ，请选择 保存 或 放弃
+  (空行): (空行)
+  '[批量] 暂无启用的行，请到「配置」页勾选': '[批量] 暂无启用的行，请到「配置」页勾选'
+  '[批量] 请至少勾选一个脚本': '[批量] 请至少勾选一个脚本'
+  '[错误] 无主窗口，无法获取运行环境': '[错误] 无主窗口，无法获取运行环境'
+  '[错误] 没有已加载的布局': '[错误] 没有已加载的布局'
+  '[错误] 脚本内容为空': '[错误] 脚本内容为空'
+  '[错误] 请先在主窗口定位游戏窗口': '[错误] 请先在主窗口定位游戏窗口'
+  '[错误] 请先在主窗口连接 ADB 设备': '[错误] 请先在主窗口连接 ADB 设备'
+  保存脚本文件: 保存脚本文件
+  元数据定义: Metadata Definition
+  关闭场景编辑器: 关闭场景编辑器
+  分组: 分组
+  '列数:': '列数:'
+  刷新截图失败: 刷新截图失败
+  名称: 名称
+  图库管理: Reference Manager
+  图片文件 (*.png *.jpg *.bmp *.webp): 图片文件 (*.png *.jpg *.bmp *.webp)
+  工作流文件 (*.wf): 工作流文件 (*.wf)
+  当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: 当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）
+  批次初始化 wf：: 批次初始化 wf：
+  批次收尾 wf：: 批次收尾 wf：
+  数字: 数字
+  文本: 文本
+  新建分组: 新建分组
+  新建图库空间: 新建图库空间
+  新建布局: 新建布局
+  新建配置: 新建配置
+  条目: 条目
+  条目准备 wf：: 条目准备 wf：
+  条目收尾 wf：: 条目收尾 wf：
+  '校准模式:': '校准模式:'
+  没有已加载的布局: 没有已加载的布局
+  '滚动方向:': '滚动方向:'
+  激活布局不可删除: 激活布局不可删除
+  状态: 状态
+  移动场景: 移动场景
+  '空间名:': '空间名:'
+  结果集：: 结果集：
+  结果集：(空): 结果集：(空)
+  脚本: 脚本
+  脚本内容为空，无法保存: 脚本内容为空，无法保存
+  脚本测试失败: 脚本测试失败
+  脚本测试完成: 脚本测试完成
+  脚本测试运行中...: 脚本测试运行中...
+  '行数:': '行数:'
+  '行最小可见比例:': '行最小可见比例:'
+  '视图:': '视图:'
+  请先新建或加载布局: 请先新建或加载布局
+  请输入布局名称：: 请输入布局名称：
+  输入新的方向 key（小写字母开头）：: 输入新的方向 key（小写字母开头）：
+  返回值：(无): 返回值：(无)
+  选择参考图片: 选择参考图片
+  选择工作流文件: 选择工作流文件
+  选择脚本文件: 选择脚本文件
+  配置名称：: 配置名称：
+  重命名分组: 重命名分组
+  重命名方向: 重命名方向
+  （未开启多视图，点「新增视图」自动开启）: (Multi-view not enabled, click "New View" to enable)

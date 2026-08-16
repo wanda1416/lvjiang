@@ -74,7 +74,7 @@
   "active_layout": "默认布局",
   "layouts": ["VIVO投屏方案", "测试布局", "默认布局"],
   "users": [...],
-  "active_user": "示例角色甲"
+  "active_user": "测试用户A"
 }
 ```
 

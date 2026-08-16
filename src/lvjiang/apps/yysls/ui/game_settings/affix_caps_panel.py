@@ -292,7 +292,7 @@ class AffixCapsPanel(QWidget):
         right_layout.addLayout(btn_layout)
         splitter.addWidget(right_widget)
 
-        splitter.setSizes([150, 400])
+        splitter.setSizes([120, 430])
 
     def _load_data(self):
         """从 YAML 加载数据"""

@@ -163,6 +163,8 @@ class SchoolPanel(QWidget):
         self._btn_import_scheme.clicked.connect(self._on_import_scheme)
         scheme_layout.addWidget(self._btn_import_scheme)
         self._scheme_list = QListWidget()
+        self._scheme_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._scheme_list.customContextMenuRequested.connect(self._on_scheme_context_menu)
         self._scheme_list.currentRowChanged.connect(self._on_scheme_selected)
         scheme_layout.addWidget(self._scheme_list, stretch=1)
         management_layout.addWidget(scheme_group, stretch=1)
@@ -201,7 +203,7 @@ class SchoolPanel(QWidget):
         right_layout.addWidget(value_group, stretch=2)
 
         splitter.addWidget(right_widget)
-        splitter.setSizes([150, 400])
+        splitter.setSizes([120, 430])
 
     def _combos(self) -> list[QComboBox]:
         return [
@@ -266,6 +268,15 @@ class SchoolPanel(QWidget):
     def _current_school(self) -> str | None:
         row = self._school_list.currentRow()
         return self._names[row] if 0 <= row < len(self._names) else None
+
+    def select_school_base_attr(self, school: str, base_attr: str) -> None:
+        """供外部一键跳转：选中流派及其基础属性。"""
+        self._refresh_list(select=school)
+        matches = self._ps_list.findItems(
+            base_attr, Qt.MatchFlag.MatchExactly,
+        )
+        if matches:
+            self._ps_list.setCurrentItem(matches[0])
 
     def _on_school_changed(self, row: int):
         """切换流派 → 刷新右侧表单"""
@@ -462,6 +473,56 @@ class SchoolPanel(QWidget):
             ),
         )
 
+    def _on_scheme_context_menu(self, pos):
+        """方案列表右键菜单：删除"""
+        item = self._scheme_list.itemAt(pos)
+        if not item:
+            return
+        menu = QMenu(self)
+        del_action = menu.addAction(tr("删除"))
+        action = menu.exec(self._scheme_list.mapToGlobal(pos))
+        if action == del_action:
+            self._do_delete_scheme(item.text())
+
+    def _do_delete_scheme(self, name: str):
+        """删除毕业率方案：移除 JSON 文件 + 更新 game_config.yaml"""
+        school = self._current_school()
+        if not school:
+            return
+        ret = QMessageBox.question(
+            self, tr("确认删除"),
+            tr("确定删除方案「{name}」？\n对应的 JSON 文件也会被删除。").format(name=name),
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        # 1. 先删除 JSON 文件（失败则中止，保持配置与磁盘一致）
+        try:
+            from ...evaluator.graduation_converter import scheme_path
+            json_file = scheme_path(school, name)
+            if json_file.exists():
+                json_file.unlink()
+                logger.info(f"已删除方案文件: {json_file}")
+        except Exception as exc:
+            logger.warning(f"删除方案文件失败: {exc}")
+            QMessageBox.warning(
+                self, tr("删除失败"),
+                tr("无法删除方案文件: {exc}").format(exc=exc),
+            )
+            return
+        # 2. 从 schemes 列表中移除并保存
+        cfg = self._schools().get(school) or {}
+        schemes = [s for s in (cfg.get("schemes") or []) if s != name]
+        cfg["schemes"] = schemes
+        self._data.setdefault("schools", {})[school] = cfg
+        self._save_data()
+        # 3. 失效毕业率缓存
+        try:
+            from ...evaluator.graduation import invalidate_graduation_cache
+            invalidate_graduation_cache()
+        except Exception:
+            pass
+        self._refresh_schemes()
+
     # ── 基础属性管理 ──────────────────────────────────────────
 
     def _refresh_play_styles(self):
@@ -612,6 +673,7 @@ class SchoolPanel(QWidget):
                 value_widget = QLineEdit()
                 value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
                 value_widget.setFixedWidth(100)
+                value_widget.setFixedHeight(24)
                 value_widget.setValidator(
                     QDoubleValidator(-999999.0, 999999.0, 4, value_widget)
                 )
@@ -627,6 +689,7 @@ class SchoolPanel(QWidget):
                     f"{value:.2f}" if value != int(value) else str(int(value))
                 )
                 value_widget = QLabel(text)
+                value_widget.setFixedHeight(24)
                 value_widget.setStyleSheet("font-size: 13px; font-weight: 600;")
                 value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
             if tip:
@@ -642,7 +705,13 @@ class SchoolPanel(QWidget):
             grid.setHorizontalSpacing(20)
             grid.setVerticalSpacing(7)
             for index, cell_args in enumerate(cells):
-                widget = make_cell(*cell_args) if cell_args is not None else QWidget()
+                if cell_args is not None:
+                    widget = make_cell(*cell_args)
+                else:
+                    # 空属性仍占据一个标准数据单元高度。基础属性没有武器武学
+                    # 增效或指定技能增效时，稳定保留对应的两行空白。
+                    widget = QWidget()
+                    widget.setFixedHeight(24)
                 grid.addWidget(widget, index // 2, index % 2)
             grid.setColumnStretch(0, 1)
             grid.setColumnStretch(1, 1)

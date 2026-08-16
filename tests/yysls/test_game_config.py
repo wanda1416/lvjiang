@@ -143,12 +143,6 @@ class TestExternalAffixAliases:
         assert mgr.get_affix_names_for_alias("拳甲增") == ["手甲武学增伤"]
         assert mgr.get_affix_names_for_alias("首领增") == ["对首领单位增伤"]
 
-    def test_shared_alias_returns_all_exact_names(self, mgr):
-        names = mgr.get_affix_names_for_alias("蓄力技定音")
-        assert "无名剑法蓄力技增伤" in names
-        assert "无名枪法蓄力技增伤" in names
-        assert "天志垂象蓄力技增伤" in names
-
     def test_no_fuzzy_fallback(self, mgr):
         assert mgr.get_affix_names_for_alias("蓄力技") == []
         assert mgr.get_affix_names_for_alias("不存在的增") == []

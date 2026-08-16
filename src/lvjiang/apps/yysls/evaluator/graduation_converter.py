@@ -16,6 +16,7 @@ from openpyxl.worksheet.formula import ArrayFormula
 from lvjiang.constants import PROJECT_ROOT
 
 from .excel_formula import FormulaError, FormulaModel, parse_formula
+from .graduation_program import ProgramCompiler, ProgramRuntime
 
 GRADUATION_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "graduation"
 GAME_CONFIG_PATH = PROJECT_ROOT / "config" / "system" / "yysls" / "game_config.yaml"
@@ -105,6 +106,30 @@ def _affix_input_names(workbook, school: str) -> dict[str, list[str]]:
             f"游戏配置没有流派「{school}」的指定技能增效分组，无法解析 Excel。"
             "请补充流派配置后重新导入。"
         )
+    school_config = (config.get("schools") or {}).get(school)
+    if not isinstance(school_config, dict):
+        raise RuntimeError(f"游戏配置缺少流派「{school}」定义，无法筛选 Excel 词条。")
+    weapon_affixes = {
+        str(entry.get("name")): str(entry.get("wuxue_affix"))
+        for entry in (config.get("weapon_types") or [])
+        if isinstance(entry, dict) and entry.get("name") and entry.get("wuxue_affix")
+    }
+    school_weapon_names = {
+        weapon_affixes.get(str((school_config.get(position) or {}).get("weapon")))
+        for position in ("main", "sub")
+    } - {None}
+    category_names = {
+        name: set((config.get("affix_caps", {}).get(name) or {}).get("_aliases") or [])
+        for name in ("全部武学增效", "对单位增效", "奇术类增伤")
+    }
+    allowed_by_input = {
+        "all_skill_bonus": category_names["全部武学增效"],
+        "boss_bonus": category_names["对单位增效"],
+        "weapon_bonus_primary": school_weapon_names,
+        "weapon_bonus_secondary": school_weapon_names,
+        "single_qs_bonus": category_names["奇术类增伤"],
+        "group_qs_bonus": category_names["奇术类增伤"],
+    }
     result: dict[str, list[str]] = {}
     for input_name, label in labels.items():
         if label is None or not str(label).strip():
@@ -132,15 +157,134 @@ def _affix_input_names(workbook, school: str) -> dict[str, list[str]]:
                 )
             result[input_name] = [matches[0]]
             continue
-        matches = alias_index.get(str(label), [])
-        if not matches:
+        matches = [
+            name for name in alias_index.get(str(label), [])
+            if name in allowed_by_input[input_name]
+        ]
+        if len(matches) != 1:
             raise RuntimeError(
-                f"流派「{school}」无法解析 Excel 字段简称 {label!r}。"
-                "请在词组配置中补充对应精准词条的别名，"
-                "或修正 Excel 字段名后重新导入。"
+                f"流派「{school}」的 Excel 字段简称 {label!r} 应唯一映射到"
+                f"一个精准词条，实际匹配 {matches!r}。请修改 Excel 或词组别名"
+                "配置后重新导入。"
             )
         result[input_name] = matches
     return result
+
+
+def _cell_value(formulas, cached, address: str) -> Any:
+    sheet, coordinate = address.split("!", 1)
+    cached_value = cached[sheet][coordinate].value
+    return _json_value(cached_value if cached_value is not None else formulas[sheet][coordinate].value)
+
+
+def _extract_environment(formulas, cached) -> dict[str, Any]:
+    sheet = formulas["期望"]
+    cached_sheet = cached["期望"]
+    team_buffs = []
+    for row in range(16, 21):
+        for name_col, enabled_col in ((3, 4), (5, 6)):
+            name = sheet.cell(row, name_col).value
+            if name not in (None, ""):
+                team_buffs.append({
+                    "name": str(name),
+                    "enabled": str(sheet.cell(row, enabled_col).value or "") == "√",
+                })
+    monster = {}
+    for row in range(2, 6):
+        name = sheet.cell(row, 8).value
+        if name not in (None, ""):
+            value = cached_sheet.cell(row, 9).value
+            if value is None:
+                value = sheet.cell(row, 9).value
+            monster[str(name)] = _json_value(value)
+    return {
+        "food_bonus": {
+            "min_outer": _cell_value(formulas, cached, "期望!B23"),
+            "max_outer": _cell_value(formulas, cached, "期望!B24"),
+        },
+        "fixed_damage_bonus": _cell_value(formulas, cached, "期望!B22"),
+        "team_buffs": team_buffs,
+        "monster": monster,
+        "combat_time": _cell_value(formulas, cached, "期望!I8"),
+    }
+
+
+def _baseline_attrs(model: dict[str, Any], affix_names: dict[str, list[str]]) -> dict[str, Any]:
+    runtime = FormulaModel(model)
+    attrs: dict[str, Any] = {}
+    extra_attrs: dict[str, float] = {}
+    dynamic = {"weapon_bonus_primary", "weapon_bonus_secondary", "special_bonus"}
+    for name, target in INPUTS.items():
+        value = float(runtime.value(target) or 0)
+        if name in dynamic:
+            names = affix_names[name]
+            if names:
+                extra_attrs[names[0]] = value
+        else:
+            attrs[name] = value
+    if extra_attrs:
+        attrs["extra_attrs"] = extra_attrs
+    return attrs
+
+
+def _compile_v2(
+    workbook_model: dict[str, Any], school: str, affix_names: dict[str, list[str]],
+    environment: dict[str, Any],
+) -> dict[str, Any]:
+    dynamic = {"weapon_bonus_primary", "weapon_bonus_secondary", "special_bonus"}
+    bindings: dict[str, dict[str, str]] = {}
+    for name, target in INPUTS.items():
+        if name in dynamic:
+            names = affix_names[name]
+            if not names:
+                # A deliberately empty skill bonus remains a fixed zero.
+                continue
+            bindings[target] = {"kind": "affix", "name": names[0]}
+        else:
+            bindings[target] = {"kind": "field", "name": name}
+    compiler = ProgramCompiler(workbook_model, bindings)
+    program = compiler.compile({
+        name: OUTPUTS[name]
+        for name in ("combat_time", "total_damage", "dps", "graduation_rate")
+    })
+    baseline_attrs = _baseline_attrs(workbook_model, affix_names)
+    input_values = []
+    extra = baseline_attrs.get("extra_attrs", {})
+    for spec in program["inputs"]:
+        input_values.append(float(
+            baseline_attrs.get(spec["name"], 0)
+            if spec["kind"] == "field" else extra.get(spec["name"], 0)
+        ))
+    compiled_outputs = ProgramRuntime(program, input_values).outputs()
+    workbook_runtime = FormulaModel(workbook_model)
+    reference = {
+        name: float(workbook_runtime.value(OUTPUTS[name]))
+        for name in compiled_outputs
+    }
+    for name, actual in reference.items():
+        sheet, coordinate = OUTPUTS[name].split("!", 1)
+        cached = workbook_model["sheets"][sheet]["cells"][coordinate].get("cached")
+        if cached is not None and abs(actual - float(cached)) > max(
+            1e-6, abs(float(cached)) * 1e-10,
+        ):
+            raise FormulaError(
+                f"Excel 公式 {name}={actual} 与工作簿缓存值 {cached} 不一致"
+            )
+    for name, actual in compiled_outputs.items():
+        expected = reference[name]
+        if abs(actual - expected) > max(1e-6, abs(expected) * 1e-10):
+            raise FormulaError(
+                f"编译后的 {name}={actual} 与 Excel 公式结果 {expected} 不一致"
+            )
+    return {
+        "schema_version": 2,
+        "school": school,
+        "source": workbook_model["model"]["source"],
+        "baseline_attrs": baseline_attrs,
+        "environment": environment,
+        "reference": reference,
+        "program": program,
+    }
 
 
 def convert_workbook(path: Path, school: str) -> dict[str, Any]:
@@ -177,7 +321,7 @@ def convert_workbook(path: Path, school: str) -> dict[str, Any]:
                 "cells": cells,
             }
         source_bytes = path.read_bytes()
-        return {
+        workbook_model = {
             "schema_version": "1.0",
             "formula_language": "excel_subset_v1",
             "model": {
@@ -205,25 +349,29 @@ def convert_workbook(path: Path, school: str) -> dict[str, Any]:
             "outputs": {name: {"ref": ref} for name, ref in OUTPUTS.items()},
             "sheets": sheets,
         }
+        return _compile_v2(
+            workbook_model, school, affix_names,
+            _extract_environment(formulas, cached),
+        )
     finally:
         formulas.close()
         cached.close()
 
 
 def validate_model(model: dict[str, Any]) -> dict[str, float]:
-    runtime = FormulaModel(model)
-    results: dict[str, float] = {}
-    for name, spec in model["outputs"].items():
-        result = runtime.value(spec["ref"])
-        results[name] = float(result) if result is not None else 0.0
-        sheet, coordinate = spec["ref"].split("!", 1)
-        cached = model["sheets"][sheet]["cells"][coordinate].get("cached")
-        if cached is not None and abs(float(cached) - results[name]) > max(
-            1e-6, abs(float(cached)) * 1e-10,
-        ):
-            raise FormulaError(
-                f"{spec['ref']} evaluated to {results[name]}, cached value is {cached}"
-            )
+    if model.get("schema_version") != 2:
+        raise FormulaError("graduation model must use schema version 2")
+    baseline = model["baseline_attrs"]
+    extra = baseline.get("extra_attrs", {})
+    values = [
+        float(baseline.get(spec["name"], 0) if spec["kind"] == "field"
+              else extra.get(spec["name"], 0))
+        for spec in model["program"]["inputs"]
+    ]
+    results = ProgramRuntime(model["program"], values).outputs()
+    for name, expected in model["reference"].items():
+        if abs(results[name] - float(expected)) > max(1e-6, abs(float(expected)) * 1e-10):
+            raise FormulaError(f"compiled {name} does not match its reference value")
     return results
 
 

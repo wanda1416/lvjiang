@@ -104,6 +104,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     user_changed = pyqtSignal(str)
     # 装备变更信号（用于通知战斗属性 Tab 刷新）
     equipment_changed = pyqtSignal()
+    # 毕业率计算完成信号（用于通知装备状态页同步状态展示行）
+    graduation_updated = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()

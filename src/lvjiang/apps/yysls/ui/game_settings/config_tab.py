@@ -68,3 +68,8 @@ class GameConfigTab(QWidget):
         self._affix_panel.refresh_level_combos()
         self._base_panel.refresh_level_combos()
         self._season_panel.refresh_level_combos()
+
+    def select_school_base_attr(self, school: str, base_attr: str) -> None:
+        """切换到流派配置，并定位指定基础属性。"""
+        self._tabs.setCurrentWidget(self._school_panel)
+        self._school_panel.select_school_base_attr(school, base_attr)

@@ -51,10 +51,15 @@ def main() -> None:
     for path, school in selected:
         model = convert_workbook(path, school)
         outputs = validate_model(model)
+        if f"{outputs['graduation_rate'] * 100:.2f}%" != "100.00%":
+            raise RuntimeError(
+                f"{school} 官方满值表回算不是 100.00%："
+                f"{outputs['graduation_rate'] * 100:.8f}%"
+            )
         if not args.check:
             write_model(OUTPUT_DIR / f"{school}_{args.scheme}.json", model)
         print(
-            f"{school}: formulas={model['model']['formula_count']}, "
+            f"{school}: nodes={len(model['program']['nodes'])}, "
             f"DPS={outputs['dps']:.6f}, graduation={outputs['graduation_rate']:.9f}"
         )
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QGroupBox, QLabel, QMessageBox
+from PyQt6.QtWidgets import QGroupBox, QLabel, QLineEdit, QMessageBox
 
 from lvjiang.apps.yysls.config import EQUIP_PART_NAMES
 from lvjiang.apps.yysls.ui.game_settings import (
@@ -248,6 +248,38 @@ class TestSchoolPanel:
         assert not old_panel.isVisible()
         # 当前面板 + 末尾 stretch，不允许旧卡片残留在布局里。
         assert panel._ps_scroll_layout.count() == 2
+
+    def test_external_navigation_selects_school_and_base_attr(
+        self, qtbot, tmp_attrs, monkeypatch,
+    ):
+        import lvjiang.apps.yysls.config as game_config
+
+        monkeypatch.setattr(
+            game_config,
+            "get_play_styles",
+            lambda school: {"测试基础属性": {"min_outer": 1234}},
+        )
+        panel = SchoolPanel()
+        qtbot.addWidget(panel)
+        panel.select_school_base_attr("鸣金·虹", "测试基础属性")
+        assert panel._current_school() == "鸣金·虹"
+        assert panel._ps_list.currentItem().text() == "测试基础属性"
+        assert panel._scheme_list.currentRow() == -1
+        assert panel._ps_current_name == "测试基础属性"
+
+        values = panel._ps_scroll_widget.findChildren(QLineEdit)
+        assert values
+        assert {edit.height() for edit in values} == {24}
+        gain_card = next(
+            card for card in panel._ps_scroll_widget.findChildren(QGroupBox)
+            if card.title() == "增益效果"
+        )
+        assert gain_card.layout().rowCount() == 6
+        empty_cells = [
+            gain_card.layout().itemAtPosition(row, column).widget()
+            for row in (1, 5) for column in (0, 1)
+        ]
+        assert all(cell is not None and cell.height() == 24 for cell in empty_cells)
 
     def test_field_edit_saves(self, qtbot, tmp_attrs):
         panel = SchoolPanel()

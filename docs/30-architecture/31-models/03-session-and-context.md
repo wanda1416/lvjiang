@@ -22,13 +22,13 @@
 
 ## 二、Session 数据模型
 
-Session 存储于 `config/local/users/{username}.json`，按用户隔离。
+Session 存储于 `config/session/users/{username}.json`，按用户隔离。
 
 ### 2.1 顶层结构
 
 ```json
 {
-  "current_user": "宛元芷",
+  "current_user": "测试用户B",
   "current_school": "ming_hong",
   "equipped": { ... },
   "materials": { ... }
@@ -307,11 +307,11 @@ eval save()
 ## 五、存储路径
 
 ```
-config/local/
-├── session.json                    ← 应用级基准（active_user、用户列表、布局列表）
+config/session/
+├── session.json                       ← 应用级基准（active_user、用户列表、布局列表）
 └── users/
-    ├── 蔡元君.json                 ← session 持久化数据
-    ├── 宛元芷.json
+    ├── 测试用户A.json                 ← session 持久化数据
+    ├── 测试用户B.json
     └── ...
 ```
 

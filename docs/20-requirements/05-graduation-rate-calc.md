@@ -282,7 +282,7 @@ c24, e18, c22, c23, c25, c26, e25, fourth_xinfa
 
 ---
 
-## 9. 验证结果（蔡元君 · 鸣金虹）
+## 9. 验证结果（测试用户A · 鸣金虹）
 
 ### 9.1 已验证匹配的属性
 
@@ -359,4 +359,4 @@ c24, e18, c22, c23, c25, c26, e25, fourth_xinfa
 | 字符串表 | `data/temp/leoq7/assets/js/generated-calc-strings.js` |
 | JS 封装层 | `data/temp/leoq7/assets/js/excel-runtime.js` |
 | 计算脚本 v2 | `data/temp/leoq7/calc_v2.js` |
-| 蔡元君装备数据 | `config/session/users/蔡元君.json` |
+| 测试用户A装备数据 | `config/session/users/测试用户A.json` |

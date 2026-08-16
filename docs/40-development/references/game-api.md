@@ -54,7 +54,7 @@ GET https://s3.game.163.com/7540694694f2dddc/game/regional/data?access_token={to
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `roleId` | string | 角色 ID，如 `"0339046679"` |
-| `roleName` | string | 角色名，如 `"蔡元君"` |
+| `roleName` | string | 角色名，如 `"测试用户A"` |
 | `level` | int | 等级（100） |
 | `kongfuMain` | int | 主功法 ID（10102 = 牵丝霖） |
 | `kongfuSub` | int | 副功法 ID（10202） |
@@ -211,7 +211,7 @@ import urllib.request
 import urllib.parse
 
 # 读取 token
-with open("config/session/users/蔡元君.json", "r", encoding="utf-8") as f:
+with open("config/session/users/测试用户A.json", "r", encoding="utf-8") as f:
     token = json.load(f)["access_token"]
 
 HASH = "7540694694f2dddc"

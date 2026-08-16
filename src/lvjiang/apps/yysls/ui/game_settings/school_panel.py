@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -199,6 +200,7 @@ class SchoolPanel(QWidget):
         self._ps_scroll.setWidget(self._ps_scroll_widget)
         self._ps_edits: dict[str, QLineEdit] = {}
         self._ps_current_name: str = ""  # 当前编辑的基础属性名
+        self._scheme_baseline_edit: QLineEdit | None = None
         value_layout.addWidget(self._ps_scroll, stretch=1)
         right_layout.addWidget(value_group, stretch=2)
 
@@ -550,6 +552,7 @@ class SchoolPanel(QWidget):
                 widget.deleteLater()
         self._ps_edits.clear()
         self._ps_current_name = ""
+        self._scheme_baseline_edit = None
 
     def _on_scheme_selected(self, row: int) -> None:
         """选中方案 → 展示 Excel 输入满值（输入契约不包含食物加成）。"""
@@ -565,9 +568,13 @@ class SchoolPanel(QWidget):
             tr("方案：{name}（满值属性，不含食物加成）").format(name=scheme)
         )
         try:
-            from ...evaluator.graduation import get_graduation_scheme_combat_attrs
+            from ...evaluator.graduation import (
+                get_graduation_scheme_combat_attrs,
+                get_graduation_scheme_metrics,
+            )
 
             attrs = get_graduation_scheme_combat_attrs(school, scheme)
+            adps, baseline_dps = get_graduation_scheme_metrics(school, scheme)
         except Exception as exc:
             logger.error(f"读取毕业率方案数值失败: {exc}")
             self._value_source_label.setText(tr("方案数值读取失败：{error}").format(
@@ -580,7 +587,68 @@ class SchoolPanel(QWidget):
         self._ps_scroll_layout.addWidget(
             self._create_standard_attrs_widget(attrs, school_attr, editable=False)
         )
+        self._ps_scroll_layout.addWidget(
+            self._create_scheme_metrics_widget(
+                school, scheme, adps, baseline_dps,
+            )
+        )
         self._ps_scroll_layout.addStretch()
+
+    def _create_scheme_metrics_widget(
+        self, school: str, scheme: str, adps: float, baseline_dps: float,
+    ) -> QWidget:
+        """四张属性卡片下方的方案 DPS 校正区。"""
+        panel = QFrame()
+        panel.setObjectName("schemeMetricsPanel")
+        panel.setStyleSheet(
+            "QFrame#schemeMetricsPanel {"
+            " background-color: palette(base);"
+            " border: 1px solid palette(midlight); border-radius: 6px;"
+            "}"
+        )
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
+        layout.addWidget(QLabel(tr("方案 ADPS")))
+        adps_value = QLabel(f"{adps:.2f}")
+        adps_value.setObjectName("schemeAdpsValue")
+        adps_value.setStyleSheet("font-weight: 600;")
+        layout.addWidget(adps_value)
+        layout.addStretch()
+        layout.addWidget(QLabel(tr("100%毕业率基准 DPS")))
+        edit = QLineEdit(f"{baseline_dps:.2f}")
+        edit.setObjectName("graduationBaselineDpsEdit")
+        edit.setAlignment(Qt.AlignmentFlag.AlignRight)
+        edit.setFixedSize(130, 24)
+        edit.setValidator(QDoubleValidator(0.01, 999999999.0, 2, edit))
+        edit.setToolTip(tr("修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算"))
+        edit.editingFinished.connect(
+            lambda: self._save_scheme_baseline_dps(school, scheme, edit)
+        )
+        self._scheme_baseline_edit = edit
+        layout.addWidget(edit)
+        return panel
+
+    def _save_scheme_baseline_dps(
+        self, school: str, scheme: str, edit: QLineEdit,
+    ) -> None:
+        """保存人工校正的 100% 毕业率基准 DPS。"""
+        try:
+            value = float(edit.text())
+            from ...evaluator.graduation import set_graduation_baseline_dps
+
+            set_graduation_baseline_dps(school, scheme, value)
+            edit.setText(f"{value:.2f}")
+        except Exception as exc:
+            logger.error(f"保存毕业率基准 DPS 失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            try:
+                from ...evaluator.graduation import get_graduation_scheme_metrics
+
+                _adps, old_value = get_graduation_scheme_metrics(school, scheme)
+                edit.setText(f"{old_value:.2f}")
+            except Exception:
+                pass
 
     def _on_ps_selected(self, row: int):
         """选中基础属性 → 在右侧显示可编辑卡片"""

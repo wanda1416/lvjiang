@@ -96,6 +96,7 @@
     "dps": 106783.87137252906,
     "graduation_rate": 1.000000012853337
   },
+  "graduation_baseline_dps": 106783.86999999998,
   "program": {
     "inputs": [
       {
@@ -19328,22 +19329,12 @@
         "div",
         3814,
         0
-      ],
-      [
-        "const",
-        106783.87
-      ],
-      [
-        "div",
-        3815,
-        3816
       ]
     ],
     "outputs": {
       "combat_time": 0,
       "total_damage": 3814,
-      "dps": 3815,
-      "graduation_rate": 3817
+      "dps": 3815
     }
   }
 }

@@ -754,43 +754,58 @@ class EquipStatusTab(QWidget):
         layout.addLayout(btn_row)
 
         # ── 状态展示行：DPS / 毕业率（复用角色详情配置） ──
-        status_row = QHBoxLayout()
-        status_row.setContentsMargins(8, 2, 8, 4)
-        status_row.setSpacing(20)
+        # 与下方战斗属性卡片同结构：左右两栏各含两列，当前占前两列
+        status_root = QWidget()
+        status_root.setFixedHeight(32)
+        status_columns = QHBoxLayout(status_root)
+        status_columns.setContentsMargins(8, 2, 8, 4)
+        status_columns.setSpacing(10)
 
-        # DPS
-        dps_widget = QWidget()
-        dps_layout = QHBoxLayout(dps_widget)
+        # 左栏：DPS（列 0-1）+ 毕业率（列 2-3 中的列 2）
+        status_left = QWidget()
+        status_grid = QGridLayout(status_left)
+        status_grid.setContentsMargins(0, 0, 0, 0)
+        status_grid.setHorizontalSpacing(20)
+        status_grid.setColumnStretch(0, 1)
+        status_grid.setColumnStretch(1, 1)
+
+        # DPS（第 0 列）
+        dps_layout = QHBoxLayout()
         dps_layout.setContentsMargins(0, 0, 0, 0)
         dps_layout.setSpacing(8)
         dps_name = QLabel(tr("DPS"))
         dps_name.setStyleSheet(_STATUS_NAME_STYLE)
         self._status_dps = QLabel("--")
         self._status_dps.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._status_dps.setMinimumWidth(100)
+        self._status_dps.setMinimumWidth(80)
         self._status_dps.setStyleSheet(_STATUS_VALUE_STYLE)
         dps_layout.addWidget(dps_name)
         dps_layout.addStretch()
         dps_layout.addWidget(self._status_dps)
-        status_row.addWidget(dps_widget)
+        status_grid.addLayout(dps_layout, 0, 0)
 
-        # 毕业率
-        rate_widget = QWidget()
-        rate_layout = QHBoxLayout(rate_widget)
+        # 毕业率（第 1 列）
+        rate_layout = QHBoxLayout()
         rate_layout.setContentsMargins(0, 0, 0, 0)
         rate_layout.setSpacing(8)
         rate_name = QLabel(tr("毕业率"))
         rate_name.setStyleSheet(_STATUS_NAME_STYLE)
         self._status_graduation = QLabel("--")
         self._status_graduation.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._status_graduation.setMinimumWidth(100)
+        self._status_graduation.setMinimumWidth(80)
         self._status_graduation.setStyleSheet(_STATUS_YELLOW_VALUE_STYLE)
         rate_layout.addWidget(rate_name)
         rate_layout.addStretch()
         rate_layout.addWidget(self._status_graduation)
-        status_row.addWidget(rate_widget)
+        status_grid.addLayout(rate_layout, 0, 1)
 
-        layout.addLayout(status_row)
+        status_columns.addWidget(status_left, stretch=1)
+
+        # 右栏：留空，未来补充更多数据
+        status_right = QWidget()
+        status_columns.addWidget(status_right, stretch=1)
+
+        layout.addWidget(status_root)
 
         # ── 滚动区域：槽位 + 背包网格统一滚动 ──
         scroll = QScrollArea()

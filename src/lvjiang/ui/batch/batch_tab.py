@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -133,9 +134,10 @@ class BatchTab(QWidget):
         self._progress_table.setHorizontalHeaderLabels([tr("条目"), tr("脚本"), tr("状态")])
         hheader = self._progress_table.horizontalHeader()
         assert hheader is not None
+        # 前两列自适应内容，最后一列拉伸填充剩余空间
+        hheader.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        hheader.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         hheader.setStretchLastSection(True)
-        self._progress_table.setColumnWidth(0, 100)
-        self._progress_table.setColumnWidth(1, 110)
         self._progress_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers
         )

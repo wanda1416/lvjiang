@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QGroupBox, QLabel, QMessageBox
 
 from lvjiang.apps.yysls.config import EQUIP_PART_NAMES
 from lvjiang.apps.yysls.ui.game_settings import (
@@ -215,6 +215,39 @@ class TestSchoolPanel:
         assert panel._edit_sub_martial.text() == "十方破阵"
         assert panel._scheme_list.count() == 1
         assert panel._scheme_list.item(0).text() == "基础方案"
+        assert panel._scheme_list.currentRow() == 0
+        assert "方案：基础方案" in panel._value_source_label.text()
+        assert panel._scheme_group.height() == panel._base_attrs_group.height()
+        cards = {
+            card.title(): card for card
+            in panel._ps_scroll_widget.findChildren(QGroupBox)
+        }
+        assert cards["攻击属性"].layout().rowCount() == 6
+        assert cards["判定属性"].layout().rowCount() == 3
+        assert cards["增益效果"].layout().rowCount() == 6
+        assert cards["伤害加成"].layout().rowCount() == 3
+        labels = {
+            label.text() for label
+            in panel._ps_scroll_widget.findChildren(QLabel)
+        }
+        assert "陌刀武学增伤" in labels
+        assert "十方破阵蓄力技增伤" in labels
+        assert "陌刀增" not in labels
+        assert "蓄力技定音" not in labels
+
+    def test_switching_scheme_removes_old_value_panel_immediately(
+        self, qtbot, tmp_attrs,
+    ):
+        panel = SchoolPanel()
+        qtbot.addWidget(panel)
+        assert panel._scheme_list.count() >= 1
+        panel._on_scheme_selected(0)
+        old_panel = panel._ps_scroll_layout.itemAt(0).widget()
+        panel._on_scheme_selected(0)
+        assert old_panel.parent() is None
+        assert not old_panel.isVisible()
+        # 当前面板 + 末尾 stretch，不允许旧卡片残留在布局里。
+        assert panel._ps_scroll_layout.count() == 2
 
     def test_field_edit_saves(self, qtbot, tmp_attrs):
         panel = SchoolPanel()

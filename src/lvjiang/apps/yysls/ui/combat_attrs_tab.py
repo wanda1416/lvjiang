@@ -765,7 +765,7 @@ class CombatAttrsTab(QWidget):
             school_attr = get_game_config().get_school_attr(school)
         target_pen = WUXIANG_TO_ATTR_PEN.get(school_attr or "")
         for field_name in (
-            "outer_pen", "mingjin_pen", "lieshi_pen", "pozhua_pen", "qiansi_pen",
+            "outer_pen", "mingjin_pen", "lieshi_pen", "pozhu_pen", "qiansi_pen",
         ):
             equipment_value = getattr(equip_attrs, field_name)
             if field_name == target_pen:
@@ -794,7 +794,7 @@ class CombatAttrsTab(QWidget):
         attr_fields = (
             ("鸣金", "mingjin_bonus"),
             ("裂石", "lieshi_bonus"),
-            ("破竹", "pozhua_bonus"),
+            ("破竹", "pozhu_bonus"),
             ("牵丝", "qiansi_bonus"),
         )
         school = self._get_current_school()
@@ -847,7 +847,7 @@ class CombatAttrsTab(QWidget):
         attr_fields = (
             ("鸣金", "mingjin_pen"),
             ("裂石", "lieshi_pen"),
-            ("破竹", "pozhua_pen"),
+            ("破竹", "pozhu_pen"),
             ("牵丝", "qiansi_pen"),
         )
         school = self._get_current_school()

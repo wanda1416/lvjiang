@@ -28,7 +28,11 @@ FILE_TO_SCHOOL = {
 def workbooks() -> list[tuple[Path, str]]:
     result = []
     for prefix, school in FILE_TO_SCHOOL.items():
-        matches = list(EXCEL_DIR.glob(f"*{prefix}*.xlsx"))
+        # 批量脚本只处理正式源文件；用户另存的“副本”应通过方案管理单独导入。
+        matches = [
+            path for path in EXCEL_DIR.glob(f"*{prefix}*.xlsx")
+            if "副本" not in path.stem
+        ]
         if len(matches) != 1:
             raise RuntimeError(f"expected one workbook for {school}, found {len(matches)}")
         result.append((matches[0], school))

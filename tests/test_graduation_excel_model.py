@@ -8,11 +8,17 @@ import pytest
 from lvjiang.apps.yysls.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.evaluator.excel_formula import FormulaModel, parse_formula
-from lvjiang.apps.yysls.evaluator.graduation import get_graduation_calculator
+from lvjiang.apps.yysls.evaluator.graduation import (
+    get_graduation_calculator,
+    get_graduation_scheme_combat_attrs,
+    get_graduation_scheme_inputs,
+)
+from lvjiang.apps.yysls.evaluator.graduation_converter import convert_workbook
 
 DATA_DIR = (
     Path(__file__).parents[1] / "config" / "system" / "yysls" / "graduation"
 )
+EXCEL_DIR = Path(__file__).parents[1] / "data" / "temp" / "excel"
 SCHOOLS = [
     "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
     "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",
@@ -29,6 +35,23 @@ def test_formula_parser_supports_workbook_subset() -> None:
     ast = parse_formula('=IF(A1>0,SUM(B1:B3),VLOOKUP("x",表!A:C,2,FALSE))')
     assert ast["op"] == "call"
     assert ast["name"] == "IF"
+
+
+def test_converter_resolves_skill_alias_in_school_group() -> None:
+    path = next(
+        path for path in EXCEL_DIR.glob("*鸣金虹*.xlsx")
+        if "副本" not in path.stem
+    )
+    model = convert_workbook(path, "鸣金·虹")
+    assert model["inputs"]["special_bonus"]["affix_names"] == [
+        "无名剑法蓄力技增伤"
+    ]
+
+
+def test_converter_ignores_blank_skill_affix_label() -> None:
+    path = next(EXCEL_DIR.glob("*牵丝霖*.xlsx"))
+    model = convert_workbook(path, "牵丝·霖")
+    assert model["inputs"]["special_bonus"]["affix_names"] == []
 
 
 @pytest.mark.parametrize("school", SCHOOLS)
@@ -80,9 +103,17 @@ def test_dynamic_inputs_use_canonical_game_affix_names(school: str) -> None:
         label_cell = model["sheets"][sheet]["cells"].get(coordinate, {})
         label = label_cell.get("value")
         affix_names = spec["affix_names"]
-        assert affix_names == (
-            game_config.get_affix_names_for_alias(label) if label else []
-        )
+        if name == "special_bonus" and label:
+            group = game_config.get_alias_groups("指定技能增效").get(school, [])
+            matches = [
+                exact for exact in group
+                if label in game_config.get_affix_aliases(exact)
+            ]
+            assert affix_names == [matches[0]]
+        else:
+            assert affix_names == (
+                game_config.get_affix_names_for_alias(label) if label else []
+            )
         if name in {"weapon_bonus_primary", "weapon_bonus_secondary", "special_bonus"}:
             assert set(affix_names) <= canonical
 
@@ -100,13 +131,39 @@ def test_runtime_matches_mingjin_hong_excel_example() -> None:
         all_skill_bonus=0.08, boss_bonus=0.083,
         extra_attrs={
             "剑武学增伤": 0.08,
-            "无名剑法蓄力技增伤": 0.16,
-            "无名枪法蓄力技增伤": 0.16,
+            "无名剑法蓄力技增伤": 0.32,
         },
     )
     result = calculator.calculate(attrs)
     assert result.dps == pytest.approx(119459.79969686334)
     assert result.graduation_rate == pytest.approx(0.9907868092668608)
+
+
+def test_scheme_value_inputs_exclude_food_bonus() -> None:
+    values = get_graduation_scheme_inputs("鸣金·虹", "基础方案")
+    names = {entry["name"] for entry in values}
+    assert "min_outer" in names
+    assert "special_bonus" in names
+    assert all("food" not in name.lower() for name in names)
+
+
+def test_scheme_combat_attrs_only_expose_canonical_affix_names() -> None:
+    attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")
+    assert "剑武学增伤" in attrs.extra_attrs
+    assert "无名剑法蓄力技增伤" in attrs.extra_attrs
+    assert "剑增" not in attrs.extra_attrs
+    assert "蓄力技定音" not in attrs.extra_attrs
+
+
+def test_pozhu_scheme_uses_canonical_field_spelling() -> None:
+    values = {
+        entry["name"]: entry["value"]
+        for entry in get_graduation_scheme_inputs("破竹·风", "基础方案")
+    }
+    attrs = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
+    assert attrs.pozhu_pen == values["pozhu_pen"]
+    assert attrs.pozhu_bonus == values["pozhu_bonus"]
+    assert "pozhu_pen" in attrs.to_dict()
 
 
 def test_runtime_maps_real_affix_names_to_excel_short_labels() -> None:
@@ -125,16 +182,14 @@ def test_runtime_maps_real_affix_names_to_excel_short_labels() -> None:
         **common,
         extra_attrs={
             "剑武学增伤": 0.08,
-            "无名剑法蓄力技增伤": 0.16,
-            "无名枪法蓄力技增伤": 0.16,
+            "无名剑法蓄力技增伤": 0.32,
         },
     )
     scanned = CombatAttributes(
         **common,
         extra_attrs={
             "剑武学增伤": 0.08,
-            "无名剑法蓄力技增伤": 0.16,
-            "无名枪法蓄力技增伤": 0.16,
+            "无名剑法蓄力技增伤": 0.32,
             "文动霓裳特殊技增伤": 0.99,
         },
     )

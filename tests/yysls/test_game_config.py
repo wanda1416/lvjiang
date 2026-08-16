@@ -289,7 +289,10 @@ class TestWeaponTypesAndSchools:
         assert cfg_zun["sub"] == {"weapon": "双刀", "martial_art": "断水双诀"}
 
     def test_graduation_schemes(self, mgr):
-        assert mgr.get_graduation_schemes("鸣金·虹") == ["基础方案"]
+        # 已注册流派至少包含基础方案
+        schemes = mgr.get_graduation_schemes("鸣金·虹")
+        assert "基础方案" in schemes
+        # 未注册流派返回空
         assert mgr.get_graduation_schemes("未注册流派") == []
 
     def test_school_bindings_valid(self, mgr):

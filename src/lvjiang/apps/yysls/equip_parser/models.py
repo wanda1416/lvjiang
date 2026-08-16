@@ -159,14 +159,12 @@ class EquipmentData:
 def make_fingerprint(equip_data: dict) -> str:
     """基于装备数据生成去重指纹（MD5 前 8 位 hex）
 
-    指纹由 type + level + quality + is_chengyin + 全部词条(name:value) 组成。
+    详细规则参见 docs/30-architecture/31-models/01-equipment-models.md 第六章。
+
+    拼接字符串 = type + level + quality + is_chengyin + affix_1~5(name:value)
+    定音词条(dingyin)故意不包含在指纹中。
+    模拟装备使用 mock_ 前缀：_fp = f"mock_{make_fingerprint(equip_data)}"
     空数据或空字典返回空字符串。
-
-    此函数为共享实现，供 to_equipment 内置函数和 make_fingerprint 内置函数复用。
-
-    注意：定音词条(dingyin)故意不包含在指纹中。
-    原因：装备可能切换定音，五个词条数值完全相同的概率极低，
-    包含定音会导致同一件装备换定音后被误判为不同装备。
     """
     if not isinstance(equip_data, dict) or not equip_data:
         return ""

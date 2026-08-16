@@ -26,7 +26,6 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
-    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -50,12 +49,6 @@ _ATTRS_REL = "yysls/game_config.yaml"
 
 # 流派属性候选
 _SCHOOL_ATTRS = [tr("鸣金"), tr("裂石"), tr("破竹"), tr("牵丝")]
-
-
-def _get_combat_display_names() -> list[tuple[str, str, str, bool]]:
-    """返回 COMBAT_ATTR_FIELDS 的 (field_name, display_name, unit, is_interval) 列表"""
-    from ...combat_attrs import COMBAT_ATTR_FIELDS
-    return list(COMBAT_ATTR_FIELDS)
 
 
 class SchoolPanel(QWidget):
@@ -158,37 +151,45 @@ class SchoolPanel(QWidget):
 
         right_layout.addWidget(attr_group)
 
-        # ── 方案管理 ──
+        # ── 方案管理 / 基础属性：同一行、等高双栏 ──
+        management_layout = QHBoxLayout()
+        management_layout.setSpacing(10)
+
         scheme_group = QGroupBox(tr("方案管理"))
-        scheme_layout = QHBoxLayout(scheme_group)
-        self._scheme_list = QListWidget()
-        self._scheme_list.setMaximumHeight(84)
-        scheme_layout.addWidget(self._scheme_list, stretch=1)
+        self._scheme_group = scheme_group
+        scheme_group.setMinimumHeight(150)
+        scheme_layout = QVBoxLayout(scheme_group)
         self._btn_import_scheme = QPushButton(tr("导入 Excel…"))
         self._btn_import_scheme.clicked.connect(self._on_import_scheme)
         scheme_layout.addWidget(self._btn_import_scheme)
-        right_layout.addWidget(scheme_group)
+        self._scheme_list = QListWidget()
+        self._scheme_list.currentRowChanged.connect(self._on_scheme_selected)
+        scheme_layout.addWidget(self._scheme_list, stretch=1)
+        management_layout.addWidget(scheme_group, stretch=1)
 
-        # ── 基础属性管理 ──
         ps_group = QGroupBox(tr("基础属性"))
-        ps_main_layout = QHBoxLayout(ps_group)
-
-        # 左侧：基础属性列表（右键菜单提供删除）
-        ps_left = QWidget()
-        ps_left_layout = QVBoxLayout(ps_left)
-        ps_left_layout.setContentsMargins(0, 0, 0, 0)
-
+        self._base_attrs_group = ps_group
+        ps_group.setMinimumHeight(150)
+        ps_layout = QVBoxLayout(ps_group)
         self._ps_list = QListWidget()
         self._ps_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._ps_list.customContextMenuRequested.connect(self._on_ps_context_menu)
         self._ps_list.currentRowChanged.connect(self._on_ps_selected)
-        ps_left_layout.addWidget(self._ps_list)
+        ps_layout.addWidget(self._ps_list)
+        management_layout.addWidget(ps_group, stretch=1)
+        right_layout.addLayout(management_layout, stretch=1)
 
-        ps_main_layout.addWidget(ps_left)
-
-        # 右侧：选中基础属性的可编辑卡片（所见即所得，修改自动保存）
+        # ── 数值展示：方案为只读满值，基础属性保留可编辑能力 ──
+        value_group = QGroupBox(tr("数值展示"))
+        value_layout = QVBoxLayout(value_group)
+        self._value_source_label = QLabel(tr("请选择方案或基础属性"))
+        self._value_source_label.setStyleSheet("color: palette(mid);")
+        value_layout.addWidget(self._value_source_label)
         self._ps_scroll = QScrollArea()
         self._ps_scroll.setWidgetResizable(True)
+        self._ps_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self._ps_scroll_widget = QWidget()
         self._ps_scroll_layout = QVBoxLayout(self._ps_scroll_widget)
         self._ps_scroll_layout.setContentsMargins(4, 4, 4, 4)
@@ -196,10 +197,8 @@ class SchoolPanel(QWidget):
         self._ps_scroll.setWidget(self._ps_scroll_widget)
         self._ps_edits: dict[str, QLineEdit] = {}
         self._ps_current_name: str = ""  # 当前编辑的基础属性名
-        ps_main_layout.addWidget(self._ps_scroll, stretch=1)
-
-        # 基础属性管理占据剩余空间
-        right_layout.addWidget(ps_group, stretch=1)
+        value_layout.addWidget(self._ps_scroll, stretch=1)
+        right_layout.addWidget(value_group, stretch=2)
 
         splitter.addWidget(right_widget)
         splitter.setSizes([150, 400])
@@ -292,6 +291,13 @@ class SchoolPanel(QWidget):
         self._loading = prev_loading
         self._refresh_schemes()
         self._refresh_play_styles()
+        if self._scheme_list.count():
+            self._scheme_list.setCurrentRow(0)
+        elif self._ps_list.count():
+            self._ps_list.setCurrentRow(0)
+        else:
+            self._clear_ps_editor()
+            self._value_source_label.setText(tr("请选择方案或基础属性"))
 
     @staticmethod
     def _fill_combo(combo: QComboBox, candidates: list[str], value: str | None):
@@ -446,6 +452,9 @@ class SchoolPanel(QWidget):
             self._data.setdefault("schools", {})[school] = cfg
             self._save_data()
         self._refresh_schemes()
+        matches = self._scheme_list.findItems(name, Qt.MatchFlag.MatchExactly)
+        if matches:
+            self._scheme_list.setCurrentItem(matches[0])
         QMessageBox.information(
             self, tr("导入成功"),
             tr("方案「{name}」已生成。\nDPS：{dps:.2f}\n文件：{path}").format(
@@ -468,131 +477,254 @@ class SchoolPanel(QWidget):
             self._ps_list.addItem(name)
 
     def _clear_ps_editor(self):
-        """清空右侧基础属性编辑区"""
+        """清空共享数值展示区。"""
         while self._ps_scroll_layout.count():
             item = self._ps_scroll_layout.takeAt(0)
             if item.widget():
-                item.widget().deleteLater()
+                widget = item.widget()
+                # deleteLater() 要等事件循环返回才生效；切换列表时新旧面板会短暂
+                # 叠在同一个滚动区域。先隐藏并脱离父控件，保证本次刷新立即清空。
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
         self._ps_edits.clear()
         self._ps_current_name = ""
+
+    def _on_scheme_selected(self, row: int) -> None:
+        """选中方案 → 展示 Excel 输入满值（输入契约不包含食物加成）。"""
+        school = self._current_school()
+        if not school or row < 0:
+            return
+        self._ps_list.blockSignals(True)
+        self._ps_list.setCurrentRow(-1)
+        self._ps_list.blockSignals(False)
+        self._clear_ps_editor()
+        scheme = self._scheme_list.item(row).text()
+        self._value_source_label.setText(
+            tr("方案：{name}（满值属性，不含食物加成）").format(name=scheme)
+        )
+        try:
+            from ...evaluator.graduation import get_graduation_scheme_combat_attrs
+
+            attrs = get_graduation_scheme_combat_attrs(school, scheme)
+        except Exception as exc:
+            logger.error(f"读取毕业率方案数值失败: {exc}")
+            self._value_source_label.setText(tr("方案数值读取失败：{error}").format(
+                error=str(exc),
+            ))
+            return
+        from ...config import get_game_config
+
+        school_attr = get_game_config().get_school_attr(school)
+        self._ps_scroll_layout.addWidget(
+            self._create_standard_attrs_widget(attrs, school_attr, editable=False)
+        )
+        self._ps_scroll_layout.addStretch()
 
     def _on_ps_selected(self, row: int):
         """选中基础属性 → 在右侧显示可编辑卡片"""
         school = self._current_school()
         if not school or row < 0:
-            self._clear_ps_editor()
             return
+        self._scheme_list.blockSignals(True)
+        self._scheme_list.setCurrentRow(-1)
+        self._scheme_list.blockSignals(False)
         from ...config import get_game_config, get_play_styles
         styles = get_play_styles(school)
         name = self._ps_list.item(row).text()
         attrs = styles.get(name, {})
-        self._ps_current_name = name
         self._clear_ps_editor()
+        self._ps_current_name = name
+        self._value_source_label.setText(tr("基础属性：{name}").format(name=name))
 
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
-        resolved = self._get_resolved_fields_for_school(school_attr)
+        from ...combat_attrs import CombatAttributes
 
-        display_names = {
-            fn: dn for fn, dn, _u, _i in _get_combat_display_names()
-        }
-
-        # 将所有分组的字段合并为一个扁平列表
-        all_fields: list[tuple[str, str, str]] = []
-        for _group_label, fields in resolved:
-            all_fields.extend(fields)
-
-        # 创建一个统一的编辑卡片
-        card = self._create_ps_card(all_fields, attrs, display_names)
+        # 基础属性也进入标准战斗属性模型，再按战斗属性面板结构展示。
+        combat_attrs = CombatAttributes.from_dict(attrs)
+        card = self._create_standard_attrs_widget(
+            combat_attrs, school_attr, editable=True,
+        )
         self._ps_scroll_layout.addWidget(card)
         self._ps_scroll_layout.addStretch()
 
-    def _get_resolved_fields_for_school(self, school_attr: str | None):
-        """解析占位符字段，返回实际字段列表"""
-        from ...combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
-        if not school_attr or school_attr not in SCHOOL_ATTR_FIELD_MAP:
-            result = []
-            for label, fields in PLAY_STYLE_FIELD_GROUPS:
-                resolved = [(fn, dl, u) for fn, dl, u in fields if not fn.startswith("__")]
-                if resolved:
-                    result.append((label, resolved))
-            return result
-        attr_map = SCHOOL_ATTR_FIELD_MAP[school_attr]
-        result = []
-        for label, fields in PLAY_STYLE_FIELD_GROUPS:
-            resolved = []
-            for fn, dl, u in fields:
-                if fn == "__attr_pen__":
-                    resolved.append((attr_map["attr_pen"], dl, u))
-                elif fn == "__attr_bonus__":
-                    resolved.append((attr_map["attr_bonus"], dl, u))
-                elif fn == "__min_attr__":
-                    resolved.append((attr_map["min_attr"], dl, u))
-                elif fn == "__max_attr__":
-                    resolved.append((attr_map["max_attr"], dl, u))
+    def _create_standard_attrs_widget(
+        self, attrs, school_attr: str | None, *, editable: bool,
+    ) -> QWidget:
+        """按战斗属性页的四张标准卡片展示 CombatAttributes。"""
+        from ...combat_attrs import SCHOOL_ATTR_FIELD_MAP
+        attr_map = SCHOOL_ATTR_FIELD_MAP.get(school_attr or "", {})
+        attr_name = school_attr or tr("属攻")
+        attr_fields = {
+            "min_attr": attr_map.get("min_attr", "min_mingjin"),
+            "max_attr": attr_map.get("max_attr", "max_mingjin"),
+            "attr_pen": attr_map.get("attr_pen", "mingjin_pen"),
+            "attr_bonus": attr_map.get("attr_bonus", "mingjin_bonus"),
+        }
+
+        attr_series = {
+            "攻击": (
+                ("鸣金", "min_mingjin", "max_mingjin"),
+                ("裂石", "min_lieshi", "max_lieshi"),
+                ("破竹", "min_pozhu", "max_pozhu"),
+                ("牵丝", "min_qiansi", "max_qiansi"),
+            ),
+            "穿透": (
+                ("鸣金", "mingjin_pen"), ("裂石", "lieshi_pen"),
+                ("破竹", "pozhu_pen"), ("牵丝", "qiansi_pen"),
+            ),
+            "伤害加成": (
+                ("鸣金", "mingjin_bonus"), ("裂石", "lieshi_bonus"),
+                ("破竹", "pozhu_bonus"), ("牵丝", "qiansi_bonus"),
+            ),
+        }
+
+        def tooltip(kind: str) -> str:
+            lines = []
+            for item in attr_series[kind]:
+                name, *fields = item
+                values = [getattr(attrs, field, 0.0) for field in fields]
+                if kind == "攻击":
+                    lines.append(f"{name}攻击：{values[0]:.2f} - {values[1]:.2f}")
+                elif kind == "伤害加成":
+                    lines.append(f"{name}伤害加成：{values[0] * 100:.2f}%")
                 else:
-                    resolved.append((fn, dl, u))
-            result.append((label, resolved))
-        return result
+                    lines.append(f"{name}穿透：{values[0]:.2f}")
+            return "\n".join(lines)
 
-    def _create_ps_card(self, fields: list[tuple[str, str, str]],
-                        attrs: dict, display_names: dict) -> QFrame:
-        """创建一个基础属性编辑卡片（所有字段平铺）"""
-        card = QFrame()
-        card.setStyleSheet("""
-            QFrame#psCard {
-                background-color: palette(base);
-                border: 1px solid palette(midlight);
-                border-radius: 6px;
-            }
-        """)
-        card.setObjectName("psCard")
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(12, 10, 12, 10)
-        card_layout.setSpacing(6)
-
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(20)
-        grid.setVerticalSpacing(6)
-        grid.setContentsMargins(0, 0, 0, 0)
-
-        row, col = 0, 0
-        for field_name, fallback_label, unit in fields:
-            display_label = display_names.get(field_name, fallback_label)
+        def make_cell(
+            field_name: str | None, label_text: str, unit: str = "",
+            tip: str = "", value_override: float | None = None,
+        ) -> QWidget:
+            value = value_override if value_override is not None else (
+                getattr(attrs, field_name, 0.0) if field_name else 0.0
+            )
             cell = QWidget()
             cell_layout = QHBoxLayout(cell)
             cell_layout.setContentsMargins(0, 0, 0, 0)
-            cell_layout.setSpacing(6)
-
-            lbl = QLabel(tr(display_label))
-            lbl.setStyleSheet("font-size: 12px; color: palette(mid);")
-            cell_layout.addWidget(lbl)
-
-            edit = QLineEdit()
-            edit.setAlignment(Qt.AlignmentFlag.AlignRight)
-            edit.setFixedWidth(110)
-            edit.setFixedHeight(24)
-            validator = QDoubleValidator(-999999.0, 999999.0, 4, edit)
-            edit.setValidator(validator)
-            v = attrs.get(field_name, 0)
-            if unit == "%":
-                edit.setText(f"{v * 100:.2f}")
+            cell_layout.setSpacing(8)
+            label = QLabel(tr(label_text))
+            label.setStyleSheet("font-size: 12px; color: palette(mid);")
+            cell_layout.addWidget(label)
+            cell_layout.addStretch()
+            if editable and field_name:
+                value_widget = QLineEdit()
+                value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
+                value_widget.setFixedWidth(100)
+                value_widget.setValidator(
+                    QDoubleValidator(-999999.0, 999999.0, 4, value_widget)
+                )
+                value_widget.setText(
+                    f"{value * 100:.2f}" if unit == "%" else f"{value:.2f}"
+                )
+                value_widget.textChanged.connect(
+                    lambda _text, fn=field_name: self._on_ps_field_changed(fn, unit)
+                )
+                self._ps_edits[field_name] = value_widget
             else:
-                edit.setText(f"{v:.2f}" if v else "0")
-            edit.textChanged.connect(
-                lambda _t, fn=field_name, u=unit: self._on_ps_field_changed(fn, u)
-            )
-            cell_layout.addWidget(edit)
-            self._ps_edits[field_name] = edit
+                text = f"{value * 100:.2f}%" if unit == "%" else (
+                    f"{value:.2f}" if value != int(value) else str(int(value))
+                )
+                value_widget = QLabel(text)
+                value_widget.setStyleSheet("font-size: 13px; font-weight: 600;")
+                value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
+            if tip:
+                label.setToolTip(tip)
+                value_widget.setToolTip(tip)
+            cell_layout.addWidget(value_widget)
+            return cell
 
-            grid.addWidget(cell, row, col)
-            col += 1
-            if col >= 2:
-                col = 0
-                row += 1
+        def make_card(title: str, cells: list[tuple | None]) -> QGroupBox:
+            group = QGroupBox(tr(title))
+            grid = QGridLayout(group)
+            grid.setContentsMargins(12, 8, 12, 10)
+            grid.setHorizontalSpacing(20)
+            grid.setVerticalSpacing(7)
+            for index, cell_args in enumerate(cells):
+                widget = make_cell(*cell_args) if cell_args is not None else QWidget()
+                grid.addWidget(widget, index // 2, index % 2)
+            grid.setColumnStretch(0, 1)
+            grid.setColumnStretch(1, 1)
+            return group
 
-        card_layout.addLayout(grid)
-        return card
+        pen_tip = tooltip("穿透")
+        bonus_tip = tooltip("伤害加成")
+        attack_cells = [
+            ("min_outer", "最小外功攻击", ""),
+            ("max_outer", "最大外功攻击", ""),
+            ("min_mingjin", "最小鸣金攻击", ""),
+            ("max_mingjin", "最大鸣金攻击", ""),
+            ("min_lieshi", "最小裂石攻击", ""),
+            ("max_lieshi", "最大裂石攻击", ""),
+            ("min_pozhu", "最小破竹攻击", ""),
+            ("max_pozhu", "最大破竹攻击", ""),
+            ("min_qiansi", "最小牵丝攻击", ""),
+            ("max_qiansi", "最大牵丝攻击", ""),
+            ("min_wuxiang", "最小无相攻击", ""),
+            ("max_wuxiang", "最大无相攻击", ""),
+        ]
+        judgment_cells = [
+            ("precision", "精准率", "%"),
+            None,
+            ("crit_rate", "会心率", "%"),
+            ("direct_crit", "直接会心率", "%"),
+            ("intent_rate", "会意率", "%"),
+            ("direct_intent", "直接会意率", "%"),
+        ]
+        weapon_extras = [
+            (name, value) for name, value in sorted(attrs.extra_attrs.items())
+            if name.endswith(("武学增伤", "武学增效")) and value
+        ]
+        skill_extras = [
+            (name, value) for name, value in sorted(attrs.extra_attrs.items())
+            if not name.endswith(("武学增伤", "武学增效")) and value
+        ]
+        weapon_cells = [
+            (None, name, "%", "", value) for name, value in weapon_extras[:2]
+        ]
+        weapon_cells.extend([None] * (2 - len(weapon_cells)))
+        skill_cell = (
+            (None, skill_extras[0][0], "%", "", skill_extras[0][1])
+            if skill_extras else None
+        )
+        gain_cells = [
+            ("outer_pen", "外功穿透", ""),
+            (attr_fields["attr_pen"], f"属攻穿透（{attr_name}）", "", pen_tip),
+            *weapon_cells,
+            ("all_skill_bonus", "全武学增效", "%"),
+            None,
+            ("single_qs_bonus", "单体类奇术增伤", "%"),
+            ("group_qs_bonus", "群体类奇术增伤", "%"),
+            ("boss_bonus", "对首领单位增伤", "%"),
+            ("player_bonus", "对玩家单位增效", "%"),
+            skill_cell,
+            None,
+        ]
+        damage_cells = [
+            ("crit_dmg", "会心伤害加成", "%"),
+            ("intent_dmg", "会意伤害加成", "%"),
+            ("outer_bonus", "外功伤害加成", "%"),
+            (None, "外功伤害减免", "%", "", 0.0),
+            (attr_fields["attr_bonus"], f"属攻伤害加成（{attr_name}）", "%", bonus_tip),
+            (None, f"属攻伤害减免（{attr_name}）", "%", "", 0.0),
+        ]
+
+        root = QWidget()
+        columns = QHBoxLayout(root)
+        columns.setContentsMargins(0, 0, 0, 0)
+        columns.setSpacing(10)
+        left = QVBoxLayout()
+        right = QVBoxLayout()
+        left.addWidget(make_card("攻击属性", attack_cells))
+        left.addWidget(make_card("判定属性", judgment_cells))
+        right.addWidget(make_card("增益效果", gain_cells))
+        right.addWidget(make_card("伤害加成", damage_cells))
+        left.addStretch()
+        right.addStretch()
+        columns.addLayout(left, stretch=1)
+        columns.addLayout(right, stretch=1)
+        return root
 
     def _on_ps_field_changed(self, field_name: str, unit: str):
         """任一字段变更 → 自动保存到当前基础属性"""

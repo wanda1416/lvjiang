@@ -93,6 +93,7 @@ class GameConfigManager:
         self._load()
 
     def _load(self):
+        self._type_to_group_cache = None  # 重置缓存
         if self._path is not None:
             with open(self._path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
@@ -351,6 +352,11 @@ class GameConfigManager:
         return [alias for alias, cat in self._alias_to_category.items()
                 if self._affix_pools.get(cat, POOL_NORMAL) != POOL_DINGYIN]
 
+    def get_dingyin_affix_names(self) -> list[str]:
+        """全部定音词条标准名（定音词组的 _aliases 并集，按 YAML 声明序）"""
+        return [alias for alias, cat in self._alias_to_category.items()
+                if self._affix_pools.get(cat, POOL_NORMAL) == POOL_DINGYIN]
+
     # ── 词条上限查询 ────────────────────────────────────────
 
     def get_affix_caps(self, level: int, affix_name: str) -> dict | None:
@@ -421,6 +427,46 @@ class GameConfigManager:
     def get_weapon_types(self) -> list[str]:
         """武器类型注册表（顶层 weapon_types，reload 后实时生效）"""
         return list(self._weapon_types)
+
+    def get_type_to_group(self) -> dict[str, str]:
+        """装备 type → 分组 key 的全局映射。
+
+        包含所有武器具体名称（剑/枪/扇…）→ "weapon"，
+        以及非武器部位名（环/佩/冠胄…）→ 对应 group_key。
+        武器名称从配置动态加载，新增武器自动生效。
+        """
+        if not hasattr(self, '_type_to_group_cache') or self._type_to_group_cache is None:
+            from lvjiang.i18n import tr
+            mapping: dict[str, str] = {}
+            # 所有武器具体名称 → "weapon"
+            for wt in self._weapon_types:
+                mapping[wt] = "weapon"
+            # 武器显示名（对话框部位下拉用）
+            mapping[tr("武器")] = "weapon"
+            # 非武器部位
+            mapping.update({
+                tr("环"): "ring",
+                tr("佩"): "pendant",
+                tr("冠胄"): "head",
+                tr("胸甲"): "chest",
+                tr("胫甲"): "leg",
+                tr("腕甲"): "wrist",
+            })
+            self._type_to_group_cache = mapping
+        return dict(self._type_to_group_cache)
+
+    def get_group_to_part(self) -> dict[str, str]:
+        """分组 key → 部位显示名的反向映射。"""
+        from lvjiang.i18n import tr
+        return {
+            "weapon": tr("武器"),
+            "ring": tr("环"),
+            "pendant": tr("佩"),
+            "head": tr("冠胄"),
+            "chest": tr("胸甲"),
+            "leg": tr("胫甲"),
+            "wrist": tr("腕甲"),
+        }
 
     def get_weapon_wuxue_affix(self, weapon: str) -> str:
         """武器对应的武学增效词条（来自 weapon_types 的 wuxue_affix 字段）

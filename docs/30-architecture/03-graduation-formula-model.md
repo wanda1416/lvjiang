@@ -1,5 +1,8 @@
 # 毕业率公式模型
 
+> 本文档为快速参考。完整的架构说明、公式语言规范、JSON Schema 契约、别名解析规则等
+> 已拆分至 [`36-graduation/`](36-graduation/README.md) 目录。
+
 ## 数据流
 
 `data/temp/excel/*.xlsx` 是 DPS 与毕业率的唯一真源。开发期转换脚本读取公式和
@@ -13,7 +16,7 @@ Excel 工作簿
   → 词组配置 affix_aliases 严格校验
   → JSON 公式模型
   → FormulaModel（受限公式执行器）
-  → DPS / RDPS / 毕业率
+  → DPS / 毕业率
 ```
 
 ## 更新表格
@@ -41,12 +44,8 @@ Excel 工作簿
 
 ## JSON 契约
 
-- `schema_version`：模型结构版本。
-- `formula_language`：当前为 `excel_subset_v1`。
-- `model.source`：Excel 文件名、版本与 SHA-256。
-- `inputs`：语义字段、单位及目标单元格。
-- `outputs`：战斗时间、总伤害、DPS、RDPS、毕业率引用。
-- `sheets`：工作表尺寸，以及非空单元格的常量、公式和 Excel 缓存值。
+v2 schema 包含以下顶层字段：`schema_version`、`school`、`source`、`baseline_attrs`、`environment`、`reference`、`program`。
+详见 [03-json-model.md](36-graduation/03-json-model.md)。
 
 百分比统一使用小数比例，例如 `8.52%` 保存为 `0.0852`。
 
@@ -71,3 +70,15 @@ Excel 中的“全武增”“首领增”“拳甲增”“蓄力技定音”�
 
 未来 Excel 引入新函数时，转换阶段会直接失败。应先在公式引擎中实现并增加测试，
 不能静默读取旧缓存值替代计算。
+
+## 详细文档
+
+| 文档 | 内容 |
+|---|---|
+| [36-graduation/README.md](36-graduation/README.md) | 四层管线总览与模块索引 |
+| [01-data-flow.md](36-graduation/01-data-flow.md) | 端到端数据流与各层职责 |
+| [02-formula-language.md](36-graduation/02-formula-language.md) | Excel 公式子集规范 |
+| [03-json-model.md](36-graduation/03-json-model.md) | JSON v2 Schema 契约 |
+| [04-alias-resolution.md](36-graduation/04-alias-resolution.md) | 别名解析规则 |
+| [05-compiler-runtime.md](36-graduation/05-compiler-runtime.md) | 编译器与运行时 |
+| [06-operations.md](36-graduation/06-operations.md) | 操作指南与故障排查 |

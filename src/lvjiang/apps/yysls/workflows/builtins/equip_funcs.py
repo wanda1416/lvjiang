@@ -58,7 +58,7 @@ def _bag_cursor_visit(_engine, fingerprint: str | None, *args) -> str:
 
 @builtin_func("bag_cursor_finish_window")
 def _bag_cursor_finish_window(
-    _engine, visible_rows: int, expected_rows: int = 3, *args
+    _engine, visible_rows: int, expected_rows: int, *args
 ) -> str:
     """提交一个完整窗口，返回 ``scroll`` 或 ``end``。
 

@@ -2,9 +2,15 @@
 
 提供穷举匹配制的四档评级（顶级/优秀/一般/垃圾）与规则驱动的
 通用调律规则判定器（GenericTuningJudge + tuning_rules YAML）。
+毕业率计算器（GraduationCalculator）。
 """
 
 from .base import JudgeResult, Rating, TuningJudge
+from .graduation import (
+    GraduationCalculator,
+    GraduationResult,
+    get_graduation_calculator,
+)
 from .registry import (
     get_rule_names,
     get_tuning_judge,
@@ -38,4 +44,8 @@ __all__ = [
     "judge_equipment_actual",
     "judge_tuning_worthiness",
     "summarize_potential",
+    # 毕业率
+    "GraduationCalculator",
+    "GraduationResult",
+    "get_graduation_calculator",
 ]

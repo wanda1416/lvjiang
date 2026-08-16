@@ -416,7 +416,9 @@ weapon_types:
   wuxue_affix: 舞绫鼓武学增伤
 schools:
   鸣金·虹:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
+    - 加强方案
     attr: 鸣金
     main:
       weapon: 剑
@@ -425,7 +427,8 @@ schools:
       weapon: 枪
       martial_art: 无名枪法
   鸣金·影:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 鸣金
     main:
       weapon: 剑
@@ -434,7 +437,8 @@ schools:
       weapon: 枪
       martial_art: 九曲惊神枪
   裂石·威:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 裂石
     main:
       weapon: 陌刀
@@ -443,7 +447,8 @@ schools:
       weapon: 枪
       martial_art: 八方风雷枪
   裂石·钧:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 裂石
     main:
       weapon: 横刀
@@ -452,7 +457,8 @@ schools:
       weapon: 陌刀
       martial_art: 十方破阵
   牵丝·玉:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 牵丝
     main:
       weapon: 伞
@@ -461,7 +467,8 @@ schools:
       weapon: 扇
       martial_art: 青山执笔
   牵丝·霖:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 牵丝
     main:
       weapon: 扇
@@ -470,7 +477,8 @@ schools:
       weapon: 伞
       martial_art: 千香引魂蛊
   牵丝·翊:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 牵丝
     main:
       weapon: 舞绫鼓
@@ -479,7 +487,8 @@ schools:
       weapon: 扇
       martial_art: 杏游草野
   破竹·风:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 破竹
     main:
       weapon: 双刀
@@ -488,7 +497,8 @@ schools:
       weapon: 绳镖
       martial_art: 粟子游尘
   破竹·尘:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 破竹
     main:
       weapon: 伞
@@ -497,7 +507,8 @@ schools:
       weapon: 绳镖
       martial_art: 粟子行云
   破竹·鸢:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 破竹
     main:
       weapon: 手甲
@@ -506,7 +517,8 @@ schools:
       weapon: 绳镖
       martial_art: 千机索天
   破竹·樽:
-    schemes: [基础方案]
+    schemes:
+    - 基础方案
     attr: 破竹
     main:
       weapon: 手甲
@@ -545,13 +557,9 @@ affix_aliases:
   - 鼓增
   无名剑法蓄力技增伤:
   - 蓄力技定音
-  无名枪法蓄力技增伤:
-  - 蓄力技定音
   积矩九剑流血增伤:
   - 流血定音
   嗟夫刀法蓄力技增伤:
-  - 蓄力技定音
-  斩雪刀法蓄力技增伤:
   - 蓄力技定音
   十方破阵蓄力技增伤:
   - 蓄力技定音

@@ -263,6 +263,7 @@ def save_equip_display(params: dict[str, Any]) -> None:
 # ─── 装备筛选配置 ────────────────────────────────────────────
 
 _EQUIP_FILTER_DEFAULTS: dict[str, str] = {
+    "type": "all",        # all | main_weapon | sub_weapon | ring | pendant | head | chest | leg | wrist
     "level": "all",       # all | 110 | 105
     "affix": "all",       # all | dingyin | full_tuning
 }

@@ -90,15 +90,54 @@ def _affix_input_names(workbook, school: str) -> dict[str, list[str]]:
             raise RuntimeError(f"affix_aliases[{affix_name!r}] must be a list")
         for alias in aliases:
             alias_index.setdefault(str(alias), []).append(str(affix_name))
+    skill_category = (config.get("affix_caps") or {}).get("指定技能增效") or {}
+    skill_groups = skill_category.get("_aliases") if isinstance(
+        skill_category, dict,
+    ) else None
+    if not isinstance(skill_groups, dict):
+        raise RuntimeError(
+            "游戏配置缺少 affix_caps.指定技能增效._aliases 流派分组，"
+            "无法解析 Excel 的指定技能增效。请补充配置后重新导入。"
+        )
+    school_skill_names = skill_groups.get(school)
+    if not isinstance(school_skill_names, list) or not school_skill_names:
+        raise RuntimeError(
+            f"游戏配置没有流派「{school}」的指定技能增效分组，无法解析 Excel。"
+            "请补充流派配置后重新导入。"
+        )
     result: dict[str, list[str]] = {}
     for input_name, label in labels.items():
-        if label is None and input_name == "special_bonus":
-            result[input_name] = []
+        if label is None or not str(label).strip():
+            if input_name == "special_bonus":
+                # 部分流派没有指定技能增效；Excel 留空即明确表示不参与计算。
+                result[input_name] = []
+                continue
+            raise RuntimeError(
+                f"{school} Excel 输入 {input_name} 的字段名为空。"
+                "请修正 Excel，或在词组配置中补充对应别名后重新导入。"
+            )
+        if input_name == "special_bonus":
+            # 只在当前流派的指定技能增效分组中反查，按配置顺序取第一个。
+            matches = [
+                str(affix_name) for affix_name in school_skill_names
+                if str(label) in (config.get("affix_aliases") or {}).get(
+                    str(affix_name), [],
+                )
+            ]
+            if not matches:
+                raise RuntimeError(
+                    f"流派「{school}」无法解析 Excel 指定技能增效简称 "
+                    f"{label!r}。请在该流派的指定技能增效词条中配置此别名，"
+                    "或修正 Excel 字段名后重新导入。"
+                )
+            result[input_name] = [matches[0]]
             continue
         matches = alias_index.get(str(label), [])
         if not matches:
             raise RuntimeError(
-                f"{school} Excel label {label!r} has no affix_aliases mapping"
+                f"流派「{school}」无法解析 Excel 字段简称 {label!r}。"
+                "请在词组配置中补充对应精准词条的别名，"
+                "或修正 Excel 字段名后重新导入。"
             )
         result[input_name] = matches
     return result

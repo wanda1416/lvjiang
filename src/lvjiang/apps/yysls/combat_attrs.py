@@ -53,13 +53,13 @@ COMBAT_ATTR_FIELDS: list[tuple[str, str, str, bool]] = [
     ("outer_bonus", "外功伤害加成", "%", False),
     ("mingjin_bonus", "鸣金伤害加成", "%", False),
     ("lieshi_bonus", "裂石伤害加成", "%", False),
-    ("pozhua_bonus", "破竹伤害加成", "%", False),
+    ("pozhu_bonus", "破竹伤害加成", "%", False),
     ("qiansi_bonus", "牵丝伤害加成", "%", False),
     # 穿透（增效类，基础值不受抗性影响）
     ("outer_pen", "外功穿透", "", False),
     ("mingjin_pen", "鸣金穿透", "", False),
     ("lieshi_pen", "裂石穿透", "", False),
-    ("pozhua_pen", "破竹穿透", "", False),
+    ("pozhu_pen", "破竹穿透", "", False),
     ("qiansi_pen", "牵丝穿透", "", False),
     # 增伤（增效类，整个值除以除数）
     ("all_skill_bonus", "全武学增效", "%", False),
@@ -85,7 +85,7 @@ SCHOOL_ATTR_FIELD_MAP: dict[str, dict[str, str]] = {
     },
     "破竹": {
         "min_attr": "min_pozhu", "max_attr": "max_pozhu",
-        "attr_pen": "pozhua_pen", "attr_bonus": "pozhua_bonus",
+        "attr_pen": "pozhu_pen", "attr_bonus": "pozhu_bonus",
     },
     "牵丝": {
         "min_attr": "min_qiansi", "max_attr": "max_qiansi",
@@ -131,13 +131,13 @@ INTENT_RATE_CAP = 0.40  # 40%
 THREE_RATE_FIELDS = {"precision", "crit_rate", "intent_rate"}
 
 # 穿透字段（基础值不受抗性，装备定音值除以除数）
-PENETRATION_FIELDS = {"outer_pen", "mingjin_pen", "lieshi_pen", "pozhua_pen", "qiansi_pen"}
+PENETRATION_FIELDS = {"outer_pen", "mingjin_pen", "lieshi_pen", "pozhu_pen", "qiansi_pen"}
 
 # 无相穿透 → 属攻穿透字段映射（定音只有无相穿透，需要根据流派属性转换）
 WUXIANG_TO_ATTR_PEN = {
     "鸣金": "mingjin_pen",
     "裂石": "lieshi_pen",
-    "破竹": "pozhua_pen",
+    "破竹": "pozhu_pen",
     "牵丝": "qiansi_pen",
 }
 
@@ -214,14 +214,14 @@ class CombatAttributes:
     # 属攻伤害加成（四种，根据流派属性使用对应字段）
     mingjin_bonus: float = 0.0
     lieshi_bonus: float = 0.0
-    pozhua_bonus: float = 0.0
+    pozhu_bonus: float = 0.0
     qiansi_bonus: float = 0.0
 
     # 穿透（增效类，基础值不受抗性）
     outer_pen: float = 0.0
     mingjin_pen: float = 0.0
     lieshi_pen: float = 0.0
-    pozhua_pen: float = 0.0
+    pozhu_pen: float = 0.0
     qiansi_pen: float = 0.0
     # 无相穿透（定音词条，需要根据流派属性转换为属攻穿透）
     wuxiang_pen: float = 0.0
@@ -359,7 +359,7 @@ AFFIX_TO_ATTR: dict[str, str] = {
     "外功穿透": "outer_pen",
     "鸣金穿透": "mingjin_pen",
     "裂石穿透": "lieshi_pen",
-    "破竹穿透": "pozhua_pen",
+    "破竹穿透": "pozhu_pen",
     "牵丝穿透": "qiansi_pen",
     "无相穿透": "wuxiang_pen",  # 定音词条，需要根据流派属性转换为属攻穿透
     # 增伤
@@ -373,7 +373,7 @@ AFFIX_TO_ATTR: dict[str, str] = {
     "外功伤害加成": "outer_bonus",
     "鸣金伤害加成": "mingjin_bonus",
     "裂石伤害加成": "lieshi_bonus",
-    "破竹伤害加成": "pozhua_bonus",
+    "破竹伤害加成": "pozhu_bonus",
     "牵丝伤害加成": "qiansi_bonus",
 }
 

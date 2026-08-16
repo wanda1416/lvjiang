@@ -146,7 +146,7 @@ class CombatAttrsTab(QWidget):
 
         select_layout.addWidget(QLabel(tr("流派")))
         self._combo_school = QComboBox()
-        self._combo_school.setMinimumWidth(140)
+        self._combo_school.setFixedWidth(110)
         self._combo_school.setMinimumHeight(30)
         self._combo_school.currentTextChanged.connect(self._on_school_changed)
         select_layout.addWidget(self._combo_school)
@@ -154,13 +154,19 @@ class CombatAttrsTab(QWidget):
         select_layout.addSpacing(8)
         select_layout.addWidget(QLabel(tr("基础属性")))
         self._combo_play_style = QComboBox()
-        self._combo_play_style.setMinimumWidth(170)
+        self._combo_play_style.setFixedWidth(130)
         self._combo_play_style.setMinimumHeight(30)
         self._combo_play_style.currentTextChanged.connect(self._on_play_style_changed)
         select_layout.addWidget(self._combo_play_style)
+        self._btn_edit_play_style = QPushButton(tr("编辑"))
+        self._btn_edit_play_style.setFixedWidth(52)
+        self._btn_edit_play_style.setMinimumHeight(30)
+        self._btn_edit_play_style.setToolTip(tr("在游戏配置中编辑当前基础属性"))
+        self._btn_edit_play_style.clicked.connect(self._on_edit_play_style)
+        select_layout.addWidget(self._btn_edit_play_style)
 
         select_layout.addSpacing(8)
-        select_layout.addWidget(QLabel(tr("弓玦")))
+        select_layout.addWidget(QLabel(tr("弓玦套装")))
         self._combo_gongjue = QComboBox()
         self._combo_gongjue.setMinimumWidth(100)
         self._combo_gongjue.setMinimumHeight(30)
@@ -171,7 +177,7 @@ class CombatAttrsTab(QWidget):
         select_layout.addWidget(self._combo_gongjue)
 
         select_layout.addSpacing(8)
-        select_layout.addWidget(QLabel(tr("方案")))
+        select_layout.addWidget(QLabel(tr("计算方案")))
         self._combo_scheme = QComboBox()
         self._combo_scheme.setMinimumWidth(120)
         self._combo_scheme.setMinimumHeight(30)
@@ -524,6 +530,9 @@ class CombatAttrsTab(QWidget):
                 self._combo_play_style.addItem(name)
 
         self._combo_play_style.blockSignals(False)
+        self._btn_edit_play_style.setEnabled(
+            bool(school and self._combo_play_style.currentText())
+        )
 
     def _refresh_schemes(self):
         """刷新当前流派的毕业率方案；有配置时默认选中第一项。"""
@@ -551,8 +560,29 @@ class CombatAttrsTab(QWidget):
 
     def _on_play_style_changed(self, _name: str):
         """基础属性切换。"""
+        self._btn_edit_play_style.setEnabled(
+            bool(_name and self._get_current_school())
+        )
         self._refresh_display()
         self._save_selection()
+
+    def _on_edit_play_style(self) -> None:
+        """打开游戏配置，并定位到当前流派的当前基础属性。"""
+        school = self._get_current_school()
+        play_style = self._combo_play_style.currentText()
+        if not school or not play_style:
+            QMessageBox.warning(self, tr("无法编辑"), tr("请先选择基础属性"))
+            return
+        from .game_settings import GameConfigDialog
+
+        dialog = GameConfigDialog(parent=self._host)
+        dialog.select_school_base_attr(school, play_style)
+        dialog.exec()
+        self._refresh_play_styles()
+        index = self._combo_play_style.findText(play_style)
+        if index >= 0:
+            self._combo_play_style.setCurrentIndex(index)
+        self._refresh_display()
 
     def _on_gongjue_changed(self, _gongjue: str):
         """弓玦切换"""
@@ -1024,6 +1054,8 @@ class CombatAttrsTab(QWidget):
         )
         self._dps_value.setToolTip(tooltip)
         self._graduation_value.setToolTip(tooltip)
+        # 通知装备状态页状态展示行同步
+        self._host.graduation_updated.emit()
 
     def _compute_combat_attrs(self) -> CombatAttributes:
         """计算最终战斗属性 = 基础属性 + 装备基础攻击 + 装备词条 + 弓玦属性。"""

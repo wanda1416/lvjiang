@@ -7,13 +7,14 @@ import pytest
 
 from lvjiang.apps.yysls.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.evaluator.excel_formula import FormulaModel, parse_formula
+from lvjiang.apps.yysls.evaluator.excel_formula import parse_formula
 from lvjiang.apps.yysls.evaluator.graduation import (
     get_graduation_calculator,
     get_graduation_scheme_combat_attrs,
     get_graduation_scheme_inputs,
 )
 from lvjiang.apps.yysls.evaluator.graduation_converter import convert_workbook
+from lvjiang.apps.yysls.evaluator.graduation_program import ProgramRuntime
 
 DATA_DIR = (
     Path(__file__).parents[1] / "config" / "system" / "yysls" / "graduation"
@@ -43,30 +44,35 @@ def test_converter_resolves_skill_alias_in_school_group() -> None:
         if "副本" not in path.stem
     )
     model = convert_workbook(path, "鸣金·虹")
-    assert model["inputs"]["special_bonus"]["affix_names"] == [
-        "无名剑法蓄力技增伤"
-    ]
+    assert model["baseline_attrs"]["extra_attrs"]["无名剑法蓄力技增伤"] == 0.32
 
 
 def test_converter_ignores_blank_skill_affix_label() -> None:
     path = next(EXCEL_DIR.glob("*牵丝霖*.xlsx"))
     model = convert_workbook(path, "牵丝·霖")
-    assert model["inputs"]["special_bonus"]["affix_names"] == []
+    skill_group = set(
+        get_game_config().get_alias_groups("指定技能增效")["牵丝·霖"]
+    )
+    assert not skill_group.intersection(model["baseline_attrs"].get("extra_attrs", {}))
 
 
 @pytest.mark.parametrize("school", SCHOOLS)
 def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     model = _load(school)
-    assert model["schema_version"] == "1.0"
-    assert model["model"]["source"]["sha256"]
-    runtime = FormulaModel(model)
-    for name in ("combat_time", "total_damage", "dps", "rdps", "graduation_rate"):
-        reference = model["outputs"][name]["ref"]
-        actual = float(runtime.value(reference))
-        sheet, coordinate = reference.split("!", 1)
-        cell = model["sheets"][sheet]["cells"][coordinate]
-        expected = float(cell.get("cached", cell.get("value")))
-        assert actual == pytest.approx(expected, rel=1e-10, abs=1e-6)
+    assert model["schema_version"] == 2
+    assert model["source"]["sha256"]
+    assert "sheets" not in model
+    baseline = model["baseline_attrs"]
+    extra = baseline.get("extra_attrs", {})
+    values = [
+        baseline.get(spec["name"], 0) if spec["kind"] == "field"
+        else extra.get(spec["name"], 0)
+        for spec in model["program"]["inputs"]
+    ]
+    actual = ProgramRuntime(model["program"], values).outputs()
+    for name, expected in model["reference"].items():
+        assert actual[name] == pytest.approx(expected, rel=1e-10, abs=1e-6)
+    assert f"{actual['graduation_rate'] * 100:.2f}%" == "100.00%"
 
 
 def test_runtime_uses_non_mingjin_element_inputs() -> None:
@@ -92,30 +98,12 @@ def test_dynamic_inputs_use_canonical_game_affix_names(school: str) -> None:
     game_config = get_game_config()
     canonical = set(game_config.get_wuxue_affix_names())
     canonical.update(game_config.get_aliases_for_category("指定技能增效"))
-    mapped_inputs = (
-        "all_skill_bonus", "boss_bonus", "weapon_bonus_primary",
-        "weapon_bonus_secondary", "single_qs_bonus", "group_qs_bonus",
-        "special_bonus",
-    )
-    for name in mapped_inputs:
-        spec = model["inputs"][name]
-        sheet, coordinate = spec["label_ref"].split("!", 1)
-        label_cell = model["sheets"][sheet]["cells"].get(coordinate, {})
-        label = label_cell.get("value")
-        affix_names = spec["affix_names"]
-        if name == "special_bonus" and label:
-            group = game_config.get_alias_groups("指定技能增效").get(school, [])
-            matches = [
-                exact for exact in group
-                if label in game_config.get_affix_aliases(exact)
-            ]
-            assert affix_names == [matches[0]]
-        else:
-            assert affix_names == (
-                game_config.get_affix_names_for_alias(label) if label else []
-            )
-        if name in {"weapon_bonus_primary", "weapon_bonus_secondary", "special_bonus"}:
-            assert set(affix_names) <= canonical
+    affix_inputs = {
+        spec["name"] for spec in model["program"]["inputs"]
+        if spec["kind"] == "affix"
+    }
+    assert affix_inputs <= canonical
+    assert affix_inputs <= set(model["baseline_attrs"].get("extra_attrs", {}))
 
 
 def test_runtime_matches_mingjin_hong_excel_example() -> None:
@@ -143,8 +131,29 @@ def test_scheme_value_inputs_exclude_food_bonus() -> None:
     values = get_graduation_scheme_inputs("鸣金·虹", "基础方案")
     names = {entry["name"] for entry in values}
     assert "min_outer" in names
-    assert "special_bonus" in names
+    assert "无名剑法蓄力技增伤" in names
     assert all("food" not in name.lower() for name in names)
+
+
+def test_v2_records_environment_without_exposing_it_as_inputs() -> None:
+    model = _load("鸣金·虹")
+    assert model["environment"]["food_bonus"] == {
+        "min_outer": 200,
+        "max_outer": 400,
+    }
+    assert model["environment"]["team_buffs"]
+    input_names = {spec["name"] for spec in model["program"]["inputs"]}
+    assert "food_bonus" not in input_names
+    assert "team_buffs" not in input_names
+
+
+@pytest.mark.parametrize("school", SCHOOLS)
+def test_v2_contains_no_excel_affix_aliases(school: str) -> None:
+    raw = (DATA_DIR / f"{school}_基础方案.json").read_text(encoding="utf-8")
+    game_config = get_game_config()
+    for exact_name in game_config.get_wuxue_affix_names():
+        for alias in game_config.get_affix_aliases(exact_name):
+            assert f'"{alias}"' not in raw
 
 
 def test_scheme_combat_attrs_only_expose_canonical_affix_names() -> None:
@@ -166,7 +175,7 @@ def test_pozhu_scheme_uses_canonical_field_spelling() -> None:
     assert "pozhu_pen" in attrs.to_dict()
 
 
-def test_runtime_maps_real_affix_names_to_excel_short_labels() -> None:
+def test_runtime_only_consumes_canonical_affix_names() -> None:
     calculator = get_graduation_calculator("鸣金·虹")
     assert calculator is not None
     common = dict(

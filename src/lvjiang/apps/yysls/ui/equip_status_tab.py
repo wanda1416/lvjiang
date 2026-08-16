@@ -38,6 +38,11 @@ _QUALITY_COLORS = {
     None: "#999999",
 }
 
+# 状态展示行样式（与角色详情毕业率卡片一致）
+_STATUS_NAME_STYLE = "font-size: 13px; color: palette(mid);"
+_STATUS_VALUE_STYLE = "font-size: 15px; font-weight: 600;"
+_STATUS_YELLOW_VALUE_STYLE = "font-size: 15px; font-weight: 600; color: #D97706;"
+
 # 顶部槽位布局（固定 2×4）
 # (row, col, slot_key, display_name, filter_type)
 # filter_type 对应 bag_items 的分组 key；主副武器共享 "weapon"
@@ -103,6 +108,46 @@ def _affix_value_color(cap_pct: int | float | None) -> str:
     return "#2563EB"
 
 
+# ── 标签样式 ──────────────────────────────────────────
+
+_TAG_STYLE = (
+    "color: white; border-radius: 8px; "
+    "font-size: 11px; font-weight: 600; padding: 2px 7px;"
+)
+
+
+def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
+    """创建标准标签胶囊（用于 name_row 的标签序列）。"""
+    lbl = QLabel(text, parent)
+    lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+    lbl.setStyleSheet(f"background-color: {bg}; {_TAG_STYLE}")
+    return lbl
+
+
+class _StatusTagBar(QWidget):
+    """名称行右侧的通用多状态标签容器。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(4)
+        self._tags: dict[str, QLabel] = {}
+
+    def define(self, key: str, text: str, bg: str = "#607D8B") -> None:
+        label = _make_tag(text, bg, self)
+        label.setVisible(False)
+        self._tags[key] = label
+        self._layout.addWidget(label)
+
+    def set_visible(self, key: str, visible: bool) -> None:
+        self._tags[key].setVisible(visible)
+
+    def is_visible(self, key: str) -> bool:
+        return not self._tags[key].isHidden()
+
+
 # ── 顶部：可点击槽位卡片 ──────────────────────────────
 
 
@@ -140,7 +185,7 @@ class _SlotCard(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(3)
 
-        # 槽位名 / 装备名 + 筛选状态
+        # 槽位名 + 标签序列
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(6)
@@ -148,13 +193,10 @@ class _SlotCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px; color: #333;")
         header.addWidget(self.lbl_name, stretch=1)
-        self.lbl_filter = QLabel(tr("筛选中"))
-        self.lbl_filter.setStyleSheet(
-            "background-color: #607D8B; color: white; border-radius: 8px; "
-            "font-size: 11px; font-weight: 600; padding: 2px 7px;"
-        )
-        self.lbl_filter.setVisible(False)
-        header.addWidget(self.lbl_filter)
+        self.status_tags = _StatusTagBar()
+        self.status_tags.define("filtered", tr("筛选中"))
+        self.status_tags.define("mock", tr("模拟"), "#7E57C2")
+        header.addWidget(self.status_tags)
         layout.addLayout(header)
 
         # 等级行
@@ -183,7 +225,7 @@ class _SlotCard(QFrame):
 
     def set_selected(self, selected: bool):
         self._selected = selected
-        self.lbl_filter.setVisible(selected)
+        self.status_tags.set_visible("filtered", selected)
         bg = self._quality_bg or "#f8f9fa"
         if selected:
             self._apply_style(_slot_style_selected(bg))
@@ -262,6 +304,7 @@ class _SlotCard(QFrame):
     def set_empty(self):
         self._quality_bg = None
         self._equip_data = {}
+        self.status_tags.set_visible("mock", False)
         self.lbl_name.setText(self._display_name)
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px; color: #333;")
@@ -274,6 +317,9 @@ class _SlotCard(QFrame):
 
     def set_equip(self, equip_data: dict):
         self._equip_data = equip_data
+        self.status_tags.set_visible(
+            "mock", bool(equip_data.get("_extra", {}).get("is_mock", False)),
+        )
         quality = equip_data.get("quality") or ""
         color = _QUALITY_COLORS.get(quality, "#888888")
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
@@ -398,7 +444,7 @@ class _CompactEquipCard(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(3)
 
-        # 装备名 / 模拟标签（同行）
+        # 装备名 + 标签序列
         name_row = QHBoxLayout()
         name_row.setContentsMargins(0, 0, 0, 0)
         name_row.setSpacing(6)
@@ -408,15 +454,9 @@ class _CompactEquipCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
         name_row.addWidget(self.lbl_name, stretch=1)
-        self.lbl_mock_tag = QLabel(tr("模拟"))
-        self.lbl_mock_tag.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.lbl_mock_tag.setStyleSheet(
-            "background-color: #607D8B; color: white; border-radius: 8px; "
-            "font-size: 11px; font-weight: 600; padding: 2px 7px;"
-        )
-        self.lbl_mock_tag.setVisible(False)
-        name_row.addWidget(self.lbl_mock_tag)
+        self.status_tags = _StatusTagBar()
+        self.status_tags.define("mock", tr("模拟"), "#7E57C2")
+        name_row.addWidget(self.status_tags)
         layout.addLayout(name_row)
 
         self.lbl_level = QLabel()
@@ -512,7 +552,10 @@ class _CompactEquipCard(QFrame):
         self.lbl_name.setText(f"{part_label} · {name}")
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px; color: {color};")
-        self.lbl_mock_tag.setVisible(is_mock)
+        self.status_tags.set_visible(
+            "mock",
+            bool(is_mock or equip_data.get("_extra", {}).get("is_mock", False)),
+        )
 
         level = equip_data.get("level", "?")
         is_chengyin = equip_data.get("is_chengyin", False)
@@ -626,6 +669,9 @@ class EquipStatusTab(QWidget):
         self._slot_cards: dict[str, _SlotCard] = {}
         self._setup_ui()
         self._refresh_all()
+        # 订阅装备变更信号，更新状态展示行
+        self._host.equipment_changed.connect(self._update_status_row)
+        self._host.graduation_updated.connect(self._update_status_row)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -706,6 +752,45 @@ class EquipStatusTab(QWidget):
         btn_export.clicked.connect(self._on_export)
         btn_row.addWidget(btn_export)
         layout.addLayout(btn_row)
+
+        # ── 状态展示行：DPS / 毕业率（复用角色详情配置） ──
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(8, 2, 8, 4)
+        status_row.setSpacing(20)
+
+        # DPS
+        dps_widget = QWidget()
+        dps_layout = QHBoxLayout(dps_widget)
+        dps_layout.setContentsMargins(0, 0, 0, 0)
+        dps_layout.setSpacing(8)
+        dps_name = QLabel(tr("DPS"))
+        dps_name.setStyleSheet(_STATUS_NAME_STYLE)
+        self._status_dps = QLabel("--")
+        self._status_dps.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._status_dps.setMinimumWidth(100)
+        self._status_dps.setStyleSheet(_STATUS_VALUE_STYLE)
+        dps_layout.addWidget(dps_name)
+        dps_layout.addStretch()
+        dps_layout.addWidget(self._status_dps)
+        status_row.addWidget(dps_widget)
+
+        # 毕业率
+        rate_widget = QWidget()
+        rate_layout = QHBoxLayout(rate_widget)
+        rate_layout.setContentsMargins(0, 0, 0, 0)
+        rate_layout.setSpacing(8)
+        rate_name = QLabel(tr("毕业率"))
+        rate_name.setStyleSheet(_STATUS_NAME_STYLE)
+        self._status_graduation = QLabel("--")
+        self._status_graduation.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._status_graduation.setMinimumWidth(100)
+        self._status_graduation.setStyleSheet(_STATUS_YELLOW_VALUE_STYLE)
+        rate_layout.addWidget(rate_name)
+        rate_layout.addStretch()
+        rate_layout.addWidget(self._status_graduation)
+        status_row.addWidget(rate_widget)
+
+        layout.addLayout(status_row)
 
         # ── 滚动区域：槽位 + 背包网格统一滚动 ──
         scroll = QScrollArea()
@@ -1028,6 +1113,20 @@ class EquipStatusTab(QWidget):
     def _on_refresh(self):
         self._refresh_all()
 
+    def _update_status_row(self):
+        """更新状态展示行：从角色详情 Tab 读取 DPS 和毕业率。"""
+        from .combat_attrs_tab import CombatAttrsTab
+        for child in self._host.findChildren(QWidget):
+            if isinstance(child, CombatAttrsTab):
+                self._status_dps.setText(child._dps_value.text())
+                self._status_graduation.setText(child._graduation_value.text())
+                self._status_dps.setToolTip(child._dps_value.toolTip())
+                self._status_graduation.setToolTip(
+                    child._graduation_value.toolTip())
+                return
+        self._status_dps.setText("--")
+        self._status_graduation.setText("--")
+
     def _refresh_all(self):
         from lvjiang.core.config import load_equip_display
 
@@ -1057,6 +1156,7 @@ class EquipStatusTab(QWidget):
 
         self._refresh_slots()
         self._rebuild_grid()
+        self._update_status_row()
 
     def _refresh_slots(self):
         dp = self._display_params

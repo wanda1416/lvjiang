@@ -3,7 +3,7 @@
 独立窗口，管理装备配置、词条配置与流派配置。
 """
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
 from .....i18n import tr
@@ -29,3 +29,9 @@ class GameConfigDialog(QDialog):
 
         self._tab = GameConfigTab()
         layout.addWidget(self._tab)
+
+    def select_school_base_attr(self, school: str, base_attr: str) -> None:
+        """显示后定位到流派配置及指定基础属性。"""
+        QTimer.singleShot(
+            0, lambda: self._tab.select_school_base_attr(school, base_attr),
+        )

@@ -172,7 +172,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
             break
         end
 
-        eval $signal = bag_cursor_finish_window($rows, 3)
+        eval $signal = bag_cursor_finish_window($rows, $rows)
         if $signal equals "end"
             log "  已到达背包末尾"
             break

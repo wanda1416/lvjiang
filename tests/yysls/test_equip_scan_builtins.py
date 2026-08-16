@@ -144,7 +144,7 @@ def test_equip_scan_uses_window_protocol_and_correct_detail_scenes():
     text = (root / "config/system/workflows/equip_scan.wf").read_text(
         encoding="utf-8")
     assert "bag_cursor_visit($fp)" in text
-    assert "bag_cursor_finish_window($rows, 3)" in text
+    assert "bag_cursor_finish_window($rows, $rows)" in text
     assert 'panel_rows("bag_equip_detail", "bag_grid")' in text
     assert 'call scan_slot_bag("ring", "ring", "weapon", $min_level)' in text
     assert ('call scan_slot_bag("pendant", "pendant", "weapon", '

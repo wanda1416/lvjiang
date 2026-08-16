@@ -51,3 +51,8 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: zaoyi
+  name: 装备造诣
+  type: attr
+  is_text: true
+  is_clickable: false

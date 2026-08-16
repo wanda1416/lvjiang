@@ -4,6 +4,9 @@
 支持 JSON 序列化/反序列化。
 """
 
+from __future__ import annotations
+
+import hashlib
 from dataclasses import dataclass, field
 
 
@@ -151,3 +154,32 @@ class EquipmentData:
             warnings=d.get("_warnings", []),
             extra_data=d.get("_extra", {}),
         )
+
+
+def make_fingerprint(equip_data: dict) -> str:
+    """基于装备数据生成去重指纹（MD5 前 8 位 hex）
+
+    指纹由 type + level + quality + is_chengyin + 全部词条(name:value) 组成。
+    空数据或空字典返回空字符串。
+
+    此函数为共享实现，供 to_equipment 内置函数和 make_fingerprint 内置函数复用。
+
+    注意：定音词条(dingyin)故意不包含在指纹中。
+    原因：装备可能切换定音，五个词条数值完全相同的概率极低，
+    包含定音会导致同一件装备换定音后被误判为不同装备。
+    """
+    if not isinstance(equip_data, dict) or not equip_data:
+        return ""
+    parts = [
+        str(equip_data.get("type", "") or ""),
+        str(equip_data.get("level", "") or ""),
+        str(equip_data.get("quality", "") or ""),
+        str(equip_data.get("is_chengyin", "") or ""),
+    ]
+    # 词条以 affix_1 ~ affix_5 形式存储在 dict 中
+    for i in range(1, 6):
+        affix = equip_data.get(f"affix_{i}")
+        if isinstance(affix, dict) and affix.get("name"):
+            parts.append(f"{affix['name']}:{affix.get('value', '')}")
+    raw = "+".join(parts)
+    return hashlib.md5(raw.encode()).hexdigest()[:8]

@@ -1030,28 +1030,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """生成装备指纹，空装备返回空串。
 
         空装备判定：type/name/level 全为空或 None。
+        委托给共享 make_fingerprint 函数。
         """
-        if not isinstance(equip, dict) or not equip:
-            return ""
-        # 检查是否有有效装备数据（type/level 至少有一个非空）
-        equip_type = equip.get("type") or ""
-        equip_name = equip.get("name") or ""
-        equip_level = equip.get("level") or ""
-        if not equip_type and not equip_name and not equip_level:
-            return ""  # 空装备 → 空指纹
-        import hashlib
-        parts = [
-            str(equip_type),
-            str(equip_level),
-            str(equip.get("quality", "") or ""),
-            str(equip.get("chengyin", "") or ""),
-        ]
-        for i in range(1, 6):
-            affix = equip.get(f"affix_{i}")
-            if isinstance(affix, dict) and affix.get("name"):
-                parts.append(f"{affix['name']}:{affix.get('value', '')}")
-        raw = "+".join(parts)
-        return hashlib.md5(raw.encode()).hexdigest()[:8]
+        from ...equip_parser.models import make_fingerprint
+        return make_fingerprint(equip)
 
     @staticmethod
     def _equip_label(equip: dict) -> str:

@@ -167,14 +167,14 @@ class TestSchoolPanel:
     def test_list_prefilled(self, qtbot, tmp_attrs):
         panel = SchoolPanel()
         qtbot.addWidget(panel)
-        assert panel._school_list.count() == 10
-        names = [panel._school_list.item(i).text() for i in range(10)]
+        assert panel._school_list.count() == 11
+        names = [panel._school_list.item(i).text() for i in range(11)]
         assert "鸣金·虹" in names and "破竹·鸢" in names
 
     def test_form_follows_selection(self, qtbot, tmp_attrs):
         panel = SchoolPanel()
         qtbot.addWidget(panel)
-        names = [panel._school_list.item(i).text() for i in range(10)]
+        names = [panel._school_list.item(i).text() for i in range(11)]
         panel._school_list.setCurrentRow(names.index("裂石·钧"))
         assert panel._combo_attr.currentText() == "裂石"
         assert panel._combo_main_weapon.currentText() == "横刀"
@@ -185,7 +185,7 @@ class TestSchoolPanel:
     def test_field_edit_saves(self, qtbot, tmp_attrs):
         panel = SchoolPanel()
         qtbot.addWidget(panel)
-        names = [panel._school_list.item(i).text() for i in range(10)]
+        names = [panel._school_list.item(i).text() for i in range(11)]
         panel._school_list.setCurrentRow(names.index("鸣金·虹"))
         panel._combo_sub_weapon.setCurrentText("伞")
         cfg = _load_yaml(tmp_attrs)["schools"]["鸣金·虹"]
@@ -205,7 +205,7 @@ class TestSchoolPanel:
         )
         panel._on_add_school()
         assert "测试流派" in _load_yaml(tmp_attrs)["schools"]
-        assert panel._school_list.count() == 11
+        assert panel._school_list.count() == 12
         # 新增流派自动选中，表单置空
         assert panel._current_school() == "测试流派"
         assert panel._combo_attr.currentText() == ""
@@ -215,7 +215,7 @@ class TestSchoolPanel:
         assert _load_yaml(tmp_attrs)["schools"]["测试流派"] == {"attr": "鸣金"}
 
         # 重命名（编辑列表项触发 itemChanged）
-        row = [panel._school_list.item(i).text() for i in range(11)].index("测试流派")
+        row = [panel._school_list.item(i).text() for i in range(12)].index("测试流派")
         panel._school_list.item(row).setText("测试流派2")
         schools = _load_yaml(tmp_attrs)["schools"]
         assert "测试流派2" in schools and "测试流派" not in schools
@@ -225,8 +225,8 @@ class TestSchoolPanel:
             school_panel.QMessageBox, "question",
             staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes),
         )
-        row = [panel._school_list.item(i).text() for i in range(11)].index("测试流派2")
+        row = [panel._school_list.item(i).text() for i in range(12)].index("测试流派2")
         panel._school_list.setCurrentRow(row)
         panel._on_del_school()
         assert "测试流派2" not in _load_yaml(tmp_attrs)["schools"]
-        assert panel._school_list.count() == 10
+        assert panel._school_list.count() == 11

@@ -1,29 +1,41 @@
 """流派配置面板
 
 左侧为流派列表（对应游戏十大流派，可增删、直接编辑重命名），
-右侧为选中流派的配置表单，分三行：
-- 第一行：属性（下拉 鸣金 / 裂石 / 破竹 / 牵丝）；
-- 第二行：主武器（下拉）+ 主武学（文本框），两列等宽；
-- 第三行：副武器（下拉）+ 副武学（文本框），两列等宽。
-武学增效已移至装备配置的武器类型中，每个武器绑定一种武学增效。
-武器候选来自 weapon_types 注册表。
-数据存于 attributes.yaml 顶层 schools：
-    流派名 → {attr: 属性, main: {weapon, martial_art}, sub: {weapon, martial_art}}
+右侧为选中流派的配置表单：
+- 属性 / 主武器+主武学 / 副武器+副武学
+- 玩法管理（查看/添加/编辑/删除当前流派的玩法）
+
+数据存于 game_config.yaml 顶层 schools：
+    流派名 → {
+        attr: 属性,
+        main: {weapon, martial_art},
+        sub: {weapon, martial_art},
+    }
 修改即时写盘，并刷新 GameConfigManager 单例。
+
+玩法数据存于 config/session/yysls.json，由 play_styles 模块管理。
 """
 
 from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFormLayout,
+    QFrame,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
+    QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -36,6 +48,12 @@ _ATTRS_REL = "yysls/game_config.yaml"
 
 # 流派属性候选
 _SCHOOL_ATTRS = [tr("鸣金"), tr("裂石"), tr("破竹"), tr("牵丝")]
+
+
+def _get_combat_display_names() -> list[tuple[str, str, str, bool]]:
+    """返回 COMBAT_ATTR_FIELDS 的 (field_name, display_name, unit, is_interval) 列表"""
+    from ...combat_attrs import COMBAT_ATTR_FIELDS
+    return list(COMBAT_ATTR_FIELDS)
 
 
 class SchoolPanel(QWidget):
@@ -77,7 +95,7 @@ class SchoolPanel(QWidget):
 
         splitter.addWidget(left_widget)
 
-        # ── 右侧：流派配置表单 ──
+        # ── 右侧：流派配置表单 + 玩法 Tab ──
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -86,18 +104,21 @@ class SchoolPanel(QWidget):
         hint.setStyleSheet("color: #888;")
         right_layout.addWidget(hint)
 
-        # 第一行：属性（标签后留两字宽，使下拉框与下方主/副武器列对齐）
+        # ── 武学属性 ──
+        attr_group = QGroupBox(tr("武学属性"))
+        attr_layout = QVBoxLayout(attr_group)
+
+        # 第一行：属性
         row_attr = QHBoxLayout()
-        row_attr.setSpacing(28)  # 属性(2字) + 2字间距 = 主武器(3字) + 1字间距
+        row_attr.setSpacing(28)
         row_attr.addWidget(QLabel(tr("属性")))
         self._combo_attr = QComboBox()
         self._combo_attr.setFixedWidth(100)
         row_attr.addWidget(self._combo_attr)
         row_attr.addStretch()
-        right_layout.addLayout(row_attr)
+        attr_layout.addLayout(row_attr)
 
-        # 第二/三行：两列等宽网格（主武器+主武学 / 副武器+副武学）
-        # 每列内部：标签后紧接控件（约一个汉字间距），控件定宽，不贴右缘
+        # 第二/三行：主武器+主武学 / 副武器+副武学
         self._combo_main_weapon = QComboBox()
         self._combo_main_weapon.setFixedWidth(100)
         self._edit_main_martial = QLineEdit()
@@ -113,7 +134,7 @@ class SchoolPanel(QWidget):
 
         def _pair(label: str, widget) -> QHBoxLayout:
             lay = QHBoxLayout()
-            lay.setSpacing(14)  # 约一个汉字宽度
+            lay.setSpacing(14)
             lay.addWidget(QLabel(label))
             lay.addWidget(widget)
             lay.addStretch()
@@ -126,18 +147,49 @@ class SchoolPanel(QWidget):
         grid.addLayout(_pair(tr("主武学"), self._edit_main_martial), 0, 1)
         grid.addLayout(_pair(tr("副武器"), self._combo_sub_weapon), 1, 0)
         grid.addLayout(_pair(tr("副武学"), self._edit_sub_martial), 1, 1)
-        right_layout.addLayout(grid)
-
-        right_layout.addStretch()
+        attr_layout.addLayout(grid)
 
         for combo in self._combos():
             combo.currentTextChanged.connect(self._on_field_changed)
         for edit in self._edits():
             edit.textChanged.connect(self._on_field_changed)
 
+        right_layout.addWidget(attr_group)
+
+        # ── 玩法管理 ──
+        ps_group = QGroupBox(tr("玩法管理"))
+        ps_main_layout = QHBoxLayout(ps_group)
+
+        # 左侧：玩法列表（右键菜单提供删除）
+        ps_left = QWidget()
+        ps_left_layout = QVBoxLayout(ps_left)
+        ps_left_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._ps_list = QListWidget()
+        self._ps_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._ps_list.customContextMenuRequested.connect(self._on_ps_context_menu)
+        self._ps_list.currentRowChanged.connect(self._on_ps_selected)
+        ps_left_layout.addWidget(self._ps_list)
+
+        ps_main_layout.addWidget(ps_left)
+
+        # 右侧：选中玩法的可编辑卡片（所见即所得，修改自动保存）
+        self._ps_scroll = QScrollArea()
+        self._ps_scroll.setWidgetResizable(True)
+        self._ps_scroll_widget = QWidget()
+        self._ps_scroll_layout = QVBoxLayout(self._ps_scroll_widget)
+        self._ps_scroll_layout.setContentsMargins(4, 4, 4, 4)
+        self._ps_scroll_layout.setSpacing(6)
+        self._ps_scroll.setWidget(self._ps_scroll_widget)
+        self._ps_edits: dict[str, QLineEdit] = {}
+        self._ps_current_name: str = ""  # 当前编辑的玩法名
+        ps_main_layout.addWidget(self._ps_scroll, stretch=1)
+
+        # 玩法管理占据剩余空间
+        right_layout.addWidget(ps_group, stretch=1)
+
         splitter.addWidget(right_widget)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([150, 400])
 
     def _combos(self) -> list[QComboBox]:
         return [
@@ -210,7 +262,7 @@ class SchoolPanel(QWidget):
         main = cfg.get("main") or {}
         sub = cfg.get("sub") or {}
 
-        prev_loading = self._loading  # 可能由 _refresh_list 嵌套触发，保持外层标志
+        prev_loading = self._loading
         self._loading = True
         weapons = self._weapon_candidates()
         self._fill_combo(self._combo_attr, _SCHOOL_ATTRS, cfg.get("attr"))
@@ -223,7 +275,9 @@ class SchoolPanel(QWidget):
             combo.setEnabled(enabled)
         for edit in self._edits():
             edit.setEnabled(enabled)
+
         self._loading = prev_loading
+        self._refresh_play_styles()
 
     @staticmethod
     def _fill_combo(combo: QComboBox, candidates: list[str], value: str | None):
@@ -293,7 +347,7 @@ class SchoolPanel(QWidget):
         name = self._current_school()
         if name is None:
             return
-        cfg: dict = {}
+        cfg: dict = self._schools().get(name, {})
         attr = self._combo_attr.currentText()
         if attr:
             cfg["attr"] = attr
@@ -324,3 +378,331 @@ class SchoolPanel(QWidget):
             get_game_config()._load()
         except Exception as e:
             logger.error(f"保存失败: {e}")
+
+    # ── 玩法管理 ──────────────────────────────────────────────
+
+    def _refresh_play_styles(self):
+        """刷新当前流派的玩法列表"""
+        school = self._current_school()
+        self._ps_list.clear()
+        self._clear_ps_editor()
+        if not school:
+            return
+        from ...config import get_play_styles
+        styles = get_play_styles(school)
+        for name in sorted(styles.keys()):
+            self._ps_list.addItem(name)
+
+    def _clear_ps_editor(self):
+        """清空右侧玩法编辑区"""
+        while self._ps_scroll_layout.count():
+            item = self._ps_scroll_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._ps_edits.clear()
+        self._ps_current_name = ""
+
+    def _on_ps_selected(self, row: int):
+        """选中玩法 → 在右侧显示可编辑卡片"""
+        school = self._current_school()
+        if not school or row < 0:
+            self._clear_ps_editor()
+            return
+        from ...config import get_play_styles, get_game_config
+        styles = get_play_styles(school)
+        name = self._ps_list.item(row).text()
+        attrs = styles.get(name, {})
+        self._ps_current_name = name
+        self._clear_ps_editor()
+
+        gc = get_game_config()
+        school_attr = gc.get_school_attr(school)
+        resolved = self._get_resolved_fields_for_school(school_attr)
+
+        display_names = {
+            fn: dn for fn, dn, _u, _i in _get_combat_display_names()
+        }
+
+        # 将所有分组的字段合并为一个扁平列表
+        all_fields: list[tuple[str, str, str]] = []
+        for _group_label, fields in resolved:
+            all_fields.extend(fields)
+
+        # 创建一个统一的编辑卡片
+        card = self._create_ps_card(all_fields, attrs, display_names)
+        self._ps_scroll_layout.addWidget(card)
+        self._ps_scroll_layout.addStretch()
+
+    def _get_resolved_fields_for_school(self, school_attr: str | None):
+        """解析占位符字段，返回实际字段列表"""
+        from ...combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
+        if not school_attr or school_attr not in SCHOOL_ATTR_FIELD_MAP:
+            result = []
+            for label, fields in PLAY_STYLE_FIELD_GROUPS:
+                resolved = [(fn, dl, u) for fn, dl, u in fields if not fn.startswith("__")]
+                if resolved:
+                    result.append((label, resolved))
+            return result
+        attr_map = SCHOOL_ATTR_FIELD_MAP[school_attr]
+        result = []
+        for label, fields in PLAY_STYLE_FIELD_GROUPS:
+            resolved = []
+            for fn, dl, u in fields:
+                if fn == "__attr_pen__":
+                    resolved.append((attr_map["attr_pen"], dl, u))
+                elif fn == "__attr_bonus__":
+                    resolved.append((attr_map["attr_bonus"], dl, u))
+                elif fn == "__min_attr__":
+                    resolved.append((attr_map["min_attr"], dl, u))
+                elif fn == "__max_attr__":
+                    resolved.append((attr_map["max_attr"], dl, u))
+                else:
+                    resolved.append((fn, dl, u))
+            result.append((label, resolved))
+        return result
+
+    def _create_ps_card(self, fields: list[tuple[str, str, str]],
+                        attrs: dict, display_names: dict) -> QFrame:
+        """创建一个玩法属性编辑卡片（所有字段平铺）"""
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame#psCard {
+                background-color: palette(base);
+                border: 1px solid palette(midlight);
+                border-radius: 6px;
+            }
+        """)
+        card.setObjectName("psCard")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12, 10, 12, 10)
+        card_layout.setSpacing(6)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(20)
+        grid.setVerticalSpacing(6)
+        grid.setContentsMargins(0, 0, 0, 0)
+
+        row, col = 0, 0
+        for field_name, fallback_label, unit in fields:
+            display_label = display_names.get(field_name, fallback_label)
+            cell = QWidget()
+            cell_layout = QHBoxLayout(cell)
+            cell_layout.setContentsMargins(0, 0, 0, 0)
+            cell_layout.setSpacing(6)
+
+            lbl = QLabel(tr(display_label))
+            lbl.setStyleSheet("font-size: 12px; color: palette(mid);")
+            cell_layout.addWidget(lbl)
+
+            edit = QLineEdit()
+            edit.setAlignment(Qt.AlignmentFlag.AlignRight)
+            edit.setFixedWidth(110)
+            edit.setFixedHeight(24)
+            validator = QDoubleValidator(-999999.0, 999999.0, 4, edit)
+            edit.setValidator(validator)
+            v = attrs.get(field_name, 0)
+            if unit == "%":
+                edit.setText(f"{v * 100:.2f}")
+            else:
+                edit.setText(f"{v:.2f}" if v else "0")
+            edit.textChanged.connect(
+                lambda _t, fn=field_name, u=unit: self._on_ps_field_changed(fn, u)
+            )
+            cell_layout.addWidget(edit)
+            self._ps_edits[field_name] = edit
+
+            grid.addWidget(cell, row, col)
+            col += 1
+            if col >= 2:
+                col = 0
+                row += 1
+
+        card_layout.addLayout(grid)
+        return card
+
+    def _on_ps_field_changed(self, field_name: str, unit: str):
+        """任一字段变更 → 自动保存到当前玩法"""
+        school = self._current_school()
+        name = self._ps_current_name
+        if not school or not name:
+            return
+        from ...config import get_play_styles, save_play_style
+        styles = get_play_styles(school)
+        attrs = dict(styles.get(name, {}))
+        for fn, edit in self._ps_edits.items():
+            try:
+                v = float(edit.text())
+            except (ValueError, TypeError):
+                v = 0.0
+            # 判断 unit：从当前 resolved fields 中查找
+            fn_unit = self._find_field_unit(fn)
+            if fn_unit == "%":
+                v = v / 100.0
+            if v:
+                attrs[fn] = v
+            else:
+                attrs.pop(fn, None)
+        save_play_style(school, name, attrs)
+
+    def _find_field_unit(self, field_name: str) -> str:
+        """查找字段单位"""
+        from ...combat_attrs import COMBAT_ATTR_FIELDS
+        for fn, _dn, unit, _ in COMBAT_ATTR_FIELDS:
+            if fn == field_name:
+                return unit
+        return ""
+
+    def _on_ps_context_menu(self, pos):
+        """玩法列表右键菜单：删除"""
+        item = self._ps_list.itemAt(pos)
+        if not item:
+            return
+        menu = QMenu(self)
+        del_action = menu.addAction(tr("删除"))
+        action = menu.exec(self._ps_list.mapToGlobal(pos))
+        if action == del_action:
+            self._do_delete_play_style(item.text())
+
+    def _do_delete_play_style(self, name: str):
+        """删除玩法"""
+        school = self._current_school()
+        if not school:
+            return
+        ret = QMessageBox.question(
+            self, tr("确认删除"),
+            tr("确定删除玩法「{name}」？").format(name=name),
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ...config import delete_play_style
+        delete_play_style(school, name)
+        self._refresh_play_styles()
+
+
+class _PlayStyleEditDialog(QDialog):
+    """编辑/创建玩法对话框"""
+
+    def __init__(self, parent=None, name: str = "", attrs: dict | None = None,
+                 school_attr: str | None = None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("编辑玩法") if name else tr("创建玩法"))
+        self.setMinimumWidth(400)
+        self._school_attr = school_attr
+        self._spins: dict[str, QDoubleSpinBox] = {}
+        self._setup_ui(name, attrs or {})
+
+    def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
+        """解析占位符字段，返回实际字段列表"""
+        from ...combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
+
+        if not self._school_attr or self._school_attr not in SCHOOL_ATTR_FIELD_MAP:
+            # 无流派属性时，跳过属攻相关字段
+            result = []
+            for label, fields in PLAY_STYLE_FIELD_GROUPS:
+                resolved = [(fn, dl, u) for fn, dl, u in fields if not fn.startswith("__")]
+                if resolved:
+                    result.append((label, resolved))
+            return result
+
+        # 有流派属性时，替换占位符
+        attr_map = SCHOOL_ATTR_FIELD_MAP[self._school_attr]
+        result = []
+        for label, fields in PLAY_STYLE_FIELD_GROUPS:
+            resolved = []
+            for fn, dl, u in fields:
+                if fn == "__attr_pen__":
+                    resolved.append((attr_map["attr_pen"], dl, u))
+                elif fn == "__attr_bonus__":
+                    resolved.append((attr_map["attr_bonus"], dl, u))
+                elif fn == "__min_attr__":
+                    resolved.append((attr_map["min_attr"], dl, u))
+                elif fn == "__max_attr__":
+                    resolved.append((attr_map["max_attr"], dl, u))
+                else:
+                    resolved.append((fn, dl, u))
+            result.append((label, resolved))
+        return result
+
+    def _setup_ui(self, name: str, attrs: dict):
+        layout = QVBoxLayout(self)
+
+        # 属性表单（分组同行显示）
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        form_widget = QWidget()
+        form = QFormLayout(form_widget)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        resolved_groups = self._get_resolved_fields()
+        for group_label, fields in resolved_groups:
+            row_widget = QWidget()
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(6)
+
+            for field_name, display_label, unit in fields:
+                row_layout.addWidget(QLabel(tr(display_label)))
+                spin = QDoubleSpinBox()
+                spin.setRange(-999999, 999999)
+                spin.setDecimals(4)
+                spin.setSingleStep(0.1)
+                spin.setFixedWidth(100)
+                if unit == "%":
+                    spin.setSuffix("%")
+                v = attrs.get(field_name, 0)
+                if unit == "%":
+                    spin.setValue(v * 100)
+                else:
+                    spin.setValue(v)
+                row_layout.addWidget(spin)
+                self._spins[field_name] = spin
+
+            row_layout.addStretch()
+            form.addRow(QLabel(tr(group_label)) if group_label else QLabel(""), row_widget)
+
+        scroll.setWidget(form_widget)
+        layout.addWidget(scroll, stretch=1)
+
+        # 名称
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel(tr("玩法名称")))
+        self._edit_name = QLineEdit()
+        self._edit_name.setText(name)
+        self._edit_name.setPlaceholderText(tr("输入玩法名称"))
+        self._edit_name.setMaxLength(20)
+        name_row.addWidget(self._edit_name)
+        layout.addLayout(name_row)
+
+        # 按钮
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_save = QPushButton(tr("保存"))
+        btn_save.clicked.connect(self._on_save)
+        btn_row.addWidget(btn_save)
+        btn_cancel = QPushButton(tr("取消"))
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(btn_cancel)
+        layout.addLayout(btn_row)
+
+    def _on_save(self):
+        if not self._edit_name.text().strip():
+            QMessageBox.warning(self, tr("名称为空"), tr("玩法名称不能为空"))
+            return
+        self.accept()
+
+    def get_name(self) -> str:
+        return self._edit_name.text().strip()
+
+    def get_attrs(self) -> dict:
+        result = {}
+        for _, fields in self._get_resolved_fields():
+            for fn, _, unit in fields:
+                spin = self._spins.get(fn)
+                if not spin:
+                    continue
+                v = spin.value()
+                if unit == "%":
+                    v = v / 100.0
+                if v:
+                    result[fn] = v
+        return result

@@ -894,6 +894,14 @@ class AffixCapsPanel(QWidget):
                 lambda text, a=alias: self._on_category_changed(a, text))
         row_layout.addWidget(combo)
 
+        # 外部简称（毕业率 Excel 等外部系统严格按此匹配）
+        aliases = self._get_external_aliases(alias)
+        alias_btn = QPushButton(" / ".join(aliases) if aliases else tr("别名"))
+        alias_btn.setFixedWidth(150)
+        alias_btn.clicked.connect(
+            lambda _c, a=alias, b=alias_btn: self._edit_external_aliases(a, b))
+        row_layout.addWidget(alias_btn)
+
         # 词条部位（点击弹七部位多选；全选展示「全部」；仅普通词组启用）
         parts_btn = QPushButton(self._format_parts(self._get_affix_parts(alias)))
         parts_btn.setFixedWidth(130)
@@ -936,11 +944,43 @@ class AffixCapsPanel(QWidget):
                 return valid
         return list(EQUIP_PART_NAMES)
 
+    def _get_external_aliases(self, affix_name: str) -> list[str]:
+        """读取具体词条的多个外部简称。"""
+        aliases = (self._data.get("affix_aliases") or {}).get(affix_name)
+        if not isinstance(aliases, list):
+            return []
+        return [str(value) for value in aliases if str(value).strip()]
+
+    def _edit_external_aliases(self, affix_name: str, btn: QPushButton):
+        """编辑具体词条的外部简称，一行一个。"""
+        current = "\n".join(self._get_external_aliases(affix_name))
+        text, ok = QInputDialog.getMultiLineText(
+            self, tr("编辑别名"), tr("别名（每行一个）:"), current,
+        )
+        if not ok:
+            return
+        aliases = list(dict.fromkeys(
+            line.strip() for line in text.splitlines() if line.strip()
+        ))
+        mapping = self._data.setdefault("affix_aliases", {})
+        if aliases:
+            mapping[affix_name] = aliases
+        else:
+            mapping.pop(affix_name, None)
+            if not mapping:
+                self._data.pop("affix_aliases", None)
+        btn.setText(" / ".join(aliases) if aliases else tr("别名"))
+        self._save_data()
+
     @staticmethod
     def _format_parts(parts: list[str]) -> str:
-        """部位按钮文本：全选展示「全部」，否则 / 拼接（如 环/佩）"""
-        if len(parts) >= len(EQUIP_PART_NAMES):
+        """部位按钮文本：全选展示「全部」，>=4 个展示「非 XX/XX」（未选），否则 / 拼接"""
+        all_parts = list(EQUIP_PART_NAMES)
+        if len(parts) >= len(all_parts):
             return tr("全部")
+        if len(parts) >= 4:
+            excluded = [p for p in all_parts if p not in parts]
+            return tr("非 ") + "/".join(excluded)
         return "/".join(parts)
 
     def _pick_affix_parts(self, alias: str, btn: QPushButton):
@@ -1013,6 +1053,9 @@ class AffixCapsPanel(QWidget):
         affix_parts = self._data.get("affix_parts") or {}
         if alias in affix_parts:
             affix_parts[name] = affix_parts.pop(alias)
+        external_aliases = self._data.get("affix_aliases") or {}
+        if alias in external_aliases:
+            external_aliases[name] = external_aliases.pop(alias)
 
         self._refresh_alias_tags()
         self._save_data()
@@ -1079,14 +1122,24 @@ class AffixCapsPanel(QWidget):
                 if isinstance(names, list) and alias in names:
                     names.remove(alias)
                     self._drop_affix_parts(alias)
+                    self._drop_external_aliases(alias)
                     self._refresh_alias_tags()
                     self._save_data()
                     return
         elif isinstance(raw, list) and alias in raw:
             raw.remove(alias)
             self._drop_affix_parts(alias)
+            self._drop_external_aliases(alias)
             self._refresh_alias_tags()
             self._save_data()
+
+    def _drop_external_aliases(self, affix_name: str):
+        """删除具体词条时同步删除其外部简称。"""
+        mapping = self._data.get("affix_aliases")
+        if mapping and affix_name in mapping:
+            mapping.pop(affix_name)
+            if not mapping:
+                self._data.pop("affix_aliases", None)
 
     def _get_all_aliases(self) -> dict[str, str]:
         """获取所有类别的词条名映射 {alias: category}（兼容分组形态）"""

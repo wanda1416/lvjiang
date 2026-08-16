@@ -37,12 +37,12 @@ def clean(text: str) -> str:
 
 class TestCandidates:
     def test_full_pool(self, dp):
-        # 全量池 = 增益类 3 条 + 指定技能增效 52 条
+        # 全量池 = 增益类 3 条 + 指定技能增效 57 条（11 流派）
         names = set(dp._candidates())
         assert {"外功穿透", "外功抗性", "无相穿透"} <= names
         assert "无名剑法武学技增伤" in names
         assert "千机索天重击增伤" in names
-        assert len(names) == 55
+        assert len(names) == 60
 
 
 # ─── 解析 ─────────────────────────────────────────────────

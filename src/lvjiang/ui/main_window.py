@@ -102,6 +102,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     # 宿主信号：自动化状态（"running" / "not_ready" / "ready"）与用户切换
     automation_state_changed = pyqtSignal(str)
     user_changed = pyqtSignal(str)
+    # 装备变更信号（用于通知战斗属性 Tab 刷新）
+    equipment_changed = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()

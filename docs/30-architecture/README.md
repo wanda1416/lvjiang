@@ -13,6 +13,8 @@
 
 DSL 语法文档已拆分至 [`32-grammar/`](32-grammar/README.md)。
 
+毕业率计算引擎文档已独立至 [`36-graduation/`](36-graduation/README.md)。
+
 ## 待补充
 
 - `layers/` — 各层详细说明（capture、ocr、input、detector、rules-engine、inventory、workflow）

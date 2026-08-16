@@ -1,15 +1,15 @@
-"""玩法配置存储
+"""基础属性配置存储（兼容旧的 play_styles 命名）。
 
-玩法数据属于会话级数据（反推出的基础属性），不应提交到 git。
+基础属性数据属于会话级数据（由面板属性反推），不应提交到 git。
 存储在 config/session/yysls.json：
 
     play_styles: {
         流派名: {
-            玩法名: { field_name: value, ... }
+            基础属性名称: { field_name: value, ... }
         }
     }
 
-此文件与用户无关，所有用户共享同一套玩法配置。
+此文件与用户无关，所有用户共享同一套基础属性配置。
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from loguru import logger
 
 from lvjiang.constants import SESSION_CONFIG_DIR
 
-# 玩法配置文件路径
+# 基础属性配置文件路径
 _PLAY_STYLES_PATH = SESSION_CONFIG_DIR / "yysls.json"
 
 
@@ -33,7 +33,7 @@ def _load() -> dict:
     try:
         return json.loads(_PLAY_STYLES_PATH.read_text(encoding="utf-8"))
     except Exception as e:
-        logger.error(f"加载玩法配置失败: {e}")
+        logger.error(f"加载基础属性配置失败: {e}")
         return {}
 
 
@@ -67,13 +67,13 @@ def _save(data: dict) -> None:
 
 
 def get_play_styles(school: str) -> dict[str, dict]:
-    """获取指定流派的全部玩法
-    
+    """获取指定流派的全部基础属性配置。
+
     Args:
         school: 流派名称
-        
+
     Returns:
-        玩法字典：玩法名 → {field_name: value, ...}
+        基础属性字典：名称 → {field_name: value, ...}
     """
     data = _load()
     all_styles = data.get("play_styles", {})
@@ -81,11 +81,11 @@ def get_play_styles(school: str) -> dict[str, dict]:
 
 
 def save_play_style(school: str, name: str, attrs: dict) -> None:
-    """保存一个玩法
-    
+    """保存一套基础属性。
+
     Args:
         school: 流派名称
-        name: 玩法名称
+        name: 基础属性名称
         attrs: 属性字典 {field_name: value}
     """
     data = _load()
@@ -93,27 +93,27 @@ def save_play_style(school: str, name: str, attrs: dict) -> None:
     school_styles = all_styles.setdefault(school, {})
     school_styles[name] = attrs
     _save(data)
-    logger.debug(f"已保存玩法: {school}/{name}")
+    logger.debug(f"已保存基础属性: {school}/{name}")
 
 
 def delete_play_style(school: str, name: str) -> None:
-    """删除一个玩法
-    
+    """删除一套基础属性。
+
     Args:
         school: 流派名称
-        name: 玩法名称
+        name: 基础属性名称
     """
     data = _load()
     all_styles = data.get("play_styles", {})
     school_styles = all_styles.get(school, {})
     school_styles.pop(name, None)
     _save(data)
-    logger.debug(f"已删除玩法: {school}/{name}")
+    logger.debug(f"已删除基础属性: {school}/{name}")
 
 
 def rename_play_style(school: str, old_name: str, new_name: str) -> None:
-    """重命名一个玩法
-    
+    """重命名一套基础属性。
+
     Args:
         school: 流派名称
         old_name: 旧名称
@@ -125,4 +125,4 @@ def rename_play_style(school: str, old_name: str, new_name: str) -> None:
     if old_name in school_styles:
         school_styles[new_name] = school_styles.pop(old_name)
     _save(data)
-    logger.debug(f"已重命名玩法: {school}/{old_name} → {new_name}")
+    logger.debug(f"已重命名基础属性: {school}/{old_name} → {new_name}")

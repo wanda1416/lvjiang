@@ -23,7 +23,6 @@ from typing import Any
 
 from loguru import logger
 
-
 # 战斗属性字段定义（顺序即展示顺序）
 # 每组: (字段名, 显示名, 单位, 是否区间)
 COMBAT_ATTR_FIELDS: list[tuple[str, str, str, bool]] = [
@@ -174,11 +173,11 @@ FIVE_DIM_NAMES = {"劲", "势", "敏", "体", "御"}
 @dataclass
 class CombatAttributes:
     """战斗属性集合
-    
+
     包含固定字段和动态字段（extra_attrs）。
     固定字段是大多数流派共有的属性；
     动态字段是流派/玩法特有的属性（如特定武器增效、技能增伤）。
-    
+
     抗性机制：
     - 精准率: 生效 = 基础值 + (面板 - 基础值) / 2.45
     - 会心/会意率: 生效 = 面板 / 2.45（有上限）
@@ -199,7 +198,7 @@ class CombatAttributes:
     max_qiansi: float = 0.0
     min_wuxiang: float = 0.0
     max_wuxiang: float = 0.0
-    
+
     # 三率（存储为小数，有抗性）
     precision: float = 0.0
     crit_rate: float = 0.0
@@ -207,7 +206,7 @@ class CombatAttributes:
     # 直接率（无抗性）
     direct_crit: float = 0.0
     direct_intent: float = 0.0
-    
+
     # 伤害加成（小数）
     crit_dmg: float = 0.0
     intent_dmg: float = 0.0
@@ -217,7 +216,7 @@ class CombatAttributes:
     lieshi_bonus: float = 0.0
     pozhua_bonus: float = 0.0
     qiansi_bonus: float = 0.0
-    
+
     # 穿透（增效类，基础值不受抗性）
     outer_pen: float = 0.0
     mingjin_pen: float = 0.0
@@ -226,7 +225,7 @@ class CombatAttributes:
     qiansi_pen: float = 0.0
     # 无相穿透（定音词条，需要根据流派属性转换为属攻穿透）
     wuxiang_pen: float = 0.0
-    
+
     # 增伤（小数，有抗性）
     all_skill_bonus: float = 0.0
     boss_bonus: float = 0.0
@@ -234,10 +233,10 @@ class CombatAttributes:
     # 奇术增伤（小数，有抗性，装备提供）
     single_qs_bonus: float = 0.0
     group_qs_bonus: float = 0.0
-    
+
     # 动态字段（流派/玩法特有）
     extra_attrs: dict[str, float] = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """转为字典（用于序列化）"""
         result = {}
@@ -248,7 +247,7 @@ class CombatAttributes:
         if self.extra_attrs:
             result["extra_attrs"] = dict(self.extra_attrs)
         return result
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CombatAttributes:
         """从字典加载"""
@@ -261,7 +260,7 @@ class CombatAttributes:
         if "extra_attrs" in data and isinstance(data["extra_attrs"], dict):
             obj.extra_attrs = {k: float(v) for k, v in data["extra_attrs"].items()}
         return obj
-    
+
     def __sub__(self, other: CombatAttributes) -> CombatAttributes:
         """减法：用于反推基础属性（面板 - 装备 - 弓玦）"""
         result = CombatAttributes()
@@ -282,7 +281,7 @@ class CombatAttributes:
             if f.name in result.extra_attrs:
                 setattr(result, f.name, result.extra_attrs.pop(f.name))
         return result
-    
+
     def __add__(self, other: CombatAttributes) -> CombatAttributes:
         """加法：用于叠加属性（基础 + 装备 + 弓玦）"""
         result = CombatAttributes()
@@ -297,7 +296,7 @@ class CombatAttributes:
             v2 = other.extra_attrs.get(key, 0.0)
             result.extra_attrs[key] = v1 + v2
         return result
-    
+
     def display_items(self) -> list[tuple[str, float, str]]:
         """返回用于展示的列表：[(显示名, 数值, 单位), ...]"""
         items = []
@@ -412,12 +411,12 @@ def convert_five_dims(jin: float = 0, shi: float = 0, min_val: float = 0,
 
 def map_affix_to_attr(affix_name: str) -> tuple[str | None, bool]:
     """将词条名映射到战斗属性字段
-    
+
     Args:
         affix_name: 词条名（如 "最大外功攻击"、"剑武学增伤"）
-        
+
     Returns:
-        (field_name, is_percent): 
+        (field_name, is_percent):
         - field_name: 对应的战斗属性字段名，无法映射返回 None
         - is_percent: 该字段是否为百分比类型
     """
@@ -429,23 +428,23 @@ def map_affix_to_attr(affix_name: str) -> tuple[str | None, bool]:
             if fn == field_name:
                 return field_name, (unit == "%")
         return field_name, False
-    
+
     # 2. 动态字段匹配
     for suffix, _ in DYNAMIC_AFFIX_PATTERNS:
         if affix_name.endswith(suffix):
             # 动态字段存入 extra_attrs，key 为词条名本身
             return affix_name, True  # 动态字段默认为百分比
-    
+
     return None, False
 
 
 def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
     """聚合装备属性到战斗属性
-    
+
     Args:
         equipped: 用户装备数据，格式为 {slot_key: equip_dict}
                   equip_dict 包含 affix_1~5 和 dingyin
-                  
+
     Returns:
         聚合后的装备属性（不含基础属性和弓玦）
 
@@ -455,44 +454,44 @@ def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
     result = CombatAttributes()
     # 五维累计（最后统一转换）
     five_dims = {"劲": 0.0, "势": 0.0, "敏": 0.0, "体": 0.0, "御": 0.0}
-    
-    for slot_key, equip in equipped.items():
+
+    for _slot_key, equip in equipped.items():
         if not isinstance(equip, dict):
             continue
-        
+
         # 处理 affix_1 ~ affix_5
         for i in range(1, 6):
             affix = equip.get(f"affix_{i}")
             if not affix or not isinstance(affix, dict):
                 continue
-            
+
             name = affix.get("name", "")
             value = affix.get("value", 0)
             if not name or value == 0:
                 continue
-            
+
             # 五维词条：累计，稍后统一转换
             if name in FIVE_DIM_NAMES:
                 five_dims[name] += value
                 continue
-            
+
             field_name, is_percent = map_affix_to_attr(name)
             if field_name is None:
                 continue
-            
+
             # 百分比词条需要转换为小数
             if is_percent:
                 value = value / 100.0
-            
+
             # 累加到对应字段
-            if field_name in [f[0] for f in COMBAT_ATTR_FIELDS]:
+            if hasattr(result, field_name):
                 current = getattr(result, field_name, 0.0)
                 setattr(result, field_name, current + value)
             else:
                 # 动态字段
                 current = result.extra_attrs.get(field_name, 0.0)
                 result.extra_attrs[field_name] = current + value
-        
+
         # 处理定音词条（dingyin）
         dingyin = equip.get("dingyin")
         if dingyin and isinstance(dingyin, dict):
@@ -507,13 +506,13 @@ def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
                 if field_name:
                     if is_percent:
                         value = value / 100.0
-                    if field_name in [f[0] for f in COMBAT_ATTR_FIELDS]:
+                    if hasattr(result, field_name):
                         current = getattr(result, field_name, 0.0)
                         setattr(result, field_name, current + value)
                     else:
                         current = result.extra_attrs.get(field_name, 0.0)
                         result.extra_attrs[field_name] = current + value
-    
+
     # 五维转换：劲/势/敏 → 外功攻击/会心/会意
     if any(v > 0 for v in five_dims.values()):
         five_dim_attrs = convert_five_dims(
@@ -522,7 +521,7 @@ def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
             yu=five_dims["御"],
         )
         result = result + five_dim_attrs
-    
+
     return result
 
 
@@ -612,22 +611,26 @@ def is_bonus_percent_field(field_name: str) -> bool:
 
 def has_resistance(field_name: str) -> bool:
     """判断字段是否有抗性机制"""
-    return (is_three_rate_field(field_name) or 
-            is_penetration_field(field_name) or 
+    return (is_three_rate_field(field_name) or
+            is_penetration_field(field_name) or
             is_bonus_percent_field(field_name))
 
 
-def apply_three_rate_resistance(field_name: str, value: float) -> float:
+def apply_three_rate_resistance(
+    field_name: str,
+    value: float,
+    resistance: float = THREE_RATE_RESISTANCE,
+) -> float:
     """应用三率抗性
-    
+
     精准率: 生效 = 基础值 + (面板 - 基础值) / 2.45
     会心率: 生效 = 面板 / 2.45，上限 80%
     会意率: 生效 = 面板 / 2.45，上限 40%
-    
+
     Args:
         field_name: 字段名（precision/crit_rate/intent_rate）
         value: 原始值（小数形式，如 1.463 表示 146.3%）
-        
+
     Returns:
         抗性后的生效值（小数形式）
     """
@@ -636,51 +639,59 @@ def apply_three_rate_resistance(field_name: str, value: float) -> float:
         base = PRECISION_BASE / 100  # 转换为小数
         if value <= base:
             return value
-        return base + (value - base) / THREE_RATE_DIVISOR
-    
+        return base + (value - base) / (1 + resistance / 100)
+
     elif field_name == "crit_rate":
         # 会心率：面板 / 2.45，上限 80%
-        effective = value / THREE_RATE_DIVISOR
+        effective = value / (1 + resistance / 100)
         return min(effective, CRIT_RATE_CAP)
-    
+
     elif field_name == "intent_rate":
         # 会意率：面板 / 2.45，上限 40%
-        effective = value / THREE_RATE_DIVISOR
+        effective = value / (1 + resistance / 100)
         return min(effective, INTENT_RATE_CAP)
-    
+
     return value
 
 
-def apply_bonus_resistance(value: float, base: float = 0.0) -> float:
+def apply_bonus_resistance(
+    value: float,
+    base: float = 0.0,
+    resistance: float = BONUS_RESISTANCE,
+) -> float:
     """应用增效抗性
-    
+
     生效值 = 基础值 + 装备值 / 1.15
-    
+
     Args:
         value: 装备值（小数形式）
         base: 基础值（不受抗性影响）
-        
+
     Returns:
         抗性后的生效值
     """
-    return base + value / BONUS_DIVISOR
+    return base + value / (1 + resistance / 100)
 
 
-def apply_penetration_resistance(equipment_value: float, base: float = 0.0) -> float:
+def apply_penetration_resistance(
+    equipment_value: float,
+    base: float = 0.0,
+    resistance: float = BONUS_RESISTANCE,
+) -> float:
     """应用穿透抗性
-    
+
     穿透公式：生效 = 基础值 + 装备定音 / 1.15
-    
+
     基础值不受抗性影响，只有装备定音部分需要计算抗性。
-    
+
     Args:
         equipment_value: 装备定音提供的穿透值
         base: 基础值（从玩法配置读取，不受抗性影响）
-        
+
     Returns:
         抗性后的生效值
     """
-    return base + equipment_value / BONUS_DIVISOR
+    return base + equipment_value / (1 + resistance / 100)
 
 
 def compute_gongjue_attrs(gongjue_type: str, equip_level: int,
@@ -719,7 +730,7 @@ def compute_gongjue_attrs(gongjue_type: str, equip_level: int,
 
 def get_resistance_info(field_name: str) -> dict | None:
     """获取字段的抗性信息，无抗性返回 None
-    
+
     Returns:
         {"type": "three_rate" | "penetration" | "bonus", "divisor": float, "base": float, "cap": float | None}
     """

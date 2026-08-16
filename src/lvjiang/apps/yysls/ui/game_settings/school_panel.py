@@ -3,7 +3,8 @@
 左侧为流派列表（对应游戏十大流派，可增删、直接编辑重命名），
 右侧为选中流派的配置表单：
 - 属性 / 主武器+主武学 / 副武器+副武学
-- 玩法管理（查看/添加/编辑/删除当前流派的玩法）
+- 基础属性管理（查看/编辑/删除当前流派的基础属性）
+- 方案管理（导入 Excel 并注册毕业率计算方案）
 
 数据存于 game_config.yaml 顶层 schools：
     流派名 → {
@@ -13,7 +14,7 @@
     }
 修改即时写盘，并刷新 GameConfigManager 单例。
 
-玩法数据存于 config/session/yysls.json，由 play_styles 模块管理。
+基础属性数据存于 config/session/yysls.json，兼容沿用 play_styles 存储键。
 """
 
 from loguru import logger
@@ -23,6 +24,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -95,7 +97,7 @@ class SchoolPanel(QWidget):
 
         splitter.addWidget(left_widget)
 
-        # ── 右侧：流派配置表单 + 玩法 Tab ──
+        # ── 右侧：流派配置表单 + 基础属性/方案管理 ──
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -156,11 +158,22 @@ class SchoolPanel(QWidget):
 
         right_layout.addWidget(attr_group)
 
-        # ── 玩法管理 ──
-        ps_group = QGroupBox(tr("玩法管理"))
+        # ── 方案管理 ──
+        scheme_group = QGroupBox(tr("方案管理"))
+        scheme_layout = QHBoxLayout(scheme_group)
+        self._scheme_list = QListWidget()
+        self._scheme_list.setMaximumHeight(84)
+        scheme_layout.addWidget(self._scheme_list, stretch=1)
+        self._btn_import_scheme = QPushButton(tr("导入 Excel…"))
+        self._btn_import_scheme.clicked.connect(self._on_import_scheme)
+        scheme_layout.addWidget(self._btn_import_scheme)
+        right_layout.addWidget(scheme_group)
+
+        # ── 基础属性管理 ──
+        ps_group = QGroupBox(tr("基础属性"))
         ps_main_layout = QHBoxLayout(ps_group)
 
-        # 左侧：玩法列表（右键菜单提供删除）
+        # 左侧：基础属性列表（右键菜单提供删除）
         ps_left = QWidget()
         ps_left_layout = QVBoxLayout(ps_left)
         ps_left_layout.setContentsMargins(0, 0, 0, 0)
@@ -173,7 +186,7 @@ class SchoolPanel(QWidget):
 
         ps_main_layout.addWidget(ps_left)
 
-        # 右侧：选中玩法的可编辑卡片（所见即所得，修改自动保存）
+        # 右侧：选中基础属性的可编辑卡片（所见即所得，修改自动保存）
         self._ps_scroll = QScrollArea()
         self._ps_scroll.setWidgetResizable(True)
         self._ps_scroll_widget = QWidget()
@@ -182,10 +195,10 @@ class SchoolPanel(QWidget):
         self._ps_scroll_layout.setSpacing(6)
         self._ps_scroll.setWidget(self._ps_scroll_widget)
         self._ps_edits: dict[str, QLineEdit] = {}
-        self._ps_current_name: str = ""  # 当前编辑的玩法名
+        self._ps_current_name: str = ""  # 当前编辑的基础属性名
         ps_main_layout.addWidget(self._ps_scroll, stretch=1)
 
-        # 玩法管理占据剩余空间
+        # 基础属性管理占据剩余空间
         right_layout.addWidget(ps_group, stretch=1)
 
         splitter.addWidget(right_widget)
@@ -277,6 +290,7 @@ class SchoolPanel(QWidget):
             edit.setEnabled(enabled)
 
         self._loading = prev_loading
+        self._refresh_schemes()
         self._refresh_play_styles()
 
     @staticmethod
@@ -379,10 +393,70 @@ class SchoolPanel(QWidget):
         except Exception as e:
             logger.error(f"保存失败: {e}")
 
-    # ── 玩法管理 ──────────────────────────────────────────────
+    # ── 方案管理 ──────────────────────────────────────────────
+
+    def _refresh_schemes(self):
+        self._scheme_list.clear()
+        school = self._current_school()
+        if not school:
+            self._btn_import_scheme.setEnabled(False)
+            return
+        self._btn_import_scheme.setEnabled(True)
+        cfg = self._schools().get(school) or {}
+        schemes = cfg.get("schemes") or []
+        if isinstance(schemes, list):
+            self._scheme_list.addItems([str(name) for name in schemes if str(name)])
+
+    def _on_import_scheme(self):
+        school = self._current_school()
+        if not school:
+            return
+        excel_path, _ = QFileDialog.getOpenFileName(
+            self, tr("导入毕业率 Excel"), "", tr("Excel 工作簿 (*.xlsx)"),
+        )
+        if not excel_path:
+            return
+        name, ok = QInputDialog.getText(
+            self, tr("方案名称"), tr("保存为方案："), text=tr("基础方案"),
+        )
+        name = name.strip()
+        if not ok or not name:
+            return
+        cfg = self._schools().get(school) or {}
+        schemes = cfg.get("schemes") or []
+        if name in schemes:
+            ret = QMessageBox.question(
+                self, tr("方案已存在"),
+                tr("方案「{name}」已存在，是否覆盖？").format(name=name),
+            )
+            if ret != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            from ...evaluator.graduation import invalidate_graduation_cache
+            from ...evaluator.graduation_converter import import_graduation_scheme
+            destination, outputs = import_graduation_scheme(excel_path, school, name)
+            invalidate_graduation_cache()
+        except Exception as exc:
+            logger.exception("导入毕业率方案失败")
+            QMessageBox.critical(self, tr("导入失败"), str(exc))
+            return
+        if name not in schemes:
+            schemes = list(schemes) + [name]
+            cfg["schemes"] = schemes
+            self._data.setdefault("schools", {})[school] = cfg
+            self._save_data()
+        self._refresh_schemes()
+        QMessageBox.information(
+            self, tr("导入成功"),
+            tr("方案「{name}」已生成。\nDPS：{dps:.2f}\n文件：{path}").format(
+                name=name, dps=outputs["dps"], path=str(destination),
+            ),
+        )
+
+    # ── 基础属性管理 ──────────────────────────────────────────
 
     def _refresh_play_styles(self):
-        """刷新当前流派的玩法列表"""
+        """刷新当前流派的基础属性列表"""
         school = self._current_school()
         self._ps_list.clear()
         self._clear_ps_editor()
@@ -394,7 +468,7 @@ class SchoolPanel(QWidget):
             self._ps_list.addItem(name)
 
     def _clear_ps_editor(self):
-        """清空右侧玩法编辑区"""
+        """清空右侧基础属性编辑区"""
         while self._ps_scroll_layout.count():
             item = self._ps_scroll_layout.takeAt(0)
             if item.widget():
@@ -403,12 +477,12 @@ class SchoolPanel(QWidget):
         self._ps_current_name = ""
 
     def _on_ps_selected(self, row: int):
-        """选中玩法 → 在右侧显示可编辑卡片"""
+        """选中基础属性 → 在右侧显示可编辑卡片"""
         school = self._current_school()
         if not school or row < 0:
             self._clear_ps_editor()
             return
-        from ...config import get_play_styles, get_game_config
+        from ...config import get_game_config, get_play_styles
         styles = get_play_styles(school)
         name = self._ps_list.item(row).text()
         attrs = styles.get(name, {})
@@ -463,7 +537,7 @@ class SchoolPanel(QWidget):
 
     def _create_ps_card(self, fields: list[tuple[str, str, str]],
                         attrs: dict, display_names: dict) -> QFrame:
-        """创建一个玩法属性编辑卡片（所有字段平铺）"""
+        """创建一个基础属性编辑卡片（所有字段平铺）"""
         card = QFrame()
         card.setStyleSheet("""
             QFrame#psCard {
@@ -521,7 +595,7 @@ class SchoolPanel(QWidget):
         return card
 
     def _on_ps_field_changed(self, field_name: str, unit: str):
-        """任一字段变更 → 自动保存到当前玩法"""
+        """任一字段变更 → 自动保存到当前基础属性"""
         school = self._current_school()
         name = self._ps_current_name
         if not school or not name:
@@ -553,7 +627,7 @@ class SchoolPanel(QWidget):
         return ""
 
     def _on_ps_context_menu(self, pos):
-        """玩法列表右键菜单：删除"""
+        """基础属性列表右键菜单：删除"""
         item = self._ps_list.itemAt(pos)
         if not item:
             return
@@ -564,13 +638,13 @@ class SchoolPanel(QWidget):
             self._do_delete_play_style(item.text())
 
     def _do_delete_play_style(self, name: str):
-        """删除玩法"""
+        """删除基础属性"""
         school = self._current_school()
         if not school:
             return
         ret = QMessageBox.question(
             self, tr("确认删除"),
-            tr("确定删除玩法「{name}」？").format(name=name),
+            tr("确定删除基础属性「{name}」？").format(name=name),
         )
         if ret != QMessageBox.StandardButton.Yes:
             return
@@ -580,12 +654,12 @@ class SchoolPanel(QWidget):
 
 
 class _PlayStyleEditDialog(QDialog):
-    """编辑/创建玩法对话框"""
+    """编辑/创建基础属性对话框。"""
 
     def __init__(self, parent=None, name: str = "", attrs: dict | None = None,
                  school_attr: str | None = None):
         super().__init__(parent)
-        self.setWindowTitle(tr("编辑玩法") if name else tr("创建玩法"))
+        self.setWindowTitle(tr("编辑基础属性") if name else tr("创建基础属性"))
         self.setMinimumWidth(400)
         self._school_attr = school_attr
         self._spins: dict[str, QDoubleSpinBox] = {}
@@ -665,10 +739,10 @@ class _PlayStyleEditDialog(QDialog):
 
         # 名称
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel(tr("玩法名称")))
+        name_row.addWidget(QLabel(tr("基础属性名称")))
         self._edit_name = QLineEdit()
         self._edit_name.setText(name)
-        self._edit_name.setPlaceholderText(tr("输入玩法名称"))
+        self._edit_name.setPlaceholderText(tr("输入基础属性名称"))
         self._edit_name.setMaxLength(20)
         name_row.addWidget(self._edit_name)
         layout.addLayout(name_row)
@@ -686,7 +760,7 @@ class _PlayStyleEditDialog(QDialog):
 
     def _on_save(self):
         if not self._edit_name.text().strip():
-            QMessageBox.warning(self, tr("名称为空"), tr("玩法名称不能为空"))
+            QMessageBox.warning(self, tr("名称为空"), tr("基础属性名称不能为空"))
             return
         self.accept()
 

@@ -19,6 +19,12 @@ from .constants import (
 )
 from .manager import GameConfigManager, get_game_config
 from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
+from .play_styles import (
+    delete_play_style,
+    get_play_styles,
+    rename_play_style,
+    save_play_style,
+)
 from .profile_models import (
     ALL_MODELS,
     MODEL_LABELS,
@@ -31,12 +37,6 @@ from .profile_models import (
     format_sync_label,
     parse_sync_key,
     parse_sync_targets,
-)
-from .play_styles import (
-    delete_play_style,
-    get_play_styles,
-    rename_play_style,
-    save_play_style,
 )
 from .profile_store import (
     get_active_group,
@@ -96,7 +96,7 @@ __all__ = [
     "set_alert_history",
     "mark_alert",
     "unmark_alert",
-    # 玩法配置存储
+    # 基础属性配置存储（保留 play_style API 名称以兼容已有数据）
     "get_play_styles",
     "save_play_style",
     "delete_play_style",

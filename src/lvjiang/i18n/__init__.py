@@ -1,6 +1,8 @@
 """国际化支持（i18n）—— 翻译加载与查询
 
-翻译文件位于 config/i18n/{lang}.yaml，启动时根据用户配置加载。
+翻译文件分层加载：
+  - 主体：config/i18n/{lang}.yaml（启动时加载）
+  - 插件：config/i18n/apps/{app_name}/{lang}.yaml（插件加载时按需加载）
 tr(text) 以中文原文为 key 查找翻译，找不到则返回原文。
 """
 from __future__ import annotations
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 _translations: dict[str, str] = {}   # 扁平化翻译表：中文原文 → 译文
 _current_language: str = "zh_CN"
 _i18n_dir: Path = PROJECT_ROOT / "config" / "i18n"
+_loaded_app_i18n: set[str] = set()   # 已加载插件翻译的集合（幂等保护）
 
 
 def init_i18n(language: str | None = None) -> str:
@@ -29,13 +32,14 @@ def init_i18n(language: str | None = None) -> str:
     Returns:
         实际加载的语言代码。
     """
-    global _current_language, _translations
+    global _current_language, _translations, _loaded_app_i18n
 
     if language is None or language == "auto":
         language = _detect_system_language() if language == "auto" else _load_config_language()
 
     _current_language = language
     _translations = _load_translation_file(language)
+    _loaded_app_i18n.clear()  # 重置后需重新加载插件翻译
 
     if language != "zh_CN":
         logger.info("[i18n] 已加载语言: %s，共 %d 条翻译", language, len(_translations))
@@ -52,6 +56,53 @@ def tr(text: str) -> str:
     if _current_language == "zh_CN":
         return text
     return _translations.get(text, text)
+
+
+def load_app_i18n(app_name: str) -> None:
+    """加载插件的翻译文件，合并到全局翻译表。
+
+    在 init_i18n() 之后调用，仅当语言非 zh_CN 时实际加载。
+    插件翻译文件位于 config/i18n/apps/{app_name}/{lang}.yaml。
+    同一插件重复调用时幂等跳过。
+    """
+    global _translations
+
+    if _current_language == "zh_CN":
+        return
+    if app_name in _loaded_app_i18n:
+        return
+
+    app_dir = _i18n_dir / "apps" / app_name
+    if not app_dir.is_dir():
+        return
+
+    yaml_file = app_dir / f"{_current_language}.yaml"
+    if not yaml_file.exists():
+        return
+
+    zh_file = app_dir / "zh_CN.yaml"
+
+    try:
+        with open(yaml_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        logger.exception("[i18n] 解析插件翻译文件失败: %s", yaml_file)
+        return
+
+    zh_data: dict = {}
+    if zh_file.exists():
+        try:
+            with open(zh_file, "r", encoding="utf-8") as f:
+                zh_data = yaml.safe_load(f) or {}
+        except Exception:
+            logger.warning("[i18n] 解析插件中文基准文件失败: %s", zh_file)
+
+    before = len(_translations)
+    _build_translation_map(zh_data, data, _translations)
+    added = len(_translations) - before
+    _loaded_app_i18n.add(app_name)
+    if added:
+        logger.info("[i18n] 已加载插件 %s 翻译: %d 条", app_name, added)
 
 
 def set_language(language: str) -> None:

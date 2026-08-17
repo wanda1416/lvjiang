@@ -56,10 +56,15 @@ class _ExprMixin:
         """false → Python False"""
         return False
 
-    # ─── by 子句（短路识别）───────────────────────────────
+    # ─── by 子句（短路 / 全量识别）───────────────────────────────
 
     def by_clause(self, items):
-        """by <match_mode> <target> → ByClause"""
+        """[full] by <match_mode> <target> → ByClause"""
+        # FULL_KEYWORD 是命名终端，如果存在会作为 Token 出现在 items[0]
+        full = False
+        if items and isinstance(items[0], Token) and items[0].type == "FULL_KEYWORD":
+            full = True
+            items = items[1:]  # 剥离 FULL_KEYWORD，剩余为 match_mode + by_target
         match_mode = items[0]   # str: equals / contains / equals_any / contains_any
         target_node = items[1]  # VarRef | Token(STRING)
         # STRING token 须显式去引号包装为 Literal；VarRef 直接透传
@@ -67,7 +72,7 @@ class _ExprMixin:
             target = target_node
         else:
             target = Literal(value=self._unquote(str(target_node)))
-        return ByClause(match_mode=match_mode, target=target)
+        return ByClause(match_mode=match_mode, target=target, full=full)
 
     def match_equals(self, _):
         return "equals"

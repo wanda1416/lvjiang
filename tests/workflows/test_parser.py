@@ -1045,6 +1045,41 @@ def test_scan_panel_range_index():
     assert n.where is not None
 
 
+def test_recognize_full_by():
+    """recognize ... full by ... — 全量匹配取最高置信度"""
+    # Region 模式 + full by
+    program = parse_text('recognize [s].[f1, f2] as $v full by equals "材料"')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert n.by is not None
+    assert n.by.full is True
+    assert n.by.match_mode == "equals"
+
+    # Panel 模式 + full by
+    program = parse_text('recognize [s].[p] as $v full by contains "材料"')
+    n = program.body[0]
+    assert n.by is not None
+    assert n.by.full is True
+
+    # 普通 by（无 full）向后兼容
+    program = parse_text('recognize [s].[f1] as $v by equals "材料"')
+    n = program.body[0]
+    assert n.by is not None
+    assert n.by.full is False
+
+    # full by + where 组合
+    program = parse_text('recognize [s].[f1, f2] as $v full by equals "材料" where confidence >= 0.8')
+    n = program.body[0]
+    assert n.by.full is True
+    assert n.where is not None
+
+    # full by + on group 组合
+    program = parse_text('recognize [s].[f1] as $v full by equals "材料" on group ["分组A", "分组B"]')
+    n = program.body[0]
+    assert n.by.full is True
+    assert isinstance(n.group, list)
+
+
 # ─── collect 测试 ───────────────────────────────────────────
 
 def test_collect():

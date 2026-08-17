@@ -133,6 +133,7 @@ def test_daily_jianghu_matches_legacy_required_scenes():
         "activity_jianghu", "waiguan_yigui", "waiguan_qingjing",
         "general_action", "game_menu_page", "game_main_page",
         "general_control", "school_main",
+        "bag_item_detail", "bag_equip_detail",
     }
 
 

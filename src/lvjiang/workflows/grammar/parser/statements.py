@@ -24,6 +24,7 @@ from ..ast_nodes import (
     WaitStable,
     WhereClause,
 )
+from ...engine.signals import WorkflowUserError
 
 
 class _StmtMixin:
@@ -279,6 +280,10 @@ class _StmtMixin:
         var_ref = items[1]       # var_ref → VarRef
         var_name = var_ref.name
         by_clause = items[2]     # ByClause（必填）
+        if by_clause.full:
+            raise WorkflowUserError(
+                f"'full by' 仅 recognize 语句支持，find 不支持（第 {self._line(items)} 行）"
+            )
         where_clause = items[3] if len(items) > 3 else None  # WhereClause | None
         # 解析搜索区域（与 scan 一致）
         search_region = None
@@ -302,6 +307,10 @@ class _StmtMixin:
         var_ref = items[0]       # var_ref → VarRef
         var_name = var_ref.name
         by_clause = items[1]     # ByClause（必填）
+        if by_clause.full:
+            raise WorkflowUserError(
+                f"'full by' 仅 recognize 语句支持，find 不支持（第 {self._line(items)} 行）"
+            )
         where_clause = items[2] if len(items) > 2 else None  # WhereClause | None
         return Find(
             var_name=var_name, by=by_clause,
@@ -536,6 +545,10 @@ class _StmtMixin:
         for item in items[2:]:
             if isinstance(item, ByClause):
                 by_clause = item
+                if by_clause.full:
+                    raise WorkflowUserError(
+                        f"'full by' 仅 recognize 语句支持，scan 不支持（第 {self._line(items)} 行）"
+                    )
             elif isinstance(item, WhereClause):
                 where_clause = item
         return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, line_no=self._line(items))

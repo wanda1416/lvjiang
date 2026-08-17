@@ -137,7 +137,7 @@ class Find:
 
 @dataclass(frozen=True)
 class ByClause:
-    """scan/recognize 的 by 子句 —— 短路识别策略
+    """scan/recognize 的 by 子句 —— 识别策略
 
     match_mode:
         - "equals"        精确匹配单值（target 为 str）
@@ -146,11 +146,17 @@ class ByClause:
         - "contains_any"  子串匹配列表任一元素（target 必须为 list）
     target:
         Literal（字符串常量）或 VarRef（运行时变量，求值后须匹配 match_mode 要求类型）
+    full:
+        False（默认）= 短路匹配，首个命中即返回
+        True = 全量匹配，取最高置信度的命中项（仅 recognize 支持）
 
-    语义：一次截图后逐字段识别，首个命中即返回该字段名（str）；全部未命中返回 ""。
+    语义：一次截图后逐字段识别。
+    - full=False: 首个命中即返回该字段名（str）；全部未命中返回 ""。
+    - full=True: 遍历全部字段，取置信度最高的命中项；全部未命中返回 ""。
     """
     match_mode: str
     target: Any     # Literal | VarRef
+    full: bool = False
 
 
 @dataclass(frozen=True)

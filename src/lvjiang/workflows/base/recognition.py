@@ -392,8 +392,9 @@ class _RecognitionMixin:
         mode: str,
         group: str | list[str] | None = None,
         min_confidence: float | None = None,
+        full: bool = False,
     ) -> str:
-        """短路材料识别：一次截图，逐 slot 识别，首个命中即返回 slot 名
+        """材料识别：一次截图，逐 slot 识别
 
         Args:
             scene_key: 场景 key
@@ -402,9 +403,12 @@ class _RecognitionMixin:
             mode: equals | contains | equals_any | contains_any
             group: 可选，限定材料分组范围
             min_confidence: 可选，置信度阈值，低于阈值的视为未识别
+            full: False=短路匹配（首个命中即返回），True=全量匹配（取最高置信度）
 
         Returns:
-            首个命中的 slot_key（str），全部未命中返回 ""
+            命中的 slot_key（str），全部未命中返回 ""
+            full=False: 首个命中的 slot_key
+            full=True: 置信度最高的 slot_key
 
         Raises:
             ValueError: field_keys 里有 key 在当前布局未绑定坐标
@@ -426,6 +430,9 @@ class _RecognitionMixin:
         else:
             ordered_regions = regions
 
+        best_key = ""
+        best_confidence = -1.0
+
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
             if crop is None:
@@ -436,8 +443,20 @@ class _RecognitionMixin:
                 logger.debug(f"by 材料识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
                 continue
             if self._match_text(info.type, target_value, mode):
-                logger.info(f"by 材料识别命中: [{scene_key}].[{region.key}] type={info.type!r} mode={mode} group={group}")
-                return region.key
+                if full:
+                    # 全量模式：记录最高置信度的命中项
+                    if info.confidence > best_confidence:
+                        best_key = region.key
+                        best_confidence = info.confidence
+                    logger.debug(f"full by 材料识别: region {region.key} type={info.type!r} confidence={info.confidence:.3f}")
+                else:
+                    # 短路模式：首个命中即返回
+                    logger.info(f"by 材料识别命中: [{scene_key}].[{region.key}] type={info.type!r} mode={mode} group={group}")
+                    return region.key
+
+        if full and best_key:
+            logger.info(f"full by 材料识别命中: [{scene_key}].[{best_key}] confidence={best_confidence:.3f} mode={mode} group={group}")
+            return best_key
 
         logger.info(f"by 材料识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
         return ""

@@ -7,7 +7,7 @@
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.equip_parser.constants import WEAPON_TYPES
+from lvjiang.apps.yysls.core.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.ui.equip_judge_dialog import (
     _NONE_ITEM,
     PART_ITEMS,
@@ -168,7 +168,7 @@ class TestTuningConfigWidget:
     def test_default_all_playstyles_checked(self, qtbot):
         # 初始状态：玩法全部勾选（缺省 = 全部）；玩法定义随 YAML
         # 变更，不硬编码内容，对照规则定义校验
-        from lvjiang.apps.yysls.evaluator import get_tuning_rules
+        from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
         w = TuningConfigWidget()
         qtbot.addWidget(w)
         result = w.get_config()

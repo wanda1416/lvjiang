@@ -15,7 +15,7 @@ def _yysls_rich_parse(base: dict) -> dict:
 
     解析完成后删除原始 level_text / count_text，保持 dict 扁平干净。
     """
-    from ...core.material_recognizer import _parse_number
+    from ...core.recognizer.material_recognizer import _parse_number
     level_text = base.pop("level_text", "")
     count_text = base.pop("count_text", "")
     real_level = _parse_number(level_text)
@@ -55,8 +55,8 @@ def _to_equipment(raw_data: dict) -> dict:
         logger.warning("to_equipment: 输入为空或非字典")
         return {}
 
-    from ...equip_parser import get_equipment_parser
-    from ...equip_parser.models import make_fingerprint
+    from ...core.equip_parser import get_equipment_parser
+    from ...core.equip_parser.models import make_fingerprint
     parser = get_equipment_parser()
 
     try:
@@ -83,7 +83,7 @@ def _make_fingerprint(equip_data: dict, *args) -> str:
     .wf 用法:
         eval $fp = make_fingerprint($equip)
     """
-    from ...equip_parser.models import make_fingerprint
+    from ...core.equip_parser.models import make_fingerprint
     return make_fingerprint(equip_data)
 
 
@@ -203,8 +203,8 @@ def _evaluate(equip_data: dict, *args) -> dict:
     if not isinstance(equip_data, dict) or not equip_data:
         return {"rating": tr("垃圾"), "skipped": True, "reasons": [tr("空数据")]}
 
-    from ...equip_parser.models import EquipmentData
-    from ...evaluator import get_tuning_judge
+    from ...core.equip_parser.models import EquipmentData
+    from ...core.evaluator import get_tuning_judge
 
     # 判定器实例（缓存到模块级变量）
     global _cached_judge

@@ -1040,7 +1040,7 @@ class EquipStatusTab(QWidget):
         if not result:
             return
         # 生成新 _fp
-        from ..equip_parser.models import make_fingerprint
+        from ..core.equip_parser.models import make_fingerprint
         new_fp = f"mock_{make_fingerprint(result)}"
         result["_fp"] = new_fp
         try:
@@ -1421,7 +1421,7 @@ class EquipStatusTab(QWidget):
         new_group_key = get_game_config().get_type_to_group().get(new_type, group_key)
 
         # 生成新 _fp
-        from ..equip_parser.models import make_fingerprint
+        from ..core.equip_parser.models import make_fingerprint
         new_fp = f"mock_{make_fingerprint(result)}"
         result["_fp"] = new_fp
 
@@ -1480,7 +1480,7 @@ class EquipStatusTab(QWidget):
             return
 
         # 生成 _fp
-        from ..equip_parser.models import make_fingerprint
+        from ..core.equip_parser.models import make_fingerprint
         fp = f"mock_{make_fingerprint(result)}"
         result["_fp"] = fp
 
@@ -1530,7 +1530,7 @@ class EquipStatusTab(QWidget):
         try:
             from lvjiang.core.config import SessionManager
 
-            from ..leoq7_export import export_leoq7
+            from .leoq7_export import export_leoq7
             data = SessionManager().load(user_name)
             text = export_leoq7(
                 data,

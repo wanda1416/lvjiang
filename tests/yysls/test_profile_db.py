@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.apps.yysls.profile.profile_db import (
+from lvjiang.apps.yysls.core.profile_engine.profile_db import (
     MIGRATIONS,
     ProfileDB,
 )

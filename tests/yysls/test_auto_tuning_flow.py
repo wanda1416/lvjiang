@@ -15,8 +15,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from lvjiang.apps.yysls.config import LevelConfig
-from lvjiang.apps.yysls.equip_parser import EquipmentData
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.equip_parser import EquipmentData
+from lvjiang.apps.yysls.core.tuning_rules import (
     BehaviorRule,
     FoodRule,
     MaterialSettings,
@@ -680,7 +680,7 @@ def test_skip_tuning_no_entry(patch_worth):
 
 def test_below_min_level_skips(monkeypatch):
     """等级低于门槛 → 直接跳过，不走任何行为判定"""
-    from lvjiang.apps.yysls.evaluator.tuning_rules import ScanBehavior
+    from lvjiang.apps.yysls.core.tuning_rules import ScanBehavior
     base = TuningGroup(scan=ScanBehavior(min_level=120))
     wf = _wf_with(base)
     fp, outcome = wf._process_equipment_once(
@@ -1899,7 +1899,7 @@ class TestBaseGroupFallback:
         """回退读 wf_configs 并缓存在 ctx"""
         group = TuningGroup(key="test_grp", name="测试组")
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.evaluator.tuning_rules.get_tuning_group",
+            "lvjiang.apps.yysls.core.tuning_rules.get_tuning_group",
             lambda key: group if key == "test_grp" else None)
         session.set_node("wf_configs", {"auto_tuning": {"base_group": "test_grp"}})
         wf = FakeWF()

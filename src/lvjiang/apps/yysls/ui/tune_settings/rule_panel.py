@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.tuning_rules import (
     DYNAMIC_AFFIXES,
     GENERIC_ATTR,
     TuningRuleManager,
@@ -232,7 +232,7 @@ class RulePanel(QWidget):
     def _is_rule_enabled(self) -> bool:
         """从 tune_config.tuning_rules 读取当前规则启用状态"""
         try:
-            from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+            from lvjiang.apps.yysls.core.tuning_rules import get_tune_config
             tuning_rules = get_tune_config().tuning_rules
             return tuning_rules.get(self._key, True)
         except Exception:

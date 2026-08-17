@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from ...profile.profile_db import db_get_history
+from ...core.profile_engine.profile_db import db_get_history
 
 # ProfileDefinitionDialog 位于 settings_dialog.py，此处 re-export 便于统一导入。
 from .settings_dialog import ProfileDefinitionDialog  # noqa: F401

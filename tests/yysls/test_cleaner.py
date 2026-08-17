@@ -8,7 +8,7 @@
 
 import pytest
 
-from lvjiang.apps.yysls.equip_parser.parser import EquipmentParser
+from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.core.ocr_cleaner import OCRCleaner
 
 

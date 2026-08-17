@@ -28,8 +28,8 @@ from ...config.profile_models import (
     KeyDef,
     RegenKeyDef,
 )
-from ...profile.profile_db import db_read_all
-from ...profile.regen_math import compute_regen_entry
+from ...core.profile_engine.profile_db import db_read_all
+from ...core.profile_engine.regen_math import compute_regen_entry
 
 # 统一的刷新按钮样式（overview.py 与 tab.py 共用）
 REFRESH_BTN_STYLE = (
@@ -115,7 +115,7 @@ class ProfileTab(QWidget):
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新当前用户详情。"""
         try:
-            from ...profile.profile_engine import get_or_create_engine
+            from ...core.profile_engine.profile_engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
             engine.data_updated.connect(self._on_profile_data_updated)
             engine.alert_triggered.connect(self._on_alert_triggered)

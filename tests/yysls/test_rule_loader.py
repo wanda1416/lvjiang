@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lvjiang.apps.yysls.evaluator import get_tuning_rules
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
+from lvjiang.apps.yysls.core.tuning_rules import (
     DYNAMIC_AFFIXES,
     MAX_TUNE_RESETS,
     QUALITY_PARTS,
@@ -101,7 +101,7 @@ class TestBuiltinRules:
     def test_order_matches_tune_config(self):
         """规则顺序与 tune_config.yaml tuning_rules 声明顺序一致"""
         rules = get_tuning_rules()
-        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tune_config
+        from lvjiang.apps.yysls.core.tuning_rules import get_tune_config
         tuning_rules = get_tune_config().tuning_rules
         declared = [k for k in tuning_rules if k in rules]
         undeclared = sorted(k for k in rules if k not in tuning_rules)

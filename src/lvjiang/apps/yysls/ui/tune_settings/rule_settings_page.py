@@ -39,7 +39,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.tuning_rules import (
     GENERIC_ATTR,
     QUALITY_PARTS,
     RATING_KEYS,

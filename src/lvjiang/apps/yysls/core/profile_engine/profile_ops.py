@@ -17,14 +17,14 @@ from datetime import datetime
 
 from loguru import logger
 
-from ....i18n import tr
-from ..config.profile_models import (
+from .....i18n import tr
+from ...config.profile_models import (
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
     RegenKeyDef,
 )
-from ..config.user_profile import get_profile_config
+from ...config.user_profile import get_profile_config
 from .profile_db import db_read_all, db_read_entry, db_update_if_current, db_upsert
 from .regen_math import (
     compute_realtime_value,

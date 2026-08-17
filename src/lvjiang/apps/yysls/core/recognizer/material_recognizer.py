@@ -23,7 +23,7 @@ from lvjiang.core.ocr import OCREngine
 from lvjiang.core.recognizers.reference_matcher import ReferenceMatcher
 from lvjiang.core.reference_db import ReferenceDatabase
 
-from ....i18n import tr
+from .....i18n import tr
 
 # yysls 调律输出字段契约：自动调律启动前必须存在的 output 字段 key
 # （业务层对核心层 meta_schema 的合法要求，非侵入）
@@ -65,6 +65,7 @@ class MaterialInfo:
             如 {"level_text": "110阶", "count_text": "0/691"}）
         confidence: 类型匹配置信度 0~1
         meta: 匹配参考条目的元数据（输入字段 key -> 值，如 {"level": 110}）
+        group: 匹配参考条目所属分组（如 "调律材料"）
 
     便捷属性（读取 ocr_texts 原始文本）：
         level_text: 等级区域的 OCR 文本（如 "110阶"）
@@ -81,6 +82,7 @@ class MaterialInfo:
     ocr_texts: dict[str, str] = field(default_factory=dict)
     confidence: float = 0.0
     meta: dict = field(default_factory=dict)
+    group: str = ""
 
     # ── 便捷属性（读取 ocr_texts）──────────────────────
 
@@ -178,13 +180,13 @@ class MaterialRecognizer:
     def recognize(
         self,
         slot_img: np.ndarray,
-        group: str | None = None,
+        group: str | list[str] | None = None,
     ) -> MaterialInfo:
         """识别单个材料槽
 
         Args:
             slot_img: 材料槽裁剪图（BGR numpy 数组）
-            group: 限定匹配范围到指定分组，None 表示匹配所有分组
+            group: 限定匹配范围，支持单分组名、分组名列表或 None（匹配所有分组）
 
         Returns:
             MaterialInfo（通用字段：type, ocr_texts, confidence）
@@ -209,20 +211,21 @@ class MaterialRecognizer:
             ocr_texts=ocr_texts,
             confidence=confidence,
             meta=match_result.meta,
+            group=match_result.entry.group if match_result.entry else "",
         )
 
     def recognize_top_n(
         self,
         slot_img: np.ndarray,
         n: int = 5,
-        group: str | None = None,
+        group: str | list[str] | None = None,
     ) -> list[MaterialInfo]:
         """识别单个材料槽，返回最相似的 N 个结果
 
         Args:
             slot_img: 材料槽裁剪图（BGR numpy 数组）
             n: 返回结果数量
-            group: 限定匹配范围到指定分组
+            group: 限定匹配范围，支持单分组名、分组名列表或 None（匹配所有分组）
 
         Returns:
             按置信度降序排列的 MaterialInfo 列表
@@ -254,6 +257,7 @@ class MaterialRecognizer:
                 ocr_texts=texts,
                 confidence=match_result.confidence,
                 meta=match_result.meta,
+                group=match_result.entry.group if match_result.entry else "",
             ))
 
         return results
@@ -261,16 +265,17 @@ class MaterialRecognizer:
     # ─── 富 dict 序列化（插件扩展钩子）────────────────────────
 
     @staticmethod
-    def build_rich_base(info: MaterialInfo, group: str | None = None) -> dict:
+    def build_rich_base(info: MaterialInfo) -> dict:
         """构建 rich 模式 base dict（扁平结构）
 
         字段：label / group / confidence / level_text / count_text
+        group 取匹配条目的实际分组（info.group），非过滤参数。
         np.float32 → Python float 确保 JSON 可序列化。
         workflows 层和 enrich_info 共用此方法，消除重复。
         """
         return {
             "label": info.type,
-            "group": group or "",
+            "group": info.group,
             "confidence": float(info.confidence),
             "level_text": info.ocr_texts.get("level_text", ""),
             "count_text": info.ocr_texts.get("count_text", ""),
@@ -285,7 +290,7 @@ class MaterialRecognizer:
         DSL ``recognize ... as rich $var`` 使用此方法构建返回值。
         """
         from lvjiang.workflows import builtins
-        base = self.build_rich_base(info, group=group)
+        base = self.build_rich_base(info)
         parser = builtins.get_function("yysls_rich_parse")
         return parser(base) if parser else base
 

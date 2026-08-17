@@ -49,8 +49,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.evaluator import get_rule_names
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.evaluator import get_rule_names
+from lvjiang.apps.yysls.core.tuning_rules import (
     BEHAVIOR_ACTION_LABELS,
     BEHAVIOR_ACTION_TOOLTIPS,
     BEHAVIOR_STAGE_ACTIONS,

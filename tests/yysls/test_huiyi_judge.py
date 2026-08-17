@@ -9,8 +9,8 @@
 
 import pytest
 
-from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
-from lvjiang.apps.yysls.evaluator import (
+from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
+from lvjiang.apps.yysls.core.evaluator import (
     Rating,
     get_tuning_judge,
     get_tuning_rules,
@@ -379,8 +379,8 @@ class TestPatternDefaultRating:
     def _make_judge(pattern_default: str | None):
         from typing import Any
 
-        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
-        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.core.evaluator.rule_judge import GenericTuningJudge
+        from lvjiang.apps.yysls.core.tuning_rules import parse_tuning_rule
         data: dict[str, Any] = {
             "key": "t1",
             "name": "测试规则",
@@ -425,8 +425,8 @@ class TestPatternDefaultRating:
 class TestCommonConditionsJudge:
     @staticmethod
     def _make_judge(common: dict | None, config: dict | None = None):
-        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
-        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.core.evaluator.rule_judge import GenericTuningJudge
+        from lvjiang.apps.yysls.core.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",
             "name": "测试规则",
@@ -493,8 +493,8 @@ class TestPlaystyleBoundSwitch:
     def _make_judge(playstyle_switch: str | None = None,
                     common: dict | None = None,
                     config: dict | None = None):
-        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
-        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.core.evaluator.rule_judge import GenericTuningJudge
+        from lvjiang.apps.yysls.core.tuning_rules import parse_tuning_rule
         ps_data = {
             "main": {"weapon": "剑", "damage": "剑武学增伤"},
             "sub": {"weapon": "枪", "damage": None},
@@ -555,8 +555,8 @@ class TestPlaystyleBoundSwitch:
 
     def test_non_weapon_best_playstyle_wins(self):
         """多个玩法展开同一非武器部位时，取最优评级"""
-        from lvjiang.apps.yysls.evaluator.rule_judge import GenericTuningJudge
-        from lvjiang.apps.yysls.evaluator.tuning_rules import parse_tuning_rule
+        from lvjiang.apps.yysls.core.evaluator.rule_judge import GenericTuningJudge
+        from lvjiang.apps.yysls.core.tuning_rules import parse_tuning_rule
         data = {
             "key": "t1",
             "name": "测试规则",

@@ -35,7 +35,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ....i18n import tr
-from ..combat_attrs import (
+from ..core.combat.combat_attrs import (
     COMBAT_ATTR_FIELDS,
     PLAY_STYLE_FIELD_GROUPS,
     CombatAttributes,
@@ -89,7 +89,7 @@ class _GraduationTask(QRunnable):
 
     def run(self) -> None:
         try:
-            from ..evaluator.graduation import get_graduation_calculator
+            from ..core.graduation import get_graduation_calculator
 
             calculator = get_graduation_calculator(self.school, self.scheme)
             result = calculator.calculate(self.attrs) if calculator else None
@@ -704,7 +704,7 @@ class CombatAttrsTab(QWidget):
 
     def _refresh_display(self):
         """刷新属性显示"""
-        from ..combat_attrs import (
+        from ..core.combat.combat_attrs import (
             WUXIANG_TO_ATTR_PEN,
             apply_bonus_resistance,
             apply_penetration_resistance,
@@ -818,7 +818,7 @@ class CombatAttrsTab(QWidget):
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""
-        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP
+        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
         from ..config import get_game_config
 
         attr_fields = (
@@ -871,7 +871,7 @@ class CombatAttrsTab(QWidget):
         buff_resistance: float,
     ) -> None:
         """显示当前流派属攻穿透，悬浮时展示完整四系明细。"""
-        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP, apply_penetration_resistance
+        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP, apply_penetration_resistance
         from ..config import get_game_config
 
         attr_fields = (
@@ -942,7 +942,7 @@ class CombatAttrsTab(QWidget):
         self, extra_attrs: dict[str, float], buff_resistance: float,
     ) -> None:
         """将动态增益填入武器和技能各自的两个固定槽位。"""
-        from ..combat_attrs import apply_bonus_resistance, has_resistance
+        from ..core.combat.combat_attrs import apply_bonus_resistance, has_resistance
 
         self._extra_labels.clear()
         for widget, name_label, value_label in (
@@ -1069,7 +1069,7 @@ class CombatAttrsTab(QWidget):
         if equip_attrs.wuxiang_pen > 0:
             school = self._get_current_school()
             if school:
-                from ..combat_attrs import WUXIANG_TO_ATTR_PEN
+                from ..core.combat.combat_attrs import WUXIANG_TO_ATTR_PEN
                 from ..config import get_game_config
                 gc = get_game_config()
                 school_attr = gc.get_school_attr(school)
@@ -1102,7 +1102,7 @@ class CombatAttrsTab(QWidget):
         """计算装备词条属性总和（含五维转换，不含装备基础攻击值）"""
         from lvjiang.core.config import SessionManager
 
-        from ..combat_attrs import aggregate_equipment_attrs
+        from ..core.combat.combat_attrs import aggregate_equipment_attrs
 
         user_name = self._host.active_user_name()
         if not user_name:
@@ -1123,7 +1123,7 @@ class CombatAttrsTab(QWidget):
         """
         from lvjiang.core.config import SessionManager
 
-        from ..combat_attrs import compute_equip_base_attrs
+        from ..core.combat.combat_attrs import compute_equip_base_attrs
         from ..config import get_game_config
 
         user_name = self._host.active_user_name()
@@ -1207,7 +1207,7 @@ class CombatAttrsTab(QWidget):
         base_attrs = panel_attrs - equip_base_attrs - equip_attrs - gongjue_attrs
 
         # 穿透类特殊处理：用户填写的就是基础值，直接保存
-        from ..combat_attrs import PENETRATION_FIELDS
+        from ..core.combat.combat_attrs import PENETRATION_FIELDS
         for pen_field in PENETRATION_FIELDS:
             panel_val = getattr(panel_attrs, pen_field, 0.0)
             setattr(base_attrs, pen_field, panel_val)
@@ -1225,7 +1225,7 @@ class CombatAttrsTab(QWidget):
 
     def _save_play_style(self, school: str, name: str, base_attrs: CombatAttributes):
         """保存基础属性到 session 配置（仅保存允许的字段）。"""
-        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP
+        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
         from ..config import get_game_config, save_play_style
 
         # 解析占位符：根据流派属性获取实际字段名
@@ -1271,7 +1271,7 @@ class _CreatePlayStyleDialog(QDialog):
 
     def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
         """解析占位符字段，返回实际字段列表"""
-        from ..combat_attrs import SCHOOL_ATTR_FIELD_MAP
+        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
 
         if not self._school_attr or self._school_attr not in SCHOOL_ATTR_FIELD_MAP:
             # 无流派属性时，跳过属攻相关字段

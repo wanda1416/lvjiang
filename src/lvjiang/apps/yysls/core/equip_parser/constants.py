@@ -8,7 +8,7 @@ UI 新增武器后需重启方可参与识别）。
 
 import re
 
-from ....i18n import tr
+from .....i18n import tr
 
 # ─── 部位分类（旧，仅 parser 内部用于 base_attr 分派） ────
 

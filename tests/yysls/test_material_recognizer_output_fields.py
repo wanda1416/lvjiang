@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import yaml
 
-from lvjiang.apps.yysls.core.material_recognizer import (
+from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
     REQUIRED_OUTPUT_FIELDS,
     MaterialInfo,
     MaterialRecognizer,

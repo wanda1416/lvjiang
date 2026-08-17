@@ -15,7 +15,7 @@ import re
 
 from loguru import logger
 
-from ....i18n import tr
+from .....i18n import tr
 
 # 定音词条所在的全部类别（增益类 + 指定技能增效）
 _DINGYIN_CATEGORIES = (tr("外功增益"), tr("属攻增益"), tr("指定技能增效"))
@@ -25,7 +25,7 @@ class DingyinParser:
     """定音词条解析器"""
 
     def __init__(self):
-        from ..config import get_game_config
+        from ...config import get_game_config
         self._attr_config = get_game_config()
 
     def parse(self, raw: str) -> dict | None:

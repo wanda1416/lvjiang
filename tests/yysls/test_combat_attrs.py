@@ -2,7 +2,7 @@
 
 import pytest
 
-from lvjiang.apps.yysls.combat_attrs import (
+from lvjiang.apps.yysls.core.combat.combat_attrs import (
     aggregate_equipment_attrs,
     apply_bonus_resistance,
     apply_penetration_resistance,

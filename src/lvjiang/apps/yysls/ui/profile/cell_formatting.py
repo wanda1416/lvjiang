@@ -29,7 +29,7 @@ from ...config.profile_models import (
     format_sync_label,
     parse_sync_key,
 )
-from ...profile.regen_math import (
+from ...core.profile_engine.regen_math import (
     compute_regen_entry,
     format_seconds,
     is_realtime_regen,

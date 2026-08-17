@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from lvjiang.apps.yysls.evaluator.graduation_converter import (  # noqa: E402
+from lvjiang.apps.yysls.core.graduation.graduation_converter import (  # noqa: E402
     convert_workbook,
     validate_model,
     write_model,

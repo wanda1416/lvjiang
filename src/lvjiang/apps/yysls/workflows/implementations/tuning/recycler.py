@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from lvjiang.apps.yysls.equip_parser import EquipmentData
-from lvjiang.apps.yysls.evaluator.tuning_rules import BEHAVIOR_STAGE_LABELS
+from lvjiang.apps.yysls.core.equip_parser import EquipmentData
+from lvjiang.apps.yysls.core.tuning_rules import BEHAVIOR_STAGE_LABELS
 
 from ......i18n import tr
 

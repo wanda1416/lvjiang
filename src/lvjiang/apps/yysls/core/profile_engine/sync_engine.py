@@ -14,8 +14,8 @@ from typing import Callable
 
 from loguru import logger
 
-from ..config.profile_models import DIR_NEG, DIR_POS, KeyDef, parse_sync_key
-from ..config.user_profile import get_profile_config
+from ...config.profile_models import DIR_NEG, DIR_POS, KeyDef, parse_sync_key
+from ...config.user_profile import get_profile_config
 
 # write_fn 签名：(user_name, model_type, key, delta, change_type, detail, source)
 # -> (new_value, applied_delta)；写入失败返回 None

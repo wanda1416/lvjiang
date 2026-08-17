@@ -83,7 +83,7 @@
 ### 独立验证
 
 ```python
-from lvjiang.apps.yysls.evaluator.graduation_converter import validate_model
+from lvjiang.apps.yysls.core.graduation.graduation_converter import validate_model
 import json
 
 model = json.load(open("config/system/yysls/graduation/鸣金·虹_基础方案.json", encoding="utf-8"))
@@ -114,7 +114,7 @@ results = validate_model(model)  # 返回 dict，或抛出 FormulaError
 - 重新导入 Excel 后
 
 ```python
-from lvjiang.apps.yysls.evaluator.graduation import invalidate_graduation_cache
+from lvjiang.apps.yysls.core.graduation import invalidate_graduation_cache
 invalidate_graduation_cache()
 ```
 

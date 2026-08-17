@@ -22,16 +22,16 @@ from lvjiang.core.config import SessionManager
 from lvjiang.core.config.session import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
-from ....i18n import tr
-from ..config.profile_models import RegenKeyDef
-from ..config.profile_store import (
+from .....i18n import tr
+from ...config.profile_models import RegenKeyDef
+from ...config.profile_store import (
     get_alert_history,
     is_alert_marked,
     mark_alert,
     set_alert_history,
     unmark_alert,
 )
-from ..config.user_profile import (
+from ...config.user_profile import (
     get_profile_config,
 )
 from .profile_db import db_read_all, db_update_if_current, db_upsert
@@ -115,7 +115,7 @@ def _get_season_boundary(
     period: str, now: datetime, hour: int, minute: int
 ) -> datetime:
     """获取赛季/半赛季周期的起始边界"""
-    from ..config.manager import get_game_config
+    from ...config.manager import get_game_config
     game_config = get_game_config()
     seasons = game_config.get_season_configs()
     if not seasons:

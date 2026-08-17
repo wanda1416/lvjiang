@@ -13,7 +13,7 @@ def profile_func_env(tmp_path, monkeypatch):
     session_dir.mkdir()
 
     import lvjiang.apps.yysls.config.user_profile as profile_config
-    import lvjiang.apps.yysls.profile.profile_db as profile_db
+    import lvjiang.apps.yysls.core.profile_engine.profile_db as profile_db
 
     profile_config._config = None
     profile_config._PROFILE_PATH = session_dir / "profile.yaml"
@@ -50,7 +50,7 @@ def profile_func_env(tmp_path, monkeypatch):
 
 
 def test_profile_all_computes_realtime_regen_value(profile_func_env):
-    from lvjiang.apps.yysls.profile.profile_db import db_upsert
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_upsert
     from lvjiang.apps.yysls.workflows.builtins.profile_funcs import (
         _profile_all,
         _profile_get,
@@ -68,7 +68,7 @@ def test_profile_all_computes_realtime_regen_value(profile_func_env):
 
 
 def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
-    from lvjiang.apps.yysls.profile.profile_db import db_read_entry, db_upsert
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry, db_upsert
     from lvjiang.apps.yysls.workflows.builtins.profile_funcs import _profile_inc
 
     updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
@@ -87,8 +87,8 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
 
 
 def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func_env):
-    from lvjiang.apps.yysls.profile.profile_db import db_read_entry, db_upsert
-    from lvjiang.apps.yysls.profile.profile_ops import sync_write_adapter
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry, db_upsert
+    from lvjiang.apps.yysls.core.profile_engine.profile_ops import sync_write_adapter
 
     updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
     db_upsert(profile_func_env.username, "regen", "xinli", 100, updated_at=updated_at)

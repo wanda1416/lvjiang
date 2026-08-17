@@ -49,7 +49,7 @@ def decimal_env(tmp_path):
     session_dir.mkdir()
 
     import lvjiang.apps.yysls.config.user_profile as profile_config
-    import lvjiang.apps.yysls.profile.profile_db as profile_db
+    import lvjiang.apps.yysls.core.profile_engine.profile_db as profile_db
 
     profile_config._config = None
     profile_config._PROFILE_PATH = session_dir / "profile.yaml"
@@ -75,8 +75,8 @@ def decimal_env(tmp_path):
 
 
 def test_profile_action_normalizes_tiny_float_noise(decimal_env):
-    from lvjiang.apps.yysls.profile.profile_db import db_read_entry
-    from lvjiang.apps.yysls.profile.profile_ops import profile_action
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry
+    from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
 
     result = profile_action(decimal_env.username, "tongbao", set_value=12.0000000001)
     entry = db_read_entry(decimal_env.username, MODEL_STOCK, "tongbao")
@@ -86,8 +86,8 @@ def test_profile_action_normalizes_tiny_float_noise(decimal_env):
 
 
 def test_profile_action_keeps_real_decimal(decimal_env):
-    from lvjiang.apps.yysls.profile.profile_db import db_read_entry
-    from lvjiang.apps.yysls.profile.profile_ops import profile_action
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry
+    from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
 
     result = profile_action(decimal_env.username, "tongbao", set_value=12.5)
     entry = db_read_entry(decimal_env.username, MODEL_STOCK, "tongbao")
@@ -97,8 +97,8 @@ def test_profile_action_keeps_real_decimal(decimal_env):
 
 
 def test_profile_action_does_not_block_real_decimal_on_non_decimal_key(decimal_env):
-    from lvjiang.apps.yysls.profile.profile_db import db_read_entry
-    from lvjiang.apps.yysls.profile.profile_ops import profile_action
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry
+    from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
 
     result = profile_action(decimal_env.username, "changmingyu", set_value=12.5)
     entry = db_read_entry(decimal_env.username, MODEL_STOCK, "changmingyu")

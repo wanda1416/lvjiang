@@ -27,14 +27,14 @@ from PyQt6.QtWidgets import (
 )
 
 from ....i18n import tr
-from ..tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+from ..config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 from .tune_config_widget import TuningConfigWidget, TuningGlobalsWidget
 
 
 def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
     """开启的开关 key → 注册表显示名（注册表不可用时退回 key）"""
     try:
-        from ..evaluator.tuning_rules import get_tune_config
+        from ..core.tuning_rules import get_tune_config
         names = get_tune_config().switches
     except Exception:
         names = {}
@@ -118,7 +118,7 @@ class TuningTab(QWidget):
 
     def _refresh_base_group_radios(self):
         """重建基础规则单选组（遍历全部规则组，选中项保持不变）"""
-        from ..evaluator.tuning_rules import get_tuning_group_manager
+        from ..core.tuning_rules import get_tuning_group_manager
         groups = get_tuning_group_manager().get_groups()
         # 当前 key 不在时取第一个可用组
         if self._base_group_key not in groups:
@@ -300,7 +300,7 @@ class TuningTab(QWidget):
         """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
         from lvjiang.core.reference_db import ReferenceDatabase
 
-        from ..core.material_recognizer import get_missing_output_fields
+        from ..core.recognizer.material_recognizer import get_missing_output_fields
         db = ReferenceDatabase()
         db.load()
         return get_missing_output_fields(db)
@@ -346,7 +346,7 @@ class TuningTab(QWidget):
             return
 
         # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
-        from ..evaluator import (
+        from ..core.evaluator import (
             get_rule_names,
             get_tuning_judge,
             get_tuning_rules,
@@ -385,7 +385,7 @@ class TuningTab(QWidget):
         flow_name = tr("自动调律")
 
         # 基础规则组（启动时快照注入）
-        from ..evaluator.tuning_rules import get_tuning_group
+        from ..core.tuning_rules import get_tuning_group
         group_key = tc.get("base_group", "")
         base_group = get_tuning_group(group_key) if group_key else None
         if base_group is None:

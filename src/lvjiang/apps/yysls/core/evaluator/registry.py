@@ -5,10 +5,10 @@
 规则变更（含 UI「装备调律配置」编辑保存）后 reload 即生效。
 """
 
-from ....i18n import tr
+from .....i18n import tr
 from .base import Rating, TuningJudge
 from .rule_judge import GenericTuningJudge
-from .tuning_rules import TuningRule, get_tuning_rule_manager
+from ..tuning_rules import TuningRule, get_tuning_rule_manager
 
 __all__ = [
     "get_tuning_rules", "get_rule_names",

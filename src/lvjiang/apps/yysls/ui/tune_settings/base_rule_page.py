@@ -36,7 +36,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_LABELS,
     RuleValidationError,
     TuningGroupManager,

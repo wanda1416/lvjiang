@@ -10,13 +10,13 @@ from typing import Any
 
 from loguru import logger
 
-from ..combat_attrs import (
+from ..combat.combat_attrs import (
     CombatAttributes,
 )
 from .graduation_program import ProgramRuntime
 
 _DATA_DIR = (
-    Path(__file__).parents[5] / "config" / "system" / "yysls" / "graduation"
+    Path(__file__).parents[6] / "config" / "system" / "yysls" / "graduation"
 )
 _ALL_SCHOOLS = {
     "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",

@@ -59,8 +59,8 @@ from ...config.user_profile import (
     get_profile_config,
     save_profile_config,
 )
-from ...profile.profile_db import db_read_all
-from ...profile.regen_math import (
+from ...core.profile_engine.profile_db import db_read_all
+from ...core.profile_engine.regen_math import (
     compute_regen_entry,
     is_realtime_regen,
 )
@@ -132,7 +132,7 @@ class ProfileOverviewTab(QWidget):
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新总览 UI。"""
         try:
-            from ...profile.profile_engine import get_or_create_engine
+            from ...core.profile_engine.profile_engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager, self._host.session_manager)
             engine.data_updated.connect(lambda _user_name: self._schedule_refresh())
         except Exception as e:
@@ -927,7 +927,7 @@ class ProfileOverviewTab(QWidget):
 
         UI 只负责收集上下文、处理提示和刷新；写入语义统一委托 profile_ops.profile_action。
         """
-        from ...profile.profile_ops import ProfileWriteConflict, profile_action
+        from ...core.profile_engine.profile_ops import ProfileWriteConflict, profile_action
         try:
             profile_action(
                 user_name, key,

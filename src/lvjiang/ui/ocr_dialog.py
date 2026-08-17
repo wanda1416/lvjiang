@@ -571,7 +571,7 @@ class OCRDialog(QDialog):
         QApplication.processEvents()
 
         try:
-            from lvjiang.apps.yysls.core.material_recognizer import (
+            from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
                 MaterialRecognizer,
             )
             from lvjiang.core.ocr import OCREngine

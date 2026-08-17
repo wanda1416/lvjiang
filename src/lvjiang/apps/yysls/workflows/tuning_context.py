@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..evaluator.tuning_rules import TuningGroup
+    from ..core.tuning_rules import TuningGroup
 
 
 @dataclass

@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.apps.yysls.core.material_recognizer import MaterialRecognizer
+from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
 from lvjiang.core.layout_models import Region
 from lvjiang.core.ocr import OCREngine
 

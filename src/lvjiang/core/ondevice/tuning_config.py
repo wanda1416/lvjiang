@@ -35,12 +35,12 @@ def get_tuning_config() -> str:
 
         ensure_loaded()  # 规则注册表在 yysls 插件内，未加载时枚举为空
 
-        from ...apps.yysls.evaluator import get_tuning_rules
-        from ...apps.yysls.evaluator.tuning_rules import (
+        from ...apps.yysls.core.evaluator import get_tuning_rules
+        from ...apps.yysls.core.tuning_rules import (
             get_tune_config,
             get_tuning_group_manager,
         )
-        from ...apps.yysls.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+        from ...apps.yysls.config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
         from ...core.config.wf_configs import get_wf_config
 
         tc = get_wf_config("auto_tuning")
@@ -133,11 +133,11 @@ def save_tuning_config(payload: str) -> str:
 
         ensure_loaded()
 
-        from ...apps.yysls.evaluator import get_tuning_rules
-        from ...apps.yysls.evaluator.tuning_rules import (
+        from ...apps.yysls.core.evaluator import get_tuning_rules
+        from ...apps.yysls.core.tuning_rules import (
             get_tuning_group_manager,
         )
-        from ...apps.yysls.tune_slots import LOCKED_SLOTS, SLOT_LABELS
+        from ...apps.yysls.config.tune_slots import LOCKED_SLOTS, SLOT_LABELS
         from ...core.config.wf_configs import get_wf_config, update_wf_config
 
         data = json.loads(payload)

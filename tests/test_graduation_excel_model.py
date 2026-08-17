@@ -6,18 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.apps.yysls.combat_attrs import CombatAttributes
+from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.evaluator.excel_formula import parse_formula
-from lvjiang.apps.yysls.evaluator.graduation import (
+from lvjiang.apps.yysls.core.graduation.excel_formula import parse_formula
+from lvjiang.apps.yysls.core.graduation import (
     get_graduation_calculator,
     get_graduation_scheme_combat_attrs,
     get_graduation_scheme_inputs,
     invalidate_graduation_cache,
     set_graduation_baseline_dps,
 )
-from lvjiang.apps.yysls.evaluator.graduation_converter import convert_workbook
-from lvjiang.apps.yysls.evaluator.graduation_program import ProgramRuntime
+from lvjiang.apps.yysls.core.graduation.graduation_converter import convert_workbook
+from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
 
 DATA_DIR = (
     Path(__file__).parents[1] / "config" / "system" / "yysls" / "graduation"
@@ -101,7 +101,7 @@ def test_runtime_reports_workbook_baseline() -> None:
 def test_editable_baseline_dps_recalibrates_graduation_rate(
     tmp_path, monkeypatch,
 ) -> None:
-    import lvjiang.apps.yysls.evaluator.graduation as graduation
+    import lvjiang.apps.yysls.core.graduation as graduation
 
     source = DATA_DIR / "鸣金·虹_基础方案.json"
     shutil.copy(source, tmp_path / source.name)

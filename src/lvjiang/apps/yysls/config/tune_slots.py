@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from ...i18n import tr
+from ....i18n import tr
 
 #: 部位分组：(组名, ((部位 key, 中文标签), ...))，顺序即 UI 展示顺序
 SLOT_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (

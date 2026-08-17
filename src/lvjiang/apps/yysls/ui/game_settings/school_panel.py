@@ -451,8 +451,8 @@ class SchoolPanel(QWidget):
             if ret != QMessageBox.StandardButton.Yes:
                 return
         try:
-            from ...evaluator.graduation import invalidate_graduation_cache
-            from ...evaluator.graduation_converter import import_graduation_scheme
+            from ...core.graduation import invalidate_graduation_cache
+            from ...core.graduation.graduation_converter import import_graduation_scheme
             destination, outputs = import_graduation_scheme(excel_path, school, name)
             invalidate_graduation_cache()
         except Exception as exc:
@@ -499,7 +499,7 @@ class SchoolPanel(QWidget):
             return
         # 1. 先删除 JSON 文件（失败则中止，保持配置与磁盘一致）
         try:
-            from ...evaluator.graduation_converter import scheme_path
+            from ...core.graduation.graduation_converter import scheme_path
             json_file = scheme_path(school, name)
             if json_file.exists():
                 json_file.unlink()
@@ -519,7 +519,7 @@ class SchoolPanel(QWidget):
         self._save_data()
         # 3. 失效毕业率缓存
         try:
-            from ...evaluator.graduation import invalidate_graduation_cache
+            from ...core.graduation import invalidate_graduation_cache
             invalidate_graduation_cache()
         except Exception:
             pass
@@ -568,7 +568,7 @@ class SchoolPanel(QWidget):
             tr("方案：{name}（满值属性，不含食物加成）").format(name=scheme)
         )
         try:
-            from ...evaluator.graduation import (
+            from ...core.graduation import (
                 get_graduation_scheme_combat_attrs,
                 get_graduation_scheme_metrics,
             )
@@ -635,7 +635,7 @@ class SchoolPanel(QWidget):
         """保存人工校正的 100% 毕业率基准 DPS。"""
         try:
             value = float(edit.text())
-            from ...evaluator.graduation import set_graduation_baseline_dps
+            from ...core.graduation import set_graduation_baseline_dps
 
             set_graduation_baseline_dps(school, scheme, value)
             edit.setText(f"{value:.2f}")
@@ -643,7 +643,7 @@ class SchoolPanel(QWidget):
             logger.error(f"保存毕业率基准 DPS 失败: {exc}")
             QMessageBox.warning(self, tr("保存失败"), str(exc))
             try:
-                from ...evaluator.graduation import get_graduation_scheme_metrics
+                from ...core.graduation import get_graduation_scheme_metrics
 
                 _adps, old_value = get_graduation_scheme_metrics(school, scheme)
                 edit.setText(f"{old_value:.2f}")
@@ -668,7 +668,7 @@ class SchoolPanel(QWidget):
 
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
-        from ...combat_attrs import CombatAttributes
+        from ...core.combat.combat_attrs import CombatAttributes
 
         # 基础属性也进入标准战斗属性模型，再按战斗属性面板结构展示。
         combat_attrs = CombatAttributes.from_dict(attrs)
@@ -682,7 +682,7 @@ class SchoolPanel(QWidget):
         self, attrs, school_attr: str | None, *, editable: bool,
     ) -> QWidget:
         """按战斗属性页的四张标准卡片展示 CombatAttributes。"""
-        from ...combat_attrs import SCHOOL_ATTR_FIELD_MAP
+        from ...core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
         attr_map = SCHOOL_ATTR_FIELD_MAP.get(school_attr or "", {})
         attr_name = school_attr or tr("属攻")
         attr_fields = {
@@ -889,7 +889,7 @@ class SchoolPanel(QWidget):
 
     def _find_field_unit(self, field_name: str) -> str:
         """查找字段单位"""
-        from ...combat_attrs import COMBAT_ATTR_FIELDS
+        from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS
         for fn, _dn, unit, _ in COMBAT_ATTR_FIELDS:
             if fn == field_name:
                 return unit
@@ -936,7 +936,7 @@ class _PlayStyleEditDialog(QDialog):
 
     def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
         """解析占位符字段，返回实际字段列表"""
-        from ...combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
+        from ...core.combat.combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
 
         if not self._school_attr or self._school_attr not in SCHOOL_ATTR_FIELD_MAP:
             # 无流派属性时，跳过属攻相关字段

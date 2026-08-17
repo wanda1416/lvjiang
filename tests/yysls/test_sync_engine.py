@@ -19,7 +19,7 @@ from lvjiang.apps.yysls.config.profile_models import (
     SyncTargetDef,
 )
 from lvjiang.apps.yysls.config.user_profile import ProfileSchema
-from lvjiang.apps.yysls.profile.sync_engine import _apply_ratio, fire_sync_targets
+from lvjiang.apps.yysls.core.profile_engine.sync_engine import _apply_ratio, fire_sync_targets
 
 # ─── 辅助工具 ─────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, target_kd),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -153,7 +153,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="yuanbao", label="元宝")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -183,7 +183,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="c")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -208,7 +208,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="bugan")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -228,7 +228,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, source_kd),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -249,7 +249,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="bugan")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -275,7 +275,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, kd_b),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -303,7 +303,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, kd_c),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -324,7 +324,7 @@ class TestFireSyncTargets:
         )
         schema = _make_schema((MODEL_STOCK, source_kd))
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -344,7 +344,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="a")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -358,7 +358,7 @@ class TestFireSyncTargets:
         source_kd = StockKeyDef(key="a", label="A")
         schema = _make_schema((MODEL_STOCK, source_kd))
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -378,7 +378,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="a")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -406,7 +406,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, kd_c),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -436,7 +436,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="c")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -466,7 +466,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="d")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -488,7 +488,7 @@ class TestFireSyncTargets:
             (MODEL_QUOTA, QuotaKeyDef(key="jindu")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -511,7 +511,7 @@ class TestFireSyncTargets:
             (MODEL_QUOTA, QuotaKeyDef(key="jindu")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 
@@ -534,7 +534,7 @@ class TestFireSyncTargets:
             (MODEL_STOCK, StockKeyDef(key="b")),
         )
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.profile.sync_engine.get_profile_config",
+            "lvjiang.apps.yysls.core.profile_engine.sync_engine.get_profile_config",
             lambda: schema,
         )
 

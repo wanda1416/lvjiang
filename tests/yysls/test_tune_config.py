@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.evaluator import get_tuning_rules
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
+from lvjiang.apps.yysls.core.tuning_rules import (
     TuneConfigManager,
     TuningGroupManager,
     TuningRuleManager,
@@ -179,7 +179,7 @@ class TestBehaviorPages:
                                                       tmp_group_manager):
         """判定语义切换时判定结果候选域联动重置：affix → 词条
         候选（选中首个）；切离 → 评级四档（全选 = 不限）"""
-        from lvjiang.apps.yysls.evaluator.tuning_rules import (
+        from lvjiang.apps.yysls.core.tuning_rules import (
             rule_affix_candidates,
         )
         statuses: list[tuple[str, bool]] = []
@@ -465,7 +465,7 @@ class TestPlaystyleTableCombos:
 
     def test_attr_column_candidates(self, qtbot, tmp_manager):
         # 属性列（col 5）候选 = 属性攻击组名，无留空项
-        from lvjiang.apps.yysls.evaluator.tuning_rules import standard_playstyle_attrs
+        from lvjiang.apps.yysls.core.tuning_rules import standard_playstyle_attrs
         panel = RulePanel("heal_fire", tmp_manager, lambda t, e: None)
         qtbot.addWidget(panel)
         table = panel._settings_page._playstyle_table

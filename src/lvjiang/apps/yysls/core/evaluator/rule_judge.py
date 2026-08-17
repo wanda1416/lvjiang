@@ -40,11 +40,11 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
 
 from __future__ import annotations
 
-from lvjiang.apps.yysls.equip_parser import EquipmentData
+from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 
-from ....i18n import tr
+from .....i18n import tr
 from .base import JudgeResult, Rating, TuningJudge, part_label
-from .tuning_rules import (
+from ..tuning_rules import (
     DYNAMIC_AFFIXES,
     GENERIC_ATTR,
     PART_ALIAS,
@@ -265,7 +265,7 @@ class GenericTuningJudge(TuningJudge):
         优先级词条，替换后再定级，与不转律基线取评级较高者。填充
         与转律后均复用 _grade（与完整定级同一套条件求值）。
         """
-        from ..config import get_game_config
+        from ...config import get_game_config
         gc = get_game_config()
         part = result.equipment.part
 

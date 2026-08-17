@@ -45,7 +45,7 @@ def _build_tuning_progress_tab(host):
 
 def _ensure_engine_started(host):
     """确保 ProfileEngine 已启动（首次构建 profile Tab 时调用）"""
-    from .profile.profile_engine import get_or_create_engine, stop_engine
+    from .core.profile_engine.profile_engine import get_or_create_engine, stop_engine
     engine = get_or_create_engine(
         user_manager=host.user_manager,
         session_manager=host.session_manager,

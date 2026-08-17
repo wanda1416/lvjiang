@@ -31,12 +31,12 @@ _resolve_selected_slots。
 from loguru import logger
 
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.equip_parser import EquipmentData
-from lvjiang.apps.yysls.evaluator import (
+from lvjiang.apps.yysls.core.equip_parser import EquipmentData
+from lvjiang.apps.yysls.core.evaluator import (
     judge_equipment_potential,
     summarize_potential,
 )
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_LABELS,
     RATING_RANK,
     get_tune_config,
@@ -181,7 +181,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     @staticmethod
     def _missing_output_fields() -> list[str]:
         """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
-        from lvjiang.apps.yysls.core.material_recognizer import (
+        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
             get_missing_output_fields,
         )
         from lvjiang.core.reference_db import ReferenceDatabase
@@ -1032,7 +1032,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         空装备判定：type/name/level 全为空或 None。
         委托给共享 make_fingerprint 函数。
         """
-        from ...equip_parser.models import make_fingerprint
+        from ...core.equip_parser.models import make_fingerprint
         return make_fingerprint(equip)
 
     @staticmethod
@@ -1066,7 +1066,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         group_key = get_wf_config("auto_tuning").get("base_group", "")
         if not group_key:
             raise ValueError(tr("未配置基础规则组，请在调律页选择基础规则组"))
-        from lvjiang.apps.yysls.evaluator.tuning_rules import get_tuning_group
+        from lvjiang.apps.yysls.core.tuning_rules import get_tuning_group
         group = get_tuning_group(group_key)
         if group is None:
             raise ValueError(f"基础规则组 '{group_key}' 不存在，请检查配置")

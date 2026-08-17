@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from lvjiang.apps.yysls.equip_parser import EquipmentData, get_equipment_parser
+from lvjiang.apps.yysls.core.equip_parser import EquipmentData, get_equipment_parser
 
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (

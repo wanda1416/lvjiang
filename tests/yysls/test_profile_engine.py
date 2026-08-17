@@ -15,7 +15,7 @@ from lvjiang.apps.yysls.config.user_profile import (
     read_profile_entry,
     write_profile_entry,
 )
-from lvjiang.apps.yysls.profile.profile_engine import (
+from lvjiang.apps.yysls.core.profile_engine.profile_engine import (
     _compute_regen_value,
     _count_quota_regens,
     _get_period_boundary,
@@ -294,7 +294,7 @@ class TestComputeRealtimeValue:
         fixed_now = datetime(2026, 8, 8, 10, 0, 0)
         yesterday_3am = datetime(2026, 8, 7, 3, 0, 0)
         updated_at = yesterday_3am.isoformat(timespec="seconds")
-        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+        with patch('lvjiang.apps.yysls.core.profile_engine.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val, ts = _compute_regen_value(100, updated_at, "day", 450, 2500, "05:00")
@@ -306,7 +306,7 @@ class TestComputeRealtimeValue:
         from unittest.mock import patch
         fixed_now = datetime(2026, 8, 9, 5, 9, 0)
         updated_at = datetime(2026, 8, 9, 4, 40, 6).isoformat(timespec="seconds")
-        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+        with patch('lvjiang.apps.yysls.core.profile_engine.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val, ts = _compute_regen_value(1256, updated_at, "day", 450, 2500, "05:00")
@@ -346,7 +346,7 @@ class TestComputeRealtimeValue:
 
         fixed_now = datetime(2026, 8, 9, 10, 4, 0)
         updated_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
-        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+        with patch('lvjiang.apps.yysls.core.profile_engine.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val, new_ts = _compute_regen_value(
@@ -365,14 +365,14 @@ class TestComputeRealtimeValue:
         second_now = datetime(2026, 8, 9, 10, 8, 0)
         updated_at = start.isoformat(timespec="seconds")
 
-        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+        with patch('lvjiang.apps.yysls.core.profile_engine.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = first_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val1, ts1 = _compute_regen_value(
                 100.5, updated_at, "minute", 0.125, 600
             )
 
-        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+        with patch('lvjiang.apps.yysls.core.profile_engine.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = second_now
             mock_dt.fromisoformat = datetime.fromisoformat
             stepped_val, stepped_ts = _compute_regen_value(
@@ -391,7 +391,7 @@ class TestComputeRealtimeValue:
 
         fixed_now = datetime(2026, 8, 9, 10, 0, 59)
         updated_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
-        with patch('lvjiang.apps.yysls.profile.profile_engine.datetime') as mock_dt:
+        with patch('lvjiang.apps.yysls.core.profile_engine.profile_engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val, new_ts = _compute_regen_value(

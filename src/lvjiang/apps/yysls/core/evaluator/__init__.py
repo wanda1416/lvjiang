@@ -6,7 +6,7 @@
 """
 
 from .base import JudgeResult, Rating, TuningJudge
-from .graduation import (
+from ..graduation import (
     GraduationCalculator,
     GraduationResult,
     get_graduation_calculator,
@@ -22,7 +22,7 @@ from .registry import (
     summarize_potential,
 )
 from .rule_judge import GenericTuningJudge
-from .tuning_rules import (
+from ..tuning_rules import (
     TuningRule,
     TuningRuleManager,
     get_tuning_rule_manager,

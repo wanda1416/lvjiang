@@ -34,7 +34,7 @@ def _profile_get(_engine, key: str, *args) -> float | None:
         logger.warning("profile_get: key 为空")
         return None
 
-    from ...profile.profile_ops import profile_read
+    from ...core.profile_engine.profile_ops import profile_read
     username = _get_username(_engine)
     return profile_read(username, key)
 
@@ -61,7 +61,7 @@ def _profile_set(_engine, key: str, value, *args) -> float:
         logger.warning(f"profile_set: value 无法转为数字: {value!r}")
         return 0
 
-    from ...profile.profile_ops import profile_action
+    from ...core.profile_engine.profile_ops import profile_action
     username = _get_username(_engine)
     return profile_action(username, key, set_value=value_num, source=tr("DSL 写入"))
 
@@ -92,7 +92,7 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
         logger.warning(f"profile_inc: delta 无法转为数字: {delta!r}")
         return 0
 
-    from ...profile.profile_ops import profile_action
+    from ...core.profile_engine.profile_ops import profile_action
     username = _get_username(_engine)
     return profile_action(username, key, delta=delta_num, source=tr("DSL 写入"))
 
@@ -131,6 +131,6 @@ def _profile_all(_engine, *args) -> dict:
         eval $quota = $all.quota
         collect $all as "profile"
     """
-    from ...profile.profile_ops import profile_read_all
+    from ...core.profile_engine.profile_ops import profile_read_all
     username = _get_username(_engine)
     return profile_read_all(username)

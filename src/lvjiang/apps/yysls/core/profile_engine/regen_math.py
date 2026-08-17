@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from loguru import logger
 
-from ..config.profile_models import RegenKeyDef
+from ...config.profile_models import RegenKeyDef
 
 REGEN_REALTIME = "realtime"
 REGEN_BOUNDARY = "boundary"

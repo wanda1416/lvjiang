@@ -35,7 +35,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.tuning_rules import (
     RuleValidationError,
     get_tune_config,
     get_tune_config_manager,

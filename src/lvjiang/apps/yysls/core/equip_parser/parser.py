@@ -7,7 +7,7 @@ import re
 
 from loguru import logger
 
-from ....i18n import tr
+from .....i18n import tr
 from .constants import (
     AFFIX_NAMES,
     PERCENT_AFFIXES,
@@ -30,7 +30,7 @@ class EquipmentParser:
     }
 
     def __init__(self):
-        from ..config import get_game_config
+        from ...config import get_game_config
         self._attr_config = get_game_config()
         self._dingyin_parser = DingyinParser()
 

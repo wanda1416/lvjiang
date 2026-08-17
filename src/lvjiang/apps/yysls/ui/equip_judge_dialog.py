@@ -25,20 +25,20 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.equip_parser.constants import WEAPON_TYPES
-from lvjiang.apps.yysls.equip_parser.models import Affix, EquipmentData
-from lvjiang.apps.yysls.evaluator import (
+from lvjiang.apps.yysls.core.equip_parser.constants import WEAPON_TYPES
+from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
+from lvjiang.apps.yysls.core.evaluator import (
     get_tuning_judge,
     is_rule_implemented,
     judge_equipment_potential,
     judge_tuning_worthiness,
 )
-from lvjiang.apps.yysls.evaluator.tuning_rules import (
+from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_LABELS,
     RATING_RANK,
     get_tuning_group,
 )
-from lvjiang.apps.yysls.evaluator.tuning_rules.models import FOOD_LABELS
+from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
 
 from ....i18n import tr
 from .game_settings.level_combo import LevelCombo

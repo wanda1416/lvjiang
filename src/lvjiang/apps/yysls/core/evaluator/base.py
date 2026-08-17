@@ -8,9 +8,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 
-from lvjiang.apps.yysls.equip_parser import EquipmentData
+from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 
-from ....i18n import tr
+from .....i18n import tr
 
 # ─── 评级枚举 ──────────────────────────────────────────────
 

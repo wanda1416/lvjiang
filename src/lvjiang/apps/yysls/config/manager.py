@@ -89,6 +89,8 @@ class GameConfigManager:
         self._level_configs: list[LevelConfig] = []
         # 赛季配置：赛季编号 → SeasonConfig（顶层 season_configs）
         self._season_configs: list[SeasonConfig] = []
+        # 基础属性名（从 _attr 字段收集：外功攻击/气血最大值/...）
+        self._base_attr_names: list[str] = []
 
         self._load()
 
@@ -113,6 +115,7 @@ class GameConfigManager:
         self._affix_to_category.clear()
         self._affix_parts.clear()
         self._external_alias_to_affixes.clear()
+        self._base_attr_names.clear()
         self._affix_external_aliases.clear()
         self._weapon_types.clear()
         self._weapon_wuxue_affixes.clear()
@@ -180,6 +183,10 @@ class GameConfigManager:
             if target:
                 follows[key] = target
                 continue
+            # 收集基础属性名（_attr 字段）
+            attr_name = section.get("_attr")
+            if attr_name and attr_name not in self._base_attr_names:
+                self._base_attr_names.append(attr_name)
             self._base_rules[key] = {}
             for level_str, qualities in section.items():
                 if str(level_str).startswith("_"):
@@ -284,6 +291,14 @@ class GameConfigManager:
             ))
         # 按赛季编号排序
         self._season_configs.sort(key=lambda c: c.season_number)
+
+    @property
+    def base_attr_names(self) -> list[str]:
+        """所有合法基础属性名（从 game_config.yaml 的 _attr 字段收集）
+
+        如 ['外功攻击', '最小外功攻击', '最大外功攻击', '气血最大值']
+        """
+        return list(self._base_attr_names)
 
     # ── 词条映射 ────────────────────────────────────────────
 

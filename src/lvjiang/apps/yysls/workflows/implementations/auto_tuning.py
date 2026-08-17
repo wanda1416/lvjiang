@@ -1027,11 +1027,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     @staticmethod
     def _make_fingerprint(equip: dict) -> str:
-        """生成装备指纹，空装备返回空串。
+        """获取或计算装备指纹。
 
-        空装备判定：type/name/level 全为空或 None。
-        委托给共享 make_fingerprint 函数。
+        优先读取 dict 内已有的 _fp 字段（由 to_equipment / to_dict 自动设置），
+        仅当缺失时才回退计算。空装备返回空串。
         """
+        fp = equip.get("_fp", "")
+        if fp:
+            return fp
         from ...core.equip_parser.models import make_fingerprint
         return make_fingerprint(equip)
 

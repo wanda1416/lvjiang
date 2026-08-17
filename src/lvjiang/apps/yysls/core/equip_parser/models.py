@@ -106,10 +106,11 @@ class EquipmentData:
         from .constants import WEAPON_TYPES_SET
         return self.type if self.type in WEAPON_TYPES_SET else None
 
-    def to_dict(self) -> dict:
+    def to_dict(self, *, include_fp: bool = True, is_mock: bool = False) -> dict:
         """转换为标准装备领域模型 JSON dict
 
         affixes 列表展开为 affix_1 ~ affix_5 键。
+        默认自动计算并包含 _fp 指纹字段；is_mock=True 时指纹带 mock_ 前缀。
         """
         d: dict = {
             "type": self.type,
@@ -130,6 +131,8 @@ class EquipmentData:
             d["_warnings"] = self.warnings
         if self.extra_data:
             d["_extra"] = self.extra_data
+        if include_fp:
+            d["_fp"] = make_fingerprint(d, is_mock=is_mock)
         return d
 
     @classmethod
@@ -156,14 +159,14 @@ class EquipmentData:
         )
 
 
-def make_fingerprint(equip_data: dict) -> str:
+def make_fingerprint(equip_data: dict, *, is_mock: bool = False) -> str:
     """基于装备数据生成去重指纹（MD5 前 8 位 hex）
 
     详细规则参见 docs/30-architecture/31-models/01-equipment-models.md 第六章。
 
     拼接字符串 = type + level + quality + is_chengyin + affix_1~5(name:value)
     定音词条(dingyin)故意不包含在指纹中。
-    模拟装备使用 mock_ 前缀：_fp = f"mock_{make_fingerprint(equip_data)}"
+    is_mock=True 时自动添加 mock_ 前缀，确保模拟装备与真实装备指纹永不冲突。
     空数据或空字典返回空字符串。
     """
     if not isinstance(equip_data, dict) or not equip_data:
@@ -180,4 +183,5 @@ def make_fingerprint(equip_data: dict) -> str:
         if isinstance(affix, dict) and affix.get("name"):
             parts.append(f"{affix['name']}:{affix.get('value', '')}")
     raw = "+".join(parts)
-    return hashlib.md5(raw.encode()).hexdigest()[:8]
+    fp = hashlib.md5(raw.encode()).hexdigest()[:8]
+    return f"mock_{fp}" if is_mock else fp

@@ -260,20 +260,20 @@ class TestParseFullChain:
         assert equip.affixes[0].cap_pct == 100.0
         assert equip.affixes[1].cap_pct == 50.0
 
-    def test_type_recovered_from_base_attr_when_ocr_missing(self, parser):
-        # equip_type 类型段 OCR 丢失且名称无部位关键字（如"吴钩霜甲"）
-        # → base_attr 19445 唯一命中 chest 110 gold，反查回填 type=胸甲
+    def test_type_not_backfilled_from_base_attr(self, parser):
+        # equip_type 未识别到类型关键字 → type 为 None，不做反推
+        # 即使 base_attr 19445 唯一命中 chest 110 gold，也不回填 type
         equip = parser.parse({
             "equip_type": "吴钩霜甲",
             "equip_level": "110阶",
             "base_attr": "气血最大值 19445",
             "affix_gong": "劲 +76.8",
         })
-        assert equip.type == "胸甲"
+        assert equip.type is None
         assert equip.quality == "gold"
 
-    def test_type_not_recovered_when_ambiguous(self, parser):
-        # 冠/胫/腕数值相同（_follow），反查无法区分 → type 保持 None
+    def test_type_none_when_unrecognized(self, parser):
+        # equip_type 未识别到类型关键字 → type 为 None
         equip = parser.parse({
             "equip_type": "雁南飞",
             "equip_level": "110阶",

@@ -1,7 +1,6 @@
 #% name: 装备分析
 
 import "subcall/navigation.wf"
-import "subcall/equipment.wf"
 
 # 装备分析工作流
 #
@@ -27,8 +26,11 @@ for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
     click [bag_equip_detail].$slot after wait @step_interval
     scan [equip_weapon_detail] as $scan_result
     eval $equip = to_equipment($scan_result)
-    call fill_equipment_type($equip, $slot)
-    eval $equipped.$slot = $equip
+    if not $equip.type
+        log error "equip_type OCR 失败, slot=" + $slot
+    else
+        eval $equipped.$slot = $equip
+    end
 end
 
 # 防具类（equip_armor_detail）
@@ -36,8 +38,11 @@ for slot in ["head", "chest", "leg", "wrist"]
     click [bag_equip_detail].$slot after wait @step_interval
     scan [equip_armor_detail] as $scan_result
     eval $equip = to_equipment($scan_result)
-    call fill_equipment_type($equip, $slot)
-    eval $equipped.$slot = $equip
+    if not $equip.type
+        log error "equip_type OCR 失败, slot=" + $slot
+    else
+        eval $equipped.$slot = $equip
+    end
 end
 
 # 结束后一次性写入 session

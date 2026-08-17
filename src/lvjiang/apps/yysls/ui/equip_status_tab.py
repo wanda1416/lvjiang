@@ -329,7 +329,7 @@ class _SlotCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px; color: {color};")
 
-        level = equip_data.get("level", "?")
+        level = equip_data.get("level") or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
         tag = " [" + tr("承音") + "]" if is_chengyin else ""
         self.lbl_info.setText(f"Lv{level}{tag}")
@@ -557,7 +557,7 @@ class _CompactEquipCard(QFrame):
             bool(is_mock or equip_data.get("_extra", {}).get("is_mock", False)),
         )
 
-        level = equip_data.get("level", "?")
+        level = equip_data.get("level") or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
         tag = " [" + tr("承音") + "]" if is_chengyin else ""
         self.lbl_level.setText(f"Lv{level}{tag}")
@@ -929,7 +929,7 @@ class EquipStatusTab(QWidget):
         # 等级筛选
         level_threshold = self._get_level_threshold()
         if level_threshold > 0:
-            equip_level = equip.get("level", 0)
+            equip_level = equip.get("level") or 0
             if isinstance(equip_level, str):
                 try:
                     equip_level = int(equip_level)
@@ -1039,10 +1039,6 @@ class EquipStatusTab(QWidget):
         result = dialog.get_result()
         if not result:
             return
-        # 生成新 _fp
-        from ..core.equip_parser.models import make_fingerprint
-        new_fp = f"mock_{make_fingerprint(result)}"
-        result["_fp"] = new_fp
         try:
             from lvjiang.core.config import SessionManager
             mgr = SessionManager()
@@ -1420,10 +1416,8 @@ class EquipStatusTab(QWidget):
         new_type = result.get("type", "")
         new_group_key = get_game_config().get_type_to_group().get(new_type, group_key)
 
-        # 生成新 _fp
-        from ..core.equip_parser.models import make_fingerprint
-        new_fp = f"mock_{make_fingerprint(result)}"
-        result["_fp"] = new_fp
+        # _fp 已由 MockEquipDialog 自动计算（含 mock_ 前缀）
+        new_fp = result["_fp"]
 
         try:
             from lvjiang.core.config import SessionManager
@@ -1479,10 +1473,8 @@ class EquipStatusTab(QWidget):
         if not result:
             return
 
-        # 生成 _fp
-        from ..core.equip_parser.models import make_fingerprint
-        fp = f"mock_{make_fingerprint(result)}"
-        result["_fp"] = fp
+        # _fp 已由 MockEquipDialog 自动计算（含 mock_ 前缀）
+        fp = result["_fp"]
 
         # 确定分组
         # 确定分组 key（使用全局映射）

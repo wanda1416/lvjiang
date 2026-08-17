@@ -212,6 +212,58 @@ class _PanelMixin:
             self.variables[var_name] = text
         logger.info(f"scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
+    def _scan_panel_range(self, node: Scan):
+        """scan [scene].[panel][r1...r2][c1...c2] as $var [by ...] [where ...] — 面板范围 OCR
+
+        仅扫描指定行列范围，结果结构与整面板一致：$var.[行].[列]。
+        """
+        ref: PanelRef = node.scene
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        scene_key = self._resolve(ref.scene) if isinstance(ref.scene, VarRef) else ref.scene
+        panel_key = self._resolve(ref.panel) if isinstance(ref.panel, VarRef) else ref.panel
+
+        # 解析行范围
+        if isinstance(ref.row, tuple):
+            row_start = self._resolve_range_endpoint(ref.row[0])
+            row_end = self._resolve_range_endpoint(ref.row[1])
+        else:
+            r = int(self._resolve(ref.row)) if isinstance(ref.row, VarRef) else int(ref.row)
+            row_start = row_end = r
+
+        # 解析列范围
+        if isinstance(ref.col, tuple):
+            col_start = self._resolve_range_endpoint(ref.col[0])
+            col_end = self._resolve_range_endpoint(ref.col[1])
+        else:
+            c = int(self._resolve(ref.col)) if isinstance(ref.col, VarRef) else int(ref.col)
+            col_start = col_end = c
+
+        panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
+        if panel_img is None:
+            self.variables[var_name] = {}
+            return
+
+        min_conf = self._resolve_min_confidence(node.where)
+        result: dict[str, dict[str, str]] = {}
+        for r_1based in range(row_start, row_end + 1):
+            for c_1based in range(col_start, col_end + 1):
+                r_idx, c_idx = r_1based - 1, c_1based - 1
+                if not (0 <= r_idx < cal.n_rows and 0 <= c_idx < cal.n_cols):
+                    result.setdefault(str(r_1based), {})[str(c_1based)] = ""
+                    continue
+                slot_img = cal.crop_slot(panel_img, r_idx, c_idx)
+                if slot_img is None:
+                    result.setdefault(str(r_1based), {})[str(c_1based)] = ""
+                    continue
+                ocr_results = self._ocr.recognize(slot_img)
+                if min_conf is not None:
+                    ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
+                text = " ".join(t.text for t in ocr_results).strip()
+                result.setdefault(str(r_1based), {})[str(c_1based)] = text
+
+        self.variables[var_name] = result
+        logger.info(f"scan panel range [{scene_key}.{panel_key}][{row_start}...{row_end}][{col_start}...{col_end}] => {result}")
+
     def _recognize_panel_cell(self, node: Recognize):
         """recognize [scene].[panel][row][col] as [rich] $var [by ...] [on group ...] [where ...]
 
@@ -244,7 +296,7 @@ class _PanelMixin:
             elif not info.type:
                 self.variables[var_name] = {}
             else:
-                base = recognizer.build_rich_base(info, group=group)
+                base = recognizer.build_rich_base(info)
                 if node.with_func is not None:
                     from .. import builtins
                     func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
@@ -345,7 +397,7 @@ class _PanelMixin:
                     cell_value = {} if rich else ""
                 elif rich:
                     if info.type:
-                        base = recognizer.build_rich_base(info, group=group)
+                        base = recognizer.build_rich_base(info)
                         cell_value = transform(base) if transform is not None else base
                     else:
                         cell_value = {}
@@ -354,6 +406,95 @@ class _PanelMixin:
             result.setdefault(str(r + 1), {})[str(c + 1)] = cell_value
         self.variables[var_name] = result
         logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
+
+    def _resolve_range_endpoint(self, val) -> int:
+        """解析范围端点：int 直接返回，VarRef 查变量表"""
+        if isinstance(val, VarRef):
+            return int(self._resolve(val))
+        return int(val)
+
+    def _recognize_panel_range(self, node: Recognize):
+        """recognize [scene].[panel][r1...r2][c1...c2] as [rich] $var — 面板范围识别
+
+        row/col 支持范围索引，仅识别指定行列子集。
+        结果结构与整面板一致：$var.[行].[列] 取材料类型或富 dict。
+        """
+        ref: PanelRef = node.scene
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        scene_key = self._resolve(ref.scene) if isinstance(ref.scene, VarRef) else ref.scene
+        panel_key = self._resolve(ref.panel) if isinstance(ref.panel, VarRef) else ref.panel
+
+        # 解析行范围
+        if isinstance(ref.row, tuple):
+            row_start = self._resolve_range_endpoint(ref.row[0])
+            row_end = self._resolve_range_endpoint(ref.row[1])
+        else:
+            r = int(self._resolve(ref.row)) if isinstance(ref.row, VarRef) else int(ref.row)
+            row_start = row_end = r
+
+        # 解析列范围
+        if isinstance(ref.col, tuple):
+            col_start = self._resolve_range_endpoint(ref.col[0])
+            col_end = self._resolve_range_endpoint(ref.col[1])
+        else:
+            c = int(self._resolve(ref.col)) if isinstance(ref.col, VarRef) else int(ref.col)
+            col_start = col_end = c
+
+        panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
+        if panel_img is None:
+            self.variables[var_name] = {}
+            return
+
+        recognizer = self._ensure_workflow().material_recognizer
+        transform = None
+        if node.rich and node.with_func is not None:
+            from .. import builtins
+            func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
+            transform = builtins.get_function(func_name)
+            if transform is None:
+                raise ValueError(f"未知内置函数: {func_name}")
+
+        group = self._resolve(node.group) if node.group is not None else None
+        min_conf = self._resolve_min_confidence(node.where)
+        ph, pw = panel_img.shape[:2]
+
+        result: dict[str, dict[str, str | dict]] = {}
+        for r_1based in range(row_start, row_end + 1):
+            for c_1based in range(col_start, col_end + 1):
+                r_idx, c_idx = r_1based - 1, c_1based - 1
+                if not (0 <= r_idx < cal.n_rows and 0 <= c_idx < cal.n_cols):
+                    continue
+                x1_r, y1_r, x2_r, y2_r = cal.slot_bounds(r_idx, c_idx)
+                x1 = max(0, int(x1_r * pw))
+                y1 = max(0, int(y1_r * ph))
+                x2 = min(pw, int(x2_r * pw))
+                y2 = min(ph, int(y2_r * ph))
+                slot_img = panel_img[y1:y2, x1:x2]
+                if slot_img.size == 0:
+                    continue
+                slot_img = slot_img if slot_img.size else None
+
+                if slot_img is None:
+                    cell_value: str | dict = {} if node.rich else ""
+                else:
+                    info = recognizer.recognize(slot_img, group=group)
+                    if min_conf is not None and info.confidence < min_conf:
+                        cell_value = {} if node.rich else ""
+                    elif node.rich:
+                        if info.type:
+                            base = recognizer.build_rich_base(info)
+                            cell_value = transform(base) if transform is not None else base
+                        else:
+                            cell_value = {}
+                    else:
+                        cell_value = info.type
+                result.setdefault(str(r_1based), {})[str(c_1based)] = cell_value
+
+        self.variables[var_name] = result
+        logger.info(
+            f"recognize panel range [{scene_key}.{panel_key}]"
+            f"[{row_start}...{row_end}][{col_start}...{col_end}] => {result}"
+        )
 
     def _scan_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
         """scan [scene].[panel] as $var by ... [where ...] — 整面板 OCR + by 短路匹配

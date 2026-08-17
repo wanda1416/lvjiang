@@ -328,6 +328,52 @@ class _StmtMixin:
         """
         return items[0]  # var_ref 已返回 VarRef
 
+    # ─── recognize 专用 panel 索引（额外支持范围 [start...end]）─────
+
+    def recognize_panel_index_int(self, items):
+        """recognize panel 数字索引：[2] → int"""
+        return int(str(items[0]))
+
+    def recognize_panel_index_var(self, items):
+        """recognize panel 变量索引：[$var] → VarRef"""
+        return items[0]
+
+    def recognize_panel_index_range(self, items):
+        """recognize panel 范围索引：[1...3] → tuple(start, end)
+
+        items 包含 [recognize_range_endpoint, RANGE_OP, recognize_range_endpoint]，
+        RANGE_OP 是命名终端会传入，取 items[0] 和 items[2]。
+        """
+        return (items[0], items[2])
+
+    def recognize_range_endpoint(self, items):
+        """范围端点：INT → int | var_ref → VarRef"""
+        val = items[0]
+        if isinstance(val, VarRef):
+            return val
+        return int(str(val))
+
+    # ─── scan 专用 panel 索引（额外支持范围 [start...end]）───────
+
+    def scan_panel_index_int(self, items):
+        """scan panel 数字索引：[2] → int"""
+        return int(str(items[0]))
+
+    def scan_panel_index_var(self, items):
+        """scan panel 变量索引：[$var] → VarRef"""
+        return items[0]
+
+    def scan_panel_index_range(self, items):
+        """scan panel 范围索引：[1...3] → tuple(start, end)"""
+        return (items[0], items[2])
+
+    def scan_range_endpoint(self, items):
+        """范围端点：INT → int | var_ref → VarRef"""
+        val = items[0]
+        if isinstance(val, VarRef):
+            return val
+        return int(str(val))
+
     def wait_stmt(self, items):
         arg = items[0]
         return self._build_wait_node(arg, items)
@@ -537,8 +583,8 @@ class _StmtMixin:
         for item in non_token[2:]:
             if isinstance(item, ByClause):
                 by_clause = item
-            elif isinstance(item, (Literal, VarRef)):
-                group_clause = item  # group 子句返回的是 Literal 或 VarRef
+            elif isinstance(item, (Literal, VarRef, list)):
+                group_clause = item  # group 子句：Literal | VarRef | list
             elif isinstance(item, WhereClause):
                 where_clause = item
             elif isinstance(item, tuple) and item[0] == "__with_func__":
@@ -563,8 +609,8 @@ class _StmtMixin:
         for item in non_token[5:]:
             if isinstance(item, ByClause):
                 by_clause = item
-            elif isinstance(item, (Literal, VarRef)):
-                group_clause = item
+            elif isinstance(item, (Literal, VarRef, list)):
+                group_clause = item  # group 子句：Literal | VarRef | list
             elif isinstance(item, WhereClause):
                 where_clause = item
             elif isinstance(item, tuple) and item[0] == "__with_func__":

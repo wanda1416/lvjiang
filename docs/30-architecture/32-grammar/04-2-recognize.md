@@ -4,37 +4,42 @@
 
 > 概览与对比表见 [04-data-flow.md](04-data-flow.md)。
 
-## 完整语法
+## 语法定义
 
 ```
-# ── Region 模式（一个或多个区域） ──
-recognize [scene] as $var                           # 识别场景所有 slot
-recognize [scene].[s1, s2] as $var                  # 仅识别指定 slot
-recognize [scene].$area_key as $var                 # 动态 slot（变量指定 key）
+recognize <target> as [rich] $var [<clause>...]
 
-# ── Panel 模式（网格逐格识别） ──
-recognize [scene].[panel] as $var                   # 整面板逐格识别
-recognize [scene].[panel][row][col] as $var         # 单格识别
+─── 目标 <target> ───────────────────────────────────
+  [scene]                          场景全部 slot
+  [scene].[f1, f2]                 指定 slot
+  [scene].$var                     动态 slot
+  [scene].[panel]                  整面板逐格
+  [scene].[panel][row][col]        单格识别
+  [scene].[panel][r1...r2][c1...c2]  范围识别（仅扫描指定行列子集）
 
-# ── 带 by 子句（短路匹配） ──
-recognize [scene].[s1, s2] as $var by equals "材料名"
-recognize [scene].[s1, s2] as $var by contains "材料名"
-recognize [scene].[s1, s2] as $var by equals_any $list
-recognize [scene].[s1, s2] as $var by contains_any $list
+─── 可选子句 <clause>（顺序无关，均可省略）─────────────
+  by <mode> <target>               短路匹配，降级返回 str / 位置
+  on group <groups>                限定匹配分组范围
+  where confidence >= <threshold>  置信度过滤
+  with <func_name>                 指定 rich 转换函数（须配合 as rich）
 
-# ── 带 as rich（富返回值） ──
-recognize [scene].[s1, s2] as rich $var             # 返回富 dict
-recognize [scene].[s1, s2] as rich $var with yysls_rich_parse   # 指定转换函数
+─── by 子句 ──────────────────────────────────────────
+  by equals "材料名"               精确匹配
+  by contains "材料名"             子串匹配
+  by equals_any $list              列表任一精确匹配
+  by contains_any $list            列表任一子串匹配
 
-# ── 带 where 子句（置信度过滤） ──
-recognize [scene].[s1, s2] as $var where confidence >= 0.85
+─── on group 子句 ────────────────────────────────────
+  on group "分组名"                单分组
+  on group ["分组A", "分组B"]      列表常量（可内联多分组）
+  on group $var                    变量引用（str 或 list[str]）
 
-# ── 带 on group 子句（限定分组范围） ──
-recognize [scene].[s1, s2] as $var on group "分组名"
-recognize [scene].[s1, s2] as $var by equals $name on group "分组名"
+─── where 子句 ───────────────────────────────────────
+  where confidence >= 0.85         数字常量
+  where confidence >= $var         变量引用
 
-# ── 组合使用 ──
-recognize [scene].[s1, s2] as rich $var with yysls_rich_parse where confidence >= 0.8 on group "调律材料"
+─── with 子句 ────────────────────────────────────────
+  with yysls_rich_parse            内置 dict→dict 转换函数名
 ```
 
 ## 参数说明
@@ -111,6 +116,20 @@ recognize [bag_item_detail].[bag_grid][1][2] as $item
 
 recognize [bag_item_detail].[bag_grid][1][2] as rich $item
 # $item = {"label": "金狗粮", "group": "食物", "confidence": 0.95, ...}
+```
+
+### Panel 范围
+
+`[r1...r2][c1...c2]` 仅扫描指定行列子集，结果结构与整面板一致。
+范围端点支持数字常量和变量引用。
+
+```
+# 只扫描第 1~2 行、第 1~6 列
+recognize [bag_item_detail].[bag_grid][1...2][1...6] as rich $result \
+        on group ["普通道具", "增益道具"] \
+        where confidence >= 0.65 \
+        with yysls_rich_parse
+# $result = {"1": {"1": {...}, "2": {...}, ...}, "2": {...}}
 ```
 
 ## as rich — 富返回值
@@ -227,22 +246,26 @@ recognize [scene].[s1, s2] as $key by equals "玄铁" where confidence >= 0.8
 
 ## on group 子句
 
-`on group` 限定材料识别的匹配范围，仅在指定分组的参考材料中匹配。
+`on group` 限定材料识别的匹配范围，仅在指定分组的参考材料中匹配。支持三种形式：
 
-```
-on group "<分组名>"
-on group $var          # 变量引用
-```
+| 形式 | 说明 |
+|------|------|
+| `"分组名"` | 单分组（字符串常量） |
+| `["A", "B"]` | 多分组（列表常量，直接内联） |
+| `$var` | 变量引用（str 或 list[str]） |
 
 **示例**：
 
 ```
-# 只在"调律材料"分组中匹配
+# 单分组
 recognize [equip_tune_detail].[material_1, material_2] as $slot by equals "玄铁" on group "调律材料"
 
-# 动态分组
-eval $group_name = "食物"
-recognize [bag_item_detail].[bag_grid] as $pos by equals "金狗粮" on group $group_name
+# 列表常量直接内联多分组
+recognize [bag_item_detail].[bag_grid][1...2][1...6] as rich $result on group ["普通道具", "增益道具"]
+
+# 变量引用（动态分组）
+eval $groups = ["律准石", "转律石"]
+recognize [equip_tune_detail].[material_1, material_2] as $slot by equals "玄铁" on group $groups
 ```
 
 ## 与 click 的配合

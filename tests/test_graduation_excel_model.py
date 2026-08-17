@@ -73,9 +73,11 @@ def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
         for spec in model["program"]["inputs"]
     ]
     actual = ProgramRuntime(model["program"], values).outputs()
-    actual["graduation_rate"] = (
-        actual["dps"] / model["graduation_baseline_dps"]
+    # 从 reference 自行计算 Excel 原始基准，不依赖可能被用户覆盖的 graduation_baseline_dps
+    expected_baseline = (
+        model["reference"]["dps"] / model["reference"]["graduation_rate"]
     )
+    actual["graduation_rate"] = actual["dps"] / expected_baseline
     for name, expected in model["reference"].items():
         assert actual[name] == pytest.approx(expected, rel=1e-10, abs=1e-6)
     assert f"{actual['graduation_rate'] * 100:.2f}%" == "100.00%"
@@ -102,10 +104,15 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
     tmp_path, monkeypatch,
 ) -> None:
     import lvjiang.apps.yysls.core.graduation as graduation
+    import lvjiang.apps.yysls.config.graduation_session as graduation_session
 
     source = DATA_DIR / "鸣金·虹_基础方案.json"
     shutil.copy(source, tmp_path / source.name)
     monkeypatch.setattr(graduation, "_DATA_DIR", tmp_path)
+    # 将 session 写入隔离的临时文件，不污染真实 session
+    monkeypatch.setattr(
+        graduation_session, "_SESSION_PATH", tmp_path / "session.json",
+    )
     invalidate_graduation_cache()
     try:
         attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")

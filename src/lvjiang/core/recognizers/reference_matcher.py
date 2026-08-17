@@ -158,13 +158,13 @@ class ReferenceMatcher:
     def match(
         self,
         query: np.ndarray,
-        group: str | None = None,
+        group: str | list[str] | None = None,
     ) -> MatchResult:
         """匹配查询图像到参考图库
 
         Args:
             query: 查询图像（BGR numpy 数组）
-            group: 限定匹配范围到指定分组，None 表示匹配所有
+            group: 限定匹配范围，支持单分组名、分组名列表或 None（匹配所有）
 
         Returns:
             MatchResult
@@ -191,9 +191,10 @@ class ReferenceMatcher:
         # 过滤候选
         candidates = self._features
         if group:
-            candidates = [f for f in self._features if f[0].group == group]
+            groups = {group} if isinstance(group, str) else set(group)
+            candidates = [f for f in self._features if f[0].group in groups]
             if not candidates:
-                logger.warning(f"分组 '{group}' 中无参考图")
+                logger.warning(f"分组 {groups} 中无参考图")
                 return MatchResult(entry=None, label="", confidence=0.0, meta={})
 
         best_entry = None
@@ -237,14 +238,14 @@ class ReferenceMatcher:
         self,
         query: np.ndarray,
         n: int = 5,
-        group: str | None = None,
+        group: str | list[str] | None = None,
     ) -> list[MatchResult]:
         """匹配查询图像，返回置信度最高的 N 个结果
 
         Args:
             query: 查询图像（BGR numpy 数组）
             n: 返回结果数量
-            group: 限定匹配范围到指定分组
+            group: 限定匹配范围，支持单分组名、分组名列表或 None（匹配所有）
 
         Returns:
             按置信度降序排列的 MatchResult 列表
@@ -271,7 +272,8 @@ class ReferenceMatcher:
         # 过滤候选
         candidates = self._features
         if group:
-            candidates = [f for f in self._features if f[0].group == group]
+            groups = {group} if isinstance(group, str) else set(group)
+            candidates = [f for f in self._features if f[0].group in groups]
             if not candidates:
                 return []
 

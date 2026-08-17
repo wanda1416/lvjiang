@@ -81,9 +81,13 @@ class _DataOpsMixin:
         return key
 
     def _exec_scan(self, node: Scan):
-        # PanelRef: panel cell 级 OCR
+        # PanelRef: panel cell 级 OCR（单格或范围）
         if isinstance(node.scene, PanelRef):
-            self._scan_panel_cell(node)
+            ref = node.scene
+            if isinstance(ref.row, tuple) or isinstance(ref.col, tuple):
+                self._scan_panel_range(node)
+            else:
+                self._scan_panel_cell(node)
             return
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, EntityRef) else node.scene
@@ -137,9 +141,13 @@ class _DataOpsMixin:
                 f"'with' 子句必须与 'as rich' 搭配使用，"
                 f"请改为 'as rich ${var_desc} with ...'"
             )
-        # PanelRef: panel cell 级材料识别
+        # PanelRef: panel cell 级材料识别（单格或范围）
         if isinstance(node.scene, PanelRef):
-            self._recognize_panel_cell(node)
+            ref = node.scene
+            if isinstance(ref.row, tuple) or isinstance(ref.col, tuple):
+                self._recognize_panel_range(node)
+            else:
+                self._recognize_panel_cell(node)
             return
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, EntityRef) else node.scene

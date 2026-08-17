@@ -523,6 +523,10 @@ class MockEquipDialog(QDialog):
         # _extra
         result["_extra"] = {"is_mock": True, "affix_count": sum(1 for i in range(1, 6) if f"affix_{i}" in result)}
 
+        # _fp：模拟装备指纹自动添加 mock_ 前缀
+        from ..core.equip_parser.models import make_fingerprint
+        result["_fp"] = make_fingerprint(result, is_mock=True)
+
         return result
 
     def _get_value_mode(self) -> str:

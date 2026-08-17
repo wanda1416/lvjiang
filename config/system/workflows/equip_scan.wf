@@ -35,7 +35,6 @@
 default $min_level = 110
 
 import "subcall/navigation.wf"
-import "subcall/equipment.wf"
 
 call nav_main_to_equip()
 if not session.bag_items
@@ -100,12 +99,11 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                 scan [equip_armor_detail] as $raw
             end
             eval $equip = to_equipment($raw)
-            # OCR 完全失败（type 和 name 均为空）→ 锚点为空，当前槽位结束
-            if not $equip.type and not $equip.name
-                log "  [" + $r + ",1] OCR 无效，槽位结束"
+            # type 为空 → equip_type OCR 失败，当前槽位结束
+            if not $equip.type
+                log error "  [" + $r + ",1] equip_type OCR 失败，槽位结束"
                 break
             end
-            call fill_equipment_type($equip, $group)
             eval $fp = make_fingerprint($equip)
             eval $signal = bag_cursor_visit($fp)
             log "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
@@ -133,12 +131,11 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                         scan [equip_armor_detail] as $raw
                     end
                     eval $equip = to_equipment($raw)
-                    # OCR 完全失败 → 视为空白格，结束本行（继续下一行）
-                    if not $equip.type and not $equip.name
-                        log "    [" + $r + "," + $c + "] OCR 无效，结束本行"
+                    # type 为空 → equip_type OCR 失败，结束本行
+                    if not $equip.type
+                        log error "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
                         break
                     end
-                    call fill_equipment_type($equip, $group)
                     eval $fp = make_fingerprint($equip)
                     log "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
 

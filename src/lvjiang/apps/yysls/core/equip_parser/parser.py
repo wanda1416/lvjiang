@@ -33,6 +33,10 @@ class EquipmentParser:
         from ...config import get_game_config
         self._attr_config = get_game_config()
         self._dingyin_parser = DingyinParser()
+        # 合法基础属性名（按长度降序，确保贪婪匹配最长前缀）
+        self._base_attr_names = sorted(
+            self._attr_config.base_attr_names, key=len, reverse=True
+        )
 
     def parse(self, raw: dict) -> EquipmentData:
         """解析单件装备的 OCR 原始数据
@@ -61,7 +65,7 @@ class EquipmentParser:
 
         # base_attr：统一解析，不依赖 category
         equip.base_attr = self._parse_base_attr(raw.get("base_attr", ""))
-        equip.base_attr_2 = self._parse_base_attr(raw.get("base_attr_2", ""))
+        equip.base_attr_2 = self._parse_base_attr(raw.get("base_attr_2", ""), is_base_attr_2=True)
 
         # 品阶推断：type + level + base_attr value → quality
         equip.quality = self._infer_quality(equip, category)
@@ -88,12 +92,13 @@ class EquipmentParser:
         return equip
 
     def _infer_quality(self, equip: EquipmentData, category: str) -> str | None:
-        """根据 base_attr 推断品阶；等级/类型缺失时由数值反查回填
+        """根据 base_attr 推断品阶；等级缺失时由数值反查回填
 
         基础属性值全局唯一，故即便 OCR 漏识别 equip_level，
-        也能仅凭 base_attr 值反查出等级与品阶，并回填 equip.level；
-        类型缺失（OCR 漏读/错字）时同样按数值反查回填 equip.type
-        （仅数值唯一对应部位时回填；冠/胫/腕同值无法区分）。
+        也能仅凭 base_attr 值反查出等级与品阶，并回填 equip.level。
+
+        type 必须由 equip_type OCR 文本解析得到，不做反推。
+        解析失败则 type 为 None，由开发者排查。
 
         区间属性（武器）value 为 [min, max]，需与配置区间两端精确匹配；
         点值属性（首饰/防具）value 为标量。两者均直接透传。
@@ -114,14 +119,6 @@ class EquipmentParser:
                 equip.level = level
                 logger.info(
                     f"equip_level OCR 缺失，由基础属性值 {value} 反查得等级 {level}")
-
-        # 类型缺失：数值反查回填部位（避免下游判定拿到 部位 None）
-        if equip.type is None and quality:
-            inferred = self._attr_config.infer_type_by_value(value)
-            if inferred:
-                equip.type = inferred
-                logger.info(
-                    f"equip_type OCR 缺失，由基础属性值 {value} 反查回填部位 {inferred}")
         return quality
 
     # ─── equip_type 解析 ──────────────────────────────────
@@ -231,43 +228,59 @@ class EquipmentParser:
 
     # ─── base_attr 解析 ────────────────────────────────────
 
-    def _parse_base_attr(self, raw: str) -> EquipAttr | None:
-        """统一解析 base_attr，尝试所有可能的格式
+    def _parse_base_attr(self, raw: str, *, is_base_attr_2: bool = False) -> EquipAttr | None:
+        """统一解析 base_attr：匹配已知属性名 → 提取数值
 
-        支持格式：
-          - 范围格式："外功攻击 87~203" → EquipAttr("外功攻击", [87, 203])
-          - 单值格式："气血最大值 8750" → EquipAttr("气血最大值", 8750)
-          - 脏数据："外功攻击 老著 52~121" → EquipAttr("外功攻击", [52, 121])
+        策略：
+          1. 遍历配置中的合法属性名（长度降序），命中即提取数值
+          2. 均未命中 → 回退裁剪提取（不丢数据，但非权威）
+
+        base_attr_2 固定为「外功防御」（仅防具有），不参与品阶推断，
+        直接写死匹配。
+
+        支持数值格式：
+          - 范围："87~203" → [87, 203]
+          - 单值："8750" → 8750
+          - 脏数据间隔："老著 52~121" → [52, 121]
         """
         raw = raw.strip()
         if not raw:
             return None
 
-        # 尝试范围格式（名称 + 数字~数字）
-        # 名称：所有非数字字符（贪婪匹配，直到遇到数字）
-        range_match = re.match(r"^([^\d]+)\s*(\d+)\s*~\s*(\d+)", raw)
-        if range_match:
-            name = range_match.group(1).strip()
-            low = int(range_match.group(2))
-            high = int(range_match.group(3))
-            return EquipAttr(name=name, value=[low, high])
-
-        # 尝试单值格式（名称 + 单个数字）
-        # 已知属性名前缀
-        for attr_name in [tr("气血最大值"), tr("外功防御"), tr("最大外功攻击"), tr("最小外功攻击")]:
-            if raw.startswith(attr_name):
-                remainder = raw[len(attr_name):]
-                nums = re.findall(r"\d+", remainder)
-                if nums:
-                    return EquipAttr(name=attr_name, value=int(nums[-1]))
+        # ── base_attr_2：固定「外功防御」 ──
+        if is_base_attr_2:
+            attr_name = tr("外功防御")
+            if not raw.startswith(attr_name):
+                logger.warning(f"base_attr_2 未匹配「{attr_name}」: {raw!r}")
                 return None
+            remainder = raw[len(attr_name):]
+            nums = re.findall(r"\d+", remainder)
+            if not nums:
+                return None
+            return EquipAttr(name=attr_name, value=int(nums[-1]))
 
-        # 无法匹配，尝试提取末尾数字作为单值
+        # ── 1. 已知属性名正向匹配 ──
+        for attr_name in self._base_attr_names:
+            if not raw.startswith(attr_name):
+                continue
+            remainder = raw[len(attr_name):]
+            nums = re.findall(r"\d+", remainder)
+            if not nums:
+                return None
+            if len(nums) >= 2 and "~" in remainder:
+                # 范围格式：取前两个数字
+                return EquipAttr(name=attr_name, value=[int(nums[0]), int(nums[1])])
+            # 单值格式：取最后一个数字
+            return EquipAttr(name=attr_name, value=int(nums[-1]))
+
+        # ── 2. 回退：未知属性名，裁剪提取 ──
         nums = re.findall(r"\d+", raw)
         if nums:
-            # 尝试提取名称（去掉数字和常见噪声字符）
-            name_match = re.match(r"^([^\d]+)", raw)
+            name_match = re.match(r"^([^\d|]+?)\s*\|?\s*(?=\d)", raw)
             name = name_match.group(1).strip() if name_match else tr("未知")
+            logger.warning(f"base_attr 未匹配已知属性名，回退裁剪: {raw!r} → name={name!r}")
+            if len(nums) >= 2 and "~" in raw:
+                return EquipAttr(name=name, value=[int(nums[0]), int(nums[1])])
             return EquipAttr(name=name, value=int(nums[-1]))
 
         logger.warning(f"base_attr 无法解析: {raw!r}")

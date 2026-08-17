@@ -42,7 +42,7 @@ def _yysls_rich_parse(base: dict) -> dict:
 def _to_equipment(raw_data: dict) -> dict:
     """解析装备 OCR 原始数据为标准装备字典
 
-    返回 EquipmentData.to_dict() 结果，并自动计算 _fp 指纹字段，
+    返回 EquipmentData.to_dict() 结果（已自动包含 _fp 指纹），
     支持 DSL 链式字段访问：$weapon.affix_1.value / $weapon._fp 等。
 
     .wf 用法:
@@ -56,13 +56,10 @@ def _to_equipment(raw_data: dict) -> dict:
         return {}
 
     from ...core.equip_parser import get_equipment_parser
-    from ...core.equip_parser.models import make_fingerprint
     parser = get_equipment_parser()
 
     try:
-        result = parser.parse(raw_data).to_dict()
-        result["_fp"] = make_fingerprint(result)
-        return result
+        return parser.parse(raw_data).to_dict()
     except Exception as e:
         logger.warning(f"to_equipment: 解析失败: {e}")
         return {}

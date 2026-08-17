@@ -248,6 +248,14 @@ OCR 识别输出为原始文本，需经过清洗才能转换为上述结构化�
 
 每件装备在存储时携带一个 `_fp` 字段作为去重标识，用于背包管理、装备/卸载、模拟装备等场景。
 
+**`_fp` 是 dict 内部的权威字段**，外部 dict key 只是索引别名。存储结构：
+
+```json
+"bag_items": { "weapon": { "015850f8": { ..., "_fp": "015850f8" } } }
+```
+
+其中 `"015850f8"` 是索引 key，`"_fp": "015850f8"` 是 dict 内部的权威值。
+
 ### 6.1 计算规则
 
 ```
@@ -273,15 +281,27 @@ _fp = MD5(拼接字符串)[:8]   # 取前 8 位十六进制字符
 | `dingyin` | ✗ | **定音词条故意不包含** |
 | `base_attr` | ✗ | 基础属性不参与 |
 | `_extra` | ✗ | 扩展标记不参与 |
+| `_fp` | ✗ | 指纹自身不参与计算 |
 
 **定音词条不参与指纹的原因**：装备可能切换定音，五个词条数值完全相同的概率极低，包含定音会导致同一件装备换定音后被误判为不同装备。
 
-### 6.3 模拟装备约定
+### 6.3 自动产出与模拟装备
 
-模拟装备的 `_fp` 使用 `mock_` 前缀：
+`EquipmentData.to_dict()` 默认自动计算并包含 `_fp`：
 
 ```python
-_fp = f"mock_{make_fingerprint(equip_data)}"
+# 真实装备
+equip_dict = equipment_data.to_dict()          # _fp = "015850f8"
+
+# 模拟装备
+equip_dict = equipment_data.to_dict(is_mock=True)  # _fp = "mock_015850f8"
+```
+
+`make_fingerprint()` 同样支持 `is_mock` 参数：
+
+```python
+make_fingerprint(equip_dict)                    # "015850f8"
+make_fingerprint(equip_dict, is_mock=True)      # "mock_015850f8"
 ```
 
 这确保模拟装备指纹与真实装备指纹永不冲突。**每次编辑模拟装备的词条/数值后必须重新生成指纹。**
@@ -290,7 +310,7 @@ _fp = f"mock_{make_fingerprint(equip_data)}"
 
 | 类别 | JSON 节点 | 说明 |
 |------|-----------|------|
-| 真实装备 | `bag_items` | 按部位分组，以 `_fp` 为 key |
-| 模拟装备 | `mock_items` | 结构同上，以 `mock_` 前缀 `_fp` 为 key |
+| 真实装备 | `bag_items` | 按部位分组，以 `_fp` 为索引 key |
+| 模拟装备 | `mock_items` | 结构同上，索引 key 带 `mock_` 前缀 |
 
 两者结构相同（`{ group_key: { _fp: equip_data } }`），但在扫描工具 (wf) 扫描时必须分离，因此分开存储。UI 展示时将两者合并，模拟装备卡片带「模拟」标签。

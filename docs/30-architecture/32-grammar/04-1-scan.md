@@ -4,46 +4,40 @@
 
 > 概览与对比表见 [04-data-flow.md](04-data-flow.md)。
 
-## 完整语法
+## 语法定义
 
 ```
-# ── Region 模式（一个或多个区域） ──
-scan [scene] as $var                              # 扫描场景所有 region
-scan [scene].[r1, r2, ...] as $var                # 仅扫描指定 region
-scan [scene].$area_key as $var                    # 动态 region（变量指定 key）
+scan_stmt : "scan" scene_target "as" var_ref [by_clause] [where_clause]
+          | "scan" scene "." panel scan_panel_index scan_panel_index "as" var_ref [by_clause] [where_clause]
 
-# ── Panel 模式（网格逐格识别） ──
-scan [scene].[panel] as $var                      # 整面板逐格 OCR
-scan [scene].[panel][row][col] as $var            # 单格 OCR
+scene_target  : "[" scene_key "]" [ "." field_list ]        # Region 模式
+              | "[" scene_key "]." "$" var                   # 动态 region
+field_list    : key_list | "$" var                           # 区域列表或动态变量
 
-# ── 带 by 子句（短路匹配） ──
-scan [scene].[r1, r2] as $var by equals "文本"
-scan [scene].[r1, r2] as $var by contains "文本"
-scan [scene].[r1, r2] as $var by equals_any $list
-scan [scene].[r1, r2] as $var by contains_any $list
-
-# ── 带 where 子句（置信度过滤） ──
-scan [scene].[r1, r2] as $var where confidence >= 0.8
-scan [scene].[r1, r2] as $var by contains "文本" where confidence >= 0.7
+scan_panel_index : "[" INT "]"                                # 单格索引
+                 | "[" "$" var "]"                            # 变量索引
+                 | "[" endpoint "..." endpoint "]"              # 范围索引（仅 scan）
+endpoint      : INT | "$" var
 ```
 
-## 参数说明
+## 目标形式
 
-| 参数 | 支持形式 | 说明 |
-|------|---------|------|
-| scene | `[key]` / `$var` | 场景名，必须在当前布局中绑定坐标 |
-| region | `[key]` / `$var` | 区域名，必须在当前布局中绑定坐标 |
-| panel | `[key]` | 面板名，引擎自动按对齐结果逐格识别 |
-| `$var` | `$name` | 目标变量名，结果写入此变量 |
+| 形式 | 示例 | 说明 |
+|------|------|------|
+| 整面板 | `scan [scene].[panel] as $var` | 扫描面板所有格 |
+| 范围 | `scan [scene].[panel][1...2][1...6] as $var` | 仅扫描指定行列子集 |
+| 单格 | `scan [scene].[panel][1][2] as $var` | 扫描单格 |
+| Region | `scan [scene].[r1, r2] as $var` | 扫描指定区域 |
+| 动态 Region | `scan [scene].$var as $var` | 变量指定区域 key |
 
-> scene 和 region 支持 `[key]`（配置引用）和 `$var`（变量引用）两种形式。`"text"` 始终表示字符串数据，不用于配置引用。
+> scene/panel 支持 `[key]` 和 `$var` 两种形式；row/col 支持 INT、`$var`、`[start...end]` 三种形式。
 
 ## 返回值格式
 
 ### Region 模式
 
 | 修饰符 | `$var` 类型 | 内容 | 未命中时 |
-|--------|------------|------|---------|
+|--------|------------|------|--------|
 | 无 | `dict` | `{region_key: ocr_text}` | 空 dict `{}` |
 | `by ...` | `str` | 首个命中的 region_key | 空字符串 `""` |
 
@@ -53,8 +47,6 @@ scan [scene].[r1, r2] as $var by contains "文本" where confidence >= 0.7
 scan [equip_weapon_detail] as $result
 # $result = {"affix_1": "攻击+10", "affix_2": "防御+5", ...}
 # 取值：$result.affix_1
-# 点击：click [equip_weapon_detail].$result    ← 不行！$result 是 dict
-#        正确做法：先 by 匹配拿到 key，再 click [scene].$key
 ```
 
 **有 by（短路匹配）**：
@@ -68,7 +60,7 @@ scan [equip_weapon_detail].[sub_func_1, sub_func_2, sub_func_3] as $key by conta
 ### Panel 模式
 
 | 修饰符 | `$var` 类型 | 内容 | 未命中时 |
-|--------|------------|------|---------|
+|--------|------------|------|--------|
 | 无 | `dict` | `{行号: {列号: ocr_text}}` | 空 dict `{}` |
 | `by ...` | `dict` | `{"row": 行号, "col": 列号}` | 空 dict `{}` |
 
@@ -98,6 +90,17 @@ scan [general_action].[actions] as $pos by contains "背包"
 scan [scene].[panel][1][2] as $cell
 # $cell = "抱拳"（该格的 OCR 文本）
 ```
+
+### Panel 范围
+
+```
+scan [scene].[panel][1...2][1...6] as $result
+# $result = {"1": {"1": "文本", "2": "文本", ..., "6": "文本"},
+#            "2": {"1": "文本", "2": "文本", ..., "6": "文本"}}
+# 仅扫描第 1~2 行、第 1~6 列，结果结构与整面板一致
+```
+
+> 范围索引仅 `scan` 和 `recognize` 支持，`click`/`drag` 不支持。
 
 ## by 子句
 

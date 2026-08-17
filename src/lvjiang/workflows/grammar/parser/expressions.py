@@ -82,10 +82,12 @@ class _ExprMixin:
         return "contains_any"
 
     def group_clause(self, items):
-        """group "分组名" 或 group $var → Literal 或 VarRef"""
-        target_node = items[0]  # Token(STRING) 或 VarRef
+        """on group "分组名" / $var / ["a", "b"] → Literal | VarRef | list"""
+        target_node = items[0]  # Token(STRING) | VarRef | list（list_literal）
         if isinstance(target_node, VarRef):
             return target_node
+        elif isinstance(target_node, list):
+            return target_node  # list_literal 已返回 Python list
         else:
             return Literal(value=self._unquote(str(target_node)))
 

@@ -13,6 +13,10 @@ from loguru import logger
 from ..combat.combat_attrs import (
     CombatAttributes,
 )
+from ...config.graduation_session import (
+    get_baseline_dps as _get_session_baseline,
+    set_baseline_dps as _set_session_baseline,
+)
 from .graduation_program import ProgramRuntime
 
 _DATA_DIR = (
@@ -56,7 +60,9 @@ class GenericCalculator(GraduationCalculator):
         self._data = self._load_data(school_name, scheme_name)
         if self._data.get("schema_version") != 2:
             raise ValueError(f"unsupported graduation model for {school_name}")
-        self._baseline = float(self._data["graduation_baseline_dps"])
+        json_baseline = float(self._data["graduation_baseline_dps"])
+        session_override = _get_session_baseline(school_name, scheme_name)
+        self._baseline = session_override if session_override is not None else json_baseline
         if self._baseline <= 0:
             raise ValueError("100%毕业率基准 DPS 必须大于 0")
         self._combat_time = float(self._data["environment"]["combat_time"])
@@ -128,29 +134,24 @@ def get_graduation_scheme_combat_attrs(
 def get_graduation_scheme_metrics(
     school_name: str, scheme_name: str,
 ) -> tuple[float, float]:
-    """返回方案满值 ADPS 与可校正的 100% 毕业率基准 DPS。"""
+    """返回方案满值 ADPS 与可校正的 100% 毕业率基准 DPS（含 session 覆盖）。"""
     model = GenericCalculator._load_data(school_name, scheme_name)
+    session_override = _get_session_baseline(school_name, scheme_name)
+    baseline = session_override if session_override is not None else float(model["graduation_baseline_dps"])
     return (
         float(model["reference"]["dps"]),
-        float(model["graduation_baseline_dps"]),
+        baseline,
     )
 
 
 def set_graduation_baseline_dps(
     school_name: str, scheme_name: str, value: float,
 ) -> None:
-    """原子更新方案的 100% 毕业率基准 DPS。"""
-    value = float(value)
-    if value <= 0:
-        raise ValueError("100%毕业率基准 DPS 必须大于 0")
-    model = dict(GenericCalculator._load_data(school_name, scheme_name))
+    """将方案的 100% 毕业率基准 DPS 写入 session 覆盖层。"""
+    model = GenericCalculator._load_data(school_name, scheme_name)
     if model.get("schema_version") != 2:
         raise ValueError("方案不是当前 v2 格式，请重新导入 Excel")
-    model["graduation_baseline_dps"] = value
-    from .graduation_converter import scheme_path, write_model
-
-    destination = _DATA_DIR / scheme_path(school_name, scheme_name).name
-    write_model(destination, model)
+    _set_session_baseline(school_name, scheme_name, value)
     invalidate_graduation_cache()
 
 

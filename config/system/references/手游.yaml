@@ -288,3 +288,21 @@ references:
     group: 货币资产
   source: screenshot
   notes: ''
+- file: EE2D557D.png
+  label: 袅袅之音
+  meta:
+    group: 普通道具
+  source: screenshot
+  notes: 收藏
+- file: 849A8303.png
+  label: 绕梁之音
+  meta:
+    group: 普通道具
+  source: screenshot
+  notes: 收藏
+- file: A12F5189.png
+  label: 黄泉酿
+  meta:
+    group: 增益道具
+  source: screenshot
+  notes: 收藏

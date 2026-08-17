@@ -110,7 +110,7 @@ class Recognize:
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
-    group: Any = None  # Literal | VarRef | None（group 子句：限定材料分组）
+    group: Any = None  # Literal | VarRef | list | None（group 子句：限定材料分组）
     where: Any = None  # WhereClause | None（where 子句：识别结果过滤）
     rich: bool = False  # as rich 模式：返回包含输入/输出元数据的富 dict
     with_func: Any = None  # Literal(函数名) | None — with 子句指定的 dict->dict 转换函数
@@ -347,13 +347,16 @@ class PanelRef:
     """panel 三级索引：[scene].[panel][row][col]
 
     scene/panel 为静态名称（str）或 VarRef（运行时变量）；
-    row/col 可为 int（字面量）或 VarRef（运行时变量）。
+    row/col 支持三种形式：
+      - int（字面量）：单格定位
+      - VarRef：运行时变量
+      - tuple(start, end)：范围索引（仅 recognize，迭代指定行列子集）
     引擎执行时查 panel 校准缓存获取格子中心坐标。
     """
     scene: str
     panel: str
-    row: Any      # int | VarRef
-    col: Any      # int | VarRef
+    row: Any      # int | VarRef | tuple[int | VarRef, int | VarRef]
+    col: Any      # int | VarRef | tuple[int | VarRef, int | VarRef]
 
 
 @dataclass(frozen=True)

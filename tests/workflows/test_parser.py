@@ -927,6 +927,124 @@ def test_recognize_with_clause():
     assert n.with_func.value == "yysls_rich_parse"
 
 
+def test_recognize_group_list_literal():
+    """on group 支持列表常量 ["a", "b"] 直接内联多分组"""
+    # 列表常量
+    program = parse_text('recognize [s].[f1] as rich $m on group ["a", "b"]')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    assert isinstance(n.group, list)
+    assert len(n.group) == 2
+    assert isinstance(n.group[0], Literal) and n.group[0].value == "a"
+    assert isinstance(n.group[1], Literal) and n.group[1].value == "b"
+
+    # 单字符串（向后兼容）
+    program = parse_text('recognize [s].[f1] as $m on group "调律材料"')
+    n = program.body[0]
+    assert isinstance(n.group, Literal) and n.group.value == "调律材料"
+
+    # 变量引用（向后兼容）
+    program = parse_text('recognize [s].[f1] as $m on group $groups')
+    n = program.body[0]
+    assert isinstance(n.group, VarRef) and n.group.name == "groups"
+
+    # 全组合：by + on group list + where + with
+    program = parse_text(
+        'recognize [s].[f1] as rich $m by equals "x" on group ["g1", "g2"] where confidence >= 0.5 with my_func'
+    )
+    n = program.body[0]
+    assert n.rich is True
+    assert n.by is not None
+    assert isinstance(n.group, list) and len(n.group) == 2
+    assert n.where is not None
+    assert n.with_func is not None
+
+    # panel 模式 + 列表常量
+    program = parse_text('recognize [s].[p][1][2] as rich $m on group ["x", "y"]')
+    n = program.body[0]
+    assert isinstance(n.scene, PanelRef)
+    assert isinstance(n.group, list)
+
+
+def test_recognize_panel_range_index():
+    """recognize [scene].[panel][r1...r2][c1...c2] — 范围索引"""
+    # 基本范围
+    program = parse_text('recognize [s].[p][1...2][1...6] as rich $m')
+    n = program.body[0]
+    assert isinstance(n, Recognize)
+    ref = n.scene
+    assert isinstance(ref, PanelRef)
+    assert ref.row == (1, 2)
+    assert ref.col == (1, 6)
+    assert n.rich is True
+
+    # 单索引向后兼容
+    program = parse_text('recognize [s].[p][1][2] as $m')
+    n = program.body[0]
+    assert n.scene.row == 1 and n.scene.col == 2
+
+    # 变量索引向后兼容
+    program = parse_text('recognize [s].[p][$r][$c] as $m')
+    n = program.body[0]
+    assert isinstance(n.scene.row, VarRef) and n.scene.row.name == "r"
+
+    # 范围端点支持变量
+    program = parse_text('recognize [s].[p][1...$n][$start...6] as $m')
+    n = program.body[0]
+    assert n.scene.row == (1, VarRef("n"))
+    assert n.scene.col == (VarRef("start"), 6)
+
+    # 全组合：range + rich + group list + where + with
+    program = parse_text(
+        'recognize [s].[p][1...2][1...6] as rich $r '
+        'on group ["a", "b"] where confidence >= 0.65 with my_func'
+    )
+    n = program.body[0]
+    assert n.scene.row == (1, 2)
+    assert isinstance(n.group, list)
+    assert n.where is not None
+    assert n.with_func is not None
+
+
+def test_scan_panel_range_index():
+    """scan [scene].[panel][r1...r2][c1...c2] — 范围索引"""
+    # 基本范围
+    program = parse_text('scan [s].[p][1...2][1...6] as $v')
+    n = program.body[0]
+    assert isinstance(n, Scan)
+    ref = n.scene
+    assert isinstance(ref, PanelRef)
+    assert ref.row == (1, 2)
+    assert ref.col == (1, 6)
+
+    # 单索引向后兼容
+    program = parse_text('scan [s].[p][1][2] as $v')
+    n = program.body[0]
+    assert n.scene.row == 1 and n.scene.col == 2
+
+    # 变量索引向后兼容
+    program = parse_text('scan [s].[p][$r][$c] as $v')
+    n = program.body[0]
+    assert isinstance(n.scene.row, VarRef) and n.scene.row.name == "r"
+
+    # 范围端点支持变量
+    program = parse_text('scan [s].[p][1...$n][$start...6] as $v')
+    n = program.body[0]
+    assert n.scene.row == (1, VarRef("n"))
+    assert n.scene.col == (VarRef("start"), 6)
+
+    # 范围 + by 子句
+    program = parse_text('scan [s].[p][1...3][1...4] as $v by contains "文本"')
+    n = program.body[0]
+    assert n.scene.row == (1, 3)
+    assert n.by is not None
+
+    # 范围 + where 子句
+    program = parse_text('scan [s].[p][1...2][1...6] as $v where confidence >= 0.8')
+    n = program.body[0]
+    assert n.where is not None
+
+
 # ─── collect 测试 ───────────────────────────────────────────
 
 def test_collect():

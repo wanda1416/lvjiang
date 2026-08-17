@@ -78,7 +78,7 @@ class _RecognitionMixin:
         self,
         scene_key: str,
         slot_keys: list[str] | None = None,
-        group: str | None = None,
+        group: str | list[str] | None = None,
         min_confidence: float | None = None,
     ) -> tuple[dict[str, str], dict]:
         """对指定场景的每个 slot 执行参考图匹配
@@ -148,7 +148,7 @@ class _RecognitionMixin:
         self,
         scene_key: str,
         slot_keys: list[str] | None = None,
-        group: str | None = None,
+        group: str | list[str] | None = None,
         min_confidence: float | None = None,
         with_func=None,
     ) -> tuple[dict[str, dict], dict]:
@@ -214,7 +214,7 @@ class _RecognitionMixin:
             elif not info.type:
                 result[region.key] = {}  # 空槽
             else:
-                base = recognizer.build_rich_base(info, group=group)
+                base = recognizer.build_rich_base(info)
                 if transform is not None:
                     base = transform(base)
                 result[region.key] = base
@@ -231,7 +231,7 @@ class _RecognitionMixin:
         self,
         scene_key: str,
         panel_key: str,
-        group: str | None = None,
+        group: str | list[str] | None = None,
     ) -> dict[tuple[int, int], object]:
         """Panel grid 模式材料识别：一次截图，逐 cell 返回识别结果对象
 
@@ -390,7 +390,7 @@ class _RecognitionMixin:
         field_keys: list[str],
         target_value,
         mode: str,
-        group: str | None = None,
+        group: str | list[str] | None = None,
         min_confidence: float | None = None,
     ) -> str:
         """短路材料识别：一次截图，逐 slot 识别，首个命中即返回 slot 名

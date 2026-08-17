@@ -144,17 +144,31 @@ tuple_elem: number | var_ref
 // scan 支持两种目标：
 //   1. [scene].[region] — 场景区域 OCR
 //   2. [scene].[panel][row][col] — panel cell 级 OCR
+//      row/col 支持范围索引 [start...end]，仅扫描指定行列子集
 scan_stmt: "scan"i scene_target "as"i var_ref by_clause? where_clause? _NL
-         | "scan"i const_or_var "." const_or_var panel_index panel_index "as"i var_ref by_clause? where_clause? _NL -> scan_panel_stmt
+         | "scan"i const_or_var "." const_or_var scan_panel_index scan_panel_index "as"i var_ref by_clause? where_clause? _NL -> scan_panel_stmt
+
+// scan 专用 panel 索引：在单格 [INT] / [$var] 基础上，额外支持范围 [start...end]
+scan_panel_index: "[" INT "]" -> scan_panel_index_int
+                | "[" var_ref "]" -> scan_panel_index_var
+                | "[" scan_range_endpoint RANGE_OP scan_range_endpoint "]" -> scan_panel_index_range
+scan_range_endpoint: INT | var_ref
 
 // recognize 支持两种目标：
 //   1. [scene].[region] — 场景区域材料识别
 //   2. [scene].[panel][row][col] — panel cell 级材料识别
+//      row/col 支持范围索引 [start...end]，仅识别指定行列子集
 // rich 关键字：as rich $var 返回包含输入/输出元数据的富 dict
-// with 子句：as rich $var with func_name — 指定 dict->dict 转换函数
+// with 子句：as rich $var with func_name — 指定 dict→dict 转换函数
 RICH_KEYWORD: "rich"i
 recognize_stmt: "recognize"i scene_target "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL
-              | "recognize"i const_or_var "." const_or_var panel_index panel_index "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL -> recognize_panel_stmt
+              | "recognize"i const_or_var "." const_or_var recognize_panel_index recognize_panel_index "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL -> recognize_panel_stmt
+
+// recognize 专用 panel 索引：在单格 [INT] / [$var] 基础上，额外支持范围 [start...end]
+recognize_panel_index: "[" INT "]" -> recognize_panel_index_int
+                     | "[" var_ref "]" -> recognize_panel_index_var
+                     | "[" recognize_range_endpoint RANGE_OP recognize_range_endpoint "]" -> recognize_panel_index_range
+recognize_range_endpoint: INT | var_ref
 
 // by 子句：短路识别模式
 // 有 by 时返回首个命中的字段名（str），无 by 时返回完整 dict
@@ -167,7 +181,8 @@ match_mode: "equals_any"i -> match_equals_any
 ?by_target: STRING | var_ref
 
 // group 子句：限定材料识别的分组范围
-group_clause: "on"i "group"i (STRING | var_ref)
+// 支持单分组名、列表常量、变量引用（str 或 list[str]）
+group_clause: "on"i "group"i (STRING | var_ref | list_literal)
 
 // where 子句：识别结果过滤条件（纯过滤，不改变返回语义）
 // 当前仅支持 confidence >= threshold

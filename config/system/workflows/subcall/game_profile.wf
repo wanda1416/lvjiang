@@ -1,0 +1,36 @@
+#% name: 游戏档案子过程
+
+# 游戏档案公共子过程库
+# 提供角色档案相关的扫描解析操作，供各工作流 import 后调用。
+#
+# 包含过程：
+#   parse_bugan_jindu($raw) — 解析不肝进度 OCR 文本并写入 profile
+
+# ─── 解析不肝进度 ────────────────────────────────────────
+# 参数：$raw — scan 得到的 bugan_jindu 原始文本
+# 返回：0 成功，-1 失败
+# 写入：profile bugan_of_week
+def parse_bugan_jindu($raw)
+    if $raw contains "|"
+        log error "不肝进度 OCR 异常，识别到噪声数据: " + $raw
+        return -1
+    end
+
+    eval $parts = split($raw, "/")
+    eval $current = $parts[0]
+    eval $total = $parts[1]
+
+    if $current < 0
+        log concat("不肝进度异常：当前值 ", $current, " 小于 0")
+        return -1
+    end
+
+    if $current > $total
+        log concat("不肝进度解析错误：", $current, " > ", $total)
+        return -1
+    end
+
+    eval profile_set("bugan_of_week", $current)
+    log concat("本周不肝进度: ", $current, "/", $total)
+    return 0
+end

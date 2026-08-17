@@ -48,6 +48,7 @@ default $tol_baoqian = 0
 default $tol_changmingyu = 0
 
 import "subcall/navigation.wf"
+import "subcall/game_profile.wf"
 
 # ─── 导航到钱袋页面 ──────────────────────────────────────
 # 主页 → 菜单
@@ -114,23 +115,8 @@ if $bugan_pos
     eval $bugan_col = $bugan_pos.col
     click [bag_wallet_detail].[money_2][$bugan_row][$bugan_col] after wait @step_interval
     
-    # 扫描不肝进度
     scan [bag_wallet_detail].[bugan_jindu] as $jindu_str
-    eval $parts = split($jindu_str.bugan_jindu, "/")
-    eval $current = $parts[0]
-    eval $total = $parts[1]
-    
-    # 校验进度值
-    if $current < 0
-        log concat("不肝进度异常：当前值 ", $current, " 小于 0")
-    else
-        if $current > $total
-            log concat("不肝进度解析错误：", $current, " > ", $total)
-        else
-            eval profile_set("bugan_of_week", $current)
-            log concat("本周不肝进度: ", $current, "/", $total)
-        end
-    end
+    call parse_bugan_jindu($jindu_str.bugan_jindu)
 end
 
 # ─── 返回主界面 ──────────────────────────────────────────

@@ -172,8 +172,10 @@ recognize_range_endpoint: INT | var_ref
 
 // by 子句：短路识别模式
 // 有 by 时返回首个命中的字段名（str），无 by 时返回完整 dict
+// full by：全量匹配取最高置信度（仅 recognize 支持）
 // match_mode 顺序：长关键字在前，确保词法 max-munch 正确分词
-by_clause: "by"i match_mode by_target
+FULL_KEYWORD: "full"i
+by_clause: FULL_KEYWORD? "by"i match_mode by_target
 match_mode: "equals_any"i -> match_equals_any
           | "contains_any"i -> match_contains_any
           | "equals"i -> match_equals

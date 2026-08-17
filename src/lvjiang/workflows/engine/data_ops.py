@@ -180,12 +180,12 @@ class _DataOpsMixin:
             return
 
         if node.by is not None:
-            # ── by 子句：短路参考图匹配，返回 slot 名 str（by 优先，rich 不影响）──
+            # ── by 子句：参考图匹配，返回 slot 名 str（by 优先，rich 不影响）──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             result = self._ensure_workflow().recognize_materials_by(
                 scene, field_keys or [], target_value, by_clause.match_mode,
-                group=group, min_confidence=min_conf,
+                group=group, min_confidence=min_conf, full=by_clause.full,
             )
             self.variables[var_name] = result  # str（命中 slot 名或 ""）
         elif node.rich:

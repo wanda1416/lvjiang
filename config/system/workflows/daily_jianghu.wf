@@ -97,7 +97,8 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       end
 
       # 领取奖励（勾选时）：动作完成后、切到下一个 label 前再点一次任务标签
-      if $claim_reward
+      # 觉障林未实现，点击会卡页面，无论是否勾选均跳过领奖
+      if $claim_reward and not $task_text contains "觉障林"
          call claim_reward($label, $idx)
       end
    end
@@ -262,9 +263,57 @@ def action_dongfang($label, $idx)
    end
 end
 
-# 饮酒（醉意）：动作暂未实现
+# 饮酒（醉意）：号令 → 退回首页 → 菜单 → 包裹 → 道具栏 → 找黄泉酿食用 → 退回首页 → 返回号令
 def action_zuiyi($label)
-   log "醉意动作暂未实现"
+   # ── 从江湖号令退回首页 ──
+   click [activity_jianghu].[back] after wait stable @page_refresh least 0.5
+   click [school_main].[back] after wait stable @page_refresh least 0.5
+   click [game_menu_page].[back] after wait stable @page_refresh least 0.5
+
+   # ── 首页 → 菜单 → 包裹 → 道具 - 普通道具 ──
+   click [game_main_page].[menu] after wait stable @page_refresh least 0.5
+   click [game_menu_page].[baoguo] after wait stable @page_refresh least 0.5
+   click [bag_equip_detail].[item] after wait stable @step_interval least 0.5
+   click [bag_item_detail].[putong] after wait stable @step_interval least 0.5
+
+   # ── 在背包网格中寻找黄泉酿 ──
+   recognize [bag_item_detail].[bag_grid][1...2][1...6] as $result \
+      by equals "黄泉酿" \
+      on group ["增益道具"] \
+      where confidence >= 0.65
+
+   if $result
+      eval $zuiyi_r = $result.row
+      eval $zuiyi_c = $result.col
+      log "找到黄泉酿：row=" + $zuiyi_r + ", col=" + $zuiyi_c
+
+      # 点击黄泉酿所在格子，打开道具详情
+      click [bag_item_detail].[bag_grid][$zuiyi_r][$zuiyi_c] after wait stable @page_refresh least 0.5
+
+      # 在详情面板中寻找「食用」按钮
+      find [bag_item_detail].[main_area] as $btn by contains "食用"
+      if $btn
+         click $btn after wait @step_interval
+         wait 1
+
+         # 食用后可能弹出确认弹窗，识别到"确认"则点击"取消"关闭
+         scan [general_control].[confirm] as $has_confirm by contains "确认"
+         if $has_confirm
+            click [general_control].[cancel] after wait @step_interval
+         end
+      else
+         log "找不到食用按钮"
+      end
+   else
+      log "找不到黄泉酿"
+   end
+
+   # ── 关闭背包，退回首页 ──
+   click [bag_equip_detail].[back] after wait stable @page_refresh least 0.5
+   click [game_menu_page].[back] after wait stable @page_refresh least 0.5
+
+   # ── 从首页返回江湖号令 ──
+   call back_to_haoling()
 end
 
 # 觉障林：动作暂未实现

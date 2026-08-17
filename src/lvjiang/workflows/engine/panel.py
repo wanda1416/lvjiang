@@ -414,10 +414,10 @@ class _PanelMixin:
         return int(val)
 
     def _recognize_panel_range(self, node: Recognize):
-        """recognize [scene].[panel][r1...r2][c1...c2] as [rich] $var — 面板范围识别
+        """recognize [scene].[panel][r1...r2][c1...c2] as [rich] $var [by ...] — 面板范围识别
 
         row/col 支持范围索引，仅识别指定行列子集。
-        结果结构与整面板一致：$var.[行].[列] 取材料类型或富 dict。
+        有 by 时降级返回位置 dict {"row": r, "col": c}，无 by 时返回完整 dict。
         """
         ref: PanelRef = node.scene
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
@@ -446,6 +446,58 @@ class _PanelMixin:
             return
 
         recognizer = self._ensure_workflow().material_recognizer
+        group = self._resolve(node.group) if node.group is not None else None
+        min_conf = self._resolve_min_confidence(node.where)
+        ph, pw = panel_img.shape[:2]
+
+        # by 子句处理：降级返回位置 dict
+        if node.by is not None:
+            by_clause = node.by
+            target_value = self._resolve(by_clause.target)
+            match_mode = by_clause.match_mode
+            full = by_clause.full
+
+            best_pos = None
+            best_confidence = -1.0
+
+            for r_1based in range(row_start, row_end + 1):
+                for c_1based in range(col_start, col_end + 1):
+                    r_idx, c_idx = r_1based - 1, c_1based - 1
+                    if not (0 <= r_idx < cal.n_rows and 0 <= c_idx < cal.n_cols):
+                        continue
+                    x1_r, y1_r, x2_r, y2_r = cal.slot_bounds(r_idx, c_idx)
+                    x1 = max(0, int(x1_r * pw))
+                    y1 = max(0, int(y1_r * ph))
+                    x2 = min(pw, int(x2_r * pw))
+                    y2 = min(ph, int(y2_r * ph))
+                    slot_img = panel_img[y1:y2, x1:x2]
+                    if slot_img.size == 0:
+                        continue
+
+                    info = recognizer.recognize(slot_img, group=group)
+                    if min_conf is not None and info.confidence < min_conf:
+                        continue
+                    if self._match_text(info.type, target_value, match_mode):
+                        if full:
+                            confidence = getattr(info, 'confidence', 0.0)
+                            if confidence > best_confidence:
+                                best_pos = {"row": r_1based, "col": c_1based}
+                                best_confidence = confidence
+                        else:
+                            self.variables[var_name] = {"row": r_1based, "col": c_1based}
+                            logger.info(f"recognize panel range by [{scene_key}.{panel_key}] matched at row={r_1based}, col={c_1based}: {info.type!r}")
+                            return
+
+            if full and best_pos is not None:
+                self.variables[var_name] = best_pos
+                logger.info(f"recognize panel range full by [{scene_key}.{panel_key}] matched at row={best_pos['row']}, col={best_pos['col']} confidence={best_confidence:.3f}")
+                return
+
+            self.variables[var_name] = {}
+            logger.info(f"recognize panel range by [{scene_key}.{panel_key}] no match")
+            return
+
+        # 无 by 子句：返回完整 dict
         transform = None
         if node.rich and node.with_func is not None:
             from .. import builtins
@@ -453,10 +505,6 @@ class _PanelMixin:
             transform = builtins.get_function(func_name)
             if transform is None:
                 raise ValueError(f"未知内置函数: {func_name}")
-
-        group = self._resolve(node.group) if node.group is not None else None
-        min_conf = self._resolve_min_confidence(node.where)
-        ph, pw = panel_img.shape[:2]
 
         result: dict[str, dict[str, str | dict]] = {}
         for r_1based in range(row_start, row_end + 1):
@@ -523,10 +571,11 @@ class _PanelMixin:
         logger.info(f"scan panel by [{scene_key}.{panel_key}] no match")
 
     def _recognize_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
-        """recognize [scene].[panel] as $var by ... [on group ...] [where ...] — 整面板材料识别 + by 短路匹配
+        """recognize [scene].[panel] as $var [full] by ... [on group ...] [where ...] — 整面板材料识别 + by 匹配
 
-        返回首个命中的行列位置 {"row": 行号, "col": 列号}，未命中返回空 dict {}。
-        行列号为 1-based 整数。
+        by_clause.full=False: 短路匹配，返回首个命中的行列位置 {"row": 行号, "col": 列号}
+        by_clause.full=True: 全量匹配，返回置信度最高的行列位置
+        未命中返回空 dict {}。行列号为 1-based 整数。
         """
         panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
         if panel_img is None:
@@ -535,18 +584,39 @@ class _PanelMixin:
         recognizer = self._ensure_workflow().material_recognizer
         target_value = self._resolve(by_clause.target)
         match_mode = by_clause.match_mode
+        full = by_clause.full
+
+        best_pos = None
+        best_confidence = -1.0
+
         for r, c, slot_img in self._iter_slot_images(panel_img, cal):
             mat_type = ""
+            confidence = 0.0
             if slot_img is not None:
                 info = recognizer.recognize(slot_img, group=group)
                 if min_confidence is not None and info.confidence < min_confidence:
                     mat_type = ""
                 else:
                     mat_type = info.type
+                    confidence = getattr(info, 'confidence', 0.0)  # 兼容 mock 对象
             if self._match_text(mat_type, target_value, match_mode):
-                self.variables[var_name] = {"row": r + 1, "col": c + 1}
-                logger.info(f"recognize panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {mat_type!r}")
-                return
+                if full:
+                    # 全量模式：记录最高置信度的命中项
+                    if confidence > best_confidence:
+                        best_pos = {"row": r + 1, "col": c + 1}
+                        best_confidence = confidence
+                    logger.debug(f"full by panel: [{scene_key}.{panel_key}] row={r+1}, col={c+1} type={mat_type!r} confidence={confidence:.3f}")
+                else:
+                    # 短路模式：首个命中即返回
+                    self.variables[var_name] = {"row": r + 1, "col": c + 1}
+                    logger.info(f"recognize panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {mat_type!r}")
+                    return
+
+        if full and best_pos is not None:
+            self.variables[var_name] = best_pos
+            logger.info(f"recognize panel full by [{scene_key}.{panel_key}] matched at row={best_pos['row']}, col={best_pos['col']} confidence={best_confidence:.3f}")
+            return
+
         self.variables[var_name] = {}
         logger.info(f"recognize panel by [{scene_key}.{panel_key}] no match")
 

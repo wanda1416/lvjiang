@@ -18,16 +18,17 @@ recognize <target> as [rich] $var [<clause>...]
   [scene].[panel][r1...r2][c1...c2]  范围识别（仅扫描指定行列子集）
 
 ─── 可选子句 <clause>（顺序无关，均可省略）─────────────
-  by <mode> <target>               短路匹配，降级返回 str / 位置
+  [full] by <mode> <target>        匹配策略（full=全量取最高置信度）
   on group <groups>                限定匹配分组范围
   where confidence >= <threshold>  置信度过滤
   with <func_name>                 指定 rich 转换函数（须配合 as rich）
 
 ─── by 子句 ──────────────────────────────────────────
-  by equals "材料名"               精确匹配
+  by equals "材料名"               短路匹配，首个命中即返回
   by contains "材料名"             子串匹配
   by equals_any $list              列表任一精确匹配
   by contains_any $list            列表任一子串匹配
+  full by equals "材料名"          全量匹配，取置信度最高的命中项
 
 ─── on group 子句 ────────────────────────────────────
   on group "分组名"                单分组
@@ -201,7 +202,14 @@ recognize [material_grid].[f1, f2] as rich $mats with yysls_rich_parse
 
 > `by` 子句等价于 `recognize` + `find_key` 的组合，但只需一次截图，推荐使用。
 
-**语义**：一次截图 → 逐 slot 识别 → 首个命中即返回 slot key，不再遍历剩余 slot。
+**两种匹配策略**：
+
+| 策略 | 语义 | 返回值 |
+|------|------|--------|
+| `by ...`（默认） | 短路匹配：逐 slot 识别，首个命中即返回 | 首个命中的 slot key / 位置 |
+| `full by ...` | 全量匹配：遍历所有 slot，取置信度最高的命中项 | 置信度最高的 slot key / 位置 |
+
+> `full by` 仅 `recognize` 支持，`scan`/`find` 不支持。
 
 **四种匹配模式**：
 
@@ -215,7 +223,7 @@ recognize [material_grid].[f1, f2] as rich $mats with yysls_rich_parse
 **示例**：
 
 ```
-# 在材料槽中找到指定材料
+# 短路匹配：找到第一个“玄铁”即返回
 recognize [equip_tune_detail].[material_1, material_2, material_3] as $slot by equals "玄铁"
 if $slot
     click [equip_tune_detail].$slot
@@ -224,6 +232,12 @@ end
 # 匹配多种材料之一
 eval $targets = ["玄铁", "精金", "银矿"]
 recognize [material_grid] as $found by equals_any $targets
+
+# 全量匹配：遍历所有槽，取置信度最高的命中项
+recognize [equip_tune_detail].[material_1, material_2, material_3] as $best full by equals "玄铁"
+
+# Panel 模式 + full by：遍历所有格子，取置信度最高的位置
+recognize [bag_item_detail].[bag_grid] as $pos full by contains "玄铁" where confidence >= 0.65
 ```
 
 ## where 子句

@@ -743,8 +743,8 @@ class EquipStatusTab(QWidget):
         self._slot_cards: dict[str, _SlotCard] = {}
         self._setup_ui()
         self._refresh_all()
-        # 订阅装备变更信号，更新状态展示行
-        self._host.equipment_changed.connect(self._update_status_row)
+        # 订阅装备变更信号（UI 操作与工作流写入均会触发），完整刷新展示
+        self._host.equipment_changed.connect(self._refresh_all)
         self._host.graduation_updated.connect(self._update_status_row)
 
     def _setup_ui(self):
@@ -765,7 +765,7 @@ class EquipStatusTab(QWidget):
         action_row.addStretch()
 
         # 最优组合
-        btn_optimal = QPushButton(tr("最优组合"))
+        btn_optimal = QPushButton(tr("计算最优组合"))
         btn_optimal.setToolTip(tr("搜索最优毕业率装备组合"))
         btn_optimal.setFixedWidth(80)
         btn_optimal.setStyleSheet(_PRIMARY_BTN_STYLE)
@@ -773,7 +773,7 @@ class EquipStatusTab(QWidget):
         action_row.addWidget(btn_optimal)
 
         # 创建装备（原「模拟装备」，去掉菜单直接弹对话框）
-        btn_create = QPushButton(tr("创建装备"))
+        btn_create = QPushButton(tr("创建模拟装备"))
         btn_create.setToolTip(tr("创建模拟装备"))
         btn_create.setFixedWidth(80)
         btn_create.setStyleSheet(_REFRESH_BTN_STYLE)

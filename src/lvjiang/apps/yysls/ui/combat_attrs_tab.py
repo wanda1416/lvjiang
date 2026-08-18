@@ -179,17 +179,16 @@ class CombatAttrsTab(QWidget):
         self._combo_play_style.setMinimumHeight(30)
         self._combo_play_style.currentTextChanged.connect(self._on_play_style_changed)
         base_layout.addWidget(self._combo_play_style, 1)
-        self._btn_edit_play_style = QPushButton(tr("编辑"))
-        self._btn_edit_play_style.setFixedWidth(52)
+
+        self._btn_edit_play_style = QPushButton(tr("编辑基础属性"))
         self._btn_edit_play_style.setMinimumHeight(30)
         self._btn_edit_play_style.setToolTip(tr("在游戏配置中编辑当前基础属性"))
         self._btn_edit_play_style.clicked.connect(self._on_edit_play_style)
-        base_layout.addWidget(self._btn_edit_play_style)
 
         gongjue_field = QWidget()
         gongjue_layout = QHBoxLayout(gongjue_field)
         gongjue_layout.setContentsMargins(0, 0, 0, 0)
-        gongjue_layout.addWidget(QLabel(tr("弓玦套装")))
+        gongjue_layout.addWidget(QLabel(tr("弓玦")))
         self._combo_gongjue = QComboBox()
         self._combo_gongjue.setMinimumWidth(100)
         self._combo_gongjue.setMinimumHeight(30)
@@ -204,21 +203,21 @@ class CombatAttrsTab(QWidget):
         scheme_layout.setContentsMargins(0, 0, 0, 0)
         scheme_layout.addWidget(QLabel(tr("计算方案")))
         self._combo_scheme = QComboBox()
-        self._combo_scheme.setMinimumWidth(120)
+        self._combo_scheme.setFixedWidth(130)
         self._combo_scheme.setMinimumHeight(30)
         self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)
         scheme_layout.addWidget(self._combo_scheme, 1)
 
-        self._btn_create_play = QPushButton(tr("新建基础属性…"))
+        self._btn_create_play = QPushButton(tr("新建基础属性"))
         self._btn_create_play.setMinimumHeight(30)
         self._btn_create_play.clicked.connect(self._on_create_play_style)
         self._config_fields = (
-            school_field, base_field, gongjue_field, scheme_field,
-            self._btn_create_play,
+            school_field, base_field, self._btn_edit_play_style,
+            gongjue_field, scheme_field, self._btn_create_play,
         )
         for col, widget in enumerate(self._config_fields):
             select_layout.addWidget(widget, 0, col)
-        for col in range(4):
+        for col in range(6):
             select_layout.setColumnStretch(col, 1)
 
         self._config_row = QWidget()
@@ -475,9 +474,9 @@ class CombatAttrsTab(QWidget):
         if not collapsed:
             self._layout_attribute_cards(mode)
             positions = (
-                ((0, 0), (0, 1), (0, 2), (0, 3), (0, 4))
+                ((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
                 if mode == "full"
-                else ((0, 0), (0, 1), (1, 0), (1, 1), (1, 2))
+                else ((0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2))
             )
             for widget, (row, col) in zip(self._config_fields, positions, strict=True):
                 self._select_layout.addWidget(widget, row, col)

@@ -54,6 +54,8 @@ addopts = "-ra -q"
 qt_api = "pyqt6"
 # 把未处理警告升级为错误，保障回归基线干净（具体需要时再单独放行）
 filterwarnings = ["error"]
+# 自定义 marker：slow 标记耗时测试（Excel 转换等），本地迭代可用 -m "not slow" 跳过
+markers = ["slow: 耗时测试（Excel 转换等），本地迭代可用 -m 'not slow' 跳过"]
 
 [tool.ruff]
 src = ["src"]

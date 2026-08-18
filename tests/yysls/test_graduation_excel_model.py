@@ -20,9 +20,9 @@ from lvjiang.apps.yysls.core.graduation.graduation_converter import convert_work
 from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
 
 DATA_DIR = (
-    Path(__file__).parents[1] / "config" / "system" / "yysls" / "graduation"
+    Path(__file__).parents[2] / "config" / "system" / "yysls" / "graduation"
 )
-EXCEL_DIR = Path(__file__).parents[1] / "data" / "temp" / "excel"
+EXCEL_DIR = Path(__file__).parents[2] / "data" / "temp" / "excel"
 SCHOOLS = [
     "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
     "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",
@@ -41,6 +41,7 @@ def test_formula_parser_supports_workbook_subset() -> None:
     assert ast["name"] == "IF"
 
 
+@pytest.mark.slow
 def test_converter_resolves_skill_alias_in_school_group() -> None:
     path = next(
         path for path in EXCEL_DIR.glob("*鸣金虹*.xlsx")
@@ -50,6 +51,7 @@ def test_converter_resolves_skill_alias_in_school_group() -> None:
     assert model["baseline_attrs"]["extra_attrs"]["无名剑法蓄力技增伤"] == 0.32
 
 
+@pytest.mark.slow
 def test_converter_ignores_blank_skill_affix_label() -> None:
     path = next(EXCEL_DIR.glob("*牵丝霖*.xlsx"))
     model = convert_workbook(path, "牵丝·霖")

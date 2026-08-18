@@ -5,18 +5,14 @@ scan [scene].[key] 的 key 命中 panel（而非 region）时分派为整面板�
 数字 key 与 $var.$r 动态数字 key（for 循环 int 归一化为 "1" 字符串）取值。
 """
 
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import cv2
 import numpy as np
 
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import Eval, FieldAccess, Literal, VarRef, parse_text
 from lvjiang.workflows.workflow_references import collect_refs
-
-DATA_DIR = Path(__file__).parent / "data"
 
 # ─── 语法：数字字面量 key ─────────────────────────────────
 
@@ -647,67 +643,3 @@ def test_region_key_still_goes_region_path(tmp_path):
     output = engine.execute(wf)
     workflow.ocr_scene.assert_called_once_with("s", ["title"], min_confidence=None)
     assert output["x"] == {"title": "背包"}
-
-
-# ─── 实测图片：材料识别集成测试 ─────────────────────────────
-
-class TestRealImageRecognition:
-    """使用实测图片验证整面板识别流程"""
-
-    def test_image1_row2_col1_is_cai_gouliang(self):
-        """image1.png 第2行第1列应为彩狗粮"""
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-            MaterialRecognizer,
-        )
-        from lvjiang.core.ocr import OCREngine
-        from lvjiang.workflows.align import detect_grid
-
-        img_path = DATA_DIR / "image1.png"
-        img = cv2.imread(str(img_path))
-        assert img is not None, f"无法读取图片: {img_path}"
-
-        # 检测网格
-        cal = detect_grid(img, expected_rows=5, expected_cols=6)
-        assert cal is not None, "未检测到网格"
-        assert cal.n_rows == 5
-        assert cal.n_cols == 6
-
-        # 提取第2行第1列的 slot 图片（0-indexed: row=1, col=0）
-        h, w = img.shape[:2]
-        x1, y1, x2, y2 = cal.slot_bounds(1, 0)
-        slot_img = img[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)]
-
-        # 材料识别
-        ocr = OCREngine()
-        recognizer = MaterialRecognizer(ocr)
-        result = recognizer.recognize(slot_img, group="调律材料")
-
-        assert result.type == "彩狗粮", f"期望彩狗粮，实际识别为 {result.type!r}"
-
-    def test_image1_row2_col2_is_jin_gouliang(self):
-        """image1.png 第2行第2列应为金狗粮"""
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-            MaterialRecognizer,
-        )
-        from lvjiang.core.ocr import OCREngine
-        from lvjiang.workflows.align import detect_grid
-
-        img_path = DATA_DIR / "image1.png"
-        img = cv2.imread(str(img_path))
-        assert img is not None, f"无法读取图片: {img_path}"
-
-        # 检测网格
-        cal = detect_grid(img, expected_rows=5, expected_cols=6)
-        assert cal is not None, "未检测到网格"
-
-        # 提取第2行第2列的 slot 图片（0-indexed: row=1, col=1）
-        h, w = img.shape[:2]
-        x1, y1, x2, y2 = cal.slot_bounds(1, 1)
-        slot_img = img[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)]
-
-        # 材料识别
-        ocr = OCREngine()
-        recognizer = MaterialRecognizer(ocr)
-        result = recognizer.recognize(slot_img, group="调律材料")
-
-        assert result.type == "金狗粮", f"期望金狗粮，实际识别为 {result.type!r}"

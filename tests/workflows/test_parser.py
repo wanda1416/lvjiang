@@ -46,16 +46,6 @@ from lvjiang.workflows.grammar import (
 
 # ─── 现有 .wf 文件验证 ─────────────────────────────────────
 
-def test_existing_wf_files():
-    """验证现有 .wf 文件能正常解析"""
-    print("=== 验证现有 .wf 文件 ===")
-    for wf in ["equip_analysis", "daily_jianghu"]:
-        path = Path(f"config/system/workflows/{wf}.wf")
-        program = parse_file(path)
-        print(f"  {path}: {len(program.body)} 条指令 OK")
-        assert isinstance(program, Program)
-
-
 def test_workflow_parser():
     """测试读取所有注册的 workflow 文件并解析"""
     print("\n=== 测试所有 workflow 文件解析 ===")
@@ -1803,8 +1793,6 @@ def test_crlf_line_continuation():
 # ─── 主入口 ─────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # 现有文件验证
-    test_existing_wf_files()
     test_workflow_parser()
 
     # click

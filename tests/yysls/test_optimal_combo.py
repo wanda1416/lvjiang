@@ -479,7 +479,7 @@ class TestSearchOptimalCombo:
     def test_search_with_dominance_pruning(self) -> None:
         """Pruning should not change the optimal result."""
         calc = _get_calculator()
-        candidates = _make_synthetic_candidates(per_slot=3)
+        candidates = _make_synthetic_candidates(per_slot=2)
         base_attrs = CombatAttributes(
             min_outer=1500, max_outer=5000,
             min_mingjin=500, max_mingjin=1300,

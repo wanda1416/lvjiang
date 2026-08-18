@@ -120,7 +120,8 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
 
     from ...core.profile_engine.profile_ops import profile_action
     username = _get_username(_engine)
-    return profile_action(username, key, delta=delta_num, source=tr("DSL 写入"))
+    result = profile_action(username, key, delta=delta_num, source=tr("DSL 写入"))
+    return float(result) if not isinstance(result, str) else 0.0
 
 
 @builtin_func("profile_model")

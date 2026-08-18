@@ -16,14 +16,9 @@ def _build_tuning_tab(host):
     return TuningTab(host)
 
 
-def _build_equip_status_tab(host):
-    from .ui.equip_status_tab import EquipStatusTab
-    return EquipStatusTab(host)
-
-
-def _build_character_detail_tab(host):
-    from .ui.character_detail_tab import CharacterDetailTab
-    return CharacterDetailTab(host)
+def _build_loadout_panel(host):
+    from .ui.loadout_panel import LoadoutPanel
+    return LoadoutPanel(host)
 
 
 def _build_profile_overview_tab(host):
@@ -69,8 +64,7 @@ hooks = AppHooks(
     left_tab_builders=[(tr("调律"), _build_tuning_tab)],
     right_tab_builders=[
         (tr("用户总览"), _build_profile_overview_tab),
-        (tr("角色详情"), _build_character_detail_tab),
-        (tr("装备数据"), _build_equip_status_tab),
+        (tr("备战方案"), _build_loadout_panel),
         (tr("其他信息"), _build_profile_tab),
         (tr("调律进度"), _build_tuning_progress_tab),
     ],
@@ -89,6 +83,7 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.workflows.builtins.equipment",
         "lvjiang.apps.yysls.workflows.builtins.bag_funcs",
         "lvjiang.apps.yysls.workflows.builtins.equip_funcs",
+        "lvjiang.apps.yysls.workflows.builtins.equipment_ingest",
         "lvjiang.apps.yysls.workflows.builtins.profile_funcs",
     ],
 )

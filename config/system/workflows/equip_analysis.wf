@@ -8,18 +8,13 @@ import "subcall/navigation.wf"
 #   1. 导航：从首页进入装备页面（调用 nav_main_to_equip）
 #   2. 读取武器类装备：主武器、副武器、戒指、吊坠
 #   3. 读取防具类装备：冠胄、胸甲、胫甲、腕甲
-#   4. 将读取结果写入 session.equipped 持久化
-#   5. 输出装备数据供调用方使用（collect）
-#   6. 返回主界面（调用 nav_back_to_main）
+#   4. 逐槽调用 write_equipped 写入本次绑定的备战方案
+#   5. 返回主界面（调用 nav_back_to_main）
 #
 # 输出：
-#   session.equipped — 字典，key 为槽位名，value 为装备解析结果
-#   collect 输出 — 同上字典，供工作流调用方 read 取用
+#   通过 write_equipped 逐槽写入备战方案（无 collect 输出）
 
 call nav_main_to_equip()
-
-# 用局部 dict 收集，结束后一次性写入 session（避免中途失败污染 session）
-eval $equipped = {}
 
 # 武器类（equip_weapon_detail）
 for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
@@ -29,7 +24,7 @@ for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
     if not $equip.type
         log error "equip_type OCR 失败, slot=" + $slot
     else
-        eval $equipped.$slot = $equip
+        eval write_equipped($slot, $equip)
     end
 end
 
@@ -41,12 +36,9 @@ for slot in ["head", "chest", "leg", "wrist"]
     if not $equip.type
         log error "equip_type OCR 失败, slot=" + $slot
     else
-        eval $equipped.$slot = $equip
+        eval write_equipped($slot, $equip)
     end
 end
-
-# 结束后一次性写入 session
-session.equipped = $equipped
 
 # 返回主界面
 call nav_back_to_main()

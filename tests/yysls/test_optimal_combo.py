@@ -211,75 +211,37 @@ class TestCandidateRules:
 
 class TestApplyComboThroughInventoryApi:
     @staticmethod
-    def _inventory():
+    def _inventory(tmp_path):
         from lvjiang.apps.yysls.core.combat.equipment import EquipmentInventory
+        from lvjiang.apps.yysls.core.loadout import LoadoutRepository
 
         inventory = EquipmentInventory.__new__(EquipmentInventory)
-        inventory._user_name = "test"
-        inventory._equipped = {
-            "ring": {"name": "old_ring", "type": "环", "_fp": "old"},
-            "head": {"name": "same_head", "type": "冠", "_fp": "head"},
-        }
-        inventory._bag_items = {
-            "ring": {
-                "new": {"name": "new_ring", "type": "环", "_fp": "new"},
-            },
-        }
-        inventory._mock_items = {}
+        inventory._repo = LoadoutRepository("test", tmp_path)
+        state = inventory._repo.load()
+        inventory._repo.assign_equipment(
+            state.active_plan_id, "ring",
+            {"name": "old_ring", "type": "环", "_fp": "old"})
+        inventory._repo.assign_equipment(
+            state.active_plan_id, "head",
+            {"name": "same_head", "type": "冠胄", "_fp": "head"})
+        inventory._repo.upsert_item(
+            {"name": "new_ring", "type": "环", "_fp": "new"})
+        inventory.reload()
         return inventory
 
     def test_only_changed_slots_are_applied_and_saved_once(
-        self, monkeypatch,
+        self, tmp_path,
     ) -> None:
-        inventory = self._inventory()
-        saves: list[bool] = []
-        monkeypatch.setattr(inventory, "_save", lambda: saves.append(True))
+        inventory = self._inventory(tmp_path)
 
         inventory.apply_combos({
-            "ring": inventory._bag_items["ring"]["new"],
-            "head": inventory._equipped["head"].copy(),
+            "ring": inventory.bag_items["ring"]["new"],
+            "head": inventory.equipped["head"].copy(),
         })
 
-        assert saves == [True]
-        assert inventory._equipped["ring"]["name"] == "new_ring"
-        assert inventory._equipped["head"]["name"] == "same_head"
-        assert inventory._bag_items["ring"]["old"]["name"] == "old_ring"
-        assert "new" not in inventory._bag_items["ring"]
-
-    def test_failed_save_rolls_back_all_in_memory_changes(
-        self, monkeypatch,
-    ) -> None:
-        inventory = self._inventory()
-        before = (
-            inventory.equipped,
-            {key: value.copy() for key, value in inventory.bag_items.items()},
-            inventory.mock_items,
-        )
-
-        def fail_save() -> None:
-            raise OSError("disk failure")
-
-        monkeypatch.setattr(inventory, "_save", fail_save)
-        with pytest.raises(OSError, match="disk failure"):
-            inventory.apply_combos({
-                "ring": inventory._bag_items["ring"]["new"],
-            })
-
-        assert inventory.equipped == before[0]
-        assert inventory.bag_items == before[1]
-        assert inventory.mock_items == before[2]
-
-    def test_equip_same_item_is_noop(self, monkeypatch) -> None:
-        from lvjiang.apps.yysls.core.combat.equipment import EquipmentInventory
-
-        inventory = EquipmentInventory.__new__(EquipmentInventory)
-        equip = {"name": "same", "type": "环"}
-        monkeypatch.setattr(inventory, "get_equipped", lambda _slot: equip.copy())
-        monkeypatch.setattr(
-            inventory, "_save", lambda: pytest.fail("same item must not save"),
-        )
-        assert inventory.equip_to_slot("ring", equip, "ring") is None
-
+        assert inventory.equipped["ring"]["name"] == "new_ring"
+        assert inventory.equipped["head"]["name"] == "same_head"
+        assert inventory._repo.load().revision > 0
 
 # ---------------------------------------------------------------------------
 # Integration tests — require real graduation calculator

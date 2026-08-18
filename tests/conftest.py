@@ -37,3 +37,16 @@ def _reset_session_store():
     reset_session_store()
     yield
     reset_session_store()
+
+
+@pytest.fixture(autouse=True)
+def _reset_game_config():
+    """每个用例前重置 GameConfigManager 单例
+
+    并行执行时同一 worker 内多个测试共享单例，前一个测试的 monkeypatch
+    或配置修改会污染后续测试。生产环境不受影响。
+    """
+    from lvjiang.apps.yysls.config.manager import reset_game_config
+    reset_game_config()
+    yield
+    reset_game_config()

@@ -733,3 +733,9 @@ def get_game_config() -> GameConfigManager:
     if _instance is None:
         _instance = GameConfigManager()
     return _instance
+
+
+def reset_game_config() -> None:
+    """重置全局 GameConfigManager 单例（测试隔离用）"""
+    global _instance
+    _instance = None

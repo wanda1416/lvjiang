@@ -44,16 +44,20 @@ def test_formula_parser_supports_workbook_subset() -> None:
 @pytest.mark.slow
 def test_converter_resolves_skill_alias_in_school_group() -> None:
     path = next(
-        path for path in EXCEL_DIR.glob("*鸣金虹*.xlsx")
-        if "副本" not in path.stem
+        (p for p in EXCEL_DIR.glob("*鸣金虹*.xlsx") if "副本" not in p.stem),
+        None,
     )
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/*鸣金虹*.xlsx")
     model = convert_workbook(path, "鸣金·虹")
     assert model["baseline_attrs"]["extra_attrs"]["无名剑法蓄力技增伤"] == 0.32
 
 
 @pytest.mark.slow
 def test_converter_ignores_blank_skill_affix_label() -> None:
-    path = next(EXCEL_DIR.glob("*牵丝霖*.xlsx"))
+    path = next(EXCEL_DIR.glob("*牵丝霖*.xlsx"), None)
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/*牵丝霖*.xlsx")
     model = convert_workbook(path, "牵丝·霖")
     skill_group = set(
         get_game_config().get_alias_groups("指定技能增效")["牵丝·霖"]

@@ -32,3 +32,13 @@ def test_compact_card_uses_same_status_tag_bar(qtbot):
         "环",
     )
     assert card.status_tags.is_visible("mock")
+
+
+def test_compact_card_can_show_loadout_tag(qtbot):
+    card = _CompactEquipCard()
+    qtbot.addWidget(card)
+    card.set_equip(
+        {"name": "备用环", "level": 110}, "环", is_loadout=True,
+    )
+    assert card.status_tags.is_visible("loadout")
+    assert not card.status_tags.is_visible("mock")

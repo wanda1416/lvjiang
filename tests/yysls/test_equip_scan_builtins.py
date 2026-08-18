@@ -173,24 +173,21 @@ def test_equip_scan_level_threshold_ends_current_slot_without_cast():
     assert 'if $signal equals "end" or $signal equals "level_end"' in text
 
 
-def test_proc_writes_shared_session_not_isolated_local_bag():
+def test_proc_writes_each_item_through_builtin():
     root = Path(__file__).resolve().parents[2]
     text = (root / "config/system/workflows/equip_scan.wf").read_text(
         encoding="utf-8")
-    assert "if not session.bag_items" in text
-    assert "eval session.bag_items = {}" in text
-    assert "eval session.bag_items.$group = $items" in text
-    assert "eval $bag.$group" not in text
-    assert "eval session.bag_items = $bag" not in text
+    assert "write_bag_item($group, $equip)" in text
+    assert "session.bag_items" not in text
 
 
-def test_each_slot_replaces_atomically_then_saves():
+def test_each_item_is_persisted_immediately():
     root = Path(__file__).resolve().parents[2]
     text = (root / "config/system/workflows/equip_scan.wf").read_text(
         encoding="utf-8")
-    replace_at = text.index("eval session.bag_items.$group = $items")
-    save_at = text.index("eval save()", replace_at)
-    assert save_at > replace_at
+    collect_at = text.index("eval $items.$fp = $equip")
+    write_at = text.index("eval write_bag_item($group, $equip)", collect_at)
+    assert write_at > collect_at
 
 
 def test_min_level_is_explicit_proc_parameter():

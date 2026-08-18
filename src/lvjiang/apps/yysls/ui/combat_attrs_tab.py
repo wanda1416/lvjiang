@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -138,7 +139,9 @@ class CombatAttrsTab(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
 
         # ── 公共工具栏：与其他角色信息 Tab 保持位置和样式一致 ──
-        btn_row = QHBoxLayout()
+        self._toolbar_widget = QWidget()
+        btn_row = QHBoxLayout(self._toolbar_widget)
+        btn_row.setContentsMargins(0, 0, 0, 0)
         btn_refresh = QPushButton(tr("刷新"))
         btn_refresh.setFixedWidth(60)
         btn_refresh.setToolTip(tr("刷新战斗属性"))
@@ -147,37 +150,46 @@ class CombatAttrsTab(QWidget):
         btn_row.addWidget(btn_refresh)
         add_user_nav_buttons(btn_row, self._host)
         btn_row.addStretch()
-        layout.addLayout(btn_row)
+        layout.addWidget(self._toolbar_widget)
 
         # ── 当前配置 ──
         select_group = QGroupBox(tr("当前配置"))
-        select_layout = QHBoxLayout(select_group)
+        self._select_group = select_group
+        select_layout = QGridLayout(select_group)
+        self._select_layout = select_layout
         select_layout.setContentsMargins(14, 14, 14, 12)
         select_layout.setSpacing(8)
 
-        select_layout.addWidget(QLabel(tr("流派")))
+        school_field = QWidget()
+        school_layout = QHBoxLayout(school_field)
+        school_layout.setContentsMargins(0, 0, 0, 0)
+        school_layout.addWidget(QLabel(tr("流派")))
         self._combo_school = QComboBox()
         self._combo_school.setFixedWidth(110)
         self._combo_school.setMinimumHeight(30)
         self._combo_school.currentTextChanged.connect(self._on_school_changed)
-        select_layout.addWidget(self._combo_school)
+        school_layout.addWidget(self._combo_school, 1)
 
-        select_layout.addSpacing(8)
-        select_layout.addWidget(QLabel(tr("基础属性")))
+        base_field = QWidget()
+        base_layout = QHBoxLayout(base_field)
+        base_layout.setContentsMargins(0, 0, 0, 0)
+        base_layout.addWidget(QLabel(tr("基础属性")))
         self._combo_play_style = QComboBox()
         self._combo_play_style.setFixedWidth(130)
         self._combo_play_style.setMinimumHeight(30)
         self._combo_play_style.currentTextChanged.connect(self._on_play_style_changed)
-        select_layout.addWidget(self._combo_play_style)
+        base_layout.addWidget(self._combo_play_style, 1)
         self._btn_edit_play_style = QPushButton(tr("编辑"))
         self._btn_edit_play_style.setFixedWidth(52)
         self._btn_edit_play_style.setMinimumHeight(30)
         self._btn_edit_play_style.setToolTip(tr("在游戏配置中编辑当前基础属性"))
         self._btn_edit_play_style.clicked.connect(self._on_edit_play_style)
-        select_layout.addWidget(self._btn_edit_play_style)
+        base_layout.addWidget(self._btn_edit_play_style)
 
-        select_layout.addSpacing(8)
-        select_layout.addWidget(QLabel(tr("弓玦套装")))
+        gongjue_field = QWidget()
+        gongjue_layout = QHBoxLayout(gongjue_field)
+        gongjue_layout.setContentsMargins(0, 0, 0, 0)
+        gongjue_layout.addWidget(QLabel(tr("弓玦套装")))
         self._combo_gongjue = QComboBox()
         self._combo_gongjue.setMinimumWidth(100)
         self._combo_gongjue.setMinimumHeight(30)
@@ -185,29 +197,43 @@ class CombatAttrsTab(QWidget):
         for gongjue_type in _GONGJUE_TYPES[1:]:
             self._combo_gongjue.addItem(gongjue_type, gongjue_type)
         self._combo_gongjue.currentTextChanged.connect(self._on_gongjue_changed)
-        select_layout.addWidget(self._combo_gongjue)
+        gongjue_layout.addWidget(self._combo_gongjue, 1)
 
-        select_layout.addSpacing(8)
-        select_layout.addWidget(QLabel(tr("计算方案")))
+        scheme_field = QWidget()
+        scheme_layout = QHBoxLayout(scheme_field)
+        scheme_layout.setContentsMargins(0, 0, 0, 0)
+        scheme_layout.addWidget(QLabel(tr("计算方案")))
         self._combo_scheme = QComboBox()
         self._combo_scheme.setMinimumWidth(120)
         self._combo_scheme.setMinimumHeight(30)
         self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)
-        select_layout.addWidget(self._combo_scheme)
+        scheme_layout.addWidget(self._combo_scheme, 1)
 
-        select_layout.addStretch()
         self._btn_create_play = QPushButton(tr("新建基础属性…"))
         self._btn_create_play.setMinimumHeight(30)
         self._btn_create_play.clicked.connect(self._on_create_play_style)
-        select_layout.addWidget(self._btn_create_play)
+        self._config_fields = (
+            school_field, base_field, gongjue_field, scheme_field,
+            self._btn_create_play,
+        )
+        for col, widget in enumerate(self._config_fields):
+            select_layout.addWidget(widget, 0, col)
+        for col in range(4):
+            select_layout.setColumnStretch(col, 1)
 
-        layout.addWidget(select_group)
+        self._config_row = QWidget()
+        config_row_layout = QHBoxLayout(self._config_row)
+        config_row_layout.setContentsMargins(0, 0, 0, 0)
+        config_row_layout.setSpacing(4)
+        config_row_layout.addWidget(select_group, 1)
+        layout.addWidget(self._config_row)
 
         # ── 毕业率（独立区域，单列展示） ──
-        self._add_graduation_card(layout)
+        self._graduation_card = self._add_graduation_card(layout)
 
         # ── 属性展示区（主题一致的中性数据卡片） ──
         scroll = QScrollArea()
+        self._attrs_scroll = scroll
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border: none; }")
@@ -225,17 +251,17 @@ class CombatAttrsTab(QWidget):
         self._main_layout.addLayout(left_layout, stretch=1)
         self._main_layout.addLayout(right_layout, stretch=1)
 
-        self._add_attack_card(left_layout)
+        self._attack_card = self._add_attack_card(left_layout)
 
         # ── 判定属性卡片 ──
-        self._add_judgment_card(left_layout)
+        self._judgment_card = self._add_judgment_card(left_layout)
         left_layout.addStretch()
 
         # ── 增益效果（含动态专项增益） ──
-        self._add_gain_card(right_layout)
+        self._gain_card = self._add_gain_card(right_layout)
 
         # ── 增伤效果卡片 ──
-        self._add_damage_card(right_layout)
+        self._damage_card = self._add_damage_card(right_layout)
         right_layout.addStretch()
         scroll.setWidget(self._attrs_widget)
         layout.addWidget(scroll, stretch=1)
@@ -285,6 +311,7 @@ class CombatAttrsTab(QWidget):
         if card_layout is not None:
             card_layout.addWidget(content)
         parent_layout.addWidget(card)
+        return card
 
     def _create_card(self, title: str) -> QFrame:
         """创建与应用主题一致的中性分组卡片。"""
@@ -332,6 +359,7 @@ class CombatAttrsTab(QWidget):
         if card_layout is not None:
             card_layout.addLayout(grid)
         parent_layout.addWidget(card)
+        return card
 
     def _add_judgment_card(self, parent_layout: QVBoxLayout):
         """判定属性按相同业务含义排成三行。"""
@@ -357,6 +385,7 @@ class CombatAttrsTab(QWidget):
         if card_layout is not None:
             card_layout.addLayout(grid)
         parent_layout.addWidget(card)
+        return card
 
     def _add_gain_card(self, parent_layout: QVBoxLayout):
         """创建具有固定六行槽位的增益效果卡片。"""
@@ -396,6 +425,7 @@ class CombatAttrsTab(QWidget):
         if card_layout is not None:
             card_layout.addLayout(grid)
         parent_layout.addWidget(card)
+        return card
 
     def _add_damage_card(self, parent_layout: QVBoxLayout):
         """创建固定三行两列的伤害加成卡片。"""
@@ -432,6 +462,65 @@ class CombatAttrsTab(QWidget):
         if card_layout is not None:
             card_layout.addLayout(grid)
         parent_layout.addWidget(card)
+        return card
+
+    def set_embedded_mode(self, mode: str) -> None:
+        """Adapt the reusable content for loadout sidebar/half/full modes."""
+        self._toolbar_widget.setVisible(False)
+        collapsed = mode == "sidebar"
+        self._select_group.setVisible(not collapsed)
+        self._graduation_card.setVisible(False)  # promoted to LoadoutPanel row 3
+        self._attrs_scroll.setVisible(not collapsed)
+        self.setMinimumWidth(0)
+        if not collapsed:
+            self._layout_attribute_cards(mode)
+            positions = (
+                ((0, 0), (0, 1), (0, 2), (0, 3), (0, 4))
+                if mode == "full"
+                else ((0, 0), (0, 1), (1, 0), (1, 1), (1, 2))
+            )
+            for widget, (row, col) in zip(self._config_fields, positions, strict=True):
+                self._select_layout.addWidget(widget, row, col)
+
+    @staticmethod
+    def _drain_layout(layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.layout() is not None:
+                CombatAttrsTab._drain_layout(item.layout())
+
+    def _layout_attribute_cards(self, mode: str) -> None:
+        """Half screen is a single ordered flow; full screen is a compact grid."""
+        self._drain_layout(self._main_layout)
+        cards = (
+            self._attack_card, self._judgment_card,
+            self._gain_card, self._damage_card,
+        )
+        for card in cards:
+            card.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        if mode == "half":
+            flow = QVBoxLayout()
+            flow.setContentsMargins(0, 0, 0, 0)
+            flow.setSpacing(12)
+            for card in cards:
+                flow.addWidget(card)
+            flow.addStretch(1)
+            self._main_layout.addLayout(flow)
+            return
+
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+        grid.addWidget(self._attack_card, 0, 0)
+        grid.addWidget(self._judgment_card, 1, 0)
+        grid.addWidget(self._gain_card, 0, 1)
+        grid.addWidget(self._damage_card, 1, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        grid.setRowStretch(2, 1)
+        self._main_layout.addLayout(grid)
 
     def _create_dynamic_slot(self, grid: QGridLayout, row: int,
                              col: int) -> tuple[QWidget, QLabel, QLabel]:
@@ -536,6 +625,7 @@ class CombatAttrsTab(QWidget):
 
         self._combo_school.blockSignals(True)
         self._combo_school.clear()
+        self._combo_school.addItem("")
         for name in schools:
             self._combo_school.addItem(name)
         self._combo_school.blockSignals(False)

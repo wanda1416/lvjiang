@@ -28,7 +28,7 @@
 # 主副武器共用武器背包，只通过 main_weapon 扫描一次；环、佩使用
 # 武器详情字段，四件防具使用防具详情字段。指纹按业务约定唯一，
 # 行首装备指纹用于判断该物理行是否读过；装备指纹作为
-# session.bag_items 的装备 key。已读行只读第一列锚点，不再重复
+# 公共装备池的装备 key。已读行只读第一列锚点，不再重复
 # 点击和 OCR 第 2～6 列。背包装备按等级倒序排列，首次读到低于
 # min_level 的装备后立即结束当前槽位扫描。
 
@@ -37,10 +37,6 @@ default $min_level = 110
 import "subcall/navigation.wf"
 
 call nav_main_to_equip()
-if not session.bag_items
-    eval session.bag_items = {}
-end
-
 if $slots.weapon
     call scan_slot_bag("main_weapon", "weapon", "weapon", $min_level)
 end
@@ -120,6 +116,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                     break
                 end
                 eval $items.$fp = $equip
+                eval write_bag_item($group, $equip)
                 eval $total_count = $total_count + 1
 
                 eval $c = 2
@@ -154,6 +151,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                         break
                     end
                     eval $items.$fp = $equip
+                    eval write_bag_item($group, $equip)
                     eval $total_count = $total_count + 1
                     eval $c = $c + 1
                 end
@@ -180,7 +178,5 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
         wait stable @scroll_settle
     end
 
-    eval session.bag_items.$group = $items
-    eval save()
     log "═══ 部位 " + $group + " 扫描完成，共 " + $total_count + " 件 ═══"
 end

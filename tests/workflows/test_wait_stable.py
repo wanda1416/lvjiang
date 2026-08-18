@@ -41,28 +41,32 @@ def _workflow_with_capture(cap: _SeqCapture, **kw):
 
 class TestWaitStableExecution:
     def test_stable_screen_returns(self):
-        """画面变化后稳定 → 正常返回"""
+        """画面变化后稳定 → 正常返回，capture 被多次调用"""
         frames = [
             _frame(100),
             _frame(200),   # 变化
             *[_frame(200) for _ in range(20)],  # 大量相同帧
         ]
-        wf = _workflow_with_capture(_SeqCapture(frames))
-        # timeout=5s 总超时，stable_duration=0.1s 需连续稳定 0.1s
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap)
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01, stable_duration=0.02)
+        assert cap._idx > 2  # 至少采集了变化前 + 变化 + 稳定帧
 
     def test_timeout_continues_without_raising(self):
         """画面持续变化，超时后记警告并继续（不抛异常）"""
         frames = [_frame(i * 10) for i in range(50)]
-        wf = _workflow_with_capture(_SeqCapture(frames))
-        # 新语义：timeout 是预算而非断言，耗尽后正常返回
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap)
         wf.wait_stable(timeout=0.15, threshold=0.02, interval=0.01, stable_duration=0.02)
+        assert cap._idx > 0  # 至少尝试采集过
 
     def test_stop_check_exits_early(self):
-        """停止标志置位时立即返回"""
+        """停止标志置位时立即返回，采集次数极少"""
         frames = [_frame(i * 20) for i in range(100)]
-        wf = _workflow_with_capture(_SeqCapture(frames), stop_check=lambda: True)
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap, stop_check=lambda: True)
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01)
+        assert cap._idx <= 1  # 停止标志应在首帧后即生效
 
     def test_capture_none_continues(self):
         """截图失败（返回 None）时继续循环"""
@@ -71,40 +75,39 @@ class TestWaitStableExecution:
             _frame(100),
             *[_frame(100) for _ in range(20)],
         ]
-        wf = _workflow_with_capture(_SeqCapture(frames))
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap)
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01, stable_duration=0.02)
+        assert cap._idx >= 2  # 跳过了 None 帧后继续采集
 
     def test_least_prevents_false_stable(self):
         """least 期间即使画面相同也不判定为稳定"""
-        # 前 10 帧全部相同（模拟点击后画面还没开始变化）
-        # 之后帧变化，再稳定
         frames = [
             *[_frame(100) for _ in range(10)],  # 相同帧（least 期间应忽略）
             _frame(200),                         # 变化
             *[_frame(200) for _ in range(20)],   # 稳定
         ]
-        wf = _workflow_with_capture(_SeqCapture(frames))
-        # least=0.5s，在 least 期间前 10 帧（0.05s * 10 = 0.5s）不应触发稳定判定
-        # 之后帧变化再稳定，应正常返回
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap)
+        # least=0.15 要求至少 0.15s 后才开始稳定检测，10 帧(0.1s) 不够
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
-                       stable_duration=0.02, least=0.1)
+                       stable_duration=0.02, least=0.15)
+        assert cap._idx > 10  # least 期间不应提前返回
 
     def test_crop_box_region_stable(self):
         """crop_box 限定区域：只对比指定区域，背景变化不影响稳定判定"""
-        # 构造 100x100 帧，左半背景变化、右半区域稳定
         frames = []
         for i in range(25):
             f = _frame(100)  # 全灰
-            # 左半背景随机变化（模拟游戏动画）
-            f[:, :50] = (i * 37) % 256
-            # 右半区域始终相同
-            f[:, 50:] = 200
+            f[:, :50] = (i * 37) % 256  # 左半背景变化
+            f[:, 50:] = 200              # 右半区域稳定
             frames.append(f)
-        wf = _workflow_with_capture(_SeqCapture(frames))
-        # 只对比右半区域 [x=50, y=0, w=50, h=100]，应快速稳定
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap)
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
                        stable_duration=0.02, least=0.02,
                        crop_box={"x": 50, "y": 0, "w": 50, "h": 100})
+        assert cap._idx > 0
 
     def test_crop_box_none_falls_back_to_full(self):
         """crop_box=None 时回退到全画面检测（向后兼容）"""
@@ -113,9 +116,11 @@ class TestWaitStableExecution:
             _frame(200),
             *[_frame(200) for _ in range(20)],
         ]
-        wf = _workflow_with_capture(_SeqCapture(frames))
+        cap = _SeqCapture(frames)
+        wf = _workflow_with_capture(cap)
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
                        stable_duration=0.02, crop_box=None)
+        assert cap._idx > 2
 
 
 class TestWaitStableDSL:
@@ -127,8 +132,7 @@ class TestWaitStableDSL:
         wf.write_text("wait stable 5 duration 0.02 interval 0.01\n", encoding="utf-8")
         eng = make_engine()
         eng._capture.capture.return_value = _frame(128)
-        # 正常执行不报"未定义等待参数"
-        eng.execute(wf)
+        eng.execute(wf)  # 不抛异常即通过
 
     def test_timeout_via_engine_continues(self, tmp_path):
         """通过引擎执行 wait stable，超时仅记警告，后续语句继续执行"""
@@ -144,5 +148,5 @@ class TestWaitStableDSL:
             "log \"timeout 后仍继续执行\"\n",
             encoding="utf-8",
         )
-        # 不抛异常，流程正常走完
-        eng.execute(wf)
+        eng.execute(wf)  # 不抛异常，流程正常走完
+        assert cap._idx > 0

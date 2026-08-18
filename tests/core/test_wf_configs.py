@@ -39,6 +39,7 @@ class TestBasicOperations:
 
     def test_delete_nonexistent_is_silent(self, session_store):
         delete_wf_config("never_existed")  # 不抛异常
+        assert get_wf_config("never_existed") == {}  # 仍为空
 
     def test_get_all(self, session_store):
         set_wf_config("wf_1", {"a": 1})

@@ -33,130 +33,64 @@ def fire():
     return get_tuning_judge("heal_fire")
 
 
-# ─── 纯奶：主武器（扇，需 扇武学增效） ─────────────────────
+# ─── 纯奶：各部位四档判定（参数化） ─────────────────────────
 
-class TestPureFan:
-    def test_top(self, pure):
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "敏"])
-        assert pure.judge(e).rating == Rating.TOP
+class TestPureRatings:
+    """纯奶规则各部位四档评级。"""
 
-    def test_min_first_huixin_excellent(self, pure):
-        # 首词条 大外/小外 均可；会心 破坏顶级排除条件 → 优秀
-        e = make_equip("扇", ["最小外功攻击", "扇武学增效", "最大外功攻击", "劲", "会心率"])
-        assert pure.judge(e).rating == Rating.EXCELLENT
+    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+        # 主武器扇
+        ("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "敏"], "gold", Rating.TOP),
+        ("扇", ["最小外功攻击", "扇武学增效", "最大外功攻击", "劲", "会心率"], "gold", Rating.EXCELLENT),
+        # 副武器伞
+        ("伞", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "敏"], "gold", Rating.TOP),
+        ("伞", ["最大外功攻击", "最小外功攻击", "劲", "敏", "会心率"], "gold", Rating.EXCELLENT),
+        ("伞", ["最大外功攻击", "最大外功攻击", "敏", "势", "会心率"], "gold", Rating.NORMAL),
+        # 环
+        ("环", ["最小外功攻击", "全武学增效", "劲", "最大外功攻击", "会心率"], "gold", Rating.TOP),
+        ("环", ["最大外功攻击", "全武学增效", "劲", "敏", "最大牵丝攻击"], "gold", Rating.EXCELLENT),
+        ("环", ["最小外功攻击", "劲", "最大外功攻击", "敏", "会心率"], "gold", Rating.JUNK),
+        # 冠胄
+        ("冠胄", ["会心率", "最大外功攻击", "劲", "敏", "会心率"], "purple", Rating.TOP),
+        ("冠胄", ["会心率", "最大外功攻击", "敏", "会心率", "势"], "purple", Rating.NORMAL),
+        # 胫甲
+        ("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "敏"], "purple", Rating.TOP),
+        ("胫甲", ["劲", "最小外功攻击", "最大外功攻击", "势", "敏"], "purple", Rating.JUNK),
+        ("胫甲", ["劲", "对首领单位增伤", "最小外功攻击", "最大外功攻击", "势"], "purple", Rating.JUNK),
+    ])
+    def test_rating(self, pure, equip_type, affixes, quality, expected):
+        e = make_equip(equip_type, affixes, quality=quality)
+        assert pure.judge(e).rating == expected
 
-    def test_junk_missing_zengxiao(self, pure):
+    def test_junk_missing_zengxiao_reason(self, pure):
+        """缺增伤时 reason 包含 '增伤'"""
         e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "最小外功攻击", "劲", "势"])
         r = pure.judge(e)
         assert r.rating == Rating.JUNK
         assert any("增伤" in s for s in r.reasons)
 
 
-# ─── 纯奶：副武器（伞，不需增伤） ──────────────────────────
+# ─── 火拳奶：各部位四档判定（参数化） ───────────────────────
 
-class TestPureUmbrella:
-    def test_top(self, pure):
-        e = make_equip("伞", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "敏"])
-        assert pure.judge(e).rating == Rating.TOP
+class TestFireRatings:
+    """火拳奶规则各部位四档评级。"""
 
-    def test_min_huixin_together_excellent(self, pure):
-        # 敏+会心 同现破坏顶级条件 → 优秀
-        e = make_equip("伞", ["最大外功攻击", "最小外功攻击", "劲", "敏", "会心率"])
-        assert pure.judge(e).rating == Rating.EXCELLENT
-
-    def test_normal_low_count(self, pure):
-        # 大外/小外/劲 计数 ≤ 1 → 一般
-        e = make_equip("伞", ["最大外功攻击", "最大外功攻击", "敏", "势", "会心率"])
-        assert pure.judge(e).rating == Rating.NORMAL
-
-
-# ─── 纯奶：环、冠胄、胫甲 ──────────────────────────────────
-
-class TestPureArmor:
-    def test_ring_top(self, pure):
-        # 无 敏 不触发 敏+会心 同现 → 顶级
-        e = make_equip("环", ["最小外功攻击", "全武学增效", "劲", "最大外功攻击", "会心率"])
-        assert pure.judge(e).rating == Rating.TOP
-
-    def test_ring_qiansi_excellent(self, pure):
-        # 最大牵丝攻击 破坏顶级排除条件 → 优秀
-        e = make_equip("环", ["最大外功攻击", "全武学增效", "劲", "敏", "最大牵丝攻击"])
-        assert pure.judge(e).rating == Rating.EXCELLENT
-
-    def test_ring_missing_quanwuxue_junk(self, pure):
-        e = make_equip("环", ["最小外功攻击", "劲", "最大外功攻击", "敏", "会心率"])
-        assert pure.judge(e).rating == Rating.JUNK
-
-    def test_helm_top(self, pure):
-        e = make_equip("冠胄", ["会心率", "最大外功攻击", "劲", "敏", "会心率"],
-                       quality="purple")
-        assert pure.judge(e).rating == Rating.TOP
-
-    def test_helm_normal_low_count(self, pure):
-        e = make_equip("冠胄", ["会心率", "最大外功攻击", "敏", "会心率", "势"],
-                       quality="purple")
-        assert pure.judge(e).rating == Rating.NORMAL
-
-    def test_leg_top_without_keep_pvp(self, pure):
-        # 对玩家单位增效 是纯奶池内必选词条：无需开启 keep_pvp 即顶级
-        e = make_equip("胫甲", ["劲", "对玩家单位增效", "最小外功攻击", "最大外功攻击", "敏"],
-                       quality="purple")
-        assert pure.judge(e).rating == Rating.TOP
-
-    def test_leg_missing_pvp_effect_junk(self, pure):
-        e = make_equip("胫甲", ["劲", "最小外功攻击", "最大外功攻击", "势", "敏"],
-                       quality="purple")
-        assert pure.judge(e).rating == Rating.JUNK
-
-    def test_leg_boss_damage_junk(self, pure):
-        # 纯奶不需要 对首领单位增伤 → 池外 → 垃圾
-        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最小外功攻击", "最大外功攻击", "势"],
-                       quality="purple")
-        assert pure.judge(e).rating == Rating.JUNK
-
-
-# ─── 火拳奶：武器不需增伤 ──────────────────────────────────
-
-class TestFire:
-    def test_fan_top(self, fire):
-        e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "精准率"])
-        assert fire.judge(e).rating == Rating.TOP
-
-    def test_fan_normal_missing_jin_dawai(self, fire):
-        # 非首无劲且无大外 → 一般
-        e = make_equip("扇", ["最大外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"])
-        assert fire.judge(e).rating == Rating.NORMAL
-
-    def test_fan_zengxiao_junk(self, fire):
-        # 扇武学增效 不在火拳词条库（两规则独立）→ 垃圾
-        e = make_equip("扇", ["最大外功攻击", "扇武学增效", "最大外功攻击", "劲", "势"])
-        assert fire.judge(e).rating == Rating.JUNK
-
-    def test_helm_top(self, fire):
-        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert fire.judge(e).rating == Rating.TOP
-
-    def test_helm_normal_missing_max(self, fire):
-        # 缺 最大外功攻击 → 一般
-        e = make_equip("冠胄", ["会心率", "单体类奇术增伤", "劲", "势", "敏"],
-                       quality="purple")
-        assert fire.judge(e).rating == Rating.NORMAL
-
-    def test_helm_missing_qishu_junk(self, fire):
-        e = make_equip("冠胄", ["会心率", "最大外功攻击", "劲", "势", "敏"],
-                       quality="purple")
-        assert fire.judge(e).rating == Rating.JUNK
-
-    def test_leg_top(self, fire):
-        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert fire.judge(e).rating == Rating.TOP
-
-    def test_leg_missing_boss_damage_junk(self, fire):
-        e = make_equip("胫甲", ["劲", "最大外功攻击", "劲", "势", "敏"],
-                       quality="purple")
-        assert fire.judge(e).rating == Rating.JUNK
+    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+        # 扇（不需增伤）
+        ("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "精准率"], "gold", Rating.TOP),
+        ("扇", ["最大外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"], "gold", Rating.NORMAL),
+        ("扇", ["最大外功攻击", "扇武学增效", "最大外功攻击", "劲", "势"], "gold", Rating.JUNK),
+        # 冠胄
+        ("冠胄", ["会心率", "单体类奇术增伤", "最大外功攻击", "劲", "敏"], "purple", Rating.TOP),
+        ("冠胄", ["会心率", "单体类奇术增伤", "劲", "势", "敏"], "purple", Rating.NORMAL),
+        ("冠胄", ["会心率", "最大外功攻击", "劲", "势", "敏"], "purple", Rating.JUNK),
+        # 胫甲
+        ("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "敏"], "purple", Rating.TOP),
+        ("胫甲", ["劲", "最大外功攻击", "劲", "势", "敏"], "purple", Rating.JUNK),
+    ])
+    def test_rating(self, fire, equip_type, affixes, quality, expected):
+        e = make_equip(equip_type, affixes, quality=quality)
+        assert fire.judge(e).rating == expected
 
 
 # ─── 势语义：势与三率同现降一般，仅带势/首词条三率封顶优秀 ──────────

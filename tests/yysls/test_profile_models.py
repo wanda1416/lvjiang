@@ -287,29 +287,29 @@ class TestParseKeyDef:
 
 
 class TestStepDef:
-    def test_from_raw_int(self):
-        s = StepDef.from_raw(100)
-        assert s.value == 100
-        assert s.source == ""
+    @pytest.mark.parametrize("raw,expected_value,expected_source", [
+        (100, 100, ""),
+        ({"value": -900, "source": " 打本消耗 "}, -900, "打本消耗"),
+    ])
+    def test_from_raw(self, raw, expected_value, expected_source):
+        s = StepDef.from_raw(raw)
+        assert s.value == expected_value
+        assert s.source == expected_source
 
-    def test_from_raw_dict(self):
-        s = StepDef.from_raw({"value": -900, "source": " 打本消耗 "})
-        assert s.value == -900
-        assert s.source == "打本消耗"
-
-    def test_to_dict_plain(self):
-        assert StepDef(10).to_dict() == 10
-
-    def test_to_dict_with_source(self):
-        assert StepDef(-900, "打本").to_dict() == {"value": -900, "source": "打本"}
+    @pytest.mark.parametrize("step,expected", [
+        (StepDef(10), 10),
+        (StepDef(-900, "打本"), {"value": -900, "source": "打本"}),
+    ])
+    def test_to_dict(self, step, expected):
+        assert step.to_dict() == expected
 
     def test_parse_steps_mixed(self):
         steps = parse_steps([1, {"value": 2, "source": "商店"}])
         assert steps == [StepDef(1), StepDef(2, "商店")]
 
-    def test_parse_steps_non_list(self):
-        assert parse_steps("invalid") == []
-        assert parse_steps(None) == []
+    @pytest.mark.parametrize("input", ["invalid", None])
+    def test_parse_steps_non_list(self, input):
+        assert parse_steps(input) == []
 
 
 class TestConstants:
@@ -353,19 +353,13 @@ class TestSyncTargetDef:
         t = SyncTargetDef.from_raw(orig)
         assert t is orig
 
-    def test_to_dict_minimal(self):
-        t = SyncTargetDef(key="stock:bugan")
-        assert t.to_dict() == {"key": "stock:bugan"}
-
-    def test_to_dict_with_ratio(self):
-        t = SyncTargetDef(key="stock:bugan", ratio=2.0)
-        d = t.to_dict()
-        assert d == {"key": "stock:bugan", "ratio": 2.0}
-
-    def test_to_dict_with_source(self):
-        t = SyncTargetDef(key="stock:bugan", ratio=1.0, source="打本")
-        d = t.to_dict()
-        assert d == {"key": "stock:bugan", "source": "打本"}
+    @pytest.mark.parametrize("kwargs,expected", [
+        ({"key": "stock:bugan"}, {"key": "stock:bugan"}),
+        ({"key": "stock:bugan", "ratio": 2.0}, {"key": "stock:bugan", "ratio": 2.0}),
+        ({"key": "stock:bugan", "ratio": 1.0, "source": "打本"}, {"key": "stock:bugan", "source": "打本"}),
+    ])
+    def test_to_dict(self, kwargs, expected):
+        assert SyncTargetDef(**kwargs).to_dict() == expected
 
     def test_roundtrip(self):
         orig = SyncTargetDef(key="stock:bugan", ratio=-1.0, source="副本")
@@ -375,25 +369,27 @@ class TestSyncTargetDef:
         assert restored.ratio == orig.ratio
         assert restored.source == orig.source
 
-    def test_from_raw_direction(self):
-        t = SyncTargetDef.from_raw({"key": "stock:x", "direction": "neg"})
-        assert t.direction == DIR_NEG
-
-    def test_from_raw_direction_default_both(self):
-        t = SyncTargetDef.from_raw({"key": "stock:x"})
-        assert t.direction == DIR_BOTH
+    @pytest.mark.parametrize("raw,expected_dir", [
+        ({"key": "stock:x", "direction": "neg"}, DIR_NEG),
+        ({"key": "stock:x"}, DIR_BOTH),
+    ])
+    def test_from_raw_direction(self, raw, expected_dir):
+        assert SyncTargetDef.from_raw(raw).direction == expected_dir
 
     def test_from_raw_direction_invalid_raises(self):
         with pytest.raises(ValueError, match="无效的同步方向"):
             SyncTargetDef.from_raw({"key": "stock:x", "direction": "sideways"})
 
-    def test_to_dict_direction_non_default(self):
-        t = SyncTargetDef(key="stock:x", direction=DIR_POS)
-        assert t.to_dict() == {"key": "stock:x", "direction": "pos"}
-
-    def test_to_dict_direction_both_omitted(self):
-        t = SyncTargetDef(key="stock:x", direction=DIR_BOTH)
-        assert "direction" not in t.to_dict()
+    @pytest.mark.parametrize("kwargs,has_direction", [
+        ({"key": "stock:x", "direction": DIR_POS}, True),
+        ({"key": "stock:x", "direction": DIR_BOTH}, False),
+    ])
+    def test_to_dict_direction(self, kwargs, has_direction):
+        d = SyncTargetDef(**kwargs).to_dict()
+        if has_direction:
+            assert "direction" in d
+        else:
+            assert "direction" not in d
 
     def test_roundtrip_with_direction(self):
         orig = SyncTargetDef(key="stock:x", ratio=-1.0, direction=DIR_NEG, source="兑换")
@@ -405,20 +401,15 @@ class TestSyncTargetDef:
 
 
 class TestParseSyncKey:
-    def test_namespaced(self):
-        assert parse_sync_key("stock:bugan") == ("stock", "bugan")
-
-    def test_bare_key(self):
-        assert parse_sync_key("bugan") == ("", "bugan")
-
-    def test_empty(self):
-        assert parse_sync_key("") == ("", "")
-
-    def test_none(self):
-        assert parse_sync_key(None) == ("", "")
-
-    def test_whitespace(self):
-        assert parse_sync_key("  stock : bugan  ") == ("stock", "bugan")
+    @pytest.mark.parametrize("input,expected", [
+        ("stock:bugan", ("stock", "bugan")),
+        ("bugan", ("", "bugan")),
+        ("", ("", "")),
+        (None, ("", "")),
+        ("  stock : bugan  ", ("stock", "bugan")),
+    ])
+    def test_parse_sync_key(self, input, expected):
+        assert parse_sync_key(input) == expected
 
 
 # ─── parse_sync_targets ─────────────────────────────────────
@@ -439,9 +430,9 @@ class TestParseSyncTargets:
         assert len(targets) == 2
         assert targets[0].key == "stock:a"
 
-    def test_non_list(self):
-        assert parse_sync_targets("invalid") == []
-        assert parse_sync_targets(None) == []
+    @pytest.mark.parametrize("input", ["invalid", None])
+    def test_non_list_returns_empty(self, input):
+        assert parse_sync_targets(input) == []
 
     def test_filters_empty(self):
         targets = parse_sync_targets([None, "", {"key": "stock:a"}])

@@ -228,16 +228,14 @@ class TestValidation:
         rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
         assert "keep_pvp" in rule.referenced_switches()
 
-    def test_playstyle_switch_unknown_key_rejected(self):
-        """玩法绑定未注册开关 key：传 switch_keys 时报错"""
+    def test_playstyle_switch_rejected(self):
+        """玩法绑定开关：未注册 key 或非法格式均拒绝"""
         data = minimal_rule()
+        # 未注册 key
         data["playstyles"]["测试"]["switch"] = "nonexistent"
         with pytest.raises(RuleValidationError, match="未注册"):
             parse_tuning_rule(data, switch_keys={"keep_pvp"})
-
-    def test_playstyle_switch_bad_format_rejected(self):
-        """玩法绑定开关 key 格式非法：拒绝"""
-        data = minimal_rule()
+        # 非法格式
         data["playstyles"]["测试"]["switch"] = "Bad-Key"
         with pytest.raises(RuleValidationError, match="非法"):
             parse_tuning_rule(data)
@@ -653,21 +651,14 @@ class TestTuneConfig:
         data.pop("switches")
         assert parse_tune_config(data).switches == {}
 
-    def test_missing_part_rejected(self):
+    @pytest.mark.parametrize("mutate", [
+        lambda d: d["quality_thresholds"].pop("佩"),           # 缺少部位
+        lambda d: d["quality_thresholds"].update({"default": ["gold"]}),  # 未知部位
+        lambda d: d["quality_thresholds"].update({"武器": ["legendary"]}),  # 非法品阶
+    ])
+    def test_quality_threshold_rejected(self, mutate):
         data = _valid_config()
-        data["quality_thresholds"].pop("佩")
-        with pytest.raises(RuleValidationError):
-            parse_tune_config(data)
-
-    def test_unknown_part_rejected(self):
-        data = _valid_config()
-        data["quality_thresholds"]["default"] = ["gold"]
-        with pytest.raises(RuleValidationError):
-            parse_tune_config(data)
-
-    def test_bad_quality_rejected(self):
-        data = _valid_config()
-        data["quality_thresholds"]["武器"] = ["legendary"]
+        mutate(data)
         with pytest.raises(RuleValidationError):
             parse_tune_config(data)
 
@@ -1194,15 +1185,13 @@ class TestRuleQualityThresholds:
             quality_thresholds={"佩": ["gold", "purple"]}))
         assert rule.quality_thresholds == {"佩": ["gold", "purple"]}
 
-    def test_unknown_part_rejected(self):
+    @pytest.mark.parametrize("thresholds", [
+        {"default": ["gold"]},   # 未知部位
+        {"佩": ["legendary"]},   # 非法品阶
+    ])
+    def test_quality_threshold_rejected(self, thresholds):
         with pytest.raises(RuleValidationError):
-            parse_tuning_rule(minimal_rule(
-                quality_thresholds={"default": ["gold"]}))
-
-    def test_bad_quality_rejected(self):
-        with pytest.raises(RuleValidationError):
-            parse_tuning_rule(minimal_rule(
-                quality_thresholds={"佩": ["legendary"]}))
+            parse_tuning_rule(minimal_rule(quality_thresholds=thresholds))
 
     def test_builtin_examples_loaded(self):
         # 内置示例：会意环 / 小外佩 金紫皆可
@@ -1245,19 +1234,15 @@ class TestTuningGroupManagerCRUD:
         assert g.scan.rules == []
         assert g.tune.rules == []
 
-    def test_create_group_bad_key_rejected(self, mgr):
-        with pytest.raises(RuleValidationError):
-            mgr.create_group("BadKey", "非法大写")
-        with pytest.raises(RuleValidationError):
-            mgr.create_group("1abc", "数字开头")
-
-    def test_create_group_duplicate_key_rejected(self, mgr):
-        with pytest.raises(RuleValidationError, match="已存在"):
-            mgr.create_group("default", "重复")
-
-    def test_create_group_empty_name_rejected(self, mgr):
-        with pytest.raises(RuleValidationError, match="名称"):
-            mgr.create_group("new_key", "")
+    @pytest.mark.parametrize("key,name,match", [
+        ("BadKey", "非法大写", None),
+        ("1abc", "数字开头", None),
+        ("default", "重复", "已存在"),
+        ("new_key", "", "名称"),
+    ])
+    def test_create_group_rejected(self, mgr, key, name, match):
+        with pytest.raises(RuleValidationError, match=match):
+            mgr.create_group(key, name)
 
     def test_copy_group_is_independent(self, mgr):
         # 复制组应是源组的独立副本
@@ -1273,9 +1258,13 @@ class TestTuningGroupManagerCRUD:
         mgr.save_group("default_copy", raw)
         assert mgr.get_group("default").scan.min_level != 50
 
-    def test_copy_group_missing_src_rejected(self, mgr):
+    @pytest.mark.parametrize("method,args", [
+        ("copy_group", ("nonexistent", "new", "新组")),
+        ("delete_group", ("nonexistent",)),
+    ])
+    def test_nonexistent_rejected(self, mgr, method, args):
         with pytest.raises(RuleValidationError, match="不存在"):
-            mgr.copy_group("nonexistent", "new", "新组")
+            getattr(mgr, method)(*args)
 
     def test_delete_last_group_rejected(self, mgr):
         # 仅剩一个规则组时不可删除
@@ -1296,7 +1285,3 @@ class TestTuningGroupManagerCRUD:
         mgr.delete_group("default")
         assert "default" not in mgr.get_groups()
         assert "temp" in mgr.get_groups()
-
-    def test_delete_group_nonexistent_rejected(self, mgr):
-        with pytest.raises(RuleValidationError, match="不存在"):
-            mgr.delete_group("nonexistent")

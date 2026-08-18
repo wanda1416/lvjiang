@@ -141,12 +141,39 @@ class FakeWF(AutoTuningWorkflow):
         # 默认值：回收确认弹窗包含「确认」（除非测试显式覆盖为锁定场景）
         if scene_key == EQUIP_DETAIL and "recycle_confirm" not in data:
             data["recycle_confirm"] = "确认"
+        # 导航预检：菜单页检查
+        if scene_key == "game_menu_page":
+            data.setdefault("wulinlu", "武林录")
+        # 导航预检：包裹页 tab 检查
+        if scene_key == "bag_equip_detail":
+            data.setdefault("sub_baoguo", "培养")
         if field_keys:
             return {k: v for k, v in data.items() if k in field_keys}
         return data
 
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
-        return "sub_func_1" if self._nav_tune_ok else ""
+        # 导航预检：菜单页检查
+        if scene_key == "game_menu_page" and "wulinlu" in field_keys:
+            return "武林录"
+        # 导航预检：主页多区域检查
+        if scene_key == "game_main_page":
+            return "菜单"  # 模拟在主页
+        # 导航预检：包裹页 tab 检查
+        if scene_key == "bag_equip_detail" and "sub_baoguo" in field_keys:
+            return "培养"  # 模拟在培养 tab
+        # 导航预检：装备列表检查（recycle + sub_equip）
+        if scene_key == "bag_equip_detail" and ("recycle" in field_keys or "sub_equip" in field_keys):
+            if "recycle" in field_keys:
+                return "回收"
+            if "sub_equip" in field_keys:
+                return "装备"
+        # 调律按钮查找
+        if scene_key == "equip_detail":
+            return "sub_func_1" if self._nav_tune_ok else ""
+        # 调律页校验
+        if scene_key == "equip_tune_detail" and "tune_btn" in field_keys:
+            return "词库预览"
+        return ""
 
     def recognize_materials_by(self, scene_key, field_keys, target_value,
                                mode, group=None, min_confidence=None):
@@ -1531,6 +1558,16 @@ def test_row_cols_stops_at_empty_slot():
     }
     wf._process_row_cols(WEAPON_DETAIL, win_row=1, logical_row=1, cols=3)
     assert wf.processed == []
+
+
+def test_empty_ocr_model_with_cached_fingerprint_is_empty_slot():
+    """回归：空槽即使携带旧固定 _fp，也不能被自动调律当成装备。"""
+    empty = {
+        "type": None, "name": None, "level": None, "quality": None,
+        "is_chengyin": False, "base_attr": None, "base_attr_2": None,
+        "dingyin": None, "_fp": "116f370e",
+    }
+    assert AutoTuningWorkflow._make_fingerprint(empty) == ""
 
 
 def test_row_cols_recycle_stays_at_column():

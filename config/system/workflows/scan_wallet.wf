@@ -51,19 +51,7 @@ import "subcall/navigation.wf"
 import "subcall/game_profile.wf"
 
 # ─── 导航到钱袋页面 ──────────────────────────────────────
-# 主页 → 菜单
-click [game_main_page].[menu] after wait @page_refresh
-# 菜单 → 包裹
-click [game_menu_page].[baoguo] after wait @page_refresh
-
-# 确保在装备页（包裹可能默认打开道具页）
-scan [bag_equip_detail].[sub_equip] as $check
-if not $check.sub_equip contains "装备"
-    click [bag_equip_detail].[peiyang] after wait @page_refresh
-end
-
-# 装备页 → 钱袋
-click [bag_equip_detail].[qiandai] after wait @page_refresh
+call nav_main_to_wallet()
 
 # ─── 扫描区域货币（money_1, 1×4） ────────────────────────
 # 四种可能：宋元通宝、月华通宝、周元通宝、墨筹

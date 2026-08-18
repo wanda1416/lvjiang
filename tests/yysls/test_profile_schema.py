@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from lvjiang.apps.yysls.config.profile_models import (
+    NoteKeyDef,
     QuotaKeyDef,
     RegenKeyDef,
     StockKeyDef,
@@ -179,6 +180,19 @@ class TestLoadConfig:
         assert len(schema.get_all_keys()) == 1
         assert schema.get_key("valid") is not None
 
+    def test_load_note_model(self, profile_env):
+        """note 模型 key 正确加载"""
+        _write_profile_yaml(profile_env, {
+            "note": [
+                {"key": "took_xinfa", "label": "是否拿心法"},
+            ],
+        })
+        schema = _load_config()
+        kd = schema.get_key("took_xinfa")
+        assert kd is not None
+        assert isinstance(kd, NoteKeyDef)
+        assert schema.get_model_type("took_xinfa") == "note"
+
 
 # ─── 保存 ────────────────────────────────────────────────────
 
@@ -203,14 +217,16 @@ class TestSaveConfig:
             "quota": [QuotaKeyDef(key="d1", label="D1", period="week")],
             "regen": [RegenKeyDef(key="r1", label="R1", cap=100)],
             "stock": [StockKeyDef(key="res1", label="Res1")],
+            "note": [NoteKeyDef(key="n1", label="N1")],
         })
         save_profile_config(schema)
         reloaded = _load_config()
 
-        assert len(reloaded.get_all_keys()) == 3
+        assert len(reloaded.get_all_keys()) == 4
         assert isinstance(reloaded.get_key("d1"), QuotaKeyDef)
         assert isinstance(reloaded.get_key("r1"), RegenKeyDef)
         assert isinstance(reloaded.get_key("res1"), StockKeyDef)
+        assert isinstance(reloaded.get_key("n1"), NoteKeyDef)
 
 
 # ─── 单例 ────────────────────────────────────────────────────

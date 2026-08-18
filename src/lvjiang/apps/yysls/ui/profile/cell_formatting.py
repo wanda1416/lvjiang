@@ -19,6 +19,7 @@ from .....i18n import tr
 from ...config.profile_models import (
     DIR_BOTH,
     DIRECTION_LABELS,
+    MODEL_NOTE,
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
@@ -202,6 +203,13 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
         # 存量模型无上限时纯数字
         return str(int(value)), ""
 
+    if model_type == MODEL_NOTE:
+        text = entry.get("value_text", "")
+        if text:
+            return text, ""
+        # 兼容：如果 value_text 为空但有数值 value，显示数值
+        return (str(int(value)) if value else "", "")
+
     return str(value), ""
 
 
@@ -308,6 +316,12 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         lines.append(f"更新时间: {updated_at}")
     if model_type != MODEL_REGEN and updated_time:
         lines.append(f"写入时间: {updated_time}")
+
+    # note 模型显示文本值
+    if model_type == MODEL_NOTE:
+        text = entry.get("value_text", "")
+        if text:
+            lines.append(f"备注值: {text}")
 
     # 配额模型显示周期、上限
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):

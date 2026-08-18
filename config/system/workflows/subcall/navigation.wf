@@ -4,35 +4,117 @@
 # 提供页面间导航的原子操作，供各工作流 import 后调用。
 #
 # 包含过程：
-#   nav_main_to_equip()  — 主界面 → 背包装备页
+#   nav_main_to_bag()    — 主界面 → 背包页（返回当前 tab 编号 1-4）
+#   nav_main_to_equip()  — 主界面 → 背包装备列表页
+#   nav_main_to_wallet() — 主界面 → 背包钱袋页
 #   nav_back_to_main()   — 背包装备页 → 主界面
 #   nav_equip_to_tune()  — 装备详情页 → 调律页
 
-# ─── nav_main_to_equip ────────────────────────────────────
-# 从主界面导航到装备培养页面
-# 路径：主界面 → 菜单 → 包裹 → 培养（如不在装备页则自动切换）
+# ─── nav_main_to_bag ──────────────────────────────────────
+# 从主界面导航到背包页面
+# 路径：主界面 → 菜单 → 包裹
 # 前置：在主界面或菜单页
-# 后置：在背包装备页（bag_equip_detail）
+# 后置：在背包页（bag_equip_detail），通过 sub_baoguo 判定当前 tab
+# 返回：1=培养, 2=道具, 3=任务, 4=钱袋；0 表示无法识别（已 pause）
 
-def nav_main_to_equip()
+def nav_main_to_bag()
     # 检查当前是否在菜单页
-    scan [game_menu_page].[wulinlu] as $result
-    if not $result.[wulinlu] equals "武林录"
-        # 不在菜单页，从主界面进入菜单
-        click [game_main_page].[menu] after wait @page_refresh
+    scan [game_menu_page].[wulinlu] as $menu_check
+    if $menu_check.[wulinlu] contains "武林录"
+        log info "当前已在菜单页"
     else
-        log "当前已在菜单页"
+        # 不在菜单页，检查是否在主页（多区域同时扫描）
+        eval $main_items = ["菜单", "活动", "武林录", "限时"]
+        scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $main_check by contains_any $main_items
+        if $main_check
+            log info "从主页进入菜单页"
+            click [game_main_page].[menu] after wait @page_refresh
+        else
+            eval pause("当前不在主页或菜单页，请手动导航后点击继续")
+        end
     end
 
     # 菜单页 → 背包页
+    log info "从菜单页进入包裹页"
     click [game_menu_page].[baoguo] after wait @page_refresh
 
-    # 检查是否在装备页（可能开包裹后在道具页等其他页面）
-    scan [bag_equip_detail].[sub_equip] as $bag_scan
-    if not $bag_scan.sub_equip contains "装备"
-        # 不在装备页，点击培养切换
+    # 通过 sub_baoguo 判定当前 tab
+    scan [bag_equip_detail].[sub_baoguo] as $tab_text
+    eval $tab = 0
+    if $tab_text.sub_baoguo contains "培养"
+        eval $tab = 1
+    end
+    if $tab_text.sub_baoguo contains "道具"
+        eval $tab = 2
+    end
+    if $tab_text.sub_baoguo contains "任务"
+        eval $tab = 3
+    end
+    if $tab_text.sub_baoguo contains "钱袋"
+        eval $tab = 4
+    end
+
+    if $tab == 0
+        eval pause("未进入包裹页面，请手动导航后点击继续")
+    end
+
+    return $tab
+end
+
+# ─── nav_main_to_equip ────────────────────────────────────
+# 从主界面导航到装备培养页面的装备列表
+# 路径：主界面 → 菜单 → 包裹 → 培养 → 装备列表
+# 前置：在主界面或菜单页
+# 后置：在背包装备列表页（recycle + sub_equip 同时可见）
+
+def nav_main_to_equip()
+    call $tab = nav_main_to_bag()
+
+    # 不在培养 tab 则点击切换
+    if $tab != 1
+        log info "从包裹页切换到培养页"
         click [bag_equip_detail].[peiyang] after wait @page_refresh
     end
+
+    # 校验是否在装备列表：recycle 含"回收" 且 sub_equip 含"装备"
+    scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
+    scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
+    if not $recycle_check or not $equip_check
+        # 不在装备列表子 tab，点击 sub_equip 切换
+        log info "从培养页切换到装备列表"
+        click [bag_equip_detail].[sub_equip] after wait @page_refresh
+    end
+
+    # 最终校验
+    scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
+    scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
+    if not $recycle_check or not $equip_check
+        eval pause("未进入装备列表，请手动导航后点击继续")
+    end
+    log info "已到达装备列表页"
+end
+
+# ─── nav_main_to_wallet ───────────────────────────────────
+# 从主界面导航到背包钱袋页面
+# 路径：主界面 → 菜单 → 包裹 → 钱袋
+# 前置：在主界面或菜单页
+# 后置：在背包钱袋页（bag_wallet_detail）
+
+def nav_main_to_wallet()
+    call $tab = nav_main_to_bag()
+
+    # 不在钱袋 tab 则点击切换
+    if $tab != 4
+        log info "从包裹页切换到钱袋页"
+        click [bag_equip_detail].[qiandai] after wait @page_refresh
+    end
+
+    # 校验是否到达钱袋页
+    scan [bag_equip_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
+    if not $wallet_check
+        eval pause("未进入钱袋页面，请手动导航后点击继续")
+    end
+    log info "已到达钱袋页"
 end
 
 # ─── nav_back_to_main ─────────────────────────────────────
@@ -43,10 +125,13 @@ end
 # 注意：详情弹窗是覆盖在背包页上的隐形弹窗，需先关闭再逐层返回
 
 def nav_back_to_main()
+    log info "从装备详情页返回背包页"
     # 关闭详情弹窗 → 背包页
     click [bag_equip_detail].[back] after wait @page_refresh
+    log info "从背包页返回菜单页"
     # 背包页 → 菜单页
     click [bag_equip_detail].[back] after wait @page_refresh
+    log info "从菜单页返回主页"
     # 菜单页 → 主界面
     click [game_menu_page].[back] after wait @page_refresh
 end
@@ -72,5 +157,13 @@ def nav_equip_to_tune()
     end
 
     # 点击调律按钮，进入调律页
+    log info "从装备详情页进入调律页"
     click [equip_detail].$tune_key after wait @page_refresh
+
+    # 校验是否到达调律页
+    scan [equip_tune_detail].[tune_btn] as $tune_check by contains "词库预览"
+    if not $tune_check
+        eval pause("未进入调律页面，请手动导航后点击继续")
+    end
+    log info "已到达调律页"
 end

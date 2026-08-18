@@ -7,6 +7,8 @@ views:
   name: 确认
 - key: fight
   name: 战斗
+- key: get_item
+  name: 获得箱子
 regions:
 - key: confirm
   name: 确认
@@ -20,6 +22,17 @@ regions:
   is_text: true
   is_clickable: true
   view: confirm
+- key: close_item
+  name: 关闭提示
+  type: func
+  is_text: false
+  is_clickable: true
+  view: get_item
+- key: menu_area
+  name: 菜单功能区
+  type: attr
+  is_text: false
+  is_clickable: false
 points:
 - key: material_slot_1
   name: 材料格1

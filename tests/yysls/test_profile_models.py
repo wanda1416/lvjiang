@@ -11,11 +11,13 @@ from lvjiang.apps.yysls.config.profile_models import (
     DIR_NEG,
     DIR_POS,
     MODEL_CLASSES,
+    MODEL_NOTE,
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
     VALID_PERIODS,
     KeyDef,
+    NoteKeyDef,
     QuotaKeyDef,
     RegenKeyDef,
     StepDef,
@@ -278,6 +280,10 @@ class TestParseKeyDef:
         kd = parse_key_def("stock", {"key": "k", "label": "l"})
         assert isinstance(kd, StockKeyDef)
 
+    def test_note(self):
+        kd = parse_key_def("note", {"key": "k", "label": "l"})
+        assert isinstance(kd, NoteKeyDef)
+
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="未知模型类型"):
             parse_key_def("unknown", {"key": "k"})
@@ -314,15 +320,17 @@ class TestStepDef:
 
 class TestConstants:
     def test_all_models(self):
-        assert len(ALL_MODELS) == 3
+        assert len(ALL_MODELS) == 4
         assert MODEL_QUOTA in ALL_MODELS
         assert MODEL_REGEN in ALL_MODELS
         assert MODEL_STOCK in ALL_MODELS
+        assert MODEL_NOTE in ALL_MODELS
 
     def test_model_classes(self):
         assert MODEL_CLASSES[MODEL_QUOTA] is QuotaKeyDef
         assert MODEL_CLASSES[MODEL_REGEN] is RegenKeyDef
         assert MODEL_CLASSES[MODEL_STOCK] is StockKeyDef
+        assert MODEL_CLASSES[MODEL_NOTE] is NoteKeyDef
 
     def test_valid_periods(self):
         assert "day" in VALID_PERIODS

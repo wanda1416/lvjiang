@@ -12,6 +12,11 @@
 
 # ─── 从游戏首页进入活动页面 ─────────────────────────────
 click [game_main_page].[menu] after wait @page_refresh
+
+scan [game_menu_page].[huodong] as $nav_check by contains "活动"
+if not $nav_check
+    eval pause("未进入菜单页，请手动导航后点击继续")
+end
 click [game_menu_page].[huodong] after wait @page_refresh
 
 # ─── 各活动签到 ──────────────────────────────────────

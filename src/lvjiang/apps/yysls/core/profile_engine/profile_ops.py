@@ -19,6 +19,7 @@ from loguru import logger
 
 from .....i18n import tr
 from ...config.profile_models import (
+    MODEL_NOTE,
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
@@ -56,8 +57,11 @@ def _normalize_float_noise(value: float) -> float:
     return value
 
 
-def _read_current_value(username: str, model_type: str, key: str, kd) -> float:
-    """读取当前值（regen 模型按实时计算）"""
+def _read_current_value(username: str, model_type: str, key: str, kd) -> float | str | None:
+    """读取当前值（regen 模型按实时计算，note 返回文本或 None）"""
+    if model_type == MODEL_NOTE:
+        entry = db_read_entry(username, model_type, key)
+        return entry.get("value_text", "") or None
     profile_data = db_read_all(username)
     entry = profile_data.get(model_type, {}).get(key, {})
     current = entry.get("value", 0) or 0
@@ -103,8 +107,8 @@ def _clamp(new_value: float, model_type: str, kd) -> float:
 # ─── 共享读取管线 ─────────────────────────────────────────────
 
 
-def profile_read(username: str, key: str) -> float | None:
-    """读取 profile 单个 key 的当前值（regen 自动实时计算）
+def profile_read(username: str, key: str) -> float | str | None:
+    """读取 profile 单个 key 的当前值（regen 自动实时计算，note 返回文本）
 
     key 未在 profile.yaml 中定义或无数据时返回 None。
     与 UI 读取路径共用 _read_current_value，保证行为一致。
@@ -146,7 +150,7 @@ def profile_action(
     *,
     model_type: str | None = None,
     delta: float | None = None,
-    set_value: float | None = None,
+    set_value: float | str | None = None,
     source: str = tr("DSL 写入"),
     current_value: float | None = None,
     expected_entry: dict | None = None,
@@ -154,11 +158,14 @@ def profile_action(
     use_cas: bool = False,
     regen_progress_source: str = "target",
     force_write: bool = False,
-) -> float:
+) -> float | str:
     """统一 profile 写入入口
 
-    语义与 UI 的「增加/减少」完全一致：
+    数值模型（quota/regen/stock）：
     读当前值 → 计算新值 → clamp → 算 actual_delta → detail → db_upsert → sync_targets
+
+    note 模型：
+    直接写入 value_text 列，不走数值管线，不触发同步。
 
     Parameters
     ----------
@@ -169,15 +176,15 @@ def profile_action(
     delta:
         增减量（与 set_value 二选一）。
     set_value:
-        绝对设定值（与 delta 二选一）。
+        绝对设定值（与 delta 二选一）。数值模型内部转化为 delta；note 模型直接存储文本。
         内部转化为 delta = set_value - current，后续管线完全一致。
     source:
         变更来源，写入 history。
 
     Returns
     -------
-    float
-        写入后的新值；key 未定义或 clamp 后无变化时返回当前值。
+    float | str
+        数值模型返回写入后的新值；note 模型返回写入的文本；key 未定义时返回 0。
     """
     config = get_profile_config()
     model_type = model_type or config.get_model_type(key)
@@ -185,6 +192,15 @@ def profile_action(
         logger.warning(f"profile_action: key '{key}' 未在 profile.yaml 中定义")
         return 0
     kd = config.get_key(key, model_type=model_type)
+
+    # ── note 短路：文本直接写入，不走数值管线 ──
+    if model_type == MODEL_NOTE:
+        if kd is None:
+            logger.warning(f"profile_action: note key '{key}' 未在 profile.yaml 中定义")
+            return ""
+        text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
+        db_upsert(username, model_type, key, 0, value_text=text, source=source)
+        return text
 
     # ── 1. 读当前值 ──
     if current_value is None:

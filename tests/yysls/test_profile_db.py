@@ -87,6 +87,25 @@ class TestCRUD:
         assert db.get_entry("user1", "quota", "k1")["value"] == 10
         assert db.get_entry("user2", "quota", "k1")["value"] == 99
 
+    def test_upsert_value_text(self, db: ProfileDB):
+        """note 模型写入 value_text 列"""
+        db.upsert("user1", "note", "took_xinfa", 0, value_text="已拿")
+        entry = db.get_entry("user1", "note", "took_xinfa")
+        assert entry["value_text"] == "已拿"
+        assert entry["value"] == 0
+
+    def test_upsert_value_text_default_empty(self, db: ProfileDB):
+        """不传 value_text 时默认为空字符串"""
+        db.upsert("user1", "quota", "k1", 42)
+        entry = db.get_entry("user1", "quota", "k1")
+        assert entry["value_text"] == ""
+
+    def test_get_all_includes_value_text(self, db: ProfileDB):
+        """get_all 返回的 entry 包含 value_text 字段"""
+        db.upsert("user1", "note", "k1", 0, value_text="备注内容")
+        all_data = db.get_all("user1")
+        assert all_data["note"]["k1"]["value_text"] == "备注内容"
+
     def test_update_if_current_success(self, db: ProfileDB):
         db.upsert("user1", "regen", "xinli", 100, updated_at="2026-08-11T10:00:00")
         updated = db.update_if_current(
@@ -317,6 +336,61 @@ class TestSchemaMigration:
         entry = db.get_entry("u", "regen", "xinli")
 
         assert entry["updated_time"] != ""
+
+    def test_migrate_v4_adds_value_text_column(self, tmp_path: Path):
+        """v4: profile_entries 增加 value_text 列"""
+        db_path = tmp_path / "test_v4.db"
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.executescript("""
+                CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+                INSERT INTO schema_version(version) VALUES (3);
+                CREATE TABLE profile_entries (
+                    username   TEXT NOT NULL,
+                    type       TEXT NOT NULL,
+                    key        TEXT NOT NULL,
+                    value      REAL NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT '',
+                    updated_time TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (username, type, key)
+                );
+                CREATE TABLE profile_history (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts          TEXT    NOT NULL,
+                    username    TEXT    NOT NULL,
+                    type        TEXT    NOT NULL,
+                    key         TEXT    NOT NULL,
+                    old_value   REAL,
+                    new_value   REAL    NOT NULL,
+                    change_type TEXT    NOT NULL,
+                    detail      TEXT    DEFAULT '',
+                    source      TEXT    DEFAULT ''
+                );
+            """)
+            conn.commit()
+        finally:
+            conn.close()
+
+        db = ProfileDB(db_path)
+        conn = db._connect()
+        try:
+            cols = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
+            }
+        finally:
+            conn.close()
+
+        assert "value_text" in cols
+
+    def test_migrate_v4_idempotent(self, tmp_path: Path):
+        """v4 迁移列已存在时应幂等跳过"""
+        db_path = tmp_path / "test_v4_idem.db"
+        db1 = ProfileDB(db_path)
+        db1.upsert("u", "note", "k", 0, value_text="test")
+        # 重新打开应幂等
+        db2 = ProfileDB(db_path)
+        assert db2.get_entry("u", "note", "k")["value_text"] == "test"
 
 
 # ─── 变更历史 ─────────────────────────────────────────────────

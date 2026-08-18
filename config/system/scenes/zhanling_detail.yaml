@@ -1,0 +1,13 @@
+key: zhanling_detail
+name: 战令
+regions:
+- key: back
+  name: 返回
+  type: func
+  is_text: false
+  is_clickable: true
+- key: claim_all
+  name: 一键领取
+  type: func
+  is_text: true
+  is_clickable: true

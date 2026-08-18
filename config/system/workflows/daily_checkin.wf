@@ -25,6 +25,8 @@ call checkin_zhaoxi()
 # TODO: 后续在此添加更多活动签到过程
 # call checkin_xxx()
 
+# ─── 从活动退回菜单 ──────────────────────────────────────
+click [activity_main].[back] after wait @step_interval
 # ─── 从菜单退回主页 ──────────────────────────────────────
 click [game_menu_page].[back] after wait @step_interval
 log "每日签到流程结束。"
@@ -59,11 +61,7 @@ def checkin_zhaoxi()
 
       # 签到后：两次 back 退回菜单页
       click [activity_main].[back] after wait @step_interval
-      click [activity_main].[back] after wait @step_interval
    else
       log "今日已签到，无需重复操作。"
-
-      # 已签到：一次 back 退回菜单页
-      click [activity_main].[back] after wait @step_interval
    end
 end

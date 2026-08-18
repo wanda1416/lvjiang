@@ -367,4 +367,5 @@ def back_to_haoling()
       log "找不到江湖号令，请手动定位后继续"
       eval pause("找不到「江湖号令」，请手动定位到号令页后点击确定")
    end
+   return 0
 end

@@ -1030,8 +1030,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """获取或计算装备指纹。
 
         优先读取 dict 内已有的 _fp 字段（由 to_equipment / to_dict 自动设置），
-        仅当缺失时才回退计算。空装备返回空串。
+        仅当缺失时才回退计算。身份字段全空时必须返回空串，即使上游错误
+        缓存了 _fp；这是背包遍历判定空 slot 的入口隔离。
         """
+        if not isinstance(equip, dict) or not any(
+                equip.get(key) for key in ("type", "name", "level")):
+            return ""
         fp = equip.get("_fp", "")
         if fp:
             return fp

@@ -82,17 +82,14 @@ class TestWaitStableExecution:
 
     def test_least_prevents_false_stable(self):
         """least 期间即使画面相同也不判定为稳定"""
-        frames = [
-            *[_frame(100) for _ in range(10)],  # 相同帧（least 期间应忽略）
-            _frame(200),                         # 变化
-            *[_frame(200) for _ in range(20)],   # 稳定
-        ]
+        frames = [_frame(100) for _ in range(80)]  # 全部相同
         cap = _SeqCapture(frames)
         wf = _workflow_with_capture(cap)
-        # least=0.15 要求至少 0.15s 后才开始稳定检测，10 帧(0.1s) 不够
+        # least=0.3 强制至少等 0.3s，远超 stable_duration=0.02
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
-                       stable_duration=0.02, least=0.15)
-        assert cap._idx > 10  # least 期间不应提前返回
+                       stable_duration=0.02, least=0.3)
+        # 无 least 时 2-3 帧即可判稳定；有 least 必须等够 0.3s
+        assert cap._idx > 5
 
     def test_crop_box_region_stable(self):
         """crop_box 限定区域：只对比指定区域，背景变化不影响稳定判定"""

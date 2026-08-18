@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 
 from ..core.config.resolver import get_resolver
 from ..i18n import tr
@@ -58,6 +58,7 @@ class _UIHelper(QObject):
         super().__init__()
         self._window = window
         self._active_dialog = None
+        self._equip_notify_timer: QTimer | None = None
         self.request.connect(self._on_request)
 
     def _on_request(self, req: dict):
@@ -125,8 +126,26 @@ class _UIHelper(QObject):
             if self._window and getattr(self._window, 'alert_panel', None) is not None:
                 self._window.alert_panel.push_alert(alert_id, message, now.isoformat())
             return None
+        if action == "equipment_changed":
+            # 工作流写入装备数据后通知 UI。延迟发射 + 防抖合并：
+            # 立即返回放行工作流线程（不阻塞等待 UI 刷新），
+            # 批量写入时仅最后一次通知后 150ms 触发一次全量刷新
+            self._schedule_equipment_notify()
+            return None
         logger.warning(f"未知 UI 交互类型: {action}")
         return None
+
+    def _schedule_equipment_notify(self):
+        """主线程：重启式防抖，合并短时间内的多次装备变更通知。"""
+        if self._window is None:
+            return
+        if self._equip_notify_timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(150)
+            timer.timeout.connect(self._window.equipment_changed)
+            self._equip_notify_timer = timer
+        self._equip_notify_timer.start()
 
     def close_active_dialog(self):
         """主线程：关闭当前活动对话框（F10 停止时调用）

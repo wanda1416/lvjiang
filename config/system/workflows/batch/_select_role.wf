@@ -24,6 +24,18 @@ def _select_role($role_index, $role, $batch_state)
     click [game_login_page].[enter]
     wait 5
 
+    # 等待加载完成并进入主页
+    call login_to_main_page()
+
+    eval $batch_state.page_state = 2
+    eval $batch_state.role = $role
+    wait @step_interval
+    return {"status": "success", "message": "", "state": $batch_state}
+end
+
+# ─── 登录加载到主页 ────────────────────────────────────────
+# 等待加载条消失 → 检测主页元素 → 处理战令领奖/关闭弹窗
+def login_to_main_page()
     # 等待加载完成：检测 loading 区域的「加载」文字
     # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
     loop 10
@@ -40,23 +52,44 @@ def _select_role($role_index, $role, $batch_state)
     wait 5
 
     # 等待主页加载完成：检测菜单、活动、武林录任一文字
-    # 能读到 → 登录完成；否则关闭活动弹窗
+    # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
     eval $main_items = ["菜单", "活动", "武林录", "限时"]
     loop 8
         scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
         if $found
             log "主页加载完成，检测到：" + $found
-            goto all_done
+            # 检查是否有战令领奖入口
+            call claim_zhanling_reward()
+            return
         end
-        # 未检测到，关闭活动弹窗
-        click [game_login_page].[close_btn]
-        wait 2
+
+        # 未检测到主页，先检查战令领奖
+        scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
+        if $zllj
+            log "检测到战令领奖入口，先领奖"
+            call claim_zhanling_reward()
+            wait 2
+        else
+            # 没有战令领奖，尝试关闭活动弹窗
+            click [game_login_page].[close_btn]
+            wait 2
+        end
     end
     eval pause("无法确认已登录至主页，请手动检查后点击确定")
+end
 
-    @all_done
-    eval $batch_state.page_state = 2
-    eval $batch_state.role = $role
-    wait @step_interval
-    return {"status": "success", "message": "", "state": $batch_state}
+# ─── 战令领奖 ──────────────────────────────────────────────
+# 检测战令领奖入口，有则进入领取并返回
+def claim_zhanling_reward()
+    scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
+    if $zllj
+        log "进入战令领奖页面"
+        click [game_login_page].[zllj_btn] after wait @step_interval
+        scan [zhanling_detail].[claim_all] as $claim by contains "一键领取"
+        if $claim
+            log "点击一键领取"
+            click [zhanling_detail].[claim_all] after wait @step_interval
+        end
+        click [zhanling_detail].[back] after wait @step_interval
+    end
 end

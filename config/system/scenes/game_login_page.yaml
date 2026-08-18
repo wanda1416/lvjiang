@@ -80,6 +80,12 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: zllj_btn
+  name: 战令领奖
+  type: func
+  is_text: true
+  is_clickable: true
+  view: start
 points:
 - key: point_1
   name: 点1

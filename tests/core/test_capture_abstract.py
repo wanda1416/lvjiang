@@ -43,7 +43,8 @@ def test_default_attach_to_window_returns_false():
 
 def test_default_stop_is_noop():
     fake = _FakeCapture()
-    fake.stop()
+    fake.stop()  # 默认实现不抛异常
+    assert fake.get_capture_size() == (1080, 1920)  # 状态未变
 
 
 def test_default_capture_to_file_returns_false_when_capture_fails():

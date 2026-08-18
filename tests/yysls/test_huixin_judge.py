@@ -80,98 +80,57 @@ class TestBigWeaponRules:
         assert r.skipped and r.not_applicable
 
 
-# ─── 大外：四档条件与档序 ──────────────────────────────────
+# ─── 大外：四档条件与档序（参数化） ─────────────────────────
 
 class TestBigTiers:
-    def test_main_normal_before_top(self, big):
-        # 势 为缺陷词条命中一般条件；一般先于顶级判定
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "势"])
-        assert big.judge(e).rating == Rating.NORMAL
+    """大外规则各部位四档评级。"""
 
-    def test_main_defect_pair_normal(self, big):
-        # 精准+会心（非首）同现：当前规则 common normal 不再覆盖此场景
-        # → 四档条件均未命中，默认判定为优秀
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "会心率", "精准率"])
-        assert big.judge(e).rating == Rating.EXCELLENT
+    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+        # 主武器陌刀
+        ("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.NORMAL),
+        ("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "会心率", "精准率"], "gold", Rating.EXCELLENT),
+        ("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "会心率"], "gold", Rating.TOP),
+        ("陌刀", ["最大外功攻击", "陌刀武学增伤", "劲", "劲", "敏"], "gold", Rating.NORMAL),
+        # 环
+        ("环", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"], "gold", Rating.JUNK),
+        ("环", ["最大外功攻击", "全武学增效", "最大外功攻击", "劲", "敏"], "gold", Rating.TOP),
+        # 冠胄
+        ("冠胄", ["会心率", "精准率", "最大外功攻击", "劲", "敏"], "purple", Rating.TOP),
+        ("冠胄", ["精准率", "精准率", "最大外功攻击", "劲", "敏"], "purple", Rating.EXCELLENT),
+        # 胫甲
+        ("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "敏"], "purple", Rating.TOP),
+        ("胫甲", ["劲", "最大外功攻击", "最大外功攻击", "劲", "敏"], "purple", Rating.JUNK),
+    ])
+    def test_rating(self, big, equip_type, affixes, quality, expected):
+        e = make_equip(equip_type, affixes, quality=quality)
+        assert big.judge(e).rating == expected
 
-    def test_main_excellent(self, big):
-        # 单会心：当前规则主武器顶级要求 count_min[会心率/精准率/敏]≥1
-        # 会心率帮助命中顶级而非阻止
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "会心率"])
-        assert big.judge(e).rating == Rating.TOP
-
-    def test_main_missing_waigong_normal(self, big):
-        # 非首缺大外是硬门槛 → 能用封顶（一般）
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "劲", "劲", "敏"])
-        assert big.judge(e).rating == Rating.NORMAL
-
-    def test_ring_missing_quanwuxue_junk(self, big):
-        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
-        assert big.judge(e).rating == Rating.JUNK
-
-    def test_ring_out_of_pool_junk(self, big):
-        # 最大鸣金攻击 不在裂石词条库 → 垃圾
+    def test_ring_out_of_pool_junk_reason(self, big):
+        """池外词条判垃圾，reason 包含 '垃圾词条'"""
         e = make_equip("环", ["最大外功攻击", "全武学增效", "劲", "敏", "最大鸣金攻击"])
         r = big.judge(e)
         assert r.rating == Rating.JUNK
         assert any("垃圾词条" in s for s in r.reasons)
 
-    def test_ring_top(self, big):
-        e = make_equip("环", ["最大外功攻击", "全武学增效", "最大外功攻击", "劲", "敏"])
-        assert big.judge(e).rating == Rating.TOP
 
-    def test_helm_one_zhunji_top(self, big):
-        # count_max include_first：首会心 + 1 精准（计 1 ≤ 1）→ 顶级
-        e = make_equip("冠胄", ["会心率", "精准率", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert big.judge(e).rating == Rating.TOP
-
-    def test_helm_double_zhunji_excellent(self, big):
-        # 首精准 + 1 精准（含首计 2 > 1）→ 顶级条件不成立 → 优秀
-        e = make_equip("冠胄", ["精准率", "精准率", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert big.judge(e).rating == Rating.EXCELLENT
-
-    def test_leg_top(self, big):
-        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert big.judge(e).rating == Rating.TOP
-
-    def test_leg_missing_boss_damage_junk(self, big):
-        e = make_equip("胫甲", ["劲", "最大外功攻击", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert big.judge(e).rating == Rating.JUNK
-
-
-# ─── 小外：独立池与部位差异 ────────────────────────────────
+# ─── 小外：独立池与部位差异（参数化） ───────────────────────
 
 class TestSmall:
-    def test_main_top(self, small):
-        e = make_equip("陌刀", ["最小外功攻击", "陌刀武学增伤", "最小外功攻击", "敏", "最大无相攻击"])
-        assert small.judge(e).rating == Rating.TOP
+    """小外规则各部位评级。"""
 
-    def test_jin_out_of_pool_junk(self, small):
-        # 劲 不在小外词条库（大外池才有）→ 垃圾
-        e = make_equip("陌刀", ["最小外功攻击", "陌刀武学增伤", "劲", "敏", "最大无相攻击"])
-        assert small.judge(e).rating == Rating.JUNK
-
-    def test_leg_first_is_huixin(self, small):
-        # 小外胫甲首词条为 会心率/精准率（与大外的 劲 不同）
-        # 最大裂石攻击 经动态归类(裂石) → 最大本属攻击，满足顶级条件
-        e = make_equip("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "最大裂石攻击"],
-                       quality="purple")
-        assert small.judge(e).rating == Rating.TOP
-
-    def test_leg_jin_first_skipped(self, small):
-        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最小外功攻击", "敏", "最大无相攻击"],
-                       quality="purple")
-        assert small.judge(e).skipped
-
-    def test_leg_huixin_token_excellent(self, small):
-        # 非首词条再出现会心 → 顶级排除条件不成立 → 优秀
-        e = make_equip("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "会心率"],
-                       quality="purple")
-        assert small.judge(e).rating == Rating.EXCELLENT
+    @pytest.mark.parametrize("equip_type,affixes,quality,expected,skipped", [
+        ("陌刀", ["最小外功攻击", "陌刀武学增伤", "最小外功攻击", "敏", "最大无相攻击"], "gold", Rating.TOP, False),
+        ("陌刀", ["最小外功攻击", "陌刀武学增伤", "劲", "敏", "最大无相攻击"], "gold", Rating.JUNK, False),
+        ("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "最大裂石攻击"], "purple", Rating.TOP, False),
+        ("胫甲", ["劲", "对首领单位增伤", "最小外功攻击", "敏", "最大无相攻击"], "purple", None, True),
+        ("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "会心率"], "purple", Rating.EXCELLENT, False),
+    ])
+    def test_rating(self, small, equip_type, affixes, quality, expected, skipped):
+        e = make_equip(equip_type, affixes, quality=quality)
+        if skipped:
+            assert small.judge(e).skipped
+        else:
+            assert small.judge(e).rating == expected
 
 
 # ─── 品阶与首词条筛选 ──────────────────────────────────────

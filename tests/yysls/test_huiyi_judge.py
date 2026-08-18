@@ -42,143 +42,54 @@ def judge_pvp():
                             {"switches": {"keep_danti": True, "keep_wanjia": True}})
 
 
-# ─── 主武器（剑，会意规则需要 剑武学增伤） ─────────────────
+# ─── 各部位四档判定（参数化） ────────────────────────────────
 
-class TestJian:
-    def test_top(self, judge):
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"])
-        assert judge.judge(e).rating == Rating.TOP
+class TestEquipRatings:
+    """各部位装备在不同词条组合下的四档评级。"""
 
-    def test_excellent_huiyi(self, judge):
-        # 会意率 破坏顶级排除条件 → 优秀
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会意率"])
-        assert judge.judge(e).rating == Rating.EXCELLENT
+    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+        # ── 剑（主武器，需增伤）──
+        ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.TOP),
+        ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会意率"], "gold", Rating.EXCELLENT),
+        ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会意率", "最大无相攻击"], "gold", Rating.EXCELLENT),
+        ("剑", ["最大外功攻击", "剑武学增伤", "劲", "势", "会意率"], "gold", Rating.NORMAL),
+        ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会心率"], "gold", Rating.NORMAL),
+        ("剑", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.JUNK),
+        ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会心率", "精准率"], "gold", Rating.JUNK),
+        # ── 枪（副武器，不需增伤）──
+        ("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "最大无相攻击"], "gold", Rating.TOP),
+        ("枪", ["最大外功攻击", "最大外功攻击", "劲", "劲", "会意率"], "gold", Rating.EXCELLENT),
+        ("枪", ["最大外功攻击", "最大外功攻击", "会意率", "最大无相攻击", "最大无相攻击"], "gold", Rating.EXCELLENT),
+        ("枪", ["最大外功攻击", "劲", "势", "会意率", "最大无相攻击"], "gold", Rating.NORMAL),
+        ("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "精准率"], "gold", Rating.NORMAL),
+        ("枪", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.JUNK),
+        # ── 环/佩 ──
+        ("环", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "势"], "gold", Rating.TOP),
+        ("佩", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "最大鸣金攻击"], "gold", Rating.EXCELLENT),
+        ("环", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "劲"], "gold", Rating.EXCELLENT),
+        ("环", ["最大外功攻击", "最大外功攻击", "劲", "势", "劲"], "gold", Rating.JUNK),
+        # ── 冠胄 ──
+        ("冠胄", ["会意率", "最大外功攻击", "劲", "势", "会意率"], "purple", Rating.TOP),
+        ("冠胄", ["会意率", "最大外功攻击", "劲", "势", "最大鸣金攻击"], "purple", Rating.EXCELLENT),
+        ("冠胄", ["会意率", "会心率", "最大外功攻击", "劲", "势"], "purple", Rating.NORMAL),
+        ("冠胄", ["会意率", "会心率", "精准率", "最大外功攻击", "劲"], "purple", Rating.JUNK),
+        # ── 胫甲 ──
+        ("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "势"], "purple", Rating.TOP),
+        ("胫甲", ["劲", "最大外功攻击", "最大鸣金攻击", "劲", "势"], "purple", Rating.JUNK),
+    ])
+    def test_rating(self, judge, equip_type, affixes, quality, expected):
+        e = make_equip(equip_type, affixes, quality=quality)
+        assert judge.judge(e).rating == expected
 
-    def test_normal_missing_jin_shi(self, judge):
-        # 劲/势 全缺不算缺陷（可调出）→ 优秀
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会意率", "最大无相攻击"])
-        assert judge.judge(e).rating == Rating.EXCELLENT
-
-    def test_normal_missing_waigong(self, judge):
-        # 非首缺大外是硬门槛 → 能用封顶（一般）
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "劲", "势", "会意率"])
-        assert judge.judge(e).rating == Rating.NORMAL
-
-    def test_normal_defect_huixin(self, judge):
-        # 会心率 为会意流缺陷词条 → 一般
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会心率"])
-        assert judge.judge(e).rating == Rating.NORMAL
-
-    def test_junk_missing_damage(self, judge):
+    def test_junk_missing_damage_reason(self, judge):
+        """缺增伤时 reason 包含 '增伤'"""
         e = make_equip("剑", ["最大外功攻击", "最大外功攻击", "劲", "势", "会意率"])
         r = judge.judge(e)
         assert r.rating == Rating.JUNK
         assert any("增伤" in s for s in r.reasons)
 
-    def test_junk_wrong_wuxue(self, judge):
-        # 枪武学增伤 非本次增伤且池外 → 垃圾
-        e = make_equip("剑", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"])
-        assert judge.judge(e).rating == Rating.JUNK
 
-    def test_junk_before_normal(self, judge):
-        # 会心+精准 双出同时命中 垃圾(≥2) 与 一般(≥1) 条件 → 垃圾优先
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会心率", "精准率"])
-        assert judge.judge(e).rating == Rating.JUNK
-
-
-# ─── 副武器（枪，不需增伤） ────────────────────────────────
-
-class TestQiang:
-    def test_top_jin_and_shi(self, judge):
-        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "最大无相攻击"])
-        assert judge.judge(e).rating == Rating.TOP
-
-    def test_excellent_double_jin(self, judge):
-        # 双劲无势 → 顶级 contains_all[劲,势] 不成立 → 优秀
-        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "劲", "会意率"])
-        assert judge.judge(e).rating == Rating.EXCELLENT
-
-    def test_normal_missing_jin_shi(self, judge):
-        # 缺劲/势不算缺陷 → 优秀（非首大外在位）
-        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "会意率", "最大无相攻击", "最大无相攻击"])
-        assert judge.judge(e).rating == Rating.EXCELLENT
-
-    def test_normal_missing_waigong(self, judge):
-        # 非首缺大外是硬门槛 → 能用封顶（一般）
-        e = make_equip("枪", ["最大外功攻击", "劲", "势", "会意率", "最大无相攻击"])
-        assert judge.judge(e).rating == Rating.NORMAL
-
-    def test_normal_defect_huixin(self, judge):
-        # 精准率 为会意流缺陷词条 → 一般
-        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "精准率"])
-        assert judge.judge(e).rating == Rating.NORMAL
-
-    def test_junk_qiang_wuxue(self, judge):
-        e = make_equip("枪", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"])
-        assert judge.judge(e).rating == Rating.JUNK
-
-
-# ─── 环、佩（归并部位） ────────────────────────────────────
-
-class TestJewelry:
-    def test_top(self, judge):
-        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "势"])
-        assert judge.judge(e).rating == Rating.TOP
-
-    def test_pei_alias_excellent(self, judge):
-        # 佩 归并 环；大鸣金入池但只有劲没有势 → 优秀
-        e = make_equip("佩", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "最大鸣金攻击"])
-        assert judge.judge(e).rating == Rating.EXCELLENT
-
-    def test_excellent_double_jin(self, judge):
-        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "全武学增效", "劲", "劲"])
-        assert judge.judge(e).rating == Rating.EXCELLENT
-
-    def test_junk_missing_quan_wuxue(self, judge):
-        e = make_equip("环", ["最大外功攻击", "最大外功攻击", "劲", "势", "劲"])
-        assert judge.judge(e).rating == Rating.JUNK
-
-
-# ─── 冠胄（首词条 会意率） ─────────────────────────────────
-
-class TestHelm:
-    def test_top(self, judge):
-        e = make_equip("冠胄", ["会意率", "最大外功攻击", "劲", "势", "会意率"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.TOP
-
-    def test_excellent_mingjin(self, judge):
-        # 大鸣金 破坏顶级排除条件 → 优秀
-        e = make_equip("冠胄", ["会意率", "最大外功攻击", "劲", "势", "最大鸣金攻击"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.EXCELLENT
-
-    def test_normal_single_huixin(self, judge):
-        e = make_equip("冠胄", ["会意率", "会心率", "最大外功攻击", "劲", "势"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.NORMAL
-
-    def test_junk_double_huixin(self, judge):
-        e = make_equip("冠胄", ["会意率", "会心率", "精准率", "最大外功攻击", "劲"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.JUNK
-
-
-# ─── 胫甲（首词条 劲，对首领增要求挂 keep_wanjia 开关） ──────
-
-class TestLeg:
-    def test_top(self, judge):
-        e = make_equip("胫甲", ["劲", "对首领单位增伤", "最大外功攻击", "劲", "势"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.TOP
-
-    def test_junk_missing_boss_damage(self, judge):
-        e = make_equip("胫甲", ["劲", "最大外功攻击", "最大鸣金攻击", "劲", "势"],
-                       quality="purple")
-        assert judge.judge(e).rating == Rating.JUNK
-
-
-# ─── 开关 keep_danti（冠胄·单体奇术） / keep_wanjia（胫甲·玩家增效） ────
+# ─── 开关 keep_danti / keep_wanjia ────
 
 class TestKeepDanti:
     """keep_danti 控制冠胄部位单体类奇术增伤的垃圾/顶级判定"""

@@ -363,93 +363,36 @@ def test_eval_tuple_mixed():
     assert n.func_args[1].name == "b"
 
 
-# ─── wait stable 指令测试 ─────────────────────────────────
+# ─── wait stable 指令测试（参数化） ────────────────────────────
 
-def test_wait_stable_basic():
-    """wait stable 5 → WaitStable(timeout=5.0)"""
-    program = parse_text("wait stable 5")
+@pytest.mark.parametrize("dsl,expected", [
+    ("wait stable 5",
+     {"timeout": 5.0, "threshold": 0.02, "interval": 0.3, "stable_duration": 0.5, "area": None}),
+    ("wait stable 3 threshold 0.05",
+     {"timeout": 3.0, "threshold": 0.05, "interval": 0.3}),
+    ("wait stable 3 interval 0.5",
+     {"timeout": 3.0, "threshold": 0.02, "interval": 0.5}),
+    ("wait stable 5 threshold 0.03 interval 0.5 duration 1.0 least 0.3",
+     {"timeout": 5.0, "threshold": 0.03, "interval": 0.5, "stable_duration": 1.0, "least": 0.3}),
+    ("wait stable 5 least 0.3 duration 0.5 interval 0.3 threshold 0.01",
+     {"timeout": 5.0, "threshold": 0.01, "interval": 0.3, "stable_duration": 0.5, "least": 0.3}),
+    ("wait stable 5 on [equip_page].[bag_area]",
+     {"timeout": 5.0, "area": ("equip_page", "bag_area")}),
+    ("wait stable 5 on [equip_page].[bag_area] threshold 0.05 interval 0.2",
+     {"timeout": 5.0, "threshold": 0.05, "interval": 0.2, "area": ("equip_page", "bag_area")}),
+])
+def test_wait_stable(dsl, expected):
+    """wait_stable 各参数组合解析正确"""
+    program = parse_text(dsl)
     n = program.body[0]
     assert isinstance(n, WaitStable)
-    assert n.timeout == 5.0
-    assert n.threshold == 0.02
-    assert n.interval == 0.3
-    assert n.stable_duration == 0.5
-
-
-def test_wait_stable_with_threshold():
-    """wait stable 3 threshold 0.05"""
-    program = parse_text("wait stable 3 threshold 0.05")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.timeout == 3.0
-    assert n.threshold == 0.05
-    assert n.interval == 0.3
-
-
-def test_wait_stable_with_interval():
-    """wait stable 3 interval 0.5"""
-    program = parse_text("wait stable 3 interval 0.5")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.timeout == 3.0
-    assert n.threshold == 0.02
-    assert n.interval == 0.5
-
-
-def test_wait_stable_full():
-    """wait stable 5 threshold 0.03 interval 0.5 duration 1.0 least 0.3"""
-    program = parse_text("wait stable 5 threshold 0.03 interval 0.5 duration 1.0 least 0.3")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.timeout == 5.0
-    assert n.threshold == 0.03
-    assert n.interval == 0.5
-    assert n.stable_duration == 1.0
-    assert n.least == 0.3
-
-
-def test_wait_stable_reversed_opts():
-    """wait stable 5 least 0.3 duration 0.5 interval 0.3 threshold 0.01 — 选项顺序可互换"""
-    program = parse_text("wait stable 5 least 0.3 duration 0.5 interval 0.3 threshold 0.01")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.timeout == 5.0
-    assert n.threshold == 0.01
-    assert n.interval == 0.3
-    assert n.stable_duration == 0.5
-    assert n.least == 0.3
-
-
-def test_wait_stable_on_region():
-    """wait stable 5 on [scene].[region] — 区域限定"""
-    program = parse_text("wait stable 5 on [equip_page].[bag_area]")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.timeout == 5.0
-    assert isinstance(n.area, EntityRef)
-    assert n.area.scene == "equip_page"
-    assert n.area.entity == "bag_area"
-
-
-def test_wait_stable_on_with_opts():
-    """wait stable 5 on [scene].[region] threshold 0.05 — 区域 + 选项"""
-    program = parse_text("wait stable 5 on [equip_page].[bag_area] threshold 0.05 interval 0.2")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.timeout == 5.0
-    assert n.threshold == 0.05
-    assert n.interval == 0.2
-    assert isinstance(n.area, EntityRef)
-    assert n.area.scene == "equip_page"
-    assert n.area.entity == "bag_area"
-
-
-def test_wait_stable_no_area_default():
-    """wait stable 5 — area 默认为 None（全画面）"""
-    program = parse_text("wait stable 5")
-    n = program.body[0]
-    assert isinstance(n, WaitStable)
-    assert n.area is None
+    for key, val in expected.items():
+        if key == "area" and val is not None:
+            assert isinstance(n.area, EntityRef)
+            assert n.area.scene == val[0]
+            assert n.area.entity == val[1]
+        else:
+            assert getattr(n, key) == val
 
 
 def test_click_after_wait_stable_on_region():

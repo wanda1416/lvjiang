@@ -121,11 +121,8 @@ class LoadoutPanel(QWidget):
         self._build_ui()
         host.user_changed.connect(lambda _name: self.refresh())
         host.graduation_updated.connect(self._sync_metrics)
-        host.equipment_changed.connect(self._sync_metrics)
-        self._timer = QTimer(self)
-        self._timer.setInterval(1000)
-        self._timer.timeout.connect(self._poll_revision)
-        self._timer.start()
+        # 装备变更（UI 操作与工作流写入）：刷新方案展示并同步指标
+        host.equipment_changed.connect(self._on_equipment_changed)
         self.refresh()
 
     def _build_ui(self):
@@ -142,8 +139,8 @@ class LoadoutPanel(QWidget):
         add_user_nav_buttons(tools, self._host)
         tools.addStretch()
         for label, callback in (
-            (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
-            (tr("创建装备"), lambda: self._equipment._on_mock_create()),
+            (tr("计算最优组合"), lambda: self._equipment._on_optimal_combo()),
+            (tr("创建模拟装备"), lambda: self._equipment._on_mock_create()),
             (tr("清空真实装备"), lambda: self._equipment._on_clear_real()),
             (tr("导出数据"), lambda: self._equipment._on_export()),
         ):
@@ -366,7 +363,6 @@ class LoadoutPanel(QWidget):
         if self._repo is None:
             return
         state = self._repo.load()
-        self._revision = state.revision
         self._refreshing = True
         self._plans.clear()
         for pid, plan in state.plans.items():
@@ -387,6 +383,8 @@ class LoadoutPanel(QWidget):
         )
         self._school.setText(school or tr("无方案"))
         self._refreshing = False
+        # 下游消费者（装备页/战斗属性页）已显式驱动，无需再 emit
+        # equipment_changed：emit 会导致信号订阅者重复全量刷新
         self._equipment._refresh_all()
         combat = self._character._combat_attrs_tab
         school_index = combat._combo_school.findText(school or "")
@@ -394,7 +392,16 @@ class LoadoutPanel(QWidget):
         combat._refresh_play_styles()
         combat._refresh_schemes()
         combat._refresh_display()
-        self._host.equipment_changed.emit()
+
+    def _on_equipment_changed(self):
+        """装备变更（UI 操作或工作流写入）：刷新方案展示。
+
+        指标（DPS/毕业率）经异步毕业率计算完成后的
+        graduation_updated 信号同步，无需在此处理。
+        """
+        if self._refreshing:
+            return
+        self.refresh()
 
     def _sync_metrics(self):
         combat = self._character._combat_attrs_tab
@@ -408,10 +415,6 @@ class LoadoutPanel(QWidget):
         combo.clear()
         combo.addItems(list(values))
         combo.setCurrentText(selected)
-
-    def _poll_revision(self):
-        if self._repo and self._repo.load().revision != getattr(self, "_revision", -1):
-            self.refresh()
 
     def _switch_plan(self, _index):
         if self._refreshing or not self._repo:

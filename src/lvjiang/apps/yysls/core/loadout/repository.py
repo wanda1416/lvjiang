@@ -161,8 +161,8 @@ class LoadoutRepository:
             for fp in fingerprints:
                 state.equipment_items.pop(fp, None)
             for plan in state.plans.values():
-                for slot, fp in plan.equipment.items():
-                    if fp in fingerprints:
+                for slot, eq_fp in plan.equipment.items():
+                    if eq_fp in fingerprints:
                         plan.equipment[slot] = None
         self.update(mutate)
 
@@ -172,8 +172,8 @@ class LoadoutRepository:
             for fp in fps:
                 state.equipment_items.pop(fp, None)
             for plan in state.plans.values():
-                for slot, fp in plan.equipment.items():
-                    if fp in fps:
+                for slot, eq_fp in plan.equipment.items():
+                    if eq_fp in fps:
                         plan.equipment[slot] = None
         self.update(mutate)
 

@@ -1,6 +1,5 @@
-from lvjiang.workflows.builtins import get_function
-
 import lvjiang.apps.yysls.workflows.builtins.equipment_ingest  # noqa: F401
+from lvjiang.workflows.builtins import get_function
 
 
 class Engine:

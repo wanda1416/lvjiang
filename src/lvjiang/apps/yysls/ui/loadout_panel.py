@@ -255,6 +255,8 @@ class LoadoutPanel(QWidget):
     ) -> None:
         while row.count():
             item = row.takeAt(0)
+            if item is None:
+                continue
             widget = item.widget()
             if widget is not None:
                 # 同步销毁旧按钮：deleteLater 会让旧按钮在下一次事件循环

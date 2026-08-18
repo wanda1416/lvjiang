@@ -1,4 +1,4 @@
-"""燕云「装备数据」Tab —— 装备背包统一视图。
+"""燕云「装备」Tab —— 装备背包统一视图。
 
 顶部 8 个可点击槽位（固定 2×4），下方全部装备网格（可配置列数）。
 点击槽位触发部位筛选，再次点击取消选中。
@@ -72,6 +72,21 @@ _SLOT_LAYOUT = [
 _GROUP_PART_LABELS: dict[str, str] = {}
 
 _GRID_COLS = 4  # 默认值，实际从 settings.equip_display.grid_columns 读取
+
+
+def _route_weapon_slot(eq_type: str, main_type: str, sub_type: str) -> str:
+    """按流派武器类型路由武器槽位（纯函数，便于单测）。
+
+    返回 "main_weapon"/"sub_weapon" 表示直接生效；"ask" 表示主副武器
+    同型或流派未绑定，需手动选择；"reject" 表示武器与主副武学均不匹配。
+    """
+    if not main_type or not sub_type or main_type == sub_type:
+        return "ask"
+    if eq_type == main_type:
+        return "main_weapon"
+    if eq_type == sub_type:
+        return "sub_weapon"
+    return "reject"
 
 # 品质背景色（半透明，仅金/紫）
 _QUALITY_BG_COLORS = {
@@ -491,6 +506,7 @@ class _CompactEquipCard(QFrame):
         name_row.addWidget(self.lbl_name, stretch=1)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
+        self.status_tags.define("loadout", tr("备战中"), "#00897B")
         name_row.addWidget(self.status_tags)
         layout.addLayout(name_row)
 
@@ -577,6 +593,7 @@ class _CompactEquipCard(QFrame):
     def set_equip(
         self, equip_data: dict, part_label: str,
         group_key: str = "", is_mock: bool = False,
+        is_loadout: bool = False,
     ):
         # 存储装备数据和分组 key（用于右键菜单）
         self._equip_data = equip_data
@@ -595,6 +612,7 @@ class _CompactEquipCard(QFrame):
             "mock",
             bool(is_mock or equip_data.get("_extra", {}).get("is_mock", False)),
         )
+        self.status_tags.set_visible("loadout", is_loadout)
 
         level = equip_data.get("level") or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
@@ -707,7 +725,7 @@ class _CompactEquipCard(QFrame):
 
 
 class EquipStatusTab(QWidget):
-    """装备数据 Tab —— 装备背包统一视图。
+    """装备 Tab —— 装备背包统一视图。
 
     顶部 8 个可点击槽位（固定 2×4），下方全部装备网格。
     点击槽位触发部位筛选，再次点击取消选中。
@@ -734,10 +752,12 @@ class EquipStatusTab(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
 
         # ── Row A: 操作栏 ──
-        action_row = QHBoxLayout()
+        self._action_widget = QWidget()
+        action_row = QHBoxLayout(self._action_widget)
+        action_row.setContentsMargins(0, 0, 0, 0)
         btn_refresh = QPushButton(tr("刷新"))
         btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip(tr("刷新装备数据"))
+        btn_refresh.setToolTip(tr("刷新装备"))
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)
         action_row.addWidget(btn_refresh)
@@ -760,6 +780,11 @@ class EquipStatusTab(QWidget):
         btn_create.clicked.connect(self._on_mock_create)
         action_row.addWidget(btn_create)
 
+        btn_clear_real = QPushButton(tr("清空真实装备"))
+        btn_clear_real.setToolTip(tr("删除全部真实装备，保留模拟装备"))
+        btn_clear_real.clicked.connect(self._on_clear_real)
+        action_row.addWidget(btn_clear_real)
+
         # 导出数据
         btn_export = QPushButton(tr("导出数据"))
         btn_export.setToolTip(tr("导出为 leoq7 格式"))
@@ -767,15 +792,17 @@ class EquipStatusTab(QWidget):
         btn_export.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_export.clicked.connect(self._on_export)
         action_row.addWidget(btn_export)
-        layout.addLayout(action_row)
+        layout.addWidget(self._action_widget)
 
         # ── Row B: 信息 + 筛选栏 ──
-        info_row = QHBoxLayout()
+        self._info_widget = QWidget()
+        info_row = QHBoxLayout(self._info_widget)
         info_row.setContentsMargins(8, 0, 8, 0)
         info_row.setSpacing(12)
 
         # 左区：DPS + 毕业率
         dps_lbl = QLabel(tr("DPS"))
+        self._status_dps_name = dps_lbl
         dps_lbl.setStyleSheet(_STATUS_NAME_STYLE)
         info_row.addWidget(dps_lbl)
         self._status_dps = QLabel("--")
@@ -787,6 +814,7 @@ class EquipStatusTab(QWidget):
         info_row.addSpacing(16)
 
         rate_lbl = QLabel(tr("毕业率"))
+        self._status_graduation_name = rate_lbl
         rate_lbl.setStyleSheet(_STATUS_NAME_STYLE)
         info_row.addWidget(rate_lbl)
         self._status_graduation = QLabel("--")
@@ -813,9 +841,9 @@ class EquipStatusTab(QWidget):
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
         info_row.addWidget(self._sort_filter)
 
-        lbl_type = QLabel(tr("类型"))
-        lbl_type.setStyleSheet(_filter_lbl_style)
-        info_row.addWidget(lbl_type)
+        lbl_part = QLabel(tr("部位"))
+        lbl_part.setStyleSheet(_filter_lbl_style)
+        info_row.addWidget(lbl_part)
         self._type_filter = QComboBox()
         self._type_filter.addItem(tr("全部"), "all")
         for sk, dn, _ in [
@@ -859,7 +887,20 @@ class EquipStatusTab(QWidget):
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
         info_row.addWidget(self._affix_filter)
 
-        layout.addLayout(info_row)
+        # 数据来源筛选：全部/背包/模拟
+        lbl_source = QLabel(tr("类型"))
+        lbl_source.setStyleSheet(_filter_lbl_style)
+        info_row.addWidget(lbl_source)
+        self._source_filter = QComboBox()
+        self._source_filter.addItem(tr("全部"), "all")
+        self._source_filter.addItem(tr("背包"), "bag")
+        self._source_filter.addItem(tr("模拟"), "mock")
+        self._source_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
+        info_row.addWidget(self._source_filter)
+
+        layout.addWidget(self._info_widget)
 
         # ── 滚动区域：槽位 + 背包网格统一滚动 ──
         scroll = QScrollArea()
@@ -917,6 +958,15 @@ class EquipStatusTab(QWidget):
         # 加载筛选配置
         self._load_filter_settings()
 
+    def set_embedded_mode(self, embedded: bool = True) -> None:
+        """Hide duplicated chrome when hosted by LoadoutPanel."""
+        self._action_widget.setVisible(not embedded)
+        for widget in (
+            self._status_dps_name, self._status_dps,
+            self._status_graduation_name, self._status_graduation,
+        ):
+            widget.setVisible(not embedded)
+
     # ── 筛选 ──
 
     def _load_filter_settings(self):
@@ -928,6 +978,7 @@ class EquipStatusTab(QWidget):
         self._type_filter.blockSignals(True)
         self._level_filter.blockSignals(True)
         self._affix_filter.blockSignals(True)
+        self._source_filter.blockSignals(True)
         try:
             # 排序
             sort_idx = self._sort_filter.findData(filters.get("sort", "default"))
@@ -946,11 +997,15 @@ class EquipStatusTab(QWidget):
             # 词条筛选
             affix_idx = self._affix_filter.findData(filters.get("affix", "all"))
             self._affix_filter.setCurrentIndex(affix_idx if affix_idx >= 0 else 0)
+            # 来源筛选
+            source_idx = self._source_filter.findData(filters.get("source", "all"))
+            self._source_filter.setCurrentIndex(source_idx if source_idx >= 0 else 0)
         finally:
             self._sort_filter.blockSignals(False)
             self._type_filter.blockSignals(False)
             self._level_filter.blockSignals(False)
             self._affix_filter.blockSignals(False)
+            self._source_filter.blockSignals(False)
 
     def _save_filter_settings(self):
         """保存筛选配置到 session"""
@@ -960,6 +1015,7 @@ class EquipStatusTab(QWidget):
             "type": self._type_filter.currentData(),
             "level": self._level_filter.currentData(),
             "affix": self._affix_filter.currentData(),
+            "source": self._source_filter.currentData(),
         }
         save_equip_filter(filters)
 
@@ -1072,7 +1128,9 @@ class EquipStatusTab(QWidget):
         if inv is None:
             return
         try:
-            inv.replace_equipped(slot_key, result)
+            # 携带旧指纹走「先写新、后清旧」链路，避免遗留同名孤儿装备
+            old_fp = equip.get("_fp", "")
+            inv.replace_equipped_mock(slot_key, old_fp, result)
             self._sync_inv()
         except Exception as e:
             logger.error(f"编辑槽位模拟装备失败: {e}")
@@ -1105,31 +1163,46 @@ class EquipStatusTab(QWidget):
         # 收集装备（bag_items + mock_items）
         from ..config import get_game_config
         group_to_part = get_game_config().get_group_to_part()
-        cards: list[tuple[dict, str, str, bool]] = []
-        for group_key, items in self._bag_items.items():
-            if filter_type is not None and group_key != filter_type:
-                continue
-            part_label = group_to_part.get(group_key, group_key)
-            for _fp, equip in items.items():
-                # 应用等级/词条筛选
-                if not self._equip_passes_filter(equip):
+        cards: list[tuple[dict, str, str, bool, bool]] = []
+        standby_fps = self._inv.standby_plan_fps if self._inv is not None else set()
+        # 当前方案已穿戴的指纹不再出现在下方未装备区
+        equipped_fps = self._inv.active_plan_fps if self._inv is not None else set()
+        # 来源筛选：all=全部, bag=仅背包, mock=仅模拟
+        source_mode = self._source_filter.currentData() or "all"
+        show_bag = source_mode in ("all", "bag")
+        show_mock = source_mode in ("all", "mock")
+        if show_bag:
+            for group_key, items in self._bag_items.items():
+                if filter_type is not None and group_key != filter_type:
                     continue
-                cards.append((equip, part_label, group_key, False))
+                part_label = group_to_part.get(group_key, group_key)
+                for _fp, equip in items.items():
+                    if _fp in equipped_fps:
+                        continue
+                    # 应用等级/词条筛选
+                    if not self._equip_passes_filter(equip):
+                        continue
+                    cards.append((equip, part_label, group_key, False, _fp in standby_fps))
 
         # 合并模拟装备
-        for group_key, items in self._mock_items.items():
-            if filter_type is not None and group_key != filter_type:
-                continue
-            part_label = group_to_part.get(group_key, group_key)
-            for _fp, equip in items.items():
-                if not self._equip_passes_filter(equip):
+        if show_mock:
+            for group_key, items in self._mock_items.items():
+                if filter_type is not None and group_key != filter_type:
                     continue
-                cards.append((equip, part_label, group_key, True))
+                part_label = group_to_part.get(group_key, group_key)
+                for _fp, equip in items.items():
+                    if _fp in equipped_fps:
+                        continue
+                    if not self._equip_passes_filter(equip):
+                        continue
+                    cards.append((equip, part_label, group_key, True, _fp in standby_fps))
 
         # 排序模式
         sort_mode = self._sort_filter.currentData() or "default"
 
-        def _level_cap_sum(item: tuple[dict, str, str, bool]) -> tuple[int, int]:
+        def _level_cap_sum(
+            item: tuple[dict, str, str, bool, bool],
+        ) -> tuple[int, int]:
             equip = item[0]
             level = equip.get("level") or 0
             if isinstance(level, str):
@@ -1174,9 +1247,12 @@ class EquipStatusTab(QWidget):
 
         # 填充
         pos = 0
-        for equip, part_label, group_key, is_mock in same_slot_cards:
+        for equip, part_label, group_key, is_mock, is_loadout in same_slot_cards:
             card = _CompactEquipCard(self._display_params)
-            card.set_equip(equip, part_label, group_key, is_mock=is_mock)
+            card.set_equip(
+                equip, part_label, group_key,
+                is_mock=is_mock, is_loadout=is_loadout,
+            )
             card.equip_requested.connect(self._on_equip_requested)
             card.edit_requested.connect(self._on_mock_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
@@ -1188,9 +1264,12 @@ class EquipStatusTab(QWidget):
         if other_cards and pos % cols != 0:
             pos = (pos // cols + 1) * cols
 
-        for equip, part_label, group_key, is_mock in other_cards:
+        for equip, part_label, group_key, is_mock, is_loadout in other_cards:
             card = _CompactEquipCard(self._display_params)
-            card.set_equip(equip, part_label, group_key, is_mock=is_mock)
+            card.set_equip(
+                equip, part_label, group_key,
+                is_mock=is_mock, is_loadout=is_loadout,
+            )
             card.equip_requested.connect(self._on_equip_requested)
             card.edit_requested.connect(self._on_mock_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
@@ -1244,7 +1323,7 @@ class EquipStatusTab(QWidget):
             self._inv = EquipmentInventory(user_name)
             self._sync_inv()
         except Exception as e:
-            logger.error(f"加载装备数据失败: {e}")
+            logger.error(f"加载装备失败: {e}")
             self._inv = None
             self._equipped = {}
             self._bag_items = {}
@@ -1268,7 +1347,7 @@ class EquipStatusTab(QWidget):
         """返回已加载的装备库存；不可用时给出统一提示。"""
         if self._inv is None:
             QMessageBox.warning(
-                self, tr("提示"), tr("装备数据未加载，请刷新"))
+                self, tr("提示"), tr("装备未加载，请刷新"))
             return None
         return self._inv
 
@@ -1310,17 +1389,34 @@ class EquipStatusTab(QWidget):
             logger.error(f"无法找到 {group_key} 对应的槽位")
             return
 
-        # 如果是武器，需要选择主/副武器
+        # 武器按流派武器类型路由：主副武器不同型时直接生效，
+        # 与主副武学均不匹配的武器禁止装备（需另建对应流派方案）
         if len(target_slots) > 1:
-            from PyQt6.QtWidgets import QInputDialog
-            slot_names = [tr("主武器") if s == "main_weapon" else tr("副武器") for s in target_slots]
-            choice, ok = QInputDialog.getItem(
-                self, tr("选择槽位"), tr("请选择要穿戴到的槽位:"),
-                slot_names, 0, False
-            )
-            if not ok:
+            main_type = self._get_school_weapon_type("main_weapon") or ""
+            sub_type = self._get_school_weapon_type("sub_weapon") or ""
+            route = _route_weapon_slot(equip_data.get("type", ""), main_type, sub_type)
+            if route == "reject":
+                QMessageBox.warning(
+                    self, tr("无法装备"),
+                    tr("武器【{type}】与当前方案的武学不匹配"
+                       "（主武学武器：{main}，副武学武器：{sub}）。\n"
+                       "如需使用该武器，请新建对应流派的方案。").format(
+                        type=equip_data.get("type", tr("未知")),
+                        main=main_type, sub=sub_type))
                 return
-            target_slot = target_slots[slot_names.index(choice)]
+            if route in ("main_weapon", "sub_weapon") and route in target_slots:
+                target_slot = route
+            else:
+                # 主副武器同型或流派未绑定：仍需手动选择
+                from PyQt6.QtWidgets import QInputDialog
+                slot_names = [tr("主武器") if s == "main_weapon" else tr("副武器") for s in target_slots]
+                choice, ok = QInputDialog.getItem(
+                    self, tr("选择槽位"), tr("请选择要穿戴到的槽位:"),
+                    slot_names, 0, False
+                )
+                if not ok:
+                    return
+                target_slot = target_slots[slot_names.index(choice)]
         else:
             target_slot = target_slots[0]
 
@@ -1378,6 +1474,24 @@ class EquipStatusTab(QWidget):
         except Exception as e:
             logger.error(f"删除失败: {e}")
             QMessageBox.critical(self, tr("删除失败"), str(e))
+
+    def _on_clear_real(self):
+        """UI-owned bulk deletion; mock_ items are always preserved."""
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return
+        reply = QMessageBox.question(
+            self, tr("确认清空"),
+            tr("确定删除全部真实装备吗？模拟装备会被保留，方案中的相关槽位会置空。"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        from ..core.loadout import LoadoutRepository
+        LoadoutRepository(user_name).delete_all_real()
+        self._refresh_all()
+        self._host.equipment_changed.emit()
 
     def _on_mock_delete_requested(self, equip_data: dict, group_key: str):
         """处理模拟装备删除请求"""
@@ -1550,10 +1664,16 @@ class EquipStatusTab(QWidget):
             QMessageBox.warning(self, tr("导出失败"), tr("没有激活的用户"))
             return
         try:
-            from lvjiang.core.config import SessionManager
-
             from .leoq7_export import export_leoq7
-            data = SessionManager().load(user_name)
+            inv = self._require_inventory()
+            if inv is None:
+                return
+            inv.reload()
+            data = {
+                "equipped": inv.equipped,
+                "bag_items": inv.bag_items,
+                "mock_items": inv.mock_items,
+            }
             text = export_leoq7(
                 data,
                 user_name,

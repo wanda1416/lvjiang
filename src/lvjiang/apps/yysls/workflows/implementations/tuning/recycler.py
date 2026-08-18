@@ -93,6 +93,9 @@ class TuningRecycler:
             logger.info("  重置调律按钮无剩余次数，不再重置")
             return False
         logger.info(f"  执行重置调律（剩余次数 OCR: {remaining}）：{why}")
+        wf._emit_operation(
+            "reset", f"准备重置，剩余次数 {remaining}，正在检查冷却状态",
+            reason=why, resets=resets_used)
         wf.click_region(wf.TUNE_SCENE, "reset_tune")
         wf.wait_stable("page_refresh")  # 重置确认弹窗
         # 冷却期检查：确认弹窗内应含「可调律重置」，否则装备在冷却期
@@ -106,6 +109,9 @@ class TuningRecycler:
             return tr("装备重置冷却期，跳过该装备")
         # 材料检查：读取 reset_info 解析「持有 N」格式
         if min_material_count is not None:
+            wf._emit_operation(
+                "reset", "冷却检查通过，正在读取重置材料数量",
+                reason=why, resets=resets_used)
             reset_info_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_info"]).get(
                 "reset_info", "") or ""
             material_count = self._parse_material_count(reset_info_text)
@@ -126,10 +132,14 @@ class TuningRecycler:
                 wf.wait_delay("step_interval")
                 return f"重置材料不足（持有 {material_count} < 要求 {min_material_count}），跳过该装备"
             logger.info(f"  重置材料检查通过（持有 {material_count} >= 要求 {min_material_count}）")
+        wf._emit_operation(
+            "reset", "检查通过，正在执行两次重置确认",
+            reason=why, resets=resets_used)
         wf.click_region(wf.TUNE_SCENE, "reset_confirm")
         # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
         wf.wait_seconds(random.uniform(6.0, 7.0))
         wf.click_region(wf.TUNE_SCENE, "reset_confirm_2")
+        wf._emit_operation("reset", "重置已提交，正在读取重置结果")
         wf.wait_stable("page_refresh")  # 重置结果弹窗出现
         wf.click_region(wf.TUNE_SCENE, "close_btn")  # 关闭 → 回到调律进度页
         wf.wait_delay("step_interval")

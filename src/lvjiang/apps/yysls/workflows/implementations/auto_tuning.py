@@ -147,9 +147,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         except Exception:
             pass  # 进度信号失败不应影响工作流执行
 
+    def _emit_operation(self, phase: str, message: str, **details) -> None:
+        """在耗时动作开始前推送当前阶段，避免进度页只显示事后结果。"""
+        self._emit_progress("operation_updated", {
+            "phase": phase,
+            "message": message,
+            **details,
+        })
+
     def _emit_equip_finish(self, name, equip_data, rounds=0,
                            affix_count=0, status="skipped",
-                           final_rating=""):
+                           final_rating="", reason=""):
         """发送装备处理结束信号（供 early-return 路径补发）"""
         self._emit_progress("equipment_finished", {
             "name": name,
@@ -158,6 +166,31 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "affix_count": affix_count,
             "final_affixes": [a.to_dict() for a in equip_data.affixes],
             "status": status,
+            "reason": reason,
+        })
+
+    def _emit_equip_started(self, name: str, equip: dict,
+                            equip_data: EquipmentData) -> None:
+        """OCR 解析成功即展示装备，不让潜力判定或提前返回阻塞面板。"""
+        target_names: set[str] = set()
+        for cfg in (self.ctx.judge_configs or {}).values():
+            target_names.update(cfg.get("affix_pool") or [])
+        self._emit_progress("equipment_started", {
+            "name": name,
+            "type": equip.get("type", ""),
+            "level": equip.get("level", 0),
+            "quality": equip.get("quality", ""),
+            "affixes": [a.to_dict() for a in equip_data.affixes],
+            "expect_rating": "",
+            "target_affixes": sorted(target_names),
+        })
+
+    def _emit_assessment(self, potential: dict, expect: str | None,
+                         stage: str = "scan") -> None:
+        self._emit_progress("equipment_assessed", {
+            "expect_rating": expect or "",
+            "rule_ratings": potential,
+            "stage": stage,
         })
 
     def _recycle_current(self, equip_data: EquipmentData, detail_scene: str,
@@ -177,6 +210,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """停止请求或材料耗尽（大律准石低于基准）都视为停止，
         背包遍历与部位循环全部收束，复用 F10 中断的退出路径"""
         return self.executor.materials_exhausted or super().is_stopped
+
+    @property
+    def slot_level_exhausted(self) -> bool:
+        """当前部位已遇到首件有效但低于等级门槛的装备。"""
+        return bool(getattr(self, "_slot_level_exhausted", False))
 
     @staticmethod
     def _missing_output_fields() -> list[str]:
@@ -268,20 +306,37 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             user_interrupt = (hasattr(self, '_stop_check')
                              and callable(self._stop_check)
                              and self._stop_check())
+            if user_interrupt:
+                # 先封存当前装备、写完 Markdown 调律报告并关闭文件，随后才
+                # 对 UI 宣告流程结束；避免“已结束”时报告仍缺最后一件。
+                finalized = self.recorder.finalize_interrupted_current()
+                if finalized:
+                    partial = self.recorder.collect_reports()[-1]
+                    self._emit_progress("equipment_finished", {
+                        "name": partial.get("name", ""),
+                        "final_rating": "",
+                        "rounds": partial.get("rounds", 0),
+                        "affix_count": partial.get("final_affix_count", 0),
+                        "final_affixes": partial.get("final_affixes", []),
+                        "status": "interrupted",
+                    })
+                self.output["tuning_reports"] = list(
+                    self.recorder.collect_reports())
+                if "stop_reason" not in self.output:
+                    self.output["stop_reason"] = "用户中断（F10）"
+            self._close_doc()
             # 进度信号：整体完成
             self._emit_progress("tuning_finished", {
                 "total_equipment": _slot_idx,
                 "total_rounds": sum(
                     int(r.get("rounds") or 0)
                     for r in self.recorder.collect_reports()
-                    if r.get("status") == "tuned"),
+                    if r.get("status") in ("tuned", "interrupted")),
                 "interrupted": user_interrupt,
             })
             if user_interrupt:
                 # 用户按 F10 中断：保留当前页面，方便查看停在哪里
                 logger.info("自动调律被用户中断（F10），保留当前页面")
-                if "stop_reason" not in self.output:
-                    self.output["stop_reason"] = "用户中断（F10）"
             else:
                 # 正常完成或材料耗尽：返回主页
                 self.navigator.navigate_back()
@@ -334,8 +389,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return
         reports = rec.collect_reports()
         tuned = [r for r in reports if r.get("status") == "tuned"]
-        total_rounds = sum(int(r.get("rounds") or 0) for r in tuned)
-        rec.doc_end_run(self.is_stopped, len(tuned), total_rounds)
+        processed = [r for r in reports
+                     if r.get("status") in ("tuned", "interrupted")]
+        total_rounds = sum(int(r.get("rounds") or 0) for r in processed)
+        user_interrupt = (hasattr(self, '_stop_check')
+                          and callable(self._stop_check)
+                          and self._stop_check())
+        rec.doc_end_run(user_interrupt, len(processed), total_rounds)
         rec.doc_run_summary(TuningRecorder.summary_items(tuned))
         rec.close_doc()
 
@@ -347,6 +407,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         切换部位必然伴随窗口内装备整体更新，上一部位记录的锁定
         阻断指纹对新部位无效，必须清空。
         """
+        self._slot_level_exhausted = False
         self.recorder.on_slot_enter(slot)
         self._emit_progress(
             "slot_entered", slot,
@@ -433,6 +494,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.info(f"  行{logical_row} grid[{win_row}][{col}] {name} fp={fp}")
             self._process_equipment(name, equip, detail_scene,
                                     row=win_row, col=col)
+            if self.slot_level_exhausted:
+                logger.info(
+                    f"  当前部位已进入低等级区间，停止读取行{logical_row}后续装备")
+                break
             if self.recorder.equipment_recycled:
                 # 回收使后续装备前移补位到当前列，留在当前列继续处理
                 if not fp:
@@ -515,12 +580,23 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if not equip:
             return "", None
 
+        equip_data = EquipmentData.from_dict(equip)
+        affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
+        self._emit_equip_started(name, equip, equip_data)
+
         # 前置拦截 0：等级门槛 — 低于 min_level 直接跳过，不走任何判定
-        level = equip.get("level") or 0
+        level = equip.get("level")
         min_level = self.base_group.scan.min_level
-        if level < min_level:
+        if (isinstance(level, (int, float)) and not isinstance(level, bool)
+                and level > 0 and level < min_level):
             logger.info(
-                f"  [{name}] 等级 {level} < 门槛 {min_level}，直接跳过")
+                f"  [{name}] 等级 {level} < 门槛 {min_level}；背包装备按等级倒序，"
+                "结束当前部位扫描")
+            self._slot_level_exhausted = True
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="below_level",
+                reason=f"等级 {level} < 门槛 {min_level}，结束当前部位扫描")
             return self._make_fingerprint(equip), None
 
         # 前置拦截 1：品阶识别异常 — 无法识别品阶说明 OCR 有问题，直接跳过
@@ -528,13 +604,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if not quality:
             logger.warning(
                 f"  [{name}] 品阶识别失败（quality 为空），视为异常直接跳过")
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="invalid_quality", reason="品阶识别失败")
             return self._make_fingerprint(equip), None
 
-        equip_data = EquipmentData.from_dict(equip)
-        affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
         fp = self._make_fingerprint(equip_data.to_dict())
         if fp and self.recorder.is_locked(fp):
             logger.info(f"  [{name}] 本次运行已确认锁定，跳过重复回收")
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="locked", reason="本次运行已确认锁定")
             return fp, None
         logger.info(
             f"  处理装备: {self._equip_label(equip)} "
@@ -546,12 +626,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if affix_count >= self.MAX_AFFIX:
             logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
             judgement = self.judge.final_judge(equip_data)
+            actual_rating = self.judge.compute_actual_rating(equip_data) or ""
+            self._emit_assessment(judgement, actual_rating)
             self.recorder.report_set("status", "already_full")
             self.recorder.report_set("final_judgement", judgement)
             outcome = self._on_scan_reject(
                 equip_data, judgement, detail_scene, already_full=True)
             # 词条已满，计算实际评级用于进度显示
-            actual_rating = self.judge.compute_actual_rating(equip_data) or ""
             if outcome is RecycleOutcome.RECYCLED:
                 self._emit_equip_finish(name, equip_data, affix_count=affix_count,
                                         status="recycled",
@@ -559,7 +640,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self.recorder.discard_report()
                 return "", outcome
             self._emit_equip_finish(name, equip_data, affix_count=affix_count,
-                                    final_rating=actual_rating)
+                                    final_rating=actual_rating,
+                                    status="already_full")
             self.recorder.discard_report()
             return self._make_fingerprint(equip_data.to_dict()), outcome
 
@@ -572,22 +654,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         _, logs = summarize_potential(potential)
         expect = self.judge.expect_key(potential)
         self.recorder.expect_rating = expect
+        self._emit_assessment(potential, expect)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         self.recorder.report_set("worthiness", logs)
-        # 进度信号：装备开始处理（含目标词条）
-        _target_names: set[str] = set()
-        for _cfg in (self.ctx.judge_configs or {}).values():
-            _target_names.update(_cfg.get("affix_pool") or [])
-        self._emit_progress("equipment_started", {
-            "name": name,
-            "type": equip.get("type", ""),
-            "level": equip.get("level", 0),
-            "quality": equip.get("quality", ""),
-            "affixes": [a.to_dict() for a in equip_data.affixes],
-            "expect_rating": expect,
-            "target_affixes": sorted(_target_names),
-        })
+        self._emit_operation(
+            "scan", "潜力判定完成，正在匹配扫描处理规则",
+            affix_count=affix_count, expect_rating=expect)
         # 重置调满后回收模式标记与强制调律标记（每件装备重新判断）
         self.recorder.tune_full_recycle_mode = False
         self.recorder.force_tune_mode = False
@@ -617,13 +690,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # C. 值得 → 实际调律；说明文档开装备节（只写命中的规则）
         self.recorder.doc_start_equipment(equip)
         self.recorder.doc_worthiness_matched(potential)
+        self._emit_operation("navigation", "装备符合进入条件，正在打开调律页")
         if not self.navigator.nav_to_tune():
             logger.info(f"  [{name}] 未找到调律入口，跳过")
             self.recorder.doc_note("已符合规则但未找到调律入口，跳过本件")
             self.recorder.commit_report("no_tune_entry")
             self.output.setdefault("tuning_reports", []).extend(
                 self.recorder.collect_reports()[-1:])
-            self._emit_equip_finish(name, equip_data, affix_count=affix_count)
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="no_tune_entry", reason="未找到调律入口")
             return self._make_fingerprint(equip_data.to_dict()), None
 
         # 临时测试开关：只有词条未满、判定值得调律且找到入口的装备
@@ -639,10 +715,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.commit_report("skip_tuning")
             self.output.setdefault("tuning_reports", []).extend(
                 self.recorder.collect_reports()[-1:])
-            self._emit_equip_finish(name, equip_data, affix_count=affix_count)
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="skip_tuning", reason="测试开关已启用")
             return self._make_fingerprint(equip_data.to_dict()), None
 
         # 进入调律页成功，缓存材料区 OCR（后续轮次复用，避免每轮 OCR）
+        self._emit_operation("material", "已进入调律页，正在读取材料库存")
         self.executor.cache_materials()
 
         # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
@@ -657,6 +736,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         stop_reason = ""
         if tune_cfg.initial_check and tune_cfg.enabled:
             logger.info(f"  ═══ [{name}] 初始判定（第一次调律前执行结束处理）═══")
+            self._emit_operation(
+                "decision", "执行首次调律前的初始判定",
+                affix_count=affix_count, resets=resets_used)
             action, why, resets_used, affix_count = self._execute_end_processing(
                 tune_cfg, equip_data, affix_count, resets_used, base_affixes,
                 potential=potential, is_initial_check=True)
@@ -680,10 +762,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         while not self.is_stopped and not skip_tune_loop:
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
+            self._emit_operation(
+                "tuning", f"准备执行第 {rounds + 1} 轮调律"
+                f"（当前 {affix_count}/{self.MAX_AFFIX}）",
+                round_no=rounds + 1, affix_count=affix_count,
+                resets=resets_used)
             self.wait_stable("page_refresh")
             result = self.executor.tune_once(
                 equip_data, self.recorder.expect_rating,
-                self.recorder.tune_full_recycle_mode)
+                self.recorder.tune_full_recycle_mode,
+                round_no=rounds + 1)
             if result is None:
                 stop_reason = self.executor.abort_reason or "无法继续调律"
                 self.recorder.report_set("stop_reason", stop_reason)
@@ -696,6 +784,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             new_affix = self.navigator.collect_new_affix(
                 equip_data, result.get("tune_affix", "")) \
                 or result.get("tune_affix", "")
+            self.recorder.report_set("rounds", rounds)
+            self.recorder.report_set("final_affix_count", affix_count)
+            self.recorder.report_set(
+                "latest_affixes", [a.to_dict() for a in equip_data.affixes])
             if self.executor.round_food_reason != last_food_reason:
                 self.recorder.doc_food_strategy(self.executor.round_food_reason)
                 last_food_reason = self.executor.round_food_reason
@@ -722,6 +814,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "affix_count": affix_count,
                 "expect_rating": new_expect,
                 "actual_rating": actual_for_signal,
+                "rule_ratings": incoming,
             })
             # 扣减本轮狗粮缓存：返还时不消耗（不变），否则 -1
             if not self.executor.round_food_refunded:
@@ -750,6 +843,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 因进调律前点过「更多」弹出子菜单，back 回来后弹窗仍在，
         # 再点一次「更多」more_func 使其收起，保持背包页干净以继续遍历。
         self.executor.invalidate_cache()  # 退出调律页，清空材料缓存
+        self._emit_operation("finish", "正在返回背包并完成当前装备收尾")
         self.click_region(self.TUNE_SCENE, "back")
         self.wait_stable("page_refresh")  # 调律页 → 背包详情页（页面切换）
         self.click_region(self.EQUIP_DETAIL, "more_func")
@@ -860,6 +954,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             part, quality, cap_pct, rating_of, full,
             [a.name for a in equip_data.affixes])
         logger.info(f"  [{prefix}] {why}")
+        self._emit_operation(
+            "decision", f"{prefix}命中：{action}", reason=why,
+            action=action, affix_count=affix_count, resets=resets_used)
 
         # 处理各动作
         if action == "continue":
@@ -874,8 +971,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 equip_data.affixes = base_affixes[:1]
                 equip_data.extra_data["affix_count"] = 1
                 # 重置后刷新预期评级（首词条不变，但词条数变化可能影响判定）
-                _, self.recorder.expect_rating = \
+                incoming, self.recorder.expect_rating = \
                     self.judge.refresh_expectation(equip_data)
+                self._emit_assessment(
+                    incoming, self.recorder.expect_rating, stage="scan")
                 return "continue", why, resets_used, 1
             # skip 或 recycle → 直接返回
             return action, why, resets_used, affix_count
@@ -936,12 +1035,29 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.info(f"  [{prefix}] {why}")
             return action, why, resets_used
         # 等级配置允许重置，继续正常重置流程
+        self._emit_operation(
+            "reset", "规则已命中重置，正在检查次数、冷却和材料",
+            reason=why, resets=resets_used)
         result = self.recycler.try_reset_tune(
             tune_cfg, resets_used, why,
             min_material_count=level_cfg.min_material_count)
         if result is True:
             # 重置成功，重新缓存材料区（重置后材料数量已变化）
             self.executor.cache_materials()
+            self._emit_progress("equipment_reset", {
+                "name": equip_data.name or equip_data.type,
+                "type": equip_data.type,
+                "level": equip_data.level,
+                "quality": equip_data.quality,
+                "before_affixes": [a.to_dict() for a in equip_data.affixes],
+                "before_affix_count": len(equip_data.affixes),
+                "after_affixes": [a.to_dict() for a in equip_data.affixes[:1]],
+                "after_affix_count": min(len(equip_data.affixes), 1),
+                "resets_used": resets_used + 1,
+                # recorder 中的评级属于重置前装备；重置后等待重新判定。
+                "before_rating": self.recorder.expect_rating or "",
+                "expect_rating": "",
+            })
             return "continue", why, resets_used + 1
         if isinstance(result, str):
             # 冷却期/材料不足拒绝 → 强制跳过（不走 reset_exhausted_action）
@@ -1030,11 +1146,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """获取或计算装备指纹。
 
         优先读取 dict 内已有的 _fp 字段（由 to_equipment / to_dict 自动设置），
-        仅当缺失时才回退计算。身份字段全空时必须返回空串，即使上游错误
-        缓存了 _fp；这是背包遍历判定空 slot 的入口隔离。
+        仅当缺失时才回退计算。type 未被装备解析器确认时必须返回空串，
+        即使 OCR 噪声形成了 name 或上游错误缓存了 _fp；这是背包遍历判定
+        空 slot 的入口隔离。
         """
-        if not isinstance(equip, dict) or not any(
-                equip.get(key) for key in ("type", "name", "level")):
+        if not isinstance(equip, dict) or not equip.get("type"):
             return ""
         fp = equip.get("_fp", "")
         if fp:

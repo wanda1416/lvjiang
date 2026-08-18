@@ -58,8 +58,8 @@ def _profile_set(_engine, key: str, value, *args) -> float | str:
         logger.warning("profile_set: key 为空")
         return 0
 
-    from ...core.profile_engine.profile_ops import profile_action
     from ...config.user_profile import get_profile_config
+    from ...core.profile_engine.profile_ops import profile_action
     username = _get_username(_engine)
     config = get_profile_config()
     model_type = config.get_model_type(key) or ""

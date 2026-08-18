@@ -34,11 +34,12 @@ materials:
     on_insufficient: continue
 scan:
   enabled: true
-  min_level: 100
+  min_level: 105
   entry_min_rating: excellent
   max_consecutive_recycles: 50
   rules:
-  - parts:
+  - enabled: true
+    parts:
     - 全部
     max_quality: gold_only
     pct_op: le
@@ -49,7 +50,8 @@ scan:
     judge_rules: []
     action: tune_full_recycle
     first_affix_only: true
-  - parts:
+  - enabled: true
+    parts:
     - 武器
     max_quality: purple_only
     pct_op: ge
@@ -60,7 +62,8 @@ scan:
     judge_rules: []
     action: skip
     first_affix_only: true
-  - parts:
+  - enabled: true
+    parts:
     - 全部
     max_quality: purple
     pct_op: ge
@@ -72,7 +75,8 @@ scan:
     judge_rules: []
     action: skip
     first_affix_only: false
-  - parts:
+  - enabled: true
+    parts:
     - 全部
     max_quality: purple
     pct_op: le

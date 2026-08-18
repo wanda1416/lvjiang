@@ -167,6 +167,23 @@ def test_recycled_empty_slot_ends_traversal():
     assert wf.drags == 0
 
 
+def test_low_level_signal_ends_slot_without_reading_later_rows():
+    """首件低等级有效装备出现后，不再读本窗口后续行，也不滚动。"""
+    class _LowLevelWF(DedupFakeWF):
+        def _process_equipment(self, name, equip, detail_scene,
+                               row=None, col=1):
+            self.processed.append(equip["fp"])
+            if equip["fp"] == "B":
+                self._slot_level_exhausted = True
+            return equip["fp"]
+
+    wf = _LowLevelWF([["A", "B", "C"]])
+    DedupTraversal().traverse(wf, WEAPON_DETAIL)
+
+    assert wf.processed == ["A", "B"]
+    assert wf.drags == 0
+
+
 def test_max_rounds_fuse():
     """总轮数保险丝：每轮都有新行也会在 MAX_ROUNDS 处强制收束"""
     windows = [[f"r{i}a", f"r{i}b", f"r{i}c"] for i in range(10)]

@@ -570,10 +570,6 @@ class EquipJudgeTestDialog(QDialog):
             food_tag = (food.food if food.action == "feed"
                         else tr("无") if food.action == "none"
                         else food.action)
-            log.append(
-                f"R{rnd} +{new_affix.name} 狗粮:{food_tag}"
-                f" 评:{expect_label}")
-
             # 添加词条
             equip.affixes.append(new_affix)
             affix_count += 1
@@ -583,6 +579,11 @@ class EquipJudgeTestDialog(QDialog):
             pot = judge_equipment_potential(equip, configs, rule_keys)
             expect_key = _best_rating_key(pot, label_to_key)
             expect_label = RATING_LABELS.get(expect_key, expect_key or "?")
+            # 本轮日志必须显示新增词条后的评级。旧实现写在 append 之前，
+            # 导致 Rn 实际展示 R(n-1) 的潜力，满词条 R4 尤其会误报顶级。
+            log.append(
+                f"R{rnd} +{new_affix.name} 狗粮:{food_tag}"
+                f" 评:{expect_label}")
 
             # 结束处理
             if group.tune.enabled:

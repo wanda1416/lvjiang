@@ -4,6 +4,11 @@
 - 画面从变化到稳定时正常返回
 - 超时未稳定时记警告并继续（不抛异常）
 - 停止检查生效
+- least 期间不误判稳定
+- crop_box 区域限定
+
+所有测试通过注入 _clock / _sleep 实现确定性时序，
+不依赖真实 wall-clock，消除 OS 调度引起的 flaky。
 """
 
 import numpy as np
@@ -31,12 +36,36 @@ class _SeqCapture:
         return self._frames[-1] if self._frames else None
 
 
+class FakeClock:
+    """确定性假时钟：每次调用递增 step 秒，不受 OS 调度影响。"""
+
+    def __init__(self, step: float = 0.01):
+        self._t = 0.0
+        self._step = step
+
+    def __call__(self) -> float:
+        self._t += self._step
+        return self._t
+
+
+def _no_sleep(_dur: float) -> None:
+    """假 sleep：什么都不做，时钟推进由 FakeClock 控制。"""
+
+
 def _workflow_with_capture(cap: _SeqCapture, **kw):
     """创建 BaseWorkflow，使用自定义 capture"""
     eng = make_engine(**kw)
     eng._capture = cap
     eng._workflow = None
     return eng._ensure_workflow()
+
+
+def _run_wait_stable(cap: _SeqCapture, **kw):
+    """便捷方法：用 FakeClock 运行 wait_stable，返回 (workflow, clock)"""
+    wf = _workflow_with_capture(cap)
+    clock = FakeClock()
+    wf.wait_stable(_clock=clock, _sleep=_no_sleep, **kw)
+    return wf, clock
 
 
 class TestWaitStableExecution:
@@ -48,8 +77,8 @@ class TestWaitStableExecution:
             *[_frame(200) for _ in range(20)],  # 大量相同帧
         ]
         cap = _SeqCapture(frames)
-        wf = _workflow_with_capture(cap)
-        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01, stable_duration=0.02)
+        _run_wait_stable(cap, timeout=5.0, threshold=0.02, interval=0.01,
+                         stable_duration=0.02)
         assert cap._idx > 2  # 至少采集了变化前 + 变化 + 稳定帧
 
     def test_timeout_continues_without_raising(self):
@@ -57,7 +86,10 @@ class TestWaitStableExecution:
         frames = [_frame(i * 10) for i in range(50)]
         cap = _SeqCapture(frames)
         wf = _workflow_with_capture(cap)
-        wf.wait_stable(timeout=0.15, threshold=0.02, interval=0.01, stable_duration=0.02)
+        clock = FakeClock()
+        # 不抛异常即通过
+        wf.wait_stable(timeout=0.15, threshold=0.02, interval=0.01,
+                       stable_duration=0.02, _clock=clock, _sleep=_no_sleep)
         assert cap._idx > 0  # 至少尝试采集过
 
     def test_stop_check_exits_early(self):
@@ -65,7 +97,9 @@ class TestWaitStableExecution:
         frames = [_frame(i * 20) for i in range(100)]
         cap = _SeqCapture(frames)
         wf = _workflow_with_capture(cap, stop_check=lambda: True)
-        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01)
+        clock = FakeClock()
+        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
+                       _clock=clock, _sleep=_no_sleep)
         assert cap._idx <= 1  # 停止标志应在首帧后即生效
 
     def test_capture_none_continues(self):
@@ -76,20 +110,38 @@ class TestWaitStableExecution:
             *[_frame(100) for _ in range(20)],
         ]
         cap = _SeqCapture(frames)
-        wf = _workflow_with_capture(cap)
-        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01, stable_duration=0.02)
+        _run_wait_stable(cap, timeout=5.0, threshold=0.02, interval=0.01,
+                         stable_duration=0.02)
         assert cap._idx >= 2  # 跳过了 None 帧后继续采集
 
     def test_least_prevents_false_stable(self):
         """least 期间即使画面相同也不判定为稳定"""
-        frames = [_frame(100) for _ in range(80)]  # 全部相同
+        # 全部相同帧：无 least 时 2-3 帧即判稳定
+        frames = [_frame(100) for _ in range(50)]
         cap = _SeqCapture(frames)
+        clock = FakeClock(step=0.01)
+
         wf = _workflow_with_capture(cap)
-        # least=0.3 强制至少等 0.3s，远超 stable_duration=0.02
         wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
-                       stable_duration=0.02, least=0.3)
-        # 无 least 时 2-3 帧即可判稳定；有 least 必须等够 0.3s
-        assert cap._idx > 5
+                       stable_duration=0.02, least=0.15,
+                       _clock=clock, _sleep=_no_sleep)
+
+        # 核心不变量：返回时 fake clock 一定已走过 least 时长
+        # 不依赖帧数（每迭代 clock 被调 2-3 次，帧数 ≠ 时间/step）
+        assert clock._t >= 0.15
+
+    def test_least_exact_boundary(self):
+        """least 边界：恰好到 least 时间后第一帧才开始检查稳定"""
+        frames = [_frame(100) for _ in range(30)]
+        cap = _SeqCapture(frames)
+        clock = FakeClock(step=0.01)
+
+        wf = _workflow_with_capture(cap)
+        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
+                       stable_duration=0.02, least=0.05,
+                       _clock=clock, _sleep=_no_sleep)
+
+        assert clock._t >= 0.05
 
     def test_crop_box_region_stable(self):
         """crop_box 限定区域：只对比指定区域，背景变化不影响稳定判定"""
@@ -100,10 +152,9 @@ class TestWaitStableExecution:
             f[:, 50:] = 200              # 右半区域稳定
             frames.append(f)
         cap = _SeqCapture(frames)
-        wf = _workflow_with_capture(cap)
-        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
-                       stable_duration=0.02, least=0.02,
-                       crop_box={"x": 50, "y": 0, "w": 50, "h": 100})
+        _run_wait_stable(cap, timeout=5.0, threshold=0.02, interval=0.01,
+                         stable_duration=0.02, least=0.02,
+                         crop_box={"x": 50, "y": 0, "w": 50, "h": 100})
         assert cap._idx > 0
 
     def test_crop_box_none_falls_back_to_full(self):
@@ -114,9 +165,8 @@ class TestWaitStableExecution:
             *[_frame(200) for _ in range(20)],
         ]
         cap = _SeqCapture(frames)
-        wf = _workflow_with_capture(cap)
-        wf.wait_stable(timeout=5.0, threshold=0.02, interval=0.01,
-                       stable_duration=0.02, crop_box=None)
+        _run_wait_stable(cap, timeout=5.0, threshold=0.02, interval=0.01,
+                         stable_duration=0.02, crop_box=None)
         assert cap._idx > 2
 
 

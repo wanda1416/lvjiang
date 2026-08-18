@@ -705,8 +705,8 @@ def test_skip_tuning_no_entry(patch_worth):
 # ─── 等级门槛 + 品阶异常前置拦截 ───────────────────
 
 
-def test_below_min_level_skips(monkeypatch):
-    """等级低于门槛 → 直接跳过，不走任何行为判定"""
+def test_below_min_level_ends_current_slot(monkeypatch):
+    """有效装备等级低于门槛 → 标记当前部位结束，不走行为判定。"""
     from lvjiang.apps.yysls.core.tuning_rules import ScanBehavior
     base = TuningGroup(scan=ScanBehavior(min_level=120))
     wf = _wf_with(base)
@@ -715,10 +715,23 @@ def test_below_min_level_skips(monkeypatch):
 
     assert fp   # 保留装备，返回指纹
     assert outcome is None
+    assert wf.slot_level_exhausted
     assert not wf.output.get("tuning_reports")   # 不进调律
     assert not wf.scan_reject_calls   # 不走扫描处置
     assert not wf.full_calls   # 不走已满处理
     assert (EQUIP_DETAIL, "more_func") not in wf.clicks   # 不触发回收
+
+
+def test_missing_level_does_not_end_current_slot():
+    """等级 OCR 缺失是异常数据，不得据此推断后续装备都低等级。"""
+    wf = FakeWF()
+    equip = _equip(2, name="等级异常剑")
+    equip["level"] = None
+    equip["quality"] = None
+
+    wf._process_equipment_once("等级异常剑", equip, WEAPON_DETAIL)
+
+    assert not wf.slot_level_exhausted
 
 
 def test_quality_unrecognized_skips(monkeypatch):
@@ -1561,9 +1574,9 @@ def test_row_cols_stops_at_empty_slot():
 
 
 def test_empty_ocr_model_with_cached_fingerprint_is_empty_slot():
-    """回归：空槽即使携带旧固定 _fp，也不能被自动调律当成装备。"""
+    """回归：OCR 噪声名和旧固定 _fp 都不能把空槽变成装备。"""
     empty = {
-        "type": None, "name": None, "level": None, "quality": None,
+        "type": None, "name": "王", "level": None, "quality": None,
         "is_chengyin": False, "base_attr": None, "base_attr_2": None,
         "dingyin": None, "_fp": "116f370e",
     }
@@ -1723,6 +1736,35 @@ class TestTuningDocIntegration:
             "tune_affix": "最大外功攻击 100", "tune_tip": ""}
         wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
         assert wf.output["tuning_reports"][0]["status"] == "tuned"
+
+    def test_interrupted_current_report_is_finalized(self, tmp_path):
+        """F10 时当前装备的部分报告必须先写入 Markdown 再关闭。"""
+        wf = FakeWF()
+        wf._engine.run_username = "小明"
+        wf.ctx.doc_dir = tmp_path
+        wf._open_doc(["main_weapon"])
+        equip = _equip(2, name="中断剑")
+        wf.recorder.start_report("中断剑", equip, 2)
+        wf.recorder.doc_start_equipment(equip)
+        wf.recorder.report_set("rounds", 1)
+        wf.recorder.report_set("final_affix_count", 3)
+        wf.recorder.report_set("latest_affixes", [
+            equip["affix_1"], equip["affix_2"],
+            {"name": "敏", "value": 10},
+        ])
+
+        assert wf.recorder.finalize_interrupted_current()
+        wf._stopped = True
+        wf._close_doc()
+
+        report = wf.recorder.collect_reports()[-1]
+        assert report["status"] == "interrupted"
+        assert report["rounds"] == 1
+        assert report["stop_reason"] == "用户中断（F10）"
+        text = next(tmp_path.glob("调律说明_小明_*.md")).read_text(encoding="utf-8")
+        assert "用户中断（F10），保存当前装备的部分调律结果" in text
+        assert "本件小结：共 1 轮，词条 3/5" in text
+        assert "## 运行结束" in text
 
     def test_open_doc_failure_degrades(self, monkeypatch):
         """文档创建失败（OSError）→ 只警告，_doc 置 None，流程不中断"""

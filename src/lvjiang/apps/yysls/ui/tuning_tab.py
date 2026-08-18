@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -424,6 +425,8 @@ class TuningTab(QWidget):
                 if widget is not None:
                     widget.reconnect(engine._progress_hub)
                     widget.reset_state()
+                else:
+                    logger.warning("未找到调律进度控件，进度信号不会显示")
 
             rule_names_text = "、".join(j.rule_name for j in rule_judges)
             on_names = _tuning_switch_names(switches)

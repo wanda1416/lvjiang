@@ -51,11 +51,11 @@ class TestMakeFingerprint:
         assert _fn("make_fingerprint")(None) == ""
         assert _fn("make_fingerprint")("not a dict") == ""
 
-    def test_serialized_empty_equipment_returns_empty(self):
-        """空槽 OCR 字段齐全但身份全空，仍必须视为空装备。"""
+    def test_unrecognized_type_with_garbage_name_returns_empty(self):
+        """空槽 OCR 噪声只能形成 name，type 未确认时仍为空装备。"""
         data = {
             "type": None,
-            "name": None,
+            "name": "王",
             "level": None,
             "quality": None,
             "is_chengyin": False,

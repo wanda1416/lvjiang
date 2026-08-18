@@ -153,7 +153,8 @@ class TuningExecutor:
 
     def tune_once(self, equip_data: EquipmentData,
                   expect_rating: str | None,
-                  full_recycle_mode: bool = False) -> dict | None:
+                  full_recycle_mode: bool = False,
+                  round_no: int | None = None) -> dict | None:
         """执行一轮调律：展开材料区→逐轮狗粮决策→一键添加→调律→收结果。
 
         石头检查与狗粮决策共用同一次材料区识别；决策结果存入
@@ -199,9 +200,27 @@ class TuningExecutor:
             self.round_food_reason = decision.reason
             if decision.action == "skip":
                 self.abort_reason = decision.reason
+                emit_progress = getattr(wf, "_emit_progress", None)
+                if callable(emit_progress):
+                    emit_progress("round_prepared", {
+                        "round_no": round_no,
+                        "food_used": "",
+                        "food_reason": self.round_food_reason,
+                        "material_stock": self.get_material_stock(),
+                        "will_tune": False,
+                    })
                 return None
             food = decision.food if decision.action == "feed" else ""
             self.round_food = food
+        emit_progress = getattr(wf, "_emit_progress", None)
+        if callable(emit_progress):
+            emit_progress("round_prepared", {
+                "round_no": round_no,
+                "food_used": self.round_food,
+                "food_reason": self.round_food_reason,
+                "material_stock": self.get_material_stock(),
+                "will_tune": True,
+            })
         if food:
             # 同名幽灵槽防护：只认数量有效的槽位
             slot = next(

@@ -117,8 +117,8 @@ class TestNoteKeyDef:
 class TestNoteConfigLoading:
     def test_load_note_from_yaml(self, note_env):
         """profile.yaml 含 note 节点正确加载"""
-        from lvjiang.apps.yysls.config.user_profile import _load_config
         from lvjiang.apps.yysls.config.profile_models import NoteKeyDef
+        from lvjiang.apps.yysls.config.user_profile import _load_config
 
         schema = _load_config()
         kd = schema.get_key("took_xinfa")
@@ -235,11 +235,12 @@ class TestNoteProfileAction:
 
     def test_note_no_sync_targets(self, note_env):
         """note 不触发 sync_targets"""
-        from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry
-        from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
-
         # 先给同步目标设初始值
-        from lvjiang.apps.yysls.core.profile_engine.profile_db import db_upsert
+        from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+            db_read_entry,
+            db_upsert,
+        )
+        from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
         db_upsert(note_env.username, "stock", "target_stock", 1000)
 
         # note 写入（即使 note key 定义了 sync_targets，也不会触发）
@@ -290,7 +291,6 @@ class TestNoteProfileRead:
 class TestNoteEngineTick:
     def test_engine_tick_ignores_note(self, note_env):
         """ProfileEngine._tick_user 不处理 note"""
-        from unittest.mock import MagicMock
 
         from lvjiang.apps.yysls.config.user_profile import _load_config
         from lvjiang.apps.yysls.core.profile_engine.profile_db import (
@@ -400,12 +400,12 @@ class TestNoteSyncValidation:
 
         from loguru import logger
 
-        from lvjiang.apps.yysls.config.user_profile import _validate_sync_targets
         from lvjiang.apps.yysls.config.profile_models import (
             NoteKeyDef,
             StockKeyDef,
             SyncTargetDef,
         )
+        from lvjiang.apps.yysls.config.user_profile import _validate_sync_targets
 
         keys_by_model = {
             "note": [NoteKeyDef(key="took_xinfa", label="是否拿心法")],

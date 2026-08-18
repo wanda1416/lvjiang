@@ -34,6 +34,10 @@ class TestEquipmentDataDimensions:
         """空槽 OCR 的标准模型不得生成可被遍历器当成装备的指纹。"""
         assert EquipmentData().to_dict()["_fp"] == ""
 
+    def test_garbage_name_without_type_has_no_fingerprint(self):
+        """equip_type OCR 噪声保留为诊断名称，但不能确立装备身份。"""
+        assert EquipmentData(name="王").to_dict()["_fp"] == ""
+
     def test_weapon_equipment(self):
         e = EquipmentData(type="剑")
         assert e.part == "武器"

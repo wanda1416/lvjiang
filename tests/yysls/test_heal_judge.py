@@ -134,6 +134,14 @@ class TestShiSemantics:
 # ─── 调律潜力判定 ──────────────────────────────────────────
 
 class TestPotential:
+    def test_wrist_full_waste_affix_transmute_is_excellent(self, pure):
+        """满词条腕甲带御：考虑一次转律后的潜力为优秀，不是顶级。"""
+        e = make_equip(
+            "腕甲",
+            ["劲", "对玩家单位增效", "最大外功攻击", "最小牵丝攻击", "御"],
+        )
+        assert pure.check_tuning_worthiness(e).rating == Rating.EXCELLENT
+
     def test_fan_free_slot_fills_zengxiao_top(self, pure):
         # 空槽可补 扇武学增效 → 仍可达顶级
         e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "势"])

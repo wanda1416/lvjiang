@@ -137,7 +137,8 @@ class _ActionMixin:
 
     def wait_stable(self, timeout: float | str, threshold: float = 0.02,
                     interval: float = 0.3, stable_duration: float = 0.5,
-                    least: float = 0.5, crop_box: dict | None = None):
+                    least: float = 0.5, crop_box: dict | None = None,
+                    *, _clock=time.monotonic, _sleep=time.sleep):
         """等待画面稳定（连续截图对比）
 
         每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
@@ -173,20 +174,20 @@ class _ActionMixin:
         else:
             timeout_val = float(timeout)
 
-        start_time = time.monotonic()
+        start_time = _clock()
         deadline = start_time + max(0.0, timeout_val)
         least_until = start_time + max(0.0, least)
         prev = None
         stable_since = None
 
-        while time.monotonic() < deadline:
+        while _clock() < deadline:
             if self._stop_check():
                 logger.debug("wait stable: 收到停止请求，提前结束")
                 return
 
             img = self._capture.capture()
             if img is None:
-                time.sleep(interval)
+                _sleep(interval)
                 continue
 
             # 区域限定：裁剪到指定区域后再做 diff 对比
@@ -202,14 +203,14 @@ class _ActionMixin:
                     img = img[y1:y2, x1:x2]
 
             # least 期间：只截图建立基准，不判断稳定
-            if prev is not None and time.monotonic() >= least_until:
+            if prev is not None and _clock() >= least_until:
                 diff = float(cv2.absdiff(prev, img).mean()) / 255.0
                 if diff < threshold:
                     if stable_since is None:
-                        stable_since = time.monotonic()
+                        stable_since = _clock()
                         logger.debug(f"wait stable: 差异 {diff:.4f} < {threshold}，开始计时")
-                    elif time.monotonic() - stable_since >= stable_duration:
-                        elapsed = time.monotonic() - start_time
+                    elif _clock() - stable_since >= stable_duration:
+                        elapsed = _clock() - start_time
                         logger.debug(f"wait stable: 画面已稳定 {elapsed:.1f}s (差异 {diff:.4f})")
                         return
                 else:
@@ -218,10 +219,10 @@ class _ActionMixin:
                     stable_since = None
 
             prev = img.copy()
-            remaining = deadline - time.monotonic()
-            time.sleep(min(interval, max(0.0, remaining)))
+            remaining = deadline - _clock()
+            _sleep(min(interval, max(0.0, remaining)))
 
-        elapsed = time.monotonic() - start_time
+        elapsed = _clock() - start_time
         logger.warning(
             f"wait stable: 画面在 {elapsed:.1f}s 内未稳定（差异阈值 {threshold}），继续执行"
         )

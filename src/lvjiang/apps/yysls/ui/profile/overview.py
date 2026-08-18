@@ -20,7 +20,6 @@ from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import (
     QAbstractItemView,
-    QComboBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -248,6 +247,21 @@ class ProfileOverviewTab(QWidget):
         v_header.setDefaultSectionSize(24)
         v_header.setVisible(False)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        # 选中行保持轻量提示，当前编辑/移动焦点格使用更深的底色突出。
+        table.setStyleSheet("""
+            QTableWidget::item:selected {
+                background-color: #e6e6e6;
+                color: #202020;
+            }
+            QTableWidget::item:selected:focus {
+                background-color: #666666;
+                color: #ffffff;
+            }
+            QTableWidget::item:focus {
+                outline: 1px solid #4a4a4a;
+                outline-offset: -2px;
+            }
+        """)
 
         # 右键菜单：快速增减数值
         table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

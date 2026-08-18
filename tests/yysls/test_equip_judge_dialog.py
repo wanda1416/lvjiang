@@ -248,3 +248,32 @@ class TestCanTransmuteCheckbox:
         dialog._on_judge()
         assert captured
         assert captured[0]["huiyi_general"]["can_transmute"] is False
+
+
+class TestSimulationRoundRating:
+    def test_r4_shows_rating_after_fourth_affix(self, qtbot, monkeypatch):
+        """R4 必须显示加入御后的满词条潜力，不能沿用 R3 的顶级。"""
+        from lvjiang.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
+
+        monkeypatch.setattr(
+            "lvjiang.core.config.wf_configs.get_wf_config",
+            lambda _key: {"base_group": "aggressive"})
+        dialog = EquipJudgeTestDialog()
+        qtbot.addWidget(dialog)
+        dialog._tuning_config.set_config({
+            "heal_pure": {"enabled": True, "playstyles": ["纯奶"]},
+        })
+        dialog.editor.part_combo.setCurrentText("腕甲")
+        dialog.editor.quality_combo.setCurrentText("金色")
+        names = ["劲", "对玩家单位增效", "最大外功攻击", "最小牵丝攻击", "御"]
+        for combo, name in zip(dialog.editor._affix_combos, names, strict=True):
+            combo.setCurrentText(name)
+        for checkbox in dialog.editor._tune_checkboxes:
+            checkbox.setChecked(True)
+
+        dialog._on_simulate()
+
+        lines = dialog.result_text.toPlainText().splitlines()
+        r4 = next(line for line in lines if line.startswith("R4 "))
+        assert "评:优秀" in r4
+        assert "评:顶级" not in r4

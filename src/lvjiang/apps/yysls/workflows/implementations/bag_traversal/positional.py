@@ -67,6 +67,9 @@ class PositionalTraversal(BagTraversal):
         logger.info("═══ 初始扫描 ═══")
         row_index = self._process_new_rows(
             wf, detail_scene, fps, 0, 1, initial_rows, cols)
+        if wf.slot_level_exhausted:
+            logger.info("遇到低于等级门槛的有效装备 → 结束当前部位")
+            return
         first_real_row = 1
         logger.info(f"初始完成: row_index={row_index} first_real_row=1 fps={fps}")
         if row_index == 0:
@@ -76,7 +79,7 @@ class PositionalTraversal(BagTraversal):
         # 主循环：滚动 → 校验 → 处理新行
         last_real_rows = 0
         scroll_round = 0
-        while not wf.is_stopped:
+        while not wf.is_stopped and not wf.slot_level_exhausted:
             scroll_round += 1
             logger.info(f"═══ 滚动 #{scroll_round} ═══")
 
@@ -104,10 +107,13 @@ class PositionalTraversal(BagTraversal):
             row_index = self._process_new_rows(
                 wf, detail_scene, fps, row_index, first_real_row, real_rows,
                 cols)
+            if wf.slot_level_exhausted:
+                logger.info("遇到低于等级门槛的有效装备 → 结束当前部位")
+                break
             logger.info(f"  row_index → {row_index}, fps={fps}")
 
         # 循环结束：处理剩余可见行（到底时处理，正常退出时 row_index==last_real_row 不处理）
-        if last_real_rows > 0:
+        if last_real_rows > 0 and not wf.slot_level_exhausted:
             final_last = first_real_row + last_real_rows - 1
             if row_index < final_last:
                 row_index = self._process_new_rows(
@@ -139,6 +145,9 @@ class PositionalTraversal(BagTraversal):
             logger.info(f"  新行{logical_row} grid[{win_row}][1] {name} fp={fp}")
             new_fp = wf._process_equipment(name, equip, detail_scene,
                                            row=win_row)
+            if wf.slot_level_exhausted:
+                logger.info(f"  新行{logical_row} 命中等级终止条件")
+                break
             # 调律会给该行首列装备加词条 → 指纹变化；用处理后指纹覆盖。
             # 回收后由 _process_equipment 就地续处理补位，new_fp 为最终
             # 占位者指纹；空串表示该格已空（背包尽头）。
@@ -151,6 +160,8 @@ class PositionalTraversal(BagTraversal):
                 fps[-1] = new_fp
             # ── 第 2..cols 列：遍历本行剩余列 ──
             wf._process_row_cols(detail_scene, win_row, logical_row, cols)
+            if wf.slot_level_exhausted:
+                break
             processed = logical_row
         return processed
 

@@ -34,6 +34,7 @@ class TuningRecorder:
         # 文档
         self._doc: TuningDocWriter | None = None
         self._doc_seq: int = 0
+        self._doc_equipment_open: bool = False
 
         # 锁定指纹集（本次运行内已确认锁定的装备指纹）
         self._locked_fps: set[str] = set()
@@ -80,6 +81,7 @@ class TuningRecorder:
         if self._doc:
             self._doc_seq += 1
             self._doc.start_equipment(self._doc_seq, equip)
+            self._doc_equipment_open = True
 
     def doc_worthiness_matched(self, potential: dict):
         """符合的规则：只写命中 顶级/优秀 的规则"""
@@ -112,6 +114,7 @@ class TuningRecorder:
         if self._doc:
             self._doc.finish_equipment(rounds, affix_count, stop_reason,
                                        judgement)
+            self._doc_equipment_open = False
 
     def doc_end_run(self, interrupted: bool, tuned_count: int,
                     total_rounds: int):
@@ -189,6 +192,27 @@ class TuningRecorder:
         self._reports.clear()
         self._current_report = None
 
+    def finalize_interrupted_current(self) -> bool:
+        """封存 F10 时尚未正常提交的当前装备报告。"""
+        if self._current_report is None:
+            return False
+        report = self._current_report
+        rounds = int(report.get("rounds") or len(report.get("tune_results") or []))
+        affix_count = int(report.get("final_affix_count")
+                          or report.get("affix_count") or 0)
+        report.setdefault("rounds", rounds)
+        report.setdefault("final_affix_count", affix_count)
+        report.setdefault("final_affixes", report.get("latest_affixes") or [])
+        report.setdefault("final_judgement", {})
+        report["stop_reason"] = "用户中断（F10）"
+        if self._doc_equipment_open:
+            self.doc_note("用户中断（F10），保存当前装备的部分调律结果")
+            self.doc_finish_equipment(
+                rounds, affix_count, report["stop_reason"],
+                report.get("final_judgement") or {})
+        self.commit_report("interrupted")
+        return True
+
     # ─── 成品清单 ─────────────────────────────────────────
 
     @staticmethod
@@ -253,5 +277,6 @@ class TuningRecorder:
         self.expect_rating = None
         self.equipment_recycled = False
         self._doc_seq = 0
+        self._doc_equipment_open = False
         self._reports.clear()
         self._current_report = None

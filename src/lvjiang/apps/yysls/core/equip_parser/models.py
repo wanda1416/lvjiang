@@ -167,13 +167,13 @@ def make_fingerprint(equip_data: dict, *, is_mock: bool = False) -> str:
     拼接字符串 = type + level + quality + is_chengyin + affix_1~5(name:value)
     定音词条(dingyin)故意不包含在指纹中。
     is_mock=True 时自动添加 mock_ 前缀，确保模拟装备与真实装备指纹永不冲突。
-    空数据、空字典，或 type/name/level 三个身份字段全为空时返回空字符串。
-    后一种情况是 OCR 点击空槽后的标准 EquipmentData 序列化结果；不得
-    为其生成固定指纹，否则背包遍历会把空槽当成真实装备。
+    空数据、空字典或 type 未被解析时返回空字符串。装备类型是解析器确认
+    装备身份的权威字段；OCR 在空槽读出的「王」「C」只能落入 name，type
+    会保持 None，不得因此生成指纹，否则背包遍历会把噪声当成真实装备。
     """
     if not isinstance(equip_data, dict) or not equip_data:
         return ""
-    if not any(equip_data.get(key) for key in ("type", "name", "level")):
+    if not equip_data.get("type"):
         return ""
     parts = [
         str(equip_data.get("type", "") or ""),

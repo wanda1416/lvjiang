@@ -1,11 +1,13 @@
 """玩家数据模型定义
 
-三种游戏数据模型的数据类：
+四种游戏数据模型的数据类：
 - quota: 配额（周期任务/限额），周期结束自动清零
 - regen: 再生（恢复状态），按规则回复，有上限
 - stock: 存量（资源计数），纯数字，无颜色告警
+- note: 备注（轻量标记），文本存储，不参与数值管线与同步
 
-任意模型的 key 可通过 sync_targets 配置触发器同步（跨模型、多目标、倍率、方向限定）。
+quota/regen/stock 的 key 可通过 sync_targets 配置触发器同步（跨模型、多目标、倍率、方向限定）。
+note 不参与 sync_targets。
 
 定义与存储完全镜像：profile.yaml 按模型归档，user.json 按模型分节点。
 """
@@ -24,13 +26,15 @@ VALID_PERIODS = ("day", "week", "month", "season", "half_season")
 MODEL_QUOTA = "quota"
 MODEL_REGEN = "regen"
 MODEL_STOCK = "stock"
+MODEL_NOTE = "note"
 
-ALL_MODELS = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK)
+ALL_MODELS = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK, MODEL_NOTE)
 
 MODEL_LABELS = {
     MODEL_QUOTA: tr("配额"),
     MODEL_REGEN: tr("再生"),
     MODEL_STOCK: tr("库存"),
+    MODEL_NOTE: tr("备注"),
 }
 
 # 同步方向限定
@@ -353,12 +357,39 @@ class StockKeyDef(KeyDef):
         )
 
 
+@dataclass
+class NoteKeyDef(KeyDef):
+    """备注数据模型 — 轻量标记
+
+    无模型专属字段，仅继承 KeyDef 基类。
+    存储走 value_text 列（文本），不参与数值管线。
+    不参与 ProfileEngine tick，不参与 sync_targets。
+    """
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> NoteKeyDef:
+        base = KeyDef.from_dict(data)
+        return cls(
+            key=base.key,
+            label=base.label,
+            description=base.description,
+            cap=base.cap,
+            soft=base.soft,
+            show_cap=base.show_cap,
+            decimal=base.decimal,
+            sources=base.sources,
+            uses=base.uses,
+            sync_targets=base.sync_targets,
+        )
+
+
 # ─── 模型类型 -> 数据类映射 ─────────────────────────────────
 
 MODEL_CLASSES: dict[str, type[KeyDef]] = {
     MODEL_QUOTA: QuotaKeyDef,
     MODEL_REGEN: RegenKeyDef,
     MODEL_STOCK: StockKeyDef,
+    MODEL_NOTE: NoteKeyDef,
 }
 
 

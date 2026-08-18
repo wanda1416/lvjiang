@@ -31,8 +31,10 @@ from lvjiang.core.config import load_yaml, save_yaml
 from ....i18n import tr
 from .profile_models import (
     ALL_MODELS,
+    MODEL_NOTE,
     KeyDef,
     parse_key_def,
+    parse_sync_key,
 )
 
 # 配置文件路径（用户级数据，位于 session 目录）
@@ -168,7 +170,25 @@ def _load_config() -> ProfileSchema:
                 key_defs.append(key_def)
         keys_by_model[model_type] = key_defs
 
+    _validate_sync_targets(keys_by_model)
     return ProfileSchema(keys_by_model=keys_by_model)
+
+
+def _validate_sync_targets(keys_by_model: dict[str, list[KeyDef]]) -> None:
+    """校验 sync_targets 配置：note 模型不能作为同步目标"""
+    note_keys = {kd.key for kd in keys_by_model.get(MODEL_NOTE, [])}
+    if not note_keys:
+        return
+    for model_type, kds in keys_by_model.items():
+        for kd in kds:
+            for st in kd.sync_targets:
+                st_model, st_key = parse_sync_key(st.key)
+                if st_model == MODEL_NOTE and st_key in note_keys:
+                    logger.warning(
+                        f"sync_targets 配置错误: "
+                        f"{model_type}:{kd.key} 的目标 {st.key} 是 note 模型，"
+                        f"note 不参与同步，该目标将被忽略"
+                    )
 
 
 def get_profile_config() -> ProfileSchema:

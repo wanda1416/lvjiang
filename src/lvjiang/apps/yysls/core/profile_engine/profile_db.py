@@ -88,11 +88,24 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """entries 新增 value_text 列：note 模型存储文本（幂等）。"""
+    cols = [
+        row[1]
+        for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
+    ]
+    if "value_text" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_entries ADD COLUMN value_text TEXT NOT NULL DEFAULT ''"
+        )
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
     (2, "history add source column", _migrate_v2),
     (3, "entries add updated_time column", _migrate_v3),
+    (4, "entries add value_text column", _migrate_v4),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -155,7 +168,7 @@ class ProfileDB:
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT value, updated_at, updated_time FROM profile_entries "
+                "SELECT value, value_text, updated_at, updated_time FROM profile_entries "
                 "WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
@@ -164,18 +177,18 @@ class ProfileDB:
 
         if row is None:
             return {}
-        return {"value": row[0], "updated_at": row[1], "updated_time": row[2]}
+        return {"value": row[0], "value_text": row[1], "updated_at": row[2], "updated_time": row[3]}
 
     def get_all(self, username: str) -> dict[str, dict[str, dict]]:
         """读取用户全部 profile
 
-        Returns: {type: {key: {value, updated_at}}}
+        Returns: {type: {key: {value, value_text, updated_at}}}
         格式与 user.json 的 profile 节点兼容。
         """
         conn = self._connect()
         try:
             rows = conn.execute(
-                "SELECT type, key, value, updated_at, updated_time FROM profile_entries "
+                "SELECT type, key, value, value_text, updated_at, updated_time FROM profile_entries "
                 "WHERE username=?",
                 (username,),
             ).fetchall()
@@ -183,10 +196,11 @@ class ProfileDB:
             conn.close()
 
         result: dict[str, dict[str, dict]] = {}
-        for type_, key, value, updated_at, updated_time in rows:
+        for type_, key, value, value_text, updated_at, updated_time in rows:
             model_data = result.setdefault(type_, {})
             model_data[key] = {
                 "value": value,
+                "value_text": value_text,
                 "updated_at": updated_at,
                 "updated_time": updated_time,
             }
@@ -204,11 +218,13 @@ class ProfileDB:
         change_type: str | None = None,
         detail: str = "",
         source: str = "",
+        value_text: str = "",
     ) -> None:
         """INSERT OR REPLACE 单条 entry
 
         change_type 非 None 时记录 history（内部对比 old/new 值，无变化跳过）。
         source: 变更来源描述，随 history 一并记录。
+        value_text: note 模型存储文本，其他模型传默认空串。
         锁冲突抛 sqlite3.OperationalError。
         """
         write_ts = datetime.now().isoformat(timespec="seconds")
@@ -227,9 +243,9 @@ class ProfileDB:
             # upsert entry
             conn.execute(
                 "INSERT OR REPLACE INTO profile_entries "
-                "(username, type, key, value, updated_at, updated_time) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (username, type_, key, float(value), ts, write_ts),
+                "(username, type, key, value, value_text, updated_at, updated_time) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, type_, key, float(value), value_text, ts, write_ts),
             )
 
             # history 记录
@@ -261,7 +277,7 @@ class ProfileDB:
     ) -> None:
         """批量 upsert（事务包裹），用于 tick 写入
 
-        entries 元素: (type_, key, value, updated_at, change_type, detail[, source])
+        entries 元素: (type_, key, value, updated_at, change_type, detail[, source[, value_text]])
         """
         conn = self._connect()
         try:
@@ -269,6 +285,7 @@ class ProfileDB:
 
             for entry in entries:
                 source = entry[6] if len(entry) > 6 else ""
+                value_text = entry[7] if len(entry) > 7 else ""
                 type_, key, value, updated_at, change_type, detail = entry[:6]
                 write_ts = datetime.now().isoformat(timespec="seconds")
                 ts = updated_at or write_ts
@@ -282,9 +299,9 @@ class ProfileDB:
 
                 conn.execute(
                     "INSERT OR REPLACE INTO profile_entries "
-                    "(username, type, key, value, updated_at, updated_time) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (username, type_, key, float(value), ts, write_ts),
+                    "(username, type, key, value, value_text, updated_at, updated_time) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (username, type_, key, float(value), value_text, ts, write_ts),
                 )
 
                 if change_type is not None:
@@ -466,8 +483,9 @@ def db_upsert(
     change_type: str | None = None,
     detail: str = "",
     source: str = "",
+    value_text: str = "",
 ) -> None:
-    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, detail, source)
+    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, detail, source, value_text)
 
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:

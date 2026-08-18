@@ -38,7 +38,9 @@ from lvjiang.core.user_config import UserConfigManager
 
 from .....i18n import tr
 from ...config.profile_models import (
+    ALL_MODELS,
     MODEL_LABELS,
+    MODEL_NOTE,
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
@@ -504,7 +506,6 @@ class ProfileOverviewTab(QWidget):
         menu = QMenu(self)
 
         if logical_index == 0:
-            menu.addAction(tr("角色名列（不可删除）"))
             menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, -1))
         else:
             # 数据列索引需要减 1（跳过角色名列）
@@ -541,19 +542,9 @@ class ProfileOverviewTab(QWidget):
         dialog.setMinimumWidth(250)
         layout = QVBoxLayout(dialog)
 
-        combo = QComboBox()
-        combo.addItem(tr("（请选择）"), "")
-        for kd in all_keys:
-            model_type = config.get_model_type(kd.key) or ""
-            model_label = MODEL_LABELS.get(model_type, model_type)
-            combo.addItem(f"[{model_label}] {kd.label} ({kd.key})", kd.key)
-
-        if current_key:
-            idx = combo.findData(current_key)
-            if idx >= 0:
-                combo.setCurrentIndex(idx)
-
-        layout.addWidget(combo)
+        selected = [current_key]  # 可变容器，供级联菜单回调
+        btn = self._create_key_picker(config, all_keys, current_key, selected)
+        layout.addWidget(btn)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -566,9 +557,8 @@ class ProfileOverviewTab(QWidget):
         layout.addLayout(btn_row)
 
         if dialog.exec():
-            selected_key = combo.currentData()
-            if selected_key:
-                self._set_column_field(group_name, data_index, selected_key)
+            if selected[0]:
+                self._set_column_field(group_name, data_index, selected[0])
 
     def _add_column(self, group_name: str, after_index: int):
         """在指定分组的指定列后新增一列"""
@@ -592,12 +582,9 @@ class ProfileOverviewTab(QWidget):
         dialog.setMinimumWidth(250)
         layout = QVBoxLayout(dialog)
 
-        combo = QComboBox()
-        for kd in all_keys:
-            model_type = config.get_model_type(kd.key) or ""
-            model_label = MODEL_LABELS.get(model_type, model_type)
-            combo.addItem(f"[{model_label}] {kd.label} ({kd.key})", kd.key)
-        layout.addWidget(combo)
+        selected = [""]  # 可变容器，供级联菜单回调
+        btn = self._create_key_picker(config, all_keys, "", selected)
+        layout.addWidget(btn)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -610,7 +597,7 @@ class ProfileOverviewTab(QWidget):
         layout.addLayout(btn_row)
 
         if dialog.exec():
-            selected_key = combo.currentData()
+            selected_key = selected[0]
             if selected_key:
                 groups = get_groups()
                 group_data = groups.get(group_name, {"columns": []})
@@ -638,6 +625,55 @@ class ProfileOverviewTab(QWidget):
             save_groups(groups)
             self._remove_column_width(group_name, logical_index, self._tables[group_name])
             self._refresh_group(group_name, self._tables[group_name])
+
+    def _create_key_picker(
+        self, config, all_keys: list, current_key: str, selected: list,
+    ) -> QPushButton:
+        """创建级联菜单 key 选择按钮
+
+        一级菜单：模型类型（配额/再生/库存/备注）
+        二级菜单：该类型下的具体 key
+
+        selected: 可变容器 [key]，选中后更新 selected[0]。
+        """
+        from PyQt6.QtWidgets import QMenu
+
+        def _label_for_key(key: str) -> str:
+            kd = config.get_key(key)
+            if kd:
+                return f"{kd.label} ({kd.key})"
+            return key
+
+        btn = QPushButton(_label_for_key(current_key) if current_key else tr("（请选择）"))
+        btn.setMinimumWidth(200)
+
+        def show_menu():
+            menu = QMenu(btn)
+            # 按模型类型分组
+            keys_by_model: dict[str, list] = {}
+            for kd in all_keys:
+                mt = config.get_model_type(kd.key) or ""
+                keys_by_model.setdefault(mt, []).append(kd)
+
+            for mt in ALL_MODELS:
+                kds = keys_by_model.get(mt, [])
+                if not kds:
+                    continue
+                model_label = MODEL_LABELS.get(mt, mt)
+                submenu = menu.addMenu(model_label)
+                for kd in kds:
+                    action = submenu.addAction(f"{kd.label} ({kd.key})")
+                    action.triggered.connect(
+                        lambda checked, k=kd.key: (
+                            selected.__setitem__(0, k),
+                            btn.setText(_label_for_key(k)),
+                        )
+                    )
+
+            menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+
+        btn.clicked.connect(show_menu)
+        return btn
 
     def _set_column_field(self, group_name: str, logical_index: int, field_key: str):
         """设置指定分组的指定列字段"""
@@ -730,6 +766,22 @@ class ProfileOverviewTab(QWidget):
         user_name = name_item.text()
 
         raw_value = item.text()
+
+        # ── note 模型：直接写入文本，不走数值管线 ──
+        if model_type == MODEL_NOTE:
+            from ...core.profile_engine.profile_ops import profile_action
+            try:
+                profile_action(
+                    user_name, key_str,
+                    model_type=model_type,
+                    set_value=raw_value,
+                    source="",
+                )
+            except Exception as e:
+                logger.error(f"note 写入失败: {e}")
+                QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=e))
+            return
+
         parsed_value = _parse_value(raw_value, model_type, kd)
         if parsed_value is _PARSE_ERROR:
             self._loading = True
@@ -814,6 +866,23 @@ class ProfileOverviewTab(QWidget):
         # 构建菜单
         menu = QMenu(self)
         menu.setTitle(f"{kd.label} ({user_name})")
+
+        # note 模型：提供文本编辑选项
+        if model_type == MODEL_NOTE:
+            action_edit = menu.addAction(tr("编辑文本..."))
+            if action_edit:
+                current_text = expected_entry.get("value_text", "")
+                action_edit.triggered.connect(
+                    lambda: self._edit_note_text(
+                        user_name, model_type, key_str, kd, current_text,
+                        group_name, table,
+                    )
+                )
+            # note 不记录 history，不提供"查看历史记录"菜单项
+            viewport = table.viewport()
+            if viewport:
+                menu.exec(viewport.mapToGlobal(pos))
+            return
 
         # 获取该字段的自定义 steps（Quota、Regen 和 Stock 模型支持）
         kd_steps: list[StepDef] = []
@@ -1124,6 +1193,46 @@ class ProfileOverviewTab(QWidget):
             regen_progress_source="target",
             force_write=force_target_write,
         )
+
+    def _edit_note_text(
+        self,
+        user_name: str,
+        model_type: str,
+        key: str,
+        kd,
+        current_text: str,
+        group_name: str = "",
+        table: QTableWidget | None = None,
+    ) -> None:
+        """弹出多行文本输入框编辑 note 文本"""
+        from ...core.profile_engine.profile_ops import profile_action
+
+        text, ok = QInputDialog.getMultiLineText(
+            self,
+            tr("编辑备注 - {label}").format(label=kd.label),
+            tr("备注内容:"),
+            current_text,
+        )
+        if not ok:
+            return
+
+        try:
+            profile_action(
+                user_name, key,
+                model_type=model_type,
+                set_value=text,
+                source="",
+            )
+        except Exception as e:
+            logger.error(f"note 写入失败: {e}")
+            QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=e))
+            return
+
+        if not group_name:
+            group_name = self._get_current_group_name()
+            table = self._tables.get(group_name)
+        if table:
+            self._refresh_group(group_name, table)
 
     def _show_history_dialog(
         self, user_name: str, model_type: str, key: str, key_label: str,

@@ -13,6 +13,16 @@ if $batch_state.page_state == 2
     eval $batch_state.role = ""
 end
 
+# 确认在登录页：扫描「选择角色」区域
+scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
+if not $login_check
+    wait 5
+    scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
+    if not $login_check
+        eval pause("当前不在登录页，请切换到登录页后点击继续")
+    end
+end
+
 log "目标账号：" + $account
 
 if $batch_state.account is_empty

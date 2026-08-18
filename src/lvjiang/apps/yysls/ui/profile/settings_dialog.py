@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -35,10 +36,12 @@ from ...config.profile_models import (
     DIR_BOTH,
     DIRECTION_LABELS,
     MODEL_LABELS,
+    MODEL_NOTE,
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
     KeyDef,
+    NoteKeyDef,
     QuotaKeyDef,
     RegenKeyDef,
     StepDef,
@@ -48,7 +51,7 @@ from ...config.profile_models import (
 )
 
 # 模型 TAB 顺序
-_MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN]
+_MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]
 
 
 def _format_steps(steps: list[StepDef]) -> str:
@@ -321,6 +324,7 @@ class _ModelTab(QWidget):
         # Quota: Key | 标签 | 上限 | 周期 | 来源 | 详情摘要
         # Regen: Key | 标签 | 上限 | 周期 | 用途 | 详情摘要
         # Stock: Key | 标签 | 上限 | 来源 | 用途 | 详情摘要
+        # Note:  Key | 标签 | 上限 | 来源/用途 | 详情摘要
         self._table = QTableWidget()
         if self._model_type == MODEL_QUOTA:
             self._table.setColumnCount(6)
@@ -328,6 +332,9 @@ class _ModelTab(QWidget):
         elif self._model_type == MODEL_REGEN:
             self._table.setColumnCount(6)
             self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("周期"), tr("用途"), tr("详情摘要")])
+        elif self._model_type == MODEL_NOTE:
+            self._table.setColumnCount(5)
+            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("来源/用途"), tr("详情摘要")])
         else:
             self._table.setColumnCount(6)
             self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("来源"), tr("用途"), tr("详情摘要")])
@@ -342,12 +349,21 @@ class _ModelTab(QWidget):
         header_font.setBold(True)
         self._table.horizontalHeader().setFont(header_font)
 
+        # Key/标签/上限: 最小宽度 4 个汉字，超出自适应
+        fm = QFontMetrics(header_font)
+        min_col_width = fm.horizontalAdvance("测") * 4
+
         header = self._table.horizontalHeader()
-        # Key/标签/上限: 自适应
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        if self._model_type == MODEL_STOCK:
+        header.setMinimumSectionSize(min_col_width)
+        if self._model_type == MODEL_NOTE:
+            # Note: 来源/用途: 固定, 详情摘要: 拉伸
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+            self._table.setColumnWidth(3, 200)
+        elif self._model_type == MODEL_STOCK:
             # 来源/用途: 固定, 详情摘要: 拉伸
             header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
             header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
@@ -426,7 +442,7 @@ class ProfileDefinitionDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        info = QLabel(tr("定义三种数据模型的 key。双击行可编辑。"))
+        info = QLabel(tr("定义数据模型的 key。双击行可编辑。"))
         info.setStyleSheet("color: #666666; margin-bottom: 10px;")
         layout.addWidget(info)
 
@@ -485,6 +501,11 @@ class ProfileDefinitionDialog(QDialog):
             tab.table.setItem(row, 3, QTableWidgetItem(_format_period(kd)))
             tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.uses)))
             tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
+        elif tab.model_type == MODEL_NOTE:
+            # Key | 标签 | 上限 | 来源/用途 | 详情摘要
+            combined = list(dict.fromkeys(kd.sources + kd.uses))
+            tab.table.setItem(row, 3, QTableWidgetItem(",".join(combined)))
+            tab.table.setItem(row, 4, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
         else:
             # Key | 标签 | 上限 | 来源 | 用途 | 详情摘要
             tab.table.setItem(row, 3, QTableWidgetItem(",".join(kd.sources)))
@@ -555,6 +576,14 @@ class ProfileDefinitionDialog(QDialog):
             sync_summary = _format_sync_summary(kd)
             if sync_summary:
                 parts.append(sync_summary)
+            if kd.description:
+                parts.append(kd.description)
+            return ", ".join(parts)
+
+        if isinstance(kd, NoteKeyDef):
+            parts = []
+            if kd.show_cap:
+                parts.append(tr("展示上限"))
             if kd.description:
                 parts.append(kd.description)
             return ", ".join(parts)
@@ -998,6 +1027,17 @@ class ProfileDefinitionDialog(QDialog):
                     show_cap=show_cap_final,
                     decimal=decimal_final,
                     steps=steps_list,
+                )
+            elif model_type == MODEL_NOTE:
+                kd = NoteKeyDef(
+                    key=key, label=label,
+                    sources=sources_list,
+                    uses=uses_list,
+                    sync_targets=sync_targets_list,
+                    cap=cap_final,
+                    soft=soft_final,
+                    show_cap=show_cap_final,
+                    decimal=decimal_final,
                 )
             else:
                 kd = KeyDef(key=key, label=label, sources=sources_list, uses=uses_list)

@@ -15,10 +15,21 @@
 
 # ─── 导航：从首页到心法置换视图 ─────────────────────────
 click [game_main_page].[menu] after wait @page_refresh
+
+scan [game_menu_page].[peiyang] as $nav_check by contains "培养"
+if not $nav_check
+    eval pause("未找到「培养」入口，请确认当前在菜单页后点击继续")
+end
 click [game_menu_page].[peiyang] after wait @page_refresh
+
 click [training_main].[gongfa] after wait @step_interval
 click [training_main].[xinfa] after wait @page_refresh
 click [training_xinfa].[exchange] after wait @page_refresh
+
+scan [training_xinfa].[exchange] as $nav_check by contains "心得置换"
+if not $nav_check
+    eval pause("未进入心得置换页面，请手动导航后点击继续")
+end
 
 # ─── 返回导航 ────────────────────────────────────────────
 def go_back()

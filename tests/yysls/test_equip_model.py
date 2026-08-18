@@ -30,6 +30,10 @@ class TestInferPart:
 
 
 class TestEquipmentDataDimensions:
+    def test_empty_serialization_has_no_fingerprint(self):
+        """空槽 OCR 的标准模型不得生成可被遍历器当成装备的指纹。"""
+        assert EquipmentData().to_dict()["_fp"] == ""
+
     def test_weapon_equipment(self):
         e = EquipmentData(type="剑")
         assert e.part == "武器"

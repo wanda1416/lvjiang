@@ -51,6 +51,20 @@ class TestMakeFingerprint:
         assert _fn("make_fingerprint")(None) == ""
         assert _fn("make_fingerprint")("not a dict") == ""
 
+    def test_serialized_empty_equipment_returns_empty(self):
+        """空槽 OCR 字段齐全但身份全空，仍必须视为空装备。"""
+        data = {
+            "type": None,
+            "name": None,
+            "level": None,
+            "quality": None,
+            "is_chengyin": False,
+            "base_attr": None,
+            "base_attr_2": None,
+            "dingyin": None,
+        }
+        assert _fn("make_fingerprint")(data) == ""
+
     def test_affixes_included_in_fingerprint(self):
         """词条参与指纹计算"""
         base = {"type": "武器", "level": "40", "quality": "紫色"}

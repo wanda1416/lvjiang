@@ -20,6 +20,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -226,6 +227,20 @@ class CombatAttrsTab(QWidget):
         config_row_layout.setSpacing(4)
         config_row_layout.addWidget(select_group, 1)
         layout.addWidget(self._config_row)
+
+        # ── 显示选项（独立区域） ──
+        display_options_group = QGroupBox(tr("显示选项"))
+        display_options_layout = QHBoxLayout(display_options_group)
+        display_options_layout.setContentsMargins(14, 8, 14, 8)
+        self._chk_resistance_only = QCheckBox(tr("仅展示抗性结果"))
+        self._chk_resistance_only.setToolTip(
+            tr("勾选后，判定属性和增益效果直接展示抗性后数值，节省空间")
+        )
+        self._chk_resistance_only.stateChanged.connect(self._refresh_display)
+        self._chk_resistance_only.stateChanged.connect(lambda _: self._save_selection())
+        display_options_layout.addWidget(self._chk_resistance_only)
+        display_options_layout.addStretch()
+        layout.addWidget(display_options_group)
 
         # ── 毕业率（独立区域，单列展示） ──
         self._graduation_card = self._add_graduation_card(layout)
@@ -471,6 +486,8 @@ class CombatAttrsTab(QWidget):
         self._graduation_card.setVisible(False)  # promoted to LoadoutPanel row 3
         self._attrs_scroll.setVisible(not collapsed)
         self.setMinimumWidth(0)
+        # 不设置最小高度，允许内容自适应压缩和滚动
+        self.setMinimumHeight(0)
         if not collapsed:
             self._layout_attribute_cards(mode)
             positions = (
@@ -495,9 +512,10 @@ class CombatAttrsTab(QWidget):
             self._attack_card, self._judgment_card,
             self._gain_card, self._damage_card,
         )
+        # 允许卡片压缩以适应可用空间
         for card in cards:
             card.setSizePolicy(
-                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         if mode == "half":
             flow = QVBoxLayout()
             flow.setContentsMargins(0, 0, 0, 0)
@@ -599,10 +617,10 @@ class CombatAttrsTab(QWidget):
         return widget
 
     def _create_value_label(self, yellow: bool = False) -> QLabel:
-        """创建右对齐数值标签"""
+        """创建右对齐数值标签（无最小宽度限制，允许压缩）"""
         label = QLabel("0")
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        label.setMinimumWidth(120)
+        # 不设置最小宽度，允许标签压缩以适应可用空间
         label.setStyleSheet(_YELLOW_VALUE_STYLE if yellow else _VALUE_STYLE)
         return label
 
@@ -739,6 +757,7 @@ class CombatAttrsTab(QWidget):
             "play_style": self._combo_play_style.currentText(),
             "gongjue": self._get_current_gongjue(),
             "scheme": self._combo_scheme.currentText(),
+            "resistance_only": self._chk_resistance_only.isChecked(),
         }
 
         try:
@@ -773,6 +792,7 @@ class CombatAttrsTab(QWidget):
             play_style = selection.get("play_style", "")
             gongjue = selection.get("gongjue", "")
             scheme = selection.get("scheme", "")
+            resistance_only = selection.get("resistance_only", False)
 
             # 恢复流派
             if school:
@@ -799,6 +819,9 @@ class CombatAttrsTab(QWidget):
                 idx = self._combo_scheme.findText(scheme)
                 if idx >= 0:
                     self._combo_scheme.setCurrentIndex(idx)
+
+            # 恢复仅展示抗性结果
+            self._chk_resistance_only.setChecked(resistance_only)
         except Exception as e:
             logger.debug(f"恢复战斗属性选择失败: {e}")
 
@@ -1003,16 +1026,26 @@ class CombatAttrsTab(QWidget):
         self._attr_pen_name.setToolTip(tooltip)
         self._attr_pen_label.setToolTip(tooltip)
 
-    @staticmethod
-    def _set_resistance_text(label: QLabel, original: float,
+    def _set_resistance_text(self, label: QLabel, original: float,
                              effective: float, unit: str) -> None:
-        """按游戏的白字(黄字)语义显示原始值与抗性后数值。"""
+        """按游戏的白字 (黄字) 语义显示原始值与抗性后数值。
+
+        当勾选“仅展示抗性结果”时，直接展示黄字（抗性后数值）。
+        """
         original_text = format_value(original, unit)
         effective_text = format_value(effective, unit)
-        label.setText(
-            f"{original_text}(<span style='color:{_YELLOW_VALUE_COLOR};'>"
-            f"{effective_text}</span>)"
-        )
+        if self._chk_resistance_only.isChecked():
+            # 仅展示抗性结果（黄字）
+            label.setText(
+                f"<span style='color:{_YELLOW_VALUE_COLOR};'>"
+                f"{effective_text}</span>"
+            )
+        else:
+            # 白字 (黄字) 格式
+            label.setText(
+                f"{original_text}(<span style='color:{_YELLOW_VALUE_COLOR};'>"
+                f"{effective_text}</span>)"
+            )
 
     def _refresh_extra_attrs(
         self, extra_attrs: dict[str, float], buff_resistance: float,

@@ -42,6 +42,13 @@ base_attrs:
       blue:
         min: 52
         max: 121
+    _first_affixes:
+    - 最大外功攻击
+    - 最小外功攻击
+    - 势
+    - 敏
+    - 最大无相攻击
+    - 最小无相攻击
   ring:
     _attr: 最小外功攻击
     110:
@@ -60,6 +67,9 @@ base_attrs:
       gold: 86
       purple: 78
       blue: 69
+    _first_affixes:
+    - 最大外功攻击
+    - 最小外功攻击
   pendant:
     _attr: 最大外功攻击
     110:
@@ -78,6 +88,9 @@ base_attrs:
       gold: 129
       purple: 116
       blue: 104
+    _first_affixes:
+    - 最大外功攻击
+    - 最小外功攻击
   head:
     _attr: 气血最大值
     110:
@@ -96,6 +109,12 @@ base_attrs:
       gold: 5774
       purple: 5196
       blue: 4619
+    _first_affixes:
+    - 精准率
+    - 会心率
+    - 会意率
+    - 外功防御
+    - 气血最大值
   chest:
     _attr: 气血最大值
     110:
@@ -114,10 +133,32 @@ base_attrs:
       gold: 11547
       purple: 10392
       blue: 9238
+    _first_affixes:
+    - 精准率
+    - 会心率
+    - 会意率
+    - 外功防御
+    - 气血最大值
   leg:
     _follow: head
+    _first_affixes:
+    - 劲
+    - 精准率
+    - 会心率
+    - 会意率
+    - 体
+    - 外功防御
+    - 气血最大值
   wrist:
     _follow: head
+    _first_affixes:
+    - 劲
+    - 精准率
+    - 会心率
+    - 会意率
+    - 体
+    - 外功防御
+    - 气血最大值
 affix_caps:
   外功攻击:
     _aliases:
@@ -252,6 +293,10 @@ affix_caps:
   外功增益:
     _pool: dingyin
     _unit: '%'
+    _parts:
+    - 武器
+    - 环
+    - 佩
     _aliases:
     - 外功穿透
     - 外功抗性
@@ -262,6 +307,10 @@ affix_caps:
   属攻增益:
     _pool: dingyin
     _unit: '%'
+    _parts:
+    - 武器
+    - 环
+    - 佩
     _aliases:
     - 无相穿透
     110:
@@ -274,6 +323,11 @@ affix_caps:
     _pool: dingyin
     _group: true
     _unit: '%'
+    _parts:
+    - 冠胄
+    - 胸甲
+    - 胫甲
+    - 腕甲
     _aliases:
       鸣金·虹:
       - 无名剑法武学技增伤
@@ -418,7 +472,6 @@ schools:
   鸣金·虹:
     schemes:
     - 基础方案
-    - 加强方案
     attr: 鸣金
     main:
       weapon: 剑

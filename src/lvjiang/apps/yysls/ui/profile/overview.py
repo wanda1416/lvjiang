@@ -927,7 +927,10 @@ class ProfileOverviewTab(QWidget):
 
         UI 只负责收集上下文、处理提示和刷新；写入语义统一委托 profile_ops.profile_action。
         """
-        from ...core.profile_engine.profile_ops import ProfileWriteConflict, profile_action
+        from ...core.profile_engine.profile_ops import (
+            ProfileWriteConflict,
+            profile_action,
+        )
         try:
             profile_action(
                 user_name, key,

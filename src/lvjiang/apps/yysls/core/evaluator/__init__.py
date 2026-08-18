@@ -5,12 +5,17 @@
 毕业率计算器（GraduationCalculator）。
 """
 
-from .base import JudgeResult, Rating, TuningJudge
 from ..graduation import (
     GraduationCalculator,
     GraduationResult,
     get_graduation_calculator,
 )
+from ..tuning_rules import (
+    TuningRule,
+    TuningRuleManager,
+    get_tuning_rule_manager,
+)
+from .base import JudgeResult, Rating, TuningJudge
 from .registry import (
     get_rule_names,
     get_tuning_judge,
@@ -22,11 +27,6 @@ from .registry import (
     summarize_potential,
 )
 from .rule_judge import GenericTuningJudge
-from ..tuning_rules import (
-    TuningRule,
-    TuningRuleManager,
-    get_tuning_rule_manager,
-)
 
 __all__ = [
     "Rating",

@@ -19,7 +19,10 @@ from lvjiang.apps.yysls.config.profile_models import (
     SyncTargetDef,
 )
 from lvjiang.apps.yysls.config.user_profile import ProfileSchema
-from lvjiang.apps.yysls.core.profile_engine.sync_engine import _apply_ratio, fire_sync_targets
+from lvjiang.apps.yysls.core.profile_engine.sync_engine import (
+    _apply_ratio,
+    fire_sync_targets,
+)
 
 # ─── 辅助工具 ─────────────────────────────────────────────
 

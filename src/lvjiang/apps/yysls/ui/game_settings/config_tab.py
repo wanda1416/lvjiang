@@ -6,7 +6,7 @@
 - 流派配置
 - 等级配置（按等级区分重置支持与材料要求）
 - 赛季配置（管理游戏赛季时间与装备等级）
-- 装备展示（卡片字号、高度、网格列数等外观参数）
+- 字体设置（卡片字号、高度、网格列数等外观参数）
 """
 
 from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
@@ -54,9 +54,9 @@ class GameConfigTab(QWidget):
         self._season_panel = SeasonConfigPanel()
         self._tabs.addTab(self._season_panel, tr("赛季配置"))
 
-        # 装备展示面板（卡片字号、高度、网格列数）
+        # 字体设置面板（卡片字号、高度、网格列数）
         self._equip_display_panel = EquipDisplayPanel()
-        self._tabs.addTab(self._equip_display_panel, tr("装备展示"))
+        self._tabs.addTab(self._equip_display_panel, tr("字体设置"))
 
         # 等级配置保存后，刷新其他面板中的 LevelCombo
         self._level_panel.level_configs_saved.connect(self._refresh_level_combos)

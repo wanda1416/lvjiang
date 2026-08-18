@@ -75,6 +75,8 @@ class GameConfigManager:
         self._affix_to_category: dict[str, str] = {}
         # 词条部位：词条名 → [部位中文名]（顶层 affix_parts，缺省全部位）
         self._affix_parts: dict[str, list[str]] = {}
+        # 分类级词条部位：category → [部位中文名]（affix_caps 内 _parts 字段）
+        self._category_parts: dict[str, list[str]] = {}
         # 外部简称：简称 → [精准词条名]（顶层 affix_aliases）
         self._external_alias_to_affixes: dict[str, list[str]] = {}
         # 精准词条名 → [外部简称]
@@ -91,6 +93,8 @@ class GameConfigManager:
         self._season_configs: list[SeasonConfig] = []
         # 基础属性名（从 _attr 字段收集：外功攻击/气血最大值/...）
         self._base_attr_names: list[str] = []
+        # 首词条候选（从 base_attrs 各部位的 _first_affixes 字段收集）
+        self._first_affixes: dict[str, list[str]] = {}
 
         self._load()
 
@@ -114,8 +118,10 @@ class GameConfigManager:
         self._affix_categories.clear()
         self._affix_to_category.clear()
         self._affix_parts.clear()
+        self._category_parts.clear()
         self._external_alias_to_affixes.clear()
         self._base_attr_names.clear()
+        self._first_affixes.clear()
         self._affix_external_aliases.clear()
         self._weapon_types.clear()
         self._weapon_wuxue_affixes.clear()
@@ -175,10 +181,16 @@ class GameConfigManager:
 
         # ── base_attrs ──
         # _follow: <目标部位> 声明该部位跟随目标部位的数值（单层解析）
+        # 注意：_follow 仅影响基础属性数值，首词条(_first_affixes)独立配置，不跟随
         base_attrs = data.get("base_attrs", {})
         follows: dict[str, str] = {}
         for key in BASE_ATTR_PARTS:
             section = base_attrs.get(key, {}) or {}
+            # 首词条独立解析（不受 _follow 影响）
+            first_affixes = section.get("_first_affixes")
+            if isinstance(first_affixes, list) and first_affixes:
+                self._first_affixes[key] = [str(a) for a in first_affixes]
+            # _follow 仅影响基础属性数值
             target = section.get("_follow")
             if target:
                 follows[key] = target
@@ -208,7 +220,7 @@ class GameConfigManager:
                         ranges.append(AttrRange(quality=q, min_val=val, max_val=val))
                 self._base_rules[key][level] = LevelRule(ranges=ranges)
 
-        # 跟随部位直接复用目标部位的规则对象
+        # 跟随部位直接复用目标部位的基础属性规则（首词条独立，不跟随）
         for key, target in follows.items():
             self._base_rules[key] = self._base_rules.get(target, {})
 
@@ -236,6 +248,12 @@ class GameConfigManager:
             self._affix_pools[category] = pool if pool == POOL_DINGYIN else POOL_NORMAL
             # 解析 _unit 字段（词组级单位，缺省空字符串）
             self._affix_units[category] = levels.get("_unit", "")
+            # 解析 _parts 字段（分类级词条部位，缺省全部位）
+            raw_parts = levels.get("_parts")
+            if isinstance(raw_parts, list) and raw_parts:
+                self._category_parts[category] = [
+                    p for p in raw_parts if p in EQUIP_PART_NAMES
+                ]
             for level_str, entry in levels.items():
                 # 跳过 _aliases 等非等级 key
                 if str(level_str).startswith("_"):
@@ -333,12 +351,28 @@ class GameConfigManager:
         return self._affix_to_category.get(affix_name, "")
 
     def get_affix_parts(self, affix_name: str) -> list[str]:
-        """词条可出现的装备部位（未配置 = 全部七个部位）"""
-        return list(self._affix_parts.get(affix_name) or EQUIP_PART_NAMES)
+        """词条可出现的装备部位
+
+        优先级：单独配置(affix_parts) > 分类级(_parts) > 全部七部位。
+        """
+        individual = self._affix_parts.get(affix_name)
+        if individual:
+            return list(individual)
+        # 回退到分类级 _parts（使用 _alias_to_category，包含定音词条）
+        category = self._alias_to_category.get(affix_name, "")
+        if category:
+            cat_parts = self._category_parts.get(category)
+            if cat_parts:
+                return list(cat_parts)
+        return list(EQUIP_PART_NAMES)
 
     def get_affix_aliases(self, affix_name: str) -> list[str]:
         """返回精准词条配置的外部简称。"""
         return list(self._affix_external_aliases.get(affix_name) or [])
+
+    def get_alias_groups_for_category(self, category: str) -> dict[str, list[str]]:
+        """返回词条类别的标准名称分组快照。"""
+        return copy.deepcopy(self._alias_groups.get(category) or {})
 
     def get_affix_names_for_alias(self, alias: str) -> list[str]:
         """严格按外部简称返回精准词条名，不执行任何模糊匹配。"""
@@ -482,6 +516,14 @@ class GameConfigManager:
             "leg": tr("胫甲"),
             "wrist": tr("腕甲"),
         }
+
+    def get_first_affixes(self, part: str) -> list[str]:
+        """指定部位的首词条候选列表（来自 base_attrs.<part>._first_affixes）
+
+        part 为 group_key（weapon/ring/pendant/head/chest/leg/wrist）。
+        未配置时返回空列表。
+        """
+        return list(self._first_affixes.get(part, []))
 
     def get_weapon_wuxue_affix(self, weapon: str) -> str:
         """武器对应的武学增效词条（来自 weapon_types 的 wuxue_affix 字段）

@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, WUXUE_CATEGORY
+from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_CATEGORY
 
 from .....i18n import tr
 from .level_combo import LevelCombo
@@ -59,6 +59,10 @@ _QUALITY_NAMES = {
     "purple": tr("紫装"),
     "blue": tr("蓝装"),
 }
+
+# 部位 key → 显示名称（BASE_ATTR_PARTS 与 EQUIP_PART_NAMES 同序映射，
+# 用于 affix_parts 过滤时按当前部位 key 查对应中文名）
+_PART_TO_NAME = dict(zip(BASE_ATTR_PARTS, EQUIP_PART_NAMES, strict=True))
 
 
 class _RangeCell(QWidget):
@@ -150,27 +154,33 @@ class BaseAttrPanel(QWidget):
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ── 属性跟随（勾选后下拉选择跟随的目标部位）──
-        follow_frame = QFrame()
-        follow_frame.setStyleSheet(
-            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
-        )
-        follow_layout = QHBoxLayout(follow_frame)
-        follow_layout.setContentsMargins(8, 4, 8, 4)
+        # 属性跟随控件（合入基础属性行，仅控制基础属性表格）
         self._check_follow = QCheckBox(tr("属性跟随"))
         self._check_follow.toggled.connect(self._on_follow_toggled)
-        follow_layout.addWidget(self._check_follow)
-
         self._combo_follow = QComboBox()
         self._combo_follow.setMinimumWidth(120)
         self._combo_follow.currentIndexChanged.connect(self._on_follow_target_changed)
-        follow_layout.addWidget(self._combo_follow)
-
         self._follow_hint = QLabel("")
         self._follow_hint.setStyleSheet("color: #888;")
-        follow_layout.addWidget(self._follow_hint)
-        follow_layout.addStretch()
-        right_layout.addWidget(follow_frame)
+
+        # ── 首词条（基础属性上方，每个部位可限定首词条候选）──
+        self._first_affix_frame = QFrame()
+        self._first_affix_frame.setObjectName("firstAffixFrame")
+        self._first_affix_frame.setStyleSheet(
+            "QFrame#firstAffixFrame { background-color: #f5f5f5; "
+            "border-radius: 4px; padding: 4px; }"
+        )
+        first_affix_layout = QHBoxLayout(self._first_affix_frame)
+        first_affix_layout.setContentsMargins(8, 4, 8, 4)
+        first_affix_layout.addWidget(QLabel(tr("首词条")))
+        self._first_affix_btn = QPushButton(tr("（点击选择首词条）"))
+        self._first_affix_btn.clicked.connect(self._pick_first_affixes)
+        first_affix_layout.addWidget(self._first_affix_btn, 1)
+        self._first_affix_hint = QLabel("")
+        self._first_affix_hint.setStyleSheet("color: #888;")
+        first_affix_layout.addWidget(self._first_affix_hint)
+        self._first_affix_frame.setVisible(False)
+        right_layout.addWidget(self._first_affix_frame)
 
         # ── 武器类型（仅主武器部位；维护 weapon_types 注册表）──
         self._weapon_frame = QFrame()
@@ -214,7 +224,7 @@ class BaseAttrPanel(QWidget):
         self._weapon_frame.setVisible(False)
         right_layout.addWidget(self._weapon_frame)
 
-        # ── 基础属性说明（部位数值对应的属性名，来自 YAML _attr）──
+        # ── 基础属性说明 + 属性跟随（仅控制基础属性表格）──
         attr_frame = QFrame()
         attr_frame.setStyleSheet(
             "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
@@ -224,6 +234,9 @@ class BaseAttrPanel(QWidget):
         self._attr_label = QLabel("")
         attr_layout.addWidget(self._attr_label)
         attr_layout.addStretch()
+        attr_layout.addWidget(self._check_follow)
+        attr_layout.addWidget(self._combo_follow)
+        attr_layout.addWidget(self._follow_hint)
         right_layout.addWidget(attr_frame)
 
         self._table = QTableWidget()
@@ -272,6 +285,7 @@ class BaseAttrPanel(QWidget):
 
         self._current_part = BASE_ATTR_PARTS[row]
         self._refresh_follow_controls()
+        self._refresh_first_affixes()
         self._refresh_weapon_types()
         self._refresh_attr_label()
         self._refresh_table()
@@ -428,6 +442,64 @@ class BaseAttrPanel(QWidget):
         self._data["weapon_types"] = raw
         self._save_data()
         self._refresh_weapon_types()
+
+    # ── 首词条（每个部位限定首词条候选，数据存于 _first_affixes）──
+
+    def _refresh_first_affixes(self):
+        """刷新首词条展示（始终可编辑，不受属性跟随影响）"""
+        if not self._current_part:
+            self._first_affix_frame.setVisible(False)
+            return
+        self._first_affix_frame.setVisible(True)
+
+        part_data = self._part_data(self._current_part)
+        self._first = list(part_data.get("_first_affixes") or [])
+        self._first_affix_btn.setEnabled(True)
+        self._first_affix_btn.setText(
+            "/".join(self._first) if self._first else tr("（点击选择首词条）")
+        )
+        self._first_affix_hint.setText("")
+
+    def _pick_first_affixes(self):
+        """打开词条选择对话框，候选为词组配置中当前部位可见的普通词条"""
+        if not self._current_part:
+            return
+
+        part_name = _PART_TO_NAME.get(self._current_part, "")
+        if not part_name:
+            return
+
+        # 候选：全部普通词条中，affix_parts 包含当前部位的
+        from lvjiang.apps.yysls.config import get_game_config
+        mgr = get_game_config()
+        all_normal = mgr.get_normal_affix_names()
+        candidates = [
+            name for name in all_normal
+            if part_name in mgr.get_affix_parts(name)
+        ]
+
+        from ..tune_settings.affix_picker import AffixSelectSortDialog
+        dlg = AffixSelectSortDialog(
+            candidates, list(self._first),
+            tr("选择首词条"), self, flat=True,
+        )
+        if dlg.exec():
+            self._first = dlg.selected()
+            self._first_affix_btn.setText(
+                "/".join(self._first) if self._first else tr("（点击选择首词条）")
+            )
+            self._save_first_affixes()
+
+    def _save_first_affixes(self):
+        """保存首词条到 YAML（_first_affixes 字段，属 meta 不被表格同步覆盖）"""
+        if not self._current_part:
+            return
+        part_data = self._part_data(self._current_part)
+        if self._first:
+            part_data["_first_affixes"] = list(self._first)
+        else:
+            part_data.pop("_first_affixes", None)
+        self._save_data()
 
     # ── 基础属性说明 ──────────────────────────────────
 

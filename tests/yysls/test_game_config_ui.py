@@ -59,7 +59,7 @@ class TestDialog:
         assert tabs.tabText(2) == "流派配置"
         assert tabs.tabText(3) == "等级配置"
         assert tabs.tabText(4) == "赛季配置"
-        assert tabs.tabText(5) == "装备展示"
+        assert tabs.tabText(5) == "字体设置"
 
 
 # ─── 武器类型增删往返 ──────────────────────────────────────

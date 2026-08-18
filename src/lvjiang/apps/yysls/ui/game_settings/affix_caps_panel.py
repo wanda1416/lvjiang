@@ -2,8 +2,9 @@
 
 管理各词组在不同等级的最大值。
 左侧词组列表，右侧等级-上限表格。
-右侧顶部为词组分类（普通词组 / 定音词组）+ 词组单位（空 / %）+ 词条分组（不分组 / 分组）+ 词条名称区域。
+右侧顶部为词组分类（普通词组 / 定音词组）+ 词组单位（空 / %）+ 词条分组（不分组 / 分组）+ 词条部位（分类级，整组生效）+ 词条名称区域。
 定音词组不受承音限制，表格隐藏承音列。
+定音词组的词条部位为分类级配置（affix_caps 内 _parts 字段），整组统一设置。
 普通词组的每个词条可配置归属与词条部位（可出现的装备部位，
 顶层 affix_parts，全选展示「全部」且不落盘）。
 词条名称支持分组（_aliases 为 dict 形态），分组后按 Tab 页展示，
@@ -227,6 +228,23 @@ class AffixCapsPanel(QWidget):
         group_mode_layout.addStretch()
         right_layout.addWidget(group_frame)
 
+        # ── 词条部位（分类级，整组生效）──
+        self._cat_parts_frame = QFrame()
+        self._cat_parts_frame.setObjectName("catPartsFrame")
+        self._cat_parts_frame.setStyleSheet(
+            "QFrame#catPartsFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+        )
+        cat_parts_layout = QHBoxLayout(self._cat_parts_frame)
+        cat_parts_layout.setContentsMargins(8, 4, 8, 4)
+        cat_parts_layout.addWidget(QLabel(tr("词条部位")))
+        self._cat_parts_btn = QPushButton(tr("全部"))
+        self._cat_parts_btn.setFixedWidth(130)
+        self._cat_parts_btn.clicked.connect(self._pick_category_parts)
+        cat_parts_layout.addWidget(self._cat_parts_btn)
+        cat_parts_layout.addStretch()
+        self._cat_parts_frame.setVisible(False)
+        right_layout.addWidget(self._cat_parts_frame)
+
         # ── 词条名称区域 ──
         self._alias_frame = QFrame()
         self._alias_frame.setStyleSheet(
@@ -326,6 +344,7 @@ class AffixCapsPanel(QWidget):
             self._refresh_unit_combo()
             self._refresh_group_radios()
             self._refresh_alias_tags()
+            self._refresh_category_parts()
             return
 
         self._current_affix = affix_names[row]
@@ -334,6 +353,7 @@ class AffixCapsPanel(QWidget):
         self._refresh_group_radios()
         self._refresh_table()
         self._refresh_alias_tags()
+        self._refresh_category_parts()
 
     def _refresh_table(self):
         """刷新表格内容"""
@@ -693,6 +713,48 @@ class AffixCapsPanel(QWidget):
         self._refresh_alias_tags()
         self._save_data()
 
+    # ── 分类级词条部位 ────────────────────────────────────────────
+
+    def _refresh_category_parts(self):
+        """刷新分类级词条部位按钮：仅定音词组显示"""
+        is_dingyin = self._is_dingyin()
+        self._cat_parts_frame.setVisible(is_dingyin and self._current_affix is not None)
+        if not is_dingyin or not self._current_affix:
+            return
+        parts = self._get_category_parts()
+        self._cat_parts_btn.setText(self._format_parts(parts))
+
+    def _get_category_parts(self) -> list[str]:
+        """读取当前分类的 _parts 字段（未配置 = 全部七部位）"""
+        if not self._current_affix:
+            return list(EQUIP_PART_NAMES)
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.get(self._current_affix, {})
+        parts = category_data.get("_parts") if isinstance(category_data, dict) else None
+        if isinstance(parts, list) and parts:
+            return [p for p in parts if p in EQUIP_PART_NAMES]
+        return list(EQUIP_PART_NAMES)
+
+    def _pick_category_parts(self):
+        """弹出部位多选对话框，设置当前分类的 _parts"""
+        if not self._current_affix:
+            return
+        current = self._get_category_parts()
+        dlg = _PartsDialog(current, self)
+        if not dlg.exec():
+            return
+        parts = dlg.selected()
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.setdefault(self._current_affix, {})
+        if not parts or len(parts) >= len(EQUIP_PART_NAMES):
+            # 全选 = 不限部位，移除 _parts 字段
+            category_data.pop("_parts", None)
+            self._cat_parts_btn.setText(tr("全部"))
+        else:
+            category_data["_parts"] = parts
+            self._cat_parts_btn.setText(self._format_parts(parts))
+        self._save_data()
+
     def _add_group(self):
         """添加词条分组"""
         if not self._current_affix or not self._is_grouped():
@@ -906,6 +968,8 @@ class AffixCapsPanel(QWidget):
         parts_btn = QPushButton(self._format_parts(self._get_affix_parts(alias)))
         parts_btn.setFixedWidth(130)
         if self._is_dingyin():
+            # 定音词组：显示分类级部位，但不可单独编辑
+            parts_btn.setText(self._format_parts(self._get_category_parts()))
             parts_btn.setEnabled(False)
         else:
             parts_btn.clicked.connect(
@@ -974,11 +1038,11 @@ class AffixCapsPanel(QWidget):
 
     @staticmethod
     def _format_parts(parts: list[str]) -> str:
-        """部位按钮文本：全选展示「全部」，>=4 个展示「非 XX/XX」（未选），否则 / 拼接"""
+        """部位按钮文本：全选展示「全部」，>=5 个展示「非 XX/XX」（未选），否则 / 拼接"""
         all_parts = list(EQUIP_PART_NAMES)
         if len(parts) >= len(all_parts):
             return tr("全部")
-        if len(parts) >= 4:
+        if len(parts) >= 5:
             excluded = [p for p in all_parts if p not in parts]
             return tr("非 ") + "/".join(excluded)
         return "/".join(parts)

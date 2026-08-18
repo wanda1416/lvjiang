@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from loguru import logger
 from PyQt6.QtCore import (
     QLocale,
@@ -62,6 +64,15 @@ _VALUE_STYLE = "font-size: 15px; font-weight: 600;"
 _YELLOW_VALUE_STYLE = (
     f"font-size: 15px; font-weight: 600; color: {_YELLOW_VALUE_COLOR};"
 )
+
+
+@dataclass(frozen=True)
+class GraduationContext:
+    """供其他组件读取的毕业率计算上下文快照。"""
+
+    school: str
+    scheme: str
+    base_attrs: CombatAttributes
 
 
 class _GraduationSignals(QObject):
@@ -270,7 +281,9 @@ class CombatAttrsTab(QWidget):
         rate_layout.addWidget(self._graduation_value)
         content_layout.addWidget(rate_widget)
 
-        card.layout().addWidget(content)
+        card_layout = card.layout()
+        if card_layout is not None:
+            card_layout.addWidget(content)
         parent_layout.addWidget(card)
 
     def _create_card(self, title: str) -> QFrame:
@@ -315,7 +328,9 @@ class CombatAttrsTab(QWidget):
             grid.addWidget(max_widget, row, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        card.layout().addLayout(grid)
+        card_layout = card.layout()
+        if card_layout is not None:
+            card_layout.addLayout(grid)
         parent_layout.addWidget(card)
 
     def _add_judgment_card(self, parent_layout: QVBoxLayout):
@@ -338,7 +353,9 @@ class CombatAttrsTab(QWidget):
                 grid.addWidget(widget, row, col)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        card.layout().addLayout(grid)
+        card_layout = card.layout()
+        if card_layout is not None:
+            card_layout.addLayout(grid)
         parent_layout.addWidget(card)
 
     def _add_gain_card(self, parent_layout: QVBoxLayout):
@@ -371,10 +388,13 @@ class CombatAttrsTab(QWidget):
         self._skill_bonus_slots = [
             self._create_dynamic_slot(grid, 5, col) for col in range(2)
         ]
+        self._gain_grid = grid
         self._extra_labels: dict[str, QLabel] = {}
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        card.layout().addLayout(grid)
+        card_layout = card.layout()
+        if card_layout is not None:
+            card_layout.addLayout(grid)
         parent_layout.addWidget(card)
 
     def _add_damage_card(self, parent_layout: QVBoxLayout):
@@ -408,7 +428,9 @@ class CombatAttrsTab(QWidget):
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        card.layout().addLayout(grid)
+        card_layout = card.layout()
+        if card_layout is not None:
+            card_layout.addLayout(grid)
         parent_layout.addWidget(card)
 
     def _create_dynamic_slot(self, grid: QGridLayout, row: int,
@@ -466,7 +488,9 @@ class CombatAttrsTab(QWidget):
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        card.layout().addLayout(grid)
+        card_layout = card.layout()
+        if card_layout is not None:
+            card_layout.addLayout(grid)
         parent_layout.addWidget(card)
         return card
 
@@ -709,6 +733,7 @@ class CombatAttrsTab(QWidget):
             apply_bonus_resistance,
             apply_penetration_resistance,
             apply_three_rate_resistance,
+            build_graduation_attrs,
             has_resistance,
             is_penetration_field,
             is_three_rate_field,
@@ -767,59 +792,18 @@ class CombatAttrsTab(QWidget):
         self._refresh_attr_penetration(base_attrs, equip_attrs, buff_resistance)
         self._refresh_attr_bonus(combat_attrs)
         self._refresh_extra_attrs(combat_attrs.extra_attrs, buff_resistance)
-        graduation_attrs = CombatAttributes.from_dict(combat_attrs.to_dict())
-        for field_name in ("precision", "crit_rate", "intent_rate"):
-            setattr(
-                graduation_attrs,
-                field_name,
-                apply_three_rate_resistance(
-                    field_name, getattr(combat_attrs, field_name), judge_resistance,
-                ),
-            )
-        for field_name in (
-            "all_skill_bonus", "boss_bonus", "player_bonus",
-            "single_qs_bonus", "group_qs_bonus",
-        ):
-            setattr(
-                graduation_attrs,
-                field_name,
-                apply_bonus_resistance(
-                    getattr(combat_attrs, field_name),
-                    resistance=buff_resistance,
-                ),
-            )
         school = self._get_current_school()
-        school_attr = None
-        if school:
-            from ..config import get_game_config
-            school_attr = get_game_config().get_school_attr(school)
-        target_pen = WUXIANG_TO_ATTR_PEN.get(school_attr or "")
-        for field_name in (
-            "outer_pen", "mingjin_pen", "lieshi_pen", "pozhu_pen", "qiansi_pen",
-        ):
-            equipment_value = getattr(equip_attrs, field_name)
-            if field_name == target_pen:
-                equipment_value += equip_attrs.wuxiang_pen
-            setattr(
-                graduation_attrs,
-                field_name,
-                apply_penetration_resistance(
-                    equipment_value,
-                    getattr(base_attrs, field_name),
-                    buff_resistance,
-                ),
-            )
-        graduation_attrs.extra_attrs = {
-            key: apply_bonus_resistance(value, resistance=buff_resistance)
-            if has_resistance(key) else value
-            for key, value in combat_attrs.extra_attrs.items()
-        }
+        graduation_attrs = build_graduation_attrs(
+            base_attrs + gongjue_attrs,
+            equip_base_attrs + equip_attrs,
+            school,
+        )
         self._schedule_graduation(graduation_attrs)
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""
-        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
         from ..config import get_game_config
+        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
 
         attr_fields = (
             ("鸣金", "mingjin_bonus"),
@@ -871,8 +855,11 @@ class CombatAttrsTab(QWidget):
         buff_resistance: float,
     ) -> None:
         """显示当前流派属攻穿透，悬浮时展示完整四系明细。"""
-        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP, apply_penetration_resistance
         from ..config import get_game_config
+        from ..core.combat.combat_attrs import (
+            SCHOOL_ATTR_FIELD_MAP,
+            apply_penetration_resistance,
+        )
 
         attr_fields = (
             ("鸣金", "mingjin_pen"),
@@ -941,23 +928,35 @@ class CombatAttrsTab(QWidget):
     def _refresh_extra_attrs(
         self, extra_attrs: dict[str, float], buff_resistance: float,
     ) -> None:
-        """将动态增益填入武器和技能各自的两个固定槽位。"""
+        """按配置词组分类动态增益，技能定音按需扩展到第七行。"""
+        from ..config import get_game_config
         from ..core.combat.combat_attrs import apply_bonus_resistance, has_resistance
 
         self._extra_labels.clear()
-        for widget, name_label, value_label in (
+
+        weapon_items: list[tuple[str, float]] = []
+        skill_items: list[tuple[str, float]] = []
+        game_config = get_game_config()
+        for key, value in sorted(extra_attrs.items()):
+            if game_config.resolve_affix_category(key) == "指定技能增效":
+                skill_items.append((key, value))
+            else:
+                weapon_items.append((key, value))
+
+        # 常态只保留第六行两个槽位；第三、第四个技能定音出现时，
+        # 才创建并显示第七行。
+        if len(skill_items) > 2 and len(self._skill_bonus_slots) < 4:
+            for col in range(2):
+                slot = self._create_dynamic_slot(self._gain_grid, 6, col)
+                self._skill_bonus_slots.append(slot)
+        show_seventh_row = len(skill_items) > 2
+        for index, (widget, name_label, value_label) in enumerate(
                 self._weapon_bonus_slots + self._skill_bonus_slots):
             name_label.clear()
             value_label.clear()
             widget.setToolTip("")
-
-        weapon_items: list[tuple[str, float]] = []
-        skill_items: list[tuple[str, float]] = []
-        for key, value in sorted(extra_attrs.items()):
-            if key.endswith(("武学增伤", "武学增效")):
-                weapon_items.append((key, value))
-            else:
-                skill_items.append((key, value))
+            if index >= len(self._weapon_bonus_slots) + 2:
+                widget.setVisible(show_seventh_row)
 
         def fill_slots(items: list[tuple[str, float]], slots) -> None:
             overflow = items[len(slots):]
@@ -1017,7 +1016,9 @@ class CombatAttrsTab(QWidget):
         self._graduation_value.setText(tr("计算中…"))
         task = _GraduationTask(generation, user_name, school, scheme, attrs)
         task.signals.finished.connect(self._on_graduation_finished)
-        QThreadPool.globalInstance().start(task)
+        pool = QThreadPool.globalInstance()
+        if pool is not None:
+            pool.start(task)
 
     def _on_graduation_finished(
         self,
@@ -1069,8 +1070,8 @@ class CombatAttrsTab(QWidget):
         if equip_attrs.wuxiang_pen > 0:
             school = self._get_current_school()
             if school:
-                from ..core.combat.combat_attrs import WUXIANG_TO_ATTR_PEN
                 from ..config import get_game_config
+                from ..core.combat.combat_attrs import WUXIANG_TO_ATTR_PEN
                 gc = get_game_config()
                 school_attr = gc.get_school_attr(school)
                 if school_attr and school_attr in WUXIANG_TO_ATTR_PEN:
@@ -1079,6 +1080,19 @@ class CombatAttrsTab(QWidget):
                     setattr(result, target_field, current + equip_attrs.wuxiang_pen)
 
         return result
+
+    def get_graduation_context(self) -> GraduationContext | None:
+        """返回当前流派/方案及不含装备的基础属性公共快照。"""
+        school = self._get_current_school()
+        scheme = self._combo_scheme.currentText()
+        if not school or not scheme:
+            return None
+        base_attrs = self._get_base_attrs() + self._compute_gongjue_attrs()
+        return GraduationContext(
+            school=school,
+            scheme=scheme,
+            base_attrs=CombatAttributes.from_dict(base_attrs.to_dict()),
+        )
 
     def _get_base_attrs(self) -> CombatAttributes:
         """获取当前选择的基础属性。"""
@@ -1100,18 +1114,15 @@ class CombatAttrsTab(QWidget):
 
     def _compute_equip_attrs(self) -> CombatAttributes:
         """计算装备词条属性总和（含五维转换，不含装备基础攻击值）"""
-        from lvjiang.core.config import SessionManager
-
         from ..core.combat.combat_attrs import aggregate_equipment_attrs
+        from ..core.combat.equipment import EquipmentInventory
 
         user_name = self._host.active_user_name()
         if not user_name:
             return CombatAttributes()
 
         try:
-            data = SessionManager().load(user_name)
-            equipped = data.get("equipped", {})
-            return aggregate_equipment_attrs(equipped)
+            return aggregate_equipment_attrs(EquipmentInventory(user_name).equipped)
         except Exception as e:
             logger.error(f"读取装备数据失败: {e}")
             return CombatAttributes()
@@ -1121,10 +1132,9 @@ class CombatAttrsTab(QWidget):
 
         武器/环/佩 提供基础外功攻击，品阶不同数值不同。
         """
-        from lvjiang.core.config import SessionManager
-
-        from ..core.combat.combat_attrs import compute_equip_base_attrs
         from ..config import get_game_config
+        from ..core.combat.combat_attrs import compute_equip_base_attrs
+        from ..core.combat.equipment import EquipmentInventory
 
         user_name = self._host.active_user_name()
         if not user_name:
@@ -1132,9 +1142,10 @@ class CombatAttrsTab(QWidget):
 
         try:
             gc = get_game_config()
-            data = SessionManager().load(user_name)
-            equipped = data.get("equipped", {})
-            return compute_equip_base_attrs(equipped, gc.get_base_attr_values)
+            return compute_equip_base_attrs(
+                EquipmentInventory(user_name).equipped,
+                gc.get_base_attr_values,
+            )
         except Exception as e:
             logger.error(f"计算装备基础攻击失败: {e}")
             return CombatAttributes()
@@ -1225,8 +1236,8 @@ class CombatAttrsTab(QWidget):
 
     def _save_play_style(self, school: str, name: str, base_attrs: CombatAttributes):
         """保存基础属性到 session 配置（仅保存允许的字段）。"""
-        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
         from ..config import get_game_config, save_play_style
+        from ..core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
 
         # 解析占位符：根据流派属性获取实际字段名
         gc = get_game_config()

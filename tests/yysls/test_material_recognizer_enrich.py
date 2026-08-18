@@ -10,7 +10,10 @@ import numpy as np
 
 # 确保 yysls 内置函数已注册
 import lvjiang.apps.yysls.workflows.builtins.equipment  # noqa: F401
-from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialInfo, MaterialRecognizer
+from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+    MaterialInfo,
+    MaterialRecognizer,
+)
 
 
 def _make_recognizer() -> MaterialRecognizer:

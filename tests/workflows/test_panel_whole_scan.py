@@ -269,7 +269,9 @@ def test_whole_panel_recognize_nested_result(tmp_path):
 
 def test_single_cell_recognize_rich(tmp_path):
     """recognize [s].[actions][1][1] as rich $cell → 扁平 base dict（无 with 时只有标准字段）"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+        MaterialRecognizer,
+    )
     wf = _write_wf(tmp_path, (
         'recognize [s].[actions][1][1] as rich $cell\n'
         'collect $cell\n'
@@ -314,7 +316,9 @@ def test_single_cell_recognize_rich_empty_slot(tmp_path):
 
 def test_whole_panel_recognize_rich(tmp_path):
     """recognize [s].[actions] as rich $mats → 嵌套 dict，value 为 base dict"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+        MaterialRecognizer,
+    )
     wf = _write_wf(tmp_path, (
         'recognize [s].[actions] as rich $mats\n'
         'collect $mats\n'
@@ -514,7 +518,9 @@ def test_region_recognize_rich_with_func_e2e(tmp_path):
 
 def test_single_cell_recognize_rich_with_func(tmp_path):
     """recognize [s].[actions][1][1] as rich $cell with test_parse → base dict 经函数转换"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+        MaterialRecognizer,
+    )
     from lvjiang.workflows import builtins
 
     @builtins.builtin_func("test_cell_transform")
@@ -551,7 +557,9 @@ def test_single_cell_recognize_rich_with_func(tmp_path):
 
 def test_whole_panel_recognize_rich_with_func(tmp_path):
     """recognize [s].[actions] as rich $mats with test_parse → 每格经函数转换"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+        MaterialRecognizer,
+    )
     from lvjiang.workflows import builtins
 
     @builtins.builtin_func("test_panel_transform")
@@ -648,7 +656,9 @@ class TestRealImageRecognition:
 
     def test_image1_row2_col1_is_cai_gouliang(self):
         """image1.png 第2行第1列应为彩狗粮"""
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+            MaterialRecognizer,
+        )
         from lvjiang.core.ocr import OCREngine
         from lvjiang.workflows.align import detect_grid
 
@@ -676,7 +686,9 @@ class TestRealImageRecognition:
 
     def test_image1_row2_col2_is_jin_gouliang(self):
         """image1.png 第2行第2列应为金狗粮"""
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+            MaterialRecognizer,
+        )
         from lvjiang.core.ocr import OCREngine
         from lvjiang.workflows.align import detect_grid
 

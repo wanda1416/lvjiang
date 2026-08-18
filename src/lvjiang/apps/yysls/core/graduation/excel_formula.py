@@ -80,6 +80,7 @@ class FormulaParser:
 
     def _expr(self, minimum: int) -> dict[str, Any]:
         token = self.take()
+        left: dict[str, Any]
         if token.kind == "op" and token.value in ("+", "-"):
             left = {"op": "unary", "operator": token.value, "arg": self._expr(6)}
         elif token.kind == "number":
@@ -361,9 +362,11 @@ class FormulaModel:
 
     @staticmethod
     def _compare(left: Any, right: Any, operator: str) -> bool:
+        cmp_a: Any
+        cmp_b: Any
         if isinstance(left, str) or isinstance(right, str):
-            a, b = str(left).casefold(), str(right).casefold()
+            cmp_a, cmp_b = str(left).casefold(), str(right).casefold()
         else:
-            a, b = left or 0, right or 0
-        return {"=": a == b, "<>": a != b, "<": a < b, ">": a > b,
-                "<=": a <= b, ">=": a >= b}[operator]
+            cmp_a, cmp_b = left or 0, right or 0
+        return {"=": cmp_a == cmp_b, "<>": cmp_a != cmp_b, "<": cmp_a < cmp_b, ">": cmp_a > cmp_b,
+                "<=": cmp_a <= cmp_b, ">=": cmp_a >= cmp_b}[operator]

@@ -43,7 +43,6 @@ from __future__ import annotations
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 
 from .....i18n import tr
-from .base import JudgeResult, Rating, TuningJudge, part_label
 from ..tuning_rules import (
     DYNAMIC_AFFIXES,
     GENERIC_ATTR,
@@ -55,6 +54,7 @@ from ..tuning_rules import (
     dynamic_affix_map,
     get_tune_config,
 )
+from .base import JudgeResult, Rating, TuningJudge, part_label
 
 # 评级排序（多玩法/转律模拟取评级上限最高的组合）
 _RANK = {Rating.JUNK: 0, Rating.NORMAL: 1, Rating.EXCELLENT: 2,

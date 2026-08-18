@@ -10,12 +10,14 @@ from typing import Any
 
 from loguru import logger
 
-from ..combat.combat_attrs import (
-    CombatAttributes,
-)
 from ...config.graduation_session import (
     get_baseline_dps as _get_session_baseline,
+)
+from ...config.graduation_session import (
     set_baseline_dps as _set_session_baseline,
+)
+from ..combat.combat_attrs import (
+    CombatAttributes,
 )
 from .graduation_program import ProgramRuntime
 

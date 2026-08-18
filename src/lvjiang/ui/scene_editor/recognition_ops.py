@@ -184,7 +184,9 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在识别材料..."))
         QApplication.processEvents()
 
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+            MaterialRecognizer,
+        )
 
         from ...core.ocr import OCREngine
         ocr_engine = OCREngine()
@@ -250,7 +252,9 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在校准面板网格..."))
         QApplication.processEvents()
 
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+            MaterialRecognizer,
+        )
 
         from ...core.ocr import OCREngine
 

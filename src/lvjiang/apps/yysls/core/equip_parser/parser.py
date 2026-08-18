@@ -83,6 +83,13 @@ class EquipmentParser:
             result = self._dingyin_parser.parse(dingyin_text)
             if result:
                 equip.dingyin = result
+                # 计算定音词条 cap_pct（与普通词条相同逻辑）
+                if equip.level and result.get("name"):
+                    caps = self._attr_config.get_affix_caps(
+                        equip.level, result["name"])
+                    if caps and caps.get("cap"):
+                        result["cap_pct"] = round(
+                            result["value"] / caps["cap"] * 100, 1)
             else:
                 equip.warnings.append(f"定音词条无法解析: {dingyin_text!r}")
 

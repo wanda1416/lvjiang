@@ -6,9 +6,9 @@
 """
 
 from .....i18n import tr
+from ..tuning_rules import TuningRule, get_tuning_rule_manager
 from .base import Rating, TuningJudge
 from .rule_judge import GenericTuningJudge
-from ..tuning_rules import TuningRule, get_tuning_rule_manager
 
 __all__ = [
     "get_tuning_rules", "get_rule_names",

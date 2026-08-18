@@ -273,6 +273,7 @@ call_output_clause: "as"i "$" NAME  -> call_output_as
 call_arg_list: call_arg ("," call_arg)*
 ?call_arg: STRING -> call_arg_str
          | number -> call_arg_num
+         | field_access -> call_arg_field
          | var_ref -> call_arg_var
 
 // ─── 控制流 ───────────────────────────────────────────────

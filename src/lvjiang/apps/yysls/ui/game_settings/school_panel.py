@@ -17,6 +17,10 @@
 基础属性数据存于 config/session/yysls.json，兼容沿用 play_styles 存储键。
 """
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDoubleValidator
@@ -738,20 +742,21 @@ class SchoolPanel(QWidget):
             cell_layout.addWidget(label)
             cell_layout.addStretch()
             if editable and field_name:
-                value_widget = QLineEdit()
-                value_widget.setAlignment(Qt.AlignmentFlag.AlignRight)
-                value_widget.setFixedWidth(100)
-                value_widget.setFixedHeight(24)
-                value_widget.setValidator(
-                    QDoubleValidator(-999999.0, 999999.0, 4, value_widget)
+                line_edit = QLineEdit()
+                value_widget: QWidget = line_edit
+                line_edit.setAlignment(Qt.AlignmentFlag.AlignRight)
+                line_edit.setFixedWidth(100)
+                line_edit.setFixedHeight(24)
+                line_edit.setValidator(
+                    QDoubleValidator(-999999.0, 999999.0, 4, line_edit)
                 )
-                value_widget.setText(
+                line_edit.setText(
                     f"{value * 100:.2f}" if unit == "%" else f"{value:.2f}"
                 )
-                value_widget.textChanged.connect(
+                line_edit.textChanged.connect(
                     lambda _text, fn=field_name: self._on_ps_field_changed(fn, unit)
                 )
-                self._ps_edits[field_name] = value_widget
+                self._ps_edits[field_name] = line_edit
             else:
                 text = f"{value * 100:.2f}%" if unit == "%" else (
                     f"{value:.2f}" if value != int(value) else str(int(value))
@@ -766,7 +771,7 @@ class SchoolPanel(QWidget):
             cell_layout.addWidget(value_widget)
             return cell
 
-        def make_card(title: str, cells: list[tuple | None]) -> QGroupBox:
+        def make_card(title: str, cells: Sequence[tuple | None]) -> QGroupBox:  # type: ignore[type-arg]
             group = QGroupBox(tr(title))
             grid = QGridLayout(group)
             grid.setContentsMargins(12, 8, 12, 10)
@@ -817,7 +822,7 @@ class SchoolPanel(QWidget):
             (name, value) for name, value in sorted(attrs.extra_attrs.items())
             if not name.endswith(("武学增伤", "武学增效")) and value
         ]
-        weapon_cells = [
+        weapon_cells: list[tuple | None] = [
             (None, name, "%", "", value) for name, value in weapon_extras[:2]
         ]
         weapon_cells.extend([None] * (2 - len(weapon_cells)))
@@ -936,7 +941,10 @@ class _PlayStyleEditDialog(QDialog):
 
     def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
         """解析占位符字段，返回实际字段列表"""
-        from ...core.combat.combat_attrs import PLAY_STYLE_FIELD_GROUPS, SCHOOL_ATTR_FIELD_MAP
+        from ...core.combat.combat_attrs import (
+            PLAY_STYLE_FIELD_GROUPS,
+            SCHOOL_ATTR_FIELD_MAP,
+        )
 
         if not self._school_attr or self._school_attr not in SCHOOL_ATTR_FIELD_MAP:
             # 无流派属性时，跳过属攻相关字段

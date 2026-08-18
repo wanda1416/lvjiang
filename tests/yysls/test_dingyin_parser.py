@@ -97,8 +97,8 @@ class TestParserDelegation:
             **self._FULL_AFFIXES,
             "dingyin": "外功穿透 +14.2%",
         })
-        assert equip.dingyin == {"name": "外功穿透", "value": 14.2}
-        assert equip.to_dict()["dingyin"] == {"name": "外功穿透", "value": 14.2}
+        assert equip.dingyin == {"name": "外功穿透", "value": 14.2, "cap_pct": 84.5}
+        assert equip.to_dict()["dingyin"] == {"name": "外功穿透", "value": 14.2, "cap_pct": 84.5}
 
     def test_armor_dingyin_parsed(self, parser):
         equip = parser.parse({
@@ -112,7 +112,7 @@ class TestParserDelegation:
             "affix_yu": "体 +20.0",
             "dingyin": "千机索天重击增伤 +6.4%",
         })
-        assert equip.dingyin == {"name": "千机索天重击增伤", "value": 6.4}
+        assert equip.dingyin == {"name": "千机索天重击增伤", "value": 6.4, "cap_pct": 69.6}
 
     def test_no_dingyin_field(self, parser):
         equip = parser.parse({

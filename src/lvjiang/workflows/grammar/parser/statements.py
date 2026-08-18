@@ -2,6 +2,7 @@
 
 from lark import Token
 
+from ...engine.signals import WorkflowUserError
 from ..ast_nodes import (
     Align,
     ByClause,
@@ -24,7 +25,6 @@ from ..ast_nodes import (
     WaitStable,
     WhereClause,
 )
-from ...engine.signals import WorkflowUserError
 
 
 class _StmtMixin:

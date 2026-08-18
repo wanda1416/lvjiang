@@ -148,7 +148,7 @@ BONUS_PERCENT_FIELDS = {
 }
 
 # 动态增效字段后缀（整个值除以除数）
-BONUS_SUFFIXES = ("武学增伤", "武学增效", "蓄力技增伤", "技能增伤")
+BONUS_SUFFIXES = ("武学增伤", "武学增效")
 
 # ─── 五维属性转换系数 ─────────────────────────────────────
 # 劲/势/敏/体/御 是装备词条，需要转换为战斗属性
@@ -383,8 +383,6 @@ DYNAMIC_AFFIX_PATTERNS = [
     # (词条名后缀, extra_attrs key)
     ("武学增伤", None),  # 如 "剑武学增伤" → extra_attrs["剑武学增伤"]
     ("武学增效", None),  # 如 "扇武学增效"
-    ("蓄力技增伤", None),  # 如 "无名剑法·蓄力技增伤"
-    ("技能增伤", None),  # 如 "指定武学技能增伤"
 ]
 
 
@@ -429,7 +427,14 @@ def map_affix_to_attr(affix_name: str) -> tuple[str | None, bool]:
                 return field_name, (unit == "%")
         return field_name, False
 
-    # 2. 动态字段匹配
+    # 2. 指定技能定音：以游戏配置的词组归属为唯一权威来源。
+    # 这类名称包含武学技、蓄力技、特殊技、重击、增疗等多种形式，
+    # 不能依靠字符串后缀穷举。
+    from ...config import get_game_config
+    if get_game_config().resolve_affix_category(affix_name) == "指定技能增效":
+        return affix_name, True
+
+    # 3. 武器自身的武学增伤/增效动态字段。
     for suffix, _ in DYNAMIC_AFFIX_PATTERNS:
         if affix_name.endswith(suffix):
             # 动态字段存入 extra_attrs，key 为词条名本身
@@ -586,6 +591,77 @@ def compute_equip_base_attrs(equipped: dict, base_attr_lookup) -> CombatAttribut
     return result
 
 
+@dataclass(frozen=True)
+class GraduationAttrContext:
+    """毕业率属性预处理所需的不可变配置快照。"""
+
+    judge_resistance: float
+    buff_resistance: float
+    target_pen_field: str | None
+
+    @classmethod
+    def from_school(cls, school: str) -> "GraduationAttrContext":
+        from ...config import get_game_config
+
+        gc = get_game_config()
+        configs = gc.get_level_configs()
+        if configs:
+            level_cfg = max(configs, key=lambda item: item.level)
+            judge_resistance = float(level_cfg.judge_resistance or 0)
+            buff_resistance = float(level_cfg.buff_resistance or 0)
+        else:
+            judge_resistance = buff_resistance = 0.0
+        school_attr = gc.get_school_attr(school) if school else None
+        return cls(
+            judge_resistance=judge_resistance,
+            buff_resistance=buff_resistance,
+            target_pen_field=WUXIANG_TO_ATTR_PEN.get(school_attr or ""),
+        )
+
+
+def build_graduation_attrs(
+    base_attrs: CombatAttributes,
+    equipment_attrs: CombatAttributes,
+    school: str,
+    *,
+    context: GraduationAttrContext | None = None,
+) -> CombatAttributes:
+    """构造毕业率计算唯一输入：原始属性合并后统一应用抗性规则。
+
+    ``equipment_attrs`` 可同时包含装备基础攻击和装备词条；只有穿透字段
+    需要区分基础值与装备值，装备基础攻击不会影响该区分。
+    """
+    context = context or GraduationAttrContext.from_school(school)
+    judge_resistance = context.judge_resistance
+    buff_resistance = context.buff_resistance
+    result = base_attrs + equipment_attrs
+    target_pen = context.target_pen_field
+
+    for field_name in THREE_RATE_FIELDS:
+        setattr(result, field_name, apply_three_rate_resistance(
+            field_name, getattr(result, field_name), judge_resistance,
+        ))
+    for field_name in BONUS_PERCENT_FIELDS:
+        setattr(result, field_name, apply_bonus_resistance(
+            getattr(result, field_name), resistance=buff_resistance,
+        ))
+    for field_name in PENETRATION_FIELDS:
+        equipment_value = getattr(equipment_attrs, field_name)
+        if field_name == target_pen:
+            equipment_value += equipment_attrs.wuxiang_pen
+        setattr(result, field_name, apply_penetration_resistance(
+            equipment_value,
+            getattr(base_attrs, field_name),
+            buff_resistance,
+        ))
+    result.extra_attrs = {
+        key: apply_bonus_resistance(value, resistance=buff_resistance)
+        if has_resistance(key) else value
+        for key, value in result.extra_attrs.items()
+    }
+    return result
+
+
 # ─── 抗性计算 ─────────────────────────────────────────────
 
 def is_three_rate_field(field_name: str) -> bool:
@@ -601,6 +677,9 @@ def is_penetration_field(field_name: str) -> bool:
 def is_bonus_percent_field(field_name: str) -> bool:
     """判断是否为增伤类增效字段（整个值除以除数）"""
     if field_name in BONUS_PERCENT_FIELDS:
+        return True
+    from ...config import get_game_config
+    if get_game_config().resolve_affix_category(field_name) == "指定技能增效":
         return True
     # 动态增效字段
     for suffix in BONUS_SUFFIXES:

@@ -115,7 +115,7 @@ class TuningDocWriter:
                 {"name": a.get("name"), "value": a.get("value"),
                  "unit": a.get("unit") or "",
                  "cap_pct": a.get("cap_pct")}
-                for a in affixes
+                for a in affixes if isinstance(a, dict)
             ],
             "rounds": [],
             "final_rating": None,

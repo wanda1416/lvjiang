@@ -6,9 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.core.graduation.excel_formula import parse_formula
+from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.core.graduation import (
     get_graduation_calculator,
     get_graduation_scheme_combat_attrs,
@@ -16,6 +15,7 @@ from lvjiang.apps.yysls.core.graduation import (
     invalidate_graduation_cache,
     set_graduation_baseline_dps,
 )
+from lvjiang.apps.yysls.core.graduation.excel_formula import parse_formula
 from lvjiang.apps.yysls.core.graduation.graduation_converter import convert_workbook
 from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
 
@@ -103,8 +103,8 @@ def test_runtime_reports_workbook_baseline() -> None:
 def test_editable_baseline_dps_recalibrates_graduation_rate(
     tmp_path, monkeypatch,
 ) -> None:
-    import lvjiang.apps.yysls.core.graduation as graduation
     import lvjiang.apps.yysls.config.graduation_session as graduation_session
+    import lvjiang.apps.yysls.core.graduation as graduation
 
     source = DATA_DIR / "鸣金·虹_基础方案.json"
     shutil.copy(source, tmp_path / source.name)
@@ -143,7 +143,11 @@ def test_dynamic_inputs_use_canonical_game_affix_names(school: str) -> None:
     assert affix_inputs <= set(model["baseline_attrs"].get("extra_attrs", {}))
 
 
-def test_runtime_matches_mingjin_hong_excel_example() -> None:
+def test_runtime_matches_mingjin_hong_excel_example(monkeypatch) -> None:
+    # 隔离 session 覆盖层，确保使用 JSON 源数据 baseline
+    import lvjiang.apps.yysls.core.graduation as grad_mod
+    monkeypatch.setattr(grad_mod, "_get_session_baseline", lambda *a, **kw: None)
+    invalidate_graduation_cache()
     calculator = get_graduation_calculator("鸣金·虹")
     assert calculator is not None
     attrs = CombatAttributes(

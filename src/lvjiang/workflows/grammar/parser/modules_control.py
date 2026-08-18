@@ -111,6 +111,10 @@ class _ModuleControlMixin:
         """变量参数 → VarRef"""
         return items[0]
 
+    def call_arg_field(self, items):
+        """字段访问参数 → FieldAccess"""
+        return items[0]
+
     # ─── 控制流 ───────────────────────────────────────────
 
     @staticmethod

@@ -68,7 +68,10 @@ def test_profile_all_computes_realtime_regen_value(profile_func_env):
 
 
 def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
-    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry, db_upsert
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+        db_read_entry,
+        db_upsert,
+    )
     from lvjiang.apps.yysls.workflows.builtins.profile_funcs import _profile_inc
 
     updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
@@ -87,7 +90,10 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
 
 
 def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func_env):
-    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry, db_upsert
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+        db_read_entry,
+        db_upsert,
+    )
     from lvjiang.apps.yysls.core.profile_engine.profile_ops import sync_write_adapter
 
     updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")

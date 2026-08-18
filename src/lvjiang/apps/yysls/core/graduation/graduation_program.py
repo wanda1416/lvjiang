@@ -122,7 +122,7 @@ class ProgramCompiler:
         else:
             self.active.add(key)
             try:
-                result = self._expr(parse_formula(cell["formula"]), sheet)
+                result = self._scalar(self._expr(parse_formula(cell["formula"]), sheet))
             finally:
                 self.active.remove(key)
         self.cell_nodes[key] = result
@@ -199,7 +199,7 @@ class ProgramCompiler:
             return self._compile_lookup(name, compiled)
         raise FormulaError(f"unsupported function {name}")
 
-    def _compile_vlookup_ast(self, args: list[dict[str, Any]], sheet: str) -> int:
+    def _compile_vlookup_ast(self, args: list[dict[str, Any]], sheet: str) -> int | _Range:
         """Compile VLOOKUP without expanding every column of a wide Excel range."""
         if len(args) < 3 or args[1].get("op") != "ref":
             raise FormulaError("VLOOKUP requires a fixed table range")

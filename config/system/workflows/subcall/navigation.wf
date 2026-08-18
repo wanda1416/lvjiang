@@ -30,7 +30,7 @@ def nav_main_to_bag()
             log info "从主页进入菜单页"
             click [game_main_page].[menu] after wait @page_refresh
         else
-            eval pause("当前不在主页或菜单页，请手动导航后点击继续")
+            eval pause("未进入菜单页面，请手动导航后点击继续")
         end
     end
 

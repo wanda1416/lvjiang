@@ -204,7 +204,9 @@ def profile_action(
 
     # ── 1. 读当前值 ──
     if current_value is None:
-        current_value = _read_current_value(username, model_type, key, kd)
+        _raw = _read_current_value(username, model_type, key, kd)
+        # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
+        current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
 
     # ── 2. 计算目标新值 ──
     if set_value is not None:
@@ -316,6 +318,9 @@ def sync_write_adapter(
     kd = config.get_key(key, model_type=model_type)
 
     current_value = _read_current_value(user_name, model_type, key, kd)
+    # sync 适配器仅用于数值模型
+    if current_value is None or isinstance(current_value, str):
+        current_value = 0.0
     new_value = _normalize_float_noise(_clamp(current_value + delta, model_type, kd))
     semantic_new_value = new_value
     actual_delta = _normalize_float_noise(semantic_new_value - current_value)

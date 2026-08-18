@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -29,6 +30,7 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -329,8 +331,8 @@ class OptimalComboDialog(QDialog):
         self._result_cards: list[_ResultCard] = []
 
         self.setWindowTitle(tr("最优毕业率组合搜索"))
-        self.setMinimumSize(600, 500)
-        self.resize(700, 600)
+        self.setMinimumSize(800, 550)
+        self.resize(900, 650)
         self._setup_ui()
         self._load_candidates()
 
@@ -347,20 +349,6 @@ class OptimalComboDialog(QDialog):
             "font-size: 13px; color: palette(mid); padding: 4px 0;")
         layout.addWidget(header)
 
-        # Candidates area (scrollable)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; }")
-
-        self._candidates_widget = QWidget()
-        self._candidates_layout = QVBoxLayout(self._candidates_widget)
-        self._candidates_layout.setContentsMargins(4, 0, 4, 0)
-        self._candidates_layout.setSpacing(4)
-        scroll.setWidget(self._candidates_widget)
-        layout.addWidget(scroll, stretch=1)
-
         # Options row
         options = QHBoxLayout()
         self._chk_pruning = QCheckBox(tr("支配剪枝"))
@@ -371,6 +359,7 @@ class OptimalComboDialog(QDialog):
         options.addStretch()
         layout.addLayout(options)
 
+        # Tuning row
         tuning_row = QHBoxLayout()
         tuning_row.addWidget(QLabel(tr("调律规则：")))
         self._combo_tuning_rule = QComboBox()
@@ -419,32 +408,45 @@ class OptimalComboDialog(QDialog):
         action_row.addStretch()
         layout.addLayout(action_row)
 
-        # Results area
-        self._results_group = QGroupBox(tr("搜索结果"))
-        self._results_group.setVisible(False)
-        self._results_group.setStyleSheet(
-            "QGroupBox { font-weight: 600; font-size: 13px; "
-            "border: 1px solid palette(midlight); border-radius: 4px; "
-            "margin-top: 8px; padding-top: 12px; }"
-            "QGroupBox::title { subcontrol-origin: margin; left: 8px; "
-            "padding: 0 4px; }"
-        )
-        results_layout = QVBoxLayout(self._results_group)
-        results_layout.setContentsMargins(6, 4, 6, 4)
-        results_layout.setSpacing(4)
+        # Tab widget: 候选装备 / 最优结果
+        self._tab_widget = QTabWidget()
+
+        # Tab 1: 候选装备 (4×2 grid)
+        candidates_tab = QWidget()
+        candidates_layout = QVBoxLayout(candidates_tab)
+        candidates_layout.setContentsMargins(4, 4, 4, 4)
+        grid = QGridLayout()
+        grid.setSpacing(6)
+        self._slot_scroll_areas: dict[str, QScrollArea] = {}
+        for idx, (slot_key, _display_name, _ft) in enumerate(_SLOT_ORDER):
+            row = idx // 4
+            col = idx % 4
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setStyleSheet(
+                "QScrollArea { border: 1px solid palette(midlight); "
+                "border-radius: 4px; }")
+            grid.addWidget(scroll, row, col)
+            self._slot_scroll_areas[slot_key] = scroll
+        for c in range(4):
+            grid.setColumnStretch(c, 1)
+        for r in range(2):
+            grid.setRowStretch(r, 1)
+        candidates_layout.addLayout(grid)
+        self._tab_widget.addTab(candidates_tab, tr("候选装备"))
+
+        # Tab 2: 最优结果
+        results_tab = QWidget()
+        results_layout = QVBoxLayout(results_tab)
+        results_layout.setContentsMargins(4, 4, 4, 4)
         self._results_inner = QVBoxLayout()
         self._results_inner.setSpacing(4)
         results_layout.addLayout(self._results_inner)
-        layout.addWidget(self._results_group)
+        self._tab_widget.addTab(results_tab, tr("最优结果"))
 
-        # Close button
-        close_row = QHBoxLayout()
-        close_row.addStretch()
-        close_btn = QPushButton(tr("关闭"))
-        close_btn.setFixedHeight(28)
-        close_btn.clicked.connect(self.close)
-        close_row.addWidget(close_btn)
-        layout.addLayout(close_row)
+        layout.addWidget(self._tab_widget, stretch=1)
 
     def _load_tuning_options(self) -> None:
         """加载调律规则；只展示至少有一个玩法匹配当前流派的规则。"""
@@ -584,7 +586,16 @@ class OptimalComboDialog(QDialog):
                 rule_key, self._combo_tuning_playstyle.currentText(),
             )
             self._slot_groups[slot_key] = group
-            self._candidates_layout.addWidget(group)
+            scroll = self._slot_scroll_areas.get(slot_key)
+            if scroll:
+                # 用容器包裹 group，底部加 stretch 防止内容居中
+                container = QWidget()
+                container_layout = QVBoxLayout(container)
+                container_layout.setContentsMargins(0, 0, 0, 0)
+                container_layout.setSpacing(0)
+                container_layout.addWidget(group)
+                container_layout.addStretch()
+                scroll.setWidget(container)
 
         self._slot_labels = slot_labels
 
@@ -676,7 +687,9 @@ class OptimalComboDialog(QDialog):
         self._progress.setMaximum(max(total, 1))
         self._progress.setValue(0)
         self._progress_label.setText(f"0 / {total:,}")
-        self._results_group.setVisible(False)
+        # 切回候选装备 Tab，重置结果 Tab 标题
+        self._tab_widget.setCurrentIndex(0)
+        self._tab_widget.setTabText(1, tr("最优结果"))
 
         # Clear old results
         while self._results_inner.count():
@@ -720,16 +733,16 @@ class OptimalComboDialog(QDialog):
         self._progress_label.setVisible(False)
 
         if not results:
-            self._results_group.setTitle(tr("搜索结果"))
-            self._results_group.setVisible(True)
+            self._tab_widget.setTabText(1, tr("最优结果"))
             lbl = QLabel(tr("未找到有效组合"))
             lbl.setStyleSheet("color: palette(mid);")
             self._results_inner.addWidget(lbl)
+            self._tab_widget.setCurrentIndex(1)
             return
 
-        self._results_group.setTitle(
-            tr("搜索结果") + f"  (Top {len(results)})")
-        self._results_group.setVisible(True)
+        self._tab_widget.setTabText(
+            1, tr("最优结果") + f"  (Top {len(results)})")
+        self._tab_widget.setCurrentIndex(1)
 
         for i, result in enumerate(results):
             card = _ResultCard(i + 1, result, self._slot_labels)

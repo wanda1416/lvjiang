@@ -42,23 +42,31 @@ def _system_layouts() -> list[str]:
     )
 
 
+_VALIDATOR_CACHE: dict[str, WorkflowEngine] = {}
+
+
 def _validator(layout_name: str) -> WorkflowEngine:
     """装配「只校验」的引擎：后端全为 None，validate_only 不触碰它们
 
     delay_params 必须取真实配置 —— 命名等待校验比对的就是它，传空会把
     `wait @step_interval` 全判成未定义。
+    同一布局的引擎实例缓存复用，避免每个参数化用例重复加载布局+配置。
     """
+    if layout_name in _VALIDATOR_CACHE:
+        return _VALIDATOR_CACHE[layout_name]
     from lvjiang.core.layout_manager import load_layout_by_name
     layout = load_layout_by_name(layout_name)
     assert layout is not None, f"布局加载失败: {layout_name}"
     user_config = load_user_config()
-    return WorkflowEngine(
+    engine = WorkflowEngine(
         capture=None, ocr=None, input_ctrl=None,
         layout=layout,
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
         window_left=0, window_top=0,
     )
+    _VALIDATOR_CACHE[layout_name] = engine
+    return engine
 
 
 def test_system_layouts_and_workflows_exist():

@@ -69,7 +69,7 @@ class ProfileCellEditingMixin:
 
     # ─── 单元格事件与编辑 ──────────────────────────────────────
 
-    def _on_cell_double_clicked(self: ProfileOverviewTab, row: int, col: int, group_name: str):
+    def _on_cell_double_clicked(self: ProfileOverviewTab, row: int, col: int, group_name: str):  # type: ignore[misc]
         """单元格双击：对有 cap 的列，剥离 /cap 后缀再进入编辑"""
         if self._loading:
             return
@@ -107,7 +107,7 @@ class ProfileCellEditingMixin:
             item.setText(value_part)
             self._editing_cap_cell = False
 
-    def _on_item_changed(self: ProfileOverviewTab, item: QTableWidgetItem, group_name: str):
+    def _on_item_changed(self: ProfileOverviewTab, item: QTableWidgetItem, group_name: str):  # type: ignore[misc]
         """单元格编辑完成后回写到 profile 节点"""
         if self._loading or self._editing_cap_cell:
             return
@@ -195,7 +195,7 @@ class ProfileCellEditingMixin:
             force_write=force_target_write,
         )
 
-    def _on_cell_context_menu(self: ProfileOverviewTab, pos, group_name: str, table: QTableWidget):
+    def _on_cell_context_menu(self: ProfileOverviewTab, pos, group_name: str, table: QTableWidget):  # type: ignore[misc]
         """右键菜单：快速增减数值"""
         from PyQt6.QtWidgets import QMenu
 
@@ -356,7 +356,7 @@ class ProfileCellEditingMixin:
 
     # ─── 数据写入与增减 ──────────────────────────────────────
 
-    def _adjust_value(
+    def _adjust_value(  # type: ignore[misc]
         self: ProfileOverviewTab,
         user_name: str,
         model_type: str,
@@ -414,7 +414,7 @@ class ProfileCellEditingMixin:
         if table:
             self._refresh_group(current_group, table)
 
-    def _register_new_source(self: ProfileOverviewTab, kd: KeyDef, source: str, vocab: list[str]) -> None:
+    def _register_new_source(self: ProfileOverviewTab, kd: KeyDef, source: str, vocab: list[str]) -> None:  # type: ignore[misc]
         """新词条自动追加到对应词表（来源/用途）并持久化到 profile.yaml
 
         保存与内存修改原子化：save 失败时回滚内存词表，避免"会话内可见、重启后丢失"。
@@ -431,7 +431,7 @@ class ProfileCellEditingMixin:
                 pass
             logger.warning(f"持久化新词条 '{source}' 失败: {e}")
 
-    def _adjust_value_custom(
+    def _adjust_value_custom(  # type: ignore[misc]
         self: ProfileOverviewTab,
         user_name: str,
         model_type: str,
@@ -512,7 +512,7 @@ class ProfileCellEditingMixin:
             is_action=True, source=source, expected_entry=expected_entry,
         )
 
-    def _override_value_custom(
+    def _override_value_custom(  # type: ignore[misc]
         self: ProfileOverviewTab,
         user_name: str,
         model_type: str,
@@ -573,7 +573,7 @@ class ProfileCellEditingMixin:
             force_write=force_target_write,
         )
 
-    def _edit_note_text(
+    def _edit_note_text(  # type: ignore[misc]
         self: ProfileOverviewTab,
         user_name: str,
         model_type: str,
@@ -613,7 +613,7 @@ class ProfileCellEditingMixin:
         if table:
             self._refresh_group(group_name, table)
 
-    def _show_history_dialog(
+    def _show_history_dialog(  # type: ignore[misc]
         self: ProfileOverviewTab,
         user_name: str, model_type: str, key: str, key_label: str,
     ) -> None:

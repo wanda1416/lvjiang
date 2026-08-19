@@ -52,7 +52,7 @@ class ProfileColumnMixin:
 
     # ─── 列管理 ──────────────────────────────────────────────
 
-    def _on_columns_reordered(self: ProfileOverviewTab, group_name: str, table: QTableWidget):
+    def _on_columns_reordered(self: ProfileOverviewTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
         """拖拽列头后持久化新顺序"""
         if self._reordering or self._loading:
             return
@@ -80,7 +80,7 @@ class ProfileColumnMixin:
         finally:
             self._reordering = False
 
-    def _on_column_resized(self: ProfileOverviewTab, group_name: str, table: QTableWidget):
+    def _on_column_resized(self: ProfileOverviewTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
         """列宽拖拽调整后持久化，并同步角色名列宽到所有分组"""
         if self._restoring_widths or self._loading:
             return
@@ -112,7 +112,7 @@ class ProfileColumnMixin:
 
         _save_column_widths(all_widths)
 
-    def _restore_column_widths(self: ProfileOverviewTab, group_name: str, table: QTableWidget):
+    def _restore_column_widths(self: ProfileOverviewTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
         """恢复指定分组的列宽配置"""
         all_widths = _get_column_widths()
         widths = all_widths.get(group_name)
@@ -131,7 +131,7 @@ class ProfileColumnMixin:
             h_header.resizeSection(idx, w)
         self._restoring_widths = False
 
-    def _insert_column_width(self: ProfileOverviewTab, group_name: str, data_insert_idx: int, table: QTableWidget) -> None:
+    def _insert_column_width(self: ProfileOverviewTab, group_name: str, data_insert_idx: int, table: QTableWidget) -> None:  # type: ignore[misc]
         """新增数据列时同步列宽数组；第 0 列为角色名。"""
         h_header = table.horizontalHeader()
         assert h_header is not None
@@ -145,7 +145,7 @@ class ProfileColumnMixin:
         all_widths[group_name] = widths
         _save_column_widths(all_widths)
 
-    def _remove_column_width(self: ProfileOverviewTab, group_name: str, data_idx: int, table: QTableWidget) -> None:
+    def _remove_column_width(self: ProfileOverviewTab, group_name: str, data_idx: int, table: QTableWidget) -> None:  # type: ignore[misc]
         """删除数据列时同步列宽数组；第 0 列为角色名。"""
         h_header = table.horizontalHeader()
         assert h_header is not None
@@ -159,7 +159,7 @@ class ProfileColumnMixin:
             all_widths[group_name] = widths
             _save_column_widths(all_widths)
 
-    def _on_header_context_menu(self: ProfileOverviewTab, pos, group_name: str):
+    def _on_header_context_menu(self: ProfileOverviewTab, pos, group_name: str):  # type: ignore[misc]
         """表头右键菜单（分组上下文）"""
         from PyQt6.QtWidgets import QMenu
 
@@ -182,7 +182,7 @@ class ProfileColumnMixin:
 
         menu.exec(h_header.mapToGlobal(pos))
 
-    def _on_header_double_clicked(self: ProfileOverviewTab, logical_index: int, group_name: str):
+    def _on_header_double_clicked(self: ProfileOverviewTab, logical_index: int, group_name: str):  # type: ignore[misc]
         """表头双击：选择字段"""
         # 第 0 列是角色名，不可编辑
         if logical_index == 0:
@@ -224,7 +224,7 @@ class ProfileColumnMixin:
             if selected[0]:
                 self._set_column_field(group_name, data_index, selected[0])
 
-    def _add_column(self: ProfileOverviewTab, group_name: str, after_index: int):
+    def _add_column(self: ProfileOverviewTab, group_name: str, after_index: int):  # type: ignore[misc]
         """在指定分组的指定列后新增一列"""
         config = get_profile_config()
 
@@ -274,7 +274,7 @@ class ProfileColumnMixin:
                 self._insert_column_width(group_name, insert_idx, self._tables[group_name])
                 self._refresh_group(group_name, self._tables[group_name])
 
-    def _remove_column(self: ProfileOverviewTab, group_name: str, logical_index: int):
+    def _remove_column(self: ProfileOverviewTab, group_name: str, logical_index: int):  # type: ignore[misc]
         """从指定分组中删除指定列"""
         groups = get_groups()
         group_data = groups.get(group_name, {"columns": []})
@@ -287,7 +287,7 @@ class ProfileColumnMixin:
             self._remove_column_width(group_name, logical_index, self._tables[group_name])
             self._refresh_group(group_name, self._tables[group_name])
 
-    def _create_key_picker(
+    def _create_key_picker(  # type: ignore[misc]
         self: ProfileOverviewTab,
         config, all_keys: list, current_key: str, selected: list,
     ) -> QPushButton:
@@ -337,7 +337,7 @@ class ProfileColumnMixin:
         btn.clicked.connect(show_menu)
         return btn
 
-    def _set_column_field(self: ProfileOverviewTab, group_name: str, logical_index: int, field_key: str):
+    def _set_column_field(self: ProfileOverviewTab, group_name: str, logical_index: int, field_key: str):  # type: ignore[misc]
         """设置指定分组的指定列字段"""
         groups = get_groups()
         group_data = groups.get(group_name, {"columns": []})

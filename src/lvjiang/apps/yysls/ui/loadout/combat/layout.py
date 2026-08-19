@@ -122,7 +122,7 @@ class CombatLayoutMixin:
 
     def resizeEvent(self, event) -> None:
         """响应宽度变化，在半屏模式下触发紧凑布局适配。"""
-        super().resizeEvent(event)
+        super().resizeEvent(event)  # type: ignore[misc]
         # 仅在半屏模式下启用自适应（包括完整模式和退化模式）
         if self._display_mode in (DISPLAY_MODE_HALF, DISPLAY_MODE_HALF_COMPACT):
             QTimer.singleShot(0, self._check_compact_mode)

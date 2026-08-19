@@ -232,6 +232,7 @@ class _SlotCard(QFrame):
     # ── 点击事件 ──
 
     def mousePressEvent(self, event):
+        from .status_tab import EquipStatusTab
         # 仅左键触发部位筛选，右键留给 contextMenuEvent
         if event.button() == Qt.MouseButton.LeftButton:
             parent = self.parent()
@@ -243,6 +244,7 @@ class _SlotCard(QFrame):
 
     def contextMenuEvent(self, event):
         """右键菜单：已装备物品可卸载，模拟装备可编辑，所有可复制。"""
+        from .status_tab import EquipStatusTab
         if not getattr(self, '_equip_data', None):
             event.ignore()
             return

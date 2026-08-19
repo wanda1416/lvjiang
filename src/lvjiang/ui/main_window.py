@@ -407,12 +407,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
 
     def _open_feedback(self):
-        """打开 GitHub Issue 反馈页面"""
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
-
-        from .about_dialog import GITHUB_REPO
-        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/issues"))
+        """打开反馈对话框：展示微信交流群二维码"""
+        from .feedback_dialog import FeedbackDialog
+        dialog = FeedbackDialog(self)
+        dialog.exec()
 
     def _open_user_manager(self):
         from .user_manager_dialog import UserManagerDialog

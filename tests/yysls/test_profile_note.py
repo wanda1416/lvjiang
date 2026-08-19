@@ -217,8 +217,8 @@ class TestNoteProfileAction:
         entry = db_read_entry(note_env.username, "note", "took_xinfa")
         assert entry["value_text"] == ""
 
-    def test_note_no_history(self, note_env):
-        """note 写入不记入 history"""
+    def test_note_records_history(self, note_env):
+        """note 写入记入 history"""
         from lvjiang.apps.yysls.core.profile_engine.profile_db import ProfileDB
         from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
 
@@ -231,7 +231,9 @@ class TestNoteProfileAction:
         import lvjiang.apps.yysls.core.profile_engine.profile_db as pdb
         db: ProfileDB = pdb._db
         history = db.get_history(note_env.username)
-        assert history == []
+        assert len(history) == 1
+        assert history[0]["new_value_text"] == "已拿"
+        assert history[0]["type"] == "note"
 
     def test_note_no_sync_targets(self, note_env):
         """note 不触发 sync_targets"""
@@ -427,3 +429,86 @@ class TestNoteSyncValidation:
         output = buf.getvalue()
         assert "sync_targets" in output
         assert "note" in output
+
+
+# ─── note 历史记录支持 ────────────────────────────────────────────
+
+
+class TestNoteHistory:
+    def test_note_action_records_history(self, note_env):
+        """profile_action note 写入记录 history"""
+        from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+            db_get_history,
+        )
+        from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
+
+        # 第一次写入
+        profile_action(
+            note_env.username, "took_xinfa",
+            model_type="note",
+            set_value="已拿",
+        )
+
+        history = db_get_history(note_env.username, type_="note", key="took_xinfa")
+        assert len(history) == 1
+        assert history[0]["new_value_text"] == "已拿"
+        assert history[0]["old_value_text"] == ""
+        assert history[0]["change_type"] == "action"
+
+    def test_note_history_records_old_text(self, note_env):
+        """note 覆写时 history 记录旧文本"""
+        from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+            db_get_history,
+        )
+        from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
+
+        profile_action(
+            note_env.username, "took_xinfa",
+            model_type="note",
+            set_value="已拿",
+        )
+        profile_action(
+            note_env.username, "took_xinfa",
+            model_type="note",
+            set_value="未拿",
+        )
+
+        history = db_get_history(note_env.username, type_="note", key="took_xinfa")
+        assert len(history) == 2
+        # 最新记录在前（按 id 倒序）
+        assert history[0]["new_value_text"] == "未拿"
+        assert history[0]["old_value_text"] == "已拿"
+        assert history[1]["new_value_text"] == "已拿"
+        assert history[1]["old_value_text"] == ""
+
+    def test_note_same_value_no_history(self, note_env):
+        """note 写入相同值不重复记录 history"""
+        from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+            db_get_history,
+            db_upsert,
+        )
+
+        # 先写入初始值
+        db_upsert(note_env.username, "note", "took_xinfa", 0, change_type="action", value_text="已拿")
+        # 再次写入相同值
+        db_upsert(note_env.username, "note", "took_xinfa", 0, change_type="action", value_text="已拿")
+
+        history = db_get_history(note_env.username, type_="note", key="took_xinfa")
+        # action 类型始终记录，所以会有 2 条
+        assert len(history) == 2
+
+    def test_note_history_tick_only_on_change(self, note_env):
+        """note tick 类型仅在值变化时记录"""
+        from lvjiang.apps.yysls.core.profile_engine.profile_db import (
+            db_get_history,
+            db_upsert,
+        )
+
+        # tick 写入新值
+        db_upsert(note_env.username, "note", "took_xinfa", 0, change_type="tick", value_text="新值")
+        # tick 写入相同值
+        db_upsert(note_env.username, "note", "took_xinfa", 0, change_type="tick", value_text="新值")
+
+        history = db_get_history(note_env.username, type_="note", key="took_xinfa")
+        # tick 只在值变化时记录，所以只有 1 条
+        assert len(history) == 1

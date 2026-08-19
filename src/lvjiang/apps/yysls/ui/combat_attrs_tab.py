@@ -70,6 +70,13 @@ DISPLAY_MODE_HALF = "half"
 # 半屏退化模式：宽度不足时触发，卡片内部重排为单列，过滤零值行
 DISPLAY_MODE_HALF_COMPACT = "half_compact"
 
+# 退化模式阈值：38 个汉字宽度（约 532px，按 14px/字计算）
+# 宽度 >= 此值时展示两列，< 此值时退化为单列
+_COMPACT_THRESHOLD_CHARS = 38
+_COMPACT_THRESHOLD_PX = _COMPACT_THRESHOLD_CHARS * 14  # 532px
+# 迟滞偏移：退出退化模式需要比进入时多 36px（约 2.5 字）
+_COMPACT_HYSTERESIS_PX = 36
+
 _YELLOW_VALUE_COLOR = "#D97706"
 _CARD_STYLE = """
     QFrame#combatAttrCard {
@@ -554,6 +561,8 @@ class CombatAttrsTab(QWidget):
         # 不设置最小高度，允许内容自适应压缩和滚动
         self.setMinimumHeight(0)
         if not collapsed:
+            # 保存旧模式，用于判断是否需要恢复被隐藏的行
+            old_mode = self._display_mode
             # 设置展示模式：full -> DISPLAY_MODE_FULL, half -> DISPLAY_MODE_HALF
             self._display_mode = DISPLAY_MODE_FULL if mode == "full" else DISPLAY_MODE_HALF
             self._layout_attribute_cards(mode)
@@ -564,9 +573,10 @@ class CombatAttrsTab(QWidget):
             )
             for widget, (row, col) in zip(self._config_fields, positions, strict=True):
                 self._select_layout.addWidget(widget, row, col)
-            # 确保从退化模式恢复
-            if self._display_mode != DISPLAY_MODE_HALF_COMPACT:
-                self._ensure_normal_layout()
+            # 如果之前是退化模式，恢复被隐藏的行和正常布局
+            if old_mode == DISPLAY_MODE_HALF_COMPACT:
+                self._restore_zero_attack_rows()
+                self._reset_name_label_widths()
 
     @staticmethod
     def _drain_layout(layout) -> None:
@@ -616,15 +626,18 @@ class CombatAttrsTab(QWidget):
         - DISPLAY_MODE_FULL: 全屏模式，卡片 2×2 网格
         - DISPLAY_MODE_HALF: 半屏完整模式，卡片垂直排列，内部多列
         - DISPLAY_MODE_HALF_COMPACT: 半屏退化模式，卡片内部单列，过滤零值行
+
+        阈值逻辑：基于 36 个汉字宽度判断是否能容纳两列内容。
         """
         super().resizeEvent(event)
-        # 仅在半屏完整模式下启用自适应
-        if self._display_mode == DISPLAY_MODE_HALF:
+        # 仅在半屏模式下启用自适应（包括完整模式和退化模式）
+        if self._display_mode in (DISPLAY_MODE_HALF, DISPLAY_MODE_HALF_COMPACT):
             width = event.size().width()
-            # 阈值：宽度小于 420px 时进入退化模式，大于 460px 时退出（迟滞避免抖动）
-            should_compact = width < 420
-            should_normal = width > 460
-            if should_compact:
+            # 进入退化模式：宽度 < 36 字宽度
+            # 退出退化模式：宽度 >= 36 字宽度 + 迟滞偏移（避免抖动）
+            should_compact = width < _COMPACT_THRESHOLD_PX
+            should_normal = width >= _COMPACT_THRESHOLD_PX + _COMPACT_HYSTERESIS_PX
+            if should_compact and self._display_mode == DISPLAY_MODE_HALF:
                 self._switch_to_compact_layout()
             elif should_normal and self._display_mode == DISPLAY_MODE_HALF_COMPACT:
                 self._switch_to_normal_layout()
@@ -659,26 +672,28 @@ class CombatAttrsTab(QWidget):
         # 恢复 name 标签的自动宽度
         self._reset_name_label_widths()
 
-    def _ensure_normal_layout(self) -> None:
-        """确保从退化模式恢复到正常模式（模式切换时调用）。"""
-        if self._display_mode == DISPLAY_MODE_HALF_COMPACT:
-            self._switch_to_normal_layout()
-
     @staticmethod
     def _rearrange_grid_compact(
         grid: QGridLayout,
         items: list[tuple[QWidget, int, int]],
     ) -> None:
-        """将网格中的 widget 重排为单列，并确保右侧对齐。"""
+        """将网格中的 widget 重排为单列，并确保右侧对齐。
+
+        不可见的 widget（如空的动态槽位）会被跳过，避免产生空行。
+        """
         # 移除所有 widget
         for widget, _, _ in items:
             grid.removeWidget(widget)
         # 重置列拉伸设置，仅拉伸第 0 列
         grid.setColumnStretch(0, 0)
         grid.setColumnStretch(1, 0)
-        # 按原始顺序重新排列为单列，所有 widget 放在第 0 列
-        for new_row, (widget, _, _) in enumerate(items):
+        # 按原始顺序重新排列为单列，跳过不可见的 widget
+        new_row = 0
+        for widget, _, _ in items:
+            if not widget.isVisible():
+                continue
             grid.addWidget(widget, new_row, 0)
+            new_row += 1
         # 拉伸第 0 列以填充空间
         grid.setColumnStretch(0, 1)
 

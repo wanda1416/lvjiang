@@ -199,7 +199,7 @@ def profile_action(
             logger.warning(f"profile_action: note key '{key}' 未在 profile.yaml 中定义")
             return ""
         text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
-        db_upsert(username, model_type, key, 0, value_text=text, source=source)
+        db_upsert(username, model_type, key, 0, change_type="action", value_text=text, source=source)
         return text
 
     # ── 1. 读当前值 ──

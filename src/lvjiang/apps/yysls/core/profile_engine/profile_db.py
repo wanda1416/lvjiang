@@ -100,12 +100,29 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """history 新增 old_value_text/new_value_text 列：note 模型记录文本变更（幂等）。"""
+    cols = [
+        row[1]
+        for row in conn.execute("PRAGMA table_info(profile_history)").fetchall()
+    ]
+    if "old_value_text" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_history ADD COLUMN old_value_text TEXT DEFAULT ''"
+        )
+    if "new_value_text" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_history ADD COLUMN new_value_text TEXT DEFAULT ''"
+        )
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
     (2, "history add source column", _migrate_v2),
     (3, "entries add updated_time column", _migrate_v3),
     (4, "entries add value_text column", _migrate_v4),
+    (5, "history add old/new_value_text columns", _migrate_v5),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -235,10 +252,11 @@ class ProfileDB:
 
             # 读取旧值（用于 history 对比）
             old_row = conn.execute(
-                "SELECT value FROM profile_entries WHERE username=? AND type=? AND key=?",
+                "SELECT value, value_text FROM profile_entries WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
             old_value = old_row[0] if old_row else None
+            old_value_text = old_row[1] if old_row and len(old_row) > 1 else ""
 
             # upsert entry
             conn.execute(
@@ -254,6 +272,10 @@ class ProfileDB:
                 if change_type in ("action", "override"):
                     # 用户主动操作始终记录
                     should_record = True
+                elif type_ == "note":
+                    # note 模型对比文本值
+                    if old_value_text != value_text:
+                        should_record = True
                 elif old_value != float(value):
                     # tick 仅在值变化时记录
                     should_record = True
@@ -262,9 +284,10 @@ class ProfileDB:
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
-                        "change_type, detail, source) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "old_value_text, new_value_text, change_type, detail, source) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (write_ts, username, type_, key, old_value, float(value),
+                         old_value_text or "", value_text,
                          change_type, detail, source),
                     )
 
@@ -291,11 +314,12 @@ class ProfileDB:
                 ts = updated_at or write_ts
 
                 old_row = conn.execute(
-                    "SELECT value FROM profile_entries "
+                    "SELECT value, value_text FROM profile_entries "
                     "WHERE username=? AND type=? AND key=?",
                     (username, type_, key),
                 ).fetchone()
                 old_value = old_row[0] if old_row else None
+                old_value_text = old_row[1] if old_row and len(old_row) > 1 else ""
 
                 conn.execute(
                     "INSERT OR REPLACE INTO profile_entries "
@@ -308,6 +332,9 @@ class ProfileDB:
                     should_record = False
                     if change_type in ("action", "override"):
                         should_record = True
+                    elif type_ == "note":
+                        if old_value_text != value_text:
+                            should_record = True
                     elif old_value != float(value):
                         should_record = True
 
@@ -315,8 +342,10 @@ class ProfileDB:
                         conn.execute(
                             "INSERT INTO profile_history "
                             "(ts, username, type, key, old_value, new_value, "
-                            "change_type, detail, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            "old_value_text, new_value_text, change_type, detail, source) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (write_ts, username, type_, key, old_value, float(value),
+                             old_value_text or "", value_text,
                              change_type, detail, source),
                         )
 
@@ -410,7 +439,8 @@ class ProfileDB:
         try:
             rows = conn.execute(
                 f"SELECT id, ts, username, type, key, old_value, new_value, "
-                f"change_type, detail, source FROM profile_history "
+                f"old_value_text, new_value_text, change_type, detail, source "
+                f"FROM profile_history "
                 f"WHERE {where} ORDER BY id DESC LIMIT ?",
                 params,
             ).fetchall()
@@ -422,7 +452,8 @@ class ProfileDB:
                 "id": r[0], "ts": r[1], "username": r[2],
                 "type": r[3], "key": r[4],
                 "old_value": r[5], "new_value": r[6],
-                "change_type": r[7], "detail": r[8], "source": r[9],
+                "old_value_text": r[7] or "", "new_value_text": r[8] or "",
+                "change_type": r[9], "detail": r[10], "source": r[11],
             }
             for r in rows
         ]

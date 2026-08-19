@@ -1,0 +1,79 @@
+#% name: 周常百业货运
+
+# 周常百业货运流程
+#
+# 流程结构：
+#   1. 导航：从首页 → 菜单 → 百业 → 返回驻地
+#   2. 处理确认弹窗后验证是否抵达百业驻地
+#   3. TODO: 后续补充货运具体操作
+
+import "subcall/navigation.wf"
+
+# ─── 导航：从首页到百业驻地 ─────────────────────────────
+click [game_main_page].[menu] after wait @step_interval
+
+scan [game_menu_page].[menu] as $menu_check by contains "菜单"
+if not $menu_check
+    eval pause("未进入菜单页，请手动导航后点击继续")
+end
+
+find [game_menu_page].[menu] as $found by contains "百业"
+if $found
+    click $found after wait stable @page_refresh
+    click [baiye_main].[goto_baiye] after wait @page_refresh
+
+    scan [general_control].[confirm] as $confirm by contains "确定"
+    if $confirm
+        click [general_control].[confirm] after wait @page_refresh
+
+        # 通过 check_in_baiye 检查是否抵达百业，最多等待 20s
+        eval $arrived = 0
+        loop 10
+            call $result = check_in_baiye()
+            if $result == 0
+                eval $arrived = 1
+                break
+            end
+            wait 2
+        end
+        if not $arrived
+            eval pause("等待进入百业驻地超时，请手动检查后点击继续")
+        end
+    else
+        log "找不到百业驻地入口确认弹窗，请手动进入百业驻地"
+        eval pause("请手动进入百业驻地后点击继续")
+        call $result = check_in_baiye()
+        if $result != 0
+            eval pause("仍未检测到百业驻地，请确认页面状态后点击继续")
+        end
+    end
+else
+    log "菜单中未找到「百业」入口"
+    eval pause("请手动导航到百业驻地后点击继续")
+    call $result = check_in_baiye()
+    if $result != 0
+        eval pause("仍未检测到百业驻地，请确认页面状态后点击继续")
+    end
+end
+
+log "已抵达百业驻地"
+
+# ─── TODO: 后续补充货运具体操作 ──────────────────────────
+
+# ─── 返回主页 ──────────────────────────────────────────
+click [baiye_main].[back] after wait @page_refresh
+click [game_menu_page].[back] after wait @page_refresh
+log "百业货运流程结束"
+
+# ─── 检查是否抵达百业驻地 ──────────────────────────────
+# 百业驻地在游戏主页，通过检测 menu/xianshi 区域判定
+def check_in_baiye()
+    eval $main_items = ["菜单", "限时"]
+    scan [game_main_page].[menu, xianshi] as $found by contains_any $main_items
+    if $found
+        log "抵达百业驻地"
+        return 0
+    else
+        return -1
+    end
+end

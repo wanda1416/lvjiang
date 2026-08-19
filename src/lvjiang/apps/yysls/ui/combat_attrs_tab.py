@@ -1174,7 +1174,9 @@ class CombatAttrsTab(QWidget):
                         )
                         # 显示：原始值(生效值)，其中原始值 = 基础 + 装备
                         original = base_val + equip_val
-                        self._set_resistance_text(label, original, capped, unit)
+                        self._set_resistance_text(
+                            label, original, capped, unit, force_decimal=True,
+                        )
                         continue
                     else:
                         # 增伤类：整个值 / 1.15
@@ -1291,8 +1293,8 @@ class CombatAttrsTab(QWidget):
             )
             values[field] = (original, effective)
             details.append(
-                f"{name}穿透：{format_value(original, '')}"
-                f"({format_value(effective, '')})"
+                f"{name}穿透：{original:.2f}"
+                f"({effective:.2f})"
             )
 
         if current_field:
@@ -1312,19 +1314,28 @@ class CombatAttrsTab(QWidget):
                 original = effective = 0.0
                 self._attr_pen_name.setText(tr("属攻穿透"))
 
-        self._set_resistance_text(self._attr_pen_label, original, effective, "")
+        self._set_resistance_text(
+            self._attr_pen_label, original, effective, "", force_decimal=True,
+        )
         tooltip = "\n".join(details)
         self._attr_pen_name.setToolTip(tooltip)
         self._attr_pen_label.setToolTip(tooltip)
 
-    def _set_resistance_text(self, label: QLabel, original: float,
-                             effective: float, unit: str) -> None:
+    def _set_resistance_text(
+        self, label: QLabel, original: float, effective: float,
+        unit: str, *, force_decimal: bool = False,
+    ) -> None:
         """按游戏的白字 (黄字) 语义显示原始值与抗性后数值。
 
-        当勾选“仅展示抗性结果”时，直接展示黄字（抗性后数值）。
+        当勾选"仅展示抗性结果"时，直接展示黄字（抗性后数值）。
+        force_decimal: 强制保留两位小数（用于穿透类）。
         """
-        original_text = format_value(original, unit)
-        effective_text = format_value(effective, unit)
+        if force_decimal:
+            original_text = f"{original:.2f}"
+            effective_text = f"{effective:.2f}"
+        else:
+            original_text = format_value(original, unit)
+            effective_text = format_value(effective, unit)
         if self._chk_resistance_only.isChecked():
             # 仅展示抗性结果（黄字）
             label.setText(
@@ -1393,6 +1404,10 @@ class CombatAttrsTab(QWidget):
 
         fill_slots(weapon_items, self._weapon_bonus_slots)
         fill_slots(skill_items, self._skill_bonus_slots)
+
+        # 隐藏没有内容的动态槽位，避免单列模式产生空行
+        for widget, name_label, _ in self._weapon_bonus_slots + self._skill_bonus_slots:
+            widget.setVisible(bool(name_label.text()))
 
     def _schedule_graduation(self, combat_attrs: CombatAttributes) -> None:
         """延迟提交毕业率计算；新请求会使旧结果自动失效。"""

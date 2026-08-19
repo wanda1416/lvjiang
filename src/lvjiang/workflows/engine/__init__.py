@@ -13,8 +13,15 @@
 - control_flow.py  控制流：if/for/for-range/loop
 - evaluation.py    条件求值与变量解析
 """
-from .core import WorkflowEngine
 from .signals import WorkflowUserError
+
+# WorkflowEngine 延迟加载：core.py 依赖 grammar 包，而 grammar.parser 又间接
+# 依赖 engine.signals。若在此处 eagerly import core，会触发循环导入。
+def __getattr__(name):
+    if name == "WorkflowEngine":
+        from .core import WorkflowEngine
+        return WorkflowEngine
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "WorkflowEngine",

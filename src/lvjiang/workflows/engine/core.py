@@ -18,7 +18,8 @@ from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
 from ..align import GridAlignment
 from ..base import BaseWorkflow
-from ..grammar import (
+from ..grammar.ast_nodes import (
+    Align,
     Break,
     CallProc,
     Click,
@@ -43,13 +44,13 @@ from ..grammar import (
     Return,
     Scan,
     Screenshot,
+    Try,
     UntilLoop,
     Wait,
     WaitStable,
     WhileLoop,
-    parse_file,
 )
-from ..grammar.ast_nodes import Align, Try
+from ..grammar.parser import parse_file
 from ..static_check import check_refs, format_problems
 from ..workflow_references import collect_refs
 from .actions import _ActionsMixin

@@ -465,7 +465,7 @@ yysls:
   重置时刻: '重置时刻:'
   默认: 默认
 config:
-  wf_equip_analysis: Equipment Analysis
+  wf_scan_unequipped: Equipment Analysis
   wf_purchase_xinfa: Auto Purchase Xinfa
   wf_purchase_bugan: Auto Purchase Bugan
   wf_daily_jianghu: Daily Jianghu Order

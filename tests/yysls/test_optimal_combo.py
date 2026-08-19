@@ -472,16 +472,25 @@ class TestSearchOptimalCombo:
             min_mingjin=500, max_mingjin=1300,
         )
         cancelled = [False]
-        call_count = [0]
 
-        def on_progress(evaluated: int, total: int, msg: str) -> None:
-            call_count[0] += 1
-            if call_count[0] >= 2:
-                cancelled[0] = True
+        class MockCounter:
+            def __init__(self):
+                object.__setattr__(self, 'evaluated', 0)
+                object.__setattr__(self, 'total', 0)
+                object.__setattr__(self, 'message', "")
+                object.__setattr__(self, 'call_count', 0)
 
+            def __setattr__(self, name, value):
+                if name == "evaluated":
+                    object.__setattr__(self, 'call_count', self.call_count + 1)
+                    if self.call_count >= 2:
+                        cancelled[0] = True
+                object.__setattr__(self, name, value)
+
+        counter = MockCounter()
         results = search_optimal_combo(
             candidates, calc, base_attrs,
-            progress_cb=on_progress,
+            progress_counter=counter,
             cancel_flag=lambda: cancelled[0],
         )
         # Should have returned (possibly partial results)

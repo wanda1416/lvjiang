@@ -244,11 +244,11 @@ def search_optimal_combo(
     top_r: int = 200,
     use_dominance_pruning: bool = True,
     max_per_slot: int = 0,  # 0 = no limit
-    progress_cb: Callable[[int, int, str], None] | None = None,
     cancel_flag: Callable[[], bool] | None = None,
     full_chengyin: bool = False,
     full_dingyin: bool = False,
     full_level: int = 0,
+    progress_counter: Any = None,  # 具有 evaluated, total, message 属性的对象
 ) -> list[dict[str, Any]]:
     """Search for the best equipment combinations.
 
@@ -266,16 +266,21 @@ def search_optimal_combo(
         Whether to remove dominated candidates.
     max_per_slot:
         If > 0, apply linear-score Top-K safety net after pruning.
-    progress_cb:
-        ``callback(evaluated, total, message)`` for progress updates.
     cancel_flag:
         Callable returning True to abort search early.
+    progress_counter:
+        具有 evaluated, total, message 属性的对象，用于轮询进度。
 
     Returns
     -------
     List of up to 5 result dicts, each containing:
     ``rate``, ``dps``, ``total_damage``, ``equipped`` (per-slot equip dicts).
     """
+    # 立即反馈，避免 UI 看起来卡住
+    if progress_counter:
+        total_items = sum(len(v) for v in candidates.values())
+        progress_counter.message = f"准备中… 共 {total_items} 件候选装备"
+
     program = calculator._data["program"]
     input_specs = program["inputs"]
     baseline = calculator.baseline_dps()
@@ -310,8 +315,9 @@ def search_optimal_combo(
     for k in slot_keys:
         total_combos *= len(slot_deltas[k])
 
-    if progress_cb:
-        progress_cb(0, total_combos, f"搜索空间: {total_combos:,} 种组合")
+    if progress_counter:
+        progress_counter.total = total_combos
+        progress_counter.message = f"搜索空间: {total_combos:,} 种组合"
 
     # -- Phase 1b: dominance pruning --
     if use_dominance_pruning:
@@ -319,11 +325,9 @@ def search_optimal_combo(
         pruned_combos = 1
         for k in slot_keys:
             pruned_combos *= max(len(slot_deltas.get(k, [])), 1)
-        if progress_cb and pruned_combos < total_combos:
-            progress_cb(
-                0, pruned_combos,
-                f"支配剪枝: {total_combos:,} → {pruned_combos:,}",
-            )
+        if progress_counter and pruned_combos < total_combos:
+            progress_counter.total = pruned_combos
+            progress_counter.message = f"支配剪枝: {total_combos:,} → {pruned_combos:,}"
         total_combos = pruned_combos
 
     # -- Phase 1c: Top-K safety net --
@@ -333,11 +337,9 @@ def search_optimal_combo(
         for k in slot_keys:
             safe_combos *= max(len(slot_deltas.get(k, [])), 1)
         if safe_combos < total_combos:
-            if progress_cb:
-                progress_cb(
-                    0, safe_combos,
-                    f"Top-K 缩减: {total_combos:,} → {safe_combos:,}",
-                )
+            if progress_counter:
+                progress_counter.total = safe_combos
+                progress_counter.message = f"Top-K 缩减: {total_combos:,} → {safe_combos:,}"
             total_combos = safe_combos
 
     # -- Prepare fast-lookup arrays for inner loop --
@@ -356,8 +358,6 @@ def search_optimal_combo(
     # -- Phase 2: enumerate + evaluate --
     board = TopRLeaderboard(top_r)
     evaluated = 0
-    batch = 0
-    BATCH_SIZE = 4096
 
     # Reusable accumulation buffer and runtime
     acc = [0.0] * n_dims
@@ -371,9 +371,10 @@ def search_optimal_combo(
             break
 
         # 所有调用方必须通过统一的毕业率属性预处理（抗性/无相转换）。
+        # 使用原地加法避免创建中间对象（性能关键路径）
         equipment_attrs = CombatAttributes()
         for si, idx in enumerate(combo_indices):
-            equipment_attrs = equipment_attrs + slot_attr_arrays[si][idx]
+            equipment_attrs += slot_attr_arrays[si][idx]
         effective_attrs = build_graduation_attrs(
             base_attrs, equipment_attrs, calculator._school,
             context=graduation_context,
@@ -392,11 +393,9 @@ def search_optimal_combo(
             board.insert(rate, list(combo_indices), dps)
 
         evaluated += 1
-        batch += 1
-        if batch >= BATCH_SIZE:
-            batch = 0
-            if progress_cb:
-                progress_cb(evaluated, total_combos, "")
+        # 每完成一条就更新计数器，前台定时器会轮询读取
+        if progress_counter:
+            progress_counter.evaluated = evaluated
 
     # -- Phase 3: build results --
     results: list[dict[str, Any]] = []

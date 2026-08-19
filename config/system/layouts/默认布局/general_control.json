@@ -23,9 +23,9 @@
     },
     {
       "key": "menu_area",
-      "x_ratio": 0.6475723888314374,
+      "x_ratio": 0.6504653567735263,
       "y_ratio": 0.0,
-      "w_ratio": 0.3524276111685626,
+      "w_ratio": 0.34953464322647365,
       "h_ratio": 1.0
     }
   ],
@@ -44,14 +44,14 @@
     },
     {
       "key": "left_screen_1",
-      "cx_ratio": 0.15294987638475854,
-      "cy_ratio": 0.45346571411334596,
+      "cx_ratio": 0.16649431230610134,
+      "cy_ratio": 0.383775709525451,
       "r_ratio": 0.06720758118566075
     },
     {
       "key": "left_screen_2",
-      "cx_ratio": 0.15294987638475854,
-      "cy_ratio": 0.6952896582767063,
+      "cx_ratio": 0.16649431230610134,
+      "cy_ratio": 0.7721475353326439,
       "r_ratio": 0.06720758118566075
     },
     {
@@ -139,12 +139,12 @@
       "to_key": "material_slot_1"
     },
     {
-      "key": "left_page_down",
+      "key": "page_down",
       "from_key": "left_screen_1",
       "to_key": "left_screen_2"
     },
     {
-      "key": "left_up",
+      "key": "page_up",
       "from_key": "left_screen_2",
       "to_key": "left_screen_1"
     },

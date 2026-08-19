@@ -37,7 +37,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("关于律匠"))
-        self.setFixedSize(400, 320)
+        self.setFixedSize(400, 350)
         self._update_checker = None
         self._setup_ui()
 
@@ -77,6 +77,15 @@ class AboutDialog(QDialog):
         )
         tech_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(tech_label)
+
+        # ─── 开源声明 ───
+        opensource_label = QLabel(
+            f"<p style='text-align: center; font-size: 15px; font-weight: 600;'>"
+            f"{tr('本项目完全开源免费')}"
+            f"</p>"
+        )
+        opensource_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(opensource_label)
 
         layout.addStretch()
 

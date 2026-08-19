@@ -977,10 +977,10 @@ class EquipStatusTab(QWidget):
         from ..combat.attrs_tab import CombatAttrsTab
         for child in self._host.findChildren(QWidget):
             if isinstance(child, CombatAttrsTab):
-                ctx = child.get_graduation_context()
-                if ctx and ctx.school:
+                school = child._get_current_school()
+                if school:
                     from ....config import get_game_config
-                    school_cfg = get_game_config().get_schools().get(ctx.school, {})
+                    school_cfg = get_game_config().get_schools().get(school, {})
                     hand = "main" if slot_key == "main_weapon" else "sub"
                     return (school_cfg.get(hand) or {}).get("weapon")
                 break
@@ -991,10 +991,8 @@ class EquipStatusTab(QWidget):
         from ..combat.attrs_tab import CombatAttrsTab
         for child in self._host.findChildren(QWidget):
             if isinstance(child, CombatAttrsTab):
-                ctx = child.get_graduation_context()
-                if ctx and ctx.school:
-                    return ctx.school
-                break
+                school = child._get_current_school()
+                return school or ""
         return ""
 
     def _on_mock_create(self):

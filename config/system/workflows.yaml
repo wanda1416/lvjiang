@@ -9,21 +9,5 @@ exposed:
 - gather_zhayu
 - auto_tuning
 overrides:
-  scan_unequipped:
-    name: 当前装备分析
-  scan_equipped:
-    name: 装备全量扫描
-  scan_wallet:
-    name: 扫描钱袋货币
-  purchase_xinfa:
-    name: 循环购买心法
-  purchase_bugan:
-    name: 自动购买不肝
-  daily_jianghu:
-    name: 每日江湖号令
-  daily_checkin:
-    name: 每日自动签到
-  gather_zhayu:
-    name: 太极炸鱼
   auto_tuning:
     scope: dedicated

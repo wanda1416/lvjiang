@@ -133,15 +133,15 @@ class TestBagCursorFinishWindow:
         assert _fn("bag_cursor_finish_window")(engine, 3, 3) == "end"
 
 
-def test_scan_equipped_workflow_parses():
+def test_scan_unequipped_workflow_parses():
     root = Path(__file__).resolve().parents[2]
-    program = parse_file(root / "config/system/workflows/scan_equipped.wf")
+    program = parse_file(root / "config/system/workflows/scan_unequipped.wf")
     assert program is not None
 
 
-def test_scan_equipped_uses_window_protocol_and_correct_detail_scenes():
+def test_scan_unequipped_uses_window_protocol_and_correct_detail_scenes():
     root = Path(__file__).resolve().parents[2]
-    text = (root / "config/system/workflows/scan_equipped.wf").read_text(
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert "bag_cursor_visit($fp)" in text
     assert "bag_cursor_finish_window($rows, $rows)" in text
@@ -152,10 +152,10 @@ def test_scan_equipped_uses_window_protocol_and_correct_detail_scenes():
     assert "bag_cursor_next" not in text
 
 
-def test_scan_equipped_seen_row_skips_remaining_columns():
+def test_scan_unequipped_seen_row_skips_remaining_columns():
     """每行仅首列调用游标；第 2～末列只位于 new 分支内。"""
     root = Path(__file__).resolve().parents[2]
-    text = (root / "config/system/workflows/scan_equipped.wf").read_text(
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert text.count("bag_cursor_visit($fp)") == 1
     new_branch = text.index('if $signal equals "new"')
@@ -163,9 +163,9 @@ def test_scan_equipped_seen_row_skips_remaining_columns():
     assert remaining_cols > new_branch
 
 
-def test_scan_equipped_level_threshold_ends_current_slot_without_cast():
+def test_scan_unequipped_level_threshold_ends_current_slot_without_cast():
     root = Path(__file__).resolve().parents[2]
-    text = (root / "config/system/workflows/scan_equipped.wf").read_text(
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert "int($equip.level)" not in text
     assert "$equip.level < $min_level" in text
@@ -175,7 +175,7 @@ def test_scan_equipped_level_threshold_ends_current_slot_without_cast():
 
 def test_proc_writes_each_item_through_builtin():
     root = Path(__file__).resolve().parents[2]
-    text = (root / "config/system/workflows/scan_equipped.wf").read_text(
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert "write_bag_item($group, $equip)" in text
     assert "session.bag_items" not in text
@@ -183,7 +183,7 @@ def test_proc_writes_each_item_through_builtin():
 
 def test_each_item_is_persisted_immediately():
     root = Path(__file__).resolve().parents[2]
-    text = (root / "config/system/workflows/scan_equipped.wf").read_text(
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     collect_at = text.index("eval $items.$fp = $equip")
     write_at = text.index("eval write_bag_item($group, $equip)", collect_at)
@@ -192,7 +192,7 @@ def test_each_item_is_persisted_immediately():
 
 def test_min_level_is_explicit_proc_parameter():
     root = Path(__file__).resolve().parents[2]
-    text = (root / "config/system/workflows/scan_equipped.wf").read_text(
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert "def scan_slot_bag($slot, $group, $detail_kind, $min_level)" in text
     calls = [line.strip() for line in text.splitlines()

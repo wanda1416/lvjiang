@@ -1,182 +1,43 @@
-#% name: 装备全量扫描
-#% parameters:
-#%   - name: slots
-#%     label: 扫描部位
-#%     type: checkgroup
-#%     default:
-#%       weapon: true
-#%       ring: true
-#%       pendant: true
-#%       head: true
-#%       chest: true
-#%       leg: true
-#%       wrist: true
-#%     options:
-#%       - { value: weapon, label: 武器 }
-#%       - { value: ring, label: 环 }
-#%       - { value: pendant, label: 佩 }
-#%       - { value: head, label: 冠胄 }
-#%       - { value: chest, label: 胸甲 }
-#%       - { value: leg, label: 胫甲 }
-#%       - { value: wrist, label: 腕甲 }
-#%   - name: min_level
-#%     label: 装备最小等级
-#%     type: number
-#%     default: 110
-
-# 对应槽位背包装备全量扫描。
-# 主副武器共用武器背包，只通过 main_weapon 扫描一次；环、佩使用
-# 武器详情字段，四件防具使用防具详情字段。指纹按业务约定唯一，
-# 行首装备指纹用于判断该物理行是否读过；装备指纹作为
-# 公共装备池的装备 key。已读行只读第一列锚点，不再重复
-# 点击和 OCR 第 2～6 列。背包装备按等级倒序排列，首次读到低于
-# min_level 的装备后立即结束当前槽位扫描。
-
-default $min_level = 110
+#% name: 扫描备战装备
+#
+# 装备分析工作流
+#
+# 流程结构：
+#   1. 导航：从首页进入装备页面（调用 nav_main_to_equip）
+#   2. 读取武器类装备：主武器、副武器、戒指、吊坠
+#   3. 读取防具类装备：冠胄、胸甲、胫甲、腕甲
+#   4. 逐槽调用 write_equipped 写入本次绑定的备战方案
+#   5. 返回主界面（调用 nav_back_to_main）
+#
+# 输出：
+#   通过 write_equipped 逐槽写入备战方案（无 collect 输出）
 
 import "subcall/navigation.wf"
-
 call nav_main_to_equip()
-if $slots.weapon
-    call scan_slot_bag("main_weapon", "weapon", "weapon", $min_level)
-end
-if $slots.ring
-    call scan_slot_bag("ring", "ring", "weapon", $min_level)
-end
-if $slots.pendant
-    call scan_slot_bag("pendant", "pendant", "weapon", $min_level)
-end
-if $slots.head
-    call scan_slot_bag("head", "head", "armor", $min_level)
-end
-if $slots.chest
-    call scan_slot_bag("chest", "chest", "armor", $min_level)
-end
-if $slots.leg
-    call scan_slot_bag("leg", "leg", "armor", $min_level)
-end
-if $slots.wrist
-    call scan_slot_bag("wrist", "wrist", "armor", $min_level)
-end
 
-call nav_back_to_main()
-
-
-def scan_slot_bag($slot, $group, $detail_kind, $min_level)
-    log "═══ 开始扫描部位: " + $group + " (detail=" + $detail_kind + ", min_level=" + $min_level + ") ═══"
-    # 点击穿戴槽位会把右侧背包过滤到对应部位并回到该列表顶部。
+# 武器类（equip_weapon_detail）
+for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
     click [bag_equip_detail].$slot after wait @step_interval
-    eval bag_cursor_init()
-    eval $items = {}
-    eval $signal = ""
-    eval $total_count = 0
-    eval $window_idx = 0
-
-    loop while 1 == 1
-        align [bag_equip_detail].[bag_grid]
-        eval $rows = panel_rows("bag_equip_detail", "bag_grid")
-        eval $cols = panel_cols("bag_equip_detail", "bag_grid")
-        eval $window_idx = $window_idx + 1
-        log "[窗口 " + $window_idx + "] 部位 " + $group + ": 检测到 " + $rows + " 行 × " + $cols + " 列"
-
-        if $rows <= 0
-            log "  未检测到背包行，结束扫描"
-            break
-        end
-
-        eval $r = 1
-        loop while $r <= $rows
-            # 第一列是物理行锚点。锚点已见过意味着整行此前已完整读取，
-            # 直接跳过剩余列；只有新行才扫描第 2～末列。
-            click [bag_equip_detail].[bag_grid][$r][1] after wait @step_interval
-            if $detail_kind equals "weapon"
-                scan [equip_weapon_detail] as $raw
-            else
-                scan [equip_armor_detail] as $raw
-            end
-            eval $equip = to_equipment($raw)
-            # type 为空 → equip_type OCR 失败，当前槽位结束
-            if not $equip.type
-                log error "  [" + $r + ",1] equip_type OCR 失败，槽位结束"
-                break
-            end
-            eval $fp = make_fingerprint($equip)
-            eval $signal = bag_cursor_visit($fp)
-            log "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
-
-            if $signal equals "end"
-                log "  锚点已见过，结束当前窗口"
-                break
-            end
-
-            if $signal equals "new"
-                if $equip.level < $min_level
-                    log "  等级 " + $equip.level + " < " + $min_level + "，等级截止"
-                    eval $signal = "level_end"
-                    break
-                end
-                eval $items.$fp = $equip
-                eval write_bag_item($group, $equip)
-                eval $total_count = $total_count + 1
-
-                eval $c = 2
-                loop while $c <= $cols
-                    click [bag_equip_detail].[bag_grid][$r][$c] after wait @step_interval
-                    if $detail_kind equals "weapon"
-                        scan [equip_weapon_detail] as $raw
-                    else
-                        scan [equip_armor_detail] as $raw
-                    end
-                    eval $equip = to_equipment($raw)
-                    # type 为空 → equip_type OCR 失败，结束本行
-                    if not $equip.type
-                        log error "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
-                        break
-                    end
-                    eval $fp = make_fingerprint($equip)
-                    log "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
-
-                    if not $fp
-                        log "    指纹为空，空白格，结束本行"
-                        break
-                    end
-                    # 指纹已存在于本槽位 → 点击落到了空白格（详情页未刷新），结束本行
-                    if $items.$fp
-                        log "    指纹已存在，空白格残留数据，结束本行"
-                        break
-                    end
-                    if $equip.level < $min_level
-                        log "    等级 " + $equip.level + " < " + $min_level + "，等级截止"
-                        eval $signal = "level_end"
-                        break
-                    end
-                    eval $items.$fp = $equip
-                    eval write_bag_item($group, $equip)
-                    eval $total_count = $total_count + 1
-                    eval $c = $c + 1
-                end
-            end
-
-            if $signal equals "end" or $signal equals "level_end"
-                break
-            end
-            eval $r = $r + 1
-        end
-
-        if $signal equals "end" or $signal equals "level_end"
-            break
-        end
-
-        eval $signal = bag_cursor_finish_window($rows, $rows)
-        if $signal equals "end"
-            log "  已到达背包末尾"
-            break
-        end
-
-        log "  滚动到下一窗口 (已收集 " + $total_count + " 件)"
-        drag [bag_equip_detail].[bag_grid] up
-        wait stable @scroll_settle
+    scan [equip_weapon_detail] as $scan_result
+    eval $equip = to_equipment($scan_result)
+    if not $equip.type
+        log error "equip_type OCR 失败, slot=" + $slot
+    else
+        eval write_equipped($slot, $equip)
     end
-
-    log "═══ 部位 " + $group + " 扫描完成，共 " + $total_count + " 件 ═══"
 end
+
+# 防具类（equip_armor_detail）
+for slot in ["head", "chest", "leg", "wrist"]
+    click [bag_equip_detail].$slot after wait @step_interval
+    scan [equip_armor_detail] as $scan_result
+    eval $equip = to_equipment($scan_result)
+    if not $equip.type
+        log error "equip_type OCR 失败, slot=" + $slot
+    else
+        eval write_equipped($slot, $equip)
+    end
+end
+
+# 返回主界面
+call nav_back_to_main()

@@ -4,8 +4,6 @@
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFrame,
@@ -17,9 +15,6 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
-
-if TYPE_CHECKING:
-    from .status_tab import EquipStatusTab
 
 # 品质颜色映射（适配浅色背景）
 _QUALITY_COLORS = {

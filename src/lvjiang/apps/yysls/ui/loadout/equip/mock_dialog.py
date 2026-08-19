@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....i18n import tr
+from ......i18n import tr
 
 # 部位 → group_key 映射
 _PART_TO_GROUP = {
@@ -122,7 +122,7 @@ class _AffixRow(QWidget):
 
     def _refresh_cap_info(self):
         """从 GameConfig 获取当前词条的上限和单位"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         name = self._combo_name.currentData()
         if not name:
             self._lbl_cap_val.setText("")
@@ -164,7 +164,7 @@ class _AffixRow(QWidget):
         name = self._combo_name.currentData()
         if not name or self._cap <= 0:
             return
-        from ..config import get_game_config
+        from ....config import get_game_config
         caps_info = get_game_config().get_affix_caps(self._get_level(), name)
         if not caps_info:
             return
@@ -267,7 +267,7 @@ class MockEquipDialog(QDialog):
 
         # 等级
         self._combo_level = QComboBox()
-        from ..config import get_game_config
+        from ....config import get_game_config
         for lvl in sorted([c.level for c in get_game_config().get_level_configs()], reverse=True):
             self._combo_level.addItem(str(lvl), lvl)
         basic_layout.addRow(tr("等级:"), self._combo_level)
@@ -424,14 +424,14 @@ class MockEquipDialog(QDialog):
 
     def _refresh_weapon_types(self):
         """刷新武器类型下拉"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         self._combo_weapon_type.clear()
         for wt in get_game_config().get_weapon_types():
             self._combo_weapon_type.addItem(wt, wt)
 
     def _get_first_affix_names(self) -> list[str]:
         """获取当前部位的首词条候选列表（来自 base_attrs.<part>._first_affixes）"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         part_name = self._combo_part.currentData()
         if not part_name:
@@ -447,7 +447,7 @@ class MockEquipDialog(QDialog):
         1. 武器类型过滤：武学增效词条只保留当前武器类型绑定的那条
         2. 部位过滤：只保留可出现在当前部位的词条
         """
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         all_normal = gc.get_normal_affix_names()
 
@@ -506,7 +506,7 @@ class MockEquipDialog(QDialog):
 
     def _get_normal_affix_names(self) -> list[str]:
         """获取普通词条列表"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         return get_game_config().get_normal_affix_names()
 
     def _is_right_side_part(self) -> bool:
@@ -523,7 +523,7 @@ class MockEquipDialog(QDialog):
         根据 default_school 排序：将包含流派名的分组提到最前。
         仅返回当前部位有合法词条的分组。
         """
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         # 获取指定技能增效分类的分组
         groups = gc.get_alias_groups_for_category(tr("指定技能增效"))
@@ -557,7 +557,7 @@ class MockEquipDialog(QDialog):
 
     def _get_dingyin_affixes_by_group(self, group_key: str) -> list[str]:
         """获取指定分组的定音词条列表（按当前部位过滤）"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         groups = gc.get_alias_groups_for_category(tr("指定技能增效"))
         affixes = groups.get(group_key, [])
@@ -578,7 +578,7 @@ class MockEquipDialog(QDialog):
 
     def _get_dingyin_affixes_filtered(self) -> list[str]:
         """获取当前部位的定音词条列表（按部位过滤，平铺）"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         all_dingyin = gc.get_dingyin_affix_names()
         part_name = self._combo_part.currentData()
@@ -663,7 +663,7 @@ class MockEquipDialog(QDialog):
         data = self._equip_data
         # 部位
         part_name = data.get("type", "")
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         type_to_group = gc.get_type_to_group()
         # 根据 type 找到对应的对话框部位选择
@@ -724,7 +724,7 @@ class MockEquipDialog(QDialog):
             self._lbl_dingyin_pct.setText("")
             self._dingyin_cap = 0.0
             return
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         level = self._get_level()
         caps_info = gc.get_affix_caps(level, name)
@@ -755,7 +755,7 @@ class MockEquipDialog(QDialog):
 
     def _build_equip_data(self) -> dict | None:
         """构建装备数据字典"""
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
 
         # 确定类型
@@ -829,7 +829,7 @@ class MockEquipDialog(QDialog):
         result["_extra"] = {"is_mock": True, "affix_count": sum(1 for i in range(1, 6) if f"affix_{i}" in result)}
 
         # _fp：模拟装备指纹自动添加 mock_ 前缀
-        from ..core.equip_parser.models import make_fingerprint
+        from ....core.equip_parser.models import make_fingerprint
         result["_fp"] = make_fingerprint(result, is_mock=True)
 
         return result
@@ -851,7 +851,7 @@ class MockEquipDialog(QDialog):
         mode = self._get_affix_mode()
         if mode == _MODE_CUSTOM:
             return
-        from ..config import get_game_config
+        from ....config import get_game_config
         gc = get_game_config()
         level = self._get_level()
         for row in self._affix_rows:

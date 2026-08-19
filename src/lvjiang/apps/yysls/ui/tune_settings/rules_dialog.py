@@ -362,7 +362,9 @@ class TuningRulesDialog(QDialog):
     # ── 其他 ──
 
     def _open_judge_test(self):
-        from lvjiang.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
+        from lvjiang.apps.yysls.ui.loadout.equip.judge_dialog import (
+            EquipJudgeTestDialog,
+        )
         dialog = EquipJudgeTestDialog(parent=self)
         dialog.exec()
 

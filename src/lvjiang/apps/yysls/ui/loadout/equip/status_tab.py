@@ -26,10 +26,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....i18n import tr
-from .mock_equip_dialog import MockEquipDialog
-from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
-from .profile.tab import add_user_nav_buttons
+from ......i18n import tr
+from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
+from ...profile.tab import add_user_nav_buttons
+from .mock_dialog import MockEquipDialog
 
 # 品质颜色映射（适配浅色背景）
 _QUALITY_COLORS = {
@@ -1202,7 +1202,7 @@ class EquipStatusTab(QWidget):
                     break
 
         # 收集装备（bag_items + mock_items）
-        from ..config import get_game_config
+        from ....config import get_game_config
         group_to_part = get_game_config().get_group_to_part()
         cards: list[tuple[dict, str, str, bool, bool]] = []
         standby_fps = self._inv.standby_plan_fps if self._inv is not None else set()
@@ -1330,19 +1330,33 @@ class EquipStatusTab(QWidget):
     def _on_refresh(self):
         self._refresh_all()
 
-    def _update_status_row(self):
-        """更新状态展示行：从角色详情 Tab 读取 DPS 和毕业率。"""
-        from .combat_attrs_tab import CombatAttrsTab
-        for child in self._host.findChildren(QWidget):
-            if isinstance(child, CombatAttrsTab):
-                self._status_dps.setText(child._dps_value.text())
-                self._status_graduation.setText(child._graduation_value.text())
-                self._status_dps.setToolTip(child._dps_value.toolTip())
-                self._status_graduation.setToolTip(
-                    child._graduation_value.toolTip())
-                return
-        self._status_dps.setText("--")
-        self._status_graduation.setText("--")
+    def _update_status_row(self, result=None):
+        """更新状态展示行：从 LoadoutPanel 读取 DPS 和毕业率。"""
+        if result is None:
+            # 从 LoadoutPanel 读取（信号未携带结果时的兑底）
+            from ..loadout_panel import LoadoutPanel
+            widget = self.parent()
+            while widget is not None:
+                if isinstance(widget, LoadoutPanel):
+                    result = widget._graduation_result
+                    break
+                widget = widget.parent()
+        if result is not None:
+            dps_text = f"{result.dps:,.0f}"
+            rate_text = f"{result.graduation_rate * 100:.2f}%"
+            tooltip = (
+                f"{tr('总伤害')}: {result.total_damage:,.0f}\n"
+                f"{tr('基准DPS')}: {result.baseline_dps:,.2f}\n"
+                f"{tr('战斗时间')}: {result.combat_time}s"
+            )
+        else:
+            dps_text = "--"
+            rate_text = "--"
+            tooltip = ""
+        self._status_dps.setText(dps_text)
+        self._status_graduation.setText(rate_text)
+        self._status_dps.setToolTip(tooltip)
+        self._status_graduation.setToolTip(tooltip)
 
     def _refresh_all(self):
         from lvjiang.core.config import load_equip_display
@@ -1360,7 +1374,7 @@ class EquipStatusTab(QWidget):
             return
 
         try:
-            from ..core.combat.equipment import EquipmentInventory
+            from ....core.combat.equipment import EquipmentInventory
             self._inv = EquipmentInventory(user_name)
             self._sync_inv()
         except Exception as e:
@@ -1529,7 +1543,7 @@ class EquipStatusTab(QWidget):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        from ..core.loadout import LoadoutRepository
+        from ....core.loadout import LoadoutRepository
         LoadoutRepository(user_name).delete_all_real()
         self._refresh_all()
         self._host.equipment_changed.emit()
@@ -1584,7 +1598,7 @@ class EquipStatusTab(QWidget):
             return
 
         # 确定新类型和分组（使用全局映射）
-        from ..config import get_game_config
+        from ....config import get_game_config
         new_type = result.get("type", "")
         new_group_key = get_game_config().get_type_to_group().get(new_type, group_key)
 
@@ -1601,12 +1615,12 @@ class EquipStatusTab(QWidget):
 
     def _get_school_weapon_type(self, slot_key: str) -> str | None:
         """从当前流派配置获取指定武器槽的武器类型（如 '剑'/'枪'。"""
-        from .combat_attrs_tab import CombatAttrsTab
+        from ..combat.attrs_tab import CombatAttrsTab
         for child in self._host.findChildren(QWidget):
             if isinstance(child, CombatAttrsTab):
                 ctx = child.get_graduation_context()
                 if ctx and ctx.school:
-                    from ..config import get_game_config
+                    from ....config import get_game_config
                     school_cfg = get_game_config().get_schools().get(ctx.school, {})
                     hand = "main" if slot_key == "main_weapon" else "sub"
                     return (school_cfg.get(hand) or {}).get("weapon")
@@ -1615,7 +1629,7 @@ class EquipStatusTab(QWidget):
 
     def _get_current_school(self) -> str:
         """获取当前角色配置的流派名称"""
-        from .combat_attrs_tab import CombatAttrsTab
+        from ..combat.attrs_tab import CombatAttrsTab
         for child in self._host.findChildren(QWidget):
             if isinstance(child, CombatAttrsTab):
                 ctx = child.get_graduation_context()
@@ -1639,7 +1653,7 @@ class EquipStatusTab(QWidget):
             return
 
         # 确定分组 key（使用全局映射）
-        from ..config import get_game_config
+        from ....config import get_game_config
         equip_type = result.get("type", "")
         group_key = get_game_config().get_type_to_group().get(equip_type, "ring")
 
@@ -1675,7 +1689,7 @@ class EquipStatusTab(QWidget):
         if not result:
             return
 
-        from ..config import get_game_config
+        from ....config import get_game_config
         equip_type = result.get("type", "")
         gk = get_game_config().get_type_to_group().get(equip_type, "ring")
 
@@ -1707,7 +1721,7 @@ class EquipStatusTab(QWidget):
             QMessageBox.warning(self, tr("导出失败"), tr("没有激活的用户"))
             return
         try:
-            from .leoq7_export import export_leoq7
+            from ..leoq7_export import export_leoq7
             inv = self._require_inventory()
             if inv is None:
                 return
@@ -1743,7 +1757,7 @@ class EquipStatusTab(QWidget):
     def _on_optimal_combo(self):
         """打开最优组合搜索对话框。"""
         # 从角色详情 Tab 读取流派/方案/基础属性
-        from .combat_attrs_tab import CombatAttrsTab
+        from ..combat.attrs_tab import CombatAttrsTab
         combat_tab = None
         for child in self._host.findChildren(QWidget):
             if isinstance(child, CombatAttrsTab):
@@ -1759,7 +1773,7 @@ class EquipStatusTab(QWidget):
                 self, tr("提示"), tr("请先在角色详情页选择流派和毕业率方案"))
             return
 
-        from .optimal_combo_dialog import OptimalComboDialog
+        from ..optimal_combo import OptimalComboDialog
         dlg = OptimalComboDialog(
             self._host, context.school, context.scheme, context.base_attrs,
             level_threshold=self._get_level_threshold(),

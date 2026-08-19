@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....i18n import tr
+from .....i18n import tr
 
 
 class TuningGlobalsWidget(QWidget):

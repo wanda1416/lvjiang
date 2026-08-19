@@ -1,4 +1,4 @@
-from lvjiang.apps.yysls.ui.equip_status_tab import _route_weapon_slot
+from lvjiang.apps.yysls.ui.loadout.equip.status_tab import _route_weapon_slot
 
 
 def test_route_to_main_when_matches_main_art_weapon():

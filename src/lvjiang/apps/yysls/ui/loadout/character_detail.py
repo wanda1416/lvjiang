@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .combat_attrs_tab import CombatAttrsTab
+from .combat.attrs_tab import CombatAttrsTab
 
 
 class CharacterDetailTab(QWidget):

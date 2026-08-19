@@ -12,12 +12,12 @@ from ..base import AppHooks
 
 
 def _build_tuning_tab(host):
-    from .ui.tuning_tab import TuningTab
+    from .ui.tuning import TuningTab
     return TuningTab(host)
 
 
 def _build_loadout_panel(host):
-    from .ui.loadout_panel import LoadoutPanel
+    from .ui.loadout import LoadoutPanel
     return LoadoutPanel(host)
 
 
@@ -34,7 +34,7 @@ def _build_profile_tab(host):
 
 
 def _build_tuning_progress_tab(host):
-    from .ui.tuning_progress_widget import TuningProgressWidget
+    from .ui.tuning.progress_widget import TuningProgressWidget
     return TuningProgressWidget()
 
 

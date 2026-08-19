@@ -27,15 +27,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....i18n import tr
-from ..config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
-from .tune_config_widget import TuningConfigWidget, TuningGlobalsWidget
+from .....i18n import tr
+from ...config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+from .config_widget import TuningConfigWidget, TuningGlobalsWidget
 
 
 def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
     """开启的开关 key → 注册表显示名（注册表不可用时退回 key）"""
     try:
-        from ..core.tuning_rules import get_tune_config
+        from ...core.tuning_rules import get_tune_config
         names = get_tune_config().switches
     except Exception:
         names = {}
@@ -52,7 +52,7 @@ class TuningTab(QWidget):
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
         # 基础配置变更时刷新「更多」页开关（新增/删除开关即时生效）
-        from ....core.config.resolver import get_resolver
+        from .....core.config.resolver import get_resolver
         get_resolver().add_change_listener(self._on_base_config_changed)
 
     # ─── UI 构建 ─────────────────────────────────────────────
@@ -119,7 +119,7 @@ class TuningTab(QWidget):
 
     def _refresh_base_group_radios(self):
         """重建基础规则单选组（遍历全部规则组，选中项保持不变）"""
-        from ..core.tuning_rules import get_tuning_group_manager
+        from ...core.tuning_rules import get_tuning_group_manager
         groups = get_tuning_group_manager().get_groups()
         # 当前 key 不在时取第一个可用组
         if self._base_group_key not in groups:
@@ -301,7 +301,7 @@ class TuningTab(QWidget):
         """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
         from lvjiang.core.reference_db import ReferenceDatabase
 
-        from ..core.recognizer.material_recognizer import get_missing_output_fields
+        from ...core.recognizer.material_recognizer import get_missing_output_fields
         db = ReferenceDatabase()
         db.load()
         return get_missing_output_fields(db)
@@ -336,7 +336,7 @@ class TuningTab(QWidget):
             return
 
         # ── 从统一存储读取配置 ──
-        from ....core.config.wf_configs import get_wf_config
+        from .....core.config.wf_configs import get_wf_config
         tc = get_wf_config("auto_tuning")
 
         selected_slots = tc.get("selected_slots") or []
@@ -347,7 +347,7 @@ class TuningTab(QWidget):
             return
 
         # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
-        from ..core.evaluator import (
+        from ...core.evaluator import (
             get_rule_names,
             get_tuning_judge,
             get_tuning_rules,
@@ -386,7 +386,7 @@ class TuningTab(QWidget):
         flow_name = tr("自动调律")
 
         # 基础规则组（启动时快照注入）
-        from ..core.tuning_rules import get_tuning_group
+        from ...core.tuning_rules import get_tuning_group
         group_key = tc.get("base_group", "")
         base_group = get_tuning_group(group_key) if group_key else None
         if base_group is None:
@@ -404,7 +404,7 @@ class TuningTab(QWidget):
             target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
 
         def configure(wf_instance, engine):
-            from ..workflows.tuning_context import TuningRunContext
+            from ...workflows.tuning_context import TuningRunContext
             wf_instance.run_ctx = TuningRunContext(
                 selected_slots=selected_slots,
                 rule_judges=rule_judges,
@@ -418,7 +418,7 @@ class TuningTab(QWidget):
             )
             # 创建调律进度信号桥（右侧进度 Tab 由 _find_progress_widget 查找并连接）
             if engine is not None:
-                from .tuning_progress_hub import TuningProgressHub
+                from .progress_hub import TuningProgressHub
                 engine._progress_hub = TuningProgressHub()
                 # 连接右侧调律进度 Tab
                 widget = self._find_progress_widget()
@@ -445,7 +445,7 @@ class TuningTab(QWidget):
 
     def _find_progress_widget(self):
         """在右侧 Tab 中查找 TuningProgressWidget"""
-        from .tuning_progress_widget import TuningProgressWidget
+        from .progress_widget import TuningProgressWidget
         tabs = getattr(self._host, 'tabs', None)
         if tabs is None:
             return None
@@ -458,7 +458,7 @@ class TuningTab(QWidget):
     # ─── 调律配置持久化（wf_configs["auto_tuning"]）──────────
 
     def _load_tuning_config(self):
-        from ....core.config.wf_configs import get_wf_config
+        from .....core.config.wf_configs import get_wf_config
         tc = get_wf_config("auto_tuning")
         selected = tc.get("selected_slots") or list(DEFAULT_SLOTS)
         rules_cfg = tc.get("rules") or {"huiyi_general": {"enabled": True}}
@@ -494,7 +494,7 @@ class TuningTab(QWidget):
         self._on_skip_target_toggled()
 
     def _save_tuning_config(self):
-        from ....core.config.wf_configs import update_wf_config
+        from .....core.config.wf_configs import update_wf_config
         skip_start = None
         if self._cb_skip.isChecked():
             skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]

@@ -11,7 +11,7 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import (
     build_graduation_attrs,
     has_resistance,
 )
-from lvjiang.apps.yysls.ui.combat_attrs_tab import CombatAttrsTab
+from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
 
 
 def test_wuxiang_penetration_is_a_fixed_numeric_field() -> None:

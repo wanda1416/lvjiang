@@ -12,7 +12,7 @@ import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QTabWidget
 
-from lvjiang.apps.yysls.ui.tuning_tab import TuningTab
+from lvjiang.apps.yysls.ui.tuning import TuningTab
 
 
 class _FakeHost(QObject):

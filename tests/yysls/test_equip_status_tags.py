@@ -1,6 +1,6 @@
 """装备卡片名称行多状态标签测试。"""
 
-from lvjiang.apps.yysls.ui.equip_status_tab import (
+from lvjiang.apps.yysls.ui.loadout.equip.status_tab import (
     _CompactEquipCard,
     _SlotCard,
 )

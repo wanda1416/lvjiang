@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from ....i18n import tr
+from .....i18n import tr
 
 # 部位 key → 中文名（工作流与对话框共享，避免各自维护）
 SLOT_NAMES: dict[str, str] = {

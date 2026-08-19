@@ -297,6 +297,17 @@ class CombatAttributes:
             result.extra_attrs[key] = v1 + v2
         return result
 
+    def __iadd__(self, other: CombatAttributes) -> CombatAttributes:
+        """原地加法：用于累加属性，避免创建新对象（性能优化）"""
+        for f in fields(self):
+            if f.name == "extra_attrs":
+                continue
+            setattr(self, f.name, getattr(self, f.name) + getattr(other, f.name))
+        # 处理动态字段
+        for key, v2 in other.extra_attrs.items():
+            self.extra_attrs[key] = self.extra_attrs.get(key, 0.0) + v2
+        return self
+
     def display_items(self) -> list[tuple[str, float, str]]:
         """返回用于展示的列表：[(显示名, 数值, 单位), ...]"""
         items = []

@@ -14,6 +14,7 @@ from PyQt6.QtCore import (
     QRunnable,
     Qt,
     QThreadPool,
+    QTimer,
     pyqtSignal,
     pyqtSlot,
 )
@@ -74,7 +75,6 @@ _CARD_STYLE = """
 # ---------------------------------------------------------------------------
 
 class _SearchSignals(QObject):
-    progress = pyqtSignal(int, int, str)  # evaluated, total, message
     finished = pyqtSignal(list)  # results list
     error = pyqtSignal(str)
 
@@ -104,6 +104,10 @@ class _SearchWorker(QRunnable):
         self.full_level = full_level
         self.signals = _SearchSignals()
         self._cancel_event = threading.Event()
+        # 进度计数器（线程安全，由 GIL 保证）
+        self.evaluated = 0
+        self.total = 0
+        self.message = ""
 
     def cancel(self) -> None:
         self._cancel_event.set()
@@ -124,11 +128,11 @@ class _SearchWorker(QRunnable):
                 calc,
                 self.base_attrs,
                 use_dominance_pruning=self.use_dominance_pruning,
-                progress_cb=lambda ev, tot, msg: self.signals.progress.emit(ev, tot, msg),
                 cancel_flag=self._cancel_event.is_set,
                 full_chengyin=self.full_chengyin,
                 full_dingyin=self.full_dingyin,
                 full_level=self.full_level,
+                progress_counter=self,
             )
             self.signals.finished.emit(results)
         except Exception as exc:
@@ -823,25 +827,37 @@ class OptimalComboDialog(QDialog):
             full_dingyin=self._chk_full_dingyin.isChecked(),
             full_level=full_level,
         )
-        self._worker.signals.progress.connect(self._on_progress)
         self._worker.signals.finished.connect(self._on_finished)
         self._worker.signals.error.connect(self._on_error)
         pool = QThreadPool.globalInstance()
         if pool is not None:
             pool.start(self._worker)
+        # 启动定时器轮询进度
+        self._progress_timer = QTimer(self)
+        self._progress_timer.timeout.connect(self._poll_progress)
+        self._progress_timer.start(1000)  # 每 1 秒轮询一次
 
     def _on_cancel(self) -> None:
         if self._worker:
             self._worker.cancel()
 
-    @pyqtSlot(int, int, str)
-    def _on_progress(self, evaluated: int, total: int, message: str) -> None:
+    def _poll_progress(self) -> None:
+        """定时轮询 worker 的进度计数器。"""
+        if not self._worker:
+            return
+        evaluated = self._worker.evaluated
+        total = self._worker.total
+        message = self._worker.message
+        self._progress.setMaximum(max(total, 1))
         self._progress.setValue(evaluated)
         self._progress_label.setText(
             f"{evaluated:,} / {total:,}" + (f"  {message}" if message else ""))
 
     @pyqtSlot(list)
     def _on_finished(self, results: list) -> None:
+        # 停止进度轮询定时器
+        if hasattr(self, '_progress_timer'):
+            self._progress_timer.stop()
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
         self._progress.setVisible(False)
@@ -867,6 +883,9 @@ class OptimalComboDialog(QDialog):
 
     @pyqtSlot(str)
     def _on_error(self, message: str) -> None:
+        # 停止进度轮询定时器
+        if hasattr(self, '_progress_timer'):
+            self._progress_timer.stop()
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
         self._progress.setVisible(False)

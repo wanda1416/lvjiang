@@ -9,7 +9,7 @@
 
 典型用法：
     from .workflow_runner import run_workflow
-    result = run_workflow("equip_analysis.wf")
+    result = run_workflow("scan_unequipped.wf")
 """
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def run_workflow(
     """运行指定工作流
 
     Args:
-        wf_name: 工作流文件名（如 "equip_analysis.wf"）或完整路径
+        wf_name: 工作流文件名（如 "scan_unequipped.wf"）或完整路径
         layout_name: 布局名称，None 则用 session 活动布局/名册首个布局
         initial_variables: 初始变量
 

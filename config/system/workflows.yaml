@@ -1,18 +1,20 @@
 exposed:
-- equip_analysis
-- equip_scan
+- scan_unequipped
+- scan_equipped
+- scan_wallet
 - purchase_xinfa
 - purchase_bugan
 - daily_jianghu
 - daily_checkin
 - gather_zhayu
-- scan_wallet
 - auto_tuning
 overrides:
-  equip_analysis:
+  scan_unequipped:
     name: 当前装备分析
-  equip_scan:
+  scan_equipped:
     name: 装备全量扫描
+  scan_wallet:
+    name: 扫描钱袋货币
   purchase_xinfa:
     name: 循环购买心法
   purchase_bugan:
@@ -23,7 +25,5 @@ overrides:
     name: 每日自动签到
   gather_zhayu:
     name: 太极炸鱼
-  scan_wallet:
-    name: 扫描钱袋货币
   auto_tuning:
     scope: dedicated

@@ -632,12 +632,18 @@ class EquipStatusTab(QWidget):
             # 默认：保持 bag_items → mock_items 原始顺序
             ordered = cards
 
-        # 武器槽位分组（仅等级排序模式下生效）
-        if sort_mode != "default" and self._selected_slot in ("main_weapon", "sub_weapon"):
+        # 武器槽位严格分组：同类型武器归为一组，组内按等级降序
+        if self._selected_slot in ("main_weapon", "sub_weapon"):
             weapon_type_for_slot = self._get_school_weapon_type(self._selected_slot)
             if weapon_type_for_slot and filter_type == "weapon":
-                same_slot_cards = [c for c in ordered if c[0].get("type") == weapon_type_for_slot]
-                other_cards = [c for c in ordered if c[0].get("type") != weapon_type_for_slot]
+                same_type = [c for c in ordered if c[0].get("type") == weapon_type_for_slot]
+                other_type = [c for c in ordered if c[0].get("type") != weapon_type_for_slot]
+                # 组内始终按等级降序
+                def _weapon_sk(item):
+                    lv, cs = _level_cap_sum(item)
+                    return (-lv, -cs)
+                same_slot_cards = sorted(same_type, key=_weapon_sk)
+                other_cards = sorted(other_type, key=_weapon_sk)
             else:
                 same_slot_cards = ordered
                 other_cards = []

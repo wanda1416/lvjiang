@@ -1,7 +1,6 @@
-# 公共子过程：完整账号切换流程
-# 登录页 → 选账号 → 登录 → 选角色 → 进入游戏
-
-import "_select_role.wf"
+# 公共子过程：账号切换流程
+# 登录页 → 选账号 → 登录 → 到达角色选择页（page_state=1）
+# 不包含选角色，由调用方决定是否接着调用 _select_role
 
 def _switch_account($tail, $role_index, $account, $role, $batch_state)
     log "当前匹配" + $tail
@@ -38,17 +37,15 @@ def _switch_account($tail, $role_index, $account, $role, $batch_state)
     @account_selected
     wait (1, 2)
 
-    # 3. 登录
+    # 3. 登录 → 到达角色选择页
     click [game_login_page].[login]
     wait (2, 3)
 
-    # 已确认目标账号完成登录；即使后续角色被跳过，也保留账号状态，
-    # 下一条同账号任务可以直接切换角色。
+    # 已确认目标账号，保留账号状态
+    # 下一条同账号任务可以跳过账号切换，直接选角色
     eval $batch_state.account = $account
     eval $batch_state.role = ""
     eval $batch_state.page_state = 1
 
-    # 4. 选角色 + 进入游戏
-    call $sr = _select_role($role_index, $role, $batch_state)
-    return $sr
+    return {"status": "account_ready", "message": "", "state": $batch_state}
 end

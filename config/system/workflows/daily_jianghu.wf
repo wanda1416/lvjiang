@@ -29,6 +29,8 @@
 default $max_refresh = 50
 default $claim_reward = false
 
+import "subcall/navigation.wf"
+
 # 目标任务关键词列表
 eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉障林"]
 
@@ -265,7 +267,7 @@ def action_dongfang($label, $idx)
    end
 end
 
-# 饮酒（醉意）：号令 → 退回首页 → 菜单 → 包裹 → 道具栏 → 找黄泉酿食用 → 退回首页 → 返回号令
+# 饮酒（醉意）：号令 → 退回首页 → 菜单 → 包裹 → 道具 - 普通道具 → 找黄泉酿食用 → 退回首页 → 返回号令
 def action_zuiyi($label)
    # ── 从江湖号令退回首页 ──
    click [activity_jianghu].[back] after wait stable @page_refresh least 0.5
@@ -273,10 +275,7 @@ def action_zuiyi($label)
    click [game_menu_page].[back] after wait stable @page_refresh least 0.5
 
    # ── 首页 → 菜单 → 包裹 → 道具 - 普通道具 ──
-   click [game_main_page].[menu] after wait stable @page_refresh least 0.5
-   click [game_menu_page].[baoguo] after wait stable @page_refresh least 0.5
-   click [bag_equip_detail].[item] after wait stable @step_interval least 0.5
-   click [bag_item_detail].[putong] after wait stable @step_interval least 0.5
+   call nav_main_to_item()
 
    # ── 在背包网格中寻找黄泉酿 ──
    recognize [bag_item_detail].[bag_grid][1...2][1...6] as $result \

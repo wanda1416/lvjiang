@@ -470,7 +470,7 @@ config:
   wf_purchase_bugan: Auto Purchase Bugan
   wf_daily_jianghu: Daily Jianghu Order
   wf_daily_checkin: Daily Check-in
-  wf_daily_zhayu: Taiji Fish Bombing
+  wf_gather_zhayu: Taiji Fish Bombing
 auto_strings:
   + 分组: + 分组
   + 词条名: + 词条名

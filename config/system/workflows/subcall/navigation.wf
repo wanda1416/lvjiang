@@ -7,6 +7,7 @@
 #   nav_main_to_bag()    — 主界面 → 背包页（返回当前 tab 编号 1-4）
 #   nav_main_to_equip()  — 主界面 → 背包装备列表页
 #   nav_main_to_wallet() — 主界面 → 背包钱袋页
+#   nav_main_to_item()   — 主界面 → 背包道具页（普通道具子区域）
 #   nav_back_to_main()   — 背包装备页 → 主界面
 #   nav_equip_to_tune()  — 装备详情页 → 调律页
 
@@ -115,6 +116,39 @@ def nav_main_to_wallet()
         eval pause("未进入钱袋页面，请手动导航后点击继续")
     end
     log info "已到达钱袋页"
+end
+
+# ─── nav_main_to_item ─────────────────────────────────────
+# 从主界面导航到背包道具页的普通道具子区域
+# 路径：主界面 → 菜单 → 包裹 → 道具 → 普通道具
+# 前置：在主界面或菜单页
+# 后置：在背包道具页（bag_item_detail），普通道具子区域已选中
+
+def nav_main_to_item()
+    call $tab = nav_main_to_bag()
+
+    # 不在道具 tab 则点击切换
+    if $tab != 2
+        log info "从包裹页切换到道具页"
+        click [bag_equip_detail].[item] after wait @page_refresh
+    end
+
+    # 校验是否到达道具页
+    scan [bag_equip_detail].[sub_baoguo] as $item_check by contains "道具"
+    if not $item_check
+        eval pause("未进入道具页面，请手动导航后点击继续")
+    end
+
+    # 点击普通道具，锁定子区域
+    log info "从道具页进入普通道具"
+    click [bag_item_detail].[putong] after wait @step_interval
+
+    # 校验是否到达普通道具子区域
+    scan [bag_item_detail].[putong] as $putong_check by contains "普通"
+    if not $putong_check
+        eval pause("未进入普通道具页面，请手动导航后点击继续")
+    end
+    log info "已到达普通道具页"
 end
 
 # ─── nav_back_to_main ─────────────────────────────────────

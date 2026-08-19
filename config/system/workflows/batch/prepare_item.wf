@@ -25,17 +25,12 @@ end
 
 log "目标账号：" + $account
 
-if $batch_state.account is_empty
-    log "状态未知，完整登录: " + $role
-    call $result = _switch_account($tail, $role_index, $account, $role, $batch_state)
-else
-    if $batch_state.account equals $account
-        log "同账号，直接切换角色: " + $role
-        call $result = _select_role($role_index, $role, $batch_state)
-    else
-        log "不同账号，重新登录: " + $role
-        call $result = _switch_account($tail, $role_index, $account, $role, $batch_state)
-    end
+if not $batch_state.account equals $account
+    log "需要切换账号: " + $account
+    call _switch_account($tail, $role_index, $account, $role, $batch_state)
 end
+
+log "切换角色: " + $role
+call $result = _select_role($role_index, $role, $batch_state)
 
 return $result

@@ -85,6 +85,7 @@ class GraduationContext:
     school: str
     scheme: str
     base_attrs: CombatAttributes
+    gongjue: str = ""  # 当前弓玦类型（"会意"/"精准"/"会心"/""）
 
 
 class _GraduationSignals(QObject):
@@ -1262,16 +1263,22 @@ class CombatAttrsTab(QWidget):
         return result
 
     def get_graduation_context(self) -> GraduationContext | None:
-        """返回当前流派/方案及不含装备的基础属性公共快照。"""
+        """返回当前流派/方案及不含装备的基础属性公共快照。
+
+        注意：base_attrs 不含弓玦属性，弓玦类型单独传递，
+        由调用方（如最优组合搜索对话框）按需重算。
+        """
         school = self._get_current_school()
         scheme = self._combo_scheme.currentText()
         if not school or not scheme:
             return None
-        base_attrs = self._get_base_attrs() + self._compute_gongjue_attrs()
+        base_attrs = self._get_base_attrs()
+        gongjue = self._get_current_gongjue()
         return GraduationContext(
             school=school,
             scheme=scheme,
             base_attrs=CombatAttributes.from_dict(base_attrs.to_dict()),
+            gongjue=gongjue,
         )
 
     def _get_base_attrs(self) -> CombatAttributes:

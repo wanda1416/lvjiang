@@ -149,6 +149,48 @@ def _equip_label(equip: dict) -> str:
     return f'<span style="color:{color}">{name}</span> (Lv{level})'
 
 
+def _equip_tooltip(equip: dict) -> str:
+    """装备详细信息 tooltip（HTML）。"""
+    parts: list[str] = []
+    name = equip.get("name", tr("未知"))
+    level = equip.get("level", "?")
+    quality = equip.get("quality", "")
+    color = _QUALITY_COLORS.get(quality, "#666")
+    parts.append(
+        f'<b><span style="color:{color}">{name}</span></b>  Lv{level}')
+    is_cy = equip.get("is_chengyin", False)
+    if is_cy:
+        parts.append(tr("承音"))
+    # 基础属性
+    base = equip.get("base_attr")
+    if isinstance(base, dict) and base.get("name"):
+        val = base.get("value")
+        if isinstance(val, list):
+            parts.append(f"{base['name']}: {val[0]}~{val[1]}")
+        else:
+            parts.append(f"{base['name']}: {val}")
+    # 普通词条
+    for i in range(1, 6):
+        affix = equip.get(f"affix_{i}")
+        if isinstance(affix, dict) and affix.get("name"):
+            val = affix.get("value", "")
+            cap_pct = affix.get("cap_pct")
+            line = f"{affix['name']}: {val}"
+            if cap_pct is not None:
+                line += f" ({cap_pct:.0f}%)"
+            parts.append(line)
+    # 定音词条
+    dingyin = equip.get("dingyin")
+    if isinstance(dingyin, dict) and dingyin.get("name"):
+        val = dingyin.get("value", "")
+        cap_pct = dingyin.get("cap_pct")
+        line = f"{tr('定音')} {dingyin['name']}: {val}"
+        if cap_pct is not None:
+            line += f" ({cap_pct:.0f}%)"
+        parts.append(line)
+    return "<br>".join(parts)
+
+
 class _CandidateRow(QWidget):
     """单件候选装备行：勾选框 + 名称 + 评分。"""
 
@@ -168,6 +210,7 @@ class _CandidateRow(QWidget):
         self.label = QLabel()
         self.label.setTextFormat(Qt.TextFormat.RichText)
         self.label.setText(_equip_label(equip))
+        self.label.setToolTip(_equip_tooltip(equip))
         layout.addWidget(self.label, stretch=1)
 
         self.score_label = QLabel(rating)
@@ -225,18 +268,6 @@ class _SlotGroup(QGroupBox):
             empty = QLabel(tr("（无候选装备）"))
             empty.setStyleSheet("color: palette(mid); font-size: 12px;")
             layout.addWidget(empty)
-
-    def update_ratings(self, rule_key: str, playstyle: str) -> None:
-        from ..core.graduation.combo_rules import judge_tuning_candidate
-        for row in self.rows:
-            result = judge_tuning_candidate(row.equip, rule_key, playstyle)
-            if result.not_applicable:
-                label = tr("不适用")
-            elif result.skipped:
-                label = tr("跳过")
-            else:
-                label = result.rating.value
-            row.set_rating(label)
 
     def get_selected(self) -> list[dict]:
         """返回勾选的装备列表。"""
@@ -326,13 +357,17 @@ class OptimalComboDialog(QDialog):
         base_attrs: CombatAttributes,
         level_threshold: int = 0,
         affix_filter: str = "all",
+        gongjue: str = "",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._host = host
         self._school = school
         self._scheme = scheme
-        self._base_attrs = base_attrs
+        # base_attrs 不含弓玦，弓玦属性按需计算
+        self._base_attrs_raw = base_attrs
+        self._current_gongjue = gongjue
+        self._base_attrs = base_attrs + self._compute_gongjue_attrs(gongjue)
         self._level_threshold = level_threshold
         self._affix_filter = affix_filter
         self._worker: _SearchWorker | None = None
@@ -365,6 +400,11 @@ class OptimalComboDialog(QDialog):
         self._chk_pruning.setToolTip(
             tr("自动淘汰被其他候选完全压制的装备，缩减搜索空间"))
         options.addWidget(self._chk_pruning)
+        self._chk_exclude_mock = QCheckBox(tr("排除模拟"))
+        self._chk_exclude_mock.setChecked(True)
+        self._chk_exclude_mock.setToolTip(
+            tr("搜索时排除模拟装备，仅使用真实背包和已穿戴装备"))
+        options.addWidget(self._chk_exclude_mock)
         self._chk_full_chengyin = QCheckBox(tr("满承音"))
         self._chk_full_chengyin.setToolTip(
             tr("将承音装备的词条数值视为承音上限参与计算"))
@@ -382,16 +422,25 @@ class OptimalComboDialog(QDialog):
 
         # Tuning row
         tuning_row = QHBoxLayout()
+        tuning_row.addWidget(QLabel(tr("弓玦套装：")))
+        self._combo_gongjue = QComboBox()
+        self._combo_gongjue.addItem(tr("无"), "")
+        for gj_type in ["会意", "精准", "会心"]:
+            self._combo_gongjue.addItem(gj_type, gj_type)
+        # 设置默认选中
+        idx = self._combo_gongjue.findData(self._current_gongjue)
+        if idx >= 0:
+            self._combo_gongjue.setCurrentIndex(idx)
+        self._combo_gongjue.currentIndexChanged.connect(
+            self._on_gongjue_changed)
+        tuning_row.addWidget(self._combo_gongjue)
+        tuning_row.addSpacing(16)
         tuning_row.addWidget(QLabel(tr("调律规则：")))
-        self._combo_tuning_rule = QComboBox()
-        self._combo_tuning_rule.currentIndexChanged.connect(
-            self._refresh_tuning_playstyles)
-        tuning_row.addWidget(self._combo_tuning_rule)
-        tuning_row.addWidget(QLabel(tr("玩法：")))
-        self._combo_tuning_playstyle = QComboBox()
-        self._combo_tuning_playstyle.currentTextChanged.connect(
-            self._on_tuning_selection_changed)
-        tuning_row.addWidget(self._combo_tuning_playstyle)
+        self._combo_tuning = QComboBox()
+        self._combo_tuning.addItem(tr("不应用规则"), None)
+        self._combo_tuning.currentIndexChanged.connect(
+            self._on_tuning_changed)
+        tuning_row.addWidget(self._combo_tuning, 1)
         tuning_row.addStretch()
         layout.addLayout(tuning_row)
         self._load_tuning_options()
@@ -469,8 +518,40 @@ class OptimalComboDialog(QDialog):
 
         layout.addWidget(self._tab_widget, stretch=1)
 
+    def _compute_gongjue_attrs(self, gongjue_type: str) -> CombatAttributes:
+        """计算弓玦属性：当前赛季最大等级三率词条上限的一半。"""
+        if not gongjue_type:
+            return CombatAttributes()
+        try:
+            from ..config import get_game_config
+            from ..core.combat.combat_attrs import compute_gongjue_attrs
+            gc = get_game_config()
+            seasons = gc.get_season_configs()
+            if not seasons:
+                return CombatAttributes()
+            equip_level = seasons[-1].equip_level
+            if not equip_level:
+                return CombatAttributes()
+            return compute_gongjue_attrs(
+                gongjue_type, equip_level, gc.get_affix_caps)
+        except Exception as e:
+            logger.error(f"计算弓玦属性失败: {e}")
+            return CombatAttributes()
+
+    def _on_gongjue_changed(self, _index: int) -> None:
+        """弓玦切换后重算基础属性。"""
+        gongjue = self._combo_gongjue.currentData()
+        if not isinstance(gongjue, str):
+            gongjue = ""
+        self._current_gongjue = gongjue
+        self._base_attrs = self._base_attrs_raw + self._compute_gongjue_attrs(gongjue)
+
     def _load_tuning_options(self) -> None:
-        """加载调律规则；只展示至少有一个玩法匹配当前流派的规则。"""
+        """加载调律规则，填充合并后的下拉框。
+
+        每个条目格式："规则名-玩法名"，data 为 (rule_key, playstyle)。
+        只展示匹配当前流派的规则+玩法组合。
+        """
         from ..config import get_game_config
         from ..core.evaluator import get_tuning_rules
 
@@ -478,7 +559,7 @@ class OptimalComboDialog(QDialog):
         main_weapon = (school_cfg.get("main") or {}).get("weapon", "")
         sub_weapon = (school_cfg.get("sub") or {}).get("weapon", "")
         school_attr = school_cfg.get("attr", "")
-        self._combo_tuning_rule.clear()
+
         for key, rule in get_tuning_rules().items():
             matching = [
                 name for name, playstyle in rule.playstyles.items()
@@ -486,25 +567,47 @@ class OptimalComboDialog(QDialog):
                 == {main_weapon, sub_weapon}
                 and playstyle.attr == school_attr
             ]
-            if matching:
-                self._combo_tuning_rule.addItem(rule.name, (key, matching))
-        self._refresh_tuning_playstyles()
+            for name in matching:
+                self._combo_tuning.addItem(
+                    f"{rule.name}-{name}", (key, name))
 
-    def _refresh_tuning_playstyles(self) -> None:
-        self._combo_tuning_playstyle.clear()
-        data = self._combo_tuning_rule.currentData()
-        if not data:
+    def _on_tuning_changed(self, _index: int) -> None:
+        """调律规则切换时，前置过滤装备勾选状态。"""
+        data = self._combo_tuning.currentData()
+        if data is None:
+            # "不应用规则"：全部勾选
+            for group in self._slot_groups.values():
+                for row in group.rows:
+                    row.checkbox.setChecked(True)
+                    row.checkbox.setVisible(True)
             return
-        _key, names = data
-        self._combo_tuning_playstyle.addItems(names)
-
-    def _on_tuning_selection_changed(self, playstyle: str) -> None:
-        data = self._combo_tuning_rule.currentData()
-        if not data or not playstyle:
-            return
-        rule_key, _names = data
+        rule_key, playstyle = data
+        from ..core.graduation.combo_rules import judge_tuning_candidate
         for group in self._slot_groups.values():
-            group.update_ratings(rule_key, playstyle)
+            for row in group.rows:
+                result = judge_tuning_candidate(
+                    row.equip, rule_key, playstyle)
+                if result.not_applicable:
+                    # 不适用：保持勾选，显示提示
+                    row.checkbox.setChecked(True)
+                    row.checkbox.setVisible(True)
+                    row.set_rating(tr("不适用"))
+                elif result.skipped:
+                    # 跳过：取消勾选
+                    row.checkbox.setChecked(False)
+                    row.checkbox.setVisible(True)
+                    row.set_rating(tr("跳过"))
+                elif result.rating and result.rating.value == tr("垃圾"):
+                    # 垃圾：取消勾选
+                    row.checkbox.setChecked(False)
+                    row.checkbox.setVisible(True)
+                    row.set_rating(tr("垃圾"))
+                else:
+                    # 正常评级：保持勾选
+                    row.checkbox.setChecked(True)
+                    row.checkbox.setVisible(True)
+                    row.set_rating(
+                        result.rating.value if result.rating else "-")
 
     def _load_candidates(self) -> None:
         """从 session 加载候选装备并按槽位分组。
@@ -551,9 +654,18 @@ class OptimalComboDialog(QDialog):
             key: [] for key, _, _ in _SLOT_ORDER
         }
 
+        exclude_mock = self._chk_exclude_mock.isChecked()
+
+        def _is_mock(eq: dict) -> bool:
+            fp = eq.get("_fp", "")
+            if isinstance(fp, str) and fp.startswith("mock_"):
+                return True
+            return bool(eq.get("_extra", {}).get("is_mock"))
+
         # 1. 已穿戴装备：先按流派武器和装备页筛选条件校验
         for slot_key, eq in equipped.items():
             if (isinstance(eq, dict) and slot_key in slot_candidates
+                    and not (exclude_mock and _is_mock(eq))
                     and self._candidate_passes(slot_key, eq,
                                                main_weapon_type, sub_weapon_type)):
                 slot_candidates[slot_key].append(eq)
@@ -600,11 +712,12 @@ class OptimalComboDialog(QDialog):
                 if fp not in seen:
                     seen.add(fp)
                     unique.append(eq)
-            tuning_data = self._combo_tuning_rule.currentData()
+            tuning_data = self._combo_tuning.currentData()
             rule_key = tuning_data[0] if tuning_data else ""
+            playstyle = tuning_data[1] if tuning_data else ""
             group = _SlotGroup(
                 slot_key, display_name, unique, self._school,
-                rule_key, self._combo_tuning_playstyle.currentText(),
+                rule_key, playstyle,
             )
             self._slot_groups[slot_key] = group
             scroll = self._slot_scroll_areas.get(slot_key)
@@ -667,38 +780,6 @@ class OptimalComboDialog(QDialog):
                 self, tr("无法搜索"),
                 tr("以下部位没有候选装备：") + "、".join(missing))
             return
-
-        from ..core.graduation.combo_rules import (
-            CandidateRuleContext,
-            TuningJunkRule,
-            apply_candidate_rules,
-        )
-        tuning_data = self._combo_tuning_rule.currentData()
-        playstyle = self._combo_tuning_playstyle.currentText()
-        if not tuning_data or not playstyle:
-            QMessageBox.warning(
-                self, tr("无法搜索"), tr("当前流派没有可用的调律规则和玩法"))
-            return
-        rule_key, _names = tuning_data
-        rules = [TuningJunkRule(rule_key, playstyle)]
-        candidates, rule_stats = apply_candidate_rules(
-            candidates, rules,
-            CandidateRuleContext(self._school),
-        )
-        missing = [display_name for slot_key, display_name, _ft in _SLOT_ORDER
-                   if not candidates.get(slot_key)]
-        if missing:
-            QMessageBox.warning(
-                self, tr("无法搜索"),
-                tr("应用调律/评分规则后以下部位没有候选装备：") + "、".join(missing))
-            return
-        total = 1
-        for entries in candidates.values():
-            total *= len(entries)
-        removed = sum(rule_stats.removed.values())
-        if removed:
-            self._progress_label.setToolTip(
-                "，".join(f"{key}: -{count}" for key, count in rule_stats.removed.items()))
 
         # UI state
         self._btn_search.setVisible(False)

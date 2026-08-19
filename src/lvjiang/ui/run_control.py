@@ -410,6 +410,14 @@ class RunControlMixin:
         helper = self._ui_helper
         if helper is not None:
             helper.close_active_dialog()
+        # 若工作流正阻塞在 ADB 断连等待上，唤醒以便响应停止
+        device = getattr(self, '_device', None)
+        if device is not None and hasattr(device, 'resume_event'):
+            device.resume_event.set()
+        # 隐藏 ADB 断连横幅
+        banner = getattr(self, '_adb_banner', None)
+        if banner is not None:
+            banner.setVisible(False)
         self.statusBar().showMessage(tr("停止中... | 等待当前步骤结束"))
         # 占位主流程（_on_start）没有工作流线程，直接复位
         if self._current_worker is None:
@@ -418,6 +426,44 @@ class RunControlMixin:
             self._refresh_run_button()
             self._overlay.set_color("red")
             self.log_text.append(tr("[操作] 已停止"))
+
+    # ─── ADB 断连暂停恢复 ────────────────────────────────
+
+    def _on_adb_connection_lost(self, error_msg: str):
+        """ADB 断连通知处理（主线程，由信号桥投递）
+
+        非阻塞：显示醒目红色横幅 + 日志记录，不弹窗。
+        工作流线程已阻塞在 resume_event.wait()，等待用户手动恢复。
+        """
+        self.log_text.append(f"[警告] ADB 连接异常，请重连设备后点击恢复: {error_msg}")
+        self.statusBar().showMessage(tr("ADB 异常，请重连设备后点击恢复"))
+        # 显示主内容区顶部红色横幅（极其醒目，不阻塞操作）
+        banner = getattr(self, '_adb_banner', None)
+        if banner is not None:
+            label = getattr(self, '_adb_banner_label', None)
+            if label is not None:
+                label.setText(tr("⚠ ADB 连接异常，请重连设备后点击右侧「恢复」按钮"))
+            btn = getattr(self, '_adb_banner_btn', None)
+            if btn is not None:
+                # 防止重复连接
+                try:
+                    btn.clicked.disconnect()
+                except TypeError:
+                    pass
+                btn.clicked.connect(self._resume_adb)
+            banner.setVisible(True)
+
+    def _resume_adb(self):
+        """用户点击「恢复」：唤醒工作流线程，重试失败的 ADB 命令"""
+        device = getattr(self, '_device', None)
+        if device is not None and hasattr(device, 'resume_event'):
+            device.resume_event.set()
+            self.statusBar().showMessage(tr("已恢复，继续执行..."))
+            self.log_text.append(tr("[操作] ADB 已恢复，工作流继续"))
+        # 隐藏红色横幅
+        banner = getattr(self, '_adb_banner', None)
+        if banner is not None:
+            banner.setVisible(False)
 
     # ─── 后端就绪判定 ──────────────────────────────────
 

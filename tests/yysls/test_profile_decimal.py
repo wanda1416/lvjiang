@@ -11,12 +11,12 @@ from lvjiang.apps.yysls.config.profile_models import (
     RegenKeyDef,
     StockKeyDef,
 )
-from lvjiang.apps.yysls.ui.profile.overview import _PARSE_ERROR, _parse_value
+from lvjiang.apps.yysls.ui.profile.cell_editing import _PARSE_ERROR, _parse_value
 
 
 def test_parse_value_allows_float_only_when_decimal(monkeypatch):
     monkeypatch.setattr(
-        "lvjiang.apps.yysls.ui.profile.overview.QMessageBox.warning",
+        "lvjiang.apps.yysls.ui.profile.cell_editing.QMessageBox.warning",
         lambda *args, **kwargs: None,
     )
 
@@ -26,7 +26,7 @@ def test_parse_value_allows_float_only_when_decimal(monkeypatch):
 
 def test_parse_value_realtime_regen_still_uses_decimal_flag(monkeypatch):
     monkeypatch.setattr(
-        "lvjiang.apps.yysls.ui.profile.overview.QMessageBox.warning",
+        "lvjiang.apps.yysls.ui.profile.cell_editing.QMessageBox.warning",
         lambda *args, **kwargs: None,
     )
 

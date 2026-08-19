@@ -16,14 +16,25 @@ from typing import Any, Callable
 from loguru import logger
 
 from ..combat.combat_attrs import (
+    BONUS_PERCENT_FIELDS,
+    CRIT_RATE_CAP,
+    INTENT_RATE_CAP,
+    PENETRATION_FIELDS,
+    PRECISION_BASE,
     CombatAttributes,
     GraduationAttrContext,
     aggregate_equipment_attrs,
     apply_hypothetical_caps,
-    build_graduation_attrs,
     compute_equip_base_attrs,
+    has_resistance,
 )
 from .graduation_program import ProgramRuntime
+
+# 固定战斗属性字段名集合：extra_attrs 抗性循环需跳过（原逻辑只对
+# BONUS_PERCENT_FIELDS/PENETRATION_FIELDS/THREE_RATE_FIELDS 固定字段套公式）。
+_FIXED_ATTR_NAMES: frozenset[str] = frozenset(
+    f.name for f in dataclass_fields(CombatAttributes)
+) - {"extra_attrs"}
 
 # The 8 equipment slots in enumeration order.
 SLOT_KEYS: list[str] = [
@@ -54,6 +65,138 @@ def _zero_input(input_specs: list[dict[str, str]]) -> list[float]:
     return [0.0] * len(input_specs)
 
 
+def _build_field_index_map(
+    input_specs: list[dict[str, str]],
+) -> dict[str, int]:
+    """Map field name → input vector index for O(1) lookup."""
+    return {spec["name"]: i for i, spec in enumerate(input_specs)}
+
+
+def _compute_base_vec_raw(
+    base_attrs: CombatAttributes,
+    input_specs: list[dict[str, str]],
+    field_index: dict[str, int],
+) -> list[float]:
+    """Compute base input vector WITHOUT resistance applied.
+
+    This is the raw base contribution. Resistance will be applied
+    after combining with equipment contributions.
+    """
+    vec = _zero_input(input_specs)
+
+    # Fixed fields
+    for f in dataclass_fields(CombatAttributes):
+        if f.name == "extra_attrs":
+            continue
+        fname = f.name
+        idx = field_index.get(fname)
+        if idx is None:
+            continue
+        vec[idx] = getattr(base_attrs, fname)
+
+    # Extra attrs
+    for key, value in base_attrs.extra_attrs.items():
+        idx = field_index.get(key)
+        if idx is not None:
+            vec[idx] = value
+
+    return vec
+
+
+def _compute_equip_vec_raw(
+    equip_attrs: CombatAttributes,
+    input_specs: list[dict[str, str]],
+    field_index: dict[str, int],
+    context: GraduationAttrContext,
+) -> list[float]:
+    """Compute equipment's contribution vector WITHOUT resistance applied.
+
+    Resistance will be applied after combining all equipment contributions.
+    """
+    vec = _zero_input(input_specs)
+    target_pen = context.target_pen_field
+
+    # Fixed fields
+    for f in dataclass_fields(CombatAttributes):
+        if f.name == "extra_attrs":
+            continue
+        fname = f.name
+        idx = field_index.get(fname)
+        if idx is None:
+            continue
+        value = getattr(equip_attrs, fname)
+        vec[idx] = value
+
+    # Handle wuxiang_pen → target penetration mapping
+    if target_pen and equip_attrs.wuxiang_pen != 0:
+        idx = field_index.get(target_pen)
+        if idx is not None:
+            vec[idx] += equip_attrs.wuxiang_pen
+
+    # Extra attrs
+    for key, value in equip_attrs.extra_attrs.items():
+        idx = field_index.get(key)
+        if idx is not None:
+            vec[idx] = value
+
+    return vec
+
+
+def _apply_resistance_to_vec(
+    vec: list[float],
+    base_vec: list[float],
+    field_index: dict[str, int],
+    context: GraduationAttrContext,
+) -> None:
+    """Apply resistance rules to the combined vector (in-place).
+
+    与 build_graduation_attrs 逐字段等效（基准语义已核对）：
+    - precision: 阈值与基准均为硬编码常量 PRECISION_BASE/100（非基础面板值）
+    - crit_rate/intent_rate: 合并值整体除以 judge_divisor 后封顶
+    - BONUS_PERCENT_FIELDS 与 extra_attrs 抗性键: 合并值整体除以 buff_divisor
+      （apply_bonus_resistance 的 base 默认 0.0）
+    - PENETRATION_FIELDS: 基础面板值不变，仅装备部分（含无相映射）除以 buff_divisor
+    base_vec is needed for penetration fields where base stays unchanged.
+    """
+    judge_divisor = 1 + context.judge_resistance / 100  # 2.45
+    buff_divisor = 1 + context.buff_resistance / 100    # 1.15
+    precision_base = PRECISION_BASE / 100  # 0.65
+
+    # precision: 阈值/基准都是常量 0.65，combined <= 0.65 时不变
+    idx = field_index.get("precision")
+    if idx is not None and vec[idx] > precision_base:
+        vec[idx] = precision_base + (vec[idx] - precision_base) / judge_divisor
+
+    idx = field_index.get("crit_rate")
+    if idx is not None:
+        vec[idx] = min(vec[idx] / judge_divisor, CRIT_RATE_CAP)
+
+    idx = field_index.get("intent_rate")
+    if idx is not None:
+        vec[idx] = min(vec[idx] / judge_divisor, INTENT_RATE_CAP)
+
+    # 增效字段: apply_bonus_resistance(combined, base=0.0) → 合并值整体除
+    for fname in BONUS_PERCENT_FIELDS:
+        idx = field_index.get(fname)
+        if idx is not None:
+            vec[idx] = vec[idx] / buff_divisor
+
+    # 穿透字段: 基础值不变，装备部分（_compute_equip_vec_raw 已含无相映射）除
+    for fname in PENETRATION_FIELDS:
+        idx = field_index.get(fname)
+        if idx is not None:
+            equipment_part = vec[idx] - base_vec[idx]
+            vec[idx] = base_vec[idx] + equipment_part / buff_divisor
+
+    # extra_attrs 抗性键: 合并值整体除；跳过固定字段（由以上分支处理，
+    # 且原逻辑的 extra_attrs 循环不会触及固定字段名）
+    for key, idx in field_index.items():
+        if key in _FIXED_ATTR_NAMES:
+            continue
+        if has_resistance(key):
+            vec[idx] = vec[idx] / buff_divisor
+
+
 # ---------------------------------------------------------------------------
 # Delta pre-computation
 # ---------------------------------------------------------------------------
@@ -62,6 +205,9 @@ def compute_slot_deltas(
     candidates: dict[str, list[dict]],
     input_specs: list[dict[str, str]],
     base_attr_lookup: Callable,
+    *,
+    field_index: dict[str, int] | None = None,
+    context: GraduationAttrContext | None = None,
 ) -> dict[str, list[tuple[dict, CombatAttributes, list[float]]]]:
     """Pre-compute each candidate's attribute contribution.
 
@@ -73,12 +219,20 @@ def compute_slot_deltas(
         The program's input specification list (from ``data["program"]["inputs"]``).
     base_attr_lookup:
         ``GameConfigManager.get_base_attr_values`` for base-attack lookup.
+    field_index:
+        Optional pre-computed field index map for resistance-aware vectors.
+    context:
+        Optional graduation context for resistance-aware vectors.
 
     Returns
     -------
     dict mapping slot_key to list of ``(equip, combat_attrs_delta, input_vector)``.
+    If field_index and context are provided, input_vector is the raw contribution
+    vector (resistance NOT yet applied — caller must call _apply_resistance_to_vec).
     """
     result: dict[str, list[tuple[dict, CombatAttributes, list[float]]]] = {}
+    use_resistance = field_index is not None and context is not None
+
     for slot_key, equips in candidates.items():
         slot_data: list[tuple[dict, CombatAttributes, list[float]]] = []
         for equip in equips:
@@ -86,7 +240,13 @@ def compute_slot_deltas(
             affix = aggregate_equipment_attrs(single)
             base = compute_equip_base_attrs(single, base_attr_lookup)
             delta = affix + base
-            vec = _attrs_to_input(delta, input_specs)
+            if use_resistance:
+                # Use raw vector (resistance applied later in inner loop via _apply_resistance_to_vec)
+                assert field_index is not None
+                assert context is not None
+                vec = _compute_equip_vec_raw(delta, input_specs, field_index, context)
+            else:
+                vec = _attrs_to_input(delta, input_specs)
             slot_data.append((equip, delta, vec))
         result[slot_key] = slot_data
     return result
@@ -299,12 +459,20 @@ def search_optimal_combo(
 
     # -- Phase 1: pre-compute deltas --
     slot_keys = [k for k in SLOT_KEYS if k in candidates and candidates[k]]
+    graduation_context = GraduationAttrContext.from_school(calculator._school)
+    field_index = _build_field_index_map(input_specs)
+
     slot_deltas = compute_slot_deltas(
         {k: candidates[k] for k in slot_keys},
         input_specs,
         # We need a base_attr_lookup — extract from calculator context
         _make_base_attr_lookup(),
+        field_index=field_index,
+        context=graduation_context,
     )
+
+    # Compute base vector (raw, no resistance)
+    base_vec = _compute_base_vec_raw(base_attrs, input_specs, field_index)
 
     # Filter out empty slots
     slot_keys = [k for k in slot_keys if slot_deltas.get(k)]
@@ -345,15 +513,13 @@ def search_optimal_combo(
     # -- Prepare fast-lookup arrays for inner loop --
     active_slots = [k for k in slot_keys if slot_deltas.get(k)]
     slot_equip_arrays: list[list[dict]] = []
-    slot_attr_arrays: list[list[CombatAttributes]] = []
+    slot_vec_arrays: list[list[list[float]]] = []  # Changed from CombatAttributes to vectors
     for k in active_slots:
         entries = slot_deltas[k]
         slot_equip_arrays.append([e[0] for e in entries])
-        slot_attr_arrays.append([e[1] for e in entries])
-    slot_sizes = [len(v) for v in slot_attr_arrays]
+        slot_vec_arrays.append([e[2] for e in entries])  # raw vectors, resistance applied in-loop
+    slot_sizes = [len(v) for v in slot_vec_arrays]
     n_dims = len(input_specs)
-
-    graduation_context = GraduationAttrContext.from_school(calculator._school)
 
     # -- Phase 2: enumerate + evaluate --
     board = TopRLeaderboard(top_r)
@@ -370,18 +536,17 @@ def search_optimal_combo(
         if cancel_flag and cancel_flag():
             break
 
-        # 所有调用方必须通过统一的毕业率属性预处理（抗性/无相转换）。
-        # 使用原地加法避免创建中间对象（性能关键路径）
-        equipment_attrs = CombatAttributes()
-        for si, idx in enumerate(combo_indices):
-            equipment_attrs += slot_attr_arrays[si][idx]
-        effective_attrs = build_graduation_attrs(
-            base_attrs, equipment_attrs, calculator._school,
-            context=graduation_context,
-        )
-        effective_vec = _attrs_to_input(effective_attrs, input_specs)
+        # 性能关键路径：纯数组累加 + 直接评估
+        # 1. 从 base_vec 开始
         for d in range(n_dims):
-            acc[d] = effective_vec[d]
+            acc[d] = base_vec[d]
+        # 2. 累加每件装备的原始贡献（抗性在第3步统一应用）
+        for si, idx in enumerate(combo_indices):
+            vec = slot_vec_arrays[si][idx]
+            for d in range(n_dims):
+                acc[d] += vec[d]
+        # 3. 应用抗性规则（向量化等效 build_graduation_attrs）
+        _apply_resistance_to_vec(acc, base_vec, field_index, graduation_context)
 
         # Evaluate via ProgramRuntime (reuse object, just clear cache)
         cache_clear()

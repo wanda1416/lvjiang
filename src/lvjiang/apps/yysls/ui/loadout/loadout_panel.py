@@ -367,12 +367,7 @@ class LoadoutPanel(QWidget):
             return
         main_art = self._main_art.currentText()
         sub_art = self._sub_art.currentText()
-        if not main_art or not sub_art:
-            # 方案必须始终绑定双武学，清空选择直接回退
-            QMessageBox.warning(
-                self, tr("武学绑定"), tr("方案必须同时绑定主武学和副武学"))
-            self.refresh()
-            return
+        # 允许单独绑定，不强制同时设置
         state = self._repo.load()
         self._repo.configure_plan(
             state.active_plan_id,

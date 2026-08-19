@@ -19,6 +19,7 @@ from ..combat.combat_attrs import (
     CombatAttributes,
     GraduationAttrContext,
     aggregate_equipment_attrs,
+    apply_hypothetical_caps,
     build_graduation_attrs,
     compute_equip_base_attrs,
 )
@@ -245,6 +246,9 @@ def search_optimal_combo(
     max_per_slot: int = 0,  # 0 = no limit
     progress_cb: Callable[[int, int, str], None] | None = None,
     cancel_flag: Callable[[], bool] | None = None,
+    full_chengyin: bool = False,
+    full_dingyin: bool = False,
+    full_level: int = 0,
 ) -> list[dict[str, Any]]:
     """Search for the best equipment combinations.
 
@@ -275,6 +279,18 @@ def search_optimal_combo(
     program = calculator._data["program"]
     input_specs = program["inputs"]
     baseline = calculator.baseline_dps()
+
+    # -- Phase 0: apply hypothetical caps if requested --
+    if full_chengyin or full_dingyin or full_level > 0:
+        for slot_key in list(candidates):
+            candidates[slot_key] = [
+                e for _k, e in sorted(
+                    apply_hypothetical_caps(
+                        {i: e for i, e in enumerate(candidates[slot_key])},
+                        full_chengyin, full_dingyin, full_level,
+                    ).items()
+                )
+            ]
 
     # -- Phase 1: pre-compute deltas --
     slot_keys = [k for k in SLOT_KEYS if k in candidates and candidates[k]]

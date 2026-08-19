@@ -443,6 +443,78 @@ def map_affix_to_attr(affix_name: str) -> tuple[str | None, bool]:
     return None, False
 
 
+def apply_hypothetical_caps(
+    equipped: dict,
+    full_chengyin: bool = False,
+    full_dingyin: bool = False,
+    full_level: int = 0,
+) -> dict:
+    """假设装备升至理想状态，返回变换后的装备副本。
+
+    Args:
+        equipped: {slot_key: equip_dict}
+        full_chengyin: 承音装备的普通词条 → 承音上限 (cap×0.94)
+        full_dingyin: 所有装备的定音词条 → 上限 (cap, 100%)
+        full_level: 目标等级（>0 时，低于该等级的装备升至该等级）
+            仅升基础属性；词条/定音数值是否升级取决于 full_chengyin/full_dingyin。
+            词条上限按升级后的等级查询。
+
+    Returns:
+        变换后的装备 dict；无需变换时返回原 dict。
+    """
+    if not full_chengyin and not full_dingyin and full_level <= 0:
+        return equipped
+
+    import copy
+
+    from ...config import get_game_config
+
+    gc = get_game_config()
+    result: dict = {}
+
+    for slot_key, equip in equipped.items():
+        if not isinstance(equip, dict):
+            result[slot_key] = equip
+            continue
+
+        equip = copy.deepcopy(equip)
+
+        # 满等级：提升装备等级（基础属性随之变化）
+        # 低于赛季最高等级的装备均可升级为承音装备
+        if full_level > 0:
+            try:
+                cur_level = int(equip.get("level") or 0)
+            except (TypeError, ValueError):
+                cur_level = 0
+            if 0 < cur_level < full_level:
+                equip["level"] = full_level
+                equip["is_chengyin"] = True
+
+        effective_level = equip.get("level")
+        is_cy = equip.get("is_chengyin", False)
+
+        # 普通词条 affix_1~5
+        for i in range(1, 6):
+            affix = equip.get(f"affix_{i}")
+            if not affix or not isinstance(affix, dict) or not affix.get("name"):
+                continue
+            if full_chengyin and is_cy and effective_level:
+                caps = gc.get_affix_caps(effective_level, affix["name"])
+                if caps:
+                    affix["value"] = caps["chengyin"]
+
+        # 定音词条
+        dingyin = equip.get("dingyin")
+        if full_dingyin and dingyin and isinstance(dingyin, dict) and dingyin.get("name") and effective_level:
+            caps = gc.get_affix_caps(effective_level, dingyin["name"])
+            if caps:
+                dingyin["value"] = caps["cap"]
+
+        result[slot_key] = equip
+
+    return result
+
+
 def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
     """聚合装备属性到战斗属性
 

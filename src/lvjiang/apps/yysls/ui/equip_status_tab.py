@@ -970,9 +970,8 @@ class EquipStatusTab(QWidget):
     # ── 筛选 ──
 
     def _load_filter_settings(self):
-        """从 session 加载筛选配置并设置下拉框"""
-        from ....core.config import load_equip_filter
-        filters = load_equip_filter()
+        """从用户级 loadout 存储加载筛选配置并设置下拉框"""
+        filters = self._load_user_filter()
         # 屏蔽信号，避免初始化时触发 _on_filter_changed
         self._sort_filter.blockSignals(True)
         self._type_filter.blockSignals(True)
@@ -1008,8 +1007,7 @@ class EquipStatusTab(QWidget):
             self._source_filter.blockSignals(False)
 
     def _save_filter_settings(self):
-        """保存筛选配置到 session"""
-        from ....core.config import save_equip_filter
+        """保存筛选配置到用户级 loadout 存储"""
         filters = {
             "sort": self._sort_filter.currentData(),
             "type": self._type_filter.currentData(),
@@ -1017,7 +1015,18 @@ class EquipStatusTab(QWidget):
             "affix": self._affix_filter.currentData(),
             "source": self._source_filter.currentData(),
         }
-        save_equip_filter(filters)
+        self._save_user_filter(filters)
+
+    def _load_user_filter(self) -> dict:
+        """从当前用户的 loadout 存储读取筛选配置"""
+        if self._inv is not None:
+            return self._inv._repo.get_ui_state("equip_filter")
+        return {}
+
+    def _save_user_filter(self, filters: dict) -> None:
+        """将筛选配置写入当前用户的 loadout 存储"""
+        if self._inv is not None:
+            self._inv._repo.set_ui_state("equip_filter", filters)
 
     def _on_filter_changed(self):
         """筛选下拉框变化时触发"""
@@ -1039,6 +1048,38 @@ class EquipStatusTab(QWidget):
     def _get_affix_filter(self) -> str:
         """获取词条筛选类型: all/dingyin/full_tuning"""
         return self._affix_filter.currentData()
+
+    def _reset_filter_for_mock(self):
+        """创建/复制模拟装备后，自动切换筛选以便新装备可见。
+
+        将来源切换为「模拟」、清除部位和词条筛选，确保新创建的模拟装备
+        不会被当前筛选条件隐藏。
+        """
+        self._source_filter.blockSignals(True)
+        self._type_filter.blockSignals(True)
+        self._affix_filter.blockSignals(True)
+        try:
+            # 来源切换到「模拟」
+            mock_idx = self._source_filter.findData("mock")
+            if mock_idx >= 0:
+                self._source_filter.setCurrentIndex(mock_idx)
+            # 部位筛选清除（回到「全部」）
+            all_type_idx = self._type_filter.findData("all")
+            if all_type_idx >= 0 and self._type_filter.currentData() != "all":
+                self._type_filter.setCurrentIndex(all_type_idx)
+                self._selected_slot = None
+                for _key, card in self._slot_cards.items():
+                    card.set_selected(False)
+            # 词条筛选清除（回到「全部」）
+            all_affix_idx = self._affix_filter.findData("all")
+            if all_affix_idx >= 0 and self._affix_filter.currentData() != "all":
+                self._affix_filter.setCurrentIndex(all_affix_idx)
+        finally:
+            self._source_filter.blockSignals(False)
+            self._type_filter.blockSignals(False)
+            self._affix_filter.blockSignals(False)
+        self._save_filter_settings()
+        self._rebuild_grid()
 
     def _equip_passes_filter(self, equip: dict) -> bool:
         """检查装备是否通过筛选条件"""
@@ -1608,6 +1649,7 @@ class EquipStatusTab(QWidget):
         try:
             inv.add_to_mock(group_key, result)
             self._sync_inv()
+            self._reset_filter_for_mock()
             logger.info(f"已创建模拟装备 {result.get('name', '未知')}")
         except Exception as e:
             logger.error(f"创建模拟装备失败: {e}")
@@ -1643,6 +1685,7 @@ class EquipStatusTab(QWidget):
         try:
             inv.add_to_mock(gk, result)
             self._sync_inv()
+            self._reset_filter_for_mock()
             logger.info(f"已复制创建模拟装备 {result.get('name', '未知')}")
         except Exception as e:
             logger.error(f"复制创建模拟装备失败: {e}")

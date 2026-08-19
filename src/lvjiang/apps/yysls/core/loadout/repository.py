@@ -208,6 +208,20 @@ class LoadoutRepository:
         self.update(mutate)
         return new_fp
 
+    # ── 用户级 UI 状态（筛选等） ──────────────────────────
+
+    def get_ui_state(self, key: str) -> dict:
+        """读取用户级 UI 状态节点（如 equip_filter）。"""
+        state = self.load()
+        value = state.ui_state.get(key)
+        return dict(value) if isinstance(value, dict) else {}
+
+    def set_ui_state(self, key: str, value: dict) -> None:
+        """写入用户级 UI 状态节点。"""
+        def mutate(state: LoadoutState) -> None:
+            state.ui_state[key] = value
+        self.update(mutate)
+
     def update_mock(self, old_fp: str, equip: dict) -> str:
         from ..equip_parser.models import make_fingerprint
         value = copy.deepcopy(equip)

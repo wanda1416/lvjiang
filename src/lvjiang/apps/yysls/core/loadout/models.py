@@ -56,6 +56,7 @@ class LoadoutState:
     active_plan_id: str = ""
     plans: dict[str, LoadoutPlan] = field(default_factory=dict)
     equipment_items: dict[str, dict] = field(default_factory=dict)
+    ui_state: dict[str, dict] = field(default_factory=dict)
 
     @classmethod
     def empty(cls) -> "LoadoutState":
@@ -78,11 +79,13 @@ class LoadoutState:
         if active not in plans:
             active = next(iter(plans))
         items = data.get("equipment_items", {})
+        ui = data.get("ui_state", {})
         return cls(
             revision=int(data.get("revision") or 0),
             active_plan_id=active,
             plans=plans,
             equipment_items=dict(items) if isinstance(items, dict) else {},
+            ui_state=dict(ui) if isinstance(ui, dict) else {},
         )
 
     def to_dict(self) -> dict:
@@ -91,6 +94,7 @@ class LoadoutState:
             "active_plan_id": self.active_plan_id,
             "plans": {pid: plan.to_dict() for pid, plan in self.plans.items()},
             "equipment_items": self.equipment_items,
+            "ui_state": self.ui_state,
         }
 
     @property

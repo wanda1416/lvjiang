@@ -49,6 +49,16 @@ from ..core.combat.combat_attrs import (
 from .profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from .profile.tab import add_user_nav_buttons
 
+# 攻击属性字段：显示时四舍五入取整
+_ATTACK_FIELDS = frozenset({
+    "min_outer", "max_outer",
+    "min_mingjin", "max_mingjin",
+    "min_lieshi", "max_lieshi",
+    "min_pozhu", "max_pozhu",
+    "min_qiansi", "max_qiansi",
+    "min_wuxiang", "max_wuxiang",
+})
+
 # 弓玦类型候选
 _GONGJUE_TYPES = ["", "会意", "精准", "会心"]
 
@@ -232,13 +242,31 @@ class CombatAttrsTab(QWidget):
         display_options_group = QGroupBox(tr("显示选项"))
         display_options_layout = QHBoxLayout(display_options_group)
         display_options_layout.setContentsMargins(14, 8, 14, 8)
-        self._chk_resistance_only = QCheckBox(tr("仅展示抗性结果"))
+        self._chk_resistance_only = QCheckBox(tr("仅黄字"))
         self._chk_resistance_only.setToolTip(
             tr("勾选后，判定属性和增益效果直接展示抗性后数值，节省空间")
         )
         self._chk_resistance_only.stateChanged.connect(self._refresh_display)
         self._chk_resistance_only.stateChanged.connect(lambda _: self._save_selection())
         display_options_layout.addWidget(self._chk_resistance_only)
+        self._chk_full_chengyin = QCheckBox(tr("满承音"))
+        self._chk_full_chengyin.setToolTip(
+            tr("将已装备的承音装备词条数值视为承音上限参与计算"))
+        self._chk_full_chengyin.stateChanged.connect(self._refresh_display)
+        self._chk_full_chengyin.stateChanged.connect(lambda _: self._save_selection())
+        display_options_layout.addWidget(self._chk_full_chengyin)
+        self._chk_full_dingyin = QCheckBox(tr("满定音"))
+        self._chk_full_dingyin.setToolTip(
+            tr("将已装备的定音词条数值视为上限（100%）参与计算"))
+        self._chk_full_dingyin.stateChanged.connect(self._refresh_display)
+        self._chk_full_dingyin.stateChanged.connect(lambda _: self._save_selection())
+        display_options_layout.addWidget(self._chk_full_dingyin)
+        self._chk_full_level = QCheckBox(tr("满等级"))
+        self._chk_full_level.setToolTip(
+            tr("将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定"))
+        self._chk_full_level.stateChanged.connect(self._refresh_display)
+        self._chk_full_level.stateChanged.connect(lambda _: self._save_selection())
+        display_options_layout.addWidget(self._chk_full_level)
         display_options_layout.addStretch()
         layout.addWidget(display_options_group)
 
@@ -758,6 +786,9 @@ class CombatAttrsTab(QWidget):
             "gongjue": self._get_current_gongjue(),
             "scheme": self._combo_scheme.currentText(),
             "resistance_only": self._chk_resistance_only.isChecked(),
+            "full_chengyin": self._chk_full_chengyin.isChecked(),
+            "full_dingyin": self._chk_full_dingyin.isChecked(),
+            "full_level": self._chk_full_level.isChecked(),
         }
 
         try:
@@ -822,6 +853,14 @@ class CombatAttrsTab(QWidget):
 
             # 恢复仅展示抗性结果
             self._chk_resistance_only.setChecked(resistance_only)
+
+            # 恢复满承音/满定音/满等级
+            self._chk_full_chengyin.setChecked(
+                selection.get("full_chengyin", False))
+            self._chk_full_dingyin.setChecked(
+                selection.get("full_dingyin", False))
+            self._chk_full_level.setChecked(
+                selection.get("full_level", False))
         except Exception as e:
             logger.debug(f"恢复战斗属性选择失败: {e}")
 
@@ -843,6 +882,7 @@ class CombatAttrsTab(QWidget):
         from ..core.combat.combat_attrs import (
             WUXIANG_TO_ATTR_PEN,
             apply_bonus_resistance,
+            apply_hypothetical_caps,
             apply_penetration_resistance,
             apply_three_rate_resistance,
             build_graduation_attrs,
@@ -850,11 +890,27 @@ class CombatAttrsTab(QWidget):
             is_penetration_field,
             is_three_rate_field,
         )
+        from ..core.combat.equipment import EquipmentInventory
 
-        # 一次性计算所有中间结果，避免重复加载装备数据
+        # 一次性加载并变换装备数据，避免重复读取仓库
+        user_name = self._host.active_user_name()
+        equipped = None
+        if user_name:
+            try:
+                equipped = EquipmentInventory(user_name).equipped
+                equipped = apply_hypothetical_caps(
+                    equipped,
+                    full_chengyin=self._chk_full_chengyin.isChecked(),
+                    full_dingyin=self._chk_full_dingyin.isChecked(),
+                    full_level=self._get_full_level(),
+                )
+            except Exception as e:
+                logger.error(f"读取装备数据失败: {e}")
+
+        # 一次性计算所有中间结果
         base_attrs = self._get_base_attrs()
-        equip_base_attrs = self._compute_equip_base_attrs()
-        equip_attrs = self._compute_equip_attrs()
+        equip_base_attrs = self._compute_equip_base_attrs(equipped)
+        equip_attrs = self._compute_equip_attrs(equipped)
         gongjue_attrs = self._compute_gongjue_attrs()
         combat_attrs = base_attrs + equip_base_attrs + equip_attrs + gongjue_attrs
         judge_resistance, buff_resistance = self._current_resistances()
@@ -899,6 +955,8 @@ class CombatAttrsTab(QWidget):
                         )
                     self._set_resistance_text(label, value, capped, unit)
                 else:
+                    if field_name in _ATTACK_FIELDS:
+                        value = round(value)
                     label.setText(format_value(value, unit))
 
         self._refresh_attr_penetration(base_attrs, equip_attrs, buff_resistance)
@@ -1234,9 +1292,18 @@ class CombatAttrsTab(QWidget):
 
         return CombatAttributes.from_dict(play_styles[play_style])
 
-    def _compute_equip_attrs(self) -> CombatAttributes:
-        """计算装备词条属性总和（含五维转换，不含装备基础攻击值）"""
-        from ..core.combat.combat_attrs import aggregate_equipment_attrs
+    def _compute_equip_attrs(
+        self, equipped: dict | None = None,
+    ) -> CombatAttributes:
+        """计算装备词条属性总和（含五维转换，不含装备基础攻击值）
+
+        Args:
+            equipped: 已变换的装备数据；为 None 时从仓库加载。
+        """
+        from ..core.combat.combat_attrs import (
+            aggregate_equipment_attrs,
+            apply_hypothetical_caps,
+        )
         from ..core.combat.equipment import EquipmentInventory
 
         user_name = self._host.active_user_name()
@@ -1244,15 +1311,28 @@ class CombatAttrsTab(QWidget):
             return CombatAttributes()
 
         try:
-            return aggregate_equipment_attrs(EquipmentInventory(user_name).equipped)
+            if equipped is None:
+                equipped = EquipmentInventory(user_name).equipped
+                equipped = apply_hypothetical_caps(
+                    equipped,
+                    full_chengyin=self._chk_full_chengyin.isChecked(),
+                    full_dingyin=self._chk_full_dingyin.isChecked(),
+                    full_level=self._get_full_level(),
+                )
+            return aggregate_equipment_attrs(equipped)
         except Exception as e:
             logger.error(f"读取装备数据失败: {e}")
             return CombatAttributes()
 
-    def _compute_equip_base_attrs(self) -> CombatAttributes:
+    def _compute_equip_base_attrs(
+        self, equipped: dict | None = None,
+    ) -> CombatAttributes:
         """计算装备基础外功攻击值（根据部位/等级/品阶）
 
         武器/环/佩 提供基础外功攻击，品阶不同数值不同。
+
+        Args:
+            equipped: 已变换的装备数据；为 None 时从仓库加载。
         """
         from ..config import get_game_config
         from ..core.combat.combat_attrs import compute_equip_base_attrs
@@ -1263,14 +1343,28 @@ class CombatAttrsTab(QWidget):
             return CombatAttributes()
 
         try:
+            if equipped is None:
+                equipped = EquipmentInventory(user_name).equipped
             gc = get_game_config()
             return compute_equip_base_attrs(
-                EquipmentInventory(user_name).equipped,
+                equipped,
                 gc.get_base_attr_values,
             )
         except Exception as e:
             logger.error(f"计算装备基础攻击失败: {e}")
             return CombatAttributes()
+
+    def _get_full_level(self) -> int:
+        """返回满等级的目标等级；未勾选返回 0。"""
+        if not self._chk_full_level.isChecked():
+            return 0
+        from ..config import get_game_config
+        season = get_game_config().current_season()
+        if season and season.equip_level:
+            return season.equip_level
+        # 兑底：无赛季配置时取等级配置最高项
+        configs = get_game_config().get_level_configs()
+        return configs[-1].level if configs else 0
 
     def _compute_gongjue_attrs(self) -> CombatAttributes:
         """计算弓玦属性：当前赛季最大等级三率词条上限的一半"""

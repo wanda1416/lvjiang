@@ -4,6 +4,10 @@
 
 > 工作流 DSL 语法不在本文范围，见 [DSL 语法文档](../30-architecture/32-grammar/README.md)。
 
+**欢迎加群反馈问题和提交建议：**
+
+![微信交流群](wx-qrcode/2026-8-27.jpg)
+
 ---
 
 ## 目录

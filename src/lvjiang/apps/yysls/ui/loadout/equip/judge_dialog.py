@@ -40,9 +40,9 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
 
-from ....i18n import tr
-from .game_settings.level_combo import LevelCombo
-from .tune_config_widget import TuningConfigWidget
+from ......i18n import tr
+from ...game_settings.level_combo import LevelCombo
+from ...tuning.config_widget import TuningConfigWidget
 
 # 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
 # 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
@@ -385,7 +385,7 @@ class EquipJudgeTestDialog(QDialog):
     @staticmethod
     def _load_session_tuning() -> tuple[dict, dict]:
         """读取调律 Tab 已保存的规则配置与全局开关作为初值（统一存储）"""
-        from ....core.config.wf_configs import get_wf_config
+        from ......core.config.wf_configs import get_wf_config
         tc = get_wf_config("auto_tuning")
         return tc.get("rules", {}), tc.get("switches", {})
 
@@ -457,7 +457,7 @@ class EquipJudgeTestDialog(QDialog):
             return
 
         # 加载基础规则组
-        from ....core.config.wf_configs import get_wf_config
+        from ......core.config.wf_configs import get_wf_config
         group_key = get_wf_config("auto_tuning").get("base_group", "default")
         group = get_tuning_group(group_key)
         if group is None:

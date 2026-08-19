@@ -36,8 +36,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....i18n import tr
-from ..core.combat.combat_attrs import (
+from .....i18n import tr
+from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
 
@@ -114,8 +114,8 @@ class _SearchWorker(QRunnable):
 
     def run(self) -> None:
         try:
-            from ..core.graduation import get_graduation_calculator
-            from ..core.graduation.optimal_combo import search_optimal_combo
+            from ...core.graduation import get_graduation_calculator
+            from ...core.graduation.optimal_combo import search_optimal_combo
 
             calc = get_graduation_calculator(self.school, self.scheme)
             if calc is None:
@@ -247,7 +247,7 @@ class _SlotGroup(QGroupBox):
         layout.setContentsMargins(6, 4, 6, 4)
         layout.setSpacing(1)
 
-        from ..core.graduation.combo_rules import judge_tuning_candidate
+        from ...core.graduation.combo_rules import judge_tuning_candidate
         def rating_of(equip: dict) -> tuple[int, str]:
             if not tuning_rule or not playstyle:
                 return 0, "-"
@@ -526,8 +526,8 @@ class OptimalComboDialog(QDialog):
         if not gongjue_type:
             return CombatAttributes()
         try:
-            from ..config import get_game_config
-            from ..core.combat.combat_attrs import compute_gongjue_attrs
+            from ...config import get_game_config
+            from ...core.combat.combat_attrs import compute_gongjue_attrs
             gc = get_game_config()
             seasons = gc.get_season_configs()
             if not seasons:
@@ -555,8 +555,8 @@ class OptimalComboDialog(QDialog):
         每个条目格式："规则名-玩法名"，data 为 (rule_key, playstyle)。
         只展示匹配当前流派的规则+玩法组合。
         """
-        from ..config import get_game_config
-        from ..core.evaluator import get_tuning_rules
+        from ...config import get_game_config
+        from ...core.evaluator import get_tuning_rules
 
         school_cfg = get_game_config().get_schools().get(self._school, {})
         main_weapon = (school_cfg.get("main") or {}).get("weapon", "")
@@ -585,7 +585,7 @@ class OptimalComboDialog(QDialog):
                     row.checkbox.setVisible(True)
             return
         rule_key, playstyle = data
-        from ..core.graduation.combo_rules import judge_tuning_candidate
+        from ...core.graduation.combo_rules import judge_tuning_candidate
         for group in self._slot_groups.values():
             for row in group.rows:
                 result = judge_tuning_candidate(
@@ -624,7 +624,7 @@ class OptimalComboDialog(QDialog):
             return
 
         try:
-            from ..core.combat.equipment import EquipmentInventory
+            from ...core.combat.equipment import EquipmentInventory
             inv = EquipmentInventory(user_name)
         except Exception as e:
             logger.error(f"加载装备数据失败: {e}")
@@ -634,7 +634,7 @@ class OptimalComboDialog(QDialog):
         bag_items = inv.bag_items
 
         # 读取流派配置的主/副武器类型
-        from ..config import get_game_config
+        from ...config import get_game_config
         gc = get_game_config()
         school_cfg = gc.get_schools().get(self._school, {})
         main_weapon_type = (school_cfg.get("main") or {}).get("weapon", "")
@@ -808,7 +808,7 @@ class OptimalComboDialog(QDialog):
         # Launch worker
         full_level = 0
         if self._chk_full_level.isChecked():
-            from ..config import get_game_config
+            from ...config import get_game_config
             gc = get_game_config()
             season = gc.current_season()
             if season and season.equip_level:
@@ -903,7 +903,7 @@ class OptimalComboDialog(QDialog):
             return
 
         try:
-            from ..core.combat.equipment import EquipmentInventory
+            from ...core.combat.equipment import EquipmentInventory
             inv = EquipmentInventory(user_name)
             inv.apply_combos(equipped)
 

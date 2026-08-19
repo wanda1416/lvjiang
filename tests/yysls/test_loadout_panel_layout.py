@@ -1,13 +1,13 @@
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QWidget
 
-from lvjiang.apps.yysls.ui.loadout_panel import LoadoutPanel
+from lvjiang.apps.yysls.ui.loadout import LoadoutPanel
 
 
 class Host(QWidget):
     user_changed = pyqtSignal(str)
     equipment_changed = pyqtSignal()
-    graduation_updated = pyqtSignal()
+    graduation_updated = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()

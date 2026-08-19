@@ -8,13 +8,13 @@ import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.equip_parser.constants import WEAPON_TYPES
-from lvjiang.apps.yysls.ui.equip_judge_dialog import (
+from lvjiang.apps.yysls.ui.loadout.equip.judge_dialog import (
     _NONE_ITEM,
     PART_ITEMS,
     PART_WEAPON,
     EquipAffixEditor,
 )
-from lvjiang.apps.yysls.ui.tune_config_widget import TuningConfigWidget
+from lvjiang.apps.yysls.ui.tuning.config_widget import TuningConfigWidget
 
 
 def _combo_items(combo) -> list[str]:
@@ -225,7 +225,9 @@ class TestTuningConfigWidget:
 
 class TestCanTransmuteCheckbox:
     def test_default_checked_and_injected(self, qtbot, monkeypatch):
-        from lvjiang.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
+        from lvjiang.apps.yysls.ui.loadout.equip.judge_dialog import (
+            EquipJudgeTestDialog,
+        )
         dialog = EquipJudgeTestDialog()
         qtbot.addWidget(dialog)
         # 默认勾选
@@ -239,7 +241,7 @@ class TestCanTransmuteCheckbox:
             return False, ["stub"]
 
         monkeypatch.setattr(
-            "lvjiang.apps.yysls.ui.equip_judge_dialog.judge_tuning_worthiness",
+            "lvjiang.apps.yysls.ui.loadout.equip.judge_dialog.judge_tuning_worthiness",
             fake_worthiness)
         dialog._tuning_config.set_config(
             {"huiyi_general": {"enabled": True}})
@@ -253,7 +255,9 @@ class TestCanTransmuteCheckbox:
 class TestSimulationRoundRating:
     def test_r4_shows_rating_after_fourth_affix(self, qtbot, monkeypatch):
         """R4 必须显示加入御后的满词条潜力，不能沿用 R3 的顶级。"""
-        from lvjiang.apps.yysls.ui.equip_judge_dialog import EquipJudgeTestDialog
+        from lvjiang.apps.yysls.ui.loadout.equip.judge_dialog import (
+            EquipJudgeTestDialog,
+        )
 
         monkeypatch.setattr(
             "lvjiang.core.config.wf_configs.get_wf_config",

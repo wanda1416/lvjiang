@@ -5,13 +5,10 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -20,12 +17,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....core.config import load_ui_page_state, update_ui_page_state
-from ....i18n import tr
-from ..core.loadout import LoadoutRepository, resolve_school
-from .character_detail_tab import CharacterDetailTab
-from .equip_status_tab import EquipStatusTab
-from .profile.tab import add_user_nav_buttons
+from .....core.config import load_ui_page_state, update_ui_page_state
+from .....i18n import tr
+from ...core.loadout import LoadoutRepository, resolve_school
+from ..profile.tab import add_user_nav_buttons
+from .character_detail import CharacterDetailTab
+from .equip.status_tab import EquipStatusTab
+from .plan_create_dialog import PlanCreateDialog
 
 _METRIC_CARD = (
     "QFrame {background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;}"
@@ -43,69 +41,13 @@ _VIEW_MODE_BTN_STYLE = (
 )
 
 
-class _PlanCreateDialog(QDialog):
-    """新建方案对话框：必须同时绑定主武学与副武学，且组合需匹配流派。"""
-
-    def __init__(self, schools: dict, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(tr("新建方案"))
-        self._schools = schools
-        form = QFormLayout(self)
-        self._edit_name = QLineEdit()
-        form.addRow(tr("方案名称:"), self._edit_name)
-        main_arts = list(dict.fromkeys(
-            (cfg.get("main") or {}).get("martial_art", "")
-            for cfg in schools.values()))
-        sub_arts = list(dict.fromkeys(
-            (cfg.get("sub") or {}).get("martial_art", "")
-            for cfg in schools.values()))
-        self._combo_main = QComboBox()
-        self._combo_main.addItems([a for a in main_arts if a])
-        form.addRow(tr("主武学:"), self._combo_main)
-        self._combo_sub = QComboBox()
-        self._combo_sub.addItems([a for a in sub_arts if a])
-        form.addRow(tr("副武学:"), self._combo_sub)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self._validate_and_accept)
-        buttons.rejected.connect(self.reject)
-        form.addRow(buttons)
-
-    def _validate_and_accept(self):
-        main_art = self._combo_main.currentText()
-        sub_art = self._combo_sub.currentText()
-        if not main_art or not sub_art:
-            QMessageBox.warning(
-                self, tr("新建方案"), tr("必须同时绑定主武学和副武学"))
-            return
-        school = resolve_school(main_art, sub_art, self._schools)
-        if school is None:
-            QMessageBox.warning(
-                self, tr("新建方案"),
-                tr("所选主副武学无法匹配任何流派，请重新选择"))
-            return
-        self.accept()
-
-    @property
-    def plan_name(self) -> str:
-        return self._edit_name.text().strip()
-
-    @property
-    def main_art(self) -> str:
-        return self._combo_main.currentText()
-
-    @property
-    def sub_art(self) -> str:
-        return self._combo_sub.currentText()
-
-
 class LoadoutPanel(QWidget):
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
         self._repo = None
         self._refreshing = False
+        self._graduation_result = None
         saved = load_ui_page_state(_UI_PAGE_KEY)
         mode = saved.get("view_mode")
         self._view_mode = mode if mode in _VIEW_MODES else "sidebar"
@@ -318,7 +260,7 @@ class LoadoutPanel(QWidget):
         for pid, plan in state.plans.items():
             self._plans.addItem(plan.name, pid)
         self._plans.setCurrentIndex(self._plans.findData(state.active_plan_id))
-        from ..config import get_game_config
+        from ...config import get_game_config
         schools = get_game_config().get_schools()
         main_arts = [""] + list(dict.fromkeys(
             (cfg.get("main") or {}).get("martial_art", "") for cfg in schools.values()))
@@ -353,12 +295,25 @@ class LoadoutPanel(QWidget):
             return
         self.refresh()
 
-    def _sync_metrics(self):
-        combat = self._character._combat_attrs_tab
-        self._metric_dps.setText(combat._dps_value.text())
-        self._metric_rate.setText(combat._graduation_value.text())
-        self._metric_dps.setToolTip(combat._dps_value.toolTip())
-        self._metric_rate.setToolTip(combat._graduation_value.toolTip())
+    def _sync_metrics(self, result):
+        """接收毕业率计算结果并更新 DPS / 毕业率展示。"""
+        self._graduation_result = result
+        if result is not None:
+            dps_text = f"{result.dps:,.0f}"
+            rate_text = f"{result.graduation_rate * 100:.2f}%"
+            tooltip = (
+                f"{tr('总伤害')}: {result.total_damage:,.0f}\n"
+                f"{tr('基准DPS')}: {result.baseline_dps:,.2f}\n"
+                f"{tr('战斗时间')}: {result.combat_time}s"
+            )
+        else:
+            dps_text = "--"
+            rate_text = "--"
+            tooltip = ""
+        self._metric_dps.setText(dps_text)
+        self._metric_rate.setText(rate_text)
+        self._metric_dps.setToolTip(tooltip)
+        self._metric_rate.setToolTip(tooltip)
 
     @staticmethod
     def _set_combo(combo, values, selected):
@@ -377,8 +332,8 @@ class LoadoutPanel(QWidget):
     def _create_plan(self):
         if not self._repo:
             return
-        from ..config import get_game_config
-        dialog = _PlanCreateDialog(get_game_config().get_schools(), self)
+        from ...config import get_game_config
+        dialog = PlanCreateDialog(get_game_config().get_schools(), self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self._repo.create_plan(dialog.plan_name, dialog.main_art, dialog.sub_art)

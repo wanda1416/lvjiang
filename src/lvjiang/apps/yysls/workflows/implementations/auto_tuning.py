@@ -41,7 +41,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_RANK,
     get_tune_config,
 )
-from lvjiang.apps.yysls.ui.tuning_progress_hub import SLOT_NAMES
+from lvjiang.apps.yysls.ui.tuning.progress_hub import SLOT_NAMES
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -233,7 +233,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if self.engine is not None and (
             not hasattr(self.engine, '_progress_hub') or self.engine._progress_hub is None
         ):
-            from lvjiang.apps.yysls.ui.tuning_progress_hub import TuningProgressHub
+            from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
             self.engine._progress_hub = TuningProgressHub()
         # 预检：当前图库空间必须满足调律输出字段契约（levels/counts）
         missing = self._missing_output_fields()

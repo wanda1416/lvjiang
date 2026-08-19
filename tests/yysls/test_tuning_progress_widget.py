@@ -1,7 +1,7 @@
 """自动调律进度页的实时阶段信息。"""
 
-from lvjiang.apps.yysls.ui.tuning_progress_hub import TuningProgressHub
-from lvjiang.apps.yysls.ui.tuning_progress_widget import TuningProgressWidget
+from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
+from lvjiang.apps.yysls.ui.tuning.progress_widget import TuningProgressWidget
 
 
 def test_operation_update_is_shown_immediately(qtbot):

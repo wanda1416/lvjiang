@@ -21,8 +21,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ....i18n import tr
-from .tuning_progress_hub import TuningProgressHub
+from .....i18n import tr
+from .progress_hub import TuningProgressHub
 
 # 品阶 key → 颜色
 _QUALITY_COLORS = {
@@ -631,7 +631,7 @@ class TuningProgressWidget(QWidget):
         slot_key = info.get("current_slot", "")
         slot_idx = info.get("slot_index", 0)
         total = info.get("total_slots", 0)
-        from lvjiang.apps.yysls.ui.tuning_progress_hub import SLOT_NAMES
+        from lvjiang.apps.yysls.ui.tuning.progress_hub import SLOT_NAMES
         slot_cn = SLOT_NAMES.get(slot_key, slot_key)
         self._batch_label.setText(
             tr("正在处理：{name}（{idx}/{total}）").format(

@@ -15,6 +15,7 @@
 """
 from .signals import WorkflowUserError
 
+
 # WorkflowEngine 延迟加载：core.py 依赖 grammar 包，而 grammar.parser 又间接
 # 依赖 engine.signals。若在此处 eagerly import core，会触发循环导入。
 def __getattr__(name):

@@ -465,7 +465,8 @@ yysls:
   重置时刻: 'Reset Time:'
   默认: Default
 config:
-  wf_scan_unequipped: Equipment Analysis
+  wf_scan_equipped: Equipment Analysis
+  wf_scan_unequipped: Full Equipment Scan
   wf_purchase_xinfa: Auto Purchase Xinfa
   wf_purchase_bugan: Auto Purchase Bugan
   wf_daily_jianghu: Daily Jianghu Order

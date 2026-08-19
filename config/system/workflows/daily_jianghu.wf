@@ -1,4 +1,4 @@
-#% name: 江湖号令刷新
+#% name: 每日江湖号令
 #% parameters:
 #%   - name: max_refresh
 #%     label: 单任务最大刷新次数
@@ -9,7 +9,7 @@
 #%     label: 领取奖励
 #%     type: bool
 #%     default: false
-
+#
 # 江湖号令任务刷新流程
 #
 # 流程结构：

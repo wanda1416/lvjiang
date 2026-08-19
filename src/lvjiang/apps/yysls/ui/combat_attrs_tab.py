@@ -576,6 +576,11 @@ class CombatAttrsTab(QWidget):
             # 如果之前是退化模式，恢复被隐藏的行和正常布局
             if old_mode == DISPLAY_MODE_HALF_COMPACT:
                 self._restore_zero_attack_rows()
+                # 恢复所有卡片网格为原始多列布局
+                self._restore_grid_normal(self._attack_grid, self._attack_grid_items)
+                self._restore_grid_normal(self._judgment_grid, self._judgment_grid_items)
+                self._restore_grid_normal(self._gain_grid, self._gain_grid_items)
+                self._restore_grid_normal(self._damage_grid, self._damage_grid_items)
                 self._reset_name_label_widths()
 
     @staticmethod
@@ -627,20 +632,27 @@ class CombatAttrsTab(QWidget):
         - DISPLAY_MODE_HALF: 半屏完整模式，卡片垂直排列，内部多列
         - DISPLAY_MODE_HALF_COMPACT: 半屏退化模式，卡片内部单列，过滤零值行
 
-        阈值逻辑：基于 36 个汉字宽度判断是否能容纳两列内容。
+        阈值逻辑：基于 38 个汉字宽度判断是否能容纳两列内容。
         """
         super().resizeEvent(event)
         # 仅在半屏模式下启用自适应（包括完整模式和退化模式）
         if self._display_mode in (DISPLAY_MODE_HALF, DISPLAY_MODE_HALF_COMPACT):
-            width = event.size().width()
-            # 进入退化模式：宽度 < 36 字宽度
-            # 退出退化模式：宽度 >= 36 字宽度 + 迟滞偏移（避免抖动）
-            should_compact = width < _COMPACT_THRESHOLD_PX
-            should_normal = width >= _COMPACT_THRESHOLD_PX + _COMPACT_HYSTERESIS_PX
-            if should_compact and self._display_mode == DISPLAY_MODE_HALF:
-                self._switch_to_compact_layout()
-            elif should_normal and self._display_mode == DISPLAY_MODE_HALF_COMPACT:
-                self._switch_to_normal_layout()
+            # 延迟到下一帧处理，确保布局完全稳定后再判断宽度
+            QTimer.singleShot(0, self._check_compact_mode)
+
+    def _check_compact_mode(self) -> None:
+        """检查是否应该切换到退化模式（延迟执行，确保布局稳定）。"""
+        if self._display_mode not in (DISPLAY_MODE_HALF, DISPLAY_MODE_HALF_COMPACT):
+            return
+        width = self.width()
+        # 进入退化模式：宽度 < 38 字宽度
+        # 退出退化模式：宽度 >= 38 字宽度 + 迟滞偏移（避免抖动）
+        should_compact = width < _COMPACT_THRESHOLD_PX
+        should_normal = width >= _COMPACT_THRESHOLD_PX + _COMPACT_HYSTERESIS_PX
+        if should_compact and self._display_mode == DISPLAY_MODE_HALF:
+            self._switch_to_compact_layout()
+        elif should_normal and self._display_mode == DISPLAY_MODE_HALF_COMPACT:
+            self._switch_to_normal_layout()
 
     def _switch_to_compact_layout(self) -> None:
         """切换到半屏退化模式：单列布局 + 过滤零值行 + 右侧对齐。"""

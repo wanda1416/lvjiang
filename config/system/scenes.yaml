@@ -21,12 +21,13 @@ layout_scenes:
   - zhanling_detail
   group_4:
   - school_main
+  - baiye_main
   - waiguan_yigui
   - waiguan_qingjing
-  - baiye_main
   group_5:
   - activity_main
   - activity_jianghu
+  - activity_huoyun
   - activity_mengzhu
 group_names:
   group_1: 通用

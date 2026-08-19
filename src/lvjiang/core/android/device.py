@@ -1,19 +1,11 @@
-"""AdbDevice - adb 可执行/serial 解析、shell/forward/push、设备属性查询
-
-ADB 通信异常暂停恢复策略：
-  shell / shell_bytes 遇到超时或 OSError 时：
-  1. 触发 on_connection_lost 回调（UI 层用于非阻塞状态栏提示）
-  2. 工作流线程阻塞在 resume_event.wait()，等待用户手动恢复连接
-  3. 用户重连设备后点击「恢复」→ resume_event.set() → 工作流重试原命令
-  4. 用户点击「停止」(F10) → stop_check 触发 → 抛出 AdbConnectionError 终止流程
-  无自动重试，完全依赖用户手动恢复。
-"""
+"""AdbDevice - adb 可执行/serial 解析、shell/forward/push、设备属性查询"""
 
 import os
 import re
 import shutil
 import subprocess
 import threading
+import time
 from typing import Callable
 
 from loguru import logger
@@ -92,14 +84,10 @@ class AdbDevice:
         self._resolution: tuple[int, int] | None = None
         self._abi: str | None = None
         self._sdk: int | None = None
-        # ── 断连暂停恢复机制 ──
-        # UI 层在连接成功后设置以下属性：
-        #   on_connection_lost: 非阻塞回调，从工作流线程调用，用于状态栏提示
-        #   resume_event: threading.Event，用户点击「恢复」时 set
-        #   stop_check: 停止检测函数，F10 时返回 True
+        # ── 断连暂停恢复 ──
         self.on_connection_lost: Callable[[str], None] | None = None
         self.resume_event = threading.Event()
-        self.resume_event.set()  # 初始为已恢复状态，不阻塞
+        self.resume_event.set()  # 初始为已恢复，不阻塞
         self.stop_check: Callable[[], bool] | None = None
 
     # ─── 命令前缀 ─────────────────────────────────────────
@@ -110,78 +98,90 @@ class AdbDevice:
             cmd += ["-s", self.serial]
         return cmd
 
+    # ─── 断连检测 ─────────────────────────────────────────
+
+    _DISCONNECT_KEYWORDS = ("not found", "device offline", "no devices", "connection refused")
+
+    def _is_disconnect_error(self, stderr: str) -> bool:
+        msg = stderr.strip().lower()
+        return any(kw in msg for kw in self._DISCONNECT_KEYWORDS)
+
     # ─── 基础执行 ─────────────────────────────────────────
 
     def _handle_connection_error(self, error: Exception, cmd_desc: str):
-        """ADB 命令失败时的暂停恢复处理
-
-        1. 非阻塞通知 UI（状态栏提示）
-        2. 暂停工作流线程，等待用户手动恢复或停止
-        3. 恢复后清除事件状态，返回以便调用方重试
-        4. 停止时抛出 AdbConnectionError
-        """
+        """ADB 命令失败 → 通知 UI → 暂停工作流线程等待用户点「恢复」"""
         err_msg = f"{cmd_desc} 失败: {error}"
         logger.warning(f"ADB 连接异常: {err_msg}")
-
-        # 1. 非阻塞通知 UI
         if self.on_connection_lost:
             try:
                 self.on_connection_lost(err_msg)
             except Exception:
                 pass
-
-        # 2. 暂停工作流线程，等待用户操作
         self.resume_event.clear()
         while True:
-            # 检查是否被要求停止
             if self.stop_check and self.stop_check():
                 self.resume_event.set()
                 raise AdbConnectionError(
                     f"{cmd_desc} 失败且用户停止: {error}"
                 ) from None
-            # 等待恢复信号（1 秒超时轮询，兼顾响应速度）
             if self.resume_event.wait(timeout=1.0):
-                logger.info("ADB 用户已恢复，重试命令")
-                self.resume_event.clear()  # 为下次断连重置
+                logger.info("ADB 用户已恢复，等待设备稳定...")
+                self.resume_event.clear()
+                # 给设备短暂稳定时间（scrcpy 重连后 adb 需要几秒就绪）
+                # 期间保持响应 F10 停止
+                for _ in range(6):
+                    if self.stop_check and self.stop_check():
+                        self.resume_event.set()
+                        raise AdbConnectionError(
+                            f"{cmd_desc} 恢复后用户停止: {error}"
+                        ) from None
+                    time.sleep(0.5)
                 return
 
     def shell(self, *args: str, timeout: float = 15.0) -> str:
-        """执行 adb shell 命令，返回 stdout 文本
-
-        断连暂停机制：超时/OSError 时暂停工作流线程并通知 UI，
-        等待用户手动重连并点击「恢复」后重试原命令。
-        """
+        """执行 adb shell 命令，返回 stdout 文本"""
+        retried = False
         while True:
             try:
+                if retried:
+                    logger.info(f"ADB 重试: adb shell {' '.join(args)}")
                 r = subprocess.run(
                     [*self._base(), "shell", *args],
                     capture_output=True, text=True, timeout=timeout,
                     **SUBPROCESS_NO_WINDOW,
                 )
                 if r.returncode != 0:
-                    logger.debug(f"adb shell {args} 返回码 {r.returncode}: {r.stderr.strip()}")
+                    stderr_msg = r.stderr.strip()
+                    if self._is_disconnect_error(stderr_msg):
+                        raise OSError(stderr_msg)
+                    logger.debug(f"adb shell {args} 返回码 {r.returncode}: {stderr_msg}")
                 return r.stdout.strip()
             except (subprocess.TimeoutExpired, OSError) as e:
                 self._handle_connection_error(e, f"adb shell {args}")
-                # 用户已恢复，重试原命令
+                retried = True
 
     def shell_bytes(self, *args: str, timeout: float = 15.0) -> bytes:
-        """执行 adb 命令返回原始字节流（如 exec-out screencap）
-
-        断连暂停机制：超时/OSError 时暂停工作流线程并通知 UI，
-        等待用户手动重连并点击「恢复」后重试原命令。
-        """
+        """执行 adb 命令返回原始字节流（如 exec-out screencap）"""
+        retried = False
         while True:
             try:
+                if retried:
+                    logger.info(f"ADB 重试: adb {' '.join(args)}")
                 r = subprocess.run(
                     [*self._base(), *args],
                     capture_output=True, timeout=timeout,
                     **SUBPROCESS_NO_WINDOW,
                 )
+                if r.returncode != 0:
+                    stderr_msg = r.stderr.strip()
+                    if isinstance(stderr_msg, bytes):
+                        stderr_msg = stderr_msg.decode(errors="replace")
+                    if self._is_disconnect_error(stderr_msg):
+                        raise OSError(stderr_msg)
                 return r.stdout
             except (subprocess.TimeoutExpired, OSError) as e:
                 self._handle_connection_error(e, f"adb {args}")
-                # 用户已恢复，重试原命令
+                retried = True
 
     def forward(self, local: str, remote: str) -> bool:
         """建立端口转发 local -> remote，成功返回 True"""

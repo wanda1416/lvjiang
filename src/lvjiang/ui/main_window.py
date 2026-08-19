@@ -11,6 +11,8 @@
 """
 from __future__ import annotations
 
+import threading
+
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QKeyEvent
@@ -453,24 +455,24 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         top_row.addStretch()
         main_layout.addLayout(top_row)
 
-        # === ADB 断连警告横幅（默认隐藏，ADB 异常时显示）===
+        # === ADB 断连警告条（单行，默认隐藏）===
+        # resume_event 存在主窗口级别，不随 device 对象断连/重连而丢失
+        self._adb_resume_event = threading.Event()
+        self._adb_resume_event.set()  # 初始为已恢复，不阻塞
         self._adb_banner = QFrame()
-        self._adb_banner.setStyleSheet(
-            "background-color: #d32f2f; border-radius: 6px; padding: 8px;"
-        )
+        self._adb_banner.setStyleSheet("background-color: #d32f2f;")
         self._adb_banner.setVisible(False)
-        banner_layout = QHBoxLayout(self._adb_banner)
-        banner_layout.setContentsMargins(12, 8, 12, 8)
+        _bl = QHBoxLayout(self._adb_banner)
+        _bl.setContentsMargins(8, 2, 8, 2)
         self._adb_banner_label = QLabel()
-        self._adb_banner_label.setStyleSheet("color: white; font-weight: bold; font-size: 13px;")
-        self._adb_banner_label.setWordWrap(True)
-        banner_layout.addWidget(self._adb_banner_label, stretch=1)
+        self._adb_banner_label.setStyleSheet("color: white; font-weight: bold;")
+        _bl.addWidget(self._adb_banner_label, stretch=1)
         self._adb_banner_btn = QPushButton(tr("恢复"))
         self._adb_banner_btn.setStyleSheet(
             "background-color: white; color: #d32f2f; font-weight: bold; "
-            "padding: 6px 20px; border: none; border-radius: 4px; font-size: 13px;"
+            "padding: 2px 12px; border: none; font-size: 12px;"
         )
-        banner_layout.addWidget(self._adb_banner_btn)
+        _bl.addWidget(self._adb_banner_btn)
         main_layout.addWidget(self._adb_banner)
 
         # === 窗口/设备选择 ===

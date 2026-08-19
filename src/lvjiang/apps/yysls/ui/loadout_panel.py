@@ -36,11 +36,8 @@ _METRIC_CARD = (
 _UI_PAGE_KEY = "loadout_panel"
 _VIEW_MODES = ("sidebar", "half", "full")
 
-# 折叠按钮专属控制条：左右两个 shell 使用完全相同的几何参数，
-# 从而保证成对按钮垂直对齐且水平镜像对称，与 Tab 内部布局解耦。
-_CTRL_ROW_HEIGHT = 34
-_CTRL_ROW_MARGIN = (8, 2, 8, 2)
-_CTRL_BTN_STYLE = (
+# 视图切换图标按钮样式（与刷新按钮视觉一致）
+_VIEW_MODE_BTN_STYLE = (
     "QPushButton{border:0;border-radius:4px;font-size:16px;color:#546E7A;}"
     "QPushButton:hover{background:#E8EEF2;color:#263238;}"
 )
@@ -130,13 +127,26 @@ class LoadoutPanel(QWidget):
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(8)
 
-        # Row 1: same navigation structure as “其他信息”.
+        # Row 1: same navigation structure as "其他信息".
         tools = QHBoxLayout()
         refresh = QPushButton(tr("刷新"))
         refresh.setFixedWidth(60)
         refresh.clicked.connect(self.refresh)
         tools.addWidget(refresh)
         add_user_nav_buttons(tools, self._host)
+        # 视图切换图标：4 个汉字宽度间距
+        tools.addSpacing(64)
+        for symbol, tooltip, callback in (
+            ("▣", tr("战斗属性全屏"), lambda: self._set_view_mode("full")),
+            ("◧", tr("战斗属性半屏"), lambda: self._set_view_mode("half")),
+            ("▣", tr("装备面板全屏"), lambda: self._set_view_mode("sidebar")),
+        ):
+            btn = QPushButton(symbol)
+            btn.setToolTip(tooltip)
+            btn.setFixedSize(36, 36)
+            btn.setStyleSheet(_VIEW_MODE_BTN_STYLE)
+            btn.clicked.connect(callback)
+            tools.addWidget(btn)
         tools.addStretch()
         for label, callback in (
             (tr("计算最优组合"), lambda: self._equipment._on_optimal_combo()),
@@ -218,7 +228,6 @@ class LoadoutPanel(QWidget):
         layout = QVBoxLayout(shell)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self._combat_ctrl_row = self._make_ctrl_row(layout, align_right=True)
         self._character = CharacterDetailTab(self._host, shell)
         layout.addWidget(self._character, 1)
         return shell
@@ -228,53 +237,10 @@ class LoadoutPanel(QWidget):
         layout = QVBoxLayout(shell)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self._equip_ctrl_row = self._make_ctrl_row(layout, align_right=False)
         self._equipment = EquipStatusTab(self._host, shell)
         self._equipment.set_embedded_mode(True)
         layout.addWidget(self._equipment, 1)
         return shell
-
-    def _make_ctrl_row(
-        self, parent_layout: QVBoxLayout, *, align_right: bool,
-    ) -> QHBoxLayout:
-        """创建固定高度的折叠按钮控制条。
-
-        左右两个 shell 各自拥有一条几何完全相同的控制条，成对按钮因此
-        必然垂直对齐且水平镜像对称，不受各自 Tab 内容布局影响。
-        """
-        host = QWidget()
-        host.setFixedHeight(_CTRL_ROW_HEIGHT)
-        row = QHBoxLayout(host)
-        row.setContentsMargins(*_CTRL_ROW_MARGIN)
-        row.setSpacing(3)
-        parent_layout.addWidget(host)
-        return row
-
-    def _fill_ctrl_row(
-        self, row: QHBoxLayout, specs, *, align_right: bool,
-    ) -> None:
-        while row.count():
-            item = row.takeAt(0)
-            if item is None:
-                continue
-            widget = item.widget()
-            if widget is not None:
-                # 同步销毁旧按钮：deleteLater 会让旧按钮在下一次事件循环
-                # 前继续占据布局位置，导致新按钮定位错乱
-                widget.setParent(None)
-                widget.deleteLater()
-                del widget
-        if align_right:
-            row.addStretch()
-        for symbol, tooltip, callback in specs:
-            button = QPushButton(symbol)
-            button.setToolTip(tooltip)
-            button.setFixedSize(28, 28)
-            button.setStyleSheet(_CTRL_BTN_STYLE)
-            button.clicked.connect(callback)
-            row.addWidget(button)
-        if not align_right:
-            row.addStretch()
 
     def _set_view_mode(self, mode: str) -> None:
         if mode != self._view_mode:
@@ -284,26 +250,6 @@ class LoadoutPanel(QWidget):
         combat.set_embedded_mode(mode)
         self._left_shell.setVisible(mode != "sidebar")
         self._right_shell.setVisible(mode != "full")
-        if mode == "sidebar":
-            # 与战斗属性侧镜像对称：全屏按钮靠外缘，半屏按钮靠中线
-            self._fill_ctrl_row(self._equip_ctrl_row, (
-                ("▣", tr("全屏展开战斗属性"), lambda: self._set_view_mode("full")),
-                ("◧", tr("半屏展开战斗属性"), lambda: self._set_view_mode("half")),
-            ), align_right=False)
-            self._fill_ctrl_row(self._combat_ctrl_row, (), align_right=True)
-        elif mode == "half":
-            self._fill_ctrl_row(self._combat_ctrl_row, (
-                ("‹", tr("收缩战斗属性"), lambda: self._set_view_mode("sidebar")),
-            ), align_right=True)
-            self._fill_ctrl_row(self._equip_ctrl_row, (
-                ("›", tr("收缩装备"), lambda: self._set_view_mode("full")),
-            ), align_right=False)
-        else:
-            self._fill_ctrl_row(self._combat_ctrl_row, (
-                ("◧", tr("半屏展开装备"), lambda: self._set_view_mode("half")),
-                ("▣", tr("全屏展开装备"), lambda: self._set_view_mode("sidebar")),
-            ), align_right=True)
-            self._fill_ctrl_row(self._equip_ctrl_row, (), align_right=False)
         self._left_shell.setMaximumWidth(16777215)
         self._right_shell.setMaximumWidth(16777215)
         # 强制忽略 sizeHint，让 splitter 按 setSizes 分配空间

@@ -31,10 +31,6 @@ def test_three_view_modes(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(host)
     qtbot.addWidget(panel)
 
-    def ctrl_buttons(row):
-        return [row.itemAt(i).widget() for i in range(row.count())
-                if row.itemAt(i).widget() is not None]
-
     assert panel._view_mode == "sidebar"
     assert panel._equipment.isVisible() is False  # parent panel not shown yet
 
@@ -42,7 +38,6 @@ def test_three_view_modes(qtbot, tmp_path, monkeypatch):
     qtbot.wait(10)
     assert not panel._left_shell.isVisible()
     assert panel._right_shell.isVisible()
-    assert len(ctrl_buttons(panel._equip_ctrl_row)) == 2
 
     panel._set_view_mode("half")
     assert panel._left_shell.isVisible()
@@ -51,31 +46,10 @@ def test_three_view_modes(qtbot, tmp_path, monkeypatch):
     assert panel._character._combat_attrs_tab._attrs_scroll.isVisible()
     flow = panel._character._combat_attrs_tab._main_layout.itemAt(0).layout()
     assert flow.count() == 5  # four ordered cards + bottom stretch
-    # 成对折叠按钮分别位于两个 shell 顶部的专属控制条
-    left_btns = ctrl_buttons(panel._combat_ctrl_row)
-    right_btns = ctrl_buttons(panel._equip_ctrl_row)
-    assert len(left_btns) == 1
-    assert len(right_btns) == 1
-    # 控制条几何完全相同 → 按钮垂直对齐
-    assert panel._combat_ctrl_row.parentWidget().height() == \
-        panel._equip_ctrl_row.parentWidget().height()
-    panel.resize(1200, 800)
-    qtbot.wait(100)  # 确保布局完成
-    left_pos = left_btns[0].mapTo(panel, left_btns[0].rect().center())
-    right_pos = right_btns[0].mapTo(panel, right_btns[0].rect().center())
-    assert left_pos.y() == right_pos.y()
-    # 水平镜像对称：两按钮中心到面板中线的距离相等
-    # （允许 splitter 分割条宽度的舍入误差）
-    from PyQt6.QtWidgets import QStyle
-    handle = panel._splitter.style().pixelMetric(
-        QStyle.PixelMetric.PM_SplitterWidth)
-    center_x = panel.width() / 2
-    assert abs((center_x - left_pos.x()) - (right_pos.x() - center_x)) <= handle
 
     panel._set_view_mode("full")
     assert panel._left_shell.isVisible()
     assert not panel._right_shell.isVisible()
-    assert len(ctrl_buttons(panel._combat_ctrl_row)) == 2
     grid = panel._character._combat_attrs_tab._main_layout.itemAt(0).layout()
     assert grid.itemAtPosition(0, 0).widget() is panel._character._combat_attrs_tab._attack_card
     assert grid.itemAtPosition(1, 0).widget() is panel._character._combat_attrs_tab._judgment_card

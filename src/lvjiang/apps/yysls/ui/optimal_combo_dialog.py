@@ -89,6 +89,9 @@ class _SearchWorker(QRunnable):
         scheme: str,
         base_attrs: CombatAttributes,
         use_dominance_pruning: bool,
+        full_chengyin: bool = False,
+        full_dingyin: bool = False,
+        full_level: int = 0,
     ) -> None:
         super().__init__()
         self.candidates = candidates
@@ -96,6 +99,9 @@ class _SearchWorker(QRunnable):
         self.scheme = scheme
         self.base_attrs = base_attrs
         self.use_dominance_pruning = use_dominance_pruning
+        self.full_chengyin = full_chengyin
+        self.full_dingyin = full_dingyin
+        self.full_level = full_level
         self.signals = _SearchSignals()
         self._cancel_event = threading.Event()
 
@@ -120,6 +126,9 @@ class _SearchWorker(QRunnable):
                 use_dominance_pruning=self.use_dominance_pruning,
                 progress_cb=lambda ev, tot, msg: self.signals.progress.emit(ev, tot, msg),
                 cancel_flag=self._cancel_event.is_set,
+                full_chengyin=self.full_chengyin,
+                full_dingyin=self.full_dingyin,
+                full_level=self.full_level,
             )
             self.signals.finished.emit(results)
         except Exception as exc:
@@ -351,11 +360,23 @@ class OptimalComboDialog(QDialog):
 
         # Options row
         options = QHBoxLayout()
-        self._chk_pruning = QCheckBox(tr("支配剪枝"))
+        self._chk_pruning = QCheckBox(tr("智能筛选"))
         self._chk_pruning.setChecked(True)
         self._chk_pruning.setToolTip(
-            tr("移除被其他候选完全压制的装备，缩减搜索空间"))
+            tr("自动淘汰被其他候选完全压制的装备，缩减搜索空间"))
         options.addWidget(self._chk_pruning)
+        self._chk_full_chengyin = QCheckBox(tr("满承音"))
+        self._chk_full_chengyin.setToolTip(
+            tr("将承音装备的词条数值视为承音上限参与计算"))
+        options.addWidget(self._chk_full_chengyin)
+        self._chk_full_dingyin = QCheckBox(tr("满定音"))
+        self._chk_full_dingyin.setToolTip(
+            tr("将定音词条数值视为上限（100%）参与计算"))
+        options.addWidget(self._chk_full_dingyin)
+        self._chk_full_level = QCheckBox(tr("满等级"))
+        self._chk_full_level.setToolTip(
+            tr("将低于最高等级的装备视为最高等级参与计算"))
+        options.addWidget(self._chk_full_level)
         options.addStretch()
         layout.addLayout(options)
 
@@ -701,12 +722,25 @@ class OptimalComboDialog(QDialog):
         self._result_cards.clear()
 
         # Launch worker
+        full_level = 0
+        if self._chk_full_level.isChecked():
+            from ..config import get_game_config
+            gc = get_game_config()
+            season = gc.current_season()
+            if season and season.equip_level:
+                full_level = season.equip_level
+            else:
+                configs = gc.get_level_configs()
+                full_level = configs[-1].level if configs else 0
         self._worker = _SearchWorker(
             candidates,
             self._school,
             self._scheme,
             self._base_attrs,
             self._chk_pruning.isChecked(),
+            full_chengyin=self._chk_full_chengyin.isChecked(),
+            full_dingyin=self._chk_full_dingyin.isChecked(),
+            full_level=full_level,
         )
         self._worker.signals.progress.connect(self._on_progress)
         self._worker.signals.finished.connect(self._on_finished)

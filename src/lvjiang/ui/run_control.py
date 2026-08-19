@@ -368,6 +368,9 @@ class RunControlMixin:
         self._stop_requested = False
         self._current_worker = None
         self._refresh_run_button()
+        banner = getattr(self, '_adb_banner', None)
+        if banner is not None:
+            banner.setVisible(False)
         self.statusBar().showMessage(f"{name} 已结束")
         logger.info(f"自动化结束: {name}")
 
@@ -411,10 +414,9 @@ class RunControlMixin:
         if helper is not None:
             helper.close_active_dialog()
         # 若工作流正阻塞在 ADB 断连等待上，唤醒以便响应停止
-        device = getattr(self, '_device', None)
-        if device is not None and hasattr(device, 'resume_event'):
-            device.resume_event.set()
-        # 隐藏 ADB 断连横幅
+        resume_event = getattr(self, '_adb_resume_event', None)
+        if resume_event is not None:
+            resume_event.set()
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
             banner.setVisible(False)
@@ -429,23 +431,41 @@ class RunControlMixin:
 
     # ─── ADB 断连暂停恢复 ────────────────────────────────
 
-    def _on_adb_connection_lost(self, error_msg: str):
-        """ADB 断连通知处理（主线程，由信号桥投递）
+    def _refresh_running_engine_backends(self):
+        """重连后把新的截图/输入后端同步给运行中的引擎
 
-        非阻塞：显示醒目红色横幅 + 日志记录，不弹窗。
-        工作流线程已阻塞在 resume_event.wait()，等待用户手动恢复。
+        工作流运行中断连重连时，引擎及其 BaseWorkflow 委托仍持有旧后端：
+        scrcpy 截图后端的流已死，capture() 永远返回断连前的陈旧帧，OCR 全未命中。
+        仅在引擎阻塞在 resume_event 等待时调用（此时替换引用无并发风险）。
         """
+        engine = getattr(self, '_current_engine', None)
+        if engine is None:
+            return
+        capture = getattr(self, '_capture', None)
+        input_ctrl = getattr(self, '_input', None)
+        if capture is not None:
+            engine._capture = capture
+        if input_ctrl is not None:
+            engine._input = input_ctrl
+        wf = getattr(engine, '_workflow', None)
+        if wf is not None:
+            if capture is not None:
+                wf._capture = capture
+            if input_ctrl is not None:
+                wf._input = input_ctrl
+        logger.info("[恢复] 已为运行中的引擎刷新截图/输入后端引用")
+
+    def _on_adb_connection_lost(self, error_msg: str):
+        """ADB 断连通知（主线程，由信号桥投递）"""
         self.log_text.append(f"[警告] ADB 连接异常，请重连设备后点击恢复: {error_msg}")
         self.statusBar().showMessage(tr("ADB 异常，请重连设备后点击恢复"))
-        # 显示主内容区顶部红色横幅（极其醒目，不阻塞操作）
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
             label = getattr(self, '_adb_banner_label', None)
             if label is not None:
-                label.setText(tr("⚠ ADB 连接异常，请重连设备后点击右侧「恢复」按钮"))
+                label.setText(tr("⚠ ADB 连接异常，请重连设备后点击右侧「恢复」"))
             btn = getattr(self, '_adb_banner_btn', None)
             if btn is not None:
-                # 防止重复连接
                 try:
                     btn.clicked.disconnect()
                 except TypeError:
@@ -455,12 +475,12 @@ class RunControlMixin:
 
     def _resume_adb(self):
         """用户点击「恢复」：唤醒工作流线程，重试失败的 ADB 命令"""
-        device = getattr(self, '_device', None)
-        if device is not None and hasattr(device, 'resume_event'):
-            device.resume_event.set()
+        # 直接用主窗口级别的 resume_event，不依赖 device 对象
+        resume_event = getattr(self, '_adb_resume_event', None)
+        if resume_event is not None:
+            resume_event.set()
             self.statusBar().showMessage(tr("已恢复，继续执行..."))
             self.log_text.append(tr("[操作] ADB 已恢复，工作流继续"))
-        # 隐藏红色横幅
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
             banner.setVisible(False)

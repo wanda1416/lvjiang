@@ -12,15 +12,10 @@ from ..i18n import tr
 
 
 class _AdbConnSignalBridge(QObject):
-    """工作流线程 → 主线程的 ADB 断连信号桥
-
-    AdbDevice.on_connection_lost 从工作流线程调用，通过 Qt 信号
-    安全投递到主线程槽，避免跨线程操作 Qt 控件。
-    """
+    """工作流线程 → 主线程的 ADB 断连信号桥"""
     adb_lost = pyqtSignal(str)
 
     def notify_lost(self, error_msg: str):
-        """从工作流线程调用，发射信号到主线程"""
         self.adb_lost.emit(error_msg)
 
 
@@ -530,17 +525,25 @@ class WindowOpsMixin:
                 self._scrcpy_streaming = True
                 logger.info("[连接] scrcpy 视频流预览已启用")
 
+        # ── ADB 断连暂停恢复接线 ──
+        # resume_event 存在主窗口级别（self._adb_resume_event），不随 device 断连/重连而丢失。
+        # 每次连接都指向同一个 event，确保工作流线程等待的和「恢复」按钮 set 的是同一个。
+        device.resume_event = self._adb_resume_event
+
         self._capture = capture
         self._device = device
         self._device_ready = True
 
-        # ── ADB 断连暂停恢复接线 ──
-        # 工作流线程遇到 ADB 超时时通过桥信号通知主线程（非阻塞），
-        # 主线程显示状态栏提示 + 恢复按钮；用户点击恢复后唤醒工作流线程。
         self._adb_conn_bridge = _AdbConnSignalBridge()
         self._adb_conn_bridge.adb_lost.connect(self._on_adb_connection_lost)
         device.on_connection_lost = self._adb_conn_bridge.notify_lost
         device.stop_check = lambda: self._stop_requested
+
+        # 若工作流正阻塞在断连等待上（resume_event 未 set），
+        # 把新的截图/输入后端同步给运行中的引擎，否则引擎继续用已死的旧 scrcpy 流截图
+        resume_event = getattr(self, '_adb_resume_event', None)
+        if resume_event is not None and not resume_event.is_set():
+            self._refresh_running_engine_backends()
 
         method_label = "scrcpy" if capture_method == "scrcpy" else "screencap"
         self.lbl_window_info.setText(f"已连接: {combo_data['serial']}  |  分辨率: {w}x{h}  |  {method_label}")

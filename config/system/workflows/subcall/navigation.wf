@@ -149,11 +149,12 @@ def nav_main_to_item()
         click [bag_equip_detail].[item] after wait @page_refresh
     end
 
+    # 道具识别错误率较高，暂时注释掉
     # 校验是否到达道具页
-    scan [bag_equip_detail].[sub_baoguo] as $item_check by contains "道具"
-    if not $item_check
-        eval pause("未进入道具页面，请手动导航后点击继续")
-    end
+    #scan [bag_equip_detail].[sub_baoguo] as $item_check by contains "道具"
+    #if not $item_check
+    #    eval pause("未进入道具页面，请手动导航后点击继续")
+    #end
 
     # 点击普通道具，锁定子区域
     log info "从道具页进入普通道具"

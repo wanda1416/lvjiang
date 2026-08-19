@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -82,8 +83,10 @@ class ScriptConfigDialog(QDialog):
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         header = self._table.horizontalHeader()
-        header.setSectionResizeMode(self.COL_NAME, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(self.COL_SOURCE, QHeaderView.ResizeMode.Stretch)
+        fm = QFontMetrics(header.font())
+        header.setMinimumSectionSize(fm.horizontalAdvance("测") * 3)
+        for col in range(self._table.columnCount()):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self._table)
 
         # 顺序调整按钮

@@ -892,7 +892,12 @@ class ProfileOverviewTab(QWidget):
                         group_name, table,
                     )
                 )
-            # note 不记录 history，不提供"查看历史记录"菜单项
+            # note 历史记录
+            action_history = menu.addAction(tr("查看历史记录"))
+            if action_history:
+                action_history.triggered.connect(
+                    lambda: self._show_history_dialog(user_name, model_type, key_str, kd.label)
+                )
             viewport = table.viewport()
             if viewport:
                 menu.exec(viewport.mapToGlobal(pos))

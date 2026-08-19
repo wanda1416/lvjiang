@@ -86,16 +86,25 @@ class HistoryDialog(QDialog):
                 formatted_ts = raw_ts
 
             ct = rec.get("change_type", "")
-            old_val = rec.get("old_value")
-            new_val = rec.get("new_value")
-            old_str = (
-                str(int(old_val)) if old_val is not None and old_val == int(old_val)
-                else str(old_val) if old_val is not None else "—"
-            )
-            new_str = (
-                str(int(new_val)) if new_val is not None and new_val == int(new_val)
-                else str(new_val) if new_val is not None else "—"
-            )
+            rec_type = rec.get("type", "")
+
+            # note 模型展示文本值，其他模型展示数值
+            if rec_type == "note":
+                old_str = rec.get("old_value_text", "") or "—"
+                new_str = rec.get("new_value_text", "") or "—"
+                if not old_str:
+                    old_str = "—"
+            else:
+                old_val = rec.get("old_value")
+                new_val = rec.get("new_value")
+                old_str = (
+                    str(int(old_val)) if old_val is not None and old_val == int(old_val)
+                    else str(old_val) if old_val is not None else "—"
+                )
+                new_str = (
+                    str(int(new_val)) if new_val is not None and new_val == int(new_val)
+                    else str(new_val) if new_val is not None else "—"
+                )
 
             table.setItem(row, 0, QTableWidgetItem(formatted_ts))
             table.setItem(row, 1, QTableWidgetItem(tr(self._TYPE_LABEL.get(ct, ct))))

@@ -252,6 +252,8 @@ class LoadoutPanel(QWidget):
         self._right_shell.setVisible(mode != "full")
         self._left_shell.setMaximumWidth(16777215)
         self._right_shell.setMaximumWidth(16777215)
+        # 半屏模式左侧最低宽度：20 个汉字（280px）
+        self._left_shell.setMinimumWidth(280 if mode == "half" else 0)
         # 强制忽略 sizeHint，让 splitter 按 setSizes 分配空间
         self._left_shell.setSizePolicy(
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)

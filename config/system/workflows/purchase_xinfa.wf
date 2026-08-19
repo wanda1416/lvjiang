@@ -26,7 +26,7 @@ click [training_main].[gongfa] after wait @step_interval
 click [training_main].[xinfa] after wait @page_refresh
 click [training_xinfa].[exchange] after wait @page_refresh
 
-scan [training_xinfa].[exchange] as $nav_check by contains "心得置换"
+scan [training_xinfa].[exchange] as $nav_check by contains "置换"
 if not $nav_check
     eval pause("未进入心得置换页面，请手动导航后点击继续")
 end

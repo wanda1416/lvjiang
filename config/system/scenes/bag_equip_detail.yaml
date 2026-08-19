@@ -106,6 +106,16 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: zhengli
+  name: 整理背包
+  type: func
+  is_text: true
+  is_clickable: true
+- key: zhizao
+  name: 制造
+  type: func
+  is_text: true
+  is_clickable: true
 panels:
 - key: bag_grid
   name: 背包网格

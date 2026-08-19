@@ -39,6 +39,8 @@ xcopy /e /i /y data\adb dist\lvjiang\data\adb >nul
 if errorlevel 1 exit /b 1
 xcopy /e /i /y data\scrcpy dist\lvjiang\data\scrcpy >nul
 if errorlevel 1 exit /b 1
+xcopy /e /i /y data\image dist\lvjiang\data\image >nul
+if errorlevel 1 exit /b 1
 
 powershell -NoProfile -Command "Compress-Archive -Path dist/lvjiang -DestinationPath dist/lvjiang-v%APP_VERSION%-win64.zip -Force"
 if errorlevel 1 exit /b 1

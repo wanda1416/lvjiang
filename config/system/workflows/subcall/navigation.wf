@@ -4,7 +4,7 @@
 # 提供页面间导航的原子操作，供各工作流 import 后调用。
 #
 # 包含过程：
-#   nav_main_to_bag()    — 主界面 → 背包页（返回当前 tab 编号 1-4）
+#   nav_main_to_bag()    — 主界面 → 背包页（>=0 成功，<0 导航失败）
 #   nav_main_to_equip()  — 主界面 → 背包装备列表页
 #   nav_main_to_wallet() — 主界面 → 背包钱袋页
 #   nav_main_to_item()   — 主界面 → 背包道具页（普通道具子区域）
@@ -56,7 +56,14 @@ def nav_main_to_bag()
     end
 
     if $tab == 0
-        eval pause("未进入包裹页面，请手动导航后点击继续")
+        # tab 未识别，通过 zhengli 区域二次确认是否在背包页
+        scan [bag_equip_detail].[zhengli] as $zhengli_text
+        if $zhengli_text.zhengli contains "整理"
+            log info "通过整理按钮确认在背包页"
+        else
+            log error "未进入包裹页面"
+            $tab = -1
+        end
     end
 
     return $tab
@@ -70,6 +77,9 @@ end
 
 def nav_main_to_equip()
     call $tab = nav_main_to_bag()
+    if $tab < 0
+        return -1
+    end
 
     # 不在培养 tab 则点击切换
     if $tab != 1
@@ -103,6 +113,9 @@ end
 
 def nav_main_to_wallet()
     call $tab = nav_main_to_bag()
+    if $tab < 0
+        return -1
+    end
 
     # 不在钱袋 tab 则点击切换
     if $tab != 4
@@ -126,6 +139,9 @@ end
 
 def nav_main_to_item()
     call $tab = nav_main_to_bag()
+    if $tab < 0
+        return -1
+    end
 
     # 不在道具 tab 则点击切换
     if $tab != 2
@@ -142,13 +158,6 @@ def nav_main_to_item()
     # 点击普通道具，锁定子区域
     log info "从道具页进入普通道具"
     click [bag_item_detail].[putong] after wait @step_interval
-
-    # 校验是否到达普通道具子区域
-    scan [bag_item_detail].[putong] as $putong_check by contains "普通"
-    if not $putong_check
-        eval pause("未进入普通道具页面，请手动导航后点击继续")
-    end
-    log info "已到达普通道具页"
 end
 
 # ─── nav_back_to_main ─────────────────────────────────────

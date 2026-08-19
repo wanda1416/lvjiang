@@ -11,6 +11,19 @@ from PyQt6.QtGui import QImage, QPixmap
 from ..i18n import tr
 
 
+class _AdbConnSignalBridge(QObject):
+    """工作流线程 → 主线程的 ADB 断连信号桥
+
+    AdbDevice.on_connection_lost 从工作流线程调用，通过 Qt 信号
+    安全投递到主线程槽，避免跨线程操作 Qt 控件。
+    """
+    adb_lost = pyqtSignal(str)
+
+    def notify_lost(self, error_msg: str):
+        """从工作流线程调用，发射信号到主线程"""
+        self.adb_lost.emit(error_msg)
+
+
 class _DeviceWorker(QObject):
     """后台线程：扫描或连接 ADB 设备（互斥，不会同时运行）"""
     scan_finished = pyqtSignal(list)  # devices
@@ -520,6 +533,15 @@ class WindowOpsMixin:
         self._capture = capture
         self._device = device
         self._device_ready = True
+
+        # ── ADB 断连暂停恢复接线 ──
+        # 工作流线程遇到 ADB 超时时通过桥信号通知主线程（非阻塞），
+        # 主线程显示状态栏提示 + 恢复按钮；用户点击恢复后唤醒工作流线程。
+        self._adb_conn_bridge = _AdbConnSignalBridge()
+        self._adb_conn_bridge.adb_lost.connect(self._on_adb_connection_lost)
+        device.on_connection_lost = self._adb_conn_bridge.notify_lost
+        device.stop_check = lambda: self._stop_requested
+
         method_label = "scrcpy" if capture_method == "scrcpy" else "screencap"
         self.lbl_window_info.setText(f"已连接: {combo_data['serial']}  |  分辨率: {w}x{h}  |  {method_label}")
         self.lbl_window_info.setStyleSheet("color: green;")
@@ -561,6 +583,10 @@ class WindowOpsMixin:
         self._scrcpy_streaming = False
         self._stop_capture_backend()
         self._input = None
+        # 清理断连信号桥
+        if hasattr(self, '_adb_conn_bridge') and self._adb_conn_bridge is not None:
+            self._adb_conn_bridge.deleteLater()
+            self._adb_conn_bridge = None
         self._device = None
         # 停止后台扫描/连接线程
         self._wait_device_thread()

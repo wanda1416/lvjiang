@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -451,6 +452,26 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         top_row.addWidget(self.layout_combo)
         top_row.addStretch()
         main_layout.addLayout(top_row)
+
+        # === ADB 断连警告横幅（默认隐藏，ADB 异常时显示）===
+        self._adb_banner = QFrame()
+        self._adb_banner.setStyleSheet(
+            "background-color: #d32f2f; border-radius: 6px; padding: 8px;"
+        )
+        self._adb_banner.setVisible(False)
+        banner_layout = QHBoxLayout(self._adb_banner)
+        banner_layout.setContentsMargins(12, 8, 12, 8)
+        self._adb_banner_label = QLabel()
+        self._adb_banner_label.setStyleSheet("color: white; font-weight: bold; font-size: 13px;")
+        self._adb_banner_label.setWordWrap(True)
+        banner_layout.addWidget(self._adb_banner_label, stretch=1)
+        self._adb_banner_btn = QPushButton(tr("恢复"))
+        self._adb_banner_btn.setStyleSheet(
+            "background-color: white; color: #d32f2f; font-weight: bold; "
+            "padding: 6px 20px; border: none; border-radius: 4px; font-size: 13px;"
+        )
+        banner_layout.addWidget(self._adb_banner_btn)
+        main_layout.addWidget(self._adb_banner)
 
         # === 窗口/设备选择 ===
         window_group = QGroupBox()

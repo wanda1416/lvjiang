@@ -881,7 +881,7 @@ class EquipStatusTab(QWidget):
         info_row.addWidget(lbl_affix)
         self._affix_filter = QComboBox()
         self._affix_filter.addItem(tr("全部"), "all")
-        self._affix_filter.addItem(tr("定音"), "dingyin")
+        self._affix_filter.addItem(tr("已定音"), "dingyin")
         self._affix_filter.addItem(tr("满调律"), "full_tuning")
         self._affix_filter.setMinimumWidth(70)
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
@@ -1764,6 +1764,7 @@ class EquipStatusTab(QWidget):
             self._host, context.school, context.scheme, context.base_attrs,
             level_threshold=self._get_level_threshold(),
             affix_filter=self._get_affix_filter(),
+            gongjue=context.gongjue,
             parent=self,
         )
         dlg.exec()

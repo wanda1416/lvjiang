@@ -16,8 +16,8 @@ regions:
   type: attr
   is_text: true
   is_clickable: true
-- key: shuxing_detail
-  name: 属性详情
+- key: detail_1
+  name: 属性面板_左
   type: attr
   is_text: true
   is_clickable: false
@@ -26,3 +26,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: detail_2
+  name: 属性面板_右
+  type: attr
+  is_text: true
+  is_clickable: false

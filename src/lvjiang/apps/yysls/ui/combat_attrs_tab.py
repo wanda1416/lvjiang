@@ -62,6 +62,14 @@ _ATTACK_FIELDS = frozenset({
 # 弓玦类型候选
 _GONGJUE_TYPES = ["", "会意", "精准", "会心"]
 
+# ─── 战斗属性展示模式 ─────────────────────────────────────────
+# 全屏模式：卡片以 2×2 网格排列，配置栏分两行展示
+DISPLAY_MODE_FULL = "full"
+# 半屏完整模式：卡片垂直排列，每个卡片内部保持多列布局
+DISPLAY_MODE_HALF = "half"
+# 半屏退化模式：宽度不足时触发，卡片内部重排为单列，过滤零值行
+DISPLAY_MODE_HALF_COMPACT = "half_compact"
+
 _YELLOW_VALUE_COLOR = "#D97706"
 _CARD_STYLE = """
     QFrame#combatAttrCard {
@@ -143,6 +151,8 @@ class CombatAttrsTab(QWidget):
         self._graduation_timer.setSingleShot(True)
         self._graduation_timer.setInterval(180)
         self._graduation_timer.timeout.connect(self._start_graduation_task)
+        # 战斗属性展示模式：DISPLAY_MODE_FULL / DISPLAY_MODE_HALF / DISPLAY_MODE_HALF_COMPACT
+        self._display_mode: str = DISPLAY_MODE_FULL
         self._setup_ui()
         self._load_data()
 
@@ -177,7 +187,7 @@ class CombatAttrsTab(QWidget):
         school_layout.setContentsMargins(0, 0, 0, 0)
         school_layout.addWidget(QLabel(tr("流派")))
         self._combo_school = QComboBox()
-        self._combo_school.setFixedWidth(110)
+        self._combo_school.setFixedWidth(84)  # 4 汉字宽度
         self._combo_school.setMinimumHeight(30)
         self._combo_school.currentTextChanged.connect(self._on_school_changed)
         school_layout.addWidget(self._combo_school, 1)
@@ -187,7 +197,7 @@ class CombatAttrsTab(QWidget):
         base_layout.setContentsMargins(0, 0, 0, 0)
         base_layout.addWidget(QLabel(tr("基础属性")))
         self._combo_play_style = QComboBox()
-        self._combo_play_style.setFixedWidth(130)
+        self._combo_play_style.setFixedWidth(104)  # 5 汉字宽度
         self._combo_play_style.setMinimumHeight(30)
         self._combo_play_style.currentTextChanged.connect(self._on_play_style_changed)
         base_layout.addWidget(self._combo_play_style, 1)
@@ -202,7 +212,7 @@ class CombatAttrsTab(QWidget):
         gongjue_layout.setContentsMargins(0, 0, 0, 0)
         gongjue_layout.addWidget(QLabel(tr("弓玦")))
         self._combo_gongjue = QComboBox()
-        self._combo_gongjue.setMinimumWidth(100)
+        self._combo_gongjue.setFixedWidth(84)  # 4 汉字宽度
         self._combo_gongjue.setMinimumHeight(30)
         self._combo_gongjue.addItem(tr("无"), "")
         for gongjue_type in _GONGJUE_TYPES[1:]:
@@ -215,7 +225,7 @@ class CombatAttrsTab(QWidget):
         scheme_layout.setContentsMargins(0, 0, 0, 0)
         scheme_layout.addWidget(QLabel(tr("计算方案")))
         self._combo_scheme = QComboBox()
-        self._combo_scheme.setFixedWidth(130)
+        self._combo_scheme.setFixedWidth(104)  # 5 汉字宽度
         self._combo_scheme.setMinimumHeight(30)
         self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)
         scheme_layout.addWidget(self._combo_scheme, 1)
@@ -387,6 +397,8 @@ class CombatAttrsTab(QWidget):
             ("牵丝", "min_qiansi", "max_qiansi"),
             ("无相", "min_wuxiang", "max_wuxiang"),
         )
+        # 存储原始布局位置用于自适应重排
+        self._attack_grid_items: list[tuple[QWidget, int, int]] = []
         for row, (name, min_field, max_field) in enumerate(attacks):
             min_widget = self._create_attr_widget(
                 f"最小{name}攻击", min_field
@@ -396,8 +408,11 @@ class CombatAttrsTab(QWidget):
             )
             grid.addWidget(min_widget, row, 0)
             grid.addWidget(max_widget, row, 1)
+            self._attack_grid_items.append((min_widget, row, 0))
+            self._attack_grid_items.append((max_widget, row, 1))
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+        self._attack_grid = grid
         card_layout = card.layout()
         if card_layout is not None:
             card_layout.addLayout(grid)
@@ -418,12 +433,16 @@ class CombatAttrsTab(QWidget):
         grid.setContentsMargins(14, 2, 14, 14)
         grid.setHorizontalSpacing(20)
         grid.setVerticalSpacing(8)
+        # 存储原始布局位置用于自适应重排
+        self._judgment_grid_items: list[tuple[QWidget, int, int]] = []
         for row, fields in enumerate(rows):
             for col, (field_name, label_text, yellow) in enumerate(fields):
                 widget = self._create_attr_widget(label_text, field_name, yellow)
                 grid.addWidget(widget, row, col)
+                self._judgment_grid_items.append((widget, row, col))
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+        self._judgment_grid = grid
         card_layout = card.layout()
         if card_layout is not None:
             card_layout.addLayout(grid)
@@ -447,9 +466,12 @@ class CombatAttrsTab(QWidget):
             (4, 0, "对首领单位增伤", "boss_bonus"),
             (4, 1, "对玩家单位增效", "player_bonus"),
         )
+        # 存储原始布局位置用于自适应重排
+        self._gain_grid_items: list[tuple[QWidget, int, int]] = []
         for row, col, label_text, field_name in fixed_cells:
             widget = self._create_attr_widget(label_text, field_name)
             grid.addWidget(widget, row, col)
+            self._gain_grid_items.append((widget, row, col))
             if field_name == "__attr_pen__":
                 self._attr_pen_name = widget.findChild(QLabel, "attrName")
                 self._attr_pen_label = self._attr_labels[field_name]
@@ -460,6 +482,11 @@ class CombatAttrsTab(QWidget):
         self._skill_bonus_slots = [
             self._create_dynamic_slot(grid, 5, col) for col in range(2)
         ]
+        # 存储动态槽位置
+        for slot_widget, _, _ in self._weapon_bonus_slots:
+            self._gain_grid_items.append((slot_widget, 1, 0 if slot_widget is self._weapon_bonus_slots[0][0] else 1))
+        for slot_widget, _, _ in self._skill_bonus_slots:
+            self._gain_grid_items.append((slot_widget, 5, 0 if slot_widget is self._skill_bonus_slots[0][0] else 1))
         self._gain_grid = grid
         self._extra_labels: dict[str, QLabel] = {}
         grid.setColumnStretch(0, 1)
@@ -484,9 +511,12 @@ class CombatAttrsTab(QWidget):
             (1, 0, "外功伤害加成", "outer_bonus"),
             (2, 0, "属攻伤害加成", "__attr_bonus__"),
         )
+        # 存储原始布局位置用于自适应重排
+        self._damage_grid_items: list[tuple[QWidget, int, int]] = []
         for row, col, label_text, field_name in cells:
             widget = self._create_attr_widget(label_text, field_name)
             grid.addWidget(widget, row, col)
+            self._damage_grid_items.append((widget, row, col))
             if field_name == "__attr_bonus__":
                 self._attr_bonus_name = widget.findChild(QLabel, "attrName")
                 self._attr_bonus_label = self._attr_labels[field_name]
@@ -498,9 +528,11 @@ class CombatAttrsTab(QWidget):
             widget = self._create_attr_widget(label_text, f"__reduction_{row}__")
             self._attr_labels[f"__reduction_{row}__"].setText("0.00%")
             grid.addWidget(widget, row, 1)
+            self._damage_grid_items.append((widget, row, 1))
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+        self._damage_grid = grid
         card_layout = card.layout()
         if card_layout is not None:
             card_layout.addLayout(grid)
@@ -508,7 +540,11 @@ class CombatAttrsTab(QWidget):
         return card
 
     def set_embedded_mode(self, mode: str) -> None:
-        """Adapt the reusable content for loadout sidebar/half/full modes."""
+        """Adapt the reusable content for loadout sidebar/half/full modes.
+
+        Args:
+            mode: "sidebar" / "half" / "full"
+        """
         self._toolbar_widget.setVisible(False)
         collapsed = mode == "sidebar"
         self._select_group.setVisible(not collapsed)
@@ -518,6 +554,8 @@ class CombatAttrsTab(QWidget):
         # 不设置最小高度，允许内容自适应压缩和滚动
         self.setMinimumHeight(0)
         if not collapsed:
+            # 设置展示模式：full -> DISPLAY_MODE_FULL, half -> DISPLAY_MODE_HALF
+            self._display_mode = DISPLAY_MODE_FULL if mode == "full" else DISPLAY_MODE_HALF
             self._layout_attribute_cards(mode)
             positions = (
                 ((0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
@@ -526,6 +564,9 @@ class CombatAttrsTab(QWidget):
             )
             for widget, (row, col) in zip(self._config_fields, positions, strict=True):
                 self._select_layout.addWidget(widget, row, col)
+            # 确保从退化模式恢复
+            if self._display_mode != DISPLAY_MODE_HALF_COMPACT:
+                self._ensure_normal_layout()
 
     @staticmethod
     def _drain_layout(layout) -> None:
@@ -567,6 +608,177 @@ class CombatAttrsTab(QWidget):
         grid.setColumnStretch(1, 1)
         grid.setRowStretch(2, 1)
         self._main_layout.addLayout(grid)
+
+    def resizeEvent(self, event) -> None:
+        """响应宽度变化，在半屏模式下触发紧凑布局适配。
+
+        展示模式转换：
+        - DISPLAY_MODE_FULL: 全屏模式，卡片 2×2 网格
+        - DISPLAY_MODE_HALF: 半屏完整模式，卡片垂直排列，内部多列
+        - DISPLAY_MODE_HALF_COMPACT: 半屏退化模式，卡片内部单列，过滤零值行
+        """
+        super().resizeEvent(event)
+        # 仅在半屏完整模式下启用自适应
+        if self._display_mode == DISPLAY_MODE_HALF:
+            width = event.size().width()
+            # 阈值：宽度小于 420px 时进入退化模式，大于 460px 时退出（迟滞避免抖动）
+            should_compact = width < 420
+            should_normal = width > 460
+            if should_compact:
+                self._switch_to_compact_layout()
+            elif should_normal and self._display_mode == DISPLAY_MODE_HALF_COMPACT:
+                self._switch_to_normal_layout()
+
+    def _switch_to_compact_layout(self) -> None:
+        """切换到半屏退化模式：单列布局 + 过滤零值行 + 右侧对齐。"""
+        if self._display_mode == DISPLAY_MODE_HALF_COMPACT:
+            return  # 已在退化模式
+        self._display_mode = DISPLAY_MODE_HALF_COMPACT
+        # 过滤攻击属性中值为 0 的行
+        self._filter_zero_attack_rows()
+        # 重排所有卡片网格为单列
+        self._rearrange_grid_compact(self._attack_grid, self._attack_grid_items)
+        self._rearrange_grid_compact(self._judgment_grid, self._judgment_grid_items)
+        self._rearrange_grid_compact(self._gain_grid, self._gain_grid_items)
+        self._rearrange_grid_compact(self._damage_grid, self._damage_grid_items)
+        # 统一所有 name 标签宽度以实现右侧对齐
+        self._align_name_labels()
+
+    def _switch_to_normal_layout(self) -> None:
+        """从半屏退化模式恢复到半屏完整模式。"""
+        if self._display_mode != DISPLAY_MODE_HALF_COMPACT:
+            return  # 不在退化模式
+        self._display_mode = DISPLAY_MODE_HALF
+        # 恢复被过滤的攻击属性行
+        self._restore_zero_attack_rows()
+        # 恢复所有卡片网格为原始多列布局
+        self._restore_grid_normal(self._attack_grid, self._attack_grid_items)
+        self._restore_grid_normal(self._judgment_grid, self._judgment_grid_items)
+        self._restore_grid_normal(self._gain_grid, self._gain_grid_items)
+        self._restore_grid_normal(self._damage_grid, self._damage_grid_items)
+        # 恢复 name 标签的自动宽度
+        self._reset_name_label_widths()
+
+    def _ensure_normal_layout(self) -> None:
+        """确保从退化模式恢复到正常模式（模式切换时调用）。"""
+        if self._display_mode == DISPLAY_MODE_HALF_COMPACT:
+            self._switch_to_normal_layout()
+
+    @staticmethod
+    def _rearrange_grid_compact(
+        grid: QGridLayout,
+        items: list[tuple[QWidget, int, int]],
+    ) -> None:
+        """将网格中的 widget 重排为单列，并确保右侧对齐。"""
+        # 移除所有 widget
+        for widget, _, _ in items:
+            grid.removeWidget(widget)
+        # 重置列拉伸设置，仅拉伸第 0 列
+        grid.setColumnStretch(0, 0)
+        grid.setColumnStretch(1, 0)
+        # 按原始顺序重新排列为单列，所有 widget 放在第 0 列
+        for new_row, (widget, _, _) in enumerate(items):
+            grid.addWidget(widget, new_row, 0)
+        # 拉伸第 0 列以填充空间
+        grid.setColumnStretch(0, 1)
+
+    @staticmethod
+    def _restore_grid_normal(
+        grid: QGridLayout,
+        items: list[tuple[QWidget, int, int]],
+    ) -> None:
+        """恢复网格 widget 到原始位置。"""
+        # 移除所有 widget
+        for widget, _, _ in items:
+            grid.removeWidget(widget)
+        # 恢复到原始位置
+        for widget, row, col in items:
+            grid.addWidget(widget, row, col)
+        # 恢复原始列拉伸设置
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+
+    def _align_name_labels(self) -> None:
+        """统一所有属性 name 标签的宽度以实现右侧数值对齐。"""
+        # 收集所有 name 标签
+        name_labels: list[QLabel] = []
+        for items in (
+            self._attack_grid_items,
+            self._judgment_grid_items,
+            self._gain_grid_items,
+            self._damage_grid_items,
+        ):
+            for widget, _, _ in items:
+                name_label = widget.findChild(QLabel, "attrName")
+                if name_label is not None:
+                    name_labels.append(name_label)
+        if not name_labels:
+            return
+        # 计算最大宽度（考虑当前尺寸提示）
+        max_width = max(label.sizeHint().width() for label in name_labels)
+        # 设置固定宽度
+        for label in name_labels:
+            label.setFixedWidth(max_width)
+
+    def _reset_name_label_widths(self) -> None:
+        """恢复所有属性 name 标签的自动宽度。"""
+        for items in (
+            self._attack_grid_items,
+            self._judgment_grid_items,
+            self._gain_grid_items,
+            self._damage_grid_items,
+        ):
+            for widget, _, _ in items:
+                name_label = widget.findChild(QLabel, "attrName")
+                if name_label is not None:
+                    name_label.setMinimumWidth(0)
+                    name_label.setMaximumWidth(16777215)
+
+    def _filter_zero_attack_rows(self) -> None:
+        """半屏退化模式：隐藏攻击属性中 min 和 max 值都为 0 的行。
+
+        攻击属性每行包含 min_xxx 和 max_xxx 两个 widget，
+        当两者对应的值都为 0 时，隐藏该行。
+        """
+        # 攻击属性字段对：(min_field, max_field)
+        attack_pairs = [
+            ("min_outer", "max_outer"),
+            ("min_mingjin", "max_mingjin"),
+            ("min_lieshi", "max_lieshi"),
+            ("min_pozhu", "max_pozhu"),
+            ("min_qiansi", "max_qiansi"),
+            ("min_wuxiang", "max_wuxiang"),
+        ]
+        # _attack_grid_items 按顺序存储：每两个一组 (min_widget, row, 0), (max_widget, row, 1)
+        for i, (min_field, max_field) in enumerate(attack_pairs):
+            min_idx = i * 2
+            max_idx = i * 2 + 1
+            if min_idx >= len(self._attack_grid_items) or max_idx >= len(self._attack_grid_items):
+                break
+            min_widget, _, _ = self._attack_grid_items[min_idx]
+            max_widget, _, _ = self._attack_grid_items[max_idx]
+            # 获取对应的值标签
+            min_label = self._attr_labels.get(min_field)
+            max_label = self._attr_labels.get(max_field)
+            if min_label is not None and max_label is not None:
+                # 解析值：去除百分号并转换为浮点数
+                min_text = min_label.text().replace("%", "").strip()
+                max_text = max_label.text().replace("%", "").strip()
+                try:
+                    min_val = float(min_text) if min_text else 0.0
+                    max_val = float(max_text) if max_text else 0.0
+                except ValueError:
+                    min_val = 0.0
+                    max_val = 0.0
+                # 如果两者都为 0，隐藏该行
+                if min_val == 0.0 and max_val == 0.0:
+                    min_widget.setVisible(False)
+                    max_widget.setVisible(False)
+
+    def _restore_zero_attack_rows(self) -> None:
+        """恢复被隐藏的攻击属性行。"""
+        for widget, _, _ in self._attack_grid_items:
+            widget.setVisible(True)
 
     def _create_dynamic_slot(self, grid: QGridLayout, row: int,
                              col: int) -> tuple[QWidget, QLabel, QLabel]:
@@ -970,6 +1182,11 @@ class CombatAttrsTab(QWidget):
             school,
         )
         self._schedule_graduation(graduation_attrs)
+
+        # 刷新退化模式的零值过滤（先恢复再重新过滤）
+        if self._display_mode == DISPLAY_MODE_HALF_COMPACT:
+            self._restore_zero_attack_rows()
+            self._filter_zero_attack_rows()
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""

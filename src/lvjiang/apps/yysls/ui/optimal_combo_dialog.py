@@ -112,7 +112,6 @@ class _SearchWorker(QRunnable):
     def cancel(self) -> None:
         self._cancel_event.set()
 
-    @pyqtSlot()
     def run(self) -> None:
         try:
             from ..core.graduation import get_graduation_calculator
@@ -827,8 +826,12 @@ class OptimalComboDialog(QDialog):
             full_dingyin=self._chk_full_dingyin.isChecked(),
             full_level=full_level,
         )
-        self._worker.signals.finished.connect(self._on_finished)
-        self._worker.signals.error.connect(self._on_error)
+        # 使用 QueuedConnection 确保 slot 在 UI 线程执行
+        # （signal 从后台线程 emit，但 _SearchSignals 的线程亲和性是 UI 线程）
+        self._worker.signals.finished.connect(  # type: ignore[call-arg]
+            self._on_finished, Qt.ConnectionType.QueuedConnection)
+        self._worker.signals.error.connect(  # type: ignore[call-arg]
+            self._on_error, Qt.ConnectionType.QueuedConnection)
         pool = QThreadPool.globalInstance()
         if pool is not None:
             pool.start(self._worker)

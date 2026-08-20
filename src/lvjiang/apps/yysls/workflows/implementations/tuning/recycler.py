@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import random
 import re
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -136,8 +135,8 @@ class TuningRecycler:
             "reset", "检查通过，正在执行两次重置确认",
             reason=why, resets=resets_used)
         wf.click_region(wf.TUNE_SCENE, "reset_confirm")
-        # 游戏在两次确认间强制等 5s，二次确认按钮才可点 → 等 6-7s
-        wf.wait_seconds(random.uniform(6.0, 7.0))
+        # 游戏在两次确认间强制等 5s，二次确认按钮才可点
+        wf.wait_delay("secondary_confirm")
         wf.click_region(wf.TUNE_SCENE, "reset_confirm_2")
         wf._emit_operation("reset", "重置已提交，正在读取重置结果")
         wf.wait_stable("page_refresh")  # 重置结果弹窗出现

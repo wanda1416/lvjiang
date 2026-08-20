@@ -1,5 +1,7 @@
 # 公共子过程：选角色 + 进入游戏
 
+import "../subcall/navigation.wf"
+
 def _select_role($role_index, $role, $batch_state)
     log "当前下标" + $role_index
 
@@ -51,13 +53,12 @@ def login_to_main_page()
     @loading_done
     wait 5
 
-    # 等待主页加载完成：检测菜单、活动、武林录任一文字
+    # 等待主页加载完成：检测主界面入口按钮
     # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
-    eval $main_items = ["菜单", "活动", "武林录", "限时"]
     loop 8
-        scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
-        if $found
-            log "主页加载完成，检测到：" + $found
+        call $in_main = is_in_main_page()
+        if $in_main
+            log "主页加载完成"
             # 检查是否有战令领奖入口
             call claim_zhanling_reward()
             return

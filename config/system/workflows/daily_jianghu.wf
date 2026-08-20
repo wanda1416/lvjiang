@@ -186,7 +186,7 @@ def action_qingjing($label)
    end
 
    # 保存后弹窗需要渲染时间，先等一下再扫描
-   click [waiguan_qingjing].[save] after wait @page_refresh
+   click [waiguan_qingjing].[save] after wait @secondary_confirm
    
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
    scan [waiguan_qingjing].[cancel] as $has_cancel by contains "取消"

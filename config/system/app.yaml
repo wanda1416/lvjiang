@@ -12,12 +12,12 @@ input_simulation:
   region_jitter_ratio: 0.25
 delay_params:
   step_interval:
-    label: 步骤间等待
+    label: 操作间隔
     range:
     - 1.0
     - 1.2
   click_interval:
-    label: 连续点击间隔
+    label: 点击间隔
     range:
     - 1.0
     - 1.2
@@ -31,3 +31,8 @@ delay_params:
     range:
     - 3.0
     - 4.0
+  secondary_confirm:
+    label: 二次确认等待（包括装备冷却）
+    range:
+    - 6.0
+    - 7.0

@@ -277,8 +277,9 @@ class EquipStatusTab(QWidget):
 
         # 顶部：8 个可点击槽位（固定 2×4）
         self._slot_container = QWidget()
+        # Expanding：跟随父容器宽度铺满，避免固定 4 列在宽度不足时溢出被截断
         self._slot_container.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         slot_grid = QGridLayout(self._slot_container)
         slot_grid.setSpacing(8)
         slot_grid.setContentsMargins(8, 8, 8, 8)
@@ -287,6 +288,10 @@ class EquipStatusTab(QWidget):
             card = _SlotCard(slot_key, display_name, _filter_type)
             slot_grid.addWidget(card, row, col)
             self._slot_cards[slot_key] = card
+
+        # 4 列等宽伸缩：宽度不足时各列均分收缩，保证第 4 列始终可见
+        for c in range(4):
+            slot_grid.setColumnStretch(c, 1)
 
         wrapper_layout.addWidget(self._slot_container)
 

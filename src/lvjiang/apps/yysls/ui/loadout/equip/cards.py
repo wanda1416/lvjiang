@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -15,6 +16,52 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
+
+
+class _ElidedLabel(QLabel):
+    """单行文本可收缩的 QLabel —— 空间不足时以省略号截断。
+
+    默认 QLabel 的 minimumSizeHint 等于完整文本宽度（不换行），
+    会把父布局/网格列的最小宽度钉死在文字宽度上。宽度不足时
+    网格无法收缩导致溢出。本类重写 paintEvent 绘制省略号，
+    并压低 minimumSizeHint 使所在列可收缩到小于文字宽度。
+    """
+
+    def minimumSizeHint(self):  # type: ignore[override]
+        # 保留一个最小可读宽度（约 3 个汉字 / 6 个字符宽），
+        # 避免 stretch 项被压缩到 0 导致文字与兄弟控件重叠。
+        # 仍允许比完整文字更窄，使网格在宽度不足时能等分收缩。
+        size = super().minimumSizeHint()
+        fm = self.fontMetrics()
+        min_width = fm.horizontalAdvance("中") * 3
+        # 取当前完整文字宽度与最小可读宽度的较小者（不强制撑到 min_width）
+        size.setWidth(min(min_width, size.width()))
+        return size
+
+    def paintEvent(self, event: QPaintEvent | None):  # type: ignore[override]
+        # 富文本（含内联 <span> 颜色）无法用 elidedText 直接省略，回退默认绘制
+        if self.textFormat() == Qt.TextFormat.RichText:
+            super().paintEvent(event)
+            return
+        # 手动绘制省略号：样式表颜色/字号会反映到 palette 与字体上
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        fm = painter.fontMetrics()
+        text = self.text()
+        avail = self.width() - self.margin() * 2 - 4
+        elided = fm.elidedText(text, Qt.TextElideMode.ElideRight, max(1, avail))
+        color = self.palette().color(self.foregroundRole())
+        if self.isEnabled():
+            painter.setPen(color)
+        else:
+            painter.setPen(self.palette().color(
+                self.palette().Disabled, self.foregroundRole()))
+        # 垂直对齐：QLabel 默认居中；水平由 alignment 决定
+        flags = int(self.alignment())
+        rect = self.rect().adjusted(self.margin(), 0, -self.margin(), 0)
+        painter.drawText(rect, flags, elided)
+        painter.end()
+
 
 # 品质颜色映射（适配浅色背景）
 _QUALITY_COLORS = {
@@ -154,7 +201,7 @@ class _SlotCard(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(6)
-        self.lbl_name = QLabel(display_name)
+        self.lbl_name = _ElidedLabel(display_name)
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px; color: #333;")
         header.addWidget(self.lbl_name, stretch=1)
@@ -371,7 +418,7 @@ class _SlotCard(QFrame):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(2)
 
-        lbl = QLabel(f"{affix['name']}{transfer_mark}")
+        lbl = _ElidedLabel(f"{affix['name']}{transfer_mark}")
         lbl.setStyleSheet(
             f"font-size: {self._affix_fs}px; color: #555; font-weight: bold;")
         row.addWidget(lbl, stretch=1)
@@ -440,7 +487,7 @@ class _CompactEquipCard(QFrame):
         name_row = QHBoxLayout()
         name_row.setContentsMargins(0, 0, 0, 0)
         name_row.setSpacing(6)
-        self.lbl_name = QLabel()
+        self.lbl_name = _ElidedLabel()
         self.lbl_name.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_name.setStyleSheet(
@@ -604,7 +651,7 @@ class _CompactEquipCard(QFrame):
             row.setContentsMargins(0, 0, 0, 0)
             row.setSpacing(2)
 
-            lbl_name = QLabel(f"{affix['name']}{transfer_mark}")
+            lbl_name = _ElidedLabel(f"{affix['name']}{transfer_mark}")
             lbl_name.setStyleSheet(
                 f"font-size: {self._affix_fs}px; color: #555; font-weight: bold;")
             row.addWidget(lbl_name, stretch=1)
@@ -637,7 +684,7 @@ class _CompactEquipCard(QFrame):
             row.setContentsMargins(0, 0, 0, 0)
             row.setSpacing(2)
 
-            lbl_name = QLabel(dingyin["name"])
+            lbl_name = _ElidedLabel(dingyin["name"])
             lbl_name.setStyleSheet(
                 f"font-size: {self._affix_fs}px; color: #555; font-weight: bold;")
             row.addWidget(lbl_name, stretch=1)

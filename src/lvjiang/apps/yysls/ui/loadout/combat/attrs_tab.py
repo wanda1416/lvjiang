@@ -33,7 +33,12 @@ from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from ...profile.tab import add_user_nav_buttons
 from .cards import CombatCardsMixin
 from .graduation import CombatGraduationMixin
-from .layout import CombatLayoutMixin
+from .layout import (
+    DISPLAY_MODE_FULL,
+    DISPLAY_MODE_HALF_COMPACT,
+    CombatLayoutMixin,
+)
+from .layout_strategies import CardLayoutStrategy, FullCardLayout
 from .play_style_dialog import PlayStyleDialogMixin
 
 # 攻击属性字段：显示时四舍五入取整
@@ -50,19 +55,7 @@ _ATTACK_FIELDS = frozenset({
 _GONGJUE_TYPES = ["", "会意", "精准", "会心"]
 
 # ─── 战斗属性展示模式 ─────────────────────────────────────────
-# 全屏模式：卡片以 2×2 网格排列，配置栏单行 6 列展示
-DISPLAY_MODE_FULL = "full"
-# 半屏完整模式：卡片垂直排列，配置栏 2 行 3 列
-DISPLAY_MODE_HALF = "half"
-# 半屏退化模式：宽度不足时触发，卡片内部重排为单列，过滤零值行
-DISPLAY_MODE_HALF_COMPACT = "half_compact"
-
-# 退化模式阈值：38 个汉字宽度（约 532px，按 14px/字计算）
-# 宽度 >= 此值时展示两列，< 此值时退化为单列
-_COMPACT_THRESHOLD_CHARS = 38
-_COMPACT_THRESHOLD_PX = _COMPACT_THRESHOLD_CHARS * 14  # 532px
-# 迟滞偏移：退出退化模式需要比进入时多 36px（约 2.5 字）
-_COMPACT_HYSTERESIS_PX = 36
+# 常量已从 layout.py 导入，此处不再重复定义
 
 _YELLOW_VALUE_COLOR = "#D97706"
 
@@ -81,6 +74,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._graduation_timer.timeout.connect(self._start_graduation_task)
         # 战斗属性展示模式：DISPLAY_MODE_FULL / DISPLAY_MODE_HALF / DISPLAY_MODE_HALF_COMPACT
         self._display_mode: str = DISPLAY_MODE_FULL
+        self._strategy: CardLayoutStrategy = FullCardLayout()
         self._setup_ui()
         self._load_data()
 
@@ -574,14 +568,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         )
         self._schedule_graduation(graduation_attrs)
 
-        # 刷新退化模式：先完整恢复标准网格，再重新应用紧凑适配
+        # 刷新退化模式：委托策略重新应用紧凑布局
         if self._display_mode == DISPLAY_MODE_HALF_COMPACT:
-            self._restore_zero_attack_rows()
-            self._restore_grid_normal()
-            self._reset_name_label_widths()
-            self._filter_zero_attack_rows()
-            self._rearrange_grid_compact()
-            self._align_name_labels()
+            self._strategy.on_refresh_display(self)
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""

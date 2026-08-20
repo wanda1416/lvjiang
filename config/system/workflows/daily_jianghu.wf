@@ -247,27 +247,41 @@ def action_dongfang($label, $idx)
    click [general_action].[actions][$fr][$fc] after wait @step_interval
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
-   click [general_action].[choose_1] after wait stable @page_refresh least 0.5
-   click [general_action].[back] after wait stable @page_refresh least 0.5
-
-   # 投票后可能弹出确认弹窗，识别到“确认”则点击“取消”关闭
-   scan [general_control].[confirm] as $has_confirm by contains "确认"
-   if $has_confirm
-      log "检测到确认弹窗，点击取消关闭"
-      click [general_control].[cancel] after wait @step_interval
+   
+   # 检查是否仍在主页（看报动作未解锁，未进入表情动作视图）
+   call $in_main = is_in_main_page()
+   if $in_main
+       log "仍在主页，看报动作可能未解锁，跳过看报操作"
+   else
+       call do_kanbao()
    end
- 
-   # 如果已经完成过任务，可能导致此时已经在主页，所以需要额外判断
-   call $in_main_page = is_in_main_page()
-   if $in_main_page == 0
-       click [general_action].[back] after wait @step_interval
-   end
-
+   
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward
       log "末个任务看报完成且无需领奖，留在桌面"
    else
       call back_to_haoling()
+   end
+end
+
+# ─── 看报操作 ─────────────────────────────────────────────
+# 前提：已进入表情动作视图（不在主页）
+# 点第一个选择 → 返回 → 处理确认弹窗 → 检查是否已回到主页
+def do_kanbao()
+   click [general_action].[choose_1] after wait stable @page_refresh least 0.5
+   click [general_action].[space_area] after wait stable @page_refresh least 0.5
+
+   # 投票后可能弹出确认弹窗，识别到"确认"则点击"取消"关闭
+   scan [general_control].[confirm] as $has_confirm by contains "确认"
+   if $has_confirm
+      log "检测到确认弹窗，点击取消关闭"
+      click [general_control].[cancel] after wait @step_interval
+   end
+
+   # 如果已经完成过任务，可能导致此时已经在主页，所以需要额外判断
+   call $in_main_page = is_in_main_page()
+   if $in_main_page == 0
+       click [general_action].[back] after wait @step_interval
    end
 end
 

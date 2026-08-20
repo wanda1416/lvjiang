@@ -4,7 +4,25 @@
 # 提供角色档案相关的扫描解析操作，供各工作流 import 后调用。
 #
 # 包含过程：
+#   check_profile($keys)   — 批量校验 profile key 已定义，未定义则阻塞提醒
 #   parse_bugan_jindu($raw) — 解析不肝进度 OCR 文本并写入 profile
+
+# ─── 批量校验 profile key ─────────────────────────────────
+# 参数：$keys — key 列表（如 ["tongbao", "bugan"]）
+# 逐个检查 key 是否在 profile.yaml 中已定义（quota/regen/stock/note）
+# 返回：0 全部已定义，-1 存在未定义 key（已弹窗提醒）
+def check_profile($keys)
+    for key in $keys
+        eval $model = profile_model($key)
+        if not $model
+            eval $msg = "profile key '" + $key + "' 未在 profile.yaml 中定义，请检查配置"
+            log error $msg
+            eval pause($msg)
+            return -1
+        end
+    end
+    return 0
+end
 
 # ─── 解析不肝进度 ────────────────────────────────────────
 # 参数：$raw — scan 得到的 bugan_jindu 原始文本

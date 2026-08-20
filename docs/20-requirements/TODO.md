@@ -37,7 +37,7 @@
 - DSL click/drag 时序增强：suppress_defaults + before/after 组合 wait_clause +
   泛化元组语法 + clock/datetime 内置函数。
 - i18n 国际化框架已落地：核心模块 + 翻译文件（zh_CN/en_US）+ 25+ 文件 tr() 改造。
-- pytest **1654 例全绿**（2026-08-15 本地全量验证）。
+- pytest **1932 例全绿**（2026-08-21 本地全量验证）。
 
 ---
 

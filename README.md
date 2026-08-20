@@ -2,9 +2,11 @@
 
 > 通用视觉 RPA 引擎 + 插件架构
 
-律匠是一个基于计算机视觉的桌面自动化工具，采用「通用引擎 + 插件」架构。通过投屏画面的截图识别、OCR 与模拟点击，自动完成各类手游中繁琐的操作流程。工具运行在 PC 端，通过投屏窗口或 ADB 与手机交互，**不读取内存、不注入游戏进程**，规避手游反作弊风险。
+律匠是一个基于计算机视觉的桌面自动化工具，采用「通用引擎 + 插件」架构。通过桌面窗口的截图识别、OCR 与模拟点击，自动完成各类繁琐的操作流程。工具运行在 PC 端，支持两种输入后端：**窗口模式**（捕捉任意 PC 窗口，包括游戏窗口化模式、手机投屏窗口、模拟器）和 **ADB 模式**（直连手机/模拟器）。**不读取内存、不注入游戏进程**，规避反作弊风险。
 
 当前已内置《燕云十六声》装备调律插件，可通过插件机制扩展至更多游戏/场景。
+
+> **当前状态**：律匠引擎理论上可通过窗口捕捉支持任意桌面应用，但由于布局适配与输入识别的差异，游戏 PC 端暂时无法直接使用。当前请通过 **手机投屏** 或 **Android 模拟器** 运行游戏。
 
 <p align="left">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue">
@@ -17,14 +19,16 @@
 
 ## ✨ 功能特性
 
-- **双输入后端**：支持「桌面投屏窗口」（截图 + 后台 PostMessage / SendInput 点击）与「Android ADB」（screencap / scrcpy 视频流截图 + 触控注入）两种模式。
+- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；截图 + 后台 PostMessage / SendInput 点击）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入）两种模式。
 - **视觉识别流水线**：`mss` / scrcpy 截图 → RapidOCR（ONNX）文字识别 → 装备词条结构化解析 → 品阶与数值评分。
 - **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放。
-- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算。
+- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算。支持 `full by` 全量匹配与短路匹配双模式、panel 范围索引、工作流暂停/恢复。
 - **装备评分规则**：可配置的词条上限（cap）、品阶推断、流派权重，支持鸣金 / 通用等评估器。
 - **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/20-requirements/01-auto-tuning.md)）。
 - **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
 - **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
+- **毕业率计算**：Excel 公式 → Python 转换引擎，支持最优组合搜索与毕业概率评估。
+- **i18n 国际化**：核心模块 tr() 全覆盖，支持中文 / 英文界面切换。
 - **安卓独立执行端（实验性）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [安卓迁移进度](docs/20-requirements/todo-android.md)）。
 
 ---
@@ -174,6 +178,12 @@ pip install -e ".[dev]"
 
 > 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/60-userguide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
 
+**Windows 用户** 可直接从 [Releases](https://github.com/wanda1416/lvjiang/releases) 下载最新发行包（免安装 zip 或安装程序 exe），解压/安装后运行 `lvjiang.exe` 即可，无需 Python 环境。
+
+> 使用安装程序时建议选择「仅为当前用户安装」，不建议「为所有用户安装」，否则可能被安全软件拦截。
+
+**源码运行**（macOS / Linux / 需要最新功能）：
+
 ```powershell
 # 方式一：纯通用模式（场景编辑 + 识别测试）
 python -m lvjiang
@@ -255,7 +265,7 @@ pytest tests/workflows/test_parser.py
 | [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接手机、配置与运行自动调律 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
-| [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型 |
+| [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型、Profile、毕业率、国际化 |
 | [`docs/30-architecture/`](docs/30-architecture/README.md) | 技术架构：主窗口状态机、插件系统 |
 | [`docs/30-architecture/31-models/`](docs/30-architecture/31-models/README.md) | 数据模型：装备模型、场景实现、会话与上下文 |
 | [`docs/30-architecture/32-grammar/`](docs/30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
@@ -268,7 +278,7 @@ pytest tests/workflows/test_parser.py
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（实验性）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)，安卓端迁移进度见 [todo-android](docs/20-requirements/todo-android.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（实验性）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)（1932 测试用例），安卓端迁移进度见 [todo-android](docs/20-requirements/todo-android.md)，macOS 适配见 [todo-mac](docs/20-requirements/todo-mac.md)。
 
 ---
 
@@ -279,6 +289,25 @@ pytest tests/workflows/test_parser.py
 1. 保证 `pytest` 全部通过；
 2. 遵循现有代码风格与文档分层约定；
 3. 涉及新场景 / 工作流时，同步更新 `config/system/` 与对应文档。
+
+---
+
+## 💬 反馈与支持
+
+欢迎通过以下方式反馈问题：
+
+- **微信交流群**：见主窗口「帮助 → 反馈与建议」中的二维码
+- **GitHub Issue**：[github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
+
+**反馈范围说明：**
+
+| 可以帮你的 | 超出能力范围的 |
+|-----------|--------------|
+| Bug 报告（附带日志/截图） | 一对一使用教学 |
+| 功能建议与需求 | 远程协助配置环境 |
+| 文档内容过时或无法实操 | 逐个步骤指导操作 |
+
+作者精力有限，无法提供一对一使用教学。[用户指南](docs/60-userguide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。
 
 ---
 

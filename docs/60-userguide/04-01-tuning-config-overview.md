@@ -109,4 +109,4 @@
 
 ---
 
-上一步：[← 通用配置](03-base-config.md) | 下一步：[4.2 默认配置 →](04-02-default-config.md)
+上一步：[← 通用配置](03-01-base-config.md) | 下一步：[4.2 默认配置 →](04-02-default-config.md)

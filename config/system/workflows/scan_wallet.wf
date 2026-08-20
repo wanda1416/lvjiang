@@ -50,6 +50,13 @@ default $tol_changmingyu = 0
 import "subcall/navigation.wf"
 import "subcall/game_profile.wf"
 
+# ─── 校验 profile key 已定义 ─────────────────────────────
+eval $profile_keys = ["tongbao", "bugan", "baoqian", "changmingyu", "bugan_of_week"]
+call $chk = check_profile($profile_keys)
+if $chk < 0
+    return -1
+end
+
 # ─── 导航到钱袋页面 ──────────────────────────────────────
 call nav_main_to_wallet()
 

@@ -333,7 +333,7 @@ Phase 9 之后的延伸工作（07-26 ~ 08-16）：
 - **Android 独立执行端**：三通道 PoC 闭环、系统配置随 APK 分发、设备端工作流引擎、原生调律参数配置页、release 实机复验。
 - **打包分发**：PyInstaller onedir 一键打包 + 内置 adb，用户免装 platform-tools。
 - **平台适配**：抽离 core/platforms.py；macOS Phase 0（依赖验证 + 退出崩溃修复）。
-- **质量门禁**：ruff + mypy + GitHub Actions CI；pytest 1654 例全绿。
+- **质量门禁**：ruff + mypy + GitHub Actions CI；pytest 1932 例全绿。
 - **DSL CoordRef 坐标统一体系**：CoordRef/RectCoordRef/CircleCoordRef/Offset 类型层次 + 向量运算规则 + AST SceneRef→EntityRef 重命名 + click/drag 语义修正。
 - **DSL click/drag 时序增强**：suppress_defaults + before/after 组合 wait_clause + 泛化元组语法 + clock/datetime 内置函数。
 - **i18n 国际化框架**：核心模块 + 翻译文件（zh_CN/en_US）+ 25+ 文件 tr() 改造 + 设置对话框语言选择。

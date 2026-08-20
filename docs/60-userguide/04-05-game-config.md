@@ -102,4 +102,4 @@
 
 ---
 
-上一步：[← 流派规则详解](04-04-school-rules.md) | 下一步：[5. 运行自动调律 →](05-running-tuning.md)
+上一步：[← 流派规则详解](04-04-school-rules.md) | 下一步：[4.6 运行自动调律 →](04-06-running-tuning.md)

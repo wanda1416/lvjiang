@@ -256,8 +256,12 @@ def action_dongfang($label, $idx)
       log "检测到确认弹窗，点击取消关闭"
       click [general_control].[cancel] after wait @step_interval
    end
-
-   click [general_action].[back] after wait @step_interval
+ 
+   # 如果已经完成过任务，可能导致此时已经在主页，所以需要额外判断
+   call $in_main_page = is_in_main_page()
+   if $in_main_page == 0
+       click [general_action].[back] after wait @step_interval
+   end
 
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward

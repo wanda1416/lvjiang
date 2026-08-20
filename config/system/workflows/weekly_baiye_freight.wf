@@ -66,11 +66,10 @@ click [game_menu_page].[back] after wait @page_refresh
 log "百业货运流程结束"
 
 # ─── 检查是否抵达百业驻地 ──────────────────────────────
-# 百业驻地在游戏主页，通过检测 menu/xianshi 区域判定
+# 百业驻地在游戏主页，通过 is_in_main_page 判定
 def check_in_baiye()
-    eval $main_items = ["菜单", "限时"]
-    scan [game_main_page].[menu, xianshi] as $found by contains_any $main_items
-    if $found
+    call $in_main = is_in_main_page()
+    if $in_main
         log "抵达百业驻地"
         return 0
     else

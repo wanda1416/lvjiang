@@ -10,6 +10,8 @@
 #   nav_main_to_item()   — 主界面 → 背包道具页（普通道具子区域）
 #   nav_back_to_main()   — 背包装备页 → 主界面
 #   nav_equip_to_tune()  — 装备详情页 → 调律页
+#   is_in_main_page()    — 检测当前是否在主界面（返回 1/0）
+#   is_in_menu_page()    — 检测当前是否在菜单页（返回 1/0）
 
 # ─── nav_main_to_bag ──────────────────────────────────────
 # 从主界面导航到背包页面
@@ -20,14 +22,13 @@
 
 def nav_main_to_bag()
     # 检查当前是否在菜单页
-    scan [game_menu_page].[wulinlu] as $menu_check
-    if $menu_check.[wulinlu] contains "武林录"
+    call $in_menu = is_in_menu_page()
+    if $in_menu
         log info "当前已在菜单页"
     else
-        # 不在菜单页，检查是否在主页（多区域同时扫描）
-        eval $main_items = ["菜单", "活动", "武林录", "限时"]
-        scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $main_check by contains_any $main_items
-        if $main_check
+        # 不在菜单页，检查是否在主页
+        call $in_main = is_in_main_page()
+        if $in_main
             log info "从主页进入菜单页"
             click [game_main_page].[menu] after wait @page_refresh
         else
@@ -210,4 +211,34 @@ def nav_equip_to_tune()
         eval pause("未进入调律页面，请手动导航后点击继续")
     end
     log info "已到达调律页"
+end
+
+# ─── is_in_main_page ─────────────────────────────────────
+# 检测当前是否在游戏主界面
+# 通过扫描主界面多个入口按钮文字判定（菜单/活动/武林录/限时）
+# 返回：1=在主界面，0=不在
+
+def is_in_main_page()
+   eval $main_items = ["菜单", "活动", "武林录", "限时"]
+   scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
+   if $found
+       return 1
+   else
+       return 0
+   end
+end
+
+# ─── is_in_menu_page ─────────────────────────────────────
+# 检测当前是否在菜单页
+# 通过扫描菜单页入口按钮文字判定（包裹/培养）
+# 返回：1=在菜单页，0=不在
+
+def is_in_menu_page()
+   eval $menu_items = ["包裹", "培养"]
+   scan [game_menu_page].[baoguo, peiyang] as $found by contains_any $menu_items
+   if $found
+       return 1
+   else
+       return 0
+   end
 end

@@ -58,17 +58,29 @@ class TuningTab(QWidget):
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
-        # 顶部固定「开始调律」按钮（第一行）+ 下方配置三页 Tab（规则 | 部位 | 更多）+ 底部状态栏
+        # 顶部固定「开始调律」+「暂停/恢复」按钮（第一行）+ 下方配置三页 Tab + 底部状态栏
         tab_layout = QVBoxLayout(self)
         tab_layout.setContentsMargins(8, 8, 8, 8)
         tab_layout.setSpacing(8)
 
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(8)
         self.btn_run_tuning = QPushButton(tr("开始调律 (F9)"))
         self.btn_run_tuning.clicked.connect(self.f9_run)
         self.btn_run_tuning.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
         )
-        tab_layout.addWidget(self.btn_run_tuning)
+        btn_layout.addWidget(self.btn_run_tuning)
+
+        self.btn_pause_resume = QPushButton(tr("暂停"))
+        self.btn_pause_resume.setEnabled(False)
+        self.btn_pause_resume.setStyleSheet(
+            "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+        )
+        self.btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
+        btn_layout.addWidget(self.btn_pause_resume)
+        tab_layout.addLayout(btn_layout)
 
         config_tabs = QTabWidget()
         config_tabs.addTab(self._build_rules_page(), tr("规则"))
@@ -263,20 +275,20 @@ class TuningTab(QWidget):
     # ─── 按钮状态（订阅宿主 automation_state_changed）──────────
 
     def _on_automation_state(self, state: str):
-        if state == "running":
-            self.btn_run_tuning.setText(tr("停止 (F10)"))
+        if state in ("running", "paused"):
+            self.btn_run_tuning.setText(tr("结束 (F10)"))
             self.btn_run_tuning.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         elif state == "not_ready":
             self.btn_run_tuning.setText(tr("未就绪"))
             self.btn_run_tuning.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         else:
             self.btn_run_tuning.setText(tr("开始调律 (F9)"))
             self.btn_run_tuning.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
             # 工作流结束：通知调律进度 Tab 标记完成
             engine = getattr(self._host, '_current_engine', None)
@@ -284,6 +296,29 @@ class TuningTab(QWidget):
                 widget = self._find_progress_widget()
                 if widget is not None:
                     widget.mark_done()
+        # 刷新暂停/恢复按钮
+        if state == "running":
+            self.btn_pause_resume.setText(tr("暂停 (F8)"))
+            self.btn_pause_resume.setEnabled(True)
+            self.btn_pause_resume.setStyleSheet(
+                "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        elif state == "paused":
+            self.btn_pause_resume.setText(tr("恢复 (F8)"))
+            self.btn_pause_resume.setEnabled(True)
+            self.btn_pause_resume.setStyleSheet(
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        else:
+            self.btn_pause_resume.setText(tr("暂停"))
+            self.btn_pause_resume.setEnabled(False)
+            self.btn_pause_resume.setStyleSheet(
+                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+
+    def _on_pause_resume_clicked(self):
+        """暂停/恢复按钮点击 → 转发给宿主"""
+        self._host.request_pause_resume()
 
     # ─── 配置变更监听 ────────────────────────────────────────
 

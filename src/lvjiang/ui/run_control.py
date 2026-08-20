@@ -1,6 +1,7 @@
 """运行控制混入类 - 用户/布局选择器、启停控制、工作流通用执行"""
 
 import json
+import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -173,6 +174,13 @@ class RunControlMixin:
     _param_panel = None         # 参数面板（MainWindow._setup_ui 构建）
     _left_tabs = None           # 左侧页签（MainWindow._setup_ui 构建）
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
+    _run_state = "idle"         # 运行状态：idle / running / paused
+    _pause_event: threading.Event | None = None  # 暂停事件：set=运行，clear=暂停阻塞
+
+    @property
+    def _running(self) -> bool:
+        """运行状态派生自 _run_state（唯一事实来源）"""
+        return getattr(self, '_run_state', 'idle') != 'idle'
 
     # ─── 工作流配置加载 ──────────────────────────────────
 
@@ -351,23 +359,31 @@ class RunControlMixin:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
             self.log_text.append(tr("[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止"))
-            self.statusBar().showMessage(tr("自动化运行中 | F10 停止"))
+            self.statusBar().showMessage(tr("自动化运行中 | F10 结束"))
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False
-        self._running = True
         self._stop_requested = False
+        self._run_state = "running"
+        # 暂停事件：set=运行，clear=暂停阻塞
+        self._pause_event = threading.Event()
+        self._pause_event.set()  # 初始为运行状态
         self._refresh_run_button()
-        # 运行期间保持按钮可点击，以便用户点击切换为停止（_on_run_workflow 内部判断 _running 后转发 _request_stop）
-        self.statusBar().showMessage(f"{name} 运行中 | F10 停止")
+        self._refresh_pause_button()
+        self.statusBar().showMessage(f"{name} 运行中 | F8 暂停 | F10 结束")
         logger.info(f"开始自动化: {name}")
         return True
 
     def _end_automation(self, name: str):
         """结束自动化，恢复 UI 状态。由工作流线程实际结束后调用。"""
-        self._running = False
         self._stop_requested = False
+        self._run_state = "idle"
+        # 确保 pause_event 为 set 状态，避免下次启动阻塞
+        pause_event = getattr(self, '_pause_event', None)
+        if pause_event is not None:
+            pause_event.set()
         self._current_worker = None
         self._refresh_run_button()
+        self._refresh_pause_button()
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
             banner.setVisible(False)
@@ -402,12 +418,18 @@ class RunControlMixin:
         return callback
 
     def _request_stop(self):
-        """统一停止入口（F10 / 停止按钮）。只设标志，不立即改 running。"""
+        """统一停止入口（F10 / 结束按钮）。只设标志，不立即改 running。"""
         self.log_text.append(tr("[操作] 收到停止请求"))
         logger.info("收到停止请求")
         if not self._running:
             self.log_text.append(tr("[提示] 当前没有正在运行的自动化"))
             return
+        # 若处于暂停状态，唤醒工作流线程以便响应停止
+        if self._run_state == 'paused':
+            pause_event = getattr(self, '_pause_event', None)
+            if pause_event is not None:
+                pause_event.set()
+            self._run_state = 'running'  # 避免停止窗口期内 F8 误恢复
         self._stop_requested = True
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
         helper = self._ui_helper
@@ -423,11 +445,75 @@ class RunControlMixin:
         self.statusBar().showMessage(tr("停止中... | 等待当前步骤结束"))
         # 占位主流程（_on_start）没有工作流线程，直接复位
         if self._current_worker is None:
-            self._running = False
             self._stop_requested = False
+            self._run_state = 'idle'
             self._refresh_run_button()
+            self._refresh_pause_button()
             self._overlay.set_color("red")
             self.log_text.append(tr("[操作] 已停止"))
+
+    # ─── 暂停/恢复 ────────────────────────────────────────
+
+    def _on_pause_resume(self):
+        """暂停/恢复按钮点击处理（F8 快捷键转发）"""
+        run_state = getattr(self, '_run_state', 'idle')
+        if run_state == 'running':
+            self._request_pause()
+        elif run_state == 'paused':
+            self._resume_execution()
+
+    def _request_pause(self):
+        """暂停执行：阻塞工作流线程，保留调用栈"""
+        if getattr(self, '_run_state', 'idle') != 'running':
+            return
+        self._run_state = 'paused'
+        pause_event = getattr(self, '_pause_event', None)
+        if pause_event is not None:
+            pause_event.clear()  # 阻塞工作流线程
+        self._refresh_pause_button()
+        self._refresh_run_button()  # 广播 "paused" 状态给插件 Tab
+        self.log_text.append(tr("[操作] 已暂停 | F8 恢复 | F10 结束"))
+        self.statusBar().showMessage(tr("已暂停 | F8 恢复 | F10 结束"))
+        logger.info("工作流已暂停")
+
+    def _resume_execution(self):
+        """恢复执行：唤醒工作流线程，从暂停点继续"""
+        if getattr(self, '_run_state', 'idle') != 'paused':
+            return
+        self._run_state = 'running'
+        pause_event = getattr(self, '_pause_event', None)
+        if pause_event is not None:
+            pause_event.set()  # 唤醒工作流线程
+        self._refresh_pause_button()
+        self._refresh_run_button()  # 广播 "running" 状态给插件 Tab
+        self.log_text.append(tr("[操作] 已恢复，继续执行..."))
+        self.statusBar().showMessage(tr("已恢复 | F8 暂停 | F10 结束"))
+        logger.info("工作流已恢复")
+
+    def _refresh_pause_button(self):
+        """刷新暂停/恢复按钮状态"""
+        btn = getattr(self, 'btn_pause_resume', None)
+        if btn is None:
+            return
+        run_state = getattr(self, '_run_state', 'idle')
+        if run_state == 'running':
+            btn.setText(tr("暂停 (F8)"))
+            btn.setEnabled(True)
+            btn.setStyleSheet(
+                "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        elif run_state == 'paused':
+            btn.setText(tr("恢复 (F8)"))
+            btn.setEnabled(True)
+            btn.setStyleSheet(
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        else:  # idle
+            btn.setText(tr("暂停"))
+            btn.setEnabled(False)
+            btn.setStyleSheet(
+                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
 
     # ─── ADB 断连暂停恢复 ────────────────────────────────
 
@@ -553,6 +639,7 @@ class RunControlMixin:
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,
+            pause_event=self._pause_event,
         )
         # session/context 初始化：启动时快照当前用户，全程只依赖此绑定值
         username = self._user_manager.get_active_user_name()
@@ -593,6 +680,7 @@ class RunControlMixin:
                 window_left=window_left,
                 window_top=window_top,
                 stop_check=self._is_stopped,
+                pause_event=self._pause_event,
             )
             self._start_workflow(flow_id, flow_name,
                                  lambda: engine.execute(wf_instance, initial_variables=flow_params))
@@ -696,24 +784,25 @@ class RunControlMixin:
 
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
+        run_state = getattr(self, '_run_state', 'idle')
         if self._running:
-            state = "running"
-            self.btn_run_workflow.setText(tr("停止 (F10)"))
+            state = run_state  # running 或 paused
+            self.btn_run_workflow.setText(tr("结束 (F10)"))
             self.btn_run_workflow.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         elif not self._backend_ready():
             state = "not_ready"
             label = tr("未连接") if self._backend == "adb" else tr("未定位")
             self.btn_run_workflow.setText(label)
             self.btn_run_workflow.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         else:
-            state = "ready"
+            state = "idle"
             self.btn_run_workflow.setText(tr("开始执行 (F9)"))
             self.btn_run_workflow.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         self.automation_state_changed.emit(state)
 
@@ -735,13 +824,6 @@ class RunControlMixin:
     def _on_stop(self):
         """停止执行（转发到统一停止入口）"""
         self._request_stop()
-
-    def _on_toggle_running(self):
-        """单按钮切换运行状态。"""
-        if self._running:
-            self._request_stop()
-        else:
-            self._on_start()
 
     # ─── 插件工作流执行 ────────────────────────────────────
 
@@ -796,6 +878,7 @@ class RunControlMixin:
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,
+            pause_event=self._pause_event,
         )
         username = self._user_manager.get_active_user_name()
         engine.session = self._session_manager.load(username)
@@ -815,6 +898,7 @@ class RunControlMixin:
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,
+            pause_event=self._pause_event,
         )
 
         # 插件写入专属参数（如判定器、部位选择等）并输出开始日志

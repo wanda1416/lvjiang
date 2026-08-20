@@ -1,6 +1,7 @@
 """WorkflowEngine 主类：生命周期、执行入口与语句分发"""
 
 import posixpath
+import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -89,6 +90,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         window_left: int = 0,
         window_top: int = 0,
         stop_check: Callable[[], bool] | None = None,
+        pause_event: threading.Event | None = None,
     ):
         # 硬件后端（直接持有）
         self._capture = capture
@@ -100,6 +102,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._window_left = window_left
         self._window_top = window_top
         self._stop_check = stop_check or (lambda: False)
+        # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
+        self._pause_event = pause_event
         # 执行状态
         self.variables: dict = {}
         self.output: dict = {}
@@ -150,8 +154,23 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 window_left=self._window_left,
                 window_top=self._window_top,
                 stop_check=self._stop_check,
+                pause_event=self._pause_event,
             )
         return self._workflow
+
+    def _wait_if_paused(self):
+        """暂停检查：若 pause_event 未 set 则阻塞等待，期间响应 stop_check
+
+        与 _stop_check 的区别：
+        - _stop_check 返回 True → raise _BreakSignal 终止
+        - _wait_if_paused 阻塞 → 直到 resume（event set）或 stop → 若 stop 则 raise
+        """
+        if self._pause_event is None:
+            return
+        while not self._pause_event.is_set():
+            if self._stop_check():
+                raise _BreakSignal()
+            self._pause_event.wait(timeout=1.0)
 
     def execute(self, source, *, initial_variables: dict | None = None,
                 _reset_context: bool = True) -> dict:
@@ -488,6 +507,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             if self._stop_check():
                 logger.info("工作流被用户停止")
                 return
+            self._wait_if_paused()  # 暂停检查：阻塞直到恢复或停止
 
             node = stmts[pc]
 
@@ -522,6 +542,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 语句边界也检查停止标志，让 F10 在两条语句之间立即生效
         if self._stop_check():
             raise _BreakSignal()
+        self._wait_if_paused()  # 暂停检查
         match node:
             case Click():
                 self._exec_click(node)

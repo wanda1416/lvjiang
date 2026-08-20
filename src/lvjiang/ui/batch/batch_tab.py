@@ -54,13 +54,22 @@ _STATUS_COLORS = {
 }
 
 _STYLE_BTN_RUN = (
-    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 _STYLE_BTN_STOP = (
-    "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+    "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 _STYLE_BTN_NOT_READY = (
-    "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+    "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
+)
+_STYLE_BTN_PAUSE = (
+    "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+)
+_STYLE_BTN_RESUME = (
+    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+)
+_STYLE_BTN_DISABLED = (
+    "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 
 
@@ -111,11 +120,21 @@ class BatchTab(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        # ── 执行按钮（第一行）──
+        # ── 执行按钮 + 暂停/恢复按钮（第一行）──
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(8)
         self._btn_run = QPushButton(tr("开始批量执行 (F9)"))
         self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         self._btn_run.clicked.connect(self._on_run_clicked)
-        layout.addWidget(self._btn_run)
+        btn_layout.addWidget(self._btn_run)
+
+        self._btn_pause_resume = QPushButton(tr("暂停"))
+        self._btn_pause_resume.setEnabled(False)
+        self._btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
+        self._btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
+        btn_layout.addWidget(self._btn_pause_resume)
+        layout.addLayout(btn_layout)
 
         # ── 三页子 Tab ──
         self._sub_tabs = QTabWidget()
@@ -475,7 +494,7 @@ class BatchTab(QWidget):
         """批量全部结束（由 host 调用）"""
         self._running = False
         self._set_config_enabled(True)
-        self._refresh_run_button("ready")
+        self._refresh_run_button("idle")
 
     def refresh_config(self):
         """外部配置变更后调用，刷新配置 + 脚本 + 行列表"""
@@ -487,16 +506,20 @@ class BatchTab(QWidget):
 
     def _on_automation_state(self, state: str):
         """宿主自动化状态变化 → 刷新按钮"""
-        self._running = (state == "running")
+        self._running = state in ("running", "paused")
         self._refresh_run_button(state)
-        if state == "running":
+        if state in ("running", "paused"):
             self._set_config_enabled(False)
         else:
             self._set_config_enabled(True)
 
+    def _on_pause_resume_clicked(self):
+        """暂停/恢复按钮点击 → 转发给宿主"""
+        self._host.request_pause_resume()
+
     def _refresh_run_button(self, state: str):
-        if state == "running":
-            self._btn_run.setText(tr("停止 (F10)"))
+        if state in ("running", "paused"):
+            self._btn_run.setText(tr("结束 (F10)"))
             self._btn_run.setStyleSheet(_STYLE_BTN_STOP)
         elif state == "not_ready":
             self._btn_run.setText(tr("未连接"))
@@ -504,6 +527,19 @@ class BatchTab(QWidget):
         else:
             self._btn_run.setText(tr("开始批量执行 (F9)"))
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
+        # 刷新暂停/恢复按钮
+        if state == "running":
+            self._btn_pause_resume.setText(tr("暂停 (F8)"))
+            self._btn_pause_resume.setEnabled(True)
+            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
+        elif state == "paused":
+            self._btn_pause_resume.setText(tr("恢复 (F8)"))
+            self._btn_pause_resume.setEnabled(True)
+            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_RESUME)
+        else:
+            self._btn_pause_resume.setText(tr("暂停"))
+            self._btn_pause_resume.setEnabled(False)
+            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
 
     def _set_config_enabled(self, enabled: bool):
         """运行期间锁定脚本页和配置页"""

@@ -5,7 +5,7 @@
 - 窗口/设备扫描与定位
 - 工作流加载、执行
 - 运行日志面板
-- 全局热键（仅 F8-F10：F9 执行、F10 停止、F8 脚本录制；定位/连接后方生效）
+- 全局热键（仅 F8-F10：F9 开始、F10 结束、F8 暂停/恢复或脚本录制；定位/连接后方生效）
 
 插件通过 hooks 机制扩展左侧/右侧 Tab 和菜单项。
 """
@@ -102,7 +102,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     f10_pressed = pyqtSignal()
     f8_pressed = pyqtSignal()
     _scrcpy_frame_ready = pyqtSignal(object)
-    # 宿主信号：自动化状态（"running" / "not_ready" / "ready"）与用户切换
+    # 宿主信号：自动化状态（"running" / "paused" / "not_ready" / "idle"）与用户切换
     automation_state_changed = pyqtSignal(str)
     user_changed = pyqtSignal(str)
     # 装备变更信号（用于通知战斗属性 Tab 刷新）
@@ -127,7 +127,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._scanned_windows = []
         self._device = None
         self._device_ready = False
-        self._running = False
         self._stop_requested = False
         self._current_worker = None
         self._overlay = BorderOverlay()
@@ -213,9 +212,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.f10_pressed.emit()
 
     def _on_global_f8(self):
+        """全局 F8：运行/暂停时暂停/恢复；空闲时脚本录制"""
         if not self._backend_ready():
             return
-        self.f8_pressed.emit()
+        run_state = getattr(self, '_run_state', 'idle')
+        if run_state in ('running', 'paused'):
+            self._on_pause_resume()
+        else:
+            self.f8_pressed.emit()
 
     def _on_f9_start(self):
         """F9 启动入口（全局热键 / 窗口按键共用）"""
@@ -584,7 +588,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
-        self.statusBar().showMessage(tr("就绪 | F9 开始 | F10 停止 | F8 脚本录制"))
+        self.statusBar().showMessage(tr("就绪 | F9 开始 | F8 暂停/录制 | F10 结束"))
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._migrate_ui_state()
@@ -602,13 +606,25 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         daily_layout.setContentsMargins(8, 8, 8, 8)
         daily_layout.setSpacing(8)
 
-        # 开始/停止按钮（第一行）
+        # 开始/停止 + 暂停/恢复按钮（第一行）
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(8)
         self.btn_run_workflow = QPushButton(tr("开始执行 (F9)"))
         self.btn_run_workflow.clicked.connect(self._on_run_workflow)
         self.btn_run_workflow.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px; margin: 4px 0;"
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
         )
-        daily_layout.addWidget(self.btn_run_workflow)
+        btn_layout.addWidget(self.btn_run_workflow)
+
+        self.btn_pause_resume = QPushButton(tr("暂停"))
+        self.btn_pause_resume.clicked.connect(self._on_pause_resume)
+        self.btn_pause_resume.setEnabled(False)  # 初始禁用
+        self.btn_pause_resume.setStyleSheet(
+            "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+        )
+        btn_layout.addWidget(self.btn_pause_resume)
+        daily_layout.addLayout(btn_layout)
 
         wf_group = QGroupBox(tr("脚本"))
         wf_layout = QHBoxLayout(wf_group)
@@ -723,6 +739,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         """请求停止当前自动化（等价 F10）"""
         self._request_stop()
 
+    def request_pause_resume(self):
+        """切换暂停/恢复（等价 F8）"""
+        self._on_pause_resume()
+
     def append_log(self, text: str):
         """向运行日志面板追加一行消息"""
         self._log_append(text)
@@ -789,6 +809,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             delay_params=self._user_config.delay_params,
             window_left=window_left,
             window_top=window_top,
+            pause_event=getattr(self, '_pause_event', None),
         )
 
         # 获取当前配置
@@ -1123,6 +1144,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def keyPressEvent(self, event: QKeyEvent):  # type: ignore[override]
         if event.key() == Qt.Key.Key_F9:
             self._on_f9_start()
+        elif event.key() == Qt.Key.Key_F8:
+            # 运行中/暂停时 F8 暂停/恢复；空闲时 F8 脚本录制
+            run_state = getattr(self, '_run_state', 'idle')
+            if run_state in ('running', 'paused'):
+                self._on_pause_resume()
+            else:
+                self._on_f8_script_record()
         elif event.key() == Qt.Key.Key_F10:
             self._request_stop()
         else:

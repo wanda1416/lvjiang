@@ -1,5 +1,6 @@
 """工作流基类主体 - 生命周期、变量、内置函数调用，组合各操作 Mixin"""
 
+import threading
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         window_left: int = 0,
         window_top: int = 0,
         stop_check: Optional[Callable[[], bool]] = None,
+        pause_event: threading.Event | None = None,
     ):
         self._capture = capture
         self._ocr = ocr
@@ -59,6 +61,8 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         self._window_left = window_left
         self._window_top = window_top
         self._stop_check = stop_check or (lambda: False)
+        # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
+        self._pause_event = pause_event
 
         # 运行时状态
         self.output: dict = {}  # collect 语句写入的输出字典
@@ -85,8 +89,22 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
 
     @property
     def is_stopped(self) -> bool:
-        """是否请求了停止"""
+        """是否请求了停止（检查前先过暂停检查点）"""
+        self._wait_if_paused()  # 暂停时阻塞，恢复或停止后才继续
         return self._stop_check()
+
+    def _wait_if_paused(self):
+        """暂停检查：若 pause_event 未 set 则阻塞等待，期间响应 stop_check
+
+        Python 工作流子类在关键操作前调用此方法以支持暂停/恢复。
+        """
+        if self._pause_event is None:
+            return
+        while not self._pause_event.is_set():
+            if self._stop_check():
+                from ..engine.signals import _BreakSignal
+                raise _BreakSignal()
+            self._pause_event.wait(timeout=1.0)
 
     # ─── 材料识别器（类级别共享） ──────────────────────────
 

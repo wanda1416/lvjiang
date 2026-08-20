@@ -5,7 +5,7 @@
 - 窗口/设备扫描与定位
 - 工作流加载、执行
 - 运行日志面板
-- 全局热键（仅 F8-F10：F9 开始、F10 结束、F8 暂停/恢复或脚本录制；定位/连接后方生效）
+- 全局热键（F9 开始、F10 结束、F8 暂停/恢复、F12 脚本录制；定位/连接后方生效）
 
 插件通过 hooks 机制扩展左侧/右侧 Tab 和菜单项。
 """
@@ -101,6 +101,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     f9_pressed = pyqtSignal()
     f10_pressed = pyqtSignal()
     f8_pressed = pyqtSignal()
+    f12_pressed = pyqtSignal()
     _scrcpy_frame_ready = pyqtSignal(object)
     # 宿主信号：自动化状态（"running" / "paused" / "not_ready" / "idle"）与用户切换
     automation_state_changed = pyqtSignal(str)
@@ -162,7 +163,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # ── 全局热键（仅 F8-F10；回调内按后端就绪门控，定位/连接后方生效）──
         self.f9_pressed.connect(self._on_f9_start)
         self.f10_pressed.connect(self._request_stop)
-        self.f8_pressed.connect(self._on_f8_script_record)
+        self.f8_pressed.connect(self._on_pause_resume)
+        self.f12_pressed.connect(self._on_f12_script_record)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
         # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 已处理 F8-F10）
@@ -171,6 +173,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             "<f9>": self._on_global_f9,
             "<f10>": self._on_global_f10,
             "<f8>": self._on_global_f8,
+            "<f12>": self._on_global_f12,
         })
 
         logger.info("主窗口已初始化")
@@ -212,14 +215,16 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.f10_pressed.emit()
 
     def _on_global_f8(self):
-        """全局 F8：运行/暂停时暂停/恢复；空闲时脚本录制"""
+        """全局 F8：暂停/恢复"""
         if not self._backend_ready():
             return
-        run_state = getattr(self, '_run_state', 'idle')
-        if run_state in ('running', 'paused'):
-            self._on_pause_resume()
-        else:
-            self.f8_pressed.emit()
+        self._on_pause_resume()
+
+    def _on_global_f12(self):
+        """全局 F12：脚本录制"""
+        if not self._backend_ready():
+            return
+        self.f12_pressed.emit()
 
     def _on_f9_start(self):
         """F9 启动入口（全局热键 / 窗口按键共用）"""
@@ -324,8 +329,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         finally:
             self._script_record_dialog = None
 
-    def _on_f8_script_record(self):
-        """F8：对话框已打开则切换录制，未打开则打开脚本录制对话框"""
+    def _on_f12_script_record(self):
+        """F12：对话框已打开则切换录制，未打开则打开脚本录制对话框"""
         dialog = self._script_record_dialog
         if dialog is not None and dialog.isVisible():
             dialog.toggle_recording()
@@ -588,7 +593,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
-        self.statusBar().showMessage(tr("就绪 | F9 开始 | F8 暂停/录制 | F10 结束"))
+        self.statusBar().showMessage(tr("就绪 | F9 开始 | F8 暂停 | F10 结束 | F12 录制"))
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._migrate_ui_state()
@@ -1145,12 +1150,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if event.key() == Qt.Key.Key_F9:
             self._on_f9_start()
         elif event.key() == Qt.Key.Key_F8:
-            # 运行中/暂停时 F8 暂停/恢复；空闲时 F8 脚本录制
-            run_state = getattr(self, '_run_state', 'idle')
-            if run_state in ('running', 'paused'):
-                self._on_pause_resume()
-            else:
-                self._on_f8_script_record()
+            # 全局热键已处理 F8（避免双触发导致暂停/恢复互相抵消）
+            if self._hotkey_listener is not None:
+                return
+            self._on_pause_resume()
+        elif event.key() == Qt.Key.Key_F12:
+            if self._hotkey_listener is not None:
+                return
+            self._on_f12_script_record()
         elif event.key() == Qt.Key.Key_F10:
             self._request_stop()
         else:

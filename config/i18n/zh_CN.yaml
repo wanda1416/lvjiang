@@ -37,7 +37,7 @@ main_window:
   btn_load: 加载
   group_params: 参数设置
   label_log_level: 日志级别
-  status_ready: 就绪 | F9 开始 | F10 停止 | F8 脚本录制
+  status_ready: 就绪 | F9 开始 | F8 暂停 | F10 结束 | F12 录制
   label_no_window: 未选择窗口
   label_preview_placeholder: 定位窗口后自动截屏
   status_window_located: 窗口已定位
@@ -100,12 +100,12 @@ user_manager:
   cannot_delete: 无法删除该用户
 script_record:
   title: 脚本录制
-  btn_record: ● 录制脚本 (F8)
+  btn_record: ● 录制脚本 (F12)
   btn_save: 保存
   btn_copy: 复制
   btn_clear: 清除
-  status_idle: 待机 | 点击「录制脚本」或按 F8 开始
-  btn_stop_record: ■ 停止录制 (F8)
+  status_idle: 待机 | 点击「录制脚本」或按 F12 开始
+  btn_stop_record: ■ 停止录制 (F12)
   save_workflow_title: 保存为工作流文件
   save_workflow_filter: 工作流文件 (*.wf);;所有文件 (*)
   err_workflow_running: 工作流运行中，无法录制
@@ -114,7 +114,7 @@ script_record:
   err_layout_not_found: '无法加载布局: {layout_name}'
   err_start_failed: '启动失败: {e}'
   err_record_failed: '录制启动失败: {e}'
-  status_recording: 录制中…在游戏窗口内点击/拖拽，F8 或点击停止
+  status_recording: 录制中…在游戏窗口内点击/拖拽，F12 或点击停止
   status_done: 录制结束，可编辑后保存为 .wf
   status_done_empty: 录制结束，未捕获到有效操作
   status_copied: 已复制到剪贴板

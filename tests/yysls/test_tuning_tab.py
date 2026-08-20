@@ -124,9 +124,10 @@ class TestSelectAll:
 
 class TestButtonState:
     @pytest.mark.parametrize("state,text", [
-        ("running", "停止 (F10)"),
+        ("running", "结束 (F10)"),
         ("not_ready", "未就绪"),
-        ("ready", "开始调律 (F9)"),
+        ("idle", "开始调律 (F9)"),
+        ("paused", "结束 (F10)"),
     ])
     def test_button_follows_host_state(self, qtbot, host, session_path, state, text):
         tab = _make_tab(qtbot, host)

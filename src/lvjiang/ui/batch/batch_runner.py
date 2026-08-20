@@ -72,6 +72,7 @@ class BatchContext:
     delay_params: dict | None = None
     window_left: int = 0
     window_top: int = 0
+    pause_event: object = None  # threading.Event | None
 
 
 @dataclass(frozen=True)
@@ -392,6 +393,7 @@ class BatchWorker(QThread):
             window_left=ctx.window_left,
             window_top=ctx.window_top,
             stop_check=self._stop_check,
+            pause_event=ctx.pause_event,
         )
 
     def _run_stage(

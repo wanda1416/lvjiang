@@ -44,8 +44,8 @@ class _ControlFlowMixin:
 
         for value in items:
             if self._stop_check():
-                logger.info("工作流被用户停止")
                 return
+            self._wait_if_paused()  # 暂停检查
             # 设置循环变量（保持原始类型：int/float/str）
             self.variables[node.var] = value
             try:
@@ -73,8 +73,8 @@ class _ControlFlowMixin:
 
         for value in items:
             if self._stop_check():
-                logger.info("工作流被用户停止")
                 return
+            self._wait_if_paused()  # 暂停检查
             self.variables[node.var] = value  # int，保持原始类型
             try:
                 self._exec_body(node.body)
@@ -99,8 +99,8 @@ class _ControlFlowMixin:
         logger.debug(f"loop {count}")
         for _ in range(count):
             if self._stop_check():
-                logger.info("工作流被用户停止")
                 return
+            self._wait_if_paused()  # 暂停检查
             try:
                 self._exec_body(node.body)
             except _BreakSignal:
@@ -114,8 +114,8 @@ class _ControlFlowMixin:
         safety_counter = 0
         while self._eval_condition(node.condition):
             if self._stop_check():
-                logger.info("工作流被用户停止")
                 return
+            self._wait_if_paused()  # 暂停检查
             try:
                 self._exec_body(node.body)
             except _BreakSignal:
@@ -133,8 +133,8 @@ class _ControlFlowMixin:
         safety_counter = 0
         while True:
             if self._stop_check():
-                logger.info("工作流被用户停止")
                 return
+            self._wait_if_paused()  # 暂停检查
             try:
                 self._exec_body(node.body)
             except _BreakSignal:

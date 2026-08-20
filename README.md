@@ -43,14 +43,15 @@ PC 端投屏窗口 或 ADB 连接
 
 | 层 | 模块 | 职责 |
 |----|------|------|
-| 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`src/lvjiang/core/desktop/`、`src/lvjiang/core/android/` | 截图与点击的统一抽象，桌面窗口与 ADB / scrcpy 后端 |
+| 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口与 ADB / scrcpy 后端 |
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
-| 场景 / 布局 | `src/lvjiang/core/scene_*.py`、`src/lvjiang/core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
-| 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征） |
-| 工作流 | `src/lvjiang/workflows/` | `.wf` DSL 语法解析、执行引擎、通用内置函数 |
+| 场景 / 布局 | `src/lvjiang/core/scene_definition.py`、`core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
+| 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征 / 参考图） |
+| 配置管理 | `src/lvjiang/core/config/` | 应用配置、会话管理、用户数据、工作流配置加载与合并 |
+| 工作流 | `src/lvjiang/workflows/` | `.wf` DSL 语法解析（grammar/）、执行引擎（engine/）、通用内置函数（builtins/） |
 | 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、运行控制 |
 | 插件 | `src/lvjiang/apps/<name>/` | 游戏/场景专属插件（识别器、工作流、UI Tab） |
-| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备解析、评分、调律、材料识别、专属 UI |
+| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备解析、评分、调律、材料识别、毕业率、专属 UI（config/ + core/ + workflows/ + ui/） |
 | 设备端 | `src/lvjiang/core/ondevice/`、`android/` | 安卓独立执行端：无障碍截图/手势桥接、rapidocr 设备端适配、Kotlin 宿主工程 |
 
 更多细节见 [架构文档](docs/30-architecture/README.md) 与 [DSL 语法文档](docs/30-architecture/32-grammar/README.md)。
@@ -64,26 +65,54 @@ lvjiang/
 ├── src/lvjiang/               # 通用视觉 RPA 引擎（src-layout，唯一可导入包）
 │   ├── __main__.py            # 启动入口（python -m lvjiang [-reg <plugin>]）
 │   ├── app.py                 # QApplication 入口
-│   ├── config.py              # 配置加载与校验
-│   ├── constants.py           # 路径与常量定义
+│   ├── _version.py            # 版本号
 │   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局 / 坐标类型
 │   │   ├── coord_types.py     # CoordRef 坐标类型体系（CoordRef/RectCoordRef/CircleCoordRef/Offset）
-│   │   ├── desktop/           # 桌面投屏窗口后端
+│   │   ├── config/            # 配置加载与会话管理（app.yaml / session / 用户 / 工作流配置）
+│   │   ├── desktop/           # 桌面投屏窗口后端（截图 + SendInput 点击）
 │   │   ├── android/           # ADB / scrcpy 后端
 │   │   ├── ondevice/          # 设备端（Chaquopy）无障碍截图/输入与 OCR 适配
-│   │   └── recognizers/       # 可插拔识别器插件包
+│   │   ├── recognizers/       # 可插拔识别器插件包（OCR / 模板 / 颜色 / 参考图）
+│   │   ├── scene_definition.py      # 声明式场景模型加载
+│   │   ├── layout_manager.py        # 布局索引与坐标换算
+│   │   ├── reference_db.py          # 参考图库管理
+│   │   ├── platforms.py             # 跨平台统一收口
+│   │   └── crash_handler.py         # 崩溃日志收集
 │   ├── workflows/             # 工作流 DSL 语法、引擎与通用内置函数
+│   │   ├── grammar/           # .wf 语法定义（Lark）与解析器
+│   │   ├── engine/            # 执行引擎（控制流 / 数据操作 / 面板识别）
+│   │   ├── base/              # DSL 原语基类（识别 / 坐标 / 面板 / 动作）
+│   │   ├── builtins/          # 通用内置函数（算术 / 字符串 / 系统）
+│   │   └── implementations/   # 插件级工作流实现（背包遍历 / 调律）
+│   ├── i18n/                  # 国际化
 │   ├── ui/                    # PyQt6 通用图形界面
+│   │   ├── scene_editor/      # 场景编辑器（坐标标注 / 区域绘制）
+│   │   ├── reference_manager/ # 参考图库管理 UI
+│   │   ├── batch/             # 批量运行面板
+│   │   ├── macros/            # 脚本录制
+│   │   └── run_control.py     # 运行控制与日志
 │   └── apps/                  # 插件注册表
 │       ├── base.py            # AppHooks 数据类
 │       └── yysls/             # 燕云十六声插件
-│           ├── core/          # 材料识别等核心逻辑
-│           ├── equip_parser/  # 装备词条解析
-│           ├── evaluator/     # 评分与规则引擎
+│           ├── config/        # 配置管理（manager / profile / 毕业率会话 / 玩法）
+│           ├── core/          # 核心业务逻辑
+│           │   ├── combat/        # 战斗属性与装备模型
+│           │   ├── equip_parser/  # 装备词条解析（含定音词条）
+│           │   ├── evaluator/     # 评分规则引擎
+│           │   ├── graduation/    # 毕业率计算（Excel 公式 → Python）
+│           │   ├── loadout/       # 装备方案管理
+│           │   ├── profile_engine/ # Profile 持久化与再生数学
+│           │   ├── recognizer/    # 材料识别
+│           │   └── tuning_rules/  # 调律规则解析与判定
 │           ├── workflows/     # 燕云专属工作流与内置函数
-│           ├── ui/            # 燕云专属 UI Tab
-│           ├── game_config.py # 游戏规则配置
-│           └── plugin_session.py # 插件会话管理
+│           │   ├── builtins/      # 背包 / 装备 / Profile 专属函数
+│           │   └── implementations/ # 自动调律 / 背包遍历实现
+│           └── ui/            # 燕云专属 UI Tab
+│               ├── game_settings/ # 游戏规则配置面板
+│               ├── loadout/       # 装备展示与方案面板
+│               ├── profile/       # Profile 数据面板
+│               ├── tune_settings/ # 调律规则编辑面板
+│               └── tuning/        # 调律进度面板
 ├── android/                   # 安卓独立执行端（Kotlin + Chaquopy 宿主工程）
 ├── config/
 │   ├── system/                # 随版本发布的配置
@@ -91,18 +120,20 @@ lvjiang/
 │   │   ├── scenes/            # 场景定义 YAML
 │   │   ├── workflows/         # 工作流脚本（.wf）
 │   │   ├── references/        # 参考图库
+│   │   ├── yysls/             # 燕云插件专属配置（调律规则 / 玩法等）
 │   │   ├── app.yaml           # 应用配置
 │   │   ├── layouts.yaml       # 布局索引
 │   │   ├── scenes.yaml        # 场景索引
 │   │   ├── workflows.yaml     # 工作流索引
-│   │   └── references.yaml    # 参考图索引
+│   │   ├── references.yaml    # 参考图索引
+│   │   └── ocr_rules.yaml     # OCR 规则配置
 │   ├── local/                 # 用户覆盖配置（已 .gitignore）
 │   └── session/               # 运行时会话数据
 ├── data/                      # 材料模板图、scrcpy-server 等资源
-├── docs/                      # 分层文档（用户指南 / 游戏机制 / 需求 / 架构 / 开发日志 / 进度追踪）
+├── docs/                      # 分层文档
 ├── packaging/                 # PyInstaller 打包配置与脚本
 ├── scripts/                   # 辅助脚本与手动测试
-├── tests/                     # pytest 测试（按 src 三层结构分包）
+├── tests/                     # pytest 测试（按 core / ui / workflows / yysls 分包）
 ├── dev.bat                    # Windows 快捷启动脚本
 ├── dev.sh                     # macOS 快捷启动脚本
 └── pyproject.toml             # 项目元数据与依赖
@@ -220,6 +251,7 @@ pytest tests/workflows/test_parser.py
 
 | 目录 | 内容 |
 |------|------|
+| [`docs/50-releases/`](docs/50-releases/) | 发布记录与版本说明 |
 | [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接手机、配置与运行自动调律 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |

@@ -1,6 +1,6 @@
 """脚本录制对话框 - 录制鼠标操作实时生成 DSL，支持保存/复制/清除
 
-从「工具 → 脚本录制」打开（F8 也可）。录制中每生成一行 DSL 实时追加到
+从「工具 → 脚本录制」打开（F12 也可）。录制中每生成一行 DSL 实时追加到
 文本区（pynput 监听线程 → line_captured 信号 → UI 线程）；停止后用
 recorder.stop() 全文兜底刷新，文本可编辑后再保存为 .wf。
 """
@@ -54,7 +54,7 @@ class ScriptRecordDialog(QDialog):
         layout = QVBoxLayout(self)
 
         btn_row = QHBoxLayout()
-        self.btn_record = QPushButton(tr("● 录制脚本 (F8)"))
+        self.btn_record = QPushButton(tr("● 录制脚本 (F12)"))
         self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.clicked.connect(self.toggle_recording)
         btn_row.addWidget(self.btn_record)
@@ -70,7 +70,7 @@ class ScriptRecordDialog(QDialog):
         btn_row.addWidget(self.btn_clear)
         layout.addLayout(btn_row)
 
-        self.lbl_status = QLabel(tr("待机 | 点击「录制脚本」或按 F8 开始"))
+        self.lbl_status = QLabel(tr("待机 | 点击「录制脚本」或按 F12 开始"))
         self.lbl_status.setStyleSheet("color: #888;")
         layout.addWidget(self.lbl_status)
 
@@ -89,7 +89,7 @@ class ScriptRecordDialog(QDialog):
         return self._recorder is not None
 
     def toggle_recording(self):
-        """录制/停止切换（按钮与主窗口 F8 共用入口）"""
+        """录制/停止切换（按钮与主窗口 F12 共用入口）"""
         if self.is_recording:
             self._stop_recording()
         else:
@@ -130,7 +130,7 @@ class ScriptRecordDialog(QDialog):
             self.lbl_status.setText(tr("启动失败: {e}").format(e=e))
             logger.error(f"录制启动失败: {e}")
             return
-        self.lbl_status.setText(tr("录制中…在游戏窗口内点击/拖拽，F8 或点击停止"))
+        self.lbl_status.setText(tr("录制中…在游戏窗口内点击/拖拽，F12 或点击停止"))
         self._refresh_buttons()
 
     def _stop_recording(self):
@@ -156,10 +156,10 @@ class ScriptRecordDialog(QDialog):
         recording = self.is_recording
         has_text = bool(self.text_edit.toPlainText().strip())
         if recording:
-            self.btn_record.setText(tr("■ 停止录制 (F8)"))
+            self.btn_record.setText(tr("■ 停止录制 (F12)"))
             self.btn_record.setStyleSheet(_STYLE_RECORDING)
         else:
-            self.btn_record.setText(tr("● 录制脚本 (F8)"))
+            self.btn_record.setText(tr("● 录制脚本 (F12)"))
             self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.setEnabled(not self._main._running)
         for btn in (self.btn_save, self.btn_copy, self.btn_clear):

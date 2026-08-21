@@ -11,10 +11,10 @@ def _exit_to_login()
     click [game_menu_page].[exit]
     wait (1, 2)
 
-    # 3. 二次确认：在 check_right 区域找「返回登录界面」按钮
-    find [game_main_page].[check_right] as $confirm by contains "返回"
+    # 3. 二次确认：检查退出弹窗中是否有「返回登录页面」按钮
+    scan [game_login_page].[back_to_login] as $confirm by contains "返回登录"
     if $confirm
-        click $confirm
+        click [game_login_page].[back_to_login]
     else
         eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
     end

@@ -75,6 +75,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     WEAPON_SLOTS = ["main_weapon", "sub_weapon", "ring", "pendant"]
     ARMOR_SLOTS = ["head", "chest", "leg", "wrist"]
+    # 有类型分组的部位（武库装备穿插时不能结束扫描）
+    GROUPED_SLOTS = {"main_weapon", "sub_weapon"}
     WEAPON_DETAIL = "equip_weapon_detail"
     ARMOR_DETAIL = "equip_armor_detail"
     EQUIP_DETAIL = "equip_detail"  # 通用交互区域（more_func/sub_func_*/recycle_*）
@@ -83,6 +85,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         "equip_type", "equip_level", "base_attr",
         "affix_gong", "affix_shang", "affix_jue",
         "affix_zhi", "affix_yu",
+        "status",
     ]
 
     GRID_SCENE = "bag_equip_detail"
@@ -407,6 +410,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         切换部位必然伴随窗口内装备整体更新，上一部位记录的锁定
         阻断指纹对新部位无效，必须清空。
         """
+        self._current_slot = slot
         self._slot_level_exhausted = False
         self.recorder.on_slot_enter(slot)
         self._emit_progress(
@@ -461,6 +465,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                      if detail_scene == self.ARMOR_DETAIL else [])
         raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
+        # 武库标记：status 字段含“武库”说明该装备存放在武库中
+        if equip and raw:
+            equip["is_wuku"] = "武库" in (raw.get("status") or "")
         name = (equip.get("name") or "") if equip else ""
         fp = self._make_fingerprint(equip)
         if fp:
@@ -584,9 +591,34 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
         self._emit_equip_started(name, equip, equip_data)
 
-        # 前置拦截 0：等级门槛 — 低于 min_level 直接跳过，不走任何判定
+        # 前置拦截 0：武库装备 — 不属于当前处理范围
+        if equip.get("is_wuku"):
+            slot = getattr(self, "_current_slot", "")
+            if slot in self.GROUPED_SLOTS:
+                # 主/副武器按类型分组，武库装备穿插其中，跳过但不结束扫描
+                logger.info(f"  [{name}] 武库装备，跳过（武器分组，不结束扫描）")
+                self._emit_equip_finish(
+                    name, equip_data, affix_count=affix_count,
+                    status="wuku_skip",
+                    reason="武库装备，跳过")
+                return self._make_fingerprint(equip), None
+            else:
+                # 环佩/防具无分组，按等级倒序，武库装备意味着已经到底
+                logger.info(f"  [{name}] 武库装备，当前部位已到底")
+                self._slot_level_exhausted = True
+                self._emit_equip_finish(
+                    name, equip_data, affix_count=affix_count,
+                    status="wuku_bottom",
+                    reason="武库装备，当前部位已到底")
+                return self._make_fingerprint(equip), None
+
+        # 前置拦截 1：等级门槛 — 低于 min_level 直接跳过，不走任何判定
         level = equip.get("level")
-        min_level = self.base_group.scan.min_level
+        # UI 覆盖优先：ctx.min_level 不为 None 时覆盖基础规则的 scan.min_level
+        min_level = (
+            self.ctx.min_level if self.ctx.min_level is not None
+            else self.base_group.scan.min_level
+        )
         if (isinstance(level, (int, float)) and not isinstance(level, bool)
                 and level > 0 and level < min_level):
             logger.info(
@@ -708,10 +740,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if self.ctx.skip_tuning:
             logger.info(f"  [{name}] 值得调律，但跳过实际调律（测试开关）")
             self.recorder.doc_note("值得调律，但测试开关已启用，跳过实际调律")
-            self.click_region(self.TUNE_SCENE, "back")
-            self.wait_stable("page_refresh")  # 调律页 → 背包详情页
-            self.click_region(self.EQUIP_DETAIL, "more_func")
-            self.wait_delay("step_interval")
+            self.navigator.leave_tune()
             self.recorder.commit_report("skip_tuning")
             self.output.setdefault("tuning_reports", []).extend(
                 self.recorder.collect_reports()[-1:])
@@ -839,15 +868,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.doc_round_decision(why)
             break
 
-        # 返回背包浏览页：调律页单次 back 即回到 bag_equip_detail（装备位置保持不变）。
-        # 因进调律前点过「更多」弹出子菜单，back 回来后弹窗仍在，
-        # 再点一次「更多」more_func 使其收起，保持背包页干净以继续遍历。
+        # 返回背包浏览页，并由环境策略恢复装备详情页的可操作状态。
         self.executor.invalidate_cache()  # 退出调律页，清空材料缓存
         self._emit_operation("finish", "正在返回背包并完成当前装备收尾")
-        self.click_region(self.TUNE_SCENE, "back")
-        self.wait_stable("page_refresh")  # 调律页 → 背包详情页（页面切换）
-        self.click_region(self.EQUIP_DETAIL, "more_func")
-        self.wait_delay("step_interval")
+        self.navigator.leave_tune()
 
         judgement = self.judge.final_judge(equip_data)
         self.recorder.report_set("rounds", rounds)

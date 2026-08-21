@@ -21,7 +21,14 @@
 # 返回：1=培养, 2=道具, 3=任务, 4=钱袋；0 表示无法识别（已 pause）
 
 def nav_main_to_bag()
-    # 检查当前是否在菜单页
+    if env("desktop")
+        # 桌面端：简单处理
+        log info "桌面端：按 B 打开背包"
+        press "B" after wait @step_interval
+        return 0
+    end
+
+    # 安卓端：检查当前是否在菜单页
     call $in_menu = is_in_menu_page()
     if $in_menu
         log info "当前已在菜单页"
@@ -193,6 +200,7 @@ def nav_back_to_main()
         click [game_menu_page].[back] after wait @page_refresh
     else if env("desktop")
         log info "桌面端：按 ESC 返回主界面"
+        
         press "ESC" after wait @step_interval
         press "ESC" after wait @step_interval
         press "ESC" after wait @step_interval
@@ -204,27 +212,43 @@ end
 
 # ─── nav_equip_to_tune ────────────────────────────────────
 # 从装备详情页进入调律页面
+# android：展开「更多」弹窗 → 扫描次功能按钮找「调律」→ 点击进入
+# desktop：直接扫描功能按钮区找「调律」→ 按 F 进入调律详情页
 # 前置：在装备详情页（equip_detail）
 # 后置（成功）：在调律详情页（equip_tune_detail）
-# 后置（失败）：仍在装备详情页，弹窗已收起
+# 后置（失败）：仍在装备详情页（android 弹窗已收起）
 
 def nav_equip_to_tune()
-    # 展开「更多」弹窗
-    click [equip_detail].[more_func] after wait @page_refresh
+    if env("desktop")
+        # 桌面端：直接扫描检查是否存在调律，有的话按 F 进入
+        scan [equip_detail].[func_area] as $tune_key by contains "调律"
+        if not $tune_key
+            log "桌面端：未找到调律入口"
+            return -1
+        end
 
-    # 在次功能按钮中寻找「调律」
-    scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+        log info "桌面端：找到调律入口，按 F 进入调律详情页"
+        press "F" after wait @page_refresh
+    else if env("android")
+        # 展开「更多」弹窗
+        click [equip_detail].[more_func] after wait @page_refresh
 
-    if not $tune_key
-        log "未找到调律按钮"
-        # 再次点击 more_func 收起弹窗，保持页面干净
-        click [equip_detail].[more_func] after wait @step_interval
+        # 在次功能按钮中寻找「调律」
+        scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+        if not $tune_key
+            log "未找到调律按钮"
+            # 再次点击 more_func 收起弹窗，保持页面干净
+            click [equip_detail].[more_func] after wait @step_interval
+            return -1
+        end
+
+        # 点击调律按钮，进入调律页
+        log info "从装备详情页进入调律页"
+        click [equip_detail].$tune_key after wait @page_refresh
+    else
+        log error "不支持当前环境"
         return -1
     end
-
-    # 点击调律按钮，进入调律页
-    log info "从装备详情页进入调律页"
-    click [equip_detail].$tune_key after wait @page_refresh
 
     # 校验是否到达调律页
     scan [equip_tune_detail].[tune_btn] as $tune_check by contains "词库预览"

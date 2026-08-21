@@ -1,6 +1,7 @@
 """导航与装备操作 — TuningNavigator
 
 页面导航（主界面→背包、详情页→调律页）与词条收集。
+环境差异由 TuningRouteStrategy 隔离，本类作为业务侧稳定门面。
 导航序列的唯一事实来源是 DSL subcall 文件（config/system/workflows/
 subcall/），经引擎 load_subcalls / call_subcall 桥调用，避免 Python 与
 DSL 两处重复维护同一操作序列。
@@ -13,24 +14,26 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData, get_equipment_parser
+from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
+    TuningRouteStrategy,
+    create_tuning_route_strategy,
+)
 
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
     )
 
-# 导航 subcall 文件（相对 workflows 根）与过程名
-_NAV_FILE = "subcall/navigation.wf"
-_NAV_MAIN_TO_EQUIP = (_NAV_FILE, "nav_main_to_equip")
-_NAV_EQUIP_TO_TUNE = (_NAV_FILE, "nav_equip_to_tune")
-_NAV_BACK_TO_MAIN = (_NAV_FILE, "nav_back_to_main")
-
-
 class TuningNavigator:
     """导航与装备操作：页面跳转、调律入口、词条收集"""
 
     def __init__(self, wf: AutoTuningWorkflow):
         self._wf = wf
+        self._routes: TuningRouteStrategy = create_tuning_route_strategy(wf)
+
+    @property
+    def routes(self) -> TuningRouteStrategy:
+        return self._routes
 
     def load_dependencies(self) -> None:
         """加载导航所需的 DSL subcall 文件
@@ -38,29 +41,15 @@ class TuningNavigator:
         在工作流启动时调用一次，确保后续导航操作能正确执行。
         每次运行都重新加载，保证文件修改立即生效。
         """
-        engine = self._wf.engine
-        if engine is None:
-            raise RuntimeError(
-                "TuningNavigator.load_dependencies: 未注入 WorkflowEngine，"
-                "无法加载导航 subcall")
-        engine.load_subcalls(_NAV_FILE)
-
-    def _call_subcall(self, proc_name: str, args: list | None = None):
-        """经引擎桥调用已加载的 DSL 子过程"""
-        engine = self._wf.engine
-        if engine is None:
-            raise RuntimeError(
-                f"TuningNavigator.{proc_name}: 未注入 WorkflowEngine，"
-                "导航 subcall 无法执行")
-        return engine.call_subcall(proc_name, args)
+        self._routes.load_dependencies()
 
     def navigate_to_equip(self):
         """从主界面导航到背包装备页（DSL subcall nav_main_to_equip）"""
-        self._call_subcall(_NAV_MAIN_TO_EQUIP[1])
+        self._routes.enter_equip()
 
     def navigate_back(self):
         """从背包详情页返回主界面（DSL subcall nav_back_to_main）"""
-        self._call_subcall(_NAV_BACK_TO_MAIN[1])
+        self._routes.return_main()
 
     def nav_to_tune(self) -> bool:
         """从装备详情页进入调律页（DSL subcall nav_equip_to_tune）
@@ -68,8 +57,11 @@ class TuningNavigator:
         失败时停留在详情页（弹窗已收起）并返回 False；返回值语义遵循
         DSL 约定：子过程 return < 0 表示错误。
         """
-        result = self._call_subcall(_NAV_EQUIP_TO_TUNE[1])
-        return not (isinstance(result, (int, float)) and result < 0)
+        return self._routes.enter_tune_detail()
+
+    def leave_tune(self) -> None:
+        """离开调律页，并恢复装备详情页的环境相关 UI 状态。"""
+        self._routes.leave_tune_detail()
 
     def collect_new_affix(self, equip_data: EquipmentData, text: str) -> str:
         """把调律结果的新词条补充进装备数据，供下一轮判定使用

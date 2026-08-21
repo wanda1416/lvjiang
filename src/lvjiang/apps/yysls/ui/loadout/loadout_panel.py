@@ -50,7 +50,7 @@ class LoadoutPanel(QWidget):
         self._graduation_result = None
         saved = load_ui_page_state(_UI_PAGE_KEY)
         mode = saved.get("view_mode")
-        self._view_mode = mode if mode in _VIEW_MODES else "sidebar"
+        self._view_mode = mode if mode in _VIEW_MODES else "half"
         half_sizes = saved.get("half_split_sizes")
         self._half_split_sizes = (
             [int(v) for v in half_sizes]

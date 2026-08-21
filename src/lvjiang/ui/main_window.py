@@ -635,12 +635,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         btn_layout.addWidget(self.btn_pause_resume)
         daily_layout.addLayout(btn_layout)
 
-        # 工作环境显示（第二行）
+        # 目标环境显示（第二行）
         from ..core.config import load_available_envs, load_env, save_env
         env_layout = QHBoxLayout()
         env_layout.setContentsMargins(0, 0, 0, 0)
         env_layout.setSpacing(8)
-        env_label = QLabel(tr("工作环境："))
+        env_label = QLabel(tr("目标环境："))
         env_label.setStyleSheet("color: #666; font-size: 12px;")
         env_layout.addWidget(env_label)
         self._env_combo = QComboBox()
@@ -654,6 +654,24 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             lambda i: save_env(self._env_combo.itemData(i)))
         self._env_combo.setStyleSheet("font-size: 12px;")
         env_layout.addWidget(self._env_combo)
+        # 目标环境说明按钮
+        env_tips_btn = QPushButton("?")
+        env_tips_btn.setFixedSize(20, 20)
+        env_tips_btn.setToolTip(tr(
+            "目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：\n"
+            "• 桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击\n"
+            "• 安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入\n\n"
+            "【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，\n"
+            "否则导航流程会因输入方式不匹配而失败。\n\n"
+            "【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，\n"
+            "可采用自定义设置 2000:900（等效 20:9）。"
+        ))
+        env_tips_btn.setStyleSheet(
+            "QPushButton{border:1px solid #90A4AE;border-radius:10px;"
+            "color:#546E7A;font-weight:bold;font-size:12px;}"
+            "QPushButton:hover{background:#E8EEF2;}"
+        )
+        env_layout.addWidget(env_tips_btn)
         env_layout.addStretch()
         daily_layout.addLayout(env_layout)
 

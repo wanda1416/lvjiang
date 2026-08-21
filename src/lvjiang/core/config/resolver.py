@@ -302,7 +302,7 @@ def load_app_config() -> dict:
 
 def save_app_config(input_sim: dict, delay_params: dict, envs: list | None = None) -> None:
     """保存输入模拟 + 延迟参数 + 环境列表到 app.yaml（开发模式写 system 全量，用户模式写 local diff）"""
-    data = {
+    data: dict = {
         "input_simulation": input_sim,
         "delay_params": delay_params,
     }
@@ -317,10 +317,10 @@ def load_available_envs() -> list[tuple[str, str]]:
     envs = app.get("envs", [])
     if not isinstance(envs, list):
         return [("desktop", "桌面")]
-    result = []
+    result: list[tuple[str, str]] = []
     for item in envs:
         if isinstance(item, dict) and "key" in item:
-            key = item["key"]
-            name = item.get("name", key)
+            key = str(item["key"])
+            name = str(item.get("name", key))
             result.append((key, name))
     return result or [("desktop", "桌面")]

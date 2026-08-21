@@ -1,5 +1,9 @@
 """PostMessage 输入后端 - 不移动光标，直接向目标窗口投递鼠标消息
 
+.. deprecated::
+    TODO [严重回归] 窗口模式的后台 PostMessage 投递出现严重回归问题，
+    当前版本暂不可用。详见 docs/desktop_input_blocker.md。
+
 通过 Win32 PostMessageW 发送 WM_LBUTTON* 消息到指定窗口客户区，
 实现后台操作（不抢占焦点、不移动光标）。
 """
@@ -14,7 +18,7 @@ from ..input_base import InputBackend
 from .win32_util import (
     postmessage_click,
     postmessage_drag,
-    screen_to_client,
+    screen_to_client_logical,
 )
 
 
@@ -26,6 +30,9 @@ class PostMessageInput(InputBackend):
         # 兼容属性：PostMessage 恒为后台模式
         self.background_mode = True
         self.target_hwnd = hwnd
+        # SDL/投屏窗口（scrcpy 等）只有处于前台/焦点才处理鼠标消息，
+        # 投递前先瞬时激活目标窗口、投递后还原焦点，否则消息被忽略。
+        self.activate_before_send = True
 
     # ─── 点击 ─────────────────────────────────────────────────
 
@@ -43,10 +50,10 @@ class PostMessageInput(InputBackend):
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
         time.sleep(random.uniform(*_pre))
 
-        cx, cy = screen_to_client(self.target_hwnd, sx, sy)
+        cx, cy = screen_to_client_logical(self.target_hwnd, sx, sy)
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"[后台] 点击 {label}: 屏幕({sx},{sy}) -> 客户区({cx},{cy}) [偏移: {offset_x:+d}, {offset_y:+d}]")
-        postmessage_click(self.target_hwnd, cx, cy)
+        postmessage_click(self.target_hwnd, cx, cy, activate=self.activate_before_send)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
@@ -79,13 +86,13 @@ class PostMessageInput(InputBackend):
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
         time.sleep(random.uniform(*_pre))
 
-        fx, fy = screen_to_client(self.target_hwnd, from_x, from_y)
-        tx, ty = screen_to_client(self.target_hwnd, to_x, to_y)
+        fx, fy = screen_to_client_logical(self.target_hwnd, from_x, from_y)
+        tx, ty = screen_to_client_logical(self.target_hwnd, to_x, to_y)
         steps = max(int(move_dur / 0.02), 5)
 
         logger.debug(f"[后台] 拖拽 {poi_name}: ({from_x},{from_y})->({to_x},{to_y}) "
                      f"客户区: ({fx},{fy})->({tx},{ty}) [{move_dur:.2f}s]")
-        postmessage_drag(self.target_hwnd, fx, fy, tx, ty, steps=steps)
+        postmessage_drag(self.target_hwnd, fx, fy, tx, ty, steps=steps, activate=self.activate_before_send)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))

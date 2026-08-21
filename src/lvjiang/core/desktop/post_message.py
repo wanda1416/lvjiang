@@ -15,9 +15,20 @@ from loguru import logger
 
 from ...core.config import InputSimConfig
 from ..input_base import InputBackend
+from .win32_keyboard import (
+    KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP,
+    is_extended_key,
+    key_to_vk_scan,
+    normalize_key,
+    post_keyboard_input,
+)
 from .win32_util import (
+    _WHEEL_DELTA,
     postmessage_click,
     postmessage_drag,
+    postmessage_move,
+    postmessage_scroll,
     screen_to_client_logical,
 )
 
@@ -58,6 +69,40 @@ class PostMessageInput(InputBackend):
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 
+    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """后台移动：PostMessage 向目标窗口发送 WM_MOUSEMOVE，不移动光标"""
+        if not self.target_hwnd:
+            logger.error("PostMessage 模式未设置目标窗口句柄")
+            return
+
+        cx, cy = screen_to_client_logical(self.target_hwnd, screen_x, screen_y)
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(f"[后台] 移动 {label}: 屏幕({screen_x},{screen_y}) -> 客户区({cx},{cy})")
+        postmessage_move(self.target_hwnd, cx, cy, activate=self.activate_before_send)
+
+    def scroll_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        direction: str = "down",
+        amount: int = 1,
+        poi_name: str = "",
+    ):
+        """后台滚动：PostMessage 向目标窗口发送 WM_MOUSEWHEEL"""
+        if not self.target_hwnd:
+            logger.error("PostMessage 模式未设置目标窗口句柄")
+            return
+
+        cx, cy = screen_to_client_logical(self.target_hwnd, screen_x, screen_y)
+        sign = 1 if direction == "up" else -1
+        delta = sign * amount * _WHEEL_DELTA
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(
+            f"[后台] 滚轮 {label}: {direction} x{amount} "
+            f"屏幕({screen_x},{screen_y}) -> 客户区({cx},{cy})"
+        )
+        postmessage_scroll(self.target_hwnd, cx, cy, delta, activate=self.activate_before_send)
+
     # ─── 拖拽 ─────────────────────────────────────────────────
 
     def drag_screen(
@@ -96,3 +141,27 @@ class PostMessageInput(InputBackend):
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
+
+    # ─── 键盘 ─────────────────────────────────────────────────
+
+    def key_down(self, key: str) -> None:
+        """按下按键（仅 keydown，不释放）"""
+        if not self.target_hwnd:
+            logger.error("PostMessage 模式未设置目标窗口句柄")
+            return
+        k = normalize_key(key)
+        vk, scan = key_to_vk_scan(k)
+        flags = KEYEVENTF_EXTENDEDKEY if is_extended_key(k) else 0
+        logger.debug(f"[PostMessage] key_down: {k} (vk=0x{vk:02X}, scan={scan})")
+        post_keyboard_input(self.target_hwnd, vk, scan, flags)
+
+    def key_up(self, key: str) -> None:
+        """释放按键"""
+        if not self.target_hwnd:
+            logger.error("PostMessage 模式未设置目标窗口句柄")
+            return
+        k = normalize_key(key)
+        vk, scan = key_to_vk_scan(k)
+        flags = KEYEVENTF_KEYUP | (KEYEVENTF_EXTENDEDKEY if is_extended_key(k) else 0)
+        logger.debug(f"[PostMessage] key_up: {k} (vk=0x{vk:02X}, scan={scan})")
+        post_keyboard_input(self.target_hwnd, vk, scan, flags)

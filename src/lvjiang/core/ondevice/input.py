@@ -56,6 +56,21 @@ class _GestureInput(InputBackend):
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 
+    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """设备端不支持鼠标移动，空操作"""
+        print(f"[{self.name}] move 指令无效：设备端输入后端不支持鼠标移动")
+
+    def scroll_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        direction: str = "down",
+        amount: int = 1,
+        poi_name: str = "",
+    ):
+        """设备端不支持鼠标滚轮，空操作"""
+        print(f"[{self.name}] scroll 指令无效：设备端输入后端不支持鼠标滚轮")
+
     def drag_screen(
         self,
         from_x: int,
@@ -87,6 +102,14 @@ class _GestureInput(InputBackend):
         self._swipe(from_x, from_y, to_x, to_y, total_ms)
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
+
+    def key_down(self, key: str) -> None:
+        """设备端不支持独立键盘按下"""
+        raise NotImplementedError("设备端输入后端不支持 key_down")
+
+    def key_up(self, key: str) -> None:
+        """设备端不支持独立键盘释放"""
+        raise NotImplementedError("设备端输入后端不支持 key_up")
 
 
 class A11yInput(_GestureInput):

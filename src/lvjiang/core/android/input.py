@@ -18,6 +18,53 @@ from ...core.config import InputSimConfig
 from ..input_base import InputBackend
 from .device import AdbDevice
 
+# 标准键名 → Android keycode（adb shell input keyevent 参数）
+# 参考: https://developer.android.com/reference/android/view/KeyEvent
+_KEY_TO_ANDROID_KEYCODE: dict[str, int] = {
+    # 字母 A-Z
+    **{chr(c): 29 + (c - ord("A")) for c in range(ord("A"), ord("Z") + 1)},
+    # 数字 0-9
+    **{str(d): 7 + d for d in range(10)},
+    # 功能键 F1-F12
+    **{f"F{i}": 131 + i - 1 for i in range(1, 13)},
+    # 特殊键
+    "ESC": 111,
+    "ENTER": 66,
+    "SPACE": 62,
+    "TAB": 61,
+    "BACKSPACE": 67,
+    "DELETE": 112,
+    "INSERT": 124,
+    "HOME": 3,
+    "END": 123,
+    "PAGEUP": 92,
+    "PAGEDOWN": 93,
+    # 修饰键
+    "SHIFT": 59,
+    "CTRL": 113,
+    "ALT": 57,
+    "LCTRL": 113,
+    "RCTRL": 114,
+    "LSHIFT": 59,
+    "RSHIFT": 60,
+    "LALT": 57,
+    "RALT": 58,
+    "WIN": 0,   # Android 无 WIN 键，用 0 占位
+    "LWIN": 0,
+    "RWIN": 0,
+    # 方向键
+    "UP": 19,
+    "DOWN": 20,
+    "LEFT": 21,
+    "RIGHT": 22,
+    # 其他
+    "CAPSLOCK": 115,
+    "NUMLOCK": 143,
+    "SCROLLLOCK": 116,
+    "PRINTSCREEN": 122,
+    "PAUSE": 121,
+}
+
 
 class AdbInput(InputBackend):
     """基于 adb shell input 的输入后端（接口继承 InputBackend）"""
@@ -62,6 +109,38 @@ class AdbInput(InputBackend):
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
+
+    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """ADB 不支持鼠标移动，空操作"""
+        logger.warning("[ADB] move 指令无效：ADB 后端不支持鼠标移动")
+
+    def scroll_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        direction: str = "down",
+        amount: int = 1,
+        poi_name: str = "",
+    ):
+        """ADB 模拟滚动：用短距离 swipe 模拟鼠标滚轮
+
+        每格对应 100px 的滑动距离，方向由参数决定。
+        """
+        dist = 100 * amount
+        if direction == "up":
+            # 向上滚动 = 手指从下往上划
+            end_y = screen_y - dist
+        else:
+            # 向下滚动 = 手指从上往下划
+            end_y = screen_y + dist
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(f"[ADB] 滚轮 {label}: {direction} x{amount} @ ({screen_x}, {screen_y})")
+        self._device.shell(
+            "input", "swipe",
+            str(screen_x), str(screen_y),
+            str(screen_x), str(end_y),
+            "100",
+        )
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 
@@ -114,3 +193,25 @@ class AdbInput(InputBackend):
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
+
+    # ─── 键盘 ─────────────────────────────────────────────────
+
+    def _key_to_keycode(self, key: str) -> int:
+        """将标准化键名转为 Android keycode"""
+        upper = key.strip().upper()
+        code = _KEY_TO_ANDROID_KEYCODE.get(upper)
+        if code is None:
+            raise ValueError(f"未知按键名: {key!r}，无对应 Android keycode")
+        return code
+
+    def key_down(self, key: str) -> None:
+        """按下按键（adb input keyevent 不区分 down/up，发送一次即可）"""
+        code = self._key_to_keycode(key)
+        logger.debug(f"[ADB] key_down: {key} → keycode {code}")
+        self._device.shell("input", "keyevent", str(code))
+
+    def key_up(self, key: str) -> None:
+        """释放按键（adb input keyevent 不区分 down/up，发送一次即可）"""
+        code = self._key_to_keycode(key)
+        logger.debug(f"[ADB] key_up: {key} → keycode {code}")
+        self._device.shell("input", "keyevent", str(code))

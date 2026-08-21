@@ -11,12 +11,23 @@ from loguru import logger
 
 from ...core.config import InputSimConfig
 from ..input_base import InputBackend
+from .win32_keyboard import (
+    KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP,
+    KEYEVENTF_SCANCODE,
+    is_extended_key,
+    key_to_vk_scan,
+    normalize_key,
+    send_keyboard_input,
+)
 from .win32_util import (
     _MOUSEEVENTF_LEFTDOWN,
     _MOUSEEVENTF_LEFTUP,
+    _WHEEL_DELTA,
     _user32,
     activate_window,
     send_mouse_event,
+    send_mouse_wheel_event,
     smooth_move_to,
 )
 
@@ -41,6 +52,30 @@ class SendInputInput(InputBackend):
         self._activate_target()
         self._move_to(screen_x, screen_y)
         self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay, post_delay=post_delay)
+
+    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """移动鼠标到屏幕坐标（不点击）"""
+        self._activate_target()
+        self._move_to(screen_x, screen_y)
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(f"移动 {label}: ({screen_x}, {screen_y})")
+
+    def scroll_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        direction: str = "down",
+        amount: int = 1,
+        poi_name: str = "",
+    ):
+        """在指定坐标位置发送鼠标滚轮事件"""
+        self._activate_target()
+        self._move_to(screen_x, screen_y)
+        sign = 1 if direction == "up" else -1
+        delta = sign * amount * _WHEEL_DELTA
+        send_mouse_wheel_event(delta)
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(f"滚轮 {label}: {direction} x{amount} @ ({screen_x}, {screen_y})")
 
     def _activate_target(self):
         """点击/拖拽前瞬时激活目标窗口（若设置了 hwnd）。
@@ -117,3 +152,31 @@ class SendInputInput(InputBackend):
         send_mouse_event(_MOUSEEVENTF_LEFTUP)
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
+
+    # ─── 键盘 ─────────────────────────────────────────────────
+
+    def key_down(self, key: str) -> None:
+        """按下按键（仅 keydown，不释放）
+
+        以扫描码为主键码（KEYEVENTF_SCANCODE），同时消息型应用会由系统把
+        扫描码翻译成 VK 码、DirectInput 游戏直接读扫描码，两类都能命中。
+        """
+        self._activate_target()
+        k = normalize_key(key)
+        vk, scan = key_to_vk_scan(k)
+        flags = KEYEVENTF_SCANCODE
+        if is_extended_key(k):
+            flags |= KEYEVENTF_EXTENDEDKEY
+        logger.debug(f"[SendInput] key_down: {k} (vk=0x{vk:02X}, scan={scan})")
+        send_keyboard_input(vk, scan, flags)
+
+    def key_up(self, key: str) -> None:
+        """释放按键"""
+        self._activate_target()
+        k = normalize_key(key)
+        vk, scan = key_to_vk_scan(k)
+        flags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE
+        if is_extended_key(k):
+            flags |= KEYEVENTF_EXTENDEDKEY
+        logger.debug(f"[SendInput] key_up: {k} (vk=0x{vk:02X}, scan={scan})")
+        send_keyboard_input(vk, scan, flags)

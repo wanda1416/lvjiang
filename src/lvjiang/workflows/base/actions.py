@@ -65,6 +65,36 @@ class _ActionMixin:
             f"请在场景布局编辑器中绑定后重试"
         )
 
+    def move_any(self, scene_key: str, key: str):
+        """移动鼠标到 region / point / panel 中心（自动识别，region → point → panel 顺序）"""
+        regions = self._layout.get_scene_regions(scene_key)
+        region = next((r for r in regions if r.key == key), None)
+        if region is not None:
+            screen_x, screen_y = self._region_to_screen(region, jitter=True)
+            logger.debug(f"移动: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
+            self._input.move_screen(screen_x, screen_y, f"{scene_key}/{key}")
+            return
+        points = self._layout.get_scene_points(scene_key)
+        point = next((p for p in points if p.key == key), None)
+        if point is not None:
+            screen_x, screen_y = self._point_to_screen(point)
+            logger.debug(f"移动 point: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
+            self._input.move_screen(screen_x, screen_y, f"{scene_key}/{key}")
+            return
+        panels = self._layout.get_scene_panels(scene_key)
+        panel = next((p for p in panels if p.key == key), None)
+        if panel is not None:
+            cx = panel.x_ratio + panel.w_ratio / 2
+            cy = panel.y_ratio + panel.h_ratio / 2
+            screen_x, screen_y = self._ratio_to_screen(cx, cy)
+            logger.debug(f"移动 panel 中心: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
+            self._input.move_screen(screen_x, screen_y, f"{scene_key}/{key}(panel)")
+            return
+        raise ValueError(
+            f"场景 {scene_key} 的 region / point / panel 未绑定坐标: {key}，"
+            f"请在场景布局编辑器中绑定后重试"
+        )
+
     def click_point(self, scene_key: str, point_key: str, **kw):
         """点击 point 中心（带半径内随机偏移）"""
         points = self._layout.get_scene_points(scene_key)

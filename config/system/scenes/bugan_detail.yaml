@@ -61,6 +61,12 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: cat_6
+  name: 类目6
+  type: func
+  is_text: false
+  is_clickable: true
+  view: shangdian
 panels:
 - key: shangpin_1
   name: 商品列表1

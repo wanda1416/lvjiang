@@ -56,3 +56,8 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: status
+  name: 装备状态
+  type: attr
+  is_text: true
+  is_clickable: false

@@ -81,4 +81,5 @@ def build_flow_config(path: str | Path) -> dict:
         "wf_file": str(p),
         "required_scenes": meta.get("required_scenes") or [],
         "parameters": meta.get("parameters") or [],
+        "env": meta.get("env") or [],
     }

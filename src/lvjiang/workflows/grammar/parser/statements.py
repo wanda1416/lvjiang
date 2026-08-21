@@ -61,6 +61,46 @@ class _StmtMixin:
                 stmts.append(item)
         return Program(body=stmts, imports=imports, procs=procs)
 
+    # ─── 公共 wait_clause 展开 ──────────────────────────────
+
+    @staticmethod
+    def _extract_wait_pairs(items):
+        """从 items 末尾提取 wait_clauses 产生的 [timing, Wait] 对列表。
+
+        wait_clauses 规则产生一个嵌套列表，位于 items 末尾。
+        返回 wait_pairs 列表（可能为空），以及去除 wait 后的 core_items。
+        """
+        if not items:
+            return [], items
+        last = items[-1]
+        if (isinstance(last, list) and last
+                and isinstance(last[0], list) and len(last[0]) == 2
+                and isinstance(last[0][1], (Wait, WaitStable))):
+            return last, items[:-1]
+        return [], items
+
+    @staticmethod
+    def _expand_wait_clauses(action_node, wait_pairs):
+        """公共 wait_clause 展开：around → before + after，按语义顺序组装。
+
+        返回 list：[before_waits..., action_node, after_waits...]
+        若无 wait_pairs 则返回 action_node 本身。
+        """
+        if not wait_pairs:
+            return action_node
+
+        expanded = []
+        for timing, wait_node in wait_pairs:
+            if timing == "around":
+                expanded.append(("before", wait_node))
+                expanded.append(("after", wait_node))
+            else:
+                expanded.append((timing, wait_node))
+
+        before_waits = [w for t, w in expanded if t == "before"]
+        after_waits = [w for t, w in expanded if t == "after"]
+        return before_waits + [action_node] + after_waits
+
     # ─── 基础指令 ─────────────────────────────────────────
 
     def _resolve_const_or_var(self, item):
@@ -77,31 +117,14 @@ class _StmtMixin:
         around 是语法糖，等价于同时指定 before 和 after（同一参数）。
         """
         click_node = items[0]
-        # wait_clauses 返回一个列表，元素是每个 wait_clause 的 [timing, Wait] 对
-        wait_pairs = []
-        if len(items) > 1 and isinstance(items[1], list):
-            wait_pairs = [it for it in items[1] if isinstance(it, list) and len(it) == 2
-                          and isinstance(it[1], (Wait, WaitStable))]
+        wait_pairs, _ = self._extract_wait_pairs(items[1:])
         if not wait_pairs:
             return click_node
 
         # 显式 wait_clause → 抑制默认延迟
         click_node = Click(target=click_node.target, line_no=click_node.line_no,
                           suppress_defaults=True)
-
-        # 展开 around 为 before + after
-        expanded = []
-        for timing, wait_node in wait_pairs:
-            if timing == "around":
-                expanded.append(("before", wait_node))
-                expanded.append(("after", wait_node))
-            else:
-                expanded.append((timing, wait_node))
-
-        # 按语义顺序组装：before 在 click 前，after 在 click 后
-        before_waits = [w for t, w in expanded if t == "before"]
-        after_waits = [w for t, w in expanded if t == "after"]
-        return before_waits + [click_node] + after_waits
+        return self._expand_wait_clauses(click_node, wait_pairs)
 
     def click_panel_target(self, items):
         """click [scene].[panel][row][col] — panel 三级索引
@@ -143,36 +166,21 @@ class _StmtMixin:
         支持 wait_clause，展开逻辑与 click_stmt 一致。
         """
         click_node = items[0]
-        wait_pairs = []
-        if len(items) > 1 and isinstance(items[1], list):
-            wait_pairs = [it for it in items[1] if isinstance(it, list) and len(it) == 2
-                          and isinstance(it[1], (Wait, WaitStable))]
+        wait_pairs, _ = self._extract_wait_pairs(items[1:])
         move_node = Move(target=click_node.target, line_no=click_node.line_no)
-        if not wait_pairs:
-            return move_node
-
-        # 展开 around 为 before + after
-        expanded = []
-        for timing, wait_node in wait_pairs:
-            if timing == "around":
-                expanded.append(("before", wait_node))
-                expanded.append(("after", wait_node))
-            else:
-                expanded.append((timing, wait_node))
-
-        before_waits = [w for t, w in expanded if t == "before"]
-        after_waits = [w for t, w in expanded if t == "after"]
-        return before_waits + [move_node] + after_waits
+        return self._expand_wait_clauses(move_node, wait_pairs)
 
     def scroll_stmt(self, items):
-        """scroll up|down [目标] [数量] — 鼠标滚轮滚动
+        """scroll up|down [目标] [数量] [before|after|around wait ...] — 鼠标滚轮滚动
 
         复用 click_target 子规则解析目标（如果存在），
         提取数量参数（如果存在）。
+        scroll 没有默认延迟，不需要 suppress_defaults。
         """
         # 第一个元素是 SCROLL_DIR token
         direction = str(items[0]).lower()
-        remaining = items[1:]
+        wait_pairs, core_items = self._extract_wait_pairs(items[1:])
+        remaining = core_items
 
         target = None
         amount = 1
@@ -185,12 +193,13 @@ class _StmtMixin:
             elif isinstance(item, (int, float)):
                 amount = int(item)
 
-        return Scroll(
+        scroll_node = Scroll(
             direction=direction,
             target=target,
             amount=amount,
             line_no=self._line(items),
         )
+        return self._expand_wait_clauses(scroll_node, wait_pairs)
 
     def drag_stmt(self, items):
         """drag 目标 [duration] [hold] [before|after|around wait 参数 ...] — 支持 before/after 任意组合
@@ -198,15 +207,7 @@ class _StmtMixin:
         显式 wait_clause 时抑制 drag 默认的 before/after_click_wait 延迟。
         around 是语法糖，等价于同时指定 before 和 after（同一参数）。
         """
-        # wait_clauses 结果是嵌套在 items 末尾的列表
-        wait_pairs = []
-        core_items = items
-        if len(items) > 1 and isinstance(items[-1], list):
-            # items[-1] 是 wait_clauses 的结果（一个列表，元素是 [timing, Wait]）
-            clauses_list = items[-1]
-            if clauses_list and isinstance(clauses_list[0], list) and len(clauses_list[0]) == 2 and isinstance(clauses_list[0][1], (Wait, WaitStable)):
-                wait_pairs = clauses_list
-                core_items = items[:-1]
+        wait_pairs, core_items = self._extract_wait_pairs(items)
 
         drag_node = core_items[0]  # 已由 drag_*_target 构造为 Drag
         duration = None
@@ -229,21 +230,7 @@ class _StmtMixin:
             line_no=drag_node.line_no,
             suppress_defaults=suppress,
         )
-        if not wait_pairs:
-            return result
-
-        # 展开 around 为 before + after
-        expanded = []
-        for timing, wait_node in wait_pairs:
-            if timing == "around":
-                expanded.append(("before", wait_node))
-                expanded.append(("after", wait_node))
-            else:
-                expanded.append((timing, wait_node))
-
-        before_waits = [w for t, w in expanded if t == "before"]
-        after_waits = [w for t, w in expanded if t == "after"]
-        return before_waits + [result] + after_waits
+        return self._expand_wait_clauses(result, wait_pairs)
 
     def drag_panel_target(self, items):
         """drag [scene].[panel][row][col] [up|down [n]] — panel 三级索引 + 可选方向距离"""
@@ -334,35 +321,17 @@ class _StmtMixin:
         key = self._unquote(str(items[0]))  # STRING token → 去引号
         mode = PressMode.PRESS
         duration = None
-        wait_pairs = []
+        # 先用共享 helper 提取 wait_pairs
+        wait_pairs, non_wait_items = self._extract_wait_pairs(items[1:])
 
-        for item in items[1:]:
+        for item in non_wait_items:
             if item is None:
                 continue
             if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], PressMode):
                 mode, duration = item
-            elif isinstance(item, list):
-                # wait_clauses 的结果：[[timing, Wait], ...]
-                wait_pairs = [it for it in item if isinstance(it, list) and len(it) == 2
-                              and isinstance(it[1], (Wait, WaitStable))]
 
         press_node = Press(key=key, mode=mode, duration=duration, line_no=self._line(items))
-
-        if not wait_pairs:
-            return press_node
-
-        # 展开 around 为 before + after
-        expanded = []
-        for timing, wait_node in wait_pairs:
-            if timing == "around":
-                expanded.append(("before", wait_node))
-                expanded.append(("after", wait_node))
-            else:
-                expanded.append((timing, wait_node))
-
-        before_waits = [w for t, w in expanded if t == "before"]
-        after_waits = [w for t, w in expanded if t == "after"]
-        return before_waits + [press_node] + after_waits
+        return self._expand_wait_clauses(press_node, wait_pairs)
 
     def press_hold(self, items):
         """hold <number> → (PressMode.HOLD, duration)"""

@@ -8,8 +8,9 @@
 - release_all 单键失败不阻塞其他键
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from lvjiang.workflows.engine.key_state import KeyStateRegistry
 from lvjiang.workflows.engine.signals import WorkflowUserError

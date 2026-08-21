@@ -7,9 +7,16 @@
   就是脚本遍历网格时的终止条件
 """
 
+from __future__ import annotations
+
+import random
 import time
+from typing import TYPE_CHECKING
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from .key_state import KeyStateRegistry
 
 from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
 from ...i18n import tr
@@ -47,6 +54,8 @@ class _ActionsMixin:
 
     状态属性与跨 Mixin 方法由 WorkflowEngine 组合后提供。
     """
+
+    _key_registry: "KeyStateRegistry | None"
 
     def _exec_click(self, node: Click):
         """click scene.coord / scene.panel[row][col] — scene 和 coord 都可以是常量或变量。
@@ -257,6 +266,8 @@ class _ActionsMixin:
                 self._resolve_and_scroll_at_entity(str(scene), str(region_val), direction, amount)
                 return
             else:
+                if entity is None:
+                    raise WorkflowUserError("scroll: entity 未指定")
                 self._resolve_and_scroll_at_entity(str(scene), entity, direction, amount)
                 return
         elif isinstance(node.target, VarRef):
@@ -628,9 +639,9 @@ class _ActionsMixin:
                 logger.debug(f"press: {key}")
                 reg.key_down(key)
                 try:
-                    # down/up 之间留短暂间隔，确保 Windows/目标应用识别为
+                    # down/up 之间留短暂随机间隔，确保 Windows/目标应用识别为
                     # 一次有效按键（零间隔时部分应用会忽略，认为从未真正按下）
-                    time.sleep(0.03)
+                    time.sleep(random.uniform(0.025, 0.035))
                 finally:
                     reg.key_up(key)
 

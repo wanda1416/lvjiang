@@ -660,6 +660,60 @@ def test_scroll_with_var_target():
     assert node.amount == 1
 
 
+# ─── scroll wait_clause 测试 ────────────────────────────────────
+
+
+def test_scroll_after_wait():
+    """scroll down after wait -> [Scroll, Wait]"""
+    program = parse_text("scroll down after wait 0.5")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Scroll)
+    assert isinstance(program.body[1], Wait)
+    assert program.body[0].direction == "down"
+    assert program.body[1].delay.value == 0.5
+
+
+def test_scroll_before_wait():
+    """scroll up [scene].[region] before wait -> [Wait, Scroll]"""
+    program = parse_text("scroll up [scene].[region] before wait @step_interval")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Scroll)
+    assert program.body[1].direction == "up"
+
+
+def test_scroll_around_wait():
+    """scroll down 3 around wait -> [Wait, Scroll, Wait]"""
+    program = parse_text("scroll down 3 around wait 0.5")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Scroll)
+    assert isinstance(program.body[2], Wait)
+    assert program.body[1].amount == 3
+    # 同一参数：前后 Wait 的 delay 相同
+    assert program.body[0].delay == program.body[2].delay
+
+
+def test_scroll_before_after_wait():
+    """scroll down [scene].[region] before wait 0.3 after wait 0.8 -> [Wait, Scroll, Wait]"""
+    program = parse_text("scroll down [scene].[region] before wait 0.3 after wait 0.8")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Scroll)
+    assert isinstance(program.body[2], Wait)
+    assert program.body[0].delay.value == 0.3
+    assert program.body[2].delay.value == 0.8
+
+
+def test_scroll_after_wait_stable():
+    """scroll down after wait stable -> [Scroll, WaitStable]"""
+    program = parse_text("scroll down after wait stable 5")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Scroll)
+    assert isinstance(program.body[1], WaitStable)
+    assert program.body[1].timeout == 5.0
+
+
 def test_drag_after_wait_stable():
     """drag ... after wait stable -> [Drag, WaitStable]"""
     program = parse_text("drag [scene].[panel] up 2 after wait stable 6")

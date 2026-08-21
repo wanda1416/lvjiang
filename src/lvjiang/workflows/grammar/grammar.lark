@@ -87,7 +87,7 @@ move_stmt: "move"i click_target wait_clauses? _NL
 // 方向：up（向上滚）/ down（向下滚）
 // 目标：可选，指定后先移动光标到该位置再滚动；省略则在当前位置滚动
 // 数量：可选，滚动格数（默认 1），支持数字或变量
-scroll_stmt: "scroll"i SCROLL_DIR click_target? (number | var_ref)? _NL
+scroll_stmt: "scroll"i SCROLL_DIR click_target? (number | var_ref)? wait_clauses? _NL
 SCROLL_DIR: /up/i | /down/i
 
 // drag 支持五种目标：

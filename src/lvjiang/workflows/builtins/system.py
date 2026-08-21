@@ -175,6 +175,32 @@ def _env(name: str | None = None) -> str | bool:
     return current == str(name)
 
 
+@builtin_func("check_env")
+def _check_env(envs) -> bool:
+    """检查当前工作环境是否在允许列表中内，否则报错中断
+
+    参数为环境名称列表，当前环境不在列表中时抛 WorkflowUserError。
+    用于工作流开头快速校验环境，避免后续执行到不兼容的步骤才失败。
+
+    返回值：
+    -  True：当前环境在列表中，可继续执行
+
+    .wf 用法:
+        check_env(["android"])
+        # 当前环境不是 android 时直接报错，后续语句不会执行
+    """
+    from ...engine.signals import WorkflowUserError
+
+    current = load_env()
+    if not isinstance(envs, list):
+        envs = [envs]
+    env_strs = [str(e) for e in envs]
+    if current not in env_strs:
+        raise WorkflowUserError(
+            f"check_env: 当前环境 {current!r} 不在允许列表 {env_strs} 中，工作流中止")
+    return True
+
+
 @builtin_func("is_send")
 def _is_send(_engine=None) -> int:
     """判断当前是否为 SendInput 模式

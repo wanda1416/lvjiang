@@ -439,8 +439,10 @@ def postmessage_drag(
 def list_visible_windows() -> list[dict]:
     """列出所有可见窗口（Win32 API）
 
-    返回 list[dict]，每个 dict 包含 title, hwnd, left, top, width, height
+    返回 list[dict]，每个 dict 包含 title, hwnd, left, top, width, height。
+    自动排除当前进程自身的窗口（含律匠主窗口及其子窗口）。
     """
+    import os
     results = []
 
     # Win32 常量
@@ -448,6 +450,10 @@ def list_visible_windows() -> list[dict]:
     WS_EX_TOOLWINDOW = 0x00000080   # 工具窗口（不显示在任务栏）
     WS_EX_NOACTIVATE = 0x08000000   # 不可激活的窗口
     GW_OWNER = 4
+
+    # 当前进程 PID（排除自身窗口）
+    _self_pid = os.getpid()
+    _pid_buf = ctypes.c_ulong()
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     def _callback(hwnd, lParam):
@@ -464,6 +470,11 @@ def list_visible_windows() -> list[dict]:
         # 过滤有所有者的窗口（弹窗、对话框，不是主窗口）
         owner = _user32.GetWindow(hwnd, GW_OWNER)
         if owner:
+            return True
+
+        # 过滤当前进程自身的窗口（律匠主窗口等）
+        _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(_pid_buf))
+        if _pid_buf.value == _self_pid:
             return True
 
         # 用固定大小缓冲区获取窗口标题
@@ -490,5 +501,5 @@ def list_visible_windows() -> list[dict]:
 
     _user32.EnumWindows(_callback, None)
 
-    logger.debug(f"枚举到 {len(results)} 个可见窗口")
+    logger.debug(f"枚举到 {len(results)} 个可见窗口（已排除自身进程）")
     return results

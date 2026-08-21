@@ -39,6 +39,10 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
 from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
     TuningNavigator,
 )
+from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
+    AndroidTuningRouteStrategy,
+    DesktopTuningRouteStrategy,
+)
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_name
@@ -222,6 +226,17 @@ def _patch_core(monkeypatch):
                         lambda *a, **k: dict(_WORTHY))
     monkeypatch.setattr(TuningNavigator, "collect_new_affix",
                         lambda self, ed, text: None)
+    # 默认环境设为 android（现有测试均基于 android 流程：more_func 展开/收起）
+    import lvjiang.core.config.session as _session
+    monkeypatch.setattr(_session, "load_env", lambda: "android")
+    # DSL env() 经 system.py 导入 load_env，需同步 patch
+    from lvjiang.workflows.builtins import system as _sys_mod
+    monkeypatch.setattr(_sys_mod, "load_env", lambda: "android")
+    # recycler.py 也直接导入 load_env
+    from lvjiang.apps.yysls.workflows.implementations.tuning import (
+        recycler as _recycler_mod,
+    )
+    monkeypatch.setattr(_recycler_mod, "load_env", lambda: "android")
 
 
 @pytest.fixture
@@ -229,6 +244,31 @@ def patch_worth(monkeypatch):
     """默认：值得调律（血河 顶级）；终局判定返回同一结构"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
+
+
+def test_android_route_restores_detail_menu(monkeypatch):
+    import lvjiang.core.config.session as _session
+    monkeypatch.setattr(_session, "load_env", lambda: "android")
+    wf = FakeWF()
+
+    assert isinstance(wf.navigator.routes, AndroidTuningRouteStrategy)
+    wf.navigator.leave_tune()
+
+    assert wf.clicks == [
+        (TUNE_SCENE, "back"),
+        (EQUIP_DETAIL, "more_func"),
+    ]
+
+
+def test_desktop_route_leaves_detail_without_menu_click(monkeypatch):
+    import lvjiang.core.config.session as _session
+    monkeypatch.setattr(_session, "load_env", lambda: "desktop")
+    wf = FakeWF()
+
+    assert isinstance(wf.navigator.routes, DesktopTuningRouteStrategy)
+    wf.navigator.leave_tune()
+
+    assert wf.clicks == [(TUNE_SCENE, "back")]
 
 
 def test_already_full(monkeypatch):

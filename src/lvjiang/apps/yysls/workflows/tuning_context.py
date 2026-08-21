@@ -36,6 +36,7 @@ class TuningRunContext:
     skip_start: tuple[int, int] | None = None    # 初始跳过 (row, col)；None=不跳过
     target_cell: tuple[int, int] | None = None   # 指定调律 (row, col)；None=不指定
     base_group: TuningGroup | None = None        # 基础规则组（None=回退 session）
+    min_level: int | None = None                 # 最低等级覆盖（None=跟随基础规则 scan.min_level）
 
 
 class TuningContextMixin:

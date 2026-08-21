@@ -215,14 +215,14 @@ class SettingsDialog(QDialog):
         vbox.addStretch()
         return tab
 
-    # ─── Tab4 系统参数（可用工作环境）────────────────────
+    # ─── Tab4 系统参数（可用目标环境）────────────────────
 
     def _build_env_tab(self) -> QWidget:
-        """系统参数 Tab：可用工作环境列表"""
+        """系统参数 Tab：可用目标环境列表"""
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
-        caption = QLabel(tr("工作环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。"))
+        caption = QLabel(tr("目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。"))
         caption.setWordWrap(True)
         vbox.addWidget(caption)
 

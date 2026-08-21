@@ -12,17 +12,20 @@
 |------|------|
 | [01-basics.md](01-basics.md) | 词法与值、引用模型、变量系统、表达式 |
 | [02-concepts.md](02-concepts.md) | 场景（Scene）、布局（Layout）、Area/Action、Panel |
-| [03-1-interaction.md](03-1-interaction.md) | 交互指令：click、drag、wait、wait stable、align、screenshot |
-| [03-2-basic-commands.md](03-2-basic-commands.md) | 基础指令：collect、eval、call、log |
+| [03-interaction.md](03-interaction.md) | 交互指令概览：指令分类、隐藏延迟共性、press 状态管理 |
+| [03.1-basic-commands.md](03.1-basic-commands.md) | 基础指令：collect、eval、call、log |
+| [03.2-interaction.md](03.2-interaction.md) | 时间与辅助：wait、wait stable、align、screenshot |
+| [03.3-mouse.md](03.3-mouse.md) | 鼠标操作：click、drag、后缀等待子句、隐藏延迟 |
+| [03.4-keyboard.md](03.4-keyboard.md) | 键盘输入：press 四种模式、KeyStateRegistry、键名表 |
 | [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
-| [04-1-scan.md](04-1-scan.md) | scan — OCR 文字扫描 |
-| [04-2-recognize.md](04-2-recognize.md) | recognize — 图像材料识别 |
-| [04-3-find.md](04-3-find.md) | find — 文字坐标定位 |
+| [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
+| [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |
+| [04.3-find.md](04.3-find.md) | find — 文字坐标定位 |
 | [05-control-flow.md](05-control-flow.md) | 控制流：if/for/loop/try/return/goto、条件表达式 |
 | [06-functions.md](06-functions.md) | 内置函数总览与速查表 |
-| [06-1-basic-functions.md](06-1-basic-functions.md) | 基础函数：算术、字典/列表、字符串 |
-| [06-2-system-interaction.md](06-2-system-interaction.md) | 系统与交互函数 |
-| [06-3-game-functions.md](06-3-game-functions.md) | 游戏相关函数 |
+| [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术、字典/列表、字符串 |
+| [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数 |
+| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数 |
 | [07-subworkflows.md](07-subworkflows.md) | 模块化：import/def/call、变量隔离、参数声明 |
 | [08-examples.md](08-examples.md) | 完整示例 |
 | [09-data-channels.md](09-data-channels.md) | 数据通道：session/context/variables/output |
@@ -167,6 +170,32 @@ align [scene].[panel]                   # 手动触发面板自对齐
 screenshot                              # 截图保存到 logs/image/
 ```
 
+### press — 键盘输入
+
+```
+press "KEY"                             # 完整按键（down + up）
+press "KEY" hold <秒数>                 # 按住指定时长
+press "KEY" down                        # 按下保持
+press "KEY" up                          # 释放
+```
+
+| 模式 | 语义 | 状态变化 |
+|------|------|--------|
+| PRESS | 一次完整按键 | down → up |
+| HOLD | 按住 N 秒 | down → sleep → up |
+| DOWN | 按下保持 | 键留在 registry |
+| UP | 释放 | 键从 registry 移除 |
+
+键名不区分大小写，支持别名（Escape→ESC, Control→CTRL）。组合键用 down/up 构造：
+
+```
+press "CTRL" down
+press "C"
+press "CTRL" up
+```
+
+工作流退出时 `release_all()` 自动释放所有残留按键。详见 [03.4-keyboard.md](03.4-keyboard.md)。
+
 ## 六、基础指令
 
 ```
@@ -195,7 +224,7 @@ log concat("a", $var)                   # 函数返回值
 
 ## 七、感知指令
 
-> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04-1](04-1-scan.md) / [04-2](04-2-recognize.md) / [04-3](04-3-find.md)。
+> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04-1](04.1-scan.md) / [04-2](04.2-recognize.md) / [04-3](04.3-find.md)。
 
 ### scan — OCR 文字扫描
 

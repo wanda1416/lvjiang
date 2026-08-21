@@ -284,7 +284,8 @@ end
 **后续阅读**：
 
 - 场景、布局与 Panel 概念 → [02-concepts.md](02-concepts.md)
-- 交互指令（click/drag/wait/align） → [03-1-interaction.md](03-1-interaction.md)
-- 基础指令（collect/eval/call/log） → [03-2-basic-commands.md](03-2-basic-commands.md)
+- 交互指令（click/drag） → [03.3-mouse.md](03.3-mouse.md)
+- 时间与辅助指令（wait/align/screenshot） → [03.2-interaction.md](03.2-interaction.md)
+- 基础指令（collect/eval/call/log） → [03.1-basic-commands.md](03.1-basic-commands.md)
 - 感知指令（scan/recognize/find/where） → [04-data-flow.md](04-data-flow.md) 概览，详见 04-1 / 04-2 / 04-3
 - 控制流与条件表达式 → [05-control-flow.md](05-control-flow.md)

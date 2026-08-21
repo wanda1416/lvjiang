@@ -31,11 +31,14 @@ def test_three_view_modes(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(host)
     qtbot.addWidget(panel)
 
-    assert panel._view_mode == "sidebar"
-    assert panel._equipment.isVisible() is False  # parent panel not shown yet
+    assert panel._view_mode == "half"
 
     panel.show()
     qtbot.wait(10)
+    assert panel._left_shell.isVisible()
+    assert panel._right_shell.isVisible()
+
+    panel._set_view_mode("sidebar")
     assert not panel._left_shell.isVisible()
     assert panel._right_shell.isVisible()
 

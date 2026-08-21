@@ -5,10 +5,7 @@
 """
 
 import ctypes
-import sys
 from ctypes import wintypes
-
-from loguru import logger
 
 from .win32_util import _Input, _InputUnion, _KeyBdInput, _user32
 

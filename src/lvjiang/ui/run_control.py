@@ -343,6 +343,7 @@ class RunControlMixin:
         if idx >= 0:
             self.layout_combo.setCurrentIndex(idx)
         self.layout_combo.blockSignals(False)
+        self._update_layout_desc_label()
 
     def _on_layout_changed(self, index: int):
         """布局选择器切换"""
@@ -352,6 +353,17 @@ class RunControlMixin:
         if name and name != self._layout_manager.get_active_layout_name():
             self._layout_manager.set_active_layout(name)
             logger.info(f"已切换到布局: {name}")
+        self._update_layout_desc_label()
+
+    def _update_layout_desc_label(self):
+        """更新布局描述标签"""
+        name = self.layout_combo.currentText()
+        desc = ""
+        if name:
+            layout = self._layout_manager.load_layout(name)
+            if layout:
+                desc = layout.desc
+        self.layout_desc_label.setText(desc)
 
     # ─── 自动化状态管理 ────────────────────────────────────
 

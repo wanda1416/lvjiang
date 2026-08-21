@@ -37,7 +37,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps import get_registry
 
-from ..core.config import load_user_config
+from ..core.config import load_available_envs, load_env, load_user_config, save_env
 from ..core.config.users import SessionManager
 from ..core.layout_manager import LayoutConfigManager
 from ..core.user_config import UserConfigManager
@@ -446,15 +446,48 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
 
-        # === 顶部：用户 + 布局 ===
+        # === 顶部：用户 + 环境 + 布局 ===
         top_row = QHBoxLayout()
-        top_row.addWidget(QLabel(tr("当前用户")))
+        top_row.addWidget(QLabel(tr("用户")))
         self.user_combo = QComboBox()
         self.user_combo.setMinimumWidth(150)
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         top_row.addWidget(self.user_combo)
         top_row.addSpacing(20)
-        top_row.addWidget(QLabel(tr("当前布局")))
+        top_row.addWidget(QLabel(tr("环境")))
+        self._env_combo = QComboBox()
+        for key, display in load_available_envs():
+            self._env_combo.addItem(display, key)
+        current_env = load_env()
+        idx = self._env_combo.findData(current_env)
+        if idx >= 0:
+            self._env_combo.setCurrentIndex(idx)
+        self._env_combo.currentIndexChanged.connect(
+            lambda i: save_env(self._env_combo.itemData(i)))
+        top_row.addWidget(self._env_combo)
+        # 环境说明按钮
+        env_tips_btn = QPushButton("?")
+        env_tips_btn.setFixedSize(20, 20)
+        _env_tip_text = (
+            tr("目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：") + "\n"
+            "• " + tr("桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击") + "\n"
+            "• " + tr("安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入") + "\n\n"
+            + tr("【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，") + "\n"
+            + tr("否则导航流程会因输入方式不匹配而失败。") + "\n\n"
+            + tr("【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，") + "\n"
+            + tr("可采用自定义设置 2000:900（等效 20:9）。")
+        )
+        env_tips_btn.setToolTip(_env_tip_text)
+        env_tips_btn.clicked.connect(
+            lambda: QMessageBox.information(self, tr("目标环境说明"), _env_tip_text))
+        env_tips_btn.setStyleSheet(
+            "QPushButton{border:1px solid #90A4AE;border-radius:10px;"
+            "color:#546E7A;font-weight:bold;font-size:12px;}"
+            "QPushButton:hover{background:#E8EEF2;}"
+        )
+        top_row.addWidget(env_tips_btn)
+        top_row.addSpacing(20)
+        top_row.addWidget(QLabel(tr("布局")))
         self.layout_combo = QComboBox()
         self.layout_combo.setMinimumWidth(150)
         self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
@@ -635,46 +668,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         btn_layout.addWidget(self.btn_pause_resume)
         daily_layout.addLayout(btn_layout)
 
-        # 目标环境显示（第二行）
-        from ..core.config import load_available_envs, load_env, save_env
-        env_layout = QHBoxLayout()
-        env_layout.setContentsMargins(0, 0, 0, 0)
-        env_layout.setSpacing(8)
-        env_label = QLabel(tr("目标环境："))
-        env_label.setStyleSheet("color: #666; font-size: 12px;")
-        env_layout.addWidget(env_label)
-        self._env_combo = QComboBox()
-        for key, display in load_available_envs():
-            self._env_combo.addItem(display, key)
-        current_env = load_env()
-        idx = self._env_combo.findData(current_env)
-        if idx >= 0:
-            self._env_combo.setCurrentIndex(idx)
-        self._env_combo.currentIndexChanged.connect(
-            lambda i: save_env(self._env_combo.itemData(i)))
-        self._env_combo.setStyleSheet("font-size: 12px;")
-        env_layout.addWidget(self._env_combo)
-        # 目标环境说明按钮
-        env_tips_btn = QPushButton("?")
-        env_tips_btn.setFixedSize(20, 20)
-        env_tips_btn.setToolTip(tr(
-            "目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：\n"
-            "• 桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击\n"
-            "• 安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入\n\n"
-            "【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，\n"
-            "否则导航流程会因输入方式不匹配而失败。\n\n"
-            "【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，\n"
-            "可采用自定义设置 2000:900（等效 20:9）。"
-        ))
-        env_tips_btn.setStyleSheet(
-            "QPushButton{border:1px solid #90A4AE;border-radius:10px;"
-            "color:#546E7A;font-weight:bold;font-size:12px;}"
-            "QPushButton:hover{background:#E8EEF2;}"
-        )
-        env_layout.addWidget(env_tips_btn)
-        env_layout.addStretch()
-        daily_layout.addLayout(env_layout)
-
         wf_group = QGroupBox(tr("脚本"))
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
@@ -731,9 +724,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         filter_bar.addStretch()
         filter_bar.addWidget(QLabel(tr("日志级别")))
         self._log_level_combo = QComboBox()
-        self._log_level_combo.addItem("INFO", 20)
         self._log_level_combo.addItem("DEBUG", 10)
-        self._log_level_combo.setToolTip(tr("切换日志显示级别：DEBUG 会显示更详细的调试信息"))
+        self._log_level_combo.addItem("INFO", 20)
+        self._log_level_combo.addItem("WARNING", 30)
+        self._log_level_combo.addItem("ERROR", 40)
+        self._log_level_combo.setToolTip(tr("切换日志显示级别：低于选中级别的日志将被隐藏"))
         self._log_level_combo.currentIndexChanged.connect(self._on_log_level_changed)
         filter_bar.addWidget(self._log_level_combo)
         log_layout.addLayout(filter_bar)
@@ -799,9 +794,16 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def _log_append(self, text: str):
         """带级别检测的日志追加：缓冲全部，按当前级别过滤显示"""
         import logging
-        # 支持两种格式：[DEBUG] 前缀 或 loguru 格式 "| DEBUG"
-        is_debug = text.startswith("[DEBUG]") or "| DEBUG" in text[:30]
-        level = logging.DEBUG if is_debug else logging.INFO
+        # 支持两种格式：[LEVEL] 前缀 或 loguru 格式 "| LEVEL"
+        prefix = text[:40]
+        if text.startswith("[ERROR]") or "| ERROR" in prefix:
+            level = logging.ERROR
+        elif text.startswith("[WARNING]") or "| WARNING" in prefix:
+            level = logging.WARNING
+        elif text.startswith("[DEBUG]") or "| DEBUG" in prefix:
+            level = logging.DEBUG
+        else:
+            level = logging.INFO
         self._log_buffer.append((level, text))
         if level >= self._log_min_level:
             self.log_text.append(text)

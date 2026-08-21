@@ -37,6 +37,7 @@ def _discover_wf_scripts() -> dict[str, dict]:
             "wf_file": p.name,
             "class": "",
             "parameters": meta.get("parameters") or [],
+            "env": meta.get("env") or [],
         }
     return result
 
@@ -56,6 +57,7 @@ def _discover_class_scripts() -> dict[str, dict]:
             "wf_file": "",
             "class": name,
             "parameters": list(getattr(cls, "PARAMETERS", []) or []),
+            "env": list(getattr(cls, "ENV", []) or []),
         }
     return result
 

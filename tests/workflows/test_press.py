@@ -9,11 +9,11 @@
 - 异常清理（execute finally release_all）
 """
 
-import pytest
-from unittest.mock import MagicMock
 
-from lvjiang.workflows.grammar import parse_text
+import pytest
+
 from lvjiang.workflows.engine.signals import WorkflowUserError
+from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
 

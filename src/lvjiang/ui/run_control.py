@@ -191,6 +191,7 @@ class RunControlMixin:
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
         """
+        from ..core.config.session import load_env
         from ..workflows.discovery import list_exposed_scripts
 
         self._workflow_configs: list[dict] = []
@@ -202,11 +203,18 @@ class RunControlMixin:
             logger.error(f"发现脚本失败: {e}")
             return
 
+        current_env = load_env()
+
         # 填充下拉列表（block 信号，避免 addItem 逐条触发 _on_workflow_combo_changed）
         self.workflow_combo.blockSignals(True)
         self.workflow_combo.clear()
         for cfg in self._workflow_configs:
-            self.workflow_combo.addItem(cfg["name"], cfg["id"])
+            display_name = cfg["name"]
+            # env 限制检查：若脚本声明了 env 且当前环境不在列表中，追加提示
+            env_list = cfg.get("env") or []
+            if env_list and current_env not in env_list:
+                display_name = f"{display_name} ({tr('环境不支持')})"
+            self.workflow_combo.addItem(display_name, cfg["id"])
         self.workflow_combo.blockSignals(False)
 
         # 初始化当前面板显示的脚本追踪（供日常配置持久化使用）
@@ -613,6 +621,17 @@ class RunControlMixin:
         if flow_cfg is None:
             self.log_text.append(tr("[错误] 请选择一个工作流"))
             return
+
+        # env 限制检查：脚本声明了 env 且当前环境不在列表中，阻止执行
+        env_list = flow_cfg.get("env") or []
+        if env_list:
+            from ..core.config.session import load_env
+            current_env = load_env()
+            if current_env not in env_list:
+                self.log_text.append(
+                    tr("[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中").format(
+                        env=current_env, envs=", ".join(env_list)))
+                return
 
         flow_name = flow_cfg["name"]
         flow_id = flow_cfg["id"]

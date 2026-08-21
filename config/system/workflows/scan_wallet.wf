@@ -1,4 +1,5 @@
 #% name: 扫描钱袋货币
+#% env: [android, desktop]
 #% parameters:
 #%   - name: tol_tongbao
 #%     label: 通宝允许差值(万)

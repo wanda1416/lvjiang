@@ -15,11 +15,13 @@
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
+> 📖 **用户手册**：[快速开始](docs/60-userguide/01-quick-start.md) | [目录](docs/60-userguide/README.md)
+
 ---
 
 ## ✨ 功能特性
 
-- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；截图 + SendInput 点击）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入）两种模式。**注意：窗口模式的后台 PostMessage 投递出现严重回归问题，当前版本暂不可用，详见 [desktop_input_blocker.md](docs/desktop_input_blocker.md)。**
+- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；截图 + SendInput 点击）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入）两种模式。**注意：窗口模式的后台 PostMessage 投递出现严重回归问题，当前版本暂不可用。**
 - **视觉识别流水线**：`mss` / scrcpy 截图 → RapidOCR（ONNX）文字识别 → 装备词条结构化解析 → 品阶与数值评分。
 - **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放。
 - **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算。支持 `full by` 全量匹配与短路匹配双模式、panel 范围索引、工作流暂停/恢复。

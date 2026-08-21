@@ -499,7 +499,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 panel = Panel(
                     key=pd.key,
                     x_ratio=x, y_ratio=y, w_ratio=w, h_ratio=h,
-                    cols=pd.cols, rows=pd.rows,
+                    # rows/cols 属于布局级配置，使用 Panel 默认值
                     min_visible=getattr(pd, "min_visible", 0.95),
                     calibration=getattr(pd, "calibration", "auto"),
                     scroll_direction=getattr(pd, "scroll_direction", "vertical"),

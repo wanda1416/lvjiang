@@ -66,8 +66,6 @@ regions:
 panels:
 - key: actions
   name: 动作列表
-  cols: 6
-  rows: 2
   min_visible: 0.95
   view: biaoqing
   calibration: even

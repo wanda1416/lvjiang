@@ -5,10 +5,10 @@ layouts:
       y_ratio: 0.0
       w_ratio: 1.0
       h_ratio: 1.0
-  手机布局:
+  继承布局:
     extends: 默认布局
     canvas:
-      x_ratio: 0.0025587939429956566
-      y_ratio: 0.043081305199414874
-      w_ratio: 0.9945427691580124
-      h_ratio: 0.9211101358883642
+      x_ratio: 0.0
+      y_ratio: 0.0
+      w_ratio: 1.0
+      h_ratio: 1.0

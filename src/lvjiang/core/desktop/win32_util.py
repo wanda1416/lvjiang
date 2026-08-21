@@ -89,48 +89,275 @@ def make_lparam(x: int, y: int) -> int:
 
 
 def screen_to_client(hwnd: int, screen_x: int, screen_y: int) -> tuple[int, int]:
-    """屏幕坐标 → 窗口客户区坐标"""
+    """屏幕坐标 → 窗口客户区坐标（本进程为 Per-Monitor V2，返回物理像素）"""
     pt = wintypes.POINT(screen_x, screen_y)
     _user32.ScreenToClient(hwnd, ctypes.byref(pt))
     return pt.x, pt.y
 
 
-def postmessage_click(hwnd: int, client_x: int, client_y: int):
-    """通过 PostMessage 向窗口发送一次点击（不移动光标）"""
+# ─── DPI 感知适配（PostMessage 坐标换算）────────────────────────
+
+# GetAwarenessFromDpiAwarenessContext 返回值
+_DPI_AWARENESS_UNAWARE = 0
+_DPI_AWARENESS_SYSTEM = 1
+_DPI_AWARENESS_PER_MONITOR = 2
+
+# MonitorFromWindow / GetDpiForMonitor 常量
+_MONITOR_DEFAULTTONEAREST = 2
+_MDT_EFFECTIVE_DPI = 0
+
+
+def _get_window_dpi_awareness(hwnd: int) -> int:
+    """目标窗口的 DPI awareness；失败按 per-monitor 兜底（不缩放，与旧行为一致）"""
+    try:
+        _user32.GetWindowDpiAwarenessContext.restype = ctypes.c_void_p
+        _user32.GetAwarenessFromDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+        _user32.GetAwarenessFromDpiAwarenessContext.restype = ctypes.c_int
+        ctx = _user32.GetWindowDpiAwarenessContext(wintypes.HWND(hwnd))
+        if not ctx:
+            return _DPI_AWARENESS_PER_MONITOR
+        return int(_user32.GetAwarenessFromDpiAwarenessContext(ctx))
+    except (AttributeError, OSError):
+        return _DPI_AWARENESS_PER_MONITOR
+
+
+def _get_window_screen_dpi(hwnd: int) -> int:
+    """目标窗口所在显示器的实际 DPI（与窗口自身 awareness 无关）。
+
+    不能用 GetDpiForWindow：它对 unaware 窗口恒返回 96、对 system aware
+    恒返回系统 DPI，拿不到所在屏真实缩放。
+    """
+    try:
+        _user32.MonitorFromWindow.restype = ctypes.c_void_p
+        _user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+        hmon = _user32.MonitorFromWindow(wintypes.HWND(hwnd), _MONITOR_DEFAULTTONEAREST)
+        if not hmon:
+            return 96
+        x_dpi = ctypes.c_uint(0)
+        y_dpi = ctypes.c_uint(0)
+        shcore = ctypes.windll.shcore
+        shcore.GetDpiForMonitor.argtypes = [
+            ctypes.c_void_p, ctypes.c_int,
+            ctypes.POINTER(ctypes.c_uint), ctypes.POINTER(ctypes.c_uint),
+        ]
+        hr = shcore.GetDpiForMonitor(
+            hmon, _MDT_EFFECTIVE_DPI,
+            ctypes.byref(x_dpi), ctypes.byref(y_dpi),
+        )
+        if hr == 0 and x_dpi.value:
+            return int(x_dpi.value)
+    except (AttributeError, OSError):
+        pass
+    return 96
+
+
+def _get_system_dpi() -> int:
+    """系统 DPI（system-aware 窗口的虚拟化基准 = 主显示器启动时 DPI）"""
+    try:
+        _user32.GetDpiForSystem.restype = ctypes.c_uint
+        dpi = _user32.GetDpiForSystem()
+        if dpi:
+            return int(dpi)
+    except (AttributeError, OSError):
+        pass
+    return 96
+
+
+def message_coord_scale(awareness: int, window_dpi: int, system_dpi: int) -> float:
+    """PostMessage 坐标缩放比（本进程物理客户区坐标 → 目标窗口消息坐标系）。
+
+    PostMessageW 不做跨进程 DPI 转换，lparam 坐标按目标窗口自身坐标系解读：
+    - per-monitor aware：1:1 原样
+    - system aware：客户区按系统 DPI 虚拟化 → ×system_dpi/屏DPI
+    - unaware：客户区按 96 DPI 虚拟化 → ×96/屏DPI
+    """
+    if awareness == _DPI_AWARENESS_PER_MONITOR:
+        return 1.0
+    base = system_dpi if awareness == _DPI_AWARENESS_SYSTEM else 96
+    dpi = window_dpi or 96
+    return base / dpi
+
+
+def screen_to_client_logical(hwnd: int, screen_x: int, screen_y: int) -> tuple[int, int]:
+    """屏幕物理坐标 → 目标窗口 PostMessage 消息坐标（含 DPI 换算）。
+
+    本进程锁定 Per-Monitor V2（__main__._configure_dpi），ScreenToClient 返回
+    物理客户区坐标；若目标窗口 DPI unaware / system aware（投屏软件常见），
+    在高缩放副屏上直接投递物理坐标会整体偏移，超出其逻辑客户区的消息被
+    DefWindowProc 丢弃——表现为后台模式点击毫无反应。
+    """
+    cx, cy = screen_to_client(hwnd, screen_x, screen_y)
+    awareness = _get_window_dpi_awareness(hwnd)
+    if awareness == _DPI_AWARENESS_PER_MONITOR:
+        return cx, cy
+    screen_dpi = _get_window_screen_dpi(hwnd)
+    system_dpi = _get_system_dpi()
+    scale = message_coord_scale(awareness, screen_dpi, system_dpi)
+    if scale == 1.0:
+        return cx, cy
+    rx, ry = int(round(cx * scale)), int(round(cy * scale))
+    logger.debug(
+        f"[DPI] hwnd=0x{hwnd:X} awareness={awareness} "
+        f"screen_dpi={screen_dpi} system_dpi={system_dpi} "
+        f"scale={scale:.3f} client({cx},{cy}) -> logical({rx},{ry})"
+    )
+    return rx, ry
+
+
+# 子窗口命中探测（投屏/游戏窗口常用子窗口接收鼠标，投给顶层无效）
+# ChildWindowFromPointEx 标志：跳过不可见 + 禁用子窗口
+_CWP_SKIPINVISIBLE = 0x0001
+_CWP_SKIPDISABLED = 0x0002
+
+
+def resolve_message_target(hwnd: int, client_x: int, client_y: int) -> int:
+    """返回实际应接收鼠标消息的窗口句柄。
+
+    若 (client_x, client_y) 处命中一个非顶层的子窗口（投屏软件如
+    vivo 互传、部分 Qt 渲染窗口），鼠标消息需投给该子窗口，
+    投给顶层窗口会被忽略 → 后台模式点击毫无反应。
+    未命中子窗口时返回原 hwnd。
+    """
+    try:
+        _user32.ChildWindowFromPointEx.restype = ctypes.c_void_p
+        _user32.ChildWindowFromPointEx.argtypes = [wintypes.HWND, wintypes.POINT, wintypes.UINT]
+        pt = wintypes.POINT(client_x, client_y)
+        child = _user32.ChildWindowFromPointEx(
+            wintypes.HWND(hwnd), pt, _CWP_SKIPINVISIBLE | _CWP_SKIPDISABLED
+        )
+        if child and int(child) != hwnd:
+            return int(child)
+    except (AttributeError, OSError):
+        pass
+    return hwnd
+
+
+# ─── 前台激活辅助（SDL/投屏窗口需要窗口激活才处理鼠标）──────────
+
+def activate_window(hwnd: int, restore: bool = True) -> bool:
+    """瞬时激活目标窗口，让 SDL 类窗口（scrcpy 等）产生鼠标事件。
+
+    这类窗口只有处于前台/焦点状态才把鼠标消息转成 SDL 事件，
+    后台直接投递 PostMessage 会被忽略（实测 PostMessage/SendMessage
+    均无反应，激活窗口后即生效）。
+
+    restore=True 时投递完成后把焦点还原给原前台窗口，尽量不影响
+    用户正在使用的窗口（后台跑）。
+    """
     import time
+    # 记录原前台窗口（用于还原）
+    _user32.GetForegroundWindow.restype = ctypes.c_void_p
+    prev = _user32.GetForegroundWindow() or 0
+
+    # 解除前台锁定：把本线程输入附加到当前前台窗口线程，使 SetForegroundWindow 合法
+    try:
+        _user32.GetCurrentThreadId.restype = ctypes.c_uint
+        _user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        _user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        _user32.GetForegroundWindow.restype = wintypes.HWND
+        fg = _user32.GetForegroundWindow()
+        cur = _user32.GetCurrentThreadId()
+        fg_tid = _user32.GetWindowThreadProcessId(fg, None) if fg else 0
+        attached = False
+        if fg_tid and fg_tid != cur:
+            _user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+            _user32.AttachThreadInput.restype = wintypes.BOOL
+            attached = bool(_user32.AttachThreadInput(cur, fg_tid, True))
+    except (AttributeError, OSError):
+        attached = False
+
+    try:
+        _user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+        _user32.SetForegroundWindow.restype = wintypes.BOOL
+        _user32.BringWindowToTop.argtypes = [wintypes.HWND]
+        _user32.BringWindowToTop.restype = wintypes.BOOL
+        _user32.SetForegroundWindow(wintypes.HWND(hwnd))
+        _user32.BringWindowToTop(wintypes.HWND(hwnd))
+        # 等窗口真正激活
+        for _ in range(20):
+            _user32.GetForegroundWindow.restype = wintypes.HWND
+            if _user32.GetForegroundWindow() == hwnd:
+                break
+            time.sleep(0.01)
+    except (AttributeError, OSError):
+        pass
+
+    if restore and prev and prev != hwnd:
+        try:
+            _user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+            _user32.SetForegroundWindow(wintypes.HWND(prev))
+        except (AttributeError, OSError):
+            pass
+
+    # 解除线程附加
+    if attached:
+        try:
+            _user32.AttachThreadInput(cur, fg_tid, False)
+        except (AttributeError, OSError):
+            pass
+    return True
+
+
+def postmessage_click(hwnd: int, client_x: int, client_y: int, activate: bool = False):
+    """通过 PostMessage 向窗口发送一次点击（不移动光标）
+
+    activate=True 时先瞬时激活目标窗口再投递，适配 SDL 类窗口
+    （scrcpy 等）——这类窗口只有处于前台/焦点才处理鼠标消息。
+    投递完成后自动还原原前台窗口焦点。
+    """
+    import time
+    if activate:
+        activate_window(hwnd)
+    target = resolve_message_target(hwnd, client_x, client_y)
     lparam = make_lparam(client_x, client_y)
-    _user32.PostMessageW(hwnd, _WM_MOUSEMOVE, 0, lparam)
+    _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, lparam)
     time.sleep(0.03)
-    _user32.PostMessageW(hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, lparam)
+    _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, lparam)
     time.sleep(0.05)
-    _user32.PostMessageW(hwnd, _WM_LBUTTONUP, 0, lparam)
+    _user32.PostMessageW(target, _WM_LBUTTONUP, 0, lparam)
 
 
-def postmessage_drag(hwnd: int, x1: int, y1: int, x2: int, y2: int, steps: int = 20):
+def postmessage_drag(
+    hwnd: int,
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    steps: int = 20,
+    activate: bool = False,
+):
     """通过 PostMessage 向窗口发送拖拽（不移动光标）
 
     在 WM_LBUTTONDOWN 前先通过 SendMessage 发送 WM_NCHITTEST，
     让目标窗口的 DefWindowProc 完成命中测试、建立正确的拖拽上下文，
     避免与外部真实鼠标点击产生状态冲突。
+
+    activate=True 时先瞬时激活目标窗口再投递（适配 SDL 类窗口）。
+
+    按下窗口自动解析为起点命中点处的实际子窗口（投屏窗口），
+    整个拖拽过程统一投递给该子窗口。
     """
     import time
+    if activate:
+        activate_window(hwnd)
+    target = resolve_message_target(hwnd, x1, y1)
     # 移动到起点
-    _user32.PostMessageW(hwnd, _WM_MOUSEMOVE, 0, make_lparam(x1, y1))
+    _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, make_lparam(x1, y1))
     time.sleep(0.03)
     # 命中测试：同步确认起点在客户区内（DefWindowProc 返回 HTCLIENT）
-    _user32.SendMessageW(hwnd, _WM_NCHITTEST, 0, make_lparam(x1, y1))
+    _user32.SendMessageW(target, _WM_NCHITTEST, 0, make_lparam(x1, y1))
     # 按下
-    _user32.PostMessageW(hwnd, _WM_LBUTTONDOWN, _MK_LBUTTON, make_lparam(x1, y1))
+    _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, make_lparam(x1, y1))
     time.sleep(0.05)
     # 逐步移动
     for i in range(1, steps + 1):
         ratio = i / steps
         cx = int(x1 + (x2 - x1) * ratio)
         cy = int(y1 + (y2 - y1) * ratio)
-        _user32.PostMessageW(hwnd, _WM_MOUSEMOVE, _MK_LBUTTON, make_lparam(cx, cy))
+        _user32.PostMessageW(target, _WM_MOUSEMOVE, _MK_LBUTTON, make_lparam(cx, cy))
         time.sleep(0.02)
     # 终点松开
-    _user32.PostMessageW(hwnd, _WM_LBUTTONUP, 0, make_lparam(x2, y2))
+    _user32.PostMessageW(target, _WM_LBUTTONUP, 0, make_lparam(x2, y2))
 
 
 # ─── 窗口枚举 ─────────────────────────────────────────────────

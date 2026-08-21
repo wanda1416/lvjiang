@@ -15,6 +15,7 @@ from .win32_util import (
     _MOUSEEVENTF_LEFTDOWN,
     _MOUSEEVENTF_LEFTUP,
     _user32,
+    activate_window,
     send_mouse_event,
     smooth_move_to,
 )
@@ -28,14 +29,28 @@ class SendInputInput(InputBackend):
         # 兼容属性：SendInput 模式无后台概念
         self.background_mode = False
         self.target_hwnd = None
+        # SDL/游戏窗口（scrcpy、燕云十六声等）只有处于前台/焦点才处理
+        # SendInput 事件。点击前先瞬时激活目标窗口（随后还原焦点）。
+        self.activate_before_send = True
 
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay=None, post_delay=None):
         """点击屏幕坐标（带鼠标移动时长 + 点击后延迟）"""
+        self._activate_target()
         self._move_to(screen_x, screen_y)
         self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay, post_delay=post_delay)
+
+    def _activate_target(self):
+        """点击/拖拽前瞬时激活目标窗口（若设置了 hwnd）。
+
+        SDL/游戏窗口只有处于前台/焦点才处理 SendInput 事件（历史验证：
+        燕云十六声、scrcpy 均需激活窗口到前台才能收到点击）。激活后
+        activate_window 会自动还原原前台窗口焦点。
+        """
+        if self.target_hwnd and self.activate_before_send:
+            activate_window(self.target_hwnd)
 
     def _move_to(self, x: int, y: int):
         """移动鼠标到指定位置（时长随机化）"""
@@ -81,6 +96,7 @@ class SendInputInput(InputBackend):
             duration: 移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认 mouse_move_duration。
             hold: 到达目标后按住不放的时长（秒）。None 表示不按。
         """
+        self._activate_target()
         self._move_to(from_x, from_y)
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
         time.sleep(random.uniform(*_pre))

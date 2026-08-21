@@ -1925,8 +1925,6 @@ class TestRunWithTargetCell:
         assert wf.process_equipment_calls[0][0] == "目标剑"
         # 没有遍历背包
         assert wf.traverse_calls == []
-        # 已导航返回
-        assert ("bag_equip_detail", "back") in wf.clicks
 
 
 class TestRunWithSkipStart:

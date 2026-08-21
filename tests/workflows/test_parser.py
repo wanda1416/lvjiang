@@ -12,6 +12,7 @@ from lvjiang.workflows.grammar import (
     Click,
     Collect,
     Contains,
+    CoordPoint,
     Drag,
     EntityRef,
     Equals,
@@ -29,13 +30,16 @@ from lvjiang.workflows.grammar import (
     Literal,
     Log,
     Loop,
+    Move,
     Not,
     NumericEqual,
     PanelRef,
+    Press,
     ProcDef,
     Program,
     Recognize,
     Scan,
+    Scroll,
     TupleLiteral,
     VarRef,
     Wait,
@@ -43,6 +47,7 @@ from lvjiang.workflows.grammar import (
     parse_file,
     parse_text,
 )
+from lvjiang.workflows.grammar.ast_nodes import PressMode
 
 # ─── 现有 .wf 文件验证 ─────────────────────────────────────
 
@@ -498,6 +503,163 @@ def test_click_around_wait_stable():
     assert program.body[0].threshold == 0.03
 
 
+# ─── move 指令 ──────────────────────────────────────────────
+
+def test_move_scene_ref():
+    program = parse_text("move [scene].[region]")
+    assert len(program.body) == 1
+    node = program.body[0]
+    assert isinstance(node, Move)
+    assert isinstance(node.target, EntityRef)
+    assert node.target.scene == "scene"
+    assert node.target.entity == "region"
+
+
+def test_move_panel_target():
+    program = parse_text("move [scene].[panel][1][2]")
+    node = program.body[0]
+    assert isinstance(node, Move)
+    assert isinstance(node.target, PanelRef)
+    assert node.target.scene == "scene"
+    assert node.target.panel == "panel"
+    assert node.target.row == 1
+    assert node.target.col == 2
+
+
+def test_move_coord_target():
+    program = parse_text("move (0.5, 0.3)")
+    node = program.body[0]
+    assert isinstance(node, Move)
+    assert isinstance(node.target, CoordPoint)
+    assert node.target.rx == 0.5
+    assert node.target.ry == 0.3
+
+
+def test_move_var_target():
+    program = parse_text("move $var")
+    node = program.body[0]
+    assert isinstance(node, Move)
+    assert isinstance(node.target, VarRef)
+    assert node.target.name == "var"
+
+
+def test_move_after_wait():
+    """move ... after wait -> [Move, Wait]"""
+    program = parse_text("move [scene].[region] after wait 0.5")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Move)
+    assert isinstance(program.body[1], Wait)
+
+
+def test_move_before_wait():
+    """move ... before wait -> [Wait, Move]"""
+    program = parse_text("move [scene].[region] before wait 0.3")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Move)
+
+
+def test_move_around_wait():
+    """move ... around wait -> [Wait, Move, Wait]"""
+    program = parse_text("move [scene].[region] around wait 0.5")
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Move)
+    assert isinstance(program.body[2], Wait)
+
+
+# ─── scroll 解析测试 ─────────────────────────────────────────────
+
+
+def test_scroll_down_no_target():
+    """scroll down — 无目标，默认数量 1"""
+    program = parse_text("scroll down")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "down"
+    assert node.target is None
+    assert node.amount == 1
+
+
+def test_scroll_up_no_target():
+    """scroll up — 无目标，默认数量 1"""
+    program = parse_text("scroll up")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "up"
+    assert node.target is None
+    assert node.amount == 1
+
+
+def test_scroll_down_with_amount():
+    """scroll down 3 — 无目标，数量 3"""
+    program = parse_text("scroll down 3")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "down"
+    assert node.target is None
+    assert node.amount == 3
+
+
+def test_scroll_up_with_target():
+    """scroll up [scene].[region] — 有目标，默认数量"""
+    program = parse_text("scroll up [scene].[region]")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "up"
+    assert isinstance(node.target, EntityRef)
+    assert node.target.scene == "scene"
+    assert node.target.entity == "region"
+    assert node.amount == 1
+
+
+def test_scroll_down_with_target_and_amount():
+    """scroll down [scene].[panel][1][2] 5 — panel 目标 + 数量"""
+    program = parse_text("scroll down [scene].[panel][1][2] 5")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "down"
+    assert isinstance(node.target, PanelRef)
+    assert node.target.scene == "scene"
+    assert node.target.panel == "panel"
+    assert node.target.row == 1
+    assert node.target.col == 2
+    assert node.amount == 5
+
+
+def test_scroll_with_var_amount():
+    """scroll down [scene].[region] $n — 变量数量"""
+    program = parse_text("scroll down [scene].[region] $n")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "down"
+    assert isinstance(node.target, EntityRef)
+    assert isinstance(node.amount, VarRef)
+    assert node.amount.name == "n"
+
+
+def test_scroll_with_coord_target():
+    """scroll up (0.5, 0.3) — 坐标目标"""
+    program = parse_text("scroll up (0.5, 0.3)")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "up"
+    assert isinstance(node.target, CoordPoint)
+    assert node.target.rx == 0.5
+    assert node.target.ry == 0.3
+
+
+def test_scroll_with_var_target():
+    """scroll down $var — 变量目标"""
+    program = parse_text("scroll down $var")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "down"
+    assert isinstance(node.target, VarRef)
+    assert node.target.name == "var"
+    assert node.amount == 1
+
+
 def test_drag_after_wait_stable():
     """drag ... after wait stable -> [Drag, WaitStable]"""
     program = parse_text("drag [scene].[panel] up 2 after wait stable 6")
@@ -642,6 +804,85 @@ def test_click_wait_in_def_body():
     assert isinstance(proc.body[0], Click)
     assert isinstance(proc.body[1], Wait)
     assert isinstance(proc.body[2], Log)
+
+
+# ─── press wait_clause 测试 ────────────────────────────────────
+
+def test_press_after_wait():
+    """press "KEY" after wait -> [Press, Wait]"""
+    program = parse_text('press "A" after wait 0.5')
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Press)
+    assert isinstance(program.body[1], Wait)
+    assert program.body[0].key == "A"
+    assert program.body[1].delay.value == 0.5
+
+
+def test_press_before_wait():
+    """press "KEY" before wait -> [Wait, Press]"""
+    program = parse_text('press "A" before wait @step_interval')
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Press)
+    assert program.body[0].delay.value == "step_interval"
+
+
+def test_press_around_wait():
+    """press "KEY" around wait -> [Wait, Press, Wait]"""
+    program = parse_text('press "A" around wait (0.3, 0.8)')
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Press)
+    assert isinstance(program.body[2], Wait)
+    # 同一参数：前后 Wait 的 delay 相同
+    assert program.body[0].delay == program.body[2].delay
+
+
+def test_press_before_after_wait():
+    """press "KEY" before wait X after wait Y -> [Wait(X), Press, Wait(Y)]"""
+    program = parse_text('press "SHIFT" before wait 0.3 after wait 1.0')
+    assert len(program.body) == 3
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Press)
+    assert isinstance(program.body[2], Wait)
+    assert program.body[0].delay.value == 0.3
+    assert program.body[2].delay.value == 1.0
+    assert program.body[1].key == "SHIFT"
+
+
+def test_press_hold_after_wait():
+    """press "KEY" hold N after wait -> [Press(hold), Wait]"""
+    program = parse_text('press "W" hold 2.0 after wait 0.5')
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Press)
+    assert isinstance(program.body[1], Wait)
+    assert program.body[0].mode == PressMode.HOLD
+    assert program.body[0].duration == 2.0
+
+
+def test_press_down_before_wait():
+    """press "KEY" down before wait -> [Wait, Press(down)]"""
+    program = parse_text('press "CTRL" down before wait 0.2')
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Wait)
+    assert isinstance(program.body[1], Press)
+    assert program.body[1].mode == PressMode.DOWN
+
+
+def test_press_no_wait():
+    """无 wait 子句的 press 行为不变"""
+    program = parse_text('press "A"')
+    assert len(program.body) == 1
+    assert isinstance(program.body[0], Press)
+
+
+def test_press_after_wait_stable():
+    """press "KEY" after wait stable -> [Press, WaitStable]"""
+    program = parse_text('press "A" after wait stable 5')
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Press)
+    assert isinstance(program.body[1], WaitStable)
+    assert program.body[1].timeout == 5.0
 
 
 # ─── scan/recognize 测试 ────────────────────────────────────
@@ -1356,6 +1597,77 @@ end
     assert isinstance(if_node.condition.operand, Contains)
     assert len(if_node.then_body) == 2  # collect + log
     print("  if + scan as: OK")
+
+
+def test_else_if_basic():
+    """else if 基本语法：if ... else if ... else ... end"""
+    text = """\
+if $x
+    log "a"
+else if $y
+    log "b"
+else
+    log "c"
+end
+"""
+    program = parse_text(text)
+    assert len(program.body) == 1
+    if_node = program.body[0]
+    assert isinstance(if_node, If)
+    assert len(if_node.then_body) == 1
+    # else_body 应包含一个嵌套的 If
+    assert len(if_node.else_body) == 1
+    nested_if = if_node.else_body[0]
+    assert isinstance(nested_if, If)
+    assert len(nested_if.then_body) == 1
+    # 嵌套 if 的 else_body 应包含 log "c"
+    assert len(nested_if.else_body) == 1
+
+
+def test_else_if_chain():
+    """多个 else if 链：if ... else if ... else if ... else ... end"""
+    text = """\
+if $a
+    log "a"
+else if $b
+    log "b"
+else if $c
+    log "c"
+else
+    log "d"
+end
+"""
+    program = parse_text(text)
+    assert len(program.body) == 1
+    if_node = program.body[0]
+    assert isinstance(if_node, If)
+    # 第一层 else 包含嵌套 if
+    nested1 = if_node.else_body[0]
+    assert isinstance(nested1, If)
+    # 第二层 else 包含另一个嵌套 if
+    nested2 = nested1.else_body[0]
+    assert isinstance(nested2, If)
+    assert len(nested2.else_body) == 1  # log "d"
+
+
+def test_else_if_no_else():
+    """else if 不带最终 else：if ... else if ... end"""
+    text = """\
+if $x
+    log "a"
+else if $y
+    log "b"
+end
+"""
+    program = parse_text(text)
+    assert len(program.body) == 1
+    if_node = program.body[0]
+    assert isinstance(if_node, If)
+    assert len(if_node.else_body) == 1
+    nested_if = if_node.else_body[0]
+    assert isinstance(nested_if, If)
+    # 嵌套 if 没有 else
+    assert len(nested_if.else_body) == 0
 
 
 def test_full_workflow():

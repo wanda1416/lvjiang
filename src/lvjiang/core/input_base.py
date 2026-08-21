@@ -19,7 +19,10 @@ class InputBackend(ABC):
 
     公开接口：
     - click_screen(x, y, poi_name)：点击屏幕/设备坐标
+    - move_screen(x, y, poi_name)：移动鼠标到屏幕/设备坐标（不点击）
     - drag_screen(from_x, from_y, to_x, to_y, ...)：从起点拖拽到终点
+    - key_down(key)：按下按键（仅 keydown，不释放）
+    - key_up(key)：释放按键
 
     兼容属性（供 run_control 访问）：
     - background_mode: bool（ADB 恒 True）
@@ -55,6 +58,40 @@ class InputBackend(ABC):
         """
 
     @abstractmethod
+    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """移动鼠标到指定坐标（不点击）
+
+        SendInput：SetCursorPos 移动系统光标。
+        PostMessage：WM_MOUSEMOVE 向目标窗口投递鼠标移动消息。
+        ADB：不支持，空操作并记录警告。
+        """
+
+    @abstractmethod
+    def scroll_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        direction: str = "down",
+        amount: int = 1,
+        poi_name: str = "",
+    ):
+        """在指定坐标位置滚动鼠标滚轮
+
+        通常与 move_screen 配套使用：先移动光标到目标区域，再执行滚动。
+
+        Args:
+            screen_x: 屏幕 x 坐标
+            screen_y: 屏幕 y 坐标
+            direction: 滚动方向，"up" 或 "down"
+            amount: 滚动格数（默认 1）
+            poi_name: 日志标签
+
+        SendInput：MOUSEEVENTF_WHEEL 发送滚轮事件。
+        PostMessage：WM_MOUSEWHEEL 向目标窗口投递滚轮消息。
+        ADB：用短距离 input swipe 模拟滚动。
+        """
+
+    @abstractmethod
     def drag_screen(
         self,
         from_x: int,
@@ -74,6 +111,22 @@ class InputBackend(ABC):
             hold: 到达终点后按住不放的时长（秒）。None 表示不按。
             pre_delay: 拖拽前延迟范围。None=使用默认 before_click_wait，(0,0)=不延迟。
             post_delay: 拖拽后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
+        """
+
+    @abstractmethod
+    def key_down(self, key: str) -> None:
+        """按下按键（仅 keydown，不释放）
+
+        Backend 不负责状态管理，只负责发送。
+        key 参数已经是标准化后的键名（由调用方 normalize_key 处理）。
+        """
+
+    @abstractmethod
+    def key_up(self, key: str) -> None:
+        """释放按键
+
+        Backend 不负责状态管理，只负责发送。
+        key 参数已经是标准化后的键名。
         """
 
     @staticmethod

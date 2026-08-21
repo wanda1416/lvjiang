@@ -40,10 +40,13 @@ from ..grammar.ast_nodes import (
     Literal,
     Log,
     Loop,
+    Move,
+    Press,
     ProcDef,
     Recognize,
     Return,
     Scan,
+    Scroll,
     Screenshot,
     Try,
     UntilLoop,
@@ -58,6 +61,7 @@ from .actions import _ActionsMixin
 from .control_flow import _ControlFlowMixin
 from .data_ops import _DataOpsMixin
 from .evaluation import _EvalMixin
+from .key_state import KeyStateRegistry
 from .panel import _PanelMixin
 from .signals import (
     WorkflowUserError,
@@ -135,6 +139,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._ui_callback: Callable | None = None
         # 游戏操作委托（execute 时懒创建）
         self._workflow: BaseWorkflow | None = None
+        # 按键状态注册表（press 指令用，懒初始化绑定当前 backend）
+        self._key_registry: KeyStateRegistry | None = None
 
     def _ensure_workflow(self) -> BaseWorkflow:
         """懒创建 BaseWorkflow 作为游戏操作委托
@@ -192,15 +198,20 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         if _reset_context:
             self.context = {}
 
-        # Python 工作流实例
-        if isinstance(source, BaseWorkflow):
-            return self._execute_python_workflow(source)
+        try:
+            # Python 工作流实例
+            if isinstance(source, BaseWorkflow):
+                return self._execute_python_workflow(source)
 
-        # DSL .wf 文件
-        source_path = Path(source)
-        if source_path.suffix == ".wf":
-            return self._execute_dsl(source_path)
-        raise ValueError(f"不支持的执行源: {source}")
+            # DSL .wf 文件
+            source_path = Path(source)
+            if source_path.suffix == ".wf":
+                return self._execute_dsl(source_path)
+            raise ValueError(f"不支持的执行源: {source}")
+        finally:
+            # 所有退出路径统一释放按键（正常/异常/取消/超时）
+            if self._key_registry:
+                self._key_registry.release_all()
 
     def validate_only(self, wf_path: Path | str) -> None:
         """只解析与静态校验 .wf，不执行任何动作
@@ -546,8 +557,14 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         match node:
             case Click():
                 self._exec_click(node)
+            case Move():
+                self._exec_move(node)
+            case Scroll():
+                self._exec_scroll(node)
             case Drag():
                 self._exec_drag(node)
+            case Press():
+                self._exec_press(node)
             case Wait():
                 self._exec_wait(node)
             case WaitStable():

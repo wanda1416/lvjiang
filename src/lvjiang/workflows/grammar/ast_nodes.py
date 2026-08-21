@@ -4,7 +4,7 @@
 
 节点分三类：
 - 程序：Program
-- 语句：Click / Drag / Wait / Scan / Recognize / Collect / Log / Align
+- 语句：Click / Move / Drag / Press / Wait / Scan / Recognize / Collect / Log / Align
          If / For / Loop / Break / Return / Label / Goto / Eval
 - 表达式：EntityRef / PanelRef / VarRef / Literal / FieldAccess / Contains / Equals / InList / IsEmpty
           Not / And / Or
@@ -16,6 +16,7 @@
 """
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 # ─── 程序 ─────────────────────────────────────────────────
@@ -35,6 +36,32 @@ class Click:
     target: Any     # EntityRef（静态 [scene].[entity]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0
     suppress_defaults: bool = False  # 显式 wait_clause 时抑制默认 before/after_click_wait
+
+
+@dataclass(frozen=True)
+class Move:
+    """move 指令：仅移动鼠标到目标位置，不点击
+
+    目标类型与 click 完全平行：
+    EntityRef | PanelRef | VarRef（CoordRef / FoundRegion）| CoordPoint
+    """
+    target: Any
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Scroll:
+    """scroll 指令：鼠标滚轮滚动
+
+    direction: "up" | "down"
+    target: 可选，与 click 完全平行的目标类型。
+            指定时先移动光标到目标位置再滚动；省略则在当前位置滚动。
+    amount: 滚动格数，int 或 VarRef。默认 1。
+    """
+    direction: str
+    target: Any = None
+    amount: Any = 1
+    line_no: int = 0
 
 
 @dataclass(frozen=True)
@@ -190,6 +217,30 @@ class Log:
 @dataclass(frozen=True)
 class Screenshot:
     """截取当前画面并保存到 logs/image/"""
+    line_no: int = 0
+
+
+class PressMode(Enum):
+    """press 指令的四种模式"""
+    PRESS = "press"   # 完整按键（down + up）
+    HOLD = "hold"     # 按住指定时长
+    DOWN = "down"     # 按下保持
+    UP = "up"         # 释放
+
+
+@dataclass(frozen=True)
+class Press:
+    """press 指令：模拟键盘按键
+
+    四种模式：
+    - PRESS: press "M" — 一次完整按键（down + up）
+    - HOLD: press "W" hold 2.0 — 按住指定时长后释放
+    - DOWN: press "SHIFT" down — 按下保持
+    - UP: press "SHIFT" up — 释放此前按下的键
+    """
+    key: Any          # str（常量）| VarRef（变量）
+    mode: PressMode = PressMode.PRESS
+    duration: Any = None  # None | float | VarRef（hold 模式必须有且 > 0）
     line_no: int = 0
 
 

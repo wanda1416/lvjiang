@@ -26,11 +26,13 @@ from .grammar.ast_nodes import (
     If,
     Literal,
     Loop,
+    Move,
     PanelGridDrag,
     PanelRef,
     ProcDef,
     Recognize,
     Scan,
+    Scroll,
     Try,
     UntilLoop,
     WaitStable,
@@ -103,6 +105,18 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
         if isinstance(target, EntityRef):
             # click_any 先查 region 再查 point 再查 panel
             _add(acc, target.scene, target.entity, "click_target", line)
+        elif isinstance(target, PanelRef):
+            _add(acc, target.scene, target.panel, "panel", line)
+    elif isinstance(stmt, Move):
+        target = stmt.target
+        if isinstance(target, EntityRef):
+            _add(acc, target.scene, target.entity, "move_target", line)
+        elif isinstance(target, PanelRef):
+            _add(acc, target.scene, target.panel, "panel", line)
+    elif isinstance(stmt, Scroll):
+        target = stmt.target
+        if isinstance(target, EntityRef):
+            _add(acc, target.scene, target.entity, "scroll_target", line)
         elif isinstance(target, PanelRef):
             _add(acc, target.scene, target.panel, "panel", line)
     elif isinstance(stmt, Drag):

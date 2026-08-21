@@ -34,12 +34,34 @@ class _MouseInput(ctypes.Structure):
     ]
 
 
+class _KeyBdInput(ctypes.Structure):
+    _fields_ = [
+        ("wVk", wintypes.WORD),
+        ("wScan", wintypes.WORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", PUL),
+    ]
+
+
 class _InputUnion(ctypes.Union):
-    _fields_ = [("mi", _MouseInput)]
+    _fields_ = [("mi", _MouseInput), ("ki", _KeyBdInput)]
 
 
 class _Input(ctypes.Structure):
     _fields_ = [("type", ctypes.c_ulong), ("ii", _InputUnion)]
+
+
+# SendInput 必须显式声明 argtypes，否则 ctypes 默认把所有参数按 c_int 处理，
+# 指针参数（byref 地址）会被截断为 32 位，SendInput 读到错误内存而返回 0，
+# 键盘/鼠标事件注入静默失败（实测：未声明时 ret=0，声明后 ret=1）。
+if _user32 is not None:
+    _user32.SendInput.argtypes = [
+        wintypes.UINT,             # nInputs
+        ctypes.POINTER(_Input),    # lpInput
+        ctypes.c_int,              # cbSize
+    ]
+    _user32.SendInput.restype = wintypes.UINT
 
 
 # 鼠标事件常量
@@ -47,11 +69,14 @@ _INPUT_MOUSE = 0
 _MOUSEEVENTF_MOVE = 0x0001
 _MOUSEEVENTF_LEFTDOWN = 0x0002
 _MOUSEEVENTF_LEFTUP = 0x0004
+_MOUSEEVENTF_WHEEL = 0x0800
+_WHEEL_DELTA = 120
 
 # PostMessage 鼠标消息常量
 _WM_MOUSEMOVE = 0x0200
 _WM_LBUTTONDOWN = 0x0201
 _WM_LBUTTONUP = 0x0202
+_WM_MOUSEWHEEL = 0x020A
 _MK_LBUTTON = 0x0001
 _WM_NCHITTEST = 0x0084
 _HTCLIENT = 1
@@ -61,6 +86,21 @@ def send_mouse_event(flags: int, dx: int = 0, dy: int = 0):
     """通过 SendInput 发送鼠标事件"""
     mi = _MouseInput(
         dx=dx, dy=dy, mouseData=0, dwFlags=flags, time=0,
+        dwExtraInfo=PUL(ctypes.c_ulong(0)),
+    )
+    ii = _InputUnion(mi=mi)
+    inp = _Input(type=_INPUT_MOUSE, ii=ii)
+    _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+
+
+def send_mouse_wheel_event(delta: int):
+    """通过 SendInput 发送鼠标滚轮事件
+
+    delta > 0 向上滚动，delta < 0 向下滚动。
+    每个 WHEEL_DELTA (120) 对应一格滚动。
+    """
+    mi = _MouseInput(
+        dx=0, dy=0, mouseData=delta, dwFlags=_MOUSEEVENTF_WHEEL, time=0,
         dwExtraInfo=PUL(ctypes.c_ulong(0)),
     )
     ii = _InputUnion(mi=mi)
@@ -315,6 +355,40 @@ def postmessage_click(hwnd: int, client_x: int, client_y: int, activate: bool = 
     _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, lparam)
     time.sleep(0.05)
     _user32.PostMessageW(target, _WM_LBUTTONUP, 0, lparam)
+
+
+def postmessage_move(hwnd: int, client_x: int, client_y: int, activate: bool = False):
+    """通过 PostMessage 向窗口发送鼠标移动消息（不点击）
+
+    activate=True 时先瞬时激活目标窗口再投递。
+    """
+    if activate:
+        activate_window(hwnd)
+    target = resolve_message_target(hwnd, client_x, client_y)
+    lparam = make_lparam(client_x, client_y)
+    _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, lparam)
+
+
+def postmessage_scroll(
+    hwnd: int,
+    client_x: int,
+    client_y: int,
+    delta: int,
+    activate: bool = False,
+):
+    """通过 PostMessage 向窗口发送鼠标滚轮消息
+
+    delta > 0 向上滚动，delta < 0 向下滚动。
+    每个 _WHEEL_DELTA (120) 对应一格滚动。
+    activate=True 时先瞬时激活目标窗口再投递。
+    """
+    if activate:
+        activate_window(hwnd)
+    target = resolve_message_target(hwnd, client_x, client_y)
+    # wParam: 高 16 位 = wheel delta，低 16 位 = 虚拟键标志（0）
+    wparam = (delta & 0xFFFF) << 16
+    lparam = make_lparam(client_x, client_y)
+    _user32.PostMessageW(target, _WM_MOUSEWHEEL, wparam, lparam)
 
 
 def postmessage_drag(

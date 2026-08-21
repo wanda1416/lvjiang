@@ -1,4 +1,4 @@
-"""基础指令 Mixin：click / drag / wait
+"""基础指令 Mixin：click / drag / press / wait
 
 报错还是跳过，按失败原因分：
 - 脚本 / 布局配错（变量未定义、panel 不在布局里、距离参数非数值、
@@ -6,6 +6,8 @@
 - 运行时状态（panel 尚未对齐、索引越界）→ 记日志后跳过，越界本身
   就是脚本遍历网格时的终止条件
 """
+
+import time
 
 from loguru import logger
 
@@ -17,13 +19,16 @@ from ..grammar import (
     Drag,
     EntityRef,
     Literal,
+    Move,
     PanelGridDrag,
     PanelRef,
+    Press,
+    Scroll,
     VarRef,
     Wait,
     WaitStable,
 )
-from ..grammar.ast_nodes import Align, TupleLiteral
+from ..grammar.ast_nodes import Align, PressMode, TupleLiteral
 from .signals import WorkflowUserError
 
 # FoundRegion 延迟导入，避免循环依赖
@@ -38,7 +43,7 @@ def _get_found_region_cls():
 
 
 class _ActionsMixin:
-    """基础指令执行：_exec_click / _exec_drag / _exec_wait
+    """基础指令执行：_exec_click / _exec_move / _exec_drag / _exec_press / _exec_wait
 
     状态属性与跨 Mixin 方法由 WorkflowEngine 组合后提供。
     """
@@ -119,6 +124,201 @@ class _ActionsMixin:
             )
         else:
             raise WorkflowUserError(f"click: 未知目标类型 {type(node.target).__name__}")
+
+    def _exec_move(self, node: Move):
+        """move scene.coord / scene.panel[row][col] — 仅移动鼠标到目标位置，不点击。
+        目标解析逻辑与 _exec_click 完全平行。
+        """
+        if isinstance(node.target, CoordPoint):
+            x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
+            self._input.move_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
+            return
+        if isinstance(node.target, PanelRef):
+            x, y = self._panel_ref_to_screen(node.target)
+            if x is not None and y is not None:
+                self._input.move_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])")
+            return
+        if isinstance(node.target, EntityRef):
+            # 解析 scene
+            if isinstance(node.target.scene, VarRef):
+                scene = self.variables.get(node.target.scene.name)
+                if scene is None:
+                    raise WorkflowUserError(
+                        f"变量 ${node.target.scene.name} 未定义，无法移动"
+                    )
+            else:
+                scene = node.target.scene
+
+            # 解析 entity
+            entity = node.target.entity
+            if isinstance(entity, VarRef):
+                region_val = self.variables.get(entity.name)
+                if region_val is None:
+                    raise WorkflowUserError(f"变量 ${entity.name} 未定义，无法移动")
+                FoundRegionCls = _get_found_region_cls()
+                if isinstance(region_val, FoundRegionCls):
+                    x, y = self._found_region_to_screen(region_val)
+                    self._input.move_screen(x, y, f"find({region_val.text!r})")
+                    return
+                region_obj = self._find_region_in_coord_meta(region_val)
+                if region_obj is not None:
+                    x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
+                    self._input.move_screen(x, y, f"{scene}/{region_val}")
+                    return
+                self._ensure_workflow().move_any(str(scene), str(region_val))
+            else:
+                self._ensure_workflow().move_any(str(scene), entity)
+        elif isinstance(node.target, VarRef):
+            region_val = self.variables.get(node.target.name)
+            if region_val is None:
+                raise WorkflowUserError(
+                    f"变量 ${node.target.name} 未定义，无法移动"
+                )
+            if isinstance(region_val, CoordRef):
+                x, y = self._coord_ref_to_screen(region_val, jitter=True)
+                self._input.move_screen(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})")
+                return
+            FoundRegionCls = _get_found_region_cls()
+            if isinstance(region_val, FoundRegionCls):
+                x, y = self._found_region_to_screen(region_val)
+                self._input.move_screen(x, y, f"find({region_val.text!r})")
+                return
+            raise WorkflowUserError(
+                f"move ${node.target.name}: 变量值不是可移动目标类型 "
+                f"(类型: {type(region_val).__name__})，"
+                f"仅支持 CoordRef / find 产出的 FoundRegion"
+            )
+        else:
+            raise WorkflowUserError(f"move: 未知目标类型 {type(node.target).__name__}")
+
+    def _exec_scroll(self, node: Scroll):
+        """scroll up|down [目标] [数量] — 鼠标滚轮滚动
+
+        如果指定了目标，先移动光标到目标位置再滚动（与 move 配套）。
+        如果未指定目标，在当前光标位置滚动（取画布中心作为默认坐标）。
+        """
+        # 解析 amount（支持 int 或 VarRef）
+        amount = node.amount
+        if isinstance(amount, VarRef):
+            amount = self.variables.get(amount.name, 1)
+        try:
+            amount = int(amount)
+        except (TypeError, ValueError):
+            raise WorkflowUserError(f"scroll: 无效滚动数量: {node.amount}") from None
+
+        direction = node.direction  # "up" | "down"
+
+        if node.target is None:
+            # 无目标：在画布中心滚动（作为默认位置）
+            w, h = self._capture.get_capture_size()
+            x, y = w // 2, h // 2
+            self._input.scroll_screen(x, y, direction, amount, "canvas_center")
+            return
+
+        # 有目标：解析目标坐标（与 _exec_move 完全平行）
+        if isinstance(node.target, CoordPoint):
+            x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
+            self._input.scroll_screen(x, y, direction, amount, f"coord({node.target.rx},{node.target.ry})")
+            return
+        if isinstance(node.target, PanelRef):
+            x, y = self._panel_ref_to_screen(node.target)
+            if x is not None and y is not None:
+                self._input.scroll_screen(
+                    x, y, direction, amount,
+                    f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])",
+                )
+            return
+        if isinstance(node.target, EntityRef):
+            if isinstance(node.target.scene, VarRef):
+                scene = self.variables.get(node.target.scene.name)
+                if scene is None:
+                    raise WorkflowUserError(
+                        f"变量 ${node.target.scene.name} 未定义，无法滚动"
+                    )
+            else:
+                scene = node.target.scene
+
+            entity = node.target.entity
+            if isinstance(entity, VarRef):
+                region_val = self.variables.get(entity.name)
+                if region_val is None:
+                    raise WorkflowUserError(f"变量 ${entity.name} 未定义，无法滚动")
+                FoundRegionCls = _get_found_region_cls()
+                if isinstance(region_val, FoundRegionCls):
+                    x, y = self._found_region_to_screen(region_val)
+                    self._input.scroll_screen(x, y, direction, amount, f"find({region_val.text!r})")
+                    return
+                region_obj = self._find_region_in_coord_meta(region_val)
+                if region_obj is not None:
+                    x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
+                    self._input.scroll_screen(x, y, direction, amount, f"{scene}/{region_val}")
+                    return
+                # 回退：move_any 逻辑复制（获取坐标后移动 + 滚动）
+                self._resolve_and_scroll_at_entity(str(scene), str(region_val), direction, amount)
+                return
+            else:
+                self._resolve_and_scroll_at_entity(str(scene), entity, direction, amount)
+                return
+        elif isinstance(node.target, VarRef):
+            region_val = self.variables.get(node.target.name)
+            if region_val is None:
+                raise WorkflowUserError(
+                    f"变量 ${node.target.name} 未定义，无法滚动"
+                )
+            if isinstance(region_val, CoordRef):
+                x, y = self._coord_ref_to_screen(region_val, jitter=True)
+                self._input.scroll_screen(x, y, direction, amount, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})")
+                return
+            FoundRegionCls = _get_found_region_cls()
+            if isinstance(region_val, FoundRegionCls):
+                x, y = self._found_region_to_screen(region_val)
+                self._input.scroll_screen(x, y, direction, amount, f"find({region_val.text!r})")
+                return
+            raise WorkflowUserError(
+                f"scroll ${node.target.name}: 变量值不是可滚动目标类型 "
+                f"(类型: {type(region_val).__name__})，"
+                f"仅支持 CoordRef / find 产出的 FoundRegion"
+            )
+        else:
+            raise WorkflowUserError(f"scroll: 未知目标类型 {type(node.target).__name__}")
+
+    def _resolve_and_scroll_at_entity(
+        self, scene_key: str, key: str, direction: str, amount: int,
+    ):
+        """回退路径：按 region → point → panel 顺序查找目标坐标，移动光标后滚动。
+
+        与 move_any 逻辑平行，但额外获取坐标用于 scroll_screen。
+        """
+        wf = self._ensure_workflow()
+        # region
+        regions = self._layout.get_scene_regions(scene_key)
+        region = next((r for r in regions if r.key == key), None)
+        if region is not None:
+            x, y = wf._region_to_screen(region, jitter=True)
+            self._input.move_screen(x, y, f"{scene_key}/{key}")
+            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}")
+            return
+        # point
+        points = self._layout.get_scene_points(scene_key)
+        point = next((p for p in points if p.key == key), None)
+        if point is not None:
+            x, y = wf._point_to_screen(point)
+            self._input.move_screen(x, y, f"{scene_key}/{key}")
+            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}")
+            return
+        # panel
+        panels = self._layout.get_scene_panels(scene_key)
+        panel = next((p for p in panels if p.key == key), None)
+        if panel is not None:
+            cx = panel.x_ratio + panel.w_ratio / 2
+            cy = panel.y_ratio + panel.h_ratio / 2
+            x, y = wf._ratio_to_screen(cx, cy)
+            self._input.move_screen(x, y, f"{scene_key}/{key}(panel)")
+            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}(panel)")
+            return
+        raise WorkflowUserError(
+            f"scroll: 场景 {scene_key} 的 region / point / panel 未绑定坐标: {key}"
+        )
 
     def _exec_drag(self, node: Drag):
         """drag scene.arrow / scene.panel[row][col] / scene.point1 scene.point2 — 多种拖拽模式。
@@ -400,6 +600,66 @@ class _ActionsMixin:
             )
         else:
             raise WorkflowUserError(f"drag: 未知目标类型 {type(node.scene).__name__}")
+
+    def _exec_press(self, node: Press):
+        """press "KEY" [hold N | down | up] — 模拟键盘按键
+
+        四种模式：
+        - PRESS: 一次完整按键（down + up）
+        - HOLD: 按住指定时长后释放（down + sleep + up）
+        - DOWN: 按下保持
+        - UP: 释放此前按下的键
+        """
+        from ...core.desktop.win32_keyboard import normalize_key
+
+        # 懒初始化 KeyStateRegistry（绑定当前 backend）
+        if self._key_registry is None:
+            from .key_state import KeyStateRegistry
+            self._key_registry = KeyStateRegistry(self._input)
+
+        key_raw = self._resolve(node.key)
+        if key_raw is None:
+            raise WorkflowUserError("press: 按键变量未定义")
+        key = normalize_key(str(key_raw))
+        reg = self._key_registry
+
+        match node.mode:
+            case PressMode.PRESS:
+                logger.debug(f"press: {key}")
+                reg.key_down(key)
+                try:
+                    # down/up 之间留短暂间隔，确保 Windows/目标应用识别为
+                    # 一次有效按键（零间隔时部分应用会忽略，认为从未真正按下）
+                    time.sleep(0.03)
+                finally:
+                    reg.key_up(key)
+
+            case PressMode.HOLD:
+                duration = float(self._resolve(node.duration))
+                if duration <= 0:
+                    raise WorkflowUserError(f"press hold 时长必须 > 0，得到 {duration}")
+                logger.debug(f"press: {key} hold {duration}s")
+                reg.key_down(key)
+                try:
+                    # 可中断等待：暂停阻塞不触发 finally，停止抛 _BreakSignal 触发 finally
+                    deadline = time.monotonic() + duration
+                    while time.monotonic() < deadline:
+                        self._wait_if_paused()
+                        if self._stop_check():
+                            from .signals import _BreakSignal
+                            raise _BreakSignal()
+                        remaining = deadline - time.monotonic()
+                        time.sleep(min(0.05, max(0.0, remaining)))
+                finally:
+                    reg.key_up(key)
+
+            case PressMode.DOWN:
+                logger.debug(f"press: {key} down")
+                reg.key_down(key)
+
+            case PressMode.UP:
+                logger.debug(f"press: {key} up")
+                reg.key_up(key)
 
     def _exec_wait(self, node: Wait):
         delay = node.delay

@@ -10,7 +10,10 @@ start: (_NL | statement)*
 // ─── 语句分派 ─────────────────────────────────────────────
 
 ?statement: click_stmt
+          | move_stmt
+          | scroll_stmt
           | drag_stmt
+          | press_stmt
           | wait_stable_stmt
           | wait_stmt
           | scan_stmt
@@ -40,6 +43,16 @@ start: (_NL | statement)*
 
 // ─── 基础指令 ─────────────────────────────────────────────
 
+// press：模拟键盘按键
+// press "M"             — 完整按键（down + up）
+// press "W" hold 2.0    — 按住 2 秒后释放
+// press "SHIFT" down    — 按下保持
+// press "SHIFT" up      — 释放
+press_stmt: "press"i STRING press_modifier? wait_clauses? _NL
+press_modifier: "hold"i number -> press_hold
+              | "down"i        -> press_down
+              | "up"i          -> press_up
+
 // align：触发 panel 区域截图 + 图像自对齐，缓存格子坐标
 // 语法：align [scene].[panel]
 align_stmt: "align"i bracket_expr "." bracket_expr _NL
@@ -65,6 +78,17 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
             | const_or_var "." const_or_var                          -> click_scene_target
             | var_ref                                                  -> click_var_target
             | coord_point                                              -> click_coord_target
+
+// move：仅移动鼠标到目标位置，不点击（与 click 完全平行的目标语法）
+// 用途：悬停触发 tooltip、安全区检查、拖拽前预定位
+move_stmt: "move"i click_target wait_clauses? _NL
+
+// scroll：鼠标滚轮滚动（往往需要先 move 到目标位置再滚动）
+// 方向：up（向上滚）/ down（向下滚）
+// 目标：可选，指定后先移动光标到该位置再滚动；省略则在当前位置滚动
+// 数量：可选，滚动格数（默认 1），支持数字或变量
+scroll_stmt: "scroll"i SCROLL_DIR click_target? (number | var_ref)? _NL
+SCROLL_DIR: /up/i | /down/i
 
 // drag 支持五种目标：
 //   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽
@@ -281,6 +305,7 @@ call_arg_list: call_arg ("," call_arg)*
 if_stmt: "if"i condition _NL (_NL | statement)* else_clause? "end"i _NL
 
 else_clause: "else"i _NL (_NL | statement)*
+           | "else"i "if"i condition _NL (_NL | statement)* else_clause? -> elif_clause
 
 for_stmt: "for"i NAME "in"i for_iter _NL (_NL | statement)* "end"i _NL
 

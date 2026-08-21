@@ -1,4 +1,4 @@
-"""_StmtMixin：程序入口与语句/目标回调（click/drag/wait/scan/recognize/align/panel）"""
+"""_StmtMixin：程序入口与语句/目标回调（click/drag/press/wait/scan/recognize/align/panel）"""
 
 from lark import Token
 
@@ -13,12 +13,16 @@ from ..ast_nodes import (
     Find,
     Import,
     Literal,
+    Move,
     PanelGridDrag,
     PanelRef,
+    Press,
+    PressMode,
     ProcDef,
     Program,
     Recognize,
     Scan,
+    Scroll,
     TupleLiteral,
     VarRef,
     Wait,
@@ -131,6 +135,62 @@ class _StmtMixin:
     def coord_point(self, items):
         """(rx, ry) → CoordPoint，number 规则已转为 float"""
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
+
+    def move_stmt(self, items):
+        """move 目标 [before|after|around wait 参数 ...] — 仅移动鼠标，不点击
+
+        复用 click_target 子规则解析目标，将 Click 节点转换为 Move 节点。
+        支持 wait_clause，展开逻辑与 click_stmt 一致。
+        """
+        click_node = items[0]
+        wait_pairs = []
+        if len(items) > 1 and isinstance(items[1], list):
+            wait_pairs = [it for it in items[1] if isinstance(it, list) and len(it) == 2
+                          and isinstance(it[1], (Wait, WaitStable))]
+        move_node = Move(target=click_node.target, line_no=click_node.line_no)
+        if not wait_pairs:
+            return move_node
+
+        # 展开 around 为 before + after
+        expanded = []
+        for timing, wait_node in wait_pairs:
+            if timing == "around":
+                expanded.append(("before", wait_node))
+                expanded.append(("after", wait_node))
+            else:
+                expanded.append((timing, wait_node))
+
+        before_waits = [w for t, w in expanded if t == "before"]
+        after_waits = [w for t, w in expanded if t == "after"]
+        return before_waits + [move_node] + after_waits
+
+    def scroll_stmt(self, items):
+        """scroll up|down [目标] [数量] — 鼠标滚轮滚动
+
+        复用 click_target 子规则解析目标（如果存在），
+        提取数量参数（如果存在）。
+        """
+        # 第一个元素是 SCROLL_DIR token
+        direction = str(items[0]).lower()
+        remaining = items[1:]
+
+        target = None
+        amount = 1
+
+        for item in remaining:
+            if isinstance(item, Click):
+                target = item.target
+            elif isinstance(item, VarRef):
+                amount = item
+            elif isinstance(item, (int, float)):
+                amount = int(item)
+
+        return Scroll(
+            direction=direction,
+            target=target,
+            amount=amount,
+            line_no=self._line(items),
+        )
 
     def drag_stmt(self, items):
         """drag 目标 [duration] [hold] [before|after|around wait 参数 ...] — 支持 before/after 任意组合
@@ -262,6 +322,59 @@ class _StmtMixin:
     def drag_hold(self, items):
         """hold <seconds> → float"""
         return float(items[0])
+
+    # ─── press 指令 ─────────────────────────────────────
+
+    def press_stmt(self, items):
+        """press "KEY" [hold N | down | up] [before|after|around wait ...] — 模拟键盘按键
+
+        wait_clause 展开为独立 Wait 语句，按语义顺序排列：before 在前，after 在后。
+        press 没有默认延迟，不需要 suppress_defaults。
+        """
+        key = self._unquote(str(items[0]))  # STRING token → 去引号
+        mode = PressMode.PRESS
+        duration = None
+        wait_pairs = []
+
+        for item in items[1:]:
+            if item is None:
+                continue
+            if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], PressMode):
+                mode, duration = item
+            elif isinstance(item, list):
+                # wait_clauses 的结果：[[timing, Wait], ...]
+                wait_pairs = [it for it in item if isinstance(it, list) and len(it) == 2
+                              and isinstance(it[1], (Wait, WaitStable))]
+
+        press_node = Press(key=key, mode=mode, duration=duration, line_no=self._line(items))
+
+        if not wait_pairs:
+            return press_node
+
+        # 展开 around 为 before + after
+        expanded = []
+        for timing, wait_node in wait_pairs:
+            if timing == "around":
+                expanded.append(("before", wait_node))
+                expanded.append(("after", wait_node))
+            else:
+                expanded.append((timing, wait_node))
+
+        before_waits = [w for t, w in expanded if t == "before"]
+        after_waits = [w for t, w in expanded if t == "after"]
+        return before_waits + [press_node] + after_waits
+
+    def press_hold(self, items):
+        """hold <number> → (PressMode.HOLD, duration)"""
+        return (PressMode.HOLD, float(items[0]))
+
+    def press_down(self, items):
+        """down → (PressMode.DOWN, None)"""
+        return (PressMode.DOWN, None)
+
+    def press_up(self, items):
+        """up → (PressMode.UP, None)"""
+        return (PressMode.UP, None)
 
     # ─── align 指令 ─────────────────────────────────────
 

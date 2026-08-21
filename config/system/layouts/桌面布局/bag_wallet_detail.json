@@ -1,0 +1,44 @@
+{
+  "regions": [
+    {
+      "key": "back",
+      "x_ratio": 0.9180264415699169,
+      "y_ratio": 0.016086406986096747,
+      "w_ratio": 0.031023784901758056,
+      "h_ratio": 0.06204756980351603
+    },
+    {
+      "key": "bugan_jindu",
+      "x_ratio": 0.4992125889162378,
+      "y_ratio": 0.36613732976996705,
+      "w_ratio": 0.09925204373564173,
+      "h_ratio": 0.05563678127323257
+    }
+  ],
+  "panels": [
+    {
+      "key": "money_1",
+      "x_ratio": 0.6924923292856453,
+      "y_ratio": 0.23017547869923155,
+      "w_ratio": 0.18835695373192396,
+      "h_ratio": 0.08590067089461001,
+      "cols": 4,
+      "rows": 1,
+      "min_visible": 0.95,
+      "calibration": "even",
+      "scroll_direction": "none"
+    },
+    {
+      "key": "money_2",
+      "x_ratio": 0.6927083871754046,
+      "y_ratio": 0.4084899446903536,
+      "w_ratio": 0.28234924632846436,
+      "h_ratio": 0.3342825085727855,
+      "cols": 6,
+      "rows": 4,
+      "min_visible": 0.8,
+      "calibration": "even",
+      "scroll_direction": "vertical"
+    }
+  ]
+}

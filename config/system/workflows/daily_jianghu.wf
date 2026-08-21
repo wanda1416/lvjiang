@@ -175,14 +175,14 @@ def action_qingjing($label)
    click [activity_jianghu].[goto] after wait @step_interval
    click [activity_jianghu].[confirm] after wait @step_interval
    click [activity_jianghu].[expand_up] after wait @step_interval
-   click [activity_jianghu].[goto_qingjing] after wait stable @page_refresh least 0.5
+   click [activity_jianghu].[goto_qingjing] after wait @secondary_confirm
 
    # 检查是否在衣柜页面（识别到"穿搭"），如果是则导航回情境页面
    scan [waiguan_yigui].[chuanda] as $in_yigui by contains "穿搭"
    if $in_yigui
       log "检测到在衣柜页面，导航回情境编辑页面"
       click [waiguan_qingjing].[qingjing] after wait @step_interval
-      click [waiguan_qingjing].[goto_editing] after wait stable @page_refresh least 0.5
+      click [waiguan_qingjing].[goto_editing] after wait @secondary_confirm
    end
 
    # 保存后弹窗需要渲染时间，先等一下再扫描

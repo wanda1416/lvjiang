@@ -83,28 +83,6 @@ class TuningTab(QWidget):
         btn_layout.addWidget(self.btn_pause_resume)
         tab_layout.addLayout(btn_layout)
 
-        # 工作环境显示（第二行）
-        from .....core.config import load_available_envs, load_env, save_env
-        env_layout = QHBoxLayout()
-        env_layout.setContentsMargins(0, 0, 0, 0)
-        env_layout.setSpacing(8)
-        env_label = QLabel(tr("工作环境："))
-        env_label.setStyleSheet("color: #666; font-size: 12px;")
-        env_layout.addWidget(env_label)
-        self._env_combo = QComboBox()
-        for key, display in load_available_envs():
-            self._env_combo.addItem(display, key)
-        current_env = load_env()
-        idx = self._env_combo.findData(current_env)
-        if idx >= 0:
-            self._env_combo.setCurrentIndex(idx)
-        self._env_combo.currentIndexChanged.connect(
-            lambda i: save_env(self._env_combo.itemData(i)))
-        self._env_combo.setStyleSheet("font-size: 12px;")
-        env_layout.addWidget(self._env_combo)
-        env_layout.addStretch()
-        tab_layout.addLayout(env_layout)
-
         config_tabs = QTabWidget()
         config_tabs.addTab(self._build_rules_page(), tr("规则"))
         config_tabs.addTab(self._build_slots_page(), tr("部位"))
@@ -132,10 +110,29 @@ class TuningTab(QWidget):
         return scroll
 
     def _build_rules_page(self) -> QWidget:
-        """「规则」页：基础规则单选 + 流派规则与玩法（变更即持久化）"""
+        """「规则」页：最低等级覆盖 + 基础规则单选 + 流派规则与玩法（变更即持久化）"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
+
+        # ── 最低等级（运行时覆盖基础规则的等级门槛）────────
+        min_level_row = QHBoxLayout()
+        min_level_row.setContentsMargins(0, 0, 0, 0)
+        min_level_row.setSpacing(6)
+        min_level_row.addWidget(QLabel("<b>" + tr("最低等级：") + "</b>"))
+        self._min_level_combo = QComboBox()
+        self._min_level_combo.addItem(tr("默认（跟随基础规则）"), None)
+        self._refresh_min_level_combo()
+        self._min_level_combo.currentIndexChanged.connect(
+            lambda _i: self._save_tuning_config())
+        self._min_level_combo.setToolTip(tr(
+            "运行时覆盖基础规则中的等级门槛；\n"
+            "「默认」使用基础规则定义的 min_level，\n"
+            "选择具体等级后以该值为准。"))
+        min_level_row.addWidget(self._min_level_combo)
+        min_level_row.addStretch()
+        layout.addLayout(min_level_row)
+
         layout.addWidget(QLabel("<b>" + tr("基础规则（单选）：") + "</b>"))
         self._base_group_key = ""
         self._button_group: QButtonGroup | None = None
@@ -151,6 +148,24 @@ class TuningTab(QWidget):
         layout.addWidget(self._tuning_config)
         layout.addStretch()
         return self._wrap_scroll(panel)
+
+    def _refresh_min_level_combo(self):
+        """刷新最低等级下拉列表（等级配置变更后调用）"""
+        current = self._min_level_combo.currentData()
+        self._min_level_combo.blockSignals(True)
+        self._min_level_combo.clear()
+        self._min_level_combo.addItem(tr("默认（跟随基础规则）"), None)
+        from ...config import get_game_config
+        configs = get_game_config().get_level_configs()
+        levels = sorted([c.level for c in configs], reverse=True)
+        for lv in levels:
+            self._min_level_combo.addItem(str(lv), lv)
+        # 恢复之前的选中值
+        if current is not None:
+            idx = self._min_level_combo.findData(current)
+            if idx >= 0:
+                self._min_level_combo.setCurrentIndex(idx)
+        self._min_level_combo.blockSignals(False)
 
     def _refresh_base_group_radios(self):
         """重建基础规则单选组（遍历全部规则组，选中项保持不变）"""
@@ -460,6 +475,10 @@ class TuningTab(QWidget):
         target_cell = None
         if self._cb_target.isChecked() and self._cb_target.isEnabled():
             target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
+        # 最低等级覆盖（None=跟随基础规则）
+        min_level_override = self._min_level_combo.currentData()
+        if min_level_override is not None:
+            min_level_override = int(min_level_override)
 
         def configure(wf_instance, engine):
             from ...workflows.tuning_context import TuningRunContext
@@ -473,6 +492,7 @@ class TuningTab(QWidget):
                 skip_tuning=skip_tuning,
                 skip_start=skip_start,
                 target_cell=target_cell,
+                min_level=min_level_override,
             )
             # 创建调律进度信号桥（右侧进度 Tab 由 _find_progress_widget 查找并连接）
             if engine is not None:
@@ -492,9 +512,14 @@ class TuningTab(QWidget):
                 rule_names_text += f"（开关：{'、'.join(on_names)}）"
             if skip_tuning:
                 host.append_log(tr("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律"))
+            effective_min_level = (
+                min_level_override if min_level_override is not None
+                else base_group.scan.min_level)
             host.append_log(
                 f"[开始] {flow_name} 流程，基础规则: {base_group.name}，"
-                f"规则: {rule_names_text}，部位: {selected_slots}")
+                f"规则: {rule_names_text}，部位: {selected_slots}，"
+                f"最低等级: {effective_min_level}"
+                + ("" if min_level_override is None else "（UI 覆盖）"))
 
         host.run_workflow_implementation(
             "auto_tuning", flow_name, configure)
@@ -531,6 +556,18 @@ class TuningTab(QWidget):
         self._select_base_group_radio(self._base_group_key)
         self._tuning_globals.set_switches(tc.get("switches", {}))
         self._tuning_globals.set_skip_tuning(bool(tc.get("skip_tuning", False)))
+        # 最低等级（运行时覆盖基础规则的等级门槛）
+        saved_min_level = tc.get("min_level")
+        self._min_level_combo.blockSignals(True)
+        if saved_min_level is not None:
+            idx = self._min_level_combo.findData(int(saved_min_level))
+            if idx >= 0:
+                self._min_level_combo.setCurrentIndex(idx)
+            else:
+                self._min_level_combo.setCurrentIndex(0)  # 回退到「默认」
+        else:
+            self._min_level_combo.setCurrentIndex(0)  # 「默认」
+        self._min_level_combo.blockSignals(False)
         # 初始跳过 / 指定调律
         for key, cb, sp_row, sp_col in (
             ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
@@ -567,6 +604,7 @@ class TuningTab(QWidget):
             "skip_tuning": self._get_tuning_skip_tuning(),
             "skip_start": skip_start,
             "target_cell": target_cell,
+            "min_level": self._min_level_combo.currentData(),
         })
 
     def _set_all_tuning_checks(self, checked: bool):

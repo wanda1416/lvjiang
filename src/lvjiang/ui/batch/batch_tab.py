@@ -136,28 +136,6 @@ class BatchTab(QWidget):
         btn_layout.addWidget(self._btn_pause_resume)
         layout.addLayout(btn_layout)
 
-        # ── 工作环境显示（第二行）──
-        from ...core.config import load_available_envs, load_env, save_env
-        env_layout = QHBoxLayout()
-        env_layout.setContentsMargins(0, 0, 0, 0)
-        env_layout.setSpacing(8)
-        env_label = QLabel(tr("工作环境："))
-        env_label.setStyleSheet("color: #666; font-size: 12px;")
-        env_layout.addWidget(env_label)
-        self._env_combo = QComboBox()
-        for key, display in load_available_envs():
-            self._env_combo.addItem(display, key)
-        current_env = load_env()
-        idx = self._env_combo.findData(current_env)
-        if idx >= 0:
-            self._env_combo.setCurrentIndex(idx)
-        self._env_combo.currentIndexChanged.connect(
-            lambda i: save_env(self._env_combo.itemData(i)))
-        self._env_combo.setStyleSheet("font-size: 12px;")
-        env_layout.addWidget(self._env_combo)
-        env_layout.addStretch()
-        layout.addLayout(env_layout)
-
         # ── 三页子 Tab ──
         self._sub_tabs = QTabWidget()
         self._sub_tabs.addTab(self._build_script_page(), tr("脚本"))

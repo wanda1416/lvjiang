@@ -9,6 +9,12 @@ layouts:
     extends: 默认布局
     canvas:
       x_ratio: 0.0
-      y_ratio: 0.0
+      y_ratio: 0.040113312207636344
       w_ratio: 1.0
-      h_ratio: 1.0
+      h_ratio: 0.9214251493308252
+  桌面布局:
+    canvas:
+      x_ratio: 0.0
+      y_ratio: 0.02779822622677561
+      w_ratio: 1.0
+      h_ratio: 0.9722017737732244

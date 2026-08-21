@@ -64,15 +64,11 @@ regions:
 panels:
 - key: shangpin_1
   name: 商品列表1
-  cols: 4
-  rows: 2
   min_visible: 0.95
   view: shangdian
   calibration: even
 - key: shangpin_2
   name: 商品列表2
-  cols: 4
-  rows: 2
   min_visible: 0.95
   view: shangdian
   calibration: even

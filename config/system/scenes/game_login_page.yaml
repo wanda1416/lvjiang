@@ -102,15 +102,11 @@ points:
 panels:
 - key: role_list
   name: 角色列表
-  cols: 1
-  rows: 4
   min_visible: 0.95
   view: roles
   calibration: even
 - key: user_list
   name: 用户列表
-  cols: 1
-  rows: 3
   min_visible: 0.95
   view: users
   calibration: even

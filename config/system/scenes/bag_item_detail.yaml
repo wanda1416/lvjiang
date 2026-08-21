@@ -86,6 +86,4 @@ regions:
 panels:
 - key: bag_grid
   name: 背包
-  cols: 6
-  rows: 5
   min_visible: 0.85

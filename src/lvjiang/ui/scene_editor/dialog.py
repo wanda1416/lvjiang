@@ -432,7 +432,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                     panels = dst_tab.get_panels()
                     for p in panels:
                         if p.key == key:
-                            p.cols, p.rows = pdef.cols, pdef.rows
+                            # rows/cols 属于布局级配置，不从 PanelDef 同步
                             p.min_visible = pdef.min_visible
                     dst_tab.set_panels(panels)
             dst_tab._refresh_lists()

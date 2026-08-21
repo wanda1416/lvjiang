@@ -66,7 +66,10 @@ class PointDef:
 class PanelDef:
     """单个 panel 的类型定义（声明式网格容器）
 
-    描述「场景里存在这样一个网格区域」的类型信息（key/name/行列数）。
+    描述「场景里存在这样一个网格区域」的类型信息（key/name）。
+    行列数（rows/cols）属于布局级配置，保存在布局 JSON 的 Panel 中，
+    不同设备/分辨率可有不同行列数。
+
     具体的格子坐标由引擎运行时通过图像自对齐（方差分析 + 黑边检测）计算，
     并缓存在 WorkflowEngine._panel_alignments 中。
     span（间距）由对齐算法自动检测，无需手动指定。
@@ -81,12 +84,9 @@ class PanelDef:
     - "horizontal"：横向滚动，cols 允许 expected-1
     - "both"：双向滚动，rows/cols 都允许 expected-1
     - "none"：固定网格，rows/cols 必须精确匹配
-    约束：rows=1 时禁止 vertical/both，cols=1 时禁止 horizontal/both
     """
     key: str
     name: str
-    cols: int = 6                   # 列数
-    rows: int = 3                   # 行数
     min_visible: float = 0.95       # 行计入有效的最小可见比例（0.5-1.0）
     view: str = ""                  # 归属视图 key，空 = 基底视图
     calibration: str = "auto"       # "auto" | "even" | "image"

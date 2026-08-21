@@ -55,21 +55,19 @@ class PanelEditorMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._panel_table = QTableWidget()
-        self._panel_table.setColumnCount(7)
+        self._panel_table.setColumnCount(5)
         self._panel_table.setHorizontalHeaderLabels(
-            [tr("名称"), "Key", tr("行数"), tr("列数"), tr("比例"), tr("校准模式"), tr("滚动方向")]
+            [tr("名称"), "Key", tr("比例"), tr("校准模式"), tr("滚动方向")]
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        for col in (2, 3, 4, 5, 6):
+        for col in (2, 3, 4):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 40)   # 行数
-        header.resizeSection(3, 40)   # 列数
-        header.resizeSection(4, 40)   # 行可见比例
-        header.resizeSection(5, 60)   # 校准模式
-        header.resizeSection(6, 60)   # 滚动方向
+        header.resizeSection(2, 40)   # 行可见比例
+        header.resizeSection(3, 60)   # 校准模式
+        header.resizeSection(4, 60)   # 滚动方向
         self._panel_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
@@ -139,26 +137,18 @@ class PanelEditorMixin:
             if panel_def.key not in bound_keys:
                 key_item.setForeground(Qt.GlobalColor.gray)
             self._panel_table.setItem(row, 1, key_item)
-            # 行数
-            rows_item = QTableWidgetItem(str(panel_def.rows))
-            rows_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 2, rows_item)
-            # 列数
-            cols_item = QTableWidgetItem(str(panel_def.cols))
-            cols_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 3, cols_item)
             # 行最小可见比例
             vis_item = QTableWidgetItem(f"{panel_def.min_visible:.2f}")
             vis_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 4, vis_item)
+            self._panel_table.setItem(row, 2, vis_item)
             # 校准模式
             cal_item = QTableWidgetItem(self._CALIBRATION_LABELS.get(panel_def.calibration, panel_def.calibration))
             cal_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 5, cal_item)
+            self._panel_table.setItem(row, 3, cal_item)
             # 滚动方向
             sd_item = QTableWidgetItem(self._SCROLL_LABELS.get(panel_def.scroll_direction, panel_def.scroll_direction))
             sd_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 6, sd_item)
+            self._panel_table.setItem(row, 4, sd_item)
         self._panel_table.blockSignals(False)
 
     # ─── 事件处理 ────────────────────────────────────────
@@ -174,6 +164,13 @@ class PanelEditorMixin:
             return
         self._canvas.select_panel_by_key(key_item.text())
 
+    def _find_bound_panel(self, panel_key: str):
+        """查找已绑定的 Panel（布局级）"""
+        for p in self._canvas.get_panels():
+            if p.key == panel_key:
+                return p
+        return None
+
     def _on_edit_panel_from_table(self, row, col):
         """双击表格行编辑面板属性（场景变更时跨场景迁移）"""
         registry = get_registry()
@@ -187,7 +184,7 @@ class PanelEditorMixin:
         result = self._show_panel_edit_dialog(old_def)
         if result is None:
             return
-        new_def, target_scene = result
+        new_def, target_scene, new_rows, new_cols = result
         old_key = old_def.key
         new_key = new_def.key
         key_changed = new_key != old_key
@@ -206,6 +203,13 @@ class PanelEditorMixin:
             sync_scene_cache(target_scene)
             if self.on_item_migrated:
                 self.on_item_migrated("panel", new_key, self._scene_key, target_scene)
+            # 更新已绑定 Panel 的 rows/cols（布局级配置）
+            panels = self._canvas.get_panels()
+            for p in panels:
+                if p.key == old_key:
+                    p.key = new_key
+                    p.rows, p.cols = new_rows, new_cols
+            self._canvas.set_panels(panels)
             self._refresh_lists()
             return
 
@@ -216,27 +220,26 @@ class PanelEditorMixin:
                 rename_item_key_across_all_layouts(self._scene_key, "panel", old_key, new_key)
                 # 更新其他属性
                 registry.update_panel_in_scene(self._scene_key, new_key, new_def)
-                # 同步画布数据中的 key
+                # 同步画布数据中的 key 和布局级配置
                 panels = self._canvas.get_panels()
                 for p in panels:
                     if p.key == old_key:
                         p.key = new_key
-                        # 同步网格参数
-                        p.cols, p.rows = new_def.cols, new_def.rows
+                        p.rows, p.cols = new_rows, new_cols
                         p.min_visible = new_def.min_visible
                         p.calibration = new_def.calibration
                         p.scroll_direction = new_def.scroll_direction
                 self._canvas.set_panels(panels)
                 self._canvas._notify_panel_changed()
             else:
-                # key 不变：只更新其他属性
+                # key 不变：更新其他属性 + 布局级 rows/cols
                 registry.update_panel_in_scene(self._scene_key, old_key, new_def)
-                # 同步网格参数到已绑定的布局 Panel
+                # 同步到已绑定的布局 Panel
                 panels = self._canvas.get_panels()
                 changed = False
                 for p in panels:
                     if p.key == old_key:
-                        p.cols, p.rows = new_def.cols, new_def.rows
+                        p.rows, p.cols = new_rows, new_cols
                         p.min_visible = new_def.min_visible
                         p.calibration = new_def.calibration
                         p.scroll_direction = new_def.scroll_direction
@@ -344,10 +347,11 @@ class PanelEditorMixin:
 
     def _show_panel_edit_dialog(
         self, panel_def: PanelDef | None
-    ) -> tuple[PanelDef, str] | None:
-        """弹窗编辑面板属性，返回 (新 PanelDef, 目标场景 key) 或 None（取消）
+    ) -> tuple[PanelDef, str, int, int] | None:
+        """弹窗编辑面板属性，返回 (新 PanelDef, 目标场景 key, rows, cols) 或 None（取消）
 
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
+        rows/cols 属于布局级配置，从已绑定的 Panel 读取，保存时写回布局。
         """
         dialog = QDialog(self)  # type: ignore[arg-type]
         dialog.setWindowTitle(tr("新建面板") if panel_def is None else tr("编辑面板"))
@@ -366,14 +370,20 @@ class PanelEditorMixin:
             name_edit.setText(panel_def.name)
         form.addRow(tr("名称:"), name_edit)
 
+        # 行数和列数（布局级配置，从已绑定的 Panel 读取）
         cols_spin = QSpinBox()
         cols_spin.setRange(1, 20)
-        cols_spin.setValue(panel_def.cols if panel_def else 6)
-        form.addRow(tr("列数:"), cols_spin)
-
         rows_spin = QSpinBox()
         rows_spin.setRange(1, 20)
-        rows_spin.setValue(panel_def.rows if panel_def else 3)
+        # 尝试从已绑定的 Panel 读取 rows/cols
+        bound_panel = self._find_bound_panel(panel_def.key) if panel_def else None
+        if bound_panel:
+            cols_spin.setValue(bound_panel.cols)
+            rows_spin.setValue(bound_panel.rows)
+        else:
+            cols_spin.setValue(6)
+            rows_spin.setValue(3)
+        form.addRow(tr("列数:"), cols_spin)
         form.addRow(tr("行数:"), rows_spin)
 
         vis_spin = QDoubleSpinBox()
@@ -423,29 +433,6 @@ class PanelEditorMixin:
                 scroll_combo.setCurrentIndex(idx)
         form.addRow(tr("滚动方向:"), scroll_combo)
 
-        # 实时校验 scroll_direction 与 rows/cols 的约束
-        scroll_error_label = QLabel()
-        scroll_error_label.setStyleSheet("color: #c62828;")
-        scroll_error_label.hide()
-        form.addRow("", scroll_error_label)
-
-        def _validate_scroll():
-            rows = rows_spin.value()
-            cols = cols_spin.value()
-            direction = scroll_combo.currentData()
-            if rows == 1 and direction in ("vertical", "both"):
-                scroll_error_label.setText(tr("rows=1 时滚动方向不能为纵向"))
-                scroll_error_label.show()
-                return False
-            if cols == 1 and direction in ("horizontal", "both"):
-                scroll_error_label.setText(tr("cols=1 时滚动方向不能为横向"))
-                scroll_error_label.show()
-                return False
-            scroll_error_label.hide()
-            return True
-
-        _validate_scroll()  # 初始校验
-
         # 仅编辑模式可选择归属场景（跨场景迁移）
         scene_combo = None
         if panel_def is not None:
@@ -482,18 +469,11 @@ class PanelEditorMixin:
             # 检查 key 是否被占用（新建时检查全部，编辑时排除自身）
             if k in existing and k != old_key:
                 ok_btn.setEnabled(False)
-                scroll_error_label.hide()  # 清除残留的滚动错误提示
                 return
-            ok_btn.setEnabled(
-                bool(k and name_edit.text().strip())
-                and _validate_scroll()
-            )
+            ok_btn.setEnabled(bool(k and name_edit.text().strip()))
 
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
-        rows_spin.valueChanged.connect(_validate)
-        cols_spin.valueChanged.connect(_validate)
-        scroll_combo.currentTextChanged.connect(_validate)
         _validate()
 
         buttons.accepted.connect(dialog.accept)
@@ -508,10 +488,8 @@ class PanelEditorMixin:
         return PanelDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
-            cols=cols_spin.value(),
-            rows=rows_spin.value(),
             min_visible=round(vis_spin.value(), 2),
             view=combo_view_value(view_combo, self._current_view),
             calibration=calibration_combo.currentData(),
             scroll_direction=scroll_combo.currentData(),
-        ), target_scene
+        ), target_scene, rows_spin.value(), cols_spin.value()

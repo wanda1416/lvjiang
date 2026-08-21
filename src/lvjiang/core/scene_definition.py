@@ -160,8 +160,6 @@ class SceneRegistry:
             panels.append(PanelDef(
                 key=pd["key"],
                 name=pd.get("name", pd["key"]),
-                cols=int(pd.get("cols", 6)),
-                rows=int(pd.get("rows", 3)),
                 min_visible=float(pd.get("min_visible", 0.95)),
                 view=_view_of(pd),
                 calibration=str(pd.get("calibration", "auto")),
@@ -712,8 +710,6 @@ class SceneRegistry:
                 {
                     "key": p.key,
                     "name": p.name,
-                    "cols": p.cols,
-                    "rows": p.rows,
                     "min_visible": p.min_visible,
                     **({"view": p.view} if p.view else {}),
                     **({"calibration": p.calibration} if p.calibration != "auto" else {}),

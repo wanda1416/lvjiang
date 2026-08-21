@@ -88,10 +88,10 @@ def nav_main_to_equip()
         click [bag_equip_detail].[peiyang] after wait @page_refresh
     end
 
-    # 校验是否在装备列表：recycle 含"回收" 且 sub_equip 含"装备"
+    # 校验是否在装备列表：recycle 含"回收" 或 sub_equip 含"装备"，任一成功即可
     scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
     scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
-    if not $recycle_check or not $equip_check
+    if not $recycle_check and not $equip_check
         # 不在装备列表子 tab，点击 sub_equip 切换
         log info "从培养页切换到装备列表"
         click [bag_equip_detail].[sub_equip] after wait @page_refresh
@@ -100,7 +100,7 @@ def nav_main_to_equip()
     # 最终校验
     scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
     scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
-    if not $recycle_check or not $equip_check
+    if not $recycle_check and not $equip_check
         eval pause("未进入装备列表，请手动导航后点击继续")
     end
     log info "已到达装备列表页"

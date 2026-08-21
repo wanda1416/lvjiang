@@ -1,11 +1,13 @@
 layouts:
   默认布局:
+    desc: 用于安卓设备，适配横屏宽高比 20:9 无边框场景
     canvas:
       x_ratio: 0.0
       y_ratio: 0.0
       w_ratio: 1.0
       h_ratio: 1.0
   继承布局:
+    desc: 用于模拟器等存在边框的场景，需要对画布先裁剪
     extends: 默认布局
     canvas:
       x_ratio: 0.0
@@ -13,6 +15,7 @@ layouts:
       w_ratio: 1.0
       h_ratio: 0.9214251493308252
   桌面布局:
+    desc: 用于 PC 端游，建议窗口模式，分辨率 1920*1080
     canvas:
       x_ratio: 0.0
       y_ratio: 0.02779822622677561

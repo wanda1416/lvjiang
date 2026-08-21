@@ -392,8 +392,8 @@ def _enumerate_scene_files(name: str) -> list[str]:
     return alive
 
 
-def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str] | None:
-    """解析布局条目，返回 (canvas_dict, scene 目录所属布局名)
+def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str, str] | None:
+    """解析布局条目，返回 (canvas_dict, scene 目录所属布局名, desc)
 
     支持别名布局：条目带 extends 时，scene 文件目录指向根布局。
     严格约束：extends 只能指向根布局（目标自身不得再带 extends）。
@@ -403,15 +403,16 @@ def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str] | No
     """
     entry = layouts_doc.get(name) or {}
     extends = entry.get("extends")
+    desc = entry.get("desc", "")
     if not extends:
-        return entry.get("canvas", {}), name
+        return entry.get("canvas", {}), name, desc
     if extends not in layouts_doc:
         logger.error(f"布局 [{name}] 的 extends 目标不存在: {extends}")
         return None
     if (layouts_doc.get(extends) or {}).get("extends"):
         logger.error(f"布局 [{name}] 的 extends 只能指向根布局，禁止多级继承: {extends}")
         return None
-    return entry.get("canvas", {}), extends
+    return entry.get("canvas", {}), extends, desc
 
 
 def load_layout_by_name(name: str) -> Layout | None:
@@ -429,7 +430,7 @@ def load_layout_by_name(name: str) -> Layout | None:
     resolved = _resolve_layout_entry(layouts_doc, name)
     if resolved is None:
         return None
-    canvas_dict, scene_dir_name = resolved
+    canvas_dict, scene_dir_name, desc = resolved
 
     if name not in layouts_doc:
         # 回退：目录存在但 yaml 未登记（兼容迁移中间态）
@@ -467,7 +468,7 @@ def load_layout_by_name(name: str) -> Layout | None:
         if "panels" in data:
             panels[scene_key] = [Panel.from_dict(p) for p in data["panels"]]
 
-    return Layout(name=name, canvas=canvas, scenes=scenes,
+    return Layout(name=name, desc=desc, canvas=canvas, scenes=scenes,
                   points=points, arrows=arrows, panels=panels)
 
 
@@ -614,13 +615,18 @@ class LayoutConfigManager:
         if resolved is None:
             logger.error(f"布局 [{layout.name}] 的 extends 条目非法，拒绝保存")
             return False
-        _, scene_dir_name = resolved
+        _, scene_dir_name, _ = resolved
 
         # 2. 更新 layouts.yaml 中的条目（别名布局保留 extends）
         existing = layouts_doc.get(layout.name) or {}
         entry_out: dict = {}
         if existing.get("extends"):
             entry_out["extends"] = existing["extends"]
+        # 保留 desc 字段（如果有）
+        if layout.desc:
+            entry_out["desc"] = layout.desc
+        elif existing.get("desc"):
+            entry_out["desc"] = existing["desc"]
         entry_out["canvas"] = layout.canvas.to_dict()
         layouts_doc[layout.name] = entry_out
         resolver.save_merged(_LAYOUTS_YAML_REL, merged)

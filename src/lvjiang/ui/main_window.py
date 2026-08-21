@@ -459,6 +459,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.layout_combo.setMinimumWidth(150)
         self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
         top_row.addWidget(self.layout_combo)
+        # 布局描述标签（显示布局的 desc 字段）
+        self.layout_desc_label = QLabel()
+        self.layout_desc_label.setStyleSheet("color: #666;")
+        top_row.addWidget(self.layout_desc_label)
         top_row.addStretch()
         main_layout.addLayout(top_row)
 

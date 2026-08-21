@@ -2,6 +2,7 @@
 
 from loguru import logger
 
+from ...core.config.session import load_env
 from ...core.platforms import native_confirm, native_notify, native_pause
 from ...i18n import tr
 from ._registry import builtin_func
@@ -141,3 +142,34 @@ def _panel_cols(_engine, scene_key: str = "", panel_key: str = "") -> int:
     """
     cal = _engine._panel_alignments.get((scene_key, panel_key))
     return cal.n_cols if cal else 0
+
+
+# ─── 工作环境查询 ─────────────────────────────────────────
+
+@builtin_func("env")
+def _env(name: str | None = None) -> str | bool:
+    """查询当前工作环境
+
+    - env()       → 返回环境名称（"desktop" / "android"）
+    - env("xxx")  → 返回 bool，判断当前环境是否匹配
+
+    环境配置持久化在 session.json 的 settings.env 节点，
+    通过 UI 下拉框切换。用于工作流中区分 PC 游戏与手游导航策略：
+
+    .wf 用法:
+        # 获取环境名称
+        eval $current_env = env()
+
+        # 条件判断
+        if env("desktop")
+            send_key esc
+        end
+
+        if env("android")
+            click [main_page].[menu_button]
+        end
+    """
+    current = load_env()
+    if name is None:
+        return current
+    return current == str(name)

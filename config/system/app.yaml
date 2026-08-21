@@ -1,3 +1,9 @@
+# 可用工作环境（DSL 通过 env() 查询，UI 下拉框展示）
+envs:
+  - key: android
+    name: 安卓
+  - key: desktop
+    name: 桌面
 input_simulation:
   before_click_wait:
   - 0.1

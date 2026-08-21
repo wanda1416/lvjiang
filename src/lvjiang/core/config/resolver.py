@@ -300,9 +300,27 @@ def load_app_config() -> dict:
         return {}
 
 
-def save_app_config(input_sim: dict, delay_params: dict) -> None:
-    """保存输入模拟 + 延迟参数到 app.yaml（开发模式写 system 全量，用户模式写 local diff）"""
-    get_resolver().save_merged(_APP_CONFIG_REL, {
+def save_app_config(input_sim: dict, delay_params: dict, envs: list | None = None) -> None:
+    """保存输入模拟 + 延迟参数 + 环境列表到 app.yaml（开发模式写 system 全量，用户模式写 local diff）"""
+    data = {
         "input_simulation": input_sim,
         "delay_params": delay_params,
-    })
+    }
+    if envs is not None:
+        data["envs"] = envs
+    get_resolver().save_merged(_APP_CONFIG_REL, data)
+
+
+def load_available_envs() -> list[tuple[str, str]]:
+    """从 app.yaml 读取可用环境列表，返回 [(key, display_name), ...]"""
+    app = load_app_config()
+    envs = app.get("envs", [])
+    if not isinstance(envs, list):
+        return [("desktop", "桌面")]
+    result = []
+    for item in envs:
+        if isinstance(item, dict) and "key" in item:
+            key = item["key"]
+            name = item.get("name", key)
+            result.append((key, name))
+    return result or [("desktop", "桌面")]

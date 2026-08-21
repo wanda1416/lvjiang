@@ -343,6 +343,7 @@ catch_clause: "catch"i var_ref? _NL (_NL | statement)*
           | var_ref "contains"i cond_text -> contains_op
           | var_ref "in"i list_literal -> in_op
           | var_ref "is_empty"i -> is_empty_op
+          | func_call -> func_cond
           | field_access -> var_cond
           | var_ref -> var_cond
 

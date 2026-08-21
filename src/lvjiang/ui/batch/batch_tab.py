@@ -124,7 +124,7 @@ class BatchTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self._btn_run = QPushButton(tr("开始批量执行 (F9)"))
+        self._btn_run = QPushButton(tr("开始执行 (F9)"))
         self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         self._btn_run.clicked.connect(self._on_run_clicked)
         btn_layout.addWidget(self._btn_run)
@@ -135,6 +135,28 @@ class BatchTab(QWidget):
         self._btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
         btn_layout.addWidget(self._btn_pause_resume)
         layout.addLayout(btn_layout)
+
+        # ── 工作环境显示（第二行）──
+        from ...core.config import load_available_envs, load_env, save_env
+        env_layout = QHBoxLayout()
+        env_layout.setContentsMargins(0, 0, 0, 0)
+        env_layout.setSpacing(8)
+        env_label = QLabel(tr("工作环境："))
+        env_label.setStyleSheet("color: #666; font-size: 12px;")
+        env_layout.addWidget(env_label)
+        self._env_combo = QComboBox()
+        for key, display in load_available_envs():
+            self._env_combo.addItem(display, key)
+        current_env = load_env()
+        idx = self._env_combo.findData(current_env)
+        if idx >= 0:
+            self._env_combo.setCurrentIndex(idx)
+        self._env_combo.currentIndexChanged.connect(
+            lambda i: save_env(self._env_combo.itemData(i)))
+        self._env_combo.setStyleSheet("font-size: 12px;")
+        env_layout.addWidget(self._env_combo)
+        env_layout.addStretch()
+        layout.addLayout(env_layout)
 
         # ── 三页子 Tab ──
         self._sub_tabs = QTabWidget()
@@ -525,7 +547,7 @@ class BatchTab(QWidget):
             self._btn_run.setText(tr("未连接"))
             self._btn_run.setStyleSheet(_STYLE_BTN_NOT_READY)
         else:
-            self._btn_run.setText(tr("开始批量执行 (F9)"))
+            self._btn_run.setText(tr("开始执行 (F9)"))
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         # 刷新暂停/恢复按钮
         if state == "running":

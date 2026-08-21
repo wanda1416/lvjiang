@@ -1,6 +1,6 @@
 # DSL 感知指令概览
 
-> 基础指令（collect/eval/call/log）见 [03-2-basic-commands.md](03-2-basic-commands.md)。
+> 基础指令（collect/eval/call/log）见 [03.1-basic-commands.md](03.1-basic-commands.md)。
 
 ## 三条指令的定位
 
@@ -112,6 +112,6 @@ click $target
 
 ## 详细文档
 
-- [04-1-scan.md](04-1-scan.md) — scan 完整语法、返回值、修饰子句
-- [04-2-recognize.md](04-2-recognize.md) — recognize 完整语法、返回值、rich/with
-- [04-3-find.md](04-3-find.md) — find 完整语法、FoundRegion、搜索区域
+- [04.1-scan.md](04.1-scan.md) — scan 完整语法、返回值、修饰子句
+- [04.2-recognize.md](04.2-recognize.md) — recognize 完整语法、返回值、rich/with
+- [04.3-find.md](04.3-find.md) — find 完整语法、FoundRegion、搜索区域

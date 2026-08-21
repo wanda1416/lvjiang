@@ -6,9 +6,9 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 | 文件 | 内容 |
 |------|------|
-| [06-1-basic-functions.md](06-1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
-| [06-2-system-interaction.md](06-2-system-interaction.md) | 系统与交互函数：用户交互（confirm/pause/notify/input）、系统函数（save/panel）、玩家档案（profile） |
-| [06-3-game-functions.md](06-3-game-functions.md) | 游戏相关函数：装备处理、背包遍历、玩家档案、综合示例 |
+| [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
+| [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数：用户交互（confirm/pause/notify/input）、系统函数（save/panel）、玩家档案（profile） |
+| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历、玩家档案、综合示例 |
 
 ---
 

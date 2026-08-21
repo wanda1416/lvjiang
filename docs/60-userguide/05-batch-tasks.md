@@ -234,4 +234,4 @@ config/session/output/{角色名}/{script_id}_{时间戳}.json
 
 ---
 
-上一步：[← 调律配置](04-06-running-tuning.md) | 下一步：[6. 常见问题 →](06-faq.md)
+上一步：[← 调律配置](04.06-running-tuning.md) | 下一步：[6. 常见问题 →](06-faq.md)

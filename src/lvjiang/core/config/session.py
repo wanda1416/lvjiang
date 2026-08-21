@@ -286,6 +286,26 @@ def save_equip_filter(filters: dict[str, str]) -> None:
     get_session_store().set_node("settings", existing)
 
 
+# ─── 便捷函数：env 工作环境 ──────────────────────────────────
+
+_DEFAULT_ENV = "desktop"
+
+
+def load_env() -> str:
+    """读取当前工作环境（session.json 的 settings.env 节点，默认 desktop）"""
+    value = load_settings().get("env")
+    if isinstance(value, str) and value:
+        return value
+    return _DEFAULT_ENV
+
+
+def save_env(env: str) -> None:
+    """保存工作环境到 session.json 的 settings.env 节点"""
+    existing = load_settings()
+    existing["env"] = env
+    get_session_store().set_node("settings", existing)
+
+
 # ─── 便捷函数：alert_info 告警存储 ────────────────────────────
 
 

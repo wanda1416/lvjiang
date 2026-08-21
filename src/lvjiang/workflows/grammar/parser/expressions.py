@@ -478,6 +478,10 @@ class _ExprMixin:
         """条件中的 $var → VarRef（truthy 检查）"""
         return items[0]
 
+    def func_cond(self, items):
+        """条件中的 func_call → FuncCall（truthy 检查）"""
+        return items[0]
+
     def field_base(self, items):
         """$var.field → FieldAccess(root=VarRef, field_name)"""
         var_ref, field_name = items

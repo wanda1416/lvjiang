@@ -105,6 +105,10 @@ class _EvalMixin:
                 # 条件中的 $var.field / $var.[key] → truthy 检查
                 val = self._eval_field_raw(node)
                 return bool(val)
+            case FuncCall():
+                # 条件中的 func_call → 调用函数并做 truthy 检查
+                val = self._call_func(node)
+                return bool(val)
             case _:
                 logger.error(f"未知条件节点: {type(node).__name__}")
                 return False

@@ -1,7 +1,8 @@
 """配置管理对话框（多 Tab）
 
-Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）。
-Tab1 写 session.json（settings 节点）；Tab2/Tab3 写 app.yaml（input_simulation / delay_params，
+Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）、
+Tab4 系统参数（可用工作环境）。
+Tab1 写 session.json（settings 节点）；Tab2/Tab3/Tab4 写 app.yaml（input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。
 """
 
@@ -26,7 +27,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.config import load_user_config, save_app_config, save_settings
+from ..core.config import load_available_envs, load_user_config, save_app_config, save_settings
 from ..i18n import tr
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
@@ -67,6 +68,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_basic_tab(), tr("基础配置"))
         tabs.addTab(self._build_input_tab(), tr("输入模拟"))
         tabs.addTab(self._build_wait_tab(), tr("等待参数"))
+        tabs.addTab(self._build_env_tab(), tr("系统参数"))
         layout.addWidget(tabs)
 
         # ── 底部按钮：保存（左）与关闭（右）隔开，语义不同 ──
@@ -208,6 +210,82 @@ class SettingsDialog(QDialog):
         vbox.addStretch()
         return tab
 
+    # ─── Tab4 系统参数（可用工作环境）────────────────────
+
+    def _build_env_tab(self) -> QWidget:
+        """系统参数 Tab：可用工作环境列表"""
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+
+        caption = QLabel(tr("工作环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。"))
+        caption.setWordWrap(True)
+        vbox.addWidget(caption)
+
+        # 表头
+        self._env_grid = QGridLayout()
+        self._env_grid.setColumnStretch(0, 2)
+        self._env_grid.setColumnStretch(1, 3)
+        self._env_grid.addWidget(QLabel(tr("环境 key")), 0, 0)
+        self._env_grid.addWidget(QLabel(tr("显示名称")), 0, 1)
+        vbox.addLayout(self._env_grid)
+
+        # 加载当前环境列表
+        self._env_rows: list[dict] = []
+        for key, name in load_available_envs():
+            self._add_env_row(key, name, saved=True)
+
+        add_row = QHBoxLayout()
+        add_btn = QPushButton(tr("添加环境"))
+        add_btn.clicked.connect(self._on_add_env_row)
+        add_row.addWidget(add_btn)
+        add_row.addStretch()
+        vbox.addLayout(add_row)
+
+        vbox.addStretch()
+        return tab
+
+    def _on_add_env_row(self):
+        """用户点击添加环境"""
+        entry = self._add_env_row()
+        self._connect_env_row_dirty(entry)
+        self._mark_dirty()
+
+    def _add_env_row(self, key: str = "", name: str = "", saved: bool = False) -> dict:
+        """向共享网格追加一行环境配置"""
+        key_edit = QLineEdit(key)
+        key_edit.setPlaceholderText(tr("如 ios"))
+        key_edit.setMinimumWidth(100)
+
+        name_edit = QLineEdit(name)
+        name_edit.setPlaceholderText(tr("显示名称"))
+        name_edit.setMinimumWidth(100)
+
+        entry = {"key": key_edit, "name": name_edit, "saved": saved}
+        del_btn = QPushButton(tr("删除"))
+        del_btn.clicked.connect(lambda: self._remove_env_row(entry))
+
+        widgets = [key_edit, name_edit, del_btn]
+        entry["widgets"] = widgets
+        grid_row = self._env_grid.rowCount()
+        for col, widget in enumerate(widgets):
+            self._env_grid.addWidget(widget, grid_row, col)
+
+        self._env_rows.append(entry)
+        return entry
+
+    def _connect_env_row_dirty(self, entry: dict):
+        """连接环境行的变更信号"""
+        entry["key"].textChanged.connect(self._mark_dirty)
+        entry["name"].textChanged.connect(self._mark_dirty)
+
+    def _remove_env_row(self, entry: dict):
+        """删除一行环境配置"""
+        self._env_rows.remove(entry)
+        for widget in entry["widgets"]:
+            self._env_grid.removeWidget(widget)
+            widget.deleteLater()
+        self._mark_dirty()
+
     # ─── 通用控件 ──────────────────────────────────────────
 
     @staticmethod
@@ -340,6 +418,23 @@ class SettingsDialog(QDialog):
             }
         return custom
 
+    def _collect_envs(self) -> list[dict]:
+        """收集环境配置，返回 [{key, name}, ...]"""
+        envs = []
+        seen_keys = set()
+        for entry in self._env_rows:
+            key = entry["key"].text().strip()
+            if not key:
+                continue
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            envs.append({
+                "key": key,
+                "name": entry["name"].text().strip() or key,
+            })
+        return envs
+
     def _on_save(self):
         delay_params = self._collect_custom()
         if delay_params is None:
@@ -363,8 +458,11 @@ class SettingsDialog(QDialog):
             input_sim[name] = [round(lo, 2), round(hi, 2)]
         input_sim["click_random_offset"] = self._offset_spin.value()
         input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
-        save_app_config(input_sim, delay_params)
+        envs = self._collect_envs()
+        save_app_config(input_sim, delay_params, envs)
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改
         for entry in self._custom_rows:
+            entry["saved"] = bool(entry["key"].text().strip())
+        for entry in self._env_rows:
             entry["saved"] = bool(entry["key"].text().strip())
         self._save_btn.setEnabled(False)

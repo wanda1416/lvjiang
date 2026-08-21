@@ -1,0 +1,172 @@
+{
+  "regions": [
+    {
+      "key": "confirm",
+      "x_ratio": 0.7533714925071586,
+      "y_ratio": 0.6428499344030678,
+      "w_ratio": 0.19020436200918678,
+      "h_ratio": 0.08678978706226659
+    },
+    {
+      "key": "cancel",
+      "x_ratio": 0.05267938237965486,
+      "y_ratio": 0.6398223836915934,
+      "w_ratio": 0.10717529518619437,
+      "h_ratio": 0.09284488848521555
+    },
+    {
+      "key": "close_item",
+      "x_ratio": 0.752566729186992,
+      "y_ratio": 0.24409822592041572,
+      "w_ratio": 0.029102356558401654,
+      "h_ratio": 0.06035727169596469
+    },
+    {
+      "key": "menu_area",
+      "x_ratio": 0.6504653567735263,
+      "y_ratio": 0.0,
+      "w_ratio": 0.34953464322647365,
+      "h_ratio": 1.0
+    }
+  ],
+  "points": [
+    {
+      "key": "material_slot_1",
+      "cx_ratio": 0.6852116238044493,
+      "cy_ratio": 0.6478990082793364,
+      "r_ratio": 0.006833311851675555
+    },
+    {
+      "key": "material_slot_2",
+      "cx_ratio": 0.6852116238044493,
+      "cy_ratio": 0.7540442425827157,
+      "r_ratio": 0.007336995544476559
+    },
+    {
+      "key": "left_screen_1",
+      "cx_ratio": 0.16649431230610134,
+      "cy_ratio": 0.383775709525451,
+      "r_ratio": 0.06720758118566075
+    },
+    {
+      "key": "left_screen_2",
+      "cx_ratio": 0.16649431230610134,
+      "cy_ratio": 0.7721475353326439,
+      "r_ratio": 0.06720758118566075
+    },
+    {
+      "key": "equip_slot_1",
+      "cx_ratio": 0.732778914965237,
+      "cy_ratio": 0.6478990082793364,
+      "r_ratio": 0.007408985312558208
+    },
+    {
+      "key": "equip_slot_2",
+      "cx_ratio": 0.732778914965237,
+      "cy_ratio": 0.7540442425827157,
+      "r_ratio": 0.007004465442434594
+    },
+    {
+      "key": "menu_point_1",
+      "cx_ratio": 0.784218712040814,
+      "cy_ratio": 0.360811201842869,
+      "r_ratio": 0.015
+    },
+    {
+      "key": "menu_point_2",
+      "cx_ratio": 0.784218712040814,
+      "cy_ratio": 0.8479708878995126,
+      "r_ratio": 0.011584161917979053
+    },
+    {
+      "key": "wuxueji",
+      "cx_ratio": 0.741630406632852,
+      "cy_ratio": 0.7365224975345408,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "teshuji",
+      "cx_ratio": 0.7315789017982278,
+      "cy_ratio": 0.8941931616070767,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "qishu",
+      "cx_ratio": 0.7816276909527518,
+      "cy_ratio": 0.6026559730940398,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "xieshi",
+      "cx_ratio": 0.8469033458787816,
+      "cy_ratio": 0.5331494886820636,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "xuli",
+      "cx_ratio": 0.9142188650212498,
+      "cy_ratio": 0.5014182675374658,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "qingji",
+      "cx_ratio": 0.8450558127728665,
+      "cy_ratio": 0.7452117688916471,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "shanbi",
+      "cx_ratio": 0.8255440680938901,
+      "cy_ratio": 0.9107659661678098,
+      "r_ratio": 0.04994632908086091
+    },
+    {
+      "key": "tiaoyue",
+      "cx_ratio": 0.9207377315276837,
+      "cy_ratio": 0.7097358694753265,
+      "r_ratio": 0.04994632908086091
+    }
+  ],
+  "arrows": [
+    {
+      "key": "material_down",
+      "from_key": "material_slot_1",
+      "to_key": "material_slot_2"
+    },
+    {
+      "key": "material_up",
+      "from_key": "material_slot_2",
+      "to_key": "material_slot_1"
+    },
+    {
+      "key": "page_down",
+      "from_key": "left_screen_1",
+      "to_key": "left_screen_2"
+    },
+    {
+      "key": "page_up",
+      "from_key": "left_screen_2",
+      "to_key": "left_screen_1"
+    },
+    {
+      "key": "equip_down",
+      "from_key": "equip_slot_1",
+      "to_key": "equip_slot_2"
+    },
+    {
+      "key": "equip_up",
+      "from_key": "equip_slot_2",
+      "to_key": "equip_slot_1"
+    },
+    {
+      "key": "menu_down",
+      "from_key": "menu_point_1",
+      "to_key": "menu_point_2"
+    },
+    {
+      "key": "menu_up",
+      "from_key": "menu_point_2",
+      "to_key": "menu_point_1"
+    }
+  ]
+}

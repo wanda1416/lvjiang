@@ -75,13 +75,14 @@ def test_view_mode_persisted_in_ui_state(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(host)
     qtbot.addWidget(panel)
 
-    # 默认无记录时为 sidebar
-    assert panel._view_mode == "sidebar"
+    # 默认无记录时为 half
+    assert panel._view_mode == "half"
 
-    panel._set_view_mode("half")
-    assert load_ui_page_state("loadout_panel")["view_mode"] == "half"
+    panel._set_view_mode("full")
+    assert load_ui_page_state("loadout_panel")["view_mode"] == "full"
 
     # 模拟半屏下拖动分割条 → 记录值即实际展示值
+    panel._set_view_mode("half")
     panel.show()
     panel.resize(1200, 800)
     qtbot.wait(10)

@@ -13,6 +13,7 @@
 #   通过 write_equipped 逐槽写入备战方案（无 collect 输出）
 
 import "subcall/navigation.wf"
+
 call nav_main_to_equip()
 
 # 武器类（equip_weapon_detail）

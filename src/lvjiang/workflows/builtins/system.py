@@ -173,3 +173,49 @@ def _env(name: str | None = None) -> str | bool:
     if name is None:
         return current
     return current == str(name)
+
+
+@builtin_func("is_send")
+def _is_send(_engine=None) -> int:
+    """判断当前是否为 SendInput 模式
+
+    返回值：
+    -  1：窗口模式且为 SendInput 后端
+    -  0：窗口模式但非 SendInput 后端（如 PostMessage）
+    - -1：设备端（ADB）
+
+    .wf 用法:
+        if is_send()
+            log info "当前为 SendInput 模式"
+        end
+    """
+    if _engine is None:
+        return -1
+    from ...core.android.input import AdbInput
+    if isinstance(_engine._input, AdbInput):
+        return -1
+    from ...core.desktop.send_input import SendInputInput
+    return 1 if isinstance(_engine._input, SendInputInput) else 0
+
+
+@builtin_func("is_post")
+def _is_post(_engine=None) -> int:
+    """判断当前是否为 PostMessage 模式
+
+    返回值：
+    -  1：窗口模式且为 PostMessage 后端
+    -  0：窗口模式但非 PostMessage 后端（如 SendInput）
+    - -1：设备端（ADB）
+
+    .wf 用法:
+        if is_post()
+            log info "当前为 PostMessage 模式"
+        end
+    """
+    if _engine is None:
+        return -1
+    from ...core.android.input import AdbInput
+    if isinstance(_engine._input, AdbInput):
+        return -1
+    from ...core.desktop.post_message import PostMessageInput
+    return 1 if isinstance(_engine._input, PostMessageInput) else 0

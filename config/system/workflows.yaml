@@ -1,6 +1,6 @@
 exposed:
-- scan_unequipped
 - scan_equipped
+- scan_unequipped
 - scan_wallet
 - purchase_xinfa
 - purchase_bugan

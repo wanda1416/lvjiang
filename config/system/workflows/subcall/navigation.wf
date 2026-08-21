@@ -71,39 +71,50 @@ def nav_main_to_bag()
 end
 
 # ─── nav_main_to_equip ────────────────────────────────────
-# 从主界面导航到装备培养页面的装备列表
-# 路径：主界面 → 菜单 → 包裹 → 培养 → 装备列表
+# 从主界面导航到装备页面
+# android 路径：主界面 → 菜单 → 包裹 → 培养 → 装备列表
+# desktop 路径：按 B 打开背包 → 培养 → 主武器槽
 # 前置：在主界面或菜单页
-# 后置：在背包装备列表页（recycle + sub_equip 同时可见）
+# 后置：android 在装备列表页；desktop 在主武器装备详情页
 
 def nav_main_to_equip()
-    call $tab = nav_main_to_bag()
-    if $tab < 0
+    if env("android")
+        call $tab = nav_main_to_bag()
+        if $tab < 0
+            return -1
+        end
+
+        # 不在培养 tab 则点击切换
+        if $tab != 1
+            log info "从包裹页切换到培养页"
+            click [bag_equip_detail].[peiyang] after wait @page_refresh
+        end
+
+        # 校验是否在装备列表：recycle 含"回收" 或 sub_equip 含"装备"，任一成功即可
+        scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
+        scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
+        if not $recycle_check and not $equip_check
+            # 不在装备列表子 tab，点击 sub_equip 切换
+            log info "从培养页切换到装备列表"
+            click [bag_equip_detail].[sub_equip] after wait @page_refresh
+        end
+
+        # 最终校验
+        scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
+        scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
+        if not $recycle_check and not $equip_check
+            eval pause("未进入装备列表，请手动导航后点击继续")
+        end
+        log info "已到达装备列表页"
+    else if env("desktop")
+        log info "桌面端：按 B 打开背包"
+        press "B" after wait @step_interval
+        click [bag_equip_detail].[peiyang] after wait @step_interval
+        click [bag_equip_detail].[main_weapon] after wait @step_interval
+    else
+        log error "不支持当前环境"
         return -1
     end
-
-    # 不在培养 tab 则点击切换
-    if $tab != 1
-        log info "从包裹页切换到培养页"
-        click [bag_equip_detail].[peiyang] after wait @page_refresh
-    end
-
-    # 校验是否在装备列表：recycle 含"回收" 或 sub_equip 含"装备"，任一成功即可
-    scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
-    scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
-    if not $recycle_check and not $equip_check
-        # 不在装备列表子 tab，点击 sub_equip 切换
-        log info "从培养页切换到装备列表"
-        click [bag_equip_detail].[sub_equip] after wait @page_refresh
-    end
-
-    # 最终校验
-    scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
-    scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
-    if not $recycle_check and not $equip_check
-        eval pause("未进入装备列表，请手动导航后点击继续")
-    end
-    log info "已到达装备列表页"
 end
 
 # ─── nav_main_to_wallet ───────────────────────────────────
@@ -164,21 +175,31 @@ end
 
 # ─── nav_back_to_main ─────────────────────────────────────
 # 从装备详情弹窗返回主界面
-# 路径：详情弹窗 → 背包页 → 菜单页 → 主界面
+# android 路径：详情弹窗 → 背包页 → 菜单页 → 主界面（逐层点击返回）
+# desktop 路径：连按三次 ESC
 # 前置：在背包页且装备详情弹窗已打开（bag_equip_detail 场景内）
 # 后置：在主界面
-# 注意：详情弹窗是覆盖在背包页上的隐形弹窗，需先关闭再逐层返回
 
 def nav_back_to_main()
-    log info "从装备详情页返回背包页"
-    # 关闭详情弹窗 → 背包页
-    click [bag_equip_detail].[back] after wait @page_refresh
-    log info "从背包页返回菜单页"
-    # 背包页 → 菜单页
-    click [bag_equip_detail].[back] after wait @page_refresh
-    log info "从菜单页返回主页"
-    # 菜单页 → 主界面
-    click [game_menu_page].[back] after wait @page_refresh
+    if env("android")
+        log info "从装备详情页返回背包页"
+        # 关闭详情弹窗 → 背包页
+        click [bag_equip_detail].[back] after wait @page_refresh
+        log info "从背包页返回菜单页"
+        # 背包页 → 菜单页
+        click [bag_equip_detail].[back] after wait @page_refresh
+        log info "从菜单页返回主页"
+        # 菜单页 → 主界面
+        click [game_menu_page].[back] after wait @page_refresh
+    else if env("desktop")
+        log info "桌面端：按 ESC 返回主界面"
+        press "ESC" after wait @step_interval
+        press "ESC" after wait @step_interval
+        press "ESC" after wait @step_interval
+    else
+        log error "不支持当前环境"
+        return -1
+    end
 end
 
 # ─── nav_equip_to_tune ────────────────────────────────────

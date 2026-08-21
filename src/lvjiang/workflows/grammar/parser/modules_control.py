@@ -150,9 +150,38 @@ class _ModuleControlMixin:
         return If(condition=condition, then_body=then_body, else_body=else_body, line_no=self._line(items))
 
     def else_clause(self, items):
-        """返回标记元组，便于 if_stmt 区分 then/else"""
-        body = [i for i in items if i is not None]
+        """返回标记元组，便于 if_stmt 区分 then/else
+
+        支持两种形式：
+        - else + 语句块 → ("else", [stmt1, stmt2, ...])
+        - else if（elif_clause）→ ("else", [If(...)])
+        """
+        body = [i for i in items if i is not None and not isinstance(i, Token)]
         return ("else", body)
+
+    def elif_clause(self, items):
+        """else if 子句 → 构造嵌套 If 节点，包装为 else body
+
+        items: condition, [body_stmts...], [else_clause]
+        返回 ("else", [If(...)]) 供 if_stmt 使用
+        """
+        condition = items[0]
+        then_body = []
+        else_body = []
+        in_else = False
+        for item in items[1:]:
+            if isinstance(item, tuple) and len(item) == 2 and item[0] == "else":
+                in_else = True
+                else_body = item[1]
+            elif item is not None and not isinstance(item, Token):
+                if in_else:
+                    else_body.append(item)
+                else:
+                    then_body.append(item)
+        then_body = self._flatten_body(then_body)
+        else_body = self._flatten_body(else_body)
+        nested_if = If(condition=condition, then_body=then_body, else_body=else_body, line_no=self._line(items))
+        return ("else", [nested_if])
 
     def for_stmt(self, items):
         var_name = str(items[0])

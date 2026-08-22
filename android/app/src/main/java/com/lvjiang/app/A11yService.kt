@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
  *
  * 本服务不监听任何界面事件，只把系统赋予无障碍服务的两项能力借出来：
  *   - takeScreenshot()  整屏截图（Android 11+）
- *   - dispatchGesture() 手势注入（点击/滑动）
+ *   - dispatchGesture() 手势注入（点击/滑动/推住不放）
+ *   - performGlobalAction() 系统 BACK/HOME
  * 因此 accessibilityEventTypes 配成 none，不产生任何事件回调开销。
  */
 class A11yService : AccessibilityService() {
@@ -215,6 +216,85 @@ object A11yBridge {
 
         // 等回调而不是立即返回：上层脚本紧接着就要截图看结果，手势没落地就截等于白截。
         // 超时给足 stroke 时长 + 3s 余量。
+        if (!latch.await(durationMs + 3000, TimeUnit.MILLISECONDS)) {
+            Log.w(TAG, "等待手势回调超时")
+            return false
+        }
+        return completed
+    }
+
+    /**
+     * 推到位后按住：移动 stroke（willContinue）+ 同一指针的 dwell stroke（continueStroke）。
+     *
+     * 为什么不是一条长 stroke：单 stroke 的 duration 是沿整条 path 的总时长，手指会在
+     * durationMs 内**匀速滑完全程**，推摇杆时就成了"慢慢推"而不是"推到位停住"；
+     * continueStroke 的 dwell 段 path 只有 1px，时长却是 holdMs，这才是按住不动。
+     * 两段各等回调，总耗时 ≈ moveMs + holdMs。
+     */
+    fun holdMove(x1: Int, y1: Int, x2: Int, y2: Int, moveMs: Long, holdMs: Long): Boolean {
+        val service = A11yService.instance ?: run {
+            Log.w(TAG, "手势失败：无障碍服务未连接")
+            return false
+        }
+        val movePath = Path().apply {
+            moveTo(x1.toFloat(), y1.toFloat())
+            lineTo(x2.toFloat(), y2.toFloat())
+        }
+        val moveStroke = android.accessibilityservice.GestureDescription.StrokeDescription(
+            movePath, 0, moveMs.coerceAtLeast(1), holdMs > 0,
+        )
+        if (!dispatchAndWait(service, moveStroke, moveMs)) return false
+        if (holdMs <= 0) return true
+        val dwellPath = Path().apply {
+            moveTo(x2.toFloat(), y2.toFloat())
+            lineTo(x2 + 1f, y2.toFloat())
+        }
+        val dwellStroke = moveStroke.continueStroke(dwellPath, 0, holdMs, false)
+        return dispatchAndWait(service, dwellStroke, holdMs)
+    }
+
+    /** 系统全局动作：BACK / HOME（对应 Python 侧 press "ESC" / press "HOME"） */
+    fun globalBack(): Boolean = globalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+
+    fun globalHome(): Boolean = globalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+
+    private fun globalAction(action: Int): Boolean {
+        val service = A11yService.instance ?: run {
+            Log.w(TAG, "全局动作失败：无障碍服务未连接")
+            return false
+        }
+        return service.performGlobalAction(action)
+    }
+
+    private fun dispatchAndWait(
+        service: AccessibilityService,
+        stroke: android.accessibilityservice.GestureDescription.StrokeDescription,
+        durationMs: Long,
+    ): Boolean {
+        val gesture = android.accessibilityservice.GestureDescription.Builder()
+            .addStroke(stroke)
+            .build()
+        val latch = CountDownLatch(1)
+        var completed = false
+        val ok = service.dispatchGesture(
+            gesture,
+            object : AccessibilityService.GestureResultCallback() {
+                override fun onCompleted(description: android.accessibilityservice.GestureDescription?) {
+                    completed = true
+                    latch.countDown()
+                }
+
+                override fun onCancelled(description: android.accessibilityservice.GestureDescription?) {
+                    Log.w(TAG, "手势被取消")
+                    latch.countDown()
+                }
+            },
+            null,
+        )
+        if (!ok) {
+            Log.w(TAG, "dispatchGesture 返回 false（服务未就绪或手势非法）")
+            return false
+        }
         if (!latch.await(durationMs + 3000, TimeUnit.MILLISECONDS)) {
             Log.w(TAG, "等待手势回调超时")
             return false

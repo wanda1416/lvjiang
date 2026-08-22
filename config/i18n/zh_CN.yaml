@@ -30,6 +30,7 @@ main_window:
   btn_hide_preview: 隐藏预览
   chk_bg_mode: 后台模式
   chk_scrcpy: 流式截图
+  chk_agent: 设备端手势
   tab_daily: 日常
   tab_batch: 批量
   tab_log: 运行日志
@@ -63,6 +64,10 @@ settings_dialog:
   adb_capture_label: 'ADB 截图方式:'
   adb_capture_scrcpy: 视频流截图 (scrcpy)
   adb_capture_screencap: 静态截图 (screencap)
+  adb_input_label: 'ADB 输入方式:'
+  adb_input_agent: 设备端手势 (律匠 app 无障碍)
+  adb_input_shell: adb shell input
+  adb_input_tip: 手机上安装律匠 app 并开启无障碍后，点击/拖拽/截图由 app 落地；app 不可达时自动回退 adb
   input_mode_label: '窗口输入模式:'
   input_postmessage: 后台输入 (PostMessage)
   input_sendinput: 光标输入 (SendInput)

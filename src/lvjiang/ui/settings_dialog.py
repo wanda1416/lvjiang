@@ -140,6 +140,13 @@ class SettingsDialog(QDialog):
         self._capture_combo.setCurrentIndex(0 if self._config.adb_capture_streaming else 1)
         form.addRow(tr("ADB 截图方式:"), self._capture_combo)
 
+        self._agent_combo = QComboBox()
+        self._agent_combo.addItem(tr("设备端手势 (律匠 app 无障碍)"), True)
+        self._agent_combo.addItem(tr("adb shell input"), False)
+        self._agent_combo.setCurrentIndex(0 if self._config.adb_agent_mode else 1)
+        self._agent_combo.setToolTip(tr("手机上安装律匠 app 并开启无障碍后，点击/拖拽/截图由 app 落地；app 不可达时自动回退 adb"))
+        form.addRow(tr("ADB 输入方式:"), self._agent_combo)
+
         self._input_combo = QComboBox()
         self._input_combo.addItem(tr("后台输入 (PostMessage)"), True)
         self._input_combo.addItem(tr("光标输入 (SendInput)"), False)
@@ -446,6 +453,7 @@ class SettingsDialog(QDialog):
             return
         settings = {
             "adb_capture_streaming": self._capture_combo.currentData(),
+            "adb_agent_mode": self._agent_combo.currentData(),
             "desktop_background_input": self._input_combo.currentData(),
             "desktop_window_title": self._title_edit.text().strip(),
         }

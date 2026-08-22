@@ -53,7 +53,7 @@ from .column_management import (
     _get_column_widths,
     _save_column_widths,
 )
-from .tab import REFRESH_BTN_STYLE
+from .tab import add_user_toolbar_refresh_button
 
 
 def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> QTimer:
@@ -118,12 +118,11 @@ class ProfileOverviewTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         # ── 工具栏：刷新 + 分组管理 ──
         toolbar = QHBoxLayout()
 
-        btn_refresh = QPushButton(tr("刷新"))
-        btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip(tr("重新读取角色数据"))
-        btn_refresh.setStyleSheet(REFRESH_BTN_STYLE)
-        btn_refresh.clicked.connect(self.refresh)
-        toolbar.addWidget(btn_refresh)
+        add_user_toolbar_refresh_button(
+            toolbar,
+            self.refresh,
+            refresh_tooltip=tr("重新读取角色数据"),
+        )
 
         btn_add_group = QPushButton(tr("新建分组"))
         btn_add_group.setFixedWidth(70)

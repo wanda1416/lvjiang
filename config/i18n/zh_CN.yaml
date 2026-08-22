@@ -137,9 +137,14 @@ script_config:
   save_failed: 保存失败
 update_dialog:
   title: 发现新版本
-  btn_download: 前往下载
-  chk_skip: 此版本不再询问
-  btn_continue: 继续使用
+  latest_version: 最新版本
+  current_version: 当前版本
+  published_at: 发布于 {date}
+  no_release_notes: 本次发布暂无详细说明。
+  chk_skip: 该版本不再提醒
+  btn_release_notes: 前往发布声明
+  btn_download: 下载该版本
+  btn_continue: 忽略该提示
 ocr_dialog:
   title: 图像识别
   tab_ocr: 图像识别

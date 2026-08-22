@@ -186,12 +186,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         checker = UpdateChecker(self)
 
-        def on_finished(latest_version: str, download_url: str):
-            if not should_prompt_update(latest_version):
+        def on_finished(release):
+            if not should_prompt_update(release.version):
                 return  # 用户已选择跳过此版本
 
             from .update_dialog import UpdateDialog
-            dialog = UpdateDialog(latest_version, download_url, self)
+            dialog = UpdateDialog(release, self)
             dialog.exec()  # 用户选择“继续使用”时直接关闭对话框
 
         def on_error(_error_msg: str):
@@ -385,27 +385,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _check_update(self):
         """直接检查更新（帮助菜单 → 检查更新）"""
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtWidgets import QMessageBox
 
         from ..core.update import UpdateChecker, get_version, is_newer_version
+        from .update_dialog import UpdateDialog
 
         checker = UpdateChecker(self)
 
-        def on_finished(latest_version: str, download_url: str):
+        def on_finished(release):
             current_version = get_version()
 
-            if is_newer_version(latest_version, current_version):
-                result = QMessageBox.information(
-                    self,
-                    tr("发现新版本"),
-                    tr("发现新版本 v{latest}\n当前版本: v{current}\n\n是否前往下载？").format(
-                        latest=latest_version, current=current_version),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                )
-                if result == QMessageBox.StandardButton.Yes:
-                    QDesktopServices.openUrl(QUrl(download_url))
+            if is_newer_version(release.version, current_version):
+                UpdateDialog(release, self).exec()
             else:
                 QMessageBox.information(
                     self,

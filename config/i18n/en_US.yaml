@@ -137,9 +137,14 @@ script_config:
   save_failed: Save failed
 update_dialog:
   title: New Version Available
-  btn_download: Download
-  chk_skip: Don't ask again for this version
-  btn_continue: Continue
+  latest_version: Latest version
+  current_version: Current version
+  published_at: Published on {date}
+  no_release_notes: No detailed release notes are available for this release.
+  chk_skip: Don't remind me about this version
+  btn_release_notes: View release notes
+  btn_download: Download this version
+  btn_continue: Dismiss
 ocr_dialog:
   title: Image Recognition
   tab_ocr: Image Recognition

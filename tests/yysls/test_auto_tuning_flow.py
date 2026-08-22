@@ -159,9 +159,9 @@ class FakeWF(AutoTuningWorkflow):
         return data
 
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
-        # 导航预检：菜单页检查
-        if scene_key == "game_menu_page" and "wulinlu" in field_keys:
-            return "武林录"
+        # 导航预检：菜单页检查（is_in_menu_page 用）
+        if scene_key == "game_menu_page" and ("baoguo" in field_keys or "peiyang" in field_keys or "wulinlu" in field_keys):
+            return "baoguo" if "baoguo" in field_keys else "wulinlu"
         # 导航预检：主页多区域检查
         if scene_key == "game_main_page":
             return "菜单"  # 模拟在主页

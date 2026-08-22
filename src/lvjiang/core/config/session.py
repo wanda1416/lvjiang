@@ -288,15 +288,18 @@ def save_equip_filter(filters: dict[str, str]) -> None:
 
 # ─── 便捷函数：env 工作环境 ──────────────────────────────────
 
-_DEFAULT_ENV = "desktop"
-
 
 def load_env() -> str:
-    """读取当前工作环境（session.json 的 settings.env 节点，默认 desktop）"""
+    """读取当前工作环境（session.json 的 settings.env 节点）
+
+    无配置时取 app.yaml envs 列表第一项，保证与默认布局对应。
+    """
     value = load_settings().get("env")
     if isinstance(value, str) and value:
         return value
-    return _DEFAULT_ENV
+    from .resolver import load_available_envs
+    envs = load_available_envs()
+    return envs[0][0] if envs else "desktop"
 
 
 def save_env(env: str) -> None:

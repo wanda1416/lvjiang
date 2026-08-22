@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -62,9 +63,14 @@ def get_version() -> str:
 
 
 def parse_version(version: str) -> list[int]:
-    """解析版本号为可比较的整数列表"""
+    """解析版本号为可比较的整数列表
+
+    自动去除预发布后缀（如 0.5.0b0 → [0, 5, 0]）
+    """
     try:
-        return [int(x) for x in version.split(".")]
+        # 去掉预发布后缀：a/b/rc/alpha/beta/dev 及其数字
+        cleaned = re.sub(r'[.-]?(a|alpha|b|beta|rc|dev)\d*$', '', version, flags=re.IGNORECASE)
+        return [int(x) for x in cleaned.split(".")]
     except (ValueError, AttributeError):
         return [0]
 

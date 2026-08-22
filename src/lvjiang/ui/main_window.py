@@ -728,6 +728,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._log_level_combo.addItem("INFO", 20)
         self._log_level_combo.addItem("WARNING", 30)
         self._log_level_combo.addItem("ERROR", 40)
+        self._log_level_combo.setCurrentIndex(1)  # 默认 INFO，与 _log_min_level=20 一致
         self._log_level_combo.setToolTip(tr("切换日志显示级别：低于选中级别的日志将被隐藏"))
         self._log_level_combo.currentIndexChanged.connect(self._on_log_level_changed)
         filter_bar.addWidget(self._log_level_combo)

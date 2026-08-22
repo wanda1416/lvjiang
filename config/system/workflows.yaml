@@ -8,7 +8,6 @@ exposed:
 - daily_checkin
 - gather_zhayu
 - auto_tuning
-- test
 overrides:
   auto_tuning:
     scope: dedicated

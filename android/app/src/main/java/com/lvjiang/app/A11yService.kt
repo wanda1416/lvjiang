@@ -34,6 +34,8 @@ class A11yService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         Log.i(TAG, "无障碍服务已连接")
+        // 幂等：App.onCreate 已启动过则直接返回；这里兜底进程由系统为绑定服务而拉起的情况
+        AgentServer.start()
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {

@@ -32,6 +32,9 @@ class App : Application() {
             ).apply { description = "悬浮控制与任务运行的前台服务通知" }
         )
         syncSystemConfig()
+        // PC 端代理通道：进程在（无障碍已绑定 / 悬浮服务在跑 / 用户打开了主页）就监听，
+        // 由 PC 经 adb forward 连入使用无障碍截图与手势，见 AgentServer
+        AgentServer.start()
     }
 
     /**

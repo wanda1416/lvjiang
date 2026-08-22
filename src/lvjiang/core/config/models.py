@@ -86,6 +86,7 @@ class UserConfig:
     language: str = "zh_CN"                  # 界面语言（zh_CN / en_US / auto）
     theme: str = "light"                     # 界面主题（light / dark）
     adb_capture_streaming: bool = True     # ADB 模式是否使用 scrcpy 视频流截图（false 则用 screencap）
+    adb_agent_mode: bool = True            # ADB 模式是否经手机上的律匠 app 下手势/截图（无障碍）；app 不可达时自动回退 adb shell input
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
     material_grid: MaterialGridConfig = field(default_factory=MaterialGridConfig)

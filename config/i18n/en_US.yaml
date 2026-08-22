@@ -30,6 +30,7 @@ main_window:
   btn_hide_preview: Hide Preview
   chk_bg_mode: Background Mode
   chk_scrcpy: Streaming Capture
+  chk_agent: On-device Gestures
   tab_daily: Daily
   tab_batch: Batch
   tab_log: Run Log
@@ -63,6 +64,10 @@ settings_dialog:
   adb_capture_label: 'ADB Capture Mode:'
   adb_capture_scrcpy: Streaming (scrcpy)
   adb_capture_screencap: Static (screencap)
+  adb_input_label: 'ADB Input Mode:'
+  adb_input_agent: On-device gestures (Lvjiang app accessibility)
+  adb_input_shell: adb shell input
+  adb_input_tip: With the Lvjiang app installed and accessibility enabled, taps/drags/screenshots are performed by the app; falls back to adb when unreachable
   input_mode_label: 'Window Input Mode:'
   input_postmessage: Background (PostMessage)
   input_sendinput: Foreground (SendInput)

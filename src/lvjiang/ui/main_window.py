@@ -275,6 +275,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         script_record.triggered.connect(self._open_script_record)
         tools_menu.addAction(script_record)
 
+        script_editor = QAction(tr("脚本编辑"), self)
+        script_editor.setShortcut("F6")
+        script_editor.triggered.connect(self._open_script_editor)
+        tools_menu.addAction(script_editor)
+
         script_config = QAction(tr("脚本配置"), self)
         script_config.triggered.connect(self._open_script_config)
         tools_menu.addAction(script_config)
@@ -336,6 +341,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             dialog.toggle_recording()
         else:
             self._open_script_record()
+
+    def _open_script_editor(self):
+        """打开脚本编辑对话框；有新建/保存/删除时刷新日常页脚本下拉。"""
+        from .script_editor_dialog import ScriptEditorDialog
+        dialog = ScriptEditorDialog(self)
+        dialog.exec()
+        if dialog.changed:
+            self._load_workflow_configs()
 
     def _open_script_config(self):
         """打开脚本配置对话框；保存后刷新日常页脚本下拉。"""

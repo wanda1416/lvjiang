@@ -1,0 +1,15 @@
+#% name: test
+#% env: [android, desktop]
+
+# 在这里写工作流。常用指令：
+#   click [scene].[region] after wait @page_refresh
+#   scan [scene].[region] as $text by contains "关键字"
+#   find as $hit by image "模板名"
+#   if $hit
+#       click $hit
+#   end
+# 语法文档：docs/30-architecture/32-grammar/README.md
+
+log "开始"
+click (0.9142, 0.5285)
+

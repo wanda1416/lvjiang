@@ -353,6 +353,10 @@ class TuningTab(QWidget):
             self.btn_pause_resume.setStyleSheet(
                 "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
+        # 进度面板的暂停提示：独立于按钮，避免只看右侧面板时误以为卡死
+        widget = self._find_progress_widget()
+        if widget is not None:
+            widget.set_paused(state == "paused")
 
     def _on_pause_resume_clicked(self):
         """暂停/恢复按钮点击 → 转发给宿主"""

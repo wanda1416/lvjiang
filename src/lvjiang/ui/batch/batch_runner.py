@@ -481,6 +481,7 @@ class BatchWorker(QThread):
                 window_left=ctx.window_left,
                 window_top=ctx.window_top,
                 stop_check=self._stop_check,
+                pause_event=ctx.pause_event,
             )
             return engine.execute(wf_instance, initial_variables=params)
 

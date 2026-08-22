@@ -4,7 +4,7 @@ from typing import Any
 
 from loguru import logger
 
-from ...core.coord_types import CoordRef, Offset, to_offset
+from ...core.coord_types import CoordRef, Offset, RectCoordRef, to_offset
 from ..builtins._coerce import to_number
 from ..grammar import (
     And,
@@ -29,6 +29,7 @@ from ..grammar import (
     Or,
     VarRef,
 )
+from ..grammar.ast_nodes import TupleLiteral
 from .signals import WorkflowUserError
 
 # 数值相等容差：== / != 统一用容差比较，避免浮点误差（如 0.1+0.2 != 0.3）
@@ -254,6 +255,8 @@ class _EvalMixin:
                 return self._call_func(node)
             case EntityRef():
                 return self._resolve_entity_ref(node)
+            case TupleLiteral():
+                return self._resolve_tuple(node)
             case int() | float():
                 return node
             case str():
@@ -264,6 +267,14 @@ class _EvalMixin:
                 return [self._resolve(item) for item in node]
             case _:
                 return None
+
+    def _resolve_tuple(self, node: TupleLiteral):
+        """元组字面量：(x, y) → tuple；(x, y, w, h) 全数值 → RectCoordRef（画布框出的区域）"""
+        vals = tuple(self._resolve(e) for e in node.elements)
+        if len(vals) == 4 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+            x, y, w, h = (float(v) for v in vals)
+            return RectCoordRef(cx=x + w / 2, cy=y + h / 2, w=w, h=h)
+        return vals
 
     def _resolve_entity_ref(self, node: EntityRef) -> CoordRef:
         """EntityRef → 布局查询 → CoordRef

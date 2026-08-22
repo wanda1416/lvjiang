@@ -6,6 +6,7 @@
 - ``general``:    通用工具 (concat/range/count_nonempty/contains/find_key/append)
 - ``strings``:    字符串处理 (substr/split/replace/match/trim/upper/lower/to_num)
 - ``system``:     系统与 UI (confirm/pause/notify/input/save/panel_rows/panel_cols)
+- ``vision``:     图色 (pixel/bright/color_ratio/bright_segs/color_vec/find_icons/find_multi_color)
 
 燕云专属内置函数（``equipment`` / ``bag_traversal``）位于
 ``lvjiang.apps.yysls.workflows.builtins``，由燕云插件在加载时注册。
@@ -18,5 +19,6 @@ from . import (
     general,  # noqa: F401
     strings,  # noqa: F401
     system,  # noqa: F401
+    vision,  # noqa: F401
 )
 from ._registry import builtin_func, get_function, list_functions  # noqa: F401

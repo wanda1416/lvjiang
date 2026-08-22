@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -123,15 +124,39 @@ def test_adaptive_scales_near_one():
     assert tl.adaptive_scales(1000, 0) == [0.9, 1.0, 1.1]
 
 
-def test_store_missing_and_cache(tmp_path):
+def _touch(path: Path, offset_s: int) -> None:
+    """把 mtime 往后拨，保证同一秒内连续写入也被识别为"变了" """
+    t = path.stat().st_mtime_ns + offset_s * 1_000_000_000
+    os.utime(path, ns=(t, t))
+
+
+def test_store_tracks_files_without_restart(tmp_path):
+    """工作台边调边加模板：新增 / 替换 / 加 sidecar / 删除 都不需要 invalidate"""
     store = tl.TemplateStore(tmp_path)
     assert store.get("nope") is None
-    assert store.get("late") is None          # 此时文件不存在 → miss 被缓存
-    cv2.imwrite(str(tmp_path / "late.png"), _icon(20))
-    assert store.get("late") is None          # 仍是缓存的 miss
+    assert store.get("late") is None          # 此时文件不存在
+    png = tmp_path / "late.png"
+    cv2.imwrite(str(png), _icon(20))
+    tpl = store.get("late")
+    assert tpl is not None and tpl.w == 20    # 新加的模板立刻可用
+    assert store.get("late.png") is tpl       # 文件没变 → 命中缓存，不重载
+    # 替换图片 → 重载
+    cv2.imwrite(str(png), _icon(30))
+    _touch(png, 2)
+    tpl2 = store.get("late")
+    assert tpl2 is not tpl and tpl2.w == 30
+    # 后补 sidecar → 重载并读到录制尺寸
+    (tmp_path / "late.json").write_text('{"recordW": 2400, "recordH": 1080}', encoding="utf-8")
+    tpl3 = store.get("late")
+    assert tpl3 is not tpl2 and tpl3.record_w == 2400
+    assert store.get("late") is tpl3
+    # 删除 → None，下次再出现又能找到
+    png.unlink()
+    assert store.get("late") is None
+    cv2.imwrite(str(png), _icon(20))
+    assert store.get("late").w == 20
     store.invalidate()
-    assert store.get("late") is not None
-    assert store.get("late.png") is store.get("late")
+    assert store.get("late").w == 20
 
 
 def test_alpha_template_composited_on_black(tmp_path):

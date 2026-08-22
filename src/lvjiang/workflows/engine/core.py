@@ -141,6 +141,11 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._workflow: BaseWorkflow | None = None
         # 按键状态注册表（press 指令用，懒初始化绑定当前 backend）
         self._key_registry: KeyStateRegistry | None = None
+        # 调试钩子（脚本工作台注入）：每条语句执行前回调 (line_no, variables 快照)。
+        # step_mode=True 时每条语句前把 pause_event 清掉再等——即"单步"：
+        # UI 每 set 一次事件，引擎只往前走一条。两者都在工作流线程里触发。
+        self.statement_hook: Callable[[int, dict], None] | None = None
+        self.step_mode: bool = False
 
     def _ensure_workflow(self) -> BaseWorkflow:
         """懒创建 BaseWorkflow 作为游戏操作委托
@@ -163,6 +168,27 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 pause_event=self._pause_event,
             )
         return self._workflow
+
+    def _debug_before_stmt(self, node) -> None:
+        """语句级调试钩子：上报当前行 + 变量快照；单步模式下在此停住等 UI 放行
+
+        快照是浅拷贝：UI 线程只读展示，引擎继续改自己的 dict 互不干扰。
+        """
+        if self.statement_hook is None and not self.step_mode:
+            return
+        line_no = getattr(node, "line_no", 0) or 0
+        if self.statement_hook is not None:
+            try:
+                self.statement_hook(line_no, dict(self.variables))
+            except Exception as e:  # noqa: BLE001 — 调试面板出错不能把脚本带崩
+                logger.warning(f"statement_hook 异常: {e}")
+        if self.step_mode and self._pause_event is not None:
+            self._pause_event.clear()
+            self._wait_if_paused()
+            # 「停止」是靠 set 事件把阻塞中的引擎唤醒的——醒来后必须再看一眼停止标志，
+            # 否则会把当前这条语句执行掉才在下一条边界退出
+            if self._stop_check():
+                raise _BreakSignal()
 
     def _wait_if_paused(self):
         """暂停检查：若 pause_event 未 set 则阻塞等待，期间响应 stop_check
@@ -554,6 +580,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         if self._stop_check():
             raise _BreakSignal()
         self._wait_if_paused()  # 暂停检查
+        self._debug_before_stmt(node)
         match node:
             case Click():
                 self._exec_click(node)

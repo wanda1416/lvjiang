@@ -69,6 +69,14 @@ class TuningProgressWidget(QWidget):
         self._batch_label = QLabel(tr("准备中..."))
         self._batch_label.setStyleSheet("font-size: 12px;")
         batch_layout.addWidget(self._batch_label)
+        # 暂停提示：独立于 _operation_label（后者被各阶段信号频繁覆写，
+        # 放在这会被瞬间冲掉），只由 set_paused 控制，不受其他信号影响。
+        self._pause_label = QLabel(tr("暂停中..."))
+        self._pause_label.setStyleSheet(
+            "font-size: 12px; color: #E65100; font-weight: bold; padding: 2px;"
+            "background: #FFF3E0; border-radius: 3px;")
+        self._pause_label.setVisible(False)
+        batch_layout.addWidget(self._pause_label)
         self._batch_progress = QProgressBar()
         self._batch_progress.setValue(0)
         batch_layout.addWidget(self._batch_progress)
@@ -260,6 +268,11 @@ class TuningProgressWidget(QWidget):
     def mark_done(self):
         """工作流结束回调"""
         pass  # Tab 模式无需按钮状态变更
+
+    def set_paused(self, paused: bool) -> None:
+        """暂停状态提示：请求暂停时立即显示，不等待工作流线程真正阻塞
+        （原子操作如重置调律二次确认执行期间可能有数秒延迟才会真正停下）。"""
+        self._pause_label.setVisible(paused)
 
     def _record_event(self, text: str) -> None:
         """记录当前装备的紧凑过程，完成后整体归档到右栏。"""

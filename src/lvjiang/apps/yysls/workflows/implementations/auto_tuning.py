@@ -250,8 +250,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     @property
     def is_stopped(self) -> bool:
         """停止请求或材料耗尽（大律准石低于基准）都视为停止，
-        背包遍历与部位循环全部收束，复用 F10 中断的退出路径"""
-        return self.executor.materials_exhausted or super().is_stopped
+        背包遍历与部位循环全部收束，复用 F10 中断的退出路径。
+
+        super().is_stopped 放在前面求值：它内部会先过暂停检查点
+        （_wait_if_paused），若放在 or 后面，一旦材料耗尽，短路求值会
+        跳过暂停阻塞——用户此时按 F8 暂停会被静默吞掉，直接当结束处理。
+        """
+        return super().is_stopped or self.executor.materials_exhausted
 
     @property
     def slot_level_exhausted(self) -> bool:

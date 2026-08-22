@@ -1,8 +1,9 @@
 @echo off
 cd /d "%~dp0"
-rem src-layout 后包在 src/lvjiang 下，仓库根不再是可导入路径，
-rem 所以显式把源根加进 PYTHONPATH —— 这样裸 python 无需 pip install -e . 也能起。
+rem With src-layout the package lives under src/lvjiang, so the repo root
+rem is not importable. Add the source root to PYTHONPATH explicitly — this
+rem allows running bare python without pip install -e .
 set "PYTHONPATH=%~dp0src;%PYTHONPATH%"
-rem dev 脚本强制开发模式：配置写向 config/system（不依赖 .git 探测）
+rem Force dev mode: config writes go to config/system (no .git probing)
 set "LVJIANG_DEV_MODE=1"
 python -m lvjiang -reg yysls

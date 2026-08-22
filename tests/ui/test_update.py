@@ -7,10 +7,58 @@ import pytest
 from lvjiang.core.update import (
     get_skip_version,
     is_newer_version,
+    parse_release_info,
     parse_version,
     set_skip_version,
     should_prompt_update,
 )
+
+
+class TestParseReleaseInfo:
+    def test_extracts_release_metadata_and_windows_installer(self):
+        data = {
+            "tag_name": "v0.5.0",
+            "name": "v0.5.0 — 功能更新",
+            "body": "## 更新内容\n\n- 新功能",
+            "published_at": "2026-08-22T11:02:05Z",
+            "html_url": "https://github.com/example/releases/tag/v0.5.0",
+            "assets": [
+                {
+                    "name": "app-v0.5.0-win64.zip",
+                    "browser_download_url": "https://example.test/app.zip",
+                },
+                {
+                    "name": "app-v0.5.0-win64-setup.exe",
+                    "browser_download_url": "https://example.test/setup.exe",
+                },
+            ],
+        }
+
+        release = parse_release_info(data, platform="win32")
+
+        assert release is not None
+        assert release.version == "0.5.0"
+        assert release.title == "v0.5.0 — 功能更新"
+        assert release.body.startswith("## 更新内容")
+        assert release.published_at == "2026-08-22T11:02:05Z"
+        assert release.download_url == "https://example.test/setup.exe"
+
+    def test_non_windows_download_falls_back_to_release_page(self):
+        release = parse_release_info(
+            {
+                "tag_name": "0.5.0",
+                "html_url": "https://github.com/example/releases/tag/0.5.0",
+                "assets": [{"name": "setup.exe", "browser_download_url": "https://example.test/setup.exe"}],
+            },
+            platform="linux",
+        )
+
+        assert release is not None
+        assert release.title == "0.5.0"
+        assert release.download_url == release.release_url
+
+    def test_missing_tag_is_invalid(self):
+        assert parse_release_info({"name": "无版本号"}) is None
 
 
 @pytest.fixture(autouse=True)

@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.update import (
     GITHUB_REPO,
+    ReleaseInfo,
     UpdateChecker,
     get_version,
     is_newer_version,
@@ -126,23 +127,16 @@ class AboutDialog(QDialog):
         self._update_checker.error.connect(self._on_update_error)
         self._update_checker.start()
 
-    def _on_update_available(self, latest_version: str, download_url: str):
+    def _on_update_available(self, release: ReleaseInfo):
         """发现新版本"""
         self._check_update_btn.setEnabled(True)
         self._check_update_btn.setText(tr("检查更新"))
 
         current_version = get_version()
 
-        if is_newer_version(latest_version, current_version):
-            result = QMessageBox.information(
-                self,
-                tr("发现新版本"),
-                tr("发现新版本 v{latest}\n当前版本: v{current}\n\n是否前往下载？").format(
-                    latest=latest_version, current=current_version),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if result == QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(QUrl(download_url))
+        if is_newer_version(release.version, current_version):
+            from .update_dialog import UpdateDialog
+            UpdateDialog(release, self).exec()
         else:
             QMessageBox.information(
                 self,

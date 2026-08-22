@@ -7,19 +7,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from loguru import logger
 
+from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
+    RouteHostPort,
+    SubcallEnginePort,
+)
 from lvjiang.core.config import session
 
 from ......i18n import tr
-
-if TYPE_CHECKING:
-    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
-        AutoTuningWorkflow,
-    )
-
 
 _NAV_FILE = "subcall/navigation.wf"
 
@@ -29,7 +27,7 @@ class TuningRouteStrategy(ABC):
 
     env: str
 
-    def __init__(self, wf: AutoTuningWorkflow):
+    def __init__(self, wf: RouteHostPort):
         self._wf = wf
 
     def load_dependencies(self) -> None:
@@ -65,7 +63,7 @@ class TuningRouteStrategy(ABC):
         """背包格子内的横向点击比例（0~1）；默认居中点击。"""
         return 0.5
 
-    def _require_engine(self, operation: str):
+    def _require_engine(self, operation: str) -> SubcallEnginePort:
         engine = self._wf.engine
         if engine is None:
             raise RuntimeError(
@@ -135,7 +133,7 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
 
 
 def create_tuning_route_strategy(
-        wf: AutoTuningWorkflow) -> TuningRouteStrategy:
+        wf: RouteHostPort) -> TuningRouteStrategy:
     """按当前运行环境创建路径策略；环境只在这里判定一次。"""
     env = session.load_env()
     strategies = {

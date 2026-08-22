@@ -15,19 +15,13 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from lvjiang.apps.yysls.config.tune_slots import SLOT_LABELS
 from lvjiang.constants import PROJECT_ROOT
 
 from ....i18n import tr
 
 # 文档输出目录（运行时自建；logs/ 不入库）
 TUNING_DOC_DIR = PROJECT_ROOT / "logs" / "tuning"
-
-# slot key → 标准部位名（与调律 Tab 部位勾选文案一致）
-SLOT_NAMES = {
-    "main_weapon": tr("主武器"), "sub_weapon": tr("副武器"),
-    "ring": tr("环"), "pendant": tr("佩"),
-    "head": tr("冠胄"), "chest": tr("胸甲"), "leg": tr("胫甲"), "wrist": tr("腕甲"),
-}
 
 # 品阶 key → 中文名
 _QUALITY_NAMES = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}
@@ -87,7 +81,7 @@ class TuningDocWriter:
         self._write(f"- 启用规则：{rules_text}")
         for name, state in (switches or {}).items():
             self._write(f"- 开关 {name}：{tr('是') if state else tr('否')}")
-        slot_names = "、".join(SLOT_NAMES.get(s, s) for s in slots)
+        slot_names = "、".join(SLOT_LABELS.get(s, s) for s in slots)
         self._write(f"- 调律部位：{slot_names}")
 
     def start_equipment(self, seq: int, equip: dict):

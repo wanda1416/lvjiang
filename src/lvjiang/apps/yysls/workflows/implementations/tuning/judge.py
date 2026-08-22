@@ -22,6 +22,11 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_LABELS,
     RATING_RANK,
     RatingProvider,
+    ScanBehavior,
+    TuneBehavior,
+)
+from lvjiang.apps.yysls.workflows.implementations.tuning.decisions import (
+    BehaviorDecision,
 )
 
 from ......i18n import tr
@@ -125,6 +130,43 @@ class TuningJudge:
             return cache[ck]
 
         return rating_of
+
+    def decide_scan(
+        self,
+        config: ScanBehavior,
+        equip_data: EquipmentData,
+        incoming: dict,
+    ) -> BehaviorDecision:
+        """纯扫描行为决策；不执行回收、导航或 UI 通知。"""
+        part, quality, cap_pct = self.recycle_inputs(equip_data)
+        action, reason = config.decide(
+            part,
+            quality,
+            cap_pct,
+            self.rating_provider(equip_data, incoming),
+            [affix.name for affix in equip_data.affixes],
+        )
+        return BehaviorDecision.from_raw(action, reason)
+
+    def decide_end(
+        self,
+        config: TuneBehavior,
+        equip_data: EquipmentData,
+        incoming: dict | None,
+        *,
+        full: bool,
+    ) -> BehaviorDecision:
+        """纯单轮结束行为决策；不执行重置、回收或继续动作。"""
+        part, quality, cap_pct = self.recycle_inputs(equip_data)
+        action, reason = config.decide(
+            part,
+            quality,
+            cap_pct,
+            self.rating_provider(equip_data, incoming),
+            full,
+            [affix.name for affix in equip_data.affixes],
+        )
+        return BehaviorDecision.from_raw(action, reason)
 
     @staticmethod
     def recycle_inputs(equip_data: EquipmentData,

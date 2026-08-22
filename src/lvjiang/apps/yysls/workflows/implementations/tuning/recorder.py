@@ -1,15 +1,11 @@
-"""调律过程记录器 — 收拢文档/报告/状态/指纹的记录职责
+"""调律过程记录器 — 收拢文档与报告职责
 
 AutoTuningWorkflow 只编排流程、传递数据，所有记录操作经 TuningRecorder 完成：
 - 调律说明文档（TuningDocWriter 协调）
 - 调律报告累积（tuning_reports）
-- 锁定指纹集管理（_locked_fps）
-- 模式标记与状态（tune_full_recycle_mode / force_tune_mode / expect_rating）
-- 装备回收补位标记（equipment_recycled）
+- 装备回收补位标记（迁移期兼容字段，后续由结构化处理结果替代）
 """
 from __future__ import annotations
-
-from loguru import logger
 
 from lvjiang.apps.yysls.core.evaluator import get_rule_names
 from lvjiang.apps.yysls.core.tuning_rules import (
@@ -25,8 +21,6 @@ class TuningRecorder:
     职责：
     - 协调 TuningDocWriter 写入说明文档
     - 累积调律报告（tuning_reports）
-    - 管理锁定指纹集（跨窗口记忆，按部位清空）
-    - 管理模式标记（调满后回收 / 强制调律 / 预期评级）
     - 管理装备回收补位标记
     """
 
@@ -35,14 +29,6 @@ class TuningRecorder:
         self._doc: TuningDocWriter | None = None
         self._doc_seq: int = 0
         self._doc_equipment_open: bool = False
-
-        # 锁定指纹集（本次运行内已确认锁定的装备指纹）
-        self._locked_fps: set[str] = set()
-
-        # 模式标记
-        self.tune_full_recycle_mode: bool = False
-        self.force_tune_mode: bool = False
-        self.expect_rating: str | None = None
 
         # 装备回收补位标记
         self.equipment_recycled: bool = False
@@ -126,24 +112,6 @@ class TuningRecorder:
         """成品清单"""
         if self._doc:
             self._doc.run_summary(items)
-
-    # ─── 部位切换 ─────────────────────────────────────────
-
-    def on_slot_enter(self, slot: str):
-        """切换部位时调用：清空锁定指纹集（新部位装备全部更新）"""
-        logger.info(f"── 处理部位: {slot} ──")
-        self._locked_fps.clear()
-
-    # ─── 锁定指纹管理 ─────────────────────────────────────
-
-    def record_locked(self, fp: str):
-        """记录已锁定的装备指纹"""
-        if fp:
-            self._locked_fps.add(fp)
-
-    def is_locked(self, fp: str) -> bool:
-        """检查装备指纹是否已锁定"""
-        return fp in self._locked_fps
 
     # ─── 报告管理 ─────────────────────────────────────────
 
@@ -271,10 +239,6 @@ class TuningRecorder:
 
     def reset(self):
         """重置所有状态（run 开始时调用）"""
-        self._locked_fps.clear()
-        self.tune_full_recycle_mode = False
-        self.force_tune_mode = False
-        self.expect_rating = None
         self.equipment_recycled = False
         self._doc_seq = 0
         self._doc_equipment_open = False

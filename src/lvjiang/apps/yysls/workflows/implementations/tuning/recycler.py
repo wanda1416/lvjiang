@@ -14,13 +14,15 @@ from loguru import logger
 
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 from lvjiang.apps.yysls.core.tuning_rules import BEHAVIOR_STAGE_LABELS
-from lvjiang.core.config.session import load_env
 
 from ......i18n import tr
 
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
         AutoTuningWorkflow,
+    )
+    from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
+        TuningRouteStrategy,
     )
 
 
@@ -43,8 +45,9 @@ class RecycleOutcome(Enum):
 class TuningRecycler:
     """重置调律与装备回收"""
 
-    def __init__(self, wf: AutoTuningWorkflow):
+    def __init__(self, wf: AutoTuningWorkflow, routes: TuningRouteStrategy):
         self._wf = wf
+        self._routes = routes
 
     def reset_remaining(self) -> int:
         """OCR 调律页「重置调律」按钮文本，解析剩余次数
@@ -165,9 +168,7 @@ class TuningRecycler:
                         report: dict | None = None) -> RecycleOutcome:
         """回收当前详情页选中的装备
 
-        android：更多 → 子菜单「回收」→ 确认弹窗
-        desktop：直接扫描功能区找「回收」→ 按 X 回收 → 确认弹窗
-
+        回收入口路径按环境不同，见 TuningRouteStrategy.open_recycle_dialog。
         进入时背包详情页无弹窗；未找到回收按钮时收起弹窗返回
         UNAVAILABLE（装备保留原地）。成功后背包刷新、后续装备前移补位。
         装备锁定检测：确认弹窗内无「确认」字样 = 装备被锁定，
@@ -177,46 +178,14 @@ class TuningRecycler:
         stage_label = BEHAVIOR_STAGE_LABELS.get(stage, stage)
         logger.info(f"  [{stage_label}] 回收 {label}：{reason}")
 
-        is_android = load_env() != "desktop"
-        if not self._try_open_recycle(is_android):
+        if not self._routes.open_recycle_dialog():
             return RecycleOutcome.UNAVAILABLE
         return self._handle_recycle_confirm(
-            equip_data, stage, stage_label, reason, report, is_android)
-
-    def _try_open_recycle(self, is_android: bool) -> bool:
-        """打开回收确认弹窗：android 经「更多」弹窗，desktop 直接按 X。
-        返回 True=确认弹窗已出现；False=未找到回收按钮。
-        """
-        wf = self._wf
-        if is_android:
-            wf.click_region(wf.EQUIP_DETAIL, "more_func")
-            wf.wait_stable("page_refresh")
-            key = wf.ocr_scene_by(
-                wf.EQUIP_DETAIL,
-                ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
-                tr("回收"), "contains")
-            if not key:
-                logger.warning("未找到回收按钮，装备保留")
-                wf.click_region(wf.EQUIP_DETAIL, "more_func")
-                wf.wait_delay("step_interval")
-                return False
-            wf.click_region(wf.EQUIP_DETAIL, key)
-        else:
-            key = wf.ocr_scene_by(
-                wf.EQUIP_DETAIL, ["func_area"],
-                tr("回收"), "contains")
-            if not key:
-                logger.warning("桌面端：未找到回收按钮，装备保留")
-                return False
-            logger.info("  [桌面端] 找到回收入口，按 X 回收")
-            wf.press("X", wait=None)
-        wf.wait_stable("page_refresh")  # 回收确认弹窗
-        return True
+            equip_data, stage, stage_label, reason, report)
 
     def _handle_recycle_confirm(self, equip_data: EquipmentData,
                                 stage: str, stage_label: str, reason: str,
-                                report: dict | None,
-                                is_android: bool) -> RecycleOutcome:
+                                report: dict | None) -> RecycleOutcome:
         """回收确认弹窗处理（android/desktop 共用）"""
         wf = self._wf
         label = equip_data.name or equip_data.type
@@ -227,10 +196,7 @@ class TuningRecycler:
             logger.warning(f"  回收确认弹窗未识别到「确认」"
                            f"（recycle_confirm={confirm_text!r}），"
                            f"装备被锁定，保留")
-            if is_android:
-                wf.click_region(wf.EQUIP_DETAIL, "more_func")
-            # 桌面端被锁定不会出现任何现象，但是也要等待
-            wf.wait_delay("step_interval")
+            self._routes.close_recycle_entry_on_lock()
             return RecycleOutcome.LOCKED
         wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
         wf.wait_stable("page_refresh")  # 回收完成，背包刷新补位

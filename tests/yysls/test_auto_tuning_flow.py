@@ -235,11 +235,6 @@ def _patch_core(monkeypatch):
     # DSL env() 经 system.py 导入 load_env，需同步 patch
     from lvjiang.workflows.builtins import system as _sys_mod
     monkeypatch.setattr(_sys_mod, "load_env", lambda: "android")
-    # recycler.py 也直接导入 load_env
-    from lvjiang.apps.yysls.workflows.implementations.tuning import (
-        recycler as _recycler_mod,
-    )
-    monkeypatch.setattr(_recycler_mod, "load_env", lambda: "android")
 
 
 @pytest.fixture
@@ -274,12 +269,20 @@ def test_desktop_route_leaves_detail_without_menu_click(monkeypatch):
     assert wf.clicks == [(TUNE_SCENE, "back")]
 
 
+def test_workflow_shares_route_strategy_between_components():
+    """导航与回收必须共享同一策略实例，不能各自重复判断环境。"""
+    wf = FakeWF()
+
+    assert wf.navigator.routes is wf.route_strategy
+    assert wf.recycler._routes is wf.route_strategy
+
+
 def test_desktop_first_grid_col_uses_detected_slot_bounds(monkeypatch):
     """首列偏移基于实际检测边界，不能按列数假设网格严格等分。"""
-    monkeypatch.setattr(auto_tuning, "load_env", lambda: "desktop")
     wf = MagicMock()
     wf.GRID_SCENE = AutoTuningWorkflow.GRID_SCENE
     wf.GRID_PANEL = AutoTuningWorkflow.GRID_PANEL
+    wf.route_strategy.grid_click_x_ratio.return_value = 0.75
     cal = MagicMock(n_rows=4, n_cols=6)
     cal.slot_center.return_value = (0.18, 0.35)
     cal.slot_bounds.return_value = (0.10, 0.20, 0.30, 0.50)
@@ -291,6 +294,7 @@ def test_desktop_first_grid_col_uses_detected_slot_bounds(monkeypatch):
     result = AutoTuningWorkflow._click_grid(wf, row=1, col=1)
 
     assert result is True
+    wf.route_strategy.grid_click_x_ratio.assert_called_once_with(1)
     # 实际边界 [0.10, 0.30] 的 75% 位置为 0.25；旧等分公式为 0.2217。
     wf._panel_ratio_to_screen.assert_called_once_with(panel_obj, 0.25, 0.35)
     wf._input.click_screen.assert_called_once_with(

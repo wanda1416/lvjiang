@@ -8,6 +8,7 @@
 |------|------|
 | [01-main-window-state-flow.md](01-main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南 |
+| [04-device-agent-protocol.md](04-device-agent-protocol.md) | 设备端代理协议：PC 经 adb forward 连律匠 app，用无障碍/Shizuku 截图与手势（L7 契约） |
 
 > 场景系统文档已独立至 [34-scene/](34-scene/) 目录。
 

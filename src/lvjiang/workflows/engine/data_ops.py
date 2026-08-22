@@ -523,10 +523,15 @@ class _DataOpsMixin:
                         f"find: 搜索区域 [{scene}].[{region_key}] 在当前布局未绑定坐标"
                     )
 
-        # 执行搜索
-        result = self._ensure_workflow().find_text_in_region(
-            match_target, match_mode, search_region,
-            min_confidence=min_conf,
-        )
+        # 执行搜索：by image → 模板定位；其余 → OCR 文字搜索
+        if match_mode == "image":
+            result = self._ensure_workflow().find_image_in_region(
+                str(match_target), search_region, min_score=min_conf,
+            )
+        else:
+            result = self._ensure_workflow().find_text_in_region(
+                match_target, match_mode, search_region,
+                min_confidence=min_conf,
+            )
         # 结果存入变量：FoundRegion（找到）或 ""（未找到，falsy）
         self.variables[node.var_name] = result

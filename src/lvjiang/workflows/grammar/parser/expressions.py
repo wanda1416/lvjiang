@@ -86,6 +86,9 @@ class _ExprMixin:
     def match_contains_any(self, _):
         return "contains_any"
 
+    def match_image(self, _):
+        return "image"
+
     def group_clause(self, items):
         """on group "分组名" / $var / ["a", "b"] → Literal | VarRef | list"""
         target_node = items[0]  # Token(STRING) | VarRef | list（list_literal）

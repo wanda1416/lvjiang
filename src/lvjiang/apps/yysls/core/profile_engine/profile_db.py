@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -23,13 +24,19 @@ from lvjiang.constants import SESSION_CONFIG_DIR
 # 数据库路径
 _DB_PATH = SESSION_CONFIG_DIR / "profile.db"
 
+# SQLite 首次切换 WAL 模式需要独占数据库。进程内多个初始化线程若同时
+# 执行 PRAGMA journal_mode=WAL，busy_timeout 尚未必能介入，会直接报 locked。
+_connection_setup_lock = threading.Lock()
+
 
 # ─── Schema 版本管理 ──────────────────────────────────────────
 
 
 def _migrate_v1(conn: sqlite3.Connection) -> None:
     """初始建表: profile_entries + profile_history"""
-    conn.executescript("""
+    # 不使用 executescript：它会先隐式提交已有事务，破坏
+    # _ensure_schema() 持有的 BEGIN IMMEDIATE 迁移锁。
+    conn.execute("""
         CREATE TABLE profile_entries (
             username   TEXT NOT NULL,
             type       TEXT NOT NULL,
@@ -38,7 +45,9 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL DEFAULT '',
             updated_time TEXT NOT NULL DEFAULT '',
             PRIMARY KEY (username, type, key)
-        );
+        )
+    """)
+    conn.execute("""
         CREATE TABLE profile_history (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             ts          TEXT    NOT NULL,
@@ -49,9 +58,11 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             new_value   REAL    NOT NULL,
             change_type TEXT    NOT NULL,
             detail      TEXT    DEFAULT ''
-        );
+        )
+    """)
+    conn.execute("""
         CREATE INDEX idx_history_user_key
-            ON profile_history(username, type, key, id DESC);
+            ON profile_history(username, type, key, id DESC)
     """)
 
 
@@ -148,17 +159,29 @@ class ProfileDB:
     def _connect(self) -> sqlite3.Connection:
         """创建短生命周期连接（WAL + busy_timeout=5000）"""
         conn = sqlite3.connect(str(self._db_path), timeout=5.0)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
+        try:
+            conn.execute("PRAGMA busy_timeout=5000")
+            with _connection_setup_lock:
+                conn.execute("PRAGMA journal_mode=WAL")
+        except Exception:
+            conn.close()
+            raise
         return conn
 
     # ─── Schema 迁移 ───
 
     def _ensure_schema(self) -> None:
-        """检测当前 schema 版本，依次执行未应用的迁移"""
+        """检测当前 schema 版本，依次执行未应用的迁移。
+
+        版本读取和迁移必须处于同一个写事务内。否则两个初始化线程可能
+        同时读到旧版本，并先后对同一列执行 ALTER TABLE。
+        """
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = self._connect()
         try:
+            # 在读取版本前取得写锁。并发初始化者会在 busy_timeout 范围内
+            # 等待，取得锁后重新读取已经提交的新版本，不会重复执行迁移。
+            conn.execute("BEGIN IMMEDIATE")
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
             )
@@ -175,6 +198,9 @@ class ProfileDB:
                     logger.info(f"ProfileDB 迁移 v{version}: {desc}")
 
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -481,20 +507,24 @@ class ProfileDB:
 
 
 _db: ProfileDB | None = None
+_db_lock = threading.Lock()
 
 
 def get_profile_db() -> ProfileDB:
-    """懒加载 ProfileDB 单例"""
+    """线程安全地懒加载 ProfileDB 单例。"""
     global _db
     if _db is None:
-        _db = ProfileDB(_DB_PATH)
+        with _db_lock:
+            if _db is None:
+                _db = ProfileDB(_DB_PATH)
     return _db
 
 
 def reset_profile_db() -> None:
     """重置单例（测试用）"""
     global _db
-    _db = None
+    with _db_lock:
+        _db = None
 
 
 def db_read_entry(username: str, type_: str, key: str) -> dict:

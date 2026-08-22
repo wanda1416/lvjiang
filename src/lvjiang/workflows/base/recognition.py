@@ -563,3 +563,68 @@ class _RecognitionMixin:
 
         logger.debug(f"find 未命中: target={target_value!r} mode={mode}")
         return ""
+
+
+    def find_image_in_region(
+        self,
+        template_name: str,
+        search_region: Region | None = None,
+        min_score: float | None = None,
+    ) -> FoundRegion | str:
+        """在指定区域或全画布做模板定位，返回命中区域（画布归一化）或 ""
+
+        模板来自 config/system/templates/<name>.png（+ sidecar recordW 做分辨率自适应）。
+        min_score 为 None 时用 DEFAULT_MIN_SCORE。
+        """
+        from ...core.recognizers.template_locator import (
+            DEFAULT_MIN_SCORE,
+            adaptive_scales,
+            get_template_store,
+            locate,
+        )
+
+        tpl = get_template_store().get(template_name)
+        if tpl is None:
+            raise ValueError(tr("find: 模板 {name} 不存在（config/system/templates/）").format(name=template_name))
+
+        img = self._capture.capture()
+        if img is None:
+            logger.error("find: 截图失败")
+            return ""
+
+        canvas = self._layout.get_canvas()
+        h, w = img.shape[:2]
+        canvas_px_x = canvas.x_ratio * w
+        canvas_px_y = canvas.y_ratio * h
+        canvas_px_w = canvas.w_ratio * w
+        canvas_px_h = canvas.h_ratio * h
+
+        if search_region is not None:
+            x1 = int(canvas_px_x + search_region.x_ratio * canvas_px_w)
+            y1 = int(canvas_px_y + search_region.y_ratio * canvas_px_h)
+            x2 = int(canvas_px_x + (search_region.x_ratio + search_region.w_ratio) * canvas_px_w) - 1
+            y2 = int(canvas_px_y + (search_region.y_ratio + search_region.h_ratio) * canvas_px_h) - 1
+        else:
+            x1, y1 = int(canvas_px_x), int(canvas_px_y)
+            x2, y2 = int(canvas_px_x + canvas_px_w) - 1, int(canvas_px_y + canvas_px_h) - 1
+
+        hit = locate(
+            img, tpl, x1, y1, x2, y2,
+            scales=adaptive_scales(int(canvas_px_w), tpl.record_w),
+            min_score=DEFAULT_MIN_SCORE if min_score is None else float(min_score),
+        )
+        if hit is None:
+            logger.debug(f"find: 模板 {template_name} 未命中")
+            return ""
+        found = FoundRegion(
+            x_ratio=(hit.cx - hit.w / 2 - canvas_px_x) / canvas_px_w,
+            y_ratio=(hit.cy - hit.h / 2 - canvas_px_y) / canvas_px_h,
+            w_ratio=hit.w / canvas_px_w,
+            h_ratio=hit.h / canvas_px_h,
+            text=template_name,
+        )
+        logger.info(
+            f"find 命中模板: {template_name} score={hit.score:.3f} scale={hit.scale:.2f} "
+            f"center=({found.center_ratios()[0]:.3f},{found.center_ratios()[1]:.3f})"
+        )
+        return found

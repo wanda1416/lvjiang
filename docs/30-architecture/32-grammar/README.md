@@ -20,12 +20,13 @@
 | [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
 | [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
 | [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |
-| [04.3-find.md](04.3-find.md) | find — 文字坐标定位 |
+| [04.3-find.md](04.3-find.md) | find — 文字坐标定位 / 模板定位（by image） |
 | [05-control-flow.md](05-control-flow.md) | 控制流：if/for/loop/try/return/goto、条件表达式 |
 | [06-functions.md](06-functions.md) | 内置函数总览与速查表 |
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术、字典/列表、字符串 |
 | [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数 |
 | [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数 |
+| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、色占比、亮段、色心方位、同色图标、多点找色 |
 | [07-subworkflows.md](07-subworkflows.md) | 模块化：import/def/call、变量隔离、参数声明 |
 | [08-examples.md](08-examples.md) | 完整示例 |
 | [09-data-channels.md](09-data-channels.md) | 数据通道：session/context/variables/output |
@@ -269,6 +270,10 @@ find $scene.$region as $var by contains_any $list       # 动态区域
 
 # 带 where
 find as $var by contains "文字" where confidence >= 0.8
+
+# 模板定位（仅 find）：config/system/templates/<name>.png，where 作匹配分门槛
+find as $var by image "extract_icon"
+find [scene].[area] as $var by image "extract_icon" where confidence >= 0.85
 ```
 
 ### 修饰子句速查
@@ -281,7 +286,7 @@ find as $var by contains "文字" where confidence >= 0.8
 | `where confidence >= <n>` | 过滤 | scan / recognize / find |
 | `on group "<name>"` | 限定分组 | 仅 recognize |
 
-by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list`
+by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list` / `image "模板名"`（仅 find）
 
 ### 与 click 的配合
 
@@ -362,7 +367,7 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（52 个）
+## 十、内置函数（59 个）
 
 > 完整签名与说明见 [06-functions.md](06-functions.md)。
 
@@ -375,6 +380,7 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **背包（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
 | **时间（2）** | `clock` `datetime` |
 | **系统/交互（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
+| **图色（7）** | `pixel` `bright` `color_ratio` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
 | **玩家档案（5）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` |
 
 ## 十一、模块化

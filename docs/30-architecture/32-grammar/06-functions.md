@@ -9,12 +9,13 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
 | [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数：用户交互（confirm/pause/notify/input）、系统函数（save/panel）、玩家档案（profile） |
 | [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历、玩家档案、综合示例 |
+| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、色占比、亮段、色心方位、同色图标、多点找色 |
 
 ---
 
 ## 速查表
 
-共 52 个内置函数，按功能分为 8 类：
+共 59 个内置函数，按功能分为 9 类：
 
 ### 基础运算（8）
 
@@ -97,6 +98,20 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `save` | `() -> ""` | 强制保存 session 到磁盘 |
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
+
+### 图色（7）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `pixel` | `(ref) -> [r, g, b]` | 取坐标中心点颜色 |
+| `bright` | `(ref) -> int` | 中心点亮度 r+g+b（0–765） |
+| `color_ratio` | `(rect, "#rrggbb", tol) -> float` / `(rect, "#lo", "#hi") -> float` | 区域内目标色像素占比 |
+| `bright_segs` | `(rect, on_min, off_max) -> int` | 沿区域中线数亮→暗跳变次数 |
+| `color_vec` | `(rect, center, c_lo, c_hi, margin, channel?, min_r?, max_r?, step?) -> {deg, count} \| null` | 主导通道像素相对中心的合成方位角 |
+| `find_icons` | `(rect, channel, c_min, margin1, margin2?, o_max?, min_area?, min_bbox?, c_max?) -> [FoundRegion]` | 同色连通块（可 click），按面积降序 |
+| `find_multi_color` | `(rect, "#anchor", [[dx, dy, "#c"], …], tol?) -> FoundRegion \| ""` | 多点找色 |
+
+> 坐标入参是 `$ref = [scene].[region]` 的求值结果或 find 产出；距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
 
 ### 玩家档案（5）
 

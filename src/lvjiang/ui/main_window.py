@@ -276,7 +276,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         tools_menu.addAction(script_record)
 
         script_editor = QAction(tr("脚本编辑"), self)
-        script_editor.setShortcut("F6")
+        # F7：F5/F6 已被燕云插件菜单占用（游戏配置 / 调律配置），F8–F10、F12 是运行热键
+        script_editor.setShortcut("F7")
         script_editor.triggered.connect(self._open_script_editor)
         tools_menu.addAction(script_editor)
 

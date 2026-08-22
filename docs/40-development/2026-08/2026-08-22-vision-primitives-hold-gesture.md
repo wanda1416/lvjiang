@@ -56,7 +56,7 @@ find_multi_color`），入参 CoordRef，距离类参数按画布高比例、偏
 
 ## 五、脚本编辑对话框（`ui/script_editor_dialog.py`）
 
-原先新建 / 改 `.wf` 只能开文件管理器，或从脚本录制对话框另存。加「工具 → 脚本编辑」（F6）：
+原先新建 / 改 `.wf` 只能开文件管理器，或从脚本录制对话框另存。加「工具 → 脚本编辑」（F7；F6 已被燕云插件的「调律配置」占用）：
 列表（system ∪ local 合并视图，标层来源）+ 语法高亮编辑区 + 新建 / 保存 / 另存为 / 删除 / 检查。
 
 - 写入走 `ConfigResolver.write_entity`（开发→system，用户→local 影子），删除走 `delete_entity`

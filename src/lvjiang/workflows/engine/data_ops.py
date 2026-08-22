@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from ...core.coord_types import RectCoordRef
 from ..grammar import (
     ArithOp,
     ByClause,
@@ -285,6 +286,15 @@ class _DataOpsMixin:
         if node.func_name == "__tuple__":
             if node.target is not None:
                 tuple_val = tuple(self._resolve(elem) for elem in node.func_args)
+                # (x, y, w, h) 四元数值 → 矩形坐标（脚本工作台画布框出来的区域），
+                # 与 [scene].[region] 求值结果同型，可 click / 喂图色函数
+                if len(tuple_val) == 4 and all(
+                    isinstance(v, (int, float)) and not isinstance(v, bool) for v in tuple_val
+                ):
+                    x, y, w, h = (float(v) for v in tuple_val)
+                    self.variables[node.target] = RectCoordRef(cx=x + w / 2, cy=y + h / 2, w=w, h=h)
+                    logger.debug(f"eval: {node.target} = rect({x}, {y}, {w}, {h})")
+                    return
                 self.variables[node.target] = tuple_val
                 logger.debug(f"eval: {node.target} = {tuple_val!r}")
             return

@@ -281,6 +281,8 @@ arg_list: arg ("," arg)*
     | number -> arg_num
     | field_access -> arg_field
     | var_ref -> arg_var
+    | rect_literal -> arg_tuple
+    | range_literal -> arg_tuple
 
 // ─── 模块化：import / def / call proc ─────────────────────
 
@@ -440,10 +442,15 @@ keyword_ref: "session" -> session_ref
         | "false"i -> false_literal
         | dict_literal
         | list_literal
+        | rect_literal
         | range_literal
 
 // 范围字面量：(min, max) 用于 wait 随机等待 / eval 元组赋值
 range_literal: "(" tuple_elem "," tuple_elem ")"
+
+// 矩形字面量：(x, y, w, h) 画布归一化 → RectCoordRef，可 click / 喂图色函数
+// 来源通常是脚本工作台画布上框出来的区域
+rect_literal: "(" tuple_elem "," tuple_elem "," tuple_elem "," tuple_elem ")"
 
 // 列表字面量：["a", "b", 1, 2]，支持字符串、数字和变量引用
 list_literal: "[" [list_item ("," list_item)*] "]"

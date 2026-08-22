@@ -10,6 +10,7 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -46,8 +47,27 @@ NAV_BTN_STYLE = (
     "QPushButton:disabled { background-color: #B0BEC5; }"
 )
 
+# “备战方案”与“其他信息”首行共用的浅色工具栏按钮。该样式只用于这两个
+# 顶层 Tab，避免改变战斗属性、装备状态等子面板已有的操作栏配色。
+USER_TOOLBAR_BTN_STYLE = (
+    "QPushButton { background-color: #F4F6F8; color: #263238; font-size: 12px; "
+    "border: 1px solid #B0BEC5; padding: 2px 6px; border-radius: 3px; }"
+    "QPushButton:hover { background-color: #E8EEF2; border-color: #90A4AE; }"
+    "QPushButton:pressed { background-color: #DDE5EA; }"
+    "QPushButton:disabled { background-color: #ECEFF1; color: #90A4AE; "
+    "border-color: #CFD8DC; }"
+)
+# 与“备战方案”首行的视图切换按钮等高，避免切换 Tab 时工具栏视觉缩放。
+_USER_TOOLBAR_BTN_HEIGHT = 36
 
-def add_user_nav_buttons(btn_row: QHBoxLayout, host) -> None:
+
+def add_user_nav_buttons(
+    btn_row: QHBoxLayout,
+    host,
+    *,
+    button_style: str = NAV_BTN_STYLE,
+    fixed_height: int | None = None,
+) -> None:
     """在工具栏的刷新按钮后追加「上一个 / 下一个」用户导航按钮。
 
     按钮通过 host.navigate_user(delta) 切换当前用户，
@@ -57,15 +77,19 @@ def add_user_nav_buttons(btn_row: QHBoxLayout, host) -> None:
     btn_row.addSpacing(6)
     btn_prev = QPushButton("◀")
     btn_prev.setFixedWidth(28)
+    if fixed_height is not None:
+        btn_prev.setFixedHeight(fixed_height)
     btn_prev.setToolTip(tr("上一个用户"))
-    btn_prev.setStyleSheet(NAV_BTN_STYLE)
+    btn_prev.setStyleSheet(button_style)
     btn_prev.clicked.connect(lambda: host.navigate_user(-1))
     btn_row.addWidget(btn_prev)
 
     btn_next = QPushButton("▶")
     btn_next.setFixedWidth(28)
+    if fixed_height is not None:
+        btn_next.setFixedHeight(fixed_height)
     btn_next.setToolTip(tr("下一个用户"))
-    btn_next.setStyleSheet(NAV_BTN_STYLE)
+    btn_next.setStyleSheet(button_style)
     btn_next.clicked.connect(lambda: host.navigate_user(1))
     btn_row.addWidget(btn_next)
 
@@ -81,6 +105,35 @@ def add_user_nav_buttons(btn_row: QHBoxLayout, host) -> None:
     # 延迟到事件循环再执行初始状态检查，确保 _refresh_user_combo 已完成
     from PyQt6.QtCore import QTimer
     QTimer.singleShot(0, _update_enabled)
+
+
+def add_user_toolbar_refresh_button(
+    btn_row: QHBoxLayout, refresh_callback, *, refresh_tooltip: str
+) -> None:
+    """添加顶层用户页面共用的浅色刷新按钮。"""
+    btn_refresh = QPushButton(tr("刷新"))
+    btn_refresh.setFixedSize(60, _USER_TOOLBAR_BTN_HEIGHT)
+    btn_refresh.setToolTip(refresh_tooltip)
+    btn_refresh.setStyleSheet(USER_TOOLBAR_BTN_STYLE)
+    btn_refresh.clicked.connect(refresh_callback)
+    btn_row.addWidget(btn_refresh)
+
+
+def add_user_toolbar_buttons(
+    btn_row: QHBoxLayout, host, refresh_callback, *, refresh_tooltip: str
+) -> None:
+    """添加顶层用户工具栏的浅色“刷新 / 上一个 / 下一个”按钮。"""
+    add_user_toolbar_refresh_button(
+        btn_row,
+        refresh_callback,
+        refresh_tooltip=refresh_tooltip,
+    )
+    add_user_nav_buttons(
+        btn_row,
+        host,
+        button_style=USER_TOOLBAR_BTN_STYLE,
+        fixed_height=_USER_TOOLBAR_BTN_HEIGHT,
+    )
 
 
 # ─── 其他信息 Tab ────────────────────────────────────────────
@@ -144,21 +197,23 @@ class ProfileTab(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
 
         # 刷新按钮
         btn_row = QHBoxLayout()
-        btn_refresh = QPushButton(tr("刷新"))
-        btn_refresh.setFixedWidth(60)
-        btn_refresh.setToolTip(tr("重新读取角色数据"))
-        btn_refresh.setStyleSheet(REFRESH_BTN_STYLE)
-        btn_refresh.clicked.connect(self._refresh_current_user)
-        btn_row.addWidget(btn_refresh)
-        add_user_nav_buttons(btn_row, self._host)
+        add_user_toolbar_buttons(
+            btn_row,
+            self._host,
+            self._refresh_current_user,
+            refresh_tooltip=tr("重新读取角色数据"),
+        )
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
         # 详情容器
         self._detail_container = QVBoxLayout()
+        self._detail_container.setContentsMargins(0, 0, 0, 0)
+        self._detail_container.setSpacing(0)
         layout.addLayout(self._detail_container, stretch=1)
 
     def _refresh_current_user(self):
@@ -195,14 +250,18 @@ class _DetailPage(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        # ProfileTab 已提供统一的页面外边距；详情页本身不再重复内缩。
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
 
         self._container = QWidget()
         self._form_layout = QVBoxLayout(self._container)
+        self._form_layout.setContentsMargins(8, 8, 8, 8)
         self._form_layout.setSpacing(8)
         scroll.setWidget(self._container)
         layout.addWidget(scroll)

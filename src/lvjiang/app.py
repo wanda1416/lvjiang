@@ -16,6 +16,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
 from .ui.main_window import MainWindow
+from .ui.theme import apply_light_theme
 from .ui.widgets import install_wheel_guard
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,8 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
                 [getattr(h, "name", "?") for h in hooks_list] or "无")
 
     _app = QApplication(sys.argv)
+    # 界面现阶段按浅色配色设计，不继承 Windows 深色系统调色板。
+    apply_light_theme(_app)
 
     # ── 初始化 i18n（在 QApplication 之后、MainWindow 之前）──
     from .i18n import init_i18n, load_app_i18n

@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from loguru import logger
 
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
@@ -16,13 +14,11 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     FoodDecision,
     MaterialSettings,
 )
+from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
+    TuningRoundHostPort,
+)
 
 from ......i18n import tr
-
-if TYPE_CHECKING:
-    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
-        AutoTuningWorkflow,
-    )
 
 
 class TuningExecutor:
@@ -35,7 +31,7 @@ class TuningExecutor:
     - _material_cache: 材料区 OCR 缓存（进入调律页/重置后刷新）
     """
 
-    def __init__(self, wf: AutoTuningWorkflow):
+    def __init__(self, wf: TuningRoundHostPort):
         self._wf = wf
         self.abort_reason = ""
         self.round_food = ""

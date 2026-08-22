@@ -9,24 +9,19 @@ DSL 两处重复维护同一操作序列。
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from loguru import logger
 
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData, get_equipment_parser
+from lvjiang.apps.yysls.workflows.implementations.tuning.ports import RouteHostPort
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     TuningRouteStrategy,
 )
 
-if TYPE_CHECKING:
-    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
-        AutoTuningWorkflow,
-    )
 
 class TuningNavigator:
     """导航与装备操作：页面跳转、调律入口、词条收集"""
 
-    def __init__(self, wf: AutoTuningWorkflow, routes: TuningRouteStrategy):
+    def __init__(self, wf: RouteHostPort, routes: TuningRouteStrategy):
         self._wf = wf
         self._routes = routes
 

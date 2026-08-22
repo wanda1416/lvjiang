@@ -1414,11 +1414,11 @@ def test_reset_remaining_parses():
     """_reset_remaining：括号/斜杠样式均可解，无数字 = 用尽返 0"""
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律(3)"}
-    assert wf.recycler.reset_remaining() == 3
+    assert wf.resetter.reset_remaining() == 3
     wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律 2/3"}
-    assert wf.recycler.reset_remaining() == 2
+    assert wf.resetter.reset_remaining() == 2
     wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律"}
-    assert wf.recycler.reset_remaining() == 0
+    assert wf.resetter.reset_remaining() == 0
 
 
 def test_recycle_refill_reprocesses_slot():

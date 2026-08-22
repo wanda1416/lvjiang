@@ -13,14 +13,10 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from .....i18n import tr
+from lvjiang.apps.yysls.config.tune_slots import SLOT_LABELS
 
 # 部位 key → 中文名（工作流与对话框共享，避免各自维护）
-SLOT_NAMES: dict[str, str] = {
-    "main_weapon": tr("主武器"), "sub_weapon": tr("副武器"),
-    "ring": tr("环"), "pendant": tr("佩"),
-    "head": tr("冠胄"), "chest": tr("胸甲"), "leg": tr("胫甲"), "wrist": tr("腕甲"),
-}
+SLOT_NAMES = SLOT_LABELS
 
 
 class TuningProgressHub(QObject):

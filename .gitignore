@@ -41,6 +41,8 @@ Desktop.ini
 
 # Qoder
 .qoder/
+# Claude
+.claude/
 
 # Android 构建（工具链自包含在 .tooling/，不入库）
 .tooling/

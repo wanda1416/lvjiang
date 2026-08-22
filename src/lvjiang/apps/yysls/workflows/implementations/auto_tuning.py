@@ -53,10 +53,11 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
     TuningNavigator,
     TuningRecorder,
     TuningRecycler,
+    TuningRouteStrategy,
+    create_tuning_route_strategy,
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
-from lvjiang.core.config import load_env
 from lvjiang.workflows.base import BaseWorkflow
 
 from .....i18n import tr
@@ -111,6 +112,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _navigator: TuningNavigator | None = None
     _recycler: TuningRecycler | None = None
     _recorder: TuningRecorder | None = None
+    _route_strategy: TuningRouteStrategy | None = None
+
+    @property
+    def route_strategy(self) -> TuningRouteStrategy:
+        """本次工作流共享的平台路径策略。"""
+        if self._route_strategy is None:
+            self._route_strategy = create_tuning_route_strategy(self)
+        return self._route_strategy
 
     @property
     def judge(self) -> TuningJudge:
@@ -127,13 +136,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     @property
     def navigator(self) -> TuningNavigator:
         if self._navigator is None:
-            self._navigator = TuningNavigator(self)
+            self._navigator = TuningNavigator(self, self.route_strategy)
         return self._navigator
 
     @property
     def recycler(self) -> TuningRecycler:
         if self._recycler is None:
-            self._recycler = TuningRecycler(self)
+            self._recycler = TuningRecycler(self, self.route_strategy)
         return self._recycler
 
     @property
@@ -475,13 +484,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _click_grid(self, row: int, col: int) -> bool:
         """点击背包网格格子。
 
-        桌面端第 1 列：装备详情弹窗的功能区域遮挡格子左半区，
-        将点击位置偏移到格子右 3/4 处避开遮挡。
-        其余情况直接委托 click_panel。
+        格内横向点击位置由环境策略决定（见
+        TuningRouteStrategy.grid_click_x_ratio）：部分环境的详情弹窗
+        功能区域会遮挡格子局部，需偏移点击位置避开遮挡。
         """
-        if col != 1 or load_env() != "desktop":
+        x_ratio = self.route_strategy.grid_click_x_ratio(col)
+        if x_ratio == 0.5:
             return self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
-        # 桌面端 col=1：偏移到格子右半区
         cal = self._ensure_aligned(self.GRID_SCENE, self.GRID_PANEL)
         if cal is None:
             return False
@@ -491,8 +500,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         panel_obj = self._find_panel(self.GRID_SCENE, self.GRID_PANEL)
         _, cy = cal.slot_center(row_idx, col_idx)
         x1, _, x2, _ = cal.slot_bounds(row_idx, col_idx)
-        # 使用自动对齐得到的实际格子边界，落在格内横向 75% 处。
-        cx_shifted = x1 + 0.75 * (x2 - x1)
+        # 使用自动对齐得到的实际格子边界，落在格内横向 x_ratio 处。
+        cx_shifted = x1 + x_ratio * (x2 - x1)
         sx, sy = self._panel_ratio_to_screen(panel_obj, cx_shifted, cy)
         self._input.click_screen(
             sx, sy,

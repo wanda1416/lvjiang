@@ -16,7 +16,6 @@ from loguru import logger
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData, get_equipment_parser
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     TuningRouteStrategy,
-    create_tuning_route_strategy,
 )
 
 if TYPE_CHECKING:
@@ -27,9 +26,9 @@ if TYPE_CHECKING:
 class TuningNavigator:
     """导航与装备操作：页面跳转、调律入口、词条收集"""
 
-    def __init__(self, wf: AutoTuningWorkflow):
+    def __init__(self, wf: AutoTuningWorkflow, routes: TuningRouteStrategy):
         self._wf = wf
-        self._routes: TuningRouteStrategy = create_tuning_route_strategy(wf)
+        self._routes = routes
 
     @property
     def routes(self) -> TuningRouteStrategy:

@@ -6,10 +6,14 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
+
 from lvjiang.core.config import session
+
+from ......i18n import tr
 
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
@@ -47,6 +51,20 @@ class TuningRouteStrategy(ABC):
         self._wf.click_region(self._wf.TUNE_SCENE, "back")
         self._wf.wait_stable("page_refresh")
 
+    @abstractmethod
+    def open_recycle_dialog(self) -> bool:
+        """打开装备回收确认弹窗。返回 True=已打开；False=未找到入口（装备保留）。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def close_recycle_entry_on_lock(self) -> None:
+        """回收确认弹窗判定装备锁定后，恢复本环境回收入口的 UI 状态。"""
+        raise NotImplementedError
+
+    def grid_click_x_ratio(self, col: int) -> float:
+        """背包格子内的横向点击比例（0~1）；默认居中点击。"""
+        return 0.5
+
     def _require_engine(self, operation: str):
         engine = self._wf.engine
         if engine is None:
@@ -68,9 +86,52 @@ class AndroidTuningRouteStrategy(TuningRouteStrategy):
         self._wf.click_region(self._wf.EQUIP_DETAIL, "more_func")
         self._wf.wait_delay("step_interval")
 
+    def open_recycle_dialog(self) -> bool:
+        # 经「更多」弹窗 → 子菜单「回收」
+        wf = self._wf
+        wf.click_region(wf.EQUIP_DETAIL, "more_func")
+        wf.wait_stable("page_refresh")
+        key = wf.ocr_scene_by(
+            wf.EQUIP_DETAIL,
+            ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
+            tr("回收"), "contains")
+        if not key:
+            logger.warning("未找到回收按钮，装备保留")
+            wf.click_region(wf.EQUIP_DETAIL, "more_func")
+            wf.wait_delay("step_interval")
+            return False
+        wf.click_region(wf.EQUIP_DETAIL, key)
+        wf.wait_stable("page_refresh")  # 回收确认弹窗
+        return True
+
+    def close_recycle_entry_on_lock(self) -> None:
+        wf = self._wf
+        wf.click_region(wf.EQUIP_DETAIL, "more_func")
+        wf.wait_delay("step_interval")
+
 
 class DesktopTuningRouteStrategy(TuningRouteStrategy):
     env = "desktop"
+
+    def open_recycle_dialog(self) -> bool:
+        # 直接扫描功能区找「回收」→ 按 X 回收
+        wf = self._wf
+        key = wf.ocr_scene_by(wf.EQUIP_DETAIL, ["func_area"], tr("回收"), "contains")
+        if not key:
+            logger.warning("桌面端：未找到回收按钮，装备保留")
+            return False
+        logger.info("  [桌面端] 找到回收入口，按 X 回收")
+        wf.press("X", wait=None)
+        wf.wait_stable("page_refresh")  # 回收确认弹窗
+        return True
+
+    def close_recycle_entry_on_lock(self) -> None:
+        # 桌面端被锁定不会出现任何现象，但也要等待
+        self._wf.wait_delay("step_interval")
+
+    def grid_click_x_ratio(self, col: int) -> float:
+        # 第 1 列：装备详情弹窗的功能区域遮挡格子左半区，偏移到右 3/4 处避开遮挡
+        return 0.75 if col == 1 else 0.5
 
 
 def create_tuning_route_strategy(

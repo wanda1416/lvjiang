@@ -64,3 +64,18 @@ def swipe(x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> bool:
 
 def long_press(x: int, y: int, duration_ms: int) -> bool:
     return bool(_bridge().longPress(int(x), int(y), int(duration_ms)))
+
+
+def hold_move(x1: int, y1: int, x2: int, y2: int, move_ms: int, hold_ms: int) -> bool:
+    """推到位后按住 hold_ms 再抬起（两段 stroke，见 A11yBridge.holdMove）"""
+    return bool(_bridge().holdMove(int(x1), int(y1), int(x2), int(y2), int(move_ms), int(hold_ms)))
+
+
+def back() -> bool:
+    """系统 BACK（performGlobalAction）"""
+    return bool(_bridge().globalBack())
+
+
+def home() -> bool:
+    """系统 HOME（performGlobalAction）"""
+    return bool(_bridge().globalHome())

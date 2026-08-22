@@ -71,3 +71,9 @@ def tap(x: int, y: int) -> str:
 
 def swipe(x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> str:
     return str(_bridge().swipe(int(x1), int(y1), int(x2), int(y2), int(duration_ms)))
+
+
+def key_event(keycode: int) -> bool:
+    """input keyevent <code>（4=BACK 3=HOME）；命令返回非空通常是报错文本"""
+    out = exec_text("input", "keyevent", str(int(keycode)))
+    return not out.strip()

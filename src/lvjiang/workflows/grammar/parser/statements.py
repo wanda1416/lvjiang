@@ -609,6 +609,17 @@ class _StmtMixin:
         """(min, max) → TupleLiteral，支持混合数字和变量，用于 eval 赋值"""
         return self._build_tuple_literal(items)
 
+    def rect_literal(self, items):
+        """(x, y, w, h) → 4 元 TupleLiteral；引擎求值为 RectCoordRef"""
+        return self._build_tuple_literal(items)
+
+    def _reject_image_by(self, by_clause, verb: str, items):
+        """by image 只属于 find（模板定位产出可点击区域）；scan/recognize 是文字/材料识别"""
+        if by_clause is not None and by_clause.match_mode == "image":
+            raise WorkflowUserError(
+                f"'by image' 仅 find 语句支持，{verb} 不支持（第 {self._line(items)} 行）"
+            )
+
     def scan_stmt(self, items):
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
@@ -633,6 +644,7 @@ class _StmtMixin:
                     )
             elif isinstance(item, WhereClause):
                 where_clause = item
+        self._reject_image_by(by_clause, "scan", items)
         return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, line_no=self._line(items))
 
     def scan_panel_stmt(self, items):
@@ -650,6 +662,7 @@ class _StmtMixin:
             elif isinstance(item, WhereClause):
                 where_clause = item
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
+        self._reject_image_by(by_clause, "scan", items)
         return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, line_no=self._line(items))
 
     def recognize_stmt(self, items):
@@ -684,6 +697,7 @@ class _StmtMixin:
                 where_clause = item
             elif isinstance(item, tuple) and item[0] == "__with_func__":
                 with_func = Literal(value=item[1])
+        self._reject_image_by(by_clause, "recognize", items)
         return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, line_no=self._line(items))
 
     def recognize_panel_stmt(self, items):
@@ -711,6 +725,7 @@ class _StmtMixin:
             elif isinstance(item, tuple) and item[0] == "__with_func__":
                 with_func = Literal(value=item[1])
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
+        self._reject_image_by(by_clause, "recognize", items)
         return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, line_no=self._line(items))
 
     def with_clause(self, items):

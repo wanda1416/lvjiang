@@ -8,7 +8,7 @@
 |------|---------|--------|---------|
 | **scan** | OCR 文字识别 | `{key: 文本}` 或命中 key | 读按钮文字、读装备词条 |
 | **recognize** | ORB 图像匹配 | `{key: 材料名}` 或命中 key | 识别材料类型、道具种类 |
-| **find** | OCR 文字定位 | `FoundRegion`（坐标对象） | 找到文字后直接点击 |
+| **find** | OCR 文字定位 / 模板定位（`by image`） | `FoundRegion`（坐标对象） | 找到文字或图标后直接点击 |
 
 一句话区分：
 - `scan` / `recognize` → 「这个区域里**写了什么** / **是什么**」
@@ -56,6 +56,7 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 | 子句 | 作用 | 方向 | 适用指令 |
 |------|------|------|---------|
 | `by <mode> <target>` | 短路匹配，返回命中 key 或坐标 | **降级**：dict → str/位置 | scan / recognize / find |
+| `by image "<模板名>"` | 模板定位，返回命中矩形 | — | 仅 find |
 | `as rich` | 返回含元数据的富 dict | **升级**：str → dict | 仅 recognize |
 | `with <func>` | 指定 rich dict 的转换函数 | 配合 rich 使用 | 仅 recognize |
 | `where confidence >= <n>` | 过滤低置信度结果（阈值 `[0.0, 1.0]`，超出范围输出警告） | **过滤**：不改变类型 | scan / recognize / find |

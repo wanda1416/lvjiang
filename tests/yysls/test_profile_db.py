@@ -234,6 +234,38 @@ class TestSchemaMigration:
         db2 = ProfileDB(db_path)
         assert db2.get_entry("u", "quota", "k")["value"] == 10
 
+    def test_concurrent_initialization_serializes_migrations(self, tmp_path: Path):
+        """多个线程首次打开同一 DB 时只执行一轮 schema 迁移。"""
+        db_path = tmp_path / "concurrent_init.db"
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            databases = list(pool.map(lambda _: ProfileDB(db_path), range(16)))
+
+        assert len(databases) == 16
+        conn = databases[0]._connect()
+        try:
+            version = conn.execute(
+                "SELECT MAX(version) FROM schema_version"
+            ).fetchone()[0]
+            entry_cols = {
+                row[1]
+                for row in conn.execute(
+                    "PRAGMA table_info(profile_entries)"
+                ).fetchall()
+            }
+            history_cols = {
+                row[1]
+                for row in conn.execute(
+                    "PRAGMA table_info(profile_history)"
+                ).fetchall()
+            }
+        finally:
+            conn.close()
+
+        assert version == MIGRATIONS[-1][0]
+        assert "value_text" in entry_cols
+        assert {"old_value_text", "new_value_text"} <= history_cols
+
     def test_migrate_v2_idempotent(self, tmp_path: Path):
         """v2 迁移列已存在时应幂等跳过（不报 duplicate column name）"""
         db_path = tmp_path / "test.db"

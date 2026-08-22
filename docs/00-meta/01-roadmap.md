@@ -331,6 +331,7 @@ Phase 9 之后的延伸工作（07-26 ~ 08-16）：
 
 - **自动调律端到端流水线**：背包遍历 → 潜力判定 → 实际调律 → 终局判定 → 调律说明文档。
 - **Android 独立执行端**：三通道 PoC 闭环、系统配置随 APK 分发、设备端工作流引擎、原生调律参数配置页、release 实机复验。
+- **设备端代理通道**（2026-08-22）：PC 端 ADB 模式经手机上的律匠 app 用无障碍截图 + 手势（`adb forward` → `AgentServer`），替代 `adb shell input`；app 不可达自动回退。契约见 `30-architecture/04-device-agent-protocol.md`。
 - **打包分发**：PyInstaller onedir 一键打包 + 内置 adb，用户免装 platform-tools。
 - **平台适配**：抽离 core/platforms.py；macOS Phase 0（依赖验证 + 退出崩溃修复）。
 - **质量门禁**：ruff + mypy + GitHub Actions CI；pytest 1932 例全绿。

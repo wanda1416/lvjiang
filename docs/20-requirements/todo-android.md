@@ -508,3 +508,18 @@ $adb = ".tooling\android-sdk\platform-tools\adb.exe"
   注意给 mypy 传路径参数会**覆盖** `[tool.mypy] files` 清单；同理 ruff 门禁范围只是
   `src tests`，加上 `scripts` 会多出 42 个既有错。
 
+
+---
+
+## 设备端代理通道（2026-08-22）：把无障碍 / Shizuku 借给 PC 端
+
+PC 端 ADB 模式原先只有 `adb shell input` + `screencap`。现在 app 内起 `AgentServer`
+（`LocalServerSocket("lvjiang-agent")`，随 `App.onCreate` 启动，对端 uid 只收 adbd/本进程），
+PC 经 `adb forward tcp:<port> localabstract:lvjiang-agent` 连入，截图走 `takeScreenshot`（RGBA 裸字节）、
+点击/拖拽/推住走 `dispatchGesture`、BACK/HOME 走 `performGlobalAction`，Shizuku 为可选通道。
+协议契约：`docs/30-architecture/04-device-agent-protocol.md`；PC 侧 `core/android/agent.py`。
+
+- [x] Kotlin `AgentServer` + `App`/`A11yService` 启动挂钩（`kotlinc` + android.jar + 桩编译零错误）
+- [x] PC 侧 `AgentClient / AgentCapture / AgentInput` + 工厂 + 配置 `adb_agent_mode` + 设置页/主窗口开关
+- [x] PC 侧单测 14 例（本地假服务端）
+- [ ] Windows 侧 Gradle 构建 APK → 实机：装包、开无障碍、PC 连接、跑一条 .wf（推摇杆 hold 验证停住）

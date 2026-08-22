@@ -62,11 +62,16 @@ class TemplateStore:
 
     ``base_dir`` 给定时直接从该目录读（测试/离线用）；否则走 ConfigResolver
     的 ``templates/`` 相对路径，local 覆盖 system。
+
+    缓存按文件失效：每次 ``get`` 先 stat 一下 png / sidecar json，路径或 mtime 变了就重载，
+    文件没了就丢缓存。脚本工作台里边调边截新模板、替换旧图，不用重启也不用手动
+    ``invalidate``；代价是每次查找多两次 stat，相对模板匹配本身可以忽略。
     """
 
     def __init__(self, base_dir: Path | str | None = None):
         self._base_dir = Path(base_dir) if base_dir else None
-        self._cache: dict[str, Template | None] = {}
+        #: name → (文件签名, 模板)；签名 = (png 路径, png mtime, json 路径, json mtime)
+        self._cache: dict[str, tuple[tuple[str, int, str, int], Template]] = {}
 
     def _resolve(self, rel: str) -> Path | None:
         if self._base_dir is not None:
@@ -75,22 +80,40 @@ class TemplateStore:
         from ..config.resolver import get_resolver
         return get_resolver().resolve_read(f"{TEMPLATES_REL_DIR}/{rel}")
 
+    def _signature(self, base: str) -> tuple[str, int, str, int] | None:
+        """当前磁盘上该模板的 (png, mtime, json, mtime)；png 不存在返回 None"""
+        png = self._resolve(f"{base}.png")
+        if png is None:
+            return None
+        meta = self._resolve(f"{base}.json")
+        try:
+            png_m = Path(png).stat().st_mtime_ns
+            meta_m = Path(meta).stat().st_mtime_ns if meta is not None else 0
+        except OSError:
+            return None
+        return (str(png), png_m, str(meta) if meta is not None else "", meta_m)
+
     def get(self, name: str) -> Template | None:
         base = name[:-4] if name.endswith(".png") else name
-        if base in self._cache:
-            return self._cache[base]
-        tpl = self._load(base)
-        self._cache[base] = tpl
+        sig = self._signature(base)
+        if sig is None:
+            self._cache.pop(base, None)
+            logger.warning(f"模板不存在: {base}.png（目录 {TEMPLATES_REL_DIR}/）")
+            return None
+        cached = self._cache.get(base)
+        if cached is not None and cached[0] == sig:
+            return cached[1]
+        tpl = self._load(base, Path(sig[0]), Path(sig[2]) if sig[2] else None)
+        if tpl is None:
+            self._cache.pop(base, None)
+            return None
+        self._cache[base] = (sig, tpl)
         return tpl
 
     def invalidate(self) -> None:
         self._cache.clear()
 
-    def _load(self, base: str) -> Template | None:
-        png = self._resolve(f"{base}.png")
-        if png is None:
-            logger.warning(f"模板不存在: {base}.png（目录 {TEMPLATES_REL_DIR}/）")
-            return None
+    def _load(self, base: str, png: Path, meta: Path | None) -> Template | None:
         data = np.fromfile(str(png), dtype=np.uint8)  # 路径含中文时 cv2.imread 在 Windows 上会失败
         img = cv2.imdecode(data, cv2.IMREAD_UNCHANGED)
         if img is None:
@@ -98,7 +121,6 @@ class TemplateStore:
             return None
         gray = _to_gray(img)
         record_w = record_h = 0
-        meta = self._resolve(f"{base}.json")
         if meta is not None:
             try:
                 o = json.loads(Path(meta).read_text(encoding="utf-8"))

@@ -446,6 +446,10 @@ class _ExprMixin:
         """field_access 作为函数参数 → FieldAccess"""
         return items[0]  # field_access 已返回 FieldAccess
 
+    def arg_tuple(self, items):
+        """(x, y) / (x, y, w, h) 作为函数参数 → TupleLiteral（引擎求值为 tuple / RectCoordRef）"""
+        return items[0]  # rect_literal / range_literal 已返回 TupleLiteral
+
     # ─── 条件表达式 ───────────────────────────────────────
 
     def cond_passthrough(self, items):

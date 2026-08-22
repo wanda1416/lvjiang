@@ -38,6 +38,7 @@ default $min_level = 110
 import "subcall/navigation.wf"
 
 call nav_main_to_equip()
+
 if $slots.weapon
     call scan_slot_bag("main_weapon", "weapon", "weapon", $min_level)
 end

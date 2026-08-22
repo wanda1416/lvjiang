@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr
 from ...core.loadout import LoadoutRepository, resolve_school
-from ..profile.tab import add_user_nav_buttons
+from ..profile.tab import add_user_toolbar_buttons
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
@@ -71,11 +71,12 @@ class LoadoutPanel(QWidget):
 
         # Row 1: same navigation structure as "其他信息".
         tools = QHBoxLayout()
-        refresh = QPushButton(tr("刷新"))
-        refresh.setFixedWidth(60)
-        refresh.clicked.connect(self.refresh)
-        tools.addWidget(refresh)
-        add_user_nav_buttons(tools, self._host)
+        add_user_toolbar_buttons(
+            tools,
+            self._host,
+            self.refresh,
+            refresh_tooltip=tr("刷新装备数据"),
+        )
         # 视图切换图标：4 个汉字宽度间距
         tools.addSpacing(64)
         for symbol, tooltip, callback in (

@@ -144,6 +144,7 @@ def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,
     """构造最小引擎；bound_scenes 中的场景视为绑定了区域 btn，其余为空。
 
     静态检查只读绑定对象的 key / from_key / to_key，用最小对象充当即可。
+    disabled 状态直接设在实例属性上，静态检查视已绑定实例为有效（不论 disabled）。
     """
     capture = MagicMock()
     capture.get_capture_size.return_value = (1920, 1080)
@@ -153,7 +154,8 @@ def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,
     # 默认 region 包含完整属性，供运行时使用
     default_region = SimpleNamespace(key="btn", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5)
     layout.get_scene_regions.side_effect = lambda k: (
-        [regions.get(k, default_region)] if k in bound_scenes else []) if regions else (
+        [regions[k]] if k in regions else
+        [default_region] if k in bound_scenes else []) if regions else (
         [default_region] if k in bound_scenes else [])
     layout.get_scene_points.side_effect = lambda k: list((points or {}).get(k, []))
     layout.get_scene_arrows.side_effect = lambda k: list((arrows or {}).get(k, []))
@@ -284,3 +286,89 @@ def test_dynamic_key_skips_key_check(tmp_path):
     ))
     engine = _make_engine(bound_scenes={"game_main_page"})
     engine.execute(wf)
+
+
+# ─── disabled 实例静态检查 ────────────────────────────────
+
+def test_disabled_region_key_does_not_raise(tmp_path):
+    """disabled 的 region 实例仍在列表中，静态检查视为已绑定"""
+    wf = _write_wf(tmp_path, (
+        'def helper()\n'
+        '    click [game_main_page].[main_func]\n'
+        'end\n'
+        'log "ok"\n'
+    ))
+    disabled_region = SimpleNamespace(
+        key="main_func", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5, disabled=True)
+    engine = _make_engine(
+        bound_scenes=set(),  # 没有实际绑定任何非 disabled region
+        regions={"game_main_page": disabled_region},
+    )
+    engine.execute(wf)  # 不抛异常（helper 未被调用，仅校验不执行）
+
+
+def test_disabled_point_key_does_not_raise(tmp_path):
+    """disabled 的 point 实例视为已绑定"""
+    wf = _write_wf(tmp_path, (
+        'def helper()\n'
+        '    click [game_main_page].[my_point]\n'
+        'end\n'
+        'log "ok"\n'
+    ))
+    disabled_point = SimpleNamespace(key="my_point", disabled=True)
+    engine = _make_engine(
+        bound_scenes=set(),
+        points={"game_main_page": [disabled_point]},
+    )
+    engine.execute(wf)
+
+
+def test_disabled_panel_key_does_not_raise(tmp_path):
+    """disabled 的 panel 实例视为已绑定"""
+    wf = _write_wf(tmp_path, (
+        'def helper()\n'
+        '    align [game_main_page].[grid]\n'
+        'end\n'
+        'log "ok"\n'
+    ))
+    disabled_panel = SimpleNamespace(key="grid", disabled=True)
+    engine = _make_engine(
+        bound_scenes=set(),
+        panels={"game_main_page": [disabled_panel]},
+    )
+    engine.execute(wf)
+
+
+def test_disabled_arrow_key_does_not_raise(tmp_path):
+    """disabled 的 arrow 实例视为已绑定，端点检查仍需通过"""
+    wf = _write_wf(tmp_path, (
+        'def helper()\n'
+        '    drag [game_main_page].[menu_up]\n'
+        'end\n'
+        'log "ok"\n'
+    ))
+    disabled_arrow = SimpleNamespace(key="menu_up", from_key="p1", to_key=None, disabled=True)
+    engine = _make_engine(
+        bound_scenes=set(),
+        arrows={"game_main_page": [disabled_arrow]},
+        points={"game_main_page": [SimpleNamespace(key="p1")]},
+    )
+    engine.execute(wf)
+
+
+def test_non_disabled_key_still_raises(tmp_path):
+    """未绑定的 key 仍然报错（disabled 的是别的 key）"""
+    wf = _write_wf(tmp_path, (
+        'def helper()\n'
+        '    click [game_main_page].[unknown_key]\n'
+        'end\n'
+        'log "ok"\n'
+    ))
+    disabled_region = SimpleNamespace(
+        key="main_func", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5, disabled=True)
+    engine = _make_engine(
+        bound_scenes=set(),
+        regions={"game_main_page": disabled_region},  # disabled 的是别的 key
+    )
+    with pytest.raises(WorkflowUserError):
+        engine.execute(wf)

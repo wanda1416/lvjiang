@@ -340,7 +340,7 @@ class LayoutOpsMixin:
             if idx >= 0:
                 self._layout_combo.setCurrentIndex(idx)
             self._update_ui_state()
-            total = sum(len(r) for r in temp.scenes.values())
+            total = sum(len(r) for r in temp.regions.values())
             self._status_bar.showMessage(f"已另存为布局「{name}」，共 {total} 个区域")
             self._mark_all_scenes_clean()
             logger.info(f"布局已另存为: {name}, {total} 个区域")

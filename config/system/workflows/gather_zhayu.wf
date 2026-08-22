@@ -17,8 +17,13 @@ default $max_loops = 500
 eval $loop_count = 0
 
 @zhayu
-click [general_control].[qingji] after wait @step_interval
-click [general_control].[qishu]
+if env("android")
+   click [general_control].[qingji] after wait @step_interval
+   click [general_control].[qishu]
+else if env("desktop")
+   press "1" after wait @step_interval
+end
+
 loop 20
    wait (0.99,1.02)
 end

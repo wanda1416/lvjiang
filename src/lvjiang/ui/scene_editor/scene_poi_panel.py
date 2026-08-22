@@ -65,16 +65,15 @@ class PoiPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._point_list = QTableWidget()
-        self._point_list.setColumnCount(5)
-        self._point_list.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击")])
+        self._point_list.setColumnCount(6)
+        self._point_list.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"), tr("禁用")])
         # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._point_list.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(3, 50)
-        header.resizeSection(4, 50)
+        for col in (3, 4, 5):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            header.resizeSection(col, 50)
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -109,12 +108,14 @@ class PoiPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._arrow_list = QTableWidget()
-        self._arrow_list.setColumnCount(2)
-        self._arrow_list.setHorizontalHeaderLabels(["Key", tr("方向")])
+        self._arrow_list.setColumnCount(3)
+        self._arrow_list.setHorizontalHeaderLabels(["Key", tr("方向"), tr("禁用")])
         header = self._arrow_list.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(2, 50)
         self._arrow_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._arrow_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._arrow_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -178,6 +179,14 @@ class PoiPanelMixin:
             click_item = QTableWidgetItem("\u2713" if point_def.is_clickable else "")
             click_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._point_list.setItem(row, 4, click_item)
+            # 禁用复选框
+            disabled_keys = self._canvas.get_disabled_keys("point")
+            cb = QCheckBox()
+            cb.setChecked(point_def.key in disabled_keys)
+            cb.stateChanged.connect(
+                lambda state, k=point_def.key: self._on_toggle_poi_disabled(k, "point", state)
+            )
+            self._point_list.setCellWidget(row, 5, cb)
         self._point_list.blockSignals(False)
 
     def _refresh_arrow_list(self):
@@ -197,7 +206,19 @@ class PoiPanelMixin:
                 cy = a.to_cy_ratio if a.to_cy_ratio is not None else 0.0
                 desc = f"{a.from_key} \u2192 ({cx:.2f}, {cy:.2f})"
             self._arrow_list.setItem(row, 1, QTableWidgetItem(desc))
+            # 禁用复选框
+            disabled_keys = self._canvas.get_disabled_keys("arrow")
+            cb = QCheckBox()
+            cb.setChecked(a.key in disabled_keys)
+            cb.stateChanged.connect(
+                lambda state, k=a.key: self._on_toggle_poi_disabled(k, "arrow", state)
+            )
+            self._arrow_list.setCellWidget(row, 2, cb)
         self._arrow_list.blockSignals(False)
+
+    def _on_toggle_poi_disabled(self, key: str, kind: str, state: int):
+        """切换某 key 的禁用状态，通过画布回调通知 dialog 标记 dirty"""
+        self._canvas.set_item_disabled(kind, key, bool(state))
 
     def _on_poi_changed(self):
         """画布 point/arrow 数据变化时刷新两个列表"""

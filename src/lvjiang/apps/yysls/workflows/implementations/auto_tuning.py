@@ -56,6 +56,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
+from lvjiang.core.config import load_env
 from lvjiang.workflows.base import BaseWorkflow
 
 from .....i18n import tr
@@ -254,6 +255,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._ensure_judge_config()
             group = self._ensure_base_group()
             self.recorder.reset()  # 重置所有记录状态
+            self._equipped_items: dict[str, dict] = {}  # 各槽位已装备装备信息（进入时读取）
             # 加载导航所需的 DSL subcall 文件（每次运行都重新加载，保证修改立即生效）
             self.navigator.load_dependencies()
             selected = self._resolve_selected_slots()
@@ -404,6 +406,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     # ─── 部位处理 ──────────────────────────────────────────
 
+    def _read_equipped(self, slot: str) -> dict:
+        """读取当前槽位已装备的装备信息。
+
+        点击部位标签后详情页已打开，直接 OCR 即可。
+        武器用 weapon_detail，防具/首饰用 armor_detail。
+        """
+        detail_scene = (self.WEAPON_DETAIL if slot in self.WEAPON_SLOTS
+                        else self.ARMOR_DETAIL)
+        fields = self.SCAN_FIELDS + (["base_attr_2"]
+                                     if detail_scene == self.ARMOR_DETAIL else [])
+        raw = self.ocr_scene(detail_scene, fields)
+        equip = self.call_function("to_equipment", [raw]) if raw else {}
+        return equip
+
     def _process_slot_group_enter(self, slot: str):
         """点击部位标签进入背包网格页
 
@@ -418,6 +434,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._SLOT_NAMES.get(slot, slot))
         self.click_region(self.GRID_SCENE, slot)
         self.wait_stable("page_refresh")  # 背包浏览页 → 装备详情页
+        # 读取当前槽位已装备装备信息（用于分组部位的类型过滤）
+        self._equipped_items[slot] = self._read_equipped(slot)
 
     def _process_slot_group(self, slot: str, detail_scene: str):
         self._process_slot_group_enter(slot)
@@ -454,12 +472,39 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     # ─── 背包遍历（滚动策略实现见 bag_traversal）──────────────
 
+    def _click_grid(self, row: int, col: int) -> bool:
+        """点击背包网格格子。
+
+        桌面端第 1 列：装备详情弹窗的功能区域遮挡格子左半区，
+        将点击位置偏移到格子右 3/4 处避开遮挡。
+        其余情况直接委托 click_panel。
+        """
+        if col != 1 or load_env() != "desktop":
+            return self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
+        # 桌面端 col=1：偏移到格子右半区
+        cal = self._ensure_aligned(self.GRID_SCENE, self.GRID_PANEL)
+        if cal is None:
+            return False
+        row_idx, col_idx = row - 1, col - 1
+        if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
+            return False
+        panel_obj = self._find_panel(self.GRID_SCENE, self.GRID_PANEL)
+        _, cy = cal.slot_center(row_idx, col_idx)
+        x1, _, x2, _ = cal.slot_bounds(row_idx, col_idx)
+        # 使用自动对齐得到的实际格子边界，落在格内横向 75% 处。
+        cx_shifted = x1 + 0.75 * (x2 - x1)
+        sx, sy = self._panel_ratio_to_screen(panel_obj, cx_shifted, cy)
+        self._input.click_screen(
+            sx, sy,
+            f"grid_shifted({self.GRID_SCENE}.{self.GRID_PANEL}[{row}][{col}])")
+        return True
+
     def _read_row(self, detail_scene: str, row: int,
                   col: int = 1) -> tuple[str, str, dict]:
         """点击指定行/列 slot，等面板刷新后 OCR，返回 (装备名, 指纹, 装备dict)
 
         默认第 1 列（行指纹/滚动校验链路）；列遍历时传入 col 读非首列。"""
-        self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
+        self._click_grid(row, col)
         self.wait_stable("page_refresh")  # 点击装备 → 详情页加载
         fields = self.SCAN_FIELDS + (["base_attr_2"]
                                      if detail_scene == self.ARMOR_DETAIL else [])
@@ -595,13 +640,26 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if equip.get("is_wuku"):
             slot = getattr(self, "_current_slot", "")
             if slot in self.GROUPED_SLOTS:
-                # 主/副武器按类型分组，武库装备穿插其中，跳过但不结束扫描
-                logger.info(f"  [{name}] 武库装备，跳过（武器分组，不结束扫描）")
-                self._emit_equip_finish(
-                    name, equip_data, affix_count=affix_count,
-                    status="wuku_skip",
-                    reason="武库装备，跳过")
-                return self._make_fingerprint(equip), None
+                # 主/副武器按类型分组，检查武库装备类型是否与当前装备一致
+                equipped_type = (self._equipped_items.get(slot) or {}).get("type")
+                current_type = equip.get("type")
+                if current_type and equipped_type and current_type == equipped_type:
+                    # 同类型武库：跳过但不结束扫描
+                    logger.info(f"  [{name}] 武库装备（同类型），跳过（武器分组，不结束扫描）")
+                    self._emit_equip_finish(
+                        name, equip_data, affix_count=affix_count,
+                        status="wuku_skip",
+                        reason="武库装备（同类型），跳过")
+                    return self._make_fingerprint(equip), None
+                else:
+                    # 不同类型武库：当前类型组已到底，停止扫描
+                    logger.info(f"  [{name}] 武库装备（不同类型），当前类型组已到底")
+                    self._slot_level_exhausted = True
+                    self._emit_equip_finish(
+                        name, equip_data, affix_count=affix_count,
+                        status="wuku_bottom",
+                        reason="武库装备（不同类型），当前类型组已到底")
+                    return self._make_fingerprint(equip), None
             else:
                 # 环佩/防具无分组，按等级倒序，武库装备意味着已经到底
                 logger.info(f"  [{name}] 武库装备，当前部位已到底")
@@ -621,6 +679,32 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         )
         if (isinstance(level, (int, float)) and not isinstance(level, bool)
                 and level > 0 and level < min_level):
+            slot = getattr(self, "_current_slot", "")
+            if slot in self.GROUPED_SLOTS:
+                # 主/副武器按类型分组，检查装备类型是否与当前装备一致
+                equipped_type = (self._equipped_items.get(slot) or {}).get("type")
+                current_type = equip.get("type")
+                if current_type and equipped_type and current_type == equipped_type:
+                    # 同类型低等级：同组内后面都是低的，跳过但不结束扫描
+                    logger.info(
+                        f"  [{name}] 等级 {level} < 门槛 {min_level}"
+                        f"（同类型，跳过但不结束扫描）")
+                    self._emit_equip_finish(
+                        name, equip_data, affix_count=affix_count,
+                        status="below_level_skip",
+                        reason=f"等级 {level} < 门槛 {min_level}，跳过（同类型）")
+                    return self._make_fingerprint(equip), None
+                else:
+                    # 不同类型低等级：已越过当前类型组，停止扫描
+                    logger.info(
+                        f"  [{name}] 等级 {level} < 门槛 {min_level}"
+                        f"（不同类型，当前类型组已到底）")
+                    self._slot_level_exhausted = True
+                    self._emit_equip_finish(
+                        name, equip_data, affix_count=affix_count,
+                        status="below_level",
+                        reason=f"等级 {level} < 门槛 {min_level}，当前类型组已到底")
+                    return self._make_fingerprint(equip), None
             logger.info(
                 f"  [{name}] 等级 {level} < 门槛 {min_level}；背包装备按等级倒序，"
                 "结束当前部位扫描")

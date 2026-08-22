@@ -5,10 +5,8 @@ views:
   name: 基底
 - key: confirm
   name: 确认
-- key: fight
-  name: 战斗
-- key: get_item
-  name: 获得箱子
+- key: fight_android
+  name: 战斗_手游
 regions:
 - key: confirm
   name: 确认
@@ -27,12 +25,12 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-  view: get_item
 - key: menu_area
   name: 菜单功能区
   type: attr
   is_text: false
   is_clickable: false
+  view: confirm
 points:
 - key: material_slot_1
   name: 材料格1
@@ -79,46 +77,46 @@ points:
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: teshuji
   name: 特殊技
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: qishu
   name: 奇术
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: xieshi
   name: 卸势
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: xuli
   name: 蓄力
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: qingji
   name: 轻击
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: shanbi
   name: 闪避
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android
 - key: tiaoyue
   name: 跳跃
   type: func
   is_text: false
   is_clickable: true
-  view: fight
+  view: fight_android

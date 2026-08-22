@@ -2,6 +2,7 @@
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -54,19 +55,20 @@ class PanelEditorMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._panel_table = QTableWidget()
-        self._panel_table.setColumnCount(5)
+        self._panel_table.setColumnCount(6)
         self._panel_table.setHorizontalHeaderLabels(
-            [tr("名称"), "Key", tr("比例"), tr("校准模式"), tr("滚动方向")]
+            [tr("名称"), "Key", tr("比例"), tr("校准模式"), tr("滚动方向"), tr("禁用")]
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        for col in (2, 3, 4):
+        for col in (2, 3, 4, 5):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
         header.resizeSection(2, 40)   # 行可见比例
         header.resizeSection(3, 60)   # 校准模式
         header.resizeSection(4, 60)   # 滚动方向
+        header.resizeSection(5, 50)   # 禁用
         self._panel_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
@@ -148,7 +150,19 @@ class PanelEditorMixin:
             sd_item = QTableWidgetItem(self._SCROLL_LABELS.get(panel_def.scroll_direction, panel_def.scroll_direction))
             sd_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._panel_table.setItem(row, 4, sd_item)
+            # 禁用复选框
+            disabled_keys = self._canvas.get_disabled_keys("panel")
+            cb = QCheckBox()
+            cb.setChecked(panel_def.key in disabled_keys)
+            cb.stateChanged.connect(
+                lambda state, k=panel_def.key: self._on_toggle_panel_disabled(k, "panel", state)
+            )
+            self._panel_table.setCellWidget(row, 5, cb)
         self._panel_table.blockSignals(False)
+
+    def _on_toggle_panel_disabled(self, key: str, kind: str, state: int):
+        """切换某 key 的禁用状态，通过画布回调通知 dialog 标记 dirty"""
+        self._canvas.set_item_disabled(kind, key, bool(state))
 
     # ─── 事件处理 ────────────────────────────────────────
 

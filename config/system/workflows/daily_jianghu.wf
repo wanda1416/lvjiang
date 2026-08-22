@@ -1,4 +1,5 @@
 #% name: 每日江湖号令
+#% env: [android, desktop]
 #% parameters:
 #%   - name: max_refresh
 #%     label: 单任务最大刷新次数

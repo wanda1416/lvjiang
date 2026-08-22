@@ -39,16 +39,16 @@ def parse_bugan_jindu($raw)
     eval $total = $parts[1]
 
     if $current < 0
-        log concat("不肝进度异常：当前值 ", $current, " 小于 0")
+        log "不肝进度异常：当前值 " + $current + " 小于 0"
         return -1
     end
 
     if $current > $total
-        log concat("不肝进度解析错误：", $current, " > ", $total)
+        log "不肝进度解析错误：" + $current + " > " + $total
         return -1
     end
 
     eval profile_set("bugan_of_week", $current)
-    log concat("本周不肝进度: ", $current, "/", $total)
+    log "本周不肝进度: " + $current + "/" + $total
     return 0
 end

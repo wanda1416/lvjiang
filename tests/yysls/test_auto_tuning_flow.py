@@ -147,7 +147,10 @@ class FakeWF(AutoTuningWorkflow):
             data["recycle_confirm"] = "确认"
         # 导航预检：菜单页检查
         if scene_key == "game_menu_page":
-            data.setdefault("wulinlu", "武林录")
+            data.setdefault("baoguo", "包裹")
+        # 导航预检：主界面检查（is_in_main_page 用）
+        if scene_key == "game_main_page":
+            data.setdefault("menu", "菜单")
         # 导航预检：包裹页 tab 检查
         if scene_key == "bag_equip_detail":
             data.setdefault("sub_baoguo", "培养")
@@ -269,6 +272,29 @@ def test_desktop_route_leaves_detail_without_menu_click(monkeypatch):
     wf.navigator.leave_tune()
 
     assert wf.clicks == [(TUNE_SCENE, "back")]
+
+
+def test_desktop_first_grid_col_uses_detected_slot_bounds(monkeypatch):
+    """首列偏移基于实际检测边界，不能按列数假设网格严格等分。"""
+    monkeypatch.setattr(auto_tuning, "load_env", lambda: "desktop")
+    wf = MagicMock()
+    wf.GRID_SCENE = AutoTuningWorkflow.GRID_SCENE
+    wf.GRID_PANEL = AutoTuningWorkflow.GRID_PANEL
+    cal = MagicMock(n_rows=4, n_cols=6)
+    cal.slot_center.return_value = (0.18, 0.35)
+    cal.slot_bounds.return_value = (0.10, 0.20, 0.30, 0.50)
+    wf._ensure_aligned.return_value = cal
+    panel_obj = object()
+    wf._find_panel.return_value = panel_obj
+    wf._panel_ratio_to_screen.return_value = (123, 456)
+
+    result = AutoTuningWorkflow._click_grid(wf, row=1, col=1)
+
+    assert result is True
+    # 实际边界 [0.10, 0.30] 的 75% 位置为 0.25；旧等分公式为 0.2217。
+    wf._panel_ratio_to_screen.assert_called_once_with(panel_obj, 0.25, 0.35)
+    wf._input.click_screen.assert_called_once_with(
+        123, 456, "grid_shifted(bag_equip_detail.bag_grid[1][1])")
 
 
 def test_already_full(monkeypatch):

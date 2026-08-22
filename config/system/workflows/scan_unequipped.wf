@@ -1,4 +1,5 @@
 #% name: 扫描全部装备
+#% env: [android, desktop]
 #% parameters:
 #%   - name: slots
 #%     label: 扫描部位
@@ -71,6 +72,8 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
     eval $signal = ""
     eval $total_count = 0
     eval $window_idx = 0
+    call $slot_equip = scan_cell($detail_kind)
+    eval $slot_type = $slot_equip.type
 
     loop while 1 == 1
         align [bag_equip_detail].[bag_grid]
@@ -89,17 +92,14 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
             # 第一列是物理行锚点。锚点已见过意味着整行此前已完整读取，
             # 直接跳过剩余列；只有新行才扫描第 2～末列。
             click [bag_equip_detail].[bag_grid][$r][1] after wait @step_interval
-            if $detail_kind equals "weapon"
-                scan [equip_weapon_detail] as $raw
-            else
-                scan [equip_armor_detail] as $raw
-            end
-            eval $equip = to_equipment($raw)
+            call $equip = scan_cell($detail_kind)
             # type 为空 → equip_type OCR 失败，当前槽位结束
             if not $equip.type
                 log error "  [" + $r + ",1] equip_type OCR 失败，槽位结束"
                 break
             end
+            # 有装备，关闭详情弹窗
+            press "ESC" after wait @page_refresh
             eval $fp = make_fingerprint($equip)
             eval $signal = bag_cursor_visit($fp)
             log "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
@@ -111,49 +111,56 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
 
             if $signal equals "new"
                 if $equip.level < $min_level
-                    log "  等级 " + $equip.level + " < " + $min_level + "，等级截止"
-                    eval $signal = "level_end"
-                    break
-                end
-                eval $items.$fp = $equip
-                eval write_bag_item($group, $equip)
-                eval $total_count = $total_count + 1
-
-                eval $c = 2
-                loop while $c <= $cols
-                    click [bag_equip_detail].[bag_grid][$r][$c] after wait @step_interval
-                    if $detail_kind equals "weapon"
-                        scan [equip_weapon_detail] as $raw
+                    if $group equals "weapon" and $equip.type equals $slot_type
+                        log "  同类型低等级，跳过到下一行"
                     else
-                        scan [equip_armor_detail] as $raw
-                    end
-                    eval $equip = to_equipment($raw)
-                    # type 为空 → equip_type OCR 失败，结束本行
-                    if not $equip.type
-                        log error "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
-                        break
-                    end
-                    eval $fp = make_fingerprint($equip)
-                    log "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
-
-                    if not $fp
-                        log "    指纹为空，空白格，结束本行"
-                        break
-                    end
-                    # 指纹已存在于本槽位 → 点击落到了空白格（详情页未刷新），结束本行
-                    if $items.$fp
-                        log "    指纹已存在，空白格残留数据，结束本行"
-                        break
-                    end
-                    if $equip.level < $min_level
-                        log "    等级 " + $equip.level + " < " + $min_level + "，等级截止"
+                        log "  等级 " + $equip.level + " < " + $min_level + "，等级截止"
                         eval $signal = "level_end"
                         break
                     end
+                else
                     eval $items.$fp = $equip
                     eval write_bag_item($group, $equip)
                     eval $total_count = $total_count + 1
-                    eval $c = $c + 1
+
+                    eval $c = 2
+                    loop while $c <= $cols
+                        click [bag_equip_detail].[bag_grid][$r][$c] after wait @step_interval
+                        call $equip = scan_cell($detail_kind)
+                        # type 为空 → equip_type OCR 失败，结束本行
+                        if not $equip.type
+                            log error "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
+                            break
+                        end
+                        # 有装备，关闭详情弹窗
+                        press "ESC" after wait @page_refresh
+                        eval $fp = make_fingerprint($equip)
+                        log "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
+
+                        if not $fp
+                            log "    指纹为空，空白格，结束本行"
+                            break
+                        end
+                        # 指纹已存在于本槽位 → 点击落到了空白格（详情页未刷新），结束本行
+                        if $items.$fp
+                            log "    指纹已存在，空白格残留数据，结束本行"
+                            break
+                        end
+                        if $equip.level < $min_level
+                            if $group equals "weapon" and $equip.type equals $slot_type
+                                log "    同类型低等级，跳过到下一行"
+                                break
+                            else
+                                log "    等级 " + $equip.level + " < " + $min_level + "，等级截止"
+                                eval $signal = "level_end"
+                                break
+                            end
+                        end
+                        eval $items.$fp = $equip
+                        eval write_bag_item($group, $equip)
+                        eval $total_count = $total_count + 1
+                        eval $c = $c + 1
+                    end
                 end
             end
 
@@ -179,4 +186,14 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
     end
 
     log "═══ 部位 " + $group + " 扫描完成，共 " + $total_count + " 件 ═══"
+end
+
+# 扫描当前格子并解析装备，返回装备字典
+def scan_cell($detail_kind)
+    if $detail_kind equals "weapon"
+        scan [equip_weapon_detail] as $raw
+    else
+        scan [equip_armor_detail] as $raw
+    end
+    return to_equipment($raw)
 end

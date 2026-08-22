@@ -14,7 +14,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from ...core.layout_models import CanvasConfig, Panel, Region
+from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region
 from ...core.scene_registry import get_region_name
 from ...i18n import tr
 from .canvas_interaction import HANDLE_SIZE, CanvasInteractionMixin, EditMode, HandlePos
@@ -128,6 +128,71 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._arrow_snap_timer.start()
 
     # ─── 公开接口 ────────────────────────────────────────
+
+    def set_item_disabled(self, kind: str, key: str, disabled: bool):
+        """设置某类型某 key 实例的 disabled 属性，并触发 dirty 回调"""
+        target = self._find_item_by_kind(kind, key)
+        if target is None and disabled:
+            # 为无实例的 key 创建占位，保证 disabled 状态可持久化
+            target = self._create_placeholder(kind, key)
+            self._append_to_kind(kind, target)
+        if target is not None:
+            target.disabled = disabled
+        # 按 kind 分发正确的回调
+        if kind == "region" and self.on_region_changed:
+            self.on_region_changed()
+        elif kind in ("point", "arrow") and self.on_poi_changed:
+            self.on_poi_changed()
+        elif kind == "panel" and self.on_panel_changed:
+            self.on_panel_changed()
+
+    def get_disabled_keys(self, kind: str) -> set[str]:
+        """获取某类型中已标记 disabled 的全部 key"""
+        items = self._items_by_kind(kind)
+        return {item.key for item in items if item.disabled}
+
+    def _items_by_kind(self, kind: str) -> list:
+        """按类型取实例列表（含隐藏项）"""
+        if kind == "region":
+            return self._regions + self._hidden_regions
+        if kind == "panel":
+            return self._panels + self._hidden_panels
+        if kind == "point":
+            return self._points + self._hidden_points
+        if kind == "arrow":
+            return self._arrows + self._hidden_arrows
+        return []
+
+    def _find_item_by_kind(self, kind: str, key: str):
+        """按类型+key 查找实例"""
+        for item in self._items_by_kind(kind):
+            if item.key == key:
+                return item
+        return None
+
+    @staticmethod
+    def _create_placeholder(kind: str, key: str):
+        """创建零坐标占位实例（用于 disabled 但无画布实例的 key）"""
+        if kind == "region":
+            return Region(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
+        if kind == "point":
+            return Point(key=key, cx_ratio=0, cy_ratio=0, disabled=True)
+        if kind == "arrow":
+            return Arrow(key=key, from_key="", disabled=True)
+        if kind == "panel":
+            return Panel(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
+        raise ValueError(f"unknown kind: {kind}")
+
+    def _append_to_kind(self, kind: str, item):
+        """将占位实例追加到对应列表"""
+        if kind == "region":
+            self._regions.append(item)
+        elif kind == "point":
+            self._points.append(item)
+        elif kind == "arrow":
+            self._arrows.append(item)
+        elif kind == "panel":
+            self._panels.append(item)
 
     def set_current_regions(self, regions: list[tuple[str, str]]):
         """设置当前场景的区域列表（由对话框调用）"""

@@ -24,7 +24,11 @@ class RefProblem:
 
 
 def _bound_keys(layout, scene: str) -> dict[str, set[str]]:
-    """取某场景在当前布局已绑定的各类 key"""
+    """取某场景在当前布局已绑定的各类 key
+
+    disabled 实例仍在列表中，其 key 自然包含在对应集合内，
+    静态检查视为已绑定（不报错）。
+    """
     return {
         "region": {r.key for r in layout.get_scene_regions(scene)},
         "point": {p.key for p in layout.get_scene_points(scene)},

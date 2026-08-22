@@ -208,5 +208,12 @@
       "from_key": "origin",
       "to_key": "turn_left"
     }
-  ]
+  ],
+  "disabled": {
+    "region": [
+      "huanma",
+      "more_func",
+      "tingfeng"
+    ]
+  }
 }

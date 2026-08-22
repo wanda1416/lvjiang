@@ -51,9 +51,10 @@ def _make_key_lparam(scan: int, flags: int) -> int:
     - 0-15:  repeat count = 1
     - 16-23: scan code
     - 24:    extended key flag
-    - 25-28: context code = 0
-    - 29:    previous key state (down=0, up=1)
-    - 30:    transition state (down=0, up=1)
+    - 25-28: reserved = 0
+    - 29:    context code = 0（非 ALT 系统键）
+    - 30:    previous key state (down=0, up=1)
+    - 31:    transition state (down=0, up=1)
     """
     repeat_count = 1
     extended = 1 if (flags & KEYEVENTF_EXTENDEDKEY) else 0
@@ -63,7 +64,7 @@ def _make_key_lparam(scan: int, flags: int) -> int:
         repeat_count
         | (scan << 16)
         | (extended << 24)
-        | (prev_state << 29)
+        | (prev_state << 30)
         | (transition << 31)
     )
 
@@ -86,14 +87,18 @@ _KEY_ALIASES: dict[str, str] = {
     "PGUP": "PAGEUP",
     "PGDN": "PAGEDOWN",
     "WINDOWS": "WIN",
+    # 小键盘别名：NUM1 → NUMPAD1
+    **{f"NUM{d}": f"NUMPAD{d}" for d in range(10)},
 }
 
 # 标准键名 → VK code
 KEY_NAME_TO_VK: dict[str, int] = {
     # 字母 A-Z
     **{chr(c): c for c in range(ord("A"), ord("Z") + 1)},
-    # 数字 0-9
+    # 数字 0-9（字母区上方）
     **{str(d): 0x30 + d for d in range(10)},
+    # 小键盘 0-9
+    **{f"NUMPAD{d}": 0x60 + d for d in range(10)},
     # 功能键 F1-F12
     **{f"F{i}": 0x70 + i - 1 for i in range(1, 13)},
     # 特殊键

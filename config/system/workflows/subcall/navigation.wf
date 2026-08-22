@@ -22,7 +22,7 @@
 
 def nav_main_to_bag()
     if env("desktop")
-        # 桌面端：简单处理
+        # 桌面端：简单处理，暂不支持从 菜单页进入
         log info "桌面端：按 B 打开背包"
         press "B" after wait @step_interval
         return 0
@@ -85,12 +85,12 @@ end
 # 后置：android 在装备列表页；desktop 在主武器装备详情页
 
 def nav_main_to_equip()
-    if env("android")
-        call $tab = nav_main_to_bag()
-        if $tab < 0
-            return -1
-        end
+    call $tab = nav_main_to_bag()
+    if $tab < 0
+        return -1
+    end
 
+    if env("android")
         # 不在培养 tab 则点击切换
         if $tab != 1
             log info "从包裹页切换到培养页"
@@ -114,10 +114,8 @@ def nav_main_to_equip()
         end
         log info "已到达装备列表页"
     else if env("desktop")
-        log info "桌面端：按 B 打开背包"
-        press "B" after wait @step_interval
         click [bag_equip_detail].[peiyang] after wait @step_interval
-        click [bag_equip_detail].[main_weapon] after wait @step_interval
+        click [bag_equip_detail].[sub_equip] after wait @step_interval
     else
         log error "不支持当前环境"
         return -1
@@ -200,10 +198,19 @@ def nav_back_to_main()
         click [game_menu_page].[back] after wait @page_refresh
     else if env("desktop")
         log info "桌面端：按 ESC 返回主界面"
-        
-        press "ESC" after wait @step_interval
-        press "ESC" after wait @step_interval
-        press "ESC" after wait @step_interval
+        eval $tries = 0
+        loop while $tries < 3
+            call $in_main = is_in_main_page()
+            if $in_main
+                break
+            end
+            press "ESC" after wait @step_interval
+            eval $tries = $tries + 1
+        end
+        call $in_main = is_in_main_page()
+        if not $in_main
+            eval confirm("当前未回到主页，请手动回到主页后点击确定")
+        end
     else
         log error "不支持当前环境"
         return -1
@@ -264,13 +271,15 @@ end
 # 返回：1=在主界面，0=不在
 
 def is_in_main_page()
-   eval $main_items = ["菜单", "活动", "武林录", "限时"]
-   scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
-   if $found
-       return 1
-   else
-       return 0
-   end
+    eval $main_items = ["菜单", "活动", "武林录", "限时"]
+    scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
+    if $found
+        call $in_bag = is_in_bag_page()
+        if $in_bag == 0
+            return 1
+        end
+    end
+    return 0
 end
 
 # ─── is_in_menu_page ─────────────────────────────────────
@@ -281,6 +290,20 @@ end
 def is_in_menu_page()
    eval $menu_items = ["包裹", "培养"]
    scan [game_menu_page].[baoguo, peiyang] as $found by contains_any $menu_items
+   if $found
+       return 1
+   else
+       return 0
+   end
+end
+
+# ─── is_in_bag_page ─────────────────────────────────────
+# 检测当前是否在背包页
+# 通过扫描背包页入口按钮文字判定（回收/整理背包）
+# 返回：1=在背包页，0=不在
+def is_in_bag_page()
+   eval $bag_items = ["回收", "整理背包"]
+   scan [bag_equip_detail].[recycle, zhengli] as $found by contains_any $bag_items
    if $found
        return 1
    else

@@ -24,14 +24,16 @@ class _DeviceWorker(QObject):
     scan_finished = pyqtSignal(list)  # devices
     wireless_finished = pyqtSignal(list)  # devices (无线扫描结果)
     wireless_progress = pyqtSignal(str, int, int)  # message, current, total
-    connect_finished = pyqtSignal(object, object, str, int, int)  # device, capture, method, w, h
+    connect_finished = pyqtSignal(object, object, str, int, int, object)  # device, capture, method, w, h, agent
+    notice = pyqtSignal(str)  # 连接过程中的提示（主线程写进日志区）
     error = pyqtSignal(str)
 
-    def __init__(self, task: str, serial: str = "", capture_method: str = ""):
+    def __init__(self, task: str, serial: str = "", capture_method: str = "", agent_mode: bool = False):
         super().__init__()
         self._task = task
         self._serial = serial
         self._capture_method = capture_method
+        self._agent_mode = agent_mode
         self._cancelled = False
 
     def cancel(self):
@@ -77,7 +79,7 @@ class _DeviceWorker(QObject):
         self.wireless_progress.emit(message, current, total)
 
     def _do_connect(self):
-        from ..core.android import AdbDevice, create_capture_backend
+        from ..core.android import AdbDevice, connect_agent, create_capture_backend
 
         device = AdbDevice(serial=self._serial)
         w, h = device.get_resolution()
@@ -85,12 +87,33 @@ class _DeviceWorker(QObject):
             self.error.emit(tr("无法获取设备分辨率"))
             return
 
-        capture = create_capture_backend(device=device, method=self._capture_method)
-        if not capture.start():
-            self.error.emit(f"{self._capture_method} 截图后端不可用")
+        # 设备端代理：连上就用 app 内的无障碍截图/手势；连不上回退 adb（只提示，不算失败）
+        agent = None
+        method = self._capture_method
+        if self._agent_mode:
+            agent = connect_agent(device)
+            if agent is None:
+                self.notice.emit(tr("[设备端手势] 连不上手机上的律匠 app（未安装或未开无障碍），回退 adb shell input"))
+            else:
+                self.notice.emit(f"[设备端手势] 已连接 {agent.describe()}")
+                if method != "scrcpy":
+                    method = "agent"
+
+        capture = create_capture_backend(device=device, method=method, agent=agent)
+        started = capture.start()
+        if not started and method == "agent":
+            # 代理截图失败（多半是无障碍未开、Shizuku 也没授权）→ 退 screencap，手势仍走代理
+            self.notice.emit(tr("[设备端手势] 代理截图不可用，截图回退 screencap"))
+            method = "screencap"
+            capture = create_capture_backend(device=device, method=method)
+            started = capture.start()
+        if not started:
+            if agent is not None:
+                agent.close()
+            self.error.emit(f"{method} 截图后端不可用")
             return
 
-        self.connect_finished.emit(device, capture, self._capture_method, w, h)
+        self.connect_finished.emit(device, capture, method, w, h, agent)
 
 
 class _WirelessScanDialog(QObject):
@@ -234,6 +257,8 @@ class WindowOpsMixin:
             self.chk_bg_mode.setEnabled(True)
         if hasattr(self, "chk_scrcpy"):
             self.chk_scrcpy.setVisible(False)
+        if hasattr(self, "chk_agent"):
+            self.chk_agent.setVisible(False)
 
         had_target = self._target_window is not None
         self._target_window = None
@@ -306,6 +331,13 @@ class WindowOpsMixin:
                 self.chk_scrcpy.blockSignals(False)
             self.chk_scrcpy.setVisible(True)
             self.chk_scrcpy.setEnabled(True)
+        if hasattr(self, "chk_agent"):
+            if not self.chk_agent.isVisible():
+                self.chk_agent.blockSignals(True)
+                self.chk_agent.setChecked(bool(self._user_config.adb_agent_mode))
+                self.chk_agent.blockSignals(False)
+            self.chk_agent.setVisible(True)
+            self.chk_agent.setEnabled(True)
         if hasattr(self, "chk_bg_mode"):
             self.chk_bg_mode.setVisible(False)
         if self._target_window is not None:
@@ -498,23 +530,28 @@ class WindowOpsMixin:
         # 异步连接
         self._wait_device_thread()
         self._device_thread = QThread()
-        self._device_worker = _DeviceWorker(task="connect", serial=d["serial"], capture_method=capture_method)
+        self._device_worker = _DeviceWorker(
+            task="connect", serial=d["serial"], capture_method=capture_method,
+            agent_mode=bool(self._user_config.adb_agent_mode),
+        )
         self._device_worker.moveToThread(self._device_thread)
         self._device_thread.started.connect(self._device_worker.run)
+        self._device_worker.notice.connect(self.log_text.append)
         self._device_worker.connect_finished.connect(
-            lambda device, capture, method, w, h: self._on_connect_done(d, device, capture, method, w, h)
+            lambda device, capture, method, w, h, agent: self._on_connect_done(d, device, capture, method, w, h, agent)
         )
         self._device_worker.error.connect(self._on_connect_error)
         self._device_worker.connect_finished.connect(self._device_thread.quit)
         self._device_worker.error.connect(self._device_thread.quit)
         self._device_thread.start()
 
-    def _on_connect_done(self, combo_data, device, capture, capture_method, w, h):
+    def _on_connect_done(self, combo_data, device, capture, capture_method, w, h, agent=None):
         """连接成功回调（主线程）"""
         from ..core.android import create_input_backend
 
-        # 创建输入控制器（adb shell input）
-        self._input = create_input_backend(device=device, input_sim=self._user_config.input_sim)
+        # 创建输入控制器：有设备端代理走无障碍手势，否则 adb shell input
+        self._agent = agent
+        self._input = create_input_backend(device=device, input_sim=self._user_config.input_sim, agent=agent)
 
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
         self._scrcpy_streaming = False
@@ -545,7 +582,9 @@ class WindowOpsMixin:
         if resume_event is not None and not resume_event.is_set():
             self._refresh_running_engine_backends()
 
-        method_label = "scrcpy" if capture_method == "scrcpy" else "screencap"
+        method_label = {"scrcpy": "scrcpy", "agent": "设备端截图"}.get(capture_method, "screencap")
+        if agent is not None:
+            method_label += "  |  " + tr("设备端手势")
         self.lbl_window_info.setText(f"已连接: {combo_data['serial']}  |  分辨率: {w}x{h}  |  {method_label}")
         self.lbl_window_info.setStyleSheet("color: green;")
         self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
@@ -586,6 +625,14 @@ class WindowOpsMixin:
         self._scrcpy_streaming = False
         self._stop_capture_backend()
         self._input = None
+        # 设备端代理：关 socket + 撤 adb forward
+        agent = getattr(self, "_agent", None)
+        if agent is not None:
+            try:
+                agent.close()
+            except Exception as e:
+                logger.debug(f"[设备端手势] 关闭代理失败: {e}")
+            self._agent = None
         # 清理断连信号桥
         if hasattr(self, '_adb_conn_bridge') and self._adb_conn_bridge is not None:
             self._adb_conn_bridge.deleteLater()
@@ -605,12 +652,16 @@ class WindowOpsMixin:
                 self.chk_bg_mode.setEnabled(False)
             if hasattr(self, "chk_scrcpy"):
                 self.chk_scrcpy.setEnabled(False)
+            if hasattr(self, "chk_agent"):
+                self.chk_agent.setEnabled(False)
         else:
             # 断连后恢复当前模式可见 checkbox 的可选状态
             if hasattr(self, "chk_bg_mode") and self.chk_bg_mode.isVisible():
                 self.chk_bg_mode.setEnabled(True)
             if hasattr(self, "chk_scrcpy") and self.chk_scrcpy.isVisible():
                 self.chk_scrcpy.setEnabled(True)
+            if hasattr(self, "chk_agent") and self.chk_agent.isVisible():
+                self.chk_agent.setEnabled(True)
         # 采集面板（录屏/截屏）随连接态刷新可用性
         if hasattr(self, "_apply_rec_state"):
             self._apply_rec_state()
@@ -729,11 +780,14 @@ class WindowOpsMixin:
             self._user_config.adb_capture_streaming = state
             return
 
-        # 已连接设备时重建截图后端
+        # 已连接设备时重建截图后端；非流式且代理在线 → 截图也走代理（无障碍 takeScreenshot）
         self._user_config.adb_capture_streaming = state
         from ..core.android import create_capture_backend
+        agent = getattr(self, "_agent", None)
+        if method != "scrcpy" and agent is not None and agent.connected:
+            method = "agent"
         old_capture = self._capture
-        self._capture = create_capture_backend(device=self._device, method=method)
+        self._capture = create_capture_backend(device=self._device, method=method, agent=agent)
         if self._capture.start():
             # scrcpy 模式订阅帧回调
             self._scrcpy_streaming = False
@@ -748,7 +802,7 @@ class WindowOpsMixin:
                     old_capture.stop()
                 except Exception:
                     pass
-            mode_label = tr("scrcpy 流式") if method == "scrcpy" else "screencap"
+            mode_label = {"scrcpy": tr("scrcpy 流式"), "agent": tr("设备端")}.get(method, "screencap")
             self.log_text.append(f"[模式] 已切换到 {mode_label} 截图")
             if not self._scrcpy_streaming:
                 self._capture_preview()
@@ -765,6 +819,12 @@ class WindowOpsMixin:
         # 流式状态变化后刷新采集面板可用性
         if hasattr(self, "_apply_rec_state"):
             self._apply_rec_state()
+
+    def _on_agent_mode_changed(self, state):
+        """设备端手势开关：只改内存配置，下次连接生效（已连接时开关被锁定）"""
+        self._user_config.adb_agent_mode = bool(state)
+        label = tr("设备端手势（律匠 app 无障碍）") if state else "adb shell input"
+        self.log_text.append(f"[模式] ADB 输入方式: {label}（下次连接生效）")
 
     # ─── 截屏 ─────────────────────────────────────────────
 

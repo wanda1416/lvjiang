@@ -667,6 +667,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.chk_scrcpy.setVisible(False)
         self.chk_scrcpy.stateChanged.connect(self._on_capture_method_changed)
         row2.addWidget(self.chk_scrcpy)
+
+        # 设备端手势：经手机上的律匠 app（无障碍）下点击/截图，替代 adb shell input；连接时生效
+        self.chk_agent = QCheckBox(tr("设备端手势"))
+        self.chk_agent.setVisible(False)
+        self.chk_agent.setToolTip(tr("手机上安装律匠 app 并开启无障碍后，点击/拖拽/截图由 app 落地；app 不可达时自动回退 adb"))
+        self.chk_agent.stateChanged.connect(self._on_agent_mode_changed)
+        row2.addWidget(self.chk_agent)
         window_main_layout.addLayout(row2)
 
         self._apply_backend_ui(self._backend)

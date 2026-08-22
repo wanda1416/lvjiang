@@ -46,16 +46,15 @@ class RegionPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._region_table = QTableWidget()
-        self._region_table.setColumnCount(5)
-        self._region_table.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击")])
+        self._region_table.setColumnCount(6)
+        self._region_table.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"), tr("禁用")])
         # 列宽：名称/Key 自适应内容，后三列固定窄宽
         header = self._region_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(3, 50)
-        header.resizeSection(4, 50)
+        for col in (3, 4, 5):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
+            header.resizeSection(col, 50)
         self._region_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._region_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._region_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -120,7 +119,19 @@ class RegionPanelMixin:
             click_item = QTableWidgetItem("\u2713" if region_def.is_clickable else "")
             click_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._region_table.setItem(row, 4, click_item)
+            # 禁用复选框
+            disabled_keys = self._canvas.get_disabled_keys("region")
+            cb = QCheckBox()
+            cb.setChecked(region_def.key in disabled_keys)
+            cb.stateChanged.connect(
+                lambda state, k=region_def.key: self._on_toggle_disabled(k, "region", state)
+            )
+            self._region_table.setCellWidget(row, 5, cb)
         self._region_table.blockSignals(False)
+
+    def _on_toggle_disabled(self, key: str, kind: str, state: int):
+        """切换某 key 的禁用状态，标记场景 dirty"""
+        self._canvas.set_item_disabled(kind, key, bool(state))
 
     # ─── 事件处理 ────────────────────────────────────────
 

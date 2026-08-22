@@ -1,4 +1,5 @@
 #% name: 自动购买不肝
+#% env: [android, desktop]
 
 # 自动购买不肝商店商品
 #
@@ -20,7 +21,11 @@ eval $buy_keywords = ["心法", "武学", "奇术", "生活", "宝钱", "短陌�
 import "subcall/game_profile.wf"
 
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
-click [game_main_page].[menu] after wait @page_refresh
+if env("android")
+    click [game_main_page].[menu] after wait @page_refresh
+else if env("desktop")
+    press "ESC" after wait @page_refresh
+end
 
 scan [game_menu_page].[bugan] as $nav_check by contains "不肝"
 if not $nav_check
@@ -33,6 +38,13 @@ click [bugan_detail].[bugan_view] after wait @step_interval
 scan [bugan_detail].[bugan_jindu] as $jindu_str
 call parse_bugan_jindu($jindu_str.bugan_jindu)
 
+# 领取不肝进度奖励
+scan [bugan_detail].[purchase] as $found by contains "全部领取"
+if $found
+    click [bugan_detail].[purchase] after wait @step_interval
+    click [general_action].[space_area] after wait @step_interval
+    log "领取本周不肝奖励"
+end
 
 click [bugan_detail].[shop] after wait @page_refresh
 
@@ -41,25 +53,39 @@ if not $nav_check
     eval pause("未进入商店购买区域，请确认当前在不肝商店后点击继续")
 end
 
-# ─── 战斗养成：依次购买两个商品面板 ─────────────────────
-call buy_panel("shangpin_1", $buy_keywords)
-drag [bugan_detail].[shangpin_2] up 2 after wait @step_interval
-call buy_panel("shangpin_2", $buy_keywords)
+if env("android")
+    # ─── 战斗养成：依次购买两个商品面板 ─────────────────────
+    call buy_panel("shangpin_1", $buy_keywords)
+    drag [bugan_detail].[shangpin_1] up 2 after wait @step_interval
+    call buy_panel("shangpin_2", $buy_keywords)
+else if env("desktop")
+    # PC 端可以展示 3行，直接买全部即可
+    call buy_panel("shangpin_1", $buy_keywords)
+end
 
 # ─── 营生：只买第一格（先确认格子内容是营生） ────────────
 click [bugan_detail].[cat_4] after wait @page_refresh
 scan [bugan_detail].[shangpin_1][1][1] as $cat4_cell
 if $cat4_cell contains "营生"
-   call buy_cell(1, 1)
+   call buy_cell("shangpin_1", 1, 1)
 else
    log "营生 (1,1) 未命中，跳过购买"
 end
 
-# ─── 赛季：shangpin_1 全部格子买一遍 ───
+# ─── 赛季：shangpin_1 全部 2×4 格子买一遍 ───
 click [bugan_detail].[cat_5] after wait @page_refresh
-call buy_all_cells()
-
-# TODO 后续需要实现购买袅袅之音
+scan [bugan_detail].[shangpin_1] as $season_grid
+for r in [1, 2]
+    for c in [1, 2, 3, 4]
+        eval $cell = $season_grid.$r.$c
+        call $reason = buy_block_reason($cell)
+        if $reason
+            log "赛季追赶 行" + $r + "列" + $c + " " + $reason + "，跳过"
+            continue
+        end
+        call buy_cell("shangpin_1", $r, $c)
+    end
+end
 
 # ─── 返回主页 ──────────────────────────────────────────
 click [bugan_detail].[back] after wait @step_interval
@@ -77,34 +103,45 @@ def match_keyword($text, $keywords)
     return ""
 end
 
+# ─── 判断商品格子是否可购买 ────────────────────────────
+# 返回不可购买原因（"库存不足"/"条件不足"），可购买返回 ""
+def buy_block_reason($cell)
+    if $cell contains "库存不足"
+        return "库存不足"
+    end
+    if $cell contains "条件不足"
+        return "条件不足"
+    end
+    return ""
+end
+
 # ─── 购买单个格子：点击格子 → 全部添加 → 购买 ─────────
-def buy_cell($r, $c)
-    click [bugan_detail].[shangpin_1][$r][$c] after wait @step_interval
+def buy_cell($panel_key, $r, $c)
+    click [bugan_detail].$panel_key[$r][$c] after wait @step_interval
     click [bugan_detail].[add_all] after wait @step_interval
     click [bugan_detail].[purchase] after wait @step_interval
 end
 
-# ─── shangpin_1 全部格子（2×4）各购买一次 ──────────────
-def buy_all_cells()
-    for r in [1, 2]
-        for c in [1, 2, 3, 4]
-            call buy_cell($r, $c)
-        end
-    end
-end
-
 # ─── 按关键词购买单个商品面板 ──────────────────────────
 # 整面板 OCR 后逐格判断，命中目标类目则购买
+# 行数从 panel 实际检测结果读取（PC 端可显示 3 行）
 def buy_panel($panel_key, $keywords)
     scan [bugan_detail].$panel_key as $grid
-    for r in [1, 2]
+    eval $rows = panel_rows("bugan_detail", $panel_key)
+    for r in range(1, $rows)
         for c in [1, 2, 3, 4]
             eval $cell = $grid.$r.$c
             call $hit = match_keyword($cell, $keywords)
-            if $hit
-                log concat("命中商品 [", $panel_key, "] 行", $r, "列", $c, " (", $hit, "): ", $cell)
-                call buy_cell($r, $c)
+            if not $hit
+                continue
             end
+            call $reason = buy_block_reason($cell)
+            if $reason
+                log "战斗养成 [" + $panel_key + "] 行" + $r + "列" + $c + " " + $reason + "，跳过"
+                continue
+            end
+            log "命中商品 [" + $panel_key + "] 行" + $r + "列" + $c + " (" + $hit + "): " + $cell
+            call buy_cell($panel_key, $r, $c)
         end
     end
 end

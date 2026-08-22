@@ -63,15 +63,20 @@ class Region:
     """单个区域实例（归一化坐标）
 
     仅存储位置数据，名称等元信息通过 key 从场景定义 (RegionDef) 获取。
+    disabled 标记该区域在当前布局中不可用，静态检查时视为已绑定。
     """
     key: str
     x_ratio: float
     y_ratio: float
     w_ratio: float
     h_ratio: float
+    disabled: bool = False
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not d.get("disabled"):
+            d.pop("disabled", None)
+        return d
 
     def to_coord_ref(self) -> RectCoordRef:
         """转换为 RectCoordRef（左上角 → 中心点）"""
@@ -87,6 +92,7 @@ class Region:
             y_ratio=d["y_ratio"],
             w_ratio=d["w_ratio"],
             h_ratio=d["h_ratio"],
+            disabled=d.get("disabled", False),
         )
 
 
@@ -97,9 +103,13 @@ class Point:
     cx_ratio: float
     cy_ratio: float
     r_ratio: float = 0.015
+    disabled: bool = False
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not d.get("disabled"):
+            d.pop("disabled", None)
+        return d
 
     def to_coord_ref(self) -> CircleCoordRef:
         """转换为 CircleCoordRef（已是中心点）"""
@@ -112,6 +122,7 @@ class Point:
             cx_ratio=d["cx_ratio"],
             cy_ratio=d["cy_ratio"],
             r_ratio=d.get("r_ratio", 0.015),
+            disabled=d.get("disabled", False),
         )
 
 
@@ -122,12 +133,14 @@ class Arrow:
     终点互斥二态：
     - 吸附态：to_key 非空，终点绑定到另一个 point，随其移动
     - 绝对态：to_cx_ratio/to_cy_ratio 非空，终点为固定归一化坐标
+    disabled 标记该方向在当前布局中不可用，静态检查时视为已绑定。
     """
     key: str
     from_key: str
     to_key: str | None = None
     to_cx_ratio: float | None = None
     to_cy_ratio: float | None = None
+    disabled: bool = False
 
     def to_dict(self) -> dict:
         d: dict = {"key": self.key, "from_key": self.from_key}
@@ -136,6 +149,8 @@ class Arrow:
         else:
             d["to_cx_ratio"] = self.to_cx_ratio
             d["to_cy_ratio"] = self.to_cy_ratio
+        if self.disabled:
+            d["disabled"] = True
         return d
 
     @staticmethod
@@ -146,6 +161,7 @@ class Arrow:
             to_key=d.get("to_key"),
             to_cx_ratio=d.get("to_cx_ratio"),
             to_cy_ratio=d.get("to_cy_ratio"),
+            disabled=d.get("disabled", False),
         )
 
 
@@ -181,6 +197,7 @@ class Panel:
     min_visible: float = 0.95
     calibration: str = "auto"  # "image" | "even" | "auto"
     scroll_direction: str = "vertical"  # "vertical" | "horizontal" | "both" | "none"
+    disabled: bool = False
 
     _VALID_SCROLL_DIRECTIONS = ("vertical", "horizontal", "both", "none")
 
@@ -200,7 +217,10 @@ class Panel:
             )
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not d.get("disabled"):
+            d.pop("disabled", None)
+        return d
 
     def to_coord_ref(self) -> RectCoordRef:
         """转换为 RectCoordRef（左上角 → 中心点）"""
@@ -221,7 +241,55 @@ class Panel:
             min_visible=float(d.get("min_visible", 0.95)),
             calibration=str(d.get("calibration", "auto")),
             scroll_direction=str(d.get("scroll_direction", "vertical")),
+            disabled=d.get("disabled", False),
         )
+
+
+def _apply_legacy_disabled(
+    disabled_section: dict,
+    regions: dict[str, list[Region]],
+    points: dict[str, list[Point]],
+    arrows: dict[str, list[Arrow]],
+    panels: dict[str, list[Panel]],
+    scene_key: str,
+) -> None:
+    """向后兼容：将旧格式 disabled 段迁移到实例属性
+
+    旧格式中 disabled key 可能没有对应实例（仅存 key 名），
+    此时需创建占位实例（坐标归零）以保证静态检查能找到该 key。
+    """
+    for kind, keys in disabled_section.items():
+        if not isinstance(keys, list):
+            continue
+        key_set = set(keys)
+        if kind == "region":
+            ritems = regions.setdefault(scene_key, [])
+            for item in ritems:
+                if item.key in key_set:
+                    item.disabled = True
+            for key in key_set - {i.key for i in ritems}:
+                ritems.append(Region(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True))
+        elif kind == "point":
+            pitems = points.setdefault(scene_key, [])
+            for pi in pitems:
+                if pi.key in key_set:
+                    pi.disabled = True
+            for key in key_set - {i.key for i in pitems}:
+                pitems.append(Point(key=key, cx_ratio=0, cy_ratio=0, disabled=True))
+        elif kind == "arrow":
+            aitems = arrows.setdefault(scene_key, [])
+            for ai in aitems:
+                if ai.key in key_set:
+                    ai.disabled = True
+            for key in key_set - {i.key for i in aitems}:
+                aitems.append(Arrow(key=key, from_key="", disabled=True))
+        elif kind == "panel":
+            pnitems = panels.setdefault(scene_key, [])
+            for ni in pnitems:
+                if ni.key in key_set:
+                    ni.disabled = True
+            for key in key_set - {i.key for i in pnitems}:
+                pnitems.append(Panel(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True))
 
 
 @dataclass
@@ -230,17 +298,17 @@ class Layout:
     name: str = ""
     desc: str = ""  # 描述性文本（来自 layouts.yaml，仅展示用）
     canvas: CanvasConfig = field(default_factory=CanvasConfig)
-    scenes: dict[str, list[Region]] = field(default_factory=dict)
+    regions: dict[str, list[Region]] = field(default_factory=dict)
     points: dict[str, list[Point]] = field(default_factory=dict)
     arrows: dict[str, list[Arrow]] = field(default_factory=dict)
     panels: dict[str, list[Panel]] = field(default_factory=dict)
-    # scenes = {"equip_detail": [Region, ...], "equip_tune": [Region, ...]}
+    # regions = {"equip_detail": [Region, ...], "equip_tune": [Region, ...]}
 
     def get_scene_regions(self, scene_key: str) -> list[Region]:
-        return self.scenes.get(scene_key, [])
+        return self.regions.get(scene_key, [])
 
     def set_scene_regions(self, scene_key: str, regions: list[Region]):
-        self.scenes[scene_key] = regions
+        self.regions[scene_key] = regions
 
     def get_scene_points(self, scene_key: str) -> list[Point]:
         return self.points.get(scene_key, [])
@@ -268,11 +336,11 @@ class Layout:
 
     def to_dict(self) -> dict:
         # 汇总所有出现过的场景 key
-        scene_keys = set(self.scenes) | set(self.points) | set(self.arrows) | set(self.panels)
+        scene_keys = set(self.regions) | set(self.points) | set(self.arrows) | set(self.panels)
         scenes_out: dict[str, dict] = {}
         for sk in scene_keys:
             entry: dict = {}
-            regions = self.scenes.get(sk) or []
+            regions = self.regions.get(sk) or []
             entry["regions"] = [r.to_dict() for r in regions]
             pts = self.points.get(sk) or []
             if pts:
@@ -296,24 +364,31 @@ class Layout:
         if "canvas" in d and isinstance(d["canvas"], dict):
             canvas = CanvasConfig.from_dict(d["canvas"])
         # 解析各场景 regions / points / arrows / panels
-        scenes: dict[str, list[Region]] = {}
+        regions: dict[str, list[Region]] = {}
         points: dict[str, list[Point]] = {}
         arrows: dict[str, list[Arrow]] = {}
         panels: dict[str, list[Panel]] = {}
 
         def _parse_scene_entry(scene_key: str, scene_data: dict):
             if "regions" in scene_data:
-                scenes[scene_key] = [Region.from_dict(r) for r in scene_data["regions"]]
+                regions[scene_key] = [Region.from_dict(r) for r in scene_data["regions"]]
             if "points" in scene_data:
                 points[scene_key] = [Point.from_dict(p) for p in scene_data["points"]]
             if "arrows" in scene_data:
                 arrows[scene_key] = [Arrow.from_dict(a) for a in scene_data["arrows"]]
             if "panels" in scene_data:
                 panels[scene_key] = [Panel.from_dict(p) for p in scene_data["panels"]]
+            # 向后兼容：旧格式 disabled 段迁移到实例属性
+            if "disabled" in scene_data and isinstance(scene_data["disabled"], dict):
+                _apply_legacy_disabled(
+                    scene_data["disabled"],
+                    regions, points, arrows, panels, scene_key,
+                )
 
         scenes_data = d.get("scenes", {})
         if isinstance(scenes_data, dict):
             for scene_key, scene_data in scenes_data.items():
                 if isinstance(scene_data, dict):
                     _parse_scene_entry(scene_key, scene_data)
-        return Layout(name=name, canvas=canvas, scenes=scenes, points=points, arrows=arrows, panels=panels)
+        return Layout(name=name, canvas=canvas, regions=regions,
+                      points=points, arrows=arrows, panels=panels)

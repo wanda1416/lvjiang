@@ -90,6 +90,18 @@
       "min_visible": 0.95,
       "calibration": "even",
       "scroll_direction": "vertical"
+    },
+    {
+      "key": "shangpin_2",
+      "x_ratio": 0.10477245726993556,
+      "y_ratio": 0.1430077581268918,
+      "w_ratio": 0.5074463034070619,
+      "h_ratio": 0.7038775990835155,
+      "cols": 6,
+      "rows": 3,
+      "min_visible": 0.95,
+      "calibration": "even",
+      "scroll_direction": "vertical"
     }
   ]
 }

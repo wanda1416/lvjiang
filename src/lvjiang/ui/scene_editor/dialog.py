@@ -345,6 +345,11 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.canvas.on_panel_changed = lambda sk=scene_key: self._on_scene_data_changed(sk)
             tab.canvas.on_status_message = lambda msg: self._status_bar.showMessage(msg, 5000)
             tab.on_view_changed = self._on_tab_view_changed
+            # 回调设置完毕后显式刷新，重建表格并创建 checkbox
+            tab._refresh_region_list()
+            tab._refresh_point_list()
+            tab._refresh_arrow_list()
+            tab._refresh_panel_list()
         self._set_dirty(False)
         self._status_bar.showMessage(f"当前布局: {layout_name}")
         # 只加载当前可见 Tab 的底图，其余在切到时懒加载

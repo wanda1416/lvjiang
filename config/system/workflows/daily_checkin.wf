@@ -1,4 +1,5 @@
 #% name: 每日自动签到
+#% env: [android, desktop]
 
 # 每日自动签到流程
 #

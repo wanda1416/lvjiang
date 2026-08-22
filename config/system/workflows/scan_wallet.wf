@@ -73,7 +73,7 @@ for c in range(1, 4)
     eval $count = $cell.count
     if $label
         eval $tongbao_total = $tongbao_total + $count
-        log concat("区域货币: ", $label, " = ", $count)
+        log "区域货币: " + $label + " = " + $count
     end
 end
 
@@ -176,10 +176,10 @@ def safe_set($key, $new_val, $tolerance, $label)
         eval $delta = $new_val - $old
         eval $diff = abs($delta)
         if $diff > $tolerance
-            log concat($label, " 差值 ", $diff, " 超过容差 ", $tolerance, "，跳过写入")
+            log $label + " 差值 " + $diff + " 超过容差 " + $tolerance + "，跳过写入"
             return
         end
     end
     eval profile_set($key, $new_val)
-    log concat($label, ": ", $new_val)
+    log $label + ": " + $new_val
 end

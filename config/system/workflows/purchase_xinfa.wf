@@ -1,4 +1,5 @@
 #% name: 自动购买心法
+#% env: [android, desktop]
 
 # 自动购买心法流程
 #

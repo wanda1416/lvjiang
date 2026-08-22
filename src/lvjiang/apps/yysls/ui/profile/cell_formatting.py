@@ -193,13 +193,11 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
         if isinstance(kd, StockKeyDef) and kd.cap is not None:
             if kd.show_cap and kd.cap:
                 if value >= kd.cap:
-                    style = "red_bold" if not kd.soft else "orange_bold"
-                    return f"{int(value)}/{kd.cap}", style
+                    return f"{int(value)}/{kd.cap}", "green_bold"
                 return f"{int(value)}/{kd.cap}", ""
             # 不展示上限但达到上限时
             if value >= kd.cap:
-                style = "red_bold" if not kd.soft else "orange_bold"
-                return str(int(value)), style
+                return str(int(value)), "green_bold"
         # 存量模型无上限时纯数字
         return str(int(value)), ""
 

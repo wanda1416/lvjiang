@@ -133,6 +133,23 @@ class _ActionMixin:
         logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})" + (f" hold {hold}s" if hold else ""))
         self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration, hold=hold, **kw)
 
+    # ─── 键盘 ──────────────────────────────────────────────
+
+    def press(self, key: str, wait: str | None = "step_interval"):
+        """模拟一次完整按键（down + up），默认跟随 step_interval 等待。
+
+        Args:
+            key: 按键名称（如 "ESC"、"B"、"X"），后端内部自动 normalize。
+            wait: 按键后的命名等待参数，默认 "step_interval"。
+                  传 None 表示不等待。
+        """
+        logger.debug(f"press: {key}")
+        self._input.key_down(key)
+        time.sleep(random.uniform(0.025, 0.035))
+        self._input.key_up(key)
+        if wait is not None:
+            self.wait_delay(wait)
+
     # ─── 等待 ──────────────────────────────────────────────
 
     def wait_delay(self, delay_name: str):

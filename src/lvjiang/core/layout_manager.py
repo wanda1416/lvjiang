@@ -421,7 +421,7 @@ def load_layout_by_name(name: str) -> Layout | None:
     从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
     别名布局（带 extends）的 scene 从根布局目录加载，canvas 取自身条目。
     """
-    from .layout_models import Arrow, Panel, Point, Region
+    from .layout_models import Arrow, Panel, Point, Region, _apply_legacy_disabled
 
     resolver = get_resolver()
     merged = resolver.load_merged(_LAYOUTS_YAML_REL)
@@ -445,7 +445,7 @@ def load_layout_by_name(name: str) -> Layout | None:
     canvas = CanvasConfig.from_dict(canvas_dict) if canvas_dict else CanvasConfig()
 
     # 逐场景加载（别名布局从根布局目录读）
-    scenes: dict[str, list[Region]] = {}
+    regions: dict[str, list[Region]] = {}
     points: dict[str, list[Point]] = {}
     arrows: dict[str, list[Arrow]] = {}
     panels: dict[str, list[Panel]] = {}
@@ -460,15 +460,21 @@ def load_layout_by_name(name: str) -> Layout | None:
             logger.error(f"场景文件解析失败 {path}: {e}")
             continue
         if "regions" in data:
-            scenes[scene_key] = [Region.from_dict(r) for r in data["regions"]]
+            regions[scene_key] = [Region.from_dict(r) for r in data["regions"]]
         if "points" in data:
             points[scene_key] = [Point.from_dict(p) for p in data["points"]]
         if "arrows" in data:
             arrows[scene_key] = [Arrow.from_dict(a) for a in data["arrows"]]
         if "panels" in data:
             panels[scene_key] = [Panel.from_dict(p) for p in data["panels"]]
+        # 向后兼容：旧格式 disabled 段迁移到实例属性
+        if "disabled" in data and isinstance(data["disabled"], dict):
+            _apply_legacy_disabled(
+                data["disabled"],
+                regions, points, arrows, panels, scene_key,
+            )
 
-    return Layout(name=name, desc=desc, canvas=canvas, scenes=scenes,
+    return Layout(name=name, desc=desc, canvas=canvas, regions=regions,
                   points=points, arrows=arrows, panels=panels)
 
 
@@ -538,7 +544,7 @@ class LayoutConfigManager:
         from .scene_registry import SCENE_REGIONS
         layout = Layout(name=name)
         for scene_key in SCENE_REGIONS:
-            layout.scenes[scene_key] = []
+            layout.regions[scene_key] = []
         self.save_layout(layout)
         self.set_active_layout(name)
         logger.info(f"布局已新建: {name}")
@@ -632,13 +638,13 @@ class LayoutConfigManager:
         resolver.save_merged(_LAYOUTS_YAML_REL, merged)
 
         # 3. 写场景 JSON 文件（增量或全量）；别名布局落到根布局目录
-        all_scene_keys = set(layout.scenes) | set(layout.points) | set(layout.arrows) | set(layout.panels)
+        all_scene_keys = set(layout.regions) | set(layout.points) | set(layout.arrows) | set(layout.panels)
         scene_keys = all_scene_keys if changed_scenes is None else (changed_scenes & all_scene_keys)
         for sk in scene_keys:
             entry: dict = {}
             # 按场景定义顺序排序 regions/points/panels，避免编辑顺序影响输出
             region_order = {r.key: i for i, r in enumerate(get_region_defs(sk))}
-            regions = layout.scenes.get(sk) or []
+            regions = layout.regions.get(sk) or []
             entry["regions"] = [r.to_dict() for r in sorted(regions, key=lambda r: region_order.get(r.key, 999))]
             pts = layout.points.get(sk) or []
             if pts:

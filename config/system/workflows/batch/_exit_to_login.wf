@@ -18,5 +18,5 @@ def _exit_to_login()
     else
         eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
     end
-    wait @page_refresh
+    wait @secondary_confirm
 end

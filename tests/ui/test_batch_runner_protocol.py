@@ -9,6 +9,7 @@ from lvjiang.ui.batch.batch_runner import (
     BatchStageResult,
     BatchWorker,
 )
+from lvjiang.workflows.base import BaseWorkflow
 
 
 def test_stage_result_accepts_standard_dict_and_keeps_private_state():
@@ -143,6 +144,47 @@ def test_skipped_item_state_is_passed_to_next_item(monkeypatch):
 
     assert seen_states == [{}, {"opaque_cursor": "after-first"}]
     assert executed_rows == ["second"]
+
+
+def test_run_script_class_branch_propagates_pause_event(monkeypatch):
+    """Python 类批量脚本必须收到 pause_event，否则 F8 暂停对它完全失效
+    （回归 batch_runner.py 历史 bug：曾只传 stop_check，漏传 pause_event）。"""
+    import lvjiang.workflows.implementations as impl_module
+
+    captured = {}
+
+    class FakeWorkflow(BaseWorkflow):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            captured["pause_event"] = kwargs.get("pause_event")
+
+        def run(self):
+            return {}
+
+    monkeypatch.setattr(impl_module, "get_workflow_class", lambda name: FakeWorkflow)
+    monkeypatch.setattr(
+        "lvjiang.core.config.wf_configs.get_wf_config", lambda script_id: {})
+
+    sentinel_pause_event = object()
+    ctx = BatchContext(object(), object(), object(), object(),
+                       pause_event=sentinel_pause_event)
+
+    class Sessions:
+        pass
+
+    worker = BatchWorker(
+        enabled_rows=[],
+        scripts=[],
+        config=BatchConfigItem(name="test"),
+        ctx=ctx,
+        session_manager=Sessions(),
+        stop_check=lambda: False,
+    )
+
+    worker._run_script(
+        BatchScript(id="task", name="Task", class_name="Fake"), {}, None)
+
+    assert captured["pause_event"] is sentinel_pause_event
 
 
 def test_failed_batch_setup_starts_no_later_stage(monkeypatch):

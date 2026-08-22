@@ -439,6 +439,9 @@ class RunControlMixin:
 
     def _request_stop(self):
         """统一停止入口（F10 / 结束按钮）。只设标志，不立即改 running。"""
+        # 暂停中点结束先二次确认：F8/F10 位置接近，容易手误想恢复点成结束
+        if self._run_state == 'paused' and not self._confirm_stop_while_paused():
+            return
         self.log_text.append(tr("[操作] 收到停止请求"))
         logger.info("收到停止请求")
         if not self._running:
@@ -472,6 +475,16 @@ class RunControlMixin:
             self._overlay.set_color("red")
             self.log_text.append(tr("[操作] 已停止"))
 
+    def _confirm_stop_while_paused(self) -> bool:
+        """暂停中点击结束时弹二次确认，返回是否确认结束。"""
+        from PyQt6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self, tr("确认结束"), tr("任务暂停中，是否直接结束？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
     # ─── 暂停/恢复 ────────────────────────────────────────
 
     def _on_pause_resume(self):
@@ -492,9 +505,12 @@ class RunControlMixin:
             pause_event.clear()  # 阻塞工作流线程
         self._refresh_pause_button()
         self._refresh_run_button()  # 广播 "paused" 状态给插件 Tab
-        self.log_text.append(tr("[操作] 已暂停 | F8 恢复 | F10 结束"))
-        self.statusBar().showMessage(tr("已暂停 | F8 恢复 | F10 结束"))
-        logger.info("工作流已暂停")
+        # 请求已发出，但工作流线程可能仍在执行一个不可中断的原子操作
+        # （如调律重置二次确认），未必已经真正阻塞，故用「暂停中」而非
+        # 「已暂停」这种确定性措辞。
+        self.log_text.append(tr("[操作] 暂停中... | F8 恢复 | F10 结束"))
+        self.statusBar().showMessage(tr("暂停中... | F8 恢复 | F10 结束"))
+        logger.info("工作流暂停中")
 
     def _resume_execution(self):
         """恢复执行：唤醒工作流线程，从暂停点继续"""

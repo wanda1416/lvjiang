@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.request import Request, urlopen
 
 from loguru import logger
@@ -21,6 +24,66 @@ from ..i18n import tr
 GITHUB_REPO = "wanda1416/lvjiang"
 GITHUB_RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+
+
+@dataclass(frozen=True)
+class ReleaseInfo:
+    """GitHub Release 中供更新界面使用的信息。"""
+
+    version: str
+    title: str
+    body: str
+    published_at: str
+    release_url: str
+    download_url: str
+
+
+def _select_download_url(data: dict[str, Any], platform: str) -> str:
+    """优先选择适合当前平台的 Release 附件。"""
+    release_url = str(data.get("html_url") or GITHUB_RELEASES_URL)
+    assets = data.get("assets")
+    if platform != "win32" or not isinstance(assets, list):
+        return release_url
+
+    candidates: list[tuple[int, str]] = []
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        name = str(asset.get("name") or "").lower()
+        url = str(asset.get("browser_download_url") or "")
+        if not name or not url:
+            continue
+        if name.endswith(("-setup.exe", "_setup.exe", "setup.exe")):
+            priority = 0
+        elif name.endswith((".exe", ".msi")):
+            priority = 1
+        elif "win64" in name and name.endswith(".zip"):
+            priority = 2
+        elif name.endswith(".zip"):
+            priority = 3
+        else:
+            continue
+        candidates.append((priority, url))
+
+    return min(candidates, default=(99, release_url))[1]
+
+
+def parse_release_info(data: dict[str, Any], platform: str | None = None) -> ReleaseInfo | None:
+    """从 GitHub Releases API 响应提取稳定的界面模型。"""
+    tag_name = str(data.get("tag_name") or "").strip()
+    if not tag_name:
+        return None
+
+    version = tag_name[1:] if tag_name[:1].lower() == "v" else tag_name
+    release_url = str(data.get("html_url") or GITHUB_RELEASES_URL)
+    return ReleaseInfo(
+        version=version,
+        title=str(data.get("name") or "").strip() or tag_name,
+        body=str(data.get("body") or "").strip(),
+        published_at=str(data.get("published_at") or "").strip(),
+        release_url=release_url,
+        download_url=_select_download_url(data, platform or sys.platform),
+    )
 
 
 def get_version() -> str:
@@ -124,7 +187,7 @@ def should_prompt_update(latest_version: str) -> bool:
 class UpdateChecker(QThread):
     """后台线程检查 GitHub Release 更新"""
 
-    finished = pyqtSignal(str, str)  # (latest_version, download_url)
+    finished = pyqtSignal(object)  # ReleaseInfo
     error = pyqtSignal(str)
 
     def run(self):
@@ -138,11 +201,9 @@ class UpdateChecker(QThread):
             with urlopen(req, timeout=10) as response:
                 data = json.loads(response.read().decode())
 
-            latest_version = data.get("tag_name", "").lstrip("v")
-            download_url = data.get("html_url", GITHUB_RELEASES_URL)
-
-            if latest_version:
-                self.finished.emit(latest_version, download_url)
+            release = parse_release_info(data)
+            if release:
+                self.finished.emit(release)
             else:
                 self.error.emit(tr("无法获取版本信息"))
         except Exception as e:

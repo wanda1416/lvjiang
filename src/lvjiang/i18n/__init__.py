@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 
 import yaml
+from PyQt6.QtCore import QCoreApplication, QLibraryInfo, QTranslator
 
 from ..constants import PROJECT_ROOT
 
@@ -21,6 +22,7 @@ _translations: dict[str, str] = {}   # 扁平化翻译表：中文原文 → 译
 _current_language: str = "zh_CN"
 _i18n_dir: Path = PROJECT_ROOT / "config" / "i18n"
 _loaded_app_i18n: set[str] = set()   # 已加载插件翻译的集合（幂等保护）
+_qt_translator: QTranslator | None = None
 
 
 def init_i18n(language: str | None = None) -> str:
@@ -40,6 +42,7 @@ def init_i18n(language: str | None = None) -> str:
     _current_language = language
     _translations = _load_translation_file(language)
     _loaded_app_i18n.clear()  # 重置后需重新加载插件翻译
+    _install_qt_translation(language)
 
     if language != "zh_CN":
         logger.info("[i18n] 已加载语言: %s，共 %d 条翻译", language, len(_translations))
@@ -143,6 +146,40 @@ def available_languages() -> list[dict[str, str]]:
 
 
 # ── 内部函数 ──
+
+def _install_qt_translation(language: str) -> bool:
+    """让 Qt 标准对话框按钮和提示跟随应用语言。
+
+    应用自己的 ``tr()`` 无法覆盖 QInputDialog/QMessageBox/
+    QDialogButtonBox 内部生成的标准文本；这些文本来自 Qt 的 ``qtbase``
+    语言包。翻译器必须保留模块级引用，否则会被回收并立即失效。
+    """
+    global _qt_translator
+
+    app = QCoreApplication.instance()
+    if app is None:
+        return False
+
+    if _qt_translator is not None:
+        app.removeTranslator(_qt_translator)
+        _qt_translator = None
+
+    translations_dir = Path(
+        QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    )
+    candidates = [language]
+    base_language = language.partition("_")[0]
+    if base_language and base_language not in candidates:
+        candidates.append(base_language)
+
+    translator = QTranslator(app)
+    for locale_name in candidates:
+        if translator.load(str(translations_dir / f"qtbase_{locale_name}.qm")):
+            app.installTranslator(translator)
+            _qt_translator = translator
+            return True
+    logger.warning("[i18n] Qt 标准控件翻译不存在: %s", language)
+    return False
 
 def _load_translation_file(language: str) -> dict[str, str]:
     """加载指定语言的翻译文件，扁平化为 {原文: 译文} 字典。

@@ -7,6 +7,8 @@
 - RunControlMixin._on_start：F9 按当前左侧 Tab 的 f9_run 鸭子类型分发
 """
 
+from PyQt6.QtWidgets import QMainWindow
+
 import lvjiang.ui.main_window as mw_module
 from lvjiang.apps import register_hooks
 from lvjiang.apps.base import AppHooks
@@ -100,8 +102,14 @@ class TestAddPluginTabs:
 
 class TestSetupMenuInjection:
     def _make_window(self, qtbot):
-        from PyQt6.QtWidgets import QMainWindow
-        win = QMainWindow()
+        class _MenuTestWindow(QMainWindow):
+            def _toggle_theme(inner_self):
+                MainWindow._toggle_theme(inner_self)
+
+            def _update_theme_button(inner_self, theme):
+                MainWindow._update_theme_button(inner_self, theme)
+
+        win = _MenuTestWindow()
         qtbot.addWidget(win)
         # _setup_menu 只 connect 不调用这些处理器，桩为空函数即可
         for name in ("_open_settings_manager", "_open_user_manager",
@@ -134,6 +142,10 @@ class TestSetupMenuInjection:
 
         assert self._menu_titles(win) == ["通用", "工具", "插件A", "插件B", "帮助"]
         assert calls == [(win, win.menuBar())]
+        corner = win.menuBar().cornerWidget()
+        assert corner is not None
+        assert corner.objectName() == "themeToggleButton"
+        assert corner.toolTip() in {"切换到深色主题", "切换到浅色主题"}
 
     def test_menu_builder_exception_does_not_interrupt(self, qtbot, monkeypatch):
         win = self._make_window(qtbot)

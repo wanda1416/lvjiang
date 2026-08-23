@@ -161,13 +161,13 @@ class BaseAttrPanel(QWidget):
         self._combo_follow.setMinimumWidth(120)
         self._combo_follow.currentIndexChanged.connect(self._on_follow_target_changed)
         self._follow_hint = QLabel("")
-        self._follow_hint.setStyleSheet("color: #888;")
+        self._follow_hint.setStyleSheet("color: palette(mid);")
 
         # ── 首词条（基础属性上方，每个部位可限定首词条候选）──
         self._first_affix_frame = QFrame()
         self._first_affix_frame.setObjectName("firstAffixFrame")
         self._first_affix_frame.setStyleSheet(
-            "QFrame#firstAffixFrame { background-color: #f5f5f5; "
+            "QFrame#firstAffixFrame { background-color: palette(alternate-base); "
             "border-radius: 4px; padding: 4px; }"
         )
         first_affix_layout = QHBoxLayout(self._first_affix_frame)
@@ -177,7 +177,7 @@ class BaseAttrPanel(QWidget):
         self._first_affix_btn.clicked.connect(self._pick_first_affixes)
         first_affix_layout.addWidget(self._first_affix_btn, 1)
         self._first_affix_hint = QLabel("")
-        self._first_affix_hint.setStyleSheet("color: #888;")
+        self._first_affix_hint.setStyleSheet("color: palette(mid);")
         first_affix_layout.addWidget(self._first_affix_hint)
         self._first_affix_frame.setVisible(False)
         right_layout.addWidget(self._first_affix_frame)
@@ -187,7 +187,7 @@ class BaseAttrPanel(QWidget):
         self._weapon_frame.setObjectName("weaponFrame")
         # 用 objectName 限定，避免样式级联到 QListWidget（其继承自 QFrame）
         self._weapon_frame.setStyleSheet(
-            "QFrame#weaponFrame { background-color: #f5f5f5; "
+            "QFrame#weaponFrame { background-color: palette(alternate-base); "
             "border-radius: 4px; padding: 4px; }"
         )
         weapon_layout = QVBoxLayout(self._weapon_frame)
@@ -196,7 +196,7 @@ class BaseAttrPanel(QWidget):
         weapon_header = QHBoxLayout()
         weapon_header.addWidget(QLabel(tr("武器类型")))
         hint = QLabel(tr("新增武器重启后方可参与识别；被流派配置引用的武器不可删除"))
-        hint.setStyleSheet("color: #888;")
+        hint.setStyleSheet("color: palette(mid);")
         weapon_header.addWidget(hint)
         weapon_header.addStretch()
         self._btn_add_weapon = QPushButton(tr("添加"))
@@ -227,7 +227,7 @@ class BaseAttrPanel(QWidget):
         # ── 基础属性说明 + 属性跟随（仅控制基础属性表格）──
         attr_frame = QFrame()
         attr_frame.setStyleSheet(
-            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
         attr_layout = QHBoxLayout(attr_frame)
         attr_layout.setContentsMargins(8, 4, 8, 4)

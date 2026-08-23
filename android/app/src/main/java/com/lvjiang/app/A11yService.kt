@@ -156,17 +156,24 @@ object A11yBridge {
         return arrayOf(width, height, buffer.array())
     }
 
+    // 所有手势的坐标都是调用方在截图上量出来的，进来先过一遍 ScreenMap（截图空间 → 输入空间，
+    // 绝大多数设备是恒等）。映射放在这个注入口而不是各调用方：PC 代理通道与设备端 Python
+    // 通道都经过这里，标定一次两边同时生效。
+
     /** 单点点击；durationMs 是按住时长 */
     fun tap(x: Int, y: Int, durationMs: Long = 50): Boolean {
-        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        val p = ScreenMap.mapPoint(x, y)
+        val path = Path().apply { moveTo(p[0].toFloat(), p[1].toFloat()) }
         return dispatch(path, 0, durationMs)
     }
 
     /** 直线滑动 */
     fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long): Boolean {
+        val a = ScreenMap.mapPoint(x1, y1)
+        val b = ScreenMap.mapPoint(x2, y2)
         val path = Path().apply {
-            moveTo(x1.toFloat(), y1.toFloat())
-            lineTo(x2.toFloat(), y2.toFloat())
+            moveTo(a[0].toFloat(), a[1].toFloat())
+            lineTo(b[0].toFloat(), b[1].toFloat())
         }
         return dispatch(path, 0, durationMs)
     }
@@ -176,7 +183,8 @@ object A11yBridge {
      * 长按都是几百毫秒到几秒，直接用 stroke 时长表达即可。
      */
     fun longPress(x: Int, y: Int, durationMs: Long): Boolean {
-        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        val p = ScreenMap.mapPoint(x, y)
+        val path = Path().apply { moveTo(p[0].toFloat(), p[1].toFloat()) }
         return dispatch(path, 0, durationMs)
     }
 
@@ -238,9 +246,11 @@ object A11yBridge {
             Log.w(TAG, "手势失败：无障碍服务未连接")
             return false
         }
+        val a = ScreenMap.mapPoint(x1, y1)
+        val b = ScreenMap.mapPoint(x2, y2)
         val movePath = Path().apply {
-            moveTo(x1.toFloat(), y1.toFloat())
-            lineTo(x2.toFloat(), y2.toFloat())
+            moveTo(a[0].toFloat(), a[1].toFloat())
+            lineTo(b[0].toFloat(), b[1].toFloat())
         }
         val moveStroke = android.accessibilityservice.GestureDescription.StrokeDescription(
             movePath, 0, moveMs.coerceAtLeast(1), holdMs > 0,
@@ -248,8 +258,8 @@ object A11yBridge {
         if (!dispatchAndWait(service, moveStroke, moveMs)) return false
         if (holdMs <= 0) return true
         val dwellPath = Path().apply {
-            moveTo(x2.toFloat(), y2.toFloat())
-            lineTo(x2 + 1f, y2.toFloat())
+            moveTo(b[0].toFloat(), b[1].toFloat())
+            lineTo(b[0] + 1f, b[1].toFloat())
         }
         val dwellStroke = moveStroke.continueStroke(dwellPath, 0, holdMs, false)
         return dispatchAndWait(service, dwellStroke, holdMs)

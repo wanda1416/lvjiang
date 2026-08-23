@@ -122,12 +122,18 @@ object ShellBridge {
     /** 文本命令便捷封装 */
     fun execText(vararg cmd: String): String = exec(*cmd).toString(Charsets.UTF_8).trim()
 
-    /** 点击（语义对齐 PC 端 AdbInput.click_screen 最终下发的命令） */
-    fun tap(x: Int, y: Int): String = execText("input", "tap", x.toString(), y.toString())
+    /** 点击（语义对齐 PC 端 AdbInput.click_screen 最终下发的命令）；坐标先过 ScreenMap，同 A11yBridge */
+    fun tap(x: Int, y: Int): String {
+        val p = ScreenMap.mapPoint(x, y)
+        return execText("input", "tap", p[0].toString(), p[1].toString())
+    }
 
     /** 滑动/拖拽 */
-    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): String =
-        execText("input", "swipe", "$x1", "$y1", "$x2", "$y2", "$durationMs")
+    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): String {
+        val a = ScreenMap.mapPoint(x1, y1)
+        val b = ScreenMap.mapPoint(x2, y2)
+        return execText("input", "swipe", "${a[0]}", "${a[1]}", "${b[0]}", "${b[1]}", "$durationMs")
+    }
 
     /** 截屏 PNG 字节流（语义对齐 PC 端 AdbCapture 的 adb exec-out screencap -p） */
     fun screencapPng(): ByteArray = exec("screencap", "-p")

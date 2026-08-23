@@ -32,6 +32,9 @@ class App : Application() {
             ).apply { description = "悬浮控制与任务运行的前台服务通知" }
         )
         syncSystemConfig()
+        // 屏幕映射（截图坐标 → 输入坐标）需要 Context 读标定文件与屏幕尺寸
+        ScreenMap.init(this)
+        AgentServer.appContext = this
         // PC 端代理通道：进程在（无障碍已绑定 / 悬浮服务在跑 / 用户打开了主页）就监听，
         // 由 PC 经 adb forward 连入使用无障碍截图与手势，见 AgentServer
         AgentServer.start()

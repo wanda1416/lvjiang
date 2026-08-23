@@ -34,6 +34,17 @@
             android:exported="false"
             android:theme="@style/Theme.Lvjiang.Translucent" />
 
+        <!-- 屏幕标定页：同样透明叠在游戏上——截图时把自己藏起来就能拍到底下的游戏画面。
+             独立 task（taskAffinity 空）：从悬浮面板 NEW_TASK 启动时不能被拉进律匠主页所在的
+             任务，否则底下露出来的是主页而不是游戏，截到的就不是游戏画面 -->
+        <activity
+            android:name=".CalibActivity"
+            android:exported="false"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Lvjiang.Translucent" />
+
         <!-- 悬浮图标前台服务 -->
         <service
             android:name=".FloatService"

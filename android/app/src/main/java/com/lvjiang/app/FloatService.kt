@@ -69,6 +69,7 @@ class FloatService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         isRunning = true
         startForeground(NOTIFICATION_ID, buildNotification("悬浮控制运行中"))
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -78,6 +79,7 @@ class FloatService : Service() {
     }
 
     override fun onDestroy() {
+        instance = null
         isRunning = false
         ui.removeCallbacks(poller)
         closePanel()
@@ -369,8 +371,9 @@ class FloatService : Service() {
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                         text = result.optString("error").ifEmpty { "没有可执行任务" }
                     })
-                    // 配置页不依赖任务清单，清单拉不到时也给入口
+                    // 配置页 / 标定页不依赖任务清单，清单拉不到时也给入口
                     area.addView(smallButton("调律配置") { openTuningConfig() })
+                    area.addView(smallButton("屏幕标定") { openCalib() })
                     return@post
                 }
                 for (i in 0 until tasks.length()) {
@@ -380,8 +383,21 @@ class FloatService : Service() {
                     area.addView(smallButton(name) { launchTask(id, name) })
                 }
                 area.addView(smallButton("调律配置") { openTuningConfig() })
+                area.addView(smallButton("屏幕标定") { openCalib() })
             }
         }
+    }
+
+    /** 打开屏幕标定页：游戏此刻在前台，让标定页一进去就先把游戏画面截下来 */
+    private fun openCalib() {
+        closePanel()
+        runCatching {
+            startActivity(
+                Intent(this, CalibActivity::class.java)
+                    .putExtra(CalibActivity.EXTRA_CAPTURE, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onFailure { Log.w(TAG, "打开屏幕标定页失败", it) }
     }
 
     /** 打开调律参数配置页：先收面板再跳，配置页是全屏 Activity 不需要悬浮层 */
@@ -475,6 +491,21 @@ class FloatService : Service() {
         @Volatile
         var isRunning = false
             private set
+
+        @Volatile
+        private var instance: FloatService? = null
+
+        /**
+         * 临时藏起 / 恢复悬浮图标（主线程执行）。屏幕标定页截底下的游戏画面前调用，
+         * 否则图标会被截进参照图 / 本机画面里，用户可能把它当成地标去点。
+         */
+        fun setIconHidden(hidden: Boolean) {
+            val svc = instance ?: return
+            svc.ui.post {
+                svc.floatView?.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
+                if (hidden) svc.closePanel()
+            }
+        }
 
         private const val TAG = "FloatService"
         private const val NOTIFICATION_ID = 1

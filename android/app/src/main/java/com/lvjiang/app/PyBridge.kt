@@ -23,6 +23,7 @@ object PyBridge {
     private const val TAG = "PyBridge"
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
     private const val TUNING_MODULE = "lvjiang.core.ondevice.tuning_config"
+    private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
 
     @Volatile
     private var startFailure: String? = null
@@ -93,4 +94,8 @@ object PyBridge {
     /** 保存调律配置：`{ok, message}`。ok=false 时 message 为校验失败原因。 */
     fun saveTuningConfig(context: Context, payload: String): JSONObject =
         callJson(context, "save_tuning_config", payload, moduleName = TUNING_MODULE)
+
+    /** 屏幕标定接口（CalibActivity 用）：calib_info / calib_capture / calib_locate / calib_solve / calib_save / … */
+    fun calib(context: Context, fn: String, vararg args: Any?): JSONObject =
+        callJson(context, fn, *args, moduleName = CALIB_MODULE)
 }

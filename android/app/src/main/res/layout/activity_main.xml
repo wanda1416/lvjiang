@@ -101,6 +101,12 @@
                 android:text="@string/btn_tuning_config" />
 
             <Button
+                android:id="@+id/btn_calib"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_calib" />
+
+            <Button
                 android:id="@+id/btn_float_toggle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

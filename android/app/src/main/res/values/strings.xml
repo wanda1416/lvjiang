@@ -21,6 +21,7 @@
     <!-- 主页功能区与调律参数配置页 -->
     <string name="section_features">功能</string>
     <string name="btn_tuning_config">调律参数配置</string>
+    <string name="btn_calib">屏幕标定（换机后对齐布局）</string>
     <string name="tuning_config_title">调律参数配置</string>
     <string name="tuning_config_loading">加载配置…</string>
     <string name="tuning_config_save">保存</string>

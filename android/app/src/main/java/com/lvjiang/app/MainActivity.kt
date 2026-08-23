@@ -50,6 +50,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, TuningConfigActivity::class.java))
         }
         findViewById<Button>(R.id.btn_float_toggle).setOnClickListener { onFloatToggle() }
+        // 屏幕标定：从主页进来游戏不在底下，页内再按「重新截图」前请先切到游戏大厅，
+        // 常规入口是悬浮面板里的「屏幕标定」（游戏在前台时直接拍）
+        findViewById<Button>(R.id.btn_calib).setOnClickListener {
+            startActivity(Intent(this, CalibActivity::class.java))
+        }
 
         findViewById<Button>(R.id.btn_overlay).setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {

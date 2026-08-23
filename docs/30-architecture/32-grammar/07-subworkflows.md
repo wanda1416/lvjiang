@@ -26,7 +26,7 @@ DSL 通过三个正交指令实现代码复用和模块化：
 | `call name($args)` | 执行调用 | 调用本地或导入的过程 |
 | `call $var = name($args)` | 返回值绑定 | 调用过程并接收返回值 |
 
-**命名空间**：平铺。`import "a.wf"` 后，a.wf 中的 `def foo()` 直接以 `call foo()` 调用。名字冲突时后 import 覆盖先 import。
+**命名空间**：平铺。`import "a.wf"` 后，a.wf 中的 `def foo()` 直接以 `call foo()` 调用。不同文件定义同名过程时会在解析期报冲突，不允许依赖 import 顺序隐式覆盖。
 
 ## 二、import — 引入外部 def 定义
 
@@ -38,7 +38,10 @@ import "subcall/navigation.wf"
 - 路径基于**当前 wf 所在目录**解析（相对路径）
 - import 仅引入目标文件中的 `def` 定义，不执行任何过程体
 - 支持链式 import（A import B，B import C → A 可使用 B 和 C 的所有 def）
+- 每个文件应显式 import 它直接调用过程所在的文件，不把传递导入当作本文件的隐式依赖
+- **重复去重**：同一次根工作流加载中，解析到同一规范绝对路径时只加载一次；直接重复和菱形依赖均安全
 - **循环检测**：解析期检测循环 import，发现后抛出错误
+- **冲突检测**：不同文件的同名过程，以及根工作流与导入文件的同名过程，均直接报错并列出两个来源
 
 ```
 # 循环 import 示例（会报错）
@@ -46,6 +49,8 @@ import "subcall/navigation.wf"
 # b.wf: import "a.wf"
 # → 循环 import 检测: a.wf -> b.wf -> a.wf
 ```
+
+`load_subcalls()` 的去重范围仅限于单次调用的 import 图。下一次显式调用仍会重新解析并覆盖引擎中之前加载的同名过程，用于支持热更新；这不属于 import 冲突。
 
 ## 三、def — 定义子过程
 

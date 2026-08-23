@@ -8,7 +8,7 @@
 #   2. 处理确认弹窗后验证是否抵达百业驻地
 #   3. TODO: 后续补充货运具体操作
 
-import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
 
 # ─── 导航：从首页到百业驻地 ─────────────────────────────
 click [game_main_page].[menu] after wait @step_interval

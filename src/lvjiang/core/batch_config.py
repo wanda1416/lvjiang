@@ -85,7 +85,7 @@ class BatchConfig:
 
     configs: {配置名: BatchConfigItem}
     active_config: 当前选中的配置名
-    script_ids: 勾选的脚本 ID 列表（所有配置共享）
+    script_ids: 按执行顺序排列的已勾选脚本 ID（所有配置共享）
     """
     configs: dict[str, BatchConfigItem] = field(default_factory=dict)
     active_config: str = ""

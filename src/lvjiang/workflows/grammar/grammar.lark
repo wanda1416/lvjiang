@@ -85,10 +85,11 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 move_stmt: "move"i click_target wait_clauses? _NL
 
 // scroll：鼠标滚轮滚动（往往需要先 move 到目标位置再滚动）
-// 方向：up（向上滚）/ down（向下滚）
 // 目标：可选，指定后先移动光标到该位置再滚动；省略则在当前位置滚动
+// 方向：up（向上滚）/ down（向下滚），紧跟目标之后
 // 数量：可选，滚动格数（默认 1），支持数字或变量
-scroll_stmt: "scroll"i SCROLL_DIR click_target? (number | var_ref)? wait_clauses? _NL
+// 目标在前、方向紧随其后、数量收尾——与 drag_stmt 语法形状保持一致
+scroll_stmt: "scroll"i click_target? SCROLL_DIR (number | var_ref)? wait_clauses? _NL
 SCROLL_DIR: /up/i | /down/i
 
 // drag 支持五种目标：

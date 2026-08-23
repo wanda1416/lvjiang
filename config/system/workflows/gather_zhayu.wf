@@ -1,4 +1,5 @@
 #% name: 太极炸鱼
+#% env: [android, desktop]
 #% parameters:
 #%   - name: max_loops
 #%     label: 最大循环次数

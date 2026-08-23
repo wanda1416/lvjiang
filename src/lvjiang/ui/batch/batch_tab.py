@@ -396,7 +396,10 @@ class BatchTab(QWidget):
         self._updating_script_list = True
         self._script_list.clear()
         try:
-            configs = list_exposed_scripts()
+            configs = [
+                cfg for cfg in list_exposed_scripts()
+                if cfg.get("batchable", True)
+            ]
         except Exception:
             configs = []
         self._script_configs_by_id = {cfg["id"]: cfg for cfg in configs}

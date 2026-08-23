@@ -40,7 +40,7 @@ main_window:
   btn_load: Load
   group_params: Parameters
   label_log_level: Log Level
-  status_ready: Ready | F9 Start | F10 Stop | F8 Record
+  status_ready: Ready | F9 Start | F8 Pause/Resume | F10 Stop
   label_no_window: No window selected
   label_preview_placeholder: Locate window to capture
   status_window_located: Window located
@@ -107,12 +107,12 @@ user_manager:
   cannot_delete: Cannot delete this user
 script_record:
   title: Script Recording
-  btn_record: ● Record Script (F8)
+  btn_record: ● Record Script (F12)
   btn_save: Save
   btn_copy: Copy
   btn_clear: Clear
-  status_idle: Idle | Click "Record Script" or press F8
-  btn_stop_record: ■ Stop Recording (F8)
+  status_idle: Idle | Click "Record Script" or press F12
+  btn_stop_record: ■ Stop Recording (F12)
   save_workflow_title: Save as Workflow File
   save_workflow_filter: Workflow Files (*.wf);;All Files (*)
   err_workflow_running: Cannot record while workflow is running
@@ -121,7 +121,7 @@ script_record:
   err_layout_not_found: 'Failed to load layout: {layout_name}'
   err_start_failed: 'Start failed: {e}'
   err_record_failed: 'Recording start failed: {e}'
-  status_recording: Recording... Click/drag in game window, F8 or click to stop
+  status_recording: Recording... Click/drag/scroll/press, F12 or click to stop
   status_done: Recording done. Edit and save as .wf
   status_done_empty: Recording ended, no valid actions captured
   status_copied: Copied to clipboard

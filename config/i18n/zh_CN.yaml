@@ -40,7 +40,7 @@ main_window:
   btn_load: 加载
   group_params: 参数设置
   label_log_level: 日志级别
-  status_ready: 就绪 | F9 开始 | F8 暂停 | F10 结束 | F12 录制
+  status_ready: 就绪 | F9 开始 | F8 暂停 | F10 结束
   label_no_window: 未选择窗口
   label_preview_placeholder: 定位窗口后自动截屏
   status_window_located: 窗口已定位
@@ -121,7 +121,7 @@ script_record:
   err_layout_not_found: '无法加载布局: {layout_name}'
   err_start_failed: '启动失败: {e}'
   err_record_failed: '录制启动失败: {e}'
-  status_recording: 录制中…在游戏窗口内点击/拖拽，F12 或点击停止
+  status_recording: 录制中…点击/拖拽/滚轮/按键，F12 或点击停止
   status_done: 录制结束，可编辑后保存为 .wf
   status_done_empty: 录制结束，未捕获到有效操作
   status_copied: 已复制到剪贴板

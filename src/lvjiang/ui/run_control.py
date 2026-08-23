@@ -133,6 +133,14 @@ class _UIHelper(QObject):
             # 批量写入时仅最后一次通知后 150ms 触发一次全量刷新
             self._schedule_equipment_notify()
             return None
+        if action == "open_play_style_form":
+            # 工作流请求打开"创建基础属性"面板并预填数值：直接转发信号，
+            # 不 exec() 等待——已打开的战斗属性 Tab 自行订阅处理（若未打开
+            # 该 Tab 则静默无效果，与 equipment_changed 行为一致），
+            # 工作流线程发出请求后立即返回，不等待对话框关闭
+            if self._window is not None:
+                self._window.open_play_style_form.emit(kwargs.get("prefill") or {})
+            return None
         logger.warning(f"未知 UI 交互类型: {action}")
         return None
 

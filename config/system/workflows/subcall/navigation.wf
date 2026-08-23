@@ -6,11 +6,12 @@
 #
 # 包含过程：
 #   nav_main_to_bag()    — 主界面 → 背包页（>=0 成功，<0 导航失败）
-#   nav_main_to_equip()  — 主界面 → 背包装备列表页
-#   nav_main_to_wallet() — 主界面 → 背包钱袋页
-#   nav_main_to_item()   — 主界面 → 背包道具页（普通道具子区域）
-#   nav_back_to_main()   — 背包装备页 → 主界面
-#   nav_equip_to_tune()  — 装备详情页 → 调律页
+#   nav_main_to_equip()  — 主界面 → 背包装备列表页（0 成功，-1 失败）
+#   nav_main_to_wallet() — 主界面 → 背包钱袋页（0 成功，-1 失败）
+#   nav_main_to_item()   — 主界面 → 背包道具页（0 成功，-1 失败）
+#   nav_main_to_menu()   — 主界面 → 菜单页（0 成功，-1 失败）
+#   nav_back_to_main()   — 背包装备页 → 主界面（0 成功，-1 失败）
+#   nav_equip_to_tune()  — 装备详情页 → 调律页（0 成功，-1 失败）
 
 import "page_detection.wf"
 
@@ -19,34 +20,39 @@ import "page_detection.wf"
 # 路径：主界面 → 菜单 → 包裹
 # 前置：在主界面或菜单页
 # 后置：在背包页（bag_equip_detail），通过 sub_baoguo 判定当前 tab
-# 返回：1=培养, 2=道具, 3=任务, 4=钱袋；0 表示无法识别（已 pause）
+# 返回：1=培养, 2=道具, 3=任务, 4=钱袋；0=已确认在背包页但 tab 未识别；-1=失败
 
 def nav_main_to_bag()
-    if env("desktop")
-        # 桌面端：简单处理，暂不支持从 菜单页进入
-        log info "桌面端：按 B 打开背包"
-        press "B" after wait @step_interval
-        return 0
-    end
-
-    # 安卓端：检查当前是否在菜单页
-    call $in_menu = is_in_menu_page()
-    if $in_menu
-        log info "当前已在菜单页"
+    call $in_bag = is_in_bag_page()
+    # 如果已经在背包页就不用操作
+    if $in_bag
+        log info "当前已在背包页"
     else
-        # 不在菜单页，检查是否在主页
-        call $in_main = is_in_main_page()
-        if $in_main
-            log info "从主页进入菜单页"
-            click [game_main_page].[menu] after wait @page_refresh
+        if env("desktop")
+            # 桌面端：简单处理，主页、菜单页 均通过 B 进入背包
+            log info "桌面端：按 B 打开背包"
+            press "B" after wait @step_interval
         else
-            eval pause("未进入菜单页面，请手动导航后点击继续")
+            # 安卓端：检查当前是否在菜单页
+            call $in_menu = is_in_menu_page()
+            if $in_menu
+                log info "当前已在菜单页"
+            else
+                # 不在菜单页，检查是否在主页
+                call $in_main = is_in_main_page()
+                if $in_main
+                    log info "从主页进入菜单页"
+                    click [game_main_page].[menu] after wait @page_refresh
+                else
+                    eval pause("未进入菜单页面，请手动导航后点击继续")
+                end
+            end
+
+            # 菜单页 → 背包页
+            log info "从菜单页进入包裹页"
+            click [game_menu_page].[baoguo] after wait @page_refresh
         end
     end
-
-    # 菜单页 → 背包页
-    log info "从菜单页进入包裹页"
-    click [game_menu_page].[baoguo] after wait @page_refresh
 
     # 通过 sub_baoguo 判定当前 tab
     scan [bag_equip_detail].[sub_baoguo] as $tab_text
@@ -71,7 +77,7 @@ def nav_main_to_bag()
             log info "通过整理按钮确认在背包页"
         else
             log error "未进入包裹页面"
-            $tab = -1
+            eval $tab = -1
         end
     end
 
@@ -80,10 +86,9 @@ end
 
 # ─── nav_main_to_equip ────────────────────────────────────
 # 从主界面导航到装备页面
-# android 路径：主界面 → 菜单 → 包裹 → 培养 → 装备列表
-# desktop 路径：按 B 打开背包 → 培养 → 主武器槽
+# 路径：主界面 → 菜单 → 包裹 → 培养 → 装备列表
 # 前置：在主界面或菜单页
-# 后置：android 在装备列表页；desktop 在主武器装备详情页
+# 后置：在装备列表页（bag_equip_detail 培养 tab）
 
 def nav_main_to_equip()
     call $tab = nav_main_to_bag()
@@ -91,36 +96,24 @@ def nav_main_to_equip()
         return -1
     end
 
-    if env("android")
-        # 不在培养 tab 则点击切换
-        if $tab != 1
-            log info "从包裹页切换到培养页"
-            click [bag_equip_detail].[peiyang] after wait @page_refresh
-        end
-
-        # 校验是否在装备列表：recycle 含"回收" 或 sub_equip 含"装备"，任一成功即可
-        scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
-        scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
-        if not $recycle_check and not $equip_check
-            # 不在装备列表子 tab，点击 sub_equip 切换
-            log info "从培养页切换到装备列表"
-            click [bag_equip_detail].[sub_equip] after wait @page_refresh
-        end
-
-        # 最终校验
-        scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
-        scan [bag_equip_detail].[sub_equip] as $equip_check by contains "装备"
-        if not $recycle_check and not $equip_check
-            eval pause("未进入装备列表，请手动导航后点击继续")
-        end
-        log info "已到达装备列表页"
-    else if env("desktop")
-        click [bag_equip_detail].[peiyang] after wait @step_interval
-        click [bag_equip_detail].[sub_equip] after wait @step_interval
-    else
-        log error "不支持当前环境"
-        return -1
+    # 不在培养 tab 则点击切换
+    if $tab != 1
+        log info "从包裹页切换到培养页"
+        click [bag_equip_detail].[peiyang] after wait @page_refresh
     end
+    # 幂等点击，没必要额外判断
+    click [bag_equip_detail].[sub_equip] after wait @step_interval
+
+    # 最终校验
+    scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
+    if not $recycle_check
+        eval pause("未进入装备列表，请手动导航后点击继续")
+        scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
+        if not $recycle_check
+            return -1
+        end
+    end
+    return 0
 end
 
 # ─── nav_main_to_wallet ───────────────────────────────────
@@ -145,8 +138,13 @@ def nav_main_to_wallet()
     scan [bag_equip_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
     if not $wallet_check
         eval pause("未进入钱袋页面，请手动导航后点击继续")
+        scan [bag_equip_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
+        if not $wallet_check
+            return -1
+        end
     end
     log info "已到达钱袋页"
+    return 0
 end
 
 # ─── nav_main_to_item ─────────────────────────────────────
@@ -177,45 +175,77 @@ def nav_main_to_item()
     # 点击普通道具，锁定子区域
     log info "从道具页进入普通道具"
     click [bag_item_detail].[putong] after wait @step_interval
+    return 0
+end
+
+# ─── nav_main_to_menu ─────────────────────────────────────
+# 从主页进入菜单页；若已在菜单页则不执行操作
+# 前置：在主页或菜单页
+# 后置：在菜单页
+
+def nav_main_to_menu()
+    call $in_menu = is_in_menu_page()
+    if $in_menu
+        return 0
+    end
+    if env("android")
+        click [game_main_page].[menu] after wait @page_refresh
+    else
+        press "ESC" after wait @page_refresh
+    end
+    call $in_menu = is_in_menu_page()
+    if not $in_menu
+        eval pause("未进入菜单页面，请手动导航后点击继续")
+        call $in_menu = is_in_menu_page()
+        if not $in_menu
+            return -1
+        end
+    end
+    return 0
 end
 
 # ─── nav_back_to_main ─────────────────────────────────────
-# 从装备详情弹窗返回主界面
-# android 路径：详情弹窗 → 背包页 → 菜单页 → 主界面（逐层点击返回）
-# desktop 路径：连按三次 ESC
-# 前置：在背包页且装备详情弹窗已打开（bag_equip_detail 场景内）
+# 从背包装备页返回主界面
+# 检测式返回：循环检测是否在背包页，点击返回直到离开背包页，再从菜单页返回主界面
+# 前置：在背包页（bag_equip_detail 场景内）
 # 后置：在主界面
 
 def nav_back_to_main()
-    if env("android")
-        log info "从装备详情页返回背包页"
-        # 关闭详情弹窗 → 背包页
-        click [bag_equip_detail].[back] after wait @page_refresh
-        log info "从背包页返回菜单页"
-        # 背包页 → 菜单页
-        click [bag_equip_detail].[back] after wait @page_refresh
-        log info "从菜单页返回主页"
-        # 菜单页 → 主界面
-        click [game_menu_page].[back] after wait @page_refresh
-    else if env("desktop")
-        log info "桌面端：按 ESC 返回主界面"
-        eval $tries = 0
-        loop while $tries < 3
-            call $in_main = is_in_main_page()
-            if $in_main
-                break
+    eval $is_android = env("android")
+
+    eval $tries = 0
+    loop while $tries < 3
+        call $in_bag = is_in_bag_page()
+        if $in_bag
+            if $is_android
+                click [bag_equip_detail].[back] after wait @step_interval
+            else
+                press "ESC" after wait @step_interval
             end
-            press "ESC" after wait @step_interval
-            eval $tries = $tries + 1
+        else
+            break
         end
+        eval $tries = $tries + 1
+    end
+
+    call $in_menu = is_in_menu_page()
+    if $in_menu
+        if $is_android
+            click [game_menu_page].[back] after wait @step_interval
+        else
+            press "ESC" after wait @step_interval
+        end
+    end
+
+    call $in_main = is_in_main_page()
+    if not $in_main
+        eval confirm("当前未回到主页，请手动回到主页后点击确定")
         call $in_main = is_in_main_page()
         if not $in_main
-            eval confirm("当前未回到主页，请手动回到主页后点击确定")
+            return -1
         end
-    else
-        log error "不支持当前环境"
-        return -1
     end
+    return 0
 end
 
 # ─── nav_equip_to_tune ────────────────────────────────────
@@ -237,7 +267,7 @@ def nav_equip_to_tune()
 
         log info "桌面端：找到调律入口，按 F 进入调律详情页"
         press "F" after wait @page_refresh
-    else if env("android")
+    else
         # 展开「更多」弹窗
         click [equip_detail].[more_func] after wait @page_refresh
 
@@ -253,15 +283,17 @@ def nav_equip_to_tune()
         # 点击调律按钮，进入调律页
         log info "从装备详情页进入调律页"
         click [equip_detail].$tune_key after wait @page_refresh
-    else
-        log error "不支持当前环境"
-        return -1
     end
 
     # 校验是否到达调律页
     scan [equip_tune_detail].[tune_btn] as $tune_check by contains "词库预览"
     if not $tune_check
         eval pause("未进入调律页面，请手动导航后点击继续")
+        scan [equip_tune_detail].[tune_btn] as $tune_check by contains "词库预览"
+        if not $tune_check
+            return -1
+        end
     end
     log info "已到达调律页"
+    return 0
 end

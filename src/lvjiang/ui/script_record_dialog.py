@@ -1,14 +1,19 @@
-"""脚本录制对话框 - 录制鼠标操作实时生成 DSL，支持保存/复制/清除
+"""脚本录制对话框 - 录制鼠标/键盘操作实时生成 DSL，支持保存/复制/清除
 
-从「工具 → 脚本录制」打开（F12 也可）。录制中每生成一行 DSL 实时追加到
+只能由用户从「工具 → 脚本录制」打开。对话框可见期间临时注册
+系统全局 F12，用于开始/停止录制；对话框关闭后立即注销。录制中每生成一行 DSL 实时追加到
 文本区（pynput 监听线程 → line_captured 信号 → UI 线程）；停止后用
-recorder.stop() 全文兜底刷新，文本可编辑后再保存为 .wf。
+recorder.stop() 全文兜底刷新，文本可编辑后再保存为 .wf。支持
+click/drag/scroll/press 四种操作，停止录制时会自动补一条收尾 wait
+（反映最后一个动作到按 F12 之间的等待）。F8/F9/F10 是主窗口全局热键，
+F12 是本对话框打开期间的临时全局热键；这些按键在
+按键录制时会被忽略，不会被误录成 press 语句。
 """
 
 from pathlib import Path
 
 from loguru import logger
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -36,17 +41,67 @@ class ScriptRecordDialog(QDialog):
     """脚本录制：录制按钮 + 实时 DSL 展示 + 保存/复制/清除"""
 
     line_captured = pyqtSignal(str)
+    f12_pressed = pyqtSignal()
 
     def __init__(self, main_window):
         super().__init__(main_window)
         self._main = main_window
         self._recorder = None
+        self._f12_hotkey_listener = None
         self._preserved = False   # 已保存/复制过（防误关丢失）
         self.setWindowTitle(tr("脚本录制"))
         self.setMinimumSize(560, 520)
         self._setup_ui()
         self.line_captured.connect(self._append_line)
+        self.f12_pressed.connect(self.toggle_recording)
         self._refresh_buttons()
+
+    # ─── F12 热键生命周期 ───────────────────────────────
+
+    def _start_f12_hotkey(self):
+        """对话框打开后才注册系统全局 F12。"""
+        if self._f12_hotkey_listener is not None:
+            return
+        from ..core.platforms import start_global_hotkeys
+        try:
+            self._f12_hotkey_listener = start_global_hotkeys({
+                "<f12>": self.f12_pressed.emit,
+            })
+        except Exception as exc:
+            logger.warning(f"脚本录制 F12 全局热键注册失败: {exc}")
+
+    def stop_f12_hotkey(self):
+        """对话框关闭时注销 F12，并等待钩子线程退出。"""
+        listener = self._f12_hotkey_listener
+        self._f12_hotkey_listener = None
+        if listener is None:
+            return
+        try:
+            listener.stop()
+            listener.join(3.0)
+            if listener.is_alive():
+                logger.warning("脚本录制 F12 热键监听线程 3 秒内未退出")
+        except Exception as exc:
+            logger.warning(f"脚本录制 F12 全局热键注销失败: {exc}")
+
+    def showEvent(self, event):  # type: ignore[override]
+        super().showEvent(event)
+        self._start_f12_hotkey()
+
+    def done(self, result: int):  # type: ignore[override]
+        """仅在对话框真正结束时注销；失焦/最小化不影响 F12。"""
+        self.stop_f12_hotkey()
+        super().done(result)
+
+    def keyPressEvent(self, event):  # type: ignore[override]
+        if event.key() == Qt.Key.Key_F12:
+            # 全局 listener 已激活时，Qt 也可能收到同一次按键；
+            # 只保留一个切换入口，避免开始后立即又停止。
+            if self._f12_hotkey_listener is None:
+                self.toggle_recording()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     # ─── UI 构建 ─────────────────────────────────────────
 
@@ -78,7 +133,8 @@ class ScriptRecordDialog(QDialog):
         self.text_edit.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;")
         self.text_edit.setPlaceholderText(
-            tr("录制生成的 DSL 语句将实时显示在这里（画布归一化坐标，可直接保存为 .wf）"))
+            tr("录制生成的 DSL 语句将实时显示在这里（画布归一化坐标，可直接保存为 .wf）\n"
+               "支持点击/拖拽/滚轮/按键，F8/F9/F10/F12 不会被录制"))
         self.text_edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.text_edit)
 
@@ -89,7 +145,7 @@ class ScriptRecordDialog(QDialog):
         return self._recorder is not None
 
     def toggle_recording(self):
-        """录制/停止切换（按钮与主窗口 F12 共用入口）"""
+        """录制/停止切换（对话框按钮与临时 F12 共用入口）。"""
         if self.is_recording:
             self._stop_recording()
         else:
@@ -130,7 +186,7 @@ class ScriptRecordDialog(QDialog):
             self.lbl_status.setText(tr("启动失败: {e}").format(e=e))
             logger.error(f"录制启动失败: {e}")
             return
-        self.lbl_status.setText(tr("录制中…在游戏窗口内点击/拖拽，F12 或点击停止"))
+        self.lbl_status.setText(tr("录制中…点击/拖拽/滚轮/按键，F12 或点击停止"))
         self._refresh_buttons()
 
     def _stop_recording(self):
@@ -236,6 +292,7 @@ class ScriptRecordDialog(QDialog):
         if self.is_recording:
             self._stop_recording()
         if self._confirm_discard():
+            self.stop_f12_hotkey()
             event.accept()
         else:
             event.ignore()

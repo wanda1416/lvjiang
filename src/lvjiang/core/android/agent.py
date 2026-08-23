@@ -431,8 +431,20 @@ class AgentInput(InputBackend):
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 
-    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+    def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        logger.warning("[Agent] place 指令无效：设备端手势不支持鼠标放置")
+
+    def move_screen(
+        self, screen_x: int, screen_y: int, poi_name: str = "",
+        duration: float | None = None,
+    ):
         logger.warning("[Agent] move 指令无效：设备端手势不支持鼠标移动")
+
+    def move_relative(
+        self, delta_x: int, delta_y: int, poi_name: str = "",
+        duration: float | None = None,
+    ):
+        logger.warning("[Agent] move by 指令无效：设备端手势不支持鼠标移动")
 
     def scroll_screen(self, screen_x: int, screen_y: int, direction: str = "down",
                       amount: int = 1, poi_name: str = ""):

@@ -34,6 +34,7 @@ from lvjiang.workflows.grammar import (
     Not,
     NumericEqual,
     PanelRef,
+    Place,
     Press,
     ProcDef,
     Program,
@@ -506,7 +507,7 @@ def test_click_around_wait_stable():
 # ─── move 指令 ──────────────────────────────────────────────
 
 def test_move_scene_ref():
-    program = parse_text("move [scene].[region]")
+    program = parse_text("move to [scene].[region]")
     assert len(program.body) == 1
     node = program.body[0]
     assert isinstance(node, Move)
@@ -516,7 +517,7 @@ def test_move_scene_ref():
 
 
 def test_move_panel_target():
-    program = parse_text("move [scene].[panel][1][2]")
+    program = parse_text("move to [scene].[panel][1][2]")
     node = program.body[0]
     assert isinstance(node, Move)
     assert isinstance(node.target, PanelRef)
@@ -527,7 +528,7 @@ def test_move_panel_target():
 
 
 def test_move_coord_target():
-    program = parse_text("move (0.5, 0.3)")
+    program = parse_text("move to (0.5, 0.3)")
     node = program.body[0]
     assert isinstance(node, Move)
     assert isinstance(node.target, CoordPoint)
@@ -536,7 +537,7 @@ def test_move_coord_target():
 
 
 def test_move_var_target():
-    program = parse_text("move $var")
+    program = parse_text("move to $var")
     node = program.body[0]
     assert isinstance(node, Move)
     assert isinstance(node.target, VarRef)
@@ -545,7 +546,7 @@ def test_move_var_target():
 
 def test_move_after_wait():
     """move ... after wait -> [Move, Wait]"""
-    program = parse_text("move [scene].[region] after wait 0.5")
+    program = parse_text("move to [scene].[region] after wait 0.5")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Move)
     assert isinstance(program.body[1], Wait)
@@ -553,7 +554,7 @@ def test_move_after_wait():
 
 def test_move_before_wait():
     """move ... before wait -> [Wait, Move]"""
-    program = parse_text("move [scene].[region] before wait 0.3")
+    program = parse_text("move to [scene].[region] before wait 0.3")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Wait)
     assert isinstance(program.body[1], Move)
@@ -561,11 +562,53 @@ def test_move_before_wait():
 
 def test_move_around_wait():
     """move ... around wait -> [Wait, Move, Wait]"""
-    program = parse_text("move [scene].[region] around wait 0.5")
+    program = parse_text("move to [scene].[region] around wait 0.5")
     assert len(program.body) == 3
     assert isinstance(program.body[0], Wait)
     assert isinstance(program.body[1], Move)
     assert isinstance(program.body[2], Wait)
+
+
+def test_place_coord_target():
+    program = parse_text("place (0.25, 0.75)")
+    node = program.body[0]
+    assert isinstance(node, Place)
+    assert node.target == CoordPoint(0.25, 0.75)
+
+
+def test_move_explicit_start_expands_to_place():
+    program = parse_text(
+        "move (0.1, 0.2) to (0.8, 0.7) duration 0.4")
+    assert len(program.body) == 2
+    place, move = program.body
+    assert isinstance(place, Place)
+    assert place.target == CoordPoint(0.1, 0.2)
+    assert isinstance(move, Move)
+    assert move.mode == "to"
+    assert move.target == CoordPoint(0.8, 0.7)
+    assert move.duration == Literal(0.4)
+
+
+def test_move_by_canvas_ratio():
+    program = parse_text("move by (-0.25, 0.1) duration $turn_time")
+    node = program.body[0]
+    assert isinstance(node, Move)
+    assert node.mode == "by"
+    assert node.target == CoordPoint(-0.25, 0.1)
+    assert node.duration == VarRef("turn_time")
+
+
+def test_move_by_explicit_start_and_around_wait():
+    program = parse_text(
+        "move (0.5, 0.5) by (0.2, -0.1) duration 0.3 around wait 0.2")
+    assert [type(node) for node in program.body] == [Wait, Place, Move, Wait]
+    assert program.body[1].target == CoordPoint(0.5, 0.5)
+    assert program.body[2].target == CoordPoint(0.2, -0.1)
+
+
+def test_legacy_move_syntax_is_rejected():
+    with pytest.raises(LarkError):
+        parse_text("move (0.5, 0.3)")
 
 
 # ─── scroll 解析测试 ─────────────────────────────────────────────

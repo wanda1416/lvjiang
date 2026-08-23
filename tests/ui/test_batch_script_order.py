@@ -18,7 +18,7 @@ class _Host(QObject):
 
 
 def _scripts() -> list[dict]:
-    return [
+    scripts = [
         {
             "id": script_id,
             "name": f"Script {script_id.upper()}",
@@ -27,6 +27,14 @@ def _scripts() -> list[dict]:
         }
         for script_id in ("a", "b", "c", "d")
     ]
+    scripts.append({
+        "id": "standalone",
+        "name": "Standalone",
+        "wf_file": "standalone/demo.wf",
+        "class": "",
+        "batchable": False,
+    })
+    return scripts
 
 
 def _make_tab(qtbot, monkeypatch, initial_order=()):
@@ -103,6 +111,7 @@ def test_script_rows_match_config_checkbox_density(qtbot, monkeypatch):
     tab, _ = _make_tab(qtbot, monkeypatch)
     item = tab._script_list.topLevelItem(0)
 
+    assert tab._script_list.topLevelItemCount() == 4
     assert item.sizeHint(0).height() == (
         QCheckBox().sizeHint().height() + tab._entry_container.spacing()
     )

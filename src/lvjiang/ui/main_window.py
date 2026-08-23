@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps import get_registry
 
-from ..core.config import load_available_envs, load_env, load_user_config, save_env
+from ..core.config import load_available_envs, load_env, load_user_config
 from ..core.config.users import SessionManager
 from ..core.layout_manager import LayoutConfigManager
 from ..core.user_config import UserConfigManager
@@ -92,6 +92,20 @@ def _set_combo_character_capacity(
     ).width()
     combo.setFixedWidth(width)
     return width
+
+
+def _create_workflow_note_label() -> QLabel:
+    """创建脚本说明标签；按左侧 Tab 可用宽度自动换行。"""
+    label = QLabel()
+    label.setObjectName("workflowNote")
+    label.setWordWrap(True)
+    label.setAlignment(
+        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+    label.setTextInteractionFlags(
+        Qt.TextInteractionFlag.TextSelectableByMouse)
+    label.setStyleSheet("padding: 2px 4px;")
+    label.setVisible(False)
+    return label
 
 
 def _get_title_with_version() -> str:
@@ -558,8 +572,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         idx = self._env_combo.findData(current_env)
         if idx >= 0:
             self._env_combo.setCurrentIndex(idx)
-        self._env_combo.currentIndexChanged.connect(
-            lambda i: save_env(self._env_combo.itemData(i)))
+        self._env_combo.currentIndexChanged.connect(self._on_env_changed)
         top_row.addWidget(self._env_combo)
         # 环境说明按钮
         env_tips_btn = QPushButton("?")
@@ -785,6 +798,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         )
         wf_layout.addWidget(self.btn_load_workflow)
         daily_layout.addWidget(wf_group)
+
+        self._workflow_note_label = _create_workflow_note_label()
+        daily_layout.addWidget(self._workflow_note_label)
 
         self._param_panel = QGroupBox(tr("参数设置"))
         self._param_layout = QFormLayout(self._param_panel)
@@ -1225,6 +1241,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         while self._param_layout.rowCount() > 0:
             self._param_layout.removeRow(0)
         flow_cfg = self._get_selected_flow_config()
+        note = str(flow_cfg.get("note") or "").strip() if flow_cfg else ""
+        self._workflow_note_label.setText(f"{tr('说明')}：{note}" if note else "")
+        self._workflow_note_label.setVisible(bool(note))
         # ⚠️ 专用脚本不画参数面板
         if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
             self._param_panel.setVisible(False)

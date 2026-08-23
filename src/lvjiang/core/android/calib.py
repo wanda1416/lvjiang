@@ -170,6 +170,11 @@ def probe(client: AgentClient, apply: bool = False, via: str = "auto") -> CalibR
     screen = (int(info["screen"]["w"]), int(info["screen"]["h"]))
     sw, sh = screen
     previous = info.get("calib") or {}
+    # 悬浮球藏起来，免得被截进准星检测窗口
+    try:
+        client.set_float_icon(True)
+    except AgentError:
+        pass
     try:
         # 探针期间必须恒等：准星才画在"原始输入坐标"上
         if not info.get("identity", True):
@@ -223,6 +228,10 @@ def probe(client: AgentClient, apply: bool = False, via: str = "auto") -> CalibR
             client.calib_hide()
         except AgentError as e:
             logger.warning(f"[Calib] 撤覆盖层失败: {e}")
+        try:
+            client.set_float_icon(False)
+        except AgentError:
+            pass
 
 
 # ─── 命令行 ───────────────────────────────────────────────
@@ -247,6 +256,10 @@ def _main(argv: list[str] | None = None) -> int:
     p.add_argument("x", type=int)
     p.add_argument("y", type=int)
     sub.add_parser("hide")
+    p = sub.add_parser("float", help="显隐设备端悬浮球")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--hide", dest="hidden", action="store_true", default=True)
+    g.add_argument("--show", dest="hidden", action="store_false")
     args = parser.parse_args(argv)
 
     client = connect_agent(AdbDevice(args.serial))
@@ -275,6 +288,9 @@ def _main(argv: list[str] | None = None) -> int:
                   f"dx={found[0] - args.x:+.1f} dy={found[1] - args.y:+.1f}")
         elif args.cmd == "hide":
             client.calib_hide()
+        elif args.cmd == "float":
+            running = client.set_float_icon(args.hidden)
+            print(f"悬浮球 {'隐藏' if args.hidden else '显示'}（悬浮服务{'在跑' if running else '未启动'}）")
         return 0
     except (AgentError, CalibError) as e:
         print(f"失败: {e}", file=sys.stderr)

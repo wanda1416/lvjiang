@@ -75,12 +75,27 @@ android {
 // Chaquopy 用 buildPython 建一个 venv 来跑 pip，因此 pip 看到的解释器版本就是它的版本。
 // 若沿用系统 Python 3.13，rapidocr_onnxruntime 的 Requires-Python (>=3.6,<3.13) 会把安装
 // 直接拦下；版本对齐后还能顺带预编译 .pyc（否则设备首次导入明显变慢）。
-// 该解释器由 `uv python install 3.10` 装入 .tooling（已 gitignore），与 jdk17/gradle 同为便携工具链。
-val buildPythonExe = rootProject.file("../.tooling/python/cpython-3.10-windows-x86_64-none/python.exe")
+// 该解释器由 `uv python install 3.10` 装入 .tooling（已 gitignore），与 jdk17/gradle 同为便携工具链；
+// Windows 与 macOS/Linux 的目录名和可执行文件位置不同，这里按平台通配解析，也允许
+// `-PbuildPython=<path>` 或环境变量 LVJIANG_BUILD_PYTHON 直接指定。
+val buildPythonExe: File = run {
+    val explicit = (project.findProperty("buildPython") as String?) ?: System.getenv("LVJIANG_BUILD_PYTHON")
+    if (!explicit.isNullOrBlank()) return@run File(explicit)
+    val root = rootProject.file("../.tooling/python")
+    val isWindows = System.getProperty("os.name").lowercase().contains("win")
+    val candidates = root.listFiles { f -> f.isDirectory && f.name.startsWith("cpython-3.10") }
+        ?.sortedBy { it.name }
+        ?.map { if (isWindows) File(it, "python.exe") else File(it, "bin/python3") }
+        ?.filter { it.exists() }
+        .orEmpty()
+    candidates.firstOrNull() ?: File(root, if (isWindows) "cpython-3.10-windows-x86_64-none/python.exe" else "cpython-3.10-<platform>/bin/python3")
+}
 if (!buildPythonExe.exists()) {
     throw GradleException(
         "缺少 buildPython：$buildPythonExe\n" +
-            "请执行：\$env:UV_PYTHON_INSTALL_DIR=\"<repo>/.tooling/python\"; uv python install 3.10"
+            "请执行：UV_PYTHON_INSTALL_DIR=<repo>/.tooling/python uv python install 3.10\n" +
+            "（PowerShell：\$env:UV_PYTHON_INSTALL_DIR=\"<repo>/.tooling/python\"; uv python install 3.10）\n" +
+            "或用 -PbuildPython=<python 可执行文件> / 环境变量 LVJIANG_BUILD_PYTHON 指定"
     )
 }
 

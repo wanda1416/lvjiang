@@ -66,6 +66,11 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
+
+        # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
+        self._session_user = None  # 当前会话的用户
+        self._equipped_cache = None  # 缓存的装备数据
+
         self._graduation_generation = 0
         self._pending_graduation: tuple[int, str, str, str, CombatAttributes] | None = None
         self._graduation_timer = QTimer(self)
@@ -245,7 +250,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         layout.addWidget(scroll, stretch=1)
 
         # 订阅装备变更信号（装备数据 Tab 中穿戴/卸下装备时触发）
-        self._host.equipment_changed.connect(self._refresh_display)
+        self._host.equipment_changed.connect(self._on_equipment_changed)
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
         self._host.user_changed.connect(self._on_user_changed)
 
@@ -350,20 +355,40 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         """毕业率方案切换。"""
         self._refresh_display()
 
+    def _on_equipment_changed(self) -> None:
+        """装备变更：清除缓存并刷新显示"""
+        logger.debug("CombatAttrsTab: 装备已变更，清除缓存")
+        # ✅ 清除装备缓存（因为装备数据已改变）
+        self._equipped_cache = None
+        # 重新加载并显示
+        self._refresh_display()
+
     def _on_user_changed(self, _name: str) -> None:
         """切换用户时立即废弃尚未完成的毕业率请求。"""
+        logger.info(f"CombatAttrsTab: 用户切换到 {_name}，清除会话缓存")
+        # ✅ 清除会话缓存（多进程安全）
+        self._clear_session_cache()
+
         self._graduation_generation += 1
         self._graduation_timer.stop()
         self._pending_graduation = None
         self._load_data()
         self._save_selection()
 
+    def _clear_session_cache(self):
+        """清除会话级缓存（用户切换/刷新时调用）"""
+        self._session_user = None
+        self._equipped_cache = None
+
     def _get_current_gongjue(self) -> str:
         value = self._combo_gongjue.currentData()
         return value if isinstance(value, str) else self._combo_gongjue.currentText()
 
     def _on_refresh(self):
-        """刷新按钮"""
+        """刷新按钮：强制从磁盘重新加载"""
+        logger.info("CombatAttrsTab: 用户按下刷新，清除会话缓存")
+        # ✅ 清除缓存，强制重新加载（多进程场景）
+        self._clear_session_cache()
         self._load_data()
 
     # ── 配置选择持久化 ──────────────────────────────────────────
@@ -488,18 +513,35 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         )
         from ....core.combat.equipment import EquipmentInventory
 
-        # 一次性加载并变换装备数据，避免重复读取仓库
+        # ✅ 会话级缓存：避免反复load装备文件
         user_name = self._host.active_user_name()
         equipped = None
+
         if user_name:
+            # 检查缓存是否有效
+            if self._session_user == user_name and self._equipped_cache is not None:
+                logger.debug(f"复用缓存装备数据 (用户: {user_name})")
+                equipped = self._equipped_cache
+            else:
+                # 会话变化或缓存无效，从磁盘加载
+                logger.debug(f"加载装备数据 (用户: {user_name})")
+                try:
+                    equipped = EquipmentInventory(user_name).equipped
+                    self._session_user = user_name
+                    self._equipped_cache = equipped
+                except Exception as e:
+                    logger.error(f"加载装备失败: {e}")
+                    equipped = {}
+
+            # 应用假定上限（满承音/满定音/满等级）
             try:
-                equipped = EquipmentInventory(user_name).equipped
-                equipped = apply_hypothetical_caps(
-                    equipped,
-                    full_chengyin=self._chk_full_chengyin.isChecked(),
-                    full_dingyin=self._chk_full_dingyin.isChecked(),
-                    full_level=self._get_full_level(),
-                )
+                if equipped:
+                    equipped = apply_hypothetical_caps(
+                        equipped,
+                        full_chengyin=self._chk_full_chengyin.isChecked(),
+                        full_dingyin=self._chk_full_dingyin.isChecked(),
+                        full_level=self._get_full_level(),
+                    )
             except Exception as e:
                 logger.error(f"读取装备数据失败: {e}")
 

@@ -29,6 +29,7 @@ from ..grammar import (
     Move,
     PanelGridDrag,
     PanelRef,
+    Place,
     Press,
     Scroll,
     VarRef,
@@ -134,18 +135,55 @@ class _ActionsMixin:
         else:
             raise WorkflowUserError(f"click: 未知目标类型 {type(node.target).__name__}")
 
+    def _exec_place(self, node: Place):
+        """place (rx, ry) — 直接设置鼠标位置，不产生移动过程。"""
+        if not isinstance(node.target, CoordPoint):
+            raise WorkflowUserError("place: 仅支持画布归一化坐标")
+        x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
+        self._input.place_screen(
+            x, y, f"coord({node.target.rx},{node.target.ry})")
+
+    def _move_duration(self, node: Move) -> float | None:
+        duration = node.duration
+        if isinstance(duration, VarRef):
+            if duration.name not in self.variables:
+                raise WorkflowUserError(
+                    f"move: 时长变量 ${duration.name} 未定义")
+            duration = self.variables[duration.name]
+        return self._resolve_duration(duration) if duration is not None else None
+
     def _exec_move(self, node: Move):
-        """move scene.coord / scene.panel[row][col] — 仅移动鼠标到目标位置，不点击。
-        目标解析逻辑与 _exec_click 完全平行。
-        """
+        """move to/by — 执行绝对目标或画布比例相对位移。"""
+        duration = self._move_duration(node)
+        if node.mode == "by":
+            if not isinstance(node.target, CoordPoint):
+                raise WorkflowUserError("move by: 位移量必须是画布比例坐标")
+            w, h = self._capture.get_capture_size()
+            canvas = self._layout.get_canvas()
+            delta_x = round(node.target.rx * canvas.w_ratio * w)
+            delta_y = round(node.target.ry * canvas.h_ratio * h)
+            self._input.move_relative(
+                delta_x,
+                delta_y,
+                f"canvas_delta({node.target.rx},{node.target.ry})",
+                duration=duration,
+            )
+            return
+        if node.mode != "to":
+            raise WorkflowUserError(f"move: 未知移动模式 {node.mode}")
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
-            self._input.move_screen(x, y, f"coord({node.target.rx},{node.target.ry})")
+            self._input.move_screen(
+                x, y, f"coord({node.target.rx},{node.target.ry})",
+                duration=duration)
             return
         if isinstance(node.target, PanelRef):
             x, y = self._panel_ref_to_screen(node.target)
             if x is not None and y is not None:
-                self._input.move_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])")
+                self._input.move_screen(
+                    x, y,
+                    f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])",
+                    duration=duration)
             return
         if isinstance(node.target, EntityRef):
             # 解析 scene
@@ -167,16 +205,20 @@ class _ActionsMixin:
                 FoundRegionCls = _get_found_region_cls()
                 if isinstance(region_val, FoundRegionCls):
                     x, y = self._found_region_to_screen(region_val)
-                    self._input.move_screen(x, y, f"find({region_val.text!r})")
+                    self._input.move_screen(
+                        x, y, f"find({region_val.text!r})", duration=duration)
                     return
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
-                    self._input.move_screen(x, y, f"{scene}/{region_val}")
+                    self._input.move_screen(
+                        x, y, f"{scene}/{region_val}", duration=duration)
                     return
-                self._ensure_workflow().move_any(str(scene), str(region_val))
+                self._ensure_workflow().move_any(
+                    str(scene), str(region_val), duration=duration)
             else:
-                self._ensure_workflow().move_any(str(scene), entity)
+                self._ensure_workflow().move_any(
+                    str(scene), entity, duration=duration)
         elif isinstance(node.target, VarRef):
             region_val = self.variables.get(node.target.name)
             if region_val is None:
@@ -185,12 +227,16 @@ class _ActionsMixin:
                 )
             if isinstance(region_val, CoordRef):
                 x, y = self._coord_ref_to_screen(region_val, jitter=True)
-                self._input.move_screen(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})")
+                self._input.move_screen(
+                    x, y,
+                    f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})",
+                    duration=duration)
                 return
             FoundRegionCls = _get_found_region_cls()
             if isinstance(region_val, FoundRegionCls):
                 x, y = self._found_region_to_screen(region_val)
-                self._input.move_screen(x, y, f"find({region_val.text!r})")
+                self._input.move_screen(
+                    x, y, f"find({region_val.text!r})", duration=duration)
                 return
             raise WorkflowUserError(
                 f"move ${node.target.name}: 变量值不是可移动目标类型 "

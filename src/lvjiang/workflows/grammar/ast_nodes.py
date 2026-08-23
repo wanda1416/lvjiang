@@ -39,13 +39,22 @@ class Click:
 
 
 @dataclass(frozen=True)
-class Move:
-    """move 指令：仅移动鼠标到目标位置，不点击
+class Place:
+    """place 指令：直接设置鼠标位置，不产生移动过程。"""
+    target: Any
+    line_no: int = 0
 
-    目标类型与 click 完全平行：
-    EntityRef | PanelRef | VarRef（CoordRef / FoundRegion）| CoordPoint
+
+@dataclass(frozen=True)
+class Move:
+    """move to/by 指令：产生鼠标移动输入，不点击。
+
+    mode="to" 时 target 与 click 目标类型平行；mode="by" 时 target 是
+    CoordPoint，其 rx/ry 表示相对整个画布宽高的有符号位移比例。
     """
     target: Any
+    mode: str = "to"
+    duration: Any = None
     line_no: int = 0
 
 

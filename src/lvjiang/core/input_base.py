@@ -19,7 +19,9 @@ class InputBackend(ABC):
 
     公开接口：
     - click_screen(x, y, poi_name)：点击屏幕/设备坐标
-    - move_screen(x, y, poi_name)：移动鼠标到屏幕/设备坐标（不点击）
+    - place_screen(x, y, poi_name)：直接设置鼠标位置（不产生移动过程）
+    - move_screen(x, y, poi_name, duration)：产生鼠标移动并到达屏幕坐标
+    - move_relative(dx, dy, poi_name, duration)：产生有符号的相对鼠标位移
     - drag_screen(from_x, from_y, to_x, to_y, ...)：从起点拖拽到终点
     - key_down(key)：按下按键（仅 keydown，不释放）
     - key_up(key)：释放按键
@@ -58,12 +60,41 @@ class InputBackend(ABC):
         """
 
     @abstractmethod
-    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
-        """移动鼠标到指定坐标（不点击）
+    def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """直接设置鼠标位置，不产生移动过程。
 
-        SendInput：SetCursorPos 移动系统光标。
+        SendInput：SetCursorPos 绝对放置系统光标。
+        PostMessage：投递一次目标位置 WM_MOUSEMOVE。
+        ADB/设备端：不支持。
+        """
+
+    @abstractmethod
+    def move_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        poi_name: str = "",
+        duration: float | None = None,
+    ):
+        """通过鼠标移动输入到达指定坐标（不点击）。
+
+        SendInput：根据当前光标位置计算相对位移并分步注入。
         PostMessage：WM_MOUSEMOVE 向目标窗口投递鼠标移动消息。
         ADB：不支持，空操作并记录警告。
+        """
+
+    @abstractmethod
+    def move_relative(
+        self,
+        delta_x: int,
+        delta_y: int,
+        poi_name: str = "",
+        duration: float | None = None,
+    ):
+        """产生相对鼠标位移，不依赖系统光标绝对位置。
+
+        SendInput：逐步注入 MOUSEEVENTF_MOVE 相对位移。
+        其他后端：不支持，空操作并记录警告。
         """
 
     @abstractmethod

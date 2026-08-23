@@ -4,8 +4,10 @@
 避免其封装层在 QThread 中可能引发的死锁问题。
 """
 
+import ctypes
 import random
 import time
+from ctypes import wintypes
 
 from loguru import logger
 
@@ -23,6 +25,7 @@ from .win32_keyboard import (
 from .win32_util import (
     _MOUSEEVENTF_LEFTDOWN,
     _MOUSEEVENTF_LEFTUP,
+    _MOUSEEVENTF_MOVE,
     _WHEEL_DELTA,
     _user32,
     activate_window,
@@ -53,12 +56,77 @@ class SendInputInput(InputBackend):
         self._move_to(screen_x, screen_y)
         self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay, post_delay=post_delay)
 
-    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
-        """移动鼠标到屏幕坐标（不点击）"""
+    def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """直接设置系统光标位置，不产生鼠标移动输入。"""
         self._activate_target()
-        self._move_to(screen_x, screen_y)
         label = f"({poi_name})" if poi_name else ""
-        logger.debug(f"移动 {label}: ({screen_x}, {screen_y})")
+        logger.debug(f"放置 {label}: ({screen_x}, {screen_y})")
+        _user32.SetCursorPos(int(screen_x), int(screen_y))
+
+    def move_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        poi_name: str = "",
+        duration: float | None = None,
+    ):
+        """根据当前光标位置计算相对位移，并分步移动到目标坐标。"""
+        self._activate_target()
+        point = wintypes.POINT()
+        _user32.GetCursorPos(ctypes.byref(point))
+        dx = int(screen_x) - int(point.x)
+        dy = int(screen_y) - int(point.y)
+        move_dur = (
+            random.uniform(*self.mouse_move_duration)
+            if duration is None else max(float(duration), 0.0)
+        )
+        self._send_relative_steps(dx, dy, move_dur)
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(
+            f"移动到 {label}: ({screen_x}, {screen_y}), "
+            f"delta=({dx},{dy}), duration={move_dur:.3f}s")
+
+    def move_relative(
+        self,
+        delta_x: int,
+        delta_y: int,
+        poi_name: str = "",
+        duration: float | None = None,
+    ):
+        """通过 SendInput 注入相对鼠标位移。"""
+        self._activate_target()
+        move_dur = (
+            random.uniform(*self.mouse_move_duration)
+            if duration is None else max(float(duration), 0.0)
+        )
+        self._send_relative_steps(int(delta_x), int(delta_y), move_dur)
+        label = f"({poi_name})" if poi_name else ""
+        logger.debug(
+            f"相对移动 {label}: ({delta_x:+d}, {delta_y:+d}), "
+            f"duration={move_dur:.3f}s")
+
+    @staticmethod
+    def _distribute(total: int, steps: int) -> list[int]:
+        """把有符号整数位移无损、均匀地分配到多个步骤。"""
+        if steps <= 1:
+            return [total]
+        values: list[int] = []
+        previous = 0
+        for index in range(1, steps + 1):
+            current = round(total * index / steps)
+            values.append(current - previous)
+            previous = current
+        return values
+
+    def _send_relative_steps(self, dx: int, dy: int, duration: float):
+        steps = max(int(duration / 0.01), 1)
+        dx_steps = self._distribute(dx, steps)
+        dy_steps = self._distribute(dy, steps)
+        delay = duration / steps if duration > 0 else 0
+        for step_dx, step_dy in zip(dx_steps, dy_steps, strict=True):
+            send_mouse_event(_MOUSEEVENTF_MOVE, step_dx, step_dy)
+            if delay:
+                time.sleep(delay)
 
     def scroll_screen(
         self,

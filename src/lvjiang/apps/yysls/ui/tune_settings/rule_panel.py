@@ -32,6 +32,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 
 from .....i18n import tr
+from ..layout_helpers import configure_navigation_list
 from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
 from .pool_page import PoolPage
@@ -130,7 +131,7 @@ class RulePanel(QWidget):
             self._nav.addItem(tr(title))
             if row == _SEP_ROW - 1:
                 add_nav_separator(self._nav)
-        self._nav.setFixedWidth(140)
+        configure_navigation_list(self._nav, minimum_width=190)
         self._nav.currentRowChanged.connect(self._on_nav_changed)
         body.addWidget(self._nav)
 
@@ -247,4 +248,3 @@ class RulePanel(QWidget):
             self._status_cb(f"{status}（{now}）", False)
         except Exception as e:  # noqa: BLE001
             self._status_cb(tr("设置启用状态失败：{e}").format(e=e), True)
-

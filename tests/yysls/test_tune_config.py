@@ -78,6 +78,8 @@ class TestDialog:
         # 分割线项不可选中
         assert not dialog._nav.item(4).flags()
         assert dialog._nav.item(5).text() == "流派规则"
+        assert dialog._nav.minimumWidth() >= 220
+        assert dialog._nav.property("navigation") is True
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
         first_rule = next(iter(get_tuning_rules().values()))
@@ -87,6 +89,9 @@ class TestDialog:
         assert dialog._stack.currentIndex() == 3
         dialog._nav.setCurrentRow(6)
         assert dialog._stack.currentIndex() == 5
+        rule_panel = dialog._stack.widget(5)
+        assert rule_panel._nav.minimumWidth() >= 190
+        assert rule_panel._nav.property("navigation") is True
 
 
 class TestBehaviorPages:

@@ -219,6 +219,22 @@ QPushButton:disabled, QToolButton:disabled {{
 QDialogButtonBox QPushButton {{
     padding: 6px 18px;
 }}
+QListWidget[navigation="true"] {{
+    font-size: 14px;
+    padding: 4px;
+}}
+QListWidget[navigation="true"]::item {{
+    min-height: 24px;
+    padding: 5px 10px;
+    border-radius: 4px;
+}}
+QListWidget[navigation="true"]::item:hover {{
+    background-color: {t.surface_hover};
+}}
+QListWidget[navigation="true"]::item:selected {{
+    background-color: {t.accent};
+    color: {t.selection_text};
+}}
 QTabWidget::pane {{
     border: 1px solid {t.border};
     background-color: {t.window};

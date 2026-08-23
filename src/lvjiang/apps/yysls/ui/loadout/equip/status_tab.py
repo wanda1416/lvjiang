@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
+from ...layout_helpers import fit_combo_to_contents
 from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from ...profile.tab import add_user_nav_buttons
 from .cards import _CompactEquipCard, _SlotCard
@@ -155,34 +156,42 @@ class EquipStatusTab(QWidget):
 
         # ── Row B: 信息 + 筛选栏 ──
         self._info_widget = QWidget()
-        info_row = QHBoxLayout(self._info_widget)
-        info_row.setContentsMargins(8, 0, 8, 0)
-        info_row.setSpacing(12)
+        info_layout = QVBoxLayout(self._info_widget)
+        info_layout.setContentsMargins(8, 0, 8, 4)
+        info_layout.setSpacing(6)
+
+        metrics_row = QHBoxLayout()
+        metrics_row.setSpacing(12)
 
         # 左区：DPS + 毕业率
         dps_lbl = QLabel(tr("DPS"))
         self._status_dps_name = dps_lbl
         dps_lbl.setStyleSheet(_STATUS_NAME_STYLE)
-        info_row.addWidget(dps_lbl)
+        metrics_row.addWidget(dps_lbl)
         self._status_dps = QLabel("--")
         self._status_dps.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._status_dps.setMinimumWidth(80)
         self._status_dps.setStyleSheet(_STATUS_VALUE_STYLE)
-        info_row.addWidget(self._status_dps)
+        metrics_row.addWidget(self._status_dps)
 
-        info_row.addSpacing(16)
+        metrics_row.addSpacing(16)
 
         rate_lbl = QLabel(tr("毕业率"))
         self._status_graduation_name = rate_lbl
         rate_lbl.setStyleSheet(_STATUS_NAME_STYLE)
-        info_row.addWidget(rate_lbl)
+        metrics_row.addWidget(rate_lbl)
         self._status_graduation = QLabel("--")
         self._status_graduation.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._status_graduation.setMinimumWidth(80)
         self._status_graduation.setStyleSheet(_STATUS_YELLOW_VALUE_STYLE)
-        info_row.addWidget(self._status_graduation)
+        metrics_row.addWidget(self._status_graduation)
 
-        info_row.addStretch()
+        metrics_row.addStretch()
+        info_layout.addLayout(metrics_row)
+
+        # 筛选项保持单行，避免窗口尚有横向空间时提前折行。
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
 
         # 右区：筛选下拉框
         _filter_lbl_style = "font-size: 12px; color: palette(mid);"
@@ -190,19 +199,20 @@ class EquipStatusTab(QWidget):
         # 排序
         lbl_sort = QLabel(tr("排序"))
         lbl_sort.setStyleSheet(_filter_lbl_style)
-        info_row.addWidget(lbl_sort)
+        filter_row.addWidget(lbl_sort)
         self._sort_filter = QComboBox()
         self._sort_filter.addItem(tr("默认"), "default")
         self._sort_filter.addItem(tr("等级倒序"), "level_desc")
         self._sort_filter.addItem(tr("等级正序"), "level_asc")
         self._sort_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
+        fit_combo_to_contents(self._sort_filter, minimum=104)
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
-        info_row.addWidget(self._sort_filter)
+        filter_row.addWidget(self._sort_filter)
 
         lbl_part = QLabel(tr("部位"))
         lbl_part.setStyleSheet(_filter_lbl_style)
-        info_row.addWidget(lbl_part)
+        filter_row.addWidget(lbl_part)
         self._type_filter = QComboBox()
         self._type_filter.addItem(tr("全部"), "all")
         for sk, dn, _ in [
@@ -218,46 +228,51 @@ class EquipStatusTab(QWidget):
             self._type_filter.addItem(dn, sk)
         self._type_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
+        fit_combo_to_contents(self._type_filter, minimum=104)
         self._type_filter.currentIndexChanged.connect(self._on_filter_changed)
-        info_row.addWidget(self._type_filter)
+        filter_row.addWidget(self._type_filter)
 
         lbl_level = QLabel(tr("等级"))
         lbl_level.setStyleSheet(_filter_lbl_style)
-        info_row.addWidget(lbl_level)
+        filter_row.addWidget(lbl_level)
         self._level_filter = QComboBox()
         self._level_filter.addItem(tr("全部"), "all")
         from lvjiang.apps.yysls.config import get_game_config
         for lvl in sorted([c.level for c in get_game_config().get_level_configs()], reverse=True):
             self._level_filter.addItem(tr("≥{level}").format(level=lvl), str(lvl))
-        self._level_filter.setMinimumWidth(70)
         self._level_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
+        fit_combo_to_contents(self._level_filter, minimum=88)
         self._level_filter.currentIndexChanged.connect(self._on_filter_changed)
-        info_row.addWidget(self._level_filter)
+        filter_row.addWidget(self._level_filter)
 
         lbl_affix = QLabel(tr("词条"))
         lbl_affix.setStyleSheet(_filter_lbl_style)
-        info_row.addWidget(lbl_affix)
+        filter_row.addWidget(lbl_affix)
         self._affix_filter = QComboBox()
         self._affix_filter.addItem(tr("全部"), "all")
         self._affix_filter.addItem(tr("已定音"), "dingyin")
         self._affix_filter.addItem(tr("满调律"), "full_tuning")
-        self._affix_filter.setMinimumWidth(70)
+        fit_combo_to_contents(self._affix_filter, minimum=88)
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
-        info_row.addWidget(self._affix_filter)
+        filter_row.addWidget(self._affix_filter)
 
         # 数据来源筛选：全部/背包/模拟
         lbl_source = QLabel(tr("类型"))
         lbl_source.setStyleSheet(_filter_lbl_style)
-        info_row.addWidget(lbl_source)
+        filter_row.addWidget(lbl_source)
         self._source_filter = QComboBox()
         self._source_filter.addItem(tr("全部"), "all")
         self._source_filter.addItem(tr("背包"), "bag")
         self._source_filter.addItem(tr("模拟"), "mock")
         self._source_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
+        fit_combo_to_contents(self._source_filter, minimum=104)
         self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
-        info_row.addWidget(self._source_filter)
+        filter_row.addWidget(self._source_filter)
+
+        filter_row.addStretch()
+        info_layout.addLayout(filter_row)
 
         layout.addWidget(self._info_widget)
 

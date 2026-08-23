@@ -121,7 +121,20 @@ script_record:
   err_layout_not_found: '无法加载布局: {layout_name}'
   err_start_failed: '启动失败: {e}'
   err_record_failed: '录制启动失败: {e}'
-  status_recording: 录制中…点击/拖拽/滚轮/按键，F12 或点击停止
+  err_content_not_cleared_title: 无法开始录制
+  err_content_not_cleared_message: 已有未清除的录制内容，请清除后再次点击「录制脚本」，避免覆盖丢失。
+  status_recording: 录制中…Raw Input 移动/点击/拖拽/滚轮/按键，F12 或点击停止
+  precision_label: 录制精度
+  precision_low: 低精度（普通界面，可编辑 WF）
+  precision_high: 高精度（游戏视角，原始轨迹）
+  precision_tip_low: 合并连续移动，生成可编辑 DSL 指令
+  precision_tip_high: 保存 workflows/lvtrace 配套文件，忠实还原原始输入
+  high_copy_disabled: 高精度 WF 依赖配套轨迹文件，不能单独复制
+  status_recording_low: 低精度录制中…连续移动将合并，F12 或点击停止
+  status_recording_high: 高精度录制中…原始输入写入统一时间线，F12 或点击停止
+  placeholder: |-
+    录制结果将显示在这里（画布归一化坐标，可保存为 .wf）
+    低精度生成可编辑指令；高精度保存原始输入轨迹，F8/F9/F10/F12 不会被录制
   status_done: 录制结束，可编辑后保存为 .wf
   status_done_empty: 录制结束，未捕获到有效操作
   status_copied: 已复制到剪贴板

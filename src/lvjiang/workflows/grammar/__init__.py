@@ -55,6 +55,7 @@ from .ast_nodes import (
     # 程序
     Program,
     Recognize,
+    ReplayInputTrace,
     Return,
     Scan,
     Screenshot,
@@ -73,6 +74,7 @@ from .parser import parse_file, parse_text
 __all__ = [
     "parse_file", "parse_text",
     "Program",
+    "ReplayInputTrace",
     "Click", "Place", "Move", "Scroll", "Drag", "Press", "Wait", "WaitStable", "Scan", "Recognize", "Collect", "Log", "Screenshot", "Find",
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Return", "Label", "Goto", "Try",

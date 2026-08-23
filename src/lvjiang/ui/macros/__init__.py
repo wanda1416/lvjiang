@@ -1,9 +1,10 @@
-"""宏录制模块 - 将鼠标/键盘操作录制为 DSL 语句文本
+"""宏录制模块 - 低精度 DSL 与高精度输入轨迹录制
 
-录制产物直接是符合 .wf 语法的 click/drag/scroll/press/wait 语句，
-坐标为画布归一化比例，可剪切复用到任意工作流，回放走现有 DSL 引擎。
+低精度产物是可编辑的 click/drag/scroll/press/move/wait 指令；高精度产物
+由一条 replay input_trace 指令和 workflows/lvtrace 配套文件组成。两种模式
+都以画布为归一化基准，高精度轨迹由专用实时调度器回放。
 """
 
-from .recorder import MacroRecorder
+from .recorder import PRECISION_HIGH, PRECISION_LOW, MacroRecorder
 
-__all__ = ["MacroRecorder"]
+__all__ = ["MacroRecorder", "PRECISION_HIGH", "PRECISION_LOW"]

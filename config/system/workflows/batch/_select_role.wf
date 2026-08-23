@@ -1,6 +1,6 @@
 # 公共子过程：选角色 + 进入游戏
 
-import "../subcall/navigation.wf"
+import "../subcall/page_detection.wf"
 
 def _select_role($role_index, $role, $batch_state)
     log "当前下标" + $role_index

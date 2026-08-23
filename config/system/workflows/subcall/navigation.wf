@@ -2,6 +2,7 @@
 
 # 通用导航子过程库
 # 提供页面间导航的原子操作，供各工作流 import 后调用。
+# 页面状态判断是本文件的直接依赖，由 page_detection.wf 提供。
 #
 # 包含过程：
 #   nav_main_to_bag()    — 主界面 → 背包页（>=0 成功，<0 导航失败）
@@ -10,8 +11,8 @@
 #   nav_main_to_item()   — 主界面 → 背包道具页（普通道具子区域）
 #   nav_back_to_main()   — 背包装备页 → 主界面
 #   nav_equip_to_tune()  — 装备详情页 → 调律页
-#   is_in_main_page()    — 检测当前是否在主界面（返回 1/0）
-#   is_in_menu_page()    — 检测当前是否在菜单页（返回 1/0）
+
+import "page_detection.wf"
 
 # ─── nav_main_to_bag ──────────────────────────────────────
 # 从主界面导航到背包页面
@@ -263,50 +264,4 @@ def nav_equip_to_tune()
         eval pause("未进入调律页面，请手动导航后点击继续")
     end
     log info "已到达调律页"
-end
-
-# ─── is_in_main_page ─────────────────────────────────────
-# 检测当前是否在游戏主界面
-# 通过扫描主界面多个入口按钮文字判定（菜单/活动/武林录/限时）
-# 返回：1=在主界面，0=不在
-
-def is_in_main_page()
-    eval $main_items = ["菜单", "活动", "武林录", "限时"]
-    scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
-    if $found
-        call $in_bag = is_in_bag_page()
-        if $in_bag == 0
-            return 1
-        end
-    end
-    return 0
-end
-
-# ─── is_in_menu_page ─────────────────────────────────────
-# 检测当前是否在菜单页
-# 通过扫描菜单页入口按钮文字判定（包裹/培养）
-# 返回：1=在菜单页，0=不在
-
-def is_in_menu_page()
-   eval $menu_items = ["包裹", "培养"]
-   scan [game_menu_page].[baoguo, peiyang] as $found by contains_any $menu_items
-   if $found
-       return 1
-   else
-       return 0
-   end
-end
-
-# ─── is_in_bag_page ─────────────────────────────────────
-# 检测当前是否在背包页
-# 通过扫描背包页入口按钮文字判定（回收/整理背包）
-# 返回：1=在背包页，0=不在
-def is_in_bag_page()
-   eval $bag_items = ["回收", "整理背包"]
-   scan [bag_equip_detail].[recycle, zhengli] as $found by contains_any $bag_items
-   if $found
-       return 1
-   else
-       return 0
-   end
 end

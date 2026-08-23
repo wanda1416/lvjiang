@@ -45,6 +45,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 from lvjiang.core.config.wf_configs import get_wf_config
 
 from .....i18n import tr
+from ..layout_helpers import configure_navigation_list
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
@@ -129,7 +130,7 @@ class TuningRulesDialog(QDialog):
         left = QVBoxLayout()
         left.setContentsMargins(0, 0, 0, 0)
         self._nav = QListWidget()
-        self._nav.setFixedWidth(180)
+        configure_navigation_list(self._nav, minimum_width=220)
         self._nav.currentRowChanged.connect(self._on_nav_changed)
         self._nav.itemDoubleClicked.connect(self._on_nav_double_clicked)
         left.addWidget(self._nav, 1)

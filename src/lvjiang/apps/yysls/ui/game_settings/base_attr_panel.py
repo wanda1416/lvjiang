@@ -37,6 +37,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_CATEGORY
 
 from .....i18n import tr
+from ..layout_helpers import configure_navigation_list
 from .level_combo import LevelCombo
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
@@ -142,6 +143,7 @@ class BaseAttrPanel(QWidget):
         left_layout.addWidget(QLabel(tr("装备类型")))
 
         self._part_list = QListWidget()
+        configure_navigation_list(self._part_list, minimum_width=200)
         for part in BASE_ATTR_PARTS:
             self._part_list.addItem(_PART_NAMES.get(part, part))
         self._part_list.currentRowChanged.connect(self._on_part_changed)
@@ -255,7 +257,10 @@ class BaseAttrPanel(QWidget):
         right_layout.addLayout(btn_layout)
         splitter.addWidget(right_widget)
 
-        splitter.setSizes([120, 430])
+        splitter.setChildrenCollapsible(False)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([220, 650])
 
     def _load_data(self):
         """从 YAML 加载数据"""

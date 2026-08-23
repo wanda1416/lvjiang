@@ -334,6 +334,22 @@ class RunControlMixin:
         # 通知插件页面（如装备状态）刷新
         self.user_changed.emit(self._user_manager.get_active_user_name() or "")
 
+    def _on_env_changed(self, index: int):
+        """环境选择器切换：持久化 + 刷新工作流下拉框的"环境不支持"提示
+
+        _load_workflow_configs 里拼接后缀用的 current_env 是切换前 load_env()
+        读到的旧值，只在启动/脚本编辑保存/脚本配置保存时跑一次——环境切换
+        本身不在这三个触发时机内，之前切完环境下拉框文字不会跟着刷新（虽然
+        真正点运行时 _on_run_workflow 会用最新环境重新校验、正确拦截，只是
+        UI 提示滞后）。这里补上刷新，须先 save_env 落盘，_load_workflow_configs
+        内部才能读到切换后的新环境。
+        """
+        if index < 0:
+            return
+        from ..core.config import save_env
+        save_env(self._env_combo.itemData(index))
+        self._load_workflow_configs()
+
     def navigate_user(self, delta: int) -> None:
         """按 delta 偏移切换当前用户（-1 上一个 / +1 下一个）。
 
@@ -422,6 +438,57 @@ class RunControlMixin:
     def _is_stopped(self) -> bool:
         """工作流回调：检查是否请求了停止"""
         return self._stop_requested
+
+    def _resolve_dsl_workflow_path(self, flow_cfg: dict) -> Path | None:
+        """解析 DSL 文件；缓存路径失效时按脚本 ID 重新发现一次。
+
+        应用升级期间窗口可能仍持有迁移前的 ``wf_file``。重新发现可把同一
+        脚本 ID 校正到新目录，同时不掩盖文件确实缺失的情况。
+        """
+        resolver = get_resolver()
+
+        def resolve(wf_file: str) -> Path | None:
+            path = Path(wf_file)
+            if path.is_absolute():
+                return path if path.is_file() else None
+            found = resolver.resolve_read(f"workflows/{wf_file}")
+            return Path(found) if found is not None and Path(found).is_file() else None
+
+        wf_file = str(flow_cfg.get("wf_file") or "")
+        path = resolve(wf_file) if wf_file else None
+        if path is not None:
+            return path
+
+        from ..workflows.discovery import discover_scripts
+
+        fresh_cfg = next(
+            (cfg for cfg in discover_scripts()
+             if cfg.get("id") == flow_cfg.get("id") and cfg.get("wf_file")),
+            None,
+        )
+        if fresh_cfg is None:
+            return None
+        fresh_file = str(fresh_cfg["wf_file"])
+        path = resolve(fresh_file)
+        if path is None:
+            return None
+        if fresh_file != wf_file:
+            logger.info(
+                f"工作流路径已刷新: {wf_file or '<空>'} -> {fresh_file}")
+            flow_cfg["wf_file"] = fresh_file
+        return path
+
+    def _show_workflow_start_error(self, message: str):
+        """报告启动前错误：控制台、日志与可见弹窗保持一致。"""
+        from PyQt6.QtWidgets import QMessageBox, QWidget
+
+        self.log_text.append(f"[错误] {message}")
+        logger.error(message)
+        QMessageBox.critical(
+            self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
+            tr("无法启动工作流"),
+            message,
+        )
 
     def _create_ui_callback(self):
         """创建线程安全的 UI 交互回调（confirm/pause/input/notify）
@@ -677,6 +744,15 @@ class RunControlMixin:
 
         flow_name = flow_cfg["name"]
         flow_id = flow_cfg["id"]
+        wf_class_name = flow_cfg.get("class", "")
+        wf_path: Path | None = None
+        if not wf_class_name:
+            wf_path = self._resolve_dsl_workflow_path(flow_cfg)
+            if wf_path is None:
+                wf_file = flow_cfg.get("wf_file") or flow_id
+                self._show_workflow_start_error(
+                    tr("工作流文件不存在: {path}").format(path=wf_file))
+                return
 
         if not self._begin_automation(flow_name):
             return
@@ -739,7 +815,6 @@ class RunControlMixin:
             self.log_text.append(f"[参数] {flow_params}")
 
         # Python 代码工作流 vs DSL 工作流
-        wf_class_name = flow_cfg.get("class", "")
         if wf_class_name:
             from ..workflows.implementations import get_workflow_class
             wf_class = get_workflow_class(wf_class_name)
@@ -758,15 +833,8 @@ class RunControlMixin:
             self._start_workflow(flow_id, flow_name,
                                  lambda: engine.execute(wf_instance, initial_variables=flow_params))
         else:
-            # 原有 DSL 路径
-            wf_file = flow_cfg["wf_file"]
-            wf_path = Path(wf_file)
-            if not wf_path.is_absolute():
-                resolved = get_resolver().resolve_read(f"workflows/{wf_file}")
-                if resolved is None:
-                    logger.error(f"工作流文件不存在: {wf_file}")
-                    return
-                wf_path = resolved
+            # DSL 路径已在进入运行态之前完成校验。
+            assert wf_path is not None
             self._start_workflow(flow_id, flow_name,
                                  lambda: engine.execute(wf_path, initial_variables=flow_params))
 

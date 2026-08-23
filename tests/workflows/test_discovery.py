@@ -30,10 +30,17 @@ class TestDiscoverWfScripts:
         wf_dir = tmp_path / "workflows"
         wf_dir.mkdir()
         wf_file = wf_dir / "test_flow.wf"
-        wf_file.write_text("#% name: 测试流程\n#% parameters:\n#%   - name: target\n", encoding="utf-8")
+        wf_file.write_text(
+            "#% name: 测试流程\n"
+            "#% note: 运行前请确认页面。\n"
+            "#% parameters:\n"
+            "#%   - name: target\n",
+            encoding="utf-8",
+        )
 
         fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: ["test_flow.wf"],
+            "enumerate_entities": lambda self, d, p: (
+                ["test_flow.wf"] if d == "workflows" else []),
             "resolve_read": lambda self, rel: wf_file,
         })()
         monkeypatch.setattr(
@@ -43,8 +50,34 @@ class TestDiscoverWfScripts:
         result = _discover_wf_scripts()
         assert "test_flow" in result
         assert result["test_flow"]["name"] == "测试流程"
+        assert result["test_flow"]["note"] == "运行前请确认页面。"
         assert result["test_flow"]["wf_file"] == "test_flow.wf"
         assert len(result["test_flow"]["parameters"]) == 1
+
+    def test_discovers_standalone_subdirectory(self, tmp_path, monkeypatch):
+        """standalone 下脚本以文件 stem 注册，并保留相对路径。"""
+        wf_file = tmp_path / "workflows" / "standalone" / "fengshajiusi.wf"
+        wf_file.parent.mkdir(parents=True)
+        wf_file.write_text("#% name: 风沙酒肆\n", encoding="utf-8")
+
+        fake_resolver = type("R", (), {
+            "enumerate_entities": lambda self, d, p: (
+                ["fengshajiusi.wf"]
+                if d == "workflows/standalone" else []
+            ),
+            "resolve_read": lambda self, rel: wf_file,
+        })()
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.get_resolver",
+            lambda: fake_resolver,
+        )
+
+        result = _discover_wf_scripts()
+
+        assert result["fengshajiusi"]["name"] == "风沙酒肆"
+        assert result["fengshajiusi"]["wf_file"] == (
+            "standalone/fengshajiusi.wf")
+        assert result["fengshajiusi"]["batchable"] is False
 
 
 class TestDiscoverClassScripts:
@@ -98,7 +131,8 @@ class TestDiscoverScripts:
         wf_file.write_text("#% name: WF版本\n", encoding="utf-8")
 
         fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: ["shared.wf"],
+            "enumerate_entities": lambda self, d, p: (
+                ["shared.wf"] if d == "workflows" else []),
             "resolve_read": lambda self, rel: wf_file,
         })()
         monkeypatch.setattr(

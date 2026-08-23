@@ -10,6 +10,7 @@ start: (_NL | statement)*
 // ─── 语句分派 ─────────────────────────────────────────────
 
 ?statement: click_stmt
+          | place_stmt
           | move_stmt
           | scroll_stmt
           | drag_stmt
@@ -80,9 +81,18 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
             | var_ref                                                  -> click_var_target
             | coord_point                                              -> click_coord_target
 
-// move：仅移动鼠标到目标位置，不点击（与 click 完全平行的目标语法）
-// 用途：悬停触发 tooltip、安全区检查、拖拽前预定位
-move_stmt: "move"i click_target wait_clauses? _NL
+// place：将鼠标直接放到画布归一化坐标，不产生移动过程。
+// 它是 move 的辅助原语，不承担 scene/region 等业务目标解析。
+place_stmt: "place"i coord_point wait_clauses? _NL
+
+// move to：通过鼠标移动输入到达目标位置；目标语法与 click 平行。
+// move by：按画布宽高比例产生有符号相对位移。
+// 显式起点会先展开为 place，再执行 move to：
+//   move (x1,y1) to (x2,y2) duration t
+move_stmt: "move"i move_action wait_clauses? _NL
+?move_action: coord_point? "to"i click_target move_duration? -> move_to_action
+            | coord_point? "by"i coord_point move_duration?  -> move_by_action
+move_duration: "duration"i (number | var_ref)
 
 // scroll：鼠标滚轮滚动（往往需要先 move 到目标位置再滚动）
 // 目标：可选，指定后先移动光标到该位置再滚动；省略则在当前位置滚动

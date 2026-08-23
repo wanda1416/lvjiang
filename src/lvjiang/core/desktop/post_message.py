@@ -69,7 +69,17 @@ class PostMessageInput(InputBackend):
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 
-    def move_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+    def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
+        """后台放置与移动到目标均表现为一次绝对 WM_MOUSEMOVE。"""
+        self.move_screen(screen_x, screen_y, poi_name, duration=0)
+
+    def move_screen(
+        self,
+        screen_x: int,
+        screen_y: int,
+        poi_name: str = "",
+        duration: float | None = None,
+    ):
         """后台移动：PostMessage 向目标窗口发送 WM_MOUSEMOVE，不移动光标"""
         if not self.target_hwnd:
             logger.error("PostMessage 模式未设置目标窗口句柄")
@@ -79,6 +89,15 @@ class PostMessageInput(InputBackend):
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"[后台] 移动 {label}: 屏幕({screen_x},{screen_y}) -> 客户区({cx},{cy})")
         postmessage_move(self.target_hwnd, cx, cy, activate=self.activate_before_send)
+
+    def move_relative(
+        self,
+        delta_x: int,
+        delta_y: int,
+        poi_name: str = "",
+        duration: float | None = None,
+    ):
+        logger.warning("PostMessage 后端不支持相对鼠标移动，已忽略 move by")
 
     def scroll_screen(
         self,

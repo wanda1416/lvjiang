@@ -16,6 +16,7 @@ from ..ast_nodes import (
     Move,
     PanelGridDrag,
     PanelRef,
+    Place,
     Press,
     PressMode,
     ProcDef,
@@ -101,6 +102,21 @@ class _StmtMixin:
         after_waits = [w for t, w in expanded if t == "after"]
         return before_waits + [action_node] + after_waits
 
+    @staticmethod
+    def _expand_wait_clauses_many(action_nodes, wait_pairs):
+        """把 wait_clause 包在一组不可拆分的语法糖动作之外。"""
+        if not wait_pairs:
+            return action_nodes
+        expanded = []
+        for timing, wait_node in wait_pairs:
+            if timing == "around":
+                expanded.extend((("before", wait_node), ("after", wait_node)))
+            else:
+                expanded.append((timing, wait_node))
+        before_waits = [w for timing, w in expanded if timing == "before"]
+        after_waits = [w for timing, w in expanded if timing == "after"]
+        return before_waits + list(action_nodes) + after_waits
+
     # ─── 基础指令 ─────────────────────────────────────────
 
     def _resolve_const_or_var(self, item):
@@ -159,16 +175,63 @@ class _StmtMixin:
         """(rx, ry) → CoordPoint，number 规则已转为 float"""
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
 
-    def move_stmt(self, items):
-        """move 目标 [before|after|around wait 参数 ...] — 仅移动鼠标，不点击
+    def place_stmt(self, items):
+        """place (rx, ry) — 直接设置鼠标位置。"""
+        wait_pairs, core_items = self._extract_wait_pairs(items)
+        node = Place(target=core_items[0], line_no=self._line(items))
+        return self._expand_wait_clauses(node, wait_pairs)
 
-        复用 click_target 子规则解析目标，将 Click 节点转换为 Move 节点。
-        支持 wait_clause，展开逻辑与 click_stmt 一致。
-        """
-        click_node = items[0]
-        wait_pairs, _ = self._extract_wait_pairs(items[1:])
-        move_node = Move(target=click_node.target, line_no=click_node.line_no)
-        return self._expand_wait_clauses(move_node, wait_pairs)
+    def move_duration(self, items):
+        """duration <number|$var>。"""
+        value = items[0]
+        return value if isinstance(value, VarRef) else Literal(value=float(value))
+
+    def move_to_action(self, items):
+        """[起点] to 目标 [duration t]，显式起点展开为 place。"""
+        click_index, click_node = next(
+            (index, item) for index, item in enumerate(items)
+            if isinstance(item, Click)
+        )
+        start = next(
+            (item for item in items[:click_index]
+             if isinstance(item, CoordPoint)),
+            None,
+        )
+        duration = next(
+            (item for item in items
+             if isinstance(item, (Literal, VarRef))),
+            None,
+        )
+        move = Move(
+            target=click_node.target,
+            mode="to",
+            duration=duration,
+            line_no=click_node.line_no,
+        )
+        return [Place(start, line_no=click_node.line_no), move] if start else [move]
+
+    def move_by_action(self, items):
+        """[起点] by (横向比例, 纵向比例) [duration t]。"""
+        points = [item for item in items if isinstance(item, CoordPoint)]
+        start = points[0] if len(points) == 2 else None
+        delta = points[-1]
+        duration = next(
+            (item for item in items
+             if isinstance(item, (Literal, VarRef))),
+            None,
+        )
+        move = Move(
+            target=delta,
+            mode="by",
+            duration=duration,
+            line_no=self._line(items),
+        )
+        return [Place(start, line_no=move.line_no), move] if start else [move]
+
+    def move_stmt(self, items):
+        """move ... [wait_clauses]，等待包围完整 place+move 序列。"""
+        wait_pairs, core_items = self._extract_wait_pairs(items)
+        return self._expand_wait_clauses_many(core_items[0], wait_pairs)
 
     def scroll_stmt(self, items):
         """scroll [目标] up|down [数量] [before|after|around wait ...] — 鼠标滚轮滚动

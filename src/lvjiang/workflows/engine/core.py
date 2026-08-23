@@ -41,6 +41,7 @@ from ..grammar.ast_nodes import (
     Log,
     Loop,
     Move,
+    Place,
     Press,
     ProcDef,
     Recognize,
@@ -663,6 +664,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         match node:
             case Click():
                 self._exec_click(node)
+            case Place():
+                self._exec_place(node)
             case Move():
                 self._exec_move(node)
             case Scroll():

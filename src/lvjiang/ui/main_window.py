@@ -145,6 +145,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     user_changed = pyqtSignal(str)
     # 装备变更信号（用于通知战斗属性 Tab 刷新）
     equipment_changed = pyqtSignal()
+    # 工作流请求打开"创建基础属性"面板并预填数值（战斗属性 Tab 订阅处理）
+    open_play_style_form = pyqtSignal(dict)
     # 毕业率计算完成信号（携带计算结果，None 表示尚未计算）
     graduation_updated = pyqtSignal(object)
 

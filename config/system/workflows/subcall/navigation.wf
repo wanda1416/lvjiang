@@ -10,6 +10,7 @@
 #   nav_main_to_wallet() — 主界面 → 背包钱袋页（0 成功，-1 失败）
 #   nav_main_to_item()   — 主界面 → 背包道具页（0 成功，-1 失败）
 #   nav_main_to_menu()   — 主界面 → 菜单页（0 成功，-1 失败）
+#   nav_main_to_role()   — 主界面 → 角色详情页（0 成功，-1 失败）
 #   nav_back_to_main()   — 背包装备页 → 主界面（0 成功，-1 失败）
 #   nav_equip_to_tune()  — 装备详情页 → 调律页（0 成功，-1 失败）
 
@@ -201,6 +202,39 @@ def nav_main_to_menu()
             return -1
         end
     end
+    return 0
+end
+
+# ─── nav_main_to_role ─────────────────────────────────────
+# 从主界面导航到角色详情页
+# 路径：主界面 → 菜单 → 角色（在菜单项列表里查找，找不到翻一页再找）
+# 前置：在主界面或菜单页
+# 后置：在角色详情页（role_detail）
+# 返回：-1 表示彻底找不到「角色」入口（已 pause 提示手动介入过）
+
+def nav_main_to_role()
+    call $in_menu = nav_main_to_menu()
+    if $in_menu < 0
+        return -1
+    end
+
+    find [game_menu_page].[menu] as $found by contains "角色"
+    if not $found
+        # 翻一页再找
+        drag [general_control].[menu_up] after wait @step_interval
+        find [game_menu_page].[menu] as $found by contains "角色"
+    end
+    if not $found
+        log "找不到「角色」，请手动定位后继续"
+        eval pause("找不到「角色」，请手动定位到角色入口后点击确定")
+        find [game_menu_page].[menu] as $found by contains "角色"
+    end
+    if not $found
+        log "仍未找到「角色」，无法进入角色详情页"
+        return -1
+    end
+
+    click $found after wait @page_refresh
     return 0
 end
 

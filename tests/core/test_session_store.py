@@ -129,6 +129,21 @@ class TestDiskSemantics:
 
 
 class TestConcurrency:
+    def test_independent_stores_merge_same_node_from_latest_disk(self, tmp_path):
+        """两个进程式独立缓存更新同一节点时，不覆盖对方已经写入的键。"""
+        path = tmp_path / "session.json"
+        first = SessionStore(path)
+        second = SessionStore(path)
+
+        first.update_node("settings", {"theme": "dark"})
+        second.update_node("settings", {"language": "zh_CN"})
+
+        first.reload()
+        assert first.get_node("settings") == {
+            "theme": "dark",
+            "language": "zh_CN",
+        }
+
     def test_concurrent_updates_no_lost_keys(self, tmp_path):
         """多线程并发 update_node 各自节点键不丢失（单写者快照语义）"""
         store = SessionStore(tmp_path / "session.json")

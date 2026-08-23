@@ -7,7 +7,7 @@
 
 import time
 
-from lvjiang.ui.macros.recorder import MacroRecorder
+from lvjiang.ui.macros.recorder import PRECISION_HIGH, MacroRecorder
 
 
 class _MockKey:
@@ -47,11 +47,12 @@ class _Layout:
         return _Canvas()
 
 
-def _make_recorder(lines: list[str]) -> MacroRecorder:
+def _make_recorder(lines: list[str], precision: str = "low") -> MacroRecorder:
     win = {"left": 0, "top": 0, "width": 1000, "height": 800}
     return MacroRecorder(
         target_window=win, capture=_Capture(), layout=_Layout(),
         win_left=0, win_top=0, on_line=lines.append,
+        precision=precision,
     )
 
 
@@ -126,6 +127,67 @@ class TestOnLineCallback:
         rec._handle_release(100, 80)
 
         assert rec._lines == ["click (0.1, 0.1)"]
+
+
+class _FakeButton:
+    """模拟 pynput mouse.Button 具名枚举成员：_on_click 只依赖 .name。"""
+
+    def __init__(self, name):
+        self.name = name
+
+
+class TestHighPrecisionClick:
+    """precision=high 下 _on_click 对各鼠标键（含侧键）的录制。
+
+    本测试环境没有真实 pynput 后端（无 DISPLAY），recorder 模块顶层的
+    pynput_mouse 恒为 None，_on_click 开头 `if pynput_mouse is None:
+    return` 会直接短路——monkeypatch 成非 None 的哨兵值绕过这层守卫，
+    走真实的按键名判定逻辑。
+    """
+
+    def _make_high_precision_recorder(self, monkeypatch):
+        from lvjiang.ui.macros import recorder as recorder_module
+        monkeypatch.setattr(recorder_module, "pynput_mouse", object())
+        win = {"left": 0, "top": 0, "width": 1000, "height": 800}
+        rec = MacroRecorder(
+            target_window=win, capture=_Capture(), layout=_Layout(),
+            win_left=0, win_top=0, on_line=lambda _line: None,
+            precision=PRECISION_HIGH,
+        )
+        rec._recording = True
+        monkeypatch.setattr(rec, "_target_is_foreground", lambda: True)
+        return rec
+
+    def test_side_buttons_recorded_as_trace_events(self, monkeypatch):
+        rec = self._make_high_precision_recorder(monkeypatch)
+
+        rec._on_click(10, 10, _FakeButton("x1"), True)
+        rec._on_click(10, 10, _FakeButton("x1"), False)
+        rec._on_click(10, 10, _FakeButton("x2"), True)
+        rec._on_click(10, 10, _FakeButton("x2"), False)
+
+        assert [(e.kind, e.values) for e in rec._trace_events] == [
+            ("button", ("x1", True)),
+            ("button", ("x1", False)),
+            ("button", ("x2", True)),
+            ("button", ("x2", False)),
+        ]
+
+    def test_left_right_middle_still_recorded(self, monkeypatch):
+        rec = self._make_high_precision_recorder(monkeypatch)
+
+        for name in ("left", "right", "middle"):
+            rec._on_click(10, 10, _FakeButton(name), True)
+
+        assert [e.values[0] for e in rec._trace_events] == [
+            "left", "right", "middle"]
+
+    def test_unrecognized_button_name_ignored(self, monkeypatch):
+        rec = self._make_high_precision_recorder(monkeypatch)
+
+        rec._on_click(10, 10, _FakeButton("mouse6"), True)
+
+        assert rec._trace_events == []
 
 
 class TestScroll:
@@ -315,3 +377,86 @@ class TestTrailingWaitOnStop:
         rec._recording = False  # 无真实 listener，模拟已经停止过一次
         assert rec.stop() == "\n".join(lines)
         assert lines == ["click (0.1, 0.1)"]
+
+
+class TestRawInputMove:
+    def test_low_precision_merges_continuous_raw_packets(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        start_ns = 1_000_000_000
+
+        rec._on_raw_move(10, -8, start_ns)
+        rec._on_raw_move(5, 4, start_ns + 2_000_000)
+        rec._on_raw_move(-20, 8, start_ns + 6_000_000)
+        with rec._lock:
+            rec._flush_raw_frame()
+
+        assert lines == [
+            "move by (-0.005, 0.005) duration 0.006",
+        ]
+
+    def test_raw_packet_gap_is_preserved_to_millisecond_precision(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        start_ns = 2_000_000_000
+
+        rec._on_raw_move(10, 0, start_ns)
+        rec._on_raw_move(10, 0, start_ns + 12_000_000)
+        with rec._lock:
+            rec._flush_raw_frame()
+
+        assert lines == [
+            "move by (0.01, 0) duration 0.001",
+            "wait 0.011",
+            "move by (0.01, 0) duration 0.001",
+        ]
+
+    def test_low_precision_allows_opposite_packets_to_cancel(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        start_ns = 3_000_000_000
+
+        rec._on_raw_move(10, 0, start_ns)
+        rec._on_raw_move(-10, 0, start_ns + 2_000_000)
+        with rec._lock:
+            rec._flush_raw_frame()
+
+        assert lines == []
+
+    def test_high_precision_preserves_every_raw_packet(self):
+        rec = _make_recorder([], precision=PRECISION_HIGH)
+        rec._recording = True
+        start_ns = 3_000_000_000
+
+        rec._on_raw_move(10, 0, start_ns)
+        rec._on_raw_move(-10, 5, start_ns + 2_000_000)
+
+        trace = rec.build_input_trace()
+        assert [(event.at_us, event.kind, event.values)
+                for event in trace.events] == [
+            (0, "move", (10, 0)),
+            (2000, "move", (-10, 5)),
+        ]
+
+    def test_raw_relative_components_are_clamped_to_signed_unit_range(self):
+        rec = _make_recorder([])
+        assert rec._raw_delta_to_canvas_ratio(2000, -1600) == (1.0, -1.0)
+
+    def test_absolute_coordinates_are_clamped_to_canvas_unit_range(self):
+        rec = _make_recorder([])
+        assert rec._screen_to_canvas_ratio(-100, 900) == (0.0, 1.0)
+
+    def test_raw_move_is_suppressed_during_drag(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        rec._press_pos = (100, 100)
+
+        rec._on_raw_move(20, 20, 1_000_000_000)
+        with rec._lock:
+            rec._flush_raw_frame()
+
+        assert lines == []

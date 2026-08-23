@@ -1,5 +1,6 @@
 """数据指令 Mixin：scan / recognize / collect / eval / call proc"""
 
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -460,11 +461,21 @@ class _DataOpsMixin:
 
         call 语句与 call_subcall（Python 桥）共用的过程执行核心：
         子过程从干净变量表与空 output 开始，结束后恢复调用方快照。
+
+        过程体内的 replay input_trace 等相对路径引用须相对过程自身
+        所在文件解析，而不是调用方所在文件——过程可能来自 import 引入
+        的另一个 .wf，所以执行期间临时把 _base_dir 切到 proc_sources
+        记录的定义文件目录（_proc_sources 未命中时保持调用方当前值，
+        兼容测试直接构造 ProcDef 而不经过 loaded_procs 注册的场景）。
         """
         saved_vars = dict(self.variables)
         saved_output = dict(self.output)
         self.variables = {}  # 子过程从干净变量表开始（作用域隔离）
         self.output = {}  # type: ignore[var-annotated]  # 子过程从空 output 开始
+        saved_base_dir = self._base_dir
+        proc_source = self._proc_sources.get(proc_def.name)
+        if proc_source is not None:
+            self._base_dir = Path(proc_source).parent
         return_value = None
         try:
             # 绑定参数（使用预解析的值）
@@ -477,10 +488,11 @@ class _DataOpsMixin:
             except _ReturnSignal as e:
                 return_value = e.value  # 捕获返回值
         finally:
-            # 捕获子过程的 output，然后恢复调用方的变量和 output
+            # 捕获子过程的 output，然后恢复调用方的变量、output 与 base_dir
             callee_output = dict(self.output)
             self.variables = saved_vars
             self.output = saved_output
+            self._base_dir = saved_base_dir
         return return_value, callee_output
 
     def _exec_find(self, node: Find):

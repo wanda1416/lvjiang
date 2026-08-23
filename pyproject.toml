@@ -20,6 +20,7 @@ dependencies = [
     "loguru>=0.7",
     "av>=12.0",  # PyAV — H.264 解码（scrcpy 模式需要）
     "opencv-python==4.10.0.84; sys_platform == 'darwin'",  # 4.11+/5.x 需 macOS 13-14+，macOS 12 用 4.10
+    "fasteners>=0.19",  # 跨平台文件锁（session.json 多进程安全）
 ]
 
 [project.optional-dependencies]

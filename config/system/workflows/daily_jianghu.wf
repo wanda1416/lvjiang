@@ -14,9 +14,9 @@
 # 江湖号令任务刷新流程
 #
 # 流程结构：
-#   0. 起始定位：读 label_0 判断在活动页还是首页，必要时先导航
+#   0. 起始定位：通过公共页面判断确认在活动页，否则先导航
 #   for 遍历 6 组 label_N / btn_N
-#      0. 再次读 label_0 校验仍在号令页；不在则阻塞弹窗提示用户手动
+#      0. 再次校验仍在号令页；不在则阻塞弹窗提示用户手动
 #         处理（前一个任务卡住退出时可能漏回号令页，需及时拦截，
 #         避免后续任务在错误页面上继续乱点）
 #      1. 识别 label_N 文本是否命中目标任务列表（contains_any 短路匹配）
@@ -34,6 +34,7 @@ default $max_refresh = 50
 default $claim_reward = false
 
 import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
 
 # 目标任务关键词列表
 eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉障林"]
@@ -115,7 +116,7 @@ end
 log "六个任务刷新处理完成"
 
 # 收尾：末个任务非合影时仍停在江湖号令页，连点三次返回退回游戏首页
-scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
+call $at_haoling = is_in_haoling_page()
 if $at_haoling
    log "仍在江湖号令页，退回游戏首页"
    click [activity_jianghu].[back] after wait @step_interval
@@ -130,7 +131,7 @@ end
 #                  改为阻塞弹窗提示用户手动返回号令页
 # 返回：0=已在号令页；-1=补救后仍不在，调用方应终止流程
 def ensure_at_haoling($idx, $auto_nav)
-   scan [activity_jianghu].[label_0, haoling_of_week] as $at_haoling by contains "号令"
+   call $at_haoling = is_in_haoling_page()
    if $at_haoling
       return 0
    end
@@ -143,7 +144,7 @@ def ensure_at_haoling($idx, $auto_nav)
       eval pause("检测到当前不在江湖号令页，请手动返回号令页后点击继续")
    end
 
-   scan [activity_jianghu].[label_0, haoling_of_week] as $at_haoling by contains "号令"
+   call $at_haoling = is_in_haoling_page()
    if $at_haoling
       return 0
    end

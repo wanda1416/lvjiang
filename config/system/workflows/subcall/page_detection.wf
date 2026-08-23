@@ -1,0 +1,46 @@
+#% name: 页面状态判断子过程集合
+
+# 底层页面状态判断库。
+# 只负责识别当前所在页面，不执行导航或点击动作。
+
+def is_in_main_page()
+    eval $main_items = ["菜单", "活动", "武林录", "限时"]
+    scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
+    if $found
+        call $in_bag = is_in_bag_page()
+        if $in_bag == 0
+            return 1
+        end
+    end
+    return 0
+end
+
+def is_in_menu_page()
+   eval $menu_items = ["包裹", "培养"]
+   scan [game_menu_page].[baoguo, peiyang] as $found by contains_any $menu_items
+   if $found
+       return 1
+   else
+       return 0
+   end
+end
+
+def is_in_bag_page()
+   eval $bag_items = ["回收", "整理背包"]
+   scan [bag_equip_detail].[recycle, zhengli] as $found by contains_any $bag_items
+   if $found
+       return 1
+   else
+       return 0
+   end
+end
+
+# 同时扫描页面标题和“当周获取号令”，避免单个标题区域偶发识别失败。
+def is_in_haoling_page()
+   scan [activity_jianghu].[label_0, haoling_of_week] as $found by contains "号令"
+   if $found
+       return 1
+   else
+       return 0
+   end
+end

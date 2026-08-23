@@ -59,11 +59,16 @@ class UserConfigManager:
             self._create_default_user()
 
     def _save(self):
-        """保存用户字段到 session.json（经 SessionStore，不影响其他节点）"""
+        """保存用户字段到 session.json（原子操作，经 SessionStore）
+
+        ⚠️ 使用 mutate_node 确保并发安全
+        """
         from .config.session import get_session_store
         store = get_session_store()
-        store.set_node("users", [u.to_dict() for u in self._users.values()])
-        store.set_node("active_user", self._active_user)
+        # 原子化保存用户列表
+        store.mutate_node("users", lambda _: [u.to_dict() for u in self._users.values()])
+        # 原子化保存当前用户
+        store.mutate_node("active_user", lambda _: self._active_user)
 
     def _create_default_user(self):
         """创建默认用户"""

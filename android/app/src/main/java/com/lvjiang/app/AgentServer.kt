@@ -185,6 +185,7 @@ object AgentServer {
         "calib_clear" -> calibClear()
         "calib_mark" -> calibMark(req)
         "calib_hide" -> calibHide()
+        "float_icon" -> floatIcon(req)
         else -> fail("未知 op: $op")
     }
 
@@ -270,6 +271,16 @@ object AgentServer {
             ?: return fail("拿不到 Context（进程未初始化）")
         CalibOverlay.hide(ctx)
         return ok(JSONObject())
+    }
+
+    /**
+     * 动态显隐悬浮球（截图 / 标定时把它藏掉，免得被截进画面）。
+     * hidden 缺省 true；悬浮服务没在跑时 running=false，静默即可（本来就没图标）。
+     */
+    private fun floatIcon(req: JSONObject): Pair<JSONObject, ByteArray?> {
+        val hidden = req.optBoolean("hidden", true)
+        val running = FloatService.setIconHidden(hidden)
+        return ok(JSONObject().put("running", running).put("hidden", hidden))
     }
 
     // ─── 通道选择 ───────────────────────────────────────────

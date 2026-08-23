@@ -121,7 +121,20 @@ script_record:
   err_layout_not_found: 'Failed to load layout: {layout_name}'
   err_start_failed: 'Start failed: {e}'
   err_record_failed: 'Recording start failed: {e}'
-  status_recording: Recording... Click/drag/scroll/press, F12 or click to stop
+  err_content_not_cleared_title: Cannot Start Recording
+  err_content_not_cleared_message: There is unsaved recorded content. Please click "Clear" before recording again to avoid overwriting it.
+  status_recording: Recording... Raw Input move/click/drag/scroll/press; F12 or click to stop
+  precision_label: Recording precision
+  precision_low: Low precision (editable workflow)
+  precision_high: High precision (raw game input)
+  precision_tip_low: Merges continuous movement into editable DSL commands
+  precision_tip_high: Saves a workflows/lvtrace companion file, faithfully replaying raw input
+  high_copy_disabled: High-precision workflows require their companion trace and cannot be copied alone
+  status_recording_low: Recording in low precision... continuous movement will be merged; F12 or click to stop
+  status_recording_high: Recording in high precision... writing raw input to one timeline; F12 or click to stop
+  placeholder: |-
+    Recorded output appears here (canvas-normalized coordinates, savable as .wf)
+    Low precision creates editable commands; high precision saves a raw input trace; F8/F9/F10/F12 are ignored
   status_done: Recording done. Edit and save as .wf
   status_done_empty: Recording ended, no valid actions captured
   status_copied: Copied to clipboard

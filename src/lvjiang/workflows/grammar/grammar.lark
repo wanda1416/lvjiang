@@ -12,6 +12,7 @@ start: (_NL | statement)*
 ?statement: click_stmt
           | place_stmt
           | move_stmt
+          | replay_input_trace_stmt
           | scroll_stmt
           | drag_stmt
           | press_stmt
@@ -93,6 +94,9 @@ move_stmt: "move"i move_action wait_clauses? _NL
 ?move_action: coord_point? "to"i click_target move_duration? -> move_to_action
             | coord_point? "by"i coord_point move_duration?  -> move_by_action
 move_duration: "duration"i (number | var_ref)
+
+// 高精度输入轨迹：轨迹相对当前 .wf 文件解析，由专用实时回放器一次执行。
+replay_input_trace_stmt: "replay"i "input_trace"i STRING _NL
 
 // scroll：鼠标滚轮滚动（往往需要先 move 到目标位置再滚动）
 // 目标：可选，指定后先移动光标到该位置再滚动；省略则在当前位置滚动

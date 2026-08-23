@@ -147,6 +147,7 @@ class FloatService : Service() {
         windowManager.addView(icon, params)
         floatView = icon
         floatParams = params
+        if (iconHidden) icon.visibility = View.INVISIBLE
     }
 
     private fun tintIcon(state: String) {
@@ -495,16 +496,23 @@ class FloatService : Service() {
         @Volatile
         private var instance: FloatService? = null
 
+        /** 悬浮图标当前是否被临时隐藏（截图/标定期间）。服务重建时据此保持隐藏态 */
+        @Volatile
+        var iconHidden = false
+            private set
+
         /**
-         * 临时藏起 / 恢复悬浮图标（主线程执行）。屏幕标定页截底下的游戏画面前调用，
-         * 否则图标会被截进参照图 / 本机画面里，用户可能把它当成地标去点。
+         * 动态显隐悬浮图标（主线程执行）。截图 / 屏幕标定前藏起来，否则图标会被截进画面、
+         * 用户可能把它当成地标去点。返回悬浮服务是否在运行（没在跑本来就没图标，返回 false）。
          */
-        fun setIconHidden(hidden: Boolean) {
-            val svc = instance ?: return
+        fun setIconHidden(hidden: Boolean): Boolean {
+            iconHidden = hidden
+            val svc = instance ?: return false
             svc.ui.post {
                 svc.floatView?.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
                 if (hidden) svc.closePanel()
             }
+            return true
         }
 
         private const val TAG = "FloatService"

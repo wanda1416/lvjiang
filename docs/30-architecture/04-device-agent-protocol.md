@@ -67,6 +67,7 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 | `calib_clear` | — | 删掉当前朝向分辨率的映射文件 |
 | `calib_mark` | `x`,`y`,`tap`(false),`via` | 在 (x,y) **经映射后**的像素画准星（需悬浮窗权限，没有则 `ok=false`）；`tap=true` 同点再点一下。返回 `px{x,y}` + `calib_get` 字段 |
 | `calib_hide` | — | 撤掉准星覆盖层 |
+| `float_icon` | `hidden`(true) | 动态显隐悬浮球（截图/标定前藏起来，免得被截进画面）。返回 `running`（悬浮服务是否在跑）、`hidden` |
 
 坐标都是设备截图坐标系的像素（与 `screencap` / 无障碍截图一致），PC 端不做旋转变换。
 

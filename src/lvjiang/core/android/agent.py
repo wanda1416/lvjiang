@@ -185,6 +185,11 @@ class AgentClient:
     def calib_hide(self) -> None:
         self.call("calib_hide")
 
+    def set_float_icon(self, hidden: bool = True) -> bool:
+        """动态显隐设备端悬浮球（截图 / 标定前藏起来）。返回悬浮服务是否在运行"""
+        header, _ = self.call("float_icon", hidden=bool(hidden))
+        return bool(header.get("running"))
+
     # ─── 连接管理 ─────────────────────────────────────────
 
     def connect(self, connect_timeout: float = 3.0) -> bool:

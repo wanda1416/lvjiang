@@ -1,0 +1,71 @@
+#% name: 风沙酒肆
+#% env: [android]
+#% note: |-
+#%   请确认靠近从拾香，出现与其对话的按钮
+#%   "从拾香"（不要点击）后开始执行脚本。
+#% parameters:
+#%   - name: rounds
+#%     label: 执行轮数（一般12轮满不肝）
+#%     type: number
+#%     default: 12
+#%     min: 1
+
+# 由「屏幕点击器」分享脚本转换。
+# 原始录制分辨率：2800 × 1260（横屏）；坐标已归一化。
+# 初始化序列执行一次，主体序列按用户参数执行，默认 12 轮。
+
+default $rounds = 12
+
+# ─── 初始化：风沙酒肆初 ───────────────────────────────────
+
+click (0.658571, 0.480159) before wait 0.500
+click (0.771393, 0.552778) before wait 5.083
+click (0.743822, 0.539920) before wait 6.914
+
+# 原始方向：(457.0996, 969) → (580, 636)，手指向右上滑动。
+drag (0.163250, 0.769048) (0.207143, 0.504762) 0.450 before wait 25.860
+
+click (0.734179, 0.467539) before wait 0.717
+click (0.722179, 0.238651) before wait 13.991
+click (0.352250, 0.498254) before wait 1.957
+click (0.852428, 0.679286) before wait 1.477
+click (0.687393, 0.167301) before wait 16.673
+click (0.700964, 0.246350) before wait 16.871
+click (0.696107, 0.260397) before wait 16.222
+click (0.612500, 0.175794) before wait 17.395
+click (0.780536, 0.915317) before wait 30.000
+
+# 屏幕点击器 type=4 节拍节点。
+wait 26.000
+
+# 嵌套脚本参数：startDelay=1s、repeatDelay=1s、endDelay=0.5s。
+wait 1.000
+eval $round = 1
+loop while $round <= $rounds
+    call fengshajiusi_round()
+    if $round < $rounds
+        wait 1.000
+    end
+    eval $round = $round + 1
+end
+wait 0.500
+
+
+# ─── 主体：风沙酒肆（每轮 10 个操作）─────────────────────
+
+def fengshajiusi_round()
+    # 原始方向：(785, 954) → (854, 775)，手指向右上滑动。
+    drag (0.280357, 0.757143) (0.305000, 0.615079) 0.400 before wait 0.500
+
+    click (0.697822, 0.482222) before wait 0.892
+    click (0.672143, 0.253968) before wait 14.762 after wait 5.000
+    click (0.697857, 0.169841) before wait 14.858
+    click (0.625714, 0.252381) before wait 15.590
+    click (0.723929, 0.250000) before wait 15.494
+    click (0.661429, 0.169048) before wait 14.371
+    click (0.768571, 0.923016) before wait 30.740
+    click (0.734000, 0.655159) before wait 2.799
+
+    # 屏幕点击器 type=4 节拍节点。
+    wait 25.000
+end

@@ -4,6 +4,9 @@ from lvjiang.workflows.metadata import build_flow_config, parse_metadata
 
 SAMPLE = """\
 #% name: 单件装备调律
+#% note: |-
+#%   请先打开装备页面。
+#%   确认无弹窗后执行。
 #% required_scenes: [game_main_page, equip_tune_detail]
 #% parameters:
 #%   - name: target_material
@@ -28,6 +31,7 @@ wait @step_interval
 def test_parse_basic_fields():
     m = parse_metadata(SAMPLE)
     assert m["name"] == "单件装备调律"
+    assert m["note"] == "请先打开装备页面。\n确认无弹窗后执行。"
     assert m["required_scenes"] == ["game_main_page", "equip_tune_detail"]
     assert len(m["parameters"]) == 2
 
@@ -74,6 +78,7 @@ def test_build_flow_config_defaults(tmp_path):
     cfg = build_flow_config(wf)
     assert cfg["id"] == "__loaded__:demo_flow"
     assert cfg["name"] == "[外部] demo_flow.wf"
+    assert cfg["note"] == ""
     assert cfg["wf_file"] == str(wf)
     assert cfg["required_scenes"] == []
     assert cfg["parameters"] == []
@@ -84,6 +89,7 @@ def test_build_flow_config_with_metadata(tmp_path):
     wf.write_text(SAMPLE, encoding="utf-8")
     cfg = build_flow_config(wf)
     assert cfg["name"] == "单件装备调律"
+    assert cfg["note"] == "请先打开装备页面。\n确认无弹窗后执行。"
     assert cfg["required_scenes"] == ["game_main_page", "equip_tune_detail"]
     assert len(cfg["parameters"]) == 2
     assert cfg["wf_file"] == str(wf)

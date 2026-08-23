@@ -250,6 +250,21 @@ end
 
 工作流可以通过 `workflows.yaml` 声明外部参数，由 UI 参数面板提供配置界面，运行时注入到工作流变量系统中。
 
+`.wf` 文件也可以在顶部用 `#%` front-matter 声明显示名、说明和参数。
+其中 `note` 会显示在日常页“脚本”区域下方、“参数设置”上方，并自动换行：
+
+```text
+#% name: 示例脚本
+#% note: |-
+#%   运行前请确认已经进入目标页面。
+#%   确认无弹窗后再开始执行。
+#% parameters:
+#%   - name: execute_times
+#%     label: 执行次数
+#%     type: number
+#%     default: 10
+```
+
 ### 6.1 参数声明语法
 
 在 `config/system/workflows.yaml` 的 flow 条目下新增 `parameters` 字段：

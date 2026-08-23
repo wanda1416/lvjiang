@@ -236,7 +236,7 @@ class ReferenceManagerDialog(QDialog):
 
         # 信息栏：显示区域规格和 cell 规格
         self._info_label = QLabel(tr("未框选区域"))
-        self._info_label.setStyleSheet("color: #888; font-size: 11px;")
+        self._info_label.setStyleSheet("color: palette(mid); font-size: 11px;")
         self._info_label.setMaximumHeight(20)
         canvas_layout.addWidget(self._info_label)
 

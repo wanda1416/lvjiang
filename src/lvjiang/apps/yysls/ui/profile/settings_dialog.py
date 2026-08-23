@@ -443,7 +443,7 @@ class ProfileDefinitionDialog(QDialog):
         layout = QVBoxLayout(self)
 
         info = QLabel(tr("定义数据模型的 key。双击行可编辑。"))
-        info.setStyleSheet("color: #666666; margin-bottom: 10px;")
+        info.setStyleSheet("color: palette(mid); margin-bottom: 10px;")
         layout.addWidget(info)
 
         # 模型 Tab

@@ -174,7 +174,7 @@ class AffixCapsPanel(QWidget):
         pool_frame = QFrame()
         pool_frame.setObjectName("poolFrame")
         pool_frame.setStyleSheet(
-            "QFrame#poolFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame#poolFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
         pool_layout = QHBoxLayout(pool_frame)
         pool_layout.setContentsMargins(8, 4, 8, 4)
@@ -195,7 +195,7 @@ class AffixCapsPanel(QWidget):
         unit_frame = QFrame()
         unit_frame.setObjectName("unitFrame")
         unit_frame.setStyleSheet(
-            "QFrame#unitFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame#unitFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
         unit_layout = QHBoxLayout(unit_frame)
         unit_layout.setContentsMargins(8, 4, 8, 4)
@@ -211,7 +211,7 @@ class AffixCapsPanel(QWidget):
         group_frame = QFrame()
         group_frame.setObjectName("groupFrame")
         group_frame.setStyleSheet(
-            "QFrame#groupFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame#groupFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
         group_mode_layout = QHBoxLayout(group_frame)
         group_mode_layout.setContentsMargins(8, 4, 8, 4)
@@ -232,7 +232,7 @@ class AffixCapsPanel(QWidget):
         self._cat_parts_frame = QFrame()
         self._cat_parts_frame.setObjectName("catPartsFrame")
         self._cat_parts_frame.setStyleSheet(
-            "QFrame#catPartsFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame#catPartsFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
         cat_parts_layout = QHBoxLayout(self._cat_parts_frame)
         cat_parts_layout.setContentsMargins(8, 4, 8, 4)
@@ -248,7 +248,7 @@ class AffixCapsPanel(QWidget):
         # ── 词条名称区域 ──
         self._alias_frame = QFrame()
         self._alias_frame.setStyleSheet(
-            "QFrame { background-color: #f5f5f5; border-radius: 4px; padding: 4px; }"
+            "QFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
         alias_layout = QVBoxLayout(self._alias_frame)
         alias_layout.setContentsMargins(8, 4, 8, 4)
@@ -888,7 +888,7 @@ class AffixCapsPanel(QWidget):
         # 无词条名时显示提示
         if not aliases:
             hint = QLabel(tr("（无词条名，点击 '+ 词条名' 添加）"))
-            hint.setStyleSheet("color: #888; font-size: 12px;")
+            hint.setStyleSheet("color: palette(mid); font-size: 12px;")
             self._alias_tags_layout.addWidget(hint)
 
     def _rebuild_group_tabs(self):
@@ -910,7 +910,7 @@ class AffixCapsPanel(QWidget):
                 rows.addWidget(self._create_alias_row(alias))
             if not names:
                 hint = QLabel(tr("（无词条名，点击 '+ 词条名' 添加）"))
-                hint.setStyleSheet("color: #888; font-size: 12px;")
+                hint.setStyleSheet("color: palette(mid); font-size: 12px;")
                 rows.addWidget(hint)
             rows.addStretch()
             self._alias_group_tabs.addTab(page, group_name)
@@ -932,7 +932,7 @@ class AffixCapsPanel(QWidget):
         name_widget = _AliasTag(alias, self._rename_alias)
         name_widget.setMinimumWidth(160)
         name_widget.setStyleSheet(
-            "QWidget { background-color: #e0e0e0; border-radius: 3px; }"
+            "QWidget { background-color: palette(midlight); border-radius: 3px; }"
         )
         name_layout = QHBoxLayout(name_widget)
         name_layout.setContentsMargins(6, 2, 6, 2)
@@ -982,7 +982,7 @@ class AffixCapsPanel(QWidget):
         del_btn = QPushButton("×")
         del_btn.setFixedSize(16, 16)
         del_btn.setStyleSheet(
-            "QPushButton { background: transparent; border: none; color: #666; "
+            "QPushButton { background: transparent; border: none; color: palette(mid); "
             "font-weight: bold; font-size: 14px; padding: 0; }"
             "QPushButton:hover { color: #c00; }"
         )

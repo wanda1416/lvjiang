@@ -63,15 +63,6 @@ class _ElidedLabel(QLabel):
         painter.end()
 
 
-# 品质颜色映射（适配浅色背景）
-_QUALITY_COLORS = {
-    "gold": "#B8860B",
-    "purple": "#8B5CF6",
-    "blue": "#2563EB",
-    "green": "#16A34A",
-    None: "#999999",
-}
-
 # 品质背景色（半透明，仅金/紫）
 _QUALITY_BG_COLORS = {
     "gold": "rgba(210, 179, 102, 0.25)",
@@ -80,28 +71,31 @@ _QUALITY_BG_COLORS = {
 
 # 槽位卡片样式
 _SLOT_STYLE_EMPTY = (
-    "_SlotCard { background-color: #f0f0f0; border: 2px dashed #ccc; "
+    "_SlotCard { background-color: palette(alternate-base); "
+    "border: 2px dashed palette(mid); "
     "border-radius: 6px; }"
 )
 
 
-def _slot_style_normal(bg: str = "#f8f9fa", border: str = "#dee2e6") -> str:
+def _slot_style_normal(
+    bg: str = "palette(base)", border: str = "palette(midlight)"
+) -> str:
     return (
         f"_SlotCard {{ background-color: {bg}; border: 2px solid {border}; "
         "border-radius: 6px; }"
     )
 
 
-def _slot_style_selected(bg: str = "#e8f5e9") -> str:
+def _slot_style_selected(bg: str = "palette(alternate-base)") -> str:
     return (
-        f"_SlotCard {{ background-color: {bg}; border: 2px solid #607D8B; "
+        f"_SlotCard {{ background-color: {bg}; border: 2px solid palette(highlight); "
         "border-radius: 7px; }"
     )
 
 
-def _slot_style_hovered(bg: str = "#f8f9fa") -> str:
+def _slot_style_hovered(bg: str = "palette(base)") -> str:
     return (
-        f"_SlotCard {{ background-color: {bg}; border: 2px solid #90A4AE; "
+        f"_SlotCard {{ background-color: {bg}; border: 2px solid palette(mid); "
         "border-radius: 7px; }"
     )
 
@@ -109,7 +103,7 @@ def _slot_style_hovered(bg: str = "#f8f9fa") -> str:
 def _affix_value_color(cap_pct: int | float | None) -> str:
     """词条数值颜色：>=90 金，[70,90) 紫，<70 蓝"""
     if cap_pct is None:
-        return "#333"
+        return "palette(text)"
     if cap_pct >= 90:
         return "#B8860B"
     if cap_pct >= 70:
@@ -123,6 +117,16 @@ _TAG_STYLE = (
     "color: white; border-radius: 8px; "
     "font-size: 11px; font-weight: 600; padding: 2px 7px;"
 )
+
+
+def _set_quality(widget: QLabel, quality: str) -> None:
+    """设置动态品质属性并刷新全局主题选择器。"""
+    widget.setProperty("quality", quality)
+    style = widget.style()
+    assert style is not None
+    style.unpolish(widget)
+    style.polish(widget)
+    widget.update()
 
 
 def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
@@ -202,8 +206,10 @@ class _SlotCard(QFrame):
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(6)
         self.lbl_name = _ElidedLabel(display_name)
+        self.lbl_name.setProperty("equipmentName", True)
+        _set_quality(self.lbl_name, "")
         self.lbl_name.setStyleSheet(
-            f"font-weight: bold; font-size: {self._name_fs}px; color: #333;")
+            f"font-weight: bold; font-size: {self._name_fs}px;")
         header.addWidget(self.lbl_name, stretch=1)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("filtered", tr("筛选中"))
@@ -214,13 +220,13 @@ class _SlotCard(QFrame):
         # 等级行
         self.lbl_info = QLabel("")
         self.lbl_info.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: #999;")
+            f"font-size: {self._level_fs}px; color: palette(mid);")
         layout.addWidget(self.lbl_info)
 
         # 分割线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: #dee2e6;")
+        line.setStyleSheet("color: palette(midlight);")
         line.setFixedHeight(1)
         layout.addWidget(line)
 
@@ -238,13 +244,13 @@ class _SlotCard(QFrame):
     def set_selected(self, selected: bool):
         self._selected = selected
         self.status_tags.set_visible("filtered", selected)
-        bg = self._quality_bg or "#f8f9fa"
+        bg = self._quality_bg or "palette(base)"
         if selected:
             self._apply_style(_slot_style_selected(bg))
         elif self.lbl_info.text() == tr("未装备"):
             self._apply_style(_SLOT_STYLE_EMPTY)
         else:
-            border = "#b0a080" if self._quality_bg else "#dee2e6"
+            border = "#b0a080" if self._quality_bg else "palette(midlight)"
             self._apply_style(_slot_style_normal(bg, border))
 
     def is_selected(self) -> bool:
@@ -256,7 +262,7 @@ class _SlotCard(QFrame):
     def enterEvent(self, event):
         self._hovered = True
         if not self._selected:
-            self._apply_style(_slot_style_hovered(self._quality_bg or "#f8f9fa"))
+            self._apply_style(_slot_style_hovered(self._quality_bg or "palette(base)"))
         super().enterEvent(event)
 
     def leaveEvent(self, event):
@@ -265,9 +271,9 @@ class _SlotCard(QFrame):
             if self.lbl_info.text() == tr("未装备"):
                 self._apply_style(_SLOT_STYLE_EMPTY)
             else:
-                border = "#b0a080" if self._quality_bg else "#dee2e6"
+                border = "#b0a080" if self._quality_bg else "palette(midlight)"
                 self._apply_style(_slot_style_normal(
-                    self._quality_bg or "#f8f9fa", border
+                    self._quality_bg or "palette(base)", border
                 ))
         super().leaveEvent(event)
 
@@ -328,11 +334,12 @@ class _SlotCard(QFrame):
         self._equip_data = {}
         self.status_tags.set_visible("mock", False)
         self.lbl_name.setText(self._display_name)
+        _set_quality(self.lbl_name, "")
         self.lbl_name.setStyleSheet(
-            f"font-weight: bold; font-size: {self._name_fs}px; color: #333;")
+            f"font-weight: bold; font-size: {self._name_fs}px;")
         self.lbl_info.setText(tr("未装备"))
         self.lbl_info.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: #999;")
+            f"font-size: {self._level_fs}px; color: palette(mid);")
         self._clear_affixes()
         if not self._selected:
             self._apply_style(_SLOT_STYLE_EMPTY)
@@ -343,13 +350,13 @@ class _SlotCard(QFrame):
             "mock", bool(equip_data.get("_extra", {}).get("is_mock", False)),
         )
         quality = equip_data.get("quality") or ""
-        color = _QUALITY_COLORS.get(quality, "#888888")
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
 
         name = equip_data.get("name", tr("未知"))
         self.lbl_name.setText(f"{self._display_name} · {name}")
+        _set_quality(self.lbl_name, quality)
         self.lbl_name.setStyleSheet(
-            f"font-weight: bold; font-size: {self._name_fs}px; color: {color};")
+            f"font-weight: bold; font-size: {self._name_fs}px;")
 
         level = equip_data.get("level") or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
@@ -372,11 +379,11 @@ class _SlotCard(QFrame):
             self.lbl_info.setTextFormat(Qt.TextFormat.PlainText)
             self.lbl_info.setText(f"Lv{level}{tag}")
         self.lbl_info.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: #666; font-weight: bold;")
+            f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
 
         if not self._selected:
-            border = "#b0a080" if self._quality_bg else "#dee2e6"
-            bg = self._quality_bg or "#f8f9fa"
+            border = "#b0a080" if self._quality_bg else "palette(midlight)"
+            bg = self._quality_bg or "palette(base)"
             self._apply_style(_slot_style_normal(bg, border))
 
         # 词条
@@ -393,7 +400,7 @@ class _SlotCard(QFrame):
             dash = QFrame()
             dash.setFrameShape(QFrame.Shape.NoFrame)
             dash.setStyleSheet(
-                "border: none; border-top: 1px dashed #adb5bd;")
+                "border: none; border-top: 1px dashed palette(mid);")
             dash.setFixedHeight(1)
             self.affix_layout.addWidget(dash)
             self._add_affix_row(dingyin)
@@ -420,7 +427,7 @@ class _SlotCard(QFrame):
 
         lbl = _ElidedLabel(f"{affix['name']}{transfer_mark}")
         lbl.setStyleSheet(
-            f"font-size: {self._affix_fs}px; color: #555; font-weight: bold;")
+            f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
         row.addWidget(lbl, stretch=1)
 
         val = QLabel(val_str)
@@ -488,6 +495,8 @@ class _CompactEquipCard(QFrame):
         name_row.setContentsMargins(0, 0, 0, 0)
         name_row.setSpacing(6)
         self.lbl_name = _ElidedLabel()
+        self.lbl_name.setProperty("equipmentName", True)
+        self.lbl_name.setProperty("quality", "")
         self.lbl_name.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_name.setStyleSheet(
@@ -503,13 +512,13 @@ class _CompactEquipCard(QFrame):
         self.lbl_level.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_level.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: #666;")
+            f"font-size: {self._level_fs}px; color: palette(mid);")
         layout.addWidget(self.lbl_level)
 
         line = QFrame()
         line.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: #dee2e6;")
+        line.setStyleSheet("color: palette(midlight);")
         line.setFixedHeight(1)
         layout.addWidget(line)
 
@@ -524,9 +533,9 @@ class _CompactEquipCard(QFrame):
         layout.addStretch()
 
     def _apply_card_style(self, hovered: bool = False):
-        border = "#78909C" if hovered else "#dee2e6"
+        border = "palette(mid)" if hovered else "palette(midlight)"
         width = 2 if hovered else 1
-        bg = self._quality_bg or "#f8f9fa"
+        bg = self._quality_bg or "palette(base)"
         self.setStyleSheet(f"""
             _CompactEquipCard {{
                 background-color: {bg};
@@ -589,14 +598,14 @@ class _CompactEquipCard(QFrame):
         self._group_key = group_key
 
         quality = equip_data.get("quality") or ""
-        color = _QUALITY_COLORS.get(quality, "#888888")
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
         self._apply_card_style()
 
         name = equip_data.get("name", tr("未知"))
         self.lbl_name.setText(f"{part_label} · {name}")
+        _set_quality(self.lbl_name, quality)
         self.lbl_name.setStyleSheet(
-            f"font-weight: bold; font-size: {self._name_fs}px; color: {color};")
+            f"font-weight: bold; font-size: {self._name_fs}px;")
         self.status_tags.set_visible(
             "mock",
             bool(is_mock or equip_data.get("_extra", {}).get("is_mock", False)),
@@ -624,7 +633,7 @@ class _CompactEquipCard(QFrame):
             self.lbl_level.setTextFormat(Qt.TextFormat.PlainText)
             self.lbl_level.setText(f"Lv{level}{tag}")
         self.lbl_level.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: #666; font-weight: bold;")
+            f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
 
         self._clear_affixes()
         for i in range(1, 6):
@@ -653,7 +662,7 @@ class _CompactEquipCard(QFrame):
 
             lbl_name = _ElidedLabel(f"{affix['name']}{transfer_mark}")
             lbl_name.setStyleSheet(
-                f"font-size: {self._affix_fs}px; color: #555; font-weight: bold;")
+                f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
             row.addWidget(lbl_name, stretch=1)
 
             lbl_val = QLabel(val_str)
@@ -669,7 +678,7 @@ class _CompactEquipCard(QFrame):
             dash = QFrame()
             dash.setFrameShape(QFrame.Shape.NoFrame)
             dash.setStyleSheet(
-                "border: none; border-top: 1px dashed #adb5bd;")
+                "border: none; border-top: 1px dashed palette(mid);")
             dash.setFixedHeight(1)
             self.affix_layout.addWidget(dash)
 
@@ -686,7 +695,7 @@ class _CompactEquipCard(QFrame):
 
             lbl_name = _ElidedLabel(dingyin["name"])
             lbl_name.setStyleSheet(
-                f"font-size: {self._affix_fs}px; color: #555; font-weight: bold;")
+                f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
             row.addWidget(lbl_name, stretch=1)
 
             lbl_val = QLabel(dy_val_str)

@@ -101,7 +101,7 @@ class SchoolPanel(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
 
         hint = QLabel(tr("武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。"))
-        hint.setStyleSheet("color: #888;")
+        hint.setStyleSheet("color: palette(mid);")
         right_layout.addWidget(hint)
 
         # ── 武学属性 ──

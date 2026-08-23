@@ -202,15 +202,15 @@ class ProfileOverviewTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         # 选中行保持轻量提示，当前编辑/移动焦点格使用更深的底色突出。
         table.setStyleSheet("""
             QTableWidget::item:selected {
-                background-color: #e6e6e6;
-                color: #202020;
+                background-color: palette(midlight);
+                color: palette(text);
             }
             QTableWidget::item:selected:focus {
-                background-color: #666666;
-                color: #ffffff;
+                background-color: palette(highlight);
+                color: palette(highlighted-text);
             }
             QTableWidget::item:focus {
-                outline: 1px solid #4a4a4a;
+                outline: 1px solid palette(mid);
                 outline-offset: -2px;
             }
         """)

@@ -73,7 +73,7 @@ class ScriptConfigDialog(QDialog):
                "用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。")
         )
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: #666;")
+        hint.setStyleSheet("color: palette(mid);")
         layout.addWidget(hint)
 
         self._table = QTableWidget(0, 6)

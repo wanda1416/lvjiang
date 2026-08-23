@@ -68,12 +68,23 @@ class SendInputInput(InputBackend):
         amount: int = 1,
         poi_name: str = "",
     ):
-        """在指定坐标位置发送鼠标滚轮事件"""
+        """在指定坐标位置发送鼠标滚轮事件
+
+        逐格发送 amount 次独立的单格（WHEEL_DELTA=120）滚轮事件，而不是把
+        amount 折算进单次事件的 mouseData 一次性发出——很多游戏 UI（含 SDL
+        窗口）收到滚轮消息只按"是否发生过"响应一次，不按消息里的 delta 数值
+        等比例滚动，一次性发大 delta 会被当成只滚了 1 格（实测：down 2 效果
+        与 down 1 一致）。真实鼠标硬件每格也是独立发一条消息，逐格发送能同
+        时兼容"按消息计数"和"按 delta 累加"两种处理方式。
+        """
         self._activate_target()
         self._move_to(screen_x, screen_y)
         sign = 1 if direction == "up" else -1
-        delta = sign * amount * _WHEEL_DELTA
-        send_mouse_wheel_event(delta)
+        delta = sign * _WHEEL_DELTA
+        for i in range(amount):
+            send_mouse_wheel_event(delta)
+            if i < amount - 1:
+                time.sleep(random.uniform(0.02, 0.05))
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"滚轮 {label}: {direction} x{amount} @ ({screen_x}, {screen_y})")
 

@@ -59,7 +59,10 @@ if $chk < 0
 end
 
 # ─── 导航到钱袋页面 ──────────────────────────────────────
-call nav_main_to_wallet()
+call $nav_result = nav_main_to_wallet()
+if $nav_result < 0
+    return -1
+end
 
 # ─── 扫描区域货币（money_1, 1×4） ────────────────────────
 # 四种可能：宋元通宝、月华通宝、周元通宝、墨筹

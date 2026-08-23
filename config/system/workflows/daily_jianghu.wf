@@ -98,7 +98,10 @@ for idx in ["1", "2", "3", "4", "5", "6"]
          call action_dongfang($label, $idx)
       end
       if $task_text contains "醉意"
-         call action_zuiyi($label)
+         call $action_result = action_zuiyi($label)
+         if $action_result < 0
+            return -1
+         end
       end
       if $task_text contains "觉障林"
          call action_juezhanglin($label)
@@ -328,7 +331,10 @@ def action_zuiyi($label)
    click [game_menu_page].[back] after wait stable @page_refresh least 0.5
 
    # ── 首页 → 菜单 → 包裹 → 道具 - 普通道具 ──
-   call nav_main_to_item()
+   call $nav_result = nav_main_to_item()
+   if $nav_result < 0
+      return -1
+   end
 
    # ── 在背包网格中寻找黄泉酿 ──
    recognize [bag_item_detail].[bag_grid][1...2][1...6] as $result \
@@ -368,6 +374,7 @@ def action_zuiyi($label)
 
    # ── 从首页返回江湖号令 ──
    call back_to_haoling()
+   return 0
 end
 
 # 觉障林：动作暂未实现

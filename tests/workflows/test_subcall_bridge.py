@@ -7,8 +7,11 @@
 import pytest
 
 from lvjiang.core.config import load_user_config
+from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_name
 from lvjiang.workflows.engine.signals import WorkflowUserError
+from lvjiang.workflows.grammar import parse_file
+from lvjiang.workflows.grammar.ast_nodes import Return
 from tests.workflows.conftest import make_engine
 
 WF_WITH_RETURN = '''def add_one($x)
@@ -86,3 +89,21 @@ def test_real_nav_subcalls_loadable():
     assert "nav_main_to_equip" in eng._procs
     assert "nav_equip_to_tune" in eng._procs
     assert "nav_back_to_main" in eng._procs
+
+
+def test_nav_subcalls_have_explicit_success_return():
+    """除返回背包 tab 的基础过程外，导航过程统一以 0 表示成功。"""
+    nav_path = SYSTEM_CONFIG_DIR / "workflows/subcall/navigation.wf"
+    program = parse_file(nav_path)
+
+    for name in (
+        "nav_main_to_equip",
+        "nav_main_to_wallet",
+        "nav_main_to_item",
+        "nav_main_to_menu",
+        "nav_back_to_main",
+        "nav_equip_to_tune",
+    ):
+        final_stmt = program.procs[name].body[-1]
+        assert isinstance(final_stmt, Return), f"{name} 缺少显式成功返回值"
+        assert final_stmt.value == 0, f"{name} 应以 0 表示成功"

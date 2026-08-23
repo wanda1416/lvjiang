@@ -37,13 +37,13 @@ class TuningNavigator:
         """
         self._routes.load_dependencies()
 
-    def navigate_to_equip(self):
+    def navigate_to_equip(self) -> bool:
         """从主界面导航到背包装备页（DSL subcall nav_main_to_equip）"""
-        self._routes.enter_equip()
+        return self._routes.enter_equip()
 
-    def navigate_back(self):
+    def navigate_back(self) -> bool:
         """从背包详情页返回主界面（DSL subcall nav_back_to_main）"""
-        self._routes.return_main()
+        return self._routes.return_main()
 
     def nav_to_tune(self) -> bool:
         """从装备详情页进入调律页（DSL subcall nav_equip_to_tune）

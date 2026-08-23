@@ -531,6 +531,11 @@ def search_optimal_combo(
     output_nodes = program["outputs"]
     cache_clear = runtime.cache.clear
 
+    # ✅ 向量结果缓存：tuple(属性向量) → (dps, total_damage)
+    # 防止相同属性向量被重复计算毕业率
+    vec_result_cache: dict[tuple, tuple[float, float]] = {}
+    cache_hits = 0
+
     for combo_indices in _generate_combos(active_slots, slot_sizes):
         # Check cancel every iteration (threading.Event.is_set is fast)
         if cancel_flag and cancel_flag():
@@ -548,9 +553,19 @@ def search_optimal_combo(
         # 3. 应用抗性规则（向量化等效 build_graduation_attrs）
         _apply_resistance_to_vec(acc, base_vec, field_index, graduation_context)
 
-        # Evaluate via ProgramRuntime (reuse object, just clear cache)
-        cache_clear()
-        dps = float(runtime.value(output_nodes["dps"]))
+        # ✅ 检查向量缓存
+        vec_tuple = tuple(acc)
+        if vec_tuple in vec_result_cache:
+            dps, total_damage = vec_result_cache[vec_tuple]
+            cache_hits += 1
+        else:
+            # 缓存未命中，计算毕业率
+            cache_clear()
+            dps = float(runtime.value(output_nodes["dps"]))
+            total_damage = float(runtime.value(output_nodes["total_damage"]))
+            # 存储结果到缓存
+            vec_result_cache[vec_tuple] = (dps, total_damage)
+
         rate = dps / baseline
 
         # Insert into leaderboard
@@ -575,9 +590,12 @@ def search_optimal_combo(
             "equipped": equipped,
         })
 
+    # ✅ 输出缓存统计信息
+    cache_hit_rate = f"{cache_hits*100//max(evaluated, 1)}%" if evaluated > 0 else "N/A"
     logger.info(
         f"最优组合搜索完成: 评估 {evaluated:,} 种组合, "
-        f"最佳毕业率 {results[0]['rate']:.2%}" if results else "无结果",
+        f"向量缓存命中 {cache_hits:,} 次 ({cache_hit_rate}), "
+        f"最佳毕业率 {results[0]['rate']:.2%}" if results else "无结果"
     )
     return results
 

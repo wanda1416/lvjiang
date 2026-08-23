@@ -602,8 +602,8 @@ def test_scroll_down_with_amount():
 
 
 def test_scroll_up_with_target():
-    """scroll up [scene].[region] — 有目标，默认数量"""
-    program = parse_text("scroll up [scene].[region]")
+    """scroll [scene].[region] up — 有目标，默认数量"""
+    program = parse_text("scroll [scene].[region] up")
     node = program.body[0]
     assert isinstance(node, Scroll)
     assert node.direction == "up"
@@ -614,8 +614,8 @@ def test_scroll_up_with_target():
 
 
 def test_scroll_down_with_target_and_amount():
-    """scroll down [scene].[panel][1][2] 5 — panel 目标 + 数量"""
-    program = parse_text("scroll down [scene].[panel][1][2] 5")
+    """scroll [scene].[panel][1][2] down 5 — panel 目标 + 数量"""
+    program = parse_text("scroll [scene].[panel][1][2] down 5")
     node = program.body[0]
     assert isinstance(node, Scroll)
     assert node.direction == "down"
@@ -628,8 +628,8 @@ def test_scroll_down_with_target_and_amount():
 
 
 def test_scroll_with_var_amount():
-    """scroll down [scene].[region] $n — 变量数量"""
-    program = parse_text("scroll down [scene].[region] $n")
+    """scroll [scene].[region] down $n — 变量数量"""
+    program = parse_text("scroll [scene].[region] down $n")
     node = program.body[0]
     assert isinstance(node, Scroll)
     assert node.direction == "down"
@@ -639,8 +639,8 @@ def test_scroll_with_var_amount():
 
 
 def test_scroll_with_coord_target():
-    """scroll up (0.5, 0.3) — 坐标目标"""
-    program = parse_text("scroll up (0.5, 0.3)")
+    """scroll (0.5, 0.3) up — 坐标目标"""
+    program = parse_text("scroll (0.5, 0.3) up")
     node = program.body[0]
     assert isinstance(node, Scroll)
     assert node.direction == "up"
@@ -650,8 +650,8 @@ def test_scroll_with_coord_target():
 
 
 def test_scroll_with_var_target():
-    """scroll down $var — 变量目标"""
-    program = parse_text("scroll down $var")
+    """scroll $var down — 变量目标"""
+    program = parse_text("scroll $var down")
     node = program.body[0]
     assert isinstance(node, Scroll)
     assert node.direction == "down"
@@ -674,8 +674,8 @@ def test_scroll_after_wait():
 
 
 def test_scroll_before_wait():
-    """scroll up [scene].[region] before wait -> [Wait, Scroll]"""
-    program = parse_text("scroll up [scene].[region] before wait @step_interval")
+    """scroll [scene].[region] up before wait -> [Wait, Scroll]"""
+    program = parse_text("scroll [scene].[region] up before wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Wait)
     assert isinstance(program.body[1], Scroll)
@@ -695,8 +695,8 @@ def test_scroll_around_wait():
 
 
 def test_scroll_before_after_wait():
-    """scroll down [scene].[region] before wait 0.3 after wait 0.8 -> [Wait, Scroll, Wait]"""
-    program = parse_text("scroll down [scene].[region] before wait 0.3 after wait 0.8")
+    """scroll [scene].[region] down before wait 0.3 after wait 0.8 -> [Wait, Scroll, Wait]"""
+    program = parse_text("scroll [scene].[region] down before wait 0.3 after wait 0.8")
     assert len(program.body) == 3
     assert isinstance(program.body[0], Wait)
     assert isinstance(program.body[1], Scroll)

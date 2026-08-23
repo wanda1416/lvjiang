@@ -1,5 +1,5 @@
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QWidget
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QWidget
 
 from lvjiang.apps.yysls.ui.loadout import LoadoutPanel
 
@@ -46,6 +46,16 @@ def test_three_view_modes(qtbot, tmp_path, monkeypatch):
     assert panel._left_shell.isVisible()
     assert panel._right_shell.isVisible()
     assert panel._equipment.isVisible()
+    for combo in (
+        panel._equipment._sort_filter,
+        panel._equipment._type_filter,
+        panel._equipment._source_filter,
+    ):
+        assert combo.minimumWidth() >= 104
+        assert combo.view().minimumWidth() >= combo.minimumWidth()
+    filter_row = panel._equipment._info_widget.layout().itemAt(1).layout()
+    assert isinstance(filter_row, QHBoxLayout)
+    assert filter_row.count() == 11  # five labels, five combos, trailing stretch
     assert panel._character._combat_attrs_tab._attrs_scroll.isVisible()
     flow = panel._character._combat_attrs_tab._main_layout.itemAt(0).layout()
     assert flow.count() == 5  # four ordered cards + bottom stretch

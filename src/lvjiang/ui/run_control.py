@@ -176,6 +176,7 @@ class RunControlMixin:
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
     _run_state = "idle"         # 运行状态：idle / running / paused
     _pause_event: threading.Event | None = None  # 暂停事件：set=运行，clear=暂停阻塞
+    _stop_confirm_pending = False  # 暂停中点结束的二次确认弹窗是否正打开（挡 F8 竞态）
 
     @property
     def _running(self) -> bool:
@@ -476,19 +477,36 @@ class RunControlMixin:
             self.log_text.append(tr("[操作] 已停止"))
 
     def _confirm_stop_while_paused(self) -> bool:
-        """暂停中点击结束时弹二次确认，返回是否确认结束。"""
-        from PyQt6.QtWidgets import QMessageBox
-        reply = QMessageBox.question(
-            self, tr("确认结束"), tr("任务暂停中，是否直接结束？"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        return reply == QMessageBox.StandardButton.Yes
+        """暂停中点击结束时弹二次确认，返回是否确认结束。
+
+        弹窗期间用 _stop_confirm_pending 挡住 F8：QMessageBox.question 是
+        Qt 主线程上的嵌套事件循环，但全局热键回调（pynput 监听线程）会
+        直接同步调用 _on_pause_resume（不走 Qt 信号跨线程队列），不受
+        这个嵌套事件循环阻塞，因此弹窗还开着时按 F8 仍可能并发抢跑：
+        此时 _run_state 尚未被状态借用改为 'running'，F8 会被误判为
+        "暂停中按 F8" 而提前唤醒工作流线程——弹窗都没确认，线程却先动了。
+        """
+        self._stop_confirm_pending = True
+        try:
+            from PyQt6.QtWidgets import QMessageBox, QWidget
+            reply = QMessageBox.question(
+                self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
+                tr("确认结束"), tr("任务暂停中，是否直接结束？"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            return reply == QMessageBox.StandardButton.Yes
+        finally:
+            self._stop_confirm_pending = False
 
     # ─── 暂停/恢复 ────────────────────────────────────────
 
     def _on_pause_resume(self):
         """暂停/恢复按钮点击处理（F8 快捷键转发）"""
+        # 停止确认弹窗打开期间忽略 F8，避免与二次确认竞态
+        # （见 _confirm_stop_while_paused 的说明）
+        if getattr(self, '_stop_confirm_pending', False):
+            return
         run_state = getattr(self, '_run_state', 'idle')
         if run_state == 'running':
             self._request_pause()

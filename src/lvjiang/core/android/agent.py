@@ -39,7 +39,7 @@ AGENT_SOCKET_NAME = "lvjiang-agent"
 #: 律匠 app 包名，日志提示用
 AGENT_PACKAGE = "com.lvjiang.app"
 #: 协议版本：设备端返回不一致时拒绝使用（避免两端静默错位）
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 
 #: PC 本地转发端口范围（与 scrcpy 的 27183 错开）
 _PORT_RANGE = (27300, 27399)
@@ -145,6 +145,11 @@ class AgentClient:
     def shell_ready(self) -> bool:
         return bool(self._status.get("shizuku_granted"))
 
+    @property
+    def calib_identity(self) -> bool:
+        """设备端屏幕映射是否恒等（旧版 app 没这个字段时视为恒等）"""
+        return bool(self._status.get("calib_identity", True))
+
     def describe(self) -> str:
         """供 UI 标签/日志用的一句话通道描述"""
         if not self.connected:
@@ -152,7 +157,33 @@ class AgentClient:
         parts = ["无障碍" if self.a11y_ready else "无障碍未开"]
         if self.shell_ready:
             parts.append("Shizuku")
+        if not self.calib_identity:
+            parts.append("已标定")
         return "设备端代理(" + "/".join(parts) + ")"
+
+    # ─── 屏幕映射标定（截图坐标 → 输入坐标，设备端 ScreenMap / CalibOverlay）──
+
+    def calib_get(self) -> dict:
+        """当前朝向分辨率的映射参数：{key, screen{w,h,rotation}, calib{sx,ox,sy,oy}, identity, stored}"""
+        header, _ = self.call("calib_get")
+        return header
+
+    def calib_set(self, sx: float = 1.0, ox: float = 0.0, sy: float = 1.0, oy: float = 0.0) -> dict:
+        """保存逐轴仿射 input% = shot% * s + o；全恒等等价于 calib_clear"""
+        header, _ = self.call("calib_set", sx=float(sx), ox=float(ox), sy=float(sy), oy=float(oy))
+        return header
+
+    def calib_clear(self) -> dict:
+        header, _ = self.call("calib_clear")
+        return header
+
+    def calib_mark(self, x: int, y: int, tap: bool = False, via: str = "auto") -> dict:
+        """在 (x, y) 经映射后的落点画准星（需悬浮窗权限）；tap=True 时同点再点一下。返回含 px{x,y}"""
+        header, _ = self.call("calib_mark", x=int(x), y=int(y), tap=bool(tap), via=via)
+        return header
+
+    def calib_hide(self) -> None:
+        self.call("calib_hide")
 
     # ─── 连接管理 ─────────────────────────────────────────
 

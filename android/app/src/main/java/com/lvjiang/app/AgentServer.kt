@@ -34,7 +34,7 @@ import java.io.IOException
 object AgentServer {
 
     const val SOCKET_NAME = "lvjiang-agent"
-    const val PROTOCOL_VERSION = 1
+    const val PROTOCOL_VERSION = 2
 
     private const val TAG = "AgentServer"
 
@@ -49,6 +49,10 @@ object AgentServer {
 
     @Volatile
     private var server: LocalServerSocket? = null
+
+    /** 应用 Context（App.onCreate 登记），标定覆盖层要用；无障碍服务在时优先用它的 */
+    @Volatile
+    var appContext: android.content.Context? = null
 
     /** 所有 op 串行：手势与截图本来就不该并发，省掉各桥接对象的并发考虑 */
     private val dispatchLock = Any()
@@ -176,6 +180,11 @@ object AgentServer {
         "hold_move" -> holdMove(req)
         "key" -> key(req)
         "shell" -> shell(req)
+        "calib_get" -> ok(calibInfo())
+        "calib_set" -> calibSet(req)
+        "calib_clear" -> calibClear()
+        "calib_mark" -> calibMark(req)
+        "calib_hide" -> calibHide()
         else -> fail("未知 op: $op")
     }
 
@@ -186,6 +195,81 @@ object AgentServer {
         put("a11y", A11yBridge.isReady())
         put("shizuku", ShellBridge.isShizukuAlive())
         put("shizuku_granted", ShellBridge.hasPermission())
+        // 屏幕映射：非恒等时 PC 端在连接日志里提示一句，免得用户不知道点击坐标被改写过
+        put("calib_identity", ScreenMap.current().isIdentity)
+        put("screen", screenInfo())
+    }
+
+    // ─── 屏幕映射标定（截图坐标 → 输入坐标，见 ScreenMap / CalibOverlay）──────
+
+    private fun screenInfo(): JSONObject {
+        val (w, h) = ScreenMap.screenSize()
+        return JSONObject().put("w", w).put("h", h).put("rotation", ScreenMap.rotation())
+    }
+
+    private fun calibInfo(): JSONObject {
+        val (w, h) = ScreenMap.screenSize()
+        val map = ScreenMap.current()
+        return JSONObject()
+            .put("key", ScreenMap.key(w, h))
+            .put("screen", screenInfo())
+            .put("calib", map.toJson())
+            .put("identity", map.isIdentity)
+            .put("stored", ScreenMap.file(w, h).exists())
+            .put("overlay", CalibOverlay.size()?.let { JSONObject().put("w", it[0]).put("h", it[1]) } ?: JSONObject.NULL)
+    }
+
+    /** 保存当前朝向分辨率的仿射参数；缺省轴按恒等 */
+    private fun calibSet(req: JSONObject): Pair<JSONObject, ByteArray?> {
+        val map = ScreenMap(
+            req.optDouble("sx", 1.0), req.optDouble("ox", 0.0),
+            req.optDouble("sy", 1.0), req.optDouble("oy", 0.0),
+        )
+        if (listOf(map.sx, map.ox, map.sy, map.oy).any { it.isNaN() || it.isInfinite() }) {
+            return fail("calib_set 参数必须是有限数")
+        }
+        if (map.sx <= 0 || map.sy <= 0) return fail("calib_set 缩放必须为正")
+        val (w, h) = ScreenMap.screenSize()
+        ScreenMap.save(w, h, map)
+        return ok(calibInfo())
+    }
+
+    private fun calibClear(): Pair<JSONObject, ByteArray?> {
+        val (w, h) = ScreenMap.screenSize()
+        ScreenMap.save(w, h, ScreenMap())
+        return ok(calibInfo())
+    }
+
+    /**
+     * 在"(x, y) 经映射后将落到的像素"上画准星；`tap=true` 时再在同一位置点一下
+     * （验证准星 == 手势落点）。需要悬浮窗权限，没授权时报错而不是静默。
+     */
+    private fun calibMark(req: JSONObject): Pair<JSONObject, ByteArray?> {
+        val x = req.getInt("x")
+        val y = req.getInt("y")
+        val p = ScreenMap.mapPoint(x, y)
+        val ctx = A11yService.instance?.applicationContext ?: appContext
+            ?: return fail("拿不到 Context（进程未初始化）")
+        try {
+            CalibOverlay.mark(ctx, p[0], p[1], "$x,$y -> ${p[0]},${p[1]}")
+        } catch (e: Throwable) {
+            return fail("覆盖层显示失败（悬浮窗权限未授予？）: $e")
+        }
+        val header = calibInfo().put("px", JSONObject().put("x", p[0]).put("y", p[1]))
+        if (!req.optBoolean("tap", false)) return ok(header)
+        return withVia(req) { via ->
+            // 走各桥接的 tap：它们内部会再做一次同样的映射，因此传原始 (x, y)
+            val done = if (via == "a11y") A11yBridge.tap(x, y, req.optLong("duration_ms", 50))
+            else ShellBridge.tap(x, y).isEmpty()
+            if (done) ok(header.put("via", via)) else fail("标定点击未成功")
+        }
+    }
+
+    private fun calibHide(): Pair<JSONObject, ByteArray?> {
+        val ctx = A11yService.instance?.applicationContext ?: appContext
+            ?: return fail("拿不到 Context（进程未初始化）")
+        CalibOverlay.hide(ctx)
+        return ok(JSONObject())
     }
 
     // ─── 通道选择 ───────────────────────────────────────────

@@ -39,6 +39,7 @@ class TestLoadUserConfig:
         monkeypatch.setattr(
             "lvjiang.core.config.load_app_config", lambda: {})
         config = load_user_config()
+        assert config.theme == "light"
         assert config.adb_capture_streaming is True
         assert config.desktop_background_input is True
         assert config.desktop_window_title == ""
@@ -57,12 +58,14 @@ class TestLoadUserConfig:
             "settings": {
                 "adb_capture_streaming": False,
                 "desktop_window_title": "手机投屏",
+                "theme": "dark",
             }
         }), encoding="utf-8")
         reset_session_store()
         config = load_user_config()
         assert config.adb_capture_streaming is False
         assert config.desktop_window_title == "手机投屏"
+        assert config.theme == "dark"
         assert config.desktop_background_input is True  # 未配置项保持默认
 
     def test_session_material_grid_override(self, session_env, monkeypatch):

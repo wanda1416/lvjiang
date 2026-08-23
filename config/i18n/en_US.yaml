@@ -19,6 +19,8 @@ main_window:
   menu_docs: Documentation
   menu_feedback: Feedback
   menu_about: About
+  theme_to_light: Switch to light theme
+  theme_to_dark: Switch to dark theme
   label_current_user: Current User
   label_current_layout: Current Layout
   btn_scan_window: Scan Windows

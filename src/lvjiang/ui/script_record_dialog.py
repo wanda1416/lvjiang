@@ -71,7 +71,7 @@ class ScriptRecordDialog(QDialog):
         layout.addLayout(btn_row)
 
         self.lbl_status = QLabel(tr("待机 | 点击「录制脚本」或按 F12 开始"))
-        self.lbl_status.setStyleSheet("color: #888;")
+        self.lbl_status.setStyleSheet("color: palette(mid);")
         layout.addWidget(self.lbl_status)
 
         self.text_edit = QTextEdit()

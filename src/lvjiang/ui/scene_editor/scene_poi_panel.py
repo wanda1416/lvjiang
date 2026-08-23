@@ -42,9 +42,9 @@ from .scene_select import (
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
 _LIGHT_DIALOG_QSS = (
-    "QInputDialog { background-color: #f0f0f0; }"
-    "QLabel { color: #333; }"
-    "QComboBox { background-color: white; color: #333; padding: 4px; }"
+    "QInputDialog { background-color: palette(window); }"
+    "QLabel { color: palette(text); }"
+    "QComboBox { background-color: palette(base); color: palette(text); padding: 4px; }"
     "QPushButton { padding: 4px 16px; }"
 )
 

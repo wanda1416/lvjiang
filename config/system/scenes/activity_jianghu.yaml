@@ -99,3 +99,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: haoling_of_week
+  name: 当周获取号令
+  type: attr
+  is_text: true
+  is_clickable: false

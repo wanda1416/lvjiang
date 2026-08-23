@@ -26,7 +26,8 @@ from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
 
 _METRIC_CARD = (
-    "QFrame {background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;}"
+    "QFrame {background:palette(base);border:1px solid palette(midlight);"
+    "border-radius:6px;}"
 )
 
 # ui_state 页面归档键：view_mode 与 half_split_sizes 两个字段独立保存，
@@ -36,8 +37,8 @@ _VIEW_MODES = ("sidebar", "half", "full")
 
 # 视图切换图标按钮样式（与刷新按钮视觉一致）
 _VIEW_MODE_BTN_STYLE = (
-    "QPushButton{border:0;border-radius:4px;font-size:16px;color:#546E7A;}"
-    "QPushButton:hover{background:#E8EEF2;color:#263238;}"
+    "QPushButton{border:0;border-radius:4px;font-size:16px;color:palette(text);}"
+    "QPushButton:hover{background:palette(midlight);color:palette(text);}"
 )
 
 

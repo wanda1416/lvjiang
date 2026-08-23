@@ -30,6 +30,7 @@ from ...core.scene_registry import (
     get_scene_name,
 )
 from ...i18n import tr
+from ..theme import get_theme_manager
 from .layout_ops import LayoutOpsMixin
 from .recognition_ops import RecognitionOpsMixin
 from .scene_ops import SceneOpsMixin
@@ -69,6 +70,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._loaded_scenes: set[str] = set()
 
         self._setup_ui()
+        get_theme_manager().theme_changed.connect(self._update_info_label)
         self._auto_load_script()
         self._auto_load_active()
         self._restore_window_size()
@@ -198,7 +200,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
         # 继承标识（别名布局时显示）
         self._inherit_label = QLabel()
-        self._inherit_label.setStyleSheet("color: #888; font-size: 11px;")
+        self._inherit_label.setStyleSheet("color: palette(mid); font-size: 11px;")
         self._inherit_label.hide()
         second_line.addWidget(self._inherit_label)
 
@@ -206,7 +208,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._info_label = QLabel()
         self._info_label.setTextFormat(Qt.TextFormat.RichText)
         self._info_label.setStyleSheet("font-size: 12px; padding: 2px 2px 4px 2px;")
-        self._info_label.setText(tr('<span style="color:#888;">截图：—  画布：—</span>'))
+        self._set_empty_info_label()
         second_line.addWidget(self._info_label)
         second_line.addStretch()
 
@@ -604,9 +606,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             return
         tab = self._current_scene_tab()
         if tab is None or tab.canvas.image_size[0] <= 0:
-            self._info_label.setText(
-                tr('<span style="color:#888;">截图：—　　画布：—</span>')
-            )
+            self._set_empty_info_label()
             return
         img_w, img_h = tab.canvas.image_size
         cfg = tab.get_canvas_config()
@@ -616,13 +616,19 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
         cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
 
+        muted = get_theme_manager().tokens.text_muted
         self._info_label.setText(
-            f'<span style="color:#ccc;">截图</span> '
+            f'<span style="color:{muted};">截图</span> '
             f'<b style="color:#4da6ff;">{ss_txt}</b>'
-            f'<span style="color:#666;"> │ </span>'
-            f'<span style="color:#ccc;">画布</span> '
+            f'<span style="color:{muted};"> │ </span>'
+            f'<span style="color:{muted};">画布</span> '
             f'<b style="color:#ffc850;">{cv_txt}</b>'
         )
+
+    def _set_empty_info_label(self) -> None:
+        muted = get_theme_manager().tokens.text_muted
+        text = tr("截图：—　　画布：—")
+        self._info_label.setText(f'<span style="color:{muted};">{text}</span>')
 
     @staticmethod
     def _fmt_ratio(w: int, h: int) -> str:

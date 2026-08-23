@@ -50,12 +50,12 @@ NAV_BTN_STYLE = (
 # “备战方案”与“其他信息”首行共用的浅色工具栏按钮。该样式只用于这两个
 # 顶层 Tab，避免改变战斗属性、装备状态等子面板已有的操作栏配色。
 USER_TOOLBAR_BTN_STYLE = (
-    "QPushButton { background-color: #F4F6F8; color: #263238; font-size: 12px; "
-    "border: 1px solid #B0BEC5; padding: 2px 6px; border-radius: 3px; }"
-    "QPushButton:hover { background-color: #E8EEF2; border-color: #90A4AE; }"
-    "QPushButton:pressed { background-color: #DDE5EA; }"
-    "QPushButton:disabled { background-color: #ECEFF1; color: #90A4AE; "
-    "border-color: #CFD8DC; }"
+    "QPushButton { background-color: palette(button); color: palette(button-text); "
+    "font-size: 12px; border: 1px solid palette(mid); padding: 2px 6px; "
+    "border-radius: 3px; }"
+    "QPushButton:hover { background-color: palette(midlight); border-color: palette(mid); }"
+    "QPushButton:pressed { background-color: palette(mid); }"
+    "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 # 与“备战方案”首行的视图切换按钮等高，避免切换 Tab 时工具栏视觉缩放。
 _USER_TOOLBAR_BTN_HEIGHT = 36
@@ -228,7 +228,8 @@ class ProfileTab(QWidget):
         if not user_name:
             placeholder = QLabel(tr("请先选择用户"))
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setStyleSheet("color: #999; font-size: 14px; padding: 40px;")
+            placeholder.setStyleSheet(
+                "color: palette(mid); font-size: 14px; padding: 40px;")
             self._detail_container.addWidget(placeholder)
             return
 
@@ -304,7 +305,7 @@ class _DetailPage(QWidget):
 
             for kd in keys:
                 label = QLabel("")
-                label.setStyleSheet("color: #333333;")
+                label.setStyleSheet("color: palette(text);")
                 form.addRow(f"{kd.label}:", label)
                 self._value_labels[kd.key] = label
 

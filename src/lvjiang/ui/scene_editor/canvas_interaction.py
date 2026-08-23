@@ -778,9 +778,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         dlg.setLabelText(tr("为该区域绑定哪个字段？"))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(
-            "QInputDialog { background-color: #f0f0f0; }"
-            "QLabel { color: #333; }"
-            "QComboBox { background-color: white; color: #333; padding: 4px; }"
+            "QInputDialog { background-color: palette(window); }"
+            "QLabel { color: palette(text); }"
+            "QComboBox { background-color: palette(base); color: palette(text); padding: 4px; }"
             "QPushButton { padding: 4px 16px; }"
         )
         ok = dlg.exec()
@@ -805,7 +805,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         """在指定位置显示右键菜单"""
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
-            "QMenu { background-color: #f0f0f0; padding: 4px; }"
+            "QMenu { background-color: palette(base); padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
@@ -844,7 +844,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         """在指定位置显示 Panel 右键菜单"""
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
-            "QMenu { background-color: #f0f0f0; padding: 4px; }"
+            "QMenu { background-color: palette(base); padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )

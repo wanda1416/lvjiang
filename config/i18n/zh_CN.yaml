@@ -19,6 +19,8 @@ main_window:
   menu_docs: 文档
   menu_feedback: 反馈
   menu_about: 关于
+  theme_to_light: 切换到浅色主题
+  theme_to_dark: 切换到深色主题
   label_current_user: 当前用户
   label_current_layout: 当前布局
   btn_scan_window: 扫描窗口

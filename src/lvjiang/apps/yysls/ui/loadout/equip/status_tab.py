@@ -185,7 +185,7 @@ class EquipStatusTab(QWidget):
         info_row.addStretch()
 
         # 右区：筛选下拉框
-        _filter_lbl_style = "font-size: 12px; color: #555;"
+        _filter_lbl_style = "font-size: 12px; color: palette(mid);"
 
         # 排序
         lbl_sort = QLabel(tr("排序"))
@@ -686,7 +686,7 @@ class EquipStatusTab(QWidget):
             placeholder = QLabel(tr("暂无数据"))
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setStyleSheet(
-                "color: #999; font-size: 14px; padding: 40px;")
+                "color: palette(mid); font-size: 14px; padding: 40px;")
             self._grid.addWidget(placeholder, 0, 0, 1, cols)
 
     # ── 数据刷新 ──

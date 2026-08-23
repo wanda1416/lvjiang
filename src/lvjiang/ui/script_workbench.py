@@ -163,7 +163,8 @@ class DebugPanel(QWidget):
         self.canvas.region_changed.connect(self._on_region)
         cl.addWidget(self.canvas, 1)
         self.lbl_readout = QLabel(tr("（未截图）"))
-        self.lbl_readout.setStyleSheet("font-family: Menlo, Consolas, monospace; color: #444; padding: 2px;")
+        self.lbl_readout.setStyleSheet(
+            "font-family: Menlo, Consolas, monospace; color: palette(mid); padding: 2px;")
         cl.addWidget(self.lbl_readout)
         vsplit.addWidget(canvas_box)
 
@@ -187,7 +188,7 @@ class DebugPanel(QWidget):
         row2.addStretch()
         rl.addLayout(row2)
         self.lbl_run = QLabel(tr("就绪"))
-        self.lbl_run.setStyleSheet("color: #555; padding: 2px;")
+        self.lbl_run.setStyleSheet("color: palette(mid); padding: 2px;")
         rl.addWidget(self.lbl_run)
         self.vars = QTableWidget(0, 2)
         self.vars.setHorizontalHeaderLabels([tr("变量"), tr("值")])

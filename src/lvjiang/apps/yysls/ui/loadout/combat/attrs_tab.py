@@ -253,6 +253,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._host.equipment_changed.connect(self._on_equipment_changed)
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
         self._host.user_changed.connect(self._on_user_changed)
+        # 订阅工作流请求打开"创建基础属性"面板并预填数值
+        self._host.open_play_style_form.connect(self._on_open_play_style_form)
 
 
     # ── 数据加载 ──────────────────────────────────────────────

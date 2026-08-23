@@ -85,5 +85,6 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.workflows.builtins.equip_funcs",
         "lvjiang.apps.yysls.workflows.builtins.equipment_ingest",
         "lvjiang.apps.yysls.workflows.builtins.profile_funcs",
+        "lvjiang.apps.yysls.workflows.builtins.role_attr_ingest",
     ],
 )

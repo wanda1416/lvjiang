@@ -6,11 +6,13 @@
 - alert_history: 提醒去重记录 {alert_key: timestamp}
 
 所有调用方必须通过本模块的函数访问 profile 节点，禁止直接 get_node/set_node。
+
+多进程安全：使用 SessionStore.mutate_node() 提供的文件锁机制。
+不再使用进程内锁（threading.Lock），因为其在多进程场景中无效。
 """
 
 from __future__ import annotations
 
-import threading
 from typing import Any
 
 from lvjiang.core.config import get_session_store
@@ -22,9 +24,6 @@ _PROFILE_KEY = "profile"
 _SUB_GROUPS = "overview_groups"
 _SUB_ACTIVE_GROUP = "overview_active_group"
 _SUB_ALERT_HISTORY = "alert_history"
-
-# 模块级锁，保证 read-modify-write 原子性
-_rw_lock = threading.Lock()
 
 
 def _load() -> dict[str, Any]:
@@ -47,11 +46,13 @@ def get_groups() -> dict:
 
 
 def save_groups(groups: dict) -> None:
-    """保存总览分组配置"""
-    with _rw_lock:
-        data = _load()
+    """保存总览分组配置（多进程安全）"""
+    def _merge(old):
+        data = old if isinstance(old, dict) else {}
         data[_SUB_GROUPS] = groups
-        _save(data)
+        return data
+
+    get_session_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 # ─── 活跃分组 ────────────────────────────────────────────────
@@ -63,11 +64,13 @@ def get_active_group() -> str:
 
 
 def set_active_group(name: str) -> None:
-    """设置当前活跃分组名"""
-    with _rw_lock:
-        data = _load()
+    """设置当前活跃分组名（多进程安全）"""
+    def _merge(old):
+        data = old if isinstance(old, dict) else {}
         data[_SUB_ACTIVE_GROUP] = name
-        _save(data)
+        return data
+
+    get_session_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 # ─── 提醒历史 ────────────────────────────────────────────────
@@ -80,23 +83,27 @@ def get_alert_history() -> dict[str, str]:
 
 
 def set_alert_history(history: dict[str, str]) -> None:
-    """整体替换提醒历史"""
-    with _rw_lock:
-        data = _load()
+    """整体替换提醒历史（多进程安全）"""
+    def _merge(old):
+        data = old if isinstance(old, dict) else {}
         data[_SUB_ALERT_HISTORY] = history
-        _save(data)
+        return data
+
+    get_session_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 def mark_alert(alert_key: str, timestamp: str) -> None:
-    """标记一个提醒已发送"""
-    with _rw_lock:
-        data = _load()
+    """标记一个提醒已发送（多进程安全）"""
+    def _merge(old):
+        data = old if isinstance(old, dict) else {}
         history = data.get(_SUB_ALERT_HISTORY, {})
         if not isinstance(history, dict):
             history = {}
         history[alert_key] = timestamp
         data[_SUB_ALERT_HISTORY] = history
-        _save(data)
+        return data
+
+    get_session_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 def is_alert_marked(alert_key: str) -> bool:
@@ -105,16 +112,18 @@ def is_alert_marked(alert_key: str) -> bool:
 
 
 def unmark_alert(alert_key: str) -> None:
-    """移除一个提醒标记（条件不满足时调用，允许下次重新触发）"""
-    with _rw_lock:
-        data = _load()
+    """移除一个提醒标记（条件不满足时调用，允许下次重新触发）（多进程安全）"""
+    def _merge(old):
+        data = old if isinstance(old, dict) else {}
         history = data.get(_SUB_ALERT_HISTORY, {})
         if not isinstance(history, dict):
-            return
+            return data  # 无需修改
         if alert_key in history:
             del history[alert_key]
             data[_SUB_ALERT_HISTORY] = history
-            _save(data)
+        return data
+
+    get_session_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 

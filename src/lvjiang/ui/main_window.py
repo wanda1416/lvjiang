@@ -213,7 +213,30 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             "<f12>": self._on_global_f12,
         })
 
+        # 注册 SessionStore 的 UI 回调，用于多进程文件锁失败时显示重试对话框
+        self._setup_session_ui_callback()
+
         logger.info("主窗口已初始化")
+
+    # ─── SessionStore UI 回调 ──────────────────────────────────────
+
+    def _setup_session_ui_callback(self):
+        """为 SessionStore 注册 UI 回调，用于显示多进程锁失败的重试对话框"""
+        from ..core.config import get_session_store
+
+        def show_confirm_dialog(title: str, message: str) -> bool:
+            """显示确认对话框，返回用户是否选择重试"""
+            reply = QMessageBox.warning(
+                self,
+                title,
+                message,
+                QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Cancel
+            )
+            return reply == QMessageBox.StandardButton.Retry
+
+        get_session_store().set_ui_callback(lambda cmd, *args:
+            show_confirm_dialog(*args) if cmd == "confirm" else None
+        )
 
     # ─── 启动时检查更新 ────────────────────────────────────────
 

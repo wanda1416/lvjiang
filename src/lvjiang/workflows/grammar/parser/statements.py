@@ -171,23 +171,25 @@ class _StmtMixin:
         return self._expand_wait_clauses(move_node, wait_pairs)
 
     def scroll_stmt(self, items):
-        """scroll up|down [目标] [数量] [before|after|around wait ...] — 鼠标滚轮滚动
+        """scroll [目标] up|down [数量] [before|after|around wait ...] — 鼠标滚轮滚动
 
+        与 click/move/drag 语法风格保持一致：目标（如果存在）紧跟指令关键字，
+        方向 up/down 紧随目标出现，数量参数收尾。
         复用 click_target 子规则解析目标（如果存在），
-        提取数量参数（如果存在）。
+        按 token 类型（而非位置）提取方向，提取数量参数（如果存在）。
         scroll 没有默认延迟，不需要 suppress_defaults。
         """
-        # 第一个元素是 SCROLL_DIR token
-        direction = str(items[0]).lower()
-        wait_pairs, core_items = self._extract_wait_pairs(items[1:])
-        remaining = core_items
+        wait_pairs, core_items = self._extract_wait_pairs(items)
 
+        direction = None
         target = None
         amount = 1
 
-        for item in remaining:
+        for item in core_items:
             if isinstance(item, Click):
                 target = item.target
+            elif isinstance(item, Token) and item.type == "SCROLL_DIR":
+                direction = str(item).lower()
             elif isinstance(item, VarRef):
                 amount = item
             elif isinstance(item, (int, float)):

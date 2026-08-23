@@ -88,20 +88,28 @@ class PostMessageInput(InputBackend):
         amount: int = 1,
         poi_name: str = "",
     ):
-        """后台滚动：PostMessage 向目标窗口发送 WM_MOUSEWHEEL"""
+        """后台滚动：PostMessage 向目标窗口发送 WM_MOUSEWHEEL
+
+        逐格发送 amount 次独立消息，理由同 SendInputInput.scroll_screen——
+        目标窗口收到消息通常只按"是否发生过"响应一次，不会按 wParam 里的
+        delta 数值等比例滚动。
+        """
         if not self.target_hwnd:
             logger.error("PostMessage 模式未设置目标窗口句柄")
             return
 
         cx, cy = screen_to_client_logical(self.target_hwnd, screen_x, screen_y)
         sign = 1 if direction == "up" else -1
-        delta = sign * amount * _WHEEL_DELTA
+        delta = sign * _WHEEL_DELTA
         label = f"({poi_name})" if poi_name else ""
         logger.debug(
             f"[后台] 滚轮 {label}: {direction} x{amount} "
             f"屏幕({screen_x},{screen_y}) -> 客户区({cx},{cy})"
         )
-        postmessage_scroll(self.target_hwnd, cx, cy, delta, activate=self.activate_before_send)
+        for i in range(amount):
+            postmessage_scroll(self.target_hwnd, cx, cy, delta, activate=self.activate_before_send)
+            if i < amount - 1:
+                time.sleep(random.uniform(0.02, 0.05))
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 

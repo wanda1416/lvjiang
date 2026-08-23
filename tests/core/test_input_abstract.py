@@ -24,7 +24,13 @@ class _FakeInput(InputBackend):
     def click_screen(self, screen_x, screen_y, poi_name=""):
         pass
 
-    def move_screen(self, screen_x, screen_y, poi_name=""):
+    def place_screen(self, screen_x, screen_y, poi_name=""):
+        pass
+
+    def move_screen(self, screen_x, screen_y, poi_name="", duration=None):
+        pass
+
+    def move_relative(self, delta_x, delta_y, poi_name="", duration=None):
         pass
 
     def scroll_screen(self, screen_x, screen_y, direction="down", amount=1, poi_name=""):

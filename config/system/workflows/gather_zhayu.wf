@@ -25,7 +25,7 @@ else if env("desktop")
 end
 
 loop 20
-   wait (0.99,1.02)
+   wait (1.10,1.15)
 end
 eval $loop_count = $loop_count + 1
 if $loop_count < $max_loops

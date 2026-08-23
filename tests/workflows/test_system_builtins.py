@@ -1,11 +1,14 @@
 """系统内置函数测试
 
-覆盖 _build_text / _save / _panel_rows / _panel_cols / _input 的可测路径。
+覆盖 _build_text / _save / _panel_rows / _panel_cols / _input / _check_env 的可测路径。
 confirm / pause / notify 依赖平台原生弹窗，不纳入。
 """
 
 
+import pytest
+
 from lvjiang.workflows.builtins import get_function
+from lvjiang.workflows.engine.signals import WorkflowUserError
 
 
 def _fn(name):
@@ -110,3 +113,28 @@ class TestInput:
         engine = MockEngine(ui_callback=lambda kind, prompt="": "用户输入")
         result = _fn("input")(engine, "请输入:")
         assert result == "用户输入"
+
+
+class TestCheckEnv:
+    @pytest.mark.parametrize("allowed", [["android"], "android"])
+    def test_matching_env_returns_true(self, monkeypatch, allowed):
+        """允许列表和单个环境名均可匹配当前环境。"""
+        monkeypatch.setattr(
+            "lvjiang.workflows.builtins.system.load_env",
+            lambda: "android",
+        )
+
+        assert _fn("check_env")(allowed) is True
+
+    def test_mismatching_env_raises_workflow_user_error(self, monkeypatch):
+        """环境不匹配时抛出可由工作流引擎处理的用户错误。"""
+        monkeypatch.setattr(
+            "lvjiang.workflows.builtins.system.load_env",
+            lambda: "android",
+        )
+
+        with pytest.raises(
+            WorkflowUserError,
+            match=r"当前环境 'android' 不在允许列表 \['desktop'\]",
+        ):
+            _fn("check_env")(["desktop"])

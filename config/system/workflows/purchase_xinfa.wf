@@ -1,5 +1,5 @@
 #% name: 自动购买心法
-#% env: [android, desktop]
+#% env: [android]
 
 # 自动购买心法流程
 #
@@ -14,9 +14,14 @@
 #      f. 最大数量添加 → 确认购买 → 点击空白处重置
 #   3. 重复步骤 2 直到无法继续购买
 
-# ─── 导航：从首页到心法置换视图 ─────────────────────────
-click [game_main_page].[menu] after wait @page_refresh
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
 
+# ─── 导航：从首页到心法置换视图 ─────────────────────────
+call $nav_result = nav_main_to_menu()
+if $nav_result < 0
+    return -1
+end
 scan [game_menu_page].[peiyang] as $nav_check by contains "培养"
 if not $nav_check
     eval pause("未找到「培养」入口，请确认当前在菜单页后点击继续")

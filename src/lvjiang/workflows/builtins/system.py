@@ -189,7 +189,7 @@ def _check_env(envs) -> bool:
         check_env(["android"])
         # 当前环境不是 android 时直接报错，后续语句不会执行
     """
-    from ...engine.signals import WorkflowUserError
+    from ..engine.signals import WorkflowUserError
 
     current = load_env()
     if not isinstance(envs, list):

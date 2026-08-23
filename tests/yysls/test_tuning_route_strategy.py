@@ -87,3 +87,23 @@ def test_grid_click_ratios():
     assert android.grid_click_x_ratio(1) == 0.5
     assert desktop.grid_click_x_ratio(1) == 0.75
     assert desktop.grid_click_x_ratio(2) == 0.5
+
+
+def test_navigation_subcall_failure_is_propagated():
+    wf = MagicMock()
+    wf.engine.call_subcall.return_value = -1
+    routes = DesktopTuningRouteStrategy(wf)
+
+    assert routes.enter_equip() is False
+    assert routes.return_main() is False
+    assert routes.enter_tune_detail() is False
+
+
+def test_navigation_subcall_success_is_propagated():
+    wf = MagicMock()
+    wf.engine.call_subcall.return_value = 0
+    routes = DesktopTuningRouteStrategy(wf)
+
+    assert routes.enter_equip() is True
+    assert routes.return_main() is True
+    assert routes.enter_tune_detail() is True

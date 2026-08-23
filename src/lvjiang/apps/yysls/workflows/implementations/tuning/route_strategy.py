@@ -34,15 +34,17 @@ class TuningRouteStrategy(ABC):
         engine = self._require_engine("load_dependencies")
         engine.load_subcalls(_NAV_FILE)
 
-    def enter_equip(self) -> None:
-        self._call_subcall("nav_main_to_equip")
+    def enter_equip(self) -> bool:
+        result = self._call_subcall("nav_main_to_equip")
+        return self._subcall_succeeded(result)
 
-    def return_main(self) -> None:
-        self._call_subcall("nav_back_to_main")
+    def return_main(self) -> bool:
+        result = self._call_subcall("nav_back_to_main")
+        return self._subcall_succeeded(result)
 
     def enter_tune_detail(self) -> bool:
         result = self._call_subcall("nav_equip_to_tune")
-        return not (isinstance(result, (int, float)) and result < 0)
+        return self._subcall_succeeded(result)
 
     def leave_tune_detail(self) -> None:
         """离开调律页，并将装备详情页恢复到可继续操作的状态。"""
@@ -73,6 +75,11 @@ class TuningRouteStrategy(ABC):
 
     def _call_subcall(self, proc_name: str, args: list | None = None) -> Any:
         return self._require_engine(proc_name).call_subcall(proc_name, args)
+
+    @staticmethod
+    def _subcall_succeeded(result: Any) -> bool:
+        """导航 DSL 约定：负数表示失败，非负数表示成功。"""
+        return not (isinstance(result, (int, float)) and result < 0)
 
 
 class AndroidTuningRouteStrategy(TuningRouteStrategy):

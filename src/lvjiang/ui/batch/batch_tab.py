@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -35,6 +34,7 @@ from ...core.batch_config import (
 )
 from ...core.config.session import get_session_store
 from ...i18n import tr
+from ..theme import get_theme_manager
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
@@ -44,14 +44,20 @@ from .batch_runner import (
     BatchScript,
 )
 
-# 状态 → 表格背景色
-_STATUS_COLORS = {
-    ST_PENDING: QColor("#f5f5f5"),
-    ST_RUNNING: QColor("#e3f2fd"),
-    ST_SUCCESS: QColor("#e8f5e9"),
-    ST_FAILED: QColor("#ffebee"),
-    ST_SKIPPED: QColor("#fff8e1"),
-}
+
+def _status_color(status: str):
+    """返回随主题变化的批量任务状态背景色。"""
+    from PyQt6.QtGui import QColor
+    tokens = get_theme_manager().tokens
+    colours = {
+        ST_PENDING: tokens.surface_alt,
+        ST_RUNNING: tokens.info_surface,
+        ST_SUCCESS: tokens.success_surface,
+        ST_FAILED: tokens.danger_surface,
+        ST_SKIPPED: tokens.warning_surface,
+    }
+    value = colours.get(status)
+    return QColor(value) if value else None
 
 _STYLE_BTN_RUN = (
     "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
@@ -108,6 +114,7 @@ class BatchTab(QWidget):
 
         # 宿主状态信号
         host.automation_state_changed.connect(self._on_automation_state)
+        get_theme_manager().theme_changed.connect(self._refresh_status_colors)
 
         self._refresh_script_list()
         self._refresh_config_combo()
@@ -280,7 +287,7 @@ class BatchTab(QWidget):
         config = cfg.get_active()
         if not config or not config.rows:
             lbl = QLabel(tr("暂无数据，请通过 工具 → 批量配置 添加"))
-            lbl.setStyleSheet("color: #999;")
+            lbl.setStyleSheet("color: palette(mid);")
             self._entry_container.addWidget(lbl)
             return
 
@@ -462,7 +469,7 @@ class BatchTab(QWidget):
                 self._progress_table.setItem(
                     row, 1, QTableWidgetItem(script.name))
                 status_item = QTableWidgetItem(ST_PENDING)
-                status_item.setBackground(_STATUS_COLORS[ST_PENDING])
+                status_item.setBackground(_status_color(ST_PENDING))
                 self._progress_table.setItem(row, 2, status_item)
 
     def update_progress(self, entry_label: str, script_id: str, status: str):
@@ -483,12 +490,22 @@ class BatchTab(QWidget):
             if u_item and u_item.text() == entry_label and \
                s_item and s_item.text() == script_name:
                 status_item = QTableWidgetItem(status)
-                color = _STATUS_COLORS.get(status)
+                color = _status_color(status)
                 if color:
                     status_item.setBackground(color)
                 self._progress_table.setItem(row, 2, status_item)
                 self._progress_table.scrollToItem(status_item)
                 break
+
+    def _refresh_status_colors(self, _theme: str) -> None:
+        """实时切换主题后重绘现有进度行。"""
+        for row in range(self._progress_table.rowCount()):
+            item = self._progress_table.item(row, 2)
+            if item is None:
+                continue
+            color = _status_color(item.text())
+            if color is not None:
+                item.setBackground(color)
 
     def on_batch_finished(self, summary: dict):
         """批量全部结束（由 host 调用）"""

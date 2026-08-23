@@ -16,6 +16,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
 from .ui.main_window import MainWindow
+from .ui.theme import get_theme_manager, reset_theme_manager
 from .ui.widgets import install_wheel_guard
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ def _cleanup_on_exit() -> None:
         _window = None
 
     # 3. 最后删除 QApplication
+    reset_theme_manager()
     _app = None
 
 
@@ -124,6 +126,10 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
                 [getattr(h, "name", "?") for h in hooks_list] or "无")
 
     _app = QApplication(sys.argv)
+
+    # 窗口创建前应用主题，避免启动时先闪出系统浅色再切换。
+    from .core.config import load_user_config
+    get_theme_manager(_app).apply(load_user_config().theme)
 
     # ── 初始化 i18n（在 QApplication 之后、MainWindow 之前）──
     from .i18n import init_i18n, load_app_i18n

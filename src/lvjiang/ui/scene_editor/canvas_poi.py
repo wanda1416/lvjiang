@@ -291,7 +291,7 @@ class CanvasPoiMixin:
 
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
-            "QMenu { background-color: #f0f0f0; padding: 4px; }"
+            "QMenu { background-color: palette(base); padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
@@ -322,9 +322,9 @@ class CanvasPoiMixin:
         dlg.setLabelText(tr("新坐标绑定哪个坐标点？（沿用源半径）："))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(
-            "QInputDialog { background-color: #f0f0f0; }"
-            "QLabel { color: #333; }"
-            "QComboBox { background-color: white; color: #333; padding: 4px; }"
+            "QInputDialog { background-color: palette(window); }"
+            "QLabel { color: palette(text); }"
+            "QComboBox { background-color: palette(base); color: palette(text); padding: 4px; }"
             "QPushButton { padding: 4px 16px; }"
         )
         if not dlg.exec():
@@ -650,9 +650,9 @@ class CanvasPoiMixin:
             dlg.setLabelText(tr("输入方向 key（小写字母开头，可含数字/下划线）："))
             dlg.setTextValue("")
             dlg.setStyleSheet(
-                "QInputDialog { background-color: #f0f0f0; }"
-                "QLabel { color: #333; }"
-                "QLineEdit { background-color: white; color: #333; padding: 4px; }"
+                "QInputDialog { background-color: palette(window); }"
+                "QLabel { color: palette(text); }"
+                "QLineEdit { background-color: palette(base); color: palette(text); padding: 4px; }"
                 "QPushButton { padding: 4px 16px; }"
             )
             ok = dlg.exec()

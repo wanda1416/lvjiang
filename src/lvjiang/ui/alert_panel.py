@@ -23,28 +23,24 @@ class AlertPanel(QWidget):
     无告警时隐藏整个面板。
     """
 
-    # 告警样式：浅黄背景 + 圆角
+    # 告警样式：颜色由全局 warning 语义令牌提供。
     ALERT_STYLE = """
         QWidget {
-            background-color: #fff3cd;
-            border: 1px solid #ffc107;
             border-radius: 4px;
             padding: 8px;
         }
         QLabel {
-            color: #856404;
             font-size: 13px;
         }
         QPushButton {
             background-color: transparent;
             border: none;
-            color: #856404;
             font-size: 16px;
             font-weight: bold;
             padding: 0 4px;
         }
         QPushButton:hover {
-            background-color: #ffc107;
+            background-color: palette(midlight);
             border-radius: 3px;
         }
     """
@@ -57,6 +53,7 @@ class AlertPanel(QWidget):
 
     def _setup_ui(self) -> None:
         """初始化 UI 组件"""
+        self.setProperty("status", "warning")
         self.setStyleSheet(self.ALERT_STYLE)
         self.setVisible(False)  # 初始隐藏
 

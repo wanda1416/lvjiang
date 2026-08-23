@@ -120,7 +120,7 @@ class ActionPalette(QWidget):
         root.addWidget(self.list, 2)
         self.lbl_doc = QLabel("")
         self.lbl_doc.setWordWrap(True)
-        self.lbl_doc.setStyleSheet("color: #666; padding: 2px;")
+        self.lbl_doc.setStyleSheet("color: palette(mid); padding: 2px;")
         root.addWidget(self.lbl_doc)
         self.form_host = QWidget()
         self.form = QFormLayout(self.form_host)
@@ -129,7 +129,8 @@ class ActionPalette(QWidget):
         self.preview = QLabel("")
         self.preview.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.preview.setStyleSheet(
-            "font-family: Menlo, Consolas, monospace; background: #f4f4f4; padding: 6px; border: 1px solid #ddd;")
+            "font-family: Menlo, Consolas, monospace; background: palette(alternate-base); "
+            "padding: 6px; border: 1px solid palette(midlight);")
         self.preview.setWordWrap(True)
         root.addWidget(self.preview)
         row = QHBoxLayout()
@@ -348,12 +349,14 @@ class ActionPalette(QWidget):
             text = cat.render(self._action, self.values())
             self.preview.setText(text)
             self.preview.setStyleSheet(
-                "font-family: Menlo, Consolas, monospace; background: #f4f4f4; padding: 6px; border: 1px solid #ddd;")
+                "font-family: Menlo, Consolas, monospace; background: palette(alternate-base); "
+                "padding: 6px; border: 1px solid palette(midlight);")
             self.btn_insert.setEnabled(True)
         except cat.RenderError as e:
             self.preview.setText(str(e))
             self.preview.setStyleSheet(
-                "font-family: Menlo, Consolas, monospace; background: #fff4f4; padding: 6px; border: 1px solid #e0b4b4; color: #a33;")
+                "font-family: Menlo, Consolas, monospace; background: palette(alternate-base); "
+                "padding: 6px; border: 1px solid #c62828; color: #c62828;")
             self.btn_insert.setEnabled(False)
 
     def _on_insert(self):

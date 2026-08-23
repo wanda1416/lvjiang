@@ -31,9 +31,9 @@ _ACCENT = "#0078d4"
 
 _STYLE_LIST = """
 QListWidget#userList {
-    border: 1px solid #d9d9d9;
+    border: 1px solid palette(midlight);
     border-radius: 6px;
-    background: #fafafa;
+    background: palette(base);
     outline: none;
     padding: 4px;
 }
@@ -41,10 +41,10 @@ QListWidget#userList::item {
     padding: 5px 10px;
     border-radius: 4px;
     margin: 1px 0;
-    color: #333;
+    color: palette(text);
 }
 QListWidget#userList::item:hover {
-    background: #eaeaea;
+    background: palette(alternate-base);
 }
 QListWidget#userList::item:selected {
     background: #0078d4;
@@ -62,7 +62,7 @@ QPushButton {{
 }}
 QPushButton:hover {{ background: #106ebe; }}
 QPushButton:pressed {{ background: #005a9e; }}
-QPushButton:disabled {{ background: #c8c8c8; }}
+QPushButton:disabled {{ background: palette(mid); }}
 """
 
 _STYLE_BTN_DANGER = """
@@ -73,27 +73,27 @@ QPushButton {
     border-radius: 4px;
     padding: 6px 14px;
 }
-QPushButton:hover { background: #fdf3f4; }
-QPushButton:pressed { background: #fbe4e6; }
-QPushButton:disabled { color: #c8c8c8; border-color: #c8c8c8; }
+QPushButton:hover { background: palette(alternate-base); }
+QPushButton:pressed { background: palette(midlight); }
+QPushButton:disabled { color: palette(mid); border-color: palette(mid); }
 """
 
 _STYLE_BTN_GHOST = """
 QPushButton {
     background: transparent;
-    color: #333;
-    border: 1px solid #c8c8c8;
+    color: palette(text);
+    border: 1px solid palette(mid);
     border-radius: 4px;
     padding: 6px 14px;
 }
-QPushButton:hover { background: #f0f0f0; }
-QPushButton:pressed { background: #e0e0e0; }
+QPushButton:hover { background: palette(alternate-base); }
+QPushButton:pressed { background: palette(midlight); }
 """
 
 _STYLE_CARD = """
 QFrame#detailCard {
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: palette(base);
+    border: 1px solid palette(midlight);
     border-radius: 8px;
 }
 """
@@ -263,7 +263,7 @@ class UserManagerDialog(QDialog):
         stats_layout.addWidget(self._section_title(tr("数据统计")))
 
         self._lbl_stats = QLabel(tr("装备数据展示功能开发中..."))
-        self._lbl_stats.setStyleSheet("color: #999; font-style: italic;")
+        self._lbl_stats.setStyleSheet("color: palette(mid); font-style: italic;")
         stats_layout.addWidget(self._lbl_stats)
 
         layout.addWidget(stats_card)
@@ -289,7 +289,7 @@ class UserManagerDialog(QDialog):
     def _field_label(text: str) -> QLabel:
         """表单字段名标签"""
         label = QLabel(text)
-        label.setStyleSheet("color: #666;")
+        label.setStyleSheet("color: palette(mid);")
         return label
 
     # ─── 列表刷新与选中 ──────────────────────────────────
@@ -411,4 +411,3 @@ class UserManagerDialog(QDialog):
             logger.info(f"用户已删除: {name}")
         else:
             QMessageBox.warning(self, tr("失败"), tr("无法删除该用户"))
-

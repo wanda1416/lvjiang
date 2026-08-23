@@ -84,6 +84,7 @@ class UserConfig:
     （system 出厂默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
     language: str = "zh_CN"                  # 界面语言（zh_CN / en_US / auto）
+    theme: str = "light"                     # 界面主题（light / dark）
     adb_capture_streaming: bool = True     # ADB 模式是否使用 scrcpy 视频流截图（false 则用 screencap）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
@@ -92,6 +93,8 @@ class UserConfig:
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
 
     def __post_init__(self):
+        if self.theme not in {"light", "dark"}:
+            self.theme = "light"
         if isinstance(self.material_grid, dict):
             self.material_grid = MaterialGridConfig(**self.material_grid)
         if isinstance(self.input_sim, dict):

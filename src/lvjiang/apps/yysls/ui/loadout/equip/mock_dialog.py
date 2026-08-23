@@ -69,7 +69,7 @@ class _AffixRow(QWidget):
         lbl_idx = QLabel(_AFFIX_LABELS[index - 1])
         lbl_idx.setFixedWidth(28)
         lbl_idx.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_idx.setStyleSheet("color: #888; font-size: 12px;")
+        lbl_idx.setStyleSheet("color: palette(mid); font-size: 12px;")
         layout.addWidget(lbl_idx)
 
         # 词条名下拉
@@ -94,19 +94,19 @@ class _AffixRow(QWidget):
         self._lbl_le = QLabel("≤")
         self._lbl_le.setFixedWidth(14)
         self._lbl_le.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_le.setStyleSheet("color: #888; font-size: 11px;")
+        self._lbl_le.setStyleSheet("color: palette(mid); font-size: 11px;")
         layout.addWidget(self._lbl_le)
 
         self._lbl_cap_val = QLabel("")
         self._lbl_cap_val.setFixedWidth(50)
-        self._lbl_cap_val.setStyleSheet("color: #888; font-size: 11px;")
+        self._lbl_cap_val.setStyleSheet("color: palette(mid); font-size: 11px;")
         layout.addWidget(self._lbl_cap_val)
 
         # X%（两个汉字宽度）
         self._lbl_pct = QLabel("")
         self._lbl_pct.setFixedWidth(56)
         self._lbl_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._lbl_pct.setStyleSheet("color: #888; font-size: 11px;")
+        self._lbl_pct.setStyleSheet("color: palette(mid); font-size: 11px;")
         layout.addWidget(self._lbl_pct)
 
         layout.addStretch()
@@ -321,7 +321,7 @@ class MockEquipDialog(QDialog):
         lbl_dingyin_idx = QLabel(tr("定音"))
         lbl_dingyin_idx.setFixedWidth(28)
         lbl_dingyin_idx.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_dingyin_idx.setStyleSheet("color: #888; font-size: 12px;")
+        lbl_dingyin_idx.setStyleSheet("color: palette(mid); font-size: 12px;")
         dingyin_layout.addWidget(lbl_dingyin_idx)
 
         # 定音词条选择：级联菜单按钮（左三件平铺，右四件按流派分组）
@@ -331,13 +331,12 @@ class MockEquipDialog(QDialog):
             QPushButton {
                 text-align: left;
                 padding: 4px 24px 4px 8px;
-                border: 1px solid #ABADB3;
+                border: 1px solid palette(mid);
                 border-radius: 2px;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #FFFFFF, stop:1 #E8E8E8);
+                background: palette(button);
             }
             QPushButton:hover {
-                border: 1px solid #7EB4EA;
+                border: 1px solid palette(highlight);
             }
             QPushButton::menu-indicator {
                 image: none;
@@ -359,18 +358,19 @@ class MockEquipDialog(QDialog):
         self._lbl_dingyin_le = QLabel("≤")
         self._lbl_dingyin_le.setFixedWidth(14)
         self._lbl_dingyin_le.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_dingyin_le.setStyleSheet("color: #888; font-size: 11px;")
+        self._lbl_dingyin_le.setStyleSheet("color: palette(mid); font-size: 11px;")
         dingyin_layout.addWidget(self._lbl_dingyin_le)
 
         self._lbl_dingyin_cap_val = QLabel("")
         self._lbl_dingyin_cap_val.setFixedWidth(50)
-        self._lbl_dingyin_cap_val.setStyleSheet("color: #888; font-size: 11px;")
+        self._lbl_dingyin_cap_val.setStyleSheet(
+            "color: palette(mid); font-size: 11px;")
         dingyin_layout.addWidget(self._lbl_dingyin_cap_val)
 
         self._lbl_dingyin_pct = QLabel("")
         self._lbl_dingyin_pct.setFixedWidth(56)
         self._lbl_dingyin_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._lbl_dingyin_pct.setStyleSheet("color: #888; font-size: 11px;")
+        self._lbl_dingyin_pct.setStyleSheet("color: palette(mid); font-size: 11px;")
         dingyin_layout.addWidget(self._lbl_dingyin_pct)
 
         self._dingyin_cap = 0.0
@@ -606,8 +606,8 @@ class MockEquipDialog(QDialog):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background-color: #FFFFFF;
-                border: 1px solid #ABADB3;
+                background-color: palette(base);
+                border: 1px solid palette(mid);
                 padding: 4px 0px;
             }
             QMenu::item {
@@ -620,7 +620,7 @@ class MockEquipDialog(QDialog):
             }
             QMenu::separator {
                 height: 1px;
-                background: #E0E0E0;
+                background: palette(midlight);
                 margin: 4px 8px;
             }
         """)

@@ -72,9 +72,9 @@ class TuningProgressWidget(QWidget):
         # 暂停提示：独立于 _operation_label（后者被各阶段信号频繁覆写，
         # 放在这会被瞬间冲掉），只由 set_paused 控制，不受其他信号影响。
         self._pause_label = QLabel(tr("暂停中..."))
+        self._pause_label.setProperty("status", "warning")
         self._pause_label.setStyleSheet(
-            "font-size: 12px; color: #E65100; font-weight: bold; padding: 2px;"
-            "background: #FFF3E0; border-radius: 3px;")
+            "font-size: 12px; font-weight: bold; padding: 2px; border-radius: 3px;")
         self._pause_label.setVisible(False)
         batch_layout.addWidget(self._pause_label)
         self._batch_progress = QProgressBar()
@@ -100,12 +100,12 @@ class TuningProgressWidget(QWidget):
         self._equip_name_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         equip_layout.addWidget(self._equip_name_label)
         self._equip_info_label = QLabel("")
-        self._equip_info_label.setStyleSheet("font-size: 12px; color: #666;")
+        self._equip_info_label.setStyleSheet("font-size: 12px; color: palette(mid);")
         equip_layout.addWidget(self._equip_info_label)
         self._scan_decision_label = QLabel("")
+        self._scan_decision_label.setProperty("status", "info")
         self._scan_decision_label.setStyleSheet(
-            "font-size: 12px; color: #1565C0; padding: 2px;"
-            "background: #E3F2FD; border-radius: 3px;")
+            "font-size: 12px; padding: 2px; border-radius: 3px;")
         self._scan_decision_label.setWordWrap(True)
         self._scan_decision_label.setVisible(False)
         equip_layout.addWidget(self._scan_decision_label)
@@ -142,9 +142,9 @@ class TuningProgressWidget(QWidget):
         status_group = QGroupBox(tr("调律状态"))
         status_layout = QVBoxLayout(status_group)
         self._operation_label = QLabel(tr("当前阶段：等待开始"))
+        self._operation_label.setProperty("status", "info")
         self._operation_label.setStyleSheet(
-            "font-size: 12px; color: #0D47A1; padding: 4px;"
-            "background: #E3F2FD; border-radius: 4px; font-weight: bold;")
+            "font-size: 12px; padding: 4px; border-radius: 4px; font-weight: bold;")
         self._operation_label.setWordWrap(True)
         status_layout.addWidget(self._operation_label)
         self._round_label = QLabel(tr("轮次：0"))
@@ -157,19 +157,20 @@ class TuningProgressWidget(QWidget):
         self._actual_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._actual_label)
         self._last_result_label = QLabel("")
-        self._last_result_label.setStyleSheet("font-size: 11px; color: #555; padding: 2px;")
+        self._last_result_label.setStyleSheet(
+            "font-size: 11px; color: palette(mid); padding: 2px;")
         self._last_result_label.setWordWrap(True)
         status_layout.addWidget(self._last_result_label)
         self._status_msg_label = QLabel("")
+        self._status_msg_label.setProperty("status", "warning")
         self._status_msg_label.setStyleSheet(
-            "font-size: 12px; color: #E65100; padding: 4px;"
-            "background: #FFF3E0; border-radius: 4px;")
+            "font-size: 12px; padding: 4px; border-radius: 4px;")
         self._status_msg_label.setWordWrap(True)
         self._status_msg_label.setVisible(False)
         self._material_label = QLabel("")
         self._material_label.setStyleSheet(
-            "font-size: 11px; color: #555; padding: 2px;"
-            "background: #F5F5F5; border-radius: 3px;")
+            "font-size: 11px; color: palette(mid); padding: 2px;"
+            "background: palette(alternate-base); border-radius: 3px;")
         self._material_label.setWordWrap(True)
         self._material_label.setVisible(False)
         status_layout.addWidget(self._material_label)
@@ -184,7 +185,8 @@ class TuningProgressWidget(QWidget):
             "font-size: 14px; font-weight: bold;")
         previous_layout.addWidget(self._previous_name_label)
         self._previous_info_label = QLabel("")
-        self._previous_info_label.setStyleSheet("font-size: 12px; color: #666;")
+        self._previous_info_label.setStyleSheet(
+            "font-size: 12px; color: palette(mid);")
         self._previous_info_label.setWordWrap(True)
         previous_layout.addWidget(self._previous_info_label)
         self._previous_process = QPlainTextEdit()
@@ -311,11 +313,15 @@ class TuningProgressWidget(QWidget):
             tr("上一件装备 · 重置前") if is_reset_before else tr("上一件装备"))
         self._previous_name_label.setText(name)
         if is_reset_before:
-            self._previous_name_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; color: #E65100;")
-        else:
+            self._previous_name_label.setProperty("status", "warning")
             self._previous_name_label.setStyleSheet(
                 "font-size: 14px; font-weight: bold;")
+        else:
+            self._previous_name_label.setProperty("status", "")
+            self._previous_name_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold;")
+        self._previous_name_label.style().unpolish(self._previous_name_label)
+        self._previous_name_label.style().polish(self._previous_name_label)
         self._previous_info_label.setText(
             tr("等级 {level} | {quality} | {rounds} 轮 | {rating} | {status}").format(
                 level=level if level is not None else "-",

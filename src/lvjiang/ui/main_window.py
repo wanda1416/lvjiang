@@ -11,10 +11,11 @@
 """
 from __future__ import annotations
 
+import sys
 import threading
 
 from loguru import logger
-from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtCore import QObject, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QKeyEvent
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -30,7 +31,10 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSpinBox,
     QSplitter,
+    QStyle,
+    QStyleOptionComboBox,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -45,6 +49,7 @@ from ..i18n import tr
 from .capture_ops import CaptureOpsMixin
 from .overlay import BorderOverlay
 from .run_control import RunControlMixin
+from .theme import get_theme_manager
 from .widgets import FlowLayout, TrimmedLogEdit
 from .window_ops import WindowOpsMixin
 
@@ -55,6 +60,38 @@ class _LogBridge(QObject):
 
 
 DEFAULT_TITLE = tr("律匠 - 通用视觉 RPA 引擎")
+_TOP_COMBO_CHARACTER_CAPACITY = 6
+
+
+def _set_combo_character_capacity(
+    combo: QComboBox,
+    character_count: int = _TOP_COMBO_CHARACTER_CAPACITY,
+) -> int:
+    """Fix a combo width that leaves room for N full-width Chinese characters.
+
+    ``setMinimumContentsLength`` is based on an average Latin glyph and can still
+    truncate CJK text.  Ask the active Qt style to add its frame and arrow chrome
+    around an explicitly measured full-width text area instead.
+    """
+    metrics = combo.fontMetrics()
+    content = QSize(
+        metrics.horizontalAdvance("汉" * character_count),
+        metrics.height(),
+    )
+    option = QStyleOptionComboBox()
+    option.initFrom(combo)
+    option.editable = combo.isEditable()
+    option.frame = combo.hasFrame()
+    style = combo.style()
+    assert style is not None
+    width = style.sizeFromContents(
+        QStyle.ContentsType.CT_ComboBox,
+        option,
+        content,
+        combo,
+    ).width()
+    combo.setFixedWidth(width)
+    return width
 
 
 def _get_title_with_version() -> str:
@@ -235,12 +272,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
     def _setup_menu(self):
         menubar = self.menuBar()
-        menubar.setStyleSheet("""
-            QMenuBar::item { padding: 6px 16px; }
-            QMenuBar::item:selected { background: #d4d4d4; }
-            QMenu::item { padding: 8px 32px; }
-            QMenu::item:selected { background: #0078d4; color: white; }
-        """)
+        # macOS 的原生全局菜单栏无法容纳 Qt corner widget；使用窗口内菜单栏
+        # 才能保证主题按钮在所有桌面平台都位于菜单同行最右侧。
+        if sys.platform == "darwin":
+            menubar.setNativeMenuBar(False)
 
         # ── 通用 ──
         settings_menu = menubar.addMenu(tr("通用"))
@@ -317,6 +352,36 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         about = QAction(tr("关于"), self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
+
+        # ── 主题切换（不属于任何插件，固定在菜单栏最右侧）──
+        self._theme_button = QToolButton(menubar)
+        self._theme_button.setObjectName("themeToggleButton")
+        self._theme_button.setAutoRaise(True)
+        self._theme_button.setFixedSize(34, 28)
+        self._theme_button.clicked.connect(self._toggle_theme)
+        manager = get_theme_manager()
+        manager.theme_changed.connect(self._update_theme_button)
+        self._update_theme_button(manager.current)
+        menubar.setCornerWidget(
+            self._theme_button, Qt.Corner.TopRightCorner
+        )
+
+    def _update_theme_button(self, theme: str) -> None:
+        """更新图标和辅助文本，描述按钮点击后的目标主题。"""
+        if theme == "dark":
+            text = tr("切换到浅色主题")
+            self._theme_button.setText("☀")
+        else:
+            text = tr("切换到深色主题")
+            self._theme_button.setText("☾")
+        self._theme_button.setToolTip(text)
+        self._theme_button.setAccessibleName(text)
+
+    def _toggle_theme(self) -> None:
+        manager = get_theme_manager()
+        theme = manager.toggle()
+        from ..core.config import save_settings
+        save_settings({"theme": theme})
 
     # ─── 对话框 ──────────────────────────────────────────────
 
@@ -461,6 +526,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("环境")))
         self._env_combo = QComboBox()
+        _set_combo_character_capacity(self._env_combo)
         for key, display in load_available_envs():
             self._env_combo.addItem(display, key)
         current_env = load_env()
@@ -486,20 +552,20 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         env_tips_btn.clicked.connect(
             lambda: QMessageBox.information(self, tr("目标环境说明"), _env_tip_text))
         env_tips_btn.setStyleSheet(
-            "QPushButton{border:1px solid #90A4AE;border-radius:10px;"
-            "color:#546E7A;font-weight:bold;font-size:12px;}"
-            "QPushButton:hover{background:#E8EEF2;}"
+            "QPushButton{border:1px solid palette(mid);border-radius:10px;"
+            "color:palette(text);font-weight:bold;font-size:12px;}"
+            "QPushButton:hover{background:palette(midlight);}"
         )
         top_row.addWidget(env_tips_btn)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("布局")))
         self.layout_combo = QComboBox()
-        self.layout_combo.setMinimumWidth(150)
+        _set_combo_character_capacity(self.layout_combo)
         self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
         top_row.addWidget(self.layout_combo)
         # 布局描述标签（显示布局的 desc 字段）
         self.layout_desc_label = QLabel()
-        self.layout_desc_label.setStyleSheet("color: #666;")
+        self.layout_desc_label.setStyleSheet("color: palette(mid);")
         top_row.addWidget(self.layout_desc_label)
         top_row.addStretch()
         main_layout.addLayout(top_row)

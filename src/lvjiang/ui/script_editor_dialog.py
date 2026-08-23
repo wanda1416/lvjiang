@@ -54,6 +54,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.config.resolver import get_resolver
 from ..i18n import tr
+from .theme import get_theme_manager
 
 #: 脚本 id = 文件名 stem；``_`` 前缀被发现层视为临时文件，不允许
 _SCRIPT_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -284,7 +285,7 @@ class ScriptEditorDialog(QDialog):
             btn_row.addWidget(b)
         btn_row.addStretch()
         self.lbl_layer = QLabel("")
-        self.lbl_layer.setStyleSheet("color: #888;")
+        self.lbl_layer.setStyleSheet("color: palette(mid);")
         btn_row.addWidget(self.lbl_layer)
         root.addLayout(btn_row)
 
@@ -310,7 +311,7 @@ class ScriptEditorDialog(QDialog):
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
         self.lbl_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.lbl_status.setStyleSheet("color: #555; padding: 4px;")
+        self.lbl_status.setStyleSheet("color: palette(mid); padding: 4px;")
         rl.addWidget(self.lbl_status)
         splitter.addWidget(right)
 
@@ -599,7 +600,9 @@ class ScriptEditorDialog(QDialog):
             self.editor.setExtraSelections([])
             return
         sel = QTextEdit.ExtraSelection()
-        sel.format.setBackground(QColor("#fff3b0"))
+        sel.format.setBackground(
+            QColor(get_theme_manager().tokens.warning_surface)
+        )
         sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
         cur = QTextCursor(block)
         sel.cursor = cur

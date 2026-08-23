@@ -310,7 +310,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         self._open_doc(selected)
         try:
-            self.navigator.navigate_to_equip()
+            if not self.navigator.navigate_to_equip():
+                msg = "未能进入背包装备页，自动调律中止"
+                logger.error(msg)
+                self.output["error"] = msg
+                return self.output
 
             first_slot = True
             _batch_total_slots = len(selected)
@@ -384,7 +388,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 logger.info("自动调律被用户中断（F10），保留当前页面")
             else:
                 # 正常完成或材料耗尽：返回主页
-                self.navigator.navigate_back()
+                if not self.navigator.navigate_back():
+                    msg = "自动调律已完成，但未能返回主页"
+                    logger.error(msg)
+                    self.output["error"] = msg
                 if self.executor.materials_exhausted:
                     logger.info("自动调律因材料耗尽而结束，已返回主页")
                 else:

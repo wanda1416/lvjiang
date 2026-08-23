@@ -15,7 +15,10 @@
 
 import "subcall/navigation.wf"
 
-call nav_main_to_equip()
+call $nav_result = nav_main_to_equip()
+if $nav_result < 0
+    return -1
+end
 
 # 武器类（equip_weapon_detail）
 for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
@@ -42,4 +45,7 @@ for slot in ["head", "chest", "leg", "wrist"]
 end
 
 # 返回主界面
-call nav_back_to_main()
+call $nav_result = nav_back_to_main()
+if $nav_result < 0
+    return -1
+end

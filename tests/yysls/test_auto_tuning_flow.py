@@ -1943,6 +1943,14 @@ class SkipTargetFakeWF(FakeWF):
     def _ensure_judge_config(self):
         pass
 
+    def call_function(self, func_name: str, args: list, engine=None) -> any:
+        """Mock 阻塞式内置函数，避免测试中触发原生弹窗"""
+        if func_name == "confirm":
+            return True  # confirm() 总是返回 True
+        if func_name == "pause":
+            return  # pause() 直接返回，不阻塞
+        return super().call_function(func_name, args, engine)
+
 
 class TestScrollToRow:
     def test_no_scroll_for_row_1(self):

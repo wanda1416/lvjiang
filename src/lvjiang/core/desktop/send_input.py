@@ -6,12 +6,15 @@
 
 import ctypes
 import random
+import threading
 import time
 from ctypes import wintypes
+from typing import Callable
 
 from loguru import logger
 
 from ...core.config import InputSimConfig
+from ...core.input_trace import InputTrace
 from ..input_base import InputBackend
 from .win32_keyboard import (
     KEYEVENTF_EXTENDEDKEY,
@@ -25,14 +28,26 @@ from .win32_keyboard import (
 from .win32_util import (
     _MOUSEEVENTF_LEFTDOWN,
     _MOUSEEVENTF_LEFTUP,
+    _MOUSEEVENTF_MIDDLEDOWN,
+    _MOUSEEVENTF_MIDDLEUP,
     _MOUSEEVENTF_MOVE,
+    _MOUSEEVENTF_MOVE_NOCOALESCE,
+    _MOUSEEVENTF_RIGHTDOWN,
+    _MOUSEEVENTF_RIGHTUP,
+    _MOUSEEVENTF_XDOWN,
+    _MOUSEEVENTF_XUP,
     _WHEEL_DELTA,
+    _XBUTTON1,
+    _XBUTTON2,
     _user32,
     activate_window,
     send_mouse_event,
     send_mouse_wheel_event,
     smooth_move_to,
 )
+
+if _user32 is not None:
+    _user32.GetForegroundWindow.restype = wintypes.HWND
 
 
 class SendInputInput(InputBackend):
@@ -119,6 +134,9 @@ class SendInputInput(InputBackend):
         return values
 
     def _send_relative_steps(self, dx: int, dy: int, duration: float):
+        # 供 move_relative（普通 DSL move by）使用，步长与 smooth_move_to
+        # 对齐（10ms/步）。注意 replay_input_trace 回放高精度轨迹时不走
+        # 这个方法——它有自己独立的、按绝对截止时间调度的发送循环。
         steps = max(int(duration / 0.01), 1)
         dx_steps = self._distribute(dx, steps)
         dy_steps = self._distribute(dy, steps)
@@ -127,6 +145,152 @@ class SendInputInput(InputBackend):
             send_mouse_event(_MOUSEEVENTF_MOVE, step_dx, step_dy)
             if delay:
                 time.sleep(delay)
+
+    def replay_input_trace(
+        self,
+        trace: InputTrace,
+        *,
+        canvas_width: int,
+        canvas_height: int,
+        stop_check: Callable[[], bool],
+        pause_event: threading.Event | None = None,
+    ) -> None:
+        """以绝对截止时间回放完整输入轨迹，避免逐条 DSL 与相对 sleep 漂移。"""
+        self._activate_target()
+        start_ns = time.perf_counter_ns()
+        paused_ns = 0
+        source_x = source_y = 0
+        sent_x = sent_y = 0
+        held_buttons: set[str] = set()
+        held_keys: set[str] = set()
+        # 值是 (dwFlags, mouseData) 二元组——XBUTTONDOWN/XBUTTONUP（侧键）
+        # 靠 mouseData 区分 XBUTTON1/XBUTTON2，其余键该字段固定为 0，
+        # 统一走同一套 send_mouse_event(flag, mouse_data=...) 调用。
+        button_flags = {
+            ("left", True): (_MOUSEEVENTF_LEFTDOWN, 0),
+            ("left", False): (_MOUSEEVENTF_LEFTUP, 0),
+            ("right", True): (_MOUSEEVENTF_RIGHTDOWN, 0),
+            ("right", False): (_MOUSEEVENTF_RIGHTUP, 0),
+            ("middle", True): (_MOUSEEVENTF_MIDDLEDOWN, 0),
+            ("middle", False): (_MOUSEEVENTF_MIDDLEUP, 0),
+            ("x1", True): (_MOUSEEVENTF_XDOWN, _XBUTTON1),
+            ("x1", False): (_MOUSEEVENTF_XUP, _XBUTTON1),
+            ("x2", True): (_MOUSEEVENTF_XDOWN, _XBUTTON2),
+            ("x2", False): (_MOUSEEVENTF_XUP, _XBUTTON2),
+        }
+
+        try:
+            for event in trace.events:
+                if stop_check():
+                    break
+                # 内层循环：deadline 等待期间也可能被暂停打断（长间隔事件
+                # 之间常有数秒空档，不能只在等待开始前查一次 pause_event），
+                # 打断后回到暂停阻塞分支、累计暂停时长、用最新 paused_ns
+                # 重新算 deadline 再继续等，直到真正到达或收到停止信号。
+                while True:
+                    if pause_event is not None and not pause_event.is_set():
+                        pause_started = time.perf_counter_ns()
+                        while not pause_event.wait(0.01):
+                            if stop_check():
+                                return
+                        paused_ns += time.perf_counter_ns() - pause_started
+                        continue
+
+                    deadline = start_ns + paused_ns + event.at_us * 1000
+                    interrupted = self._wait_trace_deadline(
+                        deadline, stop_check, pause_event)
+                    if stop_check() or not interrupted:
+                        break
+                if stop_check():
+                    break
+
+                if event.kind == "move":
+                    dx, dy = (int(event.values[0]), int(event.values[1]))
+                    source_x += dx
+                    source_y += dy
+                    target_x = round(
+                        source_x * canvas_width / trace.source_width)
+                    target_y = round(
+                        source_y * canvas_height / trace.source_height)
+                    out_dx, out_dy = target_x - sent_x, target_y - sent_y
+                    sent_x, sent_y = target_x, target_y
+                    if out_dx or out_dy:
+                        send_mouse_event(
+                            _MOUSEEVENTF_MOVE | _MOUSEEVENTF_MOVE_NOCOALESCE,
+                            out_dx,
+                            out_dy,
+                        )
+                elif event.kind == "button":
+                    button = str(event.values[0])
+                    is_down = bool(event.values[1])
+                    flag_pair = button_flags.get((button, is_down))
+                    if flag_pair is None:
+                        logger.warning(f"忽略未知轨迹鼠标键: {button}")
+                        continue
+                    flag, mouse_data = flag_pair
+                    send_mouse_event(flag, mouse_data=mouse_data)
+                    if is_down:
+                        held_buttons.add(button)
+                    else:
+                        held_buttons.discard(button)
+                elif event.kind == "wheel":
+                    send_mouse_wheel_event(int(event.values[0]))
+                elif event.kind == "key":
+                    key = normalize_key(str(event.values[0]))
+                    is_down = bool(event.values[1])
+                    vk, scan = key_to_vk_scan(key)
+                    flags = KEYEVENTF_SCANCODE
+                    if is_extended_key(key):
+                        flags |= KEYEVENTF_EXTENDEDKEY
+                    if not is_down:
+                        flags |= KEYEVENTF_KEYUP
+                    send_keyboard_input(vk, scan, flags)
+                    if is_down:
+                        held_keys.add(key)
+                    else:
+                        held_keys.discard(key)
+        finally:
+            # 停止、异常或暂停退出都不能把游戏按键留在按下状态。
+            for button in held_buttons:
+                flag_pair = button_flags.get((button, False))
+                if flag_pair is not None:
+                    flag, mouse_data = flag_pair
+                    send_mouse_event(flag, mouse_data=mouse_data)
+            for key in held_keys:
+                vk, scan = key_to_vk_scan(key)
+                flags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
+                if is_extended_key(key):
+                    flags |= KEYEVENTF_EXTENDEDKEY
+                send_keyboard_input(vk, scan, flags)
+
+    @staticmethod
+    def _wait_trace_deadline(
+        deadline_ns: int,
+        stop_check: Callable[[], bool],
+        pause_event: threading.Event | None = None,
+    ) -> bool:
+        """粗粒度休眠后短暂自旋，以绝对时钟达到亚 10ms 调度。
+
+        单次 sleep 上限 50ms：长间隔事件之间的等待可达数秒，不能一次
+        睡掉整个区间，否则 stop_check / pause_event 在此期间形同虚设。
+        pause_event 变为 clear 时提前返回 True（"被暂停打断"），调用方
+        据此回到暂停阻塞分支、用最新累计暂停时长重新算 deadline 再继续
+        等——不这样处理的话，暂停请求会被这里的长等待吞掉，held 的
+        按键/鼠标键会在暂停后继续按原计划触发一段时间。到达 deadline
+        正常返回 False。
+        """
+        while not stop_check():
+            if pause_event is not None and not pause_event.is_set():
+                return True
+            remaining_ns = deadline_ns - time.perf_counter_ns()
+            if remaining_ns <= 0:
+                return False
+            if remaining_ns > 2_000_000:
+                sleep_s = min((remaining_ns - 1_000_000) / 1_000_000_000, 0.05)
+                time.sleep(sleep_s)
+            elif remaining_ns > 200_000:
+                time.sleep(0)
+        return False
 
     def scroll_screen(
         self,
@@ -164,6 +328,8 @@ class SendInputInput(InputBackend):
         activate_window 会自动还原原前台窗口焦点。
         """
         if self.target_hwnd and self.activate_before_send:
+            if _user32.GetForegroundWindow() == self.target_hwnd:
+                return
             activate_window(self.target_hwnd)
 
     def _move_to(self, x: int, y: int):

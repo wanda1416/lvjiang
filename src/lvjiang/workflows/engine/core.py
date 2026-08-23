@@ -3,6 +3,7 @@
 import posixpath
 import threading
 import traceback
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -15,6 +16,7 @@ from ...core.capture_base import CaptureBackend
 from ...core.config import DelayParam, InputSimConfig
 from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend
+from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
 from ..align import GridAlignment
@@ -45,6 +47,7 @@ from ..grammar.ast_nodes import (
     Press,
     ProcDef,
     Recognize,
+    ReplayInputTrace,
     Return,
     Scan,
     Screenshot,
@@ -123,6 +126,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._procs: dict[str, ProcDef] = {}
         # 过程来源索引：{name: 所在 .wf 文件}，静态检查报错定位用
         self._proc_sources: dict[str, str] = {}
+        # 高精度轨迹解码缓存：{resolved path: InputTrace}，校验期填充，
+        # 执行期 _exec_replay_input_trace 直接复用，避免同一份 .lvtrace
+        # 在一次运行内解码两次；每次 _load_and_validate 重新执行前清空。
+        self._input_trace_cache: dict[Path, InputTrace] = {}
         # session / context（公开属性，UI 层注入）
         self.session: dict = {}          # 持久状态（UI 层从 SessionManager 加载）
         self.context: dict = {}          # 运行时上下文（每次执行自动初始化空 dict）
@@ -282,12 +289,140 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
         self._procs = loaded_procs
         self._proc_sources = loaded_sources
+        # 本次重新加载：上一次运行缓存的轨迹解码结果作废，校验期重新填充
+        self._input_trace_cache = {}
 
         # 静态校验：wait 引用的命名等待参数必须已定义，未定义直接报错不执行
         self._validate_named_waits(program)
         # 静态校验：脚本引用的场景 / 区域 / 方向 / 面板必须已在当前布局绑定坐标
         self._validate_refs_bound(program)
+        # 高精度轨迹在执行任何动作前完成路径与内容校验（含 import 引入的过程）。
+        self._validate_input_traces(program)
         return program
+
+    def _resolve_input_trace_path(
+        self, reference: str, base_dir: Path | None = None,
+    ) -> Path:
+        """相对指定目录解析轨迹，禁止绝对路径、非 lvtrace 文件，
+        以及借 ``..`` 穿出工作流目录树引用任意"lvtrace"同名目录。
+
+        base_dir 省略时取当前 self._base_dir（顶层语句执行期即为此值，
+        _run_proc 执行过程体期间会临时切到该过程定义文件所在目录）；
+        校验阶段则显式传入每个过程各自的定义文件目录，见
+        _validate_input_traces_scoped。
+        """
+        if base_dir is None:
+            base_dir = self._base_dir
+        path = Path(reference)
+        if path.is_absolute() or path.suffix.lower() != ".lvtrace":
+            raise WorkflowUserError(
+                f"input_trace 必须是相对 .lvtrace 路径: {reference}")
+        if base_dir is None:
+            raise WorkflowUserError("input_trace 缺少工作流基准目录")
+        resolved = (base_dir / path).resolve()
+        if resolved.parent.name != "lvtrace":
+            raise WorkflowUserError(
+                f"input_trace 必须位于 lvtrace 文件夹: {reference}")
+        # 已知 workflows 根（system/local）时，轨迹必须落在该根的 lvtrace/
+        # 目录下——与 save_input_trace_bundle 的落盘约定一致，不允许借多层
+        # ".." 指向根目录树之外某个恰好也叫 lvtrace 的目录。
+        # 根外文件（测试用任意目录、编辑器临时文件）退化为不得逃出 base_dir。
+        root = self._workflows_root_for(base_dir)
+        if root is not None:
+            if resolved.parent != root / "lvtrace":
+                raise WorkflowUserError(
+                    f"input_trace 越权引用工作流目录之外的文件: {reference}")
+        else:
+            base = base_dir.resolve()
+            try:
+                resolved.relative_to(base)
+            except ValueError:
+                raise WorkflowUserError(
+                    f"input_trace 越权引用工作流目录之外的文件: {reference}"
+                ) from None
+        return resolved
+
+    @staticmethod
+    def _workflows_root_for(base_dir: Path) -> Path | None:
+        """base_dir 所属的 workflows 根目录（system/local 二选一）
+
+        未命中已知根（测试用任意目录、编辑器临时文件）时返回 None。
+        """
+        resolver = get_resolver()
+        resolved_base = base_dir.resolve()
+        for root in (resolver.system_dir, resolver.local_dir):
+            candidate = (root / "workflows").resolve()
+            try:
+                resolved_base.relative_to(candidate)
+            except (ValueError, OSError):
+                continue
+            return candidate
+        return None
+
+    def _proc_bodies_with_base_dir(
+        self, procs: dict[str, ProcDef],
+    ) -> list[tuple[list, Path | None]]:
+        """把 {name: ProcDef} 展开成 (过程体, 定义文件所在目录) 列表
+
+        定义文件目录来自 _proc_sources[name]（parse_file 记录的绝对
+        路径）——过程可能来自 import 引入的另一个 .wf，relative 路径
+        必须相对它自己的文件解析，不能沿用调用方/根文件的目录。
+        未命中 _proc_sources（测试直接构造 ProcDef 不经注册）时退回
+        self._base_dir。
+        """
+        result = []
+        for name, proc in procs.items():
+            source = self._proc_sources.get(name)
+            base = Path(source).parent if source is not None else self._base_dir
+            result.append((proc.body, base))
+        return result
+
+    def _validate_input_traces(self, program) -> None:
+        """静态校验：input_trace 路径与内容必须在执行任何动作前全部合法
+
+        遍历顶层语句与所有已加载过程体（含 import 引入的），与
+        _validate_named_waits / _validate_refs_bound 同样的覆盖范围——
+        否则导入文件里的 replay 只能等真正执行到那一行才暴露问题。
+        """
+        bodies = [(program.body, self._base_dir)]
+        bodies += self._proc_bodies_with_base_dir(self._procs)
+        self._validate_input_traces_scoped(bodies)
+
+    def _validate_input_traces_scoped(
+        self, bodies: list[tuple[list, Path | None]],
+    ) -> None:
+        """限定范围的 input_trace 校验：每个语句体各自带上其定义文件目录
+
+        供 load_subcalls 使用，避免重复校验已加载过程；也是
+        _validate_input_traces 的公共实现。校验期顺带把解码结果缓存进
+        _input_trace_cache，执行期 _exec_replay_input_trace 直接复用，
+        避免同一份 .lvtrace 在一次运行内解码两次。
+        """
+        def walk(value):
+            if isinstance(value, ReplayInputTrace):
+                yield value
+                return
+            if isinstance(value, dict):
+                for item in value.values():
+                    yield from walk(item)
+                return
+            if isinstance(value, (list, tuple)):
+                for item in value:
+                    yield from walk(item)
+                return
+            if is_dataclass(value):
+                for field in fields(value):
+                    yield from walk(getattr(value, field.name))
+
+        for body, base_dir in bodies:
+            for node in walk(body):
+                path = self._resolve_input_trace_path(node.path, base_dir=base_dir)
+                try:
+                    trace = load_input_trace(path)
+                except InputTraceError as exc:
+                    raise WorkflowUserError(str(exc)) from exc
+                self._input_trace_cache[path] = trace
+                self._input_trace_cache[path] = trace
 
     # ─── Python 桥：subcall 加载与调用 ────────────────────────
 
@@ -350,6 +485,9 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             self._validate_named_waits_scoped(program.body, loaded_bodies)
             self._validate_refs_bound_scoped(
                 program.body, loaded_proc_names, program.source)
+            self._validate_input_traces_scoped(
+                [(program.body, resolved.parent)]
+                + self._proc_bodies_with_base_dir(loaded_procs))
         except Exception:
             self._procs = previous_procs
             self._proc_sources = previous_sources
@@ -668,6 +806,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_place(node)
             case Move():
                 self._exec_move(node)
+            case ReplayInputTrace():
+                self._exec_replay_input_trace(node)
             case Scroll():
                 self._exec_scroll(node)
             case Drag():
@@ -738,6 +878,31 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_try(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
+
+    def _exec_replay_input_trace(self, node: ReplayInputTrace):
+        """绕过逐条 DSL 调度，一次交给桌面输入后端实时回放。"""
+        replay = getattr(self._input, "replay_input_trace", None)
+        if replay is None:
+            raise WorkflowUserError(
+                "replay input_trace 仅支持桌面 SendInput 前台模式")
+        path = self._resolve_input_trace_path(node.path)
+        trace = self._input_trace_cache.get(path)
+        if trace is None:
+            # 缓存未命中：正常运行下校验期已填充过，这里只覆盖 call_subcall
+            # 等绕过完整校验流程的边界场景，兜底重新解码一次。
+            try:
+                trace = load_input_trace(path)
+            except InputTraceError as exc:
+                raise WorkflowUserError(str(exc)) from exc
+        width, height = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
+        replay(
+            trace,
+            canvas_width=max(1, round(canvas.w_ratio * width)),
+            canvas_height=max(1, round(canvas.h_ratio * height)),
+            stop_check=self._stop_check,
+            pause_event=self._pause_event,
+        )
 
     def _exec_screenshot(self):
         """截取当前画面并保存到 logs/image/"""

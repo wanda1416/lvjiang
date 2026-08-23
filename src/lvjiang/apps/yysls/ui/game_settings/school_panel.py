@@ -48,6 +48,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from ..layout_helpers import configure_navigation_list
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config.yaml"
@@ -80,6 +81,7 @@ class SchoolPanel(QWidget):
         left_layout.addWidget(QLabel(tr("流派类型")))
 
         self._school_list = QListWidget()
+        configure_navigation_list(self._school_list, minimum_width=200)
         self._school_list.currentRowChanged.connect(self._on_school_changed)
         self._school_list.itemChanged.connect(self._on_item_renamed)
         left_layout.addWidget(self._school_list)
@@ -209,7 +211,10 @@ class SchoolPanel(QWidget):
         right_layout.addWidget(value_group, stretch=2)
 
         splitter.addWidget(right_widget)
-        splitter.setSizes([120, 430])
+        splitter.setChildrenCollapsible(False)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([220, 650])
 
     def _combos(self) -> list[QComboBox]:
         return [

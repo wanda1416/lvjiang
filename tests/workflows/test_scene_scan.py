@@ -137,6 +137,24 @@ def test_daily_jianghu_matches_legacy_required_scenes():
     }
 
 
+def test_daily_jianghu_reuses_shared_page_detector():
+    """号令页判断统一由底层页面判断子过程提供。"""
+    workflows = SYSTEM_CONFIG_DIR / "workflows"
+    daily_text = (workflows / "daily_jianghu.wf").read_text(encoding="utf-8")
+    detection_text = (
+        workflows / "subcall" / "page_detection.wf"
+    ).read_text(encoding="utf-8")
+
+    assert daily_text.count("is_in_haoling_page()") == 3
+    assert 'import "subcall/page_detection.wf"' in daily_text
+    assert "scan [activity_jianghu].[label_0" not in daily_text
+    assert "def is_in_haoling_page()" in detection_text
+    assert (
+        'scan [activity_jianghu].[label_0, haoling_of_week] '
+        'as $found by contains "号令"'
+    ) in detection_text
+
+
 # ─── engine 启动期绑定校验（集成） ────────────────────────
 
 def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,

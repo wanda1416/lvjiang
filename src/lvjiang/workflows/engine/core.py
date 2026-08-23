@@ -262,15 +262,25 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._wf_rel_dir = self._workflows_rel_dir(resolved)
         program = parse_file(resolved)
 
-        # 解析 import 链（含循环检测），收集所有 def 到 self._procs
-        self._procs = {}
-        self._proc_sources = {}
-        import_stack = {str(resolved)}
-        self._resolve_imports(program, import_stack)
-        # 注册本地 def
+        # 解析 import 图：同一物理文件在本次加载中只处理一次，
+        # 同名过程若来自不同文件则报错，不让 import 顺序暗中决定行为。
+        loaded_procs: dict[str, ProcDef] = {}
+        loaded_sources: dict[str, str] = {}
+        root_key = str(resolved)
+        self._resolve_imports(
+            program,
+            import_stack=[root_key],
+            imported_files={root_key},
+            loaded_procs=loaded_procs,
+            loaded_sources=loaded_sources,
+        )
+        # 注册本地 def；主工作流与导入过程同名也属于冲突。
         for name, proc_def in program.procs.items():
-            self._procs[name] = proc_def
-            self._proc_sources[name] = program.source
+            self._register_loaded_proc(
+                name, proc_def, program.source, loaded_procs, loaded_sources)
+
+        self._procs = loaded_procs
+        self._proc_sources = loaded_sources
 
         # 静态校验：wait 引用的命名等待参数必须已定义，未定义直接报错不执行
         self._validate_named_waits(program)
@@ -305,24 +315,45 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         key = str(resolved)
 
         program = parse_file(resolved)
-        # 递归解析 import 链（临时切换 base_dir，与 _load_and_validate 同语义）
+        # 每次显式调用都创建新的加载集合：本次 import 图内去重，
+        # 但下一次 load_subcalls 仍会重新解析，保留热更新语义。
+        loaded_procs: dict[str, ProcDef] = {}
+        loaded_sources: dict[str, str] = {}
         old_base, old_rel = self._base_dir, self._wf_rel_dir
         self._base_dir = resolved.parent
         self._wf_rel_dir = self._workflows_rel_dir(resolved)
         try:
-            self._resolve_imports(program, {key})
+            self._resolve_imports(
+                program,
+                import_stack=[key],
+                imported_files={key},
+                loaded_procs=loaded_procs,
+                loaded_sources=loaded_sources,
+            )
         finally:
             self._base_dir, self._wf_rel_dir = old_base, old_rel
         for name, proc_def in program.procs.items():
-            self._procs[name] = proc_def
-            self._proc_sources[name] = program.source
+            self._register_loaded_proc(
+                name, proc_def, program.source, loaded_procs, loaded_sources)
 
-        # 校验本次文件定义的所有过程（含覆盖的），确保修改后的静态校验仍然生效
-        loaded_proc_names = set(program.procs.keys())
-        loaded_bodies = [program.procs[n].body for n in loaded_proc_names]
-        self._validate_named_waits_scoped(program.body, loaded_bodies)
-        self._validate_refs_bound_scoped(program.body, loaded_proc_names, program.source)
-        logger.debug(f"load_subcalls: {key} → 注册 {len(program.procs)} 个过程")
+        # 临时合并后校验整个加载单元；若校验失败则恢复原过程表，
+        # 避免显式热加载失败时留下半套新定义。
+        previous_procs = self._procs.copy()
+        previous_sources = self._proc_sources.copy()
+        self._procs.update(loaded_procs)
+        self._proc_sources.update(loaded_sources)
+
+        loaded_proc_names = set(loaded_procs)
+        loaded_bodies = [proc.body for proc in loaded_procs.values()]
+        try:
+            self._validate_named_waits_scoped(program.body, loaded_bodies)
+            self._validate_refs_bound_scoped(
+                program.body, loaded_proc_names, program.source)
+        except Exception:
+            self._procs = previous_procs
+            self._proc_sources = previous_sources
+            raise
+        logger.debug(f"load_subcalls: {key} → 注册 {len(loaded_procs)} 个过程")
 
     def call_subcall(self, name: str, args: list | None = None):
         """调用已加载的 DSL 子过程，返回其 return 值（变量/output 隔离）
@@ -381,12 +412,39 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             return rel.parent.as_posix() if rel.parent != Path(".") else ""
         return None
 
-    def _resolve_imports(self, program, import_stack: set):
-        """递归解析 import 链，收集所有 def 到 self._procs
+    @staticmethod
+    def _register_loaded_proc(
+        name: str,
+        proc_def: ProcDef,
+        source: str,
+        loaded_procs: dict[str, ProcDef],
+        loaded_sources: dict[str, str],
+    ) -> None:
+        """将过程注册到本次加载单元，拒绝跨文件的隐式覆盖。"""
+        previous_source = loaded_sources.get(name)
+        if previous_source is not None:
+            raise WorkflowUserError(
+                f"过程 {name} 定义冲突:\n"
+                f"- {previous_source}\n"
+                f"- {source}"
+            )
+        loaded_procs[name] = proc_def
+        loaded_sources[name] = source
+
+    def _resolve_imports(
+        self,
+        program,
+        import_stack: list[str],
+        imported_files: set[str],
+        loaded_procs: dict[str, ProcDef],
+        loaded_sources: dict[str, str],
+    ) -> None:
+        """递归解析 import 图，收集本次加载单元的所有 def。
 
         相对路径先按「当前 wf 相对 workflows 根的目录 + import 路径」
         经 resolver 跨层解析（local 影子优先），未命中回退 _base_dir 拼接。
-        import_stack: 当前 import 链中的文件路径集合，用于循环检测。
+        import_stack 保留当前递归链的真实顺序，用于循环检测；
+        imported_files 记录本次加载已解析的规范绝对路径，用于菱形依赖去重。
         """
         for imp in program.imports:
             imp_path = Path(imp.path)
@@ -406,26 +464,47 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
             # 循环检测
             if imp_resolved in import_stack:
-                chain = " -> ".join(sorted(import_stack)) + f" -> {imp_resolved}"
+                cycle_start = import_stack.index(imp_resolved)
+                chain = " -> ".join(
+                    [*import_stack[cycle_start:], imp_resolved])
                 raise WorkflowUserError(f"循环 import 检测: {chain}")
+
+            # 同一规范绝对路径在一次加载中只处理一次。
+            if imp_resolved in imported_files:
+                logger.debug(f"import: {imp.path} → 已加载，跳过")
+                continue
+            imported_files.add(imp_resolved)
 
             # 解析导入文件
             imp_program = parse_file(imp_path)
-            new_stack = import_stack | {imp_resolved}
+            new_stack = [*import_stack, imp_resolved]
 
             # 递归解析子文件的 import（临时切换 base_dir 与相对目录）
             old_base = self._base_dir
             old_rel = self._wf_rel_dir
             self._base_dir = imp_path.parent
             self._wf_rel_dir = self._workflows_rel_dir(imp_path)
-            self._resolve_imports(imp_program, new_stack)
-            self._base_dir = old_base
-            self._wf_rel_dir = old_rel
+            try:
+                self._resolve_imports(
+                    imp_program,
+                    new_stack,
+                    imported_files,
+                    loaded_procs,
+                    loaded_sources,
+                )
+            finally:
+                self._base_dir = old_base
+                self._wf_rel_dir = old_rel
 
             # 收集子文件的 def（平铺到当前命名空间）
             for name, proc_def in imp_program.procs.items():
-                self._procs[name] = proc_def
-                self._proc_sources[name] = imp_program.source
+                self._register_loaded_proc(
+                    name,
+                    proc_def,
+                    imp_program.source,
+                    loaded_procs,
+                    loaded_sources,
+                )
             logger.debug(f"import: {imp.path} → 注册 {len(imp_program.procs)} 个过程")
 
     def _validate_refs_bound(self, program):

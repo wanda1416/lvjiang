@@ -59,6 +59,13 @@ class Move:
 
 
 @dataclass(frozen=True)
+class ReplayInputTrace:
+    """replay input_trace "path"：专用高精度输入轨迹回放。"""
+    path: str
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Scroll:
     """scroll 指令：鼠标滚轮滚动
 

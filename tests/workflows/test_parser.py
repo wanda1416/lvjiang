@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from lark.exceptions import LarkError
+from lark.exceptions import LarkError, VisitError
 
 from lvjiang.workflows.grammar import (
     And,
@@ -39,6 +39,7 @@ from lvjiang.workflows.grammar import (
     ProcDef,
     Program,
     Recognize,
+    ReplayInputTrace,
     Scan,
     Scroll,
     TupleLiteral,
@@ -609,6 +610,33 @@ def test_move_by_explicit_start_and_around_wait():
 def test_legacy_move_syntax_is_rejected():
     with pytest.raises(LarkError):
         parse_text("move (0.5, 0.3)")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "click (-0.1, 0.5)",
+        "place (0.5, 1.1)",
+        "move to (1.01, 0.5)",
+        "move (0.5, -0.1) by (0.2, 0)",
+        "drag (0.1, 0.1) (1.2, 0.2) 0.1",
+    ],
+)
+def test_absolute_coordinates_must_stay_in_unit_range(source):
+    with pytest.raises(VisitError, match="超出"):
+        parse_text(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "move by (-1.01, 0)",
+        "move by (0, 1.01)",
+    ],
+)
+def test_relative_move_components_must_stay_in_signed_unit_range(source):
+    with pytest.raises(VisitError, match=r"\[-1,1\]"):
+        parse_text(source)
 
 
 # ─── scroll 解析测试 ─────────────────────────────────────────────
@@ -2143,6 +2171,13 @@ def test_crlf_line_continuation():
 
 
 # ─── 主入口 ─────────────────────────────────────────────────
+
+def test_replay_input_trace():
+    program = parse_text('replay input_trace "lvtrace/abc.lvtrace"')
+    node = program.body[0]
+    assert isinstance(node, ReplayInputTrace)
+    assert node.path == "lvtrace/abc.lvtrace"
+
 
 if __name__ == "__main__":
     test_workflow_parser()

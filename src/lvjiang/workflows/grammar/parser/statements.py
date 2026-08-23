@@ -22,6 +22,7 @@ from ..ast_nodes import (
     ProcDef,
     Program,
     Recognize,
+    ReplayInputTrace,
     Scan,
     Scroll,
     TupleLiteral,
@@ -126,6 +127,13 @@ class _StmtMixin:
         else:
             return str(item)
 
+    def replay_input_trace_stmt(self, items):
+        """replay input_trace "path"。"""
+        return ReplayInputTrace(
+            path=self._unquote(str(items[0])),
+            line_no=self._line(items),
+        )
+
     def click_stmt(self, items):
         """click 目标 [before|after|around wait 参数 ...] — 支持 before/after 任意组合
 
@@ -164,6 +172,7 @@ class _StmtMixin:
     def click_coord_target(self, items):
         """click (rx, ry) — 画布归一化坐标点"""
         cp = items[0]  # CoordPoint
+        self._validate_coord_point(cp, relative=False, command="click")
         return Click(target=cp, line_no=0)
 
     def click_var_target(self, items):
@@ -175,9 +184,25 @@ class _StmtMixin:
         """(rx, ry) → CoordPoint，number 规则已转为 float"""
         return CoordPoint(rx=float(items[0]), ry=float(items[1]))
 
+    @staticmethod
+    def _validate_coord_point(
+        point: CoordPoint,
+        *,
+        relative: bool,
+        command: str,
+    ):
+        low = -1.0 if relative else 0.0
+        if not (low <= point.rx <= 1.0 and low <= point.ry <= 1.0):
+            label = "相对位移" if relative else "绝对坐标"
+            raise WorkflowUserError(
+                f"{command}: {label} ({point.rx}, {point.ry}) 超出 "
+                f"[{int(low)},1] 归一化范围")
+
     def place_stmt(self, items):
         """place (rx, ry) — 直接设置鼠标位置。"""
         wait_pairs, core_items = self._extract_wait_pairs(items)
+        self._validate_coord_point(
+            core_items[0], relative=False, command="place")
         node = Place(target=core_items[0], line_no=self._line(items))
         return self._expand_wait_clauses(node, wait_pairs)
 
@@ -197,6 +222,12 @@ class _StmtMixin:
              if isinstance(item, CoordPoint)),
             None,
         )
+        if start is not None:
+            self._validate_coord_point(
+                start, relative=False, command="move 起点")
+        if isinstance(click_node.target, CoordPoint):
+            self._validate_coord_point(
+                click_node.target, relative=False, command="move to")
         duration = next(
             (item for item in items
              if isinstance(item, (Literal, VarRef))),
@@ -215,6 +246,10 @@ class _StmtMixin:
         points = [item for item in items if isinstance(item, CoordPoint)]
         start = points[0] if len(points) == 2 else None
         delta = points[-1]
+        if start is not None:
+            self._validate_coord_point(
+                start, relative=False, command="move 起点")
+        self._validate_coord_point(delta, relative=True, command="move by")
         duration = next(
             (item for item in items
              if isinstance(item, (Literal, VarRef))),
@@ -363,6 +398,10 @@ class _StmtMixin:
     def drag_coord_target(self, items):
         """drag (rx1, ry1) (rx2, ry2) — 两个画布归一化坐标点"""
         from_point, to_point = items  # 两个 CoordPoint
+        self._validate_coord_point(
+            from_point, relative=False, command="drag 起点")
+        self._validate_coord_point(
+            to_point, relative=False, command="drag 终点")
         return Drag(scene=None, arrow=None, from_point=from_point, to_point=to_point, line_no=0)
 
     def drag_duration(self, items):

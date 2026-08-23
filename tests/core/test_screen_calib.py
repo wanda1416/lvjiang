@@ -91,6 +91,7 @@ class _OffsetPhone:
         self.calib = None  # 设备端 ScreenMap 文件：None=恒等
         self.mark = None
         self.hidden = 0
+        self.float_hidden = None
 
     def _map(self, x, y):
         if self.calib is None:
@@ -124,6 +125,9 @@ class _OffsetPhone:
             self.hidden += 1
             self.mark = None
             return {"ok": True}, b""
+        if op == "float_icon":
+            self.float_hidden = req.get("hidden", True)
+            return {"ok": True, "running": True, "hidden": self.float_hidden}, b""
         if op == "screenshot":
             img = np.zeros((self.h, self.w, 4), dtype=np.uint8)
             if self.mark is not None:
@@ -150,6 +154,17 @@ def test_probe_identity_device_keeps_identity(fake):  # noqa: F811
     assert result.identity and result.applied and phone.calib is None
     assert result.verify_err_px is not None and result.verify_err_px < 1
     assert phone.hidden == 1  # 结束撤覆盖层
+    assert phone.float_hidden is False  # 结束恢复悬浮球（探针期间先藏后显）
+    client.close()
+
+
+def test_set_float_icon(fake):  # noqa: F811
+    phone = _OffsetPhone()
+    _, dev = fake(phone.handle)
+    client = AgentClient(dev)
+    assert client.connect()
+    assert client.set_float_icon(True) is True and phone.float_hidden is True
+    assert client.set_float_icon(False) is True and phone.float_hidden is False
     client.close()
 
 

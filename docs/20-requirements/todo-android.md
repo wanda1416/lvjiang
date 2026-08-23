@@ -522,4 +522,35 @@ PC 经 `adb forward tcp:<port> localabstract:lvjiang-agent` 连入，截图走 `
 - [x] Kotlin `AgentServer` + `App`/`A11yService` 启动挂钩（`kotlinc` + android.jar + 桩编译零错误）
 - [x] PC 侧 `AgentClient / AgentCapture / AgentInput` + 工厂 + 配置 `adb_agent_mode` + 设置页/主窗口开关
 - [x] PC 侧单测 14 例（本地假服务端）
-- [ ] Windows 侧 Gradle 构建 APK → 实机：装包、开无障碍、PC 连接、跑一条 .wf（推摇杆 hold 验证停住）
+- [x] 实机：macOS 出包（见下「macOS / Linux 构建」）→ Android 14 测试机装包、开无障碍、PC 连接、
+  无障碍截图 0.30s/帧、swipe 拉下通知栏 + BACK 收起截图前后对比确认落地（2026-08-23）
+- [ ] 真游戏上跑一条 .wf（推摇杆 hold 验证停住）——作者手机上做
+
+### 屏幕标定（2026-08-23）
+
+换机后布局整体偏移的对齐方案，设计与实测见开发日志 `2026-08-23-screen-calibration.md`：
+
+- [x] `core/screen_calib.py`：参照图（`layouts/<布局>/_reference.png` + sidecar）、地标模板匹配、逐轴最小二乘解画布、
+  `layouts.yaml` 本地覆盖读写（PC / 设备共用，单测 8 例）
+- [x] `core/ondevice/screen_calib_api.py` + `CalibActivity`：悬浮面板「屏幕标定」→ 藏起自己截底下的游戏 → 参照图上点地标、
+  本机图自动定位/手点纠正 → 绿框预览 → 保存/恢复默认；「本机画面设为参照图」给作者生成参照图
+- [x] 设备端 ScreenMap（截图像素 → 触摸像素仿射，`A11yBridge`/`ShellBridge` 注入口施加）+ `CalibOverlay` 准星 +
+  代理 `calib_*` op；PC `python -m lvjiang.core.android.calib probe --apply` 自动标定（单测 7 例）
+- [x] 真机：合成偏移参照图 → 两地标自动定位 → 画布解算与期望一致（残差 0px）→ 保存/恢复覆盖文件验证
+- [ ] 作者手机生成正式参照图提交 `config/system/layouts/默认布局/_reference.png`
+- [ ] 第二台不同挖孔/宽高比的真机上跑一遍「屏幕标定 → 跑 .wf」
+
+### macOS / Linux 构建
+
+```bash
+UV_PYTHON_INSTALL_DIR="$PWD/.tooling/python" uv python install 3.10   # buildPython（按平台通配解析）
+echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > android/local.properties
+cd android && JAVA_HOME=$(brew --prefix openjdk@17) ./gradlew :app:assembleDebug   # 首次约 5 分钟，增量 5–20s
+adb push app/build/outputs/apk/debug/app-debug.apk /data/local/tmp/lvjiang.apk && adb shell pm install -r -g /data/local/tmp/lvjiang.apk
+adb shell settings put secure enabled_accessibility_services com.lvjiang.app/com.lvjiang.app.A11yService
+adb shell settings put secure accessibility_enabled 1
+adb shell appops set com.lvjiang.app SYSTEM_ALERT_WINDOW allow
+```
+
+`build.gradle.kts` 也接受 `-PbuildPython=<python>` / 环境变量 `LVJIANG_BUILD_PYTHON`。Gradle wrapper 8.10.2 已入库
+（`android/gradlew`），Windows 侧同样可用 `gradlew.bat`。

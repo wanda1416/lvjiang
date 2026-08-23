@@ -19,6 +19,7 @@
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
+| 2026-08-23 | [2026-08-23-screen-calibration.md](2026-08/2026-08-23-screen-calibration.md) | 屏幕标定：app 内用参照图 + 几组地标对齐本机布局画布；设备端 ScreenMap；macOS 出包；代理通道实机验证 |
 | 2026-08-22 | [2026-08-22-device-agent-channel.md](2026-08/2026-08-22-device-agent-channel.md) | 设备端代理通道：PC 经律匠 app 用无障碍截图 + 手势，替代 adb shell input |
 | 2026-08-22 | [2026-08-22-vision-primitives-hold-gesture.md](2026-08/2026-08-22-vision-primitives-hold-gesture.md) | 图色原语 + find by image 模板定位 + 设备端推住手势/ESC·HOME + 脚本工作台（选指令/取点取色/单步调试） |
 | 2026-08-03 | [2026-08-03-screenshot-ocr-canvas-v011.md](2026-08/2026-08-03-screenshot-ocr-canvas-v011.md) | screenshot 指令 + OCR 画布可视化 + v0.1.1 发布 |

@@ -54,7 +54,7 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 
 | op | 请求字段 | 响应 |
 |---|---|---|
-| `ping` / `status` | — | `protocol`、`app`（versionName）、`sdk`、`a11y`、`shizuku`（在跑）、`shizuku_granted` |
+| `ping` / `status` | — | `protocol`、`app`（versionName）、`sdk`、`a11y`、`shizuku`（在跑）、`shizuku_granted`、`calib_identity`（屏幕映射是否恒等）、`screen{w,h,rotation}` |
 | `screenshot` | `via`、`timeout_ms`(5000) | a11y：`fmt:"rgba"`, `w`, `h` + RGBA 裸字节；shell：`fmt:"png"` + PNG。节流失败 `retryable:true` |
 | `tap` | `x`,`y`,`duration_ms`(50) | — |
 | `long_press` | `x`,`y`,`duration_ms`(800) | — |
@@ -62,8 +62,26 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 | `hold_move` | `x1`,`y1`,`x2`,`y2`,`move_ms`,`hold_ms` | a11y 两段 stroke 真正停住；shell 只能把 hold 合并进 swipe 时长 |
 | `key` | `name:"BACK"/"HOME"` 或 `keycode:int` | BACK/HOME 无障碍用 `performGlobalAction`；其它 keycode 只有 Shizuku 能发（`auto` 下自动转 shell，没 Shizuku 报错不静默降级） |
 | `shell` | `cmd:[...]` | Shizuku 执行，stdout 作二进制负载 |
+| `calib_get` | — | `key`（机型_WxH）、`screen{w,h,rotation}`、`calib{sx,ox,sy,oy}`、`identity`、`stored`、`overlay{w,h}\|null` |
+| `calib_set` | `sx`(1),`ox`(0),`sy`(1),`oy`(0) | 保存当前朝向分辨率的屏幕映射；全恒等等价于删文件。返回同 `calib_get` |
+| `calib_clear` | — | 删掉当前朝向分辨率的映射文件 |
+| `calib_mark` | `x`,`y`,`tap`(false),`via` | 在 (x,y) **经映射后**的像素画准星（需悬浮窗权限，没有则 `ok=false`）；`tap=true` 同点再点一下。返回 `px{x,y}` + `calib_get` 字段 |
+| `calib_hide` | — | 撤掉准星覆盖层 |
 
 坐标都是设备截图坐标系的像素（与 `screencap` / 无障碍截图一致），PC 端不做旋转变换。
+
+### 屏幕映射（ScreenMap）
+
+设备端在**手势注入口**（`A11yBridge` / `ShellBridge` 的 tap/swipe/longPress/holdMove）统一施加一层
+逐轴仿射 `input% = shot% * s + o`，按机型 + 当前朝向分辨率存 `filesDir/lvjiang/calib/<型号_WxH>.json`，
+无文件即恒等。绝大多数设备截图网格 == 触摸网格，恒等就对；挖孔处理、截图缩放、黑边不同的机器用它补。
+PC 侧 `python -m lvjiang.core.android.calib -s <serial> probe [--apply]` 自动量：清映射 → 对角两点
+`calib_mark` → 截图里按色相找准星（Android 12+ 把悬浮窗按 ~0.8 不透明度合成，准星颜色会变暗，
+不能按精确 RGB 找）→ 拟合 → 写回 → 第三点验证。PC 端与设备端 Python 通道都经过同一注入口，
+标定一次两边生效。
+
+它只管"截图像素 → 触摸像素"。**换机后游戏内容区位置不同**（挖孔安全区 / 宽高比留黑）是另一层问题，
+由布局画布解决：app 内「屏幕标定」页，见 `core/screen_calib.py` 与开发日志 2026-08-23。
 
 ## PC 端使用
 
@@ -85,7 +103,8 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 
 ## 两端改动约定
 
-- 改协议（新 op / 改字段）必须同时改 `AgentServer.kt` 与 `agent.py`，并 bump 两边的 `PROTOCOL_VERSION`；
+- 改协议（新 op / 改字段）必须同时改 `AgentServer.kt` 与 `agent.py`，并 bump 两边的 `PROTOCOL_VERSION`
+  （v1 基础 op；v2 加 `calib_*` 与 status 的 `calib_identity` / `screen`）；
   PC 端握手时版本不一致直接拒绝（提示升级手机 app），避免静默错位。
 - PC 侧单测 `tests/core/test_device_agent.py` 用本地假服务端覆盖线协议与后端行为；
   Kotlin 侧可用 `kotlinc -cp android.jar` 做编译检查（见开发日志 2026-08-22）。

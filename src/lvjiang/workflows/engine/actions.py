@@ -201,7 +201,7 @@ class _ActionsMixin:
             raise WorkflowUserError(f"move: 未知目标类型 {type(node.target).__name__}")
 
     def _exec_scroll(self, node: Scroll):
-        """scroll up|down [目标] [数量] — 鼠标滚轮滚动
+        """scroll [目标] up|down [数量] — 鼠标滚轮滚动
 
         如果指定了目标，先移动光标到目标位置再滚动（与 move 配套）。
         如果未指定目标，在当前光标位置滚动（取画布中心作为默认坐标）。

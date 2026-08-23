@@ -18,13 +18,13 @@
 # ─── 配置：战斗养成要购买的商品类目（新增类目直接在此追加） ────
 eval $buy_keywords = ["心法", "武学", "奇术", "生活", "宝钱", "短陌钱"]
 
-import "subcall/game_profile.wf"
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
 
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
-if env("android")
-    click [game_main_page].[menu] after wait @page_refresh
-else if env("desktop")
-    press "ESC" after wait @page_refresh
+call $nav_result = nav_main_to_menu()
+if $nav_result < 0
+    return -1
 end
 
 scan [game_menu_page].[bugan] as $nav_check by contains "不肝"

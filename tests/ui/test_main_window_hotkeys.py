@@ -1,6 +1,6 @@
 """全局热键回调门控测试
 
-全局热键 F8-F10 + F12，且回调须经 _backend_ready() 门控：
+主窗口只注册全局热键 F8-F10，且回调须经 _backend_ready() 门控：
 未定位窗口/未连接设备时直接忽略，不发射信号。
 不实例化 MainWindow、不启动 pynput listener，用桩对象直调
 未绑定方法验证门控逻辑。
@@ -28,8 +28,10 @@ class _Stub:
         self.started = 0
         self.f9_pressed = _Signal()
         self.f10_pressed = _Signal()
-        self.f12_pressed = _Signal()
         self.pause_resume_count = 0
+        self._on_global_f8 = lambda: None
+        self._on_global_f9 = lambda: None
+        self._on_global_f10 = lambda: None
 
     def _backend_ready(self) -> bool:
         return self._ready
@@ -42,15 +44,18 @@ class _Stub:
 
 
 class TestGlobalHotkeyGating:
+    def test_main_listener_does_not_register_f12(self):
+        stub = _Stub(ready=True)
+        bindings = MainWindow._main_global_hotkey_bindings(stub)
+        assert set(bindings) == {"<f8>", "<f9>", "<f10>"}
+
     def test_not_ready_ignores_all(self):
         stub = _Stub(ready=False)
         MainWindow._on_global_f9(stub)
         MainWindow._on_global_f10(stub)
         MainWindow._on_global_f8(stub)
-        MainWindow._on_global_f12(stub)
         assert stub.f9_pressed.count == 0
         assert stub.f10_pressed.count == 0
-        assert stub.f12_pressed.count == 0
         assert stub.pause_resume_count == 0
 
     def test_ready_emits_signals(self):
@@ -58,10 +63,8 @@ class TestGlobalHotkeyGating:
         MainWindow._on_global_f9(stub)
         MainWindow._on_global_f10(stub)
         MainWindow._on_global_f8(stub)
-        MainWindow._on_global_f12(stub)
         assert stub.f9_pressed.count == 1
         assert stub.f10_pressed.count == 1
-        assert stub.f12_pressed.count == 1
         assert stub.pause_resume_count == 1  # F8 触发暂停/恢复
 
 

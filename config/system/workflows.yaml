@@ -8,6 +8,7 @@ exposed:
 - daily_checkin
 - gather_zhayu
 - auto_tuning
+- scan_role_base_attr
 overrides:
   auto_tuning:
     scope: dedicated

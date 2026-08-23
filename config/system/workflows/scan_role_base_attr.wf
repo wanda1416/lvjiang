@@ -1,0 +1,80 @@
+#% name: 扫描基础属性
+#% env: [android, desktop]
+#% parameters:
+#%   - name: scroll_count
+#%     label: 滚动次数
+#%     type: number
+#%     default: 8
+#%     min: 1
+#%     max: 20
+
+# 角色详情页反复滚动识别基础属性，交给 role_attr_parser 解析后弹出
+# "创建基础属性"面板预填数值，供用户确认。
+#
+# 流程：
+#   1. 导航到角色详情页（nav_main_to_role）
+#   2. 循环 scroll_count 次：每次 scan detail_1 暂存原始文本（left_N），
+#      顺带查找"属性攻击/外功穿透/属攻穿透"三个字段，命中就点击展开
+#      detail_2 并暂存（right_attack/right_outer_pen/right_attr_pen），
+#      再向上拖拽滚动 0.5 屏
+#   3. 把暂存的原始 dict 一次性交给 to_role_base_attrs 解析（去重 + 提取
+#      字段全部在这一次调用内完成）
+#   4. open_base_attr_form 触发面板预填，工作流即结束（不等待用户确认）
+
+default $scroll_count = 8
+
+import "subcall/navigation.wf"
+
+call $nav_result = nav_main_to_role()
+if $nav_result == -1
+    log error "无法进入角色详情页，终止"
+else
+    eval $data = {}
+    eval $got_attack = false
+    eval $got_outer_pen = false
+    eval $got_attr_pen = false
+    eval $i = 1
+
+    loop while $i <= $scroll_count
+        scan [role_detail].[detail_1] as $r1
+        eval $key = "left_" + $i
+        eval $data.$key = $r1.detail_1
+
+        if not $got_attack
+            find [role_detail].[detail_1] as $f by contains "属性攻击"
+            if $f
+                click $f after wait stable @page_refresh
+                scan [role_detail].[detail_2] as $r2
+                eval $data.right_attack = $r2.detail_2
+                eval $got_attack = true
+            end
+        end
+
+        if not $got_outer_pen
+            find [role_detail].[detail_1] as $f by contains "外功穿透"
+            if $f
+                click $f after wait stable @page_refresh
+                scan [role_detail].[detail_2] as $r2
+                eval $data.right_outer_pen = $r2.detail_2
+                eval $got_outer_pen = true
+            end
+        end
+
+        if not $got_attr_pen
+            find [role_detail].[detail_1] as $f by contains "属攻穿透"
+            if $f
+                click $f after wait stable @page_refresh
+                scan [role_detail].[detail_2] as $r2
+                eval $data.right_attr_pen = $r2.detail_2
+                eval $got_attr_pen = true
+            end
+        end
+
+        drag [role_detail].[detail_1] up 0.5 after wait stable @scroll_settle
+        eval $i = $i + 1
+    end
+
+    eval $parsed = to_role_base_attrs($data)
+    eval open_base_attr_form($parsed)
+    log "基础属性识别完成，已弹出创建面板供确认"
+end

@@ -16,6 +16,9 @@
 # 流程结构：
 #   0. 起始定位：读 label_0 判断在活动页还是首页，必要时先导航
 #   for 遍历 6 组 label_N / btn_N
+#      0. 再次读 label_0 校验仍在号令页；不在则阻塞弹窗提示用户手动
+#         处理（前一个任务卡住退出时可能漏回号令页，需及时拦截，
+#         避免后续任务在错误页面上继续乱点）
 #      1. 识别 label_N 文本是否命中目标任务列表（contains_any 短路匹配）
 #      2. 命中 → 读取任务文本，分发执行对应动作
 #      3. 未命中 → 点击 btn_N 刷新，等待后重新识别，直到命中或达到刷新上限
@@ -36,20 +39,21 @@ import "subcall/navigation.wf"
 eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉障林"]
 
 # 起始定位：用户可能在江湖号令活动页点 F9，也可能停在游戏首页
-# 读不到「号令」标题即视为在首页，先导航进活动页
-scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
-if not $at_haoling
-   log "未识别到号令标题，视为当前在游戏首页，先导航至江湖号令页"
-   call back_to_haoling()
-
-   scan [activity_jianghu].[label_0] as $at_haoling by contains "号令"
-   if not $at_haoling
-      log "导航后仍未进入江湖号令页，终止流程"
-      return -1
-   end
+# 读不到「号令」标题即视为在首页，先自动导航进活动页（auto_nav=1）
+call $haoling_ok = ensure_at_haoling("起始", 1)
+if $haoling_ok < 0
+   return -1
 end
 
 for idx in ["1", "2", "3", "4", "5", "6"]
+
+   # 任务开头再校验一次是否仍在号令页：前一个任务若卡住退出，
+   # 可能未回到号令页，导致后续任务全部错乱。此时停在未知页面，
+   # 不能自动导航（auto_nav=0），阻塞弹窗提示用户手动处理
+   call $haoling_ok = ensure_at_haoling($idx, 0)
+   if $haoling_ok < 0
+      return -1
+   end
 
    # 动态构造本组的 label / btn region 名
    eval $label = "label_" + $idx
@@ -117,6 +121,35 @@ if $at_haoling
    click [activity_jianghu].[back] after wait @step_interval
    click [school_main].[back] after wait @step_interval
    click [game_menu_page].[back] after wait @step_interval
+end
+
+# 校验当前是否位于江湖号令页，不在则先设法回到号令页再校验一次。
+#   $idx     — 调用点标识，仅用于日志（"起始" 或任务序号）
+#   $auto_nav — 1：视为停在游戏首页，调 back_to_haoling() 自动导航；
+#               0：停在未知页面（上个任务卡住未收尾），自动导航不可靠，
+#                  改为阻塞弹窗提示用户手动返回号令页
+# 返回：0=已在号令页；-1=补救后仍不在，调用方应终止流程
+def ensure_at_haoling($idx, $auto_nav)
+   scan [activity_jianghu].[label_0, haoling_of_week] as $at_haoling by contains "号令"
+   if $at_haoling
+      return 0
+   end
+
+   if $auto_nav
+      log $idx + "：未识别到号令标题，视为当前在游戏首页，先导航至江湖号令页"
+      call back_to_haoling()
+   else
+      log "任务 " + $idx + " 开始前检测到不在江湖号令页，可能是上个任务未正常收尾"
+      eval pause("检测到当前不在江湖号令页，请手动返回号令页后点击继续")
+   end
+
+   scan [activity_jianghu].[label_0, haoling_of_week] as $at_haoling by contains "号令"
+   if $at_haoling
+      return 0
+   end
+
+   log "仍未进入江湖号令页，终止流程"
+   return -1
 end
 
 # 领取奖励：动作完成后再次点击任务标签领取

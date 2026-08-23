@@ -60,6 +60,13 @@ class TestDialog:
         assert tabs.tabText(3) == "等级配置"
         assert tabs.tabText(4) == "赛季配置"
         assert tabs.tabText(5) == "字体设置"
+        for nav in (
+            dialog._tab._affix_panel._affix_list,
+            dialog._tab._base_panel._part_list,
+            dialog._tab._school_panel._school_list,
+        ):
+            assert nav.minimumWidth() >= 200
+            assert nav.property("navigation") is True
 
 
 # ─── 武器类型增删往返 ──────────────────────────────────────

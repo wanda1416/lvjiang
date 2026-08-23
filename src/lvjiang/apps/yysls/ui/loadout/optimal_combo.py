@@ -40,6 +40,7 @@ from .....i18n import tr
 from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
+from ..layout_helpers import fit_combo_to_contents
 
 # 8 个装备槽位的显示顺序与分组映射
 _SLOT_ORDER: list[tuple[str, str, str]] = [
@@ -430,6 +431,7 @@ class OptimalComboDialog(QDialog):
         self._combo_gongjue.addItem(tr("无"), "")
         for gj_type in ["会意", "精准", "会心"]:
             self._combo_gongjue.addItem(gj_type, gj_type)
+        fit_combo_to_contents(self._combo_gongjue, minimum=112)
         # 设置默认选中
         idx = self._combo_gongjue.findData(self._current_gongjue)
         if idx >= 0:

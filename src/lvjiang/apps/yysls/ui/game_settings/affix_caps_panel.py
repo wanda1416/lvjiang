@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
 from .....i18n import tr
+from ..layout_helpers import configure_navigation_list
 from .level_combo import LevelCombo
 
 
@@ -147,6 +148,7 @@ class AffixCapsPanel(QWidget):
         left_layout.addWidget(QLabel(tr("词组类型")))
 
         self._affix_list = QListWidget()
+        configure_navigation_list(self._affix_list, minimum_width=200)
         self._affix_list.currentRowChanged.connect(self._on_affix_changed)
         self._affix_list.itemDoubleClicked.connect(self._rename_affix)
         left_layout.addWidget(self._affix_list)
@@ -310,7 +312,10 @@ class AffixCapsPanel(QWidget):
         right_layout.addLayout(btn_layout)
         splitter.addWidget(right_widget)
 
-        splitter.setSizes([120, 430])
+        splitter.setChildrenCollapsible(False)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([220, 650])
 
     def _load_data(self):
         """从 YAML 加载数据"""

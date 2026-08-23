@@ -2,15 +2,16 @@
 
 统一从两个来源自动发现「脚本」（对外称谓，内部仍为 workflow/wf）：
 
-1. **.wf 来源**：workflows 目录顶层 ``*.wf`` 文件（system ∪ local 合并视图），
-   跳过 ``_`` 前缀（如 ``_editor_run.wf`` / ``_recorded.wf``）与 ``subcall/`` /
-   ``testwf/`` 等子目录。
-   name/parameters 取自文件顶部的 ``#%`` front-matter，id = 文件名 stem。
+1. **.wf 来源**：workflows 目录顶层及 ``standalone/`` 下的 ``*.wf`` 文件
+   （system ∪ local 合并视图），跳过 ``_`` 前缀（如 ``_editor_run.wf`` /
+   ``_recorded.wf``）。``subcall/``、``batch/``、``archived/`` 等内部目录不参与发现。
+   name/note/parameters 取自文件顶部的 ``#%`` front-matter，id = 文件名 stem。
 2. **class 来源**：``implementations.list_workflows()`` 中已注册的内置类实现，
    name/parameters 取自类属性 ``DISPLAY_NAME`` / ``PARAMETERS``，id = 注册名。
 
 同 id 时 class 覆盖 .wf。
-每项统一 shape：``{id, name, wf_file|class, parameters}``，不再含 ``required_scenes``
+每项统一 shape：``{id, name, note, wf_file|class, parameters, batchable}``，
+不再含 ``required_scenes``
 （场景校验改由 engine 执行时按 AST 静态搜集）。
 """
 from __future__ import annotations
@@ -21,24 +22,38 @@ from ..core.config.resolver import get_resolver
 from . import implementations
 from .metadata import parse_metadata_file
 
+# 可直接由用户启动的脚本目录。显式列举可避免把 subcall、batch 生命周期等
+# 不能独立执行的实现文件误注册到脚本列表。
+_DISCOVERABLE_WF_DIRS = ("", "standalone")
+
 
 def _discover_wf_scripts() -> dict[str, dict]:
-    """扫描 workflows/ 顶层 .wf（system ∪ local），返回 {id: config}。"""
+    """扫描可直接启动的 .wf（system ∪ local），返回 {id: config}。"""
     result: dict[str, dict] = {}
     resolver = get_resolver()
-    for name in resolver.enumerate_entities("workflows", "*.wf"):
-        p = resolver.resolve_read(f"workflows/{name}")
-        if p is None:
-            continue
-        meta = parse_metadata_file(p)
-        result[p.stem] = {
-            "id": p.stem,
-            "name": meta.get("name") or p.stem,
-            "wf_file": p.name,
-            "class": "",
-            "parameters": meta.get("parameters") or [],
-            "env": meta.get("env") or [],
-        }
+    for subdir in _DISCOVERABLE_WF_DIRS:
+        rel_dir = f"workflows/{subdir}" if subdir else "workflows"
+        for name in resolver.enumerate_entities(rel_dir, "*.wf"):
+            wf_file = f"{subdir}/{name}" if subdir else name
+            p = resolver.resolve_read(f"workflows/{wf_file}")
+            if p is None:
+                continue
+            script_id = p.stem
+            if script_id in result:
+                logger.warning(
+                    f"脚本 id 重复，忽略 {wf_file}: {script_id}")
+                continue
+            meta = parse_metadata_file(p)
+            result[script_id] = {
+                "id": script_id,
+                "name": meta.get("name") or script_id,
+                "note": meta.get("note") or "",
+                "wf_file": wf_file,
+                "class": "",
+                "parameters": meta.get("parameters") or [],
+                "env": meta.get("env") or [],
+                "batchable": subdir != "standalone",
+            }
     return result
 
 
@@ -54,10 +69,12 @@ def _discover_class_scripts() -> dict[str, dict]:
         result[name] = {
             "id": name,
             "name": getattr(cls, "DISPLAY_NAME", None) or name,
+            "note": getattr(cls, "NOTE", None) or "",
             "wf_file": "",
             "class": name,
             "parameters": list(getattr(cls, "PARAMETERS", []) or []),
             "env": list(getattr(cls, "ENV", []) or []),
+            "batchable": True,
         }
     return result
 

@@ -23,7 +23,7 @@
 
 default $scroll_count = 8
 
-import "subcall/navigation.wf"
+import "../subcall/navigation.wf"
 
 call $nav_result = nav_main_to_role()
 if $nav_result == -1

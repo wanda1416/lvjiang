@@ -1,13 +1,15 @@
 """工作流 front-matter 元数据解析
 
 .wf 文件可在任意位置（约定放文件顶部）用 `#%` 前缀声明 YAML 元数据，
-schema 与 workflows.yaml 的单条 flow 完全一致（name / required_scenes / parameters）。
+schema 与 workflows.yaml 的单条 flow 完全一致
+（name / note / required_scenes / parameters）。
 
 由于每行都以 `#` 开头，DSL 引擎将其视为普通注释忽略，文件仍可直接执行；
 而本模块单独收集这些行、剥掉 `#%` 前缀后按 YAML 解析，从而“提前”拿到名字与参数。
 
 示例：
     #% name: 单件装备调律
+    #% note: 请先打开装备调律页面再执行。
     #% required_scenes: [game_main_page, equip_tune_detail]
     #% parameters:
     #%   - name: target_material
@@ -78,6 +80,7 @@ def build_flow_config(path: str | Path) -> dict:
     return {
         "id": f"__loaded__:{p.stem}",
         "name": meta.get("name") or f"[外部] {p.name}",
+        "note": meta.get("note") or "",
         "wf_file": str(p),
         "required_scenes": meta.get("required_scenes") or [],
         "parameters": meta.get("parameters") or [],

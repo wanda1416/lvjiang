@@ -79,6 +79,24 @@
 - 加了 Gradle 8.10.2 wrapper（`android/gradlew`），`JAVA_HOME=$(brew --prefix openjdk@17) ./gradlew :app:assembleDebug`
   首次 5 分钟（含自动装 platform-35），增量 5–20 秒。`local.properties` 指向 brew 的 `android-commandlinetools`。
 
+## 悬浮球动态开关（截图/标定时隐藏）
+
+标定 / 截图会把律匠悬浮球一起截进画面，用户可能把它当地标去点。加 `AgentServer.float_icon` op +
+`FloatService.setIconHidden`（隐藏态跨图标重建保持）+ PC `AgentClient.set_float_icon` + CLI
+`calib float --hide/--show`；ScreenMap probe 截图前自动藏、结束恢复，app 内屏幕标定页本来就在截底图时隐藏。
+真机验证（测试机 B / Android 16）：`float_icon(hide)` 后悬浮球从截图消失、`--show` 恢复。
+
+## 跨设备实测（测试机 A 1080x2400 ↔ 测试机 B 1264x2800）
+
+两台真机（Android 13 国产 ROM / Android 16）都装包跑通目标游戏：无障碍 + 代理（protocol 2）+ 悬浮球 + 代理截图。
+拿测试机 A 主界面当参照、测试机 B 当目标，用三个位置固定的 HUD 地标（左上/右上/右下三个界面图标）
+模板匹配定位（跨分辨率 2400→2800 ~1.17×，匹配分 0.93+），`solve_canvas` 解出测试机 B 画布
+`x=0.0005 y=-0.0002 w=0.999 h=1.000` = 恒等（残差 0.2px）。结论：该游戏 HUD 贴边渲染 + 两台宽高比
+几乎相同（2.222 / 2.215），内容 1:1，默认布局直接可用。这也端到端验证了地标定位 + 画布解算在真机真游戏上正确。
+
+注：部分国产 ROM（测试机 A）禁 adb 注入触摸（`input tap` 被拒）与写 secure settings（装包去掉 `-g`），
+但代理通道走无障碍手势不受限；测试机 B 无此限制。
+
 ## 后续
 
 - 真机（作者的挖孔屏）生成正式参照图并提交到 `config/system/layouts/默认布局/_reference.png`。

@@ -148,7 +148,7 @@ script_record:
   precision_label: 录制精度
   precision_low: 低精度（普通界面，可编辑 WF）
   precision_high: 高精度（游戏视角，原始轨迹）
-  precision_tip_low: 合并连续移动，生成可编辑 DSL 指令
+  precision_tip_low: 按 100ms 粒度合并连续移动和短等待，生成可编辑 DSL 指令
   precision_tip_high: 保存 workflows/lvtrace 配套文件，忠实还原原始输入
   high_copy_disabled: 高精度 WF 依赖配套轨迹文件，不能单独复制
   status_recording_low: 低精度录制中…连续移动将合并，F12 或点击停止

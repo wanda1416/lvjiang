@@ -84,6 +84,15 @@ class TestOnLineCallback:
         assert lines[0].startswith("wait ")
         assert lines[1].startswith("drag (0.1, 0.1) (0.5, 0.5) ")
 
+    def test_low_precision_omits_wait_below_100ms(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._last_action_time = 10.0
+
+        rec._maybe_emit_wait(10.099)
+
+        assert lines == []
+
     def test_stop_text_matches_callback_lines(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
@@ -231,7 +240,7 @@ class TestScroll:
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
-        rec._last_action_time = time.monotonic() - 1.0  # 间隔 1s > 0.3s 阈值
+        rec._last_action_time = time.monotonic() - 1.0  # 间隔 1s > 0.1s 阈值
 
         rec._on_scroll(100, 80, 0, -1)
 
@@ -360,7 +369,7 @@ class TestTrailingWaitOnStop:
         rec._press_time = time.monotonic()
         rec._handle_release(100, 80)
 
-        rec.stop()  # 紧接着停止，间隔远小于 0.3s 阈值
+        rec.stop()  # 紧接着停止，间隔远小于 0.1s 阈值
 
         assert lines == ["click (0.1, 0.1)"]
 
@@ -396,20 +405,35 @@ class TestRawInputMove:
             "move by (-0.005, 0.005) duration 0.006",
         ]
 
-    def test_raw_packet_gap_is_preserved_to_millisecond_precision(self):
+    def test_low_precision_merges_raw_packets_within_100ms(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
         start_ns = 2_000_000_000
 
         rec._on_raw_move(10, 0, start_ns)
-        rec._on_raw_move(10, 0, start_ns + 12_000_000)
+        rec._on_raw_move(10, 0, start_ns + 99_000_000)
+        with rec._lock:
+            rec._flush_raw_frame()
+
+        assert lines == [
+            "move by (0.02, 0) duration 0.099",
+        ]
+
+    def test_low_precision_splits_after_100ms_idle_gap(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        start_ns = 2_000_000_000
+
+        rec._on_raw_move(10, 0, start_ns)
+        rec._on_raw_move(10, 0, start_ns + 120_000_000)
         with rec._lock:
             rec._flush_raw_frame()
 
         assert lines == [
             "move by (0.01, 0) duration 0.001",
-            "wait 0.011",
+            "wait 0.119",
             "move by (0.01, 0) duration 0.001",
         ]
 

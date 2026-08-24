@@ -33,10 +33,11 @@ except Exception:  # pragma: no cover - 环境缺失 pynput 时降级
 
 # ─── 事件聚合阈值 ─────────────────────────────────────────
 _DRAG_THRESHOLD_PX = 10      # 位移 >= 该值判定为拖拽，否则为点击
-_WAIT_THRESHOLD_S = 0.0005   # 输出到 1ms；半毫秒以上的空档即记录
+_LOW_PRECISION_INTERVAL_S = 0.100  # 低精度以 100ms 为合并/等待粒度
+_WAIT_THRESHOLD_S = _LOW_PRECISION_INTERVAL_S
 _MIN_DRAG_DURATION = 0.001   # 拖拽时长下限（秒）
 _PRESS_HOLD_THRESHOLD_S = 0.5  # 按键时长 >= 该值判定为长按（press "X" hold N）
-_RAW_IDLE_S = 0.010          # 包间隔 >=10ms 时切分轨迹段，空档另记 wait
+_RAW_IDLE_S = _LOW_PRECISION_INTERVAL_S
 _RAW_LAST_DURATION_S = 0.001  # 轨迹末包无后继时间戳，以 1ms 完成
 
 PRECISION_LOW = "low"
@@ -445,7 +446,7 @@ class MacroRecorder:
     # ─── Raw Input 相对移动 ──────────────────────────────────
 
     def _on_raw_move(self, dx: int, dy: int, timestamp_ns: int):
-        """Raw Input 回调：高精度逐包保存，低精度按连续移动段合并。"""
+        """Raw Input 回调：高精度逐包保存，低精度以 100ms 空档切段。"""
         with self._lock:
             try:
                 if not self._recording or not self._target_is_foreground():

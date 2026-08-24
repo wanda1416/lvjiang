@@ -15,6 +15,7 @@ main_window:
   menu_script_config: Script Config
   menu_batch_config: Batch Config
   menu_help: Help
+  menu_announcements: Announcements
   menu_check_update: Check for Updates
   menu_docs: Documentation
   menu_feedback: Feedback
@@ -165,6 +166,22 @@ update_dialog:
   btn_release_notes: View release notes
   btn_download: Download this version
   btn_continue: Dismiss
+announcement_dialog:
+  title: Announcements
+  refresh: Refresh
+  fetching: Fetching...
+  fetching_notice: Fetching announcements...
+  details: View Details
+  close: Close
+  empty: No announcements
+  no_cache: No announcements have been fetched. Click Refresh to sync.
+  notice_version: Announcement version {version}
+  updated_at: Updated {date}
+  fetch_failed: 'Failed to fetch announcements: {error}'
+  cached_error: 'Refresh failed; showing cached announcements: {error}'
+  level_critical: Critical
+  level_warning: Warning
+  level_info: Notice
 ocr_dialog:
   title: Image Recognition
   tab_ocr: Image Recognition

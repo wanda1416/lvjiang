@@ -41,8 +41,8 @@
       "properties": {
         "lvjiangWf.pythonPath": {
           "type": "string",
-          "default": "python",
-          "description": "Python interpreter path with lvjiang installed"
+          "default": "",
+          "description": "Python interpreter path with lvjiang installed. Leave empty to let the extension auto-detect (VS Code Python setting, then workspace .venv, then system python)."
         }
       }
     },

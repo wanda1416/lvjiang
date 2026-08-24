@@ -35,7 +35,6 @@ from .cards import CombatCardsMixin
 from .graduation import CombatGraduationMixin
 from .layout import (
     DISPLAY_MODE_FULL,
-    DISPLAY_MODE_HALF_COMPACT,
     CombatLayoutMixin,
 )
 from .layout_strategies import CardLayoutStrategy, FullCardLayout
@@ -612,9 +611,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         )
         self._schedule_graduation(graduation_attrs)
 
-        # 刷新退化模式：委托策略重新应用紧凑布局
-        if self._display_mode == DISPLAY_MODE_HALF_COMPACT:
-            self._strategy.on_refresh_display(self)
+        # 所有模式走统一策略钩子；full/half 默认 no-op，compact 自行重排。
+        self._strategy.on_refresh_display(self)
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""

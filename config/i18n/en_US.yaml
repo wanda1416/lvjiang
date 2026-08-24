@@ -148,7 +148,7 @@ script_record:
   precision_label: Recording precision
   precision_low: Low precision (editable workflow)
   precision_high: High precision (raw game input)
-  precision_tip_low: Merges continuous movement into editable DSL commands
+  precision_tip_low: Merges movement and short waits at 100ms granularity into editable DSL commands
   precision_tip_high: Saves a workflows/lvtrace companion file, faithfully replaying raw input
   high_copy_disabled: High-precision workflows require their companion trace and cannot be copied alone
   status_recording_low: Recording in low precision... continuous movement will be merged; F12 or click to stop

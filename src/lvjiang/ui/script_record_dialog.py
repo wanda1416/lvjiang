@@ -147,7 +147,9 @@ class ScriptRecordDialog(QDialog):
         lbl_precision.setStyleSheet("font-size: 14px; font-weight: bold;")
         mode_row.addWidget(lbl_precision)
         self.radio_precision_low = QRadioButton(tr("低精度（普通界面，可编辑 WF）"))
-        self.radio_precision_low.setToolTip(tr("合并连续移动，生成可编辑 DSL 指令"))
+        self.radio_precision_low.setToolTip(
+            tr("按 100ms 粒度合并连续移动和短等待，生成可编辑 DSL 指令")
+        )
         self.radio_precision_low.setChecked(True)
         self.radio_precision_high = QRadioButton(tr("高精度（游戏视角，原始轨迹）"))
         self.radio_precision_high.setToolTip(

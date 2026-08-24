@@ -5,6 +5,8 @@ views:
   name: 基底
 - key: zhihuan
   name: 心得置换
+- key: recycle_xinfa
+  name: 回收书票
 regions:
 - key: sanben_1
   name: 散本1
@@ -76,7 +78,7 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-  view: zhihuan
+  view: recycle_xinfa
 - key: recycle_entry
   name: 回收入口
   type: func

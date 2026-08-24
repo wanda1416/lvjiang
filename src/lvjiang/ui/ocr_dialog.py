@@ -114,12 +114,12 @@ class OCRDialog(QDialog):
         # 识别按钮栏
         btn_row = QHBoxLayout()
 
-        self._btn_ocr = QPushButton(tr("识别文字 (F5)"))
+        self._btn_ocr = QPushButton(tr("识别文字"))
         self._btn_ocr.setEnabled(False)
         self._btn_ocr.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_ocr)
 
-        self._btn_material = QPushButton(tr("识别材料 (F6)"))
+        self._btn_material = QPushButton(tr("识别材料"))
         self._btn_material.setEnabled(False)
         self._btn_material.clicked.connect(self._on_recognize_material)
         btn_row.addWidget(self._btn_material)
@@ -389,10 +389,6 @@ class OCRDialog(QDialog):
         if mod == Qt.KeyboardModifier.ControlModifier and key == Qt.Key.Key_V:
             self._paste_image()
             self._tabs.setCurrentIndex(0)  # 切换到图像识别 Tab
-        elif key == Qt.Key.Key_F5:
-            self._on_recognize()
-        elif key == Qt.Key.Key_F6:
-            self._on_recognize_material()
         else:
             super().keyPressEvent(event)
 
@@ -421,7 +417,7 @@ class OCRDialog(QDialog):
             h, w = bgr.shape[:2]
             self._btn_ocr.setEnabled(True)
             self._btn_material.setEnabled(True)
-            self._status_label.setText(f"已粘贴图片 ({w}x{h})，点击「识别」或按 F5")
+            self._status_label.setText(f"已粘贴图片 ({w}x{h})，点击「识别」")
             logger.info(f"OCR 测试：粘贴图片 {w}x{h}")
 
     def _on_upload(self):
@@ -443,7 +439,7 @@ class OCRDialog(QDialog):
             h, w = bgr.shape[:2]
             self._btn_ocr.setEnabled(True)
             self._btn_material.setEnabled(True)
-            self._status_label.setText(f"已加载图片 ({w}x{h})，点击「识别」或按 F5")
+            self._status_label.setText(f"已加载图片 ({w}x{h})，点击「识别」")
             logger.info(f"OCR 测试：上传图片 {w}x{h} <- {path}")
 
     @staticmethod

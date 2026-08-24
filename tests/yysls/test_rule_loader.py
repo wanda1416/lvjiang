@@ -38,6 +38,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     standard_affix_names,
     standard_playstyle_attrs,
 )
+from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 
 
 def minimal_rule(**overrides) -> dict:
@@ -520,6 +521,24 @@ class TestCreateAndDelete:
         rule = mgr.get_rule("t2")
         assert rule.key == "t2"
         assert rule.name == "测试规则"
+
+    def test_user_rename_system_rule_is_rejected_before_write(self, tmp_path):
+        system = tmp_path / "system"
+        local = tmp_path / "local"
+        system.mkdir()
+        write_rule(system, minimal_rule())
+        mgr = TuningRuleManager(rules_dir=system)
+        mgr._resolver = ConfigResolver(
+            system_dir=system, local_dir=local, dev_mode=False,
+        )
+        mgr.reload()
+
+        with pytest.raises(SystemContentProtected):
+            mgr.rename_rule("t1", "t2")
+
+        assert not (local / "t2.yaml").exists()
+        assert mgr.get_rule("t1") is not None
+        assert mgr.get_rule("t2") is None
 
     def test_rename_same_key_noop(self, tmp_path):
         write_rule(tmp_path, minimal_rule())

@@ -335,7 +335,7 @@ class TuningRulesDialog(QDialog):
     def _delete_rule(self, key: str):
         try:
             self._manager.delete_rule(key)
-        except RuleValidationError as e:
+        except (RuleValidationError, PermissionError) as e:
             QMessageBox.warning(self, tr("删除规则"), str(e))
             return
         for i in range(5, self._stack.count()):

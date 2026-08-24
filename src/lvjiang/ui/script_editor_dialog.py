@@ -15,7 +15,7 @@ system 目录，删除出厂脚本落墓碑而不是真删。
 - 「保存」落盘后再跑一遍引擎的 validate_only（语法 + import 链 + 命名等待 +
   布局引用），判据与真正执行共用，预检放过的上机不会炸。
 
-新建脚本自动加进 workflows.yaml 的 exposed（否则日常页下拉看不到它）。
+新建脚本会被发现层自动扫到并默认展示在日常页，无需额外登记。
 脚本 id 即文件名，不允许 ``_`` 前缀（发现层把 ``_*.wf`` 当临时文件跳过）。
 """
 from __future__ import annotations
@@ -175,22 +175,6 @@ def validate_with_layout(path: Path, layout, delay_params: dict | None) -> list[
     except Exception as e:  # noqa: BLE001
         return [f"{type(e).__name__}: {e}"]
     return []
-
-
-def expose_script(sid: str) -> bool:
-    """把脚本加进 workflows.yaml 的 exposed；已在或 exposed 为空（=全部展示）时不写，返回是否写了"""
-    resolver = get_resolver()
-    try:
-        data = resolver.load_merged("workflows.yaml") or {}
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"读取 workflows.yaml 失败，跳过自动暴露: {e}")
-        return False
-    exposed = list(data.get("exposed") or [])
-    if not exposed or sid in exposed:
-        return False
-    exposed.append(sid)
-    resolver.save_merged("workflows.yaml", {"exposed": exposed, "overrides": data.get("overrides") or {}})
-    return True
 
 
 # ─── 语法高亮 ───────────────────────────────────────────
@@ -400,7 +384,18 @@ class ScriptEditorDialog(QDialog):
         has_text = bool(self.editor.toPlainText().strip())
         self.btn_save.setEnabled(self._dirty and (has_current or has_text))
         self.btn_save_as.setEnabled(has_text)
-        self.btn_delete.setEnabled(has_current)
+        # 出厂脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
+        # 请在「工具 → 脚本配置」取消勾选。
+        can_delete = has_current
+        hint = ""
+        if self._current is not None:
+            resolver = get_resolver()
+            if not resolver.is_dev_mode() and resolver.is_system_entity(
+                    script_rel_path(self._current.id)):
+                can_delete = False
+                hint = tr("出厂脚本不可删除；不想展示请在「脚本配置」取消勾选")
+        self.btn_delete.setEnabled(can_delete)
+        self.btn_delete.setToolTip(hint)
         self.btn_check.setEnabled(has_text)
         title = tr("脚本编辑")
         if self._current is not None:
@@ -461,13 +456,11 @@ class ScriptEditorDialog(QDialog):
         path = self._write(sid, text)
         if path is None:
             return
-        exposed = expose_script(sid)
         self._changed_any = True
         self._reload_list(select_id=sid)
         self._load_entry(self._entry(sid))
         self._set_status(
-            tr("已创建 {path}").format(path=path)
-            + (tr("，并已加入日常页展示列表") if exposed else ""))
+            tr("已创建 {path}").format(path=path))
 
     def _write(self, sid: str, text: str) -> Path | None:
         try:
@@ -489,7 +482,6 @@ class ScriptEditorDialog(QDialog):
         if sid is None:
             return
         self._save_to(sid)
-        expose_script(sid)
 
     def _save_to(self, sid: str):
         text = self.editor.toPlainText()
@@ -533,7 +525,7 @@ class ScriptEditorDialog(QDialog):
         sid = self._current.id
         ret = QMessageBox.question(
             self, tr("删除脚本"),
-            tr("删除脚本 {sid}？（用户模式下出厂脚本只是被隐藏，可通过删除 local 墓碑恢复）").format(sid=sid),
+            tr("删除脚本 {sid}？此操作不可恢复。").format(sid=sid),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

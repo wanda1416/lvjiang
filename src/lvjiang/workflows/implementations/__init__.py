@@ -1,6 +1,6 @@
 """代码工作流注册表（通用）。
 
-复杂工作流以 Python 类实现，通过 ``workflows.yaml`` 中的 ``class`` 字段引用。
+复杂工作流以 Python 类实现，由插件在 ``workflow_implementations`` 中注册。
 插件可通过 ``register_workflow()`` 注入自身实现。
 
 燕云专属工作流（如 ``auto_tuning``）位于
@@ -21,7 +21,7 @@ def register_workflow(name: str, class_path: str) -> None:
     """注册一个代码工作流实现。
 
     Args:
-        name: 工作流名字（对应 workflows.yaml 中的 class 字段）
+        name: 工作流名字（即脚本 id）
         class_path: 完整类路径，例如 "lvjiang.apps.yysls.workflows.implementations.auto_tuning.AutoTuningWorkflow"
     """
     if name in _REGISTRY:

@@ -43,6 +43,7 @@ from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
+from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo
 
 
@@ -338,9 +339,14 @@ class AffixCapsPanel(QWidget):
             self._affix_list.setCurrentRow(0)
 
     def _on_affix_changed(self, row: int):
-        """切换词组时更新表格和别名"""
+        """切换词组时更新表格、别名与删除按钮可用性"""
         affix_caps = self._data.get("affix_caps", {})
         affix_names = list(affix_caps.keys())
+        picked = affix_names[row] if 0 <= row < len(affix_names) else None
+        ok, hint = deletable(
+            picked, factory_dict_keys(_ATTRS_REL, "affix_caps"), hint=READONLY_HINT)
+        self._btn_del_affix.setEnabled(picked is not None and ok)
+        self._btn_del_affix.setToolTip(hint)
 
         if row < 0 or row >= len(affix_names):
             self._current_affix = None

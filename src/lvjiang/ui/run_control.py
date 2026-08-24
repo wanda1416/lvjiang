@@ -946,6 +946,10 @@ class RunControlMixin:
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         self.automation_state_changed.emit(state)
+        # 任务开始/结束/暂停恢复都会走到这里：顺带刷新"后台模式"开关的锁定态
+        # （定位后可自由切换，仅任务运行期间锁定）
+        if hasattr(self, "_refresh_bg_mode_lock"):
+            self._refresh_bg_mode_lock()
 
     # ─── 启停控制 ──────────────────────────────────────────
 

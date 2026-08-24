@@ -21,6 +21,22 @@ class TestClickCoordPoint:
         eng._exec_body(program.body)
         assert eng._input.click_screen.called
 
+    def test_click_default_button_is_left(self):
+        """省略鼠标键时传给 click_screen 的 button 默认 left"""
+        eng = make_engine()
+        program = parse_text("click (0.5, 0.5)\n")
+        eng._exec_body(program.body)
+        _args, kwargs = eng._input.click_screen.call_args
+        assert kwargs["button"] == "left"
+
+    def test_click_explicit_button_reaches_backend(self):
+        """click ... right 等显式鼠标键要透传到 click_screen 的 button 参数"""
+        eng = make_engine()
+        program = parse_text("click (0.5, 0.5) x1\n")
+        eng._exec_body(program.body)
+        _args, kwargs = eng._input.click_screen.call_args
+        assert kwargs["button"] == "x1"
+
 
 class TestClickSceneRegion:
     def test_click_scene_region(self):

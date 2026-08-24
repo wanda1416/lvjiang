@@ -43,8 +43,13 @@ class _GestureInput(InputBackend):
         raise NotImplementedError
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None):
-        """点击设备坐标（带随机偏移 + before/after 延迟）"""
+                     *, pre_delay=None, post_delay=None, button: str = "left"):
+        """点击设备坐标（带随机偏移 + before/after 延迟）
+
+        触屏没有鼠标键概念，非 left 时按普通点击处理并打印提示。
+        """
+        if button != "left":
+            print(f"[{self.name}] 设备端输入不支持 {button} 键，按普通点击处理")
         sx = screen_x + random.randint(-self.click_random_offset, self.click_random_offset)
         sy = screen_y + random.randint(-self.click_random_offset, self.click_random_offset)
 

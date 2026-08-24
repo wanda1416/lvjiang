@@ -76,11 +76,20 @@ find_stmt: "find"i scene_target "as"i var_ref by_clause where_clause? _NL -> fin
 //
 // 注意：panel 与 scene.area 都以 [x].[y] 开头，必须用同一规则避免歧义。
 // transformer 根据 row/col 是否存在分派为 EntityRef 或 PanelRef。
-click_stmt: "click"i click_target wait_clauses? _NL
+//
+// 鼠标键可选，紧跟目标之后（与 scroll 的方向紧随目标同一风格），
+// 省略时默认左键，不影响任何既有脚本。
+click_stmt: "click"i click_target CLICK_BUTTON? wait_clauses? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var                          -> click_scene_target
             | var_ref                                                  -> click_var_target
             | coord_point                                              -> click_coord_target
+
+// click 鼠标键：与 replay input_trace 轨迹格式的键名保持一致
+// （left/right/middle/x1/x2），另外接受更直观的 back/forward 作为
+// x1/x2 的别名——Windows 默认把 X1 映射到"后退"、X2 映射到"前进"，
+// 但鼠标驱动可自定义，不是绝对规则，写脚本时按实测行为选。
+CLICK_BUTTON: /left/i | /right/i | /middle/i | /x1/i | /x2/i | /back/i | /forward/i
 
 // place：将鼠标直接放到画布归一化坐标，不产生移动过程。
 // 它是 move 的辅助原语，不承担 scene/region 等业务目标解析。

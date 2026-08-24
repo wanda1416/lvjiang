@@ -36,6 +36,7 @@ class Click:
     target: Any     # EntityRef（静态 [scene].[entity]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0
     suppress_defaults: bool = False  # 显式 wait_clause 时抑制默认 before/after_click_wait
+    button: str = "left"  # 鼠标键：left/right/middle/x1/x2，省略默认左键
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,6 @@ from .layout_strategies import (
     CardLayoutStrategy,
     FullCardLayout,
     HalfCardLayout,
-    HalfCompactCardLayout,
 )
 
 __all__ = [
@@ -63,7 +62,6 @@ class CombatLayoutMixin:
             return
 
         old_strategy = self._strategy
-        old_mode = self._display_mode
 
         # 创建新策略
         if mode == "full":
@@ -73,9 +71,8 @@ class CombatLayoutMixin:
             self._display_mode = DISPLAY_MODE_HALF
             self._strategy = HalfCardLayout()
 
-        # 从退化模式恢复时，先还原内部网格再构建新布局
-        if isinstance(old_strategy, HalfCompactCardLayout) and old_mode == DISPLAY_MODE_HALF_COMPACT:
-            old_strategy.undo(self)
+        # 由旧策略自行清理专属状态；控制层不感知 compact 内部细节。
+        old_strategy.deactivate(self)
 
         # 排列卡片 + 重排配置栏
         cards = (
@@ -97,29 +94,3 @@ class CombatLayoutMixin:
     def _config_bar_reconfigure(self) -> None:
         """根据当前策略重排配置栏。"""
         self._strategy.arrange_config_bar(self)
-
-    # ── 退化模式操作（委托给 HalfCompactCardLayout） ─────────
-
-    def _rearrange_grid_compact(self) -> None:
-        """将所有网格项重排为单列。"""
-        HalfCompactCardLayout._rearrange_grid_compact(self)
-
-    def _restore_grid_normal(self) -> None:
-        """恢复所有网格到原始多列布局。"""
-        HalfCompactCardLayout._restore_grid_normal(self)
-
-    def _align_name_labels(self) -> None:
-        """对齐所有属性名称标签宽度。"""
-        HalfCompactCardLayout._align_name_labels(self)
-
-    def _reset_name_label_widths(self) -> None:
-        """恢复属性名称标签自动宽度。"""
-        HalfCompactCardLayout._reset_name_label_widths(self)
-
-    def _filter_zero_attack_rows(self) -> None:
-        """隐藏零值攻击行。"""
-        HalfCompactCardLayout._filter_zero_attack_rows(self)
-
-    def _restore_zero_attack_rows(self) -> None:
-        """恢复零值攻击行。"""
-        HalfCompactCardLayout._restore_zero_attack_rows(self)

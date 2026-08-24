@@ -57,6 +57,30 @@
       "h_ratio": 0.04016751474480318
     },
     {
+      "key": "huanma",
+      "x_ratio": 0,
+      "y_ratio": 0,
+      "w_ratio": 0,
+      "h_ratio": 0,
+      "disabled": true
+    },
+    {
+      "key": "tingfeng",
+      "x_ratio": 0,
+      "y_ratio": 0,
+      "w_ratio": 0,
+      "h_ratio": 0,
+      "disabled": true
+    },
+    {
+      "key": "more_func",
+      "x_ratio": 0,
+      "y_ratio": 0,
+      "w_ratio": 0,
+      "h_ratio": 0,
+      "disabled": true
+    },
+    {
       "key": "dongzuo",
       "x_ratio": 0.018101043024741924,
       "y_ratio": 0.8392830650549241,
@@ -208,12 +232,5 @@
       "from_key": "origin",
       "to_key": "turn_left"
     }
-  ],
-  "disabled": {
-    "region": [
-      "huanma",
-      "more_func",
-      "tingfeng"
-    ]
-  }
+  ]
 }

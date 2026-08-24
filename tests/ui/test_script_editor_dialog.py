@@ -24,7 +24,6 @@ def dirs(tmp_path, monkeypatch):
     (local / "workflows").mkdir(parents=True)
     (system / "workflows" / "factory.wf").write_text("#% name: 出厂\nlog \"hi\"\n", encoding="utf-8")
     (system / "workflows" / "_tmp.wf").write_text("log \"skip\"\n", encoding="utf-8")
-    (system / "workflows.yaml").write_text("exposed:\n- factory\noverrides: {}\n", encoding="utf-8")
     return system, local
 
 
@@ -91,17 +90,6 @@ class TestListScripts:
         assert len(entries) == 1 and entries[0].layer == "local"
 
 
-class TestExpose:
-    def test_appends_when_list_nonempty(self, dev_resolver):
-        assert sed.expose_script("newone") is True
-        assert dev_resolver.load_merged("workflows.yaml")["exposed"] == ["factory", "newone"]
-        assert sed.expose_script("newone") is False  # 已在
-
-    def test_noop_when_exposed_empty(self, dev_resolver, dirs):
-        (dirs[0] / "workflows.yaml").write_text("exposed: []\noverrides: {}\n", encoding="utf-8")
-        assert sed.expose_script("x") is False
-
-
 def _layout(regions=()):
     layout = MagicMock()
     layout.get_canvas.return_value = MagicMock(x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
@@ -155,7 +143,7 @@ class TestDialog:
         assert "出厂" in dlg.editor.toPlainText()
         assert not dlg.btn_save.isEnabled()
 
-    def test_new_creates_file_and_exposes(self, qtbot, dev_resolver, dirs, monkeypatch):
+    def test_new_creates_file(self, qtbot, dev_resolver, dirs, monkeypatch):
         dlg = self._dialog(qtbot, monkeypatch)
         self._answers(monkeypatch, ("fresh", True), ("新脚本", True))
         dlg._on_new()
@@ -163,7 +151,7 @@ class TestDialog:
         assert path.exists() and "#% name: 新脚本" in path.read_text(encoding="utf-8")
         assert dlg._current.id == "fresh"
         assert dlg.list.count() == 2
-        assert dev_resolver.load_merged("workflows.yaml")["exposed"] == ["factory", "fresh"]
+        # 新脚本由发现层自动扫到并默认展示，不需要写任何登记文件
         assert dlg.changed
 
     def test_new_rejects_underscore_then_accepts(self, qtbot, dev_resolver, dirs, monkeypatch):
@@ -188,16 +176,16 @@ class TestDialog:
         dlg._on_save()
         assert "校验未通过" in dlg.lbl_status.text()
 
-    def test_user_mode_writes_local_and_delete_tombstones(self, qtbot, user_resolver, dirs, monkeypatch):
+    def test_user_mode_writes_local_and_cannot_delete_factory(self, qtbot, user_resolver, dirs, monkeypatch):
         dlg = self._dialog(qtbot, monkeypatch)
         dlg.editor.setPlainText('log "mine"')
         dlg._on_save()
         assert (dirs[1] / "workflows" / "factory.wf").exists()
         assert dlg._current.layer == "local"
+        # 出厂脚本不可删除：只清掉自己的 local 影子，system 原样保留
         dlg._on_delete()
-        assert not (dirs[1] / "workflows" / "factory.wf").exists()
-        assert dlg.list.count() == 0
-        assert sed.list_script_files() == []   # 墓碑把 system 同名也遮住
+        assert (dirs[1] / "workflows" / "factory.wf").exists()  # 仍在，未被删
+        assert sed.list_script_files() != []
 
     def test_check_button_only_syntax(self, qtbot, dev_resolver, monkeypatch):
         dlg = self._dialog(qtbot, monkeypatch)

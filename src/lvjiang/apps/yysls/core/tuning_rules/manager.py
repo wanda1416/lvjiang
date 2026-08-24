@@ -57,6 +57,14 @@ class TuningRuleManager:
     def _rel(self, filename: str) -> str:
         return f"{self._rel_dir}/{filename}" if self._rel_dir else filename
 
+    def is_system_rule(self, key: str) -> bool:
+        """规则是否来自 system 层且当前用户无权删除或重命名。"""
+        filename = self._files.get(key, f"{key}.yaml")
+        return bool(
+            not self._resolver.is_dev_mode()
+            and self._resolver.is_system_entity(self._rel(filename))
+        )
+
     def reload(self) -> None:
         """重新加载全部规则文件（含 when 开关引用校验）
 
@@ -247,6 +255,9 @@ class TuningRuleManager:
             raise RuleValidationError(f"规则 key 已存在: {new_key}")
         if new_key == old_key:
             return
+        old_rel = self._rel(self._files[old_key])
+        # 必须先鉴权再写新文件，避免出厂规则删除被拒后留下新 key 的孤立影子。
+        self._resolver.ensure_entity_deletable(old_rel)
         # 同步更新 data 内 key 字段，避免 reload 后 key 与文件名不一致
         data = self._raw.get(old_key) or {}
         data["key"] = new_key
@@ -254,7 +265,7 @@ class TuningRuleManager:
             self._rel(f"{new_key}.yaml"),
             yaml.dump(data, allow_unicode=True, sort_keys=False),
         )
-        self._resolver.delete_entity(self._rel(self._files[old_key]))
+        self._resolver.delete_entity(old_rel)
         self._rename_tuning_rule(old_key, new_key)
         self.reload()
 
@@ -396,6 +407,15 @@ class TuningGroupManager:
 
     def _rel(self, filename: str) -> str:
         return f"{self._rel_dir}/{filename}" if self._rel_dir else filename
+
+    def is_system_group(self, key: str) -> bool:
+        """规则组是否来自 system 层且当前用户无权删除。"""
+        filename = self._files.get(key)
+        return bool(
+            filename
+            and not self._resolver.is_dev_mode()
+            and self._resolver.is_system_entity(self._rel(filename))
+        )
 
     def _read_base_rules(self) -> list[str]:
         """从 tune_config.yaml 读取 base_rules 数组"""
@@ -680,7 +700,5 @@ def _on_config_change(rel_path: str):
 
 
 get_resolver().add_change_listener(_on_config_change)
-
-
 
 

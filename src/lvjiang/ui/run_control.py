@@ -194,9 +194,9 @@ class RunControlMixin:
     # ─── 工作流配置加载 ──────────────────────────────────
 
     def _load_workflow_configs(self):
-        """发现全部脚本，按 workflows.yaml 的 exposed/overrides 过滤排序后填充下拉。
+        """发现全部脚本，按作者声明与用户偏好过滤排序后填充下拉。
 
-        脚本本体（.wf + 内置类）由发现层自动扫描；workflows.yaml 只决定日常页
+        脚本本体（.wf + 内置类）由发现层自动扫描；暴露层只决定日常页
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
         """

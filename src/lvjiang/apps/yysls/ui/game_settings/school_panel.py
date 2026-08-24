@@ -49,6 +49,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
+from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config.yaml"
@@ -290,8 +291,12 @@ class SchoolPanel(QWidget):
             self._ps_list.setCurrentItem(matches[0])
 
     def _on_school_changed(self, row: int):
-        """切换流派 → 刷新右侧表单"""
+        """切换流派 → 刷新右侧表单与删除按钮可用性"""
         name = self._names[row] if 0 <= row < len(self._names) else None
+        ok, hint = deletable(name, factory_dict_keys(_ATTRS_REL, "schools"),
+                             hint=READONLY_HINT)
+        self._btn_del.setEnabled(name is not None and ok)
+        self._btn_del.setToolTip(hint)
         cfg = (self._schools().get(name) or {}) if name else {}
         main = cfg.get("main") or {}
         sub = cfg.get("sub") or {}

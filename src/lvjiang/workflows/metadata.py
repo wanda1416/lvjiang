@@ -1,8 +1,8 @@
 """工作流 front-matter 元数据解析
 
 .wf 文件可在任意位置（约定放文件顶部）用 `#%` 前缀声明 YAML 元数据，
-schema 与 workflows.yaml 的单条 flow 完全一致
-（name / note / required_scenes / parameters）。
+可声明 name / note / env / parameters / scope / hidden
+（``hidden: true`` 表示默认不在日常页展示，见 :mod:`lvjiang.workflows.policy`）。
 
 由于每行都以 `#` 开头，DSL 引擎将其视为普通注释忽略，文件仍可直接执行；
 而本模块单独收集这些行、剥掉 `#%` 前缀后按 YAML 解析，从而“提前”拿到名字与参数。

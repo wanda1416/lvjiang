@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ...core.config.resolver import get_resolver
 from ...core.layout_manager import copy_screenshots, delete_screenshots
 from ...core.layout_models import Layout
 from ...i18n import tr
@@ -69,13 +70,24 @@ class LayoutOpsMixin:
         self._btn_save.setEnabled(has_layout)
         self._btn_save_as.setEnabled(has_layout)
         is_active = has_layout and self._current_layout.name == active
-        self._btn_delete.setEnabled(has_layout and not is_active)
+        is_system = bool(
+            has_layout
+            and not get_resolver().is_dev_mode()
+            and self._manager.is_system_layout(self._current_layout.name)
+        )
+        can_delete = has_layout and not is_active and not is_system
+        self._btn_delete.setEnabled(can_delete)
+        if is_system:
+            self._btn_delete.setToolTip(tr("出厂布局不可删除；不使用时切换到其他布局即可"))
+        elif is_active:
+            self._btn_delete.setToolTip(tr("当前激活布局不可删除"))
+        else:
+            self._btn_delete.setToolTip("")
 
         # 更新继承标识
         if hasattr(self, "_inherit_label"):
             if has_layout and self._manager.is_alias_layout(self._current_layout.name):
                 # 获取父布局名称
-                from ...core.config.resolver import get_resolver
                 resolver = get_resolver()
                 merged = resolver.load_merged("layouts.yaml")
                 entry = merged.get("layouts", {}).get(self._current_layout.name) or {}

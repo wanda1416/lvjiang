@@ -1,7 +1,9 @@
 """场景注册表 CRUD 边界保护。"""
 
 import pytest
+import yaml
 
+from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 from lvjiang.core.scene_definition import SceneRegistry
 
 
@@ -35,3 +37,28 @@ def test_create_group_rejects_empty_name():
 
     with pytest.raises(ValueError, match="名称不能为空"):
         registry.create_group("valid_key", "  ")
+
+
+def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    (scenes / "factory.yaml").write_text(
+        yaml.dump({"key": "factory", "name": "出厂场景", "regions": []},
+                  allow_unicode=True),
+        encoding="utf-8",
+    )
+    resolver = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=False,
+    )
+    registry = SceneRegistry(resolver=resolver)
+
+    with pytest.raises(SystemContentProtected):
+        registry.rename_scene("factory", "renamed", "新名称")
+
+    assert not (local / "scenes" / "renamed.yaml").exists()
+    scene = registry.get_scene("factory")
+    assert scene is not None
+    assert scene.key == "factory"
+    assert scene.name == "出厂场景"

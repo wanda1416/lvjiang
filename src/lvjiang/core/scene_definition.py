@@ -356,6 +356,10 @@ class SceneRegistry:
         _validate_key_and_name(new_key, new_name, tr("场景"))
         if new_key != key and new_key in self._scenes:
             raise ValueError(f"场景 key 已存在: {new_key}")
+        if new_key != key:
+            # 重命名是写新删旧；先鉴权，禁止在用户模式下为 system 场景
+            # 创建孤立的新 key 影子文件。
+            self._resolver.ensure_entity_deletable(f"scenes/{key}.yaml")
         scene = self._scenes[key]
         old_name = scene.name
         scene.key = new_key

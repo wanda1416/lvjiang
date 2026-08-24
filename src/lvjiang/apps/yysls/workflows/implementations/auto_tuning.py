@@ -80,6 +80,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     # （全部部位 + 全部规则默认判定，见 _ensure_judge_config 的回退），
     # 细粒度配置仍只在桌面调律 Tab 经 run_ctx 注入。
     DISPLAY_NAME = "自动调律"
+    # 专用脚本：日常 Tab 不画其参数面板，由专属配置页自行管理
+    SCOPE = "dedicated"
 
     # ─── 共享常量 ──────────────────────────────────────────
 

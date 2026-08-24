@@ -160,6 +160,7 @@ class BaseRuleGroupPage(QWidget):
             QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(
             QTableWidget.SelectionMode.SingleSelection)
+        self._table.itemSelectionChanged.connect(self._refresh_delete_state)
         self._table.setToolTip(tr("双击「规则说明」列可编辑，选中一行后可复制/删除该规则组"))
         layout.addWidget(self._table)
 
@@ -171,14 +172,23 @@ class BaseRuleGroupPage(QWidget):
         copy_btn.setToolTip(tr("复制选中规则组为独立副本"))
         copy_btn.clicked.connect(self._on_copy)
         btn_row.addWidget(copy_btn)
-        del_btn = QPushButton(tr("删除选中"))
-        del_btn.setToolTip(tr("删除选中规则组（至少保留一个）"))
-        del_btn.clicked.connect(self._on_delete)
-        btn_row.addWidget(del_btn)
+        self._del_btn = QPushButton(tr("删除选中"))
+        self._del_btn.setToolTip(tr("删除选中规则组（至少保留一个）"))
+        self._del_btn.clicked.connect(self._on_delete)
+        btn_row.addWidget(self._del_btn)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
         layout.addStretch()
+
+    def _refresh_delete_state(self) -> None:
+        key = self._selected_key()
+        protected = bool(key and self._manager.is_system_group(key))
+        self._del_btn.setEnabled(bool(key) and not protected)
+        if protected:
+            self._del_btn.setToolTip(tr("出厂规则组不可删除"))
+        else:
+            self._del_btn.setToolTip(tr("删除选中规则组（至少保留一个）"))
 
     # ── 清单刷新 ──
 
@@ -318,7 +328,7 @@ class BaseRuleGroupPage(QWidget):
             return
         try:
             self._manager.delete_group(key)
-        except RuleValidationError as e:
+        except (RuleValidationError, PermissionError) as e:
             QMessageBox.warning(self, tr("删除基础规则组"), str(e))
             return
         if self._group_key == key:

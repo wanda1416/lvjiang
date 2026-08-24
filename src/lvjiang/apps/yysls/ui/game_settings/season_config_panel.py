@@ -32,6 +32,12 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps.yysls.config import SeasonConfig, get_game_config
 
 from .....i18n import tr
+from .factory_guard import (
+    GAME_CONFIG_REL,
+    READONLY_HINT,
+    deletable,
+    factory_list_values,
+)
 from .level_combo import LevelCombo
 
 
@@ -94,9 +100,9 @@ class SeasonConfigPanel(QWidget):
         add_btn = QPushButton(tr("添加赛季"))
         add_btn.clicked.connect(self._on_add_row)
         btn_row.addWidget(add_btn)
-        del_btn = QPushButton(tr("删除选中"))
-        del_btn.clicked.connect(self._on_del_row)
-        btn_row.addWidget(del_btn)
+        self._del_btn = QPushButton(tr("删除选中"))
+        self._del_btn.clicked.connect(self._on_del_row)
+        btn_row.addWidget(self._del_btn)
         btn_row.addSpacing(8)
         self._up_btn = QPushButton(tr("▲ 上移"))
         self._up_btn.setToolTip(tr("将选中赛季上移一行"))
@@ -253,6 +259,22 @@ class SeasonConfigPanel(QWidget):
         self._up_btn.setEnabled(has_selection and row > 0)
         self._down_btn.setEnabled(
             has_selection and row < self._table.rowCount() - 1)
+        self._refresh_del_enabled(row)
+
+    def _refresh_del_enabled(self, row: int) -> None:
+        """出厂行不允许用户删除，置灰并说明原因"""
+        # 本表所有列都是 setCellWidget，item() 恒为 None——身份要从
+        # _NUMBER_COL 上的 QSpinBox 取值，不能读单元格文本。
+        ident = None
+        if row >= 0:
+            widget = self._table.cellWidget(row, _NUMBER_COL)
+            if isinstance(widget, QSpinBox):
+                ident = widget.value()
+        ok, hint = deletable(
+            ident, factory_list_values(GAME_CONFIG_REL, "season_configs", field="season_number"),
+            hint=READONLY_HINT)
+        self._del_btn.setEnabled(row >= 0 and ok)
+        self._del_btn.setToolTip(hint)
 
     def _refresh_seq_numbers(self) -> None:
         """刷新序号列，保持与行序一致"""

@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+from typing import cast
+
 from loguru import logger
 from PyQt6.QtCore import QLocale, Qt
 from PyQt6.QtGui import QDoubleValidator
@@ -60,11 +62,19 @@ class PlayStyleDialogMixin:
     - self._combo_play_style (QComboBox)
     """
 
+    def _play_style_dialog_parent(self) -> QWidget:
+        """Return the concrete QWidget host expected by Qt dialog APIs."""
+        return cast(QWidget, self)
+
     def _on_create_play_style(self):
         """创建基础属性按钮 → 弹出对话框。"""
         school = self._get_current_school()
         if not school:
-            QMessageBox.warning(self, tr("无法创建"), tr("请先选择一个流派"))
+            QMessageBox.warning(
+                self._play_style_dialog_parent(),
+                tr("无法创建"),
+                tr("请先选择一个流派"),
+            )
             return
 
         # 获取流派属性
@@ -72,7 +82,8 @@ class PlayStyleDialogMixin:
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
 
-        dlg = _CreatePlayStyleDialog(self, school_attr=school_attr)
+        dlg = _CreatePlayStyleDialog(
+            self._play_style_dialog_parent(), school_attr=school_attr)
         self._finish_play_style_dialog(school, dlg)
 
     def _on_open_play_style_form(self, prefill: dict):
@@ -85,7 +96,7 @@ class PlayStyleDialogMixin:
         school = self._get_current_school()
         if not school:
             QMessageBox.warning(
-                self, tr("无法创建"),
+                self._play_style_dialog_parent(), tr("无法创建"),
                 tr("请先选择一个流派后再确认基础属性识别结果"),
             )
             return
@@ -94,7 +105,11 @@ class PlayStyleDialogMixin:
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
 
-        dlg = _CreatePlayStyleDialog(self, school_attr=school_attr, initial_values=prefill)
+        dlg = _CreatePlayStyleDialog(
+            self._play_style_dialog_parent(),
+            school_attr=school_attr,
+            initial_values=prefill,
+        )
         self._finish_play_style_dialog(school, dlg)
 
     def _finish_play_style_dialog(self, school: str, dlg: "_CreatePlayStyleDialog"):
@@ -110,7 +125,11 @@ class PlayStyleDialogMixin:
         name = dlg.get_play_style_name()
 
         if not name:
-            QMessageBox.warning(self, tr("无法保存"), tr("基础属性名称不能为空"))
+            QMessageBox.warning(
+                self._play_style_dialog_parent(),
+                tr("无法保存"),
+                tr("基础属性名称不能为空"),
+            )
             return
 
         # 检查重名
@@ -118,7 +137,7 @@ class PlayStyleDialogMixin:
         existing = get_play_styles(school)
         if name in existing:
             ret = QMessageBox.question(
-                self, tr("基础属性已存在"),
+                self._play_style_dialog_parent(), tr("基础属性已存在"),
                 tr("基础属性「{name}」已存在，是否覆盖？").format(name=name),
             )
             if ret != QMessageBox.StandardButton.Yes:
@@ -143,7 +162,7 @@ class PlayStyleDialogMixin:
         # 保存
         self._save_play_style(school, name, base_attrs)
         QMessageBox.information(
-            self, tr("保存成功"),
+            self._play_style_dialog_parent(), tr("保存成功"),
             tr("基础属性「{name}」已保存到流派「{school}」").format(name=name, school=school),
         )
 

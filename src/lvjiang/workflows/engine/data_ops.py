@@ -30,6 +30,8 @@ from .signals import WorkflowUserError, _ReturnSignal
 class _DataOpsMixin:
     """数据指令执行：OCR/识别取数、collect 输出、eval 赋值、过程调用"""
 
+    _base_dir: Path | None
+
     def _resolve_literal(self, value) -> Any:
         """递归解析 literal 内的 VarRef/FieldAccess（用于 default 的 dict/list）
 

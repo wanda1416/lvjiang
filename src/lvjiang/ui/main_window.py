@@ -713,6 +713,15 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         row2.addWidget(self.lbl_window_info)
         row2.addStretch()
 
+        # 红框标定：定位后窗口边缘是否显示红色标记框，纯运行期状态，不持久化，
+        # 每次启动默认勾选。
+        self.chk_red_box = QCheckBox(tr("红框标定"))
+        self.chk_red_box.setVisible(False)
+        self.chk_red_box.setChecked(True)
+        self.chk_red_box.setToolTip(tr("定位窗口后是否显示红色边框标记；不保存配置，仅本次运行期间生效"))
+        self.chk_red_box.stateChanged.connect(self._on_red_box_changed)
+        row2.addWidget(self.chk_red_box)
+
         self.chk_bg_mode = QCheckBox(tr("后台模式"))
         self.chk_bg_mode.setVisible(False)
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)

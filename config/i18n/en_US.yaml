@@ -84,6 +84,26 @@ about_dialog:
   btn_check_update: Check for Updates
   checking: Checking...
   check_failed: Update check failed
+feedback_dialog:
+  title: Feedback and Suggestions
+  heading: Prepare complete diagnostic information before reporting an issue
+  summary: Only reports with enough information to reproduce or diagnose the problem enter developer triage; acceptance does not promise a fix date.
+  required_title: Bug reports must include at least
+  required_version: LvJiang version; source builds must also include the commit hash
+  required_environment: Runtime environment, layout, device resolution, and orientation
+  required_backend: Capture method, input method, workflow name, and all parameters
+  required_reproduction: Reproduction steps, expected and actual results, and frequency
+  required_evidence: Continuous logs around the failure; screenshots or video for recognition and input issues
+  scope_title: Support scope
+  scope_accepted: "Accepted: reproducible bugs, feature requests, and outdated or unusable documentation."
+  scope_rejected: "Not accepted: one-to-one tutorials, remote setup, incomplete reports, explicitly unsupported features, third-party modifications, or commercial use."
+  privacy: Redact account details, character names, ADB serial numbers, tokens, and other private information before submitting logs or screenshots.
+  btn_group: Join Group
+  btn_details: Reporting Guide
+  btn_issue: Report on GitHub
+  btn_close: Close
+  group_hint: Please use the community group for general usage discussion and questions
+  qr_failed: Failed to load the community group QR code
 user_manager:
   title: User Management
   btn_close: Close

@@ -1,5 +1,5 @@
 #% name: 自动购买心法
-#% env: [android]
+#% env: [android, desktop]
 
 # 自动购买心法流程
 #
@@ -59,11 +59,19 @@ loop while 1 == 1
     click [training_xinfa].[count] after wait @step_interval
     click [training_xinfa].[recycle_entry] after wait @step_interval
     click [training_xinfa].[recycle] after wait @step_interval
-    click [training_xinfa].[confirm] after wait @page_refresh
+    if env("android")
+        click [training_xinfa].[confirm] after wait @page_refresh
+    else 
+        press "SPACE" after wait @page_refresh
+    end
 
     click [training_xinfa].$zixuan after wait @step_interval
     click [training_xinfa].[add_all] after wait @step_interval
-    click [training_xinfa].[purchase] after wait @page_refresh
+    if env("android")
+        click [training_xinfa].[purchase] after wait @page_refresh
+    else 
+        press "SPACE" after wait @page_refresh
+    end
 
     # 检查购买后是否出现确认按钮（未出现则数量不足）
     scan [training_xinfa].[confirm] as $confirm by contains "确认"
@@ -74,7 +82,11 @@ loop while 1 == 1
     end
 
     click [training_xinfa].[add_max] after wait @step_interval
-    click [training_xinfa].[confirm] after wait @page_refresh
-
-    click [training_xinfa].[blank] after wait @step_interval
+    if env("android")
+        click [training_xinfa].[confirm] after wait @page_refresh
+        click [training_xinfa].[blank] after wait @step_interval
+    else 
+        press "SPACE" after wait @page_refresh
+        press "SPACE" after wait @step_interval
+    end
 end

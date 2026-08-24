@@ -9,6 +9,7 @@ system ← local 合并），保存后以配置文件为准覆盖代码默认值
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
@@ -19,6 +20,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QSpinBox,
     QTabWidget,
     QToolButton,
@@ -98,7 +100,10 @@ class SettingsDialog(QDialog):
     def _connect_dirty_signals(self):
         """UI 构建完成后统一连接变更信号（避免初始赋值触发）"""
         self._lang_combo.currentIndexChanged.connect(self._mark_dirty)
-        self._capture_combo.currentIndexChanged.connect(self._mark_dirty)
+        self._capture_stream_radio.toggled.connect(self._mark_dirty)
+        self._capture_static_radio.toggled.connect(self._mark_dirty)
+        self._android_input_adb_radio.toggled.connect(self._mark_dirty)
+        self._android_input_agent_radio.toggled.connect(self._mark_dirty)
         self._input_combo.currentIndexChanged.connect(self._mark_dirty)
         self._title_edit.textChanged.connect(self._mark_dirty)
         self._offset_spin.valueChanged.connect(self._mark_dirty)
@@ -134,18 +139,45 @@ class SettingsDialog(QDialog):
             self._lang_combo.setCurrentIndex(idx)
         form.addRow(tr("界面语言") + ":", self._lang_combo)
 
-        self._capture_combo = QComboBox()
-        self._capture_combo.addItem(tr("视频流截图 (scrcpy)"), True)
-        self._capture_combo.addItem(tr("静态截图 (screencap)"), False)
-        self._capture_combo.setCurrentIndex(0 if self._config.adb_capture_streaming else 1)
-        form.addRow(tr("ADB 截图方式:"), self._capture_combo)
+        capture_row = QWidget()
+        capture_layout = QHBoxLayout(capture_row)
+        capture_layout.setContentsMargins(0, 0, 0, 0)
+        self._capture_group = QButtonGroup(self)
+        self._capture_stream_radio = QRadioButton(tr("scrcpy 视频流"))
+        self._capture_static_radio = QRadioButton(tr("ADB screencap 静态截图"))
+        self._capture_group.addButton(self._capture_stream_radio)
+        self._capture_group.addButton(self._capture_static_radio)
+        self._capture_stream_radio.setChecked(
+            self._config.android_capture_method == "scrcpy")
+        self._capture_static_radio.setChecked(
+            self._config.android_capture_method == "screencap")
+        capture_layout.addWidget(self._capture_stream_radio)
+        capture_layout.addWidget(self._capture_static_radio)
+        capture_layout.addStretch()
+        form.addRow(tr("安卓截图方式:"), capture_row)
 
-        self._agent_combo = QComboBox()
-        self._agent_combo.addItem(tr("设备端手势 (律匠 app 无障碍)"), True)
-        self._agent_combo.addItem(tr("adb shell input"), False)
-        self._agent_combo.setCurrentIndex(0 if self._config.adb_agent_mode else 1)
-        self._agent_combo.setToolTip(tr("手机上安装律匠 app 并开启无障碍后，点击/拖拽/截图由 app 落地；app 不可达时自动回退 adb"))
-        form.addRow(tr("ADB 输入方式:"), self._agent_combo)
+        input_row = QWidget()
+        input_layout = QHBoxLayout(input_row)
+        input_layout.setContentsMargins(0, 0, 0, 0)
+        self._android_input_group = QButtonGroup(self)
+        self._android_input_adb_radio = QRadioButton(tr("ADB shell input"))
+        self._android_input_agent_radio = QRadioButton(
+            tr("设备端手势（Beta，需安装律匠 App）"))
+        self._android_input_group.addButton(self._android_input_adb_radio)
+        self._android_input_group.addButton(self._android_input_agent_radio)
+        self._android_input_adb_radio.setChecked(
+            self._config.android_input_method == "adb")
+        self._android_input_agent_radio.setChecked(
+            self._config.android_input_method == "device_gesture")
+        agent_tip = tr(
+            "实验功能：手机需安装律匠 App 并开启无障碍服务；"
+            "仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。")
+        self._android_input_agent_radio.setToolTip(agent_tip)
+        input_row.setToolTip(agent_tip)
+        input_layout.addWidget(self._android_input_adb_radio)
+        input_layout.addWidget(self._android_input_agent_radio)
+        input_layout.addStretch()
+        form.addRow(tr("安卓输入方式:"), input_row)
 
         self._input_combo = QComboBox()
         self._input_combo.addItem(tr("后台输入 (PostMessage)"), True)
@@ -452,8 +484,10 @@ class SettingsDialog(QDialog):
         if delay_params is None:
             return
         settings = {
-            "adb_capture_streaming": self._capture_combo.currentData(),
-            "adb_agent_mode": self._agent_combo.currentData(),
+            "android_capture_method": (
+                "scrcpy" if self._capture_stream_radio.isChecked() else "screencap"),
+            "android_input_method": (
+                "device_gesture" if self._android_input_agent_radio.isChecked() else "adb"),
             "desktop_background_input": self._input_combo.currentData(),
             "desktop_window_title": self._title_edit.text().strip(),
         }

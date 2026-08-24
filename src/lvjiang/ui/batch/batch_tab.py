@@ -79,6 +79,8 @@ _STYLE_BTN_DISABLED = (
     "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 
+_BATCH_LIST_ROW_HEIGHT = 32
+
 
 # ─── enabled 用户态（session.json）──────────────────────────
 
@@ -198,6 +200,10 @@ class BatchTab(QWidget):
         self._script_list.setHeaderLabels([tr("脚本候选"), tr("执行顺序")])
         self._script_list.setRootIsDecorated(False)
         self._script_list.setUniformRowHeights(True)
+        self._script_list.setIndentation(0)
+        self._script_list.setStyleSheet(
+            "QTreeWidget::item { padding-left: 6px; padding-right: 8px; }"
+        )
         self._script_list.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -206,9 +212,11 @@ class BatchTab(QWidget):
         )
         header = self._script_list.header()
         assert header is not None
+        header.setMinimumHeight(32)
+        header.setMinimumSectionSize(88)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self._script_list.setColumnWidth(1, 80)
+        self._script_list.setColumnWidth(1, 96)
         self._script_list.itemChanged.connect(self._on_script_item_changed)
         self._script_list.currentItemChanged.connect(
             lambda *_: self._update_script_move_buttons()
@@ -328,6 +336,7 @@ class BatchTab(QWidget):
         for i, row_data in enumerate(config.rows):
             label = self._format_row_label(config, row_data)
             cb = QCheckBox(label)
+            cb.setMinimumHeight(_BATCH_LIST_ROW_HEIGHT)
             checked = config_enabled[i] if i < len(config_enabled) else True
             cb.setChecked(checked)
             cb.stateChanged.connect(self._on_entry_check_changed)
@@ -409,10 +418,8 @@ class BatchTab(QWidget):
                     and script_id not in self._script_order:
                 self._script_order.append(script_id)
 
-        # 与“配置”页的 QCheckBox 行保持相同的控件高度和垂直间距。
-        row_height = QCheckBox().sizeHint().height() + max(
-            0, self._entry_container.spacing()
-        )
+        # 脚本与配置两页使用同一行高，避免树控件按字体最小高度挤成一团。
+        row_height = _BATCH_LIST_ROW_HEIGHT
         for script_cfg in configs:
             item = QTreeWidgetItem([script_cfg["name"], ""])
             item.setData(0, Qt.ItemDataRole.UserRole, script_cfg)

@@ -174,9 +174,20 @@ class TestDiscoverScripts:
         assert ids == ["a_flow", "m_flow", "z_flow"]
 
 
+def _stub_prefs(monkeypatch, *, order=None, visible=None, names=None, scopes=None):
+    """打桩用户偏好，避免用例读到真实 session"""
+    from lvjiang.workflows.preferences import DailyScriptPrefs
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.load_preferences",
+        lambda: DailyScriptPrefs(order or [], visible or {}, names or {}, scopes or {}))
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.migrate_legacy_workflows_yaml", lambda: False)
+
+
 class TestListExposedScripts:
-    def test_exposed_empty_shows_all(self, tmp_path, monkeypatch):
-        """exposed 为空时展示全部"""
+    def test_no_preference_shows_all(self, tmp_path, monkeypatch):
+        """没有任何偏好时展示全部（作者未声明 hidden）"""
+        _stub_prefs(monkeypatch)
         monkeypatch.setattr(
             "lvjiang.workflows.discovery.get_resolver",
             lambda: type("R", (), {
@@ -195,13 +206,14 @@ class TestListExposedScripts:
         result = list_exposed_scripts()
         assert len(result) == 2
 
-    def test_exposed_filters_and_orders(self, tmp_path, monkeypatch):
-        """exposed 非空时按序过滤"""
+    def test_user_preference_filters_and_orders(self, tmp_path, monkeypatch):
+        """用户偏好可隐藏脚本并指定顺序"""
+        _stub_prefs(monkeypatch, order=["flow_b"], visible={"flow_a": False})
         monkeypatch.setattr(
             "lvjiang.workflows.discovery.get_resolver",
             lambda: type("R", (), {
                 "enumerate_entities": lambda self, d, p: [],
-                "load_merged": lambda self, rel: {"exposed": ["flow_b"]},
+                "load_merged": lambda self, rel: {},
             })(),
         )
         monkeypatch.setattr(
@@ -216,16 +228,14 @@ class TestListExposedScripts:
         assert len(result) == 1
         assert result[0]["id"] == "flow_b"
 
-    def test_overrides_rename(self, tmp_path, monkeypatch):
-        """overrides 可改名"""
+    def test_user_preference_rename(self, tmp_path, monkeypatch):
+        """用户偏好可改显示名"""
+        _stub_prefs(monkeypatch, names={"flow_a": "显示名称"})
         monkeypatch.setattr(
             "lvjiang.workflows.discovery.get_resolver",
             lambda: type("R", (), {
                 "enumerate_entities": lambda self, d, p: [],
-                "load_merged": lambda self, rel: {
-                    "exposed": ["flow_a"],
-                    "overrides": {"flow_a": {"name": "显示名称"}},
-                },
+                "load_merged": lambda self, rel: {},
             })(),
         )
         monkeypatch.setattr(

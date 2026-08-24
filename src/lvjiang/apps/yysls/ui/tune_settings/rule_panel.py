@@ -140,7 +140,8 @@ class RulePanel(QWidget):
         self._settings_page = RuleSettingsPage(
             self._data, self._on_changed, on_delete=self._request_delete,
             on_rename=self._rename_rule,
-            on_enable_changed=self._on_rule_enable_changed)
+            on_enable_changed=self._on_rule_enable_changed,
+            protected=self._manager.is_system_rule(self._key))
         # 回填启用状态（从 tune_config.tuning_rules 读取）
         self._settings_page.set_enabled(self._is_rule_enabled())
         self._stack.addWidget(self._wrap_scroll(self._settings_page))

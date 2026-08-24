@@ -179,20 +179,35 @@ class TestUserModeWrites:
         # 合并视图可见
         assert db.get_entry(entry.file) is not None
 
-    def test_remove_system_entry_appends_deleted(self, layers):
+    def test_remove_system_entry_refused(self, layers):
+        """出厂参考图不允许用户删除——想要自己的一套请新建图库空间。"""
+        from lvjiang.core.config.resolver import SystemContentProtected
+
         system_dir, system_yaml, _, local_yaml = layers
         (system_dir / "bucket_00").mkdir(parents=True)
         (system_dir / "bucket_00" / "A.png").write_bytes(b"sys")
         _write_yaml(system_yaml, {"version": 1, "references": [
             _entry("A.png", "甲")]})
         db = _make_db(layers, dev_mode=False)
-        assert db.remove_entry("A.png") is True
-        # system 图片与 yaml 均不动
+        with pytest.raises(SystemContentProtected):
+            db.remove_entry("A.png")
+        # 图片、名册、合并视图都不受影响
         assert (system_dir / "bucket_00" / "A.png").exists()
         assert yaml.safe_load(system_yaml.read_text(
             encoding="utf-8"))["references"]
-        overlay = yaml.safe_load(local_yaml.read_text(encoding="utf-8"))
-        assert overlay["deleted"] == ["A.png"]
+        assert not local_yaml.exists()
+        assert [e.file for e in db.entries] == ["A.png"]
+
+    def test_remove_own_local_entry_allowed(self, layers):
+        """用户自己加的条目照常可删。"""
+        _, system_yaml, local_dir, local_yaml = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        (local_dir / "bucket_00").mkdir(parents=True)
+        (local_dir / "bucket_00" / "B.png").write_bytes(b"mine")
+        _write_yaml(local_yaml, {"version": 1, "references": [
+            _entry("B.png", "乙")]})
+        db = _make_db(layers, dev_mode=False)
+        assert db.remove_entry("B.png") is True
         assert db.entries == []
 
     def test_remove_local_only_entry_deletes_file(self, layers):

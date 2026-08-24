@@ -1,5 +1,6 @@
 #% name: 周常百业货运
 #% env: [android, desktop]
+#% hidden: true   # 尚未开发完毕，默认不在日常页展示
 
 # 周常百业货运流程
 #

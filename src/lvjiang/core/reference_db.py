@@ -699,12 +699,16 @@ class ReferenceDatabase:
     def remove_entry(self, filename: str, delete_file: bool = True) -> bool:
         """删除条目
 
-        开发模式直删所在层；用户模式下 local 独有条目删条目删图，
-        system 条目落 deleted 列表（system 图片不动）。
+        开发模式直删所在层。用户模式下只能删自己的 local 条目；出厂条目属于
+        system 内容，不允许删除——想要一套自己的图请**新建图库空间**，
+        而不是把出厂图去掉（详见 docs/30-architecture/05-config-layering.md）。
 
         Args:
             filename: 目标文件路径（相对路径）
             delete_file: 是否同时删除可写层的图片文件
+
+        Raises:
+            SystemContentProtected: 用户模式下试图删除出厂条目
 
         Returns:
             是否找到并删除
@@ -714,17 +718,20 @@ class ReferenceDatabase:
         if local_entry is None and system_entry is None:
             return False
 
+        if system_entry is not None and not self._is_dev():
+            from .config.resolver import SystemContentProtected
+            raise SystemContentProtected(
+                f"参考图 {filename} 由出厂图库提供，用户模式下不可删除；"
+                f"如需自己的一套请新建图库空间")
+
         if local_entry is not None:
             self._local_entries.remove(local_entry)
             if delete_file:
                 self._delete_image(self.local_dir, filename)
         if system_entry is not None:
-            if self._is_dev():
-                self._system_entries.remove(system_entry)
-                if delete_file:
-                    self._delete_image(self.system_dir, filename)
-            else:
-                self._deleted.add(filename)
+            self._system_entries.remove(system_entry)
+            if delete_file:
+                self._delete_image(self.system_dir, filename)
 
         self.save()
         self._rebuild_merged()

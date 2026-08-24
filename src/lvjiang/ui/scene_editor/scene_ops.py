@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 
+from ...core.config.resolver import get_resolver
 from ...core.layout_manager import (
     delete_scene_across_all_layouts,
     rename_scene_across_all_layouts,
@@ -459,6 +460,15 @@ class SceneOpsMixin:
         menu = QMenu(self)  # type: ignore[call-overload]
         rename_action = menu.addAction(tr("重命名"))
         delete_action = menu.addAction(tr("删除"))
+        resolver = get_resolver()
+        protected = (
+            not resolver.is_dev_mode()
+            and resolver.is_system_entity(f"scenes/{scene_key}.yaml")
+        )
+        if protected:
+            delete_action.setEnabled(False)
+            delete_action.setToolTip(tr("出厂场景不可删除"))
+            rename_action.setToolTip(tr("出厂场景只能修改显示名称，不能修改 key"))
         # 更改分组子菜单
         move_menu = menu.addMenu(tr("更改分组"))
         registry = get_registry()
@@ -503,6 +513,14 @@ class SceneOpsMixin:
         dialog.setWindowTitle(tr("重命名场景"))
         form = QFormLayout(dialog)
         key_edit = QLineEdit(scene_key)
+        resolver = get_resolver()
+        protected = (
+            not resolver.is_dev_mode()
+            and resolver.is_system_entity(f"scenes/{scene_key}.yaml")
+        )
+        if protected:
+            key_edit.setEnabled(False)
+            key_edit.setToolTip(tr("出厂场景不能修改 key"))
         form.addRow(tr("场景 Key:"), key_edit)
         name_edit = QLineEdit(old_name)
         form.addRow(tr("场景名称:"), name_edit)
@@ -552,7 +570,7 @@ class SceneOpsMixin:
         key_changed = new_key != scene_key
         try:
             registry.rename_scene(scene_key, new_key, new_name)
-        except ValueError as e:
+        except (ValueError, PermissionError) as e:
             QMessageBox.warning(self, tr("重命名失败"), str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
@@ -593,7 +611,7 @@ class SceneOpsMixin:
         pos = siblings.index(scene_key) if scene_key in siblings else -1
         try:
             registry.delete_scene(scene_key)
-        except ValueError as e:
+        except (ValueError, PermissionError) as e:
             QMessageBox.warning(self, tr("删除失败"), str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()

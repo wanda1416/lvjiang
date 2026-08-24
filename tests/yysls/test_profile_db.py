@@ -177,6 +177,43 @@ class TestCRUD:
         assert updated is False
         assert db.get_entry("user1", "regen", "xinli") == {}
 
+    def test_update_if_current_inserts_when_missing_is_expected(self, db: ProfileDB):
+        updated = db.update_if_current(
+            "user1", "regen", "xinli",
+            expected_value=0,
+            expected_updated_at="",
+            expected_entry_exists=False,
+            new_value=10,
+            new_updated_at="2026-08-11T10:08:00",
+            change_type="action",
+            detail="delta:+10",
+        )
+
+        assert updated is True
+        entry = db.get_entry("user1", "regen", "xinli")
+        assert entry["value"] == 10
+        assert entry["updated_at"] == "2026-08-11T10:08:00"
+        history = db.get_history("user1")
+        assert len(history) == 1
+        assert history[0]["old_value"] is None
+        assert history[0]["new_value"] == 10
+
+    def test_update_if_current_missing_snapshot_rejects_concurrent_insert(
+        self, db: ProfileDB,
+    ):
+        db.upsert("user1", "regen", "xinli", 5)
+
+        updated = db.update_if_current(
+            "user1", "regen", "xinli",
+            expected_value=0,
+            expected_updated_at="",
+            expected_entry_exists=False,
+            new_value=10,
+        )
+
+        assert updated is False
+        assert db.get_entry("user1", "regen", "xinli")["value"] == 5
+
 
 # ─── Schema 版本管理 ──────────────────────────────────────────
 

@@ -89,6 +89,25 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     assert stored_ts <= datetime.now() - timedelta(minutes=3, seconds=58)
 
 
+def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_entry
+    from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
+
+    result = profile_action(
+        profile_func_env.username,
+        "xinli",
+        model_type="regen",
+        delta=10,
+        current_value=0,
+        expected_entry={},
+        use_cas=True,
+    )
+
+    assert result == 10
+    entry = db_read_entry(profile_func_env.username, "regen", "xinli")
+    assert entry["value"] == 10
+
+
 def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func_env):
     from lvjiang.apps.yysls.core.profile_engine.profile_db import (
         db_read_entry,

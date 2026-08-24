@@ -15,6 +15,7 @@ main_window:
   menu_script_config: 脚本配置
   menu_batch_config: 批量配置
   menu_help: 帮助
+  menu_announcements: 公告
   menu_check_update: 检查更新
   menu_docs: 文档
   menu_feedback: 反馈
@@ -165,6 +166,22 @@ update_dialog:
   btn_release_notes: 前往发布声明
   btn_download: 下载该版本
   btn_continue: 忽略该提示
+announcement_dialog:
+  title: 公告
+  refresh: 重新获取
+  fetching: 获取中...
+  fetching_notice: 正在获取公告...
+  details: 查看详情
+  close: 关闭
+  empty: 暂无公告
+  no_cache: 尚未获取到公告，点击“重新获取”进行同步。
+  notice_version: 公告版本 {version}
+  updated_at: 更新于 {date}
+  fetch_failed: '获取公告失败: {error}'
+  cached_error: 获取失败，当前显示上次缓存：{error}
+  level_critical: 严重
+  level_warning: 警告
+  level_info: 通知
 ocr_dialog:
   title: 图像识别
   tab_ocr: 图像识别

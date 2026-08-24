@@ -641,9 +641,9 @@ class WindowOpsMixin:
         self.btn_scan_device.setEnabled(not connected)
         self.window_combo.setEnabled(not connected)
         if connected:
-            # 连接/定位后锁定所有 checkbox，防止误切换
-            if hasattr(self, "chk_bg_mode"):
-                self.chk_bg_mode.setEnabled(False)
+            # 连接/定位后锁定 ADB 侧 checkbox，防止误切换。
+            # 后台模式不在此一并锁死：Windows 定位后允许再次切换（见 _refresh_bg_mode_lock），
+            # 避免每次切换都要断连重新定位；它只在任务运行期间被锁定。
             if hasattr(self, "chk_scrcpy"):
                 self.chk_scrcpy.setEnabled(False)
             if hasattr(self, "chk_agent"):
@@ -656,9 +656,23 @@ class WindowOpsMixin:
                 self.chk_scrcpy.setEnabled(True)
             if hasattr(self, "chk_agent") and self.chk_agent.isVisible():
                 self.chk_agent.setEnabled(True)
+        self._refresh_bg_mode_lock()
         # 采集面板（录屏/截屏）随连接态刷新可用性
         if hasattr(self, "_apply_rec_state"):
             self._apply_rec_state()
+
+    def _refresh_bg_mode_lock(self):
+        """刷新"后台模式"开关的可用性。
+
+        Windows 定位后仍允许再次切换后台/前台输入模式，无需断连重新定位；
+        只在任务运行（含暂停）期间锁定，任务结束后自动恢复——避免每次切换
+        都要走一遍断连 + 重新定位。未定位状态由调用方直接控制可用性，这里
+        不覆盖。
+        """
+        if not hasattr(self, "chk_bg_mode") or not self.chk_bg_mode.isVisible():
+            return
+        if self._backend == "windows" and self._target_window is not None:
+            self.chk_bg_mode.setEnabled(not self._running)
 
     def _on_disconnect(self):
         """通用断连：根据后端模式清理资源并恢复 UI"""

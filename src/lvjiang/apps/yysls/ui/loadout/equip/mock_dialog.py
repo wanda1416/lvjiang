@@ -306,6 +306,12 @@ class MockEquipDialog(QDialog):
         for rb in (self._radio_mode_custom, self._radio_mode_max_val, self._radio_mode_max_cy):
             rb.toggled.connect(self._on_affix_mode_changed)
 
+        # 词条冲突提示标签（红字），实际内容在按钮行左侧显示；先创建好，
+        # 词条行的下拉信号可以立即连上，不用等按钮行布局出来。
+        self._lbl_affix_warning = QLabel("")
+        self._lbl_affix_warning.setStyleSheet("color: #f44336; font-weight: bold;")
+        self._lbl_affix_warning.setWordWrap(True)
+
         self._affix_rows: list[_AffixRow] = []
         # 宫（首词条）使用首词条候选，商角徵羽使用普通词条过滤
         first_affixes = self._get_first_affix_names()
@@ -314,6 +320,8 @@ class MockEquipDialog(QDialog):
             affix_list = first_affixes if i == 1 else filtered_affixes
             row = _AffixRow(i, affix_list)
             self._affix_rows.append(row)
+            # 只有词条名变化才可能影响约束，数值变化不需要重新校验。
+            row._combo_name.currentIndexChanged.connect(self._refresh_affix_warning)
             affix_layout.addWidget(row)
 
         # 定音词条（与词条行对齐）
@@ -383,14 +391,17 @@ class MockEquipDialog(QDialog):
 
         layout.addWidget(affix_group)
 
-        # ── 按钮 ──
+        # ── 按钮（左侧留白放词条冲突提示，不用等保存才发现）──
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self._lbl_affix_warning, stretch=1)
+        btn_row.addWidget(buttons)
+        layout.addLayout(btn_row)
 
         # 武器类型变化时过滤词条列表
         self._combo_weapon_type.currentIndexChanged.connect(
@@ -497,6 +508,9 @@ class MockEquipDialog(QDialog):
             row._combo_name.blockSignals(False)
             row._refresh_cap_info()
             row._update_pct()
+        # 上面重建下拉时 blockSignals，选中项被静默清空/改变也不会触发
+        # currentIndexChanged，这里手动补一次刷新。
+        self._refresh_affix_warning()
 
     def _on_level_changed(self, _index: int):
         """等级变化时刷新所有词条行的满值和百分比"""
@@ -738,8 +752,25 @@ class MockEquipDialog(QDialog):
             self._lbl_dingyin_cap_val.setText("")
             self._lbl_dingyin_pct.setText("")
 
+    def _refresh_affix_warning(self, *_args):
+        """词条名一变化就重新校验并把结果实时显示在按钮左侧（红字，不阻塞填写）。
+
+        跟 _on_accept 共用同一份 _validate_affix_rules，保证「保存前提示的」
+        和「保存时真正拦截的」永远是同一条规则、同一句话，不会两边不一致。
+        """
+        if not hasattr(self, "_lbl_affix_warning"):
+            return  # 初始化阶段词条行尚未创建完，信号还没接好前不会走到这里
+        result = self._build_equip_data()
+        error = self._validate_affix_rules(result) if result else None
+        self._lbl_affix_warning.setText(error or "")
+
     def _on_accept(self):
-        """确认按钮处理"""
+        """确认按钮处理
+
+        填写过程中不做任何约束（下拉候选不互相排除、不限制数量），只在点击
+        确认保存时统一校验拦截；期间已经通过 _refresh_affix_warning 实时把
+        同样的校验结果显示在按钮左侧，这里再拦一次是保存动作本身的最终把关。
+        """
         name = self._edit_name.text().strip()
         if not name:
             QMessageBox.warning(self, tr("提示"), tr("请输入装备名称"))
@@ -750,8 +781,54 @@ class MockEquipDialog(QDialog):
         if result is None:
             return
 
+        error = self._validate_affix_rules(result)
+        if error:
+            QMessageBox.warning(self, tr("提示"), error)
+            return
+
         self._result_data = result
         self.accept()
+
+    def _validate_affix_rules(self, result: dict) -> str | None:
+        """校验词条 2-5（不含首词条，首词条完全独立不受此约束）的三条硬性规则。
+
+        1. 属攻类词条（四大基础属性攻击 + 会自动适配当前武学的"无相攻击"）
+           最多 2 条，且不能重复。
+        2. 神力词条（增效类 + 武器类：各武学增伤/增效、全武学增效、
+           对首领/玩家单位增伤增效、单体/群体奇术增伤）最多 1 条。
+        3. 神力词条不能是转律产出的（转律机制不会产出神力词条）。
+
+        任一规则被违反时返回中文错误提示；全部满足返回 None。
+        """
+        from ....config import get_game_config
+        gc = get_game_config()
+
+        attack_names: list[str] = []
+        divine_count = 0
+        for i in range(2, 6):
+            affix_data = result.get(f"affix_{i}")
+            if not affix_data:
+                continue
+            name = affix_data["name"]
+            category = gc.get_affix_category(name)
+            if category == tr("属攻类"):
+                attack_names.append(name)
+            elif category in (tr("增效类"), tr("武器类")):
+                divine_count += 1
+                if affix_data.get("is_transferred"):
+                    return tr(
+                        "神力词条「{name}」不能是转律产出：转律不会产出神力词条"
+                    ).format(name=name)
+
+        if len(attack_names) > 2:
+            return tr(
+                "属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条"
+            ).format(n=len(attack_names))
+        if len(set(attack_names)) != len(attack_names):
+            return tr("属攻类词条不能重复")
+        if divine_count > 1:
+            return tr("神力词条最多 1 条，当前词条 2-5 里有 {n} 条").format(n=divine_count)
+        return None
 
     def _build_equip_data(self) -> dict | None:
         """构建装备数据字典"""

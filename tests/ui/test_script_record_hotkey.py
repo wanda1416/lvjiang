@@ -7,6 +7,7 @@ from PyQt6.QtTest import QSignalSpy
 from PyQt6.QtWidgets import QApplication, QDialog, QMainWindow
 
 from lvjiang.core import platforms
+from lvjiang.core.config.models import UserConfig
 from lvjiang.core.input_trace import InputTrace, InputTraceEvent
 from lvjiang.ui import script_record_dialog as dialog_module
 from lvjiang.ui.script_record_dialog import ScriptRecordDialog
@@ -31,6 +32,7 @@ def _parent(qtbot):
     parent = QMainWindow()
     parent._running = False
     parent._backend = "adb"
+    parent._user_config = UserConfig()
     qtbot.addWidget(parent)
     return parent
 
@@ -66,6 +68,22 @@ def test_f12_is_registered_only_while_dialog_is_open(qtbot, monkeypatch):
     qtbot.waitUntil(lambda: listener.stopped)
     assert listener.join_timeout == 3.0
     assert dialog._f12_hotkey_listener is None
+
+
+def test_registers_configured_record_key_instead_of_f12(qtbot, monkeypatch):
+    """录制热键改绑到 F7 时，注册的应是 <f7>，不再是 <f12>。"""
+    registrations = []
+    monkeypatch.setattr(
+        platforms, "start_global_hotkeys",
+        lambda hotkeys: registrations.append(hotkeys) or _Listener())
+
+    parent = _parent(qtbot)
+    parent._user_config = UserConfig(hotkeys={"record": "F7"})
+    dialog = ScriptRecordDialog(parent)
+    qtbot.addWidget(dialog)
+
+    dialog._start_f12_hotkey()
+    assert set(registrations[0]) == {"<f7>"}
 
 
 def test_f12_registration_is_idempotent(qtbot, monkeypatch):

@@ -15,6 +15,22 @@ class EquipmentInventory:
 
     def reload(self) -> None:
         self._state = self._repo.load()
+        # 每次加载都用当前游戏配置刷新异常状态，使历史装备无需重新扫描也能
+        # 发现新增的合法性异常；止戈定音使用独立标记，不混入异常原因。
+        try:
+            from ..equip_parser.dingyin_parser import refresh_dingyin_marker_dict
+            from ..equip_validator import annotate_equipment_dict
+        except Exception as e:  # noqa: BLE001 - 附加审计绝不能阻断装备加载
+            logger.error(f"装备状态审计组件加载失败（不影响装备加载）: {e}")
+            return
+        # 逐件兜底：try 若包住整个循环，一件历史脏数据就会让它后面所有装备
+        # 都不刷新，卡片上继续挂着上一轮遗留的旧「!」原因。
+        for fp, equip in self._state.equipment_items.items():
+            try:
+                annotate_equipment_dict(equip)
+                refresh_dingyin_marker_dict(equip)
+            except Exception as e:  # noqa: BLE001 - 附加审计绝不能阻断装备加载
+                logger.error(f"装备 {fp} 状态审计失败（不影响装备加载）: {e}")
 
     @property
     def equipped(self) -> dict[str, dict]:

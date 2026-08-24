@@ -7,7 +7,11 @@
 
 import pytest
 
-from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import DingyinParser
+from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
+    ZHIGE_DINGYIN_KEY,
+    DingyinParser,
+    refresh_dingyin_marker_dict,
+)
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.core.ocr_cleaner import OCRCleaner
 
@@ -75,6 +79,10 @@ class TestParse:
 
     def test_name_without_value(self, dp):
         assert dp.parse("外功穿透") is None
+        assert dp.matches_normal_name("外功穿透") is True
+
+    def test_zhige_text_does_not_match_normal_name(self, dp):
+        assert dp.matches_normal_name("止戈特殊效果 +12") is False
 
 
 # ─── EquipmentParser 委托整链 ──────────────────────────────
@@ -124,7 +132,7 @@ class TestParserDelegation:
         assert equip.dingyin == {}
         assert equip.to_dict()["dingyin"] is None
 
-    def test_unparsable_dingyin_warns(self, parser):
+    def test_unparsable_dingyin_is_marked_as_zhige(self, parser):
         equip = parser.parse({
             "equip_type": "踏雪含光 | 武器·剑",
             "equip_level": "110阶",
@@ -133,6 +141,18 @@ class TestParserDelegation:
             "dingyin": "乱码噪声",
         })
         assert equip.dingyin == {}
+        assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
+        assert not any("定音词条无法解析" in w for w in equip.warnings)
+
+    def test_normal_name_with_bad_value_remains_parse_warning(self, parser):
+        equip = parser.parse({
+            "equip_type": "踏雪含光 | 武器·剑",
+            "equip_level": "承音 | 110阶",
+            "base_attr": "外功攻击 100~232",
+            **self._FULL_AFFIXES,
+            "dingyin": "外功穿透",
+        })
+        assert ZHIGE_DINGYIN_KEY not in equip.extra_data
         assert any("定音词条无法解析" in w for w in equip.warnings)
 
     def test_affixes_less_than_5_skips_dingyin(self, parser):
@@ -148,3 +168,82 @@ class TestParserDelegation:
         })
         assert equip.dingyin == {}  # 不应解析定音
         assert len(equip.affixes) == 2
+
+
+class TestZhigeMarker:
+    def test_unknown_stored_dingyin_is_marked(self):
+        equip = {"dingyin": {"name": "止戈特殊效果", "value": 99}}
+        assert refresh_dingyin_marker_dict(equip) is True
+        assert equip["_extra"][ZHIGE_DINGYIN_KEY] is True
+
+    def test_normal_dingyin_clears_stale_marker(self):
+        equip = {
+            "dingyin": {"name": "外功穿透", "value": 10},
+            "_extra": {ZHIGE_DINGYIN_KEY: True},
+        }
+        assert refresh_dingyin_marker_dict(equip) is False
+        assert ZHIGE_DINGYIN_KEY not in equip["_extra"]
+
+
+class TestMisreadVsZhige:
+    """区分「OCR 误读」与「可预计的止戈定音」
+
+    两者形态上无法区分——都带数值、名称都不在词库里。误读的特征是与真实
+    定音名共享长前缀。分不开的话，定音名错一个字就会被静默当成止戈定音，
+    该装备的定音收益从毕业率里彻底消失，而用户只看到一个正常的
+    <止戈定音>，无从察觉需要校正。
+    """
+
+    def test_misread_detected_by_shared_prefix(self, dp):
+        assert dp.suspected_misread("外功穿诱 +14.2%") == "外功穿透"
+
+    def test_genuine_zhige_not_flagged(self, dp):
+        assert dp.suspected_misread("止戈特殊效果 +12") is None
+
+    def test_random_noise_not_flagged(self, dp):
+        assert dp.suspected_misread("乱码噪声") is None
+
+    def test_valid_name_not_flagged(self, dp):
+        assert dp.suspected_misread("外功穿透 +14.2%") is None
+
+    def test_empty_not_flagged(self, dp):
+        assert dp.suspected_misread("") is None
+        assert dp.suspected_misread(None) is None
+
+
+class TestMisreadReachesWarnings:
+    _AFFIXES = {
+        "affix_gong": "最大外功攻击 +121.4",
+        "affix_shang": "会心率 +7%",
+        "affix_jue": "劲 +72.2",
+        "affix_zhi": "势 +60",
+        "affix_yu": "会意率 +6",
+    }
+
+    def _parse(self, parser, dingyin: str):
+        return parser.parse({
+            "equip_type": "踏雪含光 | 武器·剑",
+            "equip_level": "承音 | 110阶",
+            "base_attr": "外功攻击 100~232",
+            **self._AFFIXES,
+            "dingyin": dingyin,
+        })
+
+    def test_misread_warns_but_still_uses_non_normal_marker(self, parser):
+        from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
+            DINGYIN_NOTICE_KEY,
+            ZHIGE_DINGYIN_KEY,
+        )
+        equip = self._parse(parser, "外功穿诱 +14.2%")
+        assert any("疑似误读" in w for w in equip.warnings)
+        assert "外功穿透" in " ".join(equip.warnings)
+        assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
+        assert "外功穿透" in equip.extra_data[DINGYIN_NOTICE_KEY]
+
+    def test_genuine_zhige_still_silent(self, parser):
+        from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
+            ZHIGE_DINGYIN_KEY,
+        )
+        equip = self._parse(parser, "止戈特殊效果 +12")
+        assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
+        assert not any("疑似误读" in w for w in equip.warnings)

@@ -120,6 +120,76 @@
 | `value` | float | 词条数值 |
 | `unit` | string \| null | 单位，百分比类为 `"%"`，否则为 `null` |
 | `is_transferred` | bool | 是否为转律产出 |
+| `cap_pct` | float \| null | 数值占该等级上限的百分比；无上限数据时为 `null` |
+
+---
+
+## 二之二、状态异常标记 `_extra.illegal_equip`
+
+游戏产不出来的装备组合一律标为**状态异常**。判定由全局的
+`src/lvjiang/apps/yysls/core/equip_validator.py` 负责，`EquipmentParser.parse()`
+解析完成后自动调用，模拟装备创建/编辑时走同一份实现。
+
+```json
+"_extra": {
+  "affix_count": 5,
+  "illegal_equip": ["词条 2-5 不能重复：「劲」出现了 2 次"]
+}
+```
+
+| 判定码 | 含义 | 依据 |
+|--------|------|------|
+| `duplicate_affix` | 词条 2-5 出现重复 | 铁律一：调律词条不与已调出的重复（允许与首词条相同） |
+| `attack_overflow` | 属攻类词条超过 2 条 | 铁律二：属性攻击绝不出现第三次 |
+| `divine_overflow` | 神力词条超过 1 条 | 神力词条每件装备最多 1 条 |
+| `transferred_divine` | 神力词条标记为转律产出 | 转律不产出神力词条 |
+| `unknown_equip_type` | 装备类型未在装备配置登记 | 装备类型配置 |
+| `unknown_affix` | 词条未在普通词条池登记 | 词组配置 |
+| `invalid_first_affix` | 首词条不属于该部位首词条池 | `base_attrs.*._first_affixes` |
+| `invalid_affix_part` | 普通词条不能出现在该装备部位 | `affix_parts` / 词组 `_parts` |
+| `weapon_affix_mismatch` | 专属武学词条与武器类型不匹配 | `weapon_types[].wuxue_affix` |
+| `malformed_affix` | 词条缺少有效名称或数值 | 装备数据结构 |
+| `cap_overflow` | 普通词条 `cap_pct > 100` | 数值高于该等级上限，只可能是识别误读 |
+
+规则出处见 [装备系统](../../10-game/01-equipment-system.md)。
+
+**处置方式**：
+
+| 场景 | 行为 | 理由 |
+|------|------|------|
+| 扫描（`EquipmentParser.parse`） | **只标记，绝不阻断** | 长流程，丢一件或抛一次异常就会崩坏整轮 |
+| 调律过程 | **完全不判定** | 读单条新词条走 `parse_affix_text`，不经过判定器 |
+| 模拟装备创建/编辑 | 组合类违规拦下不保存 | 用户在交互中，能当场改；`cap_overflow` 仍只标记 |
+
+**「绝不阻断」是硬约束**，由三层保证，回归测试见
+`tests/yysls/test_illegal_never_blocks_flow.py`：
+
+1. `parse()` 里判定整段包在 `try` 中，判定器出任何意外都只记 error 日志，
+   解析结果照常返回。上层 DSL 内置 `to_equipment()` 捕获异常后会返回空 dict，
+   那等于把整件装备静默丢掉，比不标注严重得多。
+2. 判定器内部对数值做防御（`cap_pct` 可能是字符串或 None），
+   宁可漏报也不在扫描途中抛异常。
+3. `_extra` 不参与 `_fp` 指纹计算，标注不会改变指纹，去重与存储不受影响。
+
+库存每次加载时都会用当前游戏配置重新判定，因此历史装备也能发现新增异常；
+重新判定为合法时该键会被**移除**，不会留下过期标记。
+
+判定只作用于数据本身，与装备好坏无关——调律规则引擎不读这个字段，
+它的职责是分级不是校验。全仓只有装备卡片 UI 读取该字段。
+
+### 止戈定音标记
+
+定音不参与上述装备异常判定。普通定音词库无法解释的定音属于游戏中可预计的
+止戈定音，独立记录为：
+
+```json
+"_extra": {
+  "is_zhige_dingyin": true
+}
+```
+
+它不触发红色异常徽标。UI 在原定音位置只显示 `<止戈定音>`，不显示识别文本、
+数值或上限比例；普通定音重新被识别后会清除旧标记。
 
 ---
 

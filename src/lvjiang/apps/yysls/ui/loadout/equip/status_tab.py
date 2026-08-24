@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
+from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...layout_helpers import fit_combo_to_contents
 from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from ...profile.tab import add_user_nav_buttons
@@ -37,12 +38,12 @@ _STATUS_NAME_STYLE = "font-size: 13px; color: palette(mid);"
 _STATUS_VALUE_STYLE = "font-size: 15px; font-weight: 600;"
 _STATUS_YELLOW_VALUE_STYLE = "font-size: 15px; font-weight: 600; color: #D97706;"
 
-# 操作按钮样式
-_PRIMARY_BTN_STYLE = (
-    "QPushButton { background: #1976D2; color: white; "
-    "border: none; border-radius: 4px; padding: 5px 10px; "
+# 右侧装备操作组统一样式
+_ACTION_BTN_STYLE = (
+    "QPushButton { border: 1px solid palette(highlight); "
+    "color: palette(highlight); border-radius: 4px; padding: 5px 10px; "
     "font-weight: 600; font-size: 12px; }"
-    "QPushButton:hover { background: #1565C0; }"
+    "QPushButton:hover { background: palette(midlight); }"
 )
 
 # 顶部槽位布局（固定 2×4）
@@ -64,6 +65,29 @@ _SLOT_LAYOUT = [
 _GROUP_PART_LABELS: dict[str, str] = {}
 
 _GRID_COLS = 4  # 默认值，实际从 settings.equip_display.grid_columns 读取
+
+
+def _affix_analysis_dependencies():
+    """集中解析词条分析依赖，便于在不打开对话框时验证导入路径。"""
+    from ....config import get_game_config
+    from ....core.combat.combat_attrs import compute_gongjue_attrs
+    from ....core.combat.equipment import EquipmentInventory
+    from ....core.graduation import get_graduation_calculator
+    from ....core.graduation.affix_impact import (
+        analyze_affix_impacts,
+        analyze_combined_affix_replacements,
+    )
+    from ..affix_impact_dialog import AffixImpactDialog
+
+    return (
+        get_game_config,
+        compute_gongjue_attrs,
+        EquipmentInventory,
+        get_graduation_calculator,
+        analyze_affix_impacts,
+        analyze_combined_affix_replacements,
+        AffixImpactDialog,
+    )
 
 
 def _route_weapon_slot(eq_type: str, main_type: str, sub_type: str) -> str:
@@ -125,31 +149,40 @@ class EquipStatusTab(QWidget):
         action_row.addStretch()
 
         # 最优组合
-        btn_optimal = QPushButton(tr("计算最优组合"))
+        btn_optimal = QPushButton(tr("最优组合"))
         btn_optimal.setToolTip(tr("搜索最优毕业率装备组合"))
-        btn_optimal.setFixedWidth(80)
-        btn_optimal.setStyleSheet(_PRIMARY_BTN_STYLE)
+        btn_optimal.setMinimumWidth(96)
+        btn_optimal.setStyleSheet(_ACTION_BTN_STYLE)
         btn_optimal.clicked.connect(self._on_optimal_combo)
         action_row.addWidget(btn_optimal)
+
+        btn_affix_impact = QPushButton(tr("培养建议"))
+        btn_affix_impact.setToolTip(tr("分析当前配装的合法培养建议和词条敏感度"))
+        btn_affix_impact.setMinimumWidth(96)
+        btn_affix_impact.setStyleSheet(_ACTION_BTN_STYLE)
+        btn_affix_impact.clicked.connect(self._on_affix_impact)
+        action_row.addWidget(btn_affix_impact)
 
         # 创建装备（原「模拟装备」，去掉菜单直接弹对话框）
         btn_create = QPushButton(tr("创建模拟装备"))
         btn_create.setToolTip(tr("创建模拟装备"))
-        btn_create.setFixedWidth(80)
-        btn_create.setStyleSheet(_REFRESH_BTN_STYLE)
+        btn_create.setMinimumWidth(96)
+        btn_create.setStyleSheet(_ACTION_BTN_STYLE)
         btn_create.clicked.connect(self._on_mock_create)
         action_row.addWidget(btn_create)
 
         btn_clear_real = QPushButton(tr("清空真实装备"))
         btn_clear_real.setToolTip(tr("删除全部真实装备，保留模拟装备"))
+        btn_clear_real.setMinimumWidth(96)
+        btn_clear_real.setStyleSheet(_ACTION_BTN_STYLE)
         btn_clear_real.clicked.connect(self._on_clear_real)
         action_row.addWidget(btn_clear_real)
 
         # 导出数据
         btn_export = QPushButton(tr("导出数据"))
         btn_export.setToolTip(tr("导出为 leoq7 格式"))
-        btn_export.setFixedWidth(80)
-        btn_export.setStyleSheet(_REFRESH_BTN_STYLE)
+        btn_export.setMinimumWidth(96)
+        btn_export.setStyleSheet(_ACTION_BTN_STYLE)
         btn_export.clicked.connect(self._on_export)
         action_row.addWidget(btn_export)
         layout.addWidget(self._action_widget)
@@ -481,7 +514,7 @@ class EquipStatusTab(QWidget):
         elif affix_filter == "dingyin":
             # 有定音词条（包含满调律）
             dingyin = equip.get("dingyin")
-            return bool(dingyin and dingyin.get("name"))
+            return is_zhige_dingyin(equip) or bool(dingyin and dingyin.get("name"))
         elif affix_filter == "full_tuning":
             # 满调律：5 条非定音词条（affix_1 到 affix_5 都有）
             return all(equip.get(f"affix_{i}", {}).get("name") for i in range(1, 6))
@@ -1159,3 +1192,94 @@ class EquipStatusTab(QWidget):
             parent=self,
         )
         dlg.exec()
+
+    def _on_affix_impact(self):
+        """打开当前配装的词条培养建议与敏感度分析。"""
+        from ..combat.attrs_tab import CombatAttrsTab
+
+        combat_tab = next(
+            (
+                child
+                for child in self._host.findChildren(QWidget)
+                if isinstance(child, CombatAttrsTab)
+            ),
+            None,
+        )
+        if combat_tab is None:
+            QMessageBox.warning(self, tr("提示"), tr("未找到角色详情面板"))
+            return
+
+        context = combat_tab.get_graduation_context()
+        if context is None:
+            QMessageBox.warning(
+                self, tr("提示"), tr("请先在角色详情页选择流派和毕业率方案"))
+            return
+
+        user_name = self._host.active_user_name()
+        if not user_name:
+            QMessageBox.warning(self, tr("提示"), tr("没有激活的用户"))
+            return
+
+        try:
+            (
+                get_game_config,
+                compute_gongjue_attrs,
+                EquipmentInventory,
+                get_graduation_calculator,
+                analyze_affix_impacts,
+                analyze_combined_affix_replacements,
+                AffixImpactDialog,
+            ) = _affix_analysis_dependencies()
+
+            calculator = get_graduation_calculator(
+                context.school, context.scheme)
+            if calculator is None:
+                raise ValueError(tr("未找到对应流派的毕业率方案"))
+
+            game_config = get_game_config()
+            base_attrs = context.base_attrs
+            if context.gongjue:
+                season = game_config.current_season()
+                levels = game_config.get_level_configs()
+                equip_level = (
+                    int(season.equip_level)
+                    if season is not None and season.equip_level
+                    else max((int(item.level) for item in levels), default=0)
+                )
+                base_attrs = base_attrs + compute_gongjue_attrs(
+                    context.gongjue,
+                    equip_level,
+                    game_config.get_affix_caps,
+                )
+
+            equipped = EquipmentInventory(user_name).equipped
+            if not equipped:
+                QMessageBox.information(
+                    self, tr("词条分析"), tr("当前备战方案尚未装备任何装备。"))
+                return
+            report = analyze_affix_impacts(
+                equipped,
+                calculator,
+                base_attrs,
+                context.school,
+                game_config=game_config,
+            )
+            dialog = AffixImpactDialog(
+                report,
+                context.school,
+                context.scheme,
+                self,
+                joint_analyzer=lambda slots: analyze_combined_affix_replacements(
+                    equipped,
+                    report.suggestions,
+                    slots,
+                    calculator,
+                    base_attrs,
+                    context.school,
+                    game_config=game_config,
+                ),
+            )
+            dialog.exec()
+        except Exception as exc:
+            logger.error(f"词条分析失败: {exc}")
+            QMessageBox.critical(self, tr("分析失败"), str(exc))

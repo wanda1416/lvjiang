@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from ..workflows.discovery import discover_scripts
+from ..workflows.policy import WorkflowDiscoveryPolicy as Policy
 from ..workflows.preferences import load_preferences, save_preferences
 
 
@@ -70,6 +71,7 @@ class ScriptConfigDialog(QDialog):
         hint = QLabel(
             tr("勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数："
                "日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。"
+               "专用脚本默认不暴露，需要时可显式勾选。"
                "用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。")
         )
         hint.setWordWrap(True)
@@ -127,12 +129,17 @@ class ScriptConfigDialog(QDialog):
         self._table.setRowCount(len(ordered_ids))
         for row, sid in enumerate(ordered_ids):
             cfg = scripts[sid]
+            scope = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
             # 勾选状态：用户明确改过则以用户为准，否则用作者声明的默认可见性
-            checked = prefs.visible.get(sid, not cfg.get("hidden", False))
+            checked = prefs.visible.get(
+                sid,
+                Policy.visible_by_default(
+                    hidden=bool(cfg.get("hidden", False)), scope=scope),
+            )
             self._fill_row(
                 row, cfg, checked=checked,
                 display=prefs.names.get(sid) or cfg["name"],
-                scope=prefs.scopes.get(sid) or cfg.get("scope") or "daily")
+                scope=scope)
 
     def _fill_row(self, row: int, script: dict, checked: bool, display: str,
                   scope: str = "daily"):
@@ -153,6 +160,17 @@ class ScriptConfigDialog(QDialog):
         for key, label in self.SCOPE_LABELS.items():
             scope_combo.addItem(tr(label), key)
         scope_combo.setCurrentIndex(max(scope_combo.findData(scope), 0))
+        scope_combo.currentIndexChanged.connect(
+            lambda _index, combo=scope_combo, item=expose_item, cfg=script:
+            item.setCheckState(
+                Qt.CheckState.Checked
+                if Policy.visible_by_default(
+                    hidden=bool(cfg.get("hidden", False)),
+                    scope=combo.currentData() or "daily",
+                )
+                else Qt.CheckState.Unchecked
+            )
+        )
         self._table.setCellWidget(row, self.COL_SCOPE, scope_combo)
 
         source = f".wf: {script['wf_file']}" if script.get("wf_file") else f"内置类: {script['class']}"
@@ -221,15 +239,18 @@ class ScriptConfigDialog(QDialog):
 
             checked = (self._table.item(row, self.COL_EXPOSE).checkState()
                        == Qt.CheckState.Checked)
-            if checked == bool(cfg.get("hidden", False)):
-                visible[sid] = checked      # 与作者声明相反才记
+
+            scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
+            scope = scope_combo.currentData() if scope_combo else "daily"
+            default_visible = Policy.visible_by_default(
+                hidden=bool(cfg.get("hidden", False)), scope=scope)
+            if checked != default_visible:
+                visible[sid] = checked      # 与作者声明的默认值相反才记
 
             display = (name_item.text() or "").strip()
             if display and display != self._base_names.get(sid, ""):
                 names[sid] = display
 
-            scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
-            scope = scope_combo.currentData() if scope_combo else "daily"
             if scope and scope != (cfg.get("scope") or "daily"):
                 scopes[sid] = scope
 

@@ -1,7 +1,8 @@
 """Responsive loadout workspace with sidebar/half/full combat modes."""
 from __future__ import annotations
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QRectF, QSize, QTimer
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -20,7 +21,7 @@ from PyQt6.QtWidgets import (
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr
 from ...core.loadout import LoadoutRepository, resolve_school
-from ..profile.tab import add_user_toolbar_buttons
+from ..profile.tab import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
@@ -37,17 +38,39 @@ _VIEW_MODES = ("sidebar", "half", "full")
 
 # 视图切换图标按钮样式（与刷新按钮视觉一致）
 _VIEW_MODE_BTN_STYLE = (
-    "QPushButton{border:0;border-radius:4px;font-size:16px;color:palette(text);}"
+    "QPushButton{border:0;border-radius:4px;color:palette(text);}"
     "QPushButton:hover{background:palette(midlight);color:palette(text);}"
+    "QPushButton:checked{background:palette(midlight);border:1px solid palette(highlight);}"
 )
 
-_ACTION_BTN_STYLE = (
-    "QPushButton { border: 1px solid palette(highlight); "
-    "color: palette(highlight); border-radius: 5px; padding: 5px 11px; "
-    "font-weight: 600; }"
-    "QPushButton:hover { background: palette(midlight); }"
-)
 
+def _view_mode_icon(mode: str) -> QIcon:
+    """绘制左右面板布局图标，避免依赖字体对 Unicode 符号的支持。"""
+    pixmap = QPixmap(32, 32)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    border = QColor("#6f7b86")
+    accent = QColor("#0078d4")
+    soft = QColor("#9acbea")
+    outer = QRectF(3.5, 5.5, 25, 21)
+    painter.setPen(QPen(border, 1.6))
+    painter.setBrush(QColor(0, 0, 0, 0))
+    painter.drawRoundedRect(outer, 2.5, 2.5)
+    if mode == "full":
+        divider = 21.5
+        painter.fillRect(QRectF(5, 7, 15.5, 18), accent)
+    elif mode == "half":
+        divider = 16
+        painter.fillRect(QRectF(5, 7, 10.2, 18), accent)
+        painter.fillRect(QRectF(16.8, 7, 10.2, 18), soft)
+    else:
+        divider = 10.5
+        painter.fillRect(QRectF(11.3, 7, 15.7, 18), accent)
+    painter.setPen(QPen(border, 1.4))
+    painter.drawLine(int(divider), 6, int(divider), 26)
+    painter.end()
+    return QIcon(pixmap)
 
 class LoadoutPanel(QWidget):
     def __init__(self, host, parent=None):
@@ -87,16 +110,22 @@ class LoadoutPanel(QWidget):
         )
         # 视图切换图标：4 个汉字宽度间距
         tools.addSpacing(64)
-        for symbol, tooltip, callback in (
-            ("▣", tr("战斗属性全屏"), lambda: self._set_view_mode("full")),
-            ("◧", tr("战斗属性半屏"), lambda: self._set_view_mode("half")),
-            ("▣", tr("装备面板全屏"), lambda: self._set_view_mode("sidebar")),
+        self._view_buttons: dict[str, QPushButton] = {}
+        for mode, tooltip in (
+            ("full", tr("战斗属性全屏")),
+            ("half", tr("战斗属性半屏")),
+            ("sidebar", tr("装备面板全屏")),
         ):
-            btn = QPushButton(symbol)
+            btn = QPushButton()
+            btn.setIcon(_view_mode_icon(mode))
+            btn.setIconSize(QSize(26, 26))
             btn.setToolTip(tooltip)
+            btn.setAccessibleName(tooltip)
             btn.setFixedSize(36, 36)
+            btn.setCheckable(True)
             btn.setStyleSheet(_VIEW_MODE_BTN_STYLE)
-            btn.clicked.connect(callback)
+            btn.clicked.connect(lambda _checked, value=mode: self._set_view_mode(value))
+            self._view_buttons[mode] = btn
             tools.addWidget(btn)
         tools.addStretch()
         for label, callback in (
@@ -107,7 +136,7 @@ class LoadoutPanel(QWidget):
             (tr("导出数据"), lambda: self._equipment._on_export()),
         ):
             button = QPushButton(label)
-            button.setStyleSheet(_ACTION_BTN_STYLE)
+            button.setStyleSheet(USER_ACTION_BTN_STYLE)
             button.clicked.connect(callback)
             tools.addWidget(button)
         root.addLayout(tools)
@@ -199,6 +228,8 @@ class LoadoutPanel(QWidget):
         if mode != self._view_mode:
             update_ui_page_state(_UI_PAGE_KEY, {"view_mode": mode})
         self._view_mode = mode
+        for key, button in self._view_buttons.items():
+            button.setChecked(key == mode)
         combat = self._character._combat_attrs_tab
         combat.set_embedded_mode(mode)
         self._left_shell.setVisible(mode != "sidebar")

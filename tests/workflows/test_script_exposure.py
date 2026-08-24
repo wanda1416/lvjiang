@@ -1,7 +1,7 @@
 """脚本暴露的三层职责：目录约定 / 作者声明 / 用户偏好
 
 - **全集**由 WorkflowDiscoveryPolicy 的目录约定决定，不可配置
-- **默认是否展示**由作者声明（.wf 的 `#% hidden: true` 或类属性 HIDDEN）
+- **默认是否展示**由作者声明（hidden 脚本和 dedicated 专用脚本默认不展示）
 - **顺序、启停、显示名、性质**是用户偏好，存 session 的 daily.scripts
 
 关键性质：出厂新增的脚本自动出现，不会因为用户存过偏好被冻住——
@@ -44,7 +44,13 @@ def _ids(monkeypatch, **kw):
 
 class TestAuthorDeclaration:
     def test_hidden_script_not_shown_by_default(self, scripts, monkeypatch):
-        assert _ids(monkeypatch) == ["a", "b"]
+        assert _ids(monkeypatch) == ["a"]
+
+    def test_dedicated_script_not_shown_by_default(self, scripts, monkeypatch):
+        assert "b" not in _ids(monkeypatch)
+
+    def test_user_can_reveal_dedicated_script(self, scripts, monkeypatch):
+        assert "b" in _ids(monkeypatch, visible={"b": True})
 
     def test_user_can_reveal_hidden_script(self, scripts, monkeypatch):
         assert "c" in _ids(monkeypatch, visible={"c": True})
@@ -56,29 +62,31 @@ class TestAuthorDeclaration:
 class TestNewScriptsAppearAutomatically:
     def test_new_script_shows_even_with_saved_order(self, scripts, monkeypatch):
         """用户存过顺序后，出厂新增的脚本仍要出现——这是本次重构的核心目的。"""
-        assert _ids(monkeypatch, order=["b", "a"]) == ["b", "a"]
+        assert _ids(monkeypatch, order=["b", "a"]) == ["a"]
         scripts["new"] = {"id": "new", "name": "新", "hidden": False}
         assert "new" in _ids(monkeypatch, order=["b", "a"])
 
     def test_saved_order_respected_new_appended(self, scripts, monkeypatch):
         scripts["new"] = {"id": "new", "name": "新", "hidden": False}
-        assert _ids(monkeypatch, order=["b", "a"]) == ["b", "a", "new"]
+        assert _ids(
+            monkeypatch, order=["b", "a"], visible={"b": True}
+        ) == ["b", "a", "new"]
 
     def test_stale_id_in_order_ignored(self, scripts, monkeypatch):
-        assert _ids(monkeypatch, order=["已删除的脚本", "b"]) == ["b", "a"]
+        assert _ids(monkeypatch, order=["已删除的脚本", "b"]) == ["a"]
 
 
 class TestOverrides:
     def test_custom_name(self, scripts, monkeypatch):
         from lvjiang.workflows.discovery import list_exposed_scripts
-        _prefs(monkeypatch, names={"a": "我的叫法"})
+        _prefs(monkeypatch, names={"a": "我的叫法"}, visible={"b": True})
         got = {c["id"]: c["name"] for c in list_exposed_scripts()}
         assert got["a"] == "我的叫法"
         assert got["b"] == "乙"
 
     def test_scope_from_author_then_user(self, scripts, monkeypatch):
         from lvjiang.workflows.discovery import list_exposed_scripts
-        _prefs(monkeypatch)
+        _prefs(monkeypatch, visible={"b": True})
         assert {c["id"]: c["scope"] for c in list_exposed_scripts()}["b"] == "dedicated"
         _prefs(monkeypatch, scopes={"b": "daily"})
         assert {c["id"]: c["scope"] for c in list_exposed_scripts()}["b"] == "daily"
@@ -96,6 +104,11 @@ class TestPolicy:
     def test_hidden_meta(self):
         assert Policy.hidden_by_default({"hidden": True})
         assert not Policy.hidden_by_default({})
+
+    def test_visible_by_default(self):
+        assert Policy.visible_by_default(hidden=False, scope="daily")
+        assert not Policy.visible_by_default(hidden=True, scope="daily")
+        assert not Policy.visible_by_default(hidden=False, scope="dedicated")
 
 
 class TestRealConfig:

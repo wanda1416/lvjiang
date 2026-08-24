@@ -57,6 +57,16 @@ USER_TOOLBAR_BTN_STYLE = (
     "QPushButton:pressed { background-color: palette(mid); }"
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
+
+# 顶层页面的强调操作按钮。备战方案与用户总览共用，避免同一层级的操作
+# 在不同 Tab 中呈现两套视觉语言。
+USER_ACTION_BTN_STYLE = (
+    "QPushButton { border: 1px solid palette(highlight); "
+    "color: palette(highlight); border-radius: 5px; padding: 5px 11px; "
+    "font-weight: 600; }"
+    "QPushButton:hover { background: palette(midlight); }"
+    "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
+)
 # 与“备战方案”首行的视图切换按钮等高，避免切换 Tab 时工具栏视觉缩放。
 _USER_TOOLBAR_BTN_HEIGHT = 36
 

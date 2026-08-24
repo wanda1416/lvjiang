@@ -261,6 +261,7 @@ def profile_action(
             username, model_type, key,
             expected_value=expected_entry.get("value", 0) or 0,
             expected_updated_at=expected_entry.get("updated_at", ""),
+            expected_entry_exists=bool(expected_entry),
             new_value=write_value,
             new_updated_at=custom_updated_at,
             change_type=change_type,

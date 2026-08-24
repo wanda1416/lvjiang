@@ -112,7 +112,10 @@ def test_full_mode_cards_expand_into_real_grid_rows(qtbot, tmp_path, monkeypatch
     assert combat._display_mode == DISPLAY_MODE_FULL
     assert grid.rowStretch(0) == 1
     assert grid.rowStretch(1) == 1
-    assert len({card.height() for card in cards}) == 1
+    # Qt 按整数像素分配网格高度；可用高度为奇数时，两行即使
+    # 伸展系数相同也会相差 1px（Windows offscreen CI 即为此情况）。
+    heights = [card.height() for card in cards]
+    assert max(heights) - min(heights) <= 1
     assert max(card.geometry().bottom() for card in cards) >= (
         combat._attrs_widget.height() - 16)
 

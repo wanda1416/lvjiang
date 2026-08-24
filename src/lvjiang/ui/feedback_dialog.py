@@ -1,8 +1,7 @@
-"""反馈对话框 - 展示微信交流群二维码，提供 GitHub Issue 入口
+"""反馈与建议对话框。
 
-从「帮助 → 反馈」打开，提供：
-- 微信交流群二维码展示
-- GitHub Issue 按钮跳转
+主对话框说明问题受理范围和提交前必须准备的信息，并提供详细规范、
+GitHub Issue 与交流群入口。二维码仅在用户主动点击“扫码加群”后展示。
 """
 from __future__ import annotations
 
@@ -13,6 +12,7 @@ from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -22,9 +22,15 @@ from PyQt6.QtWidgets import (
 from ..core.update import GITHUB_REPO
 from ..i18n import tr
 
+ISSUE_GUIDE_URL = (
+    f"https://github.com/{GITHUB_REPO}/blob/master/"
+    "docs/60-userguide/08-feedback-and-issues.md"
+)
+NEW_ISSUE_URL = f"https://github.com/{GITHUB_REPO}/issues/new"
+
 
 def _resource_path(relative: str) -> Path:
-    """获取资源文件路径，兼容 PyInstaller 打包与开发环境"""
+    """获取资源文件路径，兼容 PyInstaller 打包与开发环境。"""
     if getattr(sys, "frozen", False):
         # 打包后 data/image 与 exe 同级
         base = Path(sys.executable).parent
@@ -34,55 +40,133 @@ def _resource_path(relative: str) -> Path:
     return base / relative
 
 
+class GroupQrDialog(QDialog):
+    """按需展示交流群二维码的子对话框。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("扫码加群"))
+        self.setFixedSize(420, 470)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        desc_label = QLabel(tr("使用交流和一般咨询请优先在群内讨论"))
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        self._image_label = QLabel()
+        self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pixmap = QPixmap(str(_resource_path("data/image/feedback-qrcode.jpg")))
+        if pixmap.isNull():
+            self._image_label.setText(tr("交流群二维码加载失败"))
+        else:
+            self._image_label.setPixmap(pixmap.scaled(
+                360,
+                360,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+        layout.addWidget(self._image_label, 1)
+
+        close_layout = QHBoxLayout()
+        close_layout.addStretch()
+        close_btn = QPushButton(tr("关闭"))
+        close_btn.clicked.connect(self.accept)
+        close_layout.addWidget(close_btn)
+        close_layout.addStretch()
+        layout.addLayout(close_layout)
+
+
 class FeedbackDialog(QDialog):
-    """反馈对话框"""
+    """展示反馈规范摘要与反馈渠道。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("反馈与建议"))
-        self.setFixedSize(420, 480)
+        self.setFixedSize(600, 460)
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
 
-        # ─── 说明文字 ───
-        desc_label = QLabel(
-            f"<p style='text-align: center; font-size: 14px; font-weight: 600;'>"
-            f"{tr('欢迎加群反馈问题和提交建议')}"
-            f"</p>"
-        )
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(desc_label)
+        title_label = QLabel(tr("提交问题前请准备完整的定位信息"))
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+        layout.addWidget(title_label)
 
-        # ─── 二维码图片 ───
-        img_path = _resource_path("data/image/feedback-qrcode.jpg")
-        pixmap = QPixmap(str(img_path))
-        img_label = QLabel()
-        img_label.setPixmap(pixmap.scaled(
-            360, 360,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        ))
-        img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(img_label)
+        self._summary_label = QLabel(
+            tr("只有信息足以复现或定位的问题才会进入开发者排查；"
+               "受理不代表承诺修复时间。")
+        )
+        self._summary_label.setWordWrap(True)
+        layout.addWidget(self._summary_label)
+
+        required_group = QGroupBox(tr("提交 Bug 时至少提供"))
+        required_layout = QVBoxLayout(required_group)
+        required_label = QLabel(
+            "• " + tr("律匠版本；源码版同时提供 commit hash") + "\n"
+            "• " + tr("运行环境、布局、设备分辨率与横竖屏方向") + "\n"
+            "• " + tr("截图方式、输入方式、工作流名称与全部参数") + "\n"
+            "• " + tr("复现步骤、预期结果、实际结果和出现频率") + "\n"
+            "• " + tr("异常前后的连续日志；识别或点击问题附截图或录屏")
+        )
+        required_label.setWordWrap(True)
+        required_layout.addWidget(required_label)
+        layout.addWidget(required_group)
+
+        scope_group = QGroupBox(tr("受理范围"))
+        scope_layout = QVBoxLayout(scope_group)
+        self._scope_label = QLabel(
+            tr("受理：可复现的 Bug、功能建议、过时或无法执行的文档。")
+            + "\n"
+            + tr("不受理：一对一教学、远程配置、信息不足、明确不支持的功能、"
+                 "第三方修改导致的问题及商业用途。")
+        )
+        self._scope_label.setWordWrap(True)
+        scope_layout.addWidget(self._scope_label)
+        layout.addWidget(scope_group)
+
+        privacy_label = QLabel(
+            tr("提交日志和截图前，请遮盖账号、角色名、ADB 序列号、Token 等隐私信息。")
+        )
+        privacy_label.setWordWrap(True)
+        layout.addWidget(privacy_label)
 
         layout.addStretch()
 
-        # ─── GitHub Issue 按钮 ───
         btn_layout = QHBoxLayout()
+        self._group_btn = QPushButton(tr("扫码加群"))
+        self._group_btn.clicked.connect(self._open_group_qr)
+        btn_layout.addWidget(self._group_btn)
         btn_layout.addStretch()
 
-        self._github_btn = QPushButton("GitHub Issue")
+        self._details_btn = QPushButton(tr("查看详细规范"))
+        self._details_btn.clicked.connect(self._open_issue_guide)
+        btn_layout.addWidget(self._details_btn)
+
+        self._github_btn = QPushButton(tr("提交 GitHub Issue"))
         self._github_btn.clicked.connect(self._open_github_issue)
         btn_layout.addWidget(self._github_btn)
 
-        btn_layout.addStretch()
+        self._close_btn = QPushButton(tr("关闭"))
+        self._close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(self._close_btn)
         layout.addLayout(btn_layout)
 
-        layout.addSpacing(8)
+    def _open_group_qr(self):
+        """用户主动请求时展示交流群二维码。"""
+        GroupQrDialog(self).exec()
 
-    def _open_github_issue(self):
-        """打开 GitHub Issue 页面"""
-        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/issues"))
+    @staticmethod
+    def _open_issue_guide():
+        """打开用户指南中的问题反馈详细规范。"""
+        QDesktopServices.openUrl(QUrl(ISSUE_GUIDE_URL))
+
+    @staticmethod
+    def _open_github_issue():
+        """打开 GitHub 新建 Issue 页面。"""
+        QDesktopServices.openUrl(QUrl(NEW_ISSUE_URL))

@@ -1,11 +1,11 @@
 """脚本录制对话框 - 低精度 WF / 高精度 lvtrace 录制与保存
 
 只能由用户从「工具 → 脚本录制」打开。对话框可见期间临时注册
-系统全局 F12，用于开始/停止录制；对话框关闭后立即注销。低精度实时生成
-可编辑 DSL；高精度在内存中保存统一输入时间线，保存 WF 时自动写入
-workflows/lvtrace 配套文件。F8/F9/F10 是主窗口全局热键，
-F12 是本对话框打开期间的临时全局热键；这些按键在
-按键录制时会被忽略，不会被误录成 press 语句。
+系统全局录制热键（默认 F12，可在配置管理→热键设置里改），用于开始/停止
+录制；对话框关闭后立即注销。低精度实时生成可编辑 DSL；高精度在内存中
+保存统一输入时间线，保存 WF 时自动写入 workflows/lvtrace 配套文件。
+F8/F9/F10 是主窗口常驻全局热键，录制热键是本对话框打开期间的临时全局
+热键；这些按键在按键录制时会被忽略，不会被误录成 press 语句。
 """
 
 import os
@@ -66,17 +66,22 @@ class ScriptRecordDialog(QDialog):
 
     # ─── F12 热键生命周期 ───────────────────────────────
 
+    @property
+    def _record_key(self) -> str:
+        """当前配置的录制热键（默认 F12），来自「配置管理 → 热键设置」。"""
+        return self._main._user_config.hotkeys.record
+
     def _start_f12_hotkey(self):
-        """对话框打开后才注册系统全局 F12。"""
+        """对话框打开后才注册系统全局录制热键。"""
         if self._f12_hotkey_listener is not None:
             return
-        from ..core.platforms import start_global_hotkeys
+        from ..core.platforms import hotkey_pynput_token, start_global_hotkeys
         try:
             self._f12_hotkey_listener = start_global_hotkeys({
-                "<f12>": self.f12_pressed.emit,
+                hotkey_pynput_token(self._record_key): self.f12_pressed.emit,
             })
         except Exception as exc:
-            logger.warning(f"脚本录制 F12 全局热键注册失败: {exc}")
+            logger.warning(f"脚本录制 {self._record_key} 全局热键注册失败: {exc}")
 
     def stop_f12_hotkey(self):
         """对话框关闭时注销 F12，并等待钩子线程退出。"""
@@ -88,9 +93,9 @@ class ScriptRecordDialog(QDialog):
             listener.stop()
             listener.join(3.0)
             if listener.is_alive():
-                logger.warning("脚本录制 F12 热键监听线程 3 秒内未退出")
+                logger.warning(f"脚本录制 {self._record_key} 热键监听线程 3 秒内未退出")
         except Exception as exc:
-            logger.warning(f"脚本录制 F12 全局热键注销失败: {exc}")
+            logger.warning(f"脚本录制 {self._record_key} 全局热键注销失败: {exc}")
 
     def showEvent(self, event):  # type: ignore[override]
         super().showEvent(event)
@@ -102,7 +107,7 @@ class ScriptRecordDialog(QDialog):
         super().done(result)
 
     def keyPressEvent(self, event):  # type: ignore[override]
-        if event.key() == Qt.Key.Key_F12:
+        if event.key() == getattr(Qt.Key, f"Key_{self._record_key}", None):
             # 全局 listener 已激活时，Qt 也可能收到同一次按键；
             # 只保留一个切换入口，避免开始后立即又停止。
             if self._f12_hotkey_listener is None:
@@ -115,9 +120,10 @@ class ScriptRecordDialog(QDialog):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        record_key = self._record_key
 
         btn_row = QHBoxLayout()
-        self.btn_record = QPushButton(tr("● 录制脚本 (F12)"))
+        self.btn_record = QPushButton(f"{tr('● 录制脚本')} ({record_key})")
         self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.clicked.connect(self.toggle_recording)
         btn_row.addWidget(self.btn_record)
@@ -154,17 +160,19 @@ class ScriptRecordDialog(QDialog):
         mode_row.addStretch()
         layout.addLayout(mode_row)
 
-        self.lbl_status = QLabel(tr("待机 | 点击「录制脚本」或按 F12 开始"))
+        self.lbl_status = QLabel(f"{tr('待机 | 点击「录制脚本」或按')} {record_key} {tr('开始')}")
         self.lbl_status.setStyleSheet("color: palette(mid);")
         layout.addWidget(self.lbl_status)
 
+        hk = self._main._user_config.hotkeys
+        reserved = f"{hk.start}/{hk.pause}/{hk.stop}/{hk.record}"
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;")
         self.text_edit.setPlaceholderText(
             tr("录制结果将显示在这里（画布归一化坐标，可保存为 .wf）\n"
-               "低精度生成可编辑指令；高精度保存原始输入轨迹，"
-               "F8/F9/F10/F12 不会被录制"))
+               "低精度生成可编辑指令；高精度保存原始输入轨迹，") +
+            f"{reserved} {tr('不会被录制')}")
         self.text_edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.text_edit)
 
@@ -216,12 +224,14 @@ class ScriptRecordDialog(QDialog):
         main._capture.set_capture_region(
             w["left"], w["top"], w["width"], w["height"])
         from .macros import MacroRecorder
+        hk = main._user_config.hotkeys
         try:
             self._recorder = MacroRecorder(
                 target_window=w, capture=main._capture, layout=layout,
                 win_left=w["left"], win_top=w["top"],
                 on_line=self.line_captured.emit,
                 precision=self.precision,
+                reserved_keys={hk.start, hk.pause, hk.stop, hk.record},
             )
             self._recorder.start()
         except Exception as e:
@@ -230,11 +240,11 @@ class ScriptRecordDialog(QDialog):
             logger.error(f"录制启动失败: {e}")
             return
         if self.precision == "high":
-            self.lbl_status.setText(tr(
-                "高精度录制中…原始输入写入统一时间线，F12 或点击停止"))
+            self.lbl_status.setText(
+                f"{tr('高精度录制中…原始输入写入统一时间线，')}{hk.record} {tr('或点击停止')}")
         else:
-            self.lbl_status.setText(tr(
-                "低精度录制中…连续移动将合并，F12 或点击停止"))
+            self.lbl_status.setText(
+                f"{tr('低精度录制中…连续移动将合并，')}{hk.record} {tr('或点击停止')}")
         self._refresh_buttons()
 
     def _stop_recording(self):
@@ -264,11 +274,12 @@ class ScriptRecordDialog(QDialog):
     def _refresh_buttons(self):
         recording = self.is_recording
         has_text = bool(self.text_edit.toPlainText().strip())
+        record_key = self._record_key
         if recording:
-            self.btn_record.setText(tr("■ 停止录制 (F12)"))
+            self.btn_record.setText(f"{tr('■ 停止录制')} ({record_key})")
             self.btn_record.setStyleSheet(_STYLE_RECORDING)
         else:
-            self.btn_record.setText(tr("● 录制脚本 (F12)"))
+            self.btn_record.setText(f"{tr('● 录制脚本')} ({record_key})")
             self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.setEnabled(not self._main._running)
         self.btn_save.setEnabled(not recording and has_text)

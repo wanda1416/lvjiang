@@ -161,7 +161,7 @@ class TuningRecorder:
         self._current_report = None
 
     def finalize_interrupted_current(self) -> bool:
-        """封存 F10 时尚未正常提交的当前装备报告。"""
+        """封存用户中断时尚未正常提交的当前装备报告。"""
         if self._current_report is None:
             return False
         report = self._current_report
@@ -172,9 +172,9 @@ class TuningRecorder:
         report.setdefault("final_affix_count", affix_count)
         report.setdefault("final_affixes", report.get("latest_affixes") or [])
         report.setdefault("final_judgement", {})
-        report["stop_reason"] = "用户中断（F10）"
+        report["stop_reason"] = "用户中断"
         if self._doc_equipment_open:
-            self.doc_note("用户中断（F10），保存当前装备的部分调律结果")
+            self.doc_note("用户中断，保存当前装备的部分调律结果")
             self.doc_finish_equipment(
                 rounds, affix_count, report["stop_reason"],
                 report.get("final_judgement") or {})

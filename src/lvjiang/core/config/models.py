@@ -75,6 +75,35 @@ class MaterialGridConfig:
             setattr(self, name, value)
 
 
+_VALID_HOTKEYS = {f"F{i}" for i in range(7, 13)}
+
+
+@dataclass
+class HotkeyConfig:
+    """全局热键的按键位配置（配置管理「热键设置」页维护）。
+
+    字段名是固定的"动作"语义，值是当前绑定的按键（限 F7~F12）；
+    改动写入 session.json 的 settings.hotkeys 节点，保存后由
+    主窗口重建 pynput 全局监听并立即生效。
+    """
+    start: str = "F9"    # 开始执行工作流
+    pause: str = "F8"    # 暂停 / 恢复
+    stop: str = "F10"    # 停止 / 结束
+    record: str = "F12"  # 脚本录制；仅在录制对话框打开期间临时全局注册
+
+    def __post_init__(self):
+        defaults = {"start": "F9", "pause": "F8", "stop": "F10", "record": "F12"}
+        for name, default in defaults.items():
+            value = str(getattr(self, name) or "").strip().upper()
+            setattr(self, name, value if value in _VALID_HOTKEYS else default)
+        # session.json 可能被手工编辑；重复键会在构造监听
+        # 字典时覆盖其中一个动作，因此整组回退到唯一的默认组合。
+        values = [getattr(self, name) for name in defaults]
+        if len(set(values)) != len(values):
+            for name, default in defaults.items():
+                setattr(self, name, default)
+
+
 @dataclass
 class UserConfig:
     """用户配置（代码默认值 + session.json / app.yaml 覆盖，只读）
@@ -92,6 +121,7 @@ class UserConfig:
     material_grid: MaterialGridConfig = field(default_factory=MaterialGridConfig)
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
+    hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
 
     def __post_init__(self):
         if self.theme not in {"light", "dark"}:
@@ -104,4 +134,8 @@ class UserConfig:
             self.material_grid = MaterialGridConfig(**self.material_grid)
         if isinstance(self.input_sim, dict):
             self.input_sim = InputSimConfig(**self.input_sim)
+        if isinstance(self.hotkeys, dict):
+            known_hotkeys = {"start", "pause", "stop", "record"}
+            self.hotkeys = HotkeyConfig(
+                **{k: v for k, v in self.hotkeys.items() if k in known_hotkeys})
         self.delay_params = parse_delay_params(self.delay_params)

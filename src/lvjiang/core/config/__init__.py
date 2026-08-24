@@ -19,6 +19,7 @@ import yaml
 
 from .models import (
     DelayParam,
+    HotkeyConfig,
     InputSimConfig,
     MaterialGridConfig,
     UserConfig,
@@ -77,6 +78,7 @@ __all__ = [
     "save_yaml",
     # 数据模型
     "DelayParam",
+    "HotkeyConfig",
     "InputSimConfig",
     "MaterialGridConfig",
     "UserConfig",

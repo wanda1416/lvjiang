@@ -402,9 +402,11 @@ class RunControlMixin:
 
     def _begin_automation(self, name: str) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
+        hk = self._user_config.hotkeys
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
-            self.log_text.append(tr("[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止"))
-            self.statusBar().showMessage(tr("自动化运行中 | F10 结束"))
+            self.log_text.append(
+                f"{tr('[拒绝] 已有自动化在运行中，请等待结束或按')} {hk.stop} {tr('停止')}")
+            self.statusBar().showMessage(f"{tr('自动化运行中')} | {hk.stop} {tr('结束')}")
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False
         self._stop_requested = False
@@ -414,7 +416,7 @@ class RunControlMixin:
         self._pause_event.set()  # 初始为运行状态
         self._refresh_run_button()
         self._refresh_pause_button()
-        self.statusBar().showMessage(f"{name} 运行中 | F8 暂停 | F10 结束")
+        self.statusBar().showMessage(f"{name} {tr('运行中')} | {hk.pause} {tr('暂停')} | {hk.stop} {tr('结束')}")
         logger.info(f"开始自动化: {name}")
         return True
 
@@ -601,8 +603,9 @@ class RunControlMixin:
         # 请求已发出，但工作流线程可能仍在执行一个不可中断的原子操作
         # （如调律重置二次确认），未必已经真正阻塞，故用「暂停中」而非
         # 「已暂停」这种确定性措辞。
-        self.log_text.append(tr("[操作] 暂停中... | F8 恢复 | F10 结束"))
-        self.statusBar().showMessage(tr("暂停中... | F8 恢复 | F10 结束"))
+        hk = self._user_config.hotkeys
+        self.log_text.append(f"{tr('[操作] 暂停中...')} | {hk.pause} {tr('恢复')} | {hk.stop} {tr('结束')}")
+        self.statusBar().showMessage(f"{tr('暂停中...')} | {hk.pause} {tr('恢复')} | {hk.stop} {tr('结束')}")
         logger.info("工作流暂停中")
 
     def _resume_execution(self):
@@ -615,8 +618,9 @@ class RunControlMixin:
             pause_event.set()  # 唤醒工作流线程
         self._refresh_pause_button()
         self._refresh_run_button()  # 广播 "running" 状态给插件 Tab
+        hk = self._user_config.hotkeys
         self.log_text.append(tr("[操作] 已恢复，继续执行..."))
-        self.statusBar().showMessage(tr("已恢复 | F8 暂停 | F10 结束"))
+        self.statusBar().showMessage(f"{tr('已恢复')} | {hk.pause} {tr('暂停')} | {hk.stop} {tr('结束')}")
         logger.info("工作流已恢复")
 
     def _refresh_pause_button(self):
@@ -625,14 +629,15 @@ class RunControlMixin:
         if btn is None:
             return
         run_state = getattr(self, '_run_state', 'idle')
+        hk = self._user_config.hotkeys
         if run_state == 'running':
-            btn.setText(tr("暂停 (F8)"))
+            btn.setText(f"{tr('暂停')} ({hk.pause})")
             btn.setEnabled(True)
             btn.setStyleSheet(
                 "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         elif run_state == 'paused':
-            btn.setText(tr("恢复 (F8)"))
+            btn.setText(f"{tr('恢复')} ({hk.pause})")
             btn.setEnabled(True)
             btn.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
@@ -926,9 +931,10 @@ class RunControlMixin:
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         run_state = getattr(self, '_run_state', 'idle')
+        hk = self._user_config.hotkeys
         if self._running:
             state = run_state  # running 或 paused
-            self.btn_run_workflow.setText(tr("结束 (F10)"))
+            self.btn_run_workflow.setText(f"{tr('结束')} ({hk.stop})")
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
@@ -941,7 +947,7 @@ class RunControlMixin:
             )
         else:
             state = "idle"
-            self.btn_run_workflow.setText(tr("开始执行 (F9)"))
+            self.btn_run_workflow.setText(f"{tr('开始执行')} ({hk.start})")
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )

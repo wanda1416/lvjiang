@@ -7,6 +7,7 @@ QMessageBox.question 是 Qt 主线程上的嵌套事件循环，但全局热键�
 而提前唤醒工作流线程；本文件锁定 _stop_confirm_pending 挡住这个窗口。
 """
 
+from lvjiang.core.config.models import UserConfig
 from lvjiang.ui.run_control import RunControlMixin
 
 
@@ -47,6 +48,7 @@ class _RunControlStub:
         self._run_state = run_state
         self._stop_requested = False
         self._pause_event = _PauseEvent()
+        self._user_config = UserConfig()
         self.log_text = _LogText()
         self._resume_calls = 0
         self._pause_calls = 0

@@ -67,7 +67,7 @@ class TuningTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self.btn_run_tuning = QPushButton(tr("开始调律 (F9)"))
+        self.btn_run_tuning = QPushButton(f"{tr('开始调律')} ({self._host._user_config.hotkeys.start})")
         self.btn_run_tuning.clicked.connect(self.f9_run)
         self.btn_run_tuning.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
@@ -313,8 +313,9 @@ class TuningTab(QWidget):
     # ─── 按钮状态（订阅宿主 automation_state_changed）──────────
 
     def _on_automation_state(self, state: str):
+        hk = self._host._user_config.hotkeys
         if state in ("running", "paused"):
-            self.btn_run_tuning.setText(tr("结束 (F10)"))
+            self.btn_run_tuning.setText(f"{tr('结束')} ({hk.stop})")
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
@@ -324,7 +325,7 @@ class TuningTab(QWidget):
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         else:
-            self.btn_run_tuning.setText(tr("开始调律 (F9)"))
+            self.btn_run_tuning.setText(f"{tr('开始调律')} ({hk.start})")
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
@@ -336,13 +337,13 @@ class TuningTab(QWidget):
                     widget.mark_done()
         # 刷新暂停/恢复按钮
         if state == "running":
-            self.btn_pause_resume.setText(tr("暂停 (F8)"))
+            self.btn_pause_resume.setText(f"{tr('暂停')} ({hk.pause})")
             self.btn_pause_resume.setEnabled(True)
             self.btn_pause_resume.setStyleSheet(
                 "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         elif state == "paused":
-            self.btn_pause_resume.setText(tr("恢复 (F8)"))
+            self.btn_pause_resume.setText(f"{tr('恢复')} ({hk.pause})")
             self.btn_pause_resume.setEnabled(True)
             self.btn_pause_resume.setStyleSheet(
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"

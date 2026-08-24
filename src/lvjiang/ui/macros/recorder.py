@@ -42,7 +42,9 @@ _RAW_LAST_DURATION_S = 0.001  # 轨迹末包无后继时间戳，以 1ms 完成
 PRECISION_LOW = "low"
 PRECISION_HIGH = "high"
 
-# F8/F9/F10 是主窗口全局热键，F12 是录制对话框的临时全局热键，
+# F8/F9/F10 是主窗口全局热键，F12 是录制对话框的临时全局热键（默认值，
+# 用户可在配置管理→热键设置里改绑其他键，调用方应传入当前实际生效的
+# 键位集合作为 __init__ 的 reserved_keys；这里只是没传时的兜底默认值）。
 # 录制中按下这几个键是在操作录制器本身，不应该被误录成 press 语句
 # （暂不处理"录制热键与游戏内快捷键冲突"这个更大的问题，见需求备注）。
 _RESERVED_KEYS = {"F8", "F9", "F10", "F12"}
@@ -96,7 +98,8 @@ class MacroRecorder:
     """
 
     def __init__(self, target_window: dict, capture, layout, win_left: int, win_top: int,
-                 on_line=None, precision: str = PRECISION_LOW):
+                 on_line=None, precision: str = PRECISION_LOW,
+                 reserved_keys: set[str] | None = None):
         if precision not in {PRECISION_LOW, PRECISION_HIGH}:
             raise ValueError(f"未知录制精度: {precision}")
         self._win = target_window
@@ -106,6 +109,8 @@ class MacroRecorder:
         self._win_top = win_top
         self._on_line = on_line                # 每生成一行 DSL 的实时回调（监听线程内调用）
         self.precision = precision
+        # 当前生效的系统热键（跟随「配置管理→热键设置」，未传时用默认 F8/F9/F10/F12）
+        self._reserved_keys = reserved_keys if reserved_keys is not None else _RESERVED_KEYS
 
         self._listener = None
         self._kb_listener = None
@@ -380,7 +385,7 @@ class MacroRecorder:
                 if not self._recording:
                     return
                 name = _pynput_key_to_dsl_name(key)
-                if name is None or name in _RESERVED_KEYS:
+                if name is None or name in self._reserved_keys:
                     return
                 # 只算一次前台判定：既避免高精度模式下每次按键都重复一遍
                 # GetForegroundWindow 系统调用，也避免两次调用之间前台窗口
@@ -414,7 +419,7 @@ class MacroRecorder:
                 if name is None:
                     logger.debug(f"忽略无法识别的按键: {key!r}")
                     return
-                if name in _RESERVED_KEYS:
+                if name in self._reserved_keys:
                     return
 
                 if self.precision == PRECISION_HIGH:

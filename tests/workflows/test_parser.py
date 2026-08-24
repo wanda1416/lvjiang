@@ -145,6 +145,53 @@ def test_click_const_or_var():
     print("  click [scene].$var: OK")
 
 
+# ─── click 鼠标键测试 ───────────────────────────────────────
+
+def test_click_default_button_is_left():
+    """省略鼠标键时默认 left，不影响任何既有脚本"""
+    program = parse_text("click [scene].[region]")
+    assert program.body[0].button == "left"
+
+
+@pytest.mark.parametrize("name", ["left", "right", "middle", "x1", "x2"])
+def test_click_explicit_button(name):
+    """click 支持显式指定鼠标键：left/right/middle/x1/x2"""
+    program = parse_text(f"click [scene].[region] {name}")
+    n = program.body[0]
+    assert isinstance(n, Click)
+    assert n.button == name
+
+
+def test_click_button_aliases_normalize_to_x1_x2():
+    """back/forward 是 x1/x2 的别名，解析后规范化为 x1/x2（与轨迹格式的键名统一）"""
+    assert parse_text("click [scene].[region] back").body[0].button == "x1"
+    assert parse_text("click [scene].[region] forward").body[0].button == "x2"
+
+
+def test_click_button_case_insensitive():
+    program = parse_text("click [scene].[region] RIGHT")
+    assert program.body[0].button == "right"
+
+
+def test_click_button_with_coord_target():
+    program = parse_text("click (0.3, 0.4) right")
+    n = program.body[0]
+    assert isinstance(n, Click)
+    assert isinstance(n.target, CoordPoint)
+    assert n.button == "right"
+
+
+def test_click_button_combined_with_wait_clause():
+    """鼠标键 + wait_clause 同时出现时都要生效"""
+    program = parse_text("click [scene].[region] right after wait @step_interval")
+    assert len(program.body) == 2
+    click_node = program.body[0]
+    assert isinstance(click_node, Click)
+    assert click_node.button == "right"
+    assert click_node.suppress_defaults is True
+    assert isinstance(program.body[1], Wait)
+
+
 # ─── drag 指令测试 ──────────────────────────────────────────
 
 def test_drag_const_or_var():

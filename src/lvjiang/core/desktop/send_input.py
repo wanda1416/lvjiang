@@ -49,6 +49,18 @@ from .win32_util import (
 if _user32 is not None:
     _user32.GetForegroundWindow.restype = wintypes.HWND
 
+# 鼠标键 → (按下 flags, 松开 flags, mouseData)。mouseData 只有 XBUTTON
+# （侧键）需要用来区分 XBUTTON1/XBUTTON2，其余键固定 0。_click（普通
+# DSL click）与 replay_input_trace（高精度轨迹回放）共用这份映射，
+# 避免同一份键名判断在两处各写一份。
+_MOUSE_BUTTON_EVENTS: dict[str, tuple[int, int, int]] = {
+    "left": (_MOUSEEVENTF_LEFTDOWN, _MOUSEEVENTF_LEFTUP, 0),
+    "right": (_MOUSEEVENTF_RIGHTDOWN, _MOUSEEVENTF_RIGHTUP, 0),
+    "middle": (_MOUSEEVENTF_MIDDLEDOWN, _MOUSEEVENTF_MIDDLEUP, 0),
+    "x1": (_MOUSEEVENTF_XDOWN, _MOUSEEVENTF_XUP, _XBUTTON1),
+    "x2": (_MOUSEEVENTF_XDOWN, _MOUSEEVENTF_XUP, _XBUTTON2),
+}
+
 
 class SendInputInput(InputBackend):
     """基于 SendInput 的输入后端（移动真实光标）"""
@@ -65,11 +77,12 @@ class SendInputInput(InputBackend):
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None):
+                     *, pre_delay=None, post_delay=None, button: str = "left"):
         """点击屏幕坐标（带鼠标移动时长 + 点击后延迟）"""
         self._activate_target()
         self._move_to(screen_x, screen_y)
-        self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay, post_delay=post_delay)
+        self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay,
+                     post_delay=post_delay, button=button)
 
     def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
         """直接设置系统光标位置，不产生鼠标移动输入。"""
@@ -163,20 +176,12 @@ class SendInputInput(InputBackend):
         sent_x = sent_y = 0
         held_buttons: set[str] = set()
         held_keys: set[str] = set()
-        # 值是 (dwFlags, mouseData) 二元组——XBUTTONDOWN/XBUTTONUP（侧键）
-        # 靠 mouseData 区分 XBUTTON1/XBUTTON2，其余键该字段固定为 0，
-        # 统一走同一套 send_mouse_event(flag, mouse_data=...) 调用。
+        # (键名, 按下/松开) → (dwFlags, mouseData)，从 _MOUSE_BUTTON_EVENTS
+        # 展开——与 _click（普通 DSL click）共用同一份键名→事件映射。
         button_flags = {
-            ("left", True): (_MOUSEEVENTF_LEFTDOWN, 0),
-            ("left", False): (_MOUSEEVENTF_LEFTUP, 0),
-            ("right", True): (_MOUSEEVENTF_RIGHTDOWN, 0),
-            ("right", False): (_MOUSEEVENTF_RIGHTUP, 0),
-            ("middle", True): (_MOUSEEVENTF_MIDDLEDOWN, 0),
-            ("middle", False): (_MOUSEEVENTF_MIDDLEUP, 0),
-            ("x1", True): (_MOUSEEVENTF_XDOWN, _XBUTTON1),
-            ("x1", False): (_MOUSEEVENTF_XUP, _XBUTTON1),
-            ("x2", True): (_MOUSEEVENTF_XDOWN, _XBUTTON2),
-            ("x2", False): (_MOUSEEVENTF_XUP, _XBUTTON2),
+            (name, is_down): (down if is_down else up, mouse_data)
+            for name, (down, up, mouse_data) in _MOUSE_BUTTON_EVENTS.items()
+            for is_down in (True, False)
         }
 
         try:
@@ -338,7 +343,7 @@ class SendInputInput(InputBackend):
         smooth_move_to(x, y, duration)
 
     def _click(self, x: int, y: int, poi_name: str = "",
-               *, pre_delay=None, post_delay=None):
+               *, pre_delay=None, post_delay=None, button: str = "left"):
         """点击指定坐标（加入随机偏移和延迟模拟人类）"""
         offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
         offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
@@ -349,10 +354,14 @@ class SendInputInput(InputBackend):
         time.sleep(random.uniform(*_pre))
 
         label = f"({poi_name})" if poi_name else ""
-        logger.debug(f"点击 {label}: ({actual_x}, {actual_y}) [偏移: {offset_x:+d}, {offset_y:+d}]")
+        down_flag, up_flag, mouse_data = _MOUSE_BUTTON_EVENTS.get(
+            button, _MOUSE_BUTTON_EVENTS["left"])
+        logger.debug(
+            f"点击 {label}: ({actual_x}, {actual_y}) [偏移: {offset_x:+d}, {offset_y:+d}] "
+            f"按键={button}")
         _user32.SetCursorPos(actual_x, actual_y)
-        send_mouse_event(_MOUSEEVENTF_LEFTDOWN)
-        send_mouse_event(_MOUSEEVENTF_LEFTUP)
+        send_mouse_event(down_flag, mouse_data=mouse_data)
+        send_mouse_event(up_flag, mouse_data=mouse_data)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))

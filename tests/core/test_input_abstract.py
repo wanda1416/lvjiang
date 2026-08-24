@@ -21,7 +21,7 @@ class _FakeInput(InputBackend):
         self.background_mode = False
         self.target_hwnd = None
 
-    def click_screen(self, screen_x, screen_y, poi_name=""):
+    def click_screen(self, screen_x, screen_y, poi_name="", *, button="left"):
         pass
 
     def place_screen(self, screen_x, screen_y, poi_name=""):

@@ -23,7 +23,11 @@
 # 流程结构：
 #   1. 从主页进入菜单 → 包裹 → 装备页 → 钱袋
 #   2. 扫描区域货币面板（money_1, 1×4），累计求和后写入 profile 通宝(万)
-#   3. 扫描其他货币面板（money_2, 3×6），按目标货币反向遍历取最高置信度写入 profile
+#   3. 扫描其他货币面板（money_2, 6列 × N行，N=panel_rows() 按环境自适应，
+#      安卓3/桌面4），按目标货币反向遍历取最高置信度写入 profile；
+#      安卓端 3×6=18 格装不下全部约21种货币资产，么玉/宝钱/长鸣玉若不在
+#      可视区域内，上拉面板 1 行补扫新出现的最后一行后再次取值；
+#      桌面端 4×6=24 格已能装下全部货币资产，不需要这套补扫
 #   4. 返回主界面
 #
 # 参数：
@@ -84,31 +88,73 @@ end
 eval $tongbao_wan = $tongbao_total / 10000
 call safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)")
 
-# ─── 扫描其他货币（money_2, 3×6） ────────────────────────
+# ─── 扫描其他货币（money_2, 6列 × N行；行数按环境自适应：安卓3/桌面4）───
 # where confidence >= 0.6 过滤掉低置信度噪声
 recognize [bag_wallet_detail].[money_2] as rich $money2 on group "货币资产" where confidence >= 0.6 with yysls_rich_parse
+eval $rows = panel_rows("bag_wallet_detail", "money_2")
 
-# 按目标货币反向遍历取最高置信度
-call $bugan_val = scan_get($money2, "么玉")
-if $bugan_val > 0
-    call safe_set("bugan", $bugan_val, $tol_bugan, "么玉")
+# 按目标货币反向遍历取最高置信度（三个 scan_get 合并进 scan_targets，
+# 避免补扫前后各写一遍）
+call $vals = scan_targets($money2, $rows)
+call $bugan_pos = find_cell($money2, $rows, "么玉")
+
+# 安卓端专属：3 行×6 列=18 格装不下全部货币资产（约21种），
+# 目标货币若不在可视区域内，上拉整个面板 1 行，只需补扫新出现的最后一行。
+# 桌面端 4 行×6 列=24 格已能装下全部货币资产，不需要这套补扫。
+#
+# 注意：整个面板上拉 1 行后，屏幕上「每一行」显示的内容都会整体上移一行
+# （原第2行的内容现在显示在第1行……原第$rows行的内容现在显示在第
+# $rows-1 行），不是只多出最后一行、其余行位置不变。所以不能只把补扫到
+# 的最后一行塞回 $money2 就完事——那样会把原来第 $rows 行的数据（这次
+# 就是宝钱/长鸣玉）直接覆盖丢失，而它们现在实际显示在第 $rows-1 行、
+# 根本没人补上。必须用 shift_rows_after_scroll 把 $money2 整体重建成
+# 「准确反映当前画面」的样子：旧第 r 行 → 新第 r-1 行，新的最后一行用
+# 刚补扫的数据；旧第 1 行滚出屏幕，直接丢弃。
+if env("android")
+    if $rows > 0
+        if $vals.bugan <= 0 or $vals.baoqian <= 0 or $vals.changmingyu <= 0
+            log "钱袋: 目标货币不在可视区域，上拉面板 1 行补扫最后一行"
+            drag [bag_wallet_detail].[money_2] up 1 after wait @step_interval
+            recognize [bag_wallet_detail].[money_2][$rows][1...6] as rich $money2_last on group "货币资产" where confidence >= 0.6 with yysls_rich_parse
+            call $money2 = shift_rows_after_scroll($money2, $money2_last, $rows)
+
+            # 滚动前已经找到的值直接保留（哪怕它原本在滚动后已经滚出屏幕
+            # 的旧第1行）；只用滚动后重新取到的结果填补滚动前仍然缺失的项，
+            # 避免"为了补另一项而滚动"顺带把已经拿到的值又冲掉。
+            call $vals_rescan = scan_targets($money2, $rows)
+            if $vals.bugan <= 0
+                eval $vals.bugan = $vals_rescan.bugan
+            end
+            if $vals.baoqian <= 0
+                eval $vals.baoqian = $vals_rescan.baoqian
+            end
+            if $vals.changmingyu <= 0
+                eval $vals.changmingyu = $vals_rescan.changmingyu
+            end
+
+            # 么玉的点击坐标只信任重建后的 $money2——它已经准确反映滚动后
+            # 的当前画面，不需要再单独区分"是不是这次补扫才找到的"。
+            call $bugan_pos = find_cell($money2, $rows, "么玉")
+        end
+    end
 end
 
-call $baoqian_val = scan_get($money2, "宝钱")
-if $baoqian_val > 0
-    eval $baoqian_wan = $baoqian_val / 10000
+if $vals.bugan > 0
+    call safe_set("bugan", $vals.bugan, $tol_bugan, "么玉")
+end
+
+if $vals.baoqian > 0
+    eval $baoqian_wan = $vals.baoqian / 10000
     call safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)")
 end
 
-call $changmingyu_val = scan_get($money2, "长鸣玉")
-if $changmingyu_val > 0
-    call safe_set("changmingyu", $changmingyu_val, $tol_changmingyu, "长鸣玉")
+if $vals.changmingyu > 0
+    call safe_set("changmingyu", $vals.changmingyu, $tol_changmingyu, "长鸣玉")
 end
 
 log "钱袋货币扫描完成"
 
 # ─── 点击么玉进入不肝页面，获取不肝进度 ──────────────────
-call $bugan_pos = find_cell($money2, "么玉")
 if $bugan_pos
     eval $bugan_row = $bugan_pos.row
     eval $bugan_col = $bugan_pos.col
@@ -124,12 +170,44 @@ click [bag_equip_detail].[back] after wait @step_interval
 # 菜单页 → 主界面
 click [game_menu_page].[back] after wait @page_refresh
 
+# ─── 上拉 1 行后重建面板数据 ──────────────────────────────
+# $data 是滚动前的整面板数据，$fresh 是滚动后只补扫了最后一行（$rows）
+# 的结果。整个面板上拉 1 行会让每一行的画面内容整体上移：旧第 r 行的
+# 内容现在显示在新第 r-1 行；旧第 1 行滚出屏幕丢弃；新的最后一行
+# （$rows）用 $fresh 的补扫结果填。返回准确反映滚动后当前画面的字典。
+def shift_rows_after_scroll($data, $fresh, $rows)
+    eval $shifted = {}
+    for r in range(2, $rows)
+        eval $src_key = "" + $r
+        eval $new_r = $r - 1
+        eval $dst_key = "" + $new_r
+        eval $shifted.$dst_key = $data.$src_key
+    end
+    eval $last_key = "" + $rows
+    eval $shifted.$last_key = $fresh.$last_key
+    return $shifted
+end
+
+# ─── 三个目标货币一次性取值 ──────────────────────────────
+# 把 么玉/宝钱/长鸣玉 三次 scan_get 调用合并成一次，供补扫前后各调一遍
+def scan_targets($data, $rows)
+    call $bugan = scan_get($data, $rows, "么玉")
+    call $baoqian = scan_get($data, $rows, "宝钱")
+    call $changmingyu = scan_get($data, $rows, "长鸣玉")
+    eval $result = {}
+    eval $result.bugan = $bugan
+    eval $result.baoqian = $baoqian
+    eval $result.changmingyu = $changmingyu
+    return $result
+end
+
 # ─── 最高置信度取值子过程 ────────────────────────────────
-# 遍历面板 3×6 所有格子，返回目标货币在最高置信度下的数量
-def scan_get($data, $target)
+# 遍历面板 $rows×6 所有格子（$rows 由 panel_rows() 按环境动态取得，
+# 安卓3/桌面4），返回目标货币在最高置信度下的数量
+def scan_get($data, $rows, $target)
     eval $best_val = 0
     eval $best_conf = -1
-    for r in range(1, 3)
+    for r in range(1, $rows)
         for c in range(1, 6)
             eval $cell = $data.$r.$c
             eval $label = $cell.label
@@ -146,12 +224,12 @@ def scan_get($data, $target)
 end
 
 # ─── 查找目标位置子过程 ──────────────────────────────
-# 遍历面板 3×6 所有格子，返回目标货币最高置信度的行列位置
-def find_cell($data, $target)
+# 遍历面板 $rows×6 所有格子，返回目标货币最高置信度的行列位置
+def find_cell($data, $rows, $target)
     eval $best_row = 0
     eval $best_col = 0
     eval $best_conf = -1
-    for r in range(1, 3)
+    for r in range(1, $rows)
         for c in range(1, 6)
             eval $cell = $data.$r.$c
             eval $label = $cell.label

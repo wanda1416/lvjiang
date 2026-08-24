@@ -117,7 +117,7 @@ class TestSetupMenuInjection:
                      "_open_ocr_dialog", "_open_script_record", "_open_script_editor",
                      "_open_script_config",
                      "_open_batch_config", "_show_about", "_check_update",
-                     "_open_docs", "_open_feedback"):
+                     "_open_announcements", "_open_docs", "_open_feedback"):
             setattr(win, name, lambda: None)
         return win
 
@@ -146,6 +146,10 @@ class TestSetupMenuInjection:
         assert corner is not None
         assert corner.objectName() == "themeToggleButton"
         assert corner.toolTip() in {"切换到深色主题", "切换到浅色主题"}
+        help_menu = win.menuBar().actions()[-1].menu()
+        assert help_menu is not None
+        assert [action.text() for action in help_menu.actions()][:2] == [
+            "公告", "检查更新"]
 
     def test_menu_builder_exception_does_not_interrupt(self, qtbot, monkeypatch):
         win = self._make_window(qtbot)

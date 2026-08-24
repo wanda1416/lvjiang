@@ -258,7 +258,47 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     # ─── 启动时检查更新 ────────────────────────────────────────
 
     def check_update_on_startup(self):
-        """启动时检查更新（窗口显示后调用）"""
+        """启动时先检查公告，处理完成后再检查版本更新。"""
+        from ..core.announcement import (
+            AnnouncementChecker,
+            AnnouncementFetchResult,
+            applicable_notices,
+            cache_manifest,
+            get_last_notice_version,
+            mark_notice_version,
+            should_prompt_manifest,
+        )
+
+        checker = AnnouncementChecker(self)
+
+        def continue_to_update():
+            self._start_update_check_on_startup()
+
+        def on_finished(result: AnnouncementFetchResult):
+            try:
+                manifest = result.manifest
+                cache_manifest(manifest, result.etag)
+                if should_prompt_manifest(manifest):
+                    from .announcement_dialog import AnnouncementDialog
+                    notices = applicable_notices(manifest)
+                    dialog = AnnouncementDialog(
+                        manifest, notices, self, allow_refresh=False)
+                    dialog.exec()
+                    # 窗口确实展示并关闭后才推进，避免拉取成功但弹窗失败时吞公告。
+                    mark_notice_version(manifest.notice_version)
+                elif manifest.notice_version > get_last_notice_version():
+                    # 新清单没有覆盖当前客户端，也无需在以后每次启动重复判断。
+                    mark_notice_version(manifest.notice_version)
+            finally:
+                continue_to_update()
+
+        checker.finished.connect(on_finished)
+        checker.error.connect(lambda _message: continue_to_update())
+        checker.start()
+        self._startup_announcement_checker = checker  # 防止被 GC
+
+    def _start_update_check_on_startup(self):
+        """公告检查完成后执行原有的静默版本检查。"""
         from ..core.update import UpdateChecker, should_prompt_update
 
         checker = UpdateChecker(self)
@@ -367,6 +407,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # ── 帮助 ──
         help_menu = menubar.addMenu(tr("帮助"))
 
+        announcements = QAction(tr("公告"), self)
+        announcements.triggered.connect(self._open_announcements)
+        help_menu.addAction(announcements)
+
         check_update = QAction(tr("检查更新"), self)
         check_update.triggered.connect(self._check_update)
         help_menu.addAction(check_update)
@@ -470,6 +514,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         from .about_dialog import AboutDialog
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def _open_announcements(self):
+        """打开公告中心：先显示缓存，并在窗口内异步获取最新内容。"""
+        from ..core.announcement import load_cached_manifest, mark_notice_version
+        from .announcement_dialog import AnnouncementDialog
+
+        dialog = AnnouncementDialog(load_cached_manifest(), parent=self)
+        dialog.refresh()
+        dialog.exec()
+        # 帮助入口中用户已经实际看过当前窗口内容，关闭后记录其版本。
+        if dialog.manifest is not None:
+            mark_notice_version(dialog.manifest.notice_version)
 
     def _check_update(self):
         """直接检查更新（帮助菜单 → 检查更新）"""

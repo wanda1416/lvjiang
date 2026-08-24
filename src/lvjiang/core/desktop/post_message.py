@@ -48,11 +48,19 @@ class PostMessageInput(InputBackend):
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None):
-        """后台点击：PostMessage 向目标窗口发送鼠标事件，不移动光标"""
+                     *, pre_delay=None, post_delay=None, button: str = "left"):
+        """后台点击：PostMessage 向目标窗口发送鼠标事件，不移动光标
+
+        当前只实现了左键投递（postmessage_click 底层硬编码
+        WM_LBUTTONDOWN/UP）；本后端本身已标记严重回归、暂不可用
+        （见模块 docstring），非左键先按左键降级处理并记警告，不额外
+        投入实现——等这条路径恢复可用时再一起做。
+        """
         if not self.target_hwnd:
             logger.error("PostMessage 模式未设置目标窗口句柄")
             return
+        if button != "left":
+            logger.warning(f"PostMessage 模式暂不支持 {button} 键，按左键处理")
 
         offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
         offset_y = random.randint(-self.click_random_offset, self.click_random_offset)

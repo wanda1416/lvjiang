@@ -2,6 +2,15 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QWidget
 
 from lvjiang.apps.yysls.ui.loadout import LoadoutPanel
+from lvjiang.apps.yysls.ui.loadout.combat.layout import (
+    DISPLAY_MODE_FULL,
+    DISPLAY_MODE_HALF,
+    DISPLAY_MODE_HALF_COMPACT,
+)
+from lvjiang.apps.yysls.ui.loadout.combat.layout_strategies import (
+    FullCardLayout,
+    HalfCardLayout,
+)
 
 
 class Host(QWidget):
@@ -12,14 +21,19 @@ class Host(QWidget):
 
     def __init__(self):
         super().__init__()
+        self._active_user = "alice"
         self.user_combo = QComboBox(self)
-        self.user_combo.addItem("alice")
+        self.user_combo.addItems(["alice", "bob"])
 
     def active_user_name(self):
-        return "alice"
+        return self._active_user
 
     def navigate_user(self, _delta):
         pass
+
+    def switch_user(self, name):
+        self._active_user = name
+        self.user_changed.emit(name)
 
 
 def test_three_view_modes(qtbot, tmp_path, monkeypatch):
@@ -71,6 +85,139 @@ def test_three_view_modes(qtbot, tmp_path, monkeypatch):
     panel._set_view_mode("sidebar")
     assert not panel._character._combat_attrs_tab._attrs_scroll.isVisible()
     assert panel._right_shell.isVisible()
+
+
+def test_full_mode_cards_expand_into_real_grid_rows(qtbot, tmp_path, monkeypatch):
+    """full 模式的伸展空间属于两行卡片，不能落到不存在的第3行。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    panel.resize(1200, 900)
+    panel.show()
+    panel._set_view_mode("full")
+    qtbot.wait(20)
+
+    combat = panel._character._combat_attrs_tab
+    grid = combat._main_layout.itemAt(0).layout()
+    cards = (
+        combat._attack_card, combat._judgment_card,
+        combat._gain_card, combat._damage_card,
+    )
+
+    assert combat._display_mode == DISPLAY_MODE_FULL
+    assert grid.rowStretch(0) == 1
+    assert grid.rowStretch(1) == 1
+    assert len({card.height() for card in cards}) == 1
+    assert max(card.geometry().bottom() for card in cards) >= (
+        combat._attrs_widget.height() - 16)
+
+
+def test_hidden_compact_user_refresh_keeps_card_grid_items(
+        qtbot, tmp_path, monkeypatch):
+    """父页面隐藏不等于属性行被过滤；切用户后不能把网格清空。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    # 半屏左栏约 440px，稳定进入 half_compact。
+    panel.resize(900, 800)
+    panel.show()
+    qtbot.wait(20)
+    combat = panel._character._combat_attrs_tab
+    assert combat._display_mode == DISPLAY_MODE_HALF_COMPACT
+
+    panel.hide()
+    host.switch_user("bob")
+    qtbot.wait(10)
+    panel.show()
+    qtbot.wait(20)
+
+    pairs = (
+        (combat._attack_grid, combat._attack_grid_items),
+        (combat._judgment_grid, combat._judgment_grid_items),
+        (combat._gain_grid, combat._gain_grid_items),
+        (combat._damage_grid, combat._damage_grid_items),
+    )
+    for grid, items in pairs:
+        assert grid.count() == sum(
+            1 for widget, _row, _col in items if not widget.isHidden())
+    assert combat._judgment_grid.count() > 0
+    assert combat._gain_grid.count() > 0
+    assert combat._judgment_card.height() > 52
+    assert combat._gain_card.height() > 52
+
+
+def test_stale_compact_resize_callback_cannot_override_full_mode(
+        qtbot, tmp_path, monkeypatch):
+    """紧凑策略的延迟回调执行时，必须尊重已经完成的模式切换。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    panel.resize(900, 800)
+    panel.show()
+    qtbot.wait(20)
+    combat = panel._character._combat_attrs_tab
+    assert combat._display_mode == DISPLAY_MODE_HALF_COMPACT
+
+    # 模拟 compact resizeEvent 已排队，但回调前用户切换到了 full。
+    combat.resize(700, combat.height())
+    combat._strategy.on_resize(combat)
+    panel._set_view_mode("full")
+    qtbot.wait(20)
+
+    assert combat._display_mode == DISPLAY_MODE_FULL
+    assert isinstance(combat._strategy, FullCardLayout)
+    grid = combat._main_layout.itemAt(0).layout()
+    assert grid.itemAtPosition(0, 0).widget() is combat._attack_card
+    assert grid.itemAtPosition(1, 1).widget() is combat._damage_card
+    # 从 compact 退出时，所有原始网格项均已恢复。
+    assert combat._attack_grid.count() == len(combat._attack_grid_items)
+    assert combat._judgment_grid.count() == len(combat._judgment_grid_items)
+
+
+def test_half_compact_recovers_to_half_when_width_expands(
+        qtbot, tmp_path, monkeypatch):
+    """half_compact 的退出必须恢复标准网格和 half 策略。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    panel.resize(900, 800)
+    panel.show()
+    qtbot.wait(20)
+    combat = panel._character._combat_attrs_tab
+    assert combat._display_mode == DISPLAY_MODE_HALF_COMPACT
+
+    panel.resize(1400, 800)
+    qtbot.wait(30)
+
+    assert combat.width() >= 568
+    assert combat._display_mode == DISPLAY_MODE_HALF
+    assert isinstance(combat._strategy, HalfCardLayout)
+    flow = combat._main_layout.itemAt(0).layout()
+    assert flow.count() == 5
+    assert combat._attack_grid.count() == len(combat._attack_grid_items)
+    assert combat._judgment_grid.count() == len(combat._judgment_grid_items)
+    assert combat._gain_grid.count() == len(combat._gain_grid_items)
+    assert combat._damage_grid.count() == len(combat._damage_grid_items)
 
 
 def test_view_mode_persisted_in_ui_state(qtbot, tmp_path, monkeypatch):

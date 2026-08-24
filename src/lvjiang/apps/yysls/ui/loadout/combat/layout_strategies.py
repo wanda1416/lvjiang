@@ -55,6 +55,9 @@ class CardLayoutStrategy:
     def on_refresh_display(self, tab) -> None:
         """_refresh_display 结束后的策略特定刷新。默认 no-op。"""
 
+    def deactivate(self, tab) -> None:
+        """离开当前策略前清理其专属布局状态。默认 no-op。"""
+
     # ── 公共工具 ──
 
     @staticmethod
@@ -83,7 +86,10 @@ class FullCardLayout(CardLayoutStrategy):
         grid.addWidget(tab._damage_card, 1, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        grid.setRowStretch(2, 1)
+        # 伸展空间必须分配给实际承载卡片的两行。原先误设到不存在的
+        # row 2，导致 full 模式四张卡片只保留 sizeHint 高度并挤在顶部。
+        grid.setRowStretch(0, 1)
+        grid.setRowStretch(1, 1)
         tab._main_layout.addLayout(grid)
 
     def arrange_config_bar(self, tab) -> None:
@@ -177,6 +183,10 @@ class HalfCompactCardLayout(CardLayoutStrategy):
 
     @staticmethod
     def _check_recover(tab) -> None:
+        # resize 使用 singleShot 延迟检查；回调执行前用户可能已切到 full。
+        # 过期回调不得把新策略重新覆盖成 half。
+        if tab._display_mode != DISPLAY_MODE_HALF_COMPACT:
+            return
         width = tab.width()
         if width >= _COMPACT_THRESHOLD_PX + _COMPACT_HYSTERESIS_PX:
             tab._display_mode = DISPLAY_MODE_HALF
@@ -193,8 +203,8 @@ class HalfCompactCardLayout(CardLayoutStrategy):
         self._rearrange_grid_compact(tab)
         self._align_name_labels(tab)
 
-    def undo(self, tab) -> None:
-        """恢复标准布局：恢复零值行 + 网格多列 + 重置标签。"""
+    def deactivate(self, tab) -> None:
+        """离开紧凑策略：恢复标准网格，供 half/full 接管。"""
         self._restore_zero_attack_rows(tab)
         self._restore_grid_normal(tab)
         self._reset_name_label_widths(tab)
@@ -215,7 +225,10 @@ class HalfCompactCardLayout(CardLayoutStrategy):
             grid.setColumnStretch(1, 0)
             new_row = 0
             for widget, _, _ in items:
-                if not widget.isVisible():
+                # isVisible() 会把祖先容器的隐藏状态算进去：在其它顶层 Tab
+                # 切换用户时，所有属性行都会被误判为不可见并永久移出网格。
+                # 此处只跳过零值过滤明确 hide 的行，不受祖先显隐影响。
+                if widget.isHidden():
                     continue
                 grid.addWidget(widget, new_row, 0)
                 new_row += 1

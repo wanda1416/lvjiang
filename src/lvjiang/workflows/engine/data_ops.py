@@ -387,12 +387,21 @@ class _DataOpsMixin:
         else:
             value = self._resolve(node.value)
         current[final_field] = value
-        logger.debug(f"eval: {'.'.join(field_chain)} = {value!r}")
+        logger.debug(f"eval: {'.'.join(str(f) for f in field_chain)} = {value!r}")
 
-    def _extract_field_chain(self, node: FieldAccess) -> list:
+    def _extract_field_chain(self, node: FieldAccess) -> list | None:
         """从 FieldAccess 节点提取字段名链
 
         支持 VarRef / KeywordRef 作为根。返回的链第一个元素是变量名或关键字名。
+
+        动态字段名（$dict.$key 形式）解析出的值必须已经是 str——dict key
+        跟 JSON object key 一样只应该是字符串，这里不做 int/float 隐式转
+        str（那是读路径 _eval_field_raw 专门为 $var.[3] 这种字面量按行列
+        取值设计的兼容行为，写路径没有理由静默模仿）。$key 想用数值构造，
+        脚本自己显式转（如 `eval $key = "" + $rows`），类型一目了然，也
+        不会在 dict 里意外留下一个字符串以外的 key。
+        解析失败（动态字段名不是 str）时返回 None，调用方按现有的
+        "field_chain 为空" 分支处理，不吞异常也不悄悄继续。
         """
         chain = []
         current = node
@@ -401,8 +410,16 @@ class _DataOpsMixin:
             if isinstance(fn, str):
                 chain.append(fn)
             elif isinstance(fn, VarRef):
-                # 动态字段名，解析变量值
-                chain.append(self.variables.get(fn.name, ""))
+                dynamic_key = self.variables.get(fn.name, "")
+                if not isinstance(dynamic_key, str):
+                    logger.error(
+                        f"eval_field_assign: 动态字段名 ${fn.name} 的值不是字符串"
+                        f"（{dynamic_key!r}），dict key 必须是 str；"
+                        f"请先显式转换（如 eval ${fn.name}_key = \"\" + ${fn.name}）"
+                        f"再用作 key"
+                    )
+                    return None
+                chain.append(dynamic_key)
             elif isinstance(fn, Literal):
                 chain.append(fn.value)
             elif isinstance(fn, KeywordRef):

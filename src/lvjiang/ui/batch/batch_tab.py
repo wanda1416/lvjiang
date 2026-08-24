@@ -132,7 +132,7 @@ class BatchTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self._btn_run = QPushButton(tr("开始执行 (F9)"))
+        self._btn_run = QPushButton(f"{tr('开始执行')} ({self._host._user_config.hotkeys.start})")
         self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         self._btn_run.clicked.connect(self._on_run_clicked)
         btn_layout.addWidget(self._btn_run)
@@ -643,22 +643,23 @@ class BatchTab(QWidget):
         self._host.request_pause_resume()
 
     def _refresh_run_button(self, state: str):
+        hk = self._host._user_config.hotkeys
         if state in ("running", "paused"):
-            self._btn_run.setText(tr("结束 (F10)"))
+            self._btn_run.setText(f"{tr('结束')} ({hk.stop})")
             self._btn_run.setStyleSheet(_STYLE_BTN_STOP)
         elif state == "not_ready":
             self._btn_run.setText(tr("未连接"))
             self._btn_run.setStyleSheet(_STYLE_BTN_NOT_READY)
         else:
-            self._btn_run.setText(tr("开始执行 (F9)"))
+            self._btn_run.setText(f"{tr('开始执行')} ({hk.start})")
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         # 刷新暂停/恢复按钮
         if state == "running":
-            self._btn_pause_resume.setText(tr("暂停 (F8)"))
+            self._btn_pause_resume.setText(f"{tr('暂停')} ({hk.pause})")
             self._btn_pause_resume.setEnabled(True)
             self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
         elif state == "paused":
-            self._btn_pause_resume.setText(tr("恢复 (F8)"))
+            self._btn_pause_resume.setText(f"{tr('恢复')} ({hk.pause})")
             self._btn_pause_resume.setEnabled(True)
             self._btn_pause_resume.setStyleSheet(_STYLE_BTN_RESUME)
         else:

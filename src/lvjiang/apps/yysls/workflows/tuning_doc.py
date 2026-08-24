@@ -3,7 +3,7 @@
 与 loguru 技术日志完全分离：只记录"发生了什么、为什么"（操作用户、
 配置、装备信息、命中的规则、每轮材料与结果、继续/结束原因），不含
 坐标/OCR/滚动等实现细节。auto_tuning 每次运行生成一份新文档，
-每次写入即 flush（F10 中断或崩溃时已写内容不丢失）。
+每次写入即 flush（用户中断或崩溃时已写内容不丢失）。
 
 口径（与需求确认一致）：
 - 只写实际进入调律的装备；判定不值得/词条已满而跳过的装备完全不写；
@@ -194,7 +194,12 @@ class TuningDocWriter:
     def end_run(self, interrupted: bool, tuned_count: int, total_rounds: int):
         """运行结束：结束时间、正常/中断、实际调律件数与总轮数"""
         now = datetime.now().strftime("%H:%M:%S")
-        state = tr("用户中断（F10）") if interrupted else tr("正常完成")
+        if interrupted:
+            from ....core.config import load_user_config
+            stop_key = load_user_config().hotkeys.stop
+            state = f"{tr('用户中断')}（{stop_key}）"
+        else:
+            state = tr("正常完成")
         self._write()
         self._write(tr("## 运行结束"))
         self._write()

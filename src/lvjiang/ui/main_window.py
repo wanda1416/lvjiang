@@ -5,7 +5,8 @@
 - 窗口/设备扫描与定位
 - 工作流加载、执行
 - 运行日志面板
-- 全局热键（F9 开始、F10 结束、F8 暂停/恢复；定位/连接后方生效）
+- 全局热键（默认 F9 开始、F10 结束、F8 暂停/恢复；按键位可在配置管理→
+  热键设置里改，保存后立即生效；定位/连接后回调方生效）
 
 插件通过 hooks 机制扩展左侧/右侧 Tab 和菜单项。
 """
@@ -228,11 +229,16 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         logger.info("主窗口已初始化")
 
     def _main_global_hotkey_bindings(self):
-        """主窗口常驻全局热键；F12 由录制对话框临时管理。"""
+        """主窗口常驻全局热键；F12 由录制对话框临时管理。
+
+        按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F8）。
+        """
+        from ..core.platforms import hotkey_pynput_token
+        hk = self._user_config.hotkeys
         return {
-            "<f9>": self._on_global_f9,
-            "<f10>": self._on_global_f10,
-            "<f8>": self._on_global_f8,
+            hotkey_pynput_token(hk.start): self._on_global_f9,
+            hotkey_pynput_token(hk.stop): self._on_global_f10,
+            hotkey_pynput_token(hk.pause): self._on_global_f8,
         }
 
     # ─── SessionStore UI 回调 ──────────────────────────────────────
@@ -579,10 +585,55 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     def _open_settings_manager(self):
         from .settings_dialog import SettingsDialog
         dialog = SettingsDialog(self)
+        dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
         if dialog.exec():
             # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
+            active_hotkeys = self._user_config.hotkeys
             self._user_config = load_user_config()
+            # 热键在点击保存时已独立切换；其他配置重载不得
+            # 覆盖切换失败时仍可用的运行期键位。
+            self._user_config.hotkeys = active_hotkeys
             self.statusBar().showMessage(tr("配置已保存"), 3000)
+
+    def _apply_hotkey_settings(self, values: dict) -> None:
+        """保存热键后替换全局监听并刷新相关界面文案。"""
+        from ..core.config import HotkeyConfig
+        from ..core.platforms import start_global_hotkeys
+
+        hotkeys = HotkeyConfig(**values)
+        if hotkeys == self._user_config.hotkeys:
+            return
+        old_hotkeys = self._user_config.hotkeys
+        old_listener = self._hotkey_listener
+
+        # 先启动新监听；创建失败时旧监听仍可用，不会把
+        # 当前进程留在无全局热键的半切换状态。
+        self._user_config.hotkeys = hotkeys
+        try:
+            new_listener = start_global_hotkeys(
+                self._main_global_hotkey_bindings())
+        except Exception as exc:
+            self._user_config.hotkeys = old_hotkeys
+            logger.error(f"热键立即生效失败: {exc}")
+            QMessageBox.warning(
+                self, tr("热键设置"),
+                tr("新热键已保存，但当前进程重建全局监听失败；"
+                   "本次运行继续使用原热键，重启后将重试新设置。"))
+            return
+
+        self._hotkey_listener = new_listener
+        if old_listener is not None:
+            try:
+                old_listener.stop()
+                old_listener.join(3.0)
+                if old_listener.is_alive():
+                    logger.warning("旧热键监听线程 3 秒内未退出")
+            except Exception as exc:
+                logger.warning(f"旧热键监听注销失败: {exc}")
+
+        self._refresh_run_button()
+        self._refresh_pause_button()
+        self.statusBar().showMessage(tr("热键已更新并立即生效"), 3000)
 
     def _on_toggle_preview(self, checked: bool):
         self.preview_container.setVisible(not checked)
@@ -795,7 +846,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         main_layout.addWidget(splitter, stretch=1)
 
         # === 底部状态栏 ===
-        self.statusBar().showMessage(tr("就绪 | F9 开始 | F8 暂停 | F10 结束"))
+        hk = self._user_config.hotkeys
+        self.statusBar().showMessage(
+            f"{tr('就绪')} | {hk.start} {tr('开始')} | {hk.pause} {tr('暂停')} | {hk.stop} {tr('结束')}")
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._migrate_ui_state()
@@ -817,7 +870,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self.btn_run_workflow = QPushButton(tr("开始执行 (F9)"))
+        self.btn_run_workflow = QPushButton(f"{tr('开始执行')} ({self._user_config.hotkeys.start})")
         self.btn_run_workflow.clicked.connect(self._on_run_workflow)
         self.btn_run_workflow.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
@@ -1365,14 +1418,17 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
     # ─── 快捷键 + 关闭 ───────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):  # type: ignore[override]
-        if event.key() == Qt.Key.Key_F9:
+        # macOS 无全局热键时的窗口内兜底；按键位跟随「热键设置」配置。
+        hk = self._user_config.hotkeys
+        key = event.key()
+        if key == getattr(Qt.Key, f"Key_{hk.start}", None):
             self._on_f9_start()
-        elif event.key() == Qt.Key.Key_F8:
-            # 全局热键已处理 F8（避免双触发导致暂停/恢复互相抵消）
+        elif key == getattr(Qt.Key, f"Key_{hk.pause}", None):
+            # 全局热键已处理暂停键（避免双触发导致暂停/恢复互相抵消）
             if self._hotkey_listener is not None:
                 return
             self._on_pause_resume()
-        elif event.key() == Qt.Key.Key_F10:
+        elif key == getattr(Qt.Key, f"Key_{hk.stop}", None):
             self._request_stop()
         else:
             super().keyPressEvent(event)

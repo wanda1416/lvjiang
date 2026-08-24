@@ -250,7 +250,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     @property
     def is_stopped(self) -> bool:
         """停止请求或材料耗尽（大律准石低于基准）都视为停止，
-        背包遍历与部位循环全部收束，复用 F10 中断的退出路径。
+        背包遍历与部位循环全部收束，复用用户中断的退出路径。
 
         super().is_stopped 放在前面求值：它内部会先过暂停检查点
         （_wait_if_paused），若放在 or 后面，一旦材料耗尽，短路求值会
@@ -351,7 +351,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
                 first_slot = False
 
-            # 区分用户中断（F10）和材料耗尽：前者保留页面，后者返回主页
+            # 区分用户中断和材料耗尽：前者保留页面，后者返回主页
             user_interrupt = (hasattr(self, '_stop_check')
                              and callable(self._stop_check)
                              and self._stop_check())
@@ -372,7 +372,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self.output["tuning_reports"] = list(
                     self.recorder.collect_reports())
                 if "stop_reason" not in self.output:
-                    self.output["stop_reason"] = "用户中断（F10）"
+                    self.output["stop_reason"] = "用户中断"
             self._close_doc()
             # 进度信号：整体完成
             self._emit_progress("tuning_finished", {
@@ -384,8 +384,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "interrupted": user_interrupt,
             })
             if user_interrupt:
-                # 用户按 F10 中断：保留当前页面，方便查看停在哪里
-                logger.info("自动调律被用户中断（F10），保留当前页面")
+                # 用户中断：保留当前页面，方便查看停在哪里
+                logger.info("自动调律被用户中断，保留当前页面")
             else:
                 # 正常完成或材料耗尽：返回主页
                 if not self.navigator.navigate_back():
@@ -435,7 +435,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         return TuningRecorder.describe_rules(self.ctx.judge_configs or {})
 
     def _close_doc(self):
-        """写运行小结（含 F10 中断标记）+ 成品清单并关闭文档"""
+        """写运行小结（含用户中断标记）+ 成品清单并关闭文档"""
         rec = self.recorder
         if rec.doc is None:
             return
@@ -1035,7 +1035,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                  [a.to_dict() for a in equip_data.affixes])
         logger.info(f"  [{name}] 调律结束：共 {rounds} 轮，词条 {affix_count}/{self.MAX_AFFIX}")
         if not stop_reason:
-            stop_reason = ("用户中断（F10）" if self.is_stopped
+            stop_reason = ("用户中断" if self.is_stopped
                            else "调律结束")
         self.recorder.doc_finish_equipment(rounds, affix_count, stop_reason,
                                            judgement)

@@ -98,17 +98,18 @@ def discover_scripts() -> list[dict]:
 
 
 def list_exposed_scripts() -> list[dict]:
-    """日常页要展示的脚本：全集 → 作者声明的默认可见性 → 用户偏好覆盖。
+    """通用入口展示的脚本：全集 → 作者声明的默认可见性 → 用户偏好覆盖。
 
     三层来源各司其职：
 
     - **全集**由目录约定决定（见 :class:`WorkflowDiscoveryPolicy`），不可配置；
-    - **默认是否展示**由作者在 ``.wf`` front-matter 写 ``hidden: true``
-      或内置类设 ``HIDDEN`` 声明——未开发完的脚本先藏起来；
+    - **默认是否展示**由作者声明的 ``hidden`` 和 ``scope`` 决定：隐藏脚本及
+      ``dedicated`` 专用脚本不进入通用入口；
     - **顺序、启停、显示名**是用户偏好，存 session 的 ``daily.scripts``。
 
-    因此出厂新增的脚本会自动出现在列表里，不需要用户做任何事，也不会因为
-    用户存过偏好就被冻住。桌面下拉与设备端悬浮面板共用本函数。
+    因此出厂新增的日常脚本会自动出现在列表里，不需要用户做任何事，也不会
+    因为用户存过偏好就被冻住；新增专用脚本仍保持隐藏。桌面下拉与设备端
+    悬浮面板共用本函数。
 
     Returns:
         脚本配置列表，shape 同 ``discover_scripts()``，``name`` 已套用用户
@@ -121,7 +122,10 @@ def list_exposed_scripts() -> list[dict]:
     def shown(sid: str) -> bool:
         if sid in prefs.visible:
             return prefs.visible[sid]
-        return not discovered[sid].get("hidden", False)
+        cfg = discovered[sid]
+        scope = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
+        return Policy.visible_by_default(
+            hidden=bool(cfg.get("hidden", False)), scope=scope)
 
     ordered = [sid for sid in prefs.order if sid in discovered]
     ordered += [sid for sid in sorted(discovered) if sid not in ordered]

@@ -53,7 +53,7 @@ from .column_management import (
     _get_column_widths,
     _save_column_widths,
 )
-from .tab import add_user_toolbar_refresh_button
+from .tab import USER_ACTION_BTN_STYLE, add_user_toolbar_refresh_button
 
 
 def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> QTimer:
@@ -123,19 +123,23 @@ class ProfileOverviewTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             self.refresh,
             refresh_tooltip=tr("重新读取角色数据"),
         )
+        toolbar.addSpacing(24)
 
         btn_add_group = QPushButton(tr("新建分组"))
-        btn_add_group.setFixedWidth(70)
+        btn_add_group.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_add_group.setMinimumHeight(32)
         btn_add_group.clicked.connect(self._add_group)
         toolbar.addWidget(btn_add_group)
 
         btn_rename_group = QPushButton(tr("重命名分组"))
-        btn_rename_group.setFixedWidth(80)
+        btn_rename_group.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_rename_group.setMinimumHeight(32)
         btn_rename_group.clicked.connect(self._rename_group)
         toolbar.addWidget(btn_rename_group)
 
         btn_remove_group = QPushButton(tr("删除分组"))
-        btn_remove_group.setFixedWidth(70)
+        btn_remove_group.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_remove_group.setMinimumHeight(32)
         btn_remove_group.clicked.connect(self._remove_group)
         toolbar.addWidget(btn_remove_group)
 

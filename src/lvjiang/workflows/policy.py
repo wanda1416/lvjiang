@@ -6,8 +6,8 @@
 三层职责划分：
 
 1. **脚本全集** —— 由本策略的目录约定决定，不可配置。
-2. **是否默认展示** —— 由作者声明：``.wf`` 的 ``#% hidden: true``
-   front-matter，或内置类的 ``HIDDEN`` 属性。未开发完的脚本用它先藏起来。
+2. **是否默认展示** —— 由作者声明：``hidden`` 的脚本和 ``dedicated``
+   专用脚本默认不展示；用户仍可在脚本配置中显式打开。
 3. **顺序、启停、显示名** —— 属于用户偏好，存 session 的 ``daily`` 节点，
    不写回出厂配置。
 """
@@ -47,3 +47,8 @@ class WorkflowDiscoveryPolicy:
     def hidden_by_default(cls, meta: dict) -> bool:
         """作者是否声明了默认不展示（用户仍可在脚本配置里手动打开）"""
         return bool(meta.get(cls.HIDDEN_META_KEY, False))
+
+    @classmethod
+    def visible_by_default(cls, *, hidden: bool, scope: str) -> bool:
+        """脚本未隐藏且属于日常范围时，才默认暴露在通用入口。"""
+        return not hidden and scope != "dedicated"

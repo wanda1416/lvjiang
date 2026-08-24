@@ -248,6 +248,10 @@ class WindowOpsMixin:
                 self.chk_bg_mode.blockSignals(False)
             self.chk_bg_mode.setVisible(True)
             self.chk_bg_mode.setEnabled(True)
+        # 红框标定随后台模式一起显示；不读/写配置，checkbox 自身的默认勾选态即初始态
+        if hasattr(self, "chk_red_box"):
+            self.chk_red_box.setVisible(True)
+            self.chk_red_box.setEnabled(True)
         if hasattr(self, "chk_scrcpy"):
             self.chk_scrcpy.setVisible(False)
         if hasattr(self, "chk_agent"):
@@ -334,6 +338,8 @@ class WindowOpsMixin:
             self.chk_agent.setEnabled(True)
         if hasattr(self, "chk_bg_mode"):
             self.chk_bg_mode.setVisible(False)
+        if hasattr(self, "chk_red_box"):
+            self.chk_red_box.setVisible(False)
         if self._target_window is not None:
             self._target_window = None
             self._overlay.hide_border()
@@ -738,8 +744,9 @@ class WindowOpsMixin:
             f"({w['width']}x{w['height']} @ {w['left']},{w['top']})"
             + (f" DPI={ratio:.1f}x" if ratio != 1.0 else "")
         )
-        self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
-        self._overlay.set_color("red")
+        if not hasattr(self, "chk_red_box") or self.chk_red_box.isChecked():
+            self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
+            self._overlay.set_color("red")
         self._set_connected_ui(True)
         self.btn_locate.setText(tr("断连"))
         self._refresh_run_button()
@@ -757,6 +764,20 @@ class WindowOpsMixin:
                 from ..core.desktop import SendInputInput
                 self._input = SendInputInput(input_sim=self._user_config.input_sim)
                 self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
+
+    def _on_red_box_changed(self, state):
+        """红框标定开关：仅控制定位窗口后边缘是否显示红色标记框。
+
+        不读写 _user_config，纯运行期状态——取消勾选立刻隐藏当前边框，
+        重新勾选且仍处于定位状态则立刻按当前窗口位置重新画出。
+        """
+        if bool(state):
+            if self._target_window is not None:
+                w = self._target_window
+                self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
+                self._overlay.set_color("red")
+        else:
+            self._overlay.hide_border()
 
     def _on_bg_mode_changed(self, state):
         """后台模式开关切换：在 PostMessageInput / SendInputInput 之间替换整个 _input 实例"""

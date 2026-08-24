@@ -63,8 +63,8 @@ class _ActionsMixin:
         若 target 为 CoordPoint，则按画布归一化坐标反算后点击。
         若 target 为 PanelRef，则查 panel 校准缓存获取格子中心坐标。
         """
-        # suppress_defaults：显式 wait_clause 时抑制默认 before/after 延迟
-        kw = {}
+        # button：鼠标键，默认 left；suppress_defaults：显式 wait_clause 时抑制默认 before/after 延迟
+        kw = {"button": getattr(node, "button", "left")}
         if getattr(node, 'suppress_defaults', False):
             kw["pre_delay"] = (0, 0)
             kw["post_delay"] = (0, 0)

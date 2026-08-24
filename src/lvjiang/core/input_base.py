@@ -51,12 +51,15 @@ class InputBackend(ABC):
     @abstractmethod
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay: tuple[float, float] | None = None,
-                        post_delay: tuple[float, float] | None = None):
+                        post_delay: tuple[float, float] | None = None,
+                        button: str = "left"):
         """点击指定坐标（带随机偏移 + before/after 延迟）
 
         Args:
             pre_delay: 点击前延迟范围。None=使用默认 before_click_wait，(0,0)=不延迟。
             post_delay: 点击后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
+            button: 鼠标键，left/right/middle/x1/x2。触屏类后端（ADB/设备端）
+                没有非左键的概念，非 left 时忽略该参数、按普通点击处理并记警告。
         """
 
     @abstractmethod

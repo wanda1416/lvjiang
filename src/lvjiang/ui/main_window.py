@@ -633,7 +633,9 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
 
         self._refresh_run_button()
         self._refresh_pause_button()
-        self.statusBar().showMessage(tr("热键已更新并立即生效"), 3000)
+        status_bar = self.statusBar()
+        assert status_bar is not None
+        status_bar.showMessage(tr("热键已更新并立即生效"), 3000)
 
     def _on_toggle_preview(self, checked: bool):
         self.preview_container.setVisible(not checked)

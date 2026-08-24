@@ -1,12 +1,13 @@
 """配置管理对话框（多 Tab）
 
 Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）、
-Tab4 系统参数（可用工作环境）。
-Tab1 写 session.json（settings 节点）；Tab2/Tab3/Tab4 写 app.yaml（input_simulation / delay_params / envs，
+Tab4 系统参数（可用工作环境）、Tab5 热键设置（F7~F12 按键位）。
+Tab1/Tab5 写 session.json（settings 节点）；Tab2/Tab3/Tab4 写 app.yaml（input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。
+Tab5 修改的热键保存后立即重建全局监听并生效。
 """
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -50,12 +51,26 @@ _RESERVED_KEYS = {name for name, *_ in _RANGE_FIELDS} | {
     "click_random_offset", "region_jitter_ratio",
 }
 
+# 热键设置：HotkeyConfig 字段名 → 显示标签
+_HOTKEY_FIELDS = [
+    ("start", tr("开始执行 / 开始调律")),
+    ("pause", tr("暂停 / 恢复")),
+    ("stop", tr("停止 / 结束")),
+    ("record", tr("脚本录制")),
+]
+_HOTKEY_CHOICES = [f"F{i}" for i in range(7, 13)]
+
 # 数值输入框统一定宽，避免被布局拉满整行
 _SPIN_WIDTH = 90
+# 热键候选最长为 F10/F11/F12；显式定宽，避免“脚本录制”行与提示按钮
+# 共用子布局时 QComboBox 被压缩到只剩下部分文字。
+_HOTKEY_COMBO_WIDTH = 90
 
 
 class SettingsDialog(QDialog):
     """配置管理：Tab1 基础配置 + Tab2 输入模拟 + Tab3 等待参数"""
+
+    hotkeys_saved = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -76,6 +91,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_input_tab(), tr("输入模拟"))
         tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         tabs.addTab(self._build_env_tab(), tr("系统参数"))
+        tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
         layout.addWidget(tabs)
 
         # ── 底部按钮：保存（左）与关闭（右）隔开，语义不同 ──
@@ -113,6 +129,8 @@ class SettingsDialog(QDialog):
             hi_spin.valueChanged.connect(self._mark_dirty)
         for entry in self._custom_rows:
             self._connect_row_dirty(entry)
+        for combo in self._hotkey_combos.values():
+            combo.currentIndexChanged.connect(self._mark_dirty)
 
     def _connect_row_dirty(self, entry: dict):
         """连接单行等待参数的变更信号"""
@@ -330,6 +348,51 @@ class SettingsDialog(QDialog):
             widget.deleteLater()
         self._mark_dirty()
 
+    # ─── Tab5 热键设置（F7~F12 按键位）─────────────
+
+    def _build_hotkey_tab(self) -> QWidget:
+        """热键设置 Tab：自定义全局热键按键位（限 F7~F12）。"""
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+
+        warn = QLabel(tr("以下为系统级全局热键，保存后立即生效。"))
+        warn.setStyleSheet("color: #2E7D32; font-weight: bold;")
+        warn.setWordWrap(True)
+        vbox.addWidget(warn)
+
+        form = QFormLayout()
+        hk = self._config.hotkeys
+        self._hotkey_combos: dict[str, QComboBox] = {}
+        for name, label in _HOTKEY_FIELDS:
+            combo = QComboBox()
+            combo.addItems(_HOTKEY_CHOICES)
+            combo.setFixedWidth(_HOTKEY_COMBO_WIDTH)
+            idx = combo.findText(getattr(hk, name))
+            combo.setCurrentIndex(idx if idx >= 0 else 0)
+            self._hotkey_combos[name] = combo
+            if name == "record":
+                row = QHBoxLayout()
+                row.addWidget(combo)
+                row.addWidget(self._tip_button(tr(
+                    "该热键只在「脚本录制」对话框打开期间临时全局注册，"
+                    "对话框关闭后立即注销；其余三个热键在软件运行期间始终生效。")))
+                row.addStretch()
+                form.addRow(f"{label}:", row)
+            else:
+                form.addRow(f"{label}:", combo)
+        vbox.addLayout(form)
+
+        vbox.addStretch()
+        return tab
+
+    def _collect_hotkeys(self) -> dict | None:
+        """收集热键设置，校验四个动作不能绑定同一个按键"""
+        values = {name: combo.currentText() for name, combo in self._hotkey_combos.items()}
+        if len(set(values.values())) != len(values):
+            QMessageBox.warning(self, tr("配置管理"), tr("热键不能重复绑定同一个按键，请检查后重试"))
+            return None
+        return values
+
     # ─── 通用控件 ──────────────────────────────────────────
 
     @staticmethod
@@ -483,6 +546,9 @@ class SettingsDialog(QDialog):
         delay_params = self._collect_custom()
         if delay_params is None:
             return
+        hotkeys = self._collect_hotkeys()
+        if hotkeys is None:
+            return
         settings = {
             "android_capture_method": (
                 "scrcpy" if self._capture_stream_radio.isChecked() else "screencap"),
@@ -490,6 +556,7 @@ class SettingsDialog(QDialog):
                 "device_gesture" if self._android_input_agent_radio.isChecked() else "adb"),
             "desktop_background_input": self._input_combo.currentData(),
             "desktop_window_title": self._title_edit.text().strip(),
+            "hotkeys": hotkeys,
         }
         # 保存语言设置（需重启生效）
         lang = self._lang_combo.currentData()
@@ -507,6 +574,7 @@ class SettingsDialog(QDialog):
         input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
         envs = self._collect_envs()
         save_app_config(input_sim, delay_params, envs)
+        self.hotkeys_saved.emit(hotkeys)
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改
         for entry in self._custom_rows:
             entry["saved"] = bool(entry["key"].text().strip())

@@ -54,6 +54,15 @@ def create_desktop_input(input_sim: "InputSimConfig | None" = None) -> "InputBac
 
 # ─── 全局热键 ─────────────────────────────────────────────
 
+def hotkey_pynput_token(key: str) -> str:
+    """把展示用的按键名（如 "F9"）转换成 pynput GlobalHotKeys 需要的 token（"<f9>"）。
+
+    供 start_global_hotkeys() 的调用方按用户配置的 HotkeyConfig 动态拼绑定表用，
+    避免每处调用各自手写 f"<{key.lower()}>"。
+    """
+    return f"<{key.lower()}>"
+
+
 def start_global_hotkeys(hotkeys: dict[str, Callable]) -> "GlobalHotKeys | None":
     """启动 pynput 全局热键，返回已 start 的 Listener。
 

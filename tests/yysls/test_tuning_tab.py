@@ -13,6 +13,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QTabWidget
 
 from lvjiang.apps.yysls.ui.tuning import TuningTab
+from lvjiang.core.config.models import UserConfig
 
 
 class _FakeHost(QObject):
@@ -24,6 +25,7 @@ class _FakeHost(QObject):
     def __init__(self):
         super().__init__()
         self._running = False
+        self._user_config = UserConfig()
         self.stop_requests = 0
         self.logs: list[str] = []
         self.run_calls: list[tuple] = []

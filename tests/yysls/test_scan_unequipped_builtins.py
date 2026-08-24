@@ -152,6 +152,26 @@ def test_scan_unequipped_uses_window_protocol_and_correct_detail_scenes():
     assert "bag_cursor_next" not in text
 
 
+def test_scan_unequipped_closes_detail_only_on_desktop():
+    """关闭详情是桌面端防遮挡措施，Android 不应收到 ESC/BACK。"""
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
+        encoding="utf-8")
+    guarded_close = (
+        'if env("desktop")\n'
+        '                press "ESC" after wait @page_refresh\n'
+        '            end'
+    )
+    guarded_nested_close = (
+        'if env("desktop")\n'
+        '                            press "ESC" after wait @page_refresh\n'
+        '                        end'
+    )
+    assert text.count('press "ESC" after wait @page_refresh') == 2
+    assert guarded_close in text
+    assert guarded_nested_close in text
+
+
 def test_scan_unequipped_seen_row_skips_remaining_columns():
     """每行仅首列调用游标；第 2～末列只位于 new 分支内。"""
     root = Path(__file__).resolve().parents[2]

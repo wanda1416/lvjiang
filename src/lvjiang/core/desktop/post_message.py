@@ -1,9 +1,5 @@
 """PostMessage 输入后端 - 不移动光标，直接向目标窗口投递鼠标消息
 
-.. deprecated::
-    TODO [严重回归] 窗口模式的后台 PostMessage 投递出现严重回归问题，
-    当前版本暂不可用。详见 docs/desktop_input_blocker.md。
-
 通过 Win32 PostMessageW 发送 WM_LBUTTON* 消息到指定窗口客户区，
 实现后台操作（不抢占焦点、不移动光标）。
 """
@@ -52,9 +48,7 @@ class PostMessageInput(InputBackend):
         """后台点击：PostMessage 向目标窗口发送鼠标事件，不移动光标
 
         当前只实现了左键投递（postmessage_click 底层硬编码
-        WM_LBUTTONDOWN/UP）；本后端本身已标记严重回归、暂不可用
-        （见模块 docstring），非左键先按左键降级处理并记警告，不额外
-        投入实现——等这条路径恢复可用时再一起做。
+        WM_LBUTTONDOWN/UP）；非左键按左键降级处理并记警告。
         """
         if not self.target_hwnd:
             logger.error("PostMessage 模式未设置目标窗口句柄")

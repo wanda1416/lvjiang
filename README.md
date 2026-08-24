@@ -298,8 +298,9 @@ pytest tests/workflows/test_parser.py
 
 欢迎通过以下方式反馈问题：
 
-- **微信交流群**：见主窗口「帮助 → 反馈与建议」中的二维码
+- **微信交流群**：主窗口「帮助 → 反馈」中点击「扫码加群」
 - **GitHub Issue**：[github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
+- **提交规范**：[问题反馈规范](docs/60-userguide/08-feedback-and-issues.md)
 
 **反馈范围说明：**
 
@@ -309,7 +310,7 @@ pytest tests/workflows/test_parser.py
 | 功能建议与需求 | 远程协助配置环境 |
 | 文档内容过时或无法实操 | 逐个步骤指导操作 |
 
-作者精力有限，无法提供一对一使用教学。[用户指南](docs/60-userguide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。
+作者精力有限，无法提供一对一使用教学。[用户指南](docs/60-userguide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。正式提交 Bug 时必须提供版本与运行环境、复现步骤、预期与实际结果、连续日志；识别或点击问题还需附截图或录屏。信息不足的问题在补齐前不会进入代码排查。
 
 ---
 

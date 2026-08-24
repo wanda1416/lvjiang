@@ -84,6 +84,26 @@ about_dialog:
   btn_check_update: 检查更新
   checking: 检查中...
   check_failed: 检查更新失败
+feedback_dialog:
+  title: 反馈与建议
+  heading: 提交问题前请准备完整的定位信息
+  summary: 只有信息足以复现或定位的问题才会进入开发者排查；受理不代表承诺修复时间。
+  required_title: 提交 Bug 时至少提供
+  required_version: 律匠版本；源码版同时提供 commit hash
+  required_environment: 运行环境、布局、设备分辨率与横竖屏方向
+  required_backend: 截图方式、输入方式、工作流名称与全部参数
+  required_reproduction: 复现步骤、预期结果、实际结果和出现频率
+  required_evidence: 异常前后的连续日志；识别或点击问题附截图或录屏
+  scope_title: 受理范围
+  scope_accepted: 受理：可复现的 Bug、功能建议、过时或无法执行的文档。
+  scope_rejected: 不受理：一对一教学、远程配置、信息不足、明确不支持的功能、第三方修改导致的问题及商业用途。
+  privacy: 提交日志和截图前，请遮盖账号、角色名、ADB 序列号、Token 等隐私信息。
+  btn_group: 扫码加群
+  btn_details: 查看详细规范
+  btn_issue: 提交 GitHub Issue
+  btn_close: 关闭
+  group_hint: 使用交流和一般咨询请优先在群内讨论
+  qr_failed: 交流群二维码加载失败
 user_manager:
   title: 用户管理
   btn_close: 关闭

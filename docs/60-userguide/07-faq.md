@@ -1,4 +1,4 @@
-# 6. 常见问题
+# 7. 常见问题
 
 ## 连接问题
 
@@ -108,8 +108,9 @@
 
 ## 反馈与支持
 
-见 [README — 反馈与支持](../../README.md#-反馈与支持)。
+正式提交问题前，请阅读[问题反馈规范](08-feedback-and-issues.md)。反馈入口和支持范围见
+[README — 反馈与支持](../../README.md#-反馈与支持)。
 
 ---
 
-上一步：[← 5.6 计算最优毕业率组合](05.06-optimal-equipment-combination.md) | 下一步：[工作流与日常任务 →](07-workflows.md) | [返回用户指南目录](README.md)
+上一步：[← 工作流与日常任务](06-workflows.md) | 下一步：[问题反馈规范 →](08-feedback-and-issues.md) | [返回用户指南目录](README.md)

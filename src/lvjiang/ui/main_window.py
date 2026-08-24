@@ -571,7 +571,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
 
     def _open_feedback(self):
-        """打开反馈对话框：展示微信交流群二维码"""
+        """打开反馈规范与反馈渠道对话框。"""
         from .feedback_dialog import FeedbackDialog
         dialog = FeedbackDialog(self)
         dialog.exec()

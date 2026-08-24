@@ -16,13 +16,14 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
-    QGroupBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -53,6 +54,23 @@ _MODE_CUSTOM = 0   # 自定义：不自动填充
 _MODE_MAX_VAL = 1  # 满数值：填充 cap
 _MODE_MAX_CY = 2   # 满承音：填充 chengyin
 
+_DINGYIN_BUTTON_STYLE = (
+    "QPushButton { text-align: left; padding: 5px 24px 5px 9px; "
+    "border: 1px solid palette(mid); border-radius: 4px; "
+    "background: palette(base); }"
+    "QPushButton:hover { border-color: palette(highlight); }"
+    "QPushButton::menu-indicator { image: none; subcontrol-origin: padding; "
+    "subcontrol-position: bottom right; right: 6px; }"
+)
+
+_PRIMARY_BUTTON_STYLE = (
+    "QPushButton { background: palette(highlight); color: palette(highlighted-text); "
+    "border: 1px solid palette(highlight); border-radius: 5px; padding: 6px 18px; "
+    "font-weight: 700; }"
+    "QPushButton:hover { border-color: palette(text); }"
+    "QPushButton:pressed { background: palette(dark); }"
+)
+
 
 class _AffixRow(QWidget):
     """单行词条编辑：词条名下拉 + 数值输入"""
@@ -74,12 +92,12 @@ class _AffixRow(QWidget):
 
         # 词条名下拉
         self._combo_name = QComboBox()
-        self._combo_name.setFixedWidth(180)
+        self._combo_name.setMinimumWidth(220)
         self._combo_name.addItem(tr("（空）"), "")
         for name in affix_names:
             self._combo_name.addItem(name, name)
         self._combo_name.currentIndexChanged.connect(self._on_name_changed)
-        layout.addWidget(self._combo_name)
+        layout.addWidget(self._combo_name, 1)
 
         # 数值输入（加宽一个汉字宽度）
         self._spin_value = QDoubleSpinBox()
@@ -108,8 +126,6 @@ class _AffixRow(QWidget):
         self._lbl_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._lbl_pct.setStyleSheet("color: palette(mid); font-size: 11px;")
         layout.addWidget(self._lbl_pct)
-
-        layout.addStretch()
 
         self._affix_names = affix_names
         self._cap = 0.0
@@ -233,17 +249,47 @@ class MockEquipDialog(QDialog):
         self._default_school = default_school  # 默认流派，用于右四件定音词条排序
 
         self.setWindowTitle(tr("编辑模拟装备") if self._is_edit else tr("创建模拟装备"))
-        self.setMinimumWidth(500)
+        self.setMinimumSize(680, 620)
+        self.resize(760, 700)
         self._init_ui()
         if self._is_edit:
             self._load_data()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(12)
+
+        context = QLabel(
+            tr("用于备战方案比较  ·  不会修改真实背包装备")
+        )
+        context.setProperty("tone", "muted")
+        context.setStyleSheet("font-size: 12px;")
+        layout.addWidget(context)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(10)
 
         # ── 基本信息 ──
-        self._basic_group = QGroupBox(tr("基本信息"))
-        basic_layout = QFormLayout(self._basic_group)
+        self._basic_group = QFrame()
+        self._basic_group.setProperty("surface", "card")
+        basic_card_layout = QVBoxLayout(self._basic_group)
+        basic_card_layout.setContentsMargins(14, 11, 14, 13)
+        basic_card_layout.setSpacing(8)
+        basic_title = QLabel(tr("装备信息"))
+        basic_title.setStyleSheet("font-size: 14px; font-weight: 700;")
+        basic_card_layout.addWidget(basic_title)
+        self._basic_form = QFormLayout()
+        self._basic_form.setContentsMargins(0, 0, 0, 0)
+        self._basic_form.setHorizontalSpacing(12)
+        self._basic_form.setVerticalSpacing(8)
+        basic_card_layout.addLayout(self._basic_form)
+        basic_layout = self._basic_form
 
         # 部位
         self._combo_part = QComboBox()
@@ -282,11 +328,25 @@ class MockEquipDialog(QDialog):
         self._check_chengyin = QCheckBox(tr("承音"))
         basic_layout.addRow(tr("承音:"), self._check_chengyin)
 
-        layout.addWidget(self._basic_group)
+        body_layout.addWidget(self._basic_group)
 
         # ── 词条编辑 ──
-        affix_group = QGroupBox(tr("词条"))
+        affix_group = QFrame()
+        affix_group.setProperty("surface", "card")
         affix_layout = QVBoxLayout(affix_group)
+        affix_layout.setContentsMargins(14, 11, 14, 13)
+        affix_layout.setSpacing(8)
+
+        affix_header = QHBoxLayout()
+        affix_title = QLabel(tr("词条配置"))
+        affix_title.setStyleSheet("font-size: 14px; font-weight: 700;")
+        affix_header.addWidget(affix_title)
+        affix_header.addStretch()
+        affix_hint = QLabel(tr("宫为首词条 · 商角徵羽不可重复"))
+        affix_hint.setProperty("tone", "muted")
+        affix_hint.setStyleSheet("font-size: 11px;")
+        affix_header.addWidget(affix_hint)
+        affix_layout.addLayout(affix_header)
 
         # 词条数值模式（三个 radio，默认自定义）
         self._radio_mode_custom = QRadioButton(tr("自定义"))
@@ -302,15 +362,26 @@ class MockEquipDialog(QDialog):
         mode_row.addWidget(self._radio_mode_max_val)
         mode_row.addWidget(self._radio_mode_max_cy)
         mode_row.addStretch()
-        affix_layout.addLayout(mode_row)
+        mode_panel = QFrame()
+        mode_panel.setProperty("status", "info")
+        mode_panel_layout = QHBoxLayout(mode_panel)
+        mode_panel_layout.setContentsMargins(10, 6, 10, 6)
+        mode_label = QLabel(tr("数值填充"))
+        mode_label.setStyleSheet("font-size: 12px; font-weight: 600;")
+        mode_panel_layout.addWidget(mode_label)
+        mode_panel_layout.addLayout(mode_row)
+        affix_layout.addWidget(mode_panel)
         for rb in (self._radio_mode_custom, self._radio_mode_max_val, self._radio_mode_max_cy):
             rb.toggled.connect(self._on_affix_mode_changed)
 
         # 词条冲突提示标签（红字），实际内容在按钮行左侧显示；先创建好，
         # 词条行的下拉信号可以立即连上，不用等按钮行布局出来。
         self._lbl_affix_warning = QLabel("")
-        self._lbl_affix_warning.setStyleSheet("color: #f44336; font-weight: bold;")
+        self._lbl_affix_warning.setProperty("status", "danger")
+        self._lbl_affix_warning.setStyleSheet(
+            "padding: 7px 10px; font-weight: 600; border-radius: 5px;")
         self._lbl_affix_warning.setWordWrap(True)
+        self._lbl_affix_warning.setVisible(False)
 
         self._affix_rows: list[_AffixRow] = []
         # 宫（首词条）使用首词条候选，商角徵羽使用普通词条过滤
@@ -334,27 +405,10 @@ class MockEquipDialog(QDialog):
 
         # 定音词条选择：级联菜单按钮（左三件平铺，右四件按流派分组）
         self._btn_dingyin = QPushButton(tr("（无）"))
-        self._btn_dingyin.setFixedWidth(180)
-        self._btn_dingyin.setStyleSheet("""
-            QPushButton {
-                text-align: left;
-                padding: 4px 24px 4px 8px;
-                border: 1px solid palette(mid);
-                border-radius: 2px;
-                background: palette(button);
-            }
-            QPushButton:hover {
-                border: 1px solid palette(highlight);
-            }
-            QPushButton::menu-indicator {
-                image: none;
-                subcontrol-origin: padding;
-                subcontrol-position: bottom right;
-                right: 6px;
-            }
-        """)
+        self._btn_dingyin.setMinimumWidth(220)
+        self._btn_dingyin.setStyleSheet(_DINGYIN_BUTTON_STYLE)
         self._btn_dingyin.clicked.connect(self._show_dingyin_cascade_menu)
-        dingyin_layout.addWidget(self._btn_dingyin)
+        dingyin_layout.addWidget(self._btn_dingyin, 1)
 
         self._spin_dingyin = QDoubleSpinBox()
         self._spin_dingyin.setFixedWidth(104)
@@ -383,25 +437,34 @@ class MockEquipDialog(QDialog):
 
         self._dingyin_cap = 0.0
         self._dingyin_selected = ""  # 级联菜单选中的词条名
-        dingyin_layout.addStretch()
         affix_layout.addLayout(dingyin_layout)
 
         # 等级变化时刷新所有词条行的满值和比例
         self._combo_level.currentIndexChanged.connect(self._on_level_changed)
 
-        layout.addWidget(affix_group)
+        affix_layout.addWidget(self._lbl_affix_warning)
+        body_layout.addWidget(affix_group)
+        body_layout.addStretch()
+        scroll.setWidget(body)
+        layout.addWidget(scroll, 1)
 
-        # ── 按钮（左侧留白放词条冲突提示，不用等保存才发现）──
+        # ── 操作按钮 ──
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self._lbl_affix_warning, stretch=1)
-        btn_row.addWidget(buttons)
-        layout.addLayout(btn_row)
+        ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_button is not None:
+            ok_button.setText(tr("保存修改") if self._is_edit else tr("创建装备"))
+            ok_button.setStyleSheet(_PRIMARY_BUTTON_STYLE)
+            ok_button.setMinimumHeight(32)
+        cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancel_button is not None:
+            cancel_button.setText(tr("取消"))
+            cancel_button.setMinimumHeight(32)
+        layout.addWidget(buttons)
 
         # 武器类型变化时过滤词条列表
         self._combo_weapon_type.currentIndexChanged.connect(
@@ -418,9 +481,8 @@ class MockEquipDialog(QDialog):
         """部位改变时更新武器类型行可见性，并刷新词条候选"""
         part = self._combo_part.currentData()
         is_weapon = part == tr("武器")
-        fl = self._basic_group.layout()
-        if isinstance(fl, QFormLayout):
-            fl.setRowVisible(1, is_weapon)
+        self._lbl_weapon_type.setVisible(is_weapon)
+        self._combo_weapon_type.setVisible(is_weapon)
         # 部位变化时同步刷新普通词条和定音词条（初始化阶段跳过）
         if hasattr(self, '_affix_rows') and self._affix_rows:
             self._update_affix_rows()
@@ -763,6 +825,7 @@ class MockEquipDialog(QDialog):
         result = self._build_equip_data()
         error = self._validate_affix_rules(result) if result else None
         self._lbl_affix_warning.setText(error or "")
+        self._lbl_affix_warning.setVisible(bool(error))
 
     def _on_accept(self):
         """确认按钮处理
@@ -790,45 +853,21 @@ class MockEquipDialog(QDialog):
         self.accept()
 
     def _validate_affix_rules(self, result: dict) -> str | None:
-        """校验词条 2-5（不含首词条，首词条完全独立不受此约束）的三条硬性规则。
+        """校验模拟装备是否为游戏可产出的组合，不合法返回中文提示。
 
-        1. 属攻类词条（四大基础属性攻击 + 会自动适配当前武学的"无相攻击"）
-           最多 2 条，且不能重复。
-        2. 神力词条（增效类 + 武器类：各武学增伤/增效、全武学增效、
-           对首领/玩家单位增伤增效、单体/群体奇术增伤）最多 1 条。
-        3. 神力词条不能是转律产出的（转律机制不会产出神力词条）。
+        判定本身不在这里实现，统一走全局的
+        :mod:`lvjiang.apps.yysls.core.equip_validator`，保证「创建模拟装备时
+        拦下的」和「扫描真实装备时标记的」永远是同一套规则、同一句话。
 
-        任一规则被违反时返回中文错误提示；全部满足返回 None。
+        **数值超上限（cap_overflow）不在此拦截**：它不是组合非法，而是数值
+        异常，允许保存但会被标记进 ``_extra.illegal_equip``，由装备卡片上的
+        「!」提醒用户校正。其余（词条重复、属攻超量、神力超量、神力为转律
+        产出）一律拦下，不保存、不关闭对话框。
         """
-        from ....config import get_game_config
-        gc = get_game_config()
+        from ....core.equip_validator import validate_combination_dict
 
-        attack_names: list[str] = []
-        divine_count = 0
-        for i in range(2, 6):
-            affix_data = result.get(f"affix_{i}")
-            if not affix_data:
-                continue
-            name = affix_data["name"]
-            category = gc.get_affix_category(name)
-            if category == tr("属攻类"):
-                attack_names.append(name)
-            elif category in (tr("增效类"), tr("武器类")):
-                divine_count += 1
-                if affix_data.get("is_transferred"):
-                    return tr(
-                        "神力词条「{name}」不能是转律产出：转律不会产出神力词条"
-                    ).format(name=name)
-
-        if len(attack_names) > 2:
-            return tr(
-                "属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条"
-            ).format(n=len(attack_names))
-        if len(set(attack_names)) != len(attack_names):
-            return tr("属攻类词条不能重复")
-        if divine_count > 1:
-            return tr("神力词条最多 1 条，当前词条 2-5 里有 {n} 条").format(n=divine_count)
-        return None
+        blocking = validate_combination_dict(result)
+        return blocking[0].message if blocking else None
 
     def _build_equip_data(self) -> dict | None:
         """构建装备数据字典"""
@@ -904,6 +943,12 @@ class MockEquipDialog(QDialog):
 
         # _extra
         result["_extra"] = {"is_mock": True, "affix_count": sum(1 for i in range(1, 6) if f"affix_{i}" in result)}
+
+        # 数值超上限只标记不拦截（组合类违规由 _on_accept 拦下，走不到这里保存）
+        from ....core.equip_validator import ILLEGAL_KEY, validate_equipment_dict
+        reasons = [r.message for r in validate_equipment_dict(result)]
+        if reasons:
+            result["_extra"][ILLEGAL_KEY] = reasons
 
         # _fp：模拟装备指纹自动添加 mock_ 前缀
         from ....core.equip_parser.models import make_fingerprint

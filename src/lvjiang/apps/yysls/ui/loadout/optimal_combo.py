@@ -24,7 +24,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -40,6 +39,7 @@ from .....i18n import tr
 from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
+from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ..layout_helpers import fit_combo_to_contents
 
 # 8 个装备槽位的显示顺序与分组映射
@@ -62,13 +62,22 @@ _QUALITY_COLORS = {
     "green": "#16A34A",
 }
 
-_CARD_STYLE = """
-    QFrame#optimalCard {
-        background-color: palette(base);
-        border: 1px solid palette(midlight);
-        border-radius: 6px;
-    }
-"""
+_PRIMARY_BUTTON_STYLE = (
+    "QPushButton { background: palette(highlight); color: palette(highlighted-text); "
+    "border: 1px solid palette(highlight); border-radius: 5px; padding: 6px 16px; "
+    "font-weight: 700; }"
+    "QPushButton:hover { border-color: palette(text); }"
+    "QPushButton:pressed { background: palette(dark); }"
+    "QPushButton:disabled { background: palette(midlight); color: palette(mid); "
+    "border-color: palette(midlight); }"
+)
+
+_SECONDARY_BUTTON_STYLE = (
+    "QPushButton { background: palette(button); color: palette(button-text); "
+    "border: 1px solid palette(mid); border-radius: 5px; padding: 6px 13px; "
+    "font-weight: 600; }"
+    "QPushButton:hover { border-color: palette(highlight); }"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +194,9 @@ def _equip_tooltip(equip: dict) -> str:
             parts.append(line)
     # 定音词条
     dingyin = equip.get("dingyin")
-    if isinstance(dingyin, dict) and dingyin.get("name"):
+    if is_zhige_dingyin(equip):
+        parts.append(tr("&lt;止戈定音&gt;"))
+    elif isinstance(dingyin, dict) and dingyin.get("name"):
         val = dingyin.get("value", "")
         cap_pct = dingyin.get("cap_pct")
         line = f"{tr('定音')} {dingyin['name']}: {val}"
@@ -204,7 +215,12 @@ class _CandidateRow(QWidget):
         super().__init__(parent)
         self.equip = equip
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 1, 4, 1)
+        self.setObjectName("optimalCandidateRow")
+        self.setStyleSheet(
+            "QWidget#optimalCandidateRow { border-radius: 4px; }"
+            "QWidget#optimalCandidateRow:hover { background: palette(alternate-base); }"
+        )
+        layout.setContentsMargins(5, 3, 5, 3)
         layout.setSpacing(6)
 
         self.checkbox = QCheckBox()
@@ -226,7 +242,7 @@ class _CandidateRow(QWidget):
         self.score_label.setText(rating)
 
 
-class _SlotGroup(QGroupBox):
+class _SlotGroup(QFrame):
     """单槽位候选区：标题 + 候选行列表。"""
 
     def __init__(
@@ -235,18 +251,23 @@ class _SlotGroup(QGroupBox):
         tuning_rule: str = "", playstyle: str = "",
         parent: QWidget | None = None,
     ) -> None:
-        super().__init__(display_name, parent)
+        super().__init__(parent)
         self.slot_key = slot_key
-        self.setStyleSheet(
-            "QGroupBox { font-weight: 600; font-size: 13px; "
-            "border: 1px solid palette(midlight); border-radius: 4px; "
-            "margin-top: 8px; padding-top: 12px; }"
-            "QGroupBox::title { subcontrol-origin: margin; left: 8px; "
-            "padding: 0 4px; }"
-        )
+        self.setProperty("surface", "card")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 4, 6, 4)
-        layout.setSpacing(1)
+        layout.setContentsMargins(8, 7, 8, 7)
+        layout.setSpacing(3)
+
+        header = QHBoxLayout()
+        title = QLabel(display_name)
+        title.setStyleSheet("font-size: 13px; font-weight: 700;")
+        header.addWidget(title)
+        header.addStretch()
+        count = QLabel(tr("{count} 件").format(count=len(equips)))
+        count.setProperty("tone", "muted")
+        count.setStyleSheet("font-size: 11px;")
+        header.addWidget(count)
+        layout.addLayout(header)
 
         from ...core.graduation.combo_rules import judge_tuning_candidate
         def rating_of(equip: dict) -> tuple[int, str]:
@@ -288,26 +309,25 @@ class _ResultCard(QFrame):
         slot_labels: dict[str, str], parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setObjectName("optimalCard")
-        self.setStyleSheet(_CARD_STYLE)
+        self.setProperty("surface", "card")
         self.result = result
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 6, 10, 6)
-        layout.setSpacing(4)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(7)
 
         # Top row: rank + rate + DPS + apply button
         top = QHBoxLayout()
         top.setSpacing(12)
 
         rank_label = QLabel(f"#{rank}")
-        rank_label.setStyleSheet("font-weight: 700; font-size: 15px;")
+        rank_label.setStyleSheet("font-weight: 700; font-size: 14px;")
         top.addWidget(rank_label)
 
         rate = result.get("rate", 0)
         rate_label = QLabel(f"{rate * 100:.2f}%")
         rate_label.setStyleSheet(
-            "font-weight: 700; font-size: 15px; color: #D97706;")
+            "font-weight: 700; font-size: 17px; color: palette(highlight);")
         top.addWidget(rate_label)
 
         dps = result.get("dps", 0)
@@ -318,13 +338,8 @@ class _ResultCard(QFrame):
         top.addStretch()
 
         apply_btn = QPushButton(tr("应用此组合"))
-        apply_btn.setFixedHeight(28)
-        apply_btn.setStyleSheet(
-            "QPushButton { background: #4CAF50; color: white; "
-            "border: none; border-radius: 4px; padding: 4px 12px; "
-            "font-weight: 600; }"
-            "QPushButton:hover { background: #43A047; }"
-        )
+        apply_btn.setMinimumHeight(30)
+        apply_btn.setStyleSheet(_PRIMARY_BUTTON_STYLE)
         apply_btn.clicked.connect(
             lambda: self.apply_clicked.emit(result.get("equipped", {})),
         )
@@ -341,7 +356,8 @@ class _ResultCard(QFrame):
                 label = slot_labels.get(slot_key, slot_key)
                 parts.append(f"{label}: {name}")
         summary = QLabel("  ".join(parts))
-        summary.setStyleSheet("font-size: 12px; color: palette(text);")
+        summary.setProperty("tone", "muted")
+        summary.setStyleSheet("font-size: 12px;")
         summary.setWordWrap(True)
         layout.addWidget(summary)
 
@@ -378,27 +394,37 @@ class OptimalComboDialog(QDialog):
         self._slot_groups: dict[str, _SlotGroup] = {}
         self._result_cards: list[_ResultCard] = []
 
-        self.setWindowTitle(tr("最优毕业率组合搜索"))
-        self.setMinimumSize(800, 550)
-        self.resize(900, 650)
+        self.setWindowTitle(tr("最优组合"))
+        self.setMinimumSize(920, 620)
+        self.resize(1080, 720)
         self._setup_ui()
         self._load_candidates()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setSpacing(8)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(12)
 
-        # Header: school + scheme info
-        header = QLabel(
-            f"{tr('流派')}: {self._school}  |  "
-            f"{tr('方案')}: {self._scheme}"
+        context = QLabel(
+            tr("{school}  ·  {scheme}  ·  基于当前备战方案").format(
+                school=self._school, scheme=self._scheme,
+            )
         )
-        header.setStyleSheet(
-            "font-size: 13px; color: palette(mid); padding: 4px 0;")
-        layout.addWidget(header)
+        context.setProperty("tone", "muted")
+        context.setStyleSheet("font-size: 12px;")
+        layout.addWidget(context)
 
-        # Options row
+        settings = QFrame()
+        settings.setProperty("surface", "card")
+        settings_layout = QVBoxLayout(settings)
+        settings_layout.setContentsMargins(14, 11, 14, 11)
+        settings_layout.setSpacing(9)
+        settings_title = QLabel(tr("搜索设置"))
+        settings_title.setStyleSheet("font-size: 14px; font-weight: 700;")
+        settings_layout.addWidget(settings_title)
+
         options = QHBoxLayout()
+        options.setSpacing(14)
         self._chk_pruning = QCheckBox(tr("智能筛选"))
         self._chk_pruning.setChecked(True)
         self._chk_pruning.setToolTip(
@@ -422,11 +448,13 @@ class OptimalComboDialog(QDialog):
             tr("将低于最高等级的装备视为最高等级参与计算"))
         options.addWidget(self._chk_full_level)
         options.addStretch()
-        layout.addLayout(options)
+        settings_layout.addLayout(options)
 
-        # Tuning row
         tuning_row = QHBoxLayout()
-        tuning_row.addWidget(QLabel(tr("弓玦套装：")))
+        tuning_row.setSpacing(8)
+        gongjue_label = QLabel(tr("弓玦套装"))
+        gongjue_label.setProperty("tone", "muted")
+        tuning_row.addWidget(gongjue_label)
         self._combo_gongjue = QComboBox()
         self._combo_gongjue.addItem(tr("无"), "")
         for gj_type in ["会意", "精准", "会心"]:
@@ -440,32 +468,42 @@ class OptimalComboDialog(QDialog):
             self._on_gongjue_changed)
         tuning_row.addWidget(self._combo_gongjue)
         tuning_row.addSpacing(16)
-        tuning_row.addWidget(QLabel(tr("调律规则：")))
+        tuning_label = QLabel(tr("候选评级"))
+        tuning_label.setProperty("tone", "muted")
+        tuning_label.setToolTip(tr("仅用于辅助筛选候选装备，不参与装备合法性判断"))
+        tuning_row.addWidget(tuning_label)
         self._combo_tuning = QComboBox()
         self._combo_tuning.addItem(tr("不应用规则"), None)
+        self._combo_tuning.setToolTip(
+            tr("玩法评级只辅助勾选候选，不作为装备合法性规则"))
         self._combo_tuning.currentIndexChanged.connect(
             self._on_tuning_changed)
         tuning_row.addWidget(self._combo_tuning, 1)
-        tuning_row.addStretch()
-        layout.addLayout(tuning_row)
+        settings_layout.addLayout(tuning_row)
         self._load_tuning_options()
+        layout.addWidget(settings)
 
-        # Search button + progress
+        status_card = QFrame()
+        status_card.setProperty("status", "info")
+        status_layout = QHBoxLayout(status_card)
+        status_layout.setContentsMargins(12, 8, 12, 8)
+        status_layout.setSpacing(9)
+        self._candidate_summary = QLabel(tr("正在读取候选装备…"))
+        self._candidate_summary.setWordWrap(True)
+        self._candidate_summary.setStyleSheet("font-size: 12px;")
+        status_layout.addWidget(self._candidate_summary, 1)
+
         action_row = QHBoxLayout()
+        action_row.setSpacing(8)
         self._btn_search = QPushButton(tr("开始搜索"))
-        self._btn_search.setFixedHeight(32)
-        self._btn_search.setStyleSheet(
-            "QPushButton { background: #1976D2; color: white; "
-            "border: none; border-radius: 4px; padding: 6px 20px; "
-            "font-weight: 600; font-size: 14px; }"
-            "QPushButton:hover { background: #1565C0; }"
-            "QPushButton:disabled { background: palette(mid); }"
-        )
+        self._btn_search.setMinimumHeight(32)
+        self._btn_search.setStyleSheet(_PRIMARY_BUTTON_STYLE)
         self._btn_search.clicked.connect(self._on_search)
         action_row.addWidget(self._btn_search)
 
         self._btn_cancel = QPushButton(tr("取消"))
-        self._btn_cancel.setFixedHeight(32)
+        self._btn_cancel.setMinimumHeight(32)
+        self._btn_cancel.setStyleSheet(_SECONDARY_BUTTON_STYLE)
         self._btn_cancel.setVisible(False)
         self._btn_cancel.clicked.connect(self._on_cancel)
         action_row.addWidget(self._btn_cancel)
@@ -480,18 +518,26 @@ class OptimalComboDialog(QDialog):
         self._progress_label.setVisible(False)
         action_row.addWidget(self._progress_label)
 
-        action_row.addStretch()
-        layout.addLayout(action_row)
+        status_layout.addLayout(action_row)
+        layout.addWidget(status_card)
 
         # Tab widget: 候选装备 / 最优结果
         self._tab_widget = QTabWidget()
+        self._tab_widget.setObjectName("optimalComboTabs")
+        self._tab_widget.setDocumentMode(True)
+        self._tab_widget.setStyleSheet(
+            "QTabWidget#optimalComboTabs::pane {"
+            " border: 1px solid palette(midlight); border-radius: 7px; }"
+            "QTabWidget#optimalComboTabs QTabBar::tab {"
+            " padding: 9px 18px; min-width: 120px; }"
+        )
 
         # Tab 1: 候选装备 (4×2 grid)
         candidates_tab = QWidget()
         candidates_layout = QVBoxLayout(candidates_tab)
-        candidates_layout.setContentsMargins(4, 4, 4, 4)
+        candidates_layout.setContentsMargins(8, 8, 8, 8)
         grid = QGridLayout()
-        grid.setSpacing(6)
+        grid.setSpacing(8)
         self._slot_scroll_areas: dict[str, QScrollArea] = {}
         for idx, (slot_key, _display_name, _ft) in enumerate(_SLOT_ORDER):
             row = idx // 4
@@ -500,9 +546,7 @@ class OptimalComboDialog(QDialog):
             scroll.setWidgetResizable(True)
             scroll.setHorizontalScrollBarPolicy(
                 Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            scroll.setStyleSheet(
-                "QScrollArea { border: 1px solid palette(midlight); "
-                "border-radius: 4px; }")
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
             grid.addWidget(scroll, row, col)
             self._slot_scroll_areas[slot_key] = scroll
         for c in range(4):
@@ -515,10 +559,17 @@ class OptimalComboDialog(QDialog):
         # Tab 2: 最优结果
         results_tab = QWidget()
         results_layout = QVBoxLayout(results_tab)
-        results_layout.setContentsMargins(4, 4, 4, 4)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        results_scroll = QScrollArea()
+        results_scroll.setWidgetResizable(True)
+        results_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        results_container = QWidget()
         self._results_inner = QVBoxLayout()
-        self._results_inner.setSpacing(4)
-        results_layout.addLayout(self._results_inner)
+        self._results_inner.setContentsMargins(8, 8, 8, 8)
+        self._results_inner.setSpacing(8)
+        results_container.setLayout(self._results_inner)
+        results_scroll.setWidget(results_container)
+        results_layout.addWidget(results_scroll)
         self._tab_widget.addTab(results_tab, tr("最优结果"))
 
         layout.addWidget(self._tab_widget, stretch=1)
@@ -707,6 +758,8 @@ class OptimalComboDialog(QDialog):
 
         # Build UI groups（按指纹去重）
         slot_labels = {}
+        total_candidates = 0
+        available_slots = 0
         for slot_key, display_name, _ in _SLOT_ORDER:
             slot_labels[slot_key] = display_name
             candidates = slot_candidates[slot_key]
@@ -725,6 +778,9 @@ class OptimalComboDialog(QDialog):
                 rule_key, playstyle,
             )
             self._slot_groups[slot_key] = group
+            total_candidates += len(unique)
+            if unique:
+                available_slots += 1
             scroll = self._slot_scroll_areas.get(slot_key)
             if scroll:
                 # 用容器包裹 group，底部加 stretch 防止内容居中
@@ -737,6 +793,15 @@ class OptimalComboDialog(QDialog):
                 scroll.setWidget(container)
 
         self._slot_labels = slot_labels
+        self._candidate_summary.setText(
+            tr("已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。"
+               "勾选参与搜索的装备后，系统会重新计算整套毕业率。").format(
+                   count=total_candidates, slots=available_slots,
+               )
+        )
+        self._tab_widget.setTabText(
+            0, tr("候选装备  {count}").format(count=total_candidates),
+        )
 
     def _candidate_passes(
         self, slot_key: str, equip: dict,
@@ -755,7 +820,8 @@ class OptimalComboDialog(QDialog):
             return False
         if self._affix_filter == "dingyin":
             dingyin = equip.get("dingyin")
-            return isinstance(dingyin, dict) and bool(dingyin.get("name"))
+            return (is_zhige_dingyin(equip)
+                    or isinstance(dingyin, dict) and bool(dingyin.get("name")))
         if self._affix_filter == "full_tuning":
             return all(
                 isinstance(equip.get(f"affix_{i}"), dict)
@@ -794,6 +860,10 @@ class OptimalComboDialog(QDialog):
         self._progress.setMaximum(max(total, 1))
         self._progress.setValue(0)
         self._progress_label.setText(f"0 / {total:,}")
+        self._candidate_summary.setText(
+            tr("正在比较 {count} 种装备组合，搜索期间仍可取消。")
+            .format(count=f"{total:,}"),
+        )
         # 切回候选装备 Tab，重置结果 Tab 标题
         self._tab_widget.setCurrentIndex(0)
         self._tab_widget.setTabText(1, tr("最优结果"))
@@ -867,6 +937,10 @@ class OptimalComboDialog(QDialog):
         self._btn_cancel.setVisible(False)
         self._progress.setVisible(False)
         self._progress_label.setVisible(False)
+        self._candidate_summary.setText(
+            tr("搜索完成，共得到 {count} 个可用结果。")
+            .format(count=len(results)),
+        )
 
         if not results:
             self._tab_widget.setTabText(1, tr("最优结果"))
@@ -895,6 +969,7 @@ class OptimalComboDialog(QDialog):
         self._btn_cancel.setVisible(False)
         self._progress.setVisible(False)
         self._progress_label.setVisible(False)
+        self._candidate_summary.setText(tr("搜索失败，请检查候选装备后重试。"))
         QMessageBox.critical(self, tr("搜索失败"), message)
 
     def _on_apply_result(self, equipped: dict) -> None:

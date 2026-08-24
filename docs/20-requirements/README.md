@@ -19,10 +19,7 @@
 |------|------|
 | [02-player-profile/](02-player-profile/) | 毕业率计算、货币追踪、体力管理子需求 |
 
-## 其他
-
-| 文档 | 内容 |
-|------|------|
-| [TODO.md](TODO.md) | 待办事项与最近完成记录 |
-| [todo-android.md](todo-android.md) | Android 独立执行端进度 |
-| [todo-mac.md](todo-mac.md) | macOS 适配进度 |
+待办事项与平台推进计划已移至 [00-meta](../00-meta/README.md)：
+[02-backlog.md](../00-meta/02-backlog.md)、
+[platforms/android.md](../00-meta/platforms/android.md)、
+[platforms/macos.md](../00-meta/platforms/macos.md)。

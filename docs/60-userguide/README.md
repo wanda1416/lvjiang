@@ -42,6 +42,7 @@
 |------|------|
 | [README](../../README.md) | 项目简介、安装、技术架构 |
 | [自动调律需求](../20-requirements/01-auto-tuning.md) | 自动调律需求与行为规则细节 |
-| [游戏调律机制](../10-game/04-tuning-mechanics.md) | 游戏调律机制说明 |
+| [装备与调律机制](../10-game/01-equipment-system.md) | 游戏客观机制：调律、转律、承音 |
+| [调律评价规则](../10-game/10-tuning-rules/README.md) | 律匠的装备分级与流派判定规格 |
 | [DSL 语法](../30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
 | [主窗口状态流](../30-architecture/01-main-window-state-flow.md) | 定位/连接状态机 |

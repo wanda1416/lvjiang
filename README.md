@@ -31,7 +31,7 @@
 - **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
 - **毕业率计算**：Excel 公式 → Python 转换引擎，支持最优组合搜索与毕业概率评估。
 - **i18n 国际化**：核心模块 tr() 全覆盖，支持中文 / 英文界面切换。
-- **安卓独立执行端（实验性）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [安卓迁移进度](docs/20-requirements/todo-android.md)）。
+- **安卓独立执行端（实验性）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [Android 平台计划](docs/00-meta/platforms/android.md)）。
 
 ---
 
@@ -263,7 +263,8 @@ pytest tests/workflows/test_parser.py
 
 | 目录 | 内容 |
 |------|------|
-| [`docs/50-releases/`](docs/50-releases/) | 发布记录与版本说明 |
+| [`docs/`](docs/README.md) | 完整文档中心与按读者导航 |
+| [`docs/50-releases/`](docs/50-releases/README.md) | 发布记录与版本说明 |
 | [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接手机、配置与运行自动调律 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
@@ -280,7 +281,7 @@ pytest tests/workflows/test_parser.py
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（实验性）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)（1932 测试用例），安卓端迁移进度见 [todo-android](docs/20-requirements/todo-android.md)，macOS 适配见 [todo-mac](docs/20-requirements/todo-mac.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（实验性）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)（1932 测试用例），平台计划见 [Android](docs/00-meta/platforms/android.md) 与 [macOS](docs/00-meta/platforms/macos.md)。
 
 ---
 

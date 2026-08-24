@@ -126,7 +126,7 @@
 - [x] 工作流 YAML 的设备端加载验证（2026-07-30）
   - `workflows/*.wf` 已随 assets 解压，`load_yaml` 可正确解析
 - [x] **Phase 2 提交**（2026-07-30，`1c0b754`）
-  - 含：constants.py + App.kt + build.gradle.kts + smoke.py（config 自检）+ todo-android.md
+  - 含：constants.py + App.kt + build.gradle.kts + smoke.py（config 自检）+ Android 计划文档
 
 ## Phase 3 完成：工作流引擎设备端跑通
 

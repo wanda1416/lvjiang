@@ -15,7 +15,11 @@ from .constants import (
     WUXUE_PATTERN,
     infer_category,
 )
-from .dingyin_parser import DingyinParser
+from .dingyin_parser import (
+    DINGYIN_NOTICE_KEY,
+    ZHIGE_DINGYIN_KEY,
+    DingyinParser,
+)
 from .models import Affix, EquipAttr, EquipmentData
 
 
@@ -83,6 +87,8 @@ class EquipmentParser:
             result = self._dingyin_parser.parse(dingyin_text)
             if result:
                 equip.dingyin = result
+                equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
+                equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
                 # 计算定音词条 cap_pct（与普通词条相同逻辑）
                 if equip.level and result.get("name"):
                     caps = self._attr_config.get_affix_caps(
@@ -91,10 +97,43 @@ class EquipmentParser:
                         result["cap_pct"] = round(
                             result["value"] / caps["cap"] * 100, 1)
             else:
-                equip.warnings.append(f"定音词条无法解析: {dingyin_text!r}")
+                suspected = self._dingyin_parser.suspected_misread(dingyin_text)
+                if self._dingyin_parser.matches_normal_name(dingyin_text):
+                    # 名称属于普通定音但数值解析失败，仍是未预计的 OCR 问题，
+                    # 不能伪装成止戈定音。
+                    equip.warnings.append(f"定音词条无法解析: {dingyin_text!r}")
+                elif suspected is not None:
+                    # 启发式判断只能作为核对提示，不能改变“非普通定音统一按
+                    # 止戈展示”的确定语义，否则误判会让定音整行凭空消失。
+                    notice = (
+                        f"定音词条疑似误读为 {dingyin_text!r}，"
+                        f"可能是「{suspected}」，请核对")
+                    equip.warnings.append(notice)
+                    equip.extra_data[ZHIGE_DINGYIN_KEY] = True
+                    equip.extra_data[DINGYIN_NOTICE_KEY] = notice
+                else:
+                    # 普通定音词库无法解释的文本是可预计的止戈定音，不属于装备
+                    # 异常，也不保留其名称/数值；UI 只展示 <止戈定音>。
+                    equip.extra_data[ZHIGE_DINGYIN_KEY] = True
+                    equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
+                    logger.info(f"识别为止戈定音: {dingyin_text!r}")
 
         # 辅助信息
         equip.extra_data["affix_count"] = len(equip.affixes)
+
+        # 合法性判定：游戏产不出的组合（重复词条、属攻超量、数值超上限等）
+        # 只标注不丢弃——扫描结果出现这些情况基本等于 OCR 误读，交给用户校正。
+        #
+        # 整段包在 try 里：判定结果只是附加信息，扫描与调律是长流程，
+        # 判定器出任何意外都不能让 parse 抛出。上层 to_equipment() 捕获异常后
+        # 会返回空 dict，那等于把整件装备静默丢掉，比不标注严重得多。
+        try:
+            from ..equip_validator import annotate_equipment
+            for reason in annotate_equipment(equip):
+                logger.warning(
+                    f"装备状态异常 [{reason.code}] {equip.name}: {reason.message}")
+        except Exception as e:  # pragma: no cover - 防御性兜底
+            logger.error(f"装备合法性判定失败（不影响解析结果）: {e}")
 
         return equip
 

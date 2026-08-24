@@ -11,11 +11,17 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMenu,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
 
 from ......i18n import tr
+from ....core.equip_parser.dingyin_parser import (
+    DINGYIN_NOTICE_KEY,
+    is_zhige_dingyin,
+)
+from ....core.equip_validator import illegal_reasons_of
 
 
 class _ElidedLabel(QLabel):
@@ -129,6 +135,48 @@ def _set_quality(widget: QLabel, quality: str) -> None:
     widget.update()
 
 
+class _IllegalBadge(QLabel):
+    """装备状态异常提醒「!」
+
+    只在装备被合法性判定器标记时显示（``_extra.illegal_equip`` 非空）。
+    点击弹出全部异常原因，提示用户手工校正——这类数据基本来自 OCR 误读，
+    程序不替用户猜正确值。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__("!", parent)
+        self._reasons: list[str] = []
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedSize(16, 16)
+        self.setStyleSheet(
+            "color: #ffffff; background: #f44336; border-radius: 8px;"
+            "font-weight: bold; font-size: 11px;")
+        self.hide()
+
+    def set_reasons(self, reasons: list[str]) -> None:
+        self._reasons = list(reasons or [])
+        if self._reasons:
+            self.setToolTip(tr("装备状态异常，点击查看原因"))
+            self.show()
+        else:
+            self.setToolTip("")
+            self.hide()
+
+    def mousePressEvent(self, event):  # type: ignore[override]
+        # 必须吃掉事件：卡片本身响应点击做选中/详情，点「!」不应连带触发
+        if event is not None:
+            event.accept()
+        if not self._reasons:
+            return
+        QMessageBox.warning(
+            self, tr("装备状态异常"),
+            tr("该装备存在以下异常，游戏中不会出现这样的装备，"
+               "通常是识别误读，请手工校正：") + "\n\n"
+            + "\n".join(f"· {r}" for r in self._reasons),
+        )
+
+
 def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
     """创建标准标签胶囊（用于 name_row 的标签序列）。"""
     lbl = QLabel(text, parent)
@@ -211,6 +259,8 @@ class _SlotCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
         header.addWidget(self.lbl_name, stretch=1)
+        self.illegal_badge = _IllegalBadge()
+        header.addWidget(self.illegal_badge)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("filtered", tr("筛选中"))
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
@@ -333,6 +383,7 @@ class _SlotCard(QFrame):
         self._quality_bg = None
         self._equip_data = {}
         self.status_tags.set_visible("mock", False)
+        self.illegal_badge.set_reasons([])
         self.lbl_name.setText(self._display_name)
         _set_quality(self.lbl_name, "")
         self.lbl_name.setStyleSheet(
@@ -349,6 +400,7 @@ class _SlotCard(QFrame):
         self.status_tags.set_visible(
             "mock", bool(equip_data.get("_extra", {}).get("is_mock", False)),
         )
+        self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
         quality = equip_data.get("quality") or ""
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
 
@@ -396,16 +448,27 @@ class _SlotCard(QFrame):
 
         # 定音
         dingyin = equip_data.get("dingyin")
-        if dingyin and dingyin.get("name"):
+        zhige_dingyin = is_zhige_dingyin(equip_data)
+        normal_dingyin = isinstance(dingyin, dict) and bool(dingyin.get("name"))
+        if zhige_dingyin or normal_dingyin:
             dash = QFrame()
             dash.setFrameShape(QFrame.Shape.NoFrame)
             dash.setStyleSheet(
                 "border: none; border-top: 1px dashed palette(mid);")
             dash.setFixedHeight(1)
             self.affix_layout.addWidget(dash)
-            self._add_affix_row(dingyin)
+            if zhige_dingyin:
+                notice = str(
+                    (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or ""
+                )
+                self._add_affix_row(
+                    {"name": tr("<止戈定音>")}, tooltip=notice,
+                )
+            else:
+                assert isinstance(dingyin, dict)
+                self._add_affix_row(dingyin)
 
-    def _add_affix_row(self, affix: dict):
+    def _add_affix_row(self, affix: dict, *, tooltip: str = ""):
         value = affix.get("value", "")
         unit = affix.get("unit", "")
         cap_pct = affix.get("cap_pct")
@@ -426,6 +489,8 @@ class _SlotCard(QFrame):
         row.setSpacing(2)
 
         lbl = _ElidedLabel(f"{affix['name']}{transfer_mark}")
+        if tooltip:
+            lbl.setToolTip(tooltip)
         lbl.setStyleSheet(
             f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
         row.addWidget(lbl, stretch=1)
@@ -502,6 +567,8 @@ class _CompactEquipCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
         name_row.addWidget(self.lbl_name, stretch=1)
+        self.illegal_badge = _IllegalBadge()
+        name_row.addWidget(self.illegal_badge)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
         self.status_tags.define("loadout", tr("备战中"), "#00897B")
@@ -611,6 +678,7 @@ class _CompactEquipCard(QFrame):
             bool(is_mock or equip_data.get("_extra", {}).get("is_mock", False)),
         )
         self.status_tags.set_visible("loadout", is_loadout)
+        self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
 
         level = equip_data.get("level") or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
@@ -674,7 +742,9 @@ class _CompactEquipCard(QFrame):
 
         # 定音
         dingyin = equip_data.get("dingyin")
-        if dingyin and dingyin.get("name"):
+        zhige_dingyin = is_zhige_dingyin(equip_data)
+        normal_dingyin = isinstance(dingyin, dict) and bool(dingyin.get("name"))
+        if zhige_dingyin or normal_dingyin:
             dash = QFrame()
             dash.setFrameShape(QFrame.Shape.NoFrame)
             dash.setStyleSheet(
@@ -682,6 +752,22 @@ class _CompactEquipCard(QFrame):
             dash.setFixedHeight(1)
             self.affix_layout.addWidget(dash)
 
+            if zhige_dingyin:
+                row = QHBoxLayout()
+                row.setContentsMargins(0, 0, 0, 0)
+                lbl_name = _ElidedLabel(tr("<止戈定音>"))
+                notice = str(
+                    (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or ""
+                )
+                if notice:
+                    lbl_name.setToolTip(notice)
+                lbl_name.setStyleSheet(
+                    f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
+                row.addWidget(lbl_name, stretch=1)
+                self.affix_layout.addLayout(row)
+                return
+
+            assert isinstance(dingyin, dict)
             dy_value = dingyin.get("value", "")
             dy_val_str = (
                 f"{dy_value}%" if isinstance(dy_value, (int, float))

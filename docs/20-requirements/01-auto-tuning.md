@@ -421,6 +421,7 @@ panels:
 
 | 文档 | 内容 |
 |------|------|
-| [../10-game/04-tuning-mechanics.md](../10-game/04-tuning-mechanics.md) | 调律机制详细说明（装备分级、流派规则） |
+| [../10-game/10-tuning-rules/README.md](../10-game/10-tuning-rules/README.md) | 调律评价规格：装备分级、流派词条要求、顶级判定 |
+| [../10-game/04-tuning-mechanics.md](../10-game/04-tuning-mechanics.md) | 调律相关文档的边界与索引 |
 | [../10-game/01-equipment-system.md](../10-game/01-equipment-system.md) | 装备系统介绍 |
 | [../30-architecture/35-workflows/01-current-equip-analysis.md](../30-architecture/35-workflows/01-current-equip-analysis.md) | 装备分析流程 |

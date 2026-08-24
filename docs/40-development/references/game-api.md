@@ -1,12 +1,13 @@
 # 燕云十六声官方 API 接口参考
 
-> 关键词：API、access_token、装备数据、体力、心力、不肝、destiny.cool、网易
+> 关键词：API、access_token、装备数据、体力、心力、不肝、网易
 
 ---
 
 ## 一、背景
 
-燕云十六声（yysls）的第三方工具 destiny.cool（作者：七龙HHA）通过网易官方数据接口获取角色数据。本文档记录对该接口的完整逆向分析结果，为项目后续集成官方数据做准备。
+燕云十六声（yysls）提供了一组官方角色数据接口，可用于读取角色的装备、体力与帮派信息。
+本文档整理这些接口的调用方式与响应结构，为项目后续集成官方数据做准备。
 
 ---
 
@@ -18,8 +19,7 @@
 https://s3.game.163.com/7540694694f2dddc/
 ```
 
-- `7540694694f2dddc` 为硬编码的哈希前缀，所有请求必须携带；
-- 该前缀来源于 destiny.cool 前端 JS bundle（`index-DD_jAavX.js`）。
+- `7540694694f2dddc` 为固定的路径前缀，所有请求必须携带。
 
 ### 2.2 认证方式
 
@@ -243,18 +243,15 @@ for pos, detail in data["wearEquipsDetailed"].items():
 
 ## 六、数据来源与验证
 
-- API URL 格式通过逆向 destiny.cool 的 JS bundle 发现（`index-DD_jAavX.js`）；
-- 关键代码位置：
-  - `Ds` 变量（约 L75756）：`regional/data` URL 模板；
-  - 百业加载代码（约 L112430）：`Promise.all` 中并行请求 3 个 `/hun/` 端点；
-- destiny.cool 声明：除网易官方接口外，不会向其他服务器发送携带 token 的请求；
-- 全部 4 个端点已于 2026-08-07 测试通过，返回 `code: 200`。
+- 全部 4 个端点已于 2026-08-07 实测通过，返回 `code: 200`；
+- 本文记录的字段以当时的实际响应为准，游戏版本更新后需重新核对；
+- `access_token` 由游戏官方签发，仅用于访问官方接口，不得转发到任何第三方服务。
 
 ---
 
 ## 七、后续集成方向
 
-1. **装备数据解析**：将 `wearEquipsDetailed` 中的原始属性 ID 映射为可读属性名（需下载 destiny.cool 的 `equip/decoded/equip_name.json` 等映射文件）；
+1. **装备数据解析**：将 `wearEquipsDetailed` 中的原始属性 ID 映射为可读属性名，映射表需自行维护；
 2. **体力/心力监控**：基于 `merge1Vo` 实现日常体力管理提醒；
-3. **WASM 计算对接**：将 API 返回的装备数据输入 `yysls_calc.wasm` 进行面板计算和毕业率评估；
+3. **毕业率对接**：将 API 返回的装备数据接入本项目的毕业率计算管线，产出面板与毕业率评估；
 4. **多角色支持**：遍历 `config/session/users/` 下所有角色 JSON，批量拉取数据。

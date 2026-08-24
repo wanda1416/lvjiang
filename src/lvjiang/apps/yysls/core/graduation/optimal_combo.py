@@ -1,7 +1,7 @@
 """Optimal equipment combination search for graduation rate.
 
 Brute-force enumeration with dominance pruning and Top-R leaderboard,
-inspired by leoq7's findBestBuild strategy.
+using a pruned best-build search strategy.
 
 Key insight: each equipment's contribution to CombatAttributes is a fixed
 vector independent of other slots.  We pre-compute these "delta vectors",
@@ -297,7 +297,7 @@ def prune_dominated(
 
 
 # ---------------------------------------------------------------------------
-# Generator — lazy enumeration (mirrors leoq7's function* pattern)
+# Generator — lazy enumeration, avoids materializing the full candidate space
 # ---------------------------------------------------------------------------
 
 def _generate_combos(

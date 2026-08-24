@@ -13,4 +13,4 @@
 
 - **场景实现**：[31-models/02-scene-implementations.md](../31-models/02-scene-implementations.md) — 各场景具体字段定义
 - **DSL 交互指令**：[32-grammar/02-concepts.md](../32-grammar/02-concepts.md)（概念）/ [03.3-mouse.md](../32-grammar/03.3-mouse.md)（指令） — click/drag/wait 等指令的场景寻址
-- **架构总览**：[30-architecture/README.md](../30-architecture/README.md)
+- **架构总览**：[30-architecture/README.md](../README.md)

@@ -6,12 +6,17 @@ from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtWidgets import QCheckBox
 
 from lvjiang.core.batch_config import BatchConfig
+from lvjiang.core.config.models import UserConfig
 from lvjiang.ui.batch.batch_tab import BatchTab
 
 
 class _Host(QObject):
     automation_state_changed = pyqtSignal(str)
     is_running = False
+
+    def __init__(self):
+        super().__init__()
+        self._user_config = UserConfig()
 
     def append_log(self, _message: str) -> None:
         pass

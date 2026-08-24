@@ -13,35 +13,53 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import NoReturn
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
-from lsprotocol.types import (
-    TEXT_DOCUMENT_DID_CHANGE,
-    TEXT_DOCUMENT_DID_OPEN,
-    TEXT_DOCUMENT_DID_SAVE,
-    TEXT_DOCUMENT_DOCUMENT_SYMBOL,
-    TEXT_DOCUMENT_FOLDING_RANGE,
-    TEXT_DOCUMENT_HOVER,
-    Diagnostic,
-    DiagnosticSeverity,
-    DidChangeTextDocumentParams,
-    DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams,
-    DocumentSymbol,
-    DocumentSymbolParams,
-    FoldingRange,
-    FoldingRangeKind,
-    FoldingRangeParams,
-    Hover,
-    HoverParams,
-    MarkupContent,
-    MarkupKind,
-    Position,
-    Range,
-    SymbolKind,
-)
-from pygls.server import LanguageServer
+
+def _die(msg: str) -> NoReturn:
+    """Print a diagnosable message to stderr (visible in the editor's Output panel
+    for this server) and exit, instead of letting a bare ImportError produce an
+    opaque crash that the editor reports as a generic "server exited" error."""
+    sys.stderr.write(f"[lvjiang-wf-server] {msg}\n")
+    sys.stderr.flush()
+    sys.exit(1)
+
+
+try:
+    from lsprotocol.types import (
+        TEXT_DOCUMENT_DID_CHANGE,
+        TEXT_DOCUMENT_DID_OPEN,
+        TEXT_DOCUMENT_DID_SAVE,
+        TEXT_DOCUMENT_DOCUMENT_SYMBOL,
+        TEXT_DOCUMENT_FOLDING_RANGE,
+        TEXT_DOCUMENT_HOVER,
+        Diagnostic,
+        DiagnosticSeverity,
+        DidChangeTextDocumentParams,
+        DidOpenTextDocumentParams,
+        DidSaveTextDocumentParams,
+        DocumentSymbol,
+        DocumentSymbolParams,
+        FoldingRange,
+        FoldingRangeKind,
+        FoldingRangeParams,
+        Hover,
+        HoverParams,
+        MarkupContent,
+        MarkupKind,
+        Position,
+        Range,
+        SymbolKind,
+    )
+    from pygls.server import LanguageServer
+except ImportError as e:
+    _die(
+        f"missing dependency ({e}). This interpreter ({sys.executable}) doesn't have "
+        f"'pygls'/'lsprotocol' installed. Run `pip install -e \".[dev]\"` in the project's "
+        f".venv, or point the \"lvjiangWf.pythonPath\" setting at that .venv's interpreter."
+    )
 
 # ---------------------------------------------------------------------------
 # Bootstrap: make project source importable
@@ -53,27 +71,35 @@ _src_dir = _project_root / "src"
 if _src_dir.is_dir() and str(_src_dir) not in sys.path:
     sys.path.insert(0, str(_src_dir))
 
-from lvjiang.workflows.grammar import parse_text  # noqa: E402
-from lvjiang.workflows.grammar.parser.api import _get_parser, _preprocess_line_continuation  # noqa: E402
-from lvjiang.workflows.grammar.ast_nodes import (  # noqa: E402
-    CallProc,
-    For,
-    ForRange,
-    If,
-    Import,
-    Loop,
-    ProcDef,
-    Try,
-    UntilLoop,
-    WhileLoop,
-)
-from lvjiang.workflows.workflow_references import collect_refs  # noqa: E402
-from lark.exceptions import (  # noqa: E402
-    LarkError,
-    UnexpectedCharacters,
-    UnexpectedToken,
-)
-from lark import Tree, Token  # noqa: E402
+try:
+    from lvjiang.workflows.grammar import parse_text  # noqa: E402
+    from lvjiang.workflows.grammar.parser.api import _get_parser, _preprocess_line_continuation  # noqa: E402
+    from lvjiang.workflows.grammar.ast_nodes import (  # noqa: E402
+        CallProc,
+        For,
+        ForRange,
+        If,
+        Import,
+        Loop,
+        ProcDef,
+        Try,
+        UntilLoop,
+        WhileLoop,
+    )
+    from lvjiang.workflows.workflow_references import collect_refs  # noqa: E402
+    from lark.exceptions import (  # noqa: E402
+        LarkError,
+        UnexpectedCharacters,
+        UnexpectedToken,
+    )
+    from lark import Tree, Token  # noqa: E402
+except ImportError as e:
+    _die(
+        f"cannot import 'lvjiang' ({e}). Expected the project source at {_src_dir} "
+        f"(resolved from {Path(__file__).resolve()}). If this extension was installed "
+        f"as a standalone copy rather than the install.bat junction into the project "
+        f"checkout, that path resolution will be wrong."
+    )
 
 server = LanguageServer("lvjiang-wf-server", "v0.1")
 

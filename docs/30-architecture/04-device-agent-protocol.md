@@ -91,16 +91,18 @@ from lvjiang.core.android import AdbDevice, connect_agent, create_capture_backen
 
 device = AdbDevice(serial)
 agent = connect_agent(device)            # 连不上返回 None（原因已记日志）
-capture = create_capture_backend(device, "agent" if agent else "screencap", agent=agent)
+capture = create_capture_backend(device, "screencap")  # 截图选择与输入代理独立
 inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → AgentInput，否则 AdbInput
 ```
 
-主窗口连接流程（`ui/window_ops.py::_DeviceWorker._do_connect`）按用户配置 `adb_agent_mode`
-（设置页「ADB 输入方式」/ 主窗口「设备端手势」勾选）决定是否尝试代理：
+主窗口连接流程（`ui/window_ops.py::_DeviceWorker._do_connect`）按用户配置
+`android_input_method = "device_gesture"`
+（设置页「安卓输入方式」/ 主窗口「设备端手势 (Beta)」勾选）决定是否尝试输入代理。
+截图始终独立服从「安卓截图方式」中的 `scrcpy` / `ADB screencap` 选择：
 
-- 连上：输入走 `AgentInput`；截图非流式时走 `AgentCapture`（勾了「流式截图」仍用 scrcpy 预览）
+- 连上：输入走 `AgentInput`；截图仍按设置走 `AdbCapture` 或 `AndroidStreamCapture`
 - 连不上：日志提示一行，整体回退 `AdbInput` + screencap/scrcpy，**不算连接失败**
-- 代理连上但截图不可用（无障碍未开、Shizuku 也没授权）：截图回退 screencap，手势仍走代理
+- 代理只替代 `adb shell input`，不会因为启用设备端手势而切换截图后端
 
 ## 两端改动约定
 

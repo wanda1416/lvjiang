@@ -93,7 +93,7 @@
 ### 2.4 规则 YAML 迁移（config/system/yysls/tuning_rules/）
 
 - `huiyi_general.yaml`/`huixin_big.yaml`/`huixin_small.yaml`：variants.default
-  上提扁平化 + 全部符号替换为标准名（对照 docs/10-game/11-调律说明文档 校对
+  上提扁平化 + 全部符号替换为标准名（对照 docs/10-game/10-tuning-rules 校对
   huixin_small 的 小外属 展开为 4 个具体 `最小X攻击` 标准名）。
 - 删除 `heal.yaml`，新建 `heal_pure.yaml`（key heal_pure，name 治疗-纯奶，
   order 40）与 `heal_fire.yaml`（key heal_fire，name 治疗-火拳奶，order 41）：

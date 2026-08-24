@@ -13,5 +13,5 @@
 ## 关联文档
 
 - **语义模型**：[34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md) — Scene / Area / Layout 三层数据结构
-- **游戏规则**：[10-game/01-equipment-system.md](../10-game/01-equipment-system.md) — 装备系统玩法机制
+- **游戏规则**：[10-game/01-equipment-system.md](../../10-game/01-equipment-system.md) — 装备系统玩法机制
 - **DSL 语法**：[32-grammar/README.md](../32-grammar/README.md) — 工作流 DSL 如何引用这些模型

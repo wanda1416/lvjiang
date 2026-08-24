@@ -8,13 +8,19 @@
 |------|------|
 | [01-main-window-state-flow.md](01-main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南 |
+| [03-graduation-formula-model.md](03-graduation-formula-model.md) | 毕业率公式模型快速参考 |
 | [04-device-agent-protocol.md](04-device-agent-protocol.md) | 设备端代理协议：PC 经 adb forward 连律匠 app，用无障碍/Shizuku 截图与手势（L7 契约） |
 
-> 场景系统文档已独立至 [34-scene/](34-scene/) 目录。
+## 子系统索引
 
-DSL 语法文档已拆分至 [`32-grammar/`](32-grammar/README.md)。
-
-毕业率计算引擎文档已独立至 [`36-graduation/`](36-graduation/README.md)。
+| 目录 | 内容 |
+|------|------|
+| [31-models/](31-models/README.md) | 核心领域模型与数据契约 |
+| [32-grammar/](32-grammar/README.md) | 工作流 DSL 语法与语义 |
+| [33-engine/](33-engine/README.md) | DSL 引擎内部机制与静态检查 |
+| [34-scene/](34-scene/README.md) | 场景、布局语义与编辑器 |
+| [35-workflows/](35-workflows/README.md) | 跨场景业务流程编排 |
+| [36-graduation/](36-graduation/README.md) | 毕业率计算引擎 |
 
 ## 待补充
 

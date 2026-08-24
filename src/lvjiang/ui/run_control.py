@@ -8,11 +8,20 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
 
 from ..core.config.resolver import get_resolver
 from ..i18n import tr
 from ..workflows.engine import WorkflowEngine
+
+_WORKFLOW_NAME_VISIBLE_CHARS = 8
+
+
+def _compact_workflow_name(name: str) -> str:
+    """将日常页脚本名限制为八个字符，过长时保留省略提示。"""
+    if len(name) <= _WORKFLOW_NAME_VISIBLE_CHARS:
+        return name
+    return f"{name[:_WORKFLOW_NAME_VISIBLE_CHARS]}..."
 
 
 def _to_serializable(obj):
@@ -218,12 +227,21 @@ class RunControlMixin:
         self.workflow_combo.blockSignals(True)
         self.workflow_combo.clear()
         for cfg in self._workflow_configs:
-            display_name = cfg["name"]
+            full_display_name = cfg["name"]
             # env 限制检查：若脚本声明了 env 且当前环境不在列表中，追加提示
             env_list = cfg.get("env") or []
             if env_list and current_env not in env_list:
-                display_name = f"{display_name} ({tr('环境不支持')})"
-            self.workflow_combo.addItem(display_name, cfg["id"])
+                full_display_name = (
+                    f"{full_display_name} ({tr('环境不支持')})"
+                )
+            self.workflow_combo.addItem(
+                _compact_workflow_name(full_display_name), cfg["id"])
+            item_index = self.workflow_combo.count() - 1
+            self.workflow_combo.setItemData(
+                item_index,
+                full_display_name,
+                Qt.ItemDataRole.ToolTipRole,
+            )
         self.workflow_combo.blockSignals(False)
 
         # 初始化当前面板显示的脚本追踪（供日常配置持久化使用）
@@ -252,12 +270,21 @@ class RunControlMixin:
         if self._loaded_flow_index is not None and self._loaded_flow_index < len(self._workflow_configs):
             idx = self._loaded_flow_index
             self._workflow_configs[idx] = cfg
-            self.workflow_combo.setItemText(idx, cfg["name"])
+            self.workflow_combo.setItemText(
+                idx, _compact_workflow_name(cfg["name"]))
             self.workflow_combo.setItemData(idx, cfg["id"])
+            self.workflow_combo.setItemData(
+                idx, cfg["name"], Qt.ItemDataRole.ToolTipRole)
         else:
             self._workflow_configs.append(cfg)
-            self.workflow_combo.addItem(cfg["name"], cfg["id"])
+            self.workflow_combo.addItem(
+                _compact_workflow_name(cfg["name"]), cfg["id"])
             self._loaded_flow_index = len(self._workflow_configs) - 1
+            self.workflow_combo.setItemData(
+                self._loaded_flow_index,
+                cfg["name"],
+                Qt.ItemDataRole.ToolTipRole,
+            )
         self.workflow_combo.setCurrentIndex(self._loaded_flow_index)
         self.log_text.append(f"[加载] 已加载工作流: {cfg['name']}")
 

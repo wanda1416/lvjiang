@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
-from PyQt6.QtWidgets import QCheckBox
 
 from lvjiang.core.batch_config import BatchConfig
 from lvjiang.core.config.models import UserConfig
@@ -117,6 +116,5 @@ def test_script_rows_match_config_checkbox_density(qtbot, monkeypatch):
     item = tab._script_list.topLevelItem(0)
 
     assert tab._script_list.topLevelItemCount() == 4
-    assert item.sizeHint(0).height() == (
-        QCheckBox().sizeHint().height() + tab._entry_container.spacing()
-    )
+    assert item.sizeHint(0).height() == 32
+    assert tab._script_list.header().minimumHeight() == 32

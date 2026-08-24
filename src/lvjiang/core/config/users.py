@@ -5,12 +5,12 @@ UI 层在 Engine 创建后注入 session，并在正常结束时调用 save。
 """
 
 import json
-import os
-import tempfile
 from pathlib import Path
 from typing import Callable
 
 from loguru import logger
+
+from ..fs_util import atomic_write_text
 
 
 class SessionManager:
@@ -34,32 +34,8 @@ class SessionManager:
         return data
 
     def _save(self, path: Path, session: dict) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(session, ensure_ascii=False, indent=2)
-        fd, tmp = tempfile.mkstemp(
-            dir=str(path.parent),
-            prefix=f".{path.stem}_",
-            suffix=".tmp",
-        )
-        tmp_path = Path(tmp)
-        try:
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    f.write(payload)
-            except BaseException:
-                # os.fdopen 失败时 fd 未被接管，需手动关闭
-                try:
-                    os.close(fd)
-                except OSError:
-                    pass
-                raise
-            os.replace(tmp_path, path)
-        except BaseException:
-            try:
-                tmp_path.unlink()
-            except OSError:
-                pass
-            raise
+        atomic_write_text(path, payload, prefix=f".{path.stem}_")
 
     def load(self, username: str) -> dict:
         """从 users/{username}.json 加载 session

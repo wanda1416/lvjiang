@@ -25,8 +25,6 @@ load_ui_page_state / update_ui_page_state。
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 import threading
 import time
 from copy import deepcopy
@@ -35,6 +33,8 @@ from typing import Any, Callable
 
 from fasteners import InterProcessLock
 from loguru import logger
+
+from ..fs_util import atomic_write_text
 
 
 class LockTimeoutError(Exception):
@@ -116,21 +116,9 @@ class SessionStore:
 
         tmp 文件 + os.replace，确保不会产生半截文件
         """
-        path = self.path
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            fd, tmp = tempfile.mkstemp(
-                dir=str(path.parent), prefix=".session_", suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                os.replace(tmp, path)
-            except BaseException:
-                try:
-                    os.unlink(tmp)
-                except OSError:
-                    pass
-                raise
+            text = json.dumps(data, ensure_ascii=False, indent=2)
+            atomic_write_text(self.path, text, prefix=".session_")
         except Exception as e:
             raise IOError(f"写入磁盘失败: {e}") from e
 

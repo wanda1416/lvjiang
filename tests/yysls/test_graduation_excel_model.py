@@ -22,7 +22,7 @@ from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
 DATA_DIR = (
     Path(__file__).parents[2] / "config" / "system" / "yysls" / "graduation"
 )
-EXCEL_DIR = Path(__file__).parents[2] / "data" / "temp" / "excel"
+EXCEL_DIR = Path(__file__).parents[2] / "data" / "excel"
 SCHOOLS = [
     "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
     "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",

@@ -11,6 +11,10 @@
 import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
+from lvjiang.apps.yysls.core.equip_validator import (
+    ILLEGAL_KEY,
+    illegal_reasons_of,
+)
 from lvjiang.core.ocr_cleaner import OCRCleaner
 
 
@@ -282,3 +286,43 @@ class TestParseFullChain:
         })
         assert equip.type is None
         assert equip.quality == "blue"
+
+
+# ─── 合法性判定接入（parse 后自动标记状态异常） ──────────────
+
+class TestIllegalAnnotation:
+    """parse() 解析完调用全局判定器，把游戏产不出的组合标进 _extra。
+
+    判定逻辑本身在 tests/yysls/test_equip_validator.py 里测，这里只验证
+    「parse 确实调了、结果确实落到了 extra_data」这条接线。
+    """
+
+    def test_duplicate_affix_marked(self, parser):
+        equip = parser.parse(_weapon_raw(
+            affix_jue="劲 +72.2", affix_zhi="劲 +72.2"))
+        reasons = equip.extra_data.get(ILLEGAL_KEY)
+        assert reasons, "词条 2-5 重复应被标记"
+        assert any("重复" in r for r in reasons)
+
+    def test_over_cap_value_marked(self, parser):
+        """121.4 是 110 阶最大外功攻击的上限，给个更大的值必然超上限。"""
+        equip = parser.parse(_weapon_raw(affix_gong="最大外功攻击 +200"))
+        reasons = equip.extra_data.get(ILLEGAL_KEY)
+        assert reasons
+        assert any("上限" in r for r in reasons)
+
+    def test_normal_equipment_not_marked(self, parser):
+        equip = parser.parse(_weapon_raw())
+        assert ILLEGAL_KEY not in equip.extra_data
+
+    def test_mark_reaches_json(self, parser):
+        equip = parser.parse(_weapon_raw(
+            affix_jue="劲 +72.2", affix_zhi="劲 +72.2"))
+        assert illegal_reasons_of(equip.to_dict())
+
+    def test_affix_data_not_dropped(self, parser):
+        """只标注不丢数据：异常装备的词条必须原样保留，交给用户校正。"""
+        equip = parser.parse(_weapon_raw(
+            affix_jue="劲 +72.2", affix_zhi="劲 +72.2"))
+        assert [a.name for a in equip.affixes] == [
+            "最大外功攻击", "会心率", "劲", "劲"]

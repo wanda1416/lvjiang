@@ -21,17 +21,15 @@ from loguru import logger
 from ..core.config.resolver import get_resolver
 from . import implementations
 from .metadata import parse_metadata_file
-
-# 可直接由用户启动的脚本目录。显式列举可避免把 subcall、batch 生命周期等
-# 不能独立执行的实现文件误注册到脚本列表。
-_DISCOVERABLE_WF_DIRS = ("", "standalone")
+from .policy import WorkflowDiscoveryPolicy as Policy
+from .preferences import load_preferences, migrate_legacy_workflows_yaml
 
 
 def _discover_wf_scripts() -> dict[str, dict]:
     """扫描可直接启动的 .wf（system ∪ local），返回 {id: config}。"""
     result: dict[str, dict] = {}
     resolver = get_resolver()
-    for subdir in _DISCOVERABLE_WF_DIRS:
+    for subdir in Policy.SCAN_DIRS:
         rel_dir = f"workflows/{subdir}" if subdir else "workflows"
         for name in resolver.enumerate_entities(rel_dir, "*.wf"):
             wf_file = f"{subdir}/{name}" if subdir else name
@@ -39,6 +37,8 @@ def _discover_wf_scripts() -> dict[str, dict]:
             if p is None:
                 continue
             script_id = p.stem
+            if Policy.is_internal(script_id):
+                continue
             if script_id in result:
                 logger.warning(
                     f"脚本 id 重复，忽略 {wf_file}: {script_id}")
@@ -52,7 +52,9 @@ def _discover_wf_scripts() -> dict[str, dict]:
                 "class": "",
                 "parameters": meta.get("parameters") or [],
                 "env": meta.get("env") or [],
-                "batchable": subdir != "standalone",
+                "batchable": Policy.is_batchable(subdir),
+                "scope": meta.get("scope") or "daily",
+                "hidden": Policy.hidden_by_default(meta),
             }
     return result
 
@@ -74,6 +76,10 @@ def _discover_class_scripts() -> dict[str, dict]:
             "class": name,
             "parameters": list(getattr(cls, "PARAMETERS", []) or []),
             "env": list(getattr(cls, "ENV", []) or []),
+            # 脚本性质由实现自己声明（如自动调律天然是专用脚本），
+            # 由实现声明而非出厂配置表达，用户偏好另存 session。
+            "scope": getattr(cls, "SCOPE", None) or "daily",
+            "hidden": bool(getattr(cls, Policy.HIDDEN_CLASS_ATTR, False)),
             "batchable": True,
         }
     return result
@@ -84,46 +90,49 @@ def discover_scripts() -> list[dict]:
 
     Returns:
         脚本配置列表，每项 shape：``{id, name, wf_file, class, parameters}``。
-        按 id 排序，保证结果稳定（暴露顺序由 workflows.yaml 的 exposed 决定）。
+        按 id 排序，保证结果稳定（展示顺序由 list_exposed_scripts 决定）。
     """
     merged = _discover_wf_scripts()
     merged.update(_discover_class_scripts())  # class 覆盖同 id 的 .wf
     return [merged[k] for k in sorted(merged)]
 
 
-def _load_exposure() -> tuple[list, dict]:
-    """读取 workflows.yaml（合并视图）的 exposed 列表与 overrides 映射。"""
-    try:
-        data = get_resolver().load_merged("workflows.yaml")
-    except Exception as e:
-        logger.error(f"加载脚本暴露配置失败: {e}")
-        return [], {}
-    if not data:
-        return [], {}
-    return (data.get("exposed") or []), (data.get("overrides") or {})
-
-
 def list_exposed_scripts() -> list[dict]:
-    """发现全部脚本后，按 workflows.yaml 的 exposed/overrides 过滤+排序+改名。
+    """日常页要展示的脚本：全集 → 作者声明的默认可见性 → 用户偏好覆盖。
 
-    这是「暴露层」：``discover_scripts()`` 给全集，本函数决定日常展示哪些、
-    顺序、以及显示名覆盖。语义与桌面「工具 → 脚本配置」一致：
-    exposed 缺失/为空 → 展示全部（按 id 排序）；否则仅展示且按其顺序。
-    桌面下拉与设备端悬浮面板共用本函数，避免两处各写一份暴露逻辑。
+    三层来源各司其职：
+
+    - **全集**由目录约定决定（见 :class:`WorkflowDiscoveryPolicy`），不可配置；
+    - **默认是否展示**由作者在 ``.wf`` front-matter 写 ``hidden: true``
+      或内置类设 ``HIDDEN`` 声明——未开发完的脚本先藏起来；
+    - **顺序、启停、显示名**是用户偏好，存 session 的 ``daily.scripts``。
+
+    因此出厂新增的脚本会自动出现在列表里，不需要用户做任何事，也不会因为
+    用户存过偏好就被冻住。桌面下拉与设备端悬浮面板共用本函数。
 
     Returns:
-        脚本配置列表，shape 同 ``discover_scripts()``，name 已套用 overrides，
-        额外含 ``scope`` 字段（"daily" 或 "dedicated"，默认 "daily"）。
+        脚本配置列表，shape 同 ``discover_scripts()``，``name`` 已套用用户
+        自定义显示名，额外含 ``scope``（"daily" / "dedicated"）。
     """
     discovered = {cfg["id"]: cfg for cfg in discover_scripts()}
-    exposed, overrides = _load_exposure()
-    order = [i for i in exposed if i in discovered] if exposed else sorted(discovered)
+    migrate_legacy_workflows_yaml()   # 一次性搬运，下个版本可删
+    prefs = load_preferences()
+
+    def shown(sid: str) -> bool:
+        if sid in prefs.visible:
+            return prefs.visible[sid]
+        return not discovered[sid].get("hidden", False)
+
+    ordered = [sid for sid in prefs.order if sid in discovered]
+    ordered += [sid for sid in sorted(discovered) if sid not in ordered]
+
     result: list[dict] = []
-    for sid in order:
+    for sid in ordered:
+        if not shown(sid):
+            continue
         cfg = dict(discovered[sid])
-        ov = overrides.get(sid) or {}
-        if ov.get("name"):
-            cfg["name"] = ov["name"]
-        cfg["scope"] = ov.get("scope", "daily")
+        if prefs.names.get(sid):
+            cfg["name"] = prefs.names[sid]
+        cfg["scope"] = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
         result.append(cfg)
     return result

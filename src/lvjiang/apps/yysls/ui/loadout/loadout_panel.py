@@ -41,6 +41,13 @@ _VIEW_MODE_BTN_STYLE = (
     "QPushButton:hover{background:palette(midlight);color:palette(text);}"
 )
 
+_ACTION_BTN_STYLE = (
+    "QPushButton { border: 1px solid palette(highlight); "
+    "color: palette(highlight); border-radius: 5px; padding: 5px 11px; "
+    "font-weight: 600; }"
+    "QPushButton:hover { background: palette(midlight); }"
+)
+
 
 class LoadoutPanel(QWidget):
     def __init__(self, host, parent=None):
@@ -93,12 +100,14 @@ class LoadoutPanel(QWidget):
             tools.addWidget(btn)
         tools.addStretch()
         for label, callback in (
-            (tr("计算最优组合"), lambda: self._equipment._on_optimal_combo()),
+            (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
+            (tr("培养建议"), lambda: self._equipment._on_affix_impact()),
             (tr("创建模拟装备"), lambda: self._equipment._on_mock_create()),
             (tr("清空真实装备"), lambda: self._equipment._on_clear_real()),
             (tr("导出数据"), lambda: self._equipment._on_export()),
         ):
             button = QPushButton(label)
+            button.setStyleSheet(_ACTION_BTN_STYLE)
             button.clicked.connect(callback)
             tools.addWidget(button)
         root.addLayout(tools)

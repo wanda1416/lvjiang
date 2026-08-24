@@ -32,6 +32,10 @@ from ..ast_nodes import (
     WhereClause,
 )
 
+# click 鼠标键别名：back/forward 更直观，规范化为轨迹格式统一使用的
+# x1/x2（与 replay input_trace / recorder 高精度录制的键名保持一致）。
+_CLICK_BUTTON_ALIASES = {"back": "x1", "forward": "x2"}
+
 
 class _StmtMixin:
     """程序入口、基础指令（click/drag/wait/scan/recognize）与 align/panel 索引回调"""
@@ -135,19 +139,31 @@ class _StmtMixin:
         )
 
     def click_stmt(self, items):
-        """click 目标 [before|after|around wait 参数 ...] — 支持 before/after 任意组合
+        """click 目标 [left|right|middle|x1|x2|back|forward]? [before|after|around wait 参数 ...]
 
+        鼠标键可选，省略时默认左键（click_node 已由 click_*_target 按此
+        默认构造）；显式指定时按 token 类型（而非位置）提取，与
+        scroll_stmt 提取 SCROLL_DIR 同一套路。
         显式 wait_clause 时抑制 click 默认的 before/after_click_wait 延迟。
         around 是语法糖，等价于同时指定 before 和 after（同一参数）。
         """
-        click_node = items[0]
-        wait_pairs, _ = self._extract_wait_pairs(items[1:])
-        if not wait_pairs:
+        click_node = items[0]  # 已由 click_*_target 构造为 Click（默认 button="left"）
+        wait_pairs, core_items = self._extract_wait_pairs(items[1:])
+
+        button = click_node.button
+        for item in core_items:
+            if isinstance(item, Token) and item.type == "CLICK_BUTTON":
+                raw = str(item).lower()
+                button = _CLICK_BUTTON_ALIASES.get(raw, raw)
+
+        if not wait_pairs and button == click_node.button:
             return click_node
 
-        # 显式 wait_clause → 抑制默认延迟
+        # 显式指定按键和/或 wait_clause → 重建节点；wait_clause 存在时抑制默认延迟
         click_node = Click(target=click_node.target, line_no=click_node.line_no,
-                          suppress_defaults=True)
+                          suppress_defaults=bool(wait_pairs), button=button)
+        if not wait_pairs:
+            return click_node
         return self._expand_wait_clauses(click_node, wait_pairs)
 
     def click_panel_target(self, items):

@@ -387,6 +387,7 @@ class ProfileDB:
         *,
         expected_value: float | int,
         expected_updated_at: str,
+        expected_entry_exists: bool = True,
         new_value: float | int,
         new_updated_at: str | None = None,
         change_type: str | None = None,
@@ -395,7 +396,9 @@ class ProfileDB:
     ) -> bool:
         """CAS 更新单条 entry。
 
-        仅当当前 value 与 updated_at 均仍等于调用方读到的快照时才写入。
+        仅当当前条目的存在状态、value 与 updated_at 仍等于调用方
+        读到的快照时才写入。预期条目不存在时使用原子插入；若已被
+        其他进程先行创建，则仍返回冲突。
         返回 True 表示更新成功；False 表示状态已被其他进程修改，本轮调用方应放弃。
         """
         old_value = float(expected_value)
@@ -405,13 +408,27 @@ class ProfileDB:
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
-            cursor = conn.execute(
-                "UPDATE profile_entries "
-                "SET value=?, updated_at=?, updated_time=? "
-                "WHERE username=? AND type=? AND key=? "
-                "AND value=? AND updated_at=?",
-                (value, ts, write_ts, username, type_, key, old_value, expected_updated_at),
-            )
+            if expected_entry_exists:
+                cursor = conn.execute(
+                    "UPDATE profile_entries "
+                    "SET value=?, updated_at=?, updated_time=? "
+                    "WHERE username=? AND type=? AND key=? "
+                    "AND value=? AND updated_at=?",
+                    (
+                        value, ts, write_ts, username, type_, key,
+                        old_value, expected_updated_at,
+                    ),
+                )
+                history_old_value: float | None = old_value
+            else:
+                cursor = conn.execute(
+                    "INSERT INTO profile_entries "
+                    "(username, type, key, value, value_text, updated_at, updated_time) "
+                    "VALUES (?, ?, ?, ?, '', ?, ?) "
+                    "ON CONFLICT(username, type, key) DO NOTHING",
+                    (username, type_, key, value, ts, write_ts),
+                )
+                history_old_value = None
             if cursor.rowcount != 1:
                 conn.rollback()
                 return False
@@ -420,7 +437,7 @@ class ProfileDB:
                 should_record = False
                 if change_type in ("action", "override"):
                     should_record = True
-                elif old_value != value:
+                elif history_old_value != value:
                     should_record = True
 
                 if should_record:
@@ -429,7 +446,7 @@ class ProfileDB:
                         "(ts, username, type, key, old_value, new_value, "
                         "change_type, detail, source) "
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (write_ts, username, type_, key, old_value, value,
+                        (write_ts, username, type_, key, history_old_value, value,
                          change_type, detail, source),
                     )
 
@@ -560,6 +577,7 @@ def db_update_if_current(
     *,
     expected_value: float | int,
     expected_updated_at: str,
+    expected_entry_exists: bool = True,
     new_value: float | int,
     new_updated_at: str | None = None,
     change_type: str | None = None,
@@ -572,6 +590,7 @@ def db_update_if_current(
         key,
         expected_value=expected_value,
         expected_updated_at=expected_updated_at,
+        expected_entry_exists=expected_entry_exists,
         new_value=new_value,
         new_updated_at=new_updated_at,
         change_type=change_type,

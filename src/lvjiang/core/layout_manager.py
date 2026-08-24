@@ -665,6 +665,18 @@ class LayoutConfigManager:
         logger.info(f"布局已保存: {layout.name} ({mode})")
         return True
 
+    @staticmethod
+    def is_system_layout(name: str) -> bool:
+        """布局是否由 system 层声明。
+
+        别名布局没有自己的场景目录，因此不能通过场景文件是否存在来判断来源。
+        ``layouts.yaml`` 的 system 名册才是布局身份的单一事实源。
+        """
+        resolver = get_resolver()
+        system_doc = resolver.load_system(_LAYOUTS_YAML_REL)
+        layouts = system_doc.get("layouts", {})
+        return isinstance(layouts, dict) and name in layouts
+
     def delete_layout(self, name: str) -> bool:
         resolver = get_resolver()
         # 确认布局存在
@@ -679,6 +691,10 @@ class LayoutConfigManager:
                        if isinstance(e, dict) and e.get("extends") == name]
         if referencing:
             logger.error(f"布局 [{name}] 被别名布局引用: {referencing}，拒绝删除")
+            return False
+        # 出厂布局属于 system 内容，用户模式下不可删除——不想用就别选它
+        if not resolver.is_dev_mode() and self.is_system_layout(name):
+            logger.error(f"布局 [{name}] 由出厂配置提供，用户模式下不可删除")
             return False
 
         # 删除场景文件
@@ -738,5 +754,4 @@ class LayoutConfigManager:
     def set_active_layout(self, name: str):
         self._config["active_layout"] = name
         self._save_config()
-
 

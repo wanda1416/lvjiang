@@ -75,6 +75,7 @@ class RuleSettingsPage(QWidget):
                  on_delete: Callable[[], None] | None = None,
                  on_rename: Callable[[str, str, str], None] | None = None,
                  on_enable_changed: Callable[[bool], None] | None = None,
+                 protected: bool = False,
                  parent=None):
         super().__init__(parent)
         self._data = data
@@ -82,6 +83,7 @@ class RuleSettingsPage(QWidget):
         self._on_delete = on_delete
         self._on_rename = on_rename
         self._on_enable_changed = on_enable_changed
+        self._protected = protected
         self._loading = True
         # 武器/增伤词条候选来自游戏配置数据源（保存时已刷新单例）
         mgr = get_game_config()
@@ -117,15 +119,21 @@ class RuleSettingsPage(QWidget):
         key_row = QHBoxLayout()
         self._key_label = QLabel()
         key_row.addWidget(self._key_label)
-        btn_rename_key = QPushButton(tr("重命名"))
-        btn_rename_key.clicked.connect(self._rename_key)
-        key_row.addWidget(btn_rename_key)
+        self._btn_rename_key = QPushButton(tr("重命名"))
+        self._btn_rename_key.clicked.connect(self._rename_key)
+        key_row.addWidget(self._btn_rename_key)
         key_row.addStretch()
         # 删除入口收在首行最右，避免与表格编辑区混排误触
-        btn_delete = QPushButton(tr("删除本规则"))
-        btn_delete.setStyleSheet("color: #c62828;")
-        btn_delete.clicked.connect(self._confirm_delete)
-        key_row.addWidget(btn_delete)
+        self._btn_delete = QPushButton(tr("删除本规则"))
+        self._btn_delete.setStyleSheet("color: #c62828;")
+        self._btn_delete.clicked.connect(self._confirm_delete)
+        key_row.addWidget(self._btn_delete)
+        if self._protected:
+            hint = tr("出厂规则不可删除或修改 key；不使用时请取消启用")
+            self._btn_rename_key.setEnabled(False)
+            self._btn_rename_key.setToolTip(hint)
+            self._btn_delete.setEnabled(False)
+            self._btn_delete.setToolTip(hint)
         form.addRow(tr("标识 key："), key_row)
 
         # 名称只读展示（修改走对话框左侧导航双击）

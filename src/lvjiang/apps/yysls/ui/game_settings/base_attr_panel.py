@@ -38,6 +38,7 @@ from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_C
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
+from .factory_guard import deletable, factory_list_values
 from .level_combo import LevelCombo
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
@@ -370,8 +371,21 @@ class BaseAttrPanel(QWidget):
         self._saving = False
 
     def _on_weapon_selected(self, row: int):
-        """选中武器变化时刷新武学增效下拉框"""
+        """选中武器变化时刷新武学增效下拉框与删除按钮可用性"""
         self._refresh_wuxue_combo()
+        self._refresh_del_weapon_enabled()
+
+    def _refresh_del_weapon_enabled(self):
+        """出厂武器类型不允许用户删除，置灰并说明原因"""
+        item = self._weapon_list.currentItem()
+        name = None
+        if item is not None:
+            text = item.text()
+            name = text.split("（")[0] if "（" in text else text
+        ok, hint = deletable(
+            name, factory_list_values(_ATTRS_REL, "weapon_types", field="name"))
+        self._btn_del_weapon.setEnabled(item is not None and ok)
+        self._btn_del_weapon.setToolTip(hint)
 
     def _on_wuxue_affix_changed(self, text: str):
         """武学增效下拉框变化时保存到数据"""

@@ -10,6 +10,7 @@
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南 |
 | [03-graduation-formula-model.md](03-graduation-formula-model.md) | 毕业率公式模型快速参考 |
 | [04-device-agent-protocol.md](04-device-agent-protocol.md) | 设备端代理协议：PC 经 adb forward 连律匠 app，用无障碍/Shizuku 截图与手势（L7 契约） |
+| [05-config-layering.md](05-config-layering.md) | 配置分层：system/local/session、合并语义、删除白名单 |
 
 ## 子系统索引
 

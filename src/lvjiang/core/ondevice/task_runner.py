@@ -173,7 +173,8 @@ def list_tasks() -> str:
         # 工作流注册表，未加载会退化成同名旧 .wf（见 plugins 模块说明）。
         ensure_loaded()
 
-        # 日常清单只给 workflows.yaml 暴露的脚本（含中文显示名），与桌面下拉一致。
+        # 日常清单与桌面下拉共用暴露层：目录约定给全集，作者声明默认可见性，
+        # 用户偏好（顺序/启停/改名）存 session，设备端与桌面因此天然一致。
         # 冒烟自检任务源码已内联，不再出现在清单里，由 _resolve_task 内置合成。
         items = list_exposed_scripts()
 

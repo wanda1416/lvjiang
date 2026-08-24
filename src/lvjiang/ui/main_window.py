@@ -891,16 +891,18 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         wf_group = QGroupBox(tr("脚本"))
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
-        self.workflow_combo.setMinimumWidth(150)
+        self.workflow_combo.setFixedHeight(34)
+        _set_combo_character_capacity(self.workflow_combo, 10)
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
-        wf_layout.addWidget(self.workflow_combo, stretch=1)
+        wf_layout.addWidget(self.workflow_combo)
         self.btn_load_workflow = QPushButton(tr("加载"))
-        self.btn_load_workflow.setFixedWidth(64)
+        self.btn_load_workflow.setFixedSize(68, 34)
         self.btn_load_workflow.clicked.connect(self._on_load_workflow)
         self.btn_load_workflow.setStyleSheet(
             "background-color: #607D8B; color: white; font-weight: bold; padding: 6px;"
         )
         wf_layout.addWidget(self.btn_load_workflow)
+        wf_layout.addStretch(1)
         daily_layout.addWidget(wf_group)
 
         self._workflow_note_label = _create_workflow_note_label()

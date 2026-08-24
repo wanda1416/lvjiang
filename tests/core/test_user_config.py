@@ -40,7 +40,8 @@ class TestLoadUserConfig:
             "lvjiang.core.config.load_app_config", lambda: {})
         config = load_user_config()
         assert config.theme == "light"
-        assert config.adb_capture_streaming is True
+        assert config.android_capture_method == "scrcpy"
+        assert config.android_input_method == "adb"
         assert config.desktop_background_input is True
         assert config.desktop_window_title == ""
         assert config.material_grid.rows == 3
@@ -56,14 +57,16 @@ class TestLoadUserConfig:
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
             "settings": {
-                "adb_capture_streaming": False,
+                "android_capture_method": "screencap",
+                "android_input_method": "device_gesture",
                 "desktop_window_title": "手机投屏",
                 "theme": "dark",
             }
         }), encoding="utf-8")
         reset_session_store()
         config = load_user_config()
-        assert config.adb_capture_streaming is False
+        assert config.android_capture_method == "screencap"
+        assert config.android_input_method == "device_gesture"
         assert config.desktop_window_title == "手机投屏"
         assert config.theme == "dark"
         assert config.desktop_background_input is True  # 未配置项保持默认
@@ -117,9 +120,9 @@ class TestSaveSessionNodes:
         session_env.write_text(json.dumps({"active_user": "张三", "ui_state": {"a": 1}}),
                                encoding="utf-8")
         reset_session_store()
-        save_settings({"adb_capture_streaming": False})
+        save_settings({"android_capture_method": "screencap"})
         data = json.loads(session_env.read_text(encoding="utf-8"))
-        assert data["settings"] == {"adb_capture_streaming": False}
+        assert data["settings"] == {"android_capture_method": "screencap"}
         assert data["active_user"] == "张三"
         assert data["ui_state"] == {"a": 1}
 

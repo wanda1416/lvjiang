@@ -87,7 +87,8 @@ class _DeviceWorker(QObject):
             self.error.emit(tr("无法获取设备分辨率"))
             return
 
-        # 设备端代理：连上就用 app 内的无障碍截图/手势；连不上回退 adb（只提示，不算失败）
+        # 设备端代理只负责输入手势；截图严格服从用户选择的 screencap / scrcpy。
+        # 这样启用 Beta 输入通道不会暗中改变截图命令。
         agent = None
         method = self._capture_method
         if self._agent_mode:
@@ -96,17 +97,9 @@ class _DeviceWorker(QObject):
                 self.notice.emit(tr("[设备端手势] 连不上手机上的律匠 app（未安装或未开无障碍），回退 adb shell input"))
             else:
                 self.notice.emit(f"[设备端手势] 已连接 {agent.describe()}")
-                if method != "scrcpy":
-                    method = "agent"
 
-        capture = create_capture_backend(device=device, method=method, agent=agent)
+        capture = create_capture_backend(device=device, method=method)
         started = capture.start()
-        if not started and method == "agent":
-            # 代理截图失败（多半是无障碍未开、Shizuku 也没授权）→ 退 screencap，手势仍走代理
-            self.notice.emit(tr("[设备端手势] 代理截图不可用，截图回退 screencap"))
-            method = "screencap"
-            capture = create_capture_backend(device=device, method=method)
-            started = capture.start()
         if not started:
             if agent is not None:
                 agent.close()
@@ -325,7 +318,7 @@ class WindowOpsMixin:
         if hasattr(self, "chk_scrcpy"):
             if not self.chk_scrcpy.isVisible():
                 # 首次进入 ADB 模式，从配置读取初始状态
-                is_scrcpy = self._user_config.adb_capture_streaming
+                is_scrcpy = self._user_config.android_capture_method == "scrcpy"
                 self.chk_scrcpy.blockSignals(True)
                 self.chk_scrcpy.setChecked(is_scrcpy)
                 self.chk_scrcpy.blockSignals(False)
@@ -334,7 +327,8 @@ class WindowOpsMixin:
         if hasattr(self, "chk_agent"):
             if not self.chk_agent.isVisible():
                 self.chk_agent.blockSignals(True)
-                self.chk_agent.setChecked(bool(self._user_config.adb_agent_mode))
+                self.chk_agent.setChecked(
+                    self._user_config.android_input_method == "device_gesture")
                 self.chk_agent.blockSignals(False)
             self.chk_agent.setVisible(True)
             self.chk_agent.setEnabled(True)
@@ -525,14 +519,14 @@ class WindowOpsMixin:
         self.btn_locate.setText(tr("连接中..."))
         self.statusBar().showMessage(tr("正在连接设备..."))
 
-        capture_method = "scrcpy" if self._user_config.adb_capture_streaming else "screencap"
+        capture_method = self._user_config.android_capture_method
 
         # 异步连接
         self._wait_device_thread()
         self._device_thread = QThread()
         self._device_worker = _DeviceWorker(
             task="connect", serial=d["serial"], capture_method=capture_method,
-            agent_mode=bool(self._user_config.adb_agent_mode),
+            agent_mode=self._user_config.android_input_method == "device_gesture",
         )
         self._device_worker.moveToThread(self._device_thread)
         self._device_thread.started.connect(self._device_worker.run)
@@ -777,17 +771,14 @@ class WindowOpsMixin:
 
         if not self._device:
             # 未连接设备时仅更新内存配置
-            self._user_config.adb_capture_streaming = state
+            self._user_config.android_capture_method = method
             return
 
-        # 已连接设备时重建截图后端；非流式且代理在线 → 截图也走代理（无障碍 takeScreenshot）
-        self._user_config.adb_capture_streaming = state
+        # 已连接设备时只在 screencap / scrcpy 之间重建截图后端。
+        self._user_config.android_capture_method = method
         from ..core.android import create_capture_backend
-        agent = getattr(self, "_agent", None)
-        if method != "scrcpy" and agent is not None and agent.connected:
-            method = "agent"
         old_capture = self._capture
-        self._capture = create_capture_backend(device=self._device, method=method, agent=agent)
+        self._capture = create_capture_backend(device=self._device, method=method)
         if self._capture.start():
             # scrcpy 模式订阅帧回调
             self._scrcpy_streaming = False
@@ -802,13 +793,13 @@ class WindowOpsMixin:
                     old_capture.stop()
                 except Exception:
                     pass
-            mode_label = {"scrcpy": tr("scrcpy 流式"), "agent": tr("设备端")}.get(method, "screencap")
+            mode_label = tr("scrcpy 流式") if method == "scrcpy" else "ADB screencap"
             self.log_text.append(f"[模式] 已切换到 {mode_label} 截图")
             if not self._scrcpy_streaming:
                 self._capture_preview()
         else:
             self.log_text.append(f"[错误] {method} 截图后端不可用，回退到 screencap")
-            self._user_config.adb_capture_streaming = False
+            self._user_config.android_capture_method = "screencap"
             if hasattr(self, "chk_scrcpy"):
                 self.chk_scrcpy.blockSignals(True)
                 self.chk_scrcpy.setChecked(False)
@@ -822,9 +813,9 @@ class WindowOpsMixin:
 
     def _on_agent_mode_changed(self, state):
         """设备端手势开关：只改内存配置，下次连接生效（已连接时开关被锁定）"""
-        self._user_config.adb_agent_mode = bool(state)
-        label = tr("设备端手势（律匠 app 无障碍）") if state else "adb shell input"
-        self.log_text.append(f"[模式] ADB 输入方式: {label}（下次连接生效）")
+        self._user_config.android_input_method = "device_gesture" if state else "adb"
+        label = tr("设备端手势（Beta，需安装律匠 App）") if state else "ADB shell input"
+        self.log_text.append(f"[模式] 安卓输入方式: {label}（下次连接生效）")
 
     # ─── 截屏 ─────────────────────────────────────────────
 

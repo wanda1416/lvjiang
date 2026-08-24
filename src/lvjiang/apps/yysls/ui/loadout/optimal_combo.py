@@ -400,6 +400,16 @@ class OptimalComboDialog(QDialog):
         self._setup_ui()
         self._load_candidates()
 
+    def _on_rotation(self) -> None:
+        """打开技能轴查看器（实验性）
+
+        轴数据只在毕业率计算器 Excel 里——方案 JSON 编译时丢掉了技能名，
+        所以要用户自己选文件，不从当前方案读。
+        """
+        from .rotation_dialog import RotationDialog
+
+        RotationDialog(parent=self).exec()
+
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
@@ -412,7 +422,22 @@ class OptimalComboDialog(QDialog):
         )
         context.setProperty("tone", "muted")
         context.setStyleSheet("font-size: 12px;")
-        layout.addWidget(context)
+
+        # 首行最右侧放技能轴入口。它是实验性功能：需要用户自备毕业率计算器
+        # Excel，且与本对话框的搜索流程无关，因此不放到备战方案主工具栏上，
+        # 只在这里留一个不显眼的口子。
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addWidget(context, stretch=1)
+        self._btn_rotation = QPushButton(tr("技能轴"))
+        self._btn_rotation.setToolTip(
+            tr("实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源"))
+        self._btn_rotation.setProperty("tone", "muted")
+        self._btn_rotation.setFlat(True)
+        self._btn_rotation.setStyleSheet("font-size: 12px;")
+        self._btn_rotation.clicked.connect(self._on_rotation)
+        header.addWidget(self._btn_rotation)
+        layout.addLayout(header)
 
         settings = QFrame()
         settings.setProperty("surface", "card")

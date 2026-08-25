@@ -125,13 +125,11 @@ lvjiang/
 │   │   ├── layouts/           # 布局定义（按名称分目录）
 │   │   ├── scenes/            # 场景定义 YAML
 │   │   ├── workflows/         # 工作流脚本（.wf）
-│   │   ├── references/        # 参考图库
+│   │   ├── references/        # 参考图库（{空间}.yaml + 同名图片目录）
 │   │   ├── yysls/             # 燕云插件专属配置（调律规则 / 玩法等）
 │   │   ├── app.yaml           # 应用配置
 │   │   ├── layouts.yaml       # 布局索引
 │   │   ├── scenes.yaml        # 场景索引
-│   │   ├── workflows.yaml     # 工作流索引
-│   │   ├── references.yaml    # 参考图索引
 │   │   └── ocr_rules.yaml     # OCR 规则配置
 │   ├── local/                 # 用户覆盖配置（已 .gitignore）
 │   └── session/               # 运行时会话数据

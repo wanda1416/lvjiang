@@ -6,7 +6,7 @@
 - CoordPoint 对拖拽
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
@@ -36,6 +36,30 @@ class TestClickCoordPoint:
         eng._exec_body(program.body)
         _args, kwargs = eng._input.click_screen.call_args
         assert kwargs["button"] == "x1"
+
+
+class TestRawMouseButton:
+    def test_down_up_reach_backend_in_order(self):
+        eng = make_engine()
+        program = parse_text("mouse x1 down\nmouse x1 up\n")
+
+        eng._exec_body(program.body)
+
+        assert eng._input.mouse_button.call_args_list == [
+            call("x1", True),
+            call("x1", False),
+        ]
+        assert eng._pressed_mouse_buttons == set()
+
+    def test_back_forward_aliases_are_normalized(self):
+        eng = make_engine()
+        program = parse_text("mouse back down\nmouse back up\n")
+
+        eng._exec_body(program.body)
+
+        assert [call.args[0] for call in eng._input.mouse_button.call_args_list] == [
+            "x1", "x1",
+        ]
 
 
 class TestClickSceneRegion:

@@ -40,6 +40,15 @@ class Click:
 
 
 @dataclass(frozen=True)
+class MouseButton:
+    """鼠标键原始事件，不合并 down/up，也不隐式移动光标。"""
+
+    button: str
+    pressed: bool
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Place:
     """place 指令：直接设置鼠标位置，不产生移动过程。"""
     target: Any

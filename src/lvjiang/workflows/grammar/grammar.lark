@@ -10,6 +10,7 @@ start: (_NL | statement)*
 // ─── 语句分派 ─────────────────────────────────────────────
 
 ?statement: click_stmt
+          | mouse_button_stmt
           | place_stmt
           | move_stmt
           | replay_input_trace_stmt
@@ -90,6 +91,11 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 // x1/x2 的别名——Windows 默认把 X1 映射到"后退"、X2 映射到"前进"，
 // 但鼠标驱动可自定义，不是绝对规则，写脚本时按实测行为选。
 CLICK_BUTTON: /left/i | /right/i | /middle/i | /x1/i | /x2/i | /back/i | /forward/i
+
+// 鼠标键原始事件。坐标由前置 place/move 决定；录制器用它保留多个输入
+// 同时按下时的真实 down/up 时间线。
+mouse_button_stmt: "mouse"i CLICK_BUTTON MOUSE_BUTTON_STATE _NL
+MOUSE_BUTTON_STATE: /down/i | /up/i
 
 // place：将鼠标直接放到画布归一化坐标，不产生移动过程。
 // 它是 move 的辅助原语，不承担 scene/region 等业务目标解析。

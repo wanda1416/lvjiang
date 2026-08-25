@@ -104,6 +104,11 @@ feedback_dialog:
   btn_close: 关闭
   group_hint: 使用交流和一般咨询请优先在群内讨论
   qr_failed: 交流群二维码加载失败
+  btn_refresh_qr: 刷新二维码
+  refreshing_qr: 刷新中...
+  qr_refresh_pending: 正在获取最新二维码...
+  qr_refresh_done: 二维码已更新
+  qr_refresh_failed: 刷新失败，已保留当前二维码：{error}
 user_manager:
   title: 用户管理
   btn_close: 关闭

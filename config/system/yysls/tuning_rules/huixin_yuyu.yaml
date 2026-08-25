@@ -115,7 +115,7 @@ playstyles:
       weapon: 伞
       damage: 伞武学增效
     sub:
-      weapon: 绳镖
+      weapon: 扇
       damage: null
     attr: 牵丝
     switch: keep_danti
@@ -124,6 +124,6 @@ playstyles:
       weapon: 伞
       damage: 伞武学增效
     sub:
-      weapon: 绳镖
+      weapon: 扇
       damage: null
     attr: 牵丝

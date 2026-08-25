@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.core.tuning_rules import (
     DYNAMIC_AFFIXES,
@@ -132,6 +133,60 @@ class TestBuiltinRules:
         # 火拳主扇不需要增伤
         fire = get_tuning_rules()["heal_fire"].playstyles["火拳"]
         assert fire.main.weapon == "扇" and fire.main.damage is None
+
+    def test_playstyle_weapons_match_school_registry(self):
+        """所有内置玩法的主副武器必须与全局流派注册一致。"""
+        # value = (正式流派名, 是否有意对调主副手)。裂石·钧的“双切”
+        # 是唯一反向持有武器的玩法，其余玩法均直接沿用注册表顺序。
+        bindings = {
+            ("huiyi_general", "无名"): ("鸣金·虹", False),
+            ("huiyi_general", "火九"): ("鸣金·影", False),
+            ("huixin_small", "纯唐"): ("裂石·钧", False),
+            ("huixin_small", "双切"): ("裂石·钧", True),
+            ("huixin_small", "鸢鸢"): ("破竹·鸢", False),
+            ("huixin_small", "双刀"): ("破竹·风", False),
+            ("huixin_small", "尘尘"): ("破竹·尘", False),
+            ("huixin_small", "翊翊(不推荐)"): ("牵丝·翊", False),
+            ("huixin_small", "樽樽"): ("破竹·樽", False),
+            ("huixin_big", "纯唐"): ("裂石·钧", False),
+            ("huixin_big", "双切"): ("裂石·钧", True),
+            ("huixin_big", "威威"): ("裂石·威", False),
+            ("huixin_big", "鸢鸢"): ("破竹·鸢", False),
+            ("huixin_big", "双刀"): ("破竹·风", False),
+            ("huixin_big", "尘尘"): ("破竹·尘", False),
+            ("huixin_big", "翊翊"): ("牵丝·翊", False),
+            ("huixin_big", "樽樽"): ("破竹·樽", False),
+            ("huixin_modao", "威威"): ("裂石·威", False),
+            ("huixin_yuyu", "走地玉"): ("牵丝·玉", False),
+            ("huixin_yuyu", "飞天玉"): ("牵丝·玉", False),
+            ("heal_pure", "纯奶"): ("牵丝·霖", False),
+            ("heal_fire", "火拳"): ("牵丝·霖", False),
+        }
+        rules = get_tuning_rules()
+        actual = {
+            (rule_key, playstyle)
+            for rule_key, rule in rules.items()
+            for playstyle in rule.playstyles
+        }
+        assert actual == set(bindings), "新增玩法时必须登记对应正式流派"
+
+        game = get_game_config()
+        schools = game.get_schools()
+        for (rule_key, playstyle), (school, reversed_sides) in bindings.items():
+            cfg = schools[school]
+            expected = (
+                cfg["main"]["weapon"], cfg["sub"]["weapon"])
+            if reversed_sides:
+                expected = expected[::-1]
+            plan = rules[rule_key].playstyles[playstyle]
+            assert (plan.main.weapon, plan.sub.weapon) == expected, (
+                rule_key, playstyle, school)
+
+            # 声明需要武学增伤时，词条必须属于同侧武器；允许显式为 None。
+            for side in (plan.main, plan.sub):
+                if side.damage is not None:
+                    assert side.damage == game.get_weapon_wuxue_affix(
+                        side.weapon), (rule_key, playstyle, side.weapon)
 
     def test_playstyle_attr_per_plan(self):
         # attr 随配置变更：只校验解析值与 YAML 一致且在合法集内

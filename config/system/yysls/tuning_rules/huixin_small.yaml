@@ -59,8 +59,8 @@ playstyles:
       weapon: 手甲
       damage: 手甲武学增伤
     sub:
-      weapon: 绳镖
-      damage: 绳镖武学增伤
+      weapon: 双刀
+      damage: 双刀武学增伤
     attr: 破竹
 transmute_priority:
 - 最小外功攻击

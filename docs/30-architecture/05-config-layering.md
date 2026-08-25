@@ -44,6 +44,18 @@
 | `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
 | `yysls/tune_config.yaml` | `base_rules` / `tuning_rules` / `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
 
+### 例外：telemetry/ 不是覆盖层镜像
+
+`config/local/telemetry/`（install_id + 调律事件本地缓冲，见
+`core/telemetry/paths.py`）不是 local 对 system 的覆盖，是纯本地运行态
+——system 层没有对应内容。选它而不是 `config/session/`，是因为用户会
+把 `config/session/` 打包发给作者排查问题（见
+docs/60-userguide/08-feedback-and-issues.md），标识落在那里会让匿名性
+失效；而这个目录又不适合套用 local 的影子/diff 语义（没有出厂内容可
+覆盖）。resolver 的 `enumerate_entities`/`load_merged` 只按已知
+`rel_dir` 枚举，不会遍历到这个目录，代码层面无冲突，纯粹是文档提醒：
+新增同类"纯本地状态"目录时不要往这层套。
+
 ### 例外：参考图空间
 
 `references/{空间}.yaml` **不走 resolver 的聚合接口**，

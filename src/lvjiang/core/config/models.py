@@ -105,6 +105,24 @@ class HotkeyConfig:
 
 
 @dataclass
+class NetworkConfig:
+    """三条联网行为的用户开关（session.json settings.network）。
+
+    公告/更新是给用户的服务，统计是用户给项目的贡献——分开存放，
+    ``offline`` 是总闸，勾上后其余三项在 UI 上置灰但不清空其值，
+    再关掉离线模式时恢复各自原有状态。
+    """
+    offline: bool = False
+    announcement: bool = True
+    update: bool = True
+    telemetry: bool = False  # 默认关；首启同意弹窗同意后才置 True
+
+    def __post_init__(self):
+        for name in ("offline", "announcement", "update", "telemetry"):
+            setattr(self, name, bool(getattr(self, name)))
+
+
+@dataclass
 class UserConfig:
     """用户配置（代码默认值 + session.json / app.yaml 覆盖，只读）
 
@@ -122,6 +140,7 @@ class UserConfig:
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
+    network: NetworkConfig = field(default_factory=NetworkConfig)         # 联网行为开关
 
     def __post_init__(self):
         if self.theme not in {"light", "dark"}:
@@ -138,4 +157,8 @@ class UserConfig:
             known_hotkeys = {"start", "pause", "stop", "record"}
             self.hotkeys = HotkeyConfig(
                 **{k: v for k, v in self.hotkeys.items() if k in known_hotkeys})
+        if isinstance(self.network, dict):
+            known_network = {"offline", "announcement", "update", "telemetry"}
+            self.network = NetworkConfig(
+                **{k: v for k, v in self.network.items() if k in known_network})
         self.delay_params = parse_delay_params(self.delay_params)

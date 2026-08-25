@@ -43,6 +43,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_RANK,
     get_tune_config,
 )
+from lvjiang.apps.yysls.telemetry.probe import record_tuning_roll
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -965,9 +966,21 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             affix_count += 1
             # 每轮结果挂在本件 report 下，与装备一一对应
             self.recorder.report_append("tune_results", result)
+            _affix_count_before = len(equip_data.affixes)
             new_affix = self.navigator.collect_new_affix(
                 equip_data, result.get("tune_affix", "")) \
                 or result.get("tune_affix", "")
+            # 统计采集：仅此一行，绝不中断调律主流程（record_tuning_roll
+            # 内部有 @never_raises 护栏 + 未同意时早退）。解析失败
+            # （equip_data.affixes 未增长）时传 None，探针直接跳过。
+            record_tuning_roll(
+                equip_data=equip_data,
+                new_affix=(equip_data.affixes[-1]
+                          if len(equip_data.affixes) > _affix_count_before else None),
+                slot=affix_count, roll_index=rounds, resets=resets_used,
+                food_label=self.executor.round_food,
+                mode=self.equipment_session.mode.value,
+                rule_keys=self.ctx.judge_rule_keys)
             self.recorder.report_set("rounds", rounds)
             self.recorder.report_set("final_affix_count", affix_count)
             self.recorder.report_set(

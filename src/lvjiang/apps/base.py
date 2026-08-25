@@ -39,3 +39,8 @@ class AppHooks:
 
     # 内置函数模块路径列表：["lvjiang.apps.yysls.workflows.builtins.equipment", ...]
     builtin_modules: list[str] = field(default_factory=list)
+
+    # 统计事件 schema 模块路径列表（与 builtin_modules 同款「import 即注册」
+    # 语义）：["lvjiang.apps.yysls.telemetry.schemas", ...]。core.telemetry
+    # 不认识任何插件领域词汇，字段声明由插件自己在这些模块里注册。
+    telemetry_modules: list[str] = field(default_factory=list)

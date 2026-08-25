@@ -277,19 +277,19 @@ affix_caps:
     - 单体类奇术增伤
     - 群体类奇术增伤
     110:
-      cap: 15
+      cap: 15.4
     105:
       cap: 13.4
   气血最大值:
     _aliases:
     - 气血最大值
     110:
-      cap: 4010
+      cap: 4610
   外功防御:
     _aliases:
     - 外功防御
     110:
-      cap: 52.8
+      cap: 60.6
   外功增益:
     _pool: dingyin
     _unit: '%'
@@ -304,6 +304,8 @@ affix_caps:
       cap: 16.8
     105:
       cap: 14.6
+    100:
+      cap: 12.8
   属攻增益:
     _pool: dingyin
     _unit: '%'

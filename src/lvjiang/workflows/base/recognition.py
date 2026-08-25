@@ -12,6 +12,21 @@ class _RecognitionMixin:
 
     # ─── 区域解析 ──────────────────────────────────────────
 
+    @staticmethod
+    def _log_capture_failed(op: str, scene_key: str = "", keys=None) -> None:
+        """截图失败的统一日志（带上下文）
+
+        截图失败与「文字确实不在画面上」在返回值上无法区分：两者都让
+        by 子句得到 ""、普通 OCR 得到 {}，工作流据此走「条件不成立」分支
+        继续往下点。设备/串流卡住时排障全靠这条日志，必须带够定位信息。
+        """
+        parts = [f"{op}: 截图失败（调用方将按未命中处理）"]
+        if scene_key:
+            parts.append(f"scene={scene_key}")
+        if keys:
+            parts.append(f"keys={'、'.join(str(k) for k in keys)}")
+        logger.error("，".join(parts))
+
     def _require_regions(
         self,
         scene_key: str,
@@ -56,7 +71,7 @@ class _RecognitionMixin:
         """
         img = self._capture.capture()
         if img is None:
-            logger.error("截图失败")
+            self._log_capture_failed("ocr_scene", scene_key, field_keys)
             return {}
 
         canvas = self._layout.get_canvas()
@@ -96,7 +111,7 @@ class _RecognitionMixin:
         """
         img = self._capture.capture()
         if img is None:
-            logger.error("截图失败")
+            self._log_capture_failed("scan panel", scene_key, slot_keys)
             return {}, {}
 
         canvas = self._layout.get_canvas()
@@ -175,7 +190,7 @@ class _RecognitionMixin:
 
         img = self._capture.capture()
         if img is None:
-            logger.error("截图失败")
+            self._log_capture_failed("scan panel", scene_key, slot_keys)
             return {}, {}
 
         canvas = self._layout.get_canvas()
@@ -249,7 +264,7 @@ class _RecognitionMixin:
         """
         img = self._capture.capture()
         if img is None:
-            logger.error("截图失败")
+            self._log_capture_failed("recognize panel", scene_key, [panel_key])
             return {}
 
         # 获取 panel 对象
@@ -354,7 +369,7 @@ class _RecognitionMixin:
 
         img = self._capture.capture()
         if img is None:
-            logger.error("截图失败")
+            self._log_capture_failed("scan by", scene_key, field_keys)
             return ""
 
         canvas = self._layout.get_canvas()
@@ -417,7 +432,7 @@ class _RecognitionMixin:
 
         img = self._capture.capture()
         if img is None:
-            logger.error("截图失败")
+            self._log_capture_failed("scan by", scene_key, field_keys)
             return ""
 
         canvas = self._layout.get_canvas()
@@ -486,7 +501,7 @@ class _RecognitionMixin:
 
         img = self._capture.capture()
         if img is None:
-            logger.error("find: 截图失败")
+            self._log_capture_failed("find")
             return ""
 
         canvas = self._layout.get_canvas()
@@ -589,7 +604,7 @@ class _RecognitionMixin:
 
         img = self._capture.capture()
         if img is None:
-            logger.error("find: 截图失败")
+            self._log_capture_failed("find")
             return ""
 
         canvas = self._layout.get_canvas()

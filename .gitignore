@@ -61,3 +61,6 @@ android/.kotlin/
 editors/vscode/lvjiang-wf/out/
 editors/vscode/lvjiang-wf/node_modules/
 editors/vscode/lvjiang-wf/*.vsix
+
+# Cloudflare Workers CLI 本地缓存（含账号信息，不进仓库）
+ops/stats-worker/.wrangler/

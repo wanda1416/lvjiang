@@ -1,0 +1,141 @@
+"""通道 A：心跳事件的 schema、payload 组装、节流。
+
+字段全部来自公开的运行环境信息，不涉及任何燕云领域词汇——这是 core 层
+本就该管的部分，与调律事件（apps/yysls/telemetry）分层对称。
+"""
+from __future__ import annotations
+
+import platform
+import re
+from datetime import date, datetime, timezone
+from typing import Any
+
+from .registry import register_schema
+from .schema import EventSchema, FieldSpec
+
+_VERSION_PATTERN = r"^[0-9A-Za-z.\-+]{1,32}$"
+_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+_UUID_HEX_PATTERN = r"^[0-9a-f]{32}$"
+_OS_RELEASE_PATTERN = r"^[0-9A-Za-z._-]{1,16}$"
+_ARCH_PATTERN = r"^[A-Za-z0-9_]{1,20}$"
+
+HEARTBEAT_SCHEMA = EventSchema(
+    name="heartbeat", version=1,
+    fields=(
+        FieldSpec("install_id", str, pattern=_UUID_HEX_PATTERN, example="0" * 32),
+        FieldSpec("first_seen", str, pattern=_DATE_PATTERN, example="2026-01-01"),
+        FieldSpec("day", str, pattern=_DATE_PATTERN, example="2026-01-01"),
+        FieldSpec("app_version", str, pattern=_VERSION_PATTERN, example="0.7.0"),
+        FieldSpec("run_env", str, choices=("desktop", "android")),
+        FieldSpec("os_name", str, choices=("Windows", "Darwin", "Linux", "other")),
+        FieldSpec("os_release", str, pattern=_OS_RELEASE_PATTERN, required=False,
+                  example="11"),
+        FieldSpec("arch", str, pattern=_ARCH_PATTERN, example="amd64"),
+        FieldSpec("ui_language", str, pattern=r"^[a-z]{2}_[A-Z]{2}$", example="zh_CN"),
+        # 目前只有 yysls 一个插件；将来支持第三方插件时插件名会变成用户
+        # 自定义自由文本，必须同步扩充这里的白名单，否则拒收（不是放行为
+        # 自由文本），见项目风险清单。
+        FieldSpec("plugin", str, choices=("yysls", "none")),
+        FieldSpec("dropped_events", int, required=False, minimum=0, maximum=10_000_000),
+    ),
+)
+register_schema(HEARTBEAT_SCHEMA)
+
+
+def _os_release_major() -> str:
+    """只取大版本号，绝不透传 build 号（build 号+arch+lang+版本组合起来
+    可识别性显著上升）。"""
+    raw = platform.release() or ""
+    token = re.split(r"[.\-]", raw)[0][:16]
+    return token or "unknown"
+
+
+def _detect_plugin() -> str:
+    """已加载插件的探测：AppHooks 未单独登记插件名，借用
+    ``builtin_modules`` 的模块路径判断——目前只有 yysls 一个插件。"""
+    from ...apps import get_registry
+    modules = get_registry().get("builtin_modules") or []
+    if any(".yysls." in str(m) for m in modules):
+        return "yysls"
+    return "none"
+
+
+def build_heartbeat_payload(*, install_id: str, first_seen: str) -> dict:
+    from ...i18n import current_language
+    from ..config.session import load_env
+    from ..update import get_version
+    from . import identity as identity_mod
+
+    os_name = platform.system() or "other"
+    if os_name not in ("Windows", "Darwin", "Linux"):
+        os_name = "other"
+
+    version = get_version()
+    if not re.fullmatch(_VERSION_PATTERN, version or ""):
+        version = "unknown"
+
+    run_env = load_env()
+    if run_env not in ("desktop", "android"):
+        run_env = "desktop"
+
+    payload: dict[str, Any] = {
+        "install_id": install_id,
+        "first_seen": first_seen,
+        "day": date.today().isoformat(),
+        "app_version": version,
+        "run_env": run_env,
+        "os_name": os_name,
+        "os_release": _os_release_major(),
+        "arch": (platform.machine() or "unknown")[:20],
+        "ui_language": current_language(),
+        "plugin": _detect_plugin(),
+    }
+    dropped = identity_mod.take_and_reset_dropped_events()
+    if dropped:
+        payload["dropped_events"] = dropped
+    return payload
+
+
+# ─── 节流：每 UTC 日最多一次 ─────────────────────────────────
+
+def _state() -> dict:
+    from ..config.session import get_session_store
+    server = get_session_store().get_node("server_config", {})
+    if not isinstance(server, dict):
+        return {}
+    node = server.get("telemetry")
+    return node if isinstance(node, dict) else {}
+
+
+def should_send_heartbeat() -> bool:
+    """今天（UTC）是否还没成功上报过，且上次失败距今超过 1 小时。"""
+    state = _state()
+    today = date.today().isoformat()
+    if state.get("last_report_date") == today:
+        return False
+    last_attempt = state.get("last_attempt_at")
+    if isinstance(last_attempt, str):
+        try:
+            dt = datetime.fromisoformat(last_attempt)
+            if (datetime.now(timezone.utc) - dt).total_seconds() < 3600:
+                return False
+        except ValueError:
+            pass
+    return True
+
+
+def mark_attempt(*, success: bool) -> None:
+    """必须在主线程调用（写 SessionStore）。``last_report_date`` 只在
+    成功后写——失败的一天不能算已上报。"""
+    from ..config.session import get_session_store
+
+    def _merge(existing):
+        existing = existing if isinstance(existing, dict) else {}
+        node = dict(existing.get("telemetry") or {})
+        node["last_attempt_at"] = datetime.now(timezone.utc).isoformat()
+        if success:
+            node["last_report_date"] = date.today().isoformat()
+        existing["telemetry"] = node
+        return existing
+
+    get_session_store().mutate_node("server_config", _merge)

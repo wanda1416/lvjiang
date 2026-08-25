@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import MetaFieldDef
 
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 
 class CellEditor(QWidget):
@@ -271,6 +272,14 @@ class GridPanel(QWidget):
         self._submit_btn = QPushButton(tr("提交到图库"))
         self._submit_btn.setEnabled(False)
         result_layout.addWidget(self._submit_btn)
+
+        apply_button_style(
+            self._generate_btn,
+            self._execute_btn,
+            self._apply_group_btn,
+            self._submit_btn,
+        )
+        apply_button_style(self._clear_grid_btn, variant="neutral")
 
         main_layout.addWidget(result_group)
 

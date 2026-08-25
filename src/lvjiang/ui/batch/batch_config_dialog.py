@@ -33,6 +33,7 @@ from ...core.batch_config import (
     save_batch_config,
 )
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 
 class BatchConfigDialog(QDialog):
@@ -71,6 +72,8 @@ class BatchConfigDialog(QDialog):
         self._btn_delete.setFixedWidth(60)
         self._btn_delete.clicked.connect(self._on_delete_config)
         config_row.addWidget(self._btn_delete)
+        apply_button_style(self._btn_new)
+        apply_button_style(self._btn_delete, variant="danger")
 
         layout.addLayout(config_row)
 
@@ -132,6 +135,9 @@ class BatchConfigDialog(QDialog):
         self._btn_down.setFixedWidth(72)
         self._btn_down.clicked.connect(lambda: self._move_row(1))
         table_btn_row.addWidget(self._btn_down)
+        apply_button_style(self._btn_add_row)
+        apply_button_style(self._btn_del_row, variant="danger")
+        apply_button_style(self._btn_up, self._btn_down, variant="neutral")
 
         layout.addLayout(table_btn_row)
 
@@ -156,13 +162,15 @@ class BatchConfigDialog(QDialog):
         # ── 底部按钮 ──
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()
-        btn_save = QPushButton(tr("保存"))
-        btn_save.setDefault(True)
-        btn_save.clicked.connect(self._on_save)
-        bottom_row.addWidget(btn_save)
-        btn_cancel = QPushButton(tr("取消"))
-        btn_cancel.clicked.connect(self.reject)
-        bottom_row.addWidget(btn_cancel)
+        self._btn_save = QPushButton(tr("保存"))
+        self._btn_save.setDefault(True)
+        self._btn_save.clicked.connect(self._on_save)
+        bottom_row.addWidget(self._btn_save)
+        self._btn_cancel = QPushButton(tr("取消"))
+        self._btn_cancel.clicked.connect(self.reject)
+        bottom_row.addWidget(self._btn_cancel)
+        apply_button_style(self._btn_save)
+        apply_button_style(self._btn_cancel, variant="neutral")
         layout.addLayout(bottom_row)
 
     def _create_wf_selector(self) -> QHBoxLayout:
@@ -174,6 +182,7 @@ class BatchConfigDialog(QDialog):
 
         btn = QPushButton(tr("浏览..."))
         btn.setFixedWidth(70)
+        apply_button_style(btn, variant="neutral")
         btn.clicked.connect(lambda: self._browse_wf(line_edit))
         row.addWidget(btn)
 

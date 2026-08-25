@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, validate_crop
 
 from ...i18n import tr
+from ..button_styles import apply_button_style
 from .combo_sizing import set_combo_minimum_character_capacity
 
 # 内置固定字段（只读展示，不可编辑/删除）
@@ -120,12 +121,10 @@ class MetaSchemaPanel(QWidget):
         toolbar.addStretch()
 
         self._save_btn = QPushButton(tr("保存"))
-        self._save_btn.setStyleSheet(
-            "QPushButton { background-color: #1976d2; color: white; }"
-            "QPushButton:hover { background-color: #1565c0; }"
-        )
         self._save_btn.clicked.connect(self._on_save)
         toolbar.addWidget(self._save_btn)
+        apply_button_style(self._add_btn, self._save_btn)
+        apply_button_style(self._delete_btn, variant="danger")
         layout.addLayout(toolbar)
 
         # ── 输入元数据表 ──

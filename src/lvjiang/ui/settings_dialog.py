@@ -37,6 +37,7 @@ from ..core.config import (
     save_settings,
 )
 from ..i18n import tr
+from .button_styles import apply_button_style
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -102,9 +103,11 @@ class SettingsDialog(QDialog):
         self._save_btn.clicked.connect(self._on_save)
         btn_row.addWidget(self._save_btn)
         btn_row.addStretch()
-        close_btn = QPushButton(tr("关闭"))
-        close_btn.clicked.connect(self.accept)
-        btn_row.addWidget(close_btn)
+        self._close_btn = QPushButton(tr("关闭"))
+        self._close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(self._close_btn)
+        apply_button_style(self._save_btn)
+        apply_button_style(self._close_btn, variant="neutral")
         layout.addLayout(btn_row)
 
     # ─── 脏状态跟踪 ──────────────────────────────────
@@ -265,6 +268,7 @@ class SettingsDialog(QDialog):
         add_row = QHBoxLayout()
         add_btn = QPushButton(tr("添加参数"))
         add_btn.clicked.connect(self._on_add_custom_row)
+        apply_button_style(add_btn)
         add_row.addWidget(add_btn)
         add_row.addStretch()
         vbox.addLayout(add_row)
@@ -299,6 +303,7 @@ class SettingsDialog(QDialog):
         add_row = QHBoxLayout()
         add_btn = QPushButton(tr("添加环境"))
         add_btn.clicked.connect(self._on_add_env_row)
+        apply_button_style(add_btn)
         add_row.addWidget(add_btn)
         add_row.addStretch()
         vbox.addLayout(add_row)
@@ -325,6 +330,7 @@ class SettingsDialog(QDialog):
         entry = {"key": key_edit, "name": name_edit, "saved": saved}
         del_btn = QPushButton(tr("删除"))
         del_btn.clicked.connect(lambda: self._remove_env_row(entry))
+        apply_button_style(del_btn, variant="danger")
 
         widgets = [key_edit, name_edit, del_btn]
         entry["widgets"] = widgets
@@ -469,6 +475,7 @@ class SettingsDialog(QDialog):
                  "saved": saved}
         del_btn = QPushButton(tr("删除"))
         del_btn.clicked.connect(lambda: self._remove_custom_row(entry))
+        apply_button_style(del_btn, variant="danger")
 
         widgets = [key_edit, label_edit, lo_spin, QLabel("~"), hi_spin, del_btn]
         entry["widgets"] = widgets

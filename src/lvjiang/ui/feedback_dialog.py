@@ -5,9 +5,6 @@ GitHub Issue 与交流群入口。二维码仅在用户主动点击“扫码加�
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (
@@ -19,6 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..core import group_qrcode
 from ..core.update import GITHUB_REPO
 from ..i18n import tr
 
@@ -29,24 +27,14 @@ ISSUE_GUIDE_URL = (
 NEW_ISSUE_URL = f"https://github.com/{GITHUB_REPO}/issues/new"
 
 
-def _resource_path(relative: str) -> Path:
-    """获取资源文件路径，兼容 PyInstaller 打包与开发环境。"""
-    if getattr(sys, "frozen", False):
-        # 打包后 data/image 与 exe 同级
-        base = Path(sys.executable).parent
-    else:
-        # 开发环境：从项目根目录解析
-        base = Path(__file__).resolve().parents[3]
-    return base / relative
-
-
 class GroupQrDialog(QDialog):
-    """按需展示交流群二维码的子对话框。"""
+    """按需展示交流群二维码的子对话框；支持从 GitHub Pages 刷新最新二维码。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("扫码加群"))
-        self.setFixedSize(420, 470)
+        self.setFixedSize(420, 500)
+        self._refresher: group_qrcode.QrCodeRefresher | None = None
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -58,7 +46,29 @@ class GroupQrDialog(QDialog):
 
         self._image_label = QLabel()
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pixmap = QPixmap(str(_resource_path("data/image/feedback-qrcode.jpg")))
+        self._reload_pixmap()
+        layout.addWidget(self._image_label, 1)
+
+        self._status_label = QLabel()
+        self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._status_label.setWordWrap(True)
+        self._status_label.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(self._status_label)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        self._refresh_btn = QPushButton(tr("刷新二维码"))
+        self._refresh_btn.clicked.connect(self._refresh_qrcode)
+        btn_layout.addWidget(self._refresh_btn)
+        close_btn = QPushButton(tr("关闭"))
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+    def _reload_pixmap(self) -> None:
+        """从本地磁盘（重新）加载二维码图片。"""
+        pixmap = QPixmap(str(group_qrcode.QRCODE_PATH))
         if pixmap.isNull():
             self._image_label.setText(tr("交流群二维码加载失败"))
         else:
@@ -68,15 +78,36 @@ class GroupQrDialog(QDialog):
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             ))
-        layout.addWidget(self._image_label, 1)
 
-        close_layout = QHBoxLayout()
-        close_layout.addStretch()
-        close_btn = QPushButton(tr("关闭"))
-        close_btn.clicked.connect(self.accept)
-        close_layout.addWidget(close_btn)
-        close_layout.addStretch()
-        layout.addLayout(close_layout)
+    def _refresh_qrcode(self) -> None:
+        """从 GitHub Pages 拉取最新二维码并覆盖本地文件；失败保留原图。"""
+        if self._refresher is not None and self._refresher.isRunning():
+            return
+        self._refresh_btn.setEnabled(False)
+        self._refresh_btn.setText(tr("刷新中..."))
+        self._status_label.setText(tr("正在获取最新二维码..."))
+
+        refresher = group_qrcode.QrCodeRefresher(self)
+        refresher.finished.connect(self._on_refresh_finished)
+        refresher.error.connect(self._on_refresh_error)
+        refresher.finished.connect(refresher.deleteLater)
+        refresher.error.connect(refresher.deleteLater)
+        self._refresher = refresher
+        refresher.start()
+
+    def _on_refresh_finished(self, _data: bytes) -> None:
+        self._refresher = None
+        self._refresh_btn.setEnabled(True)
+        self._refresh_btn.setText(tr("刷新二维码"))
+        self._status_label.setText(tr("二维码已更新"))
+        self._reload_pixmap()
+
+    def _on_refresh_error(self, message: str) -> None:
+        self._refresher = None
+        self._refresh_btn.setEnabled(True)
+        self._refresh_btn.setText(tr("刷新二维码"))
+        self._status_label.setText(
+            tr("刷新失败，已保留当前二维码：{error}").format(error=message))
 
 
 class FeedbackDialog(QDialog):

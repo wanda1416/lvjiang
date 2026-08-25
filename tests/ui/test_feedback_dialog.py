@@ -1,6 +1,8 @@
 """反馈规范对话框与交流群二维码子对话框测试。"""
+from io import BytesIO
 from unittest.mock import patch
 
+from lvjiang.core import group_qrcode
 from lvjiang.i18n import init_i18n
 from lvjiang.ui.feedback_dialog import (
     ISSUE_GUIDE_URL,
@@ -8,6 +10,24 @@ from lvjiang.ui.feedback_dialog import (
     FeedbackDialog,
     GroupQrDialog,
 )
+
+_JPEG_BYTES = b"\xff\xd8\xff" + b"fake-jpeg-body"
+_NEW_JPEG_BYTES = b"\xff\xd8\xff" + b"refreshed-jpeg-body"
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes):
+        self._stream = BytesIO(payload)
+        self.headers = {"Content-Length": str(len(payload))}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self, size=-1):
+        return self._stream.read(size)
 
 
 def test_feedback_dialog_shows_policy_without_qr(qtbot):
@@ -56,6 +76,48 @@ def test_group_qr_dialog_loads_image(qtbot):
     assert dialog.windowTitle() == "扫码加群"
     assert dialog._image_label.pixmap() is not None
     assert not dialog._image_label.pixmap().isNull()
+
+
+def test_refresh_qrcode_downloads_and_replaces_local_file(qtbot, tmp_path, monkeypatch):
+    target = tmp_path / "feedback-qrcode.jpg"
+    target.write_bytes(_JPEG_BYTES)
+    monkeypatch.setattr(group_qrcode, "QRCODE_PATH", target)
+    monkeypatch.setattr(
+        group_qrcode, "urlopen",
+        lambda *args, **kwargs: _FakeResponse(_NEW_JPEG_BYTES))
+
+    dialog = GroupQrDialog()
+    qtbot.addWidget(dialog)
+
+    dialog._refresh_btn.click()
+    assert dialog._refresh_btn.text() == "刷新中..."
+    assert not dialog._refresh_btn.isEnabled()
+
+    qtbot.waitUntil(lambda: dialog._status_label.text() == "二维码已更新", timeout=2000)
+
+    assert dialog._refresh_btn.isEnabled()
+    assert dialog._refresh_btn.text() == "刷新二维码"
+    assert target.read_bytes() == _NEW_JPEG_BYTES
+
+
+def test_refresh_qrcode_keeps_old_file_on_failure(qtbot, tmp_path, monkeypatch):
+    target = tmp_path / "feedback-qrcode.jpg"
+    target.write_bytes(_JPEG_BYTES)
+    monkeypatch.setattr(group_qrcode, "QRCODE_PATH", target)
+
+    def raise_error(*args, **kwargs):
+        raise TimeoutError("网络超时")
+
+    monkeypatch.setattr(group_qrcode, "urlopen", raise_error)
+
+    dialog = GroupQrDialog()
+    qtbot.addWidget(dialog)
+
+    dialog._refresh_btn.click()
+    qtbot.waitUntil(lambda: dialog._refresh_btn.isEnabled(), timeout=2000)
+
+    assert "刷新失败" in dialog._status_label.text()
+    assert target.read_bytes() == _JPEG_BYTES
 
 
 def test_feedback_dialog_has_compact_english_actions(qtbot):

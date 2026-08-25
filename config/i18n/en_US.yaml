@@ -104,6 +104,11 @@ feedback_dialog:
   btn_close: Close
   group_hint: Please use the community group for general usage discussion and questions
   qr_failed: Failed to load the community group QR code
+  btn_refresh_qr: Refresh QR Code
+  refreshing_qr: Refreshing...
+  qr_refresh_pending: Fetching the latest QR code...
+  qr_refresh_done: QR code updated
+  qr_refresh_failed: "Refresh failed, kept the current QR code: {error}"
 user_manager:
   title: User Management
   btn_close: Close

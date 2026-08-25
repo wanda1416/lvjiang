@@ -21,7 +21,7 @@
 
 按输入通道分组：
 - **基础指令**（collect / eval / call / log）→ 数据操作与控制流
-- **鼠标操作**（click / move / scroll / drag）→ 通过坐标注入鼠标/触摸事件
+- **鼠标操作**（click / mouse / move / scroll / drag）→ 通过坐标注入鼠标/触摸事件；`mouse` 保留桌面鼠标键的原始 down/up
 - **时间与辅助**（wait / wait stable / align / screenshot）→ 节奏控制与校准
 - **键盘输入**（press）→ 通过 VK 码注入键盘事件
 

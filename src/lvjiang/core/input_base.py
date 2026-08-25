@@ -62,6 +62,15 @@ class InputBackend(ABC):
                 没有非左键的概念，非 left 时忽略该参数、按普通点击处理并记警告。
         """
 
+    def mouse_button(self, button: str, pressed: bool) -> None:
+        """在当前指针位置发送一个原始鼠标键 down/up 事件。
+
+        这是桌面宏录制回放能力；不具备鼠标概念的后端应明确报错，不能把
+        down/up 偷换成一次完整 tap。
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} 不支持原始鼠标键事件")
+
     @abstractmethod
     def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
         """直接设置鼠标位置，不产生移动过程。

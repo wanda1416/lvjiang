@@ -57,6 +57,17 @@ class _ActionsMixin:
     """
 
     _key_registry: "KeyStateRegistry | None"
+    _pressed_mouse_buttons: set[str]
+
+    def _exec_mouse_button(self, node):
+        """mouse BUTTON down|up — 在当前光标位置发送原始鼠标键事件。"""
+        state = "down" if node.pressed else "up"
+        logger.debug(f"mouse: {node.button} {state}")
+        self._input.mouse_button(node.button, node.pressed)
+        if node.pressed:
+            self._pressed_mouse_buttons.add(node.button)
+        else:
+            self._pressed_mouse_buttons.discard(node.button)
 
     def _exec_click(self, node: Click):
         """click scene.coord / scene.panel[row][col] — scene 和 coord 都可以是常量或变量。

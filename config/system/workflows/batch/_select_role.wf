@@ -5,22 +5,39 @@ import "../subcall/page_detection.wf"
 def _select_role($role_index, $role, $batch_state)
     log "当前下标" + $role_index
 
-    click [game_login_page].[switch_role]
-    wait @page_refresh
+    # 打开角色选择页。不假设点一次就进去了：登录鉴权、页面加载都可能还没完，
+    # 此时盲点下去两次空点都不报错（panel 坐标算不出时是静默 return），
+    # 错误要拖到 login_to_main_page 才以「无法确认已登录至主页」暴露，对不上因。
+    # 故每点一次等一拍，以「进入游戏」是否出现为判据，最多重试 3 次。
+    eval $role_page = 0
+    loop 3
+        click [game_login_page].[switch_role]
+        wait @page_refresh
 
-    # 检查角色是否已在线（confirm 区域包含「其他角色」）
-    scan [general_control].[confirm] as $online by contains "其他角色"
-    if $online
-        log "角色在线，不可登录，跳过"
-        click [general_control].[cancel] after wait @page_refresh
-        eval $batch_state.page_state = 1
-        eval $batch_state.role = ""
-        return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+        # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
+        # 这种情况下不可能进入角色列表，取消并跳过该条目。
+        scan [general_control].[confirm] as $online by contains "其他角色"
+        if $online
+            log "角色在线，不可登录，跳过"
+            click [general_control].[cancel] after wait @page_refresh
+            eval $batch_state.page_state = 1
+            eval $batch_state.role = ""
+            return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+        end
+
+        call $role_page = is_in_role_select_page()
+        if $role_page
+            goto role_page_ready
+        end
+        log "未进入选择角色页面，重试"
     end
+    eval pause("无法进入选择角色页面，请手动进入后点击继续")
+
+    @role_page_ready
 
     # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）
     click [game_login_page].[role_list][$role_index][1]
-    wait (1, 2)
+    wait @page_refresh
 
     # 进入游戏
     click [game_login_page].[enter]

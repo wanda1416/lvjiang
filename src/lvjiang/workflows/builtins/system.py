@@ -2,7 +2,6 @@
 
 from loguru import logger
 
-from ...core.config.session import load_env
 from ...core.platforms import native_confirm, native_notify, native_pause
 from ...i18n import tr
 from ._registry import builtin_func
@@ -147,7 +146,7 @@ def _panel_cols(_engine, scene_key: str = "", panel_key: str = "") -> int:
 # ─── 工作环境查询 ─────────────────────────────────────────
 
 @builtin_func("env")
-def _env(name: str | None = None) -> str | bool:
+def _env(_engine=None, name: str | None = None) -> str | bool:
     """查询当前工作环境
 
     - env()       → 返回环境名称（"desktop" / "android"）
@@ -169,14 +168,14 @@ def _env(name: str | None = None) -> str | bool:
             click [main_page].[menu_button]
         end
     """
-    current = load_env()
+    current = str(getattr(_engine, "run_env", ""))
     if name is None:
         return current
     return current == str(name)
 
 
 @builtin_func("check_env")
-def _check_env(envs) -> bool:
+def _check_env(_engine=None, envs=None) -> bool:
     """检查当前工作环境是否在允许列表中内，否则报错中断
 
     参数为环境名称列表，当前环境不在列表中时抛 WorkflowUserError。
@@ -191,7 +190,7 @@ def _check_env(envs) -> bool:
     """
     from ..engine.signals import WorkflowUserError
 
-    current = load_env()
+    current = str(getattr(_engine, "run_env", ""))
     if not isinstance(envs, list):
         envs = [envs]
     env_strs = [str(e) for e in envs]

@@ -187,6 +187,24 @@ def test_run_script_class_branch_propagates_pause_event(monkeypatch):
     assert captured["pause_event"] is sentinel_pause_event
 
 
+def test_batch_engine_uses_startup_environment_snapshot():
+    ctx = BatchContext(
+        object(), object(), object(), object(), run_env="android"
+    )
+    worker = BatchWorker(
+        enabled_rows=[],
+        scripts=[],
+        config=BatchConfigItem(name="test"),
+        ctx=ctx,
+        session_manager=object(),
+        stop_check=lambda: False,
+    )
+
+    engine = worker._create_engine()
+
+    assert engine.run_env == "android"
+
+
 def test_failed_batch_setup_starts_no_later_stage(monkeypatch):
     phases = []
 

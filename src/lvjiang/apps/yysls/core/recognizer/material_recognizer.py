@@ -2,14 +2,14 @@
 
 识别策略：
 - 类型识别：使用通用 ReferenceMatcher（ORB 特征匹配）
-- 输出元数据 OCR：按 references.yaml meta_schema 中 scope=output 字段的
+- 输出元数据 OCR：按图库空间 meta_schema 中 scope=output 字段的
   crop 区域裁剪 OCR（schema 未配置时回退硬编码上下半区）
 - 空槽检测：图像方差判断（游戏专属）
 
 通用识别只产出 ocr_texts 原始文本（输出字段 key -> 文本）。
 投入/持有的语义解析由调用方（如调律流程）按需处理。
 
-参考库数据源：ReferenceDatabase（references.yaml）。
+参考库数据源：ReferenceDatabase（激活图库空间）。
 """
 
 import re

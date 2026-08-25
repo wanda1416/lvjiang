@@ -18,7 +18,7 @@ from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
     get_missing_output_fields,
 )
 from lvjiang.core.recognizers.reference_matcher import MatchResult
-from lvjiang.core.reference_db import DEFAULT_SPACE, ReferenceDatabase
+from lvjiang.core.reference_db import ReferenceDatabase
 
 
 def _write_yaml(path, doc):
@@ -30,17 +30,15 @@ def _make_db(tmp_path, meta_schema) -> ReferenceDatabase:
     system_yaml = tmp_path / "system" / "references.yaml"
     _write_yaml(system_yaml, {"version": 1, "references": [],
                               "meta_schema": meta_schema})
-    # 名册同步隔离到 tmp_path（避免读真实 config）
-    spaces_yaml = tmp_path / "system" / "spaces.yaml"
-    _write_yaml(spaces_yaml, {"version": 1, "spaces": [DEFAULT_SPACE]})
+    # 空间扫描隔离到 tmp_path 的空目录（避免读真实 config）
     return ReferenceDatabase(
         system_dir=tmp_path / "system" / "references",
         system_yaml=system_yaml,
         local_dir=tmp_path / "local" / "references",
         local_yaml=tmp_path / "local" / "references.yaml",
         dev_mode=False,
-        system_spaces_yaml=spaces_yaml,
-        local_spaces_yaml=tmp_path / "local" / "spaces.yaml",
+        system_spaces_dir=tmp_path / "system" / "spaces_probe",
+        local_spaces_dir=tmp_path / "local" / "spaces_probe",
         session_path=tmp_path / "session.json",
     )
 

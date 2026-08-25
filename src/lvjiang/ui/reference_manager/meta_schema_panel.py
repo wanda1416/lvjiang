@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, validate_crop
 
 from ...i18n import tr
+from .combo_sizing import set_combo_minimum_character_capacity
 
 # 内置固定字段（只读展示，不可编辑/删除）
 # (显示名, key, filterable, type, sort_by)
@@ -38,6 +39,7 @@ _BUILTIN_ROWS = [
 
 _TYPE_OPTIONS = [("文本", "text"), ("数字", "number")]
 _SORT_OPTIONS = [("升序", "asc"), ("降序", "desc")]
+_META_COMBO_CHARACTER_CAPACITY = 4
 
 _KEY_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
@@ -83,7 +85,7 @@ class MetaSchemaPanel(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # 匹配度阈值配置（写入 references.yaml 的 match_threshold，随模式路由）
+        # 匹配度阈值配置（写入激活空间 yaml 的 match_threshold，随模式路由）
         threshold_row = QHBoxLayout()
         threshold_row.addWidget(QLabel(tr("匹配度阈值")))
         self._threshold_spin = QDoubleSpinBox()
@@ -201,6 +203,9 @@ class MetaSchemaPanel(QWidget):
         type_combo.setCurrentIndex(
             max(0, next((i for i, (_, v) in enumerate(_TYPE_OPTIONS) if v == ftype), 0))
         )
+        set_combo_minimum_character_capacity(
+            type_combo, _META_COMBO_CHARACTER_CAPACITY
+        )
         type_combo.setEnabled(not builtin)
         self._input_table.setCellWidget(row, 2, type_combo)
 
@@ -210,6 +215,9 @@ class MetaSchemaPanel(QWidget):
             sort_combo.addItem(label, val)
         sort_combo.setCurrentIndex(
             max(0, next((i for i, (_, v) in enumerate(_SORT_OPTIONS) if v == sort_by), 0))
+        )
+        set_combo_minimum_character_capacity(
+            sort_combo, _META_COMBO_CHARACTER_CAPACITY
         )
         sort_combo.setEnabled(not builtin)
         self._input_table.setCellWidget(row, 3, sort_combo)

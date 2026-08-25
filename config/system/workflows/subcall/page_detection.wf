@@ -35,6 +35,18 @@ def is_in_bag_page()
    end
 end
 
+# 角色选择视图是否已打开。
+# 判据取「进入游戏」按钮：场景定义里 enter 属于 roles 视图，
+# 而「选择角色」标签在基底视图常驻，登录没完成时也读得到，不能当判据。
+def is_in_role_select_page()
+    scan [game_login_page].[enter] as $found by contains "进入游戏"
+    if $found
+        return 1
+    else
+        return 0
+    end
+end
+
 # 同时扫描页面标题和“当周获取号令”，避免单个标题区域偶发识别失败。
 def is_in_haoling_page()
    scan [activity_jianghu].[label_0, haoling_of_week] as $found by contains "号令"

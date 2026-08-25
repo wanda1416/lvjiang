@@ -56,7 +56,7 @@ class ReferenceMatcher:
         Args:
             db: 参考图库数据库
             threshold: 匹配置信度阈值；None 则动态取图库配置
-                （references.yaml 的 match_threshold，local 覆盖 system）
+                （空间 yaml 的 match_threshold，local 覆盖 system）
             target_size: 统一缩放尺寸 (w, h)，None 则自动取第一张参考图尺寸
         """
         self._db = db

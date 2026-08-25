@@ -44,11 +44,25 @@
 | `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
 | `yysls/tune_config.yaml` | `base_rules` / `tuning_rules` / `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
 
-### 例外：参考图名册
+### 例外：参考图空间
 
-`references.yaml` 与 `references/{空间}.yaml` **不走 resolver 的聚合接口**，
+`references/{空间}.yaml` **不走 resolver 的聚合接口**，
 `core/reference_db.py` 自带一套条目级 diff（`references` + `deleted` 列表，
 `meta_schema` 整列表替换）。新增同类配置前先确认是否该并入 resolver。
+
+空间列表没有名册文件，由**目录扫描**得出：
+`config/system/references/*.yaml` ∪ `config/local/references/*.yaml`，
+文件名即空间名。落一个 yaml 就是新增一个空间，作者新增的出厂空间无需用户
+删除本地文件即可见。两层同名 = local 是 system 的覆盖层，不是第二个空间。
+
+system 层扫出的空间即**出厂空间**（`is_system_space()`）：用户模式下可以改其中
+内容，但不能删除该空间——图库管理器的空间下拉将其置灰，「删除空间」按钮禁用
+并把拒绝原因写进 tooltip。用户要独立的一套图，应当新建自己的空间。
+
+`delete_space()` 的三条闸门（`can_delete_space()` 返回拒绝原因，空串即可删）：
+空间必须存在、用户模式不得删出厂空间、至少保留一个空间。用户模式只清 local 层；
+开发模式两层一起清，避免 system 层删掉后残留 local 覆盖层变成孤儿空间。
+删的是激活空间时自动改激活、写 session 并重载。
 
 ---
 

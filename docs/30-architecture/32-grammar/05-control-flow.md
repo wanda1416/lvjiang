@@ -327,7 +327,7 @@ if $status.logged_in
     log "已登录"
 end
 if $status.page_state == 2
-    call _exit_to_login()
+    call exit_to_login()
 end
 ```
 

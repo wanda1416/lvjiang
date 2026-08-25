@@ -1,14 +1,22 @@
 # 批量生命周期：每个启用条目执行一次。
 # 输入由 Runner 注入；返回统一的 {status, message, state}。
 # 根据 batch_state 中已确认的游戏状态，以最小操作达到目标账号/角色。
+#
+# 退出登录 / 切账号 / 选角色三段过去拆成三个 _ 前缀文件，既没带来复用，
+# 又因 `_` 前缀撞上打包排除规则（robocopy /XF _*）有随发行包漏发的风险，
+# 故全部并回本文件；子过程名也去掉 `_`，与目录约定保持一致。
+#
+# 流程：
+#   上一条进过主页 → exit_to_login() 退回登录页
+#   目标账号不同   → switch_account() 切账号
+#   总是           → select_role() 选角色并进入游戏
 
-import "_exit_to_login.wf"
-import "_switch_account.wf"
-import "_select_role.wf"
+import "../subcall/navigation.wf"
+import "../subcall/page_detection.wf"
 
 # 上一条成功进入主页后，先回到角色/账号入口。
 if $batch_state.page_state == 2
-    call _exit_to_login()
+    call exit_to_login()
     eval $batch_state.page_state = 1
     eval $batch_state.role = ""
 end
@@ -27,10 +35,209 @@ log "目标账号：" + $account
 
 if not $batch_state.account equals $account
     log "需要切换账号: " + $account
-    call _switch_account($tail, $role_index, $account, $role, $batch_state)
+    call switch_account($tail, $role_index, $account, $role, $batch_state)
 end
 
 log "切换角色: " + $role
-call $result = _select_role($role_index, $role, $batch_state)
+call $result = select_role($role_index, $role, $batch_state)
 
 return $result
+
+
+# ─── 主页 → 退出 → 回到登录页 ──────────────────────────────
+# 流程：主页进菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
+
+def exit_to_login()
+    # 1. 主页 → 菜单
+    # 走标准导航：安卓点菜单按钮、桌面按 ESC，并自带到位校验。
+    # 直接 click [game_main_page].[menu] 会让端游走安卓的路径。
+    call $in_menu = nav_main_to_menu()
+    if $in_menu < 0
+        log "未能进入菜单页，退出流程可能落空"
+    end
+
+    # 2. 菜单 → 退出（两端行为一致）
+    click [game_menu_page].[exit]
+    wait @page_refresh
+
+    # 3. 二次确认：检查退出弹窗中是否有「返回登录页面」按钮
+    scan [game_login_page].[back_to_login] as $confirm by contains "返回登录"
+    if $confirm
+        click [game_login_page].[back_to_login]
+    else
+        eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
+    end
+    wait @secondary_confirm
+end
+
+
+# ─── 账号切换 ──────────────────────────────────────────────
+# 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）
+# 不包含选角色，由调用方决定是否接着调用 select_role
+
+def switch_account($tail, $role_index, $account, $role, $batch_state)
+    log "当前匹配" + $tail
+    log "当前下标" + $role_index
+
+    # 1. 登录页 → 用户切换视图
+    click [game_login_page].[more_user]
+    wait @page_refresh
+
+    click [game_login_page].[users_icon]
+    wait @page_refresh
+
+    click [game_login_page].[switch_user]
+    wait @page_refresh
+
+    click [game_login_page].[tap_user]
+    wait @page_refresh
+
+    # 2. 查找目标账号（最多滚动 5 次）
+    eval $found_user = ""
+    loop 5
+        find [game_login_page].[user_list] as $found_user by contains $tail
+        if $found_user
+            click $found_user
+            goto account_selected
+        end
+        drag [game_login_page].[point_2] [game_login_page].[point_1]
+        wait @page_refresh
+    end
+
+    # 找不到 → 暂停手动处理
+    eval pause("未找到账号，请手动选定账号后点击 继续")
+
+    @account_selected
+    wait @page_refresh
+
+    # 3. 登录 → 回到登录页角色入口
+    # 登录要走一次网络鉴权，这里只按标准节奏等一拍，不假设已经就位；
+    # 真正的就位判定交给 select_role 的重试校验。
+    click [game_login_page].[login]
+    wait @page_refresh
+
+    # 已确认目标账号，保留账号状态
+    # 下一条同账号任务可以跳过账号切换，直接选角色
+    eval $batch_state.account = $account
+    eval $batch_state.role = ""
+    eval $batch_state.page_state = 1
+
+    return {"status": "account_ready", "message": "", "state": $batch_state}
+end
+
+
+# ─── 选角色 + 进入游戏 ─────────────────────────────────────
+
+def select_role($role_index, $role, $batch_state)
+    log "当前下标" + $role_index
+
+    # 打开角色选择页。不假设点一次就进去了：登录鉴权、页面加载都可能还没完，
+    # 此时盲点下去两次空点都不报错（panel 坐标算不出时是静默 return），
+    # 错误要拖到 login_to_main_page 才以「无法确认已登录至主页」暴露，对不上因。
+    # 故每点一次等一拍，以「进入游戏」是否出现为判据，最多重试 3 次。
+    eval $role_page = 0
+    loop 3
+        click [game_login_page].[switch_role]
+        wait @page_refresh
+
+        # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
+        # 这种情况下不可能进入角色列表，取消并跳过该条目。
+        scan [general_control].[confirm] as $online by contains "其他角色"
+        if $online
+            log "角色在线，不可登录，跳过"
+            click [general_control].[cancel] after wait @page_refresh
+            eval $batch_state.page_state = 1
+            eval $batch_state.role = ""
+            return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+        end
+
+        call $role_page = is_in_role_select_page()
+        if $role_page
+            goto role_page_ready
+        end
+        log "未进入选择角色页面，重试"
+    end
+    eval pause("无法进入选择角色页面，请手动进入后点击继续")
+
+    @role_page_ready
+
+    # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）
+    click [game_login_page].[role_list][$role_index][1]
+    wait @page_refresh
+
+    # 进入游戏
+    click [game_login_page].[enter]
+    wait 5
+
+    # 等待加载完成并进入主页
+    call login_to_main_page()
+
+    eval $batch_state.page_state = 2
+    eval $batch_state.role = $role
+    wait @step_interval
+    return {"status": "success", "message": "", "state": $batch_state}
+end
+
+
+# ─── 登录加载到主页 ────────────────────────────────────────
+# 等待加载条消失 → 检测主页元素 → 处理战令领奖/关闭弹窗
+
+def login_to_main_page()
+    # 等待加载完成：检测 loading 区域的「加载」文字
+    # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
+    loop 10
+        scan [game_login_page].[loading] as $load_text by contains "加载"
+        if $load_text
+            wait 3
+        else
+            goto loading_done
+        end
+    end
+    eval pause("等待加载超时，请手动检查后点击确定")
+
+    @loading_done
+    wait 5
+
+    # 等待主页加载完成：检测主界面入口按钮
+    # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
+    loop 8
+        call $in_main = is_in_main_page()
+        if $in_main
+            log "主页加载完成"
+            # 检查是否有战令领奖入口
+            call claim_zhanling_reward()
+            return
+        end
+
+        # 未检测到主页，先检查战令领奖
+        scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
+        if $zllj
+            log "检测到战令领奖入口，先领奖"
+            call claim_zhanling_reward()
+            wait 2
+        else
+            # 没有战令领奖，尝试关闭活动弹窗
+            click [game_login_page].[close_btn]
+            wait 2
+        end
+    end
+    eval pause("无法确认已登录至主页，请手动检查后点击确定")
+end
+
+
+# ─── 战令领奖 ──────────────────────────────────────────────
+# 检测战令领奖入口，有则进入领取并返回
+
+def claim_zhanling_reward()
+    scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
+    if $zllj
+        log "进入战令领奖页面"
+        click [game_login_page].[zllj_btn] after wait @step_interval
+        scan [zhanling_detail].[claim_all] as $claim by contains "一键领取"
+        if $claim
+            log "点击一键领取"
+            click [zhanling_detail].[claim_all] after wait @step_interval
+        end
+        click [zhanling_detail].[back] after wait @step_interval
+    end
+end

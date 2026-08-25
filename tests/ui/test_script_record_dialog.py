@@ -199,6 +199,40 @@ class TestHighPrecisionClick:
         assert rec._trace_events == []
 
 
+class TestLowPrecisionMouseButtons:
+    def _make_recorder(self, monkeypatch):
+        from lvjiang.ui.macros import recorder as recorder_module
+        monkeypatch.setattr(recorder_module, "pynput_mouse", object())
+        rec = _make_recorder([])
+        rec._recording = True
+        return rec
+
+    def test_side_buttons_emit_click_with_button_name(self, monkeypatch):
+        rec = self._make_recorder(monkeypatch)
+
+        rec._on_click(100, 80, _FakeButton("x1"), True)
+        rec._on_click(100, 80, _FakeButton("x1"), False)
+        rec._on_click(200, 160, _FakeButton("x2"), True)
+        rec._on_click(200, 160, _FakeButton("x2"), False)
+
+        assert rec._lines == [
+            "click (0.1, 0.1) x1",
+            "click (0.2, 0.2) x2",
+        ]
+
+    def test_right_and_middle_buttons_are_not_dropped(self, monkeypatch):
+        rec = self._make_recorder(monkeypatch)
+
+        for button in ("right", "middle"):
+            rec._on_click(100, 80, _FakeButton(button), True)
+            rec._on_click(100, 80, _FakeButton(button), False)
+
+        assert rec._lines == [
+            "click (0.1, 0.1) right",
+            "click (0.1, 0.1) middle",
+        ]
+
+
 class TestScroll:
     def test_scroll_down_emitted_with_coord_target(self):
         lines: list[str] = []
@@ -283,6 +317,18 @@ class TestPress:
 
         assert len(lines) == 1
         assert lines[0].startswith('press "W" hold ')
+
+    def test_short_meaningful_hold_is_not_collapsed_to_tap(self):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        key = _char_key("e")
+
+        rec._key_press_times[key] = time.monotonic() - 0.2
+        rec._on_key_release(key)
+
+        assert len(lines) == 1
+        assert lines[0].startswith('press "E" hold 0.2')
 
     def test_reserved_hotkeys_never_recorded(self):
         """F8/F9/F10/F12 是录制器自身的全局热键，不应被误录成 press 语句"""
@@ -389,6 +435,21 @@ class TestTrailingWaitOnStop:
 
 
 class TestRawInputMove:
+    def test_mouse_movement_can_be_disabled(self):
+        lines: list[str] = []
+        rec = MacroRecorder(
+            target_window={"left": 0, "top": 0, "width": 1000, "height": 800},
+            capture=_Capture(), layout=_Layout(), win_left=0, win_top=0,
+            on_line=lines.append, record_mouse_movement=False,
+        )
+        rec._recording = True
+
+        rec._on_raw_move(20, 20, 1_000_000_000)
+        with rec._lock:
+            rec._flush_raw_frame()
+
+        assert lines == []
+
     def test_low_precision_merges_continuous_raw_packets(self):
         lines: list[str] = []
         rec = _make_recorder(lines)

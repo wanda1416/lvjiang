@@ -36,7 +36,9 @@ _DRAG_THRESHOLD_PX = 10      # 位移 >= 该值判定为拖拽，否则为点击
 _LOW_PRECISION_INTERVAL_S = 0.100  # 低精度以 100ms 为合并/等待粒度
 _WAIT_THRESHOLD_S = _LOW_PRECISION_INTERVAL_S
 _MIN_DRAG_DURATION = 0.001   # 拖拽时长下限（秒）
-_PRESS_HOLD_THRESHOLD_S = 0.5  # 按键时长 >= 该值判定为长按（press "X" hold N）
+# 与低精度时间粒度保持一致。原来的 0.5 秒会把卸势等短促但有意义的长按
+# 压缩成普通 press，丢失按键持续时间。
+_PRESS_HOLD_THRESHOLD_S = _LOW_PRECISION_INTERVAL_S
 _RAW_IDLE_S = _LOW_PRECISION_INTERVAL_S
 _RAW_LAST_DURATION_S = 0.001  # 轨迹末包无后继时间戳，以 1ms 完成
 
@@ -100,7 +102,8 @@ class MacroRecorder:
 
     def __init__(self, target_window: dict, capture, layout, win_left: int, win_top: int,
                  on_line=None, precision: str = PRECISION_LOW,
-                 reserved_keys: set[str] | None = None):
+                 reserved_keys: set[str] | None = None,
+                 record_mouse_movement: bool = True):
         if precision not in {PRECISION_LOW, PRECISION_HIGH}:
             raise ValueError(f"未知录制精度: {precision}")
         self._win = target_window
@@ -110,6 +113,7 @@ class MacroRecorder:
         self._win_top = win_top
         self._on_line = on_line                # 每生成一行 DSL 的实时回调（监听线程内调用）
         self.precision = precision
+        self.record_mouse_movement = record_mouse_movement
         # 当前生效的系统热键（跟随「配置管理→热键设置」，未传时用默认 F8/F9/F10/F12）
         self._reserved_keys = reserved_keys if reserved_keys is not None else _RESERVED_KEYS
 
@@ -120,6 +124,7 @@ class MacroRecorder:
         self._lines: list[str] = []          # 已生成的 DSL 行
         self._press_pos: tuple[int, int] | None = None   # 左键按下屏幕坐标
         self._press_time = 0.0               # 左键按下时刻
+        self._button_presses: dict[str, tuple[int, int, float]] = {}
         self._key_press_times: dict = {}     # 已按下但未松开的按键 → 按下时刻
         # 低精度模式把同一连续段合并为一个 move by；高精度模式不使用它。
         self._raw_pending: tuple[float, float, int, int] | None = None
@@ -141,6 +146,7 @@ class MacroRecorder:
             return
         self._lines = []
         self._press_pos = None
+        self._button_presses = {}
         self._key_press_times = {}
         self._trace_events = []
         self._trace_origin_ns = time.monotonic_ns()
@@ -155,7 +161,7 @@ class MacroRecorder:
         from ...core.pynput_patch import install as _install_pynput_patch
         _install_pynput_patch()
         # Raw Input 必须在 pynput 之前启动；启动失败时不留下半套钩子。
-        if sys.platform == "win32":
+        if sys.platform == "win32" and self.record_mouse_movement:
             import ctypes
             from ctypes import wintypes
 
@@ -261,8 +267,11 @@ class MacroRecorder:
                 logger.exception("on_line 回调异常")
 
     def _on_click(self, sx, sy, button, pressed):
-        """pynput 鼠标键按下/松开回调（高精度模式下 left/right/middle/
-        x1/x2 全都录；低精度模式仍只认左键，见下方说明）"""
+        """pynput 鼠标键按下/松开回调。
+
+        高精度保留五种鼠标键的原始 down/up；低精度把非左键录成带按钮名的
+        ``click``。左键仍根据位移区分 click/drag。
+        """
         if pynput_mouse is None:
             return
         with self._lock:
@@ -283,17 +292,31 @@ class MacroRecorder:
                             "button", (button_name, bool(pressed)),
                             time.monotonic_ns())
                     return
-                # 低精度模式下 DSL 本身就只有 click/drag 两个左键专用语句，
-                # 没有右键/中键/侧键的落地方式（这是所有非左键的共同限制，
-                # 不是侧键独有），右键/中键同样在这里被忽略。
-                if button != pynput_mouse.Button.left:
+                button_name = getattr(button, "name", None)
+                if button_name not in VALID_BUTTONS:
                     return
                 self._flush_raw_frame()
+                now = time.monotonic()
+                if button_name == "left":
+                    if pressed:
+                        self._press_pos = (int(sx), int(sy))
+                        self._press_time = now
+                    else:
+                        self._handle_release(int(sx), int(sy))
+                    return
                 if pressed:
-                    self._press_pos = (int(sx), int(sy))
-                    self._press_time = time.monotonic()
-                else:
-                    self._handle_release(int(sx), int(sy))
+                    self._button_presses[button_name] = (int(sx), int(sy), now)
+                    return
+                state = self._button_presses.pop(button_name, None)
+                if state is None:
+                    return
+                px, py, press_time = state
+                if not self._in_window(px, py):
+                    return
+                self._maybe_emit_wait(press_time)
+                rx, ry = self._screen_to_canvas_ratio(px, py)
+                self._emit_line(f"click ({rx}, {ry}) {button_name}")
+                self._last_action_time = now
             except Exception:  # noqa: BLE001 - pynput 低层钩子回调里的异常可能被
                 # 静默吞掉（Windows 要求钩子过程不能抛出/长时间阻塞，否则可能被
                 # 判定为无响应并卸载），必须自己兜底记录，否则一旦出 bug 会
@@ -449,7 +472,8 @@ class MacroRecorder:
         """Raw Input 回调：高精度逐包保存，低精度以 100ms 空档切段。"""
         with self._lock:
             try:
-                if not self._recording or not self._target_is_foreground():
+                if (not self._recording or not self.record_mouse_movement
+                        or not self._target_is_foreground()):
                     self._reset_raw_frame()
                     return
                 if dx == 0 and dy == 0:

@@ -1,15 +1,21 @@
 # 公共子过程：主页 → 退出 → 回到登录页
 #
-# 流程：主页点菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
+# 流程：主页进菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
+
+import "../subcall/navigation.wf"
 
 def _exit_to_login()
     # 1. 主页 → 菜单
-    click [game_main_page].[menu]
-    wait (1, 2)
+    # 走标准导航：安卓点菜单按钮、桌面按 ESC，并自带到位校验。
+    # 直接 click [game_main_page].[menu] 会让端游走安卓的路径。
+    call $in_menu = nav_main_to_menu()
+    if $in_menu < 0
+        log "未能进入菜单页，退出流程可能落空"
+    end
 
-    # 2. 菜单 → 退出
+    # 2. 菜单 → 退出（两端行为一致）
     click [game_menu_page].[exit]
-    wait (1, 2)
+    wait @page_refresh
 
     # 3. 二次确认：检查退出弹窗中是否有「返回登录页面」按钮
     scan [game_login_page].[back_to_login] as $confirm by contains "返回登录"

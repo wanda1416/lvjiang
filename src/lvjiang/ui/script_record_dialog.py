@@ -16,6 +16,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QCheckBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -159,6 +160,12 @@ class ScriptRecordDialog(QDialog):
         self._precision_group.addButton(self.radio_precision_high)
         mode_row.addWidget(self.radio_precision_low)
         mode_row.addWidget(self.radio_precision_high)
+        self.check_mouse_movement = QCheckBox(tr("录制鼠标移动"))
+        self.check_mouse_movement.setToolTip(
+            tr("关闭时过滤鼠标视角移动，点击、拖拽和滚轮仍会录制")
+        )
+        self.check_mouse_movement.setChecked(False)
+        mode_row.addWidget(self.check_mouse_movement)
         mode_row.addStretch()
         layout.addLayout(mode_row)
 
@@ -234,6 +241,7 @@ class ScriptRecordDialog(QDialog):
                 on_line=self.line_captured.emit,
                 precision=self.precision,
                 reserved_keys={hk.start, hk.pause, hk.stop, hk.record},
+                record_mouse_movement=self.check_mouse_movement.isChecked(),
             )
             self._recorder.start()
         except Exception as e:
@@ -294,6 +302,7 @@ class ScriptRecordDialog(QDialog):
         self.btn_clear.setEnabled(not recording and has_text)
         self.radio_precision_low.setEnabled(not recording)
         self.radio_precision_high.setEnabled(not recording)
+        self.check_mouse_movement.setEnabled(not recording)
         self.text_edit.setReadOnly(recording)
 
     def _on_text_changed(self):

@@ -4,7 +4,9 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from functools import partial
+
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
     QFrame,
@@ -135,6 +137,26 @@ def _set_quality(widget: QLabel, quality: str) -> None:
     widget.update()
 
 
+def _show_illegal_reasons(parent, reasons: list[str]) -> None:
+    """在事件循环里展示装备异常原因。
+
+    与触发它的控件解耦（只收窗口与原因文本的副本），原因见
+    :meth:`_IllegalBadge.mousePressEvent`。
+    """
+    if not reasons:
+        return
+    try:
+        parent.isVisible()  # 触碰一下：窗口已销毁时 PyQt 抛 RuntimeError
+    except RuntimeError:
+        parent = None       # 绝不把已释放对象当 parent 递给模态框
+    QMessageBox.warning(
+        parent, tr("装备状态异常"),
+        tr("该装备存在以下异常，游戏中不会出现这样的装备，"
+           "通常是识别误读，请手工校正：") + "\n\n"
+        + "\n".join(f"· {r}" for r in reasons),
+    )
+
+
 class _IllegalBadge(QLabel):
     """装备状态异常提醒「!」
 
@@ -169,12 +191,14 @@ class _IllegalBadge(QLabel):
             event.accept()
         if not self._reasons:
             return
-        QMessageBox.warning(
-            self, tr("装备状态异常"),
-            tr("该装备存在以下异常，游戏中不会出现这样的装备，"
-               "通常是识别误读，请手工校正：") + "\n\n"
-            + "\n".join(f"· {r}" for r in self._reasons),
-        )
+        # 不能在事件处理里直接开模态框。模态框会跑嵌套事件循环，而扫描
+        # 期间 equipment_changed 会在那个循环里重建装备网格，把本卡片连同
+        # 本控件 deleteLater 掉——deleteLater 是在嵌套循环内发出的，同一个
+        # 循环就会处理掉它。于是模态框的 parent 与当前调用栈上的 self 双双
+        # 变成已释放对象，返回时即 Windows 0xc0000374 堆损坏。
+        # 故：窗口与原因文本按值取出，排队到事件循环里再弹，不依赖 self 存活。
+        QTimer.singleShot(
+            0, partial(_show_illegal_reasons, self.window(), list(self._reasons)))
 
 
 def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
@@ -629,31 +653,38 @@ class _CompactEquipCard(QFrame):
         event.accept()
 
     def _show_context_menu(self, global_pos):
-        """显示右键菜单：装备/编辑/复制/删除。"""
-        is_mock = (
-            self._equip_data.get("_extra", {})
-            .get("is_mock", False)
-        )
-        menu = QMenu(self)
-        equip_action = menu.addAction(tr("装备"))
-        equip_action.setToolTip(tr("穿戴到对应槽位"))
-        if is_mock:
-            edit_action = menu.addAction(tr("编辑"))
-            edit_action.setToolTip(tr("编辑模拟装备数据"))
-        copy_action = menu.addAction(tr("复制"))
-        copy_action.setToolTip(tr("复制装备数据到创建对话框"))
-        delete_action = menu.addAction(tr("删除"))
-        delete_action.setToolTip(tr("删除此装备"))
+        """显示右键菜单：装备/编辑/复制/删除。
 
-        action = menu.exec(global_pos)
-        if action == equip_action:
-            self.equip_requested.emit(self._equip_data, self._group_key)
-        elif is_mock and action == edit_action:
-            self.edit_requested.emit(self._equip_data, self._group_key)
-        elif action == copy_action:
-            self.copy_requested.emit(self._equip_data, self._group_key)
-        elif action == delete_action:
-            self.delete_requested.emit(self._equip_data, self._group_key)
+        用 popup() 而非 exec()：exec() 会跑嵌套事件循环，扫描期间
+        equipment_changed 会在循环里重建网格并 deleteLater 掉本卡片，
+        exec() 返回后对 self 的任何访问都落在已释放对象上（堆损坏）。
+        popup() 立即返回；菜单是 self 的子对象，卡片没了菜单一起销毁，
+        动作自然不会触发。装备数据按值捕获，避免期间被复用改写。
+        """
+        data = self._equip_data
+        group = self._group_key
+        is_mock = (data.get("_extra", {}) or {}).get("is_mock", False)
+
+        menu = QMenu(self)
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        entries = [(tr("装备"), tr("穿戴到对应槽位"), self.equip_requested)]
+        if is_mock:
+            entries.append(
+                (tr("编辑"), tr("编辑模拟装备数据"), self.edit_requested))
+        entries.append((tr("复制"), tr("复制装备数据到创建对话框"),
+                        self.copy_requested))
+        entries.append((tr("删除"), tr("删除此装备"), self.delete_requested))
+        for text, tip, signal in entries:
+            action = menu.addAction(text)
+            action.setToolTip(tip)
+            action.triggered.connect(
+                partial(self._emit_menu_action, signal, data, group))
+        menu.popup(global_pos)
+
+    @staticmethod
+    def _emit_menu_action(signal, data, group, _checked=False) -> None:
+        """菜单动作统一出口（triggered 会多传一个 checked 参数）。"""
+        signal.emit(data, group)
 
     def set_equip(
         self, equip_data: dict, part_label: str,

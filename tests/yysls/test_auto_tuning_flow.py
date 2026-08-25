@@ -84,7 +84,7 @@ def _delay_params():
     return _DELAY_CACHE
 
 
-def _make_subcall_engine(wf) -> WorkflowEngine:
+def _make_subcall_engine(wf, run_env: str = "android") -> WorkflowEngine:
     """装配最小引擎：后端全 mock，DSL 动作委派到 wf 的覆写原语"""
     capture = MagicMock()
     capture.get_capture_size.return_value = (1920, 1080)
@@ -92,6 +92,7 @@ def _make_subcall_engine(wf) -> WorkflowEngine:
         capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
         layout=_system_layout(), input_sim=MagicMock(),
         delay_params=_delay_params(),
+        run_env=run_env,
     )
     engine._workflow = wf
     return engine
@@ -100,7 +101,7 @@ def _make_subcall_engine(wf) -> WorkflowEngine:
 class FakeWF(AutoTuningWorkflow):
     """不走 BaseWorkflow.__init__ 的测试替身，记录调用并脚本化识别响应"""
 
-    def __init__(self):
+    def __init__(self, run_env: str = "android"):
         self.output = {}
         # 默认注入空基础规则组（行为/材料/等级门槛全默认值），
         # 测试可覆写 run_ctx.base_group 注入定制配置
@@ -109,7 +110,7 @@ class FakeWF(AutoTuningWorkflow):
         self._stopped = False
         # subcall 桥：真布局供 click_any 解析区域，引擎执行 DSL 导航
         self._layout = _system_layout()
-        self._engine = _make_subcall_engine(self)
+        self._engine = _make_subcall_engine(self, run_env)
         # 显式加载导航 subcall（生产路径在 run() 中加载，测试路径在此加载）
         self.navigator.load_dependencies()
         self.clicks: list[tuple[str, str]] = []
@@ -229,12 +230,6 @@ def _patch_core(monkeypatch):
                         lambda *a, **k: dict(_WORTHY))
     monkeypatch.setattr(TuningNavigator, "collect_new_affix",
                         lambda self, ed, text: None)
-    # 默认环境设为 android（现有测试均基于 android 流程：more_func 展开/收起）
-    import lvjiang.core.config.session as _session
-    monkeypatch.setattr(_session, "load_env", lambda: "android")
-    # DSL env() 经 system.py 导入 load_env，需同步 patch
-    from lvjiang.workflows.builtins import system as _sys_mod
-    monkeypatch.setattr(_sys_mod, "load_env", lambda: "android")
 
 
 @pytest.fixture
@@ -244,10 +239,8 @@ def patch_worth(monkeypatch):
                         lambda *a, **k: dict(_WORTHY))
 
 
-def test_android_route_restores_detail_menu(monkeypatch):
-    import lvjiang.core.config.session as _session
-    monkeypatch.setattr(_session, "load_env", lambda: "android")
-    wf = FakeWF()
+def test_android_route_restores_detail_menu():
+    wf = FakeWF("android")
 
     assert isinstance(wf.navigator.routes, AndroidTuningRouteStrategy)
     wf.navigator.leave_tune()
@@ -258,10 +251,8 @@ def test_android_route_restores_detail_menu(monkeypatch):
     ]
 
 
-def test_desktop_route_leaves_detail_without_menu_click(monkeypatch):
-    import lvjiang.core.config.session as _session
-    monkeypatch.setattr(_session, "load_env", lambda: "desktop")
-    wf = FakeWF()
+def test_desktop_route_leaves_detail_without_menu_click():
+    wf = FakeWF("desktop")
 
     assert isinstance(wf.navigator.routes, DesktopTuningRouteStrategy)
     wf.navigator.leave_tune()

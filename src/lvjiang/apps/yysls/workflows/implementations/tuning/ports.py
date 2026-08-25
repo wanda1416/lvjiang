@@ -12,6 +12,8 @@ from typing import Any, Protocol
 class SubcallEnginePort(Protocol):
     """导航 DSL 桥所需的最小 Engine 能力。"""
 
+    run_env: str
+
     def load_subcalls(self, wf_path: Any) -> None: ...
 
     def call_subcall(self, name: str, args: list | None = None) -> Any: ...

@@ -15,7 +15,6 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
     RouteHostPort,
     SubcallEnginePort,
 )
-from lvjiang.core.config import session
 
 from ......i18n import tr
 
@@ -141,8 +140,11 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
 
 def create_tuning_route_strategy(
         wf: RouteHostPort) -> TuningRouteStrategy:
-    """按当前运行环境创建路径策略；环境只在这里判定一次。"""
-    env = session.load_env()
+    """按工作流启动时的环境快照创建路径策略。"""
+    engine = wf.engine
+    if engine is None:
+        raise RuntimeError("未注入 WorkflowEngine，无法取得运行环境")
+    env = engine.run_env
     strategies = {
         AndroidTuningRouteStrategy.env: AndroidTuningRouteStrategy,
         DesktopTuningRouteStrategy.env: DesktopTuningRouteStrategy,

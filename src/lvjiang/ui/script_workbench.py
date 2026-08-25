@@ -312,7 +312,7 @@ class DebugPanel(QWidget):
 
         main = self._main
         lm = main._layout_manager
-        layout = lm.load_layout(lm.get_active_layout_name())
+        layout = lm.load_layout(main.layout_combo.currentText())
         if not layout:
             raise RuntimeError(tr("无法加载当前布局"))
         if getattr(main, "_backend", "windows") == "adb":
@@ -328,6 +328,7 @@ class DebugPanel(QWidget):
             layout=layout,
             input_sim=main._user_config.input_sim,
             delay_params=main._user_config.delay_params,
+            run_env=main._selected_run_env(),
             window_left=left, window_top=top,
             stop_check=lambda: self._stop_flag,
             pause_event=self._pause_event,

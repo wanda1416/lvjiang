@@ -373,12 +373,18 @@ class DebugPanel(QWidget):
             _LogSink(self._bridge), level="INFO", format="{time:HH:mm:ss} | {level:<5} | {message}")
         self._editor.set_locked(True)
         worker = WorkflowWorker("_editor_run", lambda: engine.execute(path))
-        worker.finished.connect(lambda _fid, res: self._bridge.finished.emit(res))
+        worker.finished.connect(self._on_worker_finished)
         self._worker = worker
         self.lbl_run.setText(tr("单步模式：在第一条语句前停住") if step else tr("运行中…"))
         self._refresh_run_buttons()
         worker.start()
         return True
+
+    def _on_worker_finished(self):
+        """QThread 已真正退出后再向调试面板发布执行结果。"""
+        worker = self._worker
+        if worker is not None:
+            self._bridge.finished.emit(worker.result_or_exception)
 
     def _on_step(self):
         if not self.running:

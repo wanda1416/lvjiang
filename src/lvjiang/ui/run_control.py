@@ -37,21 +37,20 @@ def _to_serializable(obj):
 
 class WorkflowWorker(QThread):
     """工作流异步执行线程"""
-    finished = pyqtSignal(str, object)  # (flow_id, result_or_exception)
 
     def __init__(self, flow_id: str, fn, parent=None):
         super().__init__(parent)
         self.flow_id = flow_id
         self._fn = fn
+        self.result_or_exception: Any = None
 
     def run(self):
         try:
-            result = self._fn()
-            self.finished.emit(self.flow_id, result)
+            self.result_or_exception = self._fn()
         except BaseException as e:
             tb = traceback.format_exc()
             logger.error(f"工作流 {self.flow_id} 异常退出:\n{tb}")
-            self.finished.emit(self.flow_id, e)
+            self.result_or_exception = e
 
 
 class _UIHelper(QObject):
@@ -891,10 +890,14 @@ class RunControlMixin:
         worker._flow_name = flow_name
         worker.start()
 
-    def _on_workflow_finished(self, flow_id: str, result_or_exception):
-        """工作流完成回调（在主线程执行）"""
-        # 从 worker 获取 flow_name
+    def _on_workflow_finished(self):
+        """线程退出后的工作流完成回调（在主线程执行）。"""
         worker = self.sender()
+        if not isinstance(worker, WorkflowWorker):
+            logger.error("工作流完成信号来源不是 WorkflowWorker")
+            return
+        flow_id = worker.flow_id
+        result_or_exception = worker.result_or_exception
         flow_name = getattr(worker, '_flow_name', flow_id) if worker else flow_id
 
         if isinstance(result_or_exception, BaseException):

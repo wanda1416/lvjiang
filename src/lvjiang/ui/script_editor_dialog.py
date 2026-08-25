@@ -54,6 +54,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.config.resolver import get_resolver
 from ..i18n import tr
+from .button_styles import apply_button_style
 from .theme import get_theme_manager
 
 #: 脚本 id = 文件名 stem；``_`` 前缀被发现层视为临时文件，不允许
@@ -265,6 +266,13 @@ class ScriptEditorDialog(QDialog):
         self.btn_delete.clicked.connect(self._on_delete)
         self.btn_check = QPushButton(tr("检查"))
         self.btn_check.clicked.connect(self._on_check)
+        apply_button_style(
+            self.btn_new,
+            self.btn_save,
+            self.btn_save_as,
+            self.btn_check,
+        )
+        apply_button_style(self.btn_delete, variant="danger")
         for b in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete, self.btn_check):
             btn_row.addWidget(b)
         btn_row.addStretch()

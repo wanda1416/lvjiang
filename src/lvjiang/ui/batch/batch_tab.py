@@ -9,7 +9,9 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt
+from typing import cast
+
+from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -79,7 +81,22 @@ _STYLE_BTN_DISABLED = (
     "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 
-_BATCH_LIST_ROW_HEIGHT = 32
+_BATCH_LIST_VERTICAL_PADDING = 12
+_TABLE_COLUMN_HORIZONTAL_PADDING = 20
+_TABLE_VIEWPORT_SAFETY_MARGIN = 4
+
+
+def _batch_list_row_height(widget: QWidget) -> int:
+    """Use the same font-based row height in the script and config pages."""
+    return widget.fontMetrics().height() + _BATCH_LIST_VERTICAL_PADDING
+
+
+def _four_cjk_column_width(widget: QWidget) -> int:
+    """Default compact width that still fits four CJK characters."""
+    return (
+        widget.fontMetrics().horizontalAdvance("汉字宽度")
+        + _TABLE_COLUMN_HORIZONTAL_PADDING
+    )
 
 
 # ─── enabled 用户态（session.json）──────────────────────────
@@ -113,6 +130,7 @@ class BatchTab(QWidget):
         super().__init__()
         self._host = host
         self._running = False
+        self._progress_column_resize_guard = False
         self._setup_ui()
 
         # 宿主状态信号
@@ -122,6 +140,7 @@ class BatchTab(QWidget):
         self._refresh_script_list()
         self._refresh_config_combo()
         self._refresh_entry_list()
+        QTimer.singleShot(0, self._set_initial_column_widths)
 
     # ─── UI 构建 ─────────────────────────────────────────
 
@@ -161,12 +180,20 @@ class BatchTab(QWidget):
 
         self._progress_table = QTableWidget(0, 3)
         self._progress_table.setHorizontalHeaderLabels([tr("条目"), tr("脚本"), tr("状态")])
-        hheader = self._progress_table.horizontalHeader()
-        assert hheader is not None
-        # 前两列自适应内容，最后一列拉伸填充剩余空间
-        hheader.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        hheader.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        hheader.setStretchLastSection(True)
+        self._progress_table.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self._progress_table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        cast(QWidget, self._progress_table.viewport()).installEventFilter(self)
+        hheader = cast(QHeaderView, self._progress_table.horizontalHeader())
+        # 默认保留四字宽；视口极窄时允许继续压缩，绝不产生横向滚动条。
+        hheader.setMinimumSectionSize(1)
+        hheader.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        hheader.setStretchLastSection(False)
+        hheader.sectionResized.connect(self._constrain_progress_column_widths)
+        self._progress_table.setColumnWidth(
+            2, _four_cjk_column_width(self._progress_table)
+        )
         self._progress_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers
         )
@@ -183,7 +210,6 @@ class BatchTab(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         title_row = QHBoxLayout()
-        title_row.addWidget(QLabel(tr("<b>勾选要执行的脚本：</b>")))
         title_row.addStretch()
         self._btn_script_up = QPushButton(tr("↑ 上移"))
         self._btn_script_up.setFixedWidth(72)
@@ -213,10 +239,12 @@ class BatchTab(QWidget):
         header = self._script_list.header()
         assert header is not None
         header.setMinimumHeight(32)
-        header.setMinimumSectionSize(88)
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self._script_list.setColumnWidth(1, 96)
+        header.setMinimumSectionSize(48)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(False)
+        self._script_list.setColumnWidth(
+            1, _four_cjk_column_width(self._script_list)
+        )
         self._script_list.itemChanged.connect(self._on_script_item_changed)
         self._script_list.currentItemChanged.connect(
             lambda *_: self._update_script_move_buttons()
@@ -228,6 +256,101 @@ class BatchTab(QWidget):
         self._updating_script_list = False
         self._update_script_move_buttons()
         return widget
+
+    def _set_initial_column_widths(self) -> None:
+        """Give content columns the free space while keeping metadata compact."""
+        order_width = _four_cjk_column_width(self._script_list)
+        script_viewport = cast(QWidget, self._script_list.viewport())
+        script_header = cast(QHeaderView, self._script_list.header())
+        script_available = max(
+            script_viewport.width() - _TABLE_VIEWPORT_SAFETY_MARGIN,
+            0,
+        )
+        script_name_width = max(
+            script_header.minimumSectionSize(),
+            script_available - order_width,
+        )
+        self._script_list.setColumnWidth(0, script_name_width)
+        self._script_list.setColumnWidth(1, order_width)
+
+        self._set_progress_column_widths()
+
+    def _set_progress_column_widths(self) -> None:
+        """Fit default widths inside the viewport: compact / flexible / compact."""
+        progress_viewport = cast(QWidget, self._progress_table.viewport())
+        progress_header = cast(
+            QHeaderView, self._progress_table.horizontalHeader()
+        )
+        available = max(
+            progress_viewport.width() - _TABLE_VIEWPORT_SAFETY_MARGIN,
+            0,
+        )
+        minimum = progress_header.minimumSectionSize()
+        compact_width = min(
+            _four_cjk_column_width(self._progress_table),
+            max(minimum, (available - minimum) // 2),
+        )
+        script_width = max(minimum, available - compact_width * 2)
+        self._progress_column_resize_guard = True
+        try:
+            self._progress_table.setColumnWidth(0, compact_width)
+            self._progress_table.setColumnWidth(1, script_width)
+            self._progress_table.setColumnWidth(2, compact_width)
+        finally:
+            self._progress_column_resize_guard = False
+        self._constrain_progress_column_widths()
+
+    def _constrain_progress_column_widths(self, *_args) -> None:
+        """Shrink overflowing columns so the progress table never scrolls sideways."""
+        if self._progress_column_resize_guard:
+            return
+        progress_viewport = cast(QWidget, self._progress_table.viewport())
+        progress_header = cast(
+            QHeaderView, self._progress_table.horizontalHeader()
+        )
+        available = max(
+            progress_viewport.width() - _TABLE_VIEWPORT_SAFETY_MARGIN,
+            0,
+        )
+        widths = [self._progress_table.columnWidth(column) for column in range(3)]
+        overflow = sum(widths) - available
+        if overflow <= 0:
+            return
+
+        minimum = progress_header.minimumSectionSize()
+        resized_column = (
+            _args[0]
+            if _args and isinstance(_args[0], int) and 0 <= _args[0] < 3
+            else None
+        )
+        shrink_order = [
+            column for column in (1, 0, 2) if column != resized_column
+        ]
+        if resized_column is not None:
+            shrink_order.append(resized_column)
+        self._progress_column_resize_guard = True
+        try:
+            # 用户拖动时优先压缩其他列；视口缩小时优先压缩脚本列。
+            for column in shrink_order:
+                reducible = max(0, widths[column] - minimum)
+                reduction = min(overflow, reducible)
+                if reduction:
+                    widths[column] -= reduction
+                    self._progress_table.setColumnWidth(column, widths[column])
+                    overflow -= reduction
+                if overflow <= 0:
+                    break
+        finally:
+            self._progress_column_resize_guard = False
+
+    def eventFilter(self, watched, event):
+        if (
+            hasattr(self, "_progress_table")
+            and watched is self._progress_table.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
+            QTimer.singleShot(0, self._constrain_progress_column_widths)
+        return super().eventFilter(watched, event)
 
     def _build_config_page(self) -> QWidget:
         """配置页：选择配置 + 勾选要执行的行"""
@@ -269,6 +392,7 @@ class BatchTab(QWidget):
 
         self._entry_checkboxes: list[tuple[QCheckBox, int]] = []  # (checkbox, row_index)
         self._entry_container = QVBoxLayout()
+        self._entry_container.setSpacing(0)
         scroll_layout.addLayout(self._entry_container)
         scroll_layout.addStretch()
 
@@ -336,7 +460,7 @@ class BatchTab(QWidget):
         for i, row_data in enumerate(config.rows):
             label = self._format_row_label(config, row_data)
             cb = QCheckBox(label)
-            cb.setMinimumHeight(_BATCH_LIST_ROW_HEIGHT)
+            cb.setFixedHeight(_batch_list_row_height(cb))
             checked = config_enabled[i] if i < len(config_enabled) else True
             cb.setChecked(checked)
             cb.stateChanged.connect(self._on_entry_check_changed)
@@ -419,7 +543,7 @@ class BatchTab(QWidget):
                 self._script_order.append(script_id)
 
         # 脚本与配置两页使用同一行高，避免树控件按字体最小高度挤成一团。
-        row_height = _BATCH_LIST_ROW_HEIGHT
+        row_height = _batch_list_row_height(self._script_list)
         for script_cfg in configs:
             item = QTreeWidgetItem([script_cfg["name"], ""])
             item.setData(0, Qt.ItemDataRole.UserRole, script_cfg)
@@ -581,16 +705,23 @@ class BatchTab(QWidget):
                 label = row_data.get(config.user_column, "")
             else:
                 label = self._format_row_label(config, row_data) if config else str(row_data)
+            label = str(label)
             for script in scripts:
                 row = self._progress_table.rowCount()
                 self._progress_table.insertRow(row)
-                self._progress_table.setItem(
-                    row, 0, QTableWidgetItem(label))
-                self._progress_table.setItem(
-                    row, 1, QTableWidgetItem(script.name))
+                label_item = QTableWidgetItem(label)
+                label_item.setToolTip(label)
+                self._progress_table.setItem(row, 0, label_item)
+                script_name = str(script.name)
+                script_item = QTableWidgetItem(script_name)
+                script_item.setToolTip(script_name)
+                self._progress_table.setItem(row, 1, script_item)
                 status_item = QTableWidgetItem(ST_PENDING)
+                status_item.setToolTip(ST_PENDING)
                 status_item.setBackground(_status_color(ST_PENDING))
                 self._progress_table.setItem(row, 2, status_item)
+        # Rows may make the vertical scrollbar appear, changing viewport width.
+        QTimer.singleShot(0, self._set_progress_column_widths)
 
     def update_progress(self, entry_label: str, script_id: str, status: str):
         """更新进度表中匹配行的状态（由 host 调用）"""
@@ -605,6 +736,7 @@ class BatchTab(QWidget):
             if u_item and u_item.text() == entry_label and \
                s_item and s_item.text() == script_name:
                 status_item = QTableWidgetItem(status)
+                status_item.setToolTip(status)
                 color = _status_color(status)
                 if color:
                     status_item.setBackground(color)

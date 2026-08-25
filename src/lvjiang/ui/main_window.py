@@ -47,6 +47,7 @@ from ..core.config.users import SessionManager
 from ..core.layout_manager import LayoutConfigManager
 from ..core.user_config import UserConfigManager
 from ..i18n import tr
+from .button_styles import apply_button_style
 from .capture_ops import CaptureOpsMixin
 from .overlay import BorderOverlay
 from .run_control import RunControlMixin
@@ -791,6 +792,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.btn_hide_window.setChecked(True)
         self.btn_hide_window.clicked.connect(self._on_toggle_preview)
         row1.addWidget(self.btn_hide_window)
+        apply_button_style(
+            self.btn_scan_window,
+            self.btn_scan_device,
+            self.btn_locate,
+            self.btn_hide_window,
+            variant="neutral",
+        )
         window_main_layout.addLayout(row1)
 
         row2 = QHBoxLayout()

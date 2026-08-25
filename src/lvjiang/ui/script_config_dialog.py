@@ -37,6 +37,7 @@ from ..i18n import tr
 from ..workflows.discovery import discover_scripts
 from ..workflows.policy import WorkflowDiscoveryPolicy as Policy
 from ..workflows.preferences import load_preferences, save_preferences
+from .button_styles import apply_button_style
 
 
 class ScriptConfigDialog(QDialog):
@@ -91,28 +92,28 @@ class ScriptConfigDialog(QDialog):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self._table)
 
-        # 顺序调整按钮
-        order_bar = QHBoxLayout()
+        # 底部单行操作栏：顺序调整居左，保存/取消居右
+        btn_bar = QHBoxLayout()
         self._btn_up = QPushButton(tr("上移"))
         self._btn_up.clicked.connect(lambda: self._move_row(-1))
         self._btn_down = QPushButton(tr("下移"))
         self._btn_down.clicked.connect(lambda: self._move_row(1))
-        order_bar.addWidget(self._btn_up)
-        order_bar.addWidget(self._btn_down)
-        order_bar.addStretch()
-        layout.addLayout(order_bar)
-
-        # 底部保存/取消
-        btn_bar = QHBoxLayout()
+        btn_bar.addWidget(self._btn_up)
+        btn_bar.addWidget(self._btn_down)
         btn_bar.addStretch()
-        btn_save = QPushButton(tr("保存"))
-        btn_save.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 6px 16px;")
-        btn_save.clicked.connect(self._on_save)
-        btn_cancel = QPushButton(tr("取消"))
-        btn_cancel.clicked.connect(self.reject)
-        btn_bar.addWidget(btn_save)
-        btn_bar.addWidget(btn_cancel)
+        self._btn_save = QPushButton(tr("保存"))
+        self._btn_save.clicked.connect(self._on_save)
+        self._btn_cancel = QPushButton(tr("取消"))
+        self._btn_cancel.clicked.connect(self.reject)
+        apply_button_style(self._btn_save)
+        apply_button_style(
+            self._btn_up,
+            self._btn_down,
+            self._btn_cancel,
+            variant="neutral",
+        )
+        btn_bar.addWidget(self._btn_save)
+        btn_bar.addWidget(self._btn_cancel)
         layout.addLayout(btn_bar)
 
     # ─── 数据加载 ────────────────────────────────────────

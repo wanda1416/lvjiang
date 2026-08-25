@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtWidgets import QHeaderView
 
-from lvjiang.core.batch_config import BatchConfig
+from lvjiang.core.batch_config import BatchConfig, BatchConfigItem
 from lvjiang.core.config.models import UserConfig
+from lvjiang.ui.batch.batch_runner import ST_PENDING, BatchScript
 from lvjiang.ui.batch.batch_tab import BatchTab
 
 
@@ -114,7 +116,103 @@ def test_saved_order_controls_execution_and_can_move(qtbot, monkeypatch):
 def test_script_rows_match_config_checkbox_density(qtbot, monkeypatch):
     tab, _ = _make_tab(qtbot, monkeypatch)
     item = tab._script_list.topLevelItem(0)
+    expected_height = tab._script_list.fontMetrics().height() + 12
 
     assert tab._script_list.topLevelItemCount() == 4
-    assert item.sizeHint(0).height() == 32
+    assert item.sizeHint(0).height() == expected_height
     assert tab._script_list.header().minimumHeight() == 32
+
+
+def test_config_rows_use_same_height_without_extra_layout_spacing(
+    qtbot, monkeypatch
+):
+    tab, _ = _make_tab(qtbot, monkeypatch)
+    config = BatchConfigItem(
+        name="demo",
+        columns=["role"],
+        rows=[{"role": "甲"}, {"role": "乙"}],
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_tab.load_batch_config",
+        lambda: BatchConfig(active_config="demo", configs={"demo": config}),
+    )
+
+    tab._refresh_config_combo()
+    tab._refresh_entry_list()
+
+    expected_height = tab._script_list.fontMetrics().height() + 12
+    assert [cb.height() for cb, _ in tab._entry_checkboxes] == [
+        expected_height,
+        expected_height,
+    ]
+    assert tab._entry_container.spacing() == 0
+
+
+def test_batch_table_columns_are_compact_and_user_resizable(qtbot, monkeypatch):
+    tab, _ = _make_tab(qtbot, monkeypatch)
+    tab._set_initial_column_widths()
+
+    script_header = tab._script_list.header()
+    progress_header = tab._progress_table.horizontalHeader()
+    for header in (script_header, progress_header):
+        assert all(
+            header.sectionResizeMode(column) == QHeaderView.ResizeMode.Interactive
+            for column in range(header.count())
+        )
+
+    assert tab._script_list.columnWidth(1) < tab._script_list.columnWidth(0)
+    compact_width = (
+        tab._progress_table.fontMetrics().horizontalAdvance("汉字宽度") + 20
+    )
+    assert tab._progress_table.columnWidth(0) == compact_width
+    assert tab._progress_table.columnWidth(2) == compact_width
+    assert sum(
+        tab._progress_table.columnWidth(column) for column in range(3)
+    ) <= tab._progress_table.viewport().width()
+    assert (
+        tab._progress_table.horizontalScrollBarPolicy()
+        == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    )
+
+
+def test_progress_cells_elide_and_expose_full_text_in_tooltips(qtbot, monkeypatch):
+    tab, _ = _make_tab(qtbot, monkeypatch)
+    tab.resize(420, 320)
+    tab._sub_tabs.setCurrentIndex(2)
+    tab.show()
+    config = BatchConfigItem(
+        name="demo",
+        user_column="role",
+        columns=["role"],
+        rows=[{"role": "很长的用户名"}],
+    )
+    scripts = [
+        BatchScript(id="long", name="这是一个很长的脚本名称", wf_file="long.wf")
+    ]
+
+    enabled_rows = [(index, config.rows[0]) for index in range(12)]
+    tab._build_progress_table(enabled_rows, config, scripts)
+    qtbot.wait(1)
+    tab._set_progress_column_widths()
+    qtbot.wait(1)
+
+    assert tab._progress_table.textElideMode() == Qt.TextElideMode.ElideRight
+    assert tab._progress_table.item(0, 0).toolTip() == "很长的用户名"
+    assert tab._progress_table.item(0, 1).toolTip() == "这是一个很长的脚本名称"
+    assert tab._progress_table.item(0, 2).toolTip() == ST_PENDING
+    assert tab._progress_table.horizontalScrollBar().maximum() == 0
+
+    # Even explicit user resizing must redistribute columns instead of scrolling.
+    tab._progress_table.setColumnWidth(1, 500)
+    qtbot.wait(1)
+    assert sum(
+        tab._progress_table.columnWidth(column) for column in range(3)
+    ) <= tab._progress_table.viewport().width()
+    assert not tab._progress_table.horizontalScrollBar().isVisible()
+
+    tab.resize(260, 320)
+    qtbot.wait(1)
+    assert sum(
+        tab._progress_table.columnWidth(column) for column in range(3)
+    ) <= tab._progress_table.viewport().width()
+    assert not tab._progress_table.horizontalScrollBar().isVisible()

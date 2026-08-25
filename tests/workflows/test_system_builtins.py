@@ -19,10 +19,12 @@ def _fn(name):
 
 class MockEngine:
     """模拟引擎"""
-    def __init__(self, ui_callback=None, save_callback=None, panel_alignments=None):
+    def __init__(self, ui_callback=None, save_callback=None, panel_alignments=None,
+                 run_env="desktop"):
         self._ui_callback = ui_callback
         self._save_callback = save_callback
         self._panel_alignments = panel_alignments or {}
+        self.run_env = run_env
 
 
 class TestBuildText:
@@ -117,24 +119,25 @@ class TestInput:
 
 class TestCheckEnv:
     @pytest.mark.parametrize("allowed", [["android"], "android"])
-    def test_matching_env_returns_true(self, monkeypatch, allowed):
+    def test_matching_env_returns_true(self, allowed):
         """允许列表和单个环境名均可匹配当前环境。"""
-        monkeypatch.setattr(
-            "lvjiang.workflows.builtins.system.load_env",
-            lambda: "android",
-        )
+        engine = MockEngine(run_env="android")
 
-        assert _fn("check_env")(allowed) is True
+        assert _fn("check_env")(engine, allowed) is True
 
-    def test_mismatching_env_raises_workflow_user_error(self, monkeypatch):
+    def test_mismatching_env_raises_workflow_user_error(self):
         """环境不匹配时抛出可由工作流引擎处理的用户错误。"""
-        monkeypatch.setattr(
-            "lvjiang.workflows.builtins.system.load_env",
-            lambda: "android",
-        )
+        engine = MockEngine(run_env="android")
 
         with pytest.raises(
             WorkflowUserError,
             match=r"当前环境 'android' 不在允许列表 \['desktop'\]",
         ):
-            _fn("check_env")(["desktop"])
+            _fn("check_env")(engine, ["desktop"])
+
+    def test_env_reads_engine_snapshot(self):
+        engine = MockEngine(run_env="android")
+
+        assert _fn("env")(engine) == "android"
+        assert _fn("env")(engine, "android") is True
+        assert _fn("env")(engine, "desktop") is False

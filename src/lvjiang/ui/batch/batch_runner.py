@@ -68,6 +68,7 @@ class BatchContext:
     ocr: object
     input_ctrl: object
     layout: object
+    run_env: str = ""
     input_sim: object | None = None
     delay_params: dict | None = None
     window_left: int = 0
@@ -388,6 +389,7 @@ class BatchWorker(QThread):
             ocr=ctx.ocr,  # type: ignore[arg-type]
             input_ctrl=ctx.input_ctrl,  # type: ignore[arg-type]
             layout=ctx.layout,  # type: ignore[arg-type]
+            run_env=ctx.run_env,
             input_sim=ctx.input_sim,  # type: ignore[arg-type]
             delay_params=ctx.delay_params,
             window_left=ctx.window_left,

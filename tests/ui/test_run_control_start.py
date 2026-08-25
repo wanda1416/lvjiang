@@ -38,6 +38,9 @@ class _StartStub(RunControlMixin):
         self._run_state = "idle"
         self.errors: list[str] = []
         self.begin_calls = 0
+        self._env_combo = type(
+            "EnvCombo", (), {"currentData": lambda _self: "desktop"}
+        )()
 
     def _backend_ready(self):
         return True

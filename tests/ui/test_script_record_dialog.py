@@ -292,6 +292,39 @@ class TestScroll:
         assert lines[0].startswith("wait ")
         assert lines[1] == "scroll (0.1, 0.1) down 1"
 
+    def test_driver_burst_is_recorded_as_one_scroll(self, monkeypatch):
+        """一次物理滚动被驱动拆成短脉冲时，只生成一次武器切换。"""
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        ticks = iter((10.0, 10.031789, 10.072051))
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic", lambda: next(ticks))
+
+        rec._on_scroll(500, 397, 0, -1)
+        rec._on_scroll(500, 397, 0, -1)
+        rec._on_scroll(500, 397, 0, -1)
+
+        assert lines == ["scroll (0.5, 0.4963) down 1"]
+        assert rec._last_action_time == 10.072051
+
+    def test_separate_scroll_after_burst_window_is_preserved(self, monkeypatch):
+        lines: list[str] = []
+        rec = _make_recorder(lines)
+        rec._recording = True
+        ticks = iter((10.0, 10.2))
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic", lambda: next(ticks))
+
+        rec._on_scroll(500, 397, 0, -1)
+        rec._on_scroll(500, 397, 0, -1)
+
+        assert lines == [
+            "scroll (0.5, 0.4963) down 1",
+            "wait 0.2",
+            "scroll (0.5, 0.4963) down 1",
+        ]
+
 
 class TestPress:
     def test_quick_tap_preserves_down_wait_up(self, monkeypatch):

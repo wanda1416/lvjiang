@@ -4,8 +4,8 @@
 引用条目与参考图），用户选择激活一个空间，外部消费方无感。
 
 参考图是配置资产，走 system/local 双层，每层均按空间组织：
-- 名册：config/system/references.yaml（spaces 列表）
-        + config/local/references.yaml（仅本地新建的空间）
+- 空间发现：扫描 config/system/references/*.yaml 与 config/local/references/*.yaml
+        取文件名为空间名，system ∪ local 去重（无独立名册文件）
 - 作者层：config/system/references/{space}.yaml
           + config/system/references/{space}/{bucket}/*.png
 - 用户层：config/local/references/{space}.yaml（条目级 diff：references + deleted）
@@ -16,12 +16,14 @@
 文件随机分配到某个桶，YAML 中 file 字段只存文件名（不含桶路径）。
 用户可自由移动文件到任意桶，代码均能感知。
 
+system 层出现过的空间名即出厂空间：用户层只能覆盖其内容，不能删除该空间。
 读取恒为合并视图：system 条目（deleted 剔除、同 file 被 local 条目替换）
 + local 独有条目；meta_schema 用户层存在即整列表替换。
 写入按模式路由（开发→system，用户→local），与 ConfigResolver 同一套模式判定。
 """
 
 import random
+import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -158,8 +160,8 @@ class ReferenceDatabase:
         local_dir: Path | str | None = None,
         local_yaml: Path | str | None = None,
         dev_mode: bool | None = None,
-        system_spaces_yaml: Path | str | None = None,
-        local_spaces_yaml: Path | str | None = None,
+        system_spaces_dir: Path | str | None = None,
+        local_spaces_dir: Path | str | None = None,
         session_path: Path | str | None = None,
     ):
         self._system_dir_override = Path(system_dir) if system_dir else None
@@ -167,14 +169,15 @@ class ReferenceDatabase:
         self._local_dir_override = Path(local_dir) if local_dir else None
         self._local_yaml_override = Path(local_yaml) if local_yaml else None
         self._dev_mode = dev_mode
-        self._system_spaces_yaml_override = (
-            Path(system_spaces_yaml) if system_spaces_yaml else None)
-        self._local_spaces_yaml_override = (
-            Path(local_spaces_yaml) if local_spaces_yaml else None)
+        self._system_spaces_dir_override = (
+            Path(system_spaces_dir) if system_spaces_dir else None)
+        self._local_spaces_dir_override = (
+            Path(local_spaces_dir) if local_spaces_dir else None)
         self._session_path_override = Path(session_path) if session_path else None
         self._session_store_cache = None  # 仅 session_path override 时使用的独立 store
         # 空间状态
         self._spaces: list[str] = []
+        self._system_spaces: set[str] = set()  # system 层扫出的出厂空间
         self._space: str = DEFAULT_SPACE
         # 分层状态
         self._system_entries: list[ReferenceEntry] = []
@@ -221,18 +224,18 @@ class ReferenceDatabase:
         return get_resolver().local_dir / "references" / f"{self._space}.yaml"
 
     @property
-    def system_spaces_yaml_path(self) -> Path:
-        """system 层空间名册 yaml"""
-        if self._system_spaces_yaml_override is not None:
-            return self._system_spaces_yaml_override
-        return get_resolver().system_dir / "references.yaml"
+    def system_spaces_dir(self) -> Path:
+        """system 层空间根目录（扫描 *.yaml 得出厂空间列表）"""
+        if self._system_spaces_dir_override is not None:
+            return self._system_spaces_dir_override
+        return get_resolver().system_dir / "references"
 
     @property
-    def local_spaces_yaml_path(self) -> Path:
-        """local 层空间名册 yaml（仅本地新建的空间）"""
-        if self._local_spaces_yaml_override is not None:
-            return self._local_spaces_yaml_override
-        return get_resolver().local_dir / "references.yaml"
+    def local_spaces_dir(self) -> Path:
+        """local 层空间根目录（覆盖层 yaml + 本地新建空间 yaml）"""
+        if self._local_spaces_dir_override is not None:
+            return self._local_spaces_dir_override
+        return get_resolver().local_dir / "references"
 
     @property
     def session_path(self) -> Path:
@@ -284,24 +287,36 @@ class ReferenceDatabase:
     # ─── 图库空间 ────────────────────────────────────
 
     @staticmethod
-    def _parse_roster(path: Path) -> list[str]:
-        """解析空间名册 yaml 的 spaces 列表，缺失/非法返回空列表"""
-        if not path.exists():
+    def _scan_spaces(spaces_dir: Path) -> list[str]:
+        """扫描空间根目录下的 *.yaml，文件名即空间名（按名排序）
+
+        目录即事实：不再维护独立名册，作者新增/用户新建都只落一个空间 yaml。
+        """
+        if not spaces_dir.is_dir():
             return []
+        names = {
+            f.stem.strip() for f in spaces_dir.glob("*.yaml")
+            if f.is_file() and f.stem.strip()
+        }
+        return sorted(names)
+
+    @staticmethod
+    def _warn_legacy_roster(layer_dir: Path) -> None:
+        """旧版 references.yaml 已作废：存在即提示，内容一律忽略"""
+        legacy = layer_dir / "references.yaml"
+        if not legacy.exists():
+            return
         try:
-            data = load_yaml(path)
-        except Exception as e:
-            logger.error(f"空间名册解析失败: {path}: {e}")
-            return []
-        spaces = data.get("spaces")
-        if not isinstance(spaces, list):
-            if data.get("references") is not None or data.get("meta_schema") is not None:
-                logger.error(
-                    f"检测到旧格式 references.yaml，请先运行迁移脚本 "
-                    f".tooling/migrate_references_spaces.py: {path}"
-                )
-            return []
-        return [str(s).strip() for s in spaces if str(s).strip()]
+            data = load_yaml(legacy)
+        except Exception:
+            data = {}
+        if data.get("references") is not None or data.get("meta_schema") is not None:
+            logger.error(
+                f"{legacy} 是更早的单空间覆盖层格式且已不再读取，"
+                f"请手动改名为 references/{DEFAULT_SPACE}.yaml 以保留数据"
+            )
+        else:
+            logger.info(f"空间名册已作废（空间改为扫描目录得出），可删除: {legacy}")
 
     def _get_session_store(self):
         """session.json 读写入口：缺省路径用全局单例，override 时用独立实例（测试隔离）"""
@@ -323,16 +338,26 @@ class ReferenceDatabase:
         self._get_session_store().set_node("active_space", name)
 
     def _resolve_space(self) -> None:
-        """解析激活空间：session.json → 名册首个 → DEFAULT_SPACE"""
+        """解析激活空间：session.json → DEFAULT_SPACE → 首个 → DEFAULT_SPACE"""
         saved = self._read_session_active_space()
         if saved and saved in self._spaces:
             self._space = saved
+        elif DEFAULT_SPACE in self._spaces:
+            self._space = DEFAULT_SPACE
         else:
             self._space = self._spaces[0] if self._spaces else DEFAULT_SPACE
 
     def get_spaces(self) -> list[str]:
-        """空间列表（system 名册 ∪ local 名册，保序去重；名册全空回退 DEFAULT_SPACE）"""
+        """空间列表（system 扫描 ∪ local 扫描，各自按名排序；全空回退 DEFAULT_SPACE）"""
         return list(self._spaces)
+
+    def is_system_space(self, name: str) -> bool:
+        """该空间是否由 system 层定义（出厂内容，用户层只能覆盖不能删除）"""
+        return str(name or "").strip() in self._system_spaces
+
+    def is_user_mode(self) -> bool:
+        """当前是否为用户模式（写 local 层；出厂内容只能覆盖不能删除）"""
+        return not self._is_dev()
 
     def get_active_space(self) -> str:
         """当前激活的图库空间名"""
@@ -355,64 +380,101 @@ class ReferenceDatabase:
         return True
 
     def create_space(self, name: str) -> bool:
-        """新建空图库空间（种子 meta_schema + 空条目）并注册名册
+        """新建空图库空间（空 meta_schema + 空条目）
 
-        空间 yaml 按模式写入可写层（dev→system，user→local）。
+        空间 yaml 按模式写入可写层（dev→system，user→local），
+        落盘即注册——空间列表由目录扫描得出。
         """
         name = str(name or "").strip()
-        if not name:
-            logger.warning("图库空间名不能为空")
+        if not self._valid_space_name(name):
             return False
         if name in self._spaces:
             logger.warning(f"图库空间已存在: {name}")
             return False
-        if self._is_dev():
-            base = self.system_yaml_path.parent
-            roster_path = self.system_spaces_yaml_path
-        else:
-            base = self.local_yaml_path.parent
-            roster_path = self.local_spaces_yaml_path
+        base = self.system_spaces_dir if self._is_dev() else self.local_spaces_dir
         space_yaml = base / f"{name}.yaml"
-        # 先注册名册（旧格式名册会被拒绝覆写，避免销毁未迁移的覆盖层数据）
-        if not self._register_space(roster_path, name):
-            return False
         if not space_yaml.exists():
             save_yaml(space_yaml, {
                 "version": 1,
                 "meta_schema": [],
                 "references": [],
             })
-        self._spaces.append(name)
+        self._refresh_spaces()
         logger.info(f"新建图库空间: {name} -> {space_yaml}")
         return True
 
-    @staticmethod
-    def _register_space(roster_path: Path, name: str) -> bool:
-        """将空间名追加到名册 yaml（保留已有名）；旧格式名册拒绝覆写
+    def can_delete_space(self, name: str) -> str:
+        """返回该空间**不可**删除的原因；可删则返回空串
 
-        local 层名册路径与旧版覆盖层文件同路径：未迁移的旧格式文件
-        含用户定制条目与 deleted 墓碑，覆写会造成数据丢失，必须先跑迁移脚本。
+        UI 用它决定按钮禁用与提示文案，delete_space 用它做最终把关。
         """
-        spaces: list[str] = []
-        if roster_path.exists():
-            try:
-                data = load_yaml(roster_path)
-            except Exception:
-                data = {}
-            raw = data.get("spaces")
-            if isinstance(raw, list):
-                spaces = [str(s).strip() for s in raw if str(s).strip()]
-            elif data.get("references") is not None or data.get("meta_schema") is not None:
-                logger.error(
-                    f"检测到旧格式名册，拒绝覆写，请先运行迁移脚本 "
-                    f".tooling/migrate_references_spaces.py: {roster_path}"
-                )
-                return False
-        if name in spaces:
-            return True
-        spaces.append(name)
-        save_yaml(roster_path, {"version": 1, "spaces": spaces})
+        name = str(name or "").strip()
+        if name not in self._spaces:
+            return tr("空间不存在")
+        if self.is_user_mode() and self.is_system_space(name):
+            return tr("出厂空间不可删除，可新建自己的空间")
+        if len(self._spaces) <= 1:
+            return tr("至少保留一个图库空间")
+        return ""
+
+    def delete_space(self, name: str) -> bool:
+        """删除图库空间（yaml + 同名图片目录）
+
+        用户模式只清 local 层且拒绝出厂空间；开发模式两层一起清，
+        避免 system 层删掉后残留 local 覆盖层变成一个孤儿空间。
+        删的是激活空间时自动改激活并重载。
+        """
+        name = str(name or "").strip()
+        if not self._valid_space_name(name):
+            return False
+        reason = self.can_delete_space(name)
+        if reason:
+            logger.warning(f"拒绝删除图库空间 {name!r}: {reason}")
+            return False
+        layers = [self.local_spaces_dir]
+        if self._is_dev():
+            layers.append(self.system_spaces_dir)
+        for layer in layers:
+            self._remove_space_files(layer, name)
+        self._refresh_spaces()
+        if self._space == name:  # 激活空间被删：改激活并重载
+            self._resolve_space()
+            self._write_session_active_space(self._space)
+            self.load()
+        logger.info(f"已删除图库空间: {name}（当前激活={self._space}）")
         return True
+
+    @staticmethod
+    def _remove_space_files(spaces_dir: Path, name: str) -> None:
+        """删除某一层的空间 yaml 与同名图片目录（不存在则跳过）"""
+        space_yaml = spaces_dir / f"{name}.yaml"
+        if space_yaml.is_file():
+            space_yaml.unlink()
+            logger.info(f"删除空间 yaml: {space_yaml}")
+        image_dir = spaces_dir / name
+        if image_dir.is_dir():
+            shutil.rmtree(image_dir)
+            logger.info(f"删除空间图片目录: {image_dir}")
+
+    @staticmethod
+    def _valid_space_name(name: str) -> bool:
+        """空间名即文件名：拒空、拒路径分隔符、拒 . 开头（隐藏文件）"""
+        if not name:
+            logger.warning("图库空间名不能为空")
+            return False
+        if name.startswith(".") or set(name) & set('/\\:*?"<>|'):
+            logger.warning(f"图库空间名非法（不能含路径分隔符或以 . 开头）: {name!r}")
+            return False
+        return True
+
+    def _refresh_spaces(self) -> None:
+        """重扫两层空间根目录，重建空间列表与出厂空间集合"""
+        system_spaces = self._scan_spaces(self.system_spaces_dir)
+        local_spaces = self._scan_spaces(self.local_spaces_dir)
+        self._system_spaces = set(system_spaces)
+        merged = list(system_spaces)
+        merged.extend(s for s in local_spaces if s not in self._system_spaces)
+        self._spaces = merged or [DEFAULT_SPACE]
 
     # ─── 加载 / 保存 ─────────────────────────────────────
 
@@ -430,13 +492,11 @@ class ReferenceDatabase:
         return entries
 
     def load(self):
-        """加载空间名册 + 激活空间的 system 层与 local 覆盖层，重建合并视图"""
-        # 空间名册与激活空间（路径属性依赖 self._space，必须最先解析）
-        system_spaces = self._parse_roster(self.system_spaces_yaml_path)
-        local_spaces = self._parse_roster(self.local_spaces_yaml_path)
-        merged_spaces = list(system_spaces)
-        merged_spaces.extend(s for s in local_spaces if s not in merged_spaces)
-        self._spaces = merged_spaces or [DEFAULT_SPACE]
+        """扫描空间列表 + 加载激活空间的 system 层与 local 覆盖层，重建合并视图"""
+        # 空间列表与激活空间（路径属性依赖 self._space，必须最先解析）
+        self._refresh_spaces()
+        if self._local_spaces_dir_override is None:  # override 场景（测试）不体检真实 config
+            self._warn_legacy_roster(get_resolver().local_dir)
         self._resolve_space()
 
         # system 层
@@ -446,7 +506,7 @@ class ReferenceDatabase:
             self._system_schema = self._parse_schema(data.get("meta_schema"))
             self._system_threshold = self._parse_threshold(data.get("match_threshold"))
         else:
-            logger.info(f"references.yaml 不存在，使用空数据库: {self.system_yaml_path}")
+            logger.info(f"空间 yaml 不存在，使用空数据库: {self.system_yaml_path}")
             self._system_entries = []
             self._system_schema = self._seed_schema()
             self._system_threshold = None

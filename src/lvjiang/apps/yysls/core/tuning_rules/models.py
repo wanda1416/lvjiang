@@ -345,7 +345,7 @@ class TuningRule:
 
 # ─── 基础配置（品阶门槛 + 开关注册表 + 材料设置，全局） ──────
 
-# 大律准石（数量检查目标）与狗粮材料 label（须与 references.yaml
+# 大律准石（数量检查目标）与狗粮材料 label（须与图库空间
 # 调律材料组的参考图 label 严格一致，材料识别按 label 精确匹配）
 STONE_LABEL = tr("大律准石")
 FOOD_LABELS = (tr("金狗粮"), tr("紫狗粮"), tr("彩狗粮"))

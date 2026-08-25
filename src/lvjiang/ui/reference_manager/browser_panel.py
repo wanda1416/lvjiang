@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
 
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 THUMB_SIZE = 96  # 图库缩略图尺寸
 _CHECK_SIZE = 20  # 批量模式复选框尺寸
@@ -169,6 +170,9 @@ class BrowserPanel(QWidget):
         self._batch_btn = QPushButton(tr("批量管理"))
         self._batch_btn.setCheckable(True)
         filter_layout.addWidget(self._batch_btn)
+        apply_button_style(
+            self._refresh_btn, self._batch_btn, variant="neutral"
+        )
 
         filter_layout.addStretch()
         main_layout.addLayout(filter_layout)
@@ -207,6 +211,12 @@ class BrowserPanel(QWidget):
         batch_layout.addWidget(self._deselect_all_btn)
         self._invert_sel_btn = QPushButton(tr("反选"))
         batch_layout.addWidget(self._invert_sel_btn)
+        apply_button_style(
+            self._select_all_btn,
+            self._deselect_all_btn,
+            self._invert_sel_btn,
+            variant="neutral",
+        )
         batch_layout.addStretch()
 
         self._batch_toolbar.setVisible(False)
@@ -258,6 +268,8 @@ class BrowserPanel(QWidget):
         self._delete_btn = QPushButton(tr("删除"))
         self._delete_btn.setEnabled(False)
         btn_layout.addWidget(self._delete_btn)
+        apply_button_style(self._save_btn)
+        apply_button_style(self._delete_btn, variant="danger")
         btn_layout.addStretch()
         edit_layout.addLayout(btn_layout)
 
@@ -293,10 +305,11 @@ class BrowserPanel(QWidget):
         self._batch_apply_btn = QPushButton(tr("应用设置"))
         self._batch_apply_btn.setEnabled(False)
         batch_edit_layout.addWidget(self._batch_apply_btn)
+        apply_button_style(self._batch_apply_btn)
 
         self._batch_delete_btn = QPushButton(tr("全部删除"))
         self._batch_delete_btn.setEnabled(False)
-        self._batch_delete_btn.setStyleSheet("color: #d32f2f;")
+        apply_button_style(self._batch_delete_btn, variant="danger")
         batch_edit_layout.addWidget(self._batch_delete_btn)
 
         self._batch_group.setVisible(False)

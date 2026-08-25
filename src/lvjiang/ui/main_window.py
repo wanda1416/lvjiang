@@ -339,26 +339,71 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._startup_announcement_checker = checker  # 防止被 GC
 
     def _start_update_check_on_startup(self):
-        """公告检查完成后执行原有的静默版本检查。"""
+        """公告检查完成后执行原有的静默版本检查，再串上统计的同意提示与上报。"""
         from ..core.update import UpdateChecker, should_prompt_update
 
         checker = UpdateChecker(self)
 
         def on_finished(release):
-            if not should_prompt_update(release.version):
-                return  # 用户已选择跳过此版本
+            try:
+                if not should_prompt_update(release.version):
+                    return  # 用户已选择跳过此版本
 
-            from .update_dialog import UpdateDialog
-            dialog = UpdateDialog(release, self)
-            dialog.exec()  # 用户选择“继续使用”时直接关闭对话框
+                from .update_dialog import UpdateDialog
+                dialog = UpdateDialog(release, self)
+                dialog.exec()  # 用户选择"继续使用"时直接关闭对话框
+            finally:
+                self._continue_after_update_check()
 
         def on_error(_error_msg: str):
-            pass  # 启动时检查失败静默忽略
+            self._continue_after_update_check()  # 启动时检查失败静默忽略
 
         checker.finished.connect(on_finished)
         checker.error.connect(on_error)
         checker.start()
         self._startup_update_checker = checker  # 防止被 GC
+
+    def _continue_after_update_check(self):
+        """更新检查（成功或失败）之后：首启同意提示 → 启动期统计上报。
+
+        同意提示放在这里而不是更早，是因为它是模态对话框，与公告/更新
+        弹窗一样只能串行；上报放最后，因为它没有 UI，用户感知不到，
+        也不该拖慢前面两个弹窗的展示时机。
+        """
+        from .telemetry_consent_dialog import maybe_prompt_and_record
+        maybe_prompt_and_record(self)
+        self._start_telemetry_report_on_startup()
+
+    def _start_telemetry_report_on_startup(self):
+        """启动期的统计上报：心跳（若今天还没发过）+ 积压的调律批次。
+
+        payload 在主线程构造（build_job() 读 UserConfig/i18n/游戏配置等，
+        不该在 worker 线程里首次触发懒加载），worker 线程只做 HTTP，
+        节流状态与已发批次的清理放回主线程的 finished 槽——工作线程
+        绝对不能写 SessionStore，见 core/telemetry/reporter.py 模块 docstring。
+        """
+        from ..core.telemetry.reporter import (
+            TelemetryReporter,
+            apply_outcome,
+            build_job,
+        )
+
+        job = build_job()
+        if job.is_empty:
+            return
+
+        reporter = TelemetryReporter(job, self)
+
+        def on_finished_ok(outcome):
+            apply_outcome(outcome)
+
+        def on_failed(_message: str):
+            pass  # 静默：统计失败不影响任何用户可见行为
+
+        reporter.finished_ok.connect(on_finished_ok)
+        reporter.failed.connect(on_failed)
+        reporter.start()
+        self._startup_telemetry_reporter = reporter  # 防止被 GC
 
     # ─── 热键回调 ────────────────────────────────────────────
 

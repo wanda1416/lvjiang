@@ -7,10 +7,11 @@ system ← local 合并），保存后以配置文件为准覆盖代码默认值
 Tab5 修改的热键保存后立即重建全局监听并生效。
 """
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QCursor
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal
+from PyQt6.QtGui import QCursor, QDesktopServices
 from PyQt6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
@@ -93,6 +94,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         tabs.addTab(self._build_env_tab(), tr("系统参数"))
         tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
+        tabs.addTab(self._build_privacy_tab(), tr("网络与隐私"))
         layout.addWidget(tabs)
 
         # ── 底部按钮：保存（左）与关闭（右）隔开，语义不同 ──
@@ -503,6 +505,131 @@ class SettingsDialog(QDialog):
             self._custom_grid.removeWidget(widget)
             widget.deleteLater()
         self._mark_dirty()
+
+    # ─── Tab6 网络与隐私 ────────────────────────────────────
+    #
+    # 与其余 Tab 不同：这里的每个开关点击后**立即生效**，不经"保存"按钮。
+    # 公告/更新是给用户的服务，统计是用户给项目的贡献，分开存放；关闭
+    # 统计必须同步清空本地缓冲，这类有副作用的操作不适合被"保存"按钮
+    # 延后到不确定的时间点（用户可能改完就直接关对话框）。
+
+    def _build_privacy_tab(self) -> QWidget:
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+
+        network = load_user_config().network
+
+        self._offline_check = QCheckBox(tr("完全离线模式（关闭全部联网行为）"))
+        self._offline_check.setChecked(network.offline)
+        self._offline_check.toggled.connect(self._on_offline_toggled)
+        vbox.addWidget(self._offline_check)
+
+        sub_box = QVBoxLayout()
+        sub_box.setContentsMargins(24, 0, 0, 0)
+
+        self._announcement_check = QCheckBox(tr("启动时检查公告"))
+        self._announcement_check.setChecked(network.announcement)
+        self._announcement_check.toggled.connect(
+            lambda v: self._on_net_feature_toggled("announcement", v))
+        sub_box.addWidget(self._announcement_check)
+
+        self._update_check = QCheckBox(tr("启动时检查新版本"))
+        self._update_check.setChecked(network.update)
+        self._update_check.toggled.connect(
+            lambda v: self._on_net_feature_toggled("update", v))
+        sub_box.addWidget(self._update_check)
+
+        self._telemetry_check = QCheckBox(
+            tr("参与匿名数据收集，帮助改进调律策略"))
+        self._telemetry_check.setChecked(network.telemetry)
+        self._telemetry_check.toggled.connect(self._on_telemetry_toggled)
+        sub_box.addWidget(self._telemetry_check)
+
+        caption = QLabel(
+            tr("仅用于改进内置调律规则，不公开发布原始数据；不含账号、"
+               "角色名、装备名称或完整词条组合。"))
+        caption.setWordWrap(True)
+        caption.setStyleSheet("color: palette(mid);")
+        sub_box.addWidget(caption)
+
+        id_row = QHBoxLayout()
+        self._telemetry_id_label = QLabel()
+        id_row.addWidget(self._telemetry_id_label)
+        id_row.addStretch()
+        btn_reset = QPushButton(tr("重置标识"))
+        btn_reset.clicked.connect(self._on_reset_telemetry_id)
+        id_row.addWidget(btn_reset)
+        btn_view = QPushButton(tr("查看待上报数据"))
+        btn_view.clicked.connect(self._on_view_pending_telemetry)
+        id_row.addWidget(btn_view)
+        btn_more = QPushButton(tr("了解详情"))
+        btn_more.clicked.connect(self._on_learn_more_telemetry)
+        id_row.addWidget(btn_more)
+        apply_button_style(btn_reset, btn_view, btn_more, variant="neutral")
+        sub_box.addLayout(id_row)
+
+        vbox.addLayout(sub_box)
+        vbox.addStretch()
+
+        self._sub_network_widgets = [
+            self._announcement_check, self._update_check,
+            self._telemetry_check, btn_reset, btn_view]
+        self._refresh_privacy_tab_state()
+        return tab
+
+    def _on_offline_toggled(self, checked: bool):
+        from ..core.telemetry.settings import set_network_feature
+        set_network_feature("offline", checked)
+        self._refresh_privacy_tab_state()
+
+    def _on_net_feature_toggled(self, feature: str, checked: bool):
+        from ..core.telemetry.settings import set_network_feature
+        set_network_feature(feature, checked)
+
+    def _on_telemetry_toggled(self, checked: bool):
+        from ..core.telemetry.settings import set_telemetry_enabled
+        set_telemetry_enabled(checked)
+        self._refresh_privacy_tab_state()
+
+    def _on_reset_telemetry_id(self):
+        reply = QMessageBox.question(
+            self, tr("重置匿名标识"),
+            tr("重置后服务端会把你当成一个新用户，之前的记录无法再与"
+               "新标识关联。确定重置吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        from ..core.telemetry.identity import reset_identity
+        reset_identity()
+        self._refresh_privacy_tab_state()
+
+    def _on_view_pending_telemetry(self):
+        from ..core.telemetry.paths import spool_dir
+        d = spool_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(d)))
+
+    @staticmethod
+    def _on_learn_more_telemetry():
+        QDesktopServices.openUrl(QUrl(
+            "https://github.com/wanda1416/lvjiang/blob/master/PRIVACY.md"))
+
+    def _refresh_privacy_tab_state(self):
+        """离线模式勾上时，其余三项置灰但保留各自的值不清空。"""
+        from ..core.telemetry.identity import get_identity
+
+        offline = self._offline_check.isChecked()
+        for widget in self._sub_network_widgets:
+            widget.setEnabled(not offline)
+
+        network = load_user_config().network
+        if network.telemetry:
+            identity = get_identity()
+            self._telemetry_id_label.setText(
+                tr("当前标识：") + identity.install_id[:8] + "…")
+        else:
+            self._telemetry_id_label.setText(tr("当前标识：未生成（未开启）"))
 
     # ─── 保存 ──────────────────────────────────────────────
 

@@ -87,4 +87,9 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.workflows.builtins.profile_funcs",
         "lvjiang.apps.yysls.workflows.builtins.role_attr_ingest",
     ],
+
+    # 统计事件 schema（导入即触发 register_schema 注册）
+    telemetry_modules=[
+        "lvjiang.apps.yysls.telemetry.schemas",
+    ],
 )

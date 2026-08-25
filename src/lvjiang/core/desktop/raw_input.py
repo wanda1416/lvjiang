@@ -23,6 +23,10 @@ _RIM_TYPEMOUSE = 0
 _RIDEV_INPUTSINK = 0x00000100
 _RIDEV_REMOVE = 0x00000001
 _MOUSE_MOVE_ABSOLUTE = 0x0001
+_RI_MOUSE_BUTTON_4_DOWN = 0x0040
+_RI_MOUSE_BUTTON_4_UP = 0x0080
+_RI_MOUSE_BUTTON_5_DOWN = 0x0100
+_RI_MOUSE_BUTTON_5_UP = 0x0200
 _HWND_MESSAGE = ctypes.c_void_p(-3 & ((1 << (ctypes.sizeof(ctypes.c_void_p) * 8)) - 1))
 
 
@@ -95,6 +99,28 @@ def decode_raw_mouse(buffer: bytes) -> tuple[int, int] | None:
     return int(raw.mouse.lLastX), int(raw.mouse.lLastY)
 
 
+def decode_raw_mouse_buttons(buffer: bytes) -> tuple[tuple[str, bool], ...]:
+    """解析 RAWINPUT 中的物理侧键事件。
+
+    Raw Input 将鼠标“后退/前进”键称为 Button 4/5；统一映射到 DSL 已有的
+    ``x1/x2``。一个包可能同时包含多个标志，因此返回事件序列。
+    """
+    if len(buffer) < ctypes.sizeof(_RawInput):
+        return ()
+    raw = _RawInput.from_buffer_copy(buffer)
+    if raw.header.dwType != _RIM_TYPEMOUSE:
+        return ()
+    flags = int(raw.mouse.usButtonFlags)
+    mapping = (
+        (_RI_MOUSE_BUTTON_4_DOWN, "x1", True),
+        (_RI_MOUSE_BUTTON_4_UP, "x1", False),
+        (_RI_MOUSE_BUTTON_5_DOWN, "x2", True),
+        (_RI_MOUSE_BUTTON_5_UP, "x2", False),
+    )
+    return tuple((button, pressed) for flag, button, pressed in mapping
+                 if flags & flag)
+
+
 def message_time_to_monotonic_ns(
     message_time_ms: int,
     current_tick_ms: int,
@@ -117,8 +143,13 @@ def message_time_to_monotonic_ns(
 class RawMouseListener:
     """在独立 Win32 消息线程中监听鼠标 Raw Input。"""
 
-    def __init__(self, on_move: Callable[[int, int, int], None]):
+    def __init__(
+        self,
+        on_move: Callable[[int, int, int], None],
+        on_button: Callable[[str, bool, int, int, int], None] | None = None,
+    ):
         self._on_move = on_move
+        self._on_button = on_button
         self._thread: threading.Thread | None = None
         self._thread_id = 0
         self._ready = threading.Event()
@@ -276,17 +307,30 @@ class RawMouseListener:
             raw_handle, _RID_INPUT, buffer, ctypes.byref(size), header_size)
         if result == 0xFFFFFFFF:
             return
-        movement = decode_raw_mouse(buffer.raw[:size.value])
-        if movement is None or movement == (0, 0):
-            return
-        try:
-            self._on_move(movement[0], movement[1], timestamp_ns)
-        except Exception:  # noqa: BLE001 - Win32 消息线程不能被回调异常打断
-            logger.exception("Raw Input 鼠标回调异常")
+        packet = buffer.raw[:size.value]
+        movement = decode_raw_mouse(packet)
+        if movement is not None and movement != (0, 0):
+            try:
+                self._on_move(movement[0], movement[1], timestamp_ns)
+            except Exception:  # noqa: BLE001 - Win32 消息线程不能被回调异常打断
+                logger.exception("Raw Input 鼠标移动回调异常")
+
+        buttons = decode_raw_mouse_buttons(packet)
+        if buttons and self._on_button is not None:
+            point = wintypes.POINT()
+            if not user32.GetCursorPos(ctypes.byref(point)):
+                return
+            for button, pressed in buttons:
+                try:
+                    self._on_button(
+                        button, pressed, point.x, point.y, timestamp_ns)
+                except Exception:  # noqa: BLE001
+                    logger.exception("Raw Input 鼠标侧键回调异常")
 
 
 __all__ = [
     "RawMouseListener",
     "decode_raw_mouse",
+    "decode_raw_mouse_buttons",
     "message_time_to_monotonic_ns",
 ]

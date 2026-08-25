@@ -258,4 +258,4 @@ return 0
 | 文档 | 内容 |
 |------|------|
 | [02-player-profile.md](../02-player-profile.md) | 玩家档案系统总览 |
-| [references.yaml](../../../config/system/references.yaml) | 参考图配置（货币资产组） |
+| [references/默认.yaml](../../../config/system/references/默认.yaml) | 参考图配置（货币资产组） |

@@ -27,8 +27,18 @@ from lvjiang.core.reference_db import ReferenceDatabase
 from ...i18n import tr
 from .browser_panel import BrowserPanel
 from .canvas import ReferenceCanvas
+from .combo_sizing import set_combo_minimum_character_capacity
 from .grid_panel import GridPanel
 from .meta_schema_panel import MetaSchemaPanel
+
+_SPACE_COMBO_CHARACTER_CAPACITY = 6
+
+
+def _set_space_combo_minimum_capacity(combo: QComboBox) -> int:
+    """Keep enough room for six full-width Chinese characters."""
+    return set_combo_minimum_character_capacity(
+        combo, _SPACE_COMBO_CHARACTER_CAPACITY
+    )
 
 
 class ReferenceManagerDialog(QDialog):
@@ -93,8 +103,9 @@ class ReferenceManagerDialog(QDialog):
         space_bar = QHBoxLayout()
         space_bar.addWidget(QLabel(tr("图库空间:")))
         self._space_combo = QComboBox()
-        self._space_combo.addItems(self._db.get_spaces())
+        self._fill_space_combo()
         self._space_combo.setCurrentText(self._db.get_active_space())
+        _set_space_combo_minimum_capacity(self._space_combo)
         self._space_combo.currentTextChanged.connect(self._on_space_changed)
         space_bar.addWidget(self._space_combo)
         btn_new_space = QPushButton(tr("新建空间"))
@@ -103,6 +114,10 @@ class ReferenceManagerDialog(QDialog):
         btn_activate_space = QPushButton(tr("激活空间"))
         btn_activate_space.clicked.connect(self._on_activate_space)
         space_bar.addWidget(btn_activate_space)
+        self._btn_del_space = QPushButton(tr("删除空间"))
+        self._btn_del_space.clicked.connect(self._on_delete_space)
+        space_bar.addWidget(self._btn_del_space)
+        self._refresh_del_space_enabled()
         space_bar.addStretch()
         self._active_space_label = QLabel(f"当前激活空间：{self._db.get_active_space()}")
         space_bar.addWidget(self._active_space_label)
@@ -131,8 +146,31 @@ class ReferenceManagerDialog(QDialog):
 
     # ── 图库空间切换 ──
 
+    def _fill_space_combo(self):
+        """填充空间下拉：出厂空间置灰（用户层只能覆盖内容，不能删除该空间）"""
+        from PyQt6.QtGui import QBrush, QColor
+        user_mode = self._db.is_user_mode()
+        self._space_combo.clear()
+        self._space_combo.addItems(self._db.get_spaces())
+        if not user_mode:
+            return
+        model = self._space_combo.model()
+        for row in range(self._space_combo.count()):
+            if not self._db.is_system_space(self._space_combo.itemText(row)):
+                continue
+            item = model.item(row)
+            item.setForeground(QBrush(QColor(Qt.GlobalColor.gray)))
+            item.setToolTip(tr("出厂空间：可编辑其中内容，但不能删除该空间"))
+
+    def _refresh_del_space_enabled(self):
+        """删除按钮跟随下拉选中项：不可删时禁用并把原因写进 tooltip"""
+        reason = self._db.can_delete_space(self._space_combo.currentText())
+        self._btn_del_space.setEnabled(not reason)
+        self._btn_del_space.setToolTip(reason or tr("删除选中的图库空间（含其全部参考图）"))
+
     def _on_space_changed(self, name: str):
         """下拉切换空间：持久化 + 重载 + 刷新面板"""
+        self._refresh_del_space_enabled()
         if not name or name == self._db.get_active_space():
             return
         if not self._db.set_active_space(name):
@@ -158,15 +196,41 @@ class ReferenceManagerDialog(QDialog):
             return
         name = str(name).strip()
         if not self._db.create_space(name):
-            QMessageBox.warning(self, tr("新建空间"), f"无法创建空间「{name}」（可能已存在或名册未迁移）")
+            QMessageBox.warning(
+                self, tr("新建空间"), f"无法创建空间「{name}」（名称非法或已存在）")
             return
         self._db.set_active_space(name)
-        self._space_combo.blockSignals(True)
-        self._space_combo.clear()
-        self._space_combo.addItems(self._db.get_spaces())
-        self._space_combo.setCurrentText(name)
-        self._space_combo.blockSignals(False)
+        self._reload_space_combo(name)
         self._refresh_panels()
+
+    def _on_delete_space(self):
+        """删除选中空间：二次确认（写明连带删除的参考图数量）后落盘"""
+        name = self._space_combo.currentText()
+        reason = self._db.can_delete_space(name)
+        if reason:
+            QMessageBox.warning(self, tr("删除空间"), reason)
+            self._refresh_del_space_enabled()
+            return
+        count = len(self._db.entries) if name == self._db.get_active_space() else None
+        detail = f"，其中 {count} 条参考图将一并删除" if count else "及其全部参考图"
+        if QMessageBox.question(
+            self, tr("删除空间"),
+            f"确定删除图库空间「{name}」{detail}？此操作不可撤销。",
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        if not self._db.delete_space(name):
+            QMessageBox.warning(self, tr("删除空间"), f"删除空间「{name}」失败，详见日志")
+            return
+        self._reload_space_combo(self._db.get_active_space())
+        self._refresh_panels()
+
+    def _reload_space_combo(self, current: str):
+        """重填下拉并选中指定项（静默，不触发切换信号）"""
+        self._space_combo.blockSignals(True)
+        self._fill_space_combo()
+        self._space_combo.setCurrentText(current)
+        self._space_combo.blockSignals(False)
+        self._refresh_del_space_enabled()
 
     def _refresh_panels(self):
         """空间切换后刷新依赖 db 的面板

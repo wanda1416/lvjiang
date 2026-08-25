@@ -84,6 +84,16 @@ class SendInputInput(InputBackend):
         self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay,
                      post_delay=post_delay, button=button)
 
+    def mouse_button(self, button: str, pressed: bool) -> None:
+        """发送单个物理鼠标键事件，不移动指针、不附加随机延迟。"""
+        self._activate_target()
+        down_flag, up_flag, mouse_data = _MOUSE_BUTTON_EVENTS.get(
+            button, _MOUSE_BUTTON_EVENTS["left"])
+        send_mouse_event(
+            down_flag if pressed else up_flag,
+            mouse_data=mouse_data,
+        )
+
     def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
         """直接设置系统光标位置，不产生鼠标移动输入。"""
         self._activate_target()

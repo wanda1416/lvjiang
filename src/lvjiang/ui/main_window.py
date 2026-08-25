@@ -220,6 +220,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self._overlay = BorderOverlay()
         self._capture = None
         self._last_capture = None
+        self._close_cleanup_started = False
 
         # ── 管理器 ──
         self._user_manager = UserConfigManager()
@@ -1481,6 +1482,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        # QApplication 退出或重复 close() 可能再次投递关闭事件。资源清理只
+        # 允许执行一次，尤其不能重复卸载热键、销毁 overlay 或关闭采集后端。
+        if self._close_cleanup_started:
+            super().closeEvent(event)
+            return
         if self._running:
             reply = QMessageBox.question(
                 self, tr("工作流运行中"),
@@ -1492,6 +1498,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 event.ignore()
                 return
             self._request_stop()
+        self._close_cleanup_started = True
         # 全局热键最先停：stop() 只投递停止信号不等线程结束，必须 join
         # 等钩子线程完成 UnhookWindowsHookEx；越早停，后续清理期间钩子
         # 回调踩空（退出时 TypeError 噪声乃至 access violation）的窗口越小

@@ -1,0 +1,24 @@
+name = "lvjiang-stats"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# *.workers.dev 在部分网络环境不稳定（见方案文档「域名可达性」风险条目），
+# 绑自定义域名解决这个问题。用 Custom Domain 语法（单主机名 + custom_domain=true）
+# 而不是传统 routes 通配符语法——前者由 Cloudflare 自动创建/管理 DNS 记录，
+# 后者需要手动建一条 proxied DNS 记录才能生效。
+routes = [{ pattern = "lvjiang-stats.wyxj.net", custom_domain = true }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lvjiang-stats"
+database_id = "342147bc-54a7-4114-8c97-73e939352f54"
+
+[triggers]
+# 每日 UTC 19:17（北京时间次日 03:17）执行过期数据清理，
+# 错峰避开整点批量任务。
+crons = ["17 19 * * *"]
+
+[vars]
+# 紧急止血开关：设为 "1" 时 Worker 直接返回 204，不碰 D1。
+# 通过 `wrangler deploy --var DISABLED:1` 或控制台环境变量修改，无需重新部署代码。
+DISABLED = "0"

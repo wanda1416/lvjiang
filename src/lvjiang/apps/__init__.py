@@ -104,6 +104,17 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
             logger.exception("[plugin] 内置函数模块加载失败")
         logger.info("[plugin]   builtin modules: %d", len(hooks.builtin_modules))
 
+    if hooks.telemetry_modules:
+        registry.setdefault("telemetry_modules", []).extend(hooks.telemetry_modules)
+        # 实际导入模块触发 register_schema() 注册；单个插件的 schema
+        # 声明出错不该拖垮整个插件加载，仅记日志跳过。
+        for mod_path in hooks.telemetry_modules:
+            try:
+                importlib.import_module(mod_path)
+                logger.info("[plugin]   telemetry module 已加载: %s", mod_path)
+            except Exception:  # noqa: BLE001
+                logger.exception("[plugin] 统计事件 schema 模块加载失败: %s", mod_path)
+
 
 # ── 全局注册表（内存中的插件扩展点汇总） ─────────────────────────────
 _GLOBAL_REGISTRY: dict[str, Any] = {}

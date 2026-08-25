@@ -16,7 +16,7 @@ import sys
 import threading
 
 from loguru import logger
-from PyQt6.QtCore import QObject, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QKeyEvent
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -62,6 +62,39 @@ class _LogBridge(QObject):
 
 DEFAULT_TITLE = tr("律匠 - 通用视觉 RPA 引擎")
 _TOP_COMBO_CHARACTER_CAPACITY = 6
+_BATCH_CONTEXT_LOCK_MESSAGE = tr("批量任务运行过程中不可修改环境和布局")
+
+
+class _BatchContextComboBox(QComboBox):
+    """Combo whose user interaction can be locked for a running batch."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._batch_locked = False
+        self.installEventFilter(self)
+
+    def set_batch_locked(self, locked: bool) -> None:
+        self._batch_locked = locked
+        self.setEnabled(not locked)
+        self.setCursor(
+            Qt.CursorShape.ForbiddenCursor if locked
+            else Qt.CursorShape.ArrowCursor
+        )
+        self.setToolTip(_BATCH_CONTEXT_LOCK_MESSAGE if locked else "")
+
+    def eventFilter(self, watched, event):
+        if watched is self and self._batch_locked:
+            if event.type() == QEvent.Type.MouseButtonPress:
+                QMessageBox.information(
+                    self.window(), tr("提示"), _BATCH_CONTEXT_LOCK_MESSAGE
+                )
+            if event.type() in (
+                QEvent.Type.MouseButtonPress,
+                QEvent.Type.MouseButtonRelease,
+                QEvent.Type.MouseButtonDblClick,
+            ):
+                return True
+        return super().eventFilter(watched, event)
 
 
 def _set_combo_character_capacity(
@@ -657,7 +690,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         top_row.addWidget(self.user_combo)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("环境")))
-        self._env_combo = QComboBox()
+        self._env_combo = _BatchContextComboBox()
         _set_combo_character_capacity(self._env_combo)
         for key, display in load_available_envs():
             self._env_combo.addItem(display, key)
@@ -690,7 +723,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         top_row.addWidget(env_tips_btn)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("布局")))
-        self.layout_combo = QComboBox()
+        self.layout_combo = _BatchContextComboBox()
         _set_combo_character_capacity(self.layout_combo)
         self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
         top_row.addWidget(self.layout_combo)
@@ -1059,7 +1092,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         if not self._begin_automation(tr("批量执行")):
             return False
 
-        layout_name = self._layout_manager.get_active_layout_name()
+        layout_name = self.layout_combo.currentText()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
             self._log_append(f"[错误] 无法加载布局: {layout_name}")
@@ -1082,6 +1115,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
+            run_env=self._selected_run_env(),
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
             window_left=window_left,
@@ -1116,6 +1150,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         )
 
         self._current_worker = worker  # type: ignore[assignment]
+        self._set_batch_context_controls_locked(True)
         worker.start()
         return True
 

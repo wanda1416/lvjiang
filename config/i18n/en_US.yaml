@@ -761,6 +761,7 @@ auto_strings:
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: 当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）
   批次初始化 wf：: 批次初始化 wf：
   批次收尾 wf：: 批次收尾 wf：
+  批量任务运行过程中不可修改环境和布局: Environment and layout cannot be changed while a batch task is running
   数字: 数字
   文本: 文本
   新建分组: 新建分组

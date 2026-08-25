@@ -21,7 +21,7 @@ from loguru import logger
 from ...core.capture_base import CaptureBackend
 from ...core.config import load_user_config
 from ...core.config.resolver import get_resolver
-from ...core.config.session import get_session_store
+from ...core.config.session import get_session_store, load_env
 from ...core.input_base import InputBackend
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
@@ -115,6 +115,7 @@ def create_engine(
         layout=layout,
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
+        run_env=load_env(),
         window_left=0,
         window_top=0,
         stop_check=stop_check,

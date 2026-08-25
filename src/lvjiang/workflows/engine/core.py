@@ -95,6 +95,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         layout: Layout,
         input_sim: InputSimConfig | None = None,
         delay_params: dict[str, DelayParam] | None = None,
+        run_env: str = "",
         window_left: int = 0,
         window_top: int = 0,
         stop_check: Callable[[], bool] | None = None,
@@ -107,6 +108,9 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._layout = layout
         self._input_sim = input_sim or InputSimConfig()
         self._delay_params = delay_params or {}
+        # 本次运行使用的环境快照。工作流执行期间只读此内存值，绝不回读
+        # session.json，避免 UI 切换或其他进程写配置污染已启动实例。
+        self.run_env = str(run_env)
         self._window_left = window_left
         self._window_top = window_top
         self._stop_check = stop_check or (lambda: False)

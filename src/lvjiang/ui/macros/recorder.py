@@ -35,6 +35,9 @@ except Exception:  # pragma: no cover - 环境缺失 pynput 时降级
 _LOW_PRECISION_INTERVAL_S = 0.100  # 低精度以 100ms 为合并/等待粒度
 _RAW_IDLE_S = _LOW_PRECISION_INTERVAL_S
 _RAW_LAST_DURATION_S = 0.001  # 轨迹末包无后继时间戳，以 1ms 完成
+# 部分 Windows 鼠标驱动会把一次物理滚轮动作拆成数个相邻回调。低精度脚本
+# 用滚轮切武器时逐个回放会来回切换，因此把同方向短脉冲视为同一手势。
+_SCROLL_BURST_INTERVAL_S = 0.080
 
 PRECISION_LOW = "low"
 PRECISION_HIGH = "high"
@@ -127,6 +130,7 @@ class MacroRecorder:
         self._trace_events: list[InputTraceEvent] = []
         self._final_text = ""
         self._last_action_time: float | None = None      # 上次操作完成时刻
+        self._last_scroll: tuple[str, float] | None = None
         self._recording = False
 
     # ─── 生命周期 ─────────────────────────────────────────
@@ -148,6 +152,7 @@ class MacroRecorder:
         canvas = self._layout.get_canvas()
         self._raw_canvas_size = (canvas.w_ratio * w, canvas.h_ratio * h)
         self._last_action_time = None
+        self._last_scroll = None
         self._recording = True
         # 防护补丁：避免退出竞态下 pynput 钩子回调返回 None（幂等）
         from ...core.pynput_patch import install as _install_pynput_patch
@@ -337,8 +342,19 @@ class MacroRecorder:
                     return
                 self._flush_raw_frame()
                 now = time.monotonic()
-                self._maybe_emit_wait(now)
                 direction = "up" if dy > 0 else "down"
+                last_scroll = self._last_scroll
+                if (last_scroll is not None
+                        and last_scroll[0] == direction
+                        and now - last_scroll[1] < _SCROLL_BURST_INTERVAL_S):
+                    # 只折叠低精度文本。更新时间基准到脉冲末尾，使下一动作前
+                    # 的 wait 从完整滚轮手势结束后开始计算。
+                    self._last_scroll = (direction, now)
+                    self._last_action_time = now
+                    logger.debug(f"合并同一滚轮手势的重复 {direction} 回调")
+                    return
+                self._last_scroll = (direction, now)
+                self._maybe_emit_wait(now)
                 amount = max(1, abs(round(dy)))
                 rx, ry = self._screen_to_canvas_ratio(isx, isy)
                 self._emit_line(f"scroll ({rx}, {ry}) {direction} {amount}")
@@ -365,6 +381,7 @@ class MacroRecorder:
                     return
                 if key in self._key_press_times:
                     return
+                self._last_scroll = None
                 now_ns = time.monotonic_ns()
                 now = now_ns / 1_000_000_000
                 self._key_press_times[key] = now
@@ -394,6 +411,7 @@ class MacroRecorder:
                 if name in self._reserved_keys:
                     return
 
+                self._last_scroll = None
                 now_ns = time.monotonic_ns()
                 now = now_ns / 1_000_000_000
                 if self.precision == PRECISION_HIGH:
@@ -489,6 +507,7 @@ class MacroRecorder:
             self._button_presses[button_name] = (sx, sy, event_time)
         elif self._button_presses.pop(button_name, None) is None:
             return
+        self._last_scroll = None
         self._maybe_emit_wait(event_time)
         rx, ry = self._screen_to_canvas_ratio(sx, sy)
         self._emit_line(f"place ({rx}, {ry})")

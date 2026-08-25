@@ -3,11 +3,18 @@
 from lvjiang.core.desktop import raw_input
 
 
-def _packet(dx: int, dy: int, *, absolute: bool = False) -> bytes:
+def _packet(
+    dx: int,
+    dy: int,
+    *,
+    absolute: bool = False,
+    button_flags: int = 0,
+) -> bytes:
     packet = raw_input._RawInput()
     packet.header.dwType = raw_input._RIM_TYPEMOUSE
     packet.header.dwSize = raw_input.ctypes.sizeof(packet)
     packet.mouse.usFlags = raw_input._MOUSE_MOVE_ABSOLUTE if absolute else 0
+    packet.mouse.usButtonFlags = button_flags
     packet.mouse.lLastX = dx
     packet.mouse.lLastY = dy
     return bytes(packet)
@@ -32,6 +39,24 @@ def test_decode_ignores_absolute_raw_mouse_packet():
 
 def test_decode_rejects_truncated_packet():
     assert raw_input.decode_raw_mouse(b"\0" * 4) is None
+
+
+def test_decode_physical_side_button_flags():
+    packet = _packet(
+        0,
+        0,
+        button_flags=(raw_input._RI_MOUSE_BUTTON_4_DOWN
+                      | raw_input._RI_MOUSE_BUTTON_5_UP),
+    )
+
+    assert raw_input.decode_raw_mouse_buttons(packet) == (
+        ("x1", True),
+        ("x2", False),
+    )
+
+
+def test_decode_side_buttons_rejects_truncated_packet():
+    assert raw_input.decode_raw_mouse_buttons(b"\0" * 4) == ()
 
 
 def test_message_time_preserves_queue_delay_in_monotonic_clock():

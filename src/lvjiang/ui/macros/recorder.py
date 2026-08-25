@@ -160,8 +160,9 @@ class MacroRecorder:
         # 防护补丁：避免退出竞态下 pynput 钩子回调返回 None（幂等）
         from ...core.pynput_patch import install as _install_pynput_patch
         _install_pynput_patch()
-        # Raw Input 必须在 pynput 之前启动；启动失败时不留下半套钩子。
-        if sys.platform == "win32" and self.record_mouse_movement:
+        # Raw Input 必须在 pynput 之前启动。即使过滤视角移动也要保持监听，
+        # 因为部分游戏/鼠标驱动只在 Raw Input 中暴露物理侧键。
+        if sys.platform == "win32":
             import ctypes
             from ctypes import wintypes
 
@@ -169,12 +170,14 @@ class MacroRecorder:
             self._foreground_user32.GetForegroundWindow.restype = wintypes.HWND
             from ...core.desktop.raw_input import RawMouseListener
             try:
-                self._raw_listener = RawMouseListener(self._on_raw_move)
+                self._raw_listener = RawMouseListener(
+                    self._on_raw_move, self._on_raw_button)
                 self._raw_listener.start()
-            except Exception:
+            except Exception as exc:
+                # 仍允许 pynput 兜底录制普通鼠标键；Raw Input 不可用不应让
+                # 整个脚本录制功能失效。
+                logger.warning(f"Raw Input 鼠标监听启动失败，降级到 pynput: {exc}")
                 self._raw_listener = None
-                self._recording = False
-                raise
         try:
             self._listener = pynput_mouse.Listener(
                 on_click=self._on_click, on_scroll=self._on_scroll)
@@ -295,6 +298,11 @@ class MacroRecorder:
                 button_name = getattr(button, "name", None)
                 if button_name not in VALID_BUTTONS:
                     return
+                # Windows 的物理侧键由 Raw Input 统一录制，避免与 pynput 的
+                # legacy hook 同时命中而生成两条 click。
+                if (sys.platform == "win32" and self._raw_listener is not None
+                        and button_name in {"x1", "x2"}):
+                    return
                 self._flush_raw_frame()
                 now = time.monotonic()
                 if button_name == "left":
@@ -304,19 +312,8 @@ class MacroRecorder:
                     else:
                         self._handle_release(int(sx), int(sy))
                     return
-                if pressed:
-                    self._button_presses[button_name] = (int(sx), int(sy), now)
-                    return
-                state = self._button_presses.pop(button_name, None)
-                if state is None:
-                    return
-                px, py, press_time = state
-                if not self._in_window(px, py):
-                    return
-                self._maybe_emit_wait(press_time)
-                rx, ry = self._screen_to_canvas_ratio(px, py)
-                self._emit_line(f"click ({rx}, {ry}) {button_name}")
-                self._last_action_time = now
+                self._record_aux_button(
+                    button_name, bool(pressed), int(sx), int(sy), now)
             except Exception:  # noqa: BLE001 - pynput 低层钩子回调里的异常可能被
                 # 静默吞掉（Windows 要求钩子过程不能抛出/长时间阻塞，否则可能被
                 # 判定为无响应并卸载），必须自己兜底记录，否则一旦出 bug 会
@@ -506,6 +503,59 @@ class MacroRecorder:
                     start, event_time, total_dx + int(dx), total_dy + int(dy))
             except Exception:  # noqa: BLE001 - Raw Input 消息线程不能被业务异常打断
                 logger.exception("_on_raw_move 处理异常")
+
+    def _on_raw_button(
+        self,
+        button_name: str,
+        pressed: bool,
+        sx: int,
+        sy: int,
+        timestamp_ns: int,
+    ):
+        """Raw Input 物理侧键回调；Windows 下作为 x1/x2 的权威来源。"""
+        with self._lock:
+            try:
+                if not self._recording or not self._target_is_foreground():
+                    return
+                if button_name not in {"x1", "x2"}:
+                    return
+                if self.precision == PRECISION_HIGH:
+                    self._append_trace_event(
+                        "button", (button_name, bool(pressed)), timestamp_ns)
+                    return
+                self._flush_raw_frame()
+                self._record_aux_button(
+                    button_name,
+                    bool(pressed),
+                    int(sx),
+                    int(sy),
+                    timestamp_ns / 1_000_000_000,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("_on_raw_button 处理异常")
+
+    def _record_aux_button(
+        self,
+        button_name: str,
+        pressed: bool,
+        sx: int,
+        sy: int,
+        event_time: float,
+    ) -> None:
+        """把非左键的一对 down/up 压成低精度 click DSL。"""
+        if pressed:
+            self._button_presses[button_name] = (sx, sy, event_time)
+            return
+        state = self._button_presses.pop(button_name, None)
+        if state is None:
+            return
+        px, py, press_time = state
+        if not self._in_window(px, py):
+            return
+        self._maybe_emit_wait(press_time)
+        rx, ry = self._screen_to_canvas_ratio(px, py)
+        self._emit_line(f"click ({rx}, {ry}) {button_name}")
+        self._last_action_time = event_time
 
     def _raw_delta_to_canvas_ratio(self, dx: int, dy: int) -> tuple[float, float]:
         """像素位移 → 画布宽高比例；相对分量保留符号且限定在 [-1,1]。"""

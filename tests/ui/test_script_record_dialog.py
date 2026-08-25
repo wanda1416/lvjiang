@@ -232,6 +232,29 @@ class TestLowPrecisionMouseButtons:
             "click (0.1, 0.1) middle",
         ]
 
+    def test_raw_side_button_emits_click_when_movement_is_disabled(self):
+        rec = MacroRecorder(
+            target_window={"left": 0, "top": 0, "width": 1000, "height": 800},
+            capture=_Capture(), layout=_Layout(), win_left=0, win_top=0,
+            record_mouse_movement=False,
+        )
+        rec._recording = True
+        rec._on_raw_button("x1", True, 100, 80, 1_000_000_000)
+        rec._on_raw_button("x1", False, 100, 80, 1_100_000_000)
+
+        assert rec._lines == ["click (0.1, 0.1) x1"]
+
+    def test_raw_side_button_preserves_high_precision_down_up(self):
+        rec = _make_recorder([], precision=PRECISION_HIGH)
+        rec._recording = True
+        rec._on_raw_button("x2", True, 100, 80, 1_000_000_000)
+        rec._on_raw_button("x2", False, 100, 80, 1_100_000_000)
+
+        assert [(event.kind, event.values) for event in rec._trace_events] == [
+            ("button", ("x2", True)),
+            ("button", ("x2", False)),
+        ]
+
 
 class TestScroll:
     def test_scroll_down_emitted_with_coord_target(self):

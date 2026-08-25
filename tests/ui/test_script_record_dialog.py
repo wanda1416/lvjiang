@@ -57,53 +57,38 @@ def _make_recorder(lines: list[str], precision: str = "low") -> MacroRecorder:
 
 
 class TestOnLineCallback:
-    def test_click_line_emitted(self):
+    def test_mouse_down_up_lines_emitted(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
 
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
+        rec._record_mouse_button("left", True, 100, 80, 10.0)
+        rec._record_mouse_button("left", False, 100, 80, 10.2)
 
-        assert lines == ["click (0.1, 0.1)"]
+        assert lines == [
+            "place (0.1, 0.1)",
+            "mouse left down",
+            "wait 0.2",
+            "place (0.1, 0.1)",
+            "mouse left up",
+        ]
 
-    def test_wait_and_drag_lines_emitted(self):
-        lines: list[str] = []
-        rec = _make_recorder(lines)
-        rec._recording = True
-
-        # 距上次操作 1s → 先补 wait，再拖拽
-        now = time.monotonic()
-        rec._last_action_time = now - 1.0
-        rec._press_pos = (100, 80)
-        rec._press_time = now - 0.5
-        rec._handle_release(500, 400)
-
-        assert len(lines) == 2
-        assert lines[0].startswith("wait ")
-        assert lines[1].startswith("drag (0.1, 0.1) (0.5, 0.5) ")
-
-    def test_low_precision_omits_wait_below_100ms(self):
+    def test_short_wait_is_preserved(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._last_action_time = 10.0
 
         rec._maybe_emit_wait(10.099)
 
-        assert lines == []
+        assert lines == ["wait 0.099"]
 
     def test_stop_text_matches_callback_lines(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
 
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
-        rec._press_pos = (200, 160)
-        rec._press_time = time.monotonic()
-        rec._handle_release(200, 160)
+        rec._record_mouse_button("left", True, 100, 80, 10.0)
+        rec._record_mouse_button("left", False, 100, 80, 10.1)
 
         rec._recording = False  # 无真实 listener，直接置停
         assert rec.stop() == "\n".join(lines)
@@ -118,11 +103,9 @@ class TestOnLineCallback:
             win_left=0, win_top=0, on_line=boom,
         )
         rec._recording = True
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)   # 回调抛异常不应向外传播
+        rec._record_mouse_button("left", True, 100, 80, 10.0)
 
-        assert rec._lines == ["click (0.1, 0.1)"]
+        assert rec._lines == ["place (0.1, 0.1)", "mouse left down"]
 
     def test_no_callback_still_records(self):
         win = {"left": 0, "top": 0, "width": 1000, "height": 800}
@@ -131,11 +114,9 @@ class TestOnLineCallback:
             win_left=0, win_top=0,
         )
         rec._recording = True
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
+        rec._record_mouse_button("left", True, 100, 80, 10.0)
 
-        assert rec._lines == ["click (0.1, 0.1)"]
+        assert rec._lines == ["place (0.1, 0.1)", "mouse left down"]
 
 
 class _FakeButton:
@@ -207,7 +188,7 @@ class TestLowPrecisionMouseButtons:
         rec._recording = True
         return rec
 
-    def test_side_buttons_emit_click_with_button_name(self, monkeypatch):
+    def test_side_buttons_preserve_raw_down_up(self, monkeypatch):
         rec = self._make_recorder(monkeypatch)
 
         rec._on_click(100, 80, _FakeButton("x1"), True)
@@ -215,9 +196,11 @@ class TestLowPrecisionMouseButtons:
         rec._on_click(200, 160, _FakeButton("x2"), True)
         rec._on_click(200, 160, _FakeButton("x2"), False)
 
-        assert rec._lines == [
-            "click (0.1, 0.1) x1",
-            "click (0.2, 0.2) x2",
+        assert [line for line in rec._lines if not line.startswith("wait ")] == [
+            "place (0.1, 0.1)", "mouse x1 down",
+            "place (0.1, 0.1)", "mouse x1 up",
+            "place (0.2, 0.2)", "mouse x2 down",
+            "place (0.2, 0.2)", "mouse x2 up",
         ]
 
     def test_right_and_middle_buttons_are_not_dropped(self, monkeypatch):
@@ -227,9 +210,10 @@ class TestLowPrecisionMouseButtons:
             rec._on_click(100, 80, _FakeButton(button), True)
             rec._on_click(100, 80, _FakeButton(button), False)
 
-        assert rec._lines == [
-            "click (0.1, 0.1) right",
-            "click (0.1, 0.1) middle",
+        states = [line for line in rec._lines if line.startswith("mouse ")]
+        assert states == [
+            "mouse right down", "mouse right up",
+            "mouse middle down", "mouse middle up",
         ]
 
     def test_raw_side_button_emits_click_when_movement_is_disabled(self):
@@ -242,7 +226,10 @@ class TestLowPrecisionMouseButtons:
         rec._on_raw_button("x1", True, 100, 80, 1_000_000_000)
         rec._on_raw_button("x1", False, 100, 80, 1_100_000_000)
 
-        assert rec._lines == ["click (0.1, 0.1) x1"]
+        assert rec._lines == [
+            "place (0.1, 0.1)", "mouse x1 down", "wait 0.1",
+            "place (0.1, 0.1)", "mouse x1 up",
+        ]
 
     def test_raw_side_button_preserves_high_precision_down_up(self):
         rec = _make_recorder([], precision=PRECISION_HIGH)
@@ -307,51 +294,68 @@ class TestScroll:
 
 
 class TestPress:
-    def test_quick_tap_emitted(self):
+    def test_quick_tap_preserves_down_wait_up(self, monkeypatch):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
         key = _char_key("a")
+        ticks = iter((10_000_000_000, 10_020_000_000))
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
 
-        rec._key_press_times[key] = time.monotonic()
+        rec._on_key_press(key)
         rec._on_key_release(key)
 
-        assert lines == ['press "A"']
+        assert lines == ['press "A" down', "wait 0.02", 'press "A" up']
 
-    def test_special_key_name_resolved(self):
+    def test_special_key_name_resolved(self, monkeypatch):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
         key = _special_key("esc")
+        ticks = iter((10_000_000_000, 10_100_000_000))
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
 
-        rec._key_press_times[key] = time.monotonic()
+        rec._on_key_press(key)
         rec._on_key_release(key)
 
-        assert lines == ['press "ESC"']
+        assert lines == ['press "ESC" down', "wait 0.1", 'press "ESC" up']
 
-    def test_long_press_emits_hold_modifier(self):
+    def test_long_press_is_not_collapsed_to_hold(self, monkeypatch):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
         key = _char_key("w")
+        ticks = iter((10_000_000_000, 11_000_000_000))
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
 
-        rec._key_press_times[key] = time.monotonic() - 1.0  # 按住 1s > 0.5s 阈值
+        rec._on_key_press(key)
         rec._on_key_release(key)
 
-        assert len(lines) == 1
-        assert lines[0].startswith('press "W" hold ')
+        assert lines == ['press "W" down', "wait 1", 'press "W" up']
 
-    def test_short_meaningful_hold_is_not_collapsed_to_tap(self):
+    def test_interleaved_keyboard_and_mouse_keep_global_order(self, monkeypatch):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
-        key = _char_key("e")
+        key = _char_key("r")
+        ticks = iter((10_000_000_000, 10_300_000_000))
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
 
-        rec._key_press_times[key] = time.monotonic() - 0.2
+        rec._on_key_press(key)
+        rec._record_mouse_button("left", True, 100, 80, 10.1)
+        rec._record_mouse_button("left", False, 100, 80, 10.2)
         rec._on_key_release(key)
 
-        assert len(lines) == 1
-        assert lines[0].startswith('press "E" hold 0.2')
+        assert lines == [
+            'press "R" down',
+            "wait 0.1", "place (0.1, 0.1)", "mouse left down",
+            "wait 0.1", "place (0.1, 0.1)", "mouse left up",
+            "wait 0.1", 'press "R" up',
+        ]
 
     def test_reserved_hotkeys_never_recorded(self):
         """F8/F9/F10/F12 是录制器自身的全局热键，不应被误录成 press 语句"""
@@ -361,7 +365,7 @@ class TestPress:
             rec._recording = True
             key = _special_key(name)
 
-            rec._key_press_times[key] = time.monotonic()
+            rec._on_key_press(key)
             rec._on_key_release(key)
 
             assert lines == [], f"{name} 不应被录制"
@@ -377,13 +381,11 @@ class TestPress:
         rec._key_press_times[f12] = time.monotonic()
         rec._on_key_release(f12)  # 不记录，也不刷新 _last_action_time
 
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
+        rec._record_mouse_button("left", True, 100, 80, time.monotonic())
 
         # 跨越了被过滤掉的 F12 事件，等待时间仍然完整体现在下一条动作前
         assert lines[0].startswith("wait ")
-        assert lines[1] == "click (0.1, 0.1)"
+        assert lines[1:] == ["place (0.1, 0.1)", "mouse left down"]
 
     def test_unrecognized_key_ignored(self):
         lines: list[str] = []
@@ -396,19 +398,21 @@ class TestPress:
 
         assert lines == []
 
-    def test_wait_inserted_before_press(self):
+    def test_wait_inserted_before_key_down(self, monkeypatch):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
         rec._last_action_time = time.monotonic() - 1.0
         key = _char_key("a")
+        now_ns = time.monotonic_ns()
+        monkeypatch.setattr(
+            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: now_ns)
 
-        rec._key_press_times[key] = time.monotonic()
-        rec._on_key_release(key)
+        rec._on_key_press(key)
 
         assert len(lines) == 2
         assert lines[0].startswith("wait ")
-        assert lines[1] == 'press "A"'
+        assert lines[1] == 'press "A" down'
 
 
 class TestTrailingWaitOnStop:
@@ -419,9 +423,7 @@ class TestTrailingWaitOnStop:
         rec = _make_recorder(lines)
         rec._recording = True
 
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
+        rec._emit_line('press "A" down')
 
         rec._last_action_time = time.monotonic() - 1.0  # 模拟停止前空等了 1s
         text = rec.stop()
@@ -429,18 +431,18 @@ class TestTrailingWaitOnStop:
         assert lines[-1].startswith("wait ")
         assert text == "\n".join(lines)
 
-    def test_stop_no_trailing_wait_when_gap_below_threshold(self):
+    def test_stop_preserves_even_short_trailing_wait(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
 
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
+        rec._emit_line('press "A" down')
+        rec._last_action_time = time.monotonic() - 0.01
 
-        rec.stop()  # 紧接着停止，间隔远小于 0.1s 阈值
+        rec.stop()
 
-        assert lines == ["click (0.1, 0.1)"]
+        assert lines[0] == 'press "A" down'
+        assert lines[1].startswith("wait 0.01")
 
     def test_stop_when_not_recording_has_no_side_effect(self):
         """已经不在录制状态时调用 stop() 只是返回现有文本，不应额外插入 wait"""
@@ -448,13 +450,11 @@ class TestTrailingWaitOnStop:
         rec = _make_recorder(lines)
         rec._recording = True
 
-        rec._press_pos = (100, 80)
-        rec._press_time = time.monotonic()
-        rec._handle_release(100, 80)
+        rec._emit_line('press "A" down')
 
         rec._recording = False  # 无真实 listener，模拟已经停止过一次
         assert rec.stop() == "\n".join(lines)
-        assert lines == ["click (0.1, 0.1)"]
+        assert lines == ['press "A" down']
 
 
 class TestRawInputMove:
@@ -557,14 +557,14 @@ class TestRawInputMove:
         rec = _make_recorder([])
         assert rec._screen_to_canvas_ratio(-100, 900) == (0.0, 1.0)
 
-    def test_raw_move_is_suppressed_during_drag(self):
+    def test_raw_move_is_preserved_while_mouse_button_is_held(self):
         lines: list[str] = []
         rec = _make_recorder(lines)
         rec._recording = True
-        rec._press_pos = (100, 100)
+        rec._button_presses["left"] = (100, 100, 0.9)
 
         rec._on_raw_move(20, 20, 1_000_000_000)
         with rec._lock:
             rec._flush_raw_frame()
 
-        assert lines == []
+        assert lines == ["move by (0.02, 0.025) duration 0.001"]

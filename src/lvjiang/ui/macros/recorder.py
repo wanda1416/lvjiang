@@ -32,13 +32,7 @@ except Exception:  # pragma: no cover - 环境缺失 pynput 时降级
 
 
 # ─── 事件聚合阈值 ─────────────────────────────────────────
-_DRAG_THRESHOLD_PX = 10      # 位移 >= 该值判定为拖拽，否则为点击
 _LOW_PRECISION_INTERVAL_S = 0.100  # 低精度以 100ms 为合并/等待粒度
-_WAIT_THRESHOLD_S = _LOW_PRECISION_INTERVAL_S
-_MIN_DRAG_DURATION = 0.001   # 拖拽时长下限（秒）
-# 与低精度时间粒度保持一致。原来的 0.5 秒会把卸势等短促但有意义的长按
-# 压缩成普通 press，丢失按键持续时间。
-_PRESS_HOLD_THRESHOLD_S = _LOW_PRECISION_INTERVAL_S
 _RAW_IDLE_S = _LOW_PRECISION_INTERVAL_S
 _RAW_LAST_DURATION_S = 0.001  # 轨迹末包无后继时间戳，以 1ms 完成
 
@@ -122,8 +116,7 @@ class MacroRecorder:
         self._raw_listener = None
         self._lock = threading.Lock()
         self._lines: list[str] = []          # 已生成的 DSL 行
-        self._press_pos: tuple[int, int] | None = None   # 左键按下屏幕坐标
-        self._press_time = 0.0               # 左键按下时刻
+        # 已按下的鼠标键；只用于过滤孤立/重复 up，不参与 down/up 合并。
         self._button_presses: dict[str, tuple[int, int, float]] = {}
         self._key_press_times: dict = {}     # 已按下但未松开的按键 → 按下时刻
         # 低精度模式把同一连续段合并为一个 move by；高精度模式不使用它。
@@ -145,7 +138,6 @@ class MacroRecorder:
         if self._recording:
             return
         self._lines = []
-        self._press_pos = None
         self._button_presses = {}
         self._key_press_times = {}
         self._trace_events = []
@@ -272,8 +264,9 @@ class MacroRecorder:
     def _on_click(self, sx, sy, button, pressed):
         """pynput 鼠标键按下/松开回调。
 
-        高精度保留五种鼠标键的原始 down/up；低精度把非左键录成带按钮名的
-        ``click``。左键仍根据位移区分 click/drag。
+        高精度写入轨迹；低精度同样保留五种鼠标键的原始 down/up，并用
+        place 固定每个事件发生时的指针坐标。不得把一对事件提前压成 click，
+        否则会破坏与键盘事件交叠时的全局顺序。
         """
         if pynput_mouse is None:
             return
@@ -305,14 +298,7 @@ class MacroRecorder:
                     return
                 self._flush_raw_frame()
                 now = time.monotonic()
-                if button_name == "left":
-                    if pressed:
-                        self._press_pos = (int(sx), int(sy))
-                        self._press_time = now
-                    else:
-                        self._handle_release(int(sx), int(sy))
-                    return
-                self._record_aux_button(
+                self._record_mouse_button(
                     button_name, bool(pressed), int(sx), int(sy), now)
             except Exception:  # noqa: BLE001 - pynput 低层钩子回调里的异常可能被
                 # 静默吞掉（Windows 要求钩子过程不能抛出/长时间阻塞，否则可能被
@@ -320,51 +306,13 @@ class MacroRecorder:
                 # 表现成"什么都没发生"、日志里也看不到任何报错线索。
                 logger.exception("_on_click 处理异常")
 
-    def _handle_release(self, sx: int, sy: int):
-        """左键松开：按位移判定 click / drag，并按需插入 wait"""
-        if self._press_pos is None:
-            return
-        px, py = self._press_pos
-        self._press_pos = None
-
-        # 窗口过滤：按下点必须落在目标窗口矩形内
-        if not self._in_window(px, py):
-            logger.debug(f"忽略窗口外操作: ({px},{py})")
-            return
-
-        # 与上一次操作的间隔 → wait（用按下时刻衡量空闲时间）
-        self._maybe_emit_wait(self._press_time)
-
-        dx = sx - px
-        dy = sy - py
-        dist = (dx * dx + dy * dy) ** 0.5
-
-        if dist < _DRAG_THRESHOLD_PX:
-            rx, ry = self._screen_to_canvas_ratio(px, py)
-            self._emit_line(f"click ({rx}, {ry})")
-            logger.debug(f"录制点击: ({rx}, {ry})")
-        else:
-            rx1, ry1 = self._screen_to_canvas_ratio(px, py)
-            rx2, ry2 = self._screen_to_canvas_ratio(sx, sy)
-            duration = time.monotonic() - self._press_time
-            if duration < _MIN_DRAG_DURATION:
-                duration = _MIN_DRAG_DURATION
-            duration_text = _format_number(duration)
-            self._emit_line(
-                f"drag ({rx1}, {ry1}) ({rx2}, {ry2}) {duration_text}")
-            logger.debug(
-                f"录制拖拽: ({rx1}, {ry1}) -> ({rx2}, {ry2}) "
-                f"{duration_text}s")
-
-        self._last_action_time = time.monotonic()
-
     def _maybe_emit_wait(self, event_time: float):
-        """若距上次操作完成的间隔超过阈值，插入 wait 行"""
+        """写入上一事件到本事件之间的完整时间，不丢弃短间隔。"""
         if self._last_action_time is None:
             return
         gap = event_time - self._last_action_time
-        if gap > _WAIT_THRESHOLD_S:
-            gap_text = _format_number(gap)
+        if gap > 0:
+            gap_text = _format_number(gap, digits=6)
             self._emit_line(f"wait {gap_text}")
             logger.debug(f"录制等待: {gap_text}s")
 
@@ -400,7 +348,7 @@ class MacroRecorder:
                 logger.exception("_on_scroll 处理异常")
 
     def _on_key_press(self, key):
-        """pynput 键盘按下回调：只记录按下时刻，松开时才判定 tap/hold 并生成语句"""
+        """立即记录键盘 down；自动重复事件只保留第一次。"""
         with self._lock:
             try:
                 if not self._recording:
@@ -415,25 +363,28 @@ class MacroRecorder:
                 high_precision = self.precision == PRECISION_HIGH
                 if high_precision and not self._target_is_foreground():
                     return
-                if key not in self._key_press_times:
-                    self._key_press_times[key] = time.monotonic()
-                    if high_precision:
-                        self._append_trace_event(
-                            "key", (name, True), time.monotonic_ns())
+                if key in self._key_press_times:
+                    return
+                now_ns = time.monotonic_ns()
+                now = now_ns / 1_000_000_000
+                self._key_press_times[key] = now
+                if high_precision:
+                    self._append_trace_event("key", (name, True), now_ns)
+                    return
+                self._flush_raw_frame()
+                self._maybe_emit_wait(now)
+                self._emit_line(f'press "{name}" down')
+                self._last_action_time = now
             except Exception:  # noqa: BLE001 - 见 _on_click 里同样处理的注释
                 logger.exception("_on_key_press 处理异常")
 
     def _on_key_release(self, key):
-        """pynput 键盘松开回调：按住时长 < 阈值判定为一次完整按键（press "X"），
-        否则判定为长按（press "X" hold N）；F8/F9/F10/F12 是录制器自身的
-        全局热键，不录制，也不更新 _last_action_time（等待时间累积到下一
-        条真正被记录的动作上，与鼠标点击落在窗口外时的处理方式一致）"""
+        """立即记录键盘 up，不与 down 合并，保留交叠输入的真实顺序。"""
         with self._lock:
             try:
                 if not self._recording:
                     return
-                press_time = self._key_press_times.pop(key, None)
-                if press_time is None:
+                if self._key_press_times.pop(key, None) is None:
                     return
 
                 name = _pynput_key_to_dsl_name(key)
@@ -443,23 +394,15 @@ class MacroRecorder:
                 if name in self._reserved_keys:
                     return
 
+                now_ns = time.monotonic_ns()
+                now = now_ns / 1_000_000_000
                 if self.precision == PRECISION_HIGH:
-                    self._append_trace_event(
-                        "key", (name, False), time.monotonic_ns())
+                    self._append_trace_event("key", (name, False), now_ns)
                     return
-
-                self._maybe_emit_wait(press_time)
-
-                duration = time.monotonic() - press_time
-                if duration >= _PRESS_HOLD_THRESHOLD_S:
-                    duration_text = _format_number(duration)
-                    self._emit_line(f'press "{name}" hold {duration_text}')
-                    logger.debug(f"录制长按: {name} {duration_text}s")
-                else:
-                    self._emit_line(f'press "{name}"')
-                    logger.debug(f"录制按键: {name}")
-
-                self._last_action_time = time.monotonic()
+                self._flush_raw_frame()
+                self._maybe_emit_wait(now)
+                self._emit_line(f'press "{name}" up')
+                self._last_action_time = now
             except Exception:  # noqa: BLE001 - 见 _on_click 里同样处理的注释
                 logger.exception("_on_key_release 处理异常")
 
@@ -485,9 +428,6 @@ class MacroRecorder:
                         ),
                         timestamp_ns,
                     )
-                    return
-                if self._press_pos is not None:
-                    self._reset_raw_frame()
                     return
                 event_time = timestamp_ns / 1_000_000_000
                 pending = self._raw_pending
@@ -524,7 +464,7 @@ class MacroRecorder:
                         "button", (button_name, bool(pressed)), timestamp_ns)
                     return
                 self._flush_raw_frame()
-                self._record_aux_button(
+                self._record_mouse_button(
                     button_name,
                     bool(pressed),
                     int(sx),
@@ -534,7 +474,7 @@ class MacroRecorder:
             except Exception:  # noqa: BLE001
                 logger.exception("_on_raw_button 处理异常")
 
-    def _record_aux_button(
+    def _record_mouse_button(
         self,
         button_name: str,
         pressed: bool,
@@ -542,19 +482,18 @@ class MacroRecorder:
         sy: int,
         event_time: float,
     ) -> None:
-        """把非左键的一对 down/up 压成低精度 click DSL。"""
+        """逐个写入鼠标 down/up；place 保留事件发生时的绝对位置。"""
         if pressed:
+            if button_name in self._button_presses or not self._in_window(sx, sy):
+                return
             self._button_presses[button_name] = (sx, sy, event_time)
+        elif self._button_presses.pop(button_name, None) is None:
             return
-        state = self._button_presses.pop(button_name, None)
-        if state is None:
-            return
-        px, py, press_time = state
-        if not self._in_window(px, py):
-            return
-        self._maybe_emit_wait(press_time)
-        rx, ry = self._screen_to_canvas_ratio(px, py)
-        self._emit_line(f"click ({rx}, {ry}) {button_name}")
+        self._maybe_emit_wait(event_time)
+        rx, ry = self._screen_to_canvas_ratio(sx, sy)
+        self._emit_line(f"place ({rx}, {ry})")
+        state = "down" if pressed else "up"
+        self._emit_line(f"mouse {button_name} {state}")
         self._last_action_time = event_time
 
     def _raw_delta_to_canvas_ratio(self, dx: int, dy: int) -> tuple[float, float]:

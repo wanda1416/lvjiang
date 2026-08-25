@@ -202,6 +202,12 @@ class RunControlMixin:
 
     # ─── 工作流配置加载 ──────────────────────────────────
 
+    def _selected_run_env(self) -> str:
+        """Return the environment currently held by the main-window UI."""
+        combo = self._env_combo
+        value = combo.currentData()
+        return str(value) if value is not None else ""
+
     def _load_workflow_configs(self):
         """发现全部脚本，按作者声明与用户偏好过滤排序后填充下拉。
 
@@ -209,7 +215,6 @@ class RunControlMixin:
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
         """
-        from ..core.config.session import load_env
         from ..workflows.discovery import list_exposed_scripts
 
         self._workflow_configs: list[dict] = []
@@ -221,7 +226,7 @@ class RunControlMixin:
             logger.error(f"发现脚本失败: {e}")
             return
 
-        current_env = load_env()
+        current_env = self._selected_run_env()
 
         # 填充下拉列表（block 信号，避免 addItem 逐条触发 _on_workflow_combo_changed）
         self.workflow_combo.blockSignals(True)
@@ -364,12 +369,8 @@ class RunControlMixin:
     def _on_env_changed(self, index: int):
         """环境选择器切换：持久化 + 刷新工作流下拉框的"环境不支持"提示
 
-        _load_workflow_configs 里拼接后缀用的 current_env 是切换前 load_env()
-        读到的旧值，只在启动/脚本编辑保存/脚本配置保存时跑一次——环境切换
-        本身不在这三个触发时机内，之前切完环境下拉框文字不会跟着刷新（虽然
-        真正点运行时 _on_run_workflow 会用最新环境重新校验、正确拦截，只是
-        UI 提示滞后）。这里补上刷新，须先 save_env 落盘，_load_workflow_configs
-        内部才能读到切换后的新环境。
+        下拉框是应用内环境状态；切换后持久化到 session，并基于新的内存值
+        刷新工作流下拉框提示。已启动的工作流持有自己的环境快照，不受影响。
         """
         if index < 0:
             return
@@ -456,6 +457,7 @@ class RunControlMixin:
         if pause_event is not None:
             pause_event.set()
         self._current_worker = None
+        self._set_batch_context_controls_locked(False)
         self._refresh_run_button()
         self._refresh_pause_button()
         banner = getattr(self, '_adb_banner', None)
@@ -463,6 +465,14 @@ class RunControlMixin:
             banner.setVisible(False)
         self.statusBar().showMessage(f"{name} 已结束")
         logger.info(f"自动化结束: {name}")
+
+    def _set_batch_context_controls_locked(self, locked: bool) -> None:
+        """Lock environment/layout user interaction for a running batch."""
+        for name in ("_env_combo", "layout_combo"):
+            combo = getattr(self, name, None)
+            setter = getattr(combo, "set_batch_locked", None)
+            if setter is not None:
+                setter(locked)
 
     def _is_stopped(self) -> bool:
         """工作流回调：检查是否请求了停止"""
@@ -764,10 +774,9 @@ class RunControlMixin:
             return
 
         # env 限制检查：脚本声明了 env 且当前环境不在列表中，阻止执行
+        current_env = self._selected_run_env()
         env_list = flow_cfg.get("env") or []
         if env_list:
-            from ..core.config.session import load_env
-            current_env = load_env()
             if current_env not in env_list:
                 self.log_text.append(
                     tr("[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中").format(
@@ -789,7 +798,7 @@ class RunControlMixin:
         if not self._begin_automation(flow_name):
             return
 
-        layout_name = self._layout_manager.get_active_layout_name()
+        layout_name = self.layout_combo.currentText()
         layout = self._layout_manager.load_layout(layout_name)
 
         if not layout:
@@ -817,6 +826,7 @@ class RunControlMixin:
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
+            run_env=current_env,
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,
@@ -1030,7 +1040,7 @@ class RunControlMixin:
         if not self._begin_automation(flow_name):
             return
 
-        layout_name = self._layout_manager.get_active_layout_name()
+        layout_name = self.layout_combo.currentText()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
@@ -1053,6 +1063,7 @@ class RunControlMixin:
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
+            run_env=self._selected_run_env(),
             window_left=window_left,
             window_top=window_top,
             stop_check=self._is_stopped,

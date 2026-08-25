@@ -201,22 +201,34 @@ class ScriptConfigDialog(QDialog):
         self._table.setCurrentCell(target, self.COL_NAME)
 
     def _swap_rows(self, a: int, b: int):
-        # 交换 QTableWidgetItem
-        for col in range(self._table.columnCount()):
-            item_a = self._table.takeItem(a, col)
-            item_b = self._table.takeItem(b, col)
-            self._table.setItem(a, col, item_b)
-            self._table.setItem(b, col, item_a)
-        # 交换 cell widget（QComboBox 等，takeItem 无法移动）
-        for col in range(self._table.columnCount()):
-            w_a = self._table.cellWidget(a, col)
-            w_b = self._table.cellWidget(b, col)
-            self._table.removeCellWidget(a, col)
-            self._table.removeCellWidget(b, col)
-            if w_b is not None:
-                self._table.setCellWidget(a, col, w_b)
-            if w_a is not None:
-                self._table.setCellWidget(b, col, w_a)
+        # QTableWidget 拥有 setCellWidget() 放入的控件。不能把现有 QComboBox
+        # remove 后再塞回另一格：这会跨越 Qt 的所有权/延迟销毁边界，Windows
+        # 上曾在随后的 setCurrentCell() 触发 native access violation。
+        # 先按值快照，再用新 item/widget 原地重建两行，不复用任何旧包装器。
+        state_a = self._row_state(a)
+        state_b = self._row_state(b)
+        self._restore_row(a, state_b)
+        self._restore_row(b, state_a)
+
+    def _row_state(self, row: int) -> tuple[str, bool, str, str]:
+        name_item = self._table.item(row, self.COL_NAME)
+        expose_item = self._table.item(row, self.COL_EXPOSE)
+        scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
+        return (
+            str(name_item.data(Qt.ItemDataRole.UserRole)),
+            expose_item.checkState() == Qt.CheckState.Checked,
+            name_item.text(),
+            str(scope_combo.currentData() or "daily"),
+        )
+
+    def _restore_row(
+        self, row: int, state: tuple[str, bool, str, str],
+    ) -> None:
+        sid, checked, display, scope = state
+        self._fill_row(
+            row, self._scripts[sid], checked=checked,
+            display=display, scope=scope,
+        )
 
     # ─── 读写用户偏好（session.daily.scripts）──────────────
 

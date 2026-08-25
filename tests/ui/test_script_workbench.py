@@ -215,6 +215,8 @@ class TestDebugPanel:
         panel, ed = self._panel(qtbot, main, text="$a = 1\n$b = 2\n$c = 3\n")
         with qtbot.waitSignal(panel._bridge.stepped, timeout=5000):
             assert panel._start(step=True)
+        worker = panel._worker
+        assert worker is not None
         assert ed.lines[-1] == 1 and panel.running
         assert "第 1 行" in panel.lbl_run.text()
         with qtbot.waitSignal(panel._bridge.stepped, timeout=5000):
@@ -223,6 +225,7 @@ class TestDebugPanel:
         assert panel.vars.rowCount() == 1 and panel.vars.item(0, 0).text() == "$a"
         with qtbot.waitSignal(panel._bridge.finished, timeout=5000):
             panel._on_continue()
+        assert worker.isFinished() and not worker.isRunning()
         assert not panel.running and ed.lines[-1] is None
 
     def test_stop_while_paused(self, qtbot, dev_resolver):
@@ -241,4 +244,3 @@ class TestDebugPanel:
         panel, _ = self._panel(qtbot, main, text="$a = 1\n")
         assert not panel._start(step=False)
         assert not panel.running
-

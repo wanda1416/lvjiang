@@ -9,7 +9,8 @@ isVisible() 恒为 False，区分不出「显式隐藏」与「父窗口未显�
 """
 
 import pytest
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtCore import QPoint
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_NOTICE_KEY,
@@ -64,31 +65,126 @@ class TestBadgeVisibility:
         assert card.illegal_badge.isHidden()
 
 
+def _capture_warnings(monkeypatch):
+    """拦截 QMessageBox.warning，返回收集到的 (parent, 正文) 列表"""
+    import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
+    shown: list[tuple] = []
+    monkeypatch.setattr(
+        mod.QMessageBox, "warning",
+        lambda *a, **k: shown.append((a[0], a[2] if len(a) > 2 else "")))
+    return shown
+
+
 class TestBadgeInteraction:
+    """点「!」弹原因。
+
+    弹窗是排队到事件循环里弹的（见 _IllegalBadge.mousePressEvent 的注释），
+    所以断言前必须让事件循环转一圈。
+    """
+
     def test_click_shows_all_reasons(self, qtbot, monkeypatch):
-        import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
-        shown = []
-        monkeypatch.setattr(
-            mod.QMessageBox, "warning",
-            lambda *a, **k: shown.append(a[2] if len(a) > 2 else ""))
+        shown = _capture_warnings(monkeypatch)
         card = _SlotCard("main_weapon", "主武器", "weapon")
         qtbot.addWidget(card)
         card.set_equip(_equip(illegal=["原因甲", "原因乙"]))
         card.illegal_badge.mousePressEvent(None)
-        assert len(shown) == 1
-        assert "原因甲" in shown[0]
-        assert "原因乙" in shown[0]
+        assert shown == []          # 事件处理里绝不能同步弹出
+        qtbot.waitUntil(lambda: len(shown) == 1, timeout=1000)
+        assert "原因甲" in shown[0][1]
+        assert "原因乙" in shown[0][1]
 
     def test_click_does_not_popup_when_clean(self, qtbot, monkeypatch):
-        import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
-        shown = []
-        monkeypatch.setattr(
-            mod.QMessageBox, "warning", lambda *a, **k: shown.append(a))
+        shown = _capture_warnings(monkeypatch)
         card = _SlotCard("main_weapon", "主武器", "weapon")
         qtbot.addWidget(card)
         card.set_equip(_equip())
         card.illegal_badge.mousePressEvent(None)
+        qtbot.wait(50)
         assert shown == []
+
+    def test_survives_card_deleted_before_dialog_opens(self, qtbot, monkeypatch):
+        """扫描期间卡片被重建销毁：排队中的弹窗不得触碰已释放对象
+
+        真实崩溃路径（Windows 0xc0000374）：模态框跑嵌套事件循环 →
+        equipment_changed 在循环里重建网格 deleteLater 掉本卡片 →
+        模态框的 parent 与调用栈上的 self 双双失效。改成排队后，
+        弹窗只依赖点击瞬间取到的窗口与原因副本。
+        """
+        from PyQt6 import sip
+        shown = _capture_warnings(monkeypatch)
+        holder = QWidget()          # 充当顶层窗口，卡片销毁后它仍在
+        qtbot.addWidget(holder)
+        card = _SlotCard("main_weapon", "主武器", "weapon", parent=holder)
+        card.set_equip(_equip(illegal=["原因甲"]))
+        badge = card.illegal_badge
+
+        card.illegal_badge.mousePressEvent(None)
+        sip.delete(card)            # 模拟 _rebuild_grid 的销毁
+        assert sip.isdeleted(badge)
+
+        qtbot.waitUntil(lambda: len(shown) == 1, timeout=1000)
+        assert shown[0][0] is holder   # parent 用的是存活的顶层窗口
+        assert "原因甲" in shown[0][1]
+
+    def test_dropped_parent_when_window_also_gone(self, qtbot, monkeypatch):
+        """连顶层窗口都没了：降级为无父弹出，绝不把已释放对象当 parent"""
+        from PyQt6 import sip
+
+        from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+            _show_illegal_reasons,
+        )
+        shown = _capture_warnings(monkeypatch)
+        dead = QWidget()
+        qtbot.addWidget(dead)
+        sip.delete(dead)
+        _show_illegal_reasons(dead, ["原因甲"])
+        assert len(shown) == 1
+        assert shown[0][0] is None
+
+
+class TestContextMenuNonBlocking:
+    """背包卡片右键菜单必须用 popup() 而非 exec()
+
+    exec() 会跑嵌套事件循环，扫描期间 equipment_changed 会在循环里重建网格
+    deleteLater 掉本卡片，exec() 返回后对 self 的访问全是已释放对象。
+    """
+
+    def test_popup_used_and_returns_immediately(self, qtbot, monkeypatch):
+        import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
+
+        def _banned_exec(*a, **k):
+            raise AssertionError("右键菜单不得用 exec()：会跑嵌套事件循环")
+
+        monkeypatch.setattr(mod.QMenu, "exec", _banned_exec)
+        popped: list = []
+        monkeypatch.setattr(mod.QMenu, "popup",
+                            lambda self, pos: popped.append(pos))
+        card = _CompactEquipCard()
+        qtbot.addWidget(card)
+        card.set_equip(_equip(), "主武器")
+        card._show_context_menu(QPoint(1, 2))
+        assert len(popped) == 1
+
+    def test_actions_emit_captured_data(self, qtbot, monkeypatch):
+        """菜单动作按点击瞬间捕获的数据发信号，不回读可能已被复用的字段"""
+        import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
+        menus: list = []
+        monkeypatch.setattr(mod.QMenu, "popup",
+                            lambda self, pos: menus.append(self))
+        card = _CompactEquipCard()
+        qtbot.addWidget(card)
+        equip = _equip()
+        card.set_equip(equip, "主武器", group_key="g1")
+        card._show_context_menu(QPoint(0, 0))
+
+        got: list = []
+        card.delete_requested.connect(lambda d, g: got.append((d, g)))
+        # 菜单弹出后卡片被复用渲染了别的装备
+        card.set_equip(_equip(illegal=["异常"]), "护腕", group_key="g2")
+
+        actions = {a.text(): a for a in menus[0].actions()}
+        actions["删除"].trigger()
+        assert got == [(equip, "g1")]
 
 
 class TestSlotCardEmpty:

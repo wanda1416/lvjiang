@@ -30,6 +30,7 @@ from ...core.scene_registry import (
     get_scene_name,
 )
 from ...i18n import tr
+from ..button_styles import apply_button_style
 from ..theme import get_theme_manager
 from .layout_ops import LayoutOpsMixin
 from .recognition_ops import RecognitionOpsMixin
@@ -185,6 +186,20 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._btn_new_scene.setToolTip(tr("在当前分组下新建场景"))
         self._btn_new_scene.clicked.connect(self._on_new_scene)
         top_bar.addWidget(self._btn_new_scene)
+
+        apply_button_style(
+            self._btn_save,
+            self._btn_new,
+            self._btn_save_as,
+            self._btn_new_group,
+            self._btn_new_scene,
+        )
+        apply_button_style(
+            self._btn_refresh,
+            self._btn_canvas_mode,
+            variant="neutral",
+        )
+        apply_button_style(self._btn_delete, variant="danger")
 
         top_bar.addStretch()
 

@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.ocr_cleaner import OCRCleaner
 from ..i18n import tr
+from .button_styles import apply_button_style
 from .ocr_canvas import OCRBox, OCRCanvas
 
 
@@ -96,6 +97,13 @@ class OCRDialog(QDialog):
         self._btn_clear_selection.setToolTip(tr("清除红色选框"))
         self._btn_clear_selection.clicked.connect(self._on_clear_selection)
         canvas_btn_row.addWidget(self._btn_clear_selection)
+
+        apply_button_style(
+            self._btn_upload,
+            self._btn_refresh,
+            self._btn_clear_canvas,
+            self._btn_clear_selection,
+        )
 
         canvas_btn_row.addStretch()
         left_layout.addLayout(canvas_btn_row)

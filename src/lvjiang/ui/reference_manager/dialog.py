@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import ReferenceDatabase
 
 from ...i18n import tr
+from ..button_styles import apply_button_style
 from .browser_panel import BrowserPanel
 from .canvas import ReferenceCanvas
 from .combo_sizing import set_combo_minimum_character_capacity
@@ -117,6 +118,8 @@ class ReferenceManagerDialog(QDialog):
         self._btn_del_space = QPushButton(tr("删除空间"))
         self._btn_del_space.clicked.connect(self._on_delete_space)
         space_bar.addWidget(self._btn_del_space)
+        apply_button_style(btn_new_space, btn_activate_space)
+        apply_button_style(self._btn_del_space, variant="danger")
         self._refresh_del_space_enabled()
         space_bar.addStretch()
         self._active_space_label = QLabel(f"当前激活空间：{self._db.get_active_space()}")
@@ -282,6 +285,16 @@ class ReferenceManagerDialog(QDialog):
         self._deselect_all_btn = QPushButton(tr("全不选"))
         self._deselect_all_btn.setEnabled(False)
         toolbar.addWidget(self._deselect_all_btn)
+
+        apply_button_style(
+            self._import_btn,
+            self._paste_btn,
+            self._screenshot_btn,
+            self._clear_btn,
+            self._select_all_btn,
+            self._deselect_all_btn,
+            variant="neutral",
+        )
 
         toolbar.addSeparator()
         self._source_label = QLabel(tr("  未导入图片"))

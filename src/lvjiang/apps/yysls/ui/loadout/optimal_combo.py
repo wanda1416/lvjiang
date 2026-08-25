@@ -459,6 +459,9 @@ class OptimalComboDialog(QDialog):
         self._chk_exclude_mock.setChecked(True)
         self._chk_exclude_mock.setToolTip(
             tr("搜索时排除模拟装备，仅使用真实背包和已穿戴装备"))
+        # 其余选项都在开始搜索时才读，唯独本项决定候选池内容，
+        # 必须当场重建——否则改了也只在下次打开对话框才生效。
+        self._chk_exclude_mock.toggled.connect(self._on_exclude_mock_toggled)
         options.addWidget(self._chk_exclude_mock)
         self._chk_full_chengyin = QCheckBox(tr("满承音"))
         self._chk_full_chengyin.setToolTip(
@@ -690,10 +693,22 @@ class OptimalComboDialog(QDialog):
                     row.set_rating(
                         result.rating.value if result.rating else "-")
 
+    def _on_exclude_mock_toggled(self, _checked: bool) -> None:
+        """「排除模拟」变化后重建候选池。
+
+        候选池只在对话框构造时加载一次，而本项默认勾选，用户没有机会
+        在加载前取消——不当场重建的话这个开关等于没有。
+        """
+        self._load_candidates()
+
     def _load_candidates(self) -> None:
         """从 session 加载候选装备并按槽位分组。
 
-        数据来源：equipped（已穿戴）+ bag_items（背包）。
+        数据来源：equipped（已穿戴）+ bag_items（背包真实装备），
+        未勾选「排除模拟」时再并入 mock_items（模拟装备）。
+        ``bag_items`` 本身就只含真实装备，模拟装备另存于 ``mock_items``，
+        所以不并进来的话「排除模拟」这个开关无论勾不勾都没有模拟装备可用。
+
         武器类型过滤：主武器只保留与流派 main.weapon 同类型的武器，
         副武器只保留与流派 sub.weapon 同类型的武器。
         """
@@ -709,7 +724,6 @@ class OptimalComboDialog(QDialog):
             return
 
         equipped = inv.equipped
-        bag_items = inv.bag_items
 
         # 读取流派配置的主/副武器类型
         from ...config import get_game_config
@@ -743,6 +757,11 @@ class OptimalComboDialog(QDialog):
                 return True
             return bool(eq.get("_extra", {}).get("is_mock"))
 
+        # 背包侧的候选来源：真实装备恒取，模拟装备按开关并入
+        pools: list[dict] = [inv.bag_items]
+        if not exclude_mock:
+            pools.append(inv.mock_items)
+
         # 1. 已穿戴装备：先按流派武器和装备页筛选条件校验
         for slot_key, eq in equipped.items():
             if (isinstance(eq, dict) and slot_key in slot_candidates
@@ -751,9 +770,11 @@ class OptimalComboDialog(QDialog):
                                                main_weapon_type, sub_weapon_type)):
                 slot_candidates[slot_key].append(eq)
 
-        # 2. 背包装备：按 group_key 分发到槽位
-        if isinstance(bag_items, dict):
-            for group_key, items_dict in bag_items.items():
+        # 2. 背包装备（含按开关并入的模拟装备）：按 group_key 分发到槽位
+        for pool in pools:
+            if not isinstance(pool, dict):
+                continue
+            for group_key, items_dict in pool.items():
                 if not isinstance(items_dict, dict):
                     continue
                 if group_key == "weapon":
@@ -880,6 +901,8 @@ class OptimalComboDialog(QDialog):
         # UI state
         self._btn_search.setVisible(False)
         self._btn_cancel.setVisible(True)
+        # 候选池正在被搜索，不允许中途换池
+        self._chk_exclude_mock.setEnabled(False)
         self._progress.setVisible(True)
         self._progress_label.setVisible(True)
         self._progress.setMaximum(max(total, 1))
@@ -960,6 +983,7 @@ class OptimalComboDialog(QDialog):
             self._progress_timer.stop()
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
+        self._chk_exclude_mock.setEnabled(True)
         self._progress.setVisible(False)
         self._progress_label.setVisible(False)
         self._candidate_summary.setText(
@@ -992,6 +1016,7 @@ class OptimalComboDialog(QDialog):
             self._progress_timer.stop()
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
+        self._chk_exclude_mock.setEnabled(True)
         self._progress.setVisible(False)
         self._progress_label.setVisible(False)
         self._candidate_summary.setText(tr("搜索失败，请检查候选装备后重试。"))

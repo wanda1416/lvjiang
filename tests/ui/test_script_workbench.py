@@ -15,8 +15,8 @@ from PyQt6.QtCore import QPointF, Qt
 
 from lvjiang.core.config import resolver as cr
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.ui import script_workbench as wb
-from lvjiang.ui.pick_canvas import PickCanvas
+from lvjiang.ui.ocr.pick_canvas import PickCanvas
+from lvjiang.ui.scripts import workbench as wb
 
 
 @pytest.fixture

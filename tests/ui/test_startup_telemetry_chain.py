@@ -48,7 +48,7 @@ class TestUpdateCheckAlwaysContinues:
 
     def test_finished_with_dialog_shown_still_continues(self, monkeypatch):
         import lvjiang.core.update as update_mod
-        import lvjiang.ui.update_dialog as dialog_mod
+        import lvjiang.ui.notices.update_dialog as dialog_mod
         events = []
 
         class FakeChecker:
@@ -76,7 +76,7 @@ class TestUpdateCheckAlwaysContinues:
         """更新弹窗抛异常时，统计上报不能被一并吞掉——这正是把 continue
         放进 try/finally 而不是 try 尾部的原因。"""
         import lvjiang.core.update as update_mod
-        import lvjiang.ui.update_dialog as dialog_mod
+        import lvjiang.ui.notices.update_dialog as dialog_mod
         events = []
 
         class FakeChecker:
@@ -119,7 +119,7 @@ class TestUpdateCheckAlwaysContinues:
 
 class TestContinueAfterUpdateCheck:
     def test_prompts_consent_then_starts_report(self, monkeypatch):
-        import lvjiang.ui.telemetry_consent_dialog as consent_dialog_mod
+        import lvjiang.ui.notices.telemetry_consent_dialog as consent_dialog_mod
         events = []
         monkeypatch.setattr(consent_dialog_mod, "maybe_prompt_and_record",
                             lambda parent: events.append("consent"))

@@ -11,7 +11,7 @@ from lvjiang.ui.button_styles import (
     NEUTRAL_BUTTON_STYLE,
     apply_button_style,
 )
-from lvjiang.ui.script_config_dialog import ScriptConfigDialog
+from lvjiang.ui.scripts.config_dialog import ScriptConfigDialog
 
 
 def test_shared_button_styles_keep_geometry_consistent(qtbot):
@@ -35,10 +35,10 @@ def test_shared_button_styles_keep_geometry_consistent(qtbot):
 
 def test_script_config_actions_share_one_left_right_row(qtbot, monkeypatch):
     monkeypatch.setattr(
-        "lvjiang.ui.script_config_dialog.discover_scripts", lambda: []
+        "lvjiang.ui.scripts.config_dialog.discover_scripts", lambda: []
     )
     monkeypatch.setattr(
-        "lvjiang.ui.script_config_dialog.load_preferences",
+        "lvjiang.ui.scripts.config_dialog.load_preferences",
         lambda: SimpleNamespace(order=[], visible={}, scopes={}, names={}),
     )
     dialog = ScriptConfigDialog(None)
@@ -65,9 +65,9 @@ def test_script_config_row_move_rebuilds_owned_cell_widgets(qtbot, monkeypatch):
         },
     ]
     monkeypatch.setattr(
-        "lvjiang.ui.script_config_dialog.discover_scripts", lambda: scripts)
+        "lvjiang.ui.scripts.config_dialog.discover_scripts", lambda: scripts)
     monkeypatch.setattr(
-        "lvjiang.ui.script_config_dialog.load_preferences",
+        "lvjiang.ui.scripts.config_dialog.load_preferences",
         lambda: SimpleNamespace(
             order=["first", "second"], visible={}, scopes={}, names={}),
     )

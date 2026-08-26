@@ -3,7 +3,7 @@
 from unittest.mock import patch
 
 from lvjiang.core.update import ReleaseInfo
-from lvjiang.ui.update_dialog import UpdateDialog
+from lvjiang.ui.notices.update_dialog import UpdateDialog
 
 
 def test_four_action_buttons_are_single_row_and_equal_size(qtbot):
@@ -15,7 +15,7 @@ def test_four_action_buttons_are_single_row_and_equal_size(qtbot):
         release_url="https://github.com/example/releases/tag/v0.5.1",
         download_url="https://example.test/app-v0.5.1-setup.exe",
     )
-    with patch("lvjiang.ui.update_dialog.get_version", return_value="0.5.0"):
+    with patch("lvjiang.ui.notices.update_dialog.get_version", return_value="0.5.0"):
         dialog = UpdateDialog(release)
     qtbot.addWidget(dialog)
     dialog.show()

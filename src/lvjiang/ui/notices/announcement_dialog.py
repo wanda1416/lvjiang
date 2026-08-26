@@ -18,14 +18,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.announcement import (
+from ...core.announcement import (
     Announcement,
     AnnouncementChecker,
     AnnouncementFetchResult,
     AnnouncementManifest,
     cache_manifest,
 )
-from ..i18n import tr
+from ...i18n import tr
 
 _LEVEL_LABELS = {
     "critical": "严重",

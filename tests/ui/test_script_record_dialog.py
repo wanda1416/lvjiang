@@ -7,7 +7,7 @@
 
 import time
 
-from lvjiang.ui.macros.recorder import PRECISION_HIGH, MacroRecorder
+from lvjiang.core.macro_recorder import PRECISION_HIGH, MacroRecorder
 
 
 class _MockKey:
@@ -136,7 +136,7 @@ class TestHighPrecisionClick:
     """
 
     def _make_high_precision_recorder(self, monkeypatch):
-        from lvjiang.ui.macros import recorder as recorder_module
+        from lvjiang.core import macro_recorder as recorder_module
         monkeypatch.setattr(recorder_module, "pynput_mouse", object())
         win = {"left": 0, "top": 0, "width": 1000, "height": 800}
         rec = MacroRecorder(
@@ -182,7 +182,7 @@ class TestHighPrecisionClick:
 
 class TestLowPrecisionMouseButtons:
     def _make_recorder(self, monkeypatch):
-        from lvjiang.ui.macros import recorder as recorder_module
+        from lvjiang.core import macro_recorder as recorder_module
         monkeypatch.setattr(recorder_module, "pynput_mouse", object())
         rec = _make_recorder([])
         rec._recording = True
@@ -299,7 +299,7 @@ class TestScroll:
         rec._recording = True
         ticks = iter((10.0, 10.031789, 10.072051))
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic", lambda: next(ticks))
+            "lvjiang.core.macro_recorder.time.monotonic", lambda: next(ticks))
 
         rec._on_scroll(500, 397, 0, -1)
         rec._on_scroll(500, 397, 0, -1)
@@ -314,7 +314,7 @@ class TestScroll:
         rec._recording = True
         ticks = iter((10.0, 10.2))
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic", lambda: next(ticks))
+            "lvjiang.core.macro_recorder.time.monotonic", lambda: next(ticks))
 
         rec._on_scroll(500, 397, 0, -1)
         rec._on_scroll(500, 397, 0, -1)
@@ -334,7 +334,7 @@ class TestPress:
         key = _char_key("a")
         ticks = iter((10_000_000_000, 10_020_000_000))
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
+            "lvjiang.core.macro_recorder.time.monotonic_ns", lambda: next(ticks))
 
         rec._on_key_press(key)
         rec._on_key_release(key)
@@ -348,7 +348,7 @@ class TestPress:
         key = _special_key("esc")
         ticks = iter((10_000_000_000, 10_100_000_000))
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
+            "lvjiang.core.macro_recorder.time.monotonic_ns", lambda: next(ticks))
 
         rec._on_key_press(key)
         rec._on_key_release(key)
@@ -362,7 +362,7 @@ class TestPress:
         key = _char_key("w")
         ticks = iter((10_000_000_000, 11_000_000_000))
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
+            "lvjiang.core.macro_recorder.time.monotonic_ns", lambda: next(ticks))
 
         rec._on_key_press(key)
         rec._on_key_release(key)
@@ -376,7 +376,7 @@ class TestPress:
         key = _char_key("r")
         ticks = iter((10_000_000_000, 10_300_000_000))
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: next(ticks))
+            "lvjiang.core.macro_recorder.time.monotonic_ns", lambda: next(ticks))
 
         rec._on_key_press(key)
         rec._record_mouse_button("left", True, 100, 80, 10.1)
@@ -439,7 +439,7 @@ class TestPress:
         key = _char_key("a")
         now_ns = time.monotonic_ns()
         monkeypatch.setattr(
-            "lvjiang.ui.macros.recorder.time.monotonic_ns", lambda: now_ns)
+            "lvjiang.core.macro_recorder.time.monotonic_ns", lambda: now_ns)
 
         rec._on_key_press(key)
 

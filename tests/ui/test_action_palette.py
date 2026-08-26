@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from lvjiang.ui import action_palette as ap
+from lvjiang.ui.scripts import action_palette as ap
 from lvjiang.workflows import action_catalog as cat
 from lvjiang.workflows.grammar import parse_text
 
@@ -173,7 +173,7 @@ class TestInsertStatement:
 
         from lvjiang.core.config import resolver as cr
         from lvjiang.core.config.resolver import ConfigResolver
-        from lvjiang.ui.script_editor_dialog import ScriptEditorDialog
+        from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
 
         # 对话框带未保存修改关闭时会弹「放弃修改？」模态框——qtbot 收尾关窗会卡在那等人点，
         # 必须打桩（与 test_script_editor_dialog 同一做法）

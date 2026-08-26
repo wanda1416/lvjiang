@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from lvjiang.core.config.session import reset_session_store
-from lvjiang.ui.telemetry_consent_dialog import (
+from lvjiang.ui.notices.telemetry_consent_dialog import (
     TelemetryConsentDialog,
     maybe_prompt_and_record,
 )
@@ -66,7 +66,7 @@ class TestMaybePromptAndRecord:
         def _boom(*a, **k):
             raise AssertionError("已经问过，不应该再弹窗")
         monkeypatch.setattr(
-            "lvjiang.ui.telemetry_consent_dialog.TelemetryConsentDialog", _boom)
+            "lvjiang.ui.notices.telemetry_consent_dialog.TelemetryConsentDialog", _boom)
         maybe_prompt_and_record(None)  # 不抛即通过
 
     def test_records_choice_on_first_prompt(self, qtbot, monkeypatch):
@@ -78,7 +78,7 @@ class TestMaybePromptAndRecord:
                 return 1
 
         monkeypatch.setattr(
-            "lvjiang.ui.telemetry_consent_dialog.TelemetryConsentDialog", _AutoAgree)
+            "lvjiang.ui.notices.telemetry_consent_dialog.TelemetryConsentDialog", _AutoAgree)
         maybe_prompt_and_record(None)
         assert consent.get_consent_state() is consent.ConsentState.GRANTED
         assert consent.needs_prompt() is False

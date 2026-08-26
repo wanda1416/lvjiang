@@ -16,9 +16,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core import group_qrcode
-from ..core.update import GITHUB_REPO
-from ..i18n import tr
+from ...core import group_qrcode
+from ...core.update import GITHUB_REPO
+from ...i18n import tr
 
 ISSUE_GUIDE_URL = (
     f"https://github.com/{GITHUB_REPO}/blob/master/"

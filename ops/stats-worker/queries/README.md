@@ -20,6 +20,20 @@ wrangler d1 execute lvjiang-stats --remote --file=queries/retention_cohort.sql
 - **对外公布任何数字都要注明口径**：只统计同意上报的用户，且默认开启
   被改回 opt-in 弹窗之后，样本可能明显小于总装机量。
 
+## 导出到本地做研究
+
+`roll_export.sql` 与其余查询不同，它不算结论，只把原始批次搬到本地：
+
+```bash
+wrangler d1 execute lvjiang-stats --remote --json \
+  --file=queries/roll_export.sql > rolls.json
+python scripts/analyze_telemetry_rolls.py rolls.json -o report.md
+```
+
+分层、置信区间、重抽样这类分析在 SQL 里写会很难读也很难复核。导出文件含
+`install_id`，只放本机、不提交仓库、不随 issue 外发。方法论见
+[`docs/10-game/20-affix-analysis/`](../../../docs/10-game/20-affix-analysis/README.md)。
+
 ## 保留期
 
 - `daily` / `roll_batch` / `install_day_rolls`：90 天，Worker 的

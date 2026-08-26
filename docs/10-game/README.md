@@ -13,11 +13,15 @@
 | [03-damage-mechanics.md](03-damage-mechanics.md) | 伤害机制：计算公式、属性转换 |
 | [04-tuning-mechanics.md](04-tuning-mechanics.md) | 调律相关文档的边界与索引 |
 | [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
+| [20-affix-analysis/](20-affix-analysis/README.md) | 词条分布规律分析：数据来源、分析脚本、已知偏差清单 |
 
 ## 待补充
 
 - `affix-compendium.md` — 词条大全：名称、类型、数值范围、出现规则
 - `rarity-rules.md` — 稀有词条规则
+
+这两篇要填的是**结论**（游戏实际怎么出词条），而结论得先从观测数据里推出来——
+方法与脚本见 [20-affix-analysis/](20-affix-analysis/README.md)。
 
 各流派毕业标准与调律评级不是同一概念，毕业率模型见
 [毕业率计算](../30-architecture/36-graduation/README.md)。

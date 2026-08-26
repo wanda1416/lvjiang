@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}律匠统计控制台{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="topnav">
+    <a class="brand" href="/">律匠统计控制台</a>
+    <a href="/">总览</a>
+    <a href="/rolls">调律分析</a>
+    <a href="/sync">数据与同步</a>
+    <a href="/setup">配置</a>
+  </nav>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

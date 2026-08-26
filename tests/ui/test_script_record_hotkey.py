@@ -9,8 +9,8 @@ from PyQt6.QtWidgets import QApplication, QDialog, QMainWindow
 from lvjiang.core import platforms
 from lvjiang.core.config.models import UserConfig
 from lvjiang.core.input_trace import InputTrace, InputTraceEvent
-from lvjiang.ui import script_record_dialog as dialog_module
-from lvjiang.ui.script_record_dialog import ScriptRecordDialog
+from lvjiang.ui.scripts import record_dialog as dialog_module
+from lvjiang.ui.scripts.record_dialog import ScriptRecordDialog
 
 
 class _Listener:

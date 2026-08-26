@@ -13,7 +13,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMouseEvent
 
-from .ocr_canvas import OCRCanvas
+from .canvas import OCRCanvas
 
 #: 按下到抬起位移小于此值（widget 像素）视为"点击"而非拖框
 _CLICK_SLOP = 4.0

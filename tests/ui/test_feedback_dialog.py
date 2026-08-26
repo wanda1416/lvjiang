@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from lvjiang.core import group_qrcode
 from lvjiang.i18n import init_i18n
-from lvjiang.ui.feedback_dialog import (
+from lvjiang.ui.notices.feedback_dialog import (
     ISSUE_GUIDE_URL,
     NEW_ISSUE_URL,
     FeedbackDialog,
@@ -47,7 +47,7 @@ def test_feedback_links_open_guide_and_new_issue(qtbot):
     qtbot.addWidget(dialog)
 
     with patch(
-        "lvjiang.ui.feedback_dialog.QDesktopServices.openUrl"
+        "lvjiang.ui.notices.feedback_dialog.QDesktopServices.openUrl"
     ) as open_url:
         dialog._details_btn.click()
         dialog._github_btn.click()
@@ -62,7 +62,7 @@ def test_group_qr_is_opened_only_from_button(qtbot):
     dialog = FeedbackDialog()
     qtbot.addWidget(dialog)
 
-    with patch("lvjiang.ui.feedback_dialog.GroupQrDialog") as qr_dialog:
+    with patch("lvjiang.ui.notices.feedback_dialog.GroupQrDialog") as qr_dialog:
         dialog._group_btn.click()
 
     qr_dialog.assert_called_once_with(dialog)

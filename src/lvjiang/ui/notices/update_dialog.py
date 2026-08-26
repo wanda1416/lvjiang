@@ -23,8 +23,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core.update import ReleaseInfo, get_version, set_skip_version
-from ..i18n import tr
+from ...core.update import ReleaseInfo, get_version, set_skip_version
+from ...i18n import tr
 
 
 class UpdateDialog(QDialog):

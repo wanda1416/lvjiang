@@ -21,8 +21,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..i18n import tr
-from .button_styles import apply_button_style
+from ...i18n import tr
+from ..button_styles import apply_button_style
 
 
 class TelemetryConsentDialog(QDialog):
@@ -87,10 +87,10 @@ class TelemetryConsentDialog(QDialog):
 
     @staticmethod
     def _example_payload_text() -> str:
-        from ..core.telemetry.heartbeat import HEARTBEAT_SCHEMA
+        from ...core.telemetry.heartbeat import HEARTBEAT_SCHEMA
         payloads = [HEARTBEAT_SCHEMA.example()]
         try:
-            from ..apps.yysls.telemetry.schemas import TUNING_ROLL_SCHEMA
+            from ...apps.yysls.telemetry.schemas import TUNING_ROLL_SCHEMA
             payloads.append(TUNING_ROLL_SCHEMA.example())
         except Exception:  # noqa: BLE001 —— 插件未加载时只展示心跳示例
             pass
@@ -107,7 +107,7 @@ class TelemetryConsentDialog(QDialog):
 
 def maybe_prompt_and_record(parent) -> None:
     """首启入口：需要问就问，问完立即落地选择。供 main_window 调用。"""
-    from ..core.telemetry.consent import needs_prompt, record_consent_choice
+    from ...core.telemetry.consent import needs_prompt, record_consent_choice
 
     if not needs_prompt():
         return

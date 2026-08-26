@@ -323,7 +323,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
                 manifest = result.manifest
                 cache_manifest(manifest, result.etag)
                 if should_prompt_manifest(manifest):
-                    from .announcement_dialog import AnnouncementDialog
+                    from .notices.announcement_dialog import AnnouncementDialog
                     notices = applicable_notices(manifest)
                     dialog = AnnouncementDialog(
                         manifest, notices, self, allow_refresh=False)
@@ -352,7 +352,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
                 if not should_prompt_update(release.version):
                     return  # 用户已选择跳过此版本
 
-                from .update_dialog import UpdateDialog
+                from .notices.update_dialog import UpdateDialog
                 dialog = UpdateDialog(release, self)
                 dialog.exec()  # 用户选择"继续使用"时直接关闭对话框
             finally:
@@ -373,7 +373,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         弹窗一样只能串行；上报放最后，因为它没有 UI，用户感知不到，
         也不该拖慢前面两个弹窗的展示时机。
         """
-        from .telemetry_consent_dialog import maybe_prompt_and_record
+        from .notices.telemetry_consent_dialog import maybe_prompt_and_record
         maybe_prompt_and_record(self)
         self._start_telemetry_report_on_startup()
 
@@ -551,13 +551,13 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
     # ─── 对话框 ──────────────────────────────────────────────
 
     def _open_ocr_dialog(self):
-        from .ocr_dialog import OCRDialog
+        from .ocr import OCRDialog
         dialog = OCRDialog(self, refresh_callback=self._refresh_capture)
         dialog.exec()
 
     def _open_script_record(self):
         """仅通过用户菜单操作打开脚本录制对话框。"""
-        from .script_record_dialog import ScriptRecordDialog
+        from .scripts import ScriptRecordDialog
         dialog = ScriptRecordDialog(self)
         try:
             dialog.exec()
@@ -566,7 +566,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
 
     def _open_script_editor(self):
         """打开脚本编辑对话框；有新建/保存/删除时刷新日常页脚本下拉。"""
-        from .script_editor_dialog import ScriptEditorDialog
+        from .scripts import ScriptEditorDialog
         dialog = ScriptEditorDialog(self)
         dialog.exec()
         if dialog.changed:
@@ -574,7 +574,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
 
     def _open_script_config(self):
         """打开脚本配置对话框；保存后刷新日常页脚本下拉。"""
-        from .script_config_dialog import ScriptConfigDialog
+        from .scripts import ScriptConfigDialog
         dialog = ScriptConfigDialog(self)
         if dialog.exec():
             self._load_workflow_configs()
@@ -600,14 +600,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
                 self.statusBar().showMessage(tr("图库已刷新"), 3000)
 
     def _show_about(self):
-        from .about_dialog import AboutDialog
+        from .notices.about_dialog import AboutDialog
         dialog = AboutDialog(self)
         dialog.exec()
 
     def _open_announcements(self):
         """打开公告中心：先显示缓存，并在窗口内异步获取最新内容。"""
         from ..core.announcement import load_cached_manifest, mark_notice_version
-        from .announcement_dialog import AnnouncementDialog
+        from .notices.announcement_dialog import AnnouncementDialog
 
         dialog = AnnouncementDialog(load_cached_manifest(), parent=self)
         dialog.refresh()
@@ -621,7 +621,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         from PyQt6.QtWidgets import QMessageBox
 
         from ..core.update import UpdateChecker, get_version, is_newer_version
-        from .update_dialog import UpdateDialog
+        from .notices.update_dialog import UpdateDialog
 
         checker = UpdateChecker(self)
 
@@ -650,12 +650,12 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
 
-        from .about_dialog import GITHUB_REPO
+        from ..core.update import GITHUB_REPO
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
 
     def _open_feedback(self):
         """打开反馈规范与反馈渠道对话框。"""
-        from .feedback_dialog import FeedbackDialog
+        from .notices.feedback_dialog import FeedbackDialog
         dialog = FeedbackDialog(self)
         dialog.exec()
 

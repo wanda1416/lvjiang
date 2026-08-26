@@ -33,11 +33,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..i18n import tr
-from ..workflows.discovery import discover_scripts
-from ..workflows.policy import WorkflowDiscoveryPolicy as Policy
-from ..workflows.preferences import load_preferences, save_preferences
-from .button_styles import apply_button_style
+from ...i18n import tr
+from ...workflows.discovery import discover_scripts
+from ...workflows.policy import WorkflowDiscoveryPolicy as Policy
+from ...workflows.preferences import load_preferences, save_preferences
+from ..button_styles import apply_button_style
 
 
 class ScriptConfigDialog(QDialog):

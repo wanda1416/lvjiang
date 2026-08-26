@@ -6,12 +6,15 @@
 
 | 模块 | 文件路径 |
 |------|----------|
-| 主窗口与菜单/对话框 | `lvjiang/ui/main_window.py` |
-| 运行控制混入（启停/工作流调度） | `lvjiang/ui/run_control.py` |
-| 窗口操作混入（扫描/定位/截屏） | `lvjiang/ui/window_ops.py` |
+| 主窗口本体（构造/UI 骨架/宿主 API） | `lvjiang/ui/main/window.py` |
+| 运行控制混入（启停/工作流调度） | `lvjiang/ui/main/run_control.py` |
+| 窗口操作混入（扫描/定位/截屏） | `lvjiang/ui/main/window_ops.py` |
+| 菜单与对话框入口混入 | `lvjiang/ui/main/menu_ops.py` |
+| 启动检查链混入（公告/更新/统计） | `lvjiang/ui/main/startup_ops.py` |
+| 会话状态持久化混入 | `lvjiang/ui/main/ui_state.py` |
 | 覆盖层边框绘制 | `lvjiang/ui/overlay.py` |
 | 截屏与捕获区域 | `lvjiang/core/capture.py` |
-| 日志线程安全桥 | `main_window._LogBridge`（模块级 `QObject` + `pyqtSignal`） |
+| 日志线程安全桥 | `main/window._LogBridge`（模块级 `QObject` + `pyqtSignal`） |
 
 ## 状态定义
 

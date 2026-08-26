@@ -8,7 +8,7 @@ from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 
-from ..i18n import tr
+from ...i18n import tr
 
 
 class _AdbConnSignalBridge(QObject):
@@ -53,13 +53,13 @@ class _DeviceWorker(QObject):
                 self.error.emit(str(e))
 
     def _do_scan(self):
-        from ..core.android import list_adb_devices
+        from ...core.android import list_adb_devices
         devices = list_adb_devices()
         if not self._cancelled:
             self.scan_finished.emit(devices)
 
     def _do_wireless_scan(self):
-        from ..core.android import scan_and_connect_wireless
+        from ...core.android import scan_and_connect_wireless
 
         def progress_cb(message: str, current: int, total: int):
             if self._cancelled:
@@ -79,7 +79,7 @@ class _DeviceWorker(QObject):
         self.wireless_progress.emit(message, current, total)
 
     def _do_connect(self):
-        from ..core.android import AdbDevice, connect_agent, create_capture_backend
+        from ...core.android import AdbDevice, connect_agent, create_capture_backend
 
         device = AdbDevice(serial=self._serial)
         w, h = device.get_resolution()
@@ -223,7 +223,7 @@ class WindowOpsMixin:
 
     def _on_scan_window(self):
         """扫描所有可见窗口，填充列表（切换到 Windows 投屏模式）"""
-        from ..core.platforms import DESKTOP_BACKEND_AVAILABLE
+        from ...core.platforms import DESKTOP_BACKEND_AVAILABLE
         if not DESKTOP_BACKEND_AVAILABLE:
             # 按钮在非 Windows 已隐藏，此处为防御：投屏模式依赖 Win32 API
             self.log_text.append(tr("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」"))
@@ -268,7 +268,7 @@ class WindowOpsMixin:
         if had_target:
             self.log_text.append(tr("[状态] 重新扫描窗口，旧定位已失效"))
 
-        from ..core.desktop import list_visible_windows
+        from ...core.desktop import list_visible_windows
         self._scanned_windows = list_visible_windows()
         self.window_combo.clear()
 
@@ -547,7 +547,7 @@ class WindowOpsMixin:
 
     def _on_connect_done(self, combo_data, device, capture, capture_method, w, h, agent=None):
         """连接成功回调（主线程）"""
-        from ..core.android import create_input_backend
+        from ...core.android import create_input_backend
 
         # 创建输入控制器：有设备端代理走无障碍手势，否则 adb shell input
         self._agent = agent
@@ -556,7 +556,7 @@ class WindowOpsMixin:
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
         self._scrcpy_streaming = False
         if capture_method == "scrcpy":
-            from ..core.android import AndroidStreamCapture
+            from ...core.android import AndroidStreamCapture
             if isinstance(capture, AndroidStreamCapture):
                 capture.set_on_frame(self._on_scrcpy_frame)
                 self._scrcpy_streaming = True
@@ -757,13 +757,13 @@ class WindowOpsMixin:
         # 定位成功后根据 checkbox 状态选择输入后端
         if hasattr(self, 'chk_bg_mode'):
             if self.chk_bg_mode.isChecked():
-                from ..core.desktop import PostMessageInput
+                from ...core.desktop import PostMessageInput
                 self._input = PostMessageInput(
                     input_sim=self._user_config.input_sim,
                     hwnd=w["hwnd"],
                 )
             else:
-                from ..core.desktop import SendInputInput
+                from ...core.desktop import SendInputInput
                 self._input = SendInputInput(input_sim=self._user_config.input_sim)
                 self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
 
@@ -787,14 +787,14 @@ class WindowOpsMixin:
             return
         hwnd = self._target_window["hwnd"]
         if bool(state):
-            from ..core.desktop import PostMessageInput
+            from ...core.desktop import PostMessageInput
             self._input = PostMessageInput(
                 input_sim=self._user_config.input_sim,
                 hwnd=hwnd,
             )
             self.log_text.append(tr("[模式] 已切换到后台模式（PostMessage，不移动光标）"))
         else:
-            from ..core.desktop import SendInputInput
+            from ...core.desktop import SendInputInput
             self._input = SendInputInput(input_sim=self._user_config.input_sim)
             self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
 
@@ -813,14 +813,14 @@ class WindowOpsMixin:
 
         # 已连接设备时只在 screencap / scrcpy 之间重建截图后端。
         self._user_config.android_capture_method = method
-        from ..core.android import create_capture_backend
+        from ...core.android import create_capture_backend
         old_capture = self._capture
         self._capture = create_capture_backend(device=self._device, method=method)
         if self._capture.start():
             # scrcpy 模式订阅帧回调
             self._scrcpy_streaming = False
             if method == "scrcpy":
-                from ..core.android import AndroidStreamCapture
+                from ...core.android import AndroidStreamCapture
                 if isinstance(self._capture, AndroidStreamCapture):
                     self._capture.set_on_frame(self._on_scrcpy_frame)
                     self._scrcpy_streaming = True
@@ -890,7 +890,7 @@ class WindowOpsMixin:
         # windows 投屏窗口
         if not self._target_window:
             return None
-        from ..core.desktop import DesktopCapture
+        from ...core.desktop import DesktopCapture
         if self._capture is None:
             self._capture = DesktopCapture()
         w = self._target_window
@@ -916,7 +916,7 @@ class WindowOpsMixin:
         if not self._target_window:
             return None, tr("请先在主窗口定位窗口")
         try:
-            from ..core.desktop import DesktopCapture
+            from ...core.desktop import DesktopCapture
             if self._capture is None:
                 self._capture = DesktopCapture()
             w = self._target_window

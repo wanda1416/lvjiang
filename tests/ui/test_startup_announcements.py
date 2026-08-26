@@ -6,7 +6,7 @@ from lvjiang.core.announcement import (
     AnnouncementFetchResult,
     AnnouncementManifest,
 )
-from lvjiang.ui.main_window import MainWindow
+from lvjiang.ui.main.window import MainWindow
 
 
 class FakeSignal:

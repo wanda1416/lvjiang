@@ -354,7 +354,7 @@ class DebugPanel(QWidget):
         if not text.strip():
             self.lbl_run.setText(tr("脚本为空"))
             return False
-        from ..run_control import WorkflowWorker
+        from ..main.run_control import WorkflowWorker
 
         try:
             path: Path = get_resolver().write_entity(EDITOR_RUN_REL, text if text.endswith("\n") else text + "\n")

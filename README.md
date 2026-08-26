@@ -95,8 +95,10 @@ lvjiang/
 │   │   ├── scene_editor/      # 场景编辑器（坐标标注 / 区域绘制）
 │   │   ├── reference_manager/ # 参考图库管理 UI
 │   │   ├── batch/             # 批量运行面板
-│   │   ├── macros/            # 脚本录制
-│   │   └── run_control.py     # 运行控制与日志
+│   │   ├── main/              # 主窗口本体与各功能混入（运行控制 / 窗口操作 / 菜单 / 托盘）
+│   │   ├── scripts/           # 脚本录制、编辑与清单配置
+│   │   ├── ocr/               # 图像识别对话框与画布
+│   │   └── notices/           # 公告 / 更新 / 关于 / 反馈
 │   └── apps/                  # 插件注册表
 │       ├── base.py            # AppHooks 数据类
 │       └── yysls/             # 燕云十六声插件

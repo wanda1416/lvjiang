@@ -1,6 +1,6 @@
 """日常页脚本名显示测试。"""
 
-from lvjiang.ui.run_control import _compact_workflow_name
+from lvjiang.ui.main.run_control import _compact_workflow_name
 
 
 def test_compact_workflow_name_keeps_short_name():

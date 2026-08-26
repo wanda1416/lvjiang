@@ -86,7 +86,7 @@ wrangler d1 execute lvjiang-stats --remote --file=ops/stats-worker/queries/dau.s
 个人开发者一周看一两次数字，没有建网页看板——那需要管密钥、管鉴权，
 本身也是一个攻击面，CLI 已经够用。
 
-### 五个查询能回答的问题
+### 每条查询回答什么
 
 | 文件 | 回答什么 |
 |---|---|
@@ -96,7 +96,14 @@ wrangler d1 execute lvjiang-stats --remote --file=ops/stats-worker/queries/dau.s
 | `roll_affix_prob.sql` | P(词条 \| 部位, 材料)——直接对 `roll_batch.payload` 用 `json_each` 展开查，Tier 0 阶段不需要预聚合 |
 | `roll_pity_check.sql` | 按 `roll_index` 分桶看命中率是否随次数上升——检测保底/软保底机制 |
 | `data_health.sql` | 每 install 每日调律量分位数，找量级离群的异常灌注来源 |
+| `roll_export.sql` | 把原始批次导出到本地做离线分析（配合 `--json`） |
 | `forget.sql` | `/v1/forget` 接口不可用时的应急手动删除 |
+
+上面这些是**运营视角**（这个月有多少人在用）。**研究视角**——调律到底怎么出
+词条、有没有保底、`cap_pct` 是什么分布——SQL 写起来很难读也很难复核，走
+`roll_export.sql` 导出到本地，用 `scripts/analyze_telemetry_rolls.py` 生成
+报告；方法论与这份数据已知的系统性偏差见
+[`docs/10-game/20-affix-analysis/`](../10-game/20-affix-analysis/README.md)。
 
 ### 读数字时必须记住的两条
 

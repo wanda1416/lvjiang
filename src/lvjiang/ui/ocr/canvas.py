@@ -1,6 +1,6 @@
 """OCR 测试画布 - 图片显示 + 缩放/平移 + OCR 结果标注 + 选框交互
 
-参考 reference_manager/canvas.py 的缩放平移实现。
+参考 reference/canvas.py 的缩放平移实现。
 参考 scene_editor/canvas.py 的选框交互实现。
 """
 

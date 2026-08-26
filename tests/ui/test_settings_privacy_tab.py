@@ -101,12 +101,13 @@ class TestIdLabelReflectsState:
         dlg = _make_dialog(qtbot)
         assert "未生成" in dlg._telemetry_id_label.text()
 
-    def test_shows_id_prefix_when_enabled(self, qtbot):
+    def test_shows_complete_id_when_enabled(self, qtbot):
         dlg = _make_dialog(qtbot)
         dlg._telemetry_check.setChecked(True)
         from lvjiang.core.telemetry.identity import get_identity
-        prefix = get_identity().install_id[:8]
-        assert prefix in dlg._telemetry_id_label.text()
+        install_id = get_identity().install_id
+        assert dlg._telemetry_id_label.text() == f"当前标识：{install_id}"
+        assert "…" not in dlg._telemetry_id_label.text()
 
 
 class TestResetIdButtonRequiresConfirmation:
@@ -132,4 +133,6 @@ class TestResetIdButtonRequiresConfirmation:
         monkeypatch.setattr(QMessageBox, "question",
                             lambda *a, **k: QMessageBox.StandardButton.Yes)
         dlg._on_reset_telemetry_id()
-        assert get_identity().install_id != old_id
+        new_id = get_identity().install_id
+        assert new_id != old_id
+        assert dlg._telemetry_id_label.text() == f"当前标识：{new_id}"

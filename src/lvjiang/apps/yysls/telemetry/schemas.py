@@ -35,7 +35,9 @@ _ACTIVE_RULE_PATTERN = r"^(none|[a-z0-9_]+(\+[a-z0-9_]+)*)$"
 # 但重置会把 slot 打回 1，跨重置重建终态词条组合必须先按 resets 分段。
 _AFFIX_FIELDS = (
     FieldSpec("affix", str, choices_fn=vocab.affix_choices),
-    FieldSpec("cap_pct", float, minimum=0.0, maximum=100.0),
+    # 选填：算不出上限时**省略**而不是填 0。0 是合法取值（洗到该词条下限），
+    # 兜底成 0 等于把"未知"伪装成"最差"，会把数值分布的低位堆出一根假柱子。
+    FieldSpec("cap_pct", float, required=False, minimum=0.0, maximum=100.0),
     FieldSpec("is_transferred", bool),
 )
 

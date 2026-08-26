@@ -939,7 +939,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # + 未同意时早退，绝不中断调律主流程。
         telemetry_probe.begin_session(
             equip_data=equip_data, initial_affixes=base_affixes,
-            mode=self.equipment_session.mode.value,
             rule_keys=self.ctx.judge_rule_keys)
         stop_key = "completed"
 
@@ -1085,6 +1084,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                            else "调律结束")
             stop_key = "user_stopped" if self.is_stopped else "completed"
         telemetry_probe.end_session(
+            # mode 在这里取：会话中途可能被判定切成调满回收/强制调律
+            mode=self.equipment_session.mode.value,
             stop_reason=stop_key,
             final_rating=_best_rating(judgement),
             total_rounds=rounds, resets=resets_used)

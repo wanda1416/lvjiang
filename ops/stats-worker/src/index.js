@@ -5,8 +5,15 @@
  *   - 整个文件不出现 CF-Connecting-IP / request.cf 的任何读取；
  *   - 所有维度字段落库前经白名单校验，不在名单内的值一律拒绝该条
  *     （不是"存成 other"）；
- *   - 响应恒为 204/400/404/405 且无 body，客户端永远没有东西可解析，
+ *   - 响应恒为 204/400/404/405/503 且无 body，客户端永远没有东西可解析，
  *     这个通道不可能被用来下发指令。
+ *
+ * 状态码语义（客户端据此决定是否保留缓冲重试，见 core/telemetry/transport.py）：
+ *   204  已受理，或**有意静默丢弃**（熔断、单 install 日批次上限）——
+ *        这两种情况重试也不会被接受，必须让客户端 drop 掉缓冲；
+ *   503  非预期内部异常（D1 写失败/配额耗尽）——数据没落库，客户端
+ *        保留缓冲下次启动重试。早先这里一律回 204，等于收下之后
+ *        悄悄扔掉且客户端还以为成功，是纯粹的静默丢数据。
  *
  * 端点：
  *   POST /v1/report   上报心跳 + 调律批次
@@ -148,14 +155,32 @@ function isSafeValue(v, depth) {
   return false;
 }
 
+// 已知事件类型 → 已知 schema 版本集合。
+//
+// 这份白名单与"服务端不认识调律字段"的原则不冲突：写死的是**事件类型**，
+// 不是字段。字段（part/food/affix）随游戏版本增长，抄到服务端会让新字段
+// 在双边同步完成前裸奔；而事件类型是**存储层语义**——新增一类事件本来就
+// 要决定它进哪张表、怎么聚合，那时本就必须改服务端。
+//
+// 不校验的代价是具体的：payload 是不透明 JSON，垃圾事件混进 roll_batch 后
+// 只有跑分析时才会发现，而那时它已经计进 n_events 和每日配额了。version
+// 也必须看——schema 改版后字段语义会变（例如 v1 的一条事件=一轮，v2=一件），
+// 混着聚合会算出无意义的均值，且事后无法从 payload 里区分。
+const KNOWN_SCHEMAS = {
+  "yysls.tuning_session": new Set([1]),
+};
+
 /**
  * 单条事件的结构性校验。不合法只丢弃这一条，不拖垮整个批次。
- * 只强制两个存储层自身需要的字段：schema（用于事后按类型筛选）与
- * install_id（行的归属键）——这两个不是调律语义，是存储语义。
+ * 只强制三个存储层自身需要的字段：schema + version（决定进哪张表、
+ * 怎么聚合）与 install_id（行的归属键）——都不是调律语义，是存储语义。
  */
 function sanitizeEvent(e) {
   if (!e || typeof e !== "object" || Array.isArray(e)) return null;
   if (!isStr(e.schema, RE_ASCII_TOKEN, 64)) return null;
+  const versions = KNOWN_SCHEMAS[e.schema];
+  if (!versions) return null;                       // 未知事件类型
+  if (!isInt(e.version) || !versions.has(e.version)) return null;  // 未知版本
   if (!isStr(e.install_id, RE_UUID_HEX)) return null;
   if (!isSafeValue(e, 0)) return null;
   return e;
@@ -222,9 +247,18 @@ async function handleReport(request, env) {
   }
   if (!body || body.v !== 1) return jsonResponse(400);
 
+  // 信封级 app_version：心跳每 UTC 日只发一次（见 heartbeat.should_send_heartbeat），
+  // 所以同一天第 2..N 次上报的 hb 为 null。早先在那种情况下把批次记成
+  // "unknown"，而 roll_batch.app_version 正是"事后剔除坏版本数据的唯一抓手"，
+  // 等于让绝大多数批次失去这个抓手。信封值也比回查 installs 更准：用户中途
+  // 升级重启后当天不会再发心跳，installs 里还是旧版本号。
+  const envelopeVersion = isStr(body.app_version, RE_VERSION) ? body.app_version : null;
+
   try {
     const hb = validateHeartbeat(body.heartbeat);
     if (hb) await upsertHeartbeat(env.DB, hb);
+
+    const appVersion = envelopeVersion || (hb ? hb.app_version : null) || "unknown";
 
     const batches = Array.isArray(body.batches) ? body.batches.slice(0, MAX_BATCHES) : [];
     for (const b of batches) {
@@ -232,13 +266,20 @@ async function handleReport(request, env) {
       const rawEvents = Array.isArray(b.events) ? b.events.slice(0, MAX_EVENTS_PER_BATCH) : [];
       const events = rawEvents.map(sanitizeEvent).filter(Boolean);
       if (events.length === 0) continue;
+      // 整批必须同属一个 install_id。客户端换 ID 时会连带清空本地缓冲
+      // （identity.reset_identity → spool.purge），所以混合 ID 的批次不可能
+      // 由正常客户端产生——只取第一条会让伪造批次把别人的 install_id 顶在
+      // 行上，连带污染 install_day_rolls 的限流计数和 /v1/forget 的删除范围。
       const installId = events[0].install_id;
-      const appVersion = hb ? hb.app_version : "unknown";
+      if (!events.every((e) => e.install_id === installId)) continue;
       await insertBatch(env.DB, b.batch_id, installId, appVersion, "yysls", events);
     }
   } catch (e) {
-    // 任何内部异常（含 D1 配额耗尽）都不能让客户端感知到，也不能诱发重试。
-    console.error("report_failed"); // 只打固定错误码，绝不打请求内容
+    // 只打固定错误码，绝不打请求内容。
+    console.error("report_failed");
+    // 数据没落库 → 必须让客户端保留缓冲重试。有意的静默丢弃（熔断、
+    // 日批次上限）走的是各自的 204 早退路径，不会到这里。
+    return jsonResponse(503);
   }
   return jsonResponse(204);
 }
@@ -262,6 +303,9 @@ async function handleForget(request, env) {
     ]);
   } catch (e) {
     console.error("forget_failed");
+    // 删除失败回 204 等于告诉用户"已删除"而实际没删——这是隐私承诺，
+    // 不能靠静默兜底。回 503 让调用方知道要重试。
+    return jsonResponse(503);
   }
   return jsonResponse(204);
 }

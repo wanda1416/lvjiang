@@ -25,7 +25,6 @@ from .paths import identity_path, telemetry_dir
 class Identity:
     install_id: str
     first_seen: str  # "YYYY-MM-DD"，UTC，仅到天——精确到秒是白送的指纹位
-    dropped_events: int = 0  # 本地缓冲超限时累计丢弃的事件数，随下批信封上报
 
 
 def _today_utc() -> str:
@@ -39,8 +38,7 @@ def _generate() -> Identity:
 def _write(identity: Identity) -> None:
     path = identity_path()
     payload = json.dumps(
-        {"install_id": identity.install_id, "first_seen": identity.first_seen,
-         "dropped_events": identity.dropped_events},
+        {"install_id": identity.install_id, "first_seen": identity.first_seen},
         ensure_ascii=False)
     atomic_write_text(path, payload, prefix=".identity_")
 
@@ -60,9 +58,7 @@ def _read() -> Identity | None:
         return None
     if len(install_id) != 32:
         return None
-    dropped = data.get("dropped_events", 0)
-    dropped = dropped if isinstance(dropped, int) and not isinstance(dropped, bool) else 0
-    return Identity(install_id=install_id, first_seen=first_seen, dropped_events=dropped)
+    return Identity(install_id=install_id, first_seen=first_seen)
 
 
 def get_identity() -> Identity:
@@ -93,24 +89,3 @@ def purge_identity() -> None:
     d = telemetry_dir()
     if d.exists():
         shutil.rmtree(d, ignore_errors=True)
-
-
-def bump_dropped_events(n: int) -> None:
-    """本地缓冲超限丢弃事件后累加计数，随下一批信封上报。"""
-    current = _read()
-    if current is None:
-        return  # 未同意/无标识时不产生任何本地状态
-    updated = Identity(
-        install_id=current.install_id, first_seen=current.first_seen,
-        dropped_events=current.dropped_events + n)
-    _write(updated)
-
-
-def take_and_reset_dropped_events() -> int:
-    """取出并清零 dropped_events，供上报信封使用（成功发送后才清零）。"""
-    current = _read()
-    if current is None or current.dropped_events == 0:
-        return 0
-    _write(Identity(install_id=current.install_id, first_seen=current.first_seen,
-                     dropped_events=0))
-    return current.dropped_events

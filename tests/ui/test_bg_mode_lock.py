@@ -8,7 +8,7 @@
    取消勾选立即隐藏边框，勾选且已定位则立即按当前窗口位置重新画出。
 """
 
-from lvjiang.ui.window_ops import WindowOpsMixin
+from lvjiang.ui.main.window_ops import WindowOpsMixin
 
 
 class _CheckBox:

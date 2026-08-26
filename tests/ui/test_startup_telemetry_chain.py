@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from lvjiang.ui.main_window import MainWindow
+from lvjiang.ui.main.window import MainWindow
 
 
 class FakeSignal:

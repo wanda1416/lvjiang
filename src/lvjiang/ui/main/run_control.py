@@ -10,9 +10,9 @@ from typing import Any
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
 
-from ..core.config.resolver import get_resolver
-from ..i18n import tr
-from ..workflows.engine import WorkflowEngine
+from ...core.config.resolver import get_resolver
+from ...i18n import tr
+from ...workflows.engine import WorkflowEngine
 
 _WORKFLOW_NAME_VISIBLE_CHARS = 8
 
@@ -214,7 +214,7 @@ class RunControlMixin:
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
         """
-        from ..workflows.discovery import list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts
 
         self._workflow_configs: list[dict] = []
         self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
@@ -261,7 +261,7 @@ class RunControlMixin:
         """
         from PyQt6.QtWidgets import QFileDialog
 
-        from ..workflows.metadata import build_flow_config
+        from ...workflows.metadata import build_flow_config
         path, _ = QFileDialog.getOpenFileName(
             self, tr("加载工作流文件"), str(get_resolver().write_dir("workflows")),
             tr("工作流文件 (*.wf);;所有文件 (*)"),
@@ -373,7 +373,7 @@ class RunControlMixin:
         """
         if index < 0:
             return
-        from ..core.config import save_env
+        from ...core.config import save_env
         save_env(self._env_combo.itemData(index))
         self._load_workflow_configs()
 
@@ -497,7 +497,7 @@ class RunControlMixin:
         if path is not None:
             return path
 
-        from ..workflows.discovery import discover_scripts
+        from ...workflows.discovery import discover_scripts
 
         fresh_cfg = next(
             (cfg for cfg in discover_scripts()
@@ -843,7 +843,7 @@ class RunControlMixin:
         flow_params = self._collect_flow_params()
         # 专用脚本的参数面板由日常页隐藏，执行时从 wf_configs 加载
         if not flow_params and flow_cfg.get("scope", "daily") != "daily":
-            from ..core.config.wf_configs import get_wf_config
+            from ...core.config.wf_configs import get_wf_config
             flow_params = get_wf_config(flow_cfg["id"]) or {}
         # 执行前持久化当前参数，确保下次启动恢复最新值
         if hasattr(self, '_save_displayed_params'):
@@ -857,7 +857,7 @@ class RunControlMixin:
 
         # Python 代码工作流 vs DSL 工作流
         if wf_class_name:
-            from ..workflows.implementations import get_workflow_class
+            from ...workflows.implementations import get_workflow_class
             wf_class = get_workflow_class(wf_class_name)
             wf_instance = wf_class(
                 capture=self._capture,
@@ -949,7 +949,7 @@ class RunControlMixin:
 
         serializable = _to_serializable(result)
 
-        from ..constants import OUTPUT_DIR
+        from ...constants import OUTPUT_DIR
         # 输出目录归属启动时绑定的用户名，不受运行期间 UI 切换影响
         engine = self._current_engine
         username = (engine.run_username if engine is not None else "") or "default"
@@ -1078,7 +1078,7 @@ class RunControlMixin:
         engine._save_callback = self._session_manager.save_fn(username, engine.session)
         engine._ui_callback = self._create_ui_callback()
         self._current_engine = engine  # type: ignore[assignment]
-        from ..workflows.implementations import get_workflow_class
+        from ...workflows.implementations import get_workflow_class
         wf_class = get_workflow_class(impl_name)
         wf_instance = wf_class(
             capture=self._capture,

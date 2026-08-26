@@ -210,7 +210,7 @@ class ScriptOpsMixin:
             # 格式化输出结果到左侧结果区
             import json
 
-            from ..run_control import _to_serializable
+            from ..main.run_control import _to_serializable
 
             # 构建显示内容
             lines = []

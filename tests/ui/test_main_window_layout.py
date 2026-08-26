@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QComboBox, QFormLayout, QGroupBox
 
-from lvjiang.ui.main_window import (
+from lvjiang.ui.main.window import (
     _TOP_COMBO_CHARACTER_CAPACITY,
     MainWindow,
     _create_workflow_note_label,

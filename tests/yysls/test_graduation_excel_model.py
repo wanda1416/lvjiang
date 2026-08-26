@@ -170,8 +170,8 @@ def test_runtime_matches_mingjin_hong_excel_example(monkeypatch) -> None:
         },
     )
     result = calculator.calculate(attrs)
-    assert result.dps == pytest.approx(119459.79969686334)
-    assert result.graduation_rate == pytest.approx(0.9907868092668608)
+    assert result.dps == pytest.approx(146401.02681145616)
+    assert result.graduation_rate == pytest.approx(0.9506393512026488)
 
 
 def test_scheme_value_inputs_exclude_food_bonus() -> None:

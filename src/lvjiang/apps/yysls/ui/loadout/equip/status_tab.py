@@ -163,6 +163,13 @@ class EquipStatusTab(QWidget):
         btn_affix_impact.clicked.connect(self._on_affix_impact)
         action_row.addWidget(btn_affix_impact)
 
+        btn_chengyin_merge = QPushButton(tr("承音装备合并"))
+        btn_chengyin_merge.setToolTip(tr("查找承音或再次转律产生的同件装备历史版本"))
+        btn_chengyin_merge.setMinimumWidth(112)
+        btn_chengyin_merge.setStyleSheet(_ACTION_BTN_STYLE)
+        btn_chengyin_merge.clicked.connect(self._on_chengyin_merge)
+        action_row.addWidget(btn_chengyin_merge)
+
         # 创建装备（原「模拟装备」，去掉菜单直接弹对话框）
         btn_create = QPushButton(tr("创建模拟装备"))
         btn_create.setToolTip(tr("创建模拟装备"))
@@ -959,6 +966,52 @@ class EquipStatusTab(QWidget):
         LoadoutRepository(user_name).delete_all_real()
         self._refresh_all()
         self._host.equipment_changed.emit()
+
+    def _on_chengyin_merge(self):
+        """识别候选并在用户确认后原子迁移引用、删除旧快照。"""
+        user_name = self._host.active_user_name()
+        if not user_name:
+            QMessageBox.warning(self, tr("合并失败"), tr("没有激活的用户"))
+            return
+        from ....config import get_game_config
+        from ....core.loadout import (
+            LoadoutRepository,
+            find_chengyin_merge_candidates,
+        )
+        from .chengyin_merge_dialog import ChengyinMergeDialog
+
+        repo = LoadoutRepository(user_name)
+        state = repo.load()
+        candidates = find_chengyin_merge_candidates(
+            state.equipment_items,
+            get_game_config().get_level_configs(),
+        )
+        dialog = ChengyinMergeDialog(
+            candidates, self._display_params, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected = dialog.selected_candidates()
+        replacements: dict[str, str] = {}
+        for candidate in selected:
+            existing = replacements.get(candidate.old_fp)
+            if existing is not None and existing != candidate.new_fp:
+                QMessageBox.warning(
+                    self, tr("合并失败"),
+                    tr("选中项包含冲突关系，请确保同一旧装备只合并到一个新版本。"))
+                return
+            replacements[candidate.old_fp] = candidate.new_fp
+        try:
+            repo.merge_items(replacements)
+        except Exception as exc:
+            logger.exception("承音装备合并失败")
+            QMessageBox.critical(self, tr("合并失败"), str(exc))
+            return
+        self._refresh_all()
+        self._host.equipment_changed.emit()
+        QMessageBox.information(
+            self, tr("合并完成"),
+            tr("已合并 {count} 组装备。此操作保留右侧版本，并迁移所有备战方案引用。")
+            .format(count=len(selected)))
 
     def _on_mock_delete_requested(self, equip_data: dict, group_key: str):
         """处理模拟装备删除请求"""

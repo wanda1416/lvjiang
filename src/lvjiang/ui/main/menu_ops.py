@@ -12,11 +12,12 @@
 """
 
 import sys
+from typing import cast
 
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QMessageBox, QToolButton
+from PyQt6.QtWidgets import QMessageBox, QToolButton, QWidget
 
 from lvjiang.apps import get_registry
 
@@ -233,7 +234,8 @@ class MenuOpsMixin:
                 )
 
         def on_error(error_msg: str):
-            QMessageBox.warning(self, tr("检查更新失败"), error_msg)
+            QMessageBox.warning(
+                cast(QWidget, self), tr("检查更新失败"), error_msg)
 
         checker.finished.connect(on_finished)
         checker.error.connect(on_error)
@@ -294,7 +296,7 @@ class MenuOpsMixin:
             self._user_config.hotkeys = old_hotkeys
             logger.error(f"热键立即生效失败: {exc}")
             QMessageBox.warning(
-                self, tr("热键设置"),
+                cast(QWidget, self), tr("热键设置"),
                 tr("新热键已保存，但当前进程重建全局监听失败；"
                    "本次运行继续使用原热键，重启后将重试新设置。"))
             return
@@ -318,4 +320,3 @@ class MenuOpsMixin:
     def _on_toggle_preview(self, checked: bool):
         self.preview_container.setVisible(not checked)
         self.btn_hide_window.setText(tr("显示预览") if checked else tr("隐藏预览"))
-

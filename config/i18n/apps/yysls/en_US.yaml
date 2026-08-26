@@ -669,6 +669,17 @@ auto_strings:
   指定技能增效: 指定技能增效
   指定武学增效: 指定武学增效
   支持重置: 支持重置
+  支持承音: Chengyin
+  无限转律: Unlimited Transfer
+  承音装备合并: Merge Chengyin Equipment
+  旧版本: Old Version
+  保留版本: Keep Version
+  合并: Merge
+  合并选中项: Merge Selected
+  取消合并: Cancel
+  没有找到符合条件的疑似重复装备: No suspected duplicate equipment found
+  合并失败: Merge Failed
+  合并完成: Merge Complete
   敏: 敏
   无: 无
   无处置规则命中 → 跳过该装备: 无处置规则命中 → 跳过该装备

@@ -55,14 +55,15 @@ def _affix(name, cap_pct=50.0, transferred=False):
 
 
 def _run_session(sample, *, rolls, initial=(), stop_reason="completed",
-                 final_rating=None, resets=0):
+                 final_rating=None, resets=0, mode="normal"):
     """跑完一件装备的完整采集生命周期。``rolls`` 是 (affix, food) 序列。"""
     probe.begin_session(equip_data=_equip(sample), initial_affixes=list(initial),
-                        mode="normal", rule_keys=[])
+                        rule_keys=[])
     for i, (affix, food) in enumerate(rolls, start=2):
         probe.record_roll(new_affix=affix, slot=min(i, 5), resets=resets,
                           food_label=food)
-    probe.end_session(stop_reason=stop_reason, final_rating=final_rating,
+    probe.end_session(mode=mode, stop_reason=stop_reason,
+                      final_rating=final_rating,
                       total_rounds=len(rolls), resets=resets)
 
 
@@ -111,16 +112,39 @@ class TestValidSessionIsRecorded:
         from lvjiang.apps.yysls.core.tuning_rules import get_tuning_rule_manager
         known = sorted(get_tuning_rule_manager().get_rules().keys())[:1]
         probe.begin_session(equip_data=_equip(sample), initial_affixes=[],
-                            mode="normal", rule_keys=[*known, "definitely_not_a_rule"])
+                            rule_keys=[*known, "definitely_not_a_rule"])
         probe.record_roll(new_affix=_affix(sample["affix_name"]), slot=2,
                           resets=0, food_label="")
-        probe.end_session(stop_reason="completed", final_rating=None,
+        probe.end_session(mode="normal", stop_reason="completed", final_rating=None,
                           total_rounds=1, resets=0)
         assert _events()[0]["active_rule"] == ("+".join(known) if known else "none")
 
     def test_no_active_rule_is_none(self, enabled, sample):
         _run_session(sample, rolls=[(_affix(sample["affix_name"]), "")])
         assert _events()[0]["active_rule"] == "none"
+
+    def test_mode_is_taken_at_end_not_at_begin(self, enabled, sample):
+        """mode 必须取收尾时的值。
+
+        ``equipment_session.mode`` 会在会话中途被判定改写（切进调满后回收 /
+        强制调律）。开场取值会把这两类会话统统记成 normal——而"调满后回收"
+        的产出规律与普通调律不同，混算直接污染分布结论。
+        """
+        _run_session(sample, rolls=[(_affix(sample["affix_name"]), "")],
+                     mode="tune_full_recycle")
+        assert _events()[0]["mode"] == "tune_full_recycle"
+
+    def test_cap_pct_omitted_when_unknown_not_zeroed(self, enabled, sample):
+        """算不出上限时省略 cap_pct，不能填 0。
+
+        0 是合法取值（洗到该词条下限）。兜底成 0 会把"未知"伪装成"最差"，
+        在数值分布的最低档堆出一根不存在的柱子。
+        """
+        a = Affix(name=sample["affix_name"], value=10.0, cap_pct=None)
+        a.is_transferred = False
+        _run_session(sample, rolls=[(a, "")])
+        roll = _events()[0]["rolls"][0]
+        assert "cap_pct" not in roll, f"cap_pct 不该出现，实际 {roll}"
 
     def test_unknown_stop_reason_falls_back_not_drops(self, enabled, sample):
         """stop_reason 是元数据：个别退出点漏登记不该让整条词条序列作废。"""
@@ -158,37 +182,49 @@ class TestWholeSessionDroppedNotPartial:
 
     def test_unknown_equip_type_dropped(self, enabled, sample):
         probe.begin_session(equip_data=EquipmentData(type="不存在的部位", level=110),
-                            initial_affixes=[], mode="normal", rule_keys=[])
+                            initial_affixes=[], rule_keys=[])
         probe.record_roll(new_affix=_affix(sample["affix_name"]), slot=2,
                           resets=0, food_label="")
-        probe.end_session(stop_reason="completed", final_rating=None,
+        probe.end_session(mode="normal", stop_reason="completed", final_rating=None,
                           total_rounds=1, resets=0)
         assert _events() == []
 
     def test_missing_level_dropped(self, enabled, sample):
         probe.begin_session(equip_data=EquipmentData(type=sample["weapon_type"], level=0),
-                            initial_affixes=[], mode="normal", rule_keys=[])
+                            initial_affixes=[], rule_keys=[])
         probe.record_roll(new_affix=_affix(sample["affix_name"]), slot=2,
                           resets=0, food_label="")
-        probe.end_session(stop_reason="completed", final_rating=None,
+        probe.end_session(mode="normal", stop_reason="completed", final_rating=None,
                           total_rounds=1, resets=0)
         assert _events() == []
 
-    def test_zero_roll_session_not_recorded(self, enabled, sample):
-        """一轮都没调（初始判定即跳过）——没有统计价值，不落盘。"""
-        probe.begin_session(equip_data=_equip(sample), initial_affixes=[],
-                            mode="normal", rule_keys=[])
-        probe.end_session(stop_reason="judged_before_tuning", final_rating=None,
+    def test_zero_roll_session_is_recorded(self, enabled, sample):
+        """**一轮都没调的会话也要记录。**
+
+        初始判定就跳过/回收的装备没有任何 roll，但
+        ``stop_reason="judged_before_tuning"`` 本身就是要统计的结论——
+        规则多久拒一件。早先以"没有统计价值"为由在这里丢弃，后果是该枚举值
+        永远不可能出现在数据里，结束原因分布因此系统性偏斜。
+        """
+        probe.begin_session(equip_data=_equip(sample),
+                            initial_affixes=[_affix(sample["affix_name"])],
+                            rule_keys=[])
+        probe.end_session(mode="normal", stop_reason="judged_before_tuning",
+                          final_rating="垃圾",
                           total_rounds=0, resets=0)
-        assert _events() == []
+        events = _events()
+        assert len(events) == 1
+        assert events[0]["stop_reason"] == "judged_before_tuning"
+        assert events[0]["rolls"] == []
+        assert events[0]["final_rating"] == "junk"
 
     def test_unrecognized_quality_omitted_not_rejected(self, enabled, sample):
         """品阶认不出只省略该字段，不该连累整条——它不是主载荷。"""
         probe.begin_session(equip_data=_equip(sample, quality="珍珠白"),
-                            initial_affixes=[], mode="normal", rule_keys=[])
+                            initial_affixes=[], rule_keys=[])
         probe.record_roll(new_affix=_affix(sample["affix_name"]), slot=2,
                           resets=0, food_label="")
-        probe.end_session(stop_reason="completed", final_rating=None,
+        probe.end_session(mode="normal", stop_reason="completed", final_rating=None,
                           total_rounds=1, resets=0)
         events = _events()
         assert len(events) == 1 and "quality" not in events[0]
@@ -198,7 +234,7 @@ class TestSessionIsolation:
     def test_new_session_discards_previous_in_flight(self, enabled, sample):
         """上一件没正常收尾时，下一件开场必须丢掉它，不能把两件的轮次串起来。"""
         probe.begin_session(equip_data=_equip(sample), initial_affixes=[],
-                            mode="normal", rule_keys=[])
+                            rule_keys=[])
         probe.record_roll(new_affix=_affix(sample["affix_name"], 11.0), slot=2,
                           resets=0, food_label="")
         # 没有 end_session，直接开下一件
@@ -211,7 +247,7 @@ class TestSessionIsolation:
         probe.abort_session()
         probe.record_roll(new_affix=_affix(sample["affix_name"]), slot=2,
                           resets=0, food_label="")
-        probe.end_session(stop_reason="completed", final_rating=None,
+        probe.end_session(mode="normal", stop_reason="completed", final_rating=None,
                           total_rounds=1, resets=0)
         assert _events() == []
 
@@ -228,7 +264,7 @@ class TestNeverRaises:
                             lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()))
         with pytest.raises(KeyboardInterrupt):
             probe.begin_session(equip_data=_equip(sample), initial_affixes=[],
-                                mode="normal", rule_keys=[])
+                                rule_keys=[])
 
 
 class TestNoPII:
@@ -249,10 +285,11 @@ class TestNoPII:
         )
         fp = equip.to_dict()["_fp"]
         probe.begin_session(equip_data=equip, initial_affixes=list(equip.affixes),
-                            mode="normal", rule_keys=[])
+                            rule_keys=[])
         probe.record_roll(new_affix=_affix(names[0], 88.8), slot=4,
                           resets=0, food_label="")
-        probe.end_session(stop_reason="decided_recycle", final_rating="优秀",
+        probe.end_session(mode="normal", stop_reason="decided_recycle",
+                          final_rating="优秀",
                           total_rounds=1, resets=0)
         events = _events()
         blob = json.dumps(events, ensure_ascii=False)

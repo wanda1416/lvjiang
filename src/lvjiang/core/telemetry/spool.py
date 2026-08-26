@@ -15,8 +15,9 @@
 是"这件装备最后怎么处理的"。落盘与上报必须解耦：落盘要即时，上报可以攒。
 
 容量超限时丢最旧的 ready 文件（新数据反映当前版本/当前赛季，价值更高），
-丢弃计数写进 identity.json 的 ``dropped_events``，下次批次的信封里带上，
-服务端才知道这份样本被截断过。
+只打一条 warning。**不上报丢弃计数**：丢弃与事件内容无关（按文件 mtime 删），
+对按 roll 估计的概率分布不产生偏倚，只损失精度，而精度已经由样本数 n 表达。
+知道丢了多少不会让任何结论更准，属于本地排查信息，不该占一个上报字段。
 """
 from __future__ import annotations
 
@@ -133,7 +134,6 @@ class EventSpool:
             except OSError:
                 pass
         if dropped:
-            _bump_dropped(dropped)
             logger.warning(f"[telemetry] 本地缓冲超限，丢弃 {dropped} 条最旧事件")
 
     def take_batches(self, max_batches: int) -> list[SpoolChunk]:
@@ -200,11 +200,6 @@ def _read_batch_file(path: Path) -> list[dict]:
                 continue  # 最后一行损坏：静默丢弃
             logger.warning(f"[telemetry] 缓冲文件中段损坏，跳过一行: {path.name}")
     return events
-
-
-def _bump_dropped(n: int) -> None:
-    from . import identity as identity_mod
-    identity_mod.bump_dropped_events(n)
 
 
 # ─── 模块级单例门面 ──────────────────────────────────────

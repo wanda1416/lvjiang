@@ -45,14 +45,26 @@ LVJIANG_TELEMETRY_URL=http://127.0.0.1:8787/v1/report uv run python -m lvjiang
 
 ## 已知的服务端校验边界
 
-`part`/`food`/`mode`/`quality`/`run_env`/`os_name`/`plugin` 是服务端能穷举的
-封闭枚举，不在名单内直接丢弃该条。`affix`/`weapon_type` 做不到——它们的
-取值随游戏配置增长（词条池、武器类型会随版本更新），服务端没有
-`game_config.yaml` 作为真源，没法像其余字段那样枚举穷尽。退而求其次的
-格式闸门是「必须是 1~16 个纯中文字符」（`RE_CJK_TERM`），这挡得住路径、
-邮箱、ADB 序列号这类几乎总带 ASCII/数字/符号的 PII 形状，**但挡不住一个
-纯中文的伪造字符串**（例如故意填「角色名叫张三」）——已用真实请求验证过
-这一点会被存下来。
+**心跳字段**（`run_env`/`os_name`/`plugin` 等）是服务端能穷举的封闭枚举，
+不在名单内整条心跳丢弃。
+
+**调律事件字段则刻意不校验**。服务端不知道调律有哪些字段：`part`/`food`/
+`affix` 的取值随游戏版本增长，把它们抄一份到服务端的代价是客户端每加一个
+字段都要同步改服务端并重新部署，而在同步完成之前新字段完全裸奔。改成通用
+结构闸门（键名格式、嵌套深度、数组长度、字符串形状）之后，任何未来字段自动
+受同一套约束保护，PII 纵深防御反而比逐字段枚举更强。
+
+字符串闸门只允许两种形状：ascii token（`RE_ASCII_TOKEN`）或 1~16 个纯中文
+字符（`RE_CJK_TERM`）。这挡得住路径、邮箱、ADB 序列号这类几乎总带
+ASCII/数字/符号的 PII 形状，**但挡不住一个纯中文的伪造字符串**（例如故意
+填「角色名叫张三」）——已用真实请求验证过这一点会被存下来。
+
+唯一写死的业务标识是**事件类型与 schema 版本**的白名单（`KNOWN_SCHEMAS`，
+目前只有 `yysls.tuning_session` v1）。这与「不认识调律字段」不矛盾：写死的
+是事件类型不是字段——字段随游戏版本增长，而事件类型是**存储层语义**，新增
+一类事件本来就要决定它进哪张表、怎么聚合，那时本就必须改服务端。版本也必须
+看：schema 改版后字段语义会变，混着聚合会算出无意义的数，且事后无法从
+不透明的 payload 里区分。
 
 真正的枚举白名单在客户端一侧（`core/telemetry/schema.py` +
 `apps/yysls/telemetry/vocab.py` 对 `game_config.yaml` 的实时枚举），只要
@@ -67,3 +79,14 @@ LVJIANG_TELEMETRY_URL=http://127.0.0.1:8787/v1/report uv run python -m lvjiang
 | `schema.sql` | D1 表结构，含选型理由与隐私边界的完整注释 |
 | `wrangler.toml` | 部署配置 |
 | `queries/*.sql` | 日常查数用的只读 SQL，见 `queries/README.md` |
+| `test/worker.test.mjs` | Worker 行为测试，零依赖 |
+
+## 测试
+
+```bash
+node --test ops/stats-worker/test/          # Worker 分支逻辑（伪造 D1 接口）
+```
+
+覆盖的是取值与分支：批次归属哪个 `install_id`、`app_version` 从哪来、
+事件类型白名单、以及 204（有意丢弃）与 503（该存没存）的分界。
+SQL 那半边不在这里——`queries/rollup.sql` 直接对 sqlite 跑验证。

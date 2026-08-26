@@ -12,7 +12,7 @@
 """
 from __future__ import annotations
 
-from ..core.tuning_rules.models import FOOD_LABELS
+from ..core.tuning_rules.models import FOOD_LABELS, RATING_KEYS
 
 _PART_CHOICES = ("weapon", "ring", "pendant", "head", "chest", "leg", "wrist")
 _QUALITY_CHOICES = ("blue", "purple", "gold")
@@ -20,6 +20,20 @@ _FOOD_CHOICES = ("none", "gold", "purple", "rainbow")
 _MODE_CHOICES = ("normal", "force_tune", "tune_full_recycle")
 
 _FOOD_INDEX = dict(zip(FOOD_LABELS, ("gold", "purple", "rainbow"), strict=True))
+
+# 调律结束原因：直接对应 auto_tuning 里循环的实际退出点，不是另起一套说法。
+# 现场的 stop_reason 是 f-string 拼的中文自由文本（含规则名、材料名等），
+# 绝不能原样上传——那等于在事件通道上开一个任意文本字段。这里只收敛成
+# 七个稳定 key，映射由调用方在退出点显式给出。
+_STOP_REASON_CHOICES = (
+    "decided_recycle",       # 结束处理判定回收
+    "decided_keep",          # 结束处理判定保留（action=skip）
+    "tune_full_recycle",     # 调满后回收模式
+    "judged_before_tuning",  # 初始判定即不进调律循环
+    "cannot_continue",       # 律准石/材料不足等 executor.abort_reason
+    "user_stopped",          # 用户按停止键
+    "completed",             # 正常走完的兜底
+)
 
 
 def part_choices() -> tuple[str, ...]:
@@ -119,3 +133,35 @@ def current_season_number() -> int | None:
     from ..config import get_game_config
     season = get_game_config().current_season()
     return season.season_number if season else None
+
+
+def stop_reason_choices() -> tuple[str, ...]:
+    return _STOP_REASON_CHOICES
+
+
+def normalize_stop_reason(key: str | None) -> str:
+    """结束原因 key → 稳定枚举；未知一律兜底 "completed"。
+
+    与词条名不同，这里兜底而非丢弃：stop_reason 是元数据，个别退出点
+    忘了登记不该让整条会话的词条序列一起作废。兜底值不会被误读成
+    "判定回收"这类有业务含义的结论。
+    """
+    return key if key in _STOP_REASON_CHOICES else "completed"
+
+
+def rating_choices() -> tuple[str, ...]:
+    """最终评级：复用 tuning_rules 的 ascii 档位 key，不用中文显示名。"""
+    return tuple(RATING_KEYS)
+
+
+def normalize_rating(rating: str | None) -> str | None:
+    """评级显示名（中文）或 ascii key → ascii key；无法识别返回 None（字段选填）。"""
+    if not rating:
+        return None
+    if rating in RATING_KEYS:
+        return rating
+    from ..core.tuning_rules.models import RATING_LABELS
+    for key, label in RATING_LABELS.items():
+        if label == rating:
+            return key
+    return None

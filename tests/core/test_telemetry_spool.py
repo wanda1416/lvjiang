@@ -134,16 +134,22 @@ class TestPurge:
         spool_mod.purge()
         assert spool_mod.take_batches(10) == []
 
-    def test_purge_clears_in_memory_buffer_too(self):
-        spool_mod.append(_event())  # 未 flush，还在内存里
+    def test_purge_clears_unsealed_batch_too(self):
+        spool_mod.append(_event())  # 已落盘但未封口
         spool_mod.purge()
         spool_mod.flush()
         assert spool_mod.take_batches(10) == []
 
 
 class TestPendingEventCount:
-    def test_counts_only_flushed_events(self):
+    def test_counts_events_before_flush_too(self):
+        """append 即落盘，所以未封口的事件也算在"本地待上报"里。
+
+        旧实现把事件攒在内存、凑够一批才写文件，这里曾断言未 flush 计 0
+        ——那正是尾巴丢失的根因：不足一批的部分随进程退出一起消失。
+        现在落盘与上报解耦，append 之后数据已经在磁盘上。
+        """
         spool_mod.append(_event())
-        assert spool_mod.pending_event_count() == 0  # 未 flush
+        assert spool_mod.pending_event_count() == 1   # 未 flush，但已落盘
         spool_mod.flush()
         assert spool_mod.pending_event_count() == 1

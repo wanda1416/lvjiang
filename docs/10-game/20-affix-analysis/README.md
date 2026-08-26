@@ -32,34 +32,43 @@
 
 三份不是替代关系：
 
-- **A 和 B 是同一个 schema**（`yysls.tuning_roll`，定义见
-  [`schemas.py`](../../../src/lvjiang/apps/yysls/telemetry/schemas.py)），逐次
-  roll 一条记录，带 `cap_pct` / `is_transferred` / `resets` / `active_rule` /
-  `food` / `season`。这是**做分布分析该用的数据**。A 只是 B 的一小片，适合先
-  把脚本跑通、确认输出长什么样，再去动生产数据。
-- **C 是另一回事**：它按「一件装备」组织，带 `initial_affixes`（进入调律时的
-  词条）、`rounds`（逐轮 food 与 new_affix）、`final_rating`、`stop_reason`。
-  遥测里**没有**初始词条组合和最终评级（那是刻意的，完整五词条组合属于禁发
-  数据），所以「给定首词条后，后续词条的条件概率」这类问题**只能用 C 回答**。
+- **A 和 B 是同一个 schema**（`yysls.tuning_session`，定义见
+  [`schemas.py`](../../../src/lvjiang/apps/yysls/telemetry/schemas.py)）：
+  **一条 = 一件装备从进调律页面到离开**，带初始词条、逐轮产出序列、
+  结束原因与最终评级。A 只是 B 的一小片，适合先把脚本跑通、确认输出长
+  什么样，再去动生产数据。
+- **C 覆盖面更窄但保留全部历史**：只有本机，按「一件装备」组织，字段与
+  A/B 不同（`rounds[].food`、`final_rating`、自由文本的 `stop_reason`）。
+  A/B 现在也是按件粒度，所以两者能回答的问题**基本重合**了；C 的价值在于
+  它保留了开启统计之前的历史记录。
 
-### A / B 的字段（`yysls.tuning_roll`）
+### A / B 的字段（`yysls.tuning_session`）
 
-一条记录 = 一次 roll 的产出。
+一条记录 = 一件装备的一次完整调律过程。
+
+**件级字段**
 
 | 字段 | 含义 | 分析时的注意 |
 |------|------|-------------|
-| `part` | 部位（weapon/ring/pendant/head/chest/leg/wrist） | 分层主维度 |
-| `weapon_type` | 武器细分（剑/枪/…），非武器无此字段 | |
+| `part` / `weapon_type` | 部位 / 武器细分（非武器无后者） | 分层主维度 |
 | `level` / `quality` | 装备等级 / 品阶 | `cap_pct` 的口径依赖 `level` |
-| `food` | 材料（none/gold/purple/rainbow） | 分层主维度 |
-| `slot` / `roll_index` / `resets` | 第几格 / 本件第几次调律 / 重置过几次 | 保底分析的核心 |
 | `mode` | normal / force_tune / tune_full_recycle | 不同模式不可混算 |
-| `active_rule` | 当时启用的规则集合，`+` 连接，`none` 表示未启用 | **不是决策者，是使用习惯的代理变量** |
-| `affix` | 产出词条名 | 主结果 |
-| `cap_pct` | 数值占该词条该等级上限的百分比 | 受 `game_config_customized` 影响 |
-| `is_transferred` | 是否转律产物 | **机制不同，必须分开** |
-| `season` | 赛季号 | 跨赛季机制可能变 |
-| `game_config_customized` | 用户是否改过 `game_config.yaml` | cap 口径失真的标记 |
+| `active_rule` | 启用的规则集合，`+` 连接，`none` 表示未启用 | **不是决策者，是使用习惯的代理变量** |
+| `stop_reason` | 为什么结束（七个固定值之一） | 检验规则判定的直接证据 |
+| `final_rating` | junk / normal / excellent / top | 同上；无适用规则时缺省 |
+| `total_rounds` / `resets` | 总轮次 / 重置次数 | |
+| `season` / `game_config_customized` | 赛季号 / 是否改过游戏配置 | 后者是 cap 口径失真的标记 |
+
+**`initial_affixes[]`** —— 进调律页面时已有的词条，**下标即槽位**
+（宫商角徵羽解析序，下标 i 对应第 i+1 格）。字段：`affix` / `cap_pct` /
+`is_transferred`。
+
+**`rolls[]`** —— 逐轮产出，**下标即轮次**（下标 i 对应第 i+1 轮，跨重置连续
+累加）。除上面三个字段外还有随轮变化的 `slot`（落在第几格，重置时打回 1）、
+`food`（本轮材料）、`resets`（当时已重置几次）。
+
+> 两个列表的顺序语义不同：`initial_affixes` 是**槽位序**，`rolls` 是**时间序**。
+> 混淆会同时算错槽位分布和条件概率。
 
 ---
 
@@ -129,11 +138,19 @@ python scripts/analyze_tuning_affixes.py logs/tuning
 **2. cap_pct 分布** — 看的是**形状**不是均值：均匀 → 数值在 [0, cap] 上等概率；
 集中高位 → 存在下限保护；多峰 → 离散档位。报告里有分位数表和直方图。
 
-**3. 保底检测** — 按 `roll_index` 分桶，**在「部位 × 材料」层内**比较（原因见
+**3. 保底检测** — 按轮次序号分桶，**在「部位 × 材料」层内**比较（原因见
 偏差 5）。只有同层内高桶的 CI 下界高于低桶的 CI 上界，才算「命中率随次数上升」
 的证据；区间重叠就是**没有证据**，不是「趋势不明显」。
 
 **4. 转律 vs 普通** — 单独对比，因为机制不同。
+
+**5. 结束原因分布** — `decided_recycle` 占比过高 = 规则过严（好装备被回收），
+`cannot_continue` 占比过高 = 材料配置跟不上。附最终评级分布。
+
+**6. 条件概率 P(下一条 \| 已有词条)** — 某词条已在装备上时，下一轮出它的概率
+是否变低。CI 完全落在无条件概率之下 = 游戏在排重；区间罩住无条件值 = 没有证据。
+
+**7. 第 N 格的词条分布** — 各格分布在 CI 内一致说明槽位不影响词条池。
 
 ---
 
@@ -174,9 +191,9 @@ cap 影响。
 `app_version` 是**事后剔除坏版本数据的唯一抓手**（`schema.sql:55` 明写）。发现
 任何反直觉的分布，第一件事是按 `app_version` 拆开看它是否只存在于某些版本。
 
-### 5. 按 roll_index 分桶时，高桶和低桶不是同一批样本
+### 5. 按轮次序号分桶时，高桶和低桶不是同一批样本
 
-高 `roll_index` 的记录只来自「前面都没中」的会话。这些会话的部位/材料构成与
+高轮次的记录只来自「前面都没中」的会话。这些会话的部位/材料构成与
 低桶**不同**——愿意调到第 50 次的人，用的材料档次通常也不一样。不分层直接比，
 读到的差异可能全部来自样本构成，与保底机制无关。
 

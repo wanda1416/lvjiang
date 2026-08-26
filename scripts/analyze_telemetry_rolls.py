@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """调律遥测事件分析：本地数据 → Markdown 报告。
 
-输入是 ``yysls.tuning_roll`` 事件（字段定义见
-``src/lvjiang/apps/yysls/telemetry/schemas.py``），三种来源自动识别：
+输入是 ``yysls.tuning_session`` 事件（字段定义见
+``src/lvjiang/apps/yysls/telemetry/schemas.py``）——**一条 = 一件装备从进
+调律页面到离开**，带初始词条、逐轮产出序列与结束原因。三种来源自动识别：
 
 1. 本地缓冲 NDJSON —— ``config/local/telemetry/spool/ready/*.ndjson``，
    每行一条事件，是开发者自己那台机器尚未上报的数据；
@@ -29,7 +30,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_NAME = "yysls.tuning_roll"
+SCHEMA_NAME = "yysls.tuning_session"
 
 # 每格样本少于这个数就不出结论，只报计数。7 部位 × 4 材料 × 数十词条，
 # 格子极多，小格必然出现极端比例，读成"发现"就是在读噪声。
@@ -171,9 +172,23 @@ def load_events(paths: list[Path]) -> list[dict]:
             except json.JSONDecodeError as e:
                 print(f"警告：跳过无法解析的 JSON {f}: {e}", file=sys.stderr)
 
-    rolls = [e for e in events
-             if e.get("schema") in (None, SCHEMA_NAME) and "affix" in e and "part" in e]
-    return rolls
+    return [e for e in events
+            if e.get("schema") in (None, SCHEMA_NAME)
+            and isinstance(e.get("rolls"), list) and "part" in e]
+
+
+def flatten_rolls(sessions: list[dict]) -> list[dict]:
+    """会话 → 逐轮记录，供分布/保底等按轮统计的小节使用。
+
+    ``roll_index`` 由数组下标推出（+1）：它在事件里不再单独存，因为下标就是
+    它——本件第几轮，跨重置连续累加，与 auto_tuning 里 ``rounds`` 的语义一致。
+    """
+    out: list[dict] = []
+    for s in sessions:
+        ctx = {k: v for k, v in s.items() if k not in ("rolls", "initial_affixes")}
+        for i, r in enumerate(s.get("rolls") or [], start=1):
+            out.append({**ctx, **r, "roll_index": i})
+    return out
 
 
 def subsample_per_install(events: list[dict], cap: int, seed: int) -> list[dict]:
@@ -203,7 +218,8 @@ def section_health(events: list[dict]) -> list[str]:
     dates = sorted({e.get("date") for e in events if e.get("date")})
     versions = Counter(e.get("app_version") or "(未知)" for e in events)
 
-    L += [f"- 事件总数：**{len(events)}**",
+    L += [f"- 会话数（件装备）：**{len(events)}**",
+          f"- 轮次总数：**{sum(len(e.get('rolls') or []) for e in events)}**",
           f"- 安装数：**{len(installs)}**",
           f"- 日期跨度：{dates[0]} ~ {dates[-1]}（{len(dates)} 天）" if dates
           else "- 日期跨度：(无 date 字段)"]
@@ -392,6 +408,109 @@ def section_transfer(events: list[dict], top: int) -> list[str]:
     return L
 
 
+def section_stop_reason(sessions: list[dict]) -> list[str]:
+    L = ["## 5. 结束原因分布", "",
+         "规则判定得对不对，这一节是直接证据：`decided_recycle` 占比过高说明"
+         "规则过严（好装备被回收），`cannot_continue` 占比过高说明材料配置跟不上。",
+         "旧的逐轮粒度答不了这个问题——它根本不记录会话怎么结束的。", ""]
+    counts = Counter(s.get("stop_reason") for s in sessions)
+    ratings = Counter(s.get("final_rating") for s in sessions if s.get("final_rating"))
+    n = sum(counts.values())
+    if not n:
+        return L + ["（无样本）"]
+    L += ["| 结束原因 | 会话数 | 占比 |", "|---|---:|---:|"]
+    for k, v in counts.most_common():
+        L.append(f"| `{k}` | {v} | {v / n * 100:.1f}% |")
+    if ratings:
+        m = sum(ratings.values())
+        L += ["", "**最终评级分布**（仅统计有适用规则的会话）：", "",
+              "| 评级 | 会话数 | 占比 |", "|---|---:|---:|"]
+        for k in ("top", "excellent", "normal", "junk"):
+            if k in ratings:
+                L.append(f"| `{k}` | {ratings[k]} | {ratings[k] / m * 100:.1f}% |")
+    return L
+
+
+def section_conditional(sessions: list[dict], top: int) -> list[str]:
+    L = ["## 6. 条件概率 P(下一条 | 已有词条)", "",
+         "**这一节是按件上报解锁的能力。** 逐轮独立上报的事件之间没有关联字段，"
+         "拼不出「这件装备已经有什么」，这个问题当时根本问不了。", "",
+         "看的是：某个词条已经在装备上时，下一轮出它的概率是否变化。"
+         "明显低于无条件概率 → 游戏在排重；基本持平 → 每轮独立。", ""]
+
+    base = Counter()          # 无条件：每一轮的产出
+    cond_present = Counter()  # 该词条已在场时的产出
+    cond_trials = Counter()   # 该词条已在场的轮次总数
+    for s in sessions:
+        if any(a.get("is_transferred") for a in (s.get("initial_affixes") or [])):
+            continue          # 转律机制不同，排除
+        have = {a.get("affix") for a in (s.get("initial_affixes") or [])}
+        for r in (s.get("rolls") or []):
+            name = r.get("affix")
+            base[name] += 1
+            for seen in have:
+                cond_trials[seen] += 1
+                if name == seen:
+                    cond_present[seen] += 1
+            have.add(name)
+    n_base = sum(base.values())
+    if not n_base:
+        return L + ["（无样本）"]
+
+    rows = [(a, cond_trials[a], cond_present[a]) for a in cond_trials
+            if cond_trials[a] >= MIN_CELL_N]
+    if not rows:
+        return L + [f"没有任何词条的「已在场轮次」达到 n≥{MIN_CELL_N}，样本不足。"]
+    L += ["| 词条 | 无条件 P | 已在场时 P | 已在场轮次 n | 已在场时 95% CI |",
+          "|---|---:|---:|---:|---|"]
+    for affix, trials, hits in sorted(rows, key=lambda r: -r[1])[:top]:
+        lo, hi = wilson(hits, trials)
+        L.append(f"| {affix} | {base[affix] / n_base * 100:.2f}% | "
+                 f"{hits / trials * 100:.2f}% | {trials} | "
+                 f"{lo * 100:.2f}% ~ {hi * 100:.2f}% |")
+    L += ["", "**怎么读**：只有当「已在场时」的 CI 完全落在无条件概率之下，"
+          "才是排重机制的证据。区间罩住无条件值 = 没有证据。"]
+    return L
+
+
+def section_slot(sessions: list[dict], top: int) -> list[str]:
+    """第 N 格的词条分布——对齐 analyze_tuning_affixes.py 的 position_affix。"""
+    L = ["## 7. 第 N 格的词条分布", "",
+         "`initial_affixes` 的下标是**槽位序**（宫商角徵羽），`rolls[].slot` 是"
+         "该轮落在第几格。两者合起来就是「这一格上出现过什么」。", "",
+         "重置不影响本节：第 2 格重置后仍是第 2 格，同格观测可以合并统计。"
+         "需要按 `resets` 分段的是**重建终态词条组合**（重置会把 slot 打回 1，"
+         "跨段拼接会把两批词条叠在同一格上），本节不做那件事。", ""]
+
+    by_slot: dict[int, Counter] = defaultdict(Counter)
+    for s in sessions:
+        for i, a in enumerate(s.get("initial_affixes") or [], start=1):
+            if not a.get("is_transferred"):
+                by_slot[i][a.get("affix")] += 1
+        for r in (s.get("rolls") or []):
+            if not r.get("is_transferred") and isinstance(r.get("slot"), int):
+                by_slot[r["slot"]][r.get("affix")] += 1
+    if not by_slot:
+        return L + ["（无样本）"]
+
+    for slot in sorted(by_slot):
+        c = by_slot[slot]
+        n = sum(c.values())
+        L += ["", f"### 第 {slot} 格 （n={n}）", ""]
+        if n < MIN_CELL_N:
+            L += [f"样本不足（n={n} < {MIN_CELL_N}），只列计数：", "",
+                  "　" + "、".join(f"{a}×{k}" for a, k in c.most_common(top))]
+            continue
+        L += ["| 词条 | 次数 | 占比 | 95% CI |", "|---|---:|---:|---|"]
+        for affix, k in c.most_common(top):
+            lo, hi = wilson(k, n)
+            L.append(f"| {affix} | {k} | {k / n * 100:.2f}% | "
+                     f"{lo * 100:.2f}% ~ {hi * 100:.2f}% |")
+    L += ["", "**怎么读**：各格分布若在 CI 内一致，说明槽位不影响词条池；"
+          "某格系统性偏离才是「这一格有特殊规则」的证据。"]
+    return L
+
+
 def section_caveats(args, n_raw: int, n_used: int) -> list[str]:
     return [
         "## 附录：口径与已知偏差", "",
@@ -435,7 +554,7 @@ def main() -> int:
 
     events = load_events(args.paths)
     if not events:
-        sys.exit("没有解析到任何 yysls.tuning_roll 事件")
+        sys.exit(f"没有解析到任何 {SCHEMA_NAME} 事件")
     n_raw = len(events)
 
     if args.min_version:
@@ -463,17 +582,22 @@ def main() -> int:
         f"- 过滤：{'；'.join(filters) if filters else '无'}",
         "", "---", "",
     ]
+    rolls = flatten_rolls(events)
     lines += section_health(events)
-    lines += ["", "---", ""] + section_affix_dist(events, args.top)
-    lines += ["", "---", ""] + section_cap_pct(events)
-    lines += ["", "---", ""] + section_pity(events, args.target_affix)
-    lines += ["", "---", ""] + section_transfer(events, args.top)
+    lines += ["", "---", ""] + section_affix_dist(rolls, args.top)
+    lines += ["", "---", ""] + section_cap_pct(rolls)
+    lines += ["", "---", ""] + section_pity(rolls, args.target_affix)
+    lines += ["", "---", ""] + section_transfer(rolls, args.top)
+    lines += ["", "---", ""] + section_stop_reason(events)
+    lines += ["", "---", ""] + section_conditional(events, args.top)
+    lines += ["", "---", ""] + section_slot(events, args.top)
     lines += ["", "---", ""] + section_caveats(args, n_raw, len(events))
 
     text = "\n".join(lines) + "\n"
     if args.output:
         args.output.write_text(text, encoding="utf-8")
-        print(f"报告已写入 {args.output}（{len(events)} 条事件）", file=sys.stderr)
+        print(f"报告已写入 {args.output}（{len(events)} 个会话 / {len(rolls)} 轮）",
+              file=sys.stderr)
     else:
         sys.stdout.write(text)
     return 0

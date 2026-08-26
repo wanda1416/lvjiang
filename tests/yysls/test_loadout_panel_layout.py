@@ -269,3 +269,41 @@ def test_view_mode_persisted_in_ui_state(qtbot, tmp_path, monkeypatch):
     panel2.resize(1200, 800)
     qtbot.wait(10)
     assert panel2._splitter.sizes() == dragged
+
+
+def test_panel_toolbar_exposes_every_equipment_action(qtbot, tmp_path, monkeypatch):
+    """EquipStatusTab 的动作必须全部能从面板工具栏**看得见地**触达。
+
+    EquipStatusTab 自带的按钮行在面板里被 set_embedded_mode(True) 整体隐藏，
+    面板改用自己的工具栏逐个转发。这个转发是手抄的清单，漏一条就等于该功能
+    在界面上彻底消失——「承音装备合并」曾经就这样掉了：core 逻辑、对话框、
+    测试都在，只是没有任何地方能点到它。
+
+    必须按**可见性**断言：被隐藏的那排按钮仍然是 panel 的子控件，findChildren
+    照样找得到，只查存在性的话这个测试恒真。
+    """
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    panel.show()
+    qtbot.wait(10)
+
+    from PyQt6.QtWidgets import QPushButton
+    visible = {b.text() for b in panel.findChildren(QPushButton)
+               if b.text() and b.isVisible()}
+
+    # status_tab 按钮行里每个 _on_* 动作对应的入口（刷新与用户切换由面板
+    # 自己的头部提供，不在这份清单里）。
+    for label in ("最优组合", "培养建议", "承音装备合并",
+                  "创建模拟装备", "清空真实装备", "导出数据"):
+        assert label in visible, f"面板工具栏缺少可见入口：{label}"
+
+    # 转发目标必须真实存在，否则点下去才报 AttributeError
+    for handler in ("_on_optimal_combo", "_on_affix_impact", "_on_chengyin_merge",
+                    "_on_mock_create", "_on_clear_real", "_on_export"):
+        assert callable(getattr(panel._equipment, handler)), handler

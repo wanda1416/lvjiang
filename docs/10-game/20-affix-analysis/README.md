@@ -143,7 +143,7 @@ python scripts/analyze_tuning_affixes.py logs/tuning
 
 ## 三、报告怎么读
 
-报告分五节，**顺序是有意的**：
+报告固定 0~7 共 8 节，加 `--target-slots` 才会多出第 8 节，**顺序是有意的**：
 
 **0. 样本体检** — 先看这节。头部集中度、版本分布、需要分流的样本量。这节不合格，
 下面几节的数字就没有意义。脚本在单个 install 占比 ≥30% 时会直接打警告。
@@ -166,7 +166,16 @@ python scripts/analyze_tuning_affixes.py logs/tuning
 **6. 条件概率 P(下一条 \| 已有词条)** — 某词条已在装备上时，下一轮出它的概率
 是否变低。CI 完全落在无条件概率之下 = 游戏在排重；区间罩住无条件值 = 没有证据。
 
-**7. 第 N 格的词条分布** — 各格分布在 CI 内一致说明槽位不影响词条池。
+**7. 槽位词条分布（终态重建）** — 每件装备**最终留下**的词条按 `resets`
+重建（不是每次 roll 的原始观测，见下方"值得问的问题"第 7、8 条），分
+「全部部位」「每格」「第 2-N 格并集」「分部位」几个角度，各格分布在
+CI 内一致说明槽位不影响词条池。
+
+**8. 槽位条件查询**（`--target-slots` 才有）— 单次参数化查询，回答"某
+部位 × 某首词条下，第 2-5 格出现什么"或"第 2 格出现某词条后，第 3 格及
+以后的分布"这类问题——组合太多写不进固定报告，只在给了参数时才输出这
+一节。等价功能在 `ops/stats-client` 网页「调律分析」页有交互表单，不用
+每次改命令行参数重跑。
 
 ---
 
@@ -266,13 +275,18 @@ n 小 p 小，正态近似会给出负下界或过窄的区间，恰好是它最
 5. **转律的词条池与普通调律相同吗？** → 报告第 4 节
 6. **`level` / `quality` 影响的是词条分布还是只有数值上限？**
    → 需要在第 1 节基础上加 level 分层
-7. **给定首词条，后续词条的条件概率是否独立？**
-   → 遥测数据答不了（没有词条组合），只能用 `logs/tuning`，见路径 C
-8. **`slot`（第几格）之间有差异吗？** → 现有字段够，脚本暂未覆盖
+7. **给定首词条/某格词条，后续格位的条件概率分布是什么？**
+   → 报告第 8 节（`--given-slot`/`--target-slots`），或 `ops/stats-client`
+   网页「调律分析」页的槽位条件查询表单
+8. **`slot`（第几格）之间有差异吗？** → 报告第 7 节（终态重建口径）
 
-7、8 两条目前没有现成输出。第 7 条**不应该**通过给遥测加字段来解决——完整词条
-组合是明确的禁发数据（见 [`probe.py`](../../../src/lvjiang/apps/yysls/telemetry/probe.py)
-的模块注释，那里解释了为什么不挂在 `tune_round_completed` 上）。
+> 这两条曾经写着"遥测数据答不了""脚本暂未覆盖"——那是旧版逐轮上报 schema
+> （一轮一条事件，无法关联同一件装备的多次产出）时代的结论。`一件装备
+> 一条`的新 schema（`initial_affixes[]` + `rolls[].slot`，按 `resets`
+> 能重建终态；`schemas.py` 里也写着"跨重置重建终态词条组合必须先按
+> resets 分段"，说明这条路径是预期内的用法）已经能回答了，2026-08
+> 补上了第 7、8 节，见
+> [`slots.py`](../../../scripts/telemetry_analysis/slots.py) 模块文档。
 
 ---
 
@@ -280,9 +294,10 @@ n 小 p 小，正态近似会给出负下界或过窄的区间，恰好是它最
 
 | 脚本 | 数据源 | 产出 |
 |------|--------|------|
-| [`scripts/analyze_telemetry_rolls.py`](../../../scripts/analyze_telemetry_rolls.py) | A 本地缓冲 / B D1 导出 | Markdown 报告（5 节） |
+| [`scripts/analyze_telemetry_rolls.py`](../../../scripts/analyze_telemetry_rolls.py) | A 本地缓冲 / B D1 导出 | Markdown 报告（0~7 节，`--target-slots` 时加第 8 节） |
 | [`scripts/analyze_tuning_affixes.py`](../../../scripts/analyze_tuning_affixes.py) | C `logs/tuning` | 终端报告：部位分布、第 N 词条分布、条件概率 |
 | [`ops/stats-worker/queries/roll_export.sql`](../../../ops/stats-worker/queries/roll_export.sql) | D1 | 原始批次导出，供上面第一个脚本消费 |
+| [`ops/stats-client/`](../../../ops/stats-client/README.md) | B（增量缓存到本地） | 网页：总览指标 + 调律分析（含槽位条件查询交互表单） |
 
 两个分析脚本都**只用标准库**：运行期依赖里没有 numpy/pandas/scipy，分析脚本
 不该引入只有它自己用的重型依赖。

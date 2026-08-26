@@ -186,7 +186,7 @@ class MenuOpsMixin:
         self._refresh_layout_combo()
 
     def _open_reference_manager(self):
-        from ..reference_manager import ReferenceManagerDialog
+        from ..reference import ReferenceManagerDialog
         dialog = ReferenceManagerDialog(parent=self, screenshot_callback=self._refresh_capture)
         dialog.exec()
         if dialog.data_changed:

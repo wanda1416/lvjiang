@@ -6,7 +6,7 @@
 
 from PyQt6.QtWidgets import QComboBox, QMessageBox, QPushButton
 
-from lvjiang.ui.reference_manager.dialog import ReferenceManagerDialog
+from lvjiang.ui.reference.dialog import ReferenceManagerDialog
 
 
 class _FakeDB:

@@ -12,7 +12,7 @@ import pytest
 
 from lvjiang.core.config import resolver as cr
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.ui import script_editor_dialog as sed
+from lvjiang.ui.scripts import editor_dialog as sed
 from lvjiang.workflows.metadata import parse_metadata
 
 

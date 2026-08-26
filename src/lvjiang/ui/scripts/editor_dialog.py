@@ -4,7 +4,7 @@
 （system ∪ local，标注来源层），中间是带语法高亮的编辑区，右侧是调试面板
 （「指令」Tab：快捷指令式选操作填槽位插入，见 ``action_palette``；「调试」Tab：截图画布
 取点/取色/取区域 → 插入脚本；运行/单步/继续/暂停/停止 + 当前行高亮 + 变量表 + 日志，
-见 ``script_workbench.DebugPanel``）。
+见 ``workbench.DebugPanel``）。
 
 写入走 ConfigResolver：开发模式写 system，用户模式写 local 影子
 （与脚本配置 / 场景管理同一套模式判定），所以用户改出厂脚本不会污染
@@ -52,10 +52,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.config.resolver import get_resolver
-from ..i18n import tr
-from .button_styles import apply_button_style
-from .theme import get_theme_manager
+from ...core.config.resolver import get_resolver
+from ...i18n import tr
+from ..button_styles import apply_button_style
+from ..theme import get_theme_manager
 
 #: 脚本 id = 文件名 stem；``_`` 前缀被发现层视为临时文件，不允许
 _SCRIPT_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -131,8 +131,8 @@ def check_syntax(text: str) -> list[str]:
     """
     from lark.exceptions import UnexpectedInput, VisitError
 
-    from ..workflows.engine.signals import WorkflowUserError
-    from ..workflows.grammar import parse_text
+    from ...workflows.engine.signals import WorkflowUserError
+    from ...workflows.grammar import parse_text
 
     try:
         parse_text(text)
@@ -162,8 +162,8 @@ def validate_with_layout(path: Path, layout, delay_params: dict | None) -> list[
     与真执行共用 WorkflowEngine._load_and_validate；硬件后端传 None，
     validate_only 不碰它们。
     """
-    from ..workflows.engine import WorkflowEngine
-    from ..workflows.engine.signals import WorkflowUserError
+    from ...workflows.engine import WorkflowEngine
+    from ...workflows.engine.signals import WorkflowUserError
 
     engine = WorkflowEngine(
         capture=None, ocr=None, input_ctrl=None,  # type: ignore[arg-type]
@@ -308,7 +308,7 @@ class ScriptEditorDialog(QDialog):
         splitter.addWidget(right)
 
         from .action_palette import ActionPalette, default_providers
-        from .script_workbench import DebugPanel
+        from .workbench import DebugPanel
         self.debug = DebugPanel(self._main, self)
         self.palette = ActionPalette(default_providers(self._main, self.debug))
         self.palette.insert_requested.connect(self.insert_statement)

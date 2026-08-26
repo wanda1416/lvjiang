@@ -27,10 +27,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.ocr_cleaner import OCRCleaner
-from ..i18n import tr
-from .button_styles import apply_button_style
-from .ocr_canvas import OCRBox, OCRCanvas
+from ...core.ocr_cleaner import OCRCleaner
+from ...i18n import tr
+from ..button_styles import apply_button_style
+from .canvas import OCRBox, OCRCanvas
 
 
 class OCRDialog(QDialog):

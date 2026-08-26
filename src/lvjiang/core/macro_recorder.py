@@ -6,6 +6,13 @@
 wait 语句行。产物即合法 .wf 脚本，可直接剪切复用，回放完全走
 现有 DSL 引擎（engine._coord_ratio_to_screen 的逆运算 + normalize_key
 同源的标准键名表）。
+
+两种精度：低精度产物是可编辑的 click/drag/scroll/press/move/wait 指令；
+高精度产物由一条 replay input_trace 指令和 workflows/lvtrace 配套文件组成，
+由专用实时调度器回放。两种模式都以画布为归一化基准。
+
+本模块不依赖 Qt：录制是纯 pynput/Win32 的无头采集，与 core.screen_recorder
+同层，UI 侧只有 ui.scripts.record_dialog 调用它。
 """
 
 import sys
@@ -14,14 +21,14 @@ import time
 
 from loguru import logger
 
-from ...core.desktop.win32_keyboard import KEY_NAME_TO_VK
-from ...core.input_trace import (
+from ..i18n import tr
+from .desktop.win32_keyboard import KEY_NAME_TO_VK
+from .input_trace import (
     TRACE_PLACEHOLDER,
     VALID_BUTTONS,
     InputTrace,
     InputTraceEvent,
 )
-from ...i18n import tr
 
 try:
     from pynput import keyboard as pynput_keyboard
@@ -155,7 +162,7 @@ class MacroRecorder:
         self._last_scroll = None
         self._recording = True
         # 防护补丁：避免退出竞态下 pynput 钩子回调返回 None（幂等）
-        from ...core.pynput_patch import install as _install_pynput_patch
+        from .pynput_patch import install as _install_pynput_patch
         _install_pynput_patch()
         # Raw Input 必须在 pynput 之前启动。即使过滤视角移动也要保持监听，
         # 因为部分游戏/鼠标驱动只在 Raw Input 中暴露物理侧键。
@@ -165,7 +172,7 @@ class MacroRecorder:
 
             self._foreground_user32 = ctypes.windll.user32
             self._foreground_user32.GetForegroundWindow.restype = wintypes.HWND
-            from ...core.desktop.raw_input import RawMouseListener
+            from .desktop.raw_input import RawMouseListener
             try:
                 self._raw_listener = RawMouseListener(
                     self._on_raw_move, self._on_raw_button)

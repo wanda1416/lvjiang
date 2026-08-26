@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
-from lvjiang.ui.main_window import MainWindow
+from lvjiang.ui.main.window import MainWindow
 
 
 class _Combo:

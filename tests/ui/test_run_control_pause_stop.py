@@ -8,7 +8,7 @@ QMessageBox.question 是 Qt 主线程上的嵌套事件循环，但全局热键�
 """
 
 from lvjiang.core.config.models import UserConfig
-from lvjiang.ui.run_control import RunControlMixin
+from lvjiang.ui.main.run_control import RunControlMixin
 
 
 class _PauseEvent:

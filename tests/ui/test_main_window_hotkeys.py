@@ -7,7 +7,7 @@
 """
 
 from lvjiang.core.config.models import UserConfig
-from lvjiang.ui.main_window import MainWindow
+from lvjiang.ui.main.window import MainWindow
 from lvjiang.ui.settings_dialog import SettingsDialog
 
 

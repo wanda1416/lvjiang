@@ -13,7 +13,7 @@ from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap, QPolygonF
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
-from ..i18n import tr
+from ...i18n import tr
 
 # 托盘图标三态颜色：运行前(绿)/运行中(红)/暂停中(黄)，与 _refresh_run_button 的
 # 按钮配色保持一致，方便用户建立"同一种颜色=同一种状态"的直觉。

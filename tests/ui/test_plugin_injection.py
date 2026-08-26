@@ -3,17 +3,18 @@
 覆盖三条注入路径（不实例化完整 MainWindow，沿用桩式风格）：
 - register_hooks：多插件 Tab/菜单按注册顺序叠加、window_title 后注册者覆盖
 - MainWindow._add_plugin_tabs：按序追加、builder 异常只记日志不中断
-- MainWindow._setup_menu：菜单 builder 注入在「帮助」之前、异常不中断
+- MenuOpsMixin._setup_menu：菜单 builder 注入在「帮助」之前、异常不中断
 - RunControlMixin._on_start：F9 按当前左侧 Tab 的 f9_run 鸭子类型分发
 """
 
 from PyQt6.QtWidgets import QMainWindow
 
-import lvjiang.ui.main_window as mw_module
+import lvjiang.ui.main.menu_ops as menu_ops_module
+import lvjiang.ui.main.window as mw_module
 from lvjiang.apps import register_hooks
 from lvjiang.apps.base import AppHooks
-from lvjiang.ui.main_window import MainWindow
-from lvjiang.ui.run_control import RunControlMixin
+from lvjiang.ui.main.run_control import RunControlMixin
+from lvjiang.ui.main.window import MainWindow
 
 # ─── register_hooks 多插件叠加 ─────────────────────────────
 
@@ -135,7 +136,7 @@ class TestSetupMenuInjection:
         def build_menu_b(host, menubar):
             menubar.addMenu("插件B")
 
-        monkeypatch.setattr(mw_module, "get_registry", lambda: {
+        monkeypatch.setattr(menu_ops_module, "get_registry", lambda: {
             "menu_builders": [build_menu_a, build_menu_b],
         })
         MainWindow._setup_menu(win)
@@ -160,7 +161,7 @@ class TestSetupMenuInjection:
         def build_ok(host, menubar):
             menubar.addMenu("好菜单")
 
-        monkeypatch.setattr(mw_module, "get_registry", lambda: {
+        monkeypatch.setattr(menu_ops_module, "get_registry", lambda: {
             "menu_builders": [boom, build_ok],
         })
         MainWindow._setup_menu(win)

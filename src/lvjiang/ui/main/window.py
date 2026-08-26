@@ -12,12 +12,11 @@
 """
 from __future__ import annotations
 
-import sys
 import threading
 
 from loguru import logger
 from PyQt6.QtCore import QEvent, QObject, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QKeyEvent
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -30,31 +29,31 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSpinBox,
     QSplitter,
     QStyle,
     QStyleOptionComboBox,
     QSystemTrayIcon,
     QTabWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from lvjiang.apps import get_registry
 
-from ..core.config import load_available_envs, load_env, load_user_config
-from ..core.config.users import SessionManager
-from ..core.layout_manager import LayoutConfigManager
-from ..core.user_config import UserConfigManager
-from ..i18n import tr
-from .button_styles import apply_button_style
+from ...core.config import load_available_envs, load_env, load_user_config
+from ...core.config.users import SessionManager
+from ...core.layout_manager import LayoutConfigManager
+from ...core.user_config import UserConfigManager
+from ...i18n import tr
+from ..button_styles import apply_button_style
+from ..overlay import BorderOverlay
+from ..widgets import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
-from .overlay import BorderOverlay
+from .menu_ops import MenuOpsMixin
 from .run_control import RunControlMixin
-from .theme import get_theme_manager
+from .startup_ops import StartupOpsMixin
 from .tray_ops import TrayOpsMixin
-from .widgets import FlowLayout, TrimmedLogEdit
+from .ui_state import UiStateMixin
 from .window_ops import WindowOpsMixin
 
 
@@ -148,7 +147,7 @@ def _create_workflow_note_label() -> QLabel:
 def _get_title_with_version() -> str:
     """获取带版本号的窗口标题"""
     try:
-        from .._version import __version__
+        from ..._version import __version__
         if __version__ and __version__ != "0.0.0.dev0":
             return f"{DEFAULT_TITLE} v{__version__}"
     except Exception:
@@ -156,26 +155,16 @@ def _get_title_with_version() -> str:
     return DEFAULT_TITLE
 
 
-class _FlowContainer(QWidget):
-    """FlowLayout 容器，正确传递 heightForWidth 给外层 QFormLayout。"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._flow = None
-
-    def set_flow_layout(self, flow: FlowLayout):
-        self._flow = flow
-
-    def hasHeightForWidth(self):
-        return self._flow is not None and self._flow.hasHeightForWidth()
-
-    def heightForWidth(self, width: int) -> int:
-        if self._flow is not None:
-            return self._flow.heightForWidth(width)
-        return super().heightForWidth(width)
-
-
-class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin, QMainWindow):
+class MainWindow(
+    WindowOpsMixin,
+    RunControlMixin,
+    CaptureOpsMixin,
+    TrayOpsMixin,
+    StartupOpsMixin,
+    MenuOpsMixin,
+    UiStateMixin,
+    QMainWindow,
+):
     """通用主窗口。
 
     从全局注册表读取扩展点，由插件在启动时注入：
@@ -233,10 +222,10 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         self._cleanup_callbacks: list = []  # 插件注册的关闭时清理回调
 
         # ── OCR / 输入 ──
-        from ..core.ocr import OCREngine
+        from ...core.ocr import OCREngine
         self._ocr = OCREngine()
         # 非 Windows 时返回 None（无桌面投屏后端，仅支持 ADB 模式）
-        from ..core.platforms import create_desktop_input
+        from ...core.platforms import create_desktop_input
         self._win_input = create_desktop_input(input_sim=self._user_config.input_sim)
         self._input = self._win_input
 
@@ -257,7 +246,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
         # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 已处理 F8-F10）
-        from ..core.platforms import start_global_hotkeys
+        from ...core.platforms import start_global_hotkeys
         self._hotkey_listener = start_global_hotkeys(
             self._main_global_hotkey_bindings())
 
@@ -271,7 +260,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
 
         按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F8）。
         """
-        from ..core.platforms import hotkey_pynput_token
+        from ...core.platforms import hotkey_pynput_token
         hk = self._user_config.hotkeys
         return {
             hotkey_pynput_token(hk.start): self._on_global_f9,
@@ -283,7 +272,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
 
     def _setup_session_ui_callback(self):
         """为 SessionStore 注册 UI 回调，用于显示多进程锁失败的重试对话框"""
-        from ..core.config import get_session_store
+        from ...core.config import get_session_store
 
         def show_confirm_dialog(title: str, message: str) -> bool:
             """显示确认对话框，返回用户是否选择重试"""
@@ -298,115 +287,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         get_session_store().set_ui_callback(lambda cmd, *args:
             show_confirm_dialog(*args) if cmd == "confirm" else None
         )
-
-    # ─── 启动时检查更新 ────────────────────────────────────────
-
-    def check_update_on_startup(self):
-        """启动时先检查公告，处理完成后再检查版本更新。"""
-        from ..core.announcement import (
-            AnnouncementChecker,
-            AnnouncementFetchResult,
-            applicable_notices,
-            cache_manifest,
-            get_last_notice_version,
-            mark_notice_version,
-            should_prompt_manifest,
-        )
-
-        checker = AnnouncementChecker(self)
-
-        def continue_to_update():
-            self._start_update_check_on_startup()
-
-        def on_finished(result: AnnouncementFetchResult):
-            try:
-                manifest = result.manifest
-                cache_manifest(manifest, result.etag)
-                if should_prompt_manifest(manifest):
-                    from .notices.announcement_dialog import AnnouncementDialog
-                    notices = applicable_notices(manifest)
-                    dialog = AnnouncementDialog(
-                        manifest, notices, self, allow_refresh=False)
-                    dialog.exec()
-                    # 窗口确实展示并关闭后才推进，避免拉取成功但弹窗失败时吞公告。
-                    mark_notice_version(manifest.notice_version)
-                elif manifest.notice_version > get_last_notice_version():
-                    # 新清单没有覆盖当前客户端，也无需在以后每次启动重复判断。
-                    mark_notice_version(manifest.notice_version)
-            finally:
-                continue_to_update()
-
-        checker.finished.connect(on_finished)
-        checker.error.connect(lambda _message: continue_to_update())
-        checker.start()
-        self._startup_announcement_checker = checker  # 防止被 GC
-
-    def _start_update_check_on_startup(self):
-        """公告检查完成后执行原有的静默版本检查，再串上统计的同意提示与上报。"""
-        from ..core.update import UpdateChecker, should_prompt_update
-
-        checker = UpdateChecker(self)
-
-        def on_finished(release):
-            try:
-                if not should_prompt_update(release.version):
-                    return  # 用户已选择跳过此版本
-
-                from .notices.update_dialog import UpdateDialog
-                dialog = UpdateDialog(release, self)
-                dialog.exec()  # 用户选择"继续使用"时直接关闭对话框
-            finally:
-                self._continue_after_update_check()
-
-        def on_error(_error_msg: str):
-            self._continue_after_update_check()  # 启动时检查失败静默忽略
-
-        checker.finished.connect(on_finished)
-        checker.error.connect(on_error)
-        checker.start()
-        self._startup_update_checker = checker  # 防止被 GC
-
-    def _continue_after_update_check(self):
-        """更新检查（成功或失败）之后：首启同意提示 → 启动期统计上报。
-
-        同意提示放在这里而不是更早，是因为它是模态对话框，与公告/更新
-        弹窗一样只能串行；上报放最后，因为它没有 UI，用户感知不到，
-        也不该拖慢前面两个弹窗的展示时机。
-        """
-        from .notices.telemetry_consent_dialog import maybe_prompt_and_record
-        maybe_prompt_and_record(self)
-        self._start_telemetry_report_on_startup()
-
-    def _start_telemetry_report_on_startup(self):
-        """启动期的统计上报：心跳（若今天还没发过）+ 积压的调律批次。
-
-        payload 在主线程构造（build_job() 读 UserConfig/i18n/游戏配置等，
-        不该在 worker 线程里首次触发懒加载），worker 线程只做 HTTP，
-        节流状态与已发批次的清理放回主线程的 finished 槽——工作线程
-        绝对不能写 SessionStore，见 core/telemetry/reporter.py 模块 docstring。
-        """
-        from ..core.telemetry.reporter import (
-            TelemetryReporter,
-            apply_outcome,
-            build_job,
-        )
-
-        job = build_job()
-        if job.is_empty:
-            return
-
-        reporter = TelemetryReporter(job, self)
-
-        def on_finished_ok(outcome):
-            apply_outcome(outcome)
-
-        def on_failed(_message: str):
-            pass  # 静默：统计失败不影响任何用户可见行为
-
-        reporter.finished_ok.connect(on_finished_ok)
-        reporter.failed.connect(on_failed)
-        reporter.start()
-        self._startup_telemetry_reporter = reporter  # 防止被 GC
 
     # ─── 热键回调 ────────────────────────────────────────────
 
@@ -430,299 +310,6 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         """F9 启动入口（全局热键 / 窗口按键共用）"""
         if not self._running:
             self._on_start()
-
-    # ─── 菜单栏 ──────────────────────────────────────────────
-
-    def _setup_menu(self):
-        menubar = self.menuBar()
-        # macOS 的原生全局菜单栏无法容纳 Qt corner widget；使用窗口内菜单栏
-        # 才能保证主题按钮在所有桌面平台都位于菜单同行最右侧。
-        if sys.platform == "darwin":
-            menubar.setNativeMenuBar(False)
-
-        # ── 通用 ──
-        settings_menu = menubar.addMenu(tr("通用"))
-
-        settings_mgmt = QAction(tr("配置管理"), self)
-        settings_mgmt.triggered.connect(self._open_settings_manager)
-        settings_menu.addAction(settings_mgmt)
-
-        user_mgmt = QAction(tr("用户管理"), self)
-        user_mgmt.setShortcut("F2")
-        user_mgmt.triggered.connect(self._open_user_manager)
-        settings_menu.addAction(user_mgmt)
-
-        scene_editor = QAction(tr("场景管理"), self)
-        scene_editor.setShortcut("F3")
-        scene_editor.triggered.connect(self._open_scene_editor)
-        settings_menu.addAction(scene_editor)
-
-        reference_mgr = QAction(tr("图库管理"), self)
-        reference_mgr.setShortcut("F4")
-        reference_mgr.triggered.connect(self._open_reference_manager)
-        settings_menu.addAction(reference_mgr)
-
-        # ── 工具 ──
-        tools_menu = menubar.addMenu(tr("工具"))
-
-        ocr_action = QAction(tr("图像识别"), self)
-        ocr_action.triggered.connect(self._open_ocr_dialog)
-        tools_menu.addAction(ocr_action)
-
-        script_record = QAction(tr("脚本录制"), self)
-        script_record.triggered.connect(self._open_script_record)
-        tools_menu.addAction(script_record)
-
-        script_editor = QAction(tr("脚本编辑"), self)
-        script_editor.triggered.connect(self._open_script_editor)
-        tools_menu.addAction(script_editor)
-
-        script_config = QAction(tr("脚本配置"), self)
-        script_config.triggered.connect(self._open_script_config)
-        tools_menu.addAction(script_config)
-
-        batch_settings = QAction(tr("批量配置"), self)
-        batch_settings.triggered.connect(self._open_batch_config)
-        tools_menu.addAction(batch_settings)
-
-        # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
-        registry = get_registry()
-        for builder in registry.get("menu_builders", []):
-            try:
-                builder(self, menubar)
-            except Exception:  # noqa: BLE001
-                logger.exception("menu builder 执行失败")
-
-        # ── 帮助 ──
-        help_menu = menubar.addMenu(tr("帮助"))
-
-        announcements = QAction(tr("公告"), self)
-        announcements.triggered.connect(self._open_announcements)
-        help_menu.addAction(announcements)
-
-        check_update = QAction(tr("检查更新"), self)
-        check_update.triggered.connect(self._check_update)
-        help_menu.addAction(check_update)
-
-        docs = QAction(tr("文档"), self)
-        docs.triggered.connect(self._open_docs)
-        help_menu.addAction(docs)
-
-        feedback = QAction(tr("反馈"), self)
-        feedback.triggered.connect(self._open_feedback)
-        help_menu.addAction(feedback)
-
-        help_menu.addSeparator()
-
-        about = QAction(tr("关于"), self)
-        about.triggered.connect(self._show_about)
-        help_menu.addAction(about)
-
-        # ── 主题切换（不属于任何插件，固定在菜单栏最右侧）──
-        self._theme_button = QToolButton(menubar)
-        self._theme_button.setObjectName("themeToggleButton")
-        self._theme_button.setAutoRaise(True)
-        self._theme_button.setFixedSize(34, 28)
-        self._theme_button.clicked.connect(self._toggle_theme)
-        manager = get_theme_manager()
-        manager.theme_changed.connect(self._update_theme_button)
-        self._update_theme_button(manager.current)
-        menubar.setCornerWidget(
-            self._theme_button, Qt.Corner.TopRightCorner
-        )
-
-    def _update_theme_button(self, theme: str) -> None:
-        """更新图标和辅助文本，描述按钮点击后的目标主题。"""
-        if theme == "dark":
-            text = tr("切换到浅色主题")
-            self._theme_button.setText("☀")
-        else:
-            text = tr("切换到深色主题")
-            self._theme_button.setText("☾")
-        self._theme_button.setToolTip(text)
-        self._theme_button.setAccessibleName(text)
-
-    def _toggle_theme(self) -> None:
-        manager = get_theme_manager()
-        theme = manager.toggle()
-        from ..core.config import save_settings
-        save_settings({"theme": theme})
-
-    # ─── 对话框 ──────────────────────────────────────────────
-
-    def _open_ocr_dialog(self):
-        from .ocr import OCRDialog
-        dialog = OCRDialog(self, refresh_callback=self._refresh_capture)
-        dialog.exec()
-
-    def _open_script_record(self):
-        """仅通过用户菜单操作打开脚本录制对话框。"""
-        from .scripts import ScriptRecordDialog
-        dialog = ScriptRecordDialog(self)
-        try:
-            dialog.exec()
-        finally:
-            dialog.stop_f12_hotkey()
-
-    def _open_script_editor(self):
-        """打开脚本编辑对话框；有新建/保存/删除时刷新日常页脚本下拉。"""
-        from .scripts import ScriptEditorDialog
-        dialog = ScriptEditorDialog(self)
-        dialog.exec()
-        if dialog.changed:
-            self._load_workflow_configs()
-
-    def _open_script_config(self):
-        """打开脚本配置对话框；保存后刷新日常页脚本下拉。"""
-        from .scripts import ScriptConfigDialog
-        dialog = ScriptConfigDialog(self)
-        if dialog.exec():
-            self._load_workflow_configs()
-
-    def _open_scene_editor(self):
-        from .scene_editor import SceneEditorDialog
-        dialog = SceneEditorDialog(
-            layout_manager=self._layout_manager,
-            refresh_callback=self._refresh_capture,
-            parent=self,
-        )
-        dialog.exec()
-        self._refresh_layout_combo()
-
-    def _open_reference_manager(self):
-        from .reference_manager import ReferenceManagerDialog
-        dialog = ReferenceManagerDialog(parent=self, screenshot_callback=self._refresh_capture)
-        dialog.exec()
-        if dialog.data_changed:
-            from ..workflows.base import BaseWorkflow
-            if BaseWorkflow._shared_material_recognizer is not None:
-                BaseWorkflow._shared_material_recognizer.reload()
-                self.statusBar().showMessage(tr("图库已刷新"), 3000)
-
-    def _show_about(self):
-        from .notices.about_dialog import AboutDialog
-        dialog = AboutDialog(self)
-        dialog.exec()
-
-    def _open_announcements(self):
-        """打开公告中心：先显示缓存，并在窗口内异步获取最新内容。"""
-        from ..core.announcement import load_cached_manifest, mark_notice_version
-        from .notices.announcement_dialog import AnnouncementDialog
-
-        dialog = AnnouncementDialog(load_cached_manifest(), parent=self)
-        dialog.refresh()
-        dialog.exec()
-        # 帮助入口中用户已经实际看过当前窗口内容，关闭后记录其版本。
-        if dialog.manifest is not None:
-            mark_notice_version(dialog.manifest.notice_version)
-
-    def _check_update(self):
-        """直接检查更新（帮助菜单 → 检查更新）"""
-        from PyQt6.QtWidgets import QMessageBox
-
-        from ..core.update import UpdateChecker, get_version, is_newer_version
-        from .notices.update_dialog import UpdateDialog
-
-        checker = UpdateChecker(self)
-
-        def on_finished(release):
-            current_version = get_version()
-
-            if is_newer_version(release.version, current_version):
-                UpdateDialog(release, self).exec()
-            else:
-                QMessageBox.information(
-                    self,
-                    tr("已是最新版本"),
-                    tr("当前版本 v{current} 已是最新版本").format(current=current_version),
-                )
-
-        def on_error(error_msg: str):
-            QMessageBox.warning(self, tr("检查更新失败"), error_msg)
-
-        checker.finished.connect(on_finished)
-        checker.error.connect(on_error)
-        checker.start()
-        self._update_checker = checker  # 防止被 GC
-
-    def _open_docs(self):
-        """打开 GitHub 文档"""
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
-
-        from ..core.update import GITHUB_REPO
-        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
-
-    def _open_feedback(self):
-        """打开反馈规范与反馈渠道对话框。"""
-        from .notices.feedback_dialog import FeedbackDialog
-        dialog = FeedbackDialog(self)
-        dialog.exec()
-
-    def _open_user_manager(self):
-        from .user_manager_dialog import UserManagerDialog
-        dialog = UserManagerDialog(self._user_manager, self)
-        dialog.exec()
-        self._refresh_user_combo()
-
-    def _open_settings_manager(self):
-        from .settings_dialog import SettingsDialog
-        dialog = SettingsDialog(self)
-        dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
-        if dialog.exec():
-            # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
-            active_hotkeys = self._user_config.hotkeys
-            self._user_config = load_user_config()
-            # 热键在点击保存时已独立切换；其他配置重载不得
-            # 覆盖切换失败时仍可用的运行期键位。
-            self._user_config.hotkeys = active_hotkeys
-            self.statusBar().showMessage(tr("配置已保存"), 3000)
-
-    def _apply_hotkey_settings(self, values: dict) -> None:
-        """保存热键后替换全局监听并刷新相关界面文案。"""
-        from ..core.config import HotkeyConfig
-        from ..core.platforms import start_global_hotkeys
-
-        hotkeys = HotkeyConfig(**values)
-        if hotkeys == self._user_config.hotkeys:
-            return
-        old_hotkeys = self._user_config.hotkeys
-        old_listener = self._hotkey_listener
-
-        # 先启动新监听；创建失败时旧监听仍可用，不会把
-        # 当前进程留在无全局热键的半切换状态。
-        self._user_config.hotkeys = hotkeys
-        try:
-            new_listener = start_global_hotkeys(
-                self._main_global_hotkey_bindings())
-        except Exception as exc:
-            self._user_config.hotkeys = old_hotkeys
-            logger.error(f"热键立即生效失败: {exc}")
-            QMessageBox.warning(
-                self, tr("热键设置"),
-                tr("新热键已保存，但当前进程重建全局监听失败；"
-                   "本次运行继续使用原热键，重启后将重试新设置。"))
-            return
-
-        self._hotkey_listener = new_listener
-        if old_listener is not None:
-            try:
-                old_listener.stop()
-                old_listener.join(3.0)
-                if old_listener.is_alive():
-                    logger.warning("旧热键监听线程 3 秒内未退出")
-            except Exception as exc:
-                logger.warning(f"旧热键监听注销失败: {exc}")
-
-        self._refresh_run_button()
-        self._refresh_pause_button()
-        status_bar = self.statusBar()
-        assert status_bar is not None
-        status_bar.showMessage(tr("热键已更新并立即生效"), 3000)
-
-    def _on_toggle_preview(self, checked: bool):
-        self.preview_container.setVisible(not checked)
-        self.btn_hide_window.setText(tr("显示预览") if checked else tr("隐藏预览"))
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
@@ -821,7 +408,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         self.btn_scan_window = QPushButton(tr("扫描窗口"))
         self.btn_scan_window.setFixedWidth(90)
         self.btn_scan_window.clicked.connect(self._on_scan_window)
-        from ..core.platforms import DESKTOP_BACKEND_AVAILABLE
+        from ...core.platforms import DESKTOP_BACKEND_AVAILABLE
         if not DESKTOP_BACKEND_AVAILABLE:
             # 非 Windows 仅支持 ADB 模式，隐藏窗口投屏入口
             self.btn_scan_window.setVisible(False)
@@ -932,7 +519,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         right_layout.addWidget(self.tabs, stretch=1)
 
         # 告警面板（在 Tab 下方）
-        from .alert_panel import AlertPanel
+        from ..alert_panel import AlertPanel
         self._alert_panel = AlertPanel()
         right_layout.addWidget(self._alert_panel)
 
@@ -1016,7 +603,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
         self._left_tabs.addTab(daily_scroll, tr("日常"))
 
         # ── Tab 2: 批量 ──
-        from .batch import BatchTab
+        from ..batch import BatchTab
         self._batch_tab = BatchTab(host=self)
         self._left_tabs.addTab(self._batch_tab, tr("批量"))
 
@@ -1140,6 +727,19 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
             if level >= self._log_min_level:
                 self.log_text.append(text)
 
+    def _setup_log_redirect(self):
+        self._log_bridge = _LogBridge(self)
+        self._log_bridge.append_log.connect(self._log_append)
+
+        class QtSink:
+            def __init__(self, bridge):
+                self._bridge = bridge
+            def write(self, message):
+                self._bridge.append_log.emit(message.strip())
+
+        sink = QtSink(self._log_bridge)
+        logger.add(sink, level="DEBUG", format="{time:HH:mm:ss} | {level:<7} | {message}")
+
     # ─── 批处理执行 ───────────────────────────────────────
 
     def run_batch(self, enabled_rows, scripts) -> bool:
@@ -1172,8 +772,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
             window_left = self._target_window["left"]
             window_top = self._target_window["top"]
 
-        from ..core.batch_config import load_batch_config
-        from .batch import BatchContext, BatchWorker
+        from ...core.batch_config import load_batch_config
+        from ..batch import BatchContext, BatchWorker
 
         ctx = BatchContext(
             capture=self._capture,
@@ -1221,303 +821,11 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin,
 
     def _open_batch_config(self):
         """工具菜单 → 批量配置：打开配置对话框"""
-        from .batch import BatchConfigDialog
+        from ..batch import BatchConfigDialog
         dlg = BatchConfigDialog(self)
         if dlg.exec():
             # 保存后刷新批量 Tab 的条目概览和脚本勾选
             self._batch_tab.refresh_config()
-
-    # ─── UI 状态持久化（session.json ui_state 节点，按页面归档）────────
-
-    @staticmethod
-    def _migrate_ui_state():
-        """一次性迁移：旧扁平 ui_state → 按页面归档嵌套结构"""
-        from ..core.config import get_session_store
-        store = get_session_store()
-        state = store.get_node("ui_state", {})
-        if not isinstance(state, dict) or "main_page" in state:
-            return  # 已是新格式或为空
-
-        migrated = False
-
-        # main_page
-        old_main_keys = {"window_size", "splitter_sizes"}
-        if any(k in state for k in old_main_keys):
-            page = {}
-            for k in old_main_keys:
-                if k in state:
-                    page[k] = state.pop(k)
-            state["main_page"] = page
-            migrated = True
-
-        # scene_editor
-        se_prefix = "scene_editor_"
-        se_keys = [k for k in state if k.startswith(se_prefix)]
-        if se_keys:
-            se = state.get("scene_editor", {})
-            for k in se_keys:
-                se[k[len(se_prefix):]] = state.pop(k)
-            state["scene_editor"] = se
-            migrated = True
-
-        # reference_manager
-        if "reference_manager_size" in state:
-            rm = state.get("reference_manager", {})
-            rm["size"] = state.pop("reference_manager_size")
-            state["reference_manager"] = rm
-            migrated = True
-
-        if migrated:
-            store.set_node("ui_state", state)
-
-    def _restore_ui_state(self):
-        """启动时恢复窗口大小、左右分栏比例和当前 Tab 页签"""
-        from ..core.config import load_ui_page_state
-        page = load_ui_page_state("main_page")
-        size = page.get("window_size")
-        if isinstance(size, list) and len(size) == 2:
-            self.resize(int(size[0]), int(size[1]))
-        sizes = page.get("splitter_sizes")
-        if isinstance(sizes, list) and len(sizes) == 2 and all(s > 0 for s in sizes):
-            self._main_splitter.setSizes([int(s) for s in sizes])
-        # 恢复左右 Tab 页签
-        left_idx = page.get("left_tab_index", 0)
-        right_idx = page.get("right_tab_index", 0)
-        if 0 <= left_idx < self._left_tabs.count():
-            self._left_tabs.setCurrentIndex(left_idx)
-        if 0 <= right_idx < self.tabs.count():
-            self.tabs.setCurrentIndex(right_idx)
-
-    def _save_ui_state(self):
-        """退出时安全合并 ui_state.main_page。"""
-        from ..core.config import update_ui_page_state
-        try:
-            update_ui_page_state("main_page", {
-                "window_size": [self.width(), self.height()],
-                "splitter_sizes": self._main_splitter.sizes(),
-                "left_tab_index": self._left_tabs.currentIndex(),
-                "right_tab_index": self.tabs.currentIndex(),
-            })
-        except Exception as e:
-            logger.warning(f"保存 UI 状态失败: {e}")
-
-    def _save_tab_indices(self):
-        """Tab 切换时保存当前左右页签索引"""
-        from ..core.config import update_ui_page_state
-        try:
-            update_ui_page_state("main_page", {
-                "left_tab_index": self._left_tabs.currentIndex(),
-                "right_tab_index": self.tabs.currentIndex(),
-            })
-        except Exception as e:
-            logger.warning(f"保存 Tab 页签失败: {e}")
-
-    def _setup_log_redirect(self):
-        self._log_bridge = _LogBridge(self)
-        self._log_bridge.append_log.connect(self._log_append)
-
-        class QtSink:
-            def __init__(self, bridge):
-                self._bridge = bridge
-            def write(self, message):
-                self._bridge.append_log.emit(message.strip())
-
-        sink = QtSink(self._log_bridge)
-        logger.add(sink, level="DEBUG", format="{time:HH:mm:ss} | {level:<7} | {message}")
-
-    # ─── 日常页配置持久化（session.json daily 节点）───────
-
-    def _on_workflow_combo_changed(self, index: int):
-        """脚本下拉切换：先保存旧脚本参数，重建参数面板，再保存新状态"""
-        # 面板仍显示旧脚本控件，用 _displayed_script_id 定位旧配置
-        self._save_displayed_params()
-        self._rebuild_param_panel()
-        # 更新追踪为当前脚本
-        flow_cfg = self._get_selected_flow_config()
-        self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
-        self._save_daily_config()
-
-    def _save_displayed_params(self):
-        """将当前参数面板的值写入 _displayed_script_id 对应的配置项
-
-        仅对 scope=daily 的脚本生效；专用脚本的参数由专属页面管理，
-        日常页禁止读写。
-        """
-        sid = getattr(self, '_displayed_script_id', None)
-        if not sid or not self._param_panel or not self._param_panel.isVisible():
-            return
-        # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
-        target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
-        if not target_cfg:
-            return
-        # ⚠️ 专用脚本的参数由专属页面管理，日常页禁止读写
-        if target_cfg.get("scope", "daily") != "daily":
-            return
-        if not target_cfg.get("parameters"):
-            return
-        params = {}
-        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox, QWidget
-        for param_def in target_cfg.get("parameters", []):
-            name = param_def["name"]
-            # checkgroup：从容器内收集各复选框状态为 dict
-            if param_def.get("type") == "checkgroup":
-                container = self._param_panel.findChild(QWidget, name)
-                if container is not None:
-                    group = {}
-                    for chk in container.findChildren(QCheckBox):
-                        group[chk.objectName()] = chk.isChecked()
-                    params[name] = group
-                continue
-            widget = self._param_panel.findChild(QSpinBox, name)
-            if widget is not None:
-                params[name] = str(widget.value())
-                continue
-            widget = self._param_panel.findChild(QCheckBox, name)
-            if widget is not None:
-                params[name] = widget.isChecked()
-                continue
-            widget = self._param_panel.findChild(QComboBox, name)
-            if widget is not None:
-                data = widget.currentData()
-                params[name] = data if data is not None else widget.currentText()
-        target_cfg["_saved_params"] = params
-        from ..core.config.wf_configs import update_wf_config
-        update_wf_config(sid, params)
-
-    def _save_daily_config(self):
-        """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘
-
-        ⚠️ 警告：禁止在此处添加遍历清理其他工作流 wf_configs 的逻辑。
-        各工作流的配置由其专属页面自行管理，日常页只负责自己的 workflow_id。
-        擅自清理不归自己管理的配置会破坏其他工作流的数据完整性。
-        """
-        from ..core.config import get_session_store
-
-        flow_cfg = self._get_selected_flow_config()
-        if not flow_cfg:
-            return
-
-        # workflow_id 仍存 daily 节点（UI 状态，非工作流配置）
-        try:
-            get_session_store().update_node("daily", {"workflow_id": flow_cfg["id"]})
-        except Exception as e:
-            logger.warning(f"保存日常配置失败: {e}")
-
-    def _restore_daily_config(self):
-        """启动时恢复日常页脚本选择与参数"""
-        from ..core.config import get_session_store
-        from ..core.config.wf_configs import get_wf_config
-
-        # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
-        daily = get_session_store().get_node("daily", {})
-        if not isinstance(daily, dict):
-            daily = {}
-        workflow_id = daily.get("workflow_id")
-
-        # 从统一存储读取各脚本参数；仅对 scope=daily 的脚本生效
-        # 专用脚本的参数由专属页面管理，日常页禁止读写
-        for cfg in self._workflow_configs:
-            if cfg.get("scope", "daily") != "daily":
-                continue
-            if not cfg.get("parameters"):
-                continue
-            saved = get_wf_config(cfg["id"])
-            if saved:
-                cfg["_saved_params"] = saved
-
-        # 选中上次使用的脚本
-        if workflow_id:
-            idx = self.workflow_combo.findData(workflow_id)
-            if idx >= 0:
-                self.workflow_combo.blockSignals(True)
-                self.workflow_combo.setCurrentIndex(idx)
-                self.workflow_combo.blockSignals(False)
-
-        # 统一设置追踪变量并构建参数面板
-        flow_cfg = self._get_selected_flow_config()
-        self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
-        self._rebuild_param_panel()
-
-    def _rebuild_param_panel(self):
-        """重建参数面板
-
-        仅对 scope=daily 的脚本绘制参数面板；专用脚本不画面板，
-        其参数由专属配置页面管理。
-        """
-        while self._param_layout.rowCount() > 0:
-            self._param_layout.removeRow(0)
-        flow_cfg = self._get_selected_flow_config()
-        note = str(flow_cfg.get("note") or "").strip() if flow_cfg else ""
-        self._workflow_note_label.setText(f"{tr('说明')}：{note}" if note else "")
-        self._workflow_note_label.setVisible(bool(note))
-        # ⚠️ 专用脚本不画参数面板
-        if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
-            self._param_panel.setVisible(False)
-            return
-        params = flow_cfg.get("parameters", []) if flow_cfg else []
-        if not params:
-            self._param_panel.setVisible(False)
-            return
-        saved = flow_cfg.get("_saved_params", {}) if flow_cfg else {}
-        for param_def in params:
-            name = param_def["name"]
-            label = param_def.get("label", name)
-            param_type = param_def.get("type", "select")
-            # 已保存值优先于定义默认值
-            default = saved.get(name, param_def.get("default"))
-            options = param_def.get("options", [])
-            if param_type == "number":
-                spin = QSpinBox()
-                spin.setObjectName(name)
-                spin.setRange(param_def.get("min", 0), param_def.get("max", 999999))
-                spin.setValue(int(default) if default is not None else 1)
-                self._param_layout.addRow(label + ":", spin)
-            elif param_type == "bool":
-                chk = QCheckBox()
-                chk.setObjectName(name)
-                if isinstance(default, str):
-                    chk.setChecked(default.lower() in ("true", "1", "yes", "on"))
-                else:
-                    chk.setChecked(bool(default))
-                self._param_layout.addRow(label + ":", chk)
-            elif param_type == "checkgroup":
-                # 分组复选框：值为 dict {key: bool}，使用 FlowLayout 自动换行
-                container = _FlowContainer()
-                container.setObjectName(name)
-                flow = FlowLayout(container, spacing=6)
-                flow.setContentsMargins(0, 0, 0, 0)
-                container.set_flow_layout(flow)
-                if isinstance(default, dict):
-                    saved_dict = default
-                else:
-                    saved_dict = {}
-                for opt in options:
-                    if isinstance(opt, dict):
-                        opt_key = opt["value"]
-                        opt_label = opt.get("label", opt_key)
-                    else:
-                        opt_key = str(opt)
-                        opt_label = str(opt)
-                    chk = QCheckBox(opt_label)
-                    chk.setObjectName(opt_key)
-                    chk.setChecked(bool(saved_dict.get(opt_key, True)))
-                    flow.addWidget(chk)
-                self._param_layout.addRow(label + ":", container)
-            else:
-                combo = QComboBox()
-                combo.setObjectName(name)
-                if param_type == "select" and options:
-                    for opt in options:
-                        if isinstance(opt, dict):
-                            combo.addItem(opt["label"], opt["value"])
-                        else:
-                            combo.addItem(str(opt), str(opt))
-                    if default is not None:
-                        idx = combo.findData(str(default))
-                        if idx >= 0:
-                            combo.setCurrentIndex(idx)
-                self._param_layout.addRow(label + ":", combo)
-        self._param_panel.setVisible(True)
 
     # ─── 快捷键 + 关闭 ───────────────────────────────────────
 

@@ -4,7 +4,7 @@
 用于定位“字母键有效、主键盘数字键无效”的接收路径差异。
 
 用法：
-    python scripts/manual-tests/diag_keyboard_input.py "窗口标题关键字" 1
+    python scripts/diagnostics/windows/keyboard_input.py "窗口标题关键字" 1
 
 每个测试只在用户按 Enter 后执行，执行后输入 y/n 记录游戏是否响应。
 建议先以普通权限运行；若全部失败，再以管理员权限运行一次对照。

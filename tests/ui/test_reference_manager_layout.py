@@ -2,14 +2,14 @@
 
 from PyQt6.QtWidgets import QComboBox, QStyle, QStyleOptionComboBox
 
-from lvjiang.ui.reference_manager.combo_sizing import (
+from lvjiang.ui.reference.combo_sizing import (
     set_combo_minimum_character_capacity,
 )
-from lvjiang.ui.reference_manager.dialog import (
+from lvjiang.ui.reference.dialog import (
     _SPACE_COMBO_CHARACTER_CAPACITY,
     _set_space_combo_minimum_capacity,
 )
-from lvjiang.ui.reference_manager.meta_schema_panel import (
+from lvjiang.ui.reference.meta_schema_panel import (
     _META_COMBO_CHARACTER_CAPACITY,
     MetaSchemaPanel,
 )

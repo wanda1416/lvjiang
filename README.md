@@ -93,7 +93,7 @@ lvjiang/
 │   ├── i18n/                  # 国际化
 │   ├── ui/                    # PyQt6 通用图形界面
 │   │   ├── scene_editor/      # 场景编辑器（坐标标注 / 区域绘制）
-│   │   ├── reference_manager/ # 参考图库管理 UI
+│   │   ├── reference/         # 参考图库管理 UI
 │   │   ├── batch/             # 批量运行面板
 │   │   ├── main/              # 主窗口本体与各功能混入（运行控制 / 窗口操作 / 菜单 / 托盘）
 │   │   ├── scripts/           # 脚本录制、编辑与清单配置

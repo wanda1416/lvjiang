@@ -7,8 +7,8 @@
 4. 用 PostMessage 直接点击窗口中心，观察是否响应
 
 用法：
-    python scripts/manual-tests/diag_postmessage.py "标题关键字"
-    python scripts/manual-tests/diag_postmessage.py   # 列出所有窗口后选择
+    python scripts/diagnostics/windows/postmessage.py "标题关键字"
+    python scripts/diagnostics/windows/postmessage.py   # 列出所有窗口后选择
 """
 
 import ctypes
@@ -203,7 +203,7 @@ def main():
     elif aw == 1:
         print(f"    PostMessage需缩放  : x{96/mdpi:.3f}（system 基准=96）")
     else:
-        print(f"    PostMessage不需缩放: 1.000（per-monitor 坐标一致）")
+        print("    PostMessage不需缩放: 1.000（per-monitor 坐标一致）")
     print()
 
     # 2) 窗口矩形 vs 客户区
@@ -212,7 +212,7 @@ def main():
     cw, ch = cr.right - cr.left, cr.bottom - cr.top
     print(f"[2] GetWindowRect  : ({wr.left},{wr.top})-({wr.right},{wr.bottom})  {wr.right-wr.left}x{wr.bottom-wr.top}")
     print(f"    GetClientRect  : {cw}x{ch}")
-    print(f"    边框偏移(顶/左): 窗口顶部到客户区顶差")
+    print("    边框偏移(顶/左): 窗口顶部到客户区顶差")
     # 客户区原点在屏幕上的位置
     c0sx, c0sy = client_to_screen(hwnd, 0, 0)
     print(f"    客户区原点屏幕坐标: ({c0sx},{c0sy})  窗口矩形左上: ({wr.left},{wr.top})")
@@ -226,7 +226,7 @@ def main():
     if child:
         print(f"    中心点处有子窗口: 0x{child:08X} class={class_name(child)}  ← 鼠标消息需投给子窗口")
     else:
-        print(f"    中心点无子窗口，PostMessage 投给顶层窗口即可")
+        print("    中心点无子窗口，PostMessage 投给顶层窗口即可")
     print()
 
     # 4) 多种投递方式对比测试

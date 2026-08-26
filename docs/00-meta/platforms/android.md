@@ -327,8 +327,8 @@
 | `.tooling/run_selftest.py --no-install` | 同一 APK 连跑多个 target，避免反复装包 |
 | `.tooling/run_selftest.py --release` | 用 release APK 装包跑自检，验证 R8 没砍反射 |
 | `android/app/proguard-rules.pro` | R8 keep 规则：Chaquopy 反射访问面 + 服务构造器 + AIDL + ONNX |
-| `scripts/manual-tests/preflight_device_workflows.py` | 上机前预检（DSL 侧）：走设备端真实发现路径 + session 活动布局，只解析不执行 |
-| `scripts/manual-tests/preflight_class_refs.py` | 上机前预检（类实现侧）：AST 抽 Python 字面量坐标调用比对布局 |
+| `scripts/preflight/device_workflows.py` | 上机前预检（DSL 侧）：走设备端真实发现路径 + session 活动布局，只解析不执行 |
+| `tests/workflows/test_class_workflow_refs_gate.py` | CI 门禁（类实现侧）：AST 抽 Python 字面量坐标调用并与全部系统布局比对 |
 | `tests/workflows/test_system_wf_refs_gate.py` (13 用例) | **CI 门禁**：系统布局 × 全部系统 .wf 的引用绑定，漏绑当场红 |
 | `WorkflowEngine.validate_only()` | 只解析 + 两道静态校验的正式 API，判据与真执行共用 `_load_and_validate` |
 
@@ -337,14 +337,15 @@
 江湖号令上机前是靠「依赖面核查全绿」才敢点第一下的。装备分析按同一标准补了两条
 校验路径，都在 PC 上跑、零点击 —— 实机失败的代价是游戏已经被点到别处去了。
 
-- **DSL 侧**：`preflight_device_workflows.py` 按设备端同一条路径（`ensure_loaded` →
+- **DSL 侧**：`scripts/preflight/device_workflows.py` 按设备端同一条路径（`ensure_loaded` →
   `_default_layout_name` → `_load_layout`）装配引擎，再调 `WorkflowEngine.validate_only()`。
   实测 6 项中 4 个 DSL 脚本（`equip_analysis` / `auto_purchase_xinfa` /
   `activity_jianghu` / `mengzhuzhengfeng`）**全部通过，失败 0 项**
-- **类实现侧**：静态引用收集器只认 DSL 语法，`auto_tuning` / `single_tuning` 在 Python
-  里用 `self.click_region("场景", "key")` 引坐标，是校验盲区。`preflight_class_refs.py`
-  用 AST 抽出调用点（`self.CONST` 形式经类属性求值）再比对布局：`auto_tuning`
-  21 组 + `single_tuning` 17 组去重引用，**缺失 0 处**
+- **类实现侧**：静态引用收集器只认 DSL 语法，类工作流在 Python
+  里用 `self.click_region("场景", "key")` 引坐标，是校验盲区。
+  `tests/workflows/test_class_workflow_refs_gate.py`
+  用 AST 抽出调用点（`self.CONST` 形式经类属性求值），并按设备插件当前声明
+  自动枚举类工作流，与全部系统布局逐一比对。
 
 「只校验」已从短路私有 `_exec_body` 的 hack 沉成正式 API：`WorkflowEngine.validate_only()`
 与 `_execute_dsl` 共用 `_load_and_validate`（解析 + import 链 + 两道校验），因此不会

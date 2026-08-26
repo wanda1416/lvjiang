@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}数据与同步 · 律匠统计控制台{% endblock %}
+{% block content %}
+<h1>数据与同步</h1>
+
+<div class="panel" style="display:flex;gap:0.75rem;align-items:center;">
+  <button class="btn" id="sync-btn" onclick="runSync()">立即同步</button>
+  <span id="sync-status" class="hint"></span>
+  <form method="post" action="/sync/clear-cache" style="margin-left:auto;"
+        onsubmit="return confirm('清空本地缓存？远端数据不受影响，下次同步会重新拉取。');">
+    <button class="btn danger" type="submit">清空本地缓存</button>
+  </form>
+</div>
+
+<h2>本地数据范围</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>表</th><th>最早</th><th>最晚</th></tr>
+  <tr><td>remote_daily</td><td>{{ ranges.daily[0] or "—" }}</td><td>{{ ranges.daily[1] or "—" }}</td></tr>
+  <tr><td>remote_roll_batch</td><td>{{ ranges.roll_batch[0] or "—" }}</td><td>{{ ranges.roll_batch[1] or "—" }}</td></tr>
+</table>
+</div>
+
+<h2>同步游标</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>表</th><th>cursor_a</th><th>cursor_b</th></tr>
+  {% for c in cursors %}
+  <tr><td>{{ c.table_name }}</td><td>{{ c.cursor_a or "—" }}</td><td>{{ c.cursor_b or "—" }}</td></tr>
+  {% else %}
+  <tr><td colspan="3" class="hint">还没同步过</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<h2>同步历史（最近 20 次）</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>开始</th><th>耗时</th><th>结果</th><th>详情</th></tr>
+  {% for r in runs %}
+  <tr>
+    <td>{{ r.started_at }}</td>
+    <td>{{ r.duration_ms }} ms</td>
+    <td>{% if r.ok %}<span class="badge ok">成功</span>{% else %}<span class="badge bad">失败</span>{% endif %}</td>
+    <td class="hint">{{ r.error or r.detail_json }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="hint">还没同步过</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<script>
+function runSync() {
+  var btn = document.getElementById('sync-btn');
+  var status = document.getElementById('sync-status');
+  btn.disabled = true;
+  status.textContent = '同步中…';
+  fetch('/sync/run', {method: 'POST'})
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      status.textContent = data.ok ? '同步完成' : ('失败：' + data.error);
+      location.reload();
+    })
+    .catch(function (e) {
+      status.textContent = '请求失败：' + e;
+      btn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

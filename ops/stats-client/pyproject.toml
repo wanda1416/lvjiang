@@ -1,0 +1,42 @@
+[project]
+name = "stats-client"
+version = "0.1.0"
+description = "律匠统计控制台——仅本机运行；读 Cloudflare D1 只读凭据，增量缓存到本地 SQLite，展示用户/活跃度指标与调律分析结论"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "keyring>=25.0",
+    "python-multipart>=0.0.9",  # FastAPI 表单解析（配置页用 <form>）
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "httpx>=0.27",  # FastAPI TestClient 依赖
+]
+
+[project.scripts]
+stats-client = "stats_client.app:run"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+# 独立于主项目的 ruff 配置——否则会继承仓库根 pyproject.toml 的 [tool.ruff]。
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+# B008：FastAPI 的 Depends(...) 就是要写在参数默认值里，这是官方推荐写法，
+# 不是"函数调用当默认值"的那类真问题。
+ignore = ["B008"]

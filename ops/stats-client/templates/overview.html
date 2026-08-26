@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}总览 · 律匠统计控制台{% endblock %}
+{% block content %}
+<h1>总览</h1>
+<p class="hint">
+  DAU/WAU/MAU 等活跃度数字仅含同意匿名统计的用户，不代表全部装机量。
+  最后同步：{{ ov.last_sync_at or "从未同步" }}
+  {% if ov.last_sync_ok == false %}<span class="badge bad">上次同步有错误</span>{% endif %}
+</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">本地累计可见安装数</div>
+    <div class="value">{{ ov.installs_count_local }}</div>
+  </div>
+  <div class="card">
+    <div class="label">远端 180 日可见安装数</div>
+    <div class="value">{{ ov.installs_count_remote_180d if ov.installs_count_remote_180d is not none else "—" }}</div>
+    <div class="sub">installs 表按 180 天不活动清理，两者不等价</div>
+  </div>
+  <div class="card">
+    <div class="label">今日 DAU</div>
+    <div class="value">{{ ov.dau_today }}</div>
+  </div>
+  <div class="card">
+    <div class="label">7 日活跃 WAU</div>
+    <div class="value">{{ ov.wau }}</div>
+  </div>
+  <div class="card">
+    <div class="label">30 日活跃 MAU</div>
+    <div class="value">{{ ov.mau }}</div>
+  </div>
+  <div class="card">
+    <div class="label">今日新增</div>
+    <div class="value">{{ ov.new_installs_today }}</div>
+  </div>
+  <div class="card">
+    <div class="label">30 日调律用户数</div>
+    <div class="value">{{ ov.roll_installs_30d }}</div>
+  </div>
+  <div class="card">
+    <div class="label">30 日调律会话/轮次</div>
+    <div class="value">{{ ov.roll_sessions_30d }} / {{ ov.roll_rounds_30d }}</div>
+  </div>
+</div>
+
+<h2>最近 90 天 DAU / 新增趋势</h2>
+<div class="panel"><div id="dau-chart"></div></div>
+
+<h2>版本分布（{{ ov.today }}）</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>app_version</th><th>安装数</th></tr>
+  {% for row in version_dist %}
+  <tr><td>{{ row.app_version }}</td><td>{{ row.n }}</td></tr>
+  {% else %}
+  <tr><td colspan="2" class="hint">暂无数据，先去「数据与同步」页拉一次</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<h2>端类型 / 系统分布（{{ ov.today }}）</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>run_env</th><th>os_name</th><th>安装数</th></tr>
+  {% for row in platform_dist %}
+  <tr><td>{{ row.run_env }}</td><td>{{ row.os_name }}</td><td>{{ row.n }}</td></tr>
+  {% else %}
+  <tr><td colspan="3" class="hint">暂无数据</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<h2>周 Cohort 留存</h2>
+<p class="hint">按周分组，&lt; 20 人的 cohort 不显示——样本量小时按天/格分组全是噪声。</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Cohort 周</th><th>第 N 天</th><th>回访用户数</th></tr>
+  {% for row in retention %}
+  <tr><td>{{ row.cohort_week }}</td><td>{{ row.day_n }}</td><td>{{ row.users }}</td></tr>
+  {% else %}
+  <tr><td colspan="3" class="hint">暂无满足样本量的 cohort</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<script src="/static/vendor/echarts.min.js"></script>
+<script>
+(function () {
+  var series = {{ series_json | safe }};
+  var el = document.getElementById('dau-chart');
+  if (!series.length) {
+    el.outerHTML = '<p class="hint">暂无数据，先去「数据与同步」页拉一次</p>';
+    return;
+  }
+  var chart = echarts.init(el, null, {renderer: 'svg'});
+  chart.setOption({
+    grid: {left: 40, right: 16, top: 24, bottom: 32},
+    tooltip: {trigger: 'axis'},
+    legend: {data: ['DAU', '新增'], top: 0, right: 0, textStyle: {color: '#888'}},
+    xAxis: {type: 'category', data: series.map(function (r) { return r.day; }),
+            axisLabel: {color: '#888'}},
+    yAxis: {type: 'value', axisLabel: {color: '#888'}, splitLine: {lineStyle: {color: '#333a'}}},
+    series: [
+      {name: 'DAU', type: 'line', smooth: true, data: series.map(function (r) { return r.dau; })},
+      {name: '新增', type: 'line', smooth: true, data: series.map(function (r) { return r.new_installs; })}
+    ]
+  });
+  window.addEventListener('resize', function () { chart.resize(); });
+})();
+
+// 自动增量同步：距上次同步 > 10 分钟就悄悄拉一次，完成后刷新页面
+(function () {
+  var autoSync = {{ 'true' if cfg.auto_sync else 'false' }};
+  var lastSync = {{ (ov.last_sync_at | tojson) if ov.last_sync_at else 'null' }};
+  if (!autoSync) return;
+  var staleMs = 10 * 60 * 1000;
+  var isStale = !lastSync || (Date.now() - new Date(lastSync).getTime()) > staleMs;
+  if (!isStale) return;
+  fetch('/sync/run', {method: 'POST'}).then(function () { location.reload(); });
+})();
+</script>
+{% endblock %}

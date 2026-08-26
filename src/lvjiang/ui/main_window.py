@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStyle,
     QStyleOptionComboBox,
+    QSystemTrayIcon,
     QTabWidget,
     QToolButton,
     QVBoxLayout,
@@ -52,6 +53,7 @@ from .capture_ops import CaptureOpsMixin
 from .overlay import BorderOverlay
 from .run_control import RunControlMixin
 from .theme import get_theme_manager
+from .tray_ops import TrayOpsMixin
 from .widgets import FlowLayout, TrimmedLogEdit
 from .window_ops import WindowOpsMixin
 
@@ -173,7 +175,7 @@ class _FlowContainer(QWidget):
         return super().heightForWidth(width)
 
 
-class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
+class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, TrayOpsMixin, QMainWindow):
     """通用主窗口。
 
     从全局注册表读取扩展点，由插件在启动时注入：
@@ -241,6 +243,7 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         # ── 构建 UI ──
         self._setup_menu()
         self._setup_ui()
+        self._build_tray_icon()
         self._refresh_run_button()
         self._refresh_user_combo()
         self._refresh_layout_combo()
@@ -779,6 +782,14 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
         self.layout_desc_label.setStyleSheet("color: palette(mid);")
         top_row.addWidget(self.layout_desc_label)
         top_row.addStretch()
+        # 最小化到状态栏：单屏玩家看不到任务栏时靠托盘图标颜色判断运行状态。
+        # 平时不显示托盘图标（不想常驻），点这个按钮才临时出现。
+        self.btn_minimize_to_tray = QPushButton(tr("最小化到状态栏"))
+        apply_button_style(self.btn_minimize_to_tray, variant="neutral")
+        self.btn_minimize_to_tray.clicked.connect(self._minimize_to_tray)
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            self.btn_minimize_to_tray.setVisible(False)
+        top_row.addWidget(self.btn_minimize_to_tray)
         main_layout.addLayout(top_row)
 
         # === ADB 断连警告条（单行，默认隐藏）===
@@ -1544,6 +1555,8 @@ class MainWindow(WindowOpsMixin, RunControlMixin, CaptureOpsMixin, QMainWindow):
                 return
             self._request_stop()
         self._close_cleanup_started = True
+        if self._tray_icon is not None:
+            self._tray_icon.hide()
         # 全局热键最先停：stop() 只投递停止信号不等线程结束，必须 join
         # 等钩子线程完成 UnhookWindowsHookEx；越早停，后续清理期间钩子
         # 回调踩空（退出时 TypeError 噪声乃至 access violation）的窗口越小

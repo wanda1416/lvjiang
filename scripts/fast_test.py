@@ -1,154 +1,195 @@
-"""按变更文件只跑相关测试 —— 迭代期间替代全量 pytest
+"""开发期快速验证入口：受影响测试、精确用例、失败重跑与全量验证。
 
-用法:
-    # 自动检测 git未提交变更，映射到相关测试文件
+默认使用 pytest-testmon 根据历史覆盖关系，只选择受当前代码改动影响的测试。
+第一次运行会执行全量测试并建立 ``.testmondata``，后续才能实现行级筛选。
+
+常用命令：
     python scripts/fast_test.py
-
-    # 指定源文件（支持多个）
-    python scripts/fast_test.py src/lvjiang/apps/yysls/ui/tuning_tab.py
-
-    # 指定测试目录或文件（直接透传给 pytest）
-    python scripts/fast_test.py tests/yysls/test_auto_tuning_flow.py
-
-    # 全量（等同 pytest tests/）
+    python scripts/fast_test.py tests/core/test_config_resolver.py::TestModeDetection::test_env_forces_dev
+    python scripts/fast_test.py -k config_resolver
+    python scripts/fast_test.py --lf
     python scripts/fast_test.py --all
+    python scripts/fast_test.py --dry -- -vv --tb=short
 
-映射规则:
-    源文件名 xxx.py → 查找 test_xxx.py
-    找不到精确匹配时，按源文件所在目录映射到 tests/ 对应子目录
+这是一条开发反馈环，不代替提交前的 ``--all`` 或 CI。外部配置、资源文件、
+原生平台行为等覆盖率无法追踪的变化，仍应显式指定测试目标。
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC_DIR = ROOT / "src"
 TEST_DIR = ROOT / "tests"
 
-# 手动补充：源文件 stem → 测试文件名（命名不一致时在此补映射）
+# 兼容旧用法：显式传入源文件时，处理测试文件与源文件命名不一致的情况。
 MANUAL_MAP: dict[str, list[str]] = {
     "auto_tuning": ["test_auto_tuning_flow.py"],
     "tuning_progress_hub": ["test_tuning_tab.py"],
     "tuning_progress_widget": ["test_tuning_tab.py"],
-    "cell_formatting": ["test_profile_db.py", "test_profile_overview_regen_normalize.py"],
+    "cell_formatting": [
+        "test_profile_db.py",
+        "test_profile_overview_regen_normalize.py",
+    ],
 }
 
 
-def _find_tests_for_file(filepath: Path) -> list[str]:
-    """单个源文件 → 相关测试文件列表"""
-    rel = filepath.resolve().relative_to(ROOT)
+def _find_tests_for_source(filepath: Path) -> list[str]:
+    """将显式指定的源文件映射到已有测试，供兼容模式使用。"""
     stem = filepath.stem
-
-    # 1. 手动映射
     if stem in MANUAL_MAP:
-        return [str(TEST_DIR / "yysls" / f) for f in MANUAL_MAP[stem]]
+        return [str(TEST_DIR / "yysls" / name) for name in MANUAL_MAP[stem]]
 
-    # 2. 按 stem 全局搜索 test_{stem}.py
-    matches = list(TEST_DIR.rglob(f"test_{stem}.py"))
+    matches = sorted(TEST_DIR.rglob(f"test_{stem}.py"))
     if matches:
-        return [str(m) for m in matches]
+        return [str(path) for path in matches]
 
-    # 3. 按目录映射：src/lvjiang/X/... → tests/X/
-    parts = rel.parts
-    if parts[0] == "src" and len(parts) > 1:
-        # src/lvjiang/apps/yysls/ui/xxx.py → tests/yysls/
-        # src/lvjiang/core/xxx.py → tests/core/
-        # src/lvjiang/ui/xxx.py → tests/ui/
-        # src/lvjiang/workflows/xxx.py → tests/workflows/
-        for segment in parts:
+    try:
+        rel = filepath.resolve().relative_to(ROOT)
+    except ValueError:
+        return []
+    if rel.parts[:1] == ("src",):
+        for segment in rel.parts[1:]:
             candidate = TEST_DIR / segment
             if candidate.is_dir():
                 return [str(candidate)]
-
     return []
 
 
-def _get_changed_files() -> list[str]:
-    """从 git 获取未提交的变更文件"""
-    result = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD"],
-        capture_output=True, text=True, cwd=ROOT,
-    )
-    files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
-    # 也包含未跟踪的新文件
-    result2 = subprocess.run(
+def _resolve_targets(targets: list[str]) -> list[str]:
+    """保留 pytest node id；仅对显式源文件沿用旧映射规则。"""
+    resolved: set[str] = set()
+    for target in targets:
+        path_text, separator, node_id = target.partition("::")
+        path = Path(path_text)
+        absolute = path if path.is_absolute() else ROOT / path
+
+        if separator or path_text.startswith("tests/") or absolute == TEST_DIR:
+            resolved.add(target)
+        elif absolute.suffix == ".py" and "src" in absolute.parts:
+            resolved.update(_find_tests_for_source(absolute))
+        else:
+            # 允许 pytest 自己解释包名、目录或其他 selector，并给出标准错误。
+            resolved.add(target)
+    return sorted(resolved)
+
+
+def _changed_python_files() -> list[str]:
+    """返回已跟踪改动与未跟踪的 Python 文件，供 Ruff 快速检查。"""
+    commands = [
+        ["git", "diff", "--name-only", "--diff-filter=ACMR", "HEAD"],
         ["git", "ls-files", "--others", "--exclude-standard"],
-        capture_output=True, text=True, cwd=ROOT,
+    ]
+    files: set[str] = set()
+    for command in commands:
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            continue
+        files.update(
+            name
+            for name in result.stdout.splitlines()
+            if name.endswith(".py") and (ROOT / name).is_file()
+        )
+    return sorted(files)
+
+
+def _format_command(command: list[str]) -> str:
+    """使用 Python 自带规则显示可复制的跨平台命令。"""
+    return subprocess.list2cmdline(command)
+
+
+def _run(command: list[str], *, dry: bool) -> int:
+    print(f">> {_format_command(command)}")
+    if dry:
+        return 0
+    return subprocess.run(command, cwd=ROOT, check=False).returncode
+
+
+def _pytest_command(selectors: list[str], extra: list[str]) -> list[str]:
+    return [sys.executable, "-m", "pytest", *selectors, "-x", "-q", *extra]
+
+
+def _parse_args(argv: list[str] | None) -> tuple[argparse.Namespace, list[str]]:
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if "--" in raw:
+        separator = raw.index("--")
+        own_args, passthrough = raw[:separator], raw[separator + 1 :]
+    else:
+        own_args, passthrough = raw, []
+
+    parser = argparse.ArgumentParser(
+        description="快速运行受代码行改动影响的测试（首次运行建立全量基线）"
     )
-    files.extend(f.strip() for f in result2.stdout.splitlines() if f.strip())
-    return files
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--all", action="store_true", help="运行全量测试并刷新影响数据库")
+    mode.add_argument("--lf", action="store_true", help="只重跑上次失败的测试")
+    parser.add_argument("targets", nargs="*", help="测试 node id、测试路径或源文件")
+    parser.add_argument("-k", metavar="EXPR", help="按 pytest 关键字表达式筛选")
+    parser.add_argument("--dry", action="store_true", help="只显示命令，不执行")
+    parser.add_argument("--no-lint", action="store_true", help="跳过变更 Python 文件的 Ruff 检查")
+    args, unknown = parser.parse_known_args(own_args)
+    return args, [*unknown, *passthrough]
 
 
-def _resolve_tests(targets: list[str]) -> list[str]:
-    """将目标文件列表解析为测试文件列表"""
-    test_files: set[str] = set()
-    for t in targets:
-        p = Path(t)
-        if not p.is_absolute():
-            p = ROOT / p
-        # 已经是测试文件 → 直接用
-        if p.exists() and p.name.startswith("test_") and p.suffix == ".py":
-            test_files.add(str(p))
-        # 是测试目录 → 整个目录
-        elif p.is_dir() and str(p.relative_to(ROOT)).startswith("tests"):
-            test_files.add(str(p))
-        # 源文件 → 映射
-        elif str(p).endswith(".py"):
-            found = _find_tests_for_file(p)
-            test_files.update(found)
-    return sorted(test_files)
+def main(argv: list[str] | None = None) -> int:
+    args, extra = _parse_args(argv)
 
+    if not args.no_lint:
+        changed = _changed_python_files()
+        if changed:
+            print(f"[lint] Ruff 检查 {len(changed)} 个变更 Python 文件")
+            lint_code = _run(
+                [sys.executable, "-m", "ruff", "check", *changed], dry=args.dry
+            )
+            if lint_code:
+                return lint_code
 
-def main():
-    parser = argparse.ArgumentParser(description="按变更文件跑相关测试")
-    parser.add_argument("files", nargs="*", help="源文件或测试文件路径")
-    parser.add_argument("--all", action="store_true", help="跑全量测试")
-    parser.add_argument("--dry", action="store_true", help="只打印测试文件，不执行")
-    parser.add_argument("-k", type=str, default="", help="pytest -k 关键字过滤")
-    args = parser.parse_args()
+    pytest_extra = list(extra)
+    if args.k:
+        pytest_extra.extend(["-k", args.k])
+
+    if args.lf:
+        print("[test] 重跑上次失败的测试")
+        return _run(
+            _pytest_command(["tests/", "--lf", "--lfnf=none"], pytest_extra),
+            dry=args.dry,
+        )
 
     if args.all:
-        cmd = [sys.executable, "-m", "pytest", "tests/", "-x", "-q"]
-        if args.k:
-            cmd.extend(["-k", args.k])
-        print(f"▶ 全量测试: {' '.join(cmd)}")
-        if not args.dry:
-            subprocess.run(cmd, cwd=ROOT)
-        return
+        print("[test] 全量测试，同时刷新 testmon 影响数据库")
+        return _run(
+            _pytest_command(
+                ["tests/", "--testmon", "--testmon-noselect"], pytest_extra
+            ),
+            dry=args.dry,
+        )
 
-    # 确定变更文件
-    if args.files:
-        targets = args.files
-    else:
-        targets = _get_changed_files()
-        if not targets:
-            print("[ok] 无未提交变更，无需运行测试")
-            return
-        print(f"[info] 检测到变更文件 ({len(targets)}):")
-        for f in targets:
-            print(f"   {f}")
-        print()
+    if args.targets or args.k:
+        selectors = _resolve_targets(args.targets) or ["tests/"]
+        print(f"[test] 精确选择 {len(selectors)} 个测试目标")
+        return _run(_pytest_command(selectors, pytest_extra), dry=args.dry)
 
-    # 映射到测试
-    test_files = _resolve_tests(targets)
-    if not test_files:
-        print("[warn] 未找到相关测试文件，回退到全量测试")
-        test_files = ["tests/"]
+    if importlib.util.find_spec("testmon") is None:
+        print(
+            "[error] 缺少 pytest-testmon；请先安装开发依赖：pip install -e '.[dev]'",
+            file=sys.stderr,
+        )
+        return 2
 
-    print(f"[test] 将运行 {len(test_files)} 个测试目标:")
-    for t in test_files:
-        print(f"   {t}")
-
-    cmd = [sys.executable, "-m", "pytest", *test_files, "-x", "-q"]
-    if args.k:
-        cmd.extend(["-k", args.k])
-    print(f"\n>> {' '.join(cmd)}")
-    if not args.dry:
-        subprocess.run(cmd, cwd=ROOT)
+    print("[test] 运行受当前代码行改动影响的测试（首次使用会运行全量测试）")
+    return _run(
+        _pytest_command(["tests/", "--testmon"], pytest_extra), dry=args.dry
+    )
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

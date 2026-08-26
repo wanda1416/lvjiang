@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}调律分析 · 律匠统计控制台{% endblock %}
+{% block content %}
+<h1>调律分析</h1>
+<p class="hint">
+  基于本地缓存的 <code>remote_roll_batch</code> 跑，逻辑与
+  <code>python scripts/analyze_telemetry_rolls.py</code> 完全一致（同一份
+  <code>telemetry_analysis</code> 代码），数字应当交叉核对一致。
+</p>
+
+<h2>槽位条件查询</h2>
+<p class="hint">
+  终态重建口径（见「槽位词条分布」一节文档）：统计的是每件装备<strong>最终留下</strong>的词条，
+  已排除转律件。部位/首词条/条件格位都是可选的叠加筛选——不填就是全部装备的无条件分布。
+</p>
+<form class="filters panel" method="get" action="/rolls">
+  <label>部位
+    <input name="slot_part" list="parts-list" value="{{ slot_params.part or '' }}" placeholder="不限">
+    <datalist id="parts-list">
+      {% for p in available_parts %}
+      <option value="{{ p }}">{{ part_labels.get(p, p) }}</option>
+      {% endfor %}
+    </datalist>
+  </label>
+  <label>首词条（第 1 格）
+    <input name="slot_first_affix" list="first-affix-list" value="{{ slot_params.first_affix or '' }}" placeholder="不限">
+    <datalist id="first-affix-list">
+      {% for a in available_first_affixes %}
+      <option value="{{ a }}">{{ a }}</option>
+      {% endfor %}
+    </datalist>
+  </label>
+  <label>目标格位
+    <input name="slot_target" value="{{ slot_params.target }}" placeholder="如 2 或 2-5" required>
+  </label>
+  <label>条件：给定格位
+    <input name="slot_given_slot" type="number" value="{{ slot_params.given_slot or '' }}" placeholder="可选，如 2">
+  </label>
+  <label>= 词条
+    <input name="slot_given_affix" value="{{ slot_params.given_affix or '' }}" placeholder="可选，如 会心">
+  </label>
+  <button class="btn" type="submit">查询</button>
+</form>
+
+{% if slot_error %}
+<div class="banner error">{{ slot_error }}</div>
+{% endif %}
+
+{% if slot_stat %}
+<p class="hint">筛选：{{ slot_stat.filters_desc }}　·　样本量 n={{ slot_stat.n }}</p>
+{% if slot_stat.n == 0 %}
+<p class="hint">没有符合条件的样本。</p>
+{% else %}
+<div class="table-wrap">
+<table>
+  <tr><th>词条</th><th>次数</th><th>占比</th><th>95% CI</th></tr>
+  {% for affix, k, p, ci in slot_stat.rows(30) %}
+  <tr><td>{{ affix }}</td><td>{{ k }}</td><td>{{ "%.2f"|format(p*100) }}%</td>
+      <td>{{ "%.2f"|format(ci[0]*100) }}% ~ {{ "%.2f"|format(ci[1]*100) }}%</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% if slot_stat.n < 30 %}
+<p class="hint">样本量 &lt; 30，以上数字仅供参考，不建议当结论解读。</p>
+{% endif %}
+{% endif %}
+{% endif %}
+
+<h2>完整报告</h2>
+<form class="filters panel" method="get" action="/rolls">
+  <input type="hidden" name="run" value="1">
+  <label>目标词条（保底检测）
+    <input name="target_affix" value="{{ params.target_affix or '' }}" placeholder="如：会心">
+  </label>
+  <label>最低版本
+    <input name="min_version" value="{{ params.min_version or '' }}" placeholder="如：0.7.0">
+  </label>
+  <label>起始日期
+    <input name="since" value="{{ params.since or '' }}" placeholder="YYYY-MM-DD">
+  </label>
+  <label>每 install 抽样上限
+    <input name="max_per_install" type="number" value="{{ params.max_per_install or '' }}" placeholder="不限">
+  </label>
+  <label>每格列出词条数
+    <input name="top" type="number" value="{{ params.top }}">
+  </label>
+  <button class="btn" type="submit">生成报告</button>
+  {% if report %}
+  <a class="btn secondary" href="/rolls/report.md?{{ request.query_params }}">下载 Markdown</a>
+  {% endif %}
+</form>
+
+{% if error %}
+<div class="banner error">{{ error }}</div>
+{% endif %}
+
+{% if report %}
+<p class="hint">{{ report.n_events }} 个会话 / {{ report.n_rolls }} 轮（过滤/抽样前 {{ report.n_raw }} 个会话）</p>
+<pre class="report">{{ report.text }}</pre>
+{% elif not error %}
+<p class="hint">填好筛选条件后点「生成报告」。</p>
+{% endif %}
+{% endblock %}

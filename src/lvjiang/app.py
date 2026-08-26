@@ -15,7 +15,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
-from .ui.main_window import MainWindow
+from .ui.main import MainWindow
 from .ui.theme import get_theme_manager, reset_theme_manager
 from .ui.widgets import install_wheel_guard
 

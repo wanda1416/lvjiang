@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lvjiang.ui.run_control import RunControlMixin
+from lvjiang.ui.main.run_control import RunControlMixin
 
 
 class _Resolver:
@@ -21,7 +21,7 @@ def test_stale_workflow_path_is_refreshed_by_script_id(tmp_path, monkeypatch):
     flow_cfg = {"id": "demo", "wf_file": "demo.wf"}
 
     monkeypatch.setattr(
-        "lvjiang.ui.run_control.get_resolver", lambda: resolver)
+        "lvjiang.ui.main.run_control.get_resolver", lambda: resolver)
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.discover_scripts",
         lambda: [{"id": "demo", "wf_file": "standalone/demo.wf"}],

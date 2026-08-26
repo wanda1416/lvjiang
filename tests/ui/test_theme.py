@@ -4,7 +4,7 @@ from __future__ import annotations
 from PyQt6.QtGui import QColor, QPalette
 
 from lvjiang.core.config.models import UserConfig
-from lvjiang.ui.main_window import MainWindow
+from lvjiang.ui.main.window import MainWindow
 from lvjiang.ui.theme import (
     DARK,
     LIGHT,

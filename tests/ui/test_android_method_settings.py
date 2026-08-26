@@ -1,8 +1,8 @@
 """安卓截图/输入设置的界面语义与连接命令回归测试。"""
 
 from lvjiang.core.config.models import UserConfig
+from lvjiang.ui.main.window_ops import _DeviceWorker
 from lvjiang.ui.settings_dialog import SettingsDialog
-from lvjiang.ui.window_ops import _DeviceWorker
 
 
 def test_android_methods_are_exclusive_radio_groups_and_adb_input_is_default(

@@ -95,7 +95,7 @@ capture = create_capture_backend(device, "screencap")  # 截图选择与输入�
 inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → AgentInput，否则 AdbInput
 ```
 
-主窗口连接流程（`ui/window_ops.py::_DeviceWorker._do_connect`）按用户配置
+主窗口连接流程（`ui/main/window_ops.py::_DeviceWorker._do_connect`）按用户配置
 `android_input_method = "device_gesture"`
 （设置页「安卓输入方式」/ 主窗口「设备端手势 (Beta)」勾选）决定是否尝试输入代理。
 截图始终独立服从「安卓截图方式」中的 `scrcpy` / `ADB screencap` 选择：

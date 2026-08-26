@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import Qt
 
-from lvjiang.ui.main_window import (
+from lvjiang.ui.main.window import (
     _BATCH_CONTEXT_LOCK_MESSAGE,
     _BatchContextComboBox,
 )
@@ -16,7 +16,7 @@ def test_locked_context_combo_rejects_click_and_shows_message(qtbot, monkeypatch
     combo.show()
     combo.set_batch_locked(True)
     monkeypatch.setattr(
-        "lvjiang.ui.main_window.QMessageBox.information",
+        "lvjiang.ui.main.window.QMessageBox.information",
         lambda _parent, title, message: messages.append((title, message)),
     )
 

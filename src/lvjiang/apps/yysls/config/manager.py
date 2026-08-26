@@ -282,6 +282,10 @@ class GameConfigManager:
             self._level_configs.append(LevelConfig(
                 level=level,
                 allow_reset=item.get("allow_reset"),
+                # 兼容尚未写入新能力字段的旧用户配置；显式 false 仍优先。
+                allow_chengyin=bool(item.get("allow_chengyin", level >= 91)),
+                allow_retransfer=bool(
+                    item.get("allow_retransfer", level >= 105)),
                 min_material_count=item.get("min_material_count"),
                 judge_resistance=item.get("judge_resistance"),
                 buff_resistance=item.get("buff_resistance"),

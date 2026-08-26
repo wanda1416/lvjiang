@@ -3,6 +3,8 @@
 按等级区分重置支持、材料要求与抗性：
 - 等级：装备等级（1-999，不可重复）
 - 支持重置：该等级是否允许重置调律
+- 支持承音：该等级装备是否允许进入承音合并候选
+- 无限转律：该等级已转律词条是否允许再次转律
 - 最低材料数量：该等级要求的最低材料数量
 - 判定抗性：判定抗性百分比（>= 0）
 - 增益抗性：增益抗性百分比（>= 0）
@@ -42,10 +44,15 @@ from .factory_guard import (
 _SEQ_COL = 0
 _LEVEL_COL = 1
 _RESET_COL = 2
-_MATERIAL_COL = 3
-_JUDGE_RES_COL = 4
-_BUFF_RES_COL = 5
-_COLS = ("#", tr("等级"), tr("支持重置"), tr("最低材料数量"), tr("判定抗性(%)"), "增益抗性(%)")  # runtime tr()
+_CHENGYIN_COL = 3
+_RETRANSFER_COL = 4
+_MATERIAL_COL = 5
+_JUDGE_RES_COL = 6
+_BUFF_RES_COL = 7
+_COLS = (
+    "#", tr("等级"), tr("支持重置"), tr("支持承音"), tr("无限转律"),
+    tr("最低材料数量"), tr("判定抗性(%)"), "增益抗性(%)",
+)  # runtime tr()
 
 
 class LevelConfigPanel(QWidget):
@@ -81,9 +88,10 @@ class LevelConfigPanel(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(
             _SEQ_COL, QHeaderView.ResizeMode.Fixed)
         self._table.setColumnWidth(_SEQ_COL, 32)
-        # 支持重置列按内容自适应
-        self._table.horizontalHeader().setSectionResizeMode(
-            _RESET_COL, QHeaderView.ResizeMode.ResizeToContents)
+        # 布尔能力列按内容自适应
+        for col in (_RESET_COL, _CHENGYIN_COL, _RETRANSFER_COL):
+            self._table.horizontalHeader().setSectionResizeMode(
+                col, QHeaderView.ResizeMode.ResizeToContents)
         self._table.verticalHeader().setVisible(False)
         self._table.setMinimumHeight(140)
         layout.addWidget(self._table)
@@ -161,6 +169,30 @@ class LevelConfigPanel(QWidget):
         reset_layout.addWidget(reset_cb)
         reset_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._table.setCellWidget(row, _RESET_COL, reset_widget)
+
+        # 支持承音
+        chengyin_cb = QCheckBox()
+        chengyin_cb.setToolTip(tr("该等级装备是否允许进入承音装备合并候选"))
+        chengyin_cb.setChecked(cfg.allow_chengyin)
+        chengyin_cb.stateChanged.connect(lambda _s: self._apply())
+        chengyin_widget = QWidget()
+        chengyin_layout = QHBoxLayout(chengyin_widget)
+        chengyin_layout.setContentsMargins(0, 0, 0, 0)
+        chengyin_layout.addWidget(chengyin_cb)
+        chengyin_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table.setCellWidget(row, _CHENGYIN_COL, chengyin_widget)
+
+        # 无限转律
+        retransfer_cb = QCheckBox()
+        retransfer_cb.setToolTip(tr("该等级已转律词条是否允许无限再次转律"))
+        retransfer_cb.setChecked(cfg.allow_retransfer)
+        retransfer_cb.stateChanged.connect(lambda _s: self._apply())
+        retransfer_widget = QWidget()
+        retransfer_layout = QHBoxLayout(retransfer_widget)
+        retransfer_layout.setContentsMargins(0, 0, 0, 0)
+        retransfer_layout.addWidget(retransfer_cb)
+        retransfer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table.setCellWidget(row, _RETRANSFER_COL, retransfer_widget)
 
         # 最低材料数量（可选，默认空）
         material_spin = QSpinBox()
@@ -276,6 +308,10 @@ class LevelConfigPanel(QWidget):
         level_spin: QSpinBox = self._table.cellWidget(row, _LEVEL_COL)
         reset_widget = self._table.cellWidget(row, _RESET_COL)
         reset_cb = reset_widget.findChild(QCheckBox)
+        chengyin_widget = self._table.cellWidget(row, _CHENGYIN_COL)
+        chengyin_cb = chengyin_widget.findChild(QCheckBox)
+        retransfer_widget = self._table.cellWidget(row, _RETRANSFER_COL)
+        retransfer_cb = retransfer_widget.findChild(QCheckBox)
         material_spin: QSpinBox = self._table.cellWidget(row, _MATERIAL_COL)
         judge_spin: QSpinBox = self._table.cellWidget(row, _JUDGE_RES_COL)
         buff_spin: QSpinBox = self._table.cellWidget(row, _BUFF_RES_COL)
@@ -293,6 +329,9 @@ class LevelConfigPanel(QWidget):
         return {
             "level": level_val,
             "allow_reset": allow_reset_val,
+            "allow_chengyin": bool(chengyin_cb and chengyin_cb.isChecked()),
+            "allow_retransfer": bool(
+                retransfer_cb and retransfer_cb.isChecked()),
             "min_material_count": material_val if material_val > 0 else None,
             "judge_resistance": judge_val if judge_val > 0 else None,
             "buff_resistance": buff_val if buff_val > 0 else None,
@@ -310,6 +349,18 @@ class LevelConfigPanel(QWidget):
             reset_cb.blockSignals(True)
             reset_cb.setChecked(values["allow_reset"])
             reset_cb.blockSignals(False)
+        chengyin_widget = self._table.cellWidget(row, _CHENGYIN_COL)
+        chengyin_cb = chengyin_widget.findChild(QCheckBox)
+        if chengyin_cb:
+            chengyin_cb.blockSignals(True)
+            chengyin_cb.setChecked(values["allow_chengyin"])
+            chengyin_cb.blockSignals(False)
+        retransfer_widget = self._table.cellWidget(row, _RETRANSFER_COL)
+        retransfer_cb = retransfer_widget.findChild(QCheckBox)
+        if retransfer_cb:
+            retransfer_cb.blockSignals(True)
+            retransfer_cb.setChecked(values["allow_retransfer"])
+            retransfer_cb.blockSignals(False)
         material_spin: QSpinBox = self._table.cellWidget(row, _MATERIAL_COL)
         material_spin.blockSignals(True)
         # None 表示空，设置为 0（显示为空）

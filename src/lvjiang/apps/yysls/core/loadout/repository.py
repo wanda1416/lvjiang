@@ -166,6 +166,42 @@ class LoadoutRepository:
                         plan.equipment[slot] = None
         self.update(mutate)
 
+    def merge_items(self, replacements: dict[str, str]) -> None:
+        """原子删除旧快照并把所有备战方案引用迁移到保留版本。"""
+        clean = {
+            str(old): str(new)
+            for old, new in replacements.items()
+            if old and new and old != new
+        }
+        if not clean:
+            return
+
+        def resolve(fp: str) -> str:
+            seen: set[str] = set()
+            while fp in clean:
+                if fp in seen:
+                    raise ValueError("装备合并关系存在循环")
+                seen.add(fp)
+                fp = clean[fp]
+            return fp
+
+        resolved = {old: resolve(new) for old, new in clean.items()}
+
+        def mutate(state: LoadoutState) -> None:
+            for old, new in resolved.items():
+                if old not in state.equipment_items:
+                    raise ValueError(f"待合并装备已不存在: {old}")
+                if new not in state.equipment_items:
+                    raise ValueError(f"保留装备已不存在: {new}")
+            for plan in state.plans.values():
+                for slot, fp in plan.equipment.items():
+                    if fp in resolved:
+                        plan.equipment[slot] = resolved[fp]
+            for old in resolved:
+                state.equipment_items.pop(old, None)
+
+        self.update(mutate)
+
     def delete_all_real(self) -> None:
         def mutate(state: LoadoutState) -> None:
             fps = {fp for fp in state.equipment_items if not fp.startswith("mock_")}

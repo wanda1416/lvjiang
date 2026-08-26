@@ -41,6 +41,34 @@ class TestResolveAffixCategory:
     def test_unknown_name_passthrough(self, mgr):
         assert mgr.resolve_affix_category("未知词条") == "未知词条"
 
+    def test_level_chengyin_capabilities(self, mgr):
+        levels = {item.level: item for item in mgr.get_level_configs()}
+        assert levels[91].allow_chengyin
+        assert not levels[100].allow_retransfer
+        assert levels[105].allow_chengyin
+        assert levels[105].allow_retransfer
+
+    def test_legacy_level_config_gets_capability_defaults(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "level_configs:\n"
+            "- level: 90\n"
+            "- level: 91\n"
+            "- level: 105\n"
+            "- level: 110\n"
+            "  allow_retransfer: false\n",
+            encoding="utf-8",
+        )
+        levels = {
+            item.level: item
+            for item in GameConfigManager(path).get_level_configs()
+        }
+        assert not levels[90].allow_chengyin
+        assert levels[91].allow_chengyin
+        assert not levels[91].allow_retransfer
+        assert levels[105].allow_retransfer
+        assert not levels[110].allow_retransfer
+
     def test_get_aliases_for_category(self, mgr):
         aliases = mgr.get_aliases_for_category("外功攻击")
         assert set(aliases) == {"最大外功攻击", "最小外功攻击"}

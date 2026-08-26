@@ -10,7 +10,14 @@ from pathlib import Path
 import pytest
 import yaml
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QGroupBox, QLabel, QLineEdit, QMessageBox
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QGroupBox,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QSpinBox,
+)
 
 from lvjiang.apps.yysls.config import EQUIP_PART_NAMES
 from lvjiang.apps.yysls.ui.game_settings import (
@@ -21,6 +28,9 @@ from lvjiang.apps.yysls.ui.game_settings import (
 )
 from lvjiang.apps.yysls.ui.game_settings.affix_caps_panel import AffixCapsPanel
 from lvjiang.apps.yysls.ui.game_settings.base_attr_panel import BaseAttrPanel
+from lvjiang.apps.yysls.ui.game_settings.level_config_panel import (
+    LevelConfigPanel,
+)
 from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -67,6 +77,39 @@ class TestDialog:
         ):
             assert nav.minimumWidth() >= 200
             assert nav.property("navigation") is True
+
+
+class TestLevelConfig:
+    @staticmethod
+    def _row_for_level(panel: LevelConfigPanel, level: int) -> int:
+        for row in range(panel._table.rowCount()):
+            widget = panel._table.cellWidget(row, 1)
+            if isinstance(widget, QSpinBox) and widget.value() == level:
+                return row
+        raise AssertionError(f"level {level} not found")
+
+    @staticmethod
+    def _checked(panel: LevelConfigPanel, row: int, column: int) -> bool:
+        checkbox = panel._table.cellWidget(row, column).findChild(QCheckBox)
+        assert checkbox is not None
+        return checkbox.isChecked()
+
+    def test_factory_chengyin_capabilities_are_shown_and_saved(
+        self, qtbot, tmp_attrs,
+    ):
+        panel = LevelConfigPanel()
+        qtbot.addWidget(panel)
+        row_91 = self._row_for_level(panel, 91)
+        row_100 = self._row_for_level(panel, 100)
+        row_105 = self._row_for_level(panel, 105)
+
+        assert self._checked(panel, row_91, 3)
+        assert not self._checked(panel, row_100, 4)
+        assert self._checked(panel, row_105, 3)
+        assert self._checked(panel, row_105, 4)
+        values = {item["level"]: item for item in panel._configs_raw()}
+        assert values[91]["allow_chengyin"] is True
+        assert values[105]["allow_retransfer"] is True
 
 
 # ─── 武器类型增删往返 ──────────────────────────────────────

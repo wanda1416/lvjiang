@@ -18,7 +18,9 @@ build/
 # Tool caches (mypy baseline worktree etc.)
 .git-mypy-base/
 .mypy_cache/
+.pytest_cache/
 .ruff_cache/
+.testmondata*
 
 # Logs
 logs/

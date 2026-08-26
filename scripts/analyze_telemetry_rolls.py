@@ -297,13 +297,16 @@ def section_cap_pct(events: list[dict]) -> list[str]:
          "看的是形状：均匀分布意味着数值在 [0, cap] 上等概率，"
          "集中在高位意味着有下限保护，多峰意味着离散档位。", ""]
 
+    # cap_pct 是选填：算不出上限时客户端**省略该字段**，所以缺席=未知，
+    # 用 isinstance 排除即可。**不能再用 `> 0` 过滤**——0 是合法取值
+    # （洗到该词条下限），把它当无效值丢掉会砍掉分布的整个低位，
+    # 直接扭曲「有没有下限保护」这个结论，而那正是本节要看的东西。
     base = [e for e in events
             if not e.get("game_config_customized")
             and not e.get("is_transferred")
-            and isinstance(e.get("cap_pct"), (int, float))
-            and e["cap_pct"] > 0]
+            and isinstance(e.get("cap_pct"), (int, float))]
     if not base:
-        return L + ["（无可用样本：cap_pct 全为 0 或样本已被排除）"]
+        return L + ["（无可用样本：cap_pct 均未采集到，或样本已被排除）"]
 
     by_part: dict[str, list[float]] = defaultdict(list)
     for e in base:
@@ -442,10 +445,28 @@ def section_conditional(sessions: list[dict], top: int) -> list[str]:
     cond_present = Counter()  # 该词条已在场时的产出
     cond_trials = Counter()   # 该词条已在场的轮次总数
     for s in sessions:
-        if any(a.get("is_transferred") for a in (s.get("initial_affixes") or [])):
-            continue          # 转律机制不同，排除
-        have = {a.get("affix") for a in (s.get("initial_affixes") or [])}
-        for r in (s.get("rolls") or []):
+        initial = s.get("initial_affixes") or []
+        rolls = s.get("rolls") or []
+        # 转律的出条机制与普通调律不同。这里必须连 rolls 一起看：只查
+        # initial_affixes 会漏掉「普通装备中途转律」的会话，那条转律产出
+        # 会被当成普通产出计进分母和分子。整条会话排除而不是只跳过那一轮
+        # ——序列里挖个洞会让后续轮次的「已在场」集合失真。
+        if any(a.get("is_transferred") for a in initial) or \
+                any(r.get("is_transferred") for r in rolls):
+            continue
+        # 重置会把装备清回**只剩首词条**（auto_tuning 里
+        # ``equip_data.affixes = base_affixes[:1]``），slot 也打回 1。
+        # 跨重置继续累加 have，等于拿重置前早已不存在的词条去算「已在场」
+        # 条件——条件概率的分母和分子会同时算错。所以按 resets 分段重建。
+        first_affix = {initial[0].get("affix")} if initial else set()
+        have = {a.get("affix") for a in initial}
+        prev_resets = 0
+        for r in rolls:
+            resets = r.get("resets")
+            resets = resets if isinstance(resets, int) else prev_resets
+            if resets > prev_resets:
+                have = set(first_affix)   # 重置：清回首词条
+                prev_resets = resets
             name = r.get("affix")
             base[name] += 1
             for seen in have:

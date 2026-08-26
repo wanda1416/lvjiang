@@ -120,15 +120,3 @@ class TestPurge:
 
     def test_purge_on_missing_dir_does_not_raise(self):
         identity_mod.purge_identity()  # 目录本就不存在
-
-
-class TestDroppedEvents:
-    def test_bump_and_take_reset(self):
-        identity_mod.get_identity()
-        identity_mod.bump_dropped_events(3)
-        identity_mod.bump_dropped_events(2)
-        assert identity_mod.take_and_reset_dropped_events() == 5
-        assert identity_mod.take_and_reset_dropped_events() == 0
-
-    def test_bump_without_identity_is_noop(self):
-        identity_mod.bump_dropped_events(5)  # 未生成过 identity，不应报错

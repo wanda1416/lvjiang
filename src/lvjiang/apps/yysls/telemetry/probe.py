@@ -58,11 +58,12 @@ def _affix_entry(affix: Affix | None) -> dict | None:
     name = vocab.normalize_affix_name(affix.name)
     if name is None:
         return None
-    return {
-        "affix": name,
-        "cap_pct": float(affix.cap_pct) if affix.cap_pct is not None else 0.0,
-        "is_transferred": bool(affix.is_transferred),
-    }
+    entry = {"affix": name, "is_transferred": bool(affix.is_transferred)}
+    # cap_pct 缺省时**省略字段**而不是填 0：0 是合法取值（洗到该词条下限），
+    # 兜底成 0 会把"没算出上限"伪装成"洗了个最差值"，直接污染数值分布。
+    if affix.cap_pct is not None:
+        entry["cap_pct"] = float(affix.cap_pct)
+    return entry
 
 
 @never_raises
@@ -70,10 +71,15 @@ def begin_session(
     *,
     equip_data: EquipmentData,
     initial_affixes: list[Affix] | None,
-    mode: str,
     rule_keys: list[str] | None,
 ) -> None:
-    """进入一件装备的调律流程。重复调用会丢弃上一件的在途数据。"""
+    """进入一件装备的调律流程。重复调用会丢弃上一件的在途数据。
+
+    **不在这里取 mode**：``equipment_session.mode`` 会在会话中途被改写
+    （判定进入调满后回收 / 强制调律，见 auto_tuning 的 TUNE_FULL_RECYCLE
+    分支），开场取到的一律是 NORMAL，会把这两类会话全部错记成普通调律。
+    mode 改由 ``end_session`` 在收尾时取当前值。
+    """
     global _CURRENT
     with _LOCK:
         _CURRENT = None
@@ -95,7 +101,6 @@ def begin_session(
             "date": date.today().isoformat(),
             "part": part,
             "level": equip_data.level,
-            "mode": mode,
             "active_rule": vocab.normalize_active_rule(rule_keys),
             "game_config_customized": vocab.game_config_customized(),
         }
@@ -146,20 +151,26 @@ def record_roll(
 
 
 @never_raises
-def end_session(*, stop_reason: str, final_rating: str | None,
+def end_session(*, mode: str, stop_reason: str, final_rating: str | None,
                 total_rounds: int, resets: int) -> None:
-    """离开调律页面：校验并落盘。无论成败都清空在途状态。"""
+    """离开调律页面：校验并落盘。无论成败都清空在途状态。
+
+    **零轮会话照样记录**：初始判定就跳过/回收的装备一轮都没调，但
+    ``stop_reason="judged_before_tuning"`` 本身就是要统计的结论——规则
+    多久拒一件、拒得对不对。早先在这里以"没有统计价值"为由丢弃，结果是
+    该枚举值永远不可能出现在数据里，结束原因分布因此系统性偏斜。
+    """
     global _CURRENT
     with _LOCK:
         session, _CURRENT = _CURRENT, None
         if session is None or session.poisoned:
             return
-        if not session.rolls:
-            return  # 一轮都没调（初始判定即跳过）——没有统计价值
 
         from ....core.telemetry.spool import append as spool_append
 
         fields = dict(session.fields)
+        # mode 取收尾时的当前值，不是开场值——见 begin_session 的说明。
+        fields["mode"] = mode
         fields["initial_affixes"] = session.initial_affixes
         fields["rolls"] = session.rolls
         fields["stop_reason"] = vocab.normalize_stop_reason(stop_reason)

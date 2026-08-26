@@ -78,9 +78,16 @@ def build_job() -> ReportJob:
 
 def _envelope(heartbeat: dict | None, chunks: Sequence[SpoolChunk]) -> dict:
     from datetime import datetime, timezone
+
+    from .heartbeat import normalized_app_version
+
     return {
         "v": 1,
         "sent_at": datetime.now(timezone.utc).isoformat(),
+        # 每个信封都带版本号，不依赖心跳：心跳每 UTC 日只发一次，而
+        # roll_batch.app_version 是事后剔除坏版本数据的唯一抓手，缺了它
+        # 同一天后续批次全部无法归因到具体版本。
+        "app_version": normalized_app_version(),
         "heartbeat": heartbeat,
         "batches": [
             {"batch_id": chunk.path.stem, "events": list(chunk.events)}

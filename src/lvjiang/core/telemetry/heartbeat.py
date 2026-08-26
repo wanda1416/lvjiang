@@ -36,7 +36,6 @@ HEARTBEAT_SCHEMA = EventSchema(
         # 自定义自由文本，必须同步扩充这里的白名单，否则拒收（不是放行为
         # 自由文本），见项目风险清单。
         FieldSpec("plugin", str, choices=("yysls", "none")),
-        FieldSpec("dropped_events", int, required=False, minimum=0, maximum=10_000_000),
     ),
 )
 register_schema(HEARTBEAT_SCHEMA)
@@ -60,19 +59,29 @@ def _detect_plugin() -> str:
     return "none"
 
 
+def normalized_app_version() -> str:
+    """规整后的版本号，不满足 ``_VERSION_PATTERN`` 时回退 ``"unknown"``。
+
+    信封（reporter._envelope）也要带这个值：心跳每 UTC 日只发一次，同一天
+    第 2..N 次上报没有心跳可取，服务端就只能把批次记成 unknown。
+    """
+    from ..update import get_version
+
+    version = get_version()
+    if not re.fullmatch(_VERSION_PATTERN, version or ""):
+        return "unknown"
+    return version
+
+
 def build_heartbeat_payload(*, install_id: str, first_seen: str) -> dict:
     from ...i18n import current_language
     from ..config.session import load_env
-    from ..update import get_version
-    from . import identity as identity_mod
 
     os_name = platform.system() or "other"
     if os_name not in ("Windows", "Darwin", "Linux"):
         os_name = "other"
 
-    version = get_version()
-    if not re.fullmatch(_VERSION_PATTERN, version or ""):
-        version = "unknown"
+    version = normalized_app_version()
 
     run_env = load_env()
     if run_env not in ("desktop", "android"):
@@ -90,9 +99,6 @@ def build_heartbeat_payload(*, install_id: str, first_seen: str) -> dict:
         "ui_language": current_language(),
         "plugin": _detect_plugin(),
     }
-    dropped = identity_mod.take_and_reset_dropped_events()
-    if dropped:
-        payload["dropped_events"] = dropped
     return payload
 
 

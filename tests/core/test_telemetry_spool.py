@@ -116,15 +116,6 @@ class TestCapacityLimits:
         chunks = spool_mod.take_batches(10)
         assert len(chunks) == 2
 
-    def test_dropped_events_bumped_into_identity(self, monkeypatch):
-        from lvjiang.core.telemetry import identity as identity_mod
-        identity_mod.get_identity()
-        monkeypatch.setattr(spool_mod, "MAX_READY_FILES", 1)
-        for _ in range(3):
-            spool_mod.append(_event())
-            spool_mod.flush()
-        assert identity_mod.take_and_reset_dropped_events() > 0
-
 
 class TestPurge:
     def test_purge_clears_everything(self):

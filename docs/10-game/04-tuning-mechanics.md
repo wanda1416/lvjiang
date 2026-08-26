@@ -12,6 +12,7 @@
 | 背包遍历、材料检查、自动处置与执行流程 | [../20-requirements/01-auto-tuning.md](../20-requirements/01-auto-tuning.md) | 自动调律的需求与实现结构 |
 | 狗粮规则、大律准石检查等材料配置 | [../60-userguide/04.02-default-config.md](../60-userguide/04.02-default-config.md)、[04.03-behavior-config.md](../60-userguide/04.03-behavior-config.md) | 默认值与在 UI 中如何修改 |
 | 用户如何配置并运行自动调律 | [../60-userguide/README.md](../60-userguide/README.md) | 面向使用者的操作指引 |
+| 如何从观测数据反推出词条分布规律 | [20-affix-analysis/](20-affix-analysis/README.md) | 分析方法与脚本，不沉淀结论 |
 
 ## 程序侧对应
 

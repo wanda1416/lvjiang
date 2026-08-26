@@ -16,12 +16,16 @@ class LevelConfig:
 
     level: 装备等级（必填）
     allow_reset: 该等级是否支持重置调律（可选，None 表示未设置）
+    allow_chengyin: 该等级是否支持承音
+    allow_retransfer: 该等级是否支持无限再次转律
     min_material_count: 该等级要求的最低材料数量（可选，None 表示未设置）
     judge_resistance: 判定抗性百分比（可选，>= 0）
     buff_resistance: 增益抗性百分比（可选，>= 0）
     """
     level: int = 0
     allow_reset: bool | None = None
+    allow_chengyin: bool = False
+    allow_retransfer: bool = False
     min_material_count: int | None = None
     judge_resistance: int | None = None
     buff_resistance: int | None = None

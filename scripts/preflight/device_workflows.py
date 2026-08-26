@@ -13,7 +13,7 @@
 能反映本机 `config/local` 影子文件带来的差异，上机前跑一次。
 
 用法：
-    .venv\\Scripts\\python.exe -X utf8 scripts/manual-tests/preflight_device_workflows.py
+    .venv\\Scripts\\python.exe -X utf8 scripts/preflight/device_workflows.py
 """
 import sys
 from pathlib import Path
@@ -54,8 +54,8 @@ def main() -> int:
     for item in items:
         label = f"{item['id']} ({item['name']})"
         if item["class"] or not item["wf_file"]:
-            # 类实现的脚本（auto_tuning / single_tuning）在 Python 代码里引用坐标，
-            # 静态引用收集器只认 DSL 语法，这里覆盖不到，需实机或单测验证
+            # 类实现脚本在 Python 代码里引用坐标，DSL 静态引用收集器覆盖不到；
+            # 系统层由 test_class_workflow_refs_gate.py 检查。
             print(f"  [跳过] {label} — 类实现，非 DSL 脚本")
             continue
         wf_path = get_resolver().resolve_read(f"workflows/{item['wf_file']}")

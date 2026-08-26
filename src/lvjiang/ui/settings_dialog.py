@@ -88,14 +88,15 @@ class SettingsDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        tabs = QTabWidget()
-        tabs.addTab(self._build_basic_tab(), tr("基础配置"))
-        tabs.addTab(self._build_input_tab(), tr("输入模拟"))
-        tabs.addTab(self._build_wait_tab(), tr("等待参数"))
-        tabs.addTab(self._build_env_tab(), tr("系统参数"))
-        tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
-        tabs.addTab(self._build_privacy_tab(), tr("网络与隐私"))
-        layout.addWidget(tabs)
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_basic_tab(), tr("基础配置"))
+        self._tabs.addTab(self._build_input_tab(), tr("输入模拟"))
+        self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
+        self._tabs.addTab(self._build_env_tab(), tr("系统参数"))
+        self._tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
+        self._privacy_tab_index = self._tabs.addTab(
+            self._build_privacy_tab(), tr("网络与隐私"))
+        layout.addWidget(self._tabs)
 
         # ── 底部按钮：保存（左）与关闭（右）隔开，语义不同 ──
         # 保存默认置灰，参数发生变更后启用；保存后不关闭对话框，可继续修改
@@ -111,12 +112,18 @@ class SettingsDialog(QDialog):
         apply_button_style(self._save_btn)
         apply_button_style(self._close_btn, variant="neutral")
         layout.addLayout(btn_row)
+        self._tabs.currentChanged.connect(self._refresh_save_button_visibility)
+        self._refresh_save_button_visibility(self._tabs.currentIndex())
 
     # ─── 脏状态跟踪 ──────────────────────────────────
 
     def _mark_dirty(self, *_args):
         """任意参数变更后启用保存按钮"""
         self._save_btn.setEnabled(True)
+
+    def _refresh_save_button_visibility(self, index: int) -> None:
+        """即时保存的网络与隐私页不展示无意义的全局保存按钮。"""
+        self._save_btn.setVisible(index != self._privacy_tab_index)
 
     def _connect_dirty_signals(self):
         """UI 构建完成后统一连接变更信号（避免初始赋值触发）"""
@@ -519,10 +526,15 @@ class SettingsDialog(QDialog):
 
         network = load_user_config().network
 
-        self._offline_check = QCheckBox(tr("完全离线模式（关闭全部联网行为）"))
+        self._offline_check = QCheckBox(tr("完全离线模式（暂停全部联网功能）"))
         self._offline_check.setChecked(network.offline)
         self._offline_check.toggled.connect(self._on_offline_toggled)
         vbox.addWidget(self._offline_check)
+
+        self._offline_hint = QLabel()
+        self._offline_hint.setWordWrap(True)
+        self._offline_hint.setContentsMargins(24, 0, 0, 4)
+        vbox.addWidget(self._offline_hint)
 
         sub_box = QVBoxLayout()
         sub_box.setContentsMargins(24, 0, 0, 0)
@@ -559,24 +571,29 @@ class SettingsDialog(QDialog):
             | Qt.TextInteractionFlag.TextSelectableByKeyboard)
         id_row.addWidget(self._telemetry_id_label)
         id_row.addStretch()
-        btn_reset = QPushButton(tr("重置标识"))
-        btn_reset.clicked.connect(self._on_reset_telemetry_id)
-        id_row.addWidget(btn_reset)
+        self._telemetry_reset_button = QPushButton(tr("重置标识"))
+        self._telemetry_reset_button.clicked.connect(
+            self._on_reset_telemetry_id)
+        id_row.addWidget(self._telemetry_reset_button)
         btn_view = QPushButton(tr("查看待上报数据"))
         btn_view.clicked.connect(self._on_view_pending_telemetry)
         id_row.addWidget(btn_view)
         btn_more = QPushButton(tr("了解详情"))
         btn_more.clicked.connect(self._on_learn_more_telemetry)
         id_row.addWidget(btn_more)
-        apply_button_style(btn_reset, btn_view, btn_more, variant="neutral")
+        apply_button_style(
+            self._telemetry_reset_button, btn_view, btn_more,
+            variant="neutral")
         sub_box.addLayout(id_row)
 
         vbox.addLayout(sub_box)
         vbox.addStretch()
 
-        self._sub_network_widgets = [
+        # 离线模式只覆盖三个联网偏好的“当前生效状态”，不改写其保存值。
+        # 标识重置和待上报数据查看都是纯本地操作，离线时仍应可用。
+        self._network_feature_checks = [
             self._announcement_check, self._update_check,
-            self._telemetry_check, btn_reset, btn_view]
+            self._telemetry_check]
         self._refresh_privacy_tab_state()
         return tab
 
@@ -620,14 +637,35 @@ class SettingsDialog(QDialog):
             "https://github.com/wanda1416/lvjiang/blob/master/PRIVACY.md"))
 
     def _refresh_privacy_tab_state(self):
-        """离线模式勾上时，其余三项置灰但保留各自的值不清空。"""
+        """展示实际生效状态，同时保留离线前的联网功能偏好。"""
         from ..core.telemetry.identity import get_identity
 
         offline = self._offline_check.isChecked()
-        for widget in self._sub_network_widgets:
-            widget.setEnabled(not offline)
-
         network = load_user_config().network
+        self._telemetry_reset_button.setEnabled(network.telemetry)
+        saved_values = (
+            network.announcement,
+            network.update,
+            network.telemetry,
+        )
+        for checkbox, saved in zip(
+            self._network_feature_checks, saved_values, strict=True,
+        ):
+            checkbox.blockSignals(True)
+            checkbox.setChecked(bool(saved) and not offline)
+            checkbox.setEnabled(not offline)
+            checkbox.blockSignals(False)
+
+        if offline:
+            self._offline_hint.setText(tr(
+                "已暂停公告检查、版本检查和匿名数据上报；关闭离线模式后，"
+                "将恢复之前的选择。"))
+            self._offline_hint.setStyleSheet("color: #D97706;")
+        else:
+            self._offline_hint.setText(tr(
+                "可在下方分别控制公告、版本更新和匿名数据上报。"))
+            self._offline_hint.setStyleSheet("color: palette(mid);")
+
         if network.telemetry:
             identity = get_identity()
             self._show_telemetry_identity(identity.install_id)

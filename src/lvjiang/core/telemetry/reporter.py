@@ -13,6 +13,8 @@
 """
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -22,6 +24,15 @@ from .spool import SpoolChunk
 from .transport import post_report
 
 MAX_BATCHES_PER_STARTUP = 4
+
+# 单个 HTTP 请求的信封体积上限。服务端 MAX_BODY_BYTES 是 256KB，这里留一倍
+# 余量：一条 per-session 事件约 1KB，50 条一批就是 ~50KB，遇到调满+重置的
+# 长会话还会更大，四批塞进一个请求会顶穿。
+#
+# 顶穿的解法是**分多次请求**，不是缩小批次：批次大小同时决定 D1 的行数
+# （一批 = roll_batch 一行），缩批次会让行数成倍上升，正好加重我们要解决的
+# 额度问题。批次是存储粒度，请求是传输粒度，两者不该耦合。
+MAX_ENVELOPE_BYTES = 128 * 1024
 
 
 @dataclass(frozen=True)
@@ -65,17 +76,44 @@ def build_job() -> ReportJob:
     return ReportJob(heartbeat=hb, batches=batches)
 
 
-def _build_envelope(job: ReportJob) -> dict:
+def _envelope(heartbeat: dict | None, chunks: Sequence[SpoolChunk]) -> dict:
     from datetime import datetime, timezone
     return {
         "v": 1,
         "sent_at": datetime.now(timezone.utc).isoformat(),
-        "heartbeat": job.heartbeat,
+        "heartbeat": heartbeat,
         "batches": [
             {"batch_id": chunk.path.stem, "events": list(chunk.events)}
-            for chunk in job.batches
+            for chunk in chunks
         ],
     }
+
+
+def _envelope_bytes(envelope: dict) -> int:
+    return len(json.dumps(envelope, ensure_ascii=False).encode("utf-8"))
+
+
+def plan_requests(job: ReportJob) -> list[tuple[dict | None, tuple[SpoolChunk, ...]]]:
+    """把一次上报拆成若干个不超过 ``MAX_ENVELOPE_BYTES`` 的请求。
+
+    心跳挂在第一个请求上；批次按体积贪心装箱。单个批次自己就超限时仍然
+    单独成一个请求——发出去让服务端按它自己的上限判定，总好过在客户端
+    静默丢弃（丢了就再也没有了，而服务端拒收只是这一批不落地）。
+    """
+    heartbeat = job.heartbeat
+    plans: list[tuple[dict | None, tuple[SpoolChunk, ...]]] = []
+    current: list[SpoolChunk] = []
+    for chunk in job.batches:
+        candidate = current + [chunk]
+        if current and _envelope_bytes(_envelope(heartbeat, candidate)) > MAX_ENVELOPE_BYTES:
+            plans.append((heartbeat, tuple(current)))
+            heartbeat = None          # 心跳只发一次
+            current = [chunk]
+        else:
+            current = candidate
+    if current or heartbeat is not None:
+        plans.append((heartbeat, tuple(current)))
+    return plans
 
 
 class TelemetryReporter(QThread):
@@ -95,18 +133,26 @@ class TelemetryReporter(QThread):
                 ReportOutcome(heartbeat_attempted=False, heartbeat_ok=False,
                               sent_batches=()))
             return
-        envelope = _build_envelope(job)
+        sent: list[SpoolChunk] = []
+        heartbeat_ok = False
         try:
-            ok = post_report(envelope)
+            for heartbeat, chunks in plan_requests(job):
+                ok = post_report(_envelope(heartbeat, chunks))
+                if not ok:
+                    # 中途失败就停：剩余批次留在本地，下次启动重发。
+                    # 已成功的部分照常记账，不因后续失败被重复上报。
+                    break
+                if heartbeat is not None:
+                    heartbeat_ok = True
+                sent.extend(chunks)
         except Exception as e:  # noqa: BLE001 —— 见模块 docstring：探针出任何意外都不能外抛
             self.failed.emit(str(e))
             return
-        sent = job.batches if ok else ()
         self.finished_ok.emit(
             ReportOutcome(
                 heartbeat_attempted=job.heartbeat is not None,
-                heartbeat_ok=ok and job.heartbeat is not None,
-                sent_batches=sent,
+                heartbeat_ok=heartbeat_ok,
+                sent_batches=tuple(sent),
             ))
 
 

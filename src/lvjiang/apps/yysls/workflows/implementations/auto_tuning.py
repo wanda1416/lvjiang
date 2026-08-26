@@ -43,7 +43,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_RANK,
     get_tune_config,
 )
-from lvjiang.apps.yysls.telemetry.probe import record_tuning_roll
+from lvjiang.apps.yysls.telemetry import probe as telemetry_probe
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -70,6 +70,26 @@ from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
 from lvjiang.workflows.base import BaseWorkflow
 
 from .....i18n import tr
+
+
+def _best_rating(judgement: dict | None) -> str | None:
+    """终局判定（规则 key → 结果）→ 各适用规则里最好的一档评级。
+
+    终局判定是按规则逐条给出的，没有单一"本件评级"；统计侧关心的是这件
+    装备最终成没成，所以取适用规则里的最高档。跳过/不适用的规则不参与。
+    返回 ascii 档位 key，无可用规则时返回 None（该字段选填）。
+    """
+    from lvjiang.apps.yysls.core.tuning_rules.models import RATING_KEYS
+    from lvjiang.apps.yysls.telemetry import vocab as telemetry_vocab
+
+    best = -1
+    for r in (judgement or {}).values():
+        if not isinstance(r, dict) or r.get("skipped") or r.get("not_applicable"):
+            continue
+        key = telemetry_vocab.normalize_rating(r.get("rating"))
+        if key in RATING_KEYS:
+            best = max(best, RATING_KEYS.index(key))
+    return RATING_KEYS[best] if best >= 0 else None
 
 
 class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
@@ -914,6 +934,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         base_affixes = list(equip_data.affixes)
         resets_used = 0
         tune_recycle_reason = ""
+        # 统计采集：一件装备一条事件，这里只开场，逐轮 record_roll 追加，
+        # 离开调律页后 end_session 才落盘。探针内部有 @never_raises 护栏
+        # + 未同意时早退，绝不中断调律主流程。
+        telemetry_probe.begin_session(
+            equip_data=equip_data, initial_affixes=base_affixes,
+            mode=self.equipment_session.mode.value,
+            rule_keys=self.ctx.judge_rule_keys)
+        stop_key = "completed"
 
         # ── 初始判定（initial_check）：第一次调律前先执行一次结束处理 ──
         # 用于垃圾金装复用：先走结束处理重置清空词条，再开始正常调律
@@ -938,6 +966,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 if action == "recycle":
                     tune_recycle_reason = f"初始判定：{why}"
                 stop_reason = f"初始判定：{why}"
+                stop_key = "judged_before_tuning"
                 self.recorder.report_set("stop_reason", stop_reason)
 
         rounds = 0
@@ -959,6 +988,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 round_no=rounds + 1)
             if result is None:
                 stop_reason = self.executor.abort_reason or "无法继续调律"
+                stop_key = "cannot_continue"
                 self.recorder.report_set("stop_reason", stop_reason)
                 self.recorder.doc_note(f"{stop_reason}，结束调律")
                 break
@@ -970,17 +1000,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             new_affix = self.navigator.collect_new_affix(
                 equip_data, result.get("tune_affix", "")) \
                 or result.get("tune_affix", "")
-            # 统计采集：仅此一行，绝不中断调律主流程（record_tuning_roll
-            # 内部有 @never_raises 护栏 + 未同意时早退）。解析失败
-            # （equip_data.affixes 未增长）时传 None，探针直接跳过。
-            record_tuning_roll(
-                equip_data=equip_data,
+            # 统计采集：解析失败（equip_data.affixes 未增长）时传 None，
+            # 探针据此作废**整条会话**——序列里挖个洞会让下游把第 4 轮
+            # 误读成紧跟第 2 轮，条件概率直接算错。
+            telemetry_probe.record_roll(
                 new_affix=(equip_data.affixes[-1]
                           if len(equip_data.affixes) > _affix_count_before else None),
-                slot=affix_count, roll_index=rounds, resets=resets_used,
-                food_label=self.executor.round_food,
-                mode=self.equipment_session.mode.value,
-                rule_keys=self.ctx.judge_rule_keys)
+                slot=affix_count, resets=resets_used,
+                food_label=self.executor.round_food)
             self.recorder.report_set("rounds", rounds)
             self.recorder.report_set("final_affix_count", affix_count)
             self.recorder.report_set(
@@ -1031,6 +1058,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # 回收延到 back 回背包页后执行；skip = 结束保留
             if action == "recycle":
                 tune_recycle_reason = why
+            stop_key = {"recycle": "decided_recycle",
+                        "skip": "decided_keep",
+                        "tune_full_recycle": "tune_full_recycle"}.get(
+                            action, "completed")
             stop_reason = why
             self.recorder.report_set("stop_reason", stop_reason)
             self.recorder.doc_round_decision(why)
@@ -1052,6 +1083,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if not stop_reason:
             stop_reason = ("用户中断" if self.is_stopped
                            else "调律结束")
+            stop_key = "user_stopped" if self.is_stopped else "completed"
+        telemetry_probe.end_session(
+            stop_reason=stop_key,
+            final_rating=_best_rating(judgement),
+            total_rounds=rounds, resets=resets_used)
         self.recorder.doc_finish_equipment(rounds, affix_count, stop_reason,
                                            judgement)
         # 命中回收的装备在回到背包页后执行（阻断时不回收）

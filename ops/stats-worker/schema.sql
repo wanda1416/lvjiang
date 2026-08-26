@@ -45,7 +45,10 @@ CREATE TABLE IF NOT EXISTS daily (
 
 -- ── 通道 B：调律事件（改进内置调律规则） ─────────────────────
 
--- 一次调律会话存一行，payload 整体存 JSON——不是一次 roll 一行。
+-- 一批事件存一行，payload 整体存 JSON 数组。事件粒度是"一件装备一条"
+-- （含初始词条、逐轮产出序列、结束原因），一批默认 50 件。
+-- payload 对服务端是不透明的：不做任何业务字段校验，只过结构闸门，
+-- 见 src/index.js 的 sanitizeEvent。
 -- 这是把写入配额压到最低的关键：写入量 ≈ DAU × 每日会话数，与单次
 -- 会话里的 roll 数量无关。
 CREATE TABLE IF NOT EXISTS roll_batch (

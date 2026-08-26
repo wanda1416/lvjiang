@@ -66,8 +66,9 @@ class TelemetryConsentDialog(QDialog):
         example = self._example_payload_text()
         heartbeat_line = tr("每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识")
         roll_line = tr(
-            "每次调律的结果：在什么规则激活下、第几次调律（含重置）、"
-            "哪个部位、加了什么材料，出了什么词条、数值")
+            "每件装备的一次调律过程：什么部位、什么等级品阶、在什么规则激活下、"
+            "调律前这件装备原有哪些词条、逐轮加了什么材料出了什么词条和数值、"
+            "为什么结束、最终评到哪一档")
         id_line = tr(
             "这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，"
             "但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。")
@@ -77,7 +78,7 @@ class TelemetryConsentDialog(QDialog):
             f"- {roll_line}\n\n"
             f"{tr('不收集什么')}：\n\n"
             f"- {tr('游戏账号、角色名、任何能认出你是谁的信息')}\n"
-            f"- {tr('装备名称、完整的五条词条组合、装备指纹')}\n"
+            f"- {tr('装备名称、装备指纹')}\n"
             f"- {tr('截图、日志、config/session/ 目录里的任何内容')}\n\n"
             f"{tr('用来做什么')}：{tr('仅用于改进律匠内置的调律规则，不公开发布原始数据')}。\n\n"
             f"{id_line}\n\n"
@@ -90,8 +91,8 @@ class TelemetryConsentDialog(QDialog):
         from ...core.telemetry.heartbeat import HEARTBEAT_SCHEMA
         payloads = [HEARTBEAT_SCHEMA.example()]
         try:
-            from ...apps.yysls.telemetry.schemas import TUNING_ROLL_SCHEMA
-            payloads.append(TUNING_ROLL_SCHEMA.example())
+            from ...apps.yysls.telemetry.schemas import TUNING_SESSION_SCHEMA
+            payloads.append(TUNING_SESSION_SCHEMA.example())
         except Exception:  # noqa: BLE001 —— 插件未加载时只展示心跳示例
             pass
         return json.dumps(payloads, ensure_ascii=False, indent=2)

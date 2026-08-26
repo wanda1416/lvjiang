@@ -131,6 +131,7 @@ class LoadoutPanel(QWidget):
         for label, callback in (
             (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
             (tr("培养建议"), lambda: self._equipment._on_affix_impact()),
+            (tr("承音装备合并"), lambda: self._equipment._on_chengyin_merge()),
             (tr("创建模拟装备"), lambda: self._equipment._on_mock_create()),
             (tr("清空真实装备"), lambda: self._equipment._on_clear_real()),
             (tr("导出数据"), lambda: self._equipment._on_export()),

@@ -103,6 +103,57 @@ class FieldSpec:
 
 
 @dataclass(frozen=True)
+class ListSpec:
+    """列表字段：每个元素是一个由 ``item_fields`` 声明的对象。
+
+    嵌套一层**不等于**放宽白名单：元素里的 str 字段同样受
+    :class:`FieldSpec` 那条「必须有 choices/pattern」的硬约束（由 FieldSpec
+    自己的 ``__post_init__`` 保证），否则整条防线会从嵌套结构这里漏掉。
+
+    ``max_items`` 是必须的：列表长度直接决定 payload 体积，不设上限时
+    一次异常长的会话就能把单条事件撑到几百 KB，撑爆传输层的体积闸门。
+    """
+
+    name: str
+    item_fields: tuple[FieldSpec, ...]
+    required: bool = True
+    max_items: int = 64
+
+    def __post_init__(self) -> None:
+        if not self.item_fields:
+            raise TelemetrySchemaError(f"列表字段 {self.name!r} 未声明 item_fields")
+        if self.max_items <= 0:
+            raise TelemetrySchemaError(f"列表字段 {self.name!r} 的 max_items 必须为正")
+
+    def validate_value(self, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, (list, tuple)):
+            raise TelemetrySchemaError(f"字段 {self.name!r} 应为 list")
+        if len(value) > self.max_items:
+            raise TelemetrySchemaError(
+                f"字段 {self.name!r} 元素数 {len(value)} 超出上限 {self.max_items}")
+        known = frozenset(f.name for f in self.item_fields)
+        out: list[dict[str, Any]] = []
+        for i, item in enumerate(value):
+            if not isinstance(item, Mapping):
+                raise TelemetrySchemaError(f"字段 {self.name!r}[{i}] 应为对象")
+            extra = set(item) - known
+            if extra:
+                raise TelemetrySchemaError(
+                    f"字段 {self.name!r}[{i}] 含未声明的键: {sorted(extra)}")
+            row: dict[str, Any] = {}
+            for spec in self.item_fields:
+                present = spec.name in item and item[spec.name] is not None
+                if not present:
+                    if spec.required:
+                        raise TelemetrySchemaError(
+                            f"字段 {self.name!r}[{i}] 缺少必填键 {spec.name!r}")
+                    continue
+                row[spec.name] = spec.validate_value(item[spec.name])
+            out.append(row)
+        return out
+
+
+@dataclass(frozen=True)
 class ValidatedEvent:
     """只能由 :meth:`EventSchema.validate` 构造。缓冲与传输层只接受这个类型。"""
 
@@ -117,7 +168,7 @@ class EventSchema:
 
     name: str
     version: int
-    fields: tuple[FieldSpec, ...] = field(default_factory=tuple)
+    fields: tuple[FieldSpec | ListSpec, ...] = field(default_factory=tuple)
 
     def field_names(self) -> frozenset[str]:
         return frozenset(f.name for f in self.fields)
@@ -154,15 +205,25 @@ class EventSchema:
         """
         out: dict[str, Any] = {}
         for spec in self.fields:
-            if spec.example is not None:
-                out[spec.name] = spec.example
-            elif spec.kind is bool:
-                out[spec.name] = False
-            elif spec.kind is int:
-                out[spec.name] = int(spec.minimum if spec.minimum is not None else 0)
-            elif spec.kind is float:
-                out[spec.name] = float(spec.minimum if spec.minimum is not None else 0.0)
-            elif spec.kind is str:
-                allowed = spec._allowed_choices()
-                out[spec.name] = allowed[0] if allowed else ""
+            if isinstance(spec, ListSpec):
+                # 给一个元素而不是空列表：同意弹窗拿这份样例告诉用户「实际会
+                # 发送的数据长这样」，空列表等于把嵌套字段藏起来不给用户看。
+                out[spec.name] = [
+                    {f.name: self._example_field(f) for f in spec.item_fields}
+                ]
+            else:
+                out[spec.name] = self._example_field(spec)
         return out
+
+    @staticmethod
+    def _example_field(spec: FieldSpec) -> Any:
+        if spec.example is not None:
+            return spec.example
+        if spec.kind is bool:
+            return False
+        if spec.kind is int:
+            return int(spec.minimum if spec.minimum is not None else 0)
+        if spec.kind is float:
+            return float(spec.minimum if spec.minimum is not None else 0.0)
+        allowed = spec._allowed_choices()
+        return allowed[0] if allowed else ""

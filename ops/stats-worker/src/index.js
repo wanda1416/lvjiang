@@ -34,15 +34,10 @@ const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const RE_VERSION = /^[0-9A-Za-z.\-+]{1,32}$/;
 const RE_OS_RELEASE = /^[0-9A-Za-z._-]{1,16}$/;
 const RE_ARCH = /^[A-Za-z0-9_]{1,20}$/;
-const RE_ACTIVE_RULE = /^(none|[a-z0-9_]+(\+[a-z0-9_]+)*)$/;
 
 const RUN_ENV = new Set(["desktop", "android"]);
 const OS_NAME = new Set(["Windows", "Darwin", "Linux", "other"]);
 const PLUGIN = new Set(["yysls", "none"]); // 新增插件必须同步扩充，否则拒收
-const FOOD = new Set(["none", "gold", "purple", "rainbow"]);
-const MODE = new Set(["normal", "force_tune", "tune_full_recycle"]);
-const QUALITY = new Set(["blue", "purple", "gold"]);
-const PART = new Set(["weapon", "ring", "pendant", "head", "chest", "leg", "wrist"]);
 // weapon_type / affix 的取值随游戏配置增长（武器类型、词条池会随版本更新），
 // 服务端没有游戏配置作为真源，没法像 part/food/mode 那样枚举穷尽。退而求其次
 // 的格式闸门：真实的武器类型/词条名恒为纯中文短词，不含拉丁字母、数字、
@@ -50,7 +45,6 @@ const PART = new Set(["weapon", "ring", "pendant", "head", "chest", "leg", "wris
 // PII 形状（路径、邮箱、账号、ADB 序列号等几乎总带 ASCII/数字/符号）。
 // 客户端一侧才是真正的枚举白名单（core/telemetry/schema.py + apps/yysls/
 // telemetry/vocab.py 对 game_config.yaml 的实时枚举），这里只是纵深防御。
-const RE_CJK_TERM = /^[一-鿿]{1,16}$/;
 
 function isStr(v, re, maxLen) {
   return typeof v === "string" && v.length <= (maxLen || 64) && (!re || re.test(v));
@@ -100,28 +94,70 @@ function validateHeartbeat(hb) {
   };
 }
 
-// ── 调律事件校验：单条不合法只丢弃这一条，不拖垮整个批次 ──
+// ── 事件校验：只看形状与安全性，**不认识调律** ──
+//
+// 服务端刻意不知道调律有哪些字段。业务枚举的真源是客户端的 game_config.yaml
+// （词条池随游戏版本增长），服务端没有也不该有这份真源；把 part/food/affix
+// 抄一份到这里的代价是：客户端每加一个字段都得同步改服务端并重新部署，而在
+// 同步完成之前，新字段是完全裸奔的。
+//
+// 改成通用闸门之后，任何未来字段自动受同一套约束保护，PII 纵深防御反而比
+// 逐字段枚举更强——原先只有被枚举到的那些字段受保护。业务语义的白名单仍在
+// 客户端（schema.py + vocab.py 对 game_config.yaml 的实时枚举），那才是主防线；
+// 这里是防绕过客户端直接发请求的纵深防御。
+//
+// 分析在本地做：拉原始 JSON 下来跑，见 queries/roll_export.sql。
 
-function validateRollEvent(e) {
-  if (!e || typeof e !== "object") return null;
-  if (e.schema !== "yysls.tuning_roll") return null;
+const MAX_EVENT_DEPTH = 4;
+const MAX_KEYS_PER_OBJECT = 32;
+const MAX_ARRAY_ITEMS = 64;
+const MAX_NUMBER_ABS = 1e9;
+
+const RE_EVENT_KEY = /^[a-z][a-z0-9_]{0,31}$/;
+// 字符串只允许两种形状，任一不满足即拒绝该条事件：
+//   ascii token —— 枚举 key、install_id、日期、版本号、active_rule 等
+//   CJK 词条    —— 词条名、武器类型；长度上限与旧版逐字段校验保持一致
+// 两者都不含空格、斜杠、@，挡得住路径/邮箱/账号这类几乎总带这些字符的 PII
+// 形状。挡不住一个纯中文的伪造短串（例如"角色名叫张三"）——这条限制与旧版
+// 相同，已记录在 docs/30-architecture/06-telemetry.md「服务端校验边界」。
+const RE_ASCII_TOKEN = /^[0-9A-Za-z_.+\-]{1,128}$/;
+const RE_CJK_TERM = /^[一-鿿]{1,16}$/;
+
+function isSafeString(v) {
+  return RE_ASCII_TOKEN.test(v) || RE_CJK_TERM.test(v);
+}
+
+/** 递归校验任意 JSON 值的形状；不合规返回 false。 */
+function isSafeValue(v, depth) {
+  if (depth > MAX_EVENT_DEPTH) return false;
+  if (v === null || typeof v === "boolean") return true;
+  if (typeof v === "number") {
+    return Number.isFinite(v) && Math.abs(v) <= MAX_NUMBER_ABS;
+  }
+  if (typeof v === "string") return isSafeString(v);
+  if (Array.isArray(v)) {
+    if (v.length > MAX_ARRAY_ITEMS) return false;
+    return v.every((item) => isSafeValue(item, depth + 1));
+  }
+  if (typeof v === "object") {
+    const keys = Object.keys(v);
+    if (keys.length > MAX_KEYS_PER_OBJECT) return false;
+    return keys.every(
+      (k) => RE_EVENT_KEY.test(k) && isSafeValue(v[k], depth + 1));
+  }
+  return false;
+}
+
+/**
+ * 单条事件的结构性校验。不合法只丢弃这一条，不拖垮整个批次。
+ * 只强制两个存储层自身需要的字段：schema（用于事后按类型筛选）与
+ * install_id（行的归属键）——这两个不是调律语义，是存储语义。
+ */
+function sanitizeEvent(e) {
+  if (!e || typeof e !== "object" || Array.isArray(e)) return null;
+  if (!isStr(e.schema, RE_ASCII_TOKEN, 64)) return null;
   if (!isStr(e.install_id, RE_UUID_HEX)) return null;
-  if (!isStr(e.date, RE_DATE)) return null;
-  if (!isEnum(e.part, PART)) return null;
-  if (e.weapon_type !== undefined && !isStr(e.weapon_type, RE_CJK_TERM, 16)) return null;
-  if (!isInt(e.level, 1, 999)) return null;
-  if (e.quality !== undefined && !isEnum(e.quality, QUALITY)) return null;
-  if (!isEnum(e.food, FOOD)) return null;
-  if (!isInt(e.slot, 1, 5)) return null;
-  if (!isInt(e.roll_index, 1, 100000)) return null;
-  if (!isInt(e.resets, 0, 100000)) return null;
-  if (!isEnum(e.mode, MODE)) return null;
-  if (!isStr(e.active_rule, RE_ACTIVE_RULE, 256)) return null;
-  if (!isStr(e.affix, RE_CJK_TERM, 16)) return null;
-  if (!isFloat(e.cap_pct, 0, 100)) return null;
-  if (typeof e.is_transferred !== "boolean") return null;
-  if (e.season !== undefined && !isInt(e.season, 0, 9999)) return null;
-  if (typeof e.game_config_customized !== "boolean") return null;
+  if (!isSafeValue(e, 0)) return null;
   return e;
 }
 
@@ -194,7 +230,7 @@ async function handleReport(request, env) {
     for (const b of batches) {
       if (!b || !isStr(b.batch_id, RE_UUID4) && !isStr(b.batch_id, /^[0-9a-zA-Z_-]{1,64}$/)) continue;
       const rawEvents = Array.isArray(b.events) ? b.events.slice(0, MAX_EVENTS_PER_BATCH) : [];
-      const events = rawEvents.map(validateRollEvent).filter(Boolean);
+      const events = rawEvents.map(sanitizeEvent).filter(Boolean);
       if (events.length === 0) continue;
       const installId = events[0].install_id;
       const appVersion = hb ? hb.app_version : "unknown";

@@ -28,8 +28,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..i18n import tr
-from ..workflows import action_catalog as cat
+from ...i18n import tr
+from ...workflows import action_catalog as cat
 
 
 @dataclass
@@ -46,9 +46,9 @@ class PaletteProviders:
 
 def default_providers(main_window, debug_panel=None) -> PaletteProviders:
     """从主窗口 / 调试面板组装真实数据源"""
-    from ..core import scene_registry as sr
-    from ..core.config.resolver import get_resolver
-    from .script_workbench import snippet_color, snippet_point, snippet_rect
+    from ...core import scene_registry as sr
+    from ...core.config.resolver import get_resolver
+    from .workbench import snippet_color, snippet_point, snippet_rect
 
     def scenes():
         try:

@@ -24,7 +24,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from ..i18n import tr
+from ...i18n import tr
 
 
 @dataclass

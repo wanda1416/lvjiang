@@ -23,7 +23,7 @@ class FakeSignal:
 
 def test_startup_shows_announcement_then_checks_update(monkeypatch):
     import lvjiang.core.announcement as core
-    import lvjiang.ui.announcement_dialog as dialog_module
+    import lvjiang.ui.notices.announcement_dialog as dialog_module
 
     notice = Announcement("urgent", "critical", "紧急公告", "正文")
     manifest = AnnouncementManifest(1, 5, "", (notice,))

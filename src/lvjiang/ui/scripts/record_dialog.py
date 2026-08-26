@@ -28,8 +28,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core.config.resolver import get_resolver
-from ..i18n import tr
+from ...core.config.resolver import get_resolver
+from ...i18n import tr
 
 _STYLE_IDLE = (
     "background-color: #607D8B; color: white; font-weight: bold; "
@@ -76,7 +76,7 @@ class ScriptRecordDialog(QDialog):
         """对话框打开后才注册系统全局录制热键。"""
         if self._f12_hotkey_listener is not None:
             return
-        from ..core.platforms import hotkey_pynput_token, start_global_hotkeys
+        from ...core.platforms import hotkey_pynput_token, start_global_hotkeys
         try:
             self._f12_hotkey_listener = start_global_hotkeys({
                 hotkey_pynput_token(self._record_key): self.f12_pressed.emit,
@@ -228,11 +228,11 @@ class ScriptRecordDialog(QDialog):
             self.lbl_status.setText(tr("无法加载布局: {layout_name}").format(layout_name=layout_name))
             return
         if main._capture is None:
-            from ..core.desktop import DesktopCapture
+            from ...core.desktop import DesktopCapture
             main._capture = DesktopCapture()
         main._capture.set_capture_region(
             w["left"], w["top"], w["width"], w["height"])
-        from .macros import MacroRecorder
+        from ...core.macro_recorder import MacroRecorder
         hk = main._user_config.hotkeys
         try:
             self._recorder = MacroRecorder(
@@ -323,7 +323,7 @@ class ScriptRecordDialog(QDialog):
         try:
             text = self.text_edit.toPlainText()
             if self._pending_trace is not None:
-                from ..core.input_trace import (
+                from ...core.input_trace import (
                     TRACE_PLACEHOLDER,
                     save_input_trace_bundle,
                 )

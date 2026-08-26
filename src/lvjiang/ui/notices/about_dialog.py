@@ -19,14 +19,14 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core.update import (
+from ...core.update import (
     GITHUB_REPO,
     ReleaseInfo,
     UpdateChecker,
     get_version,
     is_newer_version,
 )
-from ..i18n import tr
+from ...i18n import tr
 
 # 导出供外部使用
 __all__ = ["AboutDialog", "GITHUB_REPO"]

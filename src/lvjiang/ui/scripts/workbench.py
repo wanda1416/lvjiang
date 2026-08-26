@@ -38,9 +38,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.config.resolver import get_resolver
-from ..i18n import tr
-from .pick_canvas import PickCanvas
+from ...core.config.resolver import get_resolver
+from ...i18n import tr
+from ..ocr.pick_canvas import PickCanvas
 
 #: 临时运行文件（与场景编辑器试运行共用；``_`` 前缀不会被发现层当成正式脚本）
 EDITOR_RUN_REL = "workflows/_editor_run.wf"
@@ -308,7 +308,7 @@ class DebugPanel(QWidget):
         return None
 
     def _build_engine(self):
-        from ..workflows.engine import WorkflowEngine
+        from ...workflows.engine import WorkflowEngine
 
         main = self._main
         lm = main._layout_manager
@@ -354,7 +354,7 @@ class DebugPanel(QWidget):
         if not text.strip():
             self.lbl_run.setText(tr("脚本为空"))
             return False
-        from .run_control import WorkflowWorker
+        from ..run_control import WorkflowWorker
 
         try:
             path: Path = get_resolver().write_entity(EDITOR_RUN_REL, text if text.endswith("\n") else text + "\n")

@@ -4,7 +4,7 @@ from unittest.mock import patch
 from PyQt6.QtCore import QUrl
 
 from lvjiang.core.announcement import Announcement, AnnouncementManifest
-from lvjiang.ui.announcement_dialog import AnnouncementDialog
+from lvjiang.ui.notices.announcement_dialog import AnnouncementDialog
 
 
 def test_dialog_lists_notices_and_renders_markdown(qtbot):
@@ -59,7 +59,7 @@ def test_empty_cache_has_manual_refresh_guidance(qtbot):
 
 def test_body_links_only_open_https():
     with patch(
-        "lvjiang.ui.announcement_dialog.QDesktopServices.openUrl"
+        "lvjiang.ui.notices.announcement_dialog.QDesktopServices.openUrl"
     ) as open_url:
         AnnouncementDialog._open_body_link(QUrl("http://example.test/plain"))
         AnnouncementDialog._open_body_link(QUrl("javascript:alert(1)"))

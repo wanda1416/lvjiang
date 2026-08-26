@@ -4,12 +4,6 @@
 
 > 工作流 DSL 语法不在本文范围，见 [DSL 语法文档](../30-architecture/32-grammar/README.md)。
 
-**欢迎加群反馈问题和提交建议：**
-
-![微信交流群](../../data/image/feedback-qrcode.jpg)
-
----
-
 ## 目录
 
 | 章节 | 内容 |
@@ -47,3 +41,11 @@
 | [调律评价规则](../10-game/10-tuning-rules/README.md) | 律匠的装备分级与流派判定规格 |
 | [DSL 语法](../30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
 | [主窗口状态流](../30-architecture/01-main-window-state-flow.md) | 定位/连接状态机 |
+
+---
+
+**遇到问题或有建议？欢迎加群反馈：**
+
+进群前请至少看完 [1. 快速开始](01-quick-start.md)；没看完快速开始就来提问的，一律不回复。
+
+![微信交流群](../../data/image/feedback-qrcode.jpg)

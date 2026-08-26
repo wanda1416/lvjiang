@@ -554,6 +554,9 @@ class SettingsDialog(QDialog):
 
         id_row = QHBoxLayout()
         self._telemetry_id_label = QLabel()
+        self._telemetry_id_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.TextSelectableByKeyboard)
         id_row.addWidget(self._telemetry_id_label)
         id_row.addStretch()
         btn_reset = QPushButton(tr("重置标识"))
@@ -601,8 +604,9 @@ class SettingsDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
         from ..core.telemetry.identity import reset_identity
-        reset_identity()
-        self._refresh_privacy_tab_state()
+        identity = reset_identity()
+        # 直接使用本次重置的返回值，避免页面继续展示重置前的标识。
+        self._show_telemetry_identity(identity.install_id)
 
     def _on_view_pending_telemetry(self):
         from ..core.telemetry.paths import spool_dir
@@ -626,10 +630,13 @@ class SettingsDialog(QDialog):
         network = load_user_config().network
         if network.telemetry:
             identity = get_identity()
-            self._telemetry_id_label.setText(
-                tr("当前标识：") + identity.install_id[:8] + "…")
+            self._show_telemetry_identity(identity.install_id)
         else:
             self._telemetry_id_label.setText(tr("当前标识：未生成（未开启）"))
+
+    def _show_telemetry_identity(self, install_id: str) -> None:
+        """完整展示匿名标识，便于用户核对和复制。"""
+        self._telemetry_id_label.setText(tr("当前标识：") + install_id)
 
     # ─── 保存 ──────────────────────────────────────────────
 

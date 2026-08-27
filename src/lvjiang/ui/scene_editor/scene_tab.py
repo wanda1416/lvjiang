@@ -34,6 +34,50 @@ from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 
+def describe_scene_origin(scene_key: str,
+                          layout_name: str = "") -> tuple[str, bool]:
+    """场景当前生效配置的「版本号 / 来源」文案，返回 (文本, 是否含远端)。
+
+    场景编辑器实际在编辑**两个**文件：`scenes/{key}.yaml`（场景定义）与
+    `layouts/{布局}/{key}.json`（该布局下的坐标）。两者都可能被远端独立
+    顶替，只标一个就正好留下盲点——而这个标识存在的意义就是消除盲点，
+    让人随时知道自己正在看哪一份。
+
+    独立于 SceneTab 的纯函数：构造 SceneTab 需要整个 Qt 控件树，而它在
+    测试里反复创建/析构会触发 item delegate 的析构时序问题（PyQt 已知
+    坑，与本功能无关），把文案逻辑摘出来才能直接测。
+    """
+    from ...core.config.resolver import (
+        LAYER_LOCAL,
+        LAYER_REMOTE,
+        LAYER_SYSTEM,
+        get_resolver,
+    )
+    from ...core.layout_manager import scene_layout_rel
+
+    labels = {
+        LAYER_LOCAL: tr("用户"),
+        LAYER_REMOTE: tr("远端"),
+        LAYER_SYSTEM: tr("系统"),
+    }
+    resolver = get_resolver()
+    targets = [(tr("场景"), f"scenes/{scene_key}.yaml")]
+    if layout_name:
+        targets.append((tr("布局"), scene_layout_rel(layout_name, scene_key)))
+
+    parts: list[str] = []
+    has_remote = False
+    for title, rel_path in targets:
+        origin = resolver.describe_entity(rel_path)
+        if not origin.layer:
+            continue
+        has_remote = has_remote or origin.layer == LAYER_REMOTE
+        source = labels.get(origin.layer, origin.layer)
+        version = "" if origin.version is None else f" v{origin.version}"
+        parts.append(f"{title}{version}·{source}")
+    return "　".join(parts), has_remote
+
+
 class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域列表 / 坐标列表 / 方向列表 / 面板列表）"""
 
@@ -45,6 +89,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         # 当前视图 key（空 = 看全部）；视图切换回调：(scene_key, view)，由 dialog 注入换底图
         self._current_view: str = ""
         self.on_view_changed = None
+        # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
+        self._layout_name: str = ""
 
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -90,7 +136,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     # ─── 面板构建 ────────────────────────────────────────
 
     def _build_canvas_toolbar(self) -> QHBoxLayout:
-        """画布顶部工具栏：视图选择器 + 管理入口"""
+        """画布顶部工具栏：视图选择器 + 管理入口 + 来源/版本标识"""
         bar = QHBoxLayout()
         bar.addWidget(QLabel(tr("视图")))
         self._view_combo = QComboBox()
@@ -101,9 +147,33 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._btn_manage_views.setToolTip(tr("开启多视图、新增/重命名/删除视图"))
         self._btn_manage_views.clicked.connect(self._on_manage_views)
         bar.addWidget(self._btn_manage_views)
+
+        # 正在编辑的是哪一份：远端下发的配置会顶替出厂文件，不标出来的话
+        # 开发者本地跑出来的行为和用户不一样却毫不知情，排查问题无从下手。
+        self._origin_label = QLabel()
+        self._origin_label.setStyleSheet("color: palette(mid);")
+        bar.addWidget(self._origin_label)
+        self._refresh_origin_label()
+
         bar.addStretch()
         self._refresh_view_combo()
         return bar
+
+    def set_layout_name(self, layout_name: str):
+        """由 dialog 在应用布局时注入——布局坐标文件的来源要按布局名解析"""
+        self._layout_name = layout_name
+        self._refresh_origin_label()
+
+    def _refresh_origin_label(self):
+        """刷新「版本号 / 来源」标识"""
+        text, has_remote = describe_scene_origin(
+            self._scene_key, self._layout_name)
+        self._origin_label.setText(text)
+        self._origin_label.setToolTip(
+            tr("配置来源：用户=你改过的；系统=出厂；远端=在线下发（会顶替出厂）"))
+        # 远端顶替出厂是最容易被忽略、也最需要被注意到的一种状态
+        self._origin_label.setStyleSheet(
+            "color: #D97706;" if has_remote else "color: palette(mid);")
 
     # ─── 视图 ────────────────────────────────────────────
 

@@ -118,15 +118,17 @@ class TestUpdateCheckAlwaysContinues:
 
 
 class TestContinueAfterUpdateCheck:
-    def test_prompts_consent_then_starts_report(self, monkeypatch):
+    def test_prompts_consent_then_starts_report_and_config_sync(self, monkeypatch):
         import lvjiang.ui.notices.telemetry_consent_dialog as consent_dialog_mod
         events = []
         monkeypatch.setattr(consent_dialog_mod, "maybe_prompt_and_record",
                             lambda parent: events.append("consent"))
         host = SimpleNamespace(
-            _start_telemetry_report_on_startup=lambda: events.append("report"))
+            _start_telemetry_report_on_startup=lambda: events.append("report"),
+            _start_remote_config_sync_on_startup=lambda: events.append("config"))
         MainWindow._continue_after_update_check(host)
-        assert events == ["consent", "report"]
+        # 同意提示是模态框必须最先；上报与在线配置都无 UI，互不依赖
+        assert events == ["consent", "report", "config"]
 
 
 class TestStartTelemetryReportOnStartup:

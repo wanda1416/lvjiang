@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 
@@ -106,20 +106,38 @@ class HotkeyConfig:
 
 @dataclass
 class NetworkConfig:
-    """三条联网行为的用户开关（session.json settings.network）。
+    """四条联网行为的用户开关（session.json settings.network）。
 
-    公告/更新是给用户的服务，统计是用户给项目的贡献——分开存放，
-    ``offline`` 是总闸，勾上后其余三项在 UI 上置灰但不清空其值，
+    公告/更新/在线配置是给用户的服务，统计是用户给项目的贡献——分开存放，
+    ``offline`` 是总闸，勾上后其余各项在 UI 上置灰但不清空其值，
     再关掉离线模式时恢复各自原有状态。
+
+    ``remote_config`` 默认**开**，与统计的"默认关 + 首启询问"相反：统计是
+    把数据传出去，在线配置是把修复拿回来（布局坐标跑偏这类问题只能靠它
+    热修）。但同样必须能一键关掉。
     """
     offline: bool = False
     announcement: bool = True
     update: bool = True
     telemetry: bool = False  # 默认关；首启同意弹窗同意后才置 True
+    remote_config: bool = True
 
     def __post_init__(self):
-        for name in ("offline", "announcement", "update", "telemetry"):
-            setattr(self, name, bool(getattr(self, name)))
+        for f in fields(self):
+            setattr(self, f.name, bool(getattr(self, f.name)))
+
+
+def _from_known(cls, raw: dict):
+    """按 dataclass 的字段名过滤后构造，忽略未知键。
+
+    字段名**从 dataclass 自身取**，不另写一份白名单：session.json 里可能
+    存着旧版本/其他模块写入的键，直接展开会 TypeError；但白名单一旦手写，
+    加了新字段忘记同步就会把用户存下的值静默丢掉、回退成默认值——
+    `network.remote_config` 就这么漏过一次（用户关掉在线配置，重启又自己
+    打开了），所以这里不再给漂移留机会。
+    """
+    known = {f.name for f in fields(cls)}
+    return cls(**{k: v for k, v in raw.items() if k in known})
 
 
 @dataclass
@@ -154,11 +172,7 @@ class UserConfig:
         if isinstance(self.input_sim, dict):
             self.input_sim = InputSimConfig(**self.input_sim)
         if isinstance(self.hotkeys, dict):
-            known_hotkeys = {"start", "pause", "stop", "record"}
-            self.hotkeys = HotkeyConfig(
-                **{k: v for k, v in self.hotkeys.items() if k in known_hotkeys})
+            self.hotkeys = _from_known(HotkeyConfig, self.hotkeys)
         if isinstance(self.network, dict):
-            known_network = {"offline", "announcement", "update", "telemetry"}
-            self.network = NetworkConfig(
-                **{k: v for k, v in self.network.items() if k in known_network})
+            self.network = _from_known(NetworkConfig, self.network)
         self.delay_params = parse_delay_params(self.delay_params)

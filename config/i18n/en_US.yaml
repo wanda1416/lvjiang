@@ -289,7 +289,7 @@ window_ops:
   window_located: Window located
   window_closed: Window closed
   devices_found: Found {count} device(s)
-  no_device_found: No device found
+  no_device_found: No Device Found
   no_adb_device_title: No ADB Device Found
   no_adb_device_msg: 'No USB-connected ADB device found.
 
@@ -303,7 +303,7 @@ window_ops:
   btn_connect: Connect
   btn_locate: Locate
   btn_disconnect: Disconnect
-  btn_scan_device: Scan Device
+  btn_scan_device: Scan Devices
   status_scanning_window: Scanning windows...
   status_scanning_device: Scanning devices...
   status_connecting: Connecting to device...
@@ -357,56 +357,182 @@ config:
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
   '  未导入图片': '  No image imported'
+  '## 汇总': '## Summary'
   (可选): (Optional)
+  (无): (None)
+  (无匹配): (No Match)
   (未命名): (Unnamed)
+  (未识别到): (Not Recognized)
   (空): (Empty)
+  (空行): (Blank Line)
   + 创建区域: + Create Region
   + 创建坐标: + Create Point
   + 创建面板: + Create Panel
   '- 未分组 -': '- Ungrouped -'
   '- 未命名 -': '- Unnamed -'
+  0=红 1=绿 2=蓝: 0=Red 1=Green 2=Blue
   <b>勾选要执行的脚本：</b>: <b>Select scripts to execute:</b>
   <b>选择要执行的行：</b>: <b>Select lines to execute:</b>
-  执行顺序: Execution Order
-  脚本候选: Script Candidates
   <span style="color:#888;">截图：—  画布：—</span>: '<span style="color:#888;">Screenshot: —  Canvas: —</span>'
   <span style="color:#888;">截图：—　　画布：—</span>: '<span style="color:#888;">Screenshot: —　　Canvas: —</span>'
+  ADB screencap 静态截图: ADB screencap (static screenshot)
+  ADB shell input: ADB shell input
+  ADB 异常，请重连设备后点击恢复: ADB error, reconnect the device then click Resume
+  DesktopCapture 已停止: DesktopCapture stopped
+  ESC / HOME / 字母键；设备端 ESC=返回: ESC / HOME / letter keys; on-device ESC = Back
+  OCR 扫描区域: OCR Scan Region
+  YAML 顶层必须是字典: YAML top level must be a dict
+  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off, or disabled by the system); please re-enable it'
+  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap returned empty data (Shizuku not authorized?)'
+  '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
+  '[录屏] 仅流式截图模式支持录屏': '[Recording] Screen recording is only supported in streaming screenshot mode'
+  '[录屏] 保存失败（详见日志）': '[Recording] Save failed (see log for details)'
+  '[录屏] 启动失败（详见日志）': '[Recording] Failed to start (see log for details)'
+  '[录屏] 已放弃本次录制，文件已删除': '[Recording] Recording discarded, file deleted'
+  '[录屏] 无法获取画面尺寸': '[Recording] Failed to get frame size'
+  '[截屏] PNG 编码失败': '[Screenshot] PNG encoding failed'
+  '[截屏] 截屏失败：无可用画面': '[Screenshot] Failed: no frame available'
+  '[扫描] 局域网内未发现可连接的 ADB 设备': '[Scan] No connectable ADB device found on the LAN'
   '[扫描] 正在扫描局域网 ADB 设备...': '[Scan] Scanning LAN ADB devices...'
+  '[批量] 暂无启用的行，请到「配置」页勾选': '[Batch] No rows enabled; check them on the "Config" page'
+  '[批量] 请至少勾选一个脚本': '[Batch] Please check at least one script'
+  '[拒绝] 已有自动化在运行中，请等待结束或按': '[Rejected] Automation already running; wait for it to finish or press'
+  '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止': '[Rejected] Automation already running; wait for it to finish or press F10 to stop'
+  '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': '[Notice] The current platform doesn''t support window-mirroring mode; use "Scan Devices" instead'
+  '[提示] 当前没有正在运行的自动化': '[Notice] No automation is currently running'
+  '[提示] 未发现 USB 连接的 ADB 设备': '[Notice] No USB-connected ADB device found'
+  '[提示] 请先停止当前任务，再重新扫描窗口': '[Notice] Stop the current task before rescanning windows'
+  '[提示] 请先停止当前任务，再重新扫描设备': '[Notice] Stop the current task before rescanning devices'
+  '[操作] ADB 已恢复，工作流继续': '[Action] ADB restored, workflow continues'
+  '[操作] 已停止': '[Action] Stopped'
+  '[操作] 已恢复，继续执行...': '[Action] Resumed, continuing...'
+  '[操作] 收到停止请求': '[Action] Stop request received'
+  '[操作] 暂停中...': '[Action] Pausing...'
   '[断连] 窗口定位已清除': '[Disconnected] Window positioning cleared'
+  '[模式] 已切换到前台模式（SendInput，移动光标）': '[Mode] Switched to Foreground Mode (SendInput, moves the cursor)'
+  '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[Mode] Switched to Background Mode (PostMessage, cursor stays put)'
+  '[状态] 重新扫描窗口，旧定位已失效': '[Status] Rescanning windows; the old location is no longer valid'
+  '[设备端手势] 连不上手机上的律匠 app（未安装或未开无障碍），回退 adb shell input': '[Device-side Gesture] Cannot reach the LvJiang app on the phone (not installed or Accessibility not enabled); falling back to adb shell input'
+  '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中': '[Error] Current environment {env} is not among the environments {envs} this script supports'
+  '[错误] 无主窗口，无法获取运行环境': '[Error] No main window; cannot get the runtime environment'
+  '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[Error] No config yet; add one via Tools -> Batch Config first'
+  '[错误] 未找到可见窗口': '[Error] No visible window found'
+  '[错误] 没有已加载的布局': '[Error] No layout loaded'
+  '[错误] 脚本内容为空': '[Error] Script content is empty'
+  '[错误] 请先在主窗口定位游戏窗口': '[Error] Please locate the game window in the main window first'
+  '[错误] 请先在主窗口连接 ADB 设备': '[Error] Please connect an ADB device in the main window first'
+  '[错误] 请先定位窗口': '[Error] Please locate a window first'
+  '[错误] 请先连接设备': '[Error] Please connect a device first'
+  '[错误] 请选择一个工作流': '[Error] Please select a workflow'
+  'color_ratio: 缺少颜色参数': 'color_ratio: missing color parameter'
   cols=1 时滚动方向不能为横向: Scroll direction cannot be horizontal when cols=1
+  config 中缺少 model_path: config is missing model_path
+  find 结果、矩形或坐标变量: find result, rectangle, or coordinate variable
+  'find: 模板 {name} 不存在（config/system/templates/）': 'find: template {name} does not exist (config/system/templates/)'
+  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: offset point should be [dx, dy, "#rrggbb"], got: {v!r}'
+  'find_multi_color: 缺少锚点颜色': 'find_multi_color: missing anchor color'
+  id 不合法: Invalid id
+  initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
   key 必须以小写字母开头，仅含小写字母/数字/下划线: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores
   key 必须以小写字母开头，仅含小写字母/数字/下划线。: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores.
   key 重复: Duplicate key
+  payload 必须是 JSON 对象: payload must be a JSON object
+  pynput 未安装，无法录制: pynput not installed; cannot record
   rows=1 时滚动方向不能为纵向: Scroll direction cannot be vertical when rows=1
+  scenes.yaml 必须至少包含一个场景分组，请检查配置: scenes.yaml must contain at least one scene group; please check the config
+  scrcpy 流式: scrcpy Streaming
+  scrcpy 视频流: scrcpy Video Stream
+  '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
+  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], a find result, or an (x, y[, w, h]) literal), got: {t}'
+  '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'
   ↑ 上移: ↑ Move Up
   ↓ 下移: ↓ Move Down
+  ■ 停止录制: ■ Stop Recording
+  ● 录制脚本: ● Record Script
   ● 有改动: ● Modified
+  ⚠ ADB 连接异常，请重连设备后点击右侧「恢复」: ⚠ ADB connection error, reconnect the device then click "Resume" on the right
+  '「{label}」应为 #rrggbb': '"{label}" should be #rrggbb'
+  「{label}」应为 {n} 个数: '"{label}" should be {n} numbers'
+  「{label}」未填写: '"{label}" is not filled in'
+  【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，: '[Emulator Aspect Ratio] If the target emulator has no built-in 20:9 preset,'
+  【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，: '[Important] When using a PC emulator (e.g. MuMu, LDPlayer) you must select "Android",'
   上移视图: Move View Up
   下移视图: Move View Down
+  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: No data will be uploaded. You can opt in anytime later via "Config Manager → Network & Privacy".
+  不会被录制: Not recorded
+  不公开发布原始数据。: Raw data is never published.
+  不同意: Decline
+  不带 by 得到文字；带 by 得到命中与否: Without `by`, returns the text; with `by`, returns whether it matched
+  不收集: Not Collected
+  不收集什么: What Isn't Collected
   中文名称: Chinese Name
   中文名称，如 背包网格: Chinese name, e.g. Bag Grid
   为该区域绑定哪个字段？: Which field to bind for this region?
+  主导通道: Dominant Channel
+  主窗口有工作流在运行，先停止它: The main window has a workflow running; stop it first
+  了解详情: Learn More
+  交互: Interaction
+  亮段计数: Bright-Segment Count
+  仅上报匿名的运行环境信息，不含任何游戏内数据。: Only reports anonymous runtime environment info, no in-game data of any kind.
   仅剩基底视图时可用，取消后所有定义归为无视图区分: Only available with base view remaining; canceling merges all definitions into no-view distinction
+  仅启用一个条目时，直接执行所选脚本，不运行四个生命周期 wf: When only one entry is enabled, run the selected script directly, skipping the four lifecycle .wf hooks
+  仅用于所列功能改进，不公开发布原始数据: Used only to improve the listed features; raw data is never published
   从场景 YAML 中删除 Panel 定义: Delete Panel definition from scene YAML
   从场景 YAML 中删除坐标点定义（meta 数据）: Delete coordinate point definition from scene YAML (meta data)
+  以下为系统级全局热键，保存后立即生效。: The following are system-wide global hotkeys; changes take effect immediately after saving.
+  任务暂停中，是否直接结束？: Task is paused. End it now?
+  低精度录制中…连续移动将合并，: Low-precision recording…consecutive moves are merged,
   使用实时图像: Use Live Image
   保存文件: Save File
+  保存脚本文件: Save Script File
+  保留鼠标键按下或松开的原始事件，不自动合并为点击: Keep raw mouse-button press/release events instead of auto-merging them into clicks
+  值: Value
+  值/表达式: Value/Expression
+  停在第 {n} 行（单步 = 执行这一行）: Stopped at line {n} (Step = execute this line)
+  停止 / 结束: Stop / End
+  停止中... | 等待当前步骤结束: Stopping... | Waiting for the current step to finish
+  停止中…: Stopping…
   元数据字段定义已保存: Metadata field definitions saved
+  元数据定义: Metadata Definition
   先选中一个已放置的坐标点，再从它拉出一条方向箭头: First select a placed coordinate point, then drag to create a direction arrow
   全不选: Deselect All
+  全部: All
   全部删除: Delete All
+  全量: Full
+  关闭场景编辑器: Close Scene Editor
+  关闭时过滤鼠标视角移动，点击、拖拽和滚轮仍会录制: When on, filters out mouse-look movement while still recording clicks, drags, and scroll
+  关闭程序: Close the Program
+  内容: Content
   内置字段不可删除: Built-in fields cannot be deleted
   内置字段，不可编辑或删除: Built-in field, cannot be edited or deleted
-  '分组 Key:': '分组 Key:'
+  '内置类: ': 'Built-in class: '
+  出厂场景不可删除: Factory scenes cannot be deleted
+  出厂场景不能修改 key: The key of a factory scene cannot be changed
+  出厂场景只能修改显示名称，不能修改 key: Factory scenes can only have their display name changed, not the key
+  出厂布局不可删除；不使用时切换到其他布局即可: Factory layouts cannot be deleted; switch to another layout if you don't need it
+  出厂空间不可删除，可新建自己的空间: The factory space cannot be deleted; create your own space instead
+  出厂空间：可编辑其中内容，但不能删除该空间: 'Factory Space: its contents can be edited, but the space itself cannot be deleted'
+  出厂脚本不可删除；不想展示请在「脚本配置」取消勾选: Factory scripts cannot be deleted; uncheck them in "Script Config" instead
+  出错也继续: Continue on Error
+  分组: Group
+  '分组 Key:': 'Group Key:'
   '分组:': 'Group:'
+  分组名称不能为空: Group name cannot be empty
   分组非空，无法删除: Group is not empty, cannot delete
   切割: Split
   切割结果: Split Result
+  切换截图方式: Switch Screenshot Method
   切换日志显示级别：DEBUG 会显示更详细的调试信息: 'Switch log level: DEBUG shows more detailed debug info'
+  切换日志显示级别：低于选中级别的日志将被隐藏: 'Switch log level: logs below the selected level will be hidden'
   切换画布编辑模式，调整画布范围以排除窗口边框: Toggle canvas edit mode, adjust canvas range to exclude window borders
   '列:': 'Col:'
+  列名 '{name}' 已存在: Column name '{name}' already exists
+  列名不能为空: Column name cannot be empty
   列名（逗号分隔）：: 'Column names (comma-separated):'
+  列名：: 'Column Name:'
   列数: Columns
+  '列数:': 'Columns:'
+  列表: List
   创建分组: Create Group
   创建场景: Create Scene
   创建坐标: Create Point
@@ -417,192 +543,64 @@ auto_strings:
   删除坐标: Delete Point
   删除失败: Delete Failed
   删除方向: Delete Direction
+  删除空间: Delete Space
+  删除脚本: Delete Script
+  删除脚本 {sid}？此操作不可恢复。: Delete script {sid}? This cannot be undone.
   删除行: Delete Row
   删除视图: Delete View
+  删除选中的图库空间（含其全部参考图）: Delete the selected gallery space (including all its reference images)
   删除面板: Delete Panel
   别名布局创建失败，请检查日志。: Alias layout creation failed, please check logs.
   别名布局禁止另存为，请使用原布局另存或者新建布局。: Alias layouts cannot be saved-as. Please use the original layout or create a new one.
+  到达后按住(秒): Hold After Arriving (sec)
   刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
+  加载工作流文件: Load Workflow File
   加载文件: Load File
+  ? 勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数：日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。专用脚本默认不暴露，需要时可显式勾选。用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。
+  : 'Checking "Expose" decides whether it shows in the Daily page dropdown; "Script Nature" decides whether the Daily tab manages its parameters: Daily = the Daily page draws a parameter panel and reads/writes the config; Dedicated = the Daily page leaves it alone and a dedicated page manages it. Dedicated scripts are not exposed by default; check explicitly if needed. Use Move Up/Down to reorder exposure; double-click the display name to edit it (leave blank to restore the default).'
   勾选后直接从设备实时截屏进行识别，不保存到场景文件: When checked, capture directly from device for recognition without saving to scene file
+  匹配: Match
+  匹配参考图: Match Reference Image
   匹配度阈值: Match Threshold
+  区域: Region
+  '区域 ': 'Region '
+  区域/坐标点/面板: Region/Point/Panel
+  区域/点: Region/Point
+  区域/面板: Region/Panel
+  '区域中心偏移比例:': 'Region Center Offset Ratio:'
+  区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）: Random offset ratio of the click point from the region center (must be under 0.5 to avoid landing outside the region)
   区域列表: Region List
+  区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Fraction (0-1) of pixels in the region close to the target color; used to tell whether a button is lit / which screen is showing
+  匿名使用数据收集: Anonymous Usage Data Collection
   单cell尺寸: Cell Size
+  单条目执行时跳过上述生命周期操作: Skip the lifecycle hooks above when running a single entry
+  单步: Step
+  单步…: Step…
+  单步模式：在第一条语句前停住: 'Step Mode: pause before the first statement'
   单视图: Single View
+  参与匿名数据收集，帮助改进内置规则: Opt in to anonymous data collection to help improve built-in rules
   参数 key: Parameter key
   参数超出图片大小: Parameter exceeds image size
   参考图信息: Reference Image Info
-  双向滚动: 双向滚动
+  双向滚动: Bidirectional Scroll
   取消多视图: Cancel Multi-View
+  取点亮度: Sample Point Brightness
+  取点颜色: Sample Point Color
+  取画布: Take Canvas
+  变量: Variable
+  变量名（不用写 $）: Variable name (no need to write $)
   另存为: Save As
   另存为失败: Save As Failed
+  只下发识别所需的配置（场景与布局坐标、插件规则），用于在不发新版的情况下修复识别问题；你自己改过的配置始终优先，不会被覆盖。拉取到的配置下次启动生效。: Only pushes config needed for recognition (scene/layout coordinates, plugin rules), used to fix recognition issues without shipping a new release; your own edits always take priority and are never overwritten. Pulled config takes effect on next launch.
+  只判断是否含: Only Check Contains
+  只看某区域: Only Look at a Region
+  可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Below you can control announcements, version updates, remote config, and anonymous data reporting independently.
   可点击: Clickable
   可筛选: Filterable
-  '名称:': 'Name:'
-  名称不合法: Invalid Name
-  含文本: Contains Text
-  命名方向: Name Direction
-  命名非法: Invalid Name
-  固定网格: 固定网格
-  图像检测: 图像检测
-  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
-  '图库空间:': 'Gallery Space:'
-  在场景 YAML 中新增 Panel 定义（声明式网格）: Add Panel definition to scene YAML (declarative grid)
-  在场景 YAML 中新增坐标点定义（meta 数据）: Add coordinate point definition to scene YAML (meta data)
-  在当前分组下新建场景: Create scene under current group
-  在画布上放置一个坐标点（绑定到 YAML 定义）: Place a coordinate point on canvas (bound to YAML definition)
-  在画布上框选一个矩形区域，绑定到选中的 Panel 定义: Select a rectangular area on canvas, bound to selected Panel definition
-  '场景 Key:': 'Scene Key:'
-  '场景:': 'Scene:'
-  '场景名称:': 'Scene Name:'
-  坐标列表: Coordinate List
-  '备注:': 'Note:'
-  复制 DSL 引用: Copy DSL Reference
-  复制为新行: Copy as New Row
-  复制坐标: Copy Coordinates
-  如 my_wait: e.g. my_wait
-  字段标识 (key): Field Identifier (key)
-  '宽:': 'W:'
-  导入图片: Import Image
-  小写字母开头，仅含小写字母/数字/下划线: Starts with lowercase letter, containing only lowercase letters/digits/underscores
-  尚未切割: Not yet split
-  已保存: Saved
-  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
-  已退出画布编辑模式: Exited canvas edit mode
-  布局写入失败，请检查日志。: Layout write failed, please check logs.
-  布局名称不能以空格或点开头: Layout name cannot start with space or dot
-  应用到全部: Apply to All
-  应用设置: Apply Settings
-  开启多视图、新增/重命名/删除视图: Enable multi-view, add/rename/delete views
-  开始批量执行 (F9): Start Batch Execution (F9)
-  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
-  '当前用户:': 'Current User:'
-  当前配置：: 'Current Config:'
-  截图: Screenshot
-  截图功能不可用，请先在主窗口定位窗口或连接设备: Screenshot unavailable, please position window or connect device in main window first
-  截图失败: 截图失败
-  执行切割: Execute Split
-  '批量分组:': 'Batch Group:'
-  批量管理: Batch Management
-  批量设置: Batch Settings
-  排序: Sort
-  提交到图库: Submit to Gallery
-  新坐标绑定哪个坐标点？（沿用源半径）：: 'Which coordinate point to bind for new point? (reuse source radius):'
-  新增参考图: Add Reference Image
-  新增失败: Add Failed
-  新增字段: Add Field
-  新增视图: Add View
-  新建: New
-  新建区域: New Region
-  新建场景: 新建场景
-  新建场景分组: New Scene Group
-  新建坐标: New Point
-  新建失败: Create Failed
-  新建空间: New Space
-  新建面板: New Panel
-  方向列表: Direction List
-  无可用坐标: No Available Points
-  无可用面板: No Available Panels
-  无法取消: Cannot Cancel
-  无法获取截图: Cannot Capture Screenshot
-  是: 是
-  显示名称: Display Name
-  暂无数据，请通过 工具 → 批量配置 添加: No data yet, please add via Tools → Batch Config
-  更改分组: Change Group
-  更新失败: Update Failed
-  未保存的修改: Unsaved Changes
-  未填写: Not Filled
-  未框选区域: No Area Selected
-  未选择: Not Selected
-  校准模式: Calibration Mode
-  校验失败: Validation Failed
-  横向滚动: 横向滚动
-  比例: Ratio
-  浏览...: Browse...
-  添加参数: Add Parameter
-  清除网格: Clear Grid
-  滚动方向: Scroll Direction
-  激活空间: Active Space
-  点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果: Click 'Recognize All Fields' to view OCR results, click 'Recognize All Materials' to view material recognition results
-  点击在脚本编辑器光标处插入当前场景 key: Click to insert current scene key at script editor cursor
-  生成网格: Generate Grid
-  用户名列：: 'Username column:'
-  画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Canvas edit mode: drag/resize yellow canvas frame to exclude window borders'
-  留空则不修改: Leave empty to keep unchanged
-  留空则与 key 相同: Leave empty to same as key
-  确认覆盖: Confirm Overwrite
-  移动失败: Move Failed
-  等分网格: 等分网格
-  等待范围(秒): Wait Range (sec)
-  等级: 等级
-  管理视图: Manage Views
-  '类型:': 'Type:'
-  粘贴 (Ctrl+V): Paste (Ctrl+V)
-  纵向滚动: 纵向滚动
-  绑定坐标: Bind Point
-  绑定面板: Bind Panel
-  继承失败: Inherit Failed
-  编辑区域: Edit Region
-  编辑坐标: Edit Point
-  编辑画布: Edit Canvas
-  编辑面板: Edit Panel
-  网格参数: Grid Parameters
-  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
-  脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。: User for script test execution, defaults to current user on main page. Switching does not affect main page.
-  自动模式: 自动模式
-  至少需要保留一个场景分组: At least one scene group must be retained
-  英文，如 bag_grid: English, e.g. bag_grid
-  英文，如 my_group: English, e.g. my_group
-  英文，如 my_point: English, e.g. my_point
-  英文，如 my_region: English, e.g. my_region
-  英文，如 my_scene: English, e.g. my_scene
-  '行:': 'Row:'
-  行数: Rows
-  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
-  视图: View
-  '视图 Key:': 'View Key:'
-  '视图名称:': 'View Name:'
-  识别全部字段: Recognize All Fields
-  识别全部材料: Recognize All Materials
-  该场景尚未定义任何 Panel，请先创建面板定义。: No Panel defined for this scene, please create a panel definition first.
-  该场景所有 Panel 定义都已绑定。: All Panel definitions for this scene are already bound.
-  该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
-  该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
-  该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
-  请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。: Please select a placed coordinate point on canvas or in the list first, then create direction.
-  请先导入图片: Please import an image first
-  请先框选区域: Please select an area first
-  请先选中坐标: Please select a point first
-  请至少选择一个参考图: Please select at least one reference image
-  请输入布局名称: Please enter a layout name
-  输入 DSL 脚本内容...: Enter DSL script content...
-  输入元数据（用于筛选管理）: Enter metadata (for filter management)
-  输入当前场景: Enter current scene
-  输入方向 key（小写字母开头，可含数字/下划线）：: 'Enter direction key (starts with lowercase letter, may contain digits/underscores):'
-  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
-  迁移失败: Migration Failed
-  运行脚本: Run Script
-  进度: Progress
-  退出批量: Exit Batch
-  退出画布编辑: Exit Canvas Edit
-  选择 wf 文件...: Select wf file...
-  选择要放置的坐标点：: 'Select coordinate point to place:'
-  选择要绑定的 Panel：: 'Select Panel to bind:'
-  配置: Config
-  配置：: 'Config:'
-  重命名场景: 重命名场景
-  重命名失败: Rename Failed
-  重命名视图: Rename View
-  '间隔:': 'Interval:'
-  限定材料识别的分组范围: Limit group scope for material recognition
-  面板列表: Panel List
-  '高:': 'H:'
-  基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
-  本项目仅供学习交流使用: This project is for learning and communication purposes only
-  '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
-  '内置类: ': 'Built-in class: '
-  '当前版本: ': 'Current version: '
-  轮: round(s)
+  可采用自定义设置 2000:900（等效 20:9）。: You can use a custom 2000:900 setting (equivalent to 20:9).
+  右键表头增删列，双击表头重命名: Right-click the header to add/remove columns; double-click to rename
+  同意: Agree
+  同意后随时可在「配置管理 → 网络与隐私」关闭。: After agreeing, you can turn it off anytime via "Config Manager → Network & Privacy".
   ? '名字 = 调律 Tab 勾选项；
 
     增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；
@@ -621,186 +619,512 @@ auto_strings:
     Bind switch = this gameplay judgment equals activating that switch (overrides global state);
 
     Weapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon.'
-  DesktopCapture 已停止: DesktopCapture 已停止
-  YAML 顶层必须是字典: YAML top level must be a dict
-  '[扫描] 局域网内未发现可连接的 ADB 设备': '[扫描] 局域网内未发现可连接的 ADB 设备'
-  config 中缺少 model_path: config 中缺少 model_path
-  initial_variables 必须是 JSON 对象: initial_variables 必须是 JSON 对象
-  payload 必须是 JSON 对象: payload 必须是 JSON 对象
-  pynput 未安装，无法录制: pynput 未安装，无法录制
-  scenes.yaml 必须至少包含一个场景分组，请检查配置: scenes.yaml 必须至少包含一个场景分组，请检查配置
-  scrcpy 流式: scrcpy 流式
-  关闭程序: 关闭程序
-  分组名称不能为空: 分组名称不能为空
-  场景: 场景
-  场景必须包含 key 和 name: Scene must contain key and name
-  基底视图不可删除，如需取消分层请取消多视图: 基底视图不可删除，如需取消分层请取消多视图
-  无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: 无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）
-  无法获取版本信息: 无法获取版本信息
-  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空
-  颜色特征识别器尚未实现: 颜色特征识别器尚未实现
-  （空）: （空）
-  '## 汇总': '## 汇总'
-  (无): (无)
-  (未识别到): (未识别到)
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）'
-  '[录屏] 仅流式截图模式支持录屏': '[录屏] 仅流式截图模式支持录屏'
-  '[录屏] 保存失败（详见日志）': '[录屏] 保存失败（详见日志）'
-  '[录屏] 启动失败（详见日志）': '[录屏] 启动失败（详见日志）'
-  '[录屏] 已放弃本次录制，文件已删除': '[录屏] 已放弃本次录制，文件已删除'
-  '[录屏] 无法获取画面尺寸': '[录屏] 无法获取画面尺寸'
-  '[截屏] PNG 编码失败': '[截屏] PNG 编码失败'
-  '[截屏] 截屏失败：无可用画面': '[截屏] 截屏失败：无可用画面'
-  '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止': '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止'
-  '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」'
-  '[提示] 当前没有正在运行的自动化': '[提示] 当前没有正在运行的自动化'
-  '[提示] 未发现 USB 连接的 ADB 设备': '[提示] 未发现 USB 连接的 ADB 设备'
-  '[提示] 请先停止当前任务，再重新扫描窗口': '[提示] 请先停止当前任务，再重新扫描窗口'
-  '[提示] 请先停止当前任务，再重新扫描设备': '[提示] 请先停止当前任务，再重新扫描设备'
-  '[操作] 已停止': '[操作] 已停止'
-  '[操作] 收到停止请求': '[操作] 收到停止请求'
-  '[模式] 已切换到前台模式（SendInput，移动光标）': '[模式] 已切换到前台模式（SendInput，移动光标）'
-  '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[模式] 已切换到后台模式（PostMessage，不移动光标）'
-  '[状态] 重新扫描窗口，旧定位已失效': '[状态] 重新扫描窗口，旧定位已失效'
-  '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[错误] 暂无配置，请先通过 工具 → 批量配置 添加'
-  '[错误] 未找到可见窗口': '[错误] 未找到可见窗口'
-  '[错误] 请先定位窗口': '[错误] 请先定位窗口'
-  '[错误] 请先连接设备': '[错误] 请先连接设备'
-  '[错误] 请选择一个工作流': '[错误] 请选择一个工作流'
-  专用: 专用
-  停止中... | 等待当前步骤结束: 停止中... | 等待当前步骤结束
-  全部: 全部
-  全量: 全量
-  切换截图方式: 切换截图方式
-  加载工作流文件: 加载工作流文件
-  区域: 区域
-  区域/坐标点/面板: 区域/坐标点/面板
-  区域/面板: 区域/面板
-  '区域中心偏移比例:': '区域中心偏移比例:'
-  区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）: 区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）
-  场景未绑定任何坐标: 场景未绑定任何坐标
-  坐标点: 坐标点
-  '坐标随机偏移(px):': '坐标随机偏移(px):'
-  基底: 基底
-  失败: 失败
-  实时截屏失败: 实时截屏失败
-  工作流已暂停，点击确定继续: 工作流已暂停，点击确定继续
-  工作流文件 (*.wf);;所有文件 (*): 工作流文件 (*.wf);;所有文件 (*)
-  工作流暂停: 工作流暂停
-  工作流确认: 工作流确认
-  工作流通知: 工作流通知
-  当前场景无截图: 当前场景无截图
-  当前场景无截图，请先刷新截图: 当前场景无截图，请先刷新截图
-  当前场景没有 slot 类型的区域: 当前场景没有 slot 类型的区域
-  待执行: 待执行
-  律匠 - 通用视觉 RPA 引擎: 律匠 - 通用视觉 RPA 引擎
-  成功: 成功
-  批次初始化: 批次初始化
-  批次收尾: 批次收尾
-  批量执行: 批量执行
-  断连: 断连
-  方向: 方向
-  方向/区域: 方向/区域
-  无截图源，请先在主窗口定位窗口: 无截图源，请先在主窗口定位窗口
-  无法获取设备分辨率: 无法获取设备分辨率
-  日常: 日常
-  未定位窗口 | 未找到可见窗口: 未定位窗口 | 未找到可见窗口
-  未定位窗口 | 请先扫描窗口并点击定位: 未定位窗口 | 请先扫描窗口并点击定位
-  未连接设备 | 请先扫描并连接设备: 未连接设备 | 请先扫描并连接设备
-  正在校准面板网格...: 正在校准面板网格...
-  正在识别...: 正在识别...
-  正在识别材料...: 正在识别材料...
-  每次点击前的随机等待，模拟人类反应时间: 每次点击前的随机等待，模拟人类反应时间
-  每次点击后的随机等待: 每次点击后的随机等待
-  没有已定义的区域: 没有已定义的区域
-  没有已定义的面板: 没有已定义的面板
-  注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）: 注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）
-  点击前延迟(秒): 点击前延迟(秒)
-  点击后延迟(秒): 点击后延迟(秒)
-  点击坐标附加 ±N 像素的随机偏移: 点击坐标附加 ±N 像素的随机偏移
-  生命周期 wf 必须返回 dict 或 null: 生命周期 wf 必须返回 dict 或 null
-  生命周期 wf 的 state 必须是 dict: 生命周期 wf 的 state 必须是 dict
-  空: 空
-  等分降级: 等分降级
-  简体中文: 简体中文
-  终点: 终点
-  自动化运行中 | F10 停止: 自动化运行中 | F10 停止
-  获取图像失败: 获取图像失败
-  请先在主窗口定位窗口: 请先在主窗口定位窗口
-  请先在主窗口连接设备: 请先在主窗口连接设备
-  请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: 请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定
-  起点: 起点
-  跳过: 跳过
-  运行中: 运行中
-  通用视觉 RPA 引擎（支持插件扩展）: 通用视觉 RPA 引擎（支持插件扩展）
-  面板: 面板
-  面板/区域: 面板/区域
-  默认: 默认
-  默认用户: 默认用户
-  鼠标/触控移动到目标位置的耗时: 鼠标/触控移动到目标位置的耗时
-  鼠标移动时长(秒): 鼠标移动时长(秒)
-  （无）: （无）
-  （正常完成）: （正常完成）
-  （用户中断）: （用户中断）
-  （用户中断，部分结果）: （用户中断，部分结果）
-  ，请选择 保存 或 放弃: ，请选择 保存 或 放弃
-  (空行): (空行)
-  '[批量] 暂无启用的行，请到「配置」页勾选': '[批量] 暂无启用的行，请到「配置」页勾选'
-  '[批量] 请至少勾选一个脚本': '[批量] 请至少勾选一个脚本'
-  '[错误] 无主窗口，无法获取运行环境': '[错误] 无主窗口，无法获取运行环境'
-  '[错误] 没有已加载的布局': '[错误] 没有已加载的布局'
-  '[错误] 脚本内容为空': '[错误] 脚本内容为空'
-  '[错误] 请先在主窗口定位游戏窗口': '[错误] 请先在主窗口定位游戏窗口'
-  '[错误] 请先在主窗口连接 ADB 设备': '[错误] 请先在主窗口连接 ADB 设备'
-  保存脚本文件: 保存脚本文件
-  元数据定义: Metadata Definition
-  关闭场景编辑器: 关闭场景编辑器
-  分组: 分组
-  '列数:': '列数:'
-  刷新截图失败: 刷新截图失败
-  名称: 名称
+  名称: Name
+  '名称:': 'Name:'
+  名称不合法: Invalid Name
+  否则导航流程会因输入方式不匹配而失败。: otherwise the navigation flow will fail due to a mismatched input method.
+  含文本: Contains Text
+  启动失败: Startup Failed
+  启动时检查公告: Check Announcements on Startup
+  启动时检查新版本: Check for New Version on Startup
+  命名延迟，留空则不等待: Named delay; leave empty to skip waiting
+  命名方向: Name Direction
+  命名非法: Invalid Name
+  固定网格: Fixed Grid
+  图像检测: Image Detection
+  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
+  图库已刷新: Gallery Refreshed
+  '图库空间:': 'Gallery Space:'
   图库管理: Reference Manager
-  图片文件 (*.png *.jpg *.bmp *.webp): 图片文件 (*.png *.jpg *.bmp *.webp)
-  工作流文件 (*.wf): 工作流文件 (*.wf)
-  当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: 当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）
-  批次初始化 wf：: 批次初始化 wf：
-  批次收尾 wf：: 批次收尾 wf：
+  图库识别（分类）: Gallery Recognition (Classification)
+  图片文件 (*.png *.jpg *.bmp *.webp): Image Files (*.png *.jpg *.bmp *.webp)
+  图色: Pixel Color
+  图色函数需要在工作流引擎中调用: Pixel-color functions must be called inside the workflow engine
+  图色函数：截图失败: 'Pixel-color function: screenshot failed'
+  图色函数：画布裁剪为空（检查布局 canvas 配置）: 'Pixel-color function: canvas crop is empty (check the layout''s canvas config)'
+  在场景 YAML 中新增 Panel 定义（声明式网格）: Add Panel definition to scene YAML (declarative grid)
+  在场景 YAML 中新增坐标点定义（meta 数据）: Add coordinate point definition to scene YAML (meta data)
+  在当前分组下新建场景: Create scene under current group
+  在画布上放置一个坐标点（绑定到 YAML 定义）: Place a coordinate point on canvas (bound to YAML definition)
+  在画布上框选一个矩形区域，绑定到选中的 Panel 定义: Select a rectangular area on canvas, bound to selected Panel definition
+  场景: Scene
+  '场景 Key:': 'Scene Key:'
+  '场景:': 'Scene:'
+  '场景名称:': 'Scene Name:'
+  场景必须包含 key 和 name: Scene must contain key and name
+  场景未绑定任何坐标: The scene has no coordinates bound
+  坐标: Coordinate
+  坐标列表: Coordinate List
+  坐标点: Coordinate Point
+  '坐标随机偏移(px):': 'Coordinate Random Offset (px):'
+  基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
+  基底: Base
+  基底视图不可删除，如需取消分层请取消多视图: The base view cannot be deleted; to remove layering, disable multi-view
+  '备注:': 'Note:'
+  复制 DSL 引用: Copy DSL Reference
+  复制为新行: Copy as New Row
+  复制坐标: Copy Coordinates
+  失败退出: Exit on Failure
+  好的: OK
+  如 $x > 0.5 / $v contains "ok" / not $hit: e.g. $x > 0.5 / $v contains "ok" / not $hit
+  如 ios: e.g. ios
+  如 my_wait: e.g. my_wait
+  如果…: If…
+  如果…否则…: If… Else…
+  字段标识 (key): Field Identifier (key)
+  存入变量: Store in Variable
+  '安卓截图方式:': 'Android Screenshot Method:'
+  '安卓输入方式:': 'Android Input Method:'
+  安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入: 'Android (android): phone or emulator, uses ADB screenshot + touch input'
+  完全离线模式（暂停全部联网功能）: Fully Offline Mode (pause all network features)
+  '完成，返回值: {rv}': 'Done, return value: {rv}'
+  定义区域变量: Define Region Variable
+  定义子过程: Define Subprocedure
+  定位窗口后是否显示红色边框标记；不保存配置，仅本次运行期间生效: Whether to show a red border marker after locating the window; not saved, applies only to this run
+  实时截屏失败: Live screenshot failed
+  实际会发送的数据长这样: The data actually sent looks like this
+  实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Experimental: the phone must have the LvJiang App installed with Accessibility Service enabled; this only changes the channel used for taps and swipes, not the screenshot method. Falls back to ADB shell input if the connection fails.'
+  容差: Tolerance
+  '宽:': 'W:'
+  导入图片: Import Image
+  将在下一条语句前暂停: Will pause before the next statement
+  小写字母开头，仅含小写字母/数字/下划线: Starts with lowercase letter, containing only lowercase letters/digits/underscores
+  尚未切割: Not yet split
+  尚未获取过在线配置: Remote config has not been fetched yet
+  工作流已暂停，点击确定继续: Workflow paused; click OK to continue
+  工作流文件 (*.wf): Workflow Files (*.wf)
+  '工作流文件不存在: {path}': 'Workflow file does not exist: {path}'
+  工作流通知: Workflow Notification
+  左侧选择脚本，或点「新建」: Select a script on the left, or click "New"
+  已下载在线配置 v{version}，重启后生效: Downloaded remote config v{version}; takes effect after restart
+  已保存: Saved
+  ? '已保存 {path}，但校验未通过：
+
+    '
+  : 'Saved {path}, but validation failed:
+
+    '
+  已保存 {path}，语法与布局引用校验通过: Saved {path}; syntax and layout-reference checks passed
+  已停止: Stopped
+  已创建 {path}: Created {path}
+  已删除 {sid}: Deleted {sid}
+  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
+  已存在: Already Exists
+  已恢复: Resumed
+  已恢复，继续执行...: Resumed, continuing...
+  已截图 {w}×{h}（画布裁剪后）: Captured {w}x{h} (after canvas crop)
+  已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
+  已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Minimized to the tray; double-click the icon or right-click -> "Open Main Window" to restore.
+  已退出画布编辑模式: Exited canvas edit mode
+  布局: Layout
+  布局写入失败，请检查日志。: Layout write failed, please check logs.
+  布局名称不能以空格或点开头: Layout name cannot start with space or dot
+  应用到全部: Apply to All
+  应用设置: Apply Settings
+  延迟: Delay
+  开启多视图、新增/重命名/删除视图: Enable multi-view, add/rename/delete views
+  开始: Start
+  开始批量执行 (F9): Start Batch Execution (F9)
+  异常退出: Exit on Exception
+  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
+  当…时重复: Repeat While…
+  当前在线配置版本 v{version}（{date} 同步）: Current remote config version v{version} (synced {date})
+  当前场景无截图: The current scene has no screenshot
+  当前场景无截图，请先刷新截图: The current scene has no screenshot; refresh it first
+  当前场景没有 slot 类型的区域: The current scene has no slot-type regions
+  当前标识：: 'Current ID:'
+  当前标识：未生成（未开启）: 'Current ID: not generated (disabled)'
+  当前激活布局不可删除: The currently active layout cannot be deleted
+  '当前版本: ': 'Current version: '
+  '当前用户:': 'Current User:'
+  当前脚本有未保存的修改，放弃？: The current script has unsaved changes. Discard them?
+  当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: No region field is bindable in this view (all assigned, or not part of this view)
+  当前配置：: 'Current Config:'
+  ? '录制结果将显示在这里（画布归一化坐标，可保存为 .wf）
+
+    低精度生成可编辑指令；高精度保存原始输入轨迹，'
+  : 'Recorded output appears here (canvas-normalized coordinates, savable as .wf)
+
+    Low precision produces editable commands; high precision saves a raw input trace,'
+  录制鼠标移动: Record Mouse Movement
+  形如 [scene].[region]: 'Format: [scene].[region]'
+  形如 [scene].[region]，留空全画布: 'Format: [scene].[region]; leave empty for the full canvas'
+  待执行: Pending
+  待机 | 点击「录制脚本」或按: Idle | Click "Record Script" or press
+  循环变量: Loop Variable
+  恢复: Resume
+  感知: Perception
+  愿意贡献匿名使用数据，帮助改进律匠吗？: Would you like to contribute anonymous usage data to help improve LvJiang?
+  成功: Succeeded
+  或点击停止: or click Stop
+  截图: Screenshot
+  截图、日志、config/session/ 目录里的任何内容: Screenshots, logs, or anything under the config/session/ directory
+  截图功能不可用，请先在主窗口定位窗口或连接设备: Screenshot unavailable, please position window or connect device in main window first
+  截图失败: Screenshot Failed
+  截图失败：无障碍服务未连接或截图被节流: 'Screenshot failed: Accessibility Service not connected, or screenshots are being throttled'
+  截图存档: Screenshot Archive
+  截图编码失败: Screenshot encoding failed
+  截图：—　　画布：—: 'Screenshot: —　　Canvas: —'
+  打开主界面: Open Main Window
+  打日志: Write Log
+  执行切割: Execute Split
+  执行顺序: Execution Order
+  批次初始化: Batch Init
+  批次初始化 wf：: 'Batch Init wf:'
+  批次收尾: Batch Wrap-up
+  批次收尾 wf：: 'Batch Wrap-up wf:'
   批量任务运行过程中不可修改环境和布局: Environment and layout cannot be changed while a batch task is running
-  数字: 数字
-  文本: 文本
-  新建分组: 新建分组
-  新建图库空间: 新建图库空间
-  新建布局: 新建布局
-  新建配置: 新建配置
-  条目: 条目
-  条目准备 wf：: 条目准备 wf：
-  条目收尾 wf：: 条目收尾 wf：
-  '校准模式:': '校准模式:'
-  没有已加载的布局: 没有已加载的布局
-  '滚动方向:': '滚动方向:'
-  激活布局不可删除: 激活布局不可删除
-  状态: 状态
-  移动场景: 移动场景
-  '空间名:': '空间名:'
-  结果集：: 结果集：
-  结果集：(空): 结果集：(空)
-  脚本: 脚本
-  脚本内容为空，无法保存: 脚本内容为空，无法保存
-  脚本测试失败: 脚本测试失败
-  脚本测试完成: 脚本测试完成
-  脚本测试运行中...: 脚本测试运行中...
-  '行数:': '行数:'
-  '行最小可见比例:': '行最小可见比例:'
-  '视图:': '视图:'
-  请先新建或加载布局: 请先新建或加载布局
-  请输入布局名称：: 请输入布局名称：
-  输入新的方向 key（小写字母开头）：: 输入新的方向 key（小写字母开头）：
-  返回值：(无): 返回值：(无)
-  选择参考图片: 选择参考图片
-  选择工作流文件: 选择工作流文件
-  选择脚本文件: 选择脚本文件
-  配置名称：: 配置名称：
-  重命名分组: 重命名分组
-  重命名方向: 重命名方向
+  '批量分组:': 'Batch Group:'
+  批量执行: Batch Run
+  批量管理: Batch Management
+  批量设置: Batch Settings
+  找同色图标: Find Same-Color Icon
+  找图（模板定位）: Find Image (Template Match)
+  找文字（可点击）: Find Text (Clickable)
+  拖拽区域翻页: Drag Region to Page
+  拖拽（两点）: Drag (Two Points)
+  指令: Command
+  按键: Key Press
+  排序: Sort
+  接收在线配置更新: Receive Remote Config Updates
+  控制流: Control Flow
+  提交到图库: Submit to Gallery
+  插入到脚本: Insert into Script
+  插入区域: Insert Region
+  插入坐标: Insert Coordinate
+  插入颜色: Insert Color
+  搜索指令：点击 / 等待 / 找图 / 颜色…: 'Search commands: Click / Wait / Find Image / Color…'
+  操作后等待: Wait After Action
+  收集什么: What's Collected
+  收集到输出: Collect into Output
+  放弃修改？: Discard changes?
+  数字: Number
+  数据与输出: Data & Output
+  文字: Text
+  文本: Text
+  新坐标绑定哪个坐标点？（沿用源半径）：: 'Which coordinate point to bind for new point? (reuse source radius):'
+  新增列: Add Column
+  新增参考图: Add Reference Image
+  新增失败: Add Failed
+  新增字段: Add Field
+  新增视图: Add View
+  新建: New
+  新建分组: New Group
+  新建区域: New Region
+  新建图库空间: New Gallery Space
+  新建场景: New Scene
+  新建场景分组: New Scene Group
+  新建坐标: New Point
+  新建失败: Create Failed
+  新建布局: New Layout
+  新建空间: New Space
+  新建脚本: New Script
+  新建配置: New Config
+  新建面板: New Panel
+  新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。: New hotkeys were saved, but the current process failed to rebuild the global listener; this run keeps using the old hotkeys, and the new settings will be retried after restart.
+  方向: Direction
+  方向/区域: Direction/Region
+  方向列表: Direction List
+  无主窗口，无法截图: No main window; cannot take a screenshot
+  无主窗口，无法获取运行环境: No main window; cannot get the runtime environment
+  无可用坐标: No Available Points
+  无可用面板: No Available Panels
+  无场景改动: No Scene Changes
+  ? '无截图
+
+    请连接投屏后点击「刷新截图」'
+  : 'No screenshot
+
+    Connect screen mirroring, then click "Refresh Screenshot"'
+  无法加载当前布局: Failed to load the current layout
+  无法加载当前布局做引用校验: Failed to load the current layout to validate references
+  '无法加载当前布局做引用校验: {e}': 'Failed to load the current layout to validate references: {e}'
+  无法取消: Cannot Cancel
+  无法启动工作流: Failed to start the workflow
+  无法获取截图: Cannot Capture Screenshot
+  无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: Failed to get screenshot size; cannot convert to screen coordinates (check the screenshot backend)
+  无法获取版本信息: Failed to get version info
+  无法获取设备分辨率: Failed to get device resolution
+  时长(秒): Duration (sec)
+  是: 'Yes'
+  '显示名:': 'Display Name:'
+  显示名称: Display Name
+  暂停: Pause
+  暂停 / 恢复: Pause / Resume
+  暂停中...: Pausing...
+  暂停等人工: Pause for Manual Action
+  暂无数据，请通过 工具 → 批量配置 添加: No data yet, please add via Tools → Batch Config
+  更改分组: Change Group
+  更新失败: Update Failed
+  最低分(0-1): Min Score (0-1)
+  最小化到状态栏: Minimize to Tray
+  最长等待(秒): Max Wait (sec)
+  未保存的修改: Unsaved Changes
+  未匹配到参考图: No reference image matched
+  未填写: Not Filled
+  未定位窗口 | 未找到可见窗口: Window not located | No visible window found
+  未定位窗口 | 请先扫描窗口并点击定位: Window not located | Scan for windows and click Locate first
+  未框选区域: No Area Selected
+  '未知图色操作: {op}，可用: {ops}': 'Unknown pixel-color operation: {op}, available: {ops}'
+  未知日期: Unknown Date
+  未连接设备 | 请先扫描并连接设备: Device not connected | Scan and connect a device first
+  未选择: Not Selected
+  本项目仅供学习交流使用: This project is for learning and communication purposes only
+  本项目完全开源免费: This project is fully open-source and free
+  条目: Entry
+  条目准备 wf：: 'Entry Prep wf:'
+  条目收尾 wf：: 'Entry Wrap-up wf:'
+  查看待上报数据: View Data to Be Reported
+  校准模式: Calibration Mode
+  '校准模式:': 'Calibration Mode:'
+  校验失败: Validation Failed
+  桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击: 'Desktop (desktop): PC game window, uses window mirroring + mouse click'
+  检查: Check
+  模式: Mode
+  模板: Template
+  横向滚动: Horizontal Scroll
+  次数: Count
+  正在匹配参考图...: Matching reference images...
+  正在校准面板网格...: Calibrating panel grid...
+  正在识别...: Recognizing...
+  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: 'Once-daily launch record: LvJiang version, OS type, runtime environment, and a random identifier'
+  每次点击前的随机等待，模拟人类反应时间: Random wait before each click, simulating human reaction time
+  每次点击后的随机等待: Random wait after each click
+  比例: Ratio
+  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 'No layout available: session has no active_layout set, and the layouts.yaml roster is empty'
+  没有已加载的布局: No layout loaded
+  没有已定义的区域: No regions defined
+  没有已定义的面板: No panels defined
+  注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）: Register and load the given plugin (repeatable, e.g. -reg yysls -reg other)
+  浏览...: Browse...
+  添加参数: Add Parameter
+  添加环境: Add Environment
+  清除网格: Clear Grid
+  滚动方向: Scroll Direction
+  '滚动方向:': 'Scroll Direction:'
+  激活布局不可删除: The active layout cannot be deleted
+  激活空间: Active Space
+  点: Point
+  点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Click "Recognize All Fields" to see OCR results, or "Recognize All Reference Images" to see match results
+  点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果: Click 'Recognize All Fields' to view OCR results, click 'Recognize All Materials' to view material recognition results
+  点击前延迟(秒): Delay Before Click (sec)
+  点击区域: Click Region
+  点击变量: Click Variable
+  点击后延迟(秒): Delay After Click (sec)
+  点击在脚本编辑器光标处插入当前场景 key: Click to insert current scene key at script editor cursor
+  点击坐标: Click Coordinate
+  点击坐标附加 ±N 像素的随机偏移: Add a +/-N pixel random offset to the click coordinate
+  点击布局里已定义的区域或坐标点中心: Click the center of a region or coordinate point already defined in the layout
+  点击画布归一化坐标: Click Canvas-Normalized Coordinate
+  热键不能重复绑定同一个按键，请检查后重试: Hotkeys cannot be bound to the same key twice; please check and retry
+  热键已更新并立即生效: Hotkeys updated and took effect immediately
+  热键设置: Hotkey Settings
+  状态: Status
+  环境: Environment
+  环境 key: Environment key
+  环境不支持: Environment Not Supported
+  生命周期 wf 必须返回 dict 或 null: Lifecycle wf must return a dict or null
+  生命周期 wf 的 state 必须是 dict: The lifecycle wf's state must be a dict
+  生成网格: Generate Grid
+  用户: User
+  用户名列：: 'Username column:'
+  用来做什么: What It's Used For
+  画布上点一下取值: Click on the Canvas to Pick a Value
+  画布尺寸非法: Invalid canvas size
+  画布框选取值: Box-Select on Canvas to Pick a Value
+  画布框选的区域存成变量，之后 click / 图色函数都能用: The region boxed on the canvas is stored as a variable, usable later by click / pixel-color functions
+  画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Canvas edit mode: drag/resize yellow canvas frame to exclude window borders'
+  留空则不修改: Leave empty to keep unchanged
+  留空则与 key 相同: Leave empty to same as key
+  目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: Target Environment determines what env() returns in the DSL, used to distinguish navigation strategy between PC and mobile games. This is the environment the game runs in, not this machine's OS.
+  目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：: 'Target Environment determines navigation strategy and input method (the environment the game runs in, not this machine''s OS):'
+  目标环境说明: Target Environment Explained
+  目标色: Target Color
+  确定清除已录制的 DSL 内容吗？: Clear the recorded DSL content?
+  确认结束: Confirm End
+  确认覆盖: Confirm Overwrite
+  秒: sec
+  移动场景: Move Scene
+  移动失败: Move Failed
+  空: Empty
+  空闲: Idle
+  空间不存在: Space does not exist
+  '空间名:': 'Space Name:'
+  第 {line} 行第 {col} 列：语法错误: 'Line {line}, column {col}: syntax error'
+  等分网格: Equal-Split Grid
+  等分降级: Equal-Split Fallback
+  等待画面稳定: Wait for Screen to Settle
+  等待范围(秒): Wait Range (sec)
+  等待（命名延迟）: Wait (Named Delay)
+  等待（秒）: Wait (sec)
+  等级: Level
+  简体中文: 简体中文
+  管理视图: Manage Views
+  '类型:': 'Type:'
+  粘贴 (Ctrl+V): Paste (Ctrl+V)
+  系统: System
+  系统参数: System Parameters
+  红框标定: Red-Box Marking
+  级别: Level
+  纵向滚动: Vertical Scroll
+  终点: End Point
+  绑定坐标: Bind Point
+  绑定面板: Bind Panel
+  结束: End
+  结束任务: End Task
+  结果集：: 'Result Set:'
+  结果集：(空): 'Result Set: (Empty)'
+  继承失败: Inherit Failed
+  继续: Continue
+  编辑区域: Edit Region
+  编辑坐标: Edit Point
+  编辑画布: Edit Canvas
+  编辑面板: Edit Panel
+  缺参照图或实时截图: Missing reference image or live screenshot
+  网格参数: Grid Parameters
+  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
+  网络与隐私: Network & Privacy
+  脚本 id 不能为空: Script id cannot be empty
+  脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: Script id cannot start with _ (the discovery layer treats it as a temp file and skips it)
+  脚本 id 只能用字母、数字、下划线，且以字母开头: Script id may only use letters, digits, and underscores, and must start with a letter
+  '脚本 id（文件名，字母/数字/下划线）:': 'Script id (filename, letters/digits/underscore):'
+  脚本 {sid} 已存在，覆盖？: Script {sid} already exists. Overwrite?
+  脚本为空: Script Is Empty
+  脚本候选: Script Candidates
+  脚本内容为空，无法保存: Script content is empty; cannot save
+  脚本测试失败: Script Test Failed
+  脚本测试完成: Script Test Completed
+  脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。: User for script test execution, defaults to current user on main page. Switching does not affect main page.
+  脚本测试运行中...: Script test running...
+  脚本编辑: Script Editing
+  自动化运行中: Automation Running
+  自动化运行中 | F10 停止: Automation Running | F10 to Stop
+  自动模式: Auto Mode
+  至少保留一个图库空间: At least one gallery space must be kept
+  至少需要保留一个场景分组: At least one scene group must be retained
+  英文，如 bag_grid: English, e.g. bag_grid
+  英文，如 my_group: English, e.g. my_group
+  英文，如 my_point: English, e.g. my_point
+  英文，如 my_region: English, e.g. my_region
+  英文，如 my_scene: English, e.g. my_scene
+  行/列数: Rows/Columns
+  '行:': 'Row:'
+  行数: Rows
+  '行数:': 'Rows:'
+  '行最小可见比例:': 'Row Min Visible Ratio:'
+  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
+  视图: View
+  '视图 Key:': 'View Key:'
+  '视图:': 'View:'
+  '视图名称:': 'View Name:'
+  设备端手势 (Beta): On-Device Gesture (Beta)
+  设备端手势（Beta，需安装律匠 App）: On-Device Gesture (Beta, requires the LvJiang App)
+  识别全部参考图: Recognize All Reference Images
+  识别全部字段: Recognize All Fields
+  识别全部材料: Recognize All Materials
+  识别文字: Recognize Text
+  该场景尚未定义任何 Panel，请先创建面板定义。: No Panel defined for this scene, please create a panel definition first.
+  该场景所有 Panel 定义都已绑定。: All Panel definitions for this scene are already bound.
+  该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
+  该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
+  该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
+  该热键只在「脚本录制」对话框打开期间临时全局注册，对话框关闭后立即注销；其余三个热键在软件运行期间始终生效。: This hotkey is only registered globally while the "Script Recording" dialog is open, and unregistered as soon as it closes; the other three hotkeys stay active for the whole session.
+  语法检查通过（保存后会再做布局引用校验）: Syntax check passed (a layout-reference check runs again on save)
+  说明: Description
+  请先在主窗口定位游戏窗口: Please locate the game window in the main window first
+  请先在主窗口定位窗口: Please locate a window in the main window first
+  请先在主窗口连接设备: Please connect a device in the main window first
+  请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。: Please select a placed coordinate point on canvas or in the list first, then create direction.
+  请先导入图片: Please import an image first
+  请先新建或加载布局: Please create or load a layout first
+  请先框选区域: Please select an area first
+  请先选中坐标: Please select a point first
+  请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: Check the key spelling in the script (the DSL only recognizes keys, not Chinese names), or bind it in the Scene Editor
+  请至少选择一个参考图: Please select at least one reference image
+  请输入布局名称: Please enter a layout name
+  请输入布局名称：: 'Enter a layout name:'
+  '读取失败: {e}': 'Failed to read: {e}'
+  调用子过程: Call Subprocedure
+  调试: Debug
+  账号、姓名或其他能认出你是谁的信息: Your account, name, or any other information that could identify you
+  赋值: Assign
+  起点: Start Point
+  跳过: Skip
+  轮: round(s)
+  输入 DSL 脚本内容...: Enter DSL script content...
+  输入元数据（用于筛选管理）: Enter metadata (for filter management)
+  输入当前场景: Enter current scene
+  输入新的方向 key（小写字母开头）：: 'Enter a new direction key (must start with a lowercase letter):'
+  输入方向 key（小写字母开头，可含数字/下划线）：: 'Enter direction key (starts with lowercase letter, may contain digits/underscores):'
+  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
+  输出键名: Output Key Name
+  迁移失败: Migration Failed
+  过程名: Procedure Name
+  运行: Run
+  运行中: Running
+  运行中…: Running…
+  运行脚本: Run Script
+  返回值：(无): 'Return Value: (None)'
+  返回列表，按面积降序；$first = $icons[0] 后可 click: Returns a list, sorted by area descending; $first = $icons[0] can then be clicked
+  还没有实时截图: No live screenshot yet
+  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: This ID is a random string generated on this machine; it doesn't contain your account or hardware info, but it does let us tell that records came from the same machine. You can reset it anytime in Settings.
+  进入亮段阈值: Enter-Bright-Segment Threshold
+  进度: Progress
+  远端: Remote
+  连接中...: Connecting...
+  退出批量: Exit Batch
+  退出画布编辑: Exit Canvas Edit
+  退出阈值: Exit Threshold
+  选择 wf 文件...: Select wf file...
+  选择参考图片: Select Reference Image
+  选择工作流文件: Select Workflow File
+  选择脚本文件: Select Script File
+  选择要放置的坐标点：: 'Select coordinate point to place:'
+  选择要绑定的 Panel：: 'Select Panel to bind:'
+  通用视觉 RPA 引擎（支持插件扩展）: General-purpose vision RPA engine (plugin-extensible)
+  通道下限: Channel Lower Bound
+  遍历列表: Iterate List
+  配置: Config
+  配置名称：: 'Config Name:'
+  配置来源：用户=你改过的；系统=出厂；远端=在线下发（会顶替出厂）: 'Config Source: User = things you''ve changed; System = factory default; Remote = pushed online (supersedes factory)'
+  配置：: 'Config:'
+  重命名分组: Rename Group
+  重命名列: Rename Column
+  重命名场景: Rename Scene
+  重命名失败: Rename Failed
+  重命名方向: Rename Direction
+  重命名视图: Rename View
+  重复 N 次: Repeat N Times
+  重复直到…: Repeat Until…
+  重置匿名标识: Reset Anonymous ID
+  重置后服务端会把你当成一个新用户，之前的记录无法再与新标识关联。确定重置吗？: After resetting, the server will treat you as a new user; previous records can no longer be linked to the new ID. Reset anyway?
+  重置标识: Reset ID
+  错误变量: Error Variable
+  键名: Key Name
+  '间隔:': 'Interval:'
+  限定区域: Restrict to Region
+  限定参考图识别的分组范围: Restrict the group scope of reference-image recognition
+  限定材料识别的分组范围: Limit group scope for material recognition
+  需安装律匠 App 并开启无障碍服务；仅改变输入通道，不改变截图方式；不可达时回退 ADB shell input: Requires the LvJiang App with Accessibility Service enabled; only changes the input channel, not the screenshot method; falls back to ADB shell input if unreachable
+  面板: Panel
+  面板/区域: Panel/Region
+  面板列表: Panel List
+  颜色占比: Color Ratio
+  颜色特征识别器尚未实现: Color-feature recognizer not yet implemented
+  '高:': 'H:'
+  高出其他通道: Exceeds Other Channels By
+  高精度录制中…原始输入写入统一时间线，: High-precision recording…raw input is written to a unified timeline,
+  默认: Default
+  默认用户: Default User
+  鼠标/触控移动到目标位置的耗时: Time for the mouse/touch to move to the target position
+  鼠标移动时长(秒): Mouse Move Duration (sec)
+  鼠标键: Mouse Button
+  鼠标键原始事件: Raw Mouse Button Event
+  （无）: (None)
   （未开启多视图，点「新增视图」自动开启）: (Multi-view not enabled, click "New View" to enable)
+  （未截图）: (No Screenshot)
+  （正常完成）: (Completed Normally)
+  （用户中断）: (User Interrupted)
+  （用户中断，部分结果）: (User Interrupted, Partial Result)
+  （空）: (Empty)
+  ，请选择 保存 或 放弃: ', please choose Save or Discard'

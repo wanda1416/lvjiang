@@ -615,8 +615,11 @@ class EquipJudgeTestDialog(QDialog):
             else:
                 log.append(f"  {why} → 未知动作 {action!r}")
 
+        # log[-1] 由上面几处 f"...→ 保留/重置/回收/跳过" 拼出来，那些都是
+        # 直接写死的中文（非 tr()），这里比对也要用裸中文，否则英文界面下
+        # 永远匹配不上，会多打印一行多余的「调律结束」分隔线。
         if not full_recycle and affix_count < _AFFIX_ROWS and not log[-1].endswith(
-                (tr("保留"), tr("重置"), tr("回收"), tr("跳过"))):
+                ("保留", "重置", "回收", "跳过")):
             log.append(f"── 调律结束（{affix_count}/{_AFFIX_ROWS}）──")
 
         self.result_text.setPlainText("\n".join(log))

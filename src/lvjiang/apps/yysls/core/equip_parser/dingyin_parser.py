@@ -19,10 +19,13 @@ import re
 
 from loguru import logger
 
-from .....i18n import tr
-
 # 定音词条所在的全部类别（增益类 + 指定技能增效）
-_DINGYIN_CATEGORIES = (tr("外功增益"), tr("属攻增益"), tr("指定技能增效"))
+#
+# 传给 get_aliases_for_category()，比对的是 attributes.yaml 里 affix_caps
+# 段的分类 key——那是裸中文的游戏配置数据，从不过 tr()，这里也绝不能
+# 过 tr()，否则英文界面下会用翻译后的英文去匹配裸中文 key，查不到任何
+# 别名，定音词条会整体解析失败。
+_DINGYIN_CATEGORIES = ("外功增益", "属攻增益", "指定技能增效")
 
 # _extra 中的止戈定音标记；与 illegal_equip 完全独立。
 ZHIGE_DINGYIN_KEY = "is_zhige_dingyin"

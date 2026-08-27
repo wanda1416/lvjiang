@@ -602,7 +602,10 @@ class MockEquipDialog(QDialog):
         from ....config import get_game_config
         gc = get_game_config()
         # 获取指定技能增效分类的分组
-        groups = gc.get_alias_groups_for_category(tr("指定技能增效"))
+        # "指定技能增效" 是 attributes.yaml 里 affix_caps 段的分类 key，
+        # 裸中文的游戏配置数据，从不过 tr()，这里也不能过 tr()（同
+        # equip_parser/dingyin_parser.py 的 _DINGYIN_CATEGORIES）。
+        groups = gc.get_alias_groups_for_category("指定技能增效")
         if not groups:
             return []
         group_keys = list(groups.keys())
@@ -635,7 +638,10 @@ class MockEquipDialog(QDialog):
         """获取指定分组的定音词条列表（按当前部位过滤）"""
         from ....config import get_game_config
         gc = get_game_config()
-        groups = gc.get_alias_groups_for_category(tr("指定技能增效"))
+        # "指定技能增效" 是 attributes.yaml 里 affix_caps 段的分类 key，
+        # 裸中文的游戏配置数据，从不过 tr()，这里也不能过 tr()（同
+        # equip_parser/dingyin_parser.py 的 _DINGYIN_CATEGORIES）。
+        groups = gc.get_alias_groups_for_category("指定技能增效")
         affixes = groups.get(group_key, [])
         # 按当前部位过滤
         part_name = self._combo_part.currentData()

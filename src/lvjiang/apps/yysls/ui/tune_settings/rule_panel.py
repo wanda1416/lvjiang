@@ -14,10 +14,10 @@ from loguru import logger
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QFrame,
-    QHBoxLayout,
     QListWidget,
     QListWidgetItem,
     QScrollArea,
+    QSplitter,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -32,7 +32,11 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 
 from .....i18n import tr
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import (
+    configure_navigation_list,
+    mark_navigation_list,
+    navigation_width_for_chars,
+)
 from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
 from .pool_page import PoolPage
@@ -123,7 +127,7 @@ class RulePanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 0)
 
-        body = QHBoxLayout()
+        self._nav_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # ── 左侧导航 ──
         self._nav = QListWidget()
@@ -131,9 +135,14 @@ class RulePanel(QWidget):
             self._nav.addItem(tr(title))
             if row == _SEP_ROW - 1:
                 add_nav_separator(self._nav)
-        configure_navigation_list(self._nav, minimum_width=190)
+        mark_navigation_list(self._nav)
+        second_level_width = navigation_width_for_chars(self._nav, 6)
+        configure_navigation_list(
+            self._nav,
+            minimum_width=navigation_width_for_chars(self._nav, 4),
+        )
         self._nav.currentRowChanged.connect(self._on_nav_changed)
-        body.addWidget(self._nav)
+        self._nav_splitter.addWidget(self._nav)
 
         # ── 右侧详情页 ──
         self._stack = QStackedWidget()
@@ -158,8 +167,15 @@ class RulePanel(QWidget):
                                    self._on_changed)
             self._part_pages.append(page)
             self._stack.addWidget(self._wrap_scroll(page))
-        body.addWidget(self._stack, 1)
-        layout.addLayout(body)
+        self._nav_splitter.addWidget(self._stack)
+        self._nav_splitter.setCollapsible(0, False)
+        self._nav_splitter.setCollapsible(1, False)
+        self._nav_splitter.setStretchFactor(0, 0)
+        self._nav_splitter.setStretchFactor(1, 1)
+        self._nav_splitter.setSizes(
+            [second_level_width, 900 - second_level_width]
+        )
+        layout.addWidget(self._nav_splitter)
         self._nav.setCurrentRow(0)
 
     @staticmethod

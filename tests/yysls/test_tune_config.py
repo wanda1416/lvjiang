@@ -8,7 +8,8 @@ import shutil
 from pathlib import Path
 
 import pytest
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QPushButton
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
@@ -18,6 +19,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     TuningRuleManager,
     get_tuning_rule_manager,
 )
+from lvjiang.apps.yysls.ui.layout_helpers import navigation_width_for_chars
 from lvjiang.apps.yysls.ui.tune_settings import TuningRulesDialog
 from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
     ScanBehaviorPage,
@@ -79,7 +81,6 @@ class TestDialog:
         # 分割线项不可选中
         assert not dialog._nav.item(4).flags()
         assert dialog._nav.item(5).text() == "流派规则"
-        assert dialog._nav.minimumWidth() >= 220
         assert dialog._nav.property("navigation") is True
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
@@ -91,8 +92,19 @@ class TestDialog:
         dialog._nav.setCurrentRow(6)
         assert dialog._stack.currentIndex() == 5
         rule_panel = dialog._stack.widget(5)
-        assert rule_panel._nav.minimumWidth() >= 190
         assert rule_panel._nav.property("navigation") is True
+        dialog.show()
+        QApplication.processEvents()
+        first_width = navigation_width_for_chars(dialog._nav, 8)
+        second_width = navigation_width_for_chars(rule_panel._nav, 6)
+        assert dialog._main_splitter.orientation() == Qt.Orientation.Horizontal
+        assert rule_panel._nav_splitter.orientation() == Qt.Orientation.Horizontal
+        assert abs(dialog._main_splitter.sizes()[0] - first_width) <= 2
+        assert abs(rule_panel._nav_splitter.sizes()[0] - second_width) <= 2
+        dialog._main_splitter.setSizes([first_width + 40, 1000])
+        rule_panel._nav_splitter.setSizes([second_width + 40, 600])
+        assert dialog._main_splitter.sizes()[0] > first_width
+        assert rule_panel._nav_splitter.sizes()[0] > second_width
         buttons = dialog.findChildren(QPushButton)
         assert buttons
         assert all(button.styleSheet() for button in buttons)

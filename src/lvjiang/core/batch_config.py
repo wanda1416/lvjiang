@@ -58,6 +58,7 @@ class BatchConfigItem:
     rows: list[dict] = field(default_factory=list)
     workflows: BatchWorkflows = field(default_factory=BatchWorkflows)
     user_column: str = ""  # 指定哪一列的值作为用户名（用于 session 切换）
+    skip_lifecycle_for_single_item: bool = True
 
     def to_dict(self) -> dict:
         return {
@@ -66,6 +67,7 @@ class BatchConfigItem:
             "rows": [dict(r) for r in self.rows],
             "workflows": self.workflows.to_dict(),
             "user_column": self.user_column,
+            "skip_lifecycle_for_single_item": self.skip_lifecycle_for_single_item,
         }
 
     @staticmethod
@@ -76,6 +78,9 @@ class BatchConfigItem:
             rows=[dict(r) for r in d.get("rows", [])],
             workflows=BatchWorkflows.from_dict(d.get("workflows", {})),
             user_column=d.get("user_column", ""),
+            skip_lifecycle_for_single_item=bool(
+                d.get("skip_lifecycle_for_single_item", True)
+            ),
         )
 
 

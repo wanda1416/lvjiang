@@ -122,43 +122,51 @@ class BatchWorker(QThread):
             "entries": {}, "stopped": False, "lifecycle": {},
         }
         total = len(self._enabled_rows)
+        use_lifecycle = not (
+            total == 1 and self._config.skip_lifecycle_for_single_item
+        )
         self.log.emit(f"[批量] 开始：{total} 行 × "
                       f"{len(self._scripts)} 脚本")
+        if not use_lifecycle:
+            self.log.emit("[批量] 单条目直通：跳过批量生命周期工作流")
 
         # 初始化报告
         report = BatchReport(
             config_name=self._config.name,
             scripts=[(s.id, s.name) for s in self._scripts],
-            workflows=self._config.workflows.to_dict(),
+            workflows=(self._config.workflows.to_dict()
+                       if use_lifecycle else {}),
             user_column=self._config.user_column,
             total_rows=total,
         )
         report.start_batch()
 
         batch_state: dict = {}
-        setup = self._run_stage(
-            "batch_setup", self._config.workflows.batch_setup,
-            -1, -1, {}, batch_state,
-        )
-        batch_state = setup.state if setup.state is not None else batch_state
-        summary["lifecycle"]["batch_setup"] = setup.status
-        can_run = setup.status == RESULT_SUCCESS
-        if not can_run:
-            self._stopped = setup.status == RESULT_STOPPED
-            self.log.emit(self._stage_message(tr("批次初始化"), setup))
-            for run_idx, (_row_idx, row_data) in enumerate(self._enabled_rows):
-                label = self._format_label(row_data, run_idx)
-                username = self._get_username_from_row(row_data) or ""
-                summary["entries"][label] = {
-                    "prepare": ST_SKIPPED,
-                    "finish": ST_SKIPPED,
-                    "scripts": {s.id: ST_SKIPPED for s in self._scripts},
-                }
-                report.start_entry(label, username)
-                report.record_prepare(ST_SKIPPED)
-                report.end_entry()
-                for script in self._scripts:
-                    self.progress.emit(label, script.id, ST_SKIPPED)
+        can_run = True
+        if use_lifecycle:
+            setup = self._run_stage(
+                "batch_setup", self._config.workflows.batch_setup,
+                -1, -1, {}, batch_state,
+            )
+            batch_state = setup.state if setup.state is not None else batch_state
+            summary["lifecycle"]["batch_setup"] = setup.status
+            can_run = setup.status == RESULT_SUCCESS
+            if not can_run:
+                self._stopped = setup.status == RESULT_STOPPED
+                self.log.emit(self._stage_message(tr("批次初始化"), setup))
+                for run_idx, (_row_idx, row_data) in enumerate(self._enabled_rows):
+                    label = self._format_label(row_data, run_idx)
+                    username = self._get_username_from_row(row_data) or ""
+                    summary["entries"][label] = {
+                        "prepare": ST_SKIPPED,
+                        "finish": ST_SKIPPED,
+                        "scripts": {s.id: ST_SKIPPED for s in self._scripts},
+                    }
+                    report.start_entry(label, username)
+                    report.record_prepare(ST_SKIPPED)
+                    report.end_entry()
+                    for script in self._scripts:
+                        self.progress.emit(label, script.id, ST_SKIPPED)
 
         for run_idx, (row_idx, row_data) in enumerate(self._enabled_rows):
             if not can_run:
@@ -179,26 +187,28 @@ class BatchWorker(QThread):
 
             report.start_entry(label, username)
 
-            # 1. 每条统一调用 prepare_item；如何达到目标状态完全由 wf 决定。
-            prepared = self._run_stage(
-                "prepare_item", self._config.workflows.prepare_item,
-                run_idx, row_idx, row_data, batch_state,
-            )
-            batch_state = (prepared.state if prepared.state is not None
-                           else batch_state)
-            prepare_ui_status = self._result_to_ui_status(prepared.status)
-            entry_result["prepare"] = prepare_ui_status
-            report.record_prepare(prepare_ui_status)
-            if prepared.status != RESULT_SUCCESS:
-                report.end_entry()
-                for s in self._scripts:
-                    entry_result["scripts"][s.id] = ST_SKIPPED
-                    self.progress.emit(label, s.id, ST_SKIPPED)
-                self.log.emit(self._stage_message(label, prepared))
-                if prepared.status == RESULT_STOPPED:
-                    self._stopped = True
-                    break
-                continue
+            prepared = BatchStageResult(state=batch_state)
+            if use_lifecycle:
+                # 多条目才需要切换现场；单条目直接使用当前现场执行。
+                prepared = self._run_stage(
+                    "prepare_item", self._config.workflows.prepare_item,
+                    run_idx, row_idx, row_data, batch_state,
+                )
+                batch_state = (prepared.state if prepared.state is not None
+                               else batch_state)
+                prepare_ui_status = self._result_to_ui_status(prepared.status)
+                entry_result["prepare"] = prepare_ui_status
+                report.record_prepare(prepare_ui_status)
+                if prepared.status != RESULT_SUCCESS:
+                    report.end_entry()
+                    for s in self._scripts:
+                        entry_result["scripts"][s.id] = ST_SKIPPED
+                        self.progress.emit(label, s.id, ST_SKIPPED)
+                    self.log.emit(self._stage_message(label, prepared))
+                    if prepared.status == RESULT_STOPPED:
+                        self._stopped = True
+                        break
+                    continue
 
             # 2. 批量层显式传递用户：按行加载该用户 session，
             #    不触碰全局 active user，与 UI 下拉框彻底无关
@@ -241,27 +251,29 @@ class BatchWorker(QThread):
             if self._stopped:
                 report.finish_pending()
 
-            # 5. 条目收尾收到通用执行摘要，wf 可据此维护私有状态。
-            item_summary = {
-                "prepare": prepared.status,
-                "scripts": {
-                    script_id: self._ui_status_to_result(status)
-                    for script_id, status in entry_result["scripts"].items()
-                },
-            }
-            finished = self._run_stage(
-                "finish_item", self._config.workflows.finish_item,
-                run_idx, row_idx, row_data, batch_state, item_summary,
-            )
-            batch_state = (finished.state if finished.state is not None
-                           else batch_state)
-            finish_ui_status = self._result_to_ui_status(finished.status)
-            entry_result["finish"] = finish_ui_status
-            report.record_finish(finish_ui_status)
-            if finished.status != RESULT_SUCCESS:
-                self.log.emit(self._stage_message(f"{label} 条目收尾", finished))
-            if finished.status == RESULT_STOPPED:
-                self._stopped = True
+            if use_lifecycle:
+                # 条目收尾收到通用执行摘要，wf 可据此维护私有状态。
+                item_summary = {
+                    "prepare": prepared.status,
+                    "scripts": {
+                        script_id: self._ui_status_to_result(status)
+                        for script_id, status in entry_result["scripts"].items()
+                    },
+                }
+                finished = self._run_stage(
+                    "finish_item", self._config.workflows.finish_item,
+                    run_idx, row_idx, row_data, batch_state, item_summary,
+                )
+                batch_state = (finished.state if finished.state is not None
+                               else batch_state)
+                finish_ui_status = self._result_to_ui_status(finished.status)
+                entry_result["finish"] = finish_ui_status
+                report.record_finish(finish_ui_status)
+                if finished.status != RESULT_SUCCESS:
+                    self.log.emit(self._stage_message(
+                        f"{label} 条目收尾", finished))
+                if finished.status == RESULT_STOPPED:
+                    self._stopped = True
 
             report.end_entry()
 
@@ -274,7 +286,7 @@ class BatchWorker(QThread):
 
         # setup 成功才说明批次现场已经建立，此时才允许执行 teardown。
         # setup 非 success 时直接终止，不启动任何后续生命周期阶段。
-        if can_run:
+        if use_lifecycle and can_run:
             teardown = self._run_stage(
                 "batch_teardown", self._config.workflows.batch_teardown,
                 -1, -1, {}, batch_state,

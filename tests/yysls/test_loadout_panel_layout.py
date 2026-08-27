@@ -1,5 +1,7 @@
+from types import SimpleNamespace
+
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QWidget
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
 from lvjiang.apps.yysls.ui.loadout import LoadoutPanel
 from lvjiang.apps.yysls.ui.loadout.combat.layout import (
@@ -219,6 +221,68 @@ def test_half_compact_recovers_to_half_when_width_expands(
     assert combat._judgment_grid.count() == len(combat._judgment_grid_items)
     assert combat._gain_grid.count() == len(combat._gain_grid_items)
     assert combat._damage_grid.count() == len(combat._damage_grid_items)
+
+
+def test_half_compact_extra_skill_dingyin_expands_gain_card_without_overlap(
+        qtbot, tmp_path, monkeypatch):
+    """第三、第四个右四定音必须参与紧凑重排，不能滞留并覆盖固定属性。"""
+    import lvjiang.apps.yysls.config as game_config_module
+    import lvjiang.constants
+
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    panel.resize(900, 900)
+    panel.show()
+    qtbot.wait(20)
+
+    combat = panel._character._combat_attrs_tab
+    assert combat._display_mode == DISPLAY_MODE_HALF_COMPACT
+    initial_height = combat._gain_card.sizeHint().height()
+    monkeypatch.setattr(
+        game_config_module,
+        "get_game_config",
+        lambda: SimpleNamespace(
+            resolve_affix_category=lambda _name: "指定技能增效",
+        ),
+    )
+
+    combat._refresh_extra_attrs(
+        {f"右四定音{index}": float(index) for index in range(1, 5)},
+        buff_resistance=0,
+    )
+    combat._strategy.on_refresh_display(combat)
+    qtbot.wait(10)
+
+    assert len(combat._skill_bonus_slots) == 4
+    extra_widgets = [slot[0] for slot in combat._skill_bonus_slots[2:]]
+    registered_widgets = [item[0] for item in combat._gain_grid_items]
+    assert all(widget in registered_widgets for widget in extra_widgets)
+
+    player_widget = next(
+        widget
+        for widget, _row, _col in combat._gain_grid_items
+        if widget.findChild(QLabel, "attrName") is not None
+        and widget.findChild(QLabel, "attrName").text() == "对玩家单位增效"
+    )
+
+    def grid_position(widget):
+        index = combat._gain_grid.indexOf(widget)
+        assert index >= 0
+        return combat._gain_grid.getItemPosition(index)[:2]
+
+    visible_widgets = [
+        widget for widget, _row, _col in combat._gain_grid_items
+        if not widget.isHidden()
+    ]
+    positions = [grid_position(widget) for widget in visible_widgets]
+    assert len(positions) == len(set(positions))
+    assert grid_position(player_widget) != grid_position(extra_widgets[0])
+    assert combat._gain_card.sizeHint().height() > initial_height
 
 
 def test_view_mode_persisted_in_ui_state(qtbot, tmp_path, monkeypatch):

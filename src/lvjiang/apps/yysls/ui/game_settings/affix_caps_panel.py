@@ -40,6 +40,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
@@ -118,6 +119,12 @@ class _PartsDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        apply_button_style(btn_all, btn_invert, variant="neutral")
+        apply_button_style(buttons.button(QDialogButtonBox.StandardButton.Ok))
+        apply_button_style(
+            buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            variant="neutral",
+        )
         layout.addWidget(buttons)
 
     def selected(self) -> list[str]:
@@ -163,6 +170,8 @@ class AffixCapsPanel(QWidget):
         self._btn_del_affix = QPushButton(tr("- 词组"))
         self._btn_del_affix.clicked.connect(self._del_affix)
         affix_btn_layout.addWidget(self._btn_del_affix)
+        apply_button_style(self._btn_add_affix)
+        apply_button_style(self._btn_del_affix, variant="danger")
 
         left_layout.addLayout(affix_btn_layout)
 
@@ -243,6 +252,7 @@ class AffixCapsPanel(QWidget):
         self._cat_parts_btn = QPushButton(tr("全部"))
         self._cat_parts_btn.setFixedWidth(130)
         self._cat_parts_btn.clicked.connect(self._pick_category_parts)
+        apply_button_style(self._cat_parts_btn, variant="neutral")
         cat_parts_layout.addWidget(self._cat_parts_btn)
         cat_parts_layout.addStretch()
         self._cat_parts_frame.setVisible(False)
@@ -274,6 +284,8 @@ class AffixCapsPanel(QWidget):
         self._btn_add_alias.setFixedWidth(70)
         self._btn_add_alias.clicked.connect(self._add_alias)
         alias_title_row.addWidget(self._btn_add_alias)
+        apply_button_style(self._btn_add_group, self._btn_add_alias)
+        apply_button_style(self._btn_del_group, variant="danger")
         alias_layout.addLayout(alias_title_row)
 
         # 不分组：词条名逐行控件容器（每行：词条名 + 归属下拉 + 删除）
@@ -309,6 +321,8 @@ class AffixCapsPanel(QWidget):
         self._btn_del_level = QPushButton(tr("删除等级"))
         self._btn_del_level.clicked.connect(self._del_level)
         btn_layout.addWidget(self._btn_del_level)
+        apply_button_style(self._btn_add_level)
+        apply_button_style(self._btn_del_level, variant="danger")
 
         right_layout.addLayout(btn_layout)
         splitter.addWidget(right_widget)
@@ -973,11 +987,13 @@ class AffixCapsPanel(QWidget):
         alias_btn.setFixedWidth(150)
         alias_btn.clicked.connect(
             lambda _c, a=alias, b=alias_btn: self._edit_external_aliases(a, b))
+        apply_button_style(alias_btn, variant="neutral")
         row_layout.addWidget(alias_btn)
 
         # 词条部位（点击弹七部位多选；全选展示「全部」；仅普通词组启用）
         parts_btn = QPushButton(self._format_parts(self._get_affix_parts(alias)))
         parts_btn.setFixedWidth(130)
+        apply_button_style(parts_btn, variant="neutral")
         if self._is_dingyin():
             # 定音词组：显示分类级部位，但不可单独编辑
             parts_btn.setText(self._format_parts(self._get_category_parts()))

@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.core.tuning_rules import RATING_KEYS, RATING_LABELS
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 from .affix_picker import AffixSelectSortDialog
@@ -139,6 +140,7 @@ class PartPatternPage(QWidget):
         self._first: list[str] = []
         self._first_btn = QPushButton(tr("（点击选择首词条）"))
         self._first_btn.clicked.connect(self._pick_first)
+        apply_button_style(self._first_btn, variant="neutral")
         layout.addWidget(self._first_btn)
 
         # ② 默认判定：全档不命中时的兜底档位（空 = 跟随规则设置页）

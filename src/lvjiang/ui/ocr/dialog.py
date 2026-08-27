@@ -265,6 +265,17 @@ class OCRDialog(QDialog):
 
         layout.addWidget(test_group)
 
+        apply_button_style(
+            self._btn_add_repl,
+            self._btn_add_pattern,
+            self._btn_test,
+        )
+        apply_button_style(
+            self._btn_del_repl,
+            self._btn_del_pattern,
+            variant="danger",
+        )
+
         # 加载规则到表格
         self._refresh_rules_tables()
 

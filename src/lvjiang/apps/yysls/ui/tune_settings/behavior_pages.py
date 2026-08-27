@@ -68,6 +68,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
 )
 from lvjiang.apps.yysls.ui.game_settings.level_combo import LevelCombo
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -119,6 +120,7 @@ class _MultiSelect(QPushButton):
     def __init__(self, items: list[tuple[str, str]],
                  changed: Callable[[], None], parent=None):
         super().__init__(parent)
+        apply_button_style(self, variant="neutral")
         self._changed = changed
         self._menu = _CheckMenu(self)
         self.setMenu(self._menu)
@@ -237,6 +239,13 @@ class _JudgeRulesDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
+        apply_button_style(
+            self._buttons.button(QDialogButtonBox.StandardButton.Ok)
+        )
+        apply_button_style(
+            self._buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            variant="neutral",
+        )
         layout.addWidget(self._buttons)
         self._sync_ok()
 
@@ -277,6 +286,13 @@ class _AffixEntriesDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
+        apply_button_style(
+            self._buttons.button(QDialogButtonBox.StandardButton.Ok)
+        )
+        apply_button_style(
+            self._buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            variant="neutral",
+        )
         layout.addWidget(self._buttons)
         self._sync_ok()
 
@@ -297,6 +313,7 @@ class _AffixEntriesButton(QPushButton):
     def __init__(self, items: list[tuple[str, str]],
                  changed: Callable[[], None], parent=None):
         super().__init__(parent)
+        apply_button_style(self, variant="neutral")
         self._items = items
         self._checked: set[str] = set()
         self._changed = changed
@@ -511,6 +528,9 @@ class _BehaviorPageBase(QWidget):
         self._down_btn.clicked.connect(lambda _c: self._on_move_down())
         self._down_btn.setEnabled(False)
         btn_row.addWidget(self._down_btn)
+        apply_button_style(add_btn)
+        apply_button_style(del_btn, variant="danger")
+        apply_button_style(self._up_btn, self._down_btn, variant="neutral")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         layout.addStretch()

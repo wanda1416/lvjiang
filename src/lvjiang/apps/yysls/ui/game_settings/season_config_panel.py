@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import SeasonConfig, get_game_config
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 from .factory_guard import (
@@ -114,6 +115,9 @@ class SeasonConfigPanel(QWidget):
         self._down_btn.clicked.connect(self._on_move_down)
         self._down_btn.setEnabled(False)
         btn_row.addWidget(self._down_btn)
+        apply_button_style(add_btn)
+        apply_button_style(self._del_btn, variant="danger")
+        apply_button_style(self._up_btn, self._down_btn, variant="neutral")
         btn_row.addStretch()
         # 状态标签
         self._status_label = QLabel("")

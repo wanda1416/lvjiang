@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
+    QPushButton,
     QStyle,
     QStyledItemDelegate,
     QTableWidget,
@@ -87,7 +89,18 @@ class TestHeavyWidgetTeardown:
         QApplication.processEvents()
 
         assert tab._origin_label.height() <= tab._view_combo.height()
-        assert tab._canvas.y() <= tab._view_combo.height() + 4
+        toolbar_height = max(
+            tab._view_combo.height(), tab._btn_manage_views.height()
+        )
+        assert tab._canvas.y() <= toolbar_height + 2
+
+        disabled_cell = tab._region_table.cellWidget(0, 5)
+        assert disabled_cell.findChild(QCheckBox) is not None
+        alignment = disabled_cell.layout().itemAt(0).alignment()
+        assert alignment
+        assert all(
+            button.styleSheet() for button in tab.findChildren(QPushButton)
+        )
 
     def test_building_and_destroying_scene_tabs_does_not_crash(self, qtbot):
         """回归：反复构造/销毁 SceneTab 曾在 pytest-qt 收尾 processEvents 时段错误。

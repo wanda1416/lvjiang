@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_CATEGORY
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
@@ -178,6 +179,7 @@ class BaseAttrPanel(QWidget):
         first_affix_layout.addWidget(QLabel(tr("首词条")))
         self._first_affix_btn = QPushButton(tr("（点击选择首词条）"))
         self._first_affix_btn.clicked.connect(self._pick_first_affixes)
+        apply_button_style(self._first_affix_btn, variant="neutral")
         first_affix_layout.addWidget(self._first_affix_btn, 1)
         self._first_affix_hint = QLabel("")
         self._first_affix_hint.setStyleSheet("color: palette(mid);")
@@ -208,6 +210,8 @@ class BaseAttrPanel(QWidget):
         self._btn_del_weapon = QPushButton(tr("删除"))
         self._btn_del_weapon.clicked.connect(self._on_del_weapon)
         weapon_header.addWidget(self._btn_del_weapon)
+        apply_button_style(self._btn_add_weapon)
+        apply_button_style(self._btn_del_weapon, variant="danger")
         weapon_layout.addLayout(weapon_header)
 
         self._weapon_list = QListWidget()
@@ -254,6 +258,7 @@ class BaseAttrPanel(QWidget):
         self._btn_add_level = QPushButton(tr("添加等级"))
         self._btn_add_level.clicked.connect(self._add_level)
         btn_layout.addWidget(self._btn_add_level)
+        apply_button_style(self._btn_add_level)
 
         right_layout.addLayout(btn_layout)
         splitter.addWidget(right_widget)

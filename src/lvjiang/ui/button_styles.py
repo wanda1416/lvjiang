@@ -33,7 +33,7 @@ DANGER_BUTTON_STYLE = (
 
 
 def apply_button_style(
-    *buttons: QPushButton,
+    *buttons: QPushButton | None,
     variant: str = "action",
 ) -> None:
     """Apply one consistent geometry with semantic colour variants."""
@@ -44,4 +44,5 @@ def apply_button_style(
     }
     style = styles[variant]
     for button in buttons:
-        button.setStyleSheet(style)
+        if button is not None:
+            button.setStyleSheet(style)

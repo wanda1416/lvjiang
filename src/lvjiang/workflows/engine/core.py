@@ -759,6 +759,12 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         logger.info(f"=== Python 工作流开始: {workflow.__class__.__name__} ===")
         try:
             result = workflow.run()
+        except _BreakSignal:
+            # DSL 子过程和动作等待以 _BreakSignal 传递停止请求。Python 工作流
+            # 调用这些能力时，信号会越过 call_subcall 回到此边界；它是正常
+            # 用户停止，不应落入通用异常日志。
+            logger.info("Python 工作流收到停止请求")
+            result = workflow.output
         except Exception as e:
             logger.error(f"Python 工作流异常: {e}\n{traceback.format_exc()}")
             result = workflow.output

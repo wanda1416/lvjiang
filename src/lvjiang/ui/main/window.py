@@ -292,7 +292,9 @@ class MainWindow(
         self.f9_pressed.emit()
 
     def _on_global_f10(self):
-        if not self._backend_ready():
+        # 运行中的停止请求不依赖后端仍然可用；断连/窗口消失恰恰是最需要
+        # F10 立即退出的场景。空闲时仍保留 ready 门控以免误触。
+        if not self._running and not self._backend_ready():
             return
         self.f10_pressed.emit()
 
@@ -782,6 +784,7 @@ class MainWindow(
             window_left=window_left,
             window_top=window_top,
             pause_event=getattr(self, '_pause_event', None),
+            ui_callback=self._create_ui_callback(),
         )
 
         # 获取当前配置

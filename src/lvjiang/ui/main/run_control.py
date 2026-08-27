@@ -5,7 +5,7 @@ import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
@@ -63,15 +63,24 @@ class _UIHelper(QObject):
     """
     request = pyqtSignal(object)
 
-    def __init__(self, window=None):
+    def __init__(
+        self,
+        window=None,
+        stop_check: Callable[[], bool] | None = None,
+    ):
         super().__init__()
         self._window = window
-        self._active_dialog = None
+        self._stop_check = stop_check or (lambda: False)
+        self._active_dialog: Any = None
         self.request.connect(self._on_request)
 
     def _on_request(self, req: dict):
         """主线程：显示对话框并回填结果，无论成败都唤醒工作流线程"""
         try:
+            # F10 可能先于 queued request 抵达主线程；此时直接释放工作线程，
+            # 不能在停止请求之后再打开一个新的阻塞弹窗。
+            if self._stop_check():
+                return
             req["result"] = self._show(req["action"], req["kwargs"])
         except Exception as e:
             logger.error(f"UI 交互对话框异常: {e}")
@@ -131,13 +140,24 @@ class _UIHelper(QObject):
                 return kwargs.get("cancel_value")
             return buttons.get(clicked, kwargs.get("cancel_value"))
         if action == "pause":
-            box = QMessageBox(
-                QMessageBox.Icon.Information, tr("工作流暂停"),
-                kwargs.get("message", ""),
-                QMessageBox.StandardButton.Ok, self._window,
+            box = QMessageBox(self._window)
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setWindowTitle(tr("工作流暂停"))
+            box.setText(kwargs.get("message", ""))
+            continue_button = box.addButton(
+                tr("继续"), QMessageBox.ButtonRole.AcceptRole
             )
+            stop_button = box.addButton(
+                tr("结束任务"), QMessageBox.ButtonRole.RejectRole
+            )
+            if continue_button is not None:
+                box.setDefaultButton(continue_button)
             self._active_dialog = box
             box.exec()
+            if stop_button is not None and box.clickedButton() is stop_button:
+                request_stop = getattr(self._window, "request_stop", None)
+                if callable(request_stop):
+                    request_stop()
             return None
         if action == "input":
             dlg = QInputDialog(self._window)
@@ -449,6 +469,11 @@ class RunControlMixin:
 
     def _end_automation(self, name: str):
         """结束自动化，恢复 UI 状态。由工作流线程实际结束后调用。"""
+        helper = getattr(self, "_ui_helper", None)
+        if helper is not None:
+            helper.close_active_dialog()
+            helper.deleteLater()
+            self._ui_helper = None
         self._stop_requested = False
         self._run_state = "idle"
         # 确保 pause_event 为 set 状态，避免下次启动阻塞
@@ -538,10 +563,13 @@ class RunControlMixin:
         """
         import threading
 
-        helper = _UIHelper(self)
+        helper = _UIHelper(self, stop_check=self._is_stopped)
         self._ui_helper = helper
 
         def callback(action: str, **kwargs):
+            # 工作流在 F10 后才走到交互语句时直接取消，不再投递弹窗。
+            if self._is_stopped():
+                return None
             done_event = threading.Event()
             req = {"action": action, "kwargs": kwargs,
                    "result": None, "done": done_event}

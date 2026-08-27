@@ -1,7 +1,12 @@
 """通道 A：心跳事件的 schema、payload 组装、节流。
 
-字段全部来自公开的运行环境信息，不涉及任何燕云领域词汇——这是 core 层
-本就该管的部分，与调律事件（apps/yysls/telemetry）分层对称。
+字段全部来自公开的运行环境信息，不含任何游戏内数据——这是 core 层本就
+该管的部分，与调律事件（apps/yysls/telemetry）分层对称。
+
+唯一的例外是 ``plugin`` 的取值白名单里出现了具体插件名。取值本身来自
+``AppHooks.id``（框架登记的稳定 ID，core 不猜也不认识它的含义），白名单
+是隐私护栏而非领域耦合：放行自由文本会让自定义插件名成为指纹维度。
+详见该字段处的说明。
 """
 from __future__ import annotations
 
@@ -11,7 +16,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 from .registry import register_schema
-from .schema import EventSchema, FieldSpec, ListSpec
+from .schema import EventSchema, FieldSpec
 
 _VERSION_PATTERN = r"^[0-9A-Za-z.\-+]{1,32}$"
 _DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
@@ -20,7 +25,7 @@ _OS_RELEASE_PATTERN = r"^[0-9A-Za-z._-]{1,16}$"
 _ARCH_PATTERN = r"^[A-Za-z0-9_]{1,20}$"
 
 HEARTBEAT_SCHEMA = EventSchema(
-    name="heartbeat", version=2,
+    name="heartbeat", version=1,
     fields=(
         FieldSpec("install_id", str, pattern=_UUID_HEX_PATTERN, example="0" * 32),
         FieldSpec("first_seen", str, pattern=_DATE_PATTERN, example="2026-01-01"),
@@ -32,13 +37,18 @@ HEARTBEAT_SCHEMA = EventSchema(
                   example="11"),
         FieldSpec("arch", str, pattern=_ARCH_PATTERN, example="amd64"),
         FieldSpec("ui_language", str, pattern=r"^[a-z]{2}_[A-Z]{2}$", example="zh_CN"),
-        ListSpec(
-            "apps", max_items=16,
-            item_fields=(FieldSpec(
-                "id", str, pattern=r"^[a-z0-9][a-z0-9_-]{0,31}$",
-                example="yysls",
-            ),),
-        ),
+        # 取值来自 AppHooks.id（框架登记的稳定 ID），不是模块路径或用户文本。
+        #
+        # **保持这个字段名与单值形状**：服务端 ops/stats-worker 的 PLUGIN 枚举
+        # 校验这个键，改名或改成列表会让整条心跳被 validateHeartbeat() 判空
+        # 丢弃——而 worker 仍返回 200、客户端据此按成功记账且每 UTC 日只发
+        # 一次，于是 DAU/WAU/留存全部静默归零且事后无法补报。字段形状是跨
+        # 组件契约，要动必须连 worker 校验、D1 schema、stats-client 镜像一起
+        # 动，见 tests/core/test_heartbeat_worker_contract.py。
+        #
+        # 白名单是隐私护栏：放行自由文本会让自定义插件名成为指纹维度。
+        # 新增插件时**必须同步扩充这里与 worker 的 PLUGIN 两处**，否则拒收。
+        FieldSpec("plugin", str, choices=("yysls", "none")),
     ),
 )
 register_schema(HEARTBEAT_SCHEMA)
@@ -52,11 +62,20 @@ def _os_release_major() -> str:
     return token or "unknown"
 
 
-def _registered_apps() -> list[dict[str, str]]:
-    """只上报框架登记的稳定 ID，不读取模块路径或用户文本。"""
+def _detect_plugin() -> str:
+    """已装配插件的稳定 ID；未装配任何插件时为 "none"。
+
+    读 ``AppHooks.id``（框架登记的稳定标识），**不再靠 grep 模块路径里的
+    ``".yysls."`` 猜**——那种探测方式随插件增加就失效，这是本次解耦要保住
+    的成果。
+
+    多插件同时装配时只取第一个：字段是单值契约（理由见 HEARTBEAT_SCHEMA
+    里的说明），真要上报多个得先改服务端。目前只有一个插件，取第一个与
+    历史行为完全一致。
+    """
     from ...apps import get_registered_app_ids
     ids = get_registered_app_ids()
-    return [{"id": app_id} for app_id in ids] or [{"id": "none"}]
+    return ids[0] if ids else "none"
 
 
 def normalized_app_version() -> str:
@@ -97,7 +116,7 @@ def build_heartbeat_payload(*, install_id: str, first_seen: str) -> dict:
         "os_release": _os_release_major(),
         "arch": (platform.machine() or "unknown")[:20],
         "ui_language": current_language(),
-        "apps": _registered_apps(),
+        "plugin": _detect_plugin(),
     }
     return payload
 

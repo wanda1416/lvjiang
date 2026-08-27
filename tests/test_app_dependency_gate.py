@@ -37,6 +37,20 @@ def _resolve_import(path: Path, node: ast.ImportFrom) -> str:
     )
 
 
+def _is_import_module(node: ast.Call) -> bool:
+    """``importlib.import_module(...)`` 与 ``import_module(...)`` 两种写法。
+
+    只认属性调用会漏掉 ``from importlib import import_module`` 之后的裸调用，
+    而那正是绕过门禁最省事的写法。
+    """
+    func = node.func
+    if isinstance(func, ast.Attribute):
+        return (isinstance(func.value, ast.Name)
+                and func.value.id == "importlib"
+                and func.attr == "import_module")
+    return isinstance(func, ast.Name) and func.id == "import_module"
+
+
 def _specific_app_imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     imports: set[str] = set()
@@ -46,17 +60,11 @@ def _specific_app_imports(path: Path) -> set[str]:
             targets.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             targets.append(_resolve_import(path, node))
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "importlib"
-            and node.func.attr == "import_module"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            targets.append(node.args[0].value)
+        elif isinstance(node, ast.Call) and _is_import_module(node):
+            # 动态导入同样要拦：普通 import 检查看不到字符串形式的模块路径。
+            first = node.args[0] if node.args else None
+            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                targets.append(first.value)
         imports.update(
             target for target in targets
             if target.startswith("lvjiang.apps.")

@@ -92,4 +92,10 @@ hooks = AppHooks(
     telemetry_modules=[
         "lvjiang.apps.yysls.telemetry.schemas",
     ],
+
+    # 配置合并策略（导入即触发 register_registry_list_paths /
+    # register_protected_list_paths 注册）
+    config_policy_modules=[
+        "lvjiang.apps.yysls.config.merge_policy",
+    ],
 )

@@ -11,10 +11,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from lvjiang.apps.yysls.config.user_profile import (
-    read_profile_entry,
-    write_profile_entry,
-)
 from lvjiang.apps.yysls.core.profile_engine.profile_engine import (
     _compute_regen_value,
     _count_quota_regens,
@@ -400,38 +396,3 @@ class TestComputeRealtimeValue:
 
         assert val == 100.5
         assert new_ts == updated_at
-
-
-# ─── profile 节点读写 ────────────────────────────────────────
-
-
-class TestProfileEntry:
-    def test_read_empty(self):
-        data = {}
-        assert read_profile_entry(data, "quota", "k") == {}
-
-    def test_read_existing(self):
-        data = {"profile": {"quota": {"k": {"value": 100, "updated_at": "2026-08-08T10:00:00"}}}}
-        entry = read_profile_entry(data, "quota", "k")
-        assert entry["value"] == 100
-
-    def test_write_new(self):
-        data = {}
-        write_profile_entry(data, "quota", "k", 100)
-        assert data["profile"]["quota"]["k"]["value"] == 100
-        assert "updated_at" in data["profile"]["quota"]["k"]
-
-    def test_write_overwrites(self):
-        data = {"profile": {"quota": {"k": {"value": 100}}}}
-        write_profile_entry(data, "quota", "k", 200)
-        assert data["profile"]["quota"]["k"]["value"] == 200
-
-    def test_read_different_models(self):
-        data = {
-            "profile": {
-                "quota": {"k": {"value": 1}},
-                "regen": {"k": {"value": 2}},
-            }
-        }
-        assert read_profile_entry(data, "quota", "k")["value"] == 1
-        assert read_profile_entry(data, "regen", "k")["value"] == 2

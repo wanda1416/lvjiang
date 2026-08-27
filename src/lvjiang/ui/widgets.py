@@ -153,7 +153,19 @@ class FlowLayout(QLayout):
         self._do_layout(rect, test_only=False)
 
     def sizeHint(self):
-        return self.minimumSize()
+        margins = self.contentsMargins()
+        item_sizes = [
+            item.sizeHint()
+            for item in self._items
+            if item.widget() is not None
+        ]
+        width = sum(size.width() for size in item_sizes)
+        width += self._spacing * max(0, len(item_sizes) - 1)
+        height = max((size.height() for size in item_sizes), default=0)
+        return QSize(
+            width + margins.left() + margins.right(),
+            height + margins.top() + margins.bottom(),
+        )
 
     def minimumSize(self):
         size = QSize()

@@ -59,6 +59,15 @@ def test_dark_palette_has_readable_text_contrast(qapp):
     manager.apply("light")
 
 
+def test_menu_disabled_items_have_distinct_text_style(qapp):
+    manager = ThemeManager(qapp)
+    manager.apply("light")
+
+    stylesheet = qapp.styleSheet()
+    assert "QMenu::item:disabled" in stylesheet
+    assert f"color: {LIGHT.text_disabled};" in stylesheet
+
+
 def test_main_window_toggle_applies_and_persists(qapp, monkeypatch):
     manager = get_theme_manager(qapp)
     manager.apply("light")

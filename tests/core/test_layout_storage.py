@@ -366,3 +366,75 @@ class TestAliasLayout:
         mgr.create_alias_layout("一级别名", "根布局", CanvasConfig())
         canvas = CanvasConfig()
         assert mgr.create_alias_layout("二级别名", "一级别名", canvas) is None
+
+
+class TestSceneLayoutRel:
+    """UI 靠这个路径解析场景坐标文件的来源层（system/remote/local）。
+
+    别名布局（带 extends）的 scene 文件实际存放在**根布局**目录下，照别名
+    名字拼路径会指向一个不存在的目录——调用方拿到的是"这个文件没有"的空
+    结果而不自知：场景编辑器的来源标识就因此在继承布局下少显示了一半。
+    """
+
+    def test_root_layout_uses_its_own_dir(self, env):
+        from lvjiang.core.layout_manager import scene_layout_rel
+        mgr = LayoutConfigManager()
+        mgr.save_layout(_make_layout("根布局"))
+        assert scene_layout_rel("根布局", "scene_a") == "layouts/根布局/scene_a.json"
+
+    def test_alias_layout_points_at_root_dir(self, env):
+        from lvjiang.core.layout_manager import scene_layout_rel
+        mgr = LayoutConfigManager()
+        mgr.save_layout(_make_layout("根布局"))
+        TestAliasLayout._add_alias_entry(
+            env, "别名布局", "根布局",
+            {"x_ratio": 0.0, "y_ratio": 0.0, "w_ratio": 0.5, "h_ratio": 0.6})
+        rel = scene_layout_rel("别名布局", "scene_a")
+        assert rel == "layouts/根布局/scene_a.json"
+        # 而且这个路径确实存在——空结果正是原来的 bug
+        assert (env / "system" / rel).exists()
+
+    def test_unknown_layout_falls_back_to_its_own_name(self, env):
+        """布局不存在时不该抛异常，退回按名字拼（调用方自会得到空来源）。"""
+        from lvjiang.core.layout_manager import scene_layout_rel
+        assert scene_layout_rel("没有的布局", "scene_a") == "layouts/没有的布局/scene_a.json"
+
+
+class TestSaveLayoutScope:
+    """写盘范围：空集不写任何场景，None 才是全量（新建/另存为用）。
+
+    UI 侧曾在「没有脏场景」时传 None，于是"什么都没改、随手点一下保存"
+    会把该布局全部场景写一遍——用户模式下即为每个场景生成 local 影子，
+    而实体文件是整文件影子，等于一次点击把整个布局永久冻在本地。
+    """
+
+    def _saved_scene_files(self, env, name="根布局") -> set[str]:
+        d = env / "system" / "layouts" / name
+        return {p.name for p in d.glob("*.json")} if d.is_dir() else set()
+
+    def test_empty_set_writes_no_scene(self, env):
+        mgr = LayoutConfigManager()
+        layout = _make_layout("根布局")
+        mgr.save_layout(layout)                      # 先全量落一次
+        before = self._saved_scene_files(env)
+        assert before, "预期首次保存会写出场景文件"
+
+        for path in (env / "system" / "layouts" / "根布局").glob("*.json"):
+            path.unlink()
+        mgr.save_layout(layout, changed_scenes=set())
+        assert self._saved_scene_files(env) == set()
+
+    def test_none_still_means_full_write(self, env):
+        """新建/另存为依赖 None 的全量语义，不能一起改掉。"""
+        mgr = LayoutConfigManager()
+        mgr.save_layout(_make_layout("根布局"), changed_scenes=None)
+        assert self._saved_scene_files(env)
+
+    def test_subset_writes_only_that_scene(self, env):
+        mgr = LayoutConfigManager()
+        layout = _make_layout("根布局")
+        mgr.save_layout(layout)
+        for path in (env / "system" / "layouts" / "根布局").glob("*.json"):
+            path.unlink()
+        mgr.save_layout(layout, changed_scenes={"scene_a"})
+        assert self._saved_scene_files(env) == {"scene_a.json"}

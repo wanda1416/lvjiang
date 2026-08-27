@@ -362,6 +362,8 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.canvas.on_panel_changed = lambda sk=scene_key: self._on_scene_data_changed(sk)
             tab.canvas.on_status_message = lambda msg: self._status_bar.showMessage(msg, 5000)
             tab.on_view_changed = self._on_tab_view_changed
+            # 布局名注入后才能解析该场景坐标文件的来源层（system/remote/local）
+            tab.set_layout_name(layout_name)
             # 回调设置完毕后显式刷新，重建表格并创建 checkbox
             tab._refresh_region_list()
             tab._refresh_point_list()

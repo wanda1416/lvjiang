@@ -1,12 +1,15 @@
-"""配置解析器 —— system/local 双层配置的唯一读写咽喉
+"""配置解析器 —— system/remote/local 多层配置的唯一读写咽喉
 
-三层目录职责：
+目录职责：
 - config/system  出厂默认（进 git，用户模式下只读）
+- config/remote  在线下发层（不进 git，见 core.config.remote）：只对实体
+  文件生效，且只在 content_version 严格新于 system 时才顶替 system
 - config/local   用户覆盖层：影子文件 + 键级 diff + 墓碑（目录结构镜像 system）
 - config/session 纯运行态（不经本模块，见 core.config.session.SessionStore）
 
-读语义（两模式一致）：恒为 local 覆盖 system 的合并视图。
-写语义（按模式路由）：开发模式写 system，用户模式写 local。
+读语义（两模式一致）：local > remote（版本更新才生效）> system。
+写语义（按模式路由）：开发模式写 system，用户模式写 local；
+**任何模式都不写 remote**——那层是下发下来的，本地改动一律落 local。
 
 模式判定：LVJIANG_DEV_MODE 环境变量（1/0）强制覆盖 > PROJECT_ROOT/.git 探测。
 
@@ -38,6 +41,7 @@ from __future__ import annotations
 
 import os
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -45,15 +49,41 @@ import yaml
 from loguru import logger
 
 from ... import constants
+from . import versioning
 
 # 层根目录：ConfigResolver 内部持有，外部经 ConfigResolver API 访问
 SYSTEM_CONFIG_DIR = constants.CONFIG_DIR / "system"
 LOCAL_CONFIG_DIR = constants.CONFIG_DIR / "local"
+REMOTE_CONFIG_DIR = constants.CONFIG_DIR / "remote"
+#: 在线配置的**暂存**层：本次会话下载的内容先落在这里，下次启动才提升为
+#: 生效层（见 core.config.remote.promote_pending / stage_dir_for）。
+#: 直接写生效层会让本次会话就读到新配置——工作流每次启动都会重新
+#: load_layout，而场景注册表只在启动时加载一次，于是出现半新半旧。
+REMOTE_STAGE_DIR = constants.CONFIG_DIR / "remote.staging"
 
 # 聚合 diff 中的删除键标记
 DELETED_KEY = "__deleted__"
 # 墓碑文件后缀
 TOMBSTONE_SUFFIX = ".deleted"
+
+#: 实体来源层标识（见 ConfigResolver.describe_entity）。展示用的中文标签留给
+#: UI 层做 i18n，core 只给稳定的 key。
+LAYER_LOCAL = "local"
+LAYER_REMOTE = "remote"
+LAYER_SYSTEM = "system"
+
+
+@dataclass(frozen=True)
+class EntityOrigin:
+    """某个实体文件实际生效的来源层与内容版本。
+
+    ``layer`` 为空串表示该实体不存在（或被墓碑遮住）；``version`` 为 None
+    表示这一层的文件没有 content_version（未参与在线下发的类型都是如此）。
+    """
+
+    layer: str
+    version: int | None
+
 
 class SystemContentProtected(PermissionError):
     """试图在用户模式下删除 system 层内容
@@ -321,10 +351,13 @@ def compute_diff(base: dict, desired: dict,
 # ─── 解析器 ──────────────────────────────────────────────
 
 class ConfigResolver:
-    """system/local 双层配置解析器
+    """system/remote/local 三层配置解析器
 
     不带参构造时各层根目录动态取自 constants（monkeypatch 友好）；
     测试可显式传入 tmp_path 与 dev_mode 构造隔离实例。
+
+    remote 层只对**实体文件**生效，且只在版本更新时顶替 system，
+    见 :meth:`resolve_read`。聚合键值文件（app.yaml 等）不走 remote。
     """
 
     def __init__(
@@ -332,11 +365,15 @@ class ConfigResolver:
         system_dir: Path | str | None = None,
         local_dir: Path | str | None = None,
         dev_mode: bool | None = None,
+        remote_dir: Path | str | None = None,
     ):
         self._system_dir = Path(system_dir) if system_dir else None
         self._local_dir = Path(local_dir) if local_dir else None
+        self._remote_dir = Path(remote_dir) if remote_dir else None
         self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
         self._listeners: list[Callable[[str], None]] = []
+        #: 已记过「远端顶替出厂」日志的 (rel_path, 远端版本)，见 _log_supersede
+        self._logged_supersedes: set[tuple[str, int]] = set()
 
     @staticmethod
     def _compute_dev_mode() -> bool:
@@ -361,6 +398,12 @@ class ConfigResolver:
         if self._local_dir is not None:
             return self._local_dir
         return LOCAL_CONFIG_DIR
+
+    @property
+    def remote_dir(self) -> Path:
+        if self._remote_dir is not None:
+            return self._remote_dir
+        return REMOTE_CONFIG_DIR
 
     def is_dev_mode(self) -> bool:
         """开发模式（写 system）or 用户模式（写 local）
@@ -398,18 +441,112 @@ class ConfigResolver:
     def _tombstone(self, rel_path: str) -> Path:
         return self.local_dir / (rel_path + TOMBSTONE_SUFFIX)
 
+    def remote_supersedes(self, rel_path: str) -> bool:
+        """remote 层该文件是否该顶替 system —— 版本更新才算数。
+
+        **不是「remote 优先」**：用户升了 App，system 带来 v5 的场景坐标，
+        而远端还停在给旧版本热修的 v3，无脑覆盖会把配置静默回退成旧的，
+        没有报错，只表现为"识别又坏了"。所以恒要求 remote 严格新于 system。
+
+        三道闸门，任一不过就用 system：
+        1. 该路径参与在线下发（versioning 注册表里声明过）
+        2. system 侧版本号可读——**缺失即拒绝**（fail-safe，见 versioning
+           模块文档）；system 没有该文件时只有声明了 allow_remote_new 的
+           目录才接受远端新增
+        3. remote 侧版本号可读且严格大于 system
+        """
+        spec = versioning.spec_for(rel_path)
+        if spec is None:
+            return False
+        remote = self.remote_dir / rel_path
+        if not remote.exists():
+            return False
+        remote_version = versioning.read_version(remote)
+        if remote_version is None:
+            logger.warning(f"remote 配置缺 content_version，已忽略: {rel_path}")
+            return False
+
+        system = self.system_dir / rel_path
+        if not system.exists():
+            # 出厂没有这个文件 = 远端新增。只有明确允许的目录才接受，
+            # 否则远端凭空多出的场景/布局是死的（没在 scenes.yaml 登记）。
+            if not spec.allow_remote_new:
+                logger.warning(
+                    f"remote 下发了出厂不存在的文件，该目录未允许新增，已忽略: "
+                    f"{rel_path}")
+                return False
+            self._log_supersede(rel_path, None, remote_version)
+            return True
+
+        system_version = versioning.read_version(system)
+        if system_version is None:
+            logger.warning(
+                f"出厂配置缺 content_version，拒绝 remote 替换: {rel_path}")
+            return False
+        if remote_version <= system_version:
+            return False
+        self._log_supersede(rel_path, system_version, remote_version)
+        return True
+
+    def _log_supersede(self, rel_path: str, system_version: int | None,
+                       remote_version: int) -> None:
+        """远端顶替出厂时记一条，同一文件同一版本只记一次。
+
+        没有这条日志，远端配置生效是**完全静默**的：开发者本地跑出来的行为
+        和用户不一样却毫不知情，用户报"识别坏了"时根本复现不出来——而这
+        恰恰是在线下发最需要被排查的一类问题。
+
+        去重是必须的：resolve_read 是热路径，enumerate_entities 还会对整个
+        目录逐个调用，不去重会刷屏到没人看日志。
+        """
+        token = (rel_path, remote_version)
+        if token in self._logged_supersedes:
+            return
+        self._logged_supersedes.add(token)
+        origin = "出厂无此文件" if system_version is None else f"出厂 v{system_version}"
+        logger.info(f"[在线配置] 生效：{rel_path}（{origin} → 远端 v{remote_version}）")
+
     def resolve_read(self, rel_path: str) -> Path | None:
-        """实体读解析：local 影子优先 → system；墓碑返回 None"""
+        """实体读解析：local 影子 → remote（版本更新才生效）→ system
+
+        墓碑返回 None。local 恒为最高优先级——用户自己改过的东西，
+        任何在线下发都不该盖掉。
+        """
         if self._tombstone(rel_path).exists():
             return None
         local = self.local_dir / rel_path
         if local.exists():
             return local
+        if self.remote_supersedes(rel_path):
+            return self.remote_dir / rel_path
         system = self.system_dir / rel_path
         return system if system.exists() else None
 
+    def describe_entity(self, rel_path: str) -> EntityOrigin:
+        """这个实体实际来自哪一层、版本多少——供编辑器把来源显示给人看。
+
+        日志只在文件第一次被顶替时留一条，人不会盯着日志编辑配置；编辑器
+        里直接标出「来源 / 版本号」，才是开发者与用户都能随时"意识到"自己
+        正在看哪一份的办法。
+        """
+        path = self.resolve_read(rel_path)
+        if path is None:
+            return EntityOrigin(layer="", version=None)
+        if path == self.local_dir / rel_path:
+            layer = LAYER_LOCAL
+        elif path == self.remote_dir / rel_path:
+            layer = LAYER_REMOTE
+        else:
+            layer = LAYER_SYSTEM
+        return EntityOrigin(layer=layer, version=versioning.read_version(path))
+
     def enumerate_entities(self, rel_dir: str, pattern: str) -> list[str]:
-        """枚举实体文件名：system ∪ local 并集，剔除墓碑，跳过 _ 前缀
+        """枚举实体文件名：system ∪ local ∪ remote 并集，剔除墓碑，跳过 _ 前缀
+
+        remote 侧只有通过 :meth:`remote_supersedes` 闸门的文件才计入——
+        否则远端一份版本更旧、或落在不允许新增的目录里的文件，会在编辑器
+        列表里冒出来却永远读不到（resolve_read 会解析回 system），
+        列表和实际内容对不上比少一个条目更难查。
 
         Returns:
             排序后的文件名列表（不含目录），local 遮盖同名天然成立。
@@ -422,28 +559,112 @@ class ConfigResolver:
             for p in base.glob(pattern):
                 if p.is_file() and not p.name.startswith("_"):
                     names.add(p.name)
+        remote_base = self.remote_dir / rel_dir if rel_dir else self.remote_dir
+        if remote_base.is_dir():
+            for p in remote_base.glob(pattern):
+                if not p.is_file() or p.name.startswith("_"):
+                    continue
+                rel = f"{rel_dir}/{p.name}" if rel_dir else p.name
+                if self.remote_supersedes(rel):
+                    names.add(p.name)
         alive = [n for n in sorted(names)
                  if not self._tombstone(f"{rel_dir}/{n}" if rel_dir else n).exists()]
         return alive
 
     def write_entity(self, rel_path: str, data: str | bytes) -> Path:
-        """按模式写实体文件（开发→system，用户→local 影子并清同名墓碑）"""
+        """按模式写实体文件（开发→system，用户→local 影子并清同名墓碑）
+
+        开发模式写 system 且该路径参与在线下发（见 core.config.versioning）
+        时，落盘前自动把 content_version +1——这三类文件全是 UI 编辑器写
+        出来的，手写的版本号存一次就没了，靠人记着改必然漏。内容没变则
+        保持原号，避免"打开编辑器又原样关掉"也推高版本。
+
+        用户模式写 local 不动版本号：版本号是 system 与 remote 之间的仲裁
+        依据，local 影子恒为最高优先级，不参与比较。
+
+        远端正顶替这个文件时，新版本号以**远端那份**为下限——开发者在编辑器
+        里看到的就是远端内容，拿出厂版本做基线会写出一个与线上同号但不同
+        内容的文件，见 versioning.next_version_for_write 的 floor_version。
+        """
         root = self.system_dir if self.is_dev_mode() else self.local_dir
         target = root / rel_path
+        if isinstance(data, str) and self.is_dev_mode() \
+                and versioning.spec_for(rel_path) is not None:
+            floor = None
+            if self.remote_supersedes(rel_path):
+                floor = versioning.read_version(self.remote_dir / rel_path)
+            data = versioning.next_version_for_write(
+                rel_path, data, target, floor_version=floor)
+
+        tomb = self._tombstone(rel_path)
+        if not tomb.exists() and self._write_is_noop(rel_path, target, data):
+            # 内容与「不写的话会读到的那一份」完全一致 —— 不落盘。
+            #
+            # 用户模式下这一步尤其要紧：照写会给一个其实没改过的文件生成
+            # local 影子，而实体文件是**整文件影子**（local 有就完全顶掉
+            # system/remote，不合并），于是这个文件从此收不到任何出厂更新
+            # 与在线下发。场景编辑器里"什么都没改、随手点一下保存"就会
+            # 把整个布局的场景全冻住，代价与操作的随意程度完全不匹配。
+            #
+            # 有墓碑时不能走这条：那说明该实体当前被隐藏着，必须真写一次
+            # 才能连带把墓碑清掉。
+            return target
+
         target.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(data, bytes):
             target.write_bytes(data)
         else:
             target.write_text(data, encoding="utf-8")
-        tomb = self._tombstone(rel_path)
         if tomb.exists():
             tomb.unlink()
         self._notify(rel_path)
         return target
 
+    def _write_is_noop(self, rel_path: str, target: Path,
+                       data: str | bytes) -> bool:
+        """写下去会不会改变「读到的内容」——不会就没必要落盘。
+
+        分两种情形，都要求结果与写之后严格一致，宁可多写不可错判：
+
+        1. 目标文件已存在：与它比对，相同即纯粹的空操作。
+        2. 目标文件不存在：只有**用户模式**才比较——此时目标是 local 影子，
+           跳过写入后 resolve_read 仍会解析到当前那一层（system 或 remote），
+           内容一致则读到的东西不变。开发模式不能这样判：目标是 system，
+           而 resolve_read 可能解析到 local 影子，拿它比对会把"作者要新建
+           出厂文件"这件事误判成空操作。
+
+        文本一律用 ``read_text`` 比对，**不能逐字节比**：``write_text`` 在
+        Windows 上会把 ``\\n`` 换成 ``\\r\\n`` 落盘，拿入参的 ``\\n`` 去和盘上的
+        ``\\r\\n`` 比永远不相等，空操作检测会整个失效——本函数要防的"随手点
+        一下保存就把整个布局冻成 local 影子"在 Windows 上照旧发生。
+        ``read_text`` 的通用换行会把两侧都归一到 ``\\n``，与 ``write_text``
+        的转换恰好对称。二进制（参考图等）不涉及换行转换，仍逐字节比。
+        """
+        def _same(path: Path) -> bool:
+            try:
+                if isinstance(data, bytes):
+                    return path.read_bytes() == data
+                return path.read_text(encoding="utf-8") == data
+            except (OSError, UnicodeDecodeError):
+                return False
+
+        if target.exists():
+            return _same(target)
+        if self.is_dev_mode():
+            return False
+        current = self.resolve_read(rel_path)
+        return _same(current) if current is not None else False
+
     def is_system_entity(self, rel_path: str) -> bool:
-        """该实体是否由 system 层提供（供 UI 判断能否删除/重命名）"""
-        return (self.system_dir / rel_path).exists()
+        """该实体是否属于出厂内容（供 UI 判断能否删除/重命名）
+
+        远端下发的实体同样算出厂内容——它也是作者提供的、用户没写过的东西，
+        「出厂内容不允许用户删除」这条约定对它一样成立（见本模块「删除：
+        默认禁止」相关文档）。否则远端新增的调律规则会变成用户可删，
+        删掉之后下次同步又回来，行为莫名其妙。
+        """
+        return ((self.system_dir / rel_path).exists()
+                or self.remote_supersedes(rel_path))
 
     def ensure_entity_deletable(self, rel_path: str) -> None:
         """在删除或重命名实体前校验当前身份是否有权限。
@@ -517,14 +738,19 @@ class ConfigResolver:
         键也不会被删掉，只记 warning。这既挡住「调用方只传部分文档」的误删，
         也贯彻「不允许用户删除出厂内容」的产品约定。
         """
+        def _dump(doc: dict) -> str:
+            return yaml.dump(doc, allow_unicode=True,
+                             default_flow_style=False, sort_keys=False)
+
         if self.is_dev_mode():
             target = self.system_dir / rel_path
+            text = _dump(full_doc)
+            # 内容没变就不落盘：反复重写只会刷 mtime，还会把整份文件卷进
+            # git diff（布局那批 JSON 就这么产生过一次上千行的无意义改动）。
+            if target.exists() and target.read_text(encoding="utf-8") == text:
+                return
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(
-                yaml.dump(full_doc, allow_unicode=True,
-                          default_flow_style=False, sort_keys=False),
-                encoding="utf-8",
-            )
+            target.write_text(text, encoding="utf-8")
         else:
             base = self._load_yaml(self.system_dir / rel_path)
             diff = compute_diff(
@@ -533,14 +759,16 @@ class ConfigResolver:
                 protected=PROTECTED_LIST_PATHS.get(rel_path, {}))
             overlay_path = self.local_dir / rel_path
             if diff:
+                text = _dump(diff)
+                if (overlay_path.exists()
+                        and overlay_path.read_text(encoding="utf-8") == text):
+                    return
                 overlay_path.parent.mkdir(parents=True, exist_ok=True)
-                overlay_path.write_text(
-                    yaml.dump(diff, allow_unicode=True,
-                              default_flow_style=False, sort_keys=False),
-                    encoding="utf-8",
-                )
+                overlay_path.write_text(text, encoding="utf-8")
             elif overlay_path.exists():
                 overlay_path.unlink()
+            else:
+                return  # 本来就没有覆盖层，也不需要建
         self._notify(rel_path)
 
 

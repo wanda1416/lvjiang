@@ -1,11 +1,15 @@
-"""启动检查链混入类 - 公告 → 版本更新 → 匿名统计同意 → 统计上报
+"""启动检查链混入类 - 公告 → 版本更新 → 匿名统计同意 → 统计上报 + 在线配置
 
-四步串行，顺序是有意的：前三步都是模态对话框，只能一个接一个弹；
+前四步串行，顺序是有意的：前三步都是模态对话框，只能一个接一个弹；
 上报排在最后是因为它没有 UI，不该拖慢前面弹窗的展示时机。每一步无论
 成功还是失败都必须推进下一步，任何一环的网络故障都不能卡住启动流程。
 
-各 checker/reporter 都要挂在 self 上防止被 GC（Qt 对象的 Python 端引用
-一旦释放，底层线程还没跑完就会被回收）。
+在线配置同步和统计上报一样没有 UI，也放在链尾；两者互不依赖，各自起线程
+即可，不必再串一层。它拉下来的配置**下次启动才生效**（不热切换），
+理由见 `core/config/remote.py`。
+
+各 checker/reporter/syncer 都要挂在 self 上防止被 GC（Qt 对象的 Python 端
+引用一旦释放，底层线程还没跑完就会被回收）。
 
 依赖主类提供：QMainWindow 自身（作为各对话框的 parent）。
 """
@@ -89,6 +93,35 @@ class StartupOpsMixin:
         from ..notices.telemetry_consent_dialog import maybe_prompt_and_record
         maybe_prompt_and_record(self)
         self._start_telemetry_report_on_startup()
+        self._start_remote_config_sync_on_startup()
+
+    def _start_remote_config_sync_on_startup(self):
+        """启动期拉取在线配置（无 UI，失败静默）。
+
+        job 在主线程构造、状态回写在主线程的槽里做——worker 线程绝对不能
+        写 SessionStore，见 core/remote_config_sync.py 模块 docstring。
+
+        拉下来的配置**不热切换**：下载落在暂存层（``config/remote.staging/``），
+        由 ``__main__`` 在下次启动早期经 ``promote_pending()`` 提升为生效层。
+        光靠约定做不到这点——工作流每次启动都会重新 ``load_layout()``
+        （见 run_control.py），会立刻读到写进生效层的新布局，而场景注册表
+        只在进程启动时加载一次，半新半旧配在一起出的问题极难查。
+        """
+        from ...core.config.remote import apply_outcome
+        from ...core.remote_config_sync import RemoteConfigSyncer
+
+        syncer = RemoteConfigSyncer(self)
+
+        def on_finished_ok(result):
+            apply_outcome(result)
+
+        def on_failed(_message: str):
+            pass  # 静默：拿不到在线配置就用出厂配置，本来就是可用状态
+
+        syncer.finished_ok.connect(on_finished_ok)
+        syncer.failed.connect(on_failed)
+        syncer.start()
+        self._startup_remote_config_syncer = syncer  # 防止被 GC
 
     def _start_telemetry_report_on_startup(self):
         """启动期的统计上报：心跳（若今天还没发过）+ 积压的调律批次。

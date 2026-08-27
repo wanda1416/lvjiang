@@ -208,8 +208,15 @@ class LayoutOpsMixin:
             self._current_layout.set_scene_points(scene_key, tab.get_points())
             self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
             self._current_layout.set_scene_panels(scene_key, tab.get_panels())
-        # 增量写盘：只写变更的场景文件
-        changed = set(self._dirty_scenes) if self._dirty_scenes else None
+        # 增量写盘：只写变更的场景文件。
+        #
+        # 恒传集合，**不能在没有脏场景时传 None** —— save_layout 的 None 是
+        # 「全量写盘」语义（供新建/另存为用）。保存按钮不受 dirty 状态控制，
+        # 于是"什么都没改、随手点一下保存"会把该布局的全部场景写一遍；
+        # 用户模式下那就是给每个场景生成 local 影子，而实体文件是整文件
+        # 影子（local 有就完全顶掉出厂与在线下发，不合并），等于一次点击
+        # 把整个布局永久冻住。
+        changed = set(self._dirty_scenes)
         if not self._manager.save_layout(self._current_layout, changed_scenes=changed):
             self._status_bar.showMessage(f"保存布局「{name}」失败，请检查日志")
             return
@@ -218,12 +225,17 @@ class LayoutOpsMixin:
         total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
         total_a = sum(len(tab.get_arrows()) for tab in self._tabs.values())
         total_pn = sum(len(tab.get_panels()) for tab in self._tabs.values())
-        saved_info = f"{len(changed)} 个场景" if changed else tr("全部")
+        # changed 恒为集合；空集表示没有场景需要写盘（画布/描述等布局级
+        # 改动仍会经 layouts.yaml 落盘），不再是"全部"的意思。
+        saved_info = f"{len(changed)} 个场景" if changed else tr("无场景改动")
         self._status_bar.showMessage(
             f"已保存布局「{name}」（{saved_info}），"
             f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
         )
         self._mark_all_scenes_clean()
+        # 开发模式保存会 bump content_version，标识要跟着变，否则显示的是旧号
+        for tab in self._tabs.values():
+            tab._refresh_origin_label()
         logger.info(
             f"布局已保存: {name} ({saved_info}), "
             f"{total_r} 区域 / {total_p} 坐标 / {total_a} 方向 / {total_pn} 面板"

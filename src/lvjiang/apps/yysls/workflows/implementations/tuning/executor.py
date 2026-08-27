@@ -171,8 +171,10 @@ class TuningExecutor:
         self.round_food_reason = ""
         self.round_food_refunded = False  # 重置返还标记
         add_scan = wf.ocr_scene(wf.TUNE_SCENE, ["auto_add", "auto_add_2"])
-        can_add = tr("添加") in add_scan.get("auto_add", "")
-        if tr("添加") in add_scan.get("auto_add_2", ""):
+        # "添加" 匹配的是游戏截屏 OCR 结果，恒为中文，不能过 tr()
+        # （英文界面下会拿翻译后的英文去匹配中文截屏，永远匹配不上）。
+        can_add = "添加" in add_scan.get("auto_add", "")
+        if "添加" in add_scan.get("auto_add_2", ""):
             wf.click_region(wf.TUNE_SCENE, "expand")
             wf.wait_stable("page_refresh")  # 展开添加面板
             can_add = True
@@ -395,7 +397,8 @@ class TuningExecutor:
                 wf.wait_stable("page_refresh")  # 重试时等按钮就绪
             btn = wf.ocr_scene(wf.TUNE_SCENE, ["tune_btn"]).get(
                 "tune_btn", "") or ""
-            if tr("调律") in btn:
+            # btn 是游戏截屏 OCR 结果，恒为中文，不能过 tr()（同上）。
+            if "调律" in btn:
                 return True
         reason = (f"一键添加后「调律」按钮未就绪"
                   f"（OCR: {btn or tr('空')}），疑似材料不足")

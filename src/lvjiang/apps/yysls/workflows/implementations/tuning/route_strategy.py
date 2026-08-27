@@ -16,8 +16,6 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
     SubcallEnginePort,
 )
 
-from ......i18n import tr
-
 _NAV_FILE = "subcall/navigation.wf"
 
 
@@ -95,10 +93,13 @@ class AndroidTuningRouteStrategy(TuningRouteStrategy):
         wf = self._wf
         wf.click_region(wf.EQUIP_DETAIL, "more_func")
         wf.wait_stable("page_refresh")
+        # "回收" 是要在游戏截屏 OCR 结果里找的按钮文字，恒为中文，
+        # 不能过 tr()（英文界面下会拿翻译后的英文去匹配中文截屏，
+        # 永远匹配不上，回收功能会在英文界面下完全失效）。
         key = wf.ocr_scene_by(
             wf.EQUIP_DETAIL,
             ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
-            tr("回收"), "contains")
+            "回收", "contains")
         if not key:
             logger.warning("未找到回收按钮，装备保留")
             wf.click_region(wf.EQUIP_DETAIL, "more_func")
@@ -120,7 +121,8 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
     def open_recycle_dialog(self) -> bool:
         # 直接扫描功能区找「回收」→ 按 X 回收
         wf = self._wf
-        key = wf.ocr_scene_by(wf.EQUIP_DETAIL, ["func_area"], tr("回收"), "contains")
+        # 同上：匹配游戏截屏 OCR 文字，不能过 tr()
+        key = wf.ocr_scene_by(wf.EQUIP_DETAIL, ["func_area"], "回收", "contains")
         if not key:
             logger.warning("桌面端：未找到回收按钮，装备保留")
             return False

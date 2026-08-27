@@ -74,7 +74,10 @@ class TuningResetter:
         check_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_check"]).get(
             "reset_check", ""
         ) or ""
-        if tr("可重置") not in check_text:
+        # "可重置" 匹配的是游戏截屏 OCR 出来的文字，游戏本身只有中文，
+        # 不随本软件界面语言变化，这里绝不能过 tr()（会在英文界面下
+        # 拿翻译后的英文去匹配中文截屏，永远匹配不上）。
+        if "可重置" not in check_text:
             logger.info(
                 "  冷却期检查未通过（reset_check={!r}），装备在冷却期，降级跳过",
                 check_text,
@@ -131,10 +134,13 @@ class TuningResetter:
 
     @staticmethod
     def parse_material_count(text: str) -> int | None:
-        """解析「持有 N」；缺少“持有”返回 None，缺少数字返回 0。"""
-        if tr("持有") not in text:
+        """解析「持有 N」；缺少“持有”返回 None，缺少数字返回 0。
+
+        text 是游戏截屏 OCR 结果，恒为中文，不能过 tr()（同上）。
+        """
+        if "持有" not in text:
             return None
-        match = re.search(tr(r"持有\s*(\d+)"), text)
+        match = re.search(r"持有\s*(\d+)", text)
         return int(match.group(1)) if match else 0
 
     def _close_dialog(self) -> None:

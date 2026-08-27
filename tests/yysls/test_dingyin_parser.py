@@ -48,6 +48,18 @@ class TestCandidates:
         assert "千机索天重击增伤" in names
         assert len(names) == 60
 
+    def test_full_pool_survives_translation(self, dp, monkeypatch):
+        """_DINGYIN_CATEGORIES 查的是 attributes.yaml 里的分类 key（裸中文
+        游戏配置数据），不能过 tr()——一旦被翻译，候选池会在英文界面下
+        整个查不到任何别名，定音解析全灭。"""
+        import lvjiang.i18n as i18n
+        monkeypatch.setattr(i18n, "_current_language", "en_US")
+        monkeypatch.setattr(i18n, "_translations", {
+            "外功增益": "EXT_BONUS", "属攻增益": "ELEM_BONUS",
+            "指定技能增效": "SKILL_BONUS",
+        })
+        assert len(set(dp._candidates())) == 60
+
 
 # ─── 解析 ─────────────────────────────────────────────────
 

@@ -10,8 +10,6 @@ from loguru import logger
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 from lvjiang.apps.yysls.core.tuning_rules import BEHAVIOR_STAGE_LABELS
 
-from ......i18n import tr
-
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
         TuningRouteStrategy,
@@ -72,7 +70,9 @@ class TuningRecycler:
         # 装备锁定检测：确认弹窗内应含「确认」，否则装备被锁定
         confirm_text = wf.ocr_scene(wf.EQUIP_DETAIL,
                                     ["recycle_confirm"]).get("recycle_confirm", "") or ""
-        if tr("确认") not in confirm_text:
+        # confirm_text 是游戏截屏 OCR 结果，恒为中文，不能过 tr()
+        # （英文界面下会拿翻译后的英文去匹配中文截屏，永远匹配不上）。
+        if "确认" not in confirm_text:
             logger.warning(f"  回收确认弹窗未识别到「确认」"
                            f"（recycle_confirm={confirm_text!r}），"
                            f"装备被锁定，保留")

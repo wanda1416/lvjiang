@@ -136,7 +136,7 @@ def select_role($role_index, $role, $batch_state)
     # 错误要拖到 login_to_main_page 才以「无法确认已登录至主页」暴露，对不上因。
     # 故每点一次等一拍，以「进入游戏」是否出现为判据，最多重试 3 次。
     eval $role_page = 0
-    loop 3
+    loop 5
         click [game_login_page].[switch_role]
         wait @page_refresh
 

@@ -13,7 +13,7 @@
 | [01-basics.md](01-basics.md) | 词法与值、引用模型、变量系统、表达式 |
 | [02-concepts.md](02-concepts.md) | 场景（Scene）、布局（Layout）、Area/Action、Panel |
 | [03-interaction.md](03-interaction.md) | 交互指令概览：指令分类、隐藏延迟共性、press 状态管理 |
-| [03.1-basic-commands.md](03.1-basic-commands.md) | 基础指令：collect、eval、call、log |
+| [03.1-basic-commands.md](03.1-basic-commands.md) | 基础指令：collect、eval、default、call、log |
 | [03.2-interaction.md](03.2-interaction.md) | 时间与辅助：wait、wait stable、align、screenshot |
 | [03.3-mouse.md](03.3-mouse.md) | 鼠标操作：click、drag、后缀等待子句、隐藏延迟 |
 | [03.4-keyboard.md](03.4-keyboard.md) | 键盘输入：press 四种模式、KeyStateRegistry、键名表 |
@@ -21,7 +21,10 @@
 | [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
 | [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |
 | [04.3-find.md](04.3-find.md) | find — 文字坐标定位 / 模板定位（by image） |
-| [05-control-flow.md](05-control-flow.md) | 控制流：if/for/loop/try/return/goto、条件表达式 |
+| [05-control-flow.md](05-control-flow.md) | 控制流概览与指令总表 |
+| [05.1-loops-branches.md](05.1-loops-branches.md) | 分支与循环：if、for、loop、break、continue |
+| [05.2-flow-jumps.md](05.2-flow-jumps.md) | 异常与跳转：try/catch、return、label/goto |
+| [05.3-conditions.md](05.3-conditions.md) | 条件表达式：基础条件、组合条件、算术比较 |
 | [06-functions.md](06-functions.md) | 内置函数总览与速查表 |
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术、字典/列表、字符串 |
 | [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数 |

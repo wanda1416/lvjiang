@@ -29,6 +29,7 @@ from ....core.combat.combat_attrs import (
     compute_gongjue_attrs,
     format_value,
 )
+from ...events import get_event_hub
 from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from ...profile.tab import add_user_nav_buttons
 from .cards import CombatCardsMixin
@@ -249,11 +250,11 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         layout.addWidget(scroll, stretch=1)
 
         # 订阅装备变更信号（装备数据 Tab 中穿戴/卸下装备时触发）
-        self._host.equipment_changed.connect(self._on_equipment_changed)
+        get_event_hub(self._host).equipment_changed.connect(self._on_equipment_changed)
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
         self._host.user_changed.connect(self._on_user_changed)
         # 订阅工作流请求打开"创建基础属性"面板并预填数值
-        self._host.open_play_style_form.connect(self._on_open_play_style_form)
+        get_event_hub(self._host).open_play_style_form.connect(self._on_open_play_style_form)
 
 
     # ── 数据加载 ──────────────────────────────────────────────

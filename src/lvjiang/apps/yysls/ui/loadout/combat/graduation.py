@@ -13,6 +13,7 @@ from loguru import logger
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 from ....core.combat.combat_attrs import CombatAttributes
+from ...events import GRADUATION_UPDATED, get_event_hub
 
 
 @dataclass(frozen=True)
@@ -81,7 +82,7 @@ class CombatGraduationMixin:
     - self._get_current_gongjue() -> str
     - self._get_base_attrs() -> CombatAttributes
 
-    计算结果通过 host.graduation_updated 信号向上传递，
+    计算结果通过 yysls 事件适配器向上传递，
     由 LoadoutPanel 统一存储和分发。
     """
 
@@ -95,7 +96,7 @@ class CombatGraduationMixin:
         user_name = self._host.active_user_name() or ""
         if not school or not scheme or not user_name:
             self._pending_graduation = None
-            self._host.graduation_updated.emit(None)
+            get_event_hub(self._host).publish(GRADUATION_UPDATED, None)
             return
 
         attrs_snapshot = CombatAttributes.from_dict(combat_attrs.to_dict())
@@ -136,10 +137,10 @@ class CombatGraduationMixin:
             return
         if error is not None:
             logger.error(f"毕业率计算失败: {error}")
-            self._host.graduation_updated.emit(None)
+            get_event_hub(self._host).publish(GRADUATION_UPDATED, None)
             return
         # 结果通过信号向上传递给 LoadoutPanel
-        self._host.graduation_updated.emit(result)
+        get_event_hub(self._host).publish(GRADUATION_UPDATED, result)
 
     def get_graduation_context(self) -> GraduationContext | None:
         """返回当前流派/方案及不含装备的基础属性公共快照。

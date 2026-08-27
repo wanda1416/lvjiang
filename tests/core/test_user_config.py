@@ -1,11 +1,11 @@
 """用户配置加载链与保存函数测试
 
 覆盖链路：
-- 代码默认值 ← session.json（settings 及其 material_grid 子节点）
+- 代码默认值 ← session.json（settings 及其 reference_grid 子节点）
 - 代码默认值 ← app.yaml（input_simulation/delay_params，经 core.config 合并）
 
 保存函数：
-- save_settings / save_material_grid（读改写 session.json 的 settings 节点，各自保留对方字段）
+- save_settings / save_reference_grid（读改写 session.json 的 settings 节点，各自保留对方字段）
 - save_app_config（经 core.config 写入 app.yaml）
 """
 
@@ -16,7 +16,7 @@ import pytest
 from lvjiang.core.config import (
     load_user_config,
     save_app_config,
-    save_material_grid,
+    save_reference_grid,
     save_settings,
 )
 from lvjiang.core.config.session import reset_session_store
@@ -44,10 +44,10 @@ class TestLoadUserConfig:
         assert config.android_input_method == "adb"
         assert config.desktop_background_input is True
         assert config.desktop_window_title == ""
-        assert config.material_grid.rows == 3
-        assert config.material_grid.cols == 6
-        assert config.material_grid.height == 122
-        assert config.material_grid.width == 122
+        assert config.reference_grid.rows == 3
+        assert config.reference_grid.cols == 6
+        assert config.reference_grid.height == 122
+        assert config.reference_grid.width == 122
         assert config.input_sim.click_random_offset == 3
         assert config.delay_params == {}
 
@@ -108,8 +108,8 @@ class TestLoadUserConfig:
         assert config.theme == "dark"
         assert config.desktop_background_input is True  # 未配置项保持默认
 
-    def test_session_material_grid_override(self, session_env, monkeypatch):
-        """session.json 的 settings.material_grid 节点覆盖网格常量"""
+    def test_legacy_material_grid_override_migrates_on_read(self, session_env, monkeypatch):
+        """旧 settings.material_grid 仍能覆盖参考图网格常量。"""
         monkeypatch.setattr(
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
@@ -117,10 +117,10 @@ class TestLoadUserConfig:
         }), encoding="utf-8")
         reset_session_store()
         config = load_user_config()
-        assert config.material_grid.rows == 4
-        assert config.material_grid.cols == 5
-        assert config.material_grid.height == 100
-        assert config.material_grid.width == 122  # 未配置项保持默认
+        assert config.reference_grid.rows == 4
+        assert config.reference_grid.cols == 5
+        assert config.reference_grid.height == 100
+        assert config.reference_grid.width == 122  # 未配置项保持默认
 
     def test_app_yaml_input_sim_override(self, session_env, monkeypatch):
         """app.yaml 的 input_simulation 节点覆盖输入模拟默认值"""
@@ -163,12 +163,12 @@ class TestSaveSessionNodes:
         assert data["active_user"] == "张三"
         assert data["ui_state"] == {"a": 1}
 
-    def test_save_material_grid_creates_file(self, session_env):
-        """文件不存在时 save_material_grid 自动创建"""
+    def test_save_reference_grid_creates_file(self, session_env):
+        """文件不存在时 save_reference_grid 自动创建"""
         grid = {"rows": 2, "cols": 3, "gap": 1, "height": 80, "width": 90}
-        save_material_grid(grid)
+        save_reference_grid(grid)
         data = json.loads(session_env.read_text(encoding="utf-8"))
-        assert data == {"settings": {"material_grid": grid}}
+        assert data == {"settings": {"reference_grid": grid}}
 
 
 class TestSaveAppConfig:

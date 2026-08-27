@@ -15,9 +15,7 @@ from lvjiang.apps.yysls.ui.loadout.combat.layout_strategies import (
 
 class Host(QWidget):
     user_changed = pyqtSignal(str)
-    equipment_changed = pyqtSignal()
-    graduation_updated = pyqtSignal(object)
-    open_play_style_form = pyqtSignal(dict)
+    app_event = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()

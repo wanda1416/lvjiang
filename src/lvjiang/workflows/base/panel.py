@@ -164,16 +164,6 @@ class _PanelMixin:
         self._input.click_screen(sx, sy, f"panel({scene_key}.{panel_key}[{row}][{col}])")
         return True
 
-    def scan_panel(self, scene_key: str, panel_key: str, row: int, col: int,
-                   detail_scene: str, fields: list[str]) -> dict:
-        """点击格子后 OCR 详情场景，返回解析后的装备 dict（空则返回 {}）"""
-        if not self.click_panel(scene_key, panel_key, row, col):
-            return {}
-        raw = self.ocr_scene(detail_scene, fields)
-        if not raw:
-            return {}
-        return self.call_function("to_equipment", [raw])
-
     def drag_grid(self, scene_key: str, panel_key: str, direction: str,
                   distance: float = 1.0, hold: float | None = None):
         """按 panel 中心执行 grid 级拖拽（滚动），drag 后自动失效缓存"""

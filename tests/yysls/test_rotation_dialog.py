@@ -164,9 +164,7 @@ class TestEntryPoint:
 
         class Host(QWidget):
             user_changed = pyqtSignal(str)
-            equipment_changed = pyqtSignal()
-            graduation_updated = pyqtSignal(object)
-            open_play_style_form = pyqtSignal(dict)
+            app_event = pyqtSignal(object)
 
             def __init__(self):
                 super().__init__()

@@ -41,7 +41,7 @@ class TuningExecutor:
         self._stone_check_waived = False
         self._tune_ready_waived = False
         self._material_cache: dict | None = None
-        self._food_count_overrides: dict[str, int] = {}  # 狗粮数量覆盖（MaterialInfo.count 只读）
+        self._food_count_overrides: dict[str, int] = {}
 
     def reset_state(self):
         """每次 run 开始时重置运行期状态"""
@@ -61,9 +61,14 @@ class TuningExecutor:
         wf = self._wf
         settings = wf.base_group.materials
         if settings.stone_check_enabled or settings.food_rules:
-            infos = wf.recognize_materials_info_panel(
+            raw_infos = wf.recognize_references_info_panel(
                 wf.TUNE_SCENE, wf.MATERIAL_PANEL,
                 group=wf.MATERIAL_GROUP)
+            from ....core.recognizer.reference_adapter import parse_tuning_material
+            infos = {
+                slot: parse_tuning_material(info)
+                for slot, info in raw_infos.items()
+            }
             infos = self._validate_tuning_materials(infos)
             self._material_cache = infos
             self._food_count_overrides = {}  # 清空覆盖，使用 OCR 原始值
@@ -81,10 +86,10 @@ class TuningExecutor:
         self._material_cache = None
 
     def _get_count(self, info) -> int | None:
-        """获取材料数量：优先查覆盖字典，否则用 info.count（只读属性）"""
-        food_type = getattr(info, "type", "")
-        if food_type in self._food_count_overrides:
-            return self._food_count_overrides[food_type]
+        """获取材料数量：优先查运行期扣减覆盖，否则用识别值。"""
+        label = getattr(info, "label", "")
+        if label in self._food_count_overrides:
+            return self._food_count_overrides[label]
         return info.count
 
     def _dedup_by_confidence(self, infos: dict | None) -> dict[str, object]:
@@ -96,7 +101,7 @@ class TuningExecutor:
         """
         result: dict[str, object] = {}
         for info in (infos or {}).values():
-            label = getattr(info, "type", "")
+            label = getattr(info, "label", "")
             if not label:
                 continue
             existing = result.get(label)
@@ -125,7 +130,7 @@ class TuningExecutor:
         if not food or not self._material_cache:
             return
         for info in self._material_cache.values():
-            if getattr(info, "type", "") == food and info.count is not None:
+            if getattr(info, "label", "") == food and info.count is not None:
                 current = self._food_count_overrides.get(food, info.count)
                 self._food_count_overrides[food] = max(0, current - 1)
                 logger.debug(f"狗粮扣减: {food} → {self._food_count_overrides[food]}")
@@ -221,7 +226,7 @@ class TuningExecutor:
             # 同名幽灵槽防护：只认数量有效的槽位
             slot = next(
                 ((r, c) for (r, c), i in (infos or {}).items()
-                 if getattr(i, "type", "") == food
+                 if getattr(i, "label", "") == food
                  and getattr(i, "count", None) is not None), None)
             if not slot:
                 logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
@@ -267,7 +272,7 @@ class TuningExecutor:
         if not infos:
             return infos
         for slot_key, info in infos.items():
-            if not getattr(info, "type", ""):
+            if not getattr(info, "label", ""):
                 continue
             devoted = getattr(info, "devoted", None)
             if devoted is not None and devoted != 0:
@@ -438,8 +443,11 @@ class TuningExecutor:
         if wf.engine is None or wf.engine._ui_callback is None:
             logger.warning("无 UI 回调，材料不足对话框无法弹出，按结束处理")
             return "end"
-        result = wf.engine._ui_callback(
-            "confirm3", message=message)
+        result = wf.engine._ui_callback("choose", message=message, choices=[
+            {"label": tr("继续调律"), "value": "continue", "role": "accept"},
+            {"label": tr("跳过当前装备"), "value": "skip", "role": "destructive"},
+            {"label": tr("结束本次调律"), "value": "end", "role": "reject"},
+        ], cancel_value="end")
         return result if result in ("continue", "skip", "end") else "end"
 
     def _on_materials_insufficient(self, stock: int, baseline: int):

@@ -12,7 +12,7 @@ def _repository(_engine):
 
 
 def _notify_equipment_changed(_engine) -> None:
-    """写入成功后经 UI 桥在主线程发射 equipment_changed 信号。
+    """写入成功后经通用 UI 桥发布 yysls 事件。
 
     无回调时（测试/独立执行端）静默跳过；通知失败仅记日志，
     不影响写入结果。
@@ -21,7 +21,9 @@ def _notify_equipment_changed(_engine) -> None:
     if callback is None:
         return
     try:
-        callback("equipment_changed")
+        from lvjiang.apps.yysls.ui.events import APP_ID, EQUIPMENT_CHANGED
+        from lvjiang.ui.app_events import AppEvent
+        callback("app_event", event=AppEvent(APP_ID, EQUIPMENT_CHANGED))
     except Exception as e:
         logger.debug(f"equipment_changed 通知失败（写入已生效）: {e}")
 

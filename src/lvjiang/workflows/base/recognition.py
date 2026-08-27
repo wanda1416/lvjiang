@@ -1,4 +1,4 @@
-"""截图 / OCR / 材料识别与 by 短路识别"""
+"""截图 / OCR / 参考图识别与 by 短路识别"""
 
 import numpy as np
 from loguru import logger
@@ -87,9 +87,9 @@ class _RecognitionMixin:
         logger.debug(f"OCR [{scene_key}]:{fields_display} => {result}")
         return result
 
-    # ─── 材料识别 ──────────────────────────────────────────
+    # ─── 参考图识别 ────────────────────────────────────────
 
-    def recognize_materials(
+    def recognize_references(
         self,
         scene_key: str,
         slot_keys: list[str] | None = None,
@@ -145,21 +145,21 @@ class _RecognitionMixin:
                 result[region.key] = ""
                 continue
 
-            info = self.material_recognizer.recognize(slot_img, group=group)
+            info = self.reference_recognizer.recognize(slot_img, group=group)
             if min_confidence is not None and info.confidence < min_confidence:
                 result[region.key] = ""
             else:
-                result[region.key] = info.type  # 空槽 info.type == ""
+                result[region.key] = info.label
             logger.debug(
                 f"参考图匹配 [{scene_key}].[{region.key}]: "
-                f"label={info.type!r} real_level={info.real_level} count={info.count}"
+                f"label={info.label!r} confidence={info.confidence:.3f}"
             )
 
         fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
         logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
-    def recognize_materials_rich(
+    def recognize_references_rich(
         self,
         scene_key: str,
         slot_keys: list[str] | None = None,
@@ -167,9 +167,9 @@ class _RecognitionMixin:
         min_confidence: float | None = None,
         with_func=None,
     ) -> tuple[dict[str, dict], dict]:
-        """rich 模式材料识别：返回包含输入/输出元数据的富 dict
+        """rich 模式参考图识别：返回包含输入/输出元数据的富 dict
 
-        与 recognize_materials 相同的截图+裁切逻辑，
+        与 recognize_references 相同的截图+裁切逻辑，
         区别：构建 base dict（type/confidence/meta/ocr_texts），
         若指定 with_func 则调用内置函数进行 dict->dict 转换。
 
@@ -202,7 +202,7 @@ class _RecognitionMixin:
             return {}, {}
 
         region_map = {r.key: r for r in regions}
-        recognizer = self.material_recognizer
+        recognizer = self.reference_recognizer
 
         result: dict[str, dict] = {}
         h, w = img.shape[:2]
@@ -226,7 +226,7 @@ class _RecognitionMixin:
             info = recognizer.recognize(slot_img, group=group)
             if min_confidence is not None and info.confidence < min_confidence:
                 result[region.key] = {}
-            elif not info.type:
+            elif not info.label:
                 result[region.key] = {}  # 空槽
             else:
                 base = recognizer.build_rich_base(info)
@@ -235,22 +235,22 @@ class _RecognitionMixin:
                 result[region.key] = base
             logger.debug(
                 f"rich 匹配 [{scene_key}].[{region.key}]: "
-                f"label={info.type!r}"
+                f"label={info.label!r}"
             )
 
         fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
         logger.info(f"rich 匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
-    def recognize_materials_info_panel(
+    def recognize_references_info_panel(
         self,
         scene_key: str,
         panel_key: str,
         group: str | list[str] | None = None,
     ) -> dict[tuple[int, int], object]:
-        """Panel grid 模式材料识别：一次截图，逐 cell 返回识别结果对象
+        """Panel grid 模式参考图识别：一次截图，逐 cell 返回识别结果对象
 
-        使用 panel grid 裁剪每个 cell，适用于材料槽以网格形式排列的场景。
+        使用 panel grid 裁剪每个 cell，适用于参考对象按网格排列的场景。
         保留识别器结果的全部字段（type/level/count/devoted/count_text/confidence），
         供数量检查等策略消费；裁切失败的 cell 不入结果。
 
@@ -260,7 +260,7 @@ class _RecognitionMixin:
             group: 可选，限定参考图分组范围
 
         Returns:
-            {(row, col): MaterialInfo, ...}，row/col 均为 1-based
+            {(row, col): ReferenceInfo, ...}，row/col 均为 1-based
         """
         img = self._capture.capture()
         if img is None:
@@ -289,13 +289,12 @@ class _RecognitionMixin:
             if crop.size == 0:
                 logger.warning(f"cell ({row},{col}) 裁切为空，跳过")
                 continue
-            info = self.material_recognizer.recognize(crop, group=group)
+            info = self.reference_recognizer.recognize(crop, group=group)
             infos[(row, col)] = info
 
-        summary = {f"({r},{c})": (f"{i.type}×{i.count}" if i.count is not None else i.type)
-                   if i.type else tr("空")
+        summary = {f"({r},{c})": i.label if i.label else tr("空")
                    for (r, c), i in infos.items()}
-        logger.info(f"材料识别 panel [{scene_key}/{panel_key}]: => {summary}")
+        logger.info(f"参考图识别 panel [{scene_key}/{panel_key}]: => {summary}")
         return infos
 
     # ─── by 子句：短路识别 ──────────────────────────────────
@@ -399,7 +398,7 @@ class _RecognitionMixin:
         logger.debug(f"by OCR 未命中: [{scene_key}]:{field_keys} mode={mode}")
         return ""
 
-    def recognize_materials_by(
+    def recognize_references_by(
         self,
         scene_key: str,
         field_keys: list[str],
@@ -409,14 +408,14 @@ class _RecognitionMixin:
         min_confidence: float | None = None,
         full: bool = False,
     ) -> str:
-        """材料识别：一次截图，逐 slot 识别
+        """参考图识别：一次截图，逐 slot 识别
 
         Args:
             scene_key: 场景 key
             field_keys: 要识别的 slot 列表
             target_value: 匹配目标值（str 或 list，由 mode 决定）
             mode: equals | contains | equals_any | contains_any
-            group: 可选，限定材料分组范围
+            group: 可选，限定参考图分组范围
             min_confidence: 可选，置信度阈值，低于阈值的视为未识别
             full: False=短路匹配（首个命中即返回），True=全量匹配（取最高置信度）
 
@@ -451,29 +450,29 @@ class _RecognitionMixin:
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
             if crop is None:
-                logger.debug(f"by 材料识别: region {region.key} 裁剪为空，跳过")
+                logger.debug(f"by 参考图识别: region {region.key} 裁剪为空，跳过")
                 continue
-            info = self.material_recognizer.recognize(crop, group=group)
+            info = self.reference_recognizer.recognize(crop, group=group)
             if min_confidence is not None and info.confidence < min_confidence:
-                logger.debug(f"by 材料识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
+                logger.debug(f"by 参考图识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
                 continue
-            if self._match_text(info.type, target_value, mode):
+            if self._match_text(info.label, target_value, mode):
                 if full:
                     # 全量模式：记录最高置信度的命中项
                     if info.confidence > best_confidence:
                         best_key = region.key
                         best_confidence = info.confidence
-                    logger.debug(f"full by 材料识别: region {region.key} type={info.type!r} confidence={info.confidence:.3f}")
+                    logger.debug(f"full by 参考图识别: region {region.key} label={info.label!r} confidence={info.confidence:.3f}")
                 else:
                     # 短路模式：首个命中即返回
-                    logger.info(f"by 材料识别命中: [{scene_key}].[{region.key}] type={info.type!r} mode={mode} group={group}")
+                    logger.info(f"by 参考图识别命中: [{scene_key}].[{region.key}] label={info.label!r} mode={mode} group={group}")
                     return region.key
 
         if full and best_key:
-            logger.info(f"full by 材料识别命中: [{scene_key}].[{best_key}] confidence={best_confidence:.3f} mode={mode} group={group}")
+            logger.info(f"full by 参考图识别命中: [{scene_key}].[{best_key}] confidence={best_confidence:.3f} mode={mode} group={group}")
             return best_key
 
-        logger.info(f"by 材料识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
+        logger.info(f"by 参考图识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
         return ""
 
     # ─── find 指令：文字搜索 ─────────────────────────────────

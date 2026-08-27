@@ -237,7 +237,7 @@ def test_single_cell_recognize_returns_plain_type(tmp_path):
     ))
     engine = _make_engine()
     workflow = MagicMock()
-    workflow.material_recognizer.recognize.return_value = SimpleNamespace(type="大律准石")
+    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="大律准石")
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["mat"] == "大律准石"
@@ -250,11 +250,11 @@ def test_whole_panel_recognize_nested_result(tmp_path):
         'collect $mats\n'
     ))
     engine = _make_engine()
-    # recognize 走 workflow.material_recognizer，注入替身
+    # recognize 走 workflow.reference_recognizer，注入替身
     workflow = MagicMock()
     counter = iter(range(1, 100))
-    workflow.material_recognizer.recognize.side_effect = lambda img, group=None: (
-        SimpleNamespace(type=f"m{next(counter)}"))
+    workflow.reference_recognizer.recognize.side_effect = lambda img, group=None: (
+        SimpleNamespace(label=f"m{next(counter)}"))
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["mats"] == {
@@ -265,8 +265,8 @@ def test_whole_panel_recognize_nested_result(tmp_path):
 
 def test_single_cell_recognize_rich(tmp_path):
     """recognize [s].[actions][1][1] as rich $cell → 扁平 base dict（无 with 时只有标准字段）"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-        MaterialRecognizer,
+    from lvjiang.core.recognizers import (
+        ReferenceRecognizer,
     )
     wf = _write_wf(tmp_path, (
         'recognize [s].[actions][1][1] as rich $cell\n'
@@ -275,14 +275,14 @@ def test_single_cell_recognize_rich(tmp_path):
     engine = _make_engine()
     workflow = MagicMock()
     rich_info = SimpleNamespace(
-        type="大律准石",
+            label="大律准石",
         confidence=0.95,
         ocr_texts={"level_text": "110阶", "count_text": "0/691"},
         meta={"level": 110},
         group="",
     )
-    workflow.material_recognizer.recognize.return_value = rich_info
-    workflow.material_recognizer.build_rich_base.side_effect = MaterialRecognizer.build_rich_base
+    workflow.reference_recognizer.recognize.return_value = rich_info
+    workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
     engine._workflow = workflow
     output = engine.execute(wf)
     assert isinstance(output["cell"], dict)
@@ -304,7 +304,7 @@ def test_single_cell_recognize_rich_empty_slot(tmp_path):
     ))
     engine = _make_engine()
     workflow = MagicMock()
-    workflow.material_recognizer.recognize.return_value = SimpleNamespace(type="")
+    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="")
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["cell"] == {}
@@ -312,8 +312,8 @@ def test_single_cell_recognize_rich_empty_slot(tmp_path):
 
 def test_whole_panel_recognize_rich(tmp_path):
     """recognize [s].[actions] as rich $mats → 嵌套 dict，value 为 base dict"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-        MaterialRecognizer,
+    from lvjiang.core.recognizers import (
+        ReferenceRecognizer,
     )
     wf = _write_wf(tmp_path, (
         'recognize [s].[actions] as rich $mats\n'
@@ -322,15 +322,15 @@ def test_whole_panel_recognize_rich(tmp_path):
     engine = _make_engine()
     workflow = MagicMock()
     counter = iter(range(1, 100))
-    workflow.material_recognizer.recognize.side_effect = lambda img, group=None: (
+    workflow.reference_recognizer.recognize.side_effect = lambda img, group=None: (
         SimpleNamespace(
-            type=f"m{next(counter)}",
+            label=f"m{next(counter)}",
             confidence=0.9,
             meta={},
             ocr_texts={},
             group="",
         ))
-    workflow.material_recognizer.build_rich_base.side_effect = MaterialRecognizer.build_rich_base
+    workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
     engine._workflow = workflow
     output = engine.execute(wf)
     assert isinstance(output["mats"], dict)
@@ -384,7 +384,7 @@ def test_region_recognize_rich_e2e(tmp_path):
     }
     r1 = SimpleNamespace(key="slot_1")
     r2 = SimpleNamespace(key="slot_2")
-    workflow.recognize_materials_rich.return_value = (
+    workflow.recognize_references_rich.return_value = (
         {"slot_1": rich_slot1, "slot_2": rich_slot2},
         {"slot_1": r1, "slot_2": r2},
     )
@@ -406,7 +406,7 @@ def test_region_recognize_by_rich_returns_str(tmp_path):
     ))
     engine = _make_region_engine()
     workflow = MagicMock()
-    workflow.recognize_materials_by.return_value = "slot_1"
+    workflow.recognize_references_by.return_value = "slot_1"
     engine._workflow = workflow
     output = engine.execute(wf)
     # by 降级：返回 str 而非 dict
@@ -423,7 +423,7 @@ def test_panel_cell_by_with_rich_returns_str(tmp_path):
     ))
     engine = _make_engine()
     workflow = MagicMock()
-    workflow.material_recognizer.recognize.return_value = SimpleNamespace(type="大律准石")
+    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="大律准石")
     engine._workflow = workflow
     output = engine.execute(wf)
     # by 降级：即使写了 rich，by 匹配成功仍返回 str
@@ -440,7 +440,7 @@ def test_panel_cell_by_no_match_with_rich_returns_empty_str(tmp_path):
     ))
     engine = _make_engine()
     workflow = MagicMock()
-    workflow.material_recognizer.recognize.return_value = SimpleNamespace(type="大律准石")
+    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="大律准石")
     engine._workflow = workflow
     output = engine.execute(wf)
     # by 降级：匹配失败返回 ""（str），不是 {}（dict）
@@ -458,8 +458,8 @@ def test_panel_whole_by_with_rich_returns_position(tmp_path):
     engine = _make_engine()
     workflow = MagicMock()
     counter = iter(range(1, 100))
-    workflow.material_recognizer.recognize.side_effect = lambda img, group=None: (
-        SimpleNamespace(type=f"m{next(counter)}"))
+    workflow.reference_recognizer.recognize.side_effect = lambda img, group=None: (
+        SimpleNamespace(label=f"m{next(counter)}"))
     engine._workflow = workflow
     output = engine.execute(wf)
     # by 降级：返回位置 dict，value 是 int 而非 enriched dict
@@ -491,17 +491,17 @@ def test_region_recognize_rich_with_func_e2e(tmp_path):
         }
         r1 = SimpleNamespace(key="slot_1")
         r2 = SimpleNamespace(key="slot_2")
-        # recognize_materials_rich 会被调用，并传入 with_func
+        # recognize_references_rich 会被调用，并传入 with_func
         # 但这里 mock 掉整个方法，验证引擎传递 with_func 后结果正确
-        # 实际上应该验证 recognize_materials_rich 被调用时带了 with_func 参数
-        workflow.recognize_materials_rich.return_value = (
+        # 实际上应该验证 recognize_references_rich 被调用时带了 with_func 参数
+        workflow.recognize_references_rich.return_value = (
             {"slot_1": {**rich_slot1, "custom_field": "parsed"}, "slot_2": {}},
             {"slot_1": r1, "slot_2": r2},
         )
         engine._workflow = workflow
         output = engine.execute(wf)
-        # 验证 recognize_materials_rich 被调用时传了 with_func
-        call_kwargs = workflow.recognize_materials_rich.call_args
+        # 验证 recognize_references_rich 被调用时传了 with_func
+        call_kwargs = workflow.recognize_references_rich.call_args
         assert call_kwargs[1].get("with_func") is not None or (
             len(call_kwargs[0]) > 4 and call_kwargs[0][4] is not None
         )
@@ -514,8 +514,8 @@ def test_region_recognize_rich_with_func_e2e(tmp_path):
 
 def test_single_cell_recognize_rich_with_func(tmp_path):
     """recognize [s].[actions][1][1] as rich $cell with test_parse → base dict 经函数转换"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-        MaterialRecognizer,
+    from lvjiang.core.recognizers import (
+        ReferenceRecognizer,
     )
     from lvjiang.workflows import builtins
 
@@ -533,14 +533,14 @@ def test_single_cell_recognize_rich_with_func(tmp_path):
         engine = _make_engine()
         workflow = MagicMock()
         rich_info = SimpleNamespace(
-            type="大律准石",
+            label="大律准石",
             confidence=0.95,
             ocr_texts={"level_text": "110阶", "count_text": "0/691"},
             meta={"level": 110},
             group="",
         )
-        workflow.material_recognizer.recognize.return_value = rich_info
-        workflow.material_recognizer.build_rich_base.side_effect = MaterialRecognizer.build_rich_base
+        workflow.reference_recognizer.recognize.return_value = rich_info
+        workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
         engine._workflow = workflow
         output = engine.execute(wf)
         assert output["cell"]["label"] == "大律准石"
@@ -553,8 +553,8 @@ def test_single_cell_recognize_rich_with_func(tmp_path):
 
 def test_whole_panel_recognize_rich_with_func(tmp_path):
     """recognize [s].[actions] as rich $mats with test_parse → 每格经函数转换"""
-    from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-        MaterialRecognizer,
+    from lvjiang.core.recognizers import (
+        ReferenceRecognizer,
     )
     from lvjiang.workflows import builtins
 
@@ -571,15 +571,15 @@ def test_whole_panel_recognize_rich_with_func(tmp_path):
         engine = _make_engine()
         workflow = MagicMock()
         counter = iter(range(1, 100))
-        workflow.material_recognizer.recognize.side_effect = lambda img, group=None: (
+        workflow.reference_recognizer.recognize.side_effect = lambda img, group=None: (
             SimpleNamespace(
-                type=f"m{next(counter)}",
+            label=f"m{next(counter)}",
                 confidence=0.9,
                 meta={},
                 ocr_texts={},
                 group="",
             ))
-        workflow.material_recognizer.build_rich_base.side_effect = MaterialRecognizer.build_rich_base
+        workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
         engine._workflow = workflow
         output = engine.execute(wf)
         assert output["mats"]["1"]["1"]["label"] == "m1"
@@ -598,7 +598,7 @@ def test_recognize_rich_unknown_func_raises(tmp_path):
     ))
     engine = _make_region_engine()
     workflow = MagicMock()
-    workflow.recognize_materials_rich.side_effect = ValueError("未知内置函数: nonexistent_func")
+    workflow.recognize_references_rich.side_effect = ValueError("未知内置函数: nonexistent_func")
     engine._workflow = workflow
     import pytest
     with pytest.raises(ValueError, match="未知内置函数"):

@@ -1,4 +1,4 @@
-"""识别混入类 - OCR 文字识别 + 材料识别（区域/面板自动分发）"""
+"""识别混入类 - OCR 文字识别 + 参考图识别（区域/面板自动分发）"""
 
 from loguru import logger
 from PyQt6.QtWidgets import QApplication
@@ -8,12 +8,12 @@ from ...i18n import tr
 
 
 class RecognitionOpsMixin:
-    """OCR / 材料识别混入类
+    """OCR / 参考图识别混入类
 
     依赖主类提供:
         _tabs, _result_text, _status_bar,
         _current_scene_key (property), _current_scene_tab(),
-        _chk_live_image, _combo_mat_group, _refresh_callback
+        _chk_live_image, _combo_ref_group, _refresh_callback
     """
 
     def _is_panel_tab_active(self, current_tab) -> bool:
@@ -141,28 +141,28 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(f"面板识别完成，共 {total_cells} 个 cell")
         logger.info(f"面板 OCR 识别完成 (场景={get_scene_name(current_tab.scene_key)}, 面板数={len(panels)})")
 
-    # ─── 材料识别 ────────────────────────────────────────
+    # ─── 参考图识别 ──────────────────────────────────────
 
-    def _get_mat_group(self) -> str | None:
-        """从材料分组下拉框获取选中的分组，None 表示全部"""
-        if hasattr(self, '_combo_mat_group'):
-            return self._combo_mat_group.currentData()
+    def _get_ref_group(self) -> str | None:
+        """从参考图分组下拉框获取选中的分组，None 表示全部。"""
+        if hasattr(self, '_combo_ref_group'):
+            return self._combo_ref_group.currentData()
         return None
 
-    def _on_recognize_materials(self):
-        """对当前 Tab 场景的区域或面板做材料识别（根据激活的列表自动分发）"""
+    def _on_recognize_references(self):
+        """对当前 Tab 场景的区域或面板做参考图识别。"""
         current_tab = self._tabs.get(self._current_scene_key)
         if current_tab is None:
             return
 
         # 根据激活的 Tab 决定识别目标
         if self._is_panel_tab_active(current_tab):
-            self._on_recognize_panel_materials(current_tab)
+            self._on_recognize_panel_references(current_tab)
         else:
-            self._on_recognize_region_materials(current_tab)
+            self._on_recognize_region_references(current_tab)
 
-    def _on_recognize_region_materials(self, current_tab):
-        """区域材料识别（type==slot 的区域）"""
+    def _on_recognize_region_references(self, current_tab):
+        """识别 type==slot 的区域。"""
         regions = current_tab.get_visible_regions()
         if not regions:
             self._status_bar.showMessage(tr("没有已定义的区域"))
@@ -181,16 +181,13 @@ class RecognitionOpsMixin:
             self._status_bar.showMessage(error_msg or tr("获取图像失败"))
             return
 
-        self._status_bar.showMessage(tr("正在识别材料..."))
+        self._status_bar.showMessage(tr("正在匹配参考图..."))
         QApplication.processEvents()
 
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-            MaterialRecognizer,
-        )
-
         from ...core.ocr import OCREngine
+        from ...core.recognizers import ReferenceRecognizer
         ocr_engine = OCREngine()
-        recognizer = MaterialRecognizer(ocr_engine)
+        recognizer = ReferenceRecognizer(ocr_engine)
         # 非预制输入字段（用于展示匹配条目的元数据）
         input_fields = recognizer.reference_db.get_custom_input_fields()
         canvas = current_tab.get_canvas_config()
@@ -202,7 +199,7 @@ class RecognitionOpsMixin:
 
         # 展示结果
         self._result_text.clear()
-        group = self._get_mat_group()
+        group = self._get_ref_group()
         for region in slot_regions:
             x1 = int(canvas_x + region.x_ratio * canvas_w)
             y1 = int(canvas_y + region.y_ratio * canvas_h)
@@ -211,33 +208,30 @@ class RecognitionOpsMixin:
             crop = image[y1:y2, x1:x2]
             info = recognizer.recognize(crop, group=group)
 
-            if not info.type:
+            if not info.label:
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: (空槽)"
             else:
-                parts = [info.type]
+                parts = [info.label]
                 # 输入元数据（匹配条目的属性，如 level=110）
                 for f in input_fields:
                     value = info.meta.get(f.key)
                     if value is not None:
                         parts.append(f"{f.key}={value}")
-                # 输出元数据 OCR 原始文本（如 level_text=110阶 count_text=0/691）
+                # 输出 schema 对应的 OCR 原始文本。
                 for key, text in info.ocr_texts.items():
                     parts.append(f"{key}={text or tr('(无)')}")
-                # 解析属性
-                if info.real_level is not None:
-                    parts.append(f"real_level={info.real_level}")
                 parts.append(f"[{info.confidence:.0%}]")
                 line = f"{get_region_name(current_tab.scene_key, region.key)}: {' '.join(parts)}"
             self._result_text.append(line)
 
-        self._status_bar.showMessage(f"材料识别完成，共 {len(slot_regions)} 个槽位")
+        self._status_bar.showMessage(f"参考图识别完成，共 {len(slot_regions)} 个槽位")
         logger.info(
-            f"材料识别完成 (场景={get_scene_name(current_tab.scene_key)}, "
+            f"参考图识别完成 (场景={get_scene_name(current_tab.scene_key)}, "
             f"槽位数={len(slot_regions)})"
         )
 
-    def _on_recognize_panel_materials(self, current_tab):
-        """面板材料识别（逐 cell 识别）"""
+    def _on_recognize_panel_references(self, current_tab):
+        """面板参考图识别（逐 cell 识别）"""
         panels = current_tab.get_visible_panels()
         if not panels:
             self._status_bar.showMessage(tr("没有已定义的面板"))
@@ -252,21 +246,18 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在校准面板网格..."))
         QApplication.processEvents()
 
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-            MaterialRecognizer,
-        )
-
         from ...core.ocr import OCREngine
+        from ...core.recognizers import ReferenceRecognizer
 
         ocr_engine = OCREngine()
-        recognizer = MaterialRecognizer(ocr_engine)
+        recognizer = ReferenceRecognizer(ocr_engine)
         # 非预制输入字段（用于展示匹配条目的元数据）
         input_fields = recognizer.reference_db.get_custom_input_fields()
         canvas_config = current_tab.get_canvas_config()
 
         self._result_text.clear()
         total_cells = 0
-        group = self._get_mat_group()
+        group = self._get_ref_group()
         for panel in panels:
             # 校准网格，获取每个 cell 的位置
             cells = ocr_engine.calibrate_panel_cells(image, canvas_config, panel)
@@ -281,10 +272,10 @@ class RecognitionOpsMixin:
                 row = i // panel.cols + 1
                 col = i % panel.cols + 1
 
-                if not info.type:
+                if not info.label:
                     self._result_text.append(f"  cell[{row}][{col}]: (空)")
                 else:
-                    parts = [info.type]
+                    parts = [info.label]
                     # 输入元数据（匹配条目的属性，如 level=110）
                     for f in input_fields:
                         value = info.meta.get(f.key)
@@ -296,5 +287,5 @@ class RecognitionOpsMixin:
                     self._result_text.append(f"  cell[{row}][{col}]: {' '.join(parts)}")
                 total_cells += 1
 
-        self._status_bar.showMessage(f"面板材料识别完成，共 {total_cells} 个 cell")
-        logger.info(f"面板材料识别完成 (场景={get_scene_name(current_tab.scene_key)}, 面板数={len(panels)})")
+        self._status_bar.showMessage(f"面板参考图识别完成，共 {total_cells} 个 cell")
+        logger.info(f"面板参考图识别完成 (场景={get_scene_name(current_tab.scene_key)}, 面板数={len(panels)})")

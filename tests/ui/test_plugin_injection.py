@@ -23,13 +23,13 @@ class TestRegisterHooksStacking:
         registry: dict = {}
         b1, b2, b3, m1, m2 = (lambda h: None,) * 5
         register_hooks(AppHooks(
-            name="A", window_title="标题A",
+            id="a", name="A", window_title="标题A",
             left_tab_builders=[("A左", b1)],
             right_tab_builders=[("A右", b2)],
             menu_builders=[m1],
         ), registry)
         register_hooks(AppHooks(
-            name="B", window_title="标题B",
+            id="b", name="B", window_title="标题B",
             left_tab_builders=[("B左", b3)],
             menu_builders=[m2],
         ), registry)
@@ -37,6 +37,7 @@ class TestRegisterHooksStacking:
         assert [label for label, _ in registry["left_tab_builders"]] == ["A左", "B左"]
         assert [label for label, _ in registry["right_tab_builders"]] == ["A右"]
         assert registry["menu_builders"] == [m1, m2]
+        assert registry["app_ids"] == ["a", "b"]
         # window_title 后注册者覆盖
         assert registry["window_title"] == "标题B"
 

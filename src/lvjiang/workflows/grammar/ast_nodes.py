@@ -163,7 +163,7 @@ class Recognize:
     fields: list | None = None  # list[Literal] | None
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
-    group: Any = None  # Literal | VarRef | list | None（group 子句：限定材料分组）
+    group: Any = None  # Literal | VarRef | list | None（group 子句：限定参考图分组）
     where: Any = None  # WhereClause | None（where 子句：识别结果过滤）
     rich: bool = False  # as rich 模式：返回包含输入/输出元数据的富 dict
     with_func: Any = None  # Literal(函数名) | None — with 子句指定的 dict->dict 转换函数

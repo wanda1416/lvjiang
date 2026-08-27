@@ -79,13 +79,13 @@ class EquipDisplayPanel(QWidget):
         layout.addStretch()
 
     def _load(self):
-        from lvjiang.core.config import load_equip_display
+        from ...config.equip_display import load_equip_display
         params = load_equip_display()
         for key, spin in self._spinboxes.items():
             spin.setValue(int(params.get(key, spin.minimum())))
 
     def _save(self):
-        from lvjiang.core.config import save_equip_display
+        from ...config.equip_display import save_equip_display
         params = {key: spin.value() for key, spin in self._spinboxes.items()}
         try:
             save_equip_display(params)

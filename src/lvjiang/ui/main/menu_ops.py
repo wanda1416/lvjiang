@@ -190,10 +190,8 @@ class MenuOpsMixin:
         dialog = ReferenceManagerDialog(parent=self, screenshot_callback=self._refresh_capture)
         dialog.exec()
         if dialog.data_changed:
-            from ...workflows.base import BaseWorkflow
-            if BaseWorkflow._shared_material_recognizer is not None:
-                BaseWorkflow._shared_material_recognizer.reload()
-                self.statusBar().showMessage(tr("图库已刷新"), 3000)
+            # 工作流引擎按运行生命周期持有 reference 服务；下次运行会加载新数据。
+            self.statusBar().showMessage(tr("图库已刷新"), 3000)
 
     def _show_about(self):
         from ..notices.about_dialog import AboutDialog

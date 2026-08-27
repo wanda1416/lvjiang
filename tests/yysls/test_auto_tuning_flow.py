@@ -1,7 +1,7 @@
 """auto_tuning 端到端链路的分支覆盖测试
 
 用 FakeWF 覆写场景交互原语（click_region/ocr_scene/ocr_scene_by/
-recognize_materials_by/wait_delay）并 spy 空接口，monkeypatch 模块级
+recognize_references_by/wait_delay）并 spy 空接口，monkeypatch 模块级
 判定函数 judge_equipment_potential（结构化结果，预期评级由真实的
 summarize_potential/_expect_key 归纳），驱动 _process_equipment 的各分支：
 already_full / 未达进入门槛 / no_tune_entry / tuned（含材料不足提前
@@ -183,11 +183,11 @@ class FakeWF(AutoTuningWorkflow):
             return "词库预览"
         return ""
 
-    def recognize_materials_by(self, scene_key, field_keys, target_value,
+    def recognize_references_by(self, scene_key, field_keys, target_value,
                                mode, group=None, min_confidence=None):
         return self._material_result.get(target_value, "")
 
-    def recognize_materials_info_panel(self, scene_key, panel_key, group=None):
+    def recognize_references_info_panel(self, scene_key, panel_key, group=None):
         self.material_info_calls += 1
         return dict(self._material_infos)
 
@@ -394,7 +394,7 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
-    wf._material_infos = {(1, 3): _Stone(type="金狗粮", count=42)}
+    wf._material_infos = {(1, 3): _reference("金狗粮", count=42)}
     wf._process_equipment("高分剑", _equip(2, quality="gold", cap_pct=95),
                           WEAPON_DETAIL)
 
@@ -428,9 +428,9 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
     wf._material_infos = {
-        (1, 1): _Stone(type="紫狗粮"),                     # 前置幽灵槽
-        (1, 2): _Stone(type="紫狗粮", count=103, devoted=0),  # 真槽
-        (1, 6): _Stone(type="紫狗粮"),                     # 后置幽灵槽
+        (1, 1): _reference("紫狗粮"),                     # 前置幽灵槽
+        (1, 2): _reference("紫狗粮", count=103, devoted=0),  # 真槽
+        (1, 6): _reference("紫狗粮"),                     # 后置幽灵槽
     }
     wf._process_equipment("紫胸甲", _equip(2, quality="purple", cap_pct=95),
                           WEAPON_DETAIL)
@@ -446,12 +446,25 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
 # ─── 大律准石数量检查 ─────────────────────────
 
 class _Stone:
-    """MaterialInfo 最小替身（只需 type/count/devoted 字段）"""
+    """已完成 yysls 解析的调律材料替身。"""
 
-    def __init__(self, type="大律准石", count=None, devoted=None):
-        self.type = type
+    def __init__(self, label="大律准石", count=None, devoted=None):
+        self.label = label
         self.count = count
         self.devoted = devoted
+
+
+def _reference(label="大律准石", count=None, devoted=None):
+    """构造进入通用识别边界时的原始 ReferenceInfo。"""
+    from lvjiang.core.recognizers import ReferenceInfo
+    count_text = "" if count is None else str(count)
+    if devoted is not None and count is not None:
+        count_text = f"{devoted}/{count}"
+    return ReferenceInfo(
+        label=label, confidence=0.9,
+        # 出厂 schema 始终产出两个 key；无识别结果用空文本表示。
+        ocr_texts={"level_text": "", "count_text": count_text},
+    )
 
 
 @pytest.fixture
@@ -501,7 +514,7 @@ def test_stone_check_low_stops_all():
     """库存 < 基准 → 置标志全退，记 stop_reason，触发不足钩子"""
     wf = FakeWF()
     infos = {
-        (1, 1): _Stone(type="小律准石", count=8),
+        (1, 1): _Stone(label="小律准石", count=8),
         (1, 2): _Stone(count=50),
     }
     hook_calls = []
@@ -517,7 +530,7 @@ def test_stone_check_low_stops_all():
 def test_stone_check_missing_slot_stops():
     """材料区没有大律准石 → 视为已耗尽（stock=0）全退"""
     wf = FakeWF()
-    infos = {(1, 1): _Stone(type="小律准石", count=8)}
+    infos = {(1, 1): _Stone(label="小律准石", count=8)}
     assert wf.executor._check_stone_stock(_STONE_ON, infos) is False
     assert wf.executor.materials_exhausted
     assert "大律准石 0" in wf.output["stop_reason"]
@@ -573,7 +586,7 @@ def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
     """集成：调律循环内石头不足 → rounds=0，仍正常 back 退出调律页"""
     wf = _wf_with(stone_check_on)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
-    wf._material_infos = {(1, 2): _Stone(count=3)}
+    wf._material_infos = {(1, 2): _reference(count=3)}
     wf._process_equipment("缺石剑", _equip(2, quality="gold", cap_pct=50),
                           WEAPON_DETAIL)
 
@@ -595,7 +608,7 @@ def test_stone_low_skip_continues_flow(patch_worth, monkeypatch):
         stone_insufficient_action="skip"))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
-    wf._material_infos = {(1, 2): _Stone(count=3)}
+    wf._material_infos = {(1, 2): _reference(count=3)}
     wf._process_equipment("缺石剑", _equip(2, quality="gold", cap_pct=50),
                           WEAPON_DETAIL)
 
@@ -1391,7 +1404,7 @@ def test_materials_block_no_behavior(monkeypatch):
         tune=TuneBehavior(enabled=True, rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
-    wf._material_infos = {(1, 2): _Stone(count=3)}
+    wf._material_infos = {(1, 2): _reference(count=3)}
     fp = wf._process_equipment("缺石剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 

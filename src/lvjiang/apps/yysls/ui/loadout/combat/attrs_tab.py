@@ -783,6 +783,10 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             for col in range(2):
                 slot = self._create_dynamic_slot(self._gain_grid, 6, col)
                 self._skill_bonus_slots.append(slot)
+                # half_compact 会按此清单移除并重排全部控件。动态槽若不
+                # 登记，会滞留在原 (6, col)，与重排到第 6 行的固定属性
+                # 重叠；登记后卡片会按实际可见槽位自然扩高。
+                self._gain_grid_items.append((slot[0], 6, col))
         show_seventh_row = len(skill_items) > 2
         for index, (widget, name_label, value_label) in enumerate(
                 self._weapon_bonus_slots + self._skill_bonus_slots):

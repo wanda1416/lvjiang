@@ -551,6 +551,24 @@ class SettingsDialog(QDialog):
             lambda v: self._on_net_feature_toggled("update", v))
         sub_box.addWidget(self._update_check)
 
+        self._remote_config_check = QCheckBox(tr("接收在线配置更新"))
+        self._remote_config_check.setChecked(network.remote_config)
+        self._remote_config_check.toggled.connect(
+            lambda v: self._on_net_feature_toggled("remote_config", v))
+        sub_box.addWidget(self._remote_config_check)
+
+        remote_caption = QLabel(
+            tr("仅下发场景/布局坐标与调律规则，用于在不发新版的情况下修复"
+               "识别问题；你自己改过的配置始终优先，不会被覆盖。"
+               "拉取到的配置下次启动生效。"))
+        remote_caption.setWordWrap(True)
+        remote_caption.setStyleSheet("color: palette(mid);")
+        sub_box.addWidget(remote_caption)
+
+        self._remote_config_status = QLabel()
+        self._remote_config_status.setStyleSheet("color: palette(mid);")
+        sub_box.addWidget(self._remote_config_status)
+
         self._telemetry_check = QCheckBox(
             tr("参与匿名数据收集，帮助改进调律策略"))
         self._telemetry_check.setChecked(network.telemetry)
@@ -593,9 +611,35 @@ class SettingsDialog(QDialog):
         # 标识重置和待上报数据查看都是纯本地操作，离线时仍应可用。
         self._network_feature_checks = [
             self._announcement_check, self._update_check,
-            self._telemetry_check]
+            self._remote_config_check, self._telemetry_check]
+        self._refresh_remote_config_status()
         self._refresh_privacy_tab_state()
         return tab
+
+    def _refresh_remote_config_status(self):
+        """展示在线配置版本——用户得能知道自己在跑哪一版。
+
+        已下载但尚未生效的要说清楚：配置落在暂存层、下次启动才提升
+        （见 core/config/remote.py），此时直接报"当前版本 vN"是错的——
+        本次会话跑的还是上一版。
+        """
+        from ..core.config.remote import (
+            get_config_version,
+            get_last_synced_at,
+            stage_dir,
+        )
+        version = get_config_version()
+        if not version:
+            self._remote_config_status.setText(tr("尚未获取过在线配置"))
+            return
+        if stage_dir().is_dir():
+            self._remote_config_status.setText(
+                tr("已下载在线配置 v{version}，重启后生效").format(version=version))
+            return
+        synced = (get_last_synced_at() or "")[:10]
+        self._remote_config_status.setText(
+            tr("当前在线配置版本 v{version}（{date} 同步）").format(
+                version=version, date=synced or tr("未知日期")))
 
     def _on_offline_toggled(self, checked: bool):
         from ..core.telemetry.settings import set_network_feature
@@ -643,9 +687,12 @@ class SettingsDialog(QDialog):
         offline = self._offline_check.isChecked()
         network = load_user_config().network
         self._telemetry_reset_button.setEnabled(network.telemetry)
+        # 顺序必须与 _network_feature_checks 一一对应（zip strict=True 会
+        # 在漏加时直接报错，而不是静默错位）
         saved_values = (
             network.announcement,
             network.update,
+            network.remote_config,
             network.telemetry,
         )
         for checkbox, saved in zip(
@@ -658,12 +705,12 @@ class SettingsDialog(QDialog):
 
         if offline:
             self._offline_hint.setText(tr(
-                "已暂停公告检查、版本检查和匿名数据上报；关闭离线模式后，"
-                "将恢复之前的选择。"))
+                "已暂停公告检查、版本检查、在线配置更新和匿名数据上报；"
+                "关闭离线模式后，将恢复之前的选择。"))
             self._offline_hint.setStyleSheet("color: #D97706;")
         else:
             self._offline_hint.setText(tr(
-                "可在下方分别控制公告、版本更新和匿名数据上报。"))
+                "可在下方分别控制公告、版本更新、在线配置和匿名数据上报。"))
             self._offline_hint.setStyleSheet("color: palette(mid);")
 
         if network.telemetry:

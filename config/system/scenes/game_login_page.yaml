@@ -1,3 +1,4 @@
+content_version: 1
 key: game_login_page
 name: 登录
 views:

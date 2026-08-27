@@ -25,9 +25,10 @@ build/
 # Logs
 logs/
 
-# local config (user overlay / session runtime)
+# local config (user overlay / session runtime / 在线下发层)
 /config/local*
 /config/session*
+/config/remote*
 /config/system/workflows/_*
 
 # local data

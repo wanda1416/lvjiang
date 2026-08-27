@@ -128,6 +128,33 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
                 logger.exception("[plugin] 配置合并策略模块加载失败: %s", mod_path)
 
 
+def load_config_policies() -> None:
+    """只加载各已登记插件的配置策略声明，不注入 Tab / 工作流 / 识别器。
+
+    离线工具（`scripts/add_content_version.py`、配置层单测）需要完整的
+    「哪些路径是登记表 / 哪些目录带 content_version」注册表，但不需要——
+    也不该——把插件的 UI 与工作流一并装配起来。走 ``register_hooks`` 会
+    连带注册识别器与内置函数，对一个补字段的脚本是多余的副作用。
+
+    单个插件声明出错只记日志跳过，理由同 register_hooks 里的处理。
+    """
+    for name, module_path in _APP_REGISTRY.items():
+        try:
+            module = importlib.import_module(module_path)
+        except Exception:  # noqa: BLE001
+            logger.exception("[plugin] 加载插件模块失败: %s", module_path)
+            continue
+        hooks = getattr(module, "hooks", None)
+        if not isinstance(hooks, AppHooks):
+            continue
+        for mod_path in hooks.config_policy_modules:
+            try:
+                importlib.import_module(mod_path)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "[plugin] 配置策略模块加载失败 (%s): %s", name, mod_path)
+
+
 # ── 全局注册表（内存中的插件扩展点汇总） ─────────────────────────────
 _GLOBAL_REGISTRY: dict[str, Any] = {}
 

@@ -3,13 +3,13 @@
 覆盖 discover_scripts / list_exposed_scripts 的核心逻辑。
 """
 
-
 from lvjiang.workflows.discovery import (
     _discover_class_scripts,
     _discover_wf_scripts,
     discover_scripts,
     list_exposed_scripts,
 )
+from lvjiang.workflows.metadata import METADATA_WARNING
 
 
 class TestDiscoverWfScripts:
@@ -34,7 +34,8 @@ class TestDiscoverWfScripts:
             "#% name: 测试流程\n"
             "#% note: 运行前请确认页面。\n"
             "#% parameters:\n"
-            "#%   - name: target\n",
+            "#%   - name: target\n"
+            "#%     options: [default]\n",
             encoding="utf-8",
         )
 
@@ -78,6 +79,32 @@ class TestDiscoverWfScripts:
         assert result["fengshajiusi"]["wf_file"] == (
             "standalone/fengshajiusi.wf")
         assert result["fengshajiusi"]["batchable"] is False
+
+    def test_bad_metadata_warns_only_its_own_script(self, tmp_path, monkeypatch):
+        """一个 wf 元数据错误不能中断发现，也不能影响另一个 wf。"""
+        bad = tmp_path / "bad.wf"
+        good = tmp_path / "good.wf"
+        bad.write_text("#% name: [unclosed\nlog \"bad meta\"\n", encoding="utf-8")
+        good.write_text("#% name: 正常脚本\nlog \"ok\"\n", encoding="utf-8")
+        paths = {"workflows/bad.wf": bad, "workflows/good.wf": good}
+        fake_resolver = type("R", (), {
+            "enumerate_entities": lambda self, d, p: (
+                ["bad.wf", "good.wf"] if d == "workflows" else []
+            ),
+            "resolve_read": lambda self, rel: paths[rel],
+        })()
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.get_resolver",
+            lambda: fake_resolver,
+        )
+
+        result = _discover_wf_scripts()
+
+        assert set(result) == {"bad", "good"}
+        assert result["bad"]["note"] == METADATA_WARNING
+        assert result["bad"]["parameters"] == []
+        assert result["good"]["name"] == "正常脚本"
+        assert result["good"]["note"] == ""
 
 
 class TestDiscoverClassScripts:

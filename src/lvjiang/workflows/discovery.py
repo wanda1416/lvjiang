@@ -20,7 +20,7 @@ from loguru import logger
 
 from ..core.config.resolver import get_resolver
 from . import implementations
-from .metadata import parse_metadata_file
+from .metadata import metadata_for_script_config
 from .policy import WorkflowDiscoveryPolicy as Policy
 from .preferences import load_preferences, migrate_legacy_workflows_yaml
 
@@ -43,11 +43,11 @@ def _discover_wf_scripts() -> dict[str, dict]:
                 logger.warning(
                     f"脚本 id 重复，忽略 {wf_file}: {script_id}")
                 continue
-            meta = parse_metadata_file(p)
+            meta, warning = metadata_for_script_config(p)
             result[script_id] = {
                 "id": script_id,
                 "name": meta.get("name") or script_id,
-                "note": meta.get("note") or "",
+                "note": warning or meta.get("note") or "",
                 "wf_file": wf_file,
                 "class": "",
                 "parameters": meta.get("parameters") or [],

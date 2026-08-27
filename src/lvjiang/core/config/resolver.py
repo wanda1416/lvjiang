@@ -28,6 +28,11 @@
   冻住整张表，出厂后续新增的条目永远进不到合并视图；用户除非删掉自己的
   local 否则再也看不到更新。存量 local 里的普通列表仍按整键替换处理，
   用户下次保存时由 compute_diff 自动转成增量形式。
+
+以上举例中的 yysls/* 路径仅用于说明两档合并语义长什么样——本模块（core）
+不认识任何插件领域词汇。这些路径的登记表/受保护列表声明由插件自己经
+register_registry_list_paths / register_protected_list_paths 注册，
+不写进本文件的常量表，见两个函数的定义处。
 """
 from __future__ import annotations
 
@@ -74,10 +79,26 @@ _REGISTRY_KEYS = (ADDED_KEY, REMOVED_KEY, ORDER_KEY)
 #: 使 system 的新增条目自动出现，同时保留用户的增、删、排序。
 #:
 #: 路径为点分键名，``*`` 匹配单层任意键。
+#:
+#: **core.config 不认识任何插件领域词汇**：这里只声明 core 自己拥有的
+#: `scenes.yaml`（跨插件通用的场景注册表）。插件私有配置文件（如燕云的
+#: `yysls/tune_config.yaml`）的登记表路径由插件自己经
+#: :func:`register_registry_list_paths` 声明——见
+#: `apps/yysls/config/merge_policy.py`，经 `AppHooks.config_policy_modules`
+#: 「import 即注册」接入（同 `builtin_modules`/`telemetry_modules` 的约定）。
 REGISTRY_LIST_PATHS: dict[str, tuple[str, ...]] = {
     "scenes.yaml": ("layout_scenes.*",),
-    "yysls/tune_config.yaml": ("base_rules",),
 }
+
+
+def register_registry_list_paths(rel_path: str, paths: tuple[str, ...]) -> None:
+    """供插件声明自己私有配置文件里的「注册表列表」路径（见上）。
+
+    插件在自己的配置模块顶层调用本函数（经 `AppHooks.config_policy_modules`
+    在插件加载时 import 触发），而不是把路径写进本文件的常量表——
+    core.config 不应该认识任何插件领域词汇。
+    """
+    REGISTRY_LIST_PATHS[rel_path] = tuple(paths)
 
 
 #: 允许 local 删除 system 内容的路径白名单——**默认禁止删除**。
@@ -99,13 +120,21 @@ DELETABLE_PATHS: dict[str, tuple[str, ...]] = {}
 #:
 #: 形如 {文件: {点分路径: 身份字段}}；身份字段为 None 表示条目本身即身份
 #: （纯标量列表）。
-PROTECTED_LIST_PATHS: dict[str, dict[str, str | None]] = {
-    "yysls/game_config.yaml": {
-        "weapon_types": "name",
-        "level_configs": "level",
-        "season_configs": "season_number",
-    },
-}
+#:
+#: **core.config 不认识任何插件领域词汇**：core 目前没有自己的受保护列表，
+#: 保持空表。插件私有配置文件（如燕云 `yysls/game_config.yaml` 的
+#: `weapon_types`/`level_configs`/`season_configs`）经
+#: :func:`register_protected_list_paths` 由插件自己声明，理由同上。
+PROTECTED_LIST_PATHS: dict[str, dict[str, str | None]] = {}
+
+
+def register_protected_list_paths(rel_path: str, mapping: dict[str, str | None]) -> None:
+    """供插件声明自己私有配置文件里的受保护列表及其身份字段（见上）。
+
+    同 :func:`register_registry_list_paths`，由插件在配置模块顶层调用，
+    不写进本文件的常量表。
+    """
+    PROTECTED_LIST_PATHS.setdefault(rel_path, {}).update(mapping)
 
 
 def _identity(item, field: str | None):

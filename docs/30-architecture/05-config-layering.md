@@ -92,10 +92,16 @@ system 层扫出的空间即**出厂空间**（`is_system_space()`）：用户�
 可增长的条目登记表。local 若存下完整列表，出厂后续新增的条目就永远进不了
 合并视图，用户除非删掉自己的 local 否则再也看不到更新。
 
-| 文件 | 路径 |
-|------|------|
-| `scenes.yaml` | `layout_scenes.*` |
-| `yysls/tune_config.yaml` | `base_rules` |
+`resolver.py` 的 `REGISTRY_LIST_PATHS` 常量表**只声明 core 自己拥有的路径**
+——core.config 不认识任何插件领域词汇。插件私有配置文件的路径由插件自己
+经 `register_registry_list_paths()` 注册（「import 即注册」，同
+`builtin_modules`/`telemetry_modules` 的 `AppHooks.config_policy_modules`
+约定）：
+
+| 文件 | 路径 | 声明方 |
+|------|------|--------|
+| `scenes.yaml` | `layout_scenes.*` | core（`resolver.py` 常量表） |
+| `yysls/tune_config.yaml` | `base_rules` | 插件（`apps/yysls/config/merge_policy.py`） |
 
 local 形如：
 
@@ -148,13 +154,18 @@ base_rules:
 列表走整键替换，绕开了 `__deleted__` 那条保护——用户存一份少了几项的列表
 就把出厂条目抹掉了。`PROTECTED_LIST_PATHS` 按**条目身份字段**比对，
 出厂条目缺失即补回（插回出厂列表中的原下标），用户的新增、改值、重排
-一概保留：
+一概保留。
 
-| 文件 | 路径 | 身份字段 |
-|------|------|----------|
-| `yysls/game_config.yaml` | `weapon_types` | `name` |
-| `yysls/game_config.yaml` | `level_configs` | `level` |
-| `yysls/game_config.yaml` | `season_configs` | `season_number` |
+同 `REGISTRY_LIST_PATHS`，`resolver.py` 里这张表对 core 保持**空**——core
+没有自己的受保护列表。以下三条都是插件私有配置，经
+`register_protected_list_paths()` 由 `apps/yysls/config/merge_policy.py`
+注册：
+
+| 文件 | 路径 | 身份字段 | 声明方 |
+|------|------|----------|--------|
+| `yysls/game_config.yaml` | `weapon_types` | `name` | 插件 |
+| `yysls/game_config.yaml` | `level_configs` | `level` | 插件 |
+| `yysls/game_config.yaml` | `season_configs` | `season_number` | 插件 |
 
 新赛季、新装备等增量内容用户可以自己加条目，不需要删任何出厂设定。
 
@@ -208,6 +219,48 @@ get_resolver().save_merged("app.yaml", doc)    # 整个传回去
 只传部分键会让其余顶层键在用户模式下被判成删除（现已被白名单拦下并记
 warning），在开发模式下则会直接从出厂配置里消失——后者没有保护，
 因为开发者本就有权重排 system。
+
+---
+
+## 六、插件声明自己的合并策略
+
+`REGISTRY_LIST_PATHS`/`PROTECTED_LIST_PATHS` 曾经把 `yysls/*` 的路径直接
+写死在 `resolver.py` 的常量表里——`core.config` 因此"认识" `base_rules`
+是登记表、`weapon_types` 该按 `name` 判同一性这类纯游戏领域知识。这是
+`core` 不该背的债：往下所有插件的私有配置策略都会挤在同一张 core 常量表
+里，core 和插件各自维护一套对同一份配置的理解，随时可能对不上。
+
+现在这两张表在 `resolver.py` 里只声明 core 自己拥有的路径（目前只有
+`scenes.yaml`），插件经 `register_registry_list_paths()` /
+`register_protected_list_paths()`（`resolver.py` 里的两个函数）自己注册。
+接入方式沿用 `builtin_modules`/`telemetry_modules` 已有的「import 即注册」
+约定（见 `apps/base.py` 的 `AppHooks.config_policy_modules`）：
+
+```python
+# apps/yysls/config/merge_policy.py —— import 即触发注册，不做其他事
+from ....core.config.resolver import (
+    register_protected_list_paths, register_registry_list_paths,
+)
+
+register_registry_list_paths("yysls/tune_config.yaml", ("base_rules",))
+register_protected_list_paths("yysls/game_config.yaml", {
+    "weapon_types": "name", "level_configs": "level",
+    "season_configs": "season_number",
+})
+```
+
+```python
+# apps/yysls/__init__.py —— hooks 声明该模块，插件加载时 register_hooks
+# 会 import 一遍，注册动作在 import 时自动发生
+hooks = AppHooks(
+    ...,
+    config_policy_modules=["lvjiang.apps.yysls.config.merge_policy"],
+)
+```
+
+新增插件若也需要声明自己的注册表列表/受保护列表，照此模式新建一个
+`config/merge_policy.py`（或等价模块）并挂到自己的 `config_policy_modules`，
+不要往 `resolver.py` 的常量表里加路径。
 
 ---
 

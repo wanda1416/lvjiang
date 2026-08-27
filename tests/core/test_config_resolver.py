@@ -390,7 +390,20 @@ class TestRegistryList:
 
 
 class TestRegistryThroughResolver:
-    """经 load_merged / save_merged 走完整路径，验证按文件名选用注册表声明。"""
+    """经 load_merged / save_merged 走完整路径，验证按文件名选用注册表声明。
+
+    REGISTRY_LIST_PATHS 本身只声明 core 自己拥有的 scenes.yaml——插件私有
+    配置文件的路径由插件经 register_registry_list_paths 注册（见
+    apps/yysls/config/merge_policy.py），core 测试不该假定任何插件路径已
+    注册，故这里用 monkeypatch 造一个域中立的示例路径来验证机制本身。
+    """
+
+    DEMO_REL = "demo.yaml"
+
+    @pytest.fixture(autouse=True)
+    def _demo_registry(self, monkeypatch):
+        import lvjiang.core.config.resolver as cr
+        monkeypatch.setattr(cr, "REGISTRY_LIST_PATHS", {self.DEMO_REL: ("base_rules",)})
 
     def _write(self, path, doc):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -398,27 +411,27 @@ class TestRegistryThroughResolver:
 
     def test_user_save_writes_increment_only(self, dirs):
         system, local = dirs
-        self._write(system / "yysls" / "tune_config.yaml",
+        self._write(system / self.DEMO_REL,
                     {"base_rules": ["a", "b"], "switches": {}})
         r = _user(dirs)
-        r.save_merged("yysls/tune_config.yaml",
+        r.save_merged(self.DEMO_REL,
                       {"base_rules": ["a", "b", "mine"], "switches": {}})
         saved = yaml.safe_load(
-            (local / "yysls" / "tune_config.yaml").read_text(encoding="utf-8"))
+            (local / self.DEMO_REL).read_text(encoding="utf-8"))
         assert saved == {"base_rules": {"__added__": ["mine"]}}
 
     def test_system_addition_reaches_user_after_upgrade(self, dirs):
         """本 bug 的回归点：用户存过 local 之后仍能看到出厂新增的脚本。"""
         system, local = dirs
-        self._write(system / "yysls" / "tune_config.yaml",
+        self._write(system / self.DEMO_REL,
                     {"base_rules": ["a", "b"], "switches": {}})
         r = _user(dirs)
-        r.save_merged("yysls/tune_config.yaml",
+        r.save_merged(self.DEMO_REL,
                       {"base_rules": ["a", "b", "mine"], "switches": {}})
         # 发新版：出厂多了 c
-        self._write(system / "yysls" / "tune_config.yaml",
+        self._write(system / self.DEMO_REL,
                     {"base_rules": ["a", "b", "c"], "switches": {}})
-        assert r.load_merged("yysls/tune_config.yaml")["base_rules"] == [
+        assert r.load_merged(self.DEMO_REL)["base_rules"] == [
             "a", "b", "c", "mine"]
 
     def test_unlisted_file_keeps_replace_semantics(self, dirs):
@@ -444,13 +457,13 @@ class TestDeletionAllowlist:
         path.write_text(yaml.dump(doc, allow_unicode=True), encoding="utf-8")
 
     def test_unregistered_deletion_suppressed(self, dirs):
-        self._write_system(dirs, "yysls/game_config.yaml",
+        self._write_system(dirs, "demo.yaml",
                            {"schools": {"出厂流派": {"v": 1}}})
         r = _user(dirs)
-        doc = r.load_merged("yysls/game_config.yaml")
+        doc = r.load_merged("demo.yaml")
         doc["schools"].pop("出厂流派")
-        r.save_merged("yysls/game_config.yaml", doc)
-        assert "出厂流派" in r.load_merged("yysls/game_config.yaml")["schools"]
+        r.save_merged("demo.yaml", doc)
+        assert "出厂流派" in r.load_merged("demo.yaml")["schools"]
 
     def test_top_level_key_never_lost_to_partial_save(self, dirs):
         """调用方只传部分文档时，其余顶层键不会被判成删除。
@@ -470,18 +483,18 @@ class TestDeletionAllowlist:
 
         这正是「默认禁止删除」能同时满足两边的原因：挡住的只有出厂内容。
         """
-        self._write_system(dirs, "yysls/game_config.yaml",
+        self._write_system(dirs, "demo.yaml",
                            {"schools": {"出厂流派": {"v": 1}}})
         r = _user(dirs)
-        doc = r.load_merged("yysls/game_config.yaml")
+        doc = r.load_merged("demo.yaml")
         doc["schools"]["我的流派"] = {"v": 9}
-        r.save_merged("yysls/game_config.yaml", doc)
-        assert "我的流派" in r.load_merged("yysls/game_config.yaml")["schools"]
+        r.save_merged("demo.yaml", doc)
+        assert "我的流派" in r.load_merged("demo.yaml")["schools"]
 
-        doc = r.load_merged("yysls/game_config.yaml")
+        doc = r.load_merged("demo.yaml")
         doc["schools"].pop("我的流派")
-        r.save_merged("yysls/game_config.yaml", doc)
-        merged = r.load_merged("yysls/game_config.yaml")
+        r.save_merged("demo.yaml", doc)
+        merged = r.load_merged("demo.yaml")
         assert "我的流派" not in merged["schools"]
         assert "出厂流派" in merged["schools"]
 
@@ -522,9 +535,14 @@ class TestProtectedLists:
 
     列表走整键替换，绕开了 __deleted__ 那条保护——用户存一份少了几项的
     列表就把出厂条目抹掉了。这里按条目身份字段比对补回。
+
+    PROTECTED_LIST_PATHS 本身对 core 保持空表——插件私有配置文件的受保护
+    列表由插件经 register_protected_list_paths 注册（见
+    apps/yysls/config/merge_policy.py）。这里用 monkeypatch 造一个域中立
+    的示例路径验证机制本身，不假定任何插件路径已注册。
     """
 
-    REL = "yysls/game_config.yaml"
+    REL = "demo.yaml"
     BASE = {
         "weapon_types": [
             {"name": "剑", "wuxue_affix": "剑武学增伤"},
@@ -532,6 +550,13 @@ class TestProtectedLists:
         ],
         "level_configs": [{"level": 91}, {"level": 100}, {"level": 110}],
     }
+
+    @pytest.fixture(autouse=True)
+    def _demo_protected(self, monkeypatch):
+        import lvjiang.core.config.resolver as cr
+        monkeypatch.setattr(cr, "PROTECTED_LIST_PATHS", {
+            self.REL: {"weapon_types": "name", "level_configs": "level"},
+        })
 
     def _resolver(self, dirs):
         path = dirs[0] / self.REL

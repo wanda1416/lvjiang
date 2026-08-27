@@ -294,15 +294,24 @@ flows:
 
 支持 `select`（下拉枚举）和 `number`（数字输入）两种类型：
 
+支持四种类型：
+
+| `type` | 控件 | 注入到 `$name` 的值 |
+|---|---|---|
+| `select` | 下拉框 | 选中项的 `value`（字符串） |
+| `number` | 数字输入框 | 数字（以字符串注入） |
+| `bool` | 单个复选框 | `true` / `false` |
+| `checkgroup` | 一组复选框（自动换行） | `{选项值: 是否勾选}` 字典 |
+
 | 字段 | 说明 |
 |---|---|
 | `name` | 参数名，即工作流中的变量名（`$name`） |
 | `label` | UI 显示标签 |
-| `type` | 参数类型：`select`（下拉框）或 `number`（数字输入框） |
-| `default` | 默认值 |
-| `options` | （仅 `select`）可选项列表，支持简单字符串或 `{value, label}` 对象 |
-| `min` | （仅 `number`）最小值，默认 1 |
-| `max` | （仅 `number`）最大值，默认 9999 |
+| `type` | 参数类型，见上表；缺省为 `select` |
+| `default` | 默认值（`checkgroup` 为字典，`bool` 为真假值） |
+| `options` | （`select` / `checkgroup`）可选项列表，支持简单字符串或 `{value, label}` 对象 |
+| `min` | （仅 `number`）最小值，默认 0 |
+| `max` | （仅 `number`）最大值，默认 999999 |
 
 **示例**：
 
@@ -319,6 +328,28 @@ parameters:
     type: select
     default: "金色狗粮"
     options: ["金色狗粮", "紫色狗粮"]
+  - name: claim_reward
+    label: 领取奖励
+    type: bool
+    default: false
+  - name: buy_keywords          # 见 purchase_bugan.wf
+    label: 购买项
+    type: checkgroup
+    default: { 心法: true, 武学: true }
+    options:
+      - { value: 心法, label: 心法 }
+      - { value: 武学, label: 武学 }
+```
+
+`checkgroup` 注入的是字典，不是列表，遍历要配合 `keys()`：
+
+```
+for kw in keys($buy_keywords)
+    if not $buy_keywords.$kw       # 没勾的跳过
+        continue
+    end
+    # ... 处理勾选项
+end
 ```
 
 ### 6.3 工作流中使用
@@ -337,6 +368,16 @@ default $execute_times = 10          # 未从 UI 传入时使用默认值 10
 loop $execute_times
     # ... 每轮逻辑
 end
+```
+
+**建议为每个参数都写一条 `default`**：批量执行读的是 `wf_configs` 里存过的
+配置（见 6.4），用户若从没在日常页调过这个脚本，参数就是空的。此时
+`checkgroup` 参数会是未定义——遍历它不报错，只是一个都不处理，
+表现为"脚本跑完了但什么都没做"。`default` 写成与 front-matter 相同的
+默认值即可兜住，已注入时不会被覆盖：
+
+```
+default $buy_keywords = {"心法": true, "武学": true}
 ```
 
 动态 Area 引用：

@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QSpinBox,
 )
 
@@ -77,6 +78,9 @@ class TestDialog:
         ):
             assert nav.minimumWidth() >= 200
             assert nav.property("navigation") is True
+        buttons = dialog.findChildren(QPushButton)
+        assert buttons
+        assert all(button.styleSheet() for button in buttons)
 
 
 class TestLevelConfig:

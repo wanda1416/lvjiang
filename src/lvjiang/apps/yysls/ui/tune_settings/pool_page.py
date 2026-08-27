@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.button_styles import apply_button_style
+
 from .....i18n import tr
 from .affix_picker import AffixSelectSortDialog
 
@@ -64,6 +66,7 @@ class _AffixListBox(QWidget):
         btn_col = QVBoxLayout()
         btn_edit = QPushButton(tr("编辑"))
         btn_edit.clicked.connect(self._edit)
+        apply_button_style(btn_edit, variant="neutral")
         btn_col.addWidget(btn_edit)
         btn_col.addStretch()
         layout.addLayout(btn_col)

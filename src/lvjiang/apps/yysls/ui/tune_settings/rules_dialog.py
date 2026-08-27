@@ -43,6 +43,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_rule_manager,
 )
 from lvjiang.core.config.wf_configs import get_wf_config
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
@@ -77,6 +78,11 @@ class _NewRuleDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
+        apply_button_style(buttons.button(QDialogButtonBox.StandardButton.Ok))
+        apply_button_style(
+            buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            variant="neutral",
+        )
         layout.addWidget(buttons)
 
     def _on_accept(self):
@@ -142,6 +148,7 @@ class TuningRulesDialog(QDialog):
         btn_judge_test.setAutoDefault(False)
         btn_judge_test.clicked.connect(self._open_judge_test)
         left.addWidget(btn_judge_test)
+        apply_button_style(btn_new, btn_judge_test)
         body.addLayout(left)
 
         # ── 右侧内容区 ──

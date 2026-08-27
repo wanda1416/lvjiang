@@ -39,6 +39,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     DYNAMIC_AFFIXES,
     DYNAMIC_CATEGORY,
 )
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -102,6 +103,7 @@ class AffixSelectSortDialog(QDialog):
         top_header.addStretch()
         btn_remove = QPushButton(tr("移除选中"))
         btn_remove.clicked.connect(self._remove_selected)
+        apply_button_style(btn_remove, variant="danger")
         top_header.addWidget(btn_remove)
         top_layout.addLayout(top_header)
 
@@ -151,6 +153,11 @@ class AffixSelectSortDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        apply_button_style(buttons.button(QDialogButtonBox.StandardButton.Ok))
+        apply_button_style(
+            buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            variant="neutral",
+        )
         layout.addWidget(buttons)
 
         if flat:

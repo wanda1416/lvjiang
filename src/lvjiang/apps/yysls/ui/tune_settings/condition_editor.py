@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.button_styles import apply_button_style
 from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）
@@ -61,6 +62,7 @@ class _ConditionRow(QWidget):
 
         self.symbols_btn = QPushButton(tr("（点击选择词条）"))
         self.symbols_btn.clicked.connect(self._pick_symbols)
+        apply_button_style(self.symbols_btn, variant="neutral")
         layout.addWidget(self.symbols_btn, 1)
 
         self.count_spin = QSpinBox()
@@ -75,6 +77,7 @@ class _ConditionRow(QWidget):
         btn_del = QPushButton(tr("删除"))
         btn_del.setFixedWidth(50)
         btn_del.clicked.connect(lambda: self.remove_requested.emit(self))
+        apply_button_style(btn_del, variant="danger")
         layout.addWidget(btn_del)
 
         self._update_visibility()
@@ -172,6 +175,7 @@ class ConditionEditor(QWidget):
 
         btn_add = QPushButton("+ " + tr("添加条件"))
         btn_add.clicked.connect(self._add_row_clicked)
+        apply_button_style(btn_add)
         layout.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
 
     # ── 数据往返 ──
@@ -246,6 +250,7 @@ class _ConditionGroupBox(QGroupBox):
         btn_del = QPushButton(tr("删除本组"))
         btn_del.setFixedWidth(70)
         btn_del.clicked.connect(lambda: self.remove_requested.emit(self))
+        apply_button_style(btn_del, variant="danger")
         layout.addWidget(btn_del, alignment=Qt.AlignmentFlag.AlignRight)
 
     # ── when 往返（UI 约束单开关绑定，与现有规则形态一致）──
@@ -307,6 +312,7 @@ class ConditionGroupsEditor(QWidget):
 
         btn_add = QPushButton("+ " + tr("添加条件组"))
         btn_add.clicked.connect(self._add_group_clicked)
+        apply_button_style(btn_add)
         layout.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
 
     # ── 数据往返 ──

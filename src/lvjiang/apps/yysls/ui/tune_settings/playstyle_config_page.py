@@ -35,6 +35,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     QUALITY_PARTS,
     TuneConfigManager,
 )
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -104,6 +105,8 @@ class PlaystyleConfigPage(QWidget):
         btn_add = QPushButton(tr("添加行"))
         btn_add.clicked.connect(lambda: (insert(table.rowCount()), self._apply()))
         btn_del = QPushButton(tr("删除选中行"))
+        apply_button_style(btn_add)
+        apply_button_style(btn_del, variant="danger")
 
         def _delete():
             r = table.currentRow()

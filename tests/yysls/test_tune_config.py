@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from PyQt6.QtWidgets import QPushButton
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
@@ -92,6 +93,9 @@ class TestDialog:
         rule_panel = dialog._stack.widget(5)
         assert rule_panel._nav.minimumWidth() >= 190
         assert rule_panel._nav.property("navigation") is True
+        buttons = dialog.findChildren(QPushButton)
+        assert buttons
+        assert all(button.styleSheet() for button in buttons)
 
 
 class TestBehaviorPages:

@@ -31,7 +31,8 @@ from ...core.scene_registry import (
     sync_scene_cache,
 )
 from ...i18n import tr
-from ..widgets import strip_focus_rect
+from ..button_styles import apply_button_style
+from ..widgets import centered_cell_widget, strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
     add_view_combo_row,
@@ -100,6 +101,9 @@ class PoiPanelMixin:
         self._btn_bind_point.setToolTip(tr("在画布上放置一个坐标点（绑定到 YAML 定义）"))
         self._btn_bind_point.clicked.connect(self._on_new_point)
         btn_row.addWidget(self._btn_bind_point)
+        apply_button_style(self._btn_new_point_def)
+        apply_button_style(self._btn_bind_point, variant="neutral")
+        apply_button_style(self._btn_del_point, variant="danger")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -137,6 +141,8 @@ class PoiPanelMixin:
         self._btn_del_arrow = QPushButton(tr("删除方向"))
         self._btn_del_arrow.clicked.connect(self._on_delete_arrow)
         btn_row.addWidget(self._btn_del_arrow)
+        apply_button_style(self._btn_new_arrow)
+        apply_button_style(self._btn_del_arrow, variant="danger")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -186,7 +192,7 @@ class PoiPanelMixin:
             cb.stateChanged.connect(
                 lambda state, k=point_def.key: self._on_toggle_poi_disabled(k, "point", state)
             )
-            self._point_list.setCellWidget(row, 5, cb)
+            self._point_list.setCellWidget(row, 5, centered_cell_widget(cb))
         self._point_list.blockSignals(False)
 
     def _refresh_arrow_list(self):
@@ -213,7 +219,7 @@ class PoiPanelMixin:
             cb.stateChanged.connect(
                 lambda state, k=a.key: self._on_toggle_poi_disabled(k, "arrow", state)
             )
-            self._arrow_list.setCellWidget(row, 2, cb)
+            self._arrow_list.setCellWidget(row, 2, centered_cell_widget(cb))
         self._arrow_list.blockSignals(False)
 
     def _on_toggle_poi_disabled(self, key: str, kind: str, state: int):

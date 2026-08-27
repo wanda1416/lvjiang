@@ -183,3 +183,40 @@ class TestResetIdButtonRequiresConfirmation:
         new_id = get_identity().install_id
         assert new_id != old_id
         assert dlg._telemetry_id_label.text() == f"当前标识：{new_id}"
+
+
+class TestTelemetryCaptionComesFromPlugins:
+    """收集说明必须由插件经 AppHooks.telemetry_disclosures 提供。
+
+    原先这段文案写死在通用设置页里（"改进内置调律规则、不含装备名称或
+    完整词条组合"），那是燕云的说法，换个插件就是错的；而且它和同意框
+    各写一份，两处描述会各说各的。现在两边读同一份声明。
+    """
+
+    def test_uses_registered_disclosure(self, monkeypatch):
+        from dataclasses import dataclass
+
+        import lvjiang.apps as apps_mod
+
+        @dataclass(frozen=True)
+        class _Disclosure:
+            title: str = "示例用途"
+            purpose: str = "用于改进示例规则"
+            collected: tuple = ()
+            excluded: tuple = ("账号", "截图")
+
+        monkeypatch.setattr(
+            apps_mod, "get_registry",
+            lambda: {"telemetry_disclosures": (_Disclosure(),)})
+        caption = SettingsDialog._telemetry_caption()
+        assert "用于改进示例规则" in caption
+        assert "账号、截图" in caption
+
+    def test_falls_back_to_neutral_text_without_plugins(self, monkeypatch):
+        """没有插件时不能空着，也不能冒出任何游戏词汇。"""
+        import lvjiang.apps as apps_mod
+        monkeypatch.setattr(apps_mod, "get_registry", lambda: {})
+        caption = SettingsDialog._telemetry_caption()
+        assert caption.strip()
+        for word in ("调律", "装备", "词条", "角色名"):
+            assert word not in caption

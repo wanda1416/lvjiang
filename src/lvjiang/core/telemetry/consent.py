@@ -85,7 +85,7 @@ def record_consent_choice(granted: bool) -> None:
     # set_telemetry_enabled 负责：写 settings.network.telemetry + 生成/清除本地标识与缓冲
     set_telemetry_enabled(granted)
     logger.info(
-        "[telemetry] 用户" + ("同意" if granted else "拒绝") + "参与匿名调律数据收集")
+        "[telemetry] 用户" + ("同意" if granted else "拒绝") + "参与匿名数据收集")
 
 
 def is_network_feature_enabled(feature: NetFeature) -> bool:

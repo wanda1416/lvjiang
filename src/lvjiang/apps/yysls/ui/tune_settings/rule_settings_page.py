@@ -47,6 +47,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tune_config,
     standard_playstyle_attrs,
 )
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -121,11 +122,12 @@ class RuleSettingsPage(QWidget):
         key_row.addWidget(self._key_label)
         self._btn_rename_key = QPushButton(tr("重命名"))
         self._btn_rename_key.clicked.connect(self._rename_key)
+        apply_button_style(self._btn_rename_key, variant="neutral")
         key_row.addWidget(self._btn_rename_key)
         key_row.addStretch()
         # 删除入口收在首行最右，避免与表格编辑区混排误触
         self._btn_delete = QPushButton(tr("删除本规则"))
-        self._btn_delete.setStyleSheet("color: #c62828;")
+        apply_button_style(self._btn_delete, variant="danger")
         self._btn_delete.clicked.connect(self._confirm_delete)
         key_row.addWidget(self._btn_delete)
         if self._protected:
@@ -215,6 +217,8 @@ class RuleSettingsPage(QWidget):
         btn_add.clicked.connect(
             lambda: self._insert_playstyle_row(table.rowCount()))
         btn_del = QPushButton(tr("删除选中行"))
+        apply_button_style(btn_add)
+        apply_button_style(btn_del, variant="danger")
 
         def _delete():
             r = table.currentRow()
@@ -237,6 +241,8 @@ class RuleSettingsPage(QWidget):
             lambda: (self._insert_quality_row(self._quality_table.rowCount()),
                      self._apply_quality()))
         btn_del = QPushButton(tr("删除选中行"))
+        apply_button_style(btn_add)
+        apply_button_style(btn_del, variant="danger")
 
         def _delete():
             r = self._quality_table.currentRow()

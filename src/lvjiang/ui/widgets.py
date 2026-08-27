@@ -1,13 +1,15 @@
 """可复用 UI 控件"""
 
-from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize
+from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize, Qt
 from PyQt6.QtGui import QTextCursor, QWheelEvent
 from PyQt6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
     QComboBox,
+    QHBoxLayout,
     QLayout,
     QTextEdit,
+    QWidget,
 )
 
 _MAX_LOG_LINES = 1000
@@ -78,6 +80,15 @@ def strip_focus_rect(view) -> None:
         return
     view.setStyleSheet(
         f"{existing}\n{_NO_FOCUS_RECT_QSS}" if existing else _NO_FOCUS_RECT_QSS)
+
+
+def centered_cell_widget(widget: QWidget) -> QWidget:
+    """把单个控件放进无边距容器，供表格单元格水平、垂直居中。"""
+    container = QWidget()
+    layout = QHBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignCenter)
+    return container
 
 
 class TrimmedLogEdit(QTextEdit):

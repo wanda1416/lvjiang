@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import QCheckBox, QPushButton
 
 from lvjiang.ui.button_styles import (
     ACTION_BUTTON_STYLE,
@@ -11,7 +11,9 @@ from lvjiang.ui.button_styles import (
     NEUTRAL_BUTTON_STYLE,
     apply_button_style,
 )
+from lvjiang.ui.ocr.dialog import OCRDialog
 from lvjiang.ui.scripts.config_dialog import ScriptConfigDialog
+from lvjiang.ui.widgets import centered_cell_widget
 
 
 def test_shared_button_styles_keep_geometry_consistent(qtbot):
@@ -31,6 +33,30 @@ def test_shared_button_styles_keep_geometry_consistent(qtbot):
     for button in (action, neutral, danger):
         assert "border-radius: 5px" in button.styleSheet()
         assert "padding: 5px 11px" in button.styleSheet()
+
+
+def test_centered_cell_widget_centers_checkbox(qtbot):
+    checkbox = QCheckBox()
+    container = centered_cell_widget(checkbox)
+    qtbot.addWidget(container)
+
+    alignment = container.layout().itemAt(0).alignment()
+    assert alignment & Qt.AlignmentFlag.AlignHorizontal_Mask
+    assert alignment & Qt.AlignmentFlag.AlignVertical_Mask
+
+
+def test_ocr_cleaning_rule_actions_use_shared_styles(qtbot):
+    dialog = OCRDialog()
+    qtbot.addWidget(dialog)
+
+    for button in (
+        dialog._btn_add_repl,
+        dialog._btn_add_pattern,
+        dialog._btn_test,
+    ):
+        assert button.styleSheet() == ACTION_BUTTON_STYLE
+    for button in (dialog._btn_del_repl, dialog._btn_del_pattern):
+        assert button.styleSheet() == DANGER_BUTTON_STYLE
 
 
 def test_script_config_actions_share_one_left_right_row(qtbot, monkeypatch):

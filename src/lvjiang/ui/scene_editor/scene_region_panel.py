@@ -23,7 +23,8 @@ from ...core.layout_manager import rename_item_key_across_all_layouts
 from ...core.scene_definition import VALID_REGION_TYPES, RegionDef
 from ...core.scene_registry import get_registry, is_view_visible, sync_scene_cache
 from ...i18n import tr
-from ..widgets import strip_focus_rect
+from ..button_styles import apply_button_style
+from ..widgets import centered_cell_widget, strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
     add_view_combo_row,
@@ -76,6 +77,8 @@ class RegionPanelMixin:
         self._btn_del_region.clicked.connect(self._on_delete_region)
         self._btn_del_region.setEnabled(False)
         btn_row.addWidget(self._btn_del_region)
+        apply_button_style(self._btn_new_region)
+        apply_button_style(self._btn_del_region, variant="danger")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -126,7 +129,7 @@ class RegionPanelMixin:
             cb.stateChanged.connect(
                 lambda state, k=region_def.key: self._on_toggle_disabled(k, "region", state)
             )
-            self._region_table.setCellWidget(row, 5, cb)
+            self._region_table.setCellWidget(row, 5, centered_cell_widget(cb))
         self._region_table.blockSignals(False)
 
     def _on_toggle_disabled(self, key: str, kind: str, state: int):

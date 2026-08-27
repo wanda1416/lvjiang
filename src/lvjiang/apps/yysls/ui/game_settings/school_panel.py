@@ -47,6 +47,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.button_styles import apply_button_style
+
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
@@ -94,6 +96,8 @@ class SchoolPanel(QWidget):
         self._btn_del = QPushButton(tr("删除"))
         self._btn_del.clicked.connect(self._on_del_school)
         btn_layout.addWidget(self._btn_del)
+        apply_button_style(self._btn_add)
+        apply_button_style(self._btn_del, variant="danger")
         left_layout.addLayout(btn_layout)
 
         splitter.addWidget(left_widget)
@@ -169,6 +173,7 @@ class SchoolPanel(QWidget):
         scheme_layout = QVBoxLayout(scheme_group)
         self._btn_import_scheme = QPushButton(tr("导入 Excel…"))
         self._btn_import_scheme.clicked.connect(self._on_import_scheme)
+        apply_button_style(self._btn_import_scheme, variant="neutral")
         scheme_layout.addWidget(self._btn_import_scheme)
         self._scheme_list = QListWidget()
         self._scheme_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -1043,6 +1048,8 @@ class _PlayStyleEditDialog(QDialog):
         btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
+        apply_button_style(btn_save)
+        apply_button_style(btn_cancel, variant="neutral")
         layout.addLayout(btn_row)
 
     def _on_save(self):

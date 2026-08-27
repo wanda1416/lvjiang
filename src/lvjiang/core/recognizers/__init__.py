@@ -22,6 +22,11 @@ from ._registry import (
 from .color_recognizer import ColorRecognizer
 from .ocr_recognizer import OCRRecognizer
 from .reference_matcher import MatchResult, ReferenceMatcher
+from .reference_recognizer import (
+    RICH_RESERVED_KEYS,
+    ReferenceInfo,
+    ReferenceRecognizer,
+)
 from .template_recognizer import TemplateRecognizer
 
 __all__ = [
@@ -35,6 +40,9 @@ __all__ = [
     "ColorRecognizer",
     "ReferenceMatcher",
     "MatchResult",
+    "ReferenceInfo",
+    "ReferenceRecognizer",
+    "RICH_RESERVED_KEYS",
 ]
 
 

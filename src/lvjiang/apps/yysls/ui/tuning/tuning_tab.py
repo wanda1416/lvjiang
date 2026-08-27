@@ -379,7 +379,7 @@ class TuningTab(QWidget):
         """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
         from lvjiang.core.reference_db import ReferenceDatabase
 
-        from ...core.recognizer.material_recognizer import get_missing_output_fields
+        from ...core.recognizer.reference_adapter import get_missing_output_fields
         db = ReferenceDatabase()
         db.load()
         return get_missing_output_fields(db)

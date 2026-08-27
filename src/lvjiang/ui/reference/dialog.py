@@ -329,11 +329,11 @@ class ReferenceManagerDialog(QDialog):
         self._deselect_all_btn.clicked.connect(self._canvas.deselect_all_cells)
 
         self._grid_panel = GridPanel(
-            rows=self._config.material_grid.rows,
-            cols=self._config.material_grid.cols,
-            gap=self._config.material_grid.gap,
-            height=self._config.material_grid.height,
-            width=self._config.material_grid.width,
+            rows=self._config.reference_grid.rows,
+            cols=self._config.reference_grid.cols,
+            gap=self._config.reference_grid.gap,
+            height=self._config.reference_grid.height,
+            width=self._config.reference_grid.width,
         )
         # 初始化已知分组列表（供批量分组下拉使用）
         self._grid_panel.set_known_groups(self._db.get_groups(), self._db.get_all_labels_by_group())
@@ -459,9 +459,9 @@ class ReferenceManagerDialog(QDialog):
         self._update_info_label()
 
     def _on_grid_defaults_changed(self, grid: dict):
-        """五项网格参数手动改动后写入 session.json 的 settings.material_grid 节点"""
-        from lvjiang.core.config import save_material_grid
-        save_material_grid(grid)
+        """五项网格参数手动改动后写入 settings.reference_grid。"""
+        from lvjiang.core.config import save_reference_grid
+        save_reference_grid(grid)
 
     def _on_generate_grid(self, rows: int, cols: int, gap: int, height: int, width: int):
         """根据单cell尺寸生成网格区域"""

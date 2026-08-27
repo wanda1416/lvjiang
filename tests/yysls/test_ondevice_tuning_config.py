@@ -1,4 +1,4 @@
-"""设备端调律参数配置（core.ondevice.tuning_config）测试
+"""设备端调律参数配置（apps.yysls.ondevice.tuning_config）测试
 
 覆盖 save_tuning_config 的三条校验（与桌面 _start_tuning 一致）与
 「保存 → 回读」闭环。插件 session 单例替换为 tmp_path 隔离实例；
@@ -10,7 +10,7 @@ import json
 import pytest
 
 import lvjiang.core.ondevice.plugins as plugins_module
-from lvjiang.core.ondevice.tuning_config import (
+from lvjiang.apps.yysls.ondevice.tuning_config import (
     get_tuning_config,
     save_tuning_config,
 )
@@ -24,7 +24,7 @@ def session_path(tmp_path, monkeypatch):
     path = tmp_path / "session.json"
     monkeypatch.setattr(constants_mod, "SESSION_PATH", path)
     store_mod.reset_session_store()
-    monkeypatch.setattr(plugins_module, "ensure_loaded", lambda: None)
+    monkeypatch.setattr(plugins_module, "ensure_loaded", lambda *_args: None)
     return path
 
 

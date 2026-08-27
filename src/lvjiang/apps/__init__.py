@@ -55,6 +55,11 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     logger.info("[plugin] 注册插件: %s", hooks.name or "<unnamed>")
 
+    if hooks.id:
+        app_ids = registry.setdefault("app_ids", [])
+        if hooks.id not in app_ids:
+            app_ids.append(hooks.id)
+
     if hooks.window_title:
         registry["window_title"] = hooks.window_title
         logger.info("[plugin]   window_title = %s", hooks.window_title)
@@ -70,6 +75,11 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
     if hooks.menu_builders:
         registry.setdefault("menu_builders", []).extend(hooks.menu_builders)
         logger.info("[plugin]   menu builders: %d", len(hooks.menu_builders))
+
+    if hooks.theme_stylesheet_builders:
+        registry.setdefault("theme_stylesheet_builders", []).extend(
+            hooks.theme_stylesheet_builders
+        )
 
     if hooks.recognizer_classes:
         registry.setdefault("recognizer_classes", []).extend(hooks.recognizer_classes)
@@ -114,6 +124,11 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
                 logger.info("[plugin]   telemetry module 已加载: %s", mod_path)
             except Exception:  # noqa: BLE001
                 logger.exception("[plugin] 统计事件 schema 模块加载失败: %s", mod_path)
+
+    if hooks.telemetry_disclosures:
+        registry.setdefault("telemetry_disclosures", []).extend(
+            hooks.telemetry_disclosures
+        )
 
     if hooks.config_policy_modules:
         registry.setdefault("config_policy_modules", []).extend(hooks.config_policy_modules)
@@ -166,3 +181,8 @@ def _get_global_registry() -> dict[str, Any]:
 def get_registry() -> dict[str, Any]:
     """返回当前全局注册表（供 MainWindow / 引擎读取）。"""
     return _GLOBAL_REGISTRY
+
+
+def get_registered_app_ids() -> tuple[str, ...]:
+    """返回已装配 app 的稳定 ID，保持注册顺序。"""
+    return tuple(str(item) for item in _GLOBAL_REGISTRY.get("app_ids", ()))

@@ -4,6 +4,7 @@ import threading
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
+    from ...core.recognizers import ReferenceRecognizer
     from ..engine.core import WorkflowEngine
 
 from ...core.capture_base import CaptureBackend
@@ -27,9 +28,6 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
     - output: 收集的输出数据字典（由 collect 语句写入，key 为 alias 或变量名）
     """
 
-    # 类级别共享：MaterialRecognizer 跨所有实例复用，避免重复加载参考图
-    _shared_material_recognizer = None
-
     # 执行引擎引用（engine._execute_python_workflow 注入，供内置
     # 函数的 UI 交互 confirm/pause/input 走 Qt 主线程桥）
     _engine: Optional["WorkflowEngine"] = None
@@ -51,6 +49,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         window_top: int = 0,
         stop_check: Optional[Callable[[], bool]] = None,
         pause_event: threading.Event | None = None,
+        reference_recognizer: "ReferenceRecognizer | None" = None,
     ):
         self._capture = capture
         self._ocr = ocr
@@ -63,6 +62,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         self._stop_check = stop_check or (lambda: False)
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event
+        self._reference_recognizer = reference_recognizer
 
         # 运行时状态
         self.output: dict = {}  # collect 语句写入的输出字典
@@ -82,10 +82,8 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         """重置运行时状态（在 run 开始前调用）"""
         self.output = {}
         self.variables = {}
-        # 刷新共享材料识别器的参考库，确保图库管理中的新增/修改/删除分组
-        # 在下次工作流运行时生效（场景编辑器按钮每次 new 识别器不受此影响）
-        if BaseWorkflow._shared_material_recognizer is not None:
-            BaseWorkflow._shared_material_recognizer.reference_db.load()
+        if self._reference_recognizer is not None:
+            self._reference_recognizer.reload()
 
     @property
     def is_stopped(self) -> bool:
@@ -106,17 +104,15 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
                 raise _BreakSignal()
             self._pause_event.wait(timeout=1.0)
 
-    # ─── 材料识别器（类级别共享） ──────────────────────────
+    # ─── 通用参考图识别器 ──────────────────────────────────
 
     @property
-    def material_recognizer(self):
-        """延迟构造 MaterialRecognizer（类级别共享，跨工作流运行复用）"""
-        if BaseWorkflow._shared_material_recognizer is None:
-            from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-                MaterialRecognizer,
-            )
-            BaseWorkflow._shared_material_recognizer = MaterialRecognizer(self._ocr)
-        return BaseWorkflow._shared_material_recognizer
+    def reference_recognizer(self):
+        """返回 engine 注入的 reference 服务；独立使用时按实例懒构造。"""
+        if self._reference_recognizer is None:
+            from ...core.recognizers import ReferenceRecognizer
+            self._reference_recognizer = ReferenceRecognizer(self._ocr)
+        return self._reference_recognizer
 
     # ─── 变量与函数调用 ────────────────────────────────────
 

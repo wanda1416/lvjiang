@@ -9,7 +9,7 @@
 另有：
 - SessionManager：users/{name}.json 的用户级 session 持久化
 - load_yaml / save_yaml：通用 YAML 读写助手
-- 数据模型：UserConfig / InputSimConfig / DelayParam / MaterialGridConfig
+- 数据模型：UserConfig / InputSimConfig / DelayParam / ReferenceGridConfig
 """
 from dataclasses import fields
 from pathlib import Path
@@ -21,7 +21,7 @@ from .models import (
     DelayParam,
     HotkeyConfig,
     InputSimConfig,
-    MaterialGridConfig,
+    ReferenceGridConfig,
     UserConfig,
     parse_delay_params,
 )
@@ -40,15 +40,11 @@ from .session import (
     SessionStore,
     get_session_store,
     load_env,
-    load_equip_display,
-    load_equip_filter,
-    load_material_grid,
+    load_reference_grid,
     load_settings,
     load_ui_page_state,
     save_env,
-    save_equip_display,
-    save_equip_filter,
-    save_material_grid,
+    save_reference_grid,
     save_settings,
     update_ui_page_state,
 )
@@ -80,7 +76,7 @@ __all__ = [
     "DelayParam",
     "HotkeyConfig",
     "InputSimConfig",
-    "MaterialGridConfig",
+    "ReferenceGridConfig",
     "UserConfig",
     "parse_delay_params",
     # 便捷函数
@@ -88,12 +84,8 @@ __all__ = [
     "save_app_config",
     "load_settings",
     "save_settings",
-    "load_material_grid",
-    "save_material_grid",
-    "load_equip_display",
-    "save_equip_display",
-    "load_equip_filter",
-    "save_equip_filter",
+    "load_reference_grid",
+    "save_reference_grid",
     "load_env",
     "save_env",
     "load_available_envs",
@@ -124,16 +116,16 @@ def save_yaml(path: Path, data: dict[str, Any]) -> None:
 
 
 def load_user_config() -> UserConfig:
-    """加载用户配置：session.json（settings 及其 material_grid 子节点）+ app.yaml（输入模拟/延迟参数）"""
+    """加载用户配置：session settings + app.yaml。"""
     data: dict[str, Any] = {}
 
     # session.json 节点
     settings = load_settings()
     if settings:
         data.update(settings)
-    grid = load_material_grid()
+    grid = load_reference_grid()
     if grid:
-        data["material_grid"] = grid
+        data["reference_grid"] = grid
 
     # app.yaml 合并视图
     app = load_app_config()

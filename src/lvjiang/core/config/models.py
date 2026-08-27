@@ -58,8 +58,8 @@ def parse_delay_params(raw: dict | None) -> dict[str, DelayParam]:
 
 
 @dataclass
-class MaterialGridConfig:
-    """材料网格切割默认参数"""
+class ReferenceGridConfig:
+    """参考图批量切割的默认网格参数。"""
     rows: int = 3      # 默认行数（≥ 1）
     cols: int = 6      # 默认列数（≥ 1）
     gap: int = 0       # 默认间隔(px)（≥ 0）
@@ -71,7 +71,7 @@ class MaterialGridConfig:
                               ("height", 1), ("width", 1)):
             value = int(getattr(self, name))
             if value < minimum:
-                raise ValueError(f"material_grid.{name} 必须 ≥ {minimum}: {value}")
+                raise ValueError(f"reference_grid.{name} 必须 ≥ {minimum}: {value}")
             setattr(self, name, value)
 
 
@@ -144,7 +144,7 @@ def _from_known(cls, raw: dict):
 class UserConfig:
     """用户配置（代码默认值 + session.json / app.yaml 覆盖，只读）
 
-    settings / material_grid 来自 config/session/session.json（纯运行态）；
+    settings / reference_grid 来自 config/session/session.json（纯运行态）；
     输入模拟 input_sim + 延迟参数 delay_params 来自 config/**/app.yaml
     （system 出厂默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
@@ -154,7 +154,7 @@ class UserConfig:
     android_input_method: str = "adb"       # adb / device_gesture（Beta，需 App）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
-    material_grid: MaterialGridConfig = field(default_factory=MaterialGridConfig)
+    reference_grid: ReferenceGridConfig = field(default_factory=ReferenceGridConfig)
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
@@ -167,8 +167,8 @@ class UserConfig:
             self.android_capture_method = "scrcpy"
         if self.android_input_method not in {"adb", "device_gesture"}:
             self.android_input_method = "adb"
-        if isinstance(self.material_grid, dict):
-            self.material_grid = MaterialGridConfig(**self.material_grid)
+        if isinstance(self.reference_grid, dict):
+            self.reference_grid = ReferenceGridConfig(**self.reference_grid)
         if isinstance(self.input_sim, dict):
             self.input_sim = InputSimConfig(**self.input_sim)
         if isinstance(self.hotkeys, dict):

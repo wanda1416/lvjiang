@@ -262,7 +262,8 @@ class UserManagerDialog(QDialog):
 
         stats_layout.addWidget(self._section_title(tr("数据统计")))
 
-        self._lbl_stats = QLabel(tr("装备数据展示功能开发中..."))
+        # 占位文案保持中性：这是通用用户管理对话框，具体展示什么数据由插件决定
+        self._lbl_stats = QLabel(tr("数据展示功能开发中..."))
         self._lbl_stats.setStyleSheet("color: palette(mid); font-style: italic;")
         stats_layout.addWidget(self._lbl_stats)
 

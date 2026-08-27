@@ -9,8 +9,6 @@ from typing import Any
 from lvjiang.core.recognizers import ReferenceInfo, ReferenceRecognizer
 from lvjiang.core.reference_db import ReferenceDatabase
 
-from .....i18n import tr
-
 REQUIRED_OUTPUT_FIELDS = ("level_text", "count_text")
 
 
@@ -19,13 +17,22 @@ def get_missing_output_fields(db: ReferenceDatabase) -> list[str]:
     return [key for key in REQUIRED_OUTPUT_FIELDS if key not in existing]
 
 
+#: 游戏内数量的万位后缀。**不能走 tr()**：这是 OCR 从游戏画面读到的文本，
+#: 恒为中文，与用户界面语言无关。用 tr() 会让"把界面切成英文"意外改变解析
+#: 规则——目前两个语言文件都把它映射回"万"所以没出事，但那是巧合不是保证。
+_WAN_SUFFIX = "万"
+
+
 def parse_number(text: str) -> int | None:
-    """解析 yysls 数量/等级文本，包括“万”单位和 OCR 噪声。"""
+    """解析 yysls 数量/等级文本，包括“万”单位和 OCR 噪声。
+
+    含多段数字时取最后一段（OCR 噪声如 '0/1 1092' 取 1092）。
+    """
     text = text.strip()
     if not text:
         return None
     multiplier = 1
-    if text.endswith(tr("万")):
+    if text.endswith(_WAN_SUFFIX):
         text = text[:-1]
         multiplier = 10000
     try:

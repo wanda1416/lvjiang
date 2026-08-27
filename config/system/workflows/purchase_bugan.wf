@@ -1,5 +1,27 @@
 #% name: 自动购买不肝
 #% env: [android, desktop]
+#% parameters:
+#%   - name: buy_keywords
+#%     label: 战斗养成购买项
+#%     type: checkgroup
+#%     default:
+#%       心法: true
+#%       武学: true
+#%       奇术: true
+#%       生活: true
+#%       宝钱: true
+#%       短陌钱: true
+#%     options:
+#%       - { value: 心法, label: 心法 }
+#%       - { value: 武学, label: 武学 }
+#%       - { value: 奇术, label: 奇术 }
+#%       - { value: 生活, label: 生活 }
+#%       - { value: 宝钱, label: 宝钱 }
+#%       - { value: 短陌钱, label: 短陌钱 }
+#%   - name: buy_shengsheng
+#%     label: 购买营生
+#%     type: bool
+#%     default: true
 
 # 自动购买不肝商店商品
 #
@@ -8,15 +30,24 @@
 #   2. 战斗养成（默认类目）：依次处理两个商品面板（各 2 行 × 4 列），
 #      整面板 OCR 扫描 → 逐格判断是否命中购买关键词 → 命中则购买
 #      商品1 处理完后，商品2 上滑 2 行再处理
-#   3. 营生（cat_4）：扫描 (1,1) 确认含「营生」后才购买
-#   5. 赛季（cat_5）：shangpin_1 全部 2×4 格各购买一次
-#   6. 目前外观拖动存在问题，暂时忽略
-#   7. 完成后返回主页
+#   3. 营生（两端均为 cat_5）：扫描 (1,1) 确认含「营生」后才购买
+#   4. 赛季：shangpin_1 全部 2×4 格各购买一次。类目位置两端不同——
+#      手机端要先在类目列表内翻页，翻完落到 cat_4；PC 端不翻页，就在 cat_6
+#   5. 目前外观拖动存在问题，暂时忽略
+#   6. 完成后返回主页
 #
 # 购买动作统一为：点击格子 → 全部添加 → 购买
+#
+# 参数：
+#   buy_keywords   — 战斗养成要买哪些商品类目，勾选制，默认全选
+#                    （值是 {类目名: 是否购买} 字典，键即 OCR 匹配关键词）
+#   buy_shengsheng — 是否购买营生，默认购买
+#   赛季类目保持全买，不做成参数
 
-# ─── 配置：战斗养成要购买的商品类目（新增类目直接在此追加） ────
-eval $buy_keywords = ["心法", "武学", "奇术", "生活", "宝钱", "短陌钱"]
+# 参数未注入时（如批量执行且从未在日常页存过配置）回落到全买，
+# 与做成参数之前的行为一致；已注入时 default 不覆盖。
+default $buy_keywords = {"心法": true, "武学": true, "奇术": true, "生活": true, "宝钱": true, "短陌钱": true}
+default $buy_shengsheng = true
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -64,16 +95,32 @@ else if env("desktop")
 end
 
 # ─── 营生：只买第一格（先确认格子内容是营生） ────────────
-click [bugan_detail].[cat_4] after wait @page_refresh
-scan [bugan_detail].[shangpin_1][1][1] as $cat4_cell
-if $cat4_cell contains "营生"
-   call buy_cell("shangpin_1", 1, 1)
+# 两端都在 cat_5，翻页前就能点到
+if $buy_shengsheng
+    click [bugan_detail].[cat_5] after wait @page_refresh
+    scan [bugan_detail].[shangpin_1][1][1] as $shengsheng_cell
+    if $shengsheng_cell contains "营生"
+       call buy_cell("shangpin_1", 1, 1)
+    else
+       log "营生 (1,1) 未命中，跳过购买"
+    end
 else
-   log "营生 (1,1) 未命中，跳过购买"
+    log "未勾选购买营生，跳过营生类目"
 end
 
 # ─── 赛季：shangpin_1 全部 2×4 格子买一遍 ───
-click [bugan_detail].[cat_5] after wait @page_refresh
+# 游戏更新后类目栏一屏放不下营生和赛季：
+#   手机端可视类目更少，必须先在类目列表内翻页，翻完赛季落到 cat_4；
+#   PC 端一屏能显示到 cat_6，赛季直接就在 cat_6，不翻页。
+# 翻页只能在 liebiao 区域内做——在商品区拖会翻成商品列表滚动。
+# 翻页与是否购买营生无关，所以放在上面的 if 之外：不买营生也要能到赛季。
+if env("android")
+    drag [bugan_detail].[liebiao] up 0.5 after wait @page_refresh
+    eval $season_cat = "cat_4"
+else
+    eval $season_cat = "cat_6"
+end
+click [bugan_detail].$season_cat after wait @page_refresh
 scan [bugan_detail].[shangpin_1] as $season_grid
 for r in [1, 2]
     for c in [1, 2, 3, 4]
@@ -93,9 +140,13 @@ click [game_menu_page].[back] after wait @step_interval
 log "不肝商店购买流程结束。"
 
 # ─── 关键词命中判断 ────────────────────────────────────
-# 返回文本中命中的第一个关键词，未命中返回 ""
+# $keywords 是 {类目名: 是否购买} 字典（checkgroup 参数原样传入），
+# 只在勾选的类目里找；返回命中的第一个关键词，未命中返回 ""
 def match_keyword($text, $keywords)
-    for kw in $keywords
+    for kw in keys($keywords)
+        if not $keywords.$kw
+            continue
+        end
         if $text contains $kw
             return $kw
         end

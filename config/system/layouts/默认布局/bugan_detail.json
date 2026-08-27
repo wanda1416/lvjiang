@@ -73,10 +73,11 @@
     },
     {
       "key": "cat_6",
-      "x_ratio": 0.051169850441258526,
-      "y_ratio": 0.892341609144354,
-      "w_ratio": 0.04530523000405665,
-      "h_ratio": 0.09601889909303873
+      "x_ratio": 0,
+      "y_ratio": 0,
+      "w_ratio": 0,
+      "h_ratio": 0,
+      "disabled": true
     }
   ],
   "panels": [

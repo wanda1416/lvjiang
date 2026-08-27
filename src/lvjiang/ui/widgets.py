@@ -7,8 +7,6 @@ from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
     QLayout,
-    QStyle,
-    QStyledItemDelegate,
     QTextEdit,
 )
 
@@ -50,22 +48,36 @@ def install_wheel_guard(app) -> WheelGuard:
     return guard
 
 
-class NoFocusRectDelegate(QStyledItemDelegate):
-    """去掉单元格的虚线焦点框（只读列表靠选中底色区分即可）"""
-
-    def initStyleOption(self, option, index):
-        super().initStyleOption(option, index)
-        option.state &= ~QStyle.StateFlag.State_HasFocus
+#: 去焦点框的样式规则，见 strip_focus_rect
+_NO_FOCUS_RECT_QSS = "QAbstractItemView { outline: 0; }"
 
 
 def strip_focus_rect(view) -> None:
     """只读表格/列表：移除点击后的虚线焦点框，仅保留选中底色
 
     内容不可就地编辑（双击弹对话框）的列表，虚线框只会干扰视觉。
-    注意：会覆盖视图上已设的 item delegate，有自定义 delegate 的
-    视图应直接继承 NoFocusRectDelegate 而不是调本函数。
+
+    **用样式表而不是自定义 delegate**（原先是一个重写 ``initStyleOption``
+    的 ``QStyledItemDelegate`` 子类）。Qt 在视图析构收尾阶段仍可能派发排队
+    中的 paint 事件并回调 delegate 的虚函数；此时该虚函数若是 **Python 重写**
+    的，PyQt 要重入 Python，就会先抛
+    ``wrapped C/C++ object ... has been deleted``、随后在 C++ 侧**段错误**。
+    只要构造过 SceneTab 这种较重的控件树再销毁（关闭场景编辑器、测试收尾
+    统一 processEvents），就会稳定复现。
+
+    换 parent（挂到 QApplication 下）和改成全局共享一个实例都试过，**都不能
+    解决**——问题不在 delegate 的所有权，而在"Qt 在收尾阶段回调 Python 重写
+    的虚函数"这件事本身。改用 Qt 原生 delegate 则不崩，故这里彻底不用
+    Python 虚函数：样式表由 Qt 自己解析，全程不回调 Python。
+
+    两种写法的渲染结果经像素级比对**完全一致**（见
+    tests/ui/test_strip_focus_rect.py），不是等价的猜测。
     """
-    view.setItemDelegate(NoFocusRectDelegate(view))
+    existing = view.styleSheet()
+    if _NO_FOCUS_RECT_QSS in existing:
+        return
+    view.setStyleSheet(
+        f"{existing}\n{_NO_FOCUS_RECT_QSS}" if existing else _NO_FOCUS_RECT_QSS)
 
 
 class TrimmedLogEdit(QTextEdit):

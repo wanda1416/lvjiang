@@ -1,11 +1,29 @@
 """用户配置管理 - 多用户支持"""
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
 from loguru import logger
 
 from ..i18n import tr
+
+#: 合法用户名：中文 + 常见 ID 命名（字母数字下划线连字符），1~32 字。
+#:
+#: 用户名会**直接当文件名**用（``users/{name}.json``，见 config/users.py），
+#: 也会拼进 profile 告警去重的复合键（``{user}:{key}:...``，见
+#: profile_engine._clean_old_alerts）。不校验的话：``../x`` 能写出 users
+#: 目录之外，``a/b`` 会凭空建子目录，含 ``:`` 的名字在 Windows 上直接存不了、
+#: 还会让告警键按 ``:`` 切分时错位、把有效记录当成过期的删掉。
+#:
+#: 校验放在这一层而不是只放 UI：``create_user`` 是产生用户名的唯一入口，
+#: 挡在这里才对所有调用方（含将来的脚本/设备端）都成立。
+_VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
+
+
+def is_valid_username(name: str) -> bool:
+    """用户名是否合法（见 :data:`_VALID_USERNAME` 的理由）。"""
+    return bool(name) and bool(_VALID_USERNAME.fullmatch(name))
 
 # ─── 数据类 ──────────────────────────────────────────────
 
@@ -92,8 +110,8 @@ class UserConfigManager:
         return self._users.get(name)
 
     def create_user(self, name: str) -> bool:
-        """创建新用户，返回是否成功"""
-        if not name or name in self._users:
+        """创建新用户，返回是否成功（名字非法或重名都返回 False）"""
+        if not is_valid_username(name) or name in self._users:
             return False
         user = User(
             name=name,

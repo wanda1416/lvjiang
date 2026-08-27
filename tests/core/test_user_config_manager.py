@@ -165,3 +165,31 @@ class TestUserConfigManagerCRUD:
         mgr2 = UserConfigManager()
         assert "持久用户" in mgr2.list_users()
         assert mgr2.get_active_user_name() == "持久用户"
+
+
+class TestUsernameValidation:
+    """用户名会直接当文件名（users/{name}.json），也会拼进 profile 告警的
+    复合键（{user}:{key}:...）。不校验的话：'../x' 能写出 users 目录之外、
+    'a/b' 凭空建子目录、含 ':' 的名字在 Windows 上存不了且会让告警键按 ':'
+    切分时错位，把有效记录当过期的删掉。
+    """
+
+    @pytest.mark.parametrize("name", [
+        "默认用户", "张三", "user_01", "my-account", "A1", "测试User_2",
+    ])
+    def test_accepts_chinese_and_common_ids(self, name):
+        from lvjiang.core.user_config import is_valid_username
+        assert is_valid_username(name)
+
+    @pytest.mark.parametrize("name", [
+        "", "../逃逸", "a/b", "a\\b", "含:冒号", "a b", "a.b", "x" * 33, "emoji😀",
+    ])
+    def test_rejects_unsafe_names(self, name):
+        from lvjiang.core.user_config import is_valid_username
+        assert not is_valid_username(name)
+
+    def test_create_user_rejects_invalid(self, session_env):
+        mgr = UserConfigManager()
+        assert mgr.create_user("../逃逸") is False
+        assert mgr.create_user("含:冒号") is False
+        assert mgr.create_user("正常用户") is True

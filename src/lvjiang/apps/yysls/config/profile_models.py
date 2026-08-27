@@ -9,7 +9,7 @@
 quota/regen/stock 的 key 可通过 sync_targets 配置触发器同步（跨模型、多目标、倍率、方向限定）。
 note 不参与 sync_targets。
 
-定义与存储完全镜像：profile.yaml 按模型归档，user.json 按模型分节点。
+定义与存储完全镜像：profile.yaml 按模型归档，profile.db 按模型分表。
 """
 
 from __future__ import annotations

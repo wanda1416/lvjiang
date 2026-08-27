@@ -109,16 +109,20 @@ def test_runtime_reports_workbook_baseline() -> None:
 def test_editable_baseline_dps_recalibrates_graduation_rate(
     tmp_path, monkeypatch,
 ) -> None:
-    import lvjiang.apps.yysls.config.graduation_session as graduation_session
     import lvjiang.apps.yysls.core.graduation as graduation
+    import lvjiang.constants as constants
+    import lvjiang.core.config.session as session_mod
+    from lvjiang.apps.yysls.config import session_node
 
     source = DATA_DIR / "鸣金·虹_基础方案.json"
     shutil.copy(source, tmp_path / source.name)
     monkeypatch.setattr(graduation, "_DATA_DIR", tmp_path)
-    # 将 session 写入隔离的临时文件，不污染真实 session
-    monkeypatch.setattr(
-        graduation_session, "_SESSION_PATH", tmp_path / "session.json",
-    )
+    # 基准 DPS 覆盖值现存于 session.json 的 yysls 节点（见 config/session_node）；
+    # 把 session 目录整体指到 tmp_path 并重置单例，避免污染真实 session。
+    monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(session_mod, "_store", None)
+    monkeypatch.setattr(session_node, "LEGACY_PATH", tmp_path / "yysls.json")
     invalidate_graduation_cache()
     try:
         attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")

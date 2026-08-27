@@ -14,7 +14,8 @@ profile.yaml 结构：
     stock:
       ...
 
-此模块仅负责定义加载，不负责运行时数据存储（运行时数据在 user.json 的 profile 节点）。
+此模块仅负责定义加载，不负责运行时数据存储（运行时数据在 profile.db，
+按 username 隔离）。
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ _config: ProfileSchema | None = None
 
 
 def read_profile_entry(data: dict, model_type: str, key: str) -> dict:
-    """从 user.json 数据中读取 profile 节点值
+    """[Deprecated] 从早期 user.json 数据结构中读取 profile 节点值
 
     Returns: {"value": ..., "updated_at": ...} 或空 dict
     """
@@ -64,7 +65,7 @@ def write_profile_entry(
     value,
     updated_at: str | None = None,
 ) -> None:
-    """[Deprecated] 向 user.json 数据中写入 profile 节点值（就地修改 data）
+    """[Deprecated] 向早期 user.json 数据结构写入 profile 节点值（就地修改 data）
 
     新代码应使用 profile_db.db_upsert() 替代。
     updated_at: 可选，指定写入的时间戳；为 None 时使用当前时间。

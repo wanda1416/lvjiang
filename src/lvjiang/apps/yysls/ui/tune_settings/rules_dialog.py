@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QSplitter,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -46,7 +47,11 @@ from lvjiang.core.config.wf_configs import get_wf_config
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import (
+    configure_navigation_list,
+    mark_navigation_list,
+    navigation_width_for_chars,
+)
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
@@ -130,13 +135,19 @@ class TuningRulesDialog(QDialog):
             groups = self._group_manager.get_groups()
             group_key = next(iter(groups), "")
 
-        body = QHBoxLayout()
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # ── 左侧一级导航 + 规则入口 ──
-        left = QVBoxLayout()
+        left_widget = QWidget()
+        left = QVBoxLayout(left_widget)
         left.setContentsMargins(0, 0, 0, 0)
         self._nav = QListWidget()
-        configure_navigation_list(self._nav, minimum_width=220)
+        mark_navigation_list(self._nav)
+        first_level_width = navigation_width_for_chars(self._nav, 8)
+        configure_navigation_list(
+            self._nav,
+            minimum_width=navigation_width_for_chars(self._nav, 4),
+        )
         self._nav.currentRowChanged.connect(self._on_nav_changed)
         self._nav.itemDoubleClicked.connect(self._on_nav_double_clicked)
         left.addWidget(self._nav, 1)
@@ -149,12 +160,17 @@ class TuningRulesDialog(QDialog):
         btn_judge_test.clicked.connect(self._open_judge_test)
         left.addWidget(btn_judge_test)
         apply_button_style(btn_new, btn_judge_test)
-        body.addLayout(left)
+        self._main_splitter.addWidget(left_widget)
 
         # ── 右侧内容区 ──
         self._stack = QStackedWidget()
-        body.addWidget(self._stack, 1)
-        layout.addLayout(body, 1)
+        self._main_splitter.addWidget(self._stack)
+        self._main_splitter.setCollapsible(0, False)
+        self._main_splitter.setCollapsible(1, False)
+        self._main_splitter.setStretchFactor(0, 0)
+        self._main_splitter.setStretchFactor(1, 1)
+        self._main_splitter.setSizes([first_level_width, 1200 - first_level_width])
+        layout.addWidget(self._main_splitter, 1)
 
         self._status_label = QLabel(tr("规则变更即校验，校验通过自动保存并生效"))
         layout.addWidget(self._status_label)

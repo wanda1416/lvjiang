@@ -119,7 +119,7 @@ user_manager:
   label_username: Username
   label_created_at: Created
   section_stats: Statistics
-  equip_data_wip: Equipment data display is under development...
+  data_display_wip: Data display is under development...
   new_user_title: New User
   input_username_prompt: 'Enter username:'
   user_created: 'User created: {name}'

@@ -33,10 +33,17 @@ class _DataOpsMixin:
     _base_dir: Path | None
 
     def _resolve_literal(self, value) -> Any:
-        """递归解析 literal 内的 VarRef/FieldAccess（用于 default 的 dict/list）
+        """递归解析 literal 内的 VarRef/FieldAccess/Literal（用于 default 的 dict/list）
 
-        dict/list 的 value 可能包含 VarRef 或 FieldAccess，需要递归解析。
+        dict/list 的 value 可能包含 VarRef、FieldAccess 或 Literal，需要递归解析。
         其他类型（str/int/float/bool/None）直接返回。
+
+        ``Literal`` 这一支不能漏：dict/list 字面量的**标量**元素在解析阶段就被
+        包成了 ``Literal`` 节点（见 grammar 的 dict_val_* / list_item_* 规则），
+        漏掉它 ``default $d = {"a": true}`` 存进变量表的会是 ``Literal(value=True)``
+        这个 AST 节点本身，而不是 ``True``。后果很隐蔽——节点对象恒为真值，
+        ``if $d.a`` 无论写 true 还是 false 都成立，开关型默认值会全部失效。
+        （``eval`` 走的是另一条求值路径，没有这个问题，所以只有 ``default`` 中招。）
         """
         if isinstance(value, dict):
             return {k: self._resolve_literal(v) for k, v in value.items()}
@@ -44,6 +51,8 @@ class _DataOpsMixin:
             return [self._resolve_literal(item) for item in value]
         if isinstance(value, (VarRef, FieldAccess)):
             return self._resolve(value)
+        if isinstance(value, Literal):
+            return value.value
         return value
 
     def _dynamic_field_keys(self, region_var) -> list[str]:

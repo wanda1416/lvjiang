@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTabWidget,
     QVBoxLayout,
@@ -138,7 +139,14 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     def _build_canvas_toolbar(self) -> QHBoxLayout:
         """画布顶部工具栏：视图选择器 + 管理入口 + 来源/版本标识"""
         bar = QHBoxLayout()
-        bar.addWidget(QLabel(tr("视图")))
+        # 作为 SceneTab 内容的首行，保持与上方分组/场景 Tab 紧密衔接。
+        bar.setContentsMargins(0, 0, 0, 0)
+        view_label = QLabel(tr("视图"))
+        view_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
+        )
+        bar.addWidget(view_label)
         self._view_combo = QComboBox()
         self._view_combo.setMinimumWidth(120)
         self._view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
@@ -147,15 +155,21 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._btn_manage_views.setToolTip(tr("开启多视图、新增/重命名/删除视图"))
         self._btn_manage_views.clicked.connect(self._on_manage_views)
         bar.addWidget(self._btn_manage_views)
+        bar.addSpacing(12)
 
         # 正在编辑的是哪一份：远端下发的配置会顶替出厂文件，不标出来的话
         # 开发者本地跑出来的行为和用户不一样却毫不知情，排查问题无从下手。
         self._origin_label = QLabel()
+        # 来源文本使用剩余空间，但不能用自身长度反向撑宽画布侧分栏。
+        self._origin_label.setMinimumWidth(0)
+        self._origin_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Fixed,
+        )
         self._origin_label.setStyleSheet("color: palette(mid);")
-        bar.addWidget(self._origin_label)
+        bar.addWidget(self._origin_label, stretch=1)
         self._refresh_origin_label()
 
-        bar.addStretch()
         self._refresh_view_combo()
         return bar
 

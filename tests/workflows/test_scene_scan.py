@@ -71,14 +71,35 @@ def test_collect_from_try_and_while_bodies():
 
 
 def test_collect_from_proc_body():
-    """def 过程体内的场景引用被搜集（即使未被调用）"""
+    """被调用的 def 过程体内的场景引用会被搜集"""
     text = (
         'def helper()\n'
         '    click [scene_in_proc].[btn]\n'
         'end\n'
         'log "top"\n'
+        'call helper()\n'
     )
     assert _collect(text) == {"scene_in_proc"}
+
+
+def test_uncalled_proc_excluded_by_default_but_included_for_lint():
+    """未被调用的过程：执行前闸门不查，CI/编写期检查要查。
+
+    默认（reachable_only=True）供执行前闸门用——拿不会执行的代码挡住用户
+    是事故（真实案例：扫装备被江湖号令页的未绑定区域拒绝）。
+    reachable_only=False 供 validate_only / CI 门禁用，库函数里的 key 拼错
+    才有人发现。
+    """
+    text = (
+        'def never_called()\n'
+        '    click [scene_in_proc].[btn]\n'
+        'end\n'
+        'log "top"\n'
+    )
+    program = parse_text(text)
+    assert collect_scene_keys(program.body, program.procs) == set()
+    lint_refs = collect_refs(program.body, program.procs, reachable_only=False)
+    assert {ref.scene for ref in lint_refs} == {"scene_in_proc"}
 
 
 def test_collect_empty_when_no_scene_ref():
@@ -191,12 +212,18 @@ def _write_wf(tmp_path, text: str, name: str = "t.wf"):
 
 
 def test_missing_scene_raises_before_execution(tmp_path):
-    """引用未绑定场景：加载即报错，不进入执行阶段"""
+    """引用未绑定场景：加载即报错，不进入执行阶段
+
+    helper 必须真被 call —— 执行前闸门只校验可达过程（见
+    workflow_references.collect_refs 的 reachable_only），
+    未被调用的过程不该挡住执行。
+    """
     wf = _write_wf(tmp_path, (
         'def helper()\n'
         '    click [game_main_page].[btn]\n'
         'end\n'
         'log "start"\n'
+        'call helper()\n'
     ))
     engine = _make_engine(bound_scenes=set())
     with pytest.raises(WorkflowUserError, match="场景未绑定任何坐标"):
@@ -239,6 +266,7 @@ def test_missing_key_in_imported_proc_reports_that_file(tmp_path):
     wf = _write_wf(tmp_path, (
         'import "lib.wf"\n'
         'log "start"\n'
+        'call helper()\n'
     ))
     engine = _make_engine(bound_scenes={"game_main_page"})
     with pytest.raises(WorkflowUserError) as ei:
@@ -381,6 +409,7 @@ def test_non_disabled_key_still_raises(tmp_path):
         '    click [game_main_page].[unknown_key]\n'
         'end\n'
         'log "ok"\n'
+        'call helper()\n'
     ))
     disabled_region = SimpleNamespace(
         key="main_func", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5, disabled=True)
@@ -390,3 +419,31 @@ def test_non_disabled_key_still_raises(tmp_path):
     )
     with pytest.raises(WorkflowUserError):
         engine.execute(wf)
+
+
+def test_execute_skips_unreachable_but_validate_only_checks_it(tmp_path):
+    """执行前闸门与 CI 门禁的范围分工。
+
+    execute() 只查可达过程——拿不会执行的代码把用户挡在门外是事故；
+    validate_only()（CI 门禁与上机前预检）连没人调用的库函数一起查，
+    否则 page_detection.wf 这类函数库里的 key 拼错永远没人发现。
+
+    预检比执行更严，方向是安全的：只会「报了但其实不会炸」。
+    """
+    _write_wf(tmp_path, (
+        'def never_called()\n'
+        '    click [game_main_page].[typo_key]\n'
+        'end\n'
+    ), name="lib.wf")
+    wf = _write_wf(tmp_path, (
+        'import "lib.wf"\n'
+        'log "start"\n'
+    ))
+    engine = _make_engine(bound_scenes={"game_main_page"})
+
+    engine.execute(wf)  # 不可达，不该阻断
+
+    with pytest.raises(WorkflowUserError) as ei:
+        engine.validate_only(wf)
+    assert "typo_key" in str(ei.value)
+    assert "lib.wf:2" in str(ei.value)

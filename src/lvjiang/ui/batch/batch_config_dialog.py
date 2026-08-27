@@ -2,7 +2,7 @@
 
 工具菜单「批量配置」打开此对话框。
 每个配置包含：名字 + 用户自定义列的 table + 生命周期 wf 槽位。
-支持：新建配置 / 删除配置 / 切换配置 / 自定义列名 / 编辑行数据。
+列定义直接由表头维护：右键增删，双击重命名。
 """
 
 from __future__ import annotations
@@ -18,9 +18,11 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -78,23 +80,14 @@ class BatchConfigDialog(QDialog):
 
         layout.addLayout(config_row)
 
-        # ── 列定义行 ──
-        col_row = QHBoxLayout()
-        col_row.addWidget(QLabel(tr("列名（逗号分隔）：")))
-        self._columns_input = QLineEdit()
-        self._columns_input.setPlaceholderText("col1, col2, col3, ...")
-        self._columns_input.editingFinished.connect(self._on_columns_changed)
-        col_row.addWidget(self._columns_input, stretch=1)
-        layout.addLayout(col_row)
-
         # ── 用户名列 ──
         user_col_row = QHBoxLayout()
         user_col_row.addWidget(QLabel(tr("用户名列：")))
-        self._user_column_input = QLineEdit()
-        self._user_column_input.setPlaceholderText(tr("(可选)"))
-        self._user_column_input.setFixedWidth(120)
-        user_col_row.addWidget(self._user_column_input)
+        self._user_column_combo = QComboBox()
+        self._user_column_combo.setMinimumWidth(160)
+        user_col_row.addWidget(self._user_column_combo)
         user_col_row.addStretch()
+        user_col_row.addWidget(QLabel(tr("右键表头增删列，双击表头重命名")))
         layout.addLayout(user_col_row)
 
         # ── 条目表 ──
@@ -113,6 +106,10 @@ class BatchConfigDialog(QDialog):
         )
         self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._on_context_menu)
+        header = self._table.horizontalHeader()
+        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._on_header_context_menu)
+        header.sectionDoubleClicked.connect(self._on_header_double_clicked)
         layout.addWidget(self._table, stretch=1)
 
         # ── 表格操作行 ──
@@ -256,21 +253,20 @@ class BatchConfigDialog(QDialog):
             self._clear_editor()
             return
 
-        # 列名
-        self._columns_input.setText(", ".join(item.columns))
-
-        # 用户名列
-        self._user_column_input.setText(item.user_column)
+        columns = self._normalized_editor_columns(item.columns, item.user_column)
 
         # 表格：先清空，再创建行
-        self._table.setColumnCount(len(item.columns))
-        self._table.setHorizontalHeaderLabels(item.columns)
+        self._table.setColumnCount(len(columns))
+        self._table.setHorizontalHeaderLabels(columns)
+        self._sync_user_column_combo(
+            item.user_column if item.user_column in columns else columns[0]
+        )
         self._table.setRowCount(0)
 
         for row_data in item.rows:
             row_idx = self._table.rowCount()
             self._table.insertRow(row_idx)
-            for col_idx, col_name in enumerate(item.columns):
+            for col_idx, col_name in enumerate(columns):
                 val = str(row_data.get(col_name, ""))
                 self._table.setItem(row_idx, col_idx, QTableWidgetItem(val))
 
@@ -286,10 +282,10 @@ class BatchConfigDialog(QDialog):
     def _clear_editor(self):
         """清空编辑区"""
         self._current_name = ""
-        self._columns_input.clear()
-        self._user_column_input.clear()
         self._table.setRowCount(0)
-        self._table.setColumnCount(0)
+        self._table.setColumnCount(1)
+        self._table.setHorizontalHeaderLabels(["user"])
+        self._sync_user_column_combo("user")
         self._set_wf_text(self._wf_batch_setup, "")
         self._set_wf_text(self._wf_prepare_item, "")
         self._set_wf_text(self._wf_finish_item, "")
@@ -301,26 +297,28 @@ class BatchConfigDialog(QDialog):
         if index < 0:
             return
         name = self._config_combo.itemText(index)
+        if self._current_name and self._current_name != name:
+            self._save_current_config()
         self._load_config_to_editor(name)
 
     def _on_new_config(self):
         """新建配置"""
-        from PyQt6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getText(self, tr("新建配置"), tr("配置名称："))
         if not ok or not name.strip():
             return
         name = name.strip()
         if name in self._cfg.configs:
-            from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(self, tr("重复"), f"配置 {name!r} 已存在")
             return
 
+        self._save_current_config()
+
         item = BatchConfigItem(
             name=name,
-            columns=["col1", "col2"],
+            columns=["user"],
             rows=[],
             workflows=BatchWorkflows(),
-            user_column="",
+            user_column="user",
             skip_lifecycle_for_single_item=True,
         )
         self._cfg.configs[name] = item
@@ -331,7 +329,6 @@ class BatchConfigDialog(QDialog):
         """删除当前配置"""
         if not self._current_name:
             return
-        from PyQt6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
             self, tr("确认删除"),
             f"确定删除配置 {self._current_name!r}？",
@@ -347,28 +344,133 @@ class BatchConfigDialog(QDialog):
 
     # ─── 列定义 ──────────────────────────────────────────
 
-    def _on_columns_changed(self):
-        """列名变更 → 直接替换列名，保留数据"""
-        new_columns = self._parse_columns()
-        if not new_columns:
+    @staticmethod
+    def _normalized_editor_columns(
+        columns: list[str], user_column: str,
+    ) -> list[str]:
+        """清理旧配置列；仅对真正的零列异常补一个可编辑入口。"""
+        normalized: list[str] = []
+        for value in columns:
+            name = str(value).strip()
+            if name and name not in normalized:
+                normalized.append(name)
+        if not normalized:
+            normalized.append(user_column.strip() or "user")
+        return normalized
+
+    def _defined_columns(self) -> list[str]:
+        """以表头为列 schema 的唯一来源。"""
+        columns: list[str] = []
+        for index in range(self._table.columnCount()):
+            item = self._table.horizontalHeaderItem(index)
+            columns.append(item.text().strip() if item else "")
+        return columns
+
+    def _sync_user_column_combo(self, preferred: str | None = None) -> None:
+        """列增删改名后实时同步用户名列候选。"""
+        columns = [name for name in self._defined_columns() if name]
+        current = preferred or self._user_column_combo.currentText()
+        self._user_column_combo.blockSignals(True)
+        self._user_column_combo.clear()
+        self._user_column_combo.addItems(columns)
+        target = current if current in columns else columns[0]
+        self._user_column_combo.setCurrentText(target)
+        self._user_column_combo.blockSignals(False)
+
+    def _add_column(self, after_index: int) -> None:
+        """询问列名，并在指定表头右侧插入空列。"""
+        name, ok = QInputDialog.getText(
+            self, tr("新增列"), tr("列名：")
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        if name in self._defined_columns():
+            QMessageBox.warning(
+                self, tr("重复"),
+                tr("列名 '{name}' 已存在").format(name=name),
+            )
             return
 
-        # 直接设置新列名，保留现有数据
-        self._table.setColumnCount(len(new_columns))
-        self._table.setHorizontalHeaderLabels(new_columns)
+        insert_at = max(0, min(after_index + 1, self._table.columnCount()))
+        self._table.insertColumn(insert_at)
+        self._table.setHorizontalHeaderItem(insert_at, QTableWidgetItem(name))
+        for row in range(self._table.rowCount()):
+            self._table.setItem(row, insert_at, QTableWidgetItem(""))
+        self._sync_user_column_combo()
+        if self._table.rowCount() > 0:
+            self._table.setCurrentCell(0, insert_at)
 
-    def _parse_columns(self) -> list[str]:
-        """解析列名输入"""
-        text = self._columns_input.text().strip()
-        if not text:
-            return []
-        return [c.strip() for c in text.split(",") if c.strip()]
+    def _is_username_column(self, index: int) -> bool:
+        columns = self._defined_columns()
+        return (
+            0 <= index < len(columns)
+            and columns[index] == self._user_column_combo.currentText()
+        )
+
+    def _remove_column(self, index: int) -> None:
+        """删除非用户名列；用户名列作为最后编辑入口始终保留。"""
+        if not (0 <= index < self._table.columnCount()):
+            return
+        if self._is_username_column(index):
+            return
+        self._table.removeColumn(index)
+        self._sync_user_column_combo()
+
+    def _rename_column(self, index: int, new_name: str) -> bool:
+        """重命名列并保持用户名列指向与单元格数据不变。"""
+        columns = self._defined_columns()
+        if not (0 <= index < len(columns)):
+            return False
+        old_name = columns[index]
+        new_name = new_name.strip()
+        if not new_name:
+            QMessageBox.warning(self, tr("错误"), tr("列名不能为空"))
+            return False
+        if new_name != old_name and new_name in columns:
+            QMessageBox.warning(
+                self, tr("重复"),
+                tr("列名 '{name}' 已存在").format(name=new_name),
+            )
+            return False
+        if new_name == old_name:
+            return True
+        username = self._user_column_combo.currentText()
+        self._table.setHorizontalHeaderItem(index, QTableWidgetItem(new_name))
+        self._sync_user_column_combo(
+            new_name if username == old_name else username
+        )
+        return True
+
+    def _on_header_context_menu(self, pos) -> None:
+        header = self._table.horizontalHeader()
+        index = header.logicalIndexAt(pos)
+        after_index = index if index >= 0 else self._table.columnCount() - 1
+        menu = QMenu(header)
+        menu.addAction(tr("右侧新增列"), lambda: self._add_column(after_index))
+        if index >= 0:
+            delete_action = menu.addAction(
+                tr("删除当前列"), lambda: self._remove_column(index)
+            )
+            if delete_action is not None:
+                delete_action.setEnabled(not self._is_username_column(index))
+        menu.exec(header.mapToGlobal(pos))
+
+    def _on_header_double_clicked(self, index: int) -> None:
+        columns = self._defined_columns()
+        if not (0 <= index < len(columns)):
+            return
+        name, ok = QInputDialog.getText(
+            self, tr("重命名列"), tr("列名："), text=columns[index]
+        )
+        if ok:
+            self._rename_column(index, name)
 
     # ─── 表格操作 ─────────────────────────────────────────
 
     def _read_table_rows(self) -> list[dict]:
         """从表格读取所有行数据"""
-        columns = self._parse_columns()
+        columns = self._defined_columns()
         rows = []
         for row_idx in range(self._table.rowCount()):
             row_data = {}
@@ -447,10 +549,10 @@ class BatchConfigDialog(QDialog):
         if not item:
             return
 
-        columns = self._parse_columns()
+        columns = self._defined_columns()
         item.columns = columns
         item.rows = self._read_table_rows()
-        item.user_column = self._user_column_input.text().strip()
+        item.user_column = self._user_column_combo.currentText()
         item.workflows = BatchWorkflows(
             batch_setup=self._get_wf_text(self._wf_batch_setup),
             prepare_item=self._get_wf_text(self._wf_prepare_item),

@@ -262,6 +262,10 @@ QMenu::item:selected {{
     background-color: {t.accent};
     color: {t.selection_text};
 }}
+QMenu::item:disabled {{
+    background-color: transparent;
+    color: {t.text_disabled};
+}}
 QMenu::separator {{
     height: 1px;
     background-color: {t.border};

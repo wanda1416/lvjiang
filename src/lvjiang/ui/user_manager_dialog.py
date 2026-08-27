@@ -387,11 +387,20 @@ class UserManagerDialog(QDialog):
         if not name:
             return
 
+        # 分开报错：名字非法与重名是两回事，合成一句话用户不知道该改什么。
+        # 真正的校验在 UserManager.create_user 里（唯一入口），这里只为提示。
+        from ..core.user_config import is_valid_username
+        if not is_valid_username(name):
+            QMessageBox.warning(
+                self, tr("失败"),
+                tr("用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。"))
+            return
+
         if self._user_manager.create_user(name):
             self._refresh_user_list(select_name=name)
             logger.info(f"用户已创建: {name}")
         else:
-            QMessageBox.warning(self, tr("失败"), tr("用户名已存在或为空"))
+            QMessageBox.warning(self, tr("失败"), tr("用户名已存在"))
 
     def _on_delete_user(self):
         """删除用户"""

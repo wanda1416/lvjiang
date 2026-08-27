@@ -108,8 +108,8 @@ class TestLoadUserConfig:
         assert config.theme == "dark"
         assert config.desktop_background_input is True  # 未配置项保持默认
 
-    def test_legacy_material_grid_override_migrates_on_read(self, session_env, monkeypatch):
-        """旧 settings.material_grid 仍能覆盖参考图网格常量。"""
+    def test_obsolete_material_grid_is_not_loaded(self, session_env, monkeypatch):
+        """0.8 不再兼容旧键，用户需要重新保存 reference_grid。"""
         monkeypatch.setattr(
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
@@ -117,10 +117,10 @@ class TestLoadUserConfig:
         }), encoding="utf-8")
         reset_session_store()
         config = load_user_config()
-        assert config.reference_grid.rows == 4
-        assert config.reference_grid.cols == 5
-        assert config.reference_grid.height == 100
-        assert config.reference_grid.width == 122  # 未配置项保持默认
+        assert config.reference_grid.rows == 3
+        assert config.reference_grid.cols == 6
+        assert config.reference_grid.height == 122
+        assert config.reference_grid.width == 122
 
     def test_app_yaml_input_sim_override(self, session_env, monkeypatch):
         """app.yaml 的 input_simulation 节点覆盖输入模拟默认值"""
@@ -169,6 +169,24 @@ class TestSaveSessionNodes:
         save_reference_grid(grid)
         data = json.loads(session_env.read_text(encoding="utf-8"))
         assert data == {"settings": {"reference_grid": grid}}
+
+    def test_save_reference_grid_removes_obsolete_key(self, session_env):
+        """一旦保存新配置，只留下 reference_grid，不继续维护旧键。"""
+        session_env.write_text(json.dumps({
+            "settings": {
+                "theme": "dark",
+                "material_grid": {"rows": 9},
+            },
+        }), encoding="utf-8")
+        reset_session_store()
+
+        grid = {"rows": 2, "cols": 3}
+        save_reference_grid(grid)
+
+        settings = json.loads(
+            session_env.read_text(encoding="utf-8")
+        )["settings"]
+        assert settings == {"theme": "dark", "reference_grid": grid}
 
 
 class TestSaveAppConfig:

@@ -2,7 +2,7 @@
 
 ProfileOverviewTab: 宽表展示所有角色的概要信息，交互式列头配置。
 
-数据来源：user.json 的 profile 节点
+数据来源：profile.db（按 username 隔离）
     profile:
       quota:
         key_name: { value: ..., updated_at: ... }

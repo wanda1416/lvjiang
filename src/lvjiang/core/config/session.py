@@ -329,16 +329,13 @@ def save_settings(settings: dict[str, Any]) -> None:
 
 
 def load_reference_grid() -> dict[str, Any]:
-    """读取 reference_grid；兼容旧版 material_grid 键。"""
-    settings = load_settings()
-    value = settings.get("reference_grid")
-    if not isinstance(value, dict):
-        value = settings.get("material_grid")
+    """读取 settings.reference_grid；废弃键不参与回退。"""
+    value = load_settings().get("reference_grid")
     return value if isinstance(value, dict) else {}
 
 
 def save_reference_grid(grid: dict[str, Any]) -> None:
-    """保存参考图网格，并清除已迁移的旧 material_grid 键。
+    """保存参考图网格，并清除同节点中已废弃的 material_grid 键。
 
     ⚠️ 使用 mutate_node 确保并发安全，禁止直接 load+save 模式
     """

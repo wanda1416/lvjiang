@@ -14,7 +14,14 @@
 """
 
 from loguru import logger
-from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox, QWidget
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QLabel,
+    QSizePolicy,
+    QSpinBox,
+    QWidget,
+)
 
 from ...i18n import tr
 from ..widgets import FlowLayout
@@ -26,6 +33,10 @@ class _FlowContainer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._flow = None
+        policy = self.sizePolicy()
+        policy.setHeightForWidth(True)
+        policy.setVerticalPolicy(QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(policy)
 
     def set_flow_layout(self, flow: FlowLayout):
         self._flow = flow
@@ -302,7 +313,9 @@ class UiStateMixin:
                     chk.setObjectName(opt_key)
                     chk.setChecked(bool(saved_dict.get(opt_key, True)))
                     flow.addWidget(chk)
-                self._param_layout.addRow(label + ":", container)
+                # 标签独占一行；选项从下一行起使用表单的完整宽度。
+                self._param_layout.addRow(QLabel(label + ":"))
+                self._param_layout.addRow(container)
             else:
                 combo = QComboBox()
                 combo.setObjectName(name)
@@ -318,4 +331,3 @@ class UiStateMixin:
                             combo.setCurrentIndex(idx)
                 self._param_layout.addRow(label + ":", combo)
         self._param_panel.setVisible(True)
-

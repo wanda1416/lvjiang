@@ -15,6 +15,7 @@ from ..i18n import tr
 from .grammar.ast_nodes import (
     Align,
     ArithOp,
+    CallProc,
     Click,
     Drag,
     EntityRef,
@@ -189,15 +190,76 @@ def _collect_from_body(body, acc: list[RefUse]) -> None:
         _collect_from_stmt(stmt, acc)
 
 
+def _called_procs(body, acc: set[str]) -> None:
+    """收集语句体里直接 ``call`` 到的过程名（含嵌套体）。
+
+    ``CallProc.name`` 恒为静态字符串，DSL 没有按变量名调用过程的语法，
+    因此调用图可以完全静态求解。
+    """
+    for stmt in body or []:
+        if isinstance(stmt, CallProc):
+            acc.add(stmt.name)
+        if isinstance(stmt, If):
+            _called_procs(stmt.then_body, acc)
+            _called_procs(stmt.else_body, acc)
+        elif isinstance(stmt, (For, ForRange, Loop, WhileLoop, UntilLoop)):
+            _called_procs(stmt.body, acc)
+        elif isinstance(stmt, Try):
+            _called_procs(stmt.body, acc)
+            _called_procs(stmt.catch_body, acc)
+
+
+def reachable_procs(body: list, procs: dict) -> set[str]:
+    """从顶层语句出发，沿 ``call`` 传递闭包求出**会被执行到**的过程名。
+
+    import 是整文件平铺：``import "subcall/navigation.wf"`` 会把该文件（及它
+    自己 import 的文件）的全部过程都并进 ``procs``。而这些文件常是函数库
+    ——``page_detection.wf`` 就为游戏每个页面各备了一个 ``is_in_*_page()``。
+    若把 procs 全量拿去校验，扫装备的脚本会因为「江湖号令页的区域没绑定」
+    而被拒绝执行，可那个过程它根本不会调用。
+
+    递归/互相调用靠 visited 收敛；调用了不存在的过程名在此静默跳过，
+    那属于另一类错误，有单独的检查负责报。
+    """
+    pending: set[str] = set()
+    _called_procs(body, pending)
+    seen: set[str] = set()
+    while pending:
+        name = pending.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        proc = (procs or {}).get(name)
+        if isinstance(proc, ProcDef):
+            nested: set[str] = set()
+            _called_procs(proc.body, nested)
+            pending |= nested - seen
+    return seen
+
+
 def collect_refs(body: list, procs: dict, proc_sources: dict | None = None,
-                 source: str = "") -> list[RefUse]:
-    """收集程序主体与所有过程（含 import 平铺进来的）的静态配置引用。
+                 source: str = "", reachable_only: bool = True) -> list[RefUse]:
+    """收集程序主体与过程体的静态配置引用。
+
+    ``reachable_only`` 决定范围，两种用途要的不是同一个东西：
+
+    - **True（默认，执行前闸门用）**：只走从顶层语句沿 ``call`` 能到达的过程。
+      import 按整文件平铺，``page_detection.wf`` 这类函数库会把游戏每个页面
+      的判断过程都并进来；全量校验意味着「扫描备战装备」会因为江湖号令活动
+      页的区域没绑定而被拒绝执行——而那个过程它根本不会调用。校验失败是
+      raise 不是 warning，所以这不只是噪音，是把用户挡在门外。
+    - **False（CI 门禁 / 编写期检查用）**：连没被调用的过程一起查，库函数里
+      的 key 拼错、布局漏绑才有人发现，不必等到某天真有脚本调用它。
+
+    预检（``validate_only``）用 False、执行用 True，方向是安全的：预检更严
+    只会「报了但其实不会炸」，不会出现「预检放过、上机仍炸」。
 
     Args:
         body: 程序顶层语句列表（Program.body）
         procs: 过程名 -> ProcDef（已合并 import 后的全部过程）
         proc_sources: 过程名 -> 所在文件，缺失时回退到 source
         source: 顶层语句所在文件
+        reachable_only: 见上
 
     Returns:
         引用列表，按出现顺序、同 (scene, key, kind, 行号, 文件) 去重
@@ -206,7 +268,10 @@ def collect_refs(body: list, procs: dict, proc_sources: dict | None = None,
     main: list[RefUse] = []
     _collect_from_body(body, main)
     acc.extend(replace(ref, source=source) for ref in main)
-    for name, proc in (procs or {}).items():
+    names = (reachable_procs(body, procs) if reachable_only
+             else list((procs or {}).keys()))
+    for name in names:
+        proc = (procs or {}).get(name)
         if not isinstance(proc, ProcDef):
             continue
         sub: list[RefUse] = []

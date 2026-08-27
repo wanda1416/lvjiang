@@ -46,6 +46,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     TuningGroup,
     TuningGroupManager,
 )
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -174,6 +175,9 @@ class MaterialConfigPage(QWidget):
         self._down_btn.clicked.connect(self._on_move_down)
         self._down_btn.setEnabled(False)
         btn_row.addWidget(self._down_btn)
+        apply_button_style(add_btn)
+        apply_button_style(del_btn, variant="danger")
+        apply_button_style(self._up_btn, self._down_btn, variant="neutral")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         layout.addStretch()

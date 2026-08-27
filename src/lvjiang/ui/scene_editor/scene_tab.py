@@ -28,6 +28,7 @@ from ...core.scene_registry import (
     get_view_visible_keys,
 )
 from ...i18n import tr
+from ..button_styles import apply_button_style
 from .canvas import EditMode, RegionCanvas
 from .scene_panel_editor import PanelEditorMixin
 from .scene_poi_panel import PoiPanelMixin
@@ -154,6 +155,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._btn_manage_views = QPushButton(tr("管理视图"))
         self._btn_manage_views.setToolTip(tr("开启多视图、新增/重命名/删除视图"))
         self._btn_manage_views.clicked.connect(self._on_manage_views)
+        apply_button_style(self._btn_manage_views, variant="neutral")
         bar.addWidget(self._btn_manage_views)
         bar.addSpacing(12)
 

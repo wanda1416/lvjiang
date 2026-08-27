@@ -17,6 +17,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.button_styles import apply_button_style
+
 from .....i18n import tr
 
 # 参数定义：(key, label, min, max, suffix)
@@ -66,11 +68,7 @@ class EquipDisplayPanel(QWidget):
         btn_row = QHBoxLayout()
         btn_save = QPushButton(tr("保存"))
         btn_save.setFixedWidth(80)
-        btn_save.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; "
-            "font-weight: bold; padding: 6px; border-radius: 3px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-        )
+        apply_button_style(btn_save)
         btn_save.clicked.connect(self._save)
         btn_row.addWidget(btn_save)
         btn_row.addStretch()

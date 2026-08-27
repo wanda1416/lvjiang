@@ -257,6 +257,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._btn_recognize_ref = QPushButton(tr("识别全部参考图"))
         self._btn_recognize_ref.clicked.connect(self._on_recognize_references)
         btn_row.addWidget(self._btn_recognize_ref)
+        apply_button_style(self._btn_recognize, self._btn_recognize_ref)
         # 参考图分组筛选下拉
         self._combo_ref_group = QComboBox()
         self._combo_ref_group.addItem(tr("全部"), None)
@@ -305,6 +306,12 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._scene_key_btn = _SceneKeyButton(self._get_current_scene_key)
         self._scene_key_btn.clicked.connect(self._scene_key_btn._on_clicked)
         script_btn_row.addWidget(self._scene_key_btn)
+        apply_button_style(self._btn_run_script, self._btn_save_script)
+        apply_button_style(
+            self._btn_load_script,
+            self._scene_key_btn,
+            variant="neutral",
+        )
         script_btn_row.addStretch()
         script_layout.addLayout(script_btn_row)
 

@@ -28,7 +28,8 @@ from ...core.scene_registry import (
     sync_scene_cache,
 )
 from ...i18n import tr
-from ..widgets import strip_focus_rect
+from ..button_styles import apply_button_style
+from ..widgets import centered_cell_widget, strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
     add_view_combo_row,
@@ -106,6 +107,9 @@ class PanelEditorMixin:
         )
         self._btn_bind_panel.clicked.connect(self._on_bind_panel)
         btn_row.addWidget(self._btn_bind_panel)
+        apply_button_style(self._btn_new_panel)
+        apply_button_style(self._btn_bind_panel, variant="neutral")
+        apply_button_style(self._btn_del_panel, variant="danger")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -157,7 +161,7 @@ class PanelEditorMixin:
             cb.stateChanged.connect(
                 lambda state, k=panel_def.key: self._on_toggle_panel_disabled(k, "panel", state)
             )
-            self._panel_table.setCellWidget(row, 5, cb)
+            self._panel_table.setCellWidget(row, 5, centered_cell_widget(cb))
         self._panel_table.blockSignals(False)
 
     def _on_toggle_panel_disabled(self, key: str, kind: str, state: int):

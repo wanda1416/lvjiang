@@ -41,6 +41,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RuleValidationError,
     TuningGroupManager,
 )
+from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -70,6 +71,11 @@ class _NewGroupDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
+        apply_button_style(buttons.button(QDialogButtonBox.StandardButton.Ok))
+        apply_button_style(
+            buttons.button(QDialogButtonBox.StandardButton.Cancel),
+            variant="neutral",
+        )
         layout.addWidget(buttons)
 
     def _on_accept(self):
@@ -176,6 +182,9 @@ class BaseRuleGroupPage(QWidget):
         self._del_btn.setToolTip(tr("删除选中规则组（至少保留一个）"))
         self._del_btn.clicked.connect(self._on_delete)
         btn_row.addWidget(self._del_btn)
+        apply_button_style(add_btn)
+        apply_button_style(copy_btn, variant="neutral")
+        apply_button_style(self._del_btn, variant="danger")
         btn_row.addStretch()
         layout.addLayout(btn_row)
 

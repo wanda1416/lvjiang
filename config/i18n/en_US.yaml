@@ -124,7 +124,8 @@ user_manager:
   input_username_prompt: 'Enter username:'
   user_created: 'User created: {name}'
   failure: Failed
-  username_exists: Username already exists or is empty
+  username_exists: Username already exists
+  username_invalid: Usernames may contain Chinese characters, letters, digits, underscores and hyphens only, up to 32 characters.
   confirm_delete_title: Confirm Delete
   confirm_delete_message: 'Delete user "{name}"?
 

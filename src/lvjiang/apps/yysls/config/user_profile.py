@@ -21,7 +21,6 @@ profile.yaml 结构：
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from loguru import logger
@@ -43,38 +42,6 @@ _PROFILE_PATH = SESSION_CONFIG_DIR / "profile.yaml"
 
 # 全局单例
 _config: ProfileSchema | None = None
-
-
-# ─── profile 节点读写（共享工具函数）────────────────────
-
-
-def read_profile_entry(data: dict, model_type: str, key: str) -> dict:
-    """[Deprecated] 从早期 user.json 数据结构中读取 profile 节点值
-
-    Returns: {"value": ..., "updated_at": ...} 或空 dict
-    """
-    profile = data.get("profile", {})
-    model_data = profile.get(model_type, {})
-    return model_data.get(key, {})
-
-
-def write_profile_entry(
-    data: dict,
-    model_type: str,
-    key: str,
-    value,
-    updated_at: str | None = None,
-) -> None:
-    """[Deprecated] 向早期 user.json 数据结构写入 profile 节点值（就地修改 data）
-
-    新代码应使用 profile_db.db_upsert() 替代。
-    updated_at: 可选，指定写入的时间戳；为 None 时使用当前时间。
-    """
-    profile = data.setdefault("profile", {})
-    model_data = profile.setdefault(model_type, {})
-    entry = model_data.setdefault(key, {})
-    entry["value"] = value
-    entry["updated_at"] = updated_at or datetime.now().isoformat(timespec="seconds")
 
 
 @dataclass

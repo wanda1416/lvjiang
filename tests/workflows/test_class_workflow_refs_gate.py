@@ -16,7 +16,6 @@ import pytest
 from lvjiang.apps import load_app
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_name
-from lvjiang.core.ondevice.plugins import DEVICE_APPS
 
 # 方法名 → (场景参数位, region/key 参数位, kind)
 _CALLS = {
@@ -24,7 +23,6 @@ _CALLS = {
     "ocr_scene": (0, 1, "region_list"),
     "ocr_scene_by": (0, 1, "region_list"),
     "click_panel": (0, 1, "panel"),
-    "scan_panel": (0, 1, "panel"),
 }
 
 
@@ -83,7 +81,8 @@ def _collect(path: Path, cls) -> list[tuple[str, str, str, int]]:
 def _class_workflows() -> list[tuple[str, type]]:
     """从设备端实际插件声明取类工作流，避免维护硬编码名册。"""
     workflows: list[tuple[str, type]] = []
-    for app_name in DEVICE_APPS:
+    # 测试组合根显式声明当前 Android 构建包含的 app。
+    for app_name in ("yysls",):
         hooks = load_app(app_name)
         for workflow_id, class_path in hooks.workflow_implementations.items():
             module_path, class_name = class_path.rsplit(".", 1)

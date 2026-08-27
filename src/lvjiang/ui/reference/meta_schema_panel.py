@@ -102,7 +102,7 @@ class MetaSchemaPanel(QWidget):
 
         hint = QLabel(
             "输入元数据：用户填写，用于筛选管理参考图；勾选“可筛选”的字段才会出现在顶部筛选栏。\n"
-            "输出元数据：识别材料后按裁剪区域（x, y, w, h，归一化 0~1）OCR 产出并回传调用方。"
+            "输出元数据：参考图匹配后按裁剪区域（x, y, w, h，归一化 0~1）OCR 产出并回传调用方。"
         )
         hint.setStyleSheet("color: palette(mid); font-size: 12px;")
         hint.setWordWrap(True)

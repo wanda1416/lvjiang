@@ -21,8 +21,9 @@ import org.json.JSONObject
 object PyBridge {
 
     private const val TAG = "PyBridge"
+    private const val CONFIGURED_APPS = "yysls"
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
-    private const val TUNING_MODULE = "lvjiang.core.ondevice.tuning_config"
+    private const val TUNING_MODULE = "lvjiang.apps.yysls.ondevice.tuning_config"
     private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
 
     @Volatile
@@ -32,9 +33,13 @@ object PyBridge {
     @Synchronized
     fun ensureStarted(context: Context): String? {
         startFailure?.let { return it }
-        if (Python.isStarted()) return null
         return try {
-            Python.start(AndroidPlatform(context.applicationContext))
+            if (!Python.isStarted()) {
+                Python.start(AndroidPlatform(context.applicationContext))
+            }
+            Python.getInstance()
+                .getModule("lvjiang.core.ondevice.plugins")
+                .callAttr("configure_apps", CONFIGURED_APPS)
             null
         } catch (e: Throwable) {
             val msg = "Python 启动失败：${e.message}"

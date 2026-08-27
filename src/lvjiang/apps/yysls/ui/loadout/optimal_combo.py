@@ -40,6 +40,7 @@ from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
 from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
+from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
 
 # 8 个装备槽位的显示顺序与分组映射
@@ -1035,7 +1036,7 @@ class OptimalComboDialog(QDialog):
             inv.apply_combos(equipped)
 
             # Notify host
-            self._host.equipment_changed.emit()
+            get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
             QMessageBox.information(
                 self, tr("已应用"),
                 tr("最优组合已应用到装备栏"))

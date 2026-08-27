@@ -306,7 +306,7 @@ def update_ui_page_state(page_key: str, patch: dict[str, Any]) -> dict:
     return get_session_store().mutate_node("ui_state", _merge)
 
 
-# ─── 便捷函数：settings / material_grid ────────────────────
+# ─── 便捷函数：settings / reference_grid ───────────────────
 
 def load_settings() -> dict[str, Any]:
     """读取 session.json 的 settings 节点"""
@@ -328,86 +328,24 @@ def save_settings(settings: dict[str, Any]) -> None:
     get_session_store().mutate_node("settings", _merge)
 
 
-def load_material_grid() -> dict[str, Any]:
-    """读取 session.json 的 settings.material_grid 节点"""
-    value = load_settings().get("material_grid")
+def load_reference_grid() -> dict[str, Any]:
+    """读取 reference_grid；兼容旧版 material_grid 键。"""
+    settings = load_settings()
+    value = settings.get("reference_grid")
+    if not isinstance(value, dict):
+        value = settings.get("material_grid")
     return value if isinstance(value, dict) else {}
 
 
-def save_material_grid(grid: dict[str, Any]) -> None:
-    """保存材料网格参数到 session.json 的 settings.material_grid 节点（原子操作）
+def save_reference_grid(grid: dict[str, Any]) -> None:
+    """保存参考图网格，并清除已迁移的旧 material_grid 键。
 
     ⚠️ 使用 mutate_node 确保并发安全，禁止直接 load+save 模式
     """
     def _merge(existing):
         existing = existing if isinstance(existing, dict) else {}
-        existing["material_grid"] = grid
-        return existing
-
-    get_session_store().mutate_node("settings", _merge)
-
-
-# ─── 便捷函数：equip_display 装备展示参数 ────────────────────
-
-_EQUIP_DISPLAY_DEFAULTS: dict[str, Any] = {
-    "name_font_size": 13,
-    "level_font_size": 12,
-    "affix_font_size": 11,
-    "card_min_height": 180,
-    "grid_columns": 4,
-}
-
-
-def load_equip_display() -> dict[str, Any]:
-    """读取 session.json 的 settings.equip_display 节点，缺失字段用默认值补齐"""
-    value = load_settings().get("equip_display")
-    if not isinstance(value, dict):
-        return dict(_EQUIP_DISPLAY_DEFAULTS)
-    merged = dict(_EQUIP_DISPLAY_DEFAULTS)
-    merged.update(value)
-    return merged
-
-
-def save_equip_display(params: dict[str, Any]) -> None:
-    """保存装备展示参数到 session.json 的 settings.equip_display 节点（原子操作）
-
-    ⚠️ 使用 mutate_node 确保并发安全，禁止直接 load+save 模式
-    """
-    def _merge(existing):
-        existing = existing if isinstance(existing, dict) else {}
-        existing["equip_display"] = params
-        return existing
-
-    get_session_store().mutate_node("settings", _merge)
-
-
-# ─── 装备筛选配置 ────────────────────────────────────────────
-
-_EQUIP_FILTER_DEFAULTS: dict[str, str] = {
-    "type": "all",        # all | main_weapon | sub_weapon | ring | pendant | head | chest | leg | wrist
-    "level": "all",       # all | 110 | 105
-    "affix": "all",       # all | dingyin | full_tuning
-}
-
-
-def load_equip_filter() -> dict[str, str]:
-    """读取 session.json 的 settings.equip_filter 节点，缺失字段用默认值补齐"""
-    value = load_settings().get("equip_filter")
-    if not isinstance(value, dict):
-        return dict(_EQUIP_FILTER_DEFAULTS)
-    merged = dict(_EQUIP_FILTER_DEFAULTS)
-    merged.update(value)
-    return merged
-
-
-def save_equip_filter(filters: dict[str, str]) -> None:
-    """保存装备筛选配置到 session.json 的 settings.equip_filter 节点（原子操作）
-
-    ⚠️ 使用 mutate_node 确保并发安全，禁止直接 load+save 模式
-    """
-    def _merge(existing):
-        existing = existing if isinstance(existing, dict) else {}
-        existing["equip_filter"] = filters
+        existing["reference_grid"] = grid
+        existing.pop("material_grid", None)
         return existing
 
     get_session_store().mutate_node("settings", _merge)

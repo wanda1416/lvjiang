@@ -1,6 +1,6 @@
 """背包物品识别回归测试
 
-使用真实截图验证 MaterialRecognizer 对背包格子的识别准确率。
+使用真实截图验证通用 ReferenceRecognizer 与 yysls 字段解析。
 验证内容：材料名称 + 等级（忽略数量）。
 
 截图来源：config/session/screenshots/默认布局/bag_item_detail__bag_detail.png
@@ -16,8 +16,9 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.apps.yysls.core.recognizer.material_recognizer import MaterialRecognizer
+from lvjiang.apps.yysls.core.recognizer.reference_adapter import parse_number
 from lvjiang.core.ocr import OCREngine
+from lvjiang.core.recognizers import ReferenceRecognizer
 
 # CI 环境（GitHub Actions 等）可能不支持 ONNX Runtime，跳过整组测试
 pytestmark = pytest.mark.skipif(
@@ -112,7 +113,7 @@ def layout():
 def recognizer():
     """创建材料识别器"""
     ocr = OCREngine()
-    return MaterialRecognizer(ocr)
+    return ReferenceRecognizer(ocr)
 
 
 def crop_bag_cell(img: np.ndarray, cell_bounds: tuple[int, int, int, int]) -> np.ndarray:
@@ -179,17 +180,20 @@ class TestBagItemRecognition:
             result = recognizer.recognize(slot_img, group=group)
 
             # 验证材料名称
-            if result.type != expected_name:
+            if result.label != expected_name:
                 errors.append(
                     f"背包格{row}_{col}: 材料名称不匹配 "
-                    f"(期望={expected_name!r}, 实际={result.type!r}, "
+                    f"(期望={expected_name!r}, 实际={result.label!r}, "
                     f"置信度={result.confidence:.2f})"
                 )
             # 验证等级（None 表示无等级标识，允许识别为 None）
-            elif expected_level is not None and result.real_level != expected_level:
+            elif expected_level is not None and parse_number(
+                result.ocr_texts.get("level_text", "")
+            ) != expected_level:
                 errors.append(
                     f"背包格{row}_{col}: 等级不匹配 "
-                    f"(期望={expected_level}, 实际={result.real_level})"
+                    f"(期望={expected_level}, "
+                    f"实际={parse_number(result.ocr_texts.get('level_text', ''))})"
                 )
 
         if errors:

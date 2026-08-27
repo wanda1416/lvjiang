@@ -746,7 +746,7 @@ class _StmtMixin:
         return self._build_tuple_literal(items)
 
     def _reject_image_by(self, by_clause, verb: str, items):
-        """by image 只属于 find（模板定位产出可点击区域）；scan/recognize 是文字/材料识别"""
+        """by image 只属于 find；scan/recognize 是文字/参考图识别。"""
         if by_clause is not None and by_clause.match_mode == "image":
             raise WorkflowUserError(
                 f"'by image' 仅 find 语句支持，{verb} 不支持（第 {self._line(items)} 行）"

@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr
 from ...core.loadout import LoadoutRepository, resolve_school
+from ..events import get_event_hub
 from ..profile.tab import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
@@ -90,9 +91,9 @@ class LoadoutPanel(QWidget):
         )
         self._build_ui()
         host.user_changed.connect(lambda _name: self.refresh())
-        host.graduation_updated.connect(self._sync_metrics)
+        get_event_hub(host).graduation_updated.connect(self._sync_metrics)
         # 装备变更（UI 操作与工作流写入）：刷新方案展示并同步指标
-        host.equipment_changed.connect(self._on_equipment_changed)
+        get_event_hub(host).equipment_changed.connect(self._on_equipment_changed)
         self.refresh()
 
     def _build_ui(self):

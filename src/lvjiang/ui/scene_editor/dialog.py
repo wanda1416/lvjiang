@@ -254,15 +254,15 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._btn_recognize = QPushButton(tr("识别全部字段"))
         self._btn_recognize.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_recognize)
-        self._btn_recognize_mat = QPushButton(tr("识别全部材料"))
-        self._btn_recognize_mat.clicked.connect(self._on_recognize_materials)
-        btn_row.addWidget(self._btn_recognize_mat)
-        # 材料分组筛选下拉
-        self._combo_mat_group = QComboBox()
-        self._combo_mat_group.addItem(tr("全部"), None)
-        self._refresh_mat_group_combo()
-        self._combo_mat_group.setToolTip(tr("限定材料识别的分组范围"))
-        btn_row.addWidget(self._combo_mat_group)
+        self._btn_recognize_ref = QPushButton(tr("识别全部参考图"))
+        self._btn_recognize_ref.clicked.connect(self._on_recognize_references)
+        btn_row.addWidget(self._btn_recognize_ref)
+        # 参考图分组筛选下拉
+        self._combo_ref_group = QComboBox()
+        self._combo_ref_group.addItem(tr("全部"), None)
+        self._refresh_ref_group_combo()
+        self._combo_ref_group.setToolTip(tr("限定参考图识别的分组范围"))
+        btn_row.addWidget(self._combo_ref_group)
         from PyQt6.QtWidgets import QCheckBox
         self._chk_live_image = QCheckBox(tr("使用实时图像"))
         self._chk_live_image.setToolTip(tr("勾选后直接从设备实时截屏进行识别，不保存到场景文件"))
@@ -276,7 +276,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._result_text.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;"
         )
-        self._result_text.setPlaceholderText(tr("点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果"))
+        self._result_text.setPlaceholderText(tr("点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果"))
         ocr_layout.addWidget(self._result_text)
 
         self._bottom_splitter.addWidget(ocr_panel)
@@ -494,26 +494,26 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         else:
             self._status_bar.showMessage(error_msg or tr("刷新截图失败"))
 
-    def _refresh_mat_group_combo(self):
-        """刷新材料分组下拉：保留当前选中（如有），重新加载图库分组"""
+    def _refresh_ref_group_combo(self):
+        """刷新参考图分组下拉：保留当前选中（如有），重新加载图库分组"""
         from lvjiang.core.reference_db import ReferenceDatabase
 
-        current_data = self._combo_mat_group.currentData()
-        self._combo_mat_group.blockSignals(True)
-        self._combo_mat_group.clear()
-        self._combo_mat_group.addItem(tr("全部"), None)
+        current_data = self._combo_ref_group.currentData()
+        self._combo_ref_group.blockSignals(True)
+        self._combo_ref_group.clear()
+        self._combo_ref_group.addItem(tr("全部"), None)
         try:
             groups = ReferenceDatabase().get_groups()
         except Exception:
             groups = []
         for g in groups:
-            self._combo_mat_group.addItem(g, g)
+            self._combo_ref_group.addItem(g, g)
         # 恢复之前的选中
         if current_data is not None:
-            idx = self._combo_mat_group.findData(current_data)
+            idx = self._combo_ref_group.findData(current_data)
             if idx >= 0:
-                self._combo_mat_group.setCurrentIndex(idx)
-        self._combo_mat_group.blockSignals(False)
+                self._combo_ref_group.setCurrentIndex(idx)
+        self._combo_ref_group.blockSignals(False)
 
     # ─── 画布模式切换 ───────────────────────────────────
 

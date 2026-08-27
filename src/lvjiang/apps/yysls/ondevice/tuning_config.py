@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from ...i18n import tr
+from ....i18n import tr
 
 
 def get_tuning_config() -> str:
@@ -31,21 +31,21 @@ def get_tuning_config() -> str:
              "error": str}
     """
     try:
-        from .plugins import ensure_loaded
+        from ....core.ondevice.plugins import ensure_loaded
 
-        ensure_loaded()  # 规则注册表在 yysls 插件内，未加载时枚举为空
+        ensure_loaded(("yysls",))
 
-        from ...apps.yysls.config.tune_slots import (
+        from ....core.config.wf_configs import get_wf_config
+        from ..config.tune_slots import (
             DEFAULT_SLOTS,
             LOCKED_SLOTS,
             SLOT_GROUPS,
         )
-        from ...apps.yysls.core.evaluator import get_tuning_rules
-        from ...apps.yysls.core.tuning_rules import (
+        from ..core.evaluator import get_tuning_rules
+        from ..core.tuning_rules import (
             get_tune_config,
             get_tuning_group_manager,
         )
-        from ...core.config.wf_configs import get_wf_config
 
         tc = get_wf_config("auto_tuning")
 
@@ -133,16 +133,16 @@ def save_tuning_config(payload: str) -> str:
         校验规则与桌面 _start_tuning 一致，message 可直接 toast。
     """
     try:
-        from .plugins import ensure_loaded
+        from ....core.ondevice.plugins import ensure_loaded
 
-        ensure_loaded()
+        ensure_loaded(("yysls",))
 
-        from ...apps.yysls.config.tune_slots import LOCKED_SLOTS, SLOT_LABELS
-        from ...apps.yysls.core.evaluator import get_tuning_rules
-        from ...apps.yysls.core.tuning_rules import (
+        from ....core.config.wf_configs import get_wf_config, update_wf_config
+        from ..config.tune_slots import LOCKED_SLOTS, SLOT_LABELS
+        from ..core.evaluator import get_tuning_rules
+        from ..core.tuning_rules import (
             get_tuning_group_manager,
         )
-        from ...core.config.wf_configs import get_wf_config, update_wf_config
 
         data = json.loads(payload)
         if not isinstance(data, dict):

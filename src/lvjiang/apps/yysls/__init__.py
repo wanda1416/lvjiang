@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from ..._version import __version__
 from ...i18n import tr
-from ..base import AppHooks
+from ..base import AppHooks, TelemetryDisclosure
 
 
 def _build_tuning_tab(host):
@@ -56,7 +56,13 @@ def _build_menu(host, menubar):
     build_menu(host, menubar)
 
 
+def _quality_stylesheet(tokens):
+    from .ui.theme import equipment_quality_stylesheet
+    return equipment_quality_stylesheet(tokens)
+
+
 hooks = AppHooks(
+    id="yysls",
     name=tr("燕云十六声"),
     window_title=tr("律匠 - 燕云十六声装备调律工具") + f" v{__version__}",
 
@@ -69,9 +75,10 @@ hooks = AppHooks(
         (tr("调律进度"), _build_tuning_progress_tab),
     ],
     menu_builders=[_build_menu],
+    theme_stylesheet_builders=[_quality_stylesheet],
 
-    # 识别器：燕云材料识别器（模板匹配 + OCR）
-    recognizer_classes=[],  # 阶段 5 暂不注册，留待后续接入
+    # 通用 ReferenceRecognizer 由 core 提供，无需注册业务识别器。
+    recognizer_classes=[],
 
     # 复杂工作流实现
     workflow_implementations={
@@ -92,6 +99,15 @@ hooks = AppHooks(
     telemetry_modules=[
         "lvjiang.apps.yysls.telemetry.schemas",
     ],
+    telemetry_disclosures=[TelemetryDisclosure(
+        title=tr("装备调律过程"),
+        purpose=tr("用于改进律匠内置的调律规则"),
+        collected=(tr(
+            "装备部位、等级品阶、启用规则、初始词条、逐轮材料与产出、停止原因和最终评级"
+        ),),
+        excluded=(tr("游戏账号、角色名、装备名称、装备指纹、截图和日志"),),
+        schema_names=("yysls.tuning_session",),
+    )],
 
     # 配置合并策略（导入即触发 register_registry_list_paths /
     # register_protected_list_paths 注册）

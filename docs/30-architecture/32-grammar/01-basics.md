@@ -219,7 +219,8 @@ $var = "hello"               # 隐式 eval，效果完全相同
 
 隐式 eval 支持所有 eval 语法：字面量赋值、函数调用、字段赋值、链式赋值等。
 
-**外部参数注入**：工作流可以通过 `workflows.yaml` 声明参数，由 UI 参数面板注入初始值。详见 [07-subworkflows.md](07-subworkflows.md#六工作流参数声明)。也可直接在 `.wf` 文件内用 front-matter 声明。
+**外部参数注入**：工作流通过 `.wf` 文件头的 `#%` 元数据声明参数，由 UI
+参数面板注入初始值。详见 [07.1-metadata.md](07.1-metadata.md)。
 
 ### 类型推导
 

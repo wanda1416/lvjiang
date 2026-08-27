@@ -190,8 +190,12 @@ def test_run_script_class_branch_propagates_pause_event(monkeypatch):
 
 
 def test_batch_engine_uses_startup_environment_snapshot():
+    def ui_callback(*args, **kwargs):
+        return None
+
     ctx = BatchContext(
-        object(), object(), object(), object(), run_env="android"
+        object(), object(), object(), object(), run_env="android",
+        ui_callback=ui_callback,
     )
     worker = BatchWorker(
         enabled_rows=[],
@@ -205,6 +209,7 @@ def test_batch_engine_uses_startup_environment_snapshot():
     engine = worker._create_engine()
 
     assert engine.run_env == "android"
+    assert engine._ui_callback is ui_callback
 
 
 def test_failed_batch_setup_starts_no_later_stage(monkeypatch):

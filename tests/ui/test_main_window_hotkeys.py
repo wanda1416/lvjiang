@@ -89,6 +89,13 @@ class TestGlobalHotkeyGating:
         assert stub.f10_pressed.count == 1
         assert stub.pause_resume_count == 1  # F8 触发暂停/恢复
 
+    def test_running_stop_is_not_blocked_when_backend_becomes_unready(self):
+        stub = _Stub(ready=False, running=True)
+
+        MainWindow._on_global_f10(stub)
+
+        assert stub.f10_pressed.count == 1
+
 
 class TestConfigurableHotkeyBindings:
     def test_settings_only_offer_f7_through_f12_and_emit_on_save(

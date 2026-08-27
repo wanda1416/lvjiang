@@ -27,10 +27,17 @@ class EquipmentParser:
     """装备 OCR 数据转换器"""
 
     # 部位单字 → 类型（类型段单字足以说明部位，容忍 OCR 错字）
+    #
+    # key 匹配的是 OCR 截屏文字，恒为中文，绝不能过 tr()——英文界面下会拿
+    # 翻译后的英文去匹配中文截屏，永远匹配不上。value 是 equip.type，会被
+    # 全 app 当成规范内部标识使用（大量 UI/config 代码以 tr("环")/tr("佩")
+    # 等作为 dict key 查表），所以要过 tr() 才能保持一致；不能像这里原来
+    # 那样一部分 tr() 一部分裸写，那会导致同一部位从不同单字命中时
+    # equip.type 取值不一致。
     _PART_CHAR_TO_TYPE = {
-        tr("冠"): tr("冠胄"), tr("胄"): "冠胄",
-        tr("胸"): tr("胸甲"), tr("胫"): tr("胫甲"), tr("腕"): tr("腕甲"),
-        tr("环"): "环", tr("佩"): "佩",
+        "冠": tr("冠胄"), "胄": tr("冠胄"),
+        "胸": tr("胸甲"), "胫": tr("胫甲"), "腕": tr("腕甲"),
+        "环": tr("环"), "佩": tr("佩"),
     }
 
     def __init__(self):
@@ -214,19 +221,22 @@ class EquipmentParser:
         - 名称含"胸" → 胸甲
         - 名称含"胫" → 胫甲
         - 名称含"腕" → 腕甲
+
+        name 是 OCR 出来的装备名称，恒为中文，匹配侧不能过 tr()（同上）；
+        返回值是 equip.type，过 tr() 以保持与全 app 的规范表示一致。
         """
-        if tr("云珑") in name:
+        if "云珑" in name:
             return tr("环")
-        if tr("辟邪") in name:
+        if "辟邪" in name:
             return tr("佩")
         # 防具类型推断（按名称中的关键字）
-        if tr("冠") in name:
+        if "冠" in name:
             return tr("冠胄")
-        if tr("胸") in name:
+        if "胸" in name:
             return tr("胸甲")
-        if tr("胫") in name:
+        if "胫" in name:
             return tr("胫甲")
-        if tr("腕") in name:
+        if "腕" in name:
             return tr("腕甲")
         return None
 
@@ -239,7 +249,8 @@ class EquipmentParser:
         "一杆"    → None（脏数据）
         """
         # 武器格式：武器·XX
-        if tr("武器") in text:
+        # text 是 OCR 截屏文字，恒为中文，不能过 tr()（同上）。
+        if "武器" in text:
             for wt in WEAPON_TYPES:
                 if wt in text:
                     return wt
@@ -263,11 +274,13 @@ class EquipmentParser:
 
         Returns:
             (level, is_chengyin)
+
+        raw 是 OCR 截屏文字，恒为中文，不能过 tr()（同上）。
         """
         raw = raw.strip()
-        is_chengyin = tr("承音") in raw
+        is_chengyin = "承音" in raw
 
-        m = re.search(tr(r"(\d+)\s*阶"), raw)
+        m = re.search(r"(\d+)\s*阶", raw)
         level = int(m.group(1)) if m else None
 
         return level, is_chengyin
@@ -294,8 +307,12 @@ class EquipmentParser:
             return None
 
         # ── base_attr_2：固定「外功防御」 ──
+        # attr_name 既要匹配 OCR 截屏文字（恒为中文），又会作为
+        # EquipAttr.name 传给 get_affix_caps() 去查 attributes.yaml
+        # （同样是裸中文的游戏配置数据），两头都不认 tr() 翻译后的文本，
+        # 这里绝不能过 tr()。
         if is_base_attr_2:
-            attr_name = tr("外功防御")
+            attr_name = "外功防御"
             if not raw.startswith(attr_name):
                 logger.warning(f"base_attr_2 未匹配「{attr_name}」: {raw!r}")
                 return None
@@ -404,7 +421,8 @@ class EquipmentParser:
             if affix is None:
                 warnings.append(f"词条{cn_name}({key}) 无法解析: {text!r}")
                 # 套装信息等非词条内容，跳过但不中断
-                if tr("套装") in text:
+                # text 是 OCR 截屏文字，恒为中文，不能过 tr()（同上）。
+                if "套装" in text:
                     continue
                 break
             affixes.append(affix)
@@ -431,11 +449,12 @@ class EquipmentParser:
 
         # ── 1. 转律标记检测与移除 ──
         # 符号已统一为英文括号，匹配 [转1] / [转] / [转1 / [转 等变体
-        is_transferred = bool(re.search(tr(r"\[转[1\]]?"), text))
-        text = re.sub(tr(r"\[转[1\]]?"), "", text)
+        # text 是 OCR 截屏文字，恒为中文，正则不能过 tr()（同上）。
+        is_transferred = bool(re.search(r"\[转[1\]]?", text))
+        text = re.sub(r"\[转[1\]]?", "", text)
 
         # ── 2. 过滤套装信息 ──
-        if tr("套装") in text:
+        if "套装" in text:
             return None
 
         # ── 3. 匹配已知词条名称 ──

@@ -326,3 +326,55 @@ class TestIllegalAnnotation:
             affix_jue="劲 +72.2", affix_zhi="劲 +72.2"))
         assert [a.name for a in equip.affixes] == [
             "最大外功攻击", "会心率", "劲", "劲"]
+
+
+# ─── 界面语言切换不影响 OCR 匹配 ──────────────────────────────
+
+class TestOcrMatchingSurvivesTranslation:
+    """本模块解析的是游戏截屏 OCR 文字，恒为中文，不随本软件界面语言变化。
+
+    曾经这里大量字面量被误包了 tr()：只要对应词条被翻译，切到英文界面
+    就会拿翻译后的英文去匹配游戏截屏里恒定的中文，永远匹配不上，导致
+    装备类型/等级/承音标记/词条全部解析失败。
+
+    用 monkeypatch 强行让 tr() 对这些词返回一个明显不同的英文值，
+    模拟"已翻译"状态，验证匹配側已经不再经过 tr()。
+    """
+
+    @pytest.fixture(autouse=True)
+    def force_translated(self, monkeypatch):
+        import lvjiang.i18n as i18n
+        fake = {
+            "武器": "WEAPON", "冠": "CROWN", "胄": "HELM",
+            "胸": "CHEST", "胫": "SHIN", "腕": "WRIST",
+            "环": "RING", "佩": "PENDANT", "云珑": "YUNLONG",
+            "辟邪": "BIXIE", "承音": "CHENGYIN", "套装": "SET",
+            "外功防御": "EXT_DEF",
+        }
+        monkeypatch.setattr(i18n, "_current_language", "en_US")
+        monkeypatch.setattr(i18n, "_translations", fake)
+
+    def test_weapon_type_still_recognized(self, parser):
+        assert parser._parse_equip_type("踏雪含光 | 武器·剑") == ("踏雪含光", "剑")
+
+    def test_armor_type_from_name_still_recognized(self, parser):
+        # 匹配侧（name 里找"云珑"/"辟邪"）恒为裸中文；返回值调用时才过 tr()，
+        # 在本测试的伪造翻译下会变成 RING/PENDANT——这正是期望行为：
+        # 匹配不受语言影响，返回值该翻译的地方仍然翻译。
+        assert parser._parse_equip_type("流星云珑") == ("流星云珑", "RING")
+        assert parser._parse_equip_type("玄玉辟邪") == ("玄玉辟邪", "PENDANT")
+
+    def test_armor_type_segment_still_recognized(self, parser):
+        assert parser._parse_equip_type("雁南飞冠 | 冠胄") == ("雁南飞冠", "冠胄")
+
+    def test_chengyin_level_still_recognized(self, parser):
+        assert parser._parse_equip_level("承音 | 110阶") == (110, True)
+
+    def test_base_attr_2_still_recognized(self, parser):
+        attr = parser._parse_base_attr("外功防御 500", is_base_attr_2=True)
+        assert attr is not None
+        assert attr.name == "外功防御"
+        assert attr.value == 500
+
+    def test_set_info_still_filtered_out(self, parser):
+        assert parser._parse_single_affix("弓玦套装") is None

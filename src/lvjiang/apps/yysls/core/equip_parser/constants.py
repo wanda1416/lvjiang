@@ -127,6 +127,8 @@ def infer_part(equip_type: str | None) -> str:
 # AFFIX_NAMES / PERCENT_AFFIXES 已在上方 _load_config() 中赋值
 
 # 武学增伤/增效需要动态匹配（如 "剑武学增伤"、"扇武学增效"），单独处理
-WUXUE_PATTERN = re.compile(tr(r"^(.+?)武学增[伤效]"))
+# 匹配的是 OCR 截屏词条文字，恒为中文，正则不能过 tr()——英文界面下
+# 会拿翻译后的英文去编译正则，永远匹配不上中文截屏。
+WUXUE_PATTERN = re.compile(r"^(.+?)武学增[伤效]")
 
 # 带 % 的词条（_unit='%' 且非定音池，已在 _load_config() 中赋值）

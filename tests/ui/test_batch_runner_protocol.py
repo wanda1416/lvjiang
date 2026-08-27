@@ -4,6 +4,8 @@ from lvjiang.ui.batch.batch_runner import (
     RESULT_SKIPPED,
     RESULT_SUCCESS,
     ST_FAILED,
+    ST_SKIPPED,
+    ST_SUCCESS,
     BatchContext,
     BatchScript,
     BatchStageResult,
@@ -224,7 +226,10 @@ def test_failed_batch_setup_starts_no_later_stage(monkeypatch):
     monkeypatch.setattr(
         "lvjiang.ui.batch.batch_runner.BatchReport.write", lambda self: None)
     worker = Worker(
-        enabled_rows=[(0, {"user": "first"})],
+        enabled_rows=[
+            (0, {"user": "first"}),
+            (1, {"user": "second"}),
+        ],
         scripts=[BatchScript(id="task", name="Task")],
         config=BatchConfigItem(
             name="test",
@@ -235,6 +240,7 @@ def test_failed_batch_setup_starts_no_later_stage(monkeypatch):
                 batch_teardown="teardown.wf",
             ),
             user_column="user",
+            skip_lifecycle_for_single_item=True,
         ),
         ctx=BatchContext(object(), object(), object(), object()),
         session_manager=Sessions(),
@@ -244,3 +250,113 @@ def test_failed_batch_setup_starts_no_later_stage(monkeypatch):
     worker.run()
 
     assert phases == ["batch_setup"]
+
+
+def test_single_item_skips_lifecycle_and_runs_scripts(monkeypatch):
+    phases = []
+    executed = []
+    summaries = []
+
+    class Worker(BatchWorker):
+        def _run_stage(self, phase, wf_name, run_idx, source_idx, row_data,
+                       batch_state, item_result=None):
+            phases.append(phase)
+            return BatchStageResult(state=batch_state)
+
+        def _run_script(self, script, session, username):
+            executed.append((script.id, username, session["current_user"]))
+            return {}
+
+        def _save_result(self, username, script, result):
+            pass
+
+    class Sessions:
+        def load(self, username):
+            return {"current_user": username}
+
+        def save(self, username, session):
+            pass
+
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_runner.BatchReport.write", lambda self: None)
+    worker = Worker(
+        enabled_rows=[(4, {"user": "only"})],
+        scripts=[BatchScript(id="task", name="Task")],
+        config=BatchConfigItem(
+            name="test",
+            columns=["user"],
+            workflows=BatchWorkflows(
+                batch_setup="setup.wf",
+                prepare_item="prepare.wf",
+                finish_item="finish.wf",
+                batch_teardown="teardown.wf",
+            ),
+            user_column="user",
+        ),
+        ctx=BatchContext(object(), object(), object(), object()),
+        session_manager=Sessions(),
+        stop_check=lambda: False,
+    )
+    worker.finished_all.connect(summaries.append)
+
+    worker.run()
+
+    assert phases == []
+    assert executed == [("task", "only", "only")]
+    assert summaries[0]["lifecycle"] == {}
+    assert summaries[0]["entries"]["only"] == {
+        "prepare": ST_SKIPPED,
+        "finish": ST_SKIPPED,
+        "scripts": {"task": ST_SUCCESS},
+    }
+
+
+def test_single_item_runs_lifecycle_when_shortcut_is_disabled(monkeypatch):
+    phases = []
+
+    class Worker(BatchWorker):
+        def _run_stage(self, phase, wf_name, run_idx, source_idx, row_data,
+                       batch_state, item_result=None):
+            phases.append(phase)
+            return BatchStageResult(state=batch_state)
+
+        def _run_script(self, script, session, username):
+            return {}
+
+        def _save_result(self, username, script, result):
+            pass
+
+    class Sessions:
+        def load(self, username):
+            return {}
+
+        def save(self, username, session):
+            pass
+
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_runner.BatchReport.write", lambda self: None)
+    worker = Worker(
+        enabled_rows=[(0, {"user": "only"})],
+        scripts=[BatchScript(id="task", name="Task")],
+        config=BatchConfigItem(
+            name="test",
+            columns=["user"],
+            workflows=BatchWorkflows(
+                batch_setup="setup.wf",
+                prepare_item="prepare.wf",
+                finish_item="finish.wf",
+                batch_teardown="teardown.wf",
+            ),
+            user_column="user",
+            skip_lifecycle_for_single_item=False,
+        ),
+        ctx=BatchContext(object(), object(), object(), object()),
+        session_manager=Sessions(),
+        stop_check=lambda: False,
+    )
+
+    worker.run()
+
+    assert phases == [
+        "batch_setup", "prepare_item", "finish_item", "batch_teardown",
+    ]

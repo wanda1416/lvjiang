@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -157,6 +158,14 @@ class BatchConfigDialog(QDialog):
         self._wf_batch_teardown = self._create_wf_selector()
         wf_form.addRow(tr("批次收尾 wf："), self._wf_batch_teardown)
 
+        self._skip_single_lifecycle = QCheckBox(
+            tr("单条目执行时跳过上述生命周期操作")
+        )
+        self._skip_single_lifecycle.setToolTip(
+            tr("仅启用一个条目时，直接执行所选脚本，不运行四个生命周期 wf")
+        )
+        wf_form.addRow("", self._skip_single_lifecycle)
+
         layout.addLayout(wf_form)
 
         # ── 底部按钮 ──
@@ -270,6 +279,9 @@ class BatchConfigDialog(QDialog):
         self._set_wf_text(self._wf_prepare_item, item.workflows.prepare_item)
         self._set_wf_text(self._wf_finish_item, item.workflows.finish_item)
         self._set_wf_text(self._wf_batch_teardown, item.workflows.batch_teardown)
+        self._skip_single_lifecycle.setChecked(
+            item.skip_lifecycle_for_single_item
+        )
 
     def _clear_editor(self):
         """清空编辑区"""
@@ -282,6 +294,7 @@ class BatchConfigDialog(QDialog):
         self._set_wf_text(self._wf_prepare_item, "")
         self._set_wf_text(self._wf_finish_item, "")
         self._set_wf_text(self._wf_batch_teardown, "")
+        self._skip_single_lifecycle.setChecked(True)
 
     def _on_config_selected(self, index: int):
         """配置下拉框切换"""
@@ -308,6 +321,7 @@ class BatchConfigDialog(QDialog):
             rows=[],
             workflows=BatchWorkflows(),
             user_column="",
+            skip_lifecycle_for_single_item=True,
         )
         self._cfg.configs[name] = item
         self._cfg.active_config = name
@@ -442,4 +456,7 @@ class BatchConfigDialog(QDialog):
             prepare_item=self._get_wf_text(self._wf_prepare_item),
             finish_item=self._get_wf_text(self._wf_finish_item),
             batch_teardown=self._get_wf_text(self._wf_batch_teardown),
+        )
+        item.skip_lifecycle_for_single_item = (
+            self._skip_single_lifecycle.isChecked()
         )

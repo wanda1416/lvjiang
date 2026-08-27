@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
@@ -67,7 +67,6 @@ class _UIHelper(QObject):
         super().__init__()
         self._window = window
         self._active_dialog = None
-        self._equip_notify_timer: QTimer | None = None
         self.request.connect(self._on_request)
 
     def _on_request(self, req: dict):
@@ -81,7 +80,12 @@ class _UIHelper(QObject):
             req["done"].set()
 
     def _show(self, action: str, kwargs: dict):
-        from PyQt6.QtWidgets import QInputDialog, QMessageBox
+        from PyQt6.QtWidgets import (
+            QAbstractButton,
+            QInputDialog,
+            QMessageBox,
+            QPushButton,
+        )
         if action == "confirm":
             box = QMessageBox(
                 QMessageBox.Icon.Question, tr("工作流确认"),
@@ -91,25 +95,41 @@ class _UIHelper(QObject):
             )
             self._active_dialog = box
             return box.exec() == QMessageBox.StandardButton.Yes
-        if action == "confirm3":
-            # 三选项确认对话框（用于材料不足等场景）
+        if action == "choose":
+            # 通用多选一对话框；业务文案和值全部由调用方提供。
             box = QMessageBox(self._window)
             box.setIcon(QMessageBox.Icon.Question)
             box.setWindowTitle(tr("工作流确认"))
             box.setText(kwargs.get("message", ""))
-            btn_continue = box.addButton(tr("继续调律"), QMessageBox.ButtonRole.AcceptRole)
-            btn_skip = box.addButton(tr("跳过当前装备"), QMessageBox.ButtonRole.DestructiveRole)
-            btn_end = box.addButton(tr("结束本次调律"), QMessageBox.ButtonRole.RejectRole)  # noqa: F841
-            box.setDefaultButton(btn_continue)
+            roles = {
+                "accept": QMessageBox.ButtonRole.AcceptRole,
+                "destructive": QMessageBox.ButtonRole.DestructiveRole,
+                "reject": QMessageBox.ButtonRole.RejectRole,
+            }
+            buttons: dict[QAbstractButton, object] = {}
+            default_button: QPushButton | None = None
+            choices = kwargs.get("choices") or []
+            for choice in choices:
+                if not isinstance(choice, dict):
+                    continue
+                button = box.addButton(
+                    str(choice.get("label", "")),
+                    roles.get(str(choice.get("role", "reject")),
+                              QMessageBox.ButtonRole.RejectRole),
+                )
+                if button is None:
+                    continue
+                buttons[button] = choice.get("value")
+                if default_button is None:
+                    default_button = button
+            if default_button is not None:
+                box.setDefaultButton(default_button)
             self._active_dialog = box
             box.exec()
             clicked = box.clickedButton()
-            if clicked == btn_continue:
-                return "continue"
-            elif clicked == btn_skip:
-                return "skip"
-            else:  # btn_end or dialog closed
-                return "end"
+            if clicked is None:
+                return kwargs.get("cancel_value")
+            return buttons.get(clicked, kwargs.get("cancel_value"))
         if action == "pause":
             box = QMessageBox(
                 QMessageBox.Icon.Information, tr("工作流暂停"),
@@ -135,34 +155,14 @@ class _UIHelper(QObject):
             if self._window and getattr(self._window, 'alert_panel', None) is not None:
                 self._window.alert_panel.push_alert(alert_id, message, now.isoformat())
             return None
-        if action == "equipment_changed":
-            # 工作流写入装备数据后通知 UI。延迟发射 + 防抖合并：
-            # 立即返回放行工作流线程（不阻塞等待 UI 刷新），
-            # 批量写入时仅最后一次通知后 150ms 触发一次全量刷新
-            self._schedule_equipment_notify()
-            return None
-        if action == "open_play_style_form":
-            # 工作流请求打开"创建基础属性"面板并预填数值：直接转发信号，
-            # 不 exec() 等待——已打开的战斗属性 Tab 自行订阅处理（若未打开
-            # 该 Tab 则静默无效果，与 equipment_changed 行为一致），
-            # 工作流线程发出请求后立即返回，不等待对话框关闭
-            if self._window is not None:
-                self._window.open_play_style_form.emit(kwargs.get("prefill") or {})
+        if action == "app_event":
+            from ..app_events import AppEvent
+            event = kwargs.get("event")
+            if self._window is not None and isinstance(event, AppEvent):
+                self._window.app_event.emit(event)
             return None
         logger.warning(f"未知 UI 交互类型: {action}")
         return None
-
-    def _schedule_equipment_notify(self):
-        """主线程：重启式防抖，合并短时间内的多次装备变更通知。"""
-        if self._window is None:
-            return
-        if self._equip_notify_timer is None:
-            timer = QTimer(self)
-            timer.setSingleShot(True)
-            timer.setInterval(150)
-            timer.timeout.connect(self._window.equipment_changed)
-            self._equip_notify_timer = timer
-        self._equip_notify_timer.start()
 
     def close_active_dialog(self):
         """主线程：关闭当前活动对话框（F10 停止时调用）
@@ -362,7 +362,7 @@ class RunControlMixin:
             # 其 session 落盘归属不受此处切换影响
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
-        # 通知插件页面（如装备状态）刷新
+        # 通知插件页面刷新其用户相关状态。
         self.user_changed.emit(self._user_manager.get_active_user_name() or "")
 
     def _on_env_changed(self, index: int):

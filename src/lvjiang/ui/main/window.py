@@ -182,12 +182,8 @@ class MainWindow(
     # 宿主信号：自动化状态（"running" / "paused" / "not_ready" / "idle"）与用户切换
     automation_state_changed = pyqtSignal(str)
     user_changed = pyqtSignal(str)
-    # 装备变更信号（用于通知战斗属性 Tab 刷新）
-    equipment_changed = pyqtSignal()
-    # 工作流请求打开"创建基础属性"面板并预填数值（战斗属性 Tab 订阅处理）
-    open_play_style_form = pyqtSignal(dict)
-    # 毕业率计算完成信号（携带计算结果，None 表示尚未计算）
-    graduation_updated = pyqtSignal(object)
+    # app 业务事件统一走带命名空间的 AppEvent 信封。
+    app_event = pyqtSignal(object)
 
     def __init__(self) -> None:
         super().__init__()

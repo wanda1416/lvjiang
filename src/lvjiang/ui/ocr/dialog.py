@@ -1,6 +1,6 @@
 """图像识别对话框 - 多 Tab 结构
 
-Tab 1: 图像识别 - 粘贴截图，支持 OCR 文字识别和材料识别
+Tab 1: 图像识别 - 粘贴截图，支持 OCR 文字识别和参考图匹配
 Tab 2: 清洗规则 - 管理 OCR 文本通用清洗规则
 """
 
@@ -127,10 +127,10 @@ class OCRDialog(QDialog):
         self._btn_ocr.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_ocr)
 
-        self._btn_material = QPushButton(tr("识别材料"))
-        self._btn_material.setEnabled(False)
-        self._btn_material.clicked.connect(self._on_recognize_material)
-        btn_row.addWidget(self._btn_material)
+        self._btn_reference = QPushButton(tr("匹配参考图"))
+        self._btn_reference.setEnabled(False)
+        self._btn_reference.clicked.connect(self._on_recognize_reference)
+        btn_row.addWidget(self._btn_reference)
 
         btn_row.addStretch()
         right_layout.addLayout(btn_row)
@@ -424,7 +424,7 @@ class OCRDialog(QDialog):
             self._canvas.set_image(bgr)
             h, w = bgr.shape[:2]
             self._btn_ocr.setEnabled(True)
-            self._btn_material.setEnabled(True)
+            self._btn_reference.setEnabled(True)
             self._status_label.setText(f"已粘贴图片 ({w}x{h})，点击「识别」")
             logger.info(f"OCR 测试：粘贴图片 {w}x{h}")
 
@@ -446,7 +446,7 @@ class OCRDialog(QDialog):
             self._canvas.set_image(bgr)
             h, w = bgr.shape[:2]
             self._btn_ocr.setEnabled(True)
-            self._btn_material.setEnabled(True)
+            self._btn_reference.setEnabled(True)
             self._status_label.setText(f"已加载图片 ({w}x{h})，点击「识别」")
             logger.info(f"OCR 测试：上传图片 {w}x{h} <- {path}")
 
@@ -492,7 +492,7 @@ class OCRDialog(QDialog):
         self._canvas.set_image(new_image)
         h, w = new_image.shape[:2]
         self._btn_ocr.setEnabled(True)
-        self._btn_material.setEnabled(True)
+        self._btn_reference.setEnabled(True)
         self._status_label.setText(f"已刷新截图 ({w}x{h})")
         logger.info(f"OCR 测试：刷新截图 {w}x{h}")
 
@@ -564,24 +564,22 @@ class OCRDialog(QDialog):
             self._result_text.setText(f"识别失败: {e}")
             self._status_label.setText(tr("识别失败"))
 
-    def _on_recognize_material(self):
-        """执行材料识别（类型 + 等级 + 数量），输出最相似的 5 个结果"""
+    def _on_recognize_reference(self):
+        """执行通用参考图匹配，输出最相似的 5 个结果。"""
         image, error_msg = self._get_recognition_image()
         if image is None:
             self._status_label.setText(error_msg or tr("获取图像失败"))
             return
 
-        self._status_label.setText(tr("正在识别材料..."))
+        self._status_label.setText(tr("正在匹配参考图..."))
         QApplication.processEvents()
 
         try:
-            from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
-                MaterialRecognizer,
-            )
             from lvjiang.core.ocr import OCREngine
+            from lvjiang.core.recognizers import ReferenceRecognizer
 
             ocr = OCREngine()
-            recognizer = MaterialRecognizer(ocr)
+            recognizer = ReferenceRecognizer(ocr)
             # 输入字段 key -> 显示名（用于展示匹配条目的元数据）
             input_fields = recognizer.reference_db.get_custom_input_fields()
             input_names = {f.key: f.name for f in input_fields}
@@ -593,15 +591,15 @@ class OCRDialog(QDialog):
 
             self._result_text.clear()
             if not results:
-                self._result_text.append(tr("未识别到材料（空槽或无匹配）"))
+                self._result_text.append(tr("未匹配到参考图"))
             else:
                 for i, result in enumerate(results, 1):
                     if i > 1:
                         self._result_text.append("")  # 结果之间空行
-                    if not result.type:
+                    if not result.label:
                         self._result_text.append(f"[{i}] 空槽  (置信度: {result.confidence:.3f})")
                     else:
-                        self._result_text.append(f"[{i}] {result.type}")
+                        self._result_text.append(f"[{i}] {result.label}")
                         # 输入元数据（匹配条目的属性，如等级: 110）
                         for key, name in input_names.items():
                             value = result.meta.get(key)
@@ -613,16 +611,16 @@ class OCRDialog(QDialog):
                             self._result_text.append(f"  {name}: {text or tr('(无)')}")
                         self._result_text.append(f"  匹配置信度: {result.confidence:.3f}")
 
-            best_type = results[0].type if results else ""
+            best_type = results[0].label if results else ""
             self._status_label.setText(
-                f"材料识别完成: {best_type or tr('(空)')}"
+                f"参考图匹配完成: {best_type or tr('(无匹配)')}"
             )
             logger.info(
-                f"材料识别 top {len(results)}: "
-                + ", ".join(f"{r.type}({r.confidence:.3f})" for r in results)
+                f"参考图匹配 top {len(results)}: "
+                + ", ".join(f"{r.label}({r.confidence:.3f})" for r in results)
             )
         except Exception as e:
-            logger.error(f"材料识别失败: {e}")
+            logger.error(f"参考图匹配失败: {e}")
             self._result_text.setText(f"识别失败: {e}")
             self._status_label.setText(tr("识别失败"))
 
@@ -631,7 +629,7 @@ class OCRDialog(QDialog):
         self._canvas.clear()
         self._result_text.clear()
         self._btn_ocr.setEnabled(False)
-        self._btn_material.setEnabled(False)
+        self._btn_reference.setEnabled(False)
         self._status_label.setText(tr("就绪"))
 
     def _on_clear_selection(self):

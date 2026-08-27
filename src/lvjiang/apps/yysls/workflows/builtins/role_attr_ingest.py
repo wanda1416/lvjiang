@@ -35,9 +35,7 @@ def _to_role_base_attrs(raw: dict) -> dict:
 def _open_base_attr_form(_engine, prefill: dict) -> None:
     """触发 UI 弹出"创建基础属性"面板并预填数值，不等待用户确认
 
-    通过 MainWindow.open_play_style_form 信号广播给已打开的"培养→基础
-    属性"页签（若页签未打开则静默无效果，与 equipment_changed 通知
-    行为一致）。工作流线程发出请求后立即返回，不阻塞等待对话框关闭。
+    经通用 AppEvent 桥广播给 yysls 基础属性页签，不阻塞工作流线程。
 
     .wf 用法:
         eval open_base_attr_form($parsed)
@@ -47,6 +45,11 @@ def _open_base_attr_form(_engine, prefill: dict) -> None:
         logger.debug("open_base_attr_form: 无 UI 回调（测试/独立执行端），跳过")
         return
     try:
-        callback("open_play_style_form", prefill=prefill or {})
+        from lvjiang.apps.yysls.ui.events import APP_ID, OPEN_PLAY_STYLE_FORM
+        from lvjiang.ui.app_events import AppEvent
+        callback(
+            "app_event",
+            event=AppEvent(APP_ID, OPEN_PLAY_STYLE_FORM, prefill or {}),
+        )
     except Exception as e:
         logger.warning(f"open_base_attr_form: 触发失败: {e}")

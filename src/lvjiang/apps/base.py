@@ -10,9 +10,23 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
+@dataclass(frozen=True)
+class TelemetryDisclosure:
+    """插件声明的数据用途；通用同意框负责统一呈现和授权。"""
+
+    title: str
+    purpose: str
+    collected: tuple[str, ...] = ()
+    excluded: tuple[str, ...] = ()
+    schema_names: tuple[str, ...] = ()
+
+
 @dataclass
 class AppHooks:
     """插件向通用引擎注册的钩子集合。"""
+
+    # 稳定机器标识（小写 ASCII，不可翻译），例如 "yysls"
+    id: str = ""
 
     # 插件显示名（例如 "燕云十六声"）
     name: str = ""
@@ -31,6 +45,9 @@ class AppHooks:
     # 插入位置在「帮助」菜单之前；弹对话框用 host 作 parent
     menu_builders: list[Callable[..., None]] = field(default_factory=list)
 
+    # 主题 QSS 扩展：[fn(theme_tokens) -> str, ...]
+    theme_stylesheet_builders: list[Callable[..., str]] = field(default_factory=list)
+
     # 识别器类列表（实现 lvjiang.core.recognizers 协议的类）
     recognizer_classes: list[type] = field(default_factory=list)
 
@@ -44,6 +61,8 @@ class AppHooks:
     # 语义）：["lvjiang.apps.yysls.telemetry.schemas", ...]。core.telemetry
     # 不认识任何插件领域词汇，字段声明由插件自己在这些模块里注册。
     telemetry_modules: list[str] = field(default_factory=list)
+
+    telemetry_disclosures: list[TelemetryDisclosure] = field(default_factory=list)
 
     # 配置合并策略模块路径列表（同上「import 即注册」语义）：
     # ["lvjiang.apps.yysls.config.merge_policy", ...]。core.config 不认识

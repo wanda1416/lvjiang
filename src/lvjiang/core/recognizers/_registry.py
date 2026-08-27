@@ -1,9 +1,8 @@
 """识别器注册表。
 
-提供 ``Recognizer`` 协议以及注册 / 查询接口。通用识别器（OCR / 模板匹配 /
-颜色检测）在引擎启动时自动注册；业务识别器（如燕云材料识别器）由插件在
-``AppHooks.recognizer_classes`` 中声明，引擎在加载插件时调用
-``register_recognizer`` 注入。
+提供 ``Recognizer`` 协议以及注册 / 查询接口。可选识别能力由插件通过
+``AppHooks.recognizer_classes`` 声明，引擎加载插件时调用
+``register_recognizer`` 注入。参考图匹配是引擎自身服务，不经过此注册表。
 
 识别器使用场景：
 - DSL ``recognize`` 指令通过 ``get_recognizer(name)`` 获取识别器实例
@@ -33,7 +32,7 @@ class Recognizer(Protocol):
         image: np.ndarray,
         **kwargs: Any,
     ) -> Any:
-        """对输入图像执行识别，返回业务层约定的结果。"""
+        """对输入图像执行识别，返回该识别器约定的结果。"""
         ...
 
 

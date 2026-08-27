@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 
 from ......i18n import tr
 from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
+from ...events import EQUIPMENT_CHANGED, get_event_hub
 from ...layout_helpers import fit_combo_to_contents
 from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from ...profile.tab import add_user_nav_buttons
@@ -128,8 +129,9 @@ class EquipStatusTab(QWidget):
         self._setup_ui()
         self._refresh_all()
         # 订阅装备变更信号（UI 操作与工作流写入均会触发），完整刷新展示
-        self._host.equipment_changed.connect(self._refresh_all)
-        self._host.graduation_updated.connect(self._update_status_row)
+        events = get_event_hub(self._host)
+        events.equipment_changed.connect(self._refresh_all)
+        events.graduation_updated.connect(self._update_status_row)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -778,7 +780,7 @@ class EquipStatusTab(QWidget):
         self._status_graduation.setToolTip(tooltip)
 
     def _refresh_all(self):
-        from lvjiang.core.config import load_equip_display
+        from ....config.equip_display import load_equip_display
 
         self._display_params = load_equip_display()
 
@@ -900,7 +902,7 @@ class EquipStatusTab(QWidget):
         try:
             inv.equip_to_slot(target_slot, equip_data, group_key)
             self._sync_inv()
-            self._host.equipment_changed.emit()
+            get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
             logger.info(f"已装备 {equip_data.get('name', '未知')} 到 {target_slot}")
         except Exception as e:
             logger.error(f"装备失败: {e}")
@@ -965,7 +967,7 @@ class EquipStatusTab(QWidget):
         from ....core.loadout import LoadoutRepository
         LoadoutRepository(user_name).delete_all_real()
         self._refresh_all()
-        self._host.equipment_changed.emit()
+        get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
 
     def _on_chengyin_merge(self):
         """识别候选并在用户确认后原子迁移引用、删除旧快照。"""
@@ -1007,7 +1009,7 @@ class EquipStatusTab(QWidget):
             QMessageBox.critical(self, tr("合并失败"), str(exc))
             return
         self._refresh_all()
-        self._host.equipment_changed.emit()
+        get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
         QMessageBox.information(
             self, tr("合并完成"),
             tr("已合并 {count} 组装备。此操作保留右侧版本，并迁移所有备战方案引用。")

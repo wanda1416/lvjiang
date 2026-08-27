@@ -48,6 +48,9 @@ _SEED_META_SCHEMA = [
 # 预制输入字段 key（图库内部使用，不参与业务展示）
 _PREDEFINED_INPUT_KEYS = frozenset({"label", "group", "notes"})
 
+# rich reference dict 的引擎保留字段；output OCR 字段会被摊平，不能占用。
+REFERENCE_OUTPUT_RESERVED_KEYS = frozenset({"label", "group", "confidence", "meta"})
+
 # 默认图库空间名（名册缺失时的回退空间）
 DEFAULT_SPACE = tr("默认")
 
@@ -604,6 +607,13 @@ class ReferenceDatabase:
                 scope=self._parse_scope(item.get("scope")),
                 crop=self._parse_crop(item.get("crop")),
             ))
+            if (
+                result[-1].scope == "output"
+                and result[-1].key in REFERENCE_OUTPUT_RESERVED_KEYS
+            ):
+                raise ValueError(
+                    f"output 元数据字段 {key!r} 是参考图识别保留字段"
+                )
         return result or self._seed_schema()
 
     @staticmethod
@@ -860,6 +870,15 @@ class ReferenceDatabase:
 
     def set_meta_schema(self, schema: list[MetaFieldDef]):
         """设置并持久化 meta 字段定义（用户模式整列表替换进 local）"""
+        conflicts = sorted(
+            field.key for field in schema
+            if field.scope == "output"
+            and field.key in REFERENCE_OUTPUT_RESERVED_KEYS
+        )
+        if conflicts:
+            raise ValueError(
+                f"output 元数据字段占用参考图识别保留字段: {', '.join(conflicts)}"
+            )
         if self._is_dev():
             self._system_schema = list(schema)
         else:
@@ -992,4 +1011,3 @@ class ReferenceDatabase:
             if file_path.exists():
                 file_path.unlink()
                 logger.debug(f"删除参考图文件: {file_path}")
-

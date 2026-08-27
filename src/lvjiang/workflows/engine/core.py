@@ -19,6 +19,7 @@ from ...core.input_base import InputBackend
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
+from ...core.recognizers import ReferenceRecognizer
 from ..align import GridAlignment
 from ..base import BaseWorkflow
 from ..grammar.ast_nodes import (
@@ -117,6 +118,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._stop_check = stop_check or (lambda: False)
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event
+        # 引擎生命周期服务：DSL 委托与 Python 类工作流共享图库匹配缓存。
+        self._reference_recognizer = ReferenceRecognizer(self._ocr)
         # 执行状态
         self.variables: dict = {}
         self.output: dict = {}
@@ -182,6 +185,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 window_top=self._window_top,
                 stop_check=self._stop_check,
                 pause_event=self._pause_event,
+                reference_recognizer=self._reference_recognizer,
             )
         return self._workflow
 
@@ -742,6 +746,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
     def _execute_python_workflow(self, workflow: BaseWorkflow) -> dict:
         """执行 Python 工作流实例"""
+        # reset_state() 会刷新 reference 服务，必须先完成生命周期注入。
+        workflow._reference_recognizer = self._reference_recognizer
         workflow.reset_state()
         workflow.variables.update(self.variables)
         # 注入引擎引用，使工作流内调用的 UI 交互内置函数

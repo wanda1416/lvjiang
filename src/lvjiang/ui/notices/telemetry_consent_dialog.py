@@ -1,4 +1,4 @@
-"""匿名调律数据收集——首启一次性同意提示。
+"""匿名使用数据收集——首启一次性同意提示。
 
 新版本首次启动时弹出（``needs_prompt()`` 判定，见
 core/telemetry/consent.py）。两个按钮视觉等权，不做暗黑模式；无论选
@@ -30,7 +30,7 @@ class TelemetryConsentDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(tr("匿名调律数据收集"))
+        self.setWindowTitle(tr("匿名使用数据收集"))
         self.setMinimumSize(560, 420)
         self._granted = False
         self._setup_ui()
@@ -41,7 +41,7 @@ class TelemetryConsentDialog(QDialog):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel(tr("愿意贡献匿名调律数据，帮助改进内置调律规则吗？"))
+        title = QLabel(tr("愿意贡献匿名使用数据，帮助改进律匠吗？"))
         title.setStyleSheet("font-weight: bold; font-size: 14px;")
         title.setWordWrap(True)
         layout.addWidget(title)
@@ -65,36 +65,41 @@ class TelemetryConsentDialog(QDialog):
     def _body_markdown(self) -> str:
         example = self._example_payload_text()
         heartbeat_line = tr("每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识")
-        roll_line = tr(
-            "每件装备的一次调律过程：什么部位、什么等级品阶、在什么规则激活下、"
-            "调律前这件装备原有哪些词条、逐轮加了什么材料出了什么词条和数值、"
-            "为什么结束、最终评到哪一档")
         id_line = tr(
             "这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，"
             "但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。")
         return (
             f"{tr('收集什么')}：\n\n"
             f"- {heartbeat_line}\n"
-            f"- {roll_line}\n\n"
+            f"{self._disclosure_markdown()}"
             f"{tr('不收集什么')}：\n\n"
-            f"- {tr('游戏账号、角色名、任何能认出你是谁的信息')}\n"
-            f"- {tr('装备名称、装备指纹')}\n"
+            f"- {tr('账号、姓名或其他能认出你是谁的信息')}\n"
             f"- {tr('截图、日志、config/session/ 目录里的任何内容')}\n\n"
-            f"{tr('用来做什么')}：{tr('仅用于改进律匠内置的调律规则，不公开发布原始数据')}。\n\n"
+            f"{tr('用来做什么')}：{tr('仅用于所列功能改进，不公开发布原始数据')}。\n\n"
             f"{id_line}\n\n"
             f"{tr('同意后随时可在「配置管理 → 网络与隐私」关闭。')}\n\n"
             f"**{tr('实际会发送的数据长这样')}：**\n\n```json\n{example}\n```"
         )
 
     @staticmethod
+    def _disclosure_markdown() -> str:
+        from ...apps import get_registry
+        lines: list[str] = []
+        for item in get_registry().get("telemetry_disclosures", ()):
+            lines.append(f"- **{item.title}**：{item.purpose}")
+            lines.extend(f"  - {text}" for text in item.collected)
+            lines.extend(f"  - {tr('不收集')}：{text}" for text in item.excluded)
+        return "\n".join(lines) + ("\n\n" if lines else "\n")
+
+    @staticmethod
     def _example_payload_text() -> str:
         from ...core.telemetry.heartbeat import HEARTBEAT_SCHEMA
+        from ...core.telemetry.registry import all_schemas
         payloads = [HEARTBEAT_SCHEMA.example()]
-        try:
-            from ...apps.yysls.telemetry.schemas import TUNING_SESSION_SCHEMA
-            payloads.append(TUNING_SESSION_SCHEMA.example())
-        except Exception:  # noqa: BLE001 —— 插件未加载时只展示心跳示例
-            pass
+        payloads.extend(
+            schema.example() for schema in all_schemas()
+            if schema.name != HEARTBEAT_SCHEMA.name
+        )
         return json.dumps(payloads, ensure_ascii=False, indent=2)
 
     def _on_agree(self) -> None:

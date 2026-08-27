@@ -267,7 +267,7 @@ class _PanelMixin:
     def _recognize_panel_cell(self, node: Recognize):
         """recognize [scene].[panel][row][col] as [rich] $var [by ...] [on group ...] [where ...]
 
-        [row][col] 是 key 过滤，结果为该格材料类型名（str）或富 dict（rich 模式）。
+        [row][col] 是 key 过滤，结果为该格参考标签（str）或富 dict（rich 模式）。
         """
         ref: PanelRef = node.scene
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
@@ -277,7 +277,7 @@ class _PanelMixin:
             return
         group = self._resolve(node.group) if node.group is not None else None
         min_conf = self._resolve_min_confidence(node.where)
-        recognizer = self._ensure_workflow().material_recognizer
+        recognizer = self._ensure_workflow().reference_recognizer
         if node.by is not None:
             # by 优先：rich 不影响短路匹配语义
             by_clause: ByClause = node.by
@@ -286,14 +286,14 @@ class _PanelMixin:
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
-                matched = self._match_text(info.type, target_value, by_clause.match_mode)
-                self.variables[var_name] = info.type if matched else ""
+                matched = self._match_text(info.label, target_value, by_clause.match_mode)
+                self.variables[var_name] = info.label if matched else ""
         elif node.rich:
             # rich 模式：返回富 dict
             info = recognizer.recognize(slot_img, group=group)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = {}
-            elif not info.type:
+            elif not info.label:
                 self.variables[var_name] = {}
             else:
                 base = recognizer.build_rich_base(info)
@@ -310,7 +310,7 @@ class _PanelMixin:
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
-                self.variables[var_name] = info.type
+                self.variables[var_name] = info.label
         logger.info(f"recognize panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _aligned_panel_image(self, scene_key: str, panel_key: str):
@@ -370,15 +370,15 @@ class _PanelMixin:
         logger.info(f"scan panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
     def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None, min_confidence: float | None = None, rich: bool = False, with_func=None):
-        """recognize [scene].[panel] as [rich] $var [on group ...] [where ...] [with ...] — 整面板逐格材料识别
+        """recognize [scene].[panel] as [rich] $var [...] — 整面板逐格参考图识别
 
-        结果结构与 _scan_panel_whole 一致：$var.[行].[列] 取材料类型名或富 dict（rich 模式）。
+        结果结构与 _scan_panel_whole 一致：$var.[行].[列] 取参考标签或富 dict（rich 模式）。
         """
         panel_img, cal = self._aligned_panel_image(scene_key, panel_key)
         if panel_img is None:
             self.variables[var_name] = {}
             return
-        recognizer = self._ensure_workflow().material_recognizer
+        recognizer = self._ensure_workflow().reference_recognizer
         # 解析 with 转换函数
         transform = None
         if rich and with_func is not None:
@@ -396,13 +396,13 @@ class _PanelMixin:
                 if min_confidence is not None and info.confidence < min_confidence:
                     cell_value = {} if rich else ""
                 elif rich:
-                    if info.type:
+                    if info.label:
                         base = recognizer.build_rich_base(info)
                         cell_value = transform(base) if transform is not None else base
                     else:
                         cell_value = {}
                 else:
-                    cell_value = info.type
+                    cell_value = info.label
             result.setdefault(str(r + 1), {})[str(c + 1)] = cell_value
         self.variables[var_name] = result
         logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
@@ -445,7 +445,7 @@ class _PanelMixin:
             self.variables[var_name] = {}
             return
 
-        recognizer = self._ensure_workflow().material_recognizer
+        recognizer = self._ensure_workflow().reference_recognizer
         group = self._resolve(node.group) if node.group is not None else None
         min_conf = self._resolve_min_confidence(node.where)
         ph, pw = panel_img.shape[:2]
@@ -477,7 +477,7 @@ class _PanelMixin:
                     info = recognizer.recognize(slot_img, group=group)
                     if min_conf is not None and info.confidence < min_conf:
                         continue
-                    if self._match_text(info.type, target_value, match_mode):
+                    if self._match_text(info.label, target_value, match_mode):
                         if full:
                             confidence = getattr(info, 'confidence', 0.0)
                             if confidence > best_confidence:
@@ -485,7 +485,7 @@ class _PanelMixin:
                                 best_confidence = confidence
                         else:
                             self.variables[var_name] = {"row": r_1based, "col": c_1based}
-                            logger.info(f"recognize panel range by [{scene_key}.{panel_key}] matched at row={r_1based}, col={c_1based}: {info.type!r}")
+                            logger.info(f"recognize panel range by [{scene_key}.{panel_key}] matched at row={r_1based}, col={c_1based}: {info.label!r}")
                             return
 
             if full and best_pos is not None:
@@ -529,13 +529,13 @@ class _PanelMixin:
                     if min_conf is not None and info.confidence < min_conf:
                         cell_value = {} if node.rich else ""
                     elif node.rich:
-                        if info.type:
+                        if info.label:
                             base = recognizer.build_rich_base(info)
                             cell_value = transform(base) if transform is not None else base
                         else:
                             cell_value = {}
                     else:
-                        cell_value = info.type
+                        cell_value = info.label
                 result.setdefault(str(r_1based), {})[str(c_1based)] = cell_value
 
         self.variables[var_name] = result
@@ -571,7 +571,7 @@ class _PanelMixin:
         logger.info(f"scan panel by [{scene_key}.{panel_key}] no match")
 
     def _recognize_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
-        """recognize [scene].[panel] as $var [full] by ... [on group ...] [where ...] — 整面板材料识别 + by 匹配
+        """recognize [scene].[panel] as $var [full] by ... — 参考图识别 + by 匹配
 
         by_clause.full=False: 短路匹配，返回首个命中的行列位置 {"row": 行号, "col": 列号}
         by_clause.full=True: 全量匹配，返回置信度最高的行列位置
@@ -581,7 +581,7 @@ class _PanelMixin:
         if panel_img is None:
             self.variables[var_name] = {}
             return
-        recognizer = self._ensure_workflow().material_recognizer
+        recognizer = self._ensure_workflow().reference_recognizer
         target_value = self._resolve(by_clause.target)
         match_mode = by_clause.match_mode
         full = by_clause.full
@@ -597,7 +597,7 @@ class _PanelMixin:
                 if min_confidence is not None and info.confidence < min_confidence:
                     mat_type = ""
                 else:
-                    mat_type = info.type
+                    mat_type = info.label
                     confidence = getattr(info, 'confidence', 0.0)  # 兼容 mock 对象
             if self._match_text(mat_type, target_value, match_mode):
                 if full:

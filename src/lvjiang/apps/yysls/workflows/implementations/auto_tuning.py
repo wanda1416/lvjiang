@@ -289,7 +289,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     @staticmethod
     def _missing_output_fields() -> list[str]:
         """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
-        from lvjiang.apps.yysls.core.recognizer.material_recognizer import (
+        from lvjiang.apps.yysls.core.recognizer.reference_adapter import (
             get_missing_output_fields,
         )
         from lvjiang.core.reference_db import ReferenceDatabase

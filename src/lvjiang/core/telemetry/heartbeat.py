@@ -11,7 +11,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 from .registry import register_schema
-from .schema import EventSchema, FieldSpec
+from .schema import EventSchema, FieldSpec, ListSpec
 
 _VERSION_PATTERN = r"^[0-9A-Za-z.\-+]{1,32}$"
 _DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
@@ -20,7 +20,7 @@ _OS_RELEASE_PATTERN = r"^[0-9A-Za-z._-]{1,16}$"
 _ARCH_PATTERN = r"^[A-Za-z0-9_]{1,20}$"
 
 HEARTBEAT_SCHEMA = EventSchema(
-    name="heartbeat", version=1,
+    name="heartbeat", version=2,
     fields=(
         FieldSpec("install_id", str, pattern=_UUID_HEX_PATTERN, example="0" * 32),
         FieldSpec("first_seen", str, pattern=_DATE_PATTERN, example="2026-01-01"),
@@ -32,10 +32,13 @@ HEARTBEAT_SCHEMA = EventSchema(
                   example="11"),
         FieldSpec("arch", str, pattern=_ARCH_PATTERN, example="amd64"),
         FieldSpec("ui_language", str, pattern=r"^[a-z]{2}_[A-Z]{2}$", example="zh_CN"),
-        # 目前只有 yysls 一个插件；将来支持第三方插件时插件名会变成用户
-        # 自定义自由文本，必须同步扩充这里的白名单，否则拒收（不是放行为
-        # 自由文本），见项目风险清单。
-        FieldSpec("plugin", str, choices=("yysls", "none")),
+        ListSpec(
+            "apps", max_items=16,
+            item_fields=(FieldSpec(
+                "id", str, pattern=r"^[a-z0-9][a-z0-9_-]{0,31}$",
+                example="yysls",
+            ),),
+        ),
     ),
 )
 register_schema(HEARTBEAT_SCHEMA)
@@ -49,14 +52,11 @@ def _os_release_major() -> str:
     return token or "unknown"
 
 
-def _detect_plugin() -> str:
-    """已加载插件的探测：AppHooks 未单独登记插件名，借用
-    ``builtin_modules`` 的模块路径判断——目前只有 yysls 一个插件。"""
-    from ...apps import get_registry
-    modules = get_registry().get("builtin_modules") or []
-    if any(".yysls." in str(m) for m in modules):
-        return "yysls"
-    return "none"
+def _registered_apps() -> list[dict[str, str]]:
+    """只上报框架登记的稳定 ID，不读取模块路径或用户文本。"""
+    from ...apps import get_registered_app_ids
+    ids = get_registered_app_ids()
+    return [{"id": app_id} for app_id in ids] or [{"id": "none"}]
 
 
 def normalized_app_version() -> str:
@@ -97,7 +97,7 @@ def build_heartbeat_payload(*, install_id: str, first_seen: str) -> dict:
         "os_release": _os_release_major(),
         "arch": (platform.machine() or "unknown")[:20],
         "ui_language": current_language(),
-        "plugin": _detect_plugin(),
+        "apps": _registered_apps(),
     }
     return payload
 

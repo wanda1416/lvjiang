@@ -99,7 +99,7 @@ class TuningRoundHostPort(Protocol):
 
     output: dict
 
-    def recognize_materials_info_panel(
+    def recognize_references_info_panel(
         self,
         scene_key: str,
         panel_key: str,

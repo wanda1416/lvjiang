@@ -42,10 +42,6 @@ class ThemeTokens:
     info_surface: str
     success: str
     success_surface: str
-    quality_gold: str
-    quality_purple: str
-    quality_blue: str
-    quality_green: str
 
 
 LIGHT = ThemeTokens(
@@ -71,10 +67,6 @@ LIGHT = ThemeTokens(
     info_surface="#e3f2fd",
     success="#247a3b",
     success_surface="#e8f5e9",
-    quality_gold="#b8860b",
-    quality_purple="#8b5cf6",
-    quality_blue="#2563eb",
-    quality_green="#16863e",
 )
 
 DARK = ThemeTokens(
@@ -100,10 +92,6 @@ DARK = ThemeTokens(
     info_surface="#203b56",
     success="#73d58a",
     success_surface="#203f2b",
-    quality_gold="#ffd166",
-    quality_purple="#c4a0ff",
-    quality_blue="#73a7ff",
-    quality_green="#62d58a",
 )
 
 THEMES: dict[ThemeName, ThemeTokens] = {"light": LIGHT, "dark": DARK}
@@ -302,11 +290,6 @@ QFrame[surface="card"] {{
     border-radius: 6px;
 }}
 QLabel[tone="muted"] {{ color: {t.text_muted}; }}
-QLabel[equipmentName="true"] {{ color: {t.text}; }}
-QLabel[equipmentName="true"][quality="gold"] {{ color: {t.quality_gold}; }}
-QLabel[equipmentName="true"][quality="purple"] {{ color: {t.quality_purple}; }}
-QLabel[equipmentName="true"][quality="blue"] {{ color: {t.quality_blue}; }}
-QLabel[equipmentName="true"][quality="green"] {{ color: {t.quality_green}; }}
 QLabel[status="info"], QFrame[status="info"], QWidget[status="info"] {{
     color: {t.info}; background-color: {t.info_surface};
 }}
@@ -328,6 +311,23 @@ QToolButton#themeToggleButton {{
 }}
 QToolButton#themeToggleButton:hover {{ background-color: {t.surface_hover}; }}
 """
+
+
+def _extension_stylesheet(tokens: ThemeTokens) -> str:
+    """渲染已注册 app 的 QSS；单个扩展失败不影响基础主题。"""
+    import logging
+
+    from ..apps import get_registry
+
+    chunks: list[str] = []
+    for builder in get_registry().get("theme_stylesheet_builders", ()):
+        try:
+            chunk = builder(tokens)
+            if chunk:
+                chunks.append(str(chunk))
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).exception("app 主题扩展渲染失败")
+    return "\n".join(chunks)
 
 
 class ThemeManager(QObject):
@@ -358,7 +358,8 @@ class ThemeManager(QObject):
         self._theme = normalized
         app.setProperty("lvjiangTheme", normalized)
         app.setPalette(_palette(THEMES[normalized]))
-        app.setStyleSheet(_stylesheet(THEMES[normalized]))
+        tokens = THEMES[normalized]
+        app.setStyleSheet(_stylesheet(tokens) + _extension_stylesheet(tokens))
         if changed:
             self.theme_changed.emit(normalized)
         return normalized

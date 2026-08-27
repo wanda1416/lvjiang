@@ -1,6 +1,6 @@
 """Profile 数据 SQLite 存储层
 
-替代 user.json 中的 profile 节点，提供：
+替代早期 user.json 中的 profile 节点（该文件已不存在），提供：
 - profile_entries: 当前值（upsert 覆盖）
 - profile_history: 变更历史（append-only，记录 action/manual/tick 三类变更）
 - schema_version: 轻量版本管理，支持未来增量迁移
@@ -226,7 +226,7 @@ class ProfileDB:
         """读取用户全部 profile
 
         Returns: {type: {key: {value, value_text, updated_at}}}
-        格式与 user.json 的 profile 节点兼容。
+        格式与早期 user.json 的 profile 节点兼容。
         """
         conn = self._connect()
         try:

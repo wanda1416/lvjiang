@@ -624,3 +624,110 @@ class TestProtectedLists:
         r = self._resolver(dirs)
         merged = self._roundtrip(r, lambda d: d.__setitem__("其他列表", [1]))
         assert merged["其他列表"] == [1]
+
+
+class TestWriteIsMinimal:
+    """写盘要最小范围：内容没变就不落盘。
+
+    用户模式下这一步尤其要紧——实体文件是**整文件影子**（local 有就完全
+    顶掉 system/remote，不合并），给一个其实没改过的文件生成 local 影子，
+    等于让它从此收不到任何出厂更新与在线下发。场景编辑器里"什么都没改、
+    随手点一下保存"曾会把整个布局 25 个场景全部冻住。
+    """
+
+    def test_no_shadow_created_when_content_matches_system(self, dirs):
+        system, local = dirs
+        (system / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
+        _user(dirs).write_entity("scenes/a.yaml", "key: a\n")
+        assert not (local / "scenes" / "a.yaml").exists()
+
+    def test_real_change_still_written(self, dirs):
+        system, local = dirs
+        (system / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
+        _user(dirs).write_entity("scenes/a.yaml", "key: b\n")
+        assert (local / "scenes" / "a.yaml").read_text(encoding="utf-8") == "key: b\n"
+
+    def test_rewriting_identical_content_does_not_touch_file(self, dirs):
+        _, local = dirs
+        r = _user(dirs)
+        r.write_entity("scenes/a.yaml", "key: a\n")
+        target = local / "scenes" / "a.yaml"
+        before = target.stat().st_mtime_ns
+        r.write_entity("scenes/a.yaml", "key: a\n")
+        assert target.stat().st_mtime_ns == before
+
+    def test_tombstoned_entity_is_still_written(self, dirs):
+        """有墓碑说明该实体正被隐藏，必须真写一次才能连带清掉墓碑。"""
+        system, local = dirs
+        (system / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
+        (local / "scenes").mkdir()
+        (local / "scenes" / "a.yaml.deleted").touch()
+        r = _user(dirs)
+        assert r.resolve_read("scenes/a.yaml") is None
+        r.write_entity("scenes/a.yaml", "key: a\n")
+        assert not (local / "scenes" / "a.yaml.deleted").exists()
+        assert r.resolve_read("scenes/a.yaml") is not None
+
+    def test_crlf_on_disk_still_detected_as_noop(self, dirs):
+        """盘上 CRLF、入参 LF 时也要认出是空操作。
+
+        ``write_text`` 在 Windows 上把 ``\n`` 换成 ``\r\n`` 落盘。若拿入参的
+        ``\n`` 去和盘上的 ``\r\n`` 逐字节比，永远不相等——空操作检测整个
+        失效，"随手点一下保存就把整个布局冻成 local 影子"在 Windows 上照旧
+        发生（本机 Linux 不做转换，所以只在 Windows 上炸，CI 发现不了）。
+        这里直接写 CRLF 字节来复现该环境。
+        """
+        system, local = dirs
+        (system / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_bytes(b"key: a\r\n")
+        _user(dirs).write_entity("scenes/a.yaml", "key: a\n")
+        assert not (local / "scenes" / "a.yaml").exists()
+
+    def test_crlf_shadow_not_rewritten(self, dirs):
+        """已有 CRLF 影子时，写入等价的 LF 内容不该刷新文件。"""
+        _, local = dirs
+        (local / "scenes").mkdir()
+        target = local / "scenes" / "a.yaml"
+        target.write_bytes(b"key: a\r\n")
+        before = target.stat().st_mtime_ns
+        _user(dirs).write_entity("scenes/a.yaml", "key: a\n")
+        assert target.stat().st_mtime_ns == before
+
+    def test_binary_still_compared_byte_for_byte(self, dirs):
+        """二进制不涉及换行转换，必须逐字节比，不能走文本归一化。"""
+        _, local = dirs
+        r = _user(dirs)
+        r.write_entity("references/x.png", b"\x89PNG")
+        target = local / "references" / "x.png"
+        before = target.stat().st_mtime_ns
+        r.write_entity("references/x.png", b"\x89PNG")
+        assert target.stat().st_mtime_ns == before
+        r.write_entity("references/x.png", b"\x89PNGX")
+        assert target.read_bytes() == b"\x89PNGX"
+
+    def test_dev_mode_creates_factory_file_even_if_local_matches(self, dirs):
+        """开发模式不能拿 local 影子比对：作者新建出厂文件不是空操作。"""
+        system, local = dirs
+        (local / "scenes").mkdir()
+        (local / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
+        _dev(dirs).write_entity("scenes/a.yaml", "key: a\n")
+        assert (system / "scenes" / "a.yaml").exists()
+
+    def test_save_merged_skips_identical_overlay(self, dirs):
+        _, local = dirs
+        self_path = local / "app.yaml"
+        (dirs[0] / "app.yaml").write_text("a: 1\n", encoding="utf-8")
+        r = _user(dirs)
+        r.save_merged("app.yaml", {"a": 2})
+        before = self_path.stat().st_mtime_ns
+        r.save_merged("app.yaml", {"a": 2})
+        assert self_path.stat().st_mtime_ns == before
+
+    def test_save_merged_creates_nothing_when_matching_system(self, dirs):
+        _, local = dirs
+        (dirs[0] / "app.yaml").write_text("a: 1\n", encoding="utf-8")
+        _user(dirs).save_merged("app.yaml", {"a": 1})
+        assert not (local / "app.yaml").exists()

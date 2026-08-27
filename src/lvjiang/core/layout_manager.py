@@ -371,6 +371,21 @@ def _scene_rel(name: str, scene_key: str) -> str:
     return f"layouts/{_safe_name(name)}/{scene_key}.json"
 
 
+def scene_layout_rel(name: str, scene_key: str) -> str:
+    """某布局下某场景坐标文件的相对路径（公开入口）。
+
+    UI 要按布局名解析该文件的来源层（system/remote/local），需要这个路径。
+    命名规则（safe_name 转义）与**别名布局的解析**都只有本模块知道，不该
+    让调用方自己拼：带 ``extends`` 的别名布局，scene 文件实际存放在**根布局**
+    目录下（见 :func:`_resolve_layout_entry`），照别名拼出来的路径根本不存在，
+    调用方会得到"这个文件没有"的空结果而不自知。
+    """
+    doc = get_resolver().load_merged(_LAYOUTS_YAML_REL).get("layouts", {})
+    resolved = _resolve_layout_entry(doc, name)
+    scene_dir_name = resolved[1] if resolved else name
+    return _scene_rel(scene_dir_name, scene_key)
+
+
 def _enumerate_scene_files(name: str) -> list[str]:
     """枚举布局目录下所有场景 JSON 文件名（system ∪ local 并集，墓碑剔除）
 

@@ -275,10 +275,16 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
         判据与 _execute_dsl 共用 _load_and_validate，不会出现「预检放过、
         上机仍炸」的偏差。
-        """
-        self._load_and_validate(Path(wf_path).resolve())
 
-    def _load_and_validate(self, resolved: Path):
+        唯一的差别是**预检更严**：这里连没被调用的过程也一起校验
+        （``reachable_only=False``），执行时只查真正可达的。方向是安全的
+        ——预检更严只会「报了但其实不会炸」，反过来才是事故。这样库函数
+        （如 page_detection.wf 里那些 is_in_*_page）的 key 拼错、布局漏绑
+        仍能被 CI 门禁发现，而用户执行某个脚本时不会被无关页面挡住。
+        """
+        self._load_and_validate(Path(wf_path).resolve(), reachable_only=False)
+
+    def _load_and_validate(self, resolved: Path, *, reachable_only: bool = True):
         """解析 .wf（含 import 链与 def 注册）并跑两道静态校验，返回 program
 
         _execute_dsl 与 validate_only 共用此方法：两者对「什么算合法脚本」的
@@ -313,7 +319,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 静态校验：wait 引用的命名等待参数必须已定义，未定义直接报错不执行
         self._validate_named_waits(program)
         # 静态校验：脚本引用的场景 / 区域 / 方向 / 面板必须已在当前布局绑定坐标
-        self._validate_refs_bound(program)
+        self._validate_refs_bound(program, reachable_only=reachable_only)
         # 高精度轨迹在执行任何动作前完成路径与内容校验（含 import 引入的过程）。
         self._validate_input_traces(program)
         return program
@@ -664,7 +670,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 )
             logger.debug(f"import: {imp.path} → 注册 {len(imp_program.procs)} 个过程")
 
-    def _validate_refs_bound(self, program):
+    def _validate_refs_bound(self, program, *, reachable_only: bool = True):
         """解析后静态校验：脚本引用的坐标必须已在当前布局绑定
 
         遍历顶层语句与所有过程体（含 import 引入的），搜集全部静态引用，
@@ -673,7 +679,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         执行到那一行才炸，前面的步骤已经把游戏点到别处去了。
         """
         refs = collect_refs(program.body, self._procs,
-                           proc_sources=self._proc_sources, source=program.source)
+                           proc_sources=self._proc_sources, source=program.source,
+                           reachable_only=reachable_only)
         problems = check_refs(refs, self._layout)
         if problems:
             raise WorkflowUserError(format_problems(problems))

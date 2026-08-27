@@ -1,4 +1,4 @@
-from lvjiang.core.batch_config import BatchWorkflows
+from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
 
 
 def test_batch_workflows_round_trip_new_lifecycle():
@@ -10,3 +10,12 @@ def test_batch_workflows_round_trip_new_lifecycle():
     )
 
     assert BatchWorkflows.from_dict(workflows.to_dict()) == workflows
+
+
+def test_single_item_lifecycle_shortcut_defaults_on_and_round_trips():
+    legacy = BatchConfigItem.from_dict({"name": "旧配置"})
+    assert legacy.skip_lifecycle_for_single_item is True
+
+    legacy.skip_lifecycle_for_single_item = False
+    restored = BatchConfigItem.from_dict(legacy.to_dict())
+    assert restored.skip_lifecycle_for_single_item is False

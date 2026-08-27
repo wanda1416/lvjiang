@@ -55,7 +55,7 @@ _RESERVED_KEYS = {name for name, *_ in _RANGE_FIELDS} | {
 
 # 热键设置：HotkeyConfig 字段名 → 显示标签
 _HOTKEY_FIELDS = [
-    ("start", tr("开始执行 / 开始调律")),
+    ("start", tr("开始执行")),
     ("pause", tr("暂停 / 恢复")),
     ("stop", tr("停止 / 结束")),
     ("record", tr("脚本录制")),
@@ -558,9 +558,9 @@ class SettingsDialog(QDialog):
         sub_box.addWidget(self._remote_config_check)
 
         remote_caption = QLabel(
-            tr("仅下发场景/布局坐标与调律规则，用于在不发新版的情况下修复"
-               "识别问题；你自己改过的配置始终优先，不会被覆盖。"
-               "拉取到的配置下次启动生效。"))
+            tr("只下发识别所需的配置（场景与布局坐标、插件规则），用于在不发"
+               "新版的情况下修复识别问题；你自己改过的配置始终优先，不会被"
+               "覆盖。拉取到的配置下次启动生效。"))
         remote_caption.setWordWrap(True)
         remote_caption.setStyleSheet("color: palette(mid);")
         sub_box.addWidget(remote_caption)
@@ -569,15 +569,12 @@ class SettingsDialog(QDialog):
         self._remote_config_status.setStyleSheet("color: palette(mid);")
         sub_box.addWidget(self._remote_config_status)
 
-        self._telemetry_check = QCheckBox(
-            tr("参与匿名数据收集，帮助改进调律策略"))
+        self._telemetry_check = QCheckBox(tr("参与匿名数据收集，帮助改进内置规则"))
         self._telemetry_check.setChecked(network.telemetry)
         self._telemetry_check.toggled.connect(self._on_telemetry_toggled)
         sub_box.addWidget(self._telemetry_check)
 
-        caption = QLabel(
-            tr("仅用于改进内置调律规则，不公开发布原始数据；不含账号、"
-               "角色名、装备名称或完整词条组合。"))
+        caption = QLabel(self._telemetry_caption())
         caption.setWordWrap(True)
         caption.setStyleSheet("color: palette(mid);")
         sub_box.addWidget(caption)
@@ -615,6 +612,26 @@ class SettingsDialog(QDialog):
         self._refresh_remote_config_status()
         self._refresh_privacy_tab_state()
         return tab
+
+    @staticmethod
+    def _telemetry_caption() -> str:
+        """收集说明由插件经 ``AppHooks.telemetry_disclosures`` 提供。
+
+        通用设置页不该替插件描述它收集什么——原先写死的"改进内置调律规则、
+        不含装备名称或完整词条组合"是燕云的说法，换个插件就是错的。同意框
+        （ui/notices/telemetry_consent_dialog.py）读的是同一份声明，两处
+        描述天然一致，不会各说各的。
+        """
+        from ..apps import get_registry
+
+        parts = [
+            f"{item.purpose}；{tr('不收集')}：{'、'.join(item.excluded)}"
+            if item.excluded else item.purpose
+            for item in get_registry().get("telemetry_disclosures", ())
+        ]
+        if not parts:
+            return tr("仅上报匿名的运行环境信息，不含任何游戏内数据。")
+        return tr("不公开发布原始数据。") + " " + " ".join(parts)
 
     def _refresh_remote_config_status(self):
         """展示在线配置版本——用户得能知道自己在跑哪一版。

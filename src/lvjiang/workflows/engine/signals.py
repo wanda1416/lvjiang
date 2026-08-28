@@ -1,11 +1,6 @@
 """DSL 引擎的用户可见错误与控制流信号"""
 
-
-# ─── 用户可见的 DSL 错误 ──────────────────────────────────
-
-class WorkflowUserError(Exception):
-    """DSL 脚本中用户操作引发的可预期错误（类型不匹配、字段不存在等）"""
-
+from ..errors import WorkflowUserError as WorkflowUserError
 
 # ─── 控制流信号 ───────────────────────────────────────────
 

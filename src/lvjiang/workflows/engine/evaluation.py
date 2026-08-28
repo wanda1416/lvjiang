@@ -30,6 +30,7 @@ from ..grammar import (
     VarRef,
 )
 from ..grammar.ast_nodes import TupleLiteral
+from ..runtime_layout import require_enabled
 from .signals import WorkflowUserError
 
 # 数值相等容差：== / != 统一用容差比较，避免浮点误差（如 0.1+0.2 != 0.3）
@@ -289,16 +290,19 @@ class _EvalMixin:
         # 查 region
         for r in self._layout.get_scene_regions(scene):
             if r.key == entity:
+                require_enabled(r, str(scene), "region")
                 return r.to_coord_ref()
 
         # 查 point
         for p in self._layout.get_scene_points(scene):
             if p.key == entity:
+                require_enabled(p, str(scene), "point")
                 return p.to_coord_ref()
 
         # 查 panel
         for p in self._layout.get_scene_panels(scene):
             if p.key == entity:
+                require_enabled(p, str(scene), "panel")
                 return p.to_coord_ref()
 
         from .signals import WorkflowUserError

@@ -24,6 +24,7 @@ from ..grammar import (
     Scan,
     VarRef,
 )
+from ..runtime_layout import enabled_regions, require_enabled
 from .signals import WorkflowUserError, _ReturnSignal
 
 
@@ -143,6 +144,8 @@ class _DataOpsMixin:
             regions = self._layout.get_scene_regions(scene)
             if field_keys:
                 regions = [r for r in regions if r.key in field_keys]
+            else:
+                regions = enabled_regions(regions)
             self._coord_meta[var_name] = {r.key: r for r in regions}
 
     def _exec_recognize(self, node: Recognize):
@@ -555,7 +558,9 @@ class _DataOpsMixin:
             regions = self._layout.get_scene_regions(scene)
             region_map = {r.key: r for r in regions}
             if region_key in region_map:
-                search_region = region_map[region_key]
+                search_region = require_enabled(
+                    region_map[region_key], scene, "region"
+                )
             else:
                 # 尝试作为 panel 查找
                 panel_obj = self._find_panel_in_layout(scene, region_key)

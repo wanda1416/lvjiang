@@ -10,6 +10,8 @@ import time
 
 from loguru import logger
 
+from ..runtime_layout import require_enabled
+
 
 class _ActionMixin:
     """点击、拖拽与等待原语"""
@@ -25,6 +27,7 @@ class _ActionMixin:
                 f"场景 {scene_key} 的区域未绑定坐标: {field_key}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
+        require_enabled(region, scene_key, "region")
 
         screen_x, screen_y = self._region_to_screen(region, jitter)
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
@@ -53,6 +56,7 @@ class _ActionMixin:
         panels = self._layout.get_scene_panels(scene_key)
         panel = next((p for p in panels if p.key == key), None)
         if panel is not None:
+            require_enabled(panel, scene_key, "panel")
             # 面板中心点坐标
             cx = panel.x_ratio + panel.w_ratio / 2
             cy = panel.y_ratio + panel.h_ratio / 2
@@ -70,6 +74,7 @@ class _ActionMixin:
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == key), None)
         if region is not None:
+            require_enabled(region, scene_key, "region")
             screen_x, screen_y = self._region_to_screen(region, jitter=True)
             logger.debug(f"移动: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
             self._input.move_screen(
@@ -78,6 +83,7 @@ class _ActionMixin:
         points = self._layout.get_scene_points(scene_key)
         point = next((p for p in points if p.key == key), None)
         if point is not None:
+            require_enabled(point, scene_key, "point")
             screen_x, screen_y = self._point_to_screen(point)
             logger.debug(f"移动 point: {scene_key}/{key} -> 屏幕({screen_x},{screen_y})")
             self._input.move_screen(
@@ -86,6 +92,7 @@ class _ActionMixin:
         panels = self._layout.get_scene_panels(scene_key)
         panel = next((p for p in panels if p.key == key), None)
         if panel is not None:
+            require_enabled(panel, scene_key, "panel")
             cx = panel.x_ratio + panel.w_ratio / 2
             cy = panel.y_ratio + panel.h_ratio / 2
             screen_x, screen_y = self._ratio_to_screen(cx, cy)
@@ -105,6 +112,7 @@ class _ActionMixin:
         point = next((p for p in points if p.key == point_key), None)
         if point is None:
             raise ValueError(f"场景 {scene_key} 的坐标点未绑定: {point_key}")
+        require_enabled(point, scene_key, "point")
         screen_x, screen_y = self._point_to_screen(point)
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}", **kw)
@@ -120,15 +128,18 @@ class _ActionMixin:
         arrow = next((a for a in arrows if a.key == arrow_key), None)
         if arrow is None:
             raise ValueError(f"场景 {scene_key} 的方向未绑定: {arrow_key}")
+        require_enabled(arrow, scene_key, "arrow")
         points = self._layout.get_scene_points(scene_key)
         from_point = next((p for p in points if p.key == arrow.from_key), None)
         if from_point is None:
             raise ValueError(f"方向 {arrow_key} 的起点坐标点未定义: {arrow.from_key}")
+        require_enabled(from_point, scene_key, "point")
         # 终点：吸附态动态查 point，绝对态直接用坐标
         if arrow.to_key is not None:
             to_point = next((p for p in points if p.key == arrow.to_key), None)
             if to_point is None:
                 raise ValueError(f"方向 {arrow_key} 的终点坐标点未定义: {arrow.to_key}")
+            require_enabled(to_point, scene_key, "point")
             to_cx, to_cy = to_point.cx_ratio, to_point.cy_ratio
         else:
             to_cx, to_cy = arrow.to_cx_ratio, arrow.to_cy_ratio

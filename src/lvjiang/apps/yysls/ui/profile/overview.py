@@ -156,7 +156,9 @@ class ProfileOverviewTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         btn_row.addStretch()
 
         btn_settings = QPushButton(tr("数据模型"))
-        btn_settings.setFixedWidth(70)
+        # 与同页工具栏的新建/重命名/删除分组同一套样式，别再是系统默认灰按钮
+        btn_settings.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_settings.setMinimumHeight(32)
         btn_settings.setToolTip(tr("定义数据模型 key"))
         btn_settings.clicked.connect(self._open_metadata_dialog)
         btn_row.addWidget(btn_settings)

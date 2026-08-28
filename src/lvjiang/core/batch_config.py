@@ -145,13 +145,52 @@ def save_batch_config(cfg: BatchConfig) -> None:
     """保存批处理配置到 session.json 的 batch 节点（保留 enabled_rows 用户态）"""
     from .config.session import get_session_store
 
+    owned = set(BatchConfig().to_dict())
+
     def _merge(old):
-        # 保留 enabled_rows（用户态，由 batch_tab 管理）
-        new = cfg.to_dict()
-        if isinstance(old, dict) and old.get("enabled_rows") is not None:
-            new["enabled_rows"] = old["enabled_rows"]
-        return new
+        # 只覆盖 BatchConfig 自己拥有的键。整节点覆写会把同住 batch 节点的
+        # 其他键（enabled_rows，以及日后任何新增键）连带抹掉。
+        merged = dict(old) if isinstance(old, dict) else {}
+        merged.update({k: v for k, v in cfg.to_dict().items() if k in owned})
+        return merged
 
     get_session_store().mutate_node("batch", _merge)
     total_rows = sum(len(c.rows) for c in cfg.configs.values())
     logger.info(f"批处理配置已保存: {len(cfg.configs)} 个配置, {total_rows} 行数据")
+
+
+# ─── enabled 行状态（用户态，与配置同存 batch 节点）──────────
+
+
+def load_enabled_rows() -> dict[str, list[bool]]:
+    """读取各配置的行勾选状态。"""
+    from .config.session import get_session_store
+    batch = get_session_store().get_node("batch", {})
+    if not isinstance(batch, dict):
+        return {}
+    value = batch.get("enabled_rows", {})
+    return value if isinstance(value, dict) else {}
+
+
+def save_enabled_rows(enabled_rows: dict[str, list[bool]]) -> None:
+    """写回行勾选状态，不触碰 batch 节点的其他键。"""
+    from .config.session import get_session_store
+    get_session_store().mutate_node(
+        "batch",
+        lambda old: {**(old if isinstance(old, dict) else {}),
+                     "enabled_rows": enabled_rows},
+    )
+
+
+def config_enabled_flags(config: BatchConfigItem) -> list[bool]:
+    """返回与 ``config.rows`` 等长的勾选状态，缺失位一律视为启用。
+
+    ``enabled_rows`` 是按行号索引的定长 bool 数组。所有读它的地方必须共用
+    这一套补齐规则——两边各写一份越界兜底，就会出现界面显示打勾、执行却把
+    这行跳过去的静默偏差。
+    """
+    stored = load_enabled_rows().get(config.name) or []
+    return [
+        bool(stored[i]) if i < len(stored) else True
+        for i in range(len(config.rows))
+    ]

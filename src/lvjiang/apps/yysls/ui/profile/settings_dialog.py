@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from .....ui.button_styles import apply_button_style
+from .....ui.button_styles import apply_button_style, fit_button_width
 from ...config.profile_models import (
     ALL_MODELS,
     DIR_BOTH,
@@ -303,28 +303,27 @@ class _ModelTab(QWidget):
         toolbar.addStretch()
 
         btn_add = QPushButton("+ " + tr("新增"))
-        btn_add.setFixedWidth(70)
         btn_add.clicked.connect(self._add_key)
         toolbar.addWidget(btn_add)
 
         btn_del = QPushButton("- " + tr("删除"))
-        btn_del.setFixedWidth(70)
         btn_del.clicked.connect(self._delete_key)
         toolbar.addWidget(btn_del)
 
         btn_up = QPushButton("↑ " + tr("上移"))
-        btn_up.setFixedWidth(70)
         btn_up.clicked.connect(self._move_up)
         toolbar.addWidget(btn_up)
 
         btn_down = QPushButton("↓ " + tr("下移"))
-        btn_down.setFixedWidth(70)
         btn_down.clicked.connect(self._move_down)
         toolbar.addWidget(btn_down)
 
         apply_button_style(btn_add)
         apply_button_style(btn_del, variant="danger")
         apply_button_style(btn_up, btn_down, variant="neutral")
+        # 定宽放在套样式之后：padding 参与 sizeHint，且宽度随字体自适应，
+        # 写死 70 在 Windows 的 Segoe UI 下会把文字切掉。
+        fit_button_width(btn_add, btn_del, btn_up, btn_down, minimum=70)
 
         layout.addLayout(toolbar)
 

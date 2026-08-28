@@ -117,6 +117,19 @@ class TestBuiltinRules:
                 for pattern in rule.patterns.values():
                     assert pattern.first
 
+    def test_jewelry_requires_all_martial_bonus_except_heal_fire(self):
+        """环与佩共用「环」规则；只有治疗火拳允许没有全武学增效。"""
+        for key, rule in get_tuning_rules().items():
+            pattern = rule.patterns["环"]
+            requires_bonus = any(
+                len(group.conditions) == 1
+                and group.conditions[0].kind == "count_max"
+                and group.conditions[0].symbols == ["全武学增效"]
+                and group.conditions[0].max == 0
+                for group in pattern.junk_conditions
+            )
+            assert requires_bonus is (key != "heal_fire"), (key, rule.name)
+
     def test_playstyles_per_plan(self):
         # 玩法定义持续变更：不硬编码内容，对照 YAML 原文校验解析
         mgr = get_tuning_rule_manager()

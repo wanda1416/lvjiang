@@ -7,6 +7,7 @@ note 编辑、历史记录、值解析。
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -70,7 +71,20 @@ class ProfileCellEditingMixin:
     # ─── 单元格事件与编辑 ──────────────────────────────────────
 
     def _on_cell_double_clicked(self: ProfileOverviewTab, row: int, col: int, group_name: str):  # type: ignore[misc]
-        """单元格双击：对有 cap 的列，剥离 /cap 后缀再进入编辑"""
+        """单元格双击：把 /cap 后缀剥掉再进入编辑，让用户编辑的是值本身
+
+        取"纯值"的办法是拿同一个 formatter 再跑一遍、只把 show_cap 关掉，
+        而不是对显示文本做 ``split("/")``：
+
+        - 按 split 只能靠"文本里有没有 /"来猜，note 存的是自由文本，
+          一条「甲/乙」备注会被截成「甲」，编辑一下就把内容改没了；
+        - formatter 是显示文本的唯一来源，关掉 show_cap 得到的就是它
+          去掉后缀后的样子，两者天然对齐，不会漏也不会多剥。
+
+        原来的实现还只认 regen / quota 两种模型，stock 和 note 同样会显示
+        X/Y 却没被剥离——note 因为写入侧不做数值解析，直接把「2/7」整个当
+        文本存了回去，值就此损坏（本次修复的起因）。
+        """
         if self._loading:
             return
 
@@ -78,20 +92,20 @@ class ProfileCellEditingMixin:
         config = get_profile_config()
         groups = get_groups()
         column_keys = groups.get(group_name, {}).get("columns", [])
-        if col >= len(column_keys):
+        # 第 0 列是角色名，数据列从 1 开始——与 _on_item_changed 保持同一套
+        # 下标换算。这里原本写的是 column_keys[col]，取到的是右边一列的
+        # KeyDef，剥离与否按错误的列判断（第 0 列还会拿第一个 key 去套
+        # 角色名那格）。
+        if col < 1 or col - 1 >= len(column_keys):
             return
 
-        kd = config.get_key(column_keys[col])
+        kd = config.get_key(column_keys[col - 1])
         if not kd:
             return
+        if not (kd.show_cap and kd.cap is not None):
+            return  # 不会显示 /cap，没有要剥的东西
 
-        model_type = config.get_model_type(column_keys[col]) or ""
-        has_cap = (
-            (model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef) and kd.cap is not None)
-            or (model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef) and kd.cap is not None)
-        )
-        if not has_cap:
-            return
+        model_type = config.get_model_type(column_keys[col - 1]) or ""
 
         table = self._tables.get(group_name)
         if not table:
@@ -99,13 +113,18 @@ class ProfileCellEditingMixin:
         item = table.item(row, col)
         if not item:
             return
+        name_item = table.item(row, 0)
+        if not name_item:
+            return
 
-        text = item.text()
-        if "/" in text:
-            value_part = text.split("/")[0].strip()
-            self._editing_cap_cell = True
-            item.setText(value_part)
-            self._editing_cap_cell = False
+        user_data = self._load_user_data(name_item.text())
+        plain, _style = format_profile_cell(
+            replace(kd, show_cap=False), model_type, user_data)
+        if item.text() == plain:
+            return
+        self._editing_cap_cell = True
+        item.setText(plain)
+        self._editing_cap_cell = False
 
     def _on_item_changed(self: ProfileOverviewTab, item: QTableWidgetItem, group_name: str):  # type: ignore[misc]
         """单元格编辑完成后回写到 profile 节点"""

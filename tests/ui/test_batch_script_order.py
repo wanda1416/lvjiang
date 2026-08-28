@@ -18,9 +18,10 @@ class _Host(QObject):
     def __init__(self):
         super().__init__()
         self._user_config = UserConfig()
+        self.logs: list[str] = []
 
-    def append_log(self, _message: str) -> None:
-        pass
+    def append_log(self, message: str) -> None:
+        self.logs.append(message)
 
 
 def _scripts() -> list[dict]:
@@ -111,6 +112,84 @@ def test_saved_order_controls_execution_and_can_move(qtbot, monkeypatch):
     assert tab._checked_script_ids() == ["d", "b", "a"]
     assert item_d.text(1) == "1"
     assert saved_orders[-1] == ["d", "b", "a"]
+
+
+def _row_ids(tab: BatchTab) -> list[str]:
+    return [
+        tab._script_list.topLevelItem(index).data(
+            0, Qt.ItemDataRole.UserRole
+        )["id"]
+        for index in range(tab._script_list.topLevelItemCount())
+    ]
+
+
+def test_visible_row_order_is_the_execution_order(qtbot, monkeypatch):
+    """可见行顺序必须等于执行顺序，否则「上移/下移」看起来毫无反应。"""
+    tab, _ = _make_tab(qtbot, monkeypatch, ("b", "d", "a"))
+
+    # 已勾选的按执行顺序排在最前，未勾选的（c）落到后面。
+    assert _row_ids(tab) == ["b", "d", "a", "c"]
+    assert _row_ids(tab)[:3] == tab._checked_script_ids()
+
+    item_d = _item_by_id(tab, "d")
+    tab._script_list.setCurrentItem(item_d)
+    tab._move_selected_script(-1)
+
+    assert tab._checked_script_ids() == ["d", "b", "a"]
+    assert _row_ids(tab) == ["d", "b", "a", "c"]
+    # 选中态要跟着行走，否则连点两次「上移」第二次会静默失败。
+    assert tab._script_list.currentItem() is item_d
+
+
+def test_repeated_move_keeps_walking_the_script_up(qtbot, monkeypatch):
+    tab, _ = _make_tab(qtbot, monkeypatch, ("a", "b", "c", "d"))
+    tab._script_list.setCurrentItem(_item_by_id(tab, "d"))
+
+    tab._move_selected_script(-1)
+    tab._move_selected_script(-1)
+    tab._move_selected_script(-1)
+
+    assert tab._checked_script_ids() == ["d", "a", "b", "c"]
+    assert _row_ids(tab) == ["d", "a", "b", "c"]
+
+
+def test_checking_a_script_appends_it_to_the_visible_order(qtbot, monkeypatch):
+    tab, _ = _make_tab(qtbot, monkeypatch, ("b",))
+
+    _item_by_id(tab, "d").setCheckState(0, Qt.CheckState.Checked)
+
+    assert tab._checked_script_ids() == ["b", "d"]
+    assert _row_ids(tab)[:2] == ["b", "d"]
+
+    _item_by_id(tab, "b").setCheckState(0, Qt.CheckState.Unchecked)
+
+    assert tab._checked_script_ids() == ["d"]
+    assert _row_ids(tab)[0] == "d"
+
+
+def test_refresh_scripts_picks_up_exposure_changes(qtbot, monkeypatch):
+    """「脚本配置」改过暴露层后，批量页不能还拿着启动时的旧快照。"""
+    tab, _ = _make_tab(qtbot, monkeypatch, ("b", "a"))
+    assert _row_ids(tab) == ["b", "a", "c", "d"]
+
+    # 取消暴露 a、改掉 b 的显示名，模拟「脚本配置」保存后的发现结果。
+    def _changed() -> list[dict]:
+        return [
+            {"id": "b", "name": "改过的名字", "wf_file": "b.wf", "class": ""},
+            {"id": "c", "name": "Script C", "wf_file": "c.wf", "class": ""},
+            {"id": "d", "name": "Script D", "wf_file": "d.wf", "class": ""},
+        ]
+
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.list_exposed_scripts", _changed
+    )
+    tab.refresh_scripts()
+
+    # 取消暴露的 a 既不能再出现在候选里，也不能再被执行。
+    assert "a" not in _row_ids(tab)
+    assert tab._checked_script_ids() == ["b"]
+    assert [script.id for script in tab._checked_scripts()] == ["b"]
+    assert [script.name for script in tab._checked_scripts()] == ["改过的名字"]
 
 
 def test_script_rows_match_config_checkbox_density(qtbot, monkeypatch):
@@ -216,3 +295,26 @@ def test_progress_cells_elide_and_expose_full_text_in_tooltips(qtbot, monkeypatc
         tab._progress_table.columnWidth(column) for column in range(3)
     ) <= tab._progress_table.viewport().width()
     assert not tab._progress_table.horizontalScrollBar().isVisible()
+
+
+def test_unavailable_checked_script_is_kept_and_reported(qtbot, monkeypatch):
+    """发现不到的已勾选脚本：要报警，且绝不能被顺手从 script_ids 抹掉。"""
+    tab, saved_orders = _make_tab(
+        qtbot, monkeypatch, ("b", "gone", "a")
+    )
+
+    # 不参与执行……
+    assert tab._checked_script_ids() == ["b", "a"]
+    assert [s.id for s in tab._checked_scripts()] == ["b", "a"]
+    # ……但原位保留在落盘顺序里，脚本一恢复暴露就能回来。
+    assert tab._merged_script_ids() == ["b", "gone", "a"]
+
+    # 任何一次持久化都不能把它写没。
+    _item_by_id(tab, "c").setCheckState(0, Qt.CheckState.Checked)
+    assert "gone" in saved_orders[-1]
+
+
+def test_unavailable_script_is_surfaced_in_the_log(qtbot, monkeypatch):
+    tab, _ = _make_tab(qtbot, monkeypatch, ("gone",))
+
+    assert any("gone" in line for line in tab._test_host.logs)

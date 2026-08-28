@@ -272,6 +272,11 @@ class RunControlMixin:
         first_cfg = self._workflow_configs[0] if self._workflow_configs else None
         self._displayed_script_id = first_cfg["id"] if first_cfg else None
 
+        # 批量页的脚本候选同源于 list_exposed_scripts()，必须一起刷新，
+        # 否则它会一直停留在启动时的快照（见 BatchTab.refresh_scripts）。
+        if self._batch_tab is not None:
+            self._batch_tab.refresh_scripts()
+
         logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
 
     def _on_load_workflow(self):
@@ -503,42 +508,15 @@ class RunControlMixin:
         return self._stop_requested
 
     def _resolve_dsl_workflow_path(self, flow_cfg: dict) -> Path | None:
-        """解析 DSL 文件；缓存路径失效时按脚本 ID 重新发现一次。
-
-        应用升级期间窗口可能仍持有迁移前的 ``wf_file``。重新发现可把同一
-        脚本 ID 校正到新目录，同时不掩盖文件确实缺失的情况。
-        """
-        resolver = get_resolver()
-
-        def resolve(wf_file: str) -> Path | None:
-            path = Path(wf_file)
-            if path.is_absolute():
-                return path if path.is_file() else None
-            found = resolver.resolve_read(f"workflows/{wf_file}")
-            return Path(found) if found is not None and Path(found).is_file() else None
+        """解析 DSL 文件；缓存路径失效时按脚本 ID 重新发现一次。"""
+        from ...workflows.discovery import resolve_workflow_path
 
         wf_file = str(flow_cfg.get("wf_file") or "")
-        path = resolve(wf_file) if wf_file else None
-        if path is not None:
-            return path
-
-        from ...workflows.discovery import discover_scripts
-
-        fresh_cfg = next(
-            (cfg for cfg in discover_scripts()
-             if cfg.get("id") == flow_cfg.get("id") and cfg.get("wf_file")),
-            None,
+        path, resolved_file = resolve_workflow_path(
+            wf_file, str(flow_cfg.get("id") or "")
         )
-        if fresh_cfg is None:
-            return None
-        fresh_file = str(fresh_cfg["wf_file"])
-        path = resolve(fresh_file)
-        if path is None:
-            return None
-        if fresh_file != wf_file:
-            logger.info(
-                f"工作流路径已刷新: {wf_file or '<空>'} -> {fresh_file}")
-            flow_cfg["wf_file"] = fresh_file
+        if path is not None and resolved_file != wf_file:
+            flow_cfg["wf_file"] = resolved_file
         return path
 
     def _show_workflow_start_error(self, message: str):

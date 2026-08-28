@@ -395,6 +395,7 @@ auto_strings:
   '[截屏] 截屏失败：无可用画面': '[Screenshot] Failed: no frame available'
   '[扫描] 局域网内未发现可连接的 ADB 设备': '[Scan] No connectable ADB device found on the LAN'
   '[扫描] 正在扫描局域网 ADB 设备...': '[Scan] Scanning LAN ADB devices...'
+  '[批量] 以下已勾选脚本当前不可用，本次不会执行：': '[Batch] These checked scripts are unavailable and will not run:'
   '[批量] 暂无启用的行，请到「配置」页勾选': '[Batch] No rows enabled; check them on the "Config" page'
   '[批量] 请至少勾选一个脚本': '[Batch] Please check at least one script'
   '[拒绝] 已有自动化在运行中，请等待结束或按': '[Rejected] Automation already running; wait for it to finish or press'

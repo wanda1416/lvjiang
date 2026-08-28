@@ -32,11 +32,17 @@ from PyQt6.QtWidgets import (
 from ...core.batch_config import (
     BatchConfigItem,
     BatchWorkflows,
+    config_enabled_flags,
     load_batch_config,
+    load_enabled_rows,
     save_batch_config,
+    save_enabled_rows,
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style
+
+# 行勾选状态挂在第 0 列 item 上，随行搬运。
+_ENABLED_ROLE = Qt.ItemDataRole.UserRole
 
 
 class BatchConfigDialog(QDialog):
@@ -263,12 +269,18 @@ class BatchConfigDialog(QDialog):
         )
         self._table.setRowCount(0)
 
-        for row_data in item.rows:
-            row_idx = self._table.rowCount()
+        # 行勾选状态挂在第 0 列 item 的 UserRole 上：增删/上下移都是整
+        # item 搬运，状态自然跟着行走。它过去是一个按行号索引的独立数组，
+        # 这里一动就会张冠李戴——禁用的账号照跑，启用的反而被跳过。
+        flags = config_enabled_flags(item)
+        for row_idx, row_data in enumerate(item.rows):
             self._table.insertRow(row_idx)
             for col_idx, col_name in enumerate(columns):
                 val = str(row_data.get(col_name, ""))
-                self._table.setItem(row_idx, col_idx, QTableWidgetItem(val))
+                cell = QTableWidgetItem(val)
+                if col_idx == 0:
+                    cell.setData(_ENABLED_ROLE, flags[row_idx])
+                self._table.setItem(row_idx, col_idx, cell)
 
         # wf 槽位
         self._set_wf_text(self._wf_batch_setup, item.workflows.batch_setup)
@@ -480,6 +492,17 @@ class BatchConfigDialog(QDialog):
             rows.append(row_data)
         return rows
 
+    def _persist_enabled_flags(self, config_name: str) -> None:
+        """按表格当前行序写回勾选状态；新行默认启用。"""
+        flags: list[bool] = []
+        for row_idx in range(self._table.rowCount()):
+            cell = self._table.item(row_idx, 0)
+            stored = cell.data(_ENABLED_ROLE) if cell else None
+            flags.append(True if stored is None else bool(stored))
+        enabled = load_enabled_rows()
+        enabled[config_name] = flags
+        save_enabled_rows(enabled)
+
     def _on_add_row(self):
         """添加空行"""
         row = self._table.rowCount()
@@ -538,7 +561,13 @@ class BatchConfigDialog(QDialog):
         """保存当前配置"""
         # 先保存当前编辑区的修改
         self._save_current_config()
-        save_batch_config(self._cfg)
+        # self._cfg 是打开对话框那一刻的快照。对话框虽是模态，但全局热键
+        # 仍能在此期间启动批量并写 script_ids，直接回写快照会把它revert。
+        # 只落本对话框真正编辑的部分：configs 与 active_config。
+        latest = load_batch_config()
+        latest.configs = self._cfg.configs
+        latest.active_config = self._cfg.active_config
+        save_batch_config(latest)
         self.accept()
 
     def _save_current_config(self):
@@ -552,6 +581,7 @@ class BatchConfigDialog(QDialog):
         columns = self._defined_columns()
         item.columns = columns
         item.rows = self._read_table_rows()
+        self._persist_enabled_flags(self._current_name)
         item.user_column = self._user_column_combo.currentText()
         item.workflows = BatchWorkflows(
             batch_setup=self._get_wf_text(self._wf_batch_setup),

@@ -37,6 +37,7 @@ from ..grammar import (
     WaitStable,
 )
 from ..grammar.ast_nodes import Align, PressMode, TupleLiteral
+from ..runtime_layout import require_enabled
 from .signals import WorkflowUserError
 
 # FoundRegion 延迟导入，避免循环依赖
@@ -362,6 +363,7 @@ class _ActionsMixin:
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == key), None)
         if region is not None:
+            require_enabled(region, scene_key, "region")
             x, y = wf._region_to_screen(region, jitter=True)
             self._input.move_screen(x, y, f"{scene_key}/{key}")
             self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}")
@@ -370,6 +372,7 @@ class _ActionsMixin:
         points = self._layout.get_scene_points(scene_key)
         point = next((p for p in points if p.key == key), None)
         if point is not None:
+            require_enabled(point, scene_key, "point")
             x, y = wf._point_to_screen(point)
             self._input.move_screen(x, y, f"{scene_key}/{key}")
             self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}")
@@ -378,6 +381,7 @@ class _ActionsMixin:
         panels = self._layout.get_scene_panels(scene_key)
         panel = next((p for p in panels if p.key == key), None)
         if panel is not None:
+            require_enabled(panel, scene_key, "panel")
             cx = panel.x_ratio + panel.w_ratio / 2
             cy = panel.y_ratio + panel.h_ratio / 2
             x, y = wf._ratio_to_screen(cx, cy)
@@ -433,6 +437,7 @@ class _ActionsMixin:
                     raise WorkflowUserError(
                         f"drag grid: 布局中未定义 panel/region {grid.scene}.{grid.panel}"
                     )
+                require_enabled(region_obj, grid.scene, "region")
                 # region 中心在截图中的归一化坐标
                 cx = region_obj.x_ratio + region_obj.w_ratio / 2
                 cy = region_obj.y_ratio + region_obj.h_ratio / 2
@@ -632,6 +637,7 @@ class _ActionsMixin:
             regions = self._layout.get_scene_regions(str(scene))
             region = next((r for r in regions if r.key == str(key)), None)
             if region is not None:
+                require_enabled(region, str(scene), "region")
                 # region 中心作为起点，利用 w/h 计算终点
                 cx = region.x_ratio + region.w_ratio / 2
                 cy = region.y_ratio + region.h_ratio / 2
@@ -657,6 +663,7 @@ class _ActionsMixin:
             points = self._layout.get_scene_points(str(scene))
             point = next((p for p in points if p.key == str(key)), None)
             if point is not None:
+                require_enabled(point, str(scene), "point")
                 raise WorkflowUserError(
                     f"drag [{scene}].[{key}]: Point 无法单独 drag（无 w/h 计算终点），"
                     f"请使用两点模式 drag [{scene}].{key} [{scene}].<另一个点>"
@@ -874,6 +881,7 @@ class _ActionsMixin:
                 raise WorkflowUserError(
                     f"wait stable on [{scene}].[{entity_key}]: 区域未绑定"
                 )
+            require_enabled(region_obj, scene, "region")
             x_r, y_r, w_r, h_r = (
                 region_obj.x_ratio, region_obj.y_ratio,
                 region_obj.w_ratio, region_obj.h_ratio,
@@ -943,6 +951,7 @@ class _ActionsMixin:
             raise WorkflowUserError(
                 f"drag {label}: 场景 [{scene}] 的坐标点未绑定: {point_key}"
             )
+        require_enabled(point, str(scene), "point")
 
         # Point → 屏幕坐标（带半径内随机偏移）
         return self._ensure_workflow()._point_to_screen(point)

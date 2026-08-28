@@ -18,6 +18,7 @@ from ..grammar import (
     VarRef,
 )
 from ..grammar.ast_nodes import Align
+from ..runtime_layout import require_enabled
 from .signals import WorkflowUserError
 
 
@@ -636,7 +637,10 @@ class _PanelMixin:
     def _find_panel_in_layout(self, scene_key: str, panel_key: str):
         """在 layout 中查找指定 panel 实例"""
         panels = self._layout.get_scene_panels(scene_key)
-        return next((p for p in panels if p.key == panel_key), None)
+        panel = next((p for p in panels if p.key == panel_key), None)
+        if panel is not None:
+            require_enabled(panel, scene_key, "panel")
+        return panel
 
     def _capture_panel_image(self, panel_obj) -> "np.ndarray | None":
         """截取 panel 区域图像（像素数组），用于校准"""

@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
 )
 
 
-def fit_combo_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
-    """Keep both the combo and its popup wide enough for the longest item."""
+def combo_contents_width(combo: QComboBox, *, minimum: int = 0) -> int:
+    """Return a styled width that can display the longest item in full."""
     text_width = max(
         (combo.fontMetrics().horizontalAdvance(combo.itemText(index))
          for index in range(combo.count())),
@@ -30,10 +30,22 @@ def fit_combo_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
         combo,
     ).width()
     width = max(minimum, width + 12)
-    combo.setMinimumWidth(width)
+    return width
+
+
+def fit_combo_popup_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
+    """Keep the popup readable while allowing the closed combo to stay compact."""
+    width = combo_contents_width(combo, minimum=minimum)
     view = combo.view()
     assert view is not None
     view.setMinimumWidth(width)
+    return width
+
+
+def fit_combo_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
+    """Keep both the combo and its popup wide enough for the longest item."""
+    width = fit_combo_popup_to_contents(combo, minimum=minimum)
+    combo.setMinimumWidth(width)
     return width
 
 

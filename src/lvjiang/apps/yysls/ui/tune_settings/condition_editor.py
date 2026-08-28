@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
+from ..layout_helpers import fit_combo_to_contents
 from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）
@@ -57,6 +58,7 @@ class _ConditionRow(QWidget):
         self.kind_combo = QComboBox()
         for kind in kinds:
             self.kind_combo.addItem(tr(_KIND_NAMES[kind]), kind)
+        fit_combo_to_contents(self.kind_combo)
         self.kind_combo.currentIndexChanged.connect(self._on_kind_changed)
         layout.addWidget(self.kind_combo)
 
@@ -233,11 +235,13 @@ class _ConditionGroupBox(QGroupBox):
         self.when_combo.addItem(tr("（无，恒生效）"), "")
         for key in switch_keys:
             self.when_combo.addItem(key, key)
+        fit_combo_to_contents(self.when_combo)
         self.when_combo.currentIndexChanged.connect(self._on_when_changed)
         when_row.addWidget(self.when_combo)
         self.expect_combo = QComboBox()
         self.expect_combo.addItem(tr("开启时生效"), True)
         self.expect_combo.addItem(tr("关闭时生效"), False)
+        fit_combo_to_contents(self.expect_combo)
         self.expect_combo.currentIndexChanged.connect(
             lambda _i: self.changed.emit())
         self.expect_combo.setVisible(False)

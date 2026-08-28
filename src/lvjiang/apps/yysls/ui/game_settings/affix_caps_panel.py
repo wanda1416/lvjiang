@@ -43,7 +43,7 @@ from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo
 
@@ -969,9 +969,9 @@ class AffixCapsPanel(QWidget):
 
         # 归属下拉（空串 + 5 类；定音词组禁用并置空）
         combo = QComboBox()
-        combo.setFixedWidth(90)
         combo.addItem("")
         combo.addItems(list(AFFIX_CATEGORY_NAMES))
+        fit_combo_to_contents(combo, minimum=90)
         if self._is_dingyin():
             combo.setCurrentText("")
             combo.setEnabled(False)

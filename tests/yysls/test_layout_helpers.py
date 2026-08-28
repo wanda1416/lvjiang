@@ -4,10 +4,12 @@ from PyQt6.QtWidgets import QComboBox, QListWidget
 
 from lvjiang.apps.yysls.ui.layout_helpers import (
     configure_navigation_list,
+    fit_combo_popup_to_contents,
     fit_combo_to_contents,
     mark_navigation_list,
     navigation_width_for_chars,
 )
+from lvjiang.apps.yysls.ui.tune_settings.condition_editor import _ConditionRow
 from lvjiang.ui.theme import ThemeManager
 
 
@@ -24,6 +26,36 @@ def test_combo_and_popup_fit_longest_translated_item(qtbot):
     assert width > longest
     assert combo.minimumWidth() == width
     assert combo.view().minimumWidth() == width
+
+
+def test_combo_popup_can_expand_without_widening_closed_control(qtbot):
+    combo = QComboBox()
+    combo.setFixedWidth(80)
+    combo.addItems(["短", "A much longer translated popup option"])
+    qtbot.addWidget(combo)
+
+    width = fit_combo_popup_to_contents(combo)
+
+    assert combo.width() == 80
+    assert width > combo.width()
+    assert combo.view().minimumWidth() == width
+
+
+def test_condition_kind_combo_displays_all_four_labels_in_full(qtbot):
+    row = _ConditionRow(
+        ["contains_all", "not_together", "count_max", "count_min"],
+        [],
+    )
+    qtbot.addWidget(row)
+
+    longest = max(
+        row.kind_combo.fontMetrics().horizontalAdvance(row.kind_combo.itemText(i))
+        for i in range(row.kind_combo.count())
+    )
+
+    assert row.kind_combo.count() == 4
+    assert row.kind_combo.minimumWidth() > longest
+    assert row.kind_combo.view().minimumWidth() == row.kind_combo.minimumWidth()
 
 
 def test_navigation_list_has_readable_width_and_row_height(qapp, qtbot):

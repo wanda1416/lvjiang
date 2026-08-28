@@ -33,6 +33,17 @@ def test_top_combo_capacity_fits_six_chinese_characters(qtbot):
     assert combo.maximumWidth() == width
 
 
+def test_top_combo_keeps_compact_control_but_expands_popup(qtbot):
+    combo = QComboBox()
+    qtbot.addWidget(combo)
+    width = _set_combo_character_capacity(combo)
+
+    combo.addItem("这是一个明显超过六个汉字的配置名")
+
+    assert combo.width() == width
+    assert combo.view().minimumWidth() > width
+
+
 def test_workflow_note_is_wrapped_and_shown_above_parameters(qtbot):
     note_label = _create_workflow_note_label()
     param_panel = QGroupBox()

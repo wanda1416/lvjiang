@@ -10,16 +10,16 @@
 DSL 指令
    │
    ▼
-WorkflowEngine._exec_scan / _exec_recognize     (engine.py)
+WorkflowEngine._exec_scan / _exec_recognize     (workflows/engine/data_ops.py)
    │  解析 scene_name 与 field_keys
    ▼
-BaseWorkflow.ocr_scene / recognize_materials    (workflows/base.py)
+BaseWorkflow.ocr_scene / recognize_references    (workflows/base/recognition.py)
    │  ① 调用 ScreenCapture.capture() 截全屏大图（仅 1 次）
    │  ② 从 layout 取出该场景的 Region 列表
    │  ③ 按 field_keys 过滤（若指定）
    │  ④ 对每个 Region：归一化坐标 → 像素坐标 → 裁剪小图
    ▼
-OCREngine.ocr_scene_regions / MaterialRecognizer.recognize
+OCREngine.ocr_scene_regions / ReferenceRecognizer.recognize
    │  对裁剪后的小图做识别
    ▼
 返回 dict[field_key, 识别结果]
@@ -51,7 +51,7 @@ def capture(self, timeout=5.0) -> np.ndarray | None:
 场景的每个 Region 在 layout YAML 里用**画布归一化比例**定义(`x_ratio`, `y_ratio`, `w_ratio`, `h_ratio`)。裁剪时按大图尺寸反算像素:
 
 ```python
-# base.py: recognize_materials / ocr_scene 共用
+# base/recognition.py: recognize_references / ocr_scene 共用
 h, w = img.shape[:2]
 canvas_x = canvas.x_ratio * w
 canvas_y = canvas.y_ratio * h
@@ -74,7 +74,7 @@ numpy 切片是**视图**,不复制像素数据,所以裁剪本身几乎零成�
 
 ### scan → OCR
 ```python
-# ocr.py: ocr_scene_regions
+# core/ocr.py: ocr_scene_regions
 for region in regions:
     if region.key not in text_keys:   # 跳过 is_text=False 的区域
         continue
@@ -83,26 +83,31 @@ for region in regions:
     results[region.key] = " | ".join(r.text for r in ocr_results)
 ```
 
-### recognize → 材料识别
+### recognize → 参考图识别
 ```python
-# material_recognizer.py: recognize
-def recognize(self, slot_img):
-    if self._is_empty(slot_img):             # 1. 空槽检测(Laplacian 方差)
-        return empty
-    mat_type, conf = self._match_type(slot_img)  # 2. ORB 特征匹配类型
-    level = self._ocr_level(slot_img)            # 3. OCR 左上角等级
-    count, owned = self._ocr_count(slot_img)     # 4. OCR 右下角数量
-    return MaterialInfo(...)
+# core/recognizers/reference_recognizer.py: ReferenceRecognizer.recognize
+def recognize(self, image, group=None):
+    match = self._matcher.match(image, group=group)   # 1. ORB 特征匹配参考图库
+    return self._build_info(image, match)              # 2. 按参考图的 meta_schema 对指定子区域 OCR
 ```
 
-注意 `recognize` 单 slot 内部会调 2 次 OCR(等级 + 数量),但都是对**裁剪后的小图**做,不会再截屏。
+`ReferenceRecognizer` 本身**不含任何业务解析**——不判断"空槽"、不认"等级"/
+"数量"这类字段名，只做两件通用的事：拿裁剪后的小图去匹配参考图库
+（`ReferenceMatcher`），再按命中条目的 `meta_schema` 声明的子区域跑 OCR，
+产出 `ReferenceInfo`（`label` + `confidence` + `meta` + 逐字段 `ocr_texts`）。
+
+把"OCR 出来的原始文本"转成业务对象（数量、是否已拥有、品阶等）是插件的事：
+DSL 侧用 `recognize ... as rich $var with <fn>` 指定转换函数，`<fn>` 经
+`@builtin_func` 注册，函数体里才出现"空槽判断"、"数量解析"这类业务逻辑
+（如 yysls 插件的调律材料识别）。核心层的 `recognize` 从截图到 OCR 全程
+只做一次识别调用，不会因为要顺带解析等级/数量而额外发起 OCR。
 
 ## 五、_coord_meta:点击坐标的来源
 
 `scan` 和 `recognize` 执行后,引擎会把参与识别的 Region 对象按 field_key 存入 `self._coord_meta[var_name]`:
 
 ```python
-# engine.py: _exec_scan / _exec_recognize
+# workflows/engine/data_ops.py: _exec_scan / _exec_recognize
 self._coord_meta[var_name] = {r.key: r for r in regions}
 ```
 
@@ -174,4 +179,4 @@ A: 不能。两条 DSL 指令各自独立截屏。如果同一工作流里既需
 A: numpy 切片是视图,不复制像素。真正占内存的是那张全屏大图,截屏后由 `capture()` 返回,被多个裁剪视图共享引用,直到指令结束才释放。
 
 **Q: 截屏失败会怎样?**
-A: `capture()` 返回 None,`ocr_scene` / `recognize_materials` 直接返回空 dict,工作流继续执行(不会抛异常)。日志里会看到"截图失败"。
+A: `capture()` 返回 None,`ocr_scene` / `recognize_references` 直接返回空 dict,工作流继续执行(不会抛异常)。日志里会看到"截图失败"。

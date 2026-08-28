@@ -93,6 +93,23 @@ class SyncTargetDef:
         return result
 
 
+def note_numeric_value(text: str) -> float | None:
+    """note 文本能当数字用就返回它，否则 None
+
+    note 存的是自由文本，但配置里给它保留了「上限 / 展示上限」开关。写入侧
+    要据此决定取不取整、截不截断，展示侧要据此决定加不加 ``/上限`` 后缀——
+    两边必须用同一套判断，否则会出现存的时候当数字、显示的时候当文本
+    （或反过来）这种前后不一致。
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_sync_targets(raw) -> list[SyncTargetDef]:
     """解析 sync_targets 配置（dict / str / SyncTargetDef 混用列表）"""
     if not isinstance(raw, list):

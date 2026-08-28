@@ -21,6 +21,7 @@ affix_pool:
 - 敏
 - 最大无相攻击
 - 最大裂石攻击
+- 对玩家单位增效
 patterns:
   主武器:
     first:

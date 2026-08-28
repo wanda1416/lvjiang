@@ -130,6 +130,30 @@ class TestBuiltinRules:
             )
             assert requires_bonus is (key != "heal_fire"), (key, rule.name)
 
+    def test_pattern_affixes_are_all_in_the_rule_own_pool(self):
+        """pattern 引用的词条必须在本规则 affix_pool 内。
+
+        判定第一步就把池外词条判成垃圾，轮不到四档条件。所以一旦某个
+        条件（尤其是带 when 开关的那种）引用了池外词条，这个开关就是
+        死的：用户打开「保留 XX」，装备照样被回收，且回收不可逆。
+        解析层只按全局词表查名，不管是不是本规则池内的，拦不住这种。
+        """
+        for key, rule in get_tuning_rules().items():
+            pool = set(rule.affix_pool or [])
+            if not pool:          # 骨架规则无池，跳过
+                continue
+            for part, pattern in (rule.patterns or {}).items():
+                used = set(pattern.first or [])
+                for tier in ("junk_conditions", "normal_conditions",
+                             "excellent_conditions", "top_conditions"):
+                    for group in getattr(pattern, tier, []) or []:
+                        for cond in group.conditions:
+                            used |= set(cond.symbols or [])
+                missing = sorted(a for a in used if a and a not in pool)
+                assert not missing, (
+                    f"{key} 的 {part} 引用了池外词条 {missing}，"
+                    f"这些条件永远不会生效")
+
     def test_playstyles_per_plan(self):
         # 玩法定义持续变更：不硬编码内容，对照 YAML 原文校验解析
         mgr = get_tuning_rule_manager()

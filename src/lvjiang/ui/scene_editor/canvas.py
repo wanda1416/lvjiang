@@ -75,6 +75,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._drag_handle: HandlePos | None = None
         self._drag_start = QPointF()   # 鼠标按下位置（归一化）
         self._drag_orig: Region | None = None  # 拖拽前的原始区域
+        # 左键按下位置（widget 坐标），用于判定是否越过拖拽死区
+        self._press_pos: QPointF | None = None
 
         # 右键拖拽平移
         self._panning = False

@@ -146,7 +146,7 @@ class TestBuiltinRules:
             ("huixin_small", "鸢鸢"): ("破竹·鸢", False),
             ("huixin_small", "双刀"): ("破竹·风", False),
             ("huixin_small", "尘尘"): ("破竹·尘", False),
-            ("huixin_small", "翊翊(不推荐)"): ("牵丝·翊", False),
+            ("huixin_small", "翊翊"): ("牵丝·翊", False),
             ("huixin_small", "樽樽"): ("破竹·樽", False),
             ("huixin_big", "纯唐"): ("裂石·钧", False),
             ("huixin_big", "双切"): ("裂石·钧", True),

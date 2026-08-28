@@ -124,3 +124,72 @@ def test_script_config_row_move_rebuilds_owned_cell_widgets(qtbot, monkeypatch):
         dialog._move_row(-1)
         dialog._move_row(1)
     assert table.currentRow() == 1
+
+
+# ─── 用户总览 / 数据模型对话框 ────────────────────────────────
+# 这两处此前漏了统一样式，是系统默认灰按钮，跟同页其他按钮不一样。
+# 断言写成「与同页参照按钮一致」而不是硬编码某个 variant，这样以后调色板
+# 换了也不用改测试，跑偏了照样能抓到。
+
+def _profile_overview(qtbot):
+    from unittest.mock import MagicMock
+
+    from lvjiang.apps.yysls.ui.profile.overview import ProfileOverviewTab
+
+    tab = ProfileOverviewTab(MagicMock())
+    qtbot.addWidget(tab)
+    return tab
+
+
+def test_profile_overview_metadata_button_matches_siblings(qtbot):
+    """「数据模型」要和同页的新建/重命名/删除分组长得一样。"""
+    from lvjiang.apps.yysls.ui.profile.tab import USER_ACTION_BTN_STYLE
+
+    tab = _profile_overview(qtbot)
+    buttons = {b.text(): b for b in tab.findChildren(QPushButton)}
+    assert "数据模型" in buttons, "用户总览页应有「数据模型」按钮"
+
+    sibling = buttons["新建分组"]
+    assert sibling.styleSheet() == USER_ACTION_BTN_STYLE, "参照按钮本身应当已统一"
+    assert buttons["数据模型"].styleSheet() == USER_ACTION_BTN_STYLE
+    assert buttons["数据模型"].minimumHeight() == sibling.minimumHeight()
+
+
+def _known_variant(style: str) -> bool:
+    return style in (ACTION_BUTTON_STYLE, NEUTRAL_BUTTON_STYLE, DANGER_BUTTON_STYLE)
+
+
+def test_profile_definition_dialog_buttons_all_styled(qtbot):
+    """数据模型对话框里每个按钮都得用统一样式，且不能被固定宽度截断。"""
+    from lvjiang.apps.yysls.ui.profile.settings_dialog import ProfileDefinitionDialog
+
+    dialog = ProfileDefinitionDialog()
+    qtbot.addWidget(dialog)
+
+    buttons = dialog.findChildren(QPushButton)
+    assert buttons, "对话框里应当有按钮"
+    unstyled = [b.text() for b in buttons if not _known_variant(b.styleSheet())]
+    assert not unstyled, f"这些按钮仍是旧风格：{unstyled}"
+
+    clipped = [
+        b.text() for b in buttons
+        if b.minimumWidth() == b.maximumWidth()      # 设了固定宽
+        and b.minimumWidth() < b.sizeHint().width()  # 却装不下带内边距的文字
+    ]
+    assert not clipped, f"这些按钮的固定宽度装不下统一样式：{clipped}"
+
+
+def test_sync_target_remove_button_styled_and_fits(qtbot):
+    """行内「×」删除键：套 danger 样式后 30px 会挤掉字符，列宽与按钮宽需同步放大。"""
+    from lvjiang.apps.yysls.ui.profile.settings_dialog import _SyncTargetsWidget
+
+    widget = _SyncTargetsWidget()
+    qtbot.addWidget(widget)
+    widget.add_row()
+
+    removes = [b for b in widget.findChildren(QPushButton) if b.text() == "×"]
+    assert len(removes) == 1
+    btn = removes[0]
+    assert btn.styleSheet() == DANGER_BUTTON_STYLE
+    assert btn.minimumWidth() >= btn.sizeHint().width(), "固定宽度装不下「×」"
+    assert widget._table.columnWidth(4) >= btn.minimumWidth(), "列宽装不下删除键"

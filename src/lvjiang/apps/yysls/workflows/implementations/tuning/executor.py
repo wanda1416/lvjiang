@@ -72,7 +72,7 @@ class TuningExecutor:
             infos = self._validate_tuning_materials(infos)
             self._material_cache = infos
             self._food_count_overrides = {}  # 清空覆盖，使用 OCR 原始值
-            # 日志：记录缓存的材料数量（同名材料去重，保留最高置信度）
+            # 日志：记录缓存的材料数量（同名材料优先保留数量有效的槽）
             deduped = self._dedup_by_confidence(infos)
             counts = {label: self._get_count(info)
                       for label, info in deduped.items()}
@@ -92,12 +92,21 @@ class TuningExecutor:
             return self._food_count_overrides[label]
         return info.count
 
+    @staticmethod
+    def _has_recognized_count(info) -> bool:
+        """数量是否来自有效 OCR，而不是容错产生的 0。"""
+        recognized = getattr(info, "count_recognized", None)
+        if recognized is not None:
+            return bool(recognized)
+        # 兼容测试替身和旧扩展对象：过去 count 非 None 即表示识别成功。
+        return getattr(info, "count", None) is not None
+
     def _dedup_by_confidence(self, infos: dict | None) -> dict[str, object]:
-        """同名材料去重：保留置信度最高的槽
+        """同名材料去重：优先保留数量有效的槽，其次取最高置信度
 
         材料区可能将同一材料误识别到多个槽（如第6列真槽 + 第7列幽灵槽），
-        返回 {type: info} 字典，同名时保留 confidence 最高者；
-        置信度相同时，优先保留 count 有效的槽（防止幽灵槽覆盖真槽）。
+        返回 {type: info} 字典。数量 OCR 失败现在会容错成 0，但不能因此
+        把幽灵槽当成可点击的真实材料槽；所以有效数量优先级高于置信度。
         """
         result: dict[str, object] = {}
         for info in (infos or {}).values():
@@ -108,17 +117,16 @@ class TuningExecutor:
             if existing is None:
                 result[label] = info
             else:
+                old_valid = self._has_recognized_count(existing)
+                new_valid = self._has_recognized_count(info)
                 old_conf = getattr(existing, "confidence", 0) or 0
                 new_conf = getattr(info, "confidence", 0) or 0
-                # 置信度更高 → 替换
-                # 置信度相同 → 保留 count 有效的（防止幽灵槽覆盖真槽）
-                if new_conf > old_conf:
+                # 数量有效的真槽优先于数量容错为 0 的幽灵槽；有效性相同
+                # 时再按参考图置信度选择。
+                if new_valid and not old_valid:
                     result[label] = info
-                elif new_conf == old_conf:
-                    old_count = getattr(existing, "count", None)
-                    new_count = getattr(info, "count", None)
-                    if old_count is None and new_count is not None:
-                        result[label] = info
+                elif new_valid == old_valid and new_conf > old_conf:
+                    result[label] = info
         return result
 
     def decrement_food(self, food: str):
@@ -130,7 +138,8 @@ class TuningExecutor:
         if not food or not self._material_cache:
             return
         for info in self._material_cache.values():
-            if getattr(info, "label", "") == food and info.count is not None:
+            if (getattr(info, "label", "") == food
+                    and self._has_recognized_count(info)):
                 current = self._food_count_overrides.get(food, info.count)
                 self._food_count_overrides[food] = max(0, current - 1)
                 logger.debug(f"狗粮扣减: {food} → {self._food_count_overrides[food]}")
@@ -229,7 +238,7 @@ class TuningExecutor:
             slot = next(
                 ((r, c) for (r, c), i in (infos or {}).items()
                  if getattr(i, "label", "") == food
-                 and getattr(i, "count", None) is not None), None)
+                 and self._has_recognized_count(i)), None)
             if not slot:
                 logger.warning(f"{food} 材料槽位定位失败，提前结束调律")
                 self.abort_reason = f"{food} 材料槽位定位失败"
@@ -293,7 +302,7 @@ class TuningExecutor:
             return FoodDecision("none", "", tr("未配置狗粮规则 → 不添加"))
         cap_pct = (equip_data.affixes[0].cap_pct
                    if equip_data.affixes else None)
-        # 同名材料去重：保留最高置信度的槽
+        # 同名材料去重：优先保留数量有效的槽
         deduped = self._dedup_by_confidence(infos)
         stocks: dict[str, int | None] = {}
         for label, info in deduped.items():
@@ -324,7 +333,7 @@ class TuningExecutor:
         """
         if not settings.stone_check_enabled or self._stone_check_waived:
             return True
-        # 同名材料去重：保留最高置信度的槽
+        # 同名材料去重：优先保留数量有效的槽
         deduped = self._dedup_by_confidence(infos)
         stone = deduped.get(STONE_LABEL)
         if stone is None:

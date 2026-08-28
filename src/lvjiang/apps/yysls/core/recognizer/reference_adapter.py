@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from loguru import logger
+
 from lvjiang.core.recognizers import ReferenceInfo, ReferenceRecognizer
 from lvjiang.core.reference_db import ReferenceDatabase
 
@@ -75,18 +77,39 @@ class TuningMaterial:
 
     label: str
     confidence: float
-    count: int | None = None
+    count: int = 0
+    count_recognized: bool = False
     devoted: int | None = None
-    real_level: int | None = None
+    real_level: int = 0
 
 
 def parse_tuning_material(info: ReferenceInfo) -> TuningMaterial:
-    """让 Python 类工作流复用与 DSL ``with`` 相同的解析语义。"""
-    rich = parse_rich_base(ReferenceRecognizer.build_rich_base(info))
+    """让 Python 类工作流复用 DSL 解析语义，并对识别失败安全降级。
+
+    材料面板属于连续自动化路径：单个格子未匹配，或数量/等级 OCR
+    暂时读不到，都不能让整次调律异常退出。未匹配格按空材料处理；
+    已匹配材料的数值无法解析时按 0。DSL 的 ``with`` 转换仍保持严格，
+    真正缺少 schema 输出字段时继续报错。
+    """
+    base = ReferenceRecognizer.build_rich_base(info)
+    base.setdefault("level_text", "")
+    base.setdefault("count_text", "")
+    count_text = str(base.get("count_text", "") or "")
+    count_source = count_text.split("/")[-1] if "/" in count_text else count_text
+    count_recognized = parse_number(count_source) is not None
+    if info.label and not count_recognized:
+        logger.warning(
+            f"材料数量 OCR 无法识别: label={info.label!r}, "
+            f"count_text={count_text!r}，按 0 处理"
+        )
+    rich = parse_rich_base(base)
+    devoted = rich.get("devoted")
     return TuningMaterial(
         label=info.label,
         confidence=float(info.confidence),
-        count=rich.get("count"),
-        devoted=rich.get("devoted"),
-        real_level=rich.get("real_level"),
+        count=rich.get("count", 0),
+        count_recognized=count_recognized,
+        devoted=(devoted if devoted is not None else 0)
+        if "/" in count_text else None,
+        real_level=rich.get("real_level", 0),
     )

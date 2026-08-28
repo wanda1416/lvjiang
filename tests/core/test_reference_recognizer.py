@@ -92,6 +92,36 @@ def test_unmatched_reference_skips_ocr(tmp_path):
     assert result.ocr_texts == {}
 
 
+def test_match_exception_is_consumed_as_unmatched(tmp_path):
+    recognizer = _recognizer(tmp_path)
+    recognizer._matcher.match.side_effect = RuntimeError("特征提取失败")
+
+    result = recognizer.recognize(_image())
+
+    assert result == ReferenceInfo(label="")
+
+
+def test_ocr_exception_is_consumed_per_output_field(tmp_path):
+    recognizer = _recognizer(tmp_path)
+    recognizer._matcher.match.return_value = MatchResult(
+        entry=None, label="参考 A", confidence=0.9, meta={},
+    )
+    recognizer._ocr = MagicMock()
+    recognizer._ocr.recognize.side_effect = RuntimeError("OCR 暂不可用")
+
+    result = recognizer.recognize(_image())
+
+    assert result.label == "参考 A"
+    assert result.ocr_texts == {"level_text": "", "count_text": ""}
+
+
+def test_top_n_match_exception_is_consumed_as_no_candidates(tmp_path):
+    recognizer = _recognizer(tmp_path)
+    recognizer._matcher.match_top_n.side_effect = RuntimeError("匹配器异常")
+
+    assert recognizer.recognize_top_n(_image()) == []
+
+
 def test_empty_image_is_safely_unmatched(tmp_path):
     recognizer = _recognizer(tmp_path)
     empty = np.empty((0, 0, 3), dtype=np.uint8)

@@ -224,9 +224,9 @@ ocr_dialog:
   label_all_groups: '- All -'
   label_ocr_result: 'Recognition Results (with cleaning rules applied):'
   status_ready: Ready
-  cleaning_rules_hint: 'General cleaning rules: All OCR text goes through these rules.
+  cleaning_rules_hint: 'Global cleaning rules: every string OCR reads passes through them.
 
-    Changes take effect immediately, no restart needed.'
+    Changes take effect after you click "Save" -- no restart needed; use "Cancel" to discard unsaved edits.'
   group_text_replace: Text Replacement (exact match)
   col_original: Original Text
   col_replacement: Replace With
@@ -239,7 +239,7 @@ ocr_dialog:
   placeholder_test_input: Enter test text...
   placeholder_test_output: Cleaning result...
   btn_test: Test
-  status_rules_saved: Rules saved
+  status_rules_saved: Cleaning rules saved
   no_clipboard_image: No image in clipboard
   cannot_read_clipboard: Cannot read clipboard image
   select_image_title: Select Image
@@ -714,6 +714,7 @@ auto_strings:
   已恢复: Resumed
   已恢复，继续执行...: Resumed, continuing...
   已截图 {w}×{h}（画布裁剪后）: Captured {w}x{h} (after canvas crop)
+  已放弃未保存的清洗规则修改: Discarded unsaved cleaning-rule changes
   已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
   已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Minimized to the tray; double-click the icon or right-click -> "Open Main Window" to restore.
   已退出画布编辑模式: Exited canvas edit mode
@@ -900,6 +901,12 @@ auto_strings:
   浏览...: Browse...
   添加参数: Add Parameter
   添加环境: Add Environment
+  ? '清洗规则有未保存的修改，关闭将丢失这些修改。
+
+    是否先保存？'
+  : 'The cleaning rules have unsaved changes; closing will discard them.
+
+    Save first?'
   清除网格: Clear Grid
   滚动方向: Scroll Direction
   '滚动方向:': 'Scroll Direction:'
@@ -1008,6 +1015,7 @@ auto_strings:
   英文，如 my_point: English, e.g. my_point
   英文，如 my_region: English, e.g. my_region
   英文，如 my_scene: English, e.g. my_scene
+  '行 {n}: 无效的正则表达式': 'Row {n}: invalid regular expression'
   行/列数: Rows/Columns
   '行:': 'Row:'
   行数: Rows

@@ -542,6 +542,11 @@ class CanvasPoiMixin:
     def _poi_handle_move(self, event) -> bool:
         pos = event.position()
 
+        # 死区内不改数据，但事件仍算被 POI 消费掉，避免落到 region 分支去
+        # 移动区域（理由见 canvas_interaction.DRAG_DEAD_ZONE_PX）
+        if self._poi_drag != PoiDrag.NONE and not self._beyond_dead_zone(pos):
+            return True
+
         if self._poi_drag == PoiDrag.MOVE_POINT and self._selected_point_idx >= 0:
             cx, cy = self._widget_to_canvas_norm(pos)
             p = self._points[self._selected_point_idx]

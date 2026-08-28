@@ -1,7 +1,12 @@
 """自动调律平台路径策略的独立契约测试。"""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
+from lvjiang.apps.yysls.workflows.implementations.tuning.recycler import (
+    RecycleOutcome,
+    TuningRecycler,
+)
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     AndroidTuningRouteStrategy,
     DesktopTuningRouteStrategy,
@@ -50,24 +55,31 @@ def test_android_restores_menu_after_locked_recycle():
 
 def test_desktop_opens_recycle_dialog_with_keypress():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL)
-    wf.ocr_scene_by.return_value = "func_area"
     routes = DesktopTuningRouteStrategy(wf)
 
     assert routes.open_recycle_dialog() is True
-    wf.ocr_scene_by.assert_called_once_with(
-        EQUIP_DETAIL, ["func_area"], "回收", "contains")
+    wf.ocr_scene_by.assert_not_called()
     wf.press.assert_called_once_with("X", wait=None)
     wf.wait_stable.assert_called_once_with("page_refresh")
 
 
-def test_desktop_keeps_page_when_recycle_entry_missing():
+def test_desktop_checks_confirm_after_recycle_keypress():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL)
-    wf.ocr_scene_by.return_value = ""
+    wf.output = {}
+    wf.ocr_scene.return_value = {"recycle_confirm": "确认"}
     routes = DesktopTuningRouteStrategy(wf)
+    recycler = TuningRecycler(wf, routes)
+    equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
 
-    assert routes.open_recycle_dialog() is False
-    wf.press.assert_not_called()
-    wf.wait_stable.assert_not_called()
+    outcome = recycler.recycle_current(equip, "weapon_detail", "scan", "测试")
+
+    assert outcome is RecycleOutcome.RECYCLED
+    wf.ocr_scene.assert_called_once_with(
+        EQUIP_DETAIL, ["recycle_confirm"])
+    wf.click_region.assert_called_once_with(EQUIP_DETAIL, "recycle_confirm")
+    calls = wf.method_calls
+    assert calls.index(call.press("X", wait=None)) < calls.index(
+        call.ocr_scene(EQUIP_DETAIL, ["recycle_confirm"]))
 
 
 def test_desktop_waits_after_locked_recycle():

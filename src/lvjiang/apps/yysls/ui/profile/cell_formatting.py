@@ -28,6 +28,7 @@ from ...config.profile_models import (
     RegenKeyDef,
     StockKeyDef,
     format_sync_label,
+    note_numeric_value,
     parse_sync_key,
 )
 from ...core.profile_engine.regen_math import (
@@ -203,10 +204,19 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
 
     if model_type == MODEL_NOTE:
         text = entry.get("value_text", "")
-        if text:
-            return text, ""
-        # 兼容：如果 value_text 为空但有数值 value，显示数值
-        return (str(int(value)) if value else "", "")
+        if not text:
+            # 兼容：如果 value_text 为空但有数值 value，显示数值
+            text = str(int(value)) if value else ""
+        if not text:
+            return "", ""
+        # 只有值本身是数字时才显示 X/Y：给「已完成」这种自由文本挂个
+        # /20 没有任何意义——真要按数量管理就该用 stock 而不是 note。
+        # 数字在写入时已归一（见 profile_ops.normalize_note_text），
+        # 两边共用 note_numeric_value 判断，避免存/显不一致。
+        if kd.show_cap and kd.cap is not None \
+                and note_numeric_value(text) is not None:
+            return f"{text}/{kd.cap}", ""
+        return text, ""
 
     return str(value), ""
 

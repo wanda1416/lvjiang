@@ -24,6 +24,7 @@ from ...config.profile_models import (
     MODEL_REGEN,
     MODEL_STOCK,
     RegenKeyDef,
+    note_numeric_value,
 )
 from ...config.user_profile import get_profile_config
 from .profile_db import db_read_all, db_read_entry, db_update_if_current, db_upsert
@@ -75,6 +76,29 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         else:
             current = compute_regen_entry(entry, kd).value
     return current
+
+
+def normalize_note_text(text: str, kd) -> str:
+    """note 写入值：能转成数字就取整（硬上限再截断），否则原样保留
+
+    note 存的是自由文本，但配置里仍然给它保留了「上限 / 展示上限」两个开关。
+    既然开关在，填进来的又确实是数字，就按数值语义归一：取整 + 按硬上限截断。
+    这样展示上限时 ``X/Y`` 两边才是同一量纲，不会出现 ``12.7/20`` 或
+    ``25/20`` 这种自相矛盾的显示。
+
+    填的是「已完成」这类文字则跳过取整与取上限，原样存下——展示层仍会照常
+    补 ``/Y``，那是展示开关的职责，与值本身能不能算数无关。
+
+    软上限（``soft=True``）沿用数值模型的语义：只提醒不截断，所以只取整。
+    """
+    number = note_numeric_value(text)
+    if number is None:
+        return text
+    value = round(number)
+    cap = getattr(kd, "cap", None)
+    if cap is not None and not getattr(kd, "soft", False):
+        value = min(value, cap)
+    return str(value)
 
 
 def _clamp(new_value: float, model_type: str, kd) -> float:
@@ -199,6 +223,7 @@ def profile_action(
             logger.warning(f"profile_action: note key '{key}' 未在 profile.yaml 中定义")
             return ""
         text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
+        text = normalize_note_text(text, kd)
         db_upsert(username, model_type, key, 0, change_type="action", value_text=text, source=source)
         return text
 

@@ -512,3 +512,143 @@ class TestNoteHistory:
         history = db_get_history(note_env.username, type_="note", key="took_xinfa")
         # tick 只在值变化时记录，所以只有 1 条
         assert len(history) == 1
+
+
+# ─── note 的上限：取整、取上限、展示上限 ──────────────────────
+
+
+@pytest.fixture
+def note_cap_env(tmp_path, monkeypatch):
+    """带 cap / soft / show_cap 各种组合的 note 环境"""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    import lvjiang.apps.yysls.config.user_profile as profile_config
+    import lvjiang.apps.yysls.core.profile_engine.profile_db as profile_db
+
+    profile_config._config = None
+    profile_config._PROFILE_PATH = session_dir / "profile.yaml"
+    profile_config._PROFILE_PATH.write_text(
+        yaml.dump(
+            {
+                "note": [
+                    {"key": "hard", "label": "硬上限", "cap": 20, "show_cap": True},
+                    {"key": "soft", "label": "软上限", "cap": 20,
+                     "soft": True, "show_cap": True},
+                    {"key": "nocap", "label": "无上限", "show_cap": True},
+                    {"key": "hide", "label": "不展示", "cap": 20, "show_cap": False},
+                ]
+            },
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    profile_db._db = None
+    profile_db._DB_PATH = session_dir / "profile.db"
+
+    yield SimpleNamespace(username="u")
+
+    profile_config._config = None
+    profile_db._db = None
+
+
+def _write_then_render(env, key: str, value: str) -> tuple[str, str]:
+    """写入 note 值，返回 (落库文本, 总览单元格显示文本)"""
+    from lvjiang.apps.yysls.config.profile_models import MODEL_NOTE
+    from lvjiang.apps.yysls.config.user_profile import get_profile_config
+    from lvjiang.apps.yysls.core.profile_engine.profile_db import db_read_all
+    from lvjiang.apps.yysls.core.profile_engine.profile_ops import profile_action
+    from lvjiang.apps.yysls.ui.profile.cell_formatting import format_profile_cell
+
+    profile_action(env.username, key, model_type=MODEL_NOTE,
+                   set_value=value, source="")
+    data = db_read_all(env.username)
+    kd = get_profile_config().get_key(key, model_type=MODEL_NOTE)
+    stored = data[MODEL_NOTE][key].get("value_text")
+    text, _style = format_profile_cell(kd, MODEL_NOTE, data)
+    return stored, text
+
+
+class TestNoteNumericValueTakesCap:
+    """填的是数字就按数值语义归一，免得显示出 12.7/20 或 25/20 这种自相矛盾的值。"""
+
+    @pytest.mark.parametrize("raw,expected", [("12.7", "13"), ("12.2", "12"),
+                                              ("8", "8"), ("0", "0")])
+    def test_numeric_is_rounded(self, note_cap_env, raw, expected):
+        stored, _ = _write_then_render(note_cap_env, "hard", raw)
+        assert stored == expected
+
+    def test_numeric_clamped_to_hard_cap(self, note_cap_env):
+        stored, text = _write_then_render(note_cap_env, "hard", "25")
+        assert stored == "20", "硬上限应截断"
+        assert text == "20/20"
+
+    def test_soft_cap_rounds_but_does_not_clamp(self, note_cap_env):
+        """软上限沿用数值模型语义：只提醒不截断。"""
+        stored, text = _write_then_render(note_cap_env, "soft", "25")
+        assert stored == "25"
+        assert text == "25/20"
+
+    def test_no_cap_means_no_clamp(self, note_cap_env):
+        stored, text = _write_then_render(note_cap_env, "nocap", "12.7")
+        assert stored == "13"
+        assert text == "13", "没有上限就没有 /Y 可显示"
+
+
+class TestNoteNonNumericSkipsCap:
+    """不可转成数值的文本跳过取整、取上限，也不显示上限。
+
+    给「已完成」挂个 /20 没有任何意义——真要按数量管理就该用 stock 而不是
+    note。所以 X/Y 只在 X 确实是数字时才成立。
+    """
+
+    def test_text_stored_as_is(self, note_cap_env):
+        stored, _ = _write_then_render(note_cap_env, "hard", "已完成")
+        assert stored == "已完成"
+
+    @pytest.mark.parametrize("raw", ["已完成", "待定", "见群公告"])
+    def test_text_does_not_show_cap(self, note_cap_env, raw):
+        _, text = _write_then_render(note_cap_env, "hard", raw)
+        assert text == raw, "非数字的值不该被挂上 /上限"
+
+    def test_empty_stays_empty(self, note_cap_env):
+        stored, text = _write_then_render(note_cap_env, "hard", "")
+        assert stored == ""
+        assert text == "", "空值不该显示成 /20"
+
+
+class TestNoteShowCapToggle:
+    """show_cap 只管显示；归一化由 cap 本身决定，与开关无关。"""
+
+    def test_hidden_cap_still_normalizes(self, note_cap_env):
+        stored, text = _write_then_render(note_cap_env, "hide", "25")
+        assert stored == "20", "不展示上限，也仍按硬上限截断"
+        assert text == "20", "关掉开关就不该出现 /Y"
+
+    def test_hidden_cap_text_unchanged(self, note_cap_env):
+        stored, text = _write_then_render(note_cap_env, "hide", "已完成")
+        assert stored == "已完成"
+        assert text == "已完成"
+
+
+class TestNoteNumericPredicate:
+    """写入侧和展示侧必须用同一套"算不算数字"的判断，否则会存/显不一致。"""
+
+    @pytest.mark.parametrize("raw,expected", [
+        ("12", 12.0), ("12.7", 12.7), ("-3", -3.0), ("  8  ", 8.0),
+        ("已完成", None), ("", None), ("   ", None), ("12个", None), (None, None),
+    ])
+    def test_note_numeric_value(self, raw, expected):
+        from lvjiang.apps.yysls.config.profile_models import note_numeric_value
+
+        assert note_numeric_value(raw) == expected
+
+    def test_write_and_display_agree(self, note_cap_env):
+        """凡是写入侧当成数字归一了的，展示侧就该认它、加上 /Y；反之亦然。"""
+        from lvjiang.apps.yysls.config.profile_models import note_numeric_value
+
+        for raw in ["12.7", "25", "0", "已完成", "待定", "12个"]:
+            stored, text = _write_then_render(note_cap_env, "hard", raw)
+            numeric = note_numeric_value(stored) is not None
+            assert ("/" in text) is numeric, (
+                f"{raw!r} 存成 {stored!r} 显示 {text!r}：存/显对数字的判断不一致")

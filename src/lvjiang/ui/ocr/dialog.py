@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QTableWidget,
@@ -132,6 +133,8 @@ class OCRDialog(QDialog):
         self._btn_reference.clicked.connect(self._on_recognize_reference)
         btn_row.addWidget(self._btn_reference)
 
+        apply_button_style(self._btn_ocr, self._btn_reference)
+
         btn_row.addStretch()
         right_layout.addLayout(btn_row)
 
@@ -175,7 +178,7 @@ class OCRDialog(QDialog):
 
         layout.addWidget(QLabel(
             tr("通用清洗规则：所有 OCR 识别出的文字都会经过这些规则处理。\n"
-               "规则修改后立即生效，无需重启。")
+               "改完点「保存」后生效，无需重启；未保存的修改可以用「取消」丢弃。")
         ))
 
         # ── 文本替换规则 ──
@@ -265,39 +268,154 @@ class OCRDialog(QDialog):
 
         layout.addWidget(test_group)
 
+        # ── 底部：保存 / 取消 ──
+        save_row = QHBoxLayout()
+        save_row.addStretch()
+        self._btn_save_rules = QPushButton(tr("保存"))
+        self._btn_save_rules.clicked.connect(self._on_save_rules)
+        save_row.addWidget(self._btn_save_rules)
+        self._btn_cancel_rules = QPushButton(tr("取消"))
+        self._btn_cancel_rules.clicked.connect(self._on_cancel_rules)
+        save_row.addWidget(self._btn_cancel_rules)
+        layout.addLayout(save_row)
+
         apply_button_style(
             self._btn_add_repl,
             self._btn_add_pattern,
             self._btn_test,
+            self._btn_save_rules,
         )
         apply_button_style(
             self._btn_del_repl,
             self._btn_del_pattern,
             variant="danger",
         )
+        apply_button_style(self._btn_cancel_rules, variant="neutral")
 
-        # 加载规则到表格
+        # 载入已保存的规则。填表会触发 cellChanged，_refresh_rules_tables 内部
+        # 已屏蔽信号；这里再显式清一次脏标记，保证刚打开时「保存」是灰的。
         self._refresh_rules_tables()
+        self._set_rules_dirty(False)
 
         return widget
 
     def _refresh_rules_tables(self):
-        """刷新规则表格"""
+        """从清洗器重新载入两张规则表（纯读，不写盘）
+
+        填表用的 setItem 会逐格触发 cellChanged，所以填充期间屏蔽表格信号，
+        免得刚打开就被记成"有未保存的修改"。
+
+        注意真正挡住写盘的不是这里，而是 cellChanged 的处理器本身已经只记脏
+        不落盘了；屏蔽信号是第二道。改成显式保存之前两者都没有，光是打开这个
+        对话框就会把配置整份回写 22 遍——用户模式下还会平白落一份 local 影子，
+        而 config/local 在 .gitignore 里，用户 git diff 什么也看不到。
+        """
         cleaner = OCRCleaner()
+        self._repl_table.blockSignals(True)
+        self._pattern_table.blockSignals(True)
+        try:
+            # 文本替换
+            repls = cleaner.get_replacements()
+            self._repl_table.setRowCount(len(repls))
+            for i, (wrong, correct) in enumerate(repls.items()):
+                self._repl_table.setItem(i, 0, QTableWidgetItem(wrong))
+                self._repl_table.setItem(i, 1, QTableWidgetItem(correct))
 
-        # 文本替换
-        repls = cleaner.get_replacements()
-        self._repl_table.setRowCount(len(repls))
-        for i, (wrong, correct) in enumerate(repls.items()):
-            self._repl_table.setItem(i, 0, QTableWidgetItem(wrong))
-            self._repl_table.setItem(i, 1, QTableWidgetItem(correct))
+            # 正则替换
+            patterns = cleaner.get_patterns()
+            self._pattern_table.setRowCount(len(patterns))
+            for i, (pattern, replacement) in enumerate(patterns.items()):
+                self._pattern_table.setItem(i, 0, QTableWidgetItem(pattern))
+                self._pattern_table.setItem(i, 1, QTableWidgetItem(replacement))
+        finally:
+            self._repl_table.blockSignals(False)
+            self._pattern_table.blockSignals(False)
 
-        # 正则替换
-        patterns = cleaner.get_patterns()
-        self._pattern_table.setRowCount(len(patterns))
-        for i, (pattern, replacement) in enumerate(patterns.items()):
-            self._pattern_table.setItem(i, 0, QTableWidgetItem(pattern))
-            self._pattern_table.setItem(i, 1, QTableWidgetItem(replacement))
+    # ─── 清洗规则：脏标记与存取 ──────────────────────────────
+
+    def _set_rules_dirty(self, dirty: bool):
+        """更新未保存标记：没有改动时「保存」置灰，避免空保存又写一份影子"""
+        self._rules_dirty = dirty
+        if hasattr(self, "_btn_save_rules"):
+            self._btn_save_rules.setEnabled(dirty)
+
+    def _mark_rules_dirty(self, *_args):
+        """表格任一处被用户改动 → 只记脏，不写盘"""
+        self._set_rules_dirty(True)
+
+    def _collect_repl_rules(self) -> dict[str, str]:
+        """读取文本替换表格当前内容（key 为空的行忽略）"""
+        out: dict[str, str] = {}
+        for r in range(self._repl_table.rowCount()):
+            key_item = self._repl_table.item(r, 0)
+            val_item = self._repl_table.item(r, 1)
+            key = key_item.text() if key_item else ""
+            val = val_item.text() if val_item else ""
+            if key:
+                out[key] = val
+        return out
+
+    def _collect_pattern_rules(self) -> dict[str, str] | None:
+        """读取正则表格当前内容；有非法正则时提示并返回 None"""
+        import re
+        out: dict[str, str] = {}
+        for r in range(self._pattern_table.rowCount()):
+            key_item = self._pattern_table.item(r, 0)
+            val_item = self._pattern_table.item(r, 1)
+            key = key_item.text() if key_item else ""
+            val = val_item.text() if val_item else ""
+            if key:
+                try:
+                    re.compile(key)
+                except re.error:
+                    self._status_label.setText(
+                        tr("行 {n}: 无效的正则表达式").format(n=r + 1))
+                    return None
+                out[key] = val
+        return out
+
+    def _on_save_rules(self) -> bool:
+        """把两张表落盘。返回是否真的保存成功（正则非法时不保存）"""
+        patterns = self._collect_pattern_rules()
+        if patterns is None:
+            return False
+        cleaner = OCRCleaner()
+        cleaner.set_replacements(self._collect_repl_rules())
+        cleaner.set_patterns(patterns)
+        self._set_rules_dirty(False)
+        self._status_label.setText(tr("清洗规则已保存"))
+        return True
+
+    def _on_cancel_rules(self):
+        """丢弃未保存的修改，重新从已保存的配置载入"""
+        self._refresh_rules_tables()
+        self._set_rules_dirty(False)
+        self._status_label.setText(tr("已放弃未保存的清洗规则修改"))
+
+    def _confirm_discard_rules(self) -> bool:
+        """关闭前拦一道未保存修改。True = 可以继续关闭"""
+        if not getattr(self, "_rules_dirty", False):
+            return True
+        reply = QMessageBox.question(
+            self, tr("未保存的修改"),
+            tr("清洗规则有未保存的修改，关闭将丢失这些修改。\n是否先保存？"),
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if reply == QMessageBox.StandardButton.Save:
+            return self._on_save_rules()
+        return reply == QMessageBox.StandardButton.Discard
+
+    def reject(self):
+        """关闭对话框（X / Esc）前检查未保存的清洗规则修改
+
+        QDialog.closeEvent 会走 reject()，覆盖它即可同时拦住 X 与 Esc。
+        """
+        if not self._confirm_discard_rules():
+            return
+        super().reject()
 
     def _load_groups(self):
         """从参考图库加载分组列表到下拉框"""
@@ -312,43 +430,6 @@ class OCRDialog(QDialog):
             logger.warning(f"加载分组列表失败: {e}")
 
     # ─── 清洗规则操作 ────────────────────────────────────────
-
-    def _sync_repl_table(self):
-        """将文本替换表格内容同步到清洗器"""
-        cleaner = OCRCleaner()
-        # 读取表格当前数据
-        new_repls = {}
-        for r in range(self._repl_table.rowCount()):
-            key_item = self._repl_table.item(r, 0)
-            val_item = self._repl_table.item(r, 1)
-            key = key_item.text() if key_item else ""
-            val = val_item.text() if val_item else ""
-            if key:
-                new_repls[key] = val
-        # 批量写入，只保存一次
-        cleaner.set_replacements(new_repls)
-
-    def _sync_pattern_table(self):
-        """将正则替换表格内容同步到清洗器"""
-        cleaner = OCRCleaner()
-        import re
-        # 读取表格当前数据
-        new_patterns = {}
-        for r in range(self._pattern_table.rowCount()):
-            key_item = self._pattern_table.item(r, 0)
-            val_item = self._pattern_table.item(r, 1)
-            key = key_item.text() if key_item else ""
-            val = val_item.text() if val_item else ""
-            if key:
-                try:
-                    re.compile(key)
-                except re.error:
-                    self._status_label.setText(f"行 {r + 1}: 无效的正则表达式")
-                    return
-                new_patterns[key] = val
-        # 批量写入，只保存一次
-        cleaner.set_patterns(new_patterns)
-        self._status_label.setText(tr("规则已保存"))
 
     def _on_add_replacement(self):
         """添加文本替换规则：插入空行供编辑"""
@@ -366,11 +447,11 @@ class OCRDialog(QDialog):
         if row < 0:
             return
         self._repl_table.removeRow(row)
-        self._sync_repl_table()
+        self._mark_rules_dirty()
 
     def _on_repl_cell_changed(self, row: int, col: int):
-        """文本替换表格单元格修改后同步"""
-        self._sync_repl_table()
+        """文本替换表格被改动：只记脏，落盘等用户点「保存」"""
+        self._mark_rules_dirty()
 
     def _on_add_pattern(self):
         """添加正则替换规则：插入空行供编辑"""
@@ -388,11 +469,11 @@ class OCRDialog(QDialog):
         if row < 0:
             return
         self._pattern_table.removeRow(row)
-        self._sync_pattern_table()
+        self._mark_rules_dirty()
 
     def _on_pattern_cell_changed(self, row: int, col: int):
-        """正则替换表格单元格修改后同步"""
-        self._sync_pattern_table()
+        """正则表格被改动：只记脏，落盘等用户点「保存」"""
+        self._mark_rules_dirty()
 
     def _on_test_clean(self):
         """测试清洗效果"""

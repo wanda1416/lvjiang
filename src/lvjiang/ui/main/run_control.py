@@ -212,7 +212,7 @@ class RunControlMixin:
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
     _run_state = "idle"         # 运行状态：idle / running / paused
     _pause_event: threading.Event | None = None  # 暂停事件：set=运行，clear=暂停阻塞
-    _stop_confirm_pending = False  # 暂停中点结束的二次确认弹窗是否正打开（挡 F8 竞态）
+    _stop_confirm_pending = False  # 暂停中点结束的二次确认弹窗是否正打开（挡暂停热键竞态）
 
     @property
     def _running(self) -> bool:
@@ -559,7 +559,7 @@ class RunControlMixin:
 
     def _request_stop(self):
         """统一停止入口（F10 / 结束按钮）。只设标志，不立即改 running。"""
-        # 暂停中点结束先二次确认：F8/F10 位置接近，容易手误想恢复点成结束
+        # 暂停中点结束先二次确认：暂停/结束热键位置接近，容易手误
         if self._run_state == 'paused' and not self._confirm_stop_while_paused():
             return
         self.log_text.append(tr("[操作] 收到停止请求"))
@@ -572,7 +572,7 @@ class RunControlMixin:
             pause_event = getattr(self, '_pause_event', None)
             if pause_event is not None:
                 pause_event.set()
-            self._run_state = 'running'  # 避免停止窗口期内 F8 误恢复
+            self._run_state = 'running'  # 避免停止窗口期内暂停热键误恢复
         self._stop_requested = True
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
         helper = self._ui_helper
@@ -598,12 +598,12 @@ class RunControlMixin:
     def _confirm_stop_while_paused(self) -> bool:
         """暂停中点击结束时弹二次确认，返回是否确认结束。
 
-        弹窗期间用 _stop_confirm_pending 挡住 F8：QMessageBox.question 是
+        弹窗期间用 _stop_confirm_pending 挡住暂停热键：QMessageBox.question 是
         Qt 主线程上的嵌套事件循环，但全局热键回调（pynput 监听线程）会
         直接同步调用 _on_pause_resume（不走 Qt 信号跨线程队列），不受
-        这个嵌套事件循环阻塞，因此弹窗还开着时按 F8 仍可能并发抢跑：
-        此时 _run_state 尚未被状态借用改为 'running'，F8 会被误判为
-        "暂停中按 F8" 而提前唤醒工作流线程——弹窗都没确认，线程却先动了。
+        这个嵌套事件循环阻塞，因此弹窗还开着时按暂停热键仍可能并发抢跑：
+        此时 _run_state 尚未被状态借用改为 'running'，热键会被误判为
+        "暂停中恢复" 而提前唤醒工作流线程——弹窗都没确认，线程却先动了。
         """
         self._stop_confirm_pending = True
         try:
@@ -621,8 +621,8 @@ class RunControlMixin:
     # ─── 暂停/恢复 ────────────────────────────────────────
 
     def _on_pause_resume(self):
-        """暂停/恢复按钮点击处理（F8 快捷键转发）"""
-        # 停止确认弹窗打开期间忽略 F8，避免与二次确认竞态
+        """暂停/恢复按钮点击处理（暂停热键也转发到这里）"""
+        # 停止确认弹窗打开期间忽略暂停热键，避免与二次确认竞态
         # （见 _confirm_stop_while_paused 的说明）
         if getattr(self, '_stop_confirm_pending', False):
             return

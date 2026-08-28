@@ -149,7 +149,7 @@ def test_skipped_item_state_is_passed_to_next_item(monkeypatch):
 
 
 def test_run_script_class_branch_propagates_pause_event(monkeypatch):
-    """Python 类批量脚本必须收到 pause_event，否则 F8 暂停对它完全失效
+    """Python 类批量脚本必须收到 pause_event，否则暂停热键对它完全失效
     （回归 batch_runner.py 历史 bug：曾只传 stop_check，漏传 pause_event）。"""
     import lvjiang.workflows.implementations as impl_module
 

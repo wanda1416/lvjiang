@@ -1,9 +1,9 @@
 """暂停/停止状态机测试
 
-覆盖 2704a9f 引入的"暂停中点结束二次确认"与随之而来的 F8 竞态窗口：
+覆盖 2704a9f 引入的"暂停中点结束二次确认"与随之而来的暂停热键竞态窗口：
 QMessageBox.question 是 Qt 主线程上的嵌套事件循环，但全局热键（pynput
 监听线程）直接同步调用 _on_pause_resume，不走 Qt 信号跨线程队列，不受
-这个嵌套事件循环阻塞。修复前，弹窗打开期间按 F8 会被误判为"暂停中恢复"
+这个嵌套事件循环阻塞。修复前，弹窗打开期间按暂停热键会被误判为"暂停中恢复"
 而提前唤醒工作流线程；本文件锁定 _stop_confirm_pending 挡住这个窗口。
 """
 
@@ -72,8 +72,8 @@ class _RunControlStub:
         RunControlMixin._request_pause(self)
 
 
-class TestStopConfirmBlocksF8Race:
-    """锁定：确认结束弹窗打开期间，F8 不应提前唤醒工作流线程"""
+class TestStopConfirmBlocksPauseHotkeyRace:
+    """锁定：确认结束弹窗打开期间，暂停热键不应提前唤醒工作流线程"""
 
     def test_f8_during_confirm_dialog_is_ignored(self, monkeypatch):
         from PyQt6.QtWidgets import QMessageBox
@@ -81,7 +81,7 @@ class TestStopConfirmBlocksF8Race:
         stub = _RunControlStub(run_state="paused")
 
         def fake_question(*_a, **_k):
-            # 模拟弹窗仍开着时，pynput 线程并发按下 F8
+            # 模拟弹窗仍开着时，pynput 线程并发按下暂停热键
             RunControlMixin._on_pause_resume(stub)
             return QMessageBox.StandardButton.Yes
 
@@ -90,15 +90,15 @@ class TestStopConfirmBlocksF8Race:
         confirmed = RunControlMixin._confirm_stop_while_paused(stub)
 
         assert confirmed is True
-        # 关键断言：弹窗期间的 F8 必须被 _stop_confirm_pending 挡住，
+        # 关键断言：弹窗期间的暂停热键必须被 _stop_confirm_pending 挡住，
         # 不能真的触发 _resume_execution 唤醒线程
         assert stub._resume_calls == 0
-        assert stub._run_state == "paused"  # 未被 F8 误改
-        # 弹窗关闭后标志位必须复位，否则弹窗后 F8 会永久失效
+        assert stub._run_state == "paused"  # 未被暂停热键误改
+        # 弹窗关闭后标志位必须复位，否则弹窗后暂停热键会永久失效
         assert stub._stop_confirm_pending is False
 
     def test_f8_after_dialog_closes_works_normally(self, monkeypatch):
-        """弹窗关闭（无论是否确认）后，F8 应恢复正常响应"""
+        """弹窗关闭（无论是否确认）后，暂停热键应恢复正常响应"""
         from PyQt6.QtWidgets import QMessageBox
 
         stub = _RunControlStub(run_state="paused")
@@ -116,7 +116,7 @@ class TestStopConfirmBlocksF8Race:
         assert stub._run_state == "running"
 
     def test_pending_flag_cleared_even_if_question_raises(self, monkeypatch):
-        """弹窗回调异常也不能让标志位卡死在 True，否则 F8 永久失效"""
+        """弹窗回调异常也不能让标志位卡死在 True，否则暂停热键永久失效"""
         from PyQt6.QtWidgets import QMessageBox
 
         stub = _RunControlStub(run_state="paused")

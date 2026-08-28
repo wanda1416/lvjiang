@@ -41,7 +41,7 @@ main_window:
   btn_load: 加载
   group_params: 参数设置
   label_log_level: 日志级别
-  status_ready: 就绪 | F9 开始 | F8 暂停 | F10 结束
+  status_ready: 就绪 | F9 开始 | F11 暂停 | F10 结束
   label_no_window: 未选择窗口
   label_preview_placeholder: 定位窗口后自动截屏
   status_window_located: 窗口已定位
@@ -161,7 +161,7 @@ script_record:
   status_recording_high: 高精度录制中…原始输入写入统一时间线，F12 或点击停止
   placeholder: |-
     录制结果将显示在这里（画布归一化坐标，可保存为 .wf）
-    低精度生成可编辑指令；高精度保存原始输入轨迹，F8/F9/F10/F12 不会被录制
+    低精度生成可编辑指令；高精度保存原始输入轨迹，F9/F10/F11/F12 不会被录制
   status_done: 录制结束，可编辑后保存为 .wf
   status_done_empty: 录制结束，未捕获到有效操作
   status_copied: 已复制到剪贴板

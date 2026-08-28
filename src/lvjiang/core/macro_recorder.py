@@ -49,12 +49,12 @@ _SCROLL_BURST_INTERVAL_S = 0.080
 PRECISION_LOW = "low"
 PRECISION_HIGH = "high"
 
-# F8/F9/F10 是主窗口全局热键，F12 是录制对话框的临时全局热键（默认值，
+# F9/F10/F11 是主窗口全局热键，F12 是录制对话框的临时全局热键（默认值，
 # 用户可在配置管理→热键设置里改绑其他键，调用方应传入当前实际生效的
 # 键位集合作为 __init__ 的 reserved_keys；这里只是没传时的兜底默认值）。
 # 录制中按下这几个键是在操作录制器本身，不应该被误录成 press 语句
 # （暂不处理"录制热键与游戏内快捷键冲突"这个更大的问题，见需求备注）。
-_RESERVED_KEYS = {"F8", "F9", "F10", "F12"}
+_RESERVED_KEYS = {"F9", "F10", "F11", "F12"}
 
 # pynput 特殊键 → 本项目标准键名（与 win32_keyboard.KEY_NAME_TO_VK 同源，
 # 只覆盖 pynput.keyboard.Key 里游戏自动化场景常见的键，不追求全量覆盖）
@@ -100,7 +100,7 @@ class MacroRecorder:
     绝对坐标归一化到画布 [0,1]，相对位移归一化到 [-1,1]，
     与引擎的画布坐标换算同源，
     窗口缩放/移动后回放仍准确。鼠标操作仅录制落在目标窗口矩形内的部分；
-    键盘录制是全局的（pynput 无法判断按键是发给哪个窗口），F8/F9/F10/F12
+    键盘录制是全局的（pynput 无法判断按键是发给哪个窗口），F9/F10/F11/F12
     这几个全局热键会被排除，其余按键一律录制。
     """
 
@@ -118,7 +118,7 @@ class MacroRecorder:
         self._on_line = on_line                # 每生成一行 DSL 的实时回调（监听线程内调用）
         self.precision = precision
         self.record_mouse_movement = record_mouse_movement
-        # 当前生效的系统热键（跟随「配置管理→热键设置」，未传时用默认 F8/F9/F10/F12）
+        # 当前生效的系统热键（跟随「配置管理→热键设置」，未传时用默认 F9-F12）
         self._reserved_keys = reserved_keys if reserved_keys is not None else _RESERVED_KEYS
 
         self._listener = None

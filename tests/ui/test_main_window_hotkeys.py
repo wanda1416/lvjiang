@@ -1,6 +1,6 @@
 """全局热键回调门控测试
 
-主窗口只注册全局热键 F8-F10（按键位跟随 UserConfig.hotkeys，默认值），
+主窗口只注册开始、停止、暂停三个全局热键（默认 F9/F10/F11），
 且回调须经 _backend_ready() 门控：未定位窗口/未连接设备时直接忽略，
 不发射信号。不实例化 MainWindow、不启动 pynput listener，用桩对象直调
 未绑定方法验证门控逻辑。
@@ -14,11 +14,14 @@ from lvjiang.ui.settings_dialog import SettingsDialog
 class _Signal:
     """信号桩：记录 emit 次数"""
 
-    def __init__(self):
+    def __init__(self, callback=None):
         self.count = 0
+        self._callback = callback
 
     def emit(self):
         self.count += 1
+        if self._callback is not None:
+            self._callback()
 
 
 class _Stub:
@@ -29,10 +32,11 @@ class _Stub:
         self._running = running
         self._user_config = UserConfig()
         self.started = 0
+        self.pause_resume_count = 0
         self.f9_pressed = _Signal()
         self.f10_pressed = _Signal()
-        self.pause_resume_count = 0
-        self._on_global_f8 = lambda: None
+        self.pause_pressed = _Signal(self._on_pause_resume)
+        self._on_global_pause = lambda: None
         self._on_global_f9 = lambda: None
         self._on_global_f10 = lambda: None
         self._hotkey_listener = None
@@ -69,13 +73,13 @@ class TestGlobalHotkeyGating:
     def test_main_listener_does_not_register_f12(self):
         stub = _Stub(ready=True)
         bindings = MainWindow._main_global_hotkey_bindings(stub)
-        assert set(bindings) == {"<f8>", "<f9>", "<f10>"}
+        assert set(bindings) == {"<f9>", "<f10>", "<f11>"}
 
     def test_not_ready_ignores_all(self):
         stub = _Stub(ready=False)
         MainWindow._on_global_f9(stub)
         MainWindow._on_global_f10(stub)
-        MainWindow._on_global_f8(stub)
+        MainWindow._on_global_pause(stub)
         assert stub.f9_pressed.count == 0
         assert stub.f10_pressed.count == 0
         assert stub.pause_resume_count == 0
@@ -84,10 +88,10 @@ class TestGlobalHotkeyGating:
         stub = _Stub(ready=True)
         MainWindow._on_global_f9(stub)
         MainWindow._on_global_f10(stub)
-        MainWindow._on_global_f8(stub)
+        MainWindow._on_global_pause(stub)
         assert stub.f9_pressed.count == 1
         assert stub.f10_pressed.count == 1
-        assert stub.pause_resume_count == 1  # F8 触发暂停/恢复
+        assert stub.pause_resume_count == 1
 
     def test_running_stop_is_not_blocked_when_backend_becomes_unready(self):
         stub = _Stub(ready=False, running=True)
@@ -139,7 +143,7 @@ class TestConfigurableHotkeyBindings:
         assert set(bindings) == {"<f7>", "<f8>", "<f11>"}
         assert bindings["<f7>"] is stub._on_global_f9
         assert bindings["<f11>"] is stub._on_global_f10
-        assert bindings["<f8>"] is stub._on_global_f8
+        assert bindings["<f8>"] is stub._on_global_pause
 
     def test_saved_hotkeys_replace_listener_immediately(self, monkeypatch):
         class _Listener:

@@ -15,6 +15,7 @@ from ...i18n import tr
 from ...workflows.engine import WorkflowEngine
 
 _WORKFLOW_NAME_VISIBLE_CHARS = 8
+_RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning"})
 
 
 def _compact_workflow_name(name: str) -> str:
@@ -33,6 +34,24 @@ def _to_serializable(obj):
     if hasattr(obj, 'to_dict'):
         return obj.to_dict()
     return obj
+
+
+def _log_workflow_result(flow_id: str, result: Any, *, interrupted: bool) -> bool:
+    """Log a workflow's structured result unless it has a dedicated report.
+
+    Auto tuning already writes a Markdown tuning report.  Dumping the same
+    ``tuning_reports`` payload again through loguru duplicates it in both the
+    desktop console and the log file, often by thousands of lines.
+    """
+    if flow_id in _RESULT_LOG_SUPPRESSED_FLOW_IDS:
+        return False
+    serializable = _to_serializable(result)
+    tag = tr("（用户中断，部分结果）") if interrupted else ""
+    logger.info(
+        f"工作流 {flow_id} 结果{tag}: "
+        f"{json.dumps(serializable, ensure_ascii=False, indent=2)}"
+    )
+    return True
 
 
 class WorkflowWorker(QThread):
@@ -927,10 +946,8 @@ class RunControlMixin:
                 # 正常结束 → 自动保存 session
                 self._auto_save_session()
             self._save_workflow_result(flow_id, result, interrupted=interrupted)
-            # 通用控制台输出
-            serializable = _to_serializable(result)
-            tag = tr("（用户中断，部分结果）") if interrupted else ""
-            logger.info(f"工作流 {flow_id} 结果{tag}: {json.dumps(serializable, ensure_ascii=False, indent=2)}")
+            # 通用控制台输出；已有专用报告的工作流不再重复倾倒结果。
+            _log_workflow_result(flow_id, result, interrupted=interrupted)
             if not interrupted:
                 self.log_text.append(f"[完成] {flow_name} 结果已保存")
 

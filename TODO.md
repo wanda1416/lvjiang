@@ -1,7 +1,7 @@
-# 待办事项汇总 (2026-08-23)
+# 待办事项汇总 (2026-08-28)
 
 > 本文档整合了源码注释、开发日志、阶段计划的所有待办事项，按优先级与模块组织。
-> 最后整理日期：2026-08-23
+> 最后整理日期：2026-08-28
 
 ---
 
@@ -49,7 +49,7 @@
 
 ### 2. macOS ADB 模式真机验证 {#p1-mac-adb}
 
-**位置**: `docs/20-requirements/todo-mac.md P1-g`
+**位置**: `docs/00-meta/platforms/macos.md` Phase 1 · P1-g
 
 **状态**: 
 - ✅ P0-a ~ P0-d：依赖矩阵 + pytest 880 例全绿（macOS 12.7.6 验证）
@@ -71,7 +71,7 @@
 
 ### 3. 安卓端调律参数 UI 上机完整测试 {#p1-android-tuning-ui}
 
-**位置**: `docs/20-requirements/todo-android.md Phase 4`
+**位置**: `docs/00-meta/platforms/android.md` Phase 4
 
 **状态**:
 - ✅ 参数 UI 路线 B 实现（v11 已装）
@@ -99,7 +99,7 @@
 
 ### 1. 装备词条硬编码提取 {#p2-equipment-rules}
 
-**位置**: `src/lvjiang/apps/yysls/workflows/builtins/equipment.py:143`
+**位置**: `src/lvjiang/apps/yysls/workflows/builtins/equipment.py`（`_HIGH_VALUE_KEYWORDS`）
 
 **内容**:
 ```python
@@ -123,7 +123,7 @@
 
 ### 2. macOS 窗口模式支持 {#p2-mac-window}
 
-**位置**: `docs/20-requirements/todo-mac.md Phase 2`
+**位置**: `docs/00-meta/platforms/macos.md` Phase 2
 
 **范围**: 8~10 天工作量，可无限期后置
 
@@ -179,6 +179,14 @@
 | 设备端插件加载修复 + auto_tuning 暴露 | 2026-08-01 | ✅ versionCode 10 |
 | 废弃旧调律工作流脚本 | 2026-08-01 | ✅ 发现层清理 |
 | Android 配置架构重构 | 2026-07-31 | ✅ versionCode 9 |
+| i18n 缺失翻译全量补全（missing 棘轮清零） | 2026-08-27 | ✅ 顺带修复装备 OCR 解析误包 tr() 的 bug |
+| config/remote 在线配置下发 + content_version 仲裁 | 2026-08-27 | ✅ 场景/布局/调律规则接入 |
+| session.json 结构梳理（yysls 节点迁移、用户名校验） | 2026-08-27 | ✅ |
+| 场景编辑器拖拽死区 | 2026-08-28 | ✅ 修复点击误触发 local 影子写盘 |
+| Profile 总览：note 模型上限展示 + 单元格双击编辑 bug | 2026-08-28 | ✅ |
+| OCR 对话框清洗规则改为显式保存（去掉打开即写盘） | 2026-08-28 | ✅ |
+| 自动购买不肝：翻页适配 + 购买项参数化 | 2026-08-28 | ✅ |
+| DSL 控制流文档拆分（05 → 05.1-05.3） | 2026-08-28 | ✅ |
 
 ---
 
@@ -217,7 +225,7 @@
 
 ### 下一次审查
 
-**日期**: 2026-08-30 (一周后)
+**日期**: 2026-09-04 (一周后)
 
 **检查点**:
 - [ ] 设备端手势真机验证是否启动
@@ -229,6 +237,6 @@
 ## 相关文档引用
 
 - 开发日志：[docs/40-development/2026-08/](docs/40-development/2026-08/)
-- Android 进度：[docs/20-requirements/todo-android.md](docs/20-requirements/todo-android.md)
-- macOS 进度：[docs/20-requirements/todo-mac.md](docs/20-requirements/todo-mac.md)
+- Android 进度：[docs/00-meta/platforms/android.md](docs/00-meta/platforms/android.md)
+- macOS 进度：[docs/00-meta/platforms/macos.md](docs/00-meta/platforms/macos.md)
 - 架构文档：[docs/30-architecture/](docs/30-architecture/)

@@ -18,7 +18,7 @@
 
 | 子需求 | 文档 | 核心能力 | 优先级 | 状态 |
 |--------|------|----------|--------|------|
-| 玩家数据模型 | 本文档 §3-§7 | quota/regen/stock 三模型 + SQLite + UI | P0 | ✅ 已完成 |
+| 玩家数据模型 | 本文档 §3-§7 | quota/regen/stock/note 四模型 + SQLite + UI | P0 | ✅ 已完成 |
 | 毕业率分析 | [01-graduation-rate.md](02-player-profile/01-graduation-rate.md) | 角色信息采集 → Excel 计算 → 毕业率展示 | P2 | 🔲 未开始 |
 | 货币追踪 | [02-currency-tracking.md](02-player-profile/02-currency-tracking.md) | 货币 OCR 识别 → 历史趋势 → 资产面板 | P1 | 🔲 未开始 |
 | 心力体力管理 | [03-stamina-management.md](02-player-profile/03-stamina-management.md) | 资源监控 → 恢复预测 → 超标预警 | P0 | ✅ 已完成（基础框架） |
@@ -26,7 +26,8 @@
 ### 2.1 已完成功能（v0.2.0+）
 
 **数据模型层**
-- 三模型架构：quota（配额/周期任务）、regen（再生/恢复状态）、stock（存量/资源计数）
+- 四模型架构：quota（配额/周期任务）、regen（再生/恢复状态）、stock（存量/资源计数）、
+  note（自由文本备注——非数值状态，如「主玩会心双刀」这类无法归入前三种数值模型的标记）
 - SQLite 持久化：`config/session/profile.db`（WAL 模式 + busy_timeout）
 - 变更历史：`profile_history` 表记录所有变更（action/manual/tick 三类）
 - 周期自动重置：quota 到期自动清零，支持 day/week/month/season/half_season
@@ -128,19 +129,24 @@
 
 ```
 src/lvjiang/apps/yysls/
-├── config/                    # 配置模块（统一管理游戏配置 + 玩家元数据）
-│   ├── constants.py           # 游戏常量
-│   ├── manager.py             # 游戏配置管理器
-│   ├── models.py              # 游戏配置模型
-│   ├── profile_models.py      # 玩家数据模型定义（QuotaKeyDef/RegenKeyDef/StockKeyDef）
-│   ├── profile_store.py       # 档案总览会话数据存储（分组配置、提醒历史）
-│   └── user_profile.py        # 玩家数据模型配置加载（profile.yaml）
-├── profile/                   # 玩家档案核心
+├── config/
+│   ├── profile_models.py      # 玩家数据模型定义（QuotaKeyDef/RegenKeyDef/StockKeyDef/NoteKeyDef）
+│   ├── profile_store.py       # session.json 的 profile 节点（总览分组配置）
+│   └── user_profile.py        # profile.yaml 加载（ProfileSchema）
+├── core/profile_engine/        # 玩家档案核心
 │   ├── profile_db.py          # SQLite 存储层（profile_entries + profile_history）
-│   └── profile_engine.py      # 后台计算引擎（周期重置 + 再生计算 + 预警）
-└── ui/
-    ├── profile_tab.py         # 档案总览 + 其他信息 Tab
-    └── profile_settings_dialog.py  # 定义面板（编辑 key 定义）
+│   ├── profile_engine.py      # 后台计算引擎（QThread：周期重置 + 再生计算 + 预警）
+│   ├── profile_ops.py         # profile_action() / profile_read()：DSL 内置函数的读写实现
+│   ├── regen_math.py          # realtime / boundary 两种再生的数值计算
+│   └── sync_engine.py         # sync_targets 触发器同步
+└── ui/profile/
+    ├── overview.py             # 档案总览 Tab（宽表 + 分组）
+    ├── cell_editing.py         # 单元格双击编辑、右键菜单、回写
+    ├── cell_formatting.py      # 单元格显示文本/样式/tooltip（含 X/Y 上限展示）
+    ├── settings_dialog.py      # 定义面板（ProfileDefinitionDialog，按模型分 Tab）
+    ├── dialogs.py              # 历史记录对话框、数值输入对话框
+    ├── column_management.py    # 分组/列配置
+    └── tab.py                  # 顶层用户工具栏共用组件
 ```
 
 ### 3.3 存储方案
@@ -197,7 +203,19 @@ stock:
 - key: changmingyu
   label: 长鸣玉
   steps: [-200, -400]
+
+note:
+- key: build_note
+  label: 配装定位
+  cap: 7            # 可选：note 也能配上限/软上限/展示上限
+  show_cap: true    # 值是数字才显示 X/Y；"主玩会心双刀" 这类文本不受影响，原样显示
 ```
+
+**note 与其余三个模型的区别**：存的是自由文本而非数值，不进 `profile_history`
+的数值变更轨迹，也不参与 `sync_targets` 同步。`cap`/`soft`/`show_cap` 字段
+仍然可选：填的值能转成数字时按数值语义取整、按上限截断，展示上限时给出
+`X/Y`；填的是纯文本（如「已完成」）则原样存、原样显示，不强行套上限——
+真要按数量管理应该用 stock 而不是 note。
 
 **profile.db schema**：
 
@@ -205,7 +223,7 @@ stock:
 -- 当前值（upsert 覆盖）
 CREATE TABLE profile_entries (
     username   TEXT NOT NULL,
-    type       TEXT NOT NULL,  -- quota/regen/stock
+    type       TEXT NOT NULL,  -- quota/regen/stock/note
     key        TEXT NOT NULL,
     value      REAL NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT '',
@@ -253,7 +271,7 @@ CREATE TABLE profile_history (
 
 ### 4.2 其他信息 Tab（已实现）
 
-按模型类型分区展示当前用户的详细信息：
+按模型类型分区展示当前用户的详细信息（分区顺序：配额 → 库存 → 再生 → 备注）：
 
 ```
 ┌─────────────────────────────────────────┐
@@ -261,12 +279,15 @@ CREATE TABLE profile_history (
 │  袅袅进度: 2/3  ████████░░  67%         │
 │  不肝进度: 12000/23000  ████████░░  52% │
 ├─────────────────────────────────────────┤
+│  库存（stock）                           │
+│  袅袅之音: 12  宝钱: 1.2万  长鸣玉: 450 │
+├─────────────────────────────────────────┤
 │  再生（regen）                           │
 │  体力: 1800/2500  ████████████░░  72%   │
 │  心力: 450/600  ████████████████░░  75% │
 ├─────────────────────────────────────────┤
-│  存量（stock）                           │
-│  袅袅之音: 12  宝钱: 1.2万  长鸣玉: 450 │
+│  备注（note）                            │
+│  配装定位: 主玩会心双刀                  │
 └─────────────────────────────────────────┘
 ```
 

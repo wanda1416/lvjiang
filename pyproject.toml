@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lvjiang"
-version = "0.7.1"
+version = "0.8.0"
 description = "通用视觉 RPA 引擎（支持插件扩展，燕云十六声装备调律工具）"
 requires-python = ">=3.10"
 dependencies = [
@@ -72,6 +72,14 @@ ignore = ["E501"]
 [tool.mypy]
 files = ["src"]
 ignore_missing_imports = true
+# 钉住版本，不跟开发机解释器走。不钉这一条，开发机用 3.13 就看不见
+# 「只在 3.13 存在的 stdlib 参数」——Android 侧 Chaquopy 固定 3.10，
+# 这类调用在那里是运行期 TypeError，本地却全绿（见 versioning 的
+# read_text(newline=)）。
+# 取 3.12 与 CI 对齐：真正的下限是 3.10，但 numpy 自带的 .pyi 要求
+# >=3.12，钉 3.10 会卡在 numpy 存根上检查不下去。3.12 已能挡住
+# 3.13-only 的 API；3.10/3.11 特有的差异仍需靠 CI 与实机覆盖。
+python_version = "3.12"
 # attr-defined/has-type：Mixin 拆分架构下宿主属性在组装类才存在，
 # 单文件视角必然报未定义，属架构噪音；待 Protocol 声明宿主接口后再启用
 disable_error_code = ["attr-defined", "has-type", "annotation-unchecked"]

@@ -85,7 +85,7 @@ def main() -> int:
     missing: list[Path] = []
     written: list[Path] = []
     for path in iter_versioned_files(_REPO_ROOT / "config" / "system"):
-        text = path.read_text(encoding="utf-8", newline="")
+        text = path.read_bytes().decode("utf-8")  # newline= 是 3.13+
         if _has_version(path, text):
             continue
         missing.append(path)

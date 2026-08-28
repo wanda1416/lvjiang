@@ -87,12 +87,12 @@ class HotkeyConfig:
     主窗口重建 pynput 全局监听并立即生效。
     """
     start: str = "F9"    # 开始执行工作流
-    pause: str = "F8"    # 暂停 / 恢复
+    pause: str = "F11"   # 暂停 / 恢复
     stop: str = "F10"    # 停止 / 结束
     record: str = "F12"  # 脚本录制；仅在录制对话框打开期间临时全局注册
 
     def __post_init__(self):
-        defaults = {"start": "F9", "pause": "F8", "stop": "F10", "record": "F12"}
+        defaults = {"start": "F9", "pause": "F11", "stop": "F10", "record": "F12"}
         for name, default in defaults.items():
             value = str(getattr(self, name) or "").strip().upper()
             setattr(self, name, value if value in _VALID_HOTKEYS else default)

@@ -277,7 +277,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         super().is_stopped 放在前面求值：它内部会先过暂停检查点
         （_wait_if_paused），若放在 or 后面，一旦材料耗尽，短路求值会
-        跳过暂停阻塞——用户此时按 F8 暂停会被静默吞掉，直接当结束处理。
+        跳过暂停阻塞——用户此时按暂停热键会被静默吞掉，直接当结束处理。
         """
         return super().is_stopped or self.executor.materials_exhausted
 

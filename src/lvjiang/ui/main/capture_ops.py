@@ -40,7 +40,7 @@ def _cap_divider() -> QFrame:
 
 
 # 各状态按钮配色
-_STYLE_RECORD_IDLE = _cap_btn_style("#607D8B")   # 蓝灰（与 F8 录制一致）
+_STYLE_RECORD_IDLE = _cap_btn_style("#607D8B")   # 蓝灰（与脚本录制按钮一致）
 _STYLE_RECORD_STOP = _cap_btn_style("#d32f2f")   # 红色（录制中 → 停止）
 _STYLE_PAUSE = _cap_btn_style("#455A64")
 _STYLE_SNAP = _cap_btn_style("#2196F3")

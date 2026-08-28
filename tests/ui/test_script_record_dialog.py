@@ -391,8 +391,8 @@ class TestPress:
         ]
 
     def test_reserved_hotkeys_never_recorded(self):
-        """F8/F9/F10/F12 是录制器自身的全局热键，不应被误录成 press 语句"""
-        for name in ("f8", "f9", "f10", "f12"):
+        """F9/F10/F11/F12 是录制器自身的全局热键，不应被误录成 press 语句"""
+        for name in ("f9", "f10", "f11", "f12"):
             lines: list[str] = []
             rec = _make_recorder(lines)
             rec._recording = True

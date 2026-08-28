@@ -145,10 +145,24 @@ def version_from_text(text: str, suffix: str) -> int | None:
     return _version_from_yaml(text)
 
 
+def read_text_preserving_eol(path: Path) -> str:
+    """按原样读出文本，**不做换行转换**（CRLF 原封保留）。
+
+    不能用 ``path.read_text(newline="")``：``read_text`` 的 ``newline``
+    参数是 Python 3.13 才加的，而本仓库 requires-python 为 >=3.10、
+    Android 侧 Chaquopy 固定跑 3.10，在那里会直接 TypeError。
+
+    换行必须原样保留：``_with_version_json`` 靠 ``"\r\n" in text`` 判断原
+    文件的行尾，若被默认的通用换行模式翻成 ``\n``，CRLF 的出厂配置每次盖
+    版本号都会被改写成 LF，产生整文件 diff。
+    """
+    return path.read_bytes().decode("utf-8")
+
+
 def read_version(path: Path) -> int | None:
     """从文件读 content_version；读不到（不存在/损坏/缺字段）返回 None。"""
     try:
-        text = path.read_text(encoding="utf-8", newline="")
+        text = read_text_preserving_eol(path)
     except (OSError, UnicodeDecodeError):
         return None
     return version_from_text(text, path.suffix)
@@ -223,7 +237,7 @@ def next_version_for_write(rel_path: str, new_text: str,
     old_text = ""
     if current_path is not None and current_path.exists():
         try:
-            old_text = current_path.read_text(encoding="utf-8", newline="")
+            old_text = read_text_preserving_eol(current_path)
         except (OSError, UnicodeDecodeError):
             old_text = ""
 

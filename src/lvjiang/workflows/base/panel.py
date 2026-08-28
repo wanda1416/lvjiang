@@ -6,6 +6,7 @@ from loguru import logger
 
 from ...i18n import tr
 from ..align import GridAlignment, _make_even_alignment, detect_grid
+from ..runtime_layout import require_enabled
 
 if TYPE_CHECKING:
     import numpy as np
@@ -19,7 +20,10 @@ class _PanelMixin:
     def _find_panel(self, scene_key: str, panel_key: str):
         """在 layout 中查找 panel 实例"""
         panels = self._layout.get_scene_panels(scene_key)
-        return next((p for p in panels if p.key == panel_key), None)
+        panel = next((p for p in panels if p.key == panel_key), None)
+        if panel is not None:
+            require_enabled(panel, scene_key, "panel")
+        return panel
 
     def _capture_panel_image(self, panel_obj) -> "np.ndarray | None":
         """截取 panel 区域图像"""

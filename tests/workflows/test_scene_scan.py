@@ -402,6 +402,68 @@ def test_disabled_arrow_key_does_not_raise(tmp_path):
     engine.execute(wf)
 
 
+# 静态检查允许 disabled 绑定存在；只有真正执行到该实例时才报错。
+
+@pytest.mark.parametrize(
+    ("statement", "kind", "expected"),
+    [
+        ("click [game_main_page].[target]", "region", "区域"),
+        ("click [game_main_page].[target]", "point", "坐标点"),
+        ("align [game_main_page].[target]", "panel", "面板"),
+        ("drag [game_main_page].[target]", "arrow", "方向"),
+    ],
+)
+def test_runtime_access_to_disabled_layout_item_raises(
+    tmp_path, statement, kind, expected,
+):
+    """执行期选中 disabled 对象时，在读取其坐标前中断。"""
+    wf = _write_wf(tmp_path, statement + "\n")
+    kwargs = {
+        "regions": None,
+        "points": None,
+        "panels": None,
+        "arrows": None,
+    }
+    item = SimpleNamespace(
+        key="target", disabled=True,
+        x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
+        cx_ratio=0.0, cy_ratio=0.0, r_ratio=0.01,
+        from_key="start", to_key=None,
+    )
+    if kind == "region":
+        kwargs["regions"] = {"game_main_page": item}
+    else:
+        kwargs[f"{kind}s"] = {"game_main_page": [item]}
+    if kind == "arrow":
+        kwargs["points"] = {
+            "game_main_page": [SimpleNamespace(key="start", disabled=False)]
+        }
+
+    engine = _make_engine(bound_scenes=set(), **kwargs)
+    with pytest.raises(
+        WorkflowUserError,
+        match=rf"{expected}.*\[game_main_page\]\.\[target\].*已禁用",
+    ):
+        engine.execute(wf)
+
+
+def test_whole_scene_scan_ignores_disabled_region(tmp_path):
+    """未列字段是便捷全扫，disabled region 应视为当前布局不存在。"""
+    wf = _write_wf(tmp_path, "scan [game_main_page] as $result\n")
+    disabled_region = SimpleNamespace(
+        key="hidden", disabled=True,
+        x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
+    )
+    engine = _make_engine(
+        bound_scenes=set(),
+        regions={"game_main_page": disabled_region},
+    )
+
+    engine.execute(wf)
+    assert engine.variables["result"] == {}
+    assert engine._coord_meta["result"] == {}
+
+
 def test_non_disabled_key_still_raises(tmp_path):
     """未绑定的 key 仍然报错（disabled 的是别的 key）"""
     wf = _write_wf(tmp_path, (

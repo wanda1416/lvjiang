@@ -16,6 +16,8 @@
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from loguru import logger
 
 from ..core.config.resolver import get_resolver
@@ -140,3 +142,46 @@ def list_exposed_scripts() -> list[dict]:
         cfg["scope"] = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
         result.append(cfg)
     return result
+
+
+def resolve_workflow_path(
+    wf_file: str, script_id: str = "",
+) -> tuple[Path | None, str]:
+    """解析 ``.wf`` 实际路径，返回 ``(路径, 生效的 wf_file)``。
+
+    缓存的 ``wf_file`` 失效时按 ``script_id`` 重新发现一次：升级期间调用方
+    可能还攥着迁移前的路径，重新发现能把同一脚本 ID 校正到新目录，同时不
+    掩盖文件确实缺失的情况（两次都找不到就返回 ``None``）。
+    """
+    resolver = get_resolver()
+
+    def _resolve(candidate: str) -> Path | None:
+        if not candidate:
+            return None
+        path = Path(candidate)
+        if path.is_absolute():
+            return path if path.is_file() else None
+        found = resolver.resolve_read(f"workflows/{candidate}")
+        return (Path(found)
+                if found is not None and Path(found).is_file() else None)
+
+    path = _resolve(wf_file)
+    if path is not None:
+        return path, wf_file
+    if not script_id:
+        return None, wf_file
+
+    fresh = next(
+        (cfg for cfg in discover_scripts()
+         if cfg.get("id") == script_id and cfg.get("wf_file")),
+        None,
+    )
+    if fresh is None:
+        return None, wf_file
+    fresh_file = str(fresh["wf_file"])
+    path = _resolve(fresh_file)
+    if path is None:
+        return None, wf_file
+    if fresh_file != wf_file:
+        logger.info(f"工作流路径已刷新: {wf_file or '<空>'} -> {fresh_file}")
+    return path, fresh_file

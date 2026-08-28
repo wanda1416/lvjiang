@@ -20,8 +20,9 @@ def test_stale_workflow_path_is_refreshed_by_script_id(tmp_path, monkeypatch):
     resolver = _Resolver({"workflows/standalone/demo.wf": wf_path})
     flow_cfg = {"id": "demo", "wf_file": "demo.wf"}
 
+    # 路径自愈已下沉到 workflows.discovery，日常页与批量页共用一份。
     monkeypatch.setattr(
-        "lvjiang.ui.main.run_control.get_resolver", lambda: resolver)
+        "lvjiang.workflows.discovery.get_resolver", lambda: resolver)
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.discover_scripts",
         lambda: [{"id": "demo", "wf_file": "standalone/demo.wf"}],

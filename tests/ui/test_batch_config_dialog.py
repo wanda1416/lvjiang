@@ -192,3 +192,110 @@ def test_username_column_delete_action_is_disabled(qtbot, monkeypatch):
         action for action in captured if action.text() == "删除当前列"
     )
     assert delete_action.isEnabled() is False
+
+
+# ─── 行勾选状态随行搬运 ──────────────────────────────────
+
+
+def _rows_dialog(qtbot, monkeypatch, flags):
+    """三行配置 + 给定的勾选状态，返回 (dialog, saved) 。"""
+    item = BatchConfigItem(
+        name="账号表",
+        columns=["role"],
+        user_column="role",
+        rows=[{"role": "甲"}, {"role": "乙"}, {"role": "丙"}],
+    )
+    saved: dict[str, list[bool]] = {}
+    monkeypatch.setattr(
+        "lvjiang.core.batch_config.load_enabled_rows",
+        lambda: {item.name: list(flags)},
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_enabled_rows",
+        lambda: {item.name: list(flags)},
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.save_enabled_rows",
+        lambda value: saved.update(value),
+    )
+    return _dialog(qtbot, monkeypatch, item), saved, item
+
+
+def test_moving_a_row_carries_its_enabled_flag(qtbot, monkeypatch):
+    """乙 被禁用；把 丙 上移一格后，禁用的仍必须是 乙，不能挪到别人头上。"""
+    dialog, saved, item = _rows_dialog(
+        qtbot, monkeypatch, [True, False, True]
+    )
+
+    dialog._table.setCurrentCell(2, 0)   # 选中 丙
+    dialog._move_row(-1)                 # 丙 ↑ → 甲 丙 乙
+    dialog._save_current_config()
+
+    assert [row["role"] for row in item.rows] == ["甲", "丙", "乙"]
+    # 勾选状态跟着行走：仍然只有 乙 是禁用的。
+    assert saved["账号表"] == [True, True, False]
+
+
+def test_deleting_a_row_removes_its_flag_not_a_neighbour_s(qtbot, monkeypatch):
+    """删掉 甲 后，禁用的仍必须是 乙。"""
+    dialog, saved, item = _rows_dialog(
+        qtbot, monkeypatch, [True, False, True]
+    )
+
+    dialog._table.setCurrentCell(0, 0)
+    dialog._on_delete_row()
+    dialog._save_current_config()
+
+    assert [row["role"] for row in item.rows] == ["乙", "丙"]
+    assert saved["账号表"] == [False, True]
+
+
+def test_added_row_defaults_to_enabled(qtbot, monkeypatch):
+    dialog, saved, item = _rows_dialog(
+        qtbot, monkeypatch, [True, False, True]
+    )
+
+    dialog._on_add_row()
+    dialog._save_current_config()
+
+    assert saved["账号表"] == [True, False, True, True]
+
+
+def test_save_does_not_revert_concurrent_script_id_changes(qtbot, monkeypatch):
+    """对话框开着时热键启动批量写了 script_ids，保存不能把它退回去。"""
+    item = BatchConfigItem(name="账号表", columns=["role"], rows=[])
+    opened = BatchConfig(
+        configs={item.name: item}, active_config=item.name, script_ids=["旧"]
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config",
+        lambda: opened,
+    )
+    dialog = BatchConfigDialog()
+    qtbot.addWidget(dialog)
+
+    # 对话框打开期间，别处把 script_ids 改了。
+    latest = BatchConfig(
+        configs={item.name: item}, active_config=item.name,
+        script_ids=["新A", "新B"],
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config",
+        lambda: latest,
+    )
+    saved: list[BatchConfig] = []
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.save_batch_config", saved.append
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.save_enabled_rows",
+        lambda _v: None,
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_enabled_rows", dict
+    )
+
+    dialog._on_save()
+
+    assert saved[-1].script_ids == ["新A", "新B"]
+    assert saved[-1].configs is opened.configs

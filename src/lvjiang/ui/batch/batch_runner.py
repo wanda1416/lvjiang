@@ -19,7 +19,6 @@ import json
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Callable
 
 from loguru import logger
@@ -93,7 +92,9 @@ class BatchWorker(QThread):
         log(str): 日志行（由 host 转发到日志面板）
         finished_all(dict): 全部结束，携带汇总
     """
-    progress = pyqtSignal(str, str, str)
+    # (run_idx, 条目标签, script_id, 状态)：run_idx 是 enabled_rows 的
+    # 位置，进度表按它直接定位，不靠标签文本匹配（标签会重名）。
+    progress = pyqtSignal(int, str, str, str)
     log = pyqtSignal(str)
     finished_all = pyqtSignal(dict)
 
@@ -167,7 +168,7 @@ class BatchWorker(QThread):
                     report.record_prepare(ST_SKIPPED)
                     report.end_entry()
                     for script in self._scripts:
-                        self.progress.emit(label, script.id, ST_SKIPPED)
+                        self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
 
         for run_idx, (row_idx, row_data) in enumerate(self._enabled_rows):
             if not can_run:
@@ -204,7 +205,7 @@ class BatchWorker(QThread):
                     report.end_entry()
                     for s in self._scripts:
                         entry_result["scripts"][s.id] = ST_SKIPPED
-                        self.progress.emit(label, s.id, ST_SKIPPED)
+                        self.progress.emit(run_idx, label, s.id, ST_SKIPPED)
                     self.log.emit(self._stage_message(label, prepared))
                     if prepared.status == RESULT_STOPPED:
                         self._stopped = True
@@ -225,13 +226,13 @@ class BatchWorker(QThread):
                     self._stopped = True
                     break
 
-                self.progress.emit(label, script.id, ST_RUNNING)
+                self.progress.emit(run_idx, label, script.id, ST_RUNNING)
                 self.log.emit(f"[批量] {label} → {script.name} ...")
                 report.start_script(script.id, script.name)
                 try:
                     result = self._run_script(script, session, username)
                     entry_result["scripts"][script.id] = ST_SUCCESS
-                    self.progress.emit(label, script.id, ST_SUCCESS)
+                    self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
                     self.log.emit(f"[批量] {label} → {script.name} 完成")
                     report.end_script(ST_SUCCESS, result)
                     any_success = True
@@ -240,7 +241,7 @@ class BatchWorker(QThread):
                     tb = traceback.format_exc()
                     logger.error(f"批量执行 {label}/{script.name} 异常:\n{tb}")
                     entry_result["scripts"][script.id] = ST_FAILED
-                    self.progress.emit(label, script.id, ST_FAILED)
+                    self.progress.emit(run_idx, label, script.id, ST_FAILED)
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
                     report.end_script(ST_FAILED)
 
@@ -504,13 +505,12 @@ class BatchWorker(QThread):
             )
             return engine.execute(wf_instance, initial_variables=params)
 
-        # DSL 工作流
-        wf_path = Path(script.wf_file)
-        if not wf_path.is_absolute():
-            resolved = get_resolver().resolve_read(f"workflows/{script.wf_file}")
-            if resolved is None:
-                raise FileNotFoundError(f"工作流文件不存在: {script.wf_file}")
-            wf_path = resolved
+        # DSL 工作流。批量页的候选快照可能滞后于脚本发现（升级迁移、
+        # 「脚本配置」改动），所以和日常页一样按 id 自愈一次再判缺失。
+        from ...workflows.discovery import resolve_workflow_path
+        wf_path, _resolved = resolve_workflow_path(script.wf_file, script.id)
+        if wf_path is None:
+            raise FileNotFoundError(f"工作流文件不存在: {script.wf_file}")
         return engine.execute(wf_path, initial_variables=params)
 
     @staticmethod

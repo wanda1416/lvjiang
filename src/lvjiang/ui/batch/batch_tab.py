@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from loguru import logger
 from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -32,10 +33,12 @@ from PyQt6.QtWidgets import (
 
 from ...core.batch_config import (
     BatchConfigItem,
+    config_enabled_flags,
     load_batch_config,
+    load_enabled_rows,
     save_batch_config,
+    save_enabled_rows,
 )
-from ...core.config.session import get_session_store
 from ...i18n import tr
 from ..theme import get_theme_manager
 from .batch_runner import (
@@ -99,26 +102,6 @@ def _four_cjk_column_width(widget: QWidget) -> int:
     )
 
 
-# ─── enabled 用户态（session.json）──────────────────────────
-
-
-def _load_enabled_rows() -> dict[str, list[bool]]:
-    """从 session.json 读取各配置的 enabled 状态"""
-    batch = get_session_store().get_node("batch", {})
-    if not isinstance(batch, dict):
-        return {}
-    return batch.get("enabled_rows", {})
-
-
-def _save_enabled_rows(enabled_rows: dict[str, list[bool]]) -> None:
-    """保存 enabled 状态到 session.json 的 batch.enabled_rows（不影响其他节点）"""
-    get_session_store().mutate_node(
-        "batch",
-        lambda old: {**(old if isinstance(old, dict) else {}),
-                     "enabled_rows": enabled_rows},
-    )
-
-
 class BatchTab(QWidget):
     """批量执行页面
 
@@ -131,6 +114,7 @@ class BatchTab(QWidget):
         self._host = host
         self._running = False
         self._progress_column_resize_guard = False
+        self._progress_row_index: dict[tuple[int, str], int] = {}
         self._setup_ui()
 
         # 宿主状态信号
@@ -252,6 +236,8 @@ class BatchTab(QWidget):
         layout.addWidget(self._script_list, stretch=1)
 
         self._script_order: list[str] = []
+        self._script_candidate_order: list[str] = []
+        self._missing_script_ids: list[tuple[int, str]] = []
         self._script_configs_by_id: dict[str, dict] = {}
         self._updating_script_list = False
         self._update_script_move_buttons()
@@ -454,15 +440,13 @@ class BatchTab(QWidget):
             return
 
         # 加载 enabled 状态
-        enabled_rows = _load_enabled_rows()
-        config_enabled = enabled_rows.get(config.name, [True] * len(config.rows))
+        config_enabled = config_enabled_flags(config)
 
         for i, row_data in enumerate(config.rows):
             label = self._format_row_label(config, row_data)
             cb = QCheckBox(label)
             cb.setFixedHeight(_batch_list_row_height(cb))
-            checked = config_enabled[i] if i < len(config_enabled) else True
-            cb.setChecked(checked)
+            cb.setChecked(config_enabled[i])
             cb.stateChanged.connect(self._on_entry_check_changed)
             self._entry_container.addWidget(cb)
             self._entry_checkboxes.append((cb, i))
@@ -478,21 +462,20 @@ class BatchTab(QWidget):
 
     def _on_entry_check_changed(self):
         """行勾选变更 → 保存到 session.json（用户态）"""
-        config_name = self._current_config_name()
-        if not config_name:
-            return
-
-        enabled_rows = _load_enabled_rows()
         config = load_batch_config().get_active()
         if not config:
             return
 
+        enabled_rows = load_enabled_rows()
         enabled_list = [False] * len(config.rows)
         for cb, idx in self._entry_checkboxes:
             if 0 <= idx < len(enabled_list):
                 enabled_list[idx] = cb.isChecked()
-        enabled_rows[config_name] = enabled_list
-        _save_enabled_rows(enabled_rows)
+        # 键统一用 config.name——读侧（config_enabled_flags）就是按它取的。
+        # 这里若改用下拉框文本（即 configs 的 dict key），两者一旦分叉就会
+        # 写进一个没人读的键，表现为「改了不生效、重开就还原」。
+        enabled_rows[config.name] = enabled_list
+        save_enabled_rows(enabled_rows)
 
     def _set_all_entries_checked(self, checked: bool):
         """全选/全不选行"""
@@ -507,12 +490,11 @@ class BatchTab(QWidget):
         if not config:
             return []
 
-        enabled_rows = _load_enabled_rows()
-        config_enabled = enabled_rows.get(config.name, [True] * len(config.rows))
+        config_enabled = config_enabled_flags(config)
 
         result = []
         for i, row_data in enumerate(config.rows):
-            if i < len(config_enabled) and config_enabled[i]:
+            if config_enabled[i]:
                 result.append((i, row_data))
         return result
 
@@ -536,11 +518,21 @@ class BatchTab(QWidget):
         except Exception:
             configs = []
         self._script_configs_by_id = {cfg["id"]: cfg for cfg in configs}
+        self._script_candidate_order = [cfg["id"] for cfg in configs]
         self._script_order = []
-        for script_id in checked_ids:
-            if script_id in self._script_configs_by_id \
-                    and script_id not in self._script_order:
+        # 勾选过、但此刻发现不到的脚本（被删、取消暴露、改成 dedicated、
+        # 挪进 standalone/…）。它们不参与本次执行，但必须原位留在
+        # script_ids 里：顺手抹掉的话，脚本一恢复暴露，用户排好的顺序和
+        # 勾选就再也回不来了，而且全程没有任何提示。
+        self._missing_script_ids = []
+        for index, script_id in enumerate(checked_ids):
+            if script_id in self._script_order:
+                continue
+            if script_id in self._script_configs_by_id:
                 self._script_order.append(script_id)
+            else:
+                self._missing_script_ids.append((index, script_id))
+        self._warn_missing_scripts()
 
         # 脚本与配置两页使用同一行高，避免树控件按字体最小高度挤成一团。
         row_height = _batch_list_row_height(self._script_list)
@@ -557,6 +549,7 @@ class BatchTab(QWidget):
             item.setTextAlignment(1, Qt.AlignmentFlag.AlignCenter)
             self._script_list.addTopLevelItem(item)
         self._updating_script_list = False
+        self._reorder_script_rows()
         self._refresh_script_order_column()
         self._update_script_move_buttons()
 
@@ -579,9 +572,55 @@ class BatchTab(QWidget):
                 self._script_order.append(script_id)
         elif script_id in self._script_order:
             self._script_order.remove(script_id)
+        self._reorder_script_rows()
         self._refresh_script_order_column()
         self._persist_script_order()
         self._update_script_move_buttons()
+
+    def _reorder_script_rows(self):
+        """按执行顺序重排可见行：已勾选的在前，未勾选的按候选顺序在后。
+
+        可见行顺序就是执行顺序。少了这一步，「上移/下移」只会改动第二列
+        那个窄到看不见的序号，行本身纹丝不动——用户既以为按钮坏了，也无从
+        用肉眼校验自己排出来的顺序。
+        """
+        items_by_id: dict[str, QTreeWidgetItem] = {}
+        for index in range(self._script_list.topLevelItemCount()):
+            item = self._script_list.topLevelItem(index)
+            items_by_id[self._script_id(item)] = item
+        # 只排真正有行的 id：跳过一个缺行的 id 会让后续 target_index 整体
+        # 偏移一格，把「目标位之前均已就位」这个前提打破，反而排乱。
+        ordered_ids = [
+            script_id
+            for script_id in (
+                list(self._script_order) + self._script_candidate_order
+            )
+            if script_id in items_by_id
+        ]
+        ordered_ids = list(dict.fromkeys(ordered_ids))
+        current_id = self._script_id(self._script_list.currentItem())
+
+        self._updating_script_list = True
+        try:
+            for target_index, script_id in enumerate(ordered_ids):
+                item = items_by_id.get(script_id)
+                if item is None:
+                    continue
+                # 目标位之前均已就位，所以当前位不会小于目标位。
+                current_index = self._script_list.indexOfTopLevelItem(item)
+                if current_index != target_index:
+                    self._script_list.insertTopLevelItem(
+                        target_index,
+                        self._script_list.takeTopLevelItem(current_index),
+                    )
+        finally:
+            self._updating_script_list = False
+
+        # takeTopLevelItem 会清掉当前行，重排后需要把选中态放回原脚本，
+        # 否则连点两次「上移」第二次会因为没有选中项而静默失败。
+        moved = items_by_id.get(current_id)
+        if moved is not None:
+            self._script_list.setCurrentItem(moved)
 
     def _refresh_script_order_column(self):
         """第二列仅为已勾选脚本显示连续的 1..N。"""
@@ -597,10 +636,29 @@ class BatchTab(QWidget):
         finally:
             self._updating_script_list = False
 
+    def _warn_missing_scripts(self):
+        """勾选过但当前发现不到的脚本，必须明确告诉用户它不会执行。"""
+        if not self._missing_script_ids:
+            return
+        names = "、".join(script_id for _index, script_id in
+                          self._missing_script_ids)
+        message = tr("[批量] 以下已勾选脚本当前不可用，本次不会执行：") + names
+        logger.warning(message)
+        append_log = getattr(self._host, "append_log", None)
+        if callable(append_log):
+            append_log(message)
+
+    def _merged_script_ids(self) -> list[str]:
+        """当前执行顺序 + 暂时不可用的 id（按原位插回）。"""
+        merged = list(self._script_order)
+        for index, script_id in self._missing_script_ids:
+            merged.insert(min(index, len(merged)), script_id)
+        return merged
+
     def _persist_script_order(self):
         """立即保存勾选项及其执行顺序。"""
         cfg = load_batch_config()
-        cfg.script_ids = list(self._script_order)
+        cfg.script_ids = self._merged_script_ids()
         save_batch_config(cfg)
 
     def _move_selected_script(self, delta: int):
@@ -615,6 +673,7 @@ class BatchTab(QWidget):
         self._script_order[old_index], self._script_order[new_index] = (
             self._script_order[new_index], self._script_order[old_index]
         )
+        self._reorder_script_rows()
         self._refresh_script_order_column()
         self._persist_script_order()
         self._update_script_move_buttons()
@@ -682,7 +741,7 @@ class BatchTab(QWidget):
 
         # 保存脚本勾选到 batch_config
         cfg = load_batch_config()
-        cfg.script_ids = self._checked_script_ids()
+        cfg.script_ids = self._merged_script_ids()
         save_batch_config(cfg)
 
         # 构建进度表
@@ -699,7 +758,11 @@ class BatchTab(QWidget):
                               scripts: list[BatchScript]):
         """初始化进度表：行×脚本 全量行"""
         self._progress_table.setRowCount(0)
-        for _idx, row_data in enabled_rows:
+        # (run_idx, script_id) → 表行号。执行侧按同样的 行×脚本 顺序推进，
+        # 所以这个映射是精确的；靠标签文本反查则会在标签重名、或两边标签
+        # 算法不一致时把状态刷到别人的行上（甚至一行都刷不到）。
+        self._progress_row_index = {}
+        for run_idx, (_idx, row_data) in enumerate(enabled_rows):
             # 条目只显示 user_column 对应的值
             if config and config.user_column:
                 label = row_data.get(config.user_column, "")
@@ -708,6 +771,7 @@ class BatchTab(QWidget):
             label = str(label)
             for script in scripts:
                 row = self._progress_table.rowCount()
+                self._progress_row_index[(run_idx, script.id)] = row
                 self._progress_table.insertRow(row)
                 label_item = QTableWidgetItem(label)
                 label_item.setToolTip(label)
@@ -723,26 +787,23 @@ class BatchTab(QWidget):
         # Rows may make the vertical scrollbar appear, changing viewport width.
         QTimer.singleShot(0, self._set_progress_column_widths)
 
-    def update_progress(self, entry_label: str, script_id: str, status: str):
-        """更新进度表中匹配行的状态（由 host 调用）"""
-        script_name = script_id
-        cfg = self._script_configs_by_id.get(script_id)
-        if cfg:
-            script_name = cfg["name"]
-
-        for row in range(self._progress_table.rowCount()):
-            u_item = self._progress_table.item(row, 0)
-            s_item = self._progress_table.item(row, 1)
-            if u_item and u_item.text() == entry_label and \
-               s_item and s_item.text() == script_name:
-                status_item = QTableWidgetItem(status)
-                status_item.setToolTip(status)
-                color = _status_color(status)
-                if color:
-                    status_item.setBackground(color)
-                self._progress_table.setItem(row, 2, status_item)
-                self._progress_table.scrollToItem(status_item)
-                break
+    def update_progress(self, run_idx: int, entry_label: str,
+                        script_id: str, status: str):
+        """更新进度表中该 (条目, 脚本) 行的状态（由 host 调用）"""
+        row = self._progress_row_index.get((run_idx, script_id))
+        if row is None or row >= self._progress_table.rowCount():
+            logger.warning(
+                f"批量进度无处安放，已忽略: run_idx={run_idx} "
+                f"script_id={script_id} label={entry_label!r}"
+            )
+            return
+        status_item = QTableWidgetItem(status)
+        status_item.setToolTip(status)
+        color = _status_color(status)
+        if color:
+            status_item.setBackground(color)
+        self._progress_table.setItem(row, 2, status_item)
+        self._progress_table.scrollToItem(status_item)
 
     def _refresh_status_colors(self, _theme: str) -> None:
         """实时切换主题后重绘现有进度行。"""
@@ -765,6 +826,15 @@ class BatchTab(QWidget):
         self._refresh_config_combo()
         self._refresh_script_list()
         self._refresh_entry_list()
+
+    def refresh_scripts(self):
+        """脚本发现/暴露层变更后调用，只刷新脚本候选列表。
+
+        候选列表、显示名和 wf 路径都来自 ``list_exposed_scripts()``。不跟着
+        「脚本配置」重新拉一遍的话，批量页会一直拿着上次启动时的快照：改过
+        的显示名不更新，取消暴露的脚本仍留在列表里并且照跑不误。
+        """
+        self._refresh_script_list()
 
     # ─── 状态联动 ─────────────────────────────────────────
 

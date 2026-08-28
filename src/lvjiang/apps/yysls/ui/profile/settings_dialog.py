@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.button_styles import apply_button_style
 from ...config.profile_models import (
     ALL_MODELS,
     DIR_BOTH,
@@ -161,12 +162,13 @@ class _SyncTargetsWidget(QWidget):
         self._table.setColumnWidth(1, 120)
         self._table.setColumnWidth(2, 90)
         self._table.setColumnWidth(3, 120)
-        self._table.setColumnWidth(4, 30)
+        self._table.setColumnWidth(4, 44)
 
         layout.addWidget(self._table)
 
         btn_add = QPushButton("+ " + tr("添加同步目标"))
         btn_add.setFixedWidth(120)
+        apply_button_style(btn_add)
         btn_add.clicked.connect(lambda: self.add_row())
         layout.addWidget(btn_add)
 
@@ -226,7 +228,9 @@ class _SyncTargetsWidget(QWidget):
 
         # 删除按钮（点击时按 widget 反查行号，避免删行后行号错位）
         btn_remove = QPushButton("×")
-        btn_remove.setFixedWidth(30)
+        # 36 而不是 30：套上带边框+内边距的统一样式后 30 会把「×」挤掉
+        btn_remove.setFixedWidth(36)
+        apply_button_style(btn_remove, variant="danger")
         btn_remove.clicked.connect(
             lambda _checked, b=btn_remove: self._remove_row(self._row_of_widget(b))
         )
@@ -317,6 +321,10 @@ class _ModelTab(QWidget):
         btn_down.setFixedWidth(70)
         btn_down.clicked.connect(self._move_down)
         toolbar.addWidget(btn_down)
+
+        apply_button_style(btn_add)
+        apply_button_style(btn_del, variant="danger")
+        apply_button_style(btn_up, btn_down, variant="neutral")
 
         layout.addLayout(toolbar)
 
@@ -468,6 +476,9 @@ class ProfileDefinitionDialog(QDialog):
         btn_cancel.setFixedWidth(80)
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
+
+        apply_button_style(btn_ok)
+        apply_button_style(btn_cancel, variant="neutral")
 
         layout.addLayout(btn_row)
 
@@ -906,6 +917,8 @@ class ProfileDefinitionDialog(QDialog):
         btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
+        apply_button_style(btn_ok)
+        apply_button_style(btn_cancel, variant="neutral")
         layout.addRow(btn_row)
 
         # 错误提示

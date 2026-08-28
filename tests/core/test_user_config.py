@@ -50,6 +50,10 @@ class TestLoadUserConfig:
         assert config.reference_grid.width == 122
         assert config.input_sim.click_random_offset == 3
         assert config.delay_params == {}
+        assert config.hotkeys.start == "F9"
+        assert config.hotkeys.stop == "F10"
+        assert config.hotkeys.pause == "F11"
+        assert config.hotkeys.record == "F12"
 
     def test_hotkeys_only_allow_f7_through_f12(self, session_env, monkeypatch):
         """F1~F6 与现有菜单功能键隔离，非法值按动作回退默认。"""
@@ -57,7 +61,7 @@ class TestLoadUserConfig:
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
             "settings": {"hotkeys": {
-                "start": "F1", "pause": "F6", "stop": "F11", "record": "F7",
+                "start": "F1", "pause": "F6", "stop": "F10", "record": "F7",
             }}
         }), encoding="utf-8")
         reset_session_store()
@@ -65,8 +69,8 @@ class TestLoadUserConfig:
         config = load_user_config()
 
         assert config.hotkeys.start == "F9"
-        assert config.hotkeys.pause == "F8"
-        assert config.hotkeys.stop == "F11"
+        assert config.hotkeys.pause == "F11"
+        assert config.hotkeys.stop == "F10"
         assert config.hotkeys.record == "F7"
 
     def test_duplicate_hotkeys_fall_back_as_a_complete_set(
@@ -84,7 +88,7 @@ class TestLoadUserConfig:
         config = load_user_config()
 
         assert config.hotkeys.start == "F9"
-        assert config.hotkeys.pause == "F8"
+        assert config.hotkeys.pause == "F11"
         assert config.hotkeys.stop == "F10"
         assert config.hotkeys.record == "F12"
 

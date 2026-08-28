@@ -41,7 +41,7 @@ main_window:
   btn_load: Load
   group_params: Parameters
   label_log_level: Log Level
-  status_ready: Ready | F9 Start | F8 Pause/Resume | F10 Stop
+  status_ready: Ready | F9 Start | F11 Pause/Resume | F10 Stop
   label_no_window: No window selected
   label_preview_placeholder: Locate window to capture
   status_window_located: Window located
@@ -161,7 +161,7 @@ script_record:
   status_recording_high: Recording in high precision... writing raw input to one timeline; F12 or click to stop
   placeholder: |-
     Recorded output appears here (canvas-normalized coordinates, savable as .wf)
-    Low precision creates editable commands; high precision saves a raw input trace; F8/F9/F10/F12 are ignored
+    Low precision creates editable commands; high precision saves a raw input trace; F9/F10/F11/F12 are ignored
   status_done: Recording done. Edit and save as .wf
   status_done_empty: Recording ended, no valid actions captured
   status_copied: Copied to clipboard

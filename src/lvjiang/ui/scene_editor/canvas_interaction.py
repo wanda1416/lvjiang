@@ -40,6 +40,18 @@ class HandlePos(Enum):
 
 HANDLE_SIZE = 6  # 缩放手柄半尺寸
 SNAP_PIXELS = 6  # 吸附像素阈值（widget 像素）
+#: 拖拽死区（widget 像素）。按下到松开之间位移不超过它的，算"点了一下"而不是拖动。
+#:
+#: 真实鼠标在点击瞬间常有 1-2 px 抖动，触摸板更明显。没有死区时这一两个像素
+#: 会被当成一次真实拖动：区域坐标被改动 0.001 量级的归一化值——屏幕上根本
+#: 看不出来，用户也没打算改，却足以把场景标记为已修改，保存时整份写成 local
+#: 影子。而实体文件的 local 影子是**整文件遮盖**，此后该场景就再也收不到
+#: 出厂更新与在线下发了。所以这里宁可让 4 px 以内的微调作废（真要挪这么一点，
+#: 拖远再拖回来即可），也不能让误触悄悄冻结一个场景。
+#:
+#: 取 4 px 而不是 Qt 默认的 startDragDistance()（10 px）：后者是给"从控件里
+#: 拽出一个拖放"用的，对画布上的直接拖动来说太大，会把有意的小幅微调也吃掉。
+DRAG_DEAD_ZONE_PX = 4
 
 # 手柄光标映射
 HANDLE_CURSORS = {
@@ -65,6 +77,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _drag_handle: HandlePos | None
     _drag_start: QPointF
     _drag_orig: Region | None
+    _press_pos: QPointF | None
     _panning: bool
     _pan_start: QPointF
     _snap_lines_x: list[float]
@@ -257,6 +270,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             super().mousePressEvent(event)  # type: ignore[misc]
             return
         pos = event.position()
+        self._press_pos = pos
 
         # ── Panel 放置模式优先介入 ──
         if self._pending_panel_def is not None:
@@ -398,6 +412,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
         # ── Panel 移动/缩放拖拽 ──
         if self._panel_edit_mode is not None and self._panel_edit_orig is not None:
+            if not self._beyond_dead_zone(pos):
+                return  # 死区内：点击时的手抖不改数据
             p = self._panels[self._panel_selected_idx]
             o = self._panel_edit_orig
             dx_n, dy_n = self._widget_to_norm(pos)
@@ -418,6 +434,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
         # ── 画布编辑模式 ──
         if self._edit_mode == EditMode.CANVAS:
+            if (self._canvas_drag_mode in (DragMode.MOVING, DragMode.RESIZING)
+                    and not self._beyond_dead_zone(pos)):
+                return  # 死区内：点击时的手抖不改数据
             if self._canvas_drag_mode == DragMode.MOVING:
                 dx_s, dy_s = self._widget_to_norm(pos)
                 dx_s -= self._widget_to_norm(self._canvas_drag_start)[0]
@@ -448,6 +467,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.update()
 
         elif self._drag_mode == DragMode.MOVING:
+            if not self._beyond_dead_zone(pos):
+                return  # 死区内：点击时的手抖不改数据
             dx_n, dy_n = self._widget_to_norm(pos)
             dx_n -= self._widget_to_norm(self._drag_start)[0]
             dy_n -= self._widget_to_norm(self._drag_start)[1]
@@ -463,6 +484,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.update()
 
         elif self._drag_mode == DragMode.RESIZING:
+            if not self._beyond_dead_zone(pos):
+                return  # 死区内：点击时的手抖不改数据
             self._apply_resize(pos, event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
             self.update()
 
@@ -479,6 +502,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if event.button() != Qt.MouseButton.LeftButton:
             super().mouseReleaseEvent(event)  # type: ignore[misc]
             return
+        # 本次按下已结束，死区判定随之失效（下面各分支都不再用它）
+        self._press_pos = None
 
         # ── Panel 放置模式完成 ──
         if self._panel_drag_start is not None and self._pending_panel_def is not None:
@@ -877,6 +902,19 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self._panel_selected_idx = -1
         self._notify_panel_changed()
         self.update()
+
+    # ─── 拖拽死区 ────────────────────────────────────────
+
+    def _beyond_dead_zone(self, pos) -> bool:
+        """指针是否已离开按下点的死区（越过后才算真的在拖）。
+
+        死区内一律不改数据，越过后再按 ``_drag_orig`` + 完整位移一次算出
+        结果，所以不会出现"跨过阈值时跳一下"。理由见 DRAG_DEAD_ZONE_PX。
+        """
+        if self._press_pos is None:
+            return True
+        d = pos - self._press_pos
+        return (d.x() * d.x() + d.y() * d.y()) >= DRAG_DEAD_ZONE_PX * DRAG_DEAD_ZONE_PX
 
     # ─── 通知 ────────────────────────────────────────────
 

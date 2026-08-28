@@ -50,7 +50,7 @@ class TuningRouteStrategy(ABC):
 
     @abstractmethod
     def open_recycle_dialog(self) -> bool:
-        """打开装备回收确认弹窗。返回 True=已打开；False=未找到入口（装备保留）。"""
+        """打开装备回收确认弹窗。返回 False 表示当前环境未找到入口。"""
         raise NotImplementedError
 
     @abstractmethod
@@ -119,14 +119,11 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
     env = "desktop"
 
     def open_recycle_dialog(self) -> bool:
-        # 直接扫描功能区找「回收」→ 按 X 回收
+        # 桌面端回收始终由 X 触发；按键本身无副作用，无需先 OCR
+        # 判断功能区是否存在「回收」。是否真正打开回收弹窗，由
+        # TuningRecycler 紧接着识别 recycle_confirm 中的「确认」判定。
         wf = self._wf
-        # 同上：匹配游戏截屏 OCR 文字，不能过 tr()
-        key = wf.ocr_scene_by(wf.EQUIP_DETAIL, ["func_area"], "回收", "contains")
-        if not key:
-            logger.warning("桌面端：未找到回收按钮，装备保留")
-            return False
-        logger.info("  [桌面端] 找到回收入口，按 X 回收")
+        logger.info("  [桌面端] 按 X 回收")
         wf.press("X", wait=None)
         wf.wait_stable("page_refresh")  # 回收确认弹窗
         return True

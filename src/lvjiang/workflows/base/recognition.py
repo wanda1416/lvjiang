@@ -5,6 +5,7 @@ from loguru import logger
 
 from ...core.layout_models import CanvasConfig, FoundRegion, Region
 from ...i18n import tr
+from ..runtime_layout import enabled_regions, require_regions_enabled
 
 
 class _RecognitionMixin:
@@ -54,7 +55,7 @@ class _RecognitionMixin:
                 f"场景 {scene_key} 的区域未绑定坐标: {'、'.join(missing)}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
-        return [region_map[k] for k in field_keys]
+        return require_regions_enabled([region_map[k] for k in field_keys], scene_key)
 
     # ─── 截图与 OCR ────────────────────────────────────────
 
@@ -78,12 +79,14 @@ class _RecognitionMixin:
         regions = self._layout.get_scene_regions(scene_key)
         if field_keys:
             regions = self._require_regions(scene_key, field_keys, regions)
-        elif not regions:
-            logger.warning(f"场景 {scene_key} 没有定义区域")
-            return {}
+        else:
+            regions = enabled_regions(regions)
+            if not regions:
+                logger.warning(f"场景 {scene_key} 没有定义可用区域")
+                return {}
 
         result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key, min_confidence=min_confidence)
-        fields_display = field_keys if field_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
+        fields_display = field_keys if field_keys else [r.key for r in regions]
         logger.debug(f"OCR [{scene_key}]:{fields_display} => {result}")
         return result
 
@@ -118,9 +121,11 @@ class _RecognitionMixin:
         regions = self._layout.get_scene_regions(scene_key)
         if slot_keys:
             regions = self._require_regions(scene_key, slot_keys, regions)
-        elif not regions:
-            logger.warning(f"场景 {scene_key} 没有定义区域")
-            return {}, {}
+        else:
+            regions = enabled_regions(regions)
+            if not regions:
+                logger.warning(f"场景 {scene_key} 没有定义可用区域")
+                return {}, {}
 
         # 建立 region_map（供 coord_meta 存储）
         region_map = {r.key: r for r in regions}
@@ -155,7 +160,7 @@ class _RecognitionMixin:
                 f"label={info.label!r} confidence={info.confidence:.3f}"
             )
 
-        fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
+        fields_display = slot_keys if slot_keys else [r.key for r in regions]
         logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
@@ -197,9 +202,11 @@ class _RecognitionMixin:
         regions = self._layout.get_scene_regions(scene_key)
         if slot_keys:
             regions = self._require_regions(scene_key, slot_keys, regions)
-        elif not regions:
-            logger.warning(f"场景 {scene_key} 没有定义区域")
-            return {}, {}
+        else:
+            regions = enabled_regions(regions)
+            if not regions:
+                logger.warning(f"场景 {scene_key} 没有定义可用区域")
+                return {}, {}
 
         region_map = {r.key: r for r in regions}
         recognizer = self.reference_recognizer
@@ -238,7 +245,7 @@ class _RecognitionMixin:
                 f"label={info.label!r}"
             )
 
-        fields_display = slot_keys if slot_keys else [r.key for r in self._layout.get_scene_regions(scene_key)]
+        fields_display = slot_keys if slot_keys else [r.key for r in regions]
         logger.info(f"rich 匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
@@ -376,11 +383,11 @@ class _RecognitionMixin:
         if field_keys:
             # 按 field_keys 顺序识别，未绑定的 key 直接报错（否则会被当成未命中）
             ordered_regions = self._require_regions(scene_key, field_keys, regions)
-        elif not regions:
-            logger.warning(f"场景 {scene_key} 没有定义区域")
-            return ""
         else:
-            ordered_regions = regions
+            ordered_regions = enabled_regions(regions)
+            if not ordered_regions:
+                logger.warning(f"场景 {scene_key} 没有定义可用区域")
+                return ""
 
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
@@ -438,11 +445,11 @@ class _RecognitionMixin:
         regions = self._layout.get_scene_regions(scene_key)
         if field_keys:
             ordered_regions = self._require_regions(scene_key, field_keys, regions)
-        elif not regions:
-            logger.warning(f"场景 {scene_key} 没有定义区域")
-            return ""
         else:
-            ordered_regions = regions
+            ordered_regions = enabled_regions(regions)
+            if not ordered_regions:
+                logger.warning(f"场景 {scene_key} 没有定义可用区域")
+                return ""
 
         best_key = ""
         best_confidence = -1.0

@@ -232,13 +232,13 @@ class BatchReport:
         total_entries = len(self._entries)
         entry_success = sum(
             1 for e in self._entries
-            if e.prepare_status != tr("失败") and e.finish_status != "失败"
+            if e.prepare_status != tr("失败") and e.finish_status != tr("失败")
             and e.scripts
             and all(s.status == tr("成功") for s in e.scripts)
         )
         entry_lifecycle_fail = sum(
             1 for e in self._entries
-            if e.prepare_status == tr("失败") or e.finish_status == "失败")
+            if e.prepare_status == tr("失败") or e.finish_status == tr("失败"))
         entry_partial = total_entries - entry_success - entry_lifecycle_fail
         lines.append(f"- 行执行总计：{total_entries} 行")
         lines.append(f"  - 全部成功：{entry_success}")

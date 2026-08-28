@@ -50,7 +50,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
@@ -120,20 +120,20 @@ class SchoolPanel(QWidget):
         row_attr.setSpacing(28)
         row_attr.addWidget(QLabel(tr("属性")))
         self._combo_attr = QComboBox()
-        self._combo_attr.setFixedWidth(100)
+        self._combo_attr.setMinimumWidth(100)
         row_attr.addWidget(self._combo_attr)
         row_attr.addStretch()
         attr_layout.addLayout(row_attr)
 
         # 第二/三行：主武器+主武学 / 副武器+副武学
         self._combo_main_weapon = QComboBox()
-        self._combo_main_weapon.setFixedWidth(100)
+        self._combo_main_weapon.setMinimumWidth(100)
         self._edit_main_martial = QLineEdit()
         self._edit_main_martial.setPlaceholderText(tr("武学名称"))
         self._edit_main_martial.setMaxLength(6)
         self._edit_main_martial.setFixedWidth(100)
         self._combo_sub_weapon = QComboBox()
-        self._combo_sub_weapon.setFixedWidth(100)
+        self._combo_sub_weapon.setMinimumWidth(100)
         self._edit_sub_martial = QLineEdit()
         self._edit_sub_martial.setPlaceholderText(tr("武学名称"))
         self._edit_sub_martial.setMaxLength(6)
@@ -341,6 +341,7 @@ class SchoolPanel(QWidget):
         if value and value not in candidates:
             combo.addItem(value)
         combo.setCurrentText(value)
+        fit_combo_to_contents(combo, minimum=100)
 
     def _on_item_renamed(self, item):
         """列表项编辑 → 流派重命名（保持原顺序）"""

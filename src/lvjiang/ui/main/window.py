@@ -127,6 +127,29 @@ def _set_combo_character_capacity(
         combo,
     ).width()
     combo.setFixedWidth(width)
+
+    def _refresh_popup_width(*_args) -> None:
+        longest = max(
+            (metrics.horizontalAdvance(combo.itemText(index))
+             for index in range(combo.count())),
+            default=0,
+        )
+        popup_width = style.sizeFromContents(
+            QStyle.ContentsType.CT_ComboBox,
+            option,
+            QSize(longest, metrics.height()),
+            combo,
+        ).width() + 12
+        view = combo.view()
+        assert view is not None
+        view.setMinimumWidth(max(width, popup_width))
+
+    model = combo.model()
+    assert model is not None
+    model.rowsInserted.connect(_refresh_popup_width)
+    model.modelReset.connect(_refresh_popup_width)
+    model.dataChanged.connect(_refresh_popup_width)
+    _refresh_popup_width()
     return width
 
 

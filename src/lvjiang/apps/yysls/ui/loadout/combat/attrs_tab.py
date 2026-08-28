@@ -30,6 +30,7 @@ from ....core.combat.combat_attrs import (
     format_value,
 )
 from ...events import get_event_hub
+from ...layout_helpers import fit_combo_to_contents
 from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from ...profile.tab import add_user_nav_buttons
 from .cards import CombatCardsMixin
@@ -114,7 +115,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         school_layout.setContentsMargins(0, 0, 0, 0)
         school_layout.addWidget(QLabel(tr("流派")))
         self._combo_school = QComboBox()
-        self._combo_school.setFixedWidth(84)  # 4 汉字宽度
+        self._combo_school.setMinimumWidth(84)
         self._combo_school.setMinimumHeight(30)
         self._combo_school.currentTextChanged.connect(self._on_school_changed)
         school_layout.addWidget(self._combo_school, 1)
@@ -124,7 +125,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         base_layout.setContentsMargins(0, 0, 0, 0)
         base_layout.addWidget(QLabel(tr("属性")))
         self._combo_play_style = QComboBox()
-        self._combo_play_style.setFixedWidth(104)  # 5 汉字宽度
+        self._combo_play_style.setMinimumWidth(104)
         self._combo_play_style.setMinimumHeight(30)
         self._combo_play_style.currentTextChanged.connect(self._on_play_style_changed)
         base_layout.addWidget(self._combo_play_style, 1)
@@ -139,11 +140,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         gongjue_layout.setContentsMargins(0, 0, 0, 0)
         gongjue_layout.addWidget(QLabel(tr("弓玦")))
         self._combo_gongjue = QComboBox()
-        self._combo_gongjue.setFixedWidth(84)  # 4 汉字宽度
+        self._combo_gongjue.setMinimumWidth(84)
         self._combo_gongjue.setMinimumHeight(30)
         self._combo_gongjue.addItem(tr("无"), "")
         for gongjue_type in _GONGJUE_TYPES[1:]:
             self._combo_gongjue.addItem(gongjue_type, gongjue_type)
+        fit_combo_to_contents(self._combo_gongjue, minimum=84)
         self._combo_gongjue.currentTextChanged.connect(self._on_gongjue_changed)
         gongjue_layout.addWidget(self._combo_gongjue, 1)
 
@@ -152,7 +154,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         scheme_layout.setContentsMargins(0, 0, 0, 0)
         scheme_layout.addWidget(QLabel(tr("方案")))
         self._combo_scheme = QComboBox()
-        self._combo_scheme.setFixedWidth(104)  # 5 汉字宽度
+        self._combo_scheme.setMinimumWidth(104)
         self._combo_scheme.setMinimumHeight(30)
         self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)
         scheme_layout.addWidget(self._combo_scheme, 1)
@@ -278,6 +280,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._combo_school.addItem("")
         for name in schools:
             self._combo_school.addItem(name)
+        fit_combo_to_contents(self._combo_school, minimum=84)
         self._combo_school.blockSignals(False)
 
     def _refresh_play_styles(self):
@@ -293,6 +296,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             for name in play_styles:
                 self._combo_play_style.addItem(name)
 
+        fit_combo_to_contents(self._combo_play_style, minimum=104)
         self._combo_play_style.blockSignals(False)
         self._btn_edit_play_style.setEnabled(
             bool(school and self._combo_play_style.currentText())
@@ -308,6 +312,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if school:
             for name in get_game_config().get_graduation_schemes(school):
                 self._combo_scheme.addItem(name)
+        fit_combo_to_contents(self._combo_scheme, minimum=104)
         self._combo_scheme.blockSignals(False)
 
     def _get_current_school(self) -> str | None:

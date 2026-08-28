@@ -389,12 +389,18 @@ def test_food_skip_rule_stops_equipment(patch_worth, monkeypatch):
 
 def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
     """规则命中且库存充足 → 每轮先点狗粮槽位再一键添加"""
+    from lvjiang.core.recognizers import ReferenceInfo
+
     base = TuningGroup(materials=MaterialSettings(food_rules=[
         FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
-    wf._material_infos = {(1, 3): _reference("金狗粮", count=42)}
+    wf._material_infos = {
+        (1, 3): _reference("金狗粮", count=42),
+        # 真实识别边界在未匹配时不会附带 OCR 字段；不得拖垮整次调律。
+        (1, 7): ReferenceInfo(label="", confidence=0.1),
+    }
     wf._process_equipment("高分剑", _equip(2, quality="gold", cap_pct=95),
                           WEAPON_DETAIL)
 

@@ -50,7 +50,59 @@ def test_python_tuning_adapter_reuses_rich_semantics():
     assert material.label == "彩狗粮"
     assert material.real_level == 110
     assert material.count == 691
+    assert material.count_recognized is True
     assert material.devoted == 0
+
+
+def test_python_tuning_adapter_treats_unmatched_slot_as_empty_material():
+    material = parse_tuning_material(ReferenceInfo(label="", confidence=0.2))
+
+    assert material.label == ""
+    assert material.confidence == 0.2
+    assert material.real_level == 0
+    assert material.count == 0
+    assert material.count_recognized is False
+    assert material.devoted is None
+
+
+def test_unmatched_material_does_not_emit_ocr_warning(monkeypatch):
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.recognizer.reference_adapter.logger.warning",
+        warnings.append,
+    )
+
+    parse_tuning_material(ReferenceInfo(label="", confidence=0.2))
+
+    assert warnings == []
+
+
+@pytest.mark.parametrize(("level_text", "count_text", "devoted"), [
+    ("无法识别", "无法识别", None),
+    ("", "?/未知", 0),
+])
+def test_python_tuning_adapter_treats_unreadable_ocr_as_zero(
+    level_text, count_text, devoted, monkeypatch,
+):
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.recognizer.reference_adapter.logger.warning",
+        warnings.append,
+    )
+    material = parse_tuning_material(ReferenceInfo(
+        label="金狗粮",
+        confidence=0.8,
+        ocr_texts={"level_text": level_text, "count_text": count_text},
+    ))
+
+    assert material.label == "金狗粮"
+    assert material.real_level == 0
+    assert material.count == 0
+    assert material.count_recognized is False
+    assert material.devoted == devoted
+    assert len(warnings) == 1
+    assert "金狗粮" in warnings[0]
+    assert "按 0 处理" in warnings[0]
 
 
 def test_yysls_transform_reports_legacy_schema_without_output_fields():

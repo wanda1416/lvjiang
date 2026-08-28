@@ -55,7 +55,11 @@ class ReferenceRecognizer:
     ) -> ReferenceInfo:
         if image is None or image.size == 0:
             return ReferenceInfo(label="")
-        match = self._matcher.match(image, group=group)
+        try:
+            match = self._matcher.match(image, group=group)
+        except Exception as exc:  # noqa: BLE001 识别边界不得中断业务流程
+            logger.warning(f"参考图匹配失败，按未匹配处理: {exc}")
+            return ReferenceInfo(label="")
         return self._build_info(image, match)
 
     def recognize_top_n(
@@ -66,7 +70,11 @@ class ReferenceRecognizer:
     ) -> list[ReferenceInfo]:
         if image is None or image.size == 0:
             return []
-        matches = self._matcher.match_top_n(image, n=n, group=group)
+        try:
+            matches = self._matcher.match_top_n(image, n=n, group=group)
+        except Exception as exc:  # noqa: BLE001 识别边界不得中断业务流程
+            logger.warning(f"参考图候选匹配失败，按无候选处理: {exc}")
+            return []
         if not matches:
             return []
         # 所有候选来自同一画面，OCR 只执行一次且绝不由参考 meta 改写。
@@ -102,10 +110,25 @@ class ReferenceRecognizer:
         )
 
     def _ocr_output_fields(self, image: np.ndarray) -> dict[str, str]:
-        return {
-            field.key: self._ocr_region(image, tuple(field.crop))  # type: ignore[arg-type]
-            for field in self._db.get_output_fields()
-        }
+        try:
+            fields = self._db.get_output_fields()
+        except Exception as exc:  # noqa: BLE001 识别边界不得中断业务流程
+            logger.warning(f"参考图输出字段读取失败，按无 OCR 输出处理: {exc}")
+            return {}
+
+        result: dict[str, str] = {}
+        for output_field in fields:
+            try:
+                result[output_field.key] = self._ocr_region(
+                    image, tuple(output_field.crop)  # type: ignore[arg-type]
+                )
+            except Exception as exc:  # noqa: BLE001 单字段失败不影响其余字段
+                logger.warning(
+                    f"参考图输出区域 OCR 失败 key={output_field.key!r}，"
+                    f"按空文本处理: {exc}"
+                )
+                result[output_field.key] = ""
+        return result
 
     def _ocr_region(self, image: np.ndarray, region: tuple[float, ...]) -> str:
         height, width = image.shape[:2]

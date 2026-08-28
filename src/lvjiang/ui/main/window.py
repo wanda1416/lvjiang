@@ -5,7 +5,7 @@
 - 窗口/设备扫描与定位
 - 工作流加载、执行
 - 运行日志面板
-- 全局热键（默认 F9 开始、F10 结束、F8 暂停/恢复；按键位可在配置管理→
+- 全局热键（默认 F9 开始、F10 结束、F11 暂停/恢复；按键位可在配置管理→
   热键设置里改，保存后立即生效；定位/连接后回调方生效）
 
 插件通过 hooks 机制扩展左侧/右侧 Tab 和菜单项。
@@ -200,7 +200,7 @@ class MainWindow(
     # 全局热键信号
     f9_pressed = pyqtSignal()
     f10_pressed = pyqtSignal()
-    f8_pressed = pyqtSignal()
+    pause_pressed = pyqtSignal()
     _scrcpy_frame_ready = pyqtSignal(object)
     # 宿主信号：自动化状态（"running" / "paused" / "not_ready" / "idle"）与用户切换
     automation_state_changed = pyqtSignal(str)
@@ -258,13 +258,13 @@ class MainWindow(
         self._load_workflow_configs()
         self._restore_daily_config()
 
-        # ── 全局热键（仅 F8-F10；回调内按后端就绪门控，定位/连接后方生效）──
+        # ── 全局热键（默认 F9-F11；回调内按后端就绪门控，定位/连接后方生效）──
         self.f9_pressed.connect(self._on_f9_start)
         self.f10_pressed.connect(self._request_stop)
-        self.f8_pressed.connect(self._on_pause_resume)
+        self.pause_pressed.connect(self._on_pause_resume)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
-        # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 已处理 F8-F10）
+        # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 使用当前配置）
         from ...core.platforms import start_global_hotkeys
         self._hotkey_listener = start_global_hotkeys(
             self._main_global_hotkey_bindings())
@@ -277,14 +277,14 @@ class MainWindow(
     def _main_global_hotkey_bindings(self):
         """主窗口常驻全局热键；F12 由录制对话框临时管理。
 
-        按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F8）。
+        按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F11）。
         """
         from ...core.platforms import hotkey_pynput_token
         hk = self._user_config.hotkeys
         return {
             hotkey_pynput_token(hk.start): self._on_global_f9,
             hotkey_pynput_token(hk.stop): self._on_global_f10,
-            hotkey_pynput_token(hk.pause): self._on_global_f8,
+            hotkey_pynput_token(hk.pause): self._on_global_pause,
         }
 
     # ─── SessionStore UI 回调 ──────────────────────────────────────
@@ -321,11 +321,11 @@ class MainWindow(
             return
         self.f10_pressed.emit()
 
-    def _on_global_f8(self):
-        """全局 F8：暂停/恢复"""
+    def _on_global_pause(self):
+        """全局暂停热键：暂停/恢复。"""
         if not self._backend_ready():
             return
-        self._on_pause_resume()
+        self.pause_pressed.emit()
 
     def _on_f9_start(self):
         """F9 启动入口（全局热键 / 窗口按键共用）"""
@@ -716,7 +716,7 @@ class MainWindow(
         self._request_stop()
 
     def request_pause_resume(self):
-        """切换暂停/恢复（等价 F8）"""
+        """切换暂停/恢复（等价当前配置的暂停热键）"""
         self._on_pause_resume()
 
     def append_log(self, text: str):

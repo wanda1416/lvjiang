@@ -48,7 +48,7 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 |---|---|---|
 | `workflows/builtins/system.py` | confirm/pause 无 Qt 回调时回退 `MessageBoxW`；notify 直接调 `MessageBoxTimeoutW` | 有 UI 时走 `_ui_callback` 不受影响；回退分支加平台门控（mac 用 `osascript` 或降级为 log） |
 | `ui/window_ops.py` L3-4 顶层 `from ctypes import wintypes` | mac 上 import 不崩，但 `_refresh_window_rect` 调用会崩 | ADB 分支不走该函数；Phase 1 只需保证不误入 windows 分支 |
-| `ui/main_window.py` pynput 全局热键 F8-F10 | mac 需「输入监控+辅助功能」权限，F 键默认媒体键 | 权限未授予时降级为窗口内热键（`keyPressEvent` 已处理），启动时提示 |
+| `ui/main/window.py` pynput 全局热键 F9-F11 | mac 需「输入监控+辅助功能」权限，F 键默认媒体键 | 权限未授予时降级为窗口内热键（`keyPressEvent` 已处理），启动时提示 |
 | `_backend` 默认值 `"windows"`（散布约 10 处 `getattr(self, "_backend", "windows")`） | mac 上应默认 `"adb"` 并隐藏窗口扫描入口 | UI 层小改 |
 
 ### 依赖版本下限（2026-07-31 macOS 12.7.6 x86_64 实测更新）

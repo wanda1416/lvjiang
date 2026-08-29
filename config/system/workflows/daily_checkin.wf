@@ -11,8 +11,14 @@
 # 各活动过程前置：在活动列表页
 # 各活动过程后置：退回菜单页（找不到活动时原地不动）
 
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
+
 # ─── 从游戏首页进入活动页面 ─────────────────────────────
-click [game_main_page].[menu] after wait @page_refresh
+call $nav_result = nav_main_to_menu()
+if $nav_result < 0
+    return -1
+end
 
 scan [game_menu_page].[huodong] as $nav_check by contains "活动"
 if not $nav_check
@@ -38,13 +44,13 @@ def checkin_zhaoxi()
    # 最多滚动 2 次，加上初始位置共 3 次查找机会
    $found = ""
    wait @step_interval
-   loop 3
+   loop 4
       find [activity_main].[liebiao] as $found by contains "朝夕"
       if $found
          log "定位到朝夕共赏，准备领奖。"
          break
       end
-      drag [activity_main].[liebiao] up 1 after wait @step_interval
+      drag [activity_main].[liebiao] up 0.5 after wait @step_interval
    end
 
    if not $found

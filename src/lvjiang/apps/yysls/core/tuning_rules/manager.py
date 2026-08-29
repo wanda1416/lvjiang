@@ -51,6 +51,7 @@ class TuningRuleManager:
         self._rules: dict[str, TuningRule] = {}
         self._raw: dict[str, dict] = {}
         self._files: dict[str, str] = {}   # key -> 文件名
+        self._all_names: dict[str, str] = {}  # 含禁用规则，供 UI 导航
         self._errors: dict[str, str] = {}
         self.reload()
 
@@ -76,6 +77,7 @@ class TuningRuleManager:
         self._rules.clear()
         self._raw.clear()
         self._files.clear()
+        self._all_names.clear()
         self._errors.clear()
         switch_keys = self._switch_keys()
         # 读取 tuning_rules 顺序与启用状态（从本管理器 resolver 读取）
@@ -88,8 +90,7 @@ class TuningRuleManager:
             if path is None:
                 continue
             try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
+                data = self._resolver._load_yaml(path)
                 rule = parse_tuning_rule(data, switch_keys)
             except Exception as e:
                 logger.error(f"调律规则 {name} 加载失败，已跳过: {e}")
@@ -98,6 +99,7 @@ class TuningRuleManager:
             if rule.key in self._files:
                 logger.error(f"调律规则 {name} key 重复: {rule.key}")
                 continue
+            self._all_names[rule.key] = rule.name
             # 过滤禁用规则
             if tuning_rules and rule.key not in enabled_keys:
                 continue
@@ -114,12 +116,8 @@ class TuningRuleManager:
 
     def _load_tuning_rules(self) -> dict[str, bool]:
         """从本管理器 resolver 读取 tune_config.yaml 的 tuning_rules 段"""
-        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
-        if path is None:
-            return {}
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+            data = self._resolver.load_merged(_CONFIG_REL_PATH)
             raw = data.get("tuning_rules") or {}
             if not isinstance(raw, dict):
                 return {}
@@ -407,21 +405,7 @@ class TuningRuleManager:
 
     def get_all_rule_keys_and_names(self) -> list[tuple[str, str]]:
         """全部规则 key + 名称（含禁用），供对话框导航使用"""
-        result: list[tuple[str, str]] = []
-        for name in self._resolver.enumerate_entities(self._rel_dir, "*.yaml"):
-            path = self._resolver.resolve_read(self._rel(name))
-            if path is None:
-                continue
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f) or {}
-                key = str(data.get("key", "")).strip()
-                rule_name = str(data.get("name", "")).strip()
-                if key:
-                    result.append((key, rule_name or key))
-            except Exception:
-                continue
-        return result
+        return list(self._all_names.items())
 
 
 # ─── 全局单例 ──────────────────────────────────────────────
@@ -477,12 +461,8 @@ class TuningGroupManager:
 
     def _read_base_rules(self) -> list[str]:
         """从 tune_config.yaml 读取 base_rules 数组"""
-        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
-        if path is None:
-            return []
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+            data = self._resolver.load_merged(_CONFIG_REL_PATH)
             raw = data.get("base_rules") or []
             return [str(k).strip() for k in raw if str(k).strip()]
         except Exception as e:
@@ -516,8 +496,7 @@ class TuningGroupManager:
                 self._errors[key] = f"文件不存在: {filename}"
                 continue
             try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
+                data = self._resolver._load_yaml(path)
                 group = parse_tuning_group(data)
             except Exception as e:
                 logger.error(f"基础规则组 {filename} 加载失败，已跳过: {e}")

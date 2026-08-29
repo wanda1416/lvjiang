@@ -259,6 +259,49 @@ class TestAggregateIO:
         self._write_system(dirs, {"a": 1})
         assert _user(dirs).load_merged("scenes.yaml") == {"a": 1}
 
+    def test_yaml_parse_cache_returns_isolated_documents(
+            self, dirs, monkeypatch):
+        self._write_system(dirs, {"nested": {"value": 1}})
+        r = _user(dirs)
+        calls = 0
+        original = yaml.safe_load
+
+        def counted(stream):
+            nonlocal calls
+            calls += 1
+            return original(stream)
+
+        monkeypatch.setattr(yaml, "safe_load", counted)
+        first = r.load_system("scenes.yaml")
+        first["nested"]["value"] = 99
+
+        assert r.load_system("scenes.yaml") == {"nested": {"value": 1}}
+        assert calls == 1
+
+    def test_yaml_parse_cache_tracks_external_file_changes(self, dirs):
+        self._write_system(dirs, {"value": 1})
+        r = _user(dirs)
+        assert r.load_system("scenes.yaml") == {"value": 1}
+
+        self._write_system(dirs, {"value": 200})
+
+        assert r.load_system("scenes.yaml") == {"value": 200}
+
+    def test_notify_explicitly_invalidates_same_stamp_and_size(self, dirs):
+        path = dirs[0] / "scenes.yaml"
+        path.write_text("value: 1\n", encoding="utf-8")
+        old_stat = path.stat()
+        r = _user(dirs)
+        assert r.load_system("scenes.yaml") == {"value": 1}
+
+        path.write_text("value: 2\n", encoding="utf-8")
+        path.touch()
+        import os
+        os.utime(path, ns=(old_stat.st_atime_ns, old_stat.st_mtime_ns))
+        r._notify("scenes.yaml")
+
+        assert r.load_system("scenes.yaml") == {"value": 2}
+
     def test_save_merged_dev_writes_full_system(self, dirs):
         system, local = dirs
         self._write_system(dirs, {"a": 1})

@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QDialog, QVBoxLayout
 
 from .....i18n import tr
+from ...config import get_game_config
 from .config_tab import GameConfigTab
 
 
@@ -27,6 +28,9 @@ class GameConfigDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
+        # manager 是进程级单例；每次打开都重读一次，以便发现
+        # 两次对话框之间的外部改动。YAML 未变时只做 stat + 缓存拷贝。
+        get_game_config().reload()
         self._tab = GameConfigTab()
         layout.addWidget(self._tab)
 

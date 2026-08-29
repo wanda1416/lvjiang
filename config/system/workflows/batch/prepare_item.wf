@@ -11,8 +11,8 @@
 #   目标账号不同   → switch_account() 切账号
 #   总是           → select_role() 选角色并进入游戏
 
-import "../subcall/navigation.wf"
-import "../subcall/page_detection.wf"
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
 
 # 上一条成功进入主页后，先回到角色/账号入口。
 if $batch_state.page_state == 2

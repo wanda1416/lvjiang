@@ -214,20 +214,20 @@ def _make_engine(bound_scenes: set[str], *, points=None, arrows=None,
     )
 
 
-def _write_wf(tmp_path, text: str, name: str = "t.wf"):
-    wf = tmp_path / name
+def _write_wf(wf_root, text: str, name: str = "t.wf"):
+    wf = wf_root / name
     wf.write_text(text, encoding="utf-8")
     return wf
 
 
-def test_missing_scene_raises_before_execution(tmp_path):
+def test_missing_scene_raises_before_execution(wf_root):
     """引用未绑定场景：加载即报错，不进入执行阶段
 
     helper 必须真被 call —— 执行前闸门只校验可达过程（见
     workflow_references.collect_refs 的 reachable_only），
     未被调用的过程不该挡住执行。
     """
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    click [game_main_page].[btn]\n'
         'end\n'
@@ -239,9 +239,9 @@ def test_missing_scene_raises_before_execution(tmp_path):
         engine.execute(wf)
 
 
-def test_bound_scene_passes_validation(tmp_path):
+def test_bound_scene_passes_validation(wf_root):
     """场景已绑定坐标：校验通过，正常执行到结束"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    click [game_main_page].[btn]\n'
         'end\n'
@@ -251,9 +251,9 @@ def test_bound_scene_passes_validation(tmp_path):
     engine.execute(wf)  # 不抛异常（helper 未被调用，仅校验不执行）
 
 
-def test_missing_key_raises_with_file_and_line(tmp_path):
+def test_missing_key_raises_with_file_and_line(wf_root):
     """场景绑了别的区域、但脚本引用的 key 不存在（如把中文名当 key 写）"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'log "start"\n'
         'click [game_main_page].[返回]\n'
     ))
@@ -265,14 +265,14 @@ def test_missing_key_raises_with_file_and_line(tmp_path):
     assert "t.wf:2" in msg
 
 
-def test_missing_key_in_imported_proc_reports_that_file(tmp_path):
+def test_missing_key_in_imported_proc_reports_that_file(wf_root):
     """import 进来的 def 体报错须报它自己的文件名，否则定位到错文件"""
-    _write_wf(tmp_path, (
+    _write_wf(wf_root, (
         'def helper()\n'
         '    click [game_main_page].[nope]\n'
         'end\n'
     ), name="lib.wf")
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'import "lib.wf"\n'
         'log "start"\n'
         'call helper()\n'
@@ -283,24 +283,24 @@ def test_missing_key_in_imported_proc_reports_that_file(tmp_path):
     assert "lib.wf:2" in str(ei.value)
 
 
-def test_drag_key_checked_against_arrows_and_regions(tmp_path):
+def test_drag_key_checked_against_arrows_and_regions(wf_root):
     """drag 查的是方向/区域，绑了 region 就算绑定"""
-    wf = _write_wf(tmp_path, 'drag [game_main_page].[btn]\n')
+    wf = _write_wf(wf_root, 'drag [game_main_page].[btn]\n')
     engine = _make_engine(bound_scenes={"game_main_page"})
     # btn 作为 region 已绑定，静态检查应通过
     engine.execute(wf)
 
 
-def test_drag_key_unbound_raises(tmp_path):
+def test_drag_key_unbound_raises(wf_root):
     """drag 查的是方向/区域，都没绑才报错"""
-    wf = _write_wf(tmp_path, 'drag [game_main_page].[unknown]\n')
+    wf = _write_wf(wf_root, 'drag [game_main_page].[unknown]\n')
     engine = _make_engine(bound_scenes={"game_main_page"})
     with pytest.raises(WorkflowUserError, match="方向/区域未绑定"):
         engine.execute(wf)
 
 
-def test_drag_with_bound_arrow_passes(tmp_path):
-    wf = _write_wf(tmp_path, 'log "ok"\n')
+def test_drag_with_bound_arrow_passes(wf_root):
+    wf = _write_wf(wf_root, 'log "ok"\n')
     arrow = SimpleNamespace(key="menu_up", from_key="p1", to_key=None)
     engine = _make_engine(
         bound_scenes={"game_main_page"},
@@ -310,9 +310,9 @@ def test_drag_with_bound_arrow_passes(tmp_path):
     engine.execute(wf)
 
 
-def test_arrow_missing_from_point_raises(tmp_path):
+def test_arrow_missing_from_point_raises(wf_root):
     """方向绑了、但起点坐标点没绑：运行时同样点不出来，提前拦住"""
-    wf = _write_wf(tmp_path, 'drag [game_main_page].[menu_up]\n')
+    wf = _write_wf(wf_root, 'drag [game_main_page].[menu_up]\n')
     arrow = SimpleNamespace(key="menu_up", from_key="p1", to_key=None)
     engine = _make_engine(
         bound_scenes={"game_main_page"},
@@ -322,17 +322,17 @@ def test_arrow_missing_from_point_raises(tmp_path):
         engine.execute(wf)
 
 
-def test_panel_key_checked_against_panels(tmp_path):
+def test_panel_key_checked_against_panels(wf_root):
     """align / panel 索引查的是面板"""
-    wf = _write_wf(tmp_path, 'align [game_main_page].[grid]\n')
+    wf = _write_wf(wf_root, 'align [game_main_page].[grid]\n')
     engine = _make_engine(bound_scenes={"game_main_page"})
     with pytest.raises(WorkflowUserError, match="面板未绑定"):
         engine.execute(wf)
 
 
-def test_dynamic_key_skips_key_check(tmp_path):
+def test_dynamic_key_skips_key_check(wf_root):
     """key 为变量：静态只能校验到场景一级，不误报"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'eval $k = "whatever"\n'
         'log "ok"\n'
         'if 1 == 2\n'
@@ -345,9 +345,9 @@ def test_dynamic_key_skips_key_check(tmp_path):
 
 # ─── disabled 实例静态检查 ────────────────────────────────
 
-def test_disabled_region_key_does_not_raise(tmp_path):
+def test_disabled_region_key_does_not_raise(wf_root):
     """disabled 的 region 实例仍在列表中，静态检查视为已绑定"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    click [game_main_page].[main_func]\n'
         'end\n'
@@ -362,9 +362,9 @@ def test_disabled_region_key_does_not_raise(tmp_path):
     engine.execute(wf)  # 不抛异常（helper 未被调用，仅校验不执行）
 
 
-def test_disabled_point_key_does_not_raise(tmp_path):
+def test_disabled_point_key_does_not_raise(wf_root):
     """disabled 的 point 实例视为已绑定"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    click [game_main_page].[my_point]\n'
         'end\n'
@@ -378,9 +378,9 @@ def test_disabled_point_key_does_not_raise(tmp_path):
     engine.execute(wf)
 
 
-def test_disabled_panel_key_does_not_raise(tmp_path):
+def test_disabled_panel_key_does_not_raise(wf_root):
     """disabled 的 panel 实例视为已绑定"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    align [game_main_page].[grid]\n'
         'end\n'
@@ -394,9 +394,9 @@ def test_disabled_panel_key_does_not_raise(tmp_path):
     engine.execute(wf)
 
 
-def test_disabled_arrow_key_does_not_raise(tmp_path):
+def test_disabled_arrow_key_does_not_raise(wf_root):
     """disabled 的 arrow 实例视为已绑定，端点检查仍需通过"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    drag [game_main_page].[menu_up]\n'
         'end\n'
@@ -423,10 +423,10 @@ def test_disabled_arrow_key_does_not_raise(tmp_path):
     ],
 )
 def test_runtime_access_to_disabled_layout_item_raises(
-    tmp_path, statement, kind, expected,
+    wf_root, statement, kind, expected,
 ):
     """执行期选中 disabled 对象时，在读取其坐标前中断。"""
-    wf = _write_wf(tmp_path, statement + "\n")
+    wf = _write_wf(wf_root, statement + "\n")
     kwargs = {
         "regions": None,
         "points": None,
@@ -456,9 +456,9 @@ def test_runtime_access_to_disabled_layout_item_raises(
         engine.execute(wf)
 
 
-def test_whole_scene_scan_ignores_disabled_region(tmp_path):
+def test_whole_scene_scan_ignores_disabled_region(wf_root):
     """未列字段是便捷全扫，disabled region 应视为当前布局不存在。"""
-    wf = _write_wf(tmp_path, "scan [game_main_page] as $result\n")
+    wf = _write_wf(wf_root, "scan [game_main_page] as $result\n")
     disabled_region = SimpleNamespace(
         key="hidden", disabled=True,
         x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
@@ -473,9 +473,9 @@ def test_whole_scene_scan_ignores_disabled_region(tmp_path):
     assert engine._coord_meta["result"] == {}
 
 
-def test_non_disabled_key_still_raises(tmp_path):
+def test_non_disabled_key_still_raises(wf_root):
     """未绑定的 key 仍然报错（disabled 的是别的 key）"""
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'def helper()\n'
         '    click [game_main_page].[unknown_key]\n'
         'end\n'
@@ -492,7 +492,7 @@ def test_non_disabled_key_still_raises(tmp_path):
         engine.execute(wf)
 
 
-def test_execute_skips_unreachable_but_validate_only_checks_it(tmp_path):
+def test_execute_skips_unreachable_but_validate_only_checks_it(wf_root):
     """执行前闸门与 CI 门禁的范围分工。
 
     execute() 只查可达过程——拿不会执行的代码把用户挡在门外是事故；
@@ -501,12 +501,12 @@ def test_execute_skips_unreachable_but_validate_only_checks_it(tmp_path):
 
     预检比执行更严，方向是安全的：只会「报了但其实不会炸」。
     """
-    _write_wf(tmp_path, (
+    _write_wf(wf_root, (
         'def never_called()\n'
         '    click [game_main_page].[typo_key]\n'
         'end\n'
     ), name="lib.wf")
-    wf = _write_wf(tmp_path, (
+    wf = _write_wf(wf_root, (
         'import "lib.wf"\n'
         'log "start"\n'
     ))

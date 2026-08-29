@@ -30,7 +30,14 @@ import "subcall/bag_process_slot.wf"
 import "subcall/navigation.wf"
 ```
 
-- 路径基于**当前 wf 所在目录**解析（相对路径）
+- 路径一律**相对 workflows 根**，不是相对当前文件所在目录。所以 `subcall/` 内部互相 import 也要写全前缀：`import "subcall/page_detection.wf"`
+- 经配置层跨层解析：**local 影子优先 → system**。因此 local 里的脚本可以直接 import system 的 subcall；把某个 subcall 复制到 local 后，所有 import 它的脚本（含出厂脚本）都会改用 local 那份——整文件替换，不做过程级合并
+- **沙盒限制**：只接受以文件名开头的相对路径。以下一律拒绝——
+  - 以 `/` `\` `~` `.` 开头（绝对路径、家目录、相对当前目录、`..` 逃逸）
+  - 含 `:`（Windows 盘符 `C:/x.wf`、UNC）或 `\`（反斜杠分隔符）
+  - 规范化后仍含 `..`（如 `subcall/../../x.wf`，以文件名开头但中段逃逸）
+
+  校验不依赖 `Path.is_absolute()`——它的结果随平台变（`C:/x.wf` 在 Linux 上判定为「非绝对」），用的是与平台无关的字符串规则
 - import 仅引入目标文件中的 `def` 定义，不执行任何过程体
 - 支持链式 import（A import B，B import C → A 可使用 B 和 C 的所有 def）
 - 每个文件应显式 import 它直接调用过程所在的文件，不把传递导入当作本文件的隐式依赖

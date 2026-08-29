@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import json
 import re
+import ssl
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from loguru import logger
@@ -24,6 +26,18 @@ from ..i18n import tr
 GITHUB_REPO = "wanda1416/lvjiang"
 GITHUB_RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+
+
+def network_access_error_message(
+        url: str, resource: Literal["update", "announcement"]) -> str:
+    """面向普通用户的统一网络访问失败说明。"""
+    if resource == "update":
+        return tr(
+            "可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试"
+        ).format(url=url)
+    return tr(
+        "可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试"
+    ).format(url=url)
 
 
 @dataclass(frozen=True)
@@ -206,6 +220,18 @@ class UpdateChecker(QThread):
                 self.finished.emit(release)
             else:
                 self.error.emit(tr("无法获取版本信息"))
+        except HTTPError as e:
+            # HTTP 状态是明确的外部响应，不需要打印 urllib 调用栈。
+            message = tr("无法访问 {url} 获取更新：HTTP {code}").format(
+                url=GITHUB_API_URL, code=e.code)
+            logger.warning(message)
+            self.error.emit(message)
+        except (URLError, TimeoutError, ssl.SSLError, ConnectionError):
+            # DNS、连接、超时和 TLS 故障都是常见网络环境问题。调用栈对普通
+            # 用户没有帮助，只保留可操作的一行说明。
+            message = network_access_error_message(GITHUB_API_URL, "update")
+            logger.warning(message)
+            self.error.emit(message)
         except Exception as e:
             logger.exception("检查更新失败")
             self.error.emit(f"检查更新失败: {e}")

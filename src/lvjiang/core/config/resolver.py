@@ -618,35 +618,52 @@ class ConfigResolver:
         walk("")
         return sorted(results)
 
-    def write_entity(self, rel_path: str, data: str | bytes,
-                     *, force: bool = False) -> Path:
+    def next_entity_version(self, rel_path: str) -> int:
+        """返回实体下一发布版本号，不写盘。
+
+        system 与已下载 remote 取较大值，避免作者基于在线热修继续编辑时生成
+        同号异内容。只允许参与在线下发的实体路径调用。
+        """
+        if versioning.spec_for(rel_path) is None:
+            raise ValueError(f"实体不参与版本管理: {rel_path}")
+        versions = [
+            versioning.read_version(self.system_dir / rel_path) or 0,
+            versioning.read_version(self.remote_dir / rel_path) or 0,
+        ]
+        return max(versions) + 1
+
+    def write_entity(self, rel_path: str, data: str | bytes, *,
+                     force: bool = False,
+                     content_version: int | None = None) -> Path:
         """按模式写实体文件（开发→system，用户→local 影子并清同名墓碑）
 
         开发模式写 system 且该路径参与在线下发（见 core.config.versioning）
-        时，落盘前自动把 content_version +1——这三类文件全是 UI 编辑器写
-        出来的，手写的版本号存一次就没了，靠人记着改必然漏。内容没变则
-        保持原号，避免"打开编辑器又原样关掉"也推高版本。
+        时，普通保存保留当前 content_version，新文件从 v1 起步。编辑器只有
+        在用户显式请求提升、并最终确认保存时才传 ``content_version``；点击
+        提升链接本身不写盘，因此放弃编辑不会留下版本变更。
 
         用户模式写 local 不动版本号：版本号是 system 与 remote 之间的仲裁
         依据，local 影子恒为最高优先级，不参与比较。
-
         ``force`` 关掉下面的空操作检测，用于「用户明确要求生成 local 影子」
         （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与出厂一致，
         不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
-
-        远端正顶替这个文件时，新版本号以**远端那份**为下限——开发者在编辑器
-        里看到的就是远端内容，拿出厂版本做基线会写出一个与线上同号但不同
-        内容的文件，见 versioning.next_version_for_write 的 floor_version。
         """
         root = self.system_dir if self.is_dev_mode() else self.local_dir
         target = root / rel_path
         if isinstance(data, str) and self.is_dev_mode() \
                 and versioning.spec_for(rel_path) is not None:
-            floor = None
-            if self.remote_supersedes(rel_path):
-                floor = versioning.read_version(self.remote_dir / rel_path)
-            data = versioning.next_version_for_write(
-                rel_path, data, target, floor_version=floor)
+            if content_version is None:
+                data = versioning.preserve_version_for_write(
+                    rel_path, data, target)
+            else:
+                if not isinstance(content_version, int) \
+                        or isinstance(content_version, bool) \
+                        or content_version < 1:
+                    raise ValueError("content_version 必须是大于 0 的整数")
+                data = versioning.with_version(
+                    data, Path(rel_path).suffix, content_version)
+        elif content_version is not None:
+            raise PermissionError("只有开发模式的版本化实体可以提升版本")
 
         tomb = self._tombstone(rel_path)
         if not force and not tomb.exists() and self._write_is_noop(rel_path, target, data):

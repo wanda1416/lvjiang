@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 from ...core.config.resolver import get_resolver
 from ...core.layout_manager import copy_screenshots, delete_screenshots
 from ...core.layout_models import Layout
+from ...core.scene_registry import get_registry
 from ...i18n import tr
 
 
@@ -216,10 +217,26 @@ class LayoutOpsMixin:
         # 用户模式下那就是给每个场景生成 local 影子，而实体文件是整文件
         # 影子（local 有就完全顶掉出厂与在线下发，不合并），等于一次点击
         # 把整个布局永久冻住。
-        changed = set(self._dirty_scenes)
-        if not self._manager.save_layout(self._current_layout, changed_scenes=changed):
+        changed = set(self._data_dirty_scenes)
+        layout_versions = {
+            scene_key: tab.pending_layout_version
+            for scene_key, tab in self._tabs.items()
+            if tab.pending_layout_version is not None
+        }
+        scene_versions = {
+            scene_key: tab.pending_scene_version
+            for scene_key, tab in self._tabs.items()
+            if tab.pending_scene_version is not None
+        }
+        if not self._manager.save_layout(
+                self._current_layout,
+                changed_scenes=changed,
+                content_versions=layout_versions):
             self._status_bar.showMessage(f"保存布局「{name}」失败，请检查日志")
             return
+        registry = get_registry()
+        for scene_key, version in scene_versions.items():
+            registry.save_scene_content_version(scene_key, version)
         self._update_ui_state()
         total_r = sum(len(tab.get_regions()) for tab in self._tabs.values())
         total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
@@ -228,14 +245,17 @@ class LayoutOpsMixin:
         # changed 恒为集合；空集表示没有场景需要写盘（画布/描述等布局级
         # 改动仍会经 layouts.yaml 落盘），不再是"全部"的意思。
         saved_info = f"{len(changed)} 个场景" if changed else tr("无场景改动")
+        version_count = len(layout_versions) + len(scene_versions)
+        if version_count:
+            saved_info += tr("，提升 {count} 项版本").format(count=version_count)
         self._status_bar.showMessage(
             f"已保存布局「{name}」（{saved_info}），"
             f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
         )
         self._mark_all_scenes_clean()
-        # 开发模式保存会 bump content_version，标识要跟着变，否则显示的是旧号
+        # 显式版本提升随保存落盘，标识要跟着刷新。
         for tab in self._tabs.values():
-            tab._refresh_origin_label()
+            tab._refresh_version_info()
         logger.info(
             f"布局已保存: {name} ({saved_info}), "
             f"{total_r} 区域 / {total_p} 坐标 / {total_a} 方向 / {total_pn} 面板"

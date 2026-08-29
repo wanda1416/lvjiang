@@ -680,7 +680,20 @@ class SceneRegistry:
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
 
-    def _save_scene_yaml(self, scene: SceneDef):
+    def save_scene_content_version(self, scene_key: str,
+                                   content_version: int) -> None:
+        """按当前内存中的场景定义写入显式版本。
+
+        场景编辑器把版本提升作为待保存状态；只有用户确认保存时才调用这里，
+        因此关闭或切换时选择放弃不会改动磁盘版本。
+        """
+        scene = self._scenes.get(scene_key)
+        if scene is None:
+            raise ValueError(f"场景不存在: {scene_key}")
+        self._save_scene_yaml(scene, content_version=content_version)
+
+    def _save_scene_yaml(self, scene: SceneDef,
+                         content_version: int | None = None):
         """将场景定义经 resolver 写入 YAML（开发→system/scenes，用户→local/scenes）"""
         data: dict[str, Any] = {"key": scene.key, "name": scene.name}
         if scene.views:
@@ -724,4 +737,5 @@ class SceneRegistry:
         self._resolver.write_entity(
             f"scenes/{scene.key}.yaml",
             yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+            content_version=content_version,
         )

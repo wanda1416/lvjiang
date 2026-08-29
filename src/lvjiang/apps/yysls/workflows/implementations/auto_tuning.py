@@ -229,7 +229,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "final_rating": final_rating,
             "rounds": rounds,
             "affix_count": affix_count,
-            "final_affixes": [a.to_dict() for a in equip_data.affixes],
+            # equip_data 可为 None：武库装备刻意不建 EquipmentData
+            # （判定只依赖 status 原始 OCR，不依赖装备解析成功）
+            "final_affixes": ([a.to_dict() for a in equip_data.affixes]
+                              if equip_data is not None else []),
             "status": status,
             "reason": reason,
         })
@@ -283,8 +286,28 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     @property
     def slot_level_exhausted(self) -> bool:
-        """当前部位已遇到首件有效但低于等级门槛的装备。"""
+        """当前部位已命中无需继续遍历的槽位级终止条件。"""
         return bool(getattr(self, "_slot_level_exhausted", False))
+
+    def _mark_non_weapon_wuku_bottom(self, is_wuku: bool,
+                                     name: str = "") -> bool:
+        """非武器部位读到武库标记时，立即结束该部位遍历。
+
+        这是槽位级边界，不是装备处置规则。调用方必须在进入评级、调律、
+        回收等单件处理前检查 ``slot_level_exhausted``。
+        """
+        slot = getattr(self, "_current_slot", "")
+        if not is_wuku or not slot or slot in self.GROUPED_SLOTS:
+            return False
+        if not self.slot_level_exhausted:
+            logger.info("  检测到武库装备，当前非武器部位已到底")
+            # 面板要看得见：否则用户只会看到扫描毫无征兆地停下。
+            # 只在首次置位时发，避免同一部位重复刷屏。
+            self._emit_equip_finish(
+                name or tr("武库装备"), None,
+                status="wuku_bottom", reason=tr("武库装备，到达部位边界"))
+        self._slot_level_exhausted = True
+        return True
 
     @staticmethod
     def _missing_output_fields() -> list[str]:
@@ -318,7 +341,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._ensure_judge_config()
             group = self._ensure_base_group()
             self.recorder.reset()  # 重置所有记录状态
-            self._equipped_items: dict[str, dict] = {}  # 各槽位已装备装备信息（进入时读取）
+            # 各槽位已装备装备信息（进入时读取）；值为 None 表示类型
+            # 未解析出来，该部位退化为按部位终止语义（见 _read_equipped）
+            self._equipped_items: dict[str, dict | None] = {}
             # 加载导航所需的 DSL subcall 文件（每次运行都重新加载，保证修改立即生效）
             self.navigator.load_dependencies()
             selected = self._resolve_selected_slots()
@@ -476,11 +501,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     # ─── 部位处理 ──────────────────────────────────────────
 
-    def _read_equipped(self, slot: str) -> dict:
+    def _read_equipped(self, slot: str) -> dict | None:
         """读取当前槽位已装备的装备信息。
 
         点击部位标签后详情页已打开，直接 OCR 即可。
         武器用 weapon_detail，防具/首饰用 armor_detail。
+
+        返回 None 表示**没读出可用的类型**。这份数据唯一的用途是武器分组
+        判定（武库/低等级装备是否与当前武器同类型），拿不到类型时不能假装
+        「不同类型」——那会把一次 OCR 抖动误判成「该类型组已到底」，静默
+        砍掉整个部位后面所有装备。调用方据此退化为旧的按部位终止语义。
         """
         detail_scene = (self.WEAPON_DETAIL if slot in self.WEAPON_SLOTS
                         else self.ARMOR_DETAIL)
@@ -488,7 +518,28 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                      if detail_scene == self.ARMOR_DETAIL else [])
         raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
+        if not equip or not equip.get("type"):
+            logger.error(
+                f"槽位 {slot} 已装备装备解析失败（raw={raw!r}），"
+                f"类型未知：该部位退化为按部位终止语义，不再做武器分组判定")
+            return None
         return equip
+
+    def _grouped_type_matches(self, slot: str,
+                              current_type: str | None) -> bool | None:
+        """当前装备类型是否与该槽位已装备的一致（仅用于分组部位）。
+
+        None = 类型未知（进入槽位时解析失败，或当前装备没解析出类型）。
+        调用方必须把 None 与 False 区别对待：False 是「确实是别的类型，
+        该类型组已到底」，None 只是「不知道」，不能据此声称到底。
+        """
+        equipped = self._equipped_items.get(slot)
+        if equipped is None:
+            return None
+        equipped_type = equipped.get("type")
+        if not equipped_type or not current_type:
+            return None
+        return current_type == equipped_type
 
     def _process_slot_group_enter(self, slot: str):
         """点击部位标签进入背包网格页
@@ -535,6 +586,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return
         # 滚动后目标行在可见区第 1 行
         name, fp, equip = self._read_row(detail_scene, 1, col)
+        if self.slot_level_exhausted:
+            return
         if not fp:
             logger.warning(f"指定调律: 目标格 ({row},{col}) 为空，无装备可处理")
             return
@@ -582,9 +635,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
         # 武库标记：status 字段含“武库”说明该装备存放在武库中
-        if equip and raw:
-            equip["is_wuku"] = "武库" in (raw.get("status") or "")
+        is_wuku = bool(raw and "武库" in (raw.get("status") or ""))
+        if equip:
+            equip["is_wuku"] = is_wuku
+        # 非武器一旦出现武库装备即代表当前部位见底。该判断只依赖 status
+        # 原始 OCR，不依赖装备名称/类型/词条是否成功解析。
         name = (equip.get("name") or "") if equip else ""
+        self._mark_non_weapon_wuku_bottom(is_wuku, name)
         fp = self._make_fingerprint(equip)
         if fp:
             logger.debug(
@@ -610,6 +667,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             if self.is_stopped:
                 break
             name, fp, equip = self._read_row(detail_scene, win_row, col)
+            if self.slot_level_exhausted:
+                break
             if not fp:
                 logger.info(
                     f"  行{logical_row} grid[{win_row}][{col}] 空 slot → 本行到此为止")
@@ -691,6 +750,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             if self.is_stopped:
                 break
             name, fp, equip = self._read_row(detail_scene, row, col)
+            if self.slot_level_exhausted:
+                return EquipmentProcessingResult(
+                    fp, SlotEffect.REMOVED, outcome)
             if not fp:
                 logger.info(f"  grid[{row}][{col}] 回收后已空，该格结束")
                 return EquipmentProcessingResult(
@@ -723,45 +785,45 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if not equip:
             return "", None
 
+        # 正常路径会在 _read_row 返回后立即收束；这里保留旁路调用兜底。
+        # 武库装备只承担槽位边界/分组边界语义，不得创建调律会话，更不能
+        # 进入评级、调律或回收。
+        if equip.get("is_wuku"):
+            slot = getattr(self, "_current_slot", "")
+            if self._mark_non_weapon_wuku_bottom(True):
+                return self._make_fingerprint(equip), None
+            if slot in self.GROUPED_SLOTS:
+                match = self._grouped_type_matches(slot, equip.get("type"))
+                if match:
+                    logger.info(
+                        f"  [{name}] 武库装备（同类型），跳过"
+                        "（武器分组，不结束扫描）")
+                    self._emit_equip_finish(
+                        name, None, status="wuku_skip",
+                        reason=tr("武库装备，同武器组，跳过"))
+                else:
+                    if match is None:
+                        # 类型未知：退化为按部位终止，不谎称「不同类型」。
+                        # 具体的解析失败已在 _read_equipped 里记了 error。
+                        logger.warning(
+                            f"  [{name}] 武库装备，槽位类型未知 → "
+                            f"退化为按部位终止")
+                    else:
+                        logger.info(
+                            f"  [{name}] 武库装备（不同类型），当前类型组已到底")
+                    self._slot_level_exhausted = True
+                    self._emit_equip_finish(
+                        name, None, status="wuku_bottom",
+                        reason=tr("武库装备，到达部位边界"))
+                return self._make_fingerprint(equip), None
+            logger.warning(f"  [{name}] 武库装备（当前部位未知），跳过")
+            return self._make_fingerprint(equip), None
+
         equip_data = EquipmentData.from_dict(equip)
         self._equipment_session = EquipmentSession(
             name=name, equipment=equip_data)
         affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
         self._emit_equip_started(name, equip, equip_data)
-
-        # 前置拦截 0：武库装备 — 不属于当前处理范围
-        if equip.get("is_wuku"):
-            slot = getattr(self, "_current_slot", "")
-            if slot in self.GROUPED_SLOTS:
-                # 主/副武器按类型分组，检查武库装备类型是否与当前装备一致
-                equipped_type = (self._equipped_items.get(slot) or {}).get("type")
-                current_type = equip.get("type")
-                if current_type and equipped_type and current_type == equipped_type:
-                    # 同类型武库：跳过但不结束扫描
-                    logger.info(f"  [{name}] 武库装备（同类型），跳过（武器分组，不结束扫描）")
-                    self._emit_equip_finish(
-                        name, equip_data, affix_count=affix_count,
-                        status="wuku_skip",
-                        reason="武库装备（同类型），跳过")
-                    return self._make_fingerprint(equip), None
-                else:
-                    # 不同类型武库：当前类型组已到底，停止扫描
-                    logger.info(f"  [{name}] 武库装备（不同类型），当前类型组已到底")
-                    self._slot_level_exhausted = True
-                    self._emit_equip_finish(
-                        name, equip_data, affix_count=affix_count,
-                        status="wuku_bottom",
-                        reason="武库装备（不同类型），当前类型组已到底")
-                    return self._make_fingerprint(equip), None
-            else:
-                # 环佩/防具无分组，按等级倒序，武库装备意味着已经到底
-                logger.info(f"  [{name}] 武库装备，当前部位已到底")
-                self._slot_level_exhausted = True
-                self._emit_equip_finish(
-                    name, equip_data, affix_count=affix_count,
-                    status="wuku_bottom",
-                    reason="武库装备，当前部位已到底")
-                return self._make_fingerprint(equip), None
 
         # 前置拦截 1：等级门槛 — 低于 min_level 直接跳过，不走任何判定
         level = equip.get("level")
@@ -775,9 +837,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             slot = getattr(self, "_current_slot", "")
             if slot in self.GROUPED_SLOTS:
                 # 主/副武器按类型分组，检查装备类型是否与当前装备一致
-                equipped_type = (self._equipped_items.get(slot) or {}).get("type")
-                current_type = equip.get("type")
-                if current_type and equipped_type and current_type == equipped_type:
+                match = self._grouped_type_matches(slot, equip.get("type"))
+                if match:
                     # 同类型低等级：同组内后面都是低的，跳过但不结束扫描
                     logger.info(
                         f"  [{name}] 等级 {level} < 门槛 {min_level}"
@@ -788,10 +849,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                         reason=f"等级 {level} < 门槛 {min_level}，跳过（同类型）")
                     return self._make_fingerprint(equip), None
                 else:
-                    # 不同类型低等级：已越过当前类型组，停止扫描
+                    # 不同类型低等级：已越过当前类型组，停止扫描。
+                    # match is None（类型未知）同样落这里——退化为按部位
+                    # 终止，与非分组部位的语义一致。
+                    reason_cn = ("不同类型" if match is False else "槽位类型未知")
                     logger.info(
                         f"  [{name}] 等级 {level} < 门槛 {min_level}"
-                        f"（不同类型，当前类型组已到底）")
+                        f"（{reason_cn}，当前类型组已到底）")
                     self._slot_level_exhausted = True
                     self._emit_equip_finish(
                         name, equip_data, affix_count=affix_count,

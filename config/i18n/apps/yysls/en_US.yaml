@@ -7,6 +7,10 @@ yysls:
   承音: Chengyin
   无词条: No Affixes
   未装备: Not Equipped
+  武库装备: Vault Gear
+  武库装备，到达部位边界: Vault gear, slot boundary reached
+  武库装备，同武器组，跳过: Vault gear, same weapon group, skipped
+  武库装备，跳过: Vault gear, skipped
   跳过实际调律_仅进出调律页_测试滚动用: Skip actual tuning (enter/exit tuning page only, for scroll testing)
   全局: (Global)
   未实现: (Not implemented)

@@ -8,6 +8,7 @@
 #%       心法: true
 #%       武学: true
 #%       奇术: true
+#%       振玉: true
 #%       生活: true
 #%       宝钱: true
 #%       短陌钱: true
@@ -15,6 +16,7 @@
 #%       - { value: 心法, label: 心法 }
 #%       - { value: 武学, label: 武学 }
 #%       - { value: 奇术, label: 奇术 }
+#%       - { value: 振玉, label: 振玉 }
 #%       - { value: 生活, label: 生活 }
 #%       - { value: 宝钱, label: 宝钱 }
 #%       - { value: 短陌钱, label: 短陌钱 }
@@ -46,8 +48,15 @@
 
 # 参数未注入时（如批量执行且从未在日常页存过配置）回落到全买，
 # 与做成参数之前的行为一致；已注入时 default 不覆盖。
-default $buy_keywords = {"心法": true, "武学": true, "奇术": true, "生活": true, "宝钱": true, "短陌钱": true}
+default $buy_keywords = {"心法": true, "武学": true, "奇术": true, "振玉": true, "生活": true, "宝钱": true, "短陌钱": true}
 default $buy_shengsheng = true
+
+# 旧 session 中已保存的 checkgroup 没有新增 key；日常面板打开后会默认勾选，
+# 但批量任务可能直接注入旧字典。在脚本入口按元数据的默认值补齐。
+eval $buy_keyword_keys = keys($buy_keywords)
+if not $buy_keyword_keys contains "振玉"
+    eval $buy_keywords.振玉 = true
+end
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"

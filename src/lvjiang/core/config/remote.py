@@ -17,12 +17,12 @@ GitHub Pages 静态文件，不依赖 GitHub API、不需要服务端。manifest
 
 1. **协议版本**：`schema_version` 对不上直接整份拒绝，不做旧协议兼容
 2. **客户端版本区间**：每个条目可声明 `min_app_version` /
-   `max_app_version_exclusive`。这是"远端配置和本地代码对不上"的唯一防线
+   `max_app_version_exclusive`。这是"远程配置和本地代码对不上"的唯一防线
    ——布局里的 region key 是被 `.wf` 脚本按名字引用的（`[场景].[区域]`），
-   代码改了 key 而远端还在下发老配置，脚本会直接崩。改了就抬门槛。
+   代码改了 key 而远程还在下发老配置，脚本会直接崩。改了就抬门槛。
 3. **sha256**：逐文件校验，半截文件/被篡改的文件不落盘
 4. **路径合法性**：只接受 versioning 注册表里声明过的相对路径，且拒绝
-   任何 `..` / 绝对路径 —— manifest 是远端内容，不能让它决定往哪写盘
+   任何 `..` / 绝对路径 —— manifest 是远程内容，不能让它决定往哪写盘
 
 ## 撤回
 
@@ -30,7 +30,7 @@ manifest 是**全量声明**：本地 `config/remote/` 里存在、但本轮 man
 列（或版本区间不适用）的文件一律删除。作者推错了配置，从 manifest 里移除
 该条目即可撤回——不用发明 `revoked: true` 之类的标志位，语义只有一个。
 
-注意撤回**不能靠把 content_version 改小**：闸门要求远端严格大于 system，
+注意撤回**不能靠把 content_version 改小**：闸门要求远程严格大于 system，
 版本号调小只会让它不生效，但文件还留在本地 remote 目录里；只有从
 manifest 移除才会真正删掉。
 """
@@ -54,7 +54,7 @@ REMOTE_CONFIG_URL = "https://wanda1416.github.io/lvjiang/config/config.json"
 REMOTE_CONFIG_SCHEMA_VERSION = 1
 #: manifest 本身的大小上限
 MAX_MANIFEST_BYTES = 256 * 1024
-#: 单个配置文件的大小上限（最大的出厂布局 JSON 也就几十 KB）
+#: 单个配置文件的大小上限（最大的系统布局 JSON 也就几十 KB）
 MAX_FILE_BYTES = 1024 * 1024
 MAX_ENTRIES = 500
 _USER_AGENT = "lvjiang-remote-config"
@@ -159,10 +159,10 @@ def _positive_int(data: dict[str, Any], key: str) -> int:
 def is_safe_rel_path(rel_path: str) -> bool:
     """rel_path 是否可以安全地拼进本地 remote 目录。
 
-    manifest 是远端内容，绝不能让它决定往哪写盘：拒绝绝对路径、盘符、
+    manifest 是远程内容，绝不能让它决定往哪写盘：拒绝绝对路径、盘符、
     ``..`` 回溯与反斜杠（Windows 上 ``a\\..\\..\\x`` 同样能逃逸）。
     再要求它落在 versioning 注册表声明过的目录里——没声明的目录本来就
-    不参与在线下发，远端往那儿放文件没有任何正当理由。
+    不参与在线下发，远程往那儿放文件没有任何正当理由。
     """
     if not rel_path or rel_path.startswith("/") or "\\" in rel_path:
         return False
@@ -179,7 +179,7 @@ def _valid_https_url(value: str) -> bool:
 
 
 def parse_manifest(data: Any) -> RemoteManifest:
-    """校验并解析远端配置清单。未知字段忽略，不做旧协议兼容。"""
+    """校验并解析远程配置清单。未知字段忽略，不做旧协议兼容。"""
     if not isinstance(data, dict):
         raise RemoteConfigError("配置清单必须是 JSON 对象")
 
@@ -240,8 +240,8 @@ def _version_key(version: str) -> tuple[int, ...]:
 def entry_applies(entry: RemoteEntry, app_version: str) -> bool:
     """条目是否适用于当前客户端版本。
 
-    这是"远端配置和本地代码对不上"的唯一防线：布局里的 region key 被
-    `.wf` 脚本按名字引用，代码改了 key 而远端还在下发老配置，脚本会崩。
+    这是"远程配置和本地代码对不上"的唯一防线：布局里的 region key 被
+    `.wf` 脚本按名字引用，代码改了 key 而远程还在下发老配置，脚本会崩。
     """
     current = _version_key(app_version)
     if entry.min_app_version and current < _version_key(entry.min_app_version):
@@ -509,9 +509,9 @@ def promote_pending() -> bool:
     先把现役目录挪开、再改名暂存目录、最后删挪开的那份：中途崩溃最坏是
     留下一个 ``.old`` 残留（下次启动清掉），不会出现"生效层没了"的窗口。
 
-    用户已关闭在线配置时，两层一并清掉：开关的语义必须是"回到出厂配置"，
-    只停止下载是不够的——已下发的配置会一直顶替出厂内容，用户遇到一份有
-    问题的远端配置时就没有退路了。重新打开会重新同步，删掉没有损失。
+    用户已关闭在线配置时，两层一并清掉：开关的语义必须是"回到系统配置"，
+    只停止下载是不够的——已下发的配置会一直顶替系统内容，用户遇到一份有
+    问题的远程配置时就没有退路了。重新打开会重新同步，删掉没有损失。
     """
     import shutil
 
@@ -524,7 +524,7 @@ def promote_pending() -> bool:
         if stage.exists() or REMOTE_CONFIG_DIR.exists():
             shutil.rmtree(stage, ignore_errors=True)
             shutil.rmtree(REMOTE_CONFIG_DIR, ignore_errors=True)
-            logger.info("[在线配置] 已关闭，已清除下发的配置，回到出厂内容")
+            logger.info("[在线配置] 已关闭，已清除下发的配置，回到系统内容")
         return False
 
     if not stage.is_dir():
@@ -577,7 +577,7 @@ def run_sync(job: SyncJob, *, remote_dir: Path | None = None,
         # 一律不采信，否则整批配置会被静默回退到旧版。
         logger.warning(
             f"[在线配置] 清单版本回退（本地 v{job.config_version} → "
-            f"远端 v{manifest.config_version}），已忽略本轮")
+            f"远程 v{manifest.config_version}），已忽略本轮")
         return SyncResult(config_version=job.config_version, performed=False)
 
     result = sync_to_dir(manifest, target_dir,

@@ -381,7 +381,7 @@ class BaseAttrPanel(QWidget):
         self._refresh_del_weapon_enabled()
 
     def _refresh_del_weapon_enabled(self):
-        """出厂武器类型不允许用户删除，置灰并说明原因"""
+        """系统武器类型不允许用户删除，置灰并说明原因"""
         item = self._weapon_list.currentItem()
         name = None
         if item is not None:

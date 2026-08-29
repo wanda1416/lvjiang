@@ -1,7 +1,7 @@
 """工作流文件树的合并语义。
 
 编辑器展示的是「有哪些脚本」，不是「哪层有哪些」。所以同一路径只出现一个
-节点，显示实际生效的那一份；出厂文件只读，用户要改得先复制到 local。
+节点，显示实际生效的那一份；系统文件只读，用户要改得先复制到 local。
 """
 
 from __future__ import annotations
@@ -126,7 +126,7 @@ class TestEditability:
         f = _by_path(list_workflow_files())["factory.wf"]
 
         assert f.is_system
-        assert f.editable is False, "出厂文件必须只读，改之前要先复制到本地"
+        assert f.editable is False, "系统文件必须只读，改之前要先复制到本地"
 
     def test_local_file_is_editable(self, layers):
         _, local = layers
@@ -135,7 +135,7 @@ class TestEditability:
         assert _by_path(list_workflow_files())["mine.wf"].editable is True
 
     def test_copying_to_local_makes_it_editable(self, layers):
-        """「复制到本地」之后同一路径变为可编辑，且标记为覆盖出厂。"""
+        """「复制到本地」之后同一路径变为可编辑，且标记为覆盖系统。"""
         system, local = layers
         _write(system, "factory.wf")
         assert _by_path(list_workflow_files())["factory.wf"].editable is False

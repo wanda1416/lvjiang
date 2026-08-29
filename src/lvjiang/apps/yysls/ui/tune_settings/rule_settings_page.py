@@ -138,7 +138,7 @@ class RuleSettingsPage(QWidget):
         self._btn_bump_version.clicked.connect(self._bump_version)
         self._btn_bump_version.setEnabled(self._on_bump_version is not None)
         if self._on_bump_version is None:
-            self._btn_bump_version.setToolTip(tr("仅开发模式可以提升出厂配置版本"))
+            self._btn_bump_version.setToolTip(tr("仅开发模式可以提升系统配置版本"))
         apply_button_style(self._btn_bump_version, variant="neutral")
         key_row.addWidget(self._btn_bump_version)
         key_row.addSpacing(18)
@@ -153,7 +153,7 @@ class RuleSettingsPage(QWidget):
         self._btn_delete.clicked.connect(self._confirm_delete)
         key_row.addWidget(self._btn_delete)
         if self._protected:
-            hint = tr("出厂规则不可删除或修改 key；不使用时请取消启用")
+            hint = tr("系统规则不可删除或修改 key；不使用时请取消启用")
             self._btn_rename_key.setEnabled(False)
             self._btn_rename_key.setToolTip(hint)
             self._btn_delete.setEnabled(False)

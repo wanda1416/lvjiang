@@ -79,7 +79,7 @@ def _discover_class_scripts() -> dict[str, dict]:
             "parameters": list(getattr(cls, "PARAMETERS", []) or []),
             "env": list(getattr(cls, "ENV", []) or []),
             # 脚本性质由实现自己声明（如自动调律天然是专用脚本），
-            # 由实现声明而非出厂配置表达，用户偏好另存 session。
+            # 由实现声明而非系统配置表达，用户偏好另存 session。
             "scope": getattr(cls, "SCOPE", None) or "daily",
             "hidden": bool(getattr(cls, Policy.HIDDEN_CLASS_ATTR, False)),
             "batchable": True,
@@ -109,7 +109,7 @@ def list_exposed_scripts() -> list[dict]:
       ``dedicated`` 专用脚本不进入通用入口；
     - **顺序、启停、显示名**是用户偏好，存 session 的 ``daily.scripts``。
 
-    因此出厂新增的日常脚本会自动出现在列表里，不需要用户做任何事，也不会
+    因此系统新增的日常脚本会自动出现在列表里，不需要用户做任何事，也不会
     因为用户存过偏好就被冻住；新增专用脚本仍保持隐藏。桌面下拉与设备端
     悬浮面板共用本函数。
 

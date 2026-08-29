@@ -292,7 +292,7 @@ class TuningRuleManager:
         if new_key == old_key:
             return
         old_rel = self._rel(self._files[old_key])
-        # 必须先鉴权再写新文件，避免出厂规则删除被拒后留下新 key 的孤立影子。
+        # 必须先鉴权再写新文件，避免系统规则删除被拒后留下新 key 的孤立影子。
         self._resolver.ensure_entity_deletable(old_rel)
         # 同步更新 data 内 key 字段，避免 reload 后 key 与文件名不一致
         data = self._raw.get(old_key) or {}

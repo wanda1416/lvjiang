@@ -72,7 +72,7 @@ class AppHooks:
     # 配置合并策略模块路径列表（同上「import 即注册」语义）：
     # ["lvjiang.apps.yysls.config.merge_policy", ...]。core.config 不认识
     # 任何插件领域词汇，插件私有配置文件（如 yysls/game_config.yaml）里
-    # 哪些列表是登记表、哪些列表的出厂条目不可删除，由插件自己在这些模块里
+    # 哪些列表是登记表、哪些列表的系统条目不可删除，由插件自己在这些模块里
     # 调用 core.config.resolver 的 register_registry_list_paths /
     # register_protected_list_paths 声明。
     config_policy_modules: list[str] = field(default_factory=list)

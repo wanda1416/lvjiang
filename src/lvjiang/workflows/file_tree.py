@@ -2,16 +2,16 @@
 
 编辑器要展示的是「有哪些脚本」，而不是「local 里有哪些、system 里有哪些」。
 所以这里把两层合并成一棵虚拟目录树，每个文件带上它实际来自哪一层、能不能
-编辑、是否覆盖了出厂版本。
+编辑、是否覆盖了系统版本。
 
 三条语义直接来自配置层，不在这里另立一套：
 
 - **local 影子优先**：同名文件 local 完全顶掉 system（整文件替换，不做
   内容合并）。所以树上一个路径只对应一个节点，显示实际生效的那一份。
-- **出厂只读**：用户模式下 system 文件不可改名/删除（``SystemContentProtected``）。
-  想改必须先复制到 local——复制之后该文件就脱离出厂更新了，这个代价要让
+- **系统只读**：用户模式下 system 文件不可改名/删除（``SystemContentProtected``）。
+  想改必须先复制到 local——复制之后该文件就脱离系统更新了，这个代价要让
   用户看得见，所以 :class:`WorkflowFile` 显式区分 ``overrides_system``。
-- **不做墓碑**：用户不能删出厂脚本。要让它不出现，用的是「展示勾选」那套
+- **不做墓碑**：用户不能删系统脚本。要让它不出现，用的是「展示勾选」那套
   暴露机制，不是从磁盘上抹掉。
 
 树**不做任何过滤**：磁盘上有什么就显示什么，``_`` 前缀的编辑器临时文件与
@@ -41,7 +41,7 @@ class WorkflowFile:
 
     rel_path: str          # 相对 workflows 根的 posix 路径
     layer: str             # 实际生效的层：local / system
-    overrides_system: bool  # local 覆盖了同名出厂文件
+    overrides_system: bool  # local 覆盖了同名系统文件
 
     @property
     def name(self) -> str:
@@ -60,7 +60,7 @@ class WorkflowFile:
     def editable(self) -> bool:
         """能否直接编辑。
 
-        出厂文件只读——用户要改得先「复制到本地」。开发模式下 system 本就
+        系统文件只读——用户要改得先「复制到本地」。开发模式下 system 本就
         可写，由调用方按 ``resolver.is_dev_mode()`` 决定是否放开。
         """
         return self.layer == LAYER_LOCAL

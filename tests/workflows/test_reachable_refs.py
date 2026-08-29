@@ -99,7 +99,7 @@ class TestRealWorkflowScope:
         entry = root / "scan_equipped.wf"
         if not entry.exists():
             import pytest
-            pytest.skip("出厂脚本不在仓库内")
+            pytest.skip("系统脚本不在仓库内")
 
         def flatten(path, procs=None, seen=None):
             """按引擎语义递归平铺 import 的全部 def"""

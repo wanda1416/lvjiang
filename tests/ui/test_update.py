@@ -1,10 +1,13 @@
 """版本检查与跳过版本逻辑测试"""
 
 from unittest.mock import patch
+from urllib.error import URLError
 
 import pytest
 
 from lvjiang.core.update import (
+    GITHUB_API_URL,
+    UpdateChecker,
     get_skip_version,
     is_newer_version,
     parse_release_info,
@@ -12,6 +15,35 @@ from lvjiang.core.update import (
     set_skip_version,
     should_prompt_update,
 )
+
+
+def test_network_failure_emits_short_message_without_traceback(
+        monkeypatch, qtbot):
+    import lvjiang.core.update as update_module
+
+    def unavailable(*_args, **_kwargs):
+        raise URLError("TLS connection closed")
+
+    errors = []
+    warnings = []
+    monkeypatch.setattr(update_module, "urlopen", unavailable)
+    monkeypatch.setattr(
+        update_module.logger, "exception",
+        lambda *_args, **_kwargs: pytest.fail("网络异常不应打印 traceback"))
+    monkeypatch.setattr(
+        update_module.logger, "warning",
+        lambda message, *_args, **_kwargs: warnings.append(str(message)))
+    checker = UpdateChecker()
+    checker.error.connect(errors.append)
+
+    checker.run()
+
+    expected = (
+        f"可能因为网络原因，无法访问 {GITHUB_API_URL} 获取更新，"
+        "请检查网络设置后重试"
+    )
+    assert errors == [expected]
+    assert warnings == [expected]
 
 
 class TestParseReleaseInfo:

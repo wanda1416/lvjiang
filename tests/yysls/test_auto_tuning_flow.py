@@ -49,6 +49,7 @@ from lvjiang.core.layout_manager import load_layout_by_name
 from lvjiang.workflows.engine import WorkflowEngine
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
+ARMOR_DETAIL = AutoTuningWorkflow.ARMOR_DETAIL
 EQUIP_DETAIL = AutoTuningWorkflow.EQUIP_DETAIL
 # 调律页与调律结果弹窗已合并为同一场景（结果在 result 视图），
 # 故 _ocr_map 里两者字段共用一个场景条目
@@ -827,6 +828,40 @@ def test_quality_unrecognized_skips(monkeypatch):
     assert not wf.scan_reject_calls
     assert not wf.full_calls
     assert (EQUIP_DETAIL, "more_func") not in wf.clicks
+
+
+def test_non_weapon_wuku_bottom_does_not_depend_on_equipment_parse(monkeypatch):
+    """非武器 status 识别到武库后，即使装备字段全空也立即见底。"""
+    wf = FakeWF()
+    wf._current_slot = "head"
+    wf._ocr_map[ARMOR_DETAIL] = {"status": "武库中"}
+    monkeypatch.setattr(wf, "call_function", lambda *args, **kwargs: {})
+
+    name, fp, equip = wf._read_row(ARMOR_DETAIL, 1)
+
+    assert name == ""
+    assert fp == ""
+    assert equip == {}
+    assert wf.slot_level_exhausted
+
+
+def test_non_weapon_wuku_never_enters_equipment_processing():
+    """旁路调用也不得对非武器武库装备评级、调律或回收。"""
+    wf = FakeWF()
+    wf._current_slot = "head"
+    equip = _equip(2, name="武库冠")
+    equip["is_wuku"] = True
+
+    fp, outcome = wf._process_equipment_once(
+        "武库冠", equip, ARMOR_DETAIL)
+
+    assert fp
+    assert outcome is None
+    assert wf.slot_level_exhausted
+    assert not wf.output.get("tuning_reports")
+    assert not wf.scan_reject_calls
+    assert not wf.full_calls
+    assert not wf.clicks
 
 
 def test_min_level_default_100_passes(monkeypatch):
@@ -2074,3 +2109,122 @@ class TestBaseGroupFallback:
         assert result1 is group
         assert result1 is result2
         assert wf.run_ctx.base_group is result1
+
+
+# ─── 武器分组：槽位类型未知时的退化语义 ────────────────────
+
+class TestGroupedTypeUnknownDegrades:
+    """槽位已装备装备解析失败时，不得谎称「不同类型」。
+
+    这份数据唯一的用途就是武器分组判定。拿不到类型却按「不同类型」处理，
+    会把一次 OCR 抖动误判成「该类型组已到底」，静默砍掉整个部位后面所有
+    装备——而日志还写着「不同类型」，排障时指向完全错误的方向。
+    约定：类型未知 → 退化为按部位终止语义，并在读取处记 error。
+    """
+
+    def test_matches_returns_none_when_slot_unread(self):
+        wf = FakeWF()
+        wf._equipped_items = {}
+        assert wf._grouped_type_matches("main_weapon", "剑") is None
+
+    def test_matches_returns_none_when_slot_parse_failed(self):
+        wf = FakeWF()
+        wf._equipped_items = {"main_weapon": None}
+        assert wf._grouped_type_matches("main_weapon", "剑") is None
+
+    def test_matches_returns_none_when_current_type_missing(self):
+        wf = FakeWF()
+        wf._equipped_items = {"main_weapon": {"type": "剑"}}
+        assert wf._grouped_type_matches("main_weapon", "") is None
+
+    def test_matches_discriminates_same_and_different(self):
+        wf = FakeWF()
+        wf._equipped_items = {"main_weapon": {"type": "剑"}}
+        assert wf._grouped_type_matches("main_weapon", "剑") is True
+        assert wf._grouped_type_matches("main_weapon", "枪") is False
+
+    def test_same_type_wuku_does_not_end_the_slot(self):
+        wf = FakeWF()
+        wf._current_slot = "main_weapon"
+        wf._equipped_items = {"main_weapon": {"type": "剑"}}
+        equip = _equip(2, name="武库剑")
+        equip["is_wuku"] = True
+        equip["type"] = "剑"
+
+        wf._process_equipment_once("武库剑", equip, ARMOR_DETAIL)
+
+        assert not wf.slot_level_exhausted, "同类型武库不应结束武器部位"
+
+    def test_unknown_type_wuku_degrades_to_slot_bottom(self):
+        """类型未知 → 保守终止（与非分组部位一致），但绝不进入处理。"""
+        wf = FakeWF()
+        wf._current_slot = "main_weapon"
+        wf._equipped_items = {"main_weapon": None}
+        equip = _equip(2, name="武库剑")
+        equip["is_wuku"] = True
+        equip["type"] = "剑"
+
+        fp, outcome = wf._process_equipment_once("武库剑", equip, ARMOR_DETAIL)
+
+        assert wf.slot_level_exhausted
+        assert outcome is None
+        assert not wf.output.get("tuning_reports")
+        assert not wf.full_calls
+
+
+class TestWukuPanelEvents:
+    """武库装备必须在面板上有明确提示，不能让扫描毫无征兆地停下。"""
+
+    @staticmethod
+    def _attach_hub(wf) -> list[dict]:
+        """挂一个假 progress hub —— 真实信号经 engine._progress_hub 发出。"""
+        from types import SimpleNamespace
+
+        seen: list[dict] = []
+        wf._engine = SimpleNamespace(_progress_hub=SimpleNamespace(
+            equipment_finished=SimpleNamespace(emit=seen.append)))
+        return seen
+
+    @staticmethod
+    def _statuses(seen) -> list[str]:
+        return [info.get("status") for info in seen]
+
+    def test_non_weapon_reports_slot_boundary(self):
+        wf = FakeWF()
+        wf._current_slot = "head"
+        seen = self._attach_hub(wf)
+        wf._mark_non_weapon_wuku_bottom(True, "武库冠")
+        assert self._statuses(seen) == ["wuku_bottom"]
+
+    def test_marking_twice_reports_once(self):
+        """同一部位重复置位不刷屏。"""
+        wf = FakeWF()
+        wf._current_slot = "head"
+        seen = self._attach_hub(wf)
+        wf._mark_non_weapon_wuku_bottom(True, "武库冠")
+        wf._mark_non_weapon_wuku_bottom(True, "武库靴")
+        assert self._statuses(seen) == ["wuku_bottom"]
+
+    def test_same_weapon_group_reports_skip(self):
+        wf = FakeWF()
+        wf._current_slot = "main_weapon"
+        wf._equipped_items = {"main_weapon": {"type": "剑"}}
+        equip = _equip(2, name="武库剑")
+        equip["is_wuku"] = True
+        equip["type"] = "剑"
+        seen = self._attach_hub(wf)
+        wf._process_equipment_once("武库剑", equip, ARMOR_DETAIL)
+        assert self._statuses(seen) == ["wuku_skip"]
+        assert not wf.slot_level_exhausted
+
+    def test_different_weapon_group_reports_boundary(self):
+        wf = FakeWF()
+        wf._current_slot = "main_weapon"
+        wf._equipped_items = {"main_weapon": {"type": "剑"}}
+        equip = _equip(2, name="武库枪")
+        equip["is_wuku"] = True
+        equip["type"] = "枪"
+        seen = self._attach_hub(wf)
+        wf._process_equipment_once("武库枪", equip, ARMOR_DETAIL)
+        assert self._statuses(seen) == ["wuku_bottom"]
+        assert wf.slot_level_exhausted

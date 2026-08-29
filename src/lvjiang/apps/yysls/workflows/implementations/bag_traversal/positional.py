@@ -68,7 +68,7 @@ class PositionalTraversal(BagTraversal):
         row_index = self._process_new_rows(
             wf, detail_scene, fps, 0, 1, initial_rows, cols)
         if wf.slot_level_exhausted:
-            logger.info("遇到低于等级门槛的有效装备 → 结束当前部位")
+            logger.info("命中槽位级终止条件 → 结束当前部位")
             return
         first_real_row = 1
         logger.info(f"初始完成: row_index={row_index} first_real_row=1 fps={fps}")
@@ -108,7 +108,7 @@ class PositionalTraversal(BagTraversal):
                 wf, detail_scene, fps, row_index, first_real_row, real_rows,
                 cols)
             if wf.slot_level_exhausted:
-                logger.info("遇到低于等级门槛的有效装备 → 结束当前部位")
+                logger.info("命中槽位级终止条件 → 结束当前部位")
                 break
             logger.info(f"  row_index → {row_index}, fps={fps}")
 
@@ -138,6 +138,9 @@ class PositionalTraversal(BagTraversal):
             win_row = logical_row - first_real_row + 1
             # ── 第 1 列：读取兼作行指纹 ──
             name, fp, equip = wf._read_row(detail_scene, win_row)
+            if wf.slot_level_exhausted:
+                logger.info(f"  新行{logical_row} 命中槽位级终止条件")
+                break
             if not fp:
                 logger.info(f"  新行{logical_row} grid[{win_row}][1] 空 slot → 到底")
                 break
@@ -209,6 +212,9 @@ class PositionalTraversal(BagTraversal):
         long_count = 0
         while not wf.is_stopped:
             _, nfp, equip1 = wf._read_row(detail_scene, 1)
+            if wf.slot_level_exhausted:
+                logger.info("  滚动校验读到槽位级终止条件 → 到底")
+                return ScrollState.BOTTOM, alignment.n_rows
 
             # 空指纹 = 空行 = 到底（每行第一列不可能为空，空即超出最后一行）
             if not nfp:
@@ -270,6 +276,9 @@ class PositionalTraversal(BagTraversal):
                 # （硬到底）」：
                 label = wf._equip_label(equip1)
                 _, nfp2, equip2 = wf._read_row(detail_scene, 2)
+                if wf.slot_level_exhausted:
+                    logger.info("  第二行读到槽位级终止条件 → 到底")
+                    return ScrollState.BOTTOM, alignment.n_rows
                 if nfp2 and first_real_row + 1 < len(fps) \
                         and nfp2 == fps[first_real_row + 1]:
                     logger.warning(

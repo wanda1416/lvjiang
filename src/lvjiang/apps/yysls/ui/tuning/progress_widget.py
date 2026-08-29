@@ -306,6 +306,10 @@ class TuningProgressWidget(QWidget):
             "locked": tr("已锁定，跳过"),
             "already_full": tr("满词条，扫描完成"),
             "no_tune_entry": tr("未找到调律入口"),
+            # 武库装备：不属于处理范围，只承担边界语义。缺这两条会落到
+            # 兜底的「已保留」上——那是误导，它既没被保留也没被处理。
+            "wuku_skip": tr("武库装备，跳过"),
+            "wuku_bottom": tr("武库装备，到达部位边界"),
             "skip_tuning": tr("测试模式跳过调律"),
         }
         is_reset_before = status == "reset_before"
@@ -605,6 +609,10 @@ class TuningProgressWidget(QWidget):
             "already_full": tr("满词条，已完成扫描处理"),
             "no_tune_entry": tr("未找到调律入口"),
             "skip_tuning": tr("测试模式跳过调律"),
+            # 同 status_labels：缺这两条会落到兜底的「已保留」，
+            # 而武库装备既没被保留也没被处理。
+            "wuku_skip": tr("武库装备，跳过"),
+            "wuku_bottom": tr("武库装备，到达部位边界"),
         }.get(status, tr("已保留"))
         reason = info.get("reason", "")
         if reason:

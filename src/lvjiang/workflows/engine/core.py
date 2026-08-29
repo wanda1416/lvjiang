@@ -80,6 +80,41 @@ from .signals import (
 
 # ─── 引擎 ─────────────────────────────────────────────────
 
+
+#: import 路径的非法开头。逐条都是能逃出 workflows 沙盒的写法。
+_IMPORT_BAD_PREFIX = ("/", "\\", "~", ".")
+
+
+def _normalize_import_path(raw: str) -> str:
+    """校验并规范化 import 路径，返回相对 workflows 根的 posix 路径。
+
+    只接受「以文件名开头的相对路径」，例如 ``subcall/navigation.wf``。
+
+    不能用 ``Path.is_absolute()`` 判绝对路径——它的结果随运行平台变：
+    ``C:/evil.wf`` 与 ``\\\\server\\share\\x.wf`` 在 Linux 上判定为「非绝对」，
+    而开发与 CI 都在 Linux、用户却在 Windows，这类写法会静默漏过。
+    所以这里用与平台无关的字符串规则。
+
+    两道检查缺一不可：开头检查挡住 ``/`` ``~`` ``..`` 与盘符，
+    normpath 后再查一次 ``..`` 挡住 ``subcall/../../etc/x.wf`` 这种
+    「以文件名开头、却在中段逃逸」的写法。
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        raise WorkflowUserError("import 路径为空")
+    if raw.startswith(_IMPORT_BAD_PREFIX) or ":" in raw or "\\" in raw:
+        raise WorkflowUserError(
+            f"import 路径非法: {raw!r}。"
+            f"必须是相对 workflows 根的路径、以文件名开头，"
+            f"不能以 / \\ ~ . 开头，也不能含盘符或反斜杠。"
+            f"例如 subcall/navigation.wf")
+    rel = posixpath.normpath(raw)
+    if rel.startswith("..") or rel.startswith("/"):
+        raise WorkflowUserError(
+            f"import 路径越界: {raw!r} → {rel}，不能离开 workflows 目录")
+    return rel
+
+
 class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                      _ControlFlowMixin, _EvalMixin):
     """DSL v2 工作流运行时
@@ -605,25 +640,24 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
     ) -> None:
         """递归解析 import 图，收集本次加载单元的所有 def。
 
-        相对路径先按「当前 wf 相对 workflows 根的目录 + import 路径」
-        经 resolver 跨层解析（local 影子优先），未命中回退 _base_dir 拼接。
+        import 路径一律**相对 workflows 根**（不是相对当前文件所在目录），
+        经 resolver 跨层解析（local 影子优先 → system）。所以 subcall 内部
+        互相 import 也要写全 ``subcall/xxx.wf``。
+
+        这样每条 import 都独立地从根算起，不累积路径，越界检查退化成对
+        单条路径的判断，也不需要在递归时维护「当前目录」这类状态。
+
         import_stack 保留当前递归链的真实顺序，用于循环检测；
         imported_files 记录本次加载已解析的规范绝对路径，用于菱形依赖去重。
         """
         for imp in program.imports:
-            imp_path = Path(imp.path)
-            if not imp_path.is_absolute():
-                resolved_cross = None
-                if self._wf_rel_dir is not None:
-                    rel = posixpath.normpath(posixpath.join(
-                        self._wf_rel_dir, Path(imp.path).as_posix()))
-                    if not rel.startswith(".."):
-                        resolved_cross = get_resolver().resolve_read(
-                            f"workflows/{rel}")
-                if resolved_cross is not None:
-                    imp_path = resolved_cross
-                elif self._base_dir:
-                    imp_path = self._base_dir / imp_path
+            rel = _normalize_import_path(imp.path)
+            resolved = get_resolver().resolve_read(f"workflows/{rel}")
+            if resolved is None:
+                raise WorkflowUserError(
+                    f"import 找不到文件: {rel}"
+                    f"（在 config/local 与 config/system 的 workflows/ 下均未找到）")
+            imp_path = Path(resolved)
             imp_resolved = str(imp_path.resolve())
 
             # 循环检测
@@ -643,22 +677,14 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             imp_program = parse_file(imp_path)
             new_stack = [*import_stack, imp_resolved]
 
-            # 递归解析子文件的 import（临时切换 base_dir 与相对目录）
-            old_base = self._base_dir
-            old_rel = self._wf_rel_dir
-            self._base_dir = imp_path.parent
-            self._wf_rel_dir = self._workflows_rel_dir(imp_path)
-            try:
-                self._resolve_imports(
-                    imp_program,
-                    new_stack,
-                    imported_files,
-                    loaded_procs,
-                    loaded_sources,
-                )
-            finally:
-                self._base_dir = old_base
-                self._wf_rel_dir = old_rel
+            # 递归：路径恒从根算起，无需切换任何「当前目录」状态
+            self._resolve_imports(
+                imp_program,
+                new_stack,
+                imported_files,
+                loaded_procs,
+                loaded_sources,
+            )
 
             # 收集子文件的 def（平铺到当前命名空间）
             for name, proc_def in imp_program.procs.items():

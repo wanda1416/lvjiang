@@ -445,12 +445,18 @@ class _StmtMixin:
     # ─── press 指令 ─────────────────────────────────────
 
     def press_stmt(self, items):
-        """press "KEY" [hold N | down | up] [before|after|around wait ...] — 模拟键盘按键
+        """press "KEY"|$var [hold N | down | up] [before|after|around wait ...]
+
+        按键名可以是字符串字面量，也可以是变量——引擎侧 _exec_press 用
+        _resolve 取值后统一 str() 再 normalize_key，所以变量存数字也能按
+        （调用方若要明确语义，可在 wf 里自行转成字符串）。
 
         wait_clause 展开为独立 Wait 语句，按语义顺序排列：before 在前，after 在后。
         press 没有默认延迟，不需要 suppress_defaults。
         """
-        key = self._unquote(str(items[0]))  # STRING token → 去引号
+        key_node = items[0]  # Token(STRING) | VarRef
+        key = (key_node if isinstance(key_node, VarRef)
+               else self._unquote(str(key_node)))
         mode = PressMode.PRESS
         duration = None
         # 先用共享 helper 提取 wait_pairs

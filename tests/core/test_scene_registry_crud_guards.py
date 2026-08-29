@@ -62,3 +62,30 @@ def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
     assert scene is not None
     assert scene.key == "factory"
     assert scene.name == "出厂场景"
+
+
+def test_explicit_scene_version_is_written_only_when_saved(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    path = scenes / "factory.yaml"
+    path.write_text(
+        yaml.dump(
+            {"content_version": 2, "key": "factory", "name": "出厂场景"},
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    resolver = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True,
+    )
+    registry = SceneRegistry(resolver=resolver)
+
+    # 链接点击只在 UI 中记录 pending；对话框真正保存时才调这个 API。
+    assert yaml.safe_load(path.read_text(encoding="utf-8"))[
+        "content_version"] == 2
+    registry.save_scene_content_version("factory", 3)
+    assert yaml.safe_load(path.read_text(encoding="utf-8"))[
+        "content_version"] == 3

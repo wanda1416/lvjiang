@@ -36,48 +36,22 @@ from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 
-def describe_scene_origin(scene_key: str,
-                          layout_name: str = "") -> tuple[str, bool]:
-    """场景当前生效配置的「版本号 / 来源」文案，返回 (文本, 是否含远端)。
-
-    场景编辑器实际在编辑**两个**文件：`scenes/{key}.yaml`（场景定义）与
-    `layouts/{布局}/{key}.json`（该布局下的坐标）。两者都可能被远端独立
-    顶替，只标一个就正好留下盲点——而这个标识存在的意义就是消除盲点，
-    让人随时知道自己正在看哪一份。
-
-    独立于 SceneTab 的纯函数：构造 SceneTab 需要整个 Qt 控件树，而它在
-    测试里反复创建/析构会触发 item delegate 的析构时序问题（PyQt 已知
-    坑，与本功能无关），把文案逻辑摘出来才能直接测。
-    """
+def describe_entity_version(rel_path: str) -> tuple[int | None, str]:
+    """返回实体当前生效版本与来源文案，供版本控件和纯函数测试使用。"""
     from ...core.config.resolver import (
         LAYER_LOCAL,
         LAYER_REMOTE,
         LAYER_SYSTEM,
         get_resolver,
     )
-    from ...core.layout_manager import scene_layout_rel
 
     labels = {
         LAYER_LOCAL: tr("用户"),
-        LAYER_REMOTE: tr("远端"),
+        LAYER_REMOTE: tr("远程下发"),
         LAYER_SYSTEM: tr("系统"),
     }
-    resolver = get_resolver()
-    targets = [(tr("场景"), f"scenes/{scene_key}.yaml")]
-    if layout_name:
-        targets.append((tr("布局"), scene_layout_rel(layout_name, scene_key)))
-
-    parts: list[str] = []
-    has_remote = False
-    for title, rel_path in targets:
-        origin = resolver.describe_entity(rel_path)
-        if not origin.layer:
-            continue
-        has_remote = has_remote or origin.layer == LAYER_REMOTE
-        source = labels.get(origin.layer, origin.layer)
-        version = "" if origin.version is None else f" v{origin.version}"
-        parts.append(f"{title}{version}·{source}")
-    return "　".join(parts), has_remote
+    origin = get_resolver().describe_entity(rel_path)
+    return origin.version, labels.get(origin.layer, origin.layer)
 
 
 class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
@@ -93,6 +67,11 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self.on_view_changed = None
         # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
         self._layout_name: str = ""
+        # 版本提升是编辑状态，不在点击链接时写盘。dialog 保存成功后统一清除；
+        # 切换/关闭选择 Discard 时控件随 Tab 状态一起丢弃。
+        self._pending_scene_version: int | None = None
+        self._pending_layout_version: int | None = None
+        self.on_version_pending_changed = None
 
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -159,37 +138,144 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         bar.addWidget(self._btn_manage_views)
         bar.addSpacing(12)
 
-        # 正在编辑的是哪一份：远端下发的配置会顶替出厂文件，不标出来的话
-        # 开发者本地跑出来的行为和用户不一样却毫不知情，排查问题无从下手。
-        self._origin_label = QLabel()
-        # 来源文本使用剩余空间，但不能用自身长度反向撑宽画布侧分栏。
-        self._origin_label.setMinimumWidth(0)
-        self._origin_label.setSizePolicy(
-            QSizePolicy.Policy.Ignored,
-            QSizePolicy.Policy.Fixed,
-        )
-        self._origin_label.setStyleSheet("color: palette(mid);")
-        bar.addWidget(self._origin_label, stretch=1)
-        self._refresh_origin_label()
+        self._scene_version_title = QLabel(tr("场景版本号："))
+        self._scene_version_value = QLabel()
+        self._scene_version_link = QLabel()
+        for label in (
+                self._scene_version_title,
+                self._scene_version_value,
+                self._scene_version_link):
+            label.setSizePolicy(
+                QSizePolicy.Policy.Preferred,
+                QSizePolicy.Policy.Fixed,
+            )
+        self._configure_version_link(self._scene_version_link, "scene")
+        bar.addWidget(self._scene_version_title)
+        bar.addWidget(self._scene_version_value)
+        bar.addWidget(self._scene_version_link)
+        bar.addSpacing(18)
+
+        self._layout_version_title = QLabel(tr("布局版本号："))
+        self._layout_version_value = QLabel()
+        self._layout_version_link = QLabel()
+        for label in (
+                self._layout_version_title,
+                self._layout_version_value,
+                self._layout_version_link):
+            label.setSizePolicy(
+                QSizePolicy.Policy.Preferred,
+                QSizePolicy.Policy.Fixed,
+            )
+        self._configure_version_link(self._layout_version_link, "layout")
+        bar.addWidget(self._layout_version_title)
+        bar.addWidget(self._layout_version_value)
+        bar.addWidget(self._layout_version_link)
+        bar.addStretch()
+        self._refresh_version_info()
 
         self._refresh_view_combo()
         return bar
 
     def set_layout_name(self, layout_name: str):
         """由 dialog 在应用布局时注入——布局坐标文件的来源要按布局名解析"""
+        if layout_name != self._layout_name:
+            self._pending_layout_version = None
         self._layout_name = layout_name
-        self._refresh_origin_label()
+        self._refresh_version_info()
 
-    def _refresh_origin_label(self):
-        """刷新「版本号 / 来源」标识"""
-        text, has_remote = describe_scene_origin(
-            self._scene_key, self._layout_name)
-        self._origin_label.setText(text)
-        self._origin_label.setToolTip(
-            tr("配置来源：用户=你改过的；系统=出厂；远端=在线下发（会顶替出厂）"))
-        # 远端顶替出厂是最容易被忽略、也最需要被注意到的一种状态
-        self._origin_label.setStyleSheet(
-            "color: #D97706;" if has_remote else "color: palette(mid);")
+    def _configure_version_link(self, label: QLabel, kind: str) -> None:
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        label.setOpenExternalLinks(False)
+        label.linkActivated.connect(
+            lambda _href, k=kind: self._on_version_link(k))
+
+    def _version_rel_path(self, kind: str) -> str:
+        if kind == "scene":
+            return f"scenes/{self._scene_key}.yaml"
+        if not self._layout_name:
+            return ""
+        from ...core.layout_manager import scene_layout_rel
+        return scene_layout_rel(self._layout_name, self._scene_key)
+
+    @staticmethod
+    def _source_style(layer: str) -> str:
+        from ...core.config.resolver import LAYER_LOCAL, LAYER_REMOTE
+        if layer == LAYER_REMOTE:
+            return "color: #D97706;"
+        if layer == LAYER_LOCAL:
+            return "color: palette(highlight);"
+        return "color: palette(mid);"
+
+    def _refresh_version_control(self, kind: str, value: QLabel,
+                                 link: QLabel) -> None:
+        from ...core.config.resolver import get_resolver
+
+        resolver = get_resolver()
+        rel_path = self._version_rel_path(kind)
+        origin = resolver.describe_entity(rel_path) if rel_path else None
+        pending = (self._pending_scene_version if kind == "scene"
+                   else self._pending_layout_version)
+        version = pending if pending is not None else (
+            origin.version if origin is not None else None)
+        value.setText("-" if version is None else f"v{version}")
+        value.setStyleSheet(self._source_style(origin.layer if origin else ""))
+        source = describe_entity_version(rel_path)[1] if rel_path else ""
+        value.setToolTip(
+            tr("来源：{source}\n路径：{path}\n当前版本：{version}").format(
+                source=source or tr("未知"), path=rel_path or "-",
+                version="-" if version is None else f"v{version}"))
+
+        if not rel_path or origin is None or origin.version is None \
+                or not resolver.is_dev_mode():
+            link.hide()
+            return
+        if pending is None:
+            target = resolver.next_entity_version(rel_path)
+            link.setText(f'<a href="bump">{tr("提升至 v{version}").format(version=target)}</a>')
+        else:
+            link.setText(f'<a href="cancel">{tr("撤销提升")}</a>')
+        link.show()
+
+    def _refresh_version_info(self) -> None:
+        if not hasattr(self, "_scene_version_value"):
+            return
+        self._refresh_version_control(
+            "scene", self._scene_version_value, self._scene_version_link)
+        self._refresh_version_control(
+            "layout", self._layout_version_value, self._layout_version_link)
+
+    def _on_version_link(self, kind: str) -> None:
+        from ...core.config.resolver import get_resolver
+
+        rel_path = self._version_rel_path(kind)
+        if not rel_path:
+            return
+        attr = ("_pending_scene_version" if kind == "scene"
+                else "_pending_layout_version")
+        pending = getattr(self, attr)
+        setattr(self, attr, None if pending is not None
+                else get_resolver().next_entity_version(rel_path))
+        self._refresh_version_info()
+        if self.on_version_pending_changed is not None:
+            self.on_version_pending_changed(self._scene_key)
+
+    @property
+    def pending_scene_version(self) -> int | None:
+        return self._pending_scene_version
+
+    @property
+    def pending_layout_version(self) -> int | None:
+        return self._pending_layout_version
+
+    @property
+    def has_pending_version(self) -> bool:
+        return (self._pending_scene_version is not None
+                or self._pending_layout_version is not None)
+
+    def clear_pending_versions(self) -> None:
+        self._pending_scene_version = None
+        self._pending_layout_version = None
+        self._refresh_version_info()
 
     # ─── 视图 ────────────────────────────────────────────
 

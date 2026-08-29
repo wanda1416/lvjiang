@@ -70,7 +70,7 @@ class TestFocusRectRemoved:
 
 class TestHeavyWidgetTeardown:
     def test_scene_toolbar_stays_compact_above_canvas(self, qtbot):
-        """来源标签不能纵向撑高视图工具栏、把画布推到页面中部。"""
+        """版本控件不能纵向撑高视图工具栏、把画布推到页面中部。"""
         from lvjiang.ui.scene_editor.scene_tab import SceneTab
 
         tab = SceneTab("activity_main")
@@ -79,7 +79,8 @@ class TestHeavyWidgetTeardown:
         tab.show()
         QApplication.processEvents()
 
-        assert tab._origin_label.height() <= tab._view_combo.height()
+        assert tab._scene_version_value.height() <= tab._view_combo.height()
+        assert tab._layout_version_value.height() <= tab._view_combo.height()
         toolbar_height = max(
             tab._view_combo.height(), tab._btn_manage_views.height()
         )

@@ -1265,7 +1265,6 @@ auto_strings:
   这是出厂脚本的本地副本，删不掉；右键「还原为出厂」可丢弃本地修改: This is a local copy of a factory script and cannot be deleted; right-click and choose "Restore Factory Version" to discard local changes
   进入亮段阈值: Enter-Bright-Segment Threshold
   进度: Progress
-  远端: Remote
   连接中...: Connecting...
   退出批量: Exit Batch
   退出画布编辑: Exit Canvas Edit
@@ -1281,7 +1280,6 @@ auto_strings:
   遍历列表: Iterate List
   配置: Config
   配置名称：: 'Config Name:'
-  配置来源：用户=你改过的；系统=出厂；远端=在线下发（会顶替出厂）: 'Config Source: User = things you''ve changed; System = factory default; Remote = pushed online (supersedes factory)'
   配置：: 'Config:'
   重命名分组: Rename Group
   重命名列: Rename Column
@@ -1323,3 +1321,16 @@ auto_strings:
   （用户中断，部分结果）: (User Interrupted, Partial Result)
   （空）: (Empty)
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
+  仅开发模式可以提升出厂配置版本: Only developer mode can bump factory configuration versions
+  场景版本号：: 'Scene version:'
+  布局版本号：: 'Layout version:'
+  提升: Bump
+  '提升至 v{version}': 'Bump to v{version}'
+  撤销提升: Cancel bump
+  "来源：{source}\n路径：{path}\n当前版本：{version}": "Source: {source}\nPath: {path}\nCurrent version: {version}"
+  版本号：: 'Version:'
+  版本提升失败: Version bump failed
+  '规则版本已提升至 v{version} 并生效': 'Rule version bumped to v{version} and applied'
+  '远程下发': 'Remote delivery'
+  '配置来源：{source}': 'Configuration source: {source}'
+  '，提升 {count} 项版本': ', bumped {count} versions'

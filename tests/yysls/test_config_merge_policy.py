@@ -20,6 +20,16 @@ def test_hooks_declares_merge_policy_module():
     assert "lvjiang.apps.yysls.config.merge_policy" in yysls_hooks.config_policy_modules
 
 
+def test_hooks_only_contributes_profile_periods_and_business_tabs():
+    assert yysls_hooks.profile_period_modules == [
+        "lvjiang.apps.yysls.profile.periods"
+    ]
+    assert [label for label, _builder in yysls_hooks.right_tab_builders] == [
+        "备战方案",
+        "调律进度",
+    ]
+
+
 def test_tune_config_base_rules_registered_as_registry_list():
     assert resolver.REGISTRY_LIST_PATHS.get("yysls/tune_config.yaml") == ("base_rules",)
 

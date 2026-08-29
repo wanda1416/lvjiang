@@ -1,8 +1,9 @@
-# 玩家档案系统 — 需求总览
+# 用户 Profile 系统 — 需求总览
 
 ## 1. 背景
 
-当前燕云插件仅实现了装备分析功能（读取当前穿戴装备、调律决策），但玩家在游戏中还有大量其他维度的数据需要追踪和管理：
+Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕云只在
+通用四模型上注册赛季周期，并使用这份共享数据追踪游戏内的业务指标：
 
 - **毕业率**：角色装备距离流派毕业标准的进度
 - **货币资产**：各类货币的存量与趋势
@@ -40,8 +41,8 @@
 - 支持自定义重置日（reset_day）、软上限（soft）
 
 **UI 层**
-- 档案总览 Tab：宽表展示所有角色的概要信息，交互式列头配置
-- 其他信息 Tab：按模型类型分区展示当前用户的详细信息
+- 用户总览 Tab：宽表展示所有用户的概要信息，交互式列头配置
+- 用户信息 Tab：按模型类型分区展示当前用户的详细信息
 - 右键菜单：支持覆写、查看历史记录
 - 定义面板：支持编辑 key 定义（增删改查）
 - 分组管理：支持自定义分组和列配置
@@ -128,26 +129,26 @@
 ### 3.2 模块划分
 
 ```
-src/lvjiang/apps/yysls/
-├── config/
-│   ├── profile_models.py      # 玩家数据模型定义（QuotaKeyDef/RegenKeyDef/StockKeyDef/NoteKeyDef）
-│   ├── profile_store.py       # session.json 的 profile 节点（总览分组配置）
-│   └── user_profile.py        # profile.yaml 加载（ProfileSchema）
-├── core/profile_engine/        # 玩家档案核心
-│   ├── profile_db.py          # SQLite 存储层（profile_entries + profile_history）
-│   ├── profile_engine.py      # 后台计算引擎（QThread：周期重置 + 再生计算 + 预警）
-│   ├── profile_ops.py         # profile_action() / profile_read()：DSL 内置函数的读写实现
-│   ├── regen_math.py          # realtime / boundary 两种再生的数值计算
-│   └── sync_engine.py         # sync_targets 触发器同步
-└── ui/profile/
-    ├── overview.py             # 档案总览 Tab（宽表 + 分组）
-    ├── cell_editing.py         # 单元格双击编辑、右键菜单、回写
-    ├── cell_formatting.py      # 单元格显示文本/样式/tooltip（含 X/Y 上限展示）
-    ├── settings_dialog.py      # 定义面板（ProfileDefinitionDialog，按模型分 Tab）
-    ├── dialogs.py              # 历史记录对话框、数值输入对话框
-    ├── column_management.py    # 分组/列配置
-    └── tab.py                  # 顶层用户工具栏共用组件
+src/lvjiang/
+├── core/profile/
+│   ├── models.py       # quota/regen/stock/note 数据定义
+│   ├── schema.py       # profile.yaml 加载与校验
+│   ├── store.py        # session.json.profile 分组和告警状态
+│   ├── repository.py   # profile.db 存储层
+│   ├── engine.py       # 周期重置、再生计算和预警
+│   ├── service.py      # 统一读写语义
+│   ├── regen.py        # realtime / boundary 计算
+│   ├── sync.py         # sync_targets 同步
+│   └── periods.py      # 通用周期注册表
+├── ui/profile/               # 用户总览、用户信息和定义面板
+├── workflows/builtins/profile.py
+│                           # 通用 profile_action/profile_read 等 DSL 函数
+└── apps/yysls/profile/periods.py
+                            # 燕云 season/half_season 周期边界
 ```
+
+详细边界与不变的存储契约见
+[Profile 共享模块](../30-architecture/31-models/04-profile.md)。
 
 ### 3.3 存储方案
 
@@ -248,15 +249,15 @@ CREATE TABLE profile_history (
 
 ## 4. UI 设计
 
-### 4.1 档案总览 Tab（已实现）
+### 4.1 用户总览 Tab（已实现）
 
-宽表展示所有角色的概要信息，支持交互式列头配置：
+宽表展示所有用户的概要信息，支持交互式列头配置：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  [分组: 默认]  [刷新]                                        │
 ├─────────────────────────────────────────────────────────────┤
-│  角色名  │ 袅袅  │ 不肝   │ 体力    │ 心力   │ 宝钱  │ ...  │
+│  用户名  │ 袅袅  │ 不肝   │ 体力    │ 心力   │ 宝钱  │ ...  │
 ├─────────────────────────────────────────────────────────────┤
 │  测试用户A  │ 2/3   │ 12000  │ 1800/2500│ 450/600│ 1.2万 │ ...  │
 │  测试用户B  │ 0/3   │ 5000   │ 2400/2500│ 580/600│ 0.8万 │ ...  │
@@ -269,7 +270,7 @@ CREATE TABLE profile_history (
 - 列头拖拽调整顺序和宽度
 - 分组切换
 
-### 4.2 其他信息 Tab（已实现）
+### 4.2 用户信息 Tab（已实现）
 
 按模型类型分区展示当前用户的详细信息（分区顺序：配额 → 库存 → 再生 → 备注）：
 
@@ -347,8 +348,9 @@ CREATE TABLE profile_history (
 ### 6.1 与现有模块的关系
 
 - **装备分析**：毕业率分析需要读取装备数据，复用现有 `EquipmentData` 模型
-- **批处理**：多账号场景下，玩家档案按账号隔离
+- **批处理**：多用户数据依旧通过 `username` 区分
 - **用户管理**：与现有 `UserConfigManager` 集成
+- **App 共享**：Profile 不按 app 隔离，不增加 `app_id`；各 app 共享 key 命名空间
 
 ### 6.2 外部依赖
 
@@ -361,7 +363,7 @@ CREATE TABLE profile_history (
 ## 7. 实施路线
 
 ### Phase 1（MVP）— 玩家数据模型 ✅ 已完成
-- ✅ 三模型架构（quota/regen/stock）
+- ✅ 四模型架构（quota/regen/stock/note）
 - ✅ SQLite 持久化
 - ✅ 后台计算引擎
 - ✅ UI 总览 + 详情

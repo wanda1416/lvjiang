@@ -72,6 +72,16 @@ def _tr_literals() -> set[str]:
                 arg = node.args[0]
                 if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                     found.add(arg.value)
+            # Profile 周期标签由注册表传给 tr(period.label)，
+            # 不会以 tr("字面量") 的形式出现。把注册点的
+            # label 纳入棘轮，否则新插件周期的英文缺失无人发现。
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "register_profile_period"):
+                for keyword in node.keywords:
+                    if (keyword.arg == "label"
+                            and isinstance(keyword.value, ast.Constant)
+                            and isinstance(keyword.value.value, str)):
+                        found.add(keyword.value.value)
     return found
 
 

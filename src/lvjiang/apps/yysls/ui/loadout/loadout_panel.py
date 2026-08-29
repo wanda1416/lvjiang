@@ -18,11 +18,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
+
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr
 from ...core.loadout import LoadoutRepository, resolve_school
 from ..events import get_event_hub
-from ..profile.tab import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
@@ -101,7 +102,7 @@ class LoadoutPanel(QWidget):
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(8)
 
-        # Row 1: same navigation structure as "其他信息".
+        # Row 1: same navigation structure as "用户信息".
         tools = QHBoxLayout()
         add_user_toolbar_buttons(
             tools,

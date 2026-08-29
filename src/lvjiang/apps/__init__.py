@@ -114,6 +114,18 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
             logger.exception("[plugin] 内置函数模块加载失败")
         logger.info("[plugin]   builtin modules: %d", len(hooks.builtin_modules))
 
+    if hooks.profile_period_modules:
+        registry.setdefault("profile_period_modules", []).extend(
+            hooks.profile_period_modules
+        )
+        for mod_path in hooks.profile_period_modules:
+            try:
+                importlib.import_module(mod_path)
+                logger.info("[plugin]   profile period module 已加载: %s", mod_path)
+            except Exception:  # noqa: BLE001
+                logger.exception("[plugin] Profile 周期模块加载失败: %s", mod_path)
+                raise
+
     if hooks.telemetry_modules:
         registry.setdefault("telemetry_modules", []).extend(hooks.telemetry_modules)
         # 实际导入模块触发 register_schema() 注册；单个插件的 schema

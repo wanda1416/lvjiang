@@ -82,6 +82,9 @@ class TestDialog:
         assert not dialog._nav.item(4).flags()
         assert dialog._nav.item(5).text() == "流派规则"
         assert dialog._nav.property("navigation") is True
+        # 规则页初始只占位，首次进入才构造 RulePanel。
+        assert not isinstance(dialog._stack.widget(5), RulePanel)
+        assert not dialog.findChildren(RulePanel)
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
         first_rule = next(iter(get_tuning_rules().values()))
@@ -92,6 +95,8 @@ class TestDialog:
         dialog._nav.setCurrentRow(6)
         assert dialog._stack.currentIndex() == 5
         rule_panel = dialog._stack.widget(5)
+        assert isinstance(rule_panel, RulePanel)
+        assert len(dialog.findChildren(RulePanel)) == 1
         assert rule_panel._nav.property("navigation") is True
         dialog.show()
         QApplication.processEvents()
@@ -108,6 +113,28 @@ class TestDialog:
         buttons = dialog.findChildren(QPushButton)
         assert buttons
         assert all(button.styleSheet() for button in buttons)
+
+    def test_lazy_placeholder_tracks_add_rename_delete(
+            self, qtbot, monkeypatch):
+        dialog = TuningRulesDialog()
+        qtbot.addWidget(dialog)
+        nav_count = dialog._nav.count()
+        stack_count = dialog._stack.count()
+
+        placeholder = dialog._add_rule_page("lazy_test", "占位规则")
+        assert dialog._stack.widget(stack_count) is placeholder
+        assert dialog._nav.item(nav_count).text() == "占位规则"
+
+        # RulePanel 在调用对话框回调前会先更新自身 key；占位页
+        # 保持同一协议，导航文本应在原位更新。
+        placeholder.rule_key = "lazy_renamed"
+        dialog._rename_rule("lazy_test", "lazy_renamed", "已重命名")
+        assert dialog._nav.item(nav_count).text() == "已重命名"
+
+        monkeypatch.setattr(dialog._manager, "delete_rule", lambda _key: None)
+        dialog._delete_rule("lazy_renamed")
+        assert dialog._nav.count() == nav_count
+        assert dialog._stack.count() == stack_count
 
 
 class TestBehaviorPages:

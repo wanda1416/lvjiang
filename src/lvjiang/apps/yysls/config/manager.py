@@ -98,6 +98,10 @@ class GameConfigManager:
 
         self._load()
 
+    def reload(self) -> None:
+        """重新读取配置；resolver 会先检查文件印记再决定是否解析。"""
+        self._load()
+
     def _load(self):
         self._type_to_group_cache = None  # 重置缓存
         if self._path is not None:

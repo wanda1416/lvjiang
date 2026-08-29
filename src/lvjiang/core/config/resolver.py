@@ -372,6 +372,11 @@ class ConfigResolver:
         self._remote_dir = Path(remote_dir) if remote_dir else None
         self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
         self._listeners: list[Callable[[str], None]] = []
+        # YAML 解析结果按文件缓存；返回时必须深拷贝，因为
+        # save_merged 等调用方会就地修改读到的文档。
+        self._yaml_cache: dict[
+            str, tuple[tuple[int, int], dict]
+        ] = {}
         #: 已记过「远程顶替系统」日志的 (rel_path, 远程版本)，见 _log_supersede
         self._logged_supersedes: set[tuple[str, int]] = set()
 
@@ -430,6 +435,10 @@ class ConfigResolver:
             self._listeners.remove(cb)
 
     def _notify(self, rel_path: str):
+        # 写入路径主动失效，补上“同一 mtime tick 内写入了
+        # 同尺寸内容”这个 stat 印记无法区分的极端情况。
+        for root in (self.system_dir, self.local_dir, self.remote_dir):
+            self._yaml_cache.pop(str(root / rel_path), None)
         for cb in list(self._listeners):
             try:
                 cb(rel_path)
@@ -805,14 +814,23 @@ class ConfigResolver:
     # ─── 聚合键值文件（键级 diff 深合并）──────────────────
 
     def _load_yaml(self, path: Path) -> dict:
-        if not path.exists():
+        try:
+            stat = path.stat()
+        except OSError:
             return {}
+        stamp = (stat.st_mtime_ns, stat.st_size)
+        cache_key = str(path)
+        cached = self._yaml_cache.get(cache_key)
+        if cached is not None and cached[0] == stamp:
+            return deepcopy(cached[1])
         try:
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
+            doc = data if isinstance(data, dict) else {}
         except Exception as e:  # noqa: BLE001
             logger.error(f"配置解析失败 {path}: {e}")
-            return {}
+            doc = {}
+        self._yaml_cache[cache_key] = (stamp, doc)
+        return deepcopy(doc)
 
     def load_system(self, rel_path: str) -> dict:
         """只读 system 层文档（不合并 local）

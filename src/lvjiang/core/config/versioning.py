@@ -20,8 +20,9 @@
 
 ## 谁维护它
 
-开发模式经 `resolver.write_entity` 落盘时**自动 +1**（内容真的变了才加），
-不靠人手改——这三类文件全都是 UI 编辑器写出来的，手写的版本号存一次就没。
+开发模式普通保存只**保留当前版本号**，版本提升由编辑器中的显式操作请求，
+并和其他编辑状态一起在保存时落盘。这样一次完整编辑只产生一个发布版本，
+不会把每次自动保存都误算成新的内容代次。新文件仍自动从 1 起步。
 `scripts/add_content_version.py` 负责给存量/新增文件补齐初始值。
 
 ## 哪些目录参与
@@ -199,62 +200,21 @@ def with_version(text: str, suffix: str, version: int) -> str:
     return _with_version_yaml(text, version)
 
 
-def strip_version(text: str, suffix: str) -> str:
-    """去掉 content_version 后的内容，用于「内容是否真的变了」的比对。"""
-    if suffix == ".json":
-        try:
-            data = json.loads(text)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return text
-        if not isinstance(data, dict):
-            return text
-        rest = {k: v for k, v in data.items() if k != CONTENT_VERSION_KEY}
-        return json.dumps(rest, ensure_ascii=False, indent=2, sort_keys=True)
-    return "\n".join(line for line in text.splitlines()
-                     if not line.startswith(f"{CONTENT_VERSION_KEY}:"))
+def preserve_version_for_write(rel_path: str, new_text: str,
+                               current_path: Path | None) -> str:
+    """普通开发保存：保留 system 当前版本，新文件从 v1 起步。
 
-
-def next_version_for_write(rel_path: str, new_text: str,
-                           current_path: Path | None,
-                           floor_version: int | None = None) -> str:
-    """开发模式落盘前给内容盖上正确的 content_version。
-
-    内容（去掉版本号后）与盘上一致就保持原版本号，真的变了才 +1——每次
-    保存都 +1 会让"打开编辑器又原样关掉"也推高版本，remote 侧就分不清
-    哪次是真改动。盘上没有旧文件（新建）时从 1 起。
-
-    ``floor_version`` 是**当前实际被读到的那一层**的版本号（开发模式下
-    远端可能正顶替着出厂文件）。不传这个的话会出一个坏状态：开发者在
-    编辑器里看到的是远端 v3 的内容，改完保存却拿出厂 v2 做基线写出
-    v3——于是 v3 有两份不同内容，一份在仓库、一份在线上，版本号不再唯一
-    标识内容，作者提交后自己都分不清。传了之后新版本恒大于已发布的那份，
-    作者的改动确定性地胜出。
-
-    Returns:
-        盖好版本号的内容文本。
+    编辑器序列化场景、布局和插件配置时通常不会把 ``content_version`` 放进
+    业务模型，因此不能简单删除旧的自动 bump 逻辑，否则第一次保存就会把
+    顶层版本字段写没。这里把版本字段视为存储元数据：普通保存沿用旧号，
+    只有编辑器显式传入目标版本时才提升。
     """
     suffix = Path(rel_path).suffix
-    old_text = ""
-    if current_path is not None and current_path.exists():
-        try:
-            old_text = read_text_preserving_eol(current_path)
-        except (OSError, UnicodeDecodeError):
-            old_text = ""
-
-    old_version = version_from_text(old_text, suffix) if old_text else None
-    unchanged = (old_text
-                 and strip_version(old_text, suffix) == strip_version(new_text, suffix))
-    if unchanged and (floor_version is None
-                      or (old_version is not None and old_version > floor_version)):
-        # 内容没变且没被更新的远端版本压着：保持原版本号
-        return with_version(new_text, suffix, old_version) if old_version else new_text
-
-    base = max(old_version or 0, floor_version or 0)
+    current_version = read_version(current_path) if current_path is not None else None
+    version = current_version if current_version is not None else 1
     try:
-        return with_version(new_text, suffix, base + 1)
+        return with_version(new_text, suffix, version)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        # 内容不是合法 JSON 就原样落盘——写入方自己会因为格式错误报错，
-        # 这里不该抢先抛一个"版本号写不进去"的次要错误盖住真正的原因。
         logger.warning(f"content_version 写入跳过（内容无法解析）{rel_path}: {exc}")
         return new_text
 

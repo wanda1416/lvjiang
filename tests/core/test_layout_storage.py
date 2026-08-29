@@ -7,6 +7,7 @@
 - load_layout_by_name 模块级函数
 """
 
+import json
 
 import pytest
 
@@ -438,3 +439,21 @@ class TestSaveLayoutScope:
             path.unlink()
         mgr.save_layout(layout, changed_scenes={"scene_a"})
         assert self._saved_scene_files(env) == {"scene_a.json"}
+
+    def test_explicit_version_alone_writes_selected_scene(self, env):
+        mgr = LayoutConfigManager()
+        layout = _make_layout("根布局")
+        mgr.save_layout(layout)
+        scene_dir = env / "system" / "layouts" / "根布局"
+        for path in scene_dir.glob("*.json"):
+            path.unlink()
+
+        mgr.save_layout(
+            layout,
+            changed_scenes=set(),
+            content_versions={"scene_a": 2},
+        )
+
+        assert self._saved_scene_files(env) == {"scene_a.json"}
+        data = json.loads((scene_dir / "scene_a.json").read_text(encoding="utf-8"))
+        assert data["content_version"] == 2

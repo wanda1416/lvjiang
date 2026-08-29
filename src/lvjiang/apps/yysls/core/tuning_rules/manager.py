@@ -161,6 +161,42 @@ class TuningRuleManager:
         """原始 YAML dict 的深拷贝（UI 编辑用）"""
         return copy.deepcopy(self._raw.get(key) or {})
 
+    def describe_rule_version(self, key: str):
+        """返回规则实体来源与版本，供配置页展示。"""
+        filename = self._files.get(key) or f"{key}.yaml"
+        return self._resolver.describe_entity(self._rel(filename))
+
+    def can_bump_rule_version(self) -> bool:
+        return self._resolver.is_dev_mode()
+
+    def bump_rule_version(self, key: str,
+                          data: dict | None = None) -> int:
+        """显式提升规则版本并立即写盘生效。
+
+        ``data`` 是 UI 正在编辑的完整规则。remote 正在顶替 system
+        时，普通自动保存会保留 system 旧版本，reload 仍会读到 remote；
+        因此提升时必须优先使用 UI 工作副本，不能反过来用 reload
+        后的 remote 缓存覆盖掉用户刚做的修改。
+        """
+        filename = self._files.get(key) or f"{key}.yaml"
+        rel_path = self._rel(filename)
+        source = self._resolver.resolve_read(rel_path)
+        if source is None:
+            raise RuleValidationError(f"规则不存在: {key}")
+        target = self._resolver.next_entity_version(rel_path)
+        content = copy.deepcopy(data) if data else self._raw.get(key)
+        if content is None:
+            with open(source, "r", encoding="utf-8") as f:
+                content = yaml.safe_load(f) or {}
+        parse_tuning_rule(content, self._switch_keys())
+        self._resolver.write_entity(
+            rel_path,
+            yaml.dump(content, allow_unicode=True, sort_keys=False),
+            content_version=target,
+        )
+        self.reload()
+        return target
+
     @property
     def errors(self) -> dict[str, str]:
         """加载失败的文件（文件名 stem → 错误信息）"""
@@ -700,5 +736,3 @@ def _on_config_change(rel_path: str):
 
 
 get_resolver().add_change_listener(_on_config_change)
-
-

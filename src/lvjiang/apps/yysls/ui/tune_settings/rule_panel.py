@@ -150,7 +150,10 @@ class RulePanel(QWidget):
             self._data, self._on_changed, on_delete=self._request_delete,
             on_rename=self._rename_rule,
             on_enable_changed=self._on_rule_enable_changed,
-            protected=self._manager.is_system_rule(self._key))
+            protected=self._manager.is_system_rule(self._key),
+            version_origin=self._manager.describe_rule_version(self._key),
+            on_bump_version=(self._bump_rule_version
+                             if self._manager.can_bump_rule_version() else None))
         # 回填启用状态（从 tune_config.tuning_rules 读取）
         self._settings_page.set_enabled(self._is_rule_enabled())
         self._stack.addWidget(self._wrap_scroll(self._settings_page))
@@ -220,6 +223,16 @@ class RulePanel(QWidget):
             self._status_cb(tr("已保存并生效（{now}）").format(now=now) + "；" + warn, "warn")
         else:
             self._status_cb(tr("已保存并生效（{now}）").format(now=now), False)
+
+    def _bump_rule_version(self) -> int:
+        """规则版本提升是明确的即时操作，不进入对话框暂存状态。"""
+        version = self._manager.bump_rule_version(self._key, self._data)
+        self._data["content_version"] = version
+        self._status_cb(
+            tr("规则版本已提升至 v{version} 并生效").format(version=version),
+            False,
+        )
+        return version
 
     def _soft_pool_warning(self) -> str | None:
         """软校验（不阻止保存）：可用词条库同时含动态属攻与

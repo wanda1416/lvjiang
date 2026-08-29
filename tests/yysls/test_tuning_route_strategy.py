@@ -76,10 +76,13 @@ def test_desktop_checks_confirm_after_recycle_keypress():
     assert outcome is RecycleOutcome.RECYCLED
     wf.ocr_scene.assert_called_once_with(
         EQUIP_DETAIL, ["recycle_confirm"])
-    wf.click_region.assert_called_once_with(EQUIP_DETAIL, "recycle_confirm")
+    # 端游确认走空格，不点确认区域——那个区域在端游布局下点不动
+    wf.click_region.assert_not_called()
     calls = wf.method_calls
     assert calls.index(call.press("X", wait=None)) < calls.index(
         call.ocr_scene(EQUIP_DETAIL, ["recycle_confirm"]))
+    assert calls.index(call.ocr_scene(EQUIP_DETAIL, ["recycle_confirm"])) < \
+        calls.index(call.press("SPACE", wait=None))
 
 
 def test_desktop_waits_after_locked_recycle():
@@ -119,3 +122,20 @@ def test_navigation_subcall_success_is_propagated():
     assert routes.enter_equip() is True
     assert routes.return_main() is True
     assert routes.enter_tune_detail() is True
+
+
+def test_android_confirms_recycle_by_clicking_region():
+    """安卓侧保持点击确认区域——空格是端游特有的确认方式。"""
+    wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL)
+    wf.output = {}
+    wf.ocr_scene.return_value = {"recycle_confirm": "确认"}
+    wf.ocr_scene_by.return_value = "sub_func_1"
+    routes = AndroidTuningRouteStrategy(wf)
+    recycler = TuningRecycler(wf, routes)
+    equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
+
+    outcome = recycler.recycle_current(equip, "weapon_detail", "scan", "测试")
+
+    assert outcome is RecycleOutcome.RECYCLED
+    assert call.press("SPACE", wait=None) not in wf.method_calls
+    assert call.click_region(EQUIP_DETAIL, "recycle_confirm") in wf.method_calls

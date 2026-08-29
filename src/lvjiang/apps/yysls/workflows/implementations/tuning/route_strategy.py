@@ -54,6 +54,11 @@ class TuningRouteStrategy(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def confirm_recycle(self) -> None:
+        """确认回收（弹窗已确认含「确认」后调用）。"""
+        raise NotImplementedError
+
+    @abstractmethod
     def close_recycle_entry_on_lock(self) -> None:
         """回收确认弹窗判定装备锁定后，恢复本环境回收入口的 UI 状态。"""
         raise NotImplementedError
@@ -109,6 +114,10 @@ class AndroidTuningRouteStrategy(TuningRouteStrategy):
         wf.wait_stable("page_refresh")  # 回收确认弹窗
         return True
 
+    def confirm_recycle(self) -> None:
+        wf = self._wf
+        wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
+
     def close_recycle_entry_on_lock(self) -> None:
         wf = self._wf
         wf.click_region(wf.EQUIP_DETAIL, "more_func")
@@ -127,6 +136,12 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
         wf.press("X", wait=None)
         wf.wait_stable("page_refresh")  # 回收确认弹窗
         return True
+
+    def confirm_recycle(self) -> None:
+        # 端游的回收确认走键盘：确认区域在端游布局下并不是一个可点的按钮，
+        # 点它不生效；空格才是确认键（与 X 触发回收成对）。
+        logger.info("  [桌面端] 按空格确认回收")
+        self._wf.press("SPACE", wait=None)
 
     def close_recycle_entry_on_lock(self) -> None:
         # 桌面端被锁定不会出现任何现象，但也要等待

@@ -165,10 +165,8 @@ if $bugan_pos
 end
 
 # ─── 返回主界面 ──────────────────────────────────────────
-# 钱袋 → 菜单页
-click [bag_equip_detail].[back] after wait @step_interval
-# 菜单页 → 主界面
-click [game_menu_page].[back] after wait @page_refresh
+call nav_back_to_main()
+return 0
 
 # ─── 上拉 1 行后重建面板数据 ──────────────────────────────
 # $data 是滚动前的整面板数据，$fresh 是滚动后只补扫了最后一行（$rows）

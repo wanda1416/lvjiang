@@ -22,6 +22,7 @@ from ...core.ocr import OCREngine
 from ...core.recognizers import ReferenceRecognizer
 from ..align import GridAlignment
 from ..base import BaseWorkflow
+from ..errors import WorkflowExecutionError
 from ..grammar.ast_nodes import (
     Align,
     Break,
@@ -772,9 +773,27 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             # 用户停止，不应落入通用异常日志。
             logger.info("Python 工作流收到停止请求")
             result = workflow.output
-        except Exception as e:
-            logger.error(f"Python 工作流异常: {e}\n{traceback.format_exc()}")
-            result = workflow.output
+        except Exception as exc:
+            # 意外异常必须作为失败传播到运行线程/UI。过去这里返回部分 output，
+            # 调用方会按“正常完成”保存 session 和结果，掩盖真实失败。
+            #
+            # 失败前已产生的输出在这里记进日志：异常一路抛到 UI 后走的是
+            # 「异常退出」分支，那条路不落盘结果，output/ 下不会有 JSON。
+            # 崩溃排障时人看的是日志，把数据留在这儿比挂在异常上更实用
+            # ——挂着但无人读取，只会让人误以为它被妥善保存了。
+            name = workflow.__class__.__name__
+            if workflow.output:
+                # default=str：output 里可能有 dataclass / Path 等非 JSON 类型。
+                # 整段再套 try：日志失败绝不能盖住真正的异常。
+                try:
+                    import json
+                    dumped = json.dumps(
+                        workflow.output, ensure_ascii=False,
+                        indent=2, default=str)
+                except Exception:  # noqa: BLE001 排障日志不值得再抛
+                    dumped = repr(workflow.output)
+                logger.error(f"Python 工作流 {name} 失败前已产生的输出:\n{dumped}")
+            raise WorkflowExecutionError(name, workflow.output) from exc
         finally:
             # 清理：避免引擎复用时泄漏过期工作流引用
             self._workflow = None

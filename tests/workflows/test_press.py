@@ -155,3 +155,55 @@ class TestCleanup:
         assert not eng._key_registry.is_pressed("SHIFT")
         # backend 被调用了 2 次 key_up
         assert eng._input.key_up.call_count == 2
+
+
+class TestPressVariableKey:
+    """press $var — 按键名来自变量。
+
+    引擎侧 _exec_press 一直用 _resolve 取值、也早有「按键变量未定义」的
+    报错，只是语法与 parser 之前只收 STRING，变量写法根本进不来。
+    典型场景：面板里扫出「看报」在第几列，再按对应数字键进入。
+    """
+
+    @staticmethod
+    def _run_with(code: str, variables: dict):
+        eng = make_engine()
+        eng.variables = dict(variables)
+        program = parse_text(code)
+        eng._procs = dict(program.procs)
+        eng._exec_body(program.body)
+        return eng._input
+
+    def test_variable_key_presses_that_key(self):
+        inp = self._run_with('press $fc\n', {"fc": "3"})
+        assert inp.method_calls == [("key_down", ("3",), {}),
+                                    ("key_up", ("3",), {})]
+
+    def test_numeric_variable_is_accepted(self):
+        """扫描算出来的列号是 int，不强制调用方先转字符串。"""
+        inp = self._run_with('press $fc\n', {"fc": 3})
+        assert inp.method_calls == [("key_down", ("3",), {}),
+                                    ("key_up", ("3",), {})]
+
+    def test_variable_key_is_normalized(self):
+        inp = self._run_with('press $k\n', {"k": "shift"})
+        assert inp.method_calls == [("key_down", ("SHIFT",), {}),
+                                    ("key_up", ("SHIFT",), {})]
+
+    def test_variable_key_supports_hold(self):
+        inp = self._run_with('press $k hold 0.01\n', {"k": "W"})
+        assert [c[0] for c in inp.method_calls] == ["key_down", "key_up"]
+
+    def test_variable_key_supports_down_up(self):
+        inp = self._run_with('press $k down\npress $k up\n', {"k": "CTRL"})
+        assert inp.method_calls == [("key_down", ("CTRL",), {}),
+                                    ("key_up", ("CTRL",), {})]
+
+    def test_undefined_variable_raises_user_error(self):
+        with pytest.raises(WorkflowUserError, match="按键变量未定义"):
+            self._run_with('press $nope\n', {})
+
+    def test_string_literal_still_works(self):
+        inp = self._run_with('press "3"\n', {})
+        assert inp.method_calls == [("key_down", ("3",), {}),
+                                    ("key_up", ("3",), {})]

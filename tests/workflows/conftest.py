@@ -5,6 +5,8 @@ make_engine / run 被多个测试文件使用，集中定义避免重复。
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import parse_text
 
@@ -36,3 +38,23 @@ def run(code: str, initial: dict | None = None) -> dict:
     eng._procs = dict(program.procs)
     eng._exec_body(program.body)
     return eng.variables
+
+
+@pytest.fixture
+def wf_root(tmp_path, monkeypatch):
+    """把 resolver 指向 tmp，返回可写 .wf 的 workflows 根。
+
+    import 路径现在一律相对 workflows 根经 resolver 跨层解析，测试不能再
+    往裸 tmp_path 里丢文件用文件名 import——那样解析器根本看不到它们。
+    """
+    from lvjiang.core.config import resolver as resolver_mod
+
+    system = tmp_path / "system"
+    (system / "workflows").mkdir(parents=True)
+    (tmp_path / "local").mkdir()
+    monkeypatch.setattr(
+        resolver_mod, "_resolver",
+        resolver_mod.ConfigResolver(
+            system_dir=system, local_dir=tmp_path / "local", dev_mode=False),
+    )
+    return system / "workflows"

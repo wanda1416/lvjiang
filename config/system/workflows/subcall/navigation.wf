@@ -14,7 +14,7 @@
 #   nav_back_to_main()   — 背包装备页 → 主界面（0 成功，-1 失败）
 #   nav_equip_to_tune()  — 装备详情页 → 调律页（0 成功，-1 失败）
 
-import "page_detection.wf"
+import "subcall/page_detection.wf"
 
 # ─── nav_main_to_bag ──────────────────────────────────────
 # 从主界面导航到背包页面

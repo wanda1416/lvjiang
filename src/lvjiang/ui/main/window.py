@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QStyle,
     QStyleOptionComboBox,
@@ -102,12 +103,17 @@ class _BatchContextComboBox(QComboBox):
 def _set_combo_character_capacity(
     combo: QComboBox,
     character_count: int = _TOP_COMBO_CHARACTER_CAPACITY,
+    *,
+    expanding: bool = False,
 ) -> int:
     """Fix a combo width that leaves room for N full-width Chinese characters.
 
     ``setMinimumContentsLength`` is based on an average Latin glyph and can still
     truncate CJK text.  Ask the active Qt style to add its frame and arrow chrome
     around an explicitly measured full-width text area instead.
+
+    ``expanding=True`` 时该宽度只作为**下限**，控件随所在分栏一起变宽——
+    左侧分栏拉宽后，长脚本名就能完整显示，而不是恒定停在下限宽度上。
     """
     metrics = combo.fontMetrics()
     content = QSize(
@@ -126,7 +132,14 @@ def _set_combo_character_capacity(
         content,
         combo,
     ).width()
-    combo.setFixedWidth(width)
+    if expanding:
+        combo.setMinimumWidth(width)
+        combo.setMaximumWidth(16777215)   # 撤掉可能存在的固定宽
+        policy = combo.sizePolicy()
+        policy.setHorizontalPolicy(QSizePolicy.Policy.Expanding)
+        combo.setSizePolicy(policy)
+    else:
+        combo.setFixedWidth(width)
 
     def _refresh_popup_width(*_args) -> None:
         longest = max(
@@ -598,7 +611,9 @@ class MainWindow(
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
         self.workflow_combo.setFixedHeight(34)
-        _set_combo_character_capacity(self.workflow_combo, 10)
+        # 脚本名可以很长，下拉框随左侧分栏一起变宽
+        _set_combo_character_capacity(
+            self.workflow_combo, 10, expanding=True)
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
         wf_layout.addWidget(self.workflow_combo)
         self.btn_load_workflow = QPushButton(tr("加载"))

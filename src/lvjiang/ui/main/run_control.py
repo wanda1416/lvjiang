@@ -14,16 +14,7 @@ from ...core.config.resolver import get_resolver
 from ...i18n import tr
 from ...workflows.engine import WorkflowEngine
 
-_WORKFLOW_NAME_VISIBLE_CHARS = 8
 _RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning"})
-
-
-def _compact_workflow_name(name: str) -> str:
-    """将日常页脚本名限制为八个字符，过长时保留省略提示。"""
-    if len(name) <= _WORKFLOW_NAME_VISIBLE_CHARS:
-        return name
-    return f"{name[:_WORKFLOW_NAME_VISIBLE_CHARS]}..."
-
 
 def _to_serializable(obj):
     """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
@@ -277,8 +268,10 @@ class RunControlMixin:
                 full_display_name = (
                     f"{full_display_name} ({tr('环境不支持')})"
                 )
-            self.workflow_combo.addItem(
-                _compact_workflow_name(full_display_name), cfg["id"])
+            # 放完整名字：窄的时候 Qt 自己按可用宽度省略（CE_ComboBoxLabel
+            # 会 elide），分栏拉宽后就能完整显示。预先截断成定长会让「拉宽」
+            # 永远看不到更多内容。
+            self.workflow_combo.addItem(full_display_name, cfg["id"])
             item_index = self.workflow_combo.count() - 1
             self.workflow_combo.setItemData(
                 item_index,
@@ -318,15 +311,14 @@ class RunControlMixin:
         if self._loaded_flow_index is not None and self._loaded_flow_index < len(self._workflow_configs):
             idx = self._loaded_flow_index
             self._workflow_configs[idx] = cfg
-            self.workflow_combo.setItemText(
-                idx, _compact_workflow_name(cfg["name"]))
+            self.workflow_combo.setItemText(idx, cfg["name"])
             self.workflow_combo.setItemData(idx, cfg["id"])
             self.workflow_combo.setItemData(
                 idx, cfg["name"], Qt.ItemDataRole.ToolTipRole)
         else:
             self._workflow_configs.append(cfg)
             self.workflow_combo.addItem(
-                _compact_workflow_name(cfg["name"]), cfg["id"])
+                cfg["name"], cfg["id"])
             self._loaded_flow_index = len(self._workflow_configs) - 1
             self.workflow_combo.setItemData(
                 self._loaded_flow_index,

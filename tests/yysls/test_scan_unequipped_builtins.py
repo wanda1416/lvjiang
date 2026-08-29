@@ -157,19 +157,9 @@ def test_scan_unequipped_closes_detail_only_on_desktop():
     root = Path(__file__).resolve().parents[2]
     text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
-    guarded_close = (
-        'if env("desktop")\n'
-        '                press "ESC" after wait @page_refresh\n'
-        '            end'
-    )
-    guarded_nested_close = (
-        'if env("desktop")\n'
-        '                            press "ESC" after wait @page_refresh\n'
-        '                        end'
-    )
     assert text.count('press "ESC" after wait @page_refresh') == 2
-    assert guarded_close in text
-    assert guarded_nested_close in text
+    assert text.count(
+        'env:"desktop" -> press "ESC" after wait @page_refresh') == 2
 
 
 def test_scan_unequipped_seen_row_skips_remaining_columns():

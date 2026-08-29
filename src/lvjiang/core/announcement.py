@@ -8,10 +8,11 @@
 from __future__ import annotations
 
 import json
+import ssl
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -19,7 +20,7 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ..i18n import tr
-from .update import get_version, parse_version
+from .update import get_version, network_access_error_message, parse_version
 
 ANNOUNCEMENT_URL = "https://wanda1416.github.io/lvjiang/notices.json"
 ANNOUNCEMENT_SCHEMA_VERSION = 1
@@ -30,6 +31,10 @@ _LEVELS = {"info", "warning", "critical"}
 
 class AnnouncementError(RuntimeError):
     """公告网络或数据错误。"""
+
+
+class AnnouncementNetworkError(AnnouncementError):
+    """可明确归类为本地网络访问失败的公告错误。"""
 
 
 @dataclass(frozen=True)
@@ -297,6 +302,10 @@ def fetch_announcement_manifest(
         if exc.code == 304 and cached is not None:
             return AnnouncementFetchResult(cached, etag=etag, not_modified=True)
         raise AnnouncementError(f"公告请求失败: HTTP {exc.code}") from exc
+    except (URLError, TimeoutError, ssl.SSLError, ConnectionError) as exc:
+        raise AnnouncementNetworkError(
+            network_access_error_message(
+                ANNOUNCEMENT_URL, "announcement")) from exc
     except AnnouncementError:
         raise
     except Exception as exc:
@@ -330,6 +339,10 @@ class AnnouncementChecker(QThread):
                 etag=self._etag,
                 cached=self._cached,
             ))
+        except AnnouncementNetworkError as exc:
+            # 常见网络故障只输出一行可操作说明，不泄漏 urllib/SSL 调用栈。
+            logger.warning(str(exc))
+            self.error.emit(str(exc))
         except Exception as exc:  # noqa: BLE001 - 线程边界统一转成信号
             logger.warning(f"[公告] 获取失败: {exc}")
             self.error.emit(tr("获取公告失败: {error}").format(error=exc))

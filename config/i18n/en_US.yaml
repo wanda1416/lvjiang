@@ -1340,3 +1340,6 @@ auto_strings:
   '{scenes} 仍由本地副本生效，请先还原本地覆盖': '{scenes} still use local copies; restore the local overrides first'
   '{scenes} 仍由远程版本生效，请提升版本后再保存': '{scenes} still use remote versions; bump their versions and save again'
   已保存布局「{name}」到系统层，但尚未生效：{reasons}: 'Layout "{name}" was saved to the system layer but is not yet effective: {reasons}'
+  可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: 'The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.'
+  可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: 'The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.'
+  '无法访问 {url} 获取更新：HTTP {code}': 'Unable to access {url} for updates: HTTP {code}'

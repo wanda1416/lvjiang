@@ -99,9 +99,6 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       end
       if $task_text contains "醉意"
          call $action_result = action_zuiyi($label)
-         if $action_result < 0
-            return -1
-         end
       end
       if $task_text contains "觉障林"
          call action_juezhanglin($label)
@@ -192,10 +189,18 @@ end
 def action_heying($label, $idx)
    click [activity_jianghu].$label after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
-   click [general_action].[camera_shot] after wait @step_interval
-   click [general_action].[back] after wait @step_interval
-   click [general_action].[back] after wait @step_interval
-   click [general_action].[back_confirm] after wait @step_interval
+
+   if env("android")
+      click [general_action].[camera_shot] after wait @page_refresh
+      click [general_action].[back] after wait @step_interval
+      click [general_action].[back] after wait @step_interval
+      click [general_action].[back_confirm] after wait @step_interval
+   else
+      PRESS "SPACE" after wait @page_refresh
+      PRESS "ESC" after wait @step_interval
+      PRESS "ESC" after wait @step_interval
+      PRESS "SPACE" after wait @step_interval
+   end
 
    # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward
@@ -211,8 +216,10 @@ end
 def action_qingjing($label)
    click [activity_jianghu].$label after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
-   click [activity_jianghu].[confirm] after wait @step_interval
-   click [activity_jianghu].[expand_up] after wait @step_interval
+   if env("android")
+      click [activity_jianghu].[confirm] after wait @step_interval
+      click [activity_jianghu].[expand_up] after wait @step_interval
+   end
    click [activity_jianghu].[goto_qingjing] after wait @secondary_confirm
 
    # 检查是否在衣柜页面（识别到"穿搭"），如果是则导航回情境页面
@@ -260,11 +267,13 @@ def action_dongfang($label, $idx)
    click [activity_jianghu].$label after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
 
-   # 整面板扫描动作列表，定位「看报」所在行列
+   # 整面板扫描动作列表，定位「看报」所在行列（行列数读自布局定义）
    scan [general_action].[actions] as $acts
+   eval $nrows = panel_rows("general_action", "actions")
+   eval $ncols = panel_cols("general_action", "actions")
    eval $fr = ""
-   for r in [1...2]
-      for c in [1...6]
+   for r in [1...$nrows]
+      for c in [1...$ncols]
          if $acts.$r.$c contains "看报"
             eval $fr = $r
             eval $fc = $c
@@ -282,7 +291,11 @@ def action_dongfang($label, $idx)
       eval $fc = 3
    end
 
-   click [general_action].[actions][$fr][$fc] after wait @step_interval
+   if env("android")
+      click [general_action].[actions][$fr][$fc] after wait @step_interval
+   else
+      press $fc after wait @step_interval
+   end
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
    
@@ -320,6 +333,11 @@ def do_kanbao()
    call $in_main_page = is_in_main_page()
    if $in_main_page == 0
        click [general_action].[back] after wait @step_interval
+   end
+
+   # 端游处于动作列表必须 ESC 关闭才能结束，暂时不做判断，除非后续此处大量报错
+   if env("desktop")
+      press "ESC" after wait @step_interval
    end
 end
 
@@ -369,12 +387,13 @@ def action_zuiyi($label)
    end
 
    # ── 关闭背包，退回首页 ──
-   click [bag_equip_detail].[back] after wait stable @page_refresh least 0.5
-   click [game_menu_page].[back] after wait stable @page_refresh least 0.5
+   call nav_back_to_main()
 
-   # ── 从首页返回江湖号令 ──
-   call back_to_haoling()
-   return 0
+   if $idx equals "6" and not $claim_reward
+      log "末个任务醉意完成且无需领奖，留在桌面"
+   else
+      call back_to_haoling()
+   end
 end
 
 # 觉障林：动作暂未实现

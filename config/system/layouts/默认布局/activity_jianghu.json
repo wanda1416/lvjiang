@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "label_1",
@@ -104,7 +104,7 @@
       "x_ratio": 0.800594031906542,
       "y_ratio": 0.8775520422343515,
       "w_ratio": 0.09605911330049255,
-      "h_ratio": 0.0793650793650793
+      "h_ratio": 0.07505429030016475
     },
     {
       "key": "expand_up",

@@ -29,6 +29,7 @@ dev = [
     "pytest-qt>=4.0",
     "pytest-xdist>=3.5",
     "pytest-testmon>=2.2,<3",
+    "pytest-cov>=5.0",
     "ruff>=0.6",
     "mypy>=1.10",
     "pygls>=1.3,<2.0",  # Language Server for VS Code extension (2.x API changed)
@@ -60,6 +61,17 @@ filterwarnings = ["error"]
 # 自定义 marker：slow 标记耗时测试（Excel 转换等），本地迭代可用 -m "not slow" 跳过
 markers = ["slow: 耗时测试（Excel 转换等），本地迭代可用 -m 'not slow' 跳过"]
 
+# 覆盖率当前只做度量，不设 fail_under。CI 输出分支覆盖率与 XML 报告，
+# 本地默认 pytest 不自动开启，避免拖慢日常快速验证。
+[tool.coverage.run]
+branch = true
+source = ["lvjiang"]
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
 [tool.ruff]
 src = ["src"]
 
@@ -83,17 +95,3 @@ python_version = "3.12"
 # attr-defined/has-type：Mixin 拆分架构下宿主属性在组装类才存在，
 # 单文件视角必然报未定义，属架构噪音；待 Protocol 声明宿主接口后再启用
 disable_error_code = ["attr-defined", "has-type", "annotation-unchecked"]
-
-# 棘轮豁免清单：存量类型问题文件，只减不增；新模块不得加入
-[[tool.mypy.overrides]]
-module = [
-    "lvjiang.workflows.engine.evaluation",
-    "lvjiang.workflows.base.core",
-    "lvjiang.core.layout_manager",
-    "lvjiang.core.scene_loader",
-    "lvjiang.core.reference_db",
-    "lvjiang.core.android.scrcpy_capture",
-    "lvjiang.core.android.adb_capture",
-    "lvjiang.core.recognizers.reference_matcher",
-]
-ignore_errors = true

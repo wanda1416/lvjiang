@@ -26,6 +26,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
@@ -34,6 +35,9 @@ from ...constants import PROJECT_ROOT
 from ..capture_base import CaptureBackend
 from ..platforms import SUBPROCESS_NO_WINDOW
 from .device import AdbDevice
+
+if TYPE_CHECKING:
+    import av
 
 # scrcpy server jar 本地路径（相对于项目 data 目录）
 _JAR_RELATIVE = Path("data") / "scrcpy" / "scrcpy-server.jar"
@@ -86,7 +90,7 @@ class AndroidStreamCapture(CaptureBackend):
         self._socket_name: str = ""
         self._server_proc: subprocess.Popen | None = None
         self._sock: socket.socket | None = None
-        self._decoder = None  # av.CodecContext
+        self._decoder: "av.CodecContext | None" = None
         self._latest_frame: np.ndarray | None = None
         self._frame_lock = threading.Lock()
         self._decoder_lock = threading.Lock()  # 保护 decoder.parse/decode 的线程安全
@@ -416,7 +420,8 @@ class AndroidStreamCapture(CaptureBackend):
             if codec_id is None:
                 logger.error("[AndroidStream] 读取 codec ID 失败")
                 return False
-            logger.debug(f"[AndroidStream] codec: {codec_id}")
+            codec_name = codec_id.decode("ascii", errors="replace")
+            logger.debug(f"[AndroidStream] codec: {codec_name}")
 
             # 3. Session packet（12 字节：flags + width + height）
             session = self._recv_exact(12)

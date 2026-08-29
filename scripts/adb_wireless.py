@@ -20,8 +20,9 @@ _src = os.path.join(_root, "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from lvjiang.core.android.device import list_adb_devices
-from lvjiang.core.android.wireless import (
+# 仓库裸检出场景必须先注入 src/，因此这两条导入有意位于 bootstrap 之后。
+from lvjiang.core.android.device import list_adb_devices  # noqa: E402
+from lvjiang.core.android.wireless import (  # noqa: E402
     connect_wireless,
     enable_tcpip,
     get_adb_device_info,

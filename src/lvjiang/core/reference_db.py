@@ -27,7 +27,7 @@ import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from loguru import logger
 
@@ -40,8 +40,24 @@ if TYPE_CHECKING:
     import numpy as np
 
 
+class _SeedMetaField(TypedDict):
+    """种子 meta 字段的字面量结构。
+
+    用 TypedDict 而不是 dict[str, Any]：这份常量要经 ``MetaFieldDef(**d)``
+    展开构造，写成 Any 会让那次展开完全不受检——键名拼错、类型写反都要等
+    运行期才炸。TypedDict 既保住了 dict 的用法（下面还要 .get 取默认值），
+    又让展开重新受 mypy 检查。
+    """
+
+    key: str
+    name: str
+    filterable: bool
+    type: str
+    sort_by: str
+
+
 # meta_schema 缺失时的种子字段（兼容现有数据：等级作为默认可筛选 meta 字段）
-_SEED_META_SCHEMA = [
+_SEED_META_SCHEMA: list[_SeedMetaField] = [
     {"key": "level", "name": tr("等级"), "filterable": True, "type": "number", "sort_by": "asc"},
 ]
 
@@ -591,11 +607,16 @@ class ReferenceDatabase:
             key = item.get("key", "").strip()
             if not key:
                 continue
-            seed = seed_by_key.get(key, {})
-            ftype = str(item.get("type", seed.get("type", "text")) or "text").strip().lower()
+            # 种子里有同名字段就拿它的 type/sort_by 当默认值，否则用通用默认。
+            # 不写成 seed_by_key.get(key, {})：空 dict 让 seed 的类型退化成
+            # 联合类型，反而把 TypedDict 刚换回来的检查又丢掉。
+            seed = seed_by_key.get(key)
+            seed_type = seed["type"] if seed else "text"
+            seed_sort = seed["sort_by"] if seed else "asc"
+            ftype = str(item.get("type", seed_type) or "text").strip().lower()
             if ftype not in ("text", "number"):
                 ftype = "text"
-            sort_by = str(item.get("sort_by", seed.get("sort_by", "asc")) or "asc").strip().lower()
+            sort_by = str(item.get("sort_by", seed_sort) or "asc").strip().lower()
             if sort_by not in ("asc", "desc"):
                 sort_by = "asc"
             result.append(MetaFieldDef(
@@ -746,12 +767,15 @@ class ReferenceDatabase:
             logger.warning(f"未找到参考图文件: {filename}")
             return False
 
+        entry: ReferenceEntry
         if local_entry is not None:
             entry = local_entry
         elif self._is_dev():
+            assert system_entry is not None
             entry = system_entry
         else:
             # 用户模式改 system 条目 → 复制进 local 做影子
+            assert system_entry is not None
             entry = ReferenceEntry(**asdict(system_entry))
             self._local_entries.append(entry)
 

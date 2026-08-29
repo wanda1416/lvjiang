@@ -184,6 +184,22 @@ def test_low_level_signal_ends_slot_without_reading_later_rows():
     assert wf.drags == 0
 
 
+def test_slot_bottom_signal_stops_before_processing_sentinel():
+    """槽位读取命中见底哨兵后，不得把该格交给装备处理。"""
+    class _WukuBottomWF(DedupFakeWF):
+        def _read_row(self, detail_scene, row, col=1):
+            result = super()._read_row(detail_scene, row, col)
+            if result[1] == "WUKU":
+                self._slot_level_exhausted = True
+            return result
+
+    wf = _WukuBottomWF([["A", "WUKU", "C"]])
+    DedupTraversal().traverse(wf, WEAPON_DETAIL)
+
+    assert wf.processed == ["A"]
+    assert wf.drags == 0
+
+
 def test_max_rounds_fuse():
     """总轮数保险丝：每轮都有新行也会在 MAX_ROUNDS 处强制收束"""
     windows = [[f"r{i}a", f"r{i}b", f"r{i}c"] for i in range(10)]

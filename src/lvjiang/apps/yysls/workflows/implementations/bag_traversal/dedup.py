@@ -59,7 +59,7 @@ class DedupTraversal(BagTraversal):
         recent, new_count, hit_empty = self._scan_window(
             wf, detail_scene, panel_rows, cols, [])
         if wf.slot_level_exhausted:
-            logger.info("遇到低于等级门槛的有效装备 → 结束当前部位")
+            logger.info("命中槽位级终止条件 → 结束当前部位")
             return
         if hit_empty:
             logger.info(f"初始扫描读到空行 → 背包尽头（共 {self._seq} 行）")
@@ -86,7 +86,7 @@ class DedupTraversal(BagTraversal):
             recent, new_count, hit_empty = self._scan_window(
                 wf, detail_scene, alignment.n_rows, cols, recent)
             if wf.slot_level_exhausted:
-                logger.info("遇到低于等级门槛的有效装备 → 结束当前部位")
+                logger.info("命中槽位级终止条件 → 结束当前部位")
                 break
             if hit_empty:
                 logger.info("读到空行 → 背包尽头，结束遍历")
@@ -121,6 +121,9 @@ class DedupTraversal(BagTraversal):
             if wf.is_stopped:
                 break
             name, fp, equip = wf._read_row(detail_scene, row)
+            if wf.slot_level_exhausted:
+                logger.info("  检测到当前部位槽位级终止条件 → 结束遍历")
+                return window, new_count, False
             if not fp:
                 logger.info(f"  grid[{row}][1] 空 slot → 背包尽头")
                 return window, new_count, True
@@ -146,6 +149,8 @@ class DedupTraversal(BagTraversal):
             if new_fp != fp:
                 # 调律/回收改动了该格 → 回读首列取实际 OCR 指纹
                 _, refp, _ = wf._read_row(detail_scene, row)
+                if wf.slot_level_exhausted:
+                    return window, new_count, False
                 logger.info(
                     f"  行{self._seq} 处理后指纹回读: {fp} → {refp or new_fp}")
                 window.append(refp or new_fp)

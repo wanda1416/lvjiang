@@ -385,7 +385,14 @@ end
 # 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
 # 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
 def back_to_haoling()
-   click [game_main_page].[menu] after wait @step_interval
+   call $nav_result = nav_main_to_menu()
+   if $nav_result < 0
+      eval pause("打不开菜单页，请手动定位到菜单页后点击确定")
+      call $in_menu = is_in_menu_page()
+      if $in_menu < 1
+         return -1
+      end
+   end
 
    # 在菜单区域搜索「门派」，可能需要下滑翻页
    find [game_menu_page].[menu] as $found by contains "门派"

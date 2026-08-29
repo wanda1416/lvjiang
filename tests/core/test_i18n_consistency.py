@@ -29,7 +29,7 @@ _BASES = (_REPO / "config" / "i18n", _REPO / "config" / "i18n" / "apps" / "yysls
 
 #: 棘轮基线，只许下调。补翻译或删无用条目后同步调小，别放任它涨回去。
 MAX_MISSING_IN_TABLE = 0     # 代码 tr() 用了、翻译表没有 → 英文界面显示中文
-MAX_ORPHAN_ENTRIES = 150     # 表里有、代码已不再 tr()
+MAX_ORPHAN_ENTRIES = 149     # 表里有、代码已不再 tr()
 
 
 def _flatten(node, prefix: str = "", out: dict | None = None) -> dict:

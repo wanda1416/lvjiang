@@ -540,8 +540,13 @@ class ConfigResolver:
             layer = LAYER_SYSTEM
         return EntityOrigin(layer=layer, version=versioning.read_version(path))
 
-    def enumerate_entities(self, rel_dir: str, pattern: str) -> list[str]:
+    def enumerate_entities(self, rel_dir: str, pattern: str, *,
+                           include_internal: bool = False) -> list[str]:
         """枚举实体文件名：system ∪ local ∪ remote 并集，剔除墓碑，跳过 _ 前缀
+
+        ``include_internal=True`` 时保留 ``_`` 前缀文件。发现层要跳过它们
+        （编辑器临时运行、录制产物不该注册成脚本），但文件树是「磁盘上有
+        什么就显示什么」，藏起来反而让人找不到自己刚录的东西。
 
         remote 侧只有通过 :meth:`remote_supersedes` 闸门的文件才计入——
         否则远端一份版本更旧、或落在不允许新增的目录里的文件，会在编辑器
@@ -557,12 +562,15 @@ class ConfigResolver:
             if not base.is_dir():
                 continue
             for p in base.glob(pattern):
-                if p.is_file() and not p.name.startswith("_"):
+                if p.is_file() and (include_internal
+                                    or not p.name.startswith("_")):
                     names.add(p.name)
         remote_base = self.remote_dir / rel_dir if rel_dir else self.remote_dir
         if remote_base.is_dir():
             for p in remote_base.glob(pattern):
-                if not p.is_file() or p.name.startswith("_"):
+                if not p.is_file():
+                    continue
+                if not include_internal and p.name.startswith("_"):
                     continue
                 rel = f"{rel_dir}/{p.name}" if rel_dir else p.name
                 if self.remote_supersedes(rel):
@@ -571,7 +579,47 @@ class ConfigResolver:
                  if not self._tombstone(f"{rel_dir}/{n}" if rel_dir else n).exists()]
         return alive
 
-    def write_entity(self, rel_path: str, data: str | bytes) -> Path:
+    def enumerate_entity_tree(self, rel_dir: str, pattern: str, *,
+                              include_internal: bool = False) -> list[str]:
+        """递归枚举实体，返回**相对 rel_dir 的 posix 路径**（含子目录）。
+
+        与 :meth:`enumerate_entities` 的区别只在递归与返回形态：后者只扫一层
+        且返回裸文件名，够用于「某个目录下有哪些场景/布局」，但文件树要展示
+        ``subcall/`` ``batch/`` 这些子目录，需要带路径的全集。
+
+        合并、遮蔽、墓碑、``_`` 前缀跳过的规则与单层版本完全一致——刻意复用
+        它逐目录调用，避免两套枚举对「哪些文件算数」给出不同答案。
+        """
+        results: list[str] = []
+        seen_dirs: set[str] = set()
+
+        def walk(sub: str) -> None:
+            if sub in seen_dirs:
+                return
+            seen_dirs.add(sub)
+            full = f"{rel_dir}/{sub}" if sub else rel_dir
+            for name in self.enumerate_entities(
+                    full, pattern, include_internal=include_internal):
+                results.append(f"{sub}/{name}" if sub else name)
+            # 子目录同样取并集：local 可以新建 system 没有的目录
+            child_names: set[str] = set()
+            for root in (self.system_dir, self.local_dir):
+                base = root / full
+                if not base.is_dir():
+                    continue
+                for d in base.iterdir():
+                    if not d.is_dir() or d.name.startswith("."):
+                        continue
+                    if include_internal or not d.name.startswith("_"):
+                        child_names.add(d.name)
+            for name in sorted(child_names):
+                walk(f"{sub}/{name}" if sub else name)
+
+        walk("")
+        return sorted(results)
+
+    def write_entity(self, rel_path: str, data: str | bytes,
+                     *, force: bool = False) -> Path:
         """按模式写实体文件（开发→system，用户→local 影子并清同名墓碑）
 
         开发模式写 system 且该路径参与在线下发（见 core.config.versioning）
@@ -581,6 +629,10 @@ class ConfigResolver:
 
         用户模式写 local 不动版本号：版本号是 system 与 remote 之间的仲裁
         依据，local 影子恒为最高优先级，不参与比较。
+
+        ``force`` 关掉下面的空操作检测，用于「用户明确要求生成 local 影子」
+        （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与出厂一致，
+        不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
 
         远端正顶替这个文件时，新版本号以**远端那份**为下限——开发者在编辑器
         里看到的就是远端内容，拿出厂版本做基线会写出一个与线上同号但不同
@@ -597,7 +649,7 @@ class ConfigResolver:
                 rel_path, data, target, floor_version=floor)
 
         tomb = self._tombstone(rel_path)
-        if not tomb.exists() and self._write_is_noop(rel_path, target, data):
+        if not force and not tomb.exists() and self._write_is_noop(rel_path, target, data):
             # 内容与「不写的话会读到的那一份」完全一致 —— 不落盘。
             #
             # 用户模式下这一步尤其要紧：照写会给一个其实没改过的文件生成
@@ -694,6 +746,27 @@ class ConfigResolver:
             if local.exists():
                 local.unlink()
         self._notify(rel_path)
+
+    def revert_entity_to_system(self, rel_path: str) -> bool:
+        """撤掉 local 影子，让实体回到出厂那一份；返回是否真删了影子
+
+        与 :meth:`delete_entity` 是两回事：这不是删除实体，是**放弃自己的
+        覆盖**。所以只在出厂有同名内容时才允许——没有的话删掉 local 就等于
+        把实体整个抹掉，那条路归 delete_entity 管（用户模式下会被
+        SystemContentProtected 拦下）。
+
+        没有这个操作，「复制到本地以修改」就是一条单行道：用户复制完发现
+        改坏了，既删不掉（出厂内容受保护）也回不去。
+        """
+        if not self.is_system_entity(rel_path):
+            raise SystemContentProtected(
+                f"{rel_path} 没有出厂版本，无法还原")
+        local = self.local_dir / rel_path
+        if not local.is_file():
+            return False
+        local.unlink()
+        self._notify(rel_path)
+        return True
 
     # ─── 聚合键值文件（键级 diff 深合并）──────────────────
 

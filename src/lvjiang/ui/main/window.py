@@ -650,7 +650,7 @@ class MainWindow(
         self._left_tabs.currentChanged.connect(self._save_tab_indices)
 
     def _build_right_tabs(self):
-        """构建右侧 Tab（通用：运行日志），再追加插件注入的 Tab。"""
+        """构建内置右侧 Tab，再按注册顺序追加插件 Tab。"""
         self._log_buffer: list[tuple[int, str]] = []  # (level, text)
         self._log_min_level = 20  # INFO=20, DEBUG=10
 
@@ -681,6 +681,18 @@ class MainWindow(
         log_layout.addLayout(filter_bar)
 
         self.tabs.addTab(log_container, tr("运行日志"))
+
+        # Profile 是主引擎共享的用户档案能力，不由任何插件注入。
+        from ...core.profile.engine import get_or_create_engine, stop_engine
+        from ..profile import ProfileTab, UserInfoTab
+
+        profile_engine = get_or_create_engine(self._user_manager)
+        if not profile_engine.isRunning():
+            profile_engine.start()
+            self.register_cleanup(stop_engine)
+
+        self.tabs.addTab(ProfileTab(self), tr("用户总览"))
+        self.tabs.addTab(UserInfoTab(self), tr("用户信息"))
 
         # ── 插件注入的右侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self.tabs, "right_tab_builders")

@@ -57,6 +57,11 @@ class AppHooks:
     # 内置函数模块路径列表：["lvjiang.apps.yysls.workflows.builtins.equipment", ...]
     builtin_modules: list[str] = field(default_factory=list)
 
+    # Profile 自定义周期模块（导入即调用
+    # core.profile.register_profile_period 注册）。Profile 数据全局共享，
+    # 这里只扩展周期语义，不创建插件私有的 Profile 实例。
+    profile_period_modules: list[str] = field(default_factory=list)
+
     # 统计事件 schema 模块路径列表（与 builtin_modules 同款「import 即注册」
     # 语义）：["lvjiang.apps.yysls.telemetry.schemas", ...]。core.telemetry
     # 不认识任何插件领域词汇，字段声明由插件自己在这些模块里注册。

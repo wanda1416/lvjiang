@@ -21,34 +21,9 @@ def _build_loadout_panel(host):
     return LoadoutPanel(host)
 
 
-def _build_profile_overview_tab(host):
-    from .ui.profile import ProfileOverviewTab
-    _ensure_engine_started(host)
-    return ProfileOverviewTab(host)
-
-
-def _build_profile_tab(host):
-    from .ui.profile import ProfileTab
-    _ensure_engine_started(host)
-    return ProfileTab(host)
-
-
 def _build_tuning_progress_tab(host):
     from .ui.tuning.progress_widget import TuningProgressWidget
     return TuningProgressWidget()
-
-
-def _ensure_engine_started(host):
-    """确保 ProfileEngine 已启动（首次构建 profile Tab 时调用）"""
-    from .core.profile_engine.profile_engine import get_or_create_engine, stop_engine
-    engine = get_or_create_engine(
-        user_manager=host.user_manager,
-        session_manager=host.session_manager,
-    )
-    if not engine.isRunning():
-        engine.start()
-        # 仅在首次启动时注册清理回调，避免重复注册
-        host.register_cleanup(stop_engine)
 
 
 def _build_menu(host, menubar):
@@ -69,9 +44,7 @@ hooks = AppHooks(
     # 注入通用 MainWindow 的 Tab / 菜单
     left_tab_builders=[(tr("调律"), _build_tuning_tab)],
     right_tab_builders=[
-        (tr("用户总览"), _build_profile_overview_tab),
         (tr("备战方案"), _build_loadout_panel),
-        (tr("其他信息"), _build_profile_tab),
         (tr("调律进度"), _build_tuning_progress_tab),
     ],
     menu_builders=[_build_menu],
@@ -91,8 +64,11 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.workflows.builtins.bag_funcs",
         "lvjiang.apps.yysls.workflows.builtins.equip_funcs",
         "lvjiang.apps.yysls.workflows.builtins.equipment_ingest",
-        "lvjiang.apps.yysls.workflows.builtins.profile_funcs",
         "lvjiang.apps.yysls.workflows.builtins.role_attr_ingest",
+    ],
+
+    profile_period_modules=[
+        "lvjiang.apps.yysls.profile.periods",
     ],
 
     # 统计事件 schema（导入即触发 register_schema 注册）

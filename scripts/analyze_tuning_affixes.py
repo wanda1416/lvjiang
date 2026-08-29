@@ -10,11 +10,10 @@
 
 import json
 import re
-from pathlib import Path
-from collections import defaultdict, Counter
-from typing import Dict, List, Tuple
 import sys
-
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Dict, List
 
 # 正则表达式
 RE_EQUIP_HEADER = re.compile(
@@ -309,13 +308,13 @@ def print_report(stats: Dict, records: List[Dict]):
     print("\n" + "=" * 80)
     print("合并统计：调律新词条分布（忽略位置与部位）")
     print("=" * 80)
-    
+
     merged_counter = stats.get('merged_new_affix', {})
     if merged_counter:
         total = sum(merged_counter.values())
         print(f"\n总新词条数：{total}")
         print("-" * 70)
-        
+
         for affix, count in merged_counter.most_common(25):
             pct = count / total * 100
             bar = '█' * int(pct / 2)
@@ -446,10 +445,9 @@ def main():
     print(f"共解析到 {len(all_records)} 件装备\n")
 
     stats = analyze(all_records)
-    
+
     # 输出到文件
     output_file = tuning_dir.parent / 'tuning_report.txt'
-    import io
     with open(output_file, 'w', encoding='utf-8') as f:
         old_stdout = sys.stdout
         sys.stdout = f
@@ -457,7 +455,7 @@ def main():
             print_report(stats, all_records)
         finally:
             sys.stdout = old_stdout
-    
+
     print(f"报告已保存到：{output_file}")
 
 

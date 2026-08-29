@@ -90,6 +90,7 @@ class AdbCapture(CaptureBackend):
             if img is None:
                 # 退化兜底：无法截图时用物理分辨率（可能方向不符）
                 return self._device.get_resolution()
+        assert self._size is not None
         return self._size
 
     # set_capture_region / attach_to_window 沿用 CaptureBackend 默认 no-op

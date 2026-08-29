@@ -62,6 +62,15 @@ from .rule_panel import RulePanel, add_nav_separator
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
+class _RulePagePlaceholder(QWidget):
+    """规则页占位符；自带 key/name，不依赖导航位置反查数据。"""
+
+    def __init__(self, key: str, name: str):
+        super().__init__()
+        self.rule_key = key
+        self.rule_name = name
+
+
 class _NewRuleDialog(QDialog):
     """新增规则对话框：输入 key（英文标识，作文件名）与名称"""
 
@@ -126,9 +135,14 @@ class TuningRulesDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        self._manager = get_tuning_rule_manager()
         self._config_manager = get_tune_config_manager()
         self._group_manager = get_tuning_group_manager()
+        self._manager = get_tuning_rule_manager()
+        # 三个 manager 都是进程级单例。每次打开重读一次：
+        # 每个 YAML 会先 stat，未变则用 resolver 中的解析缓存。
+        self._config_manager.reload()
+        self._group_manager.reload()
+        self._manager.reload()
         # 初始规则组：session 持久值，组不存在取第一个可用
         group_key = get_wf_config("auto_tuning").get("base_group", "")
         if self._group_manager.get_group(group_key) is None:
@@ -208,8 +222,6 @@ class TuningRulesDialog(QDialog):
         for page in (self._scan_page, self._material_page, self._tune_page):
             self._insert_group_dropdown(page)
         self._sync_group_dropdowns(group_key)
-        for key, rule in self._manager.get_rules().items():
-            self._add_rule_page(key, rule.name)
         # 加载全部规则（含禁用），禁用规则导航文字置灰
         self._disabled_rule_keys: set[str] = set()
         try:
@@ -218,20 +230,35 @@ class TuningRulesDialog(QDialog):
                 k for k, v in tuning_rules.items() if not v}
         except Exception:
             pass
+        for key, rule in self._manager.get_rules().items():
+            self._add_rule_page(key, rule.name)
         for key, name in self._manager.get_all_rule_keys_and_names():
             if key not in self._manager.get_rules():
-                panel = self._add_rule_page(key, name)
-                self._apply_disabled_nav_style(panel, True)
+                placeholder = self._add_rule_page(key, name)
+                self._apply_disabled_nav_style(placeholder, True)
         self._nav.setCurrentRow(0)
 
     # ── 规则页增删 ──
 
-    def _add_rule_page(self, key: str, name: str) -> RulePanel:
-        panel = RulePanel(key, self._manager, self._set_status,
-                                on_delete=self._delete_rule)
-        panel._dialog_rename_cb = self._rename_rule  # type: ignore[assignment]
-        self._stack.addWidget(panel)
+    def _add_rule_page(self, key: str, name: str) -> QWidget:
+        placeholder = _RulePagePlaceholder(key, name)
+        self._stack.addWidget(placeholder)
         self._nav.addItem(name)
+        return placeholder
+
+    def _materialize_rule_page(self, index: int) -> RulePanel:
+        current = self._stack.widget(index)
+        if isinstance(current, RulePanel):
+            return current
+        key = getattr(current, "rule_key", "")
+        if not key:
+            raise RuntimeError(f"规则页占位符缺少 rule_key: index={index}")
+        panel = RulePanel(key, self._manager, self._set_status,
+                          on_delete=self._delete_rule)
+        panel._dialog_rename_cb = self._rename_rule  # type: ignore[assignment]
+        self._stack.removeWidget(current)
+        self._stack.insertWidget(index, panel)
+        current.deleteLater()
         # 连接启用状态回调，更新导航灰色样式
         settings_page = panel._settings_page
         orig_cb = settings_page._on_enable_changed
@@ -244,9 +271,9 @@ class TuningRulesDialog(QDialog):
         settings_page._on_enable_changed = _on_enable  # type: ignore[assignment]
         return panel
 
-    def _apply_disabled_nav_style(self, panel: RulePanel, disabled: bool):
+    def _apply_disabled_nav_style(self, panel: QWidget, disabled: bool):
         """更新规则导航项的灰色样式（禁用=灰色，启用=正常）"""
-        key = panel.rule_key
+        key = getattr(panel, "rule_key", "")
         if disabled:
             self._disabled_rule_keys.add(key)
         else:
@@ -265,7 +292,10 @@ class TuningRulesDialog(QDialog):
         item = self._nav.item(row)
         if row < 0 or item is None or not item.flags():
             return  # 分割线项不响应
-        self._stack.setCurrentIndex(row if row <= 3 else row - 1)
+        index = row if row <= 3 else row - 1
+        if index >= 5:
+            self._materialize_rule_page(index)
+        self._stack.setCurrentIndex(index)
 
     def _on_group_switched(self, group_key: str):
         """基础规则组切换 → 三个行为页对准新组并重载"""
@@ -327,9 +357,7 @@ class TuningRulesDialog(QDialog):
         row = self._nav.row(item)
         if row < 6:  # 四张基础规则/行为页 + 分割线 + 流派规则页
             return
-        panel = self._stack.widget(row - 1)
-        if not isinstance(panel, RulePanel):
-            return
+        panel = self._materialize_rule_page(row - 1)
         old_name = panel.rule_name
         new_name, ok = QInputDialog.getText(
             self, tr("重命名规则"), tr("规则名称："), text=old_name)
@@ -363,7 +391,7 @@ class TuningRulesDialog(QDialog):
             return
         for i in range(5, self._stack.count()):
             panel = self._stack.widget(i)
-            if isinstance(panel, RulePanel) and panel.rule_key == key:
+            if getattr(panel, "rule_key", "") == key:
                 self._stack.removeWidget(panel)
                 panel.deleteLater()
                 self._nav.takeItem(i + 1)  # 导航含分割线，行号 +1
@@ -375,7 +403,7 @@ class TuningRulesDialog(QDialog):
         """更新对应导航项的标题文本（由 panel 在 key/name 变更时回调）"""
         for i in range(5, self._stack.count()):
             panel = self._stack.widget(i)
-            if isinstance(panel, RulePanel) and panel.rule_key == new_key:
+            if getattr(panel, "rule_key", "") == new_key:
                 item = self._nav.item(i + 1)  # 含分割线偏移
                 item.setText(new_name)
                 # 重命名后保持禁用灰色样式

@@ -671,6 +671,29 @@ class TestSaveAndRaw:
 # ─── 创建与删除 ────────────────────────────────────────────
 
 class TestCreateAndDelete:
+    def test_rule_names_are_cached_from_reload(self, tmp_path, monkeypatch):
+        write_rule(tmp_path, minimal_rule())
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+
+        def unexpected_load(*_args, **_kwargs):
+            raise AssertionError("query should not parse YAML again")
+
+        monkeypatch.setattr(yaml, "safe_load", unexpected_load)
+        assert mgr.get_all_rule_keys_and_names() == [("t1", "测试规则")]
+
+    def test_reload_observes_external_rule_change(self, tmp_path):
+        path = write_rule(tmp_path, minimal_rule(name="旧名称"))
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        assert mgr.get_all_rule_keys_and_names() == [("t1", "旧名称")]
+
+        path.write_text(
+            yaml.dump(minimal_rule(name="新名称"), allow_unicode=True),
+            encoding="utf-8",
+        )
+        mgr.reload()
+
+        assert mgr.get_all_rule_keys_and_names() == [("t1", "新名称")]
+
     def test_create_rule(self, tmp_path):
         mgr = TuningRuleManager(rules_dir=tmp_path)
         mgr.create_rule("new_rule", "新规则")

@@ -18,7 +18,15 @@ AST 节点本身，不是布尔值。
 两者必须一致。
 """
 
+from pathlib import Path
+
+from lvjiang.workflows.metadata import parse_metadata_file
 from tests.workflows.conftest import run
+
+_PURCHASE_BUGAN = (
+    Path(__file__).parents[2]
+    / "config" / "system" / "workflows" / "purchase_bugan.wf"
+)
 
 
 class TestDefaultContainerLiteral:
@@ -57,3 +65,35 @@ class TestDefaultContainerLiteral:
         """default 的语义是"未注入才赋值"，容器同样不能覆盖已注入的值。"""
         v = run('default $d = {"a": true}\n', {"d": {"a": False}})
         assert v["d"] == {"a": False}
+
+
+def test_purchase_bugan_metadata_and_runtime_defaults_stay_in_sync():
+    """日常页勾选项与未注入参数时的 DSL 回退值必须一致。"""
+    metadata = parse_metadata_file(_PURCHASE_BUGAN)
+    parameter = next(
+        item for item in metadata["parameters"]
+        if item["name"] == "buy_keywords"
+    )
+    option_values = [item["value"] for item in parameter["options"]]
+
+    source = _PURCHASE_BUGAN.read_text(encoding="utf-8")
+    default_line = next(
+        line for line in source.splitlines()
+        if line.startswith("default $buy_keywords = ")
+    )
+    runtime_defaults = run(default_line + "\n")["buy_keywords"]
+
+    assert option_values == list(parameter["default"])
+    assert runtime_defaults == parameter["default"]
+    assert parameter["default"]["振玉"] is True
+
+    # 批量任务可能直接注入升级前保存的字典，不经过日常参数面板。
+    preamble = source.partition('import "subcall/navigation.wf"')[0]
+    legacy = run(preamble, {"buy_keywords": {"心法": False}})
+    assert legacy["buy_keywords"] == {"心法": False, "振玉": True}
+
+    explicitly_disabled = run(
+        preamble,
+        {"buy_keywords": {"心法": False, "振玉": False}},
+    )
+    assert explicitly_disabled["buy_keywords"]["振玉"] is False

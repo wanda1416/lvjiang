@@ -1,7 +1,7 @@
 """工作流基类主体 - 生命周期、变量、内置函数调用，组合各操作 Mixin"""
 
 import threading
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from ...core.recognizers import ReferenceRecognizer
@@ -124,7 +124,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         """设置变量"""
         self.variables[name] = value
 
-    def call_function(self, func_name: str, args: list, engine=None) -> any:
+    def call_function(self, func_name: str, args: list, engine=None) -> Any:
         """调用内置函数
 
         若函数第一参数名为 _engine，自动注入当前 Engine 实例。

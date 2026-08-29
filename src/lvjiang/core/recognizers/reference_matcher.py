@@ -173,6 +173,9 @@ class ReferenceMatcher:
 
         if not self._features or self._target_size is None:
             return MatchResult(entry=None, label="", confidence=0.0, meta={})
+        orb = self._orb
+        if orb is None:
+            return MatchResult(entry=None, label="", confidence=0.0, meta={})
 
         if self._bf is None:
             self._bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
@@ -181,7 +184,7 @@ class ReferenceMatcher:
         resized = cv2.resize(query, self._target_size, interpolation=cv2.INTER_AREA)
 
         # 计算查询图特征
-        kp, des = self._orb.detectAndCompute(resized, None)
+        kp, des = orb.detectAndCompute(resized, None)
         if des is None or len(kp) < 5:
             return MatchResult(entry=None, label="", confidence=0.0, meta={})
 
@@ -254,6 +257,9 @@ class ReferenceMatcher:
 
         if not self._features or self._target_size is None:
             return []
+        orb = self._orb
+        if orb is None:
+            return []
 
         if self._bf is None:
             self._bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
@@ -262,7 +268,7 @@ class ReferenceMatcher:
         resized = cv2.resize(query, self._target_size, interpolation=cv2.INTER_AREA)
 
         # 计算查询图特征
-        kp, des = self._orb.detectAndCompute(resized, None)
+        kp, des = orb.detectAndCompute(resized, None)
         if des is None or len(kp) < 5:
             return []
 

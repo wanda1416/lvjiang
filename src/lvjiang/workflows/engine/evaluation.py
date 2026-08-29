@@ -66,33 +66,33 @@ class _EvalMixin:
                 left = self._eval_var_or_field(node.expr)
                 return not left or left.strip() == ""
             case GreaterThan():
-                left = self._resolve_arith(node.left)
-                right = self._resolve_arith(node.right)
-                return left > right if left is not None and right is not None else False
+                num_left = self._resolve_arith(node.left)
+                num_right = self._resolve_arith(node.right)
+                return num_left > num_right if num_left is not None and num_right is not None else False
             case LessThan():
-                left = self._resolve_arith(node.left)
-                right = self._resolve_arith(node.right)
-                return left < right if left is not None and right is not None else False
+                num_left = self._resolve_arith(node.left)
+                num_right = self._resolve_arith(node.right)
+                return num_left < num_right if num_left is not None and num_right is not None else False
             case GreaterEqual():
-                left = self._resolve_arith(node.left)
-                right = self._resolve_arith(node.right)
-                return left >= right if left is not None and right is not None else False
+                num_left = self._resolve_arith(node.left)
+                num_right = self._resolve_arith(node.right)
+                return num_left >= num_right if num_left is not None and num_right is not None else False
             case LessEqual():
-                left = self._resolve_arith(node.left)
-                right = self._resolve_arith(node.right)
-                return left <= right if left is not None and right is not None else False
+                num_left = self._resolve_arith(node.left)
+                num_right = self._resolve_arith(node.right)
+                return num_left <= num_right if num_left is not None and num_right is not None else False
             case NotEqual():
-                left = self._resolve_arith(node.left)
-                right = self._resolve_arith(node.right)
-                if left is None or right is None:
+                num_left = self._resolve_arith(node.left)
+                num_right = self._resolve_arith(node.right)
+                if num_left is None or num_right is None:
                     return True
-                return abs(left - right) >= _NUM_EQ_EPSILON
+                return abs(num_left - num_right) >= _NUM_EQ_EPSILON
             case NumericEqual():
-                left = self._resolve_arith(node.left)
-                right = self._resolve_arith(node.right)
-                if left is None or right is None:
+                num_left = self._resolve_arith(node.left)
+                num_right = self._resolve_arith(node.right)
+                if num_left is None or num_right is None:
                     return False
-                return abs(left - right) < _NUM_EQ_EPSILON
+                return abs(num_left - num_right) < _NUM_EQ_EPSILON
             case Not():
                 return not self._eval_condition(node.operand)
             case And():

@@ -21,6 +21,10 @@ build/
 .pytest_cache/
 .ruff_cache/
 .testmondata*
+# .coverage* 而非 .coverage：pytest-xdist 并行跑覆盖率会产生
+# .coverage.<host>.<pid>.<rand> 分片，中断的运行会把它们留在工作区。
+.coverage*
+coverage.xml
 
 # Logs
 logs/

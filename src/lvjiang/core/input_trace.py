@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .fs_util import atomic_write_bytes
+from .key_names import normalize_key
 
 TRACE_PLACEHOLDER = "__LVTRACE__"
 TRACE_MAGIC = b"LVTRACE\x00"
@@ -89,10 +90,6 @@ def _validate_trace(trace: InputTrace) -> None:
             key, is_down = event.values
             if not isinstance(key, str) or not isinstance(is_down, bool):
                 raise InputTraceError(f"轨迹键盘事件不合法: #{index}")
-            # 延迟到函数体内 import：core.desktop 包 __init__ 会加载
-            # send_input，而 send_input 反过来 import 本模块的 InputTrace——
-            # 模块顶层 import 会在 input_trace 尚未初始化完时形成循环导入。
-            from .desktop.win32_keyboard import normalize_key
             try:
                 normalize_key(key)
             except ValueError as exc:

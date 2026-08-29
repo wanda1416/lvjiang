@@ -2,6 +2,7 @@
 
 from loguru import logger
 
+from ...core.input_base import InputBackendKind
 from ...core.platforms import native_confirm, native_notify, native_pause
 from ...i18n import tr
 from ._registry import builtin_func
@@ -200,14 +201,26 @@ def _check_env(_engine=None, envs=None) -> bool:
     return True
 
 
-@builtin_func("is_send")
-def _is_send(_engine=None) -> int:
-    """判断当前是否为 SendInput 模式
 
-    返回值：
-    -  1：窗口模式且为 SendInput 后端
-    -  0：窗口模式但非 SendInput 后端（如 PostMessage）
-    - -1：设备端（ADB）
+def _backend_kind(engine) -> InputBackendKind:
+    """取当前输入后端的 kind，容错成 UNKNOWN。
+
+    InputBackendKind 继承 str，所以测试替身或旧扩展把 kind 写成普通字符串
+    （"send"）时，``kind is InputBackendKind.SEND`` 会是 False、``kind.is_device``
+    更会直接 AttributeError 打断整条工作流。这里统一收敛成枚举。
+    """
+    raw = getattr(getattr(engine, "_input", None), "kind", None)
+    if isinstance(raw, InputBackendKind):
+        return raw
+    try:
+        return InputBackendKind(raw)
+    except ValueError:
+        return InputBackendKind.UNKNOWN
+
+
+@builtin_func("is_send")
+def _is_send(_engine=None) -> bool:
+    """判断当前是否为 SendInput 模式
 
     .wf 用法:
         if is_send()
@@ -215,22 +228,13 @@ def _is_send(_engine=None) -> int:
         end
     """
     if _engine is None:
-        return -1
-    from ...core.android.input import AdbInput
-    if isinstance(_engine._input, AdbInput):
-        return -1
-    from ...core.desktop.send_input import SendInputInput
-    return 1 if isinstance(_engine._input, SendInputInput) else 0
+        return False
+    return _backend_kind(_engine) is InputBackendKind.SEND
 
 
 @builtin_func("is_post")
-def _is_post(_engine=None) -> int:
+def _is_post(_engine=None) -> bool:
     """判断当前是否为 PostMessage 模式
-
-    返回值：
-    -  1：窗口模式且为 PostMessage 后端
-    -  0：窗口模式但非 PostMessage 后端（如 SendInput）
-    - -1：设备端（ADB）
 
     .wf 用法:
         if is_post()
@@ -238,9 +242,31 @@ def _is_post(_engine=None) -> int:
         end
     """
     if _engine is None:
-        return -1
-    from ...core.android.input import AdbInput
-    if isinstance(_engine._input, AdbInput):
-        return -1
-    from ...core.desktop.post_message import PostMessageInput
-    return 1 if isinstance(_engine._input, PostMessageInput) else 0
+        return False
+    return _backend_kind(_engine) is InputBackendKind.POST
+
+
+@builtin_func("is_device")
+def _is_device(_engine=None) -> bool:
+    """判断当前是否由设备端后端执行（ADB / Agent / 无障碍 / Shell）
+
+    与另外两组判断的区别：
+
+    - ``env()`` 问的是**配置的工作环境**（desktop / android），由 UI 下拉框
+      决定，回答「这个流程该按哪套导航策略走」。
+    - ``is_send()`` / ``is_post()`` 问的是**窗口模式下用哪种注入方式**，
+      两者在设备端都为假。
+    - ``is_device()`` 问的是**指令实际打给谁**：设备端后端（手机 ADB、
+      Agent、机上无障碍/Shell）为真，PC 窗口注入为假。
+
+    典型用途是区分「只有窗口模式才成立」的前提，例如按键、光标位置、
+    前台焦点这类概念在设备端并不存在。
+
+    .wf 用法:
+        if is_device()
+            log info "设备端执行，跳过键盘快捷键分支"
+        end
+    """
+    if _engine is None:
+        return False
+    return _backend_kind(_engine).is_device

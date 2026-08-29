@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from .key_state import KeyStateRegistry
 
 from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
+from ...core.key_names import normalize_key
 from ...i18n import tr
 from ..grammar import (
     Click,
@@ -398,283 +399,263 @@ class _ActionsMixin:
         若为点对模式（from_scene_ref/to_scene_ref），则查找两个命名点的屏幕坐标。
         若为 panel 模式，则查校准缓存获取格子中心坐标。
         """
-        # suppress_defaults：显式 wait_clause 时抑制默认 before/after 延迟
         kw = {}
         if getattr(node, 'suppress_defaults', False):
             kw["pre_delay"] = (0, 0)
             kw["post_delay"] = (0, 0)
         if isinstance(node.from_point, CoordPoint) and isinstance(node.to_point, CoordPoint):
-            x1, y1 = self._coord_ratio_to_screen(node.from_point.rx, node.from_point.ry)
-            x2, y2 = self._coord_ratio_to_screen(node.to_point.rx, node.to_point.ry)
-            duration = self._resolve_duration(node.duration) if node.duration else None
-            self._input.drag_screen(
-                x1, y1, x2, y2,
-                f"coord({node.from_point.rx},{node.from_point.ry})->({node.to_point.rx},{node.to_point.ry})",
-                duration=duration, hold=node.hold, **kw,
-            )
+            self._drag_coord_pair(node, kw)
             return
         if node.from_scene_ref is not None and node.to_scene_ref is not None:
-            # 点对模式：drag [scene1].[point1] [scene2].[point2]
-            x1, y1 = self._resolve_point_ref_to_screen(node.from_scene_ref, tr("起点"))
-            x2, y2 = self._resolve_point_ref_to_screen(node.to_scene_ref, tr("终点"))
-            duration = self._resolve_duration(node.duration) if node.duration else None
-            self._input.drag_screen(
-                x1, y1, x2, y2,
-                f"point({node.from_scene_ref.scene}.{node.from_scene_ref.entity})->({node.to_scene_ref.scene}.{node.to_scene_ref.entity})",
-                duration=duration, hold=node.hold, **kw,
-            )
+            self._drag_scene_ref_pair(node, kw)
             return
         if isinstance(node.scene, PanelGridDrag):
-            # grid 级拖拽：起点为 panel/region 中心，距离按整行/列高度
-            grid = node.scene
-            # 先尝试作为 panel 查找
-            panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
-            if panel_obj is None:
-                # 未找到 panel，尝试作为 region 查找
-                regions = self._layout.get_scene_regions(grid.scene)
-                region_obj = next((r for r in regions if r.key == grid.panel), None)
-                if region_obj is None:
-                    raise WorkflowUserError(
-                        f"drag grid: 布局中未定义 panel/region {grid.scene}.{grid.panel}"
-                    )
-                require_enabled(region_obj, grid.scene, "region")
-                # region 中心在截图中的归一化坐标
-                cx = region_obj.x_ratio + region_obj.w_ratio / 2
-                cy = region_obj.y_ratio + region_obj.h_ratio / 2
-                w, h = self._capture.get_capture_size()
-                canvas = self._layout.get_canvas()
-                x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
-                y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
-                # region 拖拽：使用 region 高度/宽度作为步长
-                direction = grid.direction
-                distance = grid.distance
-                if isinstance(distance, VarRef):
-                    distance = self.variables.get(distance.name, 1.0)
-                try:
-                    distance = float(distance)
-                except (TypeError, ValueError):
-                    raise WorkflowUserError(f"drag grid: 距离无效: {distance}") from None
-                dx, dy = 0, 0
-                if direction in ("up", "down"):
-                    dy = int(region_obj.h_ratio * canvas.h_ratio * h * distance)
-                    if direction == "up":
-                        dy = -dy
-                    if abs(dy) < 10:
-                        dy = 10 if dy >= 0 else -10
-                else:
-                    dx = int(region_obj.w_ratio * canvas.w_ratio * w * distance)
-                    if direction == "left":
-                        dx = -dx
-                    if abs(dx) < 10:
-                        dx = 10 if dx >= 0 else -10
-                x2, y2 = x + dx, y + dy
-                duration = self._resolve_duration(node.duration) if node.duration else None
-                self._input.drag_screen(
-                    x, y, x2, y2,
-                    f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
-                    duration=duration, hold=node.hold, **kw,
-                )
-                logger.debug(f"drag grid: region {grid.scene}.{grid.panel} {direction} {distance}")
-                return
-            else:
-                # panel 中心在截图中的归一化坐标
-                cx = panel_obj.x_ratio + panel_obj.w_ratio / 2
-                cy = panel_obj.y_ratio + panel_obj.h_ratio / 2
-                w, h = self._capture.get_capture_size()
-                canvas = self._layout.get_canvas()
-                x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
-                y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
-            # 解析 distance（支持 int、float、VarRef）
-            distance = grid.distance
-            if isinstance(distance, VarRef):
-                distance = self.variables.get(distance.name, 1.0)
-            try:
-                distance = float(distance)  # 支持浮点数（如 0.5 表示半行）
-            except (TypeError, ValueError):
-                raise WorkflowUserError(f"drag grid: 距离无效: {distance}") from None
-            dx, dy = 0, 0
-            direction = grid.direction
-            # 距离基于 align 实测的 slot + span/2，避免声明尺寸的误差积累
-            # slot + span/2 = 从当前 slot 中心到相邻 span 中点的距离
-            # 缓存未命中 → 懒加载 align（初始化）
-            cache_key = (grid.scene, grid.panel)
-            if cache_key not in self._panel_alignments:
-                logger.info(f"drag grid: 缓存未命中，懒加载 align: {grid.scene}.{grid.panel}")
-                self._exec_align(Align(scene=grid.scene, panel=grid.panel))
-            cal = self._panel_alignments.get(cache_key)
-            # 无兜底逻辑：align 失败直接报错，不用 panel 高度兜底
-            if cal is None or cal.row_slot <= 0:
-                logger.error(f"drag grid: align 失败，无法计算拖拽距离: {grid.scene}.{grid.panel}")
-                return
-            if direction in ("up", "down"):
-                step_norm = cal.row_slot + cal.row_span / 2.0
-                panel_pixel_h = panel_obj.h_ratio * canvas.h_ratio * h
-                dy = int(step_norm * panel_pixel_h * distance)
-                if direction == "up":
-                    dy = -dy
-                if abs(dy) < 10:
-                    dy = 10 if dy >= 0 else -10
-            else:
-                if cal.col_slot <= 0:
-                    logger.error(f"drag grid: align 列数据无效: {grid.scene}.{grid.panel}")
-                    return
-                step_norm = cal.col_slot + cal.col_span / 2.0
-                panel_pixel_w = panel_obj.w_ratio * canvas.w_ratio * w
-                dx = int(step_norm * panel_pixel_w * distance)
-                if direction == "left":
-                    dx = -dx
-                if abs(dx) < 10:
-                    dx = 10 if dx >= 0 else -10
-            x2, y2 = x + dx, y + dy
-            duration = self._resolve_duration(node.duration) if node.duration else None
-            self._input.drag_screen(
-                x, y, x2, y2,
-                f"grid({grid.scene}.{grid.panel}) {direction} {distance}",
-                duration=duration, hold=node.hold, **kw,
-            )
-            # drag 后界面已滚动，失效对齐缓存（不立即刷新，避免截到滚动动画残影）
-            # 下次访问时懒加载重新对齐（此时滚动动画已完成）
-            self._panel_alignments.pop(cache_key, None)
-            logger.debug(f"drag grid: 已失效对齐缓存: {grid.scene}.{grid.panel}")
+            self._drag_panel_grid(node, kw)
             return
         if isinstance(node.scene, PanelRef):
-            x, y = self._panel_ref_to_screen(node.scene)
-            if x is None or y is None:
-                return
-            # scene / panel 支持静态字符串或 $var（与 EntityRef 动态引用语义一致）
-            scene_key = self._resolve(node.scene.scene) if isinstance(node.scene.scene, VarRef) else node.scene.scene
-            panel_key = self._resolve(node.scene.panel) if isinstance(node.scene.panel, VarRef) else node.scene.panel
-            # panel drag：根据方向和距离计算拖拽终点
-            # up = 手指向上划 = 内容下移 = 显示上方内容
-            # down = 手指向下划 = 内容上移 = 显示下方内容
-            # left = 手指向左划 = 内容右移 = 显示左侧内容
-            # right = 手指向右划 = 内容左移 = 显示右侧内容
-            panel_obj = self._find_panel_in_layout(scene_key, panel_key)
-            if panel_obj is None:
-                raise WorkflowUserError(
-                    f"drag panel: 布局中未定义 panel "
-                    f"{scene_key}.{panel_key}"
-                )
-            # 解析 distance（支持 int、float、VarRef）
-            distance = node.distance
-            if isinstance(distance, VarRef):
-                distance = self.variables.get(distance.name, 1.0)
-            try:
-                distance = float(distance)  # 支持浮点数（如 0.5 表示半行）
-            except (TypeError, ValueError):
-                raise WorkflowUserError(f"drag: 距离无效: {distance}") from None
-            w, h = self._capture.get_capture_size()
-            canvas = self._layout.get_canvas()
-            direction = node.direction or "down"
-            # 距离基于 align 实测的 slot + span/2（与 grid drag 一致）
-            cache_key = (scene_key, panel_key)
-            cal = self._panel_alignments.get(cache_key)
-            # _panel_ref_to_screen 已触发懒加载，此处 cal 应有效
-            if cal is None:
-                logger.error(f"drag panel: align 失败: {scene_key}.{panel_key}")
-                return
-            dx, dy = 0, 0
-            if direction in ("up", "down"):
-                # 垂直拖拽：按实测行周期计算
-                step_norm = cal.row_slot + cal.row_span / 2.0
-                panel_pixel_h = panel_obj.h_ratio * canvas.h_ratio * h
-                dy = int(step_norm * panel_pixel_h * distance)
-                if direction == "up":
-                    dy = -dy  # 手指向上划
-                if abs(dy) < 10:
-                    dy = 10 if dy >= 0 else -10
-            else:
-                # 水平拖拽：按实测列周期计算
-                step_norm = cal.col_slot + cal.col_span / 2.0
-                panel_pixel_w = panel_obj.w_ratio * canvas.w_ratio * w
-                dx = int(step_norm * panel_pixel_w * distance)
-                if direction == "left":
-                    dx = -dx  # 手指向左划
-                if abs(dx) < 10:
-                    dx = 10 if dx >= 0 else -10
-            x2, y2 = x + dx, y + dy
-            duration = self._resolve_duration(node.duration) if node.duration else None
-            self._input.drag_screen(
-                x, y, x2, y2,
-                f"panel({node.scene.scene}.{node.scene.panel}[{node.scene.row}][{node.scene.col}]) {direction} {distance}",
-                duration=duration, hold=node.hold, **kw,
-            )
-            # drag 后界面已滚动，失效对齐缓存（不立即刷新，避免截到滚动动画残影）
-            # 下次访问时懒加载重新对齐（此时滚动动画已完成）
-            self._panel_alignments.pop((node.scene.scene, node.scene.panel), None)
-            logger.debug(f"drag panel: 已失效对齐缓存: {node.scene.scene}.{node.scene.panel}")
+            self._drag_panel_ref(node, kw)
             return
         if isinstance(node.scene, EntityRef):
-            # 解析 scene（可能是 str 或 VarRef）
-            if isinstance(node.scene.scene, VarRef):
-                scene = self.variables.get(node.scene.scene.name)
-                if scene is None:
-                    raise WorkflowUserError(
-                        f"变量 ${node.scene.scene.name} 未定义，无法拖拽"
-                    )
-            else:
-                scene = node.scene.scene
+            self._drag_entity(node, kw)
+            return
+        raise WorkflowUserError(f"drag: 未知目标类型 {type(node.scene).__name__}")
 
-            # 解析 key（可能是 str 或 VarRef）
-            key = node.scene.entity
-            if isinstance(key, VarRef):
-                key_val = self.variables.get(key.name)
-                if key_val is None:
-                    raise WorkflowUserError(f"变量 ${key.name} 未定义，无法拖拽")
-                key = key_val
+    def _drag_duration(self, node: Drag):
+        return self._resolve_duration(node.duration) if node.duration else None
 
-            duration = self._resolve_duration(node.duration) if node.duration else None
-            hold = node.hold
-
-            # 先尝试作为 arrow 查找
-            arrows = self._layout.get_scene_arrows(str(scene))
-            arrow = next((a for a in arrows if a.key == str(key)), None)
-            if arrow is not None:
-                self._ensure_workflow().drag_arrow(str(scene), str(key), duration=duration, hold=hold, **kw)
-                return
-
-            # 未找到 arrow，尝试作为 region 查找
-            regions = self._layout.get_scene_regions(str(scene))
-            region = next((r for r in regions if r.key == str(key)), None)
-            if region is not None:
-                require_enabled(region, str(scene), "region")
-                # region 中心作为起点，利用 w/h 计算终点
-                cx = region.x_ratio + region.w_ratio / 2
-                cy = region.y_ratio + region.h_ratio / 2
-                w, h = self._capture.get_capture_size()
-                canvas = self._layout.get_canvas()
-                x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
-                y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
-                # 默认向上拖拽一个 region 高度
-                dy = int(region.h_ratio * canvas.h_ratio * h)
-                if abs(dy) < 10:
-                    dy = 10
-                x2 = x
-                y2 = y - dy
-                self._input.drag_screen(
-                    x, y, x2, y2,
-                    f"region({scene}.{key}) up",
-                    duration=duration, hold=hold, **kw,
-                )
-                logger.debug(f"drag region: {scene}.{key} up (default)")
-                return
-
-            # 尝试作为 point 查找 → 不允许单独 drag
-            points = self._layout.get_scene_points(str(scene))
-            point = next((p for p in points if p.key == str(key)), None)
-            if point is not None:
-                require_enabled(point, str(scene), "point")
-                raise WorkflowUserError(
-                    f"drag [{scene}].[{key}]: Point 无法单独 drag（无 w/h 计算终点），"
-                    f"请使用两点模式 drag [{scene}].{key} [{scene}].<另一个点>"
-                )
-
+    def _drag_distance(self, value, error_prefix: str) -> float:
+        if isinstance(value, VarRef):
+            value = self.variables.get(value.name, 1.0)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
             raise WorkflowUserError(
-                f"drag: 场景 [{scene}] 的 arrow/region/point 未绑定: {key}，"
-                f"请在场景布局编辑器中绑定后重试"
-            )
+                f"{error_prefix}: 距离无效: {value}") from None
+
+    @staticmethod
+    def _drag_delta(
+        direction: str,
+        vertical_pixels: float,
+        horizontal_pixels: float,
+    ) -> tuple[int, int]:
+        dx, dy = 0, 0
+        if direction in ("up", "down"):
+            dy = int(vertical_pixels)
+            if direction == "up":
+                dy = -dy
+            if abs(dy) < 10:
+                dy = 10 if dy >= 0 else -10
         else:
-            raise WorkflowUserError(f"drag: 未知目标类型 {type(node.scene).__name__}")
+            dx = int(horizontal_pixels)
+            if direction == "left":
+                dx = -dx
+            if abs(dx) < 10:
+                dx = 10 if dx >= 0 else -10
+        return dx, dy
+
+    def _area_center_to_screen(self, area) -> tuple[int, int, int, int, object]:
+        cx = area.x_ratio + area.w_ratio / 2
+        cy = area.y_ratio + area.h_ratio / 2
+        w, h = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
+        x = int((canvas.x_ratio + cx * canvas.w_ratio) * w + self._window_left)
+        y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
+        return x, y, w, h, canvas
+
+    def _drag_coord_pair(self, node: Drag, kw: dict) -> None:
+        start = node.from_point
+        end = node.to_point
+        x1, y1 = self._coord_ratio_to_screen(start.rx, start.ry)
+        x2, y2 = self._coord_ratio_to_screen(end.rx, end.ry)
+        self._input.drag_screen(
+            x1, y1, x2, y2,
+            f"coord({start.rx},{start.ry})->({end.rx},{end.ry})",
+            duration=self._drag_duration(node), hold=node.hold, **kw,
+        )
+
+    def _drag_scene_ref_pair(self, node: Drag, kw: dict) -> None:
+        start = node.from_scene_ref
+        end = node.to_scene_ref
+        x1, y1 = self._resolve_point_ref_to_screen(start, tr("起点"))
+        x2, y2 = self._resolve_point_ref_to_screen(end, tr("终点"))
+        self._input.drag_screen(
+            x1, y1, x2, y2,
+            f"point({start.scene}.{start.entity})->({end.scene}.{end.entity})",
+            duration=self._drag_duration(node), hold=node.hold, **kw,
+        )
+
+    def _drag_panel_grid(self, node: Drag, kw: dict) -> None:
+        """从 panel/region 中心按一个或多个实测格距拖拽。"""
+        grid = node.scene
+        panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
+        if panel_obj is None:
+            regions = self._layout.get_scene_regions(grid.scene)
+            region_obj = next((r for r in regions if r.key == grid.panel), None)
+            if region_obj is None:
+                raise WorkflowUserError(
+                    f"drag grid: 布局中未定义 panel/region {grid.scene}.{grid.panel}"
+                )
+            self._drag_grid_region(node, region_obj, kw)
+            return
+        self._drag_grid_panel(node, panel_obj, kw)
+
+    def _drag_grid_region(self, node: Drag, region_obj, kw: dict) -> None:
+        grid = node.scene
+        require_enabled(region_obj, grid.scene, "region")
+        x, y, w, h, canvas = self._area_center_to_screen(region_obj)
+        distance = self._drag_distance(grid.distance, "drag grid")
+        dx, dy = self._drag_delta(
+            grid.direction,
+            region_obj.h_ratio * canvas.h_ratio * h * distance,
+            region_obj.w_ratio * canvas.w_ratio * w * distance,
+        )
+        self._input.drag_screen(
+            x, y, x + dx, y + dy,
+            f"grid({grid.scene}.{grid.panel}) {grid.direction} {distance}",
+            duration=self._drag_duration(node), hold=node.hold, **kw,
+        )
+        logger.debug(
+            f"drag grid: region {grid.scene}.{grid.panel} "
+            f"{grid.direction} {distance}"
+        )
+
+    def _drag_grid_panel(self, node: Drag, panel_obj, kw: dict) -> None:
+        grid = node.scene
+        x, y, w, h, canvas = self._area_center_to_screen(panel_obj)
+        distance = self._drag_distance(grid.distance, "drag grid")
+        cache_key = (grid.scene, grid.panel)
+        if cache_key not in self._panel_alignments:
+            logger.info(
+                f"drag grid: 缓存未命中，懒加载 align: {grid.scene}.{grid.panel}"
+            )
+            self._exec_align(Align(scene=grid.scene, panel=grid.panel))
+        cal = self._panel_alignments.get(cache_key)
+        if cal is None or cal.row_slot <= 0:
+            logger.error(
+                f"drag grid: align 失败，无法计算拖拽距离: "
+                f"{grid.scene}.{grid.panel}"
+            )
+            return
+        if grid.direction not in ("up", "down") and cal.col_slot <= 0:
+            logger.error(
+                f"drag grid: align 列数据无效: {grid.scene}.{grid.panel}"
+            )
+            return
+        dx, dy = self._drag_delta(
+            grid.direction,
+            (cal.row_slot + cal.row_span / 2.0)
+            * panel_obj.h_ratio * canvas.h_ratio * h * distance,
+            (cal.col_slot + cal.col_span / 2.0)
+            * panel_obj.w_ratio * canvas.w_ratio * w * distance,
+        )
+        self._input.drag_screen(
+            x, y, x + dx, y + dy,
+            f"grid({grid.scene}.{grid.panel}) {grid.direction} {distance}",
+            duration=self._drag_duration(node), hold=node.hold, **kw,
+        )
+        self._panel_alignments.pop(cache_key, None)
+        logger.debug(
+            f"drag grid: 已失效对齐缓存: {grid.scene}.{grid.panel}"
+        )
+
+    def _drag_panel_ref(self, node: Drag, kw: dict) -> None:
+        ref = node.scene
+        x, y = self._panel_ref_to_screen(ref)
+        if x is None or y is None:
+            return
+        scene_key = self._resolve(ref.scene) if isinstance(ref.scene, VarRef) else ref.scene
+        panel_key = self._resolve(ref.panel) if isinstance(ref.panel, VarRef) else ref.panel
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if panel_obj is None:
+            raise WorkflowUserError(
+                f"drag panel: 布局中未定义 panel {scene_key}.{panel_key}"
+            )
+        distance = self._drag_distance(node.distance, "drag")
+        w, h = self._capture.get_capture_size()
+        canvas = self._layout.get_canvas()
+        direction = node.direction or "down"
+        cal = self._panel_alignments.get((scene_key, panel_key))
+        if cal is None:
+            logger.error(f"drag panel: align 失败: {scene_key}.{panel_key}")
+            return
+        dx, dy = self._drag_delta(
+            direction,
+            (cal.row_slot + cal.row_span / 2.0)
+            * panel_obj.h_ratio * canvas.h_ratio * h * distance,
+            (cal.col_slot + cal.col_span / 2.0)
+            * panel_obj.w_ratio * canvas.w_ratio * w * distance,
+        )
+        self._input.drag_screen(
+            x, y, x + dx, y + dy,
+            f"panel({ref.scene}.{ref.panel}[{ref.row}][{ref.col}]) "
+            f"{direction} {distance}",
+            duration=self._drag_duration(node), hold=node.hold, **kw,
+        )
+        # 用解析后的 key：缓存是按 (scene_key, panel_key) 存的（见上方 get）。
+        # 拿未解析的 ref 去 pop，`drag $sc.$pn[1][2]` 这种变量写法永远命中不了，
+        # 滚动之后对齐缓存不失效，后续格子坐标全部按滚动前算。
+        self._panel_alignments.pop((scene_key, panel_key), None)
+        logger.debug(
+            f"drag panel: 已失效对齐缓存: {scene_key}.{panel_key}"
+        )
+
+    def _drag_entity(self, node: Drag, kw: dict) -> None:
+        ref = node.scene
+        if isinstance(ref.scene, VarRef):
+            scene = self.variables.get(ref.scene.name)
+            if scene is None:
+                raise WorkflowUserError(
+                    f"变量 ${ref.scene.name} 未定义，无法拖拽"
+                )
+        else:
+            scene = ref.scene
+        key = ref.entity
+        if isinstance(key, VarRef):
+            key_val = self.variables.get(key.name)
+            if key_val is None:
+                raise WorkflowUserError(f"变量 ${key.name} 未定义，无法拖拽")
+            key = key_val
+        duration = self._drag_duration(node)
+        scene_text, key_text = str(scene), str(key)
+        arrows = self._layout.get_scene_arrows(scene_text)
+        if next((a for a in arrows if a.key == key_text), None) is not None:
+            self._ensure_workflow().drag_arrow(
+                scene_text, key_text, duration=duration, hold=node.hold, **kw,
+            )
+            return
+        regions = self._layout.get_scene_regions(scene_text)
+        region = next((r for r in regions if r.key == key_text), None)
+        if region is not None:
+            self._drag_entity_region(
+                scene_text, key_text, region, duration, node.hold, kw,
+            )
+            return
+        points = self._layout.get_scene_points(scene_text)
+        point = next((p for p in points if p.key == key_text), None)
+        if point is not None:
+            require_enabled(point, scene_text, "point")
+            raise WorkflowUserError(
+                f"drag [{scene}].[{key}]: Point 无法单独 drag（无 w/h 计算终点），"
+                f"请使用两点模式 drag [{scene}].{key} [{scene}].<另一个点>"
+            )
+        raise WorkflowUserError(
+            f"drag: 场景 [{scene}] 的 arrow/region/point 未绑定: {key}，"
+            f"请在场景布局编辑器中绑定后重试"
+        )
+
+    def _drag_entity_region(
+        self, scene: str, key: str, region, duration, hold, kw: dict,
+    ) -> None:
+        require_enabled(region, scene, "region")
+        x, y, _w, h, canvas = self._area_center_to_screen(region)
+        dy = int(region.h_ratio * canvas.h_ratio * h)
+        if abs(dy) < 10:
+            dy = 10
+        self._input.drag_screen(
+            x, y, x, y - dy, f"region({scene}.{key}) up",
+            duration=duration, hold=hold, **kw,
+        )
+        logger.debug(f"drag region: {scene}.{key} up (default)")
 
     def _exec_press(self, node: Press):
         """press "KEY" [hold N | down | up] — 模拟键盘按键
@@ -685,8 +666,6 @@ class _ActionsMixin:
         - DOWN: 按下保持
         - UP: 释放此前按下的键
         """
-        from ...core.desktop.win32_keyboard import normalize_key
-
         # 懒初始化 KeyStateRegistry（绑定当前 backend）
         if self._key_registry is None:
             from .key_state import KeyStateRegistry

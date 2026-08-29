@@ -15,7 +15,7 @@ import time
 from loguru import logger
 
 from ...core.config import InputSimConfig
-from ..input_base import InputBackend
+from ..input_base import InputBackend, InputBackendKind
 from .device import AdbDevice
 
 # 标准键名 → Android keycode（adb shell input keyevent 参数）
@@ -68,6 +68,8 @@ _KEY_TO_ANDROID_KEYCODE: dict[str, int] = {
 
 class AdbInput(InputBackend):
     """基于 adb shell input 的输入后端（接口继承 InputBackend）"""
+
+    kind = InputBackendKind.ADB
 
     def __init__(self, device: AdbDevice, input_sim: InputSimConfig | None = None):
         self._inject_input_sim(self, input_sim)

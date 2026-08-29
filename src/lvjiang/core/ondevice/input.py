@@ -15,7 +15,7 @@ import random
 import time
 
 from ...core.config import InputSimConfig
-from ..input_base import InputBackend
+from ..input_base import InputBackend, InputBackendKind
 from . import a11y, shell
 
 
@@ -159,6 +159,7 @@ class A11yInput(_GestureInput):
     """
 
     name = "A11yInput"
+    kind = InputBackendKind.A11Y
 
     def _tap(self, x: int, y: int) -> None:
         if not a11y.tap(x, y):
@@ -187,6 +188,7 @@ class ShellInput(_GestureInput):
     """
 
     name = "ShellInput"
+    kind = InputBackendKind.SHELL
 
     def _global_key(self, key: str) -> bool:
         return shell.key_event(4 if key == "ESC" else 3)

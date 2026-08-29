@@ -8,6 +8,7 @@
 
 from unittest.mock import MagicMock, call
 
+from lvjiang.workflows.align import GridAlignment
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
@@ -91,6 +92,68 @@ class TestDragCoordPoint:
         assert eng._input.drag_screen.called
 
 
+class TestDragStructuredTargets:
+    @staticmethod
+    def _area(key: str, x=0.1, y=0.2, w=0.4, h=0.3):
+        return MagicMock(
+            key=key,
+            x_ratio=x,
+            y_ratio=y,
+            w_ratio=w,
+            h_ratio=h,
+            disabled=False,
+        )
+
+    @staticmethod
+    def _alignment():
+        return GridAlignment(
+            row_centers=[0.25, 0.75],
+            col_centers=[0.25, 0.75],
+            row_bounds=[0.0, 0.5, 1.0],
+            col_bounds=[0.0, 0.5, 1.0],
+            row_slot=0.2,
+            row_span=0.04,
+            col_slot=0.3,
+            col_span=0.02,
+        )
+
+    def test_panel_grid_uses_alignment_and_invalidates_cache(self):
+        eng = make_engine()
+        panel = self._area("items")
+        eng._layout.get_scene_panels.return_value = [panel]
+        eng._panel_alignments[("bag", "items")] = self._alignment()
+
+        eng._exec_body(parse_text("drag [bag].[items] up 2\n").body)
+
+        args = eng._input.drag_screen.call_args.args
+        assert args[:4] == (576, 378, 576, 236)
+        assert ("bag", "items") not in eng._panel_alignments
+
+    def test_region_grid_uses_declared_region_size(self):
+        eng = make_engine()
+        region = self._area("scroll_area")
+        eng._layout.get_scene_panels.return_value = []
+        eng._layout.get_scene_regions.return_value = [region]
+
+        eng._exec_body(
+            parse_text("drag [bag].[scroll_area] right 0.5\n").body
+        )
+
+        args = eng._input.drag_screen.call_args.args
+        assert args[:4] == (576, 378, 960, 378)
+
+    def test_entity_region_defaults_to_one_region_height_up(self):
+        eng = make_engine()
+        region = self._area("scroll_area")
+        eng._layout.get_scene_arrows.return_value = []
+        eng._layout.get_scene_regions.return_value = [region]
+
+        eng._exec_body(parse_text("drag [bag].[scroll_area]\n").body)
+
+        args = eng._input.drag_screen.call_args.args
+        assert args[:4] == (576, 378, 576, 54)
+
+
 class TestForLoopWithClick:
     """通过 DSL 集成测试循环内的点击"""
 
@@ -113,3 +176,35 @@ end
         eng._exec_body(program.body)
         # 循环 3 次，每次点击
         assert eng._input.click_screen.call_count == 3
+
+
+class TestDragPanelRefAlignmentCache:
+    """drag panel-ref 滚动后必须失效对齐缓存——变量写法也要生效。
+
+    缓存按解析后的 (scene_key, panel_key) 存。曾经用未解析的 ref 去 pop，
+    `drag $s.$p[1][2] down` 命中不了，滚动后缓存还在，后续格子坐标全部
+    按滚动前的对齐算。
+    """
+
+    @staticmethod
+    def _run(code: str, variables: dict) -> dict:
+        from unittest.mock import MagicMock
+
+        eng = make_engine()
+        eng.variables = dict(variables)
+        panel = MagicMock(x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
+        eng._find_panel_in_layout = lambda s, p: panel
+        eng._panel_ref_to_screen = lambda ref: (100, 100)
+        eng._panel_alignments = {
+            ("sc", "pn"): MagicMock(row_slot=10, col_slot=10,
+                                    row_span=0, col_span=0),
+        }
+        eng._exec_body(parse_text(code).body)
+        return eng._panel_alignments
+
+    def test_literal_form_invalidates(self):
+        assert self._run("drag [sc].[pn][1][2] down\n", {}) == {}
+
+    def test_variable_form_also_invalidates(self):
+        left = self._run("drag $s.$p[1][2] down\n", {"s": "sc", "p": "pn"})
+        assert left == {}, f"变量写法未失效缓存，残留: {list(left)}"

@@ -71,26 +71,6 @@ def _make_key_lparam(scan: int, flags: int) -> int:
 
 # ─── 键名 → VK 映射 ──────────────────────────────────────────
 
-# 别名表：用户可能写的非标准名称 → 标准名称（normalize_key 内部查表）
-_KEY_ALIASES: dict[str, str] = {
-    "ESCAPE": "ESC",
-    "RETURN": "ENTER",
-    "CONTROL": "CTRL",
-    "LMENU": "LALT",
-    "RMENU": "RALT",
-    "LSHIFT": "SHIFT",
-    "RSHIFT": "SHIFT",
-    "LCONTROL": "LCTRL",
-    "RCONTROL": "RCTRL",
-    "DEL": "DELETE",
-    "INS": "INSERT",
-    "PGUP": "PAGEUP",
-    "PGDN": "PAGEDOWN",
-    "WINDOWS": "WIN",
-    # 小键盘别名：NUM1 → NUMPAD1
-    **{f"NUM{d}": f"NUMPAD{d}" for d in range(10)},
-}
-
 # 标准键名 → VK code
 KEY_NAME_TO_VK: dict[str, int] = {
     # 字母 A-Z
@@ -138,21 +118,6 @@ KEY_NAME_TO_VK: dict[str, int] = {
     "PRINTSCREEN": 0x2C,
     "PAUSE": 0x13,
 }
-
-
-def normalize_key(name: str) -> str:
-    """统一键名到大写标准形式
-
-    支持别名：Escape→ESC, Control→CTRL 等。
-    不在映射表中的键名直接报错。
-    """
-    upper = name.strip().upper()
-    # 先查别名，再查标准表
-    resolved = _KEY_ALIASES.get(upper, upper)
-    if resolved not in KEY_NAME_TO_VK:
-        raise ValueError(f"未知按键名: {name!r}，标准化为 {resolved!r}，不在已知按键列表中")
-    return resolved
-
 
 # ─── 发送函数 ─────────────────────────────────────────────────
 

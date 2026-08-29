@@ -1,10 +1,11 @@
 """Win32 键盘消息编码测试。"""
 
 from lvjiang.core.desktop.win32_keyboard import (
+    KEY_NAME_TO_VK,
     KEYEVENTF_KEYUP,
     _make_key_lparam,
-    normalize_key,
 )
+from lvjiang.core.key_names import KNOWN_KEY_NAMES, normalize_key
 
 
 def test_keydown_lparam_has_scan_without_release_bits():
@@ -26,3 +27,7 @@ def test_keyup_lparam_sets_previous_and_transition_bits():
 def test_main_and_numpad_digits_are_distinct():
     assert normalize_key("1") == "1"
     assert normalize_key("NUM1") == "NUMPAD1"
+
+
+def test_platform_neutral_key_names_match_win32_mapping():
+    assert KNOWN_KEY_NAMES == KEY_NAME_TO_VK.keys()

@@ -51,7 +51,8 @@ start: (_NL | statement)*
 // press "W" hold 2.0    — 按住 2 秒后释放
 // press "SHIFT" down    — 按下保持
 // press "SHIFT" up      — 释放
-press_stmt: "press"i STRING press_modifier? wait_clauses? _NL
+// press $key            — 按键名来自变量（值按字符串处理）
+press_stmt: "press"i (STRING | var_ref) press_modifier? wait_clauses? _NL
 press_modifier: "hold"i number -> press_hold
               | "down"i        -> press_down
               | "up"i          -> press_up

@@ -106,9 +106,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                 break
             end
             # 桌面端详情功能区会遮挡下一行首格，关闭后再继续；Android 无此遮挡。
-            if env("desktop")
-                press "ESC" after wait @page_refresh
-            end
+            env:"desktop" -> press "ESC" after wait @page_refresh
             eval $fp = make_fingerprint($equip)
             eval $signal = bag_cursor_visit($fp)
             log "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
@@ -142,9 +140,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                             break
                         end
                         # 桌面端详情功能区会遮挡下一行首格，关闭后再继续；Android 无此遮挡。
-                        if env("desktop")
-                            press "ESC" after wait @page_refresh
-                        end
+                        env:"desktop" -> press "ESC" after wait @page_refresh
                         eval $fp = make_fingerprint($equip)
                         log "    [" + $r + "," + $c + "] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp
 

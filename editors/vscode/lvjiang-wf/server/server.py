@@ -112,7 +112,7 @@ DSL_KEYWORDS = {
     # Actions
     "tap", "wait", "drag", "ocr", "find", "screenshot", "scan", "recognize", "collect", "log", "align",
     # Control structures
-    "if", "elif", "else", "while", "for", "in", "break", "continue", "end",
+    "env", "if", "elif", "else", "while", "for", "in", "break", "continue", "end",
     # Boolean/null
     "true", "false", "null",
     # Logical operators
@@ -497,6 +497,11 @@ def _collect_block_ranges(body: list, result: list[FoldingRange],
             start_line = getattr(stmt, "line_no", 0)
             if start_line <= 0:
                 continue
+
+        # env:"..." -> statement 会复用 If AST，但源文本没有 end，不是可折叠块。
+        if (isinstance(stmt, If) and source_lines
+                and re.match(r"\s*env\s*:", source_lines[start_line - 1], re.I)):
+            continue
 
         # Find the max line_no in all nested statements, then +1 for 'end'
         all_stmts = []

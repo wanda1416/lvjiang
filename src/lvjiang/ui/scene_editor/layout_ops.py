@@ -155,7 +155,11 @@ class LayoutOpsMixin:
         if name:
             idx = self._layout_combo.findText(name)
             if idx >= 0:
+                # 下面会显式加载一次；这里若放行 currentIndexChanged，非首项
+                # 的激活布局会先经 _on_combo_changed 加载一遍，再重复加载。
+                self._layout_combo.blockSignals(True)
                 self._layout_combo.setCurrentIndex(idx)
+                self._layout_combo.blockSignals(False)
             layout = self._manager.load_layout(name)
             if layout:
                 self._current_layout = layout
@@ -238,10 +242,10 @@ class LayoutOpsMixin:
         for scene_key, version in scene_versions.items():
             registry.save_scene_content_version(scene_key, version)
         self._update_ui_state()
-        total_r = sum(len(tab.get_regions()) for tab in self._tabs.values())
-        total_p = sum(len(tab.get_points()) for tab in self._tabs.values())
-        total_a = sum(len(tab.get_arrows()) for tab in self._tabs.values())
-        total_pn = sum(len(tab.get_panels()) for tab in self._tabs.values())
+        total_r = sum(len(items) for items in self._current_layout.regions.values())
+        total_p = sum(len(items) for items in self._current_layout.points.values())
+        total_a = sum(len(items) for items in self._current_layout.arrows.values())
+        total_pn = sum(len(items) for items in self._current_layout.panels.values())
         # changed 恒为集合；空集表示没有场景需要写盘（画布/描述等布局级
         # 改动仍会经 layouts.yaml 落盘），不再是"全部"的意思。
         saved_info = f"{len(changed)} 个场景" if changed else tr("无场景改动")
@@ -360,19 +364,22 @@ class LayoutOpsMixin:
             logger.info(f"别名布局已创建: {name} (extends {extends_name})")
         else:
             # 正常另存为：独立副本
-            temp = Layout(name="")
             current_tab = self._current_scene_tab() or next(iter(self._tabs.values()), None)
-            temp.set_canvas(
+            self._current_layout.set_canvas(
                 current_tab.get_canvas_config()
                 if current_tab is not None
                 else self._current_layout.get_canvas()
             )
             for scene_key, tab in self._tabs.items():
-                temp.set_scene_regions(scene_key, tab.get_regions())
-                temp.set_scene_points(scene_key, tab.get_points())
-                temp.set_scene_arrows(scene_key, tab.get_arrows())
-                temp.set_scene_panels(scene_key, tab.get_panels())
+                self._current_layout.set_scene_regions(scene_key, tab.get_regions())
+                self._current_layout.set_scene_points(scene_key, tab.get_points())
+                self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
+                self._current_layout.set_scene_panels(scene_key, tab.get_panels())
 
+            # 未访问过的场景没有 SceneTab，但完整数据始终保留在当前 Layout。
+            # 从它克隆，不能只复制已创建的控件，否则另存为会静默丢场景。
+            temp = Layout.from_dict(name, self._current_layout.to_dict())
+            temp.desc = self._current_layout.desc
             temp.name = name
             if not self._manager.save_layout(temp):
                 QMessageBox.warning(self, tr("另存为失败"), tr("布局写入失败，请检查日志。"))

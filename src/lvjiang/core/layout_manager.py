@@ -12,6 +12,7 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 from loguru import logger
@@ -386,10 +387,24 @@ def scene_layout_rel(name: str, scene_key: str) -> str:
     目录下（见 :func:`_resolve_layout_entry`），照别名拼出来的路径根本不存在，
     调用方会得到"这个文件没有"的空结果而不自知。
     """
+    return scene_layout_rels(name, (scene_key,))[scene_key]
+
+
+def scene_layout_rels(name: str,
+                      scene_keys: Iterable[str]) -> dict[str, str]:
+    """批量返回布局场景路径，只解析一次 ``layouts.yaml``。
+
+    场景编辑器会同时展示一个布局下的许多场景。逐场景调用
+    :func:`scene_layout_rel` 会为每个场景重复解析同一份 YAML；这个批量入口
+    保留完全相同的别名布局语义，同时把解析成本固定为一次。
+    """
     doc = get_resolver().load_merged(_LAYOUTS_YAML_REL).get("layouts", {})
     resolved = _resolve_layout_entry(doc, name)
     scene_dir_name = resolved[1] if resolved else name
-    return _scene_rel(scene_dir_name, scene_key)
+    return {
+        scene_key: _scene_rel(scene_dir_name, scene_key)
+        for scene_key in scene_keys
+    }
 
 
 def _enumerate_scene_files(name: str) -> list[str]:

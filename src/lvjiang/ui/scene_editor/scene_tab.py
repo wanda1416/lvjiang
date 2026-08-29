@@ -1,5 +1,7 @@
 """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域 / 坐标 / 方向 / 面板）"""
 
+from collections.abc import Callable
+
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -36,13 +38,12 @@ from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 
-def describe_entity_version(rel_path: str) -> tuple[int | None, str]:
-    """返回实体当前生效版本与来源文案，供版本控件和纯函数测试使用。"""
+def _source_label(layer: str) -> str:
+    """配置层内部标识对应的界面文案。"""
     from ...core.config.resolver import (
         LAYER_LOCAL,
         LAYER_REMOTE,
         LAYER_SYSTEM,
-        get_resolver,
     )
 
     labels = {
@@ -50,8 +51,15 @@ def describe_entity_version(rel_path: str) -> tuple[int | None, str]:
         LAYER_REMOTE: tr("远程下发"),
         LAYER_SYSTEM: tr("系统"),
     }
+    return labels.get(layer, layer)
+
+
+def describe_entity_version(rel_path: str) -> tuple[int | None, str]:
+    """返回实体当前生效版本与来源文案，供版本控件和纯函数测试使用。"""
+    from ...core.config.resolver import get_resolver
+
     origin = get_resolver().describe_entity(rel_path)
-    return origin.version, labels.get(origin.layer, origin.layer)
+    return origin.version, _source_label(origin.layer)
 
 
 class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
@@ -61,17 +69,18 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         super().__init__(parent)
         self._scene_key = scene_key
         # 跨场景迁移回调：(kind, key, source_scene, target_scene)，由 dialog 注入
-        self.on_item_migrated = None
+        self.on_item_migrated: Callable[[str, str, str, str], None] | None = None
         # 当前视图 key（空 = 看全部）；视图切换回调：(scene_key, view)，由 dialog 注入换底图
         self._current_view: str = ""
-        self.on_view_changed = None
+        self.on_view_changed: Callable[[str, str], None] | None = None
         # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
         self._layout_name: str = ""
+        self._layout_rel_path: str = ""
         # 版本提升是编辑状态，不在点击链接时写盘。dialog 保存成功后统一清除；
         # 切换/关闭选择 Discard 时控件随 Tab 状态一起丢弃。
         self._pending_scene_version: int | None = None
         self._pending_layout_version: int | None = None
-        self.on_version_pending_changed = None
+        self.on_version_pending_changed: Callable[[str], None] | None = None
 
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -171,16 +180,17 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         bar.addWidget(self._layout_version_value)
         bar.addWidget(self._layout_version_link)
         bar.addStretch()
-        self._refresh_version_info()
 
         self._refresh_view_combo()
         return bar
 
-    def set_layout_name(self, layout_name: str):
+    def set_layout_name(self, layout_name: str,
+                        rel_path: str | None = None):
         """由 dialog 在应用布局时注入——布局坐标文件的来源要按布局名解析"""
         if layout_name != self._layout_name:
             self._pending_layout_version = None
         self._layout_name = layout_name
+        self._layout_rel_path = rel_path or ""
         self._refresh_version_info()
 
     def _configure_version_link(self, label: QLabel, kind: str) -> None:
@@ -194,6 +204,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
             return f"scenes/{self._scene_key}.yaml"
         if not self._layout_name:
             return ""
+        if self._layout_rel_path:
+            return self._layout_rel_path
         from ...core.layout_manager import scene_layout_rel
         return scene_layout_rel(self._layout_name, self._scene_key)
 
@@ -219,7 +231,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
             origin.version if origin is not None else None)
         value.setText("-" if version is None else f"v{version}")
         value.setStyleSheet(self._source_style(origin.layer if origin else ""))
-        source = describe_entity_version(rel_path)[1] if rel_path else ""
+        source = _source_label(origin.layer) if origin is not None else ""
         value.setToolTip(
             tr("来源：{source}\n路径：{path}\n当前版本：{version}").format(
                 source=source or tr("未知"), path=rel_path or "-",
@@ -273,6 +285,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
                 or self._pending_layout_version is not None)
 
     def clear_pending_versions(self) -> None:
+        if not self.has_pending_version:
+            return
         self._pending_scene_version = None
         self._pending_layout_version = None
         self._refresh_version_info()

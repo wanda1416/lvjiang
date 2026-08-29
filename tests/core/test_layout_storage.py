@@ -400,6 +400,27 @@ class TestSceneLayoutRel:
         from lvjiang.core.layout_manager import scene_layout_rel
         assert scene_layout_rel("没有的布局", "scene_a") == "layouts/没有的布局/scene_a.json"
 
+    def test_batch_paths_parse_layout_registry_once(self, env, monkeypatch):
+        from lvjiang.core.config.resolver import get_resolver
+        from lvjiang.core.layout_manager import scene_layout_rels
+
+        mgr = LayoutConfigManager()
+        mgr.save_layout(_make_layout("根布局"))
+        resolver = get_resolver()
+        original = resolver.load_merged
+        calls = []
+
+        def counted(rel_path):
+            calls.append(rel_path)
+            return original(rel_path)
+
+        monkeypatch.setattr(resolver, "load_merged", counted)
+        assert scene_layout_rels("根布局", ("scene_a", "scene_b")) == {
+            "scene_a": "layouts/根布局/scene_a.json",
+            "scene_b": "layouts/根布局/scene_b.json",
+        }
+        assert calls == ["layouts.yaml"]
+
 
 class TestSaveLayoutScope:
     """写盘范围：空集不写任何场景，None 才是全量（新建/另存为用）。

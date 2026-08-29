@@ -723,7 +723,6 @@ auto_strings:
   外功攻击: External ATK
   外功类: External
   外功防御: External DEF
-  大律准石: Major Tuning Stone
   如：踏雪云珑: e.g. Taxue Yunlong
   如：黄钟长鸣: e.g. Huangzhong Changming
   字体设置: Font Settings
@@ -817,7 +816,6 @@ auto_strings:
   当前阶段：等待开始: 'Current Stage: Waiting to Start'
   当前阶段：结束处理 — 第 {n} 轮完成，正在匹配处理规则: 'Current Stage: End Processing -- round {n} complete, matching processing rules'
   当前阶段：重置调律 — 重置完成，按新装备继续调律: 'Current Stage: Reset Tuning -- reset complete, continuing tuning as a new equipment'
-  彩狗粮: Rainbow Fodder
   律匠 - 燕云十六声装备调律工具: LvJiang - YYSLS Equipment Tuning Tool
   御: Defense
   徵: Zhi
@@ -1087,7 +1085,6 @@ auto_strings:
   筛选中: Filtering
   精准率: Accuracy Rate
   紫: Purple
-  紫狗粮: Purple Fodder
   紫装: Purple Equipment
   紫装及以下: Purple Equipment and Below
   红色: Red
@@ -1267,7 +1264,6 @@ auto_strings:
   重置调律: Reset Tuning
   重置边界：以下数据为执行重置前的装备状态: 'Reset Boundary: the following data is the equipment state before the reset'
   金: Gold
-  金狗粮: Gold Fodder
   金装: Gold Equipment
   防具类: Armor
   陌刀: Mo Blade

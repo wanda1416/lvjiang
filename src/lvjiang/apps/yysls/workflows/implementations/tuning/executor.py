@@ -10,6 +10,7 @@ from loguru import logger
 
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 from lvjiang.apps.yysls.core.tuning_rules import (
+    SMALL_STONE_LABEL,
     STONE_LABEL,
     FoodDecision,
     MaterialSettings,
@@ -20,6 +21,18 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
 
 from ......i18n import tr
 
+# 小律准石在场时让材料缓存按轮失效。**默认关闭。**
+#
+# 依据的因果链是：一键添加把小律准石一次性用光 → 图标从材料区消失 →
+# 后面的槽位整体左移 → 缓存里的 (row, col) 指向别的材料。但这条链的第一
+# 环存疑：一键添加理论上只消耗大律准石，并不动小律准石，那槽位就不该
+# 因此位移，现场观察到的错位多半另有成因。
+#
+# 而打开它的代价很实在——材料区几乎总有小律准石，等于每轮都重新 OCR，
+# 缓存形同虚设。所以实现保留、开关关掉：等真实成因查清，若确认槽位会
+# 位移，把这里改成 True 即可；若是别的原因，这段可以整体删掉。
+INVALIDATE_CACHE_ON_SMALL_STONE = False
+
 
 class TuningExecutor:
     """调律执行：单轮调律、材料检查、狗粮决策、就绪确认
@@ -29,6 +42,7 @@ class TuningExecutor:
     - round_food / round_food_reason: 本轮狗粮决策结果
     - materials_exhausted: 大律准石低于基准，全部退出
     - _material_cache: 材料区 OCR 缓存（进入调律页/重置后刷新）
+    - _cache_valid / _cache_volatile: 缓存是否可用、是否只能用一轮
     """
 
     def __init__(self, wf: TuningRoundHostPort):
@@ -41,6 +55,8 @@ class TuningExecutor:
         self._stone_check_waived = False
         self._tune_ready_waived = False
         self._material_cache: dict | None = None
+        self._cache_valid = False
+        self._cache_volatile = False
         self._food_count_overrides: dict[str, int] = {}
 
     def reset_state(self):
@@ -49,6 +65,8 @@ class TuningExecutor:
         self._stone_check_waived = False
         self._tune_ready_waived = False
         self._material_cache = None
+        self._cache_valid = False
+        self._cache_volatile = False
         self._food_count_overrides = {}
 
     def cache_materials(self):
@@ -57,6 +75,12 @@ class TuningExecutor:
         缓存大律准石、小律准石和三种狗粮的数值，后续调律轮次
         直接使用缓存，避免每轮重复 OCR。狗粮每轮 -1 由
         decrement_food() 维护；重置或退出调律页后需重新调用本方法刷新。
+
+        ⚠️ 材料区在场小律准石时缓存**只能用一轮**：一键添加会把小律准石
+        一次性用光，图标随之从材料区消失，它后面的槽位整体左移一格，
+        缓存里记的 (row, col) 就会指向别的材料——继续拿它点狗粮等于点错。
+        因此这种情况下本轮用完即失效，下一轮添加前必须重新识别；只有
+        材料区没有小律准石时，本轮识别才可以作为下一轮的缓存。
         """
         wf = self._wf
         settings = wf.base_group.materials
@@ -71,19 +95,54 @@ class TuningExecutor:
             }
             infos = self._validate_tuning_materials(infos)
             self._material_cache = infos
+            self._cache_valid = True
+            # 小律准石在场 → 槽位坐标可能易失，本轮用完即弃（默认关闭，
+            # 见 INVALIDATE_CACHE_ON_SMALL_STONE 的说明）
+            self._cache_volatile = (INVALIDATE_CACHE_ON_SMALL_STONE
+                                    and self._has_small_stone(infos))
             self._food_count_overrides = {}  # 清空覆盖，使用 OCR 原始值
             # 日志：记录缓存的材料数量（同名材料优先保留数量有效的槽）
             deduped = self._dedup_by_confidence(infos)
             counts = {label: self._get_count(info)
                       for label, info in deduped.items()}
             logger.debug(f"材料缓存已刷新: {counts}")
+            if self._cache_volatile:
+                logger.debug("材料区存在小律准石，本轮缓存用完即失效")
         else:
             self._material_cache = None
+            self._cache_valid = True     # 本就不需要缓存，不必反复识别
+            self._cache_volatile = False
             self._food_count_overrides = {}
 
+    def _has_small_stone(self, infos: dict | None) -> bool:
+        """材料区是否还有小律准石（数量有效且 > 0）。
+
+        数量为 0 或 OCR 容错成 0 的槽不算：那种槽点不动，也不会在这一轮
+        被消耗掉，槽位不会因此位移。
+        """
+        for info in (infos or {}).values():
+            if getattr(info, "label", "") != SMALL_STONE_LABEL:
+                continue
+            if not self._has_recognized_count(info):
+                continue
+            if (getattr(info, "count", 0) or 0) > 0:
+                return True
+        return False
+
+    def ensure_materials_cached(self):
+        """轮次开始前调用：缓存失效就重新识别一次。
+
+        与 cache_materials 的区别是幂等——缓存仍然有效时什么都不做，
+        不会把每轮一次 OCR 的开销重新引回来。
+        """
+        if not self._cache_valid:
+            self.cache_materials()
+
     def invalidate_cache(self):
-        """退出调律页时清空缓存"""
+        """退出调律页、或本轮缓存已不可信时清空缓存"""
         self._material_cache = None
+        self._cache_valid = False
+        self._cache_volatile = False
 
     def _get_count(self, info) -> int | None:
         """获取材料数量：优先查运行期扣减覆盖，否则用识别值。"""
@@ -194,7 +253,10 @@ class TuningExecutor:
 
         # 使用缓存的材料数据：大律准石检查 + 逐轮狗粮决策共用
         # 缓存由 cache_materials() 在进入调律页/重置后刷新，
-        # 每轮调律后由 decrement_food() 扣减狗粮数量
+        # 每轮调律后由 decrement_food() 扣减狗粮数量。
+        # 上一轮若在场小律准石，缓存已被置为失效，这里重新识别一次——
+        # 槽位可能因小律准石耗尽而整体左移，旧坐标不能再用。
+        self.ensure_materials_cached()
         settings = self._wf.base_group.materials
         infos = self._material_cache
         if not self._check_stone_stock(settings, infos):
@@ -249,6 +311,9 @@ class TuningExecutor:
 
         wf.click_region(wf.TUNE_SCENE, "auto_add")
         wf.wait_delay("step_interval")
+        if self._cache_volatile:
+            # 一键添加可能刚把小律准石用光，槽位随之左移，缓存作废
+            self.invalidate_cache()
         # 添加后确认按钮真的变成了「调律」，未就绪走材料不足处理
         if not self._ensure_tune_ready(settings):
             return None

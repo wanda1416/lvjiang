@@ -79,7 +79,8 @@ class TuningRecycler:
                            f"装备被锁定，保留")
             self._routes.close_recycle_entry_on_lock()
             return RecycleOutcome.LOCKED
-        wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
+        # 确认方式按环境分派：安卓点确认区域，端游按空格
+        self._routes.confirm_recycle()
         wf.wait_stable("page_refresh")  # 回收完成，背包刷新补位
         if report is not None:
             report["recycled"] = True

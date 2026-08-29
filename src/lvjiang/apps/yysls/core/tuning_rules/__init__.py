@@ -51,6 +51,7 @@ from .models import (
     RATING_KEYS,
     RATING_LABELS,
     RATING_RANK,
+    SMALL_STONE_LABEL,
     STONE_ACTION_LABELS,
     STONE_ACTIONS,
     STONE_LABEL,
@@ -115,6 +116,7 @@ __all__ = [
     "RATING_RANK",
     "STONE_ACTION_LABELS",
     "STONE_ACTIONS",
+    "SMALL_STONE_LABEL",
     "STONE_LABEL",
     "TIER_KEYS",
     # 领域模型

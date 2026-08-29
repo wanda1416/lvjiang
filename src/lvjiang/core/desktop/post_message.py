@@ -37,9 +37,19 @@ class PostMessageInput(InputBackend):
         # 兼容属性：PostMessage 恒为后台模式
         self.background_mode = True
         self.target_hwnd = hwnd
-        # SDL/投屏窗口（scrcpy 等）只有处于前台/焦点才处理鼠标消息，
-        # 投递前先瞬时激活目标窗口、投递后还原焦点，否则消息被忽略。
-        self.activate_before_send = True
+        # 默认**不**激活目标窗口。后台模式的全部意义就是不抢焦点——
+        # 用户只承诺窗口可见（副屏常驻即可），焦点归他自己用。
+        #
+        # 这里曾默认 True：7838759 排查「后台投递偶发不落地」时，在根因
+        # 未明（当时 TODO 原文：「可能是 Win32 API 序列、窗口焦点、消息
+        # 队列竞态」）的情况下，与 screen_to_client_logical 这个 DPI 坐标
+        # 修正一起打包塞了进来，随后问题消失便再没回头区分谁才是真修复。
+        # 代价是每次点击/移动/滚动/拖拽都 SetForegroundWindow 一来一回，
+        # 后台模式退化成「只是不移动光标」，副屏挂机边用电脑的场景直接废掉。
+        #
+        # 真正需要它的只有 SDL 类窗口（scrcpy 投屏窗等）：那类窗口不在前台
+        # 就不把 PostMessage 转成事件。这种目标可以显式把本属性设回 True。
+        self.activate_before_send = False
 
     # ─── 点击 ─────────────────────────────────────────────────
 

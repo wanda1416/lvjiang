@@ -8,12 +8,12 @@
 见 ``workbench.DebugPanel``）。
 
 写入走 ConfigResolver：开发模式写 system，用户模式写 local 影子
-（与脚本配置 / 场景管理同一套模式判定），所以用户改出厂脚本不会污染
+（与脚本配置 / 场景管理同一套模式判定），所以用户改系统脚本不会污染
 system 目录。
 
-用户模式下**出厂脚本只读**：编辑区置灰，要改必须先右键「复制到本地」。
+用户模式下**系统脚本只读**：编辑区置灰，要改必须先右键「复制到本地」。
 这一步不是多余的仪式——复制之后该文件就成了 local 影子，从此收不到任何
-出厂更新（实体文件是整文件影子，不做内容合并），代价得让用户明确知道。
+系统更新（实体文件是整文件影子，不做内容合并），代价得让用户明确知道。
 开发模式直接写 system，不受此限。
 
 校验分两档：
@@ -21,8 +21,8 @@ system 目录。
 - 「保存」落盘后再跑一遍引擎的 validate_only（语法 + import 链 + 命名等待 +
   布局引用），判据与真正执行共用，预检放过的上机不会炸。
 
-复制之后想反悔，右键「还原为出厂」丢掉本地那份——没有这条回头路，
-「复制到本地」就是单行道：改坏了既删不掉（出厂内容受保护）也回不去。
+复制之后想反悔，右键「还原为系统」丢掉本地那份——没有这条回头路，
+「复制到本地」就是单行道：改坏了既删不掉（系统内容受保护）也回不去。
 
 新建脚本会被发现层自动扫到并默认展示在日常页，无需额外登记。
 **新建**的脚本 id 不允许 ``_`` 前缀（发现层把 ``_*.wf`` 当临时文件跳过，
@@ -37,10 +37,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
-from PyQt6.QtCore import QRegularExpression, Qt
+from PyQt6.QtCore import QRegularExpression, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
     QFont,
+    QIcon,
     QSyntaxHighlighter,
     QTextCharFormat,
     QTextCursor,
@@ -57,6 +58,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSplitter,
+    QStyle,
     QTabWidget,
     QTextEdit,
     QTreeWidget,
@@ -338,10 +340,18 @@ class ScriptEditorDialog(QDialog):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
-        self.tree.setMinimumWidth(200)
+        self.tree.setMinimumWidth(220)
         # 节点只写文件名。「来自哪一层」「能否独立启动」是另一层面的事，
         # 走选中态的 lbl_layer 与 tooltip，不往树上堆标记。
         self.tree.setUniformRowHeights(True)
+        self.tree.setIndentation(16)
+        self.tree.setIconSize(QSize(16, 16))
+        self.tree.setAnimated(True)
+        # 只调间距，不写颜色：颜色归全局主题样式表管（见 ui.theme），
+        # 在这里硬编码 token 会在切换深浅色时留一块不跟着变的死角。
+        self.tree.setStyleSheet(
+            "QTreeWidget::item { padding: 5px 4px; }")
+        self._icon_dir, self._icon_file = self._tree_icons()
         self.tree.currentItemChanged.connect(self._on_select)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._on_tree_menu)
@@ -384,6 +394,14 @@ class ScriptEditorDialog(QDialog):
 
         self._refresh_buttons()
 
+    def _tree_icons(self) -> tuple[QIcon, QIcon]:
+        """目录 / 文件图标取系统标准图标，跟着平台与主题走"""
+        style = self.style()
+        if style is None:                      # 无 QStyle 的极端环境（离屏测试）
+            return QIcon(), QIcon()
+        return (style.standardIcon(QStyle.StandardPixmap.SP_DirIcon),
+                style.standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+
     @staticmethod
     def _is_mac() -> bool:
         import sys
@@ -403,6 +421,7 @@ class ScriptEditorDialog(QDialog):
         for d in list_directories([e.file for e in self._entries]):
             parent_dir, _, leaf = d.rpartition("/")
             node = QTreeWidgetItem([leaf])
+            node.setIcon(0, self._icon_dir)
             node.setData(0, Qt.ItemDataRole.UserRole, None)   # 目录不可选中打开
             node.setFlags(node.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             dir_items[d] = node
@@ -410,6 +429,7 @@ class ScriptEditorDialog(QDialog):
              else self.tree.addTopLevelItem(node))
         for e in self._entries:
             item = QTreeWidgetItem([e.name])
+            item.setIcon(0, self._icon_file)
             item.setData(0, Qt.ItemDataRole.UserRole, e.rel_path)
             item.setToolTip(0, f"{e.rel_path}\n{e.layer}: {e.path}")
             (dir_items[e.parent].addChild(item) if e.parent
@@ -494,9 +514,9 @@ class ScriptEditorDialog(QDialog):
             menu.addAction(tr("复制到本地以修改")).triggered.connect(
                 lambda: self._copy_to_local(entry))
         elif entry.file.overrides_system and not get_resolver().is_dev_mode():
-            # 覆盖了出厂的影子：能还原，但不能删（删了这个实体就没了，
-            # 而出厂内容不允许用户删除）
-            menu.addAction(tr("还原为出厂")).triggered.connect(
+            # 覆盖了系统的影子：能还原，但不能删（删了这个实体就没了，
+            # 而系统内容不允许用户删除）
+            menu.addAction(tr("还原为系统")).triggered.connect(
                 lambda: self._revert_to_system(entry))
         else:
             menu.addAction(tr("删除")).triggered.connect(self._on_delete)
@@ -508,14 +528,14 @@ class ScriptEditorDialog(QDialog):
         return entry.file.editable or get_resolver().is_dev_mode()
 
     def _copy_to_local(self, entry: ScriptEntry):
-        """把出厂脚本原样复制成 local 影子，之后才允许编辑
+        """把系统脚本原样复制成 local 影子，之后才允许编辑
 
-        复制后该文件脱离出厂更新（整文件影子），所以要用户明确确认一次。
+        复制后该文件脱离系统更新（整文件影子），所以要用户明确确认一次。
         """
         ret = QMessageBox.question(
             self, tr("复制到本地"),
-            tr("把出厂脚本 {name} 复制到本地后才能修改。\n"
-               "复制之后这个文件不再跟随出厂更新，确定？").format(name=entry.rel_path),
+            tr("把系统脚本 {name} 复制到本地后才能修改。\n"
+               "复制之后这个文件不再跟随系统更新，确定？").format(name=entry.rel_path),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -526,7 +546,7 @@ class ScriptEditorDialog(QDialog):
         except OSError as e:
             QMessageBox.warning(self, tr("复制失败"), str(e))
             return
-        # force：内容与出厂逐字相同，不强制的话 write_entity 会判成空操作
+        # force：内容与系统逐字相同，不强制的话 write_entity 会判成空操作
         if self._write(entry.rel_path, text, force=True) is None:
             return
         self._changed_any = True
@@ -536,10 +556,10 @@ class ScriptEditorDialog(QDialog):
         self._set_status(tr("已复制到本地，现在可以编辑"))
 
     def _revert_to_system(self, entry: ScriptEntry):
-        """丢掉 local 影子，回到出厂那一份——「复制到本地」的反向操作"""
+        """丢掉 local 影子，回到系统那一份——「复制到本地」的反向操作"""
         ret = QMessageBox.question(
-            self, tr("还原为出厂"),
-            tr("丢弃 {name} 的本地修改，恢复出厂版本？此操作不可恢复。")
+            self, tr("还原为系统"),
+            tr("丢弃 {name} 的本地修改，恢复系统版本？此操作不可恢复。")
             .format(name=entry.rel_path),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
@@ -552,13 +572,13 @@ class ScriptEditorDialog(QDialog):
         except OSError as e:
             QMessageBox.warning(self, tr("还原失败"), str(e))
             return
-        logger.info(f"脚本已还原为出厂: {rel}")
+        logger.info(f"脚本已还原为系统: {rel}")
         self._changed_any = True
         self._dirty = False
         self._current = None
         self._reload_list(select_id=rel)
         self._load_entry(self._entry(rel))
-        self._set_status(tr("已还原为出厂版本"))
+        self._set_status(tr("已还原为系统版本"))
 
     def _load_entry(self, entry: ScriptEntry | None):
         self._current = entry
@@ -576,20 +596,20 @@ class ScriptEditorDialog(QDialog):
         self._apply_read_only(entry)
         self._set_status(
             "" if entry is None or self._is_editable(entry)
-            else tr("出厂脚本只读——右键「复制到本地以修改」后才能编辑"))
+            else tr("系统脚本只读——右键「复制到本地以修改」后才能编辑"))
         self._refresh_buttons()
 
     def _apply_read_only(self, entry: ScriptEntry | None):
-        """出厂脚本置灰编辑区，并把来源写进状态标签"""
+        """系统脚本置灰编辑区，并把来源写进状态标签"""
         editable = entry is not None and self._is_editable(entry)
         self.editor.setReadOnly(entry is not None and not editable)
         if entry is None:
             self.lbl_layer.setText("")
             return
         if entry.file.is_system:
-            origin = tr("出厂") if editable else tr("出厂（只读）")
+            origin = tr("系统") if editable else tr("系统（只读）")
         else:
-            origin = tr("本地覆盖出厂") if entry.file.overrides_system else tr("本地")
+            origin = tr("本地覆盖系统") if entry.file.overrides_system else tr("本地")
         self.lbl_layer.setText(f"{origin} · {entry.path}")
 
     # ─── 状态 ──────────────────────────────────────────
@@ -602,10 +622,10 @@ class ScriptEditorDialog(QDialog):
         cur = self._current
         has_text = bool(self.editor.toPlainText().strip())
         editable = cur is not None and self._is_editable(cur)
-        # 出厂脚本只读：保存按钮直接关掉，别让用户敲完一屏才发现存不下去
+        # 系统脚本只读：保存按钮直接关掉，别让用户敲完一屏才发现存不下去
         self.btn_save.setEnabled(self._dirty and (editable or (cur is None and has_text)))
         self.btn_save_as.setEnabled(has_text)
-        # 出厂脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
+        # 系统脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
         # 请在「工具 → 脚本配置」取消勾选。
         shadow = (cur is not None and editable and cur.file.overrides_system
                   and not get_resolver().is_dev_mode())
@@ -613,9 +633,9 @@ class ScriptEditorDialog(QDialog):
         if cur is None or can_delete:
             hint = ""
         elif shadow:
-            hint = tr("这是出厂脚本的本地副本，删不掉；右键「还原为出厂」可丢弃本地修改")
+            hint = tr("这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改")
         else:
-            hint = tr("出厂脚本不可删除；不想展示请在「脚本配置」取消勾选")
+            hint = tr("系统脚本不可删除；不想展示请在「脚本配置」取消勾选")
         self.btn_delete.setEnabled(can_delete)
         self.btn_delete.setToolTip(hint)
         self.btn_check.setEnabled(has_text)
@@ -668,7 +688,7 @@ class ScriptEditorDialog(QDialog):
                 if not self._is_editable(existing):
                     QMessageBox.warning(
                         self, tr("不可覆盖"),
-                        tr("{rel} 是出厂脚本。要改它请在树里右键「复制到本地以修改」。")
+                        tr("{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。")
                         .format(rel=rel))
                     default = sid
                     continue
@@ -720,7 +740,7 @@ class ScriptEditorDialog(QDialog):
             return
         if not self._is_editable(self._current):
             self._set_status(
-                tr("出厂脚本只读——右键「复制到本地以修改」后才能保存"), error=True)
+                tr("系统脚本只读——右键「复制到本地以修改」后才能保存"), error=True)
             return
         self._save_to(self._current.rel_path)
 
@@ -859,7 +879,7 @@ class ScriptEditorDialog(QDialog):
             for b in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete):
                 b.setEnabled(False)
         else:
-            # 别无脑放开只读——出厂脚本解锁后仍应是只读的
+            # 别无脑放开只读——系统脚本解锁后仍应是只读的
             self._apply_read_only(self._current)
             self._refresh_buttons()
 

@@ -116,7 +116,7 @@ class StartupOpsMixin:
             apply_outcome(result)
 
         def on_failed(_message: str):
-            pass  # 静默：拿不到在线配置就用出厂配置，本来就是可用状态
+            pass  # 静默：拿不到在线配置就用系统配置，本来就是可用状态
 
         syncer.finished_ok.connect(on_finished_ok)
         syncer.failed.connect(on_failed)

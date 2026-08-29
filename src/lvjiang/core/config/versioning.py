@@ -3,7 +3,7 @@
 ## 为什么需要它
 
 `config/remote/`（在线下发层）插在 local 与 system 之间之后，"remote 优先"
-是错的：用户升了 App，system 带来 v5 的场景坐标，而远端还停在给旧版本热
+是错的：用户升了 App，system 带来 v5 的场景坐标，而远程还停在给旧版本热
 修的 v3——无脑覆盖会把配置**静默回退**，没有报错，只表现为"识别又坏了"。
 所以 remote 只在 ``remote.content_version > system.content_version`` 时才
 生效，见 `resolver.ConfigResolver.resolve_read`。
@@ -12,7 +12,7 @@
 
 - 整数，从 1 起，**内容变一次加一**（不是 App 版本号，也不是结构版本号）
 - system 侧**缺失即拒绝任何 remote 替换**（fail-safe）：将来漏给某个新文件
-  加字段时，后果是"这个文件收不到在线更新"，而不是"这个文件被远端悄悄
+  加字段时，后果是"这个文件收不到在线更新"，而不是"这个文件被远程悄悄
   接管"。前者能被人发现，后者不能。
 - 与 `graduation/*.json` 的 ``schema_version``（**结构**版本，决定怎么解析）
   是两回事，两者可以并存；也和 `references/*.yaml` 那个从未被消费的
@@ -57,11 +57,11 @@ class VersionedDir:
         allow_remote_new: remote 是否可以下发 system 里**不存在**的新文件。
 
             默认 False：新场景/新布局要在 `scenes.yaml` 注册表里登记才有意义，
-            而注册表本身走发版不走 remote（改注册表通常伴随代码改动），远端
+            而注册表本身走发版不走 remote（改注册表通常伴随代码改动），远程
             凭空多一个场景文件是死的，只会让编辑器列表里冒出一个用不了的条目。
             `yysls/tuning_rules/` 是例外并声明为 True：规则管理器对"未在
             tune_config.tuning_rules 里声明的规则"是追加到末尾而非报错
-            （见 `tuning_rules/manager.py` 的 _reload），所以远端新增一条
+            （见 `tuning_rules/manager.py` 的 _reload），所以远程新增一条
             调律规则能直接生效——这恰是最有价值的在线下发场景。
     """
 
@@ -154,7 +154,7 @@ def read_text_preserving_eol(path: Path) -> str:
     Android 侧 Chaquopy 固定跑 3.10，在那里会直接 TypeError。
 
     换行必须原样保留：``_with_version_json`` 靠 ``"\r\n" in text`` 判断原
-    文件的行尾，若被默认的通用换行模式翻成 ``\n``，CRLF 的出厂配置每次盖
+    文件的行尾，若被默认的通用换行模式翻成 ``\n``，CRLF 的系统配置每次盖
     版本号都会被改写成 LF，产生整文件 diff。
     """
     return path.read_bytes().decode("utf-8")

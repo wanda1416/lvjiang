@@ -266,7 +266,7 @@ class SeasonConfigPanel(QWidget):
         self._refresh_del_enabled(row)
 
     def _refresh_del_enabled(self, row: int) -> None:
-        """出厂行不允许用户删除，置灰并说明原因"""
+        """系统行不允许用户删除，置灰并说明原因"""
         # 本表所有列都是 setCellWidget，item() 恒为 None——身份要从
         # _NUMBER_COL 上的 QSpinBox 取值，不能读单元格文本。
         ident = None

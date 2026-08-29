@@ -146,7 +146,7 @@ class UserConfig:
 
     settings / reference_grid 来自 config/session/session.json（纯运行态）；
     输入模拟 input_sim + 延迟参数 delay_params 来自 config/**/app.yaml
-    （system 出厂默认 ← local 用户覆盖，随版本分发，见 core.config）。
+    （system 系统默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
     language: str = "zh_CN"                  # 界面语言（zh_CN / en_US / auto）
     theme: str = "light"                     # 界面主题（light / dark）

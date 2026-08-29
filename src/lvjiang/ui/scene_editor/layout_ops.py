@@ -79,7 +79,7 @@ class LayoutOpsMixin:
         can_delete = has_layout and not is_active and not is_system
         self._btn_delete.setEnabled(can_delete)
         if is_system:
-            self._btn_delete.setToolTip(tr("出厂布局不可删除；不使用时切换到其他布局即可"))
+            self._btn_delete.setToolTip(tr("系统布局不可删除；不使用时切换到其他布局即可"))
         elif is_active:
             self._btn_delete.setToolTip(tr("当前激活布局不可删除"))
         else:
@@ -215,7 +215,7 @@ class LayoutOpsMixin:
         # 「全量写盘」语义（供新建/另存为用）。保存按钮不受 dirty 状态控制，
         # 于是"什么都没改、随手点一下保存"会把该布局的全部场景写一遍；
         # 用户模式下那就是给每个场景生成 local 影子，而实体文件是整文件
-        # 影子（local 有就完全顶掉出厂与在线下发，不合并），等于一次点击
+        # 影子（local 有就完全顶掉系统与在线下发，不合并），等于一次点击
         # 把整个布局永久冻住。
         changed = set(self._data_dirty_scenes)
         layout_versions = {

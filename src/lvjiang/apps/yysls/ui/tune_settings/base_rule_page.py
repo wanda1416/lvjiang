@@ -195,7 +195,7 @@ class BaseRuleGroupPage(QWidget):
         protected = bool(key and self._manager.is_system_group(key))
         self._del_btn.setEnabled(bool(key) and not protected)
         if protected:
-            self._del_btn.setToolTip(tr("出厂规则组不可删除"))
+            self._del_btn.setToolTip(tr("系统规则组不可删除"))
         else:
             self._del_btn.setToolTip(tr("删除选中规则组（至少保留一个）"))
 

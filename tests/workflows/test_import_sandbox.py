@@ -70,7 +70,7 @@ def test_workflows_must_not_be_remotely_deliverable():
     """workflows 不得进在线下发注册表——那等于远程代码执行。
 
     scenes / layouts / tuning_rules 是数据，下发只改识别与判定；`.wf` 会被
-    引擎执行，下发它意味着远端可以让本机跑任意脚本。现在它「碰巧没注册」，
+    引擎执行，下发它意味着远程可以让本机跑任意脚本。现在它「碰巧没注册」，
     这条把它变成显式约束。
     """
     from lvjiang.core.config import versioning

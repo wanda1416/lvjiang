@@ -15,7 +15,7 @@
    未定义行为。etag / config_version 的写回由主线程在 ``finished`` 槽里经
    ``apply_outcome()`` 完成。
 3. **不阻塞启动**：失败只记日志、发 error 信号。拿不到在线配置的后果是
-   "用出厂配置"，本来就是可用状态，绝不该因此卡住或弹窗打断用户。
+   "用系统配置"，本来就是可用状态，绝不该因此卡住或弹窗打断用户。
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ class RemoteConfigSyncer(QThread):
         try:
             result: SyncResult = run_sync(self._job, timeout=self._timeout)
         except Exception as exc:  # noqa: BLE001 线程边界统一转成信号
-            # 拿不到在线配置 = 用出厂配置，是可用状态，不打扰用户
+            # 拿不到在线配置 = 用系统配置，是可用状态，不打扰用户
             logger.warning(f"[在线配置] 同步失败: {exc}")
             self.failed.emit(str(exc))
             return

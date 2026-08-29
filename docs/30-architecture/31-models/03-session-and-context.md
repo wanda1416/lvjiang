@@ -36,7 +36,7 @@
 {"current_user": "测试用户B"}
 ```
 
-**目前没有任何出厂 `.wf` 脚本读写 `session.*` 字段**——`config/system/workflows/`
+**目前没有任何系统 `.wf` 脚本读写 `session.*` 字段**——`config/system/workflows/`
 下全文搜索 `session\.` 没有命中。DSL 层面的裸关键字机制（`KeywordRef`、
 第四节的字段访问语法）是真实可用的，但早期设计设想的具体业务 schema
 （装备槽位摘要、调律材料库存、流派标识等）从未在这份文件上落地，也没有
@@ -62,7 +62,7 @@
 
 `context` 由引擎在 `__init__` 里自动初始化为空 dict
 （`self.context: dict = {}`），每次 `execute()` 重新清空。同 `session`，
-**没有出厂脚本读写 `context.*`**，早期设想的 `context.bag`（背包格子映射）、
+**没有系统脚本读写 `context.*`**，早期设想的 `context.bag`（背包格子映射）、
 `context.progress`（执行进度）等字段没有被任何实现采用。
 
 工作流内真正的"单次运行临时数据"走法是普通 `$var` 变量

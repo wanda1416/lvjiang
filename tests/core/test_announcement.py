@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import json
 from io import BytesIO
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
 from lvjiang.core.announcement import (
+    ANNOUNCEMENT_URL,
     Announcement,
+    AnnouncementChecker,
     AnnouncementError,
     AnnouncementManifest,
     applicable_notices,
@@ -187,6 +189,32 @@ def test_fetch_304_returns_cached_manifest(monkeypatch):
 
     assert result.manifest is cached
     assert result.not_modified is True
+
+
+def test_checker_turns_network_failure_into_short_message(
+        monkeypatch, qtbot):
+    import lvjiang.core.announcement as announcement_module
+
+    def unavailable(*_args, **_kwargs):
+        raise URLError("DNS unavailable")
+
+    errors = []
+    warnings = []
+    monkeypatch.setattr(announcement_module, "urlopen", unavailable)
+    monkeypatch.setattr(
+        announcement_module.logger, "warning",
+        lambda message, *_args, **_kwargs: warnings.append(str(message)))
+    checker = AnnouncementChecker()
+    checker.error.connect(errors.append)
+
+    checker.run()
+
+    expected = (
+        f"可能因为网络原因，无法访问 {ANNOUNCEMENT_URL} 获取公告，"
+        "请检查网络设置后重试"
+    )
+    assert errors == [expected]
+    assert warnings == [expected]
 
 
 def test_fetch_rejects_oversized_response(monkeypatch):

@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "back_confirm",
@@ -77,18 +77,6 @@
       "min_visible": 0.95,
       "calibration": "even",
       "scroll_direction": "none"
-    },
-    {
-      "key": "types",
-      "x_ratio": 0.6611473736267542,
-      "y_ratio": 0.5352263988188252,
-      "w_ratio": 0.22454367532352204,
-      "h_ratio": 0.06687440502189657,
-      "cols": 4,
-      "rows": 1,
-      "min_visible": 0.95,
-      "calibration": "auto",
-      "scroll_direction": "horizontal"
     }
   ]
 }

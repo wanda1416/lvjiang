@@ -146,10 +146,19 @@ def test_daily_jianghu_matches_legacy_required_scenes():
     """daily_jianghu.wf 搜集结果应与原手写 required_scenes 一致
 
     waiguan_qingjing 为情境动作落地后新增的依赖。
+
+    这里按引擎 _load_and_validate 的方式先合并 import 链的 procs 再搜集，
+    断言的才是运行期真正的校验范围。只 parse_file 会漏掉靠子过程引用的
+    场景（如 game_main_page 走 nav_main_to_menu、bag_equip_detail 走
+    背包子过程），那样每次把一句 click 挪进 subcall 都要改一次期望，
+    却并没有任何覆盖真的丢失。
     """
     wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
     program = parse_file(wf)
-    scenes = collect_scene_keys(program.body, program.procs)
+    procs = dict(program.procs)
+    for imported in program.imports:
+        procs.update(parse_file((wf.parent / imported.path).resolve()).procs)
+    scenes = collect_scene_keys(program.body, procs)
     assert scenes == {
         "activity_jianghu", "waiguan_yigui", "waiguan_qingjing",
         "general_action", "game_menu_page", "game_main_page",

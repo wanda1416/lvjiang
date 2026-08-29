@@ -54,7 +54,7 @@
 `users/{username}.json` 这一份独立文件，目前处于"机制通了、没人用"的状态。
 若确实需要"跨次运行持久、按用户隔离、DSL 里直接读写"的数据，且不适合归入
 `profile_action()` 的 quota/regen/stock/note 四模型，这里仍是可用的落点；
-新增前建议确认 `profile_engine` 的模型确实覆盖不了这个场景。
+新增前建议确认 `core.profile` 的模型确实覆盖不了这个场景。
 
 ---
 

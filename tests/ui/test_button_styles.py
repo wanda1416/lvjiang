@@ -134,16 +134,16 @@ def test_script_config_row_move_rebuilds_owned_cell_widgets(qtbot, monkeypatch):
 def _profile_overview(qtbot):
     from unittest.mock import MagicMock
 
-    from lvjiang.apps.yysls.ui.profile.overview import ProfileOverviewTab
+    from lvjiang.ui.profile.tab import ProfileTab
 
-    tab = ProfileOverviewTab(MagicMock())
+    tab = ProfileTab(MagicMock())
     qtbot.addWidget(tab)
     return tab
 
 
 def test_profile_overview_metadata_button_matches_siblings(qtbot):
     """「数据模型」要和同页的新建/重命名/删除分组长得一样。"""
-    from lvjiang.apps.yysls.ui.profile.tab import USER_ACTION_BTN_STYLE
+    from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE
 
     tab = _profile_overview(qtbot)
     buttons = {b.text(): b for b in tab.findChildren(QPushButton)}
@@ -161,7 +161,7 @@ def _known_variant(style: str) -> bool:
 
 def test_profile_definition_dialog_buttons_all_styled(qtbot):
     """数据模型对话框里每个按钮都得用统一样式，且不能被固定宽度截断。"""
-    from lvjiang.apps.yysls.ui.profile.settings_dialog import ProfileDefinitionDialog
+    from lvjiang.ui.profile.settings_dialog import ProfileDefinitionDialog
 
     dialog = ProfileDefinitionDialog()
     qtbot.addWidget(dialog)
@@ -181,7 +181,7 @@ def test_profile_definition_dialog_buttons_all_styled(qtbot):
 
 def test_sync_target_remove_button_styled_and_fits(qtbot):
     """行内「×」删除键：套 danger 样式后 30px 会挤掉字符，列宽与按钮宽需同步放大。"""
-    from lvjiang.apps.yysls.ui.profile.settings_dialog import _SyncTargetsWidget
+    from lvjiang.ui.profile.settings_dialog import _SyncTargetsWidget
 
     widget = _SyncTargetsWidget()
     qtbot.addWidget(widget)

@@ -105,7 +105,6 @@ yysls:
   部位: Slot
   金色: Gold
   刷新: Refresh
-  刷新角色详情: Refresh Character Details
   角色详情功能开发中: Character details under development…
   燕云: Yan Yun
   调律配置: Tuning Config
@@ -381,7 +380,6 @@ yysls:
   覆写: Override...
   该数值已被其他进程更新_本次增减未写入_请刷新后重试: Value was updated by another process, change not written. Please refresh and retry.
   选择字段: Select Field
-  重新读取角色数据: Reload character data
   错误: Error
   请选择: (Please select)
   '{field}不能大于_999999': '{field} cannot exceed 999999'
@@ -409,7 +407,6 @@ yysls:
   上限: Cap
   上限_1: 'Cap:'
   不提醒: No Alert
-  中文_如_袅袅_本周: Chinese, e.g. Niaoniao (this week)
   倍率: Ratio
   准点_{unit}: Boundary/{unit}
   准点_{val}_{period}: Boundary:{val}/{period}
@@ -431,7 +428,6 @@ yysls:
   如_900_打本消耗_1100_或_1_10_商店: 'e.g.: -900:dungeon,-1100 or 1,10:shop'
   如_1_任务奖励_10_或_1: 'e.g.: 1:quest reward,10 or -1'
   如_1_兑换_10_或_1: 'e.g.: 1:exchange,10 or -1'
-  定义三种数据模型的_key_双击行可编辑: Define keys for three data models. Double-click to edit.
   实时_{unit}: Realtime/{unit}
   实时_{val}_{unit}: Realtime:{val}/{unit}
   实时恢复: Realtime Recovery
@@ -452,7 +448,6 @@ yysls:
   每月: Monthly
   每次恢复: 'Per Recovery:'
   添加同步目标: Add Sync Target
-  玩家数据模型定义: Player Data Model Definition
   确定要删除_key_{key}_吗: Delete key '{key}'?
   红色阈值: 'Red Threshold:'
   红警_{val}: Red:>={val}
@@ -463,8 +458,6 @@ yysls:
   请输入标签: Please enter label
   赛季: Season
   软上限: Soft Cap
-  逗号分隔_减少时供下拉选择_如_兑换_强化_出售: 'Comma-separated, dropdown source for decreases, e.g.: Exchange,Enhance,Sell'
-  逗号分隔_增加时供下拉选择_如_打本_商店_任务: 'Comma-separated, dropdown source for increases, e.g.: Dungeon,Shop,Quest'
   速率单位: 'Rate Unit:'
   速率数值: 'Rate Value:'
   重置_{time}: Reset:{time}
@@ -589,7 +582,6 @@ auto_strings:
   全部未命中时取「默认判定」：部位页可按部位设置，未设置则跟随规则设置页: 'When nothing matches, falls back to the "Default Judgment": settable per slot on the Slot page, otherwise follows the Rule Settings page'
   全部规则: All Rules
   全部规则（默认配置）: All Rules (Default Config)
-  其他信息: Other Info
   ? '其他增益：
 
     '
@@ -911,7 +903,6 @@ auto_strings:
   无相: Formless
   无行为规则命中 → 继续调律: No behavior rule matched -> continue tuning
   无词条数据: No affix data
-  无赛季配置，无法计算赛季周期边界: No season config; cannot compute season period boundaries
   无限转律: Unlimited Transfer
   无障碍服务未连接，请先在设置里开启: Accessibility Service not connected; enable it in Settings first
   旧版本: Old Version
@@ -998,10 +989,8 @@ auto_strings:
     To use this weapon, create a plan for the matching playstyle.'
   武器类: Weapon
   武学属性: Martial Attributes
-  每半赛季: Every Half-Season
   每日: Daily
   每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when: 'Each tier is defined by several condition groups: OR between groups, AND within a group; a group can bind a `when` switch precondition'
-  每赛季: Every Season
   每轮添加: Add Every Round
   每轮调律开始前的行为点）：律准石数量检查、狗粮检查与添加: 'Behavior point before each tuning round): tuning-stone count check, fodder check and add'
   每轮调律结束后的行为点）：按预期评级决策（首条命中）。无命中默认：未满 = 继续调律、词条满 = 结束保留；材料不足/用户中断属阻断，不触发: 'Behavior point after each tuning round): decide by expected rating (first match wins). Default when nothing matches: not full = continue tuning, affixes full = end and keep; material shortage/user interrupt are blocking conditions and don''t trigger this'
@@ -1158,7 +1147,6 @@ auto_strings:
   规则设置: Rule Settings
   规则评级: Rule Rating
   角: Jue
-  角色名: Character Name
   角色名列（不可删除）: Character name column (cannot be deleted)
   角色详情: Character Detail
   解析 {name} 时出错：{err}: 'Error parsing {name}: {err}'

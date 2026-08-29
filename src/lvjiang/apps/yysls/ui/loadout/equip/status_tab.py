@@ -25,12 +25,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
+from lvjiang.ui.user_toolbar import add_user_nav_buttons
+
 from ......i18n import tr
 from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...events import EQUIPMENT_CHANGED, get_event_hub
 from ...layout_helpers import fit_combo_to_contents
-from ...profile.tab import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
-from ...profile.tab import add_user_nav_buttons
 from .cards import _CompactEquipCard, _SlotCard
 from .mock_dialog import MockEquipDialog
 

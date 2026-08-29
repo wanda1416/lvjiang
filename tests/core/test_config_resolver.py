@@ -178,6 +178,34 @@ class TestEntity:
         # system 无同名 → 不落墓碑
         assert not (local / "scenes" / "mine.yaml.deleted").exists()
 
+    # ─── 放弃覆盖（还原为出厂）──────────────────────────
+
+    def test_revert_drops_local_shadow(self, dirs):
+        system, local = dirs
+        (system / "scenes").mkdir()
+        (local / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_text("factory", encoding="utf-8")
+        (local / "scenes" / "a.yaml").write_text("mine", encoding="utf-8")
+        r = _user(dirs)
+        assert r.revert_entity_to_system("scenes/a.yaml") is True
+        assert not (local / "scenes" / "a.yaml").exists()
+        assert r.resolve_read("scenes/a.yaml").read_text(encoding="utf-8") == "factory"
+
+    def test_revert_without_shadow_is_noop(self, dirs):
+        system, _ = dirs
+        (system / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_text("factory", encoding="utf-8")
+        assert _user(dirs).revert_entity_to_system("scenes/a.yaml") is False
+
+    def test_revert_refuses_when_no_factory_version(self, dirs):
+        """纯本地实体没有出厂版本，还原就等于删除——那条路归 delete_entity"""
+        _, local = dirs
+        (local / "scenes").mkdir()
+        (local / "scenes" / "mine.yaml").write_text("mine", encoding="utf-8")
+        with pytest.raises(SystemContentProtected):
+            _user(dirs).revert_entity_to_system("scenes/mine.yaml")
+        assert (local / "scenes" / "mine.yaml").exists()
+
 
 # ─── 聚合：合并与 diff 纯函数 ─────────────────────────────
 
@@ -641,6 +669,14 @@ class TestWriteIsMinimal:
         (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
         _user(dirs).write_entity("scenes/a.yaml", "key: a\n")
         assert not (local / "scenes" / "a.yaml").exists()
+
+    def test_force_creates_shadow_for_identical_content(self, dirs):
+        """显式「复制到本地」要能穿过这道闸——内容本来就与出厂逐字相同"""
+        system, local = dirs
+        (system / "scenes").mkdir()
+        (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
+        _user(dirs).write_entity("scenes/a.yaml", "key: a\n", force=True)
+        assert (local / "scenes" / "a.yaml").read_text(encoding="utf-8") == "key: a\n"
 
     def test_real_change_still_written(self, dirs):
         system, local = dirs

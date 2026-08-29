@@ -1,22 +1,34 @@
 """脚本编辑对话框 - 新建 / 编辑 / 删除 .wf 工作流脚本
 
-从「工具 → 脚本编辑」打开（F6）。左侧是 workflows 顶层 .wf 的合并视图
-（system ∪ local，标注来源层），中间是带语法高亮的编辑区，右侧是调试面板
+从「工具 → 脚本编辑」打开（F6）。左侧是 workflows 整棵目录树的合并视图
+（见 ``workflows.file_tree``：system ∪ local，local 影子优先，不做任何过滤），
+中间是带语法高亮的编辑区，右侧是调试面板
 （「指令」Tab：快捷指令式选操作填槽位插入，见 ``action_palette``；「调试」Tab：截图画布
 取点/取色/取区域 → 插入脚本；运行/单步/继续/暂停/停止 + 当前行高亮 + 变量表 + 日志，
 见 ``workbench.DebugPanel``）。
 
 写入走 ConfigResolver：开发模式写 system，用户模式写 local 影子
 （与脚本配置 / 场景管理同一套模式判定），所以用户改出厂脚本不会污染
-system 目录，删除出厂脚本落墓碑而不是真删。
+system 目录。
+
+用户模式下**出厂脚本只读**：编辑区置灰，要改必须先右键「复制到本地」。
+这一步不是多余的仪式——复制之后该文件就成了 local 影子，从此收不到任何
+出厂更新（实体文件是整文件影子，不做内容合并），代价得让用户明确知道。
+开发模式直接写 system，不受此限。
 
 校验分两档：
 - 「检查」只做语法解析，不需要保存；
 - 「保存」落盘后再跑一遍引擎的 validate_only（语法 + import 链 + 命名等待 +
   布局引用），判据与真正执行共用，预检放过的上机不会炸。
 
+复制之后想反悔，右键「还原为出厂」丢掉本地那份——没有这条回头路，
+「复制到本地」就是单行道：改坏了既删不掉（出厂内容受保护）也回不去。
+
 新建脚本会被发现层自动扫到并默认展示在日常页，无需额外登记。
-脚本 id 即文件名，不允许 ``_`` 前缀（发现层把 ``_*.wf`` 当临时文件跳过）。
+**新建**的脚本 id 不允许 ``_`` 前缀（发现层把 ``_*.wf`` 当临时文件跳过，
+建出来也跑不了）；但这只约束新建，树上照旧展示磁盘上的每一个 ``.wf``，
+包括录制产物与 ``_editor_run.wf`` 这类临时文件——它们同样是用户要打开的东西。
+新建 / 另存为落在**当前选中文件所在目录**，不会莫名跑回顶层。
 """
 from __future__ import annotations
 
@@ -40,20 +52,27 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QSplitter,
     QTabWidget,
     QTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
+from ...workflows.file_tree import (
+    WORKFLOWS_DIR,
+    WorkflowFile,
+    list_directories,
+    list_workflow_files,
+)
 from ..button_styles import apply_button_style
 from ..theme import get_theme_manager
 
@@ -65,9 +84,32 @@ _SCRIPT_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 @dataclass(frozen=True)
 class ScriptEntry:
-    id: str
+    """树上一个节点：合并视图里的元信息 + 实际解析到的磁盘路径"""
+
+    file: WorkflowFile
     path: Path
-    layer: str  # "system" | "local"
+
+    @property
+    def rel_path(self) -> str:
+        """相对 workflows 根的 posix 路径，如 ``subcall/nav.wf``——节点唯一键"""
+        return self.file.rel_path
+
+    @property
+    def id(self) -> str:
+        """文件名去掉 .wf。**同名不同目录会重复**，别拿它当键"""
+        return self.file.name[:-3] if self.file.name.endswith(".wf") else self.file.name
+
+    @property
+    def name(self) -> str:
+        return self.file.name
+
+    @property
+    def parent(self) -> str:
+        return self.file.parent
+
+    @property
+    def layer(self) -> str:
+        return self.file.layer
 
 
 def validate_script_id(sid: str) -> str | None:
@@ -83,24 +125,34 @@ def validate_script_id(sid: str) -> str | None:
 
 
 def script_rel_path(sid: str) -> str:
-    return f"workflows/{sid}.wf"
+    """顶层脚本 id → resolver 相对路径（新建时用）"""
+    return f"{WORKFLOWS_DIR}/{sid}.wf"
+
+
+def wf_rel_path(rel_path: str) -> str:
+    """workflows 内相对路径（含 .wf）→ resolver 相对路径"""
+    return f"{WORKFLOWS_DIR}/{rel_path}"
+
+
+def join_rel(parent: str, sid: str) -> str:
+    """目录 + id → workflows 内相对路径；顶层 parent 传空串"""
+    return f"{parent}/{sid}.wf" if parent else f"{sid}.wf"
 
 
 def list_script_files() -> list[ScriptEntry]:
-    """workflows 顶层 .wf 的合并视图（local 影子优先），按 id 排序"""
+    """workflows 整棵树的合并视图（local 影子优先），按路径排序
+
+    过滤规则在 ``file_tree`` 里统一定义（结论是：不过滤）。这里只补上
+    resolver 解析出的真实磁盘路径，供编辑区读写。
+    """
     resolver = get_resolver()
-    local_root = Path(resolver.local_dir)
     out: list[ScriptEntry] = []
-    for name in resolver.enumerate_entities("workflows", "*.wf"):
-        p = resolver.resolve_read(f"workflows/{name}")
+    for f in list_workflow_files():
+        p = resolver.resolve_read(wf_rel_path(f.rel_path))
         if p is None:
             continue
-        try:
-            is_local = Path(p).is_relative_to(local_root)
-        except ValueError:
-            is_local = False
-        out.append(ScriptEntry(id=Path(p).stem, path=Path(p), layer="local" if is_local else "system"))
-    return sorted(out, key=lambda e: e.id)
+        out.append(ScriptEntry(file=f, path=Path(p)))
+    return out
 
 
 def new_script_text(name: str, env: tuple[str, ...] = ("android", "desktop")) -> str:
@@ -242,6 +294,8 @@ class ScriptEditorDialog(QDialog):
         super().__init__(main_window)
         self._main = main_window
         self._entries: list[ScriptEntry] = []
+        self._file_items: dict[str, QTreeWidgetItem] = {}
+        self._dir_items: dict[str, QTreeWidgetItem] = {}
         self._current: ScriptEntry | None = None
         self._dirty = False
         self._changed_any = False   # 本次会话有无落盘变更（关闭后主窗口据此刷新）
@@ -282,10 +336,16 @@ class ScriptEditorDialog(QDialog):
         root.addLayout(btn_row)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.list = QListWidget()
-        self.list.setMinimumWidth(200)
-        self.list.currentItemChanged.connect(self._on_select)
-        splitter.addWidget(self.list)
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        self.tree.setMinimumWidth(200)
+        # 节点只写文件名。「来自哪一层」「能否独立启动」是另一层面的事，
+        # 走选中态的 lbl_layer 与 tooltip，不往树上堆标记。
+        self.tree.setUniformRowHeights(True)
+        self.tree.currentItemChanged.connect(self._on_select)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._on_tree_menu)
+        splitter.addWidget(self.tree)
 
         right = QWidget()
         rl = QVBoxLayout(right)
@@ -297,6 +357,7 @@ class ScriptEditorDialog(QDialog):
         self.editor.setFont(font)
         self.editor.setTabStopDistance(4 * self.editor.fontMetrics().horizontalAdvance(" "))
         self.editor.setPlaceholderText(tr("左侧选择脚本，或点「新建」"))
+        self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.editor.textChanged.connect(self._on_text_changed)
         self._highlighter = WfHighlighter(self.editor.document())
         rl.addWidget(self.editor)
@@ -331,38 +392,173 @@ class ScriptEditorDialog(QDialog):
     # ─── 列表 ──────────────────────────────────────────
 
     def _reload_list(self, select_id: str | None = None):
+        """重建目录树。``select_id`` 是 workflows 内相对路径（含 .wf）"""
         self._entries = list_script_files()
-        self.list.blockSignals(True)
-        self.list.clear()
+        expanded = self._expanded_dirs()        # 重建会丢展开状态，先记下来
+        was_blocked = self.tree.blockSignals(True)
+        self.tree.clear()
+        self._file_items = {}
+        self._dir_items = {}
+        dir_items = self._dir_items
+        for d in list_directories([e.file for e in self._entries]):
+            parent_dir, _, leaf = d.rpartition("/")
+            node = QTreeWidgetItem([leaf])
+            node.setData(0, Qt.ItemDataRole.UserRole, None)   # 目录不可选中打开
+            node.setFlags(node.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+            dir_items[d] = node
+            (dir_items[parent_dir].addChild(node) if parent_dir
+             else self.tree.addTopLevelItem(node))
         for e in self._entries:
-            item = QListWidgetItem(f"{e.id}  [{e.layer}]")
-            item.setData(Qt.ItemDataRole.UserRole, e.id)
-            self.list.addItem(item)
-        self.list.blockSignals(False)
-        if select_id:
-            for i in range(self.list.count()):
-                if self.list.item(i).data(Qt.ItemDataRole.UserRole) == select_id:
-                    self.list.setCurrentRow(i)
-                    return
-        if self._current is None and self.list.count():
-            self.list.setCurrentRow(0)
+            item = QTreeWidgetItem([e.name])
+            item.setData(0, Qt.ItemDataRole.UserRole, e.rel_path)
+            item.setToolTip(0, f"{e.rel_path}\n{e.layer}: {e.path}")
+            (dir_items[e.parent].addChild(item) if e.parent
+             else self.tree.addTopLevelItem(item))
+            self._file_items[e.rel_path] = item
+        for d, node in dir_items.items():
+            # 必须等节点进了树才生效：脱离 model 的 QTreeWidgetItem 上
+            # setExpanded 是空操作
+            node.setExpanded(d in expanded)
+        self.tree.blockSignals(was_blocked)
+        target = select_id or (
+            self._current.rel_path if self._current is not None else None)
+        sel = self._file_items.get(target) if target else None
+        if sel is None and self._current is None:
+            sel = self._first_file_item()
+        if sel is not None:
+            self._reveal(sel)
+            self.tree.setCurrentItem(sel)
 
-    def _entry(self, sid: str) -> ScriptEntry | None:
-        return next((e for e in self._entries if e.id == sid), None)
+    def _expanded_dirs(self) -> set[str]:
+        """当前展开着的目录（相对 workflows 根）"""
+        return {d for d, node in getattr(self, "_dir_items", {}).items()
+                if node.isExpanded()}
 
-    def _on_select(self, item: QListWidgetItem | None, _prev=None):
+    @staticmethod
+    def _reveal(item: QTreeWidgetItem) -> None:
+        """展开到某个节点可见——选中子目录里的文件时必须做，否则光标落在
+        收起的目录里，用户看不到自己在编辑哪一个"""
+        node = item.parent()
+        while node is not None:
+            node.setExpanded(True)
+            node = node.parent()
+
+    def _first_file_item(self) -> QTreeWidgetItem | None:
+        """根目录下的第一个文件。
+
+        不往子目录里钻：子目录默认是收起的，钻进去等于开局就替用户展开一层
+        目录，而且 subcall/ archived/ 这些本来就不是他要跑的东西。根目录一个
+        文件都没有时才退而求其次，取树序第一个（照样得展开才看得见）。
+        """
+        roots = [self.tree.topLevelItem(i) for i in range(self.tree.topLevelItemCount())]
+        for node in roots:
+            if node.data(0, Qt.ItemDataRole.UserRole):
+                return node
+        stack = list(reversed(roots))
+        while stack:
+            node = stack.pop()
+            if node.data(0, Qt.ItemDataRole.UserRole):
+                return node
+            stack.extend(node.child(i) for i in reversed(range(node.childCount())))
+        return None
+
+    def _entry(self, rel_path: str) -> ScriptEntry | None:
+        return next((e for e in self._entries if e.rel_path == rel_path), None)
+
+    def _on_select(self, item: QTreeWidgetItem | None, _prev=None):
         if item is None:
             return
-        sid = item.data(Qt.ItemDataRole.UserRole)
-        if self._current is not None and sid == self._current.id:
+        rel = item.data(0, Qt.ItemDataRole.UserRole)
+        if rel is None:                                     # 目录节点
+            return
+        if self._current is not None and rel == self._current.rel_path:
             return
         if not self._confirm_discard():
             # 回退选中
-            self.list.blockSignals(True)
-            self._reload_list(select_id=self._current.id if self._current else None)
-            self.list.blockSignals(False)
+            self.tree.blockSignals(True)
+            self._reload_list(select_id=self._current.rel_path if self._current else None)
+            self.tree.blockSignals(False)
             return
-        self._load_entry(self._entry(sid))
+        self._load_entry(self._entry(rel))
+
+    # ─── 右键菜单 ──────────────────────────────────────
+
+    def _on_tree_menu(self, pos):
+        item = self.tree.itemAt(pos)
+        rel = item.data(0, Qt.ItemDataRole.UserRole) if item is not None else None
+        entry = self._entry(rel) if rel else None
+        if entry is None:
+            return
+        menu = QMenu(self)
+        if not self._is_editable(entry):
+            menu.addAction(tr("复制到本地以修改")).triggered.connect(
+                lambda: self._copy_to_local(entry))
+        elif entry.file.overrides_system and not get_resolver().is_dev_mode():
+            # 覆盖了出厂的影子：能还原，但不能删（删了这个实体就没了，
+            # 而出厂内容不允许用户删除）
+            menu.addAction(tr("还原为出厂")).triggered.connect(
+                lambda: self._revert_to_system(entry))
+        else:
+            menu.addAction(tr("删除")).triggered.connect(self._on_delete)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
+
+    @staticmethod
+    def _is_editable(entry: ScriptEntry) -> bool:
+        """开发模式直接写 system，用户模式只有 local 那份能改"""
+        return entry.file.editable or get_resolver().is_dev_mode()
+
+    def _copy_to_local(self, entry: ScriptEntry):
+        """把出厂脚本原样复制成 local 影子，之后才允许编辑
+
+        复制后该文件脱离出厂更新（整文件影子），所以要用户明确确认一次。
+        """
+        ret = QMessageBox.question(
+            self, tr("复制到本地"),
+            tr("把出厂脚本 {name} 复制到本地后才能修改。\n"
+               "复制之后这个文件不再跟随出厂更新，确定？").format(name=entry.rel_path),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            text = entry.path.read_text(encoding="utf-8")
+        except OSError as e:
+            QMessageBox.warning(self, tr("复制失败"), str(e))
+            return
+        # force：内容与出厂逐字相同，不强制的话 write_entity 会判成空操作
+        if self._write(entry.rel_path, text, force=True) is None:
+            return
+        self._changed_any = True
+        self._current = None          # 强制按新的 layer 重新加载
+        self._reload_list(select_id=entry.rel_path)
+        self._load_entry(self._entry(entry.rel_path))
+        self._set_status(tr("已复制到本地，现在可以编辑"))
+
+    def _revert_to_system(self, entry: ScriptEntry):
+        """丢掉 local 影子，回到出厂那一份——「复制到本地」的反向操作"""
+        ret = QMessageBox.question(
+            self, tr("还原为出厂"),
+            tr("丢弃 {name} 的本地修改，恢复出厂版本？此操作不可恢复。")
+            .format(name=entry.rel_path),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        rel = entry.rel_path
+        try:
+            get_resolver().revert_entity_to_system(wf_rel_path(rel))
+        except OSError as e:
+            QMessageBox.warning(self, tr("还原失败"), str(e))
+            return
+        logger.info(f"脚本已还原为出厂: {rel}")
+        self._changed_any = True
+        self._dirty = False
+        self._current = None
+        self._reload_list(select_id=rel)
+        self._load_entry(self._entry(rel))
+        self._set_status(tr("已还原为出厂版本"))
 
     def _load_entry(self, entry: ScriptEntry | None):
         self._current = entry
@@ -377,9 +573,24 @@ class ScriptEditorDialog(QDialog):
                 self._set_status(tr("读取失败: {e}").format(e=e), error=True)
         self.editor.blockSignals(False)
         self._dirty = False
-        self.lbl_layer.setText("" if entry is None else f"{entry.layer}: {entry.path}")
-        self._set_status("")
+        self._apply_read_only(entry)
+        self._set_status(
+            "" if entry is None or self._is_editable(entry)
+            else tr("出厂脚本只读——右键「复制到本地以修改」后才能编辑"))
         self._refresh_buttons()
+
+    def _apply_read_only(self, entry: ScriptEntry | None):
+        """出厂脚本置灰编辑区，并把来源写进状态标签"""
+        editable = entry is not None and self._is_editable(entry)
+        self.editor.setReadOnly(entry is not None and not editable)
+        if entry is None:
+            self.lbl_layer.setText("")
+            return
+        if entry.file.is_system:
+            origin = tr("出厂") if editable else tr("出厂（只读）")
+        else:
+            origin = tr("本地覆盖出厂") if entry.file.overrides_system else tr("本地")
+        self.lbl_layer.setText(f"{origin} · {entry.path}")
 
     # ─── 状态 ──────────────────────────────────────────
 
@@ -388,26 +599,29 @@ class ScriptEditorDialog(QDialog):
         self._refresh_buttons()
 
     def _refresh_buttons(self):
-        has_current = self._current is not None
+        cur = self._current
         has_text = bool(self.editor.toPlainText().strip())
-        self.btn_save.setEnabled(self._dirty and (has_current or has_text))
+        editable = cur is not None and self._is_editable(cur)
+        # 出厂脚本只读：保存按钮直接关掉，别让用户敲完一屏才发现存不下去
+        self.btn_save.setEnabled(self._dirty and (editable or (cur is None and has_text)))
         self.btn_save_as.setEnabled(has_text)
         # 出厂脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
         # 请在「工具 → 脚本配置」取消勾选。
-        can_delete = has_current
-        hint = ""
-        if self._current is not None:
-            resolver = get_resolver()
-            if not resolver.is_dev_mode() and resolver.is_system_entity(
-                    script_rel_path(self._current.id)):
-                can_delete = False
-                hint = tr("出厂脚本不可删除；不想展示请在「脚本配置」取消勾选")
+        shadow = (cur is not None and editable and cur.file.overrides_system
+                  and not get_resolver().is_dev_mode())
+        can_delete = editable and not shadow
+        if cur is None or can_delete:
+            hint = ""
+        elif shadow:
+            hint = tr("这是出厂脚本的本地副本，删不掉；右键「还原为出厂」可丢弃本地修改")
+        else:
+            hint = tr("出厂脚本不可删除；不想展示请在「脚本配置」取消勾选")
         self.btn_delete.setEnabled(can_delete)
         self.btn_delete.setToolTip(hint)
         self.btn_check.setEnabled(has_text)
         title = tr("脚本编辑")
-        if self._current is not None:
-            title += f" - {self._current.id}" + (" *" if self._dirty else "")
+        if cur is not None:
+            title += f" - {cur.rel_path}" + (" *" if self._dirty else "")
         self.setWindowTitle(title)
 
     def _set_status(self, text: str, error: bool = False):
@@ -428,9 +642,18 @@ class ScriptEditorDialog(QDialog):
 
     # ─── 动作 ──────────────────────────────────────────
 
+    def _target_dir(self) -> str:
+        """新建 / 另存为落在当前选中文件所在目录，顶层为空串"""
+        return self._current.parent if self._current is not None else ""
+
     def _ask_script_id(self, title: str, default: str = "") -> str | None:
+        """问一个 id，返回 workflows 内相对路径（含 .wf）；取消返回 None"""
+        parent = self._target_dir()
+        prompt = tr("脚本 id（文件名，字母/数字/下划线）:")
+        if parent:
+            prompt += f"\n{parent}/"
         while True:
-            sid, ok = QInputDialog.getText(self, title, tr("脚本 id（文件名，字母/数字/下划线）:"), text=default)
+            sid, ok = QInputDialog.getText(self, title, prompt, text=default)
             if not ok:
                 return None
             sid = sid.strip()
@@ -439,40 +662,52 @@ class ScriptEditorDialog(QDialog):
                 QMessageBox.warning(self, tr("id 不合法"), err)
                 default = sid
                 continue
-            if self._entry(sid) is not None:
+            rel = join_rel(parent, sid)
+            existing = self._entry(rel)
+            if existing is not None:
+                if not self._is_editable(existing):
+                    QMessageBox.warning(
+                        self, tr("不可覆盖"),
+                        tr("{rel} 是出厂脚本。要改它请在树里右键「复制到本地以修改」。")
+                        .format(rel=rel))
+                    default = sid
+                    continue
                 ret = QMessageBox.question(
                     self, tr("已存在"),
-                    tr("脚本 {sid} 已存在，覆盖？").format(sid=sid),
+                    tr("脚本 {rel} 已存在，覆盖？").format(rel=rel),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
                 )
                 if ret != QMessageBox.StandardButton.Yes:
                     default = sid
                     continue
-            return sid
+            return rel
 
     def _on_new(self):
         if not self._confirm_discard():
             return
-        sid = self._ask_script_id(tr("新建脚本"))
-        if sid is None:
+        rel = self._ask_script_id(tr("新建脚本"))
+        if rel is None:
             return
+        sid = rel.rsplit("/", 1)[-1][:-3]
         name, ok = QInputDialog.getText(self, tr("新建脚本"), tr("显示名:"), text=sid)
         if not ok:
             return
         text = new_script_text(name.strip() or sid)
-        path = self._write(sid, text)
+        path = self._write(rel, text)
         if path is None:
             return
         self._changed_any = True
-        self._reload_list(select_id=sid)
-        self._load_entry(self._entry(sid))
+        self._current = None
+        self._reload_list(select_id=rel)
+        self._load_entry(self._entry(rel))
         self._set_status(
             tr("已创建 {path}").format(path=path))
 
-    def _write(self, sid: str, text: str) -> Path | None:
+    def _write(self, rel: str, text: str, *, force: bool = False) -> Path | None:
+        """rel 是 workflows 内相对路径（含 .wf）"""
         try:
-            path = get_resolver().write_entity(script_rel_path(sid), text)
+            path = get_resolver().write_entity(wf_rel_path(rel), text, force=force)
         except OSError as e:
             QMessageBox.warning(self, tr("保存失败"), str(e))
             return None
@@ -483,27 +718,33 @@ class ScriptEditorDialog(QDialog):
         if self._current is None:
             self._on_save_as()
             return
-        self._save_to(self._current.id)
+        if not self._is_editable(self._current):
+            self._set_status(
+                tr("出厂脚本只读——右键「复制到本地以修改」后才能保存"), error=True)
+            return
+        self._save_to(self._current.rel_path)
 
     def _on_save_as(self):
-        sid = self._ask_script_id(tr("另存为"), default=self._current.id if self._current else "")
-        if sid is None:
+        rel = self._ask_script_id(
+            tr("另存为"), default=self._current.id if self._current else "")
+        if rel is None:
             return
-        self._save_to(sid)
+        self._save_to(rel)
 
-    def _save_to(self, sid: str):
+    def _save_to(self, rel: str):
         text = self.editor.toPlainText()
         if not text.endswith("\n"):
             text += "\n"
-        path = self._write(sid, text)
+        path = self._write(rel, text)
         if path is None:
             return
         self._changed_any = True
         self._dirty = False
-        self._reload_list(select_id=sid)
-        entry = self._entry(sid)
+        self._current = None
+        self._reload_list(select_id=rel)
+        entry = self._entry(rel)
         self._current = entry
-        self.lbl_layer.setText("" if entry is None else f"{entry.layer}: {entry.path}")
+        self._apply_read_only(entry)
         self._refresh_buttons()
         problems = check_syntax(text) or self._validate_on_disk(path)
         if problems:
@@ -530,28 +771,28 @@ class ScriptEditorDialog(QDialog):
     def _on_delete(self):
         if self._current is None:
             return
-        sid = self._current.id
+        rel = self._current.rel_path
         ret = QMessageBox.question(
             self, tr("删除脚本"),
-            tr("删除脚本 {sid}？此操作不可恢复。").format(sid=sid),
+            tr("删除脚本 {rel}？此操作不可恢复。").format(rel=rel),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if ret != QMessageBox.StandardButton.Yes:
             return
         try:
-            get_resolver().delete_entity(script_rel_path(sid))
+            get_resolver().delete_entity(wf_rel_path(rel))
         except OSError as e:
             QMessageBox.warning(self, tr("删除失败"), str(e))
             return
-        logger.info(f"脚本已删除: {sid}")
+        logger.info(f"脚本已删除: {rel}")
         self._changed_any = True
         self._current = None
         self._dirty = False
         self._reload_list()
         if self._current is None:
             self._load_entry(None)
-        self._set_status(tr("已删除 {sid}").format(sid=sid))
+        self._set_status(tr("已删除 {rel}").format(rel=rel))
 
     def _on_check(self):
         problems = check_syntax(self.editor.toPlainText())
@@ -612,12 +853,14 @@ class ScriptEditorDialog(QDialog):
 
     def set_locked(self, locked: bool) -> None:
         """运行期间编辑器只读——行号变了高亮就对不上"""
-        self.editor.setReadOnly(locked)
-        self.list.setEnabled(not locked)
+        self.tree.setEnabled(not locked)
         if locked:
+            self.editor.setReadOnly(True)
             for b in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete):
                 b.setEnabled(False)
         else:
+            # 别无脑放开只读——出厂脚本解锁后仍应是只读的
+            self._apply_read_only(self._current)
             self._refresh_buttons()
 
     # ─── 关闭 ──────────────────────────────────────────

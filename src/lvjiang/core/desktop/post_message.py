@@ -10,13 +10,13 @@ import time
 from loguru import logger
 
 from ...core.config import InputSimConfig
-from ..input_base import InputBackend
+from ...core.key_names import normalize_key
+from ..input_base import InputBackend, InputBackendKind
 from .win32_keyboard import (
     KEYEVENTF_EXTENDEDKEY,
     KEYEVENTF_KEYUP,
     is_extended_key,
     key_to_vk_scan,
-    normalize_key,
     post_keyboard_input,
 )
 from .win32_util import (
@@ -31,6 +31,8 @@ from .win32_util import (
 
 class PostMessageInput(InputBackend):
     """基于 PostMessage 的输入后端（后台模式，不移动光标）"""
+
+    kind = InputBackendKind.POST
 
     def __init__(self, input_sim: InputSimConfig | None = None, hwnd: int | None = None):
         self._inject_input_sim(self, input_sim)

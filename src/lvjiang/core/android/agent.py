@@ -30,7 +30,7 @@ from loguru import logger
 
 from ...core.config import InputSimConfig
 from ..capture_base import CaptureBackend
-from ..input_base import InputBackend
+from ..input_base import InputBackend, InputBackendKind
 from .device import AdbDevice
 from .input import _KEY_TO_ANDROID_KEYCODE
 
@@ -398,6 +398,8 @@ class AgentInput(InputBackend):
     - ESC → 系统 BACK、HOME → 系统 HOME（performGlobalAction）；其它键只有 Shizuku 在时能发
     无障碍没开但 Shizuku 已授权时，设备端自动改走 `input` 命令，行为退化到与 AdbInput 相同。
     """
+
+    kind = InputBackendKind.AGENT
 
     def __init__(self, client: AgentClient, input_sim: InputSimConfig | None = None):
         self._inject_input_sim(self, input_sim)

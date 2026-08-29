@@ -22,13 +22,13 @@ import time
 from loguru import logger
 
 from ..i18n import tr
-from .desktop.win32_keyboard import KEY_NAME_TO_VK
 from .input_trace import (
     TRACE_PLACEHOLDER,
     VALID_BUTTONS,
     InputTrace,
     InputTraceEvent,
 )
+from .key_names import KNOWN_KEY_NAMES
 
 try:
     from pynput import keyboard as pynput_keyboard
@@ -56,7 +56,7 @@ PRECISION_HIGH = "high"
 # （暂不处理"录制热键与游戏内快捷键冲突"这个更大的问题，见需求备注）。
 _RESERVED_KEYS = {"F9", "F10", "F11", "F12"}
 
-# pynput 特殊键 → 本项目标准键名（与 win32_keyboard.KEY_NAME_TO_VK 同源，
+# pynput 特殊键 → 本项目标准键名（与 key_names.KNOWN_KEY_NAMES 同源，
 # 只覆盖 pynput.keyboard.Key 里游戏自动化场景常见的键，不追求全量覆盖）
 _SPECIAL_KEY_NAMES: dict[str, str] = {
     "esc": "ESC", "space": "SPACE", "enter": "ENTER", "tab": "TAB",
@@ -89,9 +89,9 @@ def _pynput_key_to_dsl_name(key) -> str | None:
     char = getattr(key, "char", None)
     if char:
         name = char.upper()
-        return name if name in KEY_NAME_TO_VK else None
+        return name if name in KNOWN_KEY_NAMES else None
     name = _SPECIAL_KEY_NAMES.get(getattr(key, "name", ""))
-    return name if name and name in KEY_NAME_TO_VK else None
+    return name if name and name in KNOWN_KEY_NAMES else None
 
 
 class MacroRecorder:

@@ -10,8 +10,30 @@
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from ..core.config import InputSimConfig
+
+
+class InputBackendKind(str, Enum):
+    """输入后端的稳定身份；通用层不得通过具体实现类判断运行模式。"""
+
+    UNKNOWN = "unknown"
+    SEND = "send"
+    POST = "post"
+    ADB = "adb"
+    AGENT = "agent"
+    A11Y = "a11y"
+    SHELL = "shell"
+
+    @property
+    def is_device(self) -> bool:
+        return self in {
+            InputBackendKind.ADB,
+            InputBackendKind.AGENT,
+            InputBackendKind.A11Y,
+            InputBackendKind.SHELL,
+        }
 
 
 class InputBackend(ABC):
@@ -36,6 +58,8 @@ class InputBackend(ABC):
     - click_random_offset：坐标随机偏移像素
     - region_jitter_ratio：区域中心抖动比例
     """
+
+    kind = InputBackendKind.UNKNOWN
 
     # ─── 延迟/抖动参数（子类 __init__ 由 InputSimConfig 注入）──────────
     before_click_wait: tuple[float, float]

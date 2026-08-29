@@ -15,14 +15,14 @@ from loguru import logger
 
 from ...core.config import InputSimConfig
 from ...core.input_trace import InputTrace
-from ..input_base import InputBackend
+from ...core.key_names import normalize_key
+from ..input_base import InputBackend, InputBackendKind
 from .win32_keyboard import (
     KEYEVENTF_EXTENDEDKEY,
     KEYEVENTF_KEYUP,
     KEYEVENTF_SCANCODE,
     is_extended_key,
     key_to_vk_scan,
-    normalize_key,
     send_keyboard_input,
 )
 from .win32_util import (
@@ -64,6 +64,8 @@ _MOUSE_BUTTON_EVENTS: dict[str, tuple[int, int, int]] = {
 
 class SendInputInput(InputBackend):
     """基于 SendInput 的输入后端（移动真实光标）"""
+
+    kind = InputBackendKind.SEND
 
     def __init__(self, input_sim: InputSimConfig | None = None):
         self._inject_input_sim(self, input_sim)

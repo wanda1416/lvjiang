@@ -161,14 +161,14 @@ class TestEnumerateAndProtection:
         assert _resolver(dirs).is_system_entity("demo_rules/new.yaml")
 
 
-# ─── 开发模式写入自动 bump ────────────────────────────────
+# ─── 开发模式普通保存保留版本 / 显式提升 ───────────────────
 
-class TestWriteBumpsVersion:
-    def test_content_change_bumps(self, dirs):
+class TestWritePreservesVersion:
+    def test_content_change_keeps_version(self, dirs):
         _write_scene(dirs[0], "a.yaml", 3, "旧")
         r = _resolver(dirs, dev_mode=True)
         r.write_entity("scenes/a.yaml", "key: a\nname: 新\n")
-        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 4
+        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 3
 
     def test_unchanged_content_keeps_version(self, dirs):
         """打开编辑器又原样关掉不该推高版本，否则远端侧分不清真改动。"""
@@ -189,7 +189,7 @@ class TestWriteBumpsVersion:
         r.write_entity("scenes/a.yaml", "key: a\nname: 用户改的\n")
         assert versioning.read_version(dirs[1] / "scenes" / "a.yaml") is None
 
-    def test_json_entity_bumps_and_keeps_format(self, dirs):
+    def test_json_entity_keeps_version_and_format(self, dirs):
         """layouts/{布局}/{场景}.json 是 depth=2 的版本化实体。"""
         path = dirs[0] / "layouts" / "默认布局" / "s.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -201,8 +201,26 @@ class TestWriteBumpsVersion:
                        json.dumps({"regions": [{"key": "b"}]},
                                   ensure_ascii=False, indent=2))
         data = json.loads(path.read_text(encoding="utf-8"))
-        assert data["content_version"] == 3
+        assert data["content_version"] == 2
         assert data["regions"] == [{"key": "b"}]
+
+    def test_explicit_version_is_written(self, dirs):
+        _write_scene(dirs[0], "a.yaml", 3, "旧")
+        r = _resolver(dirs, dev_mode=True)
+        r.write_entity(
+            "scenes/a.yaml", "key: a\nname: 新\n", content_version=4)
+        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 4
+
+    @pytest.mark.parametrize("bad_version", [True, 0, -1, 2.5, "4"])
+    def test_explicit_version_requires_positive_integer(
+            self, dirs, bad_version):
+        _write_scene(dirs[0], "a.yaml", 3, "旧")
+        r = _resolver(dirs, dev_mode=True)
+        with pytest.raises(ValueError, match="大于 0 的整数"):
+            r.write_entity(
+                "scenes/a.yaml", "key: a\nname: 新\n",
+                content_version=bad_version,
+            )
 
     def test_non_versioned_path_untouched(self, dirs):
         r = _resolver(dirs, dev_mode=True)
@@ -255,7 +273,10 @@ class TestDevModeSeesRemote:
         _write_scene(dirs[0], "a.yaml", 2, "出厂")
         _write_scene(dirs[2], "a.yaml", 3, "远端")
         r = _resolver(dirs, dev_mode=True)
-        r.write_entity("scenes/a.yaml", "key: a\nname: 我基于远端改的\n")
+        target = r.next_entity_version("scenes/a.yaml")
+        r.write_entity(
+            "scenes/a.yaml", "key: a\nname: 我基于远端改的\n",
+            content_version=target)
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 4
         # 改动立刻生效，不用等"版本号追上线上"
         assert _read_marker(r.resolve_read("scenes/a.yaml")) == "我基于远端改的"
@@ -266,15 +287,17 @@ class TestDevModeSeesRemote:
         _write_scene(dirs[0], "a.yaml", 2, "同样的内容")
         _write_scene(dirs[2], "a.yaml", 5, "远端")
         r = _resolver(dirs, dev_mode=True)
-        r.write_entity("scenes/a.yaml", "key: a\nname: 同样的内容\n")
+        target = r.next_entity_version("scenes/a.yaml")
+        r.write_entity(
+            "scenes/a.yaml", "key: a\nname: 同样的内容\n",
+            content_version=target)
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 6
 
-    def test_no_remote_keeps_plain_bump(self, dirs):
-        """没有远端时行为不变，floor 逻辑不该影响常规开发。"""
+    def test_no_remote_plain_save_keeps_version(self, dirs):
         _write_scene(dirs[0], "a.yaml", 3, "旧")
         r = _resolver(dirs, dev_mode=True)
         r.write_entity("scenes/a.yaml", "key: a\nname: 新\n")
-        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 4
+        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 3
 
 
 class TestDescribeEntity:

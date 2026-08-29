@@ -620,7 +620,8 @@ class LayoutConfigManager:
             logger.info(f"布局已加载: {name}")
         return layout
 
-    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None) -> bool:
+    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None,
+                    content_versions: dict[str, int] | None = None) -> bool:
         """保存布局
 
         Args:
@@ -628,6 +629,8 @@ class LayoutConfigManager:
             changed_scenes: 需要写盘的场景 key 集合。
                 None = 全量写盘（新建布局、另存为等场景）；
                 set = 增量写盘，只写指定场景的 JSON 文件。
+            content_versions: 场景 key → 显式目标版本。版本提升本身也会使对应
+                场景文件进入本次写盘集合；未提供的文件普通保存时保留旧版本。
 
         别名布局（yaml 条目带 extends）：保留 extends 字段，
         scene 文件写入根布局目录（别名自身不维护 scene）。
@@ -660,7 +663,9 @@ class LayoutConfigManager:
 
         # 3. 写场景 JSON 文件（增量或全量）；别名布局落到根布局目录
         all_scene_keys = set(layout.regions) | set(layout.points) | set(layout.arrows) | set(layout.panels)
-        scene_keys = all_scene_keys if changed_scenes is None else (changed_scenes & all_scene_keys)
+        versions = content_versions or {}
+        scene_keys = all_scene_keys if changed_scenes is None else (
+            (changed_scenes & all_scene_keys) | set(versions))
         for sk in scene_keys:
             entry: dict = {}
             # 按场景定义顺序排序 regions/points/panels，避免编辑顺序影响输出
@@ -681,6 +686,7 @@ class LayoutConfigManager:
             resolver.write_entity(
                 _scene_rel(scene_dir_name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),
+                content_version=versions.get(sk),
             )
         mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else tr("全量")
         logger.info(f"布局已保存: {layout.name} ({mode})")

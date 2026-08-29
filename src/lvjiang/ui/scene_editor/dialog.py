@@ -65,6 +65,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         self._group_tabs: dict[str, QTabWidget] = {}  # group_key -> QTabWidget
         self._current_layout: Layout | None = None
         self._dirty_scenes: set[str] = set()  # 当前布局中已变更的场景 key 集合
+        self._data_dirty_scenes: set[str] = set()  # 真正改过布局数据的场景
         # 截图懒加载：(layout_name, scene_key, view) -> ndarray|None 缓存；
         # _loaded_scenes 记录当前布局下已上屏底图的场景，布局切换时重置
         self._img_cache: dict[tuple[str, str, str], object] = {}
@@ -369,6 +370,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.canvas.on_panel_changed = lambda sk=scene_key: self._on_scene_data_changed(sk)
             tab.canvas.on_status_message = lambda msg: self._status_bar.showMessage(msg, 5000)
             tab.on_view_changed = self._on_tab_view_changed
+            tab.on_version_pending_changed = self._on_version_pending_changed
             # 布局名注入后才能解析该场景坐标文件的来源层（system/remote/local）
             tab.set_layout_name(layout_name)
             # 回调设置完毕后显式刷新，重建表格并创建 checkbox
@@ -568,16 +570,36 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
 
     def _mark_scene_dirty(self, scene_key: str):
         """标记指定场景为已变更，更新 Tab 标题绿点 + 全局 dirty 指示"""
+        self._data_dirty_scenes.add(scene_key)
+        self._set_scene_dirty_visual(scene_key, True)
+
+    def _set_scene_dirty_visual(self, scene_key: str, dirty: bool):
+        """只维护 dirty 并集与显示，不改变变更来源。"""
+        if not dirty:
+            self._dirty_scenes.discard(scene_key)
+            self._update_scene_tab_title(scene_key, dirty=False)
+            self._dirty_label.setVisible(bool(self._dirty_scenes))
+            return
         if scene_key in self._dirty_scenes:
             return
         self._dirty_scenes.add(scene_key)
         self._dirty_label.setVisible(True)
         self._update_scene_tab_title(scene_key, dirty=True)
 
+    def _on_version_pending_changed(self, scene_key: str):
+        """版本链接进入现有保存/放弃状态，但不冒充布局数据修改。"""
+        tab = self._tabs.get(scene_key)
+        dirty = scene_key in self._data_dirty_scenes or bool(
+            tab and tab.has_pending_version)
+        self._set_scene_dirty_visual(scene_key, dirty)
+
     def _mark_all_scenes_clean(self):
         """清除所有场景的变更标记"""
         for sk in self._dirty_scenes:
             self._update_scene_tab_title(sk, dirty=False)
+        for tab in self._tabs.values():
+            tab.clear_pending_versions()
+        self._data_dirty_scenes.clear()
         self._dirty_scenes.clear()
         self._dirty_label.setVisible(False)
 

@@ -47,6 +47,12 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tune_config,
     standard_playstyle_attrs,
 )
+from lvjiang.core.config.resolver import (
+    LAYER_LOCAL,
+    LAYER_REMOTE,
+    LAYER_SYSTEM,
+    EntityOrigin,
+)
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
@@ -77,6 +83,8 @@ class RuleSettingsPage(QWidget):
                  on_rename: Callable[[str, str, str], None] | None = None,
                  on_enable_changed: Callable[[bool], None] | None = None,
                  protected: bool = False,
+                 version_origin: EntityOrigin | None = None,
+                 on_bump_version: Callable[[], int] | None = None,
                  parent=None):
         super().__init__(parent)
         self._data = data
@@ -85,6 +93,8 @@ class RuleSettingsPage(QWidget):
         self._on_rename = on_rename
         self._on_enable_changed = on_enable_changed
         self._protected = protected
+        self._version_origin = version_origin or EntityOrigin("", None)
+        self._on_bump_version = on_bump_version
         self._loading = True
         # 武器/增伤词条候选来自游戏配置数据源（保存时已刷新单例）
         mgr = get_game_config()
@@ -120,6 +130,18 @@ class RuleSettingsPage(QWidget):
         key_row = QHBoxLayout()
         self._key_label = QLabel()
         key_row.addWidget(self._key_label)
+        key_row.addSpacing(18)
+        key_row.addWidget(QLabel(tr("版本号：")))
+        self._version_label = QLabel()
+        key_row.addWidget(self._version_label)
+        self._btn_bump_version = QPushButton(tr("提升"))
+        self._btn_bump_version.clicked.connect(self._bump_version)
+        self._btn_bump_version.setEnabled(self._on_bump_version is not None)
+        if self._on_bump_version is None:
+            self._btn_bump_version.setToolTip(tr("仅开发模式可以提升出厂配置版本"))
+        apply_button_style(self._btn_bump_version, variant="neutral")
+        key_row.addWidget(self._btn_bump_version)
+        key_row.addSpacing(18)
         self._btn_rename_key = QPushButton(tr("重命名"))
         self._btn_rename_key.clicked.connect(self._rename_key)
         apply_button_style(self._btn_rename_key, variant="neutral")
@@ -137,6 +159,8 @@ class RuleSettingsPage(QWidget):
             self._btn_delete.setEnabled(False)
             self._btn_delete.setToolTip(hint)
         form.addRow(tr("标识 key："), key_row)
+        self._set_version_display(
+            self._version_origin.version, self._version_origin.layer)
 
         # 名称只读展示（修改走对话框左侧导航双击）
         name_row = QHBoxLayout()
@@ -437,6 +461,33 @@ class RuleSettingsPage(QWidget):
     def set_name(self, name: str):
         """名称变更后同步只读展示（数据由面板写入，见导航双击重命名）"""
         self._name_label.setText(name)
+
+    def _set_version_display(self, version: int | None, layer: str) -> None:
+        labels = {
+            LAYER_SYSTEM: tr("系统"),
+            LAYER_LOCAL: tr("用户"),
+            LAYER_REMOTE: tr("远程下发"),
+        }
+        styles = {
+            LAYER_LOCAL: "color: palette(highlight);",
+            LAYER_REMOTE: "color: #D97706;",
+            LAYER_SYSTEM: "color: palette(mid);",
+        }
+        self._version_label.setText("-" if version is None else f"v{version}")
+        self._version_label.setStyleSheet(styles.get(layer, "color: palette(mid);"))
+        self._version_label.setToolTip(
+            tr("配置来源：{source}").format(
+                source=labels.get(layer, tr("未知"))))
+
+    def _bump_version(self) -> None:
+        if self._on_bump_version is None:
+            return
+        try:
+            version = self._on_bump_version()
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.warning(self, tr("版本提升失败"), str(e))
+            return
+        self._set_version_display(version, LAYER_SYSTEM)
 
     def _show_playstyle_tips(self):
         btn = self._playstyle_tips_btn

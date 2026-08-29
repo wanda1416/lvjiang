@@ -47,6 +47,20 @@ end
         assert v["x"] == 7.0
 
 
+class TestEnvGuard:
+    def test_executes_only_in_matching_environment(self):
+        code = '''eval $hit = 0
+env:"android" -> eval $hit = $hit + 1
+env:"desktop" -> eval $hit = $hit + 10
+'''
+        engine = make_engine(run_env="android")
+        program = parse_text(code)
+
+        engine._exec_body(program.body)
+
+        assert engine.variables["hit"] == 1.0
+
+
 # ─── continue ─────────────────────────────────────────────
 
 class TestContinue:

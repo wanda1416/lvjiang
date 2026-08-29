@@ -49,6 +49,9 @@
       "include": "#keywords-special"
     },
     {
+      "include": "#operators"
+    },
+    {
       "include": "#labels"
     }
   ],
@@ -94,7 +97,7 @@
     },
     "keywords-control": {
       "name": "keyword.control.wf",
-      "match": "\\b(if|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch)\\b"
+      "match": "\\b(env|if|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch)\\b"
     },
     "keywords-instruction": {
       "name": "keyword.operator.wf",
@@ -127,6 +130,10 @@
     "keywords-special": {
       "name": "keyword.other.special.wf",
       "match": "\\b(session|context)\\b"
+    },
+    "operators": {
+      "name": "keyword.operator.arrow.wf",
+      "match": "->"
     },
     "labels": {
       "name": "entity.name.label.wf",

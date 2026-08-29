@@ -955,6 +955,40 @@ def test_click_wait_in_if_body():
     assert isinstance(if_node.then_body[1], Click)
 
 
+def test_env_guard_desugars_to_if_with_constant_string():
+    program = parse_text(
+        'env:"desktop" -> press "F" after wait 0.3\n'
+    )
+
+    guard = program.body[0]
+    assert isinstance(guard, If)
+    assert isinstance(guard.condition, FuncCall)
+    assert guard.condition.func_name == "env"
+    assert guard.condition.func_args == [Literal("desktop")]
+    # 一条带等待子句的源语句仍可展开成 Press + Wait。
+    assert len(guard.then_body) == 2
+    assert isinstance(guard.then_body[0], Press)
+    assert isinstance(guard.then_body[1], Wait)
+    assert guard.else_body == []
+    assert guard.line_no == 1
+    assert all(node.line_no == 1 for node in guard.then_body)
+
+
+@pytest.mark.parametrize("code", [
+    'env:$target -> press "F"\n',
+    'env:desktop -> press "F"\n',
+    'env:"desktop" -> if $ready\n',
+])
+def test_env_guard_rejects_dynamic_bare_or_block_forms(code):
+    with pytest.raises(LarkError):
+        parse_text(code)
+
+
+def test_env_guard_rejects_empty_environment_name():
+    with pytest.raises(VisitError, match="环境名不能为空"):
+        parse_text('env:"" -> press "F"\n')
+
+
 def test_click_wait_in_loop_body():
     """loop 体内的 click ... around wait 应展平为 3 条语句"""
     program = parse_text("loop 3\nclick [a].[b] around wait 0.5\nend")

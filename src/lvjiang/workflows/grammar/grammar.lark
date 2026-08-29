@@ -32,6 +32,7 @@ start: (_NL | statement)*
           | import_stmt
           | def_stmt
           | call_proc_stmt
+          | env_guard_stmt
           | if_stmt
           | for_stmt
           | loop_count_stmt
@@ -337,6 +338,36 @@ call_arg_list: call_arg ("," call_arg)*
          | var_ref -> call_arg_var
 
 // ─── 控制流 ───────────────────────────────────────────────
+
+// 环境单行守卫：只接受常量字符串环境名和一条非块语句。
+// env:"desktop" -> press "F"
+env_guard_stmt: "env"i ":" STRING "->" env_guard_action
+
+?env_guard_action: click_stmt
+                 | mouse_button_stmt
+                 | place_stmt
+                 | move_stmt
+                 | replay_input_trace_stmt
+                 | scroll_stmt
+                 | drag_stmt
+                 | press_stmt
+                 | wait_stable_stmt
+                 | wait_stmt
+                 | scan_stmt
+                 | recognize_stmt
+                 | collect_stmt
+                 | log_stmt
+                 | screenshot_stmt
+                 | eval_stmt
+                 | implicit_eval_stmt
+                 | default_stmt
+                 | align_stmt
+                 | find_stmt
+                 | call_proc_stmt
+                 | break_stmt
+                 | continue_stmt
+                 | return_stmt
+                 | goto_stmt
 
 if_stmt: "if"i condition _NL (_NL | statement)* else_clause? "end"i _NL
 

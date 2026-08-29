@@ -142,7 +142,7 @@ class TestEntity:
         assert not (local / "scenes" / "a.yaml.deleted").exists()
 
     def test_delete_entity_user_refuses_system(self, dirs):
-        """出厂实体不允许用户删除：不落墓碑、不隐藏，直接拒绝。"""
+        """系统实体不允许用户删除：不落墓碑、不隐藏，直接拒绝。"""
         system, local = dirs
         (system / "scenes").mkdir()
         (system / "scenes" / "a.yaml").write_text("x", encoding="utf-8")
@@ -178,7 +178,7 @@ class TestEntity:
         # system 无同名 → 不落墓碑
         assert not (local / "scenes" / "mine.yaml.deleted").exists()
 
-    # ─── 放弃覆盖（还原为出厂）──────────────────────────
+    # ─── 放弃覆盖（还原为系统）──────────────────────────
 
     def test_revert_drops_local_shadow(self, dirs):
         system, local = dirs
@@ -198,7 +198,7 @@ class TestEntity:
         assert _user(dirs).revert_entity_to_system("scenes/a.yaml") is False
 
     def test_revert_refuses_when_no_factory_version(self, dirs):
-        """纯本地实体没有出厂版本，还原就等于删除——那条路归 delete_entity"""
+        """纯本地实体没有系统版本，还原就等于删除——那条路归 delete_entity"""
         _, local = dirs
         (local / "scenes").mkdir()
         (local / "scenes" / "mine.yaml").write_text("mine", encoding="utf-8")
@@ -273,7 +273,7 @@ class TestAggregateIO:
         r = _user(dirs)
         r.save_merged("scenes.yaml", {"a": 1, "b": {"c": 20}})
         overlay = yaml.safe_load((local / "scenes.yaml").read_text(encoding="utf-8"))
-        # b.d 未在 DELETABLE_PATHS 声明 → 不允许删除出厂内容，只记下改动的 c
+        # b.d 未在 DELETABLE_PATHS 声明 → 不允许删除系统内容，只记下改动的 c
         assert overlay == {"b": {"c": 20}}
         # system 原样
         assert yaml.safe_load((system / "scenes.yaml").read_text(
@@ -325,7 +325,7 @@ class TestChangeNotify:
 # ─── 注册表列表（可增长的条目登记表） ──────────────────────
 
 class TestRegistryList:
-    """注册表列表存增量，出厂新增条目不会被 local 冻住。
+    """注册表列表存增量，系统新增条目不会被 local 冻住。
 
     普通列表整键替换是对的（``quality_thresholds.武器: [gold]`` 这类枚举设定
     用户就是要覆盖）；但 exposed / layout_scenes.* / base_rules 是登记表，
@@ -338,7 +338,7 @@ class TestRegistryList:
         base = {"exposed": ["a", "b"]}
         local = {"exposed": {"__added__": ["mine"]}}
         assert merge_doc(base, local, self.REG)["exposed"] == ["a", "b", "mine"]
-        # 出厂后来新增 c —— 必须自动出现
+        # 系统后来新增 c —— 必须自动出现
         base2 = {"exposed": ["a", "b", "c"]}
         assert merge_doc(base2, local, self.REG)["exposed"] == ["a", "b", "c", "mine"]
 
@@ -348,13 +348,13 @@ class TestRegistryList:
         assert merge_doc(base, local, self.REG)["exposed"] == ["a", "c"]
 
     def test_removal_persists_while_new_entries_still_appear(self):
-        """用户主动隐藏的保持隐藏，同时不挡住出厂新增。"""
+        """用户主动隐藏的保持隐藏，同时不挡住系统新增。"""
         local = {"exposed": {"__removed__": ["b"], "__added__": ["mine"]}}
         merged = merge_doc({"exposed": ["a", "b", "c", "new"]}, local, self.REG)
         assert merged["exposed"] == ["a", "c", "new", "mine"]
 
     def test_order_applied_and_unknown_appended(self):
-        """__order__ 没提到的条目（出厂新增）排末尾，宁可靠后也不能消失。"""
+        """__order__ 没提到的条目（系统新增）排末尾，宁可靠后也不能消失。"""
         base = {"exposed": ["a", "b", "later"]}
         local = {"exposed": {"__order__": ["b", "a"]}}
         assert merge_doc(base, local, self.REG)["exposed"] == ["b", "a", "later"]
@@ -449,14 +449,14 @@ class TestRegistryThroughResolver:
         assert saved == {"base_rules": {"__added__": ["mine"]}}
 
     def test_system_addition_reaches_user_after_upgrade(self, dirs):
-        """本 bug 的回归点：用户存过 local 之后仍能看到出厂新增的脚本。"""
+        """本 bug 的回归点：用户存过 local 之后仍能看到系统新增的脚本。"""
         system, local = dirs
         self._write(system / self.DEMO_REL,
                     {"base_rules": ["a", "b"], "switches": {}})
         r = _user(dirs)
         r.save_merged(self.DEMO_REL,
                       {"base_rules": ["a", "b", "mine"], "switches": {}})
-        # 发新版：出厂多了 c
+        # 发新版：系统多了 c
         self._write(system / self.DEMO_REL,
                     {"base_rules": ["a", "b", "c"], "switches": {}})
         assert r.load_merged(self.DEMO_REL)["base_rules"] == [
@@ -469,10 +469,10 @@ class TestRegistryThroughResolver:
         assert _user(dirs).load_merged("app.yaml")["lst"] == [9]
 
 
-# ─── 删除白名单（默认禁止删除出厂内容） ────────────────────
+# ─── 删除白名单（默认禁止删除系统内容） ────────────────────
 
 class TestDeletionAllowlist:
-    """出厂配置是开发者提供的初始内容，默认不允许 local 删除。
+    """系统配置是开发者提供的初始内容，默认不允许 local 删除。
 
     用户该做的是改值、复制、另存为、新建；想停用某项走激活机制
     （调律规则的 tuning_rules 开关、脚本的 exposed 暴露列表），
@@ -486,12 +486,12 @@ class TestDeletionAllowlist:
 
     def test_unregistered_deletion_suppressed(self, dirs):
         self._write_system(dirs, "demo.yaml",
-                           {"schools": {"出厂流派": {"v": 1}}})
+                           {"schools": {"系统流派": {"v": 1}}})
         r = _user(dirs)
         doc = r.load_merged("demo.yaml")
-        doc["schools"].pop("出厂流派")
+        doc["schools"].pop("系统流派")
         r.save_merged("demo.yaml", doc)
-        assert "出厂流派" in r.load_merged("demo.yaml")["schools"]
+        assert "系统流派" in r.load_merged("demo.yaml")["schools"]
 
     def test_top_level_key_never_lost_to_partial_save(self, dirs):
         """调用方只传部分文档时，其余顶层键不会被判成删除。
@@ -509,10 +509,10 @@ class TestDeletionAllowlist:
     def test_user_created_entry_freely_deletable(self, dirs):
         """用户自建的条目不在 system 基底里，删除它压根不产生 __deleted__。
 
-        这正是「默认禁止删除」能同时满足两边的原因：挡住的只有出厂内容。
+        这正是「默认禁止删除」能同时满足两边的原因：挡住的只有系统内容。
         """
         self._write_system(dirs, "demo.yaml",
-                           {"schools": {"出厂流派": {"v": 1}}})
+                           {"schools": {"系统流派": {"v": 1}}})
         r = _user(dirs)
         doc = r.load_merged("demo.yaml")
         doc["schools"]["我的流派"] = {"v": 9}
@@ -524,10 +524,10 @@ class TestDeletionAllowlist:
         r.save_merged("demo.yaml", doc)
         merged = r.load_merged("demo.yaml")
         assert "我的流派" not in merged["schools"]
-        assert "出厂流派" in merged["schools"]
+        assert "系统流派" in merged["schools"]
 
     def test_allowlist_is_empty_by_design(self):
-        """出厂内容没有一样是该让用户删的，白名单保持空。
+        """系统内容没有一样是该让用户删的，白名单保持空。
 
         保留这个扩展点是为了将来真出现例外时有地方声明，
         不是给现在留口子——空表本身就是结论。
@@ -547,7 +547,7 @@ class TestDeletionAllowlist:
         assert r.load_merged("demo.yaml")["items"] == {"a": 1}
 
     def test_dev_mode_can_still_remove_keys(self, dirs):
-        """开发模式全量写 system —— 开发者编排出厂配置不受白名单约束。"""
+        """开发模式全量写 system —— 开发者编排系统配置不受白名单约束。"""
         self._write_system(dirs, "app.yaml", {"a": 1, "b": 2})
         _dev(dirs).save_merged("app.yaml", {"a": 1})
         saved = yaml.safe_load((dirs[0] / "app.yaml").read_text(encoding="utf-8"))
@@ -559,10 +559,10 @@ class TestDeletionAllowlist:
 
 
 class TestProtectedLists:
-    """列表型出厂内容：不许移除，但可改值、可新增、可重排
+    """列表型系统内容：不许移除，但可改值、可新增、可重排
 
     列表走整键替换，绕开了 __deleted__ 那条保护——用户存一份少了几项的
-    列表就把出厂条目抹掉了。这里按条目身份字段比对补回。
+    列表就把系统条目抹掉了。这里按条目身份字段比对补回。
 
     PROTECTED_LIST_PATHS 本身对 core 保持空表——插件私有配置文件的受保护
     列表由插件经 register_protected_list_paths 注册（见
@@ -638,7 +638,7 @@ class TestProtectedLists:
         assert [c["level"] for c in merged["level_configs"]] == [110, 91, 100, 120]
 
     def test_dev_mode_can_remove(self, dirs):
-        """开发模式全量写 system，编排出厂内容不受保护。"""
+        """开发模式全量写 system，编排系统内容不受保护。"""
         path = dirs[0] / self.REL
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(yaml.dump(self.BASE, allow_unicode=True), encoding="utf-8")
@@ -659,7 +659,7 @@ class TestWriteIsMinimal:
 
     用户模式下这一步尤其要紧——实体文件是**整文件影子**（local 有就完全
     顶掉 system/remote，不合并），给一个其实没改过的文件生成 local 影子，
-    等于让它从此收不到任何出厂更新与在线下发。场景编辑器里"什么都没改、
+    等于让它从此收不到任何系统更新与在线下发。场景编辑器里"什么都没改、
     随手点一下保存"曾会把整个布局 25 个场景全部冻住。
     """
 
@@ -671,7 +671,7 @@ class TestWriteIsMinimal:
         assert not (local / "scenes" / "a.yaml").exists()
 
     def test_force_creates_shadow_for_identical_content(self, dirs):
-        """显式「复制到本地」要能穿过这道闸——内容本来就与出厂逐字相同"""
+        """显式「复制到本地」要能穿过这道闸——内容本来就与系统逐字相同"""
         system, local = dirs
         (system / "scenes").mkdir()
         (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
@@ -745,7 +745,7 @@ class TestWriteIsMinimal:
         assert target.read_bytes() == b"\x89PNGX"
 
     def test_dev_mode_creates_factory_file_even_if_local_matches(self, dirs):
-        """开发模式不能拿 local 影子比对：作者新建出厂文件不是空操作。"""
+        """开发模式不能拿 local 影子比对：作者新建系统文件不是空操作。"""
         system, local = dirs
         (local / "scenes").mkdir()
         (local / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")

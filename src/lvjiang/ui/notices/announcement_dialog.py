@@ -1,4 +1,4 @@
-"""公告中心：展示缓存/远端公告，并支持手动刷新。"""
+"""公告中心：展示缓存/远程公告，并支持手动刷新。"""
 from __future__ import annotations
 
 from datetime import datetime

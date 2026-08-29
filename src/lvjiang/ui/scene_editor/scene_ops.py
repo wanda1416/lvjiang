@@ -467,8 +467,8 @@ class SceneOpsMixin:
         )
         if protected:
             delete_action.setEnabled(False)
-            delete_action.setToolTip(tr("出厂场景不可删除"))
-            rename_action.setToolTip(tr("出厂场景只能修改显示名称，不能修改 key"))
+            delete_action.setToolTip(tr("系统场景不可删除"))
+            rename_action.setToolTip(tr("系统场景只能修改显示名称，不能修改 key"))
         # 更改分组子菜单
         move_menu = menu.addMenu(tr("更改分组"))
         registry = get_registry()
@@ -520,7 +520,7 @@ class SceneOpsMixin:
         )
         if protected:
             key_edit.setEnabled(False)
-            key_edit.setToolTip(tr("出厂场景不能修改 key"))
+            key_edit.setToolTip(tr("系统场景不能修改 key"))
         form.addRow(tr("场景 Key:"), key_edit)
         name_edit = QLineEdit(old_name)
         form.addRow(tr("场景名称:"), name_edit)

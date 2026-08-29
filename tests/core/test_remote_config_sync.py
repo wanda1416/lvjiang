@@ -90,7 +90,7 @@ class TestParseManifest:
 
 
 class TestPathSafety:
-    """manifest 是远端内容，绝不能让它决定往哪写盘。"""
+    """manifest 是远程内容，绝不能让它决定往哪写盘。"""
 
     @pytest.mark.parametrize("rel_path", [
         "../../../etc/passwd",
@@ -104,7 +104,7 @@ class TestPathSafety:
         assert not remote.is_safe_rel_path(rel_path)
 
     def test_rejects_unregistered_dir(self):
-        """没参与在线下发的目录，远端往那儿放文件没有正当理由。"""
+        """没参与在线下发的目录，远程往那儿放文件没有正当理由。"""
         assert not remote.is_safe_rel_path("workflows/evil.wf")
         assert not remote.is_safe_rel_path("app.yaml")
 
@@ -125,7 +125,7 @@ class TestPathSafety:
 # ─── 客户端版本区间 ──────────────────────────────────────
 
 class TestAppVersionGate:
-    """远端配置与本地代码对不上的唯一防线。"""
+    """远程配置与本地代码对不上的唯一防线。"""
 
     def test_below_min_version_skipped(self):
         payload = _scene_bytes(2)
@@ -158,7 +158,7 @@ class TestSyncToDir:
                                   app_version=app_version)
 
     def test_downloads_and_writes(self, tmp_path, fake_net):
-        payload = _scene_bytes(2, "远端")
+        payload = _scene_bytes(2, "远程")
         entry = _entry("scenes/a.yaml", payload, 2)
         fake_net[entry["url"]] = payload
         result = self._run(tmp_path, fake_net, [entry])
@@ -248,9 +248,9 @@ class TestEndToEndWithResolver:
 
         system = tmp_path / "system"
         (system / "scenes").mkdir(parents=True)
-        (system / "scenes" / "a.yaml").write_bytes(_scene_bytes(1, "出厂"))
+        (system / "scenes" / "a.yaml").write_bytes(_scene_bytes(1, "系统"))
 
-        payload = _scene_bytes(2, "远端")
+        payload = _scene_bytes(2, "远程")
         entry = _entry("scenes/a.yaml", payload, 2)
         fake_net[entry["url"]] = payload
         manifest = remote.parse_manifest(_manifest([entry]))
@@ -259,12 +259,12 @@ class TestEndToEndWithResolver:
         r = ConfigResolver(system_dir=system, local_dir=tmp_path / "local",
                            remote_dir=tmp_path / "remote", dev_mode=False)
         got = r.resolve_read("scenes/a.yaml").read_text(encoding="utf-8")
-        assert "远端" in got
+        assert "远程" in got
 
-        # 出厂随新版本推到 v5：远端 v2 不得盖回来
-        (system / "scenes" / "a.yaml").write_bytes(_scene_bytes(5, "出厂新版"))
+        # 系统随新版本推到 v5：远程 v2 不得盖回来
+        (system / "scenes" / "a.yaml").write_bytes(_scene_bytes(5, "系统新版"))
         got = r.resolve_read("scenes/a.yaml").read_text(encoding="utf-8")
-        assert "出厂新版" in got
+        assert "系统新版" in got
 
 
 class TestStateTransition:
@@ -426,10 +426,10 @@ class TestStagingTakesEffectNextLaunch:
         assert (stage / "scenes" / "旧的.yaml").exists()
 
     def test_disabling_clears_delivered_config(self, tmp_path, monkeypatch):
-        """关闭开关必须能退回出厂配置。
+        """关闭开关必须能退回系统配置。
 
-        只停止下载是不够的：已下发的配置会一直顶替出厂内容，用户遇到一份
-        有问题的远端配置时就没有退路了。
+        只停止下载是不够的：已下发的配置会一直顶替系统内容，用户遇到一份
+        有问题的远程配置时就没有退路了。
         """
         active, stage = self._dirs(tmp_path, monkeypatch)
         for d in (active, stage):

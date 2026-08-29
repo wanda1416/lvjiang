@@ -60,7 +60,7 @@ find_multi_color`），入参 CoordRef，距离类参数按画布高比例、偏
 列表（system ∪ local 合并视图，标层来源）+ 语法高亮编辑区 + 新建 / 保存 / 另存为 / 删除 / 检查。
 
 - 写入走 `ConfigResolver.write_entity`（开发→system，用户→local 影子），删除走 `delete_entity`
-  （用户模式下出厂脚本落墓碑而非真删）——与场景管理、脚本配置同一套模式判定，不另开写路径。
+  （用户模式下系统脚本落墓碑而非真删）——与场景管理、脚本配置同一套模式判定，不另开写路径。
 - 校验分两档：「检查」只 `parse_text`；「保存」落盘后用 `WorkflowEngine(capture=None, …).validate_only`
   跑完整静态校验（import 链 / 命名等待 / 布局引用），判据与真执行共用。硬件后端传 None 是安全的，
   `validate_only` 不碰它们。

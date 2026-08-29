@@ -1,7 +1,7 @@
 """配置解析器 —— system/remote/local 多层配置的唯一读写咽喉
 
 目录职责：
-- config/system  出厂默认（进 git，用户模式下只读）
+- config/system  系统默认（进 git，用户模式下只读）
 - config/remote  在线下发层（不进 git，见 core.config.remote）：只对实体
   文件生效，且只在 content_version 严格新于 system 时才顶替 system
 - config/local   用户覆盖层：影子文件 + 键级 diff + 墓碑（目录结构镜像 system）
@@ -25,10 +25,10 @@
 
 列表的两种语义：
 - 枚举设定（quality_thresholds.武器、mouse_move_duration 等）→ 整键替换，
-  用户就是要覆盖出厂值
+  用户就是要覆盖系统值
 - 注册表（REGISTRY_LIST_PATHS 声明的路径）→
   local 只存 __added__ / __removed__ / __order__ 增量。整键替换会让 local
-  冻住整张表，出厂后续新增的条目永远进不到合并视图；用户除非删掉自己的
+  冻住整张表，系统后续新增的条目永远进不到合并视图；用户除非删掉自己的
   local 否则再也看不到更新。存量 local 里的普通列表仍按整键替换处理，
   用户下次保存时由 compute_diff 自动转成增量形式。
 
@@ -88,7 +88,7 @@ class EntityOrigin:
 class SystemContentProtected(PermissionError):
     """试图在用户模式下删除 system 层内容
 
-    出厂内容属于开发者提供的初始版本，用户模式（拿不到 system 编辑权限）
+    系统内容属于开发者提供的初始版本，用户模式（拿不到 system 编辑权限）
     只能改值、复制、另存为、新建，或走激活机制停用，不能删除。
     要真正删除必须切到开发模式（``LVJIANG_DEV_MODE=1`` 或仓库带 .git）。
     """
@@ -103,7 +103,7 @@ _REGISTRY_KEYS = (ADDED_KEY, REMOVED_KEY, ORDER_KEY)
 #: 「注册表列表」路径声明：这些列表是**可增长的条目登记表**，不是枚举设定。
 #:
 #: 普通列表整键替换是对的——``quality_thresholds.武器: [gold]`` 这类枚举设定，
-#: 用户就是要覆盖。但注册表不同：local 若存下完整列表，出厂新增的条目就永远
+#: 用户就是要覆盖。但注册表不同：local 若存下完整列表，系统新增的条目就永远
 #: 进不到合并视图里，用户除非删掉自己的 local 否则再也看不到更新。
 #: 这些路径改存增量（``__added__`` / ``__removed__`` / ``__order__``），
 #: 使 system 的新增条目自动出现，同时保留用户的增、删、排序。
@@ -133,7 +133,7 @@ def register_registry_list_paths(rel_path: str, paths: tuple[str, ...]) -> None:
 
 #: 允许 local 删除 system 内容的路径白名单——**默认禁止删除**。
 #:
-#: 出厂配置是开发者提供的初始内容，用户该做的是改值、复制、另存为、新建，
+#: 系统配置是开发者提供的初始内容，用户该做的是改值、复制、另存为、新建，
 #: 而不是删掉它。想停用某项应走激活机制（调律规则的 tuning_rules 开关、
 #: 脚本的 exposed 暴露列表），不是删除定义本身。允许删除的场景必须先在这里
 #: 声明，未声明的删除会被拦下并记 warning。
@@ -142,11 +142,11 @@ def register_registry_list_paths(rel_path: str, paths: tuple[str, ...]) -> None:
 #: 任意键）；``""`` 表示顶层。删除 layouts.<名字> 就写 "layouts"。
 DELETABLE_PATHS: dict[str, tuple[str, ...]] = {}
 
-#: 受保护的**列表**：出厂条目不允许被移除，但可以改值、可以新增。
+#: 受保护的**列表**：系统条目不允许被移除，但可以改值、可以新增。
 #:
 #: 列表走整键替换，绕开了 __deleted__ 那条保护——用户存一份少了几项的列表
-#: 就把出厂条目抹掉了。这里按「条目身份字段」比对：出厂条目缺失即补回，
-#: 用户新增的条目和对出厂条目的改值都原样保留。
+#: 就把系统条目抹掉了。这里按「条目身份字段」比对：系统条目缺失即补回，
+#: 用户新增的条目和对系统条目的改值都原样保留。
 #:
 #: 形如 {文件: {点分路径: 身份字段}}；身份字段为 None 表示条目本身即身份
 #: （纯标量列表）。
@@ -176,9 +176,9 @@ def _identity(item, field: str | None):
 
 def restore_protected_list(base_list: list, desired: list,
                            field: str | None) -> tuple[list, list]:
-    """补回 desired 里缺失的出厂条目，返回 (结果, 被补回的身份列表)
+    """补回 desired 里缺失的系统条目，返回 (结果, 被补回的身份列表)
 
-    补回位置取出厂列表中的原下标（越界则追加），这样既保留用户对留下条目
+    补回位置取系统列表中的原下标（越界则追加），这样既保留用户对留下条目
     的排序，又让补回的条目落在大致原位而不是全堆在末尾。
     """
     kept = {_identity(x, field) for x in desired}
@@ -211,7 +211,7 @@ def _path_matches(path: str, patterns: tuple[str, ...]) -> bool:
 def merge_registry_list(base_list: list, overlay: dict) -> list:
     """注册表列表：system 基底 − __removed__ + __added__，再按 __order__ 排序
 
-    __order__ 里没提到的条目（通常是出厂后来新增的）排在末尾，保持 system 里的
+    __order__ 里没提到的条目（通常是系统后来新增的）排在末尾，保持 system 里的
     相对顺序——新条目宁可靠后也不能消失。
     """
     removed = set(overlay.get(REMOVED_KEY) or [])
@@ -300,7 +300,7 @@ def compute_diff(base: dict, desired: dict,
     传入元组则启用白名单：只有父路径被声明的键才允许进 __deleted__，
     其余缺失一律忽略并记 warning。经 save_merged 调用时恒会传入。
 
-    protected 声明受保护的列表路径及其条目身份字段：出厂条目缺失即补回，
+    protected 声明受保护的列表路径及其条目身份字段：系统条目缺失即补回，
     用户的新增与改值照常保留（见 PROTECTED_LIST_PATHS）。
     """
     base = base if isinstance(base, dict) else {}
@@ -316,7 +316,7 @@ def compute_diff(base: dict, desired: dict,
             where = _prefix or "<顶层>"
             logger.warning(
                 f"配置删除被拦下：{where} 下的 {missing} 未在 DELETABLE_PATHS 声明。"
-                f"出厂内容不允许删除——停用请走激活机制，"
+                f"系统内容不允许删除——停用请走激活机制，"
                 f"调用方若只传了部分文档请改为先 load_merged 取完整文档。")
     if deleted:
         diff[DELETED_KEY] = deleted
@@ -329,7 +329,7 @@ def compute_diff(base: dict, desired: dict,
                 base_value, value, protected[path])
             if restored:
                 logger.warning(
-                    f"配置删除被拦下：{path} 下的出厂条目 {restored} 不允许移除，"
+                    f"配置删除被拦下：{path} 下的系统条目 {restored} 不允许移除，"
                     f"已补回；如需停用请走激活机制或直接改值")
             if value != base_value:
                 diff[key] = deepcopy(value)
@@ -372,7 +372,7 @@ class ConfigResolver:
         self._remote_dir = Path(remote_dir) if remote_dir else None
         self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
         self._listeners: list[Callable[[str], None]] = []
-        #: 已记过「远端顶替出厂」日志的 (rel_path, 远端版本)，见 _log_supersede
+        #: 已记过「远程顶替系统」日志的 (rel_path, 远程版本)，见 _log_supersede
         self._logged_supersedes: set[tuple[str, int]] = set()
 
     @staticmethod
@@ -445,14 +445,14 @@ class ConfigResolver:
         """remote 层该文件是否该顶替 system —— 版本更新才算数。
 
         **不是「remote 优先」**：用户升了 App，system 带来 v5 的场景坐标，
-        而远端还停在给旧版本热修的 v3，无脑覆盖会把配置静默回退成旧的，
+        而远程还停在给旧版本热修的 v3，无脑覆盖会把配置静默回退成旧的，
         没有报错，只表现为"识别又坏了"。所以恒要求 remote 严格新于 system。
 
         三道闸门，任一不过就用 system：
         1. 该路径参与在线下发（versioning 注册表里声明过）
         2. system 侧版本号可读——**缺失即拒绝**（fail-safe，见 versioning
            模块文档）；system 没有该文件时只有声明了 allow_remote_new 的
-           目录才接受远端新增
+           目录才接受远程新增
         3. remote 侧版本号可读且严格大于 system
         """
         spec = versioning.spec_for(rel_path)
@@ -468,11 +468,11 @@ class ConfigResolver:
 
         system = self.system_dir / rel_path
         if not system.exists():
-            # 出厂没有这个文件 = 远端新增。只有明确允许的目录才接受，
-            # 否则远端凭空多出的场景/布局是死的（没在 scenes.yaml 登记）。
+            # 系统没有这个文件 = 远程新增。只有明确允许的目录才接受，
+            # 否则远程凭空多出的场景/布局是死的（没在 scenes.yaml 登记）。
             if not spec.allow_remote_new:
                 logger.warning(
-                    f"remote 下发了出厂不存在的文件，该目录未允许新增，已忽略: "
+                    f"remote 下发了系统不存在的文件，该目录未允许新增，已忽略: "
                     f"{rel_path}")
                 return False
             self._log_supersede(rel_path, None, remote_version)
@@ -481,7 +481,7 @@ class ConfigResolver:
         system_version = versioning.read_version(system)
         if system_version is None:
             logger.warning(
-                f"出厂配置缺 content_version，拒绝 remote 替换: {rel_path}")
+                f"系统配置缺 content_version，拒绝 remote 替换: {rel_path}")
             return False
         if remote_version <= system_version:
             return False
@@ -490,9 +490,9 @@ class ConfigResolver:
 
     def _log_supersede(self, rel_path: str, system_version: int | None,
                        remote_version: int) -> None:
-        """远端顶替出厂时记一条，同一文件同一版本只记一次。
+        """远程顶替系统时记一条，同一文件同一版本只记一次。
 
-        没有这条日志，远端配置生效是**完全静默**的：开发者本地跑出来的行为
+        没有这条日志，远程配置生效是**完全静默**的：开发者本地跑出来的行为
         和用户不一样却毫不知情，用户报"识别坏了"时根本复现不出来——而这
         恰恰是在线下发最需要被排查的一类问题。
 
@@ -503,8 +503,8 @@ class ConfigResolver:
         if token in self._logged_supersedes:
             return
         self._logged_supersedes.add(token)
-        origin = "出厂无此文件" if system_version is None else f"出厂 v{system_version}"
-        logger.info(f"[在线配置] 生效：{rel_path}（{origin} → 远端 v{remote_version}）")
+        origin = "系统无此文件" if system_version is None else f"系统 v{system_version}"
+        logger.info(f"[在线配置] 生效：{rel_path}（{origin} → 远程 v{remote_version}）")
 
     def resolve_read(self, rel_path: str) -> Path | None:
         """实体读解析：local 影子 → remote（版本更新才生效）→ system
@@ -549,7 +549,7 @@ class ConfigResolver:
         什么就显示什么」，藏起来反而让人找不到自己刚录的东西。
 
         remote 侧只有通过 :meth:`remote_supersedes` 闸门的文件才计入——
-        否则远端一份版本更旧、或落在不允许新增的目录里的文件，会在编辑器
+        否则远程一份版本更旧、或落在不允许新增的目录里的文件，会在编辑器
         列表里冒出来却永远读不到（resolve_read 会解析回 system），
         列表和实际内容对不上比少一个条目更难查。
 
@@ -645,7 +645,7 @@ class ConfigResolver:
         用户模式写 local 不动版本号：版本号是 system 与 remote 之间的仲裁
         依据，local 影子恒为最高优先级，不参与比较。
         ``force`` 关掉下面的空操作检测，用于「用户明确要求生成 local 影子」
-        （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与出厂一致，
+        （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与系统一致，
         不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
         """
         root = self.system_dir if self.is_dev_mode() else self.local_dir
@@ -671,7 +671,7 @@ class ConfigResolver:
             #
             # 用户模式下这一步尤其要紧：照写会给一个其实没改过的文件生成
             # local 影子，而实体文件是**整文件影子**（local 有就完全顶掉
-            # system/remote，不合并），于是这个文件从此收不到任何出厂更新
+            # system/remote，不合并），于是这个文件从此收不到任何系统更新
             # 与在线下发。场景编辑器里"什么都没改、随手点一下保存"就会
             # 把整个布局的场景全冻住，代价与操作的随意程度完全不匹配。
             #
@@ -700,7 +700,7 @@ class ConfigResolver:
            跳过写入后 resolve_read 仍会解析到当前那一层（system 或 remote），
            内容一致则读到的东西不变。开发模式不能这样判：目标是 system，
            而 resolve_read 可能解析到 local 影子，拿它比对会把"作者要新建
-           出厂文件"这件事误判成空操作。
+           系统文件"这件事误判成空操作。
 
         文本一律用 ``read_text`` 比对，**不能逐字节比**：``write_text`` 在
         Windows 上会把 ``\\n`` 换成 ``\\r\\n`` 落盘，拿入参的 ``\\n`` 去和盘上的
@@ -725,11 +725,11 @@ class ConfigResolver:
         return _same(current) if current is not None else False
 
     def is_system_entity(self, rel_path: str) -> bool:
-        """该实体是否属于出厂内容（供 UI 判断能否删除/重命名）
+        """该实体是否属于系统内容（供 UI 判断能否删除/重命名）
 
-        远端下发的实体同样算出厂内容——它也是作者提供的、用户没写过的东西，
-        「出厂内容不允许用户删除」这条约定对它一样成立（见本模块「删除：
-        默认禁止」相关文档）。否则远端新增的调律规则会变成用户可删，
+        远程下发的实体同样算系统内容——它也是作者提供的、用户没写过的东西，
+        「系统内容不允许用户删除」这条约定对它一样成立（见本模块「删除：
+        默认禁止」相关文档）。否则远程新增的调律规则会变成用户可删，
         删掉之后下次同步又回来，行为莫名其妙。
         """
         return ((self.system_dir / rel_path).exists()
@@ -743,14 +743,14 @@ class ConfigResolver:
         """
         if not self.is_dev_mode() and self.is_system_entity(rel_path):
             raise SystemContentProtected(
-                f"{rel_path} 由出厂配置提供，用户模式下不可删除或重命名；"
+                f"{rel_path} 由系统配置提供，用户模式下不可删除或重命名；"
                 f"如需停用请使用启用开关/展示勾选")
 
     def delete_entity(self, rel_path: str):
         """按模式删实体：开发→直删 system；用户→只删自己的 local 影子
 
         用户模式下若 system 存在同名文件，抛 :class:`SystemContentProtected`：
-        出厂内容不允许用户删除。想让它不出现请走激活机制（调律规则的启用
+        系统内容不允许用户删除。想让它不出现请走激活机制（调律规则的启用
         开关、脚本的展示勾选），需要真删就切到开发模式。
         """
         if self.is_dev_mode():
@@ -765,19 +765,19 @@ class ConfigResolver:
         self._notify(rel_path)
 
     def revert_entity_to_system(self, rel_path: str) -> bool:
-        """撤掉 local 影子，让实体回到出厂那一份；返回是否真删了影子
+        """撤掉 local 影子，让实体回到系统那一份；返回是否真删了影子
 
         与 :meth:`delete_entity` 是两回事：这不是删除实体，是**放弃自己的
-        覆盖**。所以只在出厂有同名内容时才允许——没有的话删掉 local 就等于
+        覆盖**。所以只在系统有同名内容时才允许——没有的话删掉 local 就等于
         把实体整个抹掉，那条路归 delete_entity 管（用户模式下会被
         SystemContentProtected 拦下）。
 
         没有这个操作，「复制到本地以修改」就是一条单行道：用户复制完发现
-        改坏了，既删不掉（出厂内容受保护）也回不去。
+        改坏了，既删不掉（系统内容受保护）也回不去。
         """
         if not self.is_system_entity(rel_path):
             raise SystemContentProtected(
-                f"{rel_path} 没有出厂版本，无法还原")
+                f"{rel_path} 没有系统版本，无法还原")
         local = self.local_dir / rel_path
         if not local.is_file():
             return False
@@ -800,7 +800,7 @@ class ConfigResolver:
     def load_system(self, rel_path: str) -> dict:
         """只读 system 层文档（不合并 local）
 
-        UI 判断某个条目是不是出厂内容时用：出厂内容用户不允许删除，
+        UI 判断某个条目是不是系统内容时用：系统内容用户不允许删除，
         对应的删除按钮应置灰并给出停用替代方案。
         """
         return self._load_yaml(self.system_dir / rel_path)
@@ -821,12 +821,12 @@ class ConfigResolver:
         **入参必须是完整文档**，不是「本次要改的那几个键」。
         compute_diff 把「system 有而入参没有」的键判成用户删除，只传部分键会
         把其余顶层键写进 __deleted__ 永久抹掉；开发模式更直接——全量写 system
-        会把没传的键从出厂配置里删掉。正确写法是先 load_merged 取回完整文档，
+        会把没传的键从系统配置里删掉。正确写法是先 load_merged 取回完整文档，
         改需要改的键再整个传回来。
 
         删除受白名单约束：未在 DELETABLE_PATHS 声明的路径，即使入参里少了某个
         键也不会被删掉，只记 warning。这既挡住「调用方只传部分文档」的误删，
-        也贯彻「不允许用户删除出厂内容」的产品约定。
+        也贯彻「不允许用户删除系统内容」的产品约定。
         """
         def _dump(doc: dict) -> str:
             return yaml.dump(doc, allow_unicode=True,
@@ -893,7 +893,7 @@ def save_app_config(input_sim: dict, delay_params: dict, envs: list | None = Non
 
     读-改-写全量：先取合并视图再改这几个键。save_merged 的入参语义是**完整
     文档**，只传自己关心的键会让 compute_diff 把其余键判成「用户删除」写进
-    __deleted__，出厂新增的顶层键一保存就永久消失。
+    __deleted__，系统新增的顶层键一保存就永久消失。
     """
     data = load_app_config()
     data["input_simulation"] = input_sim

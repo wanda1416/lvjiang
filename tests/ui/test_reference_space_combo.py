@@ -1,4 +1,4 @@
-"""图库空间栏：出厂空间置灰 + 删除空间按钮的启停与确认流
+"""图库空间栏：系统空间置灰 + 删除空间按钮的启停与确认流
 
 只驱动被测方法本体，绕开对话框的重量级 __init__
 （三个 Tab + 真实 config 读取），保证测试不触碰真实图库。
@@ -10,7 +10,7 @@ from lvjiang.ui.reference.dialog import ReferenceManagerDialog
 
 
 class _FakeDB:
-    """按 ReferenceDatabase 的空间契约打桩：出厂空间不可删、至少留一个"""
+    """按 ReferenceDatabase 的空间契约打桩：系统空间不可删、至少留一个"""
 
     def __init__(self, spaces, system_spaces, user_mode, active=None):
         self._spaces = list(spaces)
@@ -36,7 +36,7 @@ class _FakeDB:
         if name not in self._spaces:
             return "空间不存在"
         if self._user_mode and name in self._system:
-            return "出厂空间不可删除，可新建自己的空间"
+            return "系统空间不可删除，可新建自己的空间"
         if len(self._spaces) <= 1:
             return "至少保留一个图库空间"
         return ""
@@ -102,12 +102,12 @@ class TestSpaceComboGraying:
 
 class TestDeleteSpaceButton:
     def test_disabled_for_system_space_with_reason(self, qtbot):
-        """用户模式选中出厂空间：按钮禁用，tooltip 就是拒绝原因"""
+        """用户模式选中系统空间：按钮禁用，tooltip 就是拒绝原因"""
         dlg = _dialog(qtbot, _FakeDB(["默认", "我的空间"], ["默认"], True))
         dlg._space_combo.setCurrentText("默认")
         dlg._refresh_del_space_enabled()
         assert not dlg._btn_del_space.isEnabled()
-        assert "出厂空间" in dlg._btn_del_space.toolTip()
+        assert "系统空间" in dlg._btn_del_space.toolTip()
 
     def test_enabled_for_local_space(self, qtbot):
         dlg = _dialog(qtbot, _FakeDB(["默认", "我的空间"], ["默认"], True))
@@ -151,7 +151,7 @@ class TestDeleteSpaceButton:
         assert "我的空间" in db.get_spaces()
 
     def test_refuses_without_asking_when_protected(self, qtbot, monkeypatch):
-        """出厂空间：连确认框都不弹，直接给拒绝原因"""
+        """系统空间：连确认框都不弹，直接给拒绝原因"""
         db = _FakeDB(["默认", "我的空间"], ["默认"], True)
         dlg = _dialog(qtbot, db)
         dlg._space_combo.setCurrentText("默认")
@@ -165,4 +165,4 @@ class TestDeleteSpaceButton:
                             lambda _p, _t, text, *a, **k: warned.append(text))
         dlg._on_delete_space()
         assert db.deleted == []
-        assert warned and "出厂空间" in warned[0]
+        assert warned and "系统空间" in warned[0]

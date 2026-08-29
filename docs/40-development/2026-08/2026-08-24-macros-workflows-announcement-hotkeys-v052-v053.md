@@ -65,7 +65,7 @@
 `af83437`：从 0 到 1 新增公告能力，新增 `core/announcement.py`（获取、校验、版本筛选、Session 状态管理）与 `ui/announcement_dialog.py`（展示对话框）。
 
 - 公告经 GitHub Pages 静态 JSON（`https://wanda1416.github.io/lvjiang/notices.json`）下发，不依赖 GitHub API；
-- 远端 `notice_version` 单调递增，客户端只在版本推进且存在适用于当前客户端版本（`min_app_version`/`max_app_version_exclusive`）的公告时自动弹出；
+- 远程 `notice_version` 单调递增，客户端只在版本推进且存在适用于当前客户端版本（`min_app_version`/`max_app_version_exclusive`）的公告时自动弹出；
 - 公告缓存与最后已处理版本存放在 `session.json/server_config.announcement`；
 - `main_window.py` 接入启动检查；新增 `test_announcement.py`（200 行）、`test_announcement_dialog.py`、`test_startup_announcements.py` 三组测试。
 

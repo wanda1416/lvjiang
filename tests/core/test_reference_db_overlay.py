@@ -177,7 +177,7 @@ class TestUserModeWrites:
         assert db.get_entry(entry.file) is not None
 
     def test_remove_system_entry_refused(self, layers):
-        """出厂参考图不允许用户删除——想要自己的一套请新建图库空间。"""
+        """系统参考图不允许用户删除——想要自己的一套请新建图库空间。"""
         from lvjiang.core.config.resolver import SystemContentProtected
 
         system_dir, system_yaml, _, local_yaml = layers
@@ -441,11 +441,11 @@ class TestReferenceSpaces:
         assert db.get_active_space() == DEFAULT_SPACE
 
     def test_is_system_space(self, space_env):
-        """system 层扫出的空间是出厂空间；local 独有的不是"""
+        """system 层扫出的空间是系统空间；local 独有的不是"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
         _declare_spaces(space_env["local_ref"], [DEFAULT_SPACE, "我的空间"])
         db = ReferenceDatabase(dev_mode=False)
-        assert db.is_system_space(DEFAULT_SPACE) is True   # local 有覆盖层也仍是出厂空间
+        assert db.is_system_space(DEFAULT_SPACE) is True   # local 有覆盖层也仍是系统空间
         assert db.is_system_space("我的空间") is False
         assert db.is_system_space("不存在") is False
 
@@ -556,7 +556,7 @@ class TestReferenceSpaces:
         assert db.is_system_space("新空间") is False
 
     def test_create_space_dev_mode(self, space_env):
-        """开发模式新建空间：yaml 落 system 层，即出厂空间"""
+        """开发模式新建空间：yaml 落 system 层，即系统空间"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
         db = ReferenceDatabase(dev_mode=True)
         assert db.create_space("新空间") is True
@@ -564,7 +564,7 @@ class TestReferenceSpaces:
         assert db.is_system_space("新空间") is True
 
     def test_create_space_rejects_system_space_name(self, space_env):
-        """用户模式不能用出厂空间名新建（同名 yaml 是覆盖层，不是新空间）"""
+        """用户模式不能用系统空间名新建（同名 yaml 是覆盖层，不是新空间）"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
         db = ReferenceDatabase(dev_mode=False)
         assert db.create_space(DEFAULT_SPACE) is False
@@ -594,7 +594,7 @@ class TestDeleteSpace:
         assert db.get_spaces() == [DEFAULT_SPACE]
 
     def test_user_mode_refuses_system_space(self, space_env):
-        """用户模式拒删出厂空间，文件原样保留"""
+        """用户模式拒删系统空间，文件原样保留"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         db = ReferenceDatabase(dev_mode=False)
         assert db.can_delete_space("空间A") != ""
@@ -603,7 +603,7 @@ class TestDeleteSpace:
         assert "空间A" in db.get_spaces()
 
     def test_user_mode_refuses_system_space_with_local_overlay(self, space_env):
-        """出厂空间即便有 local 覆盖层也不可删（覆盖层不是本地空间）"""
+        """系统空间即便有 local 覆盖层也不可删（覆盖层不是本地空间）"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         _declare_spaces(space_env["local_ref"], ["空间A"])
         db = ReferenceDatabase(dev_mode=False)
@@ -611,7 +611,7 @@ class TestDeleteSpace:
         assert (space_env["local_ref"] / "空间A.yaml").exists()
 
     def test_dev_mode_deletes_both_layers(self, space_env):
-        """开发模式删出厂空间：两层一起清，不留孤儿覆盖层"""
+        """开发模式删系统空间：两层一起清，不留孤儿覆盖层"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         _declare_spaces(space_env["local_ref"], ["空间A"])
         db = ReferenceDatabase(dev_mode=True)

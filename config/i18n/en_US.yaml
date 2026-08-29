@@ -608,7 +608,6 @@ auto_strings:
   scrcpy 流式: scrcpy Streaming
   scrcpy 视频流: scrcpy Video Stream
   '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
-  '{rel} 是出厂脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a factory script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'
   '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], a find result, or an (x, y[, w, h]) literal), got: {t}'
   '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'
   ↑ 上移: ↑ Move Up
@@ -632,7 +631,6 @@ auto_strings:
   不带 by 得到文字；带 by 得到命中与否: Without `by`, returns the text; with `by`, returns whether it matched
   不收集: Not Collected
   不收集什么: What Isn't Collected
-  丢弃 {name} 的本地修改，恢复出厂版本？此操作不可恢复。: Discard local changes to {name} and restore the factory version? This cannot be undone.
   中文名称: Chinese Name
   中文名称，如 背包网格: Chinese name, e.g. Bag Grid
   为该区域绑定哪个字段？: Which field to bind for this region?
@@ -674,17 +672,6 @@ auto_strings:
   内置字段不可删除: Built-in fields cannot be deleted
   内置字段，不可编辑或删除: Built-in field, cannot be edited or deleted
   '内置类: ': 'Built-in class: '
-  出厂: Factory
-  出厂场景不可删除: Factory scenes cannot be deleted
-  出厂场景不能修改 key: The key of a factory scene cannot be changed
-  出厂场景只能修改显示名称，不能修改 key: Factory scenes can only have their display name changed, not the key
-  出厂布局不可删除；不使用时切换到其他布局即可: Factory layouts cannot be deleted; switch to another layout if you don't need it
-  出厂空间不可删除，可新建自己的空间: The factory space cannot be deleted; create your own space instead
-  出厂空间：可编辑其中内容，但不能删除该空间: 'Factory Space: its contents can be edited, but the space itself cannot be deleted'
-  出厂脚本不可删除；不想展示请在「脚本配置」取消勾选: Factory scripts cannot be deleted; uncheck them in "Script Config" instead
-  出厂脚本只读——右键「复制到本地以修改」后才能保存: Factory scripts are read-only — right-click and choose "Copy to Local for Editing" before saving
-  出厂脚本只读——右键「复制到本地以修改」后才能编辑: Factory scripts are read-only — right-click and choose "Copy to Local for Editing" to edit
-  出厂（只读）: Factory (read-only)
   出错也继续: Continue on Error
   分组: Group
   '分组 Key:': 'Group Key:'
@@ -891,7 +878,6 @@ auto_strings:
   已放弃未保存的清洗规则修改: Discarded unsaved cleaning-rule changes
   已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
   已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Minimized to the tray; double-click the icon or right-click -> "Open Main Window" to restore.
-  已还原为出厂版本: Restored to the factory version
   已退出画布编辑模式: Exited canvas edit mode
   布局: Layout
   布局写入失败，请检查日志。: Layout write failed, please check logs.
@@ -958,12 +944,6 @@ auto_strings:
   找同色图标: Find Same-Color Icon
   找图（模板定位）: Find Image (Template Match)
   找文字（可点击）: Find Text (Clickable)
-  ? '把出厂脚本 {name} 复制到本地后才能修改。
-  
-    复制之后这个文件不再跟随出厂更新，确定？'
-  : 'Factory script {name} must be copied to local before it can be modified.
-  
-    After copying, this file no longer follows factory updates. Continue?'
   拖拽区域翻页: Drag Region to Page
   拖拽（两点）: Drag (Two Points)
   指令: Command
@@ -1053,7 +1033,6 @@ auto_strings:
   未连接设备 | 请先扫描并连接设备: Device not connected | Scan and connect a device first
   未选择: Not Selected
   本地: Local
-  本地覆盖出厂: Local override of factory
   本项目仅供学习交流使用: This project is for learning and communication purposes only
   本项目完全开源免费: This project is fully open-source and free
   条目: Entry
@@ -1258,11 +1237,9 @@ auto_strings:
   运行脚本: Run Script
   返回值：(无): 'Return Value: (None)'
   返回列表，按面积降序；$first = $icons[0] 后可 click: Returns a list, sorted by area descending; $first = $icons[0] can then be clicked
-  还原为出厂: Restore Factory Version
   还原失败: Restore Failed
   还没有实时截图: No live screenshot yet
   这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: This ID is a random string generated on this machine; it doesn't contain your account or hardware info, but it does let us tell that records came from the same machine. You can reset it anytime in Settings.
-  这是出厂脚本的本地副本，删不掉；右键「还原为出厂」可丢弃本地修改: This is a local copy of a factory script and cannot be deleted; right-click and choose "Restore Factory Version" to discard local changes
   进入亮段阈值: Enter-Bright-Segment Threshold
   进度: Progress
   连接中...: Connecting...
@@ -1321,16 +1298,38 @@ auto_strings:
   （用户中断，部分结果）: (User Interrupted, Partial Result)
   （空）: (Empty)
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
-  仅开发模式可以提升出厂配置版本: Only developer mode can bump factory configuration versions
+  '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'
+  丢弃 {name} 的本地修改，恢复系统版本？此操作不可恢复。: Discard local changes to {name} and restore the system version? This cannot be undone.
+  仅开发模式可以提升系统配置版本: Only developer mode can bump system configuration versions
   场景版本号：: 'Scene version:'
+  已还原为系统版本: Restored to the system version
   布局版本号：: 'Layout version:'
+  ? '把系统脚本 {name} 复制到本地后才能修改。
+  
+    复制之后这个文件不再跟随系统更新，确定？'
+  : 'System script {name} must be copied to local before it can be modified.
+  
+    After copying, this file no longer follows system updates. Continue?'
   提升: Bump
   '提升至 v{version}': 'Bump to v{version}'
   撤销提升: Cancel bump
+  本地覆盖系统: Local override of system
   "来源：{source}\n路径：{path}\n当前版本：{version}": "Source: {source}\nPath: {path}\nCurrent version: {version}"
   版本号：: 'Version:'
   版本提升失败: Version bump failed
+  系统场景不可删除: System scenes cannot be deleted
+  系统场景不能修改 key: The key of a system scene cannot be changed
+  系统场景只能修改显示名称，不能修改 key: System scenes can only have their display name changed, not the key
+  系统布局不可删除；不使用时切换到其他布局即可: System layouts cannot be deleted; switch to another layout if you don't need it
+  系统空间不可删除，可新建自己的空间: The system space cannot be deleted; create your own space instead
+  系统空间：可编辑其中内容，但不能删除该空间: 'System Space: its contents can be edited, but the space itself cannot be deleted'
+  系统脚本不可删除；不想展示请在「脚本配置」取消勾选: System scripts cannot be deleted; uncheck them in "Script Config" instead
+  系统脚本只读——右键「复制到本地以修改」后才能保存: System scripts are read-only — right-click and choose "Copy to Local for Editing" before saving
+  系统脚本只读——右键「复制到本地以修改」后才能编辑: System scripts are read-only — right-click and choose "Copy to Local for Editing" to edit
+  系统（只读）: System (read-only)
   '规则版本已提升至 v{version} 并生效': 'Rule version bumped to v{version} and applied'
+  还原为系统: Restore System Version
+  这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改: This is a local copy of a system script and cannot be deleted; right-click and choose "Restore System Version" to discard local changes
   '远程下发': 'Remote delivery'
   '配置来源：{source}': 'Configuration source: {source}'
   '，提升 {count} 项版本': ', bumped {count} versions'

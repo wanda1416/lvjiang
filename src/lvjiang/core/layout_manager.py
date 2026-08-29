@@ -719,9 +719,9 @@ class LayoutConfigManager:
         if referencing:
             logger.error(f"布局 [{name}] 被别名布局引用: {referencing}，拒绝删除")
             return False
-        # 出厂布局属于 system 内容，用户模式下不可删除——不想用就别选它
+        # 系统布局属于 system 内容，用户模式下不可删除——不想用就别选它
         if not resolver.is_dev_mode() and self.is_system_layout(name):
-            logger.error(f"布局 [{name}] 由出厂配置提供，用户模式下不可删除")
+            logger.error(f"布局 [{name}] 由系统配置提供，用户模式下不可删除")
             return False
 
         # 删除场景文件

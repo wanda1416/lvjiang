@@ -469,7 +469,7 @@ def _reference(label="大律准石", count=None, devoted=None):
         count_text = f"{devoted}/{count}"
     return ReferenceInfo(
         label=label, confidence=0.9,
-        # 出厂 schema 始终产出两个 key；无识别结果用空文本表示。
+        # 系统 schema 始终产出两个 key；无识别结果用空文本表示。
         ocr_texts={"level_text": "", "count_text": count_text},
     )
 

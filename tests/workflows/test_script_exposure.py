@@ -4,7 +4,7 @@
 - **默认是否展示**由作者声明（hidden 脚本和 dedicated 专用脚本默认不展示）
 - **顺序、启停、显示名、性质**是用户偏好，存 session 的 daily.scripts
 
-关键性质：出厂新增的脚本自动出现，不会因为用户存过偏好被冻住——
+关键性质：系统新增的脚本自动出现，不会因为用户存过偏好被冻住——
 这正是当初把 exposed 存进 workflows.yaml 的病根。
 """
 
@@ -61,7 +61,7 @@ class TestAuthorDeclaration:
 
 class TestNewScriptsAppearAutomatically:
     def test_new_script_shows_even_with_saved_order(self, scripts, monkeypatch):
-        """用户存过顺序后，出厂新增的脚本仍要出现——这是本次重构的核心目的。"""
+        """用户存过顺序后，系统新增的脚本仍要出现——这是本次重构的核心目的。"""
         assert _ids(monkeypatch, order=["b", "a"]) == ["a"]
         scripts["new"] = {"id": "new", "name": "新", "hidden": False}
         assert "new" in _ids(monkeypatch, order=["b", "a"])
@@ -112,7 +112,7 @@ class TestPolicy:
 
 
 class TestRealConfig:
-    """跑真实出厂配置，锁住 weekly_baiye_freight 默认不展示。"""
+    """跑真实系统配置，锁住 weekly_baiye_freight 默认不展示。"""
 
     def test_weekly_baiye_freight_hidden(self, monkeypatch):
         from lvjiang.workflows.discovery import discover_scripts

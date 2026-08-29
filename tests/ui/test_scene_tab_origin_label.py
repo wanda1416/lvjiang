@@ -1,6 +1,6 @@
 """场景编辑器版本控件的来源与版本数据。
 
-远端下发的配置会顶替出厂文件。不标出来的话，开发者本地跑出来的行为和用户
+远程下发的配置会顶替系统文件。不标出来的话，开发者本地跑出来的行为和用户
 不一样却毫不知情，用户报"识别坏了"时根本复现不出——而这恰恰是在线下发最
 需要被排查的一类问题。
 
@@ -61,17 +61,17 @@ class TestOriginText:
         assert describe_entity_version(
             f"scenes/{_SCENE}.yaml") == (4, "远程下发")
 
-    def test_shows_user_when_locally_overridden(self, layered):
+    def test_shows_local_when_locally_overridden(self, layered):
         system, local, remote, write_scene, _, install = layered
         write_scene(system, 1)
         write_scene(remote, 4)
         write_scene(local, 1)
         install()
         assert describe_entity_version(
-            f"scenes/{_SCENE}.yaml") == (1, "用户")
+            f"scenes/{_SCENE}.yaml") == (1, "本地")
 
     def test_covers_both_scene_and_layout_files(self, layered):
-        """场景定义与布局坐标能被远端**独立**顶替，只标一个就留下盲点。"""
+        """场景定义与布局坐标能被远程**独立**顶替，只标一个就留下盲点。"""
         system, _, remote, write_scene, write_layout, install = layered
         write_scene(system, 1)
         write_layout(system, 2)
@@ -89,7 +89,7 @@ class TestOriginText:
         assert describe_entity_version(f"scenes/{_SCENE}.yaml") == (1, "系统")
 
     def test_older_remote_does_not_show_as_remote(self, layered):
-        """远端版本更旧时闸门不过，界面必须如实显示为系统。"""
+        """远程版本更旧时闸门不过，界面必须如实显示为系统。"""
         system, _, remote, write_scene, _, install = layered
         write_scene(system, 9)
         write_scene(remote, 3)

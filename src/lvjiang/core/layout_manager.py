@@ -305,26 +305,30 @@ def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key
         是否发生了改动
     """
     if kind == "region":
-        src_list = layout.get_scene_regions(source)
-        item = next((r for r in src_list if r.key == key), None)
-        if item is None:
+        source_regions = layout.get_scene_regions(source)
+        region = next((r for r in source_regions if r.key == key), None)
+        if region is None:
             return False
-        layout.set_scene_regions(source, [r for r in src_list if r.key != key])
+        layout.set_scene_regions(
+            source, [r for r in source_regions if r.key != key])
         # target 已有同 key 的陈旧项先移除
-        dst_list = [r for r in layout.get_scene_regions(target) if r.key != key]
-        dst_list.append(item)
-        layout.set_scene_regions(target, dst_list)
+        target_regions = [
+            r for r in layout.get_scene_regions(target) if r.key != key]
+        target_regions.append(region)
+        layout.set_scene_regions(target, target_regions)
         return True
 
     if kind == "point":
-        src_list = layout.get_scene_points(source)
-        item = next((p for p in src_list if p.key == key), None)
-        if item is None:
+        source_points = layout.get_scene_points(source)
+        point = next((p for p in source_points if p.key == key), None)
+        if point is None:
             return False
-        layout.set_scene_points(source, [p for p in src_list if p.key != key])
-        dst_list = [p for p in layout.get_scene_points(target) if p.key != key]
-        dst_list.append(item)
-        layout.set_scene_points(target, dst_list)
+        layout.set_scene_points(
+            source, [p for p in source_points if p.key != key])
+        target_points = [
+            p for p in layout.get_scene_points(target) if p.key != key]
+        target_points.append(point)
+        layout.set_scene_points(target, target_points)
         # 箭头联动：from_key 随迁，to_key 烘焙为绝对坐标
         src_arrows = layout.get_scene_arrows(source)
         moved = [a for a in src_arrows if a.from_key == key]
@@ -332,8 +336,8 @@ def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key
         for a in remain:
             if a.to_key == key:
                 a.to_key = None
-                a.to_cx_ratio = item.cx_ratio
-                a.to_cy_ratio = item.cy_ratio
+                a.to_cx_ratio = point.cx_ratio
+                a.to_cy_ratio = point.cy_ratio
         layout.set_scene_arrows(source, remain)
         if moved:
             moved_keys = {a.key for a in moved}
@@ -343,14 +347,16 @@ def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key
         return True
 
     if kind == "panel":
-        src_list = layout.get_scene_panels(source)
-        item = next((p for p in src_list if p.key == key), None)
-        if item is None:
+        source_panels = layout.get_scene_panels(source)
+        panel = next((p for p in source_panels if p.key == key), None)
+        if panel is None:
             return False
-        layout.set_scene_panels(source, [p for p in src_list if p.key != key])
-        dst_list = [p for p in layout.get_scene_panels(target) if p.key != key]
-        dst_list.append(item)
-        layout.set_scene_panels(target, dst_list)
+        layout.set_scene_panels(
+            source, [p for p in source_panels if p.key != key])
+        target_panels = [
+            p for p in layout.get_scene_panels(target) if p.key != key]
+        target_panels.append(panel)
+        layout.set_scene_panels(target, target_panels)
         return True
 
     raise ValueError(f"未知迁移类型: {kind}")
@@ -769,4 +775,3 @@ class LayoutConfigManager:
     def set_active_layout(self, name: str):
         self._config["active_layout"] = name
         self._save_config()
-

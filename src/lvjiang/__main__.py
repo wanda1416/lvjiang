@@ -104,7 +104,7 @@ def main() -> int:
     from .app import run_app
 
     # 应用上次下载的在线配置。必须在**任何配置读取之前**：场景注册表与布局
-    # 都在启动时加载，晚一步这次启动就还是旧配置。失败不阻断启动——用出厂
+    # 都在启动时加载，晚一步这次启动就还是旧配置。失败不阻断启动——用系统
     # 配置本来就是可用状态。
     try:
         from lvjiang.core.config.remote import promote_pending

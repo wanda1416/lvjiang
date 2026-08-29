@@ -46,7 +46,7 @@ def describe_entity_version(rel_path: str) -> tuple[int | None, str]:
     )
 
     labels = {
-        LAYER_LOCAL: tr("用户"),
+        LAYER_LOCAL: tr("本地"),
         LAYER_REMOTE: tr("远程下发"),
         LAYER_SYSTEM: tr("系统"),
     }

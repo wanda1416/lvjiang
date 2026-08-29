@@ -137,7 +137,7 @@ class TestDeleteLayout:
         assert mgr.delete_layout("不存在") is False
 
     def test_user_mode_refuses_system_layout(self, env, monkeypatch):
-        """出厂布局属于 system 内容，用户模式下不可删除——不想用就别选它。"""
+        """系统布局属于 system 内容，用户模式下不可删除——不想用就别选它。"""
         import lvjiang.core.config.resolver as cr
 
         # 先在开发模式写 system
@@ -269,16 +269,16 @@ class TestAliasLayout:
         mgr = LayoutConfigManager()
         mgr.save_layout(_make_layout("根布局"))
         self._add_alias_entry(
-            env, "出厂别名", "根布局",
+            env, "系统别名", "根布局",
             {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1},
         )
         monkeypatch.setenv("LVJIANG_DEV_MODE", "0")
         monkeypatch.setattr(cr, "_resolver", None)
         user_mgr = LayoutConfigManager()
 
-        assert user_mgr.is_system_layout("出厂别名")
-        assert user_mgr.delete_layout("出厂别名") is False
-        assert "出厂别名" in user_mgr.list_layouts()
+        assert user_mgr.is_system_layout("系统别名")
+        assert user_mgr.delete_layout("系统别名") is False
+        assert "系统别名" in user_mgr.list_layouts()
         assert not (env / "local" / "layouts.yaml").exists()
 
     def test_new_layout_rejects_existing_alias_name(self, env):

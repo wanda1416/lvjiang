@@ -593,10 +593,6 @@ auto_strings:
   冠胄 · 胸甲: Head Guard · Chest Armor
   冲突: Conflict
   准备执行: Preparing to Run
-  出厂规则不可删除或修改 key；不使用时请取消启用: Factory rules cannot be deleted or have their key changed; disable them instead of deleting
-  出厂规则组不可删除: Factory rule groups cannot be deleted
-  出厂配置不可删除。如不需要，请改用停用/取消勾选。: Factory config cannot be deleted. If you don't need it, disable/uncheck it instead.
-  出厂配置不可删除，只能修改其取值；新增的条目可以删除。: Factory config cannot be deleted, only its value edited; entries you add can be deleted.
   分析失败: Analysis Failed
   分析当前配装的合法培养建议和词条敏感度: Analyze valid growth suggestions and affix sensitivity for the current build
   切换后扫描处理/材料处理/结束处理页同步对准该组，调律任务启动时以此为准: After switching, the Scan/Material/End Processing pages sync to this group; tuning tasks use this group when started
@@ -1077,6 +1073,10 @@ auto_strings:
   等级门槛 + 调律门槛 + 扫描/材料/结束处理，一组一套可切换；流派规则全局不受影响: Level threshold + tuning threshold + scan/material/end processing, one set per switchable group; playstyle rules are unaffected globally
   筛选中: Filtering
   精准率: Accuracy Rate
+  系统规则不可删除或修改 key；不使用时请取消启用: System rules cannot be deleted or have their key changed; disable them instead of deleting
+  系统规则组不可删除: System rule groups cannot be deleted
+  系统配置不可删除。如不需要，请改用停用/取消勾选。: System config cannot be deleted. If you don't need it, disable/uncheck it instead.
+  系统配置不可删除，只能修改其取值；新增的条目可以删除。: System config cannot be deleted, only its value edited; entries you add can be deleted.
   紫: Purple
   紫装: Purple Equipment
   紫装及以下: Purple Equipment and Below

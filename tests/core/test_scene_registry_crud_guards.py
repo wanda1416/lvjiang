@@ -45,7 +45,7 @@ def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
     scenes = system / "scenes"
     scenes.mkdir(parents=True)
     (scenes / "factory.yaml").write_text(
-        yaml.dump({"key": "factory", "name": "出厂场景", "regions": []},
+        yaml.dump({"key": "factory", "name": "系统场景", "regions": []},
                   allow_unicode=True),
         encoding="utf-8",
     )
@@ -61,7 +61,7 @@ def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
     scene = registry.get_scene("factory")
     assert scene is not None
     assert scene.key == "factory"
-    assert scene.name == "出厂场景"
+    assert scene.name == "系统场景"
 
 
 def test_explicit_scene_version_is_written_only_when_saved(tmp_path):
@@ -72,7 +72,7 @@ def test_explicit_scene_version_is_written_only_when_saved(tmp_path):
     path = scenes / "factory.yaml"
     path.write_text(
         yaml.dump(
-            {"content_version": 2, "key": "factory", "name": "出厂场景"},
+            {"content_version": 2, "key": "factory", "name": "系统场景"},
             allow_unicode=True,
             sort_keys=False,
         ),

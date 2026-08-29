@@ -150,7 +150,7 @@ class ReferenceManagerDialog(QDialog):
     # ── 图库空间切换 ──
 
     def _fill_space_combo(self):
-        """填充空间下拉：出厂空间置灰（用户层只能覆盖内容，不能删除该空间）"""
+        """填充空间下拉：系统空间置灰（用户层只能覆盖内容，不能删除该空间）"""
         from PyQt6.QtGui import QBrush, QColor
         user_mode = self._db.is_user_mode()
         self._space_combo.clear()
@@ -163,7 +163,7 @@ class ReferenceManagerDialog(QDialog):
                 continue
             item = model.item(row)
             item.setForeground(QBrush(QColor(Qt.GlobalColor.gray)))
-            item.setToolTip(tr("出厂空间：可编辑其中内容，但不能删除该空间"))
+            item.setToolTip(tr("系统空间：可编辑其中内容，但不能删除该空间"))
 
     def _refresh_del_space_enabled(self):
         """删除按钮跟随下拉选中项：不可删时禁用并把原因写进 tooltip"""

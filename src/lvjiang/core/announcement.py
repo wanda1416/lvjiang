@@ -1,6 +1,6 @@
 """远程公告获取、校验、版本筛选与 Session 状态管理。
 
-公告通过 GitHub Pages 静态 JSON 下发，不依赖 GitHub API。远端
+公告通过 GitHub Pages 静态 JSON 下发，不依赖 GitHub API。远程
 ``notice_version`` 必须单调递增；客户端只在版本推进且存在适用于当前
 客户端的公告时自动展示。公告缓存与最后已处理版本存放在
 ``session.json/server_config.announcement``。
@@ -90,7 +90,7 @@ def _valid_https_url(value: str) -> bool:
 
 
 def parse_announcement_manifest(data: dict[str, Any]) -> AnnouncementManifest:
-    """校验并解析远端公告清单。未知字段忽略，不做旧协议兼容。"""
+    """校验并解析远程公告清单。未知字段忽略，不做旧协议兼容。"""
     if not isinstance(data, dict):
         raise AnnouncementError("公告清单必须是 JSON 对象")
 
@@ -260,7 +260,7 @@ def should_prompt_manifest(
     manifest: AnnouncementManifest,
     app_version: str | None = None,
 ) -> bool:
-    """只有远端公告版本推进且存在适用公告时才自动提示。"""
+    """只有远程公告版本推进且存在适用公告时才自动提示。"""
     return (
         manifest.notice_version > get_last_notice_version()
         and bool(applicable_notices(manifest, app_version))

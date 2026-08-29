@@ -4,7 +4,7 @@
 见 tests/core/test_remote_config_sync.py。两件事混在一起调试会很痛苦。
 
 核心断言是 **remote 不是无条件优先**：它只在 content_version 严格新于
-system 时才生效。用户升了 App、system 带来更新的坐标，而远端还停在给旧
+system 时才生效。用户升了 App、system 带来更新的坐标，而远程还停在给旧
 版本热修的旧配置——无脑覆盖会把配置静默回退，这正是要防的事故。
 """
 from __future__ import annotations
@@ -52,38 +52,38 @@ def _read_marker(path) -> str:
 
 class TestRemoteVersionGate:
     def test_newer_remote_supersedes_system(self, dirs):
-        _write_scene(dirs[0], "a.yaml", 1, "出厂")
-        _write_scene(dirs[2], "a.yaml", 2, "远端")
+        _write_scene(dirs[0], "a.yaml", 1, "系统")
+        _write_scene(dirs[2], "a.yaml", 2, "远程")
         r = _resolver(dirs)
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "远端"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "远程"
 
     def test_older_remote_does_not_regress_system(self, dirs):
-        """本设计的核心回归点：升级后 system 更新，远端旧配置不得盖回来。"""
-        _write_scene(dirs[0], "a.yaml", 5, "出厂新版")
-        _write_scene(dirs[2], "a.yaml", 3, "远端旧版")
+        """本设计的核心回归点：升级后 system 更新，远程旧配置不得盖回来。"""
+        _write_scene(dirs[0], "a.yaml", 5, "系统新版")
+        _write_scene(dirs[2], "a.yaml", 3, "远程旧版")
         r = _resolver(dirs)
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "出厂新版"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "系统新版"
 
     def test_equal_version_keeps_system(self, dirs):
         """同版本视为同内容，不换——换了也没意义，只会多一次读盘。"""
-        _write_scene(dirs[0], "a.yaml", 4, "出厂")
-        _write_scene(dirs[2], "a.yaml", 4, "远端")
+        _write_scene(dirs[0], "a.yaml", 4, "系统")
+        _write_scene(dirs[2], "a.yaml", 4, "远程")
         r = _resolver(dirs)
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "出厂"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "系统"
 
     def test_system_without_version_refuses_remote(self, dirs):
         """fail-safe：漏给某个文件加字段的后果是「收不到在线更新」，
-        而不是「被远端悄悄接管」。前者能被发现，后者不能。"""
-        _write_scene(dirs[0], "a.yaml", None, "出厂无版本号")
-        _write_scene(dirs[2], "a.yaml", 99, "远端")
+        而不是「被远程悄悄接管」。前者能被发现，后者不能。"""
+        _write_scene(dirs[0], "a.yaml", None, "系统无版本号")
+        _write_scene(dirs[2], "a.yaml", 99, "远程")
         r = _resolver(dirs)
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "出厂无版本号"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "系统无版本号"
 
     def test_remote_without_version_ignored(self, dirs):
-        _write_scene(dirs[0], "a.yaml", 1, "出厂")
-        _write_scene(dirs[2], "a.yaml", None, "远端无版本号")
+        _write_scene(dirs[0], "a.yaml", 1, "系统")
+        _write_scene(dirs[2], "a.yaml", None, "远程无版本号")
         r = _resolver(dirs)
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "出厂"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "系统"
 
     def test_unregistered_path_never_uses_remote(self, dirs):
         """没在 versioning 注册的路径（如 workflows/*.wf）不参与在线下发。"""
@@ -100,8 +100,8 @@ class TestRemoteVersionGate:
 class TestLocalStillWins:
     def test_local_beats_newer_remote(self, dirs):
         """用户自己改过的东西，任何在线下发都不该盖掉。"""
-        _write_scene(dirs[0], "a.yaml", 1, "出厂")
-        _write_scene(dirs[2], "a.yaml", 99, "远端")
+        _write_scene(dirs[0], "a.yaml", 1, "系统")
+        _write_scene(dirs[2], "a.yaml", 99, "远程")
         _write_scene(dirs[1], "a.yaml", 1, "用户改的")
         r = _resolver(dirs)
         assert _read_marker(r.resolve_read("scenes/a.yaml")) == "用户改的"
@@ -114,20 +114,20 @@ class TestLocalStillWins:
         assert _resolver(dirs).resolve_read("scenes/a.yaml") is None
 
 
-# ─── 远端新增文件 ────────────────────────────────────────
+# ─── 远程新增文件 ────────────────────────────────────────
 
 class TestRemoteNewFiles:
     def test_rejected_where_not_allowed(self, dirs):
-        """scenes/ 不允许远端新增：新场景要在 scenes.yaml 登记才有意义，
-        而注册表走发版；远端凭空多的场景文件是死的。"""
-        _write_scene(dirs[2], "新场景.yaml", 1, "远端新增")
+        """scenes/ 不允许远程新增：新场景要在 scenes.yaml 登记才有意义，
+        而注册表走发版；远程凭空多的场景文件是死的。"""
+        _write_scene(dirs[2], "新场景.yaml", 1, "远程新增")
         r = _resolver(dirs)
         assert r.resolve_read("scenes/新场景.yaml") is None
         assert "新场景.yaml" not in r.enumerate_entities("scenes", "*.yaml")
 
     def test_allowed_where_declared(self, dirs, monkeypatch):
         """allow_remote_new=True 的目录（燕云 yysls/tuning_rules）可以
-        接收全新文件——远端下发一条新调律规则能直接生效。"""
+        接收全新文件——远程下发一条新调律规则能直接生效。"""
         monkeypatch.setitem(
             versioning.VERSIONED_DIRS, "demo_rules",
             versioning.VersionedDir("demo_rules", "*.yaml", 1, allow_remote_new=True))
@@ -151,7 +151,7 @@ class TestEnumerateAndProtection:
         assert r.enumerate_entities("scenes", "*.yaml") == ["a.yaml"]
 
     def test_remote_entity_counts_as_factory_content(self, dirs, monkeypatch):
-        """远端下发的实体也是作者内容，用户模式下不可删。"""
+        """远程下发的实体也是作者内容，用户模式下不可删。"""
         monkeypatch.setitem(
             versioning.VERSIONED_DIRS, "demo_rules",
             versioning.VersionedDir("demo_rules", "*.yaml", 1, allow_remote_new=True))
@@ -171,7 +171,7 @@ class TestWritePreservesVersion:
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 3
 
     def test_unchanged_content_keeps_version(self, dirs):
-        """打开编辑器又原样关掉不该推高版本，否则远端侧分不清真改动。"""
+        """打开编辑器又原样关掉不该推高版本，否则远程侧分不清真改动。"""
         _write_scene(dirs[0], "a.yaml", 3, "同样的内容")
         r = _resolver(dirs, dev_mode=True)
         r.write_entity("scenes/a.yaml", "key: a\nname: 同样的内容\n")
@@ -184,7 +184,7 @@ class TestWritePreservesVersion:
 
     def test_user_mode_does_not_touch_version(self, dirs):
         """local 影子恒为最高优先级，不参与 system/remote 的版本比较。"""
-        _write_scene(dirs[0], "a.yaml", 3, "出厂")
+        _write_scene(dirs[0], "a.yaml", 3, "系统")
         r = _resolver(dirs, dev_mode=False)
         r.write_entity("scenes/a.yaml", "key: a\nname: 用户改的\n")
         assert versioning.read_version(dirs[1] / "scenes" / "a.yaml") is None
@@ -237,10 +237,10 @@ class TestDevModeSeesRemote:
     """
 
     def test_dev_mode_reads_remote_like_users_do(self, dirs):
-        _write_scene(dirs[0], "a.yaml", 2, "出厂")
-        _write_scene(dirs[2], "a.yaml", 3, "远端")
+        _write_scene(dirs[0], "a.yaml", 2, "系统")
+        _write_scene(dirs[2], "a.yaml", 3, "远程")
         r = _resolver(dirs, dev_mode=True)
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "远端"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "远程"
 
     def test_supersede_is_logged_once_per_version(self, dirs):
         """静默生效 = 开发者意识不到，所以顶替时必须留痕；但 resolve_read
@@ -252,8 +252,8 @@ class TestDevModeSeesRemote:
 
         from loguru import logger
 
-        _write_scene(dirs[0], "a.yaml", 2, "出厂")
-        _write_scene(dirs[2], "a.yaml", 3, "远端")
+        _write_scene(dirs[0], "a.yaml", 2, "系统")
+        _write_scene(dirs[2], "a.yaml", 3, "远程")
         r = _resolver(dirs)
         buf = io.StringIO()
         sink_id = logger.add(buf, level="INFO")
@@ -265,27 +265,27 @@ class TestDevModeSeesRemote:
             logger.remove(sink_id)
         output = buf.getvalue()
         assert output.count("[在线配置] 生效") == 1
-        assert "出厂 v2" in output and "远端 v3" in output
+        assert "系统 v2" in output and "远程 v3" in output
 
     def test_edit_over_remote_beats_published_version(self, dirs):
-        """开发者基于远端 v3 的内容改一版，不能写出同为 v3 的另一份内容
+        """开发者基于远程 v3 的内容改一版，不能写出同为 v3 的另一份内容
         ——版本号必须唯一标识内容，否则仓库和线上的 v3 是两个东西。"""
-        _write_scene(dirs[0], "a.yaml", 2, "出厂")
-        _write_scene(dirs[2], "a.yaml", 3, "远端")
+        _write_scene(dirs[0], "a.yaml", 2, "系统")
+        _write_scene(dirs[2], "a.yaml", 3, "远程")
         r = _resolver(dirs, dev_mode=True)
         target = r.next_entity_version("scenes/a.yaml")
         r.write_entity(
-            "scenes/a.yaml", "key: a\nname: 我基于远端改的\n",
+            "scenes/a.yaml", "key: a\nname: 我基于远程改的\n",
             content_version=target)
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 4
         # 改动立刻生效，不用等"版本号追上线上"
-        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "我基于远端改的"
+        assert _read_marker(r.resolve_read("scenes/a.yaml")) == "我基于远程改的"
 
     def test_unchanged_content_still_lifts_over_remote(self, dirs):
-        """内容没变但被更新的远端压着时也要抬版本号——否则出厂那份永远
+        """内容没变但被更新的远程压着时也要抬版本号——否则系统那份永远
         显示不出来，开发者会以为自己的文件没生效。"""
         _write_scene(dirs[0], "a.yaml", 2, "同样的内容")
-        _write_scene(dirs[2], "a.yaml", 5, "远端")
+        _write_scene(dirs[2], "a.yaml", 5, "远程")
         r = _resolver(dirs, dev_mode=True)
         target = r.next_entity_version("scenes/a.yaml")
         r.write_entity(
@@ -335,7 +335,7 @@ class TestDescribeEntity:
         assert (origin.layer, origin.version) == ("", None)
 
     def test_dev_mode_reports_remote_too(self, dirs):
-        """开发者必须看得到远端顶替，否则复现不出用户的问题。"""
+        """开发者必须看得到远程顶替，否则复现不出用户的问题。"""
         _write_scene(dirs[0], "a.yaml", 2)
         _write_scene(dirs[2], "a.yaml", 7)
         origin = _resolver(dirs, dev_mode=True).describe_entity("scenes/a.yaml")

@@ -2,7 +2,7 @@
 
 1. 纯逻辑：id 校验、模板、语法检查、目录树合并视图、落盘校验
 2. 对话框（qtbot，输入框/确认框打桩）：新建 → 文件落盘且进树；改文本保存；删除；
-   出厂只读 + 复制到本地
+   系统只读 + 复制到本地
 resolver 指向 tmp 的 system/local 双层目录，不碰真实配置。
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ def dirs(tmp_path, monkeypatch):
     local = tmp_path / "local"
     (system / "workflows").mkdir(parents=True)
     (local / "workflows").mkdir(parents=True)
-    (system / "workflows" / "factory.wf").write_text("#% name: 出厂\nlog \"hi\"\n", encoding="utf-8")
+    (system / "workflows" / "factory.wf").write_text("#% name: 系统\nlog \"hi\"\n", encoding="utf-8")
     (system / "workflows" / "_tmp.wf").write_text("log \"skip\"\n", encoding="utf-8")
     (system / "workflows" / "subcall").mkdir()
     (system / "workflows" / "subcall" / "nav.wf").write_text("log \"nav\"\n", encoding="utf-8")
@@ -200,6 +200,13 @@ class TestDialog:
         assert dlg._current.rel_path == "subcall/nav.wf"
         assert "nav" in dlg.editor.toPlainText()
 
+    def test_nodes_carry_icons(self, qtbot, dev_resolver):
+        """目录/文件靠图标区分，不靠往文字里塞标记"""
+        dlg = self._dialog(qtbot, pytest.MonkeyPatch())
+        assert not dlg._dir_items["subcall"].icon(0).isNull()
+        assert not dlg._file_items["factory.wf"].icon(0).isNull()
+        assert dlg.tree.indentation() > 0
+
     def test_directories_start_collapsed(self, qtbot, dev_resolver):
         dlg = self._dialog(qtbot, pytest.MonkeyPatch())
         assert not dlg._dir_items["subcall"].isExpanded()
@@ -256,10 +263,10 @@ class TestDialog:
     def test_edit_save_writes_and_validates(self, qtbot, dev_resolver, dirs, monkeypatch):
         dlg = self._dialog(qtbot, monkeypatch)
         self._select(dlg, "factory.wf")
-        dlg.editor.setPlainText('#% name: 出厂\nlog "changed"')
+        dlg.editor.setPlainText('#% name: 系统\nlog "changed"')
         assert dlg._dirty and dlg.btn_save.isEnabled()
         dlg._on_save()
-        assert (dirs[0] / "workflows" / "factory.wf").read_text(encoding="utf-8") == '#% name: 出厂\nlog "changed"\n'
+        assert (dirs[0] / "workflows" / "factory.wf").read_text(encoding="utf-8") == '#% name: 系统\nlog "changed"\n'
         assert not dlg._dirty
         assert "已保存" in dlg.lbl_status.text()
 
@@ -270,7 +277,7 @@ class TestDialog:
         dlg._on_save()
         assert "校验未通过" in dlg.lbl_status.text()
 
-    # ─── 出厂只读 / 复制到本地 ───────────────────────
+    # ─── 系统只读 / 复制到本地 ───────────────────────
 
     def test_user_mode_factory_is_read_only(self, qtbot, user_resolver, monkeypatch):
         dlg = self._dialog(qtbot, monkeypatch)
@@ -280,7 +287,7 @@ class TestDialog:
         assert "只读" in dlg.lbl_status.text()
 
     def test_user_mode_save_on_factory_refused(self, qtbot, user_resolver, dirs, monkeypatch):
-        """只读拦在保存这一步：不能悄悄给出厂文件生成 local 影子"""
+        """只读拦在保存这一步：不能悄悄给系统文件生成 local 影子"""
         dlg = self._dialog(qtbot, monkeypatch)
         self._select(dlg, "factory.wf")
         dlg.editor.setReadOnly(False)      # 绕过 UI 置灰，直接打服务端那道闸
@@ -296,11 +303,11 @@ class TestDialog:
         assert (dirs[1] / "workflows" / "factory.wf").exists()
         assert dlg._current.layer == "local" and dlg._current.file.overrides_system
         assert not dlg.editor.isReadOnly()
-        dlg.editor.setPlainText('#% name: 出厂\nlog "mine"')
+        dlg.editor.setPlainText('#% name: 系统\nlog "mine"')
         dlg._on_save()
         assert 'log "mine"' in (dirs[1] / "workflows" / "factory.wf").read_text(encoding="utf-8")
         assert (dirs[0] / "workflows" / "factory.wf").read_text(encoding="utf-8") == \
-            '#% name: 出厂\nlog "hi"\n'                 # system 原样未动
+            '#% name: 系统\nlog "hi"\n'                 # system 原样未动
 
     def test_copy_to_local_works_in_subdir(self, qtbot, user_resolver, dirs, monkeypatch):
         dlg = self._dialog(qtbot, monkeypatch)
@@ -310,12 +317,12 @@ class TestDialog:
         assert _rels(dlg).count("subcall/nav.wf") == 1   # 合并视图仍只有一个节点
 
     def test_shadow_cannot_be_deleted(self, qtbot, user_resolver, dirs, monkeypatch):
-        """出厂脚本的本地副本删不掉——删了这个实体就没了，走还原那条路"""
+        """系统脚本的本地副本删不掉——删了这个实体就没了，走还原那条路"""
         dlg = self._dialog(qtbot, monkeypatch)
         self._select(dlg, "factory.wf")
         dlg._copy_to_local(dlg._current)
         assert not dlg.btn_delete.isEnabled()
-        assert "还原为出厂" in dlg.btn_delete.toolTip()
+        assert "还原为系统" in dlg.btn_delete.toolTip()
         dlg._on_delete()
         assert (dirs[1] / "workflows" / "factory.wf").exists()   # 未被删
 
@@ -324,16 +331,16 @@ class TestDialog:
         dlg = self._dialog(qtbot, monkeypatch)
         self._select(dlg, "factory.wf")
         dlg._copy_to_local(dlg._current)
-        dlg.editor.setPlainText('#% name: 出厂\nlog "broken"')
+        dlg.editor.setPlainText('#% name: 系统\nlog "broken"')
         dlg._on_save()
         dlg._revert_to_system(dlg._current)
         assert not (dirs[1] / "workflows" / "factory.wf").exists()
         assert dlg._current.layer == "system" and dlg.editor.isReadOnly()
-        assert 'log "hi"' in dlg.editor.toPlainText()             # 读回出厂内容
+        assert 'log "hi"' in dlg.editor.toPlainText()             # 读回系统内容
         assert "factory.wf" in _rels(dlg)
 
     def test_local_only_script_is_deletable(self, qtbot, user_resolver, dirs, monkeypatch):
-        """纯本地脚本没有出厂版本，正常可删"""
+        """纯本地脚本没有系统版本，正常可删"""
         (dirs[1] / "workflows" / "mine.wf").write_text('log "m"\n', encoding="utf-8")
         dlg = self._dialog(qtbot, monkeypatch)
         self._select(dlg, "mine.wf")
@@ -343,14 +350,14 @@ class TestDialog:
         assert "mine.wf" not in _rels(dlg)
 
     def test_origin_label_follows_layer_not_writability(self, qtbot, dev_resolver):
-        """开发模式下 system 可写，但它仍是出厂内容，标签不能写成「本地」"""
+        """开发模式下 system 可写，但它仍是系统内容，标签不能写成「本地」"""
         dlg = self._dialog(qtbot, pytest.MonkeyPatch())
         self._select(dlg, "factory.wf")
-        assert dlg.lbl_layer.text().startswith("出厂")
+        assert dlg.lbl_layer.text().startswith("系统")
         assert not dlg.editor.isReadOnly()          # 开发模式确实可写
 
     def test_unlock_keeps_factory_read_only(self, qtbot, user_resolver, monkeypatch):
-        """调试跑完解锁编辑区，不能顺手把只读的出厂脚本也放开"""
+        """调试跑完解锁编辑区，不能顺手把只读的系统脚本也放开"""
         dlg = self._dialog(qtbot, monkeypatch)
         self._select(dlg, "factory.wf")
         dlg.set_locked(True)

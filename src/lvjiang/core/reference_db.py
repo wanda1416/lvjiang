@@ -16,7 +16,7 @@
 文件随机分配到某个桶，YAML 中 file 字段只存文件名（不含桶路径）。
 用户可自由移动文件到任意桶，代码均能感知。
 
-system 层出现过的空间名即出厂空间：用户层只能覆盖其内容，不能删除该空间。
+system 层出现过的空间名即系统空间：用户层只能覆盖其内容，不能删除该空间。
 读取恒为合并视图：system 条目（deleted 剔除、同 file 被 local 条目替换）
 + local 独有条目；meta_schema 用户层存在即整列表替换。
 写入按模式路由（开发→system，用户→local），与 ConfigResolver 同一套模式判定。
@@ -196,7 +196,7 @@ class ReferenceDatabase:
         self._session_store_cache = None  # 仅 session_path override 时使用的独立 store
         # 空间状态
         self._spaces: list[str] = []
-        self._system_spaces: set[str] = set()  # system 层扫出的出厂空间
+        self._system_spaces: set[str] = set()  # system 层扫出的系统空间
         self._space: str = DEFAULT_SPACE
         # 分层状态
         self._system_entries: list[ReferenceEntry] = []
@@ -244,7 +244,7 @@ class ReferenceDatabase:
 
     @property
     def system_spaces_dir(self) -> Path:
-        """system 层空间根目录（扫描 *.yaml 得出厂空间列表）"""
+        """system 层空间根目录（扫描 *.yaml 得系统空间列表）"""
         if self._system_spaces_dir_override is not None:
             return self._system_spaces_dir_override
         return get_resolver().system_dir / "references"
@@ -371,11 +371,11 @@ class ReferenceDatabase:
         return list(self._spaces)
 
     def is_system_space(self, name: str) -> bool:
-        """该空间是否由 system 层定义（出厂内容，用户层只能覆盖不能删除）"""
+        """该空间是否由 system 层定义（系统内容，用户层只能覆盖不能删除）"""
         return str(name or "").strip() in self._system_spaces
 
     def is_user_mode(self) -> bool:
-        """当前是否为用户模式（写 local 层；出厂内容只能覆盖不能删除）"""
+        """当前是否为用户模式（写 local 层；系统内容只能覆盖不能删除）"""
         return not self._is_dev()
 
     def get_active_space(self) -> str:
@@ -431,7 +431,7 @@ class ReferenceDatabase:
         if name not in self._spaces:
             return tr("空间不存在")
         if self.is_user_mode() and self.is_system_space(name):
-            return tr("出厂空间不可删除，可新建自己的空间")
+            return tr("系统空间不可删除，可新建自己的空间")
         if len(self._spaces) <= 1:
             return tr("至少保留一个图库空间")
         return ""
@@ -439,7 +439,7 @@ class ReferenceDatabase:
     def delete_space(self, name: str) -> bool:
         """删除图库空间（yaml + 同名图片目录）
 
-        用户模式只清 local 层且拒绝出厂空间；开发模式两层一起清，
+        用户模式只清 local 层且拒绝系统空间；开发模式两层一起清，
         避免 system 层删掉后残留 local 覆盖层变成一个孤儿空间。
         删的是激活空间时自动改激活并重载。
         """
@@ -487,7 +487,7 @@ class ReferenceDatabase:
         return True
 
     def _refresh_spaces(self) -> None:
-        """重扫两层空间根目录，重建空间列表与出厂空间集合"""
+        """重扫两层空间根目录，重建空间列表与系统空间集合"""
         system_spaces = self._scan_spaces(self.system_spaces_dir)
         local_spaces = self._scan_spaces(self.local_spaces_dir)
         self._system_spaces = set(system_spaces)
@@ -793,16 +793,16 @@ class ReferenceDatabase:
     def remove_entry(self, filename: str, delete_file: bool = True) -> bool:
         """删除条目
 
-        开发模式直删所在层。用户模式下只能删自己的 local 条目；出厂条目属于
+        开发模式直删所在层。用户模式下只能删自己的 local 条目；系统条目属于
         system 内容，不允许删除——想要一套自己的图请**新建图库空间**，
-        而不是把出厂图去掉（详见 docs/30-architecture/05-config-layering.md）。
+        而不是把系统图去掉（详见 docs/30-architecture/05-config-layering.md）。
 
         Args:
             filename: 目标文件路径（相对路径）
             delete_file: 是否同时删除可写层的图片文件
 
         Raises:
-            SystemContentProtected: 用户模式下试图删除出厂条目
+            SystemContentProtected: 用户模式下试图删除系统条目
 
         Returns:
             是否找到并删除
@@ -815,7 +815,7 @@ class ReferenceDatabase:
         if system_entry is not None and not self._is_dev():
             from .config.resolver import SystemContentProtected
             raise SystemContentProtected(
-                f"参考图 {filename} 由出厂图库提供，用户模式下不可删除；"
+                f"参考图 {filename} 由系统图库提供，用户模式下不可删除；"
                 f"如需自己的一套请新建图库空间")
 
         if local_entry is not None:

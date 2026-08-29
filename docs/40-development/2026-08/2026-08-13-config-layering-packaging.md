@@ -16,7 +16,7 @@
 - core 模块拆分——数据类独立建文件 + 模块重命名：删除零导入死代码 `material_db.py`，新建 `layout_models.py` 从 `scene_registry.py` 抽出运行时布局数据类（`CanvasConfig`/`FoundRegion`/`Region`/`Point`/`Arrow`/`Panel`/`Layout`），`scene_registry.py` 仅保留注册表全局函数（`b04740b`）；
 - 日常配置持久化 + 插件 session 合并 + 开关注册表动态刷新——日常页脚本选择与参数持久化到 `session.json` 的 daily 节点，`PluginSession` 从独立文件改为读写主 `session.json` 的 yysls 顶层节点（`bab1d06`）；
 - yysls 模块命名与结构优化——文件重命名消除歧义 + 统一静态/动态命名原则，如 `plugin_session.py → session.py`（`e7ad75d`）；
-- 输入模拟配置重构 `DelayConfig`→`InputSimConfig`：`DelayConfig` 重命名为 `InputSimConfig`（只含点击/移动/抖动参数），`CustomDelay` 重命名为 `DelayParam` 并独立为顶层类，命名等待参数（`delay_params`）从 `session.json` 迁移到 `app.yaml` 随版本分发，`UserConfig.input_delay` 重命名为 `input_sim` + `delay_params`，各输入后端（ADB/SendInput/PostMessage/OnDevice）统一使用 `_inject_input_sim`，新增 `config/system/app.yaml` 承载出厂默认（`dc83a52`）；
+- 输入模拟配置重构 `DelayConfig`→`InputSimConfig`：`DelayConfig` 重命名为 `InputSimConfig`（只含点击/移动/抖动参数），`CustomDelay` 重命名为 `DelayParam` 并独立为顶层类，命名等待参数（`delay_params`）从 `session.json` 迁移到 `app.yaml` 随版本分发，`UserConfig.input_delay` 重命名为 `input_sim` + `delay_params`，各输入后端（ADB/SendInput/PostMessage/OnDevice）统一使用 `_inject_input_sim`，新增 `config/system/app.yaml` 承载系统默认（`dc83a52`）；
 - 修复 `active_layout` 未指定时自动回退到第一个可用布局——`session.json` 不存在时 `active_layout` 为空字符串导致加载路径报错，`get_active_layout_name()` 为空时自动枚举布局文件并选择第一个（`c88fd06`）；
 - 布局下拉列表保持 YAML 定义顺序而非字典序（`9e73145`）；
 - `ConfigResolver` `dev_mode` 构造时缓存（`cf2d586`）；

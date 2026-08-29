@@ -1,6 +1,6 @@
 """旧 local/workflows.yaml → session 的一次性迁移
 
-0.5.4 之前顺序/勾选/显示名存在配置层，会把出厂新增脚本冻住。迁移把它搬进
+0.5.4 之前顺序/勾选/显示名存在配置层，会把系统新增脚本冻住。迁移把它搬进
 session 并归档旧文件。本文件随迁移代码一起删除。
 """
 
@@ -72,7 +72,7 @@ class TestMigration:
 
     def test_only_positive_visibility_migrated(self, monkeypatch, tmp_path):
         """旧 exposed 只搬正向勾选：分不清「用户取消了」和「当时还不存在」，
-        宁可多显示也不静默藏掉出厂新增的脚本。"""
+        宁可多显示也不静默藏掉系统新增的脚本。"""
         store, _ = _setup(monkeypatch, tmp_path, {"exposed": ["a"]})
         prefs_mod.migrate_legacy_workflows_yaml()
         assert store.nodes["daily"]["scripts"]["visible"] == {"a": True}

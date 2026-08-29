@@ -1,12 +1,12 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "back",
-      "x_ratio": 0.9113436208662246,
-      "y_ratio": 0,
+      "x_ratio": 0.9277215206713241,
+      "y_ratio": 0.030608677328828025,
       "w_ratio": 0.03275579961019903,
-      "h_ratio": 0.0712398023669999
+      "h_ratio": 0.05752816105917287
     },
     {
       "key": "claim_all",

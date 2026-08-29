@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QTabWidget,
+    QWidget,
 )
 
 from ...core.config.resolver import get_resolver
@@ -31,6 +32,14 @@ from .scene_tab import SceneTab
 
 # key 格式校验：小写字母开头，仅含小写字母/数字/下划线
 _RE_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+class _SceneTabPlaceholder(QWidget):
+    """只占一个 Tab 位置；真正编辑器在用户首次访问时才构建。"""
+
+    def __init__(self, scene_key: str):
+        super().__init__()
+        self.scene_key = scene_key
 
 
 class SceneOpsMixin:
@@ -70,7 +79,7 @@ class SceneOpsMixin:
         self._group_tab_widget.blockSignals(False)
 
     def _rebuild_scene_tabs(self, group_key: str):
-        """重建指定分组下的场景 Tab（二级 Tab）"""
+        """只重建场景标题；重量级 SceneTab 在首次访问时创建。"""
         scene_tab_widget = self._group_tabs.get(group_key)
         if scene_tab_widget is None:
             return
@@ -79,17 +88,51 @@ class SceneOpsMixin:
         registry = get_registry()
         for scene_key in registry.get_group_scenes(group_key):
             scene_name = get_scene_name(scene_key)
-            tab = SceneTab(scene_key)
-            tab.on_item_migrated = self._on_item_migrated
-            # 恢复 Tab 内部分割器尺寸（延迟应用）
-            if hasattr(self, '_pending_tab_split'):
-                ps = self._pending_tab_split
-                if isinstance(ps, list) and len(ps) == 2 and all(s > 0 for s in ps):
-                    tab._splitter.setSizes([int(s) for s in ps])
-            self._tabs[scene_key] = tab
-            idx = scene_tab_widget.addTab(tab, scene_name)
+            placeholder = _SceneTabPlaceholder(scene_key)
+            idx = scene_tab_widget.addTab(placeholder, scene_name)
             scene_tab_widget.setTabToolTip(idx, scene_key)
         scene_tab_widget.blockSignals(False)
+
+    def _ensure_scene_tab_loaded(self, scene_key: str) -> SceneTab | None:
+        """首次访问场景时用真正的 SceneTab 原位替换轻量占位页。"""
+        if not scene_key:
+            return None
+        loaded = self._tabs.get(scene_key)
+        if loaded is not None:
+            return loaded
+
+        registry = get_registry()
+        group_key = registry.get_scene_group(scene_key)
+        scene_tab_widget = self._group_tabs.get(group_key or "")
+        if scene_tab_widget is None:
+            return None
+        scene_keys = registry.get_group_scenes(group_key) if group_key else []
+        if scene_key not in scene_keys:
+            return None
+        index = scene_keys.index(scene_key)
+        old_widget = scene_tab_widget.widget(index)
+        title = scene_tab_widget.tabText(index)
+        tooltip = scene_tab_widget.tabToolTip(index)
+
+        tab = SceneTab(scene_key)
+        tab.on_item_migrated = self._on_item_migrated
+        if hasattr(self, '_pending_tab_split'):
+            ps = self._pending_tab_split
+            if isinstance(ps, list) and len(ps) == 2 and all(s > 0 for s in ps):
+                tab._splitter.setSizes([int(s) for s in ps])
+
+        signals_blocked = scene_tab_widget.blockSignals(True)
+        scene_tab_widget.removeTab(index)
+        scene_tab_widget.insertTab(index, tab, title)
+        scene_tab_widget.setTabToolTip(index, tooltip)
+        scene_tab_widget.setCurrentIndex(index)
+        scene_tab_widget.blockSignals(signals_blocked)
+        if old_widget is not None:
+            old_widget.deleteLater()
+
+        self._tabs[scene_key] = tab
+        self._bind_scene_tab(scene_key, tab)
+        return tab
 
     # ─── 当前场景辅助 ────────────────────────────────────
 
@@ -104,8 +147,8 @@ class SceneOpsMixin:
         if scene_tab_widget is None:
             return ""
         scene_idx = scene_tab_widget.currentIndex()
-        widget = scene_tab_widget.widget(scene_idx) if scene_idx >= 0 else None
-        return widget.scene_key if isinstance(widget, SceneTab) else ""
+        scene_keys = get_registry().get_group_scenes(group_key)
+        return scene_keys[scene_idx] if 0 <= scene_idx < len(scene_keys) else ""
 
     def _current_group_key(self) -> str:
         """获取当前激活的分组 key"""
@@ -435,12 +478,10 @@ class SceneOpsMixin:
         logger.info(f"分组顺序已更新: {new_order}")
 
     def _on_group_tab_changed(self, index: int):
-        """分组 Tab 切换：按需加载新可见场景的底图 + 刷新尺寸信息
-
-        向量数据已在 _apply_layout_to_tabs 时全量下发，无需重新应用布局（
-        重新应用会抹除未保存编辑并重读全部截图），只需懒加载当前底图。
-        """
-        self._ensure_tab_image(self._get_current_scene_key())
+        """分组 Tab 切换：按需创建当前场景编辑器并加载底图。"""
+        scene_key = self._get_current_scene_key()
+        self._ensure_scene_tab_loaded(scene_key)
+        self._ensure_tab_image(scene_key)
         self._update_info_label()
 
     # ─── 场景 Tab 右键菜单 ────────────────────────────────
@@ -633,8 +674,9 @@ class SceneOpsMixin:
         new_order = []
         for i in range(scene_tab_widget.count()):
             widget = scene_tab_widget.widget(i)
-            if isinstance(widget, SceneTab):
-                new_order.append(widget.scene_key)
+            scene_key = getattr(widget, "scene_key", "")
+            if scene_key:
+                new_order.append(scene_key)
         # 合并所有分组的顺序
         registry = get_registry()
         all_order = []

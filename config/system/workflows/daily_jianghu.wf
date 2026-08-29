@@ -98,7 +98,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
          call action_dongfang($label, $idx)
       end
       if $task_text contains "醉意"
-         call $action_result = action_zuiyi($label)
+         call $action_result = action_zuiyi($label, $idx)
       end
       if $task_text contains "觉障林"
          call action_juezhanglin($label)
@@ -342,7 +342,7 @@ def do_kanbao()
 end
 
 # 饮酒（醉意）：号令 → 退回首页 → 菜单 → 包裹 → 道具 - 普通道具 → 找黄泉酿食用 → 退回首页 → 返回号令
-def action_zuiyi($label)
+def action_zuiyi($label, $idx)
    # ── 从江湖号令退回首页 ──
    click [activity_jianghu].[back] after wait stable @page_refresh least 0.5
    click [school_main].[back] after wait stable @page_refresh least 0.5
@@ -367,20 +367,23 @@ def action_zuiyi($label)
 
       # 点击黄泉酿所在格子，打开道具详情
       click [bag_item_detail].[bag_grid][$zuiyi_r][$zuiyi_c] after wait stable @page_refresh least 0.5
-
-      # 在详情面板中寻找「食用」按钮
-      find [bag_item_detail].[main_area] as $btn by contains "食用"
-      if $btn
-         click $btn after wait @step_interval
-         wait 1
-
-         # 食用后可能弹出确认弹窗，识别到"确认"则点击"取消"关闭
-         scan [general_control].[confirm] as $has_confirm by contains "确认"
-         if $has_confirm
-            click [general_control].[cancel] after wait @step_interval
+      
+      if env("android")
+         # 在详情面板中寻找「食用」按钮
+         find [bag_item_detail].[main_area] as $btn by contains "食用"
+         if $btn
+            click $btn after wait @step_interval
+            wait 1
+            # 食用后可能弹出确认弹窗，识别到"确认"则点击"取消"关闭
+            scan [general_control].[confirm] as $has_confirm by contains "确认"
+            if $has_confirm
+               click [general_control].[cancel] after wait @step_interval
+            end
+         else
+            log "找不到食用按钮"
          end
       else
-         log "找不到食用按钮"
+         press "F" after wait @step_interval
       end
    else
       log "找不到黄泉酿"

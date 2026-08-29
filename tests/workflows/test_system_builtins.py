@@ -7,8 +7,11 @@ confirm / pause / notify 依赖平台原生弹窗，不纳入。
 
 import pytest
 
+from lvjiang.core.input_base import InputBackendKind
 from lvjiang.workflows.builtins import get_function
 from lvjiang.workflows.engine.signals import WorkflowUserError
+from lvjiang.workflows.grammar import parse_text
+from tests.workflows.conftest import make_engine
 
 
 def _fn(name):
@@ -141,3 +144,103 @@ class TestCheckEnv:
         assert _fn("env")(engine) == "android"
         assert _fn("env")(engine, "android") is True
         assert _fn("env")(engine, "desktop") is False
+
+
+class TestInputBackendKind:
+    @pytest.mark.parametrize(
+        ("kind", "send", "post", "device"),
+        [
+            (InputBackendKind.SEND, True, False, False),
+            (InputBackendKind.POST, False, True, False),
+            (InputBackendKind.UNKNOWN, False, False, False),
+            (InputBackendKind.ADB, False, False, True),
+            (InputBackendKind.AGENT, False, False, True),
+            (InputBackendKind.A11Y, False, False, True),
+            (InputBackendKind.SHELL, False, False, True),
+        ],
+    )
+    def test_send_post_device_use_abstract_backend_identity(
+        self, kind, send, post, device,
+    ):
+        """三者互斥且完备：任一后端至多命中一个，设备端全部归 is_device。"""
+        engine = MockEngine()
+        engine._input = type("Backend", (), {"kind": kind})()
+
+        assert _fn("is_send")(engine) is send
+        assert _fn("is_post")(engine) is post
+        assert _fn("is_device")(engine) is device
+        assert sum((send, post, device)) <= 1
+
+    def test_missing_engine_returns_false(self):
+        assert _fn("is_send")(None) is False
+        assert _fn("is_post")(None) is False
+        assert _fn("is_device")(None) is False
+
+    @pytest.mark.parametrize(
+        ("kind", "expected"),
+        [
+            (InputBackendKind.SEND, 1),
+            (InputBackendKind.POST, 0),
+            (InputBackendKind.ADB, 0),
+        ],
+    )
+    def test_is_send_is_safe_as_bare_dsl_condition(self, kind, expected):
+        engine = make_engine()
+        engine._input.kind = kind
+        program = parse_text(
+            "eval $hit = 0\n"
+            "if is_send()\n"
+            "    eval $hit = 1\n"
+            "end\n"
+        )
+
+        engine._exec_body(program.body)
+
+        assert engine.variables["hit"] == expected
+
+
+class TestIsDeviceInDsl:
+    """is_device 作为 DSL 裸条件的行为，以及与 env / is_send 的区别。"""
+
+    @pytest.mark.parametrize(
+        ("kind", "expected"),
+        [
+            (InputBackendKind.ADB, 1),
+            (InputBackendKind.A11Y, 1),
+            (InputBackendKind.SHELL, 1),
+            (InputBackendKind.AGENT, 1),
+            (InputBackendKind.SEND, 0),
+            (InputBackendKind.POST, 0),
+            (InputBackendKind.UNKNOWN, 0),
+        ],
+    )
+    def test_bare_condition(self, kind, expected):
+        engine = make_engine()
+        engine._input.kind = kind
+        program = parse_text(
+            "eval $hit = 0\n"
+            "if is_device()\n"
+            "    eval $hit = 1\n"
+            "end\n"
+        )
+
+        engine._exec_body(program.body)
+
+        assert engine.variables["hit"] == expected
+
+    def test_orthogonal_to_env(self):
+        """env 问的是配置的工作环境，is_device 问的是指令打给谁。
+
+        桌面环境下也可能挂着 ADB 后端（PC 连手机跑），两者不能互相替代。
+        """
+        engine = make_engine(run_env="desktop")
+        engine._input.kind = InputBackendKind.ADB
+        program = parse_text(
+            "eval $env_desktop = env(\"desktop\")\n"
+            "eval $on_device = is_device()\n"
+        )
+
+        engine._exec_body(program.body)
+
+        assert engine.variables["env_desktop"] is True
+        assert engine.variables["on_device"] is True

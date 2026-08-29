@@ -15,7 +15,14 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 59 个内置函数，按功能分为 9 类：
+共 72 个内置函数（含 yysls 插件注册的），下表按功能分为 10 类。
+
+> 表中当前收录 63 个。以下 9 个已注册但尚未收录，待补：
+> `check_env`、`yysls_rich_parse`、`to_role_base_attrs`、`open_base_attr_form`、
+> `write_bag_item`、`write_equipped`、`bag_cursor_init`、`bag_cursor_visit`、
+> `bag_cursor_finish_window`。
+> 核对方式：`list_functions()`（需先导入 `apps.yysls.workflows.builtins`
+> 各模块，否则只看得到 core 的 50 个）。
 
 ### 基础运算（8）
 
@@ -98,6 +105,27 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `save` | `() -> ""` | 强制保存 session 到磁盘 |
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
+
+### 运行环境与后端（4）
+
+三者回答的是**不同层面**的问题，不能互相替代：
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `env` | `() -> str` / `(str) -> bool` | **配置的工作环境**（`desktop` / `android`），由 UI 下拉框决定；回答「该按哪套导航策略走」 |
+| `is_send` | `() -> bool` | 窗口模式且用 SendInput 注入（移动真实光标，需前台） |
+| `is_post` | `() -> bool` | 窗口模式且用 PostMessage 注入（不移动光标，不抢焦点） |
+| `is_device` | `() -> bool` | **指令实际打给设备端**（ADB / Agent / 无障碍 / Shell） |
+
+- `is_send` / `is_post` / `is_device` **互斥**，且设备端后端一律归 `is_device`；后端未知时三者都为假。
+- `env()` 与 `is_device()` 正交：桌面环境下也可能挂着 ADB 后端（PC 连手机跑），此时 `env("desktop")` 与 `is_device()` 同时为真。
+- 需要「只有窗口模式才成立」的前提时用 `is_device()` 取反——按键、光标位置、前台焦点这些概念在设备端不存在。
+
+```
+if is_device()
+    log info "设备端执行，跳过键盘快捷键分支"
+end
+```
 
 ### 图色（7）
 

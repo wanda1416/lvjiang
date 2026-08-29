@@ -306,7 +306,9 @@ def action_dongfang($label, $idx)
    else
        call do_kanbao()
    end
-   
+   # 端游处于动作列表必须 ESC 关闭才能结束，暂时不做判断，除非后续此处大量报错
+   env:"desktop" -> press "ESC" after wait @step_interval
+
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not $claim_reward
       log "末个任务看报完成且无需领奖，留在桌面"
@@ -333,11 +335,6 @@ def do_kanbao()
    call $in_main_page = is_in_main_page()
    if $in_main_page == 0
        click [general_action].[back] after wait @step_interval
-   end
-
-   # 端游处于动作列表必须 ESC 关闭才能结束，暂时不做判断，除非后续此处大量报错
-   if env("desktop")
-      press "ESC" after wait @step_interval
    end
 end
 

@@ -2,12 +2,14 @@
 
 from lark import Token
 
+from ...engine.signals import WorkflowUserError
 from ..ast_nodes import (
     Break,
     CallProc,
     Continue,
     For,
     ForRange,
+    FuncCall,
     Goto,
     If,
     Import,
@@ -129,6 +131,27 @@ class _ModuleControlMixin:
             else:
                 result.append(item)
         return result
+
+    def env_guard_stmt(self, items):
+        """env:"desktop" -> <单行语句> → 现有 If(env(...)) AST。"""
+        line_no = self._line(items)
+        env_name = self._unquote(str(items[0]))
+        if not env_name:
+            raise WorkflowUserError("env 单行守卫的环境名不能为空")
+        body = self._flatten_body(items[1:])
+        if not body:
+            raise WorkflowUserError("env 单行守卫必须包含一条语句")
+        condition = FuncCall(
+            func_name="env",
+            func_args=[Literal(value=env_name)],
+            line_no=line_no,
+        )
+        return If(
+            condition=condition,
+            then_body=body,
+            else_body=[],
+            line_no=line_no,
+        )
 
     def if_stmt(self, items):
         condition = items[0]

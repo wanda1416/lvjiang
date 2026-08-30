@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -14,12 +14,18 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import ResetHostP
 
 from ......i18n import tr
 
+if TYPE_CHECKING:
+    from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
+        TuningRouteStrategy,
+    )
+
 
 class TuningResetter:
     """执行一次受规则约束的调律重置。"""
 
-    def __init__(self, wf: ResetHostPort):
+    def __init__(self, wf: ResetHostPort, routes: TuningRouteStrategy):
         self._wf = wf
+        self._routes = routes
 
     def reset_remaining(self) -> int:
         """读取重置按钮并解析剩余次数。"""
@@ -69,7 +75,7 @@ class TuningResetter:
             reason=why,
             resets=resets_used,
         )
-        wf.click_region(wf.TUNE_SCENE, "reset_tune")
+        self._routes.open_reset_dialog()
         wf.wait_stable("page_refresh")
         check_text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_check"]).get(
             "reset_check", ""
@@ -123,9 +129,9 @@ class TuningResetter:
         wf._emit_operation(
             "reset", "检查通过，正在执行两次重置确认", reason=why, resets=resets_used
         )
-        wf.click_region(wf.TUNE_SCENE, "reset_confirm")
+        self._routes.confirm_reset("reset_confirm")
         wf.wait_delay("secondary_confirm")
-        wf.click_region(wf.TUNE_SCENE, "reset_confirm_2")
+        self._routes.confirm_reset("reset_confirm_2")
         wf._emit_operation("reset", "重置已提交，正在读取重置结果")
         wf.wait_stable("page_refresh")
         wf.click_region(wf.TUNE_SCENE, "close_btn")

@@ -41,6 +41,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RuleValidationError,
     TuningGroupManager,
 )
+from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
@@ -211,6 +212,8 @@ class BaseRuleGroupPage(QWidget):
             self._combo.addItem(g.name, key)
         idx = self._combo.findData(self._group_key)
         self._combo.setCurrentIndex(max(idx, 0))
+        # 规则组名称是页面主选择，不应为追求紧凑而缩到只剩箭头。
+        fit_combo_to_contents(self._combo, minimum=200)
         self._combo.blockSignals(False)
 
         self._table.blockSignals(True)

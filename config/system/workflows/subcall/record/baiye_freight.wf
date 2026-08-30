@@ -1,0 +1,36 @@
+def nav_home_to_freight()
+
+    press "W" down
+    wait 4.471846
+    press "W" up
+    wait 2.152613
+    press "W" down
+    wait 2.311075
+    press "W" up
+    wait 0.703941
+    press "D" down
+    wait 0.104236
+    press "W" down
+    wait 0.191649
+    press "D" up
+    wait 0.418392
+    press "D" down
+    wait 0.397799
+    press "D" up
+    wait 0.695856
+    press "D" down
+    wait 0.241251
+    press "D" up
+    wait 0.719846
+    press "D" down
+    wait 0.129083
+    press "D" up
+    wait 1.685979
+    press "D" down
+    wait 0.167999
+    press "D" up
+    wait 1.743832
+    press "W" up
+    wait 2.513395
+
+end

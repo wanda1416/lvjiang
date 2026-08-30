@@ -246,6 +246,11 @@ class RunControlMixin:
         """
         from ...workflows.discovery import list_exposed_scripts
 
+        # 环境切换只会改变“不支持”提示，不应把用户选中的日常任务重置
+        # 为第一项。清空 combo 前先按稳定 id 留住当前选择。
+        selected_workflow_id = self.workflow_combo.currentData()
+        if selected_workflow_id is None:
+            selected_workflow_id = getattr(self, "_displayed_script_id", None)
         self._workflow_configs: list[dict] = []
         self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
 
@@ -278,11 +283,14 @@ class RunControlMixin:
                 full_display_name,
                 Qt.ItemDataRole.ToolTipRole,
             )
+        selected_index = self.workflow_combo.findData(selected_workflow_id)
+        if selected_index >= 0:
+            self.workflow_combo.setCurrentIndex(selected_index)
         self.workflow_combo.blockSignals(False)
 
         # 初始化当前面板显示的脚本追踪（供日常配置持久化使用）
-        first_cfg = self._workflow_configs[0] if self._workflow_configs else None
-        self._displayed_script_id = first_cfg["id"] if first_cfg else None
+        current_cfg = self._get_selected_flow_config()
+        self._displayed_script_id = current_cfg["id"] if current_cfg else None
 
         # 批量页的脚本候选同源于 list_exposed_scripts()，必须一起刷新，
         # 否则它会一直停留在启动时的快照（见 BatchTab.refresh_scripts）。
@@ -400,6 +408,33 @@ class RunControlMixin:
             logger.info(f"已切换到用户: {name}")
         # 通知插件页面刷新其用户相关状态。
         self.user_changed.emit(self._user_manager.get_active_user_name() or "")
+
+    # ─── 图库空间选择器 ────────────────────────────────────
+
+    def _refresh_reference_space_combo(self):
+        """重扫图库空间，并让主页面下拉跟随当前激活空间。"""
+        self._reference_db.load()
+        combo = self.reference_space_combo
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItems(self._reference_db.get_spaces())
+        combo.setCurrentText(self._reference_db.get_active_space())
+        combo.blockSignals(False)
+
+    def _on_reference_space_changed(self, index: int):
+        """主页面选取图库空间即激活；失败时恢复实际激活项。"""
+        if index < 0:
+            return
+        name = self.reference_space_combo.itemText(index)
+        if not name or name == self._reference_db.get_active_space():
+            return
+        if self._reference_db.set_active_space(name):
+            logger.info(f"已切换到图库: {name}")
+            return
+        self.reference_space_combo.blockSignals(True)
+        self.reference_space_combo.setCurrentText(
+            self._reference_db.get_active_space())
+        self.reference_space_combo.blockSignals(False)
 
     def _on_env_changed(self, index: int):
         """环境选择器切换：持久化 + 刷新工作流下拉框的"环境不支持"提示

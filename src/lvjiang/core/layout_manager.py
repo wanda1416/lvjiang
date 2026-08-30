@@ -535,23 +535,23 @@ class LayoutConfigManager:
 
     布局存储为目录结构：layouts.yaml（名册+canvas）+ layouts/{name}/{scene}.json；
     读写经 ConfigResolver（开发→system，用户→local 影子）；
-    session.json 只记 active_layout。
+    session.json 只在 actives.layout 记录激活布局。
     """
 
     def __init__(self):
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
-        """从 session.json 读 active_layout（经 SessionStore 统一入口）
+        """从 session.json 读 actives.layout（兼容旧 active_layout）
 
         layout_manager 只管理 active_layout，不触碰 session.json 其他节点。
         """
-        return {"active_layout": get_session_store().get_node("active_layout", "")}
+        return {"active_layout": get_session_store().get_active("layout", "")}
 
     def _save_config(self):
-        """保存 active_layout 到 session.json（经 SessionStore，不影响其他节点）"""
-        get_session_store().set_node(
-            "active_layout", self._config.get("active_layout", ""))
+        """保存 actives.layout，并清理旧 active_* 顶层键。"""
+        get_session_store().set_active(
+            "layout", self._config.get("active_layout", ""))
 
     def _reload_config(self):
         """从文件重新加载配置（多实例同步）"""
